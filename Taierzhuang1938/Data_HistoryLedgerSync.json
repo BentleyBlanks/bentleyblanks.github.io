@@ -8,7 +8,7 @@
       "asset": "BeishaheBridge",
       "date": "2026-10-26",
       "scope": "Independent reference-led candidate only; no replacement of the current whitebox bridge or story. Preserve global reviewedAt/repoCommit and unrelated page/source cursors.",
-      "runtimeAsset": "Model_BeishaheBridge.glb",
+      "runtimeAsset": "Model/BeishaheBridge/Data_BeishaheBridgeModules.json",
       "assetContract": "docs/Data_BeishaheBridge.md",
       "spec": "_blender/Data_BeishaheBridgeSpec.json",
       "runtimeSidecar": "Model/Data_BeishaheBridge.json",

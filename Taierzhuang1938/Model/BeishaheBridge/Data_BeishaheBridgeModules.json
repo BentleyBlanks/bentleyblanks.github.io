@@ -1,0 +1,5771 @@
+{
+  "schemaVersion": 1,
+  "version": "2026103102",
+  "appearanceVersion": "2026103101",
+  "units": "m",
+  "axis": "X transverse, Y up, Z along the bridge",
+  "sleeperTopY": 0,
+  "spanPitchM": 20,
+  "gaugeM": 1.435,
+  "sockets": {
+    "Span": {
+      "North": [
+        0,
+        0,
+        -10
+      ],
+      "South": [
+        0,
+        0,
+        10
+      ]
+    },
+    "Pier": {
+      "TrackDatum": [
+        0,
+        0,
+        0
+      ]
+    },
+    "Joint": {
+      "TrackDatum": [
+        0,
+        0,
+        0
+      ]
+    },
+    "Abutment": {
+      "TrackDatum": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "placement": "Span centers are 20 m apart. At each internal boundary place one Pier and one Joint at the same track datum. Use North/South abutment scenes at the endpoints. Do not scale to fit a different span length.",
+  "reference": {
+    "sourceGlbSha256": "2f178f463e46e5eb03951d8c92fc481a1000e9afa3c764cfe9dfac92537e2340",
+    "sourceGlbBytes": 52590464,
+    "contentSha256": "107eb014f3700ec70b36b29e52c1ac9bb76c1cbf977c9949d47b9bc19b852fc6",
+    "sourceGraph": {
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v5.2.40",
+        "version": "2.0"
+      },
+      "extensionsUsed": [
+        "EXT_texture_webp"
+      ],
+      "extensionsRequired": [
+        "EXT_texture_webp"
+      ],
+      "scene": 0,
+      "scenes": [
+        {
+          "extras": {
+            "BlenderMcpTask": "BeishaheBridge"
+          },
+          "name": "Scene",
+          "nodes": [
+            453
+          ]
+        }
+      ],
+      "buffers": [
+        {
+          "byteLength": 52457492
+        }
+      ]
+    },
+    "sourceNodes": [
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 0
+        },
+        "mesh": 0,
+        "name": "Intact_Span01_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 0
+        },
+        "mesh": 1,
+        "name": "Intact_Span01_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 0
+        },
+        "mesh": 2,
+        "name": "Intact_Span01_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 0
+        },
+        "mesh": 3,
+        "name": "Intact_Span01_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 0
+        },
+        "mesh": 4,
+        "name": "Intact_Span01_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 0
+        },
+        "mesh": 5,
+        "name": "Intact_Span01_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 0
+        },
+        "mesh": 6,
+        "name": "Intact_Span01_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 0
+        },
+        "mesh": 7,
+        "name": "Intact_Span01_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 0
+        },
+        "mesh": 8,
+        "name": "Intact_Span01_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 0
+        },
+        "mesh": 9,
+        "name": "Intact_Span01_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 0
+        },
+        "mesh": 10,
+        "name": "Intact_Span01_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 0
+        },
+        "mesh": 11,
+        "name": "Intact_Span01_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 0
+        },
+        "mesh": 12,
+        "name": "Intact_Span01_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 0
+        },
+        "mesh": 13,
+        "name": "Intact_Span01_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 0
+        },
+        "mesh": 14,
+        "name": "Intact_Span01_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 0
+        },
+        "mesh": 15,
+        "name": "Intact_Span01_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 0
+        },
+        "mesh": 16,
+        "name": "Intact_Span01_Trusses"
+      },
+      {
+        "children": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 0
+        },
+        "name": "Intact_Span01",
+        "translation": [
+          0,
+          0,
+          -130
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 1
+        },
+        "mesh": 0,
+        "name": "Intact_Span02_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 1
+        },
+        "mesh": 1,
+        "name": "Intact_Span02_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 1
+        },
+        "mesh": 2,
+        "name": "Intact_Span02_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 1
+        },
+        "mesh": 17,
+        "name": "Intact_Span02_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 1
+        },
+        "mesh": 18,
+        "name": "Intact_Span02_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 1
+        },
+        "mesh": 19,
+        "name": "Intact_Span02_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 1
+        },
+        "mesh": 6,
+        "name": "Intact_Span02_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 1
+        },
+        "mesh": 7,
+        "name": "Intact_Span02_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 1
+        },
+        "mesh": 8,
+        "name": "Intact_Span02_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 1
+        },
+        "mesh": 9,
+        "name": "Intact_Span02_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 1
+        },
+        "mesh": 10,
+        "name": "Intact_Span02_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 1
+        },
+        "mesh": 11,
+        "name": "Intact_Span02_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 1
+        },
+        "mesh": 12,
+        "name": "Intact_Span02_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 1
+        },
+        "mesh": 13,
+        "name": "Intact_Span02_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 1
+        },
+        "mesh": 20,
+        "name": "Intact_Span02_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 1
+        },
+        "mesh": 21,
+        "name": "Intact_Span02_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 1
+        },
+        "mesh": 16,
+        "name": "Intact_Span02_Trusses"
+      },
+      {
+        "children": [
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 1
+        },
+        "name": "Intact_Span02",
+        "translation": [
+          0,
+          0,
+          -110
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 2
+        },
+        "mesh": 0,
+        "name": "Intact_Span03_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 2
+        },
+        "mesh": 1,
+        "name": "Intact_Span03_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 2
+        },
+        "mesh": 2,
+        "name": "Intact_Span03_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 2
+        },
+        "mesh": 22,
+        "name": "Intact_Span03_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 2
+        },
+        "mesh": 23,
+        "name": "Intact_Span03_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 2
+        },
+        "mesh": 24,
+        "name": "Intact_Span03_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 2
+        },
+        "mesh": 6,
+        "name": "Intact_Span03_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 2
+        },
+        "mesh": 7,
+        "name": "Intact_Span03_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 2
+        },
+        "mesh": 8,
+        "name": "Intact_Span03_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 2
+        },
+        "mesh": 9,
+        "name": "Intact_Span03_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 2
+        },
+        "mesh": 10,
+        "name": "Intact_Span03_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 2
+        },
+        "mesh": 11,
+        "name": "Intact_Span03_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 2
+        },
+        "mesh": 12,
+        "name": "Intact_Span03_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 2
+        },
+        "mesh": 13,
+        "name": "Intact_Span03_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 2
+        },
+        "mesh": 25,
+        "name": "Intact_Span03_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 2
+        },
+        "mesh": 26,
+        "name": "Intact_Span03_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 2
+        },
+        "mesh": 16,
+        "name": "Intact_Span03_Trusses"
+      },
+      {
+        "children": [
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 2
+        },
+        "name": "Intact_Span03",
+        "translation": [
+          0,
+          0,
+          -90
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 3
+        },
+        "mesh": 0,
+        "name": "Intact_Span04_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 3
+        },
+        "mesh": 1,
+        "name": "Intact_Span04_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 3
+        },
+        "mesh": 2,
+        "name": "Intact_Span04_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 3
+        },
+        "mesh": 3,
+        "name": "Intact_Span04_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 3
+        },
+        "mesh": 27,
+        "name": "Intact_Span04_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 3
+        },
+        "mesh": 28,
+        "name": "Intact_Span04_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 3
+        },
+        "mesh": 6,
+        "name": "Intact_Span04_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 3
+        },
+        "mesh": 7,
+        "name": "Intact_Span04_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 3
+        },
+        "mesh": 8,
+        "name": "Intact_Span04_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 3
+        },
+        "mesh": 9,
+        "name": "Intact_Span04_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 3
+        },
+        "mesh": 10,
+        "name": "Intact_Span04_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 3
+        },
+        "mesh": 11,
+        "name": "Intact_Span04_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 3
+        },
+        "mesh": 12,
+        "name": "Intact_Span04_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 3
+        },
+        "mesh": 13,
+        "name": "Intact_Span04_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 3
+        },
+        "mesh": 14,
+        "name": "Intact_Span04_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 3
+        },
+        "mesh": 15,
+        "name": "Intact_Span04_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 3
+        },
+        "mesh": 16,
+        "name": "Intact_Span04_Trusses"
+      },
+      {
+        "children": [
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 3
+        },
+        "name": "Intact_Span04",
+        "translation": [
+          0,
+          0,
+          -70
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 4
+        },
+        "mesh": 0,
+        "name": "Intact_Span05_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 4
+        },
+        "mesh": 1,
+        "name": "Intact_Span05_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 4
+        },
+        "mesh": 2,
+        "name": "Intact_Span05_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 4
+        },
+        "mesh": 17,
+        "name": "Intact_Span05_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 4
+        },
+        "mesh": 29,
+        "name": "Intact_Span05_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 4
+        },
+        "mesh": 30,
+        "name": "Intact_Span05_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 4
+        },
+        "mesh": 6,
+        "name": "Intact_Span05_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 4
+        },
+        "mesh": 7,
+        "name": "Intact_Span05_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 4
+        },
+        "mesh": 8,
+        "name": "Intact_Span05_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 4
+        },
+        "mesh": 9,
+        "name": "Intact_Span05_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 4
+        },
+        "mesh": 10,
+        "name": "Intact_Span05_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 4
+        },
+        "mesh": 11,
+        "name": "Intact_Span05_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 4
+        },
+        "mesh": 12,
+        "name": "Intact_Span05_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 4
+        },
+        "mesh": 13,
+        "name": "Intact_Span05_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 4
+        },
+        "mesh": 20,
+        "name": "Intact_Span05_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 4
+        },
+        "mesh": 21,
+        "name": "Intact_Span05_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 4
+        },
+        "mesh": 16,
+        "name": "Intact_Span05_Trusses"
+      },
+      {
+        "children": [
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 4
+        },
+        "name": "Intact_Span05",
+        "translation": [
+          0,
+          0,
+          -50
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 5
+        },
+        "mesh": 0,
+        "name": "Intact_Span06_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 5
+        },
+        "mesh": 1,
+        "name": "Intact_Span06_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 5
+        },
+        "mesh": 2,
+        "name": "Intact_Span06_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 5
+        },
+        "mesh": 22,
+        "name": "Intact_Span06_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 5
+        },
+        "mesh": 31,
+        "name": "Intact_Span06_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 5
+        },
+        "mesh": 32,
+        "name": "Intact_Span06_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 5
+        },
+        "mesh": 6,
+        "name": "Intact_Span06_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 5
+        },
+        "mesh": 7,
+        "name": "Intact_Span06_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 5
+        },
+        "mesh": 8,
+        "name": "Intact_Span06_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 5
+        },
+        "mesh": 9,
+        "name": "Intact_Span06_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 5
+        },
+        "mesh": 10,
+        "name": "Intact_Span06_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 5
+        },
+        "mesh": 11,
+        "name": "Intact_Span06_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 5
+        },
+        "mesh": 12,
+        "name": "Intact_Span06_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 5
+        },
+        "mesh": 13,
+        "name": "Intact_Span06_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 5
+        },
+        "mesh": 25,
+        "name": "Intact_Span06_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 5
+        },
+        "mesh": 26,
+        "name": "Intact_Span06_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 5
+        },
+        "mesh": 16,
+        "name": "Intact_Span06_Trusses"
+      },
+      {
+        "children": [
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 5
+        },
+        "name": "Intact_Span06",
+        "translation": [
+          0,
+          0,
+          -30
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 6
+        },
+        "mesh": 0,
+        "name": "Intact_Span07_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 6
+        },
+        "mesh": 1,
+        "name": "Intact_Span07_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 6
+        },
+        "mesh": 2,
+        "name": "Intact_Span07_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 6
+        },
+        "mesh": 3,
+        "name": "Intact_Span07_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 6
+        },
+        "mesh": 33,
+        "name": "Intact_Span07_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 6
+        },
+        "mesh": 34,
+        "name": "Intact_Span07_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 6
+        },
+        "mesh": 6,
+        "name": "Intact_Span07_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 6
+        },
+        "mesh": 7,
+        "name": "Intact_Span07_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 6
+        },
+        "mesh": 8,
+        "name": "Intact_Span07_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 6
+        },
+        "mesh": 9,
+        "name": "Intact_Span07_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 6
+        },
+        "mesh": 10,
+        "name": "Intact_Span07_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 6
+        },
+        "mesh": 11,
+        "name": "Intact_Span07_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 6
+        },
+        "mesh": 12,
+        "name": "Intact_Span07_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 6
+        },
+        "mesh": 13,
+        "name": "Intact_Span07_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 6
+        },
+        "mesh": 14,
+        "name": "Intact_Span07_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 6
+        },
+        "mesh": 15,
+        "name": "Intact_Span07_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 6
+        },
+        "mesh": 16,
+        "name": "Intact_Span07_Trusses"
+      },
+      {
+        "children": [
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 6
+        },
+        "name": "Intact_Span07",
+        "translation": [
+          0,
+          0,
+          -10
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 7
+        },
+        "mesh": 0,
+        "name": "Intact_Span08_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 7
+        },
+        "mesh": 1,
+        "name": "Intact_Span08_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 7
+        },
+        "mesh": 2,
+        "name": "Intact_Span08_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 7
+        },
+        "mesh": 17,
+        "name": "Intact_Span08_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 7
+        },
+        "mesh": 4,
+        "name": "Intact_Span08_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 7
+        },
+        "mesh": 5,
+        "name": "Intact_Span08_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 7
+        },
+        "mesh": 6,
+        "name": "Intact_Span08_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 7
+        },
+        "mesh": 7,
+        "name": "Intact_Span08_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 7
+        },
+        "mesh": 8,
+        "name": "Intact_Span08_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 7
+        },
+        "mesh": 9,
+        "name": "Intact_Span08_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 7
+        },
+        "mesh": 10,
+        "name": "Intact_Span08_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 7
+        },
+        "mesh": 11,
+        "name": "Intact_Span08_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 7
+        },
+        "mesh": 12,
+        "name": "Intact_Span08_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 7
+        },
+        "mesh": 13,
+        "name": "Intact_Span08_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 7
+        },
+        "mesh": 20,
+        "name": "Intact_Span08_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 7
+        },
+        "mesh": 21,
+        "name": "Intact_Span08_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 7
+        },
+        "mesh": 16,
+        "name": "Intact_Span08_Trusses"
+      },
+      {
+        "children": [
+          126,
+          127,
+          128,
+          129,
+          130,
+          131,
+          132,
+          133,
+          134,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140,
+          141,
+          142
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 7
+        },
+        "name": "Intact_Span08",
+        "translation": [
+          0,
+          0,
+          10
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 8
+        },
+        "mesh": 0,
+        "name": "Intact_Span09_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 8
+        },
+        "mesh": 1,
+        "name": "Intact_Span09_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 8
+        },
+        "mesh": 2,
+        "name": "Intact_Span09_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 8
+        },
+        "mesh": 22,
+        "name": "Intact_Span09_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 8
+        },
+        "mesh": 18,
+        "name": "Intact_Span09_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 8
+        },
+        "mesh": 19,
+        "name": "Intact_Span09_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 8
+        },
+        "mesh": 6,
+        "name": "Intact_Span09_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 8
+        },
+        "mesh": 7,
+        "name": "Intact_Span09_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 8
+        },
+        "mesh": 8,
+        "name": "Intact_Span09_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 8
+        },
+        "mesh": 9,
+        "name": "Intact_Span09_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 8
+        },
+        "mesh": 10,
+        "name": "Intact_Span09_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 8
+        },
+        "mesh": 11,
+        "name": "Intact_Span09_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 8
+        },
+        "mesh": 12,
+        "name": "Intact_Span09_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 8
+        },
+        "mesh": 13,
+        "name": "Intact_Span09_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 8
+        },
+        "mesh": 25,
+        "name": "Intact_Span09_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 8
+        },
+        "mesh": 26,
+        "name": "Intact_Span09_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 8
+        },
+        "mesh": 16,
+        "name": "Intact_Span09_Trusses"
+      },
+      {
+        "children": [
+          144,
+          145,
+          146,
+          147,
+          148,
+          149,
+          150,
+          151,
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 8
+        },
+        "name": "Intact_Span09",
+        "translation": [
+          0,
+          0,
+          30
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 9
+        },
+        "mesh": 0,
+        "name": "Intact_Span10_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 9
+        },
+        "mesh": 1,
+        "name": "Intact_Span10_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 9
+        },
+        "mesh": 2,
+        "name": "Intact_Span10_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 9
+        },
+        "mesh": 3,
+        "name": "Intact_Span10_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 9
+        },
+        "mesh": 23,
+        "name": "Intact_Span10_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 9
+        },
+        "mesh": 24,
+        "name": "Intact_Span10_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 9
+        },
+        "mesh": 6,
+        "name": "Intact_Span10_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 9
+        },
+        "mesh": 7,
+        "name": "Intact_Span10_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 9
+        },
+        "mesh": 8,
+        "name": "Intact_Span10_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 9
+        },
+        "mesh": 9,
+        "name": "Intact_Span10_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 9
+        },
+        "mesh": 10,
+        "name": "Intact_Span10_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 9
+        },
+        "mesh": 11,
+        "name": "Intact_Span10_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 9
+        },
+        "mesh": 12,
+        "name": "Intact_Span10_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 9
+        },
+        "mesh": 13,
+        "name": "Intact_Span10_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 9
+        },
+        "mesh": 14,
+        "name": "Intact_Span10_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 9
+        },
+        "mesh": 15,
+        "name": "Intact_Span10_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 9
+        },
+        "mesh": 16,
+        "name": "Intact_Span10_Trusses"
+      },
+      {
+        "children": [
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          174,
+          175,
+          176,
+          177,
+          178
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 9
+        },
+        "name": "Intact_Span10",
+        "translation": [
+          0,
+          0,
+          50
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 10
+        },
+        "mesh": 0,
+        "name": "Intact_Span11_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 10
+        },
+        "mesh": 1,
+        "name": "Intact_Span11_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 10
+        },
+        "mesh": 2,
+        "name": "Intact_Span11_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 10
+        },
+        "mesh": 17,
+        "name": "Intact_Span11_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 10
+        },
+        "mesh": 27,
+        "name": "Intact_Span11_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 10
+        },
+        "mesh": 28,
+        "name": "Intact_Span11_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 10
+        },
+        "mesh": 6,
+        "name": "Intact_Span11_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 10
+        },
+        "mesh": 7,
+        "name": "Intact_Span11_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 10
+        },
+        "mesh": 8,
+        "name": "Intact_Span11_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 10
+        },
+        "mesh": 9,
+        "name": "Intact_Span11_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 10
+        },
+        "mesh": 10,
+        "name": "Intact_Span11_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 10
+        },
+        "mesh": 11,
+        "name": "Intact_Span11_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 10
+        },
+        "mesh": 12,
+        "name": "Intact_Span11_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 10
+        },
+        "mesh": 13,
+        "name": "Intact_Span11_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 10
+        },
+        "mesh": 20,
+        "name": "Intact_Span11_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 10
+        },
+        "mesh": 21,
+        "name": "Intact_Span11_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 10
+        },
+        "mesh": 16,
+        "name": "Intact_Span11_Trusses"
+      },
+      {
+        "children": [
+          180,
+          181,
+          182,
+          183,
+          184,
+          185,
+          186,
+          187,
+          188,
+          189,
+          190,
+          191,
+          192,
+          193,
+          194,
+          195,
+          196
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 10
+        },
+        "name": "Intact_Span11",
+        "translation": [
+          0,
+          0,
+          70
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 11
+        },
+        "mesh": 0,
+        "name": "Intact_Span12_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 11
+        },
+        "mesh": 1,
+        "name": "Intact_Span12_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 11
+        },
+        "mesh": 2,
+        "name": "Intact_Span12_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 11
+        },
+        "mesh": 22,
+        "name": "Intact_Span12_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 11
+        },
+        "mesh": 29,
+        "name": "Intact_Span12_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 11
+        },
+        "mesh": 30,
+        "name": "Intact_Span12_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 11
+        },
+        "mesh": 6,
+        "name": "Intact_Span12_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 11
+        },
+        "mesh": 7,
+        "name": "Intact_Span12_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 11
+        },
+        "mesh": 8,
+        "name": "Intact_Span12_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 11
+        },
+        "mesh": 9,
+        "name": "Intact_Span12_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 11
+        },
+        "mesh": 10,
+        "name": "Intact_Span12_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 11
+        },
+        "mesh": 11,
+        "name": "Intact_Span12_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 11
+        },
+        "mesh": 12,
+        "name": "Intact_Span12_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 11
+        },
+        "mesh": 13,
+        "name": "Intact_Span12_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 11
+        },
+        "mesh": 25,
+        "name": "Intact_Span12_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 11
+        },
+        "mesh": 26,
+        "name": "Intact_Span12_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 11
+        },
+        "mesh": 16,
+        "name": "Intact_Span12_Trusses"
+      },
+      {
+        "children": [
+          198,
+          199,
+          200,
+          201,
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          210,
+          211,
+          212,
+          213,
+          214
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 11
+        },
+        "name": "Intact_Span12",
+        "translation": [
+          0,
+          0,
+          90
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 12
+        },
+        "mesh": 0,
+        "name": "Intact_Span13_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 12
+        },
+        "mesh": 1,
+        "name": "Intact_Span13_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 12
+        },
+        "mesh": 2,
+        "name": "Intact_Span13_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 12
+        },
+        "mesh": 3,
+        "name": "Intact_Span13_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 12
+        },
+        "mesh": 31,
+        "name": "Intact_Span13_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 12
+        },
+        "mesh": 32,
+        "name": "Intact_Span13_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 12
+        },
+        "mesh": 6,
+        "name": "Intact_Span13_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 12
+        },
+        "mesh": 7,
+        "name": "Intact_Span13_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 12
+        },
+        "mesh": 8,
+        "name": "Intact_Span13_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 12
+        },
+        "mesh": 9,
+        "name": "Intact_Span13_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 12
+        },
+        "mesh": 10,
+        "name": "Intact_Span13_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 12
+        },
+        "mesh": 11,
+        "name": "Intact_Span13_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 12
+        },
+        "mesh": 12,
+        "name": "Intact_Span13_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 12
+        },
+        "mesh": 13,
+        "name": "Intact_Span13_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 12
+        },
+        "mesh": 14,
+        "name": "Intact_Span13_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 12
+        },
+        "mesh": 15,
+        "name": "Intact_Span13_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 12
+        },
+        "mesh": 16,
+        "name": "Intact_Span13_Trusses"
+      },
+      {
+        "children": [
+          216,
+          217,
+          218,
+          219,
+          220,
+          221,
+          222,
+          223,
+          224,
+          225,
+          226,
+          227,
+          228,
+          229,
+          230,
+          231,
+          232
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 12
+        },
+        "name": "Intact_Span13",
+        "translation": [
+          0,
+          0,
+          110
+        ]
+      },
+      {
+        "extras": {
+          "role": "BearingAnchors",
+          "spanIndex": 13
+        },
+        "mesh": 0,
+        "name": "Intact_Span14_BearingAnchors"
+      },
+      {
+        "extras": {
+          "role": "BearingCastings",
+          "spanIndex": 13
+        },
+        "mesh": 1,
+        "name": "Intact_Span14_BearingCastings"
+      },
+      {
+        "extras": {
+          "role": "Bearings",
+          "spanIndex": 13
+        },
+        "mesh": 2,
+        "name": "Intact_Span14_Bearings"
+      },
+      {
+        "extras": {
+          "role": "DeckBearers",
+          "spanIndex": 13
+        },
+        "mesh": 17,
+        "name": "Intact_Span14_DeckBearers"
+      },
+      {
+        "extras": {
+          "role": "DeckFasteners",
+          "spanIndex": 13
+        },
+        "mesh": 33,
+        "name": "Intact_Span14_DeckFasteners"
+      },
+      {
+        "extras": {
+          "role": "DeckPlanks",
+          "spanIndex": 13
+        },
+        "mesh": 34,
+        "name": "Intact_Span14_DeckPlanks"
+      },
+      {
+        "extras": {
+          "role": "GuardFasteners",
+          "spanIndex": 13
+        },
+        "mesh": 6,
+        "name": "Intact_Span14_GuardFasteners"
+      },
+      {
+        "extras": {
+          "role": "GuardTimbers",
+          "spanIndex": 13
+        },
+        "mesh": 7,
+        "name": "Intact_Span14_GuardTimbers"
+      },
+      {
+        "extras": {
+          "role": "RailEast",
+          "spanIndex": 13
+        },
+        "mesh": 8,
+        "name": "Intact_Span14_RailEast"
+      },
+      {
+        "extras": {
+          "role": "RailMidFasteners",
+          "spanIndex": 13
+        },
+        "mesh": 9,
+        "name": "Intact_Span14_RailMidFasteners"
+      },
+      {
+        "extras": {
+          "role": "RailMidSplice",
+          "spanIndex": 13
+        },
+        "mesh": 10,
+        "name": "Intact_Span14_RailMidSplice"
+      },
+      {
+        "extras": {
+          "role": "RailWear",
+          "spanIndex": 13
+        },
+        "mesh": 11,
+        "name": "Intact_Span14_RailWear"
+      },
+      {
+        "extras": {
+          "role": "RailWest",
+          "spanIndex": 13
+        },
+        "mesh": 12,
+        "name": "Intact_Span14_RailWest"
+      },
+      {
+        "extras": {
+          "role": "Rivets",
+          "spanIndex": 13
+        },
+        "mesh": 13,
+        "name": "Intact_Span14_Rivets"
+      },
+      {
+        "extras": {
+          "role": "SleeperEnds",
+          "spanIndex": 13
+        },
+        "mesh": 20,
+        "name": "Intact_Span14_SleeperEnds"
+      },
+      {
+        "extras": {
+          "role": "Sleepers",
+          "spanIndex": 13
+        },
+        "mesh": 21,
+        "name": "Intact_Span14_Sleepers"
+      },
+      {
+        "extras": {
+          "role": "Trusses",
+          "spanIndex": 13
+        },
+        "mesh": 16,
+        "name": "Intact_Span14_Trusses"
+      },
+      {
+        "children": [
+          234,
+          235,
+          236,
+          237,
+          238,
+          239,
+          240,
+          241,
+          242,
+          243,
+          244,
+          245,
+          246,
+          247,
+          248,
+          249,
+          250
+        ],
+        "extras": {
+          "role": "span",
+          "spanIndex": 13
+        },
+        "name": "Intact_Span14",
+        "translation": [
+          0,
+          0,
+          130
+        ]
+      },
+      {
+        "extras": {
+          "role": "abutment"
+        },
+        "mesh": 35,
+        "name": "Shared_AbutmentNorth",
+        "rotation": [
+          0,
+          -1,
+          0,
+          4.371138828673793e-8
+        ],
+        "translation": [
+          0,
+          0,
+          -140
+        ]
+      },
+      {
+        "extras": {
+          "role": "abutment"
+        },
+        "mesh": 36,
+        "name": "Shared_AbutmentSouth",
+        "translation": [
+          0,
+          0,
+          140
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 1
+        },
+        "mesh": 37,
+        "name": "Shared_Cap01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 2
+        },
+        "mesh": 38,
+        "name": "Shared_Cap02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 3
+        },
+        "mesh": 39,
+        "name": "Shared_Cap03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 4
+        },
+        "mesh": 37,
+        "name": "Shared_Cap04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 5
+        },
+        "mesh": 38,
+        "name": "Shared_Cap05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 6
+        },
+        "mesh": 39,
+        "name": "Shared_Cap06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 7
+        },
+        "mesh": 37,
+        "name": "Shared_Cap07"
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 8
+        },
+        "mesh": 38,
+        "name": "Shared_Cap08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 9
+        },
+        "mesh": 39,
+        "name": "Shared_Cap09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 10
+        },
+        "mesh": 37,
+        "name": "Shared_Cap10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 11
+        },
+        "mesh": 38,
+        "name": "Shared_Cap11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 12
+        },
+        "mesh": 39,
+        "name": "Shared_Cap12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "Cap",
+          "supportIndex": 13
+        },
+        "mesh": 37,
+        "name": "Shared_Cap13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 1
+        },
+        "mesh": 40,
+        "name": "Shared_DeckJoint01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 2
+        },
+        "mesh": 41,
+        "name": "Shared_DeckJoint02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 3
+        },
+        "mesh": 42,
+        "name": "Shared_DeckJoint03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 4
+        },
+        "mesh": 40,
+        "name": "Shared_DeckJoint04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 5
+        },
+        "mesh": 41,
+        "name": "Shared_DeckJoint05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 6
+        },
+        "mesh": 42,
+        "name": "Shared_DeckJoint06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 7
+        },
+        "mesh": 40,
+        "name": "Shared_DeckJoint07"
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 8
+        },
+        "mesh": 41,
+        "name": "Shared_DeckJoint08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 9
+        },
+        "mesh": 42,
+        "name": "Shared_DeckJoint09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 10
+        },
+        "mesh": 40,
+        "name": "Shared_DeckJoint10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 11
+        },
+        "mesh": 41,
+        "name": "Shared_DeckJoint11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 12
+        },
+        "mesh": 42,
+        "name": "Shared_DeckJoint12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJoint",
+          "supportIndex": 13
+        },
+        "mesh": 40,
+        "name": "Shared_DeckJoint13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 1
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 2
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 3
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 4
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 5
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 6
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 7
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts07"
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 8
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 9
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 10
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 11
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 12
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointBolts",
+          "supportIndex": 13
+        },
+        "mesh": 43,
+        "name": "Shared_DeckJointBolts13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 1
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 2
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 3
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 4
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 5
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 6
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 7
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners07"
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 8
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 9
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 10
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 11
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 12
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointFasteners",
+          "supportIndex": 13
+        },
+        "mesh": 44,
+        "name": "Shared_DeckJointFasteners13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 1
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 2
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 3
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 4
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 5
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 6
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 7
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice07"
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 8
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 9
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 10
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 11
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 12
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSplice",
+          "supportIndex": 13
+        },
+        "mesh": 45,
+        "name": "Shared_DeckJointSplice13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 1
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 2
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 3
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 4
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 5
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 6
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 7
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport07"
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 8
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 9
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 10
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 11
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 12
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "DeckJointSupport",
+          "supportIndex": 13
+        },
+        "mesh": 46,
+        "name": "Shared_DeckJointSupport13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 1
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 2
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 3
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 4
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 5
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 6
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 7
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint07"
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 8
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 9
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 10
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 11
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 12
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJoint",
+          "supportIndex": 13
+        },
+        "mesh": 47,
+        "name": "Shared_GuardJoint13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 1
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 2
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 3
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 4
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 5
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 6
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 7
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts07"
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 8
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 9
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 10
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 11
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 12
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointBolts",
+          "supportIndex": 13
+        },
+        "mesh": 48,
+        "name": "Shared_GuardJointBolts13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 1
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 2
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 3
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 4
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 5
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 6
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 7
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice07"
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 8
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 9
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 10
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 11
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 12
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "GuardJointSplice",
+          "supportIndex": 13
+        },
+        "mesh": 49,
+        "name": "Shared_GuardJointSplice13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 1,
+          "maintenanceSeed": 4237
+        },
+        "mesh": 50,
+        "name": "Shared_MasonryOldWash01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 2,
+          "maintenanceSeed": 6536
+        },
+        "mesh": 51,
+        "name": "Shared_MasonryOldWash02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 3,
+          "maintenanceSeed": 8835
+        },
+        "mesh": 52,
+        "name": "Shared_MasonryOldWash03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 4,
+          "maintenanceSeed": 11134
+        },
+        "mesh": 53,
+        "name": "Shared_MasonryOldWash04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 5,
+          "maintenanceSeed": 13433
+        },
+        "mesh": 54,
+        "name": "Shared_MasonryOldWash05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 6,
+          "maintenanceSeed": 15732
+        },
+        "mesh": 55,
+        "name": "Shared_MasonryOldWash06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 7,
+          "maintenanceSeed": 18031
+        },
+        "mesh": 56,
+        "name": "Shared_MasonryOldWash07"
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 8,
+          "maintenanceSeed": 20330
+        },
+        "mesh": 57,
+        "name": "Shared_MasonryOldWash08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 9,
+          "maintenanceSeed": 22629
+        },
+        "mesh": 58,
+        "name": "Shared_MasonryOldWash09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 10,
+          "maintenanceSeed": 24928
+        },
+        "mesh": 59,
+        "name": "Shared_MasonryOldWash10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 11,
+          "maintenanceSeed": 27227
+        },
+        "mesh": 60,
+        "name": "Shared_MasonryOldWash11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 12,
+          "maintenanceSeed": 29526
+        },
+        "mesh": 61,
+        "name": "Shared_MasonryOldWash12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "supportIndex": 13,
+          "maintenanceSeed": 31825
+        },
+        "mesh": 62,
+        "name": "Shared_MasonryOldWash13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "abutment": "North",
+          "maintenanceSeed": 185888
+        },
+        "mesh": 63,
+        "name": "Shared_MasonryOldWashNorth",
+        "rotation": [
+          0,
+          -1,
+          0,
+          4.371138828673793e-8
+        ],
+        "translation": [
+          0,
+          0,
+          -140
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryOldWash",
+          "abutment": "South",
+          "maintenanceSeed": 201726
+        },
+        "mesh": 64,
+        "name": "Shared_MasonryOldWashSouth",
+        "translation": [
+          0,
+          0,
+          140
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 1,
+          "maintenanceSeed": 4237
+        },
+        "mesh": 65,
+        "name": "Shared_MasonryRewash01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 2,
+          "maintenanceSeed": 6536
+        },
+        "mesh": 66,
+        "name": "Shared_MasonryRewash02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 3,
+          "maintenanceSeed": 8835
+        },
+        "mesh": 67,
+        "name": "Shared_MasonryRewash03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 4,
+          "maintenanceSeed": 11134
+        },
+        "mesh": 68,
+        "name": "Shared_MasonryRewash04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 5,
+          "maintenanceSeed": 13433
+        },
+        "mesh": 69,
+        "name": "Shared_MasonryRewash05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 6,
+          "maintenanceSeed": 15732
+        },
+        "mesh": 70,
+        "name": "Shared_MasonryRewash06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 7,
+          "maintenanceSeed": 18031
+        },
+        "mesh": 71,
+        "name": "Shared_MasonryRewash07"
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 8,
+          "maintenanceSeed": 20330
+        },
+        "mesh": 72,
+        "name": "Shared_MasonryRewash08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 9,
+          "maintenanceSeed": 22629
+        },
+        "mesh": 73,
+        "name": "Shared_MasonryRewash09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 10,
+          "maintenanceSeed": 24928
+        },
+        "mesh": 74,
+        "name": "Shared_MasonryRewash10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 11,
+          "maintenanceSeed": 27227
+        },
+        "mesh": 75,
+        "name": "Shared_MasonryRewash11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 12,
+          "maintenanceSeed": 29526
+        },
+        "mesh": 76,
+        "name": "Shared_MasonryRewash12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "supportIndex": 13,
+          "maintenanceSeed": 31825
+        },
+        "mesh": 77,
+        "name": "Shared_MasonryRewash13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "abutment": "North",
+          "maintenanceSeed": 185888
+        },
+        "mesh": 78,
+        "name": "Shared_MasonryRewashNorth",
+        "rotation": [
+          0,
+          -1,
+          0,
+          4.371138828673793e-8
+        ],
+        "translation": [
+          0,
+          0,
+          -140
+        ]
+      },
+      {
+        "extras": {
+          "role": "MasonryRewash",
+          "abutment": "South",
+          "maintenanceSeed": 201726
+        },
+        "mesh": 79,
+        "name": "Shared_MasonryRewashSouth",
+        "translation": [
+          0,
+          0,
+          140
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 1
+        },
+        "mesh": 80,
+        "name": "Shared_Pier01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 2
+        },
+        "mesh": 81,
+        "name": "Shared_Pier02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 3
+        },
+        "mesh": 82,
+        "name": "Shared_Pier03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 4
+        },
+        "mesh": 80,
+        "name": "Shared_Pier04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 5
+        },
+        "mesh": 81,
+        "name": "Shared_Pier05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 6
+        },
+        "mesh": 82,
+        "name": "Shared_Pier06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 7
+        },
+        "mesh": 80,
+        "name": "Shared_Pier07"
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 8
+        },
+        "mesh": 81,
+        "name": "Shared_Pier08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 9
+        },
+        "mesh": 82,
+        "name": "Shared_Pier09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 10
+        },
+        "mesh": 80,
+        "name": "Shared_Pier10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 11
+        },
+        "mesh": 81,
+        "name": "Shared_Pier11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 12
+        },
+        "mesh": 82,
+        "name": "Shared_Pier12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "Pier",
+          "supportIndex": 13
+        },
+        "mesh": 80,
+        "name": "Shared_Pier13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 1
+        },
+        "mesh": 83,
+        "name": "Shared_PierDamp01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 2
+        },
+        "mesh": 84,
+        "name": "Shared_PierDamp02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 3
+        },
+        "mesh": 85,
+        "name": "Shared_PierDamp03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 4
+        },
+        "mesh": 83,
+        "name": "Shared_PierDamp04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 5
+        },
+        "mesh": 84,
+        "name": "Shared_PierDamp05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 6
+        },
+        "mesh": 85,
+        "name": "Shared_PierDamp06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 7
+        },
+        "mesh": 83,
+        "name": "Shared_PierDamp07"
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 8
+        },
+        "mesh": 84,
+        "name": "Shared_PierDamp08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 9
+        },
+        "mesh": 85,
+        "name": "Shared_PierDamp09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 10
+        },
+        "mesh": 83,
+        "name": "Shared_PierDamp10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 11
+        },
+        "mesh": 84,
+        "name": "Shared_PierDamp11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 12
+        },
+        "mesh": 85,
+        "name": "Shared_PierDamp12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "PierDamp",
+          "supportIndex": 13
+        },
+        "mesh": 83,
+        "name": "Shared_PierDamp13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 1
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 2
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 3
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 4
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 5
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 6
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 7
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners07"
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 8
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 9
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 10
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 11
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 12
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointFasteners",
+          "supportIndex": 13
+        },
+        "mesh": 86,
+        "name": "Shared_RailJointFasteners13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 1
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice01",
+        "translation": [
+          0,
+          0,
+          -120
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 2
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice02",
+        "translation": [
+          0,
+          0,
+          -100
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 3
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice03",
+        "translation": [
+          0,
+          0,
+          -80
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 4
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice04",
+        "translation": [
+          0,
+          0,
+          -60
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 5
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice05",
+        "translation": [
+          0,
+          0,
+          -40
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 6
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice06",
+        "translation": [
+          0,
+          0,
+          -20
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 7
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice07"
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 8
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice08",
+        "translation": [
+          0,
+          0,
+          20
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 9
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice09",
+        "translation": [
+          0,
+          0,
+          40
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 10
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice10",
+        "translation": [
+          0,
+          0,
+          60
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 11
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice11",
+        "translation": [
+          0,
+          0,
+          80
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 12
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice12",
+        "translation": [
+          0,
+          0,
+          100
+        ]
+      },
+      {
+        "extras": {
+          "role": "RailJointSplice",
+          "supportIndex": 13
+        },
+        "mesh": 87,
+        "name": "Shared_RailJointSplice13",
+        "translation": [
+          0,
+          0,
+          120
+        ]
+      },
+      {
+        "children": [
+          17,
+          35,
+          53,
+          71,
+          89,
+          107,
+          125,
+          143,
+          161,
+          179,
+          197,
+          215,
+          233,
+          251,
+          252,
+          253,
+          254,
+          255,
+          256,
+          257,
+          258,
+          259,
+          260,
+          261,
+          262,
+          263,
+          264,
+          265,
+          266,
+          267,
+          268,
+          269,
+          270,
+          271,
+          272,
+          273,
+          274,
+          275,
+          276,
+          277,
+          278,
+          279,
+          280,
+          281,
+          282,
+          283,
+          284,
+          285,
+          286,
+          287,
+          288,
+          289,
+          290,
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297,
+          298,
+          299,
+          300,
+          301,
+          302,
+          303,
+          304,
+          305,
+          306,
+          307,
+          308,
+          309,
+          310,
+          311,
+          312,
+          313,
+          314,
+          315,
+          316,
+          317,
+          318,
+          319,
+          320,
+          321,
+          322,
+          323,
+          324,
+          325,
+          326,
+          327,
+          328,
+          329,
+          330,
+          331,
+          332,
+          333,
+          334,
+          335,
+          336,
+          337,
+          338,
+          339,
+          340,
+          341,
+          342,
+          343,
+          344,
+          345,
+          346,
+          347,
+          348,
+          349,
+          350,
+          351,
+          352,
+          353,
+          354,
+          355,
+          356,
+          357,
+          358,
+          359,
+          360,
+          361,
+          362,
+          363,
+          364,
+          365,
+          366,
+          367,
+          368,
+          369,
+          370,
+          371,
+          372,
+          373,
+          374,
+          375,
+          376,
+          377,
+          378,
+          379,
+          380,
+          381,
+          382,
+          383,
+          384,
+          385,
+          386,
+          387,
+          388,
+          389,
+          390,
+          391,
+          392,
+          393,
+          394,
+          395,
+          396,
+          397,
+          398,
+          399,
+          400,
+          401,
+          402,
+          403,
+          404,
+          405,
+          406,
+          407,
+          408,
+          409,
+          410,
+          411,
+          412,
+          413,
+          414,
+          415,
+          416,
+          417,
+          418,
+          419,
+          420,
+          421,
+          422,
+          423,
+          424,
+          425,
+          426,
+          427,
+          428,
+          429,
+          430,
+          431,
+          432,
+          433,
+          434,
+          435,
+          436,
+          437,
+          438,
+          439,
+          440,
+          441,
+          442,
+          443,
+          444,
+          445,
+          446,
+          447,
+          448,
+          449,
+          450,
+          451,
+          452
+        ],
+        "extras": {
+          "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
+          "assetVersion": "2026103101"
+        },
+        "name": "BeishaheBridge"
+      }
+    ]
+  },
+  "modules": {
+    "Span": {
+      "file": "Model_BeishaheBridgeSpan.glb",
+      "bytes": 18335812,
+      "sha256": "cacea887dceb093cee3fa04e27d890dbadf7266d813846b771e923af46638c90",
+      "defaultScene": 0,
+      "scenes": [
+        {
+          "index": 0,
+          "name": "BeishaheSpan01",
+          "sourceCenterZ": -130,
+          "sourceNodes": [
+            17
+          ]
+        },
+        {
+          "index": 1,
+          "name": "BeishaheSpan02",
+          "sourceCenterZ": -110,
+          "sourceNodes": [
+            35
+          ]
+        },
+        {
+          "index": 2,
+          "name": "BeishaheSpan03",
+          "sourceCenterZ": -90,
+          "sourceNodes": [
+            53
+          ]
+        },
+        {
+          "index": 3,
+          "name": "BeishaheSpan04",
+          "sourceCenterZ": -70,
+          "sourceNodes": [
+            71
+          ]
+        },
+        {
+          "index": 4,
+          "name": "BeishaheSpan05",
+          "sourceCenterZ": -50,
+          "sourceNodes": [
+            89
+          ]
+        },
+        {
+          "index": 5,
+          "name": "BeishaheSpan06",
+          "sourceCenterZ": -30,
+          "sourceNodes": [
+            107
+          ]
+        },
+        {
+          "index": 6,
+          "name": "BeishaheSpan07",
+          "sourceCenterZ": -10,
+          "sourceNodes": [
+            125
+          ]
+        },
+        {
+          "index": 7,
+          "name": "BeishaheSpan08",
+          "sourceCenterZ": 10,
+          "sourceNodes": [
+            143
+          ]
+        },
+        {
+          "index": 8,
+          "name": "BeishaheSpan09",
+          "sourceCenterZ": 30,
+          "sourceNodes": [
+            161
+          ]
+        },
+        {
+          "index": 9,
+          "name": "BeishaheSpan10",
+          "sourceCenterZ": 50,
+          "sourceNodes": [
+            179
+          ]
+        },
+        {
+          "index": 10,
+          "name": "BeishaheSpan11",
+          "sourceCenterZ": 70,
+          "sourceNodes": [
+            197
+          ]
+        },
+        {
+          "index": 11,
+          "name": "BeishaheSpan12",
+          "sourceCenterZ": 90,
+          "sourceNodes": [
+            215
+          ]
+        },
+        {
+          "index": 12,
+          "name": "BeishaheSpan13",
+          "sourceCenterZ": 110,
+          "sourceNodes": [
+            233
+          ]
+        },
+        {
+          "index": 13,
+          "name": "BeishaheSpan14",
+          "sourceCenterZ": 130,
+          "sourceNodes": [
+            251
+          ]
+        }
+      ]
+    },
+    "Pier": {
+      "file": "Model_BeishaheBridgePier.glb",
+      "bytes": 23562460,
+      "sha256": "bf04a35b78f786ac0cd4252e4534c11dd433d749947437a10dc68c3cdcd03cda",
+      "defaultScene": 0,
+      "scenes": [
+        {
+          "index": 0,
+          "name": "BeishahePier01",
+          "sourceCenterZ": -120,
+          "sourceNodes": [
+            254,
+            371,
+            386,
+            401,
+            414
+          ]
+        },
+        {
+          "index": 1,
+          "name": "BeishahePier02",
+          "sourceCenterZ": -100,
+          "sourceNodes": [
+            255,
+            372,
+            387,
+            402,
+            415
+          ]
+        },
+        {
+          "index": 2,
+          "name": "BeishahePier03",
+          "sourceCenterZ": -80,
+          "sourceNodes": [
+            256,
+            373,
+            388,
+            403,
+            416
+          ]
+        },
+        {
+          "index": 3,
+          "name": "BeishahePier04",
+          "sourceCenterZ": -60,
+          "sourceNodes": [
+            257,
+            374,
+            389,
+            404,
+            417
+          ]
+        },
+        {
+          "index": 4,
+          "name": "BeishahePier05",
+          "sourceCenterZ": -40,
+          "sourceNodes": [
+            258,
+            375,
+            390,
+            405,
+            418
+          ]
+        },
+        {
+          "index": 5,
+          "name": "BeishahePier06",
+          "sourceCenterZ": -20,
+          "sourceNodes": [
+            259,
+            376,
+            391,
+            406,
+            419
+          ]
+        },
+        {
+          "index": 6,
+          "name": "BeishahePier07",
+          "sourceCenterZ": 0,
+          "sourceNodes": [
+            260,
+            377,
+            392,
+            407,
+            420
+          ]
+        },
+        {
+          "index": 7,
+          "name": "BeishahePier08",
+          "sourceCenterZ": 20,
+          "sourceNodes": [
+            261,
+            378,
+            393,
+            408,
+            421
+          ]
+        },
+        {
+          "index": 8,
+          "name": "BeishahePier09",
+          "sourceCenterZ": 40,
+          "sourceNodes": [
+            262,
+            379,
+            394,
+            409,
+            422
+          ]
+        },
+        {
+          "index": 9,
+          "name": "BeishahePier10",
+          "sourceCenterZ": 60,
+          "sourceNodes": [
+            263,
+            380,
+            395,
+            410,
+            423
+          ]
+        },
+        {
+          "index": 10,
+          "name": "BeishahePier11",
+          "sourceCenterZ": 80,
+          "sourceNodes": [
+            264,
+            381,
+            396,
+            411,
+            424
+          ]
+        },
+        {
+          "index": 11,
+          "name": "BeishahePier12",
+          "sourceCenterZ": 100,
+          "sourceNodes": [
+            265,
+            382,
+            397,
+            412,
+            425
+          ]
+        },
+        {
+          "index": 12,
+          "name": "BeishahePier13",
+          "sourceCenterZ": 120,
+          "sourceNodes": [
+            266,
+            383,
+            398,
+            413,
+            426
+          ]
+        }
+      ]
+    },
+    "Joint": {
+      "file": "Model_BeishaheBridgeJoint.glb",
+      "bytes": 2346384,
+      "sha256": "dd0d2e29932e4b71e86f8015bb722f1041d33178e865e3dd1889d8c37305ab6f",
+      "defaultScene": 0,
+      "scenes": [
+        {
+          "index": 0,
+          "name": "BeishaheJoint01",
+          "sourceCenterZ": -120,
+          "sourceNodes": [
+            267,
+            280,
+            293,
+            306,
+            319,
+            332,
+            345,
+            358,
+            427,
+            440
+          ]
+        },
+        {
+          "index": 1,
+          "name": "BeishaheJoint02",
+          "sourceCenterZ": -100,
+          "sourceNodes": [
+            268,
+            281,
+            294,
+            307,
+            320,
+            333,
+            346,
+            359,
+            428,
+            441
+          ]
+        },
+        {
+          "index": 2,
+          "name": "BeishaheJoint03",
+          "sourceCenterZ": -80,
+          "sourceNodes": [
+            269,
+            282,
+            295,
+            308,
+            321,
+            334,
+            347,
+            360,
+            429,
+            442
+          ]
+        },
+        {
+          "index": 3,
+          "name": "BeishaheJoint04",
+          "sourceCenterZ": -60,
+          "sourceNodes": [
+            270,
+            283,
+            296,
+            309,
+            322,
+            335,
+            348,
+            361,
+            430,
+            443
+          ]
+        },
+        {
+          "index": 4,
+          "name": "BeishaheJoint05",
+          "sourceCenterZ": -40,
+          "sourceNodes": [
+            271,
+            284,
+            297,
+            310,
+            323,
+            336,
+            349,
+            362,
+            431,
+            444
+          ]
+        },
+        {
+          "index": 5,
+          "name": "BeishaheJoint06",
+          "sourceCenterZ": -20,
+          "sourceNodes": [
+            272,
+            285,
+            298,
+            311,
+            324,
+            337,
+            350,
+            363,
+            432,
+            445
+          ]
+        },
+        {
+          "index": 6,
+          "name": "BeishaheJoint07",
+          "sourceCenterZ": 0,
+          "sourceNodes": [
+            273,
+            286,
+            299,
+            312,
+            325,
+            338,
+            351,
+            364,
+            433,
+            446
+          ]
+        },
+        {
+          "index": 7,
+          "name": "BeishaheJoint08",
+          "sourceCenterZ": 20,
+          "sourceNodes": [
+            274,
+            287,
+            300,
+            313,
+            326,
+            339,
+            352,
+            365,
+            434,
+            447
+          ]
+        },
+        {
+          "index": 8,
+          "name": "BeishaheJoint09",
+          "sourceCenterZ": 40,
+          "sourceNodes": [
+            275,
+            288,
+            301,
+            314,
+            327,
+            340,
+            353,
+            366,
+            435,
+            448
+          ]
+        },
+        {
+          "index": 9,
+          "name": "BeishaheJoint10",
+          "sourceCenterZ": 60,
+          "sourceNodes": [
+            276,
+            289,
+            302,
+            315,
+            328,
+            341,
+            354,
+            367,
+            436,
+            449
+          ]
+        },
+        {
+          "index": 10,
+          "name": "BeishaheJoint11",
+          "sourceCenterZ": 80,
+          "sourceNodes": [
+            277,
+            290,
+            303,
+            316,
+            329,
+            342,
+            355,
+            368,
+            437,
+            450
+          ]
+        },
+        {
+          "index": 11,
+          "name": "BeishaheJoint12",
+          "sourceCenterZ": 100,
+          "sourceNodes": [
+            278,
+            291,
+            304,
+            317,
+            330,
+            343,
+            356,
+            369,
+            438,
+            451
+          ]
+        },
+        {
+          "index": 12,
+          "name": "BeishaheJoint13",
+          "sourceCenterZ": 120,
+          "sourceNodes": [
+            279,
+            292,
+            305,
+            318,
+            331,
+            344,
+            357,
+            370,
+            439,
+            452
+          ]
+        }
+      ]
+    },
+    "Abutment": {
+      "file": "Model_BeishaheBridgeAbutment.glb",
+      "bytes": 11846428,
+      "sha256": "2bfb9edc67e83d37de4e6e141ca7113563d89f0d7dd47937838a590efecad2b9",
+      "defaultScene": 0,
+      "scenes": [
+        {
+          "index": 0,
+          "name": "BeishaheAbutment01",
+          "sourceCenterZ": -140,
+          "sourceNodes": [
+            252,
+            384,
+            399
+          ]
+        },
+        {
+          "index": 1,
+          "name": "BeishaheAbutment02",
+          "sourceCenterZ": 140,
+          "sourceNodes": [
+            253,
+            385,
+            400
+          ]
+        }
+      ]
+    }
+  }
+}

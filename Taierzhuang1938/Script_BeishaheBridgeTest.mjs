@@ -7,16 +7,18 @@ import {fileURLToPath} from 'node:url';
 import sharp from 'sharp';
 import * as THREE from './vendor/three/build/three.module.js';
 import {LoadGlb,ReadAccessor} from './_import/Script_LugouGlbPose.mjs';
+import {AssembleExportedModules} from './_import/Script_BeishaheBridgeModules.mjs';
+import {CreateBeishaheBridgeKit} from './Script_BeishaheBridgeKit.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const file=path.join(here,'Model/Model_BeishaheBridge.glb');
+const file=path.join(here,'Model/BeishaheBridge/Data_BeishaheBridgeModules.json');
 const specPath=path.join(here,'_blender/Data_BeishaheBridgeSpec.json');
 const dataPath=path.join(here,'Model/Data_BeishaheBridge.json');
 let checks=0;
 function Check(ok,label,detail=''){checks++;if(!ok)throw Error(`${label}${detail?`: ${typeof detail==='string'?detail:JSON.stringify(detail)}`:''}`);}
 const Hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 for(const name of [file,specPath,dataPath])Check(fs.existsSync(name),'Required bridge source/asset exists',path.relative(here,name));
-const bytes=fs.readFileSync(file),specBytes=fs.readFileSync(specPath);
+const {bytes,manifest}=AssembleExportedModules(file),specBytes=fs.readFileSync(specPath);
 const spec=JSON.parse(specBytes),data=JSON.parse(fs.readFileSync(dataPath,'utf8'));
 Check(bytes.readUInt32LE(0)===0x46546c67&&bytes.readUInt32LE(4)===2&&bytes.readUInt32LE(8)===bytes.length,'Valid complete GLB 2.0 container');
 const glb=LoadGlb(bytes),g=glb.json;
@@ -25,6 +27,41 @@ Check(!g.animations?.length&&!g.skins?.length,'Only the authorized intact static
 const objects=(g.nodes||[]).map(n=>{const o=new THREE.Object3D();o.name=n.name||'';o.userData=n.extras||{};if(n.matrix)new THREE.Matrix4().fromArray(n.matrix).decompose(o.position,o.quaternion,o.scale);else{if(n.translation)o.position.fromArray(n.translation);if(n.rotation)o.quaternion.fromArray(n.rotation);if(n.scale)o.scale.fromArray(n.scale);}return o;});
 (g.nodes||[]).forEach((n,i)=>(n.children||[]).forEach(c=>objects[i].add(objects[c])));
 const root=new THREE.Group();for(const i of g.scenes[g.scene||0].nodes)root.add(objects[i]);root.updateMatrixWorld(true);
+// Check the delivered scene roots, not just the reconstructed source graph.
+// This catches a splitter that accidentally leaves a span at z=130, doubles a
+// support, drops the connecting deck, or hides variants in the default scene.
+Check(!fs.existsSync(path.join(here,'Model/Model_BeishaheBridge.glb')),'The repository delivers modules instead of a monolithic bridge');
+const moduleAssets={},moduleMeshNodes=new Set();
+for(const [kind,count] of Object.entries({Span:14,Pier:13,Joint:13,Abutment:2})){
+  const entry=manifest.modules[kind],moduleBytes=fs.readFileSync(path.join(path.dirname(file),entry.file)),part=LoadGlb(moduleBytes),pg=part.json,meta=pg.asset.extras;
+  Check(Hash(moduleBytes)===entry.sha256&&moduleBytes.length===entry.bytes,'Manifest hashes the actual delivered module',kind);
+  Check(pg.scenes.length===count&&pg.scene===entry.defaultScene&&pg.scenes.every(s=>s.nodes.length===1),'Each alternative scene exposes exactly one local component',kind);
+  Check(pg.buffers.length===1&&!pg.buffers[0].uri&&pg.images.every(im=>im.bufferView!=null),'Every module is self-contained with embedded PBR images',kind);
+  Check(!pg.cameras?.length&&!pg.animations?.length&&!pg.skins?.length,'Module contains only static authorized geometry',kind);
+  const nodes=pg.nodes.map((n,index)=>{const o=new THREE.Object3D();o.name=n.name;o.userData={...n.extras,sourceNodeIndex:meta.sourceIndices.nodes[index]};if(n.matrix)new THREE.Matrix4().fromArray(n.matrix).decompose(o.position,o.quaternion,o.scale);else{if(n.translation)o.position.fromArray(n.translation);if(n.rotation)o.quaternion.fromArray(n.rotation);if(n.scale)o.scale.fromArray(n.scale);}return o;});
+  pg.nodes.forEach((n,i)=>(n.children||[]).forEach(c=>nodes[i].add(nodes[c])));
+  const scenes=pg.scenes.map((scene,variant)=>{
+    const group=new THREE.Group();group.name=scene.name;group.add(nodes[scene.nodes[0]]);group.updateMatrixWorld(true);
+    Check(group.children[0].position.length()<1e-8&&group.children[0].scale.toArray().every(v=>Math.abs(v-1)<1e-8),'Component pivot is track datum at local origin with unit scale',{kind,variant});
+    const ids=[];function Walk(id){ids.push(id);for(const child of pg.nodes[id].children||[])Walk(child);}Walk(scene.nodes[0]);
+    let meshCount=0;for(const id of ids){if(pg.nodes[id].mesh==null)continue;meshCount++;const sourceIndex=meta.sourceIndices.nodes[id];moduleMeshNodes.add(sourceIndex);const expected=new THREE.Matrix4().makeTranslation(0,0,-entry.scenes[variant].sourceCenterZ).multiply(objects[sourceIndex].matrixWorld);const error=Math.max(...expected.elements.map((v,i)=>Math.abs(v-nodes[id].matrixWorld.elements[i])));Check(error<.000001,'Delivered component preserves the reviewed node placement relative to its own pivot',{kind,variant,node:pg.nodes[id].name,error});}
+    Check(meshCount==={Span:17,Pier:5,Joint:10,Abutment:3}[kind],'A component scene has its complete role set without neighboring spans',{kind,variant,meshCount});
+    return group;
+  });
+  moduleAssets[kind]={scenes,scene:scenes[pg.scene]};
+}
+Check(moduleMeshNodes.size===g.nodes.filter(n=>n.mesh!=null).length,'Every reviewed mesh node is retained in the module kit exactly once');
+const kit=CreateBeishaheBridgeKit(manifest,moduleAssets),assembled=kit.Assemble(14);assembled.updateMatrixWorld(true);
+let assembledMeshes=0;assembled.traverse(o=>{const id=o.userData.sourceNodeIndex;if(id==null||g.nodes[id].mesh==null)return;assembledMeshes++;const error=Math.max(...o.matrixWorld.elements.map((v,i)=>Math.abs(v-objects[id].matrixWorld.elements[i])));Check(error<.000001,'The gameplay assembly helper restores every reviewed source placement',{name:o.name,error});});
+Check(assembledMeshes===moduleMeshNodes.size,'Fourteen modular spans restore the complete reviewed bridge');
+for(const spanCount of [1,2,3]){
+  const result=kit.Assemble(spanCount),pieces=result.children;
+  for(const [kind,count] of Object.entries({Span:spanCount,Pier:spanCount-1,Joint:spanCount-1,Abutment:2}))Check(pieces.filter(o=>o.userData.moduleKind===kind).length===count,'Variable-length assembly places each support and joint once',{spanCount,kind});
+  const spans=pieces.filter(o=>o.userData.moduleKind==='Span');for(let i=1;i<spans.length;i++){const end=new THREE.Vector3(...manifest.sockets.Span.South).add(spans[i-1].position),start=new THREE.Vector3(...manifest.sockets.Span.North).add(spans[i].position);Check(end.distanceTo(start)<1e-8,'Adjacent 20 m span sockets coincide',{spanCount,i});}
+  const transform=new THREE.Group();transform.position.set(48,7,-34);transform.rotation.y=.73;transform.add(result);transform.updateMatrixWorld(true);
+  for(let i=1;i<spans.length;i++){const a=spans[i-1].localToWorld(new THREE.Vector3(...manifest.sockets.Span.South)),b=spans[i].localToWorld(new THREE.Vector3(...manifest.sockets.Span.North));Check(a.distanceTo(b)<1e-8,'Sockets still coincide after game-world translation and yaw',{spanCount,i});}
+}
+Check(data.delivery.format==='ModularGLB'&&data.delivery.version===manifest.version&&Object.keys(data.delivery.modules).length===4,'Sidecar inventories four modular asset families');
 const geometryCache=new Map(),parts=[],bounds=new THREE.Box3();
 let triangles=0,nonFinite=0,normalError=0,uvMissing=0,degenerate=0;
 function PrimitiveGeometry(primitive){
@@ -165,7 +202,7 @@ Check(baseImages.size===8&&normalImages.size===8&&ormImages.size===8,'Truss and 
 Check(spec.schemaVersion===1&&data.schemaVersion===1&&data.version===spec.version,'Spec and sidecar schema/version agree');
 Check(spec.units==='m'&&spec.lengthM===280&&spec.spanCount===14&&spec.spanPitchM===20&&spec.gaugeM===1.435,'Authorized metric design: fourteen 20 m spans and standard inner rail gauge');
 Check(JSON.stringify(data.spec)===JSON.stringify(spec),'Shipped sidecar embeds the current source spec');
-Check(data.glbSha256===Hash(bytes)&&data.glbBytes===bytes.length&&data.triangles===triangles,'Sidecar identifies these actual GLB bytes and rendered triangles');
+Check(data.glbSha256===manifest.reference.sourceGlbSha256&&data.glbBytes===manifest.reference.sourceGlbBytes&&data.triangles===triangles&&data.delivery?.contentSha256===manifest.reference.contentSha256,'Shipped modules exactly preserve the reviewed source content and rendered triangles');
 // The bridge is a local asset. Independently derive the optional modern
 // placement from its two mapped bridge axes using WGS84 ECEF -> local ENU,
 // rather than interpreting the asset's local X/Z as geographic east/south.

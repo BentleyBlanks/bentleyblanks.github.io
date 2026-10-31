@@ -14,6 +14,7 @@ import math
 import os
 import random
 import runpy
+import subprocess
 from pathlib import Path
 from mathutils import Vector
 
@@ -1447,10 +1448,15 @@ def Rebuild():
         for child in obj.children:
             SelectChildren(child)
     SelectChildren(root)
-    glb = MODEL / "Model_BeishaheBridge.glb"
+    # Full assembly is a local review/source export only. Ship reusable modules.
+    (SOURCE / "Exports").mkdir(exist_ok=True)
+    glb = SOURCE / "Exports" / "Model_BeishaheBridge.glb"
     bpy.ops.export_scene.gltf(filepath=str(glb), export_format="GLB", use_selection=True, export_yup=True,
                              export_texcoords=True, export_normals=True, export_materials="EXPORT", export_extras=True,
                              export_animations=False, export_image_format="AUTO")
+    moduleDir = MODEL / "BeishaheBridge"
+    subprocess.run(["node", str(PROJECT / "_import" / "Script_BeishaheBridgeModules.mjs"), str(glb), str(moduleDir)], check=True)
+    moduleManifest = json.loads((moduleDir / "Data_BeishaheBridgeModules.json").read_text(encoding="utf-8"))
     bpy.context.view_layer.update()
     points = [obj.matrix_world @ Vector(v) for obj in root.children_recursive if obj.type == "MESH" for v in obj.bound_box]
     game = [(p.x, p.z, -p.y) for p in points]
@@ -1528,6 +1534,9 @@ def Rebuild():
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
                            ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp", "BeishaheMasonryWash"]
                            for channel in ["Base", "Normal", "Orm"]]}
+    data["delivery"] = {"format": "ModularGLB", "version": moduleManifest["version"], "manifest": "BeishaheBridge/Data_BeishaheBridgeModules.json",
+                        "wholeBridgeExport": "LocalSourceAndReviewOnly", "contentSha256": moduleManifest["reference"]["contentSha256"],
+                        "modules": {kind: {key: entry[key] for key in ("file", "bytes", "sha256")} for kind, entry in moduleManifest["modules"].items()}}
     (MODEL / "Data_BeishaheBridge.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     # Source-only review scene. Camera sees genuine geometry and PBR, no generated model image.
     scene.world.color = (0.25, 0.28, 0.32)

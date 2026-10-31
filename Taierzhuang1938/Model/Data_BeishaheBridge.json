@@ -1150,5 +1150,34 @@
     "Texture_BeishaheMasonryWashBase.webp",
     "Texture_BeishaheMasonryWashNormal.webp",
     "Texture_BeishaheMasonryWashOrm.webp"
-  ]
+  ],
+  "delivery": {
+    "format": "ModularGLB",
+    "version": "2026103102",
+    "manifest": "BeishaheBridge/Data_BeishaheBridgeModules.json",
+    "wholeBridgeExport": "LocalSourceAndReviewOnly",
+    "contentSha256": "107eb014f3700ec70b36b29e52c1ac9bb76c1cbf977c9949d47b9bc19b852fc6",
+    "modules": {
+      "Span": {
+        "file": "Model_BeishaheBridgeSpan.glb",
+        "bytes": 18335812,
+        "sha256": "cacea887dceb093cee3fa04e27d890dbadf7266d813846b771e923af46638c90"
+      },
+      "Pier": {
+        "file": "Model_BeishaheBridgePier.glb",
+        "bytes": 23562460,
+        "sha256": "bf04a35b78f786ac0cd4252e4534c11dd433d749947437a10dc68c3cdcd03cda"
+      },
+      "Joint": {
+        "file": "Model_BeishaheBridgeJoint.glb",
+        "bytes": 2346384,
+        "sha256": "dd0d2e29932e4b71e86f8015bb722f1041d33178e865e3dd1889d8c37305ab6f"
+      },
+      "Abutment": {
+        "file": "Model_BeishaheBridgeAbutment.glb",
+        "bytes": 11846428,
+        "sha256": "2bfb9edc67e83d37de4e6e141ca7113563d89f0d7dd47937838a590efecad2b9"
+      }
+    }
+  }
 }
