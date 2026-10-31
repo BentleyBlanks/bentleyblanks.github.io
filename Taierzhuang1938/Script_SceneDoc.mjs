@@ -9,7 +9,7 @@
 //
 // 纯模块：零 three、零 DOM，node 与浏览器共用。
 
-import { SCENE_ASSETS, SCENE_MATERIALS } from "./Data_SceneAssets.mjs";
+import { SCENE_ASSETS, SCENE_MATERIALS, SCENE_LIST, SceneInfo, SceneObjectSemantic } from "./Data_SceneAssets.mjs";
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 
 export const SCENE_SCHEMA = "tengxian-scene/1";
@@ -27,8 +27,10 @@ const IsBounds = (b) => IsObject(b) && ["minX", "maxX", "minZ", "maxZ"].every(k 
 const NonEmpty = (value) => typeof value === "string" && value.length > 0;
 const DEG = Math.PI / 180;
 
-/** 现有的场景（场景编辑器的下拉、本机存盘口 /__scene/* 只认这张表）。 */
-export const SCENE_IDS = Object.freeze(["FirstLevelWhitebox"]);
+/** 现有的场景（场景编辑器的下拉、本机存盘口 /__scene/* 只认这张表；清单在 Data_SceneAssets.SCENE_LIST）。 */
+export const SCENE_IDS = Object.freeze(SCENE_LIST.map((scene) => scene.id));
+/** 场景的样子：whitebox / formal（清单里没有的当 whitebox）。 */
+export function SceneStyle(sceneId) { return SceneInfo(sceneId)?.style || "whitebox"; }
 
 /** 场景文件同目录下的文件路径：场景 id → 相对项目根的目录。 */
 export function SceneDir(sceneId) { return `Scenes/${sceneId}`; }
@@ -50,8 +52,9 @@ function ObjectIssues(obj, at, errors, ids) {
   if (!Array.isArray(obj.pos) || obj.pos.length !== 3 || !Finite(obj.pos[0]) || !Finite(obj.pos[2])
     || !(obj.pos[1] === null || Finite(obj.pos[1]))) errors.push(`${at}.pos 要是 [x, y, z]，y 可以是 null（落地）`);
   if (obj.yawDeg !== undefined && !Finite(obj.yawDeg)) errors.push(`${at}.yawDeg 要是有限数字`);
-  if (asset.sized) {
-    if (!Array.isArray(obj.size) || obj.size.length !== 3 || !obj.size.every(v => Finite(v) && v > 0)) errors.push(`${at}.size 要是三个正数 [w, h, d]`);
+  if (asset.sized && !(Array.isArray(obj.size) && obj.size.length === 3 && obj.size.every(v => Finite(v) && v > 0))) errors.push(`${at}.size 要是三个正数 [w, h, d]`);
+  // 体块必须写材质（样子看它）；道具、树的样子是模型，材质可不写
+  if (asset.kind === "box") {
     if (!SCENE_MATERIALS[obj.material]) errors.push(`${at}.material 不在材质目录：${JSON.stringify(obj.material)}`);
   } else if (obj.material !== undefined && !SCENE_MATERIALS[obj.material]) errors.push(`${at}.material 不在材质目录：${JSON.stringify(obj.material)}`);
   for (const k of ["solid", "visual", "noClimb", "standOn"]) if (obj[k] !== undefined && typeof obj[k] !== "boolean") errors.push(`${at}.${k} 要是 true / false`);
@@ -183,14 +186,24 @@ function LineTouches(region, points, pad = 0) {
   return maxX + pad >= region.minX && minX - pad <= region.maxX && maxZ + pad >= region.minZ && minZ - pad <= region.maxZ;
 }
 
-/** 物件 → 体块（白盒编辑器 / FirstLevelWhiteboxField 吃的形状）。 */
+/**
+ * 物件 → 体块（白盒编辑器 / FirstLevelWhiteboxField 吃的形状）。
+ * Look/* 材质带 look（PBR 外观名）；道具带 propModel（外部道具 id，盒子只留碰撞）；树带 sceneTree（白盒编辑器种树）。
+ */
 export function SceneObjectToBlock(obj) {
   const [w, h, d] = obj.size;
+  const asset = SCENE_ASSETS[obj.asset];
+  const look = SCENE_MATERIALS[obj.material]?.look;
   return {
     id: obj.id, x: obj.pos[0], z: obj.pos[2], w, d, h,
     ry: Finite(obj.yawDeg) ? obj.yawDeg * DEG : 0,
-    semantic: SCENE_MATERIALS[obj.material].semantic,
+    semantic: SceneObjectSemantic(obj),
     solid: obj.solid !== false,
+    ...(look ? { look } : {}),
+    ...(asset?.kind === "prop" ? { propModel: asset.model } : {}),
+    // 道具铺几件（params.tile = [nx, ny, nz]，同现行第一关替换表的 tile：一只长盒子里排几个模型）
+    ...(asset?.kind === "prop" && Array.isArray(obj.params?.tile) ? { propTile: [...obj.params.tile] } : {}),
+    ...(asset?.kind === "tree" ? { sceneTree: true } : {}),
     ...(obj.pos[1] !== null ? { y: obj.pos[1] + h / 2 } : {}),
     ...(obj.visual === false ? { visual: false } : {}),
     ...(obj.tag ? { tag: obj.tag } : {}),
@@ -231,7 +244,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const shapes = [];
   for (const obj of scene.objects) {
     if (obj.layer === "backdrop") { shapes.push(BackdropShape(obj)); continue; }
-    if (SCENE_ASSETS[obj.asset]?.kind !== "box" || !Inside(objectArea, obj.pos[0], obj.pos[2])) continue;
+    if (!["box", "prop", "tree"].includes(SCENE_ASSETS[obj.asset]?.kind) || !Inside(objectArea, obj.pos[0], obj.pos[2])) continue;
     if ((obj.hideOn && prior.has(obj.hideOn)) || (obj.showOn && future.has(obj.showOn))) continue;
     // 两个都写 = 先出现、后消失（如 0610 塌墙的土堆被清走）
     const block = SceneObjectToBlock(obj);
@@ -252,6 +265,8 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     schema: BLOCKOUT_SCENE_SCHEMA,
     level,
     source: { generator: `${SceneDir(scene.id)}/${SceneFileName(scene.id)}`, notes: `场景 ${scene.id} 按范围取的一块` },
+    scene: scene.id,
+    style: SceneStyle(scene.id),
     bounds: area,
     spawn: spawn ? { ...spawn } : { ...scene.spawn },
     terrain: { kind: "heightmap", ...crop.terrain, encoding: "int16-cm-base64", heights: crop.heights },

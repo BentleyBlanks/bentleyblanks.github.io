@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { SCENE_ASSETS, SCENE_MATERIALS, WhiteboxMaterialFor } from "./Data_SceneAssets.mjs";
+import { WHITEBOX_LOOKS } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import {
   ValidateScene, DecodeSceneHeights, EncodeSceneHeights, CropSceneHeights, SceneObjectToBlock, BlockoutDocFromScene,
 } from "./Script_SceneDoc.mjs";
@@ -24,7 +25,10 @@ const v = ValidateScene(scene);
 Check(v.ok, `FirstLevelWhitebox 过校验：${v.errors.slice(0, 5).join("；")}`);
 Check(heights.length === (scene.terrain.cols + 1) * (scene.terrain.rows + 1), "高度图格点数 = (cols+1)×(rows+1)");
 Check(scene.objects.every(o => SCENE_ASSETS[o.asset]) && scene.objects.every(o => o.material === undefined || SCENE_MATERIALS[o.material]), "资产 / 材质编号都在目录里");
-Check(Object.values(SCENE_MATERIALS).every(m => WhiteboxMaterialFor(m.semantic) && SCENE_MATERIALS[WhiteboxMaterialFor(m.semantic)] === m), "语义 ↔ 白盒材质一一对应");
+Check(Object.entries(SCENE_MATERIALS).filter(([id]) => id.startsWith("Whitebox/")).every(([id, m]) => WhiteboxMaterialFor(m.semantic) === id), "语义 ↔ 白盒材质一一对应");
+// 正式场景的外观材质（Look/*，2026-11-01）：语义都有白盒对应（换回白盒有去处），外观在现行第一关的外观表里（水与隐形墙没有外观）
+Check(Object.entries(SCENE_MATERIALS).filter(([id]) => id.startsWith("Look/"))
+  .every(([, m]) => WhiteboxMaterialFor(m.semantic) && (m.look === null || WHITEBOX_LOOKS[m.look])), "Look/* 的语义有白盒对应、外观在 WHITEBOX_LOOKS 里");
 Check(fs.readFileSync(SceneFilePath("FirstLevelWhitebox"), "utf8").indexOf("\r") < 0, "场景 JSON 是 LF");
 for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]) {
   Check(!fs.existsSync(path.join(PROJECT_DIR, "Blockout", `${level}.scene.json`)), `旧的 Blockout/${level}.scene.json 不该再出现（以 Scenes/FirstLevelWhitebox 为准）`);

@@ -180,6 +180,8 @@ export class BlockoutPlay {
   Start({ from = null, to = null, settings = null } = {}) {
     const editor = this.editor;
     if (!editor.doc || editor.rebuilding || editor.switching) return false;
+    // 试玩跑正式场景（§17，2026-11-01）：此刻建的是白盒就先整片重建成正式场景，建好再开打
+    if (editor.NeedsSceneVariant?.("play")) { this.StartAfterScene({ from, to, settings }); return true; }
     if (this.run) this.Finish("abort", { summary: false });
     this.CloseSummary({ restore: false });
     if (editor.previz?.playing) editor.previz.Stop({ restore: false });
@@ -206,6 +208,16 @@ export class BlockoutPlay {
     this.hud.hidden = false;
     this.EnterStep(0);
     return true;
+  }
+
+  /** 先换成正式场景（整片重建），再从头走一遍 Start。 */
+  async StartAfterScene(options) {
+    this.ClosePanel();
+    this.CloseSummary({ restore: false });
+    const ok = await this.editor.UseSceneVariant("play");
+    if (!ok) { this.editor.ui.Toast("正式场景没建起来，试玩没开", "warn"); return false; }
+    await this.Want();
+    return this.Start(options);
   }
 
   /** 进第 cursor 步（范围里的第几个）。 */
@@ -375,12 +387,16 @@ export class BlockoutPlay {
     if (editor.doc && index >= 0) editor.GoTo(index, { animate: false });
   }
 
-  CloseSummary({ restore = true } = {}) {
+  /** 关小结；restore = 回到编辑：换回白盒场景（编辑、预演跑白盒），摆回失败的那一步或最后一步。 */
+  async CloseSummary({ restore = true } = {}) {
     const summary = this.summary;
     if (!summary) return;
     this.summary = null;
     this.summaryEl.hidden = true;
-    if (restore) this.Restore(summary.failedIndex >= 0 ? summary.failedIndex : summary.indices[summary.indices.length - 1]);
+    if (!restore) return;
+    const index = summary.failedIndex >= 0 ? summary.failedIndex : summary.indices[summary.indices.length - 1];
+    if (this.editor.NeedsSceneVariant?.("edit")) await this.editor.UseSceneVariant("edit");
+    this.Restore(index);
   }
 
   // -------------------------------------------------------------------------

@@ -181,11 +181,14 @@ export class SceneEditModel {
   }
 
   /** 从资产目录加一个新物件。 */
-  Add(assetId, { pos, material, size = [1, 1, 1], group, layer, params } = {}) {
+  Add(assetId, { pos, material, size = null, group, layer, params } = {}) {
     const asset = SCENE_ASSETS[assetId];
     if (!asset) throw new Error(`资产目录里没有 ${assetId}`);
     const obj = { id: assetId.split("/").pop(), asset: assetId };
-    if (material || asset.sized) obj.material = material && SCENE_MATERIALS[material] ? material : Object.keys(SCENE_MATERIALS)[0];
+    // 体块必须有材质（没给就取目录第一个）；道具、树的样子是模型，给了才写
+    if (asset.kind === "box") obj.material = material && SCENE_MATERIALS[material] ? material : Object.keys(SCENE_MATERIALS)[0];
+    else if (material && SCENE_MATERIALS[material]) obj.material = material;
+    size = size || asset.size || [1, 1, 1];
     obj.pos = [Fix(pos?.[0] ?? 0, P.posM), pos?.[1] == null ? null : Fix(pos[1], P.posM), Fix(pos?.[2] ?? 0, P.posM)];
     if (asset.sized) obj.size = size.map(v => Math.max(P.minSizeM, Fix(v, P.sizeM)));
     if (asset.layer || layer) obj.layer = asset.layer || layer;

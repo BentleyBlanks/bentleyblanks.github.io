@@ -34,7 +34,7 @@ import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { WHITEBOX_RAILWAY_LOOKS, PlanRoofShells } from "./Data_FirstLevelWhiteboxMaterials.mjs";
-import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing } from "./Script_FirstLevelPropDressing.mjs";
+import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing, AddScenePropModels } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
 import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
 import { SetInteriorVolumes } from "./Script_InteriorSkyOcclusion.mjs";
@@ -265,6 +265,12 @@ export class FirstLevelWhiteboxField {
     if(this.layout.fortifications)this.breakableTrees=await BreakableTrees.Load(this);
     // 道具换模型 + 植被图集（docs/Data_FirstLevelVegetationProps.md）。
     if(this.layout.fortifications)[this.propDressing,this.vegetationAtlas]=await Promise.all([LoadFirstLevelPropDressing(this.library),LoadFirstLevelVegetationAtlas(this.library)]);
+    // 正式场景的道具（场景里资产是 Prop/* 的物件，docs/Data_Scene.md §8）：只下场景用到的那几件。
+    if(this.layout.sceneProps?.length&&this.library&&typeof document!=="undefined")
+      this.scenePropModels=await LoadFirstLevelPropDressing(this.library,{ids:this.layout.sceneProps.map(entry=>entry.asset)});
+    // 正式场景也长现行第一关的枯草丛（按场景的路与沟撒，Data_FirstLevelVegetation.SceneDressingContext）
+    if(this.layout.style==="formal"&&!this.vegetationAtlas&&this.library&&typeof document!=="undefined")
+      this.vegetationAtlas=await LoadFirstLevelVegetationAtlas(this.library);
   }
 
   BuildWhiteBoxes() {
@@ -376,6 +382,9 @@ export class FirstLevelWhiteboxField {
     this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality,trenchCrownHeightAt):null;
     trenchCrownHeightAt = null;
     for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
+    // 正式场景的道具模型：盒子不画、碰撞照旧由原块登记（同上面的替换表）。
+    this.scenePropStats=this.scenePropModels?AddScenePropModels(sink,this.layout,this.scenePropModels,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library,{scene:this.scene,meshes:this.meshes}):null;
+    for(const id of this.scenePropStats?.replaced||[])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink(),airWallSink=this.debugAirWalls?new BuildSink():null;
     // 外观合批（Script_FirstLevelWhiteboxLooks）：静态体块按外观分桶，带风化属性自己合并；

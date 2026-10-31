@@ -14,16 +14,19 @@ import { MISSION_LAYOUT, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.
 import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { BlockoutDocFromScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
+import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
 
 // 2026-10-31：第一关新剧本三段（01–05 / 06–10 / 11–18）共用一个场景 Scenes/FirstLevelWhitebox（docs/Data_Scene.md），
 // 每段按原来的场地范围取一块来建场；后面的段落把前面段落出现过的信号都当已经发生（塌了的还塌着、开了的门还开着）。
 const FIRST_LEVEL_WHITEBOX_SCENE = "./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json";
+// 2026-11-01：第一关的正式场景（照白盒布局复制、换现行第一关的外观与道具模型，之后单独打磨）。编辑与预演跑白盒，试玩跑它（§17）。
+const FIRST_LEVEL_FORMAL_SCENE = "./Scenes/FirstLevel/Scene_FirstLevel.json";
 // Stage0105Done：01–05 演完。那圈「玩家出不了沟」的隐形墙（KeepIn_*）随它消失，后两段不挡人；01–05 里它不会发生（futureSignals）
 const STAGE_0105_DONE = "Stage0105Done";
 const SIGNALS_0105 = Object.freeze(["DugoutCollapsed", "PitShelled", "TankDisabled", STAGE_0105_DONE]);
 const SIGNALS_0610 = Object.freeze(["CartDeparted", "CellarBlast", "SideGateOpen", "EastGateBurst", "MgSilenced", "NorthYardGatesBroken", "BarrageHit", "LaneWallCollapse"]);
 function WhiteboxSceneSlice(region, spawn, priorSignals, heightTint, objectMarginM = 1, futureSignals = []) {
-  return Object.freeze({ kind: "scene", url: FIRST_LEVEL_WHITEBOX_SCENE, region: Object.freeze(region), priorSignals: Object.freeze([...priorSignals]),
+  return Object.freeze({ kind: "scene", url: FIRST_LEVEL_WHITEBOX_SCENE, playUrl: FIRST_LEVEL_FORMAL_SCENE, region: Object.freeze(region), priorSignals: Object.freeze([...priorSignals]),
     futureSignals: Object.freeze([...futureSignals]), ...(heightTint !== undefined ? { heightTint } : {}), objectMarginM,
     placeholder: Object.freeze({ bounds: region, spawn }) });
 }
@@ -252,6 +255,11 @@ function GroundedBlock(block, groundAt) {
     ...(block.noClimb === true ? { noClimb: true } : {}),
     // 2026-10-26：架空桥面上的走道（BlockStandSampler 对它不限 1 m 台阶，演员站得上去；§5.6）
     ...(block.standOn === true ? { standOn: true } : {}),
+    // 2026-11-01：正式场景（docs/Data_Scene.md §8）的外观、道具模型（铺几件）、树
+    ...(block.look ? { look: block.look } : {}),
+    ...(block.propModel ? { propModel: block.propModel } : {}),
+    ...(block.propTile ? { propTile: [...block.propTile] } : {}),
+    ...(block.sceneTree ? { sceneTree: true } : {}),
   };
 }
 
@@ -314,7 +322,7 @@ function LineDistance(px, pz, pts) {
  * 把 paint 烘成栅格。→ null（没有可画的项）或 { cellM, minX, minZ, cols, rows, C: Float32Array(rgb 预乘), A: Float32Array, Blend(x, z, rgb) }。
  * Blend 把 (x,z) 处的涂色按覆盖度混进 rgb（sRGB 0–1，就地改），返回覆盖度 A（0 = 没涂）。
  */
-export function BuildGroundPaint(items, bounds = null) {
+export function BuildGroundPaint(items, bounds = null, { cellM: startCellM = BLOCKOUT_PAINT.cellM, maxCells = BLOCKOUT_PAINT.maxCells } = {}) {
   if (!Array.isArray(items) || !items.length) return null;
   const list = items.map((item) => {
     const pts = item.poly || item.line;
@@ -323,15 +331,15 @@ export function BuildGroundPaint(items, bounds = null) {
     const pad = halfW + feather;
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
-    return { pts, line: !!item.line, halfW, feather, strength: Number.isFinite(item.strength) ? item.strength : 1, rgb: HexRgb(item.color),
+    return { pts, line: !!item.line, halfW, feather, strength: Number.isFinite(item.strength) ? item.strength : 1, rgb: item.rgb || HexRgb(item.color),
       minX: minX - pad, maxX: maxX + pad, minZ: minZ - pad, maxZ: maxZ + pad };
   });
   let minX = Math.min(...list.map((p) => p.minX)), maxX = Math.max(...list.map((p) => p.maxX));
   let minZ = Math.min(...list.map((p) => p.minZ)), maxZ = Math.max(...list.map((p) => p.maxZ));
   if (bounds) { minX = Math.max(minX, bounds.minX); maxX = Math.min(maxX, bounds.maxX); minZ = Math.max(minZ, bounds.minZ); maxZ = Math.min(maxZ, bounds.maxZ); }
   if (!(maxX > minX && maxZ > minZ)) return null;
-  let cellM = BLOCKOUT_PAINT.cellM;
-  while (((maxX - minX) / cellM + 1) * ((maxZ - minZ) / cellM + 1) > BLOCKOUT_PAINT.maxCells) cellM *= 2;
+  let cellM = startCellM;
+  while (((maxX - minX) / cellM + 1) * ((maxZ - minZ) / cellM + 1) > maxCells) cellM *= 2;
   const cols = Math.ceil((maxX - minX) / cellM) + 1, rows = Math.ceil((maxZ - minZ) / cellM) + 1;
   const C = new Float32Array(cols * rows * 3), A = new Float32Array(cols * rows);
   for (const p of list) {
@@ -373,6 +381,47 @@ export function BuildGroundPaint(items, bounds = null) {
     return a;
   };
   return { cellM, minX, minZ, cols, rows, C, A, Blend };
+}
+
+/**
+ * 正式场景的分层地表（docs/Data_Scene.md §8，2026-11-01）：涂色按 id 归层（Data_SceneGroundLayers），
+ * 路的折线踩实成车道，沟的折线与陡坡是翻土。返回 FirstLevelWhiteboxField 吃的 SampleGroundSurface(x, z, color, layers)：
+ * layers = [车道, 翻土, 草茬, 车辙横坐标（1 = 没有）]，color 是反照率倍率（这里恒为 1）。
+ */
+export function BuildSceneGroundSurface(doc, sampler) {
+  const S = SCENE_GROUND_SURFACE;
+  const Weights = (id) => {
+    const hit = SCENE_GROUND_CLASSES.find((c) => c.match.test(String(id || "")));
+    return hit ? [hit.track || 0, hit.spoil || 0, hit.soil || 0] : null;
+  };
+  const items = [];
+  for (const item of doc.paint || []) {
+    const rgb = Weights(item.id);
+    if (rgb && (item.poly || item.line)) items.push({ ...item, rgb });
+  }
+  for (const line of doc.ways?.roads || []) {
+    if (line.length >= 2) items.push({ line, halfW: S.road.halfW, feather: S.road.feather, rgb: [S.road.track, 0, 0] });
+  }
+  for (const line of doc.ways?.trenches || []) {
+    if (line.length >= 2) items.push({ line, halfW: S.trench.halfW, feather: S.trench.feather, rgb: [0, 1, 0] });
+  }
+  const raster = items.length ? BuildGroundPaint(items, doc.bounds, { cellM: S.cellM, maxCells: S.maxCells }) : null;
+  const w = [0, 0, 0], step = S.slope.stepM, span = S.slope.to - S.slope.from;
+  return (x, z, color = [1, 1, 1], layers = [0, 0, 1, 1]) => {
+    w[0] = 0; w[1] = 0; w[2] = 0;
+    raster?.Blend(x, z, w);
+    let track = w[0], spoil = w[1];
+    const soil = w[2];
+    const gx = (sampler(x + step, z) - sampler(x - step, z)) / (2 * step);
+    const gz = (sampler(x, z + step) - sampler(x, z - step)) / (2 * step);
+    const u = Math.max(0, Math.min(1, (Math.hypot(gx, gz) - S.slope.from) / span));
+    const steep = u * u * (3 - 2 * u);
+    if (steep > spoil) spoil = steep;
+    track *= 1 - steep;
+    color[0] = 1; color[1] = 1; color[2] = 1;
+    layers[0] = track; layers[1] = spoil; layers[2] = Math.max(0, Math.min(1, 1 - track - spoil - soil)); layers[3] = 1;
+    return color;
+  };
 }
 
 /** 远景地面贴图（§6.3 backdrop，2026-10-20）：最长边至多 maxPx 像素、一个像素至少 minTexelM 米。 */
@@ -538,11 +587,13 @@ export function LayoutFromSceneDoc(doc) {
     const grounded = GroundedBlock(block, sampler);
     return Number.isFinite(block.y) ? { ...grounded, y: block.y } : grounded;
   };
-  // 细高的 foliage 块（DeadTree_xx，脚印 ≤ BLOCKOUT_TREE_MAX_FOOT_M）是树：只留碰撞，编辑器种枯树模型（2026-10-20，同 BlockoutBlock）
+  // 正式场景（docs/Data_Scene.md §8，2026-11-01）：体块按 Look/* 画现行第一关的 PBR 外观，道具换外部模型，地面是分层地表，水面同现行第一关
+  const formal = doc.style === "formal";
+  // 细高的 foliage 块（DeadTree_xx，脚印 ≤ BLOCKOUT_TREE_MAX_FOOT_M）与场景里的 Tree/* 是树：只留碰撞，编辑器种枯树模型（2026-10-20，同 BlockoutBlock）
   const blocks = doc.blocks.map(block => {
     const grounded = Placed(block);
-    if (grounded.semantic === "water") return { ...grounded, visual: false, blockoutWater: true };
-    if (IsSceneTreeBlock(grounded)) return { ...grounded, visual: false, blockoutTree: true, treeHeightM: grounded.h };
+    if (grounded.semantic === "water") return formal ? grounded : { ...grounded, visual: false, blockoutWater: true };
+    if (grounded.sceneTree || IsSceneTreeBlock(grounded)) return { ...grounded, visual: false, blockoutTree: true, treeHeightM: grounded.h };
     return grounded;
   });
   // 随信号出现 / 消失的体块（塌洞、坑沿被炸、战车残骸）：走 FirstLevelWhiteboxField 现成的 gate（signal / appearSignal）。
@@ -551,23 +602,30 @@ export function LayoutFromSceneDoc(doc) {
     ...(gate.signal ? { signal: gate.signal } : {}),
     ...(gate.appearSignal ? { appearSignal: gate.appearSignal } : {}),
   }));
+  const neutral = [1, 1, 1];
   return {
     id: `Blockout${doc.level}`,
     level: doc.level,
+    scene: doc.scene || null,
+    style: formal ? "formal" : "whitebox",
     legend: false,
     fortifications: false,
-    materialLooks: false,
+    materialLooks: formal,
     railway: null,
     terrain: "P012Heightfield",
     terrainSpec: null,
     terrainSampler: sampler,
-    SampleGroundColor: groundPaint
+    // 正式场景：分层地表读不到时退回平铺土，顶点色不再乘色带
+    SampleGroundColor: formal ? () => neutral : groundPaint
       ? (x, z) => { const rgb = BlockoutTintColor(sampler(x, z), tint); groundPaint.Blend(x, z, rgb); return rgb; }
       : (x, z) => BlockoutTintColor(sampler(x, z), tint),
-    SampleGroundSurface: null,
+    SampleGroundSurface: formal ? BuildSceneGroundSurface(doc, sampler) : null,
+    // 正式场景的道具（Prop/*）：盒子只留碰撞，FirstLevelWhiteboxField 换外部模型
+    sceneProps: formal ? blocks.filter((block) => block.propModel)
+      .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,
     heightTint: tint,
     groundPaint,
-    colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
+    colorSemantics: !formal && Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
     paint: groundPaint ? doc.paint.map((p) => ({ ...p })) : [],
     // 可选 backdrop（2026-10-20）：远景层，只看不走——不进 blocks / gates（不碰撞、不进寻路），bounds 不变（玩家走不出去）；
     // 编辑器按它画远景（Script_EditorBlockoutBackdrop），相机远平面拉到 cameraFar。没写 = null，cameraFar 照旧。
@@ -575,7 +633,8 @@ export function LayoutFromSceneDoc(doc) {
     backdropGroundAt: backdrop ? BackdropGroundSampler(backdrop, sampler, doc.bounds) : null,
     cameraFar: backdrop ? Math.max(BLOCKOUT_CAMERA_FAR, backdrop.far) : BLOCKOUT_CAMERA_FAR,
     bounds: { ...doc.bounds },
-    ground,
+    ground: formal ? { ...ground, pbr: MISSION_LAYOUT.ground.pbr, pbrOptions: { ...MISSION_LAYOUT.ground.pbrOptions },
+      terrainLayers: MISSION_LAYOUT.ground.terrainLayers } : ground,
     // 可选 semanticColors（2026-10-20）：场景文件改的几种块色盖在第一关那张表上
     semanticColors: { ...MISSION_LAYOUT.semanticColors,
       ...Object.fromEntries(Object.entries(doc.semanticColors || {}).map(([k, v]) => [k, parseInt(v.slice(1), 16)])) },
@@ -658,6 +717,12 @@ export function MakeBlockoutPhase(level) {
     configUrl: level.configUrl,
     scene: level.scene,
     sceneError: null,
+    /**
+     * 这一关现在建哪个场景：edit = 白盒场景（编辑、预演）；play = 正式场景（试玩，scene.playUrl，没有就还是白盒）。
+     * 总控改它再 JumpToLevel 整片重建（Script_EditorBlockout.UseSceneVariant）。
+     */
+    variant: "edit",
+    SceneUrl() { return phase.blockout.variant === "play" && level.scene.playUrl ? level.scene.playUrl : level.scene.url; },
     /** BuildField 在 new World(...) 之前 await 它。第一关立即返回；文件场景在这里读场景文件。 */
     async Prepare() {
       if (firstLevel) {
@@ -666,12 +731,13 @@ export function MakeBlockoutPhase(level) {
       }
       // 每次进关都重读：场景文件可能被场景编辑器 / 人 / agent 改过。读不到时退回上一次的布局（若有）。
       try {
-        const response = await globalThis.fetch(`${level.scene.url}?t=${Date.now()}`, { cache: "no-store" });
+        const sceneUrl = phase.blockout.SceneUrl();
+        const response = await globalThis.fetch(`${sceneUrl}?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`场景文件读不到（HTTP ${response.status}）`);
         let doc;
         try { doc = await response.json(); } catch (error) { throw new Error("场景文件不是 JSON"); }
         if (level.scene.kind === "scene") {
-          const heightUrl = new URL(doc?.terrain?.file || "", new URL(level.scene.url, globalThis.location?.href)).href;
+          const heightUrl = new URL(doc?.terrain?.file || "", new URL(sceneUrl, globalThis.location?.href)).href;
           const heightResponse = await globalThis.fetch(`${heightUrl}?t=${Date.now()}`, { cache: "no-store" });
           if (!heightResponse.ok) throw new Error(`高度图读不到（HTTP ${heightResponse.status}）`);
           doc = BlockoutSliceDoc(level, doc, DecodeSceneHeights(await heightResponse.arrayBuffer(), doc.terrain));

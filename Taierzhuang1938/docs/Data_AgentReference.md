@@ -762,7 +762,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   白盒关卡编辑器（Blockout）是独立模式而不是面板：`?editor=blockout&level=FirstLevel`（高级工具菜单栏「关卡」菜单第一项也能进；关卡表与总控经 `Script_DevTools` 边界取），
   不起任务运行时与过场，按关键帧摆敌我（独立演员，不进 AI）、画射界 / 去向 / POI，纸面小地图 + 可缩放全关总图，导航栏切关键帧；
   每关一份 `Blockout/<Level>.json`（第二关另有 `.scene.json` 场景），外部改动 2 s 内同步，生成器 `Script_EditorBlockoutCli.mjs`；
-  第一关新剧本三段（0105 / 0610 / 1218）的场地是场景 `Scenes/FirstLevelWhitebox`（2026-10-31 三段合一、以场景文件为准、每段取一块建场；
+  第一关新剧本三段（0105 / 0610 / 1218）的试玩跑正式场景 `Scenes/FirstLevel`（2026-11-01，现行第一关的外观 / 道具模型 / 分层地表，`Data_Scene.md` §8，回归 `Script_SceneFormalTest`）；
+  编辑与预演的场地是场景 `Scenes/FirstLevelWhitebox`（2026-10-31 三段合一、以场景文件为准、每段取一块建场；
   格式 / 资产编号 / 取块规矩 `docs/Data_Scene.md`，node 里 `Script_SceneNode.ReadBlockoutSceneDocSync(level)`，回归 `Script_SceneDocTest.mjs`）；
   `window.Tengxian.Debug.Blockout` 给测试与 agent 用。口径 `docs/Data_EditorBlockout.md`，回归口
   `Script_EditorBlockout{Config,Save,Map,Browser}Test.mjs`。

@@ -146,7 +146,8 @@ export class WhiteboxLooks {
   }
 
   /** 这块该用哪个外观（null = 不归外观表管）。 */
-  LookOf(block) { return ResolveWhiteboxLook(block); }
+  /** 场景物件写明了外观（正式场景的 Look/* 材质，block.look）就用它，否则按 id / 语义规则挑。 */
+  LookOf(block) { return block?.look || ResolveWhiteboxLook(block); }
 
   /**
    * 外观 → 材质（同一外观 + 同一 UV 单位只建一次）。

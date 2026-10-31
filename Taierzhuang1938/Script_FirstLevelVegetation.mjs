@@ -23,7 +23,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import {
   VEGETATION, VEGETATION_ATLAS, VEGETATION_CARDS, VEGETATION_QUALITY, VEGETATION_TINT,
-  PlanFirstLevelVegetation, MissionDressingContext, FitVegetationToCrown,
+  PlanFirstLevelVegetation, MissionDressingContext, SceneDressingContext, SCENE_VEGETATION, FitVegetationToCrown,
 } from "./Data_FirstLevelVegetation.mjs";
 
 const LOADER = new ManagedTextureLoader();
@@ -113,7 +113,10 @@ export class FirstLevelVegetation {
     this.quality = VEGETATION_QUALITY[quality] ? quality : "high";
     const q = VEGETATION_QUALITY[this.quality];
     const started = typeof performance !== "undefined" ? performance.now() : 0;
-    this.plan = PlanFirstLevelVegetation(MissionDressingContext(layout, groundAt), this.quality);
+    // 正式场景（layout.style formal）按场景的路与沟撒，规则见 SCENE_VEGETATION
+    const formal = layout.style === "formal";
+    this.plan = PlanFirstLevelVegetation(formal ? SceneDressingContext(layout, groundAt) : MissionDressingContext(layout, groundAt),
+      this.quality, formal ? SCENE_VEGETATION : VEGETATION);
     const crownFit = FitVegetationToCrown(this.plan.instances, crownHeightAt);
     this.plan.instances = crownFit.instances;
     const material = CloneShadedMaterial(library.Plain("FirstLevelVegetation", { color: 0xffffff, roughness: 0.96, metalness: 0 }));

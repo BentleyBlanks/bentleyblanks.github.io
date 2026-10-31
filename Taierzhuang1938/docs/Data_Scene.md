@@ -11,7 +11,9 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json         场景：物件引用列表 
 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.height.bin   高度图：int16 小端、厘米，(cols+1)×(rows+1) 个格点，heights[iz*(cols+1)+ix]
 ```
 
-- 现有场景：`FirstLevelWhitebox`（第一关新剧本 01–18 的白盒，三段合一，见 §5）。
+- 现有场景（清单 `Data_SceneAssets.SCENE_LIST`，场景编辑器的下拉、存盘口都认这张表）：
+  - `FirstLevelWhitebox`（第一关新剧本 01–18 的白盒，三段合一，见 §5）：白盒编辑器的编辑与预演跑它；
+  - `FirstLevel`（第一关正式场景，2026-11-01，见 §8）：白盒编辑器的试玩跑它，之后单独打磨细节。
 - **场景文件就是这个场景的唯一真相**：人、agent、以后的场景编辑器都直接改它；没有生成器在后面覆盖。改完跑 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all`。
 - JSON 一律 LF（`.gitattributes`），大数组一行一项，方便按 id grep 与 diff。
 
@@ -67,7 +69,9 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.height.bin   高度图：int16 小端、�
 
 `Data_SceneAssets.mjs`：`SCENE_ASSETS`（资产）与 `SCENE_MATERIALS`（材质）。场景里只写编号，编号 → 是什么、怎么画、在哪个文件查这张表；改文件名、换模型只改这张表一行。**编号被场景用上以后不改名**（Unity 的场景存 GUID 不存路径，同一个道理）。
 
-现有资产：`Whitebox/Box`（米制长方体）、`Backdrop/Box|Blob|Hill|Tree`（远景层）。材质：`Whitebox/<语义>`（EarthDark、Plaster、Timber、Roof……），语义决定建场用哪个材质槽，颜色在 `look.semanticColors` 与第一关语义色表。以后加模型资产（构件库可布设清单 `Script_PlaceableCatalog`、外部道具目录）与 PBR 材质时照样登记编号。
+现有资产：`Whitebox/Box`（白盒的米制长方体）、`Block/Box`（正式场景的长方体）、`Prop/<模型>`（外部道具，22 种，`model` 是 `Script_ExternalProps` 的 id，带缺省尺寸）、`Tree/Dead` / `Tree/Cypress`（树）、`Backdrop/Box|Blob|Hill|Tree`（远景层）。资产的 `kind`：box 样子看材质；prop 按 size 那只盒子缩放摆模型、碰撞仍是那只盒子、`semantic` 是弹着表面；tree 由白盒编辑器的树种植挑模型、size 是树干碰撞盒。
+
+材质：`Whitebox/<语义>`（EarthDark、Plaster、Timber、Roof……，白盒场景用），语义决定建场用哪个材质槽，颜色在 `look.semanticColors` 与第一关语义色表；`Look/<外观>`（正式场景用）是现行第一关的 PBR 外观（`look` = `Data_FirstLevelWhiteboxMaterials.WHITEBOX_LOOKS` 的键，`semantic` 管弹着表面，`color` 只是场景编辑器里的预览色），`Look/water` 水面另铺、`Look/airWall` 不画、`Look/reed` 是植物语义（长成植被卡片）。场景编辑器按场景的样子只列这一类的资产与材质（`SceneAssetsFor` / `SceneMaterialsFor`）。
 
 ## 4. 白盒编辑器怎么用场景
 
@@ -107,4 +111,21 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.height.bin   高度图：int16 小端、�
 ## 7. 还没做的
 
 - ~~去掉「白盒」画质档~~（2026-10-31 已做）：`GRAPHICS_PROFILES` 只剩 low / medium / high / ultra，白盒编辑器走正常渲染管线，灰表面 + 米格线是白盒材质本身的样子（`Script_WhiteboxMaterial`、`Data_Tuning_WhiteboxMaterial`；场景里的 `Whitebox/*` 材质按语义映射到它，`DressWorld` 装上）。光照写进场景还没做：现在白盒编辑器用本关光照 + `BLOCKOUT_EDITOR_FILL` 补光。
-- 模型资产（构件库可布设清单、外部道具）与 PBR 材质进目录；场景编辑器里的地形刷子、地面涂色、框选；高度图存盘。
+- ~~外部道具与 PBR 材质进目录~~（2026-11-01 已做，§8）；构件库可布设清单（`Script_PlaceableCatalog`）还没进；场景编辑器里的地形刷子、地面涂色、框选；高度图存盘。
+- 正式场景的房子大多还是一整块平顶盒子（白盒布局里房子本来就是整块的），没有现行第一关那种坡屋顶外壳；场景编辑器里道具、树画成盒子 / 锥，不是真模型。
+
+## 8. 第一关正式场景（2026-11-01）
+
+用户 2026-11-01：场景编辑器里两个场景——白盒版第一关，和「相对正式也会不断打磨细节的正式场景」；**白盒预演都在白盒版上做，试玩在正式场景上做**；正式场景「用现在第一关（已经上线在章节里可选的）的场景设计标准，把已经有的资产、布设给做进去」。
+
+- **布局照白盒复制**：`Script_SceneForkFormal.mjs`（一次性转换，留着重放 / 对照）把 `FirstLevelWhitebox` 复制成 `Scenes/FirstLevel/Scene_FirstLevel.json` + 同一份高度图。位置、尺寸、碰撞、信号、分组、地标、涂色、路与沟一个不动——试玩编排（`Blockout/<Level>.play.json`）与关键帧的坐标都在这套布局上。**转完以后正式场景就是它自己的唯一真相**，单独打磨，不再跟白盒同步（白盒改了布局要不要搬过来，按需手搬）。
+- **样子换成现行第一关的口径**：
+  - 体块 → `Block/Box` + `Look/<外观>`，外观按现行第一关的规则挑（`ResolveWhiteboxLook`：先按 id 形状的特例，再按语义的缺省比例——墙按建筑组在泥抹面 / 青砖 / 白灰之间分）。转出来：泥抹面 372、夯土 307、木料 288、青砖 252、白灰 218、门楼青砖 146、小青瓦 48……
+  - 有现成外部模型的道具盒（`meta.prop`）→ `Prop/<模型>`（对照表 `PROP_TO_ASSET`：弹药箱、手榴弹箱、木箱、水缸、井台、磨盘、草垛、草席、柴堆、枕木堆、树枝、沙袋、碎砖堆、桌凳、马灯、车轮、麻袋、绷带），194 件；建场时盒子不画、碰撞照旧，模型按盒子缩放与落地（同现行第一关的替换表 `PlanPropDressing`，`params.tile` 一只长盒子里排几件）。
+  - 细高的植物块与 `meta.prop` Tree / Cypress → `Tree/Dead` / `Tree/Cypress`（228 棵，白盒编辑器照旧种枯树模型）；苇丛 → `Look/reed`（长成苇子卡片）；鹿砦 → 木料；水 → `Look/water`（水面同现行第一关 `BuildWhiteboxWater`）；隐形墙 → `Look/airWall`。
+  - 地面：分层 PBR 土（`MissionPlain` 四层：底土 / 车道 / 草茬 / 翻土），权重不写进物件，建场时算（`Script_EditorBlockoutLevels.BuildSceneGroundSurface`，数在 `Data_SceneGroundLayers`）：涂色按 id 归层（路面、院场 → 车道；旧壕、坟头、沟里的沙、河床 → 翻土；阵地前清过的地 → 底土；田、田埂与没涂的地方 → 草茬），路的折线（`ways.roads`）踩实成车道，沟的折线（`ways.trenches`）与陡坡（坡度 0.55 起）是翻土。
+  - 现行第一关的枯草丛与碎砖瓦也撒：`Data_FirstLevelVegetation.SceneDressingContext` 把撒点的「路线」换成场景的路与沟、锚点换成出生点，没有旧关卡的河与弹坑表；规则 `SCENE_VEGETATION`（去掉按旧坐标挖的空圈、`Reed_` 也按苇子长）。三段各 7–9 万丛草、碎砖瓦 10 / 1130 / 1444 块。
+- **建场**：`BlockoutDocFromScene` 带出 `style: "formal"`，物件带 `look` / `propModel` / `sceneTree`；`LayoutFromSceneDoc` 对正式场景开 `materialLooks`、地面挂 `terrainLayers: "MissionPlain"` 与 `SampleGroundSurface`、列 `sceneProps`；`FirstLevelWhiteboxField` 照现行第一关那套建（`WhiteboxLooks.LookOf` 认 `block.look`，`AddScenePropModels` 摆模型与碎砖瓦，植被按场景撒）；白盒编辑器 `DressWorld` 对正式场景不再改成白盒的样子。
+- **白盒编辑器怎么切**：关卡注册表的 `scene.playUrl` 是正式场景；phase 的 `blockout.variant`（edit / play）决定建哪个。试玩「开打」先整片重建成正式场景（`UseSceneVariant("play")`，无头浏览器约 18–25 s），关小结「回到编辑」换回白盒；换关回到白盒。地址栏 `scene=FirstLevel` 进关后直接换成正式场景（试玩中刷新、场景编辑器「在白盒编辑器里看（正式场景）」都走这条）。`Debug.Blockout.Play.Scene()` / `UseScene(variant)` 给测试与 agent。
+- **场景编辑器**：下拉里两个场景（显示标题）；正式场景的资产页列 `Block/Box`、道具、树与远景，材质下拉是 `Look/*`；道具画成按语义色提亮的盒子、树画成锥、体块按外观预览色。
+- 门禁：`Script_SceneFormalTest`（纯 node）、`Script_SceneFormalBrowserTest`（真浏览器：白盒 / 正式互换、PBR 外观、分层地表、道具全摆上、没有米格线、体块数同白盒、试玩换正式 / 回编辑换白盒、06–10 / 11–18 建得起来、场景编辑器两个场景）。截图 `_shots/SceneFormal/`。

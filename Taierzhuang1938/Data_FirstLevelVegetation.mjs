@@ -197,6 +197,31 @@ export function MissionDressingContext(layout, groundAt) {
 }
 
 /**
+ * 正式场景（docs/Data_Scene.md §8，2026-11-01）的撒点环境：路线 = 场景的路与沟（ways），锚点 = 出生点；
+ * 没有现行第一关的河、弹坑表与壕沟样条计划（沟是高度图里挖的，沟底与沟壁按地表的翻土层避开）。
+ */
+export function SceneDressingContext(layout, groundAt) {
+  const routes = [...(layout.ways?.roads || []), ...(layout.ways?.trenches || [])].filter(IsPolyline);
+  return {
+    layout, blocks: layout.blocks, scenarioBlocks: [], groundAt, routes,
+    anchors: layout.spawn ? [{ x: layout.spawn.x, z: layout.spawn.z }] : [],
+    craters: [], bounds: layout.bounds, trenchCorridor: () => null,
+    surfaceAt: layout.SampleGroundSurface || SampleMissionGroundSurface,
+    river: null, riverCutAt: () => 0, riverReachAt: () => null,
+  };
+}
+
+/**
+ * 正式场景的植被规则：同现行第一关，只是不要那一个按旧坐标挖的空圈（clearDiscs），
+ * 苇丛块的 id 是 Reed_xx / MarshReed_xx（现行第一关叫 Reeds），按苇子长。
+ */
+export const SCENE_VEGETATION = Object.freeze({
+  ...VEGETATION,
+  clearDiscs: Object.freeze([]),
+  foliage: Object.freeze({ Reed: VEGETATION.foliage.Reeds, ...VEGETATION.foliage }),
+});
+
+/**
  * 路线距离的粗栅格（chamfer 两遍，格 cellM）：远处的「离路线多远」只要个大概（淡出、高卡门槛），
  * 近处 14 m 以内再用线段精算。整张图一次 ~5 万格，省掉逐点扫线段。
  */

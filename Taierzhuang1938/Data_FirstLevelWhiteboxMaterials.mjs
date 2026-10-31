@@ -79,6 +79,8 @@ export const WHITEBOX_LOOKS = Object.freeze({
     uv: "truss", truss: Object.freeze({ panelM: 4.25, chordM: 0.32, memberM: 0.2 }), weather: 0.3, jitter: 0 }),
   wire: Object.freeze({ plain: Object.freeze({ color: 0x2d2e2c, roughness: 0.6, metalness: 0.4 }) }),
   voidDark: Object.freeze({ plain: Object.freeze({ color: 0x16140f, roughness: 0.96, metalness: 0 }) }),
+  // 地上干了的血迹（正式场景 Look/bloodStain；只有场景里写明了才用，语义规则不会挑到它）
+  bloodStain: Object.freeze({ plain: Object.freeze({ color: 0x3b1a14, roughness: 0.7, metalness: 0 }) }),
 });
 
 /**

@@ -73,9 +73,18 @@ function SceneStampOf(response) {
   return h.get("etag") || h.get("last-modified") || h.get("content-length") || null;
 }
 
-/** 这一关读哪份场景 JSON：旧式文件场景（kind "file"）或场景（kind "scene"，docs/Data_Scene.md）；第一关没有 → null。 */
-function SceneUrlOf(level) {
-  return level?.scene?.kind === "file" || level?.scene?.kind === "scene" ? level.scene.url : null;
+/**
+ * 这一关此刻读哪份场景 JSON：旧式文件场景（kind "file"）或场景（kind "scene"，docs/Data_Scene.md）；第一关没有 → null。
+ * 场景有正式版（scene.playUrl）时按 phase 的 variant 取：编辑 / 预演 = 白盒，试玩 = 正式（§17，2026-11-01）。
+ */
+function SceneUrlOf(level, phase = null) {
+  if (level?.scene?.kind !== "file" && level?.scene?.kind !== "scene") return null;
+  return phase?.blockout?.SceneUrl?.() || level.scene.url;
+}
+
+/** 场景 URL → 场景 id（./Scenes/<Id>/Scene_<Id>.json）；认不出 → null。 */
+function SceneIdOfUrl(url) {
+  return /\/Scenes\/([A-Za-z0-9]+)\/Scene_\1\.json$/.exec(String(url || ""))?.[1] || null;
 }
 
 /** 落在这一关范围里（场景按范围取一块，地标与体块路径只认这一块里的）。 */
@@ -424,10 +433,13 @@ export class EditorBlockout {
     this.api.Timeline = this.timeline.api;
     // 试玩（§17）：Start({from, to, settings}) 开打；Stop() 中止（出小结）；State() 现状；Close() 关小结回到编辑；Reload() 重读编排
     this.api.Play = {
-      Start: async (options) => { await this.play.Want(); return this.play.Start(options || {}); },
+      Start: async (options) => { if (!(await this.UseSceneVariant("play"))) return false; await this.play.Want(); return this.play.Start(options || {}); },
       Stop: () => { this.play.Finish("abort"); return this.play.State(); },
       State: () => this.play.State(),
-      Close: () => { this.play.CloseSummary(); this.play.ClosePanel(); return this.play.State(); },
+      Close: async () => { await this.play.CloseSummary(); this.play.ClosePanel(); return this.play.State(); },
+      // 此刻建的场景（edit = 白盒 / play = 正式）；UseScene 换过去（整片重建）
+      Scene: () => ({ variant: this.sceneVariant, url: SceneUrlOf(this.level, this.phase), style: this.phase?.whitebox?.layout?.style || null }),
+      UseScene: (variant) => this.UseSceneVariant(variant),
       Open: () => { this.play.OpenPanel(); return this.play.State(); },
       Reload: () => { this.play.wanted = true; return this.play.Load({ force: true }); },
       Retry: (options) => { this.play.Retry(options || {}); return this.play.State(); },
@@ -466,6 +478,12 @@ export class EditorBlockout {
     }
     this.ready = true;
     this.pollTimer = setInterval(() => { this.Poll(); }, BLOCKOUT_EDITOR.pollS * 1000);
+    // ?scene=<正式场景 id>（场景编辑器「在白盒编辑器里看」、试玩中刷新）：进关后换成正式场景
+    const wantScene = this.params.get("scene");
+    if (wantScene && this.level?.scene?.playUrl && SceneIdOfUrl(this.level.scene.playUrl) === wantScene) {
+      this.UseSceneVariant("play").then(() => { if (pose) this.PlacePlayer(pose); })
+        .catch((error) => console.error("[Blockout] 正式场景建不起来", error));
+    }
     const timelineId = this.params.get("timeline");
     if (timelineId) this.timeline.Open(timelineId).catch((error) => console.error("[Blockout] Timeline 打不开", error));
     // 存档口只问一次：界面要写明「这里能不能直接存」。
@@ -573,7 +591,7 @@ export class EditorBlockout {
    */
   async LoadLandmarks() {
     const levelKey = this.levelKey;
-    const url = SceneUrlOf(this.level);
+    const url = SceneUrlOf(this.level, this.phase);
     this.landmarks = [];
     this.landmarksLevel = levelKey;
     this.scenePaths = { landmarks: new Map(), blocks: new Map() };
@@ -647,6 +665,8 @@ export class EditorBlockout {
   DressWorld(layout) {
     const field = this.game.battlefield;
     if (!field || !layout) return;
+    // 正式场景（试玩，§17）：地面、外观、水面都是 FirstLevelWhiteboxField 按现行第一关的口径建好的，这里不再改成白盒的样子
+    if (layout.style === "formal") return;
     const tint = layout.heightTint || { lo: -4, hi: 6 };
     const waterBlocks = BlockoutWaterBlocks(layout);
     const creek = layout.id !== "BlockoutFirstLevel" && waterBlocks.length > 0;
@@ -745,7 +765,7 @@ export class EditorBlockout {
    * 换关：回收演员与标记 → JumpToLevel（整片重建）→ 读新配置 → 地图重烘 → 改地址栏。
    * key 可以是关卡键，也可以是菜单行 id（换过去后跳到那一段第一帧）。
    */
-  async SwitchLevel(key) {
+  async SwitchLevel(key, { keepVariant = false } = {}) {
     const row = BLOCKOUT_MENU.find(r => r.id === key);
     const startKf = row?.from ?? null;
     if (row) key = row.key;
@@ -771,6 +791,8 @@ export class EditorBlockout {
       this.liveUnits = [];
       // 重建期间旧配置与旧场地对不上：按键、导航栏、地图点选一律不理
       this.rebuilding = true;
+      // 换关回到白盒（编辑）；正式 / 白盒互换（UseSceneVariant）与外部改了场景文件（ReloadScene）保留
+      if (!keepVariant && BLOCKOUT_PHASES[index]?.blockout) BLOCKOUT_PHASES[index].blockout.variant = "edit";
       try {
         await this.game.JumpToLevel(index);
         this.levelIndex = index;
@@ -796,10 +818,37 @@ export class EditorBlockout {
     finally { if (this.switching === run) this.switching = null; }
   }
 
+  /** 此刻建的是哪个场景：edit = 白盒（编辑、预演），play = 正式场景（试玩）。 */
+  get sceneVariant() { return this.phase?.blockout?.variant || "edit"; }
+
+  /** 这一关有正式场景、且此刻建的不是 variant 那个 → true（要整片重建）。 */
+  NeedsSceneVariant(variant) {
+    return !!this.level?.scene?.playUrl && this.sceneVariant !== variant;
+  }
+
+  /**
+   * 编辑 / 预演跑白盒场景，试玩跑正式场景（§17，2026-11-01）：variant 不一样就整片重建这一关，回到原来的关键帧。
+   * 这一关没有正式场景（旧版第一关、第二关草稿）什么也不做。→ 成没成
+   */
+  async UseSceneVariant(variant) {
+    if (!this.NeedsSceneVariant(variant)) return true;
+    if (this.switching) await this.switching.catch(() => {});
+    if (!this.NeedsSceneVariant(variant)) return true;
+    const kfId = this.doc?.keyframes?.[this.index]?.id ?? null;
+    this.phase.blockout.variant = variant;
+    this.ui.Toast(variant === "play" ? "正在换成正式场景（试玩）" : "正在换回白盒场景", "info");
+    const ok = await this.SwitchLevel(this.levelKey, { keepVariant: true });
+    if (ok && kfId != null) await this.GoTo(kfId, { animate: false });
+    return ok;
+  }
+
   ReplaceUrl() {
     try {
       const url = new URL(location.href);
       url.searchParams.set("level", this.levelKey);
+      // 正式场景（试玩）写进地址栏，刷新还是它；白盒不写
+      const sceneId = this.sceneVariant === "play" ? SceneIdOfUrl(SceneUrlOf(this.level, this.phase)) : null;
+      if (sceneId) url.searchParams.set("scene", sceneId); else url.searchParams.delete("scene");
       const id = this.keyframe?.id;
       if (id) url.searchParams.set("kf", id); else url.searchParams.delete("kf");
       url.searchParams.delete("pose");
@@ -899,7 +948,7 @@ export class EditorBlockout {
 
   /** 场景文件的戳（ETag / Last-Modified / 长度）和进关时读到的不一样 → true。读不到、没有戳、不是文件场景 → false。 */
   async SceneChanged(levelKey) {
-    const url = SceneUrlOf(this.level);
+    const url = SceneUrlOf(this.level, this.phase);
     if (!url || !this.sceneStamp) return false;
     let stamp = null;
     try {
@@ -914,7 +963,7 @@ export class EditorBlockout {
     if (this.switching || this.saving) return false;
     const kfId = this.doc?.keyframes?.[this.index]?.id ?? null;
     this.sceneReloads += 1;
-    const ok = await this.SwitchLevel(this.levelKey);
+    const ok = await this.SwitchLevel(this.levelKey, { keepVariant: true });
     if (ok && kfId != null) await this.GoTo(kfId, { animate: false });
     this.ui.Toast("场景文件更新了，场地已重建", "info");
     return ok;
@@ -1708,7 +1757,7 @@ export class EditorBlockout {
     const session = this.LayoutEdits();
     for (const m of session.moves.values()) if (m.kind === "block" && !m.path) m.path = this.scenePaths.blocks.get(m.id) || "";
     const canvas = this.ui.fullCanvas, view = this.map.view, kf = this.keyframe;
-    const sceneUrl = SceneUrlOf(this.level);
+    const sceneUrl = SceneUrlOf(this.level, this.phase);
     const scenePath = sceneUrl ? `Taierzhuang1938/${String(sceneUrl).replace(/^\.\//, "")}` : "";
     return BuildLayoutEditExport(session, {
       level: { key: this.levelKey, label: this.level?.label || this.doc?.title || "", configPath: BlockoutConfigPath(this.levelKey), scenePath },

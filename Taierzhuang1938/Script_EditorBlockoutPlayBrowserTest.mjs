@@ -9,7 +9,8 @@
 //   2. 开打：玩家不再无敌、子弹有数（宿主读 PlayOverrides）；02-4 的三个追兵是真 AI、站在沟底（不被放兵挤到沟沿上）、
 //      演员里不再有他们；顶部那条写着第几步 / 目标 / 敌几个；
 //   3. 打光 → 过关 → 下一步先走到站位（approach），到了才放兵；fresh 步同一批人重新放；
-//   4. 中止 → 小结：放出来的兵（含 fresh 步留下的尸体）全撤、无敌与无限子弹还回去、演员回来；K 再来一遍；Esc 回到编辑；
+//   4. 中止 → 小结：放出来的兵（含 fresh 步留下的尸体）全撤、无敌与无限子弹还回去、演员回来；K 再来一遍；Esc 回到编辑（换回白盒场景）；
+//   2b. 试玩跑正式场景（2026-11-01，docs/Data_Scene.md §8）：开打时场地是 Scenes/FirstLevel（formal），编辑时是白盒；
 //   5. 阵亡：玩家倒下 → 小结写「阵亡」、玩家原地换回活人并摆回那一步的机位（不被宿主送回关卡出生点）；
 //   6. 看戏步：播过场（预演）时 N 跳过就进下一步；
 //   7. 全程没有未捕获错误。截图存 _shots/EditorBlockoutPlay/（不提交）。
@@ -119,6 +120,8 @@ try {
   await Step(90);
   const r1 = await Rules();
   Check("开打：玩家不再无敌、子弹有数；页面标上 blockoutPlay", !r1.invincible && !r1.infiniteAmmo && r1.playClass, J(r1));
+  const scene1 = await B(() => window.Tengxian.Debug.Blockout.Play.Scene());
+  Check("试玩跑正式场景：开打前先整片重建成 Scenes/FirstLevel（formal）", scene1.variant === "play" && scene1.style === "formal" && String(scene1.url).includes("Scenes/FirstLevel/"), J(scene1));
   const s1 = await Soldiers();
   const p1 = await PlayState();
   const puppets1 = await B(() => window.Tengxian.Debug.Blockout.Units().map(u => u.id));
@@ -166,11 +169,16 @@ try {
   await B(() => window.Tengxian.Debug.Blockout.Play.Stop());
   await Step(2);
   await page.keyboard.press("Escape");
+  // 回到编辑要整片重建回白盒场景（正式 → 白盒），等它换完
+  await page.waitForFunction(() => { const sc = window.Tengxian.Debug.Blockout.Play.Scene(); return sc.variant === "edit" && sc.style === "whitebox"
+    && window.Tengxian.Debug.Blockout.Units().some(u => u.id === "Pursuer1"); }, null, { timeout: 180000 }).catch(() => {});
   await Step(4);
   const p7 = await PlayState();
   const puppets7 = await B(() => window.Tengxian.Debug.Blockout.Units().map(u => u.id));
   const st7 = await B(() => window.Tengxian.Debug.Blockout.State());
-  Check("Esc 回到编辑：小结收起、演员回来（含追兵）、导航栏能用", !p7.summary && puppets7.includes("Pursuer1") && !st7.play, J({ summary: !!p7.summary, kf: st7.id }));
+  const scene7 = await B(() => window.Tengxian.Debug.Blockout.Play.Scene());
+  Check("Esc 回到编辑：换回白盒场景、小结收起、演员回来（含追兵）、导航栏能用", scene7.variant === "edit" && scene7.style === "whitebox" && !p7.summary && puppets7.includes("Pursuer1") && !st7.play,
+    J({ scene: scene7.variant, summary: !!p7.summary, kf: st7.id }));
 
   // 5) 阵亡
   console.log("--- death");

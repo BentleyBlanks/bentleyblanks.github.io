@@ -8,8 +8,8 @@
 // 只给开发用，面板文字不走文本表（项目契约 10 的开发者面板例外）。
 
 import * as THREE from "three";
-import { SCENE_ASSETS, SCENE_MATERIALS } from "./Data_SceneAssets.mjs";
-import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson } from "./Script_SceneDoc.mjs";
+import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor, SceneMaterialsFor } from "./Data_SceneAssets.mjs";
+import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, SceneStyle } from "./Script_SceneDoc.mjs";
 import { SceneEditModel } from "./Script_SceneEditModel.mjs";
 import {
   BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler,
@@ -64,6 +64,8 @@ class SceneEditorApp {
   constructor() {
     this.sceneId = new URLSearchParams(location.search).get("scene") || SCENE_IDS[0];
     if (!SCENE_IDS.includes(this.sceneId)) this.sceneId = SCENE_IDS[0];
+    // whitebox = 白盒场景（Whitebox/* 材质）；formal = 正式场景（Look/* 外观、道具、树）—— 决定材质下拉与资产页列哪些
+    this.style = SceneStyle(this.sceneId);
     this.model = null;
     this.writable = false;
     this.revision = null;
@@ -279,7 +281,9 @@ class SceneEditorApp {
     const base = this.BaseY(obj);
     const x = obj.pos[0], z = obj.pos[2];
     switch (SCENE_ASSETS[obj.asset]?.kind) {
-      case "box": { const [w, h, d] = obj.size; return { kind: "box", c: [x, base + h / 2, z], half: [w / 2, h / 2, d / 2], yaw }; }
+      case "box": case "prop": { const [w, h, d] = obj.size; return { kind: "box", c: [x, base + h / 2, z], half: [w / 2, h / 2, d / 2], yaw }; }
+      // 树：画成树高那么高的锥（碰撞是 size 那根树干）
+      case "tree": { const h = obj.size[1]; return { kind: "cone", c: [x, base + h / 2, z], half: [h * 0.16, h / 2, h * 0.16], yaw }; }
       case "backdropBox": { const h = p.h || 3; return { kind: "box", c: [x, base + (p.lift || 0) + h / 2, z], half: [(p.w || 4) / 2, h / 2, (p.d || 4) / 2], yaw }; }
       case "backdropBlob": { const h = p.h || 8, rx = p.rx || 4, rz = p.rz || rx; return { kind: "sphere", c: [x, base + (p.lift || 0) + h / 2, z], half: [rx, h / 2, rz], yaw }; }
       case "backdropHill": { const h = p.h || 30, rx = p.rx || 200, rz = p.rz || rx; return { kind: "sphere", c: [x, base, z], half: [rx, h, rz], yaw }; }
@@ -305,13 +309,25 @@ class SceneEditorApp {
   LayerKey(obj) {
     if (obj.layer === "backdrop") return `bd:${SCENE_ASSETS[obj.asset]?.kind}`;
     if (obj.visual === false) return "ghost";
+    const kind = SCENE_ASSETS[obj.asset]?.kind;
+    if (kind === "tree") return "tree";
+    if (kind === "prop") return `prop:${obj.asset}`;
     return `box:${obj.material}`;
   }
 
   MakeLayerMaterial(key) {
     if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.22, depthWrite: false });
     if (key.startsWith("bd:")) return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
-    const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_MATERIALS[key.slice(4)]?.semantic), roughness: 0.95 });
+    if (key === "tree") return new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 });
+    // 道具：按弹着表面的语义色画、提亮一档（只是预览，真样子是模型）
+    if (key.startsWith("prop:")) {
+      const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_ASSETS[key.slice(5)]?.semantic), roughness: 0.8 });
+      material.color.multiplyScalar(1.25);
+      return material;
+    }
+    // Look/* 外观有预览色；白盒材质按语义色
+    const entry = SCENE_MATERIALS[key.slice(4)];
+    const material = new THREE.MeshStandardMaterial({ color: entry?.color ? HexInt(entry.color) : this.SemanticColor(entry?.semantic), roughness: 0.95 });
     ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
     return material;
   }
@@ -330,7 +346,8 @@ class SceneEditorApp {
     const matrix = new THREE.Matrix4(), color = new THREE.Color();
     for (const [key, list] of groups) {
       const kind = key.startsWith("bd:") ? key.slice(3) : "box";
-      const geometry = kind === "backdropBlob" || kind === "backdropHill" ? this.geometry.sphere : kind === "backdropTree" ? this.geometry.cone : this.geometry.box;
+      const geometry = kind === "backdropBlob" || kind === "backdropHill" ? this.geometry.sphere
+        : kind === "backdropTree" || key === "tree" ? this.geometry.cone : this.geometry.box;
       const mesh = new THREE.InstancedMesh(geometry, this.MakeLayerMaterial(key), list.length);
       mesh.frustumCulled = false;
       mesh.name = `SceneEditor_${key}`;
@@ -590,7 +607,7 @@ class SceneEditorApp {
     window.addEventListener("beforeunload", (e) => { if (this.model?.dirty) { e.preventDefault(); e.returnValue = ""; } });
 
     const select = $("seScene");
-    for (const id of SCENE_IDS) select.append(new Option(id, id));
+    for (const id of SCENE_IDS) select.append(new Option(SceneInfo(id)?.title || id, id));
     select.value = this.sceneId;
     select.addEventListener("change", () => {
       if (this.model?.dirty && !confirm("有没保存的改动，换场景就丢掉了，继续？")) { select.value = this.sceneId; return; }
@@ -610,6 +627,7 @@ class SceneEditorApp {
     $("seShowBackdrop").addEventListener("change", (e) => { this.show.backdrop = e.target.checked; this.RebuildObjects(); });
     $("seShowHidden").addEventListener("change", (e) => { this.show.hidden = e.target.checked; this.RebuildObjects(); });
     $("seBlockout").addEventListener("click", () => this.OpenInBlockout());
+    if (this.style === "formal") $("seBlockout").textContent = "在白盒编辑器里看（正式场景）";
     const jumps = $("seJumps");
     const regions = BLOCKOUT_LEVELS.filter(l => l.scene?.kind === "scene").map(l => ({ label: l.short || l.key.replace(/^FirstLevel/, ""), region: l.scene.region }));
     for (const r of regions) { const b = El("button", "", r.label); b.title = "跳到这一段的场地"; b.addEventListener("click", () => this.JumpRegion(r.region)); jumps.append(b); }
@@ -868,7 +886,7 @@ class SceneEditorApp {
     const Item = (obj) => {
       const b = El("button", `seItem${sel.has(obj.id) ? " selected" : ""}`);
       b.append(document.createTextNode(obj.id));
-      b.append(El("small", "", obj.material ? obj.material.replace(/^Whitebox\//, "") : (SCENE_ASSETS[obj.asset]?.label || obj.asset)));
+      b.append(El("small", "", obj.material ? obj.material.replace(/^(Whitebox|Look)\//, "") : (SCENE_ASSETS[obj.asset]?.label || obj.asset)));
       b.title = `${obj.asset}${obj.hideOn ? ` · 随 ${obj.hideOn} 消失` : ""}${obj.showOn ? ` · 随 ${obj.showOn} 出现` : ""}`;
       b.addEventListener("click", (e) => this.SelectIds([obj.id], { toggle: e.ctrlKey || e.metaKey, add: e.shiftKey }));
       b.addEventListener("dblclick", () => this.Frame([obj.id]));
@@ -904,19 +922,22 @@ class SceneEditorApp {
   RenderAssets() {
     const box = $("seAssets");
     box.textContent = "";
-    for (const [id, asset] of Object.entries(SCENE_ASSETS)) {
+    // 白盒场景列白盒体块 + 远景；正式场景列体块、道具、树 + 远景（Data_SceneAssets.SceneAssetsFor）
+    for (const [id, asset] of SceneAssetsFor(this.style)) {
       const card = El("div", "seAsset");
       card.append(El("h3", "", asset.label), El("code", "", id), El("p", "", asset.note || ""));
       let material = null;
       const size = [];
-      if (asset.sized) {
+      if (asset.kind === "box") {
         const row = El("div", "seRow"); row.append(El("span", "", "材质"));
         material = El("select");
-        for (const [mid, m] of Object.entries(SCENE_MATERIALS)) material.append(new Option(`${m.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
+        for (const [mid, m] of SceneMaterialsFor(this.style)) material.append(new Option(`${m.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
         row.append(material); card.append(row);
+      }
+      if (asset.sized) {
         const srow = El("div", "seRow"); srow.append(El("span", "", "尺寸 宽高深"));
         const triple = El("div", "seTriple");
-        for (let i = 0; i < 3; i++) { const input = El("input"); input.type = "number"; input.step = "0.1"; input.min = "0.02"; input.value = "1"; size.push(input); triple.append(input); }
+        for (let i = 0; i < 3; i++) { const input = El("input"); input.type = "number"; input.step = "0.1"; input.min = "0.02"; input.value = String(asset.size?.[i] ?? 1); size.push(input); triple.append(input); }
         srow.append(triple); card.append(srow);
       }
       const grow = El("div", "seRow"); grow.append(El("span", "", "分组"));
@@ -960,9 +981,12 @@ class SceneEditorApp {
     Row("名字", name);
     box.append(err);
     Row("资产", El("span", "seId", `${obj.asset}${asset.label ? ` · ${asset.label}` : ""}`));
-    if (asset.sized || obj.material) {
+    if (asset.kind === "box" || obj.material) {
       const m = El("select");
-      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
+      // 本场景这一类的材质；这件用的别类材质也列上（不然下拉里选不中它）
+      const mats = SceneMaterialsFor(this.style);
+      if (obj.material && !mats.some(([mid]) => mid === obj.material) && SCENE_MATERIALS[obj.material]) mats.push([obj.material, SCENE_MATERIALS[obj.material]]);
+      for (const [mid, mat] of mats) m.append(new Option(`${mat.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
       m.value = obj.material;
       m.addEventListener("change", () => { this.model.SetField(ids, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); });
       Row("材质", m);
@@ -1044,11 +1068,11 @@ class SceneEditorApp {
     box.append(El("h3", "", `选中 ${list.length} 个`));
     box.append(El("p", "seMuted", ids.slice(0, 8).join("、") + (ids.length > 8 ? " ……" : "")));
     const Row = (label, control) => { const row = El("div", "seRow"); row.append(El("span", "", label), control); box.append(row); };
-    const sized = list.filter(o => SCENE_ASSETS[o.asset]?.sized).map(o => o.id);
+    const sized = list.filter(o => SCENE_ASSETS[o.asset]?.kind === "box").map(o => o.id);
     if (sized.length) {
       const m = El("select");
       m.append(new Option("（不改）", ""));
-      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
+      for (const [mid, mat] of SceneMaterialsFor(this.style)) m.append(new Option(`${mat.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
       m.addEventListener("change", () => { if (m.value) { this.model.SetField(sized, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); } });
       Row("材质", m);
     }
@@ -1160,6 +1184,8 @@ class SceneEditorApp {
     url.searchParams.set("editor", "blockout");
     url.searchParams.set("level", level.key);
     url.searchParams.set("pose", [at.x.toFixed(2), at.z.toFixed(2), (this.cam.yaw / DEG).toFixed(1), "0", "stand"].join(","));
+    // 正式场景：白盒编辑器进关后换成它（试玩跑的就是它，docs/Data_EditorBlockout.md §17）
+    if (this.style === "formal") url.searchParams.set("scene", this.sceneId);
     window.open(url.href, "_blank");
   }
 

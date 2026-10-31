@@ -22,15 +22,19 @@ import {
   PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PROP_MATERIAL_OVERRIDE, PROP_SPECIAL_ASSETS,
   PlanPropDressing, PlanRubbleScatter, Rng,
 } from "./Data_FirstLevelPropDressing.mjs";
-import { MissionDressingContext } from "./Data_FirstLevelVegetation.mjs";
+import { MissionDressingContext, SceneDressingContext } from "./Data_FirstLevelVegetation.mjs";
 
-/** 预载替换表用到的模型：已落地、XZ 居中、绑好项目 PBR 的克隆（与沙袋同一个入口）。 */
-export async function LoadFirstLevelPropDressing(library) {
+/**
+ * 预载替换表用到的模型：已落地、XZ 居中、绑好项目 PBR 的克隆（与沙袋同一个入口）。
+ * ids：只下这几件（正式场景的道具，docs/Data_Scene.md §8）；不给 = 现行第一关那张替换表 + 草席 + 撤运车。
+ */
+export async function LoadFirstLevelPropDressing(library, { ids = null } = {}) {
   const models = new Map();
   const catalog = new Map(ExternalPropCatalog().map((spec) => [spec.id, spec]));
   // 调色克隆按源材质缓存：同一只库材质在本关只克隆一次（一种材质仍是一只合批桶）。
   const tinted = new Map();
-  await Promise.all([...PROP_DRESSING_ASSETS, ...Object.keys(STRAW_SLEEPING_MAT_ASSETS)].map(async (id) => {
+  const wanted = ids ? [...new Set(ids)].filter((id) => id !== "evacCartWreck") : [...PROP_DRESSING_ASSETS, ...Object.keys(STRAW_SLEEPING_MAT_ASSETS)];
+  await Promise.all(wanted.map(async (id) => {
     const root = await InstantiateExternalProp(id, library);
     if (!root && STRAW_SLEEPING_MAT_ASSETS[id]) throw new Error(`Required straw mat failed to load: ${id}`);
     if (!root) { console.warn(`[FirstLevelPropDressing] ${id} 没有加载到，这几件保留平色盒`); return; }
@@ -69,7 +73,7 @@ export async function LoadFirstLevelPropDressing(library) {
     const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
     models.set(id, { root, size: size.toArray(), box });
   }));
-  const wreck = await EvacCartWreck().catch((error) => {
+  const wreck = ids && !ids.includes("evacCartWreck") ? null : await EvacCartWreck().catch((error) => {
     console.warn("[FirstLevelPropDressing] 撤运车模型没加载到，08 障碍车身保留平色盒", error);
     return null;
   });
@@ -247,19 +251,12 @@ function SectorKey(x, z) {
   return `PropDressing_${Math.floor(x / PROP_DRESSING_SECTOR_M)}_${Math.floor(z / PROP_DRESSING_SECTOR_M)}`;
 }
 
-/**
- * 往 BuildSink 里加道具与碎砖瓦。返回：
- *   replaced —— 不再画的白盒块 id（调用方并进 fortifications 的 replaced）；
- *   placements / rubble / missing —— 给测试与调试面板看。
- */
-export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, materials, library, { scene = null, meshes = null } = {}) {
-  const started = typeof performance !== "undefined" ? performance.now() : 0;
-  const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
-  const plan = PlanPropDressing(layout.blocks, groundAt, sizes);
+/** 把一份摆位计划（PlanPropDressing 的 placements）的模型几何按 192 m 分区加进 BuildSink；返回三角形数。 */
+function AddPropPlacements(sink, placements, dressing, materials) {
   const matrix = new THREE.Matrix4(), local = new THREE.Matrix4(), roll = new THREE.Matrix4();
   const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), position = new THREE.Vector3(), scale = new THREE.Vector3();
   let triangles = 0;
-  for (const placement of plan.placements) {
+  for (const placement of placements) {
     const model = dressing.models.get(placement.asset);
     // 歪倒的件（平躺的车轮、缺了轮子的车）：先绕自身 Z 轴转 rollDeg，再把歪倒后包围盒的底面挪回 y=0、X 居中。
     if (placement.rollDeg) {
@@ -284,10 +281,36 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
       sink.Add(key, geometry);
     });
   }
+  return triangles;
+}
+
+/**
+ * 往 BuildSink 里加道具与碎砖瓦。返回：
+ *   replaced —— 不再画的白盒块 id（调用方并进 fortifications 的 replaced）；
+ *   placements / rubble / missing —— 给测试与调试面板看。
+ */
+export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, materials, library, { scene = null, meshes = null } = {}) {
+  const started = typeof performance !== "undefined" ? performance.now() : 0;
+  const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
+  const plan = PlanPropDressing(layout.blocks, groundAt, sizes);
+  let triangles = AddPropPlacements(sink, plan.placements, dressing, materials);
   const strawMats = AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materials);
   triangles += strawMats.triangles;
-  // 碎砖瓦：一区一份预并好的几何。
-  const rubble = PlanRubbleScatter(MissionDressingContext(layout, groundAt));
+  const { rubble, rubbleTriangles } = AddRubbleScatter(sink, MissionDressingContext(layout, groundAt), materials, library, { scene, meshes });
+  sink.SetSector("FirstLevelWhitebox");
+  return {
+    replaced: new Set([...plan.replaced, ...(library ? rubble.hidden : [])]),
+    placements: plan.placements, missing: plan.missing, strawMats,
+    rubble: library ? rubble.pieces.length : 0,
+    stats: { props: plan.placements.length, propTriangles: Math.round(triangles), rubble: rubble.pieces.length,
+      rubbleTriangles: Math.round(rubbleTriangles), hiddenLoose: rubble.hidden.size,
+      buildMs: started ? Math.round(performance.now() - started) : 0 },
+  };
+}
+
+/** 碎砖瓦：按撒点环境（墙脚、残墙、散块、弹坑沿）撒，一区一份预并好的几何、不投影。→ { rubble, rubbleTriangles } */
+function AddRubbleScatter(sink, ctx, materials, library, { scene = null, meshes = null } = {}) {
+  const rubble = PlanRubbleScatter(ctx);
   let rubbleTriangles = 0;
   if (rubble.pieces.length && library) {
     if (!materials.has("FirstLevelRubble")) {
@@ -317,15 +340,7 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
       meshes?.push(mesh);
     }
   }
-  sink.SetSector("FirstLevelWhitebox");
-  return {
-    replaced: new Set([...plan.replaced, ...(library ? rubble.hidden : [])]),
-    placements: plan.placements, missing: plan.missing, strawMats,
-    rubble: library ? rubble.pieces.length : 0,
-    stats: { props: plan.placements.length, propTriangles: Math.round(triangles), rubble: rubble.pieces.length,
-      rubbleTriangles: Math.round(rubbleTriangles), hiddenLoose: rubble.hidden.size,
-      buildMs: started ? Math.round(performance.now() - started) : 0 },
-  };
+  return { rubble, rubbleTriangles };
 }
 
 /** Premerge each sector/material once so BuildSink preserves the authored tangent frame. */
@@ -368,4 +383,20 @@ function AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materi
     sink.Add(key, geometry);
   }
   return { placements, triangles, batches: buckets.size };
+}
+
+/**
+ * 正式场景的道具（docs/Data_Scene.md §8）：场景里资产是 Prop/* 的物件（layout.sceneProps），盒子只留碰撞，样子换成外部模型；
+ * 按盒子缩放与落地同现行第一关的替换表（PlanPropDressing）。再按场景的路与沟撒碎砖瓦（同现行第一关的规则）。
+ * 模型没下到的那几件 missing 里有、盒子照画（按语义的外观）。
+ */
+export function AddScenePropModels(sink, layout, dressing, groundAt, materials, library, { scene = null, meshes = null } = {}) {
+  const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
+  const plan = PlanPropDressing(layout.blocks, groundAt, sizes, layout.sceneProps || []);
+  const triangles = AddPropPlacements(sink, plan.placements, dressing, materials);
+  const { rubble, rubbleTriangles } = AddRubbleScatter(sink, SceneDressingContext(layout, groundAt), materials, library, { scene, meshes });
+  sink.SetSector("FirstLevelWhitebox");
+  return { replaced: new Set([...plan.replaced, ...(library ? rubble.hidden : [])]), placements: plan.placements, missing: plan.missing,
+    stats: { props: plan.placements.length, propTriangles: Math.round(triangles), rubble: rubble.pieces.length,
+      rubbleTriangles: Math.round(rubbleTriangles), hiddenLoose: rubble.hidden.size } };
 }
