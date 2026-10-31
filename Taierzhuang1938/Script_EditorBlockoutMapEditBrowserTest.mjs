@@ -71,7 +71,7 @@ async function Drag(from, to, { steps = 8, shift = false } = {}) {
 }
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0610&kf=08-1&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0610&kf=08-1&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready
     && window.Tengxian.Debug.Blockout.Landmarks().length > 0, null, { timeout: 300000 });

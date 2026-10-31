@@ -18,7 +18,7 @@
 ## 1. 入口与总体结构
 
 ```
-index.html?editor=blockout&level=FirstLevel[&kf=03-2][&pose=x,z,朝向,俯仰,姿态][&quality=whitebox]
+index.html?editor=blockout&level=FirstLevel[&kf=03-2][&pose=x,z,朝向,俯仰,姿态][&quality=low|medium|high|ultra]
 ```
 
 - `editor=blockout` 已经能把启动路由到 `Script_Main`（`Data_StartupRouting.IsMenuStartup` 认 `editor`），**不改路由表**。
@@ -116,7 +116,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
   - `paint`：地面涂色，按数组顺序叠（后面的盖前面的）。每项 `id`（全关唯一）、`color`（`"#rrggbb"`，sRGB）、多边形 `poly`（≥ 3 点）**或**折线 `line`（≥ 2 点）+ 半宽 `halfW`（米，> 0）；可选 `strength`（0–1，缺省 1，不透明度）、`feather`（米，(0, 20]，缺省 1：边界处覆盖一半，往外 feather/2 落到 0、往里 feather/2 到满，smoothstep）。至多 `BLOCKOUT_PAINT_MAX_ITEMS`（5000）项。
   - `LayoutFromSceneDoc` 用 `BuildGroundPaint(paint, bounds)` 把它烘成一张栅格（格距从 0.5 m 起，格数超过 40 万就翻倍；0105 是 1 m，约 300×470 格）：每格存预乘颜色 C 与覆盖度 A，逐项 `A ← A(1−a) + a`、`C ← C(1−a) + color·a`。布局给出 `groundPaint`（`{ Blend(x, z, rgb) }`：双线性取 C、A，`rgb ← rgb(1−A) + C`，返回 A；没写 paint 是 `null`）、`paint`（原样，给全关总图）、`SampleGroundColor` 也混进涂色。
   - `heightTint`：高度色带上下限（米，`hi > lo`）；不写 = 网格最低 / 最高。0105 坑北抬高了 5 m 上下，钉在南面（z ≥ −8）的最高点，南面颜色一点不变。
-  - `colorSemantics`：这几种 semantic 的块在白盒画质里保留语义色（总控给它们的网格标 `whiteboxCharacter`，白盒渲染器原样画，照样加米格线）；默认白盒画质所有块都刷成同一种灰网格，远处的村子屋顶和墙分不开。至多 16 个。
+  - `colorSemantics`：这几种 semantic 的块的白盒材质保留语义色（`DressWorld` 对它们的材质 `DressAsWhitebox(material, { keepColor: true })`，再加米格线）；其余语义的材质都是同一种灰网格，远处的村子屋顶和墙分不开。至多 16 个。
   - `semanticColors`：`{ semantic: "#rrggbb" }`，盖在第一关那张语义色表上（只影响这一关）。至多 32 项。
 - **2026-10-20 可选 `backdrop`（远景层，只看不走）**（01–05 坑北第三版加的；只做加法，不写的关卡逐位不变、远平面照旧 650）：场地（`bounds` / `terrain`）以外、玩家走不到的远处地面、田、路、村子、山包。
   ```json
@@ -442,7 +442,7 @@ export class BlockoutMap {
 
 ### 5.5 3D 标记（`Script_EditorBlockoutMarkers.mjs`）
 
-- 全部画在 `post.AddDebugOverlay(root)` 里（默认白盒画质会把场景里的 Sprite / Points 藏掉、把普通 Mesh 涂灰，debug overlay 不受影响）；颜色做曝光补偿（`root.userData.PrepareDebugOverlay`，照 `Script_EditorAi` 的 `AiOverlayGeometry`）。
+- 全部画在 `post.AddDebugOverlay(root)` 里（不进预通道、不受场景里材质规则的影响）；颜色做曝光补偿（`root.userData.PrepareDebugOverlay`，照 `Script_EditorAi` 的 `AiOverlayGeometry`）。
 - 每个单位：脚下地环（敌 `#d6604a`、友 `#9dc0e4`、百姓 `#9fc47f`、推测 = 虚线）；朝向短箭头；射界扇（贴地、半透明填充 + 描边）；去向虚线箭头（贴地）。
 - 射界扇只画深度测试那一遍（不穿墙）、填充很淡（不透明度约 0.1）、描边细；扇子起点离相机 6 m 以内的整片淡出（第一人称低机位时近处的扇子会糊满屏幕）。地环、箭头、光柱照常两遍。
 - POI：细光柱 0→8 m + 地环；下一步目标：金色光柱 0→14 m + 呼吸地环。
@@ -474,7 +474,7 @@ export class BlockoutMarkers {
   - `tank` = 八九式 `Type89Tank`（`actorFactory.ModelInstance`，材质同 `Script_FirstLevelMissionView.BuildTank`）；炮塔转向 `arc.yawDeg`。车身摆法照旧（`TankGroundY`）。
   - `cart` = `Model_WoodenEvacCart` + 牛 / 马（`Script_DraftCartModel`，Walk 动画按走过的路程推，车轮跟着转，不滑步）；牲口取单位可选字段 `draft`（`"ox"` / `"horse"`），没写时名字带「牛」用牛、其余用马（驴车照游戏里老耿的车用马）；`animal: false` 不带牲口；车前 `hitchedAnimalM`（4 m）内另有 `animal` 单位时车自己的牲口藏起来（老耿的黑子拉车）。真车板顶 1.12 m，比 `BLOCKOUT_CART_SEATS` 的体块车板高约 0.1 m（坐车尾的人略低，数据没改）。
   - `animal` = 单独一匹马；`state: "down"` 侧躺、不迈腿。
-  - 模型异步下载，下完前照旧是体块，载不进来就一直是体块；组上标 `whiteboxCharacter`，白盒画质里保留贴图。Probe 多给 `model`（`"Type89Tank"` / `"ox"` / `"horse"` / null）、`draftAnimalVisible`、`draftTravelM`。
+  - 模型异步下载，下完前照旧是体块，载不进来就一直是体块；Probe 多给 `model`（`"Type89Tank"` / `"ox"` / `"horse"` / null）、`draftAnimalVisible`、`draftTravelM`。
   - 预演的飞机本来就是游戏机队的三菱 Ki-30 克隆（§14.2，`Script_EditorBlockoutPrevizAircraft`），不变。
 - 2026-10-20 不打仗时不端枪（用户：下蹲、跑步、聊天这类大部分动作不会把枪拿在手上，换成看着正常的占位动作）。判断只看 `aim`：
   - 拿步枪（`BLOCKOUT_PUPPETS.slungWeapons`：汉阳造 / 三八式 / 中正式）、`aim` 为假的兵（国军日军一样）：站着 / 走 / 跑用游戏里的背枪步态（`Script_RelaxedGait` 的 `"slung"`：`RelaxedStand` / `RelaxedWalk` / `BackRifleRun`，枪挂背上）；蹲着不动、没在播片段时播 `PvCrouchRestRifle`（单膝跪、枪竖在身前歇着）。日军不戒备原来是端枪警戒步态（`"alert"`），现在也背枪；拿机枪的日军不戒备照旧 `"alert"`。
@@ -587,20 +587,25 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 - 地形：高度色带（低处偏冷偏暗、高处偏暖偏亮，幅度克制）+ 白盒网格线；没有贴图、草、碎石、壕沟表面网格。
 - 水：北沙河等水块要读得出是水，不能是灰盒子。第一关旧版仍走 `BuildWhiteboxWater`（正片河水着色）。
-- **河沟示意（2026-10-22，`Script_EditorBlockoutCreek.mjs`，数据 `Data_Tuning_Whitebox.BLOCKOUT_CREEK_LOOK`）**：用户「河汊子最好简单的表现一下他的材质，不然我想象不出来」。只改编辑器这一层，不碰 Space / Scene 生成器 / 场景 JSON：
+- **河沟示意（2026-10-22，`Script_EditorBlockoutCreek.mjs`，数据 `Data_Tuning_WhiteboxMaterial.BLOCKOUT_CREEK_LOOK`）**：用户「河汊子最好简单的表现一下他的材质，不然我想象不出来」。只改编辑器这一层，不碰 Space / Scene 生成器 / 场景 JSON：
   - 文件场景的水块（`semantic "water"` / `blockoutWater`）顶面铺浑水贴图（`Texture/Editor/Texture_EditorCreekWaterBase.webp`，世界 xz 平铺 2 m、不透明度 0.88），网格 `BlockoutWater` 标 `whiteboxWater` + `whiteboxTerrain`（白盒画质「保留地形贴图」原样画，不换成蓝灰水色）。
   - 地面上**挨着水块的那一圈**按水块自己认（不针对哪一关写坐标）：逐顶点算到水块脚印（含 `ry` 旋转）的水平距离 `near`（≤ 3.5 m 满、8 m 淡到 0）、比水面高多少 `low`（≤ 2.2 m 满、3.4 m 淡到 0）、坡度 `steep`（1 − 法线 y 从 0.3 起、0.55 满）；泥权重 = `near × max(low, steep)`，写进顶点属性 `blockoutMud`。河汊子（沟深 3、水深 1、壁 2.5 m）：沟底、两壁、岸沿全是泥，岸上再往外约 4.5 m 渐淡。没有水块的关卡全 0、逐位不变。
   - 地面材质挂 `MUD_PATCH`（装在米格线补丁前面）：按权重把高度色带混成湿泥贴图（`Texture_EditorCreekMudBase.webp`，世界 xz 俯视投影 1.5 m 一张；三向投影在 45° 坡上出人字纹，弃用）、粗糙度压到 0.55，泥上的米格线再压一道（褐色上 15% 看不清）。
   - 两张贴图 Lovart 快速模式 GPT Image 2 生成（提示词 `_import/Prompts/Texture_EditorCreek*.txt`，清单 `EditorCreekMud / EditorCreekWater`，tier=editor），本地边缘交叉淡化去接缝后缩到 1024 webp；源图在 `tmp/EditorCreekTex/`（不进仓库）。截图 `_shots/EditorBlockoutCreek/`。
-- 方块：沿用默认白盒画质的灰网格材质。
+- 方块：白盒材质（2026-10-31 起不再是画质档的效果，是材质本身的样子）：灰表面 `#909397` + 世界坐标米格线（`Script_WhiteboxMaterial.DressAsWhitebox`，数在 `Data_Tuning_WhiteboxMaterial.WHITEBOX_MATERIAL`），详见下面「白盒材质」。
 - **地面涂色（2026-10-20）**：场景文件写了 `paint`（§2.2）时，`DressWorld` 先按高度查表上色，再逐顶点把顶点的**世界** (x, z)（`mesh.matrixWorld` 换算；地面网格本来就在原点）丢给 `layout.groundPaint.Blend` 混进涂色（sRGB 里混，再换线性写进顶点色）；覆盖度 0 的顶点照旧写查表色。地面网格 0.5 m 一个顶点（`terrain.cellM`），20–60 m 宽的田块边界清楚。没有 `paint` 的关卡不进这条路，顶点色逐位不变。
-- **块保留语义色（2026-10-20）**：场景文件 `colorSemantics` 列出的 semantic，`DressWorld` 把用这些语义材质的静态块网格标 `whiteboxCharacter`、补米格线，并让白盒渲染器重判一次（`post.whiteboxScene.Invalidate()`）；其它块照旧灰网格。
+- **白盒材质（2026-10-31，用户：「白盒本身是一个看起来像白盒的场景，不是画质开关」）**：白盒编辑器走和游戏同一套渲染管线（画质档跟玩家存的走，没存就是默认 high；`?quality=` 优先；旧存档里的 `whitebox` 当没存），关卡光照 + `BLOCKOUT_EDITOR_FILL` 补光，人物、枪、特效、天空照常。体块的样子由材质给：`DressWorld` 对场地里每种语义的那份材质（`field.materials`，地面除外）调 `DressAsWhitebox`：
+  - 普通语义：颜色改成灰 `#909397`、全粗糙，再挂米格线补丁（`whiteboxGrid1`，世界坐标三向投影，格距 1 m、线宽 1.2 cm、线色 `#55585d`，远了淡掉；`Script_WhiteboxGrid.MakeWhiteboxGridPatch`，经 `Script_MaterialPatches`，契约 11）；
+  - 场景文件 `colorSemantics` 列出的语义：保留语义色，再加同一份米格线；
+  - 水语义（`water`）：蓝灰水色 `#4d6f86` + 掠射角天空色反光（`whiteboxWater1` 补丁，`WHITEBOX_WATER`），不画网格；第一关旧版的水面网格 `BlockoutWater` 也用这份材质（`BuildCreekWater({ material })`，往相机拉一点不和水块顶面打架）；
+  - 地形：高度色带顶点色 + 地面涂色 + 米格线（`blockoutGrid1`，下面）原样，河沟示意原样。
+  这些材质是各语义共用的一份，改了就是整类块一起变；体块网格不再标 `whiteboxCharacter` / `whiteboxTerrain` 之类的画质档标记。
 - 全关总图（Map 模块）在「blocks」那一步、路和块之前，把 `paint` 以 0.32 × strength 的不透明度铺一层（多边形填、折线按 2×halfW 描）。
 - **远景层（2026-10-20，`Script_EditorBlockoutBackdrop.mjs`）**：场景文件写了 `backdrop`（§2.2）时，总控每帧 `backdrop.Sync(layout)`（布局换了才重建）：
   - 远景地面：围着场地一圈圈往外的环形网格（离场地边 −1.5 / 0 / 1 / 3 / 6 / 10 … 4000 m 和 `radiusM`，沿边 2 m 一个点）。−1.5 那一圈在场地里、比场地低 0.4 m 垫底（场地边上万一有缝，透出来的是地不是天），0 那一圈正好在场地边、高 = 场地网格（低 1 cm 让场地赢），往外按 `backdropGroundAt`。顶点色 = 场地高度色带（按边上那点的高）往 `ground.color` 过渡。
   - `paint` 用 `RasterizeBackdropPaint` 画成一张 RGBA 图（最长边 ≤ 4096 像素、≤ 显卡上限，01–05 是 4096×2295、1.83 m 一个像素；预乘累积，没涂到的像素 a = 0、rgb = `ground.color`，外框一圈透明），sRGB、mipmap、各向异性 ≤ 8。着色器按世界 (x, z) 取图、按覆盖度盖在顶点色上，再叠编辑器的米格线（场地地面同一个补丁，远了自己淡掉），出色之后按 `haze` 往远处变淡。
   - `box` / `blob` / `hill` 各合成一个网格（顶点色、同一份材质 + 变淡补丁）；`tree` 交给 §5.7 的树（`BlockoutTreeSpots` 多收远景层里的 `tree`，根按 `backdropGroundAt`，没有碰撞）。
-  - 网格都标 `userData.whiteboxTerrain`（白盒画质保留地形贴图时原样画）+ `blockoutBackdrop`，不投影、不剔除；加进场景后让白盒渲染器重判一次。
+  - 网格标 `userData.blockoutBackdrop`，不投影、不剔除。
   - `Debug.Blockout.Stats().backdrop`：`built / far / meshes / vertices / triangles / shapes / texture / rasterMs / buildMs / cameraFar`。
   - 01–05 实测：4 个网格、约 5.9 万顶点 / 8.8 万三角形；建一次约 0.6 s（其中画图 0.45 s），之后每帧 4 次绘制。
 
@@ -693,7 +698,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 | `Script_EditorBlockoutLayoutEditTest.mjs`（2026-10-21） | 纯 node | 编辑布设的改动记录与导出（§4.4）：from / to、挪回原处就删、整组平移吸附挪动量、撤销 / 重做 / 取消、标记、`Reconcile`、导出排序与文字、`数据：` 行往返 |
 | `Script_EditorBlockoutMapEditBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 0610 08-1 上真鼠标走一遍编辑布设（§4.4 门禁那条）；截图与导出文字存 `_shots/EditorBlockoutMapEdit/` |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
-| `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
+| `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&scale=small&audio=0` 启动（玩家存的 high 档）；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
 | `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 01–05 玩家出不了沟：剧本通路逐 0.25 m 在「沟里」且离隐形墙 ≥ 0.4 m；19 处低处 × 8 个方向跳 + 翻三秒每帧都在沟里；射击台翻不过胸墙；顺交通沟 / 支沟走得到；手榴弹飞出沟；预演里翻出沟的 NPC 照常出沟；无错（§13 末） |
 | `Script_EditorBlockoutFlyBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | `FirstLevel0105` 上钉飞行观察（§4.3）：O 不与 `KEYMAP` / 编辑器键冲突；按钮 / O 键进，起飞位姿 = 进入时相机；W S A D E Q 位移 = 速度 × 时间、Shift ×4、抬头沿视线斜飞、穿墙不查碰撞、唯一的地面下限；滚轮 ×1.25 / 夹上下限且不换枪；鼠标位移（`Debug.Look` 与真 mousemove）转飞行相机、玩家不转；狂按游戏键与左右键后玩家位置 / 朝向 / 姿态 / 血量 / 弹药 / 槽位不变；小地图与全关总图（M）里有青色相机标记；P 复制的是相机位姿、重现链接带第 6 项并真能从该高度起飞；O 退出后相机回到进入时玩家视角（< 2 cm）、枪模还回来；预演中进不去、飞行中开播预演自动退出、切关自动退出；无未捕获错误 |
 | `Script_EditorBlockoutTouchBrowserTest.mjs`（2026-10-23） | 浏览器（游戏，手机模拟） | 手机验收触屏层（§4.5）：`FirstLevel0105` 上 390×844（isMobile + hasTouch，CDP 真触摸、能多指）不带参数自动开；该收的收起、枪模照旧可见；卡片 / 图层按钮 / 齿轮 / 导航栏 / 摇杆 / 大按钮在屏内不重叠、按钮 ≥ 44 px；卡片点标题收起展开；空处拖动转视角（方向、量）；摇杆往前走、松手停、拖出圈外冲刺更快、摇杆与转头两指并用；飞行里摇杆 1 s ≈ 8 m、按住「升」、「加速」×4、玩家原地、退出复位；预演按钮开播 / 停止、预演中摇杆不吃手指、拖动不转头；总图双指放大、两下快点回全图、手指点在关键帧旁 14 px 也能跳；图层面板展开 / 开关 / 点空处收起；导航栏「下一个」；横过来 844×390 同样不重叠；桌面不开触屏层；无未捕获错误；截图存 `_shots/EditorBlockoutTouch/` |
@@ -703,7 +708,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
 - 验收只跑覆盖改动的测试（用户口径）；浏览器整趟每项 ≤ 2 次。
-- 视觉验收看实际截图：`?quality=whitebox` 下 01-2、03-2、08-2、12-1、18-2 五个关键帧各一张 + 全关总图一张 + 第二关一张。
+- 视觉验收看实际截图：01-2、03-2、08-2、12-1、18-2 五个关键帧各一张 + 全关总图一张 + 第二关一张。
 
 ## 11. 分工
 
@@ -756,7 +761,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - 2026-10-20（不端枪）：§5.6 不戒备的步枪兵站 / 走 / 跑背枪、蹲着歇枪竖着；预演里提枪说话换背枪版、卧倒抱头背枪；动作库开编辑器就下。
 - 2026-10-20（默认关卡）：§1 白盒工具默认开新剧本 01–05（菜单入口、没写 / 写错 `level` 都进它），不再默认开旧版第一关。
 - 2026-10-20（正式模型）：§5.6 战车 / 车 / 牲口换游戏里的八九式、撤运车 + 牛 / 马（带 Walk 动画），单位可选 `draft`；§5.7 树换枯树模型（树干块只留碰撞）；关键帧机位的蹲 / 趴走开就站起来（§7）。
-- 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（`Script_EditorBlockoutPrevizFx` 在调试叠加层另画简易爆炸，只在编辑器、只在白盒特效关时画）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。
+- 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（当时由 `Script_EditorBlockoutPrevizFx` 另画简易爆炸；2026-10-31 白盒画质档删除后这份简易画法已删，预演里的爆炸 / 烟 / 枪口火一律是 VfxSystem 的真特效）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。
 - 2026-10-18（01–05 第二轮修补）：§3 单位加可选 `lie`、`weapon` 写 `Dadao` 摆白刃戒备；§5.6 倒地的人移动只平移、`lie:"along"` 顺着躺、预演 / 关键帧换武器就地 `SetWeapon`、Probe 多给几项；§14.1 演员键加 `lie`、`weapon`（阶跃）；§13 干沟南岸坎顶加矮土埂（南边平地看沟底余量 0.16 → 0.78 m）、板桥门板之间 5 cm 缝、05-2 桥下仰看与 05-3 甩手榴弹换机位、冬瓜顺着被子躺平滑跟着走、班长 02-2 抡大刀跳沟。
 - 2026-10-18（01–05 返工）：§13 FirstLevel0105 按用户当天改稿重做地形、关键帧与预演（南沿迂回、两人并排拖单被、日常摆件、干沟集结处、路口板桥）。
 - 2026-10-18（01–05 新剧本白盒）：新关卡 `FirstLevel0105`（§13）；场景文件加可选 `gates` 与块的显式 `y`，布局 `hideOpenGates`（§2.2）；关键帧可选 `stageLabel`、单位可选 `castId`（§3）；预演（§14，用户 10-18 拍板：编辑器里加预演，缺的动作先用现成动作顶上）。
@@ -795,7 +800,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - 05-2：桥下仰看的 eye 挪到桥面南沿往南约 2 m 的沟底（蹲姿眼高）、朝西北 38°、仰 26–30°、视场 76°：画面从下往上是门板底面、桥沿、压在桥上的车身、天空；落土是烟 + 说明字。05-3：甩手榴弹换成顺子身后沟上方的宽镜头（视场 72°），前景顺子替身探身（没有扔手榴弹的片段，`PointBlockade` 顶上），越过沟沿是车尾和那块铁板。
 
 **2026-10-18 第三轮修补（用户「小毛病全都修掉」）**：
-- **爆炸看得见**：默认白盒画质（特效关）把 VfxSystem 整棵藏掉（`Script_Vfx` 的 `scene.onBeforeRender` 读 `scene.userData.whiteboxEffects`，`WhiteboxSceneRenderer` 还把 Points / Sprite / 半透明特效网格逐个藏掉），预演里 03 掷弹筒落点、05-3 炸车尾都看不见。编辑器预演另画一份简易爆炸（§14.2），游戏本身的爆炸不动。验收（1280×720，爆前 0.05 s 与爆后对比，爆点投到屏幕、半径 140 px 内隔一个像素取样，RGB 差之和 > 60 算变色）：03-2 掷弹筒落点爆后 0.12 s 变色 5567 / 15400 个取样点（其中偏暖的火光色 4070），爆后 1 s 土柱 10150 / 15379；05-3 车尾爆后 0.12 s 4543 / 15392（火光色 2638），爆后 1 s 10364 / 15393。
+- **爆炸看得见**（2026-10-31 起不再需要：白盒画质档删除，VfxSystem 的真爆炸直接画；下面是当时的记录）：默认白盒画质（特效关）把 VfxSystem 整棵藏掉（`Script_Vfx` 的 `scene.onBeforeRender` 读 `scene.userData.whiteboxEffects`，`WhiteboxSceneRenderer` 还把 Points / Sprite / 半透明特效网格逐个藏掉），预演里 03 掷弹筒落点、05-3 炸车尾都看不见。编辑器预演另画一份简易爆炸（§14.2），游戏本身的爆炸不动。验收（1280×720，爆前 0.05 s 与爆后对比，爆点投到屏幕、半径 140 px 内隔一个像素取样，RGB 差之和 > 60 算变色）：03-2 掷弹筒落点爆后 0.12 s 变色 5567 / 15400 个取样点（其中偏暖的火光色 4070），爆后 1 s 土柱 10150 / 15379；05-3 车尾爆后 0.12 s 4543 / 15392（火光色 2638），爆后 1 s 10364 / 15393。
 - **板桥门板**：缝 5 → 9 cm（`L0105_BRIDGE.gapM`；块中心只到厘米，实测 8–9 cm），每块门板逐块给 `boardJitter`：厚 6–9 cm、底面压在横木顶上或垫高 1–2 cm、顶面高低差 3 cm 上下、横向长短 ±10 cm、歪 ±0.9°。板比缝薄，桥下仰看斜着也透得出天光；从上往下看一块块板之间露出沟底。横木位置不变，桥下净空（横木底离沟底）仍是 1.76 m。SceneTest 查缝 6–10 cm、至少两种厚度、顶面高低差 2–4 cm、门板底面不压进横木。
 - **冬瓜躺在被子上**：02-3 攥顺子袖子那一下原来播 `WoundedReach`（坐起来伸手、半个身子在被子外）且转身面朝顺子，改成不播片段、不转身，只动嘴 + 说明字「（冬瓜躺在被子上，一把攥住顺子的袖子）」；`lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`（§5.6）。实测（02-3 被子铺开起到 02E-2，预演每 0.25 s + 关键帧之间的过渡全程）：骨盆、头、两脚全在被子（0.7 × 2.1 m）里，离被边最少 0.124 m（原来左脚出去 0.24 m）；骨盆离地 ≤ 0.21 m、头 ≤ 0.23 m，一直是躺着。
 - **烟与枪口火**：白盒下 `smoke` / `muzzle` 事件原来同爆炸一样看不见（VfxSystem 的烟源、枪口火整棵被藏），预演里另画（§14.2）。验收同爆炸（前后成对截图数变色）：05-2 板缝漏土，桥下仰看 6.55 s → 7.8 s 变色 7665 / 11683，侧看 5.75 s → 6.3 s 5648 / 15383；04-1 鬼子开枪，枪口那一下（+0.03 s）半径 60 px 内 741 / 2823。掷弹筒出膛的白烟在预演原来的机位里被坑沿胸墙和土坎挡着（本来就看不见），换一个旁观机位（测试时临时注入，预演文件没改）验：1.35 s → 2.9 s 变色 761 / 11309；05-3 车尾黑烟旁观机位 4.55 s → 9 s 2439 / 20101。
@@ -991,7 +996,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
   - `Seek` 只对**持续状态**确定（演员、镜头、白光、黑场、说明字、字幕、嘴、信号、持续的烟）；一次性的爆炸、枪口火、音效 Seek 时不补放。按走过的距离推身体的走路片段（带 `referenceSpeedMps`，如 `IjaWalkStabProne`）Seek 时身体停帧，正常播放没问题。
   - 嘴：previz 文件写了 `faceTracks` 就按 mp3 sha256 用口型轨，没有就用配音的音频包络。
   - 预演期间小地图照常显示。
-- 简易爆炸与飞行中的手榴弹（2026-10-18 第三轮，`Script_EditorBlockoutPrevizFx.mjs`）：默认白盒画质（特效关）出画前把 VfxSystem 整棵藏掉，`vfx.Explosion` 在白盒下什么都画不出来。预演自己在 `post.AddDebugOverlay` 的调试叠加层里另画：爆炸 = 一团火光（橙、0.3–0.5 s 胀大退掉，半径 = 0.22 × radius，夹在 0.25–2 m）+ 土柱 / 烟尘（7 团褐灰球往上冒、胀大变淡，2.6 s，顶高 0.75 × radius）+ 贴地尘环（写了 `h` > 0.5 的不画）；`radius ≤ 1` 的「子弹打在土里」只有一小团土（0.6 s）。**只在白盒且特效关时画**（`post.whiteboxScene.config.effects === false`；其它画质 VfxSystem 自己画得出来，不叠两份）；游戏本身各画质的爆炸不动。演员键 `throw` 的弹（一捆五根深色短圆柱 + 一条淡色拖尾）任何画质都画。两样都按预演时间求值：**Seek 到爆炸那一秒也看得见**（VfxSystem 的爆炸、枪口火、音效 Seek 时照旧不补放）。同一轮补了**烟**（`smoke` 事件：窗口 `[t, t + dur)` 里每个烟源 9 个槽位等间隔冒烟球，每团往上冒、往外飘、胀大、先浓后淡，窗口结束后已冒出来的散完；`SmokeDust` 褐黄土雾（冒 1.4 m、寿命 2.4 s）、`SmokeWhite` 灰白烟（掷弹筒出膛，冒 4.5 m、3 s）、`SmokeBlack` 黑烟柱（冒 5.5 m、3.6 s），表在 `PREVIZ_SMOKE_LOOK`）与**枪口火**（`muzzle` 事件：每一发 0.07 s 亮黄火光 + 0.6 s 一小团灰烟，位置取演员枪口，顺子自己开枪不画），同爆炸只在白盒特效关时画、按 t 求值。`Previz.State().fx` → `{ blasts, grenades, smokes, muzzles, blastsDrawn }`（这一帧画了几团爆炸、几颗弹、几个烟源、几下枪口火，白盒简易特效开没开）。
+- **（2026-10-31 更新：白盒画质档删除，`Script_EditorBlockoutPrevizFx` 只剩飞行中的手榴弹；爆炸 / 烟 / 枪口火的简易画法、`PREVIZ_SMOKE_LOOK`、`BlastsHidden`、`State().fx` 里的 `blasts / smokes / muzzles / blastsDrawn` 都已删，`State().fx` 只剩 `{ grenades }`。飞机扫射的弹着点土改成播放时跨过那一刻冒一下 VfxSystem 的真弹着土（`PrevizAircraft` 的 `dirt` 回调）。下面是 2026-10-18 当时的记录。）** 简易爆炸与飞行中的手榴弹（2026-10-18 第三轮，`Script_EditorBlockoutPrevizFx.mjs`）：默认白盒画质（特效关）出画前把 VfxSystem 整棵藏掉，`vfx.Explosion` 在白盒下什么都画不出来。预演自己在 `post.AddDebugOverlay` 的调试叠加层里另画：爆炸 = 一团火光（橙、0.3–0.5 s 胀大退掉，半径 = 0.22 × radius，夹在 0.25–2 m）+ 土柱 / 烟尘（7 团褐灰球往上冒、胀大变淡，2.6 s，顶高 0.75 × radius）+ 贴地尘环（写了 `h` > 0.5 的不画）；`radius ≤ 1` 的「子弹打在土里」只有一小团土（0.6 s）。**只在白盒且特效关时画**（`post.whiteboxScene.config.effects === false`；其它画质 VfxSystem 自己画得出来，不叠两份）；游戏本身各画质的爆炸不动。演员键 `throw` 的弹（一捆五根深色短圆柱 + 一条淡色拖尾）任何画质都画。两样都按预演时间求值：**Seek 到爆炸那一秒也看得见**（VfxSystem 的爆炸、枪口火、音效 Seek 时照旧不补放）。同一轮补了**烟**（`smoke` 事件：窗口 `[t, t + dur)` 里每个烟源 9 个槽位等间隔冒烟球，每团往上冒、往外飘、胀大、先浓后淡，窗口结束后已冒出来的散完；`SmokeDust` 褐黄土雾（冒 1.4 m、寿命 2.4 s）、`SmokeWhite` 灰白烟（掷弹筒出膛，冒 4.5 m、3 s）、`SmokeBlack` 黑烟柱（冒 5.5 m、3.6 s），表在 `PREVIZ_SMOKE_LOOK`）与**枪口火**（`muzzle` 事件：每一发 0.07 s 亮黄火光 + 0.6 s 一小团灰烟，位置取演员枪口，顺子自己开枪不画），同爆炸只在白盒特效关时画、按 t 求值。`Previz.State().fx` → `{ blasts, grenades, smokes, muzzles, blastsDrawn }`（这一帧画了几团爆炸、几颗弹、几个烟源、几下枪口火，白盒简易特效开没开）。
 
 - 飞机与慢动作的运行时（2026-10-19）：飞机在 `Script_EditorBlockoutPrevizAircraft.mjs`（借 `editorHost.aircraft`——`Script_Main` 的 `game.aircraft` 取值器、`Script_Editor.editorHost` 转出——的 `AcquireClone` / `ReleaseClone`，自己的组标 `whiteboxCharacter` 所以白盒画质里保留贴图；引擎声 `audio.Play("planeDrone")` 起一条 voice 后每帧 `MoveVoice` 搬到机身、离场 / 中断 `StopVoice` 淡出；`audio=0` 时只画不响）。慢动作在 `Script_EditorBlockoutPreviz.Update`：`run.t += dt × PrevizTimeScale(seq, run.t)`，总控把 `dt × previz.TimeScale()` 喂给演员层（`BlockoutPuppets.Update`），所以人物步态 / 片段 / 动画时钟一起慢；卡片的秒数前写「慢 ×0.3」。`Previz.State()` 多给 `timeScale`、`wallT`（墙上已播秒数）、`aircraft[]`（每架的机型 / 可见 / 位置 / 模型有没有载进来）、`missingModels`。模型还没载进来（机队异步下载）那一帧跳过、下一帧再试。
 - 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。

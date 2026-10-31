@@ -25,13 +25,13 @@ assert.ok(FlareGlareProfile(0,.004)<FlareGlareProfile(0,0),'Coarse pixels filter
 assert.equal(FlareGlareProfile(G.supportDeg*Math.PI/180),0);
 const samples=Array.from({length:100},(_,i)=>FlareGlareProfile(i/100*.05));
 assert.ok(samples.every((v,i)=>i===0||v<=samples[i-1]),'A restrained halo has no invented diffraction rings');
-assert.equal(G.slots,2);assert.equal(G.byQuality.low,0);assert.equal(G.byQuality.whitebox,0);
+assert.equal(G.slots,2);assert.equal(G.byQuality.low,0);assert.equal(G.byQuality.whitebox,undefined);
 // Exercise the actual pass gates: medium has no solar lens-flare capability,
 // yet its source PSF must run. Hiding the emitter clears the optical layer while
 // leaving the independent physical light object/intensity present.
 const camera=new THREE.PerspectiveCamera(70,16/9,.1,600);camera.updateMatrixWorld();
 const marked={...source,position:new THREE.Vector3(0,0,-100),opticalEmitter:true,temporalFlutter:false,handle:1};
-const pipeline={quality:'medium',whiteboxConfig:null},pass=new LensFlarePass(pipeline,{});
+const pipeline={quality:'medium'},pass=new LensFlarePass(pipeline,{});
 pass.SetSource({fireSources:new Map([[1,marked]])});
 const ctx={preset:{lensFlare:false},options:{lensFlare:0},normalDepthTexture:{},camera,view:camera.matrixWorldInverse,
  projScale:new THREE.Vector2(1/Math.tan(35*Math.PI/180)/(16/9),1/Math.tan(35*Math.PI/180)),
@@ -42,6 +42,5 @@ try{
  marked.emitterVisible=false;pass.Prepare(ctx);assert.ok(!pass.Enabled());assert.equal(marked.currentIntensity,90000);
  assert.ok(pass.uniforms.uEmitterSource.value.every(slot=>slot.w===0));
  marked.emitterVisible=true;pipeline.quality='low';pass.Prepare(ctx);assert.ok(!pass.Enabled());
- pipeline.quality='high';pipeline.whiteboxConfig={effects:true};pass.Prepare(ctx);assert.ok(!pass.Enabled());
 }finally{pass.Dispose();}
 console.log('FlareGlareTest passed',JSON.stringify({near,far,integral:clear,filteredIntegral:coarse}));

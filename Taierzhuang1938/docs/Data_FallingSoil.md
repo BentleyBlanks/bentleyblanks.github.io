@@ -1,6 +1,6 @@
 # 共用落土：不同程度的漏灰、漏土与崩落
 
-入口：高级工具 → 特效与声音 → 特效预览，效果库选择以 **落土** 开头的七种预设。推荐直达 `/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&quality=high&audio=0`：沿用现有工具首页的 `tool=vfx` 路由，不先构建整关；`audio=0` 只关闭此视觉预览的声音。白盒模式也临时保留特效原材质，退出恢复；完整光照按 high 验收。需要挂着第一关宿主检查时仍可用 `?whitebox=p012&editor=vfx`。
+入口：高级工具 → 特效与声音 → 特效预览，效果库选择以 **落土** 开头的七种预设。推荐直达 `/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&quality=high&audio=0`：沿用现有工具首页的 `tool=vfx` 路由，不先构建整关；`audio=0` 只关闭此视觉预览的声音。完整光照按 high 验收（2026-10-31 起没有白盒画质档）。需要挂着第一关宿主检查时仍可用 `?whitebox=p012&editor=vfx`。
 
 本轮只交付共享效果与现有编辑器接入，不改第一关 01/05 剧情，不自动替换其历史落土实现。程度与情境共用同一实现，没有按关卡号分叉。按实拍特征调整的外观、粒径、阻力和时序均是美术近似，未按真实土质、质量流量或空气动力学进行物理标定，也不作为历史测量。
 

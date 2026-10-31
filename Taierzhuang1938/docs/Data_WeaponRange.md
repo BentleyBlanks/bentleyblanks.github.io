@@ -73,4 +73,4 @@ node Taierzhuang1938/Script_WeaponShot.mjs --reload
 
 音频清单同时约束 PrefetchPacks 与手势后的 LoadPacks / LoadSfxPack；必需模型完成后才预取枪声、动作、脚步、命中和投掷音效。不加载剧情语音、音乐、车厢与战场环境包（测试场原本没有这些播放预设）。普通游戏的完整音频路径保留。
 
-普通入口默认正常 high，白盒编辑器独立保存画质，详见 [画质入口](Data_WhiteboxQuality.md)。
+普通入口默认正常 high；白盒编辑器与游戏同一套画质档（2026-10-31 起没有白盒画质档），见 [Data_WhiteboxQuality.md](Data_WhiteboxQuality.md) 顶部说明。

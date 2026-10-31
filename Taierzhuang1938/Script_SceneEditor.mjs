@@ -17,13 +17,14 @@ import {
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "./Script_WhiteboxGrid.mjs";
+import { WHITEBOX_MATERIAL } from "./Data_Tuning_WhiteboxMaterial.mjs";
 
 export const SCENE_EDITOR = Object.freeze({
   pollMs: 2000,
   terrainMaxVerts: 900000,
   near: 0.1, far: 9000, fov: 55,
   flyMps: 14, fastMul: 4, lookRadPerPx: 0.0032,
-  grid: Object.freeze({ gridSize: 1, gridLineWidth: 0.012, gridColor: "#55585d" }),
+  grid: WHITEBOX_MATERIAL,   // 米格线与灰表面：同白盒编辑器
   sky: "#adb8c2", fog: [900, 6500],
   snapM: 0.5, snapDeg: 15,
   gizmoScreen: 0.12,
@@ -48,7 +49,7 @@ function El(tag, cls, text) {
   return node;
 }
 
-function HexInt(value, fallback = 0x909397) {
+function HexInt(value, fallback = parseInt(WHITEBOX_MATERIAL.surfaceColor.slice(1), 16)) {
   if (typeof value === "number") return value;
   if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) return parseInt(value.slice(1), 16);
   return fallback;

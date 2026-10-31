@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
 
-const quality = process.argv.find(arg => arg.startsWith('--quality='))?.slice(10) || 'whitebox';
+const quality = process.argv.find(arg => arg.startsWith('--quality='))?.slice(10) || 'low';
 const samples = Number(process.argv.find(arg => arg.startsWith('--samples='))?.slice(10) || 0);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'tmp', 'FrameDebugger'); await fs.mkdir(output, { recursive: true });
@@ -214,12 +214,12 @@ try {
     // NVIDIA) the same command stream is not bit-reproducible by itself: results
     // move by one half-float ulp with GPU scheduling (live submission interleaves
     // CPU work, the replay is back-to-back) and in a driver window after level
-    // load (docs/Data_FrameDebugger.md, 回放保真度). So whitebox runs on SwiftShader
+    // load (docs/Data_FrameDebugger.md, 回放保真度). So the low tier runs on SwiftShader
     // (deterministic; ~2 min to load). Full presets never finish warming shaders in
     // software within the timeout, so they (and --gpu) stay on the GPU and the
     // checked capture is serialized identically in both executions instead: a 1×1
     // readPixels after every event of the live frame and of the timing replay.
-    const software = process.argv.includes('--software') || quality === 'whitebox' && !process.argv.includes('--gpu');
+    const software = process.argv.includes('--software') || quality === 'low' && !process.argv.includes('--gpu');
     gameBrowser = software ? await LaunchBrowser({ extraArgs: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }) : browser;
     console.log('Game renderer', software ? 'SwiftShader' : 'hardware GPU, serialized pixel check');
     const game = gameBrowser === browser ? page : await gameBrowser.newPage({ viewport: { width: 1100, height: 760 } });

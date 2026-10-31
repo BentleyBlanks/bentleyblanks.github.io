@@ -162,9 +162,8 @@ import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
-import { WhiteboxGraphicsOverrides, WhiteboxPostOptions, BLOCKOUT_EDITOR_FILL } from "./Data_Tuning_Whitebox.mjs";
-import { LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
-import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
+import { BLOCKOUT_EDITOR_FILL } from "./Data_Tuning_WhiteboxMaterial.mjs";
+import { LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { BootPaper } from "./Script_BootPaper.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
@@ -274,9 +273,8 @@ window.__bootGuardDismiss?.();
 
 const params = new URLSearchParams(location.search);
 const GRAPHICS_PROFILE = LoadGraphicsProfile(location.search);
-// Tier controls geometry/asset budgets; presentation is independently editable.
-const QUALITY = GRAPHICS_PROFILE === "whitebox" ? "high" : GRAPHICS_PROFILE;
-const WHITEBOX_CONFIG = GRAPHICS_PROFILE === "whitebox" ? LoadWhiteboxConfig() : null;
+// 画质档同时决定几何 / 资产预算与呈现（2026-10-31 起没有「白盒」档，白盒编辑器走同一套）。
+const QUALITY = GRAPHICS_PROFILE;
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
 // 空气墙调试显示：第一关白盒把 tag:"airWall" 的体块画成半透明红板（docs/Data_FirstLevelGuidance20260928.md §3.2）。
@@ -550,7 +548,6 @@ camera.rotation.order = "YXZ";
 const trailFocus = new THREE.Vector3();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
-  whitebox: WHITEBOX_CONFIG,
 });
 // AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
 // （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
@@ -688,7 +685,6 @@ function ProfilerFrameContext() {
 const graphics = CreateGameGraphics({ profile: GRAPHICS_PROFILE, preset: post.preset, taaEnabled: post.taaEnabled,
   gi: params.get("gi") === "1", gore: IsGoreEnabled() });
 NormalizeGraphicsDetails(graphics, post);
-if (WHITEBOX_CONFIG) Object.assign(graphics, WhiteboxGraphicsOverrides(WHITEBOX_CONFIG));
 // 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
 // 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
 const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
@@ -741,9 +737,7 @@ if (post.prepassPass) post.prepassPass.staticBatch = prepassStaticBatch;
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
 SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
-const sky = new SkyDome(renderer, { quality: QUALITY,
-  environment: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.environment || WHITEBOX_CONFIG.weaponReflections,
-  atmosphere: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.atmosphere });
+const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
@@ -751,23 +745,9 @@ SetWaterSkyUniforms(sky.uniforms);
 // BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
 // Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
-// 白盒关卡编辑器在正片光照下（非白盒画质，或白盒开了「场景光照」）背光面近乎死黑：补光抬上来。
+// 白盒关卡编辑器走正片光照，背光面近乎死黑：补光抬上来（只管编辑器，正片不吃）。
 if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
-if (WHITEBOX_CONFIG) {
-  renderer.shadowMap.enabled = graphics.shadows;
-  lights.SetShadowsEnabled(graphics.shadows);
-  lights.SetClusteredEnabled(graphics.clusteredLights);
-}
-const whiteboxRenderer = WHITEBOX_CONFIG ? new WhiteboxSceneRenderer(scene, WHITEBOX_CONFIG, {
-  sky: sky.mesh,
-  sunCascades: lights.csm.lights,
-  prepareMaterial: (material, source) => {
-    if (WHITEBOX_CONFIG.firstPersonShadow && source.userData.firstPersonSelfShadow) firstPersonSelfShadow?.PatchPresentationMaterial(material);
-  },
-}) : null;
-post.whiteboxScene = whiteboxRenderer;
-const graphicsProfileApi = CreateGraphicsProfileApi({ profile: GRAPHICS_PROFILE,
-  config: WHITEBOX_CONFIG || LoadWhiteboxConfig(), post, renderer: whiteboxRenderer });
+const graphicsProfileApi = CreateGraphicsProfileApi({ profile: GRAPHICS_PROFILE, post });
 // 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
 // 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
 lights.SetViewCamera(camera);
@@ -2301,7 +2281,7 @@ async function Boot() {
   // 预热全编成了用不上的变体，第一颗手榴弹炸出弹坑、断肢那一帧再现编（实测 3 s + 9 s）。
   // 编辑器那次再套是同一组值，编译期开关不变就不重编。
   try {
-    if (LoadSavedGraphics(graphics) || WHITEBOX_CONFIG) ApplyGraphics();
+    if (LoadSavedGraphics(graphics)) ApplyGraphics();
   } catch (error) {
     console.warn("[Main] 预热前套用存档画质失败（退回编辑器建好后再套）", error);
   }
@@ -4660,25 +4640,19 @@ function EndOfficialCampaign(phase) {
  * 提交编译（`renderer.compile`）要按**真出画时的场景状态**编，缓存键差一位就是一份用不上的
  * 孪生 program —— 白链一遍，真正那份到出画时还得同步现编现等。两处会让两边不一样：
  *   ① 绑着的靶：键里的 `outputColorSpace` 按当前靶算，场景网格只画进 HDR 主靶（§18.2 ②）；
- *   ② 白盒画质（出厂默认档）：出画前 `WhiteboxSceneRenderer.Begin` 藏关卡灯、换中性光、把场景资产
- *      换成白盒材质。不在这一层里提交，编出来的是「关卡灯光 + 原材质」那一份。2026-10-01 第一关
- *      白盒档实测：提交的 135 个 program 一个都没用上，真用的 64 个全在出画时同步链接，关掉 program
- *      缓存时主线程卡 22.5 s（docs/Data_TechRenderPipeline.md §18.7）。
+ *   ② （2026-10-31 删）原来这里还有一条「白盒画质出画前换材质、换灯光」的规矩，白盒档没了、编出来的就是出画的那一份。
  * @returns {boolean} 提交成功（失败时调用方退回「用到时现编」）
  */
 function CompileAsRendered(root, label = "submit") {
   const restoreTarget = renderer.getRenderTarget();
   if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
-  let restoreWhitebox = null;
   try {
-    restoreWhitebox = post?.whiteboxScene?.Begin(scene, camera, { compileRoots: [root] }) || null;
     renderer.compile(root, camera, scene);
     return true;
   } catch (error) {
     console.warn(`[Main] 着色器提交编译失败（${label}，退回用到时现编）`, error);
     return false;
   } finally {
-    restoreWhitebox?.();
     renderer.setRenderTarget(restoreTarget);
   }
 }
@@ -10256,9 +10230,7 @@ function RenderSceneContent(dt) {
   // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
-  // 白盒默认不跑预通道（WhiteboxPassPlan）：那张靶是空的，交出去会让弹孔逐像素「后面没有表面」全裁掉。
-  const prepassLive = !post.whiteboxConfig || post.whiteboxPasses?.has("prepass");
-  vfx.SetDepthSource(prepassLive ? post.NormalDepthTexture : null, post.width, post.height, post.SceneDepthTexture);
+  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height, post.SceneDepthTexture);
   // 落地扬尘按画质档降分辨率算体积（Script_PostGroundDust）：尘团系统是懒建的，每帧交一次。
   post.SetGroundDustSource?.(vfx.dustFields || null);
   // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾
@@ -10351,7 +10323,7 @@ function RenderSceneContent(dt) {
   const openingLens = missionRuntime?.Perception().lens || null;
   hud.SetLens(openingLens);
   profiler.B("post");
-  post.Render(scene, camera, WhiteboxPostOptions(WHITEBOX_CONFIG, ApplyLensToPost({
+  post.Render(scene, camera, ApplyLensToPost({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
@@ -10410,7 +10382,7 @@ function RenderSceneContent(dt) {
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !WEAPON_RANGE ? AdsSightUv() : null,
-  }, openingLens)));
+  }, openingLens));
   profiler.E("post");
   profiler.GpuFrameEnd();
   skeletonPassGuard = false;
@@ -10642,7 +10614,6 @@ function RecompileAllMaterials() {
 function ApplyGraphics() {
   if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   NormalizeGraphicsDetails(graphics, post);
-  if (WHITEBOX_CONFIG) Object.assign(graphics, WhiteboxGraphicsOverrides(WHITEBOX_CONFIG));
   // 断肢内容开关。`?gore=0` 压过面板与存档那一位 —— 出图与回归靠这个参数
   // 拿确定的画面，不能被上一次存下的偏好推翻（见 GORE_FORCED_OFF）。
   // 关掉时 `GoreSystem.SetEnabled` 会顺手 ReleaseAll：场上已经飞出去的肢块

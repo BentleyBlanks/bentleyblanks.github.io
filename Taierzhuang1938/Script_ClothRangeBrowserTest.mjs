@@ -25,6 +25,7 @@ page.on('request', request => {
 });
 page.on('pageerror', error => { errors.push(String(error)); console.log('PAGE ERROR', String(error)); });
 page.on('console', message => { if (message.type() === 'error') { errors.push(message.text()); console.log('CONSOLE ERROR', message.text().slice(0, 300)); } });
+// 旧存档里残留的 "whitebox" 画质与白盒配置（2026-10-31 起没有白盒档）：当没存，回默认档；旧键原样留着、不迁移
 const savedProfile = JSON.stringify('whitebox');
 const savedWhitebox = JSON.stringify({ schema: 2, assetTextures: false, grid: true, gridSize: 2, surfaceColor: '#909397' });
 await page.addInitScript(({ savedProfile, savedWhitebox }) => {
@@ -156,8 +157,8 @@ try {
       audio: JSON.parse(localStorage.getItem('tengxian1938_audio_v1')).master };
   });
   assert.equal(result.boot.level, 'ClothRange');
-  assert.equal(result.boot.graphics.profile, 'high', 'Bare cloth URL uses original materials even with a saved whitebox preference');
-  assert.equal(result.boot.graphics.whitebox, false);
+  assert.equal(result.boot.graphics.profile, 'high', 'Bare cloth URL uses original materials; a legacy saved whitebox profile falls back to the default tier');
+  assert.equal(result.boot.graphics.whitebox, undefined, 'Inspect() has no whitebox field any more');
   assert.equal(result.boot.savedProfile, savedProfile); assert.equal(result.boot.savedWhitebox, savedWhitebox);
   assert.equal(result.boot.state.selected, 'banner');
   assert.ok(result.boot.camera[0] > 2, 'Completing the final GLB preserves the selected banner camera');
@@ -561,8 +562,7 @@ try {
   assert.equal(result.normalProfile.storedProfile, savedProfile); assert.equal(result.normalProfile.storedWhitebox, savedWhitebox);
   console.log('PASS normal boot / rAF / pointer orbit / real-time pause / Esc resume');
 
-  // An explicit whitebox URL still wins. Exercise its cached DRAW material too,
-  // since source material.wireframe alone cannot detect the old replacement bug.
+  // `?quality=whitebox` is just an unknown value now: default tier, original materials, wireframe toggles live.
   await page.goto(`${base}/Taierzhuang1938/?cloth=1&quality=whitebox&shot=1&manual=1&scale=small`, { timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.ClothRange?.State().ready,
     null, { timeout: 300000 });
@@ -570,14 +570,14 @@ try {
     const t = window.Taierzhuang; t.state.menu = false; t.Debug.ClothRange.Pause(true);
     return t.GraphicsProfile.Inspect().profile;
   });
-  assert.equal(explicitProfile, 'whitebox');
+  assert.equal(explicitProfile, 'high');
   const whiteSolid = await DrawMaterials(false), whiteWire = await DrawMaterials(true), whiteBack = await DrawMaterials(false);
-  assert.ok(whiteSolid.length >= expectedMeshes && whiteSolid.every(row => row.material.startsWith('Whitebox_') && !row.wireframe));
-  assert.ok(whiteWire.length >= expectedMeshes && whiteWire.every(row => row.material.startsWith('Whitebox_') && row.wireframe),
-    'Cached whitebox replacement materials follow the live wireframe toggle');
+  assert.ok(whiteSolid.length >= expectedMeshes && whiteSolid.every(row => !row.material.startsWith('Whitebox_') && !row.wireframe));
+  assert.ok(whiteWire.length >= expectedMeshes && whiteWire.every(row => !row.material.startsWith('Whitebox_') && row.wireframe),
+    'Original materials follow the live wireframe toggle');
   assert.ok(whiteBack.length >= expectedMeshes && whiteBack.every(row => !row.wireframe));
-  result.explicitWhitebox = { profile: explicitProfile, solid: whiteSolid, wire: whiteWire, restored: whiteBack };
-  console.log('PASS explicit whitebox choice / actual cached draw wireframe on and off');
+  result.unknownQualityValue = { profile: explicitProfile, solid: whiteSolid, wire: whiteWire, restored: whiteBack };
+  console.log('PASS unknown quality=whitebox falls back to default / draw wireframe on and off');
   assert.deepEqual(errors, [], `Console errors: ${errors.join(' | ')}`);
   console.log('ClothRangeBrowserTest: all passed');
 } catch (error) {

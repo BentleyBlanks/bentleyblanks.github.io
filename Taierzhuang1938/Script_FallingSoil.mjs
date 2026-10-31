@@ -11,7 +11,6 @@ export class FallingSoilEffects{
     // clods must be siblings of it, under the same effect lifetime owner.
     this.solidRoot=new THREE.Group();this.solidRoot.name='FallingSoilSolidRoot';(particles.parent.parent||particles.parent).add(this.solidRoot);}
   Presets(){return Object.entries(PRESETS).map(([id,{label,note}])=>({id,label,note}));}
-  SetVisible(on){for(const e of this.entries.values())if(e.material)e.material.visible=on;}
   Get(id){const e=this.entries.get(id);if(!e)throw new Error('Unknown falling soil emitter: '+id);return e;}
   SetSurface(host={}){this.defaultHost=host;}
   Count(layer){let count=0;for(const e of this.entries.values())count+=e.simulation?.[layer].length||0;return count;}

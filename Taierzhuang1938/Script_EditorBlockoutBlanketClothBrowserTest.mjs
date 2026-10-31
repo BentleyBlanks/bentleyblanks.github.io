@@ -72,7 +72,7 @@ const Shot = (name) => page.screenshot({ path: path.join(shotDir, name) });
 
 try {
   console.log("--- boot");
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=02-4&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=02-4&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000, polling: 200 });
   // 正式模型异步下载：等被子换上单被
@@ -174,7 +174,7 @@ try {
   //    被子键 dragSolo: true 之后只剩妮儿那一角钉在手上，玩家那角放开落地
   console.log("--- 1218 14-5 dragSolo");
   {
-    await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel1218&kf=14-5&quality=whitebox&scale=small&audio=0`,
+    await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel1218&kf=14-5&scale=small&audio=0`,
       { waitUntil: "load", timeout: 180000 });
     await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000, polling: 200 });
     await page.waitForFunction(() => window.Tengxian.Debug.Blockout.Probe("BlanketDonggua")?.model === "SingleBlanket", null, { timeout: 120000, polling: 200 });

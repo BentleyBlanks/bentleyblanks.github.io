@@ -7,12 +7,11 @@
 //     米格线补丁在它后面照画，线落在泥上也看得见。
 // 规则只看「有没有水块、离水块多远、比水面高多少、坡多陡」，凡是有水块的关卡都一样。
 // 两张贴图是编辑器专用的反照率（Texture/Editor/，清单 EditorCreekMud / EditorCreekWater），模块里只下一次、材质共用。
-// 水面网格标 whiteboxTerrain：白盒画质「保留地形贴图」默认开，白盒渲染器原样画它（不然会换成蓝灰水色、贴图丢掉）。
 
 import * as THREE from "three";
 import { MakePatch } from "./Script_MaterialPatches.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
-import { BLOCKOUT_CREEK_LOOK } from "./Data_Tuning_Whitebox.mjs";
+import { BLOCKOUT_CREEK_LOOK } from "./Data_Tuning_WhiteboxMaterial.mjs";
 
 /** 地面顶点属性名：泥权重 0…1。 */
 export const MUD_ATTRIBUTE = "blockoutMud";
@@ -155,13 +154,14 @@ export const MUD_PATCH = MakePatch({
 });
 
 /**
- * 水块顶面铺一层浑水（世界坐标平铺贴图、半透明）。名字带 water、标 whiteboxWater；再标 whiteboxTerrain，
- * 白盒画质（保留地形贴图）原样画，不换成蓝灰水色。
+ * 水块顶面铺一层水面（默认是世界坐标平铺的浑水贴图、半透明；给了 material 就用它，例：白盒水材质）。名字带 water。
  * @param {Array} blocks semantic "water" 的块
  * @param {(x:number,z:number)=>number} groundAt 没写 y 的块按地面高取
+ * @param {THREE.Scene} scene
+ * @param {{ name?: string, material?: THREE.Material }} [options]
  * @returns {THREE.Mesh|null}
  */
-export function BuildCreekWater(blocks, groundAt, scene, { name = "BlockoutWater" } = {}) {
+export function BuildCreekWater(blocks, groundAt, scene, { name = "BlockoutWater", material: given = null } = {}) {
   if (!blocks.length) return null;
   const look = BLOCKOUT_CREEK_LOOK.water;
   const positions = [], uvs = [], indices = [];
@@ -180,15 +180,19 @@ export function BuildCreekWater(blocks, groundAt, scene, { name = "BlockoutWater
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  const material = MarkNoPrepass(new THREE.MeshStandardMaterial({
-    color: look.tint, map: TileTexture(look.url), roughness: look.roughness, metalness: 0,
-    transparent: true, opacity: look.opacity, depthWrite: false, side: THREE.DoubleSide,
-  }));
-  material.name = "BlockoutCreekWater";
+  let material = given;
+  if (material) {
+    // 不透明的水面和水块顶面同一高度：往相机拉一点，不闪
+    material.polygonOffset = true; material.polygonOffsetFactor = -2; material.polygonOffsetUnits = -2;
+  } else {
+    material = MarkNoPrepass(new THREE.MeshStandardMaterial({
+      color: look.tint, map: TileTexture(look.url), roughness: look.roughness, metalness: 0,
+      transparent: true, opacity: look.opacity, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    material.name = "BlockoutCreekWater";
+  }
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = name;
-  mesh.userData.whiteboxWater = true;
-  mesh.userData.whiteboxTerrain = true;
   scene?.add(mesh);
   return mesh;
 }

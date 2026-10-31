@@ -1,6 +1,6 @@
 // 《台儿庄：血战滕县》画质档位表（纯数据，零 three 依赖 —— 契约 2）。
-// 默认呈现配置见 Data_Tuning_Whitebox：whitebox 复用 high 资产预算，以允许表关闭高级渲染。
-// 美术验收显式 ?quality=high/ultra；查询 Tengxian.GraphicsProfile.Inspect()。
+// 画质档只有 low / medium / high / ultra 四档（2026-10-31 起不再有「白盒」档：白盒的样子由场景引用的白盒材质给出）。
+// 查询 Tengxian.GraphicsProfile.Inspect()。
 //
 // **口径文档：`docs/Data_TechRenderPipeline.md` §1.10「Data_Tuning_Graphics 结构」**
 // （这张表在帧图里的角色），分档实测与自动降档在 §17，逐子系统的档位表在各自那一章
@@ -291,6 +291,17 @@ export const QUALITY_PRESETS = {
 
 /** 画质档名（`?quality=` 认这几个，别的一律退回 high）。 */
 export const POST_QUALITY_KEYS = Object.keys(QUALITY_PRESETS);
+
+/** 玩家可选的画质档（顺序即界面顺序）。`?quality=` 与存档里认这几个，别的（含旧的 "whitebox"）一律当没写。 */
+export const GRAPHICS_PROFILES = Object.freeze(["low", "medium", "high", "ultra"]);
+export const DEFAULT_GRAPHICS_PROFILE = "high";
+export const GRAPHICS_PROFILE_STORAGE_KEY = "tengxian1938_graphics_profile_v1";
+
+/** 地址栏的 `?quality=` 优先，其次存档，都不是画质档就是默认档。 */
+export function ResolveGraphicsProfile(requested, saved) {
+  return GRAPHICS_PROFILES.includes(requested) ? requested
+    : GRAPHICS_PROFILES.includes(saved) ? saved : DEFAULT_GRAPHICS_PROFILE;
+}
 
 /** 取一份档位副本。调用方会往上写运行时状态（FrameProfileTest 就直接改 preset.ssao）。 */
 export function MakeQualityPreset(quality) {

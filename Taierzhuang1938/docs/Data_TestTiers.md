@@ -133,7 +133,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 |---|---|---|---|
 | AutoQualityTest | 自动降档阶梯（Tier 0 快测，也在 render 领域里） | 毫秒级（默认 10 分钟） | 否，纯 Node |
 | PostFrameGraphTest | 帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译 | 分钟级（15 分钟） | 是 |
-| SamplerBudgetTest | 采样器预算：四档 × `gi=0/1` 八轮正片，每个程序都链接成功且 sampler uniform ≤ `MAX_TEXTURE_IMAGE_UNITS` | **十分钟级**（40 分钟；八次开正片） | 是 |
+| SamplerBudgetTest | 采样器预算：四档 × `gi=0/1` 八轮正片 + 三次第一关 + 一次白盒编辑器（high 档，白盒材质的米格线补丁真的编出来），每个程序都链接成功且 sampler uniform ≤ `MAX_TEXTURE_IMAGE_UNITS` | **十分钟级**（40 分钟；十二次开正片） | 是 |
 | GtaoTest | GTAO / 弯曲法线 / 镜面遮蔽 / SSIL：接触暗带、时域收敛、无重投影残影、色板反弹 | 分钟级（15 分钟） | 是 |
 | CsmTest | 级联阴影 / PCSS / 接触阴影：逐级图与分割、纹素吸附、级间重叠、节流排班、痤疮比例、三张调试图，末尾四档各加载一遍 | ~70 秒（15 分钟） | 是 |
 | MaterialUpgradeTest | 材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 绒光与各向异性 / 皮肤散射红移 / 程序数稳态 | 分钟级（15 分钟） | 是（源码契约与纯 Node 两级也在同一进程里） |

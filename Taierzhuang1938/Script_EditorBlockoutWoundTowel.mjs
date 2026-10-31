@@ -4,7 +4,6 @@
 // 一块折起来的毛巾（叠成一摞的厚片、边缘收薄、面上几道褶，程序化几何），不做布料模拟，每帧按倒地的人骨盆→胸口、两肩
 // 摆到肚子正面（BlockoutPuppets._StepTowels）。贴图借布料测试场毛巾样片的底色和法线（Script_ClothSampleMaterials "towel"，全场一份），
 // 材质是普通 MeshStandardMaterial（白盒只要看得见，不用样片那只带粗糙度图、绒光的 MeshPhysicalMaterial，少占采样器）。
-// 网格标 whiteboxCharacter：白盒画质（编辑器默认）不把它刷成灰网格，血迹补丁才看得见。
 // 吸血走布料测试场那套双面吸血（Script_ClothBlood，毛巾档 towel）：贴肚子的背面接血，造出来时倒 soakMl、空推 soakS 秒
 // （正面透出来、晕到边），之后背面每秒再渗 feedMlS，总量到 capMl 停。
 // 谁塞：倒地（state "down"）的人里，名字在 names 里的（冬瓜），或单位写了 woundTowel: true 的；站起来就拿掉。
@@ -64,7 +63,6 @@ export function CreateWoundTowel() {
   mesh.name = "BlockoutWoundTowel";
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.matrixAutoUpdate = false;
-  mesh.userData.whiteboxCharacter = true;
   const sourceGeometry = mesh.geometry;
   let blood = null;
   try {

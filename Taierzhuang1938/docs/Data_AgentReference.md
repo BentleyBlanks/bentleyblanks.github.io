@@ -244,7 +244,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 | Composite（雾段 / tonemap / LUT / 镜头） | `Script_PostComposite.mjs`、`Script_PostGrade.mjs` | §14 | `Script_PostTest.mjs`、`Script_ExposureTest.mjs` |
 | 簇状前向光照 | `Script_ClusteredLights.mjs`、`Data_Tuning_Lights.mjs` | §15 | `Script_ClusteredLightsTest.mjs`（`--node` / `--perf`） |
 | 探针体 GI | `Script_Gi.mjs`、`Data_GlobalShProbe.mjs` | §16 | `Script_GiTest.mjs` |
-| 画质分档 / 自动降档 | `Data_Tuning_Graphics.mjs`、`Script_AutoQuality.mjs` | §17 | `Script_AutoQualityTest.mjs`、`Script_FrameProfileTest.mjs` |
+| 画质分档 / 自动降档 | `Data_Tuning_Graphics.mjs`（含 `GRAPHICS_PROFILES` = low / medium / high / ultra，没有「白盒」档）、`Script_GraphicsProfile.mjs`、`Script_AutoQuality.mjs` | §17 | `Script_GraphicsProfileTest.mjs`、`Script_AutoQualityTest.mjs`、`Script_FrameProfileTest.mjs` |
+| 白盒材质（灰表面 + 米格线 / 白盒水；白盒编辑器与场景编辑器共用） | `Data_Tuning_WhiteboxMaterial.mjs`、`Script_WhiteboxMaterial.mjs`、`Script_WhiteboxGrid.mjs` | 白盒编辑器 §6.3 | `Script_WhiteboxMaterialTest.mjs`、`Script_SamplerBudgetTest.mjs` |
 | 着色器预热（进过场 / 开机 / 换人） | `Script_Main.WarmupShaders` / `WarmActorShaders` | §18 | `Script_RespawnShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印） |
 | 全部调试视图 | `Script_PostDebug.mjs`、`Script_EditorDebugRendering.mjs` | §1.11 三条登记路 | `Script_EditorTest.mjs` |
 | 第一人称自阴影 | `Script_FirstPersonSelfShadow.mjs` | §6.12 | `Script_EditorTest.mjs`（自阴影软化热切） |
@@ -260,7 +261,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Script_Materials.CloneShadedMaterial`（它按 `PatchesOf(source)` 重挂，不能抄
   `onBeforeCompile`）。**采样器硬预算 16 个**，预算表与打包手段在 §1.8。
 - **画质旋钮只在 `Data_Tuning_Graphics.mjs` 与各 `Data_Tuning_*`**；
-  `Script_Post` / `Script_Main` / `Script_EditorSettings` 只读，不写。
+  `Script_Post` / `Script_Main` / `Script_EditorSettings` 只读，不写。画质档只有 low / medium / high / ultra（2026-10-31 删了「白盒」档：白盒是场景里的材质，不是渲染模式）。
   `Data_Tuning_TemporalDof` 管「算法怎么算」，`Data_Tuning_Graphics` 管「这台机器画多重」。
 - **两组分辨率**：`post.width/height` 是内部分辨率、`post.outputWidth/outputHeight` 是输出
   分辨率，分界在 `Script_Post.mjs` 的模块内常量 `OUTPUT_DOMAIN_PASSES`（不导出）。

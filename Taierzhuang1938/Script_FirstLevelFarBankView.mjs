@@ -36,7 +36,6 @@ export class FarBankTankView {
     this.group = new THREE.Group();
     this.group.name = "FarBankTanks";
     // 白盒画质里战车也保持本色（与人物一样是运动的角色，不是灰盒子地物）：不然灰色的车混在灰色的房子里，几十米外认不出是坦克。
-    this.group.userData.whiteboxCharacter = true;
     root.add(this.group);
     this.entries = new Map();
     this.materials = [];

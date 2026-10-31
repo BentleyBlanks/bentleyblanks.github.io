@@ -20,7 +20,6 @@
 /**
  * 按画质分档。size = 渲染靶边长（纹素），texelM = 一纹素多少米，窗口边长 = size × texelM。
  * low 不建靶、材质也不编进采样（与 low「能跑就行」的定位一致）。
- * whitebox 默认画质跟随其底档（Data_Tuning_Whitebox 的 terrainTrails 开关只决定跑不跑）。
  *
  * 2 cm 一纹素：一只 27 cm 的草鞋约 13 × 5 纹素，鞋纹靠印章图集的 mip 取平均、坑的轮廓与泥边读得出来。
  * 2048² RGBA8 = 16 MB 显存，窗口 41 m（半径 20 m，脚印在 18 m 外已经淡掉）。

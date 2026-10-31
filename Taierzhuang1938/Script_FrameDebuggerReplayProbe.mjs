@@ -19,7 +19,7 @@ import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
 
 const Arg = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const runs = Number(Arg('runs', 3)), captures = Number(Arg('captures', 4)), quality = Arg('quality', 'whitebox'), step = Number(Arg('step', 3));
+const runs = Number(Arg('runs', 3)), captures = Number(Arg('captures', 4)), quality = Arg('quality', 'low'), step = Number(Arg('step', 3));
 const snapshots = Arg('snapshots', 'gpu'), every = Number(Arg('every', 0)), angle = Arg('angle', ''), plain = Number(Arg('plain', 0));
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const server = await ServeRoot(root, 0);

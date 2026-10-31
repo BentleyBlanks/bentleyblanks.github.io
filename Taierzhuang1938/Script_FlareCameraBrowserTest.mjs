@@ -150,7 +150,7 @@ try{
  await Open('quality=high&effect=SignalRed');await Visible('DirectSignalRed');
  const fixed=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,poses=[];for(const t of [.2,2,4.5,7]){e.Seek(t);g.StepFrames(2,0,true);poses.push(g.camera.position.toArray());}return poses;});
  assert.ok(fixed.every(p=>p.every((v,i)=>Math.abs(v-fixed[0][i])<1e-8)),'Default observation must preserve the carrier flight instead of tracking it');
- await Open('quality=whitebox&effect=Illumination');await Visible('DirectIlluminationWhitebox');
+ await Open('quality=high&effect=Illumination');await Visible('DirectIlluminationWhitebox');
  assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_CameraReport.json'),JSON.stringify({reports,overview,observer,restored,follow,defaultFraming,errors},null,2));
  console.log('FlareCameraBrowserTest passed');
 }finally{await browser.close();server.close();}

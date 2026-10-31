@@ -60,7 +60,6 @@
 //     没写时名字带「牛」用牛、其余用马（驴车照游戏里老耿的车用马）；animal:false 不带牲口；车前 4 m 内另有一个 animal
 //     单位（老耿的黑子）时车自己的牲口藏起来，不叠两匹。单独的 animal 单位 = 只有那匹马；倒地（state down）侧躺、不迈腿。
 //   · 模型异步下载：下完之前照旧是体块，下完那一帧换掉（体块藏起，不删）；模型载不进来就一直是体块。
-//     组上标 whiteboxCharacter：白盒画质里也保留贴图（同预演的飞机）。
 //
 // 2026-10-20（不打仗时不端枪，用户：下蹲、跑步、聊天这类大部分动作不会把枪拿在手上）：
 //   · 拿步枪（BLOCKOUT_PUPPETS.slungWeapons）、此刻不戒备（aim 为假）的兵，国军日军一样：站着 / 走 / 跑换游戏里的
@@ -850,7 +849,7 @@ export class BlockoutPuppets {
       }
     }
     body.userData.model = model;
-    if (model) { body.userData.boxes.visible = false; body.userData.whiteboxCharacter = true; }
+    if (model) { body.userData.boxes.visible = false; }
   }
 
   /** 每帧：炮塔对着射界扇；车轮、牲口按走过的路程迈步；倒地的牲口侧躺；车前另有牲口单位时藏自己的；被子拖着走时兜起来。 */

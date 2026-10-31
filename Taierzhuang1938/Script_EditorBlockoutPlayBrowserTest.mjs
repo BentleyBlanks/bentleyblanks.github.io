@@ -81,7 +81,7 @@ const Rules = () => B(() => {
 
 try {
   console.log("--- boot");
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=02-4&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=02-4&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
   await Step(4);

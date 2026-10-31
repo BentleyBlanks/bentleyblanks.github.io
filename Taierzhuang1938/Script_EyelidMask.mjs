@@ -1,6 +1,6 @@
 // 《台儿庄：血战滕县》后期里的眼皮（2026-10-29）。纯字符串与取参，零 three（契约 2）。
 //
-// 完整画质的合成（Script_PostComposite）与白盒的输出（Script_WhiteboxRendering.WhiteboxOutputPass）共用这一份，
+// 完整画质的合成（Script_PostComposite）用这一份（原来白盒画质的输出 pass 也共用，2026-10-31 已删），
 // 原来白盒那份是上下对称的一条缝、过渡只有屏高 2.5%，炸飞时一眨眼就是两道硬边（用户 2026-10-29：「眨眼的 mask 边缘过于锐利」）。
 //
 // 形状：上下两片眼皮，上眼皮走 upperShare 那一段（合拢处在屏高 1 − upperShare），中间弓起（curvature）、略斜（tilt），

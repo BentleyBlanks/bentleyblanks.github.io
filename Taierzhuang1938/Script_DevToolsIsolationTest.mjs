@@ -18,9 +18,9 @@ import { BuildBrowserBundle, DEV_TOOL_STUBS } from "./Script_BuildBrowserBundle.
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 
-// 名字带 Editor 但随玩家设置一起发布的三个模块（设置页的类、控件工具箱、白盒画质那一栏）。
+// 名字带 Editor 但随玩家设置一起发布的两个模块（设置页的类、控件工具箱）。
 // 名字是历史遗留；它们只许 import 彼此与普通运行时模块，不许碰下面的开发模块。
-const SHIPPED_EDITOR_MODULES = new Set(["Script_EditorSettings.mjs", "Script_EditorUi.mjs", "Script_EditorWhiteboxQuality.mjs"]);
+const SHIPPED_EDITOR_MODULES = new Set(["Script_EditorSettings.mjs", "Script_EditorUi.mjs"]);
 const IsDevModule = (file) => {
   const name = path.basename(file);
   if (SHIPPED_EDITOR_MODULES.has(name)) return false;

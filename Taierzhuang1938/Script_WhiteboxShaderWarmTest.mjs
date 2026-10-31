@@ -1,24 +1,21 @@
 // ===========================================================================
-// Script_WhiteboxShaderWarmTest.mjs —— 白盒画质（出厂默认档）下，着色器预热要编对那一份
+// Script_WhiteboxShaderWarmTest.mjs —— 第一关（?whitebox=p012）开机预热要编对出画用的那一份
 //
 // 事故（2026-10-01，用户报「本地加载也很慢」）：第一关关掉 program 缓存开机 63 s，主线程有 22.5 s
-// 卡在「第一次用某个 program」上。预热的提交编译（renderer.compile）在白盒那一层之外跑：
-// 出画前 WhiteboxSceneRenderer.Begin 会藏关卡灯、换中性光、把场景资产换成白盒材质，而提交时
-// 场景还是「关卡灯光 + 原材质」—— 缓存键对不上，提交的 135 个 program 一个都没用上，
-// 真正要用的 64 个全在出画时同步链接。其余预热门（RespawnShaderWarmTest / SavedGraphicsWarmTest /
-// ExplosionRangeTest）都用 quality=high/medium 跑，白盒档从来没被量过。
-// 修法：Script_Main.CompileAsRendered —— 提交编译绑 HDR 主靶并套上白盒那一层（Begin 的 compileRoots）。
+// 卡在「第一次用某个 program」上。预热的提交编译（renderer.compile）要按出画时的真实状态编（绑 HDR 主靶），
+// 缓存键对不上就是一份用不上的孪生 program，真正要用的全在出画时同步链接。
+// 当时是在「白盒画质」档下量的（出画前换材质、换灯光，提交时没套那一层）；2026-10-31 起不再有白盒画质档，
+// 同一件事改在 high 档量（Script_Main.CompileAsRendered 只剩绑靶那一条）。
 //
 // 断言（只数 program，不量毫秒，机器忙闲不影响结论）：
-//   1. 真的在白盒档（post.whiteboxScene 在）。
-//   2. 开机到「进城」可点，主场景那一趟（PostPipeline._RenderScene）里现建的 program = 0 ——
+//   1. 开机到「进城」可点，主场景那一趟（PostPipeline._RenderScene）里现建的 program = 0 ——
 //      预热漏交的材质都会在这里同步链接。修前 64。阴影趟（WebGLShadowMap.render 里）的投影深度程序
 //      单独记：renderer.compile 编不到它们，WarmLevel 那次强制烘阴影就是为了在加载画面后面把它们逼出来
-//      （渲染管线 §18.5 / §18.8）；2026-10-02 白盒默认开太阳阴影之后才有这一类。它们是否漏到进城以后，由第 4 条管。
-//   3. 提交编译建的 program 至少一半在开机结束前真被用上（修前 0/135）。故意留到以后用的
+//      （渲染管线 §18.5 / §18.8）；2026-10-02 起有这一类。它们是否漏到进城以后，由第 3 条管。
+//   2. 提交编译建的 program 至少一半在开机结束前真被用上（修前 0/135）。故意留到以后用的
 //      （伤口变体、断肢块）不多，阈值只拦「整批编错状态」。
-//   4. 点「进城」后连跑 300 帧，program 一个不新编。
-//   5. 页面没有 pageerror / console.error。
+//   3. 点「进城」后连跑 300 帧，program 一个不新编。
+//   4. 页面没有 pageerror / console.error。
 //
 // 用法：node Taierzhuang1938/Script_WhiteboxShaderWarmTest.mjs
 // ===========================================================================
@@ -85,7 +82,7 @@ const Report = (ok, name, detail) => {
 
 try {
   const port = server.address().port;
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&quality=whitebox&manual=1&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&quality=high&manual=1&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.waitForFunction(() => window.Taierzhuang?.state?.ready && !document.getElementById("bootStart")?.disabled,
     null, { timeout: 600000, polling: 500 });
@@ -95,7 +92,6 @@ try {
     ledger.frozen = true;
     const compiled = ledger.links.filter((r) => r.origin === "compile");
     return {
-      whitebox: !!T.post?.whiteboxScene,
       links: ledger.links.length,
       scenePass: ledger.links.filter((r) => r.origin === "scenePass").length,
       shadowPass: ledger.links.filter((r) => r.origin === "shadowPass").length,
@@ -104,7 +100,6 @@ try {
       programs: T.renderer.info.programs.length,
     };
   });
-  Report(boot.whitebox, "白盒画质档", `post.whiteboxScene ${boot.whitebox ? "在" : "不在"}`);
   Report(boot.scenePass === 0, "预热不漏交：主场景那一趟不现建 program",
     `开机共 link ${boot.links} 个，主场景一趟现建 ${boot.scenePass} 个（修前 64）；阴影趟投影深度 ${boot.shadowPass} 个（预热强制烘阴影时编，开机前收完）`);
   const share = boot.compiled ? boot.compiledUsed / boot.compiled : 0;

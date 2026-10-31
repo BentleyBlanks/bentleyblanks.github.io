@@ -372,7 +372,7 @@ export class FirstLevelBunkerShow {
    */
   WarmProxy(){
     const r=this.r,group=new THREE.Group();group.name="ShaderWarm_Opening";
-    const props=new THREE.Group();props.name="ShaderWarm_OpeningFirstPerson";props.userData.whiteboxCharacter=true;group.add(props);
+    const props=new THREE.Group();props.name="ShaderWarm_OpeningFirstPerson";group.add(props);
     const show={r,owned:[],ownedGeometry:[]};
     BuildOpeningFirstPersonWarmProps(Object.assign(show,BuildSupplyProps(r,show.owned,show.ownedGeometry)),props);
     const warm={geometries:show.ownedGeometry,comrade:null,restoreBlood:null};

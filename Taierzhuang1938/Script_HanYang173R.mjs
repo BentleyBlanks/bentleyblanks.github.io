@@ -38,7 +38,6 @@ export function ConfigureHanYang173R(asset, library) {
     if(!mesh.isMesh) return;
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
-    material.userData.whiteboxWeaponReflection = true;
     material.color.setScalar(D.exposureGain);
     for(const slot of ['map','normalMap','roughnessMap','metalnessMap'])
       if(material[slot]&&material[slot].anisotropy!==anisotropy) {material[slot].anisotropy=anisotropy;material[slot].needsUpdate=true;}

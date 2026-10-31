@@ -618,7 +618,6 @@ export class TengxianCity {
     groundMesh.receiveShadow = true;
     groundMesh.castShadow = false;
     groundMesh.name = "CityPlatform";
-    groundMesh.userData.whiteboxTerrain = true;
     this.scene.add(groundMesh);
     this.meshes.push(groundMesh);
     this.craters = craters;
@@ -700,7 +699,6 @@ export class TengxianCity {
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.name = "OuterGround";
-    mesh.userData.whiteboxTerrain = true;
     this.scene.add(mesh);
     this.meshes.push(mesh);
   }
@@ -805,7 +803,6 @@ export class TengxianCity {
     const bank = new THREE.Mesh(MergeGeometries(strips), this.library.Get("GroundRubble"));
     bank.receiveShadow = true; bank.castShadow = false;
     bank.name = "MoatBank";
-    bank.userData.whiteboxTerrain = true;
     this.scene.add(bank);
     this.meshes.push(bank);
 

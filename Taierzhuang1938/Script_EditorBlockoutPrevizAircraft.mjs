@@ -5,11 +5,10 @@
 //   · 模型借游戏自己的机队（Script_Aircraft.AircraftFlight）：AcquireClone(机型) 取一架克隆（共用几何与材质，白盒关卡里
 //     原机本来就藏着），挂在本模块自己的组里按 PrevizPlan 的姿态摆（机头局部 −Z，同 ApplyStrafePose 的换算：
 //     rotation.set(climb, atan2(−dirX, −dirZ), bank, "YXZ")）；播完 / 中断 ReleaseClone 还回池子。模型还没载进来那一帧跳过，下一帧再试。
-//     组上标 whiteboxCharacter，白盒画质里也保留原贴图（不涂成灰网格，天上那一点要读得出是飞机）。
 //   · 引擎声：planeDrone（合成的持续引擎，audio.Play 起一条 voice，每帧 MoveVoice 搬到机身 + 速度做多普勒）从飞机出现起
 //     一直响到消失 / 预演结束（StopVoice 淡出）；sound.diveT 那一刻一次 planeDive（录好多普勒的通场，挂在机身上）。
 //   · 扫射：每段 strafe 开始时按机身离听者的远近放 strafeNear / strafeFar；弹着点由 PrevizPlan.PrevizStrafeImpacts 给，
-//     每 strafeDirtEvery 发一声 strafeDirt 落在弹着点上；地上的土点由 Script_EditorBlockoutPrevizFx 当「子弹打在土里」画（Seek 也看得见）。
+//     每 strafeDirtEvery 发一声 strafeDirt 落在弹着点上，同时冒一下 VfxSystem 的真弹着土（deps.dirt，只在播放跨过那一刻冒）。
 //   音效走 Script_EditorBlockoutPreviz 的 PREVIZ_SFX 别名表（planeDrone / planeDive / strafeNear / strafeFar / strafeDirt 已在表里），
 //   这里通过 host.PlaySfx(name, at) / host.StartDrone / host.MoveDrone / host.StopDrone 调它，不另存一份键名。
 //   没有音频上下文（audio=0）时只画不响。
@@ -22,14 +21,15 @@ export class BlockoutPrevizAircraft {
    * @param {{ scene: THREE.Scene, aircraft: () => object|null, sfx: object }} deps
    *   aircraft()  游戏的 AircraftFlight（Script_Main 的 editorHost.aircraft；取值器，切关后对象会换）
    *   sfx         { Play(name, at|null, opts?), StartLoop(name, at) → voice|null, MoveLoop(voice, at, velocity), StopLoop(voice) }
+   *   dirt        (x, z) => 弹着点冒一下土（可选）
    */
-  constructor({ scene, aircraft, sfx }) {
+  constructor({ scene, aircraft, sfx, dirt = null }) {
     this.scene = scene;
     this.aircraft = typeof aircraft === "function" ? aircraft : () => aircraft || null;
     this.sfx = sfx || {};
+    this.dirt = typeof dirt === "function" ? dirt : null;
     this.root = new THREE.Group();
     this.root.name = "BlockoutPrevizAircraft";
-    this.root.userData.whiteboxCharacter = true;   // 白盒画质里保留贴图（Script_WhiteboxRendering.IsWhiteboxCharacter）
     scene?.add(this.root);
     this.planes = new Map();   // id → { entry, slot: {id: 机型, root} | null, drone, dived, strafeStarted: Set, dirtFired: Set, visible }
     this.seq = null;
@@ -103,15 +103,9 @@ export class BlockoutPrevizAircraft {
         if (plane.dirtFired.has(key)) continue;
         plane.dirtFired.add(key);
         this.sfx.Play?.("strafeDirt", { x: hit.x, z: hit.z, ground: true });
+        try { this.dirt?.(hit.x, hit.z); } catch (error) { console.warn("[BlockoutPrevizAircraft] dirt failed", error); }
       }
     }
-  }
-
-  /** 这一段所有扫射的弹着点 → 给简易特效当「子弹打在土里」画：[{ t, x, z, radius }]。 */
-  Blasts() {
-    const out = [];
-    for (const plane of this.planes.values()) for (const hit of plane.impacts) out.push({ t: hit.t, x: hit.x, z: hit.z, radius: PREVIZ_AIRCRAFT.strafeImpactRadius });
-    return out;
   }
 
   /** 某架飞机此刻的位置（镜头锚 { aircraft } 用）；不在这一段里 → null。 */

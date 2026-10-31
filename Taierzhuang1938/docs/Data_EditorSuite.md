@@ -52,8 +52,8 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
   esbuild 插件把两个边界模块换成剔除版，其余代码不动。现在 Pages 发布**默认不剔除**。
 - 宿主拿到 `editor === null` 就按「没有开发工具」跑：不建齿轮、`` ` `` 不响应、菜单不列「Debug工具」「高级工具」
   （`Script_Menu` 看宿主给的 `DevToolsAvailable`），`Debug.OpenEditor` 等取证口回答「没有」。
-- 名字带 Editor 却随包发布的只有三个：`Script_EditorSettings`（设置页的类）、`Script_EditorUi`（控件工具箱）、
-  `Script_EditorWhiteboxQuality`（白盒画质那一栏）。它们不许 import 任何开发模块。
+- 名字带 Editor 却随包发布的只有两个：`Script_EditorSettings`（设置页的类）、`Script_EditorUi`（控件工具箱）。
+  它们不许 import 任何开发模块。（原来的第三个 `Script_EditorWhiteboxQuality`——白盒画质那一栏——2026-10-31 随白盒画质档一起删了。）
 - 样式：菜单栏 / Inspector 停靠只写在 `#edRoot` 下（`Style_Editor.css`「高级工具」两节），控件样式两边共用；
   剔除时 CSS 可原样留着（选择器落空），要瘦身再把 `#edRoot` 专属段落拆出去。
 - 闸门 `Script_DevToolsIsolationTest.mjs`：两对边界模块导出同名；剔除后游戏包与菜单包里没有任何开发模块
@@ -713,7 +713,7 @@ DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选�
 
 入口：高级工具菜单栏「关卡」→ 白盒关卡编辑器（第一项）。它跳到 `index.html?editor=blockout&level=FirstLevel`
 （保留当前的画质 / 尺寸 / 声音参数）；也可以直接开
-`?editor=blockout&level=<关卡>[&kf=<关键帧 id>][&quality=whitebox]`。已经在这个模式里时按钮显示为当前项，
+`?editor=blockout&level=<关卡>[&kf=<关键帧 id>][&quality=low|medium|high|ultra]`。已经在这个模式里时按钮显示为当前项，
 点了不重新加载。数据格式、接口与分工见 [Data_EditorBlockout.md](Data_EditorBlockout.md)，这里只记怎么用。
 
 这是整页模式，不是叠加面板：只建白盒场景（地形只有高度色带和网格）、玩家（汉阳造 + 大刀 + 手榴弹，

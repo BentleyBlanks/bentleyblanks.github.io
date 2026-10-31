@@ -48,7 +48,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
-  HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity, high wood/metal lighting and whitebox weapon-only reflections'},
+  HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity and high wood/metal lighting'},
   HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
   Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: declared400k target/420k ceiling, wheel profiles, cast openings, texel density, rigid hinges and finite tangent bases"},
   Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
@@ -81,13 +81,12 @@ export const testDefs = {
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   ParticleModulesTest: {file:"Script_ParticleModulesTest.mjs",desc:"Unity-style particle modules, deterministic timeline and validated agent inputs"},
   FallingSoilTest: {file:"Script_FallingSoilTest.mjs",desc:"Shared falling soil: sources, world motion, deterministic contacts, fragments, dust, full schema and budgets"},
-  FallingSoilBrowserTest: {file:"Script_FallingSoilBrowserTest.mjs",timeoutMs:600000,desc:"Production falling soil in VFX editor: pixels, controls, presets, replay, whitebox, collision, isolation and disposal"},
+  FallingSoilBrowserTest: {file:"Script_FallingSoilBrowserTest.mjs",timeoutMs:600000,desc:"Production falling soil in VFX editor: pixels, controls, presets, replay, collision, isolation and disposal"},
   ParticleVolumeTest: {file:"Script_ParticleVolumeTest.mjs",desc:"CC0 volume source hashes, bounded atlas dimensions, timestamps and public configuration"},
   ParticleVolumeBrowserTest: {file:"Script_ParticleVolumeBrowserTest.mjs",timeoutMs:120000,desc:"True 3D particle volumes: shared simulation, GPU animation, replay, depth, HDR alpha and disposal"},
   ParticleBrowserTest: {file:"Script_ParticleBrowserTest.mjs",timeoutMs:120000,desc:"Production fire GPU: replay, pause, motion, occlusion, alpha and batched rendering"},
   ParticleChannelsTest: {file:"Script_ParticleChannelsTest.mjs",timeoutMs:120000,desc:"All production sprite channels share module ownership, GPU curves, pause, emission and cleanup"},
   ParticleEditorControlsTest: {file:"Script_ParticleEditorControlsTest.mjs",timeoutMs:600000,desc:"Particle editor: native module controls, curves, time scrub, presets, paused lights and restored game state"},
-  ParticleEditorWhiteboxTest: {file:"Script_ParticleEditorControlsTest.mjs",args:["--whitebox"],timeoutMs:600000,desc:"Default tools entry: visible particle pixels, original shaders and restored whitebox preferences"},
   ToolsHomeTest: {file:"Script_ToolsHomeTest.mjs",timeoutMs:600000,desc:"Tools home: no level built, studio tools open in place, scene tools ask for a chapter, Esc returns to title"},
   ParticleEditorTest: {file:"Script_ParticleCli.mjs",args:["--quality=low","--editor-check","--label=EditorGate"],timeoutMs:600000,desc:"Actual game VFX editor: isolated playback, restore and resume"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
@@ -540,9 +539,8 @@ export const testDefs = {
     desc: "簇状前向光照：簇分配与暴力法逐簇相等（纯 Node）+ 24 盏彩色点光逐盏读回、聚光锥内外、不重编译（真浏览器）" },
   PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "渲染帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译" },
-  WhiteboxQualityTest: { file: "Script_WhiteboxQualityTest.mjs", desc: "白盒画质默认、配置校验、依赖与存档隔离" },
-  WhiteboxQualityBrowserTest: { file: "Script_WhiteboxQualityBrowserTest.mjs", timeoutMs: 15 * 60 * 1000,
-    desc: "白盒实机：实际 Pass、地形例外、动态材质、编辑保存与美术模式切换" },
+  GraphicsProfileTest: { file: "Script_GraphicsProfileTest.mjs", desc: "画质档只有 low / medium / high / ultra：?quality= 与存档解析、旧 whitebox 值回落默认、Inspect() 没有白盒字段" },
+  WhiteboxMaterialTest: { file: "Script_WhiteboxMaterialTest.mjs", desc: "白盒材质：灰表面 + 米格线补丁、语义色保留、水材质，数据文件纯数据" },
   SsrTest: { file: "Script_SsrTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图" },
   AtmosphereTest: { file: "Script_AtmosphereTest.mjs", timeoutMs: 15 * 60 * 1000,
@@ -601,7 +599,6 @@ export const browserTests = new Set([
   "BootPaperPbrTest",
   "TextureManagerBrowserTest",
   "FrameDebuggerTest",
-  "WhiteboxQualityBrowserTest",
   "AllyGaitBrowserTest",
   "AllyGaitMissionTest",
   "BreakableTreesBrowserTest",
@@ -630,7 +627,6 @@ export const browserTests = new Set([
   "FlareWorldBrowserTest",
   "FlareShadowBrowserTest",
   "FlareShadowCoverageBrowserTest",
-  "ParticleEditorWhiteboxTest",
   "ParticleEditorTest",
   "FirstLevelDistantSmokeBrowserTest",
   "FirstLevelSkyGradeBrowserTest",
@@ -849,18 +845,18 @@ export const tier2 = [
 ];
 
 export const domains = {
-  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
+  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
+  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
-  particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","FallingSoilTest","FallingSoilBrowserTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
+  particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","FallingSoilTest","FallingSoilBrowserTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   skyGrade: {label:"第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点",tests:["FirstLevelSkyGradeTest","FirstLevelSkyGradeBrowserTest","ModuleGraphTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
@@ -958,7 +954,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
-    // 预热按白盒档（出厂默认）编对没有，看 WhiteboxShaderWarmTest（约一分半）。
+    // 第一关开机预热编对没有，看 WhiteboxShaderWarmTest（约一分半，high 档）。
     tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
@@ -1014,7 +1010,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Data_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
-  { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|EyelidMask|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
+  { domain: "graphicsProfile", pattern: /EyelidMask|GraphicsProfile|Tuning_Graphics|WhiteboxMaterial|WhiteboxGrid|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
   {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},
   {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},
@@ -1169,7 +1165,7 @@ const changedDomainRules = [
   // 配置里没有游戏数据（改它不影响正式关卡），但编辑器与生成器读它，改了跑 editor 域。
   { domain: "editor", pattern: /Blockout\/|Script_EditorBlockout|Data_EditorBlockout/i },
   // 场景文件与场景编辑器（docs/Data_Scene.md）：白盒编辑器第一关新剧本三段从 Scenes/FirstLevelWhitebox 取一块建场，改了跑 editor 域。
-  { domain: "editor", pattern: /Scenes\/|Script_Scene(Doc|Node|ImportBlockout|Edit)|Data_SceneAssets|SceneEditor|Script_WhiteboxGrid/i },
+  { domain: "editor", pattern: /Scenes\/|Script_Scene(Doc|Node|ImportBlockout|Edit)|Data_SceneAssets|SceneEditor|WhiteboxGrid|WhiteboxMaterial/i },
   // 白盒预演额外加载的占位动作库（Animation/Previz*/，烘在 NRA02 上、只有编辑器的预演读）与它们的名单：游戏正片不读，改了跑 editor 域。
   { domain: "editor", pattern: /Animation\/Previz[A-Za-z0-9]+\/|Data_BlockoutPrevizClips/i },
   // 村子占位库的源脚本、烘焙入口与门禁（_import/Script_PrevizVillage*.py、Script_PrevizVillageClipsTest）。

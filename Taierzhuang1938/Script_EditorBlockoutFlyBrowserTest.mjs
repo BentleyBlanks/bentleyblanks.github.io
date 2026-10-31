@@ -110,7 +110,7 @@ const AngDiff = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
 
 try {
   console.log("--- boot");
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
   await Step(4);

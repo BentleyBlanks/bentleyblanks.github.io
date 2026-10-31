@@ -76,7 +76,7 @@ function Watch(page) {
     errors.push(`CONSOLE ${message.text().slice(0, 240)} @ ${url}`);
   });
 }
-const URL_OF = (extra = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&quality=whitebox&scale=small&audio=0${extra}`;
+const URL_OF = (extra = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&scale=small&audio=0${extra}`;
 async function Boot(page, extra = "") {
   await page.goto(URL_OF(extra), { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });

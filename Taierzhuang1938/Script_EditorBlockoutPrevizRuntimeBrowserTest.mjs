@@ -157,7 +157,7 @@ const Shot = (name) => page.screenshot({ path: path.join(shotDir, name) });
 try {
   console.log("--- boot");
   // 2026-10-20 起不带 audio=0：url 音效要音频上下文（浏览器本身 --mute-audio 静音）
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=${KF}&quality=whitebox&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=${KF}&scale=small`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
   await page.route(new RegExp(`/Blockout/${LEVEL}\\.previz\\.json`), (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(previzDoc) }));
@@ -283,7 +283,7 @@ try {
   Check("Seek(9) 飞机在相机视锥里、正对画面中央（镜头 look 飞机锚）", air9.ndc && Math.abs(air9.ndc.x) < 0.05 && Math.abs(air9.ndc.y) < 0.05 && air9.ndc.z > 0 && air9.ndc.z <= 1.0001, J({ ndc: air9.ndc, cam: air9.cam, plane: air9.plane }));
   await Shot("Aircraft_t9.png");
   const s105 = await Seek(10.5);
-  Check("Seek(10.5) 扫射段里简易特效画出土点（白盒特效关 → 由预演画）", s105.fx && s105.fx.blastsDrawn && s105.fx.blasts >= 3, J(s105.fx));
+  Check("Seek(10.5) 扫射段里没有另画的简易特效（爆炸 / 烟 / 枪口火一律是 VfxSystem 的真特效，预演层只画飞行中的手榴弹）", s105.fx && Object.keys(s105.fx).join() === "grenades", J(s105.fx));
   await Shot("Strafe_t10.5.png");
   const s19 = await Seek(19);
   Check("Seek(19) 过了最后一个航点飞机不可见", s19.aircraft[0] && !s19.aircraft[0].visible, J(s19.aircraft));

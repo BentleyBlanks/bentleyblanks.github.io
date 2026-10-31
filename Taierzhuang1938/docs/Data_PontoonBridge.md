@@ -10,7 +10,7 @@
 > **2026-10-01 第二轮（集成者验收）改了三处**，本文以下各节的数字都已按第二轮更新，旧值见 §11 的变更表：
 > ① 船要读得出来（长 6.6 × 宽 2.2、船间 0.8 m 水缝、干舷 0.52 m、桥面在舷缘上 0.32 m、船头朝上游带绞盘 / 锚 / 缆桩）；
 > ② 射位搬到南岸水边桥头旁（离桥轴 7.6 m、离水线 4.8 m），被炸段北移 12 m 到河心（中心 z 122），射位到中心 40.7 m；
-> ③ 白盒画质下的芦苇 / 草卡片不再是满地白刺（保留原贴图色，见 [Data_WhiteboxQuality.md](Data_WhiteboxQuality.md)）。
+> ③ 白盒画质下的芦苇 / 草卡片不再是满地白刺（保留原贴图色，见 [Data_WhiteboxQuality.md](Data_WhiteboxQuality.md)；2026-10-31 白盒画质档已删，卡片就是原材质）。
 
 ## 1. 河与岸（`MISSION_NORTH_RIVER.reaches[0]` = `RailBridgeReach`，只改 x −95…−60 这一段用得上的断面）
 
@@ -74,7 +74,7 @@
   摆在水面上 5 cm：舱底、肋骨、芦苇先画完不受影响，后画的水面在舱里过不了深度测试。截面与 Blender 的 `HalfBeam / BottomHalf / BottomY / GunwaleY / InnerPoint`
   同式、只取船壳的那几个站位（±3.25 / ±2.75 / ±2.2 / 0，站间直线），再往里收 1 cm；**改船型要两边一起改**，门禁拿 GLB 真船壳在遮挡片高度切片逐 5 cm 核对「不出内壁、缝 < 3 cm」。
   三态：南截（船 0…6）挂 static 一直在；完好桥身（船 7…20）挂 intact；北截（船 16…20）在 wreck 组按末帧位姿一份、坍塌那几秒挂在 `NorthSection` 节点上跟着摆；下沉 / 炸飞的船不遮（进水了）。
-  白盒画质原样保留这类只写深度的面（`Script_WhiteboxRendering` 不替换 `colorWrite: false && depthWrite` 的材质），不会变成灰板。
+  白盒画质原样保留这类只写深度的面（当时 `Script_WhiteboxRendering` 不替换 `colorWrite: false && depthWrite` 的材质；白盒画质档 2026-10-31 已删，现在就是它自己的材质），不会变成灰板。
 
 ## 4. 碰撞与三态（`Data_FirstLevelMissionLayout`）
 

@@ -4,7 +4,7 @@
 const Range=(min,max)=>({mode:'twoConstants',min,max});
 export const FALLING_SOIL_LIMITS=Object.freeze({
   emitters:8,grains:6000,grainsPerEmitter:4096,clods:48,dust:384,raysPerStep:128,birthsPerStep:512,step:1/60,
-  quality:{whitebox:.8,low:.45,medium:.7,high:1,ultra:1.2},
+  quality:{low:.45,medium:.7,high:1,ultra:1.2},
   // Numerical/engine limits; exposed in Inspect, not adjustable art controls.
   maxCatchup:120,maxProbeSegments:8,maxFragmentGeneration:1,contactEpsilon:.002,
 });

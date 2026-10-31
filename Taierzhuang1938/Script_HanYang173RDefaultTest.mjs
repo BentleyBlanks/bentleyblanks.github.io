@@ -22,7 +22,7 @@ try{
    else errors.push(`${m.text()} @ ${url}`);
   });
   page.on('request',r=>{if(/Model_HanYang\.tzm/.test(r.url()))requests.push(r.url());});
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&quality=whitebox&manual=1&shot=1&scale=small&audio=0&arms=${arms}`,{timeout:120000});
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&manual=1&shot=1&scale=small&audio=0&arms=${arms}`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.Debug?.Blockout?.State().ready,null,{timeout:360000});
   const row=await page.evaluate(async()=>{
    const g=window.Taierzhuang,vm=g.viewmodel;

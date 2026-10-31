@@ -414,7 +414,6 @@ export class TerrainDeformationView {
       mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
-      if (material === this.material) mesh.userData.whiteboxTerrain = true;
       mesh.onAfterShadow = () => { if (this.warmState) this.warmState.shadowed = true; };
       mesh.onAfterRender = () => this.NoteWarmRender();
       group.add(mesh); this.warmProxies.push(mesh);

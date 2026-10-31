@@ -4,7 +4,7 @@
 // 细高 foliage 块，见 Script_EditorBlockoutLevels）只留碰撞、不画盒子（visual:false），这里在同一位置种一棵
 // 游戏里那种枯树（Model_BreakableDeadTree.glb 的完整树身：Stump + Crown 的树皮，不要断口盖），高度按块的
 // treeHeightM（缺省块高）÷ 模型原高 BREAKABLE_TREES.heightM 等比缩放，朝向按 id 散开。不会被炸断（编辑器不需要）。
-// 一关一只 InstancedMesh；切关（battlefield.layout 换了）重种。组上标 whiteboxCharacter：白盒画质里保留贴图。
+// 一关一只 InstancedMesh；切关（battlefield.layout 换了）重种。
 
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
@@ -73,7 +73,6 @@ export class BlockoutTrees {
     this.groundAt = groundAt;
     this.root = new THREE.Group();
     this.root.name = "BlockoutTrees";
-    this.root.userData.whiteboxCharacter = true;
     scene?.add(this.root);
     this.template = null;
     this.failed = false;

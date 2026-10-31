@@ -321,7 +321,7 @@ export class LensFlarePass {
     const U=this.uniforms;
     for(const slot of U.uEmitterSource.value)slot.w=0;
     this.emitterActive=false;
-    const quality=this.pipeline.whiteboxConfig?0:(G.byQuality[this.pipeline.quality]??0);
+    const quality=G.byQuality[this.pipeline.quality]??0;
     if(!(quality>0)||!ctx.normalDepthTexture)return;
     const candidates=[];
     for(const source of this.source?.fireSources?.values()||[]){

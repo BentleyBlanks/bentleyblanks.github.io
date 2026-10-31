@@ -55,7 +55,7 @@ import { LayoutEditSession, BuildLayoutEditExport, FormatLayoutEdit } from "./Sc
 import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
 import { BlockoutPlay, PLAY_KEY } from "./Script_EditorBlockoutPlay.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
-import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
+import { DressAsWhitebox, MakeWhiteboxWaterMaterial } from "./Script_WhiteboxMaterial.mjs";
 import { BuildCreekWater, MUD_PATCH, PaintWaterEdgeMud, WaterPrints } from "./Script_EditorBlockoutCreek.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
@@ -631,9 +631,11 @@ export class EditorBlockout {
   }
 
   /**
-   * §6.3：地面按真实高度的色带上色 + 米格线；水块铺成水面（白盒画质认网格名里的 water）。
+   * §6.3：地面按真实高度的色带上色 + 米格线；水块铺成水面。
    * 河沟示意（2026-10-22，Script_EditorBlockoutCreek）：文件场景的水块顶面铺浑水贴图，地面上挨着水块的那一圈
-   * 写泥权重（顶点属性 blockoutMud）、材质挂湿泥补丁；第一关旧版仍走 BuildWhiteboxWater（正片河水着色）。
+   * 写泥权重（顶点属性 blockoutMud）、材质挂湿泥补丁；第一关旧版的水面是白盒水材质（蓝灰 + 掠射角反光）。
+   * 白盒的样子是材质给的（2026-10-31，不再有白盒画质档）：各语义的块材质改成灰表面 + 米格线
+   * （Script_WhiteboxMaterial.DressAsWhitebox），colorSemantics 那几种保留语义色再加网格，水语义是白盒水材质。
    */
   DressWorld(layout) {
     const field = this.game.battlefield;
@@ -699,21 +701,18 @@ export class EditorBlockout {
         if (changed) { ApplyPatches(material, wanted); material.needsUpdate = true; }
       }
     }
-    // 场景文件 colorSemantics（§6.3，2026-10-20）：这几种块在白盒画质里保留语义色（标 whiteboxCharacter，白盒渲染器原样画），照样加米格线
-    const keep = new Set((layout.colorSemantics || []).map(sem => field.materials?.get?.(sem)).filter(Boolean));
-    if (keep.size) {
-      for (const mesh of field.meshes || []) {
-        if (!mesh?.isMesh || !keep.has(mesh.material) || mesh.userData.whiteboxCharacter) continue;
-        mesh.userData.whiteboxCharacter = true;
-        const patches = PatchesOf(mesh.material) || [];
-        if (!patches.some(patch => patch.key === GRID_PATCH.key)) { ApplyPatches(mesh.material, [...patches, GRID_PATCH]); mesh.material.needsUpdate = true; }
-      }
-      this.host.post?.whiteboxScene?.Invalidate?.();
+    // 块的白盒材质（场景文件 colorSemantics，§6.3，2026-10-20 / 2026-10-31）：场地里每种语义一份材质，原地改成
+    // 灰表面 + 米格线；colorSemantics 列出的几种保留语义色再加网格；水语义是白盒水材质；地面是上面那份（高度色带 + 涂色 + 米格线）
+    const keepColor = new Set(layout.colorSemantics || []);
+    const groundSemantic = layout.ground?.semantic;
+    for (const [semantic, material] of field.materials || []) {
+      if (!material?.isMeshStandardMaterial || semantic === groundSemantic) continue;
+      DressAsWhitebox(material, semantic === "water" ? { kind: "water" } : { keepColor: keepColor.has(semantic) });
     }
     if (!field.waterMesh && waterBlocks.length) {
-      const mesh = creek
-        ? BuildCreekWater(waterBlocks, (x, z) => this.groundAt(x, z), this.host.scene, { name: "BlockoutWater" })
-        : BuildWhiteboxWater(waterBlocks, this.host.scene, { name: "BlockoutWater" });
+      const mesh = BuildCreekWater(waterBlocks, (x, z) => this.groundAt(x, z), this.host.scene, creek
+        ? { name: "BlockoutWater" }
+        : { name: "BlockoutWater", material: MakeWhiteboxWaterMaterial({ name: "BlockoutWhiteboxWater" }) });
       if (mesh) { field.waterMesh = mesh; field.meshes.push(mesh); }
     }
   }
@@ -1140,7 +1139,7 @@ export class EditorBlockout {
     this.UpdateFly(dt);
     this.UpdatePosedStance();
     this.trees.Sync(game.battlefield.layout);
-    if (this.backdrop.Sync(game.battlefield.layout)) this.host.post?.whiteboxScene?.Invalidate?.();
+    this.backdrop.Sync(game.battlefield.layout);
     this.puppets.Update(dt * (this.previz.TimeScale?.() ?? 1), this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);

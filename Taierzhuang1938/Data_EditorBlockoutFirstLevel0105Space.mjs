@@ -644,7 +644,7 @@ export const L0105_BACKDROP_HILLS = Object.freeze([
   ["Hill7", 3150, 80, 320, 230, 24, -1.3],
 ].map(([id, x, z, rx, rz, h, ry]) => Object.freeze({ id, x, z, rx, rz, h, ry })));
 
-/** 远景层的颜色（sRGB）与参数。haze 照白盒画质的底色（Data_Tuning_Whitebox backgroundColor）。 */
+/** 远景层的颜色（sRGB）与参数。haze 取灰蓝雾色（原来白盒画质的底色 #adb8c2）。 */
 export const L0105_BACKDROP = Object.freeze({
   far: 7000, radiusM: 6000, blendM: 160,
   ground: "#7a7150",   // 远处没切田块的地：几种田混起来的平均色

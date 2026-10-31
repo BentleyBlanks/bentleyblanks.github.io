@@ -1,6 +1,6 @@
 // 第一关 18 · 对岸步坦部队的出图与帧耗时对照（真浏览器，调试跳转 + 强记事实，**不算通关证据**）。
 //
-//   node Taierzhuang1938/Script_FirstLevelFarBankShots.mjs --stage-jumps --stage-from=18 [--quality=whitebox|high|low]
+//   node Taierzhuang1938/Script_FirstLevelFarBankShots.mjs --stage-jumps --stage-from=18 [--quality=high|low]
 //        [--out=<目录>] [--perf] [--baseline-root=<不带对岸模块的检出根>]
 //
 // 为什么另起一只：整关驾驶（Script_FirstLevelCampaignEnd）在共享机器上一趟要二三十分钟，出图与 A/B 帧耗时不需要

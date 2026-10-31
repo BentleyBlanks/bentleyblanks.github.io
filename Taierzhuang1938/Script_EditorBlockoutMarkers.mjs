@@ -1,7 +1,6 @@
 // 白盒关卡编辑器的 3D 标记（docs/Data_EditorBlockout.md §5.5）。
 //
-// 全部画在 post.AddDebugOverlay(root) 里：默认白盒画质会把场景里的 Sprite / Points 藏掉、
-// 把普通 Mesh 涂灰，调试叠加层不受影响。颜色按曝光预补（同 Script_EditorAi 的叠加层：
+// 全部画在 post.AddDebugOverlay(root) 里（不进预通道、不被场景里的 Sprite / 材质规则影响）。颜色按曝光预补（同 Script_EditorAi 的叠加层：
 // 峰值压到 0.75，否则 ACES 会把阵营色冲成白）。
 //
 // 看得见 / 被挡住两种画法：同一份几何画两遍 —— 一遍做深度测试（亮），一遍穿墙（暗、半透明；深度钉在离眼 1.25 m，
@@ -250,7 +249,7 @@ class DynamicLayer {
  *   看得见那一遍 —— 深度 = max(自己, 1.25 m 处)：比这还近的标记也排在手和枪后面；
  *   穿墙那一遍   —— 深度钉在 1.25 m 处：1.25 m 外的墙挡不住它（照旧穿墙），这以内的手 / 枪挡得住；
  *                   代价是贴脸 1.25 m 内的墙也不再被穿透（人都贴着墙了，越过去看就是）。
- * 不读预通道（白盒画质不跑预通道），只改 gl_FragDepth；depthWrite 本来就关着，不污染深度。
+ * 不读预通道，只改 gl_FragDepth；depthWrite 本来就关着，不污染深度。
  */
 export const BLOCKOUT_FOREGROUND_M = 1.25;
 function BehindForeground(material, pin) {

@@ -122,7 +122,7 @@ export const FLARE_EXPOSURE = Object.freeze({maxDarkEv:3,recoveryS:1.8,cutoff:.0
 // ammunition signature or a simulation of the anatomy in Ritschel et al. 2009
 // (https://people.compute.dtu.dk/jerf/papers/TemporalGlare.pdf).
 export const FLARE_GLARE=Object.freeze({
-  slots:2,byQuality:Object.freeze({low:0,medium:1,high:1,ultra:1,whitebox:0}),
+  slots:2,byQuality:Object.freeze({low:0,medium:1,high:1,ultra:1}),
   scatterFraction:.00015,narrowSigmaDeg:.16,wideSigmaDeg:.65,narrowWeight:.8,
   supportDeg:3,sourceRadiusM:.035,depthBiasM:.035,minDistanceM:.25,
   // Per-pixel HDR storage safety; the un-clipped outer halo still follows I/r².

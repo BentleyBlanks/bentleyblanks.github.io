@@ -1945,7 +1945,7 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     terrain,
     // 色带钉在南面（z ≥ −8）的最低 / 最高点：坑北压平后坎下比南面的沟底还低，色带不跟着挪，南面颜色跟原来一样；坑北有涂色盖着
     heightTint: { lo: southMinM, hi: southMaxM },
-    // 白盒画质里树冠块（坟地柏树）保留暗绿（第三版村子挪进远景层，场地里没有屋顶块了）
+    // 白盒材质里树冠块（坟地柏树）保留暗绿（第三版村子挪进远景层，场地里没有屋顶块了）
     colorSemantics: ["foliage"],
     blocks,
     gates,

@@ -1572,7 +1572,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "lovart", date: "2026-10-22", ref: "thread 4b44ecda-1975-48ed-ae3d-6387df233e36（快速模式，GPT Image 2）",
       prompt: "_import/Prompts/Texture_EditorCreekMud.txt",
       note: "湿的黄褐色河泥 / 陡坎泥土（干裂、草根、水渍），俯视正交无光影；源图 2048 方在 tmp/EditorCreekTex/mud（不进仓库），本地按边缘交叉淡化 48 px 去接缝后缩到 1024 存 webp" },
-    consumers: [{ file: "Data_Tuning_Whitebox.mjs", token: "Texture_EditorCreekMudBase" },
+    consumers: [{ file: "Data_Tuning_WhiteboxMaterial.mjs", token: "Texture_EditorCreekMudBase" },
       { file: "Script_EditorBlockoutCreek.mjs", token: "BLOCKOUT_CREEK_LOOK.mud" }],
     files: [
       ["Editor/Texture_EditorCreekMudBase.webp", "Base", 1024, 1024],
@@ -1583,7 +1583,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "lovart", date: "2026-10-22", ref: "thread 0e3b0c51-61e2-4820-a02f-e2ded4dda9b9（快速模式，GPT Image 2）",
       prompt: "_import/Prompts/Texture_EditorCreekWater.txt",
       note: "浑浊的浅河水面（黄褐偏绿、细波纹、漂着草屑），俯视正交无反光；源图在 tmp/EditorCreekTex/water（不进仓库），边缘交叉淡化 96 px 去接缝后缩到 1024 存 webp" },
-    consumers: [{ file: "Data_Tuning_Whitebox.mjs", token: "Texture_EditorCreekWaterBase" },
+    consumers: [{ file: "Data_Tuning_WhiteboxMaterial.mjs", token: "Texture_EditorCreekWaterBase" },
       { file: "Script_EditorBlockoutCreek.mjs", token: "BLOCKOUT_CREEK_LOOK.water" }],
     files: [
       ["Editor/Texture_EditorCreekWaterBase.webp", "Base", 1024, 1024],

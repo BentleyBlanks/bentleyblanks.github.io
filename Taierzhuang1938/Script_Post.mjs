@@ -74,8 +74,6 @@
 import * as THREE from "three";
 import { Blitter, FrameContext, MakeRenderTarget, RenderTargetPool } from "./Script_PostCommon.mjs";
 import { MakeQualityPreset, POST_QUALITY_KEYS } from "./Data_Tuning_Graphics.mjs";
-import { MakeWhiteboxQualityPreset } from "./Data_Tuning_Whitebox.mjs";
-import { WhiteboxOutputPass, InstallWhiteboxPassPolicy } from "./Script_WhiteboxRendering.mjs";
 import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
   InvalidatePrepassSkip,
@@ -140,12 +138,10 @@ const OUTPUT_DOMAIN_PASSES = new Set([
 ]);
 
 export class PostPipeline {
-  constructor(renderer, { width, height, quality = "high", whitebox = null } = {}) {
+  constructor(renderer, { width, height, quality = "high" } = {}) {
     this.renderer = renderer;
     this.quality = POST_QUALITY_KEYS.includes(quality) ? quality : "high";
     this.preset = MakeQualityPreset(this.quality);
-    if (whitebox) this.preset = MakeWhiteboxQualityPreset(this.preset, whitebox);
-    this.whiteboxConfig = whitebox;
     this.lastRenderedPasses = [];
     this.frame = 0;
     this.width = Math.max(2, width | 0);
@@ -364,10 +360,8 @@ export class PostPipeline {
       // 镜头光晕读的是泛光那一趟提取好的亮部图，所以只能排在它后面
       this.lensFlarePass,
       this.compositePass,
-      ...(whitebox ? [new WhiteboxOutputPass(this)] : []),
       this.fxaaPass,
     ];
-    InstallWhiteboxPassPolicy(this, whitebox);
 
     // 旧名字的别名（测试与编辑器直接读它们，重构不许断）
     this.normalDepthMaterial = this.prepassPass.material;
@@ -716,10 +710,7 @@ export class PostPipeline {
    * @param {object} options sunDirection / exposure / damage / fade / bloom / godStrength / dt
    */
   Render(scene, camera, options = {}) {
-    // Every enabled pass must see the same whitebox silhouette/material. Restore
-    // before returning to simulation, even when a draw or diagnostic throws.
-    const restore = this.whiteboxScene?.Begin(scene, camera);
-    try { this._RenderFrame(scene, camera, options); } finally { restore?.(); }
+    this._RenderFrame(scene, camera, options);
   }
 
   _RenderFrame(scene, camera, options) {
@@ -770,7 +761,6 @@ export class PostPipeline {
 
   Dispose() {
     this.staticInstances?.Dispose();
-    this.whiteboxScene?.Dispose();
     for (const pass of this.passes) pass.Dispose?.();
     this.shadowDebugViews?.Dispose?.();
     this.debugPass.Dispose();

@@ -381,7 +381,7 @@ export function ValidateBlockoutScene(doc) {
     const ht = doc.heightTint;
     if (!IsObject(ht) || !Finite(ht.lo) || !Finite(ht.hi) || ht.hi <= ht.lo) errors.push("heightTint 要是 { lo, hi }，有限数字且 hi > lo");
   }
-  // 可选 colorSemantics（§2.2 / §6.3，2026-10-20）：这几种 semantic 的块在白盒画质里保留语义色（屋顶深灰、树冠暗绿），不刷成灰网格。
+  // 可选 colorSemantics（§2.2 / §6.3，2026-10-20）：这几种 semantic 的块的白盒材质保留语义色（屋顶深灰、树冠暗绿）再加米格线，不刷成灰。
   if (doc.colorSemantics !== undefined) {
     if (!Array.isArray(doc.colorSemantics) || doc.colorSemantics.length > 16 || !doc.colorSemantics.every(v => typeof v === "string" && v)) errors.push("colorSemantics 要是至多 16 个非空字符串的数组");
   }

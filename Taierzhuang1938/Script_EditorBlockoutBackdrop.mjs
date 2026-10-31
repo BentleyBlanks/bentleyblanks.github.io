@@ -12,7 +12,6 @@
 //     tree 不在这里画，交给 Script_EditorBlockoutTrees（同场地里的树一个 InstancedMesh）。
 //   · 远处变淡：所有远景材质在出色之后按离相机的距离往 haze.color 混（smoothstep(fromM, toM) × max），场地本身不混；
 //     fromM 取得比场地边到常用机位的距离远，接缝上是 0。
-// 网格都标 userData.whiteboxTerrain：白盒画质（保留地形贴图）原样画，不刷成灰网格。
 // ===========================================================================
 import * as THREE from "three";
 import { BlockoutTintColor, BackdropBlend, RasterizeBackdropPaint, BLOCKOUT_BACKDROP_TEXTURE } from "./Script_EditorBlockoutLevels.mjs";
@@ -319,8 +318,6 @@ export class BlockoutBackdrop {
     mesh.castShadow = false;
     mesh.receiveShadow = receiveShadow;
     mesh.matrixAutoUpdate = false;
-    // 白盒画质：按地形对待（保留自己的颜色，不刷成灰网格）
-    mesh.userData.whiteboxTerrain = true;
     mesh.userData.blockoutBackdrop = true;
     this.root.add(mesh);
     this.meshes.push(mesh);

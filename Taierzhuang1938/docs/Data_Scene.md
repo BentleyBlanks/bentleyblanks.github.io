@@ -106,5 +106,5 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.height.bin   高度图：int16 小端、�
 
 ## 7. 还没做的
 
-- 去掉「白盒」画质档：白盒的灰网格改由场景引用的白盒材质给出，光照写进场景。
+- ~~去掉「白盒」画质档~~（2026-10-31 已做）：`GRAPHICS_PROFILES` 只剩 low / medium / high / ultra，白盒编辑器走正常渲染管线，灰表面 + 米格线是白盒材质本身的样子（`Script_WhiteboxMaterial`、`Data_Tuning_WhiteboxMaterial`；场景里的 `Whitebox/*` 材质按语义映射到它，`DressWorld` 装上）。光照写进场景还没做：现在白盒编辑器用本关光照 + `BLOCKOUT_EDITOR_FILL` 补光。
 - 模型资产（构件库可布设清单、外部道具）与 PBR 材质进目录；场景编辑器里的地形刷子、地面涂色、框选；高度图存盘。

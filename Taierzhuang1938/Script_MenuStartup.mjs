@@ -9,10 +9,9 @@ import {AudioEngine} from './Script_Audio.mjs';
 import {ApplySavedSettings, NormalizeGraphicsDetails} from './Script_EditorSettings.mjs';
 import {SettingsHost, SETTINGS_PAGE_IDS} from './Script_SettingsHost.mjs';
 import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS} from './Data_DevTools.mjs';
-import {LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
+import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
 import {CreateGameGraphics} from './Data_Tuning_GameGraphics.mjs';
-import {WhiteboxGraphicsOverrides} from './Data_Tuning_Whitebox.mjs';
 import {CAMPAIGN_ENTRIES} from './Data_Menu.mjs';
 import {MOVEMENT_RANGE_PHASE} from './Data_MovementRange.mjs';
 import {WEAPON_RANGE_PHASE} from './Data_WeaponRange.mjs';
@@ -45,13 +44,12 @@ const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .05, 80
 const audio = new AudioEngine({enabled: params.get('audio') !== '0', recordedPacks: false});
 const debugOptions = new DebugOptions();
 const state = {ready: false, running: false, menu: true, warming: false, builtPhase: null, standaloneMenu: true};
-const profile = LoadGraphicsProfile(location.search), quality = profile === 'whitebox' ? 'high' : profile;
-const preset = QUALITY_PRESETS[quality], config = LoadWhiteboxConfig();
+const profile = LoadGraphicsProfile(location.search), quality = profile;
+const preset = QUALITY_PRESETS[quality];
 const graphics = CreateGameGraphics({profile, preset, gi: params.get('gi') === '1'});
 NormalizeGraphicsDetails(graphics, {preset});
-if (profile === 'whitebox') Object.assign(graphics, WhiteboxGraphicsOverrides(config));
-const graphicsProfile = CreateGraphicsProfileApi({profile, config,
-  post: {quality, passes: [{name: 'commandRoom'}], lastRenderedPasses: ['commandRoom']}, renderer: null});
+const graphicsProfile = CreateGraphicsProfileApi({profile,
+  post: {quality, passes: [{name: 'commandRoom'}], lastRenderedPasses: ['commandRoom']}});
 let menu, frameId = 0;
 // 画面 / 声音 / 操作三页：与游戏宿主共用 Script_SettingsHost，这里只管藏菜单与背景声。
 const settings = new SettingsHost({

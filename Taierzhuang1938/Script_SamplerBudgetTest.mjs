@@ -23,7 +23,8 @@
 // low / medium / high / ultra × `gi=0|1` 共八次装载，跑的是**正片**
 // （`?shot=1&phase=2`）—— 只有正片同时有静态墙材质、人物 GLB 材质、第一人称视模
 // 材质、水面与破口材质；探针页缺后三样，而最挤的那份恰恰是视模。
-// 另加三次**第一关**装载（`?whitebox=p012`）：地面是分层地形材质（两张 sampler2DArray 的
+// 另加一次**白盒编辑器**装载（`?editor=blockout`，high 档）：白盒材质（灰表面 + 米格线补丁）真的编出来、采样器不超。
+// 再加三次**第一关**装载（`?whitebox=p012`）：地面是分层地形材质（两张 sampler2DArray 的
 // 表面补丁，docs/Data_TerrainLayers.md），只有这一关有；low|gi=0 / medium|gi=1 / ultra|gi=1
 // 覆盖地形的三种编译分档，并断言地形程序与它的砸坑变体真的编出来了。
 // 每一档都会把「cacheKey → 采样器数」整张表打出来：调参的人要能一眼看到
@@ -58,7 +59,8 @@ for (const quality of ["low", "medium", "high", "ultra"]) {
 for (const [quality, gi] of [["low", 0], ["medium", 1], ["ultra", 1]]) {
   CASES.push({ name: `firstLevel ${quality}|gi=${gi}`, quality, gi, firstLevel: true });
 }
-CASES.push({ name: "firstLevel whitebox|gi=0", quality: "whitebox", gi: 0, firstLevel: true });
+// 白盒编辑器（2026-10-31 起走正常渲染管线，白盒的样子是材质）：灰表面 + 米格线的材质要真的编出来、也在采样器预算内
+CASES.push({ name: "blockout high|gi=0", quality: "high", gi: 0, blockout: true });
 const cases = ONLY ? CASES.filter((c) => c.name.includes(ONLY)) : CASES;
 
 const server = await ServeRoot(rootDir, 0);
@@ -129,16 +131,21 @@ try {
     page.on("console", (message) => {
       if (message.type() !== "error") return;
       if (/fonts\.(googleapis|gstatic)\.com/.test(message.location()?.url || "")) return;
+      // 白盒编辑器读 Blockout/*.previz.json 等可选文件，没有就是 404（同白盒编辑器各浏览器测试的口径）
+      if (item.blockout && /status of 404/.test(message.text())) return;
       errors.push(`CONSOLE ${message.text().slice(0, 240)}`);
     });
     try {
-      const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&${item.firstLevel ? "whitebox=p012" : "phase=2"}&manual=1`
+      const url = `http://127.0.0.1:${port}/Taierzhuang1938/?${item.blockout ? "editor=blockout&level=FirstLevel0105&audio=0" : `shot=1&${item.firstLevel ? "whitebox=p012" : "phase=2"}&manual=1`}`
         + `&quality=${item.quality}&scale=small&gi=${item.gi}`;
       await page.goto(url, { waitUntil: "load", timeout: 180000 });
       await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
+      if (item.blockout) await page.waitForFunction(() => window.Taierzhuang?.Debug?.Blockout?.State().ready, null, { timeout: 240000 });
       // 推够帧数：视模、人物、水面、破口材质要真的进过一次画面才会编出程序来。
       // 第一人称手与枪在 shot=1 下照常画，`?ads=` 不必带 —— 视模材质本来就在。
       await page.evaluate((frames) => window.Taierzhuang.StepFrames(frames, 1 / 60), FRAMES);
+      // 白盒编辑器出生点的视野里不一定有体块：把场景里所有材质都提交编译一遍（compile 不看视锥），白盒材质才一定在表里
+      if (item.blockout) await page.evaluate(() => { const T = window.Taierzhuang; T.renderer.compile(T.scene, T.camera); });
       const { maxUnits, rows } = await page.evaluate(COUNT_SAMPLERS);
       const glError = await page.evaluate(() => {
         const gl = window.Taierzhuang.renderer.getContext();
@@ -177,10 +184,9 @@ try {
           ? over.slice(0, 4).map((r) => `${r.name} ${r.samplers}: ${r.names.join(",")}`).join(" / ")
           : `最挤的是 ${worst ? `${worst.name} ${worst.samplers}` : "(无程序)"}`);
       Report(rows.length > 0, `${item.name} 真的编出了程序`, `${rows.length} 个`);
-      if (item.quality === "whitebox") {
+      if (item.blockout) {
         const grid = rows.filter((row) => row.cacheKey.includes("whiteboxGrid1"));
-        Report(grid.length > 0, `${item.name} 灰盒网格材质实际编译`, `grid=${grid.length}`);
-        Report(rows.some((row) => /terrain\d/.test(row.cacheKey)), `${item.name} 保留地形材质`);
+        Report(grid.length > 0, `${item.name} 白盒材质（灰表面 + 米格线）实际编译`, `grid=${grid.length}`);
       } else if (item.firstLevel) {
         // 砸坑变体由 TerrainDeformationView.Warm() 在进关时预编，不必真炸一次。
         const terrain = rows.filter((row) => /terrain\d/.test(row.cacheKey));

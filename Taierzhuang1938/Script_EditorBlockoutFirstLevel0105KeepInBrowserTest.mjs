@@ -98,7 +98,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e?.message || e)));
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=03-3&quality=whitebox&scale=small&audio=0&airWalls=1`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=03-3&scale=small&audio=0&airWalls=1`,
     { waitUntil: "load", timeout: 300000 });
   await page.waitForFunction(() => window.Tengxian?.Debug?.Blockout?.State().ready && window.Taierzhuang?.player, null, { timeout: 300000 });
   const loaded = await page.evaluate(() => {

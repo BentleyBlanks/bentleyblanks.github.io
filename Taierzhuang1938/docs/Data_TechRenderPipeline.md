@@ -78,7 +78,7 @@ function generateShadowMapTypeDefine( parameters ) {
 
 ## 1. 帧图与模块契约（现役）
 
-**2026-09-29 默认表现入口**：[白盒画质](Data_WhiteboxQuality.md) 默认只跑 main + whiteboxOutput，Feature/Pass 从 `Data_Tuning_Whitebox` 显式允许表接入。下文四档美术管线仍然保留，验收它们需显式 `?quality=high`（或相应档位）；`Tengxian.GraphicsProfile.Inspect()` 查询当前实际运行的 Pass。
+**2026-09-29 默认表现入口（2026-10-31 作废）**：当时「白盒画质」做过一个只跑 main + whiteboxOutput 的画质档（[白盒画质](Data_WhiteboxQuality.md)，已删）。现在画质档只有 low / medium / high / ultra，默认 high，白盒编辑器与游戏走同一套管线；`Tengxian.GraphicsProfile.Inspect()` 查询当前档与实际运行的 Pass。下文凡提到白盒档的 pass 策略、`whiteboxScene`、`WhiteboxSceneRenderer`、`whiteboxOutput` 的，都是已删的旧口径，留作历史。
 
 > **这一节是渲染侧唯一的接入说明。** 后续所有子系统（CSM/接触阴影、GTAO+SSIL、SSR、
 > froxel 体积雾、物理大气、曝光/镜头/LUT、TAAU/运动模糊/DoF、材质升级、簇状多光源）
@@ -6067,7 +6067,7 @@ program 数不涨、爆炸帧 < 1000 ms）。去掉修复同一条测试爆炸�
 **规矩**：以后凡是往开机链里加「按画质建东西 / 预热」的步骤，都要排在 `LoadSavedGraphics` 之后；
 复现卡顿先用用户存的设置（记忆条「复现用用户的设置」），默认画质下量不到的不等于没有。
 
-### 18.7 白盒档的提交编译要套白盒那一层（2026-10-01）
+### 18.7 白盒档的提交编译要套白盒那一层（2026-10-01；2026-10-31 白盒画质档已删，`CompileAsRendered` 只剩绑 HDR 靶，`Script_WhiteboxShaderWarmTest` 改在 high 档量同一件事）
 
 **症状**：用户报「本地加载也很慢」。白盒画质 2026-09-29 成了出厂默认档之后，第一关
 （`?whitebox=p012`）关掉 program 缓存开机 63 s，主线程有 22.5 s 卡在「第一次用某个 program」上；
@@ -6104,7 +6104,7 @@ program 数不涨、爆炸帧 < 1000 ms）。去掉修复同一条测试爆炸�
 修后预热段剩下的：并行编约 45 个 program（冷 ≈ 3 s）、第一遍整场出画（贴图 / 缓冲上传）、
 预建 88 个人物对象（纯 CPU ≈ 2 s）。
 
-**门禁**：`Script_WhiteboxShaderWarmTest`（`?whitebox=p012&quality=whitebox`）—— 预热期间主场景那一趟现建
+**门禁**：`Script_WhiteboxShaderWarmTest`（`?whitebox=p012&quality=high`；2026-10-31 前是 `quality=whitebox`）—— 预热期间主场景那一趟现建
 program = 0（修前 64）；提交编译建的 program 至少一半在开机结束前被用上（修前 0/135，修后 64/67）；
 进城后 300 帧不新编。测试的 `KNOWN_LATE`（允许现编的已知项）是空的，**别往里加** —— 新的现编就是预热漏了。
 

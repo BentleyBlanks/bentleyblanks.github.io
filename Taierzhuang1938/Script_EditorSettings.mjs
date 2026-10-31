@@ -25,7 +25,6 @@ import { El, Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } fro
 import { T } from "./Script_Text.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
-import { BuildWhiteboxQualityUi } from "./Script_EditorWhiteboxQuality.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 
 
@@ -115,7 +114,6 @@ export function LoadSavedGraphics(graphics) {
   let changed = 0;
   for (const key of Object.keys(graphics)) {
     if (key === "profile") continue;
-    if (graphics.profile === "whitebox" && !["fov", "gore"].includes(key)) continue;
     if (typeof gfx[key] === typeof graphics[key] && gfx[key] != null && graphics[key] !== gfx[key]) {
       graphics[key] = gfx[key];
       changed += 1;
@@ -178,10 +176,6 @@ export class GraphicsSettings {
   }
 
   Save() {
-    if (this.gfx.profile === "whitebox") {
-      WriteJson(KEY_GFX, { ...ReadJson(KEY_GFX), fov: this.gfx.fov, gore: this.gfx.gore });
-      return;
-    }
     WriteJson(KEY_GFX, { ...this.gfx });
   }
 
@@ -192,8 +186,6 @@ export class GraphicsSettings {
 
   BuildUi(body) {
     const gfx = this.gfx;
-    if (BuildWhiteboxQualityUi(this, body)) return;
-
     const controls = GraphicsDetailControls(this.host.post);
     const Details = (parent, group) => {
       for (const control of controls[group]) {
@@ -482,7 +474,6 @@ export class GraphicsSettings {
   }
 
   Reset() {
-    if (this.gfx.profile === "whitebox") { this.host.game.GraphicsProfile.ResetWhitebox({ reload: true }); return; }
     const gfx = this.gfx;
     // 渲染分辨率的出厂值跟画质档走（TAAU：medium 0.75 / high 0.8 / ultra 1.0），
     // 不是固定的 1 —— 「恢复出厂」要回到这一档真正的出厂设置。
@@ -546,11 +537,6 @@ export class GraphicsSettings {
   }
 
   Update(dt) {
-    if (this.whiteboxReadout) {
-      const state = this.host.game.GraphicsProfile?.Inspect();
-      this.whiteboxReadout.textContent = `实际运行：${state?.renderedPasses.join(" → ") || "等待渲染"}`;
-      return;
-    }
     // 帧率：设置面板里唯一有意义的反馈就是「我改完之后是不是真的快了」。
     // 玩法是停的，但渲染照跑，所以这个数量的是**合成链**的成本，正好是这一栏管的东西。
     this.fps.frames += 1;

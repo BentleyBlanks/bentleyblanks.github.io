@@ -76,7 +76,7 @@ const State = () => B(() => {
 const Dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 try {
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=03-1&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=03-1&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
   await B(() => { const T = window.Tengxian; T.player.health = 100; T.player.spawnGrace = 999; });

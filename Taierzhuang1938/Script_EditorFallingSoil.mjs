@@ -8,7 +8,7 @@ import {FALLING_SOIL_SCHEMA as SCHEMA,FALLING_SOIL_STAGE as STAGE,FALLING_SOIL_P
 const Clone=value=>JSON.parse(JSON.stringify(value));
 
 // Only UI + studio reference surfaces. All emission/collision/rendering is the
-// production ParticleEffects.FallingSoil implementation, including in whitebox.
+// production ParticleEffects.FallingSoil implementation.
 export class FallingSoilInspector{
   constructor(editor,parent){this.editor=editor;this.parent=parent;this.configs=new Map();this.stage=Clone(STAGE);this.id=null;}
   get api(){return this.editor.host.vfx.particles.FallingSoil;}

@@ -1,5 +1,10 @@
 # 白盒画质与美术验收入口
 
+> **2026-10-31 用户要求删除。** 用户：「白盒本身现在是由一个看起来是白盒的场景而出现的，并非一个画质开关，所以可以清理掉所有『白盒画质』这样的开关。」
+> 「白盒」画质档（`quality=whitebox`、`GRAPHICS_PROFILES` 里的 `"whitebox"`、`WHITEBOX_CONTROLS` 四十来个开关、换材质渲染器 `WhiteboxSceneRenderer`、白盒输出 pass 与 pass 策略、「编辑白盒画质」设置页、`tengxian1938_whitebox_v1` 存档键）已全部删除；下面的正文是删除前的口径，只当历史，不再有效，也不要照着恢复。
+> 现在：画质档只有 low / medium / high / ultra（`Data_Tuning_Graphics.GRAPHICS_PROFILES`，`?quality=whitebox` 与存档里残留的 `whitebox` 当没写，回默认 high，旧键不迁移）；白盒编辑器走和游戏同一套渲染管线（关卡光照 + `BLOCKOUT_EDITOR_FILL` 补光，人物 / 枪 / 特效 / 天空照常）；白盒的样子是**材质**给的——灰表面 `#909397` + 世界坐标米格线（`Script_WhiteboxMaterial`、`Script_WhiteboxGrid`，数在 `Data_Tuning_WhiteboxMaterial`），见 [白盒编辑器 §6.3](Data_EditorBlockout.md) 与 [场景文件](Data_Scene.md) §7。
+> 门禁：`Script_GraphicsProfileTest`（画质档规则 + 源码里没有白盒画质档残留）、`Script_WhiteboxMaterialTest`、`Script_SamplerBudgetTest` 的 blockout 装载。
+
 2026-10-26 起，普通入口默认 **high**，仅 `?editor=blockout` 默认 **whitebox**。玩家与白盒编辑器的预设分别保存；旧全局 `whitebox` 存档不再覆盖普通入口，已有 low / medium / high / ultra 保留。显式 URL `quality` 优先。从菜单进入白盒编辑器不携带玩家画质，离开编辑器不携带其画质；`?whitebox=p012` 只选择第一关。
 
 ## 玩家入口

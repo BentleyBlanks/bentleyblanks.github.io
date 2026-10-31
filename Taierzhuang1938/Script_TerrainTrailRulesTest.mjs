@@ -83,7 +83,7 @@ const Ok = (cond, msg) => { assert.ok(cond, msg); passed++; };
   for (let i = 0; i < 400; i++) if (SoleForKind("nra", `nra:${i}`) === "straw") straw++;
   Ok(straw > 240 && straw < 320, `川军约七成草鞋（${straw}/400）`);
   Ok(SoleForKind("nra", "nra:7") === SoleForKind("nra", "nra:7"), "同一个人一直穿同一双");
-  Ok(TerrainTrailTierOf("low") === null && TerrainTrailTierOf("whitebox") === TERRAIN_TRAIL_TIERS.high, "分档：low 关、未登记按 high");
+  Ok(TerrainTrailTierOf("low") === null && TerrainTrailTierOf("unregistered") === TERRAIN_TRAIL_TIERS.high, "分档：low 关、未登记按 high");
 }
 
 // --- 3. 环形窗口 --------------------------------------------------------------

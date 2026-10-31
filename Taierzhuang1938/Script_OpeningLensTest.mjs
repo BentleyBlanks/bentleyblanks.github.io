@@ -233,7 +233,7 @@ Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sam
   const composite = Read("Script_PostComposite.mjs"), hud = Read("Script_Hud.mjs"), css = Read("Style_Game.css");
   assert.match(main, /const openingLens = missionRuntime\?\.Perception\(\)\.lens \|\| null;/);
   assert.match(main, /hud\.SetLens\(openingLens\)/, "a direct call: a renamed HUD method fails loudly");
-  assert.match(main, /post\.Render\(scene, camera, WhiteboxPostOptions\(WHITEBOX_CONFIG, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\)\);/);
+  assert.match(main, /post\.Render\(scene, camera, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\);/);
   assert.match(runtime, /lens: this\.OpeningLens\(\)/);
   assert.match(runtime, /live \? show\.phase : null/);
   for (const u of ["uRadialBlur", "uBloodEdge", "uBloodCorners", "uSideDaze", "uCheekCut"]) {

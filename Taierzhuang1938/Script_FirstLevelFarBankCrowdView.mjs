@@ -7,7 +7,7 @@
 //   · 枪口焰 / 曳光 / 弹着：FarBankCrowd.TakeShots 的事件，用共用的 vfx 画（MuzzleFlash / Tracer / Impact）。
 // 旗与刀是**逐个普通 Mesh**（每个一个 draw，共 ≤ 16 个），不是 InstancedMesh：会动的实例没有前帧历史，
 // 违背 docs/Data_MotionVectorContract.md；普通 Mesh 的世界矩阵历史自动记录。
-// 材质是顶点色的 Lambert（无贴图，不占采样器）；挂在 whiteboxCharacter 根下，白盒画质里也保持本色。
+// 材质是顶点色的 Lambert（无贴图，不占采样器）。
 // ===========================================================================
 import * as THREE from "three";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
@@ -77,7 +77,6 @@ export class FarBankCrowdView {
     this.viewApi = { visible: (x, y, z, r = 1.7) => { this.sphere.center.set(x, y, z); this.sphere.radius = r; return this.frustum.intersectsSphere(this.sphere); } };
     this.group = new THREE.Group();
     this.group.name = "FarBankCrowdProps";
-    this.group.userData.whiteboxCharacter = true;
     root.add(this.group);
     this.material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this.flagGeometry = BuildFlagGeometry();

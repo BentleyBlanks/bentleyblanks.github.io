@@ -109,7 +109,7 @@ const sceneText = await fs.readFile(path.join(projectDir, "Blockout", "SecondLev
 }
 {
   const url = new URL(BlockoutEntry.Url("http://127.0.0.1:9/Taierzhuang1938/?whitebox=p012&missionStage=3&phase=2&quality=high&scale=small&audio=0"));
-  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留规模 / 音频，白盒画质独立", url.pathname === "/Taierzhuang1938/"
+  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留规模 / 音频（画质档跟玩家存的走）", url.pathname === "/Taierzhuang1938/"
     && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel0105"
     && !url.searchParams.has("quality") && url.searchParams.get("scale") === "small" && url.searchParams.get("audio") === "0"
     && !url.searchParams.has("whitebox") && !url.searchParams.has("missionStage") && !url.searchParams.has("phase"), url.search);
@@ -194,7 +194,8 @@ try {
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready,
     null, { timeout: 300000 });
   metrics.bootMs = Date.now() - bootStart;
-  Check("白盒编辑器默认白盒，不继承玩家 high", await page.evaluate(() => Tengxian.GraphicsProfile.Inspect().profile) === "whitebox");
+  Check("白盒编辑器走正常画质档：玩家存的 high 就是 high（不再有白盒画质档）", await page.evaluate(() => Tengxian.GraphicsProfile.Inspect().profile) === "high"
+    && await page.evaluate(() => !("whitebox" in Tengxian.GraphicsProfile.Inspect()) && Object.keys(Tengxian.post).every(k => !/^whitebox/.test(k))));
   const boot = await page.evaluate(() => {
     const T = window.Tengxian;
     return {
@@ -691,11 +692,18 @@ try {
       for (let i = 0; i < attribute.count; i += 211) { const g = attribute.getY(i); lo = Math.min(lo, g); hi = Math.max(hi, g); }
     }
     const spread = colors ? hi - lo : 0;
+    const keys = (m) => m?.userData?.materialPatchKeys || [];
+    const water = bf.materials.get("water");
     return { grounds: grounds.length, vertexColors: !!material?.vertexColors, colorSpread: spread,
-      water: bf.waterMesh?.name || null, waterInScene: !!bf.waterMesh?.parent };
+      water: bf.waterMesh?.name || null, waterInScene: !!bf.waterMesh?.parent,
+      waterMaterial: { kind: water?.userData?.whiteboxMaterial, keys: keys(water), hex: water?.color?.getHexString() },
+      waterMeshKeys: keys(bf.waterMesh?.material) };
   });
   Check("地面按高度上色（顶点色有深浅）、北沙河铺成水面", look.grounds > 0 && look.vertexColors && look.colorSpread > 0.05
     && look.water === "BlockoutWater" && look.waterInScene, JSON.stringify(look));
+  Check("水是白盒水材质：蓝灰 #4d6f86 + 反光补丁、没有网格（水块的材质与水面网格都是）",
+    look.waterMaterial.kind === "water" && look.waterMaterial.hex === "4d6f86" && look.waterMaterial.keys.includes("whiteboxWater1") && !look.waterMaterial.keys.includes("whiteboxGrid1")
+    && look.waterMeshKeys.includes("whiteboxWater1"), JSON.stringify({ m: look.waterMaterial, mesh: look.waterMeshKeys }));
   await B(() => window.Tengxian.Debug.Blockout.PlacePlayer({ x: -60, z: 84, yawDeg: 180, pitchDeg: -8 }));
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(shotDir, "FirstLevel_River.png") });
@@ -1020,6 +1028,22 @@ try {
     JSON.stringify({ meshes: bd.st.meshes, tris: bd.st.triangles, far: bd.st.cameraFar, inField: bd.inField, tex: bd.st.texture, bounds: bd.bounds, ms: bd.st.buildMs }));
   Check("01–05 远景层的树（村 A、田野上零星的树）和场地里的树一起种", bd.trees.count === bd.treeBlocks + bd.shapes && bd.shapes > 30,
     JSON.stringify({ trees: bd.trees, treeBlocks: bd.treeBlocks, backdropTrees: bd.shapes }));
+  // 白盒的样子是材质给的（2026-10-31）：体块用灰表面 + 米格线的白盒材质；colorSemantics 那几种保留语义色再加网格；地形有米格线
+  const wb = await B(() => {
+    const T = window.Tengxian, bf = T.battlefield, layout = bf.layout, keep = new Set(layout.colorSemantics || []);
+    const keys = (m) => m?.userData?.materialPatchKeys || [];
+    const rows = [];
+    for (const [semantic, m] of bf.materials) {
+      if (!m?.isMeshStandardMaterial || semantic === layout.ground?.semantic) continue;
+      rows.push({ semantic, kind: m.userData.whiteboxMaterial, grid: keys(m).includes("whiteboxGrid1"), hex: m.color.getHexString() });
+    }
+    const ground = bf.meshes.find(m => m.name === "FirstLevelWhitebox_Ground")?.material;
+    return { rows, keep: [...keep], ground: keys(ground), groundVertexColors: !!ground?.vertexColors, profile: T.GraphicsProfile.Inspect().profile };
+  });
+  const keptRows = wb.rows.filter(r => wb.keep.includes(r.semantic)), grayRows = wb.rows.filter(r => !wb.keep.includes(r.semantic) && r.semantic !== "water");
+  Check("01–05 体块材质：非语义色的都是灰 #909397 + 米格线", grayRows.length >= 5 && grayRows.every(r => r.kind === "surface" && r.grid && r.hex === "909397"), JSON.stringify(grayRows));
+  Check("01–05 体块材质：colorSemantics 保留语义色（不是灰）并加米格线", keptRows.length >= 3 && keptRows.every(r => r.kind === "semantic" && r.grid && r.hex !== "909397"), JSON.stringify({ keep: wb.keep, keptRows }));
+  Check("01–05 地形：高度色带顶点色 + 米格线补丁；画质档是正常档、没有白盒渲染器", wb.groundVertexColors && wb.ground.includes("blockoutGrid1") && wb.profile === "high", JSON.stringify({ ground: wb.ground, profile: wb.profile }));
   await page.screenshot({ path: path.join(shotDir, "FirstLevel0105_Backdrop.png") });
 
   // 三层新标记（§5.5，2026-10-20）：0610 的地标从场景文件读进来、狗洞地标在 09-5 的画面里有线框和标签（10-22 第四版：狗洞那一拍从 09-2 挪到 09-5，玩家蹲在便门外、狗洞在左手边 11 m）；

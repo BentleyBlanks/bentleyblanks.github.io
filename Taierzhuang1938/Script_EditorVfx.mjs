@@ -142,22 +142,12 @@ export class VfxEditor {
     this.savedPadGeometry=this.studio.pad.geometry;
     this.flareField=new FlarePreviewField(this.studio,this.host.library);
     this.flarePadGeometry=this.flareField.groundGeometry;
-    // The studio owns the visible scene here. Keep its authored particle/mesh
-    // materials without changing the game's whitebox config or saved preferences.
-    const whitebox=this.host.post?.whiteboxScene;
-    this.savedWhiteboxConfig=whitebox?.config??null;
-    this.savedClusteredEnabled=this.host.lights?.clustered?.enabled;
-    if(whitebox){
-      this.previewWhiteboxConfig={...whitebox.config,effects:true,assetTextures:true};
-      this.flareWhiteboxConfig={...this.previewWhiteboxConfig,sceneLighting:true,clusteredLights:true,sky:true,environment:true};
-      whitebox.config=this.previewWhiteboxConfig;whitebox.Invalidate();
-    }
     // WorldMask 会把场景直属的 VfxRoot 一起藏掉；预览器明确把它列为展品。
     vfx.root.visible = true;
     this.studio.SetGridVisible(true);
     this.studio.Frame(3.4, 8.5);
     this.panel = Panel({
-      title: "粒子特效编辑器", sub: this.savedWhiteboxConfig?"白盒环境 · 保留特效材质":"游戏同源预览",
+      title: "粒子特效编辑器", sub: "游戏同源预览",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -207,8 +197,6 @@ export class VfxEditor {
     if (this.savedWind) vfx.SetWind(this.savedWind);
     if (this.panel) this.panel.root.remove();
     this.panel = null;
-    if(this.savedWhiteboxConfig){const whitebox=this.host.post.whiteboxScene;whitebox.config=this.savedWhiteboxConfig;whitebox.Invalidate();this.savedWhiteboxConfig=null;}
-    if(this.savedClusteredEnabled!==undefined)this.host.lights.SetClusteredEnabled(this.savedClusteredEnabled);
     this.studio.Close();
     this.studio.maxDistance=this.savedStudioMaxDistance;
     this.studio.pad.geometry=this.savedPadGeometry;this.flarePadGeometry.dispose();
@@ -360,11 +348,6 @@ export class VfxEditor {
   }
   Play(){
     this.Stop();const vfx=this.host.vfx,api=vfx.particles;this.layerRecords.clear();
-    if(this.savedWhiteboxConfig){
-      const whitebox=this.host.post.whiteboxScene,flare=!!FLARE_EFFECTS[this.effectId],config=flare?this.flareWhiteboxConfig:this.previewWhiteboxConfig;
-      if(whitebox.config!==config){whitebox.config=config;whitebox.Invalidate();}
-      if(this.savedClusteredEnabled!==undefined)this.host.lights.SetClusteredEnabled(flare?true:this.savedClusteredEnabled);
-    }
     this.studio.pad.geometry=FLARE_EFFECTS[this.effectId]?this.flarePadGeometry:this.savedPadGeometry;
     this.flareField.SetVisible(!!FLARE_EFFECTS[this.effectId]);
     this.flareCameraSelect.root.closest('.edRow').hidden=!FLARE_EFFECTS[this.effectId];

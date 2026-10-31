@@ -9,10 +9,9 @@
 //     嘴：有口型轨（faceTracks，按 mp3 sha256）用口型轨，否则用这句干声的包络；按预演时间取样，Seek 也对得上；
 //   · 事件：白光 / 黑场 / 说明字（确定性遮罩）、爆炸 / 烟 / 枪口火（VfxSystem）、震屏、场景信号（播完 / 中断按 then 的关键帧恢复）、
 //     音效（§14.3 别名 → 现有音频库的键，表在下面 PREVIZ_SFX；找不到记进 State().missingSfx）。
-//     2026-10-18 第三轮：默认白盒画质（特效关）把 VfxSystem 整棵藏掉，爆炸看不见 —— 这时由 Script_EditorBlockoutPrevizFx
-//     在调试叠加层里另画一份简易爆炸（火光 + 土柱 / 烟尘 + 尘环，按 t 求值，Seek 也看得见）；演员键 throw 的手榴弹飞行
-//     （抛物线 + 拖尾）也由它画，任何画质都画。游戏本身的爆炸表现不动。同一轮补了烟（smoke 事件）与枪口火（muzzle 事件），
-//     同爆炸只在白盒特效关时画，Seek 也看得见。
+//     演员键 throw 的手榴弹飞行（抛物线 + 拖尾）VfxSystem 不管，由 Script_EditorBlockoutPrevizFx 在调试叠加层里画，任何画质都画。
+//     2026-10-31 起不再有「白盒画质」档（原来白盒特效关时由 PrevizFx 另画的一份简易爆炸 / 烟 / 枪口火已删），
+//     爆炸 / 烟 / 枪口火一律是 VfxSystem 的真特效。
 //   · 播完 / 中断：交还演员与相机，按 then 跳关键帧（直接到位）。
 //   · 2026-10-19：飞机（段里的 aircraft[]，Script_EditorBlockoutPrevizAircraft：借游戏机队的模型克隆、按 PrevizPlan 的纯函数取样摆位、
 //     引擎声 MoveVoice 跟着机身、扫射的弹着点交给简易特效当土点画）与慢动作（段里的 slowmo[]：预演时钟按 PrevizTimeScale 走，
@@ -136,7 +135,7 @@ export class BlockoutPreviz {
     this.dialogue = null;
     this.fx = null;
     try { this.fx = new BlockoutPrevizFx({ post: editor.host.post, scene: editor.host.scene }); }
-    catch (error) { console.warn("[BlockoutPreviz] 简易爆炸层建不起来", error); }
+    catch (error) { console.warn("[BlockoutPreviz] 手榴弹层建不起来", error); }
     this.flareTrack=this.fx?new FlareTrack(this.fx.root,editor.host,(x,z)=>editor.standAt(x,z)):null;
     // 飞机（2026-10-19）：模型借游戏机队，声音走 PREVIZ_SFX 别名表（planeDrone 是持续声，起一条 voice 逐帧搬）
     this.air = null;
@@ -149,6 +148,8 @@ export class BlockoutPreviz {
           MoveLoop: (voice, at, velocity) => { this.host.audio?.MoveVoice?.(voice, this.CuePosition(at), { velocity }); },
           StopLoop: (voice) => { this.host.audio?.StopVoice?.(voice, 1.0); },
         },
+        // 扫射弹着点的土：VfxSystem 的真弹着（只在播放时跨过那一刻才冒，Seek 不重放）
+        dirt: (x, z) => { this.host.vfx?.Impact?.(new THREE.Vector3(x, this.editor.standAt(x, z), z), new THREE.Vector3(0, 1, 0), "dirt"); },
       });
     } catch (error) { console.warn("[BlockoutPreviz] 飞机层建不起来", error); }
     // 能转头不能走（2026-10-21，§14.1 eye.free）：segment = 现在这一段 free 眼睛的第一条镜头下标（-1 = 不在 free 眼睛里）；
@@ -577,17 +578,14 @@ export class BlockoutPreviz {
     this.RenderOverlays(PrevizOverlays(run.seq, t), lines);
   }
 
-  /** 简易爆炸（白盒特效关时）与飞行中的手榴弹：按 t 求值。飞机扫射的弹着点也从这里当土点画。 */
+  /** 飞行中的手榴弹：按 t 求值。 */
   UpdateFx(t) {
     const run = this.run;
     if (!this.fx || !run) return;
     try {
       this.fx.Update(run.seq, t, {
         standAt: this.editor.standAt, baseOf: (id) => run.units.get(id),
-        drawBlasts: BlockoutPrevizFx.BlastsHidden(this.host.post),
         actorOpts: { resolve: (id) => this.ResolveUnit(id), clipDuration: (clip) => this.ClipDuration(clip) },
-        muzzleAt: (e) => this.MuzzleAt(e),
-        extraBlasts: this.air?.Blasts() || null,
       });
     } catch (error) { console.warn("[BlockoutPreviz] fx failed", error); }
   }
@@ -943,7 +941,7 @@ export class BlockoutPreviz {
       missingClips: [...this.missingClips], missingLines: [...this.missingLines], missingSfx: [...this.missingSfx],
       errors: this.validation?.errors?.slice(0, 20) ?? [], warnings: this.validation?.warnings?.length ?? 0,
       voices: this.loadedVoices.size,
-      fx: this.fx ? { ...this.fx.stats, blastsDrawn: BlockoutPrevizFx.BlastsHidden(this.host.post) } : null,
+      fx: this.fx ? { ...this.fx.stats } : null,
       // 2026-10-19：慢动作倍率与墙上时间、飞机
       timeScale: run ? +(run.timeScale ?? PrevizTimeScale(run.seq, run.t)).toFixed(3) : 1,
       wallT: run ? +run.wallT.toFixed(3) : 0,

@@ -169,11 +169,6 @@ try{
  report.restored=await page.evaluate(()=>{const g=Tengxian,original=g.ParticleEditor.savedParticleEffects;g.editor.Close();return {same:g.vfx.particles===original,soil:g.Particles.FallingSoil.entries.size,solidRoots:g.scene.children.filter(o=>o.name==='FallingSoilSolidRoot').length,references:g.scene.getObjectByName('FallingSoilPreviewReferences')!==undefined};});
  assert.ok(report.restored.same&&!report.restored.references);
  assert.equal(report.restored.solidRoots,baselineSolidRoots-1,'the preview solid root is released alongside its particle fork');
- if(!online){
-   await Open('whitebox');await page.evaluate(()=>{Tengxian.ParticleEditor.Seek(1.2);Tengxian.StepFrames(2,0,true);});
-   report.whitebox=await Pixels();assert.equal(report.whitebox.quality,'whitebox');assert.ok(report.whitebox.changed>35,'default whitebox preview keeps falling soil visible');await Capture('DefaultWhitebox');
-   const quality=await page.evaluate(()=>{Tengxian.editor.Close();return Tengxian.GraphicsProfile.Inspect();});assert.equal(quality.config.effects,false,'exit restores hidden-VFX preference');
- }
  assert.deepEqual(errors,[],'no runtime/WebGL errors');report.errors=errors;
  await fs.writeFile(path.join(out,online?'Report_Online.json':'Report.json'),JSON.stringify(report,null,2));
  console.log('ok falling soil browser:',JSON.stringify({base,online,presets:report.presets.map(p=>({preset:p.preset,pixels:p.changed,dustPixels:p.dustPixels})),

@@ -76,7 +76,7 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     super.BuildWhiteBoxes();
     const tint = new THREE.Color().setRGB(SHELL_IMPACT_GROUND_TINT[0], SHELL_IMPACT_GROUND_TINT[1], SHELL_IMPACT_GROUND_TINT[2], THREE.SRGBColorSpace);
     for (const mesh of this.meshes) {
-      if (!mesh.userData.trenchEarth || !mesh.userData.whiteboxTerrain) continue;
+      if (!mesh.userData.trenchEarth || !mesh.userData.groundSurface) continue;
       const color = mesh.geometry.attributes.color;
       if (!color) continue;
       for (let i = 0; i < color.count; i++) color.setXYZ(i, color.getX(i) * tint.r, color.getY(i) * tint.g, color.getZ(i) * tint.b);
