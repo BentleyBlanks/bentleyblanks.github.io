@@ -21,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 import { KeepInMask, KEEP_IN } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import { L0105_TRENCHES, L0105_PLACES, L0105_GULLY, L0105_SUNKEN_LANE, PointAlong, LineLength } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
@@ -38,7 +39,7 @@ const J = (v) => JSON.stringify(v);
 const P = L0105_PLACES;
 
 // --- 1. 静态 ------------------------------------------------------------------
-const scene = JSON.parse(await fs.readFile(path.join(projectDir, "Blockout", "FirstLevel0105.scene.json"), "utf8"));
+const scene = ReadBlockoutSceneDocSync("FirstLevel0105");
 const t = scene.terrain;
 const { mask, W } = KeepInMask(t);
 const Inside = (x, z) => {

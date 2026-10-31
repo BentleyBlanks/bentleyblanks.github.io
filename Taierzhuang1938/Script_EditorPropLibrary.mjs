@@ -1,4 +1,4 @@
-// 构件库预览器：把场景关卡编辑器能布设的每一种 Prop / 程序化构件 / tzm 模型
+// 构件库预览器：把构件目录（Script_PlaceableCatalog）里的每一种 Prop / 程序化构件 / tzm 模型
 // 放进共用摄影棚逐项查看。预览走正片同一套 BuildSink 与模型实例化函数，不维护
 // 第二份“预览专用”几何；这里不写关卡、不写地形，也不推进碰撞盒。
 
@@ -10,7 +10,7 @@ import {
 import {
   PLACEABLE, PLACEABLE_CATEGORIES, MODEL_PLACEABLE, BuildPlaceableVisual,
   BUILDING_DAMAGE_STATES, BUILDING_DAMAGE_STATE_OPTIONS, SupportsBuildingDamageStates,
-} from "./Script_EditorScene.mjs";
+} from "./Script_PlaceableCatalog.mjs";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
 import { Type89Motion } from "./Model/Type89MediumTank/Script_Type89Motion.mjs";

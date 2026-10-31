@@ -40,6 +40,7 @@ import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrev
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
 import { LanePointAtZ, L0610_ALLEY_WINDOWS as AW } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { BACK_WINDOW } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -196,7 +197,7 @@ export async function CheckPreviz(doc, { config, voice }) {
   const table = ClipTable();
   const lines = new Map();
   for (const sc of voice.scenes) for (const l of sc.lines) lines.set(l.id, l);
-  const scene = Load("Blockout/FirstLevel0610.scene.json");
+  const scene = ReadBlockoutSceneDocSync("FirstLevel0610");
   const layout = LayoutFromSceneDoc(scene);
   const ground = HeightGridSampler(scene.terrain);
   const B = scene.bounds;

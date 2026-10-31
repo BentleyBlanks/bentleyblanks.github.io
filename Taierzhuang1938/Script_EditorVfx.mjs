@@ -1,5 +1,5 @@
 // 特效预览编辑器：直接驱动正片的 VfxSystem，不维护第二套“看起来差不多”的假预览。
-// 持续效果来自 SCENE_EFFECTS，因而这里确认过的火/烟参数可以原样进场景关卡 JSON。
+// 持续效果来自 SCENE_EFFECTS，因而这里确认过的火/烟参数可以原样进场景布设 JSON。
 
 import * as THREE from "three";
 import { El, Panel, Section, Slider, Select, Toggle, ButtonRow, Facts, Note, ListBox, TextArea }

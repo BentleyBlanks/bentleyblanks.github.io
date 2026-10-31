@@ -87,11 +87,11 @@ try {
   }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY, filterKey: FILTER_KEY });
 
   // -------------------------------------------------------------------------
-  // 1) 入口：高级工具菜单栏共 20 项（含白盒关卡编辑器入口），工作台在「关卡」菜单里
+  // 1) 入口：高级工具菜单栏共 17 项（含白盒关卡编辑器入口），工作台在「关卡」菜单里
   //    （它在语义上仍是叠加层 —— 独立窗口、不接管相机、keepOnClose —— 但用户
   //     去找它时想的是「我要编关卡」，所以放在关卡菜单，不在 设置 → Debug工具）
   // -------------------------------------------------------------------------
-  Check("高级工具菜单栏共 20 项", await page.locator("#edRoot .edMenuBar [data-editor]").count() === 20,
+  Check("高级工具菜单栏共 17 项", await page.locator("#edRoot .edMenuBar [data-editor]").count() === 17,
     `实际 ${await page.locator("#edRoot .edMenuBar [data-editor]").count()}`);
   const group = await page.locator('#edRoot [data-editor="orchestration"]').getAttribute("data-group");
   Check("关卡编排入口在「关卡」菜单", group === "level", `实际「${group}」`);

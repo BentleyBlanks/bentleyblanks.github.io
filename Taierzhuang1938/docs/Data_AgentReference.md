@@ -15,7 +15,6 @@
 ### 出图（优先复用的入口；输出落 `_shots/`）
 
 ```powershell
-node Taierzhuang1938/Script_SamplePointShot.mjs                 # 采样点基线；--compare= 与上一批逐张对位
 node Taierzhuang1938/Script_ShotTest.mjs                        # 正片固定镜头（--probe / --only=名字）
 node Taierzhuang1938/Script_CutsceneShot.mjs                    # 过场：播一场，指定秒数各落一张
 node Taierzhuang1938/Script_DressingShot.mjs --phase=5 --x=...  # 布设自验：任意机位拍当前城
@@ -333,8 +332,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
 - **没有哪一章会生成整座城了**（重制取消了「城墙关」）：要全城就走 `?phase=overview`
   （`Data_Menu.OVERVIEW_PHASE`，bounds = `Data_Battle.OVERVIEW_BOUNDS`，天光钉死 smokyDay）。
-  它**不进 PHASES、不进选章**，只服务出图与自检 —— 采样点表八成的机位、Script_ShotTest
-  的 Z 系列、Script_TownDressingDump 都从这条入口进。
+  它**不进 PHASES、不进选章**，只服务出图与自检 —— Script_ShotTest
+  的 Z 系列、Script_TownDressingDump 都从这条入口进（旧采样点表也走这条，2026-10-31 用户要求删除后已不在）。
 - 先读：`docs/Data_MissionRemake.md`（旧章节资料，§10 保留共享组件的工程背景）、
   `docs/Data_TengxianCity.md`（考据）。
 
@@ -745,12 +744,12 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 ### 编辑器与调试工具
 - 人物面部：`Script_EditorFacial.mjs`，配套录音、口型/表情近景与关键帧草稿；见 [人物面部编辑器](Data_FacialEditor.md)。
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
+- `Script_Editor{Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,ShotCamera,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
-  FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
+  ShotCamera = 出图脚本与测试用的定镜小工具（不进菜单，`Debug.OpenEditor("shotCamera")` + `ApplyPose`）；
+  构件目录在 `Script_PlaceableCatalog.mjs`（构件库预览用它，以后的新场景编辑器也复用）。场景关卡 / 地形 / 完整场景预览 / 采样点四个工具已于 2026-10-31 用户要求删除；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
-  车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
   DebugRendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 是菜单 设置 → Debug工具 里的叠加层，关卡编排在高级工具「关卡」菜单；
   都可叠加且不接管相机、不暂停玩法。高级工具 = 顶部菜单栏 + 右侧 Inspector；整组开发工具只经 Script_DevTools / Data_DevTools
   两个边界模块进来，打包可剔除（docs/Data_EditorSuite.md「开发工具隔离与打包剔除」）。
@@ -760,6 +759,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   白盒关卡编辑器（Blockout）是独立模式而不是面板：`?editor=blockout&level=FirstLevel`（高级工具菜单栏「关卡」菜单第一项也能进；关卡表与总控经 `Script_DevTools` 边界取），
   不起任务运行时与过场，按关键帧摆敌我（独立演员，不进 AI）、画射界 / 去向 / POI，纸面小地图 + 可缩放全关总图，导航栏切关键帧；
   每关一份 `Blockout/<Level>.json`（第二关另有 `.scene.json` 场景），外部改动 2 s 内同步，生成器 `Script_EditorBlockoutCli.mjs`；
+  第一关新剧本三段（0105 / 0610 / 1218）的场地是场景 `Scenes/FirstLevelWhitebox`（2026-10-31 三段合一、以场景文件为准、每段取一块建场；
+  格式 / 资产编号 / 取块规矩 `docs/Data_Scene.md`，node 里 `Script_SceneNode.ReadBlockoutSceneDocSync(level)`，回归 `Script_SceneDocTest.mjs`）；
   `window.Tengxian.Debug.Blockout` 给测试与 agent 用。口径 `docs/Data_EditorBlockout.md`，回归口
   `Script_EditorBlockout{Config,Save,Map,Browser}Test.mjs`。
   用户贴来以「【滕县白盒编辑器 · 当前位置】」开头的一段文字，是编辑器里按 P / 复制按钮复制的现场（§4.2）：
@@ -785,9 +786,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七片切片开机 + 性能红线；
   旧七章整局通关测试 `Script_PlayTest.mjs` 已删除。新版第一关通关用
   `Script_FirstLevelMissionBrowserTest.mjs --campaign`，旧 P012 测试只覆盖归档夹具；专项数量与分级以 runner 登记为准。
-- 出图七支 + `Script_SamplePoints.mjs`（一片一建的出图计划）+ `Data_SamplePoints.mjs`
-  （机位表，用采样点编辑器逐点调，出图脚本不自己算机位）。
-- 先读：`docs/Data_TestTiers.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`（评分表）。
+- 出图脚本各自带机位（旧采样点表 / 采样点编辑器 / Script_SamplePointShot 已于 2026-10-31 用户要求删除；定镜用 `Script_EditorShotCamera`）。
+- 先读：`docs/Data_TestTiers.md`、`Data_VisualReview.md`（评分表）。
 
 ### 资产目录
 - `Model/NakajimaKi4/` —— 九四式侦察机独立同型复原；1937原始说明书与三图对照，8个可动节点、完整PBR，高源留OneDrive。历史定位仍为候选；未替换任务飞机。入口 `Model/NakajimaKi4/README.md`，字节门禁 `Script_NakajimaKi4AssetTest.mjs`，真实重开/扫角 `_blender/Script_NakajimaKi4Audit.py`。
@@ -805,7 +805,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Data_AudioEngine.md`、`Data_AudioWiring.md`。
 - `Data_FirstLevelRebuildAcceptance.md` —— 新版第一关来源、范围决定和验收；`Data_MissionDesign.md` 保留线性剧情设计背景，涉及旧章节的内容须结合当前入口核对；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（枪感相关改动或专项审查时使用）、
-  `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
+  `Data_MainMenu.md`、`Data_VisualReview.md`。
 - `Data_MocapPipeline.md`（视频转骨骼动画流水线：素材要求 / 提取 / 反解 / 接线点名单）。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`、`Data_CutsceneRedo.md`、
   `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、

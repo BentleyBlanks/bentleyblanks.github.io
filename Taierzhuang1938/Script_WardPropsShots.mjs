@@ -18,7 +18,7 @@ try {
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 300000 });
   report.assets = await page.evaluate(() => {
     const g = window.Tengxian;
-    g.StepFrames(120); g.Debug.OpenEditor("samplePoints");
+    g.StepFrames(120); g.Debug.OpenEditor("shotCamera");
     const stats = g.battlefield.propDressingStats;
     const materials = new Map();
     g.scene.traverse(o => {

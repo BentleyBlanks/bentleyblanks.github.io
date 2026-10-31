@@ -53,13 +53,13 @@ try{
   if(!stressCity&&(!g.player.Alive||g.state.elapsed-beforePrelude<1.9))throw new Error('Normal game prelude must run alive for 120 gameplay frames');
   const bootCamera={position:g.camera.position.toArray(),quaternion:g.camera.quaternion.toArray(),fov:g.camera.fov,near:g.camera.near,far:g.camera.far,zoom:g.camera.zoom,aspect:g.camera.aspect};
   const bootEnvironment=g.editor.host.game.GetEnvironmentState();
-  // Opening the EMPTY tools panel pauses combat without entering SceneEditor.
-  // SceneEditor would replace the game's projection with FOV55/far2000 and fit
+  // Opening the EMPTY tools panel pauses combat without entering a flycam editor.
+  // A flycam editor (the removed scene editor did) would replace the game's projection with FOV55/far2000 and fit
   // CSM twice per frame; neither behavior belongs in this game budget fixture.
   g.editor.TogglePanel(true);if(stressCity)g.Debug.ApplySky('firstLevelNight');g.ApplyGraphics();
   if(!g.post.taaEnabled||!g.post.preset.flareShadows)throw new Error('The high profile must retain default TAA and flare shadows');
   // An empty inspector legitimately pauses combat while Main still owns the
-  // single shadow-frustum update. SceneEditor itself would add another update.
+  // single shadow-frustum update. A flycam editor itself would add another update.
   if(!g.editor.Capturing||g.editor.active)throw new Error('Empty inspector must own the frozen camera');
   const Pose=(eye,target)=>{
    g.camera.position.set(...eye);g.camera.lookAt(...target);

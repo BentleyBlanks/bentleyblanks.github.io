@@ -179,7 +179,8 @@ assert.equal(SnapM(1.26), 1.3); assert.equal(SnapM(-0.04), -0); assert.equal(Sna
   assert.ok(text.includes("关键帧 08-2 的玩家站位「压窗口」"));
   assert.ok(text.includes("① x 83.0  z 486.0，半径 4 m 这一片：「狗洞再往东一点」"));
   assert.ok(text.includes("② x 500.0  z 500.0：（没写字）"));
-  assert.ok(text.includes("scene <Level> --force"));
+  // 2026-10-31：第一关新剧本的场景以 Scenes/FirstLevelWhitebox 为准，导出里叫 agent 直接改场景文件（docs/Data_Scene.md）
+  assert.ok(text.includes("Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json") && text.includes("objects[i]"), "导出说明指到场景文件");
   assert.ok(lines[lines.length - 1].startsWith(LAYOUT_EDIT_DATA_PREFIX));
   const back = ParseLayoutEdit(text);
   assert.deepEqual(back, JSON.parse(JSON.stringify(exp)));

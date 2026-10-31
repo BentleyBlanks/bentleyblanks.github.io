@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 机位表 | `Data_FirstLevelWhitebox0518Cameras.mjs` | 31 个机位，id 与概念图同名；`stage` / `camera{x,z,h\|y}` / `look` / `yawDeg` / `pitchDeg` / `note` |
 | 出图脚本 | `Script_FirstLevelWhitebox0518Shots.mjs` | `node Taierzhuang1938/Script_FirstLevelWhitebox0518Shots.mjs [--only=08_1,08_2\|maps\|top\|Map_Village0810] [--out=<dir>] [--no-shots] [--no-maps] [--no-top]` |
-| 现状图 | `Taierzhuang1938/_shots/Whitebox0518/<id>.png` | 1280×720、55° FOV、`missionStage=N&quality=medium&scale=small`，经采样点编辑器 `ApplyPose`，不碰指针锁 |
+| 现状图 | `Taierzhuang1938/_shots/Whitebox0518/<id>.png` | 1280×720、55° FOV、`missionStage=N&quality=medium&scale=small`，经出图机位工具（`Script_EditorShotCamera`）的 `ApplyPose`，不碰指针锁 |
 | 数据俯视图 | `_shots/Whitebox0518/Map_<区>[_<框>].png` | 共享地面高度着色 + 相对 natural 的 0.5 m 挖/填等值线 + 实心体块（按顶高深浅，蓝边 = cover）+ 路线 + 锚点 + 机位视线 |
 | 高空俯拍 | `_shots/Whitebox0518/Top_<区>[_<框>].png` | 实机 110 m 俯拍，fov 自适应分区框 |
 | 地形钩子门禁 | `Script_FirstLevelWhiteboxTerrainTest.mjs` | 见 §3；`--digest` 打印 05–18 地面采样 sha256 |

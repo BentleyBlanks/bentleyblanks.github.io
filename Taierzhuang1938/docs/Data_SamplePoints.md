@@ -1,5 +1,8 @@
 # 县城场景采样点（Data_SamplePoints）
 
+> **已删除（2026-10-31 用户要求删除）**：采样点编辑器、`Data_SamplePoints.mjs`、`Script_SamplePoints.mjs`、`Script_SamplePointShot.mjs`、`Script_SamplePointTest.mjs` 与 `Debug.SamplePoints` / `Debug.SamplePoint` 都已不在仓库里，以下为历史记录。
+> 仍在用的定镜小工具见 [编辑器套件](Data_EditorSuite.md) 的「出图机位」。
+
 > 一句话：**同一批机位、同一套参数，隔一段时间再拍一次**，两批图逐张对位就是这段时间里
 > 场景样式的真实变化。这是基线，不是花絮。
 

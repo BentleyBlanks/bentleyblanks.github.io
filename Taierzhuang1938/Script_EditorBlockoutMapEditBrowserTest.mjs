@@ -11,7 +11,7 @@
 //   6. 画布上 Ctrl+Z 撤掉一步、Ctrl+Y 重做；方向键微调 0.1 m；
 //   7. 「导出给 Agent」：剪贴板（给了权限）里那段文字末行能解析，条目数对得上；
 //   8. 关掉开关：地图照旧（点关键帧能跳）；关图再开，改动还在；
-//   9. 全程没有未捕获错误；Blockout/FirstLevel0610.json 与 .scene.json 前后逐字节相同（不存盘）。
+//   9. 全程没有未捕获错误；Blockout/FirstLevel0610.json 与场景文件（2026-10-31 起 Scenes/FirstLevelWhitebox）前后逐字节相同（不存盘）。
 // 截图存 _shots/EditorBlockoutMapEdit/（不提交）。
 // ===========================================================================
 
@@ -27,7 +27,7 @@ const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "EditorBlockoutMapEdit");
 const configFile = path.join(projectDir, "Blockout", "FirstLevel0610.json");
-const sceneFile = path.join(projectDir, "Blockout", "FirstLevel0610.scene.json");
+const sceneFile = path.join(projectDir, "Scenes", "FirstLevelWhitebox", "Scene_FirstLevelWhitebox.json");
 await fs.mkdir(shotDir, { recursive: true });
 const shots = !process.argv.includes("--no-shots");
 
@@ -92,7 +92,7 @@ try {
   Check("上下文：当前关键帧 08-1 的人、所有站位、地标都在", ctx.keyframeId === "08-1" && ctx.units.length >= 4 && ctx.stations.length >= 15 && ctx.landmarks.length >= 40,
     `人 ${ctx.units.length}，站位 ${ctx.stations.length}，地标 ${ctx.landmarks.length}`);
 
-  // 2. 拖狗洞
+  // 2. 拖狗洞（2026-10-31 起 06–10 读 Scenes/FirstLevelWhitebox：地标路径是 markers[i]）
   const dog = ctx.landmarks.find(l => l.id === "LmDogHole");
   const view = await LE(([x, z]) => window.Tengxian.Debug.Blockout.LayoutEdit.Focus(x, z, 12), [dog.x + 4, dog.z - 4]);
   const p0 = await Point(dog.x, dog.z);
@@ -100,7 +100,7 @@ try {
   let moves = await Moves();
   const dm = moves.find(m => m.kind === "landmark" && m.id === "LmDogHole");
   const expectDx = Math.round(40 / view.pxPerM * 10) / 10;
-  Check("拖狗洞往东 40 px：记一条地标挪动，挪动量吸附到 0.1 m，z 不变", dm && Math.abs((dm.to.x - dm.from.x) - expectDx) < 0.051 && dm.to.z === dm.from.z && dm.path.startsWith("landmarks["),
+  Check("拖狗洞往东 40 px：记一条地标挪动，挪动量吸附到 0.1 m，z 不变", dm && Math.abs((dm.to.x - dm.from.x) - expectDx) < 0.051 && dm.to.z === dm.from.z && dm.path.startsWith("markers["),
     dm ? `dx ${(dm.to.x - dm.from.x).toFixed(2)}（应 ${expectDx}），${dm.path}` : "没记上");
   const head = await LE(() => document.querySelector(".boEditInspector .boEditHead")?.textContent || "");
   Check("检查器认出选中的是狗洞", /狗洞/.test(head), head);
@@ -176,7 +176,7 @@ try {
   const exp = ParseLayoutEdit(text);
   const nowMoves = await Moves();
   Check("「导出给 Agent」：剪贴板里的文字末行能解析，挪动 / 标记条数对得上", exp && exp.level === "FirstLevel0610" && exp.moves.length === nowMoves.length && exp.markers.length === 1
-    && exp.moves.some(m => m.kind === "landmark" && m.id === "LmDogHole") && /体块 Kitchen/.test(text) && exp.scenePath.endsWith("Blockout/FirstLevel0610.scene.json"),
+    && exp.moves.some(m => m.kind === "landmark" && m.id === "LmDogHole") && /体块 Kitchen/.test(text) && exp.scenePath.endsWith("Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json"),
     exp ? `挪动 ${exp.moves.length}，标记 ${exp.markers.length}` : `没解析出来：${text.slice(0, 80)}`);
   if (text) await fs.writeFile(path.join(shotDir, "Export.txt"), text, "utf8");
 

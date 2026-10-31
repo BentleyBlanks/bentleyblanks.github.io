@@ -2,7 +2,7 @@
 // 每一张 Notion「第一关｜游戏概念参考图」对应一个游戏内机位，出图脚本
 // Script_FirstLevelWhitebox0518Shots.mjs 照这张表拍现状，供和概念图逐张对比。
 //
-// 约定（与 Script_EditorSamplePoints.ApplyPose 一致）：
+// 约定（与 Script_EditorShotCamera.ApplyPose 一致）：
 //   · camera.x / camera.z 世界米；camera.y 省略时取「共享地面 + h」，h 默认 1.6（站姿眼高）。
 //   · yawDeg：0 = 朝北（-Z），+90 = 朝西（-X），-90 = 朝东，180 = 朝南。由 look 点算出，
 //     look 是这一张图「看向哪儿」的世界坐标，改机位时改 look，不要手改 yawDeg。

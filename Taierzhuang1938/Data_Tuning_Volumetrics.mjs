@@ -135,7 +135,7 @@ export const VOLUMETRIC_PRESETS = {
     densityScale: 0.99, albedo: 0.9, anisotropy: 0.25, sunScale: 0.4,
     noiseAmount: 0.08, far: 220,
   },
-  // 完整场景编辑器的长视距白昼：1.6 km 总览，雾只做空气透视，噪声几乎关掉
+  // 完整县城（?phase=fullscene）的长视距白昼：1.6 km 总览，雾只做空气透视，噪声几乎关掉
   // （55 m 的团在这个尺度上会变成一片斑）。
   editorClear: {
     densityScale: 1.0, anisotropy: 0.35, noiseAmount: 0.08, noiseScale: 0.006,

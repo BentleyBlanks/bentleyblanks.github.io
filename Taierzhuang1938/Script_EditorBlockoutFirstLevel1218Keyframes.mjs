@@ -1392,10 +1392,9 @@ export async function BuildFirstLevel1218Config({ commit = "", generatedAt = "",
 /** node 里读场景文件（没有或在浏览器里返回 null：只做与场景无关的检查）。 */
 export async function LoadSceneLayout() {
   try {
-    const fs = await import("node:fs");
-    const url = new URL("./Blockout/FirstLevel1218.scene.json", import.meta.url);
-    if (!fs.existsSync(url)) return null;
-    const doc = JSON.parse(fs.readFileSync(url, "utf8"));
+    // 2026-10-31：场景在 Scenes/FirstLevelWhitebox（三段合一），按这一关的范围取一块（docs/Data_Scene.md）
+    const { ReadBlockoutSceneDocSync } = await import("./Script_SceneNode.mjs");
+    const doc = ReadBlockoutSceneDocSync("FirstLevel1218");
     const { LayoutFromSceneDoc } = await import("./Script_EditorBlockoutLevels.mjs");
     return LayoutFromSceneDoc(doc);
   } catch (error) {

@@ -70,7 +70,7 @@ try {
     }
     if (todoMounted.length) await page.evaluate(() => { window.Tengxian.Debug.Emplacement.Vacate("shots"); window.Tengxian.StepFrames(10, 1 / 60, false); });
     if (todo.length) {
-      const opened = await page.evaluate(() => window.Tengxian.Debug.OpenEditor("samplePoints"));
+      const opened = await page.evaluate(() => window.Tengxian.Debug.OpenEditor("shotCamera"));
       log.push({ stage, opened, errors: [...errors] });
     }
     for (const [k, kid, tank, hide, opts = {}] of todo) {

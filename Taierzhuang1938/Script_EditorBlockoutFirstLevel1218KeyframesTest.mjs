@@ -13,6 +13,7 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { IsBlanketLitter } from "./Script_EditorBlockoutPuppets.mjs";
 import { BuildFirstLevel1218Config, StreetRoute, LoadSceneLayout, StandSampler, FirstLevel1218Issues, OnRailBridge, CART_LINE } from "./Script_EditorBlockoutFirstLevel1218Keyframes.mjs";
 import { BlockSight, SolidBlocks, BlockCenterY, SightBlock } from "./Script_EditorBlockoutFirstLevel1218Scene.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 import {
   L1218_BOUNDS as B, L1218_PLACES as P, L1218_SIGNALS as SIG, L1218_AID as A, L1218_AT_DITCH as AT, L1218_PLANK as PK, L1218_TRENCH as TR, L1218_HEIGHTS as H,
   L1218_CART_PARK as CPK, L1218_RAIL as RL, L1218_RAIL_BRIDGE as RB, L1218_BANK as BK, L1218_LEVEE as LV, L1218_NORTH_GATE as NG, L1218_GIRL_YARD as GY, L1218_FROM_0610,
@@ -190,7 +191,7 @@ assert.ok(CART_LINE.length >= 12 && Math.hypot(CART_LINE.at(-1).x - P.aidGateOut
 // --- 场景：脚下都在地面上、身子不进实心块、视线 ---
 const scene = await LoadSceneLayout();
 assert.ok(scene && !scene.error, `读不到场景文件：${scene?.error}`);
-const sceneDoc = JSON.parse(fs.readFileSync(new URL("./Blockout/FirstLevel1218.scene.json", import.meta.url), "utf8"));
+const sceneDoc = ReadBlockoutSceneDocSync("FirstLevel1218");
 const PEOPLE = new Set(["soldier", "officer", "civilian", "child"]);
 let onPlank = 0, inHole = 0, onRail = 0;
 for (const kf of NormalizeBlockout(a).keyframes) {

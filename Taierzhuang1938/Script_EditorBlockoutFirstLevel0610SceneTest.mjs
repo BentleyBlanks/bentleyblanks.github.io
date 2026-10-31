@@ -31,11 +31,11 @@ import {
   L0610_EAST_YARD_ROUTE, L0610_LANE, L0610_ROADS, L0610_FOOTPATHS, L0610_FIELDS, L0610_GROVES, L0610_FIELD_TREES, L0610_WELLS, L0610_LOCKED_YARDS, L0610_YARD_POSE, L0610_LANE_PATHS,
   L0610_FARMSTEADS, L0610_TOILET, L0610_FIELD_GRAVES, L0610_ALLEY_WINDOWS, RiverAtZ, YardPose, YardCorners, YardGateWorld, PathNearest, PointInPoly, LanePointAtZ, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
-const opts = { commit: "test", generatedAt: "2026-10-22T00:00:00.000Z" };
-const a = await BuildFirstLevel0610Scene({ ...opts, notes: [] });
-const b = await BuildFirstLevel0610Scene({ ...opts, notes: [] });
-assert.equal(JSON.stringify(a), JSON.stringify(b), "生成两次要逐字相同");
+// 2026-10-31：场景生成器退休，场景以 Scenes/FirstLevelWhitebox 为准（三段合一，docs/Data_Scene.md）；
+// 下面的设计约束改查场景按 FirstLevel0610 的范围取出来的那一块——在场景编辑器里改坏了，这里会报。
+const a = ReadBlockoutSceneDocSync("FirstLevel0610");
 const check = ValidateBlockoutScene(a);
 assert.ok(check.ok, check.errors.join("; "));
 

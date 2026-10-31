@@ -696,7 +696,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs     # 整帧 CPU/GPU 消融
 | §10 / §13 / §14 曝光 / 光晕 / LUT | `Script_ExposureTest.mjs` | `--calibrate` / `--shots` / `--baseline=` |
 | §15 簇光 | `Script_ClusteredLightsTest.mjs`（`--node` / `--perf`） | — |
 | §16 GI 探针体 | `Script_GiTest.mjs` | — |
-| §17 性能与自动降档 | `Script_FrameProfileTest.mjs`、`Script_AutoQualityTest.mjs` | `Script_SamplePointShot.mjs --compare=` |
+| §17 性能与自动降档 | `Script_FrameProfileTest.mjs`、`Script_AutoQualityTest.mjs` | ~~`Script_SamplePointShot.mjs --compare=`~~（2026-10-31 用户要求删除） |
 | §18 预热 | `Script_RespawnShaderWarmTest.mjs`、`Script_SavedGraphicsWarmTest.mjs`、`Script_WhiteboxShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印不判红） | — |
 | 全部调试视图 | `Script_EditorTest.mjs` | — |
 
@@ -6410,7 +6410,7 @@ program = 0（修前 64）；提交编译建的 program 至少一半在开机结
 
 ### 2026-09-08 逐点回归复核（85 个采样点 vs 大修前基线树）
 
-`node Taierzhuang1938/Script_SamplePointShot.mjs --compare=<基线树>/…/Sample_2026.09.07`。
+`node Taierzhuang1938/Script_SamplePointShot.mjs --compare=<基线树>/…/Sample_2026.09.07`（该脚本 2026-10-31 用户要求删除，历史记录）。
 **没有一张变暗**：85 张的全幅均值差中位 **+4.98**，范围 [−5.3, +22.4]。
 按时段拆开：
 

@@ -6,7 +6,7 @@
 // 但入口挪到了菜单 设置 → Debug工具（DebugToolStates / ToggleDebugTool），菜单栏里不再列。
 //
 // ## 一次只开一个
-// 十七个互斥编辑器里多数要**接管相机**（摄影棚 / 过场 / 自由飞行），
+// 互斥编辑器里多数要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
 // 所以菜单栏里的工具语义是「换到这一个」：开新的自动关旧的；再点一次当前那个就关掉它。
 // 关掉当前工具（Inspector 上的 ×）只回到空 Inspector，不退出高级工具；
@@ -40,14 +40,11 @@ import { FirstPersonMotionEditor } from "./Script_EditorFirstPersonMotion.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
-import { SceneEditor } from "./Script_EditorScene.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
 import { PropPcgEditor } from "./Script_EditorPropPcg.mjs";
-import { TerrainEditor } from "./Script_EditorTerrain.mjs";
 import { SplineEditor } from "./Script_EditorSplines.mjs";
-import { FullSceneEditor } from "./Script_EditorFullScene.mjs";
-import { SamplePointEditor } from "./Script_EditorSamplePoints.mjs";
+import { ShotCameraEditor } from "./Script_EditorShotCamera.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
@@ -65,8 +62,9 @@ import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
   ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
-  SceneEditor, PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, TerrainEditor, SplineEditor, DestructionEditor,
-  FullSceneEditor, SamplePointEditor,
+  PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, SplineEditor, DestructionEditor,
+  // 出图脚本与测试用的定镜小工具（不在任何菜单里，见 Script_EditorShotCamera 文件头）
+  ShotCameraEditor,
 ];
 // 叠加层：不接管相机、不参与互斥，可以叠在任意一个编辑器上，也可以关掉菜单回去边打边看。
 // 渲染调试只读地观察后处理靶；性能剖析甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
@@ -89,7 +87,7 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
  * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
  */
 const TOOL_MENUS = [
-  { id: "scene", label: "场景", items: [SceneEditor, TerrainEditor, SplineEditor, PropPcgEditor, FullSceneEditor, SamplePointEditor, DestructionEditor] },
+  { id: "scene", label: "场景", items: [SplineEditor, PropPcgEditor, DestructionEditor] },
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
   { id: "level", label: "关卡", items: [BlockoutEntry, OrchestrationEditor, TimelineEditor, SquadMarchEditor] },
   { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
@@ -122,9 +120,6 @@ export class EditorSuite {
     this.menus = new Map();
     this.openMenuId = null;
     this.hidden = false;
-    // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
-    // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
-    this.worldEditDocument = null;
     // 高级工具自己的音量（Script_EditorVolume）：开着高级工具时盖过玩家的总音量，退出就还回去
     this.toolsVolume = LoadToolsVolume(host.audio?.masterVolume ?? 1);
 
@@ -174,11 +169,6 @@ export class EditorSuite {
       SetViewmodelVisible: (on) => { if (host.viewmodel) host.viewmodel.root.visible = !!on; },
       SetHint: (text) => suite.SetHint(text),
       SetCrosshair: (on, mode = "") => suite.SetCrosshair(on, mode),
-      GetWorldEditDocument: () => (suite.worldEditDocument
-        ? JSON.parse(JSON.stringify(suite.worldEditDocument)) : null),
-      SetWorldEditDocument: (data) => {
-        suite.worldEditDocument = data ? JSON.parse(JSON.stringify(data)) : null;
-      },
       // 工作窗自己的 ×：只关这个工具，回到空 Inspector，不退出高级工具
       Close: () => suite.CloseTool(),
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
@@ -627,7 +617,7 @@ export class EditorSuite {
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
     if (this.active) this.CloseTool({ refresh: false });
     // 真正的编辑器必须接管整张画面：主菜单本身有运镜，暂停菜单有「继续 / 设置 / 调试选项」，
-    // 都不该和编辑器叠在同一张画面上。以前只有 SceneEditor 自己做这一步，构件库等摄影棚工具
+    // 都不该和编辑器叠在同一张画面上。以前只有旧的场景关卡编辑器自己做这一步，构件库等摄影棚工具
     // 就会把暂停菜单留在背后。交接放在公共入口，不能漏工具。
     this.host.game.PrepareEditor?.();
     this.panelOpen = true;

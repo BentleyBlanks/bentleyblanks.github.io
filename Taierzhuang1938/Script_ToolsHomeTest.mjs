@@ -47,25 +47,25 @@ try {
       assert.equal(await page.locator("#edRoot .edHome").isVisible(), true, "Esc 先回首页");
 
       // 场景类工具：先选关卡（菜单栏里点也一样），Esc 只收单子
-      await page.click('#edRoot .edHomeTool[data-home-tool="scene"]');
+      await page.click('#edRoot .edHomeTool[data-home-tool="splines"]');
       await page.waitForSelector("#edRoot .edHomeSheet:not([hidden])");
       const choices = await page.locator("#edRoot .edHomeChoice").count();
-      assert.equal(choices, 7, "场景关卡列出七章");
+      assert.equal(choices, 7, "场景样条PCG列出七章");
       await page.screenshot({ path: path.join(out, "LevelSheet.png") });
       await page.keyboard.press("Escape");
       assert.equal(await page.locator("#edRoot .edHomeSheet").isHidden(), true);
       assert.equal(await page.evaluate(() => window.Tengxian.editor.panelOpen), true, "Esc 收单子不退出");
       await page.click('#edRoot .edMenu[data-menu="scene"] > .edMenuTitle');
-      await page.click('#edRoot [data-editor="scene"].edMenuItem');
+      await page.click('#edRoot [data-editor="splines"].edMenuItem');
       await page.waitForSelector("#edRoot .edHomeSheet:not([hidden])");
       // 只核对跳转地址，不真的建那一关
-      await page.route("**/*tool=scene*", (route) => route.fulfill({ contentType: "text/html", body: "<title>nav fixture</title>" }));
+      await page.route("**/*tool=splines*", (route) => route.fulfill({ contentType: "text/html", body: "<title>nav fixture</title>" }));
       await page.locator("#edRoot .edHomeChoice").nth(1).click();
-      await page.waitForURL((url) => url.searchParams.get("tool") === "scene");
+      await page.waitForURL((url) => url.searchParams.get("tool") === "splines");
       const target = new URL(page.url());
       assert.equal(target.searchParams.get("phase"), "1");
       assert.equal(target.searchParams.get("editor"), "tools");
-      await page.unroute("**/*tool=scene*");
+      await page.unroute("**/*tool=splines*");
 
       // 首页 Esc = 回标题菜单
       await page.goto(`${base}?editor=tools&audio=0`, { waitUntil: "domcontentloaded" });

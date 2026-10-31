@@ -28,6 +28,7 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { BuildFirstLevel0610Config, StreetRoute, LoadSceneLayout, StandSampler, FirstLevel0610Issues, RoadPointAtX, BIG_LOCUST, BACK_WINDOW } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
 import { L0610_ALLEY_WINDOWS as AW } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { BlockSight, SolidBlocks, BlockCenterY } from "./Script_EditorBlockoutFirstLevel0610Scene.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 import {
   L0610_BOUNDS as B, L0610_PLACES as P, L0610_GENG as G, L0610_JIEFANG as JF, L0610_BENJIA as BJ, L0610_EAST_STREET as ES, L0610_SOUTH_LANE as SLN,
   L0610_SIGNALS as SIG, L0610_STREETS as ST, L0610_DITCH as DT, L0610_STREET_YARDS as SY, L0610_MOUTH_SHOOTERS, L0610_ROUTE, LanePointAtZ, Station,
@@ -547,7 +548,7 @@ assert.ok(toLane.some((p) => Math.abs(p.x - ST.southLane1.c) < 0.3 && p.z < 472 
 // --- 场景：脚下都在地面上（没人站在房顶上）、视线 ---
 const scene = await LoadSceneLayout();
 assert.ok(scene && !scene.error, `读不到场景文件：${scene?.error}`);
-const sceneDoc = JSON.parse(fs.readFileSync(new URL("./Blockout/FirstLevel0610.scene.json", import.meta.url), "utf8"));
+const sceneDoc = ReadBlockoutSceneDocSync("FirstLevel0610");
 const PEOPLE = new Set(["soldier", "officer", "civilian", "child"]);
 const roofs = sceneDoc.blocks.filter((blk) => blk.semantic === "roof" && blk.h <= 0.3);
 for (const kf of NormalizeBlockout(a).keyframes) {

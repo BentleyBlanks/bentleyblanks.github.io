@@ -18,7 +18,6 @@ const built = new Map(index.models.map((entry) => [entry.name, entry]));
 const pythonRules = fs.readFileSync(path.join(projectDir, "_blender", "AssetBudgets.py"), "utf8");
 const editorSource = fs.readFileSync(path.join(projectDir, "Script_EditorAssetStandards.mjs"), "utf8");
 const suiteSource = fs.readFileSync(path.join(projectDir, "Script_Editor.mjs"), "utf8");
-const sceneEditorSource = fs.readFileSync(path.join(projectDir, "Script_EditorScene.mjs"), "utf8");
 const bootTestSource = fs.readFileSync(path.join(projectDir, "Script_BootTest.mjs"), "utf8");
 const html = fs.readFileSync(path.join(projectDir, "index.html"), "utf8");
 
@@ -33,8 +32,10 @@ Check(TRIANGLE_RULES.vehicle.limit === 80000, "战车仅在选定源几何 > 80,
 Check(MIN_DECIMATION_REDUCTION === 0.05 && /MIN_DECIMATION_REDUCTION\s*=\s*0\.05/.test(pythonRules),
   "降幅 5% 及以下时浏览器规范与 Blender 都保留原始拓扑");
 Check(SCENE_RENDER_LIMITS.drawCalls === 5000 && SCENE_RENDER_LIMITS.triangles === 9000000
-  && /SCENE_RENDER_LIMITS/.test(sceneEditorSource) && /SCENE_RENDER_LIMITS/.test(bootTestSource),
-"恢复原模后的全场红线由规范、编辑器与开机门禁共用");
+  && /SCENE_RENDER_LIMITS/.test(bootTestSource),
+// 原来还要求场景关卡编辑器的预算读数引用它；该编辑器 2026-10-31 删除，这条职责随之离开，
+// 新的场景编辑器接上预算读数后可把这一项加回来。
+"恢复原模后的全场红线由规范与开机门禁共用");
 Check(/WEAPON_TRIANGLE_LIMIT\s*=\s*30000/.test(pythonRules)
   && /VEHICLE_TRIANGLE_LIMIT\s*=\s*80000/.test(pythonRules),
 "浏览器规范与 Blender 分类阈值一致");

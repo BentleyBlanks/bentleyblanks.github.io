@@ -72,6 +72,17 @@ function SceneStampOf(response) {
   return h.get("etag") || h.get("last-modified") || h.get("content-length") || null;
 }
 
+/** 这一关读哪份场景 JSON：旧式文件场景（kind "file"）或场景（kind "scene"，docs/Data_Scene.md）；第一关没有 → null。 */
+function SceneUrlOf(level) {
+  return level?.scene?.kind === "file" || level?.scene?.kind === "scene" ? level.scene.url : null;
+}
+
+/** 落在这一关范围里（场景按范围取一块，地标与体块路径只认这一块里的）。 */
+function InRegion(level, x, z) {
+  const r = level?.scene?.region;
+  return !r || (x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ);
+}
+
 export const BLOCKOUT_EDITOR = Object.freeze({
   pollS: 2,
   /** 每几次轮询查一次场景文件有没有被重烘（配置变了另外立刻查）。 */
@@ -555,7 +566,7 @@ export class EditorBlockout {
    */
   async LoadLandmarks() {
     const levelKey = this.levelKey;
-    const url = this.level?.scene?.kind === "file" ? this.level.scene.url : null;
+    const url = SceneUrlOf(this.level);
     this.landmarks = [];
     this.landmarksLevel = levelKey;
     this.scenePaths = { landmarks: new Map(), blocks: new Map() };
@@ -569,9 +580,17 @@ export class EditorBlockout {
       if (response.ok) {
         stamp = SceneStampOf(response);
         const doc = await response.json();
-        list = NormalizeLandmarks(doc?.landmarks);
-        (doc?.landmarks || []).forEach((lm, i) => { if (lm?.id) paths.landmarks.set(String(lm.id), `landmarks[${i}]`); });
-        for (const key of ["blocks", "gates"]) (doc?.[key] || []).forEach((b, i) => { if (b?.id) paths.blocks.set(String(b.id), `${key}[${i}]`); });
+        if (this.level.scene.kind === "scene") {
+          // 场景（2026-10-31）：地标在 markers、物件在 objects；只取这一关范围里的
+          const own = (doc?.markers || []).map((lm, i) => ({ lm, i })).filter(({ lm }) => InRegion(this.level, lm?.x, lm?.z));
+          list = NormalizeLandmarks(own.map(({ lm }) => lm));
+          own.forEach(({ lm, i }) => { if (lm?.id) paths.landmarks.set(String(lm.id), `markers[${i}]`); });
+          (doc?.objects || []).forEach((o, i) => { if (o?.id && o.layer !== "backdrop") paths.blocks.set(String(o.id), `objects[${i}]`); });
+        } else {
+          list = NormalizeLandmarks(doc?.landmarks);
+          (doc?.landmarks || []).forEach((lm, i) => { if (lm?.id) paths.landmarks.set(String(lm.id), `landmarks[${i}]`); });
+          for (const key of ["blocks", "gates"]) (doc?.[key] || []).forEach((b, i) => { if (b?.id) paths.blocks.set(String(b.id), `${key}[${i}]`); });
+        }
       }
     } catch (error) {
       console.warn("[Blockout] landmarks load failed", error);
@@ -874,7 +893,7 @@ export class EditorBlockout {
 
   /** 场景文件的戳（ETag / Last-Modified / 长度）和进关时读到的不一样 → true。读不到、没有戳、不是文件场景 → false。 */
   async SceneChanged(levelKey) {
-    const url = this.level?.scene?.kind === "file" ? this.level.scene.url : null;
+    const url = SceneUrlOf(this.level);
     if (!url || !this.sceneStamp) return false;
     let stamp = null;
     try {
@@ -1682,7 +1701,8 @@ export class EditorBlockout {
     const session = this.LayoutEdits();
     for (const m of session.moves.values()) if (m.kind === "block" && !m.path) m.path = this.scenePaths.blocks.get(m.id) || "";
     const canvas = this.ui.fullCanvas, view = this.map.view, kf = this.keyframe;
-    const scenePath = this.level?.scene?.kind === "file" ? `Taierzhuang1938/${String(this.level.scene.url).replace(/^\.\//, "")}` : "";
+    const sceneUrl = SceneUrlOf(this.level);
+    const scenePath = sceneUrl ? `Taierzhuang1938/${String(sceneUrl).replace(/^\.\//, "")}` : "";
     return BuildLayoutEditExport(session, {
       level: { key: this.levelKey, label: this.level?.label || this.doc?.title || "", configPath: BlockoutConfigPath(this.levelKey), scenePath },
       keyframe: kf ? { id: kf.id, index: this.index } : null,

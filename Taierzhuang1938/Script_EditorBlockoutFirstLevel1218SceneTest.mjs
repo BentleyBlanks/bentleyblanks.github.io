@@ -25,14 +25,13 @@ import {
   L1218_FIELD_PATH as FP, L1218_LANES, L1218_RAIL_RAMPS, L1218_SOUTH_ROAD, L1218_SIGNALS as SIG, L1218_PLACES as PL, L1218_BOUNDS as B, L1218_SLEEPER_PILES, L1218_SLOGANS, L1218_OLD_MAN, L1218_FAMILY_HOLE,
   RiverAtX, StreetFrame,
 } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
-const opts = { commit: "test", generatedAt: "2026-10-26T00:00:00.000Z" };
-const a = await BuildFirstLevel1218Scene({ ...opts, notes: [] });
-const b = await BuildFirstLevel1218Scene({ ...opts, notes: [] });
-assert.equal(JSON.stringify(a), JSON.stringify(b), "生成两次要逐字相同");
+// 2026-10-31：场景生成器退休，场景以 Scenes/FirstLevelWhitebox 为准（三段合一，docs/Data_Scene.md）；
+// 下面的设计约束改查场景按 FirstLevel1218 的范围取出来的那一块——在场景编辑器里改坏了，这里会报。
+const a = ReadBlockoutSceneDocSync("FirstLevel1218");
 const check = ValidateBlockoutScene(a);
 assert.ok(check.ok, check.errors.join("; "));
-assert.ok(JSON.stringify(a).length < 3.5 * 1024 * 1024, "场景文件要在 3.5 MB 以内");
 
 const sample = HeightGridSampler(a.terrain);
 const stand = BlockStandSampler(a.blocks, a.gates, sample, () => false);
@@ -173,7 +172,9 @@ Clear(s.leveeToNorthBank, "南头河堤上看得见北岸桥头路基上的人")
 
 // --- 7. 没有第二版的残留 ---
 const OLD = /^(StoneDeck|StonePier_|BridgeWater$|Deck_\d|Boat_\d|Post_[WE]\d|LanternPost_|BridgeLantern_|FerryHouse_|FerryPlatform|Yard(North|South|West|East|MainHouse|Kitchen|GateLamp|GateLintel|Lantern)|Xiang|TrenchSandbags_|Breach|RiverWater$|Debris(Deck|Boat)_|Charge_\d|Fuse$|CityWall|GateHouse_|HechaWater_|OverturnedCart_)/;
-assert.deepEqual(all.filter((x) => OLD.test(x.id)).map((x) => x.id), [], "第二版的块（石板桥、渡口、浮桥、接收院、豁子、旧北门）不该还在");
+// 三段合一（2026-10-31）后这一块会多带场地外 64 m 内 06–10 的东西（村子边上的房子），残留只查场地里的
+const InSite = (x) => x.x >= B.minX && x.x <= B.maxX && x.z >= B.minZ && x.z <= B.maxZ;
+assert.deepEqual(all.filter((x) => OLD.test(x.id) && InSite(x)).map((x) => x.id), [], "第二版的块（石板桥、渡口、浮桥、接收院、豁子、旧北门）不该还在");
 for (const id of ["VillageWestEdge_1", "VillageSouthEdge_1", "Wall_x535_1", "Fence_SW1b_N"]) assert.ok(byId.has(id), `0610 的 ${id} 照原样带过来（第二版的豁子不要了）`);
 for (const [x, z, what] of [[-40, 636, "旧北堤"], [-40, 714, "旧南堤"], [-8, 675, "旧北沙河"], [-40, 675, "旧北沙河"], [17, 628, "旧低洼"], [34.5, 600, "河汊子往南"], [34.5, 640, "河汊子往南"]]) {
   assert.ok(Math.abs(sample(x, z) - H.plain) < 0.45, `${what} (${x},${z}) 不该还在：${sample(x, z).toFixed(2)}`);
@@ -188,7 +189,8 @@ const lms = NormalizeLandmarks(a.landmarks);
 assert.equal(lms.length, a.landmarks.length, "地标都过归一化");
 for (const lm of lms) assert.ok(lm.x >= B.minX && lm.x <= B.maxX && lm.z >= B.minZ && lm.z <= B.maxZ, `地标 ${lm.id} 在场地外`);
 const LM = new Map(lms.map((x) => [x.id, x]));
-for (const id of ["LmVillageSouth", "LmDirtRoad", "LmPostRoad", "LmAtDitch", "LmPlank", "LmMainStreet", "LmChurch", "LmAid", "LmRailNorth", "LmRailBridge", "LmRiver", "LmBank", "LmLevee", "LmNorthGate", "LmGirlYard", "LmOldMan", "LmVillageWest"]) assert.ok(LM.has(id), `缺地标 ${id}`);
+// 三段合一（2026-10-31）：和 06–10 重名的三个地标（官道、主街、河）在场景里改名带 _1218
+for (const id of ["LmVillageSouth", "LmDirtRoad", "LmPostRoad_1218", "LmAtDitch", "LmPlank", "LmMainStreet_1218", "LmChurch", "LmAid", "LmRailNorth", "LmRailBridge", "LmRiver_1218", "LmBank", "LmLevee", "LmNorthGate", "LmGirlYard", "LmOldMan", "LmVillageWest"]) assert.ok(LM.has(id), `缺地标 ${id}`);
 assert.ok(Math.abs(LM.get("LmPlank").x - PK.x) < 0.05 && Math.abs(LM.get("LmAtDitch").z - AT.z) < 0.05, "板桥、沟的地标框对得上");
 assert.ok(LM.get("LmAidHoleA").y < H.plain && LM.get("LmAidHoleA").y - LM.get("LmAidHoleA").h / 2 <= H.holeFloorY + 0.05, "洞的地标框从洞底立到地面");
 for (const id of ["Fields", "Village", "SandBed", "Stream", "Road_DirtRoad", "Road_PostRoadNorth", "Road_MainStreet", "RailNorth", "RailSouth"]) assert.ok(a.paint.some((p) => p.id === id), `缺涂色 ${id}`);

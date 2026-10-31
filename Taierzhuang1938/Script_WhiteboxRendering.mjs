@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
+import { MakeWhiteboxGridPatch } from "./Script_WhiteboxGrid.mjs";
 import { WHITEBOX_CARDS, WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
 import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
 import { EYELID_GLSL, LidShapeArray, LidSoftArray, LidLightArray, AfterimageArrays } from "./Script_EyelidMask.mjs";
@@ -21,57 +22,7 @@ export function IsWhiteboxCharacter(object) {
   return false;
 }
 
-// Procedural metre grid: no bitmap/UV requirement, including scaled instances.
-// Derivative filtering fades sub-pixel cells to avoid distant grid shimmer.
-function MakeWhiteboxGridPatch(config) {
-  return MakePatch({
-    key: "whiteboxGrid1",
-    uniforms: (uniforms) => Object.assign(uniforms, {
-      uWhiteboxGridSize: { value: config.gridSize },
-      uWhiteboxGridWidth: { value: config.gridLineWidth },
-      uWhiteboxGridColor: { value: new THREE.Color(config.gridColor) },
-    }),
-    vertex: [
-      ["#include <common>", "varying vec3 vWhiteboxPosition;"],
-      ["#include <project_vertex>", `
-        vec4 whiteboxPosition = vec4(transformed, 1.0);
-        #ifdef USE_BATCHING
-          whiteboxPosition = batchingMatrix * whiteboxPosition;
-        #endif
-        #ifdef USE_INSTANCING
-          whiteboxPosition = instanceMatrix * whiteboxPosition;
-        #endif
-        vWhiteboxPosition = (modelMatrix * whiteboxPosition).xyz;
-      `],
-    ],
-    fragment: [
-      ["#include <common>", `
-        varying vec3 vWhiteboxPosition;
-        uniform float uWhiteboxGridSize;
-        uniform float uWhiteboxGridWidth;
-        uniform vec3 uWhiteboxGridColor;
-        float WhiteboxGrid(vec2 position) {
-          vec2 cell = position / uWhiteboxGridSize;
-          vec2 footprint = max(fwidth(cell), vec2(0.00001));
-          vec2 distanceToLine = abs(fract(cell + 0.5) - 0.5);
-          float halfWidth = min(uWhiteboxGridWidth / uWhiteboxGridSize * 0.5, 0.1);
-          vec2 line = 1.0 - smoothstep(vec2(halfWidth), vec2(halfWidth) + footprint, distanceToLine);
-          line *= 1.0 - smoothstep(vec2(0.25), vec2(0.5), footprint);
-          return max(line.x, line.y);
-        }
-      `],
-      ["#include <color_fragment>", `
-        vec3 gridNormal = abs(cross(dFdx(vWhiteboxPosition), dFdy(vWhiteboxPosition)));
-        gridNormal /= max(max(gridNormal.x, gridNormal.y), max(gridNormal.z, 0.000001));
-        vec3 gridWeight = pow(gridNormal, vec3(8.0));
-        gridWeight /= max(dot(gridWeight, vec3(1.0)), 0.000001);
-        float gridLine = dot(gridWeight, vec3(WhiteboxGrid(vWhiteboxPosition.yz),
-          WhiteboxGrid(vWhiteboxPosition.xz), WhiteboxGrid(vWhiteboxPosition.xy)));
-        diffuseColor.rgb = mix(diffuseColor.rgb, uWhiteboxGridColor, gridLine);
-      `],
-    ],
-  });
-}
+// 米格线补丁在 Script_WhiteboxGrid（2026-10-31 抽出来，场景编辑器共用）。
 
 // 镂空卡片（植被十字面片、壕沟草、桁架镂空节）：alphaTest + 贴图 alpha。白盒替换材质不能丢掉裁切，
 // 否则卡片变成整块不透明竖片。保留 map / alphaMap 与 alphaTest，只把 rgb 换成表面色（再画网格）。

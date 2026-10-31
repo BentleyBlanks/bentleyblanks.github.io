@@ -749,7 +749,7 @@ export class DestructionSystem {
     RestorePhysics(snapshot.outfieldColliders);
     if (typeof physics.RefreshStaticQueries === "function") physics.RefreshStaticQueries();
 
-    // 子层与合并层都重刷：SceneEditor 之后若 RefreshColliders，不能从一张旧 city.grid
+    // 子层与合并层都重刷：编辑器之后若 RefreshColliders，不能从一张旧 city.grid
     // 把已经复原的墙再次弄成“画面在、射线不认”。
     const RebuildGrid = (owner) => {
       if (!owner || typeof owner.BuildCollisionGrid !== "function") return;

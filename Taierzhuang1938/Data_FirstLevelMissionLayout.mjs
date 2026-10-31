@@ -766,8 +766,8 @@ function FieldCover(id, x, z, w, h, d, semantic = "cover", ry = 0) {
 }
 export const MISSION_ANCHORS = Object.freeze({
   // `train` / `unload` 两个锚点随军列下线（2026.09.19 第三波）：`unload` 最后一个
-  // 消费者是 Script_EditorFullScene 的「军列卸载」巡场机位，那个机位已经换成
-  // 掩蔽部与伤员集结处（按 `collection` 取点）。
+  // 消费者是旧完整场景预览的「军列卸载」巡场机位（该预览 2026-10-31 已删；机位早先已经换成
+  // 掩蔽部与伤员集结处，按 `collection` 取点）。
   front: Sortie.nest,
   rightRear:Sortie.rear,withdrawalGap:Sortie.gap,
   orders: Sortie.orders,

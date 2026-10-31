@@ -25,6 +25,7 @@ import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, SamplePrevizActor, SamplePrevizAircraft, PrevizStrafeImpacts } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
 import { L1218_RIVER as RV, L1218_RAIL_BRIDGE as RB, L1218_RAIL as RL, L1218_HEIGHTS as HT, L1218_AID as A, L1218_PLACES as PL, L1218_SIGNALS as SIG, RiverAtX } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -197,7 +198,7 @@ export async function CheckPreviz(doc, { config, voice }) {
   const table = ClipTable();
   const lines = new Map();
   for (const sc of voice.scenes) for (const l of sc.lines) lines.set(l.id, l);
-  const scene = Load("Blockout/FirstLevel1218.scene.json");
+  const scene = ReadBlockoutSceneDocSync("FirstLevel1218");
   const layout = LayoutFromSceneDoc(scene);
   const ground = HeightGridSampler(scene.terrain);
   const B = scene.bounds;

@@ -10,3 +10,7 @@ Taierzhuang1938/Model/Type89MediumTank/Data_*.json text eol=lf
 Taierzhuang1938/Model/Type89MediumTank/Data_RunningGearReconstruction.json text eol=crlf
 Taierzhuang1938/_blender/Script_RebuildType89PaintFinish.mjs text eol=lf
 Taierzhuang1938/_blender/Script_Type89PaintFinishAudit.mjs text eol=lf
+
+# 场景文件（2026-10-31）：保存口按原始字节 sha1 判冲突，JSON 统一 LF；高度图是二进制
+Taierzhuang1938/Scenes/**/*.json text eol=lf
+Taierzhuang1938/Scenes/**/*.bin binary

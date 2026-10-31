@@ -25,7 +25,7 @@ import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./
 //
 // 任务流程重制之后，七章里没有哪一章会把整座城连同东西关一起建出来，也没有哪一章
 // 走到界河。于是两批已经做好的东西同时失去了入口：
-//   · 采样点表 89 个机位里 74 个、Script_ShotTest 的 Z 系列约二十张 —— 它们当年
+//   · 旧采样点表（2026-10-31 已删）89 个机位里 74 个、Script_ShotTest 的 Z 系列约二十张 —— 它们当年
 //     靠的是「城墙关」那片全城切片（bounds 与 Data_Battle.OVERVIEW_BOUNDS 逐字相同）；
 //   · Script_JieheField / Script_JieheHeight / OUTFIELD_SCENES.L0_Jiehe /
 //     Data_Dressing_JieheVillages 那一整套界河资产（Script_JieheTerrainTest 整份红）。
@@ -61,7 +61,7 @@ export const OVERVIEW_PHASE = Object.freeze({
   minutes: 600,
   brief: Object.freeze([
     "照 Data_Battle.OVERVIEW_BOUNDS 建整座城：四门、城墙、主次街、城内院落与东西关同时在场。",
-    "采样点表（Data_SamplePoints，phase: \"overview\"）与 Script_ShotTest 的 Z 系列都站在这一片上。",
+    "Script_ShotTest 的 Z 系列都站在这一片上。",
   ]),
   story: OVERVIEW_LEVEL_ID,          // 没有剧本，Story 会打一条 warn，属预期
   cutsceneIn: null,
@@ -96,9 +96,9 @@ export const OVERVIEW_PHASE = Object.freeze({
 });
 
 /**
- * 完整场景编辑器专用边界。
+ * 完整县城边界（`?phase=fullscene`；原完整场景预览工具 2026-10-31 已删，这条开发入口保留）。
  *
- * `OVERVIEW_BOUNDS` 是既有出图基线，不能为了编辑器擅自扩张：它只到北关以南、
+ * `OVERVIEW_BOUNDS` 是既有出图基线，不能为了巡场擅自扩张：它只到北关以南、
  * 善国门以北。这里另开一片，把四门外需要巡场的最远锚点全部包进来：
  * 北关坝墙 z=-560、城西津浦路、东郊农田 maxX=756、城南善国门 z=900。
  */
@@ -116,8 +116,8 @@ export const FULL_SCENE_LEVEL_ID = "FullScene";
 export const FULL_SCENE_PHASE = Object.freeze({
   id: FULL_SCENE_LEVEL_ID,
   fieldFrom: OVERVIEW_LEVEL_ID,
-  date: "完整场景预览",
-  label: "完整县城（场景编辑器）",
+  date: "完整县城",
+  label: "完整县城（开发入口）",
   place: "开发专用 · 城内与四门外",
   // 完整巡场需要读到一公里外的四门外轮廓；smokyDay 在这个尺度上会把整城吃成灰片。
   // 使用编辑器专属长视距白昼，用户仍可在环境面板一键切回硝烟、夜间等全部预设。
@@ -126,13 +126,13 @@ export const FULL_SCENE_PHASE = Object.freeze({
   minutes: 600,
   brief: Object.freeze([
     "完整生成滕县城、东西南北四门外关厢，以及北关坝墙、东郊农田和南关善国门。",
-    "只供完整场景编辑器巡场、Spline 与环境取证；原场景关卡编辑器仍按章节切片工作。",
+    "开发专用：只用来巡场、Spline 与环境取证；章节仍按各自切片工作。",
   ]),
   story: FULL_SCENE_LEVEL_ID,
   cutsceneIn: null,
   cutsceneOut: null,
   objectives: Object.freeze(["无 —— 只读巡场，不编辑任务关卡"]),
-  mechanic: "完整场景预览切片：不撒兵、不结算、不换关。",
+  mechanic: "完整县城切片：不撒兵、不结算、不换关。",
   nraPool: 9999,
   poolGain: 0,
   ijaPool: 0,

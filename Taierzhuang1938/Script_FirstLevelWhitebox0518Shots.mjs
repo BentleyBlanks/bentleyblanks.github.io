@@ -2,7 +2,7 @@
 // 两类产物，都写进忽略目录 Taierzhuang1938/_shots/Whitebox0518/（或 --out=<dir>）：
 //   1. <id>.png：Data_FirstLevelWhitebox0518Cameras 里每个机位一张实机图（1280×720、55° FOV、
 //      ?whitebox=p012&shot=1&manual=1&missionStage=N&quality=medium&scale=small），与 Notion 概念图同名对照。
-//      走采样点编辑器的 ApplyPose（与 Script_FirstLevelSpaceShots 同一条路），不碰指针锁。
+//      走出图机位工具（Script_EditorShotCamera）的 ApplyPose（与 Script_FirstLevelSpaceShots 同一条路），不碰指针锁。
 //   2. Map_<region>.png：按 Data_FirstLevelWhiteboxTerrain 的分区，直接从数据表画的俯视图 ——
 //      共享地面高度着色（相对 natural 的挖/填另画等值线）、实心体块轮廓（按顶高深浅）、冻结路线、
 //      锚点、机位与视线方向。纯数据渲染，不开游戏。
@@ -127,7 +127,7 @@ async function EngineShots(browser, server) {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
     await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 300000 });
     await page.evaluate(() => window.Tengxian.StepFrames(120));
-    const opened = await page.evaluate(() => window.Tengxian.Debug.OpenEditor("samplePoints"));
+    const opened = await page.evaluate(() => window.Tengxian.Debug.OpenEditor("shotCamera"));
     for (const c of cams) {
       if (c.scenario) await page.evaluate((id) => { const g = window.Tengxian, st = g.battlefield.layout.scenario.states.find((s) => s.id === id);
         g.battlefield.SetScenarioState(st); g.physics.RefreshStaticQueries?.(); }, c.scenario);

@@ -91,9 +91,9 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 按菜单栏同一分组列出全部工具，等人自己挑。
 
 - 摄影棚类工具（人物、枪械、特效、音效、构件库、Timeline……）点了就在首页上开；Esc 先回首页，首页上再按 Esc 回标题菜单。
-- 场景类工具（场景关卡、地形、样条、PCG 撒点、采样点、可破坏场景）卡片标「载入关卡」：先弹单子选七章之一，
+- 场景类工具（样条、PCG 撒点、可破坏场景）卡片标「载入关卡」：先弹单子选七章之一，
   再整页换到 `?phase=N&editor=tools&tool=<id>`，载入完自动打开那个工具（菜单栏里点它们也走这张单子）。
-  完整场景预览同理，三选一：第一关 / 完整县城 / 出川车厢。
+  （原场景关卡 / 地形 / 采样点同样走这张单子，完整场景预览另有三选一：2026-10-31 用户要求删除，已不存在。）
 - 带关卡参数的老入口（`?phase=2&editor=tools`、`?whitebox=p012&editor=tools`）照旧：先建那一关再开工具。
 - 回归：`node Taierzhuang1938/Script_TestRunner.mjs --only=ToolsHomeTest`。
 工作窗（Inspector）右上的 × 只关当前工具、回到空 Inspector，不退出高级工具。
@@ -106,8 +106,8 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 
 ## 一次只开一个
 
-十七个互斥编辑器里有十四个要接管相机（七个摄影棚 `cameraMode="studio"`、七个自由飞行
-`"fly"`，地形编辑器继承场景编辑器的 `"fly"`），过场时间轴还要把相机交给过场导演。
+互斥编辑器里多数要接管相机（摄影棚 `cameraMode="studio"`、自由飞行 `"fly"`；2026-10-31 删掉场景关卡 / 地形 /
+完整场景预览 / 采样点后，菜单栏里剩十三个互斥编辑器，另有一个不进菜单的「出图机位」），过场时间轴还要把相机交给过场导演。
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
 所以菜单栏里的工具虽然是勾选项，语义是**换到这一个**：开新的自动关旧的；再点一次打勾的那项就关掉它。
 不接管相机的三个（音频 / 资产规范 / 过场时间轴）也走同一条互斥路 —— 它们改的都是
@@ -353,6 +353,9 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 ### 场景关卡 `Script_EditorScene.mjs`
 
+> **已删除（2026-10-31 用户要求删除）**：`Script_EditorScene.mjs` 连同其中的地图参考标记、世界文档 / `worldEditDocument` 一并删除；
+> 构件目录（`PLACEABLE` 等）搬到 `Script_PlaceableCatalog.mjs`，构件库预览继续用它。以下为历史记录。
+
 城是 `Script_TengxianCity` 按 `Data_Tengxian` 的图纸现生成的，这个编辑器不去改那座城
 （改它要改图纸与生成规则，那是源码层的事）。它保留原工具的关卡切片、自由飞行、
 回到玩家 / 把玩家挪来 / 俯瞰全城、落点拾取、放置 / 挪动 / 删除、碰撞盒和 JSON 存取，
@@ -393,6 +396,9 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 ### 完整场景预览 `Script_EditorFullScene.mjs`
 
+> **已删除（2026-10-31 用户要求删除）**：工具、`?editor=fullScene` 入口与车厢静态布景（`CutsceneDirector.MountStaticSet`）都已删；
+> `?phase=fullscene`（`Data_Menu.FULL_SCENE_PHASE`）作为不带工具的开发入口保留。以下为历史记录。
+
 它与「场景关卡」是两件工具。场景关卡继续负责章节切片、摆件文档和关卡标记；完整场景
 预览只读，不写 `worldEditDocument`，也不改变任何章节任务数据。县城入口固定为
 `?phase=fullscene&menu=0&editor=fullScene`：独立 `FULL_SCENE_PHASE` 一次生成城内和四门外，
@@ -422,7 +428,7 @@ Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与�
 
 ### 构件库预览 `Script_EditorPropLibrary.mjs`
 
-专门浏览场景关卡编辑器能布设的全部构件，以及 `Script_ExternalProps` 已放进正式战场的
+专门浏览构件目录（`Script_PlaceableCatalog.mjs`，原场景关卡编辑器的可布设表）里的全部构件，以及 `Script_ExternalProps` 已放进正式战场的
 带署名 GLB（乡村房屋 / 手推车 / 栅栏 / 木箱 / 砖瓦堆）。每次在共用摄影棚里展示一项，
 程序化构件走同一个 `BuildSink` / `Script_World` 生成器，tzm 模型走同一个
 `InstantiateModel`，外部道具走同一个缓存与运行时材质克隆；不维护第二份预览几何。
@@ -491,6 +497,8 @@ GPU 实例桶」：PCG 输出就是普通 ExternalProps placement，但默认 `s
 真浏览器开关、预览、JSON 往返和退出还原由 `Script_PropPcgEditorTest.mjs` 守。
 
 ### 地形 `Script_EditorTerrain.mjs` + `Script_EditorScene.mjs` 共享内核
+
+> **已删除（2026-10-31 用户要求删除）**：连同场景关卡一起删。以下为历史记录。
 
 只提供关卡切片、自由飞行与抬高 / 压低 / 弹坑 / 抹平。笔刷同时改**网格顶点**与
 **解析高程 `GroundHeight`**；只改前者的下场是「看着是个坑，人在坑口上平地走过去」。
@@ -941,6 +949,14 @@ Actor，桶早就建好（所以被藏）；城里那几关的日军几乎全在
 的那一刻做，不能在「`battlefield` 变了」那一刻做 —— `TengxianCity.BuildSteps` 走到最后会
 `this.colliders = sink.colliders.concat(...)` 整根换掉那个数组，在那之前推进去的盒子
 会被连锅端走，而地形位移那时候连地面网格都还没建出来。
+
+### 构件目录与出图机位（2026-10-31）
+
+- `Script_PlaceableCatalog.mjs`：可放置构件总表（`PLACEABLE` / `MODEL_PLACEABLE` / `PLACEABLE_CATEGORIES`、`BuildPlaceableVisual`、
+  `BUILDING_DAMAGE_*`、`FlushSinkProps`），从已删的场景关卡编辑器里原样搬出；构件库预览用它，以后的新场景编辑器也复用它当资产目录。
+- `Script_EditorShotCamera.mjs`（id `shotCamera`，不进菜单）：采样点编辑器删除后留下的最小一块 ——
+  出图脚本与几支浏览器测试用 `Debug.OpenEditor("shotCamera")` 暂停玩法、接管相机、藏视图模型，再调 `ApplyPose` 摆镜头
+  （位姿口径：`y` 绝对高度，缺省取 地高 + `h`；没写 `fov` 取画质档出厂值，没写 `far` 取 620 m）。
 
 ## 加一个新编辑器
 

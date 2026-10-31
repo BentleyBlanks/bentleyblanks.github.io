@@ -414,9 +414,9 @@ Profiler 独立窗口复制入口的主题样式 URL，与主页面使用同一�
 **玩家看得见的入口一条都不许指向已退出正片的内容。** 2026-09-07 按这条清了两处：
 加载画面页脚那条「新版序章预览（开发）」链接（`#bootPreview`，`index.html` + `Style_Game.css`），
 与场景编辑器「关卡切片」列表第一条「序章 · 出川（车厢）」及其 `game.OpenProloguePreview`
-跳转（`Script_EditorScene` + `Script_Main`）。序章 2026-09-06 起退出选章、要并进第一关，
+跳转（`Script_EditorScene`（该编辑器 2026-10-31 用户要求删除）+ `Script_Main`）。序章 2026-09-06 起退出选章、要并进第一关，
 留着这两条只会让人以为它还是一关。加载画面页脚现在只有「进 城」一颗按钮；
-审片、出图与 `Script_EditorTest` 第 10 节仍从 `?preview=CS_Chuchuan` 直达，一样也没少。
+审片、出图与 `Script_EditorTest`（第 10 节）仍从 `?preview=CS_Chuchuan` 直达，一样也没少。
 两条闸在 `Script_EditorTest`：「加载画面上不再挂序章预览入口」与
 「场景编辑器的关卡切片列表不再列序章过场」。
 
@@ -430,7 +430,7 @@ Profiler 独立窗口复制入口的主题样式 URL，与主页面使用同一�
 
 另有一条**不进选章**的切片：全城俯瞰 `?phase=overview`（`Data_Menu.OVERVIEW_PHASE`）。
 它没有玩法，只服务出图与自检，摆进列表只会让人以为那是一关 —— 口径见
-`Data_SamplePoints.md` 与 `Data_MissionRemake.md` §10.9。
+`Data_MissionRemake.md` §10.9（旧 `Data_SamplePoints.md` 已标删除）。
 
 配套的一条：`MENU_ON` 与 `MENU_AT_BOOT` 分了家。靶场里菜单**照建**（Esc 暂停、设置、
 调试选项和那条出口都挂在它上面），只是开机不 `Open()`。

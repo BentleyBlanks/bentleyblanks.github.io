@@ -22,7 +22,7 @@ try{
    return [...new Set([...materials].flatMap(material=>[...(r.properties.get(material)?.programs?.values()||[])].map(program=>program.cacheKey)))].sort();
   };
   const beforePrograms=DepthPrograms();
-  g.editor.Open('scene');g.graphics.autoQuality=false;g.ApplyGraphics();g.Debug.ApplySky('firstLevelNight');
+  g.editor.Open('shotCamera');g.camera.far=2000;g.camera.fov=55;g.camera.updateProjectionMatrix();g.graphics.autoQuality=false;g.ApplyGraphics();g.Debug.ApplySky('firstLevelNight');
   g.post.SetTaaEnabled(false);g.post.SetAutoExposure(false);g.lights.ClearFires();
   g.scene.children.forEach(object=>{if(object.name==='SkyDome')object.visible=false;});
   const mat=new T.MeshStandardMaterial({color:0xaaaaaa,roughness:1,fog:false});M.ApplyPatches(mat,[M.MakeClusteredLightsPatch()]);

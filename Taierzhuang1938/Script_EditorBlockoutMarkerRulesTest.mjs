@@ -13,6 +13,7 @@ import {
   UnitFallbackText, UnitLabelTexts, IdTail, LabelMode, LandmarkGeometry, StationLabel, NormalizeLayers, ParseStoredLayers, SerializeLayers,
 } from "./Script_EditorBlockoutMarkerRules.mjs";
 import { BLOCKOUT_MARKER_COLORS } from "./Script_EditorBlockoutMarkers.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
 // --- 兜底文字 ---
 assert.equal(UnitFallbackText({ side: "nra", kind: "soldier" }), "国军");
@@ -72,7 +73,7 @@ const units = [
   assert.deepEqual(n[0], { id: "A", name: "狗洞", kind: "hole", x: 81.5, z: 488, y: null, w: 0.7, d: 0.45, h: 0.4, ry: 0, radiusM: null, note: "" });
   assert.equal(n[2].w, 0); assert.equal(n[2].radiusM, 2.5); assert.equal(n[2].note, "出村");
   // 场景校验器也认 landmarks
-  const scene = JSON.parse(fs.readFileSync(new URL("./Blockout/FirstLevel0610.scene.json", import.meta.url), "utf8"));
+  const scene = ReadBlockoutSceneDocSync("FirstLevel0610");
   assert.ok(Array.isArray(scene.landmarks) && scene.landmarks.length >= 40, "0610 场景文件里有地标");
   assert.ok(ValidateBlockoutScene(scene).ok, "0610 场景文件过校验");
   assert.equal(NormalizeLandmarks(scene.landmarks).length, scene.landmarks.length, "0610 的地标归一化后一个不丢");

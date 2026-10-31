@@ -14,7 +14,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?phase=4&quality=high&manual=1&menu=0`,{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!window.Tengxian?.state?.ready,null,{timeout:600000});
  await page.locator('#bootStart').click();
- await page.evaluate(()=>{Tengxian.audio.Unlock();Tengxian.editor.Open('scene');Tengxian.Debug.ApplySky('firstLevelNight');Tengxian.graphics.autoQuality=false;Tengxian.ApplyGraphics();});
+ await page.evaluate(()=>{Tengxian.audio.Unlock();Tengxian.editor.Open('shotCamera');Tengxian.camera.far=2000;Tengxian.camera.fov=55;Tengxian.camera.updateProjectionMatrix();Tengxian.Debug.ApplySky('firstLevelNight');Tengxian.graphics.autoQuality=false;Tengxian.ApplyGraphics();});
  await page.waitForFunction(()=>window.Tengxian.audio.sfxReady,null,{timeout:90000});
  assert.equal(await page.locator('#boot').evaluate(e=>e.classList.contains('gone')),true,'Screenshots must be the world, not the boot overlay');
  await page.addStyleTag({content:'#edRoot,.hud{visibility:hidden!important}'});

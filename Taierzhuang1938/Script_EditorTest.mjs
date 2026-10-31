@@ -90,13 +90,8 @@ async function CanvasDrag(x, y, steps = 12) {
 // 启动（正常模式：要验齿轮按钮真的能点）
 // ===========================================================================
 // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
-// **在城里那几关跑，不在序·界河（phase 0）跑。**
-// 界河是独立场景（JieheField）：它没有 `.city`，地皮是分块的 JieheGround_i_j，
-// 而且那张地表一格 40 m 上下 —— 地形笔刷的「网格太疏就拒绝落笔」判据在那儿
-// 恒为真，也就是说**地形编辑器在那一关本来就用不了**，那六条断言不可能过。
-// 这不是这一趟改出来的（这个文件之前停在 phase 0，第一条取证就抛
-// `T.battlefield.city is undefined`，整个冒烟根本没跑到地形那一段）。
-// 界河要不要支持地形笔刷是另一件事，别混在这里。
+// **在城里那几关跑，不在序·界河（phase 0）跑**：界河是独立场景（JieheField），没有 `.city`，
+// 好几节取证（碰撞体、地面高程等）都按城里的 battlefield 结构读。
 // gi=1：GI 出厂默认关（2026-08-26 起探针体不构造）。Debug Rendering 那一节要
 // 直接掏 gi.irradiance / gi.distanceMoments 验图集送屏，考的是「GI 开着」的面板，
 // 所以显式强开 —— 默认关状态下的调试视图契约由 Script_GiTest 管。
@@ -165,9 +160,10 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十七个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
-// + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 21 个条目
-Check("菜单栏列出全部编辑器入口", afterGear.entries === 21
+// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十三个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
+// + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 17 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点；
+// 出图机位 shotCamera 是不进菜单的测试工具，不计入）
+Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
   && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产,Debug工具"
   && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
@@ -650,11 +646,11 @@ Check("Debug Rendering：透视（关深度测试）比贴面模式画出更多�
   `透视=${debugShading.xrayDiff.toFixed(4)} 贴面=${debugShading.colliders.diff.toFixed(4)}`);
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
-// 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
-await ClickTool("scene");
+// 就不再收到 WASD：自由飞行类工具（这里用场景样条PCG）的飞行镜头仍应继续移动。
+await ClickTool("splines");
 await Step(4);
 const debugOverlayPersists = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
-Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "scene"
+Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "splines"
   && debugOverlayPersists.debugRendering && debugOverlayPersists.debugView === "normal",
 JSON.stringify(debugOverlayPersists));
 const sliderFound = await page.locator('.edPanel.work input[type="range"]').count();
@@ -678,45 +674,8 @@ Check("调过滑杆后 WASD 仍控制编辑器飞行",
     ? `焦点=${sliderKeyboard.focused} 按下=${sliderKeyboard.heldAfterDown} 松开=${sliderKeyboard.released}`
     : "未找到滑杆");
 
-// 「俯瞰当前切片」必须把四角真的装进视锥。旧版只按最长边抬高，镜头还斜着看，
-// 更要命的是沿用战斗 far=400：相机飞到六百多米后整片西关都被远平面裁掉。
-const topDown = await page.evaluate(async () => {
-  const THREE = await import("./vendor/three/build/three.module.js");
-  const T = window.Taierzhuang;
-  const beforeFar = T.camera.far;
-  const beforeFov = T.camera.fov;
-  // 战斗那份 far 存在 FlyCam.saved 里：编辑器一进来就把相机换成出厂投影，
-  // T.camera.far 已经是编辑器的 2000 了，拿它当「战斗远平面」会对不上。
-  const battleFar = T.editor.flycam.saved.far;
-  T.editor.active.TopDown();
-  T.StepFrames(3);
-  const camera = T.camera;
-  camera.updateMatrixWorld(true);
-  const matrix = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-  const frustum = new THREE.Frustum().setFromProjectionMatrix(matrix);
-  const bounds = T.editor.host.game.battlefield.bounds;
-  const corners = [
-    [bounds.minX, bounds.minZ], [bounds.maxX, bounds.minZ],
-    [bounds.maxX, bounds.maxZ], [bounds.minX, bounds.maxZ],
-  ];
-  return {
-    beforeFar, beforeFov, battleFar,
-    far: camera.far,
-    height: camera.position.y,
-    allCornersVisible: corners.every(([x, z]) => frustum.containsPoint(new THREE.Vector3(x, 0, z))),
-  };
-});
-Check("场景编辑器出厂投影：远面 2000 m / FOV 55°",
-  topDown.beforeFar === 2000 && topDown.beforeFov === 55,
-  `far=${topDown.beforeFar} fov=${topDown.beforeFov}（战斗 far=${topDown.battleFar}）`);
-Check("俯瞰当前切片：四角都在视锥且 far 盖得住机位",
-  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far >= topDown.beforeFar,
-  JSON.stringify(topDown));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 await Step(3);
-const restoredTopDownFar = await page.evaluate(() => window.Taierzhuang.camera.far);
-Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.battleFar,
-  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}（战斗 ${topDown.battleFar}）`);
 
 // ---------------------------------------------------------------------------
 // 1b) 暂停要连**声音**一起停
@@ -1702,310 +1661,10 @@ Check("Timeline 按住 Alt 会释放鼠标并暂停序章视线",
 await page.evaluate(() => window.Taierzhuang.editor.active.Stop());
 
 // ---------------------------------------------------------------------------
-// 7) 拆分后的场景关卡编辑器
-// ---------------------------------------------------------------------------
-await ClickTool("scene");
-await Step(15);
-const scene = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const editor = T.editor;
-  const active = editor.active;
-  const out = { id: editor.ActiveId, fly: editor.flycam.Active };
-  out.sections = [...active.panel.root.querySelectorAll(".edSection > .h")]
-    .map((node) => node.textContent);
-  out.originalProjection = [editor.flycam.saved.fov, editor.flycam.saved.far];
-  active.TopDown();
-  out.topDownFar = T.camera.far;
-  out.topDownHeight = T.camera.position.y;
-  const SetSlider = (control, value) => {
-    const input = control.root.querySelector("input");
-    input.value = String(value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-  SetSlider(active.projectionControls.fov, 68);
-  SetSlider(active.projectionControls.far, 1500);
-  out.projection = [T.camera.fov, T.camera.far];
-
-  // 场景关卡入口必须从能力层也拒绝地形落笔，不只是把按钮藏起来。
-  const groundBefore = T.battlefield.GroundHeight(60, 60);
-  active.SetMode("terrain");
-  active.PaintTerrain(60, 60, false);
-  out.terrainBlocked = active.mode === "look"
-    && active.terrainOps.length === 0
-    && T.battlefield.GroundHeight(60, 60) === groundBefore;
-  const before = (T.battlefield.city || T.battlefield).colliders.length;
-
-  // 摆一个四合院：碰撞盒必须真的进城的格子（否则玩家能穿墙走过去）
-  active.SetPalette("Compound");
-  active.Place(30, 30);
-  out.items = active.items.length;
-  out.nodes = active.root.children.length;
-  out.colliderGain = (T.battlefield.city || T.battlefield).colliders.length - before;
-  out.nearby = T.battlefield.NearbyColliders(30, 30, 12)
-    .filter((b) => b.tag === "editorPlacement").length;
-
-  // 沙包路障走的是 props 通道，最容易「点了没反应」
-  active.SetPalette("Barricade");
-  active.Place(-20, 10);
-  const bar = active.items[active.items.length - 1];
-  out.barMeshes = bar.node ? bar.node.children.length : 0;
-
-  // 文本标记是独立语义层：区域有占地框，道路有带宽/走向，两者都画中文世界牌。
-  active.markerDraft = { kind: "region", text: "滕文中学旧址", ry: Math.PI / 2, w: 66, d: 40 };
-  active.PlaceMarker(-186, 220);
-  active.markerDraft = { kind: "road", text: "火神庙东街", ry: 0, w: 337, d: 5 };
-  active.PlaceMarker(23.5, 210);
-  let markerSprites = 0;
-  active.root.traverse((node) => { if (node.isSprite && node.name.startsWith("MapMarkerText_")) markerSprites += 1; });
-  out.markers = {
-    count: active.markers.length,
-    kinds: active.markers.map((marker) => marker.kind).sort().join(","),
-    sprites: markerSprites,
-    chinese: active.Serialize().markers.map((marker) => marker.text).join(" / "),
-  };
-
-  // 存取：本地保存/读回与 JSON 导出/导入都必须同时带回构件和中文标记。
-  const json = JSON.stringify(active.Serialize());
-  active.Save();
-  active.ClearAll();
-  active.ClearMarkers();
-  active.Restore(false);
-  out.localRoundTrip = `${active.items.length} / ${active.markers.length}`;
-  active.ClearAll();
-  active.ClearMarkers();
-  const cleared = `${active.items.length} / ${active.markers.length}`;
-  active.Import(json, false);
-  out.roundTrip = `${cleared} → ${active.items.length} / ${active.markers.length}`;
-
-  // 一键图纸标记必须来自正式数据：两校和警察所是区域，火神庙东街是道路。
-  active.LoadMapReferences();
-  out.mapReferences = {
-    count: active.markers.filter((marker) => marker.source === "map").length,
-    custom: active.markers.filter((marker) => marker.source === "custom").length,
-    customText: active.markers.filter((marker) => marker.source === "custom")
-      .map((marker) => marker.text).join(" / "),
-    school: active.markers.some((marker) => marker.sourceId === "feature:WenzhongSchool"
-      && marker.text === "滕文中学旧址" && marker.w === 66 && marker.d === 40),
-    police: active.markers.some((marker) => marker.sourceId === "feature:PoliceStation"
-      && marker.text === "警察所"),
-    road: active.markers.some((marker) => marker.sourceId === "street:FireGodTempleEastStreet"
-      && marker.kind === "road" && marker.text === "火神庙东街"),
-    exterior: [
-      "gate:East", "gate:West", "gate:South", "gate:North",
-      "outskirts:PowerPlant", "outskirts:JinpuRailway", "outskirts:EastSuburb",
-      "outskirts:NorthStreet", "outskirts:Landmark:CatholicChurchSouth",
-    ].every((sourceId) => active.markers.some((marker) => marker.sourceId === sourceId)),
-  };
-  active.Import(json, false);
-
-  // v1 没有 markers；升级后必须安全读成空层，再恢复本轮文档继续后面的测试。
-  active.Import('{"v":1,"items":[],"terrain":[]}', false);
-  out.legacyMarkers = active.markers.length;
-  const many = Array.from({ length: 200 }, (_, index) => ({
-    id: 7, kind: index % 2 ? "road" : "region", text: `标记${index}`,
-    x: index, z: -index, w: 30, d: 8,
-  }));
-  active.Import(JSON.stringify({ v: 2, items: [], markers: many, terrain: [] }), false);
-  out.markerImportGuard = {
-    count: active.markers.length,
-    uniqueIds: new Set(active.markers.map((marker) => marker.id)).size,
-  };
-  active.Import(json, false);
-
-  // 名牌 HUD：布防图名字必须不点任何按钮就直接读得到（DOM 层，不是世界牌）。
-  // 机位定死、逐点直上直下拍，避免整城视角下名牌互相挤掉造成断言抖动。
-  const Labels = () => [...active.hudLayer.querySelectorAll(".edMapLabel")];
-  const Named = (text) => Labels().filter((el) => el.textContent === text);
-  const LookDownAt = (x, z, height) => {
-    T.camera.position.set(x, height, z);
-    T.camera.rotation.set(-Math.PI / 2, 0, 0, "YXZ");
-    editor.flycam.yaw = 0;
-    editor.flycam.pitch = -Math.PI / 2;
-    T.camera.updateMatrixWorld();
-    active.UpdateHudLabels();
-  };
-  LookDownAt(104, -216, 250);              // 警察所正上方：图纸参考名（虚线 ref 样式）
-  out.hud = {
-    layerInDom: !!active.hudLayer && active.hudLayer.isConnected,
-    police: Named("警察所").length,
-    policeRef: Named("警察所").every((el) => el.classList.contains("ref")),
-  };
-  LookDownAt(-186, 220, 250);              // 自放标记与同址图纸名：只留一张、算文档的
-  out.hud.custom = Named("滕文中学旧址").length === 1
-    && !Named("滕文中学旧址")[0].classList.contains("ref");
-  LookDownAt(0, 0, 700);                   // 整城俯瞰：名牌要成片出现（挤掉的不算）
-  out.hud.cityCount = Labels().length;
-  active.LoadMapReferences();
-  LookDownAt(104, -216, 250);              // 载入图纸标记后：同名不双份，且已转正为文档标记
-  out.hudDedup = {
-    police: Named("警察所").length,
-    policeNowDoc: Named("警察所").every((el) => !el.classList.contains("ref")),
-  };
-  active.hudNamesVisible = false;
-  active.UpdateHudLabels();
-  out.hudOff = Labels().length;
-  active.hudNamesVisible = true;
-  active.Import(json, false);
-
-  // 俯瞰拾取回归：700 m 机位下画面边缘的射线要走 900 m 上下才碰到地。
-  // 旧的 600 m 定值在这儿必然空手而归，表现就是「标记怎么点都放不下」。
-  LookDownAt(0, 0, 700);
-  const pick = active.Pick({ clientX: 200, clientY: 150 });
-  out.overviewPick = pick ? { kind: pick.kind, distance: Math.round(pick.distance) } : null;
-
-  // 特效与构件共用落点和 JSON，但不创建假碰撞盒；编辑器接管期间仍要推进烟火。
-  active.SetPalette("Effect_FireSmall");
-  active.Place(12, -18);
-  T.StepFrames(45);
-  // 【2026-10-12】只量这一个放下去的烟源自己挂的体积烟 / 燃烧系统（同上节 Vefects 常驻烟火）：
-  // 原来读 sourceSmoke / sourceFire 两个精灵池的累计游标，那是全场的数，2026-10-09 起烟也不再进那个池。
-  const placed = T.vfx.smokeSources.get(active.effectHandles[0]);
-  const placedEntries = T.vfx.particles.Inspect().entries;
-  const Emitted = (ids) => placedEntries.filter((entry) => (ids || []).includes(entry.id))
-    .reduce((n, entry) => n + entry.emitted, 0);
-  out.effect = {
-    category: active.panel.root.textContent.includes("特效"),
-    handles: active.effectHandles.length,
-    source: T.vfx.smokeSources.has(active.effectHandles[0]),
-    json: active.Serialize().items.some((item) => item.type === "Effect_FireSmall"),
-    emitted: Emitted(placed?.volumeSmokeHandles) > 0 && Emitted(placed?.particleHandles) > 0,
-  };
-  active.DeleteSelected();
-
-  return out;
-});
-Check("场景编辑器进自由飞行", scene.id === "scene" && scene.fly);
-Check("场景编辑器只保留关卡与布设职责",
-  scene.sections.includes("关卡切片") && scene.sections.includes("构件库")
-    && scene.sections.includes("已放置") && scene.sections.includes("文本标记")
-    && !scene.sections.includes("地形笔刷"),
-  scene.sections.join(" / "));
-Check("场景编辑器不再能编辑地形", scene.terrainBlocked);
-Check("场景相机可调 FOV 与远裁剪面",
-  scene.projection[0] === 68 && scene.projection[1] === 1500, scene.projection.join(" / "));
-// 编辑器出厂就是 2000 m，俯瞰通常不需要再扩；但战斗那份 400 m 一定盖不住
-// 俯瞰机位，所以这里断的是「结果够远」，不是「有没有扩过」。
-Check("俯瞰全城的远裁剪面盖得住机位（战斗那份盖不住）",
-  scene.topDownFar > scene.topDownHeight && scene.topDownFar > scene.originalProjection[1],
-  `战斗 ${scene.originalProjection[1].toFixed(0)} → 俯瞰 ${scene.topDownFar.toFixed(0)} m（机位高 ${scene.topDownHeight.toFixed(0)} m）`);
-Check("放置的构件进场景且带碰撞盒",
-  scene.items === 1 && scene.nodes >= 1 && scene.colliderGain > 0 && scene.nearby > 0,
-  `盒子 +${scene.colliderGain}，附近 ${scene.nearby}`);
-Check("沙包路障（props 通道）真的建出来了", scene.barMeshes > 0, `网格 ${scene.barMeshes}`);
-Check("区域/道路标记会生成中文世界牌并进入 JSON",
-  scene.markers.count === 2 && scene.markers.kinds === "region,road"
-    && scene.markers.sprites === 2 && scene.markers.chinese.includes("滕文中学旧址")
-    && scene.markers.chinese.includes("火神庙东街"), JSON.stringify(scene.markers));
-Check("场景本地存档会带回构件与标记", scene.localRoundTrip === "2 / 2", scene.localRoundTrip);
-Check("场景 JSON 存取往返", scene.roundTrip === "0 / 0 → 2 / 2", scene.roundTrip);
-Check("编辑器从 Data_Tengxian 载入院落与道路图纸标记",
-  scene.mapReferences.count >= 35 && scene.mapReferences.school
-    && scene.mapReferences.police && scene.mapReferences.road
-    && scene.mapReferences.exterior
-    && scene.mapReferences.custom === 2 && scene.mapReferences.customText.includes("滕文中学旧址")
-    && scene.mapReferences.customText.includes("火神庙东街"), JSON.stringify(scene.mapReferences));
-Check("旧版 v1 场景文档按空标记层兼容", scene.legacyMarkers === 0, scene.legacyMarkers);
-Check("布防图名牌 HUD 不点按钮就直接显示（图纸参考名走 ref 样式）",
-  scene.hud.layerInDom && scene.hud.police === 1 && scene.hud.policeRef
-    && scene.hud.custom && scene.hud.cityCount >= 25, JSON.stringify(scene.hud));
-Check("载入图纸标记后名牌按 sourceId 去重且转正为文档标记",
-  scene.hudDedup.police === 1 && scene.hudDedup.policeNowDoc, JSON.stringify(scene.hudDedup));
-Check("名牌 HUD 开关会清空名牌层", scene.hudOff === 0, String(scene.hudOff));
-Check("俯瞰机位的拾取能超过旧 600 m 射程落到地面",
-  scene.overviewPick && scene.overviewPick.distance > 600
-    && scene.overviewPick.distance < 1500,
-  JSON.stringify(scene.overviewPick));
-Check("外部 JSON 标记有数量上限且重复 id 会重编号",
-  scene.markerImportGuard.count === 96 && scene.markerImportGuard.uniqueIds === 96,
-  JSON.stringify(scene.markerImportGuard));
-Check("场景关卡可布设、预览并序列化特效",
-  scene.effect.category && scene.effect.handles === 1 && scene.effect.source
-    && scene.effect.json && scene.effect.emitted, JSON.stringify(scene.effect));
-
-// ---------------------------------------------------------------------------
-// 6a+) 名牌 HUD 的每帧驱动 + 俯瞰下的真鼠标放标记
-//
-// 用户报的原话是「文本标记怎么都没有生效」，成因有二，都只在俯瞰机位下复现：
-//   · 拾取射程定值 600 m，TopDown 机位五六百米起步，画面边缘的射线量程先用完 ——
-//     内部直调 PlaceMarker 是复现不出来的，必须走真鼠标；
-//   · 世界牌是定死的世界尺寸，五百米高空看只剩几个像素 —— 名字改走屏幕空间 HUD。
-// 上面那节验的是 UpdateHudLabels 手动调用；这里验 Update() 每帧真的在驱动它。
-// ---------------------------------------------------------------------------
-await page.evaluate(() => window.Taierzhuang.editor.active.TopDown());
-await Step(8);
-const hudLive = await page.evaluate(() =>
-  window.Taierzhuang.editor.active.hudLayer.querySelectorAll(".edMapLabel").length);
-Check("名牌 HUD 由每帧 Update 驱动（俯瞰下自动成片出现）", hudLive >= 10, String(hudLive));
-
-const markersBefore = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.SetMode("mark");
-  return active.markers.length;
-});
-await CanvasClick(320, 210);
-const markByMouse = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  const marker = active.markers[active.markers.length - 1];
-  return {
-    count: active.markers.length,
-    at: marker ? `${Math.round(marker.x)}, ${Math.round(marker.z)}` : null,
-  };
-});
-Check("俯瞰机位下真鼠标能放下文本标记（旧 600 m 射程在这儿必失败）",
-  markByMouse.count === markersBefore + 1, JSON.stringify(markByMouse));
-// 名牌 HUD 的视觉验收产物（_shots 已 gitignore）；顺手把试放的标记撤掉 ——
-// 后面地形抬升那节按「恰好两个标记」取证。
-await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
-await page.screenshot({ path: path.join(projectDir, "_shots", "editor_marker_hud.png") });
-await page.evaluate(() => window.Taierzhuang.editor.active.DeleteSelectedMarker());
-
-// ---------------------------------------------------------------------------
-// 6b) 场景关卡编辑器的真鼠标落点
-//
-// 用户报的两条都在这一段。它们的共同点是**没有任何报错**，只是「点了没反应」：
-//   · 点「回到玩家」把俯仰归零 = 正对地平线，而拾取是沿射线找地面 ——
-//     水平射线永远碰不到平地，于是屏幕上半边点哪儿都放不下东西；
-//   · 地形笔刷只在 mousemove 里落笔，单击（不拖）什么也不发生；
-//     而拖动时左键同时被拿去转视角，刷子跟着视角跑。
-// 所以这一段一律走**真的鼠标事件**，不调内部方法 —— 那两条 bug 从内部调是复现不出来的。
-// ---------------------------------------------------------------------------
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ClearAll();
-  active.GoToPlayer();
-});
-await Step(5);
-const aim = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const rect = T.renderer.domElement.getBoundingClientRect();
-  const hit = T.editor.active.Pick({ clientX: rect.width / 2, clientY: rect.height / 2 });
-  return { pitch: +T.editor.flycam.pitch.toFixed(2), hit: !!hit };
-});
-Check("「回到玩家」之后准心还够得着地面", aim.hit, `俯仰=${aim.pitch}`);
-
-await page.evaluate(() => window.Taierzhuang.editor.active.SetMode("place"));
-await Step(3);
-await CanvasClick(620, 430);
-const placedByMouse = await page.evaluate(() => ({
-  items: window.Taierzhuang.editor.active.items.length,
-  gizmo: !!(window.Taierzhuang.editor.active.gizmo
-    && window.Taierzhuang.editor.active.gizmo.group.visible),
-}));
-Check("「回到玩家」之后还能用鼠标放东西",
-  placedByMouse.items === 1 && placedByMouse.gizmo,
-  `items=${placedByMouse.items} 落点环=${placedByMouse.gizmo}`);
-
-// 留一口井给地形编辑器验证“物体随地面抬升”；切换入口时靠共享会话文档接过去。
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ClearAll();
-  active.SetPalette("Well");
-  active.Place(60, 60);
-});
-
-// ---------------------------------------------------------------------------
 // 6c) 构件库预览器
 // ---------------------------------------------------------------------------
+// 打开前的相机投影：摄影棚存下的「原始投影」必须就是它（关构件库时还回去的就是这一份）。
+const projectionBeforeProps = await page.evaluate(() => [window.Taierzhuang.camera.fov, window.Taierzhuang.camera.far]);
 await ClickTool("props");
 await Step(8);
 const props = await page.evaluate(() => {
@@ -2052,9 +1711,9 @@ Check("外部 GLB 按物体品类合并筛选",
   JSON.stringify({ categories: props.categories, entries: props.externalCategories }));
 Check("构件库相机可调 FOV 与远裁剪面",
   props.projection[0] === 47 && props.projection[1] === 480, props.projection.join(" / "));
-Check("切换到构件库前恢复场景相机参数",
-  JSON.stringify(props.originalProjection) === JSON.stringify(scene.originalProjection),
-  `${scene.originalProjection.join("/")} → ${props.originalProjection.join("/")}`);
+Check("构件库摄影棚存下的原始相机参数就是打开前那一份",
+  JSON.stringify(props.originalProjection) === JSON.stringify(projectionBeforeProps),
+  `${projectionBeforeProps.join("/")} → ${props.originalProjection.join("/")}`);
 
 // 三件院落小物不能再共用通用 Stone：构件库就是玩家报告问题的入口，逐件确认
 // Base / Normal 真接上，并把双面材质契约钉住（井筒和水缸从口沿看进去就是背面）。
@@ -2339,220 +1998,6 @@ Check("构件库覆盖正式战场新增的带署名外部 GLB",
     && externalProp.source.includes("Model_Handcart.glb"), JSON.stringify(externalProp));
 
 // ---------------------------------------------------------------------------
-// 6d) 地形编辑器：共享场景文档 + 物体/碰撞随地高同步
-// ---------------------------------------------------------------------------
-await ClickTool("terrain");
-await Step(8);
-const terrainLift = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  const item = active.items[0];
-  const Nearby = () => T.battlefield.NearbyColliders(60, 60, 8)
-    .find((box) => box.tag === "editorPlacement");
-  const collider = Nearby();
-  const before = {
-    ground: T.battlefield.GroundHeight(60, 60),
-    objectY: item.node.position.y,
-    colliderY: collider ? collider.min[1] : null,
-  };
-  const SetSlider = (control, value) => {
-    const input = control.root.querySelector("input");
-    input.value = String(value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-  SetSlider(active.projectionControls.fov, 72);
-  SetSlider(active.projectionControls.far, 1800);
-  active.brush.kind = "crater";
-  active.brush.radius = 14;
-  active.brush.strength = 1.5;
-  active.PaintTerrain(60, 60, true);
-  return {
-    id: T.editor.ActiveId,
-    supportsTerrain: active.supportsTerrain,
-    mode: active.mode,
-    items: active.items.length,
-    markers: active.markers.length,
-    markerText: active.markers.map((marker) => marker.text).join(" / "),
-    markerNodes: active.markers.filter((marker) => marker.node && marker.node.parent).length,
-    before,
-    afterGround: T.battlefield.GroundHeight(60, 60),
-    afterObjectY: item.node.position.y,
-    edge: T.battlefield.GroundHeight(100, 60),
-    projection: [T.camera.fov, T.camera.far],
-    originalProjection: [T.editor.flycam.saved.fov, T.editor.flycam.saved.far],
-    sections: [...active.panel.root.querySelectorAll(".edSection > .h")]
-      .map((node) => node.textContent),
-  };
-});
-await Step(4); // 松手后的 Update 会把碰撞盒按新地高重建
-const liftedCollider = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const collider = T.battlefield.NearbyColliders(60, 60, 8)
-    .find((box) => box.tag === "editorPlacement");
-  return collider ? collider.min[1] : null;
-});
-Check("地形编辑器独立接管地形并接到场景构件文档",
-  terrainLift.id === "terrain" && terrainLift.supportsTerrain
-    && terrainLift.mode === "terrain" && terrainLift.items === 1
-    && terrainLift.markers === 2 && terrainLift.markerNodes === 2
-    && terrainLift.markerText.includes("滕文中学旧址") && terrainLift.markerText.includes("火神庙东街"),
-  JSON.stringify(terrainLift));
-Check("地形编辑器只暴露地形职责",
-  terrainLift.sections.includes("地形笔刷") && terrainLift.sections.includes("关卡切片")
-    && !terrainLift.sections.includes("构件库") && !terrainLift.sections.includes("已放置"),
-  terrainLift.sections.join(" / "));
-Check("地形抬升时构件与碰撞盒同步抬升",
-  terrainLift.afterGround > terrainLift.before.ground + 1
-    && terrainLift.afterObjectY > terrainLift.before.objectY + 1
-    && liftedCollider !== null && liftedCollider > terrainLift.before.colliderY + 1,
-  `地 ${terrainLift.before.ground.toFixed(2)}→${terrainLift.afterGround.toFixed(2)}，`
-  + `物 ${terrainLift.before.objectY.toFixed(2)}→${terrainLift.afterObjectY.toFixed(2)}，`
-  + `碰撞 ${terrainLift.before.colliderY}→${liftedCollider}`);
-Check("地形笔刷同时改解析高程且不波及半径外",
-  terrainLift.afterGround > terrainLift.before.ground + 1
-    && Math.abs(terrainLift.edge - terrainLift.before.ground) < 0.001,
-  `${terrainLift.before.ground.toFixed(2)} → ${terrainLift.afterGround.toFixed(2)}`);
-Check("地形相机可调 FOV 与远裁剪面",
-  terrainLift.projection[0] === 72 && terrainLift.projection[1] === 1800,
-  terrainLift.projection.join(" / "));
-Check("切换到地形前恢复构件库相机参数",
-  JSON.stringify(terrainLift.originalProjection) === JSON.stringify(scene.originalProjection),
-  `${props.projection.join("/")} → ${terrainLift.originalProjection.join("/")}`);
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ResetTerrain();
-  active.ClearMarkers();
-});
-
-// 先飞到城内台地上空：**只有那张网格够密**（636 m 铺 116×116，约 5.5 m 一格）。
-// 城外那张是绕城的方环，700 m 以外每两百米才一个顶点，笔刷在那儿是改不动网格的。
-const brush = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  active.ClearAll();
-  T.camera.position.set(0, 58, 40);
-  T.editor.flycam.yaw = 0;
-  T.editor.flycam.pitch = -0.95;
-  active.SetMode("terrain");
-  active.brush.kind = "crater";
-  active.brush.radius = 10;
-  active.brush.strength = 1.2;
-  return { before: 0, x: 0, z: 0 };
-});
-await Step(4);
-const brushAt = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const hit = T.editor.active.Pick({ clientX: 620, clientY: 430 });
-  return hit
-    ? { before: +T.battlefield.GroundHeight(hit.x, hit.z).toFixed(3), x: hit.x, z: hit.z }
-    : { before: null, x: 0, z: 0 };
-});
-Object.assign(brush, brushAt);
-await CanvasClick(620, 430);
-const afterClick = await page.evaluate((at) => {
-  const T = window.Taierzhuang;
-  return {
-    ops: T.editor.active.terrainOps.length,
-    after: +T.battlefield.GroundHeight(at.x, at.z).toFixed(3),
-  };
-}, brush);
-Check("地形笔刷：单击一次就出一个坑",
-  afterClick.ops === 1 && afterClick.after < brush.before - 0.5,
-  `ops=${afterClick.ops}  ${brush.before} → ${afterClick.after}`);
-
-const pitchBefore = await page.evaluate(() => window.Taierzhuang.editor.flycam.pitch);
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ResetTerrain();
-  active.brush.kind = "lower";
-});
-await CanvasDrag(620, 430, 12);
-const afterDrag = await page.evaluate((p) => {
-  const T = window.Taierzhuang;
-  return {
-    ops: T.editor.active.terrainOps.length,
-    pitchMoved: Math.abs(T.editor.flycam.pitch - p) > 1e-6,
-  };
-}, pitchBefore);
-// 12 次移动以前会推 12 个 op（每个都要把十几万顶点走一遍），而且镜头跟着一起转
-Check("地形笔刷：拖动不转镜头、也不把 op 表刷爆",
-  !afterDrag.pitchMoved && afterDrag.ops > 0 && afterDrag.ops <= 6,
-  `12 次移动 → ${afterDrag.ops} 个 op，镜头动了=${afterDrag.pitchMoved}`);
-
-// 城外网格太疏的地方必须**拒绝**这一笔：只改解析高程而网格不动，
-// 就是这个模块开头声明不许出现的那种分歧（看着是平地，人却掉进坑里）。
-const coarse = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  active.ResetTerrain();
-  active.brush.kind = "crater";
-  active.brush.radius = 8;
-  const far = { x: 40, z: -1200 };          // 城外一千两百米：那儿每两百米才一个顶点
-  const before = T.battlefield.GroundHeight(far.x, far.z);
-  active.PaintTerrain(far.x, far.z, false, 1 / 60);
-  return {
-    ops: active.terrainOps.length,
-    touched: active.lastTouched,
-    moved: Math.abs(T.battlefield.GroundHeight(far.x, far.z) - before) > 1e-6,
-  };
-});
-Check("网格太疏的地方拒绝落笔（不留「看着平地却掉坑里」）",
-  coarse.ops === 0 && coarse.touched === 0 && !coarse.moved,
-  `动到顶点=${coarse.touched} 记了 ${coarse.ops} 笔 解析高程变了=${coarse.moved}`);
-
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ResetTerrain();
-  active.ClearAll();
-  active.SetMode("look");
-});
-
-// 换关：先在场景关卡编辑器布设，再切到地形编辑器落笔。两边共享的文档、碰撞盒、
-// GroundHeight 与顶点位移都必须搬到新 city，且必须等 state.ready 之后再搬。
-await ClickTool("scene");
-await Step(4);
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.SetPalette("Well");
-  active.Place(12, 12);
-});
-await ClickTool("terrain");
-await Step(4);
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.brush.kind = "crater";
-  active.PaintTerrain(12, 40, false);
-  active.host.game.JumpToLevel(1);
-});
-await page.waitForFunction(
-  () => window.Taierzhuang.state.ready && window.Taierzhuang.Debug.Level().index === 1,
-  null, { timeout: 240000 });
-await Step(20);
-const jumped = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  return {
-    level: T.Debug.Level().id,
-    items: active.items.length,
-    nodes: active.root.children.length,
-    viewmodelHidden: !T.viewmodel.root.visible,
-    patched: !!T.battlefield.__editorBaseGroundHeight,
-    solid: T.battlefield.NearbyColliders(12, 12, 6)
-      .some((b) => b.tag === "editorPlacement"),
-    dented: T.battlefield.GroundHeight(12, 40) < T.battlefield.GroundHeight(12, 90) - 0.3,
-  };
-});
-Check("换关之后放置层与地形跟着搬家",
-  jumped.items === 1 && jumped.nodes === 1 && jumped.viewmodelHidden
-    && jumped.patched && jumped.solid && jumped.dented,
-  `到了 ${jumped.level}，枪藏起=${jumped.viewmodelHidden} 碰撞=${jumped.solid} 地形=${jumped.dented}`);
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.ResetTerrain();
-  active.ClearAll();
-});
-
-// ---------------------------------------------------------------------------
 // 7) 关掉之后有没有还干净
 // ---------------------------------------------------------------------------
 // 「全部关掉」随入口面板一起去掉了：Debug工具在 设置 → Debug工具 里各自关，高级工具按 ` 退出。
@@ -2575,11 +2020,9 @@ const restored = await page.evaluate(() => {
     weapon: T.viewmodel.weaponId,
     handWeapon: T.Debug.Slots().weapon,
     viewmodel: T.viewmodel.root.visible,
-    leftovers: (T.battlefield.city || T.battlefield).colliders.filter((b) => b.tag === "editorPlacement").length,
     ground: T.battlefield.GroundHeight(4, 4),
     worldVisible: T.battlefield.meshes.every((m) => m.visible),
     hudHidden: document.body.classList.contains("edHideHud"),
-    patched: !!T.battlefield.__editorBaseGroundHeight,
     // Debug Rendering 的两样全局画法：着色模式要还回着色，碰撞体叠加层要摘干净
     shading: T.post.GetShadingMode(),
     debugOverlays: T.post.debugOverlays.size,
@@ -2597,14 +2040,13 @@ Check("世界与 HUD 都放回来了", restored.worldVisible && !restored.hudHid
 // 那一关的携行本来就不一样；要验的是「视图模型举的是游戏认为你拿着的那一把」。
 Check("武器还回玩家手里", restored.weapon === restored.handWeapon,
   `视图模型=${restored.weapon} 手里=${restored.handWeapon}`);
-Check("放置层的碰撞盒摘干净", restored.leftovers === 0, `残留 ${restored.leftovers} 个`);
-Check("GroundHeight 的包已拆", !restored.patched && restored.ground === baseline.ground);
+Check("GroundHeight 没被改写", restored.ground === baseline.ground);
 
 // 相机：玩家自己的机位每帧都在被 player.Update 写，所以只验 FOV 与「没被留在天上」
 Check("相机交还（FOV 复原）", restored.camera[3] === baseline.camera[3],
   `fov ${baseline.camera[3]} → ${restored.camera[3]}`);
 
-// 玩法恢复：当前可能已由编辑器切到 CH1。首关故意有 30 秒认路静默期，所以不再拿
+// 玩法恢复：首关故意有 30 秒认路静默期，所以不再拿
 // “立刻有人开枪”当恢复信号；直接验只有战斗主循环才会推进的 phaseTime。
 const resumed = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -2632,153 +2074,6 @@ const shot = await page.evaluate(() => ({
 }));
 Check("出图模式下编辑器不可见但 API 还在",
   shot.hidden && !shot.gearVisible && shot.api);
-
-// ---------------------------------------------------------------------------
-// 9) 完整场景编辑器：独立完整切片 + Spline/种子/环境取证
-// ---------------------------------------------------------------------------
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=fullscene&menu=0&editor=fullScene&quality=low&scale=small&audio=0`,
-  { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state.ready
-  && window.Taierzhuang.editor?.ActiveId === "fullScene", null, { timeout: 300000 });
-await Step(8);
-const fullScene = await page.evaluate(async () => {
-  const T = window.Taierzhuang;
-  const tool = T.editor.active;
-  const helper = await import("./Script_EditorFullScene.mjs");
-  const beforeEnvironment = tool.host.game.GetEnvironmentState();
-  tool.SelectEnvironment("night", true);
-  const night = tool.host.game.GetEnvironmentState();
-  const countyUrl = helper.FullSceneUrl(location.href, "county");
-  const carriageUrl = helper.FullSceneUrl(location.href, "carriage");
-  const sections = [...tool.panel.root.querySelectorAll(".edSection > .h")]
-    .map((node) => node.textContent);
-  const routeKeys = tool.routes.map((route) => route.key);
-  const seedIds = tool.seedRows.map((row) => row.id);
-  const lines = tool.overlay?.children.filter((node) => node.isLine).length || 0;
-  const jsonFolds = [...tool.panel.root.querySelectorAll(".edJsonFold")]
-    .map((node) => ({ open: node.open, summary: node.querySelector("summary")?.textContent || "" }));
-  T.editor.Close();
-  const restoredEnvironment = tool.host.game.GetEnvironmentState();
-  return {
-    id: T.Debug.Level().id, bounds: T.battlefield.bounds, sections, routeKeys, seedIds, lines,
-    beforeEnvironment, night, restoredEnvironment, countyUrl, carriageUrl, jsonFolds,
-    bootGone: document.getElementById("boot").classList.contains("gone"),
-    launcherPresent: !!document.querySelector('[data-editor="fullScene"]'),
-  };
-});
-Check("完整场景编辑器使用独立全县城切片并覆盖四门外最远锚点",
-  fullScene.id === "FullScene" && fullScene.bootGone
-    && fullScene.bounds.minX <= -480 && fullScene.bounds.maxX >= 756
-    && fullScene.bounds.minZ <= -560 && fullScene.bounds.maxZ >= 900,
-  JSON.stringify({ id: fullScene.id, bounds: fullScene.bounds }));
-Check("完整场景编辑器保留场景、机位、路线和环境测试",
-  fullScene.launcherPresent
-    && ["场景", "完整巡场机位", "Spline 完整预览（只读）", "环境系统 / 氛围预设"]
-      .every((name) => fullScene.sections.includes(name)), fullScene.sections.join(" / "));
-Check("完整 Spline 清单复用真数据并覆盖城街、东关、铁路、北关与寨墙",
-  ["city:WestGateStreet", "eastLane:EastGuangStreet", "west:railway", "north:street",
-    "wall:eastZhai", "wall:northStockade", "east:approach"]
-    .every((key) => fullScene.routeKeys.includes(key)) && fullScene.lines >= 7,
-  JSON.stringify({ count: fullScene.routeKeys.length, lines: fullScene.lines }));
-Check("完整县城随机种子清单含主种子、地形与 Spline 派生种子",
-  ["county.master", "county.outfield", "county.terrain", "spline.west:railway"]
-    .every((id) => fullScene.seedIds.includes(id)), `${fullScene.seedIds.length} 项`);
-Check("完整场景不再展示只读 JSON 与种子清单",
-  fullScene.jsonFolds.length === 0 && !fullScene.sections.includes("确定性随机种子"),
-  JSON.stringify(fullScene.jsonFolds));
-Check("环境预设实时切换并在退出完整场景编辑器后恢复",
-  fullScene.beforeEnvironment.name === "editorClear" && fullScene.night.name === "night"
-    && fullScene.restoredEnvironment.name === "editorClear" && !fullScene.restoredEnvironment.override,
-  JSON.stringify({ before: fullScene.beforeEnvironment, night: fullScene.night, after: fullScene.restoredEnvironment }));
-Check("完整县城 / 车厢切换 URL 清理互斥场景参数",
-  new URL(fullScene.countyUrl).searchParams.get("phase") === "fullscene"
-    && !new URL(fullScene.countyUrl).searchParams.has("fullSceneView")
-    && !new URL(fullScene.countyUrl).searchParams.has("preview")
-    && new URL(fullScene.carriageUrl).searchParams.get("phase") === "fullscene"
-    && new URL(fullScene.carriageUrl).searchParams.get("fullSceneView") === "carriage"
-    && !new URL(fullScene.carriageUrl).searchParams.has("preview")
-    && !new URL(fullScene.carriageUrl).searchParams.has("autoplay"),
-  `${new URL(fullScene.countyUrl).search} / ${new URL(fullScene.carriageUrl).search}`);
-
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=fullscene&fullSceneView=carriage&editor=fullScene&menu=0&quality=low&audio=0`,
-  { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state.ready
-  && window.Taierzhuang.editor?.ActiveId === "fullScene"
-  && window.Taierzhuang.cutscene?.staticSet?.id === "CS_Chuchuan", null, { timeout: 300000 });
-const carriageEditor = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const tool = T.editor.active;
-  const before = T.cutscene.Time;
-  T.StepFrames(60, 1 / 60, false);
-  const after = T.cutscene.Time;
-  const buttons = [...tool.panel.root.querySelectorAll(".edBtn")].map((node) => node.textContent);
-  const result = {
-    mode: tool.sceneMode, before, after,
-    playing: T.cutscene.Playing,
-    staticSet: T.cutscene.staticSet ? { ...T.cutscene.staticSet } : null,
-    mounted: !!T.cutscene.SetRoot,
-    props: tool.carriageSet?.props || 0,
-    actors: tool.carriageSet?.actors ?? -1,
-    preview: T.Debug.Preview(),
-    fly: tool.host.flycam.Active,
-    cinematicVisible: !!document.querySelector(".csRoot.on"),
-    buttons,
-    seedValues: tool.seedRows.map((row) => row.value),
-    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")]
-      .map((node) => node.textContent),
-    jsonFolds: [...tool.panel.root.querySelectorAll(".edJsonFold")]
-      .map((node) => node.open),
-  };
-  T.editor.Close();
-  result.unmounted = !T.cutscene.staticSet && !T.cutscene.SetRoot;
-  return result;
-});
-Check("车厢奇观是可自由巡看的纯静态场景，不启动正式序章",
-  carriageEditor.mode === "carriage" && carriageEditor.mounted && carriageEditor.unmounted
-    && carriageEditor.props > 100 && carriageEditor.actors === 0 && carriageEditor.fly
-    && !carriageEditor.playing && !carriageEditor.preview.active && !carriageEditor.cinematicVisible
-    && carriageEditor.before === carriageEditor.after
-    && !carriageEditor.sections.includes("车厢走带")
-    && !carriageEditor.buttons.some((label) => /播放|暂停|回到头/.test(label)),
-  JSON.stringify({ props: carriageEditor.props, actors: carriageEditor.actors,
-    before: carriageEditor.before, after: carriageEditor.after, preview: carriageEditor.preview }));
-Check("车厢静态场景保留布景种子数据与环境测试",
-  carriageEditor.seedValues.includes(19380314)
-    && !carriageEditor.seedValues.includes("chuchuanShunzi")
-    && carriageEditor.sections.includes("车厢场景巡看机位")
-    && carriageEditor.sections.includes("环境系统 / 氛围预设")
-    && carriageEditor.jsonFolds.length === 0 && !carriageEditor.sections.includes("确定性随机种子"),
-  `${carriageEditor.seedValues.length} 项`);
-
-// 第一关视图：就是 P012 白盒那一片，建好不开跑；切回县城/车厢时 whitebox 必须清掉。
-const firstLevelUrl = await page.evaluate(async () =>
-  (await import("./Script_EditorFullScene.mjs")).FullSceneUrl(location.href, "firstLevel"));
-await page.goto(firstLevelUrl, { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state.ready
-  && window.Taierzhuang.editor?.ActiveId === "fullScene", null, { timeout: 300000 });
-const firstLevelEditor = await page.evaluate(async () => {
-  const T = window.Taierzhuang;
-  const tool = T.editor.active;
-  const helper = await import("./Script_EditorFullScene.mjs");
-  const camera = tool.ApplyCamera("village") ? tool.host.camera.position.toArray() : null;
-  const result = {
-    mode: tool.sceneMode, level: T.Debug.Level().id, running: T.state.running, fly: tool.host.flycam.Active,
-    bootGone: document.getElementById("boot").classList.contains("gone"),
-    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")].map((node) => node.textContent),
-    carriage: !!tool.carriageSet, overlay: !!tool.overlay, camera,
-    countyUrl: helper.FullSceneUrl(location.href, "county"),
-  };
-  T.editor.Close();
-  return result;
-});
-Check("第一关视图载入 P012 白盒且不开跑、不挂车厢与县城 Spline",
-  new URL(firstLevelUrl).searchParams.get("whitebox") === "p012" && !new URL(firstLevelUrl).searchParams.has("phase")
-    && firstLevelEditor.mode === "firstLevel" && firstLevelEditor.level === "FirstLevelP012Whitebox"
-    && !firstLevelEditor.running && firstLevelEditor.fly && firstLevelEditor.bootGone
-    && !firstLevelEditor.carriage && !firstLevelEditor.overlay && !!firstLevelEditor.camera
-    && firstLevelEditor.sections.includes("第一关巡场机位")
-    && !new URL(firstLevelEditor.countyUrl).searchParams.has("whitebox"),
-  JSON.stringify({ ...firstLevelEditor, countyUrl: new URL(firstLevelEditor.countyUrl).search }));
 
 // ---------------------------------------------------------------------------
 // 10) 序章预览（URL 直达）：独立收口、单次交接、无旧 L0 AI
@@ -2882,11 +2177,12 @@ Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurr
   && blurred.aiAlive === 0, JSON.stringify(blurred));
 
 // ---------------------------------------------------------------------------
-// 12) 主菜单 → 场景编辑器 → 关卡切片
+// 12) 主菜单 → 高级工具编辑器
 //
 // 这条专门锁住一个容易被 menu=0 冒烟漏掉的路径：主菜单的活场景有自己的
-// 相机循环。若菜单没有在场景编辑器接管时退出，点切片后会继续显示菜单原有场景，
-// 并且新 field 完成后编辑层不会重新包 GroundHeight。
+// 相机循环。若菜单没有在编辑器接管时退出，编辑器就会和菜单运镜叠在同一张画面上。
+// （原来用场景关卡编辑器验这条，2026-10-31 该工具删除后改用构件库预览器：交接在
+// EditorSuite.Open 的公共入口里，不是哪个工具自己做的。）
 // ---------------------------------------------------------------------------
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=2`,
   { waitUntil: "load", timeout: 120000 });
@@ -2894,8 +2190,8 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined
   && window.Taierzhuang.state.ready && window.Taierzhuang.state.menu, null, { timeout: 240000 });
 const menuToEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
-  // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，场景工具必须先收起它。
-  T.editor.Open("scene");
+  // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，必须先收起它。
+  T.editor.Open("props");
   return {
     menu: T.state.menu,
     menuVisible: !document.getElementById("menu").classList.contains("off"),
@@ -2903,126 +2199,66 @@ const menuToEditor = await page.evaluate(() => {
     capturing: T.editor.Capturing,
   };
 });
-Check("从主菜单打开场景编辑器会交还菜单相机",
-  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "scene"
+Check("从主菜单打开编辑器会交还菜单相机",
+  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "props"
     && menuToEditor.capturing, JSON.stringify(menuToEditor));
-
-// 「关卡切片」列表只列切片。序章（CS_Chuchuan）是一段过场、不是切片，2026-09-07
-// 连同 `game.OpenProloguePreview` 一起摘掉 —— 编辑器里也不再留一条通往已退出正片
-// 内容的入口。这一条同时守住：摘掉之后列表仍然从 PHASES[0] 起完整列出，
-// 点战斗切片走的还是 JumpToLevel（下面 waitForFunction 验它真的换了切片）。
-const prologueRow = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  const rows = [...active.levelList.root.children];
-  const prologue = rows.find((row) => row.textContent.includes("序章 · 出川（车厢）"));
-  const battleRow = rows.find((row) => row.textContent.includes("往南的路"));
-  // 走 ListBox 行的真实 click，不直接调 JumpToLevel，确保 UI 选关链路也在测试内。
-  battleRow?.click();
-  return {
-    present: !!prologue,
-    battleRowPresent: !!battleRow,
-    hasPrologueHook: typeof active.host.game.OpenProloguePreview === "function",
-    firstRow: rows[0]?.textContent || null,
-  };
-});
-Check("场景编辑器的关卡切片列表不再列序章过场",
-  !prologueRow.present && !prologueRow.hasPrologueHook && prologueRow.battleRowPresent,
-  JSON.stringify(prologueRow));
-await page.waitForFunction(() => {
-  const T = window.Taierzhuang;
-  return T.state.ready && T.state.builtPhase === 1 && T.editor.active
-    && T.editor.active.groundPatched === T.battlefield;
-}, null, { timeout: 240000 });
-const menuSlice = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  return {
-    id: T.Debug.Level().id,
-    built: T.state.builtPhase,
-    menu: T.state.menu,
-    bounds: T.battlefield.bounds,
-    expected: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
-    patched: !!T.battlefield.__editorBaseGroundHeight,
-  };
-});
-Check("主菜单打开的场景关卡编辑器能切到所选关卡切片",
-  menuSlice.id === "CH1_NanLu" && menuSlice.built === 1 && !menuSlice.menu
-    && JSON.stringify(menuSlice.bounds) === JSON.stringify(menuSlice.expected) && menuSlice.patched,
-  JSON.stringify(menuSlice));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 const returnedToMenu = await page.evaluate(() => ({
   menu: window.Taierzhuang.state.menu,
   visible: !document.getElementById("menu").classList.contains("off"),
 }));
-Check("关闭场景编辑器后回到原菜单层", returnedToMenu.menu && returnedToMenu.visible,
+Check("关闭编辑器后回到原菜单层", returnedToMenu.menu && returnedToMenu.visible,
   JSON.stringify(returnedToMenu));
 
 // ===========================================================================
-// 11) 采样点编辑器：装位姿 → 取当前相机回写 → 导出 → 关掉把相机还干净
+// 11) 出图机位：装位姿 → 位姿原样落到相机上 → 关掉把相机投影还干净
 // ---------------------------------------------------------------------------
-// 出图脚本（Script_SamplePointShot）走的就是这条 ApplyPointById，所以这一节
-// 同时是「记录基线拍出来的画面对不对」的守卫：位姿在这里装错，八十多张图全错。
-await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("samplePoints"));
+// 它是出图脚本与几支浏览器测试共用的定镜工具（2026-10-31 采样点编辑器删除后留下的最小一块，
+// 见 Script_EditorShotCamera 文件头）：位姿在这里装错，所有走它的出图都会错。
+await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("shotCamera"));
 await Step(6);
-const sample = await page.evaluate(() => {
+const shotCamera = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const tool = T.editor.active;
-  // 换切片要十几秒；冒烟只验「位姿装到相机上」，不让面板去切关。
-  tool.followPhase = false;
   const saved = { fov: T.editor.flycam.saved.fov, far: T.editor.flycam.saved.far };
-  // 本切片里有点位就用它；没有就退到全城俯瞰那一片（2026-08-29 起城里那
-  // 八十来个机位全挂在 phase: "overview" 上，七章切片里只剩三个「时段对照」点）。
-  // 这一节量的是相机位姿，与脚下那片地建没建出来无关。
-  const point = tool.Points().find((p) => p.phase === T.state.builtPhase)
-    || tool.Points().find((p) => p.phase === "overview")
-    || tool.Points()[0];
-  const pose = tool.ApplyPointById(point.id);
-  const applied = {
-    x: +T.camera.position.x.toFixed(2), y: +T.camera.position.y.toFixed(2),
-    z: +T.camera.position.z.toFixed(2), yaw: +T.editor.flycam.yaw.toFixed(4),
+  const absolute = tool.ApplyPose({ id: "abs", x: 12.5, z: -33.25, y: 40, h: null, yaw: 0.75, pitch: -0.3, fov: 70, far: 900, phase: null });
+  const absoluteCamera = {
+    x: T.camera.position.x, y: T.camera.position.y, z: T.camera.position.z,
+    fov: T.camera.fov, far: T.camera.far, yaw: T.editor.flycam.yaw, pitch: T.editor.flycam.pitch,
   };
-  // 「取当前相机」：先把镜头挪开，再摁回写，看点位是不是真的跟着镜头走
-  T.camera.position.x += 7;
-  T.editor.flycam.yaw = 1.234;
-  tool.CaptureFromCamera();
-  const after = tool.Points().find((p) => p.id === point.id);
-  tool.Export("json");
-  let exported = null;
-  try { exported = JSON.parse(tool.io.value); } catch (error) { exported = null; }
+  // 没写 y 用 地高 + h；没写 fov / far 退回出厂（不沿用上一份）
+  const ground = tool.ApplyPose({ id: "gnd", x: 4, z: 4, y: null, h: 1.7, yaw: 0, pitch: 0, fov: null, far: null, phase: null });
   return {
-    id: point.id, count: tool.Points().length, pose, applied, saved,
-    captured: { x: after.x, yaw: after.yaw },
-    exported: Array.isArray(exported) ? exported.length : -1,
-    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")]
-      .map((node) => node.textContent),
+    saved, absolute, absoluteCamera, ground,
+    groundY: T.camera.position.y, groundHeight: T.battlefield.GroundHeight(4, 4),
+    viewmodelHidden: !T.viewmodel.root.visible,
+    fly: T.editor.flycam.Active,
   };
 });
-Check("采样点编辑器把表里的位姿原样装到相机上",
-  sample.count > 40 && sample.applied.x === +sample.pose.x.toFixed(2)
-    && sample.applied.z === +sample.pose.z.toFixed(2)
-    && Math.abs(sample.applied.y - sample.pose.y) < 0.01
-    && Math.abs(sample.applied.yaw - sample.pose.yaw) < 0.001,
-  JSON.stringify({ id: sample.id, count: sample.count, applied: sample.applied }));
-Check("「取当前相机」把飞到的位置与朝向写回点位",
-  Math.abs(sample.captured.x - (sample.pose.x + 7)) < 0.02
-    && Math.abs(sample.captured.yaw - 1.234) < 0.001, JSON.stringify(sample.captured));
-Check("采样点编辑器导出的 JSON 是完整一份点位表",
-  sample.exported === sample.count, `导出 ${sample.exported} / 表内 ${sample.count}`);
-Check("采样点编辑器面板分节齐全",
-  ["点位", "位姿", "增删", "取证", "导出 / 导入"].every((h) => sample.sections.includes(h)),
-  sample.sections.join(" / "));
+Check("出图机位把位姿原样装到相机上",
+  shotCamera.absolute.y === 40 && shotCamera.absoluteCamera.x === 12.5 && shotCamera.absoluteCamera.y === 40
+    && shotCamera.absoluteCamera.z === -33.25 && shotCamera.absoluteCamera.fov === 70
+    && shotCamera.absoluteCamera.far === 900 && shotCamera.absoluteCamera.yaw === 0.75
+    && shotCamera.absoluteCamera.pitch === -0.3,
+  JSON.stringify(shotCamera.absoluteCamera));
+Check("出图机位没写 y 时取 地高 + h，没写 fov / far 退回出厂值",
+  Math.abs(shotCamera.groundY - (shotCamera.groundHeight + 1.7)) < 1e-6
+    && shotCamera.ground.far === 620 && shotCamera.ground.fov !== 70,
+  JSON.stringify({ y: shotCamera.groundY, ground: shotCamera.groundHeight, fov: shotCamera.ground.fov, far: shotCamera.ground.far }));
+Check("出图机位接管相机并藏起视图模型", shotCamera.fly && shotCamera.viewmodelHidden);
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 await Step(4);
-const sampleRestored = await page.evaluate(() => ({
+const shotCameraRestored = await page.evaluate(() => ({
   active: window.Taierzhuang.editor.ActiveId,
   fov: window.Taierzhuang.camera.fov,
   far: window.Taierzhuang.camera.far,
   fly: window.Taierzhuang.editor.flycam.Active,
 }));
-Check("关闭采样点编辑器后相机投影还原",
-  !sampleRestored.active && !sampleRestored.fly
-    && Math.abs(sampleRestored.fov - sample.saved.fov) < 0.01
-    && Math.abs(sampleRestored.far - sample.saved.far) < 0.01,
-  JSON.stringify(sampleRestored));
+Check("关闭出图机位后相机投影还原",
+  !shotCameraRestored.active && !shotCameraRestored.fly
+    && Math.abs(shotCameraRestored.fov - shotCamera.saved.fov) < 0.01
+    && Math.abs(shotCameraRestored.far - shotCamera.saved.far) < 0.01,
+  JSON.stringify(shotCameraRestored));
 
 // ===========================================================================
 await browser.close();

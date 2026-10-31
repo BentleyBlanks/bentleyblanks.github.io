@@ -287,14 +287,9 @@ const EDITOR_PARAM = params.get("editor");
 // 关卡表也是开发工具的一部分，经 Script_DevTools 边界取；剔除开发工具的包里它是空表，?editor=blockout 不生效。
 const BLOCKOUT_PHASES = EDITOR_PARAM === "blockout" ? BlockoutPhases() : [];
 const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
-// 上一版曾把完整场景编辑器的车厢按钮指到正式序章预览。旧书签若还带着这组 query，
-// 也必须按静态场景解释，不能因为缓存 URL 又把过场播起来。
-const LEGACY_FULL_SCENE_CARRIAGE = EDITOR_PARAM === "fullScene"
-  && params.get("preview") === "CS_Chuchuan";
 // 新版序章是一个**独立预览**：它只展示车厢时间轴，不把下车后的未完玩法
 // 硬接到旧界河。稳定入口固定为 ?preview=CS_Chuchuan；其它 query 仍走正片。
-const PREVIEW_ID = !LEGACY_FULL_SCENE_CARRIAGE && params.get("preview") === "CS_Chuchuan"
-  ? "CS_Chuchuan" : null;
+const PREVIEW_ID = params.get("preview") === "CS_Chuchuan" ? "CS_Chuchuan" : null;
 const PREVIEW = !!PREVIEW_ID;
 // 从主页面的「新版序章预览」链接进入时直接开播，不能再让玩家在加载完成后
 // 面对第二颗同义按钮。保留不带 autoplay 的地址作为审片/音频解锁回退入口。
@@ -349,8 +344,8 @@ const JIEHE = params.get("jiehe") === "1";
 /**
  * 全城俯瞰（?phase=overview）：**出图与自检专用**，不进选章列表。
  * 重制之后没有哪一章会建整座城，而「照城防图核对整座城」这件事仍然要做 ——
- * 采样点表（Data_SamplePoints 的 `phase: "overview"`）、Script_ShotTest 的 Z 系列
- * 与 Script_TownDressingDump 都从这条入口进。切片是 Data_Battle.OVERVIEW_BOUNDS。
+ * Script_ShotTest 的 Z 系列与 Script_TownDressingDump 都从这条入口进
+ *（旧采样点表也走这条，2026-10-31 随采样点编辑器一起删了）。切片是 Data_Battle.OVERVIEW_BOUNDS。
  *
  * 它**不算 SANDBOX**：菜单要照常在开机时接管相机（Z 系列靠 `menuShot` 架机位），
  * 换成沙盒那一套「菜单只建不开」之后，ApplyShot 摆完就会被玩家相机顶掉。
@@ -361,12 +356,9 @@ const JIEHE = params.get("jiehe") === "1";
  */
 const PHASE_PARAM = params.get("phase");
 const OVERVIEW = PHASE_PARAM === "overview";
-const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
-// 完整场景编辑器内部的只读视图：carriage 仍走 fullscene 旁路，只是在城外另挂
-// 一份静态车厢布景。它不是 preview=CS_Chuchuan，也绝不会启动正式序章。
-const FULL_SCENE_VIEW = FULL_SCENE
-  && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
-  ? "carriage" : "county";
+// 完整县城（?phase=fullscene）：一次生成城内与四门外的开发入口。曾经只给完整场景预览工具用，
+// 2026-10-31 该工具被删，这条入口与 Data_Menu.FULL_SCENE_PHASE 作为独立开发入口保留。
+const FULL_SCENE = PHASE_PARAM === "fullscene";
 /**
  * 高级工具首页（?editor=tools 且没给关卡）：从主菜单打开高级工具走这里。
  * 不建任何关卡，只铺一块空地让引擎跑起来，画面由工具首页盖住，等人自己选工具
@@ -3236,14 +3228,10 @@ async function Boot() {
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
       get physics() { return physics; },
-      // 这里原来挂着 `OpenProloguePreview`：场景编辑器「关卡切片」列表第一条是
-      // 「序章 · 出川（车厢）」，点了跳去 `?preview=CS_Chuchuan`。序章 2026-09-06 起
-      // 退出选章、要并进第一关，那条列表项与这个跳转 2026-09-07 一并摘掉
-      //（见 Script_EditorScene.BuildLevelUi）。`?preview=CS_Chuchuan` 这条 URL 本身
-      // 仍然管用 —— 审片、Script_CutsceneShot 出图与 EditorTest 第 9 节都直接 goto。
-      // 第一关（P012 白盒）在完整场景编辑器里是第三个视图：同一片关卡，不另建切片。
-      sceneMode: FULL_SCENE ? FULL_SCENE_VIEW
-        : FIRST_LEVEL_P012_WHITEBOX && !ARCHIVED_P012_FIXTURE ? "firstLevel" : "level",
+      // 这里原来挂着 `OpenProloguePreview`（旧场景编辑器「关卡切片」列表第一条跳去
+      // `?preview=CS_Chuchuan`），序章 2026-09-07 起退出选章，连同 `sceneMode`（旧完整场景
+      // 预览读的视图名）2026-10-31 一并摘掉。`?preview=CS_Chuchuan` 这条 URL 本身仍然管用 ——
+      // 审片、Script_CutsceneShot 出图都直接 goto。
       ApplyEnvironment: (name) => ApplySkyPreset(name),
       GetEnvironmentState: () => ({
         name: cutsceneSky || PHASE_TABLE[state.phaseIndex].sky,
@@ -3344,13 +3332,6 @@ async function Boot() {
     hidden: editor ? editor.root.classList.contains("off") : true,
   });
 
-  // --- 采样点：县城固定机位的出图口 ----------------------------------------
-  // Script_SamplePointShot 不自己算机位，而是开采样点编辑器、逐点调它。
-  // 面板里预览到的与出图出来的必须是同一份位姿；两边各算一遍迟早会分叉。
-  const SampleTool = () => (!editor ? null : editor.ActiveId === "samplePoints"
-    ? editor.active : editor.Open("samplePoints"));
-  window.Taierzhuang.Debug.SamplePoints = () => SampleTool()?.Points() || null;
-  window.Taierzhuang.Debug.SamplePoint = (id) => SampleTool()?.ApplyPointById(id) || null;
   // 天光覆盖：夜战关（1/3/6）里的关厢建筑必须按白天记录，否则那一张图上
   // 只有黑色轮廓。与过场换天光同一条通道（三件一起换）。
   window.Taierzhuang.Debug.ApplySky = (name) => ApplySkyPreset(name);
@@ -3492,17 +3473,6 @@ async function Boot() {
     // 首页选了要关卡的工具后整页换过来，带着 ?tool= 直接打开它
     const tool = params.get("tool");
     if (tool) editor.Open(tool);
-  }
-  if (EDITOR_PARAM === "fullScene" && !SHOT) {
-    // 完整县城与车厢静态场景都直接进工具，不再让用户隔着已经打开的编辑器
-    // 再点一次「进城」。两者都不是正式序章预览，必须在这里显式收掉启动展示台。
-    // 第一关视图（?whitebox=p012&editor=fullScene）同理：关卡建好但不开跑。
-    if (FULL_SCENE || (FIRST_LEVEL_P012_WHITEBOX && !FIRST_LEVEL_STAGE_START)) {
-      ShowBoot(false);
-      state.menu = false;
-      state.running = false;
-    }
-    editor?.Open("fullScene");
   }
   if (EDITOR_PARAM === "squadMarch" && !SHOT) {
     ShowBoot(false);

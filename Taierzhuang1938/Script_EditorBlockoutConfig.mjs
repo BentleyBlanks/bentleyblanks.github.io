@@ -335,7 +335,10 @@ export function ValidateBlockoutScene(doc) {
     if (t.encoding !== "int16-cm-base64") errors.push('terrain.encoding 要是 "int16-cm-base64"');
     if (!Finite(t.minX) || !Finite(t.minZ) || !(Finite(t.cellM) && t.cellM > 0)) errors.push("terrain 要带有限的 minX / minZ 与正的 cellM");
     if (!Number.isInteger(t.cols) || !Number.isInteger(t.rows) || t.cols < 1 || t.rows < 1) errors.push("terrain.cols / rows 要是正整数");
-    if (typeof t.data !== "string") errors.push("terrain.data 要是 base64 字符串");
+    // 2026-10-31：从场景（Script_SceneDoc.BlockoutDocFromScene）取出来的一块直接带解好的 heights（米），不再绕一圈 base64
+    if (t.heights instanceof Float32Array) {
+      if (Number.isInteger(t.cols) && Number.isInteger(t.rows) && t.heights.length !== (t.cols + 1) * (t.rows + 1)) errors.push(`terrain.heights 应当有 ${(t.cols + 1) * (t.rows + 1)} 个格点，现在 ${t.heights.length}`);
+    } else if (typeof t.data !== "string") errors.push("terrain.data 要是 base64 字符串");
     else if (Number.isInteger(t.cols) && Number.isInteger(t.rows)) {
       const expectBytes = (t.cols + 1) * (t.rows + 1) * 2;
       const padding = t.data.endsWith("==") ? 2 : t.data.endsWith("=") ? 1 : 0;

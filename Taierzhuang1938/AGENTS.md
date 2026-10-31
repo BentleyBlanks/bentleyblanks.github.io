@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **场景文件：第一关白盒三段合一（2026-10-31）**：场景 = `Scenes/<Id>/Scene_<Id>.json`（物件只写资产编号 + 位置 / 朝向 / 尺寸 / 开关，资产目录 `Data_SceneAssets`）+ 同目录高度图 `.height.bin`。白盒编辑器第一关新剧本 01–05 / 06–10 / 11–18 的场地合成一个场景 `FirstLevelWhitebox`，**以场景文件为准**，人 / agent 直接改它，场景生成器（`scene FirstLevel0105` 等）退休；每段按原场地范围取一块建场，后面段落把前面出现过的信号当已发生。旧的三份 `Blockout/*.scene.json` 已删（git 历史 `763c66ea0` 还在）。格式、取一块的规矩、转换记录见 [场景文件](docs/Data_Scene.md)；门禁 `SceneDocTest` + 三段的 Scene / Keyframes / Previz 测试。同日用户还删了高级工具「场景」菜单里的场景关卡、地形编辑器、完整场景预览、采样点（构件目录挪到 `Script_PlaceableCatalog`，出图脚本改用不进菜单的 `Script_EditorShotCamera`）。
+
 - **九四式侦察机 V48 游戏接入（2026-10-28）**：`Model/NakajimaKi4/` 当前为 179679 三角／40 网格／43 张内嵌图，保留 10 个真实枢轴、216 片散热片和 1512 颗实体铆钉。构件库按需加载，`campaignEnabled:false`；原照轮廓与阴影残差保留，不宣称逐点完全一致。可编辑高／低源留 OneDrive，重建走 `_blender/Script_RebuildNakajimaKi4.mjs`；来源、接线、原门槛和收据见[资产说明](Model/NakajimaKi4/README.md)。
 - **八九式乙型可选资产（2026-10-28）**：`Model/Type89MediumTank/` 的 GeometryV54／SurfaceV14 已接入构件库「模型」，按需加载；左右履带／轮组、整周炮塔、主炮及两挺机枪保留真实轴心和演示控件。`Data_VehicleAssets` 保持 `campaignEnabled:false`。高低源、细漆膜／浅铸纹、薄盖AO及独立三角化记账均有重建和验收；原厂限位、微观材质与隐藏结构仍属复原，不改变任务参战认定。入口与证据见[资产说明](Model/Type89MediumTank/README.md)，重建 `_blender/Script_RebuildType89MediumTank.mjs`。
 

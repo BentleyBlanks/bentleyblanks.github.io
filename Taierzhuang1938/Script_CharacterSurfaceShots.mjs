@@ -55,7 +55,7 @@ try {
     await page.screenshot({ path: path.join(out, "Hands.png") });
     log.shots.push({ name: "Hands" }); console.log("shot Hands");
   }
-  await page.evaluate(() => window.Tengxian.Debug.OpenEditor("samplePoints"));
+  await page.evaluate(() => window.Tengxian.Debug.OpenEditor("shotCamera"));
   const L = await import(pathToFileURL(root.replace(/\\/g, "/") + "/Taierzhuang1938/Data_FirstLevelMissionLayout.mjs").href);
   const solids = L.MISSION_LAYOUT.blocks.filter((b) => b.solid !== false)
     .map((b) => ({ x: b.x, z: b.z, r: Math.hypot(b.w, b.d) / 2 }));

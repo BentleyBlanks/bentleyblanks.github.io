@@ -13,6 +13,20 @@
 import { MISSION_LAYOUT, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
+import { BlockoutDocFromScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
+
+// 2026-10-31：第一关新剧本三段（01–05 / 06–10 / 11–18）共用一个场景 Scenes/FirstLevelWhitebox（docs/Data_Scene.md），
+// 每段按原来的场地范围取一块来建场；后面的段落把前面段落出现过的信号都当已经发生（塌了的还塌着、开了的门还开着）。
+const FIRST_LEVEL_WHITEBOX_SCENE = "./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json";
+// Stage0105Done：01–05 演完。那圈「玩家出不了沟」的隐形墙（KeepIn_*）随它消失，后两段不挡人；01–05 里它不会发生（futureSignals）
+const STAGE_0105_DONE = "Stage0105Done";
+const SIGNALS_0105 = Object.freeze(["DugoutCollapsed", "PitShelled", "TankDisabled", STAGE_0105_DONE]);
+const SIGNALS_0610 = Object.freeze(["CartDeparted", "CellarBlast", "SideGateOpen", "EastGateBurst", "MgSilenced", "NorthYardGatesBroken", "BarrageHit", "LaneWallCollapse"]);
+function WhiteboxSceneSlice(region, spawn, priorSignals, heightTint, objectMarginM = 1, futureSignals = []) {
+  return Object.freeze({ kind: "scene", url: FIRST_LEVEL_WHITEBOX_SCENE, region: Object.freeze(region), priorSignals: Object.freeze([...priorSignals]),
+    futureSignals: Object.freeze([...futureSignals]), ...(heightTint !== undefined ? { heightTint } : {}), objectMarginM,
+    placeholder: Object.freeze({ bounds: region, spawn }) });
+}
 
 // 新旧标记（2026-10-19，用户看着旧版第一关以为是新做的）：era 分 "rewrite"（按新剧本重做）/ "legacy"（游戏里现行的旧版）/
 // "draft"（空间草稿）；badge 是关卡名前的小标，note 是下拉里的一行说明，short 是旧版提示条上跳转按钮的短名。
@@ -28,13 +42,11 @@ export const BLOCKOUT_LEVELS = Object.freeze([
   // 2026-10-18：按 Notion 定稿的 01–05（空间拓扑关系）新建的独立场地，坐标原点在沟口；不碰游戏里的第一关
   Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（新剧本）", configUrl: "./Blockout/FirstLevel0105.json",
     era: "rewrite", badge: "新剧本", short: "01–05", note: "01–05：防炮洞 → 支沟拖冬瓜 → 集结处 → 机枪坑 → 路口板桥（10-18 剧本）",
-    scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0105.scene.json",
-      placeholder: Object.freeze({ bounds: { minX: -110, maxX: 190, minZ: -235, maxZ: 200 }, spawn: { x: 66.5, z: 64.2, yawDeg: 90 } }) }) }),
+    scene: WhiteboxSceneSlice({ minX: -110, maxX: 320, minZ: -480, maxZ: 200 }, { x: 66.5, z: 64.2, yawDeg: 90 }, [], undefined, 1, [STAGE_0105_DONE]) }),
   // 2026-10-18：06–10 新剧本（干沟 → 凹路 → 耿家庄），与 0105 同一套坐标、另一片场地；锚点 Data_EditorBlockoutFirstLevel0610Space
   Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（新剧本）", configUrl: "./Blockout/FirstLevel0610.json",
     era: "rewrite", badge: "新剧本", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
-    scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
-      placeholder: Object.freeze({ bounds: { minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
+    scene: WhiteboxSceneSlice({ minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, { x: 35, z: 147, yawDeg: -90 }, SIGNALS_0105, null) }),
   // 2026-10-19：12–18 新剧本，与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space。2026-10-23 按 11–14 改稿重做、把 11 也放进来（11 出村 → 石板桥 → 空袭 → 渡口 → 北门），关卡键不变
   // 2026-10-25：Notion 剧本第一关分四大段，11–14 与 15–18 一路连着走、共用这一片场地，下拉里按 parts 拆成两行（见 BLOCKOUT_MENU）
   // 2026-10-26：第三版（北沙河村）：出村 → 土路 → 官道 → 村口沟与板桥 → 北沙河村 → 铁路桥过沙河 → 北门
@@ -46,8 +58,7 @@ export const BLOCKOUT_LEVELS = Object.freeze([
       Object.freeze({ id: "FirstLevel1218_15", from: "15-1", label: "第一关 15–18 · 冬瓜之死与炸桥（新剧本）", short: "15–18",
         note: "15–18：洞里 → 厢房门口 → 门槛 → 撤过铁路桥、炸桥 → 北门（与 11–14 同一片场地）" }),
     ]),
-    scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel1218.scene.json",
-      placeholder: Object.freeze({ bounds: { minX: -160, maxX: 236, minZ: 480, maxZ: 980 }, spawn: { x: 117, z: 547.4, yawDeg: 180 } }) }) }),
+    scene: WhiteboxSceneSlice({ minX: -160, maxX: 236, minZ: 480, maxZ: 980 }, { x: 117, z: 547.4, yawDeg: 180 }, [...SIGNALS_0105, ...SIGNALS_0610], null, 64) }),
 ]);
 
 // 关卡下拉的行（2026-10-25）：一片场地一行；写了 parts 的场地按剧本段落拆成几行、共用同一个关卡键。
@@ -120,6 +131,8 @@ function DecodeBase64(text) {
 
 /** 解出 (cols+1)×(rows+1) 个格点高度（米），heights[iz*(cols+1)+ix]。 */
 export function DecodeHeightGrid(terrain) {
+  // 从场景取出来的一块（Script_SceneDoc.BlockoutDocFromScene）直接带解好的 heights
+  if (terrain.heights instanceof Float32Array) return terrain.heights;
   const count = (terrain.cols + 1) * (terrain.rows + 1);
   const bytes = DecodeBase64(terrain.data);
   if (bytes.length < count * 2) throw new Error(`terrain.data has ${bytes.length} bytes, needs ${count * 2}`);
@@ -653,12 +666,18 @@ export function MakeBlockoutPhase(level) {
         if (!phase.whitebox.layout) ApplyLayout(phase, DeriveFirstLevelBlockoutLayout());
         return phase.whitebox.layout;
       }
-      // 每次进关都重读：场景文件可能被生成器 / 人改过。读不到时退回上一次的布局（若有）。
+      // 每次进关都重读：场景文件可能被场景编辑器 / 人 / agent 改过。读不到时退回上一次的布局（若有）。
       try {
         const response = await globalThis.fetch(`${level.scene.url}?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`场景文件读不到（HTTP ${response.status}）`);
         let doc;
         try { doc = await response.json(); } catch (error) { throw new Error("场景文件不是 JSON"); }
+        if (level.scene.kind === "scene") {
+          const heightUrl = new URL(doc?.terrain?.file || "", new URL(level.scene.url, globalThis.location?.href)).href;
+          const heightResponse = await globalThis.fetch(`${heightUrl}?t=${Date.now()}`, { cache: "no-store" });
+          if (!heightResponse.ok) throw new Error(`高度图读不到（HTTP ${heightResponse.status}）`);
+          doc = BlockoutSliceDoc(level, doc, DecodeSceneHeights(await heightResponse.arrayBuffer(), doc.terrain));
+        }
         ApplyLayout(phase, LayoutFromSceneDoc(doc));
         phase.blockout.sceneError = null;
       } catch (error) {
@@ -669,6 +688,16 @@ export function MakeBlockoutPhase(level) {
     },
   };
   return phase;
+}
+
+/** 场景（kind "scene"）+ 整张高度图 → 这一关那一块的白盒场景形状（同 Blockout/<Level>.scene.json）。node 测试也用它。 */
+export function BlockoutSliceDoc(level, sceneDoc, heights) {
+  const spec = level.scene;
+  return BlockoutDocFromScene(sceneDoc, heights, {
+    level: level.key, region: spec.region, spawn: spec.placeholder?.spawn, priorSignals: spec.priorSignals, futureSignals: spec.futureSignals,
+    objectMarginM: spec.objectMarginM,
+    ...(spec.heightTint !== undefined ? { heightTint: spec.heightTint } : {}),
+  });
 }
 
 /** 场景文件坏了也要有一片能站人的平地（配置错了仍能走场景）。 */

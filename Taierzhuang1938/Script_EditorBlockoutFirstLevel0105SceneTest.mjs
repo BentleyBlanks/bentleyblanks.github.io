@@ -35,11 +35,11 @@ import {
   L0105_BACKDROP_ROAD, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS, L0105_HEIGHTS,
   L0105_OLD_POSITION, L0105_WOODS, L0105_SOUTH_TREES, L0105_POST_ROAD_SOUTH, L0105_FIELD_LANES, L0105_BACKDROP_POST_ROAD,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
-const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
-const a = await BuildFirstLevel0105Scene({ ...opts, notes: [] });
-const b = await BuildFirstLevel0105Scene({ ...opts, notes: [] });
-assert.equal(JSON.stringify(a), JSON.stringify(b), "生成两次要逐字相同");
+// 2026-10-31：场景生成器退休，场景以 Scenes/FirstLevelWhitebox 为准（三段合一，docs/Data_Scene.md）；
+// 下面的设计约束改查场景按 FirstLevel0105 的范围取出来的那一块——在场景编辑器里改坏了，这里会报。
+const a = ReadBlockoutSceneDocSync("FirstLevel0105");
 const check = ValidateBlockoutScene(a);
 assert.ok(check.ok, check.errors.join("; "));
 
@@ -489,7 +489,9 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   const roadEnd = L0105_NORTH_ROAD[L0105_NORTH_ROAD.length - 1];
   assert.equal(roadEnd.z, L0105_BOUNDS.minZ, "驿道北段通到北边界");
   assert.deepEqual([L0105_BACKDROP_ROAD[0].x, L0105_BACKDROP_ROAD[0].z], [roadEnd.x, roadEnd.z], "远景层的大路接在场地里那段的头上");
-  const roads = a.ways.roads.map((l) => JSON.stringify(l.map((p) => [p.x, p.z])));
+  // 三段合一（2026-10-31）后，06–10 伸进 01–05 范围的路也会带进来；这里只数整条都在 01–05 场地里的
+  const Own = (l) => l.every((p) => p.x >= L0105_BOUNDS.minX - 1 && p.x <= L0105_BOUNDS.maxX + 1 && p.z >= L0105_BOUNDS.minZ - 1 && p.z <= L0105_BOUNDS.maxZ + 1);
+  const roads = a.ways.roads.filter(Own).map((l) => JSON.stringify(l.map((p) => [p.x, p.z])));
   assert.ok(roads.includes(JSON.stringify(L0105_ROAD.map((p) => [p.x, p.z]))), "ways.roads 里车道原样");
   assert.equal(roads.length, 5 + L0105_FIELD_LANES.length, "ways.roads：车道、凹路、驿道北段、田间小路、驿道南段、几条田间小路");
   const pathEnd = L0105_FIELD_PATH[L0105_FIELD_PATH.length - 1];

@@ -400,7 +400,7 @@ export const SKY_PRESETS = {
       skyTint: [1.074, 0.903, 1.031], skyFloor: [0.077, 0.145, 0.273],
       aerialBlend: 0.5, aerialGain: 0.336, artGlow: 0.35 },
   },
-  // 完整场景编辑器专用的长视距白昼。县城总览机位离最远门外约 1.6 km，正片的
+  // 完整县城（?phase=fullscene）专用的长视距白昼。县城总览机位离最远门外约 1.6 km，正片的
   // 历史硝烟档会把四关厢压成同一片灰；这一档把雾留作轻空气透视，但不遮掉地物。
   // 不进七章、不进过场，只由 Data_Menu.FULL_SCENE_PHASE 使用。
   editorClear: {

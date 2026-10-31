@@ -8,20 +8,12 @@
 import { El } from "./Script_EditorUi.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
-import { FullSceneUrl } from "./Script_EditorFullScene.mjs";
 
 /** 编辑一关真实场景的工具：首页上点它们要先选关卡。 */
-const CHAPTER_TOOLS = new Set(["scene", "terrain", "splines", "propPcg", "samplePoints", "destruction"]);
+const CHAPTER_TOOLS = new Set(["splines", "propPcg", "destruction"]);
 
 /** 某个工具要先载入什么。返回 null = 不用载入，直接开。 */
 export function HomeLevelChoices(toolId, href) {
-  if (toolId === "fullScene") {
-    return [
-      { label: "第一关 · 往南的路", sub: "未开跑的关卡场景", url: FullSceneUrl(href, "firstLevel") },
-      { label: "完整县城", sub: "县城与四门外", url: FullSceneUrl(href, "county") },
-      { label: "出川军列车厢", sub: "静态场景", url: FullSceneUrl(href, "carriage") },
-    ];
-  }
   if (!CHAPTER_TOOLS.has(toolId)) return null;
   return PHASES.map((phase, index) => {
     const url = new URL(SandboxUrl(href, null));

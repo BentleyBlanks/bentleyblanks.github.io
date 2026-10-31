@@ -7,8 +7,8 @@ import {ServeRoot} from './Script_DevServer.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 
 for (const query of ['', 'quality=high', 'menuPreview=3&menuPreviewUi=0', 'audio=0']) assert.ok(IsMenuStartup(new URLSearchParams(query)), query);
-for (const query of ['whitebox=p012', 'range=1', 'impacts=1', 'reactions=1', 'cloth=1', 'shot=1', 'phase=0', 'poseTest=1', 'editor=fullScene', 'preview=CS_Chuchuan', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);
-const target = new URL(SandboxUrl('https://example.test/?menuPreview=3&editor=fullScene&quality=high', 'firstLevelP012Whitebox'));
+for (const query of ['whitebox=p012', 'range=1', 'impacts=1', 'reactions=1', 'cloth=1', 'shot=1', 'phase=0', 'poseTest=1', 'editor=vfx', 'preview=CS_Chuchuan', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);
+const target = new URL(SandboxUrl('https://example.test/?menuPreview=3&editor=vfx&quality=high', 'firstLevelP012Whitebox'));
 assert.equal(target.search, '?quality=high&whitebox=p012');
 assert.equal(new URL(SandboxUrl('https://example.test/?reactions=1&quality=high', 'cloth')).search, '?quality=high&cloth=1');
 assert.equal(new URL(SandboxUrl('https://example.test/?cloth=1&quality=high', 'range')).search, '?quality=high&range=1');

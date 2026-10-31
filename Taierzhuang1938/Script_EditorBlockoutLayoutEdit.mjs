@@ -384,8 +384,9 @@ export function FormatLayoutEdit(exp) {
   }
   lines.push("");
   lines.push("怎么改：关键帧里的人 / 要点 / 下一步 / 玩家站位直接改配置 JSON（编辑器 2 s 内同步）；"
-    + "地标、体块在场景文件里，场景文件是生成器烘的——改对应 Script_EditorBlockout<Level>Scene.mjs / Data_EditorBlockout<Level>Space.mjs 的常量再重跑 "
-    + "`node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene <Level> --force`（只改 JSON 会被下次重烘冲掉）；第一关旧版（FirstLevel）的体块是游戏布局表，按 id 找源头。"
+    + "地标、体块在场景文件里：第一关新剧本（01–05 / 06–10 / 11–18）共用 Taierzhuang1938/Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json，"
+    + "以它为准、直接改（体块 = objects[i]：pos [x, y, z]，y 为 null 是落地，yawDeg 是角度；地标 = markers[i]；路径见上面每一条，格式见 docs/Data_Scene.md）；"
+    + "第二关草稿场景是生成器烘的，改生成器常量再重跑 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene SecondLevel --force`；第一关旧版（FirstLevel）的体块是游戏布局表，按 id 找源头。"
     + "改好后编辑器会自动认出「已经挪到位」的条目并从记录里拿掉。");
   lines.push("口径：x 向东为正、z 向南为正（米）；yawDeg 0 = 朝北、+90 = 朝西；ry 弧度（同场景文件）。格式见 Taierzhuang1938/docs/Data_EditorBlockout.md §4.4");
   lines.push(`${LAYOUT_EDIT_DATA_PREFIX}${JSON.stringify(exp)}`);

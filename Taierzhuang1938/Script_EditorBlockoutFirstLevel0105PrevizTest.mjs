@@ -21,6 +21,7 @@ import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { SamplePrevizActor, NormalizeBlockoutPreviz, PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { L0105_BRIDGE } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES, PREVIZ_LYING_CLIPS } from "./Data_BlockoutPrevizClips.mjs";
+import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -72,7 +73,7 @@ export async function CheckPreviz(doc, { config, voice }) {
   const table = ClipTable();
   const lines = new Map();
   for (const sc of voice.scenes) for (const l of sc.lines) lines.set(l.id, l);
-  const scene = Load("Blockout/FirstLevel0105.scene.json");
+  const scene = ReadBlockoutSceneDocSync("FirstLevel0105");
   const ground = HeightGridSampler(scene.terrain);
   const B = scene.bounds;
   const Slope = (x, z) => {
@@ -306,7 +307,7 @@ async function DesignChecks(doc, config, errors) {
   // 桥底下的人一律蹲 / 趴：板桥脚印（顺路 spanM + 1 m 横木，横路 deckW + 0.3 m）内、脚下比桥面低 1 m 以上 = 在桥底下
   {
     const B = L0105_BRIDGE, r = B.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
-    const scene = Load("Blockout/FirstLevel0105.scene.json"), ground = HeightGridSampler(scene.terrain);
+    const scene = ReadBlockoutSceneDocSync("FirstLevel0105"), ground = HeightGridSampler(scene.terrain);
     const deckTop = Math.max(...scene.blocks.filter(b => /^BridgeDoorBoard_/.test(b.id)).map(b => b.y + b.h / 2));
     const Under = (x, z) => {
       const dx = x - B.x, dz = z - B.z, along = dx * fx + dz * fz, across = dx * fz - dz * fx;

@@ -81,6 +81,8 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 
 ### 2.2 文件场景（`Blockout/<Level>.scene.json`）
 
+> **2026-10-31**：第一关新剧本三段（`FirstLevel0105` / `0610` / `1218`）不再各读一份 `Blockout/<Level>.scene.json`，改成 `scene: { kind: "scene", url: "./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json", region, priorSignals, objectMarginM, heightTint? }`：三段合成一个场景（以场景文件为准，生成器退休），`Prepare()` 按 `region` 取一块、转回本节这个形状（terrain 直接带 `heights`），再走 `LayoutFromSceneDoc`。格式、取一块的规矩与转换记录见 [场景文件](Data_Scene.md)。本节的形状仍是建场的输入，`SecondLevel` 也还是这种文件。
+
 ```json
 {
   "schema": "tengxian-blockout-scene/1",

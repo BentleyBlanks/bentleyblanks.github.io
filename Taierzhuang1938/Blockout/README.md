@@ -4,6 +4,8 @@
 
 这些文件不是游戏数据：改它们不影响正式关卡怎么玩，只影响编辑器里摆出来的样子。
 
+**2026-10-31 起第一关新剧本（01–05 / 06–10 / 11–18）的场地不在这个目录了**：三份 `FirstLevel0105|0610|1218.scene.json` 合成了一个场景 [`Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json`](../Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json)（+ 同目录的高度图），**以场景文件为准**，人 / agent / 场景编辑器直接改它，场景生成器（`scene FirstLevel0105` 等）退休。每一段关卡按原来的场地范围从场景里取一块来建场。格式与转换记录见 [docs/Data_Scene.md](../docs/Data_Scene.md)。下表里那三行与后面各轮对场景文件的记录是历史，关键帧 / 预演 / 配音 / 试玩文件照旧在这里。
+
 ## 有哪些文件
 
 | 文件 | 是什么 | 从哪来 |
@@ -174,7 +176,6 @@ node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf FirstLevel 03-2            
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel --force     # 从游戏数据重新生成第一关（会丢掉手改）
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel --out=tmp/FirstLevel.json   # 生成到别处对比，不碰这里
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene SecondLevel --force     # 重新生成第二关草稿场景与占位配置
-node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force  # 重新烘 01–05 场地（只写场景文件）
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel0105 --force # 从锚点重新生成 01–05 关键帧（会丢掉手改）
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs summary FirstLevel0105        # 01–05 每个关键帧一行
 node Taierzhuang1938/Script_EditorBlockoutConfigTest.mjs                        # 格式、生成器与这里几份文件的测试

@@ -33,7 +33,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=9&quality=high&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 300000 });
-  await page.evaluate(() => { const g = window.Tengxian; g.StepFrames(90); g.Debug.OpenEditor("samplePoints"); });
+  await page.evaluate(() => { const g = window.Tengxian; g.StepFrames(90); g.Debug.OpenEditor("shotCamera"); });
 
   // --- 1. 天 ------------------------------------------------------------------
   const sky = await page.evaluate(async () => {

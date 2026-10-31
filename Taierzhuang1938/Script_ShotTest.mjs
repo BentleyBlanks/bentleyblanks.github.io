@@ -177,10 +177,7 @@ const GAME_SHOTS = [
   { name: "Game_Z20_SouthSchools", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower",
       cam: { from: [-140, 155, 330], look: [-140, 0, 220], focalMm: 48 } } },
-  // 编辑器语义层全城验收：一键从 Data_Tengxian 读取公共院落和十九段街路，
-  // 区域画琥珀框、道路画蓝色带，中文牌必须在俯瞰相机里可读。
-  { name: "Game_Z21_EditorMapLabels", query: "phase=overview&quality=high&scale=medium&menu=0",
-    setup: { editorMapLabels: true } },
+  // （原 Game_Z21_EditorMapLabels：场景关卡编辑器的图纸标记全城验收，2026-10-31 随该编辑器删除。）
   // 东北治安与羁押组团俯视：警察所、警备队、监狱和看守所同框，重点看机关院
   // 石框列队场、门房/旗杆和监狱高墙，不让四处再淹没在普通民居屋顶里。
   { name: "Game_Z22_PoliceQuarter", query: "phase=overview&quality=high&scale=medium",
@@ -205,18 +202,16 @@ page.on("console", (message) => {
 });
 
 // ---------------------------------------------------------------------------
-// 按「必须重启页面」的参数组分批（抄 Script_SamplePointShot 的批处理纪律：
+// 按「必须重启页面」的参数组分批（沿用旧采样点出图脚本的批处理纪律：
 // 一关只建一次城，关内连着拍完再换关 —— 建一次城十几秒，逐张重开页面全是纯等待）。
 //
 // 分组键 = 页面文件 + 完整 query 串：phase/quality/scale/ads/fire… 任何一个
 // 参数不同都会换 URL，也就自动换页面。宁可多分组不可错合并。
-// 同键之内还有三条强制拆组的规矩：
+// 同键之内还有两条强制拆组的规矩：
 //   · 无 setup 的镜头拍的是「该页面的默认相机」（出生机位/主菜单），
 //     只能当一组的第一张 —— 前面有人挪过相机它就拍错了；
 //   · quiet 会把 AI 冻死（coolUntil = 1e9，页面内不可逆），
-//     所以非 quiet 的实机镜头不能排在 quiet 镜头后面；
-//   · editorMapLabels 会点 bootStart 并打开场景编辑器，页面状态被污染且不可逆，
-//     这种镜头必须独占一组 —— 它前后都不许有别的镜头。
+//     所以非 quiet 的实机镜头不能排在 quiet 镜头后面。
 // ---------------------------------------------------------------------------
 function GroupShots(shots, pageFile, globalName) {
   const groups = [];
@@ -224,14 +219,11 @@ function GroupShots(shots, pageFile, globalName) {
   for (const shot of shots) {
     const key = `${pageFile}?${shot.query}`;
     let group = byKey.get(key);
-    const exclusive = !!shot.setup?.editorMapLabels;
     const needsFresh = !group
-      || exclusive
-      || group.exclusive
       || (!shot.setup && group.shots.length > 0)
       || (shot.setup && !shot.setup.menuShot && !shot.setup.quiet && group.hadQuiet);
     if (needsFresh) {
-      group = { pageFile, query: shot.query, globalName, shots: [], hadQuiet: false, exclusive };
+      group = { pageFile, query: shot.query, globalName, shots: [], hadQuiet: false };
       groups.push(group);
       byKey.set(key, group);
     }
@@ -241,7 +233,7 @@ function GroupShots(shots, pageFile, globalName) {
   return groups;
 }
 
-// 同组第二张起的稳定档：抄 Script_SamplePointShot 的 SETTLE（45 帧 + 220 ms）。
+// 同组第二张起的稳定档：沿用旧采样点出图脚本的 SETTLE（45 帧 + 220 ms）。
 // 首张仍走全额预热（240 帧 + 700 ms + 60 帧 + 500 ms），语义与逐张冷启动时一致。
 const SETTLE_FRAMES = 45;
 const SETTLE_WAIT_MS = 220;
@@ -250,18 +242,6 @@ async function ApplySetup(globalName, setup) {
   await page.evaluate(({ g, pose }) => {
     const game = window[g];
     if (pose.sky && game.Debug?.ApplySky) game.Debug.ApplySky(pose.sky);
-    // 编辑器语义层验收：点开机、开场景编辑器、装地图参考、转俯拍。
-    // 这条路把页面状态改得回不了头 —— GroupShots 已保证它独占一组。
-    if (pose.editorMapLabels) {
-      document.getElementById("bootStart")?.click();
-      game.StepFrames(36);
-      game.Debug.OpenEditor("scene");
-      const editor = game.editor.active;
-      editor.LoadMapReferences();
-      editor.TopDown();
-      game.StepFrames(24);
-      return;
-    }
     if (pose.menuShot) {
       const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
       if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
@@ -371,7 +351,7 @@ async function ShootGroup(group) {
   for (let index = 0; index < group.shots.length; index += 1) {
     const shot = group.shots[index];
     try {
-      // 天光覆盖（setup.sky）：同页连拍要照 Script_SamplePointShot 的规矩，
+      // 天光覆盖（setup.sky）：同页连拍要照旧采样点出图脚本的规矩，
       // 换镜头时套上/还原 —— 不还原的话上一张的天光会串到这一张。
       const wantSky = shot.setup?.sky || null;
       if (wantSky !== appliedSky) {

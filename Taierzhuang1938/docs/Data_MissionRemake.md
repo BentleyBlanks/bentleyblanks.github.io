@@ -389,4 +389,4 @@ INT2 之后剩下的是「差一层实体/演出」的那几项。这一批把�
 
 北关那一片（z ≲ −360）**仍然没有承载切片**：`OVERVIEW_BOUNDS.minZ = −360` 只越过北墙一点点。
 所以 `Data_Dressing_NorthSuburb` 还挂在 `ORPHANED_OUTFIELD_PACKS` 里，采样点表的三个北关机位
-退表（坐标留在 `Data_SamplePoints.mjs` 的注释里，重新有章走到那儿照抄回去即可）。
+退表（坐标留在 `Data_SamplePoints.mjs` 的注释里，重新有章走到那儿照抄回去即可；该文件 2026-10-31 用户要求删除，坐标从 git 历史取）。

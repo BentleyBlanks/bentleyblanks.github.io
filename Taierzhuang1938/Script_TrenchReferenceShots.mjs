@@ -36,7 +36,7 @@ page.on('console',m=>{if(m.type()==='error'){consoleErrors.push(m.text().slice(0
 try{
  await page.goto(base+'/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=7&quality='+quality+'&scale=small',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:300000});
- await page.evaluate(()=>window.Tengxian.Debug.OpenEditor('samplePoints'));
+ await page.evaluate(()=>window.Tengxian.Debug.OpenEditor('shotCamera'));
  for(const shot of shots){
   if(focus.length&&!focus.includes(shot.id))continue;
   const pose=await page.evaluate(s=>{
