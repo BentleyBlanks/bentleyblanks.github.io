@@ -27,6 +27,8 @@
 
 1. 用 `git rev-parse --show-toplevel`、`git worktree list --porcelain` 和 `git status --short` 确认实际路径及归属；不要假定主检出位于某个历史绝对路径。
 2. 新的独立任务从最新 `origin/master` 创建新的分支与 worktree：`git fetch origin master` 后执行 `git worktree add -b <branch> <newPath> origin/master`。当前任务的续做可继续使用自己的 worktree；运行环境已为本任务创建且确认独占的 worktree 无需再套一层。
+   - 整库检出约 2.8 GB（滕县 1.7 GB）。只动一两个项目时用稀疏检出：新建写 `node scripts/Script_SparseWorktree.mjs new <newPath> <branch> <项目目录…>`（自动 fetch，`../<目录>/` 引用到的兄弟目录自动带上，例如滕县会带 PrairieFire1937 与根 `Model/`）；运行环境已建好的整库 worktree，确定项目后可用 `set <项目目录…>` 裁掉其余目录。先 `plan <项目目录…>` 可看会带哪些目录、多大。
+   - 稀疏检出之后要动别的目录用 `add <目录>`，拿不准就 `off` 恢复整库。主检出不裁。worktree 可能被复用给后续会话：看到稀疏检出提醒、或找不到某个项目目录时，先 `status` 再 `add`，不要当成目录被删。
 3. 手动创建的目录沿用 `bentleyblanks_<AgentName>_<Purpose>_<YYYYMMDD>`；分支为 `<agent-lowercase>/<purpose-kebab>-<YYYYMMDD>`。AgentName、Purpose 用 PascalCase；同日重名加目的后缀。不要占用其他任务的目录或分支。
 4. 主检出由多个 agent 共用，不在其中 checkout、switch、reset、stash、提交或清理他人文件。误在主检出提交时先记录提交号和工作区状态，将自己的提交保全到独占 worktree；不要自动 `reset HEAD~1` 改写可能已被他人推进的共享分支。
 5. 发布前 fetch；若 master 前进，在自己的 worktree rebase 并检查受影响部分。用 `git push origin HEAD:master` 快进交付，禁止 force push。推送被并发更新拒绝时重新 fetch/rebase，不覆盖他人提交。

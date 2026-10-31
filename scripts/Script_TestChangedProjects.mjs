@@ -98,9 +98,17 @@ function RunNode(args, dryRun) {
   return result.status ?? 1;
 }
 
+function IsSparseCheckout() {
+  const result = spawnSync("git", ["config", "--bool", "core.sparseCheckout"], { cwd: repoRoot, encoding: "utf8", windowsHide: true });
+  return result.stdout.trim() === "true";
+}
+
 function ValidateCommands() {
+  const sparse = IsSparseCheckout();
   for (const [project, commands] of Object.entries(projectCommands)) {
     if (!commands.length) throw new Error(`${project} 没有测试命令`);
+    // 稀疏检出（scripts/Script_SparseWorktree.mjs）只带本任务的项目，没检出的项目不在这里查。
+    if (sparse && !fs.existsSync(path.join(repoRoot, project))) continue;
     for (const [file] of commands) {
       if (!fs.existsSync(path.join(repoRoot, file))) throw new Error(`${project} 测试文件不存在：${file}`);
     }
