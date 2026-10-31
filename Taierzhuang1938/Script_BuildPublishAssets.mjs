@@ -226,8 +226,12 @@ export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null
   for(const item of await fs.readdir(outputDir,{withFileTypes:true})) {
     if(!item.isFile()||!item.name.endsWith('.html'))continue;
     const file=Within(outputDir,item.name),html=await fs.readFile(file,'utf8');
-    const next=html.replace(/<script type="importmap">([\s\S]*?)<\/script>/,(_all,body)=>{
-      const map=JSON.parse(body);Object.assign(map.imports,runtimeVersions);
+    const next=html.replace(/<script type="importmap">([\s\S]*?)<\/script>/,(all,body)=>{
+      // 只改真正的 import map（JSON）。SceneEditor.html 自己没有表，是在脚本里用同一个正则去读
+      // index.html 的表 —— 那一处匹配到的是 JS 源码，原样放过（它运行时读的就是这里盖过戳的 index.html）。
+      let map;try{map=JSON.parse(body);}catch{return all;}
+      if(!map?.imports)return all;
+      Object.assign(map.imports,runtimeVersions);
       return '<script type="importmap">'+JSON.stringify(map)+'</script>';
     });
     if(next!==html)await fs.writeFile(file,next);
