@@ -52,9 +52,11 @@
 - V49相对V48增加25,648三角、28个网格对象和114,940字节，21张图继续复用。新增铸座及锚固件网格，修正底板相互重叠和端部承托不足；既有52组无关网格及381个网格节点位置已逐项比较。石块长度、错缝、墩角留距和边缘缺损仍是依据生成式构造图的设计推定。七组木板与对应固定件变化保留，尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。V44 增加木板固定件时，本地相同视角短时预览采样中，单跨视角绘制调用由184增至198，桥面近景由72增至77；帧数未见明显下降，这不是游戏性能验证。V49增加对象与一个材质时，同一套本地预览光照和机位下，单跨视图绘制调用198→214，墩帽视图115→125，隔离查看固定端56→60、活动端33→37。这里只统计提交的绘制调用，不是帧率或正式游戏性能验证；整桥尚未接入正式关卡。桁架钢面三张图共365,882字节，其1024反照率与两张512数据图按RGBA展开约6 MiB，实际游戏显存与性能尚未测量。512反照率的实景近景对照更模糊，因此单独登记384 KiB纹理额度，未增加开机／关卡请求。此前版本另留OneDrive `Archive/`。
 - 最新44米四孔白盒、旧浮桥、旧钢桁桥及剧情／碰撞／爆破时间线均未替换。未来接入整桥须同步处理河漫滩与关卡空间，不用非均匀缩放硬塞进局部白盒。
 
-V52新增的两类维护刷层覆盖13个中间墩及两端桥台，各支承使用不同确定性布局，旧层残痕与局部补刷不是逐墩相同复制。刷层为贴合现有石面的1.5毫米闭合薄实体，砌缝和露底区域保留；部分石角与墩帽外缘磨耗切退约26—48毫米，墩帽内侧接缝及支座承托面仍保留完整接触。新刷层PBR由保留的V5去光照石面研究另行校准，不替换原V2石材底色。石材磨耗、灰浆刷层、补刷、雨水与污迹均是用户要求下的外观设计，不证明原桥维修年代、材料品种或水位。
+V52新增的两类维护刷层覆盖13个中间墩及两端桥台，各支承使用不同确定性布局。V53根据用户圈图修正其不自然的矩形与三角裁切：残留区域改为受多尺度扰动的曲面轮廓，边界网格间距从90毫米细化到35毫米，颜色在裁切边缘渐回露底状态，刷层厚度从1.5毫米降到0.4毫米，旧刷层与补刷色差均收敛；干、湿石面分别补偿边缘底色，避免湿区残留偏白。砌缝和露底区域保留；部分石角与墩帽外缘磨耗切退约26—48毫米，墩帽内侧接缝及支座承托面仍保留完整接触。V53刷层PBR由新生成的细颗粒矿物残留研究重烘，推定高度范围为1.2毫米；不替换原V2石材底色。石材磨耗、灰浆刷层、补刷、雨水与污迹均是用户要求下的外观设计，不证明原桥维修年代、材料品种或水位。
 
-新增维护层使用30个独立网格对象、两个材质和一套334,084字节PBR图；只为独立候选lazy层单列384 KiB额度，未改变boot／关卡请求。它约增加6 MiB未压缩纹理数据及维护层几何；当前总面数仍是独立高细节制作版，未接入正式关卡、无LOD，不能把预览表现当作游戏性能结论。
+V53外观参照包括[Historic Environment Scotland 的旧石灰饰面实例](https://blog.engineshed.scot/2024/08/06/historic-lime-finishes-traditional-buildings/)与[ICOMOS-ISCS 石材劣化图解](https://www.icomos.org/public/publications/monuments_and_sites/15/pdf/Monuments_and_Sites_15_ISCS_Glossary_Stone.pdf/)，用于辨别颗粒剥蚀、残留边缘与石材本体磨耗。前者照片中的粗砂饰面比模型刷层厚，不直接照搬构造；这些材料均不证明北沙河的实际涂装。内置imagegen补充的单块石面研究只作局部设计参考，提示词见 `_blender/Prompts/Reference_BeishaheStoneWear.txt`，源图在OneDrive。
+
+新增维护层使用30个独立网格对象、两个材质和一套242,196字节PBR图；只为独立候选lazy层单列384 KiB额度，未改变boot／关卡请求。它约增加6 MiB未压缩纹理数据及维护层几何；当前总面数仍是独立高细节制作版，未接入正式关卡、无LOD，不能把预览表现当作游戏性能结论。
 
 V51相对V50只更新干、湿石面两张ORM贴图，58组网格、409个网格节点、10个材质设置和其余19张图的字节不变。细部AO烘焙因子由0.5调到0.15，解码遮蔽均值由约0.883升至干石0.964／湿石0.965，使浅凿痕的间接光暗纹更克制；粗糙度按同一烘焙公式小幅联动。该因子不是glTF遮蔽强度或实测物理量，石材底色、法线、逐石颜色和实体砌缝处理保留。对照先关闭法线，再单独隔离AO，确认过强的细部遮蔽是密集暗沟的主要来源；不能把关闭法线后的残余暗纹直接全归到底色。两张新的内置imagegen研究图V4／V5已保留，但新底图、去细节和整体降低底色对比度的候选未被采用，当前采用原V2底色与法线、较弱的细部遮蔽。
 
@@ -62,7 +64,7 @@ V50相对V49只调整主斜杆／端斜柱轮廓及相关连接，拓扑、409�
 
 ## 重建与源工程
 
-源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。轨身钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成；当前桁架源图为 `Source_BeishaheDarkSteelV1.png`，不再输入现代桥图取色；旧 `Source_BeishaheSteelModernStudyV1.png` 仅归档。维护刷层源使用 `Source_BeishahePierStoneV5.png` 的细矿物纹理，经单独PBR定色成为浅灰矿物刷层；干石当前直接采用 `Source_BeishahePierStoneV2.png`；湿石源 `Source_BeishahePierDampMacroBlend20.png` 将它与以生成式构造图为参考的 `Source_BeishahePierDampWeatherV1.png` 混合。实拍节点类比的640像素预览与出处信息分别为 `Reference_EasleyNode640.jpg`、`Reference_EasleyNodeMetadata.json`。新生成的石面研究 `Source_BeishahePierStoneV3.png` 及同名 `.txt` 提示词保留在源目录 `References/`；该图烘焙后在实际模型上显得更均匀，未采用。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
+源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。轨身钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成；当前桁架源图为 `Source_BeishaheDarkSteelV1.png`，不再输入现代桥图取色；旧 `Source_BeishaheSteelModernStudyV1.png` 仅归档。V53维护刷层源改用 `Reference_StoneMineralWearV1.png`，经单独PBR定色成为低对比细颗粒矿物刷层；V52曾采用 `Source_BeishahePierStoneV5.png`，该源继续保留归档；干石当前直接采用 `Source_BeishahePierStoneV2.png`；湿石源 `Source_BeishahePierDampMacroBlend20.png` 将它与以生成式构造图为参考的 `Source_BeishahePierDampWeatherV1.png` 混合。实拍节点类比的640像素预览与出处信息分别为 `Reference_EasleyNode640.jpg`、`Reference_EasleyNodeMetadata.json`。新生成的石面研究 `Source_BeishahePierStoneV3.png` 及同名 `.txt` 提示词保留在源目录 `References/`；该图烘焙后在实际模型上显得更均匀，未采用。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
 
 ```powershell
 node scripts/Script_BlenderMcp.mjs start --task BeishaheBridge
@@ -71,9 +73,9 @@ node scripts/Script_BlenderMcp.mjs stop --save
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。当前工程实际重开后核对24张贴图均已内嵌、14跨桥面与13个受潮墩面均在；重烘的GLB与sidecar和验收版本逐字节一致。轨身钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；当前干石直接使用保留的V2源图，湿石混合源用 `_import/Script_PrepareBeishahePierDampSource.py --input-dir <References> --output <References>/Source_BeishahePierDampMacroBlend20.png` 重建。早期60/40干石混合源及其准备脚本保留作历史研究。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
+在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。当前工程实际重开后核对24张贴图均已内嵌、14跨桥面与13个受潮墩面均在；V53交付模块的实际字节与清单哈希一致，并按内容指纹复原完整桥梁后接受几何检查。轨身钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；当前干石直接使用保留的V2源图，湿石混合源用 `_import/Script_PrepareBeishahePierDampSource.py --input-dir <References> --output <References>/Source_BeishahePierDampMacroBlend20.png` 重建。早期60/40干石混合源及其准备脚本保留作历史研究。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
 
-本轮新增内置imagegen研究图 `References/Source_BeishahePierStoneV4.png`（浅凿面材质）与 `References/Source_BeishahePierStoneV5.png`（原V2表面去光照试验），对应提示词为同名 `.txt`；原图、尺寸、哈希、完整提示词和采用说明见源目录 `References/Data_StoneSurfaceStudiesV4V5.json`。V4未采用；V5仅用作本轮维护刷层的派生纹理，基础石材仍保留V2。它们不是历史照片。当前石面浅凿痕及受潮石面机位在简洁预览页可单独查看，支持V51／V52同机位比较。源工程重开后24张图均已打包，再次重建GLB与sidecar逐字节一致。
+本轮新增内置imagegen研究图 `References/Source_BeishahePierStoneV4.png`（浅凿面材质）与 `References/Source_BeishahePierStoneV5.png`（原V2表面去光照试验），对应提示词为同名 `.txt`；原图、尺寸、哈希、完整提示词和采用说明见源目录 `References/Data_StoneSurfaceStudiesV4V5.json`。V4未采用；V5曾用于V52维护刷层，V53改用新矿物残留研究；基础石材仍保留V2。它们不是历史照片。当前石面浅凿痕及受潮石面机位在简洁预览页可单独查看，支持V52／V53同机位比较。源工程重开后24张图均已打包；V52曾通过GLB与sidecar重复重建字节一致检查，V53按模块清单和内容指纹核对。
 
 ## 验收
 
@@ -81,7 +83,7 @@ node scripts/Script_BlenderMcp.mjs status --scan
 
 本地页 `tmp/BeishaheBridge/QualityReview/index.html` 支持旧版／新版切换、整桥侧视、节点、枕木、端纹、桥墩与桥底机位、原照片及局部推演图对照。仓库LocalPreview静默预览；`Script_QualityReview.mjs` 复用静音浏览器，保持1440×960实际视口，观察图长边640，检查JSON与截图只留本地。Blender渲染留源目录 `Review/`。
 
-当前简洁入口为 `tmp/BeishaheBridge/SimpleReview/index.html`；`tmp/BeishaheBridge/FullMaterialAudit/PhotoCompare.html` 用近侧节点估计的同一比较机位查看归档V49／V51，保留真实两侧桁架与杆件深度，可叠加原照。页面明确隐藏其它跨与墩台，镜头、裁切和光照未标定，仅辅助观察杆件外观，不构成物理尺寸或全模型完全一致的证明。现代咸宁原照SHA-1为 `1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc`，本地图片仅裁切展示；摄影者与[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)署名随预览保留。当前源工程实际重开核对439网格及24张已打包图片，再用独立MCP调用重建，GLB和sidecar与本次验收版逐字节一致。
+当前简洁入口为 `tmp/BeishaheBridge/SimpleReview/index.html`；`tmp/BeishaheBridge/FullMaterialAudit/PhotoCompare.html` 用近侧节点估计的同一比较机位查看归档V49／V51，保留真实两侧桁架与杆件深度，可叠加原照。页面明确隐藏其它跨与墩台，镜头、裁切和光照未标定，仅辅助观察杆件外观，不构成物理尺寸或全模型完全一致的证明。现代咸宁原照SHA-1为 `1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc`，本地图片仅裁切展示；摄影者与[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)署名随预览保留。V53源工程实际重开核对439网格及24张已打包图片。模块复原检查通过；V52阶段另曾通过独立MCP调用重建的GLB和sidecar字节一致检查。
 
 新增维护层由 `_blender/Script_BeishaheMasonryWeathering.py` 与规格共同重建。验收同时检查薄层封闭性、逐支承布局差异、实际厚度、颜色有效性和承托净空；钢面深色中性范围会拒绝旧版整体红褐偏色。当前简洁预览默认使用同期形制资料，现代图仅保留归档几何诊断。
 

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103101",
+  "version": "2026103103",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103101",
+    "version": "2026103103",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -77,22 +77,27 @@
       0.026,
       0.048
     ],
-    "masonryCoatingThicknessM": 0.0015,
-    "masonryCoatingCellM": 0.09,
+    "masonryCoatingThicknessM": 0.0004,
+    "masonryCoatingCellM": 0.035,
     "masonryOldWashTintGain": [
-      1.08,
-      1.05,
-      0.98
+      0.91,
+      0.9,
+      0.87
     ],
     "masonryRewashTintGain": [
-      0.62,
-      0.61,
-      0.58
+      0.8,
+      0.79,
+      0.77
     ],
     "masonrySubstrateCompensation": [
       0.7,
       0.67,
       0.66
+    ],
+    "masonryDampSubstrateCompensation": [
+      0.4,
+      0.38,
+      0.39
     ],
     "foundationY": -5.3,
     "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
@@ -664,110 +669,110 @@
     }
   ],
   "masonryMaintenance": {
-    "coatingThicknessM": 0.0015,
-    "cellM": 0.09,
+    "coatingThicknessM": 0.0004,
+    "cellM": 0.035,
     "supports": [
       {
-        "oldWashAreaM2": 5.75589069366265,
-        "rewashAreaM2": 1.096921105216552,
+        "oldWashAreaM2": 5.231006300728154,
+        "rewashAreaM2": 0.8852941350427272,
         "seed": 4237,
         "supportIndex": 1,
         "centerZ": -120.0
       },
       {
-        "oldWashAreaM2": 5.754315012294455,
-        "rewashAreaM2": 1.0934060197405415,
+        "oldWashAreaM2": 5.330011072784373,
+        "rewashAreaM2": 0.8762059999073699,
         "seed": 6536,
         "supportIndex": 2,
         "centerZ": -100.0
       },
       {
-        "oldWashAreaM2": 6.001446858177587,
-        "rewashAreaM2": 1.0508796007006822,
+        "oldWashAreaM2": 5.372076229790196,
+        "rewashAreaM2": 0.8917892806298369,
         "seed": 8835,
         "supportIndex": 3,
         "centerZ": -80.0
       },
       {
-        "oldWashAreaM2": 5.936430224098558,
-        "rewashAreaM2": 1.1023361846295074,
+        "oldWashAreaM2": 5.361814629450009,
+        "rewashAreaM2": 0.8793773404935337,
         "seed": 11134,
         "supportIndex": 4,
         "centerZ": -60.0
       },
       {
-        "oldWashAreaM2": 5.634860743504078,
-        "rewashAreaM2": 1.075163016755937,
+        "oldWashAreaM2": 5.392925630926584,
+        "rewashAreaM2": 0.8654811329002996,
         "seed": 13433,
         "supportIndex": 5,
         "centerZ": -40.0
       },
       {
-        "oldWashAreaM2": 5.838041678373202,
-        "rewashAreaM2": 1.0999145740634049,
+        "oldWashAreaM2": 5.380695627633713,
+        "rewashAreaM2": 0.893043407670234,
         "seed": 15732,
         "supportIndex": 6,
         "centerZ": -20.0
       },
       {
-        "oldWashAreaM2": 5.668096493417693,
-        "rewashAreaM2": 1.1067633743856504,
+        "oldWashAreaM2": 5.2882252242764025,
+        "rewashAreaM2": 0.8646144134968381,
         "seed": 18031,
         "supportIndex": 7,
         "centerZ": 0.0
       },
       {
-        "oldWashAreaM2": 5.854541434120961,
-        "rewashAreaM2": 1.048563532274784,
+        "oldWashAreaM2": 5.18641429206366,
+        "rewashAreaM2": 0.8954489666473364,
         "seed": 20330,
         "supportIndex": 8,
         "centerZ": 20.0
       },
       {
-        "oldWashAreaM2": 5.925027260002594,
-        "rewashAreaM2": 1.1062729675084029,
+        "oldWashAreaM2": 5.419264059413649,
+        "rewashAreaM2": 0.872641730081682,
         "seed": 22629,
         "supportIndex": 9,
         "centerZ": 40.0
       },
       {
-        "oldWashAreaM2": 5.894805493802664,
-        "rewashAreaM2": 1.0726291188624373,
+        "oldWashAreaM2": 5.307126461672738,
+        "rewashAreaM2": 0.8788315202750709,
         "seed": 24928,
         "supportIndex": 10,
         "centerZ": 60.0
       },
       {
-        "oldWashAreaM2": 5.8003634412963265,
-        "rewashAreaM2": 1.065611233056984,
+        "oldWashAreaM2": 5.27192968533177,
+        "rewashAreaM2": 0.8817629123878987,
         "seed": 27227,
         "supportIndex": 11,
         "centerZ": 80.0
       },
       {
-        "oldWashAreaM2": 5.957238994071304,
-        "rewashAreaM2": 1.092137575883271,
+        "oldWashAreaM2": 5.368004540558559,
+        "rewashAreaM2": 0.896097455435779,
         "seed": 29526,
         "supportIndex": 12,
         "centerZ": 100.0
       },
       {
-        "oldWashAreaM2": 5.765889904483174,
-        "rewashAreaM2": 1.113457120246835,
+        "oldWashAreaM2": 5.263936764055529,
+        "rewashAreaM2": 0.8905477466859111,
         "seed": 31825,
         "supportIndex": 13,
         "centerZ": 120.0
       },
       {
-        "oldWashAreaM2": 8.879602759664778,
-        "rewashAreaM2": 1.8447631792306822,
+        "oldWashAreaM2": 8.233631839117038,
+        "rewashAreaM2": 1.4826324706882872,
         "seed": 185888,
         "abutment": "North",
         "centerZ": -140.0
       },
       {
-        "oldWashAreaM2": 8.068774047906288,
-        "rewashAreaM2": 1.6669193117811005,
+        "oldWashAreaM2": 7.400178477341427,
+        "rewashAreaM2": 1.357393756916025,
         "seed": 201726,
         "abutment": "South",
         "centerZ": 140.0
@@ -777,19 +782,19 @@
   },
   "bounds": {
     "min": [
-      -4.801600456237793,
+      -4.800647258758545,
       -5.559999942779541,
-      -143.858154296875
+      -143.85760498046875
     ],
     "max": [
-      4.801599979400635,
+      4.800646781921387,
       2.200000047683716,
-      143.858154296875
+      143.85760498046875
     ],
     "size": [
-      9.603200435638428,
+      9.601294040679932,
       7.759999990463257,
-      287.71630859375
+      287.7152099609375
     ]
   },
   "transitions": [
@@ -898,11 +903,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1942708,
+  "triangles": 2761172,
   "meshObjects": 439,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 52590464,
-  "glbSha256": "2f178f463e46e5eb03951d8c92fc481a1000e9afa3c764cfe9dfac92537e2340",
+  "glbBytes": 107518480,
+  "glbSha256": "5c867968c923ecc256c605d8db23ed29e7e880cc2e16e6b3d8c228e7bfa883eb",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -979,7 +984,7 @@
     "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
     "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
     "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
-    "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share an authored mineral-wash PBR set derived from the retained V5 imagegen study; no original repair campaign, coating type or maintenance date is established.",
+    "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share a restrained fine-grained mineral-wash PBR set baked from the V53 imagegen material study; no original repair campaign, coating type or maintenance date is established.",
     "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. Fine surface occlusion is restrained with a 0.15 bake factor, preserving the existing albedo, normal maps and geometric joint shading. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
     "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
@@ -1153,30 +1158,30 @@
   ],
   "delivery": {
     "format": "ModularGLB",
-    "version": "2026103102",
+    "version": "2026103103",
     "manifest": "BeishaheBridge/Data_BeishaheBridgeModules.json",
     "wholeBridgeExport": "LocalSourceAndReviewOnly",
-    "contentSha256": "107eb014f3700ec70b36b29e52c1ac9bb76c1cbf977c9949d47b9bc19b852fc6",
+    "contentSha256": "8d41cf956e92b44dacfa08f68c845e209800d8e430d9091ec9ec2e09e06621bd",
     "modules": {
       "Span": {
         "file": "Model_BeishaheBridgeSpan.glb",
         "bytes": 18335812,
-        "sha256": "cacea887dceb093cee3fa04e27d890dbadf7266d813846b771e923af46638c90"
+        "sha256": "519923efbeb12d5754045368c48c9dd738e4192d20692bff66736ab3465febd9"
       },
       "Pier": {
         "file": "Model_BeishaheBridgePier.glb",
-        "bytes": 23562460,
-        "sha256": "bf04a35b78f786ac0cd4252e4534c11dd433d749947437a10dc68c3cdcd03cda"
+        "bytes": 63773476,
+        "sha256": "10677651f1f791898fa960749ecaaecd4ab9869f638db152084383d5d2de6abc"
       },
       "Joint": {
         "file": "Model_BeishaheBridgeJoint.glb",
-        "bytes": 2346384,
-        "sha256": "dd0d2e29932e4b71e86f8015bb722f1041d33178e865e3dd1889d8c37305ab6f"
+        "bytes": 2346388,
+        "sha256": "4879b234a8aa483d442c436c3c1ba45d941aefa9e03591df364bff3ca37ad944"
       },
       "Abutment": {
         "file": "Model_BeishaheBridgeAbutment.glb",
-        "bytes": 11846428,
-        "sha256": "2bfb9edc67e83d37de4e6e141ca7113563d89f0d7dd47937838a590efecad2b9"
+        "bytes": 26464180,
+        "sha256": "edb414661970687c8680976bcf6e3ede5a29dee7eb1a16231d6ac8fc391a98a8"
       }
     }
   }

@@ -532,7 +532,7 @@ def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=
 def MasonryCoatingMaterial(name):
     # Thin mineral wash retains the underlying stone grain. Its different
     # batches and worn margins are carried by the authored vertex tint.
-    return Material(name, "BeishaheMasonryWash", .96, 0, .40, colorLayer="CoatTint")
+    return Material(name, "BeishaheMasonryWash", .96, 0, .55, colorLayer="CoatTint")
 
 
 def PolishedRailMaterial():
@@ -1370,6 +1370,8 @@ def Rebuild():
     maintenance = []
     for variant in range(3):
         pier, damp, cap = BuildPier(1938 + variant * 997)
+        for face in damp.masonryFaces:
+            face["substrateCompensation"] = SPEC["masonryDampSubstrateCompensation"]
         pierFaces.append(pier.masonryFaces+damp.masonryFaces)
         pierTemplates.append((pier.Object(f"Template_Pier_{variant}", stone, tile=1.0),
                               damp.Object(f"Template_PierDamp_{variant}", dampStone, tile=1.0),
@@ -1480,7 +1482,7 @@ def Rebuild():
                 "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
                 "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
                 "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
-                "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share an authored mineral-wash PBR set derived from the retained V5 imagegen study; no original repair campaign, coating type or maintenance date is established.",
+                "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share a restrained fine-grained mineral-wash PBR set baked from the V53 imagegen material study; no original repair campaign, coating type or maintenance date is established.",
                 "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. Fine surface occlusion is restrained with a 0.15 bake factor, preserving the existing albedo, normal maps and geometric joint shading. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
                 "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",

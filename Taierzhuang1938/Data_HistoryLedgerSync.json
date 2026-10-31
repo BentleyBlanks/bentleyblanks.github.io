@@ -154,6 +154,13 @@
         "notionLedgerLastEdited": "2026-10-30T17:27:29.525Z",
         "notionParentLastEdited": "2026-10-30T17:27:32.207Z",
         "deliveryScope": "User requested this correction round to be finished and submitted. Standalone candidate only; no claim of exact 1938 reconstruction or campaign integration."
+      },
+      "stoneWearReview20261031": {
+        "version": "2026103103",
+        "scope": "User-marked polygonal wash remnants replaced with irregular fine contours, substrate-matching edge fade, lower contrast, 0.4 mm closed layers and new fine-grained imagegen wash PBR. Original 21 images and non-coating geometry are retained. Modern conservation sources and generated study inform appearance only; no original Beishahe material or maintenance claim is added.",
+        "notionLedgerLastEdited": "2026-10-31T07:13:06.713Z",
+        "notionParentLastEdited": "2026-10-31T07:13:08.401Z",
+        "generatedReference": "_blender/Prompts/Reference_BeishaheStoneWear.txt"
       }
     },
     {

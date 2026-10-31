@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "2026103102",
-  "appearanceVersion": "2026103101",
+  "version": "2026103103",
+  "appearanceVersion": "2026103103",
   "units": "m",
   "axis": "X transverse, Y up, Z along the bridge",
   "sleeperTopY": 0,
@@ -44,9 +44,9 @@
   },
   "placement": "Span centers are 20 m apart. At each internal boundary place one Pier and one Joint at the same track datum. Use North/South abutment scenes at the endpoints. Do not scale to fit a different span length.",
   "reference": {
-    "sourceGlbSha256": "2f178f463e46e5eb03951d8c92fc481a1000e9afa3c764cfe9dfac92537e2340",
-    "sourceGlbBytes": 52590464,
-    "contentSha256": "107eb014f3700ec70b36b29e52c1ac9bb76c1cbf977c9949d47b9bc19b852fc6",
+    "sourceGlbSha256": "5c867968c923ecc256c605d8db23ed29e7e880cc2e16e6b3d8c228e7bfa883eb",
+    "sourceGlbBytes": 107518480,
+    "contentSha256": "8d41cf956e92b44dacfa08f68c845e209800d8e430d9091ec9ec2e09e06621bd",
     "sourceGraph": {
       "asset": {
         "generator": "Khronos glTF Blender I/O v5.2.40",
@@ -72,7 +72,7 @@
       ],
       "buffers": [
         {
-          "byteLength": 52457492
+          "byteLength": 107385368
         }
       ]
     },
@@ -5219,7 +5219,7 @@
         ],
         "extras": {
           "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
-          "assetVersion": "2026103101"
+          "assetVersion": "2026103103"
         },
         "name": "BeishaheBridge"
       }
@@ -5229,7 +5229,7 @@
     "Span": {
       "file": "Model_BeishaheBridgeSpan.glb",
       "bytes": 18335812,
-      "sha256": "cacea887dceb093cee3fa04e27d890dbadf7266d813846b771e923af46638c90",
+      "sha256": "519923efbeb12d5754045368c48c9dd738e4192d20692bff66736ab3465febd9",
       "defaultScene": 0,
       "scenes": [
         {
@@ -5348,8 +5348,8 @@
     },
     "Pier": {
       "file": "Model_BeishaheBridgePier.glb",
-      "bytes": 23562460,
-      "sha256": "bf04a35b78f786ac0cd4252e4534c11dd433d749947437a10dc68c3cdcd03cda",
+      "bytes": 63773476,
+      "sha256": "10677651f1f791898fa960749ecaaecd4ab9869f638db152084383d5d2de6abc",
       "defaultScene": 0,
       "scenes": [
         {
@@ -5512,8 +5512,8 @@
     },
     "Joint": {
       "file": "Model_BeishaheBridgeJoint.glb",
-      "bytes": 2346384,
-      "sha256": "dd0d2e29932e4b71e86f8015bb722f1041d33178e865e3dd1889d8c37305ab6f",
+      "bytes": 2346388,
+      "sha256": "4879b234a8aa483d442c436c3c1ba45d941aefa9e03591df364bff3ca37ad944",
       "defaultScene": 0,
       "scenes": [
         {
@@ -5741,8 +5741,8 @@
     },
     "Abutment": {
       "file": "Model_BeishaheBridgeAbutment.glb",
-      "bytes": 11846428,
-      "sha256": "2bfb9edc67e83d37de4e6e141ca7113563d89f0d7dd47937838a590efecad2b9",
+      "bytes": 26464180,
+      "sha256": "edb414661970687c8680976bcf6e3ede5a29dee7eb1a16231d6ac8fc391a98a8",
       "defaultScene": 0,
       "scenes": [
         {

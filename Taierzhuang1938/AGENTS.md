@@ -11,7 +11,7 @@
 
 - **冲击波推人：推一把 / 推倒 / 掀飞（2026-10-28）**：`Combat.Blast` 在伤害之后按装药量与爆点到质心的距离算人身上的 Δv（Kinney–Graham 超压与正压持续 + Rankine–Hugoniot，绕射段 + 拖曳段，`Script_BlastKnockback`），站得住的上限按外推质心（站 1.2 / 蹲 2.0 m/s），超过就绕脚翻倒，脚撑不住就被掀飞，趴着只滑；倒地、飞、砸地、撞墙、滑、躺、爬起来由 `Script_PlayerKnockback` 管，撞击按 Glasstone 表 12.49 扣钝伤（不流血）。手榴弹 2 m 只晃，150 榴弹 5 m 倒地，250 kg 炸弹 8 m 掀飞；被这一下炸死的人照样被掀出去、镜头跟着身体走。原来 `blastImbalance`（挨炸 ≥24 血走白刃倒地）删了。数在 `Data_Tuning_BlastKnockback`，见 [冲击波推人](docs/Data_BlastKnockback.md)；回归 `Script_BlastKnockbackTest`。
 
-- **北沙河铁路桥模块（2026-10-31）**：`Model/BeishaheBridge/` 交付20米单跨、桥墩、跨间接头、两端桥台四类GLB，默认各显示一个部件，保留已确认的深灰黑钢面、连续木桥面、桥墩磨耗与维护痕迹及既有变体。`Script_BeishaheBridgeKit.mjs` 按20米支承轴距拼接；完整14跨只在OneDrive制作源与本地验收保留。邻桥与地图参考、14×20米设计及创作边界不变，1938本桥原照仍未确认。重建入口 `_blender/Script_BuildBeishaheBridge.py`；未替换44米白盒或旧浮桥剧情。见[资产口径](docs/Data_BeishaheBridge.md)与[模块使用](Model/BeishaheBridge/README.md)，门禁 `BeishaheBridgeTest`，本地验收页与截图不提交。
+- **北沙河铁路桥模块（2026-10-31）**：`Model/BeishaheBridge/` 交付20米单跨、桥墩、跨间接头、两端桥台四类GLB，默认各显示一个部件，保留深灰黑钢面、连续木桥面与既有变体；V53按用户圈图修正石面残痕的粗多边形边界，细化露底过渡与颗粒纹理，磨耗和补刷仍属设计推定。`Script_BeishaheBridgeKit.mjs` 按20米支承轴距拼接；完整14跨只在OneDrive制作源与本地验收保留。邻桥与地图参考、14×20米设计及创作边界不变，1938本桥原照仍未确认。重建入口 `_blender/Script_BuildBeishaheBridge.py`；未替换44米白盒或旧浮桥剧情。见[资产口径](docs/Data_BeishaheBridge.md)与[模块使用](Model/BeishaheBridge/README.md)，门禁 `BeishaheBridgeTest`，本地验收页与截图不提交。
 
 - **布料双面吸血（2026-10-25）**：`?cloth=1` 增加薄单被与毛巾织物样片、接触处注入/供血/停供、正反面与折叠检查、独立血迹时间回放。共用 `ClothBlood` 用静止坐标双层格场保留血色，湿润与干燥独立；材质沿用伤口色调、织纹与粗糙度逻辑，不改蒙皮和 MotionVector。仅测试场接入，原剧情、布料默认配置与三件 GLB 保留。相对容量与背渗未作物理实测标定，无流挂/接触转印。见[布料吸血](docs/Data_ClothBlood.md)，门禁 `ClothBloodTest` / `ClothBloodBrowserTest`。
 

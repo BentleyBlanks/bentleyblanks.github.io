@@ -77,7 +77,8 @@ export function ExportBridgeModules(sourcePath,outputDir){
   for(let i=0;i<14;i++){const id=g.nodes.findIndex(n=>n.extras?.role==='span'&&n.extras.spanIndex===i);if(id<0)throw Error('Missing span');Span.push({sourceNodes:[id],centerZ:g.nodes[id].translation[2]});}
   for(let i=1;i<14;i++){Pier.push({sourceNodes:bySupport(i,pierRoles),centerZ:-140+20*i});Joint.push({sourceNodes:bySupport(i,jointRoles),centerZ:-140+20*i});}
   for(const [end,z] of [['North',-140],['South',140]])Abutment.push({sourceNodes:g.nodes.flatMap((n,i)=>n.name===`Shared_Abutment${end}`||n.extras?.abutment===end?[i]:[]),centerZ:z});
-  const manifest={schemaVersion:1,version:'2026103102',appearanceVersion:'2026103101',units:'m',axis:'X transverse, Y up, Z along the bridge',sleeperTopY:0,spanPitchM:20,gaugeM:1.435,
+  const version=g.nodes.find(n=>n.name==='BeishaheBridge').extras.assetVersion;
+  const manifest={schemaVersion:1,version,appearanceVersion:version,units:'m',axis:'X transverse, Y up, Z along the bridge',sleeperTopY:0,spanPitchM:20,gaugeM:1.435,
     sockets:{Span:{North:[0,0,-10],South:[0,0,10]},Pier:{TrackDatum:[0,0,0]},Joint:{TrackDatum:[0,0,0]},Abutment:{TrackDatum:[0,0,0]}},
     placement:'Span centers are 20 m apart. At each internal boundary place one Pier and one Joint at the same track datum. Use North/South abutment scenes at the endpoints. Do not scale to fit a different span length.',
     reference:{sourceGlbSha256:Hash(sourceBytes),sourceGlbBytes:sourceBytes.length,contentSha256:ContentHash(g,source.bin),sourceGraph:Object.fromEntries(Object.entries(g).filter(([key])=>!Tables.includes(key))),sourceNodes:Clone(g.nodes)},modules:{}};

@@ -175,7 +175,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "BeishaheMasonryWash", kind: "material", tier: "lazy", toneClass: "agedMasonryWash", metersPerTile: 1,
     assetBudgetBytes: BEISHAHE_MAINTENANCE_ASSET_BYTES,
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheMasonryWash.json",
-    source: { provider: "imagegen", date: "2026-10-30", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-39205749-fe46-4d71-bcba-0424bc1d537c", prompt: "_import/Prompts/Texture_BeishaheMasonryWash.txt", note: "由保留的V5去光照石面研究生成浅灰旧矿物刷层PBR，仅供独立桥墩维护旧化层使用；旧刷层、补刷与磨耗为制作推定，非原桥维修或涂装证据。源图留OneDrive。" },
+    source: { provider: "imagegen", date: "2026-10-31", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-f8ac4c67-2d5b-4330-92e6-abf1086e0292", prompt: "_import/Prompts/Texture_BeishaheMasonryWash.txt", note: "V53用新生成的石面矿物残留研究重烘细颗粒刷层，1.2毫米高度范围、较弱细部起伏；基础干湿石材不替换。刷层、补刷与磨耗仍为制作推定，非原桥维修或涂装证据，源图留OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheMasonryWash" }],
     files: [["Texture_BeishaheMasonryWashBase.webp", "Base", 1024, 1024], ["Texture_BeishaheMasonryWashNormal.webp", "Normal", 512, 512], ["Texture_BeishaheMasonryWashOrm.webp", "Orm", 512, 512]],
   },

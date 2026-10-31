@@ -45,11 +45,14 @@ def BuildMasonryMaintenance(geometryClass, faces, seed, spec):
         u = (Vector(point)-face.get("origin", Vector())).dot(face["uAxis"])-face.get("uMid",0)
         v = point[1]
         phase = cfg["phase"]
-        def Rectangle(rect):
+        def Remnant(rect):
             x,y,rx,ry=rect
-            return 1-max(abs((u-x)/rx),abs((v-y)/ry))+.085*Noise(u*1.4,v*1.5,phase)
-        paint = min(max(Rectangle(r) for r in cfg["old"]), .25-Noise(u*1.7,v*2.3,phase+4))
-        new = Rectangle(cfg["new"])+.035*math.sin(u*38+v*3+phase)
+            # Curved, multiscale remnants instead of rectangle-shaped cards.
+            du=(u-x+.075*rx*Noise(u*.7,v*.9,phase+7))/rx
+            dv=(v-y+.06*ry*Noise(u*.9,v*.8,phase+11))/ry
+            return 1-math.hypot(du,dv)+.22*Noise(u*1.4,v*1.5,phase)+.045*Noise(u*3.2,v*3.4,phase+9)
+        paint = min(max(Remnant(r) for r in cfg["old"]), .32-Noise(u*1.7,v*2.3,phase+4))
+        new = Remnant(cfg["new"])+.025*Noise(u*2.8,v*2.4,phase+2)
         drips=[]
         for k,x in enumerate(cfg["drips"]):
             center=x+.025*math.sin(v*5+phase+k)
@@ -148,16 +151,26 @@ def BuildMasonryMaintenance(geometryClass, faces, seed, spec):
             def Tint(point):
                 base=face["tint"](point) if callable(face["tint"]) else face["tint"]
                 f=Fields(point,face)
+                substrate=face.get("substrateCompensation",spec["masonrySubstrateCompensation"])
+                # Damp stone has a darker albedo in addition to vertex stain.
+                # Its boundary must return to that actual substrate, including
+                # the reduced reflectance of wet mineral-wash remnants.
+                relative=[c/d for c,d in zip(substrate,spec["masonrySubstrateCompensation"])]
+                oldTint=[v*r for v,r in zip(spec["masonryOldWashTintGain"],relative)]
+                newTint=[v*r for v,r in zip(spec["masonryRewashTintGain"],relative)]
                 if kind==0:
-                    paint=Smooth(-.09,.09,f["paint"])
-                    drip=Smooth(-.025,.045,f["drip"])
-                    gains=[(c+(v-c)*paint)*(1-.16*drip) for c,v in zip(spec["masonrySubstrateCompensation"],spec["masonryOldWashTintGain"])]
+                    # The exposed boundary must match the substrate. The old
+                    # -0.09..+0.09 ramp was already half-painted at the cut,
+                    # making every coarse clipped triangle read as a decal.
+                    paint=Smooth(0,.30,f["paint"])
+                    drip=Smooth(0,.045,f["drip"])
+                    gains=[(c+(v-c)*paint)*(1-.08*drip) for c,v in zip(substrate,oldTint)]
                 else:
-                    strength=Smooth(0,.22,f["new"])
-                    brush=.985+.015*math.sin(f["u"]*29+f["v"]*.8+f["phase"])
-                    paint=Smooth(-.09,.09,f["paint"])
-                    edge=[c+(v-c)*paint for c,v in zip(spec["masonrySubstrateCompensation"],spec["masonryOldWashTintGain"])]
-                    gains=[(c+(v-c)*strength)*brush for c,v in zip(edge,spec["masonryRewashTintGain"])]
+                    strength=Smooth(0,.30,f["new"])
+                    brush=1-strength*(.008-.008*math.sin(f["u"]*29+f["v"]*.8+f["phase"]))
+                    paint=Smooth(0,.30,f["paint"])
+                    edge=[c+(v-c)*paint for c,v in zip(substrate,oldTint)]
+                    gains=[(c+(v-c)*strength)*brush for c,v in zip(edge,newTint)]
                 return tuple(max(.08,min(1,float(base[i])*gains[i])) for i in range(3))+(1,)
             kwargs=dict(uvOffset=face["uvOffset"],uvTurn=face["uvTurn"],tint=Tint)
             def LayerPoint(p,top):return tuple(Vector(p)+normal*(thickness if top else 0))

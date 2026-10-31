@@ -29,7 +29,7 @@ export function CreateBeishaheBridgeKit(manifest, assets) {
   return {manifest, assets, Create, Assemble};
 }
 
-export async function LoadBeishaheBridgeKit(loader, manifestUrl = new URL('./Model/BeishaheBridge/Data_BeishaheBridgeModules.json?v=2026103102', import.meta.url), kinds = ['Span', 'Pier', 'Joint', 'Abutment']) {
+export async function LoadBeishaheBridgeKit(loader, manifestUrl = new URL('./Model/BeishaheBridge/Data_BeishaheBridgeModules.json?v=2026103103', import.meta.url), kinds = ['Span', 'Pier', 'Joint', 'Abutment']) {
   const url = new URL(manifestUrl, import.meta.url);
   const response = await fetch(url);
   if (!response.ok) throw Error(`Beishahe manifest HTTP ${response.status}`);

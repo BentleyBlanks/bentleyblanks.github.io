@@ -1393,12 +1393,13 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
 // every support. They remain below the load-bearing cap surface.
 {
   Check(data.masonryMaintenance?.supports?.length===spec.spanCount+1&&/do not establish/i.test(data.masonryMaintenance.interpretation),'Maintenance is recorded as authored appearance rather than original repair history');
+  Check(spec.masonryCoatingThicknessM<=.0005&&spec.masonryCoatingCellM<=.04,'Residual mineral wash stays thin and its erosion contour is sampled below four centimetres');
   let thicknessPairs=0;
   for(const role of ['MasonryOldWash','MasonryRewash']){
     const layers=ByRole(role),shapes=new Set();
     Check(layers.length===spec.spanCount+1,'Each pier and abutment has the intended maintenance layer',role);
     for(const part of layers){
-      const {positions,normals,indices,color,colorWidth}=part.geo,edges=new Map(),columns=new Map();let invalid=0,maxY=-Infinity;
+      const {positions,normals,indices,color,colorWidth}=part.geo,edges=new Map(),columns=new Map(),faceEdges=new Map();let invalid=0,maxY=-Infinity;
       const key=i=>[0,1,2].map(k=>Math.round(positions[i*3+k]*1e5)).join(',');
       shapes.add(Hash(Buffer.from(positions.buffer,positions.byteOffset,positions.byteLength)));
       for(let i=0;i<positions.length/3;i++){
@@ -1406,6 +1407,11 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
         if(Math.abs(normals[i*3])>.999){const column=Math.round(positions[i*3+1]*1e5)+','+Math.round(positions[i*3+2]*1e5),xs=columns.get(column)||new Set();xs.add(positions[i*3]);columns.set(column,xs);}
       }
       for(let k=0;k<indices.length;k+=3)for(const [a,b]of [[indices[k],indices[k+1]],[indices[k+1],indices[k+2]],[indices[k+2],indices[k]]]){const edge=[key(a),key(b)].sort().join('|');edges.set(edge,(edges.get(edge)||0)+1);}
+      // Measure actual rendered contour segments independently of the baker's
+      // cell-size claim. The rejected version exposed coarse clipped triangles.
+      for(let k=0;k<indices.length;k+=3){const ids=[indices[k],indices[k+1],indices[k+2]];if(!ids.every(i=>normals[i*3]>.999))continue;for(const [a,b]of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){const edge=[key(a),key(b)].sort().join('|'),record=faceEdges.get(edge)||{count:0,length:Math.hypot(...[0,1,2].map(c=>positions[a*3+c]-positions[b*3+c]))};record.count++;faceEdges.set(edge,record);}}
+      const contour=[...faceEdges.values()].filter(e=>e.count===1).map(e=>e.length).sort((a,b)=>a-b);
+      Check(contour.length>20&&contour[Math.floor(contour.length*.99)]<.051,'Actual remnant contours contain fine segments rather than large polygonal tears',{name:part.node.name,samples:contour.length,p99:contour[Math.floor(contour.length*.99)]});
       Check([...edges.values()].every(count=>count===2),'Maintenance layer has closed edges without open or non-manifold paint seams',part.node.name);
       Check(invalid===0&&maxY<spec.pierTopY-.18&&part.geo.triangles>100,'Maintenance colors stay opaque and bounded, with clear space below support seats',{name:part.node.name,invalid,maxY});
       for(const xs of columns.values()){const a=[...xs].sort((x,y)=>x-y);for(let i=1;i<a.length;i++)if(Math.abs((a[i]-a[i-1])-spec.masonryCoatingThicknessM)<.00004)thicknessPairs++;}
