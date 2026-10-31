@@ -238,7 +238,8 @@ export const JIEHE_SANDBOX_PHASE = Object.freeze({
 export const CAMPAIGN_ENTRIES = Object.freeze([
   FIRST_LEVEL_P012_WHITEBOX_PHASE,
   ...PHASES
-    .filter((phase) => phase.deprecated && phase.id !== FIRST_LEVEL_P012_WHITEBOX_PHASE.contentId)
+    // 序章（CH0）2026-10-31 随出川过场删掉，不是「敬请期待」的占位章，不列。
+    .filter((phase) => phase.deprecated && phase.id !== FIRST_LEVEL_P012_WHITEBOX_PHASE.contentId && phase.id !== "CH0_Chuchuan")
     .map((phase) => Object.freeze({
       id: phase.id, chapter: true, placeholder: true,
       // 内容原稿（Script_Menu 显示时按 id 过 Localize；关号与关名从 label 的「·」两侧取）。
@@ -246,7 +247,7 @@ export const CAMPAIGN_ENTRIES = Object.freeze([
     })),
 ]);
 
-/** 焦距语汇沿用分镜表（Script_Cutscene.FovFromFocalMm，35 mm 全画幅等效）。 */
+/** 焦距语汇沿用分镜表（35 mm 全画幅等效）。 */
 export const MENU_SCENE = {
   /**
    * 菜单默认建哪一片切片。没给 ?phase= 时用它。
