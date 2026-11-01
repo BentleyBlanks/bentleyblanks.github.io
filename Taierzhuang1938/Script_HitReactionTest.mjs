@@ -454,7 +454,7 @@ const Method = (text, name) => text.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s
 
 // --- 接线：源码顺序与登记（静态）-----------------------------------------------------------------
 {
-  const actor = source("Script_Actor.mjs"), model_ = source("Script_CharacterModel.mjs"), main = source("Script_Main.mjs");
+  const actor = source("Script_Actor.mjs"), model_ = source("Script_CharacterModel.mjs"), main = source("Script_Main.mjs") + source("Script_DebugApi.mjs"); // 调试口装配在 Script_DebugApi
   const update = actor.slice(actor.indexOf("  Update(dt, state = {}) {"), actor.indexOf("  /** Aim the arms and rifle"));
   const idx = (text, needle) => { const i = text.indexOf(needle); assert.ok(i >= 0, `找不到：${needle}`); return i; };
   assert.ok(idx(update, "hitReaction?.Restore()") < idx(update, "this.rigAimApplied"), "Update 开头：先还原受击层，再还原瞄准（后进先出）");

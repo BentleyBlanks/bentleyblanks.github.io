@@ -39,12 +39,15 @@ export function FlatFrameBody() {
   return parts.join("\n");
 }
 
-/** Script_Main 的源码，只是 Frame 的函数体换成平铺版（给旧的按源码断言用）。 */
+const DEBUG_FILES = ["Script_DebugApi.mjs", "Script_DebugApiPlayer.mjs", "Script_DebugApiWorld.mjs", "Script_DebugApiMission.mjs"];
+
+/** Script_Main 的源码：Frame 的函数体换成平铺版，末尾附上调试口（Script_DebugApi*，去掉 ctx.）—— 给旧的按源码断言用。 */
 export function FlatMainSource() {
   const main = Read("Script_Main.mjs");
   const header = "function Frame(dt, render = true) {";
   const at = main.indexOf(header);
   const end = main.indexOf("\n}\n", at);
   if (at < 0 || end < 0) throw new Error("FrameFlatSource: Script_Main has no Frame");
-  return `${main.slice(0, at + header.length)}\n${FlatFrameBody()}${main.slice(end)}`;
+  const debug = DEBUG_FILES.map((file) => `// ---- ${file}\n${Read(file).replace(/\bctx\./g, "")}`).join("\n");
+  return `${main.slice(0, at + header.length)}\n${FlatFrameBody()}${main.slice(end)}\n${debug}`;
 }

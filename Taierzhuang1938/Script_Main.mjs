@@ -16,7 +16,7 @@ import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_Ballist
 // 一次全建出来既撞 draw call 红线也没有意义 —— 玩家在第二关永远看不见车站。
 // 所以换关 = 拆掉旧切片、按 Data_Battle.PHASES[i].bounds 重建一片。
 //
-// 调试口：window.Taierzhuang = { StepFrames, JumpToPhase, state, ... }
+// 调试口：window.Taierzhuang（StepFrames、JumpToPhase、state、Debug.*……）由 Script_DebugApi.InstallDebugApi 装配
 //（全局名沿用 Taierzhuang —— 出图脚本、开机冒烟、通关冒烟三处都按它取运行时。
 //  window.Tengxian 是同一个对象的别名。）
 
@@ -30,7 +30,7 @@ import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "./Script_EditorSettings.mjs";
 import { SettingsHost, SETTINGS_PAGE_IDS } from "./Script_SettingsHost.mjs";
 import { LightRig } from "./Script_Light.mjs";
-import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
+import { InstallShadowSkip } from "./Script_ShadowSkip.mjs";
 import { FirstPersonShadow } from "./Script_FirstPersonShadow.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
@@ -47,7 +47,7 @@ import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 // 测试场：登记表（网址开关与通用待遇）+ 插件（场地、建什么、每帧排在哪儿），见 docs/Data_SandboxRanges.md。
 import { SandboxRangeFromParams } from "./Data_SandboxRanges.mjs";
-import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses, SandboxDebugStubs } from "./Script_SandboxRanges.mjs";
+import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses } from "./Script_SandboxRanges.mjs";
 // 玩法时间的唯一入口：慢放 / 暂停 / 单步都往这里登记（Script_GameClock）。
 import { GameClock, CLOCK_ORDER } from "./Script_GameClock.mjs";
 // 每帧调度表：模式与正常游戏的步骤先后（Data_FrameSchedule），Frame 只按它分派。
@@ -57,6 +57,7 @@ import { PLAYER_STEPS } from "./Script_FrameStepsPlayer.mjs";
 import { WORLD_STEPS } from "./Script_FrameStepsWorld.mjs";
 import { RULES_STEPS } from "./Script_FrameStepsRules.mjs";
 import { PRESENT_STEPS } from "./Script_FrameStepsPresent.mjs";
+import { InstallDebugApi } from "./Script_DebugApi.mjs";
 import { PrepareCraterDebris } from "./Script_CraterDebris.mjs";
 import { TerrainDeformationView } from "./Script_TerrainDeformationView.mjs";
 import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
@@ -67,11 +68,7 @@ import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
 import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
 import { DEV_TOOLS_ENABLED } from "./Data_DevTools.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
-import { HitReactionOf, HitReactionEnabled, SetHitReactionEnabled, PreloadDeathLibrary, DeathLibrary } from "./Script_HitReactionLayer.mjs";
-import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
-import {
-  RANGE_PHASE, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
-} from "./Data_Range.mjs";
+import { RANGE_TARGETS, RANGE_RESPAWN_S } from "./Data_Range.mjs";
 import {
   FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
   FIRST_LEVEL_P012_WHITEBOX_PHASE as ARCHIVED_P012_PHASE,
@@ -111,11 +108,11 @@ import { VfxSystem } from "./Script_Vfx.mjs";
 // 断肢：视觉/物理层与预热代理在 Script_CharacterGore，运行时总闸在规则层
 //（`SetGoreEnabled` 同时被 `?gore=0` 与 `Debug.Gore.SetEnabled` 使用）。
 import { GoreSystem, AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
-import { SetGoreEnabled, IsGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape, PickWhipCorpse } from "./Script_Dismemberment.mjs";
+import { SetGoreEnabled, IsGoreEnabled, PickMeleeShape, PickWhipCorpse } from "./Script_Dismemberment.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
-import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
-import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
+import { Hud, ContextualActionPrompts } from "./Script_Hud.mjs";
+import { StoryDirector } from "./Script_Story.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset, CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { LoadStretcherAsset, CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
@@ -124,14 +121,14 @@ import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
-import { LoadMeleeAnimations, MeleeAnimationsLoaded } from "./Script_MeleeAnimationData.mjs";
+import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem, ScavengeAmmoPlan } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
 import { PlayerVent } from "./Script_PlayerVent.mjs";
 import { PlayerHitboxes, RaycastPlayerHitboxes } from "./Script_PlayerHitbox.mjs";
 import { EmplacementSystem } from "./Script_Emplacement.mjs";
-import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
+import { IdentifySystem } from "./Script_Identify.mjs";
 // 开发工具（高级工具 + Debug工具）只经这一个边界模块进来；打包剔除时换成 Script_DevToolsStub（见 Data_DevTools）。
 import { CreateDevTools, BlockoutPhases, BlockoutStartIndex, CreateBlockoutEditor } from "./Script_DevTools.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
@@ -140,7 +137,6 @@ import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
-import { FrameDebugAgent } from "./Script_FrameDebugAgent.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
@@ -162,12 +158,9 @@ import { RECIPES } from "./Script_TexBake.mjs";
 import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
-import {
-  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, PlayerSlotKey, WeaponShelved, DEFAULT_PLAYER_WEAPON,
-} from "./Data_Weapons.mjs";
+import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, WeaponShelved, DEFAULT_PLAYER_WEAPON } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
-import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
 // 玩家可见文本一律走这里（表在 Data_Text_Hud / Data_Text_Boot / Data_Text_Menu）。
 // 内容层（考据过的原稿：CAST 的名字、REINFORCE 的台词）走 Localize + Script_TextIds 的 id 口径。
@@ -849,15 +842,19 @@ const clock = new GameClock();
 /** 每帧调度在步骤之间传的这一帧的量（每帧覆盖同一个对象，不产生垃圾）。 */
 const frameState = { dt: 0, realDt: 0, render: true, weapon: null, phase: null };
 /**
- * 工具箱：每帧系统（Script_FrameModes / Script_FrameSteps*）从这里拿主文件里的状态、服务和函数，不直接读全局变量。
+ * 工具箱：每帧系统（Script_FrameModes / Script_FrameSteps*）与调试口（Script_DebugApi*）从这里拿主文件里的状态、服务和函数，不直接读全局变量。
  * 状态与服务都是取值器（现读：换关、换人后拿到的是新的那份）；步骤会写的几个状态带写入器。
  * 新系统要用主文件里的东西，就在这里加一行；见 docs/Data_FrameSchedule.md「工具箱」。
  */
 const ctx = {
   // 会变的状态
+  get actorBatch() { return actorBatch; },
+  get actorFactory() { return actorFactory; },
   get adsFovT() { return adsFovT; }, set adsFovT(v) { adsFovT = v; },
   get ai() { return ai; },
+  get aiDebugOverlay() { return aiDebugOverlay; }, set aiDebugOverlay(v) { aiDebugOverlay = v; },
   get aircraft() { return aircraft; },
+  get altMouseFree() { return altMouseFree; },
   get battlefield() { return battlefield; },
   get blockout() { return blockout; },
   get breathFov() { return breathFov; }, set breathFov(v) { breathFov = v; },
@@ -868,18 +865,23 @@ const ctx = {
   get commandRoom() { return commandRoom; },
   get companion() { return companion; },
   get currentWeapon() { return currentWeapon; },
+  get debugEmplacedFire() { return debugEmplacedFire; }, set debugEmplacedFire(v) { debugEmplacedFire = v; },
   get editor() { return editor; },
   get emplacedAds() { return emplacedAds; }, set emplacedAds(v) { emplacedAds = v; },
   get emplacement() { return emplacement; },
+  get fakeLocked() { return fakeLocked; }, set fakeLocked(v) { fakeLocked = v; },
   get fireEdge() { return fireEdge; }, set fireEdge(v) { fireEdge = v; },
   get firePunch() { return firePunch; }, set firePunch(v) { firePunch = v; },
+  get firstPersonSelfShadow() { return firstPersonSelfShadow; },
   get flare() { return flare; },
+  get gi() { return gi; },
   get gore() { return gore; },
   get identify() { return identify; },
   get interact() { return interact; },
   get lastLookDeltaYaw() { return lastLookDeltaYaw; }, set lastLookDeltaYaw(v) { lastLookDeltaYaw = v; },
   get lastViewPitch() { return lastViewPitch; }, set lastViewPitch(v) { lastViewPitch = v; },
   get lastViewYaw() { return lastViewYaw; }, set lastViewYaw(v) { lastViewYaw = v; },
+  get lockUnavailable() { return lockUnavailable; },
   get meleeCombat() { return meleeCombat; },
   get meleeLab() { return meleeLab; },
   get meleePreview() { return meleePreview; },
@@ -896,6 +898,8 @@ const ctx = {
   get p012StageZero() { return p012StageZero; },
   get physics() { return physics; },
   get player() { return player; },
+  get rawInputActive() { return rawInputActive; },
+  get rawInputSupported() { return rawInputSupported; },
   get sandbox() { return sandbox; },
   get scriptInvulnUntil() { return scriptInvulnUntil; },
   get seatStanceBefore() { return seatStanceBefore; }, set seatStanceBefore(v) { seatStanceBefore = v; },
@@ -916,58 +920,102 @@ const ctx = {
   get ADS_FOV_TIME() { return ADS_FOV_TIME; },
   get audio() { return audio; },
   get audioWiring() { return audioWiring; },
+  get autoQuality() { return autoQuality; },
   get BLOCKOUT() { return BLOCKOUT; },
   get BodyGroundAt() { return BodyGroundAt; },
+  get bonePrune() { return bonePrune; },
   get camera() { return camera; },
   get clock() { return clock; },
+  get emplacementViews() { return emplacementViews; },
+  get FAKE_POINTER_LOCK() { return FAKE_POINTER_LOCK; },
   get FIRE_PUNCH_DECAY_S() { return FIRE_PUNCH_DECAY_S; },
   get FIRE_PUNCH_FOV_DEG() { return FIRE_PUNCH_FOV_DEG; },
+  get frameDebugger() { return frameDebugger; },
   get graphics() { return graphics; },
+  get graphicsProfileApi() { return graphicsProfileApi; },
+  get HITBOX() { return HITBOX; },
   get hud() { return hud; },
   get hudRoot() { return hudRoot; },
   get input() { return input; },
+  get library() { return library; },
   get lights() { return lights; },
+  get lookSpike() { return lookSpike; },
   get looseGun() { return looseGun; },
   get MELEE_TEST() { return MELEE_TEST; },
   get meleeTargets() { return meleeTargets; },
   get mountView() { return mountView; },
+  get p012Debug() { return p012Debug; },
   get PHASE_TABLE() { return PHASE_TABLE; },
   get PIN_RELEASE_GRACE_S() { return PIN_RELEASE_GRACE_S; },
   get PLAY_STEPS() { return PLAY_STEPS; },
   get playerVent() { return playerVent; },
+  get post() { return post; },
+  get prepassStaticBatch() { return prepassStaticBatch; },
   get profiler() { return profiler; },
+  get RANGE() { return RANGE; },
+  get rangeStats() { return rangeStats; },
+  get rangeTargets() { return rangeTargets; },
+  get renderer() { return renderer; },
   get router() { return router; },
   get SANDBOX_PLUGIN() { return SANDBOX_PLUGIN; },
   get SANDBOX_RANGE() { return SANDBOX_RANGE; },
   get scene() { return scene; },
   get setpieceProps() { return setpieceProps; },
+  get shadingUniforms() { return shadingUniforms; },
+  get shadowCasterBatch() { return shadowCasterBatch; },
+  get shadowInstanceCulling() { return shadowInstanceCulling; },
   get sky() { return sky; },
+  get SLOT_ORDER() { return SLOT_ORDER; },
+  get SPRINT_FIRE_DELAY_S() { return SPRINT_FIRE_DELAY_S; },
   get state() { return state; },
   get SURFACE_BY_TAG() { return SURFACE_BY_TAG; },
   get TOOLS_HOME() { return TOOLS_HOME; },
   get trailFocus() { return trailFocus; },
   get WEAPON_RANGE() { return WEAPON_RANGE; },
+  get wheel() { return wheel; },
   // 主文件里的函数
   AdvanceLevel,
+  AirColumnEnteredRoad,
+  ApplyGraphics,
   BlockoutInputCaptured,
+  BuildGroundWeaponView,
+  CallMortar,
+  ClearAiDebugOverlay,
   ClearFirearmRequests,
+  CountOpenDirections,
+  DoMelee,
   EndBattle,
   EnsureDebugInventory,
+  IsGunSlot,
+  JumpFirstLevelStage,
+  JumpToLevel,
+  LooseGunState,
   MaintainMeleeTargets,
   MaintainRangeTargets,
   MeleePreviewPose,
   MeleeSnapshot,
   MountedViewPose,
   OnPlayerDown,
+  OnPointerLockChange,
   PlayHurtCues,
+  PointerLocked,
+  ReachObjective,
   ReadKeys,
   ReadP012ProgressSample,
+  RecompileAllMaterials,
+  RegisterSandboxDebug,
   ReleaseCook,
+  ReleaseLooseGun,
   ReleaseMeleeCharge,
+  ReleasePointerLock,
+  Reload,
   RenderScene,
+  RequestPointerLock,
   RespawnPlayer,
   SeedSoldiers,
   ShowPauseMenu,
+  SpawnRangeTarget,
+  StepFrames,
   StepLooseGuns,
   SyncEmplacementViews,
   SyncJumpSound,
@@ -2353,791 +2401,8 @@ async function Boot() {
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASE_TABLE.map((p) => p.minutes);
-  window.Taierzhuang = {
-    // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
-    // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
-    renderer, scene, camera, post, sky, lights, library, profiler, FrameDebugger: frameDebugger,
-    // agent / 脚本查帧：纯 JSON 的捕获、筛事件、读原始像素、像素历史（docs/Data_FrameDebugger.md「Agent 接口」）
-    FrameDebug: new FrameDebugAgent(frameDebugger, { Step: () => StepFrames(1) }),
-    // 阴影烘焙子树跳过（Script_ShadowSkip）：取证脚本读登记数、同页 A/B 开关
-    shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
-    // 骨头子树遍历剪枝（Script_BonePrune）：同页 A/B 开关、剪掉的根数与节点数
-    bonePrune,
-    // 阴影趟静态投影体合批（Script_ShadowCasterBatch）：同页 A/B 开关、成员数与组数
-    shadowCasterBatch,
-    shadowInstanceCulling,
-    // 预通道静态合批（Script_PrepassStaticBatch）：同页 A/B 开关、成员数与组数
-    prepassStaticBatch,
-    // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
-    // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
-    materialShading: shadingUniforms, RecompileAllMaterials,
-    get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
-    get Particles() { return vfx.particles; },
-    get ParticleEditor() { return editor?.activeId === 'vfx' ? editor.active : null; },
-    get MenuParticles() { return commandRoom?.atmosphere?.particles ?? null; },
-    player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
-    // 音频接线层：取证走 Debug.AudioZone，专项冒烟要直接摸缓存与限速器
-    // （Script_AudioWiringTest 换探针世界之前必须先把 1 m 网格缓存清掉）。
-    audioWiring,
-    get meleeCombat() { return meleeCombat; },
-    story, combat, interact, carry, emplacement, wheel, strafe, flare, telegraph,
-    companion, checkpoint, setpieces,
-    // 机队实例：出图脚本要能给任意一架摆手动姿态，核对模型机头朝向。
-    get aircraft() { return aircraft; },
-    // 白刃全身动画库是否已灌入（Data_MeleeAnimationSets）；测试摆姿势前要看它。
-    get meleeAnimationsLoaded() { return MeleeAnimationsLoaded(); },
-    LoadMeleeAnimations,
-    StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
-    // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
-    graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
-    // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
-    Debug: {
-      Reload, DoMelee, CallMortar, EndBattle,
-      Throw: (kind, power) => {
-        state.cooking = kind; state.cook = (power ?? 0.8) * 1.1; ReleaseCook();
-      },
-      Fire: () => { input.fire = true; fireEdge = true; TryFire(1, combat.Returning); input.fire = false; fireEdge = false; },
-      // 键位路由：合成一次键盘事件走完整条链路（KEYMAP -> 上下文 -> OnAction），
-      // 不许直接调 SwitchSlot —— 那样测的是函数，不是键位表。
-      // 不给 down 就是"点按"：按下**并且松开**。
-      // 只发 keydown 的话，InputRouter 会把第二次按下当成长按的自动重复直接吃掉
-      // （held 里还留着这个 code），于是"按 1 再按 2 再按 1"只有头一次生效 ——
-      // 通关冒烟里"切不回长枪"就是这么来的，而真人按键盘不会漏掉抬起。
-      Key: (code, down) => {
-        const Send = (type) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
-        if (down === undefined) { Send("keydown"); Send("keyup"); return; }
-        Send(down ? "keydown" : "keyup");
-      },
-      // 按住/松开鼠标键（白刃蓄力等按住型输入要用；Fire 那条只覆盖单帧点击）
-      Mouse: (button = 0, down = true) => {
-        document.dispatchEvent(new MouseEvent(down ? "mousedown" : "mouseup", { button, bubbles: true }));
-      },
-      // 一次鼠标位移。**不走 mousemove 事件**：那条链路要查指针锁，而出图/测试
-      // 模式下根本拿不到锁，查了就等于测试里转不了头。要测的是"位移进来之后
-      // 视线怎么走"，指针锁归属另有冒烟覆盖。
-      Look: (dx = 0, dy = 0) => { input.lookX += dx; input.lookY += dy; },
-      Wheel: (delta) => {
-        document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
-      },
-      // 某个武器槽的数字键 code（"melee" → "Digit3"）。测试走 Key(SlotKey(...))，
-      // 不写死数字：槽位表一改，大刀和投掷物的键就会前后挪。
-      SlotKey: (slot) => PlayerSlotKey(slot),
-      Slots: () => ({
-        active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId, order: [...SLOT_ORDER],
-        slots: { ...state.slots }, variants: { ...state.weaponVariants }, lastGunSlot: state.lastGunSlot,
-        // 背着的那支枪的账（手里那支以 ammo/clips/bayonetFixed 为准，换枪时才对账）。
-        mags: Object.fromEntries(PLAYER_GUN_SLOTS.map((slot) => [slot, { ...state.mags[slot] }])),
-        bayonets: { ...state.bayonets }, bayonetFixed: state.bayonetFixed, ammo: state.ammo, clips: state.clips,
-        viewmodel: viewmodel.weaponId, viewmodelVariant: viewmodel.weaponVariant,
-        fireMode: state.fireMode, bipod: player.bipod, ads: player.ads,
-      }),
-      LastShot: () => (state.lastShot ? { ...state.lastShot } : null),
-      Difficulty: () => ({ ...DIFFICULTY }),
-      // 数值表本体（不是快照）：伤害冒烟要把 COMBAT.player 改回旧口径跑一遍对照，
-      // 「新数值到底把 TTK 拉长了多少」只能这么取证，算不出来。
-      Tables: () => ({ COMBAT, DIFFICULTY }),
-      // 受击反馈的运行时状态。红闪与来弹方位都是**事件**（自己衰减），
-      // 不是血量的函数，所以必须从这里取证，不能从 health 反推。
-      /** 相机震动取证（Script_CameraShake）：创伤值、五个偏移、各类事件计数。 */
-      Shake: () => player?.shake?.State() ?? null,
-      Hurt: () => ({
-        health: player.health, bleeding: player.bleeding, flash: player.hitFlash,
-        marks: player.hitMarks.map((m) => ({ x: m.x, z: m.z, life: m.life })),
-        wounds: player.wounds.length, alive: player.alive,
-      }),
-      /**
-       * 命中回执的取证口（见 ConfirmHit）。**打出去的**那一侧，
-       * 与上面 Hurt() 的 marks（打进来的方位）是两件事，别串。
-       * marks 是按时间顺序的 "hit"/"kill" 序列，cues 是真的排进 WebAudio 的那两条 ——
-       * 只断言 marks 会漏掉"写实档关了记号、听觉回执也一起没了"这一类回归。
-       */
-      Hits: () => ({
-        marks: hud.confirms.slice(),
-        cues: { hit: audio.RequestedCount("hitConfirm"), kill: audio.RequestedCount("killConfirm") },
-        markerOn: DIFFICULTY.hitMarker !== false,
-        visual: hud.HitmarkState(),
-      }),
-      // --- 第 3 批的取证口 ---
-      // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）
-      Vault: () => ({
-        count: player.vaultCount, active: player.vault.active,
-        kind: player.vault.kind, rise: player.vault.rise, mantles: player.mantleCount,
-        y: player.position.y, x: player.position.x, z: player.position.z,
-        aiVaults: ai.vaultCount,
-      }),
-      /** 通行高度阶梯（Data_Traversal）。测试按它取判据，别在断言里抄数。 */
-      Traversal: () => ({ ...TRAVERSAL }),
-      // 跳跃：起跳次数、滞空/落地边沿与视图模型动作位移。
-      Jump: () => ({
-        count: player.jump.count, grounded: player.grounded,
-        y: player.position.y, velocityY: player.velocity.y,
-        airTime: player.jump.airTime, landSerial: player.jump.landSerial,
-        landImpact: player.jump.landImpact, runK: player.jump.runK,
-        viewY: viewmodel.statePivot.position.y,
-        viewPitch: viewmodel.statePivot.rotation.x,
-      }),
-      // 下水：淹了多深、算不算下水。软墙的三条代价（慢/不能开枪/掉体力）都挂在它上面
-      Water: () => ({
-        depth: player.waterDepth, inWater: player.InWater, stamina: player.stamina,
-      }),
-      // 下令轮盘：开着没有、此刻指着第几格、那一格是什么。
-      // **名字不许叫 Wheel** —— 上面那个 Wheel 是"滚一下鼠标滚轮"，
-      // 同名会把它整个盖掉：实跑里表现为滚轮切槽突然失灵，而两处代码都没错。
-      Orders: () => ({
-        open: state.ordersOpen, index: wheel.index, label: wheel.Label,
-        cursor: { x: wheel.cursorX, y: wheel.cursorY }, order: state.order,
-      }),
-      // 交互：够得着什么、捡过几次、分过几次弹、注册了哪些交互点
-      Interact: () => {
-        const c = interact.Query(player);
-        return {
-          kind: c ? c.kind : null, label: c ? c.label : null,
-          gesture: c ? c.gesture : null,
-          pickups: interact.pickups, handouts: interact.handouts,
-          pickedUp: state.pickedUp, pickedUpVariant: state.pickedUpVariant ?? 0, weapon: currentWeapon,
-          ...interact.State(),
-        };
-      },
-      /**
-       * 往地上放一把枪（与换枪丢下的那把同一条路：InteractSystem 记账 + BuildGroundWeaponView 摆模型）。
-       * 拾枪测试用它摆靶，不必去杀一个人再等尸体摔稳。返回登记条目的 id。
-       */
-      /** 被冲击波震脱手的枪（Script_LooseGun）：State 取证；Enable 开关；Release 立刻撒手（不等倒地，探针用）。 */
-      LooseGun: {
-        State: () => LooseGunState(),
-        Enable: (on = true) => { looseGun.enabled = !!on; return looseGun.enabled; },
-        Release: (push = { regime: "fall", dirX: 0, dirZ: 1, horizontalMps: 2 }) => (IsGunSlot(state.activeSlot) && WEAPONS[currentWeapon]
-          ? !!ReleaseLooseGun(push) : false),
-      },
-      DropWeapon: (weaponId, { x, z, yaw = 0, ammo = null, clips = 0 } = {}) => {
-        if (!interact || !WEAPONS[weaponId]) return null;
-        const item = interact.DropGroundWeapon({
-          weaponId, ammo: ammo ?? WEAPONS[weaponId].magazine ?? 0, clips, yaw,
-          position: { x, y: battlefield.GroundHeight(x, z), z },
-        });
-        if (item) BuildGroundWeaponView(item);
-        return item?.id ?? null;
-      },
-      /**
-       * 负重取证口。摆点是集成批的事，这里给的是**驱动 + 取证**：
-       *   Debug.Carry.Begin("stretcher", { canDrop:false })  直接抬起来（跳过交互点）
-       *   Debug.Carry.Force("dive")                          脚本强行松手（第一关扑入路沟）
-       *   Debug.Carry.State()                                规则层 + HUD 两侧一起取
-       * `speedScale` 读的是**玩家身上那个字段**，不是表里的数 ——
-       * 「规则算出来了但没写进玩家」正是这一类接线最容易漏的一环。
-       */
-      Carry: {
-        Begin: (kindId, opts) => carry.Begin(kindId, opts),
-        Drop: (reason) => carry.Drop(reason),
-        Throw: (reason) => carry.Throw(reason),
-        Force: (reason) => carry.ForceRelease(reason),
-        Reset: (reason) => carry.Reset(reason),
-        Anchor: () => carry.PartnerAnchor(player),
-        State: () => ({
-          ...carry.State(),
-          playerSpeedScale: player.carrySpeedScale,
-          gunVisible: !!viewmodel?.root?.visible,
-          hud: hud.CarryState(),
-        }),
-      },
-      /**
-       * 架设机枪取证口。摆点是集成批的事，这里给的是**驱动 + 取证**：
-       *   Debug.Emplacement.Create({...})        摆一挺（不带交互点，直接用）
-       *   Debug.Emplacement.Occupy(id)           上枪位（等价于玩家按 F）
-       *   Debug.Emplacement.Fire(true/false)     扣住/松开扳机
-       *   Debug.Emplacement.Jam(id)              脚本触发的必然失效（§6 阶段⑩②）
-       *   Debug.Emplacement.State()              规则层 + HUD + 世界模型三侧一起取
-       * `gunVisible` 读的是**视图模型那个字段**，不是规则层的推断 ——
-       * 「规则说收枪了但画面没收」正是这一类接线最容易漏的一环。
-       */
-      Emplacement: {
-        Create: (spec) => emplacement.CreateEmplacement(spec),
-        Occupy: (id) => emplacement.Occupy(id, player),
-        Vacate: (reason) => emplacement.Vacate(reason),
-        Fire: (down) => { debugEmplacedFire = down !== false; return emplacement.SetFire(debugEmplacedFire); },
-        Bolt: () => emplacement.PullBolt(),
-        // 名字不叫 Clear：`emplacement.Clear(tag)` 是「按 tag 收掉战位」，
-        // 这一条是「按住 R 排小卡」，同名会在取证脚本里被读反。
-        HoldClear: (down) => (down === false ? emplacement.EndClear() : emplacement.BeginClear()),
-        Reload: () => emplacement.Reload(),
-        Resupply: (id, belts) => emplacement.Resupply(id, belts),
-        Jam: (id, opts) => emplacement.ForceJam(id, opts),
-        State: () => ({
-          ...emplacement.State(),
-          gunVisible: !!viewmodel?.root?.visible,
-          playerYaw: player.yaw, playerPitch: player.pitch,
-          worldModels: [...emplacementViews.entries()]
-            .map(([id, view]) => ({ id, hasModel: !!view.root })),
-          hud: hud.EmplacementState(),
-        }),
-      },
-      /**
-       * 日机扫射取证口。摆点（三条航线的线段与白名单）是集成批的事，
-       * 这里给的是**驱动 + 取证**：
-       *   Debug.Strafe.Run({ preset:"crowdTurn", from, to, victims })  起一条航线
-       *   Debug.Strafe.Dodge()                       扑入路沟（等价于玩家躲开）
-       *   Debug.Strafe.PlayerDamage(false)           整条关掉对玩家的伤害
-       *   Debug.Strafe.Window(3.5)                   调宽躲避窗口
-       *   Debug.Strafe.State()                       规则层 + 世界模型两侧一起取
-       * `modelAt` 读的是**场景里那架飞机的世界坐标**，不是规则层的推断 ——
-       * 「规则飞过去了但模型还在圆周上」正是这一类接线最容易漏的一环。
-       */
-      Strafe: {
-        Run: (spec) => strafe.StrafeRun(spec),
-        Dodge: (reason) => strafe.Dodge(reason),
-        Abort: (reason) => strafe.Abort(reason),
-        Ping: (origin, dir, maxDistM) => strafe.Ping(origin, dir, maxDistM),
-        PlayerDamage: (on) => strafe.SetPlayerDamage(on),
-        Window: (seconds) => strafe.SetPlayerWindow(seconds),
-        State: () => {
-          const view = strafe.View();
-          const form = view ? aircraft?.FormFor(view.aircraft.id) : null;
-          return {
-            ...strafe.State(),
-            modelAt: form ? { x: form.root.position.x, y: form.root.position.y, z: form.root.position.z } : null,
-            modelVisible: form ? !!form.root.visible : null,
-          };
-        },
-      },
-      /**
-       * 照明弹的取证口。
-       *   Debug.Flare.Launch({ preset:"crossLane", from, at })  打一枚
-       *   Debug.Flare.Sequence([{ atS, preset, from, at }])     排时刻表
-       *   Debug.Flare.Exposure(false)                           只留画面，不动发现距离
-       *   Debug.Flare.State()                                   规则层 + AI 侧一起取
-       * `ai` 那一段是这条机制的**真正判据**：光强包络对了不算数，
-       * 要 SIGHT_BY_STANCE 三档真的一起抬起来、熄灭之后真的还回去。
-       */
-      Flare: {
-        Launch: (spec) => flare.LaunchFlare(spec),
-        Sequence: (items) => flare.LaunchSequence(items),
-        Cancel: (ticket) => flare.CancelSequence(ticket),
-        Abort: (id, reason) => flare.Abort(id, reason),
-        Exposure: (on) => flare.SetExposure(on),
-        State: () => ({
-          ...flare.State(),
-          ai: ai?.SightState() ?? null,
-          lights: lights?.GetEffectLightState() ?? null,
-        }),
-      },
-      /**
-       * 发报的取证口。
-       *   Debug.Telegraph.Begin({ groups:[...], breakAfterGroup:2 })  开一封
-       *   Debug.Telegraph.Key()                     敲一下电键（等价于玩家按 F）
-       *   Debug.Telegraph.Break() / Reconnect()     炮击松脱 / 接回去
-       *   Debug.Telegraph.State()                   规则层 + HUD 两侧一起取
-       */
-      Telegraph: {
-        Begin: (spec) => telegraph.BeginTelegraph(spec),
-        Key: (reason) => telegraph.Key(reason),
-        Break: (reason) => telegraph.ForceDisconnect(reason),
-        Reconnect: (reason) => telegraph.Reconnect(reason),
-        Abort: (reason) => telegraph.Abort(reason),
-        State: () => ({
-          ...telegraph.State(),
-          hud: hud.TelegraphState(),
-        }),
-      },
-      /**
-       * 敌军 AI 的取证口（docs/Data_EnemyAi.md §8）。
-       *   Debug.Ai.State()        全场直方图：状态 / 任务 / 警戒 / 掩体 / 令牌 / 计数
-       *   Debug.Ai.State(id)      某一个人的完整快照
-       *   Debug.Ai.Overlay(true)  打开头顶覆盖层（等价于地址栏 ?aidebug=1）
-       *   Debug.Ai.Overlay()      查询开关状态
-       * 覆盖层的文字**一律英文**：这条是开发者诊断，不进 Script_Text 的字符串表。
-       */
-      Ai: {
-        State: (id = null) => ai?.DebugState(id) ?? null,
-        Overlay: (on) => {
-          if (on === undefined) return aiDebugOverlay;
-          aiDebugOverlay = !!on;
-          if (!aiDebugOverlay) ClearAiDebugOverlay();
-          return aiDebugOverlay;
-        },
-      },
-      Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
-      /**
-       * 准心与目标识别的取证口。
-       * 准心那三个数必须一起读：`spreadDeg` 是 Player.SpreadDeg 的真值，
-       * `gap` 是 HUD 真正画出来的缝，`expected` 是按当前视场重算的应画值 ——
-       * 三者对不上就说明准心又在自说自话（这正是 2026-08-25 那次返工的病根）。
-       */
-      Reticle: () => {
-        const weapon = WEAPONS[currentWeapon];
-        const firearm = !!weapon?.ammo && weapon.magazine > 0;
-        const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
-        const drawn = hud.CrosshairState();
-        return {
-          ...drawn,
-          armed: firearm,
-          fov: camera.fov,
-          viewportHeight: window.innerHeight,
-          expected: CrosshairGeometry({
-            spreadDeg, fovDeg: camera.fov, viewportHeight: window.innerHeight,
-            sprint: player.sprint, armed: firearm,
-          }).gap,
-          sprint: player.sprint,
-          ads: player.ads,
-        };
-      },
-      Target: () => ({
-        card: hud.TargetState(),
-        detail: DIFFICULTY.targetInfo ?? "basic",
-        entityId: identify.entity?.id ?? null,
-        stats: { ...identify.stats },
-        cone: IDENTIFY.coneDeg,
-      }),
-      AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
-      // AI 那边的运行时取证口：某个兵此刻的完整状态
-      SoldierInfo: (soldier) => ({
-        id: soldier.id, side: soldier.side, state: soldier.state, order: soldier.order,
-        squad: soldier.squadId, squadSlot: soldier.squadSlot, role: soldier.tacticalRole,
-        stance: soldier.stance, yaw: soldier.yaw, lookYaw: soldier.lookYaw,
-        aim: soldier.aimBlend, targetChanges: soldier.targetChanges,
-        squadFocus: soldier.squadFocusKind, squadFocusId: soldier.squadFocusId,
-        squadForward: [soldier.squadForwardX, soldier.squadForwardZ],
-        holdZone: soldier.holdZone ? soldier.holdZone.id : null,
-        bayonet: soldier.bayonetFixed, heat: soldier.heat,
-        coolFor: Math.max(0, soldier.coolUntil - ai.time),
-        x: soldier.position.x, z: soldier.position.z,
-        goalX: soldier.goal.x, goalZ: soldier.goal.z,
-      }),
-      Ammo: () => ({ ammo: state.ammo, clips: state.clips, grenades: state.grenades, bundles: state.bundles }),
-      /**
-       * 物理层的取证口。冒烟脚本靠它断言「碰撞真的接上了」——
-       * 读源码看不出运行时到底有没有把盒子灌进去（曾经就有一版把城外的
-       * 几千个盒子漏在外面，画面上有土坎、子弹照穿）。
-       */
-      Physics: () => (physics ? {
-        ...physics.Stats(),
-        fieldColliders: battlefield ? battlefield.colliders.length : 0,
-        playerBody: !!(player && player.body),
-        grounded: player ? player.grounded : null,
-      } : null),
-      /** 城镇/村落程序化细节的运行时计数；视觉回归要能证明不是只改了注释。 */
-      Environment: () => ({
-        city: battlefield?.city?.stats ? { ...battlefield.city.stats } : null,
-        outfield: battlefield?.outfield?.stats ? {
-          ...battlefield.outfield.stats,
-          villageArchetypes: { ...battlefield.outfield.stats.villageArchetypes },
-        } : null,
-      }),
-      /** 从某点朝某方向打一条射线（斜墙/空气墙的取证）。 */
-      Ray: (ox, oy, oz, dx, dy, dz, maxDist = 60, terrain = false) => {
-        const d = Math.hypot(dx, dy, dz) || 1;
-        const hit = battlefield.Raycast(
-          { x: ox, y: oy, z: oz }, { x: dx / d, y: dy / d, z: dz / d }, maxDist, { terrain });
-        return hit ? { t: hit.t, normal: hit.normal, tag: hit.box ? hit.box.tag : null } : null;
-      },
-      /** 脚下探地（脚部 IK 与"这层站得住吗"共用的那条查询）。 */
-      Probe: (x, z, fromY) => (physics ? physics.GroundProbe(x, z, fromY) : null),
-      // --- 线性关卡的取证口 ---
-      // 这一关是哪一关、目标链走到第几个、路标各在哪儿。
-      // 「七关能依次推进」这条断言只能从这里读，读源码是推断不出来的。
-      Level: () => {
-        const phase = PHASE_TABLE[state.phaseIndex];
-        return {
-          index: state.phaseIndex, id: phase.id, title: phase.label,
-          objectiveIndex: state.objectiveIndex, objectiveCount: state.objectiveCount,
-          objective: state.storyObjective,
-          zones: battlefield.objectives.map((o) => ({
-            id: o.id, name: o.name, x: o.x, z: o.z, radius: o.radius, reached: o.reached,
-          })),
-          seconds: state.levelSeconds, elapsed: state.phaseTime,
-          pool: state.nraPool, advancing: state.advancing,
-        };
-      },
-      // 直接把玩家挪到第 n 个路标里（通关冒烟靠它一关一关推，不必真走两公里）
-      GotoObjective: (n) => {
-        const objectives = battlefield.objectives;
-        const o = objectives[Math.min(Math.max(0, n), objectives.length - 1)];
-        if (!o) return null;
-        player.Spawn(o.x, o.z, player.yaw);
-        return { x: o.x, z: o.z, id: o.id };
-      },
-      // 把当前这一关的目标链一路点完（不动画、不等 AI 让开）
-      CompleteLevel: () => {
-        const objectives = battlefield.objectives;
-        for (let i = state.objectiveIndex; i < objectives.length; i += 1) ReachObjective(i);
-        return state.objectiveIndex;
-      },
-      AdvanceLevel: (opts) => AdvanceLevel(opts || {}),
-      // 钉住/放开当前关。剧本长跑要用它，见 state.pinned 的注释。
-      PinLevel: (on) => { state.pinned = on !== false; return state.pinned; },
-      // --- 钉关原语（mechanics.pinFinalZone）的取证口 ---
-      // 「走到最后一个路标为什么没换关」只能从这里读。
-      ChapterPin: () => ({
-        pinFinalZone: state.pinFinalZone,
-        released: state.chapterReleased,
-        releaseAt: state.chapterReleaseAt,
-        signal: CHAPTER_RELEASE_SIGNAL,
-        signalled: story ? story.Signalled(CHAPTER_RELEASE_SIGNAL) : false,
-        objectiveIndex: state.objectiveIndex, objectiveCount: state.objectiveCount,
-        phaseTime: state.phaseTime, levelSeconds: state.levelSeconds,
-      }),
-      ReleaseChapter: () => { story?.Signal(CHAPTER_RELEASE_SIGNAL); return state.chapterReleased; },
-      // --- 具名同伴的取证口 ---
-      Companions: () => ({
-        present: companion ? companion.Present : [],
-        roster: companion ? companion.Roster : [],
-        absent: companion ? companion.Absent : [],
-        log: companion ? companion.log.slice() : [],
-        located: companion
-          ? Object.fromEntries(companion.Roster.map((id) => [id, companion.Locate(id)]))
-          : {},
-      }),
-      // --- 脚本检查点的取证口 ---
-      Checkpoint: () => ({
-        samples: checkpoint ? checkpoint.Count : 0,
-        rewinds: checkpoint ? checkpoint.rewinds.slice() : [],
-        latest: checkpoint ? checkpoint.Latest : null,
-      }),
-      SaveCheckpoint: () => !!checkpoint?.Save(),
-      RewindCheckpoint: (seconds) => (checkpoint ? checkpoint.Rewind(seconds) : null),
-      /**
-       * 章节摆点的取证口（集成批 INT2）。
-       *
-       *   Debug.Setpieces()              这一章摆了什么、推过哪些信号、后送队走到哪儿
-       *   Debug.SetpieceFacts()          同一局之内的场景事实（门板拆了几块、门开没开）
-       *   Debug.SetpieceProps()          运行时道具清单
-       *
-       * `signals` 是最要紧的一栏：**七章与九个系统之间的接缝只有这一条**，
-       * 「这一拍该发生的事到底推没推」在这里一眼看得出来。
-       *
-       * 还欠着的动词（host 里恒返回 null / 只记事实的那几条）：
-       *   CookingCrate  —— 二关殉爆倒计时要一件**真的弹药箱实体**，现在的箱子
-       *                    是交互点 + 搬运态，场上没有可被掷弹筒打中的那一只；
-       *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
-       */
-      Setpieces: () => (setpieces ? setpieces.State() : null),
-      /**
-       * 音频空间取证：玩家当前空间档（interior / courtyard / street / open）、
-       * 六米内数到几面墙、到最近几个兵的遮挡值（1 = 挡住）。
-       *
-       * 「隔着一堵墙为什么还这么亮」「屋里怎么没有室内混响」这类问题，
-       * 只有把两条探针的**实际返回值**摆出来才答得了 —— 光听分不出
-       * 「探针没接上」与「探针接上了但判错了」。
-       * `probesInstalled:false` = 引擎侧的 SetProbes 还没合进来（判空生效中）。
-       */
-      AudioZone: (limit) => audioWiring.Report(limit),
-      /**
-       * 战场密度取证（2026-09-09）：强度、它的三项输入、战斗床当前的倍率、
-       * 六个扇区各自的方位与播放数、压制弹着条数。
-       *
-       * 「远处怎么还是不响」有四种完全不同的原因 —— 强度没涨（没打起来 / 权重不对）、
-       * 床没接上（battleFar 没载到 / 预设里没这一层）、撒播被闸掉、扇区没料 ——
-       * 光听分不出是哪一件。
-       */
-      BattleIntensity: () => audioWiring.BattleReport(),
-      P012: () => missionRuntime?.State() || p012Flow?.State() || null,
-      FirstLevelMission: () => missionRuntime?.State() || null,
-      FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
-      FirstLevelJump: (value) => JumpFirstLevelStage(value),
-      // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
-      FirstLevelMissionRuntime: () => missionRuntime || null,
-      P012Progress: () => p012Debug.State(),
-      P012NextProgress: () => p012Debug.Next(),
-      P012CarryView: () => p012CarryView?.Debug() || null,
-      P012Casualties:()=>[...setpieceProps.entries()].filter(([,entry])=>entry.woundedActor).map(([id,entry])=>({id,actor:entry.woundedActor,root:entry.root})),
-      AircraftModel: id => aircraft?.forms.find(form=>form.spec.id===id)?.root || null,
-      P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
-        roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
-      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), stageZero:p012StageZero?.Snapshot(), cast:ai.soldiers.filter(actor=>actor.castId).map(actor=>({castId:actor.castId,age:actor.identity?.age,modelVariant:actor.actor?.modelVariant,position:{...actor.position}})), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
-        woundedDragPosition: setpieces?.mem?.p012WoundedDrag?.position || null,
-        woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
-        airCivilian: setpieces?.mem?.p012AirCivilian ? {
-          id:setpieces.mem.p012AirCivilian.member.handle.id,alive:setpieces.mem.p012AirCivilian.member.handle.alive,
-          health:setpieces.mem.p012AirCivilian.member.handle.health,carried:setpieces.mem.p012AirCivilian.carried,
-          delivered:setpieces.mem.p012AirCivilian.delivered,position:{...setpieces.mem.p012AirCivilian.member.handle.position},
-          modelKind:setpieces.mem.p012AirCivilian.member.handle.actor?.kind,
-        }:null,
-        carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
-        litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
-        fallenAt: setpieces?.mem?.p012FallenAt ? { ...setpieces.mem.p012FallenAt } : null, recoveryReason: setpieces?.mem?.p012RecoveryReason || null,
-        litters: (setpieces?.mem?.column?.litters || []).map((litter) => ({ id: litter.propLitter, bodyId: litter.propBody, dropped: litter.dropped,
-          originalCarried: litter === setpieces?.mem?.p012CarriedLitter,
-          front: litter.front?.handle?.position ? { ...litter.front.handle.position } : null,
-          rear: litter.rear?.handle?.position ? { ...litter.rear.handle.position } : null,
-          frontAlive: !!litter.front?.handle?.alive, rearAlive: !!litter.rear?.handle?.alive,
-          frontHealth: litter.front?.handle?.health ?? null, rearHealth: litter.rear?.handle?.health ?? null,
-          propPosition: setpieceProps.get(String(litter.propLitter))?.root?.position ? { ...setpieceProps.get(String(litter.propLitter)).root.position } : null })),
-        columnActors: (setpieces?.mem?.column?.Alive || []).map((member) => ({ role: member.role, x: member.handle.position.x, z: member.handle.position.z })) } : null,
-      SetpieceFacts: () => ({ ...state.setpieceFacts, items: { ...state.setpieceItems } }),
-      SetpieceProps: () => [...setpieceProps.entries()].map(([id, entry]) => ({
-        id, kind: entry.spec.kind || "box", visible: !!entry.root?.visible,
-        x: +entry.root.position.x.toFixed(1), z: +entry.root.position.z.toFixed(1),
-      })),
-      Firewalls: () => state.firewalls.map((w) => ({
-        id: w.id, until: +w.until.toFixed(1), damagePlayer: w.damagePlayer, smoke: w.smoke.length,
-      })),
-      // --- 枪感第 2 轮的取证口 ---
-      // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
-      GunFeel: () => ({
-        firePunch,
-        fovBase: graphics.fov,
-        fov: camera.fov,
-        sprintBlocked: player.sprint > 0.35
-          || (state.elapsed - sprintReleaseAt) < SPRINT_FIRE_DELAY_S,
-        sinceSprint: state.elapsed - sprintReleaseAt,
-        swayYaw: viewmodel.lookSway ? viewmodel.lookSway.yaw : null,
-        lastLookDeltaYaw: lastLookDeltaYaw,
-        lowAmmo: state.ammo <= 1,
-        boltOpen: viewmodel.boltOpen,
-        breathHold: player.breathHold,
-        breathFov,
-        breathHoldHintCount: state.breathHoldHintCount,
-      }),
-      // 指针锁：解锁通道有没有真的接上。fake=true 说明走的是页内假后端
-      // （webdriver / 出图），真指针锁一次都没碰 —— 见 FAKE_POINTER_LOCK 的注释。
-      PointerLock: () => ({
-        locked: PointerLocked(),
-        element: PointerLocked() ? "canvas" : null,
-        fake: FAKE_POINTER_LOCK,
-        browserLocked: document.pointerLockElement !== null,
-        mouseFree: altMouseFree,
-        dragLook: lockUnavailable,
-        // raw input 有没有真的要到，以及尖刺闸门丢过几个假位移（见 AcceptLookMotion）
-        rawInput: rawInputActive, rawInputSupported,
-        spikesDropped: lookSpike.dropped, lastSpike: lookSpike.last,
-      }),
-      ReleasePointerLock,
-      RequestPointerLock,
-      // 模拟浏览器吞掉 Esc、只抛 pointerlockchange 的真实路径；菜单冒烟锁死这条回归。
-      DropPointerLock: () => {
-        if (FAKE_POINTER_LOCK) {
-          if (fakeLocked) { fakeLocked = false; OnPointerLockChange(); }
-        } else if (document.pointerLockElement && typeof document.exitPointerLock === "function") {
-          document.exitPointerLock();
-        }
-      },
-      Spoken: () => hud.spoken.slice(),
-      StoryFired: () => story.fired.slice(),
-      Outcome: () => state.outcome,
-      // 「仗有没有真的在打」只能从运行时取证：全场开火累计（AI + 玩家）、
-      // AI 的状态分布、两侧的阵亡计数。读源码是推断不出来的。
-      FireCount: () => ai.fireCount + state.playerShots,
-      AiStates: () => {
-        const out = {};
-        for (const s2 of ai.soldiers) {
-          if (!s2.alive) continue;
-          out[s2.state] = (out[s2.state] || 0) + 1;
-        }
-        return out;
-      },
-      Deaths: () => ({ ...ai.deaths }),
-      Whitebox: () => {
-        const phase = PHASE_TABLE[state.phaseIndex];
-        return {
-          phase: phase.id,
-          contentId: PhaseContentId(phase),
-          storyLevel: story?.levelId || null,
-          setpieceLevel: setpieces?.levelId || null,
-          companions: companion?.Present?.length || 0,
-          enemyCount: ai.CountSide("ija"),
-          enemyDeaths: ai.deaths.ija || 0,
-          phaseTime: state.phaseTime,
-          objectiveIndex: state.objectiveIndex,
-          blockedReason: state.objectiveBlockedReason,
-          field: battlefield?.DebugState?.() || null,
-        };
-      },
-      OpenDirections: (x, z, count = 72, probeM = 20) =>
-        CountOpenDirections(x, z, battlefield.GroundHeight(x, z), probeM, count),
-    },
-  };
-  // battlefield 与 nav **每换一关都会被换成新的一份**（切片重建）。
-  // 写成普通属性的话，调试口会一直指着上一关那份已经 Dispose 掉的城 ——
-  // 表现是"取证读出来的碰撞盒表是空的"，而代码看起来完全正确。所以用取值器。
-  Object.defineProperty(window.Taierzhuang, "battlefield", { get: () => battlefield });
-  Object.defineProperty(window.Taierzhuang, "physics", { get: () => physics });
-  Object.defineProperty(window.Taierzhuang, "nav", { get: () => navGrid });
-
-  // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
-  // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
-  window.Tengxian = window.Taierzhuang;
-  // 开机那趟 EnterLevel 排在 window.Taierzhuang 建起来之前，所以测试场的取证口要在这儿再挂一次
-  //（换关时那一支在 InstallSandbox 里）；常驻的那几个（不在那个测试场时返回 null）也在这儿挂。
-  Object.assign(window.Taierzhuang.Debug, SandboxDebugStubs(() => sandbox));
-  RegisterSandboxDebug();
-  window.Taierzhuang.Debug.Clock = () => clock.State();
-
-  // --- 靶场取证口（只在 ?range=1 下存在；口径在 docs/Data_TestRange.md） ----
-  // 人机共用：agent 用 State/Targets 断言、GoTo/AimAt 摆位，真人在旁边看同一片场。
-  // 输入不在这里另开门：开枪/开镜/上刺刀/投弹照旧走 Debug.Fire / Key / Mouse / Throw
-  // 的真事件链 —— 测的是键位与玩法，不是函数。
-  window.Taierzhuang.Debug.TerrainDeformation = {
-    State: () => battlefield.deformation?.State(),
-    Height: (x, z) => battlefield.GroundHeight(x, z),
-    BaseHeight: (x, z) => battlefield.BaseGroundHeight(x, z),
-    Reset: () => battlefield.deformation?.Reset(),
-  };
-  // 断肢取证口。**所有关卡都挂**（不只测试场）：正片里也要能一句话验「打死人不报错」。
-  // 契约在 docs/Data_Dismemberment.md §8.3，别改签名。
-  window.Taierzhuang.Debug.Gore = {
-    State: () => gore?.State() || null,
-    Limbs: () => [...GORE_LIMB_IDS],
-    /**
-     * 直接对一名士兵卸一段肢体。走的是**正片那条死亡链**（Kill → Ragdoll → Sever），
-     * 不是绕过规则层的后门；已经倒下的人则直接 Sever（Kill 对死人返回 false）。
-     * @param {number} soldierId 士兵 id
-     * @param {string} limbId 肢体名（Limbs() 里的一个）
-     * @param {[number,number,number]|null} dir 卸出去的方向，默认沿断口轴
-     */
-    Sever: (soldierId, limbId, dir = null) => {
-      const soldier = ai?.soldiers.find((s) => s.id === soldierId) || null;
-      if (!soldier || !gore) return null;
-      const direction = dir ? new THREE.Vector3(dir[0], dir[1], dir[2]) : null;
-      const plan = { limbs: [limbId], kind: "debug", point: null };
-      if (soldier.alive) soldier.Kill(direction, plan);
-      else gore.Sever(soldier, plan.limbs, { direction, kind: plan.kind });
-      return gore.State();
-    },
-    // 顺手写回 graphics.gore：不写的话下一次 ApplyGraphics（改个窗口大小就够）
-    // 会拿设置面板那一位把这里刚关掉的又打开。
-    SetEnabled: (value) => {
-      graphics.gore = value !== false;
-      return gore?.SetEnabled(value !== false);
-    },
-    SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
-    Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
-  };
-  // 地面脚印与痕迹取证口（docs/Data_TerrainTrails.md §6）。?trails=0 关采集。
-  // Read 同步读回痕迹靶一个世界点（0..255 的 [坑深, 泥边, 踩乱]），别在帧循环里用。
-  window.Taierzhuang.Debug.TerrainTrails = {
-    Describe: () => ({ ...TerrainTrailSystem.Describe(), pass: post.terrainTrailsPass?.Describe() ?? null,
-      preset: post.preset?.terrainTrails ?? null }),
-    Stamp: (o) => TerrainTrailSystem.Stamp(o),
-    Read: (x, z) => post.terrainTrailsPass?.ReadTexel(renderer, x, z) ?? null,
-    SetEnabled: (value) => TerrainTrailSystem.SetEnabled(value !== false),
-    Reset: () => TerrainTrailSystem.Reset(),
-  };
-  // 受击物理反应取证口（docs/Data_HitReaction.md §2.4）。**所有关卡都挂**；?hitreact=0 关整层。
-  // Hit 走正片 TakeHit 链（扣血、可致死、方向死亡）；Impulse 只打冲量不扣血（调参、拍对照图用）。
-  {
-    const Soldier = (id) => ai?.soldiers.find((s) => s.id === id) || null;
-    const Vec = (a) => (a ? new THREE.Vector3(a[0], a[1], a[2]) : null);
-    const Descriptor = (soldier, o, lethal) => ({
-      kind: o.kind || "bullet", part: o.part || "torso", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
-      direction: Vec(o.dir || [0, 0, 1]).normalize(), sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin),
-      damage: o.damage ?? 75, rawDamage: o.damage ?? 75, weaponId: o.weaponId || null, lethal, seed: soldier.actor?.seed ?? soldier.id,
-    });
-    window.Taierzhuang.Debug.HitReaction = {
-      Hit: (id, o = {}) => {
-        const s = Soldier(id);
-        if (!s) return null;
-        const dir = Vec(o.dir || [0, 0, 1]).normalize();
-        const died = s.TakeHit(o.damage ?? 75, o.part || "torso", dir,
-          { kind: o.kind || "bullet", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
-            sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin), weaponId: o.weaponId || null });
-        return { died: !!died, health: s.health };
-      },
-      Impulse: (id, o = {}) => {
-        const s = Soldier(id);
-        return s?.alive ? s.actor?.ReceiveHit(Descriptor(s, o, false)) ?? null : null;
-      },
-      State: (id) => {
-        const s = Soldier(id);
-        const layer = s?.actor?.characterRig?.hitReaction;
-        return layer ? layer.Describe() : { active: false, enabled: HitReactionEnabled(), layer: false };
-      },
-      SetEnabled: (value) => SetHitReactionEnabled(value !== false),
-      Enabled: () => HitReactionEnabled(),
-      Preload: () => PreloadDeathLibrary().then((lib) => !!lib),
-      Library: () => { const lib = DeathLibrary(); return lib ? { revision: lib.revision, clips: [...lib.clips.keys()], profiles: lib.profiles } : null; },
-      Layer: (id) => HitReactionOf(Soldier(id)?.actor)?.Describe() ?? null,
-    };
-  }
-  if (RANGE) {
-    const RangeTargetSnapshot = (entry) => {
-      const s = entry.soldier;
-      return {
-        id: entry.spec.id, station: entry.spec.station,
-        x: entry.spec.x, z: entry.spec.z,
-        alive: !!(s && s.alive),
-        health: s ? s.health : 0,
-        deadTime: s && !s.alive ? s.deadTime : 0,
-        distance: s ? Math.hypot(s.position.x - player.position.x,
-          s.position.z - player.position.z) : null,
-      };
-    };
-    window.Taierzhuang.Debug.Range = {
-      /** 一眼总览：工位、靶况、击倒/复位计数、玩家武器与弹药 —— 验收的唯一入口。 */
-      State: () => ({
-        stations: RANGE_STATIONS.map((z) => ({ id: z.id, name: z.name, x: z.x, z: z.z })),
-        targets: rangeTargets.map(RangeTargetSnapshot),
-        stats: { ...rangeStats },
-        player: {
-          x: player.position.x, z: player.position.z, yaw: player.yaw, pitch: player.pitch,
-          health: player.health, alive: player.alive,
-          ads: player.ads, fov: camera.fov,
-          slot: state.activeSlot, weapon: currentWeapon,
-          ammo: state.ammo, clips: state.clips, grenades: state.grenades,
-          bayonetFixed: state.bayonetFixed,
-        },
-        pinned: state.pinned,
-        respawnS: RANGE_RESPAWN_S,
-      }),
-      Targets: () => rangeTargets.map(RangeTargetSnapshot),
-      /** 瞬移到某个工位（RangeRifle / RangeGrenade / RangeMelee），面朝各自靶道。 */
-      GoTo: (stationId) => {
-        const zone = RANGE_STATIONS.find((z) => z.id === stationId);
-        if (!zone) return null;
-        player.Spawn(zone.x, zone.z, zone.ry ?? 0);
-        return { id: zone.id, x: zone.x, z: zone.z, yaw: player.yaw };
-      },
-      /**
-       * 把视线摆到某个靶子身上。只摆 yaw/pitch，开火仍走 Debug.Fire ——
-       * 散布、后坐、开镜収束照旧全在链路里。
-       *
-       * offsetY 默认 = **躯干判定中心** COMBAT.hitbox.centerY（与 MarchBullet 读的
-       * 是同一份数，判定球半径 COMBAT.hitbox.radius）。两条要知道的账：
-       *   · TryFire 是先施加本发的枪口上跳再采样弹道（「顶上去 100%」的设计），
-       *     所以首发会比瞄点高出 kick × 距离 —— ADS 下约 0.9°，25 m 处 ≈ 0.4 m。
-       *     远靶验命中要么瞄低、要么用近靶（RangeTest 用的 R10）。
-       *   · 命中几何只有那一个球（爆头是 TryFire 里按概率抽的，不是几何），
-       *     所以别瞄头 —— 那条线从球上方擦过去就是脱靶。
-       */
-      AimAt: (targetId, offsetY = HITBOX.centerY) => {
-        const entry = rangeTargets.find((e) => e.spec.id === targetId);
-        const s = entry ? entry.soldier : null;
-        if (!s) return null;
-        const from = player.EyePosition;
-        const dx = s.position.x - from.x;
-        const dy = (s.position.y + offsetY) - from.y;
-        const dz = s.position.z - from.z;
-        const horiz = Math.hypot(dx, dz) || 1;
-        player.yaw = Math.atan2(-dx, -dz);
-        player.pitch = Math.atan2(dy, horiz);
-        player.aimYaw = 0;
-        player.aimPitch = 0;
-        return { yaw: player.yaw, pitch: player.pitch, distance: Math.hypot(dx, dy, dz) };
-      },
-      /** 整场复位：靶子全部立即重立，玩家满血满弹，击倒/复位计数清零。 */
-      Reset: () => {
-        for (const entry of rangeTargets) {
-          if (entry.soldier) ai.Remove(entry.soldier);
-          entry.soldier = SpawnRangeTarget(entry.spec);
-          entry.deadCounted = false;
-        }
-        rangeStats.killed = 0;
-        rangeStats.respawned = 0;
-        rangeStats.resets += 1;
-        player.health = 100;
-        player.bleeding = false;
-        const loadout = RANGE_PHASE.loadoutOverride;
-        state.mags.primary = { ammo: WEAPONS[loadout.primary].magazine, clips: loadout.spareClips };
-        // 副武器是捡来的那支（靶场携行表里没有）：身上有就给它也补满。
-        const secondary = state.slots.secondary;
-        state.mags.secondary = secondary
-          ? { ammo: WEAPONS[secondary].magazine, clips: 2 }
-          : { ammo: 0, clips: 0 };
-        const mag = state.mags[state.activeSlot];
-        if (mag) { state.ammo = mag.ammo; state.clips = mag.clips; }
-        state.grenades = loadout.throwables.Grenade;
-        return window.Taierzhuang.Debug.Range.State();
-      },
-    };
-  }
+  // 调试口 window.Tengxian（Script_DebugApi；Debug 由三组系统各自声明）。
+  InstallDebugApi(ctx);
 
   if (MELEE_TEST) {
     const api = {
