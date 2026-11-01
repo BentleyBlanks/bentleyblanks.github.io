@@ -28,6 +28,7 @@ import {
 } from "./Script_Telegraph.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { T } from "./Script_Text.mjs";
+import { FlatMainSource } from "./Script_FrameFlatSource.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -470,7 +471,7 @@ console.log("ok  ⑩ 换关兜底：Reset / Abort 分账、底噪停掉、一次
     "Style_Game.css 里有 .hudTelegraph 与它的 .on 态（与 .hudEmplacement 同一套写法）");
   Check(/\.tgGroup\.sent\b/.test(css) && /\.tgGroup\.active\b/.test(css),
     "勾掉与正在发两个态都有样式 —— 玩家要能对错，不是纯演出");
-  const main = fs.readFileSync(path.join(dirHere, "Script_Main.mjs"), "utf8");
+  const main = FlatMainSource(); // Script_Main，Frame 换成按调度表拼回的平铺版
   Check(/telegraph\?\.Update\(dt, player\)/.test(main), "装配层每帧推它");
   Check(/hud\.SetTelegraph\(telegraph\?\.View\(\) \|\| null\)/.test(main), "装配层每帧把快照交给 HUD");
   Check(/telegraph\?\.Reset\("levelChange"\)/.test(main), "换关收掉");

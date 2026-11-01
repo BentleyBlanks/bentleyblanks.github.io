@@ -52,6 +52,11 @@ import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses
 import { GameClock, CLOCK_ORDER } from "./Script_GameClock.mjs";
 // 每帧调度表：模式与正常游戏的步骤先后（Data_FrameSchedule），Frame 只按它分派。
 import { FRAME_MODES, FRAME_PLAY_STEPS } from "./Data_FrameSchedule.mjs";
+import { FrameFrozen, BeginFrame, FrameMode, FrameModeEditor, FrameModeShellShot, FrameModeLoading, FrameModeLab, FrameModePlay } from "./Script_FrameModes.mjs";
+import { PLAYER_STEPS } from "./Script_FrameStepsPlayer.mjs";
+import { WORLD_STEPS } from "./Script_FrameStepsWorld.mjs";
+import { RULES_STEPS } from "./Script_FrameStepsRules.mjs";
+import { PRESENT_STEPS } from "./Script_FrameStepsPresent.mjs";
 import { PrepareCraterDebris } from "./Script_CraterDebris.mjs";
 import { TerrainDeformationView } from "./Script_TerrainDeformationView.mjs";
 import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
@@ -81,7 +86,7 @@ import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
 import { FirstLevelP012CarryView } from "./Script_FirstLevelP012CarryView.mjs";
-import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
+import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
@@ -89,9 +94,7 @@ import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLeve
 import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
-import {
-  PhaseContentId, ContentZoneId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate,
-} from "./Script_FirstLevelWhiteboxFlow.mjs";
+import { PhaseContentId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { DeathTime, DeathReveal, DeathDof } from "./Script_PlayerDeath.mjs";
@@ -140,7 +143,6 @@ import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { FrameDebugAgent } from "./Script_FrameDebugAgent.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
-import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
@@ -844,45 +846,148 @@ let firstPersonShadow = null;
 let sandbox = null;
 /** 玩法时钟：Frame 开头一句 Step 拿这一帧的玩法时间；白刃 QTE / 测试场 / 编辑器的慢放都登记在这里。 */
 const clock = new GameClock();
-/** 结束这一帧的信号：调度表里任何一步返回它，后面的步骤这一帧都不跑（任务失败 / 通关）。 */
-const STOP = Symbol("frameStop");
 /** 每帧调度在步骤之间传的这一帧的量（每帧覆盖同一个对象，不产生垃圾）。 */
 const frameState = { dt: 0, realDt: 0, render: true, weapon: null, phase: null };
-/** 正常游戏的步骤函数（PlayStep<Id> 定义在 Frame 下面）；先后只由 Data_FrameSchedule.FRAME_PLAY_STEPS 决定。 */
+/**
+ * 工具箱：每帧系统（Script_FrameModes / Script_FrameSteps*）从这里拿主文件里的状态、服务和函数，不直接读全局变量。
+ * 状态与服务都是取值器（现读：换关、换人后拿到的是新的那份）；步骤会写的几个状态带写入器。
+ * 新系统要用主文件里的东西，就在这里加一行；见 docs/Data_FrameSchedule.md「工具箱」。
+ */
+const ctx = {
+  // 会变的状态
+  get adsFovT() { return adsFovT; }, set adsFovT(v) { adsFovT = v; },
+  get ai() { return ai; },
+  get aircraft() { return aircraft; },
+  get battlefield() { return battlefield; },
+  get blockout() { return blockout; },
+  get breathFov() { return breathFov; }, set breathFov(v) { breathFov = v; },
+  get carry() { return carry; },
+  get carryHidGun() { return carryHidGun; }, set carryHidGun(v) { carryHidGun = v; },
+  get checkpoint() { return checkpoint; },
+  get combat() { return combat; },
+  get commandRoom() { return commandRoom; },
+  get companion() { return companion; },
+  get currentWeapon() { return currentWeapon; },
+  get editor() { return editor; },
+  get emplacedAds() { return emplacedAds; }, set emplacedAds(v) { emplacedAds = v; },
+  get emplacement() { return emplacement; },
+  get fireEdge() { return fireEdge; }, set fireEdge(v) { fireEdge = v; },
+  get firePunch() { return firePunch; }, set firePunch(v) { firePunch = v; },
+  get flare() { return flare; },
+  get gore() { return gore; },
+  get identify() { return identify; },
+  get interact() { return interact; },
+  get lastLookDeltaYaw() { return lastLookDeltaYaw; }, set lastLookDeltaYaw(v) { lastLookDeltaYaw = v; },
+  get lastViewPitch() { return lastViewPitch; }, set lastViewPitch(v) { lastViewPitch = v; },
+  get lastViewYaw() { return lastViewYaw; }, set lastViewYaw(v) { lastViewYaw = v; },
+  get meleeCombat() { return meleeCombat; },
+  get meleeLab() { return meleeLab; },
+  get meleePreview() { return meleePreview; },
+  get menu() { return menu; },
+  get missionRuntime() { return missionRuntime; },
+  get mountedIdLast() { return mountedIdLast; }, set mountedIdLast(v) { mountedIdLast = v; },
+  get navGrid() { return navGrid; },
+  get p012BinocularRaised() { return p012BinocularRaised; }, set p012BinocularRaised(v) { p012BinocularRaised = v; },
+  get p012Binoculars() { return p012Binoculars; },
+  get p012CarryView() { return p012CarryView; },
+  get p012Flow() { return p012Flow; },
+  get p012Resting() { return p012Resting; },
+  get p012Runtime() { return p012Runtime; },
+  get p012StageZero() { return p012StageZero; },
+  get physics() { return physics; },
+  get player() { return player; },
+  get sandbox() { return sandbox; },
+  get scriptInvulnUntil() { return scriptInvulnUntil; },
+  get seatStanceBefore() { return seatStanceBefore; }, set seatStanceBefore(v) { seatStanceBefore = v; },
+  get setpieces() { return setpieces; },
+  get settings() { return settings; },
+  get sprintReleaseAt() { return sprintReleaseAt; }, set sprintReleaseAt(v) { sprintReleaseAt = v; },
+  get sprintWasOn() { return sprintWasOn; }, set sprintWasOn(v) { sprintWasOn = v; },
+  get story() { return story; },
+  get strafe() { return strafe; },
+  get telegraph() { return telegraph; },
+  get vfx() { return vfx; },
+  get viewmodel() { return viewmodel; },
+  // 服务与常量
+  get _forward() { return _forward; },
+  get _idAim() { return _idAim; },
+  get _idEye() { return _idEye; },
+  get _proj() { return _proj; },
+  get ADS_FOV_TIME() { return ADS_FOV_TIME; },
+  get audio() { return audio; },
+  get audioWiring() { return audioWiring; },
+  get BLOCKOUT() { return BLOCKOUT; },
+  get BodyGroundAt() { return BodyGroundAt; },
+  get camera() { return camera; },
+  get clock() { return clock; },
+  get FIRE_PUNCH_DECAY_S() { return FIRE_PUNCH_DECAY_S; },
+  get FIRE_PUNCH_FOV_DEG() { return FIRE_PUNCH_FOV_DEG; },
+  get graphics() { return graphics; },
+  get hud() { return hud; },
+  get hudRoot() { return hudRoot; },
+  get input() { return input; },
+  get lights() { return lights; },
+  get looseGun() { return looseGun; },
+  get MELEE_TEST() { return MELEE_TEST; },
+  get meleeTargets() { return meleeTargets; },
+  get mountView() { return mountView; },
+  get PHASE_TABLE() { return PHASE_TABLE; },
+  get PIN_RELEASE_GRACE_S() { return PIN_RELEASE_GRACE_S; },
+  get PLAY_STEPS() { return PLAY_STEPS; },
+  get playerVent() { return playerVent; },
+  get profiler() { return profiler; },
+  get router() { return router; },
+  get SANDBOX_PLUGIN() { return SANDBOX_PLUGIN; },
+  get SANDBOX_RANGE() { return SANDBOX_RANGE; },
+  get scene() { return scene; },
+  get setpieceProps() { return setpieceProps; },
+  get sky() { return sky; },
+  get state() { return state; },
+  get SURFACE_BY_TAG() { return SURFACE_BY_TAG; },
+  get TOOLS_HOME() { return TOOLS_HOME; },
+  get trailFocus() { return trailFocus; },
+  get WEAPON_RANGE() { return WEAPON_RANGE; },
+  // 主文件里的函数
+  AdvanceLevel,
+  BlockoutInputCaptured,
+  ClearFirearmRequests,
+  EndBattle,
+  EnsureDebugInventory,
+  MaintainMeleeTargets,
+  MaintainRangeTargets,
+  MeleePreviewPose,
+  MeleeSnapshot,
+  MountedViewPose,
+  OnPlayerDown,
+  PlayHurtCues,
+  ReadKeys,
+  ReadP012ProgressSample,
+  ReleaseCook,
+  ReleaseMeleeCharge,
+  RenderScene,
+  RespawnPlayer,
+  SeedSoldiers,
+  ShowPauseMenu,
+  StepLooseGuns,
+  SyncEmplacementViews,
+  SyncJumpSound,
+  SyncMissionHands,
+  SyncMountedView,
+  TryFire,
+  UiCapturing,
+  UpdateAiDebugOverlay,
+  UpdateContextualActionPrompts,
+  UpdateObjectives,
+  UpdatePlayerDeath,
+  UpdateReloadRequest,
+  UpdateWoundedActor,
+};
+/** 正常游戏的步骤函数（各在 Script_FrameSteps*）；先后只由 Data_FrameSchedule.FRAME_PLAY_STEPS 决定。 */
 const PLAY_STEP_FUNCS = {
-  deathTimer: PlayStepDeathTimer,
-  input: PlayStepInput,
-  carry: PlayStepCarry,
-  player: PlayStepPlayer,
-  emplacement: PlayStepEmplacement,
-  interact: PlayStepInteract,
-  hands: PlayStepHands,
-  foley: PlayStepFoley,
-  prompts: PlayStepPrompts,
-  firearms: PlayStepFirearms,
-  cameraFov: PlayStepCameraFov,
-  view: PlayStepView,
-  alliesDown: PlayStepAlliesDown,
-  flare: PlayStepFlare,
-  companion: PlayStepCompanion,
-  ai: PlayStepAi,
-  physics: PlayStepPhysics,
-  vfx: PlayStepVfx,
-  combat: PlayStepCombat,
-  lights: PlayStepLights,
-  playerDown: PlayStepPlayerDown,
-  firewalls: PlayStepFirewalls,
-  checkpoint: PlayStepCheckpoint,
-  mission: PlayStepMission,
-  p012: PlayStepP012,
-  objectives: PlayStepObjectives,
-  narrative: PlayStepNarrative,
-  setpieces: PlayStepSetpieces,
-  scenario: PlayStepScenario,
-  outcome: PlayStepOutcome,
-  spawn: PlayStepSpawn,
-  hud: PlayStepHud,
-  render: PlayStepRender,
+  ...PLAYER_STEPS,
+  ...WORLD_STEPS,
+  ...RULES_STEPS,
+  ...PRESENT_STEPS,
 };
 const PLAY_STEPS = FRAME_PLAY_STEPS.map(({ id }) => {
   if (!PLAY_STEP_FUNCS[id]) throw new Error(`Frame schedule: no PlayStep for ${id}`);
@@ -8953,903 +9058,9 @@ function UpdateAiDebugOverlay() {
  *   而不是把断言的时长缩水去迁就它。
  */
 function Frame(dt, render = true) {
-  if (FrameFrozen(dt, render)) return;
-  BeginFrame(frameState, dt, render);
-  FRAME_MODE_STEPS[FrameMode()](frameState);
-}
-
-/** 失败画面 / 任务结束：只出画面，世界时钟不走（返回 true = 这一帧到此为止）。 */
-function FrameFrozen(dt, render) {
-  if (menu?.open && menu.mode === "failure") {
-    // Only the fallen viewpoint advances; AI, damage and mission clocks stay frozen.
-    if (!player.Alive) { player.Update(dt); UpdatePlayerDeath(); }
-    if (render) RenderScene(0);
-    return true;
-  }
-  // StepFrames also enters here directly: terminal P012 screens freeze the entire world clock.
-  if (missionRuntime?.completed || missionRuntime?.failed || (missionRuntime && !state.running && !UiCapturing()) || p012Runtime?.completed || p012Runtime?.failed) {
-    if (render) RenderScene(0);
-    return true;
-  }
-  return false;
-}
-
-/** 帧头：任何模式都跑。玩法时钟在这里推一步，后面各模式读 f.dt（玩法时间）与 f.realDt（真实时间）。 */
-function BeginFrame(f, dt, render) {
-  const realDt = dt;
-  // QTE 窗口走真实时间；下面玩家、AI、弹道、特效和叙事统一吃缩放后的玩法时间。
-  // 这句必须在 state.elapsed 之前：否则慢的只有 AI，玩家/故事仍按正常速度飞过去。
-  // Combat is stepped after pause/menu/editor gates, before movement and AI.
-  // 白刃 QTE、测试场（断肢慢动作 / 炮击扬尘暂停单步 / 人物反应慢放）、编辑器持枪检查的慢放
-  // 都登记在玩法时钟里（Script_GameClock，顺序同原来那五行）。
-  dt = clock.Step(realDt);
-  state.frame += 1;
-  state.elapsed += dt;
-  // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
-  // 所有分支之前 —— 排进下面任何一条 if 里，都会有一整类帧读不到新数。
-  profiler.B("overlay");
-  if (editor) editor.UpdateOverlays(dt);
-  // 白盒关卡编辑器：演员、标记、卡片与小地图（换关中自己跳过）。
-  blockout?.Update(dt);
-  profiler.E("overlay");
-  // 外部道具流送：跟着**相机**走（游戏里相机就在玩家头上；过场里跟运镜走，
-  // 布景才不会在长焦端消失）。必须排在所有 return 分支之前。
-  if (battlefield?.externalStreamer) {
-    profiler.B("streamer");
-    battlefield.externalStreamer.Update(camera.position.x, camera.position.z);
-    profiler.E("streamer");
-  }
-  // 机队独立于玩法暂停与过场：它是远方连续发生的战场环境，不占用 AI / 物理预算。
-  // **扫射航线不是**：它归玩法时间（strafe.Update 在下面那段里推），
-  // 所以暂停/过场时 View() 停在原地不动，那一架就钉在航线上不再前进。
-  aircraft?.Update(state.elapsed, strafe?.View() ?? null);
-  f.realDt = realDt; f.dt = dt; f.render = render;
-}
-
-/** 这一帧归哪个模式（顺序同 Data_FrameSchedule.FRAME_MODES）。 */
-function FrameMode() {
-  if (UiCapturing()) return "editor";
-  if (p012StageZero?.shellShot.active) return "shellShot";
-  // 建切片期间（换关）也只走画面：碰撞盒表正在被换掉，规则层这时候查什么都是错的
-  if (!state.ready) return "loading";
-  if (sandbox?.ownsFrame) return "lab";
-  return "play";
-}
-
-/** 编辑器接管：玩法全停，只推编辑器与画面。 */
-function FrameModeEditor(f) {
-  const dt = f.dt, render = f.render;
-  // 编辑器接管：玩法全停，只推编辑器与画面。
-  settings?.Update(dt);
-  editor?.Update(dt);
-  if (commandRoom?.ready && menu?.live && settings?.IsOpen) {
-    commandRoom.Update(dt);
-    if(render)commandRoom.Render();
-    return;
-  }
-  // 阴影框跟着**编辑器相机**走：编辑器的自由飞行
-  // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
-  // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
-  camera.getWorldDirection(_forward);
-  // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
-  // 墙地仍旧不亮，退出编辑器才突然补算一大步。
-  // 高级工具开着、没有互斥编辑器时，第一人称持枪移动检查仍按外部机位出画（玩家停着，替身眼睛不重抄）
-  editor?.ApplyOverlayCamera(camera, false);
-  if(editor?.activeId==='vfx')lights.Update(0,editor.active.previewTime??state.elapsed,camera.position);
-  else lights.Update(dt, state.elapsed, camera.position);
-  lights.UpdateShadowFrustum(camera.position, _forward);
-  if (render) RenderScene(dt);
-  return;
-}
-
-/** 第一关 0 段炮弹镜头：只推镜头、天空灯光、特效、战斗与画面。 */
-function FrameModeShellShot(f) {
-  const dt = f.dt, render = f.render;
-  p012StageZero.shellShot.Update(dt);
-  sky.Update(state.elapsed);lights.Update(dt,state.elapsed,camera.position);
-  vfx?.Update(dt,camera,state.elapsed);
-  combat?.Update(dt,{phase:PHASE_TABLE[state.phaseIndex]});
-  camera.getWorldDirection(_forward);lights.UpdateShadowFrustum(camera.position,_forward);
-  if(render)RenderScene(dt);
-  return;
-}
-
-/** 换关建切片中：什么都不跑。 */
-function FrameModeLoading() {}
-
-/** 测试场整帧接管（布料实验室）。 */
-function FrameModeLab(f) {
-  const dt = f.dt, render = f.render;
-  // The laboratory owns orbit input and simulation time, without FPS movement or combat side effects.
-  sandbox.Update(dt);
-  sandbox.UpdateCamera?.(dt);
-  hudRoot.style.display = "none";
-  sky.Update(state.elapsed);
-  lights.Update(dt, state.elapsed, camera.position);
-  camera.getWorldDirection(_forward);
-  lights.UpdateShadowFrustum(camera.position, _forward);
-  if (render) RenderScene(dt);
-  return;
-}
-
-/** 正常游戏：按 Data_FrameSchedule.FRAME_PLAY_STEPS 的先后跑，任何一步返回 STOP 就结束这一帧。 */
-function FrameModePlay(f) {
-  for (const step of PLAY_STEPS) if (step(f) === STOP) return;
-}
-
-function PlayStepDeathTimer(f) {
-  const dt = f.dt;
-  if (state.deathTimer > 0) {
-    state.deathTimer -= dt;
-    if (state.deathTimer <= 0 && state.pendingRespawn) {
-      if (MELEE_TEST) { /* Keep the test result until the player restarts. */ }
-      else if (state.nraPool > 0) RespawnPlayer();
-      else hud.Say(null, T("hud.say.noOneLeft"), 8);
-    }
-  }
-}
-
-function PlayStepInput(f) {
-  const realDt = f.realDt;
-  profiler.B("input");
-  if (meleeCombat) {
-    if(MELEE_TEST)MaintainMeleeTargets();
-    meleeCombat.Update(realDt);
-    if (MELEE_TEST && meleePreview) {
-      const pose = meleeCombat.ViewPose();
-      for (const entry of meleeTargets) if (entry.soldier.meleeCombat) entry.soldier.meleeCombat = MeleePreviewPose(entry.soldier, entry.soldier.meleeCombat);
-    }
-  }
-  const firePrev = input.fire;
-  ReadKeys();
-  p012BinocularRaised = !!p012Runtime?.binocularOwned && !!input.ads;
-  if (p012Runtime?.binocularOwned) { input.fire = false; input.ads = false; }
-  EnsureDebugInventory();
-  if (meleeCombat?.CanUse()) { input.fire = false; input.ads = false; }
-  if (meleeCombat?.Blocking) {
-    input.forward = 0; input.strafe = 0; input.sprint = false;
-    input.fire = false; input.ads = false;
-    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
-  }
-  // 架着机枪：人钉在射手位上。移动/冲刺/换姿势一并封掉，**左键留着**
-  // （它这会儿是机枪的扳机）。与白刃 QTE 同一条封法，不另起一套。
-  // 右键照 COD 新作的固定机枪：贴着照门收窄视野精瞄。它不走 player.ads ——
-  // 那条是手上步枪的开镜（视图模型、两脚架闸、准心淡出），枪这会儿背在背上；
-  // 这里只把意图记进 emplacedAds 给相机 FOV，并按同一张 FREE_AIM.adsLookScale 压转向。
-  if (BlockoutInputCaptured() || sandbox?.CapturesInput?.()) {
-    input.forward = 0; input.strafe = 0; input.sprint = false; input.fire = false; input.ads = false;
-    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
-  }
-  // 白盒编辑器的飞行观察：鼠标位移转的是飞行相机（走的还是游戏自己的那条输入链：指针锁 / 假后端 / 锁不住时按住右键拖动），
-  // 玩家本人不转头、不探身（Q / E 在飞行里是升降）。灵敏度与玩家转头同一口径。
-  if (BLOCKOUT && blockout?.flying) {
-    const flySens = (input.sensitivity ?? 1) * FREE_AIM.sensitivityScale;
-    blockout.FlyLook(-input.lookX * flySens, -input.lookY * flySens);
-    input.lookX = 0; input.lookY = 0; input.lean = 0;
-  }
-  emplacedAds = !!emplacement?.Mounted && !!input.ads && player.Alive;
-  if (emplacement?.Mounted) {
-    input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
-    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
-    const lookScale = 1 - adsFovT * FREE_AIM.adsLookScale;
-    input.lookX *= lookScale; input.lookY *= lookScale;
-  }
-  fireEdge = input.fire && !firePrev;
-  profiler.E("input");
-}
-
-function PlayStepCarry(f) {
-  const dt = f.dt;
-  // 负重必须排在 player.Update **之前**：它写的 carrySpeedScale 就是这一帧
-  // 玩家要用的那个乘数，写晚一帧就会出现「刚抬起来还能冲刺一步」。
-  carry?.Update(dt, player);
-  playerVent.Update(dt);
-}
-
-function PlayStepPlayer(f) {
-  const dt = f.dt;
-  profiler.B("player");
-  input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
-  player.meleePose = meleeCombat?.ViewPose();
-  missionRuntime?.BeforePlayer(dt,input);
-  const playerFrame = player.Update(dt, input, WEAPONS[currentWeapon], {
-    allowUndeployedAds: WEAPON_RANGE && SANDBOX_PLUGIN.phase.whitebox.allowUndeployedAds,
-    blockLean: !!emplacement?.Mounted || !!carry?.Blocking || !!missionRuntime?.EmptyHands
-      || !!state.cooking || !!meleeCombat?.Blocking
-      || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
-  });
-  if (playerFrame?.stanceBlockReason === "proneSlope") {
-    hud.Hint(T("hud.hint.proneSlopeBlocked"), 2);
-  }
-  player.UpdateGunClearance(emplacement?.Mounted || carry?.Blocking || missionRuntime?.EmptyHands ? null : WEAPONS[currentWeapon]);
-  SyncJumpSound();
-  if (sandbox?.updateSlot === "afterPlayer") sandbox.Update(dt);
-  profiler.E("player");
-}
-
-function PlayStepEmplacement(f) {
-  const dt = f.dt;
-  // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
-  // 夹晚一帧画面就会先越界再被拉回来。
-  if (emplacement) {
-    emplacement.SyncNpc(ai.soldiers);
-    // 按住 R 排小卡。R 在键位表里是 press（没有松手边沿），所以按住这件事
-    // 直接问 router 要 —— 比给 R 改成 holdAction 安全：那样 Reload() 会被调两次。
-    if (emplacement.Mounted && router?.Down("KeyR")) emplacement.BeginClear();
-    else emplacement.EndClear();
-    emplacement.Update(dt, player);
-    SyncMountedView(dt);
-    SyncEmplacementViews();
-    // 「刚下枪位」那一个边沿：把上枪位之前的姿态还回去。用边沿而不是在 Vacate 里做，
-    // 是因为离位有四条路（玩家按 F、人倒了、换关、战位被收掉），一条条挂钩会漏。
-    const mountedNow = emplacement.MountedId;
-    if (mountedIdLast && !mountedNow && seatStanceBefore) {
-      player.stance = seatStanceBefore;
-      seatStanceBefore = null;
-    }
-    mountedIdLast = mountedNow;
-  }
-}
-
-function PlayStepInteract(f) {
-  const dt = f.dt;
-  // 按住型交互反过来要排在 player.Update **之后**：够不够得着要用这一帧的位置，
-  // 玩家走开一步进度就该断，而不是在后台接着读条。
-  interact?.Update(dt, player);
-  // 被冲击波震脱手的枪：撒手、飞、落地停稳后交给 interact 当地上的枪；弯腰捡的那一下（Script_LooseGun）。
-  StepLooseGuns(dt);
-  // 发报：码组推进与底噪。排在 interact **之后** —— 那一层这一帧刚可能
-  // 把一组发出去。**什么都不封**：玩家可以边发边走开，进度留着（§7 不夺控制权）。
-  telegraph?.Update(dt, player);
-}
-
-function PlayStepHands(f) {
-  // 负重与架设机枪都要收枪（两只手都占着 / 枪背在背上）。**只在边沿写 visible**：
-  // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
-  // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
-  SyncMissionHands();
-  const handsBusy = !!carry?.Blocking || !!p012CarryView?.rig.root.visible
-    || (!!emplacement?.Blocking && !mountView.active) || !!p012Runtime?.binocularOwned;
-  if (viewmodel?.root && carryHidGun !== handsBusy) {
-    carryHidGun = handsBusy;
-    if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
-  }
-  input.lookX = 0; input.lookY = 0;
-  input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
-}
-
-function PlayStepFoley(f) {
-  const dt = f.dt;
-  // 脚步、落地、身体 foley 全部交给 Script_AudioWiring。
-  //
-  // 【2026-09-08】原来这里是两段写死的逻辑，各有一处硬伤：
-  //   · 落地固定播 footstepRubble + bodyFall —— bodyFall 是**一个人倒下**
-  //     （装具散开、四肢先后落地），于是每次跳窗台都像旁边有人被打死；
-  //   · 脚步按 `state.frame % 3` 在瓦砾与土路之间轮 —— 听感是「每走三步换一次地面」，
-  //     而脚底下到底是什么从来没有人问过。
-  // 现在按脚下真实材质查（射线拿碰撞盒 tag + 水深），姿态与冲刺分别给音量与步距，
-  // 姿态切换/翻越出布料声、冲刺出装具声、跑久了或伤重出喘息。
-  audioWiring.Update(dt, state.frame, SURFACE_BY_TAG);
-
-  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：这里只收落脚（人物按真实脚骨、玩家按步距），
-  // 画进痕迹靶是帧图 terrainTrails 那一趟的事。过场里玩家不留印（机位在演，身子不在那）。
-  TerrainTrailSystem.Update(dt, { focus: camera.getWorldPosition(trailFocus),
-    player: state.cutscene || state.menu ? null : player, scene });
-}
-
-function PlayStepPrompts(f) {
-  // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
-  // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。
-  if (state.frame % 6 === 0) {
-    profiler.B("hud");
-    UpdateContextualActionPrompts();
-    profiler.E("hud");
-  }
-}
-
-function PlayStepFirearms(f) {
-  const dt = f.dt;
-  // Mark the actual sprint release before this frame can fire. The raise and
-  // the 220ms readiness window run together instead of adding two waits.
-  const sprintOn = player.sprint > 0.35 && input.sprint && !player.wantAds;
-  if (sprintWasOn && !sprintOn) sprintReleaseAt = state.elapsed;
-  sprintWasOn = sprintOn;
-  UpdateReloadRequest();
-  if (player.Alive) TryFire(dt, combat.Returning);
-  else ClearFirearmRequests();
-  // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
-  if (state.activeSlot === "throwable" && state.cooking && !input.fire) ReleaseCook();
-  // 白刃蓄力步进。鼠标那条的"松手"在这里判（键盘那条走 OnAction 的 up 边沿）；
-  // 蓄力中死了就取消 —— 尸体不出招。
-  if (state.meleeCharge) {
-    state.meleeCharge.t += dt;
-    if (!player.Alive) { state.meleeCharge = null; viewmodel.CancelMeleeCharge?.(); }
-    else if (state.meleeCharge.source === "mouse" && !input.fire) ReleaseMeleeCharge();
-  }
-}
-
-function PlayStepCameraFov(f) {
-  const dt = f.dt;
-  // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下。
-  // 屏息相对普通开镜再放大约 1.1×：这是"憋住那一口气把注意力收拢"的视觉说法，
-  // 也让玩家一眼知道自己确实在屏息（我们不给体力条）。
-  //
-  // 【2026-08-19 按战地 datamine 重做，两条】
-  //
-  // 一、**FOV 过渡是固定 150 ms 的，跟哪支枪无关。** BFV 全部 82 支枪的
-  //    AimingFovTransitionTime 都是 0.15 s —— 枪的轻重差异**全在视图模型的动画里**，
-  //    不在相机上。我们原来是「每枪不同的 ads 速度」再串一层 dt*9 的指数平滑
-  //    （≈231 ms 才到位），两层滞后叠在一起，结果手枪和捷克式在相机上反应几乎
-  //    一样糊 —— 分不出轻重，方向正好做反了。
-  //    现在相机走自己那条 150 ms 的线性过渡，枪的轻重仍由 adsTimeS 在动画上体现。
-  //
-  // 二、**拉栓/装填强制退出瞄准。** BF1 的栓动枪拉栓会强制退出瞄准镜，那一下
-  //    「丢失瞄准画面」对栓动枪分量的贡献，比那 2° 后坐大得多。
-  //    Script_Viewmodel 早就在做了（adsInput 乘了 actionBlend），但相机一直没跟上：
-  //    枪都甩出画面了视野还是窄的 —— 玩家看到的是「视野卡住了」，不是「在拉栓」。
-  const weapon = WEAPONS[currentWeapon];
-  // 只数真正拿着火器进入 ADS 的上升沿；空手、望远镜、过场和菜单不消耗三次教学。
-  const tutorialAds = state.running && !state.menu && !state.cutscene && player.Alive
-    && Number(weapon?.magazine) > 0 && player.wantAds;
-  if (tutorialAds && !state.breathHoldHintAds
-    && state.breathHoldHintCount < BREATH_HOLD.tutorialAdsCount) {
-    state.breathHoldHintCount += 1;
-    hud.Hint(T("hud.hint.breathHold"));
-  }
-  state.breathHoldHintAds = tutorialAds;
-  const adsHeld = player.wantAds || emplacedAds ? 1 : 0;
-  const fovStep = dt / ADS_FOV_TIME;
-  adsFovT = adsHeld > adsFovT ? Math.min(adsHeld, adsFovT + fovStep)
-    : Math.max(adsHeld, adsFovT - fovStep);
-  // 架着机枪时镜头倍率取**机枪**那支枪的 adsFovScale（与步枪同一条 150 ms 过渡），
-  // 背上步枪的视图模型曲线不参与：它这会儿不在瞄准线上，也不该把机枪的视野拽回来。
-  const mountedWeapon = emplacement?.Mounted
-    ? WEAPONS[emplacement.Emplacement(emplacement.MountedId)?.kind.weaponId] || null : null;
-  const fovWeapon = mountedWeapon || weapon;
-  // 拉栓/装填期间乘上视图模型自己那条脱离瞄准的曲线（Script_Viewmodel.adsSuppress）。
-  // 用它、而不是在这儿另起一个 150 ms 的 snap，是因为因果要对：
-  // 视野丢失是**枪离开了瞄准线**的结果，两者本来就该是同一条曲线。
-  const adsEff = adsFovT * (emplacement?.Mounted ? 1 : (viewmodel.adsSuppress ?? 1));
-  // 屏息放大单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
-  breathFov += ((player.breathHold ? BREATH_HOLD.fovScale : 1) - breathFov)
-    * Clamp01(dt * BREATH_HOLD.fovLerpRate);
-  const baseFov = graphics.fov * (1 - adsEff * (1 - (fovWeapon?.adsFovScale ?? 0.75))) * breathFov;
-
-  // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——
-  // 那一下才是"顿"而不是"晃"。叠在 FOV 上 1.9°，约等于开镜变化量的 12%。
-  //
-  // 关于「把 FOV 追踪系数 dt*9 提到 dt*26」那一条：**那个系数已经不存在了。**
-  // 上一轮照战地 datamine 把相机侧的指数平滑整个换成了固定 150 ms 的线性过渡
-  //（见上面那段注释），camera.fov 现在是每帧直接赋值的，没有任何一层平滑会
-  // 把 1.9° 抹平。所以这一条方子的目的（"别让顿挫被插值吃掉"）现在由结构保证，
-  // 不需要那个魔法数。这不是漏做，是前提变了。
-  if (firePunch > 0) {
-    firePunch = Math.max(0, firePunch - dt / FIRE_PUNCH_DECAY_S);
-  }
-  const punch = firePunch * firePunch;
-  // 第一关 01 受困段把视野收窄（Script_FirstLevelFrontShow.NarrowFovDeg 管平滑）；
-  // 其它时候原样返回基准 FOV，这一层不改任何既有手感。
-  const missionFov = missionRuntime?.NarrowFovDeg?.(baseFov, dt) ?? baseFov;
-  const targetFov = p012BinocularRaised ? 25 : missionFov + punch * FIRE_PUNCH_FOV_DEG;
-  if (Math.abs(camera.fov - targetFov) > 0.001) {
-    camera.fov = targetFov;
-    camera.updateProjectionMatrix();
-  }
-  p012Binoculars?.Update({owned:!!p012Runtime?.binocularOwned,raised:p012BinocularRaised},dt);
-  f.weapon = weapon;
-}
-
-function PlayStepView(f) {
-  const dt = f.dt;
-  // 枪感方子 3：**把视线增量接进 sway。**
-  // 限幅、增量换算在 Script_FirearmHandling.LookSway；这里只负责算出每帧转了多少。
-  // 算增量要用**枪口方向**（yaw + aimYaw），不是视线：自由瞄准那一段偏移
-  // 本来就是"枪还没跟上"的一部分，漏掉它枪会在自由瞄准范围内诡异地不动。
-  const viewYaw = player.yaw + player.aimYaw;
-  const viewPitch = player.pitch + player.aimPitch;
-  let dYaw = viewYaw - lastViewYaw;
-  // 绕过 ±π 那一圈：不处理的话转身穿过背后时会甩出一个 2π 的假增量，
-  // 枪会整个飞出画面（弹簧限幅救不了，因为输入本身错了三个数量级）
-  if (dYaw > Math.PI) dYaw -= Math.PI * 2;
-  else if (dYaw < -Math.PI) dYaw += Math.PI * 2;
-  const dPitch = viewPitch - lastViewPitch;
-  lastViewYaw = viewYaw;
-  lastViewPitch = viewPitch;
-  lastLookDeltaYaw = dYaw;
-
-  // 第一人称持枪移动检查：替身眼睛抄这一帧的玩家眼睛，Viewmodel 挂在它下面（没开工具 = 空操作）。
-  editor?.SyncOverlayEye(camera);
-  profiler.B("viewmodel");
-  if (!player.Alive && viewmodel.deathHands) UpdatePlayerDeath();
-  else {
-  if (mountView.active) MountedViewPose();
-  viewmodel.Update(dt, {
-    // 被冲击波掀倒时枪跟着放下去（借贴墙收枪那一层；Script_PlayerKnockback.GunLower）
-    wallLower: mountView.active ? 0 : Math.max(player.gunClearance.lower, player.knock?.GunLower ?? 0),
-    playerPosition: player.position, playerYaw: player.yaw,
-    // 第一人称身体的落脚点跟地形起伏（Script_FirstPersonGait：只取相对玩家脚下的高差）。
-    bodyGroundAt: BodyGroundAt,
-    carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
-    carryBodyYaw: p012CarryView?.bodyYaw,
-    carryBodyCrouch: p012CarryView?.BodyCrouch || 0,
-    // 第一人称的腿和身子：白刃倒地、被冲击波掀倒横在地上时都藏起来（那套站姿身体对不上）
-    meleeCameraDrop: Math.max(player.meleeCameraDrop, player.knock?.BodyHidden ? 1 : 0),
-    prone: player.stanceBlend.prone, alive: player.Alive,
-    dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
-    strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
-    verticalVelocity: player.velocity.y,
-    ads: mountView.active ? (emplacedAds ? 1 : 0) : player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
-    // 自由瞄准的**绝对**偏移（不是增量）：枪要真的指到那儿去。
-    // 没有这两条的话，2° 锥内推鼠标只有弹道在偏、画面一动不动 ——
-    // 而本作没有准星，玩家读不到任何东西（见 docs/Data_GunFeelReview.md 末节）。
-    freeAimYaw: player.aimYaw, freeAimPitch: player.aimPitch,
-    crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
-    // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
-    // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
-    lowAmmo: state.ammo <= 0,
-    ammo: emplacement?.Mounted ? emplacement.Emplacement(emplacement.MountedId)?.rounds : state.ammo,
-    meleeCombat: meleePreview && meleeCombat?.ViewPose() ? MeleePreviewPose(player, meleeCombat.ViewPose()) : meleeCombat?.ViewPose() || null,
-    // 近爆的身体反应：收枪、缩肩、手臂慢半拍、之后手抖（Script_BlastFlinch.arms；没在反应时是 null）。
-    blastFlinch: player.flinch?.Active ? player.flinch.arms : null,
-  });
-  // 弯腰捡震脱手的枪：抓到之前右手（空手）伸向地上那把（Script_LooseGun.GunReachPose）。
-  if (looseGun.recover && !viewmodel.weapon && looseGun.recover.reach > 0) viewmodel.ReachWorld(looseGun.recover.atV, looseGun.recover.reach);
-  }
-  profiler.E("viewmodel");
-}
-
-function PlayStepAlliesDown(f) {
-  // 友军倒下：叙事层要靠它触发「他倒了我上，我倒了你上」那几句。
-  // 用计数差而不是回调 —— AiDirector 没有死亡事件，加一个回调等于改它的契约，
-  // 而计数差在这里够用且不会漏（同一帧死两个人只报一次，叙事上也没差别）。
-  const alliesNow = ai.CountSide("nra");
-  if (state.prevAllies > 0 && alliesNow < state.prevAllies && story) story.Signal("allyDown");
-  state.prevAllies = alliesNow;
-}
-
-function PlayStepFlare(f) {
-  const dt = f.dt;
-  // 照明弹：升空→点燃→伞降燃烧→熄灭→暗适应，外加**发现距离倍率**。
-  // **必须排在 ai.Update 之前**：倍率要在这一帧的 Think 之前写进 AiDirector，
-  // 写晚一帧就成了「亮了，但这一帧还没有人看见」。灯与烟由它自己的宿主
-  // 适配器写进 LightRig / VfxSystem，那两个的 Update 都排在后面（见下）。
-  flare?.Update(dt);
-}
-
-function PlayStepCompanion(f) {
-  const dt = f.dt;
-  // 具名同伴的跟随目标。**必须排在 ai.Update 之前**：goal 要在这一帧的 Think
-  // 之前写进去，写晚一帧就是「班长永远慢你一步」。它自己按 regoalS 分频，
-  // 不是每帧都真的写（每帧写 goal 等于每帧打断寻路）。
-  companion?.Update(dt);
-}
-
-function PlayStepAi(f) {
-  const dt = f.dt;
-  profiler.B("ai");
-  if (sandbox?.updateSlot === "beforeAi") sandbox.Update(dt);
-  ai.Update(dt, camera);
-  profiler.E("ai");
-}
-
-function PlayStepPhysics(f) {
-  const dt = f.dt;
-  // 物理步进排在**人都走完之后、特效与投掷物之前**：
-  // 玩家与 AI 是运动学体，它们这一帧的位移要先写进刚体，引擎再把碰撞体同步过去；
-  // 手雷是动态刚体，它读的就是同步之后的那份位置。顺序反了会差一帧，
-  // 表现为「手雷从刚跑过去的人身上穿过去」。
-  profiler.B("physics");
-  if (physics) physics.Step(dt);
-  // 断肢块排在**物理步进之后、Vfx 之前**：它把刚体位姿同步到网格上，
-  // 而挂在断面上的持续血源是 Vfx 每帧读节点世界矩阵取位置的 —— 顺序反了
-  // 血会跟着上一帧的肢块走（一段在半空的血迹）。
-  gore?.Update(dt, camera);
-  profiler.E("physics");
-}
-
-function PlayStepVfx(f) {
-  const dt = f.dt;
-  profiler.B("vfx");
-  vfx.Update(dt, camera, state.elapsed);
-  profiler.E("vfx");
-}
-
-function PlayStepCombat(f) {
-  const dt = f.dt;
-  profiler.B("combat");
-  combat.Update(dt, { phase: PHASE_TABLE[state.phaseIndex] });
-  if (sandbox?.updateSlot === "afterCombat") sandbox.Update(dt);
-  // 日机扫射：弹着线推进、白名单结算、玩家躲避窗口。**必须排在下面那条
-  // 死亡判定之前** —— 它打得倒玩家，排在后面那一类死法会被整帧吞掉
-  // （与手榴弹/掷弹筒同一笔账，见死亡判定那段注释）。
-  strafe?.Update(dt);
-  // 炮坑的地表碎块：爆炸那一帧只改地形与碰撞，半埋的土块石块摊到随后一两帧铺
-  // （一块 ~12k 顶点，是爆炸链里最贵也最不怕晚一帧的一项）。
-  battlefield?.deformation?.Update();
-  profiler.E("combat");
-}
-
-function PlayStepLights(f) {
-  const dt = f.dt;
-  // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
-  if (state.cooking) state.cook += dt;
-  sky.Update(state.elapsed);
-  lights.Update(dt, state.elapsed, camera.position);
-  camera.getWorldDirection(_forward);
-  lights.UpdateShadowFrustum(player.position, _forward);
-  // 探针体（gi.Update）不在这里推，它挂在 RenderScene 上 —— 见那里的账。
-}
-
-function PlayStepPlayerDown(f) {
-  const dt = f.dt, render = f.render;
-  // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
-  // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
-  // combat.Update 里 —— 判定放在 player.Update 紧后面的话，那一类死法会被整个吞掉：
-  // 不弹卡片、兵员池不扣、不换人，玩家永远躺在地上。
-  // 脚本安排的无敌窗口（四关罗班长救顺子那 4—6 秒）：这一段是脚本不是战斗，
-  // 死在里面会把整拍跳过去。被打倒时**不走死亡链路**，走检查点倒带 ——
-  // 不扣兵员池、不弹死亡卡、不换人（Script_Checkpoint 的头注写着为什么）。
-  if (state.playerAliveLast && !player.Alive && state.elapsed < scriptInvulnUntil) {
-    if (checkpoint?.Rewind(2.0)) state.playerAliveLast = true;
-  }
-  if (state.playerAliveLast && !player.Alive) OnPlayerDown();
-  state.playerAliveLast = player.Alive;
-  if(missionRuntime?.failed || p012Runtime?.failed){if(render)RenderScene(dt);return STOP;}
-}
-
-function PlayStepFirewalls(f) {
-  // 火墙（三关传单入火封住的那条追击路线）。**对玩家同样有伤害** ——
-  // 它是封路，不是单向道具。烧完就把烟收掉。
-  if (state.firewalls.length) {
-    for (let i = state.firewalls.length - 1; i >= 0; i -= 1) {
-      const wall = state.firewalls[i];
-      if (state.elapsed > wall.until) {
-        for (const handle of wall.smoke) vfx?.RemoveSmokeSource(handle);
-        state.firewalls.splice(i, 1);
-        continue;
-      }
-      if (!wall.damagePlayer || !player.Alive) continue;
-      if (state.elapsed - wall.lastHurt < 0.6) continue;
-      // 点到线段的距离：1.6 m 之内算站在火里。
-      const dx = wall.bx - wall.ax;
-      const dz = wall.bz - wall.az;
-      const len2 = dx * dx + dz * dz;
-      const t = len2 > 0
-        ? Clamp(((player.position.x - wall.ax) * dx + (player.position.z - wall.az) * dz) / len2, 0, 1)
-        : 0;
-      const near = Math.hypot(player.position.x - (wall.ax + dx * t), player.position.z - (wall.az + dz * t));
-      if (near > 1.6) continue;
-      wall.lastHurt = state.elapsed;
-      player.TakeHit(9, "legs", null, { fire: true });
-      hud.Hint(T("hud.hint.fireBlocks"), 1.6);
-    }
-  }
-}
-
-function PlayStepCheckpoint(f) {
-  // 脚本检查点：**排在死亡判定之后**，采的是这一帧最终的位置/姿态/血/弹。
-  // 排在前面的话，被打死的那一帧也会被采进环里，倒带就退回到"刚好要死"的那一刻。
-  checkpoint?.Update();
-}
-
-function PlayStepMission(f) {
-  const dt = f.dt;
-  profiler.B("story");
-  profiler.B("story/mission");
-  missionRuntime?.Update(dt);
-  missionRuntime?.opening.ApplyCamera();
-  // 白盒编辑器的预演：玩家相机写完之后接管（docs/Data_EditorBlockout.md §14.2）
-  // 飞行观察时相机可能离玩家很远：阴影框跟着相机走（同炮击扬尘测试场的自由相机）
-  const blockoutCamera = !!blockout?.ApplyCamera?.(camera);
-  if (blockoutCamera && blockout.flying) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
-  // 测试场的自由观察相机（炮击扬尘）：玩家相机写完之后接管，阴影框跟着相机走（玩家留在原地）。
-  const sandboxCamera = !!sandbox?.ApplyCamera?.(camera);
-  if (sandboxCamera) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
-  // 第一人称持枪移动检查：白盒预演 / 飞行与测试场相机都没接管时，主相机挪到玩家身旁的外部机位
-  //（阴影框留在玩家脚下：机位就在几米内）。
-  if (!blockoutCamera && !sandboxCamera) editor?.ApplyOverlayCamera(camera, true);
-  profiler.E("story/mission");
-  if(missionRuntime?.completed){profiler.E('story');return STOP;}
-}
-
-function PlayStepP012(f) {
-  const dt = f.dt;
-  if (p012Flow) {
-    profiler.B("story/p012");
-    p012StageZero?.Update(dt);
-    p012Resting?.Update(dt);
-    p012Runtime.Update(dt);
-    p012Runtime.TryDitchDodge(player.position, player.stance, strafe?.View());
-    if (p012Runtime.weaponActionPending && !viewmodel.IsBusy?.()) {
-      p012Runtime.weaponActionPending = false; p012Runtime.weaponActionCount++;
-      CompleteP012ManualReload(p012Runtime);
-    }
-    p012Flow.Update(dt, ReadP012ProgressSample());
-    if (story.Signalled("P012Complete")) {
-      // 这片白盒就是玩家的第一关：打完记进度，选章里标「已通过」（id 与 CAMPAIGN_ENTRIES[0] 同）。
-      Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, 0);
-      p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();
-      profiler.E("story/p012"); profiler.E("story"); return STOP;
-    }
-    profiler.E("story/p012");
-  }
-}
-
-function PlayStepObjectives(f) {
-  const dt = f.dt;
-  profiler.B("story/objectives");
-  UpdateObjectives(dt);
-  profiler.E("story/objectives");
-}
-
-function PlayStepNarrative(f) {
-  const dt = f.dt;
-  // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
-  // 线性关卡里逼玩家往前打的是**时间**与**剧本**，不是一条会把你耗死的进度条：
-  // 城是必然陷落的，磨时间没有任何好处。
-
-  // --- 叙事层 ---
-  // 身边六十米内有敌人在开枪 = 正在交火。原剧本的 wave:N / waveClear:N
-  // 就映射到这个计数上 —— 开放战场没有编排好的波次，但"身边打起来了"这件事有。
-  profiler.B("story/narrative");
-  let fighting = false;
-  for (const s2 of ai.soldiers) {
-    if (!s2.alive || s2.side === "nra") continue;
-    if (state.elapsed - s2.lastFire > 2.5) continue;
-    if (s2.position.distanceTo(player.position) < 60) { fighting = true; break; }
-  }
-  story.SetFighting(fighting);
-  const playerZone = battlefield.objectives.find((o) =>
-    Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
-  story.Update(dt, {
-    zone: playerZone ? ContentZoneId(playerZone) : null,
-    objectiveIndex: state.objectiveIndex,
-    objectiveCount: state.objectiveCount,
-    levelSeconds: state.levelSeconds,
-    pool: state.nraPool,
-    p012Beat: p012Flow?.beat,
-  });
-  if (story.ObjectiveText && !p012Flow && !missionRuntime) state.storyObjective = story.ObjectiveText;
-  profiler.E("story/narrative");
-}
-
-function PlayStepSetpieces(f) {
-  const dt = f.dt;
-  // 章节摆点：**排在 story.Update 之后**。它的 onVoice 钩子读的是 story.fired，
-  // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
-  // 这种同拍的事会看得出来差一帧。
-  profiler.B("story/setpieces");
-  setpieces?.Update(dt);
-  profiler.E("story/setpieces");
-  if (p012CarryView) {
-    profiler.B("story/carry");
-    const litterId = setpieces?.mem?.p012CarriedLitter?.propLitter;
-    p012CarryView.Update(dt, { litter: missionRuntime?.view.zhouRoot || setpieceProps.get(String(litterId))?.root,
-      player, carry: carry?.View(), alive: player.Alive && !state.cutscene && !state.menu });
-    profiler.E("story/carry");
-  }
-}
-
-function PlayStepScenario(f) {
-  // 事件先改变白盒，再让玩家从改变后的世界里读到结果：护送队喊走后开院门，
-  // 南路被切断后开归路。不存在悬浮解释卡，也不存在隐形空气墙。
-  profiler.B("story/scenario");
-  const openedScenarioGates = battlefield?.SyncScenario?.({
-    objectiveIndex: state.objectiveIndex,
-    // 第一关的换态信号名与事实名不一样（契约 §3 冻结了大写信号名），
-    // 对照表在 Data_FirstLevelMissionGates.MISSION_SCENARIO_SIGNALS，运行时用 Signalled 查。
-    signalled: (name) => !!missionRuntime?.Signalled(name) || story.Signalled(name) || !!blockout?.Signalled(name),
-  });
-  // 连通分量摊到后面几帧（Script_Navigation.Refresh 的 spread）：01 洞口塌方就在近爆那一帧换态。
-  if (openedScenarioGates > 0) navGrid?.Refresh(battlefield, { spread: true });
-  profiler.E("story/scenario");
-  profiler.E("story");
-}
-
-function PlayStepOutcome(f) {
-  const dt = f.dt;
-  // --- 结束条件 ---
-  // **这座城没有"守住"这个结局。** 三月十七日它陷落，十八日午前肃清完毕，
-  // 这是信史，不给玩家改。所以"赢"只有一种意思：这一关的目标链走完了。
-  // 唯一的失败是池子空了 —— 「城里还站着的人」减到零，再没有人可以填上去。
-  if (!state.outcome && state.nraPool <= 0 && !player.Alive) EndBattle("defeat");
-
-  state.phaseTime += dt;
-  const phase = PHASE_TABLE[state.phaseIndex];
-
-  // --- 钉关（mechanics.pinFinalZone）---------------------------------------
-  // 第五关最后一个路标是「返回最后火力点」，而阶段⑩⑪⑫（最后防守三层、
-  // 最终白刃战、视角接替三段）全在它**之后**。按常规规则一踏进那个圈就
-  // objectiveIndex ≥ objectiveCount，Script_Main 立刻换关，整段被吃掉。
-  // 所以章节数据声明这条旗标之后，走到最后一个路标只是"到了"，
-  // 要等 story.Signal("ChapterRelease") 才放行。
-  //
-  // 保险丝：信号一直不来的话，超过配置时长 + PIN_RELEASE_GRACE_S 自动放行并告警。
-  // 没有它，一条忘了接的信号就是"这一关永远打不完"，而画面上完全看不出为什么。
-  if (state.pinFinalZone && !state.chapterReleased) {
-    if (story.Signalled(CHAPTER_RELEASE_SIGNAL)) {
-      state.chapterReleased = true;
-      state.chapterReleaseAt = state.phaseTime;
-    } else if (state.phaseTime > state.levelSeconds + PIN_RELEASE_GRACE_S) {
-      state.chapterReleased = true;
-      state.chapterReleaseAt = state.phaseTime;
-      console.warn(`钉关保险丝：${phase.id} 等不到 ${CHAPTER_RELEASE_SIGNAL}，`
-        + `已超时 ${Math.round(state.phaseTime - state.levelSeconds)} s，自动放行`);   // @text-ok console.warn 的续行
-    }
-  }
-  const chapterPinned = state.pinFinalZone && !state.chapterReleased;
-
-  // 换关：目标链走完，或者配置时长到了（史实时段是往前走的，不等玩家）
-  const levelOver = !state.pinned && !chapterPinned
-    && (state.objectiveIndex >= state.objectiveCount || state.phaseTime > state.levelSeconds);
-  if (levelOver && !state.advancing && !state.outcome) {
-    // 异步：建下一片切片要分帧走完。这里只管点火，别 await —— Frame 是同步的。
-    AdvanceLevel().catch((error) => console.error("换关失败", error));
-  }
-  f.phase = phase;
-}
-
-function PlayStepSpawn(f) {
-  const dt = f.dt, phase = f.phase;
-  // 补兵（靶场不补战线，只把倒下的木桩兵按 RANGE_RESPAWN_S 复位）
-  state.spawnAccumulator += dt;
-  if (state.spawnAccumulator > 3) {
-    state.spawnAccumulator = 0;
-    profiler.B("spawn");
-    if (SANDBOX_RANGE?.respawn === "range") MaintainRangeTargets();
-    else if (SANDBOX_RANGE?.respawn === "melee") MaintainMeleeTargets();
-    // 其余测试场不补兵：枪械射击场的靶由它自己每帧维护；断肢场的木桩兵**不自动复位**
-    //（断了的肢体要留在场上看，复位走面板的「重置木桩」）；其余场地本来就没有兵。
-    else if (SANDBOX_RANGE) { /* Sandbox fixtures maintain themselves. */ }
-    else if (BLOCKOUT) { /* Blockout units are editor-owned puppets; nothing to reseed. */ }
-    else if (TOOLS_HOME) { /* The tools home is an empty lot. */ }
-    else SeedSoldiers(phase);
-    profiler.E("spawn");
-  }
-}
-
-function PlayStepHud(f) {
-  const dt = f.dt, weapon = f.weapon, phase = f.phase;
-  // --- HUD ---
-  profiler.B("hud");
-  // The campaign objective is read on the pause screen, without HUD notifications.
-  hud.SetObjective(phase.whitebox?.fullMission ? missionRuntime?.ObjectiveNotice() || "" : state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
-  // 架着机枪时右下那块弹药读数换成**机枪**的：同一个元素、同一套低弹/空膛配色，
-  // 不另画一块小字面板 —— 两套口径并排，玩家会读成两件不同的事。
-  // 备弹照步枪口径折成发数（板数 × 每板），不是「3 板」。
-  const empView = emplacement?.View() || null;
-  hud.SetState({
-    wounded: player.wounds.length > 0,
-    bleeding: player.bleeding,
-    bandages: player.bandages,
-    breath: player.breathHold,
-    order: state.order,
-    ammo: empView ? empView.rounds : state.ammo,
-    clips: empView ? empView.belts : state.clips,
-    magazine: empView ? empView.beltRounds : weapon?.magazine ?? 0,
-    armed: empView ? !empView.dead : Number(weapon?.magazine) > 0,
-    infiniteAmmo: !empView && sandbox?.armory?.ammoMode === "infinite",
-    infiniteReserve: !empView && !!sandbox?.armory,
-    grenades: state.grenades,
-    bundles: state.bundles,
-    mortar: combat.MortarReady ? combat.MortarLeft : 0,
-    cooking: state.cooking ? Math.min(1, state.cook / 1.1) : 0,
-  });
-  // 标准 FPS 规则：准心固定屏幕中心。枪体动画不能拖着 HUD 基准移动；
-  // 默认难度下 AimDirection 与 ViewDirection 共轴，开镜时机械瞄具也解到同一中心。
-  // 缝画的是**这一枪真实的散布锥**（player.SpreadDeg），不是手感常数 —— 见 Hud.SetCrosshair。
-  // 大刀与手榴弹没有散布可言，给固定小十字，别拿步枪的锥去骗人。
-  // 枪械须同时有弹药类型和弹仓；没有独立散布数值的机枪也使用 Player 的默认精度。
-  // 架着机枪时准心画的是**机枪**的散布锥（Script_Emplacement 的 spreadDeg），
-  // 不是背上那支步枪的 —— 拿步枪的锥去骗人比不画还差。
-  const firearm = empView ? true : !!weapon?.ammo && weapon.magazine > 0;
-  const spreadDeg = empView ? empView.spreadDeg * player.firearmHandling.SpreadScale(WEAPONS[emplacement.Emplacement(empView.id)?.kind.weaponId]) : (firearm ? player.SpreadDeg(weapon) : 0);
-  // 弹药块的闲置自隐（COD《战争世界》）：数字变了由 Hud.SetState 自己拨；
-  // 数字没变的交互 —— 扣着扳机、开镜看一眼 —— 在这里拨。架着机枪时那块读的是机枪，
-  // 右键意图在 emplacedAds（input.ads 已被机枪那条封掉）。
-  if (player.Alive && firearm && (input.fire || input.ads || emplacedAds)) hud.Touch("combat");
-  hud.SetCrosshair({
-    // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
-    // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
-    visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && (empView || GunReadyFromCover(player.gunClearance, viewmodel.wallLower))
-      && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned && !missionRuntime?.EmptyHands,
-    spreadDeg,
-    fovDeg: camera.fov,
-    viewportHeight: window.innerHeight,
-    armed: firearm,
-    grenade: !!state.cooking,
-    sprint: player.sprint,
-    ads: player.ads,
-    dt,
-  });
-  // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
-  hud.SetTarget(MELEE_TEST || missionRuntime?.frontShow?.bunker.CameraActive ? null : identify.Update(dt, {
-    eye: _idEye.copy(player.EyePosition),
-    dir: player.AimDirection(_idAim),
-    soldiers: ai.soldiers,
-    // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
-    // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
-    detail: player.Alive && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active
-      ? (WEAPON_RANGE ? false : DIFFICULTY.targetInfo ?? "basic") : false,
-    spreadDeg,
-  }), phase.hud);
-  hud.SetSuppression(player.suppression);
-  // 屋内伏击那一拍自带一个提示环，共用的底部僵持进度卡这时候让位（其余场合照旧）。
-  const cinematicPrompt = missionRuntime?.AmbushPromptView?.() || null;
-  hud.SetCinematicBeat(missionRuntime?.AmbushCinematic === true);
-  hud.SetCinematicPrompt(cinematicPrompt);
-  hud.SetMeleeQte(missionRuntime?.AmbushCinematic ? null : (meleeCombat?.View() || null));
-  if (MELEE_TEST && state.frame % 6 === 0) meleeLab?.Update(MeleeSnapshot());
-  // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
-  hud.SetInteractProgress(interact?.View() || null);
-  hud.SetCarry(carry?.View() || null);
-  hud.SetWeaponUiVisible(!missionRuntime?.EmptyHands);
-  for(const entry of setpieceProps.values())if(entry.woundedActor&&entry.root.visible)UpdateWoundedActor(entry.woundedActor,dt);
-  // 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。同样只读脱敏快照。
-  hud.SetEmplacement(empView);
-  // 报码纸（终章亲手发报）。同样只读脱敏快照。
-  hud.SetTelegraph(telegraph?.View() || null);
-  // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
-  // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
-  // 满血挨一发三八式（当时 39.6 点）之后暗角只有 0.088 × 边缘 0.52 ≈ 看不见，
-  // 而再挨一发人就没了。玩家说的"连红框都没有"指的就是这一行。
-  hud.SetHurt({
-    health: player.health,
-    flash: player.hitFlash,
-    marks: player.hitMarks,
-    yaw: player.yaw,
-  });
-  PlayHurtCues();
-  const markerObjectives = phase.hud?.objectiveMarkers === false ? [] : battlefield.objectives;
-  hud.UpdateMarkers(markerObjectives, camera, (x, y, z) => {
-    _proj.set(x, y, z);
-    const dist = _proj.distanceTo(camera.position);
-    _proj.project(camera);
-    return {
-      x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
-      visible: _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
-      dist,
-    };
-  }, state.objectiveIndex);
-  // 活手榴弹进入实际爆炸伤害范围才提示；屏内钉住落点，屏外贴边指方向。
-  // 单独再投影一次最多只有四颗，避免把目标路标与爆炸警告绑成一套生命周期。
-  hud.UpdateGrenadeWarnings(combat.GrenadeThreats(player.position), player, (x, y, z) => {
-    _proj.set(x, y, z);
-    // 先在视空间判「在镜头前还是身后」：身后的点经透视除法会翻到对面，
-    // 屏幕坐标不能再当方向用（HUD 那边对身后的弹退回按 yaw 算方位）。
-    _proj.applyMatrix4(camera.matrixWorldInverse);
-    const behind = _proj.z >= 0;
-    _proj.set(x, y, z).project(camera);
-    return {
-      x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
-      visible: !behind && _proj.z > -1 && _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
-      behind,
-    };
-  });
-  hud.UpdateMinimap(dt, {
-    player, objectives: battlefield.objectives, soldiers: ai.soldiers, bounds: battlefield.bounds,
-  });
-  hud.Update(dt);
-  // 敌军 AI 覆盖层排在 HUD 之后、渲染之前：它读的是这一帧决策完的状态。
-  // 默认关；开着的时候也只是 DOM，画面本身一个像素都不动。
-  UpdateAiDebugOverlay();
-  profiler.E("hud");
-}
-
-function PlayStepRender(f) {
-  const dt = f.dt, render = f.render;
-  // --- 渲染 ---
-  if (!render) {
-    // Manual simulation still emits spatial audio. Keep its listener at the
-    // simulated viewpoint, just as RenderScene does after a displayed frame.
-    camera.updateWorldMatrix(true, false);
-    audio.SetListener(camera);
-    return;
-  }
-  RenderScene(dt);
+  if (FrameFrozen(ctx, dt, render)) return;
+  BeginFrame(ctx, frameState, dt, render);
+  FRAME_MODE_STEPS[FrameMode(ctx)](ctx, frameState);
 }
 
 /**

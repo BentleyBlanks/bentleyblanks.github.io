@@ -10,7 +10,7 @@ function Frame(dt, render = true) {
 }
 ```
 
-表在 `Data_FrameSchedule.mjs`（纯数据），门禁 `FrameScheduleTest`（纯 Node）。
+表在 `Data_FrameSchedule.mjs`（纯数据），模式在 `Script_FrameModes.mjs`，步骤在 `Script_FrameSteps{Player,World,Rules,Present}.mjs`，门禁 `FrameScheduleTest`（纯 Node）。
 
 ## 模式（FRAME_MODES，按先后判）
 
@@ -24,13 +24,25 @@ function Frame(dt, render = true) {
 
 ## 正常游戏的步骤（FRAME_PLAY_STEPS）
 
-33 步，一步一个函数 `PlayStep<Id>(f)`，`PLAY_STEPS` 按表的顺序生成（名字对不上开机就抛错）：
+33 步，一步一个函数 `PlayStep<Id>(ctx, f)`，按系统分在四个文件里（玩家这一侧 / 世界模拟 / 规则与任务 / 表现与出画），每个文件导出一组 `<组>_STEPS`；`Script_Main` 把四组合进 `PLAY_STEP_FUNCS`，`PLAY_STEPS` 按表的顺序生成（名字对不上开机就抛错）：
 
 deathTimer → input → carry → player → emplacement → interact → hands → foley → prompts → firearms → cameraFov → view → alliesDown → flare → companion → ai → physics → vfx → combat → lights → playerDown → firewalls → checkpoint → mission → p012 → objectives → narrative → setpieces → scenario → outcome → spawn → hud → render
 
 - 步骤之间要传的这一帧的量放在 `frameState`：`dt`（玩法时间）、`realDt`（真实时间，白刃 QTE 用）、`render`、`weapon`（cameraFov 写、hud 读）、`phase`（outcome 写、spawn / hud 读）。每帧覆盖同一个对象，不产生垃圾。
 - 任何一步返回 `STOP` 就结束这一帧：任务失败（playerDown）、第一关通关（mission）、P012 通关（p012）。步骤里不许写裸 `return;`（拆开之后它只结束这一步），门禁拦。
 - 性能分段（`profiler.B/E`）原样留在各步里，Profiler 的口径不变。
+
+## 工具箱（ctx）
+
+步骤与模式不读 `Script_Main` 的全局变量，一律从工具箱 `ctx` 取：`ctx.player`、`ctx.ai`、`ctx.RenderScene()`……
+`ctx` 定义在 `Script_Main`（搜 `const ctx = {`），三类：
+
+- **会变的状态**（53 项）：取值器，现读 —— 换关、换人以后拿到的是新的那份，所以步骤里不要把它们先存进局部变量再跨调用用；步骤会写的 14 项（`fireEdge`、`adsFovT` 等）带写入器。
+- **服务与常量**（38 项）：`hud`、`profiler`、`state`、`PLAY_STEPS` 等。
+- **主文件里的函数**（33 项）：`ReadKeys`、`TryFire`、`RenderScene` 等。
+
+步骤要用主文件里新的东西，就在 `ctx` 里加一行；门禁会查每个 `ctx.<名字>` 都登记过、步骤文件不 import `Script_Main`。模块里的东西（`WEAPONS`、`FREE_AIM` 等）照常 import。
+按源码查「A 在 B 前面」的旧静态测试用 `Script_FrameFlatSource.FlatMainSource()`：按调度表把步骤拼回一段平铺的 Frame 再查。
 
 ## 先后规则（FRAME_ORDER_RULES）
 
@@ -44,9 +56,8 @@ deathTimer → input → carry → player → emplacement → interact → hands
 
 ## 改造时怎么验的
 
-拆之前用探针（`_shots/AiRedProbe/Probe_FrameTrace.mjs`，不提交）在浏览器里录下每帧各子系统方法与性能分段的调用顺序：正片第一关开局、第 4 阶段、旧章节 `?phase=1` 三种情况各 4 帧（每帧 93–163 次调用），同一份代码录两次完全一致；拆完再录，三种情况每一帧与拆前逐条一致。
+拆之前用探针（`_shots/AiRedProbe/Probe_FrameTrace.mjs`，不提交）在浏览器里录下每帧各子系统方法与性能分段的调用顺序：正片第一关开局、第 4 阶段、旧章节 `?phase=1` 三种情况各 4 帧（每帧 93–163 次调用），同一份代码录两次完全一致；拆完再录，三种情况每一帧与拆前逐条一致。步骤挪进各自文件、改走工具箱之后又录一次，与最初的录像逐字节相同。
 
 ## 还没做的
 
-- 步骤函数仍在 `Script_Main` 里、仍读模块级变量。下一步是把这些变量收进一个上下文对象（「工具箱」），再把各步骤挪到各自系统的文件里；`window.Tengxian` 调试口那时再改成由系统表生成。
 - 移植 UE 时：一步大致对应一个 Tick Group 里的一个系统，模式对应 GameMode / 输入模式，先后规则对应 Tick 先决条件（AddTickPrerequisite）。

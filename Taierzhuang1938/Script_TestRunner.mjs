@@ -1148,7 +1148,7 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView/i },
   { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting/ },
-  { domain: "infra", pattern: /Data_FrameSchedule/ },
+  { domain: "infra", pattern: /Data_FrameSchedule|Script_FrameModes|Script_FrameSteps|Script_FrameFlatSource/ },
   { domain: "repoSize", pattern: /\.(glb|gltf|bin|fbx|blend|png|jpe?g|webp|ktx2|tga|exr|hdr|mp3|wav|ogg|mp4|webm)$/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },

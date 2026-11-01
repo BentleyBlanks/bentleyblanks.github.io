@@ -60,7 +60,7 @@
 
 18. **测试场只登记、不接线（2026-11-01）。** 新测试场在 `Data_SandboxRanges` 登记一行（网址开关与通用待遇），在 `Script_SandboxRanges` 写插件（关卡表、场地类、建什么、每帧排在哪、慢放 / 输入 / 相机钩子、取证口名），不在 `Script_Main` 里加开关或分支；慢放、暂停、单步一律往 `Script_GameClock` 登记缩放器，不在 Frame 里改 `dt`。士兵的模型 / 剔除 / 动画只在 `Script_SoldierView`，`Script_Ai` 不创建也不改 3D 对象。口径 [测试场与玩法时钟](docs/Data_SandboxRanges.md)、[敌军 AI §23](docs/Data_EnemyAi.md)，验收 `Script_SandboxRangesTest.mjs`。
 
-19. **每帧先后只在调度表里定（2026-11-01）。** `Script_Main.Frame` 只剩冻结判断、帧头、按模式分派；正常游戏是 `Data_FrameSchedule.FRAME_PLAY_STEPS` 的 33 步（一步一个 `PlayStep<Id>`），注释里那些「必须排在谁前面」写成 `FRAME_ORDER_RULES`。加每帧要跑的系统 = 加一步并写清先后与理由；结束这一帧用 `return STOP`，不在步骤里写裸 `return;`；不往 `Frame` 里直接塞代码。口径 [每帧调度表](docs/Data_FrameSchedule.md)，验收 `Script_FrameScheduleTest.mjs`。
+19. **每帧先后只在调度表里定（2026-11-01）。** `Script_Main.Frame` 只剩冻结判断、帧头、按模式分派；正常游戏是 `Data_FrameSchedule.FRAME_PLAY_STEPS` 的 33 步（一步一个 `PlayStep<Id>(ctx, f)`，在 `Script_FrameSteps*`；五个模式在 `Script_FrameModes`；主文件里的东西一律从工具箱 `ctx` 取，缺的在 `Script_Main` 的 `ctx` 里加一行），注释里那些「必须排在谁前面」写成 `FRAME_ORDER_RULES`。加每帧要跑的系统 = 加一步并写清先后与理由；结束这一帧用 `return STOP`，不在步骤里写裸 `return;`；不往 `Frame` 里直接塞代码。口径 [每帧调度表](docs/Data_FrameSchedule.md)，验收 `Script_FrameScheduleTest.mjs`。
 
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 

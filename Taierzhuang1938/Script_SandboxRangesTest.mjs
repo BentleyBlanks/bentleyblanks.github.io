@@ -60,9 +60,11 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
   Check(clock.Step(0.02) === 0.02 && !clock.Has("tmp"), "撤销后回到原样");
 }
 
-// 3. Script_Main 不再认识插件化的那六个测试场
+// 3. Script_Main 与每帧系统（Script_FrameModes / Script_FrameSteps*）不再认识插件化的那六个测试场
 {
-  const main = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+  const frameFiles = ["Script_Main.mjs", "Script_FrameModes.mjs", "Script_FrameStepsPlayer.mjs", "Script_FrameStepsWorld.mjs", "Script_FrameStepsRules.mjs", "Script_FrameStepsPresent.mjs"];
+  const main = frameFiles.map((file) => fs.readFileSync(new URL(`./${file}`, import.meta.url), "utf8")).join("\n");
+  const modes = fs.readFileSync(new URL("./Script_FrameModes.mjs", import.meta.url), "utf8");
   const banned = [
     "ClothRange", "GoreRange", "ShellImpactRange", "BattleReactionRange", "MovementRange", "ExplosionRange", "WeaponRangeRuntime",
     "ClothRangeField", "GoreRangeField", "ShellImpactRangeField", "MovementRangeField", "ExplosionRangeField", "WeaponRangeField",
@@ -70,9 +72,9 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
     "clothRange", "goreRange", "impactRange", "reactionRange", "movementRange", "weaponRange", "explosionRange",
     "CLOTH_RANGE_ID", "GORE_RANGE_ID", "SHELL_IMPACT_RANGE_ID", "BATTLE_REACTION_RANGE_ID", "MOVEMENT_RANGE_ID", "EXPLOSION_RANGE_ID",
   ];
-  for (const name of banned) Check(!new RegExp(`\\b${name}\\b`).test(main), `Script_Main 不再出现 ${name}（接线在 Script_SandboxRanges）`);
-  Check(/dt = clock\.Step\(realDt\)/.test(main), "Frame 开头只向玩法时钟要这一帧的时间");
-  Check(!/\bdt\s*=\s*\w+\.ScaleDt\(dt\)|\bdt\s*\*=/.test(main), "Script_Main 里不再有各自改 dt 的那几行");
+  for (const name of banned) Check(!new RegExp(`\\b${name}\\b`).test(main), `Script_Main 与每帧系统不再出现 ${name}（接线在 Script_SandboxRanges）`);
+  Check(/dt = ctx\.clock\.Step\(realDt\)/.test(modes), "帧头（Script_FrameModes.BeginFrame）只向玩法时钟要这一帧的时间");
+  Check(!/\bdt\s*=\s*[\w.]+\.ScaleDt\(dt\)|\bdt\s*\*=/.test(main), "Script_Main 与每帧系统里不再有各自改 dt 的那几行");
 }
 
 // 4. 只接声明过的钩子；常驻取证口

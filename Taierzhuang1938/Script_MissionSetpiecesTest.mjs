@@ -29,8 +29,9 @@ import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
 import { LEVELS, CHAPTERS, CHAPTER_EVENTS, FindLevel } from "./Data_TengxianScript.mjs";
 import { LEVEL_CUES } from "./Script_Story.mjs";
+import { FlatMainSource } from "./Script_FrameFlatSource.mjs";
 
-const MainSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+const MainSource = FlatMainSource(); // Script_Main，Frame 换成按调度表拼回的平铺版（每帧步骤在 Script_FrameSteps*）
 
 const failures = [];
 let checks = 0;

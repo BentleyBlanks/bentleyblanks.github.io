@@ -25,8 +25,9 @@ import {
   DEFAULT_PLAYER_CAST,
 } from "./Script_Companion.mjs";
 import { CheckpointRecorder, CHECKPOINT_TUNING } from "./Script_Checkpoint.mjs";
+import { FlatMainSource } from "./Script_FrameFlatSource.mjs";
 
-const MainSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+const MainSource = FlatMainSource(); // Script_Main，Frame 换成按调度表拼回的平铺版（每帧步骤在 Script_FrameSteps*）
 
 const failures = [];
 let checks = 0;

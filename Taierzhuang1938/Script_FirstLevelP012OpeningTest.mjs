@@ -14,8 +14,9 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as openingPhase } from "./Data_FirstLevelP012Whitebox.mjs";
+import { FlatMainSource } from "./Script_FrameFlatSource.mjs";
 
-const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+const main = FlatMainSource(); // Script_Main，Frame 换成按调度表拼回的平铺版（每帧步骤在 Script_FrameSteps*）
 function MainFunction(name) {
   const match = main.match(new RegExp(`function ${name}\\([^]*?\\n}`));
   assert.ok(match, `Main ${name} remains executable by the integration seam`);
