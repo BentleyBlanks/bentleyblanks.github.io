@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
-import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -280,7 +280,8 @@ export class XBotSkin {
    * 每帧（原身体 Update 之后）调一次。intent：
    *   clip / clipSeconds / clipDuration / clipLoop  预演片段与它在原片段里的秒数
    *   throwSeconds   投弹片段的秒数（预演 throw 键）
-   *   mps / stance / aim / carryRole / woundedWalk / talking / melee   原生状态
+   *   mps / stance / aim / carryRole / woundedWalk / talking   原生状态
+   *   melee          白刃导演给的姿态（Script_MeleeCombat.Pose：weapon / action / animationNormalized …），没在拼刺刀为空
    *   down           倒地；exact  要精确贴位置（顺着躺、坐车）→ 当场换算原身体的姿势
    *   firing         这一帧开了枪（试玩的 AI）→ 播 fireHoldS 秒开枪动作
    *   shadow         投不投影
@@ -311,8 +312,16 @@ export class XBotSkin {
   /** 这一帧播什么：{ mode: "clip" | "mirror", file, time?, rate?, loop, once, hold, rifleHand } */
   _Pick(intent) {
     const skins = this.skins;
-    // 精确贴位置的、白刃战（刺刀 / 大刀的刺、挡、拨、压倒，游戏自己的白刃动作）：照原身体姿势当场换算
-    if (intent.exact || intent.melee) return { mode: "mirror" };
+    if (intent.exact) return { mode: "mirror" };
+    // 白刃战：刺刀的上步 / 退步 / 刺 / 挡 / 砸 / 推用「刺刀专项」（XBOT_MELEE）；戒备、僵持、倒地和大刀照原身体当场换算
+    if (intent.melee) {
+      const m = intent.melee, entry = m.weapon && m.weapon !== "Dadao" ? XBOT_MELEE[m.action] : null;
+      if (!entry) return { mode: "mirror" };
+      const lib = skins.library.get(entry.file);
+      if (entry.loop) return { mode: "clip", file: entry.file, loop: true, hold: lib?.hold, key: "melee" + m.action };
+      const n = Number.isFinite(m.animationNormalized) ? m.animationNormalized : Number.isFinite(m.normalized) ? m.normalized : 0;
+      return { mode: "clip", file: entry.file, once: true, normalized: THREE.MathUtils.clamp(n, 0, 1), hold: lib?.hold, key: "melee" + m.action };
+    }
     if (intent.down) {
       const death = XBOT_DEATHS[this.rig.deathVariantId] || XBOT_DEATHS.DeathCollapseA;
       return { mode: "clip", file: death.file, once: true, death: true };
@@ -378,7 +387,10 @@ export class XBotSkin {
     }
     const D = clip.duration;
     let t;
-    if (Number.isFinite(pick.sourceSeconds) && !pick.travel) {
+    if (Number.isFinite(pick.normalized)) {
+      // 白刃动作：按这一下的进度对齐（出刀、格挡的时刻跟游戏里判定的那一刻大致对上）
+      t = pick.normalized * D;
+    } else if (Number.isFinite(pick.sourceSeconds) && !pick.travel) {
       // 预演片段 / 投弹：按原片段里的秒数换算（循环按圈对齐，一次性按比例）
       const S = pick.sourceDuration || D;
       if (pick.derived) t = pick.loop ? pick.sourceSeconds % D : Math.min(D, pick.sourceSeconds);
@@ -439,11 +451,13 @@ export class XBotSkin {
     for (const a of this.attachments) {
       const object = a.object;
       object.updateMatrix();
-      if (!a.written || !object.matrix.equals(a.written)) a.intended = object.matrix.clone();
+      // 挂件本身就是枪（片段道具轨把枪直接挂在 rig.root 下）时，上一帧写的是枪（wWritten）
+      const mine = a.written || (object === this.actor.weaponGroup ? a.wWritten : null);
+      if (!mine || !object.matrix.equals(mine)) a.intended = object.matrix.clone();
     }
     const weapon = this._RifleInHands() ? this.attachments.find(a => a.holdsWeapon) : null;
     const placed = weapon ? this._PlaceWeapon(weapon, pick, dt) : false;
-    if (!weapon) this.lastMount = null;
+    if (!weapon) { this.lastMount = null; this.contact = null; }
     if (!placed) { this.ikR = 0; this.ikL = 0; }
     for (const a of this.attachments) {
       if (a === weapon && placed) continue;
@@ -513,10 +527,17 @@ export class XBotSkin {
    */
   _PlaceWeapon(a, pick, dt) {
     const actor = this.actor, w = actor.weaponGroup, object = a.object, parent = object.parent;
-    if (!parent) return false;
-    const srcObj = _m.multiplyMatrices(parent.matrixWorld, a.intended);
-    const relW = new THREE.Matrix4().copy(object.matrixWorld).invert().multiply(w.matrixWorld);   // 枪在挂点里的位姿（本帧）
-    const srcW = srcObj.clone().multiply(relW);                                                    // 原身体上枪此刻在哪
+    if (!parent || !w.parent) return false;
+    // 只挪枪本身，不挪游戏的挂点（RuntimeGrip_WeaponR 这类）：游戏每帧按挂点的位置重算枪在挂点里的位姿，
+    // 挂点被挪过它就会把挪的量补回去，一帧帧越补越远（11-01 查到的步枪漂移，切到当场换算时一下甩出 20 m）。
+    // 之前写过挂点的先还原成游戏的本意。
+    if (a.written) {
+      object.matrix.copy(a.intended); object.matrix.decompose(object.position, object.quaternion, object.scale);
+      object.updateMatrix(); a.written = null; object.updateMatrixWorld(true);
+    }
+    w.updateMatrix();
+    if (!a.wWritten || !w.matrix.equals(a.wWritten)) a.wIntended = w.matrix.clone();
+    const srcW = new THREE.Matrix4().multiplyMatrices(w.parent.matrixWorld, a.wIntended);           // 原身体上枪此刻在哪
     const front = actor.weaponGripFront?.lengthSq() > 1e-8 ? actor.weaponGripFront : null;
     const muzzle = actor.weaponMuzzle?.lengthSq() > 1e-8 ? actor.weaponMuzzle : front;
     const Seg = (M) => [new THREE.Vector3().setFromMatrixPosition(M), muzzle ? muzzle.clone().applyMatrix4(M) : null];
@@ -535,7 +556,11 @@ export class XBotSkin {
     } else {
       this.rifleOnLeft = null;
       const side = srcGap.R <= srcGap.L ? "R" : "L";
-      if (!(srcGap[side] <= XBOT_GRIP.heldM)) { a.weaponBlend = null; a.weaponMode = null; return false; }
+      if (!(srcGap[side] <= XBOT_GRIP.heldM)) {
+        // 没人握着：枪还原成游戏的本意，挂点交给 _ReanchorOne（地上的原地不动、贴着躯干的跟躯干走）
+        if (a.wWritten) { w.matrix.copy(a.wIntended); w.matrix.decompose(w.position, w.quaternion, w.scale); w.updateMatrix(); a.wWritten = null; w.updateMatrixWorld(true); }
+        a.weaponBlend = null; a.weaponMode = null; return false;
+      }
       W = this._HandRelative(side, srcW);
       mode = "hand" + side;
     }
@@ -571,8 +596,12 @@ export class XBotSkin {
     this.contact = Object.fromEntries(["R", "L"].map(side => [side, target[side] && this['ik' + side] > 0.5
       ? +Palm(this.H(n[side] + "Hand"), this.H(n[side] + "HandMiddle1"), new THREE.Vector3()).distanceTo(target[side]).toFixed(3) : null]));
     this.container.updateMatrixWorld(true);
-    // 挂点按枪的相对位置倒推（整矩阵乘，不拆缩放：枪在挂点里有自己的缩放抵消身高缩放）
-    this._Write(a, W.clone().multiply(relW.clone().invert()));
+    // 枪的本地矩阵 = 挂点世界矩阵⁻¹ × 目标（整矩阵乘，不拆缩放：枪在挂点里有自己的缩放抵消身高缩放）
+    w.matrix.copy(_inv.copy(w.parent.matrixWorld).invert().multiply(W));
+    w.matrix.decompose(w.position, w.quaternion, w.scale);
+    w.updateMatrix();
+    a.wWritten = w.matrix.clone();
+    w.updateMatrixWorld(true);
     this.lastMount = mode;
     return true;
   }
@@ -740,7 +769,8 @@ export class XBotSkin {
       grip = this._GripGaps();
     }
     return { visible: this.container.visible, hips: R(hips), srcPelvis: R(src), weaponGap, ...(grip || {}), contactR: this.contact?.R ?? null, contactL: this.contact?.L ?? null,
-      mount: this.lastMount || null, attachments: this.attachments.length };
+      mount: this.lastMount || null, attachments: this.attachments.length,
+      pick: !this.pick ? null : this.pick.mode === "mirror" ? "mirror" : this.pick.key || this.pick.file };
   }
 
   /** 枪的两个握点（右手握把 = 枪的原点，左手护木 = weaponGripFront）各离 X Bot 那只手的掌心多远。 */

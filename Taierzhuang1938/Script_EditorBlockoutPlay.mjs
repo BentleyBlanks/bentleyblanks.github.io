@@ -832,7 +832,7 @@ function AiIntent(state, actor) {
   const mps = Number.isFinite(state.moveSpeedMps) ? state.moveSpeedMps : (state.moveSpeed || 0) * 3.6;
   return {
     mps, stance: state.prone > 0.5 ? "prone" : state.crouch > 0.5 ? "crouch" : "stand", aim: state.aim > 0.5,
-    melee: !!state.meleeCombat, down: !!state.dead || !!actor.ragdollState, firing: !!state.firing,
+    melee: state.meleeCombat || null, down: !!state.dead || !!actor.ragdollState, firing: !!state.firing,
     throwSeconds: rig?.currentId === "GrenadeThrow" && rig.currentAction ? rig.currentAction.time : null,
   };
 }
