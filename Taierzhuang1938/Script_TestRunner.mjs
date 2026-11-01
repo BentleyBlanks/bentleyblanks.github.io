@@ -185,6 +185,7 @@ export const testDefs = {
   SoldierComponentsTest: {file:'Script_SoldierComponentsTest.mjs',desc:'士兵组件表：Soldier 身上只有自有字段 + 十个组件、旧字段名读写同一值、生成的存取器与表同步（纯 Node，秒级）'},
   SandboxRangesTest: {file:'Script_SandboxRangesTest.mjs',desc:'测试场登记表与插件一一对应、玩法时钟叠加/暂停/单步、Script_Main 不再认识插件化的六个测试场（纯 Node，秒级）'},
   RepoSizeGateTest: {file:'Script_RepoSizeGateTest.mjs',desc:'仓库体积闸门：跟踪文件 ≥95 MiB 红（GitHub 单文件上限 100 MiB），≥50 MiB 列出并打印滕县总量（纯 Node，秒级）'},
+  FrameScheduleTest: {file:'Script_FrameScheduleTest.mjs',desc:'每帧调度表：步骤不重、18 条先后规则成立、每步每模式都有函数、Frame 只剩分派、步骤里没有裸 return（纯 Node，秒级）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
@@ -805,6 +806,7 @@ export const tier0Fast = [
   "SoldierComponentsTest",
   "SandboxRangesTest",
   "RepoSizeGateTest",
+  "FrameScheduleTest",
   "FirstLevelFrontCounterattackTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
@@ -1146,6 +1148,7 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView/i },
   { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting/ },
+  { domain: "infra", pattern: /Data_FrameSchedule/ },
   { domain: "repoSize", pattern: /\.(glb|gltf|bin|fbx|blend|png|jpe?g|webp|ktx2|tga|exr|hdr|mp3|wav|ogg|mp4|webm)$/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
