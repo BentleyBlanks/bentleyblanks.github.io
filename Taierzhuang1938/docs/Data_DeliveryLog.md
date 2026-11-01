@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **K06 煎饼筐 C 方案（2026-11-01，用户已验收）**：本地批准版 `9d52b0f6`，`PancakeBasket_Intact` / `PancakeBasket_Opened` 各 2990 三角、各六张 K07 A 薄折饼；木材版与 `34b0f088` 的全部几何属性、索引、层级、变换和盖面镂空逐项一致。柳条纵纹、露芯与粗糙度分层使用独立 PBR，修复 ORM 提前取整造成的二值化。重建源为 [Build_K06_PancakeBasket.py](../_blender/VillageInteriorProps/Build_K06_PancakeBasket.py)，盖框接触输入为 [Data_K06LidFrameInput.json](../_blender/VillageInteriorProps/Data_K06LidFrameInput.json)；GLB、28 图 packed 源工程、图片及验收证据留在 OneDrive 的 `Blender/Taierzhuang1938/VillageInteriorProps/K06_PancakeBasket`。外观为 C 参考的创作复原；本次交付离线重建源，尚未接入游戏，密集 2K / 512px 制作贴图保留体积与纹素密度警告。
+
 - **测试场插件化、统一玩法时钟、士兵画面层（2026-11-01）**：九个测试场的网址开关集中到 `Data_SandboxRanges`，开机路由与 `Script_Main` 都读它（新旧路由逐个开关比对一致）；布料 / 断肢 / 炮击扬尘 / 人物反应 / 操作交互 / 爆炸六个测试场的接线全部搬进 `Script_SandboxRanges` 插件，`Script_Main` 不再出现它们的名字；枪械射击、靶场、白刃实验场的建场 / 清理 / 取证口也走插件，弹药规则与木桩兵逻辑暂留装配层。五处各自改 `dt` 的慢放改成往 `Script_GameClock` 登记（顺序不变）。`Script_Ai` 的摆模型、剔除、远近景切换、人物与尸体动画搬进 `Script_SoldierView`，调用位置与先后不变，Script_Ai 只剩 `Vector3` 数学。口径 [测试场与玩法时钟](Data_SandboxRanges.md)、[敌军 AI §23](Data_EnemyAi.md)，门禁 `SandboxRangesTest`。
 
 - **AI 浏览器门禁七项红修复（2026-11-01）**：AI 本身没坏，都是夹具跟不上关卡改动。受控场把玩家传送到走廊外，被任务走廊软边界（09-28 起）倒计时判阵亡、世界冻结，后面「会绕 / 会扔 / 覆盖层」一帧没跑 —— `Script_AiProbeScene.IsolateSquad` 隔离期间摘掉 `areaGuard`、还原时挂回（同时治好 AiAimedAt / AiGrenadeEvade）；空地对照组把射手摆在玩家高度、埋进土里 1 m，改按射击位地面；`PickSite` 挑到顺着射击方向的窄墙（墙头 0.3 m 宽，压制弹从两侧擦过），改为藏身点左右各 0.6 m 也要挡死；AiCloseRange 的夹具墙 `FrontTraverseBlastScreen` 09-22 前沿重建后没了，改按尺寸挑现存高薄墙并当场验证零暴露；AiInitiative 老周 09-24 起守左翼机枪位、压制 0.7 蹲低，断言改认 `leftGunId` 与通用压制档；P012Animation 担架员 09-30 起停下播 Blender 站立循环，断言改认站立循环 + 双脚不挪；P012Opening 的沙箱补 `looseGun`（10-29 枪脱手）。
