@@ -157,6 +157,17 @@ try {
     const pixels = window.SceneEditor.PixelStats?.();
     return { options, assets, objects: state.objects ?? state.count, style: state.style, pixels };
   });
+  const terrainOk = await editor.evaluate(() => window.SceneEditor.TerrainReady());
+  const look = await editor.evaluate(() => {
+    window.SceneEditor.Open(["06–10", "06–10/建筑", "06–10/建筑/WN1"]);
+    window.SceneEditor.Select(["House_WN1_1"]);
+    window.SceneEditor.Frame(["House_WN1_1"]);
+    const tree = window.SceneEditor.Tree();
+    return { terrainLook: window.SceneEditor.State().terrainLook, depths: [...new Set(tree.map((r) => r.indent))].length,
+      comps: [...document.querySelectorAll("#seInspector .seCompTitle")].map((n) => n.textContent) };
+  });
+  Check("场景编辑器里正式场景的地面是分层地表（同试玩），不是白盒的高度色带", terrainOk && look.terrainLook === "layers", J({ terrainOk, look: look.terrainLook }));
+  Check("层级是一层层文件夹（段落 / 类别 / 院子），检视按组件分节", look.depths >= 4 && ["位置", "外观", "碰撞", "剧情事件"].every((c) => look.comps.includes(c)), J(look));
   Check("场景编辑器下拉里有两个场景：第一关 · 白盒、第一关 · 正式", se.options.length === 2 && se.options.some(([v]) => v === "FirstLevelWhitebox") && se.options.some(([v]) => v === "FirstLevel"), J(se.options));
   Check("正式场景的资产页列白盒体块、道具与树", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
   await editor.screenshot({ path: path.join(shotDir, "SceneEditor_Formal.png") });

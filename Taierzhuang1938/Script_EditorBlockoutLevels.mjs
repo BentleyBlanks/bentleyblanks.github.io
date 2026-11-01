@@ -21,7 +21,7 @@ import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLa
 const FIRST_LEVEL_WHITEBOX_SCENE = "./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json";
 // 2026-11-01：第一关的正式场景（照白盒布局复制、换现行第一关的外观与道具模型，之后单独打磨）。编辑与预演跑白盒，试玩跑它（§17）。
 const FIRST_LEVEL_FORMAL_SCENE = "./Scenes/FirstLevel/Scene_FirstLevel.json";
-// Stage0105Done：01–05 演完。那圈「玩家出不了沟」的隐形墙（KeepIn_*）随它消失，后两段不挡人；01–05 里它不会发生（futureSignals）
+// Stage0105Done：01–05 演完。那圈「玩家出不了沟」的空气墙（KeepIn_*）随它消失，后两段不挡人；01–05 里它不会发生（futureSignals）
 const STAGE_0105_DONE = "Stage0105Done";
 const SIGNALS_0105 = Object.freeze(["DugoutCollapsed", "PitShelled", "TankDisabled", STAGE_0105_DONE]);
 const SIGNALS_0610 = Object.freeze(["CartDeparted", "CellarBlast", "SideGateOpen", "EastGateBurst", "MgSilenced", "NorthYardGatesBroken", "BarrageHit", "LaneWallCollapse"]);

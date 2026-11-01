@@ -81,6 +81,19 @@ Check(m.dirty, "撤销一步：和盘上不一样了");
 m.SetField(["A_01"], "group", "G3");
 Check(m.dirty && m.redo.length === 0, "撤销后再改：仍算没保存（不会撞上存盘时的编号），重做栈清空");
 
+// 层级树：group 按「/」分层，子文件夹按名字排、物件挂在最底层，count 是这层以下总数
+{
+  const h = new SceneEditModel({ ...m.ToDoc(), objects: [
+    { id: "W1", asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [0, null, 0], size: [1, 1, 1], group: "06–10/建筑/WN1" },
+    { id: "W2", asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [1, null, 0], size: [1, 1, 1], group: "06–10/建筑/WN1" },
+    { id: "P1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [2, null, 0], size: [1, 1, 1], group: "06–10/道具" },
+    { id: "Loose", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [3, null, 0], size: [1, 1, 1] },
+  ] }).Hierarchy();
+  const seg = h.folders.get("06–10");
+  Check(h.count === 4 && J(h.ids) === J(["Loose"]) && seg.count === 3 && J([...seg.folders.keys()]) === J(["道具", "建筑"].sort((a, b) => a.localeCompare(b, "zh-CN")))
+    && J(seg.folders.get("建筑").folders.get("WN1").ids) === J(["W1", "W2"]) && seg.folders.get("建筑").folders.get("WN1").path === "06–10/建筑/WN1", "层级树：按「/」分层、计数、路径");
+}
+
 // 真场景：走一圈改动后撤到底与原文逐字相同
 const { doc } = ReadSceneSync("FirstLevelWhitebox");
 const real = new SceneEditModel(doc);

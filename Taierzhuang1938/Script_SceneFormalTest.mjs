@@ -87,6 +87,6 @@ Check(crate.asset === "Prop/militaryCrateClosed" && crate.material === undefined
 const tree = FormalObject({ id: "DeadTree_01", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [0, null, 0], size: [0.6, 11, 0.6] });
 Check(tree.asset === "Tree/Dead", "转换：细高的植物块 → Tree/Dead");
 const air = FormalObject({ id: "KeepIn_0001", asset: "Whitebox/Box", material: "Whitebox/AirWall", pos: [0, null, 0], size: [1, 3, 1], visual: false, tag: "airWall" });
-Check(air.material === "Whitebox/AirWall" && air.visual === false && air.tag === "airWall", "转换：隐形墙原样不动");
+Check(air.material === "Whitebox/AirWall" && air.visual === false && air.tag === "airWall", "转换：空气墙原样不动");
 
 console.log(`正式场景测试全过（${count} 项）`);

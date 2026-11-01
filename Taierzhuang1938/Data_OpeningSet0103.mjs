@@ -404,7 +404,7 @@ export const sky = Object.freeze({
 // 报告里提请集成负责人改契约。01 进场时就建好、藏着（02→03 那一帧不现建），03 起显示。
 // 全是外观：阵位白盒体块（Data_FirstLevelMissionLayout 的 RightNest*）的碰撞、掩体标签、射界一个不动，
 // 砖壳把体块整个包进去（每面外扩 3 cm、墙头只往上长）——所以砖壳露出来的只会比碰撞高，不会有「看着是缺口、
-// 其实是墙」的隐形墙；多出来的墙头锯齿只有外观（AI 视线、弹道仍按原体块）。
+// 其实是墙」的空气墙；多出来的墙头锯齿只有外观（AI 视线、弹道仍按原体块）。
 export const FRONT_SET_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 /** 砖层高（一皮砖 + 灰缝）与砖长：锯齿墙头按整皮、整砖退台；skinM 是砖壳比体块每面外扩多少。 */
 export const BRICK = Object.freeze({ courseM: 0.115, lengthM: 0.25, skinM: 0.03,

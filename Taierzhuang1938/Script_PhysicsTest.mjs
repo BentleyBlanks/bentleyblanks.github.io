@@ -750,7 +750,7 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
         && z >= b.min[2] - 0.8 && z <= b.max[2] + 0.8
       ));
       // 生成树保留的是 AddTree 的细树干盒，不把整片树冠的 GLB 包围盒变成
-      // 隐形墙；它和组合沙袋一样由生成器拥有碰撞，只是认领范围仍按树心。
+      // 空气墙；它和组合沙袋一样由生成器拥有碰撞，只是认领范围仍按树心。
       const generatedTreeTrunk = generatedTree && f.colliders.find((b) => (
         b.tag === "prop" && Math.abs(b.c[0] - x) < 0.05 && Math.abs(b.c[2] - z) < 0.05
         && (b.max[0] - b.min[0]) < 1.5 && (b.max[2] - b.min[2]) < 1.5

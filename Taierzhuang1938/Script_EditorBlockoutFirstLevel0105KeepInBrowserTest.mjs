@@ -5,14 +5,14 @@
 // 口径：docs/Data_EditorBlockout.md §13「2026-10-21 防止玩家跳出壕沟」、§2.2 体块 noClimb / tag airWall。
 //
 //   1. 静态（node）：剧本要走的通路（三条壕沟、坑与三个射位、爬沟到散兵坑、支沟到防炮洞、交通沟坡道到干沟、干沟、凹路口）
-//      逐 0.25 m 都在「沟里」掩码里，离隐形墙 ≥ 0.4 m（墙不堵路）；胸墙、板桥标了 noClimb。
+//      逐 0.25 m 都在「沟里」掩码里，离空气墙 ≥ 0.4 m（墙不堵路）；胸墙、板桥标了 noClimb。
 //   2. 浏览器：低处、空子各站一次（坡顶段、塌方摆件、台阶、支沟口、坑沿射击台、板桥两头、沟口和坑的接缝、散兵坑、
 //      前沿沟西头北折、干沟、凹路、防炮洞口），八个方向各按住 W（一半时间加 Shift）连按 Space 三秒（跳跃 + 翻越 / 攀爬），
 //      全程每一帧脚下都还在沟里；坑沿射击台朝北翻不过胸墙（ProbeVault 为空）。
 //   3. 从乙位顺交通沟走到集结处（04 / 05 / 02 末走的路，拖被子那条路的南半截）、从防炮洞口顺支沟上台阶到交通沟，都走得到。
-//   4. 手榴弹从前沿沟里往北扔，飞出沟外落在沟北（隐形墙不挡手榴弹）。
+//   4. 手榴弹从前沿沟里往北扔，飞出沟外落在沟北（空气墙不挡手榴弹）。
 //   5. NPC 不受墙影响：预演里班长翻出沟（PvClimbOutTrench）前后，人从沟里到了沟外；站人的地面在墙线上就是地面，不是墙顶。
-// 截图（?airWalls=1 把隐形墙画成半透明红板）存 _shots/EditorBlockout0105/KeepIn/（不提交）。
+// 截图（?airWalls=1 把空气墙画成半透明红板）存 _shots/EditorBlockout0105/KeepIn/（不提交）。
 // ===========================================================================
 
 import assert from "node:assert/strict";
@@ -57,7 +57,7 @@ const WallDist = (x, z) => {
   }
   return best;
 };
-Check("沟沿隐形墙：都是 tag airWall、不可见、只当碰撞（semantic airWall），数量像样",
+Check("沟沿空气墙：都是 tag airWall、不可见、只当碰撞（semantic airWall），数量像样",
   walls.length > 200 && walls.every((b) => b.visual === false && b.semantic === "airWall" && b.solid !== false && b.h > 3), `${walls.length} 段`);
 const noClimb = [...scene.blocks, ...(scene.gates || [])].filter((b) => b.noClimb).map((b) => b.id);
 Check("胸墙三截 + 塌下来的土、板桥的横木与门板标了「不能攀」（noClimb）；射击台没标",
@@ -107,7 +107,7 @@ try {
     const nc = T.battlefield?.colliders?.filter?.((c) => c.noClimb).length ?? -1;
     return { air, nc };
   });
-  Check("编辑器里建出了隐形墙碰撞、不能攀的块带着标记", loaded.air === walls.length && loaded.nc >= 15, J(loaded));
+  Check("编辑器里建出了空气墙碰撞、不能攀的块带着标记", loaded.air === walls.length && loaded.nc >= 15, J(loaded));
 
   // 2. 低处 / 空子：八个方向各试三秒（按住 W，后半段加 Shift；每 0.5 s 按一下 Space）
   const SPOTS = [
@@ -225,7 +225,7 @@ try {
     }
     return { n: track.length, first: track[0] || null, last: track[track.length - 1] || null, minZ: Math.min(...track.map((p) => p[1])) };
   });
-  Check("手榴弹从前沿沟里往北扔，飞出沟外（隐形墙不挡手榴弹）",
+  Check("手榴弹从前沿沟里往北扔，飞出沟外（空气墙不挡手榴弹）",
     nade.n > 10 && nade.last && !Inside(nade.last[0], nade.last[1]) && nade.minZ < -6, J(nade));
 
   // 5. NPC 不受墙影响
@@ -254,7 +254,7 @@ try {
       B.Previz.Stop();
       return { before, later };
     }, climb);
-    Check(`NPC 照常翻出沟：${climb.kf} 的 ${climb.id} 翻沟前在沟里、翻出去以后在沟外爬（隐形墙只挡玩家）`,
+    Check(`NPC 照常翻出沟：${climb.kf} 的 ${climb.id} 翻沟前在沟里、翻出去以后在沟外爬（空气墙只挡玩家）`,
       pos.before && Inside(pos.before[0], pos.before[1]) && pos.later.some((q) => q && !Inside(q[0], q[1])),
       J({ before: pos.before, later: pos.later.slice(0, 8), outside: pos.later.filter((q) => q && !Inside(q[0], q[1])).slice(0, 3) }));
   }
@@ -262,9 +262,9 @@ try {
     const B = window.Tengxian.Debug.Blockout;
     return pts.map(([x, z, top]) => ({ x, z, top, stand: +B.StandAt(x, z).toFixed(2) }));
   }, walls.filter((_, i) => i % Math.ceil(walls.length / 40) === 0).map((b) => [b.x, b.z, +(b.y + b.h / 2).toFixed(2)]));
-  Check("站人的地面在墙线上就是地面（不是墙顶）：预演 / 关键帧里的人不会站到隐形墙上", stand.every((s) => s.stand < s.top - 2.5), J(stand.slice(0, 3)));
+  Check("站人的地面在墙线上就是地面（不是墙顶）：预演 / 关键帧里的人不会站到空气墙上", stand.every((s) => s.stand < s.top - 2.5), J(stand.slice(0, 3)));
 
-  // 截图：坑沿射击台朝北、板桥一带俯看、坡顶段（隐形墙画成半透明红板）
+  // 截图：坑沿射击台朝北、板桥一带俯看、坡顶段（空气墙画成半透明红板）
   for (const [name, pose] of [
     ["KeepIn_PitStepNorth", { x: 0.8, z: -9.2, yawDeg: 0, pitchDeg: -4, stance: "stand" }],
     ["KeepIn_TrafficCrest", { x: 35, z: 126, yawDeg: 180, pitchDeg: -6, stance: "stand" }],

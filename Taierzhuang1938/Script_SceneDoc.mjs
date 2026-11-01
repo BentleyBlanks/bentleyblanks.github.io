@@ -228,7 +228,7 @@ function BackdropShape(obj) {
  *   region：只取这一块（缺省整个场景）；spawn：这一块的出生点（缺省场景的）；
  *   priorSignals：前面的段落已经发生过的信号——hideOn 它的物件直接不要，showOn 它的物件当已经出现；
  *   heightTint：不给 = 用场景 look 里的；null = 按这一块的最低 / 最高自动定；
- *   objectMarginM：物件取到范围外多远（米，缺省 1：贴边的隐形墙）——站在场地边上看得见的房子要带上；
+ *   objectMarginM：物件取到范围外多远（米，缺省 1：贴边的空气墙）——站在场地边上看得见的房子要带上；
  *   futureSignals：这一段里不会发生的信号（后面段落的）——hideOn 它的物件当常驻块（不做成随信号的块：那种块不合批），showOn 它的不要。
  */
 export function BlockoutDocFromScene(scene, heights, { level, region = null, spawn = null, priorSignals = [], futureSignals = [], heightTint, objectMarginM = 1 } = {}) {

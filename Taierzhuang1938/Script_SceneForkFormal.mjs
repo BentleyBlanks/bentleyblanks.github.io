@@ -6,7 +6,7 @@
 // 只把有正式资产的换掉：
 //   · 道具盒（meta.prop）有现成外部模型的 → Prop/<模型>（PROP_TO_ASSET），盒子尺寸照旧当碰撞、模型按盒子缩放；
 //   · 树（细高的植物块、meta.prop Tree / Cypress）→ Tree/Dead、Tree/Cypress；
-//   · 其余体块（房子、墙、屋顶、工事、水、隐形墙……）原样留 Whitebox/Box + Whitebox/*，画灰面 + 米格线。
+//   · 其余体块（房子、墙、屋顶、工事、水、空气墙……）原样留 Whitebox/Box + Whitebox/*，画灰面 + 米格线。
 //     用户 2026-11-01：体块「不算正式资产，你不要自己造出来」——不给它挑贴图外观，等有正式的房子模型再换。
 // 地表（分层 PBR 土）不写进物件：涂色与沟的折线照抄，建场时按 Data_SceneGroundLayers 归层。
 //

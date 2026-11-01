@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { SCENE_ASSETS, SCENE_MATERIALS, WhiteboxMaterialFor } from "./Data_SceneAssets.mjs";
+import { SCENE_EVENTS } from "./Data_SceneEvents.mjs";
 import {
   ValidateScene, DecodeSceneHeights, EncodeSceneHeights, CropSceneHeights, SceneObjectToBlock, BlockoutDocFromScene,
 } from "./Script_SceneDoc.mjs";
@@ -26,6 +27,15 @@ Check(heights.length === (scene.terrain.cols + 1) * (scene.terrain.rows + 1), "�
 Check(scene.objects.every(o => SCENE_ASSETS[o.asset]) && scene.objects.every(o => o.material === undefined || SCENE_MATERIALS[o.material]), "资产 / 材质编号都在目录里");
 Check(Object.values(SCENE_MATERIALS).every(m => WhiteboxMaterialFor(m.semantic) && SCENE_MATERIALS[WhiteboxMaterialFor(m.semantic)] === m), "语义 ↔ 白盒材质一一对应");
 Check(fs.readFileSync(SceneFilePath("FirstLevelWhitebox"), "utf8").indexOf("\r") < 0, "场景 JSON 是 LF");
+// 两个场景（2026-11-01）：剧情事件都有中文名；物件都分了层级（段落 / 类别……），没有只差大小写的两个文件夹
+for (const id of ["FirstLevelWhitebox", "FirstLevel"]) {
+  const objects = ReadSceneSync(id).doc.objects;
+  const events = [...new Set(objects.flatMap(o => [o.hideOn, o.showOn]).filter(Boolean))];
+  Check(events.every(e => SCENE_EVENTS[e]), `${id}：剧情事件都在 Data_SceneEvents 里有名字：${events.filter(e => !SCENE_EVENTS[e]).join("、")}`);
+  Check(objects.every(o => String(o.group || "").split("/").length >= 2), `${id}：每个物件的分组至少两层（段落 / 类别）`);
+  const folders = [...new Set(objects.map(o => o.group))], lower = new Set(folders.map(f => f.toLowerCase()));
+  Check(lower.size === folders.length, `${id}：没有只差大小写的文件夹`);
+}
 for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]) {
   Check(!fs.existsSync(path.join(PROJECT_DIR, "Blockout", `${level}.scene.json`)), `旧的 Blockout/${level}.scene.json 不该再出现（以 Scenes/FirstLevelWhitebox 为准）`);
 }
@@ -71,12 +81,12 @@ for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]) {
   Check(layout.blocks.length > 500 && layout.gates.length < 80 && layout.bounds.minX === slice.bounds.minX, `${level} 能建布局（${layout.blocks.length} 块、${layout.gates.length} 个随信号的块）`);
 }
 const spec = (key) => BLOCKOUT_LEVELS.find(l => l.key === key).scene;
-// Stage0105Done：01–05 演完（KeepIn_* 隐形墙随它消失），关键帧里不写，只在后两段的 priorSignals 里
+// Stage0105Done：01–05 演完（KeepIn_* 空气墙随它消失），关键帧里不写，只在后两段的 priorSignals 里
 const DONE = "Stage0105Done";
 Check(JSON.stringify([...spec("FirstLevel0610").priorSignals].sort()) === JSON.stringify([...SIGNALS.FirstLevel0105, DONE].sort()), "06–10 的 priorSignals = 01–05 出现过的全部信号 + Stage0105Done");
 Check(JSON.stringify([...spec("FirstLevel1218").priorSignals].sort()) === JSON.stringify([...SIGNALS.FirstLevel0105, DONE, ...SIGNALS.FirstLevel0610].sort()), "11–18 的 priorSignals = 01–05 与 06–10 出现过的全部信号 + Stage0105Done");
-Check(scene.objects.filter(o => /^KeepIn_/.test(o.id)).every(o => o.hideOn === DONE), "KeepIn_* 隐形墙都随 Stage0105Done 消失");
-Check(!ReadBlockoutSceneDocSync("FirstLevel0610").blocks.some(b => /^KeepIn_/.test(b.id)), "06–10 那一块里没有 01–05 的 KeepIn 隐形墙");
+Check(scene.objects.filter(o => /^KeepIn_/.test(o.id)).every(o => o.hideOn === DONE), "KeepIn_* 空气墙都随 Stage0105Done 消失");
+Check(!ReadBlockoutSceneDocSync("FirstLevel0610").blocks.some(b => /^KeepIn_/.test(b.id)), "06–10 那一块里没有 01–05 的 KeepIn 空气墙");
 { const s0105 = ReadBlockoutSceneDocSync("FirstLevel0105");
   Check(s0105.blocks.filter(b => /^KeepIn_/.test(b.id)).length > 1000 && !(s0105.gates || []).some(g => /^KeepIn_/.test(g.id)), "01–05 那一块里 KeepIn 照旧是常驻块（futureSignals，不做成随信号的块）"); }
 const t2 = BlockoutDocFromScene(tiny, heights, { level: "Tiny", region, futureSignals: ["A", "B"] });

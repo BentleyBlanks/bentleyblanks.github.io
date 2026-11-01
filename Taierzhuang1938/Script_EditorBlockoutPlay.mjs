@@ -336,7 +336,7 @@ export class BlockoutPlay {
       soldier.order = "advance";
       soldier.holdZone = null;
       const p = this.game.player?.position;
-      // 先朝玩家那边去几秒（导航网格按沟里的隐形墙排路，不翻沟沿），之后交给班组自己追
+      // 先朝玩家那边去几秒（导航网格按沟里的空气墙排路，不翻沟沿），之后交给班组自己追
       if (p) { soldier.goal.set(p.x, 0, p.z); soldier.manualGoalUntil = (this.game.ai?.time ?? 0) + 6; }
     } else {
       soldier.order = "hold";

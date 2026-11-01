@@ -203,7 +203,7 @@ polygonOffset 盖在现墙上。
 - `node Taierzhuang1938/Script_ColliderTest.mjs`：**2026-08-27 修好了一处
   测试盲区** —— 它原来只读 `mesh.matrixWorld`，于是 InstancedMesh 的每一个
   实例都被算成"堆在原点"，一整片实例化的砖在它眼里等于不存在。城内院墙转
-  样条 PCG 那一刻，几百道**画得好好的**院墙被判成隐形墙，才把这条挖出来。
+  样条 PCG 那一刻，几百道**画得好好的**院墙被判成空气墙，才把这条挖出来。
   现在按 `instanceMatrix` 逐实例摊开，寨墙/坝墙/村墙/篱笆也第一次进了它的账。
 - 几何与性能靠既有浏览器回归兜底：BootTest（draw call/三角红线）、
   ColliderTest、PlayTest、DressingProbeTest。

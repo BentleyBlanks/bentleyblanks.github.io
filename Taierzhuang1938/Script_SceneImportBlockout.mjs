@@ -182,15 +182,15 @@ export function ImportFirstLevelWhitebox({ rev = null } = {}) {
 
   const blockItems = segs.flatMap(seg => [...seg.doc.blocks, ...(seg.doc.gates || [])].map(item => ({ seg, item })));
   const mergedBlocks = MergeById(blockItems, "物件", report, { Pick: PickBlock });
-  // 01–05 的「玩家出不了沟」隐形墙在场地南边界（z = 200）把凹路封了口；三段连起来以后凹路接着往南通 06–10，封口那一段去掉
+  // 01–05 的「玩家出不了沟」空气墙在场地南边界（z = 200）把凹路封了口；三段连起来以后凹路接着往南通 06–10，封口那一段去掉
   const SEAM_CAPS = new Set(["KeepIn_0536"]);
   const kept = mergedBlocks.filter(({ item }) => {
     if (!SEAM_CAPS.has(item.id)) return true;
     if (item.tag !== "airWall" || Math.abs(item.z - 200) > 0.5) throw new Error(`${item.id} 不在 01–05 南边界上了，封口规矩要重看`);
-    report.push(`物件 ${item.id}：01–05 南边界上封凹路口的隐形墙，三段连通后去掉`);
+    report.push(`物件 ${item.id}：01–05 南边界上封凹路口的空气墙，三段连通后去掉`);
     return false;
   });
-  // 01–05 那圈「玩家出不了沟」的隐形墙（KeepIn_*）只管 01–05：随 Stage0105Done 消失，06–10 / 11–18 进来就当它已经发生
+  // 01–05 那圈「玩家出不了沟」的空气墙（KeepIn_*）只管 01–05：随 Stage0105Done 消失，06–10 / 11–18 进来就当它已经发生
   let keepIn = 0;
   const objects = kept.map(({ item, seg }) => {
     const obj = BlockToObject(item, SEGMENTS[Math.max(0, BandOf(item.z))].group ?? seg.group, report);
@@ -201,7 +201,7 @@ export function ImportFirstLevelWhitebox({ rev = null } = {}) {
     }
     return obj;
   });
-  report.push(`物件：${keepIn} 段 KeepIn_* 隐形墙（01–05 玩家出不了沟）加 hideOn ${STAGE_0105_DONE}，后两段不挡人`);
+  report.push(`物件：${keepIn} 段 KeepIn_* 空气墙（01–05 玩家出不了沟）加 hideOn ${STAGE_0105_DONE}，后两段不挡人`);
   report.push(`物件：三段原有 ${blockItems.length} 个，合并后 ${objects.length} 个`);
 
   const backdropSeg = segs.find(s => s.doc.backdrop);
