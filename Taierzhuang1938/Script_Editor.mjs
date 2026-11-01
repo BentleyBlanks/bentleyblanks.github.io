@@ -55,6 +55,7 @@ import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { SceneEditorEntry } from "./Script_EditorSceneEntry.mjs";
+import { MixamoPreviewEditor } from "./Script_EditorMixamoPreview.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 
@@ -88,12 +89,13 @@ const TOOL_MENUS = [
   { id: "scene", label: "场景", items: [SceneEditorEntry, SplineEditor, PropPcgEditor] },
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
   { id: "level", label: "关卡", items: [BlockoutEntry, TimelineEditor, SquadMarchEditor] },
-  { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
+  // Mixamo 动作预览同贴图管理一样是独立窗口，不进互斥表（2026-11-01）。
+  { id: "character", label: "角色", items: [ActorEditor, FacialEditor, MixamoPreviewEditor] },
   { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor] },
   { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
   { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
 ];
-const WINDOW_TOOLS = new Set([TextureEditor.id, SceneEditorEntry.id]);
+const WINDOW_TOOLS = new Set([TextureEditor.id, SceneEditorEntry.id, MixamoPreviewEditor.id]);
 
 export class EditorSuite {
   /**
@@ -508,7 +510,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === BlockoutEntry.id || id === TimelineEditor.id) return this.Open(id);
+    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === MixamoPreviewEditor.id || id === BlockoutEntry.id || id === TimelineEditor.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -598,12 +600,9 @@ export class EditorSuite {
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
-    if (id === TextureEditor.id) {
-      try { return TextureEditor.Open(); }
-      catch (error) { this.SetHint(error.message); return null; }
-    }
-    if (id === SceneEditorEntry.id) {
-      try { return SceneEditorEntry.Open(); }
+    for (const WindowTool of [TextureEditor, SceneEditorEntry, MixamoPreviewEditor]) {
+      if (id !== WindowTool.id) continue;
+      try { return WindowTool.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。

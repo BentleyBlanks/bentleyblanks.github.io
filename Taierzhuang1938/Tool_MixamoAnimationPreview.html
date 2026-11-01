@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mixamo 动作预览</title>
+<!-- 外观跟高级工具同一套：冷灰底、旧金选中条、细线、衬线标题、直角控件。
+     直接引 Style_Interface.css（字体与 --ui-* 变量）和 Style_Editor.css（.edPanel / .edHead / .edSection / .edChip …），
+     整页包在 #edRoot.toolsOpen 里让 --ed-* 变量生效；这里只补这一页自己的布局。缓存戳跟 index.html 一致。 -->
+<link rel="stylesheet" href="./Style_Interface.css?v=2026103080">
+<link rel="stylesheet" href="./Style_Editor.css?v=20261023010000">
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
+#view { position: fixed; inset: 0; }
+#view canvas { display: block; width: 100%; height: 100%; }
+#edRoot.mx .edMenuBar { display: flex; }
+#edRoot.mx .edPanel { top: calc(var(--ed-bar-h) + 12px); }
+#edRoot.mx #side { left: 14px; width: 340px; }
+#edRoot.mx #inspector { right: 14px; width: 360px; }
+#edRoot.mx .edBody { padding: 4px 16px 18px 22px; }
+#edRoot.mx .edHead .edSub { white-space: nowrap; }
+#search { width: 100%; box-sizing: border-box; margin: 12px 0 6px; }
+#holds { flex-wrap: nowrap; }
+#holds .edChip { flex: 1 1 auto; text-align: center; padding: 4px 6px; white-space: nowrap; font-size: 11.5px; }
+#list { margin: 4px -16px 0 -22px; }
+.cat > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 8px;
+  padding: 10px 16px 8px 22px; border-bottom: 1px solid var(--ed-rule-2);
+  color: var(--ed-text-hi); font: 700 15px/1.3 var(--ed-serif); letter-spacing: 0.1em;
+}
+.cat > summary::-webkit-details-marker { display: none; }
+.cat > summary::before { content: ""; width: 5px; height: 5px; align-self: center; border: 1px solid var(--ed-text-4); }
+.cat[open] > summary::before { background: var(--ed-gold); border-color: var(--ed-gold); }
+.cat > summary:hover { color: var(--ed-gold); }
+.cat > summary .t { flex: 1; }
+.cat > summary .n { color: var(--ed-text-4); font: 12px var(--ui-font); letter-spacing: 0; }
+.hold { display: flex; align-items: center; gap: 8px; padding: 8px 16px 2px 22px; color: var(--ed-text-3); font-size: 11px; letter-spacing: 0.16em; }
+.hold::after { content: ""; flex: 1; border-bottom: 1px solid var(--ed-rule-2); }
+.clip {
+  cursor: pointer; padding: 6px 16px 6px 19px; border-left: 3px solid transparent;
+  transition: color 0.12s linear, background 0.12s linear;
+}
+.clip:hover { background: var(--ed-sel); border-left-color: var(--ed-gold); }
+.clip.on { background: var(--ed-sel-strong); border-left-color: var(--ed-gold); }
+.clip .zh { color: var(--ed-text); font-size: 13.5px; letter-spacing: 0.06em; }
+.clip.on .zh, .clip:hover .zh { color: var(--ed-gold-text); }
+.clip .en { color: var(--ed-text-4); font-size: 11.5px; line-height: 1.4; }
+.clip .tag { display: inline-block; margin-left: 6px; padding: 0 5px; font-size: 10.5px; letter-spacing: 0.04em; border: 1px solid var(--ed-edge); color: var(--ed-text-3); vertical-align: 1px; }
+.clip .tag.warn { color: var(--ed-gold-text); border-color: var(--ed-gold); }
+.clip .tag.made { color: var(--ed-good); border-color: var(--ed-good); }
+#info .src { font: 11px/1.5 var(--ui-mono); color: var(--ed-text-3); word-break: break-all; }
+#info .edRow > .l { flex-basis: 64px; }
+#info .edRow > .c { color: var(--ed-text); font-size: 12.5px; }
+#info .en { color: var(--ed-text-4); font-size: 12px; margin: 2px 0 6px; }
+#info .note { margin-top: 10px; padding: 8px 10px; border-left: 3px solid var(--ed-gold); background: var(--ed-sel); color: var(--ed-gold-text); font-size: 12px; line-height: 1.6; }
+#playRow { display: flex; align-items: center; gap: 8px; }
+#playRow .edBtn { min-width: 64px; }
+#scrub { flex: 1 1 auto; }
+#time, #grip, #throw { font: 12px var(--ui-mono); color: var(--ed-text-3); white-space: nowrap; }
+#grip b, #throw b { color: var(--ed-gold-text); font-weight: normal; }
+#edRoot.mx .edPanel input[type="range"] { width: 100%; }
+.toggles { display: flex; flex-wrap: wrap; gap: 4px; }
+.toggles .edChip input { display: none; }
+#status { position: fixed; left: 50%; top: calc(var(--ed-bar-h) + 16px); transform: translateX(-50%); color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.1em; pointer-events: none; }
+#help { position: fixed; left: 370px; bottom: 16px; color: var(--ed-text-4); font-size: 11.5px; letter-spacing: 0.06em; line-height: 1.7; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.js?v=1",
+  "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=1",
+  "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=1"
+} }
+</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="edRoot" class="toolsOpen mx">
+  <header class="edMenuBar">
+    <div class="edMenuBrand">动作预览</div>
+    <div class="edMenuStatus" id="summary">读取中…</div>
+  </header>
+  <aside class="edPanel" id="side">
+    <div class="edHead"><div class="edTitle">Mixamo 动作库</div><div class="edSub">X Bot 骨骼 · 动作文件只在本机</div></div>
+    <div class="edBody">
+      <input id="search" type="text" placeholder="搜索中文名 / 英文名 / 顶替对象">
+      <div class="edChips" id="holds"></div>
+      <div id="list"></div>
+    </div>
+  </aside>
+  <aside class="edPanel work" id="inspector">
+    <div class="edHead"><div class="edTitle" id="clipTitle">—</div><div class="edSub" id="clipSub"></div></div>
+    <div class="edBody">
+      <div class="edSection"><div class="h">动作</div><div id="info"></div></div>
+      <div class="edSection"><div class="h">播放</div>
+        <div id="playRow"><button class="edBtn" id="play">暂停</button><input id="scrub" type="range" min="0" max="1" step="0.001" value="0"></div>
+        <div class="edRow"><div class="l">时间</div><div class="c" id="time">0.00 / 0.00 s</div></div>
+        <div class="edRow"><div class="l">速度</div><div class="c"><select id="speed"><option>0.25</option><option>0.5</option><option selected>1</option><option>1.5</option><option>2</option></select></div></div>
+        <div class="toggles">
+          <label class="edChip on"><input id="loop" type="checkbox" checked>循环</label>
+          <label class="edChip"><input id="lock" type="checkbox">锁定原地</label>
+          <label class="edChip on"><input id="follow" type="checkbox" checked>镜头跟随</label>
+        </div>
+      </div>
+      <div class="edSection"><div class="h">道具</div>
+        <div class="edRow" title="只挂在「端枪」的动作上"><div class="l">步枪</div><div class="c"><select id="rifle"><option value="">无</option><option value="ZhongZheng" selected>中正式</option><option value="Type38">三八式</option></select></div></div>
+        <div class="edRow" title="只挂在投弹动作上"><div class="l">手榴弹</div><div class="c"><select id="grenade"><option value="Gongxian" selected>国军木柄</option><option value="Type91">日军九一式</option></select></div></div>
+        <div class="edRow"><div class="l">读数</div><div class="c"><div id="grip"></div><div id="throw"></div></div></div>
+      </div>
+    </div>
+  </aside>
+  <div id="status"></div>
+  <div id="help">拖动旋转 · 滚轮缩放 · 右键拖动平移 · 双击复位<br>空格 播放 / 暂停 · ↑↓ 上下一条 · ←→ 逐帧</div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { LoadModel } from "./Script_MeshLoad.mjs";
+
+const BASE = "./tmp/Mixamo/";
+const FPS = 30;
+const $ = id => document.getElementById(id);
+const loader = new GLTFLoader();
+
+// ---------- scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+$("view").appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x24221e);
+scene.fog = new THREE.Fog(0x24221e, 14, 40);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 200);
+scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a332a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(3, 6, 4); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 20 });
+scene.add(sun, sun.target);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x3b372f, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+// 环境反光：没有它，刀身、枪管这种金属面只反射黑色。拿一个上亮下暗的球烘一张，只用于反光、不当背景。
+{
+  const sky = new THREE.SphereGeometry(10, 32, 16), colors = [];
+  const top = new THREE.Color(0xd8cfbd), bottom = new THREE.Color(0x2a2620), c = new THREE.Color();
+  for (let i = 0; i < sky.attributes.position.count; i += 1) {
+    c.lerpColors(bottom, top, THREE.MathUtils.smoothstep(sky.attributes.position.getY(i), -4, 6)).toArray(colors, i * 3);
+  }
+  sky.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  const room = new THREE.Scene();
+  room.add(new THREE.Mesh(sky, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(room, 0.04).texture;
+  scene.environmentIntensity = 0.6;
+  pmrem.dispose();
+}
+const grid = new THREE.GridHelper(40, 80, 0x6e5a33, 0x47403a);
+grid.position.y = 0.001; scene.add(grid);
+
+// ---------- orbit ----------
+const orbit = { yaw: 0.6, pitch: 0.18, dist: 5, target: new THREE.Vector3(0, 0.95, 0), pan: new THREE.Vector3() };
+function ResetOrbit() { Object.assign(orbit, { yaw: 0.6, pitch: 0.18, dist: 5 }); orbit.pan.set(0, 0, 0); }
+let drag = null;
+renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
+renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, button: e.button }; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener("pointerup", () => { drag = null; });
+renderer.domElement.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.button === 2) {
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    orbit.pan.addScaledVector(right, -dx * orbit.dist * 0.0015).addScaledVector(up, dy * orbit.dist * 0.0015);
+  } else {
+    orbit.yaw -= dx * 0.008;
+    orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.006, -0.3, 1.45);
+  }
+});
+renderer.domElement.addEventListener("wheel", e => { e.preventDefault(); orbit.dist = THREE.MathUtils.clamp(orbit.dist * Math.exp(e.deltaY * 0.001), 0.8, 30); }, { passive: false });
+renderer.domElement.addEventListener("dblclick", ResetOrbit);
+
+// ---------- state ----------
+let manifest = null, character = null, mixer = null, hips = null, action = null, current = null, playing = true;
+const clipCache = new Map();
+let rows = [];
+
+function Resize() {
+  const r = $("view").getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+new ResizeObserver(Resize).observe($("view"));
+
+async function LoadClip(entry) {
+  if (!clipCache.has(entry.file)) {
+    clipCache.set(entry.file, loader.loadAsync(BASE + "Glb/" + entry.file).then(gltf => gltf.animations[0]));
+  }
+  return clipCache.get(entry.file);
+}
+
+// ---------- rifle ----------
+// 项目里的枪（Model/Model_<id>.tzm.json）：右手握点 gripR 在原点，枪口朝 -Z、准星朝 +Y，
+// 左手握点 gripL 在护木上。Mixamo 的端枪动作是照「枪固定在右手里」做的，所以这里也这样挂：
+// 用一条端枪瞄准动作的第 0 帧标定一次——握把放进右手掌心、枪管指向左手掌心、准星朝上——
+// 记下枪相对右手骨的位置和朝向，之后每帧照抄。左手不去够枪，读数显示它离护木握点差多远。
+// 只有清单里 hold 为「端枪」的动作挂枪；空手和拿着别的动作不挂。
+// 刺刀、横枪格挡这类两手握距比瞄准时宽的，照抄会让枪管偏开左手，所以左手在枪管前方
+// （离右手 0.2–0.75 m、偏角 100° 以内）时，再把枪管转过去对准左手掌心，只转方向不改滚转。
+// 换弹时左手去拉枪栓，离右手不到 0.2 m；中弹、扔弹时左手要么甩远、要么跑到身后，都不会被误转。
+const RIFLE_CALIBRATION_CLIP = "Rifle Aiming Idle";
+const AIM_AT_LEFT = { near: 0.2, far: 0.75, maxAngle: THREE.MathUtils.degToRad(100) };
+const RIFLE_MATERIALS = {
+  wood: new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.7 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.45, metalness: 0.6 }),
+};
+const rifles = new Map();
+let rifle = null, rifleGripL = null, rifleOffset = null;
+let rightHand = null, rightMiddle = null, leftHand = null, leftMiddle = null;
+const handP = new THREE.Vector3(), handQ = new THREE.Quaternion(), handS = new THREE.Vector3();
+const palmL = new THREE.Vector3(), gripW = new THREE.Vector3();
+const muzzle = new THREE.Vector3(), toLeft = new THREE.Vector3(), turn = new THREE.Quaternion();
+
+function Palm(hand, middle, out) {
+  const a = hand.getWorldPosition(out), b = middle.getWorldPosition(new THREE.Vector3());
+  return a.lerp(b, 0.55);
+}
+
+async function LoadRifle(id) {
+  if (!rifles.has(id)) {
+    rifles.set(id, LoadModel(`./Model/Model_${id}.tzm.json`, { materials: RIFLE_MATERIALS }).then(built => {
+      if (!built) return null;
+      built.root.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      return built;
+    }));
+  }
+  return rifles.get(id);
+}
+
+async function CalibrateRifle() {
+  const entry = manifest.clips.find(clip => clip.name === RIFLE_CALIBRATION_CLIP);
+  if (!entry) return;
+  const clip = await LoadClip(entry);
+  const probe = mixer.clipAction(clip);
+  probe.reset().play(); probe.time = 0; mixer.update(0);
+  character.updateMatrixWorld(true);
+  const right = Palm(rightHand, rightMiddle, new THREE.Vector3());
+  const left = Palm(leftHand, leftMiddle, new THREE.Vector3());
+  const z = right.clone().sub(left).normalize();               // 枪的 +Z 朝后（枪口是 -Z）
+  const y = new THREE.Vector3(0, 1, 0).addScaledVector(z, -z.y).normalize();
+  const x = new THREE.Vector3().crossVectors(y, z);
+  const rifleQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+  rightHand.matrixWorld.decompose(handP, handQ, handS);
+  const inv = handQ.clone().invert();
+  rifleOffset = { position: right.sub(handP).applyQuaternion(inv), quaternion: inv.multiply(rifleQ) };
+  probe.stop(); mixer.uncacheAction(clip);
+}
+
+async function SelectRifle(id) {
+  if (rifle) scene.remove(rifle);
+  rifle = null; rifleGripL = null; $("grip").textContent = "";
+  if (!id) return;
+  const built = await LoadRifle(id);
+  if (!built || $("rifle").value !== id) return;
+  rifle = built.root; rifleGripL = built.nodes.get("gripL");
+  scene.add(rifle);
+}
+
+// 枪跟右手（照标定），左手在枪管前方时再转过去对准左手。
+function RifleFromRightHand(position, quaternion) {
+  rightHand.matrixWorld.decompose(handP, handQ, handS);
+  position.copy(rifleOffset.position).applyQuaternion(handQ).add(handP);
+  quaternion.copy(handQ).multiply(rifleOffset.quaternion);
+  Palm(leftHand, leftMiddle, palmL);
+  muzzle.set(0, 0, -1).applyQuaternion(quaternion);
+  toLeft.copy(palmL).sub(position);
+  const reach = toLeft.length();
+  if (reach > AIM_AT_LEFT.near && reach < AIM_AT_LEFT.far && muzzle.angleTo(toLeft) < AIM_AT_LEFT.maxAngle) {
+    quaternion.premultiply(turn.setFromUnitVectors(muzzle, toLeft.divideScalar(reach)));
+  }
+}
+
+// 两手掌心定枪：握把点在右手掌心，枪口朝左手掌心，准星朝上。跟 _import/Script_MixamoAuthorKit.py 的
+// RifleFrame() 是同一个算法 —— Claude 自制的拉栓、压桥夹就是照这个位置去找拉柄和桥夹槽的。
+function RifleFromPalms(position, quaternion) {
+  Palm(rightHand, rightMiddle, position);
+  axisZ.copy(position).sub(Palm(leftHand, leftMiddle, palmL)).normalize();
+  axisY.set(0, 1, 0).addScaledVector(axisZ, -axisZ.y).normalize();
+  axisX.crossVectors(axisY, axisZ);
+  quaternion.setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+}
+
+// 少数动作是右手腾出来干别的、枪留在左手（端枪单手抛弹，自制的拉栓、压桥夹）：第 0 帧两手都在枪上时放好枪，
+// 记下它相对左手骨的位置和朝向，之后整条跟左手走。清单里这种动作标 rifleHand: "L"；自制的按两手掌心定位。
+let rifleOnLeft = null;
+function PinRifleToLeftHand(fromPalms) {
+  const position = new THREE.Vector3(), quaternion = new THREE.Quaternion();
+  if (fromPalms) RifleFromPalms(position, quaternion);
+  else RifleFromRightHand(position, quaternion);
+  leftHand.matrixWorld.decompose(handP, handQ, handS);
+  const inv = handQ.clone().invert();
+  rifleOnLeft = { position: position.sub(handP).applyQuaternion(inv), quaternion: inv.multiply(quaternion) };
+}
+
+function PlaceRifle() {
+  if (!rifle || !rifleOffset) return;
+  rifle.visible = current?.hold === "端枪";
+  if (!rifle.visible) { $("grip").textContent = ""; return; }
+  if (rifleOnLeft) {
+    leftHand.matrixWorld.decompose(handP, handQ, handS);
+    rifle.position.copy(rifleOnLeft.position).applyQuaternion(handQ).add(handP);
+    rifle.quaternion.copy(handQ).multiply(rifleOnLeft.quaternion);
+    Palm(leftHand, leftMiddle, palmL);
+  } else {
+    RifleFromRightHand(rifle.position, rifle.quaternion);
+  }
+  rifle.updateMatrixWorld(true);
+  if (rifleGripL) {
+    rifleGripL.getWorldPosition(gripW);
+    const cm = palmL.distanceTo(gripW) * 100;
+    $("grip").innerHTML = `左手离护木握点 <b>${cm.toFixed(1)}</b> cm`;
+  }
+}
+
+// ---------- 手榴弹、大刀 ----------
+// 清单里 prop 为「手榴弹」的投弹动作挂手榴弹，为「大刀」的挂项目里的二十九军大刀；模型和贴图跟游戏里同一套。
+// 手榴弹：选中动作时先把整条过一遍，挥得最快的那只手是投弹手，最快那一帧算出手。出手前握在掌心
+// （弹头从拳头的拇指一侧伸出去），出手后按出手那一刻的速度走抛物线落地，循环回开头再回到手里。
+// 大刀：跟步枪一样，用一条双手大刀待机的第 0 帧标定——前握点进右手掌心、刀尾朝左手、刃口朝指节——
+// 之后每帧照抄右手；两手都握在刀柄上时，再以前握点为轴把刀尾转过去对准左手。
+const DADAO_CALIBRATION_CLIP = "Great Sword Idle";
+const DADAO_GRIP_R = new THREE.Vector3(0, 0, 0.03);          // Model_Dadao 的 gripR 挂点
+const AIM_AT_POMMEL = { near: 0.04, far: 0.4, maxAngle: THREE.MathUtils.degToRad(70) };
+const GRAVITY = 9.8, GRENADE_REST_Y = 0.03;
+const textureLoader = new THREE.TextureLoader();
+let rightThumb = null, leftThumb = null;
+let dadao = null, dadaoOffset = null, throwInfo = null;
+let grenade = null;
+const grenades = new Map();
+const propQ = new THREE.Quaternion(), propP = new THREE.Vector3(), lastGrenadeQ = new THREE.Quaternion();
+const axisX = new THREE.Vector3(), axisY = new THREE.Vector3(), axisZ = new THREE.Vector3(), basis = new THREE.Matrix4();
+
+function PbrMaterial(id) {
+  const Load = (kind, srgb) => {
+    const texture = textureLoader.load(`./Texture/Texture_${id}${kind}.webp`);
+    if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  };
+  const orm = Load("Orm");
+  return new THREE.MeshStandardMaterial({ map: Load("Base", true), normalMap: Load("Normal"),
+    aoMap: orm, roughnessMap: orm, metalnessMap: orm, roughness: 1, metalness: 1 });
+}
+
+// 九一式库里没有模型，照 Data_OpeningSet0103 的尺寸程序化：Ø5 cm × 9.5 cm 分节铸铁弹体、
+// 顶上铜引信帽、引信帽边上一个保险销拉环。跟木柄弹一样弹头朝 -Z、握点在原点。
+function BuildType91() {
+  const iron = new THREE.MeshStandardMaterial({ color: 0x3b3c34, roughness: 0.85, metalness: 0.45 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0x8c7546, roughness: 0.45, metalness: 0.85 });
+  const root = new THREE.Group();
+  const Add = (geometry, material, z) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = Math.PI / 2; mesh.position.z = z; mesh.castShadow = true; root.add(mesh);
+    return mesh;
+  };
+  Add(new THREE.CylinderGeometry(0.025, 0.025, 0.095, 20), iron, 0.01);
+  for (const z of [-0.022, 0.0, 0.022, 0.044]) Add(new THREE.CylinderGeometry(0.0265, 0.0265, 0.006, 20), iron, z);
+  Add(new THREE.CylinderGeometry(0.012, 0.012, 0.03, 16), brass, -0.052);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.011, 0.0015, 6, 16), brass);
+  ring.position.set(0.018, 0, -0.05); ring.rotation.y = Math.PI / 2; ring.castShadow = true;
+  root.add(ring);
+  return root;
+}
+
+async function LoadGrenade(id) {
+  if (!grenades.has(id)) {
+    grenades.set(id, id === "Type91" ? Promise.resolve(BuildType91())
+      : LoadModel("./Model/Model_Grenade.tzm.json", { materials: { grenade: PbrMaterial("Grenade") } })
+        .then(built => built && built.root));
+  }
+  return grenades.get(id);
+}
+
+async function SelectGrenade(id) {
+  if (grenade) scene.remove(grenade);
+  grenade = null;
+  const root = await LoadGrenade(id);
+  if (!root || $("grenade").value !== id) return;
+  root.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  grenade = root; grenade.visible = false; scene.add(grenade);
+}
+
+async function LoadDadao() {
+  const built = await LoadModel("./Model/Model_Dadao.tzm.json", { materials: { dadao: PbrMaterial("Dadao") } });
+  if (!built) return;
+  built.root.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  dadao = built.root; dadao.visible = false; scene.add(dadao);
+}
+
+// 手的朝向：手指方向（手腕 → 中指根）和拇指方向（手腕 → 拇指根，去掉沿手指的分量）。
+function HandAxes(hand, middle, thumb, fingers, thumbSide) {
+  hand.getWorldPosition(propP);
+  fingers.copy(middle.getWorldPosition(new THREE.Vector3())).sub(propP).normalize();
+  thumbSide.copy(thumb.getWorldPosition(new THREE.Vector3())).sub(propP);
+  thumbSide.addScaledVector(fingers, -thumbSide.dot(fingers)).normalize();
+}
+
+async function CalibrateDadao() {
+  const entry = manifest.clips.find(clip => clip.name === DADAO_CALIBRATION_CLIP);
+  if (!entry) return;
+  const clip = await LoadClip(entry);
+  const probe = mixer.clipAction(clip);
+  probe.reset().play(); probe.time = 0; mixer.update(0);
+  character.updateMatrixWorld(true);
+  const right = Palm(rightHand, rightMiddle, new THREE.Vector3());
+  const left = Palm(leftHand, leftMiddle, new THREE.Vector3());
+  axisZ.copy(left).sub(right).normalize();                       // 刀的 +Z 朝刀尾（刀尖是 -Z）
+  const fingers = new THREE.Vector3(); HandAxes(rightHand, rightMiddle, rightThumb, fingers, new THREE.Vector3());
+  axisY.copy(fingers).addScaledVector(axisZ, -fingers.dot(axisZ)).normalize().negate();   // 刃口（-Y）朝指节
+  axisX.crossVectors(axisY, axisZ);
+  const q = new THREE.Quaternion().setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+  const origin = right.clone().sub(DADAO_GRIP_R.clone().applyQuaternion(q));
+  rightHand.matrixWorld.decompose(handP, handQ, handS);
+  const inv = handQ.clone().invert();
+  dadaoOffset = { position: origin.sub(handP).applyQuaternion(inv), quaternion: inv.multiply(q) };
+  probe.stop(); mixer.uncacheAction(clip);
+}
+
+function PlaceDadao() {
+  if (!dadao || !dadaoOffset) return;
+  dadao.visible = current?.prop === "大刀";
+  if (!dadao.visible) return;
+  rightHand.matrixWorld.decompose(handP, handQ, handS);
+  dadao.quaternion.copy(handQ).multiply(dadaoOffset.quaternion);
+  dadao.position.copy(dadaoOffset.position).applyQuaternion(handQ).add(handP);
+  const grip = DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion).add(dadao.position);
+  const pommel = new THREE.Vector3(0, 0, 1).applyQuaternion(dadao.quaternion);
+  toLeft.copy(Palm(leftHand, leftMiddle, palmL)).sub(grip);
+  const reach = toLeft.length();
+  if (reach > AIM_AT_POMMEL.near && reach < AIM_AT_POMMEL.far && pommel.angleTo(toLeft) < AIM_AT_POMMEL.maxAngle) {
+    dadao.quaternion.premultiply(turn.setFromUnitVectors(pommel, toLeft.divideScalar(reach)));
+    dadao.position.copy(grip).sub(DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion));
+  }
+}
+
+// 担架（项目的 Model_BambooStretcher.glb：两杆中心相距 0.58 m、杆粗 5.6 cm，担架布在 z ±0.88 m 之间，
+// 两头各 19 cm 光杆当把手）。prop 为「担架」的动作把一头的两根把手放进两只手掌心：
+// stretcherEnd "rear" = 抬后头的人（面朝担架，担架在他前面），"front" = 抬前头的人（背对担架，两手在身后，担架在他后面）。
+// 担架保持水平（另一头在另一个人手里），只跟着两手的中点和左右方向走。
+const STRETCHER_GRIP = { rear: new THREE.Vector3(0, 0.12, 0.98), front: new THREE.Vector3(0, 0.12, -0.98) };
+let stretcher = null;
+loader.loadAsync("./Model/Model_BambooStretcher.glb").then(gltf => {
+  stretcher = gltf.scene;
+  stretcher.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  stretcher.visible = false;
+  scene.add(stretcher);
+});
+const palmR = new THREE.Vector3();
+function PlaceStretcher() {
+  if (!stretcher) return;
+  stretcher.visible = current?.prop === "担架";
+  if (!stretcher.visible) return;
+  Palm(rightHand, rightMiddle, palmR); Palm(leftHand, leftMiddle, palmL);
+  axisX.copy(palmR).sub(palmL).setY(0).normalize();             // 担架的 +X 杆在右手
+  axisY.set(0, 1, 0);
+  axisZ.crossVectors(axisX, axisY);                              // -Z 朝人的前方
+  stretcher.quaternion.setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+  const grip = STRETCHER_GRIP[current.stretcherEnd === "front" ? "front" : "rear"].clone().applyQuaternion(stretcher.quaternion);
+  stretcher.position.copy(palmR).add(palmL).multiplyScalar(0.5).sub(grip);
+}
+
+// 把投弹动作过一遍，找挥得最快的那只手和那一刻（出手）。用的是当前 action，过完把时间放回去。
+// 只在手往前、往上或平着走的帧里挑（往下偏不超过 20°）：整条里最快的一帧往往是出手后往下甩的收势。
+// 端着枪扔的（枪在右手）只看左手。
+const RELEASE_MAX_DOWN = Math.sin(THREE.MathUtils.degToRad(20));
+function AnalyseThrow(clip, sides) {
+  const steps = Math.max(30, Math.round(clip.duration * FPS * 2));
+  const dt = clip.duration / steps, saved = action.time;
+  const hands = { R: [rightHand, rightMiddle], L: [leftHand, leftMiddle] };
+  const prev = {}, now = new THREE.Vector3();
+  let best = null;
+  for (let i = 0; i <= steps; i += 1) {
+    action.time = i * dt; mixer.update(0); character.updateMatrixWorld(true);
+    for (const side of sides) {
+      Palm(...hands[side], now);
+      if (prev[side]) {
+        const velocity = now.clone().sub(prev[side]).divideScalar(dt);
+        const speed = velocity.length();
+        if (velocity.y >= -RELEASE_MAX_DOWN * speed && (!best || speed > best.speed)) best = { speed, hand: side, release: i * dt, p0: now.clone(), v0: velocity };
+      }
+      prev[side] = now.clone();
+    }
+  }
+  action.time = saved; mixer.update(0);
+  if (!best || best.speed <= 3) return { hand: sides[0], release: Infinity };
+  best.v0 = LaunchVelocity(best.v0);
+  return best;
+}
+
+// 动捕演员挥得慢，手在出手那帧只有 6–16 m/s，直接用会扔四五米就落地。预览里只取手的水平方向，
+// 出手速度按 THROW_SPEED、仰角夹在 THROW_ELEVATION 里，落点大约 25–30 m（估算，不是史料数）。
+const THROW_SPEED = 17, THROW_ELEVATION = [THREE.MathUtils.degToRad(18), THREE.MathUtils.degToRad(42)];
+function LaunchVelocity(hand) {
+  const flat = new THREE.Vector3(hand.x, 0, hand.z);
+  if (flat.lengthSq() < 1e-4) hips.getWorldDirection(flat).setY(0);
+  flat.normalize();
+  const elevation = THREE.MathUtils.clamp(Math.atan2(hand.y, Math.hypot(hand.x, hand.z)), ...THROW_ELEVATION);
+  return flat.multiplyScalar(THROW_SPEED * Math.cos(elevation)).setY(THROW_SPEED * Math.sin(elevation));
+}
+
+function ThrowLanding(info) {
+  const { p0, v0 } = info;
+  return (v0.y + Math.sqrt(v0.y * v0.y + 2 * GRAVITY * Math.max(0, p0.y - GRENADE_REST_Y))) / GRAVITY;
+}
+
+// 投弹动作在地上画出手榴弹的飞行轨迹和落点圈，信息栏写落点多远。
+const throwPath = new THREE.Line(new THREE.BufferGeometry(),
+  new THREE.LineDashedMaterial({ color: 0xc9a55c, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.8 }));
+const throwMark = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.45, 32),
+  new THREE.MeshBasicMaterial({ color: 0xc9a55c, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
+throwMark.rotation.x = -Math.PI / 2;
+throwPath.visible = throwMark.visible = false;
+scene.add(throwPath, throwMark);
+function ShowThrowPath() {
+  const ok = Boolean(throwInfo?.v0);
+  throwPath.visible = throwMark.visible = ok;
+  $("throw").textContent = "";
+  if (!ok) return;
+  const land = ThrowLanding(throwInfo), points = [];
+  for (let i = 0; i <= 40; i += 1) {
+    const s = land * i / 40;
+    points.push(throwInfo.p0.clone().addScaledVector(throwInfo.v0, s).setY(throwInfo.p0.y + throwInfo.v0.y * s - 0.5 * GRAVITY * s * s));
+  }
+  throwPath.geometry.setFromPoints(points);
+  throwPath.computeLineDistances();
+  const end = points[points.length - 1];
+  throwMark.position.set(end.x, 0.01, end.z);
+  const distance = Math.hypot(end.x - throwInfo.p0.x, end.z - throwInfo.p0.z);
+  $("throw").textContent = `落点约 ${distance.toFixed(0)} m`;
+}
+
+function PlaceGrenade() {
+  if (!grenade) return;
+  grenade.visible = current?.prop === "手榴弹" && Boolean(action);
+  if (!grenade.visible || !throwInfo) return;
+  const t = action.time;
+  if (t > throwInfo.release) {
+    const { p0, v0 } = throwInfo;
+    const s = Math.min(t - throwInfo.release, ThrowLanding(throwInfo));
+    grenade.position.copy(p0).addScaledVector(v0, s);
+    grenade.position.y -= 0.5 * GRAVITY * s * s;
+    grenade.quaternion.copy(lastGrenadeQ).multiply(turn.setFromAxisAngle(axisX.set(1, 0, 0), s * 14));
+    return;
+  }
+  const left = throwInfo.hand === "L";
+  const [hand, middle, thumb] = left ? [leftHand, leftMiddle, leftThumb] : [rightHand, rightMiddle, rightThumb];
+  HandAxes(hand, middle, thumb, axisY, axisZ);
+  axisZ.negate();                                                // 弹头（-Z）从拇指一侧伸出拳头
+  axisX.crossVectors(axisY, axisZ);
+  grenade.quaternion.setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+  lastGrenadeQ.copy(grenade.quaternion);
+  Palm(hand, middle, grenade.position);
+}
+
+// 锁定原地：把 Hips 的水平位移钉在第一帧（只影响显示，不改文件）。
+// Hips 的位置写在 Armature 的局部轴里（FBX 来的 Z 朝上、厘米、外面套 0.01 缩放），
+// 所以先换到世界坐标钉 X/Z，再换回去；直接钉局部 X/Z 会把上下也钉死。
+const lockedCache = new WeakMap();
+function LockedClip(clip) {
+  if (!lockedCache.has(clip)) {
+    const copy = clip.clone();
+    character.updateMatrixWorld(true);
+    const toWorld = hips.parent.matrixWorld.clone(), toLocal = toWorld.clone().invert();
+    const p = new THREE.Vector3(), first = new THREE.Vector3();
+    for (const track of copy.tracks) {
+      if (track.name !== "Hips.position") continue;
+      const v = track.values;
+      first.fromArray(v, 0).applyMatrix4(toWorld);
+      for (let i = 0; i < v.length; i += 3) {
+        p.fromArray(v, i).applyMatrix4(toWorld);
+        p.x = first.x; p.z = first.z;
+        p.applyMatrix4(toLocal).toArray(v, i);
+      }
+    }
+    lockedCache.set(clip, copy);
+  }
+  return lockedCache.get(clip);
+}
+
+async function Select(entry, { keepTime = false } = {}) {
+  current = entry;
+  for (const row of rows) row.el.classList.toggle("on", row.entry === entry);
+  const on = rows.find(row => row.entry === entry);
+  if (on) { on.el.closest("details").open = true; on.el.scrollIntoView({ block: "nearest" }); }
+  history.replaceState(null, "", "#" + encodeURIComponent(entry.file));
+  // 指定了手榴弹种类的（国军木柄 / 日军九一式）自动换上，免得九一式的动作拿着木柄弹。
+  if (entry.grenade && $("grenade").value !== entry.grenade) { $("grenade").value = entry.grenade; SelectGrenade(entry.grenade); }
+  $("loop").checked = entry.loop;
+  ShowInfo(entry, null);
+  $("status").textContent = "加载动作…";
+  let clip;
+  try { clip = await LoadClip(entry); } catch (error) { $("status").textContent = "加载失败：" + error; return; }
+  if (current !== entry) return;
+  const time = keepTime && action ? action.time : 0;
+  mixer.stopAllAction();
+  action = mixer.clipAction($("lock").checked ? LockedClip(clip) : clip);
+  ApplyLoop();
+  action.reset().play();
+  rifleOnLeft = null;
+  if (entry.rifleHand === "L") {
+    action.time = 0; mixer.update(0); character.updateMatrixWorld(true); PinRifleToLeftHand(Boolean(entry.author));
+  }
+  // 投弹手：枪在哪只手，就用另一只手扔；空着手的两只都看。
+  const throwSides = entry.hold !== "端枪" ? ["R", "L"] : entry.rifleHand === "L" ? ["R"] : ["L"];
+  throwInfo = entry.prop === "手榴弹" ? AnalyseThrow(action.getClip(), throwSides) : null;
+  ShowThrowPath();
+  action.time = Math.min(time, clip.duration);
+  action.paused = !playing;
+  $("scrub").max = clip.duration;
+  ShowInfo(entry, clip);
+  $("status").textContent = "";
+  if (!keepTime) orbit.pan.set(0, 0, 0);
+}
+
+function ApplyLoop() {
+  if (!action) return;
+  action.setLoop($("loop").checked ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+  action.clampWhenFinished = true;
+}
+
+function ShowInfo(entry, clip) {
+  const dur = clip ? clip.duration.toFixed(2) + " s · " + Math.round(clip.duration * FPS) + " 帧" : "…";
+  const flags = [entry.loop ? "可循环" : "单次", entry.inPlace ? "原地（已去根位移）" : "带根位移"].join(" · ");
+  $("clipTitle").textContent = entry.label;
+  $("clipSub").textContent = `${entry.name} · V${entry.variant}/${entry.variants}`;
+  const Row = (label, value) => `<div class="edRow"><div class="l">${label}</div><div class="c">${value}</div></div>`;
+  $("info").innerHTML = (entry.description && entry.description !== entry.name ? `<div class="en">${entry.description}</div>` : "")
+    + Row("分类", entry.category) + Row("手里", entry.hold + (entry.prop ? " · " + entry.prop : ""))
+    + Row("时长", dur) + Row("位移", flags) + Row("可顶替", entry.replaces || "—")
+    + (entry.author ? Row("制作", `${entry.author} · 基于 Mixamo`) + (entry.madeNote ? Row("说明", entry.madeNote) : "")
+      + Row("源文件", entry.sources.map(s => `<div class="src">${s}</div>`).join("")) : "")
+    + (entry.note ? `<div class="note">${entry.note}</div>` : "");
+}
+
+// 侧栏两层：动作分类 → 手里拿着什么（端枪 / 空手 / 拿着别的）。顶上的按钮只看其中一种。
+let holdFilter = "";
+function BuildHolds() {
+  const options = [["", "全部"], ...manifest.holds.map(hold => [hold, hold])];
+  $("holds").innerHTML = "";
+  for (const [value, text] of options) {
+    const n = manifest.clips.filter(clip => !value || clip.hold === value).length;
+    const button = document.createElement("button");
+    button.className = "edChip";
+    button.textContent = `${text} ${n}`;
+    button.classList.toggle("on", value === holdFilter);
+    button.onclick = () => { holdFilter = value; BuildHolds(); BuildList($("search").value); };
+    $("holds").appendChild(button);
+  }
+}
+
+function BuildList(filter = "") {
+  const q = filter.trim().toLowerCase();
+  const list = $("list"); list.innerHTML = ""; rows = [];
+  for (const category of manifest.categories) {
+    const entries = manifest.clips.filter(clip => clip.category === category && (!holdFilter || clip.hold === holdFilter) && (!q ||
+      [clip.label, clip.name, clip.description, clip.replaces, clip.hold, clip.prop, clip.note].join(" ").toLowerCase().includes(q)));
+    if (!entries.length) continue;
+    const details = document.createElement("details");
+    details.className = "cat"; details.open = Boolean(q);
+    details.innerHTML = `<summary><span class="t">${category}</span><span class="n">${entries.length}</span></summary>`;
+    let hold = null;
+    for (const entry of entries) {
+      if (entry.hold !== hold) {
+        hold = entry.hold;
+        const head = document.createElement("div");
+        head.className = "hold";
+        head.textContent = `${hold} ${entries.filter(clip => clip.hold === hold).length}`;
+        details.appendChild(head);
+      }
+      const el = document.createElement("div");
+      el.className = "clip";
+      const variant = entry.variants > 1 ? `<span class="tag">V${entry.variant}</span>` : "";
+      const loop = entry.loop ? `<span class="tag">循环</span>` : "";
+      const warn = entry.note ? `<span class="tag warn" title="${entry.note}">注意</span>` : "";
+      const made = entry.author ? `<span class="tag made" title="${entry.author} 基于 Mixamo 制作">自制</span>` : "";
+      el.innerHTML = `<div class="zh">${entry.label}${made}${variant}${loop}${warn}</div><div class="en">${entry.name}${entry.description && entry.description !== entry.name ? " — " + entry.description : ""}</div>`;
+      el.onclick = () => Select(entry);
+      details.appendChild(el);
+      rows.push({ entry, el });
+    }
+    list.appendChild(details);
+  }
+  if (current) for (const row of rows) row.el.classList.toggle("on", row.entry === current);
+}
+
+function Step(delta) {
+  if (!rows.length) return;
+  const i = rows.findIndex(row => row.entry === current);
+  const next = rows[(i + delta + rows.length) % rows.length];
+  Select(next.entry);
+}
+
+function SetPlaying(value) {
+  playing = value; $("play").textContent = playing ? "暂停" : "播放";
+  if (action) {
+    if (playing && !$("loop").checked && action.time >= action.getClip().duration - 1e-3) action.reset();
+    action.paused = !playing; action.enabled = true;
+  }
+}
+
+// 开关画成 edChip：勾选状态跟着亮金边（循环会随选中的动作自动改，所以每帧对一次）。
+function SyncToggles() {
+  for (const input of document.querySelectorAll(".toggles input")) input.parentElement.classList.toggle("on", input.checked);
+}
+$("play").onclick = () => SetPlaying(!playing);
+$("loop").onchange = () => { ApplyLoop(); if (action && playing) { action.enabled = true; action.paused = false; } };
+$("lock").onchange = () => current && Select(current, { keepTime: true });
+$("search").oninput = e => BuildList(e.target.value);
+$("scrub").oninput = e => { if (!action) return; SetPlaying(false); action.time = Number(e.target.value); mixer.update(0); };
+addEventListener("keydown", e => {
+  if (e.target === $("search")) return;
+  if (e.code === "Space") { e.preventDefault(); SetPlaying(!playing); }
+  else if (e.code === "ArrowDown") { e.preventDefault(); Step(1); }
+  else if (e.code === "ArrowUp") { e.preventDefault(); Step(-1); }
+  else if ((e.code === "ArrowRight" || e.code === "ArrowLeft") && action) {
+    e.preventDefault(); SetPlaying(false);
+    const d = action.getClip().duration;
+    action.time = THREE.MathUtils.clamp(action.time + (e.code === "ArrowRight" ? 1 : -1) / FPS, 0, d); mixer.update(0);
+  }
+});
+
+// ---------- boot ----------
+const clock = new THREE.Clock();
+const hipsWorld = new THREE.Vector3();
+function Frame() {
+  requestAnimationFrame(Frame);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (mixer) mixer.update(playing ? dt * Number($("speed").value) : 0);
+  if (character) { character.updateMatrixWorld(true); PlaceRifle(); PlaceGrenade(); PlaceDadao(); PlaceStretcher(); }
+  SyncToggles();
+  if (action) {
+    const d = action.getClip().duration;
+    $("scrub").value = action.time;
+    $("time").textContent = `${action.time.toFixed(2)} / ${d.toFixed(2)} s`;
+  }
+  if (hips && $("follow").checked) {
+    hips.getWorldPosition(hipsWorld);
+    orbit.target.x += (hipsWorld.x - orbit.target.x) * 0.15;
+    orbit.target.z += (hipsWorld.z - orbit.target.z) * 0.15;
+    sun.position.set(hipsWorld.x + 3, 6, hipsWorld.z + 4); sun.target.position.set(hipsWorld.x, 0, hipsWorld.z);
+  }
+  const t = orbit.target.clone().add(orbit.pan);
+  camera.position.set(
+    t.x + orbit.dist * Math.cos(orbit.pitch) * Math.sin(orbit.yaw),
+    t.y + orbit.dist * Math.sin(orbit.pitch),
+    t.z + orbit.dist * Math.cos(orbit.pitch) * Math.cos(orbit.yaw));
+  camera.lookAt(t);
+  renderer.render(scene, camera);
+}
+
+async function Boot() {
+  Resize();
+  try {
+    manifest = await (await fetch(BASE + "Data_MixamoLibrary.json", { cache: "no-store" })).json();
+    // 整理时剔除的条目（不合这个游戏、或手里拿着弓斧手枪之类）留在清单里备查，不显示。
+    manifest.clips = manifest.clips.filter(clip => !clip.dropped);
+    manifest.holds ||= ["端枪", "空手", "拿着别的"];
+    const gltf = await loader.loadAsync(BASE + "Glb/" + manifest.character);
+    character = gltf.scene;
+    character.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    scene.add(character);
+    hips = character.getObjectByName("Hips");
+    [rightHand, rightMiddle, leftHand, leftMiddle, rightThumb, leftThumb] = ["RightHand", "RightHandMiddle1", "LeftHand",
+      "LeftHandMiddle1", "RightHandThumb1", "LeftHandThumb1"].map(name => character.getObjectByName(name));
+    mixer = new THREE.AnimationMixer(character);
+    window.__preview = { scene, camera, renderer, character, orbit, get action() { return action; },
+      get grenade() { return grenade; }, get dadao() { return dadao; }, get throwInfo() { return throwInfo; },
+      get rifle() { return rifle; } };
+  } catch (error) {
+    // Mixamo 原始动作不许再分发，tmp/Mixamo 不进仓库：线上（Pages）和没下过动作的检出都走到这里。
+    $("summary").textContent = "读不到动作库：Mixamo 动作只在本机 tmp/Mixamo 里，线上和别的检出没有";
+    $("status").textContent = String(error);
+    return;
+  }
+  $("summary").textContent = `${manifest.clips.length} 条 · ${manifest.categories.length} 类 · X Bot`;
+  BuildHolds();
+  BuildList();
+  await CalibrateRifle();
+  await CalibrateDadao();
+  $("rifle").onchange = e => SelectRifle(e.target.value);
+  $("grenade").onchange = e => SelectGrenade(e.target.value);
+  SelectRifle($("rifle").value);
+  SelectGrenade($("grenade").value);
+  LoadDadao();
+  Frame();
+  const wanted = decodeURIComponent(location.hash.slice(1));
+  Select(manifest.clips.find(clip => clip.file === wanted) || manifest.clips[0]);
+}
+Boot();
+</script>
+</body>
+</html>
