@@ -1,0 +1,25 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_GrenadeThrow_V3",
+  "label": "日军九一式·拔销磕盔扔",
+  "note": "日军九一式手榴弹：右手握弹，举到嘴边用牙咬住保险销拉环、头一扭拔掉销（原动作）；再把引信帽一端往自己钢盔顶上一磕点火（腕往下快敲，头略低迎上去），停约 0.7 s（九一式延时 7-8 秒，老兵等一下再扔）；然后接原动作的引臂和甩出。整条 6.4 s，单次。预览里弹挂右手到出手。给日军用，不要给国军（国军木柄弹没有保险销）。",
+  "timings": {
+    "start": 0.0,
+    "bringToMouth": 0.6,
+    "biteStart": 1.2,
+    "pinPull": 1.5,
+    "raiseToHelmet": 1.7,
+    "helmetCocked": 2.233,
+    "knockContact": 2.333,
+    "pauseStart": 2.433,
+    "pauseEnd": 2.567,
+    "armBack": 3.1,
+    "release": 4.767,
+    "end": 6.433
+  },
+  "loop": false,
+  "durationSec": 6.433,
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_Type91GrenadeThrow.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/Type91GrenadeThrow.blend"
+}

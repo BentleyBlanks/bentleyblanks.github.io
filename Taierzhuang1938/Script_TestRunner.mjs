@@ -412,7 +412,7 @@ export const testDefs = {
   PrevizVillageClipsTest: { file: "Script_PrevizVillageClipsTest.mjs", desc: "白盒预演村子占位动作库 PrevizVillage（_import/Script_PrevizVillageClips.py，只烘 NRA02）：名单登记与版本、骨名与开场库逐位相同、帧数 / 有限数 / 循环接缝、脚滑 / 接触 / 膝滑验收数字、成对站位与接触时刻、根位移对契约（纯 Node）" },
   EditorBlockoutMapTest: { file: "Script_EditorBlockoutMapTest.mjs", timeoutMs: 300000, desc: "白盒关卡编辑器纸面俯视图与界面：纸色 / 块 / 旋转块 / 等高线 / 各阵营标记数像素，小地图跟玩家，全关总图缩放平移拾取，导航栏刻度与输入隔离" },
   EditorBlockoutBrowserTest: { file: "Script_EditorBlockoutBrowserTest.mjs", timeoutMs: 600000, desc: "白盒关卡编辑器实机：?editor=blockout 不起任务与过场、关键帧传送、过渡连续不瞬移、切第二关再切回、外部改配置自动同步、高级工具入口、存档退化、无未捕获错误" },
-  EditorBlockoutFirstLevel0105KeepInBrowserTest: { file: "Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs", timeoutMs: 900000, desc: "01–05 白盒玩家出不了沟（2026-10-21）：剧本通路在沟里且离隐形墙够远、19 处低处 × 8 个方向跳 + 翻每帧都在沟里、射击台翻不过胸墙、顺沟走得到、手榴弹飞出沟、NPC 照常翻出沟" },
+  EditorBlockoutFirstLevel0105KeepInBrowserTest: { file: "Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs", timeoutMs: 900000, desc: "01–05 白盒玩家出不了沟（2026-10-21）：剧本通路在沟里且离空气墙够远、19 处低处 × 8 个方向跳 + 翻每帧都在沟里、射击台翻不过胸墙、顺沟走得到、手榴弹飞出沟、NPC 照常翻出沟" },
   EditorBlockoutBlanketClothBrowserTest: { file: "Script_EditorBlockoutBlanketClothBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器单被布料模拟（2026-10-21）实机：FirstLevel0105 关键帧平铺、02-3 揪起被角、02-4 拖到半路两角钉在两个拖的人手上 / 尾巴贴地 / 冬瓜身下压着布 / 拉长有上限、从不同时刻 Seek 结果一致、松手落平、连续播每帧耗时与不对折" },
   EditorFirstPersonMotionBrowserTest: { file: "Script_EditorFirstPersonMotionBrowserTest.mjs", timeoutMs: 600000, desc: "高级工具「第一人称持枪移动检查」：外部机位、替身眼睛挂枪、真实尺寸、J/K/L 热键、读数（03-1 沟里着地脚零滑动）、关掉全还原" },
   EditorBlockoutFlyBrowserTest: { file: "Script_EditorBlockoutFlyBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器飞行观察（2026-10-21）实机：O 键 / 按钮进出、WASD 沿视线 + E/Q 升降 + Shift 加速的位移、滚轮调速、鼠标转相机、玩家原地且不吃游戏输入、小地图 / 全关总图的相机标记、复制位置与重现链接带相机位姿、退出后相机回到玩家视角、预演与切关的互斥" },
@@ -1152,8 +1152,9 @@ const changedDomainRules = [
   { domain: "editor", pattern: /PrevizVillage/i },
   // Texture/Editor 下是只有编辑器读的贴图（白盒编辑器的河沟底图）：改了跑 editor 域。
   { domain: "editor", pattern: /Texture\/Editor\//i },
-  // Mixamo 动作预览是高级工具开的独立窗口（Script_EditorMixamoPreview），读本机 tmp/Mixamo，游戏正片不读：改了跑 editor 域。
-  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html/i },
+  // Mixamo 动作库（Animation/Mixamo：X Bot 与通用动作）和它的预览窗口（Script_EditorMixamoPreview 开的独立页）：
+  // 只有预览工具与白盒编辑器读，游戏正片不读，改了跑 editor 域。
+  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html|Animation\/Mixamo\//i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

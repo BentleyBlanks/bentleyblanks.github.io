@@ -1,0 +1,19 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_Walking_V21",
+  "label": "担架·抬前头走",
+  "loop": true,
+  "duration": 1.233,
+  "timings": {
+    "start": 0.0,
+    "end": 1.233,
+    "cycle": 1.233,
+    "step": 0.617,
+    "RightFootDown": 0.9,
+    "LeftFootDown": 0.3
+  },
+  "note": "抬担架前头的人（走）：两手在胯两侧略靠后攥杆，掌心相距 0.58 m、同高、离地约 0.77 m，两臂几乎伸直下垂；上身比原件多前倾约 8 度，髋下沉 3.5 cm，步幅缩到原件的 0.92 倍；原地循环，首帧 = 末帧。预览里担架自动挂在两手中点、在他身后；站定脚前后速度见 report.json 的 mine.summary.stance。",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherFrontWalk.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StretcherFrontWalk.blend"
+}

@@ -80,7 +80,7 @@ export const SCENE_MATERIALS = Object.freeze({
   "Whitebox/Plaster": Object.freeze({ semantic: "plaster", label: "土墙 / 抹灰" }),
   "Whitebox/Foliage": Object.freeze({ semantic: "foliage", label: "植物" }),
   "Whitebox/Canvas": Object.freeze({ semantic: "canvas", label: "布 / 席" }),
-  "Whitebox/AirWall": Object.freeze({ semantic: "airWall", label: "隐形墙" }),
+  "Whitebox/AirWall": Object.freeze({ semantic: "airWall", label: "空气墙" }),
   "Whitebox/Roof": Object.freeze({ semantic: "roof", label: "屋顶" }),
   "Whitebox/Structure": Object.freeze({ semantic: "structure", label: "建筑结构" }),
   "Whitebox/Water": Object.freeze({ semantic: "water", label: "水" }),

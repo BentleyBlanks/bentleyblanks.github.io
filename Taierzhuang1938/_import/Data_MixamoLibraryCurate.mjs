@@ -15,8 +15,8 @@ export const HOLDS = ["端枪", "空手", "拿着别的"];
 
 // Claude 在 Mixamo 动作上改出来的动作（2026-11-01 起）。Mixamo 没有、但这个游戏必须有的：栓动步枪拉栓与压桥夹、
 // 国军木柄弹与日军九一式的点火、担架、包扎、往前拖人。每条一个制作脚本
-// _import/MixamoAuthored/Script_Author_<键>.py（用 _import/Script_MixamoAuthorKit.py），产物与 Mixamo 原件一样只在本机：
-// tmp/Mixamo/Glb/Animation_Claude_<键>.glb、tmp/Mixamo/Authored/<键>.blend（手改用）、<键>.report.json（逐帧测量）。
+// _import/MixamoAuthored/Script_Author_<键>.py（用 _import/Script_MixamoAuthorKit.py），产物与 Mixamo 原件一起进仓库：
+// Animation/Mixamo/Animation_Claude_<键>.glb、_import/Mixamo/Authored/<键>.blend（手改用）、<键>.report.json（逐帧测量）。
 // 字段同 CURATE 的附加项，另有 base（改自哪条 Mixamo 原动作）、grenade（预览挂哪种手榴弹：Gongxian / Type91）。
 // 只有 GLB 已经做出来的才进清单；制作时实际用的 base 与注意事项以导出写的 meta.json 为准。
 const BOLT = { category: "射击与换弹", hold: "端枪", rifleHand: "L" };

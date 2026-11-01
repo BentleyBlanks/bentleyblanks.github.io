@@ -1,0 +1,95 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_ProneIdle_V1",
+  "label": "卧姿压桥夹装弹",
+  "loop": false,
+  "note": "中正式/三八式转栓步枪（毛瑟98式系）；5发桥夹插进机匣顶桥夹槽，拇指压弹，推栓时空夹被顶飞。汉阳造是整夹装填，不是这个动作。预览里不显示桥夹和子弹。",
+  "timings": {
+    "hold": [
+      0.0,
+      0.3
+    ],
+    "rollAndTurnRifle": [
+      0.3,
+      1.2
+    ],
+    "reachBolt": [
+      0.65,
+      1.25
+    ],
+    "graspBolt": [
+      1.25,
+      1.4
+    ],
+    "boltUp": [
+      1.4,
+      1.6
+    ],
+    "boltBack": [
+      1.6,
+      1.95
+    ],
+    "releaseBolt": [
+      1.95,
+      2.3
+    ],
+    "toPouch": [
+      2.3,
+      3.18
+    ],
+    "takeClip": [
+      3.18,
+      3.45
+    ],
+    "carryClip": [
+      3.45,
+      4.2
+    ],
+    "insertClip": [
+      4.2,
+      4.32
+    ],
+    "press1": [
+      4.32,
+      4.52
+    ],
+    "pressUp": [
+      4.52,
+      4.67
+    ],
+    "press2": [
+      4.67,
+      4.85
+    ],
+    "thumbLeave": [
+      4.85,
+      5.02
+    ],
+    "backToBolt": [
+      5.02,
+      5.5
+    ],
+    "boltForward": [
+      5.5,
+      5.76
+    ],
+    "clipFlies": 5.6,
+    "boltDown": [
+      5.76,
+      5.95
+    ],
+    "toGripAndRecover": [
+      6.08,
+      6.5
+    ],
+    "hold2": [
+      6.5,
+      6.8
+    ]
+  },
+  "duration": 6.8,
+  "rifle": "ZhongZheng",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StripperLoadProne.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StripperLoadProne.blend"
+}

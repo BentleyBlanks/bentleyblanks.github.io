@@ -127,6 +127,13 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 
 汉阳造手部的视觉参照为逝去的十月发布的 [汉阳造/汉造八八式步枪](https://steamcommunity.com/sharedfiles/filedetails/?id=3233303781)。页面允许标注来源的二次创作，并将动作模板署名为 zmg、Denny凯妈、Animal33。本地对照读取了 `@awm_fire` 的静止握姿，并用 `a_idle_1` 第 0 帧校正左手指节方向；没有导入或批量转换该包的动作库。用户最终要求裸手与土灰袖子；截图仅作为手型和持枪姿态参照，本项目双臂并非该包原始手部资产。参考包与验收截图留在本地，不随游戏分发。
 
+## Mixamo 通用人物与动作（2026-11-01 进仓库）
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
+|---|---|---|---|---|
+| X Bot 人物 `Animation/Mixamo/Model_MixamoXBot.glb`、通用动作 `Animation/Mixamo/Animation_Mixamo_*.glb`（清单 `Animation/Mixamo/Data_MixamoLibrary.json`） | `_import/Mixamo/Raw/*.fbx`（用户登录自己的 Adobe 账号在 [mixamo.com](https://www.mixamo.com/) 导出，X Bot、30 fps、动作不带蒙皮） | Adobe Mixamo | [Mixamo 常见问题](https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html)：人物与动作可免版税用于个人、商业与非营利项目（含游戏）；不得把人物或动作当独立素材单卖或再分发 | `_import/Script_MixamoLibraryFetch.mjs` 对下载、写清单（`Data_MixamoLibraryCurate.mjs` 逐条起中文名、标端枪 / 空手 / 拿着别的、剔不合 1938 的），`Script_MixamoLibraryBake.py` 经 Blender 转 GLB（骨名去掉 `mixamorig:` 前缀）。只作本游戏的动作素材随游戏加载，不单独打包分发。 |
+| 自制动作 `Animation/Mixamo/Animation_Claude_*.glb` | `_import/MixamoAuthored/Script_Author_<键>.py` → `_import/Mixamo/Authored/<键>.blend` | Claude Opus 5.5，在 Mixamo 原动作上改（改自哪条见清单 `basedOn`） | 同上（Mixamo 派生） | 拉栓、压桥夹、木柄弹 / 九一式投弹、担架、包扎、拖着跑；共用 `_import/Script_MixamoAuthorKit.py`，逐帧测量 `<键>.report.json`，复审脚本 `_import/MixamoAuthored/Script_MixamoClipAudit.mjs`。 |
+
 2026-11-01 删除了早期没人再用的人物与手臂成品：`Model_FpsArms.glb`（WRAD Arms，CC0）、`Model_IjaSoldier.glb`（nisu，OpenGameArt）、`Model_NraSoldier.glb` 与 `Model_CivilianMale/Female.glb`（Quaternius，CC0），连同只导出它们的 `_import/BuildRiggedCharacters.py`、`Model/Script_ExportNraSoldier.py`；`_import/Source/` 里的下载原件未动。来源与许可原文见 git 历史。
 
 ## 特效贴图（爆炸火球序列图）

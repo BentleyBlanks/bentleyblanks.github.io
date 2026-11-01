@@ -607,7 +607,7 @@ export function L0105Ground() {
 }
 
 // ---------------------------------------------------------------------------
-// 5b. 圈住玩家（2026-10-21 用户：防止玩家跳出壕沟）：沟沿上方一圈只挡玩家的隐形墙
+// 5b. 圈住玩家（2026-10-21 用户：防止玩家跳出壕沟）：沟沿上方一圈只挡玩家的空气墙
 //   「沟里」= 开挖比没挖之前的地面低 KEEP_IN.depthM 以上、而且和机枪坑连得上的那一片（壕沟、坑、爬沟、散兵坑、防炮洞、
 //   交通沟坡道、干沟、凹路）。在它的边上立墙：tag "airWall"（Script_Physics 只挡角色控制器；子弹、手榴弹、视线、布娃娃都穿过去），
 //   预演 / 关键帧里的人不是物理角色，不受影响。墙线在边上那条格线（离沟底一侧的格点 0.25 m），按 0.2 m 容差拉直成一段段斜墙。
@@ -704,7 +704,7 @@ function SimplifyLoop(pts, tol) {
 }
 
 /**
- * 沟沿隐形墙（体块，tag "airWall"、visual false、semantic "airWall"）：掩码的边（沟里格点 | 沟外格点之间那条格线）
+ * 沟沿空气墙（体块，tag "airWall"、visual false、semantic "airWall"）：掩码的边（沟里格点 | 沟外格点之间那条格线）
  * 顺着「沟里在左手」串成环、拉直，每段一块斜墙（两头各多伸出半个墙厚，拐角不漏缝）。
  * 墙脚 = 沟里一侧 0.4 m 处地面的最低 − belowM，墙顶 = 两侧最高 + aboveM。sample = 烘好的网格采样。
  */
@@ -1850,12 +1850,12 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     if (errors.length) throw new Error(`地标表有错：${errors.join("；")}`);
   }
   // 防止玩家跳出壕沟（2026-10-21）：① 胸墙、板桥（横木 / 门板）标「不能攀」（noClimb：翻越 / 攀爬在它们上面不触发，射击台上照样露头开枪）；
-  // ② 沟沿一圈只挡玩家的隐形墙（L0105KeepInWalls，tag airWall）
+  // ② 沟沿一圈只挡玩家的空气墙（L0105KeepInWalls，tag airWall）
   const NO_CLIMB = /^(Parapet(West|East|Middle|Rubble)|Bridge(DoorBoard|Stringer|BrokenBoard)_\d+)$/;
   for (const b of [...blocks, ...gates]) if (NO_CLIMB.test(b.id)) b.noClimb = true;
   const keepIn = L0105KeepInWalls(terrain, sample);
   blocks.push(...keepIn.walls);
-  notes.push(`圈住玩家：沟里（比没挖之前低 ≥ ${KEEP_IN.depthM} m、和机枪坑连得上）${keepIn.loops} 个环、封闭小洞填了 ${keepIn.filled} 格；沟沿隐形墙 ${keepIn.walls.length} 段（只挡玩家）；`
+  notes.push(`圈住玩家：沟里（比没挖之前低 ≥ ${KEEP_IN.depthM} m、和机枪坑连得上）${keepIn.loops} 个环、封闭小洞填了 ${keepIn.filled} 格；沟沿空气墙 ${keepIn.walls.length} 段（只挡玩家）；`
     + `不能攀的块 ${[...blocks, ...gates].filter((b) => b.noClimb).length} 个（胸墙、板桥）`);
 
   // --- 抽样核对 ---

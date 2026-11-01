@@ -10,10 +10,11 @@
 import * as THREE from "three";
 import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor } from "./Data_SceneAssets.mjs";
 import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, SceneStyle } from "./Script_SceneDoc.mjs";
-import { SceneEditModel } from "./Script_SceneEditModel.mjs";
+import { SceneEditModel, SplitGroup } from "./Script_SceneEditModel.mjs";
 import {
-  BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler,
+  BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface,
 } from "./Script_EditorBlockoutLevels.mjs";
+import { SCENE_EVENTS, SceneEventLabel } from "./Data_SceneEvents.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "./Script_WhiteboxGrid.mjs";
@@ -73,7 +74,10 @@ class SceneEditorApp {
     this.show = { backdrop: true, hidden: false };
     this.layers = [];
     this.where = new Map();          // id → { layer, index }
-    this.open = new Set();           // 层级里展开的组
+    this.open = new Set();           // 层级里展开的文件夹（路径），记在本机
+    this.LoadOpen();
+    this.LoadFolds();                // 检视里各节折叠没有，记在本机
+    this.terrainLook = "tint";       // 地面现在怎么画：tint 高度色带 + 米格线；layers 正式场景的分层地表
     this.drag = null;
     this.keys = new Set();
     this.cam = { pos: new THREE.Vector3(), yaw: 0, pitch: -0.5 };
@@ -245,6 +249,8 @@ class SceneEditorApp {
     this.terrain.name = "SceneEditor_Terrain";
     this.world.add(this.terrain);
     this.terrainStep = step;
+    this.terrainLook = "tint";
+    if (this.style === "formal") this.terrainReady = this.DressFormalTerrain(this.terrain);
 
     const bd = doc.backdrop;
     this.backdropAt = bd ? BackdropGroundSampler(bd, this.sampler, bd.siteBounds || doc.bounds) : null;
@@ -258,6 +264,39 @@ class SceneEditorApp {
       plane.name = "SceneEditor_BackdropGround";
       this.backdropGround = plane;
       this.world.add(plane);
+    }
+  }
+
+  /**
+   * 正式场景的地面同游戏里那份（试玩建的）：MissionPlain 四层贴图（底土 / 车道 / 翻土 / 草茬），权重按涂色、路、沟、陡坡算
+   *（Script_EditorBlockoutLevels.BuildSceneGroundSurface，数在 Data_SceneGroundLayers）。贴图读不到就留高度色带并在状态栏说。
+   */
+  async DressFormalTerrain(mesh) {
+    const token = (this.terrainToken = (this.terrainToken || 0) + 1);
+    try {
+      const [{ MaterialLibrary }, { LoadTerrainLayers, CreateTerrainMaterial }] = await Promise.all([
+        import("./Script_Materials.mjs"), import("./Script_TerrainMaterial.mjs")]);
+      this.terrainPack ||= await LoadTerrainLayers(MISSION_LAYOUT.ground.terrainLayers, { anisotropy: this.renderer.capabilities.getMaxAnisotropy() });
+      if (token !== this.terrainToken || mesh !== this.terrain) return false;
+      const surface = BuildSceneGroundSurface(this.model.doc, this.sampler);
+      const position = mesh.geometry.getAttribute("position"), n = position.count;
+      const colors = new Float32Array(n * 3), layers = new Float32Array(n * 4), c = [1, 1, 1], w = [0, 0, 1, 1];
+      for (let i = 0; i < n; i++) {
+        surface(position.getX(i), position.getZ(i), c, w);
+        colors.set(c, i * 3); layers.set(w, i * 4);
+      }
+      mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
+      this.materialLibrary ||= new MaterialLibrary(this.renderer);
+      const material = CreateTerrainMaterial(this.materialLibrary, this.terrainPack, { quality: "medium", name: "SceneEditor_TerrainLayers" });
+      mesh.material.dispose();
+      mesh.material = material;
+      this.terrainLook = "layers";
+      return true;
+    } catch (error) {
+      console.warn("[SceneEditor] 分层地表读不到", error);
+      this.Status("正式场景的分层地表贴图读不到，地面先按高度色带画", true);
+      return false;
     }
   }
 
@@ -798,7 +837,8 @@ class SceneEditorApp {
 
   SelectIds(ids, opts = {}) {
     this.model.Select(ids, opts);
-    for (const id of this.model.selection) { const g = this.model.Find(id)?.group || "（未分组）"; this.open.add(g); }
+    this.RevealSelection();
+    this.revealPending = true;
     this.SyncSelectionLines();
     this.RenderTree();
     this.RenderInspector();
@@ -850,8 +890,9 @@ class SceneEditorApp {
     this.SelectIds([...this.model.selection]);
   }
 
-  // ------------------------------------------------------------------ 信号
+  // ------------------------------------------------------------------ 剧情事件
 
+  /** 剧情事件面板（代码里叫信号，Data_SceneEvents）：勾上 = 看这件事发生之后的样子。 */
   FillSignals() {
     const list = this.model.Signals();
     const key = list.join("|");
@@ -860,59 +901,131 @@ class SceneEditorApp {
     for (const s of [...this.signals]) if (!list.includes(s)) this.signals.delete(s);
     const box = $("seSignalList");
     box.textContent = "";
-    const note = El("p", "seMuted", "勾上 = 这个信号已经发生（随它消失的藏起来、随它出现的显示）。");
-    note.style.fontSize = "11px";
-    box.append(note);
+    box.append(El("p", "seNote", "剧情走到某一步（炸桥、塌洞、门被撞开……）就「发生」一个事件：写了「消失于」它的物件藏起来，写了「出现于」它的物件显示出来。勾上 = 看它发生之后的样子（只是预览，不存盘）。"));
     for (const s of list) {
       const label = El("label");
       const input = El("input");
       input.type = "checkbox";
       input.checked = this.signals.has(s);
       input.addEventListener("change", () => { if (input.checked) this.signals.add(s); else this.signals.delete(s); this.RebuildObjects(); $("seSignalCount").textContent = this.signals.size ? `${this.signals.size}` : ""; });
-      label.append(input, document.createTextNode(s));
+      const text = El("span", "", SceneEventLabel(s));
+      text.append(El("code", "", s));
+      label.append(input, text);
       box.append(label);
     }
   }
 
   // ------------------------------------------------------------------ 层级
 
+  /** 物件在层级里的小图标与副标题：体块按语义色、道具 ◆、树 ♣、空气墙虚框、远景淡色。 */
+  ItemBadge(obj) {
+    const asset = SCENE_ASSETS[obj.asset] || {};
+    if (obj.tag === "airWall") return { icon: "▢", cls: "air", sub: "空气墙" };
+    if (asset.kind === "prop") return { icon: "◆", cls: "prop", sub: asset.label };
+    if (asset.kind === "tree") return { icon: "♣", cls: "tree", sub: asset.label };
+    if (obj.layer === "backdrop") return { icon: "·", cls: "bd", sub: asset.label };
+    const material = SCENE_MATERIALS[obj.material];
+    return { icon: "■", cls: "box", color: `#${this.SemanticColor(material?.semantic).toString(16).padStart(6, "0")}`, sub: material?.label || "" };
+  }
+
+  /** 选中的物件所在的文件夹都展开（Unity：在画面里点一个，层级里展开到它）。 */
+  RevealSelection() {
+    for (const id of this.model.selection) {
+      const parts = SplitGroup(this.model.Find(id)?.group);
+      for (let i = 1; i <= parts.length; i++) this.open.add(parts.slice(0, i).join("/"));
+    }
+    this.SaveOpen();
+  }
+
+  SaveOpen() {
+    try { localStorage.setItem(`sceneEditor.open.${this.sceneId}`, JSON.stringify([...this.open])); } catch { /* 隐私窗口：不记 */ }
+  }
+
+  LoadOpen() {
+    try { for (const path of JSON.parse(localStorage.getItem(`sceneEditor.open.${this.sceneId}`) || "[]")) this.open.add(path); } catch { /* 读不到：全收起 */ }
+  }
+
   RenderTree() {
     const tree = $("seTree");
+    const scroll = tree.scrollTop;
     tree.textContent = "";
     const q = $("seSearch").value.trim().toLowerCase();
     const sel = this.model.selection;
-    const Item = (obj) => {
+    const Item = (obj, depth, showPath = false) => {
       const b = El("button", `seItem${sel.has(obj.id) ? " selected" : ""}`);
-      b.append(document.createTextNode(obj.id));
-      b.append(El("small", "", obj.material ? obj.material.replace(/^Whitebox\//, "") : (SCENE_ASSETS[obj.asset]?.label || obj.asset)));
-      b.title = `${obj.asset}${obj.hideOn ? ` · 随 ${obj.hideOn} 消失` : ""}${obj.showOn ? ` · 随 ${obj.showOn} 出现` : ""}`;
+      b.style.paddingLeft = `${10 + depth * 14 + 13}px`;
+      b.draggable = true;
+      const badge = this.ItemBadge(obj);
+      const icon = El("i", `seIcon ${badge.cls}`, badge.icon);
+      if (badge.color) icon.style.color = badge.color;
+      b.append(icon, El("span", "seName", obj.id), El("small", "", showPath ? (obj.group || "") : badge.sub));
+      const events = [obj.showOn && `出现于：${SceneEventLabel(obj.showOn)}`, obj.hideOn && `消失于：${SceneEventLabel(obj.hideOn)}`].filter(Boolean);
+      if (events.length) b.append(El("em", "seEvent", "⚑"));
+      b.title = [`${obj.asset}${obj.material ? ` · ${obj.material}` : ""}`, obj.group ? `分组：${obj.group}` : "", ...events].filter(Boolean).join("\n");
       b.addEventListener("click", (e) => this.SelectIds([obj.id], { toggle: e.ctrlKey || e.metaKey, add: e.shiftKey }));
       b.addEventListener("dblclick", () => this.Frame([obj.id]));
+      // 拖到文件夹上 = 挪进那个分组（拖的是选中的之一就整批挪）
+      b.addEventListener("dragstart", (e) => {
+        const ids = sel.has(obj.id) ? [...sel] : [obj.id];
+        e.dataTransfer.setData("text/x-scene-ids", JSON.stringify(ids));
+        e.dataTransfer.effectAllowed = "move";
+      });
       return b;
     };
     if (q) {
-      const hits = this.model.objects.filter(o => `${o.id} ${o.group || ""} ${o.asset} ${o.material || ""} ${o.meta?.prop || ""}`.toLowerCase().includes(q));
+      const hits = this.model.objects.filter(o => `${o.id} ${o.group || ""} ${o.asset} ${o.material || ""} ${o.meta?.prop || ""} ${o.showOn || ""} ${o.hideOn || ""}`.toLowerCase().includes(q));
       $("seCount").textContent = `搜到 ${hits.length} 个`;
-      for (const obj of hits.slice(0, E.searchLimit)) tree.append(Item(obj));
+      for (const obj of hits.slice(0, E.searchLimit)) tree.append(Item(obj, 0, true));
       if (hits.length > E.searchLimit) tree.append(El("div", "seMore", `还有 ${hits.length - E.searchLimit} 个，搜得再细一点`));
       return;
     }
-    const groups = this.model.Groups();
-    $("seCount").textContent = `${this.model.objects.length} 个物件 · ${groups.size} 组`;
-    for (const [name, ids] of groups) {
-      const group = El("div", `seGroup${this.open.has(name) ? " open" : ""}`);
-      const head = El("button", "seGroupHead");
-      head.append(El("span", "", name), El("small", "", String(ids.length)));
-      head.addEventListener("click", () => { if (this.open.has(name)) this.open.delete(name); else this.open.add(name); this.RenderTree(); });
-      group.append(head);
-      if (this.open.has(name)) {
-        const selected = ids.filter(id => sel.has(id));
-        const shown = [...new Set([...selected, ...ids.slice(0, E.treeLimit)])];
-        for (const id of shown) group.append(Item(this.model.Find(id)));
-        if (ids.length > shown.length) group.append(El("div", "seMore", `还有 ${ids.length - shown.length} 个（用搜索找）`));
+    const root = this.model.Hierarchy();
+    $("seCount").textContent = `${root.count} 个物件 · 双击文件夹选中里面全部 · 把物件拖到文件夹上挪分组`;
+    const Folder = (node, depth) => {
+      const open = this.open.has(node.path);
+      const head = El("button", `seFolder${open ? " open" : ""}`);
+      head.style.paddingLeft = `${6 + depth * 14}px`;
+      const selectedInside = [...sel].some(id => { const g = this.model.Find(id)?.group || ""; return g === node.path || g.startsWith(`${node.path}/`); });
+      if (selectedInside) head.classList.add("hasSel");
+      head.append(El("i", "seTwisty", open ? "▾" : "▸"), El("span", "seName", node.name), El("small", "", String(node.count)));
+      head.title = `${node.path}（${node.count} 个）\n单击展开 / 收起 · 双击选中里面全部`;
+      head.addEventListener("click", () => { if (open) this.open.delete(node.path); else this.open.add(node.path); this.SaveOpen(); this.RenderTree(); });
+      head.addEventListener("dblclick", () => { this.open.add(node.path); this.SelectIds(this.IdsUnder(node)); this.Frame(); });
+      head.addEventListener("dragover", (e) => { if (e.dataTransfer.types.includes("text/x-scene-ids")) { e.preventDefault(); head.classList.add("drop"); } });
+      head.addEventListener("dragleave", () => head.classList.remove("drop"));
+      head.addEventListener("drop", (e) => {
+        e.preventDefault(); head.classList.remove("drop");
+        const ids = JSON.parse(e.dataTransfer.getData("text/x-scene-ids") || "[]").filter(id => this.model.Find(id));
+        if (!ids.length) return;
+        this.model.SetField(ids, "group", node.path, `挪进 ${node.path}`);
+        this.open.add(node.path);
+        this.AfterEdit(null);
+        this.Toast(`${ids.length} 个挪进「${node.path}」`);
+      });
+      tree.append(head);
+      if (!open) return;
+      for (const child of node.folders.values()) Folder(child, depth + 1);
+      const selected = node.ids.filter(id => sel.has(id));
+      const shown = [...new Set([...selected, ...node.ids.slice(0, E.treeLimit)])];
+      for (const id of shown) tree.append(Item(this.model.Find(id), depth + 1));
+      if (node.ids.length > shown.length) {
+        const more = El("div", "seMore", `还有 ${node.ids.length - shown.length} 个（用搜索找）`);
+        more.style.paddingLeft = `${10 + (depth + 1) * 14 + 13}px`;
+        tree.append(more);
       }
-      tree.append(group);
-    }
+    };
+    for (const node of root.folders.values()) Folder(node, 0);
+    for (const id of root.ids) tree.append(Item(this.model.Find(id), 0));
+    tree.scrollTop = scroll;
+    // 刚在画面里点选：滚到它（平时重画不动滚动位置）
+    if (this.revealPending) { this.revealPending = false; tree.querySelector(".seItem.selected")?.scrollIntoView({ block: "nearest" }); }
+  }
+
+  /** 文件夹下面（含子文件夹）所有物件 id。 */
+  IdsUnder(node) {
+    const out = [...node.ids];
+    for (const child of node.folders.values()) out.push(...this.IdsUnder(child));
+    return out;
   }
 
   // ------------------------------------------------------------------ 资产
@@ -951,139 +1064,241 @@ class SceneEditorApp {
     }
   }
 
-  // ------------------------------------------------------------------ 检视
+  // ------------------------------------------------------------------ 检视（Unity Inspector 的排法）
+  //
+  // 顶上一块是物件本身（看得见、名字、资产、分组），下面一节一节是「组件」：位置、外观、碰撞、剧情事件、参数。
+  // 每节一个可折叠的标题条（折叠状态记在本机），左列名字右列控件；X / Y / Z 的小字按住左右拖能直接调数（像 Unity）。
+
+  /** 检视用的控件工厂：都在 change（或拖完）时才写进撤销记录。 */
+  InspectorKit(box, ids, err) {
+    const kit = {};
+    kit.Section = (key, title, { headerToggle = null, defaultOpen = true } = {}) => {
+      const open = this.folds.has(key) ? this.folds.get(key) : defaultOpen;
+      const section = El("section", `seComp${open ? " open" : ""}`);
+      const head = El("div", "seCompHead");
+      const twisty = El("i", "seTwisty", open ? "▾" : "▸");
+      head.append(twisty);
+      if (headerToggle) {
+        const input = El("input"); input.type = "checkbox"; input.checked = headerToggle.checked; input.title = headerToggle.title || "";
+        input.addEventListener("click", (e) => e.stopPropagation());
+        input.addEventListener("change", () => headerToggle.onChange(input.checked));
+        head.append(input);
+      }
+      head.append(El("span", "seCompTitle", title));
+      head.addEventListener("click", () => { this.folds.set(key, !open); this.SaveFolds(); this.RenderInspector(); });
+      const body = El("div", "seCompBody");
+      section.append(head, body);
+      box.append(section);
+      return body;
+    };
+    kit.Row = (body, label, ...controls) => {
+      const row = El("div", "seProp");
+      const name = El("label", "seLabel", label);
+      const value = El("div", "seValue");
+      value.append(...controls);
+      row.append(name, value);
+      body.append(row);
+      return row;
+    };
+    kit.Num = (value, onChange, { step = 0.1, disabled = false, placeholder = "" } = {}) => {
+      const input = El("input"); input.type = "number"; input.step = String(step);
+      input.value = Number.isFinite(value) ? String(value) : ""; input.disabled = disabled; input.placeholder = placeholder;
+      input.addEventListener("change", () => { const v = Number(input.value); if (input.value !== "" && Number.isFinite(v)) onChange(v); else input.classList.add("bad"); });
+      return input;
+    };
+    /** X / Y / Z 三格：axis 字按住左右拖调数（每像素 step），松手才记一步撤销。 */
+    kit.Vec = (values, onChange, { step = 0.05, disabled = [false, false, false], placeholders = ["", "", ""], axes = ["X", "Y", "Z"] } = {}) => {
+      const wrap = El("div", "seVec");
+      values.forEach((v, i) => {
+        const cell = El("div", "seAxis");
+        const tag = El("span", `seAxisTag a${i}`, axes[i]);
+        const input = kit.Num(v, (nv) => onChange(i, nv), { step, disabled: disabled[i], placeholder: placeholders[i] });
+        if (!disabled[i]) {
+          tag.title = "按住左右拖调数";
+          tag.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            tag.setPointerCapture(e.pointerId);
+            const x0 = e.clientX, v0 = Number(input.value) || 0;
+            const Move = (m) => { input.value = String(Number((v0 + Math.round((m.clientX - x0)) * step * (m.shiftKey ? 10 : 1)).toFixed(3))); };
+            const Up = () => {
+              tag.removeEventListener("pointermove", Move); tag.removeEventListener("pointerup", Up);
+              const nv = Number(input.value);
+              if (Number.isFinite(nv) && nv !== v0) onChange(i, nv);
+            };
+            tag.addEventListener("pointermove", Move); tag.addEventListener("pointerup", Up);
+          });
+        }
+        cell.append(tag, input);
+        wrap.append(cell);
+      });
+      return wrap;
+    };
+    kit.Text = (value, onChange, placeholder = "") => {
+      const input = El("input"); input.type = "text"; input.value = value || ""; input.placeholder = placeholder;
+      input.addEventListener("change", () => onChange(input.value.trim()));
+      return input;
+    };
+    kit.Check = (label, checked, onChange) => {
+      const l = El("label", "seCheck"); const input = El("input"); input.type = "checkbox"; input.checked = checked;
+      input.addEventListener("change", () => onChange(input.checked));
+      l.append(input, document.createTextNode(label));
+      return l;
+    };
+    kit.Select = (options, value, onChange) => {
+      const s = El("select");
+      for (const [v, text] of options) s.append(new Option(text, v));
+      s.value = value;
+      s.addEventListener("change", () => onChange(s.value));
+      return s;
+    };
+    kit.MaterialOptions = () => Object.entries(SCENE_MATERIALS).map(([mid, m]) => [mid, `${m.label}（${mid.replace(/^Whitebox\//, "")}）`]);
+    kit.EventOptions = (current) => {
+      const names = [...new Set([...Object.keys(SCENE_EVENTS), ...this.model.Signals(), ...(current ? [current] : [])])];
+      return [["", "（不跟事件）"], ...names.map((n) => [n, `${SceneEventLabel(n)} · ${n}`])];
+    };
+    kit.GroupInput = (value, onChange) => {
+      const input = kit.Text(value, onChange, "06–10/建筑/WN1（「/」分层）");
+      const dl = El("datalist"); dl.id = "seGroupPaths";
+      for (const p of this.FolderPaths()) dl.append(new Option(p));
+      box.append(dl); input.setAttribute("list", dl.id);
+      return input;
+    };
+    kit.Set = (key, value, label, structural = false) => { this.model.SetField(ids, key, value, label); this.AfterEdit(structural ? null : ids, { structural }); };
+    return kit;
+  }
+
+  /** 所有文件夹路径（分组输入框的候选）。 */
+  FolderPaths() {
+    const out = [];
+    const Walk = (node) => { for (const child of node.folders.values()) { out.push(child.path); Walk(child); } };
+    Walk(this.model.Hierarchy());
+    return out;
+  }
+
+  SaveFolds() {
+    try { localStorage.setItem("sceneEditor.folds", JSON.stringify([...this.folds])); } catch { /* 不记 */ }
+  }
+
+  LoadFolds() {
+    try { this.folds = new Map(JSON.parse(localStorage.getItem("sceneEditor.folds") || "[]")); } catch { this.folds = new Map(); }
+  }
 
   RenderInspector() {
     const box = $("seInspector");
     box.textContent = "";
     const list = this.model.Selected();
-    if (!list.length) { box.append(El("p", "seMuted", "在画面或层级里点一个物件（Ctrl 点多选、Shift 点加选）。")); return; }
+    if (!list.length) { box.append(El("p", "seMuted seEmpty", "在画面或层级里点一个物件（Ctrl 点多选、Shift 点加选、双击文件夹选中整组）。")); return; }
     if (list.length > 1) { this.RenderMulti(box, list); return; }
     const obj = list[0], asset = SCENE_ASSETS[obj.asset] || {}, ids = [obj.id];
-    const Row = (label, control) => { const row = El("div", "seRow"); row.append(El("span", "", label), control); box.append(row); return row; };
-    const Num = (value, onChange, { step = 0.1, disabled = false, placeholder = "" } = {}) => {
-      const input = El("input"); input.type = "number"; input.step = String(step);
-      input.value = Number.isFinite(value) ? String(value) : ""; input.disabled = disabled; input.placeholder = placeholder;
-      input.addEventListener("change", () => { const v = Number(input.value); if (Number.isFinite(v)) onChange(v); else input.classList.add("bad"); });
-      return input;
-    };
-    const Text = (value, onChange, placeholder = "") => {
-      const input = El("input"); input.type = "text"; input.value = value || ""; input.placeholder = placeholder;
-      input.addEventListener("change", () => onChange(input.value.trim()));
-      return input;
-    };
     const err = El("div", "seError");
+    const k = this.InspectorKit(box, ids, err);
+    const backdrop = obj.layer === "backdrop";
 
-    box.append(El("h3", "", "物件"));
-    const name = Text(obj.id, (v) => { try { this.model.Rename(obj.id, v); this.AfterEdit(null); } catch (error) { err.textContent = error.message; name.classList.add("bad"); } });
-    Row("名字", name);
-    box.append(err);
-    Row("资产", El("span", "seId", `${obj.asset}${asset.label ? ` · ${asset.label}` : ""}`));
-    if (asset.kind === "box" || obj.material) {
-      const m = El("select");
-      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
-      m.value = obj.material;
-      m.addEventListener("change", () => { this.model.SetField(ids, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); });
-      Row("材质", m);
-    }
+    // 物件本身：看得见 + 名字 / 资产 / 分组（Unity 的 GameObject 头）
+    const head = El("div", "seObjHead");
+    const visible = El("input"); visible.type = "checkbox"; visible.checked = obj.visual !== false; visible.title = "看得见（不勾 = 只要碰撞不画，比如空气墙）";
+    visible.disabled = backdrop;
+    visible.addEventListener("change", () => k.Set("visual", visible.checked ? undefined : false, "改看得见", true));
+    const name = k.Text(obj.id, (v) => { try { this.model.Rename(obj.id, v); this.AfterEdit(null); } catch (error) { err.textContent = error.message; name.classList.add("bad"); } });
+    name.classList.add("seObjName");
+    const line = El("div", "seObjLine"); line.append(visible, name);
+    head.append(line, err);
+    box.append(head);
+    const meta = El("div", "seObjMeta");
+    k.Row(meta, "资产", El("span", "seId", `${asset.label || obj.asset}`), El("code", "", obj.asset));
+    k.Row(meta, "分组", k.GroupInput(obj.group, (v) => k.Set("group", v || undefined, "改分组", true)));
+    box.append(meta);
 
-    box.append(El("h3", "", "位置"));
+    // 位置（Transform）
+    const t = k.Section("transform", "位置");
     const grounded = obj.pos[1] === null;
-    const pos = El("div", "seTriple");
-    const SetPos = (i) => (v) => { const p = [...obj.pos]; p[i] = v; this.model.SetField(ids, "pos", p, "改位置"); this.AfterEdit(ids); };
-    pos.append(Num(obj.pos[0], SetPos(0)), Num(obj.pos[1], SetPos(1), { disabled: grounded, placeholder: grounded ? Fixed(this.GroundY(obj)) : "" }), Num(obj.pos[2], SetPos(2)));
-    Row("x  y  z", pos);
-    const ground = El("label", "seCheck");
-    const gin = El("input"); gin.type = "checkbox"; gin.checked = grounded;
-    gin.addEventListener("change", () => { this.model.SetGrounded(ids, gin.checked, (o) => this.GroundY(o)); this.AfterEdit(ids); });
-    ground.append(gin, document.createTextNode(" 落地（y 跟着地形走）"));
-    Row("", ground);
-    Row("朝向°", Num(obj.yawDeg || 0, (v) => { this.model.SetField(ids, "yawDeg", v, "改朝向"); this.AfterEdit(ids); }, { step: 1 }));
+    const SetPos = (i, v) => { const p = [...obj.pos]; p[i] = v; k.Set("pos", p, "改位置"); };
+    k.Row(t, "位置", k.Vec(obj.pos, SetPos, { disabled: [false, grounded, false], placeholders: ["", grounded ? Fixed(this.GroundY(obj)) : "", ""] }));
+    k.Row(t, "", k.Check(" 落地（Y 跟着地形走）", grounded, (on) => { this.model.SetGrounded(ids, on, (o) => this.GroundY(o)); this.AfterEdit(ids); }));
+    k.Row(t, "朝向", k.Vec([obj.yawDeg || 0], (i, v) => k.Set("yawDeg", v, "改朝向"), { step: 1, axes: ["Y°"], disabled: [false], placeholders: [""] }));
     if (asset.sized) {
-      const size = El("div", "seTriple");
-      const SetSize = (i) => (v) => { const s = [...obj.size]; s[i] = v; this.model.SetField(ids, "size", s, "改尺寸"); this.AfterEdit(ids); };
-      size.append(Num(obj.size[0], SetSize(0)), Num(obj.size[1], SetSize(1)), Num(obj.size[2], SetSize(2)));
-      Row("宽 高 深", size);
+      const SetSize = (i, v) => { const s = [...obj.size]; s[i] = Math.max(0.02, v); k.Set("size", s, "改尺寸"); };
+      k.Row(t, "尺寸 m", k.Vec(obj.size, SetSize, { step: 0.05, axes: ["宽", "高", "深"] }));
     }
 
-    box.append(El("h3", "", "开关"));
-    const flags = El("div", "seFlags");
-    const Flag = (label, key, defaultOn) => {
-      const l = El("label", "seCheck"); const input = El("input"); input.type = "checkbox";
-      input.checked = defaultOn ? obj[key] !== false : obj[key] === true;
-      input.addEventListener("change", () => {
-        const value = defaultOn ? (input.checked ? undefined : false) : (input.checked ? true : undefined);
-        this.model.SetField(ids, key, value, `改 ${label}`);
-        this.AfterEdit(ids, { structural: key === "visual" });
-      });
-      l.append(input, document.createTextNode(` ${label}`)); flags.append(l);
-    };
-    if (obj.layer !== "backdrop") { Flag("挡人", "solid", true); Flag("看得见", "visual", true); Flag("不能翻", "noClimb", false); Flag("能站上去", "standOn", false); }
-    box.append(flags);
-    if (obj.layer !== "backdrop") {
-      const tag = El("select");
-      tag.append(new Option("（无）", ""), new Option("airWall 只挡玩家", "airWall"));
-      if (obj.tag && obj.tag !== "airWall") tag.append(new Option(obj.tag, obj.tag));
-      tag.value = obj.tag || "";
-      tag.addEventListener("change", () => { this.model.SetField(ids, "tag", tag.value || undefined, "改标签"); this.AfterEdit(ids); });
-      Row("标签", tag);
+    // 外观
+    const look = k.Section("look", "外观");
+    k.Row(look, "资产", El("span", "seId", asset.label || obj.asset));
+    if (asset.kind === "box" || obj.material) {
+      k.Row(look, "材质", k.Select(k.MaterialOptions(), obj.material, (v) => k.Set("material", v, "改材质", true)));
+    }
+    if (asset.note) look.append(El("p", "seNote", asset.note));
+
+    if (!backdrop) {
+      // 碰撞（标题条上的勾 = 挡人）
+      const col = k.Section("collider", "碰撞", { headerToggle: { checked: obj.solid !== false, title: "挡人（不勾 = 穿得过去）", onChange: (on) => k.Set("solid", on ? undefined : false, "改挡人") } });
+      k.Row(col, "空气墙", k.Check(" 只挡玩家、看不见", obj.tag === "airWall", (on) => {
+        this.model.SetField(ids, "tag", on ? "airWall" : undefined, "改空气墙");
+        if (on) this.model.SetField(ids, "visual", false, "改看得见");
+        this.AfterEdit(null, { structural: true });
+      }));
+      if (obj.tag && obj.tag !== "airWall") k.Row(col, "标签", El("code", "", obj.tag));
+      k.Row(col, "翻越", k.Check(" 不能翻过去", obj.noClimb === true, (on) => k.Set("noClimb", on ? true : undefined, "改不能翻")));
+      k.Row(col, "站上去", k.Check(" 演员能站在上面（桥面、走道）", obj.standOn === true, (on) => k.Set("standOn", on ? true : undefined, "改能站上去")));
     }
 
-    box.append(El("h3", "", "信号与分组"));
-    const signals = this.model.Signals();
-    const Listed = (input, values, listId) => {
-      const dl = El("datalist"); dl.id = listId; for (const v of values) dl.append(new Option(v)); box.append(dl); input.setAttribute("list", listId); return input;
-    };
-    Row("出现于", Listed(Text(obj.showOn, (v) => { this.model.SetField(ids, "showOn", v || undefined, "改出现信号"); this.AfterEdit(null, { structural: true }); }, "信号到了才出现"), signals, "seSigA"));
-    Row("消失于", Listed(Text(obj.hideOn, (v) => { this.model.SetField(ids, "hideOn", v || undefined, "改消失信号"); this.AfterEdit(null, { structural: true }); }, "信号到了就消失"), signals, "seSigB"));
-    Row("分组", Listed(Text(obj.group, (v) => { this.model.SetField(ids, "group", v || undefined, "改分组"); this.AfterEdit(null); }), [...this.model.Groups().keys()], "seGroups"));
+    // 剧情事件
+    const ev = k.Section("events", "剧情事件");
+    k.Row(ev, "出现于", k.Select(k.EventOptions(obj.showOn), obj.showOn || "", (v) => k.Set("showOn", v || undefined, "改出现事件", true)));
+    k.Row(ev, "消失于", k.Select(k.EventOptions(obj.hideOn), obj.hideOn || "", (v) => k.Set("hideOn", v || undefined, "改消失事件", true)));
+    ev.append(El("p", "seNote", "这件事发生之前 / 之后它在不在。哪一刻发生由白盒编辑器那一关的关键帧决定；画面上方「剧情事件」可以勾上预览。"));
 
-    for (const [key, label] of [["params", "参数"], ["meta", "附加"]]) {
+    // 参数 / 附加数据（JSON，默认收起）
+    for (const [key, label] of [["params", "参数"], ["meta", "附加数据"]]) {
       if (key === "params" && asset.sized && !obj.params) continue;
-      box.append(El("h3", "", `${label}（JSON）`));
+      const body = k.Section(key, `${label}（JSON）`, { defaultOpen: false });
       const area = El("textarea");
       area.value = obj[key] ? JSON.stringify(obj[key], null, 1) : "";
       area.placeholder = key === "meta" ? "其余原样带过去的字段（prop、loophole……）" : "";
       area.addEventListener("change", () => {
         const text = area.value.trim();
-        if (!text) { this.model.SetField(ids, key, undefined, `清空${label}`); this.AfterEdit(ids, { structural: true }); return; }
+        if (!text) { k.Set(key, undefined, `清空${label}`, true); return; }
         try {
           const value = JSON.parse(text);
           if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("要是 JSON 对象");
-          this.model.SetField(ids, key, value, `改${label}`); this.AfterEdit(ids, { structural: true });
+          k.Set(key, value, `改${label}`, true);
         } catch (error) { area.classList.add("bad"); err.textContent = `${label}：${error.message}`; }
       });
-      box.append(area);
+      body.append(area);
     }
     this.InspectorButtons(box);
   }
 
   RenderMulti(box, list) {
     const ids = list.map(o => o.id);
-    box.append(El("h3", "", `选中 ${list.length} 个`));
-    box.append(El("p", "seMuted", ids.slice(0, 8).join("、") + (ids.length > 8 ? " ……" : "")));
-    const Row = (label, control) => { const row = El("div", "seRow"); row.append(El("span", "", label), control); box.append(row); };
-    const sized = list.filter(o => SCENE_ASSETS[o.asset]?.kind === "box").map(o => o.id);
-    if (sized.length) {
-      const m = El("select");
-      m.append(new Option("（不改）", ""));
-      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
-      m.addEventListener("change", () => { if (m.value) { this.model.SetField(sized, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); } });
-      Row("材质", m);
-    }
-    const group = El("input"); group.type = "text"; group.placeholder = "一起改到这个分组";
-    group.addEventListener("change", () => { this.model.SetField(ids, "group", group.value.trim() || undefined, "改分组"); this.AfterEdit(null); });
-    Row("分组", group);
-    const buttons = El("div", "seButtons");
+    const k = this.InspectorKit(box, ids, El("div"));
+    const head = El("div", "seObjHead");
+    head.append(El("div", "seObjTitle", `选中 ${list.length} 个`), El("p", "seMuted", ids.slice(0, 8).join("、") + (ids.length > 8 ? " ……" : "")));
+    box.append(head);
+    const meta = El("div", "seObjMeta");
+    const group = k.GroupInput("", (v) => { this.model.SetField(ids, "group", v || undefined, "改分组"); this.AfterEdit(null); });
+    group.placeholder = "一起挪到这个分组";
+    k.Row(meta, "分组", group);
+    box.append(meta);
+    const t = k.Section("transform", "位置");
+    const row = El("div", "seButtons");
     const on = El("button", "", "都落地"); on.addEventListener("click", () => { this.model.SetGrounded(ids, true); this.AfterEdit(ids); });
     const off = El("button", "", "都取消落地"); off.addEventListener("click", () => { this.model.SetGrounded(ids, false, (o) => this.GroundY(o)); this.AfterEdit(ids); });
-    buttons.append(on, off);
-    box.append(buttons);
+    row.append(on, off);
+    t.append(row);
+    const boxes = list.filter(o => SCENE_ASSETS[o.asset]?.kind === "box").map(o => o.id);
+    if (boxes.length) {
+      const look = k.Section("look", "外观");
+      k.Row(look, "材质", k.Select([["", "（不改）"], ...k.MaterialOptions()], "", (v) => { if (v) { this.model.SetField(boxes, "material", v, "改材质"); this.AfterEdit(null, { structural: true }); } }));
+    }
+    const ev = k.Section("events", "剧情事件");
+    k.Row(ev, "出现于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "showOn", v || undefined, "改出现事件"); this.AfterEdit(null, { structural: true }); } }));
+    k.Row(ev, "消失于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "hideOn", v || undefined, "改消失事件"); this.AfterEdit(null, { structural: true }); } }));
     this.InspectorButtons(box);
   }
 
   InspectorButtons(box) {
-    const row = El("div", "seButtons");
+    const row = El("div", "seButtons seInspectorButtons");
     const frame = El("button", "", "看它（F）"); frame.addEventListener("click", () => this.Frame());
     const dup = El("button", "", "复制（Ctrl+D）"); dup.addEventListener("click", () => this.DuplicateSelection());
     const del = El("button", "", "删除（Del）"); del.addEventListener("click", () => this.DeleteSelection());
@@ -1217,7 +1432,7 @@ class SceneEditorApp {
       State: () => ({
         scene: this.sceneId, objects: this.model?.objects.length ?? 0, selected: [...(this.model?.selection || [])],
         dirty: !!this.model?.dirty, writable: this.writable, revision: this.revision, undo: this.model?.undo.length ?? 0,
-        layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep,
+        layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep, terrainLook: this.terrainLook, style: this.style,
         camera: { x: this.cam.pos.x, y: this.cam.pos.y, z: this.cam.pos.z, yawDeg: this.cam.yaw / DEG, pitchDeg: this.cam.pitch / DEG },
       }),
       Find: (id) => this.model.Find(id),
@@ -1266,6 +1481,9 @@ class SceneEditorApp {
         return { skyFraction: skyish / (w * h), colors: colors.size };
       },
       Signals: (list) => { this.signals = new Set(list); this.RebuildObjects(); },
+      TerrainReady: () => this.terrainReady || Promise.resolve(false),
+      Tree: () => [...document.querySelectorAll("#seTree .seFolder, #seTree .seItem")].map((n) => ({ folder: n.classList.contains("seFolder"), text: n.querySelector(".seName")?.textContent, indent: parseInt(n.style.paddingLeft, 10) || 0 })),
+      Open: (paths) => { for (const p of paths) this.open.add(p); this.RenderTree(); },
       Show: (opts) => { Object.assign(this.show, opts); this.RebuildObjects(); },
     };
   }

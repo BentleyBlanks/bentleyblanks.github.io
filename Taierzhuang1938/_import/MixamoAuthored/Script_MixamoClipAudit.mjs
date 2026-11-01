@@ -27,15 +27,15 @@ try {
   await page.goto(base);
   await page.waitForFunction(() => window.__preview?.action, null, { timeout: 120000 });
   for (const name of names) {
-    const meta = JSON.parse(fs.readFileSync(`${repo}/Taierzhuang1938/tmp/Mixamo/Authored/${name}.meta.json`, "utf8"));
+    const meta = JSON.parse(fs.readFileSync(`${repo}/Taierzhuang1938/_import/Mixamo/Authored/${name}.meta.json`, "utf8"));
     const result = await page.evaluate(async ({ name, baseFile }) => {
       const { GLTFLoader } = await import("./vendor/three/examples/jsm/loaders/GLTFLoader.js");
       const P = window.__preview, ch = P.character, Mixer = P.action.getMixer().constructor;
       const V = P.camera.position.constructor, Q = ch.quaternion.constructor;
       P.action.stop();
       const L = new GLTFLoader();
-      const clip = (await L.loadAsync(`./tmp/Mixamo/Glb/Animation_Claude_${name}.glb`)).animations[0];
-      const baseClip = (await L.loadAsync(`./tmp/Mixamo/Glb/${baseFile}.glb`)).animations[0];
+      const clip = (await L.loadAsync(`./Animation/Mixamo/Animation_Claude_${name}.glb`)).animations[0];
+      const baseClip = (await L.loadAsync(`./Animation/Mixamo/${baseFile}.glb`)).animations[0];
       const bones = []; ch.traverse((o) => { if (o.isBone && !/_End$/.test(o.name)) bones.push(o); });
       const B = (n) => ch.getObjectByName(n);
       const W = (n) => B(n).getWorldPosition(new V());

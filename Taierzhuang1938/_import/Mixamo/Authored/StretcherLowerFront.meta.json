@@ -1,0 +1,34 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_PuttingDown_V1",
+  "label": "担架·前头放下",
+  "loop": false,
+  "duration": 3.5,
+  "timings": {
+    "carry": [
+      0.0,
+      0.45
+    ],
+    "lower": [
+      0.45,
+      1.65
+    ],
+    "release": [
+      1.9,
+      2.25
+    ],
+    "rise": [
+      2.15,
+      3.05
+    ],
+    "stand": [
+      3.05,
+      3.5
+    ],
+    "end": 3.5
+  },
+  "note": "抬前头走到地方后放担架：起点是抬着担架的站姿（手在胯两侧略靠后、两掌心 0.58 m、离地约 0.77 m）→ 屈膝下蹲（背直），手随髋同步下降，杆到地 → 手型张开松手 → 站起。结尾等于 PuttingDown_V1 最后一帧，开头是抬着担架的站姿（设计上不同于 base 开头）。预览里担架在人身后，松手后还会跟着手，看手就行。",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherLowerFront.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StretcherLowerFront.blend"
+}

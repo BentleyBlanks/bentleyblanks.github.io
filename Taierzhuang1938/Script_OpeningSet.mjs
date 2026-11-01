@@ -1222,7 +1222,7 @@ export class OpeningSet {
 
   /**
    * Space 体块的土皮（SB05 左半那块平的深褐方块）：选定的几面贴一层起伏的土（外鼓 0.015–bulgeM）、顶上压一层土，
-   * 再钉几根护壁木桩、两道横板。体块本身（碰撞、掩体标签）不动；土皮只往外长，不会出现隐形墙。
+   * 再钉几根护壁木桩、两道横板。体块本身（碰撞、掩体标签）不动；土皮只往外长，不会出现空气墙。
    */
   BuildEarthSkin(prop, sink) {
     const block = MISSION_LAYOUT.scenario.states.find((s) => s.id === "BunkerCollapsed")?.blocks.find((b) => b.id === prop.block);

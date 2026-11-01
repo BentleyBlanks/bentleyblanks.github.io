@@ -14,6 +14,11 @@ export const SCENE_EDIT_PRECISION = Object.freeze({ posM: 0.01, sizeM: 0.01, yaw
 const P = SCENE_EDIT_PRECISION;
 const Fix = (value, step) => Number(Round(value, step).toFixed(6));
 
+/** 分组路径 → 各层名字（「06–10 / 建筑 /WN1 」→ ["06–10", "建筑", "WN1"]，空段去掉）。 */
+export function SplitGroup(group) {
+  return String(group || "").split("/").map((part) => part.trim()).filter(Boolean);
+}
+
 export class SceneEditModel {
   constructor(doc) {
     this.Load(doc);
@@ -57,7 +62,32 @@ export class SceneEditModel {
     return new Map([...groups].sort((a, b) => a[0].localeCompare(b[0], "zh-CN")));
   }
 
-  /** 场景里出现过的信号（hideOn / showOn），排好序。 */
+  /**
+   * 层级树（2026-11-01）：group 是「/」分隔的路径（06–10/建筑/WN1），一段一层，像 Unity 的父子层级。
+   * 返回根节点 { name, path, folders: Map<名字, 节点>, ids: [直接挂在这层的物件 id], count: 这层以下物件总数 }；
+   * 子文件夹按名字排、物件按文件顺序；没写 group 的挂在根上。
+   */
+  Hierarchy() {
+    const root = { name: "", path: "", folders: new Map(), ids: [], count: 0 };
+    for (const obj of this.doc.objects) {
+      let node = root;
+      node.count++;
+      for (const part of SplitGroup(obj.group)) {
+        if (!node.folders.has(part)) node.folders.set(part, { name: part, path: node.path ? `${node.path}/${part}` : part, folders: new Map(), ids: [], count: 0 });
+        node = node.folders.get(part);
+        node.count++;
+      }
+      node.ids.push(obj.id);
+    }
+    const Sort = (node) => {
+      node.folders = new Map([...node.folders].sort((a, b) => a[0].localeCompare(b[0], "zh-CN", { numeric: true })));
+      for (const child of node.folders.values()) Sort(child);
+    };
+    Sort(root);
+    return root;
+  }
+
+  /** 场景里出现过的剧情事件（hideOn / showOn，代码里叫信号），排好序。 */
   Signals() {
     const set = new Set();
     for (const obj of this.doc.objects) { if (obj.hideOn) set.add(obj.hideOn); if (obj.showOn) set.add(obj.showOn); }

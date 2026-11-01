@@ -214,7 +214,7 @@ export function BuildRoadRibbon(sink, {
  * 碰撞两档（colliders）：
  *   { mode:"steps", steps:4, every:15, tag }
  *     四级台阶贴着可见斜面（AddBank 的账：每级 ≤0.56 m 落在 autostep 档内，
- *     人沿可见的坡一级级走上去，不是坡脚一堵隐形墙）—— 高堤（1.35 m）用
+ *     人沿可见的坡一级级走上去，不是坡脚一堵空气墙）—— 高堤（1.35 m）用
  *   { mode:"lowRise", rise:0.34, every:12, tag }
  *     只压到地面 +rise（Station 的账：NavGrid 判「挡路」按格子各自的地面
  *     +0.56，盒顶贴太高会把导航切出随机断点）—— 城关低路基（0.46 m）用

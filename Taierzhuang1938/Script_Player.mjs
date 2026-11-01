@@ -8,7 +8,7 @@
 //
 // 这里原本是一套自己写的「胶囊 vs AABB 表 + 分轴推出」。它每修一条就压出另一条：
 // 贴着墙站着会被重力顺着侧面吸上墙顶（实测 32/32 次上房顶）、陷进房子里朝哪边走
-// 就被甩到哪一面（一秒横移 20 m）、把判据收紧之后整片碎石变成隐形墙。
+// 就被甩到哪一面（一秒横移 20 m）、把判据收紧之后整片碎石变成空气墙。
 // 三条补丁的长注释都还留在 git 历史里，那不是写得不好，是这套解法本身给不出
 // 「贴墙滑、上台阶、不卡角」这三件事的一致解。
 //
@@ -544,13 +544,13 @@ export class PlayerController {
     const landY = TraversalLanding(landNear, this.position, { x: landX, z: landZ },
       this.world.GroundHeight(landX, landZ), top + 0.05, r, obstacles);
     if (landY === null) return null;                         // 墙那边还是墙：翻过去没地方站
-    // 3) 落点和人之间隔着只挡人的隐形墙（tag airWall）就不翻：翻越是照曲线挪过去的，不走角色控制器，墙拦不住它。
+    // 3) 落点和人之间隔着只挡人的空气墙（tag airWall）就不翻：翻越是照曲线挪过去的，不走角色控制器，墙拦不住它。
     if (this._CrossesAirWall(landX, landZ)) return null;
     return { plan, top, landX, landY, landZ };
   }
 
   /**
-   * 2026-10-21：从脚下到 (toX, toZ) 这一段水平线穿不穿过隐形墙（碰撞 tag airWall，可带 ry 斜放）。
+   * 2026-10-21：从脚下到 (toX, toZ) 这一段水平线穿不穿过空气墙（碰撞 tag airWall，可带 ry 斜放）。
    * 按墙自己的朝向算（斜墙的轴对齐包围盒会盖住半条沟，不能拿它判）。
    */
   _CrossesAirWall(toX, toZ) {

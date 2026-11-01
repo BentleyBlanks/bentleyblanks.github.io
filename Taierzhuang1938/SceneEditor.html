@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>场景编辑器 · 血战滕县</title>
-  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261031240000">
+  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261101210000">
   <!--
     场景编辑器（docs/Data_Scene.md §6）。导入表不在这里另抄一份版本戳：开机先同步读 index.html 里那张 import map
     （线上发布的 index.html 也保留它），插进来再起主程序，模块版本永远跟游戏一致。
@@ -62,9 +62,9 @@
         <div class="seToolGroup">
           <span class="seToolLabel">显示</span>
           <label class="seCheck"><input id="seShowBackdrop" type="checkbox" checked> 远景</label>
-          <label class="seCheck"><input id="seShowHidden" type="checkbox"> 隐形墙</label>
+          <label class="seCheck"><input id="seShowHidden" type="checkbox"> 空气墙</label>
         </div>
-        <details class="seSignals"><summary>信号 <span id="seSignalCount"></span></summary><div id="seSignalList"></div></details>
+        <details class="seSignals"><summary title="剧情走到某一步（炸桥、塌洞……）时随它出现 / 消失的物件，勾上预览">剧情事件 <span id="seSignalCount"></span></summary><div id="seSignalList"></div></details>
         <button id="seBlockout" title="在白盒关卡编辑器里，从画面中心那一点打开">在白盒编辑器里看</button>
       </div>
       <div id="seHud" class="seHud"></div>
