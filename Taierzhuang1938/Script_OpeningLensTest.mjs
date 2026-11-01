@@ -250,7 +250,8 @@ Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sam
   const data = Read("Data_OpeningLens.mjs");
   assert.ok(!/from\s+["']three["']/.test(data), "Data_OpeningLens has no three");
   const html = Read("index.html");
-  for (const m of ["Script_OpeningLens.mjs", "Data_OpeningLens.mjs"]) assert.match(html, new RegExp(`"\\./${m}": "\\./${m}\\?v=\\d+"`), `${m} in the import map`);
+  // The import map registers modules without ?v= (Pages stamps them by content, Script_StampImportMaps).
+  for (const m of ["Script_OpeningLens.mjs", "Data_OpeningLens.mjs"]) assert.ok(html.includes(`"./${m}": "./${m}"`), `${m} in the import map`);
 });
 
 Check("mud texture: RGBA webp, 16:9, within the texture budget", () => {

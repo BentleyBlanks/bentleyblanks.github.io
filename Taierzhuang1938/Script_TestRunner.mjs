@@ -1220,7 +1220,7 @@ const changedDomainRules = [
   { domain: "render", pattern: /Data_Tuning_(Camera|TemporalDof)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
-  { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer|Script_BuildBrowserBundle|Script_BrowserBundle)/i },
+  { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer|Script_BuildBrowserBundle|Script_BrowserBundle|Script_StampImportMaps)/i },
 ];
 
 const ignoredChangeRules = [

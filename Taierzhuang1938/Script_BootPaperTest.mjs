@@ -92,8 +92,9 @@ console.log("拖拽倾斜");
 
 console.log("页面接线");
 const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
-Check(/"\.\/Script_BootPaper\.mjs": "\.\/Script_BootPaper\.mjs\?v=\d+"/.test(html), "import map 登记 Script_BootPaper");
-Check(/"\.\/Data_BootPapers\.mjs": "\.\/Data_BootPapers\.mjs\?v=\d+"/.test(html), "import map 登记 Data_BootPapers");
+// 2026-11-01 起 import map 只登记、不写 ?v=（发布时按内容盖，见 Script_StampImportMaps）。
+Check(html.includes('"./Script_BootPaper.mjs": "./Script_BootPaper.mjs"'), "import map 登记 Script_BootPaper");
+Check(html.includes('"./Data_BootPapers.mjs": "./Data_BootPapers.mjs"'), "import map 登记 Data_BootPapers");
 for (const id of ["bootPaperWrap", "bootPaper", "bootPaperName", "bootPaperNote", "bootStart", "bootStep", "bootBar"]) {
   Check(new RegExp(`id="${id}"`).test(html), `#${id} 在 DOM 里`);
 }

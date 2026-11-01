@@ -158,8 +158,8 @@ Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
 Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
-  && /Script_EditorAssetStandards\.mjs\?v=\d+/.test(html)
-  && /Data_AssetStandards\.mjs\?v=\d+/.test(html),
+  && html.includes('"./Script_EditorAssetStandards.mjs": "./Script_EditorAssetStandards.mjs"')
+  && html.includes('"./Data_AssetStandards.mjs": "./Data_AssetStandards.mjs"'),
 "资产规范编辑器已注册到套件与 import map");
 
 // Compare triangle-corner UV distributions against the downloaded glTF, so a

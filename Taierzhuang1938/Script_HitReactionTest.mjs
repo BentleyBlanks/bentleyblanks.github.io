@@ -473,7 +473,7 @@ const Method = (text, name) => text.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s
   assert.ok(/sweep: sweepDir/.test(main) && /contact\.end && contact\.previous/.test(main), "白刃把扫刀方向带进伤害链");
   assert.ok(/Debug\.HitReaction = \{/.test(main) && /Hit:|Impulse:|State:|SetEnabled:/.test(main.slice(main.indexOf("Debug.HitReaction = {"))));
   const html = source("index.html");
-  for (const name of ["Data_Tuning_HitReaction", "Script_HitReaction", "Script_HitReactionLayer"]) assert.ok(html.includes(`"./${name}.mjs": "./${name}.mjs?v=`), `${name} 登记进 import map`);
+  for (const name of ["Data_Tuning_HitReaction", "Script_HitReaction", "Script_HitReactionLayer"]) assert.ok(html.includes(`"./${name}.mjs": "./${name}.mjs"`), `${name} 登记进 import map`);
   for (const file of ["Script_HitReaction.mjs", "Data_Tuning_HitReaction.mjs"]) {
     const text = source(file);
     assert.ok(!/from\s+["']three["']/.test(text), `${file} 不 import three（纯规则 / 纯数据）`);

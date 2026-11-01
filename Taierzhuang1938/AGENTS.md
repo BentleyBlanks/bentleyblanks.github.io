@@ -36,7 +36,7 @@
 
 - **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣；第一人称身体反应与耳朵模型 trauma 也只走这一个入口（`phase.blastReaction` 开关），不在关卡里另写扭头、闭眼或耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
 
-1. 浏览器模块变更更新 `index.html` import map 对应的 `?v=`，新增模块登记 import map；源码 import 不自带 `?v=`，避免同一模块形成两个实例。验收：`Script_ModuleGraphTest.mjs`。
+1. **浏览器模块的缓存戳不手写（2026-11-01 起）。** 新增模块在 `index.html` 的 import map 登记一行 `"./X.mjs": "./X.mjs"`（不带 `?v=`）；改已有模块**不碰** `index.html`。Pages 发布时 `Script_StampImportMaps` 在 staging 里按每个文件的内容给全部条目与入口 `<script>` 盖戳（排在 GPU 资源改写之后、打包之前）；本地预览与测试服务器发 no-store，用不着戳。源码 import 不自带 `?v=`，避免同一模块形成两个实例。图标、字体、样式表这类非模块资源的 `?v=` 照旧手动维护。验收：`Script_ModuleGraphTest.mjs`（登记满模块图、仓库里没有手写模块戳、盖戳工具能盖满）。
 2. `Data_*.mjs`、规则层及要求纯 Node 运行的 TexBake / FarLand / Identify / TimelinePlan 保持无 three 依赖。
 3. 新静态几何走 `BuildSink` 分区合批，不零散 add Mesh；开机预算统一取 `SCENE_RENDER_LIMITS`。涉及场景预算时按七关检查，验收：`Script_BootTest.mjs`。
 4. 世界坐标 X 向东、Z 向南、Y 向上，单位米，原点为城中心十字街口。人物正面、枪口、车头与机首一律为局部 -Z。外部 FBX/GLB/glTF 的源朝向**用顶点云量出来并写进数据**（飞机 `Data_AircraftAssets.noseDir`、导入战车 `ImportVehicles.SOURCES.sourceNose` / `Data_Meshes.facing`），由桥接层对齐；不以目测印象或源站默认约定替代朝向测量。验收：CharacterModelTest、ActorPoseTest，飞机与战车走 `Script_ModelFacingTest.mjs`（新增外部模型必须登记进它）。
@@ -111,5 +111,5 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 - Pages 在独立 staging 目录运行 `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938`，生成带内容戳的路由、菜单、游戏三份包；Three/Rapier 仍用本仓 vendor。每次部署重建，生成文件不提交。
 - 普通入口由 `Script_Entry` / `Data_StartupRouting` 选 `Script_MenuStartup`，只建指挥部与菜单；不得预载游戏包、战场模型、物理、动作或音频包。第一关与显式 `phase` / `editor` 等开发入口仍走 `Script_Main`，进入第一关的 URL 跳转契约保持不变。菜单设置复用既有设置面板和存档；开发工具经显式点击后才装游戏宿主。回归 `Script_MenuStartupTest`，细节见[预热与启动 §18.9](docs/Data_TechRenderPipeline.md#189-独立菜单与内嵌贴图压缩2026-10-09)。
 - Ki30、枯树、卷烟的源 GLB 导出后运行 `node Taierzhuang1938/_import/Script_CompressEmbeddedTextures.mjs`，将可逐像素还原的内嵌 PNG 换为同尺寸无损 WebP；不得重采样或改几何。审计在 `Model/Data_EmbeddedTextureCompression.json`，回归 `Script_EmbeddedTextureTest`。
-- 源码与本地默认入口继续使用 import map，模块修改仍更新对应版本戳。发布 HTML 仅无条件预载小路由和 Three；游戏包只在对应路由按需导入，不再预载全部源码。
+- 源码与本地默认入口继续使用 import map（只登记、不写戳）；Pages 在打包前用 `Script_StampImportMaps` 按内容给 staging 里各页的 import map 与模块入口盖戳，`TextureManager.html` 等工具页同样处理。发布 HTML 仅无条件预载小路由和 Three；游戏包只在对应路由按需导入，不再预载全部源码。
 - 本地验收：`node Taierzhuang1938/Script_BuildBrowserBundle.mjs --preview` 后用 LocalPreview 打开 `/Taierzhuang1938/_check_Bundle.html?whitebox=p012`；回归入口 `Script_BrowserBundleTest.mjs` 验证普通白盒开始按钮、正式菜单与脚本请求数。

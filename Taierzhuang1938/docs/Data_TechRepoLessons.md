@@ -193,6 +193,8 @@ function AD(param, t, peak, attack, decay) {
 
 ### 2.8 缓存戳与 import map（★已照抄：`Script_ModuleGraphTest.mjs`，Tier 0）
 
+> **2026-11-01 更新**：滕县的模块戳不再手写。`index.html` 的 import map 只登记模块（`"./X.mjs": "./X.mjs"`），Pages 发布时 `Script_StampImportMaps` 按每个文件的内容盖戳——忘了抬戳这类事从根上没了，并行提交也不再在七百行戳上撞车（此前两周 327 个提交里 225 个改过 index.html）。`Script_ModuleGraphTest` 改为拦手写戳并验证盖戳工具能盖满。下面是改造前的记录。
+
 `TunnelLight1943/index.html:19-31` 记着一次真实事故（2026-08-07，手机上报「刨子推不动」）：`Script_Main.js` 带 `?v=157` 拿到新版，它 import 的 `Script_Core.mjs` 是裸 URL，手机上照旧吃缓存里的旧版 —— **新壳配旧芯**。桌面一刷新就好，手机 Safari 的模块缓存黏得多，所以只在移动端复现。
 
 修法：**用 import map 把每一个第一方模块重映射到带版本的 URL**，版本只写在这一张表里。两条推论：

@@ -58,7 +58,8 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
   const entryVersion = BigInt('0x' + createHash('sha256').update(entryCode).digest('hex').slice(0, 13)).toString();
   const entryBundleName = 'Script_EntryBrowserBundle.mjs';
   const entryUrl = './' + entryBundleName + '?v=' + entryVersion;
-  const entryPattern = /<script type="module" src="\.\/Script_Entry\.mjs\?v=\d+"><\/script>/;
+  // Pages stamps the entry by content first (Script_StampImportMaps); local --preview reads the unstamped source.
+  const entryPattern = /<script type="module" src="\.\/Script_Entry\.mjs(?:\?v=\d+)?"><\/script>/;
   if (!entryPattern.test(sourceHtml)) throw new Error('Source boot markup changed; update the bundle builder');
   // A second source entry tag survives the single replace below and boots a second game
   // from the source graph next to the bundle (a merge left one behind on 2026-09-24).

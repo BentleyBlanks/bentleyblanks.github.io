@@ -79,6 +79,9 @@ jobs:
         with:
           path: ${{ runner.temp }}/tengxian-gpu-cache
           key: ${{ steps.gpu-assets.outputs.cache-primary-key }}
+      # 仓库里的 import map 只登记、不写 ?v=：按每个文件此刻的内容盖戳（排在 GPU 资源改写之后、打包读 index.html 之前）。
+      - name: Stamp the Tengxian import maps by content
+        run: node Taierzhuang1938/Script_StampImportMaps.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
       - name: Build the Tengxian browser entry
         run: |
           node Taierzhuang1938/Script_BuildBrowserBundle.mjs --deploy --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
