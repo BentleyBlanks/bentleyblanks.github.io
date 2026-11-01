@@ -42,4 +42,18 @@ const actor={characterRig:{p012ActorMotion:true,Update(_dt,state){poseState=stat
 InstallSquadMarchActor(soldier);actor.characterRig.Update(.1,{aim:1,lookYaw:.8,firing:false});assert.equal(poseState.aim,0,'memory aim yields to actual recovery pose');
 actor.characterRig.Update(.1,{aim:1,firing:true});assert.equal(poseState.aim,1,'real shot preserves weapon pose');
 delete soldier.squadMarchCommand;actor.characterRig.Update(.1,{aim:.7});assert.equal(poseState.aim,.7,'normal mission pose resumes after release');
-console.log('ok actual AI adapter: memory-only movement/rest, guide separation recovery, combat and traversal handoff, disposal, existing mission pose recovery');
+// 真士兵（字段在组件里、存取器在原型上）：行军接管时改过的命令、驻守区、限时目标，Release 要原样还回去。
+// 2026-11-02 之前用 Object.hasOwn 记「原来有没有」，对存取器恒为假，Release 去 delete 一个删不到的值 —— 命令留在 advance。
+{
+  const { Soldier } = await import("./Script_Ai.mjs");
+  const real = new Soldier("nra", { x: 0, z: 0 });
+  real.order = "hold"; real.holdZone = { id: "Keep", x: 0, z: 0, radius: 2 }; real.manualGoalUntil = -99;
+  const march = new SquadMarchAi(ai, [real], { route: [{ x: 0, z: 0 }, { x: 0, z: -60 }] });
+  for (let i = 0; i < 30 && !real.squadMarchCommand; i++) { ai.time += 1 / 60; march.Update(1 / 60); }
+  assert.ok(real.squadMarchCommand && real.order === "advance" && real.holdZone === null, "the march takes over a real soldier");
+  march.Dispose();
+  assert.ok(real.order === "hold" && real.holdZone?.id === "Keep" && real.manualGoalUntil === -99
+    && real.p012Guided === undefined && real.scriptMoveSpeedMps === undefined && !real.squadMarchCommand,
+    `release hands a real soldier back its own order and hold zone (order=${real.order}, holdZone=${real.holdZone?.id})`);
+}
+console.log('ok actual AI adapter: memory-only movement/rest, guide separation recovery, combat and traversal handoff, disposal (plain and real soldiers), existing mission pose recovery');

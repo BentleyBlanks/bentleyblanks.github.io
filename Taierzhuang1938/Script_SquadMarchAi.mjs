@@ -71,7 +71,9 @@ export class SquadMarchAi {
         const values={p012Guided:true,scriptDefensive:false,scriptMoveSpeedMps:command.speedMps,
           scriptArrivalRadius:command.arrivalM??this.march.tuning.arrivalM*.5,manualGoalUntil:this.ai.time+1,order:'advance',holdZone:null};
         for(const [key,value] of Object.entries(values)){
-          if(!owner.prior.has(key))owner.prior.set(key,{had:Object.hasOwn(s,key),value:s[key]});
+          // 真士兵的字段都在组件里（Data_SoldierComponents，存取器在原型上）：用 in 判「有没有这个字段」，Release 原样写回；
+          // Object.hasOwn 对存取器恒为假，以前那样记会让 Release 去 delete 一个删不到的值（命令、驻守区不还原）。
+          if(!owner.prior.has(key))owner.prior.set(key,{had:key in s,value:s[key]});
           s[key]=value;owner.applied.set(key,value);
         }
         s.goal.set(command.goal.x,0,command.goal.z);owner.appliedGoal=s.goal.clone();
@@ -123,7 +125,7 @@ export class SquadMarchAi {
   }
   Release(s){
     const prior=this.owned.get(s);if(!prior)return;
-    if(s.squadMarchCommand===prior.command)delete s.squadMarchCommand;
+    if(s.squadMarchCommand===prior.command){s.squadMarchCommand=undefined;if(Object.hasOwn(s,"squadMarchCommand"))delete s.squadMarchCommand;}
     if(this.Move){this.owned.delete(s);return;} // custom movement host owns its own flags
     // Return only fields still carrying our last command; preserve a newer host/tactical order.
     for(const [key,value] of prior.applied){

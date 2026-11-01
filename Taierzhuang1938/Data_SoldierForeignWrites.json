@@ -1,0 +1,125 @@
+{
+ "note": "士兵字段被主人（Data_SoldierComponents 的 owners）以外的文件直接写的旧账，SoldierComponentsTest 拦新增；能改成调主人方法的改掉后从这里删。重写：node Taierzhuang1938/Script_SoldierComponentsTest.mjs --write",
+ "writes": {
+  "ammo": [
+   "Script_FirstLevelCollection.mjs",
+   "Script_Interact.mjs"
+  ],
+  "audioStepDist": [
+   "Script_AudioWiring.mjs"
+  ],
+  "bayonetFixed": [
+   "Script_EditorBlockoutPlay.mjs",
+   "Script_MeleeLabRuntime.mjs"
+  ],
+  "cover": [
+   "Script_Main.mjs"
+  ],
+  "dummy": [
+   "Script_ExplosionRange.mjs",
+   "Script_GoreRange.mjs",
+   "Script_MeleeLabRuntime.mjs",
+   "Script_RangeTargets.mjs"
+  ],
+  "goal": [
+   "Script_FirstLevelBridgeFarBank.mjs"
+  ],
+  "grounded": [
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "holdZone": [
+   "Script_EditorBlockoutPlay.mjs",
+   "Script_GoreRange.mjs",
+   "Script_Main.mjs",
+   "Script_MeleeLabRuntime.mjs",
+   "Script_RangeTargets.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "lookYaw": [
+   "Script_GoreRange.mjs",
+   "Script_RangeTargets.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "manualGoalUntil": [
+   "Script_EditorBlockoutPlay.mjs",
+   "Script_ExplosionRange.mjs",
+   "Script_Main.mjs"
+  ],
+  "meleeCombat": [
+   "Script_MeleeLabRuntime.mjs"
+  ],
+  "meleeDormant": [
+   "Script_MeleeLabRuntime.mjs"
+  ],
+  "meleeTraining": [
+   "Script_MeleeLabRuntime.mjs"
+  ],
+  "missionCombatAlert": [
+   "Script_EditorBlockoutPuppets.mjs"
+  ],
+  "moveSpeed": [
+   "Script_EditorSquadMarch.mjs"
+  ],
+  "order": [
+   "Script_EditorBlockoutPlay.mjs",
+   "Script_ExplosionRange.mjs",
+   "Script_GoreRange.mjs",
+   "Script_Main.mjs",
+   "Script_RangeTargets.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "relaxedGait": [
+   "Script_RelaxedGait.mjs"
+  ],
+  "relaxedGaitPaceMps": [
+   "Script_OpeningStoryboardAnimation.mjs"
+  ],
+  "routeArrivalOwnsRadius": [
+   "Script_FirstLevelFrontScenes.mjs"
+  ],
+  "scriptArrivalRadius": [
+   "Script_ExplosionRange.mjs"
+  ],
+  "squadMarchCommand": [
+   "Script_EditorSquadMarch.mjs"
+  ],
+  "stance": [
+   "Script_EditorBlockoutConfig.mjs"
+  ],
+  "state": [
+   "Script_EditorBlockoutConfig.mjs",
+   "Script_ExplosionRange.mjs",
+   "Script_FallingSoil.mjs",
+   "Script_Main.mjs"
+  ],
+  "suppression": [
+   "Script_Combat.mjs"
+  ],
+  "target": [
+   "Script_ExplosionRange.mjs",
+   "Script_Main.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "targetVisible": [
+   "Script_Main.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "velocityY": [
+   "Script_ExplosionRange.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ],
+  "weapon": [
+   "Script_EditorBlockoutConfig.mjs"
+  ],
+  "yaw": [
+   "Script_EditorBlockoutPuppets.mjs",
+   "Script_EditorSquadMarch.mjs",
+   "Script_FirstLevelCollection.mjs",
+   "Script_GoreRange.mjs",
+   "Script_Main.mjs",
+   "Script_MeleeLabRuntime.mjs",
+   "Script_RangeTargets.mjs",
+   "Script_WeaponRangeRuntime.mjs"
+  ]
+ }
+}

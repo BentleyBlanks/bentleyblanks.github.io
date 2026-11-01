@@ -1921,7 +1921,7 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
 - 值真正存在 `soldier.<组件>.<字段>` 里。`Script_SoldierFields.mjs` 按表生成同名存取器（`Soldier extends SoldierFieldAccessors`），旧写法 `soldier.ammo` 读写的就是 `soldier.arms.ammo`，现有代码一行不用改。新代码直接写组件路径。
 - 留在士兵本身的只有 `id`、`side`、`identity`、`rnd`、`actor`、`director`。
 - 新字段先登记进表，再写进构造器里对应的组件，然后 `node Taierzhuang1938/Script_SoldierComponentsTest.mjs --write` 重新生成存取器。门禁 `SoldierComponentsTest`（纯 Node）拦三件事：构造完身上多出没登记的平铺字段、旧写法与组件不是同一个值、生成文件与表不同步。
-- 关卡在运行时临时挂上去的字段（`missionId`、`scriptEssential`、`missionUntargetable`、`openingStoryboardPose` 等）这一步没动，仍是士兵身上的普通属性；下一步收进 `scripted`。
+- 关卡在运行时临时挂上去的字段 2026-11-02 已全部收进表，见 §24。
 - 构造器里 `rnd` 先给 `locomotion.detourSign`、再给 `locomotion.laneOffset`，顺序变了每个人的随机数就全变了。改造时用改前改后各 5 名士兵（两方、不同武器与出生参数）逐个比对了全部 182 个初值和随机数状态，完全一致。
 - 存取器写成字面量，V8 能内联；纯字段读写的微基准比平铺慢约 1.5 倍（循环里用变量当键的 `defineProperty` 写法慢 5 倍，所以没用）。字段读写只占 AI 帧时间的很小一部分。
 - 移植 UE 时一组对应一个 `UActorComponent`，`brain` + `sense` 的决策部分对应 StateTree / 行为树与 AIPerception。
@@ -1934,3 +1934,26 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
 - Script_Ai 现在只用 three 的 `Vector3` 做数学，不再创建或改动任何 3D 对象；读枪口位置（相当于骨骼插槽）仍问 actor，那是规则读画面的正常方向。
 - 纯规则测试抠 Script_Ai 方法跑时，宿主挂一个 production 的 `SoldierView`（FirstLevelP012ActorTest / FirstLevelP012RuntimeTest）。
 - 移植 UE 时这一层整个换成 Character 的骨骼网格、动画蓝图与 significance 剔除。
+
+## 24. 2026-11-02：后挂字段进表、标签、主人、兵种原型
+
+**后挂字段进表。** 浏览器普查（`_shots/AiRedProbe/Probe_SoldierFieldCensus.mjs`，不提交）跑了 P012 各段、旧章节、靶场、白刃、枪械、爆炸、断肢、白盒 8 个入口共 684 个士兵样本，找出 120 个构造之后才挂上去的字段，再加源码里 7 个普查没跑到的，全部进表：
+
+| 去处 | 字段 |
+|---|---|
+| 原有组件 | 状态（`damageSequence` 等）、移动（`crowdPushX/Z`、`relaxedGait`……）、开火（`muzzleAimYaw`、`muzzleClipped`）、感知（`grenadeThreat`、`incomingFire`……）、决策（掩体推进、失败掩体、自动冲锋、唤醒……）、命令（`escortRole`、`squadMarchCommand`）、尸体（`goreRnd`）、编排开关（`script*`、`p012*`、`weaponRange*`） |
+| 新组件 `mission` | 任务编排挂的 `mission*` 与压迫阶段（44 个） |
+| 新组件 `opening` | 开场分镜导演的 `opening*`（18 个） |
+| 新组件 `cast` | `actorKind`、`actorVariant`、`castId`、`speakerRole` |
+| 新组件 `presentation` | `renderLod`（表现层回写） |
+
+构造时初值都是 `undefined`，与「还没挂上」读起来一样；士兵从此形状固定（改后普查：构造之外再没有新挂的字段）。`delete soldier.x` 删不到存取器后面的值，三处改成 `= undefined`。
+
+**标签。** 身份类的真 / 假开关存成 `soldier.tags` 一个整数的位（对应 UE 的 GameplayTag），表 `SOLDIER_TAGS`：`dummy`、`towel`、`unarmed`、`noncombatant`（`scriptedNoncombatant`）、`essential`（`scriptEssential`）、`untargetable`（`missionUntargetable`）、`meleeDormant`、`wounded`。旧字段名照样读写（读出来是真 / 假），新代码用 `soldier.HasTag("untargetable")` / `SetTag(tag, on)` / `TagList()`。
+
+**主人。** 每个组件有机器认的 `owners`（主人文件，可带 `*`）。主人以外的文件直接写士兵字段的现有 62 处登记在 `Data_SoldierForeignWrites.json`（旧账）；`SoldierComponentsTest` 按源码扫（接收者叫 `s` / `soldier` / `ally` / `x.soldier` ……），新增一处就红。还旧账的办法是改成调主人的方法，改完 `--write` 重写登记表。写得最散的是 `yaw`、`holdZone`、`order`、`target`。
+
+**顺手修掉的一处回归。** `Script_SquadMarchAi` 接管士兵时用 `Object.hasOwn` 记「原来有没有这个字段」、放手时 `delete`。§22 分组件以后字段都是原型上的存取器，`hasOwn` 恒为假，放手时命令、驻守区、限时目标都没还回去（命令留在 `advance`）。改成用 `in` 判、原样写回，`SquadMarchAiTest` 加了真士兵的这一条。
+
+**兵种原型。** `Data_SoldierArchetypes.mjs`：川军步枪兵 / 轻机枪手 / 大刀手 / 军官 / 迫击炮手 / 敢死队员、百姓、日军步枪兵 / 轻机枪手 / 重机枪手 / 掷弹筒手 / 军官，一种一行（阵营、默认武器、外观、白头巾、不持枪）。`AiDirector.Spawn(side, x, z, { archetype: "ijaLmg", … })` 先套原型默认值，个体写的参数优先；不写原型的老写法照旧，按「百姓 / 白头巾 / 阵营 + 武器类别」认出原型记在 `soldier.archetype`。移植 UE 时一行对应一个兵种 DataAsset。准度、士气这些现在还按阵营与难度统一给，没有按原型分。
+

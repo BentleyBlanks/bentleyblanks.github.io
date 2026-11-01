@@ -3,6 +3,9 @@
 // Soldier 的旧字段名 → 组件里的同名字段（docs/Data_EnemyAi.md §22）。写成字面量存取器而不是循环 defineProperty：
 // V8 能把它内联进调用处，热路径上的读写只多一次取址；循环里用变量当键会慢五倍。
 
+/** 标签 → soldier.tags 里的位（Data_SoldierComponents.SOLDIER_TAGS 的顺序）。 */
+export const SOLDIER_TAG_BITS = Object.freeze({ dummy: 1, towel: 2, unarmed: 4, noncombatant: 8, essential: 16, untargetable: 32, meleeDormant: 64, wounded: 128 });
+
 export class SoldierFieldAccessors {
   // vitals：生命与状态
   get health() { return this.vitals.health; }
@@ -23,6 +26,12 @@ export class SoldierFieldAccessors {
   set hurtPose(value) { this.vitals.hurtPose = value; }
   get deadTime() { return this.vitals.deadTime; }
   set deadTime(value) { this.vitals.deadTime = value; }
+  get damageSequence() { return this.vitals.damageSequence; }
+  set damageSequence(value) { this.vitals.damageSequence = value; }
+  get woundedWalk() { return this.vitals.woundedWalk; }
+  set woundedWalk(value) { this.vitals.woundedWalk = value; }
+  get frontWoundEstablished() { return this.vitals.frontWoundEstablished; }
+  set frontWoundEstablished(value) { this.vitals.frontWoundEstablished = value; }
   // locomotion：移动、姿态与翻越
   get position() { return this.locomotion.position; }
   set position(value) { this.locomotion.position = value; }
@@ -82,6 +91,16 @@ export class SoldierFieldAccessors {
   set moveArriveM(value) { this.locomotion.moveArriveM = value; }
   get stationaryS() { return this.locomotion.stationaryS; }
   set stationaryS(value) { this.locomotion.stationaryS = value; }
+  get crowdPushX() { return this.locomotion.crowdPushX; }
+  set crowdPushX(value) { this.locomotion.crowdPushX = value; }
+  get crowdPushZ() { return this.locomotion.crowdPushZ; }
+  set crowdPushZ(value) { this.locomotion.crowdPushZ = value; }
+  get relaxedGait() { return this.locomotion.relaxedGait; }
+  set relaxedGait(value) { this.locomotion.relaxedGait = value; }
+  get relaxedGaitPaceMps() { return this.locomotion.relaxedGaitPaceMps; }
+  set relaxedGaitPaceMps(value) { this.locomotion.relaxedGaitPaceMps = value; }
+  get audioStepDist() { return this.locomotion.audioStepDist; }
+  set audioStepDist(value) { this.locomotion.audioStepDist = value; }
   // arms：武器、弹药与开火
   get weaponId() { return this.arms.weaponId; }
   set weaponId(value) { this.arms.weaponId = value; }
@@ -127,6 +146,10 @@ export class SoldierFieldAccessors {
   set targetFireAt(value) { this.arms.targetFireAt = value; }
   get shooting() { return this.arms.shooting; }
   set shooting(value) { this.arms.shooting = value; }
+  get muzzleAimYaw() { return this.arms.muzzleAimYaw; }
+  set muzzleAimYaw(value) { this.arms.muzzleAimYaw = value; }
+  get muzzleClipped() { return this.arms.muzzleClipped; }
+  set muzzleClipped(value) { this.arms.muzzleClipped = value; }
   // aiming：瞄准与看向（喂给 Actor 的连续量）
   get aimBlend() { return this.aiming.aimBlend; }
   set aimBlend(value) { this.aiming.aimBlend = value; }
@@ -181,6 +204,16 @@ export class SoldierFieldAccessors {
   set threatWokenAt(value) { this.sense.threatWokenAt = value; }
   get grenadeThreatAt() { return this.sense.grenadeThreatAt; }
   set grenadeThreatAt(value) { this.sense.grenadeThreatAt = value; }
+  get grenadeThreat() { return this.sense.grenadeThreat; }
+  set grenadeThreat(value) { this.sense.grenadeThreat = value; }
+  get incomingFire() { return this.sense.incomingFire; }
+  set incomingFire(value) { this.sense.incomingFire = value; }
+  get peekSaw() { return this.sense.peekSaw; }
+  set peekSaw(value) { this.sense.peekSaw = value; }
+  get visualAimPart() { return this.sense.visualAimPart; }
+  set visualAimPart(value) { this.sense.visualAimPart = value; }
+  get visualAimTargetId() { return this.sense.visualAimTargetId; }
+  set visualAimTargetId(value) { this.sense.visualAimTargetId = value; }
   // brain：决策：压制、掩体、冲锋、戒备、换位
   get combatModeUntil() { return this.brain.combatModeUntil; }
   set combatModeUntil(value) { this.brain.combatModeUntil = value; }
@@ -260,6 +293,36 @@ export class SoldierFieldAccessors {
   set grenadeEvade(value) { this.brain.grenadeEvade = value; }
   get task() { return this.brain.task; }
   set task(value) { this.brain.task = value; }
+  get coverFlankedAt() { return this.brain.coverFlankedAt; }
+  set coverFlankedAt(value) { this.brain.coverFlankedAt = value; }
+  get blindPeeks() { return this.brain.blindPeeks; }
+  set blindPeeks(value) { this.brain.blindPeeks = value; }
+  get coverMove() { return this.brain.coverMove; }
+  set coverMove(value) { this.brain.coverMove = value; }
+  get coverProgressM() { return this.brain.coverProgressM; }
+  set coverProgressM(value) { this.brain.coverProgressM = value; }
+  get coverProgressAt() { return this.brain.coverProgressAt; }
+  set coverProgressAt(value) { this.brain.coverProgressAt = value; }
+  get failedCoverId() { return this.brain.failedCoverId; }
+  set failedCoverId(value) { this.brain.failedCoverId = value; }
+  get failedCoverUntil() { return this.brain.failedCoverUntil; }
+  set failedCoverUntil(value) { this.brain.failedCoverUntil = value; }
+  get autoChargeTarget() { return this.brain.autoChargeTarget; }
+  set autoChargeTarget(value) { this.brain.autoChargeTarget = value; }
+  get autoChargeUntil() { return this.brain.autoChargeUntil; }
+  set autoChargeUntil(value) { this.brain.autoChargeUntil = value; }
+  get wakeOnThreat() { return this.brain.wakeOnThreat; }
+  set wakeOnThreat(value) { this.brain.wakeOnThreat = value; }
+  get wakeDamageSeq() { return this.brain.wakeDamageSeq; }
+  set wakeDamageSeq(value) { this.brain.wakeDamageSeq = value; }
+  get tacticalRadiusM() { return this.brain.tacticalRadiusM; }
+  set tacticalRadiusM(value) { this.brain.tacticalRadiusM = value; }
+  get contactRadiusBaseM() { return this.brain.contactRadiusBaseM; }
+  set contactRadiusBaseM(value) { this.brain.contactRadiusBaseM = value; }
+  get escortRadiusBaseM() { return this.brain.escortRadiusBaseM; }
+  set escortRadiusBaseM(value) { this.brain.escortRadiusBaseM = value; }
+  get routeArrivalOwnsRadius() { return this.brain.routeArrivalOwnsRadius; }
+  set routeArrivalOwnsRadius(value) { this.brain.routeArrivalOwnsRadius = value; }
   // meleeState：白刃
   get meleeCombat() { return this.meleeState.meleeCombat; }
   set meleeCombat(value) { this.meleeState.meleeCombat = value; }
@@ -308,11 +371,11 @@ export class SoldierFieldAccessors {
   set aiOfficer(value) { this.command.aiOfficer = value; }
   get reactionGroup() { return this.command.reactionGroup; }
   set reactionGroup(value) { this.command.reactionGroup = value; }
+  get escortRole() { return this.command.escortRole; }
+  set escortRole(value) { this.command.escortRole = value; }
+  get squadMarchCommand() { return this.command.squadMarchCommand; }
+  set squadMarchCommand(value) { this.command.squadMarchCommand = value; }
   // scripted：关卡与测试场挂的开关
-  get dummy() { return this.scripted.dummy; }
-  set dummy(value) { this.scripted.dummy = value; }
-  get towel() { return this.scripted.towel; }
-  set towel(value) { this.scripted.towel = value; }
   get missionFireSuppressOnly() { return this.scripted.missionFireSuppressOnly; }
   set missionFireSuppressOnly(value) { this.scripted.missionFireSuppressOnly = value; }
   get missionOpenUntil() { return this.scripted.missionOpenUntil; }
@@ -333,6 +396,182 @@ export class SoldierFieldAccessors {
   set ambientBlockedId(value) { this.scripted.ambientBlockedId = value; }
   get ambientBlockedUntil() { return this.scripted.ambientBlockedUntil; }
   set ambientBlockedUntil(value) { this.scripted.ambientBlockedUntil = value; }
+  get scriptAccuracyScale() { return this.scripted.scriptAccuracyScale; }
+  set scriptAccuracyScale(value) { this.scripted.scriptAccuracyScale = value; }
+  get scriptFireIntervalScale() { return this.scripted.scriptFireIntervalScale; }
+  set scriptFireIntervalScale(value) { this.scripted.scriptFireIntervalScale = value; }
+  get scriptCoverSlackM() { return this.scripted.scriptCoverSlackM; }
+  set scriptCoverSlackM(value) { this.scripted.scriptCoverSlackM = value; }
+  get scriptArrivalRadius() { return this.scripted.scriptArrivalRadius; }
+  set scriptArrivalRadius(value) { this.scripted.scriptArrivalRadius = value; }
+  get scriptDefensive() { return this.scripted.scriptDefensive; }
+  set scriptDefensive(value) { this.scripted.scriptDefensive = value; }
+  get scriptSuppressible() { return this.scripted.scriptSuppressible; }
+  set scriptSuppressible(value) { this.scripted.scriptSuppressible = value; }
+  get scriptMoveSpeedMps() { return this.scripted.scriptMoveSpeedMps; }
+  set scriptMoveSpeedMps(value) { this.scripted.scriptMoveSpeedMps = value; }
+  get scriptCoverMaxRiseM() { return this.scripted.scriptCoverMaxRiseM; }
+  set scriptCoverMaxRiseM(value) { this.scripted.scriptCoverMaxRiseM = value; }
+  get scriptEscapeStance() { return this.scripted.scriptEscapeStance; }
+  set scriptEscapeStance(value) { this.scripted.scriptEscapeStance = value; }
+  get scriptTraversalStance() { return this.scripted.scriptTraversalStance; }
+  set scriptTraversalStance(value) { this.scripted.scriptTraversalStance = value; }
+  get scriptShelterUntil() { return this.scripted.scriptShelterUntil; }
+  set scriptShelterUntil(value) { this.scripted.scriptShelterUntil = value; }
+  get scriptProneUntil() { return this.scripted.scriptProneUntil; }
+  set scriptProneUntil(value) { this.scripted.scriptProneUntil = value; }
+  get p012Guided() { return this.scripted.p012Guided; }
+  set p012Guided(value) { this.scripted.p012Guided = value; }
+  get p012ScoutDirected() { return this.scripted.p012ScoutDirected; }
+  set p012ScoutDirected(value) { this.scripted.p012ScoutDirected = value; }
+  get p012AwaitingWeapon() { return this.scripted.p012AwaitingWeapon; }
+  set p012AwaitingWeapon(value) { this.scripted.p012AwaitingWeapon = value; }
+  get p012RouteRejoining() { return this.scripted.p012RouteRejoining; }
+  set p012RouteRejoining(value) { this.scripted.p012RouteRejoining = value; }
+  get p012ScoutInitialHealth() { return this.scripted.p012ScoutInitialHealth; }
+  set p012ScoutInitialHealth(value) { this.scripted.p012ScoutInitialHealth = value; }
+  get weaponRangeTargetId() { return this.scripted.weaponRangeTargetId; }
+  set weaponRangeTargetId(value) { this.scripted.weaponRangeTargetId = value; }
+  get weaponRangeMoveSpeed() { return this.scripted.weaponRangeMoveSpeed; }
+  set weaponRangeMoveSpeed(value) { this.scripted.weaponRangeMoveSpeed = value; }
+  // mission：任务编排挂的状态（mission* 与压迫阶段）
+  get missionId() { return this.mission.missionId; }
+  set missionId(value) { this.mission.missionId = value; }
+  get missionEncounter() { return this.mission.missionEncounter; }
+  set missionEncounter(value) { this.mission.missionEncounter = value; }
+  get missionReserve() { return this.mission.missionReserve; }
+  set missionReserve(value) { this.mission.missionReserve = value; }
+  get missionReleaseDelayS() { return this.mission.missionReleaseDelayS; }
+  set missionReleaseDelayS(value) { this.mission.missionReleaseDelayS = value; }
+  get missionFrontStandby() { return this.mission.missionFrontStandby; }
+  set missionFrontStandby(value) { this.mission.missionFrontStandby = value; }
+  get missionAccuracyScale() { return this.mission.missionAccuracyScale; }
+  set missionAccuracyScale(value) { this.mission.missionAccuracyScale = value; }
+  get missionFireIntervalScale() { return this.mission.missionFireIntervalScale; }
+  set missionFireIntervalScale(value) { this.mission.missionFireIntervalScale = value; }
+  get missionFireHold() { return this.mission.missionFireHold; }
+  set missionFireHold(value) { this.mission.missionFireHold = value; }
+  get missionSurfaceRest() { return this.mission.missionSurfaceRest; }
+  set missionSurfaceRest(value) { this.mission.missionSurfaceRest = value; }
+  get missionDormant() { return this.mission.missionDormant; }
+  set missionDormant(value) { this.mission.missionDormant = value; }
+  get missionTrainReady() { return this.mission.missionTrainReady; }
+  set missionTrainReady(value) { this.mission.missionTrainReady = value; }
+  get missionCombatAlert() { return this.mission.missionCombatAlert; }
+  set missionCombatAlert(value) { this.mission.missionCombatAlert = value; }
+  get pressurePhaseId() { return this.mission.pressurePhaseId; }
+  set pressurePhaseId(value) { this.mission.pressurePhaseId = value; }
+  get missionFireGroup() { return this.mission.missionFireGroup; }
+  set missionFireGroup(value) { this.mission.missionFireGroup = value; }
+  get missionTactic() { return this.mission.missionTactic; }
+  set missionTactic(value) { this.mission.missionTactic = value; }
+  get missionAssault() { return this.mission.missionAssault; }
+  set missionAssault(value) { this.mission.missionAssault = value; }
+  get missionGrenadeEvade() { return this.mission.missionGrenadeEvade; }
+  set missionGrenadeEvade(value) { this.mission.missionGrenadeEvade = value; }
+  get missionGrenadeGoal() { return this.mission.missionGrenadeGoal; }
+  set missionGrenadeGoal(value) { this.mission.missionGrenadeGoal = value; }
+  get missionCoverWaiting() { return this.mission.missionCoverWaiting; }
+  set missionCoverWaiting(value) { this.mission.missionCoverWaiting = value; }
+  get missionRearGapM() { return this.mission.missionRearGapM; }
+  set missionRearGapM(value) { this.mission.missionRearGapM = value; }
+  get missionNaturalMarch() { return this.mission.missionNaturalMarch; }
+  set missionNaturalMarch(value) { this.mission.missionNaturalMarch = value; }
+  get missionCoverApproach() { return this.mission.missionCoverApproach; }
+  set missionCoverApproach(value) { this.mission.missionCoverApproach = value; }
+  get missionWatch() { return this.mission.missionWatch; }
+  set missionWatch(value) { this.mission.missionWatch = value; }
+  get missionCoverBounds() { return this.mission.missionCoverBounds; }
+  set missionCoverBounds(value) { this.mission.missionCoverBounds = value; }
+  get missionCoverPassed() { return this.mission.missionCoverPassed; }
+  set missionCoverPassed(value) { this.mission.missionCoverPassed = value; }
+  get missionContactPost() { return this.mission.missionContactPost; }
+  set missionContactPost(value) { this.mission.missionContactPost = value; }
+  get missionGuideWaiting() { return this.mission.missionGuideWaiting; }
+  set missionGuideWaiting(value) { this.mission.missionGuideWaiting = value; }
+  get missionDamageSequence() { return this.mission.missionDamageSequence; }
+  set missionDamageSequence(value) { this.mission.missionDamageSequence = value; }
+  get missionLastHealth() { return this.mission.missionLastHealth; }
+  set missionLastHealth(value) { this.mission.missionLastHealth = value; }
+  get missionGuideGesture() { return this.mission.missionGuideGesture; }
+  set missionGuideGesture(value) { this.mission.missionGuideGesture = value; }
+  get missionNestGuardInit() { return this.mission.missionNestGuardInit; }
+  set missionNestGuardInit(value) { this.mission.missionNestGuardInit = value; }
+  get missionContactAt() { return this.mission.missionContactAt; }
+  set missionContactAt(value) { this.mission.missionContactAt = value; }
+  get missionContactUntil() { return this.mission.missionContactUntil; }
+  set missionContactUntil(value) { this.mission.missionContactUntil = value; }
+  get missionEndCast() { return this.mission.missionEndCast; }
+  set missionEndCast(value) { this.mission.missionEndCast = value; }
+  get missionContactBound() { return this.mission.missionContactBound; }
+  set missionContactBound(value) { this.mission.missionContactBound = value; }
+  get missionGeng() { return this.mission.missionGeng; }
+  set missionGeng(value) { this.mission.missionGeng = value; }
+  get missionSortie() { return this.mission.missionSortie; }
+  set missionSortie(value) { this.mission.missionSortie = value; }
+  get missionContactResumeAt() { return this.mission.missionContactResumeAt; }
+  set missionContactResumeAt(value) { this.mission.missionContactResumeAt = value; }
+  get missionGrenadeReplanAt() { return this.mission.missionGrenadeReplanAt; }
+  set missionGrenadeReplanAt(value) { this.mission.missionGrenadeReplanAt = value; }
+  get missionIncomingAt() { return this.mission.missionIncomingAt; }
+  set missionIncomingAt(value) { this.mission.missionIncomingAt = value; }
+  get missionDangerUntil() { return this.mission.missionDangerUntil; }
+  set missionDangerUntil(value) { this.mission.missionDangerUntil = value; }
+  get missionHideWeapon() { return this.mission.missionHideWeapon; }
+  set missionHideWeapon(value) { this.mission.missionHideWeapon = value; }
+  get missionReach() { return this.mission.missionReach; }
+  set missionReach(value) { this.mission.missionReach = value; }
+  get missionCarriageAction() { return this.mission.missionCarriageAction; }
+  set missionCarriageAction(value) { this.mission.missionCarriageAction = value; }
+  // opening：开场分镜导演（opening*）
+  get openingShown() { return this.opening.openingShown; }
+  set openingShown(value) { this.opening.openingShown = value; }
+  get openingNotShown() { return this.opening.openingNotShown; }
+  set openingNotShown(value) { this.opening.openingNotShown = value; }
+  get openingStoryboardPose() { return this.opening.openingStoryboardPose; }
+  set openingStoryboardPose(value) { this.opening.openingStoryboardPose = value; }
+  get openingStoryboardLast() { return this.opening.openingStoryboardLast; }
+  set openingStoryboardLast(value) { this.opening.openingStoryboardLast = value; }
+  get openingStoryboardTravel() { return this.opening.openingStoryboardTravel; }
+  set openingStoryboardTravel(value) { this.opening.openingStoryboardTravel = value; }
+  get openingStoryboardHidden() { return this.opening.openingStoryboardHidden; }
+  set openingStoryboardHidden(value) { this.opening.openingStoryboardHidden = value; }
+  get openingStoryboardYaw() { return this.opening.openingStoryboardYaw; }
+  set openingStoryboardYaw(value) { this.opening.openingStoryboardYaw = value; }
+  get openingStoryboardAim() { return this.opening.openingStoryboardAim; }
+  set openingStoryboardAim(value) { this.opening.openingStoryboardAim = value; }
+  get openingStoryboardCrouch() { return this.opening.openingStoryboardCrouch; }
+  set openingStoryboardCrouch(value) { this.opening.openingStoryboardCrouch = value; }
+  get openingPace() { return this.opening.openingPace; }
+  set openingPace(value) { this.opening.openingPace = value; }
+  get openingTurnRate() { return this.opening.openingTurnRate; }
+  set openingTurnRate(value) { this.opening.openingTurnRate = value; }
+  get openingRerooted() { return this.opening.openingRerooted; }
+  set openingRerooted(value) { this.opening.openingRerooted = value; }
+  get openingNoBlend() { return this.opening.openingNoBlend; }
+  set openingNoBlend(value) { this.opening.openingNoBlend = value; }
+  get openingActorPerformance() { return this.opening.openingActorPerformance; }
+  set openingActorPerformance(value) { this.opening.openingActorPerformance = value; }
+  get openingAdopted() { return this.opening.openingAdopted; }
+  set openingAdopted(value) { this.opening.openingAdopted = value; }
+  get openingPlay() { return this.opening.openingPlay; }
+  set openingPlay(value) { this.opening.openingPlay = value; }
+  get openingWalk() { return this.opening.openingWalk; }
+  set openingWalk(value) { this.opening.openingWalk = value; }
+  get openingDoomed() { return this.opening.openingDoomed; }
+  set openingDoomed(value) { this.opening.openingDoomed = value; }
+  // cast：演员与说话身份
+  get actorKind() { return this.cast.actorKind; }
+  set actorKind(value) { this.cast.actorKind = value; }
+  get actorVariant() { return this.cast.actorVariant; }
+  set actorVariant(value) { this.cast.actorVariant = value; }
+  get castId() { return this.cast.castId; }
+  set castId(value) { this.cast.castId = value; }
+  get speakerRole() { return this.cast.speakerRole; }
+  set speakerRole(value) { this.cast.speakerRole = value; }
+  // presentation：表现层回写的状态
+  get renderLod() { return this.presentation.renderLod; }
+  set renderLod(value) { this.presentation.renderLod = value; }
   // remains：尸体、遗物与断肢
   get corpse() { return this.remains.corpse; }
   set corpse(value) { this.remains.corpse = value; }
@@ -366,4 +605,31 @@ export class SoldierFieldAccessors {
   set drop(value) { this.remains.drop = value; }
   get gore() { return this.remains.gore; }
   set gore(value) { this.remains.gore = value; }
+  get goreRnd() { return this.remains.goreRnd; }
+  set goreRnd(value) { this.remains.goreRnd = value; }
+  // 标签：旧字段名 → soldier.tags 的位（读出来是真 / 假）
+  get dummy() { return (this.tags & 1) !== 0; }
+  set dummy(value) { this.tags = value ? this.tags | 1 : this.tags & ~1; }
+  get towel() { return (this.tags & 2) !== 0; }
+  set towel(value) { this.tags = value ? this.tags | 2 : this.tags & ~2; }
+  get unarmed() { return (this.tags & 4) !== 0; }
+  set unarmed(value) { this.tags = value ? this.tags | 4 : this.tags & ~4; }
+  get scriptedNoncombatant() { return (this.tags & 8) !== 0; }
+  set scriptedNoncombatant(value) { this.tags = value ? this.tags | 8 : this.tags & ~8; }
+  get scriptEssential() { return (this.tags & 16) !== 0; }
+  set scriptEssential(value) { this.tags = value ? this.tags | 16 : this.tags & ~16; }
+  get missionUntargetable() { return (this.tags & 32) !== 0; }
+  set missionUntargetable(value) { this.tags = value ? this.tags | 32 : this.tags & ~32; }
+  get meleeDormant() { return (this.tags & 64) !== 0; }
+  set meleeDormant(value) { this.tags = value ? this.tags | 64 : this.tags & ~64; }
+  get wounded() { return (this.tags & 128) !== 0; }
+  set wounded(value) { this.tags = value ? this.tags | 128 : this.tags & ~128; }
+  /** 有没有这个标签（名字见 Data_SoldierComponents.SOLDIER_TAGS）。 */
+  HasTag(tag) { return (this.tags & SOLDIER_TAG_BITS[tag]) !== 0; }
+  SetTag(tag, on) {
+    const bit = SOLDIER_TAG_BITS[tag];
+    if (!bit) throw new Error(`Soldier: unknown tag ${tag}`);
+    this.tags = on ? this.tags | bit : this.tags & ~bit;
+  }
+  TagList() { return Object.keys(SOLDIER_TAG_BITS).filter((tag) => this.HasTag(tag)); }
 }

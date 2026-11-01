@@ -18,6 +18,7 @@ import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { SoldierView } from "./Script_SoldierView.mjs";
 import { SoldierFieldAccessors } from "./Script_SoldierFields.mjs";
+import { SOLDIER_ARCHETYPES, ARCHETYPE_BY_WEAPON_KIND } from "./Data_SoldierArchetypes.mjs";
 import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
   GRENADE_EVADE,
@@ -204,6 +205,27 @@ export const CAPSULE = [
   { radius: 0.42, height: 0.58 },     // 2 卧
 ];
 
+/** 撒兵参数套上兵种原型的默认值（个体写了的参数优先）；没写 archetype 就原样返回。 */
+export function ArchetypeSpawnOptions(options) {
+  if (!options?.archetype) return options;
+  const spec = SOLDIER_ARCHETYPES[options.archetype];
+  if (!spec) throw new Error(`Soldier archetype not found: ${options.archetype}`);
+  const base = {};
+  if (spec.weapon) base.weapon = spec.weapon;
+  if (spec.actorKind) base.actorKind = spec.actorKind;
+  if (spec.towel) base.towel = true;
+  if (spec.unarmed) base.unarmed = true;
+  return { ...base, ...options };
+}
+
+/** 这个兵属于哪种原型：写了就用写的，没写按「百姓 / 白头巾 / 阵营 + 武器类别」认（Data_SoldierArchetypes）。 */
+export function SoldierArchetypeOf(side, options, weaponId) {
+  if (options?.archetype) return options.archetype;
+  if (options?.actorKind === "civilian") return "civilian";
+  if (side === "nra" && options?.towel) return "nraDare";
+  return ARCHETYPE_BY_WEAPON_KIND[side]?.[WEAPONS[weaponId]?.kind] ?? (side === "nra" ? "nraRifleman" : "ijaRifleman");
+}
+
 export class Soldier extends SoldierFieldAccessors {
   // 字段按职责分在十个组件里（表在 Data_SoldierComponents，docs/Data_EnemyAi.md §22）：
   // 真正的值在 `this.<组件>.<字段>`，父类 SoldierFieldAccessors 生成同名存取器，所以旧写法 `this.ammo` 读写的是同一个值。
@@ -218,6 +240,8 @@ export class Soldier extends SoldierFieldAccessors {
     this.rnd = Mulberry32(this.id * 2654435761);
     this.actor = null;
     this.director = null;       // AiDirector.Spawn 填上，Kill 时用它发阵亡事件
+    this.archetype = null;      // 兵种原型（Data_SoldierArchetypes），AiDirector.Spawn 填
+    this.tags = 0;              // 标签位（Data_SoldierComponents.SOLDIER_TAGS；dummy / towel / unarmed …… 的存取器读写它）
     const weaponId = options.weapon || (side === "nra" ? this.identity.weapon : "Type38");
     const weapon = WEAPONS[weaponId] || WEAPONS.Type38;
 
@@ -242,6 +266,8 @@ export class Soldier extends SoldierFieldAccessors {
       stateLogged: STATE.IDLE,
       hurtPose: 0,                      // 中弹踉跄（Actor 的 hurt 覆盖姿势），Act 里按 HURT_FLINCH.decayS 衰减
       deadTime: 0,
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      damageSequence: undefined, woundedWalk: undefined, frontWoundEstablished: undefined,
     };
 
     this.locomotion = {
@@ -292,6 +318,9 @@ export class Soldier extends SoldierFieldAccessors {
       moveStore: { x: 0, z: 0, speed: 0 },
       moveArriveM: NaN,      // 这一次走位的到位半径（掩体微走位要 0.12 m，默认 1.2 m 判不出探头）
       stationaryS: 0,        // 在原地待了多久（投弹判据「对方钉在一处」读它）
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      crowdPushX: undefined, crowdPushZ: undefined, relaxedGait: undefined, relaxedGaitPaceMps: undefined,
+      audioStepDist: undefined,
     };
 
     this.arms = {
@@ -323,6 +352,8 @@ export class Soldier extends SoldierFieldAccessors {
       triggerDrySince: -1,
       targetFireAt: -99,     // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
       shooting: null,        // ShootingModel 的瞄准 / 暴露状态
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      muzzleAimYaw: undefined, muzzleClipped: undefined,
     };
 
     this.aiming = {
@@ -368,6 +399,9 @@ export class Soldier extends SoldierFieldAccessors {
       aimedAtSince: -1,      // 【§21】玩家从什么时候起一直拿枪指着我（没指着 = −1）
       threatWokenAt: -1,     // 【§21】待命兵（wakeOnThreat）被玩家惊动的时刻
       grenadeThreatAt: -99,  // 上一次「敌方手榴弹落在我掩体边上」的时刻
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      grenadeThreat: undefined, incomingFire: undefined, peekSaw: undefined, visualAimPart: undefined,
+      visualAimTargetId: undefined,
     };
 
     this.brain = {
@@ -426,6 +460,11 @@ export class Soldier extends SoldierFieldAccessors {
       displaceProne: false,  // 这次换位是匍匐后退（压制高）还是站着侧挪
       grenadeEvade: null,    // 通用躲雷（GRENADE_EVADE）：{ grenade, startAt, goal, replanAt, dive }
       task: null,            // TacticsDirector 每秒写的班组任务
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      coverFlankedAt: undefined, blindPeeks: undefined, coverMove: undefined, coverProgressM: undefined,
+      coverProgressAt: undefined, failedCoverId: undefined, failedCoverUntil: undefined, autoChargeTarget: undefined,
+      autoChargeUntil: undefined, wakeOnThreat: undefined, wakeDamageSeq: undefined, tacticalRadiusM: undefined,
+      contactRadiusBaseM: undefined, escortRadiusBaseM: undefined, routeArrivalOwnsRadius: undefined,
     };
 
     this.meleeState = {
@@ -467,16 +506,12 @@ export class Soldier extends SoldierFieldAccessors {
       aiOfficer: false,
       /** 反应层认的「本组」键（压力表的组 id）；空串时退回 squadId。 */
       reactionGroup: "",
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      escortRole: undefined, squadMarchCommand: undefined,
     };
 
     this.scripted = {
-      /**
-       * 靶场木桩兵（Script_Main ?range=1 时由装配层置真）。
-       * Update 里跳过 Think —— 不索敌、不开火、不自行走位（TryFire 要 target，
-       * Think 不跑就永远没有）；挨打、倒地、被准心识别照旧走原链路。
-       */
-      dummy: false,
-      towel: false,
+      // dummy（木桩兵：Update 里跳过 Think）与 towel（白头巾）2026-11-02 起是标签（this.tags 的位），存取器照旧。
       /**
        * 【2026-09-23】禁火的第二档：**压制档**。关卡编排（`Script_FirstLevelOpening.FireWindows`）
        * 每拍与 `missionFireHold` 同一处重置 / 置起。`missionFireHold` 为真时这一位决定
@@ -502,6 +537,46 @@ export class Soldier extends SoldierFieldAccessors {
       ambientShots: 0,           // 取证：这个人打了几发环境射击
       ambientBlockedId: null,    // 刚从枪口打过去被挡死的那个授权点（AMBIENT_FIRE.blockedRetryS 内不再挑）
       ambientBlockedUntil: -99,
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      scriptAccuracyScale: undefined, scriptFireIntervalScale: undefined, scriptCoverSlackM: undefined, scriptArrivalRadius: undefined,
+      scriptDefensive: undefined, scriptSuppressible: undefined, scriptMoveSpeedMps: undefined, scriptCoverMaxRiseM: undefined,
+      scriptEscapeStance: undefined, scriptTraversalStance: undefined, scriptShelterUntil: undefined, scriptProneUntil: undefined,
+      p012Guided: undefined, p012ScoutDirected: undefined, p012AwaitingWeapon: undefined, p012RouteRejoining: undefined,
+      p012ScoutInitialHealth: undefined, weaponRangeTargetId: undefined, weaponRangeMoveSpeed: undefined,
+    };
+
+    // 任务编排挂的状态（Data_SoldierComponents.mission；2026-11-02 普查收进表，初值 undefined）
+    this.mission = {
+      missionId: undefined, missionEncounter: undefined, missionReserve: undefined, missionReleaseDelayS: undefined,
+      missionFrontStandby: undefined, missionAccuracyScale: undefined, missionFireIntervalScale: undefined, missionFireHold: undefined,
+      missionSurfaceRest: undefined, missionDormant: undefined, missionTrainReady: undefined, missionCombatAlert: undefined,
+      pressurePhaseId: undefined, missionFireGroup: undefined, missionTactic: undefined, missionAssault: undefined,
+      missionGrenadeEvade: undefined, missionGrenadeGoal: undefined, missionCoverWaiting: undefined, missionRearGapM: undefined,
+      missionNaturalMarch: undefined, missionCoverApproach: undefined, missionWatch: undefined, missionCoverBounds: undefined,
+      missionCoverPassed: undefined, missionContactPost: undefined, missionGuideWaiting: undefined, missionDamageSequence: undefined,
+      missionLastHealth: undefined, missionGuideGesture: undefined, missionNestGuardInit: undefined, missionContactAt: undefined,
+      missionContactUntil: undefined, missionEndCast: undefined, missionContactBound: undefined, missionGeng: undefined,
+      missionSortie: undefined, missionContactResumeAt: undefined, missionGrenadeReplanAt: undefined, missionIncomingAt: undefined,
+      missionDangerUntil: undefined, missionHideWeapon: undefined, missionReach: undefined, missionCarriageAction: undefined,
+    };
+
+    // 开场分镜导演（Data_SoldierComponents.opening；2026-11-02 普查收进表，初值 undefined）
+    this.opening = {
+      openingShown: undefined, openingNotShown: undefined, openingStoryboardPose: undefined, openingStoryboardLast: undefined,
+      openingStoryboardTravel: undefined, openingStoryboardHidden: undefined, openingStoryboardYaw: undefined, openingStoryboardAim: undefined,
+      openingStoryboardCrouch: undefined, openingPace: undefined, openingTurnRate: undefined, openingRerooted: undefined,
+      openingNoBlend: undefined, openingActorPerformance: undefined, openingAdopted: undefined, openingPlay: undefined,
+      openingWalk: undefined, openingDoomed: undefined,
+    };
+
+    // 演员与说话身份（Data_SoldierComponents.cast；2026-11-02 普查收进表，初值 undefined）
+    this.cast = {
+      actorKind: undefined, actorVariant: undefined, castId: undefined, speakerRole: undefined,
+    };
+
+    // 表现层回写的状态（Data_SoldierComponents.presentation；2026-11-02 普查收进表，初值 undefined）
+    this.presentation = {
+      renderLod: undefined,
     };
 
     this.remains = {
@@ -530,6 +605,8 @@ export class Soldier extends SoldierFieldAccessors {
       // 断肢记录（GoreSystem 建、GoreSystem 清）。**非空 = 这具身上少了东西**：
       // 远景层不许接管他（那一层是整人烘的，会把肢体长回来），撤场时要先还原几何。
       gore: null,
+      // 后挂字段（2026-11-02 普查收进组件表；初值 undefined，与「还没挂上」读起来一样）
+      goreRnd: undefined,
     };
   }
 
@@ -935,6 +1012,11 @@ export class AiDirector {
 
   Spawn(side, x, z, options = {}) {
     if (this.aliveCount >= this.maxAlive) return null;
+    // 兵种原型（Data_SoldierArchetypes）：写了 archetype 就先套上它的默认武器 / 外观 / 开关。
+    if (options.archetype) {
+      options = ArchetypeSpawnOptions(options);
+      if (SOLDIER_ARCHETYPES[options.archetype].side !== side) console.warn(`AiDirector.Spawn: archetype ${options.archetype} is not ${side}`);
+    }
     /**
      * 阵地火力是**战位**，不是可以反复填的补充兵：一挺九二式就是一挺。
      *
@@ -971,6 +1053,7 @@ export class AiDirector {
     // 所以放人之前先问一句「这儿站得下吗」。
     const physics = this.ctx.physics;
     const soldier = new Soldier(side, { ...options, x, z });
+    soldier.archetype = SoldierArchetypeOf(side, options, soldier.weaponId);
     soldier.unarmed = options.unarmed === true || options.actorKind === "civilian";
     const kind = options.actorKind || (side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija");
     // Child geometry is seeded by ActorFactory. Resolve it before any physical

@@ -3642,7 +3642,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
         soldier.p012ScoutInitialHealth ??= soldier.health;
         soldier.p012ScoutDirected = true; soldier.scriptMoveSpeedMps = mode.speedMps;
         soldier.manualGoalUntil = ai.time + 3;
-      } else { delete soldier.p012ScoutDirected; delete soldier.scriptMoveSpeedMps; }
+      } else { soldier.p012ScoutDirected = undefined; soldier.scriptMoveSpeedMps = undefined; } // 组件字段：清成 undefined（delete 删不到存取器后面的值）
     },
     EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression,
       suppressed:soldier.state===AI_STATE.SUPPRESSED} : null,
@@ -3663,7 +3663,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
     EnemyGoal: (soldier, point, arrivalRadius) => {
       soldier.order = "hold";
       if (Number.isFinite(arrivalRadius) && arrivalRadius > 0) soldier.scriptArrivalRadius = Math.min(1, arrivalRadius * 0.5);
-      else delete soldier.scriptArrivalRadius;
+      else soldier.scriptArrivalRadius = undefined;
       soldier.holdZone = { id: "P012Lane", x: point.x, z: point.z, radius: soldier.scriptArrivalRadius ?? 1 };
       soldier.goal.set(point.x, 0, point.z);
     },
