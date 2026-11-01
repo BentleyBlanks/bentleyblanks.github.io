@@ -42,6 +42,39 @@ const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vect
 const _p2 = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _s2 = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _rel = new THREE.Matrix4(), _inv = new THREE.Matrix4();
 
+/** 枪与手（_PlaceWeapon）：原身体掌心离枪身这么近算握着；X Bot 掌心离握点 near 内全拉、far 外不拉；淡入淡出时长。 */
+const XBOT_GRIP = Object.freeze({ heldM: 0.2, near: 0.3, far: 0.5, blendS: 0.2, weightS: 0.12 });
+
+/** 点到线段（[a, b]，b 为空时就是到点 a）的距离；点为空 → Infinity。 */
+function SegmentDistance(p, [a, b]) {
+  if (!p) return Infinity;
+  if (!b) return p.distanceTo(a);
+  const ab = b.clone().sub(a), t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / Math.max(ab.lengthSq(), 1e-9), 0, 1);
+  return p.distanceTo(a.clone().addScaledVector(ab, t));
+}
+
+/** 两个矩阵按 e 插值（位置线性、朝向球面、缩放线性）。 */
+function BlendMatrix(from, to, e) {
+  const p1 = new THREE.Vector3(), q1 = new THREE.Quaternion(), s1 = new THREE.Vector3(), p2 = new THREE.Vector3(), q2 = new THREE.Quaternion(), s2 = new THREE.Vector3();
+  from.decompose(p1, q1, s1); to.decompose(p2, q2, s2);
+  return new THREE.Matrix4().compose(p1.lerp(p2, e), q1.slerp(q2, e), s1.lerp(s2, e));
+}
+
+/** 朝 target 指数逼近（时间常数 tau 秒）。 */
+function Approach(value, target, dt, tau) { return value + (target - value) * (1 - Math.exp(-Math.max(dt, 0) / tau)); }
+
+/** 骨头在世界空间里再转 q（左乘），换回本地写进去。 */
+function RotateBoneWorld(bone, q) {
+  const parentQ = bone.parent.getWorldQuaternion(new THREE.Quaternion()), world = bone.getWorldQuaternion(new THREE.Quaternion());
+  bone.quaternion.copy(parentQ.invert().multiply(q.multiply(world)));
+  bone.updateWorldMatrix(false, true);
+}
+
+function SetBoneWorldQuaternion(bone, world) {
+  bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+  bone.updateWorldMatrix(false, true);
+}
+
 function Palm(hand, middle, out) {
   hand.getWorldPosition(out);
   return middle ? out.lerp(middle.getWorldPosition(_p2), 0.55) : out;
@@ -272,13 +305,14 @@ export class XBotSkin {
     if (pick.mode === "mirror" || !pick.file) this._Mirror(dt);
     else this._Play(pick, intent, dt);
     this.container.updateMatrixWorld(true);
-    this._Reanchor(pick);
+    this._Reanchor(pick, dt);
   }
 
   /** 这一帧播什么：{ mode: "clip" | "mirror", file, time?, rate?, loop, once, hold, rifleHand } */
   _Pick(intent) {
     const skins = this.skins;
-    if (intent.exact) return { mode: "mirror" };
+    // 精确贴位置的、白刃战（刺刀 / 大刀的刺、挡、拨、压倒，游戏自己的白刃动作）：照原身体姿势当场换算
+    if (intent.exact || intent.melee) return { mode: "mirror" };
     if (intent.down) {
       const death = XBOT_DEATHS[this.rig.deathVariantId] || XBOT_DEATHS.DeathCollapseA;
       return { mode: "clip", file: death.file, once: true, death: true };
@@ -394,60 +428,222 @@ export class XBotSkin {
   }
 
   /**
-   * 原身体骨头上挂的东西（挂点 Socket_*、道具根）挪到 X Bot 的同一根骨上。游戏代码写的本地矩阵记作「本意」，
-   * 每帧按本意算它在原身体上的世界位姿，再按两套骨的初始朝向差换到 X Bot 那根骨上；写回去的本地矩阵记下来，
-   * 下一帧发现被游戏改过（换枪、背枪）就换成新的本意。
+   * 原身体骨头上挂的东西挪到 X Bot 身上（2026-11-01 第二版：枪单独处理 + 双手 IK）。游戏代码写的本地矩阵记作「本意」，
+   * 写回去的本地矩阵记下来，下一帧发现被游戏改过（换枪、背枪、片段道具轨）就换成新的本意。
+   *   · 手里的枪（_PlaceWeapon）：先定枪的位姿，再把 X Bot 的手 IK 到枪的握点上；
+   *   · 其余挂件（背着的枪、钢盔、刀鞘、手里的道具）按原身体那根骨挪到 X Bot 同一根骨上（在 IK 之后，跟着手走）。
    */
-  _Reanchor(pick) {
+  _Reanchor(pick, dt = 0) {
     if (this.frame - this.attachScan > 30 || this.attachWeapon !== this.actor.weaponGroup) this._ScanAttachments();
-    const rig = this.rig, retarget = this.source?.retarget;
-    rig.root.updateMatrixWorld(true);
-    const rifleMount = pick?.mode === "clip" && pick.hold === "端枪" && this.skins.rifleOffset;
-    this.lastMount = rifleMount ? "rifle" : "anchor";
-    if (rifleMount && pick.rifleHand === "L") { if (!this.rifleOnLeft || this.rifleOnLeft.file !== pick.file) this.rifleOnLeft = this._PinLeft(pick.file); }
-    else this.rifleOnLeft = null;
+    this.rig.root.updateMatrixWorld(true);
     for (const a of this.attachments) {
-      // parent：它实际挂在谁下面（骨头，或 rig.root —— 片段的道具轨把枪摆在模型空间里）；anchor：按哪根骨挪
-      const object = a.object, parent = object.parent, bone = a.anchor || parent;
-      if (!parent || !bone) continue;
+      const object = a.object;
       object.updateMatrix();
       if (!a.written || !object.matrix.equals(a.written)) a.intended = object.matrix.clone();
-      // 原身体上它此刻在哪
-      const srcWorld = _m.multiplyMatrices(parent.matrixWorld, a.intended);
-      srcWorld.decompose(_p, _q, _s);
-      const worldScale = _s.clone();
-      let P, Q;
-      if (rifleMount && a.holdsWeapon) {
-        // Mixamo 端枪动作：枪照标定放进 X Bot 右手（或左手钉住），挂点按枪的相对位置倒推（整矩阵乘，不拆缩放：
-        // 枪在挂点里有自己的缩放抵消身高缩放，拆开再按挂点的缩放拼回去会把枪挪开）
-        const W = this._RifleWorld();
-        this.actor.weaponGroup.matrixWorld.decompose(_p2, _q2, _s2);
-        const rel = _rel.copy(this.actor.weaponGroup.matrixWorld).invert().multiply(object.matrixWorld);
-        _m2.compose(W.position, W.quaternion, _s2).multiply(rel);
-        object.matrix.copy(_inv.copy(parent.matrixWorld).invert().multiply(_m2));
-        object.matrix.decompose(object.position, object.quaternion, object.scale);
-        object.updateMatrix();
-        a.written = object.matrix.clone();
-        object.updateMatrixWorld(true);
-        continue;
-      } else {
-        const xbotBone = a.xbotBone, ti = a.targetIndex;
-        if (!xbotBone) continue;
-        bone.matrixWorld.decompose(_p2, _q2, _s2);
-        const relPos = _p.clone().sub(_p2).applyQuaternion(_q2.clone().invert());
-        const relRot = _q2.clone().invert().multiply(_q);
-        const C = ti >= 0 && retarget ? retarget.correction[ti] : null;
-        if (C) { const Ci = C.clone().invert(); relPos.applyQuaternion(Ci); relRot.premultiply(Ci); }
-        xbotBone.matrixWorld.decompose(_p2, _q2, _s2);
-        P = relPos.applyQuaternion(_q2).add(_p2);
-        Q = _q2.clone().multiply(relRot);
-      }
-      object.matrix.copy(_inv.copy(parent.matrixWorld).invert().multiply(_m2.compose(P, Q, worldScale)));
-      object.matrix.decompose(object.position, object.quaternion, object.scale);
-      object.updateMatrix();
-      a.written = object.matrix.clone();
-      object.updateMatrixWorld(true);
     }
+    const weapon = this._RifleInHands() ? this.attachments.find(a => a.holdsWeapon) : null;
+    const placed = weapon ? this._PlaceWeapon(weapon, pick, dt) : false;
+    if (!weapon) this.lastMount = null;
+    if (!placed) { this.ikR = 0; this.ikL = 0; }
+    for (const a of this.attachments) {
+      if (a === weapon && placed) continue;
+      this._ReanchorOne(a, a === weapon);
+    }
+  }
+
+  _Write(a, world) {
+    const object = a.object, parent = object.parent;
+    object.matrix.copy(_inv.copy(parent.matrixWorld).invert().multiply(world));
+    object.matrix.decompose(object.position, object.quaternion, object.scale);
+    object.updateMatrix();
+    a.written = object.matrix.clone();
+    object.updateMatrixWorld(true);
+  }
+
+  /** 按原身体那根骨挪到 X Bot 同一根骨上（两套骨初始朝向差按换算的修正量补）。looseWeapon：没人握着的枪 —— 原地不动。 */
+  _ReanchorOne(a, looseWeapon) {
+    const object = a.object, parent = object.parent, bone = a.anchor || parent;
+    if (!parent || !bone) return;
+    const srcWorld = _m.multiplyMatrices(parent.matrixWorld, a.intended);
+    // 没握在手里的枪（倒地后摆在身边、被炸飞、扔掉）：挂在手骨 / rig.root 下也照原身体的位置放，不跟 X Bot 的骨头飘
+    // 贴在躯干上的（背着、斜挎在背后）跟 X Bot 的那节躯干走
+    let xbotBone = a.xbotBone, ti = a.targetIndex, from = bone;
+    if (looseWeapon && (!bone.isBone || this._HandBone(bone))) {
+      const torso = this._NearTorso(srcWorld);
+      if (!torso) { this._Write(a, srcWorld.clone()); this.lastMount = "world"; this.contact = null; return; }
+      from = torso.bone; xbotBone = torso.xbot; ti = torso.ti;
+    }
+    const retarget = this.source?.retarget;
+    if (!xbotBone) return;
+    srcWorld.decompose(_p, _q, _s);
+    const worldScale = _s.clone();
+    from.matrixWorld.decompose(_p2, _q2, _s2);
+    const relPos = _p.clone().sub(_p2).applyQuaternion(_q2.clone().invert());
+    const relRot = _q2.clone().invert().multiply(_q);
+    const C = ti >= 0 && retarget ? retarget.correction[ti] : null;
+    if (C) { const Ci = C.clone().invert(); relPos.applyQuaternion(Ci); relRot.premultiply(Ci); }
+    xbotBone.matrixWorld.decompose(_p2, _q2, _s2);
+    this._Write(a, _m2.compose(relPos.applyQuaternion(_q2).add(_p2), _q2.clone().multiply(relRot), worldScale));
+    if (looseWeapon) { this.lastMount = "body"; this.contact = null; }
+  }
+
+  /** 枪的中心离原身体躯干（骨盆、脊柱、胸、颈）0.35 m 内 → 那节骨与 X Bot 对应的骨；否则 null（在地上）。 */
+  _NearTorso(world) {
+    const at = new THREE.Vector3().setFromMatrixPosition(world);
+    let best = null, bestD = 0.35;
+    for (const name of ["Bip001_Pelvis", "Bip001_Spine", "Bip001_Spine1", "Bip001_Spine2", "Bip001_Neck"]) {
+      const bone = this.rig.root.getObjectByName(name);
+      if (!bone) continue;
+      const d = bone.getWorldPosition(new THREE.Vector3()).distanceTo(at);
+      if (d < bestD) { bestD = d; const xn = XBOT_FROM_SOLDIER[name]; best = { bone, xbot: this.bones.get(xn), ti: this.skins.rest.Find(xn) }; }
+    }
+    return best?.xbot ? best : null;
+  }
+
+  _HandBone(bone) { return bone === this.rig.bones?.handR || bone === this.rig.bones?.handL; }
+
+  /**
+   * 手里的枪。枪的位姿三选一：
+   *   · 播 Mixamo 端枪动作：照动作预览工具的标定放进右手（rifleHand "L" 的钉在左手）；
+   *   · 原身体手里握着枪（掌心离枪身 ≤ XBOT_GRIP.heldM）：照握着的那只手与枪的相对位置，挪到 X Bot 同一只手上；
+   *   · 原身体没握着：返回 false，交给 _ReanchorOne（摆在身边的原地不动、挂在背上的跟背走）。
+   * 然后把 X Bot 的两只手 IK 到枪上：Mixamo 动作的左手去这把枪自己的护木握点（weaponGripFront，汉阳造 / 中正式 / 三八式
+   * 各按各的）；换算动作的另一只手去原动作握的那个位置（拉栓、托枪照原样）。手本来离握点远（在指路、在干别的）就不拉，
+   * 远近之间渐变；挂法变了（换动作、松手）XBOT_GRIP.blendS 秒内淡过去。
+   */
+  _PlaceWeapon(a, pick, dt) {
+    const actor = this.actor, w = actor.weaponGroup, object = a.object, parent = object.parent;
+    if (!parent) return false;
+    const srcObj = _m.multiplyMatrices(parent.matrixWorld, a.intended);
+    const relW = new THREE.Matrix4().copy(object.matrixWorld).invert().multiply(w.matrixWorld);   // 枪在挂点里的位姿（本帧）
+    const srcW = srcObj.clone().multiply(relW);                                                    // 原身体上枪此刻在哪
+    const front = actor.weaponGripFront?.lengthSq() > 1e-8 ? actor.weaponGripFront : null;
+    const muzzle = actor.weaponMuzzle?.lengthSq() > 1e-8 ? actor.weaponMuzzle : front;
+    const Seg = (M) => [new THREE.Vector3().setFromMatrixPosition(M), muzzle ? muzzle.clone().applyMatrix4(M) : null];
+    const srcSeg = Seg(srcW);
+    const srcPalm = { R: this._SrcPalm("R"), L: this._SrcPalm("L") };
+    const srcGap = { R: SegmentDistance(srcPalm.R, srcSeg), L: SegmentDistance(srcPalm.L, srcSeg) };
+    const mixamo = pick?.mode === "clip" && pick.hold === "端枪" && this.skins.rifleOffset;
+    let mode, W;
+    if (mixamo) {
+      if (pick.rifleHand === "L") { if (!this.rifleOnLeft || this.rifleOnLeft.file !== pick.file) this.rifleOnLeft = this._PinLeft(pick.file); }
+      else this.rifleOnLeft = null;
+      const R = this._RifleWorld();
+      w.matrixWorld.decompose(_p2, _q2, _s2);
+      W = new THREE.Matrix4().compose(R.position, R.quaternion, _s2);
+      mode = this.rifleOnLeft ? "rifleL" : "rifle";
+    } else {
+      this.rifleOnLeft = null;
+      const side = srcGap.R <= srcGap.L ? "R" : "L";
+      if (!(srcGap[side] <= XBOT_GRIP.heldM)) { a.weaponBlend = null; a.weaponMode = null; return false; }
+      W = this._HandRelative(side, srcW);
+      mode = "hand" + side;
+    }
+    // 挂法变了：从上一帧放的位姿（容器本地，人走着也不拖）淡过去
+    const local = new THREE.Matrix4().copy(this.container.matrixWorld).invert().multiply(W);
+    if (a.weaponMode && a.weaponMode !== mode && a.weaponLocal) a.weaponBlend = { from: a.weaponLocal.clone(), t: 0 };
+    a.weaponMode = mode;
+    if (a.weaponBlend) {
+      a.weaponBlend.t += dt;
+      const k = Math.min(1, a.weaponBlend.t / XBOT_GRIP.blendS), e = k * k * (3 - 2 * k);
+      local.copy(BlendMatrix(a.weaponBlend.from, local, e));
+      if (k >= 1) a.weaponBlend = null;
+    }
+    a.weaponLocal = local.clone();
+    W = new THREE.Matrix4().copy(this.container.matrixWorld).multiply(local);
+    // 双手 IK
+    const target = { R: null, L: null };
+    if (mixamo) {
+      if (this.rifleOnLeft) target.R = new THREE.Vector3().setFromMatrixPosition(W);
+      else if (front) target.L = this._Reachable("L", new THREE.Vector3().setFromMatrixPosition(W), front.clone().applyMatrix4(W));
+    } else {
+      // 原动作里另一只手也握着枪：照它在枪上的位置（换到 X Bot 的枪上）
+      const other = mode === "handR" ? "L" : "R";
+      if (srcGap[other] <= XBOT_GRIP.heldM) target[other] = srcPalm[other].clone().applyMatrix4(srcW.clone().invert()).applyMatrix4(W);
+    }
+    for (const side of ["R", "L"]) {
+      const key = "ik" + side;
+      this[key] = Approach(this[key] || 0, target[side] ? this._GripWeight(side, target[side]) : 0, dt, XBOT_GRIP.weightS);
+      if (this[key] > 0.002 && target[side]) this._SolveArm(side, target[side], this[key]);
+    }
+    // 取证：握着枪的手（IK 之后）掌心离它该握的那一点多远
+    const n = { R: "Right", L: "Left" };
+    this.contact = Object.fromEntries(["R", "L"].map(side => [side, target[side] && this['ik' + side] > 0.5
+      ? +Palm(this.H(n[side] + "Hand"), this.H(n[side] + "HandMiddle1"), new THREE.Vector3()).distanceTo(target[side]).toFixed(3) : null]));
+    this.container.updateMatrixWorld(true);
+    // 挂点按枪的相对位置倒推（整矩阵乘，不拆缩放：枪在挂点里有自己的缩放抵消身高缩放）
+    this._Write(a, W.clone().multiply(relW.clone().invert()));
+    this.lastMount = mode;
+    return true;
+  }
+
+  /**
+   * 护木握点够不着（Mixamo 端枪动作两手只隔 0.27 m、枪定得靠后，左臂伸直也差一截）就往枪托那头退，
+   * 取够得着的最靠前一点（最多退到握点到护木的 45%），不硬把胳膊拉脱。
+   */
+  _Reachable(side, grip, front) {
+    const n = side === "R" ? "Right" : "Left";
+    const A = this.H(n + "Arm").getWorldPosition(new THREE.Vector3()), B = this.H(n + "ForeArm").getWorldPosition(new THREE.Vector3());
+    const hand = this.H(n + "Hand"), Cw = hand.getWorldPosition(new THREE.Vector3());
+    const reach = (A.distanceTo(B) + B.distanceTo(Cw)) * 0.97 + Palm(hand, this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(Cw);
+    for (let t = 1; t >= 0.45; t -= 0.05) { const p = grip.clone().lerp(front, t); if (p.distanceTo(A) <= reach) return p; }
+    return grip.clone().lerp(front, 0.45);
+  }
+
+  /** 原身体某只手与枪的相对位姿，搬到 X Bot 同一只手上（两套骨手的初始朝向差按换算的修正量补）。 */
+  _HandRelative(side, srcW) {
+    const srcHand = side === "R" ? this.rig.bones.handR : this.rig.bones.handL;
+    const xName = side === "R" ? "RightHand" : "LeftHand", ti = this.skins.rest.Find(xName);
+    srcW.decompose(_p, _q, _s);
+    const worldScale = _s.clone();
+    srcHand.matrixWorld.decompose(_p2, _q2, _s2);
+    const relPos = _p.clone().sub(_p2).applyQuaternion(_q2.clone().invert());
+    const relRot = _q2.clone().invert().multiply(_q);
+    const C = ti >= 0 ? this.source?.retarget?.correction[ti] : null;
+    if (C) { const Ci = C.clone().invert(); relPos.applyQuaternion(Ci); relRot.premultiply(Ci); }
+    this.H(xName).matrixWorld.decompose(_p2, _q2, _s2);
+    return new THREE.Matrix4().compose(relPos.applyQuaternion(_q2).add(_p2), _q2.clone().multiply(relRot), worldScale);
+  }
+
+  _SrcPalm(side) {
+    const hand = side === "R" ? this.rig.bones?.handR : this.rig.bones?.handL;
+    if (!hand) return null;
+    const key = "srcMiddle" + side;
+    if (this[key] === undefined) this[key] = this.rig.root.getObjectByName("Bip001_" + side + "_Finger2") || null;
+    return Palm(hand, this[key], new THREE.Vector3());
+  }
+
+  /** 这只手要不要去握点：掌心离握点 ≤ near 全拉，≥ far 不拉，中间渐变（按 X Bot 原尺寸的米算）。 */
+  _GripWeight(side, target) {
+    const n = side === "R" ? "Right" : "Left";
+    const scale = this.container.matrixWorld.getMaxScaleOnAxis() || 1;
+    const d = Palm(this.H(n + "Hand"), this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(target) / scale;
+    const { near, far } = XBOT_GRIP;
+    return d <= near ? 1 : d >= far ? 0 : 1 - (d - near) / (far - near);
+  }
+
+  /** 两节骨 IK：肩—肘—腕，让掌心落到 target（按 weight 插值）；肘弯的平面沿用动作自己的，手腕的世界朝向不变。 */
+  _SolveArm(side, targetPalm, weight) {
+    const n = side === "R" ? "Right" : "Left";
+    const upper = this.H(n + "Arm"), fore = this.H(n + "ForeArm"), hand = this.H(n + "Hand"), middle = this.H(n + "HandMiddle1");
+    if (!upper || !fore || !hand) return;
+    upper.updateWorldMatrix(true, true);
+    const handQ = hand.getWorldQuaternion(new THREE.Quaternion());
+    const A = upper.getWorldPosition(new THREE.Vector3()), B = fore.getWorldPosition(new THREE.Vector3()), Cw = hand.getWorldPosition(new THREE.Vector3());
+    const palmOff = Palm(hand, middle, new THREE.Vector3()).sub(Cw);
+    const target = Cw.clone().lerp(targetPalm.clone().sub(palmOff), weight);
+    const lab = A.distanceTo(B), lbc = B.distanceTo(Cw);
+    const lat = THREE.MathUtils.clamp(A.distanceTo(target), Math.abs(lab - lbc) + 1e-4, lab + lbc - 1e-4);
+    const ba = A.clone().sub(B), bc = Cw.clone().sub(B);
+    let axis = ba.clone().cross(bc);
+    if (axis.lengthSq() < 1e-10) axis = new THREE.Vector3(0, 1, 0).applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion())).cross(ba);
+    axis.normalize();
+    const cur = ba.angleTo(bc), des = Math.acos(THREE.MathUtils.clamp((lab * lab + lbc * lbc - lat * lat) / (2 * lab * lbc), -1, 1));
+    RotateBoneWorld(fore, new THREE.Quaternion().setFromAxisAngle(axis, des - cur));
+    const C2 = hand.getWorldPosition(new THREE.Vector3());
+    const ac = C2.sub(A).normalize(), at = target.clone().sub(A).normalize();
+    RotateBoneWorld(upper, new THREE.Quaternion().setFromUnitVectors(ac, at));
+    SetBoneWorldQuaternion(hand, handQ);
   }
 
   _ScanAttachments() {
@@ -537,12 +733,25 @@ export class XBotSkin {
     const R = (v) => (v ? [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)] : null);
     const hips = this.H("Hips")?.getWorldPosition(new THREE.Vector3());
     const src = this.rig.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
-    let weaponGap = null;
+    let weaponGap = null, grip = null;
     if (this._RifleInHands()) {
       const w = this.actor.weaponGroup.getWorldPosition(new THREE.Vector3());
       weaponGap = +Math.min(...["RightHand", "LeftHand"].map(n => this.H(n).getWorldPosition(new THREE.Vector3()).distanceTo(w))).toFixed(3);
+      grip = this._GripGaps();
     }
-    return { visible: this.container.visible, hips: R(hips), srcPelvis: R(src), weaponGap, mount: this.lastMount || null, attachments: this.attachments.length };
+    return { visible: this.container.visible, hips: R(hips), srcPelvis: R(src), weaponGap, ...(grip || {}), contactR: this.contact?.R ?? null, contactL: this.contact?.L ?? null,
+      mount: this.lastMount || null, attachments: this.attachments.length };
+  }
+
+  /** 枪的两个握点（右手握把 = 枪的原点，左手护木 = weaponGripFront）各离 X Bot 那只手的掌心多远。 */
+  _GripGaps() {
+    const w = this.actor.weaponGroup;
+    w.updateWorldMatrix(true, false);
+    const right = new THREE.Vector3().setFromMatrixPosition(w.matrixWorld);
+    const front = this.actor.weaponGripFront?.lengthSq() > 1e-8 ? this.actor.weaponGripFront.clone().applyMatrix4(w.matrixWorld) : null;
+    const palmR = Palm(this.H("RightHand"), this.H("RightHandMiddle1"), new THREE.Vector3());
+    const palmL = Palm(this.H("LeftHand"), this.H("LeftHandMiddle1"), new THREE.Vector3());
+    return { gripR: +right.distanceTo(palmR).toFixed(3), gripL: front ? +front.distanceTo(palmL).toFixed(3) : null };
   }
 
   Dispose() {
@@ -559,7 +768,6 @@ export function NativeKey(intent, rifleInHands) {
   if (intent.carryRole === "front") return "carryFront";
   if (intent.carryRole) return "carryRear";
   if (intent.woundedWalk && mps > 0.05) return "woundedWalk";
-  if (intent.melee) return "meleeGuard";
   const stance = intent.stance === "prone" ? "prone" : intent.stance === "crouch" ? "crouch" : "stand";
   if (intent.talking && mps < 0.05 && stance === "stand") return "talking";
   const move = mps < 0.05 ? "Idle" : stance === "prone" ? "Crawl" : mps < XBOT.runMps ? "Walk" : "Run";

@@ -802,7 +802,7 @@ export class BlockoutPlay {
   /** 取证 / 测试用的现状。 */
   State() {
     const run = this.run;
-    const soldiers = run ? [...run.soldiers.entries()].map(([id, s]) => ({ id, alive: !!s.alive, x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2), order: s.order, weapon: s.weaponId, state: s.state, xbot: !!s.xbotSkin })) : [];
+    const soldiers = run ? [...run.soldiers.entries()].map(([id, s]) => ({ id, alive: !!s.alive, x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2), order: s.order, weapon: s.weaponId, state: s.state, xbot: !!s.xbotSkin, xbotProbe: s.xbotSkin && s.alive ? s.xbotSkin.Probe() : null })) : [];
     return {
       present: this.present, valid: this.validation?.ok ?? null, panelOpen: this.panelOpen,
       active: !!run, settings: { ...this.settings },

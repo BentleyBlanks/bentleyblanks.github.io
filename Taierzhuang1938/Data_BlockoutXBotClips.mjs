@@ -112,7 +112,6 @@ export const XBOT_NATIVE = Object.freeze({
   carryRear: C("StretcherRearWalk", { speedMps: 1.07 }),
   woundedWalk: M("InjuredWalk_V1", { speedMps: 0.8 }),
   talking: M("Talking_V2"),
-  meleeGuard: M("GreatSwordIdle_V1"),
   // 投弹：国军木柄弹（拧盖拽火绳），日军九一式（拔销磕钢盔）
   grenadeNra: C("StickGrenadeStand"),
   grenadeIja: C("Type91GrenadeThrow"),
