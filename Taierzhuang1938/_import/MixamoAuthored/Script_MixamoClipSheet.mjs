@@ -23,7 +23,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
   const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`${base}#${encodeURIComponent(clip)}`);
-  await page.waitForFunction((f) => window.__preview?.action && location.hash.includes(f.split(".")[0]) && document.getElementById("clipTitle").textContent !== "—", clip, { timeout: 120000 });
+  await page.waitForFunction((f) => window.__preview?.action && decodeURIComponent(location.hash).includes(f.split(".")[0]) && document.getElementById("clipTitle").textContent !== "—", clip, { timeout: 120000 });
   await page.waitForTimeout(800);
   await page.evaluate(({ rifle, grenade }) => {
     document.getElementById("edRoot").style.display = "none";

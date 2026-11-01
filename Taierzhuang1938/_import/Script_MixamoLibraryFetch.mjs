@@ -236,7 +236,7 @@ const LABELS = {
 };
 
 const CATEGORY_ORDER = ["站立待机", "走", "跑", "转身与侧移", "蹲与跪", "卧倒与匍匐", "射击与换弹", "投弹", "受击", "死亡",
-  "伤员与救护", "背枪与取枪", "躲避与掩护", "近战", "手势与说话", "坐", "搬运与拿取", "翻越与攀爬"];
+  "伤员与救护", "背枪与取枪", "躲避与掩护", "近战", "手势与说话", "坐", "搬运与拿取", "翻越与攀爬", "白盒预演派生"];
 // 第一批下载时的分类名在这里改口径；按动作名指定的优先。
 const CATEGORY_RENAME = { "搬运与攀爬": "搬运与拿取" };
 const CATEGORY_BY_NAME = { "Climbing To Top": "翻越与攀爬", "Climbing Ladder": "翻越与攀爬" };
@@ -336,9 +336,31 @@ function AuthoredClips(byFile) {
   return clips;
 }
 
+// 白盒编辑器 X Bot 的派生动作（_import/Script_XBotDeriveClips.mjs 烘的 Derived/，对照表 Data_BlockoutXBotClips.mjs）：
+// 预演片段换算到 X Bot 的、Mixamo 动作镜像的。也进清单，预览工具里归「白盒预演派生」，好逐条看、以后精修时找。
+// 换算的枪由编辑器按原片段的手里位置放，预览里不挂枪（hold 记空手）；镜像的照原 Mixamo 那条的 hold。
+function DerivedClips(byFile) {
+  const derivedPath = path.join(LIBRARY, "Derived", "Data_XBotDerived.json");
+  if (!fs.existsSync(derivedPath)) return [];
+  const derived = JSON.parse(fs.readFileSync(derivedPath, "utf8")).clips;
+  return Object.entries(derived).filter(([, d]) => fs.existsSync(path.join(LIBRARY, "Derived", d.file))).map(([id, d]) => {
+    const base = d.method === "mirror" ? byFile.get(d.source.replace(/^Mixamo\//, "").replace(/ \(mirrored\)$/, "")) : null;
+    return {
+      file: `Derived/${d.file}`, category: "白盒预演派生", name: `XBot · ${id}`,
+      label: d.method === "mirror" ? `${id}（左右镜像）` : `${id}（士兵动作换算）`, variant: 1, variants: 1,
+      description: d.method === "mirror" ? `Mixamo「${base?.label || d.source}」左右镜像` : `预演片段 ${d.source}（${d.sourceModel}）换算到 X Bot`,
+      loop: d.loop, inPlace: true, duration: d.duration, replaces: `白盒预演片段 ${id}`,
+      hold: base?.hold && base.hold !== "端枪" ? base.hold : "空手",
+      author: "Claude Opus 5.5", basedOn: d.source, derived: d.method,
+      sources: ["Taierzhuang1938/_import/Script_XBotDeriveClips.mjs", "Taierzhuang1938/Data_BlockoutXBotClips.mjs"],
+    };
+  });
+}
+
 function WriteManifest(manifestPath, clips) {
   const mixamo = clips.filter(clip => !clip.author);
-  const curated = [...Curate(mixamo), ...AuthoredClips(new Map(mixamo.map(clip => [clip.file, clip])))].sort((a, b) =>
+  const byFile = new Map(mixamo.map(clip => [clip.file, clip]));
+  const curated = [...Curate(mixamo), ...AuthoredClips(byFile), ...DerivedClips(byFile)].sort((a, b) =>
     Boolean(a.dropped) - Boolean(b.dropped)
     || CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)
     || HOLDS.indexOf(a.hold) - HOLDS.indexOf(b.hold)
