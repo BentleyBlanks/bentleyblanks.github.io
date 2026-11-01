@@ -41,6 +41,8 @@ export const PREVIZ_SFX_ALIASES = Object.freeze([
   "babyCry", "cellarSob", "gateSmash", "jarShatter",
   // 2026-10-24（06–10 第九版 07-4）：远处听不清的日本话——直接放现成的日语占位配音（运行时 PREVIZ_SFX 写 url）
   "ijaShoutFar",
+  // 2026-11-01（开场改稿）：塌洞那发炮落下来之前的啸声（没人喊「炮来了」，只听得见它）、日军跳沟前的一声短哨
+  "shellIncoming", "whistleShort",
 ]);
 /**
  * 投弹（演员键 throw，2026-10-18 第三轮）：throw 键的 t = 开始抡（播步兵投弹片段 GrenadeThrow，Script_InfantryAnimation「背枪投弹」）。

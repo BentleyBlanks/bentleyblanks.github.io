@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel0105",
- "generatedAt": "2026-10-18T16:12:35.221Z",
- "requests": 19,
+ "generatedAt": "2026-11-01T15:50:57.686Z",
+ "requests": 32,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔。",
  "scenes": [
   {
@@ -1120,6 +1120,660 @@
      "issues": [
       "有声 0.52 s，太短不判嗓子"
      ]
+    }
+   ]
+  },
+  {
+   "id": "LastTwoRun",
+   "beat": "01",
+   "label": "01 最后两个人（11-01 改稿）：今天就跑",
+   "attempt": 2,
+   "attempts": 2,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    },
+    {
+     "who": [
+      "shunzi"
+     ],
+     "owner": "shunzi",
+     "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+    },
+    {
+     "who": [
+      "comrade"
+     ],
+     "owner": "comrade",
+     "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341"
+    }
+   ],
+   "targetDb": -22.11,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LastTwoRun.01",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "顺儿！冬瓜！磨啥子，跟斗走！",
+     "text": "顺儿！冬瓜！磨啥子，跟斗走！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_01.mp3",
+     "durationS": 4.74,
+     "gapBeforeS": 0,
+     "sha256": "a7e976ae457c91522ac7671fe7c8109cbc7b59f9c1c6a0e99394180b76a63739",
+     "speakerCos": 0.669,
+     "cer": 0.3,
+     "transcript": "孙儿,冬瓜,没啥子,跟着走。"
+    },
+    {
+     "id": "LastTwoRun.02",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "来了！",
+     "text": "来了！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_02.mp3",
+     "durationS": 0.7,
+     "gapBeforeS": 0.14,
+     "sha256": "3b84a5f555107b1901686a1cbd5761c97dcf379208f9217bc499a08ec6b8932d",
+     "speakerCos": 0.339,
+     "cer": 0,
+     "transcript": "来了!",
+     "issues": [
+      "有声 0.56 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "LastTwoRun.03",
+     "who": "comrade",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "顺儿。今天就跑。",
+     "text": "顺儿。今天就跑。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_03.mp3",
+     "durationS": 2.48,
+     "gapBeforeS": 0.24,
+     "sha256": "bddb5968608e9ed18c99ab0bdd4b2c79af5e0ee05fe14a1b3b1973758c55ee9c",
+     "speakerCos": 0.666,
+     "cer": 0.5,
+     "transcript": "今天就泡。",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "LastTwoRun.04",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "……今天？",
+     "text": "……今天？",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_04.mp3",
+     "durationS": 0.67,
+     "gapBeforeS": 1.54,
+     "sha256": "750e5132895379ca5a9d22614b7d8db0261922e4fd6fa2dac1a97bb1675a2e54",
+     "speakerCos": 0.492,
+     "cer": 0,
+     "transcript": "今天?",
+     "issues": [
+      "有声 0.54 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "LastTwoRun.05",
+     "who": "comrade",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "撤的时候乱，我嗯两个跟斗伤兵走，哪个管得到？到了汉口，坐老子舅舅的船回四川。",
+     "text": "撤的时候乱，我嗯两个跟斗伤兵走，哪个管得到？到了汉口，坐老子舅舅的船回四川。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_05.mp3",
+     "durationS": 6.6,
+     "gapBeforeS": 0.14,
+     "sha256": "c604c7f8c587e250a3980cdab0cb2f5c748d6f3cd44244fb52496edcf560871c",
+     "speakerCos": 0.804,
+     "cer": 0.1515,
+     "transcript": "车的时候乱,我横两个跟着商品走,哪个管得到?到了汉口,坐老子舅舅的船回四川。"
+    },
+    {
+     "id": "LastTwoRun.06",
+     "who": "comrade",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "路上吃饭的钱，你先垫斗。",
+     "text": "路上吃饭的钱，你先垫斗。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_06.mp3",
+     "durationS": 1.9,
+     "gapBeforeS": 1.52,
+     "sha256": "848d7e9ba87a6603c64512da2500bd2585089c04f78f2753641ba183b6b37635",
+     "speakerCos": 0.752,
+     "cer": 0.2,
+     "transcript": "路上吃饭的钱,你先点到。"
+    },
+    {
+     "id": "LastTwoRun.07",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "垫，垫你个锤子，上回借的八个都没还。",
+     "text": "垫，垫你个锤子，上回借的八个都没还。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_07.mp3",
+     "durationS": 3.525,
+     "gapBeforeS": 0.38,
+     "sha256": "053d45af019f85285f1bcfad219ed7a1293161aab3a998496bf2f4b4a652ff3f",
+     "speakerCos": 0.854,
+     "cer": 0.3333,
+     "transcript": "点,点这个锤子,上回接的八个都没换。"
+    },
+    {
+     "id": "LastTwoRun.08",
+     "who": "comrade",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "日你先人，到汉口还你！……走。",
+     "text": "日你先人，到汉口还你！……走。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105LastTwoRun_08.mp3",
+     "durationS": 3.085,
+     "gapBeforeS": 0,
+     "sha256": "3618c4dca28f9c3efcb322d04522c4d6ebd079c40a0dd42d090f56be5e7d449d",
+     "speakerCos": 0.691,
+     "cer": 0.3,
+     "transcript": "死里仙人,到汉口还你!走!"
+    }
+   ]
+  },
+  {
+   "id": "AskDonggua",
+   "beat": "02",
+   "label": "02 审冬瓜（11-01 改稿）：只问一句机枪",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaA"
+     ],
+     "owner": "ijaA",
+     "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41"
+    },
+    {
+     "who": [
+      "interpreter"
+     ],
+     "owner": "interpreter",
+     "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7"
+    },
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [
+    "AskDonggua.02 与邻句贴着，在能量最低处切",
+    "AskDonggua.03 与邻句贴着，在能量最低处切"
+   ],
+   "lines": [
+    {
+     "id": "AskDonggua.01",
+     "who": "ijaA",
+     "speaker": "甲",
+     "lang": "ja",
+     "subtitle": "问他。机枪在哪。",
+     "text": "きけ。きかんじゅうは、どこだ。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105AskDonggua_01.mp3",
+     "durationS": 3.04,
+     "gapBeforeS": 0,
+     "sha256": "d2aa2eaf9117a7a32aceef79d0064fb699b86b78905f314cf13894126c4bfb90",
+     "speakerCos": 0.835,
+     "cer": 0,
+     "transcript": "聞け、機関銃はどこだ?"
+    },
+    {
+     "id": "AskDonggua.02",
+     "who": "interpreter",
+     "speaker": "翻译",
+     "lang": "ja",
+     "subtitle": "是，是。",
+     "text": "はい、はい。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105AskDonggua_02.mp3",
+     "durationS": 1.655,
+     "gapBeforeS": 0.45,
+     "sha256": "9a103b7204f2a8b7c0fd15a8c4be0b7e9427e881c636ccfc2e64cc23a30da491",
+     "speakerCos": 0.644,
+     "cer": 0,
+     "transcript": "はい、はい",
+     "issues": [
+      "有声 0.58 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "AskDonggua.03",
+     "who": "interpreter",
+     "speaker": "翻译",
+     "lang": "zhNorth",
+     "subtitle": "说！机枪在哪儿？说了饶恁一命！",
+     "text": "说！机枪在哪儿？说了饶恁一命！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105AskDonggua_03.mp3",
+     "durationS": 3.045,
+     "gapBeforeS": 0,
+     "sha256": "39623eb6b9f8ba035a15ec3956b18177f61df4d8e26ad24a2cad0bc2e076853a",
+     "speakerCos": 0.837,
+     "cer": 0.0833,
+     "transcript": "说,机枪在哪儿?说了饶哪一命?"
+    },
+    {
+     "id": "AskDonggua.04",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "日你妈……给鬼子舔沟子的——",
+     "text": "日你妈……给鬼子舔沟子的——",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105AskDonggua_04.mp3",
+     "durationS": 3.254,
+     "gapBeforeS": 0.33,
+     "sha256": "623232e3b06abfe49faefec9e624d1f36ee8ed6822f5a6470b769168af385494",
+     "speakerCos": 0.725,
+     "cer": 0.2,
+     "transcript": "你妈给鬼子舔钩子的。"
+    }
+   ]
+  },
+  {
+   "id": "BloodingJia",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：甲的四句",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaA"
+     ],
+     "owner": "ijaA",
+     "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingJia.01",
+     "who": "ijaA",
+     "speaker": "甲",
+     "lang": "ja",
+     "subtitle": "没时间了。……新兵。",
+     "text": "じかんがない。……しょねんへい。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingJia_01.mp3",
+     "durationS": 2.66,
+     "gapBeforeS": 0,
+     "sha256": "4ba5fc3134272c990cbf28e9e8cf2198702c25eb9e94d75fb4fe23e89fadf58d",
+     "speakerCos": 0.83,
+     "cer": 0,
+     "transcript": "時間がない 初年兵"
+    },
+    {
+     "id": "BloodingJia.02",
+     "who": "ijaA",
+     "speaker": "甲",
+     "lang": "ja",
+     "subtitle": "你还没杀过人吧。你来。",
+     "text": "おまえ、まだだったな。やれ。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingJia_02.mp3",
+     "durationS": 2.88,
+     "gapBeforeS": 0.86,
+     "sha256": "c71178d0a15032cde6414a577a794c300fbf0326130c21d7beb8a2da9b6546ab",
+     "speakerCos": 0.803,
+     "cer": 0,
+     "transcript": "お前 まだだったな やれ"
+    },
+    {
+     "id": "BloodingJia.03",
+     "who": "ijaA",
+     "speaker": "甲",
+     "lang": "ja",
+     "subtitle": "吵死了。扎肚子。",
+     "text": "うるさい。はらだ。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingJia_03.mp3",
+     "durationS": 1.53,
+     "gapBeforeS": 1.11,
+     "sha256": "1533cc55aea35fa1ded0f73dbe7fbd3902747b7fafe47c71731117a7f1e7944e",
+     "speakerCos": 0.798,
+     "cer": 0,
+     "transcript": "うるさい!腹だ!"
+    },
+    {
+     "id": "BloodingJia.04",
+     "who": "ijaA",
+     "speaker": "甲",
+     "lang": "ja",
+     "subtitle": "下一个，这个。",
+     "text": "つぎは、こいつだ。",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingJia_04.mp3",
+     "durationS": 1.52,
+     "gapBeforeS": 0.75,
+     "sha256": "250d7827bc121e82128514970c6646cca9d758664527d42672eb7b40ca33e6c9",
+     "speakerCos": 0.806,
+     "cer": 0,
+     "transcript": "次は、こいつだ"
+    }
+   ]
+  },
+  {
+   "id": "BloodingDingHai",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：丁应「はい」",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaD"
+     ],
+     "owner": "ijaD",
+     "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingDingHai.01",
+     "who": "ijaD",
+     "speaker": "丁",
+     "lang": "ja",
+     "subtitle": "是！",
+     "text": "はい！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDingHai_01.mp3",
+     "durationS": 1.33,
+     "gapBeforeS": 0,
+     "sha256": "a511f25828c7a53f3f656c63390fde502e5ad1726750e709382f4b22ce4a941f",
+     "speakerCos": 0.635,
+     "cer": 0,
+     "transcript": "はい",
+     "issues": [
+      "有声 0.34 s，太短不判嗓子"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BloodingDingLate",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：丁迟了半拍才应",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaD"
+     ],
+     "owner": "ijaD",
+     "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingDingLate.01",
+     "who": "ijaD",
+     "speaker": "丁",
+     "lang": "ja",
+     "subtitle": "……是！",
+     "text": "……はい！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDingLate_01.mp3",
+     "durationS": 0.38,
+     "gapBeforeS": 0,
+     "sha256": "e326d8f8966144e0cac8f327b2bc86df2d905535345db570e90a48d6935d0042",
+     "speakerCos": 0.63,
+     "cer": 0,
+     "transcript": "はい",
+     "issues": [
+      "有声 0.24 s，太短不判嗓子"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BloodingDingSlapped",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：丁挨了耳光",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaD"
+     ],
+     "owner": "ijaD",
+     "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingDingSlapped.01",
+     "who": "ijaD",
+     "speaker": "丁",
+     "lang": "ja",
+     "subtitle": "是！",
+     "text": "はいっ！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDingSlapped_01.mp3",
+     "durationS": 1.58,
+     "gapBeforeS": 0,
+     "sha256": "581c0f123eff22afbc7e7990638f774f3b4a8d04b11ef5ad006662a59f26b2f7",
+     "speakerCos": 0.234,
+     "cer": 0,
+     "transcript": "はいっ",
+     "issues": [
+      "有声 0.56 s，太短不判嗓子"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BloodingDingYell",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：丁喊着冲上去",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaD"
+     ],
+     "owner": "ijaD",
+     "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingDingYell.01",
+     "who": "ijaD",
+     "speaker": "丁",
+     "lang": "ja",
+     "subtitle": "（新兵喊着冲上去）",
+     "text": "ヤアッ！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDingYell_01.mp3",
+     "durationS": 1.15,
+     "gapBeforeS": 0,
+     "sha256": "95f6cfac199bc79743351ff32a1b0d8d476faa57827d830f07d50ed7bfab5199",
+     "speakerCos": 0.589,
+     "cer": 0,
+     "transcript": "やあ"
+    }
+   ]
+  },
+  {
+   "id": "BloodingDonggua",
+   "beat": "02",
+   "label": "02 新兵见血（11-01 改稿）：冬瓜挨两刀",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    }
+   ],
+   "targetDb": -21.5,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingDonggua.01",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "（冬瓜惨叫）",
+     "text": "啊——！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDonggua_01.mp3",
+     "durationS": 2.4,
+     "gapBeforeS": 0,
+     "sha256": "20221ed653c138a443a909ed6ceb0a3bceaf320b9f8a853428b365c6db6a1d57",
+     "speakerCos": 0.095,
+     "cer": 2,
+     "transcript": "啊啊啊!"
+    },
+    {
+     "id": "BloodingDonggua.02",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "（冬瓜微弱地喘）",
+     "text": "呃……",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingDonggua_02.mp3",
+     "durationS": 2.088,
+     "gapBeforeS": 1.47,
+     "sha256": "269d7fc919f1aeb251464a38040b0cb1452b669c79d43a5c4bf1e8dbf3f7971f",
+     "speakerCos": 0.341,
+     "cer": 5,
+     "transcript": "词曲 李宗盛"
+    }
+   ]
+  },
+  {
+   "id": "BloodingJeer",
+   "beat": "02",
+   "label": "02 乙在岔口笑新兵（11-01 改稿）",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaB"
+     ],
+     "owner": "ijaB",
+     "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BloodingJeer.01",
+     "who": "ijaB",
+     "speaker": "乙",
+     "lang": "ja",
+     "subtitle": "尿裤子了吧？",
+     "text": "しょうべん、ちびったか？",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105BloodingJeer_01.mp3",
+     "durationS": 2.18,
+     "gapBeforeS": 0,
+     "sha256": "f2d3b53c3653a5b5a0eeaabb1e7f73d4346919388e4620ab2ae1f742943d436e",
+     "speakerCos": 0.869,
+     "cer": 0.2857,
+     "transcript": "正弁ちびったか"
+    }
+   ]
+  },
+  {
+   "id": "ReleaseCall",
+   "beat": "02",
+   "label": "02 脱困（11-01 改稿）：扒出顺子、班长塞枪",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "heyoutian"
+     ],
+     "owner": "heyoutian",
+     "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf"
+    },
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "ReleaseCall.01",
+     "who": "heyoutian",
+     "speaker": "何有田",
+     "lang": "zh",
+     "subtitle": "还活起的！来个人搭把手！",
+     "text": "还活起的！来个人搭把手！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105ReleaseCall_01.mp3",
+     "durationS": 3.09,
+     "gapBeforeS": 0,
+     "sha256": "415e76fe12e9810a5b2f44fa342f29b1b09dd4a5053836e43f9793bcb7399138",
+     "speakerCos": 0.774,
+     "cer": 0.3,
+     "transcript": "还活气呢?来个人打把手!"
+    },
+    {
+     "id": "ReleaseCall.02",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "还能打不？跟到老子，走！",
+     "text": "还能打不？跟到老子，走！",
+     "file": "./Audio/Blockout0105/AudioVoice_Blockout0105ReleaseCall_02.mp3",
+     "durationS": 2.483,
+     "gapBeforeS": 0.8,
+     "sha256": "5614a2690c65051a5617bc33544f935079c5bfd9f48e19958c7ea594d369b950",
+     "speakerCos": 0.838,
+     "cer": 0.1111,
+     "transcript": "还能大不?跟到老子,走!"
     }
    ]
   },

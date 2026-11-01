@@ -3,7 +3,8 @@
 //   node Taierzhuang1938/Script_TimelineCli.mjs list
 //   node Taierzhuang1938/Script_TimelineCli.mjs show  [Id] [--segment=01-2]   按主时间轴列出每段的镜头 / 台词 / 事件
 //   node Taierzhuang1938/Script_TimelineCli.mjs check [Id]                    核对（关键帧、单位、台词 id、时长）；有错退出 1
-//   node Taierzhuang1938/Script_TimelineCli.mjs sync  [Id]                    照 copiedFrom 从白盒预演重新拷一遍（覆盖本地改动）
+//   node Taierzhuang1938/Script_TimelineCli.mjs sync  [Id]                    照 copiedFrom 从白盒预演重新拷一遍（覆盖本地改动；
+//                                                                             登记成 ownsPreviz 的原件不许 sync）
 //   node Taierzhuang1938/Script_TimelineCli.mjs new <Id> --from=<Level> --keyframes=a,b,c [--title=…]
 //        从某关白盒预演拷几段建一份新的（写 Timeline/<Id>.timeline.json，并提示在 Script_TimelinePlan.TIMELINES 登记）
 //
@@ -77,7 +78,8 @@ try {
   if (command === "list") {
     for (const entry of TIMELINES) {
       const { doc, layout } = Load(entry.id);
-      console.log(`${entry.id}  ${doc.title || entry.title}  ${layout.segments.length} 段 ${layout.durationS.toFixed(2)} s  关卡 ${doc.level}  ${entry.file}`);
+      console.log(`${entry.id}  ${doc.title || entry.title}  ${layout.segments.length} 段 ${layout.durationS.toFixed(2)} s  关卡 ${doc.level}  ${entry.file}`
+        + (entry.ownsPreviz ? `  · ${doc.level} 这几段预演的原件` : "  · 拷贝"));
     }
   } else if (command === "show") {
     const { doc, layout, tracks } = Load(positional[0] || DEFAULT_TIMELINE_ID);
@@ -90,6 +92,8 @@ try {
   } else if (command === "sync") {
     const id = positional[0] || DEFAULT_TIMELINE_ID;
     const entry = FindTimeline(id);
+    if (!entry) throw new Error(`没有登记这份 Timeline：${id}`);
+    if (entry.ownsPreviz) throw new Error(`${id} 是 ${entry.level} 这几段预演的原件（ownsPreviz），不从预演往回拷；改它直接改 ${entry.file}`);
     const doc = ReadJson(entry.file);
     const from = doc.copiedFrom;
     if (!from) throw new Error(`${id} 不是拷贝来的（没有 copiedFrom），没法 sync`);

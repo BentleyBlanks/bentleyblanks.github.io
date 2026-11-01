@@ -11,10 +11,16 @@
 // 拖到哪一秒画面就是哪一秒。另写一个就等于把演员、镜头、字幕、口型的求值抄第二遍，抄漏一条就是
 // 「Timeline 里对、预演里不对」。Timeline 只换喂给它的那份数据（UseSource）。
 //
-// ## 拷贝，不是引用
-// 现在唯一一份 FirstLevelOpening 是第一关开场 01-1…01-4 四段预演的**拷贝**（2026-10-31 用户：测试用，
-// 不影响白盒编辑器里那份）。改 Timeline 不动 Blockout/ 里的预演；要跟回预演的新版，跑
-// `node Taierzhuang1938/Script_TimelineCli.mjs sync <Id>`（照 copiedFrom 重新拷，覆盖本地改动）。
+// ## 原件，不是拷贝（2026-11-01 起）
+// 10-31 第一版的 FirstLevelOpening 是第一关开场 01-1…01-4 四段预演的拷贝（测试用）。11-01 用户要求开场改稿后
+// 「接入到白盒编排 / 编辑器里去，试玩 / 预演就可以直接播放这一段，而不是再做一次」：登记表里写了 ownsPreviz 的
+// Timeline 是本关这几个关键帧预演的**原件**——
+//   · 白盒编辑器读本关预演时，这几个关键帧的段换成 Timeline 里的（OverlayTimelinePreviz；Timeline 文件跟预演文件一起
+//     2 s 一查，改了就重读），所以卡片上的预演按钮、N 键、试玩里「看」的那几步播的都是 Timeline；
+//   · 本关的预演生成器（Script_EditorBlockoutFirstLevel0105Previz）写 Blockout/<Level>.previz.json 时同样整段抄 Timeline 的，
+//     磁盘上那份与播的一致，台词 / 姿态门禁照样查得到；
+//   · 改这几段只改 Timeline/<Id>.timeline.json；CLI 的 sync（从预演往回拷）对原件拒绝执行。
+// 没写 ownsPreviz 的 Timeline 仍是拷贝（new 建出来的就是），sync 照 copiedFrom 重新拷。
 
 import { BLOCKOUT_PREVIZ_SCHEMA, ValidateBlockoutPreviz, PrevizSequenceDuration } from "./Script_EditorBlockoutPrevizPlan.mjs";
 
@@ -29,12 +35,39 @@ export const TIMELINE_LINE_FALLBACK_S = 2;
  * level：子序列的关键帧在哪个白盒关卡里（打开 Timeline 时白盒编辑器切到这一关）。
  */
 export const TIMELINES = Object.freeze([
-  Object.freeze({ id: "FirstLevelOpening", title: "第一关开场（测试拷贝）", level: "FirstLevel0105",
-    file: "Timeline/FirstLevelOpening.timeline.json" }),
+  Object.freeze({ id: "FirstLevelOpening", title: "第一关开场", level: "FirstLevel0105",
+    file: "Timeline/FirstLevelOpening.timeline.json", ownsPreviz: true }),
 ]);
 export const DEFAULT_TIMELINE_ID = TIMELINES[0].id;
 
 export function FindTimeline(id) { return TIMELINES.find((entry) => entry.id === id) || null; }
+
+/** 这一关里写了 ownsPreviz 的 Timeline（它们的段是本关那几个关键帧预演的原件）。 */
+export function PrevizOwnerTimelines(level) {
+  return TIMELINES.filter((entry) => entry.ownsPreviz === true && entry.level === level);
+}
+
+/**
+ * 把原件 Timeline 的段盖到本关预演上：关键帧相同的段整段换成 Timeline 的（原样、深拷贝），预演里没有的关键帧接在后面。
+ * 预演文档的其余字段（voice / faceTracks / title…）不动。previzDoc 不是对象（这关还没有预演文件）时用第一份 Timeline 的
+ * voice / faceTracks 起一份。→ { doc, owned: [关键帧 id] }；不改传入的对象。
+ */
+export function OverlayTimelinePreviz(previzDoc, timelineDocs) {
+  const docs = (timelineDocs || []).filter((d) => IsObject(d) && Array.isArray(d.sequences));
+  const base = IsObject(previzDoc) ? previzDoc : (docs.length ? TimelineAsPreviz(docs[0]) : null);
+  if (!base) return { doc: previzDoc, owned: [] };
+  const replace = new Map();
+  for (const d of docs) for (const seq of d.sequences) if (IsObject(seq) && typeof seq.keyframe === "string") replace.set(seq.keyframe, seq);
+  const copy = (seq) => JSON.parse(JSON.stringify(seq));
+  const sequences = [];
+  const used = new Set();
+  for (const seq of Array.isArray(base.sequences) ? base.sequences : []) {
+    const own = IsObject(seq) ? replace.get(seq.keyframe) : null;
+    if (own) { sequences.push(copy(own)); used.add(seq.keyframe); } else sequences.push(seq);
+  }
+  for (const [keyframe, seq] of replace) if (!used.has(keyframe)) { sequences.push(copy(seq)); used.add(keyframe); }
+  return { doc: { ...base, sequences }, owned: [...replace.keys()] };
+}
 
 /** 事件的中文名（轨道上的标签与 CLI 输出共用）。 */
 export const TIMELINE_EVENT_LABELS = Object.freeze({

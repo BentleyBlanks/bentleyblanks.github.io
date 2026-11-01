@@ -352,9 +352,10 @@ async function Main(argv) {
   const config = Load("Blockout/FirstLevel0105.json"), voice = Load("Blockout/FirstLevel0105.voice.json");
   let doc;
   if (argv.includes("--fresh")) {
-    const { BuildPreviz } = await import("./Script_EditorBlockoutFirstLevel0105Previz.mjs");
-    doc = BuildPreviz({ config, voice });
-    const again = JSON.stringify(BuildPreviz({ config, voice }));
+    const { BuildPreviz, LoadOwnerTimelineDocs } = await import("./Script_EditorBlockoutFirstLevel0105Previz.mjs");
+    const timelines = LoadOwnerTimelineDocs();
+    doc = BuildPreviz({ config, voice, timelines });
+    const again = JSON.stringify(BuildPreviz({ config, voice, timelines }));
     if (again !== JSON.stringify(doc)) { console.log("错误：两次生成不一样"); process.exitCode = 1; }
   } else {
     const file = join(HERE, "Blockout/FirstLevel0105.previz.json");
