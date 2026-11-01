@@ -785,7 +785,7 @@ export class BlockoutPuppets {
       clip: playing, clipSeconds: human.clipSeconds, clipDuration: meta.duration || null, clipLoop: meta.loop,
       throwSeconds: throwing ? drive?.throw?.seconds : null,
       mps, stance: puppet.stance, aim, carryRole, woundedWalk: !!drive?.woundedWalk, talking: !!drive?.talking,
-      melee: !!state.meleeCombat, down: !!state.dead || !!human.actor.ragdollState, exact,
+      melee: state.meleeCombat || null, down: !!state.dead || !!human.actor.ragdollState, exact,
       shadow: cameraPosition ? distance < BLOCKOUT_PUPPETS.shadowM : undefined,
     }, step);
   }
