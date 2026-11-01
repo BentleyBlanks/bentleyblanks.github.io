@@ -1309,7 +1309,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 用户要求：预演和试玩里的各个角色都改成 Mixamo 的模型与通用动作；Mixamo 上找得到对应的全用 Mixamo，找不到的把原动作转过去。动作库与预览工具见高级工具 → 角色 → Mixamo 动作预览（`Tool_MixamoAnimationPreview.html`，库在 `Animation/Mixamo/`）。
 
-- **做法**（`Script_EditorBlockoutXBot.mjs`）：原来的人物照常造、照常 Update（走位、片段层、步态、倒地、测躺姿、被子 / 担架抓点、两人配合都不变），只把蒙皮藏起来；同一位置挂一个 X Bot（按阵营上色 `XBOT_LOOKS`：国军灰蓝、日军土黄、百姓深色；按原身体头高缩放），每帧照它此刻的状态选动作。原身体骨头上挂的枪 / 道具（含片段道具轨摆在模型空间里的枪）每帧挪到 X Bot 的同一根骨上；播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手。正式关卡一行不动；`BLOCKOUT_PUPPETS.xbot = false` 退回士兵模型。
+- **做法**（`Script_EditorBlockoutXBot.mjs`）：原来的人物照常造、照常 Update（走位、片段层、步态、倒地、测躺姿、被子 / 担架抓点、两人配合都不变），只把蒙皮藏起来；同一位置挂一个 X Bot（普通人按阵营一种素色 `XBOT_LOOKS`：国军灰蓝、日军土黄、百姓灰褐；有名字有戏的人各一种好认的颜色 `XBOT_CHARACTER_LOOKS`：顺子米白、罗班长红、冬瓜橙、幺娃黄、刘文财绿、何有田青、传令兵天蓝、连长紫、翻译玫红、老耿棕、妮儿粉，按 castId 或单位 id 认；按原身体头高缩放），每帧照它此刻的状态选动作。原身体骨头上挂的枪 / 道具（含片段道具轨摆在模型空间里的枪）每帧挪到 X Bot 的同一根骨上；播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手。正式关卡一行不动；`BLOCKOUT_PUPPETS.xbot = false` 退回士兵模型。
 - **对照表**（`Data_BlockoutXBotClips.mjs`）：预演片段 118 种 → `XBOT_PREVIZ_CLIPS`（Mixamo / 自制 19 种、左右镜像 2 种、换算 97 种）；原生状态 → `XBOT_NATIVE`（姿势 × 动作 × 端枪 / 空手 × 据枪），倒地 → `XBOT_DEATHS`。以下几类即使 Mixamo 有长得像的也走换算，因为换了会穿帮：两个人一直接触的、手里一直攥着东西的、坐地躺地的（Mixamo 多是坐椅子）、片段自己带位移的、只算勉强对得上的。
 - **派生动作**（`_import/Script_XBotDeriveClips.mjs` → `Animation/Mixamo/Derived/`）：换算 = 预演片段库里士兵骨架的逐骨数据按 `Script_XBotRetarget` 搬到 X Bot（世界朝向变化量 + 初始方向对齐，胯部位移按胯高比放大）；镜像 = Mixamo 动作左右对调。烘完自动刷新动作库清单，预览工具里归「白盒预演派生」，可逐条看、在 Blender 里精修。改了对照表重跑这个脚本。
 - **当场换算**：顺着躺在被子 / 担架上、躺姿片段、坐车、被拖着的倒地者，以及表里没写的动作，X Bot 每帧照原身体的姿势换算（贴位置准，不会站着发呆）。

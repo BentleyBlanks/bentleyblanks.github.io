@@ -303,6 +303,7 @@ export class BlockoutPlay {
     const old = this.run.soldiers.get(spec.id);
     if (old && old !== soldier) this.run.corpses.push(old);
     soldier.blockoutPlayId = spec.id;
+    soldier.blockoutPlayCastId = spec.castId || null;
     this.AttachXBot(soldier);
     this.SnapToSpot(soldier, spec.x, spec.z);
     if (spec.bayonet) soldier.bayonetFixed = true;
@@ -356,7 +357,7 @@ export class BlockoutPlay {
   AttachXBot(soldier) {
     const skins = this.editor.puppets?.xbot, actor = soldier?.actor;
     if (!skins?.ready || !actor || soldier.xbotSkin) return;
-    const skin = skins.Attach(actor, { faction: "ija" });
+    const skin = skins.Attach(actor, { faction: "ija", castId: soldier.blockoutPlayCastId || null, unitId: soldier.blockoutPlayId || null });
     if (!skin) return;
     soldier.xbotSkin = skin;
     const update = actor.Update;

@@ -130,9 +130,34 @@ export const XBOT_DEATHS = Object.freeze({
   DeathCollapseD: M("StandingReactDeathForward_V1"),
 });
 
-/** 阵营的 X Bot 配色（表面 / 关节两种材质，Beta_Surface / Beta_Joints）。 */
+/**
+ * X Bot 配色（表面 / 关节两种材质，Beta_Surface / Beta_Joints）。
+ * 普通人按阵营一种素色（用户 11-01：普通兵、普通百姓各一种普通颜色）：国军灰蓝、日军土黄、百姓灰褐。
+ */
 export const XBOT_LOOKS = Object.freeze({
-  nra: Object.freeze({ surface: 0x56636e, joints: 0x262b30 }),
+  nra: Object.freeze({ surface: 0x5e6a74, joints: 0x262b30 }),
   ija: Object.freeze({ surface: 0x8a7b52, joints: 0x3a3424 }),
-  civilian: Object.freeze({ surface: 0x55504a, joints: 0x2a2724 }),
+  civilian: Object.freeze({ surface: 0x6e655a, joints: 0x2a2724 }),
 });
+
+/**
+ * 有名字、有戏的人各一种好认的颜色（用户 11-01）：色相拉开、比素色饱和，关节一律深色，远处一眼分得出谁是谁。
+ * 认人按单位的定妆角色 castId（Data_FirstLevelSpeakingCast），没有 castId 的按单位 id（顺子、老耿、妮儿）。
+ * 审问那场的日军甲乙丙丁只有代号，照普通日军。
+ */
+export const XBOT_CHARACTER_LOOKS = Object.freeze({
+  shunzi: Object.freeze({ name: "顺子", surface: 0xe6e0cf, joints: 0x2b2b2b }),
+  luo: Object.freeze({ name: "罗班长", surface: 0xb8352c, joints: 0x2b1614 }),
+  comrade: Object.freeze({ name: "冬瓜", surface: 0xd9822b, joints: 0x2e1d0c }),
+  yaowa: Object.freeze({ name: "幺娃", surface: 0xd6c03a, joints: 0x2c2810 }),
+  liuwencai: Object.freeze({ name: "刘文财", surface: 0x4f9a3c, joints: 0x14240f }),
+  heyoutian: Object.freeze({ name: "何有田", surface: 0x2f9c9a, joints: 0x0f2423 }),
+  runner: Object.freeze({ name: "传令兵", surface: 0x4a8fd6, joints: 0x122236 }),
+  frontOfficer: Object.freeze({ name: "七二七团连长", surface: 0x7b4fb8, joints: 0x1f1430 }),
+  interpreter: Object.freeze({ name: "翻译", surface: 0xc04f8f, joints: 0x301424 }),
+  geng: Object.freeze({ name: "老耿", surface: 0x8b5a2b, joints: 0x24170b }),
+  nier: Object.freeze({ name: "妮儿", surface: 0xf0a3bb, joints: 0x3a2229 }),
+});
+
+/** 没有 castId 的有名字角色：单位 id → XBOT_CHARACTER_LOOKS 的键。 */
+export const XBOT_CHARACTER_UNITS = Object.freeze({ Shunzi: "shunzi", Geng: "geng", Nier: "nier" });

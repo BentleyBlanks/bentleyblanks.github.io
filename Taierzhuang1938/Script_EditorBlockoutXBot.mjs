@@ -13,7 +13,13 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
-import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS } from "./Data_BlockoutXBotClips.mjs";
+
+/** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
+export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
+  const key = (castId && XBOT_CHARACTER_LOOKS[castId] ? castId : null) || XBOT_CHARACTER_UNITS[unitId] || null;
+  return key ? { key, ...XBOT_CHARACTER_LOOKS[key] } : { key: faction, ...(XBOT_LOOKS[faction] || XBOT_LOOKS.nra) };
+}
 
 export const XBOT = Object.freeze({
   base: "./Animation/Mixamo/",
@@ -161,10 +167,10 @@ export class XBotSkins {
     }
   }
 
-  Material(faction, part) {
-    const key = `${faction}:${part}`;
+  /** 同一种配色的人共用材质（都是同一套蒙皮，不会来回换着色器）。 */
+  Material(look, part) {
+    const key = `${look.key}:${part}`;
     if (!this.materials.has(key)) {
-      const look = XBOT_LOOKS[faction] || XBOT_LOOKS.nra;
       this.materials.set(key, new THREE.MeshStandardMaterial({ color: part === "joints" ? look.joints : look.surface, roughness: 0.62, metalness: 0.05 }));
     }
     return this.materials.get(key);
@@ -186,19 +192,20 @@ export class XBotSkins {
   }
 
   /** 给一个人挂 X Bot；资源没读完或这个人没有骨骼身体（旧的体块 / tzm 百姓）返回 null。 */
-  Attach(actor, { faction = "nra" } = {}) {
+  Attach(actor, { faction = "nra", castId = null, unitId = null } = {}) {
     if (!this.ready || !actor?.characterRig?.root) return null;
-    return new XBotSkin(this, actor, faction);
+    return new XBotSkin(this, actor, faction, XBotLook({ faction, castId, unitId }));
   }
 }
 
 /** 一个人身上的 X Bot。 */
 export class XBotSkin {
-  constructor(skins, actor, faction) {
+  constructor(skins, actor, faction, look) {
     this.skins = skins;
     this.actor = actor;
     this.rig = actor.characterRig;
     this.faction = faction;
+    this.look = look;
     this.model = CloneSkinned(skins.source);
     this.model.name = "XBot";
     this.model.traverse((o) => {
@@ -206,7 +213,7 @@ export class XBotSkin {
       o.castShadow = true; o.receiveShadow = true;
       // 蒙皮包围球冻在第一帧的姿势（趴下、倒地会被误剔），编辑器里人不多，不剔
       o.frustumCulled = false;
-      o.material = skins.Material(faction, /joint/i.test(o.material?.name || "") ? "joints" : "surface");
+      o.material = skins.Material(look, /joint/i.test(o.material?.name || "") ? "joints" : "surface");
     });
     this.container = new THREE.Group();
     this.container.name = "XBotSkin";
