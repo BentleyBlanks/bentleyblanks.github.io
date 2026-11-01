@@ -2,15 +2,16 @@
 //
 // 跑法：node Taierzhuang1938/Script_SceneFormalTest.mjs
 //   1. 场景清单：两个场景，白盒 + 正式；正式场景过校验、高度图格点数对；
-//   2. 正式场景只用正式的资产与材质（Block/Box + Look/*、Prop/*、Tree/*、远景），道具的模型都在外部道具目录里；
+//   2. 正式场景里正式资产只有道具（Prop/*，模型都在外部道具目录里）与树（Tree/*）；体块不是正式资产，
+//      和白盒场景逐个一样（Whitebox/Box + Whitebox/*，灰面 + 米格线，用户 2026-11-01：不给它自己造外观）；
 //   3. 白盒编辑器三段：试玩跑正式场景（scene.playUrl），编辑跑白盒；正式那一块转出来是 formal 样子、
-//      带 PBR 外观、道具清单、分层地表（四层权重都在 0..1、加起来不超过 1），树照旧种模型；
+//      体块不走 PBR 外观、道具清单、分层地表（四层权重都在 0..1、加起来不超过 1），树照旧种模型；
 //   4. 正式场景的撒点环境（植被、碎砖瓦）按场景的路与沟算得出来；
-//   5. 转换脚本：白盒的一个物件换成正式的样子，布局字段一个不动。
+//   5. 转换脚本：道具与树换资产、布局字段一个不动，其余体块原样。
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { SCENE_LIST, SCENE_ASSETS, SCENE_MATERIALS, SceneAssetsFor, SceneMaterialsFor } from "./Data_SceneAssets.mjs";
+import { SCENE_LIST, SCENE_ASSETS, SCENE_MATERIALS, SceneAssetsFor } from "./Data_SceneAssets.mjs";
 import { SCENE_IDS, SceneStyle, ValidateScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
 import { BLOCKOUT_LEVELS, BlockoutSliceDoc, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { SceneDressingContext, PlanFirstLevelVegetation, SCENE_VEGETATION } from "./Data_FirstLevelVegetation.mjs";
@@ -34,12 +35,14 @@ Check(v.ok, `正式场景过校验：${v.errors.slice(0, 5).join("；")}`);
 Check(text.indexOf("\r") < 0, "正式场景 JSON 是 LF");
 Check(heights.length === (scene.terrain.cols + 1) * (scene.terrain.rows + 1), "正式场景高度图格点数 = (cols+1)×(rows+1)");
 
-// 2) 只用正式的资产与材质
+// 2) 正式资产只有道具与树；体块和白盒逐个一样
 const formalAssets = new Set(SceneAssetsFor("formal").map(([id]) => id));
-const formalMaterials = new Set(SceneMaterialsFor("formal").map(([id]) => id));
-Check(scene.objects.every(o => formalAssets.has(o.asset)), "正式场景只用正式资产（Block/Box、Prop/*、Tree/*、远景）");
-Check(scene.objects.every(o => o.material === undefined || formalMaterials.has(o.material)), "正式场景的材质都是 Look/*");
-Check(scene.objects.filter(o => o.asset === "Block/Box").every(o => SCENE_MATERIALS[o.material]), "体块都写了材质");
+Check(scene.objects.every(o => formalAssets.has(o.asset)), "正式场景只用能放的资产（白盒体块、Prop/*、Tree/*、远景）");
+Check(scene.objects.every(o => o.material === undefined || SCENE_MATERIALS[o.material]) && scene.objects.filter(o => o.asset === "Whitebox/Box").every(o => SCENE_MATERIALS[o.material]),
+  "体块都写了白盒材质（Whitebox/*）");
+const whitebox = new Map(JSON.parse(fs.readFileSync(SceneFilePath("FirstLevelWhitebox"), "utf8")).objects.map(o => [o.id, JSON.stringify(o)]));
+const boxes = scene.objects.filter(o => o.asset === "Whitebox/Box");
+Check(boxes.length > 0 && boxes.every(o => whitebox.get(o.id) === JSON.stringify(o)), `体块（${boxes.length} 块）和白盒场景逐个一样：不配外观`);
 const catalog = new Set(ExternalPropCatalog().map(spec => spec.id));
 const models = Object.values(SCENE_ASSETS).filter(a => a.kind === "prop").map(a => a.model);
 Check(models.every(m => catalog.has(m)), `道具资产的模型都在外部道具目录里：${models.filter(m => !catalog.has(m)).join("、")}`);
@@ -53,13 +56,12 @@ Check(sliced.length === 3 && sliced.every(l => /FirstLevelWhitebox/.test(l.scene
   "三段：编辑跑白盒场景、试玩跑正式场景（scene.playUrl）");
 for (const level of sliced) {
   const layout = LayoutFromSceneDoc(BlockoutSliceDoc(level, scene, heights));
-  Check(layout.style === "formal" && layout.materialLooks && layout.ground.terrainLayers === "MissionPlain" && typeof layout.SampleGroundSurface === "function",
-    `${level.key}：正式样子、PBR 外观、分层地表`);
+  Check(layout.style === "formal" && !layout.materialLooks && layout.ground.terrainLayers === "MissionPlain" && typeof layout.SampleGroundSurface === "function",
+    `${level.key}：正式样子、体块不走 PBR 外观、分层地表`);
   Check(layout.sceneProps.length > 0 && layout.sceneProps.every(e => catalog.has(e.asset) && layout.blocks.some(b => b.id === e.block)),
     `${level.key}：道具清单对得上块与外部道具（${layout.sceneProps.length} 件）`);
-  Check(layout.blocks.filter(b => b.look).length > 0 && layout.blocks.every(b => !b.look || SceneMaterialsFor("formal").some(([, m]) => m.look === b.look)),
-    `${level.key}：块带的外观都是登记过的 Look`);
-  Check(layout.blocks.some(b => b.blockoutTree) && layout.colorSemantics.length === 0, `${level.key}：树照旧种模型、没有「保留语义色」`);
+  Check(layout.blocks.filter(b => b.semantic === "water").every(b => b.blockoutWater && b.visual === false), `${level.key}：水块同白盒编辑器（盒子不画，编辑器铺水面）`);
+  Check(layout.blocks.some(b => b.blockoutTree) && layout.colorSemantics.length > 0, `${level.key}：树照旧种模型、体块保留语义色同白盒`);
   const c = [0, 0, 0], layers = [0, 0, 0, 1];
   let bad = 0, n = 0, track = 0, spoil = 0;
   const b = layout.bounds;
@@ -79,14 +81,12 @@ for (const level of sliced) {
 
 // 5) 转换脚本
 const wall = { id: "House_X1_2", asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [1, null, 2], yawDeg: 30, size: [4, 3, 0.4], hideOn: "Boom", group: "06–10", meta: { house: true } };
-const formalWall = FormalObject(wall);
-Check(formalWall.asset === "Block/Box" && /^Look\//.test(formalWall.material) && formalWall.pos === wall.pos && formalWall.yawDeg === 30 && formalWall.size === wall.size
-  && formalWall.hideOn === "Boom" && formalWall.group === "06–10" && formalWall.meta === wall.meta, "转换：墙换外观，位置 / 朝向 / 尺寸 / 信号 / 分组 / meta 不动");
+Check(JSON.stringify(FormalObject(wall)) === JSON.stringify(wall), "转换：墙原样不动（体块不是正式资产，不配外观）");
 const crate = FormalObject({ id: "AmmoCrate_1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [0, null, 0], size: [0.55, 0.32, 0.38], meta: { prop: "AmmoCrate" } });
 Check(crate.asset === "Prop/militaryCrateClosed" && crate.material === undefined, "转换：弹药箱盒子 → Prop/militaryCrateClosed（不写材质）");
 const tree = FormalObject({ id: "DeadTree_01", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [0, null, 0], size: [0.6, 11, 0.6] });
 Check(tree.asset === "Tree/Dead", "转换：细高的植物块 → Tree/Dead");
 const air = FormalObject({ id: "KeepIn_0001", asset: "Whitebox/Box", material: "Whitebox/AirWall", pos: [0, null, 0], size: [1, 3, 1], visual: false, tag: "airWall" });
-Check(air.material === "Look/airWall" && air.visual === false && air.tag === "airWall", "转换：隐形墙 → Look/airWall，visual / tag 不动");
+Check(air.material === "Whitebox/AirWall" && air.visual === false && air.tag === "airWall", "转换：隐形墙原样不动");
 
 console.log(`正式场景测试全过（${count} 项）`);

@@ -8,7 +8,7 @@
 // 只给开发用，面板文字不走文本表（项目契约 10 的开发者面板例外）。
 
 import * as THREE from "three";
-import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor, SceneMaterialsFor } from "./Data_SceneAssets.mjs";
+import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor } from "./Data_SceneAssets.mjs";
 import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, SceneStyle } from "./Script_SceneDoc.mjs";
 import { SceneEditModel } from "./Script_SceneEditModel.mjs";
 import {
@@ -64,7 +64,7 @@ class SceneEditorApp {
   constructor() {
     this.sceneId = new URLSearchParams(location.search).get("scene") || SCENE_IDS[0];
     if (!SCENE_IDS.includes(this.sceneId)) this.sceneId = SCENE_IDS[0];
-    // whitebox = 白盒场景（Whitebox/* 材质）；formal = 正式场景（Look/* 外观、道具、树）—— 决定材质下拉与资产页列哪些
+    // whitebox = 白盒场景（白盒体块）；formal = 正式场景（白盒体块 + 道具、树）—— 决定资产页列哪些
     this.style = SceneStyle(this.sceneId);
     this.model = null;
     this.writable = false;
@@ -325,9 +325,7 @@ class SceneEditorApp {
       material.color.multiplyScalar(1.25);
       return material;
     }
-    // Look/* 外观有预览色；白盒材质按语义色
-    const entry = SCENE_MATERIALS[key.slice(4)];
-    const material = new THREE.MeshStandardMaterial({ color: entry?.color ? HexInt(entry.color) : this.SemanticColor(entry?.semantic), roughness: 0.95 });
+    const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_MATERIALS[key.slice(4)]?.semantic), roughness: 0.95 });
     ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
     return material;
   }
@@ -886,7 +884,7 @@ class SceneEditorApp {
     const Item = (obj) => {
       const b = El("button", `seItem${sel.has(obj.id) ? " selected" : ""}`);
       b.append(document.createTextNode(obj.id));
-      b.append(El("small", "", obj.material ? obj.material.replace(/^(Whitebox|Look)\//, "") : (SCENE_ASSETS[obj.asset]?.label || obj.asset)));
+      b.append(El("small", "", obj.material ? obj.material.replace(/^Whitebox\//, "") : (SCENE_ASSETS[obj.asset]?.label || obj.asset)));
       b.title = `${obj.asset}${obj.hideOn ? ` · 随 ${obj.hideOn} 消失` : ""}${obj.showOn ? ` · 随 ${obj.showOn} 出现` : ""}`;
       b.addEventListener("click", (e) => this.SelectIds([obj.id], { toggle: e.ctrlKey || e.metaKey, add: e.shiftKey }));
       b.addEventListener("dblclick", () => this.Frame([obj.id]));
@@ -931,7 +929,7 @@ class SceneEditorApp {
       if (asset.kind === "box") {
         const row = El("div", "seRow"); row.append(El("span", "", "材质"));
         material = El("select");
-        for (const [mid, m] of SceneMaterialsFor(this.style)) material.append(new Option(`${m.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
+        for (const [mid, m] of Object.entries(SCENE_MATERIALS)) material.append(new Option(`${m.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
         row.append(material); card.append(row);
       }
       if (asset.sized) {
@@ -983,10 +981,7 @@ class SceneEditorApp {
     Row("资产", El("span", "seId", `${obj.asset}${asset.label ? ` · ${asset.label}` : ""}`));
     if (asset.kind === "box" || obj.material) {
       const m = El("select");
-      // 本场景这一类的材质；这件用的别类材质也列上（不然下拉里选不中它）
-      const mats = SceneMaterialsFor(this.style);
-      if (obj.material && !mats.some(([mid]) => mid === obj.material) && SCENE_MATERIALS[obj.material]) mats.push([obj.material, SCENE_MATERIALS[obj.material]]);
-      for (const [mid, mat] of mats) m.append(new Option(`${mat.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
+      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
       m.value = obj.material;
       m.addEventListener("change", () => { this.model.SetField(ids, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); });
       Row("材质", m);
@@ -1072,7 +1067,7 @@ class SceneEditorApp {
     if (sized.length) {
       const m = El("select");
       m.append(new Option("（不改）", ""));
-      for (const [mid, mat] of SceneMaterialsFor(this.style)) m.append(new Option(`${mat.label}（${mid.replace(/^(Whitebox|Look)\//, "")}）`, mid));
+      for (const [mid, mat] of Object.entries(SCENE_MATERIALS)) m.append(new Option(`${mat.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
       m.addEventListener("change", () => { if (m.value) { this.model.SetField(sized, "material", m.value, "改材质"); this.AfterEdit(null, { structural: true }); } });
       Row("材质", m);
     }

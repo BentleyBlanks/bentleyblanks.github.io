@@ -188,18 +188,16 @@ function LineTouches(region, points, pad = 0) {
 
 /**
  * 物件 → 体块（白盒编辑器 / FirstLevelWhiteboxField 吃的形状）。
- * Look/* 材质带 look（PBR 外观名）；道具带 propModel（外部道具 id，盒子只留碰撞）；树带 sceneTree（白盒编辑器种树）。
+ * 道具带 propModel（外部道具 id，盒子只留碰撞）；树带 sceneTree（白盒编辑器种树）。
  */
 export function SceneObjectToBlock(obj) {
   const [w, h, d] = obj.size;
   const asset = SCENE_ASSETS[obj.asset];
-  const look = SCENE_MATERIALS[obj.material]?.look;
   return {
     id: obj.id, x: obj.pos[0], z: obj.pos[2], w, d, h,
     ry: Finite(obj.yawDeg) ? obj.yawDeg * DEG : 0,
     semantic: SceneObjectSemantic(obj),
     solid: obj.solid !== false,
-    ...(look ? { look } : {}),
     ...(asset?.kind === "prop" ? { propModel: asset.model } : {}),
     // 道具铺几件（params.tile = [nx, ny, nz]，同现行第一关替换表的 tile：一只长盒子里排几个模型）
     ...(asset?.kind === "prop" && Array.isArray(obj.params?.tile) ? { propTile: [...obj.params.tile] } : {}),

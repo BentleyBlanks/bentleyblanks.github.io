@@ -3,12 +3,11 @@
 // 用户 2026-11-01：场景编辑器里两个场景——白盒版第一关（编辑、预演）与正式场景（试玩，之后不断打磨细节）；
 // 正式场景「用现在第一关（已经上线在章节里可选的）的场景设计标准，把已经有的资产、布设给做进去」。
 // 做法：布局（位置、尺寸、碰撞、信号、地标、地形、涂色）原样复制——试玩编排与关键帧的坐标都在这套布局上；
-// 样子换成现行第一关的口径：
-//   · 体块 Whitebox/Box + Whitebox/<语义> → Block/Box + Look/<外观>，外观按现行第一关的规则挑
-//     （Data_FirstLevelWhiteboxMaterials.ResolveWhiteboxLook：先按 id 形状的特例，再按语义的缺省比例）；
+// 只把有正式资产的换掉：
 //   · 道具盒（meta.prop）有现成外部模型的 → Prop/<模型>（PROP_TO_ASSET），盒子尺寸照旧当碰撞、模型按盒子缩放；
 //   · 树（细高的植物块、meta.prop Tree / Cypress）→ Tree/Dead、Tree/Cypress；
-//   · 水 → Look/water（水面同现行第一关），隐形墙 → Look/airWall；其余没有外观的按 SPECIAL_LOOKS。
+//   · 其余体块（房子、墙、屋顶、工事、水、隐形墙……）原样留 Whitebox/Box + Whitebox/*，画灰面 + 米格线。
+//     用户 2026-11-01：体块「不算正式资产，你不要自己造出来」——不给它挑贴图外观，等有正式的房子模型再换。
 // 地表（分层 PBR 土）不写进物件：涂色与沟的折线照抄，建场时按 Data_SceneGroundLayers 归层。
 //
 // 转完以后正式场景就是它自己的唯一真相（单独打磨，不再跟白盒同步）；这个脚本留着从 git 历史重放或对照用。
@@ -19,7 +18,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCENE_ASSETS, SCENE_MATERIALS } from "./Data_SceneAssets.mjs";
-import { ResolveWhiteboxLook } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { FormatSceneJson, ValidateScene, SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
 import { BLOCKOUT_TREE_MAX_FOOT_M } from "./Script_EditorBlockoutLevels.mjs";
 
@@ -27,7 +25,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const FROM = "FirstLevelWhitebox";
 const TO = "FirstLevel";
 
-/** 道具种类（meta.prop）→ 资产。没列的道具留体块、按语义挑外观。 */
+/** 道具种类（meta.prop）→ 资产。没列的道具留白盒体块。 */
 export const PROP_TO_ASSET = Object.freeze({
   AmmoCrate: "Prop/militaryCrateClosed",
   AmmoBox: "Prop/militaryCrateClosed",
@@ -59,23 +57,10 @@ export const PROP_TILE = Object.freeze({
   CrateStack: Object.freeze([2, 1, 1]),
 });
 
-/** 体块里规则挑不到外观的（植物、危险标记……）→ 外观。键是 meta.prop 或语义。 */
-export const SPECIAL_LOOKS = Object.freeze({
-  DoorBoard: "doorLeaf",
-  BloodStain: "bloodStain",
-  Torch: "timber",
-  Charge: "canvas",
-  Canteen: "steel",
-  danger: "wire",
-  foliage: "thatch",
-  water: null,
-  airWall: null,
-});
-
 const IsTree = (obj, semantic) => semantic === "foliage" && (obj.meta?.prop === "Tree" || obj.meta?.prop === "Cypress" || !!obj.meta?.tree
   || (Math.max(obj.size[0], obj.size[2]) <= BLOCKOUT_TREE_MAX_FOOT_M && obj.size[1] >= 2));
 
-/** 白盒的一个物件 → 正式场景的物件（布局字段一个不动，只换 asset / material / params）。 */
+/** 白盒的一个物件 → 正式场景的物件（布局字段一个不动；道具与树换 asset / params、去掉 material，其余原样）。 */
 export function FormalObject(obj) {
   if (obj.layer === "backdrop" || obj.asset !== "Whitebox/Box") return { ...obj };
   const semantic = SCENE_MATERIALS[obj.material]?.semantic;
@@ -90,14 +75,7 @@ export function FormalObject(obj) {
     const tile = PROP_TILE[prop];
     return { ...rest, asset: propAsset, ...(tile ? { params: { ...(obj.params || {}), tile: [...tile] } } : {}) };
   }
-  if (semantic === "water") return { ...rest, asset: "Block/Box", material: "Look/water" };
-  if (semantic === "airWall") return { ...rest, asset: "Block/Box", material: "Look/airWall" };
-  // 苇丛长成植被（Look/reed 是植物语义）；鹿砦是砍倒的树枝堆，画成木料
-  if (obj.meta?.reed) return { ...rest, asset: "Block/Box", material: "Look/reed" };
-  if (obj.meta?.abatis) return { ...rest, asset: "Block/Box", material: "Look/timber" };
-  const look = (prop && SPECIAL_LOOKS[prop]) || ResolveWhiteboxLook({ id: obj.id, semantic }) || SPECIAL_LOOKS[semantic];
-  if (!look || !SCENE_MATERIALS[`Look/${look}`]) throw new Error(`${obj.id}（${obj.material}${prop ? ` / ${prop}` : ""}）挑不到登记过的外观：${look}`);
-  return { ...rest, asset: "Block/Box", material: `Look/${look}` };
+  return { ...obj };
 }
 
 function HashBit(text) {
@@ -109,7 +87,6 @@ function HashBit(text) {
 /** 整个场景：布局照抄，物件逐个换样子。 */
 export function ForkFormalScene(whitebox, { now = new Date().toISOString() } = {}) {
   const look = { ...(whitebox.look || {}) };
-  delete look.colorSemantics; // 正式场景没有「保留语义色」这回事：每块都有外观
   return {
     schema: whitebox.schema,
     id: TO,
@@ -118,7 +95,7 @@ export function ForkFormalScene(whitebox, { now = new Date().toISOString() } = {
       forkedFrom: whitebox.id,
       forker: "Script_SceneForkFormal.mjs",
       forkedAt: now,
-      notes: "2026-11-01 照白盒布局复制：体块换现行第一关的 PBR 外观（Look/*）、道具换外部模型（Prop/*）、树换 Tree/*；之后单独打磨，不再跟白盒同步",
+      notes: "2026-11-01 照白盒布局复制：道具换外部模型（Prop/*）、树换 Tree/*，体块仍是白盒网格（不是正式资产）；之后单独打磨，不再跟白盒同步",
     },
     bounds: { ...whitebox.bounds },
     spawn: { ...whitebox.spawn },
@@ -141,7 +118,7 @@ function Main() {
   if (!result.ok) throw new Error(`正式场景校验不过：${result.errors.slice(0, 5).join("；")}`);
   const count = {};
   for (const obj of formal.objects) {
-    const key = obj.asset === "Block/Box" ? obj.material : obj.asset;
+    const key = obj.asset === "Whitebox/Box" ? obj.material : obj.asset;
     count[key] = (count[key] || 0) + 1;
   }
   console.log(Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join("\n"));

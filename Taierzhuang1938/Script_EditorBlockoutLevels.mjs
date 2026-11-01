@@ -255,8 +255,7 @@ function GroundedBlock(block, groundAt) {
     ...(block.noClimb === true ? { noClimb: true } : {}),
     // 2026-10-26：架空桥面上的走道（BlockStandSampler 对它不限 1 m 台阶，演员站得上去；§5.6）
     ...(block.standOn === true ? { standOn: true } : {}),
-    // 2026-11-01：正式场景（docs/Data_Scene.md §8）的外观、道具模型（铺几件）、树
-    ...(block.look ? { look: block.look } : {}),
+    // 2026-11-01：正式场景（docs/Data_Scene.md §8）的道具模型（铺几件）、树
     ...(block.propModel ? { propModel: block.propModel } : {}),
     ...(block.propTile ? { propTile: [...block.propTile] } : {}),
     ...(block.sceneTree ? { sceneTree: true } : {}),
@@ -587,12 +586,12 @@ export function LayoutFromSceneDoc(doc) {
     const grounded = GroundedBlock(block, sampler);
     return Number.isFinite(block.y) ? { ...grounded, y: block.y } : grounded;
   };
-  // 正式场景（docs/Data_Scene.md §8，2026-11-01）：体块按 Look/* 画现行第一关的 PBR 外观，道具换外部模型，地面是分层地表，水面同现行第一关
+  // 正式场景（docs/Data_Scene.md §8，2026-11-01）：道具换外部模型，地面是分层地表；体块不是正式资产，照白盒画灰面 + 米格线（编辑器 DressWorld）
   const formal = doc.style === "formal";
   // 细高的 foliage 块（DeadTree_xx，脚印 ≤ BLOCKOUT_TREE_MAX_FOOT_M）与场景里的 Tree/* 是树：只留碰撞，编辑器种枯树模型（2026-10-20，同 BlockoutBlock）
   const blocks = doc.blocks.map(block => {
     const grounded = Placed(block);
-    if (grounded.semantic === "water") return formal ? grounded : { ...grounded, visual: false, blockoutWater: true };
+    if (grounded.semantic === "water") return { ...grounded, visual: false, blockoutWater: true };
     if (grounded.sceneTree || IsSceneTreeBlock(grounded)) return { ...grounded, visual: false, blockoutTree: true, treeHeightM: grounded.h };
     return grounded;
   });
@@ -610,7 +609,7 @@ export function LayoutFromSceneDoc(doc) {
     style: formal ? "formal" : "whitebox",
     legend: false,
     fortifications: false,
-    materialLooks: formal,
+    materialLooks: false,
     railway: null,
     terrain: "P012Heightfield",
     terrainSpec: null,
@@ -625,7 +624,7 @@ export function LayoutFromSceneDoc(doc) {
       .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,
     heightTint: tint,
     groundPaint,
-    colorSemantics: !formal && Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
+    colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
     paint: groundPaint ? doc.paint.map((p) => ({ ...p })) : [],
     // 可选 backdrop（2026-10-20）：远景层，只看不走——不进 blocks / gates（不碰撞、不进寻路），bounds 不变（玩家走不出去）；
     // 编辑器按它画远景（Script_EditorBlockoutBackdrop），相机远平面拉到 cameraFar。没写 = null，cameraFar 照旧。

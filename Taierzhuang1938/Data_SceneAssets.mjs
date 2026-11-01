@@ -3,17 +3,18 @@
 // 为什么不直接写文件路径：改文件名、换模型只改这里一行，几千行场景不用动（Unity 的场景存的也是资产的 GUID，不是路径）。
 // 编号一旦被场景用上就别改名；要废弃就留着编号、改 note。
 //
-// 纯数据，零 three。体块的样子由材质决定：白盒场景引用 Whitebox/* 材质（灰面 + 米格线），
-// 正式场景引用 Look/* 材质（现行第一关的 PBR 外观，Data_FirstLevelWhiteboxMaterials.WHITEBOX_LOOKS）。
+// 纯数据，零 three。体块的样子由材质决定：两个场景的体块都引用 Whitebox/* 材质（灰面 + 米格线）。
+// 正式场景另放正式资产：道具模型（Prop/*）、树（Tree/*）；体块（房子、墙、工事）还不是正式资产，
+// 不给它配贴图外观（用户 2026-11-01：「不算正式资产，你不要自己造出来」），等做了正式的房子模型再换。
 
 /**
  * 场景清单：场景编辑器的下拉、本机存盘口 /__scene/*、白盒编辑器按 id 找场景都查这张表。
- * style：whitebox = 白盒的样子（灰面 + 米格线、高度色带地面）；formal = 正式场景（PBR 外观、道具模型、分层地表）。
+ * style：whitebox = 白盒的样子（灰面 + 米格线、高度色带地面）；formal = 正式场景（体块照旧灰面 + 米格线；道具模型、树、植被、分层地表是正式的）。
  */
 export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "FirstLevelWhitebox", title: "第一关 · 白盒", style: "whitebox", note: "白盒编辑器的编辑与预演跑这个" }),
   Object.freeze({ id: "FirstLevel", title: "第一关 · 正式", style: "formal",
-    note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，换成现行第一关的外观、道具模型与分层地表，之后单独打磨" }),
+    note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，道具换外部模型、地面换分层地表，体块仍是白盒网格，之后单独打磨" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -34,7 +35,6 @@ const Prop = (model, semantic, label, size) => Object.freeze({ kind: "prop", siz
 
 export const SCENE_ASSETS = Object.freeze({
   "Whitebox/Box": Object.freeze({ kind: "box", sized: true, label: "白盒体块", note: "米制长方体；样子看 material，碰撞看 solid" }),
-  "Block/Box": Object.freeze({ kind: "box", sized: true, label: "体块", note: "米制长方体（正式场景）；样子看 material（Look/*），碰撞看 solid" }),
   "Tree/Dead": Object.freeze({ kind: "tree", sized: true, semantic: "foliage", label: "枯树", size: Object.freeze([0.6, 11, 0.6]),
     note: "size 是树干碰撞盒、h 是树高；模型由白盒编辑器的树种植挑" }),
   "Tree/Cypress": Object.freeze({ kind: "tree", sized: true, semantic: "foliage", label: "坟地柏树", size: Object.freeze([1.1, 7, 1.1]),
@@ -68,12 +68,9 @@ export const SCENE_ASSETS = Object.freeze({
 });
 
 /**
- * 材质：编号 → 语义（建场用的材质槽、弹着表面）与外观。
- * Whitebox/*：白盒材质，颜色在关卡的 semanticColors 里。
- * Look/*：现行第一关的 PBR 外观（look 是 WHITEBOX_LOOKS 的键）；水与隐形墙没有外观（水面另铺、隐形墙不画）。
+ * 材质：编号 → 语义（建场用的材质槽、弹着表面）。
+ * Whitebox/*：白盒材质（灰面 + 米格线），保留语义色的几种（场景 look.colorSemantics）颜色在关卡的 semanticColors 里。
  */
-// color：场景编辑器里这种外观画成什么颜色（只是预览色，真样子是贴图）
-const Look = (look, semantic, label, color) => Object.freeze({ semantic, look, label, color });
 
 export const SCENE_MATERIALS = Object.freeze({
   "Whitebox/EarthDark": Object.freeze({ semantic: "earthDark", label: "深土" }),
@@ -91,31 +88,10 @@ export const SCENE_MATERIALS = Object.freeze({
   "Whitebox/Metal": Object.freeze({ semantic: "metal", label: "铁件" }),
   "Whitebox/Void": Object.freeze({ semantic: "void", label: "门窗洞暗面" }),
   "Whitebox/Coping": Object.freeze({ semantic: "coping", label: "墙头压顶" }),
-  "Look/mudPlaster": Look("mudPlaster", "plaster", "泥抹面墙", "#9b8b74"),
-  "Look/limePlaster": Look("limePlaster", "plaster", "白灰抹面墙", "#c9c3b6"),
-  "Look/greyBrick": Look("greyBrick", "plaster", "青砖墙", "#8d8780"),
-  "Look/gateBrick": Look("gateBrick", "structure", "门楼青砖", "#807a72"),
-  "Look/brickPlinth": Look("brickPlinth", "plaster", "青砖碱脚", "#6c6762"),
-  "Look/earthWork": Look("earthWork", "earthDark", "夯土 / 土工事", "#8a7b62"),
-  "Look/roofTile": Look("roofTile", "roof", "小青瓦", "#5d5f5e"),
-  "Look/timber": Look("timber", "timber", "旧木料", "#7a6a56"),
-  "Look/doorLeaf": Look("doorLeaf", "timber", "旧门板", "#6e5f50"),
-  "Look/stone": Look("stone", "structure", "条石", "#8f8b84"),
-  "Look/canvas": Look("canvas", "canvas", "布 / 麻袋", "#a49c86"),
-  "Look/thatch": Look("thatch", "canvas", "草束 / 苇子", "#a8925f"),
-  "Look/jar": Look("jar", "earthDark", "陶缸", "#8a6e55"),
-  "Look/steel": Look("steel", "metal", "锈钢板", "#6e655c"),
-  "Look/wire": Look("wire", "metal", "铁丝 / 电线", "#2d2e2c"),
-  "Look/voidDark": Look("voidDark", "void", "门窗洞暗面", "#16140f"),
-  "Look/bloodStain": Look("bloodStain", "danger", "血迹", "#3b1a14"),
-  // 苇丛、草丛：植物语义 —— 正式场景里这只盒子长成植被卡片（Data_FirstLevelVegetation 的 foliage 规则），读不到植被图集时画成草束
-  "Look/reed": Object.freeze({ semantic: "foliage", look: "thatch", label: "苇丛 / 草丛（长成植被）", color: "#8f8456" }),
-  "Look/water": Object.freeze({ semantic: "water", look: null, label: "水（水面另铺）", color: "#5c6f78" }),
-  "Look/airWall": Object.freeze({ semantic: "airWall", look: null, label: "隐形墙", color: "#d6604a" }),
 });
 
 const SEMANTIC_TO_MATERIAL = Object.freeze(Object.fromEntries(
-  Object.entries(SCENE_MATERIALS).filter(([id]) => id.startsWith("Whitebox/")).map(([id, material]) => [material.semantic, id])));
+  Object.entries(SCENE_MATERIALS).map(([id, material]) => [material.semantic, id])));
 
 /** 语义 → 白盒材质编号；没登记的语义返回 null。 */
 export function WhiteboxMaterialFor(semantic) {
@@ -127,14 +103,8 @@ export function SceneObjectSemantic(obj) {
   return SCENE_MATERIALS[obj?.material]?.semantic || SCENE_ASSETS[obj?.asset]?.semantic || null;
 }
 
-/** 这种样子的场景用哪些材质：白盒场景 Whitebox/*，正式场景 Look/*（场景编辑器的材质下拉）。 */
-export function SceneMaterialsFor(style) {
-  const prefix = style === "formal" ? "Look/" : "Whitebox/";
-  return Object.entries(SCENE_MATERIALS).filter(([id]) => id.startsWith(prefix));
-}
-
-/** 这种样子的场景能放哪些资产：白盒 = 白盒体块 + 远景；正式 = 体块、道具、树 + 远景（场景编辑器的资产页）。 */
+/** 这种样子的场景能放哪些资产：白盒 = 白盒体块 + 远景；正式 = 白盒体块、道具、树 + 远景（场景编辑器的资产页）。 */
 export function SceneAssetsFor(style) {
   return Object.entries(SCENE_ASSETS).filter(([id, asset]) => asset.layer === "backdrop"
-    || (style === "formal" ? id !== "Whitebox/Box" : id === "Whitebox/Box"));
+    || id === "Whitebox/Box" || (style === "formal" && (asset.kind === "prop" || asset.kind === "tree")));
 }

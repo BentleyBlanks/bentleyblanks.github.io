@@ -4,10 +4,11 @@
 // 跑法：node Taierzhuang1938/Script_SceneFormalBrowserTest.mjs
 //
 //   1. 白盒编辑器进关建的是白盒场景（编辑、预演跑白盒）；
-//   2. 换成正式场景：体块是现行第一关的 PBR 外观（不是白盒灰面 + 米格线）、地面是分层地表（MissionPlain 四层）、
-//      道具换成外部模型（盒子不画、碰撞照旧）、水面同现行第一关；碰撞体数与白盒一样（试玩的编排坐标都在这套布局上）；
+//   2. 换成正式场景：地面是分层地表（MissionPlain 四层）、道具换成外部模型（盒子不画、碰撞照旧）；
+//      体块不是正式资产，仍是白盒灰面 + 米格线（用户 2026-11-01），道具的材质不许被刷成白盒；水同白盒编辑器铺水面；
+//      碰撞体数与白盒一样（试玩的编排坐标都在这套布局上）；
 //   3. 试玩开打先换成正式场景；关小结回到编辑换回白盒；
-//   4. 场景编辑器的下拉里有两个场景，正式场景的资产页列道具与树、材质下拉是 Look/*；
+//   4. 场景编辑器的下拉里有两个场景，正式场景的资产页列白盒体块、道具与树；
 //   5. 全程没有未捕获错误。截图存 _shots/SceneFormal/（不提交）。
 // ===========================================================================
 
@@ -50,16 +51,19 @@ const Step = (n = 2) => B((n) => window.Tengxian.StepFrames(n, 1 / 60, false), n
 const Field = () => B(() => {
   const game = window.Tengxian.editor.editorHost.game, bf = game.battlefield, layout = bf.layout;
   const ground = bf.meshes.find((m) => m.name === "FirstLevelWhitebox_Ground");
-  const blockMaterials = [...bf.materials].filter(([key, m]) => m?.isMeshStandardMaterial && key !== layout.ground?.semantic);
-  const gridded = blockMaterials.filter(([, m]) => (m.userData?.patches || m.userData?.materialPatches || []).some?.((p) => /grid/i.test(p.key || ""))).length;
+  const semantics = new Set(["Whitebox", ...Object.keys(layout.semanticColors || {})]);
+  const all = [...bf.materials].filter(([key, m]) => m?.isMeshStandardMaterial && key !== layout.ground?.semantic);
+  // 白盒灰面 + 米格线：DressAsWhitebox 打的记号
+  const gridded = all.filter(([key, m]) => semantics.has(key) && key !== "water" && m.userData?.whiteboxMaterial).length;
+  const othersGridded = all.filter(([key, m]) => !semantics.has(key) && m.userData?.whiteboxMaterial).map(([key]) => key);
   return {
     scene: window.Tengxian.Debug.Blockout.Play.Scene(),
     style: layout.style, materialLooks: !!layout.materialLooks,
     looks: bf.stats?.looks ? Object.keys(bf.stats.looks).length : 0, lookFallback: bf.stats?.lookFallbackSets || [],
     props: bf.scenePropStats?.stats?.props || 0, propMissing: bf.scenePropStats?.missing?.length ?? null, sceneProps: layout.sceneProps?.length || 0,
     terrainLayers: !!bf.terrainLayers, groundLayersAttr: !!ground?.geometry?.getAttribute("terrainLayers"),
-    water: !!bf.waterMesh, waterName: bf.waterMesh?.name || null,
-    colliders: bf.colliders?.length ?? bf.solids?.length ?? null, blocks: layout.blocks.length, gridded,
+    water: !!bf.waterMesh, waterName: bf.waterMesh?.name || null, waterBlocks: layout.blocks.filter((b) => b.blockoutWater).length,
+    colliders: bf.colliders?.length ?? bf.solids?.length ?? null, blocks: layout.blocks.length, gridded, othersGridded,
     staticMeshes: bf.meshes.filter((m) => m.name === "FirstLevelWhitebox_StaticWhiteBoxes").length,
   };
 });
@@ -85,12 +89,12 @@ try {
   const buildS = (Date.now() - t0) / 1000;
   Check("换成正式场景：variant play、读 Scenes/FirstLevel、地址栏写 scene=FirstLevel", switched && fm.scene.variant === "play" && /Scenes\/FirstLevel\/Scene_FirstLevel\.json/.test(fm.scene.url)
     && (await B(() => new URL(location.href).searchParams.get("scene"))) === "FirstLevel", J({ scene: fm.scene, buildS }));
-  Check("正式场景：体块按现行第一关的 PBR 外观合批（不止一种外观、贴图套没退回）", fm.style === "formal" && fm.materialLooks && fm.looks >= 4 && fm.staticMeshes > 0,
-    J({ looks: fm.looks, fallback: fm.lookFallback, staticMeshes: fm.staticMeshes }));
+  Check("正式场景：体块仍是白盒灰面 + 米格线（不走 PBR 外观）", fm.style === "formal" && !fm.materialLooks && fm.looks === 0 && fm.gridded >= 5 && fm.staticMeshes > 0,
+    J({ looks: fm.looks, gridded: fm.gridded, staticMeshes: fm.staticMeshes }));
   Check("正式场景：地面是分层地表（MissionPlain 读到、地面网格带 terrainLayers 权重）", fm.terrainLayers && fm.groundLayersAttr, J({ terrainLayers: fm.terrainLayers, attr: fm.groundLayersAttr }));
   Check("正式场景：道具换成外部模型，场景里的 Prop/* 都摆上了", fm.sceneProps > 0 && fm.props >= fm.sceneProps && fm.propMissing === 0,
     J({ sceneProps: fm.sceneProps, props: fm.props, missing: fm.propMissing }));
-  Check("正式场景：块材质没有白盒米格线", fm.gridded === 0, J({ gridded: fm.gridded }));
+  Check("正式场景：道具、碎砖瓦、地表的材质没被刷成白盒", fm.othersGridded.length === 0, J(fm.othersGridded.slice(0, 5)));
   Check("正式与白盒的体块数一样（试玩的编排坐标都在同一套布局上）", fm.blocks === wb.blocks, J({ whitebox: wb.blocks, formal: fm.blocks }));
   await page.screenshot({ path: path.join(shotDir, "0105_Formal.png") });
   // 高处俯看一眼（飞行观察）
@@ -131,8 +135,9 @@ try {
     await B(() => window.Tengxian.Debug.Blockout.Play.UseScene("play"));
     await Step(6);
     const v = await Field();
-    Check(`${level} 正式场景建起来：外观 ${v.looks} 种、道具 ${v.props} 件`, v.style === "formal" && v.looks >= 4 && v.propMissing === 0,
-      J({ looks: v.looks, props: v.props, sceneProps: v.sceneProps, missing: v.propMissing, terrainLayers: v.terrainLayers, water: v.waterName }));
+    Check(`${level} 正式场景建起来：体块白盒网格 ${v.gridded} 种材质、道具 ${v.props} 件、分层地表、水块 ${v.waterBlocks} 块同白盒编辑器铺水面`, v.style === "formal" && v.looks === 0 && v.gridded >= 5
+      && v.othersGridded.length === 0 && v.propMissing === 0 && v.terrainLayers && v.waterBlocks > 0 && v.waterName === "BlockoutWater",
+      J({ gridded: v.gridded, othersGridded: v.othersGridded.slice(0, 3), props: v.props, sceneProps: v.sceneProps, missing: v.propMissing, terrainLayers: v.terrainLayers, water: v.waterName, waterBlocks: v.waterBlocks }));
     await B((p) => window.Tengxian.Debug.Blockout.Fly(true, p), pose);
     await Step(4);
     await page.screenshot({ path: path.join(shotDir, `${level}_Formal.png`) });
@@ -153,7 +158,7 @@ try {
     return { options, assets, objects: state.objects ?? state.count, style: state.style, pixels };
   });
   Check("场景编辑器下拉里有两个场景：第一关 · 白盒、第一关 · 正式", se.options.length === 2 && se.options.some(([v]) => v === "FirstLevelWhitebox") && se.options.some(([v]) => v === "FirstLevel"), J(se.options));
-  Check("正式场景的资产页列道具与树，不列白盒体块", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && !se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
+  Check("正式场景的资产页列白盒体块、道具与树", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
   await editor.screenshot({ path: path.join(shotDir, "SceneEditor_Formal.png") });
   await editor.close();
 

@@ -665,12 +665,13 @@ export class EditorBlockout {
   DressWorld(layout) {
     const field = this.game.battlefield;
     if (!field || !layout) return;
-    // 正式场景（试玩，§17）：地面、外观、水面都是 FirstLevelWhiteboxField 按现行第一关的口径建好的，这里不再改成白盒的样子
-    if (layout.style === "formal") return;
+    // 正式场景（试玩，§17）：地面（分层地表）、道具、树、植被是 FirstLevelWhiteboxField 按现行第一关的口径建好的，这里不碰；
+    // 体块（房子、墙、工事）不是正式资产，照白盒画灰面 + 米格线（用户 2026-11-01），水照白盒编辑器铺浑水面
+    const formal = layout.style === "formal";
     const tint = layout.heightTint || { lo: -4, hi: 6 };
     const waterBlocks = BlockoutWaterBlocks(layout);
     const creek = layout.id !== "BlockoutFirstLevel" && waterBlocks.length > 0;
-    const prints = creek ? WaterPrints(waterBlocks, (x, z) => this.groundAt(x, z)) : [];
+    const prints = creek && !formal ? WaterPrints(waterBlocks, (x, z) => this.groundAt(x, z)) : [];
     // 色带查表：256 档，线性空间。
     const lut = new Float32Array(256 * 3), rgb = [0, 0, 0], color = new THREE.Color();
     for (let i = 0; i < 256; i++) {
@@ -686,7 +687,7 @@ export class EditorBlockout {
       BlockoutTintColor(tint.lo + (tint.hi - tint.lo) * i / 255, tint, rgb);
       srgb[i * 3] = rgb[0]; srgb[i * 3 + 1] = rgb[1]; srgb[i * 3 + 2] = rgb[2];
     }
-    for (const mesh of field.meshes || []) {
+    for (const mesh of formal ? [] : field.meshes || []) {
       if (mesh.name !== BLOCKOUT_EDITOR.groundName || !mesh.geometry) continue;
       const position = mesh.geometry.getAttribute("position");
       let colors = mesh.geometry.getAttribute("color");
@@ -729,11 +730,13 @@ export class EditorBlockout {
       }
     }
     // 块的白盒材质（场景文件 colorSemantics，§6.3，2026-10-20 / 2026-10-31）：场地里每种语义一份材质，原地改成
-    // 灰表面 + 米格线；colorSemantics 列出的几种保留语义色再加网格；水语义是白盒水材质；地面是上面那份（高度色带 + 涂色 + 米格线）
+    // 灰表面 + 米格线；colorSemantics 列出的几种保留语义色再加网格；水语义是白盒水材质；地面是上面那份（高度色带 + 涂色 + 米格线）。
+    // 正式场景的材质表里还有道具、碎砖瓦、分层地表的材质：只改语义那几份（加没写语义的块用的 Whitebox）
     const keepColor = new Set(layout.colorSemantics || []);
     const groundSemantic = layout.ground?.semantic;
     for (const [semantic, material] of field.materials || []) {
       if (!material?.isMeshStandardMaterial || semantic === groundSemantic) continue;
+      if (formal && semantic !== "Whitebox" && !(semantic in (layout.semanticColors || {}))) continue;
       DressAsWhitebox(material, semantic === "water" ? { kind: "water" } : { keepColor: keepColor.has(semantic) });
     }
     if (!field.waterMesh && waterBlocks.length) {
