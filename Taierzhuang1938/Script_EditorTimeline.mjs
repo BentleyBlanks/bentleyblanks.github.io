@@ -129,6 +129,8 @@ export class TimelinePanel {
       const response = await fetch(`./${entry.file}?t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       text = await response.text();
+      // 读的时候面板被关了（Close 已经 UseSource(null)）：别再把源换回来
+      if (!this.open) return false;
     } catch (error) {
       this.validation = { ok: false, errors: [`读不到 ${entry.file}：${error?.message || error}`], warnings: [] };
       this.RenderStatus();
