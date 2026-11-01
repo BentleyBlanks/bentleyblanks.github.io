@@ -17,6 +17,7 @@ import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
+import { SoldierFieldAccessors } from "./Script_SoldierFields.mjs";
 import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
   GRENADE_EVADE,
@@ -206,298 +207,333 @@ export const CAPSULE = [
   { radius: 0.42, height: 0.58 },     // 2 卧
 ];
 
-export class Soldier {
+export class Soldier extends SoldierFieldAccessors {
+  // 字段按职责分在十个组件里（表在 Data_SoldierComponents，docs/Data_EnemyAi.md §22）：
+  // 真正的值在 `this.<组件>.<字段>`，父类 SoldierFieldAccessors 生成同名存取器，所以旧写法 `this.ammo` 读写的是同一个值。
+  // 新字段先登记进组件表再写在下面对应的组件里，SoldierComponentsTest 会拦住平铺在 this 上的新字段。
+  // 所有字段仍在构造器里定死形状（热路径字段，V8 的隐藏类每多一次形状变更就是一次去优化）。
+  // **初始化顺序别动**：rnd 在 locomotion 里先给 detourSign、再给 laneOffset，顺序变了每个人的随机数就全变了。
   constructor(side, options = {}) {
+    super();
     this.id = nextId++;
     this.side = side;                       // "nra" | "ija"
     this.identity = options.identity || MakeSoldierIdentity(this.id * 7919 + (side === "nra" ? 11 : 97));
-    this.weaponId = options.weapon || (side === "nra" ? this.identity.weapon : "Type38");
-    this.weapon = WEAPONS[this.weaponId] || WEAPONS.Type38;
-    this.position = new THREE.Vector3(options.x || 0, 0, options.z || 0);
-    this.velocity = new THREE.Vector3();
-    this.yaw = options.ry || 0;
-    this.health = 100;
-    this.state = STATE.IDLE;
-    this.stateTime = 0;
-    /**
-     * 最近 32 次状态切换的环形记录（敌军 AI 编辑器的「30 s 状态时间带」读它）。
-     *
-     * 为什么记在人身上而不是导演身上：时间带问的是「**这一个人**刚才经历了什么」，
-     * 全局事件流要按 id 过滤一遍才能回答，而 70 个人 × 每秒几次切换会把那条流
-     * 冲得只剩最近半秒。为什么是环形复用槽而不是 push/shift：这条记录每帧都可能写，
-     * 数组增删与对象字面量都会产生垃圾 —— 调试设施不许把 GC 压力算进玩法的帧预算。
-     * 槽在第一次真的发生切换时才建（`AiDirector._LogStateChange`），
-     * 木桩兵与平民一辈子不切状态，就一个字节都不占。
-     */
-    this.stateLog = null;
-    this.stateLogHead = 0;
-    this.stateLogCount = 0;
-    /** 上一次写进 stateLog 的状态。与 `state` 不同就说明该记一条了。 */
-    this.stateLogged = this.state;
-    this.combatModeUntil = -99;
-    this.suppression = 0;
-    this.hurtPose = 0;                      // 中弹踉跄（Actor 的 hurt 覆盖姿势），Act 里按 HURT_FLINCH.decayS 衰减
-    this.stance = 0;                        // 0 站 1 蹲 2 卧
-    // 姿态决定是离散的，画面过渡必须是连续的。以前 Think 每 0.1 s 在阈值两侧切 0/1，
-    // Actor 每次都直接吃满 0/1，于是整个人像电门一样反复蹲起。
-    this.crouchBlend = 0;
-    this.proneBlend = 0;
-    this.stanceUntil = -99;
-    this.lastRiseAt = -99;
-    this.suppressedAt = -99;
-    // 被压制打断的自动冲锋记冷却：几秒内不重新发起。没有它，压制一衰减过阈值
-    // 就再冲、站上火线半秒又被压回卧倒，charge↔suppressed 两秒一圈来回抽。
-    this.chargeCooldownUntil = -99;
-    this.target = null;
-    this.targetVisible = false;
-    this.targetLostTime = 0;
-    // 目标锁至少维持一小段时间；否则距离相近的两个人每次 Think 都互换名次，
-    // 身体又逐帧朝新目标转，视觉上就是原地转圈。
-    this.targetLockUntil = -99;
-    this.targetChanges = 0;
-    // 枪不直接吃离散状态。FIRE/ADVANCE 在决策边界上偶尔切一次时，枪托仍应连续
-    // 上肩/放下；上身看向也必须相对「当前身体」而不是会量化跳变的导航方向。
-    this.aimBlend = 0;
-    this.aimUntil = -99;
-    this.lookYaw = 0;
-    /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
-    this.playerLockAt = -99;
-    this.aimTime = 0;
-    this.ammo = this.weapon.magazine || 5;
-    this.reloadTimer = 0;
-    this.fireTimer = 0;
-    this.cover = null;
-    this.coverUntil = -99;
-    this.goal = new THREE.Vector3(options.x || 0, 0, options.z || 0);
-    this.order = "advance";
-    /**
-     * 靶场木桩兵（Script_Main ?range=1 时由装配层置真）。
-     * Update 里跳过 Think —— 不索敌、不开火、不自行走位（TryFire 要 target，
-     * Think 不跑就永远没有）；挨打、倒地、被准心识别照旧走原链路。
-     */
-    this.dummy = false;
     this.rnd = Mulberry32(this.id * 2654435761);
     this.actor = null;
-    this.deadTime = 0;
-    this.moveSpeed = 0;
-    /**
-     * 物理世界里的胶囊。**这是这一轮最要紧的一条改动** ——
-     * 在此之前 AI 完全没有碰撞：位移直接写 position，再拿 StandHeight 把人吸到
-     * 「脚下最高的那层」，挡不挡得住只由一个 Blocked() 启发式说了算。
-     * 于是人从墙里穿过去是常态，站到房顶上也是常态。
-     * 现在跟玩家用**同一套**角色控制器，两边对「这儿走不走得过去」只有一个答案。
-     */
-    this.body = null;
-    this.velocityY = 0;
-    this.grounded = true;
-    /** 死后接管位移的那具刚体（见 AiDirector.StepCorpse）。 */
-    this.corpse = null;
-    /** 中弹方向 × 力度，死的那一帧交给尸体刚体当初速度。 */
-    this.deathPush = null;
-    this.corpseSettled = false;
-    // 尸体贴地：躯干对齐地表的俯仰/侧倾，与「肢体下面是空的」的下垂量。
-    // 全部带平滑（见 StepCorpse），所以要跨帧存在这儿。
-    this.corpseTiltX = 0;
-    this.corpseTiltZ = 0;
-    this.corpseDroopBody = 0;
-    this.corpseDroopArms = 0;
-    // 滑动的「卡住换向」：上一帧位置、卡住累计时长、限时绕行航向及其剩余时间。
-    this.corpseSlidePX = 0;
-    this.corpseSlidePZ = 0;
-    this.corpseStallT = 0;
-    this.corpseDetourX = 0;
-    this.corpseDetourZ = 0;
-    this.corpseDetourT = 0;
-    this.corpseSlideT = 0;
-    // 通视缓存按**目标 id** 存三份。原来一人只有一份、不区分目标：
-    // 最近的那个被墙挡住，缓存写下 clear=false，接下来 0.25 s 内换谁来问都答"看不见"，
-    // 于是整条战线一起瞎掉（实跑：losCache.clear 为 true 的 0 人）。
-    this.losCache = [
-      { id: 0, time: -99, clear: false },
-      { id: 0, time: -99, clear: false },
-      { id: 0, time: -99, clear: false },
-    ];
-    this.losSlot = 0;
-    // cohesion：34 m 内还有几个同侧活人，是**班组密度**不是士气。
-    // 原名 morale 会诱导后人往 UI 上挂一条"中国守军士气条"—— 那在立场上是灾难。
-    this.cohesion = 1;
-    this.lonelyTime = 0;        // 20 m 内一个友军都没有已经持续了多久
-    this.regoalTime = -99;      // 守点软约束上一次重设目标的时刻
-    this.stuckTime = 0;         // 想走但走不动已经持续了多久
-    this.detourTime = 0;        // 绕行还剩多久
-    this.idleStepDt = 0;        // 静止分频物理攒下的 dt（见 Act 尾部那笔账）
-    this.detourYaw = 0;         // 绕行时把前进方向拧多少
-    // 沿墙走的**固定**转向。第 1 批那版每次卡住都重掷一个随机方向，
-    // 于是撞墙→左绕一秒→回头撞墙→右绕一秒，是原地打转不是绕路：
-    // 实跑取证 37 名日军里 15—21 名常年处在"绕行中"，而兵力重心一百二十秒一动不动。
-    // 转向必须一人一个并且**认死**，这样才是真的沿着墙面兜过去。
-    this.detourSign = this.rnd() < 0.5 ? 1 : -1;
-    this.detourGoalDist = 1e9;  // 起绕那一刻离目标多远，用来判断这一圈有没有白绕
-    this.towel = false;
-    // 上刺刀。CHARGE 状态一进就上，白刃距离（2 m 内）真的会捅 —— 不是只跑过去开枪。
-    this.bayonetFixed = false;
-    // Shared melee rules own the animation state for players, friends and enemies.
-    this.meleeCombat = null;
-    this.meleeTraining = null;
-    this.chargeUntil = -99;      // 玩家下"上刺刀"之后这道命令的有效期
-    this.flankUntil = -99;       // 绕行命令的有效期，到点或超时就转 advance
-    this.covertUntil = -99;      // 潜行命令的有效期：跟班长同姿态且不开枪
-    // 翻越。院墙 2 m、窗台 0.9 m，而 Blocked() 的自动抬腿只到 TRAVERSAL.stepMax ——
-    // 不给 AI 开这一条的话，玩家翻墙抄到院子里，追他的人只能绕门洞，
-    // 这个动词就变成了单方面的作弊。
-    this.vaultT = -1;            // >= 0 表示正在翻
-    this.vaultDuration = TRAVERSAL.vaultBaseS;
-    this.vaultKind = "vault";    // vault=腰高跨过 / mantle=肩高撑上去（Data_Traversal）
-    this.vaultFrom = null;
-    this.vaultTo = null;
-    this.vaultApexY = 0;
-    // 尸体上的家当。ER2 的拾取靠它，L4_LastFiveMinutes 那句"子弹得从倒下的人身上取"
-    // 以前是一条死注释 —— 死人身上什么都没有。
-    this.drop = null;
-    // 断肢记录（GoreSystem 建、GoreSystem 清）。**非空 = 这具身上少了东西**：
-    // 远景层不许接管他（那一层是整人烘的，会把肢体长回来），撤场时要先还原几何。
-    this.gore = null;
-    // 过热。十一年式不能换枪管，约 200 发必须冷却 —— 这是日军机枪火力
-    // 有节奏间隙的史实来源，也是玩家冲过街口的战术窗口。
-    this.heat = 0;
-    this.coolUntil = -99;
-    this.heatSmoke = 0;          // 冷却期间挂的那根白烟的 handle（0 = 没挂）
-    // 排队（Conga Line）是 ER2 被骂最狠的毛病之一：一个班沿同一条线走成一串。
-    // 对策是每个人生成时就领一个固定的横向偏移，跟随目标时永远偏这么多。
-    this.laneOffset = (this.rnd() - 0.5) * 11;
-    this.squadId = "";
-    this.squadSlot = 0;
-    this.tacticalRole = "rifleman";
-    this.squadMateCount = 0;
-    this.squadForwardX = 0;
-    this.squadForwardZ = -1;
-    this.squadFocusKind = "none";
-    this.squadFocusId = null;
-    this.manualGoalUntil = -99;
-    // 守点纪律：ER2 的 AI 会在赶路途中就地对射、根本不进点，导致「只要防守方
-    // 看得见攻方，这张图就极好打」。这里给防守单位一条硬规矩：
-    // 一旦被派去守某个占领区，除非死亡，否则不许离开该区半径。
-    this.holdZone = null;
-    /**
-     * 这个人占的那个**固定战位**的名字（重机枪位之类），没占就是 null。
-     * 与 squadId 分开存：squadId 在 Spawn 里会因为满员而被改名成 `..._1/_2`，
-     * 拿它当战位标识会认不出「这挺机枪已经有人了」。见 AiDirector.Spawn。
-     */
-    this.emplacementId = null;
-    /**
-     * 【2026-09-23】禁火的第二档：**压制档**。关卡编排（`Script_FirstLevelOpening.FireWindows`）
-     * 每拍与 `missionFireHold` 同一处重置 / 置起。`missionFireHold` 为真时这一位决定
-     * 扳机怎么扣：false = 一发不打（原行为），true = 跳过「暴露采样 + 抢令牌」那条
-     * 瞄准分支，直接向 `SuppressPoint` 压制射击 —— 命中恒 false、不占射击令牌，
-     * 所以**不进 TTK 账**，只制造近失弹与压制感。瞄准档的人数仍由 `playerFireLimit`
-     * 与令牌封顶，这一位不放宽任何一条。
-     */
-    this.missionFireSuppressOnly = false;
-    // --- 2026-09-23 反应层与环境射击（docs/Data_EnemyAi.md §20）--------------------
-    // 同样在构造器里定死形状（热路径字段，见下面第二波那段的理由）。
-    /**
-     * 关卡给这个人的**授权射击点**表（`[{x,z,h?,r?,id?}]`，世界坐标，h 是离地高度）。
-     * null = 没有环境射击（默认；第一关以外永远是 null）。写入者：
-     * `Script_FirstLevelFrontPressure`（02–05 前沿）、`Script_FirstLevelBackdropSquads`（01 背景兵）。
-     */
-    this.ambientFirePoints = null;
-    /** Think 这一拍挑中的点（指向 `ambientAim` 这个复用容器；null = 不打）。 */
-    this.ambientFirePoint = null;
-    this.ambientAim = null;          // { x, y, z, r, id } 复用容器（第一次挑点时建）
-    this.ambientUntil = -99;         // 这个点打到什么时候换
-    this.ambientPickAt = -99;        // 上一次挑点的时刻（AMBIENT_FIRE.pickEveryS 限流）
-    this.ambientShots = 0;           // 取证：这个人打了几发环境射击
-    this.ambientBlockedId = null;    // 刚从枪口打过去被挡死的那个授权点（AMBIENT_FIRE.blockedRetryS 内不再挑）
-    this.ambientBlockedUntil = -99;
-    this.targetFireAt = -99;         // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
-    /** 扳机从什么时候起「想打、弹在膛、有目标却一发没出去」（-1 = 没在空转；真打出一发 / 换目标清零）。 */
-    this.triggerDrySince = -1;
-    /** 白刃卡死判定（§20.7）：idle 架势的起点与那时的位置；解扣后 meleeDormant 到什么时候。 */
-    this.meleeStallAt = -1;
-    this.meleeStallX = 0;
-    this.meleeStallZ = 0;
-    this.meleeStallDormantUntil = 0;
-    /** 迟疑到什么时候：看见身边的人倒下 / 军官阵亡。期间不走位、不开枪、不起冲锋。 */
-    this.hesitateUntil = -99;
-    /** 关卡下令的成组冲锋：什么时候起身、冲到什么时候（`AiDirector.GroupCharge`）。 */
-    this.groupChargeAt = -99;
-    this.groupChargeUntil = -99;
-    /** 被身边起冲的战友带起来的跟冲：什么时候起身（冲的是他自己的目标）。 */
-    this.chargeFollowAt = -99;
-    /** 跃进喊话（§20）：上一次 Think 结束时的状态、上一次喊「前へ」的时刻。 */
-    this.thinkEndState = null;
-    this.advanceBarkAt = -99;
-    /** 身边掩体都打不出去时去空地（§20.11）：最近一次瞎探换点的时刻、窗口内次数、不选掩体到什么时候。 */
-    this.blindMoveAt = -99;
-    this.blindMoves = 0;
-    this.missionOpenUntil = -99;
-    /** 军官（分队长）：阵亡时本组压制 + 迟疑，旁人喊「分队长殿がやられた」。由关卡置位。 */
-    this.aiOfficer = false;
-    /** 反应层认的「本组」键（压力表的组 id）；空串时退回 squadId。 */
-    this.reactionGroup = "";
-    this.muzzle = new THREE.Vector3();
-    this.lastFire = -99;
-    // --- 第二波（docs/Data_EnemyAi.md §5）在士兵上新增的字段 ------------------
-    // 全部在构造器里定死，不靠第一次赋值凭空长出来：V8 的隐藏类每多一次形状变更
-    // 就是一次去优化，而这些字段每一帧都在热路径上被读。
-    this.perception = null;      // PerceptionModel 的记忆（Attach 建）
-    this.shooting = null;        // ShootingModel 的瞄准 / 暴露状态
-    this.task = null;            // TacticsDirector 每秒写的班组任务
-    this.alert = "unaware";      // 士兵级警戒（ALERT.*）
-    this.awareness = 0;          // 当前目标的觉察度 0..1
-    this.lkp = null;             // 最后目击位置（复用对象）
-    this.lkpTime = -99;
-    this.lkpConfidence = 0;
-    this.targetMoving = false;
-    this.targetFromMemory = false;   // 目标是从记忆里接回来的（只压制射击，不冲锋）
-    this.targetExposedS = 0;     // 目标连续暴露了几秒（瞄准收敛加速）
-    this.muzzleWorld = null;     // 这一发的枪口（UpdateMuzzle 写，对不上账时为 null）
-    this.muzzleStore = null;
-    this.lookPitch = 0;          // 持续跟踪瞄点的抬枪角（向上为正）
-    this.lookPitchBlend = 0;     // 限速之后真正喂给 Actor 的那个
-    this.burstLeft = 0;          // 这一梭子还剩几发（BurstPlan 排的）
-    this.burstIntervalS = 0;
-    this.burstPauseS = 0;
-    this.moveOrder = null;       // 这一帧的走位命令 {x,z,speed}（Act 的 switch 读它）
-    this.moveStore = { x: 0, z: 0, speed: 0 };
-    this.moveArriveM = NaN;      // 这一次走位的到位半径（掩体微走位要 0.12 m，默认 1.2 m 判不出探头）
-    this.stationaryS = 0;        // 在原地待了多久（投弹判据「对方钉在一处」读它）
-    this.coverStore = null;      // s.cover 的复用容器（不每次选点都新建）
-    this.grenadeThreatAt = -99;  // 上一次「敌方手榴弹落在我掩体边上」的时刻
-    this.aimedAtSince = -1;      // 【§21】玩家从什么时候起一直拿枪指着我（没指着 = −1）
-    this.threatWokenAt = -1;     // 【§21】待命兵（wakeOnThreat）被玩家惊动的时刻
-    this.grenadeEvade = null;    // 通用躲雷（GRENADE_EVADE）：{ grenade, startAt, goal, replanAt, dive }
-    this.coverPhase = "none";    // "hide" | "peek" | "none"
-    this.coverPhaseUntil = -99;
-    this.coverPickAt = -99;      // 上一次（重）选掩体的时刻，reselectMinS 限流
-    this.coverThreatX = 0;       // 上一次选点时威胁在哪（挪远了才值得重算）
-    this.coverThreatZ = 0;
-    this.peekCount = 0;          // hide→peek 循环次数（验收探针数它）
-    /** 这一次探头里真打出去过一发（对人或环境射击都算）；任务侧开关下「白探头」据此判。 */
-    this.peekFired = false;
-    this.lastGrenadeAt = -99;
-    this.grenades = 0;           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
-    // --- 第三波：戒备与换位（docs/Data_EnemyAi.md §15）------------------------
-    /**
-     * 「这个人现在该戒备」。**由 Think 每 0.1 s 写一次，`ApplyScriptDefense` 每帧读**——
-     * 后者被 `Script_FirstLevelP012ActorTest` 抽进纯 JS 沙箱重放，里面没有 WATCH 表也
-     * 没有 ALERT_ORDER，所以那段代码只许读这个布尔，不许自己判警戒级别。
-     */
-    this.watchAlerted = false;
-    this.watchYaw = NaN;         // 戒备时面向哪儿（NaN = 没有意见，保持当前朝向）
-    this.watchUntil = -99;       // 这个朝向的有效期（Act 过期就不再接管转向）
-    this.watchScanAt = -99;      // 上一次把扫视方向扳过去的时刻
-    this.watchScanSign = 0;      // 扫视偏哪边：0 正对 / ±1 偏一侧（每 scanIntervalS 换一次）
-    this.displaceX = 0;          // 换位落点（跪射之后侧向挪 2–4 m）
-    this.displaceZ = 0;
-    this.displaceUntil = -99;    // 这次换位的超时时刻（走不到就放弃，下一拍重算）
-    this.displaceAt = -99;       // 上一次**发起**换位的时刻（displaceMinDwellS 限流）
-    this.displaceFireSeq = 0;    // 发起换位那一刻的 fireSequence（数「打了几发」）
-    this.displaceProne = false;  // 这次换位是匍匐后退（压制高）还是站着侧挪
-    // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
-    // 一发，布尔会从第一发起一直为 true，人物后坐只触发一次。序号让每发都有边沿。
-    this.fireSequence = 0;
     this.director = null;       // AiDirector.Spawn 填上，Kill 时用它发阵亡事件
+    const weaponId = options.weapon || (side === "nra" ? this.identity.weapon : "Type38");
+    const weapon = WEAPONS[weaponId] || WEAPONS.Type38;
+
+    this.vitals = {
+      health: 100,
+      state: STATE.IDLE,
+      stateTime: 0,
+      /**
+       * 最近 32 次状态切换的环形记录（敌军 AI 编辑器的「30 s 状态时间带」读它）。
+       *
+       * 为什么记在人身上而不是导演身上：时间带问的是「**这一个人**刚才经历了什么」，
+       * 全局事件流要按 id 过滤一遍才能回答，而 70 个人 × 每秒几次切换会把那条流
+       * 冲得只剩最近半秒。为什么是环形复用槽而不是 push/shift：这条记录每帧都可能写，
+       * 数组增删与对象字面量都会产生垃圾 —— 调试设施不许把 GC 压力算进玩法的帧预算。
+       * 槽在第一次真的发生切换时才建（`AiDirector._LogStateChange`），
+       * 木桩兵与平民一辈子不切状态，就一个字节都不占。
+       */
+      stateLog: null,
+      stateLogHead: 0,
+      stateLogCount: 0,
+      /** 上一次写进 stateLog 的状态。与 `state` 不同就说明该记一条了。 */
+      stateLogged: STATE.IDLE,
+      hurtPose: 0,                      // 中弹踉跄（Actor 的 hurt 覆盖姿势），Act 里按 HURT_FLINCH.decayS 衰减
+      deadTime: 0,
+    };
+
+    this.locomotion = {
+      position: new THREE.Vector3(options.x || 0, 0, options.z || 0),
+      velocity: new THREE.Vector3(),
+      yaw: options.ry || 0,
+      moveSpeed: 0,
+      /**
+       * 物理世界里的胶囊。**这是这一轮最要紧的一条改动** ——
+       * 在此之前 AI 完全没有碰撞：位移直接写 position，再拿 StandHeight 把人吸到
+       * 「脚下最高的那层」，挡不挡得住只由一个 Blocked() 启发式说了算。
+       * 于是人从墙里穿过去是常态，站到房顶上也是常态。
+       * 现在跟玩家用**同一套**角色控制器，两边对「这儿走不走得过去」只有一个答案。
+       */
+      body: null,
+      velocityY: 0,
+      grounded: true,
+      stance: 0,                        // 0 站 1 蹲 2 卧
+      // 姿态决定是离散的，画面过渡必须是连续的。以前 Think 每 0.1 s 在阈值两侧切 0/1，
+      // Actor 每次都直接吃满 0/1，于是整个人像电门一样反复蹲起。
+      crouchBlend: 0,
+      proneBlend: 0,
+      stanceUntil: -99,
+      lastRiseAt: -99,
+      stuckTime: 0,         // 想走但走不动已经持续了多久
+      detourTime: 0,        // 绕行还剩多久
+      idleStepDt: 0,        // 静止分频物理攒下的 dt（见 Act 尾部那笔账）
+      detourYaw: 0,         // 绕行时把前进方向拧多少
+      // 沿墙走的**固定**转向。第 1 批那版每次卡住都重掷一个随机方向，
+      // 于是撞墙→左绕一秒→回头撞墙→右绕一秒，是原地打转不是绕路：
+      // 实跑取证 37 名日军里 15—21 名常年处在"绕行中"，而兵力重心一百二十秒一动不动。
+      // 转向必须一人一个并且**认死**，这样才是真的沿着墙面兜过去。
+      detourSign: this.rnd() < 0.5 ? 1 : -1,
+      detourGoalDist: 1e9,  // 起绕那一刻离目标多远，用来判断这一圈有没有白绕
+      // 排队（Conga Line）是 ER2 被骂最狠的毛病之一：一个班沿同一条线走成一串。
+      // 对策是每个人生成时就领一个固定的横向偏移，跟随目标时永远偏这么多。
+      laneOffset: (this.rnd() - 0.5) * 11,
+      // 翻越。院墙 2 m、窗台 0.9 m，而 Blocked() 的自动抬腿只到 TRAVERSAL.stepMax ——
+      // 不给 AI 开这一条的话，玩家翻墙抄到院子里，追他的人只能绕门洞，
+      // 这个动词就变成了单方面的作弊。
+      vaultT: -1,            // >= 0 表示正在翻
+      vaultDuration: TRAVERSAL.vaultBaseS,
+      vaultKind: "vault",    // vault=腰高跨过 / mantle=肩高撑上去（Data_Traversal）
+      vaultFrom: null,
+      vaultTo: null,
+      vaultApexY: 0,
+      moveOrder: null,       // 这一帧的走位命令 {x,z,speed}（Act 的 switch 读它）
+      moveStore: { x: 0, z: 0, speed: 0 },
+      moveArriveM: NaN,      // 这一次走位的到位半径（掩体微走位要 0.12 m，默认 1.2 m 判不出探头）
+      stationaryS: 0,        // 在原地待了多久（投弹判据「对方钉在一处」读它）
+    };
+
+    this.arms = {
+      weaponId,
+      weapon,
+      ammo: weapon.magazine || 5,
+      reloadTimer: 0,
+      fireTimer: 0,
+      // 过热。十一年式不能换枪管，约 200 发必须冷却 —— 这是日军机枪火力
+      // 有节奏间隙的史实来源，也是玩家冲过街口的战术窗口。
+      heat: 0,
+      coolUntil: -99,
+      heatSmoke: 0,          // 冷却期间挂的那根白烟的 handle（0 = 没挂）
+      // 上刺刀。CHARGE 状态一进就上，白刃距离（2 m 内）真的会捅 —— 不是只跑过去开枪。
+      bayonetFixed: false,
+      muzzle: new THREE.Vector3(),
+      lastFire: -99,
+      muzzleWorld: null,     // 这一发的枪口（UpdateMuzzle 写，对不上账时为 null）
+      muzzleStore: null,
+      burstLeft: 0,          // 这一梭子还剩几发（BurstPlan 排的）
+      burstIntervalS: 0,
+      burstPauseS: 0,
+      // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
+      // 一发，布尔会从第一发起一直为 true，人物后坐只触发一次。序号让每发都有边沿。
+      fireSequence: 0,
+      grenades: 0,           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
+      lastGrenadeAt: -99,
+      /** 扳机从什么时候起「想打、弹在膛、有目标却一发没出去」（-1 = 没在空转；真打出一发 / 换目标清零）。 */
+      triggerDrySince: -1,
+      targetFireAt: -99,     // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
+      shooting: null,        // ShootingModel 的瞄准 / 暴露状态
+    };
+
+    this.aiming = {
+      // 枪不直接吃离散状态。FIRE/ADVANCE 在决策边界上偶尔切一次时，枪托仍应连续
+      // 上肩/放下；上身看向也必须相对「当前身体」而不是会量化跳变的导航方向。
+      aimBlend: 0,
+      aimUntil: -99,
+      lookYaw: 0,
+      lookPitch: 0,          // 持续跟踪瞄点的抬枪角（向上为正）
+      lookPitchBlend: 0,     // 限速之后真正喂给 Actor 的那个
+      aimTime: 0,
+      /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
+      playerLockAt: -99,
+    };
+
+    this.sense = {
+      target: null,
+      targetVisible: false,
+      targetLostTime: 0,
+      // 目标锁至少维持一小段时间；否则距离相近的两个人每次 Think 都互换名次，
+      // 身体又逐帧朝新目标转，视觉上就是原地转圈。
+      targetLockUntil: -99,
+      targetChanges: 0,
+      // 通视缓存按**目标 id** 存三份。原来一人只有一份、不区分目标：
+      // 最近的那个被墙挡住，缓存写下 clear=false，接下来 0.25 s 内换谁来问都答"看不见"，
+      // 于是整条战线一起瞎掉（实跑：losCache.clear 为 true 的 0 人）。
+      losCache: [
+        { id: 0, time: -99, clear: false },
+        { id: 0, time: -99, clear: false },
+        { id: 0, time: -99, clear: false },
+      ],
+      losSlot: 0,
+      // --- 第二波（docs/Data_EnemyAi.md §5）------------------------------------
+      perception: null,      // PerceptionModel 的记忆（Attach 建）
+      alert: "unaware",      // 士兵级警戒（ALERT.*）
+      awareness: 0,          // 当前目标的觉察度 0..1
+      lkp: null,             // 最后目击位置（复用对象）
+      lkpTime: -99,
+      lkpConfidence: 0,
+      targetMoving: false,
+      targetFromMemory: false,   // 目标是从记忆里接回来的（只压制射击，不冲锋）
+      targetExposedS: 0,     // 目标连续暴露了几秒（瞄准收敛加速）
+      aimedAtSince: -1,      // 【§21】玩家从什么时候起一直拿枪指着我（没指着 = −1）
+      threatWokenAt: -1,     // 【§21】待命兵（wakeOnThreat）被玩家惊动的时刻
+      grenadeThreatAt: -99,  // 上一次「敌方手榴弹落在我掩体边上」的时刻
+    };
+
+    this.brain = {
+      combatModeUntil: -99,
+      suppression: 0,
+      suppressedAt: -99,
+      // 被压制打断的自动冲锋记冷却：几秒内不重新发起。没有它，压制一衰减过阈值
+      // 就再冲、站上火线半秒又被压回卧倒，charge↔suppressed 两秒一圈来回抽。
+      chargeCooldownUntil: -99,
+      cover: null,
+      coverUntil: -99,
+      coverStore: null,      // s.cover 的复用容器（不每次选点都新建）
+      coverPhase: "none",    // "hide" | "peek" | "none"
+      coverPhaseUntil: -99,
+      coverPickAt: -99,      // 上一次（重）选掩体的时刻，reselectMinS 限流
+      coverThreatX: 0,       // 上一次选点时威胁在哪（挪远了才值得重算）
+      coverThreatZ: 0,
+      peekCount: 0,          // hide→peek 循环次数（验收探针数它）
+      /** 这一次探头里真打出去过一发（对人或环境射击都算）；任务侧开关下「白探头」据此判。 */
+      peekFired: false,
+      goal: new THREE.Vector3(options.x || 0, 0, options.z || 0),
+      regoalTime: -99,      // 守点软约束上一次重设目标的时刻
+      // cohesion：34 m 内还有几个同侧活人，是**班组密度**不是士气。
+      // 原名 morale 会诱导后人往 UI 上挂一条"中国守军士气条"—— 那在立场上是灾难。
+      cohesion: 1,
+      lonelyTime: 0,        // 20 m 内一个友军都没有已经持续了多久
+      /** 迟疑到什么时候：看见身边的人倒下 / 军官阵亡。期间不走位、不开枪、不起冲锋。 */
+      hesitateUntil: -99,
+      /** 关卡下令的成组冲锋：什么时候起身、冲到什么时候（`AiDirector.GroupCharge`）。 */
+      groupChargeAt: -99,
+      groupChargeUntil: -99,
+      /** 被身边起冲的战友带起来的跟冲：什么时候起身（冲的是他自己的目标）。 */
+      chargeFollowAt: -99,
+      /** 跃进喊话（§20）：上一次 Think 结束时的状态、上一次喊「前へ」的时刻。 */
+      thinkEndState: null,
+      advanceBarkAt: -99,
+      /** 身边掩体都打不出去时去空地（§20.11）：最近一次瞎探换点的时刻、窗口内次数、不选掩体到什么时候。 */
+      blindMoveAt: -99,
+      blindMoves: 0,
+      // --- 第三波：戒备与换位（docs/Data_EnemyAi.md §15）------------------------
+      /**
+       * 「这个人现在该戒备」。**由 Think 每 0.1 s 写一次，`ApplyScriptDefense` 每帧读**——
+       * 后者被 `Script_FirstLevelP012ActorTest` 抽进纯 JS 沙箱重放，里面没有 WATCH 表也
+       * 没有 ALERT_ORDER，所以那段代码只许读这个布尔，不许自己判警戒级别。
+       */
+      watchAlerted: false,
+      watchYaw: NaN,         // 戒备时面向哪儿（NaN = 没有意见，保持当前朝向）
+      watchUntil: -99,       // 这个朝向的有效期（Act 过期就不再接管转向）
+      watchScanAt: -99,      // 上一次把扫视方向扳过去的时刻
+      watchScanSign: 0,      // 扫视偏哪边：0 正对 / ±1 偏一侧（每 scanIntervalS 换一次）
+      displaceX: 0,          // 换位落点（跪射之后侧向挪 2–4 m）
+      displaceZ: 0,
+      displaceUntil: -99,    // 这次换位的超时时刻（走不到就放弃，下一拍重算）
+      displaceAt: -99,       // 上一次**发起**换位的时刻（displaceMinDwellS 限流）
+      displaceFireSeq: 0,    // 发起换位那一刻的 fireSequence（数「打了几发」）
+      displaceProne: false,  // 这次换位是匍匐后退（压制高）还是站着侧挪
+      grenadeEvade: null,    // 通用躲雷（GRENADE_EVADE）：{ grenade, startAt, goal, replanAt, dive }
+      task: null,            // TacticsDirector 每秒写的班组任务
+    };
+
+    this.meleeState = {
+      // Shared melee rules own the animation state for players, friends and enemies.
+      meleeCombat: null,
+      meleeTraining: null,
+      /** 白刃卡死判定（§20.7）：idle 架势的起点与那时的位置；解扣后 meleeDormant 到什么时候。 */
+      meleeStallAt: -1,
+      meleeStallX: 0,
+      meleeStallZ: 0,
+      meleeStallDormantUntil: 0,
+    };
+
+    this.command = {
+      order: "advance",
+      chargeUntil: -99,      // 玩家下"上刺刀"之后这道命令的有效期
+      flankUntil: -99,       // 绕行命令的有效期，到点或超时就转 advance
+      covertUntil: -99,      // 潜行命令的有效期：跟班长同姿态且不开枪
+      squadId: "",
+      squadSlot: 0,
+      tacticalRole: "rifleman",
+      squadMateCount: 0,
+      squadForwardX: 0,
+      squadForwardZ: -1,
+      squadFocusKind: "none",
+      squadFocusId: null,
+      manualGoalUntil: -99,
+      // 守点纪律：ER2 的 AI 会在赶路途中就地对射、根本不进点，导致「只要防守方
+      // 看得见攻方，这张图就极好打」。这里给防守单位一条硬规矩：
+      // 一旦被派去守某个占领区，除非死亡，否则不许离开该区半径。
+      holdZone: null,
+      /**
+       * 这个人占的那个**固定战位**的名字（重机枪位之类），没占就是 null。
+       * 与 squadId 分开存：squadId 在 Spawn 里会因为满员而被改名成 `..._1/_2`，
+       * 拿它当战位标识会认不出「这挺机枪已经有人了」。见 AiDirector.Spawn。
+       */
+      emplacementId: null,
+      /** 军官（分队长）：阵亡时本组压制 + 迟疑，旁人喊「分队长殿がやられた」。由关卡置位。 */
+      aiOfficer: false,
+      /** 反应层认的「本组」键（压力表的组 id）；空串时退回 squadId。 */
+      reactionGroup: "",
+    };
+
+    this.scripted = {
+      /**
+       * 靶场木桩兵（Script_Main ?range=1 时由装配层置真）。
+       * Update 里跳过 Think —— 不索敌、不开火、不自行走位（TryFire 要 target，
+       * Think 不跑就永远没有）；挨打、倒地、被准心识别照旧走原链路。
+       */
+      dummy: false,
+      towel: false,
+      /**
+       * 【2026-09-23】禁火的第二档：**压制档**。关卡编排（`Script_FirstLevelOpening.FireWindows`）
+       * 每拍与 `missionFireHold` 同一处重置 / 置起。`missionFireHold` 为真时这一位决定
+       * 扳机怎么扣：false = 一发不打（原行为），true = 跳过「暴露采样 + 抢令牌」那条
+       * 瞄准分支，直接向 `SuppressPoint` 压制射击 —— 命中恒 false、不占射击令牌，
+       * 所以**不进 TTK 账**，只制造近失弹与压制感。瞄准档的人数仍由 `playerFireLimit`
+       * 与令牌封顶，这一位不放宽任何一条。
+       */
+      missionFireSuppressOnly: false,
+      missionOpenUntil: -99,
+      // --- 2026-09-23 反应层与环境射击（docs/Data_EnemyAi.md §20）--------------------
+      /**
+       * 关卡给这个人的**授权射击点**表（`[{x,z,h?,r?,id?}]`，世界坐标，h 是离地高度）。
+       * null = 没有环境射击（默认；第一关以外永远是 null）。写入者：
+       * `Script_FirstLevelFrontPressure`（02–05 前沿）、`Script_FirstLevelBackdropSquads`（01 背景兵）。
+       */
+      ambientFirePoints: null,
+      /** Think 这一拍挑中的点（指向 `ambientAim` 这个复用容器；null = 不打）。 */
+      ambientFirePoint: null,
+      ambientAim: null,          // { x, y, z, r, id } 复用容器（第一次挑点时建）
+      ambientUntil: -99,         // 这个点打到什么时候换
+      ambientPickAt: -99,        // 上一次挑点的时刻（AMBIENT_FIRE.pickEveryS 限流）
+      ambientShots: 0,           // 取证：这个人打了几发环境射击
+      ambientBlockedId: null,    // 刚从枪口打过去被挡死的那个授权点（AMBIENT_FIRE.blockedRetryS 内不再挑）
+      ambientBlockedUntil: -99,
+    };
+
+    this.remains = {
+      /** 死后接管位移的那具刚体（见 AiDirector.StepCorpse）。 */
+      corpse: null,
+      /** 中弹方向 × 力度，死的那一帧交给尸体刚体当初速度。 */
+      deathPush: null,
+      corpseSettled: false,
+      // 尸体贴地：躯干对齐地表的俯仰/侧倾，与「肢体下面是空的」的下垂量。
+      // 全部带平滑（见 StepCorpse），所以要跨帧存在这儿。
+      corpseTiltX: 0,
+      corpseTiltZ: 0,
+      corpseDroopBody: 0,
+      corpseDroopArms: 0,
+      // 滑动的「卡住换向」：上一帧位置、卡住累计时长、限时绕行航向及其剩余时间。
+      corpseSlidePX: 0,
+      corpseSlidePZ: 0,
+      corpseStallT: 0,
+      corpseDetourX: 0,
+      corpseDetourZ: 0,
+      corpseDetourT: 0,
+      corpseSlideT: 0,
+      // 尸体上的家当。ER2 的拾取靠它，L4_LastFiveMinutes 那句"子弹得从倒下的人身上取"
+      // 以前是一条死注释 —— 死人身上什么都没有。
+      drop: null,
+      // 断肢记录（GoreSystem 建、GoreSystem 清）。**非空 = 这具身上少了东西**：
+      // 远景层不许接管他（那一层是整人烘的，会把肢体长回来），撤场时要先还原几何。
+      gore: null,
+    };
   }
 
   get alive() { return this.state !== STATE.DEAD; }

@@ -407,6 +407,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - NPC 步幅标定、按实际位移驱动的共享动画时钟与支撑脚 IK 见 [位移与步态同步](Data_ActorLocomotion.md)。`CharacterModel` 统一拥有跑步播放速率；任务/小队适配器不得重复以 AI 目标速度或固定 3.6 米/秒覆盖。速度按「播放速率 × 步幅」分摊（UE5 Lyra 式速率钳制 + Stride Warping + 骨盆下沉），日军蹲姿移动按速度选蹲走片，抬担架/跛行移动时下半身换成标定走路片（`Script_LayeredGait`），见该文「速度分摊」。
 
 ### 人物 / AI / 合批
+- **士兵分组件（2026-11-01）**：`Soldier` 的字段分在十个组件里（`soldier.arms.ammo` 等），表 `Data_SoldierComponents.mjs`，旧字段名由生成的 `Script_SoldierFields.mjs` 存取器照常读写。新字段先进表；门禁 `SoldierComponentsTest`。见 [敌军 AI §22](Data_EnemyAi.md)。
 - **带路跑通用设计**：普通随队士兵采用独立错峰的「跑几步 → 短停喘息与左右观察 → 再跑」，班长按引导职责行动。跨关卡复用、行为优先级、动画衔接与动态验收见 [NPC 带路跑通用设计](Data_NpcGuideCadence.md)。共享 `Script_SquadMarch` / `Script_SquadMarchAi` 已接第一关 Guide，`Script_EditorSquadMarch` 提供 1–24 人、路线、种子与参数预览/保存；分项验收状态见设计文档第 9 节。
 - 国军眼球材质与肩线资产修复、独立 Blender 工程和重建入口见 [国军眼睛与肩线修复](Data_NraEyesShoulders.md)。
 - `Script_Actor.mjs` —— 近景蒙皮 GLB 人物与程序化回退；预通道支持骨骼形变和运动历史。

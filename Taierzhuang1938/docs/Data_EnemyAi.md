@@ -1900,3 +1900,28 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
    要不要让玩家提前摸过去就惊动埋伏，是关卡设计的账。
 4. 整关探针的驾驶器不会拿枪去指敌人，所以 21.1 的比例量的是「在视野里」而不是「被指着」；被指着的行为靠 `AiAimedAtBrowserTest` 锁。
    同一跑驾驶器在 11 TransferSupply 停住（`actual body reached route end`，改前的树上跑出来的，与本节无关），08 以后的样本很少。
+
+## 22. 2026-11-01：士兵分组件
+
+`Soldier`（`Script_Ai.mjs`）原来是一个平铺 182 个字段的大对象，AI、关卡、白刃、尸体、测试场都直接往上写。现在按职责分成十个组件，表在 `Data_SoldierComponents.mjs`：
+
+| 组件 | 管什么 | 主人 |
+|---|---|---|
+| `vitals` | 血量、状态、状态记录、踉跄、死亡时刻 | Script_Ai |
+| `locomotion` | 位置、速度、朝向、物理胶囊、姿态、绕行、翻越、走位命令 | Script_Ai（Act） |
+| `arms` | 武器、弹药、换弹、过热、刺刀、枪口、点射、手榴弹 | Script_Ai（TryFire） |
+| `aiming` | 端枪与看向的连续量（喂给 Actor） | Script_Ai（Act） |
+| `sense` | 目标、通视缓存、感知记忆、警戒、最后目击位置 | Script_Ai（Think） |
+| `brain` | 压制、掩体、冲锋、迟疑、戒备、换位、躲雷、班组任务 | Script_Ai（Think） |
+| `meleeState` | 白刃状态与卡死判定 | Script_MeleeCombat |
+| `command` | 班组编号、命令及有效期、守点、战位、军官 | AiDirector |
+| `scripted` | 关卡与测试场挂的开关：木桩兵、禁火压制档、授权射击点 | 关卡编排 |
+| `remains` | 尸体刚体、贴地与滑动、遗物、断肢记录 | StepCorpse / GoreSystem |
+
+- 值真正存在 `soldier.<组件>.<字段>` 里。`Script_SoldierFields.mjs` 按表生成同名存取器（`Soldier extends SoldierFieldAccessors`），旧写法 `soldier.ammo` 读写的就是 `soldier.arms.ammo`，现有代码一行不用改。新代码直接写组件路径。
+- 留在士兵本身的只有 `id`、`side`、`identity`、`rnd`、`actor`、`director`。
+- 新字段先登记进表，再写进构造器里对应的组件，然后 `node Taierzhuang1938/Script_SoldierComponentsTest.mjs --write` 重新生成存取器。门禁 `SoldierComponentsTest`（纯 Node）拦三件事：构造完身上多出没登记的平铺字段、旧写法与组件不是同一个值、生成文件与表不同步。
+- 关卡在运行时临时挂上去的字段（`missionId`、`scriptEssential`、`missionUntargetable`、`openingStoryboardPose` 等）这一步没动，仍是士兵身上的普通属性；下一步收进 `scripted`。
+- 构造器里 `rnd` 先给 `locomotion.detourSign`、再给 `locomotion.laneOffset`，顺序变了每个人的随机数就全变了。改造时用改前改后各 5 名士兵（两方、不同武器与出生参数）逐个比对了全部 182 个初值和随机数状态，完全一致。
+- 存取器写成字面量，V8 能内联；纯字段读写的微基准比平铺慢约 1.5 倍（循环里用变量当键的 `defineProperty` 写法慢 5 倍，所以没用）。字段读写只占 AI 帧时间的很小一部分。
+- 移植 UE 时一组对应一个 `UActorComponent`，`brain` + `sense` 的决策部分对应 StateTree / 行为树与 AIPerception。

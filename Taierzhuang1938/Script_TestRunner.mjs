@@ -182,6 +182,7 @@ export const testDefs = {
   FirstLevelFrontPacingTest: {file:"Script_FirstLevelFrontPacingTest.mjs",desc:"03–06 节奏：何有田接枪/老周离枪 10 m、05 先炸车与并行撤离、安全区汇合、06 起行判据、PlayScene 说话人、指引指向战车、落弹区（纯 Node）"},
   FirstLevelFrontCounterattackTest: {file:'Script_FirstLevelFrontCounterattackTest.mjs',desc:'第一关 03–05 反击模块纯规则：撤退窗口双条件会关会开、落弹选点安全距、跟车解封、阵位前半边人选、攻击支路进度、车组/事实表合约、运行时三行钩子（纯 Node）'},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
+  SoldierComponentsTest: {file:'Script_SoldierComponentsTest.mjs',desc:'士兵组件表：Soldier 身上只有自有字段 + 十个组件、旧字段名读写同一值、生成的存取器与表同步（纯 Node，秒级）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
@@ -799,6 +800,7 @@ export const tier0Fast = [
   "FirstLevelStreetFightTest",
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
+  "SoldierComponentsTest",
   "FirstLevelFrontCounterattackTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
@@ -907,7 +909,7 @@ export const domains = {
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
     // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
+    tests: ["AiBehaviorTest", "SoldierComponentsTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -1134,6 +1136,7 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_Tuning_Ai/i },
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
+  { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },

@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **士兵分组件（2026-11-01）**：`Soldier` 的 182 个字段按职责分进 `vitals` / `locomotion` / `arms` / `aiming` / `sense` / `brain` / `meleeState` / `command` / `scripted` / `remains` 十个组件（表 `Data_SoldierComponents.mjs`），旧字段名经生成的存取器读写同一个值，现有代码不改；改前改后初值与随机数逐个比对一致。口径 [敌军 AI §22](Data_EnemyAi.md)，门禁 `SoldierComponentsTest`。
+
 - **九四式侦察机 V48 游戏接入（2026-10-28）**：`Model/NakajimaKi4/` 当前为 179679 三角／40 网格／43 张内嵌图，保留 10 个真实枢轴、216 片散热片和 1512 颗实体铆钉。构件库按需加载，`campaignEnabled:false`；原照轮廓与阴影残差保留，不宣称逐点完全一致。可编辑高／低源留 OneDrive，重建走 `_blender/Script_RebuildNakajimaKi4.mjs`；来源、接线、原门槛和收据见[资产说明](../Model/NakajimaKi4/README.md)。
 - **八九式乙型可选资产（2026-10-28）**：`Model/Type89MediumTank/` 的 GeometryV54／SurfaceV14 已接入构件库「模型」，按需加载；左右履带／轮组、整周炮塔、主炮及两挺机枪保留真实轴心和演示控件。`Data_VehicleAssets` 保持 `campaignEnabled:false`。高低源、细漆膜／浅铸纹、薄盖AO及独立三角化记账均有重建和验收；原厂限位、微观材质与隐藏结构仍属复原，不改变任务参战认定。入口与证据见[资产说明](../Model/Type89MediumTank/README.md)，重建 `_blender/Script_RebuildType89MediumTank.mjs`。
 
