@@ -4,12 +4,12 @@
 # loads one Mixamo base clip, edits it (mostly arms, hands and fingers) and exports. Run headless:
 #   node scripts/Script_BlenderMcp.mjs start --batch Taierzhuang1938/_import/MixamoAuthored/Script_Author_<Name>.py --task Author<Name>
 #
-# Outputs (all under the git-ignored Taierzhuang1938/tmp/Mixamo, like the Mixamo files they derive from):
-#   Glb/Animation_Claude_<Name>.glb      the clip, same layout as the converted Mixamo clips (armature "Armature",
+# Outputs (committed with the library since 2026-11-01; Raw FBX and Authored sources live in _import/Mixamo):
+#   Animation/Mixamo/Animation_Claude_<Name>.glb      the clip, same layout as the converted Mixamo clips (armature "Armature",
 #                                        bones without the "mixamorig:" prefix, one action named after the file);
 #                                        glTF extras on the scene carry author / base clip / source paths.
-#   Authored/<Name>.blend                the edited scene, for later iteration by hand.
-#   Authored/<Name>.report.json          per-frame measurements for review (palms, feet, rifle points, distances).
+#   _import/Mixamo/Authored/<Name>.blend                the edited scene, for later iteration by hand.
+#   _import/Mixamo/Authored/<Name>.report.json          per-frame measurements for review (palms, feet, rifle points, distances).
 #
 # Coordinates: Blender world is Z-up, metres. Rifle points are given in the project's weapon frame
 # (three.js convention, Model/Model_<id>.tzm.json): origin = right-hand grip (gripR), -Z = muzzle, +Y = up, +X = right.
@@ -26,8 +26,8 @@ from mathutils import Matrix, Quaternion, Vector
 PREFIX = "mixamorig:"
 FPS = 30
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.normpath(os.path.join(HERE, "..", "tmp", "Mixamo"))
-RAW, GLB, AUTHORED = (os.path.join(ROOT, sub) for sub in ("Raw", "Glb", "Authored"))
+GLB = os.path.normpath(os.path.join(HERE, "..", "Animation", "Mixamo"))
+RAW, AUTHORED = (os.path.join(HERE, "Mixamo", sub) for sub in ("Raw", "Authored"))
 AUTHOR = "Claude Opus 5.5"
 
 # Points on the project rifles, weapon frame (see header). Measured from the tzm meshes / mounts on 2026-11-01.
@@ -220,7 +220,7 @@ def Curl(arm, side, frame, amount, thumb=None, fingers=FINGERS[1:], axis=(1, 0, 
 
 # ----------------------------------------------------------------------------- output
 def Export(arm, name, meta):
-    """Write Glb/Animation_Claude_<name>.glb + Authored/<name>.blend. meta: dict with at least base, label, note."""
+    """Write Animation/Mixamo/Animation_Claude_<name>.glb + _import/Mixamo/Authored/<name>.blend. meta: dict with at least base, label, note."""
     os.makedirs(GLB, exist_ok=True)
     os.makedirs(AUTHORED, exist_ok=True)
     stem = f"Animation_Claude_{name}"
@@ -228,7 +228,7 @@ def Export(arm, name, meta):
     scene = bpy.context.scene
     info = {"author": AUTHOR, "basedOn": "Mixamo", **meta,
             "script": f"Taierzhuang1938/_import/MixamoAuthored/Script_Author_{name}.py",
-            "blend": f"Taierzhuang1938/tmp/Mixamo/Authored/{name}.blend"}
+            "blend": f"Taierzhuang1938/_import/Mixamo/Authored/{name}.blend"}
     scene["tz_authored"] = json.dumps(info, ensure_ascii=False)
     # Read by Script_MixamoLibraryFetch.mjs --prune: base / note / timings show up in the preview tool.
     with open(os.path.join(AUTHORED, name + ".meta.json"), "w", encoding="utf-8") as f:

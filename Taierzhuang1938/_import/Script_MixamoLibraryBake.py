@@ -6,7 +6,7 @@
 #
 # Every <rawDir>/*.fbx becomes <outDir>/<same stem>.glb. Bones lose the "mixamorig:" prefix
 # (Hips, Spine, LeftArm ...), the one action is renamed to the file stem. Files named
-# Character_*.fbx keep their mesh (the X Bot body); every other file is armature + one clip.
+# Model_*.fbx keep their mesh (the X Bot body); every other file is armature + one clip.
 # An existing, newer GLB is skipped, so re-running only converts new downloads.
 import bpy
 import os
@@ -81,7 +81,7 @@ def Main():
             skipped += 1
             continue
         try:
-            Convert(source, target, name.startswith("Character_"))
+            Convert(source, target, name.startswith("Model_"))
             done += 1
         except Exception as error:  # keep going; report at the end
             failed.append(f"{name}: {error}")

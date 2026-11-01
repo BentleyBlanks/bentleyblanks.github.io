@@ -7,8 +7,8 @@
 // （{stem, cat, name, variant, of, id, desc, inplace, loopable, duration, clickAt}）；
 // 本机另有程序把下载目录里新写完的 FBX 拷成 <grabDir>/Download_<首次出现毫秒>.fbx。
 // 这里按时间把文件对回日志（每个文件归给它出现前最近一次、还没被认领的点击），
-// 拷成 tmp/Mixamo/Raw/<stem>.fbx，清单写 tmp/Mixamo/Data_MixamoLibrary.json；两者都在已忽略目录：
-// Mixamo 许可允许用在游戏里，但不允许单独再分发原始动作文件，所以不进仓库。
+// 拷成 _import/Mixamo/Raw/<stem>.fbx（源文件），清单写 Animation/Mixamo/Data_MixamoLibrary.json，GLB 也在那里。
+// 2026-11-01 起整套进仓库（用户要多台电脑都能用）：Mixamo 许可允许用在自己的游戏里，只是不许当独立素材转卖 / 分发。
 // 之后跑 Script_MixamoLibraryBake.py 转 GLB。
 import fs from "node:fs";
 import path from "node:path";
@@ -16,8 +16,9 @@ import { fileURLToPath } from "node:url";
 import { AUTHORED, CURATE, DROP, HOLDS } from "./Data_MixamoLibraryCurate.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "..", "tmp", "Mixamo");
-const RAW = path.join(ROOT, "Raw");
+const LIBRARY = path.resolve(HERE, "..", "Animation", "Mixamo"); // GLB + 清单：预览工具与白盒编辑器读这里
+const RAW = path.join(HERE, "Mixamo", "Raw");
+const AUTHORED_DIR = path.join(HERE, "Mixamo", "Authored");
 
 // 名字 → [中文名, 现有动作里它可以顶替谁（空 = 补缺口）]
 const LABELS = {
@@ -315,10 +316,10 @@ function AuthoredClips(byFile) {
   const clips = [];
   for (let [key, spec] of Object.entries(AUTHORED)) {
     const file = `Animation_Claude_${key}.glb`;
-    if (!fs.existsSync(path.join(ROOT, "Glb", file))) continue;
+    if (!fs.existsSync(path.join(LIBRARY, file))) continue;
     // 制作脚本导出时写的 Authored/<键>.meta.json：改自哪条（base）、制作说明（note → madeNote，预览里是普通一行，
     // 不是黄色「注意」——「注意」只留给 AUTHORED 表里手写的时代/用法提醒）、关键帧时间（timings）以它为准。
-    const metaPath = path.join(ROOT, "Authored", `${key}.meta.json`);
+    const metaPath = path.join(AUTHORED_DIR, `${key}.meta.json`);
     const meta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, "utf8")) : {};
     spec = { ...spec, ...(meta.base ? { base: meta.base } : {}), ...(meta.note ? { madeNote: meta.note } : {}),
       ...(meta.timings ? { timings: meta.timings } : {}), ...(meta.loop !== undefined ? { loop: meta.loop } : {}) };
@@ -329,7 +330,7 @@ function AuthoredClips(byFile) {
       description: base ? `基于 Mixamo「${base.label}」（${base.name} V${base.variant}）` : `基于 Mixamo ${spec.base}`,
       loop, inPlace: false, duration: null, replaces: extra.replaces || "", hold, ...extra,
       author: "Claude Opus 5.5", basedOn: spec.base,
-      sources: [`Taierzhuang1938/_import/MixamoAuthored/Script_Author_${key}.py`, `Taierzhuang1938/tmp/Mixamo/Authored/${key}.blend`],
+      sources: [`Taierzhuang1938/_import/MixamoAuthored/Script_Author_${key}.py`, `Taierzhuang1938/_import/Mixamo/Authored/${key}.blend`],
     });
   }
   return clips;
@@ -344,7 +345,7 @@ function WriteManifest(manifestPath, clips) {
     || Boolean(b.author) - Boolean(a.author)
     || a.label.localeCompare(b.label, "zh"));
   fs.writeFileSync(manifestPath, JSON.stringify({
-    schema: 2, character: "Character_MixamoXBot.glb", source: "Mixamo X Bot, FBX 30 fps, without skin",
+    schema: 2, character: "Model_MixamoXBot.glb", source: "Mixamo X Bot, FBX 30 fps, without skin",
     categories: CATEGORY_ORDER, holds: HOLDS, clips: curated,
   }, null, 2));
   return curated;
@@ -353,9 +354,9 @@ function WriteManifest(manifestPath, clips) {
 // 转完 GLB 之后跑一次 `--prune`：清单里只留真有 GLB 的条目（没下全、转换失败的去掉，下次补下再加回来），
 // 顺带重套一遍整理表。只改了整理表时也用它。
 function Prune() {
-  const manifestPath = path.join(ROOT, "Data_MixamoLibrary.json");
+  const manifestPath = path.join(LIBRARY, "Data_MixamoLibrary.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const kept = manifest.clips.filter(clip => fs.existsSync(path.join(ROOT, "Glb", clip.file)));
+  const kept = manifest.clips.filter(clip => fs.existsSync(path.join(LIBRARY, clip.file)));
   const missing = manifest.clips.filter(clip => !kept.includes(clip)).map(clip => clip.file);
   const curated = WriteManifest(manifestPath, kept);
   const shown = curated.filter(clip => !clip.dropped);
@@ -370,7 +371,7 @@ function Main() {
   if (!input || !grabDir) throw new Error("usage: node Script_MixamoLibraryFetch.mjs <log.json> <grabDir>");
   const log = JSON.parse(fs.readFileSync(input, "utf8"));
   fs.mkdirSync(RAW, { recursive: true });
-  const manifestPath = path.join(ROOT, "Data_MixamoLibrary.json");
+  const manifestPath = path.join(LIBRARY, "Data_MixamoLibrary.json");
   const previous = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : { clips: [] };
   const clips = new Map(previous.clips.map(clip => [clip.file, clip]));
   let fetched = 0;

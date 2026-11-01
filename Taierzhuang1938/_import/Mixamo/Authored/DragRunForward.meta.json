@@ -1,0 +1,20 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_UnarmedRunForward_V1",
+  "label": "单手在身后拖着往前跑",
+  "loop": true,
+  "duration": 0.9,
+  "timings": {
+    "cycle": [
+      0.0,
+      0.9
+    ],
+    "leftFootPlant": 0.4,
+    "rightFootPlant": 0.83,
+    "stepsPerMin": 133
+  },
+  "note": "顺子右手在身后下方攥着被角/衣领，手臂几乎伸直往后拽（预览里没有被子和伤员，只有一只攥拳的右手）；原地循环 0.9 s（133 步/分），上身比空手跑多前倾约 15 度、髋下沉 7 cm、步幅缩到 0.82；拖拽式后送，不是肩扛。首尾帧相同。",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_DragRunForward.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/DragRunForward.blend"
+}

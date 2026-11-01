@@ -2,13 +2,13 @@
 // 照 TextureEditor 的写法：只有静态 id / label / hint / Open()，不进互斥编辑器表 ——
 // 预览页 Tool_MixamoAnimationPreview.html 自带场景和相机，开在独立窗口里，不碰游戏画面。
 //
-// 动作文件只在本机 tmp/Mixamo（Mixamo 不许再分发原始动作，不进仓库）：线上打开只会看到「读不到动作库」。
+// 动作库在 Animation/Mixamo（GLB + Data_MixamoLibrary.json），源 FBX 与自制动作的 .blend 在 _import/Mixamo。
 // 整理与下载流程见 _import/Script_MixamoLibraryFetch.mjs、_import/Data_MixamoLibraryCurate.mjs。
 
 export class MixamoPreviewEditor {
   static id = "mixamoPreview";
   static label = "Mixamo 动作预览";
-  static hint = "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，挂项目的步枪、手榴弹、大刀（动作文件只在本机）";
+  static hint = "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，挂项目的步枪、手榴弹、大刀、担架";
   static win = null;
   static Open() {
     if (!this.win || this.win.closed) {

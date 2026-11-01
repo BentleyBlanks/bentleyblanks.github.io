@@ -1,0 +1,23 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_RifleKneelToAim_V1",
+  "label": "跪姿拉栓",
+  "loop": true,
+  "note": "取末帧跪姿瞄准为基础。中正式（毛瑟98）转栓：上翻90°—后拉—前推—下压；单膝跪姿，枪抵肩，左手托护木不动。不要用在汉阳造上（整夹装填）。",
+  "timings": {
+    "开始": 0.0,
+    "手离开握把": 0.16666666666666666,
+    "握住拉柄": 0.36666666666666664,
+    "上翻到位": 0.5333333333333333,
+    "后拉到底": 0.8333333333333334,
+    "到底停一拍结束": 0.9,
+    "前推到位": 1.1333333333333333,
+    "下压锁闭": 1.3,
+    "手回握把": 1.6,
+    "结束": 1.8333333333333333
+  },
+  "rifle": "ZhongZheng",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_RifleBoltKneel.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/RifleBoltKneel.blend"
+}

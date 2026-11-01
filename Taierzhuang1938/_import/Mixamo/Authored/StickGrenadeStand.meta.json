@@ -1,0 +1,24 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_Throw_V1",
+  "label": "国军木柄弹·站着扔",
+  "note": "国军木柄弹（巩式/二四式，无保险销）：右手握柄弹头朝上；左手捏尾盖拧两三下拧开、盖扔掉；左小指勾拉火绳往左下后方猛拽；不停顿接原动作的引臂和甩出。点火段 1.33 s，整条 3.3 s。拉火后几秒就炸，所以拽完马上扔，别在中间加等待。",
+  "timings": {
+    "start": 0.0,
+    "gripRaise": 0.3,
+    "capPinch": 0.433,
+    "capOff": 0.8,
+    "capToss": 0.933,
+    "cordHook": 1.033,
+    "pullStart": 1.133,
+    "pullEnd": 1.333,
+    "windupStart": 1.333,
+    "release": 2.0,
+    "end": 3.3
+  },
+  "loop": false,
+  "durationSec": 3.3,
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StickGrenadeStand.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StickGrenadeStand.blend"
+}

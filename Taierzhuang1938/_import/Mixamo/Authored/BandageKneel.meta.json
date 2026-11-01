@@ -1,0 +1,24 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_KneelingIdle_V1",
+  "label": "跪着给伤员包扎",
+  "loop": true,
+  "note": "双膝跪、伤员仰躺在面前，包扎他的上臂：右手拿绷带卷从上方送过肢体，左手在下方接住拉回，每圈约1秒，缠3圈后两手向外拉紧一次，可循环。肢体轴线沿X，过点(0,-0.205,0.32)，直径约10cm；预览里没有伤员和绷带。1938年急救没有心肺复苏。",
+  "timings": {
+    "开始（右手近侧上方待送）": 0.0,
+    "第1圈送卷到远侧": 0.42,
+    "第1圈远侧交接": 0.52,
+    "第1圈拉回近侧": 0.95,
+    "第2圈起": 1.0,
+    "第2圈远侧交接": 1.4935,
+    "第3圈起": 2.05,
+    "第3圈远侧交接": 2.4964999999999997,
+    "第3圈结束": 3.0,
+    "拉紧向外最大": 3.2,
+    "拉紧回位": 3.5,
+    "结束=开始": 3.6
+  },
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_BandageKneel.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/BandageKneel.blend"
+}

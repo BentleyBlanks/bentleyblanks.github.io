@@ -1,0 +1,23 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_ProneIdle_V1",
+  "label": "卧姿拉栓",
+  "note": "中正式/毛瑟 98 式转栓：左手托护木、双肘撑地、枪抵肩不动；右手离握把 -> 攥拉柄球头 -> 上翻 90° -> 后拉到底停一拍 -> 前推 -> 下压 -> 回握把。拉栓本身（攥住到松手）1.0 s，整条 2.0 s，首尾相同可循环。不是汉阳造（整夹装填）的动作；日军三八式拉柄更靠后更大，需要换 --rifle=Type38 再看。",
+  "timings": {
+    "start": 0.0,
+    "leave": 0.17,
+    "contact": 0.47,
+    "up": 0.67,
+    "back": 0.97,
+    "forward": 1.23,
+    "down": 1.47,
+    "release": 1.53,
+    "home": 1.77,
+    "end": 2.0
+  },
+  "loop": true,
+  "durationSec": 2.0,
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_RifleBoltProne.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/RifleBoltProne.blend"
+}

@@ -1,0 +1,23 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_RifleAimingIdle_V1",
+  "label": "站姿拉栓",
+  "note": "中正式/三八式转栓：上翻、后拉、前推、下压；枪始终抵肩，左手托护木不动；首尾同姿势，可循环。按中正式拉柄位置做（三八式拉柄更靠右约 4 cm，手会略偏）。不涉及桥夹；拉到底时是弹壳抛出的时刻。",
+  "timings": {
+    "idle_start": 0.03333333333333333,
+    "release_grip": 0.26666666666666666,
+    "reach_knob": 0.5,
+    "pinch_knob": 0.6666666666666666,
+    "up_done": 0.8666666666666667,
+    "back_done": 1.1,
+    "forward_done": 1.3,
+    "down_done": 1.5,
+    "release_knob": 1.5,
+    "back_on_grip": 1.7666666666666666,
+    "duration": 2.1333333333333333
+  },
+  "loop": true,
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_RifleBoltStand.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/RifleBoltStand.blend"
+}

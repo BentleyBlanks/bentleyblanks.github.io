@@ -1,0 +1,28 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_ThrowGrenade_V2",
+  "label": "国军木柄弹·蹲着扔",
+  "loop": false,
+  "durationSec": 3.667,
+  "note": "蹲在胸墙后：右手握柄靠弹头一端、弹头朝上；左手到尾端拧盖三下，小指勾拉火绳往下后拽；随即身体半起，右臂从肩后甩出过胸墙，扔完缩回蹲下。国军木柄弹没有保险销，拉火后几秒就炸，不停顿。后抡、前甩两段来自 Mixamo 原动作（压快 1.2 倍），拧盖和拉绳是重做的。预览里弹头从拇指一侧伸出，所以右手拇指朝上 = 弹头朝上。",
+  "timings": {
+    "开始": 0.0,
+    "左手到尾端": 0.23,
+    "拧盖三下": [
+      0.23,
+      0.83
+    ],
+    "小指勾绳": 0.83,
+    "拽绳": [
+      0.93,
+      1.13
+    ],
+    "右手转向备弹、接回原动作": 1.33,
+    "出手": 2.03,
+    "结束": 3.67
+  },
+  "grenade": "Gongxian",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StickGrenadeCrouch.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StickGrenadeCrouch.blend"
+}

@@ -1,0 +1,71 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_RifleIdle_V2",
+  "label": "站姿压桥夹装弹",
+  "loop": false,
+  "duration": 6.167,
+  "timings": {
+    "start": 0.0,
+    "lower": [
+      0.3,
+      0.95
+    ],
+    "toKnob": [
+      1.0,
+      1.18
+    ],
+    "unlockUp": [
+      1.25,
+      1.5
+    ],
+    "pullBack": [
+      1.5,
+      1.72
+    ],
+    "boltOpen": 1.84,
+    "toPouch": [
+      1.84,
+      2.3
+    ],
+    "takeClip": [
+      2.3,
+      2.58
+    ],
+    "toFeed": [
+      2.58,
+      3.07
+    ],
+    "insert": [
+      3.07,
+      3.25
+    ],
+    "thumbPress1": 3.43,
+    "thumbPress2": 3.67,
+    "releaseClip": 3.85,
+    "backToKnob": [
+      3.85,
+      4.29
+    ],
+    "pushForward": [
+      4.29,
+      4.55
+    ],
+    "lockDown": [
+      4.55,
+      4.73
+    ],
+    "toGrip": [
+      4.87,
+      5.29
+    ],
+    "raise": [
+      5.22,
+      5.79
+    ],
+    "end": 6.17
+  },
+  "note": "中正式/三八式转栓式桥夹装弹（不是汉阳造）；预览只有枪，没有桥夹和子弹；单次动作，首尾逐帧等于 RifleIdle_V2 第 1 帧。装弹时枪收近身体：机匣在胸前约 27 cm、高约 1.1 m，枪口斜指左前上约 32 度，左手弯肘托枪，髋沉膝屈。",
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StripperLoadStand.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StripperLoadStand.blend"
+}

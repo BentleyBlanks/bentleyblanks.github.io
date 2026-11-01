@@ -1,0 +1,24 @@
+{
+  "author": "Claude Opus 5.5",
+  "basedOn": "Mixamo",
+  "base": "Animation_Mixamo_ThrowGrenade_V1",
+  "label": "国军木柄弹·趴着扔",
+  "note": "国军木柄手榴弹（巩式/二四式）没有保险销：趴着，右手握木柄近弹头端、弹头朝前上；左手拇指、食指捏住木柄尾端的盖，手腕绕木柄轴转 3 下拧下，小指勾住拉火绳猛拉；随即身体向左侧翻、右臂从体后向上向前抡出，出手后立刻翻回趴姿。拉火后不停顿，不能握着等。单次、不循环。预览里弹头挂在挥得最快的右手上，出手点在约 2.57 s。",
+  "timings": {
+    "start": 0.033,
+    "ready": 0.467,
+    "twist_start": 0.467,
+    "cap_off": 1.367,
+    "pull_start": 1.567,
+    "pull_end": 1.7,
+    "roll_start": 1.467,
+    "windup": 2.333,
+    "release": 2.567,
+    "followthrough": 2.8,
+    "end": 3.733
+  },
+  "loop": false,
+  "durationSec": 3.733,
+  "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StickGrenadeProne.py",
+  "blend": "Taierzhuang1938/_import/Mixamo/Authored/StickGrenadeProne.blend"
+}
