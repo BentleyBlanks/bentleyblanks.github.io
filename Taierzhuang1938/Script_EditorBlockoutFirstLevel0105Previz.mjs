@@ -29,6 +29,7 @@ import {
   L0105_TANKETTES as TK,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { PrevizOwnerTimelines, OverlayTimelinePreviz } from "./Script_TimelinePlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
 import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT, FrontAtX, SHELL_032 } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 
@@ -2088,22 +2089,36 @@ export const SEQUENCE_BUILDERS = Object.freeze([
   S0301, S0302, S0303, S0304, S0305, S0401, S0402, S0403, S0501, S0502, S0503, S0504,
 ]);
 
-/** 生成整份预演文档（纯函数：只依赖传入的配置与台词清单）。 */
-export function BuildPreviz({ config, voice }) {
+/**
+ * 本关的原件 Timeline（Script_TimelinePlan 登记里写了 ownsPreviz 的，2026-11-01 起是开场 01-1…02-3）：
+ * 这几个关键帧的段整段抄 Timeline 的，这里的 S0101… 生成结果不用（改开场去改 Timeline/FirstLevelOpening.timeline.json）。
+ */
+export function LoadOwnerTimelineDocs() {
+  return PrevizOwnerTimelines("FirstLevel0105").map(entry => LoadJson(join(HERE, entry.file)));
+}
+
+/** 生成整份预演文档（纯函数：只依赖传入的配置、台词清单与原件 Timeline）。 */
+export function BuildPreviz({ config, voice, timelines = [] }) {
   const ctx = { config, voice: VoiceIndex(voice) };
+  const owned = new Set(timelines.flatMap(d => (d.sequences || []).map(s => s.keyframe)));
   const sequences = SEQUENCE_BUILDERS.map(build => build(ctx));
-  for (const seq of sequences) RestPass(ctx, seq);
+  for (const seq of sequences) if (!owned.has(seq.keyframe)) RestPass(ctx, seq);
   const order = config.keyframes.map(k => k.id);
   sequences.sort((a, b) => order.indexOf(a.keyframe) - order.indexOf(b.keyframe));
-  return {
+  const doc = {
     schema: "tengxian-blockout-previz/1",
     level: "FirstLevel0105",
     title: "第一关 01–05 预演（占位动作 + 占位配音）",
-    source: { generator: "node Taierzhuang1938/Script_EditorBlockoutFirstLevel0105Previz.mjs --force", note: "剧本 Notion 01–05（10-18 定稿）；手改前先想好：重跑生成器会覆盖" },
+    source: {
+      generator: "node Taierzhuang1938/Script_EditorBlockoutFirstLevel0105Previz.mjs --force",
+      note: "剧本 Notion 01–05（10-18 定稿）；手改前先想好：重跑生成器会覆盖"
+        + (owned.size ? `。${[...owned].join(" / ")} 整段抄自原件 Timeline（${PrevizOwnerTimelines("FirstLevel0105").map(e => e.file).join("、")}，Notion 01–02 第四版，2026-11-01），改它们去改 Timeline` : ""),
+    },
     voice: "./Blockout/FirstLevel0105.voice.json",
     faceTracks: "./Audio/Blockout0105/Data_Blockout0105FaceTracks.json",
     sequences,
   };
+  return timelines.length ? OverlayTimelinePreviz(doc, timelines).doc : doc;
 }
 
 // ---------------------------------------------------------------------------
@@ -2111,7 +2126,7 @@ export function BuildPreviz({ config, voice }) {
 
 async function Main(argv) {
   const config = LoadJson(CONFIG_FILE), voice = LoadJson(VOICE_FILE);
-  const doc = BuildPreviz({ config, voice });
+  const doc = BuildPreviz({ config, voice, timelines: LoadOwnerTimelineDocs() });
   const { CheckPreviz } = await import("./Script_EditorBlockoutFirstLevel0105PrevizTest.mjs");
   const report = await CheckPreviz(doc, { config, voice });
   for (const w of report.warnings) console.log("警告：" + w);

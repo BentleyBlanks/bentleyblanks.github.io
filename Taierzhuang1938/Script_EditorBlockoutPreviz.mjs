@@ -40,6 +40,7 @@ import {
   PREVIZ_FREE_LOOK, PrevizFreeLookSegment, WrapDeg,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BlockoutPrevizAircraft } from "./Script_EditorBlockoutPrevizAircraft.mjs";
+import { PrevizOwnerTimelines, OverlayTimelinePreviz } from "./Script_TimelinePlan.mjs";
 import { KeyframeIndex } from "./Script_EditorBlockoutConfig.mjs";
 import { TankGroundY } from "./Script_EditorBlockoutPuppets.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
@@ -95,6 +96,9 @@ export const PREVIZ_SFX = Object.freeze({
   jarShatter: { url: "./Audio/BlockoutPreviz/Sfx_JarShatter.mp3" },
   // 2026-10-24（06–10 第九版 07-4）：远处听不清的日本话——直接放一条现成的日语占位配音（09-4 搜窖的头儿那句，远远放、小音量；不另配音）
   ijaShoutFar: { url: "./Audio/Blockout0610/AudioVoice_Blockout0610CellarHurry_01.mp3" },
+  // 2026-11-01（开场改稿）：塌洞那发炮的来弹啸声（游戏 Combat.FireShell 用的同一个合成音）、日军跳沟前的短哨
+  shellIncoming: { cue: "shellIncoming" },
+  whistleShort: { cue: "whistleShort" },
 });
 const SMOKE_KIND = Object.freeze({ SmokeDust: "dust", SmokeWhite: "screen", SmokeBlack: "black" });
 const SMOKE_DEFAULT_S = 6;
@@ -114,6 +118,9 @@ export class BlockoutPreviz {
     this.cameraMode = editor.params?.get?.("previzCamera") === "move" ? "move" : "cut";
     this.doc = null;          // 归一化后的预演
     this.source = null;       // Timeline 换上来的数据源（UseSource）；有它时一切按它播，本关的预演文件照常轮询但不用
+    this.rawDoc = null;       // 本关预演文件原样（盖原件 Timeline 之前）
+    this.ownerText = null;    // 本关原件 Timeline 的原文（只用来判断变没变）
+    this.ownedKeyframes = []; // 哪几个关键帧的段来自原件 Timeline（2026-11-01）
     this.fileVoice = null;    // 本关预演文件写的台词清单地址（换源结束时还回去）
     this.text = null;         // 原文（轮询比对）
     this.levelKey = null;
@@ -245,29 +252,66 @@ export class BlockoutPreviz {
   async Load({ force = false } = {}) {
     if (!this.openingLoading && !this.opening) this.EnsureOpening();
     const levelKey = this.editor.levelKey;
-    if (levelKey !== this.levelKey) { this.levelKey = levelKey; this.text = null; this.doc = null; this.present = false; force = true; }
+    if (levelKey !== this.levelKey) {
+      this.levelKey = levelKey; this.text = null; this.doc = null; this.present = false; force = true;
+      this.rawDoc = null; this.ownerText = null; this.ownedKeyframes = [];
+    }
     this.lastCheckMs = performance.now();
     let result;
     try { result = await this.editor.store.Load(`${levelKey}.previz`, { knownText: force ? undefined : this.text ?? undefined }); }
     catch (error) { return this.present; }
     if (levelKey !== this.editor.levelKey) return false;
-    if (result.state === "same") return this.present;
-    if (result.state === "missing") { this.Swap(null, null); return false; }
-    if (result.state !== "ok") {
+    // 2026-11-01：本关登记了 ownsPreviz 的 Timeline（Script_TimelinePlan）时，那几个关键帧的段以 Timeline 为准
+    const owners = await this.LoadOwnerTimelines(levelKey);
+    if (levelKey !== this.editor.levelKey) return false;
+    const ownersChanged = force || owners.text !== this.ownerText;
+    if (result.state === "same" && !ownersChanged) return this.present;
+    if (result.state === "missing" && !owners.docs.length) { this.rawDoc = null; this.ownerText = owners.text; this.ownedKeyframes = []; this.Swap(null, null); return false; }
+    if (result.state !== "ok" && result.state !== "same" && result.state !== "missing") {
       // 写了一半 / 网络抖：留着上一份能用的
       this.validation = { ok: false, errors: [result.message], warnings: [] };
       this.text = result.text ?? this.text;
       this.editor.OnPrevizStatus?.();
       return this.present;
     }
-    this.fileVoice = result.doc?.voice ?? null;
+    if (result.state === "ok") this.rawDoc = result.doc;
+    else if (result.state === "missing") this.rawDoc = null;
+    this.ownerText = owners.text;
+    const { doc, owned } = OverlayTimelinePreviz(this.rawDoc, owners.docs);
+    this.ownedKeyframes = owned;
+    this.fileVoice = doc?.voice ?? null;
     if (!this.source) await this.LoadVoiceManifest(this.fileVoice);
-    const check = ValidateBlockoutPreviz(result.doc, { config: this.editor.doc, voice: this.source ? null : this.voice });
+    const check = ValidateBlockoutPreviz(doc, { config: this.editor.doc, voice: this.source ? null : this.voice });
     this.validation = check;
-    if (!check.ok) console.warn(`[BlockoutPreviz] ${levelKey}.previz.json 有 ${check.errors.length} 处错误：`, check.errors.slice(0, 6));
+    if (!check.ok) console.warn(`[BlockoutPreviz] ${levelKey} 的预演（含 Timeline 原件段 ${owned.join(", ") || "无"}）有 ${check.errors.length} 处错误：`, check.errors.slice(0, 6));
     // 有错也照播能播的（坏的轨道在取样里被跳过），错误进状态
-    this.Swap(NormalizeBlockoutPreviz(result.doc), result.text);
+    this.Swap(NormalizeBlockoutPreviz(doc), result.state === "ok" ? result.text : this.text);
     return true;
+  }
+
+  /**
+   * 本关的原件 Timeline（Script_TimelinePlan.PrevizOwnerTimelines）→ { docs, text }。text 是几份原文拼起来，只用来判断变没变；
+   * 读不到的那份跳过（警告一次），预演照常用文件里的段。
+   */
+  async LoadOwnerTimelines(levelKey) {
+    const entries = PrevizOwnerTimelines(levelKey);
+    const docs = [], parts = [];
+    for (const entry of entries) {
+      try {
+        const response = await fetch(`./${entry.file}?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        docs.push(JSON.parse(text));
+        parts.push(text);
+      } catch (error) {
+        if (!this.ownerWarned?.has(entry.id)) {
+          (this.ownerWarned ||= new Set()).add(entry.id);
+          console.warn(`[BlockoutPreviz] 原件 Timeline ${entry.file} 读不到，这几段用预演文件里的：`, error?.message || error);
+        }
+        parts.push("");
+      }
+    }
+    return { docs, text: parts.join("\n---\n") };
   }
 
   Swap(doc, text) {
@@ -964,7 +1008,7 @@ export class BlockoutPreviz {
       present: this.present, playing: !!run, paused: !!run?.paused, keyframe: run?.seq.keyframe ?? null, title: run?.seq.title ?? null,
       t: run ? +run.t.toFixed(3) : 0, durationS: run ? +run.durationS.toFixed(3) : 0, then: run?.seq.then ?? null,
       cameraMode: this.cameraMode,
-      sequences: this.ActiveDoc ? this.ActiveDoc.sequences.map(s => s.keyframe) : [], source: !!this.source, lines, subtitles: this.elSubs.hidden ? [] : [...this.elSubs.querySelectorAll(".boPrevizText")].map(e => e.textContent),
+      sequences: this.ActiveDoc ? this.ActiveDoc.sequences.map(s => s.keyframe) : [], source: !!this.source, ownedKeyframes: [...(this.ownedKeyframes || [])], lines, subtitles: this.elSubs.hidden ? [] : [...this.elSubs.querySelectorAll(".boPrevizText")].map(e => e.textContent),
       camera: this.lastCamera && run ? { ...this.lastCamera, position: { ...this.lastCamera.position } } : null,
       missingClips: [...this.missingClips], missingLines: [...this.missingLines], missingSfx: [...this.missingSfx],
       errors: this.validation?.errors?.slice(0, 20) ?? [], warnings: this.validation?.warnings?.length ?? 0,

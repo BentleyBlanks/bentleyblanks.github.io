@@ -31,7 +31,7 @@ const FRAME_S = 1 / TIMELINE_FPS;
 export class TimelineEditor {
   static id = "timeline";
   static label = "Timeline 过场";
-  static hint = "过场时间轴：第一关开场四段预演（测试拷贝），走白盒编辑器的预演播放器（打开后整页切换）";
+  static hint = "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）";
 
   /** 目标地址：?editor=blockout&level=<关卡>&kf=<第一段>&timeline=<Id>，只带上规模 / 音频 / 画质。 */
   static Url(href = globalThis.location?.href || "", id = DEFAULT_TIMELINE_ID) {
@@ -129,6 +129,8 @@ export class TimelinePanel {
       const response = await fetch(`./${entry.file}?t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       text = await response.text();
+      // 读的时候面板被关了（Close 已经 UseSource(null)）：别再把源换回来
+      if (!this.open) return false;
     } catch (error) {
       this.validation = { ok: false, errors: [`读不到 ${entry.file}：${error?.message || error}`], warnings: [] };
       this.RenderStatus();

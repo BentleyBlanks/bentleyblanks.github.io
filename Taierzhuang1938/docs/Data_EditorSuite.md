@@ -350,8 +350,16 @@ FOV 按正片相同的 `adsFovScale` 收窄。红十字是枪口真实弹道在�
   `Script_TimelinePlan.TIMELINES`。一份 Timeline = 按顺序首尾相接的几段**子序列**
   （Sequencer 的 Shot / Unity 的 Control Clip）；每段就是一段白盒预演（字段口径
   [白盒编辑器 §14.1](Data_EditorBlockout.md)：镜头轨、演员键、台词、事件、飞机、慢动作），从自己那个关键帧的布设起播。
-  现有一份 `FirstLevelOpening` = 第一关开场 01-1…01-4（4 段 170.25 s）的**拷贝**：测试用，改它不动
-  `Blockout/FirstLevel0105.previz.json`；`copiedFrom` 记着从哪儿拷的，`sync` 照它重新拷（覆盖本地改动）。
+  现有一份 `FirstLevelOpening` = 第一关开场 01-1…02-3（7 段，Notion 01–02 第四版）。
+- **原件，不是拷贝（2026-11-01）**：用户「接入到白盒编排 / 编辑器里去，试玩 / 预演就可以直接播放这一段，而不是再做一次」。
+  `TIMELINES` 里写了 `ownsPreviz: true` 的 Timeline 是本关这几个关键帧预演的原件：
+  - 白盒编辑器读本关预演时，这几个关键帧的段换成 Timeline 的（`Script_TimelinePlan.OverlayTimelinePreviz`，
+    `Script_EditorBlockoutPreviz.Load` 每次连 Timeline 文件一起读，2 s 一查，改了就重读）——卡片上的预演按钮、N 键、
+    试玩里「看」的那几步播的都是 Timeline，`Previz.State().ownedKeyframes` 报哪几段来自原件；
+  - 本关的预演生成器（0105 的 `BuildPreviz({ config, voice, timelines })`）写 `Blockout/FirstLevel0105.previz.json` 时同样整段抄，
+    磁盘上那份与播的一致，0105 PrevizTest 的台词 / 说话姿态 / 歇着的门禁照样查这几段；
+  - 改这几段只改 `Timeline/FirstLevelOpening.timeline.json`，改完跑一次生成器 `--force` 让磁盘上的预演跟上；
+    CLI `sync`（从预演往回拷）对原件拒绝执行。没写 `ownsPreviz` 的（`new` 建出来的）仍是拷贝，`copiedFrom` + `sync` 照旧。
 - **不另写播放器**：播、停、拖、逐帧全走白盒编辑器里那一个预演播放器（`Script_EditorBlockoutPreviz`）。
   面板用 `UseSource(doc)` 把它的数据换成 Timeline 那份，按主时间轴调 `Play / Seek / Pause / Resume`；
   预演的 Seek 是确定性求值，拖到 41.2 s 就是那一帧。跨段时先从那一段的关键帧起播再 Seek；

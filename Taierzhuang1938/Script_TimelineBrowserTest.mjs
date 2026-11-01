@@ -4,12 +4,13 @@
 // 跑法：node Taierzhuang1938/Script_TimelineBrowserTest.mjs
 //
 // 打开 ?editor=blockout&level=FirstLevel0105&timeline=FirstLevelOpening，钉住：
-//   1. 面板开机就打开、四段子序列铺在主时间轴上、镜头 / 台词 / 事件格数与 Script_TimelinePlan 算的一致，导航栏让开；
+//   1. 面板开机就打开、各段子序列（2026-11-01 起开场 01-1…02-3 七段）铺在主时间轴上、镜头 / 台词 / 事件格数与 Script_TimelinePlan 算的一致，导航栏让开；
 //   2. 拖动走的是白盒编辑器那一个预演播放器：Seek(41.2) = 01-2 的第 7.5 s（预演播放器自己的 State 也这么说），
 //      同一秒拖两次机位一样（确定性），拖回 01-1 也对；逐帧走 1/30 s；
 //   3. 播放：时间往前走；跨段时 01-1 播完自动接 01-2；暂停停得住；面板上的播放键点得动；
 //   4. 文件改了（agent 改 Timeline 文件）2 s 内重读；
-//   5. 关掉面板：预演播放器还回本关自己的预演文件（Timeline 是拷贝，白盒编辑器那份没被换掉）；全程没有未捕获错误。
+//   5. 关掉面板：预演播放器还回本关自己的预演（UseSource(null)），但这份 Timeline 是本关这几段的原件（ownsPreviz，2026-11-01）：
+//      不开面板时这几个关键帧播的也是它（State().ownedKeyframes 等于 Timeline 的各段）；全程没有未捕获错误。
 // 截图存 _shots/Timeline/（不提交）。
 // ===========================================================================
 
@@ -85,11 +86,11 @@ try {
       nav: vis(".boNav"), mini: vis(".boMini"), state: window.Tengxian.Debug.Blockout.Timeline.State(),
     };
   });
-  Check("面板开机就打开，四段子序列与各轨格数对得上 Script_TimelinePlan", opened && ui.shown && ui.segs === layout.segments.length
+  Check("面板开机就打开，各段子序列与各轨格数对得上 Script_TimelinePlan", opened && ui.shown && ui.segs === layout.segments.length
     && ui.shots === tracks.shots.length && ui.lines === tracks.lines.length && ui.events === tracks.events.length,
     J({ opened, ...ui, state: undefined, want: { segs: layout.segments.length, shots: tracks.shots.length, lines: tracks.lines.length, events: tracks.events.length } }));
   Check("面板开着时导航栏与小地图让开", !ui.nav && !ui.mini, J({ nav: ui.nav, mini: ui.mini }));
-  Check("时长 = 四段之和、核对无错", Near(ui.state.durationS, layout.durationS, 0.01) && ui.state.errors.length === 0,
+  Check("时长 = 各段之和、核对无错", Near(ui.state.durationS, layout.durationS, 0.01) && ui.state.errors.length === 0,
     J({ durationS: ui.state.durationS, want: layout.durationS, errors: ui.state.errors }));
 
   console.log("--- seek");
@@ -158,9 +159,13 @@ try {
   console.log("--- close");
   const closed = await TL("Close");
   const fileSeqs = JSON.parse(await fs.readFile(path.join(projectDir, "Blockout", `${entry.level}.previz.json`), "utf8")).sequences.length;
-  Check("关掉面板：预演播放器还回本关自己的预演文件（Timeline 是拷贝）",
+  Check("关掉面板：预演播放器还回本关自己的预演（不再是 Timeline 换上来的源）",
     !closed.tl.open && !closed.previz.source && closed.previz.sequences.length === fileSeqs && !closed.previz.playing,
     J({ open: closed.tl.open, source: closed.previz.source, seqs: closed.previz.sequences.length, want: fileSeqs }));
+  const wantOwned = doc.sequences.map((q) => q.keyframe);
+  Check("Timeline 是本关这几段的原件：不开面板，这几个关键帧播的也是它（ownedKeyframes）",
+    entry.ownsPreviz === true && J([...(closed.previz.ownedKeyframes || [])].sort()) === J([...wantOwned].sort()),
+    J({ owned: closed.previz.ownedKeyframes, want: wantOwned }));
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
 } finally {
   await browser.close();

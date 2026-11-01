@@ -3,7 +3,8 @@
 // 跑法：node Taierzhuang1938/Script_TimelineTest.mjs
 //   1. 登记表里每一份 Timeline 文件都在、核对无错（关键帧、单位、台词 id 对着关卡配置与台词清单查）；
 //   2. 主时间轴：段首尾相接、LocateTime 落段正确、两头夹住；镜头轨每段从 0 起、不越界；
-//   3. 拷贝口径：copiedFrom 指的预演文件与关键帧都在；
+//   3. 拷贝口径：copiedFrom 指的预演文件与关键帧都在；原件口径（ownsPreviz，2026-11-01）：OverlayTimelinePreviz 只换这几段、
+//      本关磁盘上的 Blockout/<Level>.previz.json 这几段与 Timeline 逐字相同（改了 Timeline 没跑生成器 --force 会红）；
 //   4. 时码与轨道小函数。
 
 import assert from "node:assert/strict";
@@ -12,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   TIMELINES, TIMELINE_SCHEMA, ValidateTimeline, VoiceLineTable, TimelineLayout, TimelineTracks, TracksAt,
-  LocateTime, FormatTimecode, TimelineAsPreviz, TIMELINE_LINE_FALLBACK_S,
+  LocateTime, FormatTimecode, TimelineAsPreviz, TIMELINE_LINE_FALLBACK_S, PrevizOwnerTimelines, OverlayTimelinePreviz,
 } from "./Script_TimelinePlan.mjs";
 import { NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 
@@ -54,6 +55,28 @@ for (const entry of TIMELINES) {
   Check(tracks.lines.every((l) => !l.missing), `${entry.id}：每句台词都在清单里`);
   Check(TracksAt(tracks, layout.segments[0].start + 0.01).shotIndex === 0, `${entry.id}：开头在第一镜`);
   Check(TimelineAsPreviz(doc).sequences === doc.sequences, `${entry.id}：换成预演文档时子序列原样带过去`);
+  if (entry.ownsPreviz) {
+    Check(!doc.copiedFrom, `${entry.id}：原件不该再带 copiedFrom`);
+    Check(PrevizOwnerTimelines(entry.level).some((e) => e.id === entry.id), `${entry.id}：PrevizOwnerTimelines 找得到`);
+    const previz = Read(`Blockout/${entry.level}.previz.json`);
+    const { doc: merged, owned } = OverlayTimelinePreviz(previz, [doc]);
+    Check(JSON.stringify(owned) === JSON.stringify(doc.sequences.map((q) => q.keyframe)), `${entry.id}：盖上去的正是它自己的几段`);
+    Check(merged.sequences.length === previz.sequences.length, `${entry.id}：盖完段数不变（关键帧都在预演里）`);
+    for (const q of doc.sequences) {
+      const onDisk = previz.sequences.find((x) => x.keyframe === q.keyframe);
+      Check(onDisk && JSON.stringify(onDisk) === JSON.stringify(q), `${entry.id}：${entry.level}.previz.json 的 ${q.keyframe} 要与 Timeline 逐字相同（改了 Timeline 跑一次本关预演生成器 --force）`);
+    }
+    const other = merged.sequences.find((x) => !owned.includes(x.keyframe));
+    Check(!other || other === previz.sequences.find((x) => x.keyframe === other.keyframe), `${entry.id}：别的段原样不动`);
+  }
+}
+// 盖原件：纯函数行为
+{
+  const base = { schema: "x", voice: "v.json", sequences: [{ keyframe: "a", n: 1 }, { keyframe: "b", n: 2 }] };
+  const { doc: m, owned } = OverlayTimelinePreviz(base, [{ sequences: [{ keyframe: "b", n: 9 }, { keyframe: "c", n: 3 }] }]);
+  Check(owned.join() === "b,c" && m.sequences.map((q) => q.keyframe + q.n).join() === "a1,b9,c3" && m.voice === "v.json" && base.sequences[1].n === 2,
+    "OverlayTimelinePreviz：同关键帧整段换、没有的接后面、不改原对象");
+  Check(OverlayTimelinePreviz(null, [{ voice: "t.json", sequences: [{ keyframe: "a" }] }]).doc.voice === "t.json", "OverlayTimelinePreviz：没有预演文件时用 Timeline 起一份");
 }
 Check(FormatTimecode(0) === "00:00:00" && FormatTimecode(61.5) === "01:01:15" && FormatTimecode(170.25) === "02:50:08", "时码 mm:ss:ff");
 Check(!ValidateTimeline({ schema: TIMELINE_SCHEMA, id: "X", level: "L", sequences: [] }).ok, "空 Timeline 不过核对");
