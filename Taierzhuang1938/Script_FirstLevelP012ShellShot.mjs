@@ -4,6 +4,11 @@
 import * as THREE from "three";
 import { T } from "./Script_Text.mjs";
 import { P012_COMPANION_CAST } from "./Data_FirstLevelP012Cast.mjs";
+
+// 烟柱颜色要给线性三元组（与 Script_Vfx 的 VFX_PALETTE 同一口径）：粒子通道 ParticleChannel.Spawn 会展开 [...colorA]，
+// 以前这里直接写 0x47433e 这样的十六进制数，加载了正式烟雾贴图后第一发炮弹一落地 Frame 就抛错。
+const LinearTriple = (hex) => { const c = new THREE.Color().setHex(hex); return [c.r, c.g, c.b]; };
+const SHELL_SMOKE_A = LinearTriple(0x47433e), SHELL_SMOKE_B = LinearTriple(0x777068);
 export class FirstLevelP012ShellShot {
   constructor(host){this.host=host;this.played=false;this.active=false;this.time=0;this.elapsed=0;this.serial=0;this.impacts=0;this.plumes=[];this.nextShell=0;this.disposed=false;}
   Start(point){
@@ -67,7 +72,7 @@ export class FirstLevelP012ShellShot {
     if(this.plumes.length>=8){const old=this.plumes.shift();this.host.vfx.RemoveSmokeSource(old.handle);}
     const handle=this.host.vfx.SmokeSource(point.clone().add(new THREE.Vector3(0,.4,0)),{
       kind:"black",rate:5,radius:1.5,rise:2.2,sizeStart:1.5,sizeEnd:6.5,life:11,opacity:.48,turbulence:.32,
-      colorA:0x47433e,colorB:0x777068});
+      colorA:SHELL_SMOKE_A,colorB:SHELL_SMOKE_B});
     this.plumes.push({handle,point:point.clone(),until:this.elapsed+38});
   }
   Finish(){
