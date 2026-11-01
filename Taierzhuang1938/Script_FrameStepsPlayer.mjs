@@ -14,7 +14,7 @@ export function PlayStepDeathTimer(ctx, f) {
   if (ctx.state.deathTimer > 0) {
     ctx.state.deathTimer -= dt;
     if (ctx.state.deathTimer <= 0 && ctx.state.pendingRespawn) {
-      if (ctx.MELEE_TEST) { /* Keep the test result until the player restarts. */ }
+      if (ctx.sandbox?.holdsRespawn) { /* Keep the test result until the player restarts. */ }
       else if (ctx.state.nraPool > 0) ctx.RespawnPlayer();
       else ctx.hud.Say(null, T("hud.say.noOneLeft"), 8);
     }
@@ -25,12 +25,9 @@ export function PlayStepInput(ctx, f) {
   const realDt = f.realDt;
   ctx.profiler.B("input");
   if (ctx.meleeCombat) {
-    if(ctx.MELEE_TEST)ctx.MaintainMeleeTargets();
+    ctx.sandbox?.BeforeMeleeUpdate?.();
     ctx.meleeCombat.Update(realDt);
-    if (ctx.MELEE_TEST && ctx.meleePreview) {
-      const pose = ctx.meleeCombat.ViewPose();
-      for (const entry of ctx.meleeTargets) if (entry.soldier.meleeCombat) entry.soldier.meleeCombat = ctx.MeleePreviewPose(entry.soldier, entry.soldier.meleeCombat);
-    }
+    ctx.sandbox?.AfterMeleeUpdate?.();
   }
   const firePrev = ctx.input.fire;
   ctx.ReadKeys();
@@ -85,7 +82,7 @@ export function PlayStepPlayer(ctx, f) {
   ctx.player.meleePose = ctx.meleeCombat?.ViewPose();
   ctx.missionRuntime?.BeforePlayer(dt,ctx.input);
   const playerFrame = ctx.player.Update(dt, ctx.input, WEAPONS[ctx.currentWeapon], {
-    allowUndeployedAds: ctx.WEAPON_RANGE && ctx.SANDBOX_PLUGIN.phase.whitebox.allowUndeployedAds,
+    allowUndeployedAds: !!ctx.SANDBOX_PLUGIN?.phase.whitebox?.allowUndeployedAds,
     blockLean: !!ctx.emplacement?.Mounted || !!ctx.carry?.Blocking || !!ctx.missionRuntime?.EmptyHands
       || !!ctx.state.cooking || !!ctx.meleeCombat?.Blocking
       || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(ctx.viewmodel.action?.kind),
@@ -320,7 +317,7 @@ export function PlayStepView(ctx, f) {
     // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
     lowAmmo: ctx.state.ammo <= 0,
     ammo: ctx.emplacement?.Mounted ? ctx.emplacement.Emplacement(ctx.emplacement.MountedId)?.rounds : ctx.state.ammo,
-    meleeCombat: ctx.meleePreview && ctx.meleeCombat?.ViewPose() ? ctx.MeleePreviewPose(ctx.player, ctx.meleeCombat.ViewPose()) : ctx.meleeCombat?.ViewPose() || null,
+    meleeCombat: ctx.sandbox?.PreviewPose?.(ctx.player, ctx.meleeCombat?.ViewPose()) ?? (ctx.meleeCombat?.ViewPose() || null),
     // 近爆的身体反应：收枪、缩肩、手臂慢半拍、之后手抖（Script_BlastFlinch.arms；没在反应时是 null）。
     blastFlinch: ctx.player.flinch?.Active ? ctx.player.flinch.arms : null,
   });

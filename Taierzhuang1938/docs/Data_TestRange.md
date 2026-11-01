@@ -103,5 +103,5 @@ R.State().targets.find(t => t.id === "R10");   // 掉血取证
 ## 维护
 
 - 加靶/加工位：改 `Data_Range.mjs`（纯数据），场景摆设在 `Script_RangeField.BuildStructures`。
-- 加取证：往 `Debug.Range` 里加口（Script_Main 靶场那一节），并在 `Script_RangeTest.mjs` 里立断言。
+- 加取证：往 `Debug.Range` 里加口（`Script_RangeTargets.mjs` 的 `api`），并在 `Script_RangeTest.mjs` 里立断言。
 - RangeTest 挂在 TestRunner 的 combat 域（Tier 1）；`changedDomainRules` 里 `Range` 归 combat。

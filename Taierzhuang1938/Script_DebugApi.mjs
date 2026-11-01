@@ -2,8 +2,6 @@
 // 开机时 Script_Main.Boot 调 InstallDebugApi(ctx) 一次；顶层挂主文件里的对象，Debug 由三组系统各自声明后合起来，
 // 之后测试场、编辑器、菜单、白盒再往 Debug 上各挂自己的口。名字是 183 个测试脚本的契约：只加不改，改名要同步改测试。
 
-import { RANGE_PHASE, RANGE_RESPAWN_S, RANGE_STATIONS } from "./Data_Range.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
 import { LIMB_IDS as GORE_LIMB_IDS } from "./Script_Dismemberment.mjs";
 import { FrameDebugAgent } from "./Script_FrameDebugAgent.mjs";
 import { DeathLibrary, HitReactionEnabled, HitReactionOf, PreloadDeathLibrary, SetHitReactionEnabled } from "./Script_HitReactionLayer.mjs";
@@ -162,97 +160,6 @@ export function InstallDebugApi(ctx) {
       Preload: () => PreloadDeathLibrary().then((lib) => !!lib),
       Library: () => { const lib = DeathLibrary(); return lib ? { revision: lib.revision, clips: [...lib.clips.keys()], profiles: lib.profiles } : null; },
       Layer: (id) => HitReactionOf(Soldier(id)?.actor)?.Describe() ?? null,
-    };
-  }
-  if (ctx.RANGE) {
-    const RangeTargetSnapshot = (entry) => {
-      const s = entry.soldier;
-      return {
-        id: entry.spec.id, station: entry.spec.station,
-        x: entry.spec.x, z: entry.spec.z,
-        alive: !!(s && s.alive),
-        health: s ? s.health : 0,
-        deadTime: s && !s.alive ? s.deadTime : 0,
-        distance: s ? Math.hypot(s.position.x - ctx.player.position.x,
-          s.position.z - ctx.player.position.z) : null,
-      };
-    };
-    window.Taierzhuang.Debug.Range = {
-      /** 一眼总览：工位、靶况、击倒/复位计数、玩家武器与弹药 —— 验收的唯一入口。 */
-      State: () => ({
-        stations: RANGE_STATIONS.map((z) => ({ id: z.id, name: z.name, x: z.x, z: z.z })),
-        targets: ctx.rangeTargets.map(RangeTargetSnapshot),
-        stats: { ...ctx.rangeStats },
-        player: {
-          x: ctx.player.position.x, z: ctx.player.position.z, yaw: ctx.player.yaw, pitch: ctx.player.pitch,
-          health: ctx.player.health, alive: ctx.player.alive,
-          ads: ctx.player.ads, fov: ctx.camera.fov,
-          slot: ctx.state.activeSlot, weapon: ctx.currentWeapon,
-          ammo: ctx.state.ammo, clips: ctx.state.clips, grenades: ctx.state.grenades,
-          bayonetFixed: ctx.state.bayonetFixed,
-        },
-        pinned: ctx.state.pinned,
-        respawnS: RANGE_RESPAWN_S,
-      }),
-      Targets: () => ctx.rangeTargets.map(RangeTargetSnapshot),
-      /** 瞬移到某个工位（RangeRifle / RangeGrenade / RangeMelee），面朝各自靶道。 */
-      GoTo: (stationId) => {
-        const zone = RANGE_STATIONS.find((z) => z.id === stationId);
-        if (!zone) return null;
-        ctx.player.Spawn(zone.x, zone.z, zone.ry ?? 0);
-        return { id: zone.id, x: zone.x, z: zone.z, yaw: ctx.player.yaw };
-      },
-      /**
-       * 把视线摆到某个靶子身上。只摆 yaw/pitch，开火仍走 Debug.Fire ——
-       * 散布、后坐、开镜収束照旧全在链路里。
-       *
-       * offsetY 默认 = **躯干判定中心** COMBAT.hitbox.centerY（与 MarchBullet 读的
-       * 是同一份数，判定球半径 COMBAT.hitbox.radius）。两条要知道的账：
-       *   · TryFire 是先施加本发的枪口上跳再采样弹道（「顶上去 100%」的设计），
-       *     所以首发会比瞄点高出 kick × 距离 —— ADS 下约 0.9°，25 m 处 ≈ 0.4 m。
-       *     远靶验命中要么瞄低、要么用近靶（RangeTest 用的 R10）。
-       *   · 命中几何只有那一个球（爆头是 TryFire 里按概率抽的，不是几何），
-       *     所以别瞄头 —— 那条线从球上方擦过去就是脱靶。
-       */
-      AimAt: (targetId, offsetY = ctx.HITBOX.centerY) => {
-        const entry = ctx.rangeTargets.find((e) => e.spec.id === targetId);
-        const s = entry ? entry.soldier : null;
-        if (!s) return null;
-        const from = ctx.player.EyePosition;
-        const dx = s.position.x - from.x;
-        const dy = (s.position.y + offsetY) - from.y;
-        const dz = s.position.z - from.z;
-        const horiz = Math.hypot(dx, dz) || 1;
-        ctx.player.yaw = Math.atan2(-dx, -dz);
-        ctx.player.pitch = Math.atan2(dy, horiz);
-        ctx.player.aimYaw = 0;
-        ctx.player.aimPitch = 0;
-        return { yaw: ctx.player.yaw, pitch: ctx.player.pitch, distance: Math.hypot(dx, dy, dz) };
-      },
-      /** 整场复位：靶子全部立即重立，玩家满血满弹，击倒/复位计数清零。 */
-      Reset: () => {
-        for (const entry of ctx.rangeTargets) {
-          if (entry.soldier) ctx.ai.Remove(entry.soldier);
-          entry.soldier = ctx.SpawnRangeTarget(entry.spec);
-          entry.deadCounted = false;
-        }
-        ctx.rangeStats.killed = 0;
-        ctx.rangeStats.respawned = 0;
-        ctx.rangeStats.resets += 1;
-        ctx.player.health = 100;
-        ctx.player.bleeding = false;
-        const loadout = RANGE_PHASE.loadoutOverride;
-        ctx.state.mags.primary = { ammo: WEAPONS[loadout.primary].magazine, clips: loadout.spareClips };
-        // 副武器是捡来的那支（靶场携行表里没有）：身上有就给它也补满。
-        const secondary = ctx.state.slots.secondary;
-        ctx.state.mags.secondary = secondary
-          ? { ammo: WEAPONS[secondary].magazine, clips: 2 }
-          : { ammo: 0, clips: 0 };
-        const mag = ctx.state.mags[ctx.state.activeSlot];
-        if (mag) { ctx.state.ammo = mag.ammo; ctx.state.clips = mag.clips; }
-        ctx.state.grenades = loadout.throwables.Grenade;
-        return window.Taierzhuang.Debug.Range.State();
-      },
     };
   }
 }

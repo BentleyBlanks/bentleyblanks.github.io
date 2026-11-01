@@ -1,5 +1,5 @@
 {
- "note": "window.Tengxian 由 InstallDebugApi 装出来的名字（RANGE 打开时）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write",
+ "note": "window.Tengxian 由 InstallDebugApi 装出来的名字（测试场插件挂的口不在内）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write",
  "top": [
   "AdvanceLevel",
   "ApplyGraphics",
@@ -124,7 +124,6 @@
   "PointerLock",
   "Probe",
   "Prompts",
-  "Range",
   "Ray",
   "ReleaseChapter",
   "ReleasePointerLock",

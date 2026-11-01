@@ -10,13 +10,22 @@
 //   Update(dt) / UpdateCamera(dt) / ScaleDt(dt) / CapturesInput() / ApplyCamera(camera) / Dispose()
 //   OnInstalled()     装配层把它记成当前测试场之后再调（枪械射击要先登记再补弹药）
 //   armory            枪械射击场的弹药规则（装配层的补给、换弹、HUD 读它）
+//   Maintain()        补兵那个 3 秒节拍里调（靶场、白刃实验场复位木桩兵）；没有就不补兵
+//   holdsRespawn      倒下后不换人；OnPlayerDown() 返回 true = 倒下由测试场接管
+//   BeforeMeleeUpdate() / AfterMeleeUpdate() / PreviewPose(entity, pose)  白刃层每帧前后、动作预览换姿势
+//   OnKey(detail)     键先给测试场看（返回 undefined = 不归它管）；ActionPrompts() 返回整条底部提示
+//   UpdatePanel(frame)  HUD 那一步里刷新测试场自己的面板
+//
+// 插件模块可选的 startup：轻量开机（只加载列出的 PBR 组与音效，不预载担架、飞机、弹坑碎屑；只预载武器模型）。
 //
 // 宿主 `host` 是装配层交过来的「工具箱」：场地、玩家、相机、各系统，以及几只装配层自己的函数
-// （抢指针锁、藏枪模、给手榴弹、换枪补给、撒木桩兵）。每个插件只取改造前它就在用的那几样。
+// （抢指针锁、藏枪模、给手榴弹、换枪补给），以及主文件的工具箱 ctx（靶场与白刃实验场的运行时整块读写主文件状态时用）。
 
 import { SANDBOX_RANGES } from "./Data_SandboxRanges.mjs";
 import { RANGE_PHASE } from "./Data_Range.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
+import { CreateRangeTargets } from "./Script_RangeTargets.mjs";
+import { CreateMeleeLab } from "./Script_MeleeLabRuntime.mjs";
 import { MELEE_QTE_PHASE } from "./Data_MeleeQte.mjs";
 import { EXPLOSION_RANGE_PHASE } from "./Data_ExplosionRange.mjs";
 import { ExplosionRangeField } from "./Script_ExplosionRangeField.mjs";
@@ -86,7 +95,7 @@ const PLUGINS = {
   },
   range: {
     phase: RANGE_PHASE, World: RangeField,
-    Create: (h) => { h.SeedRangeTargets(); return Instance(null); },
+    Create: (h) => Instance(null, CreateRangeTargets(h)),
   },
   explosions: {
     phase: EXPLOSION_RANGE_PHASE, World: ExplosionRangeField,
@@ -104,7 +113,7 @@ const PLUGINS = {
   },
   melee: {
     phase: MELEE_QTE_PHASE, World: RangeField,
-    Create: (h) => { h.SeedMeleeTargets(); return Instance(null); },
+    Create: (h) => Instance(null, CreateMeleeLab(h)),
   },
   gore: {
     phase: GORE_RANGE_PHASE, World: GoreRangeField,

@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **主文件瘦身第二步（2026-11-02）**：每帧 33 步挪进 `Script_FrameSteps{Player,World,Rules,Present}`、五个模式进 `Script_FrameModes`，都从 `Script_Main` 的工具箱 `ctx` 取主文件的状态与函数；调试口 `window.Tengxian` 改由 `Script_DebugApi.InstallDebugApi(ctx)` 装配，`Debug` 分三组系统各自声明（名字登记 `Data_DebugApiKeys.json`，门禁 `DebugApiTest`）；最后三个测试场（靶场、白刃实验场、枪械射击场）的接线搬进插件：`Script_RangeTargets` / `Script_MeleeLabRuntime` 管木桩兵、遭遇、面板与取证口，装配层只调通用钩子（`Maintain`、`OnKey`、`ActionPrompts`、`OnPlayerDown`、白刃前后钩子），按测试场名字的判断改成登记表字段（`identify`、`targetDetail`、`steadyView`、`bayonetFixed`、`meleeAnimations`）与插件的 `startup`。`Script_Main` 10534 → 约 8900 行，已没有任何测试场的名字。验收：每帧调用顺序录像与最初逐字节一致；`window.Tengxian` 在五个入口（P012、旧章节、靶场、白刃、断肢）逐名字的类型 / 属性 / 参数个数一致；26 项浏览器回归里 6 项红在 origin/master 上同样红（DeathMenu / Editor / Menu / Boot / MeleeAnimation / BootInteraction）。
+
 - **主循环拆成调度表（2026-11-01）**：`Script_Main.Frame` 从 755 行收成三行（冻结判断 / 帧头 / 按模式分派）；五个模式各一个函数，正常游戏切成 33 个 `PlayStep<Id>`，先后由 `Data_FrameSchedule` 定，原注释里的 18 条先后约束写成规则由 `FrameScheduleTest` 守；中途结束改成 `return STOP`，步骤间共用的量进 `frameState`。函数体原样搬（只在开头取 dt 等）；浏览器录调用顺序对照：正片开局、第 4 阶段、旧章节各 4 帧与拆前逐条一致。口径 [每帧调度表](Data_FrameSchedule.md)。
 
 - **基线红清理、仓库体积闸门（2026-11-01）**：主检出补装 package.json 早已声明的 sharp / meshoptimizer / 贴图编码器，TextureImportTest、Type89MediumTankTest、ClothRangeBrowserTest 转绿；五个过时测试跟上有意的改动：RiggedModelTest（指甲单独粗糙度）、ClothRangeTest（10-31 白盒被子吸血后重登哈希）、SpeakerGestureTest（10-12 改稿里对新目标的连续手势放行）、IjaAlertGaitTest（10-11 重排后不再认 WalkIn 方法名）、BulletDecalPbrTest（命中特效多了 hardSparks）。新增 RepoSizeGateTest：跟踪文件 ≥95 MiB 红（GitHub 单文件上限 100 MiB），≥50 MiB 列出。仍红、待拍板：OpeningSetTest（开场三角面预算 6 万，汉阳造 173R 单支 5.99 万）、BootTest（远景辨识补丁没接到 GLB 士兵；CH0 爆炸点光包络；整体超时）。

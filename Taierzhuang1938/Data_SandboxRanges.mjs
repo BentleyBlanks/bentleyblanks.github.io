@@ -12,24 +12,29 @@
 //   bootLabel    开始按钮上的文本键（null = 用通用的「开始」）
 //   invincible   玩家一律无敌（炸点就在人身边的场地：被自己按的那一下炸死只会换人、弹阵亡卡）
 //   pinsPhase    没有「通关进下一关」（AdvanceLevel 原地返回）
-//   respawn      补兵怎么补：null = 不补；"range" / "melee" = 走装配层的木桩兵复位
+//   identify     准心识别（指着谁、敌我）开不开（白刃实验场关：QTE 卡片之外不叠识别）
+//   targetDetail 识别开着时要不要细节档（枪械射击场只认不细读）
+//   steadyView   关掉运动模糊与开镜近景虚化（量弹道、看照门）
+//   bayonetFixed 开局就上着刺刀
+//   meleeAnimations  开机预载白刃全身动画库
 //   externalProps / trimProps  要不要摆外部 GLB 布景 / tzm 饰件层
 //   tightBounds  关卡边界只留 1 m 余量（默认 10 m）
 //   muteAudio    不建音频上下文
 //   ownsFrame    整帧交给测试场（不走第一人称移动、战斗、HUD；自己管相机与输入）
 
 const RANGE = (spec) => Object.freeze({
-  bootLabel: null, invincible: false, pinsPhase: true, respawn: null,
+  bootLabel: null, invincible: false, pinsPhase: true,
   externalProps: true, trimProps: true, tightBounds: false, muteAudio: false, ownsFrame: false,
+  identify: true, targetDetail: true, steadyView: false, bayonetFixed: false, meleeAnimations: false,
   ...spec,
 });
 
 export const SANDBOX_RANGES = Object.freeze([
   RANGE({ id: "movement", bootLabel: "boot.start.movementRange", externalProps: false, trimProps: false }),
-  RANGE({ id: "weapons", bootLabel: "boot.start.weaponRange" }),
-  RANGE({ id: "range", pinsPhase: false, respawn: "range" }),
+  RANGE({ id: "weapons", bootLabel: "boot.start.weaponRange", targetDetail: false, steadyView: true }),
+  RANGE({ id: "range", pinsPhase: false }),
   RANGE({ id: "explosions", bootLabel: "boot.start.explosionRange", invincible: true, externalProps: false, trimProps: false }),
-  RANGE({ id: "melee", pinsPhase: false, respawn: "melee", tightBounds: true }),
+  RANGE({ id: "melee", pinsPhase: false, tightBounds: true, identify: false, bayonetFixed: true, meleeAnimations: true }),
   RANGE({ id: "gore", bootLabel: "boot.start.goreRange", invincible: true, externalProps: false, trimProps: false }),
   RANGE({ id: "impacts", bootLabel: "boot.start.impactRange", invincible: true, trimProps: false }),
   RANGE({ id: "reactions", bootLabel: "boot.start.reactionRange", invincible: true, trimProps: false }),

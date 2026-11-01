@@ -1149,7 +1149,7 @@ const changedDomainRules = [
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView/i },
-  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting/ },
+  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLabRuntime/ },
   { domain: "infra", pattern: /Data_FrameSchedule|Script_FrameModes|Script_FrameSteps|Script_FrameFlatSource|Script_DebugApi|Data_DebugApiKeys/ },
   { domain: "repoSize", pattern: /\.(glb|gltf|bin|fbx|blend|png|jpe?g|webp|ktx2|tga|exr|hdr|mp3|wav|ogg|mp4|webm)$/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。

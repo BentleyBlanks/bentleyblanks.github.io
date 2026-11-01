@@ -68,7 +68,6 @@ import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
 import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
 import { DEV_TOOLS_ENABLED } from "./Data_DevTools.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
-import { RANGE_TARGETS, RANGE_RESPAWN_S } from "./Data_Range.mjs";
 import {
   FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
   FIRST_LEVEL_P012_WHITEBOX_PHASE as ARCHIVED_P012_PHASE,
@@ -119,8 +118,6 @@ import { LoadStretcherAsset, CreateStretcherGeometry } from "./Script_StretcherA
 import { LoadCigaretteAsset } from "./Script_CigaretteAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
-import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
-import { MeleeLab } from "./Script_MeleeLab.mjs";
 import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem, ScavengeAmmoPlan } from "./Script_Interact.mjs";
@@ -266,9 +263,8 @@ const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
  */
 const SANDBOX_RANGE = SandboxRangeFromParams(params);
 const SANDBOX_PLUGIN = SandboxPluginFor(SANDBOX_RANGE);
-const RANGE = SANDBOX_RANGE?.id === "range";
-const WEAPON_RANGE = SANDBOX_RANGE?.id === "weapons";
-const MELEE_TEST = SANDBOX_RANGE?.id === "melee";
+/** 测试场插件声明的轻量开机（枪械射击场：只加载要用的 PBR 组与音效、不预载担架/飞机/弹坑碎屑）；其余入口是 null。 */
+const SANDBOX_STARTUP = SANDBOX_PLUGIN?.startup ?? null;
 // 断肢测试场（?gore=1，登记表里的 gore）与断肢内容总闸（?gore=0）是两回事，见下面 GORE_FORCED_OFF。
 // 内容总闸的运行时覆盖。`?gore=0` 一段肢体都不掉（`Data_Tuning_Gore.ENABLED` 与
 // `Debug.Gore.SetEnabled` 是另外两个入口，三者任一关闭即关闭）。
@@ -709,7 +705,7 @@ const hud = new Hud(hudRoot);
 // 白盒关卡编辑器：关卡表里 ambience / music 都是 null，环境床与配乐从来不放，就不下载、不解码
 //（解码后的 PCM 约 370 MB，手机上一半的内存超限就是它，2026-10-26 实测）。音效、台词照旧。
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED,
-  assetPolicy: WEAPON_RANGE ? SANDBOX_PLUGIN.startup.audio : BLOCKOUT ? { ambience: false, music: false } : null });
+  assetPolicy: SANDBOX_STARTUP ? SANDBOX_STARTUP.audio : BLOCKOUT ? { ambience: false, music: false } : null });
 // 顺子打空弹药时骂一句（第一次必骂，之后按概率）。规则在 Script_PlayerVent；剧情对白在说、人倒了就等着。
 const playerVent = new PlayerVent({ audio, Blocked: () => !player?.Alive || !!audio.dialogueYield });
 audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],
@@ -842,7 +838,7 @@ const clock = new GameClock();
 /** 每帧调度在步骤之间传的这一帧的量（每帧覆盖同一个对象，不产生垃圾）。 */
 const frameState = { dt: 0, realDt: 0, render: true, weapon: null, phase: null };
 /**
- * 工具箱：每帧系统（Script_FrameModes / Script_FrameSteps*）与调试口（Script_DebugApi*）从这里拿主文件里的状态、服务和函数，不直接读全局变量。
+ * 工具箱：每帧系统（Script_FrameModes / Script_FrameSteps*）、调试口（Script_DebugApi*）与测试场运行时（经插件宿主的 ctx）从这里拿主文件里的状态、服务和函数，不直接读全局变量。
  * 状态与服务都是取值器（现读：换关、换人后拿到的是新的那份）；步骤会写的几个状态带写入器。
  * 新系统要用主文件里的东西，就在这里加一行；见 docs/Data_FrameSchedule.md「工具箱」。
  */
@@ -864,7 +860,7 @@ const ctx = {
   get combat() { return combat; },
   get commandRoom() { return commandRoom; },
   get companion() { return companion; },
-  get currentWeapon() { return currentWeapon; },
+  get currentWeapon() { return currentWeapon; }, set currentWeapon(v) { currentWeapon = v; },
   get debugEmplacedFire() { return debugEmplacedFire; }, set debugEmplacedFire(v) { debugEmplacedFire = v; },
   get editor() { return editor; },
   get emplacedAds() { return emplacedAds; }, set emplacedAds(v) { emplacedAds = v; },
@@ -883,8 +879,7 @@ const ctx = {
   get lastViewYaw() { return lastViewYaw; }, set lastViewYaw(v) { lastViewYaw = v; },
   get lockUnavailable() { return lockUnavailable; },
   get meleeCombat() { return meleeCombat; },
-  get meleeLab() { return meleeLab; },
-  get meleePreview() { return meleePreview; },
+  get meleeStance() { return meleeStance; }, set meleeStance(v) { meleeStance = v; },
   get menu() { return menu; },
   get missionRuntime() { return missionRuntime; },
   get mountedIdLast() { return mountedIdLast; }, set mountedIdLast(v) { mountedIdLast = v; },
@@ -941,8 +936,6 @@ const ctx = {
   get lights() { return lights; },
   get lookSpike() { return lookSpike; },
   get looseGun() { return looseGun; },
-  get MELEE_TEST() { return MELEE_TEST; },
-  get meleeTargets() { return meleeTargets; },
   get mountView() { return mountView; },
   get p012Debug() { return p012Debug; },
   get PHASE_TABLE() { return PHASE_TABLE; },
@@ -952,9 +945,6 @@ const ctx = {
   get post() { return post; },
   get prepassStaticBatch() { return prepassStaticBatch; },
   get profiler() { return profiler; },
-  get RANGE() { return RANGE; },
-  get rangeStats() { return rangeStats; },
-  get rangeTargets() { return rangeTargets; },
   get renderer() { return renderer; },
   get router() { return router; },
   get SANDBOX_PLUGIN() { return SANDBOX_PLUGIN; },
@@ -971,11 +961,12 @@ const ctx = {
   get SURFACE_BY_TAG() { return SURFACE_BY_TAG; },
   get TOOLS_HOME() { return TOOLS_HOME; },
   get trailFocus() { return trailFocus; },
-  get WEAPON_RANGE() { return WEAPON_RANGE; },
+  get WeaponName() { return WeaponName; },
   get wheel() { return wheel; },
   // 主文件里的函数
   AdvanceLevel,
   AirColumnEnteredRoad,
+  ApplyDebugOptions,
   ApplyGraphics,
   BlockoutInputCaptured,
   BuildGroundWeaponView,
@@ -990,10 +981,6 @@ const ctx = {
   JumpFirstLevelStage,
   JumpToLevel,
   LooseGunState,
-  MaintainMeleeTargets,
-  MaintainRangeTargets,
-  MeleePreviewPose,
-  MeleeSnapshot,
   MountedViewPose,
   OnPlayerDown,
   OnPointerLockChange,
@@ -1014,9 +1001,11 @@ const ctx = {
   RespawnPlayer,
   SeedSoldiers,
   ShowPauseMenu,
-  SpawnRangeTarget,
+  SlotWeaponId,
+  SlotWeaponVariant,
   StepFrames,
   StepLooseGuns,
+  SyncBayonet,
   SyncEmplacementViews,
   SyncJumpSound,
   SyncMissionHands,
@@ -1056,13 +1045,6 @@ let navGrid = null;
 let player = null;
 let ai = null;
 let meleeCombat = null;
-let meleeLab = null;
-let meleeScenario = "EncounterField";
-let meleeEncounter = null;
-const meleeCompleted = new Set();
-let meleePaused = false;
-let meleePreview = null;
-let meleePreviewFrame = null;
 let meleeStance = false;
 let vfx = null;
 /** 断肢系统（所有关卡都有；`?gore=0` 只是让它不做事，不是不建）。 */
@@ -1476,7 +1458,7 @@ async function Boot() {
 
 
   setStep(T("boot.step.loadPbr"), BOOT.progress.loadPbr.from);
-  const pbrQueue = PBR_SETS.filter(set => !WEAPON_RANGE || SANDBOX_PLUGIN.startup.pbrSets.includes(set.name));
+  const pbrQueue = PBR_SETS.filter(set => !SANDBOX_STARTUP || SANDBOX_STARTUP.pbrSets.includes(set.name));
   const pbrTotal = pbrQueue.length;
   const pbrFailed = [];
   let pbrDone = 0;
@@ -1510,12 +1492,12 @@ async function Boot() {
   // 排在这里而不是模块顶：前面几步（外部 PBR / GLB）正把网络占满，
   // 而从建物理到装骨架这一段网络是闲的。不 await —— 它自己失败自己算，
   // 拉不到时 Unlock 之后的 LoadPacks 会照原路再来一次。
-  if (!WEAPON_RANGE) audio.PrefetchPacks?.();
+  if (!SANDBOX_STARTUP) audio.PrefetchPacks?.();
 
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep(T("boot.step.physics"), BOOT.progress.physics);
-  await Promise.all([InitPhysics(), WEAPON_RANGE ? null : PrepareCraterDebris(library)]);
+  await Promise.all([InitPhysics(), SANDBOX_STARTUP ? null : PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
@@ -1527,7 +1509,7 @@ async function Boot() {
   scene.fog = null;
 
   aircraft = new AircraftFlight(scene);
-  if (!WEAPON_RANGE) aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
+  if (!SANDBOX_STARTUP) aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
 
   await BuildField(PHASE_TABLE[state.phaseIndex], setStep,
     BOOT.progress.field.from, BOOT.progress.field.to, NextFrame);
@@ -1553,11 +1535,11 @@ async function Boot() {
   // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
-  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: WEAPON_RANGE });
+  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP });
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
-  if (MELEE_TEST) await LoadMeleeAnimations();
+  if (SANDBOX_RANGE?.meleeAnimations) await LoadMeleeAnimations();
   if (meshes.missing.length) {
     // warn 不是 error：BootTest 把 console.error 当事故，而少一个模型只是降级不是崩
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
@@ -1565,10 +1547,10 @@ async function Boot() {
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
   // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
-  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), ...(WEAPON_RANGE ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()])]);
+  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), ...(SANDBOX_STARTUP ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()])]);
   await NextFrame();
   // Start the lab sound queue after the required models have finished downloading.
-  if (WEAPON_RANGE) audio.PrefetchPacks?.();
+  if (SANDBOX_STARTUP) audio.PrefetchPacks?.();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -2404,22 +2386,6 @@ async function Boot() {
   // 调试口 window.Tengxian（Script_DebugApi；Debug 由三组系统各自声明）。
   InstallDebugApi(ctx);
 
-  if (MELEE_TEST) {
-    const api = {
-      State: () => MeleeSnapshot(),
-      Select: (id) => { StartMeleeScenario(id); return MeleeSnapshot(); },
-      Reset: () => { StartMeleeScenario(meleeScenario); return MeleeSnapshot(); },
-      Pause: (value) => { meleePaused = value ?? !meleePaused; for (const e of meleeTargets) e.soldier.meleeTraining.passive = meleePaused; return meleePaused; },
-      Preview: (clip, frame = null) => {
-        if (clip !== meleePreview) meleeCombat.Cancel("animationPreview");
-        meleePreview = clip; meleePreviewFrame = frame; api.Pause(!!clip); return clip;
-      },
-      SetAssist: (mode) => meleeCombat.SetAssist(mode),
-    };
-    window.Taierzhuang.Debug.MeleeCombat = api;
-    meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, Focus: RequestPointerLock });
-  }
-
   // --- 玩家设置页 -----------------------------------------------------------
   // 菜单「设置」的画面 / 声音 / 操作三页。存下来的画质与音量在这一刻装回去
   // （只在打开面板时才生效的设置不叫设置）。与开发工具无关，剔除后照常在。
@@ -2815,8 +2781,8 @@ function SandboxHost() {
       player.health = 100; player.bleeding = false;
     },
     EnsureDebugInventory,
-    SeedRangeTargets,
-    SeedMeleeTargets,
+    // 主文件的工具箱：靶场与白刃实验场的运行时（Script_RangeTargets / Script_MeleeLabRuntime）从这里读写主文件的状态。
+    ctx,
     GoreDebug: () => window.Taierzhuang?.Debug?.Gore || null,
   };
 }
@@ -4735,152 +4701,6 @@ function JumpToLevel(index) {
   return EnterLevel(index);
 }
 
-// ---------------------------------------------------------------------------
-// 玩法测试靶场（?range=1）的木桩兵
-//
-// 木桩兵是**整具正式的 ija Actor**（骨骼、命中箱、倒地、准心识别全走原链路），
-// 只是 s.dummy = true 让 AiDirector 跳过 Think —— 不索敌、不开火、不自行走位。
-// 「打倒 → 停 RANGE_RESPAWN_S 秒 → 原位复立」由补兵那个 3 秒节拍顺带驱动。
-// 取证口在 Debug.Range（见 window.Taierzhuang 装配处），口径在 docs/Data_TestRange.md。
-// ---------------------------------------------------------------------------
-
-/** 注册表：spec 是 Data_Range.RANGE_TARGETS 里那一条，soldier 是场上这一具。 */
-const rangeTargets = [];
-const rangeStats = { killed: 0, respawned: 0, resets: 0 };
-
-function SpawnRangeTarget(spec) {
-  const s = ai.Spawn("ija", spec.x, spec.z, {
-    weapon: spec.weapon || "Type38", squadId: `Range_${spec.id}`,
-  });
-  if (!s) return null;
-  s.dummy = true;
-  s.order = "hold";
-  s.holdZone = { id: `Range_${spec.id}`, x: spec.x, z: spec.z, radius: 2 };
-  s.goal.set(spec.x, 0, spec.z);
-  s.yaw = spec.yaw ?? Math.PI;          // 面朝工位（+Z）；朝向契约见 Data_Tengxian 头注
-  s.lookYaw = s.yaw;
-  return s;
-}
-
-function SeedRangeTargets() {
-  rangeTargets.length = 0;
-  for (const spec of RANGE_TARGETS) {
-    rangeTargets.push({ spec, soldier: SpawnRangeTarget(spec), deadCounted: false });
-  }
-}
-
-/** 每 3 秒被补兵节拍调一次：清点倒下的、到点的原位复立。 */
-function MaintainRangeTargets() {
-  for (const entry of rangeTargets) {
-    const s = entry.soldier;
-    if (s && s.alive) { entry.deadCounted = false; continue; }
-    if (s && !s.alive && !entry.deadCounted) { entry.deadCounted = true; rangeStats.killed += 1; }
-    if (s && !s.alive && s.deadTime < RANGE_RESPAWN_S) continue;
-    if (s) ai.Remove(s);
-    entry.soldier = SpawnRangeTarget(entry.spec);
-    entry.deadCounted = false;
-    if (entry.soldier) rangeStats.respawned += 1;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 白刃实验场：一个项目一组正式 Actor；结束后由玩家重开，避免尸体自动复活干扰结果。
-const meleeTargets = [];
-function StartMeleeScenario(id) {
-  const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
-  meleeScenario = spec.id; meleePaused = false; meleePreview = null;
-  post.hasPrev=false;post.hasTaaHistory=false;
-  for(const sign of battlefield.meleeLabels||[])sign.visible=spec.kind==='field';
-  meleeEncounter=null;meleeCompleted.clear();
-  meleeCombat.Reset();
-  for (const soldier of [...ai.soldiers]) ai.Remove(soldier);
-  meleeTargets.length = 0;
-  player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
-  if(spec.kind==='field')player.Spawn(1400,1476,0);
-  player.spawnGrace = 0;
-  ApplyDebugOptions();
-  state.slots.primary = "HanYang"; state.slots.melee = "Dadao";
-  viewmodel.action = null; state.meleeCharge = null;
-  state.activeSlot = spec.weapon === "Dadao" ? "melee" : "primary";
-  currentWeapon = SlotWeaponId(state.activeSlot);
-  state.ammo = state.mags[state.activeSlot]?.ammo || 0;
-  state.clips = state.mags[state.activeSlot]?.clips || 0;
-  viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
-  state.bayonetFixed = true; meleeStance=true; SyncBayonet();
-  hud.SetWeaponName(WeaponName(currentWeapon));
-  const centerZ = spec.kind === "observe" ? 1463 : 1467;
-  const close = ["push", "ground", "bind"].includes(spec.kind);
-  const separation = close ? (spec.kind === "bind" ? 1.04 : 0.82) : 3.3;
-  for (let i = 0; i < spec.enemies + (spec.allies || 0); i++) {
-    const ally = i >= spec.enemies;
-    const offset = spec.enemies === 1 ? 0 : (i - (spec.enemies - 1) / 2) * 1.65;
-    const soldier = ai.Spawn(ally ? "nra" : "ija", 1400 + (ally ? 0 : offset), ally ? centerZ : centerZ - separation, {
-      weapon: ally && spec.allyWeapon === "Dadao" ? "Dadao" : ally ? "HanYang" : "Type38", squadId: `Melee_${spec.id}_${i}`,
-    });
-    if (!soldier) continue;
-    soldier.dummy = true; soldier.bayonetFixed = true; soldier.yaw = ally ? 0 : Math.PI;
-    soldier.meleeTraining = { kind: spec.kind, slot: i, passive: false };
-    soldier.holdZone = null; soldier.goal.copy(soldier.position);
-    meleeTargets.push({ soldier, id: ally ? `Friend${i}` : `Enemy${i + 1}` });
-  }
-  if(spec.kind==='field') for(const encounter of MELEE_ENCOUNTERS) {
-    for(let i=0;i<encounter.enemies;i++) {
-      const soldier=ai.Spawn('ija',encounter.x+(i-(encounter.enemies-1)/2)*1.2,encounter.z,{weapon:'Type38',squadId:`Melee_${encounter.id}`});
-      if(!soldier)continue;
-      soldier.dummy=true;soldier.bayonetFixed=true;soldier.yaw=Math.PI;soldier.meleeDormant=true;
-      soldier.meleeTraining={kind:'duel',slot:i,passive:true};soldier.holdZone=null;soldier.goal.copy(soldier.position);
-      meleeTargets.push({soldier,id:`${encounter.id}_${i+1}`,encounterId:encounter.id});
-    }
-  }
-  if (spec.kind === "ground") meleeCombat.Fighter(player).poise = 20;
-  state.deathTimer = 0; state.pendingRespawn = false; state.playerAliveLast = true;
-  player.meleeCameraDrop = 0; player.meleePose = null;
-  viewmodel.root.visible = true; hud.HideDeathCard(); hud.Hint("", 0);
-  hud?.SetMeleeQte(null);
-  hud?.SetCinematicPrompt(null);
-  hud?.SetCinematicBeat(false);
-}
-function MeleePreviewPose(entity, pose) {
-  const normalized = meleePreviewFrame ?? (state.elapsed % 2) / 2;
-  return {...pose, clip: `${meleeCombat.Weapon(entity)}${meleePreview}`, action: meleePreview,
-    state: "preview", t: normalized, normalized, animationNormalized:null,transition:null,duration: 1};
-}
-function SeedMeleeTargets() {
-  StartMeleeScenario(meleeScenario); meleePaused = meleeScenario!=='EncounterField';
-  for (const entry of meleeTargets) entry.soldier.meleeTraining.passive = true;
-}
-function NearbyMeleeEncounter() {
-  if(meleeScenario!=='EncounterField' || meleeEncounter || !player.Alive)return null;
-  return MELEE_ENCOUNTERS.find(s=>!meleeCompleted.has(s.id) && Math.hypot(player.position.x-s.x,player.position.z-(s.z+3.2))<1.5) || null;
-}
-function TriggerMeleeEncounter(spec) {
-  if(!spec || meleeEncounter || meleeCompleted.has(spec.id))return false;
-  meleeEncounter=spec.id;meleePaused=false;
-  for(const e of meleeTargets.filter(e=>e.encounterId===spec.id)) {
-    e.soldier.meleeDormant=false;e.soldier.meleeTraining.passive=false;
-    const f=meleeCombat.Fighter(e.soldier);f.nextThink=meleeCombat.time+.65+e.soldier.meleeTraining.slot*.22;
-  }
-  meleeCombat.Log('encounterStart',player,null,{encounter:spec.id});
-  hud.Hint(T("hud.hint.meleeEncounter", { name: spec.name }),2.5);return true;
-}
-function MaintainMeleeTargets() {
-  if(meleeScenario!=='EncounterField')return;
-  if(meleeEncounter && !meleeTargets.some(e=>e.encounterId===meleeEncounter && e.soldier.alive)) {
-    meleeCompleted.add(meleeEncounter);meleeCombat.Log('encounterComplete',player,null,{encounter:meleeEncounter});meleeEncounter=null;
-    hud.Hint(T("hud.hint.meleeEncounterDone"),3);
-  }
-  const near=NearbyMeleeEncounter();if(near?.trigger==='auto')TriggerMeleeEncounter(near);
-}
-function MeleeSnapshot() {
-  const core = meleeCombat.State();
-  return { ...core, scenario: meleeScenario, menu: state.menu, health: player.health, alive: player.Alive,
-    weapon: meleeCombat.Weapon(player), stance:meleeStance?'melee':'fire', preview: meleePreview, paused: meleePaused,
-    encounter:meleeEncounter,completed:[...meleeCompleted],nearby:NearbyMeleeEncounter()?.name||null,
-    targets: meleeTargets.map(({ soldier: s, id }) => ({ id, runtimeId: s.id, side: s.side, health: s.health, alive: s.alive, x: s.position.x, z: s.position.z, distance: Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z), pose: s.meleeCombat })),
-    hud: hud.MeleeQteState(),
-  };
-}
-
 /**
  * 按关挂常驻烟柱。第一关读取参考图布设的固定区域，其他关卡沿用路标选点。
  *
@@ -5333,8 +5153,8 @@ function RespawnPlayer(initial = false) {
   state.fireMode = "auto";
   player.bipod = false;
   // 换关领新枪：刺刀从收着开始（上刺刀是玩家的一个决定，不是默认状态）
-  state.bayonetFixed = MELEE_TEST;
-  state.bayonets = { primary: MELEE_TEST, secondary: false };
+  state.bayonetFixed = !!SANDBOX_RANGE?.bayonetFixed;
+  state.bayonets = { primary: !!SANDBOX_RANGE?.bayonetFixed, secondary: false };
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
@@ -5533,10 +5353,8 @@ function OnPlayerDown() {
     missionRuntime.OnPlayerDown();
     ShowDeathMenu();return;
   }
-  if (MELEE_TEST) {
-    state.pendingRespawn = false; state.deathTimer = 0;
-    hud.Hint(T("hud.hint.meleeTestDown"), 30); return;
-  }
+  // 测试场自己接管倒下（白刃实验场：停在原地等重开）。
+  if (sandbox?.OnPlayerDown?.()) return;
   if(p012Runtime){
     p012Runtime.failed=true;state.pendingRespawn=false;state.deathTimer=0;
     // Failure freezes the frame before the ordinary carry-view update runs.
@@ -6337,8 +6155,9 @@ const router = new InputRouter({
     // 剧本提示环（第一关屋内伏击的抓枪与反捅）先于共用白刃层与 KEYMAP：
     // 那两下发生在共用 QTE 还没开／已经结算完的时候，不接管的话 F 会去拾弹药、左键会开枪。
     if(missionRuntime?.AmbushInput?.(detail.code,detail.down,detail.repeat))return true;
-    const encounter=MELEE_TEST && detail.code==='KeyF' && detail.down && !detail.repeat ? NearbyMeleeEncounter() : null;
-    if(encounter?.trigger==='interact')return TriggerMeleeEncounter(encounter);
+    // 测试场先看（白刃实验场：站在遭遇点前按 F 开打）；返回 undefined = 不归它管。
+    const sandboxKey = sandbox?.OnKey?.(detail);
+    if (sandboxKey !== undefined) return sandboxKey;
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
   },
   OnAction: (action, detail) => {
@@ -6785,13 +6604,9 @@ function UpdateContextualActionPrompts() {
     hud.SetActionPrompts([]);
     return;
   }
-  if (MELEE_TEST) {
-    const near=NearbyMeleeEncounter();
-    const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]:meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:T("hud.prompt.push"),kind:"push"}] : [];
-    if(WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed)prompts.push({keys:"V",label:meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
-    hud.SetActionPrompts(prompts);
-    return;
-  }
+  // 测试场整条接管提示（白刃实验场）。
+  const sandboxPrompts = sandbox?.ActionPrompts?.();
+  if (sandboxPrompts) { hud.SetActionPrompts(sandboxPrompts); return; }
   // 架着机枪时提示条整段被机枪接管：这会儿能按的就只有扳机、R 和 F。
   // 留着「上刺刀」「包扎」「换枪」那几条会让玩家去按一个当下没有语义的键。
   const mounted = emplacement?.View() || null;
@@ -8592,7 +8407,7 @@ function RenderSceneContent(dt) {
     // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
     // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
     // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。
-    motionBlur: WEAPON_RANGE ? 0 : graphics.motionBlur * (1 - deathDof),
+    motionBlur: SANDBOX_RANGE?.steadyView ? 0 : graphics.motionBlur * (1 - deathDof),
     dofStrength: deathDof,
     dofFocus: 1.5,
     dofRange: 2.8,
@@ -8602,11 +8417,11 @@ function RenderSceneContent(dt) {
     // 不整个关掉是因为「太阳还在那儿」这条信息本身对构图有用。
     // An obscured sun contributes diffuse daylight but no lens starburst/ghosts.
     lensFlare: (preset.lensFlare ?? 1) * (1 - adsNearDof * (1 - LENS_FLARE.adsScale)),
-    nearDofStrength: WEAPON_RANGE ? 0 : adsNearDof * ADS_NEAR_DOF_STRENGTH,
+    nearDofStrength: SANDBOX_RANGE?.steadyView ? 0 : adsNearDof * ADS_NEAR_DOF_STRENGTH,
     nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
-    nearDofSightUv: adsNearDof > 0 && !WEAPON_RANGE ? AdsSightUv() : null,
+    nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
   }, openingLens));
   profiler.E("post");
   profiler.GpuFrameEnd();

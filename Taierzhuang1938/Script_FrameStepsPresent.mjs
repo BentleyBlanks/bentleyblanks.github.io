@@ -63,14 +63,14 @@ export function PlayStepHud(ctx, f) {
     dt,
   });
   // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
-  ctx.hud.SetTarget(ctx.MELEE_TEST || ctx.missionRuntime?.frontShow?.bunker.CameraActive ? null : ctx.identify.Update(dt, {
+  ctx.hud.SetTarget(ctx.SANDBOX_RANGE?.identify === false || ctx.missionRuntime?.frontShow?.bunker.CameraActive ? null : ctx.identify.Update(dt, {
     eye: ctx._idEye.copy(ctx.player.EyePosition),
     dir: ctx.player.AimDirection(ctx._idAim),
     soldiers: ctx.ai.soldiers,
     // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
     // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
     detail: ctx.player.Alive && !ctx.state.ordersOpen && !ctx.state.cutscene && !ctx.meleeCombat?.Active
-      ? (ctx.WEAPON_RANGE ? false : DIFFICULTY.targetInfo ?? "basic") : false,
+      ? (ctx.SANDBOX_RANGE?.targetDetail === false ? false : DIFFICULTY.targetInfo ?? "basic") : false,
     spreadDeg,
   }), phase.hud);
   ctx.hud.SetSuppression(ctx.player.suppression);
@@ -79,7 +79,7 @@ export function PlayStepHud(ctx, f) {
   ctx.hud.SetCinematicBeat(ctx.missionRuntime?.AmbushCinematic === true);
   ctx.hud.SetCinematicPrompt(cinematicPrompt);
   ctx.hud.SetMeleeQte(ctx.missionRuntime?.AmbushCinematic ? null : (ctx.meleeCombat?.View() || null));
-  if (ctx.MELEE_TEST && ctx.state.frame % 6 === 0) ctx.meleeLab?.Update(ctx.MeleeSnapshot());
+  ctx.sandbox?.UpdatePanel?.(ctx.state.frame);
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   ctx.hud.SetInteractProgress(ctx.interact?.View() || null);
   ctx.hud.SetCarry(ctx.carry?.View() || null);

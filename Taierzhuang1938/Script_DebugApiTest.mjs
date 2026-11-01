@@ -6,6 +6,7 @@
 //   3. 调试口文件不 import Script_Main；用到的每个 ctx.<名字> 都在 Script_Main 的工具箱里登记过。
 //   4. Script_Main 只在 Boot 里调一次 InstallDebugApi(ctx)，不再手写 window.Taierzhuang = {…}。
 // 加了新的调试口：node Script_DebugApiTest.mjs --write 重写登记表，并在提交说明里写清加了什么。
+// 测试场插件挂的口（Range、MeleeCombat、WeaponRange、ClothRange……）不在这里：插件建好后由装配层按 debugName 挂上，SandboxRangesTest 守名字。
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -15,13 +16,13 @@ const Check = (ok, message) => { assert.ok(ok, message); checks += 1; };
 const Read = (file) => fs.readFileSync(new URL(`./${file}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const SECTION_FILES = { PlayerDebugApi: "Script_DebugApiPlayer.mjs", WorldDebugApi: "Script_DebugApiWorld.mjs", MissionDebugApi: "Script_DebugApiMission.mjs" };
 
-// 假工具箱：任何名字都给一个「什么都接得住」的替身（取属性、调用、new 都返回它自己）；RANGE 打开，靶场那一支也装上。
+// 假工具箱：任何名字都给一个「什么都接得住」的替身（取属性、调用、new 都返回它自己）。
 const stub = new Proxy(function stubFn() {}, {
   get: (_, key) => (key === Symbol.toPrimitive ? () => 0 : key === "then" ? undefined : stub),
   apply: () => stub,
   construct: () => stub,
 });
-const ctx = new Proxy({}, { get: (_, key) => (key === "RANGE" ? true : stub), set: () => true });
+const ctx = new Proxy({}, { get: () => stub, set: () => true });
 globalThis.window = {};
 
 const { InstallDebugApi } = await import("./Script_DebugApi.mjs");
@@ -33,7 +34,7 @@ const shape = { top: Object.getOwnPropertyNames(api).sort(), debug: Object.getOw
 // 1. 名字登记表
 const keysFile = new URL("./Data_DebugApiKeys.json", import.meta.url);
 if (process.argv.includes("--write")) {
-  fs.writeFileSync(keysFile, JSON.stringify({ note: "window.Tengxian 由 InstallDebugApi 装出来的名字（RANGE 打开时）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write", ...shape }, null, 1) + "\n");
+  fs.writeFileSync(keysFile, JSON.stringify({ note: "window.Tengxian 由 InstallDebugApi 装出来的名字（测试场插件挂的口不在内）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write", ...shape }, null, 1) + "\n");
   console.log(`[debugApi] 登记表已重写：顶层 ${shape.top.length}、Debug ${shape.debug.length}`);
 }
 const recorded = JSON.parse(fs.readFileSync(keysFile, "utf8"));

@@ -228,8 +228,8 @@ export function PlayStepSpawn(ctx, f) {
   if (ctx.state.spawnAccumulator > 3) {
     ctx.state.spawnAccumulator = 0;
     ctx.profiler.B("spawn");
-    if (ctx.SANDBOX_RANGE?.respawn === "range") ctx.MaintainRangeTargets();
-    else if (ctx.SANDBOX_RANGE?.respawn === "melee") ctx.MaintainMeleeTargets();
+    // 有 Maintain 的测试场（靶场、白刃实验场）按这个节拍复位木桩兵。
+    if (ctx.sandbox?.Maintain) ctx.sandbox.Maintain();
     // 其余测试场不补兵：枪械射击场的靶由它自己每帧维护；断肢场的木桩兵**不自动复位**
     //（断了的肢体要留在场上看，复位走面板的「重置木桩」）；其余场地本来就没有兵。
     else if (ctx.SANDBOX_RANGE) { /* Sandbox fixtures maintain themselves. */ }

@@ -12,30 +12,40 @@
 | `bootLabel` | 开始按钮的文本键（null = 通用「开始」） |
 | `invincible` | 玩家一律无敌（炸点就在人身边） |
 | `pinsPhase` | 没有「通关进下一关」 |
-| `respawn` | 补兵：null 不补；`range` / `melee` 走装配层的木桩兵复位 |
 | `externalProps` / `trimProps` | 要不要摆外部 GLB 布景 / tzm 饰件层 |
 | `tightBounds` | 关卡边界只留 1 m 余量 |
 | `muteAudio` | 不建音频上下文 |
 | `ownsFrame` | 整帧交给测试场（布料实验室：不走第一人称移动、战斗、HUD、指针锁） |
+| `identify` | 准心识别开不开（白刃实验场关） |
+| `targetDetail` | 识别开着时要不要细节档（枪械射击场关） |
+| `steadyView` | 关掉运动模糊与开镜近景虚化（枪械射击场） |
+| `bayonetFixed` | 开局就上着刺刀（白刃实验场） |
+| `meleeAnimations` | 开机预载白刃全身动画库（白刃实验场） |
 
-`Data_StartupRouting`（进不进正式菜单、选章生成的网址）与 `Script_Main` 的选关、开局文字、无敌、补兵、换关都读这张表。
+`Data_StartupRouting`（进不进正式菜单、选章生成的网址）与 `Script_Main` 的选关、开局文字、无敌、换关、刺刀、后期都读这张表。
 
 ## 2. 插件 `Script_SandboxRanges.mjs`
 
-每个测试场交代：关卡表 `phase`、场地类 `World`、`Create(host)`。`host` 是装配层交过来的工具箱（场地、玩家、相机、各系统，以及抢指针锁、藏枪模、给手榴弹、换枪补给、撒木桩兵这几只装配层函数），插件只取改造前它就在用的那几样。
+每个测试场交代：关卡表 `phase`、场地类 `World`、`Create(host)`。`host` 是装配层交过来的工具箱（场地、玩家、相机、各系统，抢指针锁、藏枪模、给手榴弹、换枪补给这几只装配层函数，以及主文件的工具箱 `host.ctx`），插件只取改造前它就在用的那几样。
 
 `Create` 返回的实例接口（没声明的装配层一律不调，门禁逐个核对）：
 
 | 接口 | 谁有 |
 |---|---|
-| `debugName` / `api` → `window.Tengxian.Debug[debugName]` | MovementRange、WeaponRange、GoreRange、ShellImpact、BattleReaction、ClothRange（名字与改造前一致）；`Debug.Explosions` 常驻，不在爆炸场时返回 null |
+| `debugName` / `api` → `window.Tengxian.Debug[debugName]` | MovementRange、WeaponRange、Range、MeleeCombat、GoreRange、ShellImpact、BattleReaction、ClothRange（名字与改造前一致）；`Debug.Explosions` 常驻，不在爆炸场时返回 null |
 | `updateSlot` | `afterPlayer`（操作交互、断肢）/ `beforeAi`（枪械射击）/ `afterCombat`（爆炸、炮击扬尘、人物反应）——与改造前在 Frame 里的位置一致 |
 | `ScaleDt` | 断肢（乘 timeScale）、炮击扬尘（暂停 / 单步 / 慢放）、人物反应 |
 | `CapturesInput` / `ApplyCamera` | 炮击扬尘（自由观察相机） |
 | `ownsFrame` / `UpdateCamera` | 布料 |
 | `OnInstalled` / `armory` | 枪械射击场：登记后补弹药；装配层的补给、换弹、HUD、命中记账读 `armory` |
+| `Maintain` | 靶场、白刃实验场：补兵那个 3 秒节拍里复位木桩兵（没有就不补兵） |
+| `holdsRespawn` / `OnPlayerDown` | 白刃实验场：倒下停在原地等重开 |
+| `BeforeMeleeUpdate` / `AfterMeleeUpdate` / `PreviewPose` | 白刃实验场：白刃层每帧前清点遭遇战、之后换成动作预览那一帧 |
+| `OnKey` / `ActionPrompts` / `UpdatePanel` | 白刃实验场：遭遇点按 F 开打、整条底部提示、每 6 帧刷新面板 |
 
-装配层只剩三个测试场还有逻辑留在 `Script_Main`：靶场撒 / 复位木桩兵、白刃实验场（面板与木桩）、枪械射击场的弹药规则与轻量开机资产。这些等装配层整体拆成系统时再搬。
+插件模块还可以带 `startup`（枪械射击场）：轻量开机，只加载列出的 PBR 组与音效、只预载武器模型，不预载担架、飞机、弹坑碎屑。
+
+靶场与白刃实验场的运行时各在 `Script_RangeTargets` / `Script_MeleeLabRuntime`（2026-11-01 从 `Script_Main` 搬来）：木桩兵注册表、遭遇进度、面板与取证口都在那里，经 `host.ctx` 读写主文件的状态；状态跟页面走，换关重建不清，与搬家前一致。`Script_Main` 里已经没有任何测试场的名字。
 
 **加一个测试场**：登记表加一行 → 插件里写 `phase` / `World` / `Create` → 文本表加 `bootLabel` 的键 → `SandboxRangesTest` 的钩子表补一项。不改 `Script_Main`。
 

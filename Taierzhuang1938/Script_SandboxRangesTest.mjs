@@ -71,6 +71,9 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
     "CLOTH_TEST", "GORE_TEST", "IMPACT_TEST", "REACTION_TEST", "MOVEMENT_RANGE", "EXPLOSION_TEST",
     "clothRange", "goreRange", "impactRange", "reactionRange", "movementRange", "weaponRange", "explosionRange",
     "CLOTH_RANGE_ID", "GORE_RANGE_ID", "SHELL_IMPACT_RANGE_ID", "BATTLE_REACTION_RANGE_ID", "MOVEMENT_RANGE_ID", "EXPLOSION_RANGE_ID",
+    // 2026-11-01 最后三个（靶场 / 白刃实验场 / 枪械射击场）也搬出去了
+    "RANGE", "MELEE_TEST", "WEAPON_RANGE", "rangeTargets", "rangeStats", "SeedRangeTargets", "MaintainRangeTargets", "SpawnRangeTarget",
+    "meleeTargets", "meleeScenario", "meleeLab", "MeleeLab", "StartMeleeScenario", "SeedMeleeTargets", "MaintainMeleeTargets", "MeleeSnapshot", "MeleePreviewPose",
   ];
   for (const name of banned) Check(!new RegExp(`\\b${name}\\b`).test(main), `Script_Main 与每帧系统不再出现 ${name}（接线在 Script_SandboxRanges）`);
   Check(/dt = ctx\.clock\.Step\(realDt\)/.test(modes), "帧头（Script_FrameModes.BeginFrame）只向玩法时钟要这一帧的时间");
@@ -93,6 +96,18 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
       Check(declared === (hooks[plugin.id] || []).includes(hook), `${plugin.id}: ${declared ? "接" : "不接"} ${hook}（与改造前装配层调用的一致）`);
     }
   }
+}
+
+// 5. 靶场与白刃实验场的运行时：取证口名字与改造前一致，白刃实验场交回装配层要调的那几只钩子
+{
+  const range = fs.readFileSync(new URL("./Script_RangeTargets.mjs", import.meta.url), "utf8");
+  const melee = fs.readFileSync(new URL("./Script_MeleeLabRuntime.mjs", import.meta.url), "utf8");
+  Check(/debugName: "Range", api, Maintain: MaintainRangeTargets/.test(range), "靶场：取证口仍叫 Debug.Range，补兵节拍复位木桩兵");
+  Check(/debugName: "MeleeCombat", api/.test(melee), "白刃实验场：取证口仍叫 Debug.MeleeCombat");
+  for (const hook of ["holdsRespawn", "OnPlayerDown", "Maintain", "BeforeMeleeUpdate", "AfterMeleeUpdate", "PreviewPose", "OnKey", "ActionPrompts", "UpdatePanel"])
+    Check(new RegExp(`^    ${hook}[:(]`, "m").test(melee), `白刃实验场交回钩子 ${hook}`);
+  for (const [id, fields] of Object.entries({ weapons: { targetDetail: false, steadyView: true }, melee: { identify: false, bayonetFixed: true, meleeAnimations: true } }))
+    for (const [field, value] of Object.entries(fields)) Check(SANDBOX_RANGES.find((r) => r.id === id)[field] === value, `${id}.${field} = ${value}（原来装配层按测试场名字判断的那一处）`);
 }
 
 console.log(`[sandbox] 测试场登记表 / 插件 / 玩法时钟：${checks} 条全过（${SANDBOX_PLUGINS.length} 个测试场）`);
