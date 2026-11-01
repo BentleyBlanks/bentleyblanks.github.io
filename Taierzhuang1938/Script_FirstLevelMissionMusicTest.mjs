@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
-import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FIRST_LEVEL_MUSIC_MIX, FIRST_LEVEL_MUSIC_OPENING,
-  FIRST_LEVEL_MUSIC_SPLITS, FirstLevelMusicState, FirstLevelStageCue } from "./Data_FirstLevelMissionMusic.mjs";
+import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FIRST_LEVEL_MUSIC_MIX, FIRST_LEVEL_MUSIC_OPENING, FIRST_LEVEL_MUSIC_SPLITS } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMusicState, FirstLevelStageCue } from "./Script_FirstLevelMissionMusicData.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 

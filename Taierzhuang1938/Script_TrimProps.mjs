@@ -17,7 +17,8 @@
 // field.colliders 并重跑 BuildCollisionGrid（与 ExternalProps 同一套注意事项）。
 
 import * as THREE from "three";
-import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
+import { MESHES } from "./Data_Meshes.mjs";
+import { MeshUrl } from "./Script_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";

@@ -138,7 +138,3 @@ export const SSIL = {
   thickness: 0.35,
 };
 
-/** 档位名 → 一档 GTAO。`Data_Tuning_Graphics` 里 `gtao` 那一位存的就是这个键。 */
-export function MakeGtaoTier(name) {
-  return { ...(GTAO_TIERS[name] || GTAO_TIERS.high) };
-}

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {LoadGlb,SerializeGlb,PoseScene,BuildSkin,Multiply} from './Script_LugouGlbPose.mjs';
 import {MISSION_LAYOUT} from '../Data_FirstLevelMissionLayout.mjs';
-import {SampleMissionTerrain} from '../Data_FirstLevelMissionTerrain.mjs';
+import {SampleMissionTerrain} from '../Script_FirstLevelMissionTerrain.mjs';
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):1;
 assert.ok(root&&Number.isInteger(revision)&&revision>0);

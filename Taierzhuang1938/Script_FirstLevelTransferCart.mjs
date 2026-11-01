@@ -21,7 +21,8 @@ import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelM
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, MISSION_STAGES, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Script_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { CartDeckLift } from "./Script_CartCorpseBump.mjs";
 import { GengCartTransferRoute } from "./Script_FirstLevelVillageBlock.mjs";

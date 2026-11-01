@@ -20,7 +20,8 @@
 // 靶场：追加 --range --range-target=S10（10m）或 S200（200m），输出正片/局部/实体mask对照。
 
 import fs from "node:fs/promises";
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";

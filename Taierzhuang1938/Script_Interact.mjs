@@ -34,7 +34,8 @@
 // 捡到什么、给了谁、哪件道具没了，全部通过 hooks / OnComplete 交回装配层与章节数据，
 // 因为槽位与弹仓的账在 Script_Main 手里（state.slots / state.mags）。
 
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { T, Localize } from "./Script_Text.mjs";
 import { WeaponNameId } from "./Script_TextIds.mjs";
 /** 武器名是 Data_Weapons 的内容原稿：显示前按 id 找译文；没有这把枪返回空串。 */

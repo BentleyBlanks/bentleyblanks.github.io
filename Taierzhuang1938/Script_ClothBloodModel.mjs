@@ -1,4 +1,5 @@
-import { CLOTH_BLOOD_PROFILES, CLOTH_BLOOD_DEFAULTS, CLOTH_BLOOD_SIM as S, ClampClothBloodParameter } from './Data_Tuning_ClothBlood.mjs';
+import { CLOTH_BLOOD_PROFILES, CLOTH_BLOOD_DEFAULTS, CLOTH_BLOOD_SIM as S } from './Data_Tuning_ClothBlood.mjs';
+import { ClampClothBloodParameter } from './Script_Tuning_ClothBlood.mjs';
 
 const Clamp = value => Math.max(0,Math.min(1,value));
 // A small conservative finite-volume sheet, evaluated at fixed time steps. Each cell has

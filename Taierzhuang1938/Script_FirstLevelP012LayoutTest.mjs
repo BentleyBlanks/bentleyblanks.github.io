@@ -2,9 +2,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
-import {P012Point,P012NorthPoint,P012SouthPoint,P012StationPoint,P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
+import { P012Point, P012NorthPoint, P012SouthPoint, P012StationPoint, P012MapPoints } from "./Script_FirstLevelP012Space.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES as routes,P012_ZONES as zones,P012_ANCHORS as anchors,P012_SEMANTIC_COLORS as colors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
-import {TRAVERSAL,TraversalKind} from "./Data_Traversal.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
+import { TraversalKind } from "./Script_Traversal.mjs";
 import {P012_STATION_EXITS,P012_STATION_GATES,P012_STATION_HEIGHTS} from "./Data_FirstLevelP012Station.mjs";
 import {trainColumn} from "./Data_FirstLevelP012TrainColumn.mjs";
 import {CARRY_KINDS} from "./Script_Carry.mjs";

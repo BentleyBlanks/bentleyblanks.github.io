@@ -13,7 +13,8 @@
 import * as THREE from "three";
 import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
 import { ClusteredLights, SetActiveClusteredLights } from "./Script_ClusteredLights.mjs";
-import { EFFECT_LIGHT_COUNT, MakeClusterTier } from "./Data_Tuning_Lights.mjs";
+import { EFFECT_LIGHT_COUNT } from "./Data_Tuning_Lights.mjs";
+import { MakeClusterTier } from "./Script_Tuning_Lights.mjs";
 import {
   CsmRig, ApplyRendererShadowSettings, SUN_SHADOW_SAMPLER_GLSL, MakeSunShadowUniforms,
 } from "./Script_Csm.mjs";

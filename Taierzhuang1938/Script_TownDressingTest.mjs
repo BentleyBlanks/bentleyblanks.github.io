@@ -33,11 +33,10 @@ import { fileURLToPath } from "node:url";
 import { EAST_SUBURB } from "./Data_Tengxian.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import { JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
-import { LIFE_SCENE_DRESSING, LifeScenesFor } from "./Data_Dressing_LifeScenes.mjs";
-import {
-  LIFE_SCENE_DRESSING_PASS_TWO,
-  LifeScenesPassTwoFor,
-} from "./Data_Dressing_LifeScenesPassTwo.mjs";
+import { LIFE_SCENE_DRESSING } from "./Data_Dressing_LifeScenes.mjs";
+import { LifeScenesFor } from "./Script_Dressing_LifeScenes.mjs";
+import { LIFE_SCENE_DRESSING_PASS_TWO } from "./Data_Dressing_LifeScenesPassTwo.mjs";
+import { LifeScenesPassTwoFor } from "./Script_Dressing_LifeScenesPassTwo.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(

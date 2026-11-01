@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {ParticleSystem,NormalizeParticleModules,EvaluateCurve,EvaluateGradient,IntegrateCurve} from './Script_ParticleModules.mjs';
-import {BurningParticleModules} from './Data_Tuning_Particles.mjs';
+import { BurningParticleModules } from './Script_Tuning_Particles.mjs';
 const Near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 Near(EvaluateCurve([[0,0],[.2,4],[1,0]],.1),2);
 Near(IntegrateCurve({mode:'curve',curve:[[0,0],[.2,4],[1,0]]},1),2);

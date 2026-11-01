@@ -9,12 +9,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import {
   VEGETATION, VEGETATION_ATLAS, VEGETATION_CARDS, VEGETATION_QUALITY,
   PlanFirstLevelVegetation, MissionDressingContext, FitVegetationToCrown,
 } from "./Data_FirstLevelVegetation.mjs";
-import { RouteIndex, PointIndex } from "./Data_FirstLevelPropDressing.mjs";
+import { RouteIndex, PointIndex } from "./Script_FirstLevelPropDressingData.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 let failures = 0;

@@ -18,7 +18,8 @@
 
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
-import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
+import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
+import { NoseYaw } from "./Script_AircraftAssets.mjs";
 
 const LOADER = new GLTFLoader();
 const _box = new THREE.Box3();

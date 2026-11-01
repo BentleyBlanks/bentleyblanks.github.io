@@ -96,7 +96,7 @@ function CheckForeignWrites(write) {
   if (write) {
     const note = "士兵字段被主人（Data_SoldierComponents 的 owners）以外的文件直接写的旧账，SoldierComponentsTest 拦新增；"
       + "能改成调主人方法的改掉后从这里删。重写：node Taierzhuang1938/Script_SoldierComponentsTest.mjs --write";
-    fs.writeFileSync(foreignFile, JSON.stringify({ note, writes: now }, null, 1) + "\n");
+    fs.writeFileSync(foreignFile, JSON.stringify({ format: "tengxian-soldier-foreign-writes/1", note, writes: now }, null, 1) + "\n");
     console.log(`[soldier] 已重写 ${path.basename(foreignFile)}：${Object.values(now).flat().length} 处旧账`);
     return;
   }

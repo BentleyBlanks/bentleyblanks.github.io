@@ -7,18 +7,18 @@ import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
 import { CharacterFacialAnimation, CharacterFacial } from './Script_CharacterFacialAnimation.mjs';
 import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
 import { SpeakerLookAngles, SpeakerHeadLayer } from './Script_SpeakerHeadLayer.mjs';
-import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, WORDLESS_SPEAKERS,
-  FACED_FRONT_GUARD_INDEX } from './Data_FirstLevelSpeakingCast.mjs';
+import { FIRST_LEVEL_SPEAKING_CAST, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, WORDLESS_SPEAKERS, FACED_FRONT_GUARD_INDEX } from './Data_FirstLevelSpeakingCast.mjs';
+import { SpeakingCastOptions } from './Script_FirstLevelSpeakingCast.mjs';
 import { FIRST_LEVEL_STAGES } from './Data_FirstLevelMissionStages.mjs';
 import { FRONT_GUARD_POSTS } from './Data_FirstLevelMissionFront.mjs';
 import { FRONT_BATTLE_TUNING } from './Data_Tuning_FirstLevelFront.mjs';
-import { IsApprovedCharacterVariant } from './Data_CharacterSelection.mjs';
+import { IsApprovedCharacterVariant } from './Script_CharacterSelection.mjs';
 import { MISSION_DIALOGUE } from './Data_FirstLevelMissionDialogue.mjs';
 import { CHARACTER_SPEECH as C, FACE_TRACK_BAKE } from './Data_Tuning_CharacterSpeech.mjs';
-import { MissionVoiceAlignmentCues } from './Data_FirstLevelMissionDialogue.mjs';
+import { MissionVoiceAlignmentCues } from './Script_FirstLevelMissionDialogue.mjs';
 import { MISSION_VOICE_ALIGNMENT } from './Data_FirstLevelMissionVoiceAlignment.mjs';
-import { HanReadings, FINAL_VISEMES, INITIAL_ONSET, KANA_VOWELS, KANA_SMALL, KANA_SPECIAL, KANA_ONSET, KANA_VOWEL_VISEME,
-  VISEMES } from './Data_FaceTrackPhonemes.mjs';
+import { FINAL_VISEMES, INITIAL_ONSET, KANA_VOWELS, KANA_SMALL, KANA_SPECIAL, KANA_ONSET, KANA_VOWEL_VISEME, VISEMES } from './Data_FaceTrackPhonemes.mjs';
+import { HanReadings } from './Script_FaceTrackPhonemes.mjs';
 import { ClearFaceTracks, FaceTrack, FaceTrackSpeech, RegisterFaceTracks, SampleFaceTrack, SampleLineFaceTrack } from './Script_FaceTrack.mjs';
 
 // ---- runtime envelope fallback and the voice clock (unchanged contract) ----

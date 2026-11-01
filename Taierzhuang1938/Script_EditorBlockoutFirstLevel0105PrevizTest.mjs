@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
-import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
+import { CharacterClipModelId } from "./Script_CharacterSelection.mjs";
 import { SamplePrevizActor, NormalizeBlockoutPreviz, PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { L0105_BRIDGE } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES, PREVIZ_LYING_CLIPS } from "./Data_BlockoutPrevizClips.mjs";

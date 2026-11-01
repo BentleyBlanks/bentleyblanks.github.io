@@ -1,7 +1,7 @@
 // P012实际状态机的纯Node宿主测试：用注册交互回调/玩家动作/正式信号驱动，不写beat跳关。
 import { VoiceFileName } from "./Data_Voice.mjs";
 import assert from "node:assert/strict";
-import { P012Point } from "./Data_FirstLevelP012Space.mjs";
+import { P012Point } from "./Script_FirstLevelP012Space.mjs";
 import { FirstLevelP012Director, P012_WAVES, P012EnemyRejoinPath } from "./Script_FirstLevelP012Flow.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as phase } from "./Data_FirstLevelP012Whitebox.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";

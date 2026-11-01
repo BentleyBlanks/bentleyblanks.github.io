@@ -55,7 +55,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { VOICE_LINES, VOICE_DELIVERY_MIX, STORY_CAST_IDS, IsIjaCast } from "./Data_Voice.mjs";
-import { ArchiveUrl } from "./Data_SfxSources.mjs";
+import { ArchiveUrl } from "./Script_SfxSources.mjs";
 import { ReferencePayload } from "./Script_SeedAudioVoiceKit.mjs";
 
 // 日军战斗口令（side:"ija"，纯假名）挂固定日本兵嗓子：line.voice → 第一关定妆表选定的定妆音（references / @音频1），

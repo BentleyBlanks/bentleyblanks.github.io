@@ -1,4 +1,5 @@
-import { FirstLevelMusicState, FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
+import { FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMusicState } from "./Script_FirstLevelMissionMusicData.mjs";
 
 // Only the mission selects a cue. The shared audio engine owns loading, loops and pause.
 // 【2026-09-23】01–05 的战斗让位读引擎的战场强度；标点事实（facts.has）第一次出现的时刻

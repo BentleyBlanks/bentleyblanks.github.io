@@ -40,12 +40,8 @@ import {
 } from "./Script_CharacterModel.mjs";
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { HitReactionOf, ChooseHitDeath } from "./Script_HitReactionLayer.mjs";
-import {
-  ACTOR_MESH_BY_VARIANT,
-  MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
-  WEAPON_MESH_VARIANTS, WeaponMeshId,
-  BAYONET_MESH_BY_WEAPON,
-} from "./Data_Meshes.mjs";
+import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { MeshUrl, WeaponMeshId } from "./Script_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
 // 受击弹簧层带枪跟着上身走用的临时量（_ApplyHitReaction）。

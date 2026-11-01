@@ -187,6 +187,9 @@ export const testDefs = {
   RepoSizeGateTest: {file:'Script_RepoSizeGateTest.mjs',desc:'仓库体积闸门：跟踪文件 ≥95 MiB 红（GitHub 单文件上限 100 MiB），≥50 MiB 列出并打印滕县总量（纯 Node，秒级）'},
   FrameScheduleTest: {file:'Script_FrameScheduleTest.mjs',desc:'每帧调度表：步骤不重、18 条先后规则成立、每步每模式都有函数、Frame 只剩分派、步骤里没有裸 return（纯 Node，秒级）'},
   DebugApiTest: {file:'Script_DebugApiTest.mjs',desc:'调试口 window.Tengxian：名字与登记表一致、三组系统声明不重名、只从工具箱取主文件的东西（纯 Node，秒级）'},
+  DataSourcesTest: {file:'Script_DataSourcesTest.mjs',desc:'数据来源表：每份数据文件登记了源头 / 生成的 / 退役，生成器在、退役的不在（纯 Node，秒级）'},
+  DataJsonTest: {file:'Script_DataJsonTest.mjs',desc:'数据模块只放数据：导出值都能原样写成 JSON，旧账只减不增，新 JSON 带版本号（纯 Node，秒级）'},
+  DataRefsTest: {file:'Script_DataRefsTest.mjs',desc:'数据引用：手势 / 时间轴 / 口型挂的台词编号都在且说话人对得上，说话人在选角表，文本键都在（纯 Node，秒级）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
@@ -809,6 +812,9 @@ export const tier0Fast = [
   "RepoSizeGateTest",
   "FrameScheduleTest",
   "DebugApiTest",
+  "DataSourcesTest",
+  "DataJsonTest",
+  "DataRefsTest",
   "FirstLevelFrontCounterattackTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
@@ -962,6 +968,10 @@ export const domains = {
     label: "性能红线实测（仅提示 Tier 2，不自动跑）",
     tests: [],
     tier2Tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest", "ProfileCliTest"],
+  },
+  dataRules: {
+    label: "数据规矩：来源表、数据模块只放数据、数据引用",
+    tests: ["DataSourcesTest", "DataJsonTest", "DataRefsTest"],
   },
   infra: {
     label: "测试入口/本地服务基础设施",
@@ -1148,8 +1158,9 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_Tuning_Ai/i },
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
-  { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView/i },
+  { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView|SoldierArchetypes|SoldierForeignWrites/i },
   { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLabRuntime/ },
+  { domain: "dataRules", pattern: /Data_DataSources|Script_Data(Sources|Json|Refs)Test/ },
   { domain: "infra", pattern: /Data_FrameSchedule|Script_FrameModes|Script_FrameSteps|Script_FrameFlatSource|Script_DebugApi|Data_DebugApiKeys/ },
   { domain: "repoSize", pattern: /\.(glb|gltf|bin|fbx|blend|png|jpe?g|webp|ktx2|tga|exr|hdr|mp3|wav|ogg|mp4|webm)$/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。

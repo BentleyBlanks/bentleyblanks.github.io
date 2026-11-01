@@ -1,9 +1,9 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place, MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING_STORYBOARDS as Storyboard } from "./Data_OpeningStoryboards.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);

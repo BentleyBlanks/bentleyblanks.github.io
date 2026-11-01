@@ -15,7 +15,7 @@ import { SCENE_LIST, SCENE_ASSETS, SCENE_MATERIALS, SceneAssetsFor } from "./Dat
 import { SCENE_IDS, SceneStyle, ValidateScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
 import { BLOCKOUT_LEVELS, BlockoutSliceDoc, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { SceneDressingContext, PlanFirstLevelVegetation, SCENE_VEGETATION } from "./Data_FirstLevelVegetation.mjs";
-import { PlanRubbleScatter } from "./Data_FirstLevelPropDressing.mjs";
+import { PlanRubbleScatter } from "./Script_FirstLevelPropDressingData.mjs";
 import { ExternalPropCatalog } from "./Script_ExternalProps.mjs";
 import { FormalObject } from "./Script_SceneForkFormal.mjs";
 import { SceneFilePath } from "./Script_SceneNode.mjs";

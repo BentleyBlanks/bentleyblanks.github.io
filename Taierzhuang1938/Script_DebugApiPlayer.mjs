@@ -3,7 +3,8 @@
 
 import { DIFFICULTY } from "./Data_Battle.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
-import { PLAYER_GUN_SLOTS, PlayerSlotKey, WEAPONS } from "./Data_Weapons.mjs";
+import { PLAYER_GUN_SLOTS, WEAPONS } from "./Data_Weapons.mjs";
+import { PlayerSlotKey } from "./Script_Weapons.mjs";
 import { CrosshairGeometry } from "./Script_Hud.mjs";
 import { IDENTIFY } from "./Script_Identify.mjs";
 

@@ -1,10 +1,10 @@
 // Geometric regression for the 06–10 Notion whitebox. Tests the module both
 // before and after layout integration, without accepting unrelated baselines.
 import assert from "node:assert/strict";
-import { BuildVillageWhitebox } from "./Data_FirstLevelWhiteboxVillage.mjs";
+import { BuildVillageWhitebox } from "./Script_FirstLevelWhiteboxVillage.mjs";
 import { MISSION_LAYOUT as layout, MISSION_ROUTES as routes, MISSION_PLACEMENT as placement } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_ENCOUNTERS as encounters, MISSION_TACTICS as tactics } from "./Data_FirstLevelMission.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { MISSION_CROWD_AREAS as areas } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MissionCarryRoutePoint, MissionRouteLength } from "./Script_FirstLevelMissionColumn.mjs";
 

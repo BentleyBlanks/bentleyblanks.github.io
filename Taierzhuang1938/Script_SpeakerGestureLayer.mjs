@@ -12,7 +12,8 @@
 // Script_Actor._UpdateRiggedWeaponMount asks HeldLeftGrip() for the left grip instead of the moved socket.
 import { Quaternion, Vector3 } from "three";
 import { SPEAKER_GESTURE as G } from "./Data_Tuning_CharacterSpeech.mjs";
-import { SpeakerGestureForLine, SPEAKER_GESTURE_TARGETS } from "./Data_FirstLevelSpeakerGestures.mjs";
+import { SPEAKER_GESTURE_TARGETS } from "./Data_FirstLevelSpeakerGestures.mjs";
+import { SpeakerGestureForLine } from "./Script_FirstLevelSpeakerGestures.mjs";
 import { FRONT_SORTIE, FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import {
   LoadSpeakerGestureClips, SpeakerGestureLibrary, SpeakerGestureClip, BindSpeakerGestureBones,

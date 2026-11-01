@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 

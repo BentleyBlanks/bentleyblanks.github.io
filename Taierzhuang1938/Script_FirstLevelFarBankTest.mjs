@@ -9,19 +9,19 @@
 //      桥断后没有一个人能过河 / 炮击安全落点 / retreatOutOfReach 与 Retire。
 import assert from "node:assert/strict";
 import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain as Ground, MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { NORTH_TERRACES, NORTH_TERRACE_WEST } from "./Data_FirstLevelWhiteboxTerrainRear.mjs";
 import { CompileWhiteboxTerrain, WHITEBOX_TERRAIN_REGIONS } from "./Data_FirstLevelWhiteboxTerrain.mjs";
-import { MISSION_STAGE_ROUTES as Routes, MISSION_PONTOON_BRIDGE as Bridge, MISSION_NORTH_RIVER, RiverWaterAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES as Routes, MISSION_PONTOON_BRIDGE as Bridge, MISSION_NORTH_RIVER } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverWaterAt } from "./Script_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
-import {
-  FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_RUSH,
-  FarBankRushSlot, FAR_BANK_CROWD, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_BLAST,
-  FarBankShoreZ, FarBankPoint, FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia,
-} from "./Data_FirstLevelBridgeFarBank.mjs";
-import { CrowdGroundY, BuildFarBankCrowdRoster, AssignCrowdWaves, FAR_BANK_CROWD_AXIS_X, FAR_BANK_CROWD_SPAWN_Z, FAR_BANK_CROWD_SLOPE_RANKS, FAR_BANK_CROWD_KEEPOUT } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_RUSH, FAR_BANK_CROWD, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_BLAST, FarBankShoreZ, FarBankPoint } from "./Data_FirstLevelBridgeFarBank.mjs";
+import { FarBankRushSlot, FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia } from "./Script_FirstLevelBridgeFarBankData.mjs";
+import { FAR_BANK_CROWD_AXIS_X, FAR_BANK_CROWD_SPAWN_Z, FAR_BANK_CROWD_SLOPE_RANKS, FAR_BANK_CROWD_KEEPOUT } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { CrowdGroundY, BuildFarBankCrowdRoster, AssignCrowdWaves } from "./Script_FirstLevelFarBankCrowdData.mjs";
 import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, RouteDistance, FarBankWalkInVia, FarBankSpawnAt } from "./Script_FirstLevelBridgeFarBank.mjs";
 

@@ -18,7 +18,3 @@ export const CLOTH_BLOOD_CONTROLS = Object.freeze([
 ]);
 export const CLOTH_BLOOD_SIM = Object.freeze({ columns:64, maxRows:96, stepS:0.1, maxTimeS:3600, maxEvents:2048, checkpointSeconds:10, maxCheckpoints:24,
   sourceRadiusM:0.045, pigmentOpacity:0.96, visibleDensity:2, coverageScale:0.10, fiberAnisotropy:1.45 });
-export function ClampClothBloodParameter(key,value) {
-  const entry=CLOTH_BLOOD_CONTROLS.find(control=>control.key===key);
-  return entry && Number.isFinite(value) ? Math.max(entry.min,Math.min(entry.max,value)) : null;
-}

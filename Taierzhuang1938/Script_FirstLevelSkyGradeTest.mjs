@@ -12,11 +12,11 @@ import {
   MakeVolumetricParams, AnalyticTransmittance, FroxelTransmittance, VISIBILITY_REFERENCE,
 } from "./Data_Tuning_Volumetrics.mjs";
 import { INTERIOR_SKY } from "./Data_Tuning_Lights.mjs";
-import {
-  BuildInteriorVolumes, InteriorSkyVisibility, INTERIOR_LIMITS, FIRST_LEVEL_INTERIORS,
-} from "./Data_FirstLevelInteriors.mjs";
+import { INTERIOR_LIMITS, FIRST_LEVEL_INTERIORS } from "./Data_FirstLevelInteriors.mjs";
+import { BuildInteriorVolumes, InteriorSkyVisibility } from "./Script_FirstLevelInteriors.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain, SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { FIRST_LEVEL_DISTANT_SMOKE, DISTANT_SMOKE_REGIONS } from "./Data_FirstLevelDistantSmoke.mjs";
 import { FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
 

@@ -32,7 +32,8 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
-import { FPS_RIFLE_VIEW, RifleViewDepthScale, RifleActionFraming } from "./Data_FpsRifleView.mjs";
+import { FPS_RIFLE_VIEW } from "./Data_FpsRifleView.mjs";
+import { RifleViewDepthScale, RifleActionFraming } from "./Script_FpsRifleView.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
@@ -48,7 +49,8 @@ import { MarkForegroundPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
 import { HANYANG_173R } from "./Data_HanYang173R.mjs";
-import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { WeaponMeshId } from "./Script_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
 import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
@@ -60,7 +62,8 @@ import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_Pla
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { LookSway } from "./Script_FirearmHandling.mjs";
 import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
-import { FirearmEffects, CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
+import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
+import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 
 const DEG = Math.PI / 180;
 // 手里拿着投掷物时走的 Blender 作者投掷轨迹（握点 / 掌向 / 左手去处 / 肩位 / 肘极点）。

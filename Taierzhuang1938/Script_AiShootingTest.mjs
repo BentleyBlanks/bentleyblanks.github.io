@@ -18,7 +18,8 @@
 
 import assert from "node:assert/strict";
 import { Mulberry32 } from "./Script_Noise.mjs";
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 import { PLAYER_HITBOX } from "./Script_PlayerHitbox.mjs";
 import { AIM, SHOOTING, BURST, SAMPLES, CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";

@@ -5,7 +5,7 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import { BREAKABLE_TREES as T } from "./Data_Tuning_BreakableTrees.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
-import { MakeTreePlacements, TreeBlastDamage } from "./Data_BreakableTreePlacements.mjs";
+import { MakeTreePlacements, TreeBlastDamage } from "./Script_BreakableTreePlacements.mjs";
 
 const up = new THREE.Vector3(0,1,0);
 function TrunkBox(tree, low, high) {

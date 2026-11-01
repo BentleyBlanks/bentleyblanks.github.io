@@ -32,8 +32,9 @@ const log = [];
 async function DataMaps(browser) {
   const L = await import(U("Data_FirstLevelMissionLayout.mjs"));
   const Ter = await import(U("Data_FirstLevelMissionTerrain.mjs"));
+  const TerFn = await import(U("Script_FirstLevelMissionTerrain.mjs")); // 取高函数 2026-11-02 搬出数据模块
   const lay = L.MISSION_LAYOUT;
-  const G = (x, z) => Ter.SampleMissionTerrain(x, z), N = (x, z) => Ter.SampleMissionNaturalHeight(x, z);
+  const G = (x, z) => TerFn.SampleMissionTerrain(x, z), N = (x, z) => Ter.SampleMissionNaturalHeight(x, z);
   const night = lay.scenario.states.find((s) => s.id === "NightGate").blocks;
   const solids = [...lay.blocks, ...lay.gates, ...night].filter((b) => b.solid !== false);
   const routes = Object.entries(L.MISSION_ROUTES).map(([id, pts]) => ({ id, pts: pts.map((p) => ({ x: p.x, z: p.z })) }));

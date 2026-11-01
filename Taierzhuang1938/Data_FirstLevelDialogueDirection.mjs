@@ -46,7 +46,6 @@
 //         voices（可选）{ 说话人: 定妆表 id }：这一场里这个人用另一条定妆音（同一个嗓子的另一种状态，
 //         定妆表 voiceOf）当参考、用它的人设写提示词；只影响生成，不影响谁说、从哪播。
 
-import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
 
 /** 音量档的有声段 RMS（dBFS）。整段母带的目标 = 本场各句按字数加权的平均档位（整段只拉一次电平）。 */
 export const PROJECTION_DB = Object.freeze({ shout: -16, normal: -19, low: -23, breath: -27 });
@@ -387,26 +386,3 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
 });
 
-/** 逐句 id：`<Scene>.<NN>`（两位序号，从 01 起）。 */
-export const LineId = (sceneId, index) => `${sceneId}.${String(index + 1).padStart(2, "0")}`;
-
-/**
- * 一句的导演参数。缺省：after prev（首句 start）、offsetS null（= 沿用录音间隔，播放时由清单填）、
- * intensity 0.5、projection 取定妆表的角色默认、spatial 顺子 self 其余 head。
- */
-export function LineDirection(cue, index) {
-  const line = cue.lines[index];
-  const authored = FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.lines?.[String(index + 1).padStart(2, "0")] || {};
-  return Object.freeze({
-    after: index ? "prev" : "start", offsetS: index ? null : 0, intensity: 0.5,
-    projection: FIRST_LEVEL_VOICE_CAST[line.who]?.projection || "normal",
-    spatial: line.who === "shunzi" ? "self" : "head",
-    ...authored,
-  });
-}
-
-/** 播放用的间隔：导演写了 offsetS 就用它，否则沿用整段录音里的原始间隔（缺录音时兜底 FALLBACK_GAP_S）。 */
-export function PlaybackOffset(direction, recordedGapS) {
-  if (direction.offsetS != null) return direction.offsetS;
-  return Number.isFinite(recordedGapS) ? recordedGapS : FALLBACK_GAP_S;
-}

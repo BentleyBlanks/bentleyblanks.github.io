@@ -52,9 +52,8 @@ import { PropStreamer } from "./Script_PropStreaming.mjs";
 import { PropBatcher } from "./Script_PropBatch.mjs";
 import { MergeGeometries, TILE_METERS } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
-import {
-  IsStandardSandbagAsset, SANDBAG_METRICS, SandbagGroundedBottom, SandbagGroundedY,
-} from "./Data_SandbagStandard.mjs";
+import { SANDBAG_METRICS } from "./Data_SandbagStandard.mjs";
+import { IsStandardSandbagAsset, SandbagGroundedBottom, SandbagGroundedY } from "./Script_SandbagStandardData.mjs";
 import { SandbagContactMaterial } from "./Script_SandbagStandard.mjs";
 // 并行下载工作包各交一份目录片段（PACK.url + 无 url 的 ASSETS 表），此处接线。
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";

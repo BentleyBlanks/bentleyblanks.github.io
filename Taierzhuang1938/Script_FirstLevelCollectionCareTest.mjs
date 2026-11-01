@@ -9,8 +9,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { COLLECTION_CARE_ANIMATION as A, COLLECTION_CARE_CLIPS, COLLECTION_CARE_PAIRS, COLLECTION_CARE_RECLINE_WALL_M,
-  CareMedicSpot, CarePatientClip } from "./Data_FirstLevelCollectionCare.mjs";
+import { COLLECTION_CARE_ANIMATION as A, COLLECTION_CARE_CLIPS, COLLECTION_CARE_PAIRS, COLLECTION_CARE_RECLINE_WALL_M } from "./Data_FirstLevelCollectionCare.mjs";
+import { CareMedicSpot, CarePatientClip } from "./Script_FirstLevelCollectionCare.mjs";
 import { MISSION_PLACEMENT as P, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_TUNING as F } from "./Data_Tuning_FirstLevelFront.mjs";
 

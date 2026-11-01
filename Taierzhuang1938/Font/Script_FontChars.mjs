@@ -51,7 +51,9 @@ async function CollectStrings(files) {
     if(file==="Data_FirstLevelMissionDialogue.mjs"){
       // Delivery instructions can contain kana for TTS; only subtitles and
       // speaker labels are displayed by the game.
-      Walk(mod.MISSION_DIALOGUE.map(cue=>cue.lines.map((line,index)=>mod.MissionVoiceSubtitle(cue,index))),strings);
+      // 字幕取法（MissionVoiceSubtitle）2026-11-02 搬进 Script_FirstLevelMissionDialogue（数据模块只放数据）。
+      const { MissionVoiceSubtitle } = await import(pathToFileURL(path.join(projectDir, "Script_FirstLevelMissionDialogue.mjs")).href);
+      Walk(mod.MISSION_DIALOGUE.map(cue=>cue.lines.map((line,index)=>MissionVoiceSubtitle(cue,index))),strings);
       Walk(Object.values(mod.MISSION_VOICE_CAST).map(row=>row[0]),strings);
     }else Walk({ ...mod }, strings);
   }

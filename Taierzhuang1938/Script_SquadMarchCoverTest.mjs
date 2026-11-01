@@ -4,7 +4,7 @@ import {SQUAD_COVER_THREAT as TH} from './Data_Tuning_SquadMarch.mjs';
 import {MISSION_TRENCH_COVER as C} from './Data_FirstLevelMissionTrenchCover.mjs';
 import {OPENING} from './Data_FirstLevelOpening.mjs';
 import {MISSION_LAYOUT,MISSION_ROUTES} from './Data_FirstLevelMissionLayout.mjs';
-import {SampleMissionTerrain} from './Data_FirstLevelMissionTerrain.mjs';
+import { SampleMissionTerrain } from './Script_FirstLevelMissionTerrain.mjs';
 for(const [name,route] of [['approach',OPENING.approachRoute],['support',MISSION_ROUTES.support]]){
  const stations=C[name],bounds=new SquadCoverBounds(stations,route);
  const members=Array.from({length:4},(_,slot)=>{

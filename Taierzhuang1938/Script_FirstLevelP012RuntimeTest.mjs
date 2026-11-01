@@ -11,7 +11,7 @@ import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Layout.mjs";
-import {P012SouthPoint,P012StationPoint} from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint, P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 import {openingActivities,openingStoryBeats} from "./Data_FirstLevelP012Opening.mjs";
 import { T } from "./Script_Text.mjs";
 function FootY(layout,p) {

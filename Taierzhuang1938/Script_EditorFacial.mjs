@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { Panel,Section,Select,Slider,Button,ButtonRow,Toggle,Note,El } from './Script_EditorUi.mjs';
-import { MISSION_DIALOGUE,MISSION_VOICE_CAST,MissionVoiceSubtitle,MissionVoiceSpoken } from './Data_FirstLevelMissionDialogue.mjs';
+import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from './Data_FirstLevelMissionDialogue.mjs';
+import { MissionVoiceSubtitle, MissionVoiceSpoken } from './Script_FirstLevelMissionDialogue.mjs';
 import { MISSION_VOICE_ALIGNMENT } from './Data_FirstLevelMissionVoiceAlignment.mjs';
-import { SelectP012CompanionCast } from './Data_FirstLevelP012Cast.mjs';
+import { SelectP012CompanionCast } from './Script_FirstLevelP012Cast.mjs';
 import { GetLugouCharacterVariantEntries } from './Script_CharacterModel.mjs';
 import { BuildSpeechEnvelope,SampleSpeechEnvelope } from './Script_SpeechEnvelope.mjs';
 import { FACIAL_REVIEW_DEFAULTS,FACIAL_REVIEW_STORAGE,FacialLineAt,BuildFacialReviewSamples,SampleFacialKeys,ValidateFacialReview } from './Script_FacialReview.mjs';

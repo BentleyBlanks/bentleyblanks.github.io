@@ -29,7 +29,7 @@ import { FirstLevelBackdropSquads, BackdropStep, BackdropFirePoints, InCameraVie
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { MISSION_DEFENSE_OBJECTS, MISSION_STAKE_FENCE } from "./Data_FirstLevelMissionFortifications.mjs";

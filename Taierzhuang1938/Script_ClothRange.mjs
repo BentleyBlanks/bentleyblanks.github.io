@@ -8,7 +8,8 @@ import { ApplyClothWind, ClothLabContactFriction } from './Script_ClothLabSimula
 import { CreateClothSampleMaterials } from './Script_ClothSampleMaterials.mjs';
 import { ClothBlood } from './Script_ClothBlood.mjs';
 import { T } from './Script_Text.mjs';
-import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM as S, ClampClothParameter } from './Data_Tuning_ClothRange.mjs';
+import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM as S } from './Data_Tuning_ClothRange.mjs';
+import { ClampClothParameter } from './Script_Tuning_ClothRange.mjs';
 import { CLOTH_BLOOD_CONTROLS, CLOTH_BLOOD_SIM } from './Data_Tuning_ClothBlood.mjs';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);

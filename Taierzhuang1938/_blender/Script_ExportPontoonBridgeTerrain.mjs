@@ -13,8 +13,10 @@
 // 地形、桥位、爆破手落位改了就重跑它，再重烘模型（Blender 脚本只认这份 JSON）。
 // ===========================================================================
 import fs from "node:fs";
-import { SampleMissionTerrain, SampleMissionNaturalHeight } from "../Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS, MISSION_NORTH_RIVER, MISSION_STAGE_ANCHORS, RiverWaterAt } from "../Data_FirstLevelMissionTopology.mjs";
+import { SampleMissionNaturalHeight } from "../Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "../Script_FirstLevelMissionTerrain.mjs";
+import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS, MISSION_NORTH_RIVER, MISSION_STAGE_ANCHORS } from "../Data_FirstLevelMissionTopology.mjs";
+import { RiverWaterAt } from "../Script_FirstLevelMissionTopology.mjs";
 import { MISSION_PLACEMENT } from "../Data_FirstLevelMissionLayout.mjs";
 import { END_TUNING as E } from "../Data_Tuning_FirstLevelEnd.mjs";
 

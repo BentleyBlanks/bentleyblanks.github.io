@@ -179,8 +179,3 @@ export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
   "ZhouLift.04": Row("zhou", "seat", "GestureFlickR"),
 });
 
-/** The gesture row for a per-line voice sample's lineId ("<Scene>.<NN>"), or null (no gesture on that line). */
-export function SpeakerGestureForLine(lineId) {
-  const row = Object.hasOwn(FIRST_LEVEL_SPEAKER_GESTURES, lineId) ? FIRST_LEVEL_SPEAKER_GESTURES[lineId] : null;
-  return row?.gesture ? row : null;
-}

@@ -13,7 +13,8 @@ import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
-import { BuildShellImpactLayout, SHELL_IMPACT_GROUND_TINT } from "./Data_ShellImpactRangeTerrain.mjs";
+import { SHELL_IMPACT_GROUND_TINT } from "./Data_ShellImpactRangeTerrain.mjs";
+import { BuildShellImpactLayout } from "./Script_ShellImpactRangeTerrain.mjs";
 import {
   SHELL_IMPACT_WORLD, SHELL_IMPACT_CAMERA_FAR, SHELL_IMPACT_TREES, SHELL_IMPACT_DRUMS, SHELL_IMPACT_MG, SHELL_IMPACT_TANKS,
 } from "./Data_ShellImpactRange.mjs";

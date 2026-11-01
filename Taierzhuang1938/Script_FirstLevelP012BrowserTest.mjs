@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { P012_ANCHORS, P012_ROUTES, FIRST_LEVEL_P012_LAYOUT } from "./Data_FirstLevelP012Layout.mjs";
-import { P012SouthPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint, P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 import { openingActivities } from "./Data_FirstLevelP012Opening.mjs";
 import { P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
@@ -1373,7 +1373,7 @@ async function VerifyFrontlineRecoveryFixtures() {
   const results = await page.evaluate(async () => {
     const { FirstLevelP012Director } = await import("./Script_FirstLevelP012Flow.mjs");
     const { FIRST_LEVEL_P012_WHITEBOX_PHASE: phase } = await import("./Data_FirstLevelP012Whitebox.mjs");
-    const { P012NorthPoint } = await import("./Data_FirstLevelP012Space.mjs");
+    const { P012NorthPoint } = await import("./Script_FirstLevelP012Space.mjs");
     const game = window.Tengxian, results = [];
     for (const beat of [6, 7, 8, 9, 10]) {
       const director = new FirstLevelP012Director({}, phase.whitebox);

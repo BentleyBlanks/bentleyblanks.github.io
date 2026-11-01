@@ -11,7 +11,7 @@ import {SettingsHost, SETTINGS_PAGE_IDS} from './Script_SettingsHost.mjs';
 import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS} from './Data_DevTools.mjs';
 import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
-import {CreateGameGraphics} from './Data_Tuning_GameGraphics.mjs';
+import { CreateGameGraphics } from './Script_Tuning_GameGraphics.mjs';
 import {CAMPAIGN_ENTRIES} from './Data_Menu.mjs';
 import {MOVEMENT_RANGE_PHASE} from './Data_MovementRange.mjs';
 import {WEAPON_RANGE_PHASE} from './Data_WeaponRange.mjs';

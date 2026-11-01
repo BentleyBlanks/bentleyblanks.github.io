@@ -35,12 +35,12 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { FirearmEffects } from "./Data_Tuning_FirearmEffects.mjs";
+import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
 import { ParticleEffects } from "./Script_ParticleEffects.mjs";
-import {StaticSmokeModules} from './Data_ParticleSmoke.mjs';
+import { StaticSmokeModules } from './Script_ParticleSmoke.mjs';
 import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, EXPLOSION_VOLUME_ART, PARTICLE_VOLUME, PARTICLE_MESH } from "./Data_Tuning_Particles.mjs";
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";

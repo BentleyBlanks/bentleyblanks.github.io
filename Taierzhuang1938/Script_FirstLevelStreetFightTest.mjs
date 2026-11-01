@@ -18,7 +18,7 @@ import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_LEADER_STAGES } from "./Data_FirstLevelLeaderGuide.mjs";
 import { MISSION_CIVILIAN_AFTERMATH_HOUSES } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_DEFERRED_ENCOUNTERS, FIRST_LEVEL_STAGE_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { StreetFightRules, InBox, AlleyDepth, ThrowPowerFor } from "./Script_FirstLevelStreetFight.mjs";
 import { VILLAGE_BYSTANDERS, VILLAGE_STREET_POSTS, VILLAGE_ENCOUNTER_IDS, GENG_CART_LANE_ROUTE, GengCartTransferRoute } from "./Script_FirstLevelVillageBlock.mjs";
 

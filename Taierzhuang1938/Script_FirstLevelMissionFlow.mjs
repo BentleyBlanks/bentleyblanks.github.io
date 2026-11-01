@@ -1,6 +1,7 @@
 // Pure mission facts. No kill quota, remote trigger circle or scheduled auto-win.
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
-import { FIRST_LEVEL_STAGES, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
+import { FirstLevelStageForStep } from "./Script_FirstLevelMissionStages.mjs";
 export class FirstLevelMissionFlow {
   constructor(host = {}) {
     this.host = host;

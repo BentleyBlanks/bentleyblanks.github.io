@@ -118,9 +118,3 @@ export const VISEMES = Object.freeze({
   REST: [0, 0, 0, 0],
 });
 
-/** Every Han character with a reading, as a Map char -> syllable (first reading wins). */
-export function HanReadings() {
-  const map = new Map();
-  for (const [syllable, chars] of Object.entries(HAN_PINYIN)) for (const ch of chars) if (!map.has(ch)) map.set(ch, syllable);
-  return map;
-}

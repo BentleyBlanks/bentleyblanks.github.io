@@ -8,7 +8,8 @@
 // 而杀伤半径是玩法值（掷弹筒 5 m、手榴弹 6.5 m），不跟装药走。超压按装药量的立方根缩放（Hopkinson–Cranz），
 // 这是爆炸物理里「多远算近」的那把尺子。
 import { BLAST_EXPOSURE } from "./Data_Tuning_BlastReaction.mjs";
-import { EXPLOSIVES, ExplosiveIdFor } from "./Data_Explosives.mjs";
+import { EXPLOSIVES } from "./Data_Explosives.mjs";
+import { ExplosiveIdFor } from "./Script_Explosives.mjs";
 
 const Clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const Clamp01 = (v) => Clamp(v, 0, 1);

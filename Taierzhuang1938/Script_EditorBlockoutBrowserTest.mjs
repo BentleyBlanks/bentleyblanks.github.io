@@ -38,7 +38,7 @@ import {
   BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutLevelIndex, HeightGridSampler, LayoutFromSceneDoc, DeriveFirstLevelBlockoutLayout,
 } from "./Script_EditorBlockoutLevels.mjs";
 import { NormalizeBlockout, PlanTransition, BLOCKOUT_LEVEL_KEYS } from "./Script_EditorBlockoutConfig.mjs";
-import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
+import { CreateP012Terrain } from "./Script_FirstLevelP012Terrain.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { BLOCKOUT_EDITOR } from "./Script_EditorBlockout.mjs";
 import { LitterSlots, LitterPose, BLOCKOUT_PUPPETS } from "./Script_EditorBlockoutPuppets.mjs";

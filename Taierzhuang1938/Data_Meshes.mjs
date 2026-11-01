@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "rifle-mechanisms-zb26-manufacture-type11-charge-20261015";
+export const MESH_REV = "rifle-mechanisms-zb26-manufacture-type11-charge-20261015";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -384,22 +384,6 @@ export const MESHES = {
   },
 };
 
-/** 取一个模型的 url。id 不认识时返回 null（调用方退回程序化几何）。 */
-export function MeshUrl(id) {
-  const entry = MESHES[id];
-  return entry ? `${MODEL_BASE}${entry.file}?v=${MESH_REV}` : null;
-}
-
-/** 按类别列 id。 */
-export function MeshIds(category = null) {
-  return Object.keys(MESHES).filter((id) => !category || MESHES[id].category === category);
-}
-
-/** 全部模型的 url，给 PreloadModels 用。 */
-export function AllMeshUrls() {
-  return MeshIds().map((id) => `${MODEL_BASE}${MESHES[id].file}?v=${MESH_REV}`);
-}
-
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
 export const WEAPON_MESH_BY_ID = {
   // HanYang is resolved by its required GLB loader, not the TZM registry above.
@@ -416,13 +400,6 @@ export const WEAPON_MESH_BY_ID = {
 
 /** 保留通用变体接口；大刀统一使用带铁环、缠柄的二十九军战刀。 */
 export const WEAPON_MESH_VARIANTS = {};
-
-/** 越界或已退役的变体编号回到该武器的默认模型，兼容旧掉落和编辑器数据。 */
-export function WeaponMeshId(weaponId, variant = 0) {
-  const list = WEAPON_MESH_VARIANTS[weaponId];
-  if (list && variant > 0 && variant < list.length) return list[variant];
-  return WEAPON_MESH_BY_ID[weaponId];
-}
 
 /**
  * 可装刺刀的枪 → 刺刀模型 id。运行时把刺刀模型的 socket 挂点（枪口环中心）

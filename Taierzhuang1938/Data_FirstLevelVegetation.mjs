@@ -20,9 +20,11 @@
 import {
   MISSION_ROUTES, MISSION_PLACEMENT, MISSION_ANCHORS, MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
-import { TrenchPlanFor, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_NORTH_RIVER, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
-import { HashSeed, Rng, RouteIndex, PointIndex } from "./Data_FirstLevelPropDressing.mjs";
+import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionGroundSurface } from "./Script_FirstLevelMissionTerrain.mjs";
+import { MISSION_NORTH_RIVER } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverCutAt, RiverReachAt } from "./Script_FirstLevelMissionTopology.mjs";
+import { HashSeed, Rng, RouteIndex, PointIndex } from "./Script_FirstLevelPropDressingData.mjs";
 
 export const VEGETATION_VERSION = "first-level-vegetation-20260930";
 export const VEGETATION_ATLAS = Object.freeze({

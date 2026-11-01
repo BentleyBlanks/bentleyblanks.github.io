@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { BuildDistantSmoke, FIRST_LEVEL_DISTANT_SMOKE as smoke } from "./Data_FirstLevelDistantSmoke.mjs";
 import { MISSION_LAYOUT as layout, MISSION_ROUTES as routes } from "./Data_FirstLevelMissionLayout.mjs";
 import { SPACE_KEYFRAMES } from "./Data_FirstLevelSpaceKeyframes.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { Sight, Bearing, Eye, RouteLength, RoutePoint } from "./Script_FirstLevelSpaceProbe.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";

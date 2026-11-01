@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **士兵与数据规矩（2026-11-02）**：士兵后挂字段全部进组件表（新组件 mission / opening / cast / presentation），身份开关改成标签位，字段主人以外的直接写入只减不增，十二种兵种原型；修了行军放手不还原命令的回归（§22 分组件引入）。数据：656 份数据文件登记身份（`Data_DataSources`）；57 个数据模块的 143 个函数搬进同名 `Script_` 模块（最近 7 天有会话在改的 31 个先不动；`Data_HanYang173RGrips` 由 Blender 脚本整份生成、函数写在生成模板里，没动），数据模块导出值能原样写成 JSON 的从 184 个到 229 个；台词手势 / 时间轴 / 口型 / 文本键的编号引用加了检查（`DataRefsTest`）。顺手修了第一关开场炮击镜头烟柱颜色传十六进制导致 Frame 抛错（`FirstLevelP012BrowserTest` 转绿）。
+
 - **主文件瘦身第二步（2026-11-02）**：每帧 33 步挪进 `Script_FrameSteps{Player,World,Rules,Present}`、五个模式进 `Script_FrameModes`，都从 `Script_Main` 的工具箱 `ctx` 取主文件的状态与函数；调试口 `window.Tengxian` 改由 `Script_DebugApi.InstallDebugApi(ctx)` 装配，`Debug` 分三组系统各自声明（名字登记 `Data_DebugApiKeys.json`，门禁 `DebugApiTest`）；最后三个测试场（靶场、白刃实验场、枪械射击场）的接线搬进插件：`Script_RangeTargets` / `Script_MeleeLabRuntime` 管木桩兵、遭遇、面板与取证口，装配层只调通用钩子（`Maintain`、`OnKey`、`ActionPrompts`、`OnPlayerDown`、白刃前后钩子），按测试场名字的判断改成登记表字段（`identify`、`targetDetail`、`steadyView`、`bayonetFixed`、`meleeAnimations`）与插件的 `startup`。`Script_Main` 10534 → 约 8900 行，已没有任何测试场的名字。验收：每帧调用顺序录像与最初逐字节一致；`window.Tengxian` 在五个入口（P012、旧章节、靶场、白刃、断肢）逐名字的类型 / 属性 / 参数个数一致；26 项浏览器回归里 6 项红在 origin/master 上同样红（DeathMenu / Editor / Menu / Boot / MeleeAnimation / BootInteraction）。
 
 - **主循环拆成调度表（2026-11-01）**：`Script_Main.Frame` 从 755 行收成三行（冻结判断 / 帧头 / 按模式分派）；五个模式各一个函数，正常游戏切成 33 个 `PlayStep<Id>`，先后由 `Data_FrameSchedule` 定，原注释里的 18 条先后约束写成规则由 `FrameScheduleTest` 守；中途结束改成 `return STOP`，步骤间共用的量进 `frameState`。函数体原样搬（只在开头取 dt 等）；浏览器录调用顺序对照：正片开局、第 4 阶段、旧章节各 4 帧与拆前逐条一致。口径 [每帧调度表](Data_FrameSchedule.md)。

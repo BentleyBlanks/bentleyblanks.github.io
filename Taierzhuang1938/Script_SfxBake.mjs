@@ -55,7 +55,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { SFX_SOURCES, SFX_LICENSES, ArchiveUrl } from "./Data_SfxSources.mjs";
+import { SFX_SOURCES, SFX_LICENSES } from "./Data_SfxSources.mjs";
+import { ArchiveUrl } from "./Script_SfxSources.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(HERE, "Audio", "Sfx");

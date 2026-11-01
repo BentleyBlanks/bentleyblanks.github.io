@@ -1,14 +1,17 @@
-import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
+import { FrontFieldBend } from "./Script_FirstLevelFrontRoute.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverWaterAt, RiverCutAt, RiverReachAt } from "./Script_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface } from "./Script_FirstLevelMissionTerrain.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
-import { BuildFrontWhitebox } from "./Data_FirstLevelWhiteboxFront.mjs";
-import { BuildVillageWhitebox } from "./Data_FirstLevelWhiteboxVillage.mjs";
-import { BuildTransferWhitebox } from "./Data_FirstLevelWhiteboxTransfer.mjs";
-import { BuildRearWhitebox } from "./Data_FirstLevelWhiteboxRear.mjs";
+import { BuildFrontWhitebox } from "./Script_FirstLevelWhiteboxFront.mjs";
+import { BuildVillageWhitebox } from "./Script_FirstLevelWhiteboxVillage.mjs";
+import { BuildTransferWhitebox } from "./Script_FirstLevelWhiteboxTransfer.mjs";
+import { BuildRearWhitebox } from "./Script_FirstLevelWhiteboxRear.mjs";
 // 2026.09.19 第二波：这一关的**边界**。军列与车站下线之后，旧的 z 到 743
 // （进站跑道尽头）有一半是空地 —— 地形高度场每格点都要烘，纯白烧。
 // z 北到 -232：最北的实体是弹药屋北墙 z=-219.3，北侧那道 3.1 m 地形墙在
@@ -867,7 +870,8 @@ export const MISSION_ROUTES = Object.freeze({
   // 与 Script_FirstLevelMissionTest 两道一起看着。
   ...MISSION_STAGE_ROUTES,
 });
-import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
+import { FrontAssaultLaneCuts } from "./Script_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   squadFrontPositions:OPENING.frontPosts,
   reliefApproach:[MISSION_STAGE_ANCHORS.collection,{x:-33,z:-106},...Sortie.approach.slice(0,3)],

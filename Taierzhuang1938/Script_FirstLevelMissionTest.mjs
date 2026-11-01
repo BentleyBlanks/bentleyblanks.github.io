@@ -2,12 +2,13 @@ import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
-import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
+import { MissionVoiceTimeline } from "./Script_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception, ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
-import { FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FrontFieldBend } from "./Script_FirstLevelFrontRoute.mjs";
+import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FrontReserveLane } from "./Script_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -20,7 +21,8 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
-import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_CHECKPOINT_FRONT_LOST, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_CHECKPOINT_FRONT_LOST } from "./Data_FirstLevelMissionStages.mjs";
+import { ResolveFirstLevelStage, FirstLevelStageForStep } from "./Script_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
@@ -28,9 +30,11 @@ import { MISSION_STAGE_ROUTES, MISSION_PONTOON_BRIDGE } from "./Data_FirstLevelM
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY,
   MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
-import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
-import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MISSION_TERRAIN, SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain, MissionPathDistance } from "./Script_FirstLevelMissionTerrain.mjs";
+import { CreateP012Terrain } from "./Script_FirstLevelP012Terrain.mjs";
+import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MissionVoicePrompt } from "./Script_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 
 // Exercise the real dynamic voice recipes and admission rules. Only WebAudio's
@@ -956,7 +960,7 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
 }
 console.log("ok four cover rows fill the assault front, the rush lanes still clear them and the tank lane stays open");
 // Each waiting team occupies an authored work area, with clear paths for both bearer ends.
-import {MISSION_CROWD_AREAS as areas} from './Data_FirstLevelMissionCrowd.mjs';import {MISSION_LAYOUT as crowdLayout} from './Data_FirstLevelMissionLayout.mjs';import {SampleMissionTerrain as crowdGround} from './Data_FirstLevelMissionTerrain.mjs';import {MissionCarryRoutePoint as crowdPoint,MissionRouteLength as crowdLength} from './Script_FirstLevelMissionColumn.mjs';
+import {MISSION_CROWD_AREAS as areas} from './Data_FirstLevelMissionCrowd.mjs';import {MISSION_LAYOUT as crowdLayout} from './Data_FirstLevelMissionLayout.mjs';import {SampleMissionTerrain as crowdGround} from './Script_FirstLevelMissionTerrain.mjs';import {MissionCarryRoutePoint as crowdPoint,MissionRouteLength as crowdLength} from './Script_FirstLevelMissionColumn.mjs';
 const bad=[];for(const a of areas)for(const [kind,points] of [['litter',a.pockets],['walker',a.walkerPockets]])for(const [i,p] of points.entries()){const routes=[[a.trigger,{x:a.trigger.x,z:a.entryZ},{x:p.x,z:a.entryZ},p],[p,{x:p.x,z:a.exitZ},a.merge]];for(const route of routes)for(let d=0;d<crowdLength(route);d+=.3){const c=crowdPoint(route,d);for(const offset of kind==='litter'?[-1.28,0,1.28]:[0]){const x=c.x-Math.sin(c.yaw)*offset,z=c.z-Math.cos(c.yaw)*offset,y=crowdGround(x,z);for(const b of crowdLayout.blocks){if(b.solid===false||crowdLayout.walkableSurfaces.some(s=>s.id===b.id))continue;const dx=x-b.x,dz=z-b.z,co=Math.cos(b.ry||0),si=Math.sin(b.ry||0);if(Math.abs(dx*co-dz*si)<b.w/2+.32&&Math.abs(dx*si+dz*co)<b.d/2+.32&&b.y+b.h/2>y+.3&&b.y-b.h/2<y+1.7)bad.push({area:a.id,kind,i,box:b.id,x,z});}}}}
 assert.deepEqual(bad,[],"all staging routes clear real walls and furniture, including both bearers");
 assert.ok(areas.every(a=>a.walkerPockets.length===R.walkingWoundedCount+R.medicCount+R.civilianCount));

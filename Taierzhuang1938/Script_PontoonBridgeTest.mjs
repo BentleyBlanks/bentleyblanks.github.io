@@ -36,10 +36,11 @@ const { GLTFLoader } = await import("./vendor/three/examples/jsm/loaders/GLTFLoa
 const { PontoonBridgeSet } = await import("./Script_PontoonBridgeSet.mjs");
 const { PONTOON_BRIDGE_MODEL: M, PONTOON_BRIDGE_BLAST: FX } = await import("./Data_PontoonBridgeDemolition.mjs");
 const { MISSION_LAYOUT, MISSION_PLACEMENT: P } = await import("./Data_FirstLevelMissionLayout.mjs");
-const { MISSION_PONTOON_BRIDGE: B, PONTOON_HEADS, MISSION_STAGE_ANCHORS: A, RiverWaterAt, MISSION_NORTH_RIVER } = await import("./Data_FirstLevelMissionTopology.mjs");
+const { MISSION_PONTOON_BRIDGE: B, PONTOON_HEADS, MISSION_STAGE_ANCHORS: A, MISSION_NORTH_RIVER } = await import("./Data_FirstLevelMissionTopology.mjs");
+const { RiverWaterAt } = await import("./Script_FirstLevelMissionTopology.mjs");
 const { END_TUNING: E } = await import("./Data_Tuning_FirstLevelEnd.mjs");
 const { MISSION_TUNING: R } = await import("./Data_Tuning_FirstLevel.mjs");
-const { SampleMissionTerrain } = await import("./Data_FirstLevelMissionTerrain.mjs");
+const { SampleMissionTerrain } = await import("./Script_FirstLevelMissionTerrain.mjs");
 hooks.deregister();
 
 let checks = 0;

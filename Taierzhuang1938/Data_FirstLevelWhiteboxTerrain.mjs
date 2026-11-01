@@ -54,13 +54,6 @@ export const WHITEBOX_TERRAIN_OPS = Object.freeze(["level", "raise", "cut"]);
 /** 小路染色边（米）：路面全宽之外再羽化这么宽落到 0，与 MISSION_TERRAIN.roads 的 1.8 m 同口径。 */
 export const WHITEBOX_PATH_EDGE_M = 1.8;
 export const WHITEBOX_PATH_DEFAULT_WEAR = 0.85;
-/** 小路（连染色边）的外接框：这一框之外它对地表纹理的贡献严格为 0。 */
-export function WhiteboxPathBounds(path) {
-  const pad = path.width / 2 + WHITEBOX_PATH_EDGE_M;
-  const xs = (path.points || []).map((p) => p.x), zs = (path.points || []).map((p) => p.z);
-  return { minX: Math.min(...xs) - pad, maxX: Math.max(...xs) + pad, minZ: Math.min(...zs) - pad, maxZ: Math.max(...zs) + pad };
-}
-
 const Smooth = (value) => {
   const t = value < 0 ? 0 : value > 1 ? 1 : value;
   return t * t * (3 - 2 * t);
@@ -85,7 +78,7 @@ export function WhiteboxShapeBounds(shape) {
   return { minX: b.minX - f, maxX: b.maxX + f, minZ: b.minZ - f, maxZ: b.maxZ + f };
 }
 // 到核心区边界的距离（核心内 ≤ 0）与该处的 dy。
-function CoreDistance(shape, x, z) {
+export function CoreDistance(shape, x, z) {
   if (shape.kind === "disc") return { d: Math.hypot(x - shape.x, z - shape.z) - shape.radius, dy: shape.dy };
   if (shape.kind === "box") {
     const c = Math.cos(shape.ry || 0), s = Math.sin(shape.ry || 0), dx = x - shape.x, dz = z - shape.z;
@@ -117,8 +110,6 @@ function CoreDistance(shape, x, z) {
   }
   return { d: best - shape.halfW, dy };
 }
-/** 到核心区边界的距离 d（核心内 ≤ 0，米）与该处的 dy。地表图层（SampleMissionGroundSurface）按它铺土壁/沟底。 */
-export function WhiteboxShapeDistance(shape, x, z) { return CoreDistance(shape, x, z); }
 /** 单个形状在 (x,z) 的权重与 dy（纯函数，测试与出图用）。 */
 export function WhiteboxShapeWeight(shape, x, z) {
   const { d, dy } = CoreDistance(shape, x, z);

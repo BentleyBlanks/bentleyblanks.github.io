@@ -8,7 +8,8 @@ import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState, FIRST_LEVEL_AI_RULE_STEPS } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
-import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { SortieCrawlBlocked } from "./Script_FirstLevelFrontRoute.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
 import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
@@ -31,7 +32,8 @@ import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpe
 import { OpeningLensDriver } from "./Script_OpeningLens.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
-import { FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FrontReserveLane } from "./Script_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -43,7 +45,8 @@ import {
   MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
-import { MISSION_STAGE_ROUTES, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MissionRegroupCorridor, RegroupGuideRoute } from "./Script_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import {
   MISSION_ANCHORS as A,
@@ -96,7 +99,7 @@ import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelFarBank } from "./Script_FirstLevelBridgeFarBank.mjs";
 import { FarBankTankView } from "./Script_FirstLevelFarBankView.mjs";
 import { FarBankCrowdView } from "./Script_FirstLevelFarBankCrowdView.mjs";
-import { CrowdGroundY } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { CrowdGroundY } from "./Script_FirstLevelFarBankCrowdData.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
 import { PontoonBridgeSet } from "./Script_PontoonBridgeSet.mjs";
@@ -108,7 +111,8 @@ import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { FirstLevelSpeakerBinder, FirstLevelSpeakerResolvers } from "./Script_FirstLevelSpeakerBinder.mjs";
 import { SetSpeakerGestureWorld } from "./Script_SpeakerGestureLayer.mjs";
-import { SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
+import { FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 const FACE_STEPS = new Set(FIRST_LEVEL_FACE_STEPS);
 
 export function FirstLevelCheckpointVitals(point={},player={},tuning=R){

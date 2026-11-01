@@ -1,6 +1,7 @@
 // Loading-screen-only PBR. No Three imports and no shader compilation on the UI thread.
 // The original <img> remains the accessible, immediate fallback throughout loading.
-import { BOOT_PAPER_PBR, BOOT_PAPER_TILT, BootPaperPbrUrls } from "./Data_BootPapers.mjs";
+import { BOOT_PAPER_PBR, BOOT_PAPER_TILT } from "./Data_BootPapers.mjs";
+import { BootPaperPbrUrls } from "./Script_BootPapers.mjs";
 
 export class BootPaperSurface {
   constructor(img, paper, tilt) {

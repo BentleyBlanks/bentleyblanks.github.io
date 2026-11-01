@@ -8,7 +8,8 @@
 // thousands per crater) and GroundHeight inside a crater tile ran ~100x slower
 // than untouched soil. `tiles` / `TakeDirty()` keep the string-keyed render
 // contract; everything hot below it is numeric.
-import { EXPLOSIVES, ExplosiveIdFor, TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
+import { EXPLOSIVES, TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
+import { ExplosiveIdFor } from "./Script_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
 
 // [dx, dz, lattice distance]. Distances are precomputed: the relaxation loops

@@ -12,7 +12,8 @@
 // 转动写在外层 #bootPaperWrap 的 CSS 变量上，回正是 CSS 过渡（合成线程跑，主线程建关卡堵住时照样回得动）。
 // 图没拉下来不影响文字：简述本身就是完整的一句话，图只是氛围。
 
-import { ApplyTiltDrag, BOOT_PAPER_STORAGE_KEY, BOOT_PAPER_TILT, BootPaperUrl, PickBootPaper } from "./Data_BootPapers.mjs";
+import { BOOT_PAPER_STORAGE_KEY, BOOT_PAPER_TILT } from "./Data_BootPapers.mjs";
+import { ApplyTiltDrag, BootPaperUrl, PickBootPaper } from "./Script_BootPapers.mjs";
 import { T } from "./Script_Text.mjs";
 import { BootPaperSurface } from "./Script_BootPaperSurface.mjs";
 

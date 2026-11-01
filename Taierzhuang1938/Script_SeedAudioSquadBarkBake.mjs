@@ -23,8 +23,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
-import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner, SQUAD_BARK_CAST, SquadBarkEntries, SquadBarkScript,
-  SQUAD_BARK_RETIRED_TEXT, SQUAD_BARK_TAKES, BarkTakeVoice, BarkTakeSet, PLAYER_VENT_TEXT } from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, SQUAD_BARK_CAST, SQUAD_BARK_RETIRED_TEXT, SQUAD_BARK_TAKES, BarkTakeVoice, PLAYER_VENT_TEXT } from "./Data_FirstLevelVoiceCast.mjs";
+import { CastVoiceOwner, SquadBarkEntries, SquadBarkScript, BarkTakeSet } from "./Script_FirstLevelVoiceCast.mjs";
 import { LINE_MASTER } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines }

@@ -29,7 +29,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { AMB_SOURCES, AMB_LICENSES, ArchiveUrl } from "./Data_AmbSources.mjs";
+import { AMB_SOURCES, AMB_LICENSES } from "./Data_AmbSources.mjs";
+import { ArchiveUrl } from "./Script_AmbSources.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

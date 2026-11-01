@@ -1,6 +1,7 @@
 import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 import * as THREE from "three";
-import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BLOOD_LIQUID, BloodPosition } from "./Data_Tuning_Blood.mjs";
+import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BLOOD_LIQUID } from "./Data_Tuning_Blood.mjs";
+import { BloodPosition } from "./Script_Tuning_Blood.mjs";
 import { SurfaceDecalLayer } from "./Script_SurfaceDecals.mjs";
 
 const position=new THREE.Vector3(),direction=new THREE.Vector3(),velocity=new THREE.Vector3();

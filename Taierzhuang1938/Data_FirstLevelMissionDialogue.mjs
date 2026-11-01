@@ -1,5 +1,4 @@
 import { MISSION_GUIDE_DIALOGUE } from "./Data_FirstLevelGuideDialogue.mjs";
-import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 // 第一关台词表（cue id 的唯一来源）。两种录音格式并存（契约 docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2）：
 //   · 逐句干声（perLine: true）——01–06：每句一条干声 Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3，
 //     同一角色都带定妆参考音生成；对白时间轴在 Data_FirstLevelDialogueDirection.mjs，播放器 Script_DialoguePlayer。
@@ -67,32 +66,6 @@ export const MissionLineFile = (cueId, index) => `Lines/AudioVoice_FirstLevel${c
 // 01–06 逐句格式的场景（对白导演表 Data_FirstLevelDialogueDirection 里每一个都要有）。
 const PerLine = (id, lines, extra = {}) => Cue(id, lines, { ...extra, perLine: true });
 const JA = { lang: "ja" };
-/** 送 TTS 的写法：日语行取假名侧表，其余取 line.tts ?? line.text。 */
-export function MissionVoiceSpoken(cue, index) {
-  const line = cue.lines[index];
-  return JAPANESE_SPEECH[line.id]?.kana ?? JAPANESE_SPEECH[`${cue.id}:${index}`]?.kana ?? line.tts ?? line.text;
-}
-/** 屏幕字幕文本（日语行显示中文译文）。 */
-export const MissionVoiceSubtitle = (cue, index) => cue.lines[index].subtitle ?? cue.lines[index].text;
-/**
- * 对齐与清单绑定用的「当前台词」规范串。baker、门禁与 Script_FirstLevelVoiceAlign.py
- * 三处共用同一口径：只取 who 与 text，逐行字段（tts/subtitle/lang）不进哈希。
- */
-export const MissionVoiceScriptJson = (cue) =>
-  "[" + cue.lines.map((line) =>
-    '{"who": ' + JSON.stringify(line.who) + ', "text": ' + JSON.stringify(line.text) + "}").join(", ") + "]";
-/** 强制对齐脚本读这个：每行给出真正念出来的文本与语言（函数形态，不会被界面字表扫到）。 */
-export function MissionVoiceAlignmentCues() {
-  return MISSION_DIALOGUE.map((cue) => ({
-    id: cue.id,
-    file: cue.file,
-    guidance: !!cue.guidance,
-    scriptJson: MissionVoiceScriptJson(cue),
-    lines: cue.lines.map((line, index) => ({
-      who: line.who, text: MissionVoiceSpoken(cue, index), lang: line.lang || "zh",
-    })),
-  }));
-}
 export const MISSION_DIALOGUE = Object.freeze([
   // —— 2026-10-11 Notion 稿 01–02（docs/Data_FirstLevelOpeningSource20261011.md；契约 docs/Data_OpeningRedraft20261011Contract.md §3），
   // 逐句干声。台词逐字，不改字。没改字的九场（BunkerRunnerCall BunkerOrders BunkerIncoming InterpreterCall RescueFlee
@@ -686,32 +659,11 @@ export const MISSION_DIALOGUE = Object.freeze([
 ]);
 /** 说鲁南北方官话的角色（定妆表 lang "zh-north"）；其余中国角色都是川军。 */
 export const NORTHERN_SPEAKERS = new Set(["interpreter", "geng", "peasant"]);
-export function MissionVoicePrompt(cue) {
-  const cast = [...new Set(cue.lines.map((line) => line.who))]
-    .map((who) => MISSION_VOICE_CAST[who].join("："))
-    .join("；");
-  const environment = cue.soundscape || MissionVoiceSoundscape(cue.id);
-  // 日语段单独交代口径；纯中文 cue 的提示词逐字保持旧模板，沿用的录音才不会白白重烘。
-  const bilingual = cue.lines.some((line) => line.lang === "ja");
-  // 鲁南本地人（翻译 / 老耿 / 庄稼人）说北方官话。只有翻译时句子逐字保持旧写法（沿用的录音才不会白白重烘）；
-  // 2026-10-12 03–11 重构加了老耿与庄稼人，有他们在场时点名谁说北方官话，否则「所有中国人物必须讲四川话」会把老耿念成川军。
-  const northerners = [...new Set(cue.lines.filter((line) => NORTHERN_SPEAKERS.has(line.who)).map((line) => MISSION_VOICE_CAST[line.who][0]))];
-  const northern = northerners.length > 0;
-  const onlyInterpreter = northerners.length === 1 && northerners[0] === "翻译";
-  const northText = onlyInterpreter ? "翻译只说北方官话，川军角色只说四川话。" : `${northerners.join("、")}只说北方官话，川军角色只说四川话。`;
-  const rule = bilingual
-    ? `日军角色只念稿中给出的日语，用日语发音，不说中文；${northern ? northText : "中国角色只说稿中四川话。"}`
-    : "日军角色只说稿中日语。";
-  const accent = !northern ? "1938年四川军人，所有中国人物必须讲地道四川话，使用四川方言语调与发音，不能仅四川词汇配普通话播音。"
-    : onlyInterpreter ? "1938年战场：翻译必须说鲁南北方官话，川军角色必须说地道四川话，两者口音明显不同。"
-    : `1938年战场：${northerners.join("、")}是鲁南本地人，必须说鲁南一带的北方官话（山东口音），绝不说四川话；川军角色必须说地道四川话，使用四川方言语调与发音，两者口音明显不同。`;
-  return `生成游戏战场剧情的整段连续多人对白和同场环境声，一个完整音频，一次演完。${accent}${cast}。${cue.delivery || "自然接话、短停顿、呼吸，角色声音明确不同且稳定。"}环境声必须录进本次完整录音：${environment}环境声保持在对白下方，整段连续不突兀截断；不加音乐，不念角色名和动作说明，不删词改词，不添加其他可辨识台词。${rule}完整对白如下：\n${cue.lines.map((line, index) => `${MISSION_VOICE_CAST[line.who][0]}：“${MissionVoiceSpoken(cue, index)}”`).join("\n")}`;
-}
 // 分区兜底环境声：给没有单独写 soundscape 的 cue 用。罗班长带路短命令（Guide*）
 // 一律落到默认那条，改这里不要动到它们的提示词哈希。
-const SOUNDSCAPE_DEFAULT =
+export const SOUNDSCAPE_DEFAULT =
   "1938年户外战场，连续远近枪炮低声底、脚步、衣料与装备摩擦、呼吸；土墙遮蔽让远处声音低闷，主要对白始终清晰。";
-const SOUNDSCAPES = Object.freeze({
+export const SOUNDSCAPES = Object.freeze({
   bunker: "前沿小型掩蔽部：厚土层外一声接一声的闷炮，头顶碎土簌簌落下；门外八到十米处日军的脚步、枪托砸击和推进声透过低处破口传进来，屋里只有压住的呼吸。",
   rescue: "坍塌的掩蔽部里：搬动木架、碎砖与杂物滑落、用力的喘息和呛咳；后侧交通壕方向的步枪连续射击与日兵还击，被土层压得发闷。",
   trench: "后交通壕：鞋底踩泥水、装备晃动、急促呼吸；土壁把远处枪炮压成闷响，头顶偶尔掠过一发。",
@@ -731,7 +683,7 @@ const SOUNDSCAPES = Object.freeze({
   bridge: "北沙河浮桥南岸：河风、木船浮桥上急促通过的脚步与装备哐当、船板吱呀与水拍船帮、北岸土坎方向的步枪机枪点射、远处炮击。",
   night: "夜里滕县北门外：成队的脚步踩在土路上、弹药箱与器材搬动、车轮木响、许多人低声说话和零星口令；城墙把声音兜住，没有欢呼。",
 });
-const SOUNDSCAPE_ZONES = Object.freeze({
+export const SOUNDSCAPE_ZONES = Object.freeze({
   // 2026-10-11 Notion 稿 01–02 的新场景（逐句干声不用这张表写提示词，登记在这里只为分区齐全）。
   BunkerCount: "bunker", BunkerBanter: "bunker", BunkerLedger: "bunker", BunkerExit: "bunker",
   BunkerSweep: "trench", CaptiveDragged: "trench", CaptiveInterrogation: "trench", CaptiveWoundTwist: "trench",
@@ -760,6 +712,3 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   BridgeOrders: "ward", BridgeCover: "bridge", BridgeWithdraw: "bridge", MarchToTengxian: "bridge",
   NorthGate: "night",
 });
-export function MissionVoiceSoundscape(id) {
-  return SOUNDSCAPES[SOUNDSCAPE_ZONES[id]] || SOUNDSCAPE_DEFAULT;
-}

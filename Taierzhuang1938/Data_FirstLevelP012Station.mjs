@@ -6,7 +6,7 @@
 // the old analytic y=0 spawn assumption inside the carriage or on its steps.
 // Ground-painted aprons are non-solid; train floors/steps are actual support.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
-import { P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 const blocks=[],surfaces=[];
 function Box(id,x,z,w,d,h,semantic="boundary",extra={}){
   // Solid grey shells are structures, never advertised as walkable ground.

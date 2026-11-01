@@ -30,7 +30,7 @@ try {
     const { MakeTrenchSurfacePatch } = await import("./Script_TrenchSurfaceMaterial.mjs");
     const { ApplyPatches } = await import("./Script_MaterialPatches.mjs");
     const { TerrainContactField } = await import("./Script_TerrainContact.mjs");
-    const { TerrainQualityOf } = await import("./Data_Tuning_Terrain.mjs");
+    const { TerrainQualityOf } = await import("./Script_Tuning_Terrain.mjs");
     const { TERRAIN_TRAIL_TIERS, TERRAIN_TRAIL_WINDOW } = await import("./Data_Tuning_TerrainTrails.mjs");
     const W = 480, H = 270;
     const renderer = new T.WebGLRenderer({ preserveDrawingBuffer: true });

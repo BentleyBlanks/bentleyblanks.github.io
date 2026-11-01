@@ -8,7 +8,7 @@
 //   ③ 把 flag 交给 `P012ResolveLine` 去表里选那一句。
 // 口径见 docs/Data_TextAndTuning.md §6。
 import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.mjs";
-import { P012Point } from "./Data_FirstLevelP012Space.mjs";
+import { P012Point } from "./Script_FirstLevelP012Space.mjs";
 import { P012NextVisiblePoint, P012SegmentClear, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { T } from "./Script_Text.mjs";
 import { PACING, SUPPLY, GUIDE } from "./Data_Tuning_P012.mjs";

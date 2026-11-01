@@ -15,7 +15,8 @@ import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSo
 import { BattleArtillery } from "./Script_BattleArtillery.mjs";
 import { AudioWiring } from "./Script_AudioWiring.mjs";
 import { TINNITUS, BATTLE_ARTILLERY, SUPPRESSION_BODY, TRENCH_ZONE } from "./Data_Tuning_Audio.mjs";
-import { FirstLevelMusicState, FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
+import { FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMusicState } from "./Script_FirstLevelMissionMusicData.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
 

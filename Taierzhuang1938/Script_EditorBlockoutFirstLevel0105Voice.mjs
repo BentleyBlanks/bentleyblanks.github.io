@@ -32,7 +32,8 @@ import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { L0105_VOICE_SCENES } from "./Data_EditorBlockoutFirstLevel0105Lines.mjs";
-import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
+import { CastVoiceOwner } from "./Script_FirstLevelVoiceCast.mjs";
 import { PROJECTION_DB, LINE_MASTER } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, requestStats, MasterSceneWav,
   EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter }

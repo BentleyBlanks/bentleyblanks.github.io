@@ -7,10 +7,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  SANDBAG_ASSET_IDS, SANDBAG_METRICS, SANDBAG_GROUNDING, SandbagGroundedBottom, SandbagGroundedY,
-  SandbagSoleHeight, SandbagRunPlacements,
-} from "./Data_SandbagStandard.mjs";
+import { SANDBAG_ASSET_IDS, SANDBAG_METRICS, SANDBAG_GROUNDING } from "./Data_SandbagStandard.mjs";
+import { SandbagGroundedBottom, SandbagGroundedY, SandbagSoleHeight, SandbagRunPlacements } from "./Script_SandbagStandardData.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -97,7 +95,7 @@ for (const id of SANDBAG_ASSET_IDS) {
 // ---------------------------------------------------------------- 4. 第一关：画了袋缝的白盒墙都已换成模型
 {
   const { MISSION_LAYOUT } = await import("./Data_FirstLevelMissionLayout.mjs");
-  const { IsMissionSandbagBlock } = await import("./Data_FirstLevelMissionFortifications.mjs");
+  const { IsMissionSandbagBlock } = await import("./Script_FirstLevelMissionFortificationsData.mjs");
   const ids = new Set(MISSION_LAYOUT.blocks.map((b) => b.id));
   const seamOwners = [...new Set(MISSION_LAYOUT.blocks.filter((b) => b.id.includes("BagSeam"))
     .map((b) => b.id.slice(0, b.id.indexOf("BagSeam"))))];

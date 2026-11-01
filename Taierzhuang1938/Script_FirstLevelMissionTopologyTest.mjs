@@ -17,7 +17,7 @@ import { MISSION_RECEPTION_SPACE as Reception, MISSION_REGROUP_CORRIDORS as Corr
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_RETURN_ROUTES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MissionRouteLength, MissionRouteNextIndex } from "./Script_FirstLevelMissionColumn.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // 2026-09-23: 01–06 空间按 3A 线性关卡重排（docs/Data_FirstLevelSpace0106_20260923.md），其余区沿用 09.19 采用稿。

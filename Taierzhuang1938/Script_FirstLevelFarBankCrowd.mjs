@@ -14,9 +14,8 @@
 //   instant（阶段跳转直接落在 BridgeWithdraw / NightMarch）：所有人直接在位。Retire（黑屏）全部撤掉。
 // ===========================================================================
 import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
-import {
-  BuildFarBankCrowdRoster, AssignCrowdWaves, CrowdGroundY, FAR_BANK_CROWD_SPAWN_Z, FAR_BANK_CROWD_AXIS_X,
-} from "./Data_FirstLevelFarBankCrowd.mjs";
+import { FAR_BANK_CROWD_SPAWN_Z, FAR_BANK_CROWD_AXIS_X } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { BuildFarBankCrowdRoster, AssignCrowdWaves, CrowdGroundY } from "./Script_FirstLevelFarBankCrowdData.mjs";
 
 const C = END_TUNING.farBank.crowd;
 const BLAST_CENTRE = Object.freeze({ x: -77, z: 148 });

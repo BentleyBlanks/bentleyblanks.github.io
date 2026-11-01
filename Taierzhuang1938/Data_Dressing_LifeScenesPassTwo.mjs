@@ -15,7 +15,7 @@ import { PLACEMENTS as ES } from "./Data_Dressing_EastSuburb.mjs";
 import { PLACEMENTS as WS } from "./Data_Dressing_WestSuburb.mjs";
 import { PLACEMENTS as JV } from "./Data_Dressing_JieheVillages.mjs";
 
-const EMPTY = Object.freeze([]);
+export const EMPTY = Object.freeze([]);
 const RURAL_REGIONS = new Set(["EastSuburb", "WestSuburb", "JieheVillages"]);
 const BASE_PLACEMENTS = Object.freeze({
   NortheastQuarter: NE,
@@ -207,6 +207,3 @@ export const LIFE_SCENE_DRESSING_PASS_TWO = Object.freeze(Object.fromEntries(
     [regionId, BuildRegion(regionId, placements)]),
 ));
 
-export function LifeScenesPassTwoFor(regionId) {
-  return LIFE_SCENE_DRESSING_PASS_TWO[regionId] || EMPTY;
-}

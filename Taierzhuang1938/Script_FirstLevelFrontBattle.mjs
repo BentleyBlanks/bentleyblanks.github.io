@@ -9,7 +9,7 @@ import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionR
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FRONT_DEFENDERS, FRONT_GUARD_MG_GROUP } from "./Data_FirstLevelMissionFront.mjs";
 import { InstallOpeningStoryboardAnimation } from "./Script_OpeningStoryboardAnimation.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";

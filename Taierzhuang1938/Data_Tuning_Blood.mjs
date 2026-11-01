@@ -84,16 +84,6 @@ export const BLOOD_SURFACE = Object.freeze({
 export const BLOOD_DRESSING = Object.freeze({offset:[.24,0,-.22],minRadius:.32,radiusScale:.72,
   age:65,ageStep:7,aspect:.7,opacity:.82,normalSampleM:.15});
 
-// Same damped ballistic solution as the particle vertex shader, with no Three dependency.
-export function BloodPosition(origin, velocity, age, out) {
-  const k = BLOOD_MOTION.drag, g = BLOOD_MOTION.gravity;
-  const travel = -Math.expm1(-k * age) / k;
-  out.x = origin.x + velocity.x * travel;
-  out.y = origin.y + (velocity.y + g / k) * travel - g * age / k;
-  out.z = origin.z + velocity.z * travel;
-  return out;
-}
-
 // Persistent bullet stains on clothing/skin, measured in metres and seconds.
 export const BLOOD_WOUND = Object.freeze({
   clothReachM: 0.14, maxSurfaceSamples: 768, maxRayVertices: 12000,

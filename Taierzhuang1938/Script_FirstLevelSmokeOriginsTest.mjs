@@ -5,11 +5,11 @@ import { FirstLevelSmokeOrigins } from "./Script_FirstLevelSmokeOrigins.mjs";
 import { FIRST_LEVEL_SMOKE_ORIGINS } from "./Data_FirstLevelSmokeOrigins.mjs";
 import { FIRST_LEVEL_DISTANT_SMOKE } from "./Data_FirstLevelDistantSmoke.mjs";
 import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { BattleSmokeParticleBudget } from "./Script_BattleSmoke.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
-import { MakeTreePlacements } from "./Data_BreakableTreePlacements.mjs";
+import { MakeTreePlacements } from "./Script_BreakableTreePlacements.mjs";
 
 const source=JSON.parse(fs.readFileSync(new URL("./Model/Model_Type89Tank.tzm.json",import.meta.url)));
 const fetchBefore=globalThis.fetch;globalThis.fetch=async()=>({ok:true,json:async()=>source});

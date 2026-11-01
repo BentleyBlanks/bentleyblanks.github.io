@@ -10,7 +10,8 @@ import {
 import {
   PLACEABLE, PLACEABLE_CATEGORIES, MODEL_PLACEABLE, BuildPlaceableVisual,
 } from "./Script_PlaceableCatalog.mjs";
-import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
+import { MESHES } from "./Data_Meshes.mjs";
+import { MeshUrl } from "./Script_Meshes.mjs";
 import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
 import { Type89Motion } from "./Model/Type89MediumTank/Script_Type89Motion.mjs";
 import { LoadDocument } from "./Script_MeshLoad.mjs";

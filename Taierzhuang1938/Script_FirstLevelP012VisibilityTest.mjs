@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
-import {P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
+import { P012MapPoints } from "./Script_FirstLevelP012Space.mjs";
 import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ANCHORS as anchors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
 import phase from "./Data_FirstLevelP012Whitebox.mjs";

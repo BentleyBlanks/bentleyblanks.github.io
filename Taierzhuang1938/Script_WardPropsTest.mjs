@@ -4,9 +4,10 @@ import fs from "node:fs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
 import { PACK, ASSETS } from "./Data_ExternalAssets_WardProps.mjs";
-import { WARD_PROP_DRESSING, PlanPropDressing } from "./Data_FirstLevelPropDressing.mjs";
+import { WARD_PROP_DRESSING } from "./Data_FirstLevelPropDressing.mjs";
+import { PlanPropDressing } from "./Script_FirstLevelPropDressingData.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 
 const root = new URL("./", import.meta.url);
 const bytes = fs.readFileSync(new URL(PACK.url.split("?")[0], root));

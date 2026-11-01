@@ -30,7 +30,8 @@
 // ===========================================================================
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
-import { MID_TUNING as M, MidLitterHoldSlots, MidWalkerHoldSlots } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MidLitterHoldSlots, MidWalkerHoldSlots } from "./Script_Tuning_FirstLevelMid.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { T as Text } from "./Script_Text.mjs";
 import { FirstLevelKitchenAmbush, KitchenAmbushTriggered, KitchenAmbushLungeTarget } from "./Script_FirstLevelKitchenAmbush.mjs";

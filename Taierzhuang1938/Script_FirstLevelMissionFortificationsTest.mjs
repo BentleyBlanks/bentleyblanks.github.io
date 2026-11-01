@@ -32,9 +32,11 @@ try {
     const {MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
     const {MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs");
     const {MISSION_TACTICS,MISSION_ENCOUNTERS,MISSION_PURSUIT_ROUTE}=await import("./Data_FirstLevelMission.mjs");
-    const {MISSION_DEFENSE_OBJECTS,IsMissionSandbagBlock}=await import("./Data_FirstLevelMissionFortifications.mjs");
+    const {MISSION_DEFENSE_OBJECTS}=await import("./Data_FirstLevelMissionFortifications.mjs");
+    const {IsMissionSandbagBlock}=await import("./Script_FirstLevelMissionFortificationsData.mjs");
     const {Box3,Vector3,Matrix4,Quaternion}=await import("three");
-    const {SANDBAG_GROUNDING,SANDBAG_METRICS,SandbagFootprintGround}=await import("./Data_SandbagStandard.mjs");
+    const {SANDBAG_GROUNDING,SANDBAG_METRICS}=await import("./Data_SandbagStandard.mjs");
+    const {SandbagFootprintGround}=await import("./Script_SandbagStandardData.mjs");
     // 贴地：每件最底层袋子的袋底（不是包围盒底）都要压进它脚印下的地面；下伸到上限的单独记。
     const floating=[],capped=[];let bottomRow=0;
     for(const p of field.fortificationPlacements.filter(p=>p.sourceBlock&&/_0_\d+$/.test(p.id))){

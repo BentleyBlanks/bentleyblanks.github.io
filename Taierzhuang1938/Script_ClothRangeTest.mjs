@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { registerHooks } from 'node:module';
-import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM, ClampClothParameter } from './Data_Tuning_ClothRange.mjs';
+import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM } from './Data_Tuning_ClothRange.mjs';
+import { ClampClothParameter } from './Script_Tuning_ClothRange.mjs';
 import { ApplyClothWind, ClothLabContactFriction } from './Script_ClothLabSimulation.mjs';
 import { LoadGlb, SerializeGlb, ReadAccessor } from './_import/Script_LugouGlbPose.mjs';
 

@@ -20,7 +20,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE } from "./Data_FirstLevelVoiceCast.mjs";
+import { CastVoiceOwner } from "./Script_FirstLevelVoiceCast.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Sha256, Pool, requestStats, SEED_AUDIO_MODEL, Transcribe, DecodePcm }
   from "./Script_SeedAudioVoiceKit.mjs";
 

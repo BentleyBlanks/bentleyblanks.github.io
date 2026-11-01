@@ -12,14 +12,14 @@
 // 用法：node Taierzhuang1938/Script_FirstLevelWhiteboxTerrainTest.mjs [--digest]
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_NORTH_RIVER, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain, SampleMissionGroundSurface } from "./Script_FirstLevelMissionTerrain.mjs";
+import { MISSION_NORTH_RIVER } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverCutAt, RiverReachAt } from "./Script_FirstLevelMissionTopology.mjs";
 import { MISSION_ROUTES as routes, MISSION_PLACEMENT as placement } from "./Data_FirstLevelMissionLayout.mjs";
-import { BuildFrontWhitebox } from "./Data_FirstLevelWhiteboxFront.mjs";
-import {
-  WHITEBOX_TERRAIN, WHITEBOX_TERRAIN_REGIONS as REGIONS, WHITEBOX_TERRAIN_KINDS as KINDS, WHITEBOX_TERRAIN_OPS as OPS,
-  WhiteboxShapeBounds, CompileWhiteboxTerrain, WhiteboxPathBounds, WHITEBOX_PATH_DEFAULT_WEAR,
-} from "./Data_FirstLevelWhiteboxTerrain.mjs";
+import { BuildFrontWhitebox } from "./Script_FirstLevelWhiteboxFront.mjs";
+import { WHITEBOX_TERRAIN, WHITEBOX_TERRAIN_REGIONS as REGIONS, WHITEBOX_TERRAIN_KINDS as KINDS, WHITEBOX_TERRAIN_OPS as OPS, WhiteboxShapeBounds, CompileWhiteboxTerrain, WHITEBOX_PATH_DEFAULT_WEAR } from "./Data_FirstLevelWhiteboxTerrain.mjs";
+import { WhiteboxPathBounds } from "./Script_FirstLevelWhiteboxTerrain.mjs";
 
 let checks = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };

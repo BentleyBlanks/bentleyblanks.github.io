@@ -14,7 +14,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TERRAIN_SETS, TERRAIN_QUALITY, TERRAIN_RUTS, TerrainLayerUrls, TerrainQualityOf } from "./Data_Tuning_Terrain.mjs";
+import { TERRAIN_SETS, TERRAIN_QUALITY, TERRAIN_RUTS } from "./Data_Tuning_Terrain.mjs";
+import { TerrainLayerUrls, TerrainQualityOf } from "./Script_Tuning_Terrain.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
 

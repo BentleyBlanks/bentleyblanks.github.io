@@ -16,7 +16,7 @@ import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_GUIDANCE, 
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MISSION_VOICE_FACTS } from "./Data_FirstLevelMissionGates.mjs";
 import { FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_LEADER_STAGES } from "./Data_FirstLevelLeaderGuide.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { MissionRouteProjection, MissionRouteLength } from "./Script_FirstLevelMissionColumn.mjs";
 import { TEXT } from "./Data_Text_FirstLevel.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";

@@ -21,9 +21,8 @@
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import {
-  ClusterGrid, ConeBoundingSphere, CLUSTER_TIERS, CLUSTER_NEAR, EFFECT_LIGHT_COUNT,
-} from "./Data_Tuning_Lights.mjs";
+import { CLUSTER_TIERS, CLUSTER_NEAR, EFFECT_LIGHT_COUNT } from "./Data_Tuning_Lights.mjs";
+import { ClusterGrid, ConeBoundingSphere } from "./Script_Tuning_Lights.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");

@@ -16,12 +16,12 @@ import { DeriveCoversFromColliders } from "./Script_AiCover.mjs";
 import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
 import { MarkDynamicPrepass, MarkNoPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
-import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
+import { CreateP012Terrain } from "./Script_FirstLevelP012Terrain.mjs";
 import { LoadMissionFortifications, AddMissionFortifications } from "./Script_FirstLevelMissionFortifications.mjs";
 import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
-import { IsMissionSandbagBlock } from "./Data_FirstLevelMissionFortifications.mjs";
+import { IsMissionSandbagBlock } from "./Script_FirstLevelMissionFortificationsData.mjs";
 import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BuildTrenchEarth } from "./Script_TrenchEarth.mjs";
 import { TRENCH_APPEARANCE } from "./Data_TrenchAppearance.mjs";
@@ -36,7 +36,7 @@ import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater } from "./Sc
 import { WHITEBOX_RAILWAY_LOOKS, PlanRoofShells } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing, AddScenePropModels } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
-import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
+import { BuildInteriorVolumes } from "./Script_FirstLevelInteriors.mjs";
 import { SetInteriorVolumes } from "./Script_InteriorSkyOcclusion.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }

@@ -3,7 +3,7 @@ import {ManagedTextureLoader} from './Script_TextureImports.mjs';
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { COMMAND_ROOM as DATA } from "./Data_Tuning_CommandRoom.mjs";
 import { CommandRoomAtmosphere } from "./Script_CommandRoomAtmosphere.mjs";
-import { CommandRoomPapers, CommandRoomPaperUrl } from "./Data_CommandRoomPapers.mjs";
+import { CommandRoomPapers, CommandRoomPaperUrl } from "./Script_CommandRoomPapers.mjs";
 
 /** A real, batched Blender scene; uses the existing renderer only during title menu frames.
  * All geometry is static. Transparent moving dust is excluded from depth/velocity passes.

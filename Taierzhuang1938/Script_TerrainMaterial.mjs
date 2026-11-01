@@ -32,10 +32,8 @@
 import * as THREE from "three";
 import { ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { MakePatch, SurfacePatchEnd } from "./Script_MaterialPatches.mjs";
-import {
-  TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND,
-  TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TERRAIN_MUD_ZONE, TerrainLayerUrls, TerrainQualityOf,
-} from "./Data_Tuning_Terrain.mjs";
+import { TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND, TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
+import { TerrainLayerUrls, TerrainQualityOf } from "./Script_Tuning_Terrain.mjs";
 import { TerrainTrailGlsl, TerrainTrailUniforms, TRAIL_WATER_PER_M } from "./Script_TerrainTrails.mjs";
 import { TerrainTrailTierOf, TERRAIN_TRAIL_DEBUG_VIEW } from "./Data_Tuning_TerrainTrails.mjs";
 

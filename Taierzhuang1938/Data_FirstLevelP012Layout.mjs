@@ -2,7 +2,8 @@
 // Continuous P012 soil uses shared heightfield triangles; authored foundations
 // and road aprons stay level, with explicit trench banks providing shelter.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
-import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
+import { P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
+import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS, P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { P012_HORIZON_GROUND, P012_HORIZON_BLOCKS, P012_HORIZON_REMOVE_IDS } from "./Data_FirstLevelP012Horizon.mjs";
 import { P012_RESTING_BLOCKS } from "./Data_FirstLevelP012Resting.mjs";

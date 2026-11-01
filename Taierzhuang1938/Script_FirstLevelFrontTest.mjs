@@ -15,15 +15,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
-import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
+import { MissionVoiceTimeline } from "./Script_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
-import {
-  FRONT_TUNING as F, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
-  SouthWalkLengthM, SouthWalkSeconds,
-} from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_TUNING as F, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS } from "./Data_Tuning_FirstLevelFront.mjs";
+import { SouthWalkLengthM, SouthWalkSeconds } from "./Script_Tuning_FirstLevelFront.mjs";
 import { FirstLevelCollection, CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER, BorrowLightCued } from "./Script_FirstLevelCollection.mjs";
 import { SouthPointerSpot, FRONT_WIRED_CUES } from "./Script_FirstLevelFrontShow.mjs";
 

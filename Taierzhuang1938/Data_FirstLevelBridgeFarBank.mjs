@@ -20,7 +20,8 @@
 // 桥面在被炸段（z 108.5…135.5，船 7…15；R3 第二轮从 134 北移到河心 z 122）之上：冲桥组冲到它的北半（z 112…117），桥头人堆在被炸段以北的北截上（z 102…108，起爆杀伤圈之外）；
 // 浮桥载不了战车，原来开上桥面的那辆改成停在北岸浮桥头西侧、土坎以北的一辆普通车（起爆后仍停在那儿，炮口对着南岸）。
 // ===========================================================================
-import { MISSION_NORTH_RIVER, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS as S, RiverReachAt, RiverWaterAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_NORTH_RIVER, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS as S } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverReachAt, RiverWaterAt } from "./Script_FirstLevelMissionTopology.mjs";
 
 const freeze = Object.freeze;
 
@@ -108,9 +109,6 @@ export const FAR_BANK_CROWD = freeze([
   freeze({ from: "FarBankShoreB4", lane: -77.65, z: 102 }), freeze({ from: "FarBankShoreB5", lane: -76.35, z: 102 }),
   freeze({ from: "FarBankStandby6", lane: -77.65, z: 99.8 }), freeze({ from: "FarBankStandby7", lane: -76.35, z: 99.8 }),
 ]);
-/** 第 i 个冲桥兵的列与终点 z。 */
-export const FarBankRushSlot = (i) => freeze({ lane: FAR_BANK_RUSH.lanes[i % 2], endZ: FAR_BANK_RUSH.endZ[Math.floor(i / 2)] });
-
 // ---------------------------------------------------------------------------
 // 3. 环境射击授权点（南岸，全部 ≥ 12 m 远离爆破组、班组射位与撤出线）
 //    脚本兵朝这些点打曳光（命中恒 false）；点由「谁打哪几个」的分组引用。h = 离地高度，r = 弹着散布半径。
@@ -173,11 +171,6 @@ export const FAR_BANK_TANKS = freeze([
   freeze({ id: "FarBankTankTerraceHigh", kind: "terrace", x: -127, z: 53.4, pushZ: 56.6, startX: -77, enter: "BridgeCover", delayKey: 2, viaAbs: true,
     via: freeze([freeze([-77, 62]), freeze([-127, 62])]) }),
 ]);
-/** 战车的停位 z / 下压后的 z / 途经点 z：台地上的车用绝对 z，其余仍是「离岸沿往北 back 米」。 */
-export const FarBankTankPostZ = (spec) => spec.z ?? FarBankShoreZ(spec.x) - spec.backM;
-export const FarBankTankPushZ = (spec) => spec.pushZ ?? FarBankShoreZ(spec.x) - spec.pushBackM;
-export const FarBankTankVia = (spec) => (spec.via || []).map(([x, v]) => ({ x, z: spec.viaAbs ? v : FarBankShoreZ(x) - v }));
-
 /** 炮击安全落点候选（南岸空地与沙滩，离桥头 12 m 以外）。运行时再按当下的玩家 / 己方位置过滤。 */
 export const FAR_BANK_SHELL_SPOTS = freeze([
   // 西侧田地

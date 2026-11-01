@@ -1352,7 +1352,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     "bakeRecord": "_import/TextureBakes/Data_BootPaperPbr.json",
     "consumers": [
       {
-        "file": "Data_BootPapers.mjs",
+        "file": "Script_BootPapers.mjs",
         "token": "RoughnessMask"
       }
     ],

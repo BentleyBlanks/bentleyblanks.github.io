@@ -146,7 +146,7 @@ try {
   // is sampled no matter how slow the machine is.
   const trackRun=await page.evaluate(async()=>{
     const p=window.SpeechProbe,g=p.g,r=p.r,T=p.T;
-    const ft=await import('./Script_FaceTrack.mjs'),{SpeakingCastOptions}=await import('./Data_FirstLevelSpeakingCast.mjs');
+    const ft=await import('./Script_FaceTrack.mjs'),{SpeakingCastOptions}=await import('./Script_FirstLevelSpeakingCast.mjs');
     await ft.LoadFaceTracks();
     // 03-06 lines are per-line takes cut from one scene take (Voice package): the tracks are keyed by the line
     // sha256s; a legacy whole-cue take (manifest.cues) keeps its own key.
@@ -289,7 +289,7 @@ try {
   await page.evaluate(async()=>{
     const p=window.SpeechProbe,g=p.g,T=p.T;
     p.facialApi=(await import('./Script_CharacterFacialAnimation.mjs')).CharacterFacial;
-    const {SpeakingCastOptions}=await import('./Data_FirstLevelSpeakingCast.mjs');
+    const {SpeakingCastOptions}=await import('./Script_FirstLevelSpeakingCast.mjs');
     const actor=p.closeup.comrade=g.actorFactory.Create('nra',{...SpeakingCastOptions('comrade'),seed:83,weapon:null});
     const luo=p.luo.actor.root,forward=new T.Vector3(0,0,-1).transformDirection(luo.matrixWorld);
     actor.root.position.copy(luo.getWorldPosition(new T.Vector3())).addScaledVector(forward,3);

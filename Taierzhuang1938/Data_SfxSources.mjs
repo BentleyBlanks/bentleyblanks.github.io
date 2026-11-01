@@ -87,12 +87,7 @@ export const SFX_LICENSES = {
  */
 export const BITRATE_TRANSIENT = "112k";
 
-const ARCHIVE = "https://archive.org/download/";
-
-/** 把 (item, path) 拼成 archive.org 的直链。 */
-export function ArchiveUrl(item, filePath) {
-  return ARCHIVE + item + "/" + filePath.split("/").map(encodeURIComponent).join("/");
-}
+export const ARCHIVE = "https://archive.org/download/";
 
 // ---------------------------------------------------------------------------
 // 第一关 03–05 那辆八九式中战车（甲）的声音（战车包 2026-09-23）

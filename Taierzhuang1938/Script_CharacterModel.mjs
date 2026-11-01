@@ -4,7 +4,8 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CharacterClipModelId, IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";

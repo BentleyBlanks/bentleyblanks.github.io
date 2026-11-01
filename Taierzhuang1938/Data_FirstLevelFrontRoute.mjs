@@ -11,9 +11,7 @@ const Point=(x,z)=>Object.freeze({x,z});
  *  cover in front of him. Slope <= 0.3 m per m. i = 0..3 (Bank/-193, Mound/-181.5, Ridge/-173, Stub/-166.5). */
 // [amp, phase, bias]: bias 1 = the bend only ever goes south (the Bank row must stay clear of the fire-base walls
 // on z -192.6 behind it), bias 0 = both ways.
-const FIELD_BEND=[[2.2,.7,1],[2.0,2.9,0],[1.7,4.4,0],[1.2,1.6,0]];
-export const FrontFieldBend=(i,x)=>{const [amp,phase,bias]=FIELD_BEND[i],w=.7*Math.sin(x/11.5+phase)+.3*Math.sin(x/5.3+phase*1.7);
-  return bias?amp*(.5+.5*w):amp*w;};
+export const FIELD_BEND=[[2.2,.7,1],[2.0,2.9,0],[1.7,4.4,0],[1.2,1.6,0]];
 // Semantic tank waypoints (contract §5.7). holdS=0 on block = hold until disabled.
 // id is the stable name: FRONT_SORTIE's old tank*Index keys resolve through it (never renumber).
 // faceTo = where the HULL points when it stops; turretTo = where the turret (main gun + coax) is
@@ -215,10 +213,3 @@ export const FRONT_SPACE=Object.freeze({
     ramps:[Object.freeze({x:-35.2,z:-204.5,radius:9,depth:.15}),Object.freeze({x:-13.2,z:-204.5,radius:9,depth:.15})],
   }),
 });
-export function SortieCrawlBlocked(position,next,stance){
-  if(stance==='prone')return false;
-  return FRONT_SORTIE.crawl.some(c=>{
-    const Inside=p=>Math.abs(p.x-c.x)<c.w/2&&Math.abs(p.z-c.z)<c.d/2+FRONT_SORTIE.crawlEntryMarginM;
-    return Inside(next)&&(!Inside(position)||Math.abs(next.z-c.z)<Math.abs(position.z-c.z));
-  });
-}

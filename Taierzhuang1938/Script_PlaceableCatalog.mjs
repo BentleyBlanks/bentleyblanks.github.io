@@ -30,7 +30,8 @@ import { FlushWallInstances } from "./Script_WallSpline.mjs";
 import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
 import { MakeBox } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { MESHES, MeshIds } from "./Data_Meshes.mjs";
+import { MESHES } from "./Data_Meshes.mjs";
+import { MeshIds } from "./Script_Meshes.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 

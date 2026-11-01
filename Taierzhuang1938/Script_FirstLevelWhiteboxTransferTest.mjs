@@ -1,10 +1,10 @@
 // 11–14: adopted Notion topology and Stage_11..14 / supplementary views.
 // Pure geometry gate; runtime loading, boarding and air passes remain Mid's gate.
 import assert from "node:assert/strict";
-import { BuildTransferWhitebox } from "./Data_FirstLevelWhiteboxTransfer.mjs";
+import { BuildTransferWhitebox } from "./Script_FirstLevelWhiteboxTransfer.mjs";
 import { MISSION_LAYOUT as Layout, MISSION_ROUTES as Routes,
   MISSION_PLACEMENT as Placement } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { MISSION_STAGE_ANCHORS as Anchors } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_CROWD_AREAS as Crowds } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MISSION_ENCOUNTERS as Encounters, MISSION_TACTICS as Tactics,

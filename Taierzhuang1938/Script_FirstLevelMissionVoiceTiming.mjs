@@ -1,0 +1,31 @@
+// Data_FirstLevelMissionVoiceTiming.mjs 的配套函数（2026-11-02 从数据模块搬出来：数据模块只放能导出成 JSON 的数据，见 docs/Data_DataSources.md「数据模块只放数据」）。
+
+import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
+
+// 具名事件（玩法包按这些名字接动作；每句开始另有通用的 "Line" 事件）：
+//   （01–06 已改逐句干声：BunkerBlast 由导演表 BunkerIncoming.01 的截断点发，见 Data_FirstLevelDialogueDirection）
+//   BorrowLight 两处动作空当（整段录音过渡期；逐句后由导演表 emit 发同名事件）
+//   AircraftDiveOrder          14 AircraftReturn「先下沟！莫停车边！」句首（沿用旧 id）
+//   ZhouNoAnswer               17 ZhouDeath 第一句之后那段「……」，没人应声
+export function MissionVoiceTimeline(cue, total) {
+  const aligned = MISSION_VOICE_ALIGNMENT[cue.id];
+  const weights = cue.lines.map((line) => Math.max(4, line.text.length));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let cursor = 0;
+  // 对齐区间只在确实装得进这条时长时才用：缺录音时 total 是按字数估的，
+  // 硬套录音的区间会让后几句落在区间外，字幕和 Line 事件直接被跳过。
+  const fits = aligned?.lines.length === cue.lines.length && aligned.lines.at(-1)[1] <= total + 0.05;
+  const lines = fits ? aligned.lines : weights.map((weight) => {
+    const start = cursor; cursor += total * weight / sum; return [start, cursor];
+  });
+  const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };
+  const tail = 0;
+  const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
+  if (cue.id === "BorrowLight") segment.events = [
+    { at: lines[4][1], id: "BorrowLightMatchesPocketed" },
+    { at: lines[5][1], id: "BorrowLightCigaretteOffered" },
+  ];
+  if (cue.id === "AircraftReturn") segment.events = [{ at: lines[1][0], id: "AircraftDiveOrder" }];
+  if (cue.id === "ZhouDeath") segment.events = [{ at: lines[0][1], id: "ZhouNoAnswer" }];
+  return { lines, segments: [segment], tail };
+}

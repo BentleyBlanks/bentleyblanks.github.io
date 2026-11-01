@@ -1,6 +1,7 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
-import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
+import { FrontFieldBend } from "./Script_FirstLevelFrontRoute.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
@@ -110,8 +111,6 @@ export const FRONT_RESERVES=Object.freeze(Array.from({length:FIRST_LEVEL_TUNING.
   weapon:i%FIRST_LEVEL_TUNING.frontReservePlatoonSize===0?"Type11":"Type38",
   reserve:true,releaseDelayS:Math.floor(i/FIRST_LEVEL_TUNING.frontReservePlatoonSize)*FIRST_LEVEL_TUNING.frontReserveReleaseGapS,
 })));
-// Supporting rows advance without crossing the first assault bank or collapsing their depth.
-export const FrontReserveLane=(x,z)=>[{x,z:z+FIRST_LEVEL_TUNING.frontReserveAdvanceM}];
 // Bounding assault geometry (2026-09-08). Lines are bound positions north of the traverse trench
 // (z=-124; withdrawal posts at -142..-148); each sits 1.6-2.5 m behind a cover row so kneeling
 // there never intersects it. blockedX are the cover columns a straight rush between lines would
@@ -175,34 +174,12 @@ export const FRONT_ASSAULT_STARTS=Object.freeze([
   ...FRONT_ASSAULT.waveCentersX.flatMap((cx,squad)=>Array.from({length:FIRST_LEVEL_TUNING.waveSquadSize},(_,i)=>
     Object.freeze({id:`Wave${squad}_${i}`,x:cx+((i%3)-1)*3.2+(i>=3?1.6:0),z:FRONT_ASSAULT.spawnZ-(i>=3?2.5:0)}))),
 ].filter(start=>FrontAssaultLane(start.x,start.z).length));
-/** Does the straight bounding lane from `start` pass through the footprint of this cover block?
- *  Same capsule slack the route check in `Script_FirstLevelMissionTest` uses, plus a little, so a
- *  bank is dropped before the gate can fail on it. */
-export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
-  // The flank group's and the officer's authored lanes are kept clear by the same rule
-  // (graft from space proposal C: placement steps out of every lane automatically).
-  for(const route of [...FRONT_ASSAULT_STARTS.map(start=>[start,...FrontAssaultLane(start.x,start.z)]),
-    ...FrontExplicitLanes()]){
-    for(let i=1;i<route.length;i++){
-      const a=route[i-1],b=route[i],length=Math.hypot(b.x-a.x,b.z-a.z);
-      for(let travelled=0;travelled<=length;travelled+=.25){
-        const t=travelled/length;
-        if(Math.abs(a.x+(b.x-a.x)*t-x)<w/2+slackM&&Math.abs(a.z+(b.z-a.z)*t-z)<d/2+slackM)return true;
-      }
-    }
-  }
-  return false;
-}
 /** One shell crater just south of every bounder's last bound point (kneeling cover where the lane leaves the
  *  cover columns; replaces the 09.22 hand-placed three, which assumed straight lines). Terrain digs them. */
 export const FRONT_BOUND_CRATERS=Object.freeze(FRONT_RIFLEMEN.filter(s=>s.role==="bound").flatMap(s=>{
   const last=FrontAssaultLane(s.x,s.z).at(-1);
   // ...and one under each bounder's start on the first line: he kneels in a shell hole, not behind a row.
   return [Object.freeze({x:s.x,z:s.z}),Object.freeze({x:+last.x.toFixed(2),z:+(last.z+1.15).toFixed(2)})];}));
-/** Authored (non-derived) front lanes: the flank group and the officer, start point first. */
-export function FrontExplicitLanes(){
-  return [...FRONT_FLANK_GROUP,FRONT_OFFICER].map(spec=>[{x:spec.x,z:spec.z},...spec.lane]);
-}
 // The rebuilt 03 entry runs from the casualty collection point to the traverse
 // trench. Keep a finite north / north-east screen on that live leg; the retired
 // station-side west/east teams were never encountered after the 2026.09.19 cut.

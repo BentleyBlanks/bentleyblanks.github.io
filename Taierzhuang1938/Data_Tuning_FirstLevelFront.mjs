@@ -166,22 +166,6 @@ export const FRONT_TUNING = Object.freeze({
   southPointerSideM: 3.2,
 });
 
-/** 07 南行的路线全长（m）。传 `MISSION_ROUTES.southWalk`（它与 `south` 是同一个数组）。 */
-export function SouthWalkLengthM(route) {
-  let total = 0;
-  for (let i = 1; i < route.length; i++)
-    total += Math.hypot(route[i].x - route[i - 1].x, route[i].z - route[i - 1].z);
-  return total;
-}
-
-/**
- * 07 在给定行军速度下的纯行走秒数（不含抵达村口后 VillagePointer 播完那一段）。
- * 时长闸的算式只有这一处，测试与文档共用。
- */
-export function SouthWalkSeconds(speedMps, route) {
-  return SouthWalkLengthM(route) / speedMps;
-}
-
 /**
  * 01 行刑那一拍的节拍表：`BunkerKilling` 的第 i 句对应做什么。
  * 纯数据 —— 运行时按 `Line` 事件查这张表，没有音频时按 `at` 兜底。

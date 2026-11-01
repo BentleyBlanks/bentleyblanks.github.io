@@ -7,7 +7,8 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { BOOT_PAPERS, BootPaperPbrUrls } from "./Data_BootPapers.mjs";
+import { BOOT_PAPERS } from "./Data_BootPapers.mjs";
+import { BootPaperPbrUrls } from "./Script_BootPapers.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const output = path.join(root, "tmp/BootPaperPbr");

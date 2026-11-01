@@ -34,7 +34,7 @@ const shape = { top: Object.getOwnPropertyNames(api).sort(), debug: Object.getOw
 // 1. 名字登记表
 const keysFile = new URL("./Data_DebugApiKeys.json", import.meta.url);
 if (process.argv.includes("--write")) {
-  fs.writeFileSync(keysFile, JSON.stringify({ note: "window.Tengxian 由 InstallDebugApi 装出来的名字（测试场插件挂的口不在内）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write", ...shape }, null, 1) + "\n");
+  fs.writeFileSync(keysFile, JSON.stringify({ format: "tengxian-debug-api-keys/1", note: "window.Tengxian 由 InstallDebugApi 装出来的名字（测试场插件挂的口不在内）；改动要同步测试脚本。重写：node Script_DebugApiTest.mjs --write", ...shape }, null, 1) + "\n");
   console.log(`[debugApi] 登记表已重写：顶层 ${shape.top.length}、Debug ${shape.debug.length}`);
 }
 const recorded = JSON.parse(fs.readFileSync(keysFile, "utf8"));

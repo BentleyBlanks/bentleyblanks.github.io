@@ -98,14 +98,3 @@ export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   ["village","courtyard","roofThrower"], [], ["transfer"], ["air"], ["air"],
   [], [], [], [],
 ].map(Object.freeze));
-export function FirstLevelStageForStep(step) {
-  return FIRST_LEVEL_STAGES.find(stage => stage.steps.includes(step))
-    || (step === "Complete" ? FIRST_LEVEL_STAGES.at(-1) : null);
-}
-export function ResolveFirstLevelStage(value) {
-  const number = typeof value === "number" ? value : /^\d+$/.test(value) ? Number(value) : null;
-  const stage = number === null ? FIRST_LEVEL_STAGES.find(stage => stage.id === value)
-    : FIRST_LEVEL_STAGES.find(stage => stage.number === number);
-  if (!stage) throw new Error(`Unknown first-level stage: ${String(value)}`);
-  return stage;
-}

@@ -23,7 +23,8 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

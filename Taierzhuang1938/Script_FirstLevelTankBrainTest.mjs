@@ -16,7 +16,7 @@ import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { THROW } from "./Data_Tuning_Combat.mjs";
 import { JUMP } from "./Data_Tuning_Player.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { TankAudio, TankLoopParams, CannonLayerWeights, ShellPassPoint } from "./Script_TankAudio.mjs";
 import { TANK_SFX, TankSfxFiles } from "./Data_SfxSources.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";

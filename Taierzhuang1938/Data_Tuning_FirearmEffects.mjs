@@ -34,11 +34,6 @@ export const FIREARM_EFFECTS = Object.freeze({
   }),
 });
 
-export function FirearmEffects(weaponOrKind) {
-  const kind=typeof weaponOrKind==="string"?weaponOrKind:weaponOrKind?.kind;
-  return FIREARM_EFFECTS[kind] || FIREARM_EFFECTS.boltRifle;
-}
-
 // The new ZB-26 receiver's lower plate is at y=-.005 m. Its port is below the
 // feeding line, so both the release point and velocity differ from a side port.
 export const CASE_EJECTION = Object.freeze({

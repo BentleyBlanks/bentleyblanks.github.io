@@ -321,10 +321,6 @@ export const WEAPONS = {
  */
 export const SHELVED_WEAPONS = Object.freeze(["ServicePistol"]);
 
-export function WeaponShelved(id) {
-  return SHELVED_WEAPONS.includes(id);
-}
-
 /**
  * 玩家武器槽，顺序就是数字键顺序（第一个是 Digit1）；滚轮也按这个顺序循环。
  *
@@ -336,12 +332,6 @@ export const PLAYER_SLOT_ORDER = Object.freeze(["primary", "secondary", "melee",
 
 /** 装枪的槽（主 / 副武器）。弹仓账、刺刀账、拾枪挑槽都只认这两个。 */
 export const PLAYER_GUN_SLOTS = Object.freeze(PLAYER_SLOT_ORDER.filter((slot) => slot === "primary" || slot === "secondary"));
-
-/** 某个武器槽对应的 KeyboardEvent.code；槽位停用时返回 null。 */
-export function PlayerSlotKey(slot) {
-  const index = PLAYER_SLOT_ORDER.indexOf(slot);
-  return index < 0 ? null : `Digit${index + 1}`;
-}
 
 /** 玩家在各关的携行。杂牌部队的弹药必须是紧的。 */
 export const DEFAULT_PLAYER_WEAPON = "HanYang";

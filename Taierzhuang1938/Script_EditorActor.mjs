@@ -21,7 +21,8 @@
 import * as THREE from "three";
 import { Panel, Section, Slider, Chips, Select, Toggle, ButtonRow, Facts, Note, ListBox }
   from "./Script_EditorUi.mjs";
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
 import { KIND_SPEC } from "./Script_Actor.mjs";

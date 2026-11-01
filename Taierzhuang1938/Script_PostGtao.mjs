@@ -56,7 +56,8 @@ import * as THREE from "three";
 import {
   MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON, GLSL_VIEW_POS,
 } from "./Script_PostCommon.mjs";
-import { GTAO, SSIL, MakeGtaoTier } from "./Data_Tuning_Gtao.mjs";
+import { GTAO, SSIL } from "./Data_Tuning_Gtao.mjs";
+import { MakeGtaoTier } from "./Script_Tuning_Gtao.mjs";
 
 // ---------------------------------------------------------------------------
 // 公共 GLSL：八面体法线编码、popcount、快速 acos、纹素对齐

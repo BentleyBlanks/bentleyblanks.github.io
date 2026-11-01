@@ -18,7 +18,8 @@
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32, SmoothStep } from "./Script_Noise.mjs";
 import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
-import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
+import { TraversalPlan, TraversalCurve, TraversalLanding } from "./Script_Traversal.mjs";
 import { T } from "./Script_Text.mjs";
 import {
   STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,

@@ -1,4 +1,4 @@
-import { CreateGameGraphics } from "./Data_Tuning_GameGraphics.mjs";
+import { CreateGameGraphics } from "./Script_Tuning_GameGraphics.mjs";
 import { ManagedTextureLoader, SetTextureImportRenderer } from "./Script_TextureImports.mjs";
 import { SampleShotDisk, IsAutomaticGun } from "./Script_FirearmHandling.mjs";
 import { FirearmCadence, GunReadyFromCover } from "./Script_FirearmActions.mjs";
@@ -75,7 +75,8 @@ import {
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { ApplyLensToPost } from "./Script_OpeningLens.mjs";
-import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
+import { ResolveFirstLevelStage } from "./Script_FirstLevelMissionStages.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -84,9 +85,9 @@ import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
 import { FirstLevelP012CarryView } from "./Script_FirstLevelP012CarryView.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
-import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint } from "./Script_FirstLevelP012Space.mjs";
 import { InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
-import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
+import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Script_FirstLevelP012Cast.mjs";
 import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
@@ -155,7 +156,8 @@ import { RECIPES } from "./Script_TexBake.mjs";
 import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
-import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, WeaponShelved, DEFAULT_PLAYER_WEAPON } from "./Data_Weapons.mjs";
+import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, DEFAULT_PLAYER_WEAPON } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";

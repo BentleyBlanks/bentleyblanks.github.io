@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {ParticleSystem, PARTICLE_MODULES, MergeParticleModules, NormalizeParticleModules, EvaluateCurve, EvaluateGradient, IntegrateCurve} from './Script_ParticleModules.mjs';
 import {ParticleRenderer} from './Script_ParticleRenderer.mjs';
-import {PARTICLE_PRESETS, BurningParticleModules} from './Data_Tuning_Particles.mjs';
+import { PARTICLE_PRESETS } from './Data_Tuning_Particles.mjs';
+import { BurningParticleModules } from './Script_Tuning_Particles.mjs';
 import {ParticleChannel} from './Script_ParticleChannel.mjs';
 import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 import {FallingSoilEffects} from './Script_FallingSoil.mjs';

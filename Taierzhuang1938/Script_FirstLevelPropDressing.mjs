@@ -16,12 +16,11 @@ import { LoadDraftCartAssets } from "./Script_DraftCartModel.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MergeGeometries } from "./Script_Geo.mjs";
-import { STRAW_SLEEPING_MAT_ASSETS, PlanCollectionStrawSleepingMats } from "./Data_StrawSleepingMat.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
+import { PlanCollectionStrawSleepingMats } from "./Script_StrawSleepingMat.mjs";
 import { MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
-import {
-  PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PROP_MATERIAL_OVERRIDE, PROP_SPECIAL_ASSETS,
-  PlanPropDressing, PlanRubbleScatter, Rng,
-} from "./Data_FirstLevelPropDressing.mjs";
+import { PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PROP_MATERIAL_OVERRIDE, PROP_SPECIAL_ASSETS } from "./Data_FirstLevelPropDressing.mjs";
+import { PlanPropDressing, PlanRubbleScatter, Rng } from "./Script_FirstLevelPropDressingData.mjs";
 import { MissionDressingContext, SceneDressingContext } from "./Data_FirstLevelVegetation.mjs";
 
 /**

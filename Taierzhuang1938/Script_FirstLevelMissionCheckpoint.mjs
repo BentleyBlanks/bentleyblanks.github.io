@@ -2,7 +2,7 @@
 // 2026.09.19 重构：18 个公开阶段的起点按新 27 步重建（契约 §1）。
 import { MISSION_STAGES, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
-import { ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
+import { ResolveFirstLevelStage } from "./Script_FirstLevelMissionStages.mjs";
 import { FirstLevelMissionColumn } from "./Script_FirstLevelMissionColumn.mjs";
 const checkpoints = new Map();
 function Settle(column, ready, options = {}) {

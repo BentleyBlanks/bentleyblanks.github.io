@@ -49,10 +49,8 @@
 import * as THREE from "three";
 import { FLARE_SHADOW } from "./Data_Tuning_FlareEffects.mjs";
 import {FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
-import {
-  ClusterGrid, ConeBoundingSphere, LIGHT_TYPE, LIGHT_DECAY,
-  CLUSTER_NEAR, CLUSTER_DATA_TEX_WIDTH, MakeClusterTier,
-} from "./Data_Tuning_Lights.mjs";
+import { LIGHT_TYPE, LIGHT_DECAY, CLUSTER_NEAR, CLUSTER_DATA_TEX_WIDTH } from "./Data_Tuning_Lights.mjs";
+import { ClusterGrid, ConeBoundingSphere, MakeClusterTier } from "./Script_Tuning_Lights.mjs";
 
 /** 一帧最多接收多少个候选光源（超出的按分数丢掉，不扩容、不 GC）。 */
 const MAX_SOURCES = 512;

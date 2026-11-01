@@ -25,7 +25,7 @@ import * as THREE from "three";
 import {
   BLOCKOUT_PLAY, NormalizeBlockoutPlay, ValidateBlockoutPlay, PlayStepPlan, PlayStepCleared, PlayRange, FormatPlayTime,
 } from "./Script_EditorBlockoutPlayPlan.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 
 export const PLAY_KEY = "KeyK";

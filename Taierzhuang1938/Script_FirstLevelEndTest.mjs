@@ -21,10 +21,12 @@ import { MISSION_STEP_SPAWNS, MISSION_FACT_GATES, MISSION_SCENARIO_SIGNALS } fro
 import { MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MissionRegroupCorridor, RegroupGuideRoute } from "./Script_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
-import { FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+import { FIRST_LEVEL_STAGE_MUSIC } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMusicState } from "./Script_FirstLevelMissionMusicData.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { FirstLevelMissionColumn, MissionRouteProjection, MissionGuideRoute } from "./Script_FirstLevelMissionColumn.mjs";
 import { EndExtras, EndDressing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";

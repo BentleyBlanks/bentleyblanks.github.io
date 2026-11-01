@@ -8,13 +8,14 @@ const L = await import(U("Data_FirstLevelMissionLayout.mjs"));
 const M = await import(U("Data_FirstLevelMission.mjs"));
 const F = await import(U("Data_FirstLevelMissionFront.mjs"));
 const Ter = await import(U("Data_FirstLevelMissionTerrain.mjs"));
+const TerFn = await import(U("Script_FirstLevelMissionTerrain.mjs")); // 取高函数 2026-11-02 搬出数据模块
 const Top = await import(U("Data_FirstLevelMissionTopology.mjs"));
 const Fort = await import(U("Data_FirstLevelMissionFortifications.mjs"));
 const Rt = await import(U("Data_FirstLevelFrontRoute.mjs"));
 const Probe = await import(U("Script_FirstLevelSpaceProbe.mjs"));
 const S = Rt.FRONT_SORTIE, SP = Rt.FRONT_SPACE, TP = Rt.FRONT_TANK_PATH;
 const A = L.MISSION_ANCHORS, RT = L.MISSION_ROUTES, P = L.MISSION_PLACEMENT, E = M.MISSION_ENCOUNTERS;
-const G = (x, z) => Ter.SampleMissionTerrain(x, z), N = (x, z) => Ter.SampleMissionNaturalHeight(x, z);
+const G = (x, z) => TerFn.SampleMissionTerrain(x, z), N = (x, z) => Ter.SampleMissionNaturalHeight(x, z);
 const EXT = { minX: -62, maxX: 118, minZ: -233, maxZ: -94 };
 const step = .5, W = Math.round((EXT.maxX - EXT.minX) / step), H = Math.round((EXT.maxZ - EXT.minZ) / step);
 const hg = new Float32Array(W * H), cut = new Float32Array(W * H);

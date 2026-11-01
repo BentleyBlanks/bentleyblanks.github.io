@@ -78,7 +78,7 @@ try {
   const Shoot = (pose, withRooms) => page.evaluate(async ({ pose, withRooms }) => {
     const g = window.Tengxian;
     const occ = await import("./Script_InteriorSkyOcclusion.mjs");
-    const data = await import("./Data_FirstLevelInteriors.mjs");
+    const data = await import("./Script_FirstLevelInteriors.mjs");
     occ.SetInteriorVolumes(withRooms ? data.BuildInteriorVolumes(g.battlefield.layout, (x, z) => g.battlefield.TerrainHeight(x, z)) : null);
     const tool = g.editor.active; tool.host.SetViewmodelVisible?.(false); tool.ApplyPose(pose);
     g.StepFrames(40);

@@ -1,7 +1,7 @@
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_AFTERMATH, FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_DEFENSE_OBJECTS } from "./Data_FirstLevelMissionFortifications.mjs";
-import { SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain, MissionPathDistance } from "./Script_FirstLevelMissionTerrain.mjs";
 
 // Authored environmental storytelling, not a historical casualty census. Reuse the
 // two existing adult civilian models and settled poses; no new generated assets.

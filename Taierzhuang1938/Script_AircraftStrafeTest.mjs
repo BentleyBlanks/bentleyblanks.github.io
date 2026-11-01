@@ -27,7 +27,7 @@ import {
 import { T, HasText } from "./Script_Text.mjs";
 import { EVENTS } from "./Data_MissionCh1.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
-import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint } from "./Script_FirstLevelP012Space.mjs";
 import { readFileSync } from "node:fs";
 const { Vector3 } = await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
 

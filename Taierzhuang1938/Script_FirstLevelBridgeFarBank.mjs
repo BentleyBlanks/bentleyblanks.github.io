@@ -24,12 +24,8 @@ import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
-import {
-  FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_CROWD,
-  FAR_BANK_RUSH, FarBankRushSlot, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS,
-  FAR_BANK_REINFORCE, FAR_BANK_PLAYER_ROUTE_KEYS, FAR_BANK_BLAST, FarBankShoreZ, FarBankPoint,
-  FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia,
-} from "./Data_FirstLevelBridgeFarBank.mjs";
+import { FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_CROWD, FAR_BANK_RUSH, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_PLAYER_ROUTE_KEYS, FAR_BANK_BLAST, FarBankShoreZ, FarBankPoint } from "./Data_FirstLevelBridgeFarBank.mjs";
+import { FarBankRushSlot, FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia } from "./Script_FirstLevelBridgeFarBankData.mjs";
 import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 
 const T = END_TUNING.farBank;

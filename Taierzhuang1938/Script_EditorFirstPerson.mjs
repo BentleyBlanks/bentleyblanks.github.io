@@ -17,7 +17,8 @@ import * as THREE from "three";
 import {
   Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea,
 } from "./Script_EditorUi.mjs";
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FPS_ANIMATION_LABELS } from "./Data_FpsSkeletalAnimation.mjs";
 

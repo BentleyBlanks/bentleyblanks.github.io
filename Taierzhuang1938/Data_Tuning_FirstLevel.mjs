@@ -550,5 +550,5 @@ export const MISSION_RETURN = Object.freeze({
 export { END_TUNING, END_ROUTES } from "./Data_Tuning_FirstLevelEnd.mjs";
 // 第二波 Front 玩法包（公开阶段 1–7）的数值另起一张表，减少三包并行时的同文件冲突。
 // 这一行让「数值只有一个入口」的口径保持不变：import Data_Tuning_FirstLevel 就拿得到。
-export { FRONT_TUNING, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
-  SouthWalkLengthM, SouthWalkSeconds } from "./Data_Tuning_FirstLevelFront.mjs";
+export { FRONT_TUNING, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS } from "./Data_Tuning_FirstLevelFront.mjs";
+export { SouthWalkLengthM, SouthWalkSeconds } from "./Script_Tuning_FirstLevelFront.mjs";

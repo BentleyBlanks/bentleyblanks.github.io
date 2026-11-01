@@ -8,13 +8,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MISSION_LAYOUT, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
-import { STRAW_SLEEPING_MAT_ASSETS, PlanCollectionStrawSleepingMats, STRAW_SLEEPING_MAT_SHEET_M } from "./Data_StrawSleepingMat.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS, STRAW_SLEEPING_MAT_SHEET_M } from "./Data_StrawSleepingMat.mjs";
+import { PlanCollectionStrawSleepingMats } from "./Script_StrawSleepingMat.mjs";
 import { FRONT_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
-import {
-  PROP_DRESSING, PROP_DRESSING_ASSETS, PROP_FIT_TOLERANCE, PROP_RUBBLE, PROP_SPECIAL_ASSETS, PROP_MATERIAL_OVERRIDE,
-  PlanPropDressing, PlanRubbleScatter, FitPropToBox, RouteIndex, PointIndex,
-} from "./Data_FirstLevelPropDressing.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
+import { PROP_DRESSING, PROP_DRESSING_ASSETS, PROP_FIT_TOLERANCE, PROP_RUBBLE, PROP_SPECIAL_ASSETS, PROP_MATERIAL_OVERRIDE } from "./Data_FirstLevelPropDressing.mjs";
+import { PlanPropDressing, PlanRubbleScatter, FitPropToBox, RouteIndex, PointIndex } from "./Script_FirstLevelPropDressingData.mjs";
 import { MissionDressingContext } from "./Data_FirstLevelVegetation.mjs";
 import { ExternalPropCatalog } from "./Script_ExternalProps.mjs";
 

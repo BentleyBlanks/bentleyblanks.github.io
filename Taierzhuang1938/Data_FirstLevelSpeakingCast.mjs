@@ -37,12 +37,6 @@ export const FIRST_LEVEL_SPEAKING_CAST = Object.freeze({
 /** Pinned speakers whose lines are all wordless (non-word cries, no subtitle) and whose body has no facial skin. */
 export const WORDLESS_SPEAKERS = Object.freeze(["ijaD"]);
 
-/** Spawn options for a speaking role: its castId and pinned model (unknown roles: {}). */
-export function SpeakingCastOptions(castId) {
-  const spec = Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, castId) ? FIRST_LEVEL_SPEAKING_CAST[castId] : null;
-  return spec ? { castId, modelVariant: spec.modelVariant } : {};
-}
-
 // Internal mission steps (Data_FirstLevelMissionStages phases 01-06) in which the speaker
 // binder moves faces and heads for every speaking role and dialogue plays from the
 // speaker's mouth. Later steps keep their own voice placement (08's street guard, the

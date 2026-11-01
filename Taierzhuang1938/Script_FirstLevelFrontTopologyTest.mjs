@@ -16,7 +16,8 @@ import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane,FRONT_TANK_ESCORT_S
 import {TANK_HEIGHTS as TH} from "./Data_FirstLevelSpaceKeyframes.mjs";
 import {FRONT_TANK_BRAIN_PATH} from "./Data_Tuning_Tank.mjs";
 import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
-import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionNaturalHeight as N } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as G } from "./Script_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
   ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes,Bearing} from "./Script_FirstLevelSpaceProbe.mjs";
 import {MISSION_ENCOUNTER_ACTIVATION as ACTIVATION} from "./Data_FirstLevelMissionGates.mjs";

@@ -266,12 +266,7 @@ export const AMB_BED_VARIANTS = [
   },
 ];
 
-const ARCHIVE = "https://archive.org/download/";
-
-/** 把 (item, path) 拼成 archive.org 的直链。 */
-export function ArchiveUrl(item, filePath) {
-  return ARCHIVE + item + "/" + filePath.split("/").map(encodeURIComponent).join("/");
-}
+export const ARCHIVE = "https://archive.org/download/";
 
 export const AMB_SOURCES = [
   {

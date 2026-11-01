@@ -1,5 +1,5 @@
 // P012 physical actors and pressure adapters. Pure rules; geometry/audio remain host-owned.
-import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint } from "./Script_FirstLevelP012Space.mjs";
 import { FirstLevelP012March, P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012TrainColumn } from "./Script_FirstLevelP012TrainColumn.mjs";
 /** A scripted march bypasses normal AI stance decisions, including recovery. */

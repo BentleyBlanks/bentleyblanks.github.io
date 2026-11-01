@@ -83,20 +83,3 @@ export const PARTICLE_PRESETS = Object.freeze({
     noise:{enabled:true,strength:[[0,.06],[1,.6]],frequency:1.3,scrollSpeed:.75},renderer:{mode:'volume',aspect:1.15,softRange:.7,density:4},
   },
 });
-export function BurningParticleModules(source, scale=1) {
-  const size=Math.max(.2,Math.min(3,source.fire??1)),radius=Math.max(.1,source.radius??.6);
-  return ['FireTongue','FireEmber'].map((preset,index)=>{
-    const modules=JSON.parse(JSON.stringify(PARTICLE_PRESETS[preset]));
-    modules.main.randomSeed=((source.backdrop?.seed??source.seed??1938)+index*7919)>>>0;
-    if(preset==='FireTongue'){
-      const width=Math.max(.35,radius*2.05),height=(source.fireShape==='ground'?1.35:2.15)*Math.sqrt(size);
-      modules.renderer.bounds=[width,height,width*.95];modules.main.startRotation=(modules.main.randomSeed%360)*Math.PI/180;
-      return {preset,modules};
-    }
-    modules.main.startSize.min*=size;modules.main.startSize.max*=size;
-    modules.main.startSpeed.min*=Math.sqrt(size);modules.main.startSpeed.max*=Math.sqrt(size);
-    modules.emission.rateOverTime*=scale*Math.min(1.8,Math.sqrt(size));
-    modules.shape.radius=radius*(index===0?.78:.55);
-    return {preset,modules};
-  });
-}

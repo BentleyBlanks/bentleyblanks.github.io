@@ -1,5 +1,5 @@
 // Opening-only world-space traffic and escort tuning. No scaled people or clocks.
-import { P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 import { P012_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
 const Point = (x,z) => ({x,z});
 const soldiers=[0,1,2].map(slot=>({side:0,slot,role:"soldier",speedMps:3.05,releaseBeat:0,pauseIndex:1,

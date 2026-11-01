@@ -201,12 +201,6 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
 /** 所有 01–06 定妆角色 id（含共用嗓子的龙套）。 */
 export const FIRST_LEVEL_VOICE_CAST_IDS = Object.freeze(Object.keys(FIRST_LEVEL_VOICE_CAST));
 
-/** 实际生成定妆音的那个角色（龙套 sharesWith 时取被共用的一方）。 */
-export function CastVoiceOwner(who) {
-  const entry = FIRST_LEVEL_VOICE_CAST[who];
-  return entry?.sharesWith || who;
-}
-
 /** 定妆音 / 逐句干声提示词的公共口径：干声、近讲、不许环境与音效。 */
 export const DRY_VOICE_RULE = "录音棚近讲干声，单声道，只有这一个人的声音：没有任何环境声、战场声、脚步、枪炮、爆炸、音效、音乐、混响和其他人声，开头和结尾不留长空白。";
 
@@ -262,8 +256,6 @@ export const SQUAD_BARK_RETIRED_TEXT = Object.freeze({
   move_flank: "左手边！绕过去！", warn_down: "趴倒！趴倒！", hurt_medic: "担架兵！这头有人挂彩！",
   ammo_ask: "桥夹！哪个匀我一个！", ammo_out: "子弹！我莫得子弹了！",
 });
-/** 这一套运行时真用的键 = 录音稿减去撤下的。 */
-export const SquadBarkLive = (set) => SQUAD_BARK_KEYS[set].filter((key) => !SQUAD_BARK_RETIRED[set]?.includes(key));
 /** 谁录哪一套。老周只在 01–03（开场分镜认得他的那几段）能被认出来，之后退回公用声库。 */
 export const SQUAD_BARK_CAST = Object.freeze({
   luo: "leader", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
@@ -310,17 +302,3 @@ export const SQUAD_BARK_EXTRA_TAKES = Object.freeze({
 export const SQUAD_BARK_TAKES = Object.freeze([...Object.keys(SQUAD_BARK_CAST), ...Object.keys(SQUAD_BARK_EXTRA_TAKES)]);
 /** 这条录音是谁的嗓子。 */
 export const BarkTakeVoice = (take) => SQUAD_BARK_EXTRA_TAKES[take]?.who ?? take;
-/** 这条录音录哪一套。 */
-export const BarkTakeSet = (take) => SQUAD_BARK_EXTRA_TAKES[take]?.set ?? SQUAD_BARK_CAST[take];
-/** 运行时装的本人版本：[{ who, take, key, bank, file }]，按 SQUAD_BARK_TAKES 的顺序。 */
-export function SquadBarkEntries() {
-  return SQUAD_BARK_TAKES.flatMap((take) => SquadBarkLive(BarkTakeSet(take)).map((key) => SquadBarkEntry(take, key)));
-}
-/** 这条录音稿里的全部句子（含撤下的，按录音顺序）：只给烘焙脚本重建提示词、切整条录音用。 */
-export function SquadBarkScript(take) {
-  return SQUAD_BARK_KEYS[BarkTakeSet(take)].map((key) => SquadBarkEntry(take, key));
-}
-function SquadBarkEntry(take, key) {
-  const who = BarkTakeVoice(take);
-  return { who, take, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) };
-}

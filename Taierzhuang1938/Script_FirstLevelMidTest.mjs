@@ -19,10 +19,11 @@ import { MELEE_QTE_RULES as Q } from "./Data_MeleeCombat.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { KitchenAmbushTriggered, KitchenAmbushLungeTarget } from "./Script_FirstLevelKitchenAmbush.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MidLitterHoldSlots, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin, MidTransferWalkRoute } from "./Script_Tuning_FirstLevelMid.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
   FirstLevelMissionColumn, MissionRouteProjection, MissionCarryRoutePoint,

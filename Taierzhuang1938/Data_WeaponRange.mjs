@@ -3,7 +3,8 @@
 // WEAPON_RANGE_FIRING_ORIGIN, not the length of the north/south projection.
 // Each target owns an angular corridor; moving targets stay on their measured
 // radius. The complete movement envelope remains clear of every other actor.
-import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 
 export const WEAPON_RANGE_LEVEL_ID = "WeaponRange";
 export const WEAPON_RANGE_CAMERA_FAR = 340;

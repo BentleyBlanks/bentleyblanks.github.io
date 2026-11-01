@@ -23,14 +23,8 @@ import {
   MISSION_VERSION,
   MISSION_TUNING as R,
 } from "./Data_FirstLevelMission.mjs";
-import {
-  FIRST_LEVEL_STAGES,
-  FIRST_LEVEL_ENCOUNTER_STARTS,
-  FIRST_LEVEL_DEFERRED_ENCOUNTERS,
-  FIRST_LEVEL_STAGE_ENCOUNTERS,
-  FIRST_LEVEL_STAGE_CLEARED_ENEMIES,
-  FirstLevelStageForStep,
-} from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_DEFERRED_ENCOUNTERS, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES } from "./Data_FirstLevelMissionStages.mjs";
+import { FirstLevelStageForStep } from "./Script_FirstLevelMissionStages.mjs";
 import {
   MISSION_LAYOUT,
   MISSION_ANCHORS,
@@ -41,7 +35,8 @@ import {
 import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
-import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_GUARD_MG_GROUP, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_GUARD_MG_GROUP, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FrontReserveLane } from "./Script_FirstLevelMissionFront.mjs";
 import { MISSION_SOUTH_BRIDGE, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";

@@ -1,5 +1,5 @@
 import {ParticleEffects} from './Script_ParticleEffects.mjs';
-import {BattleSmokeModules} from './Data_ParticleSmoke.mjs';
+import { BattleSmokeModules } from './Script_ParticleSmoke.mjs';
 
 export const BATTLE_SMOKE_LOBES=Object.freeze({low:1,medium:1,high:1,ultra:1});
 export function BattleSmokeParticleBudget(sources,quality='high'){

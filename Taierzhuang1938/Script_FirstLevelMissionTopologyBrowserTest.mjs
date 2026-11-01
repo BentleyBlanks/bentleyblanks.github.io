@@ -61,7 +61,7 @@ try{
  // -------------------------------------------------------------------------
  const shore=await page.evaluate(async()=>{
   const g=window.Tengxian,rows=[],body=g.physics.MakeCharacter();
-  const {RiverReachAt,RiverWaterAt}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const {RiverReachAt,RiverWaterAt}=await import('./Script_FirstLevelMissionTopology.mjs');
   const Walk=(from,dir,frames)=>{
    body.Teleport(from.x,g.physics.groundAt(from.x,from.z)+.03,from.z);
    for(let i=0;i<frames;i++)body.Move(0,-.07,dir*.06);

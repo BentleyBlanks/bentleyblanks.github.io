@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { WeaponShelved } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 
 // 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS），停用期间不量它的机械瞄具。
 const FIREARMS = ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"].filter((id) => !WeaponShelved(id));

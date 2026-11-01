@@ -11,10 +11,10 @@ import {
   SHELL_IMPACT_RANGE_PHASE, SHELL_IMPACT_TRENCH_SEGMENTS, SHELL_IMPACT_BARRAGE, SHELL_IMPACT_TIME_SCALES,
   ORIGIN_RISE_M, LobFlightS, ArrivalAngleDeg, DropPlan, SHELL_GRAVITY,
 } from "./Data_ShellImpactRange.mjs";
-import {
-  SampleImpactTerrain, SampleImpactNaturalHeight, ImpactTrenchPlan, BuildShellImpactLayout, SHELL_IMPACT_TERRAIN,
-} from "./Data_ShellImpactRangeTerrain.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleImpactNaturalHeight, SHELL_IMPACT_TERRAIN } from "./Data_ShellImpactRangeTerrain.mjs";
+import { SampleImpactTerrain, ImpactTrenchPlan, BuildShellImpactLayout } from "./Script_ShellImpactRangeTerrain.mjs";
+import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { EXPLOSIVES } from "./Data_Explosives.mjs";
 import { TEXT, GATED_MODULES } from "./Data_Text_ShellImpact.mjs";
 import { EXPLOSION_RANGE_PHASE } from "./Data_ExplosionRange.mjs";

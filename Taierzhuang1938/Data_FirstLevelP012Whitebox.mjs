@@ -5,7 +5,7 @@ import { VOICE_LINES as PROLOGUE_VOICE_LINES } from "./Data_MissionCh0.mjs";
 import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
   P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES,
   P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES, P012_BLUEPRINT_AMMO_CARRY } from "./Data_FirstLevelP012Layout.mjs";
-import { P012MapPoints, P012RailPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012MapPoints, P012RailPoint, P012StationPoint } from "./Script_FirstLevelP012Space.mjs";
 import { openingActivities, openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
 export { FIRST_LEVEL_P012_LAYOUT, P012_SEMANTIC_COLORS };

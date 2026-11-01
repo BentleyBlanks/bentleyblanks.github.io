@@ -24,12 +24,13 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_TUNING as F, BORROW_LIGHT_BEATS, FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { CreateCigaretteAsset, DisposeCigaretteAsset } from "./Script_CigaretteAsset.mjs";
 import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
-import { COLLECTION_CARE_CLIPS as CARE, CareMedicSpot, CarePatientClip } from "./Data_FirstLevelCollectionCare.mjs";
+import { COLLECTION_CARE_CLIPS as CARE } from "./Data_FirstLevelCollectionCare.mjs";
+import { CareMedicSpot, CarePatientClip } from "./Script_FirstLevelCollectionCare.mjs";
 import { LoadCollectionCareAnimation, CollectionCareLibrary, CareClipDuration, InstallCareClips, RemoveCareClips,
   DressMedic, DressWound } from "./Script_CollectionCareAnimation.mjs";
 import { T } from "./Script_Text.mjs";

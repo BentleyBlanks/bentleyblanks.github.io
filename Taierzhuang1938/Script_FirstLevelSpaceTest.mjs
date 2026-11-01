@@ -15,12 +15,10 @@ import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
   MISSION_PLACEMENT as P, MISSION_NIGHT_GATE_BLOCK_IDS as NightIds, MISSION_SUPPLIES,
   MISSION_SUPPLY_COLLIDER, MISSION_TRENCH_PLACEMENTS } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
-  MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt, RiverReachAt, RiverWaterAt,
-  MISSION_PONTOON_BRIDGE as Pontoon, PONTOON_HEADS, MISSION_SOUTH_BRIDGE as RoadBridge,
-  MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes, MISSION_NORTH_RIVER as River, MISSION_PONTOON_BRIDGE as Pontoon, PONTOON_HEADS, MISSION_SOUTH_BRIDGE as RoadBridge, MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
+import { RiverCutAt, RiverProfileAt, RiverReachAt, RiverWaterAt } from "./Script_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, MISSION_TACTICS } from "./Data_FirstLevelMission.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground } from "./Script_FirstLevelMissionTerrain.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";

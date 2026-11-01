@@ -3,7 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { WEAPONS, LOADOUTS, WeaponShelved } from "./Data_Weapons.mjs";
+import { WEAPONS, LOADOUTS } from "./Data_Weapons.mjs";
+import { WeaponShelved } from "./Script_Weapons.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import {

@@ -13,7 +13,8 @@ import { pathToFileURL } from "node:url";
 import { MISSION_LAYOUT as L, MISSION_ROUTES as R, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_ENCOUNTERS as E } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ENCOUNTER_ACTIVATION as ACTIVATION, MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
-import { SampleMissionTerrain as G, SampleMissionNaturalHeight as N } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionNaturalHeight as N } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as G } from "./Script_FirstLevelMissionTerrain.mjs";
 import { MISSION_STAGE_ANCHORS as A, MISSION_STAGE_ROUTES as SR, MISSION_BUNKER_TRENCH,
   MISSION_BUNKER_FRONT_SAP } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_DEFENSE_OBJECTS } from "./Data_FirstLevelMissionFortifications.mjs";

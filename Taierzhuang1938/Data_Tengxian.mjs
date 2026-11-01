@@ -733,7 +733,3 @@ export const PRESUMED = [
   { id: "eastFieldPattern", value: "EAST_FIELD.fieldPattern", unit: "m", note: "东关外三带田块的尺度、长边方向、犁垄间距、条播株距与残茬密度均为场景美术推定；只有三月冬小麦返青、苗高 15—30 cm、露土率高有日方一手图像证据" },
 ];
 
-/** 按 id 查推定条目，给 UI 的「这是推定值」角标用。 */
-export function FindPresumed(id) {
-  return PRESUMED.find((p) => p.id === id) || null;
-}

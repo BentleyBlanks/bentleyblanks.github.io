@@ -1,4 +1,5 @@
-import { COMMAND_ROOM_CAMPAIGN_IDS, CommandRoomPapers, CommandRoomPreviewStage } from "./Data_CommandRoomPapers.mjs";
+import { COMMAND_ROOM_CAMPAIGN_IDS } from "./Data_CommandRoomPapers.mjs";
+import { CommandRoomPapers, CommandRoomPreviewStage } from "./Script_CommandRoomPapers.mjs";
 
 /** Session-only artwork override. The save reader is deliberately read-only. */
 export class CommandRoomPreview {

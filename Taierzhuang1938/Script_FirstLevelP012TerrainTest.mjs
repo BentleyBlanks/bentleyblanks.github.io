@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {CreateP012Terrain} from './Data_FirstLevelP012Terrain.mjs';
+import { CreateP012Terrain } from './Script_FirstLevelP012Terrain.mjs';
 import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES} from './Data_FirstLevelP012Layout.mjs';
 const terrain=CreateP012Terrain(layout), {SampleHeight}=terrain;
 let min=Infinity,max=-Infinity,sloped=0,triangles=0;

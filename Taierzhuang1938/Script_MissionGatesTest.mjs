@@ -21,12 +21,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
-import {
-  FIRST_LEVEL_STAGES,
-  FIRST_LEVEL_ENCOUNTER_STARTS,
-  FIRST_LEVEL_DEFERRED_ENCOUNTERS,
-  FirstLevelStageForStep,
-} from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
+import { FirstLevelStageForStep } from "./Script_FirstLevelMissionStages.mjs";
 import { MISSION_ANCHORS, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";

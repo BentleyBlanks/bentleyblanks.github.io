@@ -56,8 +56,3 @@ export const GRENADE_RETURN = Object.freeze({
   releaseGraceS: 0.45, power: 0.72,
 });
 
-export function ExplosiveIdFor(kind) {
-  if (EXPLOSIVES[kind]) return kind;
-  if (VEHICLE_EXPLOSIVES[kind]) return VEHICLE_EXPLOSIVES[kind];
-  return ({ grenade: "Grenade", tank: "GrenadeBundle", launcher: "Shell50", mortar: "Shell82", artillery: "Shell75", shell: "Shell75" })[kind] || "Shell75";
-}

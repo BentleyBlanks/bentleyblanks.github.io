@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COMPANION_CAST } from "./Script_Companion.mjs";
 import { T } from "./Script_Text.mjs";
-import { P012_COMPANION_CAST, SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
+import { P012_COMPANION_CAST } from "./Data_FirstLevelP012Cast.mjs";
+import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Script_FirstLevelP012Cast.mjs";
 
 const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
 assert.match(main, /SelectP012CompanionCast\(castId, identity\)/,

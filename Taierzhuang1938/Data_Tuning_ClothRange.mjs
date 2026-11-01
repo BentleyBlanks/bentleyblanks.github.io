@@ -45,8 +45,3 @@ export const CLOTH_LAB_SIM = Object.freeze({ stepS: 1 / 60, maxSteps: 4, iterati
   bloodAdvanceS: 60, bloodCompareAmountMl: 30,
   inspectTopM: 2.8, inspectCameraFloorM: 0.2,
   cameraMin: 1.1, cameraMax: 15, cameraTurn: 0.006, cameraZoom: 0.001, cameraPan: 0.0015 });
-export function ClampClothParameter(key, value) {
-  const control = CLOTH_LAB_CONTROLS.find(item => item.key === key);
-  if (!control || !Number.isFinite(value)) return null;
-  return Math.max(control.min, Math.min(control.max, value));
-}

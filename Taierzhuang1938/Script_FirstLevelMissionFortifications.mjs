@@ -1,7 +1,8 @@
 import * as THREE from "three";
-import { IsMissionSandbagBlock, MISSION_DEFENSE_ASSETS, MISSION_DEFENSE_OBJECTS,
-  MISSION_DEFENSE_PACKING as PACKING, MISSION_STAKE_FENCE as FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
-import { IsStandardSandbagAsset, SANDBAG_ASSET_IDS, SandbagGroundedBottom } from "./Data_SandbagStandard.mjs";
+import { MISSION_DEFENSE_ASSETS, MISSION_DEFENSE_OBJECTS, MISSION_DEFENSE_PACKING as PACKING, MISSION_STAKE_FENCE as FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
+import { IsMissionSandbagBlock } from "./Script_FirstLevelMissionFortificationsData.mjs";
+import { SANDBAG_ASSET_IDS } from "./Data_SandbagStandard.mjs";
+import { IsStandardSandbagAsset, SandbagGroundedBottom } from "./Script_SandbagStandardData.mjs";
 import { SandbagContactMaterial } from "./Script_SandbagStandard.mjs";
 
 // Templates have already been grounded, centred and rebound to the project's PBR library.

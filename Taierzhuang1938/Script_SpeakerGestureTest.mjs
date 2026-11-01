@@ -9,9 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import {
-  FIRST_LEVEL_SPEAKER_GESTURES, SPEAKER_GESTURE_CLIPS, SPEAKER_GESTURE_TARGETS, SPEAKER_GESTURE_ASSET, SpeakerGestureForLine,
-} from "./Data_FirstLevelSpeakerGestures.mjs";
+import { FIRST_LEVEL_SPEAKER_GESTURES, SPEAKER_GESTURE_CLIPS, SPEAKER_GESTURE_TARGETS, SPEAKER_GESTURE_ASSET } from "./Data_FirstLevelSpeakerGestures.mjs";
+import { SpeakerGestureForLine } from "./Script_FirstLevelSpeakerGestures.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FRONT_SCENE_IDS } from "./Script_FirstLevelFrontScenes.mjs";
 import { FRONT_SORTIE, FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";

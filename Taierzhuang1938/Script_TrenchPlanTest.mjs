@@ -20,7 +20,8 @@ import {
   SetTrenchSegmentOverride, ClearTrenchSegmentOverrides,
 } from "./Script_TrenchPlan.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
-import { MISSION_TERRAIN, TrenchPlanFor, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain } from "./Script_FirstLevelMissionTerrain.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 
 // Sections 1-8 test the PLANNER (legacy equivalence, junction detection, berm sides, jitter bands,

@@ -42,7 +42,7 @@ import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
-import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
+import { SandbagRunPlacements } from "./Script_SandbagStandardData.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";

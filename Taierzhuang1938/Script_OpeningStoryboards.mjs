@@ -11,7 +11,7 @@ import { SET_MARKS } from "./Data_OpeningSet0103.mjs";
 import { OpeningFirstPerson, TrimOpeningPlayerBody, BuildOpeningFirstPersonWarmProps } from "./Script_OpeningFirstPerson.mjs";
 import { GearCamera, GearPoint, GearData, GearArrivalS } from "./Script_OpeningFirstPersonGear.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { CharacterFacial } from "./Script_CharacterFacialAnimation.mjs";
 import { PrepareFaceBloodVariants } from "./Script_CharacterFaceBlood.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";

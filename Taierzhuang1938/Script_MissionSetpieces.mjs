@@ -45,7 +45,7 @@ import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.
 // 二关阶段③的殉爆倒计时靠它才有一只**真的打得中**的弹药箱 ——
 // 分工与为什么不是一条 host 回调，写在 Script_BlastTargets.mjs 的头注里。
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
-import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012SouthPoint } from "./Script_FirstLevelP012Space.mjs";
 import { P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { CARRY_KINDS } from "./Script_Carry.mjs";
 import { T } from "./Script_Text.mjs";

@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { CAMPAIGN_ENTRIES } from "./Data_Menu.mjs";
-import { COMMAND_ROOM_CAMPAIGN_IDS, COMMAND_ROOM_MAPS, COMMAND_ROOM_LETTERS, CommandRoomPapers } from "./Data_CommandRoomPapers.mjs";
+import { COMMAND_ROOM_CAMPAIGN_IDS, COMMAND_ROOM_MAPS, COMMAND_ROOM_LETTERS } from "./Data_CommandRoomPapers.mjs";
+import { CommandRoomPapers } from "./Script_CommandRoomPapers.mjs";
 import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
 
 assert.deepEqual(COMMAND_ROOM_CAMPAIGN_IDS, CAMPAIGN_ENTRIES.map(entry => entry.id));

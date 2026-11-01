@@ -62,6 +62,7 @@
 
 19. **每帧先后只在调度表里定（2026-11-01）。** `Script_Main.Frame` 只剩冻结判断、帧头、按模式分派；正常游戏是 `Data_FrameSchedule.FRAME_PLAY_STEPS` 的 33 步（一步一个 `PlayStep<Id>(ctx, f)`，在 `Script_FrameSteps*`；五个模式在 `Script_FrameModes`；主文件里的东西一律从工具箱 `ctx` 取，缺的在 `Script_Main` 的 `ctx` 里加一行），注释里那些「必须排在谁前面」写成 `FRAME_ORDER_RULES`。加每帧要跑的系统 = 加一步并写清先后与理由；结束这一帧用 `return STOP`，不在步骤里写裸 `return;`；不往 `Frame` 里直接塞代码。口径 [每帧调度表](docs/Data_FrameSchedule.md)，验收 `Script_FrameScheduleTest.mjs`。调试口 `window.Tengxian` 同理不在主文件里手写：`Script_DebugApi.InstallDebugApi(ctx)` 装配，`Debug` 由 `Script_DebugApi{Player,World,Mission}` 三组各自声明，名字只加不改，加了要 `node Script_DebugApiTest.mjs --write`（[调试口](docs/Data_DebugApi.md)）。
 20. **士兵不临时挂字段（2026-11-02）。** 士兵身上要记的新东西先进 `Data_SoldierComponents` 的组件表（再 `node Script_SoldierComponentsTest.mjs --write`），不往 `soldier` 上临时挂属性；真 / 假身份开关进 `SOLDIER_TAGS`（`HasTag` / `SetTag`）；不在字段主人（`owners`）以外的文件新增直接写入（`Data_SoldierForeignWrites.json` 只减不增）；新兵种进 `Data_SoldierArchetypes`。口径 [敌军 AI §24](docs/Data_EnemyAi.md)。
+21. **数据有身份、只放数据、引用对得上（2026-11-02）。** 新加一类数据文件先在 `Data_DataSources` 登记源头 / 生成的（生成的写生成器，别手改）；`Data_*.mjs` 只导出能原样写成 JSON 的值，函数放进同名 `Script_` 模块（旧账 `DATA_JSON_DEBT` 只减不增），新数据优先写带 `schema` / `format` / `version` 的 JSON；数据之间引用写编号，台词手势、时间轴、口型、文本键由 `DataRefsTest` 核对（插句后说话人对不上就红）。口径 [数据来源与引用](docs/Data_DataSources.md)，门禁 `DataSourcesTest` / `DataJsonTest` / `DataRefsTest`。
 
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 

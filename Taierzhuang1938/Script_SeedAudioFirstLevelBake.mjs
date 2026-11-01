@@ -36,11 +36,13 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoicePrompt, MissionVoiceScriptJson, MissionVoiceSpoken }
-  from "./Data_FirstLevelMissionDialogue.mjs";
+import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MissionVoicePrompt, MissionVoiceScriptJson, MissionVoiceSpoken } from "./Script_FirstLevelMissionDialogue.mjs";
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
-import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
-import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE } from "./Data_FirstLevelVoiceCast.mjs";
+import { CastVoiceOwner } from "./Script_FirstLevelVoiceCast.mjs";
+import { PROJECTION_DB, LINE_MASTER, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
+import { LineDirection } from "./Script_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter,
   IsolatedBursts, MuteRanges, PitchShiftWav, EncodeLevelMatched, LoopSpan, PITCH_SHIFT_METHOD, DecodePcm }

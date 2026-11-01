@@ -15,7 +15,8 @@
 // 动作干什么全在 Script_Main 的 OnAction 里。
 
 import { T } from "./Script_Text.mjs";
-import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
+import { PLAYER_SLOT_ORDER } from "./Data_Weapons.mjs";
+import { PlayerSlotKey } from "./Script_Weapons.mjs";
 
 /**
  * 设置页里的操作说明。它与 KEYMAP 放在同一个文件里，避免改了实际键位却忘了改说明。

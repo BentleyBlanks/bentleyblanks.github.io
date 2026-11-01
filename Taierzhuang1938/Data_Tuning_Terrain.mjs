@@ -268,19 +268,3 @@ export const TERRAIN_DEBUG_VIEWS = Object.freeze({
   normal: 3,    // 世界空间法线
 });
 
-/** 一套地形的三张图 URL（相对 Taierzhuang1938/）。 */
-export function TerrainLayerUrls(setName) {
-  const set = TERRAIN_SETS[setName];
-  if (!set) throw new Error(`Unknown terrain set: ${setName}`);
-  return set.layers.map((layer) => ({
-    id: layer.id,
-    base: `./Texture/Texture_Terrain${layer.file}Base.webp?v=${set.version}`,
-    normal: `./Texture/Texture_Terrain${layer.file}Normal.webp?v=${set.version}`,
-    orh: `./Texture/Texture_Terrain${layer.file}Orh.webp?v=${set.version}`,
-  }));
-}
-
-/** 一档画质对应的地形分档；没登记的档位按 high。 */
-export function TerrainQualityOf(quality) {
-  return TERRAIN_QUALITY[quality] || TERRAIN_QUALITY.high;
-}

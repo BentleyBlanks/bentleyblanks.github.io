@@ -5,7 +5,7 @@
 // 由 Script_TownDressing 按章节 bounds 过滤，因此同一户在重叠章节里不会搬家。
 // 本文件只含纯数据，不许 import three。
 
-const EMPTY = Object.freeze([]);
+export const EMPTY = Object.freeze([]);
 
 export const LIFE_SCENE_DRESSING = Object.freeze({
   NortheastQuarter: Object.freeze([
@@ -562,6 +562,3 @@ export const LIFE_SCENE_DRESSING = Object.freeze({
   ]),
 });
 
-export function LifeScenesFor(regionId) {
-  return LIFE_SCENE_DRESSING[regionId] || EMPTY;
-}
