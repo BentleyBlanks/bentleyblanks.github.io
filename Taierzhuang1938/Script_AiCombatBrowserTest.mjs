@@ -298,7 +298,9 @@ try {
       T.ai.tactics.Reset();
       T.ai.shooting.Detach(shooter);
       Teleport(at.x, at.z, stance, site.yaw);
-      shooter.position.set(site.shoot.x, T.player.position.y, site.shoot.z);
+      // 射手站在射击位自己的地面上。原来抄玩家的 y：射击位比空地高约 1.2 m（第一关地形改过之后），
+      // 射手等于埋进土里一米，空地对照组被地形挡成零暴露。
+      shooter.position.set(site.shoot.x, Ground(site.shoot.x, site.shoot.z), site.shoot.z);
       shooter.body?.Teleport(shooter.position.x, shooter.position.y, shooter.position.z);
       shooter.stance = 0;
       shooter.moveSpeed = 0;

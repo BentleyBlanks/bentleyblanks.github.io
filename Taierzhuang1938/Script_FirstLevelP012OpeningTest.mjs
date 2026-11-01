@@ -32,6 +32,8 @@ const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Ret
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload() { busy = true; this.action={kind:"reload"}; return true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCadence: new FirearmCadence(), fireEdge: true,
   emplacement: null, carry: null, meleeCombat: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },
+  // Main 的 TryFire 从 2026-10-29 起先看「枪脱手、正弯腰去捡」（测试场才有）：这里没脱手。
+  looseGun: { enabled: false, pending: null, flying: [], recover: null },
 });
 vm.runInContext(["EffectiveInfiniteAmmo", "EffectiveInfiniteGrenades", "EnsureDebugInventory", "BeginCook", "Reload", "TryFire", "BufferedFirearmShot", "OnReloadEvent"].map(MainFunction).join("\n"), context);
 context.EnsureDebugInventory();

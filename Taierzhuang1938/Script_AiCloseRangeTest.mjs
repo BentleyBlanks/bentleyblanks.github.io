@@ -31,11 +31,25 @@ try {
     if (!rifle) throw new Error("Campaign fixture has no enemy rifleman");
     // Four NRA soldiers behind an actual campaign blast wall. Keep the production
     // battlefield/terrain probes and TryFire; only pin actors and force ready aim.
-    const wall = T.battlefield.layout.blocks.find(b => b.id === "FrontTraverseBlastScreen");
     const allies = ai.soldiers.filter(s => s.alive && s.side === "nra" && !s.unarmed).slice(0, 4);
+    const ground = (x,z) => T.battlefield.GroundHeight(x,z);
+    // Pick a live tall thin wall by geometry instead of a hard-coded id: the old
+    // FrontTraverseBlastScreen (0.7 x 3.75 x 5.5 m) vanished in the 2026-09-22 front
+    // rebuild and left this gate throwing for a month. The wall must fully hide a
+    // standing rifleman 3 m behind it from a shooter 3 m in front (real exposure 0).
+    const ExposureAcross = (s, w) => {
+      rifle.position.set(w.x-3, ground(w.x-3,w.z), w.z);
+      s.position.set(w.x+3, ground(w.x+3,w.z), w.z);
+      s.yaw = Math.PI/2; s.stance = 0;
+      ai.UpdateMuzzle(s);
+      return ai.shooting.Exposure(s, ai.shooting.MuzzleOrigin(s), ai.shooting.SoldierSamples(rifle.position,0),
+        {targetId:rifle.id, now:ai.time + Math.random()}).fraction;
+    };
+    const wall = allies.length === 4 ? T.battlefield.layout.blocks
+      .filter(b => b.h >= 2.5 && b.w <= 1.2 && b.d >= 3)
+      .find(b => { ai.shooting.Detach(allies[0]); return ExposureAcross(allies[0], b) === 0; }) : null;
     if (!wall || allies.length !== 4) throw new Error("Missing four-soldier wall fixture");
     const wallRows = [];
-    const ground = (x,z) => T.battlefield.GroundHeight(x,z);
     rifle.position.set(wall.x-3, ground(wall.x-3,wall.z), wall.z);
     ai.soldiers = [...allies,rifle];
     for (const [index,s] of allies.entries()) {

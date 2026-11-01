@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **AI 浏览器门禁七项红修复（2026-11-01）**：AI 本身没坏，都是夹具跟不上关卡改动。受控场把玩家传送到走廊外，被任务走廊软边界（09-28 起）倒计时判阵亡、世界冻结，后面「会绕 / 会扔 / 覆盖层」一帧没跑 —— `Script_AiProbeScene.IsolateSquad` 隔离期间摘掉 `areaGuard`、还原时挂回（同时治好 AiAimedAt / AiGrenadeEvade）；空地对照组把射手摆在玩家高度、埋进土里 1 m，改按射击位地面；`PickSite` 挑到顺着射击方向的窄墙（墙头 0.3 m 宽，压制弹从两侧擦过），改为藏身点左右各 0.6 m 也要挡死；AiCloseRange 的夹具墙 `FrontTraverseBlastScreen` 09-22 前沿重建后没了，改按尺寸挑现存高薄墙并当场验证零暴露；AiInitiative 老周 09-24 起守左翼机枪位、压制 0.7 蹲低，断言改认 `leftGunId` 与通用压制档；P012Animation 担架员 09-30 起停下播 Blender 站立循环，断言改认站立循环 + 双脚不挪；P012Opening 的沙箱补 `looseGun`（10-29 枪脱手）。
+
 - **士兵分组件（2026-11-01）**：`Soldier` 的 182 个字段按职责分进 `vitals` / `locomotion` / `arms` / `aiming` / `sense` / `brain` / `meleeState` / `command` / `scripted` / `remains` 十个组件（表 `Data_SoldierComponents.mjs`），旧字段名经生成的存取器读写同一个值，现有代码不改；改前改后初值与随机数逐个比对一致。口径 [敌军 AI §22](Data_EnemyAi.md)，门禁 `SoldierComponentsTest`。
 
 - **九四式侦察机 V48 游戏接入（2026-10-28）**：`Model/NakajimaKi4/` 当前为 179679 三角／40 网格／43 张内嵌图，保留 10 个真实枢轴、216 片散热片和 1512 颗实体铆钉。构件库按需加载，`campaignEnabled:false`；原照轮廓与阴影残差保留，不宣称逐点完全一致。可编辑高／低源留 OneDrive，重建走 `_blender/Script_RebuildNakajimaKi4.mjs`；来源、接线、原门槛和收据见[资产说明](../Model/NakajimaKi4/README.md)。

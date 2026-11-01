@@ -111,10 +111,16 @@ try{
    const b=Make(role==='front'?93:94);b.p012AwaitingWeapon=false;
    for(let i=0;i<30;i++)Frame(b,1.35,{carryRole:role});
    for(let i=0;i<20;i++)Frame(b,0,{carryRole:role});
-   const a=b.actor.characterRig.currentAction,from=a.time;
-   for(let i=0;i<30;i++)Frame(b,0,{carryRole:role});
-   bearers.push({role,from,to:a.time,rate:a.getEffectiveTimeScale()});
-   for(let i=0;i<30;i++)Frame(b,1.35,{carryRole:role});bearers.at(-1).resumed=a.time!==from;
+   // Since 39cc943b7 (2026-09-30) a stopped bearer plays the Blender-authored stand loop
+   // (LitterBearer*Stand, its own pace), not the walk frozen at rate 0. What must hold: the
+   // stopped clip is not the walk, both feet stay planted, and moving again resumes a walk.
+   const rig=b.actor.characterRig,a=rig.currentAction,from=a.time,stoppedClip=rig.currentId;
+   const Ankles=()=>['footL','footR'].map(n=>rig.bones[n].getWorldPosition(new THREE.Vector3()));
+   const planted=Ankles();let footDrift=0;
+   for(let i=0;i<30;i++){Frame(b,0,{carryRole:role});Ankles().forEach((p,k)=>{footDrift=Math.max(footDrift,p.distanceTo(planted[k]));});}
+   bearers.push({role,stoppedClip,from,to:a.time,rate:a.getEffectiveTimeScale(),footDrift:+footDrift.toFixed(4)});
+   for(let i=0;i<30;i++)Frame(b,1.35,{carryRole:role});
+   bearers.at(-1).movingClip=rig.currentId;bearers.at(-1).resumed=rig.currentAction.time!==from||rig.currentAction!==a;
    scene.remove(b.actor.root);b.actor.Dispose();
   }
   scene.remove(s.actor.root);s.actor.Dispose();const shown=[];
@@ -132,7 +138,12 @@ try{
  assert.ok(Math.abs(result.fast.rate*result.fast.stride/(result.slow.rate*result.slow.stride)-2)<1e-6);
  assert.equal(result.stop.clip,'AttackCommand');assert.equal(result.stop.rate,0);
  assert.equal(result.fire.rate,1);assert.equal(result.forced.rate,1);
- assert.ok(result.bearers.every(b=>b.from===b.to&&b.rate===0&&b.resumed));
+ for(const b of result.bearers){
+  // Authored stand loop once the LitterBearer library is in; the walk frozen at rate 0 before that.
+  assert.ok(/Stand$/.test(b.stoppedClip)||(b.from===b.to&&b.rate===0),'stopped '+b.role+' bearer neither stands nor freezes: '+JSON.stringify(b));
+  assert.ok(b.footDrift<.03,'stopped '+b.role+' bearer walks in place: '+JSON.stringify(b));
+  assert.ok(b.resumed&&!/Stand$/.test(b.movingClip),'moving '+b.role+' bearer did not resume a walk: '+JSON.stringify(b));
+ }
  // 站住的人：clip 定格（rate 0）但人不是雕像 —— 呼吸/重心/扫视由 Script_ActorStandIdle 叠上去，
  // 脚由 IK 钉在 clip 摆好的位置上。空手与持枪两种站姿各量一遍。
  for(const [label,span] of [['empty',result.emptySpan],['armed',result.armedSpan]]) {

@@ -24,6 +24,12 @@ export const SEAT_COVER_M = 6;
 const SHOOTER_EYES = Object.freeze([1.5, 1.35, 1.0, 0.85]);
 const PLAYER_STAND_EYE = 1.63;
 const PLAYER_CROUCH_EYE = 1.15;
+/**
+ * 墙后藏身点要在**横向**也挡得住：正中一条线之外，左右各偏这么多也得被墙挡死。
+ * 只验正中那条线时，一道顺着射击方向摆的窄墙（从射手看过去只有 0.3 m 宽的墙头）也会被当成「实墙」，
+ * 压制弹（横向散布 ±SHOOTING.suppressScatterM = 0.55 m）从墙头两侧擦过去，量出来就成了「隔墙开火」。
+ */
+const HIDE_LATERAL_M = Object.freeze([-0.6, 0, 0.6]);
 
 function Ground(T, x, z) { return T.battlefield.GroundHeight(x, z); }
 
@@ -79,7 +85,8 @@ export function PickSite(T, cx, cz, {nearest=false}={}) {
         // 挑站点时按 1.35 m 量的，而 AI 蹲下之后眼高只有 1.0 m。
         for (const eye of SHOOTER_EYES) {
           const from = { x: shoot.x, y: shootY + eye, z: shoot.z };
-          if (!Blocked(T, from, hide)) { ok = false; break; }        // 墙那一侧：每一档都不许通
+          // 墙那一侧：每一档眼高、正中与左右各一条都不许通
+          if (HIDE_LATERAL_M.some((dx) => !Blocked(T, from, { x: hide.x + dx, y: hide.y, z: hide.z }))) { ok = false; break; }
           if (Unseen(T, from, open)) { ok = false; break; }          // 空地那一侧：每一档都要通
         }
         if (!ok) continue;
@@ -163,6 +170,12 @@ export function IsolateSquad(T, squad, options = {}) {
   const runtime = options.runtime
     || (typeof T.Debug?.FirstLevelMissionRuntime === "function" ? T.Debug.FirstLevelMissionRuntime() : null);
   const priorWaves = runtime ? runtime.waves : null;
+  // 任务走廊软边界（Script_MissionAreaGuard，2026-09-28 起）：受控场是在关卡里另找的一块空地，
+  // 多半在这一步的走廊外，倒计时走完会按阵亡处理 → 任务失败、整个世界停在死亡菜单上，
+  // 后面的测量一帧都不跑（AiCombat / AiAimedAt / AiGrenadeEvade 三个浏览器门禁就是这么红了一个月的）。
+  // 隔离期间摘掉，Restore 时原样挂回。
+  const priorAreaGuard = runtime ? runtime.areaGuard : null;
+  if (priorAreaGuard) { runtime.ClearReturnWarning?.(); runtime.areaGuard = null; }
 
   ai.maxAlive = Number.isFinite(options.maxAlive) ? options.maxAlive : 200;
   if (runtime) runtime.waves = { spawned: 1e9, squads: 0, nextAt: 1e18 };
@@ -176,6 +189,7 @@ export function IsolateSquad(T, squad, options = {}) {
     for (const s of kept) if (!roster.includes(s)) ai.soldiers.push(s);
     ai.maxAlive = priorMaxAlive;
     if (runtime && priorWaves) runtime.waves = priorWaves;
+    if (priorAreaGuard) { runtime.areaGuard = priorAreaGuard; priorAreaGuard.Reset?.(); }
   };
 }
 

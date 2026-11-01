@@ -298,10 +298,15 @@ try{
     ai.RememberIncomingFire(gunner,gunnerFrom);r.opening.UpdateZhou();
     ai.ApplyScriptDefense(gunner);ai.UpdateMoveOrder(gunner,null);ai.Act(gunner,1/60,null);
    }
-   rows.gunnerShelter={stance:gunner.stance,held:gunner.scriptShelterUntil>ai.time,
+   // Since a9a2a68e7 (2026-09-24, 03 ends on the handover) Zhou holds the LEFT gun seat
+   // (FrontBattle.UpdateZhou -> Defend(leftSeat, slack .4)) until He takes it; under fire he
+   // follows the shared scripted-defense rule (crouch at suppression .7, prone above .8),
+   // not the companion shelter timer this check was first written against.
+   rows.gunnerShelter={stance:gunner.stance,
     blocked:r.BlocksSight(gunnerFrom,gunner.position.clone().add(new T.Vector3(0,.5,0))),
     cover:gunner.cover?.id,slack:gunner.scriptCoverSlackM,shots:(gunner.fireSequence||0)-gunnerShots,
-    reserved:r.emplacement.guns.get(r.gunId)?.npc===gunner,wounded:r.Has('zhouGunWounded'),essential:!!gunner.scriptEssential};
+    seatM:+Math.hypot(gunner.position.x-r.emplacement.guns.get(r.leftGunId)?.seat?.x,gunner.position.z-r.emplacement.guns.get(r.leftGunId)?.seat?.z).toFixed(2),
+    reserved:r.emplacement.guns.get(r.leftGunId)?.npc===gunner,wounded:r.Has('zhouGunWounded'),essential:!!gunner.scriptEssential};
   }
   return rows;
  });
@@ -375,7 +380,7 @@ try{
  assert.ok(result.realCorridorGrenade.health>0&&result.realCorridorGrenade.distance>9
   &&result.realCorridorGrenade.squad.every(a=>a.alive&&a.health>0),
   'the wounded escort survives the recorded rolling grenade on the actual curved Support trench without crossing it');
- assert.ok(result.gunnerShelter.held&&result.gunnerShelter.stance===2&&result.gunnerShelter.blocked
+ assert.ok(result.gunnerShelter.stance>=1&&result.gunnerShelter.blocked&&result.gunnerShelter.seatM<=1.5
   &&result.gunnerShelter.slack>0&&result.gunnerShelter.shots===0&&result.gunnerShelter.reserved
   &&!result.gunnerShelter.wounded&&result.gunnerShelter.essential,
   'the independently scripted gunner hides behind physical protection while retaining the real injury and handover gates');
