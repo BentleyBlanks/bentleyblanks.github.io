@@ -57,6 +57,8 @@
 16. **史实与创作跟着内容一起改（2026-10-18 用户定）。** 改剧本、大纲、节拍表、空间设计，或做带史料含义的资产（军装、背包、武器、工事摆件）时，同一轮把新出现的事件、做法、物件补进 Notion「史实与创作对照表」和资料馆条目 `HistoryAndCreation`（`Data_HistoryCodex.mjs`）。标注只按核过的出处定：Notion 或资产契约附的链接先打开看，对不上就不挂、往下降一级；查不到的标「创作」或「出处待查」，不往史实那边靠；资产按设计定的尺寸、捆法、配色写成创作。主要人物的生死不进资料馆。口径与核对记录见 [资料馆「史实与创作」](docs/Data_HistoryCodex.md)。整套流程是 skill [tengxian-fact-fiction-sync](../.claude/skills/tengxian-fact-fiction-sync/SKILL.md)（不用 Claude 的 agent 照着它走）：`Script_HistoryLedgerAudit.mjs` 从同步记号 `Data_HistoryLedgerSync.json` 起列出改动，核完用 `--mark-reviewed` 写回；验收 `HistoryLedgerCheck`（拦否决过的链接、小说当出处）与 `HistoryCodexBrowserTest`。
 17. **川军台词要粗，脏话要多（2026-10-19 用户定）。** 用户反复说台词「太文明了」：兵在炮火底下说话是骂出来的，一句话里不带骂反而不像。写 Notion 剧本、白盒占位台词（`Data_EditorBlockout*Lines`）、任务对白、配音稿都照这一条：顺子（重庆码头上混的）妈卖批、锤子、老子；冬瓜龟儿子、日你先人、狗日的；何有田最粗（日你妈、草你妈）；幺娃跟着学骂；刘文财骂得少但也骂；班长下令短，带骂（「磨你妈啥子，跟斗走！」）。川话写法按用户在 Notion 剧本页 01–05 亲手改的为准：顺儿、表（不要）、我嗯（我们）、跟斗（跟着）、咋整、着打死、九哈。不写书面语和文艺腔（「我放心不下她」这类一律改成骂出来的大白话），不用地域段子。鲁南百姓和翻译说北方话（俺、恁、咋），日军说日语、不笑场。交稿前逐句问一遍：当兵的这句会不会骂出来？会，就骂出来。
 
+18. **测试场只登记、不接线（2026-11-01）。** 新测试场在 `Data_SandboxRanges` 登记一行（网址开关与通用待遇），在 `Script_SandboxRanges` 写插件（关卡表、场地类、建什么、每帧排在哪、慢放 / 输入 / 相机钩子、取证口名），不在 `Script_Main` 里加开关或分支；慢放、暂停、单步一律往 `Script_GameClock` 登记缩放器，不在 Frame 里改 `dt`。士兵的模型 / 剔除 / 动画只在 `Script_SoldierView`，`Script_Ai` 不创建也不改 3D 对象。口径 [测试场与玩法时钟](docs/Data_SandboxRanges.md)、[敌军 AI §23](docs/Data_EnemyAi.md)，验收 `Script_SandboxRangesTest.mjs`。
+
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 
 士兵资产采用 [Tengxian 共用身体骨架与重建契约](docs/Data_CharacterStandard.md)：五款外观、53 根共同身体骨骼、米制与相同绑定；旧来源模型从 Git 历史读取，不恢复已删除的五款弃用外观。

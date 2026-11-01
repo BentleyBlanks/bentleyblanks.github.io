@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { InstallP012OpeningPose } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { SoldierView } from "./Script_SoldierView.mjs";
 const threeSource = fs.readFileSync(new URL("./vendor/three/build/three.core.js", import.meta.url), "utf8");
 const THREE = await import(`data:text/javascript;base64,${Buffer.from(threeSource).toString("base64")}`);
 
@@ -97,6 +98,8 @@ context.STATE={VAULT:"vault",ADVANCE:"advance",RELOAD:"reload",FIRE:"fire",IDLE:
 context.TASK={GRENADE:"grenade"};
 const methods=vm.runInNewContext(`({${Method("Spawn")},${Method("TryFire")},${Method("TryBayonet")},${Method("Think")},${Method("ApplyScriptDefense")},${Method("ScriptFireFactors")}})`,context);
 const host={aliveCount:0,maxAlive:32,insideWalls:null,spawnSerial:{nra:0,ija:0},soldiers:[],ctx:{battlefield:{GroundHeight:()=>0},scene:{add(){}},actorFactory:{Create(kind,options){calls.push({kind,...options});return {kind,variant:options.variant||null,root:{position:{copy(){}}}};}}}};
+// 2026-11-01 起摆位置、挂场景由画面层做（Script_SoldierView.Attach）：桩照原来的两步做。
+host.view={Attach(s){s.actor.root.position.copy(s.position);host.ctx.scene.add(s.actor.root);}};
 for(const variant of ["male","female"]){const actor=methods.Spawn.call(host,"nra",0,0,{actorKind:"civilian",actorVariant:variant,unarmed:true});assert.equal(actor.unarmed,true);assert.equal(actor.actorKind,"civilian");assert.equal(actor.actorVariant,variant);assert.ok(actor.weapon);assert.equal(calls.at(-1).weapon,null);}
 const bearer=methods.Spawn.call(host,"nra",0,0,{unarmed:true,escortRole:"bearer"});assert.equal(bearer.actorKind,"nra");assert.equal(bearer.escortRole,"bearer");assert.equal(calls.at(-1).weapon,null);
 const ordinary=methods.Spawn.call(host,"nra",0,0,{});assert.equal(ordinary.unarmed,false);assert.equal(calls.at(-1).weapon,"HanYang");assert.equal(ordinary.actorKind,"nra");
@@ -218,6 +221,8 @@ function SampleHiddenActor(fields,visible=false){
  const samples=[],soldier={id:6,position:new THREE.Vector3(1,2,3),yaw:.4,...fields,
   actor:{root,Update(dt,state){samples.push({dt,time:state.elapsed});}}};
  const host={tickIndex:0,time:0,ctx:{},ActorAnimate};
+ // 摆位置、跳帧判可见、提交动画都在画面层（Script_SoldierView）：挂 production 那一份。
+ host.view=new SoldierView(host);
  for(let frame=0;frame<6;frame++){host.tickIndex++;host.time+=1/60;ActAnimation.call(host,soldier,1/60);}
  assert.equal(root.visible,visible,'sampling cannot override render culling');
  assert.equal(root.parent,null,'sampling cannot reattach a culled actor');

@@ -88,6 +88,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 说明与验收：[通用近爆反馈](Data_BlastFeedback.md)、[人物战场反应测试场](Data_BattleReactionRange.md)。
 
 ### 引导 / 主循环
+- **测试场与玩法时钟（2026-11-01）**：九个测试场的网址开关与通用待遇在 `Data_SandboxRanges`，场地 / 建什么 / 每帧排在哪 / 慢放与相机钩子在 `Script_SandboxRanges` 的插件里；Frame 开头只向 `Script_GameClock` 要这一帧的玩法时间。见 [测试场与玩法时钟](Data_SandboxRanges.md)，门禁 `SandboxRangesTest`。
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。
 - 2026-10-06 加载报纸新增 11 套独立 Normal / RoughnessMask，后台 PBR、按期加载、失败保留原图；入口与烘焙/验证见 [加载报纸材质](Data_BootPaperPbr.md)。

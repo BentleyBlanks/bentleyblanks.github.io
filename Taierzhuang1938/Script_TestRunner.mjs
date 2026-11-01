@@ -183,6 +183,7 @@ export const testDefs = {
   FirstLevelFrontCounterattackTest: {file:'Script_FirstLevelFrontCounterattackTest.mjs',desc:'第一关 03–05 反击模块纯规则：撤退窗口双条件会关会开、落弹选点安全距、跟车解封、阵位前半边人选、攻击支路进度、车组/事实表合约、运行时三行钩子（纯 Node）'},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
   SoldierComponentsTest: {file:'Script_SoldierComponentsTest.mjs',desc:'士兵组件表：Soldier 身上只有自有字段 + 十个组件、旧字段名读写同一值、生成的存取器与表同步（纯 Node，秒级）'},
+  SandboxRangesTest: {file:'Script_SandboxRangesTest.mjs',desc:'测试场登记表与插件一一对应、玩法时钟叠加/暂停/单步、Script_Main 不再认识插件化的六个测试场（纯 Node，秒级）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
@@ -801,6 +802,7 @@ export const tier0Fast = [
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
   "SoldierComponentsTest",
+  "SandboxRangesTest",
   "FirstLevelFrontCounterattackTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
@@ -864,6 +866,8 @@ export const domains = {
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','RifleHoldRunTest','RifleShoulderMarchTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场/人物战场反应测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest", "BlastReactionTest", "BlastKnockbackTest", "BattleReactionRangeBrowserTest"] },
+  // 测试场插件（Script_SandboxRanges）、玩法时钟、开机路由：改了就把九个测试场的入口各开一遍。
+  sandboxRanges: { label: "测试场登记表 / 插件 / 玩法时钟 / 开机路由", tests: ["SandboxRangesTest", "MovementRangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "RangeTest", "ExplosionRangeTest", "MeleeQteTest", "GoreRangeTest", "ShellImpactRangeBrowserTest", "BattleReactionRangeBrowserTest", "ClothRangeBrowserTest", "MenuStartupTest", "BrowserBundleTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
     tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest"],
@@ -1137,6 +1141,7 @@ const changedDomainRules = [
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields/i },
+  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting/ },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },

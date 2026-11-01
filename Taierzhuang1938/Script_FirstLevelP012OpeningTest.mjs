@@ -28,7 +28,7 @@ let busy = false;
 const state = { activeSlot: "primary", slots: { primary: "HanYang" }, mags: { primary: { ammo: 0, clips: 0 } }, ammo: 0, clips: 0, playerShots: 0, grenades: 0 };
 const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null, missionRuntime: null,
   WEAPONS, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
-  BLOCKOUT:false, weaponRange:null, FIRE_CONTROL, IsGunSlot:slot=>slot==="primary"||slot==="secondary",
+  BLOCKOUT:false, weaponRange:null, sandbox:null, FIRE_CONTROL, IsGunSlot:slot=>slot==="primary"||slot==="secondary",
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload() { busy = true; this.action={kind:"reload"}; return true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCadence: new FirearmCadence(), fireEdge: true,
   emplacement: null, carry: null, meleeCombat: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },

@@ -1925,3 +1925,12 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
 - 构造器里 `rnd` 先给 `locomotion.detourSign`、再给 `locomotion.laneOffset`，顺序变了每个人的随机数就全变了。改造时用改前改后各 5 名士兵（两方、不同武器与出生参数）逐个比对了全部 182 个初值和随机数状态，完全一致。
 - 存取器写成字面量，V8 能内联；纯字段读写的微基准比平铺慢约 1.5 倍（循环里用变量当键的 `defineProperty` 写法慢 5 倍，所以没用）。字段读写只占 AI 帧时间的很小一部分。
 - 移植 UE 时一组对应一个 `UActorComponent`，`brain` + `sense` 的决策部分对应 StateTree / 行为树与 AIPerception。
+
+## 23. 2026-11-01：士兵的画面那一半搬出 Script_Ai
+
+`Script_Ai` 原来一边做决策一边亲手摆模型：出生时把人物挂进场景、每帧把位置朝向抄到模型上（8 处）、按镜头视锥剔除并在近景完整人物 / 远景合批层之间切换、驱动人物与尸体动画、移除时摘下模型。这些全部搬进 `Script_SoldierView.mjs`（`ai.view`），Script_Ai 在原来那几处改调 `this.view.Attach / Detach / Place / PlaceCorpse / Shown / Animate / AnimateCorpse / Cull / MuzzleReadable`，**同一帧里的先后一点没变**（开火闸门读枪口方向要的是这一帧的姿势，所以不能挪到规则全算完之后）。
+
+- `AiDirector` 上的 `ActorAnimate` / `CullActors` / `PrepareCrowd` / `_Crowd` / `_SetDetailedAttached` 留着转发，外部调用照旧；剔除切近远景仍经由 `ai._SetDetailedAttached`（OpeningLensBrowserTest 替换这个接缝）。远景层仍挂在 `ai.crowd`。
+- Script_Ai 现在只用 three 的 `Vector3` 做数学，不再创建或改动任何 3D 对象；读枪口位置（相当于骨骼插槽）仍问 actor，那是规则读画面的正常方向。
+- 纯规则测试抠 Script_Ai 方法跑时，宿主挂一个 production 的 `SoldierView`（FirstLevelP012ActorTest / FirstLevelP012RuntimeTest）。
+- 移植 UE 时这一层整个换成 Character 的骨骼网格、动画蓝图与 significance 剔除。

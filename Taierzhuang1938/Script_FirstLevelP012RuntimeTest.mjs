@@ -1,5 +1,7 @@
 // Runtime adapter regression: real actor handles, finite budgets, warning-before-impact.
 import assert from "node:assert/strict";
+// 摆位置与提交动画在画面层（Script_SoldierView）：抠出来的 AI 方法挂 production 那一份。
+import { SoldierView } from "./Script_SoldierView.mjs";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { FirstLevelP012Runtime, P012GuideApproach, P012CanResumeMarch } from "./Script_FirstLevelP012Runtime.mjs";
@@ -48,7 +50,7 @@ assert.ok(openingStoryBeats.length>0);
  const animate=source.match(/  ActorAnimate\(s, dt, options\) \{[\s\S]*?\n  \}/)[0];
  const methods=vm.runInNewContext(`({${animate},${method}})`,{Math});
  const Step=function(s,dt,player){return methods.StepCarriedCasualty.call(
-  {...this,ctx:{},ActorAnimate:methods.ActorAnimate},s,dt,player);};
+  {...this,ctx:{},ActorAnimate:methods.ActorAnimate,view:new SoldierView({ctx:{}})},s,dt,player);};
  const Position=(x,y,z)=>({x,y,z,copy(p){this.x=p.x;this.y=p.y;this.z=p.z;return this;}});
  const bodyPositions=[],poses=[],actor={id:7,alive:true,health:65,position:Position(108,0,70),
   body:{SetSize(){},Teleport:(x,y,z)=>bodyPositions.push({x,y,z})},

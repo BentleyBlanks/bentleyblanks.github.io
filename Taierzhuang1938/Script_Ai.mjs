@@ -16,7 +16,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
-import { ActorCrowd } from "./Script_ActorCrowd.mjs";
+import { SoldierView } from "./Script_SoldierView.mjs";
 import { SoldierFieldAccessors } from "./Script_SoldierFields.mjs";
 import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
@@ -153,11 +153,8 @@ function ApproachAngle(from, to, maxStep) {
 
 let nextId = 1;
 
-// 人物 LOD 的距离预算在 `Data_Tuning_Ai.ACTOR_DETAIL`（为什么改成距离 LOD、
-// 迟滞留多少，那段账跟着数搬过去了）。这三个是复用的临时对象，不是调参。
-const _cullFrustum = new THREE.Frustum();
-const _cullMatrix = new THREE.Matrix4();
-const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_DETAIL.boundRadiusM);
+// 人物 LOD 的距离预算在 `Data_Tuning_Ai.ACTOR_DETAIL`（为什么改成距离 LOD、迟滞留多少，那段账跟着数搬过去了）；
+// 剔除本身在 Script_SoldierView。
 
 /**
  * 屏幕上只有二十来像素高的人不需要 60 Hz 解十三个关节。位移与转向仍每帧同步，
@@ -738,6 +735,8 @@ export class AiDirector {
    * @param {object} ctx { battlefield, actorFactory, scene, vfx, audio, player }
    */
   constructor(ctx, { maxAlive = 56, seed = 1938, insideWalls = null } = {}) {
+    // 画面那一半（摆模型、剔除、远景层、动画）：Script_SoldierView。AI 在原来那几处调它，先后不变。
+    this.view = new SoldierView(this);
     this.ctx = ctx;
     this.soldiers = [];
     this.maxAlive = maxAlive;
@@ -1045,8 +1044,7 @@ export class AiDirector {
     if (soldier.unarmed) soldier.tacticalRole = "noncombatant";
     soldier.director = this;
     if (options.towel) { soldier.towel = true; soldier.actor.SetTowel(true); }
-    soldier.actor.root.position.copy(soldier.position);
-    this.ctx.scene.add(soldier.actor.root);
+    this.view.Attach(soldier);
     this.soldiers.push(soldier);
     return soldier;
   }
@@ -1072,8 +1070,7 @@ export class AiDirector {
     const i = this.soldiers.indexOf(soldier);
     if (i >= 0) this.soldiers.splice(i, 1);
     if (soldier.actor) {
-      this.ctx.scene.remove(soldier.actor.root);
-      soldier.actor.Dispose();
+      this.view.Detach(soldier);
       soldier.actor = null;
     }
   }
@@ -1464,21 +1461,9 @@ export class AiDirector {
     return n;
   }
 
-  /**
-   * 人物动画与蒙皮解算的统一入口。
-   *
-   * Act 这条链上的六处 `s.actor.Update(` 全部走这里，为的是把它单独记成
-   * `ai/act/anim` 子桶 —— 车厢机位实测「AI 16 ms」里的大头就是这一项，
-   * 混在 ai 一个数字里谁也看不出来。除了计时这里什么都不做；剖析器关着时
-   * 是一次布尔检查。尸体那一处不走这里：它归 `ai/corpse`（见 Update 的循环）。
-   */
+  /** 人物动画与蒙皮解算的统一入口（实现与 `ai/act/anim` 计时在 Script_SoldierView.Animate）。 */
   ActorAnimate(s, dt, options) {
-    const profiler = this.ctx.profiler;
-    // 剖析器关着（正式玩家路径）就是一次布尔检查 + 直调，连 try/finally 都不进。
-    if (!profiler || !profiler.on) { s.actor.Update(dt, options); return; }
-    profiler.B("ai/act/anim");
-    try { s.actor.Update(dt, options); }
-    finally { profiler.E("ai/act/anim"); }
+    this.view.Animate(s, dt, options);
   }
 
   Update(dt, camera) {
@@ -1562,7 +1547,7 @@ export class AiDirector {
         // 人就定在半跪 / 撑地的中间帧，枪悬在半空（2026-09-30 受击反应验收实拍：t 停在 0.47，枪最低点离地 0.15–0.38 m）。
         // 放完那一帧（t 到 1）照常走一遍，接地拟合的终帧旋转就在那一帧写进去，之后才停。
         if (s.actor && (s.deadTime <= 0.9 || s.corpse || (s.actor.ragdollState && s.actor.ragdollState.t < 1))) {
-          s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
+          this.view.AnimateCorpse(s, dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
         profiler?.E("ai/corpse");
         continue;
@@ -1862,120 +1847,18 @@ export class AiDirector {
     return !!ev && this.time >= ev.startAt;
   }
 
-  /**
-   * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；
-   * 只按投影尺寸近似值（距离）选完整 Actor / 合批远景层。
-   */
-  CullActors(camera) {
-    if (!camera) return;
-    // 视图矩阵自己从 matrixWorld 求，**不要用 camera.matrixWorldInverse** ——
-    // 那个只在 renderer.render() 里更新，剔除跑在逻辑帧里，读到的是上一帧的机位。
-    // 平时差一帧看不出来，换关/过场刚把相机瞬移过去的那一帧就是整批人闪一下。
-    // 只要相机自己的矩阵：`updateMatrixWorld()` 会连相机底下那棵第一人称树
-    // （枪、双臂、袖子，一百来个节点）一起重算，这里一个都用不上。
-    camera.updateWorldMatrix(true, false);
-    _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
-    _cullFrustum.setFromProjectionMatrix(_cullMatrix);
-    const crowd = this._Crowd();
-    if (crowd) crowd.Begin();
-    for (const s of this.soldiers) {
-      if (!s.actor) continue;
-      // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
-      _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
-      if (!_cullFrustum.intersectsSphere(_cullSphere)) {
-        this._SetDetailedAttached(s.actor, false);
-        s.actor.SetCrowdHitboxes?.(null);
-        s.actor.allowFootIk = false;
-        s.renderLod = "culled";
-        continue;
-      }
-      const distanceSq = s.position.distanceToSquared(camera.position);
-      s.actor.renderDistanceSq = distanceSq;
-      s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2 || s.stance === 2 || s.proneBlend > .45;
-      s.actor.SetShadowEnabled(distanceSq <= ACTOR_DETAIL.shadowM ** 2);
-      const settledCorpse = !s.alive && s.deadTime >= 0.9;
-      // 远景层里的尸体有距离上限（ACTOR_DETAIL.corpseCrowdMaxM 那段账）；活人没有。
-      if (settledCorpse && distanceSq > ACTOR_DETAIL.corpseCrowdMaxM * ACTOR_DETAIL.corpseCrowdMaxM) {
-        this._SetDetailedAttached(s.actor, false);
-        s.actor.SetCrowdHitboxes?.(null);
-        s.actor.allowFootIk = false;
-        s.renderLod = "culled";
-        continue;
-      }
-      const detailLimit = settledCorpse
-        ? (s.renderLod === "detail" ? ACTOR_DETAIL.corpseExitM : ACTOR_DETAIL.corpseEnterM)
-        : (s.renderLod === "detail" ? ACTOR_DETAIL.exitM : ACTOR_DETAIL.enterM);
-      // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
-      // **断过肢的人不进远景层**：远景层是按姿势桶烘的整人（见 ActorCrowd 的头注），
-      // 换过去等于把卸掉的胳膊长回来 —— 四十米外的尸体会突然肢体齐全。
-      // 距离更远时仍按 corpseCrowdMaxM 整个剔除，那一条不受影响。
-      const detailed = !crowd || !!s.gore || distanceSq <= detailLimit * detailLimit;
-      this._SetDetailedAttached(s.actor, detailed);
-      s.renderLod = detailed ? "detail" : "crowd";
-      if (detailed) s.actor.SetCrowdHitboxes?.(null);
-      if (!detailed) {
-        const prone = Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
-        // 姿态与移动信号一并交给远景层，让它挑姿势桶（站 / 跪 / 真卧 / 跑步翻页）。
-        // 【为什么补这一条】2026-09-09 实拍：前沿开战 20 s，46—74 m 那一档 31 个日军
-        // 里 20 个其实在跪射，画面上却全是站着的 —— 远景层收到的只有「卧不卧」，
-        // 蹲和跑一个字都没往下传。玩家说的「远处的敌人干站着」有一半是这一行的账。
-        //
-        // The shared distance clock advances even while the skeleton is culled;
-        // wall-clock time must not make a blocked or slowing crowd keep running.
-        const bucket = crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive,
-          { stance: s.stance | 0, moveSpeed: s.moveSpeed ?? 0, crouch: s.crouchBlend ?? 0,
-            phase: s.actor.characterRig?.locomotion.crowdPhase,
-            pronePhase: s.actor.characterRig?.locomotion.crowdPronePhase,
-            moveSpeedMps: s.actor.characterRig?.locomotion.crowdSpeedMps,
-            elapsed: this.time, jitter: s.id * 0.37 });
-        // 命中体跟着画出来的姿势桶走（骨架此刻是冻住的，见 Actor.SetCrowdHitboxes）。
-        s.actor.SetCrowdHitboxes?.(bucket?.hitboxes, crowd.LastTransform);
-      }
-    }
-    if (crowd) crowd.End();
-  }
+  /** 镜头视锥剔除 + 近景 / 远景切换（实现在 Script_SoldierView.Cull）。 */
+  CullActors(camera) { this.view.Cull(camera); }
 
-  /**
-   * 完整人物进远景 LOD / 屏外时，不只设 invisible，还从场景树摘下整棵分件子树。
-   * three 的 updateMatrixWorld 与 projectObject 都会递归 invisible 子树：69 个人约四千
-   * 节点，即使画面里只有几个人也曾经每帧全走一遍。远景画面由 ActorCrowd 接手，
-   * 逻辑位姿仍写 actor.root；回到近景时挂回同一 scene，本帧统一更新世界矩阵。
-   */
-  _SetDetailedAttached(actor, detailed) {
-    const root = actor?.root;
-    if (!root) return;
-    const scene = this.ctx.scene;
-    // 回到近景的上升沿：屏外那几帧动画层跳过了脚底求解与整棵世界矩阵更新
-    // （见 Script_FirstLevelCarriageAnimation.Sample），下一次采样要补做一次完整的。
-    if (detailed && (!root.visible || !root.parent)) actor.poseDirty = true;
-    root.visible = !!detailed;
-    if (!scene) return;
-    if (detailed) {
-      if (!root.parent) scene.add(root);
-    } else if (root.parent === scene) {
-      scene.remove(root);
-    }
-  }
+  /** 完整人物挂上 / 摘下场景树（实现在 Script_SoldierView）；剔除经由这里，测试可以替换这个接缝。 */
+  _SetDetailedAttached(actor, detailed) { this.view.SetDetailedAttached(actor, detailed); }
 
-  /**
-   * 进关时先把这些 kind 的远景层烘出来（见 ActorCrowd.Prepare）。
-   * 装配层的人物着色器预热调它；纯逻辑环境（没有 scene / factory）是空操作。
-   */
-  PrepareCrowd(kinds = [], cellM = 0) {
-    if((this.crowd?.cellM||0)!==cellM){this.crowd?.Dispose();this.crowd=undefined;}
-    this.crowdCellM=cellM;
-    const crowd = this._Crowd();
-    if (crowd) crowd.Prepare(kinds);
-    return crowd;
-  }
+  /** 进关时把这些 kind 的远景层烘出来（实现在 Script_SoldierView）。 */
+  PrepareCrowd(kinds = [], cellM = 0) { return this.view.PrepareCrowd(kinds, cellM); }
 
   /** 远景层按需建；纯逻辑环境下一直是 null。 */
-  _Crowd() {
-    if (this.crowd !== undefined) return this.crowd;
-    const { scene, actorFactory } = this.ctx;
-    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory,{cellM:this.crowdCellM||0}) : null;
-    return this.crowd;
-  }
+  /** 远景层按需建；纯逻辑环境下一直是 null（实现在 Script_SoldierView）。 */
+  _Crowd() { return this.view.Crowd(); }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
   /**
@@ -3651,7 +3534,7 @@ export class AiDirector {
       if (s.meleeCombat) { s.actor.pendingGrenadeThrow = null; this.StepMeleeCombat(s, dt); return; }
       s.stance = 0; s.crouchBlend = 0; s.proneBlend = 0; s.moveSpeed = 0;
       this.StepBody(s, 0, 0, dt);
-      s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw;
+      this.view.Place(s);
       this.ActorAnimate(s, dt, { throwing: s.actor.pendingGrenadeThrow ? 1 : 0,
         grounded: s.grounded, elapsed: this.time, moveSpeed: 0 });
       return;
@@ -4073,8 +3956,7 @@ export class AiDirector {
     s.stationaryS = s.moveSpeed > BRAIN.movingSignal ? 0 : s.stationaryS + dt;
 
     if (s.actor) {
-      s.actor.root.position.copy(s.position);
-      s.actor.root.rotation.y = s.yaw;
+      this.view.Place(s);
       s.actor.characterRig?.locomotion.AdvanceDistance(
         Math.hypot(s.position.x-animationStartX,s.position.z-animationStartZ),dt);
       // Authored carriage idles and rescue tracks run on the simulation clock,
@@ -4083,7 +3965,7 @@ export class AiDirector {
       const carriagePerformance = !!s.missionCarriageAction
         || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
-      if ((s.actor.root.visible || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
+      if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         locomotionTracked: !s.p012OnMovingTrain,
         moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
@@ -4275,7 +4157,7 @@ export class AiDirector {
     s.moveSpeed=0;s.aimBlend=0;s.velocityY=0;s.grounded=false;s.idleStepDt=0;
     s.body?.SetSize(.42,.58);s.body?.Teleport(s.position.x,s.position.y,s.position.z);
     if(s.actor){
-      s.actor.root.position.copy(s.position);s.actor.root.rotation.y=s.yaw;
+      this.view.Place(s);
       this.ActorAnimate(s,dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,hurt:s.hurtPose,
         elapsed:this.time,lookYaw:0,lookPitch:0});
     }
@@ -4292,10 +4174,9 @@ export class AiDirector {
     s.grounded = true;
     s.velocityY = 0;
     if (!s.actor) return;
-    s.actor.root.position.copy(s.position);
-    s.actor.root.rotation.y = s.yaw;
+    this.view.Place(s);
     const cadence = ActorAnimationCadence(s);
-    if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) {
+    if (this.view.Shown(s) && (this.tickIndex + s.id) % cadence === 0) {
       this.ActorAnimate(s, dt * cadence, { moveSpeed: s.moveSpeed, aim: 0, crouch: 0,
         prone: 0, grounded: true, elapsed: this.time, lookYaw: 0, lookPitch: 0, hurt: s.hurtPose });
     }
@@ -4311,7 +4192,7 @@ export class AiDirector {
     s.aimUntil = -99; s.stance = 0;
     this.StepBody(s, 0, 0, dt);
     if (!s.actor) return;
-    s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw;
+    this.view.Place(s);
     this.ActorAnimate(s, dt, { moveSpeed: s.moveSpeed, aim: s.aimBlend, crouch: 0, prone: 0,
       grounded: s.grounded, verticalVelocity: s.velocityY, elapsed: this.time,
       meleeCombat: s.meleeCombat, bayonetFixed: s.bayonetFixed, lookYaw: s.lookYaw, lookPitch: 0 });
@@ -4398,10 +4279,9 @@ export class AiDirector {
     if (s.body) s.body.Teleport(s.position.x, s.position.y, s.position.z);
     if (s.body) { s.velocityY = 0; s.grounded = true; }
     if (s.actor) {
-      s.actor.root.position.copy(s.position);
-      s.actor.root.rotation.y = s.yaw;
+      this.view.Place(s);
       const cadence = ActorAnimationCadence(s);
-      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) this.ActorAnimate(s, dt * cadence, {
+      if (this.view.Shown(s) && (this.tickIndex + s.id) % cadence === 0) this.ActorAnimate(s, dt * cadence, {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
         bayonetFixed: s.bayonetFixed,
         grounded: false,
@@ -4560,8 +4440,7 @@ export class AiDirector {
     s.corpseDroopBody += (hangEnds * ease - s.corpseDroopBody) * k;
     s.corpseDroopArms += (hangAll * ease - s.corpseDroopArms) * k;
     if (s.actor) {
-      s.actor.root.position.copy(s.position);
-      s.actor.root.rotation.set(s.corpseTiltX, s.yaw, s.corpseTiltZ, "YXZ");
+      this.view.PlaceCorpse(s);
       if (s.actor.ragdollState) {
         s.actor.ragdollState.droopBody = s.corpseDroopBody;
         s.actor.ragdollState.droopArms = s.corpseDroopArms;
@@ -4837,18 +4716,14 @@ export class AiDirector {
   UpdateMuzzle(s, checkBarrel = false) {
     s.muzzleWorld = null;
     s.muzzleClipped = false;
-    const root = s.actor && s.actor.root;
-    if (!root) return;
+    if (!s.actor) return;
     // **骨架没在更新的人，枪口是假的**：`Act` 只在 `root.visible` 时调 `actor.Update`，
     // 而远景层与镜头外的人 `visible = false`（`CullActors` 把整棵子树摘掉了）。
     // 那时 weaponGroup 的局部变换还停在上一次更新甚至出生姿势上，
     // `MuzzleWorld` 会把枪口算到脚底下 —— 暴露采样的射线从地里射出去，
     // 一条都通不过，整条战线静默退化成「只会压制射击」。
-    if (!root.visible) return;
-    const dx = root.position.x - s.position.x;
-    const dy = root.position.y - s.position.y;
-    const dz = root.position.z - s.position.z;
-    if (dx * dx + dy * dy + dz * dz > BRAIN.muzzleSyncM * BRAIN.muzzleSyncM) return;
+    // 两条都在画面层判（Script_SoldierView.MuzzleReadable）：骨架这一帧在不在更新、模型与 AI 位置对不对得上。
+    if (!this.view.MuzzleReadable(s, BRAIN.muzzleSyncM)) return;
     const m = s.actor.MuzzleWorld(this.tmpMuzzle);
     const out = s.muzzleStore || (s.muzzleStore = { x: 0, y: 0, z: 0 });
     out.x = m.x; out.y = m.y; out.z = m.z;
@@ -5431,8 +5306,7 @@ export class AiDirector {
     this.tactics.Reset();
     this.covers.Rebuild([]);
     this.coversSource = null;
-    if (this.crowd) this.crowd.Dispose();
-    this.crowd = undefined;
+    this.view.DisposeCrowd();
   }
 }
 
