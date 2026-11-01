@@ -108,4 +108,33 @@ Check(real.Validate().ok, "真场景改一圈仍过校验");
 while (real.Undo());
 Check(J(real.ToDoc()) === J(doc) && !real.dirty, "真场景撤到底：和原文逐字相同、没改动");
 
+// --- 壕沟（docs/Data_Scene.md §9）：选中和物件互斥、拖点 / 加删点 / 细节开关都进撤销，撤到底和原文一样 ---
+{
+  const { doc } = ReadSceneSync("FirstLevel");
+  const t = new SceneEditModel(doc);
+  t.Select([doc.objects[0].id]);
+  t.SelectTrench("Traffic", 2);
+  Check(t.trench === "Traffic" && t.trenchPoint === 2 && t.selection.size === 0, "选中壕沟清掉物件选中");
+  const rev = t.trenchRev;
+  t.MoveTrenchPoint("Traffic", 2, 13.456, 21.234);
+  Check(J(t.FindTrench("Traffic").points[2]) === J([13.46, 21.23]) && t.trenchRev > rev && t.dirty, "拖点记到厘米、trenchRev 加一");
+  t.InsertTrenchPoint("Traffic", 2, 14, 30);
+  Check(t.FindTrench("Traffic").points.length === 9 && t.trenchPoint === 3, "加点插在选中点后面并选中它");
+  t.SetTrenchDetail("Traffic", "revetment", true);
+  t.SetTrenchDetail("Traffic", "revetment", { spacingM: 3 });
+  t.SetTrenchDetail("Traffic", "roots", false);
+  Check(J(t.FindTrench("Traffic").details) === J({ revetment: { on: true, spacingM: 3 }, roots: false }), "细节开关与参数合并写进 details");
+  t.SetTrenchDetail("Traffic", "roots", undefined);
+  Check(!("roots" in t.FindTrench("Traffic").details), "细节回到缺省 = 删掉那一项");
+  const id = t.AddTrench({ points: [[0, 0], [10, 0]], preset: "fire", look: "scrape" });
+  Check(t.trench === id && t.Validate().ok && t.Hierarchy().folders.get("壕沟")?.trenches?.includes(id), "新加的沟选中、过校验、挂在「壕沟」文件夹");
+  Check(!t.DeleteTrenchPoint(id, 0), "两个点的沟不能再删点");
+  t.DeleteTrench(id);
+  Check(!t.FindTrench(id) && t.trench === null, "删沟");
+  t.RenameTrench("Traffic", "TrafficMain");
+  Check(t.FindTrench("TrafficMain") && !t.FindTrench("Traffic"), "壕沟改名");
+  while (t.Undo());
+  Check(J(t.ToDoc()) === J(doc) && !t.dirty, "壕沟改一圈撤到底：和原文逐字相同");
+}
+
 console.log(`场景编辑数据层测试全过（${checks} 项）`);

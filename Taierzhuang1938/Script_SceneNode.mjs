@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DecodeSceneHeights, SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
+import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
 import { BLOCKOUT_LEVELS, BlockoutSliceDoc } from "./Script_EditorBlockoutLevels.mjs";
 
 export const PROJECT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -12,12 +13,18 @@ export function SceneFilePath(sceneId) {
   return path.join(PROJECT_DIR, SceneDir(sceneId), SceneFileName(sceneId));
 }
 
-/** 场景 id → { doc, heights }（heights 是整张高度图，米）。 */
+/**
+ * 场景 id → { doc, heights, pre, plan }：heights 是按场景壕沟挖好的整张高度图（米），pre 是文件里存的没挖沟的那份，
+ * plan 是编好的壕沟网络（没有壕沟时 null，heights === pre）。
+ */
 export function ReadSceneSync(sceneId) {
   const file = SceneFilePath(sceneId);
   const doc = JSON.parse(fs.readFileSync(file, "utf8"));
-  const heights = DecodeSceneHeights(fs.readFileSync(path.join(path.dirname(file), doc.terrain.file)), doc.terrain);
-  return { doc, heights };
+  const pre = DecodeSceneHeights(fs.readFileSync(path.join(path.dirname(file), doc.terrain.file)), doc.terrain);
+  const datumFile = doc.trenches?.datum?.file;
+  const datum = datumFile ? fs.readFileSync(path.join(path.dirname(file), datumFile)) : null;
+  const { heights, plan } = PrepareSceneTerrain(doc, pre, datum);
+  return { doc, heights, pre, plan };
 }
 
 /**
@@ -30,6 +37,6 @@ export function ReadBlockoutSceneDocSync(levelKey) {
   if (level.scene.kind === "file") return JSON.parse(fs.readFileSync(path.join(PROJECT_DIR, level.scene.url), "utf8"));
   if (level.scene.kind !== "scene") return null;
   const sceneId = path.basename(path.dirname(level.scene.url));
-  const { doc, heights } = ReadSceneSync(sceneId);
-  return BlockoutSliceDoc(level, doc, heights);
+  const { doc, heights, plan } = ReadSceneSync(sceneId);
+  return BlockoutSliceDoc(level, doc, heights, plan);
 }

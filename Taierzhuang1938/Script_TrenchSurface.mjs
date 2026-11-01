@@ -5,6 +5,7 @@ import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { HashString, Mulberry32 } from './Script_Noise.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 import { TRENCH_APPEARANCE as Earth } from './Data_TrenchAppearance.mjs';
+import { TrenchSurfaceStyle } from './Data_TrenchDetails.mjs';
 
 export async function LoadTrenchSurface() {
   const resources=[];
@@ -201,21 +202,25 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}
   };
   for(const segment of plan.segments){
     const random=Mulberry32(HashString(`${plan.seed}:${segment.id}:WetSurface07`));
+    // 每段沟自己的碎石 / 沟沿干草（Data_TrenchDetails）；没解析过的段照全关那一套
+    const own=segment.details?TrenchSurfaceStyle(segment.details):null;
+    const stoneChance=own?own.stone.chance:C.stone.chance,stoneScale=own?own.stone.scale:C.stone.scale;
+    const grassChance=own?own.grass.chance:C.grass.chance,grassScale=own?own.grass.scale:C.grass.scale;
     for(let i=0;i<segment.stations.length;i++){
       const st=segment.stations[i];if(st.junctionClear||st.s<3||st.s>segment.path.length-3)continue;
       const floor=groundAt(st.x,st.z);
       for(const side of [-1,1]){
-        if(i%C.stone.stride===0&&random()<C.stone.chance){
+        if(i%C.stone.stride===0&&random()<stoneChance){
           const offset=st.halfFloor*(.85+random()*.15)+st.bank*random()*.9;
           const along=(random()-.5)*1.2,x=st.x+st.nx*side*offset+st.tx*along,z=st.z+st.nz*side*offset+st.tz*along;
-          const scale=Range(random,C.stone.scale);
+          const scale=Range(random,stoneScale);
           Add('TrenchStone',assets.stone,x,z,scale,random()*Math.PI*2,scale*C.stone.embed);stats.stones++;
           // Small fragments cluster at the foot of the exposed bank, leaving the walking centre clear.
           for(let k=0;k<2;k++){
             Add('TrenchStone',assets.stone,x+(random()-.5)*.65,z+(random()-.5)*.65,scale*(.22+random()*.35),random()*6.28,.025);stats.stones++;
           }
         }
-        if(i%C.grass.stride!==0||random()>C.grass.chance)continue;
+        if(i%C.grass.stride!==0||random()>grassChance)continue;
         // Hang over the lip: past ~0.92 of the bank the refined heightfield is already the flat
         // top, where the mat is only seen edge-on from the trench (a thin black line).
         const crest=st.halfFloor+st.bank*(.80+random()*.12);
@@ -225,7 +230,7 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}
         // glTF local -Z points down the bank towards its centre; roots are slightly buried.
         for(let tuft=0;tuft<2;tuft++){
           const along=(tuft-.5)*.52+(random()-.5)*.18;
-          if(GrassMat(x+st.tx*along,z+st.tz*along,Range(random,C.grass.scale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5))stats.grass++;
+          if(GrassMat(x+st.tx*along,z+st.tz*along,Range(random,grassScale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5))stats.grass++;
         }
         // Authored cliffs already receive wall-raycast root fibres. The legacy
         // grass model follows the physics heightfield and stretches beneath an

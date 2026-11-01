@@ -311,8 +311,11 @@ function Levee(h, x, z) {
   return h;
 }
 
-/** 建好的地面函数。 */
-export function L1218Ground() {
+/**
+ * 建好的地面函数。trench = false：村北沿战壕不挖（2026-11-01 起它是场景 trenches 里的两段样条沟，Script_SceneTrenchMigrate）；
+ * atDitch = false：村口反坦克沟也不挖（只给那两段沟当挖沟基准面用）。
+ */
+export function L1218Ground({ trench = true, atDitch = true } = {}) {
   const Ground = (x, z) => {
     if (z < L1218_GROUND.seamZ) {
       const h = Ground0610(x, z);
@@ -323,8 +326,8 @@ export function L1218Ground() {
     h += RidgesAndGraves(x, z);
     h = HechaCarve(h, x, z);
     h += RoadDelta(x, z);
-    h = AtDitch(h, x, z);
-    h = Trench(h, x, z);
+    if (atDitch) h = AtDitch(h, x, z);
+    if (trench) h = Trench(h, x, z);
     h = Holes(h, x, z);
     h = RiverCut(h, x, z);
     h = Bank(h, x, z);

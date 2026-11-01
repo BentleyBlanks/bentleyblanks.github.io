@@ -12,9 +12,14 @@ import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor } from "./Data
 import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, SceneStyle } from "./Script_SceneDoc.mjs";
 import { SceneEditModel, SplitGroup } from "./Script_SceneEditModel.mjs";
 import {
-  BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface,
+  BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface, SceneTrenchDressing,
 } from "./Script_EditorBlockoutLevels.mjs";
 import { SCENE_EVENTS, SceneEventLabel } from "./Data_SceneEvents.mjs";
+import {
+  DecodeTrenchDatum, CompileSceneTrenches, CarveSceneHeights, GridSampler, TrenchGroup, SegmentReachBounds, UnionBounds,
+} from "./Script_SceneTrenches.mjs";
+import { TRENCH_PRESETS } from "./Script_TrenchPlan.mjs";
+import { TRENCH_DETAILS, TRENCH_LOOKS, EffectiveTrenchDetail } from "./Data_TrenchDetails.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "./Script_WhiteboxGrid.mjs";
@@ -165,19 +170,27 @@ class SceneEditorApp {
   async LoadScene({ keepCamera = true } = {}) {
     this.Status("正在读取场景…");
     const { doc, revision, stamp, url } = await this.FetchScene();
-    const terrainKey = JSON.stringify(doc.terrain);
-    if (!this.heights || terrainKey !== this.terrainKey) {
+    const terrainKey = JSON.stringify([doc.terrain, doc.trenches?.datum || null]);
+    if (!this.pre || terrainKey !== this.terrainKey) {
       const heightUrl = new URL(doc.terrain.file, url);
       const response = await fetch(`${heightUrl.href}?t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`高度图读不到（HTTP ${response.status}）`);
-      this.heights = DecodeSceneHeights(await response.arrayBuffer(), doc.terrain);
+      // 高度图存的是沟没挖之前的地面；壕沟按 trenches 现挖进 this.heights（docs/Data_Scene.md §9）
+      this.pre = DecodeSceneHeights(await response.arrayBuffer(), doc.terrain);
+      this.datum = [];
+      if (doc.trenches?.datum?.file) {
+        const datumResponse = await fetch(`${new URL(doc.trenches.datum.file, url).href}?t=${Date.now()}`, { cache: "no-store" });
+        if (!datumResponse.ok) throw new Error(`壕沟基准面读不到（HTTP ${datumResponse.status}）`);
+        this.datum = DecodeTrenchDatum(doc.trenches.datum, await datumResponse.arrayBuffer());
+      }
+      this.preSampler = GridSampler(doc.terrain, this.pre);
       this.terrainKey = terrainKey;
-      this.sampler = HeightGridSampler({ ...doc.terrain, heights: this.heights });
     }
     this.revision = revision;
     this.stamp = stamp;
     if (this.model) this.model.Load(doc);
     else this.model = new SceneEditModel(doc);
+    this.CarveAll();
     this.lookKey = null;
     this.Rebuild();
     if (!keepCamera) this.Home();
@@ -193,9 +206,196 @@ class SceneEditorApp {
 
   Rebuild() {
     const doc = this.model.doc;
-    const lookKey = JSON.stringify([this.terrainKey, doc.look, doc.paint?.length, doc.backdrop?.ground]);
+    const lookKey = JSON.stringify([this.terrainKey, this.carveRev, doc.look, doc.paint?.length, doc.backdrop?.ground]);
     if (lookKey !== this.lookKey) { this.BuildTerrain(); this.lookKey = lookKey; }
     this.RebuildObjects();
+    this.BuildTrenchLines();
+    this.BuildTrenchDressing();
+  }
+
+  // ------------------------------------------------------------------ 壕沟（docs/Data_Scene.md §9）
+
+  /** 整张地面按壕沟重挖（读盘 / 重读时）。 */
+  CarveAll() {
+    const doc = this.model.doc;
+    this.trenchPlan = CompileSceneTrenches(doc.trenches, { datum: this.datum, pre: this.preSampler });
+    this.heights = CarveSceneHeights(doc.terrain, this.pre, this.trenchPlan);
+    this.sampler = HeightGridSampler({ ...doc.terrain, heights: this.heights });
+    this.carvedTrenches = JSON.stringify(this.model.trenchSegments);
+    this.carvedRev = this.model.trenchRev;
+    this.carveRev = (this.carveRev || 0) + 1;
+  }
+
+  /**
+   * 壕沟改过：重编网络，只重挖改动的段前后两次的影响范围，再重画地面。返回 "terrain"（地面变了）/ "details"（只改了
+   * 细节、套餐、备注、分组：地面不动，只重摆构件）/ false（没改）。
+   */
+  Recarve() {
+    if (this.carvedRev === this.model.trenchRev) return false;
+    const doc = this.model.doc, before = this.trenchPlan;
+    // 影响地面的写法：去掉只管样子的字段
+    const Shape = (s) => { const { details, look, note, group, ...rest } = s; return JSON.stringify(rest); };
+    const oldById = new Map(JSON.parse(this.carvedTrenches || "[]").map((s) => [s.id, Shape(s)]));
+    const now = this.model.trenchSegments;
+    const changed = new Set([...oldById.keys()].filter((id) => !now.some((s) => s.id === id)));
+    for (const seg of now) if (oldById.get(seg.id) !== Shape(seg)) changed.add(seg.id);
+    this.trenchPlan = CompileSceneTrenches(doc.trenches, { datum: this.datum, pre: this.preSampler });
+    this.carvedTrenches = JSON.stringify(now);
+    this.carvedRev = this.model.trenchRev;
+    if (!changed.size) return "details";
+    const ids = [...changed];
+    // 沟与沟连着（弃土、三岔口），往外多放 4 m
+    let region = UnionBounds(SegmentReachBounds(before, ids), SegmentReachBounds(this.trenchPlan, ids));
+    if (region) {
+      region = { minX: region.minX - 4, maxX: region.maxX + 4, minZ: region.minZ - 4, maxZ: region.maxZ + 4 };
+      const t = doc.terrain, w = t.cols + 1;
+      // 先把这一块退回没挖的，再按新网络挖
+      for (let iz = Math.max(0, Math.floor((region.minZ - t.minZ) / t.cellM)); iz <= Math.min(t.rows, Math.ceil((region.maxZ - t.minZ) / t.cellM)); iz++) {
+        const from = iz * w + Math.max(0, Math.floor((region.minX - t.minX) / t.cellM)), to = iz * w + Math.min(t.cols, Math.ceil((region.maxX - t.minX) / t.cellM));
+        this.heights.set(this.pre.subarray(from, to + 1), from);
+      }
+      if (this.trenchPlan) CarveSceneHeights(t, this.pre, this.trenchPlan, { region, into: this.heights });
+    }
+    this.carveRev++;
+    return "terrain";
+  }
+
+  /**
+   * 壕沟的构件（护壁、踏板、射击位、杂物：每段 details 开了的）照游戏里那份摆出来（Script_EditorBlockoutLevels.SceneTrenchDressing），
+   * 画成半透明盒子，只看不选；土崖、土团、草根这些土面细节太重，只在游戏里画。
+   */
+  BuildTrenchDressing() {
+    if (this.trenchDressing) { this.world.remove(this.trenchDressing); this.trenchDressing.traverse((o) => { if (o.isMesh) { o.dispose?.(); o.material.dispose(); } }); this.trenchDressing = null; }
+    this.trenchDressingCount = 0;
+    if (!this.trenchPlan) return;
+    const keep = this.model.objects.filter((o) => o.layer !== "backdrop" && o.solid !== false && o.tag !== "airWall" && o.size)
+      .map((o) => ({ x: o.pos[0], z: o.pos[2], w: o.size[0], d: o.size[2], h: o.size[1], ry: (o.yawDeg || 0) * DEG, solid: true }));
+    const { blocks } = SceneTrenchDressing(this.trenchPlan, this.sampler, keep, this.model.doc.bounds);
+    this.trenchDressingCount = blocks.length;
+    if (!blocks.length) return;
+    const group = new THREE.Group();
+    group.name = "SceneEditor_TrenchDressing";
+    const bySemantic = new Map();
+    for (const b of blocks) { if (!bySemantic.has(b.semantic)) bySemantic.set(b.semantic, []); bySemantic.get(b.semantic).push(b); }
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    for (const [semantic, list] of bySemantic) {
+      const mesh = new THREE.InstancedMesh(this.geometry.box, new THREE.MeshStandardMaterial({ color: this.SemanticColor(semantic), roughness: 0.9, transparent: true, opacity: 0.85 }), list.length);
+      list.forEach((b, i) => { m.compose(new THREE.Vector3(b.x, b.y, b.z), q.setFromAxisAngle(up, b.ry || 0), new THREE.Vector3(b.w, b.h, b.d)); mesh.setMatrixAt(i, m); });
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+    this.trenchDressing = group;
+    this.world.add(group);
+  }
+
+  /** 壕沟画成地面上方的线：没选中的土黄、选中的金色带控制点（透过沟壁也看得见）。拖点时 preview 给那一段的临时控制点。 */
+  BuildTrenchLines(preview = null) {
+    if (this.trenchLines) {
+      this.scene.remove(this.trenchLines);
+      this.trenchLines.traverse((o) => { if (o.geometry !== this.geometry.sphere) o.geometry?.dispose(); o.material?.dispose(); });
+    }
+    const group = new THREE.Group();
+    group.name = "SceneEditor_Trenches";
+    this.trenchLines = group;
+    this.scene.add(group);
+    const plan = this.trenchPlan, sel = this.model.trench;
+    const Lift = (x, z, up) => new THREE.Vector3(x, (Inside(this.model.doc.bounds, x, z) ? this.sampler(x, z) : 0) + up, z);
+    for (const seg of this.model.trenchSegments) {
+      const selected = seg.id === sel;
+      const compiled = plan?.segments.find((s) => s.id === seg.id);
+      const pts = preview && selected ? preview : seg.points;
+      const path = preview && selected || !compiled ? pts.map(([x, z]) => Lift(x, z, 0.25)) : compiled.path.points.map(([x, z]) => Lift(x, z, 0.25));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(path),
+        new THREE.LineBasicMaterial({ color: selected ? 0xedca83 : 0xc98a4b, depthTest: false, transparent: true, opacity: selected ? 1 : 0.75 }));
+      line.renderOrder = selected ? 26 : 25;
+      group.add(line);
+      if (!selected) continue;
+      // 控制点折线 + 点
+      const poly = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => Lift(x, z, 0.9))),
+        new THREE.LineDashedMaterial({ color: 0xedca83, dashSize: 0.6, gapSize: 0.4, depthTest: false, transparent: true, opacity: 0.7 }));
+      poly.computeLineDistances();
+      poly.renderOrder = 26;
+      group.add(poly);
+      pts.forEach(([x, z], i) => {
+        const dot = new THREE.Mesh(this.geometry.sphere, new THREE.MeshBasicMaterial({
+          color: i === this.model.trenchPoint ? 0xffffff : 0xedca83, depthTest: false, transparent: true }));
+        dot.position.copy(Lift(x, z, 0.9));
+        // 屏幕上大约一样大（离相机越远放得越大）
+        dot.scale.setScalar(Math.max(0.15, Math.min(3, this.camera.position.distanceTo(dot.position) * 0.006)));
+        dot.renderOrder = 27;
+        group.add(dot);
+      });
+    }
+  }
+
+  /** 屏幕上离 (clientX, clientY) 最近的选中壕沟控制点（像素以内）。 */
+  PickTrenchPoint(clientX, clientY, maxPx = 12) {
+    const seg = this.model.FindTrench(this.model.trench);
+    if (!seg) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    let best = null, bestD = maxPx;
+    seg.points.forEach(([x, z], i) => {
+      const p = new THREE.Vector3(x, this.sampler(x, z) + 0.9, z).project(this.camera);
+      if (p.z > 1) return;
+      const d = Math.hypot(rect.left + (p.x + 1) / 2 * rect.width - clientX, rect.top + (1 - p.y) / 2 * rect.height - clientY);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  /** 地面上这一点落在哪段沟里（沟沿外弃土也算）。 */
+  TrenchAt(point) {
+    const hit = point && this.trenchPlan?.Corridor(point.x, point.z);
+    return hit ? hit.id : null;
+  }
+
+  /** 选中壕沟后 Alt+点地面：在离点击处最近的那一截控制折线里插一个点。 */
+  InsertTrenchPointAt(point) {
+    const seg = this.model.FindTrench(this.model.trench);
+    if (!seg || !point) return;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < seg.points.length - 1; i++) {
+      const [ax, az] = seg.points[i], [bx, bz] = seg.points[i + 1], dx = bx - ax, dz = bz - az;
+      const t = Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.z - az) * dz) / ((dx * dx + dz * dz) || 1)));
+      const d = Math.hypot(point.x - ax - dx * t, point.z - az - dz * t);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    // 离两头更近就接在端头外面
+    const first = seg.points[0], last = seg.points[seg.points.length - 1];
+    const dFirst = Math.hypot(point.x - first[0], point.z - first[1]), dLast = Math.hypot(point.x - last[0], point.z - last[1]);
+    const after = bestD > 6 && dFirst < dLast ? -1 : bestD > 6 ? seg.points.length - 1 : best;
+    this.model.InsertTrenchPoint(seg.id, after, point.x, point.z);
+    this.AfterEdit(null);
+  }
+
+  SelectTrench(id, point = null) {
+    this.model.SelectTrench(id, point);
+    const seg = this.model.FindTrench(id);
+    if (seg) { const parts = SplitGroup(TrenchGroup(seg)); for (let i = 1; i <= parts.length; i++) this.open.add(parts.slice(0, i).join("/")); this.SaveOpen(); }
+    this.revealPending = true;
+    this.SyncSelectionLines();
+    this.BuildTrenchLines();
+    this.RenderTree();
+    this.RenderInspector();
+  }
+
+  FrameTrench(id = this.model.trench) {
+    const seg = this.model.FindTrench(id);
+    if (!seg) return;
+    const box = new THREE.Box3();
+    for (const [x, z] of seg.points) box.expandByPoint(new THREE.Vector3(x, this.sampler(x, z), z));
+    const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
+    this.LookAt(center, Math.max(14, size * 1.1), Math.min(-25, this.cam.pitch / DEG));
+  }
+
+  /** 新建一段壕沟：画面中间、顺着视线方向 16 m。 */
+  AddTrenchHere({ preset = "communication", look = "", group = "" } = {}) {
+    const at = this.ScreenCenterGround();
+    const dir = new THREE.Vector3(-Math.sin(this.cam.yaw), 0, -Math.cos(this.cam.yaw));
+    const a = [at.x - dir.x * 8, at.z - dir.z * 8], b = [at.x + dir.x * 8, at.z + dir.z * 8];
+    this.model.AddTrench({ preset, points: [a, b], group: group || undefined, look: look || undefined });
+    this.AfterEdit(null);
+    this.SelectTrench(this.model.trench);
   }
 
   SemanticColor(semantic) {
@@ -684,6 +884,12 @@ class SceneEditorApp {
     this.down = { x: e.clientX, y: e.clientY, button: e.button, moved: false, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
     if (e.button !== 0) return;
     const raycaster = this.Ray(e.clientX, e.clientY);
+    // 选中壕沟时：按住控制点拖；Alt + 点地面加一个控制点
+    if (this.model.trench) {
+      const point = this.PickTrenchPoint(e.clientX, e.clientY);
+      if (point !== null) { this.BeginTrenchDrag(point); this.down.handled = true; return; }
+      if (e.altKey) { this.InsertTrenchPointAt(this.PickGround(raycaster.ray)); this.down.handled = true; return; }
+    }
     const handle = this.PickHandle(raycaster);
     if (handle) { this.BeginDrag(handle, raycaster.ray); this.down.handled = true; return; }
     const hit = this.PickObject(raycaster.ray);
@@ -709,6 +915,7 @@ class SceneEditorApp {
       return;
     }
     if (down.button !== 0) return;
+    if (this.drag?.trench) { this.TrenchDragTo(this.Ray(e.clientX, e.clientY).ray, e.ctrlKey || e.metaKey); return; }
     if (this.drag) { this.DragTo(this.Ray(e.clientX, e.clientY).ray, e.ctrlKey || e.metaKey); return; }
     if (down.bodyDrag && down.moved) { this.BeginDrag({ plane: true }, this.Ray(down.x, down.y).ray); this.DragTo(this.Ray(e.clientX, e.clientY).ray, e.ctrlKey); }
   }
@@ -721,7 +928,12 @@ class SceneEditorApp {
     if (this.drag) { this.EndDrag(); return; }
     if (down.handled || down.moved) return;
     if (down.hit) this.SelectIds([down.hit.id], { toggle: down.ctrl, add: down.shift });
-    else if (!down.ctrl && !down.shift) this.SelectIds([]);
+    else if (!down.ctrl && !down.shift) {
+      // 没点中物件：点在沟里（含沟沿弃土）就选那段沟
+      const trench = this.TrenchAt(this.PickGround(this.Ray(e.clientX, e.clientY).ray));
+      if (trench) this.SelectTrench(trench);
+      else this.SelectIds([]);
+    }
   }
 
   Wheel(e) {
@@ -742,7 +954,7 @@ class SceneEditorApp {
     if (ctrl && e.code === "KeyD") { e.preventDefault(); this.DuplicateSelection(); return; }
     if (e.code === "Delete" || e.code === "Backspace") { e.preventDefault(); this.DeleteSelection(); return; }
     if (e.code === "Escape") { if (this.drag) this.CancelDrag(); else this.SelectIds([]); return; }
-    if (e.code === "KeyF" && !ctrl) { this.Frame(); return; }
+    if (e.code === "KeyF" && !ctrl) { if (this.model.trench) this.FrameTrench(); else this.Frame(); return; }
     if (!ctrl) this.keys.add(e.code);
   }
 
@@ -818,10 +1030,34 @@ class SceneEditorApp {
     this.UpdateInstances(d.ids, preview);
   }
 
+  BeginTrenchDrag(index) {
+    const seg = this.model.FindTrench(this.model.trench);
+    const [x, z] = seg.points[index];
+    this.model.trenchPoint = index;
+    this.drag = { trench: seg.id, index, y: this.sampler(x, z), start: seg.points.map((p) => [...p]), preview: null };
+    this.BuildTrenchLines();
+    this.RenderInspector();
+  }
+
+  TrenchDragTo(ray, snap) {
+    const d = this.drag;
+    const p = this.PlaneHit(ray, d.y);
+    if (!p) return;
+    let x = p.x, z = p.z;
+    if (snap) { x = Math.round(x / E.snapM) * E.snapM; z = Math.round(z / E.snapM) * E.snapM; }
+    d.preview = d.start.map((q, i) => (i === d.index ? [x, z] : q));
+    this.BuildTrenchLines(d.preview);
+  }
+
   EndDrag() {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
+    if (d.trench) {
+      if (d.preview) { const [x, z] = d.preview[d.index]; this.model.MoveTrenchPoint(d.trench, d.index, x, z); }
+      this.AfterEdit(null);
+      return;
+    }
     if (d.handle.ring) { if (d.yaw) this.model.RotateBy(d.ids, d.yaw, d.ids.length > 1 ? { x: d.pivot.x, z: d.pivot.z } : null); }
     else if (d.delta.some(v => v !== 0)) this.model.MoveBy(d.ids, d.delta[0], d.delta[1], d.delta[2], { groundY: (obj) => this.GroundY(obj) });
     this.AfterEdit(d.ids);
@@ -830,7 +1066,8 @@ class SceneEditorApp {
   CancelDrag() {
     const d = this.drag;
     this.drag = null;
-    if (d) this.UpdateInstances(d.ids);
+    if (d?.trench) this.BuildTrenchLines();
+    else if (d) this.UpdateInstances(d.ids);
   }
 
   // ------------------------------------------------------------------ 改动
@@ -846,8 +1083,13 @@ class SceneEditorApp {
 
   /** 改完以后刷新：ids 给了且只是挪位置 → 只改矩阵；否则整批重建。 */
   AfterEdit(ids = null, { structural = false } = {}) {
-    if (structural || !ids) this.RebuildObjects();
+    // 壕沟改过：重挖地面（落地的物件跟着新地面走，所以整批重建）
+    const carved = this.Recarve();
+    if (carved === "terrain") { this.Rebuild(); structural = true; }
+    else if (carved === "details") { this.BuildTrenchDressing(); if (structural || !ids) this.RebuildObjects(); }
+    else if (structural || !ids) this.RebuildObjects();
     else this.UpdateInstances(ids);
+    this.BuildTrenchLines();
     this.FillSignals();
     this.RenderTree();
     this.RenderInspector();
@@ -865,6 +1107,19 @@ class SceneEditorApp {
   }
 
   DeleteSelection() {
+    if (this.model.trench) {
+      const id = this.model.trench, point = this.model.trenchPoint;
+      if (point !== null) {
+        if (!this.model.DeleteTrenchPoint(id, point)) { this.Toast("一段沟至少要两个控制点"); return; }
+        this.AfterEdit(null);
+        this.Toast("删了一个控制点（Ctrl+Z 撤销）");
+      } else {
+        this.model.DeleteTrench(id);
+        this.AfterEdit(null);
+        this.Toast(`删了壕沟 ${id}（Ctrl+Z 撤销）`);
+      }
+      return;
+    }
     const ids = [...this.model.selection];
     if (!ids.length) return;
     this.model.Delete(ids);
@@ -972,20 +1227,37 @@ class SceneEditorApp {
       });
       return b;
     };
+    // 壕沟在层级里的一行（〰，副标题是沟型 · 套餐）
+    const TrenchItem = (seg, depth, showPath = false) => {
+      const b = El("button", `seItem seTrenchItem${this.model.trench === seg.id ? " selected" : ""}`);
+      b.style.paddingLeft = `${10 + depth * 14 + 13}px`;
+      const look = seg.look ? TRENCH_LOOKS[seg.look]?.label : "";
+      b.append(El("i", "seIcon trench", "〰"), El("span", "seName", seg.id),
+        El("small", "", showPath ? TrenchGroup(seg) : [TRENCH_PRESETS[seg.preset]?.label, look].filter(Boolean).join(" · ")));
+      b.title = `样条壕沟 · ${seg.points.length} 个控制点${seg.note ? `
+${seg.note}` : ""}`;
+      b.addEventListener("click", () => this.SelectTrench(seg.id));
+      b.addEventListener("dblclick", () => { this.SelectTrench(seg.id); this.FrameTrench(seg.id); });
+      return b;
+    };
     if (q) {
+      const trenchHits = this.model.trenchSegments.filter((s) => `${s.id} ${TrenchGroup(s)} ${s.preset} ${s.look || ""} 壕沟 ${s.note || ""}`.toLowerCase().includes(q));
+      for (const seg of trenchHits) tree.append(TrenchItem(seg, 0, true));
       const hits = this.model.objects.filter(o => `${o.id} ${o.group || ""} ${o.asset} ${o.material || ""} ${o.meta?.prop || ""} ${o.showOn || ""} ${o.hideOn || ""}`.toLowerCase().includes(q));
-      $("seCount").textContent = `搜到 ${hits.length} 个`;
+      $("seCount").textContent = `搜到 ${hits.length + trenchHits.length} 个`;
       for (const obj of hits.slice(0, E.searchLimit)) tree.append(Item(obj, 0, true));
       if (hits.length > E.searchLimit) tree.append(El("div", "seMore", `还有 ${hits.length - E.searchLimit} 个，搜得再细一点`));
       return;
     }
     const root = this.model.Hierarchy();
-    $("seCount").textContent = `${root.count} 个物件 · 双击文件夹选中里面全部 · 把物件拖到文件夹上挪分组`;
+    $("seCount").textContent = `${root.count - this.model.trenchSegments.length} 个物件、${this.model.trenchSegments.length} 段壕沟 · 双击文件夹选中里面全部 · 把物件拖到文件夹上挪分组`;
     const Folder = (node, depth) => {
       const open = this.open.has(node.path);
       const head = El("button", `seFolder${open ? " open" : ""}`);
       head.style.paddingLeft = `${6 + depth * 14}px`;
-      const selectedInside = [...sel].some(id => { const g = this.model.Find(id)?.group || ""; return g === node.path || g.startsWith(`${node.path}/`); });
+      const InPath = (g) => g === node.path || g.startsWith(`${node.path}/`);
+      const selectedTrench = this.model.FindTrench(this.model.trench);
+      const selectedInside = [...sel].some(id => InPath(this.model.Find(id)?.group || "")) || (selectedTrench && InPath(TrenchGroup(selectedTrench)));
       if (selectedInside) head.classList.add("hasSel");
       head.append(El("i", "seTwisty", open ? "▾" : "▸"), El("span", "seName", node.name), El("small", "", String(node.count)));
       head.title = `${node.path}（${node.count} 个）\n单击展开 / 收起 · 双击选中里面全部`;
@@ -1005,6 +1277,7 @@ class SceneEditorApp {
       tree.append(head);
       if (!open) return;
       for (const child of node.folders.values()) Folder(child, depth + 1);
+      for (const id of node.trenches || []) tree.append(TrenchItem(this.model.FindTrench(id), depth + 1));
       const selected = node.ids.filter(id => sel.has(id));
       const shown = [...new Set([...selected, ...node.ids.slice(0, E.treeLimit)])];
       for (const id of shown) tree.append(Item(this.model.Find(id), depth + 1));
@@ -1033,6 +1306,28 @@ class SceneEditorApp {
   RenderAssets() {
     const box = $("seAssets");
     box.textContent = "";
+    // 样条壕沟（docs/Data_Scene.md §9）：放下一段两点的沟，再拖点、改参数
+    {
+      const card = El("div", "seAsset");
+      card.append(El("h3", "", "样条壕沟"), El("code", "", "trenches.segments"),
+        El("p", "", "按样条现挖地面；护壁、踏板、土崖、土团、草根这些细节每段单独开关、调参数（选中后在检视里改）。"));
+      const prow = El("div", "seRow"); prow.append(El("span", "", "沟型"));
+      const preset = El("select");
+      for (const [key, p] of Object.entries(TRENCH_PRESETS)) preset.append(new Option(`${p.label}（${key}）`, key));
+      prow.append(preset); card.append(prow);
+      const lrow = El("div", "seRow"); lrow.append(El("span", "", "套餐"));
+      const look = El("select");
+      look.append(new Option("（缺省）", ""));
+      for (const [key, l] of Object.entries(TRENCH_LOOKS)) look.append(new Option(`${l.label}（${key}）`, key));
+      lrow.append(look); card.append(lrow);
+      const grow = El("div", "seRow"); grow.append(El("span", "", "分组"));
+      const group = El("input"); group.type = "text"; group.placeholder = "不写 = 壕沟";
+      grow.append(group); card.append(grow);
+      const add = El("button", "sePrimary", "放到画面中间");
+      add.addEventListener("click", () => this.AddTrenchHere({ preset: preset.value, look: look.value, group: group.value.trim() }));
+      const row = El("div", "seButtons"); row.append(add); card.append(row);
+      box.append(card);
+    }
     // 白盒场景列白盒体块 + 远景；正式场景列体块、道具、树 + 远景（Data_SceneAssets.SceneAssetsFor）
     for (const [id, asset] of SceneAssetsFor(this.style)) {
       const card = El("div", "seAsset");
@@ -1186,8 +1481,9 @@ class SceneEditorApp {
   RenderInspector() {
     const box = $("seInspector");
     box.textContent = "";
+    if (this.model.trench) { this.RenderTrenchInspector(box, this.model.FindTrench(this.model.trench)); return; }
     const list = this.model.Selected();
-    if (!list.length) { box.append(El("p", "seMuted seEmpty", "在画面或层级里点一个物件（Ctrl 点多选、Shift 点加选、双击文件夹选中整组）。")); return; }
+    if (!list.length) { box.append(El("p", "seMuted seEmpty", "在画面或层级里点一个物件或一段壕沟（Ctrl 点多选、Shift 点加选、双击文件夹选中整组；点在沟里选那段沟）。")); return; }
     if (list.length > 1) { this.RenderMulti(box, list); return; }
     const obj = list[0], asset = SCENE_ASSETS[obj.asset] || {}, ids = [obj.id];
     const err = El("div", "seError");
@@ -1267,6 +1563,142 @@ class SceneEditorApp {
       body.append(area);
     }
     this.InspectorButtons(box);
+  }
+
+  /**
+   * 壕沟的检视（docs/Data_Scene.md §9、docs/Data_TrenchDetails.md）：走向（控制点）、断面（沟型 + 段上改的数，空着 = 用沟型的）、
+   * 表现套餐、每一项细节（标题条上的勾 = 开关，展开改参数，灰字是缺省值）、沿沟变化（JSON）。
+   */
+  RenderTrenchInspector(box, seg) {
+    const id = seg.id, err = El("div", "seError");
+    const k = this.InspectorKit(box, [], err);
+    const compiled = this.trenchPlan?.segments.find((s) => s.id === id);
+    const preset = TRENCH_PRESETS[seg.preset] || TRENCH_PRESETS.communication;
+    const Edit = (fn) => { fn(); this.AfterEdit(null); };
+    const SetField = (key, value, label) => Edit(() => this.model.SetTrenchField(id, key, value, label));
+
+    const head = El("div", "seObjHead");
+    const name = k.Text(id, (v) => { try { this.model.RenameTrench(id, v); this.AfterEdit(null); } catch (error) { err.textContent = error.message; name.classList.add("bad"); } });
+    name.classList.add("seObjName");
+    const line = El("div", "seObjLine"); line.append(El("i", "seIcon trench", "〰"), name);
+    head.append(line, err);
+    box.append(head);
+    const meta = El("div", "seObjMeta");
+    k.Row(meta, "类型", El("span", "seId", "样条壕沟"), El("code", "", `${seg.points.length} 个控制点 · ${compiled ? compiled.path.length.toFixed(1) : "—"} m`));
+    k.Row(meta, "分组", k.GroupInput(seg.group, (v) => SetField("group", v || undefined, "改壕沟分组")));
+    k.Row(meta, "备注", k.Text(seg.note, (v) => SetField("note", v || undefined, "改壕沟备注"), "这段沟是干什么的"));
+    box.append(meta);
+
+    // 走向
+    const path = k.Section("trench.path", "走向");
+    const pi = this.model.trenchPoint;
+    if (pi !== null && seg.points[pi]) {
+      k.Row(path, `点 ${pi + 1}`, k.Vec(seg.points[pi], (i, v) => {
+        const p = [...seg.points[pi]]; p[i] = v;
+        Edit(() => this.model.MoveTrenchPoint(id, pi, p[0], p[1]));
+      }, { step: 0.1, axes: ["X", "Z"], disabled: [false, false], placeholders: ["", ""] }));
+    } else path.append(El("p", "seNote", "画面里按住金色控制点拖（Ctrl 吸附半米）；点一下选中一个点，这里就能填数。"));
+    const buttons = El("div", "seButtons");
+    const addAfter = El("button", "", pi !== null ? "在这个点后面加点" : "在末尾加点");
+    addAfter.addEventListener("click", () => {
+      const at = pi !== null ? pi : seg.points.length - 1;
+      const a = seg.points[at], b = seg.points[at + 1] || [a[0] + (a[0] - seg.points[at - 1][0]) * 0.5, a[1] + (a[1] - seg.points[at - 1][1]) * 0.5];
+      Edit(() => this.model.InsertTrenchPoint(id, at, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2));
+    });
+    const delPoint = El("button", "", "删这个点"); delPoint.disabled = pi === null || seg.points.length <= 2;
+    delPoint.addEventListener("click", () => Edit(() => this.model.DeleteTrenchPoint(id, pi)));
+    const reverse = El("button", "", "掉头（弃土左右对调）");
+    reverse.title = "控制点倒过来排：弧长从另一头数起，bermSide 的 plus / minus 跟着对调";
+    reverse.addEventListener("click", () => Edit(() => this.model.MutateTrench("壕沟掉头", id, (s) => {
+      s.points.reverse();
+      if (s.bermSide === "plus") s.bermSide = "minus"; else if (s.bermSide === "minus") s.bermSide = "plus";
+    })));
+    buttons.append(addAfter, delPoint, reverse);
+    path.append(buttons, El("p", "seNote", "选中沟时 Alt + 点地面 = 在最近的那一截加一个点；Del = 删选中的点（没选点就删整段沟）。"));
+
+    // 断面
+    const sec = k.Section("trench.section", "断面");
+    k.Row(sec, "沟型", k.Select(Object.entries(TRENCH_PRESETS).map(([key, p]) => [key, `${p.label}（${key}）`]), seg.preset, (v) => SetField("preset", v, "改沟型")));
+    const nominal = compiled?.nominal || {};
+    for (const [key, label, step] of [["depth", "深 m", 0.05], ["floorW", "沟底宽 m", 0.1], ["bankW", "沟壁宽 m", 0.05], ["bermH", "弃土高 m", 0.05],
+      ["bermW", "弃土宽 m", 0.1], ["cornerRadiusM", "拐角圆 m", 0.1], ["jitterScale", "毛糙 倍", 0.1], ["widthScale", "宽度 倍", 0.05]]) {
+      const fallback = key === "jitterScale" || key === "widthScale" ? 1 : preset[key] ?? nominal[key];
+      const input = k.Num(seg[key], (v) => SetField(key, v, `改壕沟 ${label}`), { step, placeholder: Number.isFinite(fallback) ? `${Number(fallback.toFixed(2))}（沟型）` : "" });
+      const clear = El("button", "seMini", "×"); clear.title = "清掉，用沟型的"; clear.disabled = seg[key] === undefined;
+      clear.addEventListener("click", () => SetField(key, undefined, `清壕沟 ${label}`));
+      k.Row(sec, label, input, clear);
+    }
+    k.Row(sec, "弃土在哪侧", k.Select([["", `（沟型：${preset.bermSide}）`], ["both", "两侧 both"], ["plus", "前进方向右手 plus"], ["minus", "前进方向左手 minus"], ["none", "不堆 none"]],
+      seg.bermSide || "", (v) => SetField("bermSide", v || undefined, "改弃土侧")));
+    sec.append(El("p", "seNote", "空着的格子用沟型的数（灰字）。毛糙 0 = 宽深不抖、沟沿不起毛。"));
+
+    // 表现套餐
+    const lookBody = k.Section("trench.look", "表现套餐");
+    const networkLook = this.model.doc.trenches?.look;
+    k.Row(lookBody, "套餐", k.Select([["", networkLook ? `（跟整张网：${TRENCH_LOOKS[networkLook]?.label}）` : "（缺省：现行第一关的样子）"],
+      ...Object.entries(TRENCH_LOOKS).map(([key, l]) => [key, `${l.label}（${key}）`])], seg.look || "", (v) => SetField("look", v || undefined, "改壕沟套餐")));
+    const lookNote = seg.look ? TRENCH_LOOKS[seg.look]?.note : "缺省：木护壁、踏板关，射击位、杂物开，土面细节全开。";
+    lookBody.append(El("p", "seNote", `${lookNote} 下面每一项还能单独改，改过的盖过套餐。`));
+
+    // 每一项细节
+    const details = compiled?.details;
+    for (const [key, info] of Object.entries(TRENCH_DETAILS)) {
+      const eff = details ? EffectiveTrenchDetail(details, key) : { on: true };
+      const own = seg.details?.[key];
+      const changed = own !== undefined;
+      const body = k.Section(`trench.detail.${key}`, `${info.label}${info.kind === "dressing" ? "" : " ·土面"}${changed ? " ●" : ""}`, {
+        defaultOpen: false,
+        headerToggle: { checked: eff.on, title: `${info.note}（勾 = 生成）`, onChange: (on) => Edit(() => this.model.SetTrenchDetail(id, key, on)) },
+      });
+      body.append(El("p", "seNote", info.note + (info.kind === "earth" ? "（只有正式场景画）" : "")));
+      for (const [param, spec] of Object.entries(info.params)) {
+        const mine = own && typeof own === "object" ? own[param] : undefined;
+        const value = eff[param];
+        const Put = (v) => Edit(() => this.model.SetTrenchDetail(id, key, { [param]: v }));
+        let control;
+        if (spec.type === "side") control = k.Select([["plus", "plus（前进方向右手）"], ["minus", "minus（左手）"]], value || "minus", Put);
+        else if (spec.type === "list") control = k.Text((value || []).join(", "), (v) => Put(v ? v.split(/[,，\s]+/).filter(Boolean) : undefined), "Prop/militaryCrateClosed, …");
+        else if (spec.type === "range") {
+          control = k.Vec(Array.isArray(value) ? value : [0, 0], (i, v) => { const r = [...(Array.isArray(value) ? value : [0, 0])]; r[i] = v; Put(r); },
+            { step: spec.step, axes: ["下", "上"], disabled: [false, false], placeholders: ["", ""] });
+        } else control = k.Num(mine, Put, { step: spec.step, placeholder: Number.isFinite(value) ? String(Number(value.toFixed(4))) : "" });
+        if (spec.type !== "range" && spec.type !== "side" && spec.type !== "list" && mine === undefined) control.classList.add("seDefault");
+        k.Row(body, `${spec.label}${spec.unit ? ` ${spec.unit}` : ""}`, control);
+      }
+      if (changed) {
+        const reset = El("button", "", "这一项回到套餐 / 缺省");
+        reset.addEventListener("click", () => Edit(() => this.model.SetTrenchDetail(id, key, undefined)));
+        const row = El("div", "seButtons"); row.append(reset); body.append(row);
+      }
+    }
+
+    // 沿沟变化（JSON）
+    for (const [key, label, hint] of [["depthAlong", "沿沟深度", "[[弧长 m, 深 m], …]：只改沟底，沟沿仍在原地面上"],
+      ["datumAlong", "沿沟基准面抬降", "[[弧长 m, 抬高 m], …]：整个断面连沟沿一起挪（坡道顺坎切下去）"],
+      ["collapses", "塌方", "[{ \"s\": 弧长, \"halfLenM\": 1.4, \"featherM\": 1.2, \"depthM\": 0.3 }, …]"]]) {
+      const body = k.Section(`trench.${key}`, `${label}（JSON）`, { defaultOpen: false });
+      const area = El("textarea");
+      area.value = seg[key] ? JSON.stringify(seg[key]) : "";
+      area.placeholder = hint;
+      area.addEventListener("change", () => {
+        const text = area.value.trim();
+        if (!text) { SetField(key, undefined, `清${label}`); return; }
+        try {
+          const value = JSON.parse(text);
+          if (!Array.isArray(value)) throw new Error("要是数组");
+          SetField(key, value, `改${label}`);
+        } catch (error) { area.classList.add("bad"); err.textContent = `${label}：${error.message}`; }
+      });
+      body.append(El("p", "seNote", hint), area);
+    }
+
+    const row = El("div", "seButtons seInspectorButtons");
+    const frame = El("button", "", "看它（F）"); frame.addEventListener("click", () => this.FrameTrench(id));
+    const del = El("button", "", "删这段沟"); del.addEventListener("click", () => { this.model.SelectTrench(id); this.model.trenchPoint = null; this.DeleteSelection(); });
+    row.append(frame, del);
+    box.append(row);
+    const check = this.model.Validate();
+    if (!check.ok) err.textContent = check.errors.filter((e) => e.startsWith("trenches")).slice(0, 3).join("；");
   }
 
   RenderMulti(box, list) {
@@ -1432,6 +1864,8 @@ class SceneEditorApp {
       State: () => ({
         scene: this.sceneId, objects: this.model?.objects.length ?? 0, selected: [...(this.model?.selection || [])],
         dirty: !!this.model?.dirty, writable: this.writable, revision: this.revision, undo: this.model?.undo.length ?? 0,
+        trenches: this.model?.trenchSegments.length ?? 0, trench: this.model?.trench ?? null, trenchPoint: this.model?.trenchPoint ?? null,
+        trenchDressing: this.trenchDressingCount ?? 0,
         layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep, terrainLook: this.terrainLook, style: this.style,
         camera: { x: this.cam.pos.x, y: this.cam.pos.y, z: this.cam.pos.z, yawDeg: this.cam.yaw / DEG, pitchDeg: this.cam.pitch / DEG },
       }),
@@ -1485,6 +1919,26 @@ class SceneEditorApp {
       Tree: () => [...document.querySelectorAll("#seTree .seFolder, #seTree .seItem")].map((n) => ({ folder: n.classList.contains("seFolder"), text: n.querySelector(".seName")?.textContent, indent: parseInt(n.style.paddingLeft, 10) || 0 })),
       Open: (paths) => { for (const p of paths) this.open.add(p); this.RenderTree(); },
       Show: (opts) => { Object.assign(this.show, opts); this.RebuildObjects(); },
+      // 壕沟（docs/Data_Scene.md §9）
+      Trench: (id) => this.model.FindTrench(id),
+      SelectTrench: (id, point = null) => this.SelectTrench(id, point),
+      MoveTrenchPoint: (id, i, x, z) => { this.model.MoveTrenchPoint(id, i, x, z); this.AfterEdit(null); },
+      SetTrenchDetail: (id, key, value) => { this.model.SetTrenchDetail(id, key, value); this.AfterEdit(null); },
+      SetTrenchField: (id, key, value) => { this.model.SetTrenchField(id, key, value); this.AfterEdit(null); },
+      AddTrench: (opts = {}) => { this.AddTrenchHere(opts); return this.model.trench; },
+      /** 地面高（挖好的）与没挖的地面高。 */
+      HeightAt: (x, z) => ({ carved: this.sampler(x, z), pre: this.preSampler(x, z) }),
+      ProjectTrenchPoint: (id, i) => {
+        const [x, z] = this.model.FindTrench(id).points[i];
+        const p = new THREE.Vector3(x, this.sampler(x, z) + 0.9, z).project(this.camera), rect = this.canvas.getBoundingClientRect();
+        return { x: rect.left + (p.x + 1) / 2 * rect.width, y: rect.top + (1 - p.y) / 2 * rect.height, visible: p.z < 1 };
+      },
+      ProjectWorld: (x, z) => {
+        const p = new THREE.Vector3(x, this.sampler(x, z), z).project(this.camera), rect = this.canvas.getBoundingClientRect();
+        return { x: rect.left + (p.x + 1) / 2 * rect.width, y: rect.top + (1 - p.y) / 2 * rect.height, visible: p.z < 1 };
+      },
+      FrameTrench: (id) => this.FrameTrench(id),
+      InspectorText: () => $("seInspector").innerText,
     };
   }
 }

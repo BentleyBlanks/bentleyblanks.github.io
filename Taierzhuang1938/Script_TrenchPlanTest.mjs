@@ -727,4 +727,40 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   console.log(`ok photo profile: unchanged routes/floors, continuous ${low.toFixed(2)}–${high.toFixed(2)} m spoil and firmer banks`);
 }
 
+// --- 每段细节、沿沟深度、基准面抬降、塌方、不堆土区（2026-11-01，docs/Data_TrenchDetails.md）---
+{
+  const Seg = (extra) => ({ id: "S", preset: "communication", points: [{ x: 0, z: 0 }, { x: 60, z: 0 }], jitterScale: 0, cornerRadiusM: 0, ...extra });
+  const flat = () => 0;
+  const Floor = (plan, x) => plan.Apply(x, 0, 0, 0);
+  // 缺省：木护壁、踏板关，射击位、杂物开（现行第一关的样子）；fresh 套餐打开木护壁；段上 details 盖套餐
+  const base = CompileTrenchNetwork({ seed: "d", segments: [Seg({})] }, { natural: flat });
+  const d0 = base.segments[0].details;
+  assert.ok(!d0.revetment.on && !d0.duckboard.on && d0.bays.on && d0.props.on && d0.roots.on && d0.cliffs.on, "default details = current first level");
+  const fresh = CompileTrenchNetwork({ seed: "d", segments: [Seg({ look: "fresh", details: { duckboard: false, revetment: { spacingM: 3 } } })] }, { natural: flat });
+  const d1 = fresh.segments[0].details;
+  assert.ok(d1.revetment.on && d1.revetment.spacingM === 3 && !d1.duckboard.on, "look then segment details");
+  const groundAt = (x, z) => fresh.Apply(x, z, 0, 0);
+  const dressed = PlanTrenchDressing(fresh, { groundAt });
+  const bareDressed = PlanTrenchDressing(CompileTrenchNetwork({ seed: "d", segments: [Seg({ look: "bare" })] }, { natural: flat }), { groundAt });
+  assert.ok(dressed.stats.revetments > 10 && dressed.stats.duckboards === 0, `fresh lays revetments, duckboard switched off (${JSON.stringify(dressed.stats)})`);
+  assert.ok(bareDressed.stats.revetments + bareDressed.stats.bays + bareDressed.stats.props === 0, "bare lays nothing");
+  // depthAlong：沟底沿弧长线性变；datumAlong：整个断面挪；collapses：那一截回填到只剩 0.3 m
+  const along = CompileTrenchNetwork({ seed: "d", segments: [Seg({ depthAlong: [[0, 1], [60, 3]] })] }, { natural: flat });
+  assert.ok(Math.abs(Floor(along, 15) + 1.5) < 0.02 && Math.abs(Floor(along, 45) + 2.5) < 0.02, `depthAlong interpolates (${Floor(along, 15)}, ${Floor(along, 45)})`);
+  const lifted = CompileTrenchNetwork({ seed: "d", segments: [Seg({ datumAlong: [[0, 0], [30, -1], [60, -1]] })] }, { natural: flat });
+  assert.ok(Math.abs(Floor(lifted, 45) + 3) < 0.02 && Math.abs(Floor(lifted, 2) + 2.07) < 0.1, `datumAlong lowers the whole section (${Floor(lifted, 45)})`);
+  const half = lifted.segments[0].stations[45];
+  assert.ok(Math.abs(half.depth - 3) < 0.05, "station depth counts the lowered datum");
+  const collapsed = CompileTrenchNetwork({ seed: "d", segments: [Seg({ collapses: [{ s: 30 }] })] }, { natural: flat });
+  assert.ok(Math.abs(Floor(collapsed, 30) + 0.3) < 0.01 && Math.abs(Floor(collapsed, 10) + 2) < 0.01, `collapse refills to 0.3 m (${Floor(collapsed, 30)})`);
+  // noBerm / noBermBelowM：区域里、坑里不堆弃土
+  const berm = CompileTrenchNetwork({ seed: "d", segments: [Seg({ bermSide: "both" })] }, { natural: flat });
+  const bermPeak = Math.max(...[3, 3.3, 3.6, 3.9, 4.2].map((z) => berm.Apply(30, z, 0, 0)));
+  const noBerm = CompileTrenchNetwork({ seed: "d", noBerm: [{ x: 30, z: 3, r: 4 }], segments: [Seg({ bermSide: "both" })] }, { natural: flat });
+  const pit = CompileTrenchNetwork({ seed: "d", noBermBelowM: 0.4, segments: [Seg({ bermSide: "both" })] }, { natural: flat });
+  assert.ok(bermPeak > 0.1 && Math.max(...[3, 3.3, 3.6, 3.9].map((z) => noBerm.Apply(30, z, 0, 0))) === 0, "noBerm zone keeps the spoil off");
+  assert.ok(pit.Apply(30, 3.6, -1.2, 0) === -1.2 && pit.Apply(30, 3.6, 0, 0) > 0.05, "no spoil into a pit deeper than noBermBelowM");
+  console.log("ok 每段细节（缺省 / 套餐 / 段上）、depthAlong、datumAlong、塌方、不堆土区");
+}
+
 console.log("TrenchPlanTest: 全部通过");

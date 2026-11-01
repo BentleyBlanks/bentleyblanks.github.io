@@ -70,7 +70,7 @@ const FIELD_DIP_RAMP_M = 25;
 // （2026-10-20：原来 z −206 那道 90 m 宽、高 2.2 m 的土坎与东轻机枪的弹坑去掉，换成坑北前景 PitNorthHeight，见本文件「坑北前景」一节）
 
 /** 干沟「挖进去多少」（0…1）：沟底里 1，两岸 wallM 内陡起、东西两头 endWallM 内缓起（形状在 Space 的 GullyU）。 */
-function GullyWeight(x, z) {
+export function GullyWeight(x, z) {
   const u = GullyU(x, z);
   return u <= 0 ? 1 : u >= 1 ? 0 : 1 - Smooth(u);
 }
@@ -442,7 +442,7 @@ export function TrafficDepthAt(z) {
   return Math.max(0, NaturalHeight(P.crest.x, z) - floorY);
 }
 /** Apply 的开挖基准面抬高量（负 = 挖深）：只在交通沟板桥往南那一截（别的沟够不着这里）。 */
-function TrafficBaseLift(x, z) {
+export function TrafficBaseLift(x, z) {
   if (z <= CROSSING_DEEP_FROM_Z || Math.abs(x - P.crest.x) > 12) return 0;
   return S.traffic.depth - TrafficDepthAt(z);
 }
@@ -575,8 +575,11 @@ function SixthRoundCarves(h, x, z, natural) {
 // ---------------------------------------------------------------------------
 // 地面合成
 
-/** 建好的地面函数（含壕沟 / 坑 / 洞）与几个平底高度。 */
-export function L0105Ground() {
+/**
+ * 建好的地面函数（含壕沟 / 坑 / 洞）与几个平底高度。
+ * trenches = false：不挖沟（2026-11-01 起场景高度图存的是这一份，沟由场景 trenches 一节现挖，Script_SceneTrenchMigrate）。
+ */
+export function L0105Ground({ trenches = true } = {}) {
   const plan = CompileTrenchNetwork(L0105TrenchSpec(), { natural: NaturalHeight });
   const pitFloorY = NaturalHeight(PIT.x, PIT.z) - PIT.floorDepth;
   const fireCFloorY = NaturalHeight(FIREC.x, FIREC.z) - FIREC.depth;
@@ -584,7 +587,7 @@ export function L0105Ground() {
   const Ground = (x, z) => {
     const natural = NaturalHeight(x, z);
     let h = natural + RoadDelta(x, z) + SouthMound(x, z);
-    h = plan.Apply(x, z, h, natural + TrafficBaseLift(x, z));
+    if (trenches) h = plan.Apply(x, z, h, natural + TrafficBaseLift(x, z));
     // 2026-10-24：沟壁上的龛（弹药 / 手榴弹 / 让担架）、排长掩蔽部、预备队浅坑、旧阵地的坑与塌方
     h = CarveNiches(h, x, z);
     h = SixthRoundCarves(h, x, z, natural);

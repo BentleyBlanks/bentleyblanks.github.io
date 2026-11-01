@@ -40,6 +40,7 @@
 
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import { Mulberry32, HashString, ValueNoise2 } from "./Script_Noise.mjs";
+import { ResolveTrenchDetails } from "./Data_TrenchDetails.mjs";
 
 /** 与 Data_FirstLevelMissionTerrain 里那个 Smooth 逐位相同 —— legacy 等价靠它。 */
 const Smooth = (value) => {
@@ -251,9 +252,22 @@ const GridKey = (ix, iz) => (ix + GRID_BIAS) * 32768 + (iz + GRID_BIAS);
 /**
  * 把网络规格编译成可采样的 plan。
  *
- * @param spec  { version, seed, segments:[{ id, preset, role, points, source,
+ * @param spec  { version, seed, look?, propKinds?, noBerm?, segments:[{ id, preset, role, points, source,
  *                routeBound, depth?, floorW?, bankW?, bermH?, bermW?, bermSide?,
- *                widthScale?, seed?, cornerRadiusM?, jitterScale? }] }
+ *                widthScale?, seed?, cornerRadiusM?, jitterScale?,
+ *                depthAlong?, datumAlong?, collapses?, look?, details? }] }
+ *              depthAlong  [[s, depth], …]：沿沟弧长 s（米，从第一个控制点起）的深度，线性插值、两头夹住；写了就不用 depth
+ *                          （坡道、桥下加深、端头接邻沟变浅都用它）
+ *              datumAlong  [[s, offset], …]：这一段的开挖基准面沿弧长抬高（+）/ 压低（−）多少米——整个断面连沟沿一起挪，
+ *                          沟沿外的地面不动（坡道顺着坎切下去、桥下整体压低）。与 depthAlong 的区别：depthAlong 只改沟底，
+ *                          沟沿仍落在原地面上
+ *              collapses   [{ s, halfLenM?, featherM?, depthM? }]：塌方——弧长 s 前后 halfLenM 内沟底回填到只剩 depthM 深，
+ *                          再过 featherM 渐回原深（缺省 1.4 / 1.2 / 0.3）
+ *              noBerm      [{ x, z, r } | { minX, maxX, minZ, maxZ } | { line: [[x,z(,halfW)],…], halfW }]：这些范围里不堆弃土
+ *                          （板桥两头的路面、干沟沟底；line 的点可以自带第三个数 = 那一点的半宽）
+ *              noBermBelowM  弃土不往坑里堆：地面比基准面低这么多以上的地方（坑、掩蔽部、龛）不加弃土，再往上 0.3 m 渐回
+ *                          （缺省不管；现行第一关不写）
+ *              look / details  每段的细节开关与参数（Data_TrenchDetails，网络级 look 给所有段）
  * @param opts  natural      (x,z)=>自然地面高；只做 Apply 的第四参缺省值与预览用
  *              jitterScale  全局随机总闸（0 = 全部退化为常量宽/深）
  *              legacy       true = jitterScale 0 + cornerRadiusM 0 + bermH 0，
@@ -311,6 +325,10 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
   const cEdgeInv = new Float64Array(n);
   const cRough = new Float64Array(n);
   const cRoughInv = new Float64Array(n);
+  const cProfile = new Array(n).fill(null);
+  const cCollapse = new Array(n).fill(null);
+  const cDatum = new Array(n).fill(null);
+  const segDetails = new Array(n);
 
   for (let i = 0; i < n; i += 1) {
     const raw = specSegments[i];
@@ -326,6 +344,16 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     const bermW = (seg.bermW ?? preset.bermW) * (profile?.bermWidthScale ?? 1);
     const bermSide = seg.bermSide ?? preset.bermSide;
     const cornerRadiusM = legacy ? 0 : (seg.cornerRadiusM ?? preset.cornerRadiusM);
+    if (Array.isArray(seg.depthAlong) && seg.depthAlong.length) {
+      cProfile[i] = seg.depthAlong.map(([s, d]) => [s, d]).sort((a, b) => a[0] - b[0]);
+    }
+    if (Array.isArray(seg.datumAlong) && seg.datumAlong.length) {
+      cDatum[i] = seg.datumAlong.map(([s, d]) => [s, d]).sort((a, b) => a[0] - b[0]);
+    }
+    if (Array.isArray(seg.collapses) && seg.collapses.length) {
+      cCollapse[i] = seg.collapses.map((c) => ({ s: c.s, half: c.halfLenM ?? 1.4, feather: c.featherM ?? 1.2, depth: c.depthM ?? 0.3 }));
+    }
+    segDetails[i] = ResolveTrenchDetails(preset, { networkLook: spec.look ?? null, segment: seg, propKinds: spec.propKinds ?? null });
 
     cFloorHalf[i] = floorW / 2;
     cFloorJ[i] = preset.floorJitter * js;
@@ -364,6 +392,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       source: seg.source || "",
       control,
       nominal: Object.freeze({ depth, floorW, bankW, bermH, bermW, bermSide }),
+      depthAlong: cProfile[i], datumAlong: cDatum[i], collapses: cCollapse[i], look: seg.look ?? spec.look ?? null, details: segDetails[i],
       corners: rounded.corners,
       path,
       dense: path.points,
@@ -393,11 +422,64 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     const c = cCellInv[i];
     return cBank[i] * (1 + cBankJ[i] * (ValueNoise2(x * c, z * c, seedBank) * 2 - 1));
   };
-  const DepthAt = (i, x, z) => {
-    if (!cJitter[i]) return cDepth[i];
+  // 沿沟深度（depthAlong）：s 是该点在段上的弧长；没给 s 的（段级出口）现量一次
+  const ProfileAt = (profile, s) => {
+    if (s <= profile[0][0]) return profile[0][1];
+    for (let k = 1; k < profile.length; k += 1) {
+      if (s <= profile[k][0]) {
+        const a = profile[k - 1], b = profile[k];
+        return a[1] + (b[1] - a[1]) * ((s - a[0]) / ((b[0] - a[0]) || 1));
+      }
+    }
+    return profile[profile.length - 1][1];
+  };
+  const DepthAt = (i, x, z, s) => {
+    let base = cDepth[i];
+    if (cProfile[i]) base = ProfileAt(cProfile[i], s ?? NearestOnSegment(i, x, z).s);
+    if (!cJitter[i]) return base;
     const c = cCellInv[i], r = cRutInv[i];
-    return cDepth[i] * (1 + cDepthJ[i] * (ValueNoise2(x * c, z * c, seedDepth) * 2 - 1))
+    return base * (1 + cDepthJ[i] * (ValueNoise2(x * c, z * c, seedDepth) * 2 - 1))
       + cRut[i] * (ValueNoise2(x * r, z * r, seedRut) * 2 - 1);
+  };
+  /** 塌方回填：dep 是已经按坡面削过的开挖深度。 */
+  const Collapsed = (i, s, dep) => {
+    const list = cCollapse[i];
+    for (let k = 0; k < list.length; k += 1) {
+      const c = list[k];
+      const w = 1 - Smooth((Math.abs(s - c.s) - c.half) / c.feather);
+      if (w > 0 && dep > c.depth) dep += (c.depth - dep) * w;
+    }
+    return dep;
+  };
+  // 不堆土区（noBerm）：命中返回 1，没命中 0
+  const noBerm = (spec.noBerm || []).map((zone) => {
+    if (Array.isArray(zone.line)) {
+      const pts = zone.line.map((p) => (Array.isArray(p) ? p : [p.x, p.z, p.halfW]));
+      const half = zone.halfW || 1;
+      const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+      const reach = Math.max(half, ...pts.map((p) => p[2] ?? 0));
+      return { kind: 2, pts, half, minX: Math.min(...xs) - reach, maxX: Math.max(...xs) + reach,
+        minZ: Math.min(...zs) - reach, maxZ: Math.max(...zs) + reach };
+    }
+    if (Number.isFinite(zone.r)) return { kind: 1, x: zone.x, z: zone.z, r: zone.r, minX: zone.x - zone.r, maxX: zone.x + zone.r, minZ: zone.z - zone.r, maxZ: zone.z + zone.r };
+    return { kind: 0, minX: zone.minX, maxX: zone.maxX, minZ: zone.minZ, maxZ: zone.maxZ };
+  });
+  const noBermBelow = Number.isFinite(spec.noBermBelowM) ? spec.noBermBelowM : null;
+  const NoBermAt = (x, z) => {
+    for (let k = 0; k < noBerm.length; k += 1) {
+      const zn = noBerm[k];
+      if (x < zn.minX || x > zn.maxX || z < zn.minZ || z > zn.maxZ) continue;
+      if (zn.kind === 0) return 1;
+      if (zn.kind === 1) { if (Math.hypot(x - zn.x, z - zn.z) <= zn.r) return 1; continue; }
+      const p = zn.pts;
+      for (let j = 0; j < p.length - 1; j += 1) {
+        const dx = p[j + 1][0] - p[j][0], dz = p[j + 1][1] - p[j][1];
+        const t = Math.max(0, Math.min(1, ((x - p[j][0]) * dx + (z - p[j][1]) * dz) / ((dx * dx + dz * dz) || 1)));
+        const half = (p[j][2] ?? zn.half) + ((p[j + 1][2] ?? zn.half) - (p[j][2] ?? zn.half)) * t;
+        if (Math.hypot(x - p[j][0] - dx * t, z - p[j][1] - dz * t) <= half) return 1;
+      }
+    }
+    return 0;
   };
   const BermHAt = (i, x, z) => {
     if (!cJitter[i]) return cBermH[i];
@@ -498,7 +580,9 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       const bank = BankAt(si, x, z);
       const cut = 1 - BankRise(si, (d - half) / bank);
       if (cut <= 0) continue;
-      const dep = DepthAt(si, x, z) * cut;
+      const e = bestEdge[si], s = es0[e] + elen[e] * bestT[si];
+      let dep = DepthAt(si, x, z, s) * cut;
+      if (cCollapse[si]) dep = Collapsed(si, s, dep);
       if (dep > deepest) deepest = dep;
     }
     return deepest;
@@ -514,6 +598,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     const base = naturalY === undefined
       ? (natural ? natural(x, z) : height) : naturalY;
     let deepest = 0;
+    let lowest = Infinity;   // 各段自己的开挖面（基准面 + 本段 datumAlong − 开挖深度）取最低
     let outside = true;
     let berm = 0;
     let cutClearance = Infinity;
@@ -528,13 +613,17 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       if (d <= halfTop) {
         outside = false;
         const t = (d - half) / bank;
-        let dep = DepthAt(si, x, z) * (1 - BankRise(si, t));
+        const e = bestEdge[si], s = es0[e] + elen[e] * bestT[si];
+        let dep = DepthAt(si, x, z, s) * (1 - BankRise(si, t));
         // 坡面粗糙度：Bump(t) 在沟底（t≤0）与沟沿（t≥1）归零，只揉坡面那一段
         if (t > 0 && cRough[si] > 0) {
           const r = cRoughInv[si];
           dep -= cRough[si] * (ValueNoise2(x * r, z * r, seedRough) * 2 - 1) * Bump(t);
         }
+        if (cCollapse[si]) dep = Collapsed(si, s, dep);
         if (dep > deepest) deepest = dep;
+        const cutI = (cDatum[si] ? base + ProfileAt(cDatum[si], s) : base) - dep;
+        if (cutI < lowest) lowest = cutI;
       } else if (cBermSide[si] !== SIDE_NONE) {
         const u = (d - halfTop) / BermWAt(si, x, z);
         if (u < 1) {
@@ -551,11 +640,11 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       }
     }
     let out = height;
-    if (deepest > 0) {
-      const cut = base - deepest;
-      if (cut < out) out = cut;
-    }
+    // 没有 datumAlong 时 lowest 就是 base − deepest（逐位相同：减法单调，最小的那个就是它）
+    if (deepest > 0 && lowest < out) out = lowest;
     // 抛土只在「不落在任何一段的开挖坡内」时才加 —— 否则土堆进邻沟的沟底。
+    if (outside && berm > 0 && noBerm.length) berm *= 1 - NoBermAt(x, z);
+    if (outside && berm > 0 && noBermBelow !== null) berm *= 1 - Smooth((base - height - noBermBelow) / 0.3);
     if (outside && berm > 0) out += berm * (profile ? Smooth(cutClearance / profile.junctionFeatherM) : 1);
     return out;
   }
@@ -636,13 +725,16 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       const nx = -p.tz, nz = p.tx;
       const halfFloor = HalfFloorAt(seg.index, p.x, p.z);
       const bank = BankAt(seg.index, p.x, p.z);
-      const depth = DepthAt(seg.index, p.x, p.z);
+      let depth = DepthAt(seg.index, p.x, p.z, s);
+      if (cCollapse[seg.index]) depth = Collapsed(seg.index, s, depth);
+      // 站点的 depth 是「比原地面低多少」：基准面压低了就更深、抬高了就更浅
+      if (cDatum[seg.index]) depth = Math.max(0, depth - ProfileAt(cDatum[seg.index], s));
       const halfTop = halfFloor + bank;
       const code = cBermSide[seg.index];
       const crest = halfTop + BermWAt(seg.index, p.x, p.z) * (profile?.bermPeak ?? .5);
-      const bermPlus = SideAllowed(code, 1)
+      const bermPlus = SideAllowed(code, 1) && !(noBerm.length && NoBermAt(p.x + nx * crest, p.z + nz * crest))
         ? BermHAt(seg.index, p.x + nx * crest, p.z + nz * crest) : 0;
-      const bermMinus = SideAllowed(code, -1)
+      const bermMinus = SideAllowed(code, -1) && !(noBerm.length && NoBermAt(p.x - nx * crest, p.z - nz * crest))
         ? BermHAt(seg.index, p.x - nx * crest, p.z - nz * crest) : 0;
       seg.stations.push({
         s, x: p.x, z: p.z, tx: p.tx, tz: p.tz, nx, nz,
@@ -739,10 +831,14 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       bounds: seg.bounds,
       cornerRadiusM: seg.cornerRadiusM, jitterScale: seg.jitterScale, frameLength: seg.frameLength,
       params: seg.preset_,
+      depthAlong: seg.depthAlong, datumAlong: seg.datumAlong, collapses: seg.collapses, look: seg.look, details: seg.details,
       // 逐点场的段级出口（回归与编辑器按段取样用；Corridor 在三岔口会跳到邻段）
       HalfFloorAt: (x, z) => HalfFloorAt(seg.index, x, z),
       BankAt: (x, z) => BankAt(seg.index, x, z),
       DepthAt: (x, z) => DepthAt(seg.index, x, z),
+      /** 弧长 s 处的标称深度（含 depthAlong 与塌方，不含噪声）——编辑器画剖面用。 */
+      DepthAtS: (s) => { const d = cProfile[seg.index] ? ProfileAt(cProfile[seg.index], s) : cDepth[seg.index];
+        return cCollapse[seg.index] ? Collapsed(seg.index, s, d) : d; },
       BermHAt: (x, z) => BermHAt(seg.index, x, z),
     });
   });
@@ -803,7 +899,8 @@ function RouteCrosses(routes, rect, margin) {
 }
 
 /**
- * 沿编译好的中心线布设护壁 / 踏板 / 射击位 / 杂物。
+ * 沿编译好的中心线布设护壁 / 踏板 / 射击位 / 杂物。每一样开不开、数值多少看段上解析好的 details
+ *（Data_TrenchDetails：缺省木护壁、踏板关，射击位、杂物开；timber = true 把所有段的木护壁、踏板强行打开）。
  *
  * 随机全部确定性（Mulberry32(HashString(seed + segId + ":" + 通道))），同种子
  * 两次结果逐位相同 —— 布设进的是烘焙结果，每次重建都换一套就没法做视觉比对。
@@ -855,7 +952,7 @@ export function PlanTrenchDressing(plan, {
   };
 
   for (const seg of plan.segments) {
-    const p = seg.params;
+    const p = seg.details || seg.params;
     const stations = seg.stations;
     const length = seg.path.length;
     // frame = the arc length the stations were laid out for (= length unless the segment pins frameLengthM).
@@ -893,7 +990,7 @@ export function PlanTrenchDressing(plan, {
           rev.postHMin + rnd() * (rev.postHMax - rev.postHMin));
         const slats = rev.slatsMin
           + Math.floor(rnd() * (rev.slatsMax - rev.slatsMin + 1));
-        if (rnd() < rev.skipChance || !timber) continue;
+        if (rnd() < rev.skipChance || !(timber || rev.on)) continue;
         const off = st.halfFloor + rev.insetM;
         const x = st.x + st.nx * side * off;
         const z = st.z + st.nz * side * off;
@@ -918,7 +1015,7 @@ export function PlanTrenchDressing(plan, {
 
       // --- 踏板：沟底中线偏一点，长边沿切向 ---
       const duck = p.duckboard;
-      if (board() < duck.chance && timber) {
+      if (board() < duck.chance && (timber || duck.on)) {
         const lateral = (board() < 0.5 ? -1 : 1) * 0.3;
         const x = st.x + st.nx * lateral;
         const z = st.z + st.nz * lateral;
@@ -937,7 +1034,7 @@ export function PlanTrenchDressing(plan, {
 
     // --- 射击位：沟沿一侧，面朝沟外，离三岔口和段端都得让开 ---
     const bays = p.bays;
-    if (bays.maxCount > 0 && length > 2 * BAY_CLEAR_M) {
+    if (bays.on !== false && bays.maxCount > 0 && length > 2 * BAY_CLEAR_M) {
       const bayRnd = Mulberry32(HashString(`${seed}:${seg.id}:bay`));
       const sideSign = bays.side === "plus" ? 1 : -1;
       let placed = 0;
@@ -969,7 +1066,7 @@ export function PlanTrenchDressing(plan, {
     // --- 杂物：沟底随机撒，只发登记过的资产名 ---
     const props = p.props;
     const total = Math.round(frame * props.perM);
-    if (total > 0 && props.kinds.length) {
+    if (props.on !== false && total > 0 && props.kinds.length) {
       const propRnd = Mulberry32(HashString(`${seed}:${seg.id}:props`));
       for (let i = 0; i < total; i += 1) {
         const ps = END_CLEAR_M + propRnd() * Math.max(0, frame - 2 * END_CLEAR_M);

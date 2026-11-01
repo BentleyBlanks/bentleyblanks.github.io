@@ -93,4 +93,33 @@ const t2 = BlockoutDocFromScene(tiny, heights, { level: "Tiny", region, futureSi
 Check(JSON.stringify(ids(t2.blocks)) === JSON.stringify(["Gone"]) && !(t2.gates || []).length, "futureSignals：hideOn 它的当常驻块，showOn 它的不要");
 Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSignals");
 
+// --- 5. 场景壕沟（docs/Data_Scene.md §9）---
+{
+  const { doc: wb, heights: carved, pre, plan } = ReadSceneSync("FirstLevelWhitebox");
+  const formal = ReadSceneSync("FirstLevel");
+  Check(plan && plan.segments.length === 28 && wb.trenches.segments.length === 28, `两个场景都带 28 段样条沟（01–05 二十六段 + 11–18 两段）`);
+  Check(JSON.stringify(formal.doc.trenches) .replace(/FirstLevel\.trench/g, "X") === JSON.stringify(wb.trenches).replace(/FirstLevelWhitebox\.trench/g, "X"), "白盒、正式两个场景的壕沟一样");
+  // 高度图是没挖的；现挖之后沟底在基准面下约一个沟深
+  const t = wb.terrain, at = (h, x, z) => h[Math.round((z - t.minZ) / t.cellM) * (t.cols + 1) + Math.round((x - t.minX) / t.cellM)];
+  const fm = plan.segments.find((s) => s.id === "FrontMid"), st = fm.stations[Math.floor(fm.stations.length / 2)];
+  const floor = at(carved, st.x, st.z), ground = at(pre, st.x, st.z);
+  Check(ground - floor > 1.6 && ground - floor < 2.3, `前沿中段沟底比没挖的地面低 1.6–2.3 m（实测 ${(ground - floor).toFixed(2)}）`);
+  Check(carved !== pre && at(carved, 200, 400) === at(pre, 200, 400), "离沟远的地方挖前挖后一样");
+  // 套餐：旧阵地是弃置旧沟、前沿 / 交通沟是裸土沟（不摆构件）、村北战壕是临时掘壕
+  const look = (id) => wb.trenches.segments.find((s) => s.id === id).look;
+  Check(look("OldSap") === "abandoned" && look("FrontMid") === "bare" && look("VillageNorthEast") === "scrape", "01–05 旧阵地 abandoned、前沿 bare、11–18 村北 scrape");
+  Check(plan.segments.find((s) => s.id === "OldSap").details.roots.chance === 0.9 && !plan.segments.find((s) => s.id === "FrontMid").details.bays.on, "套餐解析到每段的细节（旧沟草根概率 0.9、裸土沟不摆射击位）");
+  Check(wb.trenches.segments.find((s) => s.id === "Traffic").datumAlong?.length > 2 && wb.trenches.segments.find((s) => s.id === "OldSap").collapses?.length === 3,
+    "交通沟坡道写成 datumAlong、旧交通沟三处塌方写成 collapses");
+  // 校验认得出写错的细节
+  const bad = JSON.parse(JSON.stringify(wb));
+  bad.trenches.segments[0].details = { roots: { chance: 3 }, mystery: true };
+  bad.trenches.segments[1].look = "shiny";
+  const bv = ValidateScene(bad);
+  Check(!bv.ok && bv.errors.some((e) => /roots\.chance 超出/.test(e)) && bv.errors.some((e) => /mystery 不认识/.test(e)) && bv.errors.some((e) => /look 要是/.test(e)), `校验报出细节写错：${bv.errors.slice(0, 3).join("；")}`);
+  // 每一段只带自己范围里的沟
+  const segs = (k) => ReadBlockoutSceneDocSync(k).trenchPlan?.segments.map((s) => s.id) || [];
+  Check(segs("FirstLevel0105").length === 26 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 26 段、11–18 那一块只带村北两段");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);
