@@ -72,11 +72,11 @@ for (const record of catalog.models) {
   const names = new Set(glb.json.nodes.map(node => node.name.replace(/\s/g, '_')));
   for (const clip of data.clips) for (const track of clip.tracks) assert.ok(names.has(track.name.split('.')[0]), `${record.id} lacks ${track.name}`);
 }
-// The director: the vanguard walks in "alert" at a trot (the relaxed-gait run band picks IjaAlertTrot).
+// The director: a Japanese soldier comes in "alert" at a trot (the relaxed-gait run band picks IjaAlertTrot).
+// WalkIn went away in the 2026-10-11 restage (56eb7cefd); the same pattern now lives in the new beats.
 const director = fs.readFileSync(path.join(here, 'Script_OpeningStoryboards.mjs'), 'utf8');
-const walkIn = director.slice(director.indexOf('  WalkIn(age){'), director.indexOf('  InterpreterCall(){'));
-assert.ok(walkIn.includes('SetRelaxedGait(actor,"alert")') && walkIn.includes('C.speed.trot'), 'WalkIn: alert gait at a trot');
-assert.ok(walkIn.includes('"IjaReadyRifle"') && walkIn.includes('SetRelaxedGait(actor,"slung")'), 'WalkIn: slings the rifle on the mark');
+assert.ok(/SetRelaxedGait\((\w+),"alert"\);if\(this\.Follow\(\1,[^;]*C\.speed\.trot/.test(director), 'director: alert gait at a trot');
+assert.ok(director.includes('"IjaReadyRifle"') && /SetRelaxedGait\(\w+,"slung"\)/.test(director), 'director: ready rifle on the mark, slung when walking off');
 assert.ok(C.speed.trot > RELAXED_GAIT.runAboveMps, 'trot picks the trot cycle');
 const trot = data.profiles.IjaAlertTrot.referenceMps;
 assert.ok(C.speed.trot / trot > .8 && C.speed.run / trot < 1.35, `trot cycle ${trot} m/s plays near its pace`);

@@ -8,6 +8,8 @@
 
 ## 条目
 
+- **基线红清理、仓库体积闸门（2026-11-01）**：主检出补装 package.json 早已声明的 sharp / meshoptimizer / 贴图编码器，TextureImportTest、Type89MediumTankTest、ClothRangeBrowserTest 转绿；五个过时测试跟上有意的改动：RiggedModelTest（指甲单独粗糙度）、ClothRangeTest（10-31 白盒被子吸血后重登哈希）、SpeakerGestureTest（10-12 改稿里对新目标的连续手势放行）、IjaAlertGaitTest（10-11 重排后不再认 WalkIn 方法名）、BulletDecalPbrTest（命中特效多了 hardSparks）。新增 RepoSizeGateTest：跟踪文件 ≥95 MiB 红（GitHub 单文件上限 100 MiB），≥50 MiB 列出。仍红、待拍板：OpeningSetTest（开场三角面预算 6 万，汉阳造 173R 单支 5.99 万）、BootTest（远景辨识补丁没接到 GLB 士兵；CH0 爆炸点光包络；整体超时）。
+
 - **模块缓存戳改为发布时按内容生成（2026-11-01）**：仓库里 `index.html`、`TextureManager.html`、`Probe.html`、`Tool_MixamoAnimationPreview.html` 的 import map 与模块入口去掉手写 `?v=`（730 + 582 + 4 条），改模块不再碰 index.html；Pages 在 GPU 资源改写之后、打包之前跑 `Script_StampImportMaps` 按内容盖戳（本地模拟 staging：729 条本地条目全部盖上，入口换成打包产物、three 预加载带戳）。`ModuleGraphTest` 改为拦手写模块戳并验证盖戳工具；五个按 `?v=\d+` 认登记的测试改认 `"./X.mjs": "./X.mjs"`（`OpeningLensTest` 顺带转绿）。契约第 1 条已改。
 
 - **K06 煎饼筐 C 方案（2026-11-01，用户已验收）**：本地批准版 `9d52b0f6`，`PancakeBasket_Intact` / `PancakeBasket_Opened` 各 2990 三角、各六张 K07 A 薄折饼；木材版与 `34b0f088` 的全部几何属性、索引、层级、变换和盖面镂空逐项一致。柳条纵纹、露芯与粗糙度分层使用独立 PBR，修复 ORM 提前取整造成的二值化。重建源为 [Build_K06_PancakeBasket.py](../_blender/VillageInteriorProps/Build_K06_PancakeBasket.py)，盖框接触输入为 [Data_K06LidFrameInput.json](../_blender/VillageInteriorProps/Data_K06LidFrameInput.json)；GLB、28 图 packed 源工程、图片及验收证据留在 OneDrive 的 `Blender/Taierzhuang1938/VillageInteriorProps/K06_PancakeBasket`。外观为 C 参考的创作复原；本次交付离线重建源，尚未接入游戏，密集 2K / 512px 制作贴图保留体积与纹素密度警告。

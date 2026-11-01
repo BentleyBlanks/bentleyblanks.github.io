@@ -37,7 +37,9 @@ const Hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 // hashes normalize line endings so a Windows and Linux checkout have the same gate.
 const legacy = [
   ['Script_BlanketCloth.mjs', '2a74f46936be2eeca96c82ab87641401ebdd15b5feb1e85a67ea44140c4dfa95'],
-  ['Script_EditorBlockoutBlanket.mjs', 'd574e8efa3ef36e8bb3d3f881419375a2af0eeabf5b8ccedf8ffb1034b55c3c3'],
+  // Re-pinned 2026-11-01 after the intended b1ec40e3a (2026-10-31: the whitebox blanket soaks cloth blood under the
+  // wounded man). The gate still catches the cloth lab touching campaign cloth; a deliberate blanket change re-pins here.
+  ['Script_EditorBlockoutBlanket.mjs', '3b4fb47470931ffc8c48af4e6b2b611b670aca36defc15b1775ef6cc77cfccf8'],
   ['Model/Model_SingleBlanket.glb', '2b83eb41892c71c1a950141f2f2cd156ad60ee17f07149dc1342238e6e37873e'],
 ];
 for (const [file, expected] of legacy) {

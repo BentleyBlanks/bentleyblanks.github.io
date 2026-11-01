@@ -46,7 +46,7 @@ let lines = 0, gestures = 0;
 for (const id of FRONT_SCENE_IDS) {
   const cue = cues.get(id);
   assert.ok(cue, `front scene ${id} in MISSION_DIALOGUE`);
-  const lastGestured = {};
+  const lastGestured = {}, lastTarget = {};
   cue.lines.forEach((line, i) => {
     if (line.who === "shunzi" || line.who === "bearer") return;       // the player; a figure without a skeleton
     const key = `${id}.${String(i + 1).padStart(2, "0")}`;
@@ -63,8 +63,10 @@ for (const id of FRONT_SCENE_IDS) {
       // anybody who may hold a rifle gestures with the free (left) hand; only the seated, unarmed 06 Zhou uses the right
       assert.equal(clip.hand, row.pose === "seat" ? "R" : "L", `${key}: ${row.gesture} hand for pose ${row.pose}`);
       if (clip.aim) assert.ok(row.target, `${key}: aimed clip needs a target`);
-      // nobody gestures on two of his own lines in a row, except the seated cigarette talk
-      if (row.pose !== "seat") assert.ok(!lastGestured[line.who], `${key}: ${line.who} gestured on his previous line too`);
+      // nobody gestures on two of his own lines in a row, except the seated cigarette talk and pointing at /
+      // addressing a different target (2026-10-12: Luo points at the guards then the gap; at the branch then beckons Shunzi)
+      const newPoint = !!row.target && row.target !== lastTarget[line.who];
+      if (row.pose !== "seat" && !newPoint) assert.ok(!lastGestured[line.who], `${key}: ${line.who} gestured on his previous line too`);
     } else assert.equal(SpeakerGestureForLine(key), null);
     if (row.target) {
       const spec = SPEAKER_GESTURE_TARGETS[row.target];
@@ -76,6 +78,7 @@ for (const id of FRONT_SCENE_IDS) {
       } else assert.ok(["listener", "tank", "south"].includes(spec), `${key}: target ${spec}`);
     }
     lastGestured[line.who] = !!row.gesture;
+    lastTarget[line.who] = row.gesture ? row.target ?? null : null;
   });
 }
 for (const key of Object.keys(FIRST_LEVEL_SPEAKER_GESTURES)) assert.ok(expected.has(key), `row ${key} is not a 03-06 body line`);

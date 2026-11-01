@@ -23,7 +23,7 @@ for (const name of [
 const mainSource = fs.readFileSync(path.join(project, "Script_Main.mjs"), "utf8");
 const aiSource = fs.readFileSync(path.join(project, "Script_Ai.mjs"), "utf8");
 const aircraftSource = fs.readFileSync(path.join(project, "Script_Aircraft.mjs"), "utf8");
-assert.match(mainSource, /Impact\(_hitPoint, n, surface, \{ weaponKind: weapon\.kind \}\)/);
+assert.match(mainSource, /Impact\(_hitPoint, n, surface, \{ weaponKind: weapon\.kind[,}]/);
 assert.match(mainSource, /weaponKind: mountedWeapon\.kind/);
 assert.match(mainSource, /weaponKind:weapon\.kind/);
 assert.match(aiSource, /Impact\(p, normal, surface, \{ weaponKind: s\.weapon\.kind \}\)/);

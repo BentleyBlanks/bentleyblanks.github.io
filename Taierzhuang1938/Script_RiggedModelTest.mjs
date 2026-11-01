@@ -110,7 +110,8 @@ assert.equal(rigNode.extras?.fpsArmOnlyWeights, true,
 const riggedRuntime = fs.readFileSync(path.join(root, "Script_RiggedModel.mjs"), "utf8");
 assert.doesNotMatch(riggedRuntime, /userData\.skipNormalDepth\s*=\s*true/,
   "FPS arms are not removed wholesale from NormalDepth");
-assert.match(riggedRuntime, /ConfigureExternalPbr\?\.\(object\.material,[\s\S]*?metalness:\s*0[\s\S]*?minRoughness:\s*0\.78/,
+// Since be3b6a59c (2026-10-18) the scanned nails keep their own floor (nailSurface ? 0 : 0.78); skin stays 0.78.
+assert.match(riggedRuntime, /ConfigureExternalPbr\?\.\(object\.material,[\s\S]*?metalness:\s*0[\s\S]*?minRoughness:\s*(?:nailSurface \? 0 : )?0\.78/,
   "FPS arm materials enter the shared PBR/debug chain as non-metals");
 const viewmodelRuntime = fs.readFileSync(path.join(root, "Script_Viewmodel.mjs"), "utf8");
 assert.match(viewmodelRuntime, /new FpsArmRig\(riggedAssets\.fpsArms,\s*library\)/,
