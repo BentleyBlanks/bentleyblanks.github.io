@@ -65,6 +65,8 @@ const Field = () => B(() => {
     water: !!bf.waterMesh, waterName: bf.waterMesh?.name || null, waterBlocks: layout.blocks.filter((b) => b.blockoutWater).length,
     colliders: bf.colliders?.length ?? bf.solids?.length ?? null, blocks: layout.blocks.length, gridded, othersGridded,
     staticMeshes: bf.meshes.filter((m) => m.name === "FirstLevelWhitebox_StaticWhiteBoxes").length,
+    // 场景壕沟（docs/Data_Scene.md §9）：编好的网络、土面细节（正式场景才画）
+    trenchSegments: layout.trenchPlan?.segments.length ?? 0, trenchEarth: bf.stats?.trenchEarth || null, trenchSurface: bf.stats?.trenchSurface || null,
   };
 });
 
@@ -78,6 +80,7 @@ try {
   const wb = await Field();
   Check("进关建的是白盒场景：variant edit、样子 whitebox、不走 PBR 外观", wb.scene.variant === "edit" && wb.style === "whitebox" && !wb.materialLooks
     && /FirstLevelWhitebox/.test(wb.scene.url), J({ scene: wb.scene, style: wb.style }));
+  Check("白盒场景：带着这一段的壕沟网络（01–05 的 26 段），但不画土面细节", wb.trenchSegments === 26 && !wb.trenchEarth, J({ segments: wb.trenchSegments, earth: wb.trenchEarth }));
   await page.screenshot({ path: path.join(shotDir, "0105_Whitebox.png") });
 
   // 2) 换成正式场景
@@ -96,7 +99,17 @@ try {
     J({ sceneProps: fm.sceneProps, props: fm.props, missing: fm.propMissing }));
   Check("正式场景：道具、碎砖瓦、地表的材质没被刷成白盒", fm.othersGridded.length === 0, J(fm.othersGridded.slice(0, 5)));
   Check("正式与白盒的体块数一样（试玩的编排坐标都在同一套布局上）", fm.blocks === wb.blocks, J({ whitebox: wb.blocks, formal: fm.blocks }));
+  const earth = fm.trenchEarth || {}, surface = fm.trenchSurface || {};
+  Check("正式场景：沟里按样条网络画了土崖、土团、草根、沟沿干草（土面细节）", fm.trenchSegments === 26 && earth.cliffPanels > 100 && earth.clods > 100 && earth.roots > 10 && surface.grass > 10,
+    J({ cliffPanels: earth.cliffPanels, clods: earth.clods, roots: earth.roots, spoilClods: earth.spoilClods, grass: surface.grass, stones: surface.stones }));
   await page.screenshot({ path: path.join(shotDir, "0105_Formal.png") });
+  // 站到沟底平视：前沿（裸土沟）与北边旧交通沟（弃置旧沟）
+  for (const [name, pose] of [["0105_FormalTrench", { x: -9, y: -0.2, z: -0.2, yawDeg: -90, pitchDeg: -4 }], ["0105_FormalOldSap", { x: 0, y: -3.1, z: -306, yawDeg: 5, pitchDeg: -5 }]]) {
+    await B((p) => window.Tengxian.Debug.Blockout.Fly(true, p), pose);
+    await Step(4);
+    await page.screenshot({ path: path.join(shotDir, `${name}.png`) });
+    await B(() => window.Tengxian.Debug.Blockout.Fly(false));
+  }
   // 高处俯看一眼（飞行观察）
   await B(() => window.Tengxian.Debug.Blockout.Fly(true, { x: 58, y: 26, z: 40, yawDeg: -150, pitchDeg: -35 }));
   await Step(4);
@@ -135,6 +148,7 @@ try {
     await B(() => window.Tengxian.Debug.Blockout.Play.UseScene("play"));
     await Step(6);
     const v = await Field();
+    Check(`${level}：只带这一段的壕沟（${v.trenchSegments} 段）`, level === "FirstLevel1218" ? v.trenchSegments === 2 : v.trenchSegments <= 2, J({ segments: v.trenchSegments, earth: v.trenchEarth && { cliffPanels: v.trenchEarth.cliffPanels } }));
     Check(`${level} 正式场景建起来：体块白盒网格 ${v.gridded} 种材质、道具 ${v.props} 件、分层地表、水块 ${v.waterBlocks} 块同白盒编辑器铺水面`, v.style === "formal" && v.looks === 0 && v.gridded >= 5
       && v.othersGridded.length === 0 && v.propMissing === 0 && v.terrainLayers && v.waterBlocks > 0 && v.waterName === "BlockoutWater",
       J({ gridded: v.gridded, othersGridded: v.othersGridded.slice(0, 3), props: v.props, sceneProps: v.sceneProps, missing: v.propMissing, terrainLayers: v.terrainLayers, water: v.waterName, waterBlocks: v.waterBlocks }));
@@ -168,6 +182,27 @@ try {
   });
   Check("场景编辑器里正式场景的地面是分层地表（同试玩），不是白盒的高度色带", terrainOk && look.terrainLook === "layers", J({ terrainOk, look: look.terrainLook }));
   Check("层级是一层层文件夹（段落 / 类别 / 院子），检视按组件分节", look.depths >= 4 && ["位置", "外观", "碰撞", "剧情事件"].every((c) => look.comps.includes(c)), J(look));
+  // 壕沟：层级里有、选中能拖点重挖、细节开关会改构件、撤销回去
+  const tr = await editor.evaluate(async () => {
+    const A = window.SceneEditor;
+    A.Open(["01–05", "01–05/壕沟", "01–05/壕沟/交通沟"]);
+    const inTree = A.Tree().some((r) => r.text === "Traffic");
+    A.SelectTrench("Traffic", 3);
+    const comps = [...document.querySelectorAll("#seInspector .seCompTitle")].map((n) => n.textContent);
+    const [x, z] = A.Trench("Traffic").points[3];
+    const h0 = A.HeightAt(x + 8, z).carved, at0 = A.HeightAt(x, z).carved;
+    A.MoveTrenchPoint("Traffic", 3, x + 8, z);
+    const h1 = A.HeightAt(x + 8, z).carved, at1 = A.HeightAt(x, z).carved;
+    const d0 = A.State().trenchDressing;
+    A.SetTrenchField("Traffic", "look", "fresh");
+    const d1 = A.State().trenchDressing;
+    A.Undo(); A.Undo();
+    return { inTree, comps, h0, h1, at0, at1, back: A.HeightAt(x + 8, z).carved, d0, d1, dirty: A.State().dirty, undo: A.State().undo };
+  });
+  Check("场景编辑器：壕沟在层级里、检视有走向 / 断面 / 表现套餐 / 各项细节", tr.inTree && ["走向", "断面", "表现套餐"].every((c) => tr.comps.includes(c)) && tr.comps.some((c) => c.startsWith("草根")), J({ inTree: tr.inTree, comps: tr.comps.slice(0, 8) }));
+  Check("场景编辑器：拖控制点按样条重挖（新位置挖下去、旧位置填回）、撤销回原样", tr.h1 < tr.h0 - 1.2 && tr.at1 > tr.at0 + 1.2 && Math.abs(tr.back - tr.h0) < 0.01 && !tr.dirty,
+    J({ h0: tr.h0, h1: tr.h1, at0: tr.at0, at1: tr.at1, back: tr.back, dirty: tr.dirty }));
+  Check("场景编辑器：套餐换成「新挖完好」，护壁、踏板摆出来", tr.d1 > tr.d0 + 10, J({ before: tr.d0, fresh: tr.d1 }));
   Check("场景编辑器下拉里有两个场景：第一关 · 白盒、第一关 · 正式", se.options.length === 2 && se.options.some(([v]) => v === "FirstLevelWhitebox") && se.options.some(([v]) => v === "FirstLevel"), J(se.options));
   Check("正式场景的资产页列白盒体块、道具与树", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
   await editor.screenshot({ path: path.join(shotDir, "SceneEditor_Formal.png") });

@@ -128,6 +128,9 @@ try {
   Check("02-4：三个追兵是真 AI、在打（不是 idle）", s1.length === 3 && s1.every(s => s.alive) && p1.run?.step === "02-4" && p1.run?.phase === "engage" && s1.some(s => s.state !== "idle"), J(s1.map(s => [s.id, s.state])));
   Check("追兵站在沟底：离地 < 0.4 m 且比沟沿（y≈0）低 1.5 m 以上（没被放兵挤到沟沿上）", s1.every(s => s.y - s.ground < 0.4 && s.y < -1.5), J(s1.map(s => [s.id, +s.y.toFixed(2), +s.ground.toFixed(2)])));
   Check("变成 AI 的人不再摆演员", !puppets1.some(id => /^Pursuer/.test(id)), puppets1.join(","));
+  // 2026-11-01：放出来的日军也换成 Mixamo X Bot（docs/Data_EditorBlockout.md §18）
+  const xs1 = (p1.soldiers || []).filter(s => s.alive);
+  Check("放出来的日军都挂上了 X Bot", xs1.length > 0 && xs1.every(s => s.xbot), J(xs1.map(s => [s.id, s.xbot])));
   const hud1 = await B(() => ({ shown: !document.querySelector(".boPlayHud").hidden, text: document.querySelector(".boPlayHud").innerText.replace(/\n/g, " | ") }));
   Check("顶部那条：第几步 / 站位名 / 目标 / 敌几个", hud1.shown && /1\/3/.test(hud1.text) && /箱垛/.test(hud1.text) && /敌 3 \/ 3/.test(hud1.text), hud1.text);
   await page.screenshot({ path: path.join(shotDir, "Play_Fight.png") });

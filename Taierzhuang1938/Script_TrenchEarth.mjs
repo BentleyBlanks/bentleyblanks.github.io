@@ -4,9 +4,19 @@ import * as THREE from "three";
 import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
 import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 import { CreateTrenchDressingHeightSampler } from "./Script_TrenchSurface.mjs";
+import { TrenchEarthStyle } from "./Data_TrenchDetails.mjs";
 
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], cliffs = [], style: Style = DefaultStyle } = {}) {
   const stats = { clods: 0, toeCrumbs: 0, spoilClods: 0, roots: 0, rootBranches: 0, cliffPanels: 0, triangles: 0 };
+  // 每段沟自己的细节（Data_TrenchDetails，2026-11-01）：土团 / 碎土 / 沟沿碎土 / 弃土土块 / 草根的数值按段换，
+  // 土崖、弃土表皮按段开关。Style 是参数绑定，闭包里读的都是它，进每一段时换成那一段的、出循环换回来。
+  const BaseStyle = Style;
+  const segmentStyles = new Map();
+  const StyleOf = (segment) => {
+    if (!segment.details) return BaseStyle;
+    if (!segmentStyles.has(segment.id)) segmentStyles.set(segment.id, TrenchEarthStyle(segment.details, BaseStyle) || BaseStyle);
+    return segmentStyles.get(segment.id);
+  };
   const skinGeometries=[];
   const crownRuns=new Map();
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
@@ -299,6 +309,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     Add(roots, geometry);
   };
   for (const segment of plan.segments) {
+    Style = StyleOf(segment);
+    const cliffOn = segment.details?.cliffs.on !== false, spoilSkinOn = segment.details?.spoilSkin.on !== false;
+    if (!cliffOn && !spoilSkinOn) continue;
     // The skin follows the bank itself, not whichever clods won their random draw: a patch
     // skipped between two neighbours used to leave a 20 cm step running down the whole wall.
     const skin = { [-1]: new Uint8Array(segment.stations.length), [1]: new Uint8Array(segment.stations.length) };
@@ -316,12 +329,13 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       for (const side of [-1, 1]) if (skin[side][i]) {
         const st = segment.stations[i];
         sink.SetSector(`TrenchEarth_${Math.floor(st.x / Style.sectorM)}_${Math.floor(st.z / Style.sectorM)}`);
-        if(cliffs.length)CliffPanel(st,segment.stations[i+Style.stationStride],side,SkinEnds(i,side),
+        if(cliffOn&&cliffs.length)CliffPanel(st,segment.stations[i+Style.stationStride],side,SkinEnds(i,side),
           HashString(segment.id+':'+i+':'+side),segment.id);
-        else Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
-        SpoilSkin(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
+        else if(cliffOn)Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
+        if(spoilSkinOn)SpoilSkin(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
       }
   }
+  Style = BaseStyle;
   // Neighbouring modules share the border positions but were deformed and
   // shaded separately. Join only those border normals before static batching;
   // pockets inside each module keep their own sculpted shading.
@@ -375,6 +389,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     return hit?hit.point.addScaledVector(hit.face.normal,.004):null;
   };
   for (const segment of plan.segments) {
+    Style = StyleOf(segment);
     const random = Mulberry32(HashString(`${plan.seed}:${segment.id}:Earth07`));
     for (let i = 0; i < segment.stations.length; i += Style.stationStride) {
       const st = segment.stations[i];
@@ -488,6 +503,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       }
     }
   }
+  Style = BaseStyle;
   shape.dispose();tinyShape.dispose();cliffMaterial?.dispose();
   return stats;
 }

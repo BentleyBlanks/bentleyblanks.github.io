@@ -83,6 +83,11 @@
 //   「不倒地了、人却还倒着」就把这个人重造一遍（_Revive，同关键帧之间「从倒地站起来就重造」），同一帧强推一步站起来；
 //   之后再写 state:"down" 就是新人从头倒（lie:"along" 照样用 LIE_DEATH_VARIANT 落定、重新量头的方向再摆）。
 //   站着背枪的人倒下后不再背枪（倒地后步态层不推了，背枪标志停在站着时的值，枪竖着戳在背上）：拿回手里，倒地动作摆在身边。
+//
+// 2026-11-01（人物换成 Mixamo X Bot，用户：预演和试玩里的各个角色都改成 Mixamo 的模型与通用动作）：
+//   · 每个有骨骼身体的人挂一个 X Bot（Script_EditorBlockoutXBot，按阵营上色）：原身体照造照动、只把蒙皮藏起来，
+//     X Bot 每帧照它此刻的状态播对照表（Data_BlockoutXBotClips）里的动作；顺着躺、坐车这类要精确贴位置的照原身体姿势当场换算。
+//     原身体骨头上挂的枪 / 道具挪到 X Bot 同一根骨上。BLOCKOUT_PUPPETS.xbot = false 退回原来的士兵模型。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -95,6 +100,7 @@ import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCart
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
 import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
+import { XBotSkins } from "./Script_EditorBlockoutXBot.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -156,6 +162,8 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   slungWeapons: ["HanYang", "Type38", "ZhongZheng"],
   /** 拿步枪、不戒备、蹲着不动、没在播片段的兵：播这段歇着的片段（单膝跪、枪竖在身前）。 */
   crouchRestClip: "PvCrouchRestRifle",
+  /** 人物换成 Mixamo X Bot（文件头 2026-11-01）；false = 原来的士兵模型。 */
+  xbot: true,
 });
 
 /** 预演片段换成同一套里不端枪的版本（2026-10-20）：右手提枪说话 → 背枪说话。 */
@@ -341,6 +349,9 @@ export class BlockoutPuppets {
     this.warning = null;
     this.actorCount = 0;
     this.missingClips = new Set();
+    // X Bot（文件头 2026-11-01）：资源异步读，读完之前照旧是士兵模型，读完那一帧给每个人挂上
+    this.xbot = BLOCKOUT_PUPPETS.xbot ? new XBotSkins() : null;
+    this.xbot?.Load();
   }
 
   get transitioning() { return !!this.plan; }
@@ -380,7 +391,7 @@ export class BlockoutPuppets {
       else if (bodyKind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
     } catch (error) { /* 同上 */ }
     return { actor, soldier, kind, bodyKind, slot, animDt: 0, castId: cast.castId || null, baseWeapon: actor.weaponId ?? weapon ?? null, lieLocal: null,
-      body: actor.characterRig ? "rig" : "procedural" };
+      body: actor.characterRig ? "rig" : "procedural", skin: null, faction: kind === "civilian" ? "civilian" : bodyKind === "ija" || bodyKind === "ijaOfficer" ? "ija" : "nra" };
   }
 
   /** 百姓占位身体的外观：按材质名藏掉帽徽 / 枪套 / 胸前带子（军帽与军装同一网格，摘不掉）。布色在 Create 时就换了。 */
@@ -485,6 +496,7 @@ export class BlockoutPuppets {
   _DisposeHumans(puppet) {
     for (const human of puppet.humans) {
       human.towel?.Dispose(); human.towel = null;
+      human.skin?.Dispose(); human.skin = null;
       try { human.actor.Dispose(); } catch (error) { /* already gone */ }
     }
     this.actorCount -= puppet.humans.length;
@@ -752,7 +764,30 @@ export class BlockoutPuppets {
         }
       }
       if (cameraPosition) actor.SetShadowEnabled(distance < BLOCKOUT_PUPPETS.shadowM);
+      this._SyncXBot(puppet, human, { drive, state, mps, aim, carryRole, throwing, clipState, lieAlong, lieClip, seat, distance, cameraPosition }, step);
     }
+  }
+
+  /**
+   * X Bot（文件头 2026-11-01）：原身体这一帧 Update 完，把它此刻在干什么交给 X Bot。片段只有真在播（动作层装上、
+   * 姿态设了）才算；顺着躺 / 躺姿片段 / 坐车 / 被抬着的人要贴准位置，照原身体姿势当场换算（exact）。
+   */
+  _SyncXBot(puppet, human, { drive, state, mps, aim, carryRole, throwing, clipState, lieAlong, lieClip, seat, distance, cameraPosition }, step) {
+    if (!this.xbot?.ready) return;
+    // 配色：有名字的角色各一种（castId，或顺子 / 老耿 / 妮儿这类按单位 id）；抬担架的、普通人按阵营素色
+    if (!human.skin && human.body === "rig") human.skin = this.xbot.Attach(human.actor, { faction: human.faction,
+      castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null });
+    if (!human.skin) return;
+    const playing = clipState && human.soldier.openingStoryboardPose ? human.clipName : null;
+    const meta = playing ? this.opening?.api?.OpeningClipMeta?.(playing) || {} : {};
+    const exact = !!(lieAlong && human.actor.ragdollState) || !!lieClip || !!seat || (puppet.down && litter0(puppet.unit) === false && puppet.moving);
+    human.skin.Sync({
+      clip: playing, clipSeconds: human.clipSeconds, clipDuration: meta.duration || null, clipLoop: meta.loop,
+      throwSeconds: throwing ? drive?.throw?.seconds : null,
+      mps, stance: puppet.stance, aim, carryRole, woundedWalk: !!drive?.woundedWalk, talking: !!drive?.talking,
+      melee: !!state.meleeCombat, down: !!state.dead || !!human.actor.ragdollState, exact,
+      shadow: cameraPosition ? distance < BLOCKOUT_PUPPETS.shadowM : undefined,
+    }, step);
   }
 
   Update(dt, cameraPosition) {
@@ -1385,6 +1420,18 @@ export class BlockoutPuppets {
   }
 
   /** 演员现场位置（标记层与俯视图读）。 */
+  /** 取证：X Bot 读没读完、每个人有没有挂上、此刻播哪条（mirror = 照原身体当场换算）。 */
+  XBotState() {
+    const humans = [];
+    for (const puppet of this.puppets.values()) for (const human of puppet.humans) {
+      const pick = human.skin?.pick;
+      humans.push({ id: puppet.id, slot: human.slot, faction: human.faction, look: human.skin?.look.key ?? null, skin: !!human.skin, clip: human.clipName || null,
+        pick: !pick ? null : pick.mode === "mirror" ? "mirror" : pick.key || pick.file,
+        scale: human.skin ? +human.skin.container.scale.x.toFixed(3) : null, ...(human.skin ? human.skin.Probe() : {}) });
+    }
+    return { enabled: !!this.xbot, ready: !!this.xbot?.ready, failed: this.xbot?.failed ? String(this.xbot.failed) : null, humans };
+  }
+
   Live() {
     const out = [];
     for (const puppet of this.puppets.values()) {

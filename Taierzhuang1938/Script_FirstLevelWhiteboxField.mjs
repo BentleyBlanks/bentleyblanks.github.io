@@ -181,6 +181,11 @@ export class FirstLevelWhiteboxField {
   }
 
   TerrainHeight(x, z) { return this.terrain?.SampleHeight(x,z) ?? 0; }
+  /** 壕沟网络：现行第一关走 terrainSpec，场景（docs/Data_Scene.md §9）带编好的 layout.trenchPlan；都没有是 null。 */
+  TrenchPlan() {
+    if (this.layout.trenchPlan) return this.layout.trenchPlan;
+    return this.layout.terrainSpec?.trenchNetwork ? TrenchPlanFor(this.layout.terrainSpec) : null;
+  }
   WalkableHeight(x, z, terrainHeight) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,terrainHeight); }
   GroundHeight(x, z) { return this.WalkableHeight(x,z,this.TerrainHeight(x,z)); }
   // Load-time environment placement cannot rest on the train that moves away
@@ -213,7 +218,7 @@ export class FirstLevelWhiteboxField {
       // download falls back to the single tiled soil below; the level still builds.
       try {
         const { LoadTerrainLayers, CreateTerrainMaterial } = await import("./Script_TerrainMaterial.mjs");
-        const trench = !!this.layout.terrainSpec?.trenchNetwork;
+        const trench = !!this.TrenchPlan();
         const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
           .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
         this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers,
@@ -329,17 +334,17 @@ export class FirstLevelWhiteboxField {
     sink.SetSector("FirstLevelWhitebox");
 
     let trenchCrownHeightAt = null;
-    if (this.layout.terrainSpec?.trenchNetwork && this.terrainLayers) {
+    if (this.TrenchPlan() && this.terrainLayers) {
       const dressing = new BuildSink();
       if (!this.trenchSurface) this.materials.set("TrenchRoots", new THREE.MeshStandardMaterial({
         name: "TrenchRoots", color: TRENCH_APPEARANCE.rootColor,
         roughness: TRENCH_APPEARANCE.rootRoughness, metalness: 0,
       }));
-      this.stats.trenchEarth = BuildTrenchEarth(dressing, TrenchPlanFor(this.layout.terrainSpec),
+      this.stats.trenchEarth = BuildTrenchEarth(dressing, this.TrenchPlan(),
         (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? "ground" : "TrenchRoots",
           clods: this.trenchSurface?.clods, cliffs: this.trenchSurface?.cliffs });
       if (this.trenchSurface) this.stats.trenchSurface = BuildTrenchSurface(dressing,
-        TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface,
+        this.TrenchPlan(), (x, z) => this.TerrainHeight(x, z), this.trenchSurface,
         {onCrownReady: sample => { trenchCrownHeightAt = sample; }});
       const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });
       this.stats.trenchEarth.meshes = pieces.length;

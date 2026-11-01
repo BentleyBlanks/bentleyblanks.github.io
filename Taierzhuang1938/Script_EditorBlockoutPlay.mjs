@@ -17,6 +17,9 @@
 //   卡片右上「试玩」按钮 / K 打开设置面板（段落预设、起止关键帧、无敌 / 无限子弹 / 播过场三个开关、「开打」）；
 //   试玩中顶部一条：第几步 · 站位名 · 目标 · 距离 · 剩几个敌人 · 用时 · 结束（K）；打完出小结（每一步用时、结果，
 //   掉血、打死几个），「再来一遍 / 从这一步重来 / 回到编辑」。界面文字是编辑器自用的中文（Script_Editor* 不进文本门禁）。
+//
+// 2026-11-01：放出来的日军也换成 Mixamo X Bot（同预演演员，Script_EditorBlockoutXBot）：AI、命中体、开枪照旧是原身体，
+//   只是蒙皮藏起来、X Bot 照 AI 每帧交给人物的状态（速度、蹲 / 趴、据枪、开枪、倒地、投弹）播对照表里的动作；枪挪到 X Bot 手里（枪口跟着走）。
 
 import * as THREE from "three";
 import {
@@ -300,6 +303,8 @@ export class BlockoutPlay {
     const old = this.run.soldiers.get(spec.id);
     if (old && old !== soldier) this.run.corpses.push(old);
     soldier.blockoutPlayId = spec.id;
+    soldier.blockoutPlayCastId = spec.castId || null;
+    this.AttachXBot(soldier);
     this.SnapToSpot(soldier, spec.x, spec.z);
     if (spec.bayonet) soldier.bayonetFixed = true;
     this.Order(soldier, spec, step);
@@ -345,9 +350,29 @@ export class BlockoutPlay {
     }
   }
 
+  /**
+   * X Bot（文件头 2026-11-01）：包一层这个兵自己的 actor.Update，原身体更新完把 AI 给的状态交给 X Bot。
+   * 资源还没读完时先不挂，Update 里每帧补挂。
+   */
+  AttachXBot(soldier) {
+    const skins = this.editor.puppets?.xbot, actor = soldier?.actor;
+    if (!skins?.ready || !actor || soldier.xbotSkin) return;
+    const skin = skins.Attach(actor, { faction: "ija", castId: soldier.blockoutPlayCastId || null, unitId: soldier.blockoutPlayId || null });
+    if (!skin) return;
+    soldier.xbotSkin = skin;
+    const update = actor.Update;
+    actor.Update = function (dt, state = {}) {
+      const result = update.call(this, dt, state);
+      try { skin.Sync(AiIntent(state, actor), dt); } catch (error) { console.warn("[BlockoutPlay] X Bot", error); }
+      return result;
+    };
+    soldier.xbotRestore = () => { actor.Update = update; skin.Dispose(); soldier.xbotSkin = null; };
+  }
+
   RemoveSoldier(id) {
     const run = this.run, soldier = run?.soldiers.get(id);
     if (!soldier) return;
+    soldier.xbotRestore?.();
     run.soldiers.delete(id);
     try { this.game.ai?.Remove(soldier); } catch (error) { console.warn("[BlockoutPlay] 收兵失败", id, error); }
   }
@@ -359,7 +384,7 @@ export class BlockoutPlay {
     if (run.phase === "previz" && editor.previz?.playing) { run.previzToken += 1; editor.previz.Stop({ restore: false }); }
     if (result !== "done" && run.step && !run.log.some(entry => entry.cursor === run.cursor)) this.LogStep(result);
     for (const id of [...run.soldiers.keys()]) this.RemoveSoldier(id);
-    for (const corpse of run.corpses) { try { this.game.ai?.Remove(corpse); } catch (error) { /* 已撤 */ } }
+    for (const corpse of run.corpses) { corpse.xbotRestore?.(); try { this.game.ai?.Remove(corpse); } catch (error) { /* 已撤 */ } }
     run.corpses.length = 0;
     this.run = null;
     // 倒下了：马上换人（宿主的换人计时撤掉、阵亡卡收起），不然宿主自己换人会把人送回关卡出生点；
@@ -414,6 +439,8 @@ export class BlockoutPlay {
       if (Number.isFinite(run.lastHealth) && player.health < run.lastHealth) run.damage += run.lastHealth - player.health;
       run.lastHealth = player.health;
     }
+    // X Bot 资源后读完的：补挂
+    if (this.editor.puppets?.xbot?.ready) for (const soldier of run.soldiers.values()) if (!soldier.xbotSkin) this.AttachXBot(soldier);
     // 打死的人：记账（同一个人后面的步不再出现）
     for (const [id, soldier] of run.soldiers) {
       if (soldier.alive || soldier.blockoutPlayCounted) continue;
@@ -775,7 +802,7 @@ export class BlockoutPlay {
   /** 取证 / 测试用的现状。 */
   State() {
     const run = this.run;
-    const soldiers = run ? [...run.soldiers.entries()].map(([id, s]) => ({ id, alive: !!s.alive, x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2), order: s.order, weapon: s.weaponId, state: s.state })) : [];
+    const soldiers = run ? [...run.soldiers.entries()].map(([id, s]) => ({ id, alive: !!s.alive, x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2), order: s.order, weapon: s.weaponId, state: s.state, xbot: !!s.xbotSkin, xbotProbe: s.xbotSkin && s.alive ? s.xbotSkin.Probe() : null })) : [];
     return {
       present: this.present, valid: this.validation?.ok ?? null, panelOpen: this.panelOpen,
       active: !!run, settings: { ...this.settings },
@@ -797,4 +824,15 @@ export class BlockoutPlay {
     this.hud.remove();
     this.summaryEl.remove();
   }
+}
+
+/** AI 交给人物的状态（Script_Ai → actor.Update）→ X Bot 要的意图（同 BlockoutPuppets._SyncXBot 的字段）。 */
+function AiIntent(state, actor) {
+  const rig = actor.characterRig;
+  const mps = Number.isFinite(state.moveSpeedMps) ? state.moveSpeedMps : (state.moveSpeed || 0) * 3.6;
+  return {
+    mps, stance: state.prone > 0.5 ? "prone" : state.crouch > 0.5 ? "crouch" : "stand", aim: state.aim > 0.5,
+    melee: !!state.meleeCombat, down: !!state.dead || !!actor.ragdollState, firing: !!state.firing,
+    throwSeconds: rig?.currentId === "GrenadeThrow" && rig.currentAction ? rig.currentAction.time : null,
+  };
 }

@@ -198,14 +198,15 @@ export function MissionDressingContext(layout, groundAt) {
 
 /**
  * 正式场景（docs/Data_Scene.md §8，2026-11-01）的撒点环境：路线 = 场景的路与沟（ways），锚点 = 出生点；
- * 没有现行第一关的河、弹坑表与壕沟样条计划（沟是高度图里挖的，沟底与沟壁按地表的翻土层避开）。
+ * 没有现行第一关的河与弹坑表；壕沟是场景自己的样条网络（layout.trenchPlan，docs/Data_Scene.md §9），植被按它的走廊避开。
  */
 export function SceneDressingContext(layout, groundAt) {
   const routes = [...(layout.ways?.roads || []), ...(layout.ways?.trenches || [])].filter(IsPolyline);
   return {
     layout, blocks: layout.blocks, scenarioBlocks: [], groundAt, routes,
     anchors: layout.spawn ? [{ x: layout.spawn.x, z: layout.spawn.z }] : [],
-    craters: [], bounds: layout.bounds, trenchCorridor: () => null,
+    craters: [], bounds: layout.bounds,
+    trenchCorridor: layout.trenchPlan ? (x, z) => layout.trenchPlan.Corridor(x, z) : () => null,
     surfaceAt: layout.SampleGroundSurface || SampleMissionGroundSurface,
     river: null, riverCutAt: () => 0, riverReachAt: () => null,
   };

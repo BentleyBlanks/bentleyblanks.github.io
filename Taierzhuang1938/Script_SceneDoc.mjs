@@ -1,7 +1,8 @@
 // 场景文件（docs/Data_Scene.md）：格式常量、校验、高度图编解码、按范围取一块、转成白盒编辑器的场景形状。
 //
-// 一个场景 = Scenes/<Id>/Scene_<Id>.json（物件引用列表 + 地面涂色 + 远景设置 + 设计标注）
-//          + Scenes/<Id>/Scene_<Id>.height.bin（高度图，int16 小端、厘米，(cols+1)×(rows+1) 个格点）。
+// 一个场景 = Scenes/<Id>/Scene_<Id>.json（物件引用列表 + 地面涂色 + 远景设置 + 设计标注 + 样条壕沟）
+//          + Scenes/<Id>/Scene_<Id>.height.bin（高度图，int16 小端、厘米，(cols+1)×(rows+1) 个格点；沟没挖之前的地面）
+//          + Scenes/<Id>/Scene_<Id>.trench.bin（有壕沟时：挖沟基准面，Script_SceneTrenches）。
 // 物件只写资产编号（Data_SceneAssets），不写文件路径；场景文件就是这个场景的唯一真相，人、agent、场景编辑器都直接改它。
 //
 // 白盒编辑器按关卡从场景里取一块（region）来建场：BlockoutDocFromScene 把这一块转成旧的
@@ -11,6 +12,7 @@
 
 import { SCENE_ASSETS, SCENE_MATERIALS, SCENE_LIST, SceneInfo, SceneObjectSemantic } from "./Data_SceneAssets.mjs";
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
+import { SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
 
 export const SCENE_SCHEMA = "tengxian-scene/1";
 export const SCENE_HEIGHT_ENCODING = "int16-cm-le";
@@ -105,6 +107,7 @@ export function ValidateScene(doc) {
   }
   if (doc.look !== undefined && !IsObject(doc.look)) errors.push("look 要是对象");
   if (doc.ways !== undefined && !IsObject(doc.ways)) errors.push("ways 要是对象");
+  if (doc.trenches !== undefined) SceneTrenchIssues(doc.trenches, errors);
   return { ok: errors.length === 0, errors, warnings };
 }
 
@@ -118,6 +121,15 @@ export function FormatSceneJson(scene) {
       lines.push(`  ${JSON.stringify(key)}: [`);
       value.forEach((item, j) => lines.push(`    ${JSON.stringify(item)}${j < value.length - 1 ? "," : ""}`));
       lines.push(`  ]${comma}`);
+    } else if (key === "trenches" && value) {
+      // 壕沟：一段一行（好 diff、好按 id grep）
+      const { segments, ...rest } = value;
+      lines.push(`  "trenches": {`);
+      for (const [k, v] of Object.entries(rest)) lines.push(`    ${JSON.stringify(k)}: ${JSON.stringify(v)},`);
+      lines.push(`    "segments": [`);
+      (segments || []).forEach((item, j) => lines.push(`      ${JSON.stringify(item)}${j < segments.length - 1 ? "," : ""}`));
+      lines.push("    ]");
+      lines.push(`  }${comma}`);
     } else if (key === "backdrop" && value) {
       const { paint, ...rest } = value;
       lines.push(`  "backdrop": {`);
@@ -230,8 +242,10 @@ function BackdropShape(obj) {
  *   heightTint：不给 = 用场景 look 里的；null = 按这一块的最低 / 最高自动定；
  *   objectMarginM：物件取到范围外多远（米，缺省 1：贴边的空气墙）——站在场地边上看得见的房子要带上；
  *   futureSignals：这一段里不会发生的信号（后面段落的）——hideOn 它的物件当常驻块（不做成随信号的块：那种块不合批），showOn 它的不要。
+ *   trenchPlan：场景壕沟编好的网络（Script_SceneTrenches.PrepareSceneTerrain；heights 要是按它挖好的那份）。带过去给建场摆沟里的
+ *     构件、正式场景画土面细节；沟中线并进 ways.trenches。
  */
-export function BlockoutDocFromScene(scene, heights, { level, region = null, spawn = null, priorSignals = [], futureSignals = [], heightTint, objectMarginM = 1 } = {}) {
+export function BlockoutDocFromScene(scene, heights, { level, region = null, spawn = null, priorSignals = [], futureSignals = [], heightTint, objectMarginM = 1, trenchPlan = null } = {}) {
   const area = region ? { ...region } : { ...scene.bounds };
   const objectArea = { minX: area.minX - objectMarginM, maxX: area.maxX + objectMarginM, minZ: area.minZ - objectMarginM, maxZ: area.maxZ + objectMarginM };
   const crop = CropSceneHeights(scene.terrain, heights, area);
@@ -259,6 +273,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const Lines = (lines) => (lines || []).filter(line => LineTouches(area, line));
   const look = { ...(scene.look || {}) };
   if (heightTint !== undefined) look.heightTint = heightTint;
+  const slicePlan = SliceTrenchPlan(trenchPlan, area);
   return {
     schema: BLOCKOUT_SCENE_SCHEMA,
     level,
@@ -277,6 +292,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     ...(withBackdrop ? { backdrop: { far: bd.far, ground: { ...bd.ground }, ...(bd.haze ? { haze: { ...bd.haze } } : {}),
       paint: (bd.paint || []).map(p => ({ ...p })), shapes } } : {}),
     ...(markers.length ? { landmarks: markers.map(m => ({ ...m })) } : {}),
-    ways: { roads: Lines(scene.ways?.roads), trenches: Lines(scene.ways?.trenches) },
+    ways: { roads: Lines(scene.ways?.roads), trenches: [...Lines(scene.ways?.trenches), ...Lines(SceneTrenchLines(slicePlan))] },
+    ...(slicePlan ? { trenchPlan: slicePlan } : {}),
   };
 }

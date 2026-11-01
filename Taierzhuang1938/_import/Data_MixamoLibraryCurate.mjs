@@ -47,6 +47,10 @@ export const AUTHORED = {
 };
 
 export const DROP = {
+  // 刺刀专项补下时看了不合用的（11-01）
+  Bash_V1: "单手抡棒子，左手不在家伙上",
+  PikeWalk_V1: "是健身的撅臀手脚爬，不是端长枪",
+  ThrustSlash_V1: "单手刀刺劈，左手空着",
   LeaningOnAWall_V1: "小女孩靠墙听音乐",
   LookingAround_V1: "双手各拿一把手枪",
   StandingIdle_V2: "手里拿着斧头",
@@ -101,6 +105,9 @@ const STRETCHER_REAR = "两手低握两根把往前推，手势跟抬担架走�
 //                        rifleHand（"L"：枪中途留在左手、右手腾出来干别的）}]
 const Grenade = note => ({ prop: "手榴弹", note });
 const Dadao = { prop: "大刀" };
+// 刺刀专项（2026-11-01 用户要求单独一类）：刺、挡、枪托砸，加上端着枪的上步 / 退步 / 侧步（拼刺刀对峙时的步法）。
+const BAYONET = "刺刀专项";
+
 export const CURATE = {
   // 站立待机
   BreathingIdle_V1: ["空手", "站着呼吸"],
@@ -171,7 +178,7 @@ export const CURATE = {
   RightStrafe_V2: ["空手", "空手向右侧跑·二"],
   RifleCrouchTurn_V1: ["端枪", "端枪蹲着右转 180°"],
   RifleCrouchTurn_V2: ["端枪", "端枪蹲着左转 90°"],
-  RifleSideStep_V1: ["端枪", "端枪向右侧步"],
+  RifleSideStep_V1: ["端枪", "端枪向右侧步", { category: BAYONET }],
   RifleTurn_V1: ["端枪", "端枪左转 45°"],
   RifleTurn_V2: ["端枪", "端枪右转 45°"],
   Turn90Left_V1: ["端枪", "端枪左转 90°"],
@@ -315,10 +322,23 @@ export const CURATE = {
   LeftCoverSneakWRifle_V1: ["端枪", "端枪贴墙向左挪", { replaces: "缺：贴墙移动" }],
   RightCoverSneakWRifle_V1: ["端枪", "端枪贴墙向右挪", { replaces: "缺：贴墙移动" }],
   // 近战
-  BayonetStab_V1: ["端枪", "刺刀突刺"],
-  BlockWithRifle_V1: ["端枪", "横枪格挡"],
-  RifleBlock_V1: ["端枪", "端枪格挡·双手横托"],
-  RiflePunch_V1: ["端枪", "枪托前砸"],
+  BayonetStab_V1: ["端枪", "刺刀突刺", { category: BAYONET }],
+  BlockWithRifle_V1: ["端枪", "横枪格挡", { category: BAYONET }],
+  RifleBlock_V1: ["端枪", "端枪格挡·双手横托", { category: BAYONET }],
+  RiflePunch_V1: ["端枪", "枪托前砸", { category: BAYONET }],
+  // 11-01 刺刀专项补下（Mixamo 上专门的刺刀动作只有这些；步法是端枪瞄准的上步 / 退步 / 侧步，上了刺刀就是对峙步）
+  SlashAdvance_V1: ["端枪", "刺刀·上步劈砍", { category: BAYONET }],
+  Smash_V1: ["端枪", "枪身前砸", { category: BAYONET }],
+  Dodging_V1: ["端枪", "端枪闪躲", { category: BAYONET }],
+  Bash_V1: ["端枪", "枪托·过头砸", { category: BAYONET }],
+  PikeWalk_V1: ["端枪", "平端长枪前进", { category: BAYONET }],
+  ThrustSlash_V1: ["端枪", "刺后横劈", { category: BAYONET }],
+  SteppingForward_V1: ["端枪", "端枪上一步", { category: BAYONET }],
+  SteppingBackward_V1: ["端枪", "端枪退一步", { category: BAYONET }],
+  SteppingLeft_V1: ["端枪", "端枪左一步", { category: BAYONET }],
+  SingleStepRight_V1: ["端枪", "端枪右一步", { category: BAYONET }],
+  RifleSideStep_V2: ["端枪", "端枪向左侧步", { category: BAYONET }],
+  WalkingBackwards_V1: ["端枪", "端枪后退走", { category: BAYONET }],
   GreatSwordAttack_V1: ["拿着别的", "大刀·刀柄砸", Dadao],
   GreatSwordBlocking_V1: ["拿着别的", "大刀·格挡待机", Dadao],
   GreatSwordBlocking_V2: ["拿着别的", "大刀·格挡→站", Dadao],

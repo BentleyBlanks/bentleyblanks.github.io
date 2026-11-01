@@ -3,9 +3,12 @@
 // 纯模块：零 three、零 DOM，node 测试直接用。界面（Script_SceneEditor）只调这里的操作，不直接改 objects。
 // 每个操作记一条撤销记录：按数组下标记「之前 / 之后」的物件快照（null = 那时没有），撤销倒着放回去，
 // 所以加、删、改名、改字段都走同一条路，文件里物件的先后顺序也原样回来。
+// 壕沟（doc.trenches.segments，docs/Data_Scene.md §9）走同一条路，记录上带 trench: true；选中壕沟和选中物件互斥。
 
 import { SCENE_ASSETS, SCENE_MATERIALS } from "./Data_SceneAssets.mjs";
 import { ValidateScene } from "./Script_SceneDoc.mjs";
+import { TrenchGroup } from "./Script_SceneTrenches.mjs";
+import { TRENCH_DETAILS } from "./Data_TrenchDetails.mjs";
 
 const Clone = (value) => JSON.parse(JSON.stringify(value));
 const Round = (value, step) => Math.round(value / step) * step;
@@ -35,6 +38,11 @@ export class SceneEditModel {
     this.savedState = 0;
     this.Reindex();
     this.selection = new Set(keep.filter(id => this.byId.has(id)));
+    // 选中的壕沟（id）与它的控制点（下标，null = 没选点）；trenchRev 每改一次壕沟 +1（界面按它重挖地面）
+    if (this.trench && !this.FindTrench(this.trench)) this.trench = null;
+    this.trench = this.trench || null;
+    this.trenchPoint = this.trench ? this.trenchPoint ?? null : null;
+    this.trenchRev = (this.trenchRev || 0) + 1;
   }
 
   Reindex() {
@@ -79,6 +87,17 @@ export class SceneEditModel {
       }
       node.ids.push(obj.id);
     }
+    // 壕沟挂在自己的分组下（缺省「壕沟」），节点上另开 trenches 一列
+    for (const seg of this.trenchSegments) {
+      let node = root;
+      node.count++;
+      for (const part of SplitGroup(TrenchGroup(seg))) {
+        if (!node.folders.has(part)) node.folders.set(part, { name: part, path: node.path ? `${node.path}/${part}` : part, folders: new Map(), ids: [], count: 0 });
+        node = node.folders.get(part);
+        node.count++;
+      }
+      (node.trenches ||= []).push(seg.id);
+    }
     const Sort = (node) => {
       node.folders = new Map([...node.folders].sort((a, b) => a[0].localeCompare(b[0], "zh-CN", { numeric: true })));
       for (const child of node.folders.values()) Sort(child);
@@ -98,6 +117,7 @@ export class SceneEditModel {
 
   Select(ids, { add = false, toggle = false } = {}) {
     if (!add && !toggle) this.selection.clear();
+    this.trench = null; this.trenchPoint = null;
     for (const id of ids) {
       if (!this.byId.has(id)) continue;
       if (toggle && this.selection.has(id)) this.selection.delete(id);
@@ -269,18 +289,133 @@ export class SceneEditModel {
     return this.Push("改名", [{ index, before, after }]);
   }
 
+  // ---------------------------------------------------------------- 壕沟
+
+  get trenchSegments() { return this.doc.trenches?.segments || []; }
+  FindTrench(id) { return this.trenchSegments.find((s) => s.id === id) || null; }
+  TrenchIndex(id) { return this.trenchSegments.findIndex((s) => s.id === id); }
+
+  /** 选中一段壕沟（物件选中清掉）；point = 控制点下标。 */
+  SelectTrench(id, point = null) {
+    this.selection.clear();
+    this.trench = id && this.FindTrench(id) ? id : null;
+    this.trenchPoint = this.trench && Number.isInteger(point) ? point : null;
+    return this.trench;
+  }
+
+  /** 原地改一段壕沟：fn(seg) 改副本。 */
+  MutateTrench(label, id, fn) {
+    const index = this.TrenchIndex(id);
+    if (index < 0) return false;
+    const before = this.trenchSegments[index];
+    const after = Clone(before);
+    fn(after);
+    if (JSON.stringify(after) === JSON.stringify(before)) return false;
+    this.doc.trenches.segments[index] = after;
+    this.trenchRev++;
+    return this.Push(label, [{ trench: true, index, before, after }]);
+  }
+
+  MoveTrenchPoint(id, i, x, z) {
+    return this.MutateTrench("拖壕沟控制点", id, (seg) => { if (seg.points[i]) seg.points[i] = [Fix(x, P.posM), Fix(z, P.posM)]; });
+  }
+
+  /** 在第 after 个控制点后面插一个点。 */
+  InsertTrenchPoint(id, after, x, z) {
+    const ok = this.MutateTrench("加壕沟控制点", id, (seg) => seg.points.splice(after + 1, 0, [Fix(x, P.posM), Fix(z, P.posM)]));
+    if (ok && this.trench === id) this.trenchPoint = after + 1;
+    return ok;
+  }
+
+  DeleteTrenchPoint(id, i) {
+    const seg = this.FindTrench(id);
+    if (!seg || seg.points.length <= 2) return false;
+    const ok = this.MutateTrench("删壕沟控制点", id, (s) => s.points.splice(i, 1));
+    if (ok && this.trench === id) this.trenchPoint = null;
+    return ok;
+  }
+
+  /** 改一段壕沟的字段（value 为 undefined = 删掉，回到沟型 / 套餐的缺省）。 */
+  SetTrenchField(id, key, value, label = `改壕沟 ${key}`) {
+    return this.MutateTrench(label, id, (seg) => { if (value === undefined) delete seg[key]; else seg[key] = Clone(value); });
+  }
+
+  /**
+   * 改一项细节（Data_TrenchDetails）：value = true / false 只开关；对象 = 只写这几项参数（键值 undefined = 删掉那一项）；
+   * undefined = 这一项回到缺省（删掉 details 里这一项）。
+   */
+  SetTrenchDetail(id, key, value, label = `改壕沟细节 ${TRENCH_DETAILS[key]?.label || key}`) {
+    return this.MutateTrench(label, id, (seg) => {
+      const details = seg.details || {};
+      if (value === undefined) delete details[key];
+      else if (typeof value === "boolean") {
+        const old = details[key];
+        details[key] = old && typeof old === "object" ? { ...old, on: value } : value;
+      } else {
+        const old = details[key];
+        const merged = old && typeof old === "object" ? { ...old } : typeof old === "boolean" ? { on: old } : {};
+        for (const [k, v] of Object.entries(value)) { if (v === undefined) delete merged[k]; else merged[k] = Clone(v); }
+        if (Object.keys(merged).length) details[key] = merged; else delete details[key];
+      }
+      if (Object.keys(details).length) seg.details = details; else delete seg.details;
+    });
+  }
+
+  FreeTrenchId(base = "Trench") {
+    if (base && /^[A-Za-z0-9_]+$/.test(base) && !this.FindTrench(base)) return base;
+    const stem = String(base || "Trench").replace(/[^A-Za-z0-9_]/g, "_").replace(/_?[0-9]+$/, "") || "Trench";
+    for (let n = 1; ; n++) { const id = `${stem}_${String(n).padStart(2, "0")}`; if (!this.FindTrench(id)) return id; }
+  }
+
+  /** 新加一段壕沟（没有 trenches 一节就先建一个空网络）；返回新 id 并选中它。 */
+  AddTrench({ id = "Trench", preset = "communication", points, group, look } = {}) {
+    if (!this.doc.trenches) this.doc.trenches = { seed: `${this.doc.id}:trench`, earthProfile: "compact", segments: [] };
+    const seg = { id: this.FreeTrenchId(id), preset, points: points.map(([x, z]) => [Fix(x, P.posM), Fix(z, P.posM)]) };
+    if (group) seg.group = group;
+    if (look) seg.look = look;
+    const index = this.doc.trenches.segments.length;
+    this.doc.trenches.segments.push(seg);
+    this.trenchRev++;
+    this.Push("加壕沟", [{ trench: true, index, before: null, after: seg }]);
+    this.SelectTrench(seg.id);
+    return seg.id;
+  }
+
+  DeleteTrench(id) {
+    const index = this.TrenchIndex(id);
+    if (index < 0) return false;
+    const [before] = this.doc.trenches.segments.splice(index, 1);
+    this.trenchRev++;
+    if (this.trench === id) { this.trench = null; this.trenchPoint = null; }
+    return this.Push("删壕沟", [{ trench: true, index, before, after: null }]);
+  }
+
+  /** 改名：新名字已被占用 / 不合法时抛错。 */
+  RenameTrench(id, newId) {
+    if (id === newId) return false;
+    if (typeof newId !== "string" || !/^[A-Za-z0-9_]{1,96}$/.test(newId)) throw new Error("壕沟名字只能用字母、数字、下划线");
+    if (this.FindTrench(newId)) throw new Error(`${newId} 已经有了`);
+    const ok = this.MutateTrench("壕沟改名", id, (seg) => { seg.id = newId; });
+    if (ok && this.trench === id) this.trench = newId;
+    return ok;
+  }
+
   // ---------------------------------------------------------------- 撤销 / 重做
 
   Apply(changes, backward) {
     const list = backward ? [...changes].reverse() : changes;
-    for (const { index, before, after } of list) {
+    for (const { index, before, after, trench } of list) {
       const from = backward ? after : before, to = backward ? before : after;
-      if (from && to) this.doc.objects[index] = Clone(to);
-      else if (from && !to) this.doc.objects.splice(index, 1);
-      else if (!from && to) this.doc.objects.splice(index, 0, Clone(to));
+      const array = trench ? (this.doc.trenches ||= { segments: [] }).segments : this.doc.objects;
+      if (trench) this.trenchRev++;
+      if (from && to) array[index] = Clone(to);
+      else if (from && !to) array.splice(index, 1);
+      else if (!from && to) array.splice(index, 0, Clone(to));
     }
     this.Reindex();
     for (const id of [...this.selection]) if (!this.byId.has(id)) this.selection.delete(id);
+    if (this.trench && !this.FindTrench(this.trench)) { this.trench = null; this.trenchPoint = null; }
+    if (this.trenchPoint !== null && this.trench && !(this.trenchPoint < this.FindTrench(this.trench).points.length)) this.trenchPoint = null;
     return list.map(c => (backward ? c.before : c.after)?.id || (backward ? c.after : c.before)?.id);
   }
 

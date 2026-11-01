@@ -15,6 +15,9 @@ import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Da
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { BlockoutDocFromScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
+import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
+import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
+import { SCENE_ASSETS } from "./Data_SceneAssets.mjs";
 
 // 2026-10-31：第一关新剧本三段（01–05 / 06–10 / 11–18）共用一个场景 Scenes/FirstLevelWhitebox（docs/Data_Scene.md），
 // 每段按原来的场地范围取一块来建场；后面的段落把前面段落出现过的信号都当已经发生（塌了的还塌着、开了的门还开着）。
@@ -406,11 +409,19 @@ export function BuildSceneGroundSurface(doc, sampler) {
   }
   const raster = items.length ? BuildGroundPaint(items, doc.bounds, { cellM: S.cellM, maxCells: S.maxCells }) : null;
   const w = [0, 0, 0], step = S.slope.stepM, span = S.slope.to - S.slope.from;
+  // 场景壕沟：翻土层跟着样条的实际沟沿走，沿弃土垄再铺一层（同现行第一关 SampleMissionTerrain 那一段）
+  const plan = doc.trenchPlan || null;
   return (x, z, color = [1, 1, 1], layers = [0, 0, 1, 1]) => {
     w[0] = 0; w[1] = 0; w[2] = 0;
     raster?.Blend(x, z, w);
     let track = w[0], spoil = w[1];
     const soil = w[2];
+    const corridor = plan?.Corridor(x, z);
+    if (corridor) {
+      const t = 1 - Math.max(0, Math.min(1, (corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + corridor.bermWidth)));
+      const tt = t * t * (3 - 2 * t);
+      if (tt > spoil) spoil = tt;
+    }
     const gx = (sampler(x + step, z) - sampler(x - step, z)) / (2 * step);
     const gz = (sampler(x, z + step) - sampler(x, z - step)) / (2 * step);
     const u = Math.max(0, Math.min(1, (Math.hypot(gx, gz) - S.slope.from) / span));
@@ -568,6 +579,26 @@ function NormalizeBackdrop(bd) {
   };
 }
 
+/**
+ * 场景壕沟的构件 → 体块。护壁、踏板、射击位直接是 PlanTrenchDressing 的体块；杂物（Prop/* 资产）按资产尺寸做成带 propModel
+ * 的不挡人盒子（正式场景换模型）。只留落在这一块范围里的；离手摆体块太近的 PlanTrenchDressing 自己让开
+ *（空气墙不算：01–05 沟沿上那一圈只挡玩家，构件照摆）。
+ */
+export function SceneTrenchDressing(plan, groundAt, blocks, bounds) {
+  const keepOut = blocks.filter((b) => b.solid !== false && b.tag !== "airWall").map((b) => ({ x: b.x, z: b.z, w: b.w, d: b.d, ry: b.ry || 0 }));
+  const dressing = PlanTrenchDressing(plan, { groundAt, keepOut });
+  const inside = (p) => p.x >= bounds.minX && p.x <= bounds.maxX && p.z >= bounds.minZ && p.z <= bounds.maxZ;
+  const out = dressing.blocks.filter(inside).map((b) => ({ ...b, trenchDressing: true }));
+  for (const p of dressing.placements) {
+    const asset = SCENE_ASSETS[p.asset];
+    if (!inside(p) || asset?.kind !== "prop") continue;
+    const [w, h, d] = asset.size;
+    out.push({ id: p.id, x: p.x, z: p.z, w, h, d, y: groundAt(p.x, p.z) + h / 2, ry: p.ry, semantic: asset.semantic, solid: false,
+      propModel: asset.model, trenchDressing: true });
+  }
+  return { blocks: out, stats: dressing.stats };
+}
+
 export function LayoutFromSceneDoc(doc) {
   const check = ValidateBlockoutScene(doc);
   if (!check.ok) throw new Error(`场景文件有 ${check.errors.length} 处错误：${check.errors.slice(0, 3).join("；")}`);
@@ -601,6 +632,10 @@ export function LayoutFromSceneDoc(doc) {
     ...(gate.signal ? { signal: gate.signal } : {}),
     ...(gate.appearSignal ? { appearSignal: gate.appearSignal } : {}),
   }));
+  // 场景壕沟的构件（护壁、踏板、射击位、杂物，Data_TrenchDetails 每段开关）：白盒、正式都摆成体块，杂物在正式场景换模型
+  const trenchPlan = doc.trenchPlan || null;
+  const trenchDressing = trenchPlan ? SceneTrenchDressing(trenchPlan, sampler, blocks, doc.bounds) : { blocks: [], stats: null };
+  blocks.push(...trenchDressing.blocks);
   const neutral = [1, 1, 1];
   return {
     id: `Blockout${doc.level}`,
@@ -644,6 +679,9 @@ export function LayoutFromSceneDoc(doc) {
     walkableSurfaces: [],
     scenario: null,
     trenchPlacements: [],
+    // 场景壕沟编好的网络（正式场景按它画土崖、土团、草根这些土面细节；FirstLevelWhiteboxField）与构件统计
+    trenchPlan,
+    trenchDressingStats: trenchDressing.stats,
     zones: [],
     spawn: { x: doc.spawn.x, z: doc.spawn.z, yawDeg: Number.isFinite(doc.spawn.yawDeg) ? doc.spawn.yawDeg : 0 },
     ways: {
@@ -739,7 +777,16 @@ export function MakeBlockoutPhase(level) {
           const heightUrl = new URL(doc?.terrain?.file || "", new URL(sceneUrl, globalThis.location?.href)).href;
           const heightResponse = await globalThis.fetch(`${heightUrl}?t=${Date.now()}`, { cache: "no-store" });
           if (!heightResponse.ok) throw new Error(`高度图读不到（HTTP ${heightResponse.status}）`);
-          doc = BlockoutSliceDoc(level, doc, DecodeSceneHeights(await heightResponse.arrayBuffer(), doc.terrain));
+          const pre = DecodeSceneHeights(await heightResponse.arrayBuffer(), doc.terrain);
+          // 场景壕沟（Script_SceneTrenches）：高度图存的是没挖沟的地面，读进来按样条现挖
+          let datum = null;
+          if (doc.trenches?.datum?.file) {
+            const datumResponse = await globalThis.fetch(`${new URL(doc.trenches.datum.file, heightUrl).href}?t=${Date.now()}`, { cache: "no-store" });
+            if (!datumResponse.ok) throw new Error(`壕沟基准面读不到（HTTP ${datumResponse.status}）`);
+            datum = await datumResponse.arrayBuffer();
+          }
+          const { heights, plan } = PrepareSceneTerrain(doc, pre, datum);
+          doc = BlockoutSliceDoc(level, doc, heights, plan);
         }
         ApplyLayout(phase, LayoutFromSceneDoc(doc));
         phase.blockout.sceneError = null;
@@ -753,12 +800,15 @@ export function MakeBlockoutPhase(level) {
   return phase;
 }
 
-/** 场景（kind "scene"）+ 整张高度图 → 这一关那一块的白盒场景形状（同 Blockout/<Level>.scene.json）。node 测试也用它。 */
-export function BlockoutSliceDoc(level, sceneDoc, heights) {
+/**
+ * 场景（kind "scene"）+ 整张高度图 → 这一关那一块的白盒场景形状（同 Blockout/<Level>.scene.json）。node 测试也用它。
+ * heights 要是按壕沟挖好的那份，trenchPlan 是编好的壕沟网络（Script_SceneTrenches.PrepareSceneTerrain）。
+ */
+export function BlockoutSliceDoc(level, sceneDoc, heights, trenchPlan = null) {
   const spec = level.scene;
   return BlockoutDocFromScene(sceneDoc, heights, {
     level: level.key, region: spec.region, spawn: spec.placeholder?.spawn, priorSignals: spec.priorSignals, futureSignals: spec.futureSignals,
-    objectMarginM: spec.objectMarginM,
+    objectMarginM: spec.objectMarginM, trenchPlan,
     ...(spec.heightTint !== undefined ? { heightTint: spec.heightTint } : {}),
   });
 }

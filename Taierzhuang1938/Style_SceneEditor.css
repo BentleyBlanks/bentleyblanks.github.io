@@ -70,6 +70,11 @@ textarea { font: 11px/1.5 ui-monospace, Consolas, monospace; resize: vertical; m
 .seItem.selected { border-left-color: var(--se-gold); background: var(--se-sel-strong); color: var(--se-text-hi); }
 .seIcon { flex: none; width: 11px; font-style: normal; font-size: 10px; text-align: center; color: var(--se-muted); }
 .seIcon.prop { color: #c9a56a; } .seIcon.tree { color: #8fa56b; } .seIcon.air { color: #d6604a; } .seIcon.bd { color: #77756a; }
+.seIcon.trench { color: #c98a4b; }
+.seObjLine .seIcon.trench { width: auto; font-size: 14px; margin-right: 4px; }
+/* 壕沟检视：清掉段上数值的小叉、灰字 = 缺省值 */
+.seMini { flex: none; padding: 0 6px; min-width: 0; }
+input.seDefault::placeholder { color: var(--se-muted); }
 .seEvent { margin-left: auto; font-style: normal; color: var(--se-gold-text); font-size: 10px; flex: none; }
 .seMore { padding: 4px 10px; font-size: 11px; color: var(--se-muted); }
 

@@ -1,0 +1,894 @@
+{
+  "schema": 1,
+  "clips": {
+    "BlastSlamBuried": {
+      "file": "Animation_XBot_BlastSlamBuried.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/BlastSlamBuried",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.5,
+      "loop": false,
+      "frames": 37
+    },
+    "CaptiveCurledPulledUp": {
+      "file": "Animation_XBot_CaptiveCurledPulledUp.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/CaptiveCurledPulledUp",
+      "sourceModel": "TengxianNra02",
+      "duration": 3.5,
+      "loop": false,
+      "frames": 85
+    },
+    "CaptiveDraggedFromDirt": {
+      "file": "Animation_XBot_CaptiveDraggedFromDirt.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/CaptiveDraggedFromDirt",
+      "sourceModel": "TengxianNra02",
+      "duration": 4.4,
+      "loop": false,
+      "frames": 107
+    },
+    "CaptiveStabbedCurl": {
+      "file": "Animation_XBot_CaptiveStabbedCurl.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/CaptiveStabbedCurl",
+      "sourceModel": "TengxianNra02",
+      "duration": 5.5,
+      "loop": false,
+      "frames": 133
+    },
+    "CareLieTreated": {
+      "file": "Animation_XBot_CareLieTreated.glb",
+      "method": "retarget",
+      "source": "CollectionCare/CareLieTreated",
+      "sourceModel": "TengxianNra02",
+      "duration": 4,
+      "loop": true,
+      "frames": 97
+    },
+    "CareLieWrithe": {
+      "file": "Animation_XBot_CareLieWrithe.glb",
+      "method": "retarget",
+      "source": "CollectionCare/CareLieWrithe",
+      "sourceModel": "TengxianNra02",
+      "duration": 4.8,
+      "loop": true,
+      "frames": 117
+    },
+    "CareMedicPress": {
+      "file": "Animation_XBot_CareMedicPress.glb",
+      "method": "retarget",
+      "source": "CollectionCare/CareMedicPress",
+      "sourceModel": "TengxianNra02",
+      "duration": 3.2,
+      "loop": true,
+      "frames": 78
+    },
+    "CreepDadao": {
+      "file": "Animation_XBot_CreepDadao.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/CreepDadao",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.8,
+      "loop": true,
+      "frames": 45
+    },
+    "DadaoAmbush": {
+      "file": "Animation_XBot_DadaoAmbush.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/DadaoAmbush",
+      "sourceModel": "TengxianNra02",
+      "duration": 0.85,
+      "loop": false,
+      "frames": 22
+    },
+    "HeHelmetSleepSitUp": {
+      "file": "Animation_XBot_HeHelmetSleepSitUp.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/HeHelmetSleepSitUp",
+      "sourceModel": "TengxianNra02",
+      "duration": 6.25,
+      "loop": false,
+      "frames": 151
+    },
+    "HeLiftTimber": {
+      "file": "Animation_XBot_HeLiftTimber.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/HeLiftTimber",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4167,
+      "loop": false,
+      "frames": 59
+    },
+    "IjaCrouchHairHold": {
+      "file": "Animation_XBot_IjaCrouchHairHold.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaCrouchHairHold",
+      "sourceModel": "TengxianIja02",
+      "duration": 3.75,
+      "loop": false,
+      "frames": 91
+    },
+    "IjaDragCollarFromDirt": {
+      "file": "Animation_XBot_IjaDragCollarFromDirt.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaDragCollarFromDirt",
+      "sourceModel": "TengxianIja02",
+      "duration": 4.4,
+      "loop": false,
+      "frames": 107
+    },
+    "IjaDropInKneel": {
+      "file": "Animation_XBot_IjaDropInKneel.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaDropInKneel",
+      "sourceModel": "TengxianIja01",
+      "duration": 2.5,
+      "loop": false,
+      "frames": 61
+    },
+    "IjaDropInPoint": {
+      "file": "Animation_XBot_IjaDropInPoint.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaDropInPoint",
+      "sourceModel": "TengxianIja01",
+      "duration": 3.3333,
+      "loop": false,
+      "frames": 81
+    },
+    "IjaDropInStand": {
+      "file": "Animation_XBot_IjaDropInStand.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaDropInStand",
+      "sourceModel": "TengxianIja01",
+      "duration": 2.3333,
+      "loop": false,
+      "frames": 57
+    },
+    "IjaFoundLook": {
+      "file": "Animation_XBot_IjaFoundLook.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaFoundLook",
+      "sourceModel": "TengxianIja02",
+      "duration": 2.25,
+      "loop": false,
+      "frames": 55
+    },
+    "IjaGrenadeBitePin": {
+      "file": "Animation_XBot_IjaGrenadeBitePin.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaGrenadeBitePin",
+      "sourceModel": "TengxianIja02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "IjaHeaveCorpseLip": {
+      "file": "Animation_XBot_IjaHeaveCorpseLip.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaHeaveCorpseLip",
+      "sourceModel": "TengxianIja01",
+      "duration": 2.6667,
+      "loop": false,
+      "frames": 65
+    },
+    "IjaParriedChoppedFall": {
+      "file": "Animation_XBot_IjaParriedChoppedFall.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaParriedChoppedFall",
+      "sourceModel": "TengxianIja02",
+      "duration": 2.4,
+      "loop": false,
+      "frames": 59
+    },
+    "IjaRecruitChargeThrust": {
+      "file": "Animation_XBot_IjaRecruitChargeThrust.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaRecruitChargeThrust",
+      "sourceModel": "TengxianIja02",
+      "duration": 4.5,
+      "loop": false,
+      "frames": 109
+    },
+    "IjaRecruitSlapped": {
+      "file": "Animation_XBot_IjaRecruitSlapped.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaRecruitSlapped",
+      "sourceModel": "TengxianIja02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "IjaShotStaggerAway": {
+      "file": "Animation_XBot_IjaShotStaggerAway.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaShotStaggerAway",
+      "sourceModel": "TengxianIja02",
+      "duration": 3.3333,
+      "loop": false,
+      "frames": 81
+    },
+    "IjaSlapBackhand": {
+      "file": "Animation_XBot_IjaSlapBackhand.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaSlapBackhand",
+      "sourceModel": "TengxianIja02",
+      "duration": 1.5,
+      "loop": false,
+      "frames": 37
+    },
+    "IjaSlapForehand": {
+      "file": "Animation_XBot_IjaSlapForehand.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaSlapForehand",
+      "sourceModel": "TengxianIja02",
+      "duration": 1.5,
+      "loop": false,
+      "frames": 37
+    },
+    "IjaSlapRecruit": {
+      "file": "Animation_XBot_IjaSlapRecruit.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaSlapRecruit",
+      "sourceModel": "TengxianIja02",
+      "duration": 1.5,
+      "loop": false,
+      "frames": 37
+    },
+    "IjaStompStabTwist": {
+      "file": "Animation_XBot_IjaStompStabTwist.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaStompStabTwist",
+      "sourceModel": "TengxianIja01",
+      "duration": 2.5833,
+      "loop": false,
+      "frames": 63
+    },
+    "IjaWalkStabProne": {
+      "file": "Animation_XBot_IjaWalkStabProne.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/IjaWalkStabProne",
+      "sourceModel": "TengxianIja01",
+      "duration": 1.6667,
+      "loop": false,
+      "frames": 41
+    },
+    "InterpreterCrouchAsk": {
+      "file": "Animation_XBot_InterpreterCrouchAsk.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/InterpreterCrouchAsk",
+      "sourceModel": "TengxianNra02",
+      "duration": 3.2,
+      "loop": true,
+      "frames": 78
+    },
+    "InterpreterFlee": {
+      "file": "Animation_XBot_InterpreterFlee.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/InterpreterFlee",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.6,
+      "loop": false,
+      "frames": 40
+    },
+    "InterpreterGrabCollar": {
+      "file": "Animation_XBot_InterpreterGrabCollar.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/InterpreterGrabCollar",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "InterpreterShotStagger": {
+      "file": "Animation_XBot_InterpreterShotStagger.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/InterpreterShotStagger",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "LiuBoxUpGo": {
+      "file": "Animation_XBot_LiuBoxUpGo.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/LiuBoxUpGo",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.5,
+      "loop": false,
+      "frames": 61
+    },
+    "LiuDivideAmmoToss": {
+      "file": "Animation_XBot_LiuDivideAmmoToss.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/LiuDivideAmmoToss",
+      "sourceModel": "TengxianNra02",
+      "duration": 4,
+      "loop": false,
+      "frames": 97
+    },
+    "LuoDadaoChopRear": {
+      "file": "Animation_XBot_LuoDadaoChopRear.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/LuoDadaoChopRear",
+      "sourceModel": "TengxianNra05",
+      "duration": 1.3,
+      "loop": false,
+      "frames": 33
+    },
+    "LuoHandRifle": {
+      "file": "Animation_XBot_LuoHandRifle.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/LuoHandRifle",
+      "sourceModel": "TengxianNra05",
+      "duration": 5.4167,
+      "loop": false,
+      "frames": 131
+    },
+    "LuoKneelCheck": {
+      "file": "Animation_XBot_LuoKneelCheck.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/LuoKneelCheck",
+      "sourceModel": "TengxianNra05",
+      "duration": 3.4,
+      "loop": false,
+      "frames": 83
+    },
+    "MessengerReport": {
+      "file": "Animation_XBot_MessengerReport.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/MessengerReport",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": true,
+      "frames": 73
+    },
+    "PullComrade": {
+      "file": "Animation_XBot_PullComrade.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/PullComrade",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvBlanketDragL": {
+      "file": "Animation_XBot_PvBlanketDragL.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvBlanketDragL",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "PvBlanketDragR": {
+      "file": "Animation_XBot_PvBlanketDragR.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvBlanketDragR",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "PvBlanketReleaseTurn": {
+      "file": "Animation_XBot_PvBlanketReleaseTurn.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvBlanketReleaseTurn",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvBlastThrownBack": {
+      "file": "Animation_XBot_PvBlastThrownBack.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvBlastThrownBack",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.6,
+      "loop": false,
+      "frames": 40
+    },
+    "PvCaptiveButtHit": {
+      "file": "Animation_XBot_PvCaptiveButtHit.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvCaptiveButtHit",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.4,
+      "loop": false,
+      "frames": 35
+    },
+    "PvClimbOutTrench": {
+      "file": "Animation_XBot_PvClimbOutTrench.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvClimbOutTrench",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.5,
+      "loop": false,
+      "frames": 61
+    },
+    "PvCrawlCarryBundle": {
+      "file": "Animation_XBot_PvCrawlCarryBundle.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvCrawlCarryBundle",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "PvCrouchCountFingers": {
+      "file": "Animation_XBot_PvCrouchCountFingers.glb",
+      "method": "retarget",
+      "source": "PrevizTalk/PvCrouchCountFingers",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": true,
+      "frames": 73
+    },
+    "PvCrouchGripLitter": {
+      "file": "Animation_XBot_PvCrouchGripLitter.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvCrouchGripLitter",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvCrouchPointL": {
+      "file": "Animation_XBot_PvCrouchPointL.glb",
+      "method": "mirror",
+      "source": "Mixamo/Animation_Mixamo_KneelingPointing_V1.glb (mirrored)",
+      "duration": 3.9333,
+      "loop": false,
+      "frames": 119
+    },
+    "PvCrouchRunPullBehind": {
+      "file": "Animation_XBot_PvCrouchRunPullBehind.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvCrouchRunPullBehind",
+      "sourceModel": "TengxianNra02",
+      "duration": 1,
+      "loop": true,
+      "frames": 25
+    },
+    "PvIjaBayonetRaiseThreat": {
+      "file": "Animation_XBot_PvIjaBayonetRaiseThreat.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaBayonetRaiseThreat",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.4,
+      "loop": false,
+      "frames": 35
+    },
+    "PvIjaCrouchHairLift": {
+      "file": "Animation_XBot_PvIjaCrouchHairLift.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaCrouchHairLift",
+      "sourceModel": "TengxianNra02",
+      "duration": 3.5,
+      "loop": false,
+      "frames": 85
+    },
+    "PvIjaLauncherFire": {
+      "file": "Animation_XBot_PvIjaLauncherFire.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaLauncherFire",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "PvIjaLauncherLoad": {
+      "file": "Animation_XBot_PvIjaLauncherLoad.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaLauncherLoad",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "PvIjaLungeParriedFall": {
+      "file": "Animation_XBot_PvIjaLungeParriedFall.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaLungeParriedFall",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.2,
+      "loop": false,
+      "frames": 54
+    },
+    "PvIjaSignalSplit": {
+      "file": "Animation_XBot_PvIjaSignalSplit.glb",
+      "method": "retarget",
+      "source": "PrevizIja/PvIjaSignalSplit",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvKneelDig": {
+      "file": "Animation_XBot_PvKneelDig.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvKneelDig",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "PvKneelHaulBody": {
+      "file": "Animation_XBot_PvKneelHaulBody.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvKneelHaulBody",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.5,
+      "loop": true,
+      "frames": 61
+    },
+    "PvKneelPullBlanket": {
+      "file": "Animation_XBot_PvKneelPullBlanket.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvKneelPullBlanket",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "PvLegHitKneelClutch": {
+      "file": "Animation_XBot_PvLegHitKneelClutch.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvLegHitKneelClutch",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvLieGrabSleeve": {
+      "file": "Animation_XBot_PvLieGrabSleeve.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvLieGrabSleeve",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "PvProneBeckonL": {
+      "file": "Animation_XBot_PvProneBeckonL.glb",
+      "method": "retarget",
+      "source": "PrevizTalk/PvProneBeckonL",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.6,
+      "loop": true,
+      "frames": 40
+    },
+    "PvShoulderShove": {
+      "file": "Animation_XBot_PvShoulderShove.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvShoulderShove",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": false,
+      "frames": 30
+    },
+    "PvSitGrabHand": {
+      "file": "Animation_XBot_PvSitGrabHand.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvSitGrabHand",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.5,
+      "loop": false,
+      "frames": 61
+    },
+    "PvSitOfferArm": {
+      "file": "Animation_XBot_PvSitOfferArm.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvSitOfferArm",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "PvSitRestRifle": {
+      "file": "Animation_XBot_PvSitRestRifle.glb",
+      "method": "retarget",
+      "source": "PrevizTalk/PvSitRestRifle",
+      "sourceModel": "TengxianNra02",
+      "duration": 4,
+      "loop": true,
+      "frames": 97
+    },
+    "PvSitStuffPack": {
+      "file": "Animation_XBot_PvSitStuffPack.glb",
+      "method": "retarget",
+      "source": "PrevizCare/PvSitStuffPack",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": true,
+      "frames": 73
+    },
+    "PvStandBeckonL": {
+      "file": "Animation_XBot_PvStandBeckonL.glb",
+      "method": "retarget",
+      "source": "PrevizTalk/PvStandBeckonL",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.8,
+      "loop": true,
+      "frames": 45
+    },
+    "PvStandHaltL": {
+      "file": "Animation_XBot_PvStandHaltL.glb",
+      "method": "retarget",
+      "source": "PrevizKimodo/PvStandHaltL",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.0125,
+      "loop": false,
+      "frames": 49
+    },
+    "PvStandShakeHead": {
+      "file": "Animation_XBot_PvStandShakeHead.glb",
+      "method": "retarget",
+      "source": "PrevizTalk/PvStandShakeHead",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.6,
+      "loop": false,
+      "frames": 40
+    },
+    "PvStandToProneDive": {
+      "file": "Animation_XBot_PvStandToProneDive.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvStandToProneDive",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": false,
+      "frames": 30
+    },
+    "PvStandWaveOnL": {
+      "file": "Animation_XBot_PvStandWaveOnL.glb",
+      "method": "mirror",
+      "source": "Mixamo/Animation_Mixamo_Waving_V3.glb (mirrored)",
+      "duration": 4.7667,
+      "loop": false,
+      "frames": 144
+    },
+    "PvSupportedHop": {
+      "file": "Animation_XBot_PvSupportedHop.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvSupportedHop",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "PvSupportWalkL": {
+      "file": "Animation_XBot_PvSupportWalkL.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvSupportWalkL",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "PvSupportWalkR": {
+      "file": "Animation_XBot_PvSupportWalkR.glb",
+      "method": "retarget",
+      "source": "PrevizCombat/PvSupportWalkR",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "VilBiteWrist": {
+      "file": "Animation_XBot_VilBiteWrist.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilBiteWrist",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.6,
+      "loop": false,
+      "frames": 40
+    },
+    "VilClingHem": {
+      "file": "Animation_XBot_VilClingHem.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilClingHem",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "VilCowerWhimper": {
+      "file": "Animation_XBot_VilCowerWhimper.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilCowerWhimper",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": true,
+      "frames": 49
+    },
+    "VilCrawlHole": {
+      "file": "Animation_XBot_VilCrawlHole.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilCrawlHole",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "VilCrouchHold": {
+      "file": "Animation_XBot_VilCrouchHold.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilCrouchHold",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": true,
+      "frames": 73
+    },
+    "VilDraggedByArm": {
+      "file": "Animation_XBot_VilDraggedByArm.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilDraggedByArm",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "VilDuckProne": {
+      "file": "Animation_XBot_VilDuckProne.glb",
+      "method": "retarget",
+      "source": "PrevizKimodo/VilDuckProne",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.0542,
+      "loop": false,
+      "frames": 50
+    },
+    "VilHandsUpClimbOut": {
+      "file": "Animation_XBot_VilHandsUpClimbOut.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilHandsUpClimbOut",
+      "sourceModel": "TengxianNra02",
+      "duration": 5,
+      "loop": false,
+      "frames": 121
+    },
+    "VilHugLegs": {
+      "file": "Animation_XBot_VilHugLegs.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilHugLegs",
+      "sourceModel": "TengxianNra02",
+      "duration": 2,
+      "loop": false,
+      "frames": 49
+    },
+    "VilIjaBayonetLiftFling": {
+      "file": "Animation_XBot_VilIjaBayonetLiftFling.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilIjaBayonetLiftFling",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.2,
+      "loop": false,
+      "frames": 54
+    },
+    "VilIjaClimbWall": {
+      "file": "Animation_XBot_VilIjaClimbWall.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilIjaClimbWall",
+      "sourceModel": "TengxianNra02",
+      "duration": 3.4,
+      "loop": false,
+      "frames": 83
+    },
+    "VilIjaDragByArm": {
+      "file": "Animation_XBot_VilIjaDragByArm.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilIjaDragByArm",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "VilIjaPinBayonet": {
+      "file": "Animation_XBot_VilIjaPinBayonet.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilIjaPinBayonet",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": false,
+      "frames": 73
+    },
+    "VilIjaShoulderCharge": {
+      "file": "Animation_XBot_VilIjaShoulderCharge.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilIjaShoulderCharge",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.4,
+      "loop": false,
+      "frames": 35
+    },
+    "VilKneelCrawlToPit": {
+      "file": "Animation_XBot_VilKneelCrawlToPit.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilKneelCrawlToPit",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4,
+      "loop": true,
+      "frames": 59
+    },
+    "VilNraCarryOnBack": {
+      "file": "Animation_XBot_VilNraCarryOnBack.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilNraCarryOnBack",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "VilNraYankBack": {
+      "file": "Animation_XBot_VilNraYankBack.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilNraYankBack",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4,
+      "loop": false,
+      "frames": 59
+    },
+    "VilReachPinned": {
+      "file": "Animation_XBot_VilReachPinned.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilReachPinned",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4,
+      "loop": false,
+      "frames": 59
+    },
+    "VilRideOnBack": {
+      "file": "Animation_XBot_VilRideOnBack.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilRideOnBack",
+      "sourceModel": "TengxianNra02",
+      "duration": 1.2,
+      "loop": true,
+      "frames": 30
+    },
+    "VilSitEdge": {
+      "file": "Animation_XBot_VilSitEdge.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilSitEdge",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4,
+      "loop": true,
+      "frames": 59
+    },
+    "VilStabbedFall": {
+      "file": "Animation_XBot_VilStabbedFall.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilStabbedFall",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.4,
+      "loop": false,
+      "frames": 59
+    },
+    "VilUnboltDoor": {
+      "file": "Animation_XBot_VilUnboltDoor.glb",
+      "method": "retarget",
+      "source": "PrevizVillage/VilUnboltDoor",
+      "sourceModel": "TengxianNra02",
+      "duration": 2.6,
+      "loop": false,
+      "frames": 64
+    },
+    "WoundedSitRifleIdle": {
+      "file": "Animation_XBot_WoundedSitRifleIdle.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/WoundedSitRifleIdle",
+      "sourceModel": "TengxianNra02",
+      "duration": 4,
+      "loop": true,
+      "frames": 97
+    },
+    "YaowaSitLoad": {
+      "file": "Animation_XBot_YaowaSitLoad.glb",
+      "method": "retarget",
+      "source": "OpeningStoryboards/YaowaSitLoad",
+      "sourceModel": "TengxianNra02",
+      "duration": 3,
+      "loop": true,
+      "frames": 73
+    }
+  }
+}
