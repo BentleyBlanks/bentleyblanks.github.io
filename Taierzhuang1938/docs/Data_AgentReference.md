@@ -412,7 +412,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 ### 人物 / AI / 合批
 - **士兵分组件（2026-11-01）**：`Soldier` 的字段分在十个组件里（`soldier.arms.ammo` 等），表 `Data_SoldierComponents.mjs`，旧字段名由生成的 `Script_SoldierFields.mjs` 存取器照常读写。新字段先进表；门禁 `SoldierComponentsTest`。见 [敌军 AI §22](Data_EnemyAi.md)。
 - **士兵字段固定、标签、主人、兵种原型（2026-11-02）**：后挂字段全部进表（新组件 `mission` / `opening` / `cast` / `presentation`）；身份开关是 `soldier.tags` 的位（`HasTag` / `SetTag`，表 `SOLDIER_TAGS`）；主人以外的直接写入只许是 `Data_SoldierForeignWrites.json` 里的旧账（`SoldierComponentsTest` 拦新增）；兵种原型 `Data_SoldierArchetypes`，`ai.Spawn(side, x, z, { archetype })`，每个兵记 `soldier.archetype`。见 [敌军 AI §24](Data_EnemyAi.md)。
-- **数据来源表、数据模块只放数据、数据引用（2026-11-02）**：每份数据文件的身份在 `Data_DataSources.mjs`（656 份：源头 317、生成的 339）；`Data_X.mjs` 的配套函数在 `Script_X.mjs`（重名时 `Script_XData.mjs`），还没搬的 52 个模块在 `DATA_JSON_DEBT`；台词编号引用由 `DataRefsTest` 核。见 [数据来源与引用](Data_DataSources.md)。
+- **数据来源表、数据模块只放数据、数据引用（2026-11-02）**：每份数据文件的身份在 `Data_DataSources.mjs`（662 份：源头 317、生成的 345）；`Data_X.mjs` 的配套函数在 `Script_X.mjs`（重名时 `Script_XData.mjs`），还没搬的 52 个模块在 `DATA_JSON_DEBT`；台词编号引用由 `DataRefsTest` 核。见 [数据来源与引用](Data_DataSources.md)。
 - **带路跑通用设计**：普通随队士兵采用独立错峰的「跑几步 → 短停喘息与左右观察 → 再跑」，班长按引导职责行动。跨关卡复用、行为优先级、动画衔接与动态验收见 [NPC 带路跑通用设计](Data_NpcGuideCadence.md)。共享 `Script_SquadMarch` / `Script_SquadMarchAi` 已接第一关 Guide，`Script_EditorSquadMarch` 提供 1–24 人、路线、种子与参数预览/保存；分项验收状态见设计文档第 9 节。
 - 国军眼球材质与肩线资产修复、独立 Blender 工程和重建入口见 [国军眼睛与肩线修复](Data_NraEyesShoulders.md)。
 - `Script_Actor.mjs` —— 近景蒙皮 GLB 人物与程序化回退；预通道支持骨骼形变和运动历史。

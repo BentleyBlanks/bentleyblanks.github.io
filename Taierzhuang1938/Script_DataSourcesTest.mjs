@@ -19,7 +19,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
 const failures = [];
 const Check = (ok, message) => { checks += 1; if (!ok) failures.push(message); };
-const Glob = (pattern) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "(?:.*/)?").replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*")}$`);
+// 通配转正则：** 跨目录、* 不跨目录（逐段替换，免得 ** 换出来的 .* 又被 * 那一步改坏）。
+const Esc = (s) => s.replace(/[.+^${}()|[\]\\?]/g, "\\$&");
+const Glob = (pattern) => new RegExp(`^${pattern.split("**/").map((a) => a.split("**").map((b) => b.split("*").map(Esc).join("[^/]*")).join(".*")).join("(?:.*/)?")}$`);
 const include = DATA_SCAN.include.map(Glob), exclude = DATA_SCAN.exclude.map(Glob);
 
 /** 项目里的数据文件：git 跟踪的 + 未跟踪但没被忽略的。 */
