@@ -612,6 +612,14 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 先读：`docs/Data_AudioAssets.md`（素材与烘焙）、`docs/Data_AudioEngine.md`（引擎模型与探针契约）、`docs/Data_AudioWiring.md`（触发条件与限频）。
 - 2026-09-11 引擎/近距爆炸替换、持续试听停止及四首车厢配乐候选见 [车厢音频修订](Data_CarriageAudioReview.md)。
 
+### 环境 / 天光
+- **组件式环境系统**（2026-11-02）：场景的区域文件 `Scenes/<Id>/Environment_<Id>.json` + 环境预设 `Environment/EnvPreset_<Id>.json`；
+  组件声明 `Data_EnvComponents.mjs`、执行 `Script_EnvComponents.mjs`、求值 `Script_EnvTrack.mjs`、格式 `Script_EnvPreset.mjs`、
+  框架 `Script_EnvSystem.mjs`（零 three）、接渲染 `Script_EnvApply.mjs`；编辑器是白盒编辑器右侧「环境」面板（`Script_EditorEnvironment*.mjs`、
+  `Script_EnvVolumeGizmo.mjs`）。浏览器 `window.Tengxian.Debug.Lighting`（游戏侧）、`Debug.Blockout.Environment`（编辑器侧）；
+  本机存盘 `/__environment/save`。门禁 `Script_EnvSystemTest.mjs`（纯 Node）、`Script_EnvironmentBrowserTest.mjs`。口径见 [环境系统](Data_Environment.md)。
+  没有区域文件的关卡仍按 `phase.sky` 套 `Script_Sky.SKY_PRESETS`。
+
 ### 过场 / 剧情
 - **Timeline 过场**（2026-10-31 起，取代已删的 `Script_Cutscene.mjs` / `Data_Cutscene*.mjs`）：数据 `Timeline/<Id>.timeline.json`
   （子序列 = 白盒预演段，字段口径 `docs/Data_EditorBlockout.md` §14.1），规则 `Script_TimelinePlan.mjs`（纯 Node），

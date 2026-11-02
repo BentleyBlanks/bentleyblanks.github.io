@@ -293,6 +293,18 @@ export class LightRig {
 
   /** 套用 SKY_PRESETS 里那一份光照参数。 */
   ApplyPreset(preset, sunDirection) {
+    this.ApplyLevels(preset);
+    this.sunDirection.copy(sunDirection).normalize();
+    // 太阳换方向 = 所有级的图全废，下一帧整体重烘（CsmRig 自己也会按点积判，
+    // 这里显式点一下是为了换关那一帧不落后）。
+    this.csm.ForceUpdate();
+  }
+
+  /**
+   * 只换光的色与强度（平行光 / 天光探针 / 环境底色 / 照明弹昼夜口径），不动方向、不重烘阴影。
+   * 环境系统（Script_EnvApply）在昼夜过渡里只有色温在变时走这条：方向没变，级联阴影图仍然有效。
+   */
+  ApplyLevels(preset) {
     this.flareSceneScale = preset.flareSceneScale ?? 1;
     this.sun.color.setHex(preset.lightColor);
     this.sun.intensity = preset.lightIntensity;
@@ -301,13 +313,9 @@ export class LightRig {
     this.ambient.color.setHex(preset.ambientColor ?? 0x607085);
     this.ambientBase = preset.ambientIntensity ?? (preset.lightIntensity <= 0.5 ? 0.045 : 0.16);
     this._ApplyFill();
-    this.sunDirection.copy(sunDirection).normalize();
     // 夜战（lightIntensity ≤ 0.35）关掉阴影：那一档太阳本来就几乎不照，
     // 烘四张图纯属白花。low 档不再一刀切关掉（见构造器里的账）。
     this.csm.SetCastShadow(preset.lightIntensity > 0.35);
-    // 太阳换方向 = 所有级的图全废，下一帧整体重烘（CsmRig 自己也会按点积判，
-    // 这里显式点一下是为了换关那一帧不落后）。
-    this.csm.ForceUpdate();
   }
 
   /**

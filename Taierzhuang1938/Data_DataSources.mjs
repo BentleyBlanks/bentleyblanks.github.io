@@ -14,6 +14,10 @@ const RULE = (match, role, by, note) => Object.freeze({ match, role, by: Object.
 
 export const DATA_SOURCE_RULES = Object.freeze([
   // --- 关卡内容 ---------------------------------------------------------------------------------------------
+  RULE("Scenes/*/Environment_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],
+    "场景的环境：昼夜时钟默认值 + 区域列表（区域引用环境预设、管影响范围）。环境编辑器经本机 /__environment/save 存，agent 直接改它（docs/Data_Environment.md §4）"),
+  RULE("Environment/EnvPreset_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],
+    "环境预设：组件容器（主光 / 环境光 / 天空 / 雾……每种一份，参数可按昼夜关键帧），可被多个区域、场景复用。种子脚本只生成过一次，之后改文件本身"),
   RULE("Scenes/*/Scene_*.json", "source", ["SceneEditor.html", "../scripts/Script_LocalPreview.mjs", "Script_SceneRebuild1218.mjs"],
     "场景文件：资产编号引用列表。场景编辑器经本机 /__scene/save 存，agent 直接改它；白盒场景与正式场景两份并存（用户 2026-11-01 定）"),
   RULE("Blockout/*.previz.json", "generated", ["Script_EditorBlockoutFirstLevel0105Previz.mjs", "Script_EditorBlockoutFirstLevel0610Previz.mjs", "Script_EditorBlockoutFirstLevel1218Previz.mjs", "Script_TimelineCli.mjs"],
@@ -55,7 +59,7 @@ export const DATA_RETIRED = Object.freeze([]);
 
 /** 门禁扫哪些文件：数据模块、JSON（这些目录与根目录），不扫第三方、导入工作区、取证输出。 */
 export const DATA_SCAN = Object.freeze({
-  include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
+  include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
     "Audio/**/*.json", "Font/*.json", "Volume/*.json", "Model/**/*.json", "_blender/**/*.json", "docs/*.json"]),
   exclude: Object.freeze(["vendor/**", "node_modules/**", "_import/**", "_shots/**", "tmp/**"]),
 });

@@ -134,6 +134,35 @@ export function WorldDebugApi(ctx) {
           villageArchetypes: { ...ctx.battlefield.outfield.stats.villageArchetypes },
         } : null,
       }),
+      /**
+       * 组件式环境系统（docs/Data_Environment.md §8；上面那个 Environment 是城镇细节计数，名字不动）。
+       *   Debug.Lighting.State()                  时钟、观察点、每种组件的来源与过渡进度、后期档案
+       *   Debug.Lighting.SetHour(18) / SetLook("dusk") / Play(0.5) / Pause()
+       *   Debug.Lighting.Sources()                区域 + 临时覆盖，按优先级排，带「观察点在不在里面」「给哪些组件当来源」
+       *   Debug.Lighting.Values("Fog")            这一刻实际在用的某个组件参数（过渡中是插到一半的值）
+       *   Debug.Lighting.Output()                 拼出来交给渲染的那份环境参数（与 SKY_PRESETS 同形）
+       *   Debug.Lighting.PushOverride({ preset, priority, blendS, mode }) → id；ReleaseOverride(id, blendS)
+       *   Debug.Lighting.Observer("pinned", {x,y,z}) / Observer("camera")
+       * 场景没有环境文件时 State().active = false，天光照旧按 phase.sky。
+       */
+      Lighting: {
+        State: () => ({ ...ctx.env.State(), bridge: ctx.envBridge.State() }),
+        SetHour: (hour) => { ctx.env.SetHour(hour); return ctx.env.clock.hour; },
+        SetLook: (id) => ctx.env.SetLook(id),
+        Play: (speed) => { if (speed != null) ctx.env.SetSpeed(speed); ctx.env.SetPaused(false); return { ...ctx.env.clock }; },
+        Pause: () => { ctx.env.SetPaused(true); return { ...ctx.env.clock }; },
+        Sources: () => ctx.env.Sources(),
+        Values: (type) => ctx.env.CurrentValues(type),
+        Output: () => (ctx.env.output ? JSON.parse(JSON.stringify(ctx.env.output.preset)) : null),
+        PushOverride: (spec) => ctx.env.PushOverride(spec).id,
+        ReleaseOverride: (id, blendS) => ctx.env.ReleaseOverride(id, blendS),
+        Observer: (mode, at = null) => {
+          ctx.env.observerMode = mode === "pinned" || mode === "player" ? mode : "camera";
+          ctx.env.pinnedAt = at ? { x: at.x, y: at.y ?? 0, z: at.z } : null;
+          ctx.env.Touch();
+          return ctx.env.observerMode;
+        },
+      },
       /** 从某点朝某方向打一条射线（斜墙/空气墙的取证）。 */
       Ray: (ox, oy, oz, dx, dy, dz, maxDist = 60, terrain = false) => {
         const d = Math.hypot(dx, dy, dz) || 1;

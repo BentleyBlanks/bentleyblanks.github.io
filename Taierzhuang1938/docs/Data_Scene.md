@@ -10,6 +10,7 @@
 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json         场景：物件引用列表 + 地面涂色 + 远景设置 + 设计标注
 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.height.bin   高度图：int16 小端、厘米，(cols+1)×(rows+1) 个格点，heights[iz*(cols+1)+ix]；沟没挖之前的地面（§9）
 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.trench.bin   有壕沟时：挖沟基准面，几块 1 m 格依次排（§9）
+Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时钟默认值 + 区域列表（区域引用 Environment/EnvPreset_*.json），见 docs/Data_Environment.md
 ```
 
 - 现有场景（清单 `Data_SceneAssets.SCENE_LIST`，场景编辑器的下拉、存盘口都认这张表）：
@@ -124,7 +125,7 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.trench.bin   有壕沟时：挖沟基准�
 
 ## 7. 还没做的
 
-- ~~去掉「白盒」画质档~~（2026-10-31 已做）：`GRAPHICS_PROFILES` 只剩 low / medium / high / ultra，白盒编辑器走正常渲染管线，灰表面 + 米格线是白盒材质本身的样子（`Script_WhiteboxMaterial`、`Data_Tuning_WhiteboxMaterial`；场景里的 `Whitebox/*` 材质按语义映射到它，`DressWorld` 装上）。光照写进场景还没做：现在白盒编辑器用本关光照 + `BLOCKOUT_EDITOR_FILL` 补光。
+- ~~去掉「白盒」画质档~~（2026-10-31 已做）：`GRAPHICS_PROFILES` 只剩 low / medium / high / ultra，白盒编辑器走正常渲染管线，灰表面 + 米格线是白盒材质本身的样子（`Script_WhiteboxMaterial`、`Data_Tuning_WhiteboxMaterial`；场景里的 `Whitebox/*` 材质按语义映射到它，`DressWorld` 装上）。~~光照写进场景还没做~~（2026-11-02 已做）：场景的天光由同目录的 `Environment_<Id>.json`（区域）+ `Environment/EnvPreset_<Id>.json`（预设）出，见 [环境系统](Data_Environment.md)；`BLOCKOUT_EDITOR_FILL` 补光照旧乘在上面。
 - ~~外部道具与 PBR 材质进目录~~（2026-11-01 已做，§8）；构件库可布设清单（`Script_PlaceableCatalog`）还没进；场景编辑器里的地形刷子、地面涂色、框选；高度图存盘。
 - 壕沟：
   - 场景编辑器改一次地形约 1.3 s：整张地面重画，正式场景还要重算分层权重；只重画改动的那一块还没做。

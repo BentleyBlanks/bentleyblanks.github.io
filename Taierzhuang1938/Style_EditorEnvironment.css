@@ -1,0 +1,206 @@
+/* 环境编辑器（docs/Data_Environment.md §8）：白盒编辑器右侧的「环境」面板 + 底部昼夜时间轴。
+   同白盒编辑器（Style_EditorBlockout.css 的 --bo-*）一套视觉语言：半透明暗色渐变底、象牙白文字、橄榄灰细线、
+   左侧金边选中条、宽字距小标题、直角控件、数字等宽。挂在 .boRoot 里，直接用 --bo-* 变量。 */
+
+.boRoot :is(.envPanel, .envTimeline) { pointer-events: auto; user-select: none; }
+.boRoot .envPanel {
+  position: absolute; right: 16px; top: 58px; bottom: 16px; width: 432px; z-index: 8;
+  display: flex; flex-direction: column;
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge); box-shadow: 0 20px 50px #0009;
+}
+.boRoot.envTimelineOpen .envPanel { bottom: 16px; }
+.boRoot.envTimelineOpen :is(.boNav, .boMini) { display: none; }
+.envTopBtn { height: 34px; padding: 0 12px; letter-spacing: 0.16em; color: var(--bo-text); border-color: var(--bo-edge) !important; background: #13140b99 !important; }
+.envTopBtn.on { color: var(--bo-gold-text); border-color: var(--bo-gold) !important; background: var(--bo-sel-strong) !important; }
+
+/* --- 头 ------------------------------------------------------------------ */
+.envHead { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--bo-line-strong); flex: 0 0 auto; }
+.envTitle { font: 600 15px/1 var(--bo-serif); letter-spacing: 0.2em; color: var(--bo-bright); }
+.envSceneName { flex: 1 1 auto; min-width: 0; color: var(--bo-muted); font-size: 12px; letter-spacing: 0.06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envDirtyDot { width: 8px; height: 8px; border-radius: 50%; background: var(--bo-gold); margin-right: 4px; }
+.envDirtyDot[hidden] { display: none; }
+.envIcon {
+  min-width: 26px; height: 26px; padding: 0 5px; border: 1px solid transparent; background: transparent; color: var(--bo-muted);
+  font: 13px/1 var(--bo-font); cursor: pointer; border-radius: 0;
+}
+.envIcon:hover:not(:disabled) { color: var(--bo-bright); border-color: var(--bo-line-strong); background: #ffffff0a; }
+.envIcon:disabled { opacity: 0.35; cursor: default; }
+.envIcon.on { color: var(--bo-gold-text); border-color: var(--bo-gold); background: var(--bo-sel-strong); }
+.envIcon.danger:hover { color: #ffb4a6; border-color: var(--bo-bad); }
+.envClose { font-size: 17px; }
+.envBtn {
+  height: 26px; padding: 0 10px; border: 1px solid var(--bo-line-strong); background: #ffffff08; color: var(--bo-text);
+  font: 12px/1 var(--bo-font); letter-spacing: 0.08em; cursor: pointer; border-radius: 0; white-space: nowrap;
+}
+.envBtn:hover:not(:disabled) { border-color: var(--bo-gold); color: var(--bo-bright); background: var(--bo-sel-strong); }
+.envBtn:disabled { opacity: 0.4; cursor: default; }
+.envBtn.primary { border-color: #edca8388; color: var(--bo-gold-text); }
+.envStatus { padding: 6px 14px; font-size: 12px; color: var(--bo-muted); border-bottom: 1px solid var(--bo-line); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.envStatus.bad { color: #f0a493; background: #d6604a1a; }
+.envStatus[hidden] { display: none; }
+
+/* --- 时间条 ---------------------------------------------------------------- */
+.envTime { padding: 9px 14px 8px; border-bottom: 1px solid var(--bo-line-strong); display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.envTimeRow { display: flex; align-items: center; gap: 8px; }
+.envClock { font: 600 18px/1 var(--bo-num); color: var(--bo-bright); min-width: 58px; letter-spacing: 0.04em; }
+.envTimeRange { flex: 1 1 auto; }
+.envLooks { display: flex; gap: 4px; flex: 1 1 auto; }
+.envLook { height: 24px; padding: 0 10px; border: 1px solid var(--bo-line-strong); background: transparent; color: var(--bo-text); font: 12px/1 var(--bo-font); letter-spacing: 0.14em; cursor: pointer; border-radius: 0; }
+.envLook:hover { border-color: var(--bo-gold); color: var(--bo-bright); }
+.envLook.on { border-color: var(--bo-gold); background: var(--bo-sel-strong); color: var(--bo-gold-text); border-left-width: 2px; }
+.envSpeed { width: 92px; }
+
+/* --- 页签与正文 ------------------------------------------------------------- */
+.envTabs { display: flex; border-bottom: 1px solid var(--bo-line-strong); flex: 0 0 auto; }
+.envTab { flex: 1; height: 32px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--bo-muted); font: 13px/1 var(--bo-font); letter-spacing: 0.3em; cursor: pointer; }
+.envTab:hover { color: var(--bo-bright); }
+.envTab.on { color: var(--bo-gold-text); border-bottom-color: var(--bo-gold); background: linear-gradient(0deg, #d8d4c31a, transparent); }
+.envBody { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 4px 0 18px; scrollbar-width: thin; scrollbar-color: #c1bdab55 transparent; }
+.envPage[hidden] { display: none; }
+.envSection { display: flex; align-items: center; gap: 6px; margin: 14px 14px 6px; padding-bottom: 4px; border-bottom: 1px solid var(--bo-line); color: var(--bo-faint); font-size: 11px; letter-spacing: 0.22em; }
+.envSection > :is(select, .envSectionTools) { margin-left: auto; letter-spacing: 0.04em; }
+.envSectionTools { display: flex; gap: 2px; }
+.envEmpty { margin: 12px 14px; color: var(--bo-faint); font-size: 12px; line-height: 1.6; }
+.envPage > .envBtn { margin: 4px 14px; }
+
+/* 当前生效 / 区域列表 */
+.envEffective, .envSources, .envVolList { display: flex; flex-direction: column; margin: 0 8px; }
+.envEffRow, .envSrcRow {
+  position: relative; display: flex; align-items: center; gap: 7px; min-height: 26px; padding: 3px 8px 3px 10px;
+  border-left: 2px solid transparent; cursor: pointer; font-size: 12.5px;
+}
+.envEffRow:hover, .envSrcRow:hover { background: var(--bo-sel); }
+.envSrcRow.selected { background: var(--bo-sel-strong); border-left-color: var(--bo-gold); }
+.envSrcRow.off { opacity: 0.5; }
+.envEffIcon { width: 16px; text-align: center; color: var(--bo-gold-text); }
+.envEffName { width: 78px; color: var(--bo-bright); }
+.envEffSrc, .envSrcMeta { flex: 1 1 auto; min-width: 0; color: var(--bo-muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envSrcMeta { flex: 0 0 auto; margin-left: auto; font-family: var(--bo-num); font-size: 11px; }
+.envSrcName { flex: 1 1 auto; min-width: 0; color: var(--bo-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envEffBar { position: absolute; left: 10px; right: 8px; bottom: 1px; height: 2px; background: #ffffff10; }
+.envEffBar::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--t); background: var(--bo-sync); }
+.envTag { flex: 0 0 auto; padding: 0 6px; font-size: 10.5px; line-height: 17px; letter-spacing: 0.14em; border: 1px solid var(--bo-line-strong); color: var(--bo-muted); }
+.envTag.volume { color: var(--bo-gold-text); border-color: #edca8366; }
+.envTag.override { color: var(--bo-sync); border-color: #86c9dc77; }
+.envTag.none { color: var(--bo-faint); border-style: dashed; }
+.envDot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; border: 1px solid var(--bo-line-strong); }
+.envSrcRow.inside .envDot { background: var(--bo-sync); border-color: var(--bo-sync); }
+.envLink { border: 0; background: transparent; padding: 0; color: var(--bo-gold-text); font: 11.5px/1 var(--bo-num); cursor: pointer; text-decoration: underline dotted #edca8366; }
+.envLink.bad { color: var(--bo-bad); }
+
+/* 检查器字段 */
+.envInspector { margin: 6px 14px 0; display: flex; flex-direction: column; gap: 5px; }
+.envField { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 26px; }
+.envFieldLabel { color: var(--bo-muted); font-size: 12px; }
+.envFieldHint { color: var(--bo-faint); font-size: 11.5px; }
+.envInline, .envVec { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.envMono { font: 12px/1 var(--bo-num); color: var(--bo-text); }
+.envText, .envNum, .envSelect, .envHex, .envSearch {
+  height: 24px; min-width: 0; padding: 0 6px; border: 1px solid var(--bo-line-strong); border-radius: 0;
+  background: #0b0c09cc; color: var(--bo-bright); font: 12px/1 var(--bo-font);
+}
+.envNum, .envHex { font-family: var(--bo-num); }
+.envText { width: 100%; }
+.envNum { width: 74px; }
+.envNum.narrow { width: 70px; }
+.envSelect { padding: 0 4px; }
+:is(.envText, .envNum, .envSelect, .envHex, .envSearch):focus { outline: none; border-color: var(--bo-gold); }
+.envCheck { accent-color: #d9bb7b; width: 14px; height: 14px; margin: 0; }
+.envColor { width: 30px; height: 22px; padding: 0; border: 1px solid var(--bo-line-strong); background: transparent; cursor: pointer; }
+.envRange { appearance: none; -webkit-appearance: none; height: 16px; background: transparent; cursor: pointer; min-width: 0; }
+.envRange::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(90deg, var(--bo-gold-fill) var(--fill, 0%), #c1bdab44 var(--fill, 0%)); }
+.envRange::-webkit-slider-thumb { -webkit-appearance: none; width: 4px; height: 14px; margin-top: -6px; background: var(--bo-gold-hi); border-radius: 0; }
+.envRange::-moz-range-track { height: 2px; background: #c1bdab44; }
+.envRange::-moz-range-progress { height: 2px; background: var(--bo-gold-fill); }
+.envRange::-moz-range-thumb { width: 4px; height: 14px; border: 0; border-radius: 0; background: var(--bo-gold-hi); }
+
+/* --- 预设视图 --------------------------------------------------------------- */
+.envPresetView { margin: 4px 0 0; }
+.envFilters { display: flex; gap: 3px; margin: 2px 14px 6px; }
+.envFilter { min-width: 30px; height: 26px; font-size: 13px; border-color: var(--bo-line); }
+.envFilter.on { color: var(--bo-gold-text); border-color: var(--bo-gold); background: var(--bo-sel-strong); }
+.envPresetView > .envSearch { display: block; width: calc(100% - 28px); margin: 0 14px 8px; }
+.envCards { display: flex; flex-direction: column; gap: 6px; margin: 0 10px; }
+.envCard { border: 1px solid var(--bo-line); background: #ffffff04; }
+.envCard[hidden] { display: none; }
+.envCard.live { border-left: 2px solid var(--bo-gold); }
+.envCard.disabled .envCardTitle, .envCard.disabled .envCardIcon { opacity: 0.45; text-decoration: line-through; }
+.envCardHead { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 8px; cursor: pointer; background: linear-gradient(90deg, #d8d4c314, transparent); }
+.envCardHead:hover { background: var(--bo-sel-strong); }
+.envChevron { width: 10px; color: var(--bo-faint); font-size: 10px; }
+.envCardIcon { width: 16px; text-align: center; color: var(--bo-gold-text); }
+.envCardTitle { color: var(--bo-bright); font: 600 13px/1 var(--bo-serif); letter-spacing: 0.12em; }
+.envCardTag { color: var(--bo-faint); font-size: 10.5px; letter-spacing: 0.16em; }
+.envCardTools { margin-left: auto; display: flex; gap: 0; opacity: 0; transition: opacity 0.12s; }
+.envCardHead:hover .envCardTools { opacity: 1; }
+.envCardTools .envIcon { min-width: 22px; height: 22px; font-size: 12px; }
+.envCardBody { padding: 4px 8px 8px 12px; }
+.envCard.collapsed .envCardBody { display: none; }
+.envGroup { margin: 8px 0 2px; color: var(--bo-faint); font-size: 10.5px; letter-spacing: 0.24em; }
+.envParam { display: grid; grid-template-columns: 82px 22px minmax(0, 1fr) 22px 22px; align-items: center; gap: 4px; min-height: 26px; }
+.envParamLabel { color: var(--bo-text); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envParam.defaulted .envParamLabel { color: var(--bo-faint); }
+.envParam.animated .envParamLabel { color: var(--bo-gold-text); }
+.envParam .envIcon { min-width: 22px; height: 22px; padding: 0; font-size: 12px; }
+.envMode { color: var(--bo-faint); }
+.envParam.animated .envMode { color: var(--bo-gold-text); }
+.envKey { color: var(--bo-faint); }
+.envKey.on { color: var(--bo-gold-hi); }
+.envKey[hidden] { visibility: hidden; display: inline-block; }
+.envModeStub { width: 22px; }
+.envCtl { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.envCtl .envRange { flex: 1 1 auto; }
+.envCtl .envNum { width: 66px; flex: 0 0 auto; }
+.envCtl .envRgb { width: 54px; flex: 1 1 0; }
+.envCtl .envHex { width: 76px; }
+.envCtl .envSelect { flex: 1 1 auto; }
+.envAddWrap { position: relative; margin: 8px 10px 0; }
+.envAddWrap[hidden] { display: none; }
+.envAdd { width: 100%; height: 30px; border: 1px dashed var(--bo-line-strong); background: transparent; color: var(--bo-muted); font: 12.5px/1 var(--bo-font); letter-spacing: 0.2em; cursor: pointer; }
+.envAdd:hover, .envAdd.on { color: var(--bo-gold-text); border-color: var(--bo-gold); background: var(--bo-sel); }
+.envAddMenu { margin-top: 4px; border: 1px solid var(--bo-edge); background: #0d0e0bf5; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.envAddMenu[hidden] { display: none; }
+.envAddMenu .envSearch { width: 100%; }
+.envAddList { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+.envAddCat { margin: 6px 4px 2px; color: var(--bo-faint); font-size: 10.5px; letter-spacing: 0.22em; }
+.envAddItem { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 5px 8px; border: 0; border-left: 2px solid transparent; background: transparent; color: var(--bo-text); text-align: left; cursor: pointer; }
+.envAddItem:hover { background: var(--bo-sel-strong); border-left-color: var(--bo-gold); }
+.envAddItem b { font: 600 12.5px/1.2 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; }
+.envAddItem span { font-size: 11px; color: var(--bo-muted); line-height: 1.4; }
+
+/* --- 昼夜时间轴 ------------------------------------------------------------- */
+.boRoot .envTimeline {
+  position: absolute; left: 16px; right: 464px; bottom: 16px; height: 300px; z-index: 7;
+  display: flex; flex-direction: column;
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge); box-shadow: 0 20px 50px #0009;
+}
+.boRoot .envTimeline[hidden] { display: none; }
+.envTlHead { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--bo-line-strong); flex: 0 0 auto; }
+.envTlTitle { font: 600 14px/1 var(--bo-serif); letter-spacing: 0.2em; color: var(--bo-bright); }
+.envTlPreset { color: var(--bo-muted); font-size: 12px; }
+.envTlClock { font: 13px/1 var(--bo-num); color: var(--bo-gold-hi); min-width: 46px; }
+.envTlInterp { width: 92px; }
+.envTlInterp:disabled { opacity: 0.4; }
+.envTlOnly { display: flex; align-items: center; gap: 5px; color: var(--bo-muted); font-size: 12px; cursor: pointer; }
+.envTlHint { flex: 1 1 auto; min-width: 0; color: var(--bo-faint); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.envTlBody { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 150px minmax(0, 1fr); }
+.envTlLabels { overflow: hidden; border-right: 1px solid var(--bo-line); }
+.envTlLabelHead { height: 20px; padding: 0 10px; line-height: 20px; color: var(--bo-faint); font-size: 10.5px; letter-spacing: 0.2em; border-bottom: 1px solid var(--bo-line); }
+.envTlGroup, .envTlGroupLane { height: 20px; line-height: 20px; }
+.envTlGroup { padding: 0 10px; color: var(--bo-gold-text); font: 600 12px/20px var(--bo-serif); letter-spacing: 0.12em; }
+.envTlGroupLane { background: #ffffff05; }
+.envTlLabel { padding: 0 10px 0 20px; color: var(--bo-text); font-size: 12px; line-height: 22px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-left: 2px solid transparent; }
+.envTlLabel:hover { background: var(--bo-sel); }
+.envTlLabel.selected { background: var(--bo-sel-strong); border-left-color: var(--bo-gold); color: var(--bo-gold-text); }
+.envTlLanes { position: relative; overflow-y: auto; overflow-x: hidden; cursor: crosshair; scrollbar-width: thin; scrollbar-color: #c1bdab55 transparent; }
+.envTlRuler { position: sticky; top: 0; z-index: 2; height: 20px; border-bottom: 1px solid var(--bo-line); background: #0b0c09ee; margin-right: 8px; }
+.envTlTick { position: absolute; bottom: 0; width: 1px; height: 4px; background: var(--bo-line-strong); }
+.envTlTick.major { height: 8px; background: #c1bdab88; }
+.envTlTick b { position: absolute; left: 3px; bottom: 6px; font: 10px/1 var(--bo-num); font-weight: 400; color: var(--bo-faint); }
+.envTlLooks { position: absolute; inset: 0; pointer-events: none; }
+.envTlLook { position: absolute; top: 1px; transform: translateX(-50%); padding: 0 4px; font-size: 10px; line-height: 11px; color: #15130c; background: var(--bo-gold-fill); letter-spacing: 0.1em; }
+.envTlLaneList { margin-right: 8px; }
+.envTlLane { position: relative; border-bottom: 1px solid #c1bdab14; }
+.envTlLane.open { background: #ffffff06; }
+.envTlCanvas { display: block; }
+.envTlPlayhead { position: absolute; top: 0; width: 1px; margin-left: -0.5px; background: var(--bo-gold-hi); pointer-events: none; box-shadow: 0 0 4px #ffe0a180; z-index: 3; }

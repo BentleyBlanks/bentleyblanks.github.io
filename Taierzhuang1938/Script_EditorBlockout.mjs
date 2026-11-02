@@ -60,6 +60,7 @@ import { BuildCreekWater, MUD_PATCH, PaintWaterEdgeMud, WaterPrints } from "./Sc
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 import { TimelinePanel } from "./Script_EditorTimeline.mjs";
+import { EnvironmentEditor } from "./Script_EditorEnvironment.mjs";
 
 const DEG = Math.PI / 180;
 /** 打开全关总图时短边大约看多少米（玩家附近一片，不是全图）。 */
@@ -205,8 +206,9 @@ export class EditorBlockout {
    *   PointerLocked / RequestPointerLock / ReleasePointerLock  Script_Main 的指针锁三件
    *   Look(dx, dy)   往游戏的转头输入里加一笔位移（同鼠标 movementX/Y 的单位；触屏层转视角用）
    *   UnlockAudio()  音频还没响就解锁一次（触屏层在手指抬起时调，iOS 只认抬起）
+   *   Environment    { system, bridge }：组件式环境系统（docs/Data_Environment.md），环境面板编辑它
    */
-  constructor({ host, params, PointerLocked, RequestPointerLock, ReleasePointerLock, Look, UnlockAudio }) {
+  constructor({ host, params, PointerLocked, RequestPointerLock, ReleasePointerLock, Look, UnlockAudio, Environment = null }) {
     this.host = host;
     this.game = host.game;
     this.params = params || new URLSearchParams(location.search);
@@ -338,6 +340,8 @@ export class EditorBlockout {
     this.previzSignals = null;
     // Timeline 过场面板（docs/Data_EditorSuite.md「Timeline 过场」）：?timeline=<Id> 时开机就打开；它驱动的是上面这一个预演播放器
     this.timeline = new TimelinePanel(this);
+    // 环境面板（docs/Data_Environment.md §8）：顶栏「环境」按钮开；?env=1 开机就打开
+    this.environment = new EnvironmentEditor(this, Environment);
     this.play = new BlockoutPlay(this);
     // 手机验收（§4.5）：触屏设备或 ?touch=1 才建；画面不动，只加触屏输入与大按钮
     this.touch = WantsTouch(this.params) ? new BlockoutTouch({
@@ -433,6 +437,8 @@ export class EditorBlockout {
     };
     // Timeline（docs/Data_EditorSuite.md）：List / Open / Close / State / Play / Pause / Seek / Step / StepShot / Reload / Layout / Tracks
     this.api.Timeline = this.timeline.api;
+    // 环境（docs/Data_Environment.md §8）：Open / Close / State / SelectVolume / AddVolume / SetVolume / AddComponent / SetParam / Save / Undo / Redo / Timeline / Gizmo …
+    this.api.Environment = this.environment.api;
     // 试玩（§17）：Start({from, to, settings}) 开打；Stop() 中止（出小结）；State() 现状；Close() 关小结回到编辑；Reload() 重读编排
     this.api.Play = {
       Start: async (options) => { if (!(await this.UseSceneVariant("play"))) return false; await this.play.Want(); return this.play.Start(options || {}); },
@@ -488,6 +494,11 @@ export class EditorBlockout {
     }
     const timelineId = this.params.get("timeline");
     if (timelineId) this.timeline.Open(timelineId).catch((error) => console.error("[Blockout] Timeline 打不开", error));
+    // 环境面板：读一遍区域与预设（拿版本号、之后外面改了文件 2 s 内同步）；?env=1 或上次开着就打开
+    this.environment.EnsureLoaded().then(() => {
+      if (this.params.get("env") === "1" || this.environment.ui.open) return this.environment.Open();
+      return null;
+    }).catch((error) => console.error("[Blockout] 环境面板读不进来", error));
     // 存档口只问一次：界面要写明「这里能不能直接存」。
     this.store.Status().then(status => {
       this.writable = status.writable;
@@ -1198,6 +1209,7 @@ export class EditorBlockout {
     // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
     this.timeline.Update(dt);
+    this.environment.Update(dt);
     this.UpdateFly(dt);
     this.UpdatePosedStance();
     this.trees.Sync(game.battlefield.layout);
@@ -1321,7 +1333,7 @@ export class EditorBlockout {
   }
 
   /** Script_Main 问：鼠标现在是不是归编辑器（全关总图开着时游戏不转头、不开枪、不抢锁、滚轮不换枪）。 */
-  CapturesMouse() { return this.mapOpen || !!this.previz?.playing || !!this.play?.CapturesMouse(); }
+  CapturesMouse() { return this.mapOpen || !!this.previz?.playing || !!this.play?.CapturesMouse() || !!this.environment?.CapturesMouse(); }
 
   /** Script_Main 问：走动 / 姿态 / 开火的键是不是归编辑器（预演播放中玩家站在原地）。 */
   /** 宿主读（§17）：试玩中玩家无不无敌、子弹有没有数；null = 不在试玩（编辑器照旧无敌、无限子弹）。 */
@@ -1913,6 +1925,7 @@ export class EditorBlockout {
     this.ExitFly({ quiet: true });
     this.play.Dispose();
     this.previz.Dispose();
+    this.environment.Dispose();
     this.touch?.Dispose();
     this.ResolvePending(false);
     this.puppets.Dispose();

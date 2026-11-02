@@ -14,3 +14,6 @@ Taierzhuang1938/_blender/Script_Type89PaintFinishAudit.mjs text eol=lf
 # 场景文件（2026-10-31）：保存口按原始字节 sha1 判冲突，JSON 统一 LF；高度图是二进制
 Taierzhuang1938/Scenes/**/*.json text eol=lf
 Taierzhuang1938/Scenes/**/*.bin binary
+
+# 环境预设（2026-11-02，docs/Data_Environment.md）：存盘口同样按原始字节 sha1 判冲突、按 FormatEnvJson 写 LF
+Taierzhuang1938/Environment/*.json text eol=lf

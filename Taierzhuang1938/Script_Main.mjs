@@ -141,6 +141,11 @@ import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BLOCKOUT_EDITOR_FILL } from "./Data_Tuning_WhiteboxMaterial.mjs";
+import { EnvironmentSystem } from "./Script_EnvSystem.mjs";
+import { EnvRenderBridge } from "./Script_EnvApply.mjs";
+import { LoadSceneEnvironment, SceneIdOfUrl } from "./Script_EnvLoader.mjs";
+import { EnvPresetFromSkyPreset } from "./Script_EnvPreset.mjs";
+import { ENV_RUNTIME } from "./Data_Tuning_Environment.mjs";
 import { LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { BootPaper } from "./Script_BootPaper.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
@@ -690,6 +695,12 @@ SetWaterSkyUniforms(sky.uniforms);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
 // 白盒关卡编辑器走正片光照，背光面近乎死黑：补光抬上来（只管编辑器，正片不吃）。
 if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
+// 组件式环境系统（docs/Data_Environment.md）：场景有 Scenes/<Id>/Environment_<Id>.json 时由它出天光
+//（区域 + 预设 + 昼夜时钟），否则照旧按 phase.sky 套 SKY_PRESETS。出画前每帧 UpdateEnvironment。
+const env = new EnvironmentSystem();
+const envBridge = new EnvRenderBridge({ sky, lights, scene, gi: () => gi, giStrength: () => graphics.giStrength });
+/** 旧天空预设在有场景环境时变成的那个临时覆盖（ApplySkyPreset / RestoreLevelSky）。 */
+let envSkyOverride = null;
 const graphicsProfileApi = CreateGraphicsProfileApi({ profile: GRAPHICS_PROFILE, post });
 // 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
 // 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
@@ -867,6 +878,8 @@ const ctx = {
   get editor() { return editor; },
   get emplacedAds() { return emplacedAds; }, set emplacedAds(v) { emplacedAds = v; },
   get emplacement() { return emplacement; },
+  get env() { return env; },
+  get envBridge() { return envBridge; },
   get fakeLocked() { return fakeLocked; }, set fakeLocked(v) { fakeLocked = v; },
   get fireEdge() { return fireEdge; }, set fireEdge(v) { fireEdge = v; },
   get firePunch() { return firePunch; }, set firePunch(v) { firePunch = v; },
@@ -1907,6 +1920,14 @@ async function Boot() {
   function ApplySkyPreset(name) {
     if (!SKY_PRESETS[name]) return false;
     skyOverride = name;
+    // 场景有环境：旧预设变成一层全量的临时覆盖（立刻切，不过渡），撤掉后回到区域 + 时钟（docs/Data_Environment.md §5）
+    if (env.active) {
+      envSkyOverride?.Release(0);
+      envSkyOverride = env.PushOverride({ id: "LegacySky", label: name, preset: EnvPresetFromSkyPreset(SKY_PRESETS[name], name),
+        priority: ENV_RUNTIME.skyOverridePriority, blendS: 0, mode: "full" });
+      UpdateEnvironment(0, { force: true });
+      return true;
+    }
     const preset = sky.Apply(name);
     sky.BakeEnvironment(scene);
     lights.ApplyPreset(preset, sky.sunDirection);
@@ -1916,6 +1937,11 @@ async function Boot() {
   function RestoreLevelSky() {
     if (!skyOverride) return;
     skyOverride = null;
+    if (envSkyOverride) {
+      envSkyOverride.Release(0);
+      envSkyOverride = null;
+      if (env.active) { UpdateEnvironment(0, { force: true }); return; }
+    }
     const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
     sky.BakeEnvironment(scene);
     lights.ApplyPreset(preset, sky.sunDirection);
@@ -2440,6 +2466,7 @@ async function Boot() {
       }),
       RestoreEnvironmentState: (snapshot) => {
         if (snapshot?.override && snapshot.name) ApplySkyPreset(snapshot.name);
+        else if (env.active) { skyOverride = null; envSkyOverride?.Release(0); envSkyOverride = null; UpdateEnvironment(0, { force: true }); }
         else {
           skyOverride = null;
           const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
@@ -2696,6 +2723,8 @@ async function Boot() {
       // 手机验收（§4.5）：触屏拖动转视角走同一个 lookX / lookY；iOS 只认手指抬起解锁音频，这里给它一个「还没响就解锁」
       Look: (dx = 0, dy = 0) => { input.lookX += dx; input.lookY += dy; },
       UnlockAudio: () => { if (audio.ctx?.state !== "running") audio.Unlock(); },
+      // 环境面板（docs/Data_Environment.md §8）编辑的就是这一套
+      Environment: { system: env, bridge: envBridge },
     });
     window.Taierzhuang.Debug.Blockout = blockout.api;
     StartRun();
@@ -2807,6 +2836,34 @@ function DisposeSandbox() {
   sandbox = null;
 }
 
+/**
+ * 这一片用哪个场景的环境（docs/Data_Environment.md §6）：白盒编辑器的文件场景（白盒 / 正式两份）读
+ * Scenes/<Id>/Environment_<Id>.json；没有区域文件、或不是场景关卡 → 关掉环境系统，照旧按 phase.sky。
+ * 同一个场景换段（01–05 → 06–10）不重读、时钟不动；场景换了才重读。读坏了报警告，退回旧天空，不挡建关。
+ */
+async function SyncPhaseEnvironment(phase) {
+  const sceneId = SceneIdOfUrl(phase.blockout?.SceneUrl?.());
+  if (!sceneId) { if (env.active) env.Clear(); return; }
+  if (env.active && env.sceneId === sceneId) return;
+  try {
+    const loaded = await LoadSceneEnvironment(sceneId);
+    if (!loaded) { env.Clear(); return; }
+    env.SetScene(sceneId, loaded.sceneDoc, loaded.presets, { errors: loaded.errors });
+    if (loaded.errors.length) console.warn(`[Environment] ${sceneId}：${loaded.errors.join("；")}`);
+  } catch (error) {
+    console.warn(`[Environment] ${sceneId} 的环境读不进来，退回本关天空预设：`, error);
+    env.Clear();
+  }
+}
+
+/** 环境系统这一帧：按观察点挑来源、求值、过渡，再交给天穹 / 灯 / 反射。→ 输出（没开环境系统 → null） */
+function UpdateEnvironment(dt, { force = false } = {}) {
+  if (!env.active) return null;
+  const out = env.Update(dt, env.ObserverFrom(camera.position, player?.position || null));
+  envBridge.Apply(out, { force });
+  return out;
+}
+
 /** 把当前测试场的取证口挂到 window.Tengxian.Debug（名字由插件给，与改造前一致）。 */
 function RegisterSandboxDebug() {
   if (sandbox?.debugName && sandbox.api && window.Taierzhuang?.Debug) window.Taierzhuang.Debug[sandbox.debugName] = sandbox.api;
@@ -2816,6 +2873,8 @@ function RegisterSandboxDebug() {
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 白盒关卡编辑器：文件场景在这里读进来（布局、边界、出生点都可能随之更新）。
   await phase.blockout?.Prepare?.();
+  // 场景的环境（区域 + 预设）跟着场景走：EnterLevel 套完 phase.sky 之后由它接管天光
+  await SyncPhaseEnvironment(phase);
   // 断肢先收：肢块挂在**上一关**那具 PhysicsWorld 上，而这一关会 Dispose 它；
   // 身体几何也要还原回共享原件，否则对象池里的 rig 带着缺口进下一关。
   gore?.ReleaseAll();
@@ -3269,6 +3328,8 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
+  // 场景有环境：上面那套只是垫底，这里立刻按区域 + 时钟重套一遍（含反射贴图），进关第一帧就是对的天
+  if (env.active) { envBridge.Invalidate(); UpdateEnvironment(0, { force: true }); }
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
   // 废弃场景钉住：目标链走完或时长到了都不换关（与靶场同一条 state.pinned）。
@@ -8245,6 +8306,8 @@ function RenderSceneContent(dt) {
   // 这一帧要烘哪几级级联阴影图（逐级节流：近级每帧、远级 2–3 帧一次，
   // 相机瞬移 / 换关 / 太阳转向时 CsmRig 会强制全更）。真正的烘焙发生在下面
   // 第一次 renderer.render 里，烘完 three 自己把逐灯的 needsUpdate 清掉。
+  // 环境系统（docs/Data_Environment.md）：排在阴影排班之前 —— 昼夜在走时太阳方向每帧变，换了方向的级联要在这一帧就重烘
+  const envOut = UpdateEnvironment(dt);
   lights.ScheduleShadowUpdate(renderer);
   // AO / SSIL 的靶引用每帧重接：SetSize 会重建靶，纹理引用随时可能换。
   // uSsaoResolution 是**主靶**尺寸、uAoTexelResolution 才是 AO 靶尺寸（升采样用），
@@ -8265,8 +8328,9 @@ function RenderSceneContent(dt) {
   sky.mesh.position.copy(camera.position);
   // 过场可以自带天空（cut.sky）：正在播的过场套了预设就按它的后期参数走，
   // 否则按本关的。夜战预设 exposure 3.6、白天 0.5，抄错一档整帧就黑/就白。
-  const skyName = skyOverride || phase.sky;
-  const preset = SKY_PRESETS[skyName] || SKY_PRESETS[phase.sky];
+  // 场景有环境时天光由环境系统拼（与 SKY_PRESETS 同形），后期档案（自动曝光锚点、体积雾、颗粒）按它的 profile 查
+  const skyName = envOut ? envOut.profile : (skyOverride || phase.sky);
+  const preset = envOut ? envOut.preset : (SKY_PRESETS[skyName] || SKY_PRESETS[phase.sky]);
   // 粒子层要与合成 pass 共用同一份雾：它不进深度法线预通道，合成 pass 那趟
   // 又明写"深度 0 的天空不吃雾"，于是背景是天空的粒子像素一点雾都吃不到 ——
   // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
@@ -8376,7 +8440,7 @@ function RenderSceneContent(dt) {
     skyPreset: skyName,
     // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
     // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
-    exposureAnchor: skyOverride ? null : phase.id,
+    exposureAnchor: skyOverride || envOut ? null : phase.id,
     dt,
     bloom: preset.bloom * graphics.bloom,
     // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。
@@ -8773,7 +8837,7 @@ function ApplyGraphics() {
       gi.irradianceHistory = graphics.giIrradianceHistory;
       gi.distanceHistory = graphics.giDistanceHistory;
       if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
-      const preset = SKY_PRESETS[PHASE_TABLE[state.phaseIndex].sky];
+      const preset = env.active && env.output ? env.output.preset : SKY_PRESETS[PHASE_TABLE[state.phaseIndex].sky];
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
   }

@@ -1,0 +1,617 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "FirstLevelWhitebox",
+  "title": "第一关白盒 · 昼夜（白天 / 黄昏 / 晚上）",
+  "looks": [
+    {"id": "day", "label": "白天", "hour": 12},
+    {"id": "dusk", "label": "黄昏", "hour": 18},
+    {"id": "night", "label": "晚上", "hour": 22}
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {
+        "elevation": {
+          "keys": [
+            {"h": 4, "v": 34, "tag": "night"},
+            {"h": 12, "v": 52, "tag": "day"},
+            {"h": 18, "v": 12, "tag": "dusk"},
+            {"h": 22, "v": 34, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "azimuth": {
+          "keys": [
+            {"h": 4, "v": 96, "tag": "night"},
+            {"h": 12, "v": 35, "tag": "day"},
+            {"h": 18, "v": 262, "tag": "dusk"},
+            {"h": 22, "v": 96, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "color": {
+          "keys": [
+            {"h": 4, "v": "#9fb4e8", "tag": "night"},
+            {"h": 12, "v": "#fff2df", "tag": "day"},
+            {"h": 18, "v": "#ffb072", "tag": "dusk"},
+            {"h": 22, "v": "#9fb4e8", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "intensity": {
+          "keys": [
+            {"h": 4, "v": 0.42, "tag": "night"},
+            {"h": 12, "v": 4.6, "tag": "day"},
+            {"h": 18, "v": 8.8, "tag": "dusk"},
+            {"h": 22, "v": 0.42, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "discColor": {
+          "keys": [
+            {"h": 4, "v": [0.52, 0.62, 0.92], "tag": "night"},
+            {"h": 12, "v": [1, 0.97, 0.91], "tag": "day"},
+            {"h": 18, "v": [1, 0.54, 0.26], "tag": "dusk"},
+            {"h": 22, "v": [0.52, 0.62, 0.92], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "discIntensity": {
+          "keys": [
+            {"h": 4, "v": 2.4, "tag": "night"},
+            {"h": 12, "v": 1.2, "tag": "day"},
+            {"h": 18, "v": 90, "tag": "dusk"},
+            {"h": 22, "v": 2.4, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "discSize": 0.000012
+      }
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {
+        "probe": {
+          "keys": [
+            {"h": 4, "v": 0.11, "tag": "night"},
+            {"h": 12, "v": 0.42, "tag": "day"},
+            {"h": 18, "v": 0.34, "tag": "dusk"},
+            {"h": 22, "v": 0.11, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "color": {
+          "keys": [
+            {"h": 4, "v": "#607085", "tag": "night"},
+            {"h": 12, "v": "#e5e2dc", "tag": "day"},
+            {"h": 18, "v": "#607085", "tag": "dusk"},
+            {"h": 22, "v": "#607085", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "intensity": {
+          "keys": [
+            {"h": 4, "v": 0.045, "tag": "night"},
+            {"h": 12, "v": 0.18, "tag": "day"},
+            {"h": 18, "v": 0.16, "tag": "dusk"},
+            {"h": 22, "v": 0.045, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {
+        "intensity": {
+          "keys": [
+            {"h": 4, "v": 1.4, "tag": "night"},
+            {"h": 12, "v": 0.34, "tag": "day"},
+            {"h": 18, "v": 0.98, "tag": "dusk"},
+            {"h": 22, "v": 1.4, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {
+        "zenith": {
+          "keys": [
+            {"h": 4, "v": [0.02, 0.03, 0.062], "tag": "night"},
+            {"h": 12, "v": [1.15, 1.2, 1.25], "tag": "day"},
+            {"h": 18, "v": [0.42, 0.62, 1.15], "tag": "dusk"},
+            {"h": 22, "v": [0.02, 0.03, 0.062], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "horizon": {
+          "keys": [
+            {"h": 4, "v": [0.075, 0.086, 0.125], "tag": "night"},
+            {"h": 12, "v": [1.6, 1.6, 1.58], "tag": "day"},
+            {"h": 18, "v": [4.2, 2.3, 1.05], "tag": "dusk"},
+            {"h": 22, "v": [0.075, 0.086, 0.125], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "ground": {
+          "keys": [
+            {"h": 4, "v": [0.026, 0.026, 0.032], "tag": "night"},
+            {"h": 12, "v": [0.3, 0.28, 0.25], "tag": "day"},
+            {"h": 18, "v": [0.46, 0.38, 0.3], "tag": "dusk"},
+            {"h": 22, "v": [0.026, 0.026, 0.032], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "glow": {
+          "keys": [
+            {"h": 4, "v": 0.22, "tag": "night"},
+            {"h": 12, "v": 0.12, "tag": "day"},
+            {"h": 18, "v": 3.2, "tag": "dusk"},
+            {"h": 22, "v": 0.22, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "glowSpread": {
+          "keys": [
+            {"h": 4, "v": 7, "tag": "night"},
+            {"h": 12, "v": 10, "tag": "day"},
+            {"h": 18, "v": 18, "tag": "dusk"},
+            {"h": 22, "v": 7, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "smoke": {
+          "keys": [
+            {"h": 4, "v": 0.55, "tag": "night"},
+            {"h": 12, "v": 1, "tag": "day"},
+            {"h": 18, "v": 0.5, "tag": "dusk"},
+            {"h": 22, "v": 0.55, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "smokeColor": {
+          "keys": [
+            {"h": 4, "v": [0.05, 0.056, 0.074], "tag": "night"},
+            {"h": 12, "v": [1.05, 1.02, 0.96], "tag": "day"},
+            {"h": 18, "v": [1.55, 1.05, 0.7], "tag": "dusk"},
+            {"h": 22, "v": [0.05, 0.056, 0.074], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "smokeHeight": {
+          "keys": [
+            {"h": 4, "v": 0.26, "tag": "night"},
+            {"h": 12, "v": 0.18, "tag": "day"},
+            {"h": 18, "v": 0.17, "tag": "dusk"},
+            {"h": 22, "v": 0.26, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "stars": 0
+      }
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {
+        "shapeScale": {
+          "keys": [
+            {"h": 4, "v": 5.5, "tag": "night"},
+            {"h": 12, "v": 3.2, "tag": "day"},
+            {"h": 18, "v": 3.2, "tag": "dusk"},
+            {"h": 22, "v": 5.5, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "shapeLow": {
+          "keys": [
+            {"h": 4, "v": 0.445, "tag": "night"},
+            {"h": 12, "v": 0.3, "tag": "day"},
+            {"h": 18, "v": 0.3, "tag": "dusk"},
+            {"h": 22, "v": 0.445, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "shapeHigh": {
+          "keys": [
+            {"h": 4, "v": 0.615, "tag": "night"},
+            {"h": 12, "v": 0.68, "tag": "day"},
+            {"h": 18, "v": 0.68, "tag": "dusk"},
+            {"h": 22, "v": 0.615, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "shapeCover": {
+          "keys": [
+            {"h": 4, "v": 0, "tag": "night"},
+            {"h": 12, "v": 0.35, "tag": "day"},
+            {"h": 18, "v": 0.25, "tag": "dusk"},
+            {"h": 22, "v": 0, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "structure": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 0.95, "tag": "day"},
+            {"h": 18, "v": 0.75, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "coverage": {
+          "keys": [
+            {"h": 4, "v": 0.8, "tag": "night"},
+            {"h": 12, "v": 0.62, "tag": "day"},
+            {"h": 18, "v": 0.52, "tag": "dusk"},
+            {"h": 22, "v": 0.8, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "scale": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 1.1, "tag": "day"},
+            {"h": 18, "v": 1.1, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "softness": {
+          "keys": [
+            {"h": 4, "v": 0.5, "tag": "night"},
+            {"h": 12, "v": 0.5, "tag": "day"},
+            {"h": 18, "v": 0.55, "tag": "dusk"},
+            {"h": 22, "v": 0.5, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "warp": 0.35,
+        "underside": {
+          "keys": [
+            {"h": 4, "v": 0.6, "tag": "night"},
+            {"h": 12, "v": 0.5, "tag": "day"},
+            {"h": 18, "v": 0.45, "tag": "dusk"},
+            {"h": 22, "v": 0.6, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "gap": {
+          "keys": [
+            {"h": 4, "v": 0.85, "tag": "night"},
+            {"h": 12, "v": 1.4, "tag": "day"},
+            {"h": 18, "v": 1.6, "tag": "dusk"},
+            {"h": 22, "v": 0.85, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "silver": {
+          "keys": [
+            {"h": 4, "v": 0, "tag": "night"},
+            {"h": 12, "v": 0.35, "tag": "day"},
+            {"h": 18, "v": 0.6, "tag": "dusk"},
+            {"h": 22, "v": 0, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "shade": {
+          "keys": [
+            {"h": 4, "v": [0.012, 0.014, 0.02], "tag": "night"},
+            {"h": 12, "v": [0.5, 0.5, 0.52], "tag": "day"},
+            {"h": 18, "v": [0.62, 0.44, 0.33], "tag": "dusk"},
+            {"h": 22, "v": [0.012, 0.014, 0.02], "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": {
+          "keys": [
+            {"h": 4, "v": 3.6, "tag": "night"},
+            {"h": 12, "v": 8, "tag": "day"},
+            {"h": 18, "v": 2.4, "tag": "dusk"},
+            {"h": 22, "v": 3.6, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "mieG": {
+          "keys": [
+            {"h": 4, "v": 0.8, "tag": "night"},
+            {"h": 12, "v": 0.8, "tag": "day"},
+            {"h": 18, "v": 0.78, "tag": "dusk"},
+            {"h": 22, "v": 0.8, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "rayleigh": {
+          "keys": [
+            {"h": 4, "v": 2, "tag": "night"},
+            {"h": 12, "v": 0.3, "tag": "day"},
+            {"h": 18, "v": 2, "tag": "dusk"},
+            {"h": 22, "v": 2, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "ozone": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 1, "tag": "day"},
+            {"h": 18, "v": 1.4, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "groundAlbedo": {
+          "keys": [
+            {"h": 4, "v": 0.2, "tag": "night"},
+            {"h": 12, "v": 0.2, "tag": "day"},
+            {"h": 18, "v": 0.55, "tag": "dusk"},
+            {"h": 22, "v": 0.2, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "sunIrradiance": {
+          "keys": [
+            {"h": 4, "v": 1.67, "tag": "night"},
+            {"h": 12, "v": 12, "tag": "day"},
+            {"h": 18, "v": 47.17, "tag": "dusk"},
+            {"h": 22, "v": 1.67, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "skyTint": {
+          "keys": [
+            {"h": 4, "v": [0.9, 0.92, 1.14], "tag": "night"},
+            {"h": 12, "v": [0.97, 0.97, 1], "tag": "day"},
+            {"h": 18, "v": [1.192, 0.852, 0.804], "tag": "dusk"},
+            {"h": 22, "v": [0.9, 0.92, 1.14], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "skyFloor": {
+          "keys": [
+            {"h": 4, "v": [0.006, 0.01, 0.018], "tag": "night"},
+            {"h": 12, "v": [0.95, 0.95, 0.92], "tag": "day"},
+            {"h": 18, "v": [0.172, 0.172, 0.172], "tag": "dusk"},
+            {"h": 22, "v": [0.006, 0.01, 0.018], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "artGlow": {
+          "keys": [
+            {"h": 4, "v": 0.5, "tag": "night"},
+            {"h": 12, "v": 0.15, "tag": "day"},
+            {"h": 18, "v": 0.45, "tag": "dusk"},
+            {"h": 22, "v": 0.5, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "sunDiskT": {
+          "keys": [
+            {"h": 4, "v": 0, "tag": "night"},
+            {"h": 12, "v": 1, "tag": "day"},
+            {"h": 18, "v": 1, "tag": "dusk"},
+            {"h": 22, "v": 0, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "belowVeil": 0,
+        "aerialBlend": {
+          "keys": [
+            {"h": 4, "v": 0.35, "tag": "night"},
+            {"h": 12, "v": 0.5, "tag": "day"},
+            {"h": 18, "v": 0.5, "tag": "dusk"},
+            {"h": 22, "v": 0.35, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "aerialGain": {
+          "keys": [
+            {"h": 4, "v": 0.71, "tag": "night"},
+            {"h": 12, "v": 0.4, "tag": "day"},
+            {"h": 18, "v": 0.435, "tag": "dusk"},
+            {"h": 22, "v": 0.71, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": {
+          "keys": [
+            {"h": 4, "v": 0.021, "tag": "night"},
+            {"h": 12, "v": 0.0032, "tag": "day"},
+            {"h": 18, "v": 0.0125, "tag": "dusk"},
+            {"h": 22, "v": 0.021, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "falloff": {
+          "keys": [
+            {"h": 4, "v": 14, "tag": "night"},
+            {"h": 12, "v": 45, "tag": "day"},
+            {"h": 18, "v": 17, "tag": "dusk"},
+            {"h": 22, "v": 14, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "max": {
+          "keys": [
+            {"h": 4, "v": 0.96, "tag": "night"},
+            {"h": 12, "v": 0.72, "tag": "day"},
+            {"h": 18, "v": 0.93, "tag": "dusk"},
+            {"h": 22, "v": 0.96, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "skyColor": {
+          "keys": [
+            {"h": 4, "v": [0.055, 0.065, 0.095], "tag": "night"},
+            {"h": 12, "v": [0.6, 0.6, 0.59], "tag": "day"},
+            {"h": 18, "v": [0.86, 0.56, 0.34], "tag": "dusk"},
+            {"h": 22, "v": [0.055, 0.065, 0.095], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "groundColor": {
+          "keys": [
+            {"h": 4, "v": [0.03, 0.032, 0.04], "tag": "night"},
+            {"h": 12, "v": [0.45, 0.43, 0.4], "tag": "day"},
+            {"h": 18, "v": [0.4, 0.3, 0.24], "tag": "dusk"},
+            {"h": 22, "v": [0.03, 0.032, 0.04], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "sunGain": {
+          "keys": [
+            {"h": 4, "v": 0.04, "tag": "night"},
+            {"h": 12, "v": 0.08, "tag": "day"},
+            {"h": 18, "v": 0.42, "tag": "dusk"},
+            {"h": 22, "v": 0.04, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "desat": {
+          "keys": [
+            {"h": 4, "v": 0.35, "tag": "night"},
+            {"h": 12, "v": 0.16, "tag": "day"},
+            {"h": 18, "v": 0.4, "tag": "dusk"},
+            {"h": 22, "v": 0.35, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "flatten": {
+          "keys": [
+            {"h": 4, "v": 0.06, "tag": "night"},
+            {"h": 12, "v": 0.03, "tag": "day"},
+            {"h": 18, "v": 0.1, "tag": "dusk"},
+            {"h": 22, "v": 0.06, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "exposure": {
+          "keys": [
+            {"h": 4, "v": 2.7, "tag": "night"},
+            {"h": 12, "v": 0.78, "tag": "day"},
+            {"h": 18, "v": 0.62, "tag": "dusk"},
+            {"h": 22, "v": 2.7, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "profile": {
+          "keys": [
+            {"h": 4, "v": "firstLevelNight", "tag": "night"},
+            {"h": 12, "v": "firstLevelBattleDay", "tag": "day"},
+            {"h": 18, "v": "dusk", "tag": "dusk"},
+            {"h": 22, "v": "firstLevelNight", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "saturation": {
+          "keys": [
+            {"h": 4, "v": 0.72, "tag": "night"},
+            {"h": 12, "v": 0.92, "tag": "day"},
+            {"h": 18, "v": 0.98, "tag": "dusk"},
+            {"h": 22, "v": 0.72, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "contrast": {
+          "keys": [
+            {"h": 4, "v": 1.14, "tag": "night"},
+            {"h": 12, "v": 1.1, "tag": "day"},
+            {"h": 18, "v": 1.08, "tag": "dusk"},
+            {"h": 22, "v": 1.14, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "contrastCurve": {
+          "keys": [
+            {"h": 4, "v": "linear", "tag": "night"},
+            {"h": 12, "v": "soft", "tag": "day"},
+            {"h": 18, "v": "linear", "tag": "dusk"},
+            {"h": 22, "v": "linear", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "lift": {
+          "keys": [
+            {"h": 4, "v": [0.006, 0.004, 0.012], "tag": "night"},
+            {"h": 12, "v": [0, 0, 0], "tag": "day"},
+            {"h": 18, "v": [0.006, 0.004, 0.012], "tag": "dusk"},
+            {"h": 22, "v": [0.006, 0.004, 0.012], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "gain": [1.02, 1, 0.965],
+        "shadowTint": {
+          "keys": [
+            {"h": 4, "v": [0.855, 0.975, 1.17], "tag": "night"},
+            {"h": 12, "v": [0.93, 0.98, 1.08], "tag": "day"},
+            {"h": 18, "v": [0.855, 0.975, 1.17], "tag": "dusk"},
+            {"h": 22, "v": [0.855, 0.975, 1.17], "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "highlightTint": [1.105, 1.015, 0.88],
+        "splitShadow": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 0.3, "tag": "day"},
+            {"h": 18, "v": 1, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "splitHighlight": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 0.25, "tag": "day"},
+            {"h": 18, "v": 1, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "bloom": {
+          "keys": [
+            {"h": 4, "v": 0.85, "tag": "night"},
+            {"h": 12, "v": 0.04, "tag": "day"},
+            {"h": 18, "v": 0.42, "tag": "dusk"},
+            {"h": 22, "v": 0.85, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "bloomThreshold": 1.18,
+        "godStrength": {
+          "keys": [
+            {"h": 4, "v": 0, "tag": "night"},
+            {"h": 12, "v": 0, "tag": "day"},
+            {"h": 18, "v": 0.45, "tag": "dusk"},
+            {"h": 22, "v": 0, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "lensFlare": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 0, "tag": "day"},
+            {"h": 18, "v": 1, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    }
+  }
+}

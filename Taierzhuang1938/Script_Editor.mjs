@@ -55,6 +55,7 @@ import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { SceneEditorEntry } from "./Script_EditorSceneEntry.mjs";
+import { EnvironmentEntry } from "./Script_EditorEnvironmentEntry.mjs";
 import { MixamoPreviewEditor } from "./Script_EditorMixamoPreview.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
@@ -86,7 +87,8 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
  */
 const TOOL_MENUS = [
   // 场景编辑器打开独立窗口 SceneEditor.html（摆 Scenes/ 场景文件，docs/Data_Scene.md §6），同贴图管理不进互斥表。
-  { id: "scene", label: "场景", items: [SceneEditorEntry, SplineEditor, PropPcgEditor] },
+  // 环境（docs/Data_Environment.md）是白盒编辑器右侧的面板：同 Timeline 过场是跳转入口，已在白盒编辑器里就只开面板。
+  { id: "scene", label: "场景", items: [SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor] },
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
   { id: "level", label: "关卡", items: [BlockoutEntry, TimelineEditor, SquadMarchEditor] },
   // Mixamo 动作预览同贴图管理一样是独立窗口，不进互斥表（2026-11-01）。
@@ -510,7 +512,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === MixamoPreviewEditor.id || id === BlockoutEntry.id || id === TimelineEditor.id) return this.Open(id);
+    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === MixamoPreviewEditor.id || id === BlockoutEntry.id || id === TimelineEditor.id || id === EnvironmentEntry.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -613,6 +615,10 @@ export class EditorSuite {
     // Timeline 过场：同上是跳转入口（白盒编辑器 + 底部 Timeline 面板）；已经在白盒编辑器里就只开面板。
     if (id === TimelineEditor.id) {
       try { return TimelineEditor.Open(); }
+      catch (error) { this.SetHint(error.message); return null; }
+    }
+    if (id === EnvironmentEntry.id) {
+      try { return EnvironmentEntry.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);

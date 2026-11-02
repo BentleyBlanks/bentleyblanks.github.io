@@ -46,6 +46,12 @@ import { BLOCKOUT_LEVEL_KEYS, BLOCKOUT_CONFIG_FILE_RE, BlockoutConfigPath, Valid
 //   GET  /__scene/status → { writable, root, revisions: { <SceneId>: sha1 | null } }
 //   POST /__scene/save   { scene, doc, revision } → 写 Taierzhuang1938/Scenes/<SceneId>/Scene_<SceneId>.json
 import { SCENE_IDS, SCENE_FILE_RE, SceneRepoPath, ValidateScene, FormatSceneJson } from "../Taierzhuang1938/Script_SceneDoc.mjs";
+// 环境编辑器的存盘（Taierzhuang1938/docs/Data_Environment.md §8）。同场景那套闸；只写环境预设与场景的区域文件：
+//   GET  /__environment/status → { writable, root, presets: { <Id>: sha1 }, scenes: { <SceneId>: sha1 | null } }
+//   POST /__environment/save   { kind: "preset" | "scene", id, doc, revision } → 写 Environment/EnvPreset_<Id>.json 或 Scenes/<Id>/Environment_<Id>.json
+import {
+  ENV_ID_RE, ENV_PRESET_FILE_RE, SCENE_ENV_FILE_RE, EnvPresetRepoPath, SceneEnvRepoPath, ValidateEnvPreset, ValidateSceneEnv, FormatEnvJson,
+} from "../Taierzhuang1938/Script_EnvPreset.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -417,6 +423,18 @@ function CreateServer(rootDir, context) {
       return;
     }
 
+    if (route === "/__environment/status" || route === "/__environment/save") {
+      try {
+        if (route === "/__environment/status") SendEnvironmentStatus(request, response, rootDir);
+        else await HandleEnvironmentSave(request, response, rootDir);
+      } catch (error) {
+        console.error(`  ${route} 出错：${error?.stack || error}`);
+        if (!response.headersSent) SendJson(response, 500, { ok: false, error: `存档口内部出错：${String(error?.message || error).slice(0, 200)}` });
+        else if (!response.writableEnded) response.end();
+      }
+      return;
+    }
+
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
@@ -741,6 +759,88 @@ async function HandleSceneSave(request, response, rootDir) {
   SendJson(response, 200, { ok: true, scene: sceneId, file: relative, revision: createHash("sha1").update(text, "utf8").digest("hex"), warnings: check.warnings });
 }
 
+// -------------------------------------------- 环境预设与区域保存（只在本地）
+//
+// 环境编辑器（Taierzhuang1938/docs/Data_Environment.md §8）存两种文件：预设（Environment/EnvPreset_<Id>.json，可以新建）
+// 与场景的区域文件（Scenes/<Id>/Environment_<Id>.json，场景只认 SCENE_IDS）。闸同场景存盘口（本机 Host、同源、application/json、
+// revision = 读文件时原始字节的 sha1，对不上 409；新文件写 null）；校验不过 400；按 FormatEnvJson 原子写。body ≤ 2 MB。
+// status 列出盘上全部预设（编辑器的预设下拉靠它；线上没有这个口，只认场景引用到的那几份）。
+const ENVIRONMENT_BODY_LIMIT = 2 * 1024 * 1024;
+
+function EnvironmentPresetIds(rootDir) {
+  try {
+    return fs.readdirSync(path.join(rootDir, "Taierzhuang1938", "Environment"))
+      .map((name) => /^EnvPreset_([A-Z][A-Za-z0-9]{0,63})\.json$/.exec(name)?.[1]).filter(Boolean).sort();
+  } catch { return []; }
+}
+
+function SendEnvironmentStatus(request, response, rootDir) {
+  if (request.method !== "GET" && request.method !== "HEAD") { SendJson(response, 405, { ok: false, error: "只收 GET" }); return; }
+  const presets = {}, scenes = {};
+  for (const id of EnvironmentPresetIds(rootDir)) {
+    try { presets[id] = BlockoutRevision(path.join(rootDir, EnvPresetRepoPath(id))); } catch { presets[id] = null; }
+  }
+  for (const id of SCENE_IDS) {
+    try { scenes[id] = BlockoutRevision(path.join(rootDir, SceneEnvRepoPath(id))); } catch { scenes[id] = null; }
+  }
+  const writable = IsLocalPage(request);
+  SendJson(response, 200, { writable, root: rootDir, presets, scenes, ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }) });
+}
+
+async function HandleEnvironmentSave(request, response, rootDir) {
+  const Reject = (status, error, extra = {}) => SendJson(response, status, { ok: false, error, ...extra });
+  if (request.method !== "POST") { Reject(405, "只收 POST"); return; }
+  if (!IsLocalPage(request)) { Reject(403, "只接受本机 localhost / 127.0.0.1 的请求"); return; }
+  if (!String(request.headers["content-type"] || "").toLowerCase().startsWith("application/json")) { Reject(415, "Content-Type 必须是 application/json"); return; }
+  if (!IsSameOrigin(request)) { Reject(403, "只接受同源页面的请求"); return; }
+  let body;
+  try { body = await ReadBody(request, ENVIRONMENT_BODY_LIMIT); } catch (error) { Reject(413, error.message); return; }
+  let payload;
+  try { payload = JSON.parse(body); } catch { Reject(400, "body 不是 JSON"); return; }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) { Reject(400, "body 要是 { kind, id, doc, revision }"); return; }
+  const { kind, id, doc, revision } = payload;
+  if (kind !== "preset" && kind !== "scene") { Reject(400, "kind 只能是 preset / scene"); return; }
+  if (typeof id !== "string" || !ENV_ID_RE.test(id)) { Reject(403, "id 要是大写字母开头的英文字母数字"); return; }
+  if (kind === "scene" && !SCENE_IDS.includes(id)) { Reject(403, `场景只能是 ${SCENE_IDS.join(" / ")}`); return; }
+  const relative = kind === "preset" ? EnvPresetRepoPath(id) : SceneEnvRepoPath(id);
+  if (!(kind === "preset" ? ENV_PRESET_FILE_RE : SCENE_ENV_FILE_RE).test(relative)) { Reject(403, "路径不在白名单里"); return; }
+  const filePath = path.resolve(rootDir, relative);
+  if (filePath !== path.join(rootDir, relative) || !filePath.startsWith(rootDir + path.sep)) { Reject(403, "路径不在服务根之下"); return; }
+  if (revision !== null && typeof revision !== "string") { Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）"); return; }
+  let check;
+  let text;
+  try {
+    if (kind === "preset") {
+      check = ValidateEnvPreset(doc);
+      if (check.ok && doc.id !== id) { Reject(400, `预设里的 id 是 ${doc.id}，和请求的 ${id} 不是一回事`); return; }
+    } else {
+      check = ValidateSceneEnv(doc, { presetIds: new Set(EnvironmentPresetIds(rootDir)) });
+      if (check.ok && doc.scene !== id) { Reject(400, `区域文件里的 scene 是 ${doc.scene}，和请求的 ${id} 不是一回事`); return; }
+    }
+    if (!check.ok) { Reject(400, kind === "preset" ? "预设不合规" : "区域文件不合规", { details: check.errors.slice(0, 50), warnings: check.warnings }); return; }
+    text = FormatEnvJson(doc);
+  } catch (error) {
+    Reject(400, "没法校验或写回（多半是嵌套太深）", { details: [`${error?.name || "Error"}：${String(error?.message || error).slice(0, 200)}`] });
+    return;
+  }
+  let current;
+  try { current = BlockoutRevision(filePath); } catch (error) { Reject(500, String(error?.message || error)); return; }
+  if (revision !== current) {
+    Reject(409, current === null ? "盘上已经没有这个文件，按新文件保存要带 revision: null" : "文件已在别处改过（版本号对不上），先重新读取再保存", { revision: current });
+    return;
+  }
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    WriteAtomic(filePath, text);
+  } catch (error) {
+    try { fs.rmSync(`${filePath}.tmp`, { force: true }); } catch { /* 清不掉就算了，报错里有原因 */ }
+    Reject(500, String(error?.message || error));
+    return;
+  }
+  console.log(`  /__environment/save ${relative}`);
+  SendJson(response, 200, { ok: true, kind, id, file: relative, revision: createHash("sha1").update(text, "utf8").digest("hex"), warnings: check.warnings });
+}
+
 function LanAddresses(port) {
   const urls = [];
   for (const list of Object.values(os.networkInterfaces())) {
@@ -819,7 +919,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   先重新读取再存），坏 JSON / 校验不过 / 嵌套太深回 400，任何拒绝都不落盘。
 场景保存口（场景编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__scene/status；POST /__scene/save
   { scene: "FirstLevelWhitebox", doc: {...}, revision: "<读场景时那份原始字节的 sha1>" }
-  过 ValidateScene 后按场景文件的写法原子写 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json（body ≤ 16 MB）；其余同上。`;
+  过 ValidateScene 后按场景文件的写法原子写 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json（body ≤ 16 MB）；其余同上。
+环境保存口（环境编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__environment/status；POST /__environment/save
+  { kind: "preset" | "scene", id: "FirstLevel", doc: {...}, revision: "<读文件时那份原始字节的 sha1；新文件写 null>" }
+  预设写 Taierzhuang1938/Environment/EnvPreset_<Id>.json（可新建），区域文件写 Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json（body ≤ 2 MB）；其余同上。`;
 
 async function Main() {
   const args = process.argv.slice(2);
