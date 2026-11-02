@@ -15,80 +15,98 @@
       "camera": [
         {
           "t": 0,
-          "dur": 2.6,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -149.04,
+            "yawDeg": -149,
             "pitchDeg": -14
           }
         },
         {
           "t": 3.5,
           "dur": 1,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -150.95,
+            "yawDeg": -149,
             "pitchDeg": -14,
+            "toYawDeg": -151,
             "toPitchDeg": -32
           }
         },
         {
-          "t": 8.64,
-          "dur": 1.05,
+          "t": 6.25,
+          "dur": 0.5,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 95.7,
-            "pitchDeg": -4
+            "yawDeg": -151,
+            "pitchDeg": -32,
+            "toYawDeg": -149,
+            "toPitchDeg": -14
           }
         },
         {
-          "t": 9.69,
-          "dur": 1.05,
+          "t": 7.45,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 55.49,
-            "pitchDeg": -6
+            "yawDeg": -149,
+            "pitchDeg": -14,
+            "toYawDeg": -151,
+            "toPitchDeg": -32
           }
         },
         {
-          "t": 10.74,
-          "dur": 1.05,
+          "t": 8.4,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -63.43,
-            "pitchDeg": -8
+            "yawDeg": -151,
+            "pitchDeg": -32,
+            "toYawDeg": -120,
+            "toPitchDeg": -8
           }
         },
         {
-          "t": 11.79,
-          "dur": 1.05,
+          "t": 9.5,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -119.98,
-            "pitchDeg": -8
+            "yawDeg": -120,
+            "pitchDeg": -8,
+            "toYawDeg": -63,
+            "toPitchDeg": -8
           }
         },
         {
-          "t": 12.84,
-          "dur": 1,
+          "t": 10.65,
+          "dur": 1.3,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -150.95,
-            "pitchDeg": -30
+            "yawDeg": -63,
+            "pitchDeg": -8,
+            "toYawDeg": 75,
+            "toPitchDeg": -4
           }
         }
       ],
@@ -230,30 +248,30 @@
           "dur": 2.8
         },
         {
-          "t": 8.64,
+          "t": 8.4,
           "type": "flash",
           "dur": 0.22,
           "strength": 0.28
         },
         {
-          "t": 8.64,
+          "t": 8.4,
           "type": "sfx",
           "name": "artilleryFar"
         },
         {
-          "t": 9.69,
+          "t": 9.3,
           "type": "flash",
           "dur": 0.22,
           "strength": 0.28
         },
         {
-          "t": 10.74,
+          "t": 10.3,
           "type": "flash",
           "dur": 0.22,
           "strength": 0.28
         },
         {
-          "t": 11.79,
+          "t": 11.95,
           "type": "flash",
           "dur": 0.22,
           "strength": 0.28
@@ -268,109 +286,180 @@
       "camera": [
         {
           "t": 0,
-          "dur": 1,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -150.95,
-            "pitchDeg": -30
+            "yawDeg": 75,
+            "pitchDeg": -4
           }
         },
         {
           "t": 1,
-          "dur": 3,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 94.9,
-            "pitchDeg": -3
+            "yawDeg": 75,
+            "pitchDeg": -4,
+            "toYawDeg": 96,
+            "toPitchDeg": -2
           }
         },
         {
-          "t": 4,
-          "dur": 4.5,
+          "t": 8.8,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 96.71,
-            "pitchDeg": -2
-          }
-        },
-        {
-          "t": 8.7,
-          "dur": 1,
-          "eye": {
-            "x": 66.5,
-            "z": 64.2,
-            "stance": "crouch",
-            "yawDeg": 96.71,
+            "yawDeg": 96,
             "pitchDeg": -2,
-            "toYawDeg": 110.56,
-            "toPitchDeg": 4
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 15.63,
-          "dur": 1.3,
+          "t": 16.5,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 110.56,
-            "pitchDeg": 4,
-            "toYawDeg": -149.04,
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 18.1,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 18.95,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 20.5,
+          "dur": 1,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            },
+            "toYawDeg": -149,
             "toPitchDeg": -30
           }
         },
         {
-          "t": 16.93,
-          "dur": 1,
+          "t": 21.9,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
             "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": -149.04,
+            "yawDeg": -149,
             "pitchDeg": -30,
-            "toYawDeg": 74.05,
-            "toPitchDeg": 6
-          }
-        },
-        {
-          "t": 18.22,
-          "dur": 1.3,
-          "eye": {
-            "x": 66.5,
-            "z": 64.2,
-            "stance": "crouch",
-            "yawDeg": 110.56,
-            "pitchDeg": 4
-          }
-        },
-        {
-          "t": 19.62,
-          "dur": 1.6,
-          "eye": {
-            "x": 66.5,
-            "z": 64.2,
-            "stance": "crouch",
-            "yawDeg": -149.04,
-            "pitchDeg": -30
-          }
-        },
-        {
-          "t": 21.22,
-          "dur": 4.4,
-          "eye": {
-            "x": 66.5,
-            "z": 64.2,
-            "stance": "crouch",
-            "yawDeg": 95.08,
-            "pitchDeg": 2,
-            "toYawDeg": 93,
+            "toYawDeg": 95,
             "toPitchDeg": 0
+          }
+        },
+        {
+          "t": 23.6,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 95,
+            "pitchDeg": 0,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            }
           }
         }
       ],
@@ -432,44 +521,77 @@
           "id": "Luo",
           "keys": [
             {
-              "t": 3,
-              "faceTo": "Runner",
+              "t": 0,
+              "x": 63.5,
+              "z": 64.5,
+              "move": "cut",
+              "yawDeg": 90
+            },
+            {
+              "t": 2.9,
+              "x": 63.5,
+              "z": 64.5,
+              "move": "cut",
+              "faceTo": "Runner"
+            },
+            {
+              "t": 3.6,
+              "x": 64.1,
+              "z": 65.1,
+              "move": "walk",
+              "faceTo": "Runner"
+            },
+            {
+              "t": 8.9,
               "clip": "PvStandTalkSlung"
             },
             {
               "t": 12.05,
-              "faceTo": "player",
+              "faceTo": {
+                "x": 66.5,
+                "z": 64.2
+              },
               "clip": "PvStandPointL",
               "clipHold": true
             },
             {
-              "t": 15.63,
-              "clip": "PvStandTalkSlung"
+              "t": 16.5,
+              "faceTo": "Yaowa",
+              "clip": null
             },
             {
-              "t": 18.12,
-              "faceTo": "player"
+              "t": 18.1,
+              "faceTo": {
+                "x": 66.5,
+                "z": 64.2
+              }
             },
             {
-              "t": 18.92,
+              "t": 18.9,
               "faceTo": "Yaowa",
               "clip": "PvStandWaveOnL"
             },
             {
-              "t": 21.22,
+              "t": 20.5,
               "clip": null
             },
             {
-              "t": 23.42,
+              "t": 22.3,
               "x": 64.1,
               "z": 65.1,
               "move": "cut"
             },
             {
-              "t": 25.22,
-              "x": 61.6,
-              "z": 64.6,
-              "move": "walk",
+              "t": 25.62,
+              "x": 53.8,
+              "z": 65.3,
+              "move": "run",
+              "path": [
+                {
+                  "x": 62.4,
+                  "z": 64.6
+                }
+              ],
               "yawDeg": -90
             }
           ]
@@ -478,16 +600,29 @@
           "id": "Yaowa",
           "keys": [
             {
-              "t": 16.23,
+              "t": 0,
+              "x": 64.9,
+              "z": 63.1,
+              "move": "cut",
+              "stance": "crouch",
+              "faceTo": {
+                "x": 63,
+                "z": 64.5
+              },
+              "clip": "PvCrouchRestRifle"
+            },
+            {
+              "t": 16.2,
               "stance": "stand",
               "faceTo": "Luo",
               "clip": "PvStandTalkSlung"
             },
             {
-              "t": 19.22,
-              "x": 64.4,
-              "z": 63.6,
-              "move": "cut"
+              "t": 19.15,
+              "x": 64.9,
+              "z": 63.1,
+              "move": "cut",
+              "clip": null
             },
             {
               "t": 25.62,
@@ -496,15 +631,14 @@
               "move": "run",
               "path": [
                 {
-                  "x": 62,
-                  "z": 64.6
+                  "x": 62.4,
+                  "z": 64.4
                 },
                 {
                   "x": 50,
                   "z": 65.32
                 }
-              ],
-              "clip": null
+              ]
             }
           ]
         },
@@ -516,7 +650,7 @@
               "clip": "PvSitRestRifle"
             },
             {
-              "t": 20.02,
+              "t": 19.9,
               "x": 69.1,
               "z": 65.7,
               "move": "cut",
@@ -524,9 +658,9 @@
               "clip": null
             },
             {
-              "t": 25.42,
-              "x": 54,
-              "z": 65.2,
+              "t": 25.6,
+              "x": 47.06,
+              "z": 65.91,
               "move": "run",
               "path": [
                 {
@@ -586,9 +720,9 @@
             },
             {
               "t": 25.02,
-              "x": 58.5,
-              "z": 64.9,
-              "move": "walk",
+              "x": 56.5,
+              "z": 65.2,
+              "move": "run",
               "path": [
                 {
                   "x": 63,
@@ -633,6 +767,28 @@
             {
               "t": 0,
               "clip": "WoundedSitRifleIdle"
+            },
+            {
+              "t": 21.3,
+              "x": 67.1,
+              "z": 65.2,
+              "move": "cut",
+              "clip": null
+            },
+            {
+              "t": 22.6,
+              "x": 65.5,
+              "z": 65.6,
+              "move": "walk",
+              "stance": "crouch",
+              "faceTo": {
+                "x": 66.3,
+                "z": 64.6
+              }
+            },
+            {
+              "t": 22.65,
+              "clip": "PvSitStuffPack"
             }
           ]
         }
@@ -686,10 +842,16 @@
           "volume": 0.7
         },
         {
-          "t": 19.72,
+          "t": 20.7,
           "type": "caption",
           "text": "（顺子这才把结拉紧）",
           "dur": 1.6
+        },
+        {
+          "t": 23.8,
+          "type": "caption",
+          "text": "（冬瓜单手塞背包，塞不进去，顺子帮他捆好）",
+          "dur": 2.4
         }
       ]
     },
@@ -701,98 +863,157 @@
       "camera": [
         {
           "t": 0,
-          "dur": 0.9,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 137.12,
-            "pitchDeg": -30
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 0.9,
-          "dur": 1,
+          "t": 1.15,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 137.12,
-            "pitchDeg": -30,
-            "toYawDeg": 94.7,
-            "toPitchDeg": 2
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 6.24,
-          "dur": 1,
+          "t": 6.3,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 94.7,
-            "pitchDeg": 2,
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            },
             "toYawDeg": 160,
             "toPitchDeg": -50
           }
         },
         {
           "t": 8.44,
-          "dur": 1,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
             "yawDeg": 160,
             "pitchDeg": -50,
-            "toYawDeg": 137.12,
-            "toPitchDeg": -8
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
           }
         },
         {
           "t": 11.47,
-          "dur": 0.5,
+          "dur": 0.45,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 137.12,
-            "pitchDeg": -8,
-            "toYawDeg": 94.51,
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": 94.5,
             "toPitchDeg": 0
           }
         },
         {
-          "t": 12.17,
+          "t": 12.1,
           "dur": 0.5,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 94.51,
+            "yawDeg": 94.5,
             "pitchDeg": 0,
-            "toYawDeg": 137.12,
-            "toPitchDeg": -8
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
           }
         },
         {
           "t": 29,
           "dur": 0.6,
+          "keepMove": true,
           "eye": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "stance": "crouch",
-            "yawDeg": 137.12,
-            "pitchDeg": -8,
-            "toYawDeg": 160,
-            "toPitchDeg": -30
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toLook": {
+              "x": 62,
+              "z": 64.6,
+              "h": 1.4
+            }
           }
         },
         {
           "t": 29.7,
           "dur": 1.9,
+          "keepMove": true,
           "from": {
-            "x": 66.8,
+            "x": 66.5,
             "z": 64.2,
             "h": 1.05
           },
@@ -917,19 +1138,19 @@
           "keys": [
             {
               "t": 0,
-              "x": 52,
+              "x": 59,
               "z": 64.8,
               "move": "cut"
             },
             {
-              "t": 17.14,
+              "t": 9,
               "x": 28,
               "z": 66.8,
-              "move": "walk",
+              "move": "run",
               "yawDeg": 93
             },
             {
-              "t": 17.19,
+              "t": 9.05,
               "visible": false
             }
           ]
@@ -938,7 +1159,7 @@
           "id": "HeYoutian",
           "keys": [
             {
-              "t": 0.3,
+              "t": 0,
               "x": 47.06,
               "z": 65.91,
               "move": "cut"
@@ -960,20 +1181,20 @@
           "id": "Squad1",
           "keys": [
             {
-              "t": 0.6,
-              "x": 56.04,
-              "z": 65.34,
+              "t": 0,
+              "x": 56.5,
+              "z": 65.2,
               "move": "cut"
             },
             {
-              "t": 20.63,
+              "t": 10,
               "x": 28,
               "z": 66.8,
-              "move": "walk",
+              "move": "run",
               "yawDeg": 93
             },
             {
-              "t": 20.68,
+              "t": 10.05,
               "visible": false
             }
           ]
@@ -982,20 +1203,20 @@
           "id": "Squad2",
           "keys": [
             {
-              "t": 0.9,
-              "x": 43.51,
-              "z": 65.33,
+              "t": 0,
+              "x": 61.5,
+              "z": 64.6,
               "move": "cut"
             },
             {
-              "t": 11.98,
+              "t": 11,
               "x": 28,
               "z": 66.8,
-              "move": "walk",
+              "move": "run",
               "yawDeg": 93
             },
             {
-              "t": 12.03,
+              "t": 11.05,
               "visible": false
             }
           ]
@@ -1041,12 +1262,6 @@
         }
       ],
       "events": [
-        {
-          "t": 0.2,
-          "type": "caption",
-          "text": "（冬瓜单手塞背包，塞不进去，顺子帮他捆好）",
-          "dur": 2.4
-        },
         {
           "t": 7.34,
           "type": "caption",
@@ -1120,7 +1335,8 @@
       "camera": [
         {
           "t": 0,
-          "dur": 1.4,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
@@ -1130,60 +1346,103 @@
           }
         },
         {
-          "t": 1.4,
-          "dur": 3.4,
+          "t": 1.15,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 74.05,
-            "pitchDeg": 14
+            "yawDeg": 88.6,
+            "pitchDeg": -2,
+            "toYawDeg": 74,
+            "toPitchDeg": 14
           }
         },
         {
-          "t": 4.8,
-          "dur": 3.1,
+          "t": 4.3,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 97.35,
-            "pitchDeg": 2,
-            "toYawDeg": 95.39,
-            "toPitchDeg": 1
+            "yawDeg": 74,
+            "pitchDeg": 14,
+            "toYawDeg": 96,
+            "toPitchDeg": 4
           }
         },
         {
-          "t": 7.9,
-          "dur": 1.9,
+          "t": 7.5,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 62,
-            "pitchDeg": 12
+            "yawDeg": 96,
+            "pitchDeg": 4,
+            "toLook": {
+              "actor": "IjaYi",
+              "offset": [
+                0,
+                1.2,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 9.8,
-          "dur": 1.6,
+          "t": 10.2,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 104,
-            "pitchDeg": 2
+            "look": {
+              "actor": "IjaYi",
+              "offset": [
+                0,
+                1.2,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaMgGunner",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 11.4,
-          "dur": 2,
+          "t": 11.5,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 150,
-            "pitchDeg": -4
+            "look": {
+              "actor": "IjaMgGunner",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
           }
         }
       ],
@@ -2267,45 +2526,85 @@
     {
       "keyframe": "02-1",
       "title": "审冬瓜、新兵见血",
-      "durationS": 56.19,
+      "durationS": 56.4,
       "then": "next",
       "camera": [
         {
           "t": 0,
-          "dur": 2,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 150,
-            "pitchDeg": -4
+            "look": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 4.58,
-          "dur": 3,
+          "t": 1.1,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
             "x": 63.3,
             "z": 63.8,
             "stance": "prone",
-            "yawDeg": 150,
-            "pitchDeg": -4,
-            "toYawDeg": 104.5,
-            "toPitchDeg": 3
+            "look": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            },
+            "toYawDeg": 122,
+            "toPitchDeg": 8
+          }
+        },
+        {
+          "t": 4.4,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 122,
+            "pitchDeg": 8,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.6,
+                0
+              ]
+            }
           }
         },
         {
           "t": 6.28,
           "dur": 0.9,
+          "keepMove": true,
           "from": {
-            "actor": "player",
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "Donggua",
             "offset": [
               0,
-              0.3,
+              0.6,
               0
             ]
           },
-          "look": {
+          "lookTo": {
             "actor": "IjaJia",
             "offset": [
               0,
@@ -2318,13 +2617,11 @@
         {
           "t": 7.18,
           "dur": 0.8,
+          "keepMove": true,
           "from": {
-            "actor": "player",
-            "offset": [
-              0,
-              0.3,
-              0
-            ]
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
           },
           "look": {
             "actor": "IjaJia",
@@ -2335,12 +2632,9 @@
             ]
           },
           "to": {
-            "actor": "player",
-            "offset": [
-              0,
-              0.56,
-              0
-            ]
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
           },
           "lookTo": {
             "actor": "IjaJia",
@@ -2354,13 +2648,11 @@
         {
           "t": 7.98,
           "dur": 0.4,
+          "keepMove": true,
           "from": {
-            "actor": "player",
-            "offset": [
-              0,
-              0.56,
-              0
-            ]
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
           },
           "look": {
             "actor": "IjaJia",
@@ -2384,13 +2676,11 @@
         {
           "t": 8.38,
           "dur": 1.2,
+          "keepMove": true,
           "from": {
-            "actor": "player",
-            "offset": [
-              0,
-              0.5,
-              0
-            ]
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
           },
           "look": {
             "actor": "IjaJia",
@@ -2400,6 +2690,11 @@
               1.2
             ]
           },
+          "to": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.5
+          },
           "lookTo": {
             "actor": "IjaJia",
             "offset": [
@@ -2408,79 +2703,346 @@
               0
             ]
           },
-          "fov": 66,
           "shake": 0.3
         },
         {
-          "t": 10.66,
-          "dur": 1,
-          "eye": {
+          "t": 10.1,
+          "dur": 0.4,
+          "keepMove": true,
+          "from": {
             "x": 63.3,
             "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 104.5,
-            "pitchDeg": 3
+            "h": 0.5
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "to": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          }
+        },
+        {
+          "t": 10.6,
+          "dur": 0.6,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "lookTo": {
+            "actor": "IjaYi",
+            "offset": [
+              0,
+              1,
+              0
+            ]
+          }
+        },
+        {
+          "t": 11.8,
+          "dur": 5,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "IjaYi",
+            "offset": [
+              0,
+              1,
+              0
+            ]
+          },
+          "to": {
+            "x": 56,
+            "z": 64.9,
+            "h": 0.4
+          },
+          "lookTo": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.9,
+              0
+            ]
+          },
+          "ease": "linear"
+        },
+        {
+          "t": 16.8,
+          "dur": 0.8,
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 0.4
+          },
+          "look": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.9,
+              0
+            ]
+          },
+          "to": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
+          }
+        },
+        {
+          "t": 17.6,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": -85,
+            "toPitchDeg": -4
+          }
+        },
+        {
+          "t": 20.2,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "yawDeg": -85,
+            "pitchDeg": -4,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
           }
         },
         {
           "t": 24,
-          "dur": 1.6,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 80,
-            "pitchDeg": 8
-          }
-        },
-        {
-          "t": 26,
-          "dur": 1,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 104.5,
-            "pitchDeg": 3
-          }
-        },
-        {
-          "t": 35.1,
-          "dur": 1.4,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 104.5,
-            "pitchDeg": 3,
-            "toYawDeg": 108.76,
-            "toPitchDeg": 1
-          }
-        },
-        {
-          "t": 41.99,
           "dur": 0.8,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 108.76,
-            "pitchDeg": 1,
-            "toYawDeg": 110.41,
-            "toPitchDeg": 8
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": -8,
+            "toPitchDeg": 24
           }
         },
         {
-          "t": 53.59,
-          "dur": 0.8,
+          "t": 25.95,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 110.41,
-            "pitchDeg": 8,
-            "toYawDeg": 102.09,
-            "toPitchDeg": 2
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "yawDeg": -8,
+            "pitchDeg": 24,
+            "toLook": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 35.4,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.4,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 39.8,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.4,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 43.55,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 44.75,
+          "dur": 0.55,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 53.1,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 53.9,
+          "dur": 1.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
           }
         }
       ],
@@ -2618,15 +3180,15 @@
               "aim": false
             },
             {
-              "t": 34.4,
+              "t": 33.3,
               "x": 57.9,
               "z": 66.1,
               "move": "cut"
             },
             {
-              "t": 36.1,
-              "x": 56.7,
-              "z": 64.6,
+              "t": 34.8,
+              "x": 59.9,
+              "z": 66.1,
               "move": "walk",
               "aim": true,
               "faceTo": "Donggua"
@@ -2662,9 +3224,70 @@
               "move": "drag"
             },
             {
+              "t": 9.5,
+              "x": 58.4,
+              "z": 65.2,
+              "move": "cut",
+              "faceTo": {
+                "x": 63.3,
+                "z": 63.8
+              }
+            },
+            {
+              "t": 11.1,
+              "x": 62.35,
+              "z": 63.8,
+              "move": "run",
+              "faceTo": {
+                "x": 63.3,
+                "z": 63.8
+              }
+            },
+            {
+              "t": 11.15,
+              "clip": "PvKneelHaulBody"
+            },
+            {
+              "t": 11.75,
+              "clip": "VilIjaDragByArm"
+            },
+            {
+              "t": 11.8,
+              "x": 62.35,
+              "z": 63.8,
+              "move": "cut"
+            },
+            {
+              "t": 16.8,
+              "x": 55.1,
+              "z": 65.1,
+              "move": "drag"
+            },
+            {
+              "t": 16.85,
+              "clip": "PvKneelHaulBody",
+              "faceTo": {
+                "x": 56,
+                "z": 64.9
+              }
+            },
+            {
+              "t": 17.6,
+              "clip": null
+            },
+            {
+              "t": 18.6,
+              "x": 54.8,
+              "z": 64.3,
+              "move": "walk",
+              "faceTo": {
+                "x": 56.8,
+                "z": 65.2
+              }
+            },
+            {
               "t": 24.2,
               "stance": "crouch",
-              "clip": null,
               "aim": true,
               "faceTo": {
                 "x": 23,
@@ -2676,16 +3299,22 @@
               "stance": "stand"
             },
             {
-              "t": 34.3,
-              "x": 58.4,
-              "z": 65.2,
+              "t": 34,
+              "x": 54.8,
+              "z": 64.3,
               "move": "cut"
             },
             {
-              "t": 38.7,
+              "t": 36.4,
               "x": 52.3,
               "z": 65.7,
               "move": "walk",
+              "path": [
+                {
+                  "x": 53.6,
+                  "z": 64.5
+                }
+              ],
               "aim": true,
               "yawDeg": 90
             },
@@ -2740,7 +3369,10 @@
               "x": 62.5,
               "z": 63,
               "move": "walk",
-              "faceTo": "player"
+              "faceTo": {
+                "x": 63.3,
+                "z": 63.8
+              }
             },
             {
               "t": 7.4,
@@ -2751,22 +3383,41 @@
               "clip": "PvStandTalkLowRifle"
             },
             {
-              "t": 10.86,
+              "t": 9.95,
+              "faceTo": "IjaYi",
+              "clip": "PvStandPointL",
+              "clipHold": true
+            },
+            {
+              "t": 10.9,
               "faceTo": "Interpreter",
               "clip": "PvStandTalkLowRifle"
             },
             {
-              "t": 15.96,
-              "clip": null,
+              "t": 14.1,
+              "clip": null
+            },
+            {
+              "t": 14.15,
+              "x": 62.5,
+              "z": 63,
+              "move": "cut"
+            },
+            {
+              "t": 16.6,
+              "x": 59.3,
+              "z": 64.3,
+              "move": "walk",
+              "faceTo": "Donggua"
+            },
+            {
+              "t": 24.2,
+              "stance": "crouch",
               "aim": true,
               "faceTo": {
                 "x": 23,
                 "z": 66
               }
-            },
-            {
-              "t": 24.2,
-              "stance": "crouch"
             },
             {
               "t": 25.9,
@@ -2782,8 +3433,8 @@
             },
             {
               "t": 34.9,
-              "x": 62.5,
-              "z": 63,
+              "x": 59.3,
+              "z": 64.3,
               "move": "cut"
             },
             {
@@ -2814,7 +3465,10 @@
             },
             {
               "t": 53.07,
-              "faceTo": "player",
+              "faceTo": {
+                "x": 56,
+                "z": 64.9
+              },
               "clip": "PvStandPointL",
               "clipHold": true
             }
@@ -2898,7 +3552,17 @@
               "move": "run",
               "faceTo": "Donggua",
               "clip": null,
-              "aim": true
+              "aim": true,
+              "path": [
+                {
+                  "x": 55.6,
+                  "z": 66.3
+                },
+                {
+                  "x": 57.4,
+                  "z": 66.45
+                }
+              ]
             },
             {
               "t": 37.28,
@@ -2932,13 +3596,30 @@
               "yawDeg": 49.4
             },
             {
-              "t": 54.99,
-              "clip": "PvIjaBayonetRaiseThreat",
-              "clipHold": true,
+              "t": 53.45,
               "x": 58.41,
               "z": 66.27,
               "move": "cut",
+              "clip": null,
               "yawDeg": 49.4
+            },
+            {
+              "t": 55.7,
+              "x": 55.1,
+              "z": 65.95,
+              "move": "walk",
+              "path": [
+                {
+                  "x": 56.4,
+                  "z": 66.6
+                }
+              ],
+              "yawDeg": -40.6
+            },
+            {
+              "t": 55.75,
+              "clip": "PvIjaBayonetRaiseThreat",
+              "clipHold": true
             }
           ]
         },
@@ -3072,12 +3753,36 @@
               "yawDeg": -88
             },
             {
-              "t": 55.99,
-              "x": 57.63,
-              "z": 71.25,
+              "t": 43.4,
+              "x": 56.6,
+              "z": 69.5,
               "move": "crawl",
               "faceTo": {
-                "x": 57.230000000000004,
+                "x": 56.6,
+                "z": 64.9
+              }
+            },
+            {
+              "t": 43.5,
+              "stance": "crouch"
+            },
+            {
+              "t": 44.4,
+              "stance": "prone"
+            },
+            {
+              "t": 44.8,
+              "x": 56.6,
+              "z": 69.5,
+              "move": "cut"
+            },
+            {
+              "t": 55.9,
+              "x": 62,
+              "z": 69.4,
+              "move": "crawl",
+              "faceTo": {
+                "x": 61.5,
                 "z": 64.9
               }
             }
@@ -3096,12 +3801,12 @@
               "yawDeg": -88
             },
             {
-              "t": 55.99,
-              "x": 55.44,
-              "z": 71.39,
+              "t": 55.9,
+              "x": 55.4,
+              "z": 69.7,
               "move": "crawl",
               "faceTo": {
-                "x": 55.04,
+                "x": 55.4,
                 "z": 64.9
               }
             }
@@ -3120,12 +3825,12 @@
               "yawDeg": -88
             },
             {
-              "t": 55.99,
-              "x": 59.83,
-              "z": 71.11,
+              "t": 55.9,
+              "x": 53,
+              "z": 69.5,
               "move": "crawl",
               "faceTo": {
-                "x": 59.43,
+                "x": 53,
                 "z": 64.9
               }
             }
@@ -3144,12 +3849,12 @@
               "yawDeg": -88
             },
             {
-              "t": 55.99,
-              "x": 53.24,
-              "z": 71.53,
+              "t": 55.9,
+              "x": 51.4,
+              "z": 69.4,
               "move": "crawl",
               "faceTo": {
-                "x": 52.84,
+                "x": 51.4,
                 "z": 64.9
               }
             }
@@ -3621,8 +4326,8 @@
           "t": 43.59,
           "type": "sfx",
           "name": "dirtFall",
-          "x": 57.46,
-          "z": 68.46,
+          "x": 56.6,
+          "z": 68.6,
           "volume": 0.35
         },
         {
@@ -3640,7 +4345,7 @@
         {
           "t": 43.79,
           "type": "caption",
-          "text": "（南沿上滚下来几块土）",
+          "text": "（南沿上滚下来几块土，土垄上冒了一下钢盔）",
           "dur": 2
         },
         {
@@ -3705,149 +4410,182 @@
     {
       "keyframe": "02-2",
       "title": "反冲：南沿上一排枪，白刃",
-      "durationS": 18.85,
+      "durationS": 14.6,
       "then": "next",
       "camera": [
         {
           "t": 0,
-          "dur": 0.5,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 110.41,
-            "pitchDeg": 8
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 0.5,
-          "dur": 0.9,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 94.56,
-            "pitchDeg": 1,
-            "toYawDeg": 73.23,
-            "toPitchDeg": 10
-          }
-        },
-        {
-          "t": 1.5,
+          "t": 1.9,
           "dur": 0.8,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 73.23,
-            "pitchDeg": 10,
-            "toYawDeg": 128.04,
-            "toPitchDeg": 24
-          }
-        },
-        {
-          "t": 3.55,
-          "dur": 0.6,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 128.04,
-            "pitchDeg": 24,
-            "toYawDeg": 92.86,
-            "toPitchDeg": 6
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
           },
-          "shake": 0.15
+          "look": {
+            "actor": "IjaDing",
+            "offset": [
+              0,
+              1.45,
+              0
+            ]
+          },
+          "lookTo": {
+            "x": 52.6,
+            "z": 69.5,
+            "h": 1.4
+          }
         },
         {
-          "t": 4.15,
-          "dur": 0.4,
+          "t": 3.3,
+          "dur": 0.5,
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
+          },
+          "look": {
+            "x": 52.6,
+            "z": 69.5,
+            "h": 1.4
+          },
+          "to": {
+            "x": 56.35,
+            "z": 64.5,
+            "h": 0.6
+          },
+          "lookTo": {
+            "x": 57.6,
+            "z": 68.6,
+            "h": 1.3
+          },
+          "shake": 0.45
+        },
+        {
+          "t": 3.85,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
+            "x": 56.35,
+            "z": 64.5,
             "stance": "prone",
-            "yawDeg": 92.86,
+            "h": 0.6,
+            "look": {
+              "x": 57.6,
+              "z": 68.6,
+              "h": 1.3
+            },
+            "toYawDeg": -120,
+            "toPitchDeg": 12
+          }
+        },
+        {
+          "t": 6.1,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "yawDeg": -120,
+            "pitchDeg": 12,
+            "toYawDeg": -104,
+            "toPitchDeg": 6
+          }
+        },
+        {
+          "t": 9.4,
+          "dur": 0.9,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "yawDeg": -104,
             "pitchDeg": 6,
-            "toYawDeg": 94.56,
-            "toPitchDeg": 1
+            "toLook": {
+              "actor": "LiuWencai",
+              "offset": [
+                0,
+                1.1,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 4.85,
-          "dur": 0.4,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 94.56,
-            "pitchDeg": 1,
-            "toYawDeg": 132.16,
-            "toPitchDeg": 22
-          }
-        },
-        {
-          "t": 6.96,
+          "t": 11.4,
           "dur": 1.2,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
+            "x": 56.35,
+            "z": 64.5,
             "stance": "prone",
-            "yawDeg": 132.16,
-            "pitchDeg": 22,
-            "toYawDeg": 107.67,
-            "toPitchDeg": 4
+            "h": 0.6,
+            "look": {
+              "actor": "LiuWencai",
+              "offset": [
+                0,
+                1.1,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Interpreter",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 8.36,
-          "dur": 1.4,
+          "t": 12.9,
+          "dur": 0.7,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
+            "x": 56.35,
+            "z": 64.5,
             "stance": "prone",
-            "yawDeg": 107.67,
-            "pitchDeg": 4,
-            "toYawDeg": 95.31,
-            "toPitchDeg": 8
-          }
-        },
-        {
-          "t": 10.76,
-          "dur": 2,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 95.31,
-            "pitchDeg": 8,
-            "toYawDeg": 112.48,
-            "toPitchDeg": 10
-          }
-        },
-        {
-          "t": 15.16,
-          "dur": 2.6,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 112.48,
-            "pitchDeg": 10,
-            "toYawDeg": 71.57,
-            "toPitchDeg": 4
-          }
-        },
-        {
-          "t": 16.25,
-          "dur": 2,
-          "eye": {
-            "x": 63.3,
-            "z": 63.8,
-            "stance": "prone",
-            "yawDeg": 71.57,
-            "pitchDeg": 4,
-            "toYawDeg": 52.13,
-            "toPitchDeg": 14
+            "h": 0.6,
+            "look": {
+              "actor": "Interpreter",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "HeYoutian",
+              "offset": [
+                0,
+                1,
+                0
+              ]
+            }
           }
         }
       ],
@@ -3878,12 +4616,12 @@
           "keys": [
             {
               "t": 0,
-              "x": 58.41,
-              "z": 66.27,
+              "x": 55.1,
+              "z": 65.95,
               "move": "cut",
               "state": "alive",
               "stance": "stand",
-              "yawDeg": 49.4,
+              "yawDeg": -40.6,
               "clip": "PvIjaBayonetRaiseThreat",
               "clipFrom": 0.6,
               "clipHold": true
@@ -3892,7 +4630,7 @@
               "t": 3.25,
               "clip": "ShotCollapse",
               "clipHold": true,
-              "yawDeg": 49.4
+              "yawDeg": -40.6
             },
             {
               "t": 4.95,
@@ -3911,7 +4649,10 @@
               "move": "cut",
               "state": "alive",
               "stance": "stand",
-              "faceTo": "player",
+              "faceTo": {
+                "x": 56,
+                "z": 64.9
+              },
               "clip": "PvStandPointL",
               "clipFrom": 1.5,
               "clipHold": true
@@ -3932,11 +4673,11 @@
               "yawDeg": 90.95
             },
             {
-              "t": 7.76,
+              "t": 5.55,
               "clip": "IjaGrenadeBitePin"
             },
             {
-              "t": 9.76,
+              "t": 7.3,
               "x": 60.41,
               "z": 65.46,
               "move": "cut",
@@ -3945,7 +4686,7 @@
               "yawDeg": 90.95
             },
             {
-              "t": 11.76,
+              "t": 9.7,
               "state": "down",
               "clip": null
             }
@@ -3969,7 +4710,7 @@
               "faceTo": "CounterNra3"
             },
             {
-              "t": 5.2,
+              "t": 5.25,
               "clip": "BayonetClearWood"
             },
             {
@@ -3999,7 +4740,7 @@
             },
             {
               "t": 3,
-              "yawDeg": -90
+              "yawDeg": -135
             },
             {
               "t": 4.35,
@@ -4008,21 +4749,21 @@
             },
             {
               "t": 5.95,
-              "x": 56.13,
-              "z": 64.33,
+              "x": 56.42,
+              "z": 63.35,
               "move": "cut",
               "clip": null,
-              "yawDeg": 89.9,
+              "yawDeg": 44.9,
               "stance": "prone"
             },
             {
-              "t": 8.1,
-              "x": 55.13,
-              "z": 64.45,
+              "t": 12.2,
+              "x": 54.3,
+              "z": 63.5,
               "move": "crawl"
             },
             {
-              "t": 8.55,
+              "t": 12.65,
               "state": "down"
             }
           ]
@@ -4078,29 +4819,30 @@
           "spawn": {
             "side": "ija",
             "kind": "soldier",
-            "x": 56.7,
-            "z": 64.6,
-            "yawDeg": -60,
+            "x": 59.9,
+            "z": 66.1,
+            "yawDeg": 80,
             "stance": "stand"
           },
           "keys": [
             {
               "t": 0,
-              "aim": true
+              "aim": true,
+              "faceTo": "Donggua"
             },
             {
-              "t": 3.7,
+              "t": 2.5,
               "faceTo": {
-                "x": 56.5,
+                "x": 59.5,
                 "z": 69.5
               }
             },
             {
-              "t": 5,
+              "t": 5.2,
               "faceTo": "CounterNra4"
             },
             {
-              "t": 5.1,
+              "t": 5.3,
               "clip": "VilIjaBayonetThrust"
             },
             {
@@ -4133,27 +4875,27 @@
             {
               "t": 4,
               "faceTo": {
-                "x": 61.5,
-                "z": 68.9
+                "x": 57.6,
+                "z": 66.4
               }
             },
             {
-              "t": 4.9,
+              "t": 5.25,
               "stance": "stand",
               "aim": false,
               "faceTo": "CounterNra2"
             },
             {
-              "t": 4.9,
+              "t": 5.3,
               "clip": "VilIjaBayonetThrust"
             },
             {
-              "t": 6,
+              "t": 6.3,
               "clip": "PvIjaLungeParriedFall",
               "clipHold": true
             },
             {
-              "t": 7.8,
+              "t": 8.1,
               "state": "down",
               "clip": null
             }
@@ -4203,57 +4945,44 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 61.6,
-            "z": 71,
+            "x": 57.4,
+            "z": 70.3,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 2.4,
               "stance": "crouch"
             },
             {
-              "t": 2.8,
-              "x": 61.6,
-              "z": 71,
+              "t": 4.35,
+              "x": 57.4,
+              "z": 70.3,
               "move": "cut"
             },
             {
-              "t": 4.4,
-              "x": 61.5,
-              "z": 68.9,
+              "t": 5.2,
+              "x": 57.6,
+              "z": 66.4,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
               "faceTo": {
-                "x": 61.5,
-                "z": 64.9
+                "x": 50.5,
+                "z": 65.3
               }
             },
             {
-              "t": 4.6,
+              "t": 5.21,
               "clip": "ShotCollapse",
-              "clipHold": true
+              "clipHold": true,
+              "yawDeg": 90
             },
             {
-              "t": 4.65,
-              "x": 61.5,
-              "z": 68.9,
-              "move": "cut"
-            },
-            {
-              "t": 6.25,
-              "x": 61.9,
-              "z": 65.2,
-              "move": "walk"
-            },
-            {
-              "t": 6.35,
+              "t": 6.8,
               "state": "down",
-              "clip": null,
-              "yawDeg": 160
+              "clip": null
             }
           ]
         },
@@ -4262,42 +4991,38 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 52.2,
-            "z": 71.6,
+            "x": 52.6,
+            "z": 70.3,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 2.7,
               "stance": "crouch"
             },
             {
-              "t": 3.2,
-              "x": 52.2,
-              "z": 71.6,
+              "t": 4.4,
+              "x": 52.6,
+              "z": 70.3,
               "move": "cut"
             },
             {
-              "t": 4.8,
+              "t": 5.45,
               "x": 51.6,
               "z": 66,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
-              "faceTo": {
-                "x": 51.6,
-                "z": 64.9
-              }
+              "faceTo": "IjaBing"
             },
             {
-              "t": 4.9,
+              "t": 5.5,
               "clip": "VilStabbedFall",
               "clipHold": true
             },
             {
-              "t": 6.9,
+              "t": 7.5,
               "state": "down",
               "clip": null
             }
@@ -4308,42 +5033,38 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 50.6,
-            "z": 71.7,
+            "x": 54.4,
+            "z": 70.2,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 2.9,
               "stance": "crouch"
             },
             {
-              "t": 3.4,
-              "x": 50.6,
-              "z": 71.7,
+              "t": 4.2,
+              "x": 54.4,
+              "z": 70.2,
               "move": "cut"
             },
             {
-              "t": 5,
+              "t": 5.3,
               "x": 53.4,
               "z": 65.9,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
-              "faceTo": {
-                "x": 53.4,
-                "z": 64.9
-              }
+              "faceTo": "IjaYi"
             },
             {
-              "t": 5.3,
+              "t": 5.35,
               "clip": "VilStabbedFall",
               "clipHold": true
             },
             {
-              "t": 7.3,
+              "t": 7.35,
               "state": "down",
               "clip": null
             }
@@ -4354,42 +5075,39 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 56.5,
-            "z": 71.3,
+            "x": 59,
+            "z": 70.4,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 2.5,
               "stance": "crouch"
             },
             {
-              "t": 3.3,
-              "x": 56.5,
-              "z": 71.3,
+              "t": 4.45,
+              "x": 59,
+              "z": 70.4,
               "move": "cut"
             },
             {
-              "t": 4.9,
-              "x": 56.5,
-              "z": 65.9,
+              "t": 5.35,
+              "x": 58.8,
+              "z": 66.3,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
-              "faceTo": {
-                "x": 56.5,
-                "z": 64.9
-              }
+              "faceTo": "IjaWu"
             },
             {
-              "t": 5.1,
+              "t": 5.4,
               "clip": "VilStabbedFall",
-              "clipHold": true
+              "clipHold": true,
+              "faceTo": "IjaWu"
             },
             {
-              "t": 7.1,
+              "t": 7.4,
               "state": "down",
               "clip": null
             }
@@ -4400,39 +5118,67 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 54.3,
-            "z": 71.5,
+            "x": 50.8,
+            "z": 70.7,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 2.6,
               "stance": "crouch"
             },
             {
-              "t": 4.2,
-              "x": 54.3,
-              "z": 71.5,
+              "t": 5,
+              "x": 50.8,
+              "z": 70.7,
               "move": "cut"
             },
             {
-              "t": 5.8,
-              "x": 51.3,
-              "z": 66.4,
+              "t": 6.15,
+              "x": 50.8,
+              "z": 66.6,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
-              "faceTo": {
-                "x": 51.3,
-                "z": 64.9
-              }
+              "faceTo": "IjaBing"
             },
             {
-              "t": 5.9,
+              "t": 6.2,
               "clip": "DadaoAmbush",
               "faceTo": "IjaBing"
+            },
+            {
+              "t": 7.1,
+              "clip": null
+            },
+            {
+              "t": 10.9,
+              "x": 50.8,
+              "z": 66.6,
+              "move": "cut"
+            },
+            {
+              "t": 12.2,
+              "x": 53.45,
+              "z": 63.75,
+              "move": "run",
+              "path": [
+                {
+                  "x": 52.6,
+                  "z": 64.6
+                }
+              ],
+              "faceTo": "Interpreter"
+            },
+            {
+              "t": 12.25,
+              "clip": "DadaoAmbush",
+              "faceTo": "Interpreter"
+            },
+            {
+              "t": 13.2,
+              "clip": null
             }
           ]
         },
@@ -4441,56 +5187,43 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 58.7,
-            "z": 71.2,
+            "x": 61,
+            "z": 70.4,
             "stance": "prone",
             "yawDeg": 3.6,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 1.9,
+              "t": 3,
               "stance": "crouch"
             },
             {
-              "t": 4.6,
-              "x": 58.7,
-              "z": 71.2,
+              "t": 5,
+              "x": 61,
+              "z": 70.4,
               "move": "cut"
             },
             {
-              "t": 6.2,
-              "x": 57.2,
-              "z": 65.2,
+              "t": 5.95,
+              "x": 60.9,
+              "z": 66.2,
               "move": "run",
               "stance": "stand",
-              "clip": "CreepDadao",
-              "faceTo": {
-                "x": 57.2,
-                "z": 64.9
-              }
+              "faceTo": "IjaWu"
             },
             {
-              "t": 6.3,
+              "t": 6,
               "clip": "DadaoAmbush",
               "faceTo": "IjaWu"
             },
             {
-              "t": 7.8,
-              "x": 57.2,
-              "z": 65.2,
-              "move": "cut"
-            },
-            {
-              "t": 8.1,
-              "clip": "DadaoAmbush",
-              "faceTo": "Interpreter"
-            },
-            {
-              "t": 8.3,
-              "x": 55.93,
-              "z": 64.6,
-              "move": "run"
+              "t": 7,
+              "clip": null,
+              "faceTo": {
+                "x": 61,
+                "z": 63
+              }
             }
           ]
         },
@@ -4499,81 +5232,69 @@
           "keys": [
             {
               "t": 0,
-              "x": 57.63,
-              "z": 71.25,
+              "x": 62,
+              "z": 69.4,
               "move": "cut",
               "stance": "prone",
               "aim": false,
+              "weapon": "Dadao",
               "faceTo": {
-                "x": 57.23,
-                "z": 64.87
+                "x": 61.5,
+                "z": 64.9
               }
             },
             {
-              "t": 1.7,
-              "x": 57.63,
-              "z": 71.25,
-              "move": "cut",
-              "stance": "crouch",
-              "weapon": "Dadao"
+              "t": 2.1,
+              "stance": "stand"
             },
             {
-              "t": 2.5,
-              "x": 57.49,
-              "z": 69.06,
-              "move": "run",
-              "clip": "CreepDadao",
+              "t": 2.3,
+              "clip": "PvStandPointL",
+              "clipHold": true
+            },
+            {
+              "t": 4.3,
+              "x": 62,
+              "z": 69.4,
+              "move": "cut",
+              "clip": null
+            },
+            {
+              "t": 5,
+              "x": 62.3,
+              "z": 66.1,
+              "move": "run"
+            },
+            {
+              "t": 5.02,
+              "stance": "crouch"
+            },
+            {
+              "t": 5.45,
+              "stance": "stand",
               "faceTo": {
-                "x": 57.23,
-                "z": 64.87
+                "x": 60.5,
+                "z": 65.46
               }
             },
             {
-              "t": 5.15,
-              "stance": "stand",
-              "clip": "PvStandWaveOnL"
+              "t": 6.2,
+              "x": 62.3,
+              "z": 66.1,
+              "move": "cut"
             },
             {
-              "t": 6.96,
-              "x": 57.49,
-              "z": 69.06,
-              "move": "cut",
-              "clip": "DadaoAmbush",
-              "weapon": "Dadao"
-            },
-            {
-              "t": 7.66,
-              "x": 56.3,
-              "z": 66.03,
-              "move": "run",
-              "stance": "stand",
-              "faceTo": "IjaJia"
-            },
-            {
-              "t": 7.96,
-              "x": 56.3,
-              "z": 66.03,
-              "move": "cut",
-              "clip": "CreepDadao"
-            },
-            {
-              "t": 9.16,
+              "t": 6.85,
               "x": 61.1,
               "z": 64.86,
               "move": "run",
               "faceTo": {
                 "x": 60.5,
                 "z": 65.46
-              },
-              "path": [
-                {
-                  "x": 58.9,
-                  "z": 64.1
-                }
-              ]
+              }
             },
             {
-              "t": 9.26,
+              "t": 6.86,
               "clip": "LuoDadaoChopRear",
               "faceTo": {
                 "x": 60.5,
@@ -4581,14 +5302,14 @@
               }
             },
             {
-              "t": 14.16,
+              "t": 8.3,
               "x": 61.1,
               "z": 64.86,
               "move": "cut",
               "clip": null
             },
             {
-              "t": 15.36,
+              "t": 10.6,
               "x": 58.95,
               "z": 64.46,
               "move": "walk",
@@ -4602,46 +5323,31 @@
           "keys": [
             {
               "t": 0,
-              "x": 55.44,
-              "z": 71.39,
+              "x": 55.4,
+              "z": 69.7,
               "move": "cut",
               "stance": "prone",
               "aim": false,
               "faceTo": {
-                "x": 55.03,
+                "x": 55.4,
                 "z": 65
               }
             },
             {
-              "t": 1.78,
-              "x": 55.44,
-              "z": 71.39,
-              "move": "cut",
-              "stance": "crouch"
+              "t": 2.35,
+              "stance": "crouch",
+              "aim": true
             },
             {
-              "t": 2.58,
-              "x": 55.3,
-              "z": 69.2,
-              "move": "run",
-              "aim": true,
+              "t": 6.6,
+              "faceTo": "IjaYi"
+            },
+            {
+              "t": 9.3,
               "faceTo": {
-                "x": 55.03,
-                "z": 65
+                "x": 56.35,
+                "z": 64.5
               }
-            },
-            {
-              "t": 13.56,
-              "x": 55.3,
-              "z": 69.2,
-              "move": "cut"
-            },
-            {
-              "t": 14.76,
-              "x": 55.9,
-              "z": 69.16,
-              "move": "walk",
-              "faceTo": "player"
             }
           ]
         },
@@ -4650,46 +5356,20 @@
           "keys": [
             {
               "t": 0,
-              "x": 59.83,
-              "z": 71.11,
+              "x": 53,
+              "z": 69.5,
               "move": "cut",
               "stance": "prone",
               "aim": false,
               "faceTo": {
-                "x": 59.42,
-                "z": 64.73
+                "x": 53,
+                "z": 65
               }
             },
             {
-              "t": 1.86,
-              "x": 59.83,
-              "z": 71.11,
-              "move": "cut",
-              "stance": "crouch"
-            },
-            {
-              "t": 2.66,
-              "x": 59.69,
-              "z": 68.92,
-              "move": "run",
-              "aim": true,
-              "faceTo": {
-                "x": 59.42,
-                "z": 64.73
-              }
-            },
-            {
-              "t": 13.16,
-              "x": 59.69,
-              "z": 68.92,
-              "move": "cut"
-            },
-            {
-              "t": 15.56,
-              "x": 54.37,
-              "z": 65.65,
-              "move": "run",
-              "yawDeg": -86
+              "t": 2.5,
+              "stance": "stand",
+              "aim": true
             }
           ]
         },
@@ -4698,33 +5378,20 @@
           "keys": [
             {
               "t": 0,
-              "x": 53.24,
-              "z": 71.53,
+              "x": 51.4,
+              "z": 69.4,
               "move": "cut",
               "stance": "prone",
               "aim": false,
               "faceTo": {
-                "x": 52.84,
-                "z": 65.14
+                "x": 51.4,
+                "z": 65
               }
             },
             {
-              "t": 1.94,
-              "x": 53.24,
-              "z": 71.53,
-              "move": "cut",
-              "stance": "crouch"
-            },
-            {
-              "t": 2.74,
-              "x": 53.1,
-              "z": 69.33,
-              "move": "run",
-              "aim": true,
-              "faceTo": {
-                "x": 52.84,
-                "z": 65.14
-              }
+              "t": 2.65,
+              "stance": "crouch",
+              "aim": true
             }
           ]
         },
@@ -4739,10 +5406,8 @@
               "stance": "crouch",
               "aim": true,
               "faceTo": {
-                "name": "日军机枪（支沟沿）",
                 "x": 56,
-                "z": 61.6,
-                "yawDeg": 90
+                "z": 61.6
               }
             },
             {
@@ -4754,9 +5419,9 @@
               "aim": false
             },
             {
-              "t": 16.15,
-              "x": 62.4,
-              "z": 63.1,
+              "t": 13.6,
+              "x": 55.5,
+              "z": 63.75,
               "move": "run",
               "path": [
                 {
@@ -4768,16 +5433,22 @@
                   "z": 65.06
                 },
                 {
-                  "x": 58.25,
-                  "z": 63.6
+                  "x": 52.8,
+                  "z": 64.9
+                },
+                {
+                  "x": 54.6,
+                  "z": 64.3
                 }
               ],
-              "stance": "crouch",
-              "faceTo": "player"
+              "faceTo": {
+                "x": 56.35,
+                "z": 64.5
+              }
             },
             {
-              "t": 17.35,
-              "clip": "PvKneelDig"
+              "t": 13.65,
+              "stance": "crouch"
             }
           ]
         },
@@ -4807,8 +5478,8 @@
             },
             {
               "t": 13.15,
-              "x": 51,
-              "z": 64.86,
+              "x": 51.6,
+              "z": 64.6,
               "move": "run",
               "path": [
                 {
@@ -4829,22 +5500,22 @@
           "actor": "Luo"
         },
         {
-          "t": 3.95,
+          "t": 3.5,
           "line": "Counter.02",
           "actor": "IjaWu"
         },
         {
-          "t": 5.25,
+          "t": 4.3,
           "line": "Counter.03",
           "actor": "Luo"
         },
         {
-          "t": 7.66,
+          "t": 6.95,
           "line": "Counter.04",
           "actor": "Luo"
         },
         {
-          "t": 10.36,
+          "t": 9.6,
           "line": "Counter.05",
           "actor": "LiuWencai"
         }
@@ -4894,7 +5565,7 @@
           "t": 2.95,
           "type": "sfx",
           "name": "rifleVolley",
-          "x": 56.5,
+          "x": 53.8,
           "z": 69.12
         },
         {
@@ -4903,24 +5574,14 @@
           "actor": "LiuWencai"
         },
         {
-          "t": 2.95,
+          "t": 3.02,
           "type": "muzzle",
           "actor": "Squad2"
         },
         {
-          "t": 2.95,
+          "t": 3.12,
           "type": "muzzle",
           "actor": "Squad3"
-        },
-        {
-          "t": 2.95,
-          "type": "muzzle",
-          "actor": "CounterNra5"
-        },
-        {
-          "t": 2.95,
-          "type": "muzzle",
-          "actor": "CounterNra6"
         },
         {
           "t": 3.85,
@@ -4940,50 +5601,50 @@
           "actor": "LiuWencai"
         },
         {
+          "t": 3.9,
+          "type": "caption",
+          "text": "（丁扑倒在面前，刺刀尖扎进脸边的泥里）",
+          "dur": 2.2
+        },
+        {
           "t": 4.05,
           "type": "muzzle",
           "actor": "Squad3"
         },
         {
-          "t": 4.6,
+          "t": 5.2,
           "type": "muzzle",
           "actor": "IjaBing"
         },
         {
-          "t": 4.6,
+          "t": 5.2,
           "type": "sfx",
           "name": "rifleShot",
           "x": 50.5,
           "z": 65.3
         },
         {
-          "t": 5,
-          "type": "caption",
-          "text": "（丁扑倒在面前，刺刀尖扎进脸边的泥里）",
-          "dur": 2.2
-        },
-        {
-          "t": 5.4,
-          "type": "sfx",
-          "name": "stab",
-          "x": 51.6,
-          "z": 66
-        },
-        {
-          "t": 5.6,
-          "type": "sfx",
-          "name": "stab",
-          "x": 56.5,
-          "z": 65.9
-        },
-        {
-          "t": 5.7,
+          "t": 5.65,
           "type": "sfx",
           "name": "stab",
           "x": 53.4,
           "z": 65.9
         },
         {
+          "t": 5.75,
+          "type": "sfx",
+          "name": "stab",
+          "x": 51.6,
+          "z": 66
+        },
+        {
+          "t": 5.75,
+          "type": "sfx",
+          "name": "stab",
+          "x": 58.8,
+          "z": 66.3
+        },
+        {
           "t": 6.8,
           "type": "muzzle",
           "actor": "LiuWencai"
@@ -4996,42 +5657,25 @@
           "z": 69.2
         },
         {
-          "t": 8.26,
-          "type": "muzzle",
-          "actor": "LiuWencai"
-        },
-        {
-          "t": 8.26,
-          "type": "sfx",
-          "name": "rifleShot",
-          "x": 55.3,
-          "z": 69.2
-        },
-        {
-          "t": 9.96,
-          "type": "muzzle",
-          "actor": "LiuWencai"
-        },
-        {
-          "t": 9.96,
-          "type": "sfx",
-          "name": "rifleShot",
-          "x": 55.3,
-          "z": 69.2
-        },
-        {
-          "t": 10.5,
+          "t": 7.8,
           "type": "caption",
           "text": "（那颗没磕响的手榴弹滚到脸前，停住了）",
           "dur": 2.4
         },
         {
-          "t": 12.16,
+          "t": 8.26,
           "type": "muzzle",
           "actor": "LiuWencai"
         },
         {
-          "t": 12.6,
+          "t": 8.26,
+          "type": "sfx",
+          "name": "rifleShot",
+          "x": 55.3,
+          "z": 69.2
+        },
+        {
+          "t": 11,
           "type": "caption",
           "text": "（沟里一下子静了）",
           "dur": 2
@@ -5046,129 +5690,260 @@
       "camera": [
         {
           "t": 0,
-          "dur": 2.6,
+          "dur": 0,
+          "keepMove": true,
           "eye": {
-            "x": 63.3,
-            "z": 63.8,
+            "x": 56.35,
+            "z": 64.5,
             "stance": "prone",
-            "yawDeg": 52.13,
-            "pitchDeg": 12
+            "h": 0.6,
+            "look": {
+              "actor": "HeYoutian",
+              "offset": [
+                0,
+                1,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 4.4,
-          "dur": 2.2,
+          "t": 3.2,
+          "dur": 1.6,
+          "keepMove": true,
           "from": {
-            "x": 63.3,
-            "z": 63.8,
-            "h": 0.32
-          },
-          "look": {
-            "x": 60.69,
-            "z": 65.15,
+            "x": 56.35,
+            "z": 64.5,
             "h": 0.6
           },
+          "look": {
+            "actor": "HeYoutian",
+            "offset": [
+              0,
+              1,
+              0
+            ]
+          },
           "to": {
-            "x": 61.72,
-            "z": 64.78,
+            "x": 56.05,
+            "z": 64.25,
             "h": 1.05
           },
           "lookTo": {
-            "x": 58.09,
-            "z": 65.15,
-            "h": 0.6
+            "actor": "HeYoutian",
+            "offset": [
+              0,
+              1.2,
+              0
+            ]
           }
         },
         {
-          "t": 6.6,
-          "dur": 3.5,
+          "t": 5,
+          "dur": 1.4,
+          "keepMove": true,
           "eye": {
-            "x": 61.72,
-            "z": 64.78,
+            "x": 56.05,
+            "z": 64.25,
             "stance": "crouch",
-            "yawDeg": 95.82,
-            "pitchDeg": -6,
-            "toYawDeg": 95,
-            "toPitchDeg": -8
+            "look": {
+              "actor": "HeYoutian",
+              "offset": [
+                0,
+                1.2,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "t": 7.9,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56.05,
+            "z": 64.25,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "HeYoutian",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
           }
         },
         {
           "t": 11.1,
-          "dur": 1.8,
+          "dur": 0.9,
+          "keepMove": true,
           "from": {
-            "x": 61.72,
-            "z": 64.78,
+            "x": 56.05,
+            "z": 64.25,
             "h": 1.05
           },
           "look": {
-            "x": 57.49,
-            "z": 65.15,
-            "h": 0.3
+            "actor": "HeYoutian",
+            "offset": [
+              0,
+              0.9,
+              0
+            ]
           },
           "to": {
-            "x": 57.06,
+            "x": 56.75,
+            "z": 65.6,
+            "h": 1.05
+          },
+          "lookTo": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "t": 12,
+          "dur": 0.6,
+          "keepMove": true,
+          "from": {
+            "x": 56.75,
+            "z": 65.6,
+            "h": 1.05
+          },
+          "look": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.3,
+              0
+            ]
+          },
+          "to": {
+            "x": 57.76,
             "z": 65.43,
             "h": 1.05
           }
         },
         {
-          "t": 12.58,
-          "dur": 3.4,
+          "t": 12.6,
+          "dur": 0.5,
+          "keepMove": true,
           "eye": {
-            "x": 57.06,
+            "x": 57.76,
             "z": 65.43,
             "stance": "crouch",
-            "yawDeg": -24.9,
-            "pitchDeg": -52
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toYawDeg": -24.9,
+            "toPitchDeg": -52
           }
         },
         {
           "t": 15.41,
           "dur": 1,
+          "keepMove": true,
           "eye": {
-            "x": 57.06,
+            "x": 57.76,
             "z": 65.43,
             "stance": "crouch",
             "yawDeg": -24.9,
             "pitchDeg": -52,
-            "toYawDeg": -58.11,
+            "toYawDeg": -58,
             "toPitchDeg": 8
           }
         },
         {
-          "t": 18.25,
-          "dur": 1.2,
+          "t": 16.3,
+          "dur": 0.6,
+          "keepMove": true,
           "eye": {
-            "x": 57.06,
+            "x": 57.76,
             "z": 65.43,
             "stance": "crouch",
-            "yawDeg": -58.11,
+            "yawDeg": -58,
             "pitchDeg": 8,
-            "toPitchDeg": -25
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            }
           }
         },
         {
-          "t": 18.44,
-          "dur": 1.4,
+          "t": 18.15,
+          "dur": 0.8,
+          "keepMove": true,
           "eye": {
-            "x": 55.85,
-            "z": 64.6,
-            "stance": "stand",
-            "yawDeg": -176.36,
-            "pitchDeg": -4
+            "x": 57.76,
+            "z": 65.43,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            },
+            "toLook": {
+              "x": 58.5,
+              "z": 65.85,
+              "h": 0.7
+            }
           }
         },
         {
-          "t": 19.34,
-          "dur": 1.4,
-          "eye": {
-            "x": 55.85,
-            "z": 64.6,
-            "stance": "stand",
-            "yawDeg": -176.36,
-            "pitchDeg": -4,
-            "toYawDeg": -105.43,
-            "toPitchDeg": -22
+          "t": 19,
+          "dur": 1.6,
+          "keepMove": true,
+          "from": {
+            "x": 57.76,
+            "z": 65.43,
+            "h": 1.05
+          },
+          "look": {
+            "x": 58.5,
+            "z": 65.85,
+            "h": 0.7
+          },
+          "to": {
+            "x": 56.62,
+            "z": 65.7,
+            "h": 1.62
+          },
+          "lookTo": {
+            "x": 57.6,
+            "z": 65.45,
+            "h": 0.4
           }
         }
       ],
@@ -5191,11 +5966,11 @@
           "spawn": {
             "side": "ija",
             "kind": "soldier",
-            "x": 56.79,
-            "z": 64.17,
+            "x": 60.3,
+            "z": 66.1,
             "stance": "prone",
             "state": "down",
-            "yawDeg": 60
+            "yawDeg": 80
           },
           "keys": []
         },
@@ -5204,11 +5979,11 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 61.9,
-            "z": 65.2,
+            "x": 56.7,
+            "z": 66.35,
             "stance": "prone",
             "state": "down",
-            "yawDeg": 160
+            "yawDeg": 90
           },
           "keys": []
         },
@@ -5243,11 +6018,11 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 56.5,
-            "z": 66.1,
+            "x": 58.8,
+            "z": 66.3,
             "stance": "prone",
             "state": "down",
-            "yawDeg": 30
+            "yawDeg": 140
           },
           "keys": []
         },
@@ -5269,60 +6044,57 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 61.9,
-            "z": 63.6,
-            "stance": "crouch",
-            "yawDeg": 40,
+            "x": 53.45,
+            "z": 63.75,
+            "stance": "stand",
+            "yawDeg": -60,
             "weapon": "Dadao"
           },
           "keys": [
             {
-              "t": 0.6,
-              "clip": "PvKneelDig"
+              "t": 0,
+              "faceTo": {
+                "x": 56.35,
+                "z": 64.5
+              }
             },
             {
-              "t": 3,
+              "t": 1.2,
+              "x": 53.45,
+              "z": 63.75,
+              "move": "cut"
+            },
+            {
+              "t": 2.6,
+              "x": 55.35,
+              "z": 64.55,
+              "move": "walk",
+              "faceTo": {
+                "x": 56.35,
+                "z": 64.5
+              }
+            },
+            {
+              "t": 2.65,
+              "stance": "crouch",
+              "clip": "PvKneelHaulBody"
+            },
+            {
+              "t": 4.6,
               "clip": null
             },
             {
-              "t": 4.8,
+              "t": 5.2,
               "stance": "stand"
             },
             {
               "t": 6,
-              "x": 61.9,
-              "z": 63.6,
+              "x": 55.35,
+              "z": 64.55,
               "move": "cut"
             },
             {
               "t": 10,
-              "x": 56.8,
-              "z": 64.6,
-              "move": "walk",
-              "faceTo": "Donggua"
-            }
-          ]
-        },
-        {
-          "id": "CounterNra6",
-          "spawn": {
-            "side": "nra",
-            "kind": "soldier",
-            "x": 55.93,
-            "z": 64.6,
-            "stance": "stand",
-            "yawDeg": 90,
-            "weapon": "Dadao"
-          },
-          "keys": [
-            {
-              "t": 1,
-              "x": 56.3,
-              "z": 64.6,
-              "move": "cut"
-            },
-            {
-              "t": 6,
               "x": 50,
               "z": 65.6,
               "move": "walk",
@@ -5331,39 +6103,72 @@
           ]
         },
         {
+          "id": "CounterNra6",
+          "spawn": {
+            "side": "nra",
+            "kind": "soldier",
+            "x": 60.9,
+            "z": 66.2,
+            "stance": "stand",
+            "yawDeg": -90,
+            "weapon": "Dadao"
+          },
+          "keys": [
+            {
+              "t": 0,
+              "aim": false,
+              "faceTo": {
+                "x": 63,
+                "z": 63.8
+              }
+            }
+          ]
+        },
+        {
           "id": "HeYoutian",
           "keys": [
             {
               "t": 0,
-              "x": 62.4,
-              "z": 63.1,
+              "x": 55.5,
+              "z": 63.75,
               "move": "cut",
               "stance": "crouch",
-              "faceTo": "player"
+              "faceTo": {
+                "x": 56.35,
+                "z": 64.5
+              }
             },
             {
-              "t": 0.4,
+              "t": 0.3,
               "clip": "PvKneelDig"
             },
             {
-              "t": 2.5,
-              "clip": "HeLiftTimber"
+              "t": 2.6,
+              "clip": "PvKneelHaulBody"
             },
             {
-              "t": 5.4,
-              "x": 62.4,
-              "z": 63.1,
-              "move": "cut",
+              "t": 4.6,
               "clip": null
             },
             {
+              "t": 7.2,
+              "x": 55.5,
+              "z": 63.75,
+              "move": "cut"
+            },
+            {
               "t": 7.8,
-              "x": 56.24,
+              "x": 56.94,
               "z": 64.33,
               "move": "run",
+              "path": [
+                {
+                  "x": 56.6,
+                  "z": 63.5
+                }
+              ],
               "faceTo": "Donggua",
-              "stance": "crouch",
-              "clip": "PvCrouchTalkRifle"
+              "stance": "crouch"
             },
             {
               "t": 8.98,
@@ -5377,7 +6182,7 @@
             },
             {
               "t": 18.39,
-              "x": 56.24,
+              "x": 56.94,
               "z": 64.33,
               "move": "cut",
               "clip": null,
@@ -5385,15 +6190,15 @@
             },
             {
               "t": 18.94,
-              "x": 55.92,
-              "z": 65.7,
+              "x": 56.55,
+              "z": 64.6,
               "move": "walk",
               "yawDeg": 93.6
             },
             {
               "t": 19.04,
               "carryRole": "front",
-              "clip": "PvBlanketDragL"
+              "clip": "PvBlanketDragR"
             }
           ]
         },
@@ -5418,7 +6223,7 @@
             },
             {
               "t": 10.24,
-              "x": 58.51,
+              "x": 59.21,
               "z": 65.49,
               "move": "walk",
               "faceTo": "Donggua"
@@ -5430,7 +6235,7 @@
             },
             {
               "t": 14.41,
-              "x": 58.51,
+              "x": 59.21,
               "z": 65.49,
               "move": "cut",
               "clip": null,
@@ -5438,34 +6243,35 @@
               "stance": "stand"
             },
             {
-              "t": 16.01,
-              "x": 58.41,
-              "z": 64.59,
+              "t": 15.95,
+              "x": 58.75,
+              "z": 65.95,
               "move": "walk",
-              "faceTo": "player",
+              "faceTo": {
+                "x": 57.76,
+                "z": 65.43
+              }
+            },
+            {
+              "t": 16.3,
               "clip": "PvStandTalkLowRifle"
             },
             {
-              "t": 17.51,
-              "clip": "LuoHandRifle"
-            },
-            {
-              "t": 18.34,
-              "clip": "PvStandWaveOnL"
-            },
-            {
-              "t": 19.34,
-              "x": 58.41,
-              "z": 64.59,
-              "move": "cut",
+              "t": 19,
               "clip": null
             },
             {
-              "t": 21.14,
-              "x": 61.89,
-              "z": 65.07,
-              "move": "drag",
-              "yawDeg": 273.6,
+              "t": 20,
+              "x": 58.75,
+              "z": 65.95,
+              "move": "cut"
+            },
+            {
+              "t": 21.6,
+              "x": 60.5,
+              "z": 65.7,
+              "move": "walk",
+              "yawDeg": -86.4,
               "aim": true
             }
           ]
@@ -5475,6 +6281,9 @@
           "keys": [
             {
               "t": 0,
+              "x": 58.18,
+              "z": 65.05,
+              "move": "cut",
               "visible": false
             },
             {
@@ -5491,7 +6300,19 @@
               "weapon": null
             },
             {
-              "t": 12.18,
+              "t": 10.75,
+              "x": 57.48,
+              "z": 65.05,
+              "move": "cut"
+            },
+            {
+              "t": 12,
+              "x": 58.18,
+              "z": 65.05,
+              "move": "walk"
+            },
+            {
+              "t": 12.3,
               "clip": "PvLieGrabSleeve",
               "clipHold": true
             },
@@ -5504,6 +6325,18 @@
         {
           "id": "LiuWencai",
           "keys": [
+            {
+              "t": 0,
+              "x": 55.4,
+              "z": 69.7,
+              "move": "cut",
+              "stance": "crouch",
+              "aim": true,
+              "faceTo": {
+                "x": 55.4,
+                "z": 64.9
+              }
+            },
             {
               "t": 17.24,
               "x": 48.46,
@@ -5525,6 +6358,18 @@
           "id": "Squad1",
           "keys": [
             {
+              "t": 0,
+              "x": 51.6,
+              "z": 64.6,
+              "move": "cut",
+              "stance": "stand",
+              "aim": true,
+              "faceTo": {
+                "x": 51.6,
+                "z": 64.9
+              }
+            },
+            {
               "t": 17.24,
               "x": 45.53,
               "z": 66.11,
@@ -5545,6 +6390,18 @@
           "id": "Squad2",
           "keys": [
             {
+              "t": 0,
+              "x": 53,
+              "z": 69.5,
+              "move": "cut",
+              "stance": "stand",
+              "aim": true,
+              "faceTo": {
+                "x": 53,
+                "z": 64.9
+              }
+            },
+            {
               "t": 17.24,
               "x": 42.97,
               "z": 65.27,
@@ -5564,6 +6421,18 @@
         {
           "id": "Squad3",
           "keys": [
+            {
+              "t": 0,
+              "x": 51.4,
+              "z": 69.4,
+              "move": "cut",
+              "stance": "crouch",
+              "aim": true,
+              "faceTo": {
+                "x": 51.4,
+                "z": 64.9
+              }
+            },
             {
               "t": 17.24,
               "x": 40.53,
@@ -5600,12 +6469,12 @@
           "keys": [
             {
               "t": 0,
-              "x": 58.41,
-              "z": 66.27,
+              "x": 55.1,
+              "z": 65.95,
               "move": "cut",
               "state": "down",
               "stance": "prone",
-              "yawDeg": 49.4
+              "yawDeg": -40.6
             }
           ]
         },
@@ -5628,12 +6497,12 @@
           "keys": [
             {
               "t": 0,
-              "x": 55.13,
-              "z": 64.45,
+              "x": 54.3,
+              "z": 63.5,
               "move": "cut",
               "state": "down",
               "stance": "prone",
-              "yawDeg": 89.9
+              "yawDeg": 44.9
             }
           ]
         },
@@ -5673,7 +6542,7 @@
           "actor": "HeYoutian"
         },
         {
-          "t": 4.6,
+          "t": 4.15,
           "line": "Release.02"
         },
         {
@@ -5711,7 +6580,7 @@
           "dur": 2
         },
         {
-          "t": 18.25,
+          "t": 18.5,
           "type": "caption",
           "text": "（班长把枪塞进顺子手里）",
           "dur": 2.4

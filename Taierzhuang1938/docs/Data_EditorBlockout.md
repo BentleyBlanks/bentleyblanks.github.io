@@ -943,7 +943,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - `keyframe`：从这个关键帧的布设（单位、玩家机位、信号）起播；一个关键帧最多一段。`durationS` 可省（= 所有轨道、台词、事件的最晚结束）。`then`：`"next"`（缺省，播完直接到下一个关键帧）/ 某个关键帧 id / `"stay"`（留在这一帧，单位回到关键帧布设）。
 - 点 `{x, z, h?}`：`h` 是离地高（米，缺省 1.6；地面按场景高度场取）。演员锚 `{ "actor": "<单位 id>", "offset": [dx, dy, dz] }`：偏移按世界轴、相对演员脚下，不随演员转身（同 `Data_CutsceneRedo.md` 的 `fromActor`）；`"actor": "player"` = 顺子（玩家机位）。
 - **镜头** `camera[]`（按 `t` 排，每条管 `[t, t+dur)`，空档沿用上一条的最后一帧）：
-  - `eye`：顺子的眼睛（第一人称）。`stance` 定眼高（stand 1.62 / crouch 1.05 / prone 0.32 m，离地），`yawDeg` / `pitchDeg` 起始朝向，`toYawDeg` / `toPitchDeg` 可选（这一条里转头过去）；受困拍就这么写。
+  - `eye`：顺子的眼睛（第一人称）。`stance` 定眼高（stand 1.62 / crouch 1.05 / prone 0.32 m，离地；2026-11-02 起可另写 `h` 米数（0.1–2）盖过它，如被撞倒撑着胳膊肘抬起上身写 `h: 0.6`），`yawDeg` / `pitchDeg` 起始朝向，`toYawDeg` / `toPitchDeg` 可选（这一条里转头过去）；受困拍就这么写。
     - `look` / `toLook`（2026-10-21，可选）：默认视线的起幅 / 落幅也可以写锚点（点 `{x,z,h?}`、演员锚、飞机锚 `{ aircraft }`），写了就不看对应的 `yawDeg` / `pitchDeg`；锚点每次取样重算，所以 `look: { aircraft: "Ki30Lead" }` = 视线跟着飞机走。
     - `free: true`（2026-10-21，**能转头不能走**）：眼睛位置、姿态钉死（`x / z` 必填），默认视线照上面放；玩家一动鼠标或按方向键（← → ↑ ↓），这一条剩下的时间视线归玩家，WASD 本来就不起作用；**紧挨着的几条 `free` 眼睛只要位置、姿态一样算同一段**（默认视线分几条写，玩家转到的方向不被夺回），下一条不一样的镜头开始时收回。Seek / 没人碰鼠标 = 默认视线（确定性，测试、截图都按它）。鼠标走预演自己挂的 `mousemove`（不抢指针锁，`Script_Main` 那条链在预演中本来就把位移扔了）；数在 `PREVIZ_FREE_LOOK`（0.11°/px、方向键 90°/s、俯仰 ±85°），同一段的判断是 `PrevizFreeLookSegment(camera, index)`；`Debug.Blockout.Previz.Look(dx, dy)` 给测试喂位移，`State().freeLook` → `{ available, active, yawDeg, pitchDeg }`。切镜模式下 free 眼睛的默认视线照 §14.2 切。07-4 飞机过头顶那 10 s 用的就是它（§15）。
   - 否则 `from`（必填）/ `to`（可选，机位移动）+ `look`（必填）/ `lookTo`（可选）；`fov` 垂直视场度数（缺省 60）；`ease`：`"linear"` / `"inOut"`（缺省）；`shake` 0–1。
@@ -1002,6 +1002,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。
 - Timeline（2026-10-31，[编辑器套件](Data_EditorSuite.md)「Timeline 过场」）：`UseSource(doc)` 把播放器的数据换成一份 Timeline（`Timeline/<Id>.timeline.json` 的子序列），`null` 还回本关预演文件；换源期间预演按钮 / N 键 / `Debug.Blockout.Previz` 都播那一份，`State().source` 为 true。`Pause()` 停在当前这一秒（Timeline 的暂停）。`?timeline=<Id>` 开机就打开底部 Timeline 面板，接口 `Debug.Blockout.Timeline`。
 - **原件 Timeline（2026-11-01）**：登记成 `ownsPreviz` 的 Timeline（现在是 `FirstLevelOpening`，0105 的 01-1…02-3）是这几个关键帧预演的原件：`Load` 读本关预演时连这份 Timeline 一起读，这几段整段换成 Timeline 的（不开 Timeline 面板也一样），所以 N 键、预演按钮、试玩（§17）里「看」的那几步直接播它；`State().ownedKeyframes` 列出来自原件的关键帧。0105 生成器写 `previz.json` 时也整段抄（`LoadOwnerTimelineDocs`），`S0101…S0203` 的生成结果不再用。改开场改 Timeline 文件。
+  - **开场镜头 = 顺子的头（2026-11-02，用户：「镜头切得乱七八糟，非常多的镜头瞬切不知道是为了什么，完全没有节奏」）**：开场全程第一人称，镜头每一条都写 `keepMove: true`（试玩 / 预演默认的切镜模式不再把转头切成跳），而且**每一条的起幅 = 上一条的落幅**（眼睛锚 `look` 接上一条的 `toLook` / 方向，挪机位的 `from` 接上一条的 `to`），段与段接口也接上。只在黑场里换位置。每一下转头要有由头（有人开口、有声音、有动作），说话时定住；转头 0.5–1.4 s，转得越大越慢（纸面检查峰值不超过约 250°/s，扇巴掌那一下除外）。人要被拖、被拽起来时用 `from → to` 挪机位，跟着拖人的那个人的路线和时刻走。
 
 ### 14.3 音效别名（`sfx.name`）
 

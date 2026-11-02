@@ -196,6 +196,8 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (!IsObject(e)) { errors.push(`${cat}.eye 要是对象`); return; }
         if (e.stance !== undefined && !PREVIZ_STANCES.includes(e.stance)) errors.push(`${cat}.eye.stance 要是 stand / crouch / prone`);
         for (const k of ["x", "z", "yawDeg", "pitchDeg", "toYawDeg", "toPitchDeg"]) if (e[k] !== undefined && !Finite(e[k])) errors.push(`${cat}.eye.${k} 要是有限数字`);
+        // 2026-11-02：h = 眼高（离地米数），写了就不按 stance 取（趴着撑起上身这类三档之外的高度）
+        if (e.h !== undefined && !(Finite(e.h) && e.h >= 0.1 && e.h <= 2)) errors.push(`${cat}.eye.h 要是 0.1–2 的米数`);
         if ((e.x === undefined) !== (e.z === undefined)) errors.push(`${cat}.eye 的 x / z 要同时给`);
         // 2026-10-21：眼睛也能用锚点定默认视线（look 起幅 / toLook 落幅：点、演员锚、飞机锚），写了锚就不看 yawDeg / pitchDeg；
         // free: true = 能转头不能走（§14.1）：眼睛位置要钉死（x / z 必填），玩家一动鼠标这一条剩下的时间视线归玩家
@@ -903,7 +905,8 @@ function SampleShot(c, u, resolve) {
   if (c.eye) {
     const e = c.eye;
     const stance = PREVIZ_STANCES.includes(e.stance) ? e.stance : "stand";
-    const anchor = Finite(e.x) && Finite(e.z) ? { x: e.x, z: e.z, h: PREVIZ_EYE_HEIGHT[stance] } : { actor: "player", offset: [0, PREVIZ_EYE_HEIGHT[stance], 0], eye: true, stance };
+    const height = Finite(e.h) ? e.h : PREVIZ_EYE_HEIGHT[stance];
+    const anchor = Finite(e.x) && Finite(e.z) ? { x: e.x, z: e.z, h: height } : { actor: "player", offset: [0, height, 0], eye: true, stance };
     const position = resolve(anchor);
     // 默认视线：起幅 look（锚点）或 yawDeg / pitchDeg，落幅 toLook（锚点）或 toYawDeg / toPitchDeg；锚点每次取样都重新算，
     // 所以 look 写飞机锚就是「视线跟着飞机走」（2026-10-21）

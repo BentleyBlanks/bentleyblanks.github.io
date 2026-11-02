@@ -202,6 +202,11 @@ Test("镜头：eye 按姿态定眼高、这一条里转头（ease inOut）", () 
   Near(a.position.y, PREVIZ_EYE_HEIGHT.crouch); Near(a.yawDeg, 0); assert.equal(a.eye, true);
   Near(SamplePrevizCamera(seq.camera, 1, camResolve).yawDeg, 45, 1e-6, "中点（smoothstep 0.5 = 0.5）");
   Near(SamplePrevizCamera(seq.camera, 0.5, camResolve).yawDeg, 90 * 0.15625, 1e-6, "inOut 前段慢");
+  // 2026-11-02：eye.h 盖过姿态眼高（撑着胳膊肘抬起上身）；校验 0.1–2 m
+  const propped = [{ t: 0, dur: 0, eye: { x: 0, z: 0, stance: "prone", h: 0.6, yawDeg: 0, pitchDeg: 0 } }];
+  Near(SamplePrevizCamera(propped, 0, camResolve).position.y, 0.6);
+  const bad = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, sequences: [{ keyframe: "01-1", camera: [{ t: 0, dur: 0, eye: { stance: "prone", h: 3 } }] }] });
+  assert.ok(bad.errors.some((e) => e.includes("eye.h")), "眼高超范围报错");
 });
 
 Test("镜头：空档沿用上一条最后一帧；from/to + look，linear；fov", () => {
