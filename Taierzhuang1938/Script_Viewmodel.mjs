@@ -61,7 +61,7 @@ import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_Pla
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { LookSway } from "./Script_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_ADS_FLOAT, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 
@@ -1690,6 +1690,8 @@ export class Viewmodel {
     this.onActionEnd = null;
     this.onReloadEvent = null;
     this.onBoltStart = null;
+    this.onBoltCue = null;      // (weapon, {offset, maxDuration})：逐帧拉栓的实录分段
+    this.boltCycleState = null;
 
     // --- 手 -----------------------------------------------------------------
     this.handRight = MakeHand(this.materials, 1, "hr");
@@ -2385,9 +2387,10 @@ export class Viewmodel {
   }
 
   _UpdateRifleView(ads, sprint) {
+    // 逐帧拉栓的低位是在开镜（无近景构图）空间里解出来的：落得越低，腰射构图让得越多。
     const weight = FPS_RIFLE_VIEW[this.weaponId] && !this.mount
       ? (1 - Clamp01(ads)) * (1 - Clamp01(sprint))
-        * RifleActionFraming(this.action?.kind, this.action?.t) : 0;
+        * (this.boltCycleState ? 1 - this.boltCycleState.lower : RifleActionFraming(this.action?.kind, this.action?.t)) : 0;
     this.rifleViewPivot.position.copy(this.rifleViewPosition).multiplyScalar(weight);
     this.rifleViewPivot.quaternion.identity().slerp(this.rifleViewRotation, weight);
     this._rootMatrixFresh = false;
@@ -2506,7 +2509,9 @@ export class Viewmodel {
       // 打完这一发自动上膛。最后一发（lowAmmo）时栓停在后面不推回 —— 玩家一眼看见"没子弹了"
       // 延迟可由武器数据覆盖，没写的一律 0.20 s。实录枪机声不靠这个延迟对位，
       // 它跟着 onBoltStart 在动作真正开始时起播。
-      this.pendingBoltAt = this.weapon.boltDelayS ?? 0.20;
+      // 有逐帧对标拉栓（FPS_BOLT_CYCLE）的枪按那份表的起手时刻排。
+      const cycle = FPS_BOLT_CYCLE[this.weaponId];
+      this.pendingBoltAt = cycle ? cycle.startS / cycle.playbackRate : this.weapon.boltDelayS ?? 0.20;
     }
     if (this.weapon.kind === "boltRifle") this.spentCasePending = true;
 
@@ -2530,12 +2535,29 @@ export class Viewmodel {
    * 拉栓动作开始（开火后自动排的与手动触发的走同一处）。onBoltStart 在这一刻回调，
    * 调用方拿去播实录枪机声：排在开火那一刻的声音会被装填打断、被白刃推迟，与手对不上。
    */
-  _StartBolt() {
-    this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
+  _StartBolt(afterShot = false) {
+    // 汉阳造走逐帧对标的整套拉栓（FPS_BOLT_CYCLE，时刻按开枪后的秒数写）；
+    // 其余栓动枪仍是 boltTimeS 那段程序化拉栓。
+    const cycle = FPS_BOLT_CYCLE[this.weaponId] || null;
+    this._StartAction("bolt", cycle ? (cycle.durationS - cycle.startS) / cycle.playbackRate : this.weapon.boltTimeS || 1.05);
     this.action.roundsRemaining = this.visualAmmo;
     this.action.startedOpen = this.boltOpen;
     this.action.ejectSpent = this.spentCasePending;
+    if (cycle) {
+      this.action.cycle = cycle;
+      this.action.afterShot = afterShot;
+      this.action.soundIndex = 0;
+      // 实录枪机按表里的节拍一段段放（onBoltCue），不在起手时整条放完。
+      return;
+    }
     if (this.onBoltStart) this.onBoltStart(this.weapon);
+  }
+
+  /** 玩家射击间隔：手拉一整套栓的枪，拉完之前打不出下一发（AI 仍读 fireIntervalS）。 */
+  FireIntervalS(weapon = this.weapon) {
+    const base = weapon?.fireIntervalS ?? 1.2;
+    const cycle = weapon && FPS_BOLT_CYCLE[weapon.id];
+    return cycle ? Math.max(base, cycle.durationS / cycle.playbackRate + 0.02) : base;
   }
 
   /**
@@ -2778,13 +2800,17 @@ export class Viewmodel {
     if (input.meleeCombat) this._AnimMeleeBaked(input.meleeCombat);
 
     // 装填/拉栓/劈砍时强制脱离瞄准：手都离开握把了还能瞄才是穿帮
-    const actionBlend = this.action ? Ease.Pulse(Clamp01(this.action.t)) : 0;
+    // 逐帧拉栓自己给出「枪离开瞄准线」的曲线（落低 / 低头），不用通用的 Pulse。
+    const cycle = this.boltCycleState;
+    const cycleAway = cycle ? Math.max(cycle.lower, cycle.head) : 0;
+    const actionBlend = this.action && !cycle ? Ease.Pulse(Clamp01(this.action.t)) : 0;
     // 这一份要给相机看：相机的 FOV 也得跟着枪一起离开瞄准线，
     // 否则枪都甩出画面了视野还是窄的 —— 玩家读到的是「视野卡住」而不是「在拉栓」。
     // 让相机读这条曲线（而不是自己另起一个定时器 snap 出去再 snap 回来），
     // 因果才是对的：**视野丢失是因为枪动了**，两者本来就该是同一条曲线。
-    this.adsSuppress = (1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
-    const adsInput = Clamp01(input.ads ?? 0) * this.adsSuppress * (1 - sprint * 0.9);
+    this.adsSuppress = (cycle ? 1 - cycleAway : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
+    // 逐帧拉栓期间开镜姿态照旧是底座（枪从开镜位落下、回到开镜位），离开瞄准线由 cycle.lower 负责。
+    const adsInput = Clamp01(input.ads ?? 0) * (cycle ? 1 - this.wallLower : this.adsSuppress) * (1 - sprint * 0.9);
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
@@ -2794,10 +2820,11 @@ export class Viewmodel {
     this.adsGrip = (this.adsGrip || 0) + (adsGripTarget - (this.adsGrip || 0)) * (1 - Math.exp(-step / 0.09));
     // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
     if (this.adsHideParts.length) {
-      if (!this.adsHidden && ads > 0.55) {
+      const adsShown = ads * (1 - cycleAway);   // 枪落下来看机匣时，贴眼藏掉的枪托要放回来
+      if (!this.adsHidden && adsShown > 0.55) {
         for (const mesh of this.adsHideParts) mesh.visible = false;
         this.adsHidden = true;
-      } else if (this.adsHidden && ads < 0.45) {
+      } else if (this.adsHidden && adsShown < 0.45) {
         this._RestoreAdsHideParts();
       }
     }
@@ -2866,10 +2893,17 @@ export class Viewmodel {
     const breathY = Math.sin(this.elapsed * 1.15) * 0.0026 * idle;
     const breathX = Math.sin(this.elapsed * 0.73 + 1.3) * 0.0020 * idle;
 
-    this.bobPivot.position.set(bobX + breathX, bobY + breathY, 0);
+    // 开镜端稳时手的轻微浮动（参考 04 的瞄准段实测，FPS_ADS_FLOAT）：整套手臂+枪绕眼睛上下、
+    // 左右慢慢飘，照门照星一起动；走动、拉栓落低时淡掉。
+    const float = FPS_ADS_FLOAT[this.weaponId], aimHold = float ? adsVisual * (1 - gait) * (1 - cycleAway) : 0;
+    this.adsFloat = (this.adsFloat || 0) + (aimHold - (this.adsFloat || 0)) * (1 - Math.exp(-step / (float?.blendS ?? 0.35)));
+    const e = this.elapsed, TAU = Math.PI * 2;
+    const floatPitch = float ? (0.72 * Math.sin(e * TAU * float.pitchHz) + 0.28 * Math.sin(e * TAU * float.pitchHz2 + 1.7)) * this.adsFloat : 0;
+    const floatYaw = float ? (0.65 * Math.sin(e * TAU * float.yawHz + 0.6) + 0.35 * Math.sin(e * TAU * float.yawHz2 + 2.4)) * this.adsFloat : 0;
+    this.bobPivot.position.set(bobX + breathX, bobY + breathY + floatPitch * (float?.liftM ?? 0), 0);
     this.bobPivot.rotation.set(
-      Math.sin(phase * 2) * 0.010 * bobScale,
-      Math.sin(phase) * 0.014 * bobScale,
+      Math.sin(phase * 2) * 0.010 * bobScale + floatPitch * (float?.pitchRad ?? 0),
+      Math.sin(phase) * 0.014 * bobScale + floatYaw * (float?.yawRad ?? 0),
       -Math.sin(phase) * 0.018 * bobScale);
 
     // --- 状态层：起跳收枪 / 滞空换重心 / 落地下沉 / 蹲低 / 掏枪 / 贴墙收枪 ---
@@ -2925,7 +2959,16 @@ export class Viewmodel {
         ? this._AddPose(this.hipPose, BAYONET_CARRY, this.bayonetCarry)
         : this.hipPose;
       const pose = this._MixPose(hip, this.adsPose, ads);
-      const finalPose = this._MixPose(pose, this.sprintPose, Clamp01(sprintValue));
+      let finalPose = this._MixPose(pose, this.sprintPose, Clamp01(sprintValue));
+      if (cycle) {
+        // 开枪后的上扬左滚叠在当前持枪姿态上（腰射打折扣），再整体落到拉栓低位。
+        const spec = this.action.cycle;
+        finalPose = this._RisePose(finalPose, cycle.rise, spec.risePivot, Mix(spec.hipRiseScale, 1, Clamp01(ads)));
+        finalPose = this._MixPose(finalPose, this._PoseFromSpec({ mode: "fixed", ...spec.work }), cycle.lower);
+        // 腰射没有「先回到脸颊、头再贴上去」那一拍：低头跟着枪一起回。
+        const head = Mix(Math.min(cycle.head, cycle.lower), cycle.head, Clamp01(ads));
+        finalPose = this._RisePose(finalPose, [0, 0, 0, spec.headPitchRad, 0, 0], null, head);
+      }
       this.weaponMount.position.set(finalPose.px, finalPose.py, finalPose.pz);
       this.weaponMount.rotation.set(finalPose.rx, finalPose.ry, finalPose.rz, "YXZ");
     }
@@ -3145,7 +3188,7 @@ export class Viewmodel {
       if (this.pendingBoltAt <= 0 && !this.IsBusy() && this.weapon) {
         this.pendingBoltAt = -1;
         this.pendingHoldOpen = lowAmmo;
-        this._StartBolt();
+        this._StartBolt(true);
       }
     }
 
@@ -3166,7 +3209,7 @@ export class Viewmodel {
       return;
     }
     switch (a.kind) {
-      case "bolt": this._AnimBolt(a.t, this.pendingHoldOpen); break;
+      case "bolt": if (a.cycle) this._AnimBoltCycle(a, this.pendingHoldOpen); else this._AnimBolt(a.t, this.pendingHoldOpen); break;
       case "reload": this._AnimReload(a.t, a.reloadKind); break;
       case "melee": this._AnimMelee(a.t, a.melee, a.power); break;
       case "meleeWind": this._AnimMeleeWind(a.t, a.fixed); break;
@@ -3222,6 +3265,7 @@ export class Viewmodel {
   /** 把所有会被动画改动的东西恢复到静止姿态。 */
   _ResetAnimatedParts() {
     this.meleeVideoFrame = null;
+    this.boltCycleState = null;
     if (this.riggedArms) this.riggedArms.videoBody = null;
     if (this.riggedArms) this.riggedArms.reloadBodyOffset = null;
     this.actionPivot.position.set(0, 0, 0);
@@ -3360,6 +3404,117 @@ export class Viewmodel {
     if(supportOffset)this._PoseReload("left",Math.sin(Math.PI*t)**2,...supportOffset,0,0,0,0);
   }
 
+  /**
+   * 逐帧对标的整套拉栓（FPS_BOLT_CYCLE）：开枪后枪口上扬左滚 → 右手离开枪颈、枪还高着 →
+   * 枪离开脸颊落到低位、眼睛低头看机匣 → 张手去够机柄、抓住 → 抬柄 → 后拉抛壳 → 前推 → 压柄 →
+   * 手落回枪颈 → 枪回到脸颊、头最后贴上去。时刻全按开枪后的秒数取，播放与录屏逐帧对齐。
+   * 枪的位姿在 Update 里按 boltCycleState 合成（要叠在腰射/开镜姿态之上），这里只算各条曲线。
+   */
+  _AnimBoltCycle(a, holdOpen) {
+    const cycle = a.cycle, rig = this.rig, bolt = rig.parts.bolt;
+    // 曲线按参考视频的秒数取；playbackRate 只改播放快慢，不改节拍之间的比例。
+    const span = cycle.durationS - cycle.startS, since = cycle.startS + a.t * span;
+    const Phase = seconds => Clamp01((seconds - cycle.startS) / span);
+    // 空仓挂机：抬到顶、拉到底以后两条曲线都停住，不推回。
+    const Held = keys => holdOpen ? Math.min(since, keys.find(key => key[1] >= 1)[0]) : since;
+    const turn = ReloadTrack(cycle.turn, Held(cycle.turn));
+    const slide = ReloadTrack(cycle.slide, Held(cycle.slide));
+    if (bolt) {
+      bolt.rotation.z = this._BoltLiftAngle() * turn;
+      bolt.position.z = slide * rig.boltTravel;
+      if (rig.parts.dustCover) rig.parts.dustCover.position.z = bolt.position.z;
+      if (rig.parts.cockingPiece) rig.parts.cockingPiece.position.z = bolt.position.z;
+    }
+    const closing = since > cycle.slide.find(key => key[1] >= 1)[0];
+    if (slide >= 0.82 && !a.ejected) {
+      a.ejected = true;
+      const random = Mulberry32(HashString(`${this.seed}:eject:${this.shotIndex}`));
+      if (a.ejectSpent) this._SpawnShell(random);
+      else if (a.roundsRemaining > 0 && !a.startedOpen) this._SpawnCartridge(random);
+      this.spentCasePending = false;
+    }
+    if (!holdOpen && closing && slide <= 0.05 && this.weapon.reloadKind === "enBloc"
+      && a.roundsRemaining === 1 && !a.packetDropped) {
+      a.packetDropped = true;
+      this._SpawnPacketDrop();
+    }
+
+    // 实录枪机分段：每段在自己的节拍上起播，空仓挂机不放闭锁那两段。
+    while (a.soundIndex < cycle.sounds.length && since >= cycle.sounds[a.soundIndex].at) {
+      const cue = cycle.sounds[a.soundIndex++];
+      if (!(holdOpen && cue.closing)) this.onBoltCue?.(this.weapon, cue);
+    }
+
+    // 右手：握着 → 松开枪颈 → 绕到机匣右侧张开 → 抓柄 → 跟着机柄走 → 松手上扬 → 落回枪颈。
+    const placement = this._BoltHandPlacement();
+    const clearance = FPS_PACKET_RELOAD.handClearance;
+    const gripRotation = this.handBaseRot.right.toArray().slice(0, 3);
+    const Offset = (point, offset) => ({ ...point, position: point.position.clone().add(new THREE.Vector3(...offset)) });
+    const grip = { position: this.handBase.right.clone(), rotation: gripRotation, shape: "packetClear" };
+    const knob = this._BoltHandPoint().sub(new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset));
+    const gripQ = new THREE.Quaternion().setFromEuler(this.handBaseRot.right);
+    const boltQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(...placement.rotation, "YXZ"));
+    const anchors = {
+      grip, gripUnwrap: Offset(grip, clearance.unwrap), gripClear: Offset(grip, clearance.grip),
+      bolt: placement, boltClear: { ...Offset(placement, clearance.bolt), shape: "packetBoltClear" },
+      boltExit: { ...Offset(placement, clearance.boltExit), shape: "packetBolt" },
+    };
+    this._WorkingHandPath("right", a.t, (holdOpen ? cycle.holdOpenHand : cycle.hand).map(frame => {
+      let point;
+      if (frame.anchor === "knob") {
+        const rotation = new THREE.Euler().setFromQuaternion(gripQ.clone().slerp(boltQ, frame.turnMix ?? 0.3), "YXZ");
+        point = { position: knob.clone(), rotation: rotation.toArray().slice(0, 3), shape: frame.shape };
+      } else point = { ...anchors[frame.anchor] };
+      if (frame.offset) point = Offset(point, frame.offset);
+      return { ...point, ...frame, position: point.position, rotation: point.rotation, at: Phase(frame.at) };
+    }));
+
+    // 枪托在左掌里受力：抬柄、后拉、撞到底、前推、推到底、压柄各给一下衰减的余势。
+    const effort = cycle.effort, pose = [0, 0, 0, 0, 0, 0];
+    for (const event of effort.events) {
+      if (holdOpen && event.at > cycle.slide.find(key => key[1] >= 1)[0] + 0.05) continue;
+      const age = since - event.at;
+      if (age <= 0 || age >= effort.tailS) continue;
+      const response = Math.exp(-effort.decayPerS * age) * Math.sin(2 * Math.PI * effort.frequencyHz * age) * effort.gain
+        * (1 - Ease.InOut(Ease.Seg(age, effort.tailS * 0.6, effort.tailS)));
+      for (let i = 0; i < 6; i++) pose[i] += event.pose[i] * response;
+    }
+    this._PoseReload("left", 1, ...pose, 0);
+
+    // 低头看机匣：只把枪绕眼睛往上转（等于相机低头，但世界不动、准星不动），在 Update 里合成。
+    // 肩锚不跟着转——第一人称双臂的肩是贴镜头摆的，一起转会把左小臂横进画面中间。
+    const head = ReloadTrack(cycle.head, since);
+    const rise = Array.from({ length: 6 }, (_, i) => a.afterShot ? ReloadTrack(cycle.rise, since, i + 1) : 0);
+    this.boltCycleState = { lower: ReloadTrack(cycle.lower, since), head, rise, since };
+  }
+
+  /** 绕枪局部 pivot（瞄准眼位）转一个小角度再平移：开枪后枪口上扬、左滚那一下；pivot 为空时绕眼睛转。 */
+  _RisePose(pose, rise, pivot, scale) {
+    if (!(scale > 0)) return pose;
+    if (!pivot) {
+      // 绕眼睛（父空间原点）转：位置与朝向都左乘这一转。
+      const h = this._riseH || (this._riseH = new THREE.Quaternion());
+      const e = this._riseE || (this._riseE = new THREE.Euler());
+      const q = this._riseQ || (this._riseQ = new THREE.Quaternion());
+      h.setFromEuler(e.set(rise[3] * scale, rise[4] * scale, rise[5] * scale, "YXZ"));
+      const p = (this._riseV || (this._riseV = new THREE.Vector3())).set(pose.px, pose.py, pose.pz).applyQuaternion(h);
+      q.setFromEuler(e.set(pose.rx, pose.ry, pose.rz, "YXZ")).premultiply(h);
+      e.setFromQuaternion(q, "YXZ");
+      return { px: p.x, py: p.y, pz: p.z, rx: e.x, ry: e.y, rz: e.z };
+    }
+    const q = this._riseQ || (this._riseQ = new THREE.Quaternion());
+    const d = this._riseD || (this._riseD = new THREE.Quaternion());
+    const e = this._riseE || (this._riseE = new THREE.Euler());
+    const v = this._riseV || (this._riseV = new THREE.Vector3());
+    q.setFromEuler(e.set(pose.rx, pose.ry, pose.rz, "YXZ"));
+    d.setFromEuler(e.set(rise[3] * scale, rise[4] * scale, rise[5] * scale, "YXZ"));
+    // p' = p + q·(pivot − d·pivot) + t
+    v.fromArray(pivot).applyQuaternion(d).negate().add(this._riseP || (this._riseP = new THREE.Vector3()).fromArray(pivot)).applyQuaternion(q);
+    q.multiply(d); e.setFromQuaternion(q, "YXZ");
+    return { px: pose.px + v.x + rise[0] * scale, py: pose.py + v.y + rise[1] * scale, pz: pose.pz + v.z + rise[2] * scale,
+      rx: e.x, ry: e.y, rz: e.z };
+  }
+
   /** 手先到机柄上，机柄往后拉满再送回（手跟着机柄节点走），最后回握把。 */
   _AnimCharge(t) {
     this.rig.parts.bolt.position.z = Ease.Pulse(Ease.Seg(t, 0.30, 0.78)) * this.rig.boltTravel;
@@ -3459,13 +3614,17 @@ export class Viewmodel {
         const at=start.at+Math.min(delay/(this.action?.duration||1),(end.at-start.at)*.7);
         const phase=Ease.Seg(t,at,end.at);return phase*phase*(3-2*phase);
       });
+      const cycle=this.action?.kind==='bolt'?this.action.cycle:null;
+      const CyclePhase=seconds=>Clamp01((seconds-cycle.startS)/(cycle.durationS-cycle.startS));
       const handoff=side==='right'&&this.weaponId==='HanYang'
         ?this.action?.kind==='reload'?FPS_PACKET_RELOAD.thumbHandoff
+          :cycle?{releaseStart:CyclePhase(cycle.thumb.releaseStart),releaseEnd:CyclePhase(cycle.thumb.releaseEnd),
+            recoverStart:CyclePhase(cycle.thumb.recoverStart),recoverEnd:CyclePhase(cycle.thumb.recoverEnd)}
           :this.action?.kind==='bolt'?FPS_BOLT_HAND.thumbHandoffByWeapon.HanYang:null
         :null;
       const ThumbPhase=(start,end)=>{const u=Ease.Seg(t,start,end);return u*u*(3-2*u);};
       const thumbHoldingWeight=handoff
-        ?1-ThumbPhase(0,handoff.releaseEnd)+ThumbPhase(handoff.recoverStart,1)
+        ?1-ThumbPhase(handoff.releaseStart??0,handoff.releaseEnd)+ThumbPhase(handoff.recoverStart,handoff.recoverEnd??1)
         :undefined;
       const fingerHandoff=side==='right'&&this.rig?.assetVersion&&this.action?.kind==='reload'?FPS_PACKET_RELOAD.fingerHandoff:null;
       const fingerHoldingWeight=fingerHandoff?1-ThumbPhase(fingerHandoff.releaseStart,fingerHandoff.releaseEnd):undefined;

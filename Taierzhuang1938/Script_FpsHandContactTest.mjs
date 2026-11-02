@@ -417,6 +417,8 @@ try {
       }
       if(holdingOnly)continue;
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
+      // The fire pose leaves a bolt cycle running (HanYang's lasts 2.3 s); start each action from rest.
+      for(let i=0;i<600&&(vm.action||vm.pendingBoltAt>0);i++)editor.Update(1/60);
       for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
         ...(["ZhongZheng","HanYang","Type38"].includes(id)?["reloadOpen","bolt"]:[])]){
         if(action==="reloadOpen") {
@@ -457,7 +459,11 @@ try {
           }
           if(frame%5||!vm.action)continue;
           let prop=null,side="r",digits=[0,1],kind="";
-          if(action==="bolt"&&t>.25&&t<.78){prop=vm.rig.parts.bolt;kind="bolt";}
+          // Frame-matched cycles hold the knob between their first and last "bolt" hand keys.
+          const cycle=action==="bolt"&&vm.action?.cycle;
+          const CycleT=s=>(s-cycle.startS)/(cycle.durationS-cycle.startS);
+          const boltWindow=cycle?[CycleT(cycle.hand.find(f=>f.anchor==="bolt").at+.04),CycleT(cycle.hand.findLast(f=>f.anchor==="bolt").at-.04)]:[.25,.78];
+          if(action==="bolt"&&t>boltWindow[0]&&t<boltWindow[1]){prop=vm.rig.parts.bolt;kind="bolt";}
           if(action.startsWith("reload")){
             if(["ZhongZheng","HanYang","Type38"].includes(id)){
               const packet=id==="HanYang",partial=packet&&action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;

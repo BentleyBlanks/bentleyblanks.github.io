@@ -95,10 +95,12 @@ try {
     const early={slot:D.Slots().active,ammo:g.state.mags.primary.ammo};D.Key("Digit1");Step(100);
     D.Key("KeyR");Step(155);const inserted=g.state.ammo;D.Key("Digit3");Step(15);
     data.cancel={early,late:{slot:D.Slots().active,ammo:g.state.mags.primary.ammo,inserted}};
-    Equip("HanYang");range.SetAmmoMode("reload");Click();Step(24);const before=g.state.ammo;D.Key("KeyR");Step(75);
+    // The player's HanYang bolt cycle follows FPS_BOLT_CYCLE; wait it out rather than assuming 1 s.
+    const boltFrames=Math.ceil(g.viewmodel.FireIntervalS(WEAPONS.HanYang)*60)+10;
+    Equip("HanYang");range.SetAmmoMode("reload");Click();Step(24);const before=g.state.ammo;D.Key("KeyR");Step(boltFrames-24+15);
     data.queuedReload={before,action:g.viewmodel.action?.kind,ammo:g.state.ammo};Step(300);
-    Equip("HanYang");range.SetAmmoMode("reload");g.state.ammo=2;Click();Step(100);
-    const penultimate={ammo:g.state.ammo,boltOpen:g.viewmodel.boltOpen};Click();Step(100);
+    Equip("HanYang");range.SetAmmoMode("reload");g.state.ammo=2;Click();Step(boltFrames);
+    const penultimate={ammo:g.state.ammo,boltOpen:g.viewmodel.boltOpen};Click();Step(boltFrames);
     data.lastRound={penultimate,last:{ammo:g.state.ammo,boltOpen:g.viewmodel.boltOpen}};
     for(const id of ["Zb26","Type11"])for(const fps of [30,60,120]){
       Equip(id);const times=[];let old=g.state.playerShots;const start=g.state.elapsed;

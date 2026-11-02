@@ -665,10 +665,10 @@ const shell = await page.evaluate(async () => {
   };
   // 按玩法帧推，不按墙钟睡：这一页停在主菜单（running=false、menu=true），主循环只推菜单运镜，
   // 而汉阳造的实录枪机要等视图模型真的开始拉栓才起播（Viewmodel.onBoltStart）。
-  // 与 StanceTest 等同一做法摘掉菜单标记，推完还原。84 帧 = 1.4 s，盖过射击间隔。
+  // 与 StanceTest 等同一做法摘掉菜单标记，推完还原。142 帧 ≈ 2.37 s，盖过汉阳造整套拉栓（FPS_BOLT_CYCLE 2.30 s）。
   const menuWas = T.state.menu;
   T.state.menu = false;
-  for (let i = 0; i < 3; i += 1) { T.Debug.Fire(); T.StepFrames(84, 1 / 60, false); await sleep(20); }
+  for (let i = 0; i < 3; i += 1) { T.Debug.Fire(); T.StepFrames(142, 1 / 60, false); await sleep(20); }
   T.state.menu = menuWas;
   return {
     variants: entry ? entry.files.length : 0,

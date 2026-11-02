@@ -205,6 +205,115 @@ export const FPS_BOLT_HAND = Object.freeze({
   clearOffset: [.016,.008,.020],
 });
 
+// Shoulder-to-shoulder bolt cycle, digitised frame by frame from reference 04
+// (Gew88 head camera, shot at 34.80 s; 31.40 / 38.20 s give the same beats
+// within one or two frames) and the side view 07 (11-15 s). Times are seconds
+// after the shot. The shot rocks the rifle up and rolls it left, it stays high
+// while the right hand leaves the wrist, then comes off the cheek into a low
+// working hold while the eyes look down at the action; open hand to the knob,
+// lift, pull, eject, push, press down, the hand drops back to the wrist, the
+// rifle returns to the cheek and the head settles last.
+// `work` is that low hold under the shoulders (PnP-solved against the 1.70 s
+// frame, then expressed under `headPitchRad`). Poses: metres, YXZ radians.
+export const FPS_BOLT_CYCLE = Object.freeze({
+  HanYang: Object.freeze({
+    // The cycle ends with the head settled on the stock; it starts with the shot.
+    // playbackRate 1 plays it at the reference's own speed; >1 shortens every
+    // beat in proportion (player fire interval follows, AI keeps fireIntervalS).
+    durationS: 2.30, startS: 0.02, playbackRate: 1,
+    work: Object.freeze({ position: [0.0255, -0.2151, -0.1218], rotation: [0.3336, 0.2081, -0.0778] }),
+    headPitchRad: 0.35,
+    // [s, weight]; the knob holds high until .40, is down by .60; the rifle
+    // rises to the cheek in .09 s and the head lifts onto the stock last.
+    lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.88, 1], [1.94, 0.55], [1.985, 0.06], [2.01, 0]],
+    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.90, 1], [1.98, 0.62], [2.10, 0.42], [2.17, 0.26], [2.23, 0.12], [2.30, 0]],
+    // Shot response on the held pose, rotating about the aiming eye (rig
+    // space): [s, x, y, z, rx, ry, rz]. Hip fire keeps `hipRiseScale` of it.
+    risePivot: [0, 0.065, 0.159],
+    rise: [
+      [0, 0, 0, 0, 0, 0, 0], [0.035, 0.003, 0.002, 0.006, 0.030, 0, 0.150],
+      [0.067, 0.004, 0.003, 0.008, 0.060, -0.008, 0.240], [0.100, 0.003, 0.003, 0.005, 0.170, -0.008, 0.120],
+      [0.133, 0.002, 0.002, 0.003, 0.190, 0, 0.040], [0.200, 0, 0.002, 0.002, 0.185, 0, 0.012],
+      [0.333, 0, 0.001, 0, 0.180, 0, 0], [0.420, 0, 0.001, 0, 0.170, 0, 0], [0.600, 0, 0, 0, 0, 0, 0],
+    ],
+    hipRiseScale: 0.3,
+    // Handle quarter-turn and bolt travel, 0..1.
+    // The lift spreads over .12 s so the working wrist stays under 20 deg a frame.
+    turn: [[0, 0], [0.690, 0], [0.750, 0.5], [0.810, 1], [1.290, 1], [1.350, 0.5], [1.410, 0]],
+    slide: [[0, 0], [0.800, 0], [0.852, 0.55], [0.900, 1], [1.020, 1], [1.260, 0]],
+    // Reactions of the held rifle to the working hand, in seconds (as reloads).
+    effort: Object.freeze({
+      frequencyHz: 3.2, decayPerS: 9, gain: 1, tailS: 0.5,
+      events: [
+        { at: 0.690, pose: [0.002, 0.004, 0, 0.010, 0, 0.040] },
+        { at: 0.810, pose: [0.004, -0.002, 0.012, -0.006, -0.012, 0.010] },
+        { at: 0.900, pose: [0.002, 0, 0.010, -0.010, -0.008, 0] },
+        { at: 1.020, pose: [-0.002, 0.002, -0.008, 0.006, 0.006, 0] },
+        { at: 1.260, pose: [-0.002, -0.002, -0.012, -0.014, 0.006, -0.010] },
+        { at: 1.400, pose: [0.002, -0.006, 0, -0.010, 0, -0.045] },
+      ],
+    }),
+    // Right hand, seconds. Anchors: grip, gripUnwrap, gripClear, knob (+offset),
+    // boltClear, bolt (exact contact), boltExit. weight 0 = holding contact.
+    hand: [
+      { at: 0.100, anchor: "grip", weight: 0 },
+      { at: 0.175, anchor: "gripClear" },
+      { at: 0.250, anchor: "grip", offset: [0.068, 0.015, -0.012], shape: "packetRecover", through: true },
+      { at: 0.360, anchor: "grip", offset: [0.078, 0.000, -0.040], shape: "packetRecover", through: true },
+      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.35, through: true },
+      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.6, through: true },
+      { at: 0.620, anchor: "boltClear", through: true },
+      { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
+      // Press the handle down on the knob, slip off along the handle, then swing
+      // the open hand up outside the knob (never across it) and down to the wrist.
+      { at: 1.410, anchor: "bolt" },
+      { at: 1.465, anchor: "boltClear" },
+      { at: 1.560, anchor: "knob", offset: [0.085, 0.048, -0.005], shape: "packetClear", turnMix: 0.5, through: true },
+      { at: 1.630, anchor: "knob", offset: [0.090, 0.015, 0.030], shape: "packetRelax", turnMix: 0.4, through: true },
+      { at: 1.710, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
+      { at: 1.800, anchor: "gripClear" },
+      { at: 1.920, anchor: "grip", weight: 0 },
+    ],
+    // Last round: the bolt stays back; the hand lets go after the pull.
+    holdOpenHand: [
+      { at: 0.100, anchor: "grip", weight: 0 },
+      { at: 0.175, anchor: "gripClear" },
+      { at: 0.250, anchor: "grip", offset: [0.068, 0.015, -0.012], shape: "packetRecover", through: true },
+      { at: 0.360, anchor: "grip", offset: [0.078, 0.000, -0.040], shape: "packetRecover", through: true },
+      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.35, through: true },
+      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.6, through: true },
+      { at: 0.620, anchor: "boltClear", through: true },
+      { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
+      { at: 0.950, anchor: "bolt" },
+      { at: 1.010, anchor: "boltClear" },
+      { at: 1.120, anchor: "knob", offset: [0.070, 0.060, 0.020], shape: "packetRelax", turnMix: 0.5, through: true },
+      { at: 1.320, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
+      { at: 1.760, anchor: "gripClear" },
+      { at: 1.880, anchor: "grip", weight: 0 },
+    ],
+    // Thumb leaves / regains its holding opposition, seconds.
+    thumb: Object.freeze({ releaseStart: 0.10, releaseEnd: 0.19, recoverStart: 1.82, recoverEnd: 1.94 }),
+    // Recorded bolt (boltHanYang, 0.91 s) cut at its own transients so each
+    // sound lands on its beat: lift click .23, rear stop .25, forward slam .61, lock .68.
+    sounds: [
+      { at: 0.700, offset: 0.215, maxDuration: 0.035 },
+      { at: 0.880, offset: 0.240, maxDuration: 0.085 },
+      { at: 1.205, offset: 0.555, maxDuration: 0.110, closing: true },
+      { at: 1.395, offset: 0.665, maxDuration: 0.100, closing: true },
+    ],
+  }),
+});
+
+// Aimed hold drift measured on reference 04's aimed windows (29.6-31.3,
+// 37.3-38.2, 40.5-41.4 s): the receiver rides about +-1.3 deg vertically on a
+// ~1.05 s period, with a smaller, slower sideways wander.
+export const FPS_ADS_FLOAT = Object.freeze({
+  HanYang: Object.freeze({
+    pitchRad: 0.014, yawRad: 0.009, liftM: 0.0020,
+    pitchHz: 0.95, pitchHz2: 0.61, yawHz: 0.43, yawHz2: 0.27, blendS: 0.35,
+  }),
+});
+
 export const FPS_TOP_MAG_RELOAD = Object.freeze({
   blend:[[0,0],[.15,1],[.88,1],[1,0]],
   bodyOffset:{shoulders:{right:[.055,.010,-.035],left:[0,.012,0]},elbowPoles:{right:[.20,0,0],left:[-.02,0,0]},authoredElbows:{right:true}},

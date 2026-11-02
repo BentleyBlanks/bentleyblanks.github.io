@@ -1596,6 +1596,7 @@ async function Boot() {
   });
   camera.add(viewmodel.root);
   viewmodel.onBoltStart = PlayRecordedBoltCycle;
+  viewmodel.onBoltCue = PlayRecordedBoltCue;
   viewmodel.onReloadEvent = OnReloadEvent;
   viewmodel.onActionEnd = (kind, action) => {
     if (kind === "reload" && state.reloadAction?.action === action) state.reloadAction = null;
@@ -7179,6 +7180,15 @@ function PlayRecordedBoltCycle(weapon) {
     position: _boltAt.clone(), volume: PLAYER_BOLT_VOLUME, priority: true, firstPerson: true,
   });
 }
+/** 逐帧对标拉栓（FPS_BOLT_CYCLE）把同一条实录枪机按动作节拍切段起播。 */
+function PlayRecordedBoltCue(weapon, cue) {
+  if (!weapon?.boltCue) return;
+  viewmodel.MuzzleWorld(_boltAt);
+  audio.Play(weapon.boltCue, {
+    position: _boltAt.clone(), volume: PLAYER_BOLT_VOLUME, priority: true, firstPerson: true,
+    offset: cue.offset, maxDuration: cue.maxDuration,
+  });
+}
 const _hitPoint = new THREE.Vector3();
 const _bulletPos = new THREE.Vector3();
 const _bulletVel = new THREE.Vector3();
@@ -7552,7 +7562,7 @@ function TryFire(dt, returningGrenade = false) {
     ai.NoteStimulus(WEAPONS[currentWeapon]?.rpm ? "machinegun" : "gunshot",
       player.position, { side: "nra", isPlayer: true, ref: player });
   }
-  fireCadence.Fired(weapon.fireIntervalS ?? 1.2, fireEdge || buffered || !IsAutomaticGun(weapon));
+  fireCadence.Fired(viewmodel.FireIntervalS(weapon), fireEdge || buffered || !IsAutomaticGun(weapon));
   state.queuedFire = null;
 
   viewmodel.TriggerFire();

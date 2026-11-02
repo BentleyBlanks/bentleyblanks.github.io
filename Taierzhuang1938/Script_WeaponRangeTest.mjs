@@ -9,6 +9,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { WeaponShelved } from "./Script_Weapons.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
+import { FPS_BOLT_CYCLE } from "./Data_Tuning_FpsReload.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 
 // --smoke runs one representative firearm without full-magazine, repeated death or menu reload checks.
@@ -34,15 +35,22 @@ function Check(name, ok, detail = null) {
   checks.push({ name, ok: !!ok, detail });
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail === null ? "" : ` — ${JSON.stringify(detail)}`}`);
 }
-// boltHanYang starts with the bolt action: its lift hit is 0.23 s in, the forward stroke 0.52 s in.
+// The player's HanYang cycle (FPS_BOLT_CYCLE) cuts boltHanYang at its own transients
+// (lift .23, rear stop .25, forward slam .61, lock .68 s into the recording): each cut
+// must sound on its mechanical beat, i.e. lift start, rear stop, forward stop, lock.
 const hanYang = WEAPONS.HanYang;
-const [hanYangLiftEnd, hanYangBackEnd] = FPS_ARM_POSES.HanYang.actions.bolt.timing;
-const hanYangLiftAtS = hanYangLiftEnd * hanYang.boltTimeS;
-const hanYangForwardAtS = (hanYangBackEnd + 0.03) * hanYang.boltTimeS;
+const hanYangCycle = FPS_BOLT_CYCLE.HanYang;
+const { turn: hanYangTurn, slide: hanYangSlide } = hanYangCycle;
+const hanYangBeats = [hanYangTurn.find(([, v], i) => v === 0 && hanYangTurn[i + 1]?.[1] > 0)[0],
+  hanYangSlide.find(([, v]) => v === 1)[0], hanYangSlide.at(-1)[0], hanYangTurn.at(-1)[0]];
+const hanYangCueAt = hanYangCycle.sounds.map((cue, i) => cue.at + [0.23, 0.25, 0.61, 0.68][i] - cue.offset);
+Check("HanYang bolt cue cuts sound on their mechanical beats", hanYang.boltCue === "boltHanYang" && hanYangCycle.sounds.length === 4
+  && hanYangCueAt.every((at, i) => Math.abs(at - hanYangBeats[i]) <= 0.03),
+{ cueAtS: hanYangCueAt, beatsS: hanYangBeats });
 const hanYangBoltDelayS = hanYang.boltDelayS ?? 0.20;
-Check("HanYang bolt nodes match the recorded bolt cue", Math.abs(hanYangLiftAtS - 0.23) <= 0.03
-  && Math.abs(hanYangForwardAtS - 0.52) <= 0.04 && hanYang.boltCue === "boltHanYang",
-{ liftAtS: hanYangLiftAtS, forwardAtS: hanYangForwardAtS, shotCue: hanYang.shotCue, boltCue: hanYang.boltCue });
+// The 2026-09-13 single recording forced a 1.65 s wait; the hand must leave the wrist right after the shot.
+Check("HanYang player cycle starts moving right after the shot", hanYangCycle.startS <= 0.05
+  && hanYangCycle.hand[0].at <= 0.15, { startS: hanYangCycle.startS, firstHandKeyS: hanYangCycle.hand[0].at });
 // The 2026-09-13 single recording forced a 1.65 s wait before the bolt moved; players read it as input lag.
 Check("HanYang cycles the bolt promptly and fires again once it closes", hanYangBoltDelayS <= 0.30
   && hanYang.fireIntervalS >= hanYangBoltDelayS + hanYang.boltTimeS && hanYang.fireIntervalS <= hanYangBoltDelayS + hanYang.boltTimeS + 0.10,
@@ -189,7 +197,9 @@ try {
         bolt: game.audio.RequestedCount("bolt"), shell: game.audio.RequestedCount("shellDrop"),
       };
       const attempts = spec.smoke ? 2 : spec.magazine + 2;
-      const cooldownFrames = Math.ceil(Math.max(spec.fireIntervalS || 0, spec.boltTimeS || 0, 0.3) * 60) + 12;
+      // The player's cadence (Viewmodel.FireIntervalS) waits out a hand-worked bolt cycle.
+      const playerIntervalS = game.viewmodel.FireIntervalS ? game.viewmodel.FireIntervalS(spec) : spec.fireIntervalS || 0;
+      const cooldownFrames = Math.ceil(Math.max(playerIntervalS, spec.boltTimeS || 0, 0.3) * 60) + 12;
       // The first pull steps frame by frame: how long after the shot the bolt action and its recorded cue start.
       // Debug.Fire runs TryFire synchronously, so the shot lands before frame 1.
       const cycle = { fired: false, boltActionS: null, boltCueS: null };
@@ -228,14 +238,16 @@ try {
     Check(`${weapon.id}: RMB raises the sight and narrows the field of view`, report.ads.amount > 0.9 && report.ads.bipod === false && report.ads.hipFov > report.ads.fov + 2 && report.ads.hasSight && report.ads.source === "model", report.ads);
     Check(`${weapon.id}: ${smoke ? "two real trigger pulls fire" : "infinite ammunition still fires beyond its magazine"}`, report.firing.actual === report.firing.expected && report.firing.ammoAfter === report.firing.ammoBefore && report.firing.last?.weapon === weapon.id, report.firing);
     if (weapon.id === "HanYang") {
-      Check("HanYang plays its recorded shot and bolt once per pull without duplicate foley",
-        report.firing.audio.cycle === report.firing.expected && report.firing.audio.recordedBolt === report.firing.expected
+      // Each pull plays one shot and the recorded bolt cut into its beats (FPS_BOLT_CYCLE.sounds).
+      const boltCuts = hanYangCycle.sounds.length;
+      Check("HanYang plays its recorded shot and one set of bolt cuts per pull without duplicate foley",
+        report.firing.audio.cycle === report.firing.expected && report.firing.audio.recordedBolt === report.firing.expected * boltCuts
           && report.firing.audio.bolt === 0 && report.firing.audio.shell === 0,
-        report.firing.audio);
-      Check("HanYang starts the bolt within 0.3 s of the shot and its recorded cue starts with the action",
+        { ...report.firing.audio, boltCuts });
+      Check("HanYang starts the bolt within 0.3 s of the shot and its first recorded cut lands on the lift beat",
         report.firing.cycle.fired && report.firing.cycle.boltActionS !== null && report.firing.cycle.boltActionS <= 0.30
-          && report.firing.cycle.boltCueS === report.firing.cycle.boltActionS,
-        report.firing.cycle);
+          && Math.abs(report.firing.cycle.boltCueS - hanYangCycle.sounds[0].at) <= 1 / 30,
+        { ...report.firing.cycle, liftCueAtS: hanYangCycle.sounds[0].at });
     }
     if (!smoke) Check(`${weapon.id}: R plays and completes a real reload`, report.reload.action === "reload" && report.reload.complete && report.reload.ammo === weapon.magazine, report.reload);
   }
