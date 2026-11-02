@@ -31,6 +31,14 @@
 // bayonet：这一步放出来的人全上刺刀（拐角近战）；缺省只有 role 是 bayonet 的人上。
 // alert：放兵时日军知不知道玩家在哪（缺省 true：这几仗都是日军冲着人来的；守点的远处机枪光靠眼睛看不见蹲在坑里的人）。
 //   false = 不报，日军得自己看见 / 听见（以后摸进去的段落用）。
+// hint（2026-11-02，用户：「进入巷道的时候非常简单的按键提示的引导教学，比如按 C 下蹲来潜行」）：画面正中偏下一行「键帽 + 一句话」。
+//   { "action": "crouch", "text": "蹲下走……", "at": { x, z, r }, "until": "crouch", "showS": 8 }
+//   action = 游戏键位表（Script_Input.KEYMAP）里的动作名，键帽字照玩家此刻的键位取；没有动作可写 keys（直接是键帽上的字）。
+//   at 不写 = 这一步一开打就出；写了 = 玩家走进这一圈才出（approach 段也算）。
+//   until = 玩家摆成这个姿势（crouch / prone / stand）一会儿就收（至少出 BLOCKOUT_PLAY.hintMinS 秒）；不写就出 showS 秒（缺省 hintS）。一步只出一次。
+//
+// face（2026-11-02）：{ 单位 id: yawDeg }，这一步放兵时这个人朝哪看（缺省照关键帧）。关键帧的朝向是给预演摆的
+//   （09-1 窗 B 那个在预演里朝自己的门、等着站起来踹门），试玩要他看着窗户时在这里改，不动关键帧。朝向口径同关键帧（本地 −z 是正面）。
 //
 // 这一份零 three、零 DOM，node 直接测（Script_EditorBlockoutPlayPlanTest）。
 
@@ -63,7 +71,16 @@ export const BLOCKOUT_PLAY = Object.freeze({
   alertEveryS: 4,
   /** 一步最多放多少个 AI（多出来的照旧是演员，避免一帧里塞几十个兵把帧打穿）。 */
   maxAiPerStep: 28,
+  /** 按键提示不写 until 时出几秒。 */
+  hintS: 8,
+  /** 按键提示的 until 姿势做到了，再留几秒才收（让人看见「对了」，不是一按就闪没）。 */
+  hintDoneS: 1.2,
+  /** 按键提示至少出几秒：关键帧把人摆成蹲着开打时，姿势一开始就对，不留这几秒提示就只闪一下。 */
+  hintMinS: 3,
 });
+
+/** 按键提示 until 认的姿势（同 player.stance）。 */
+export const PLAY_HINT_STANCES = Object.freeze(["crouch", "prone", "stand"]);
 
 /** 不变 AI 的角色：掷弹筒组（AI 不会用掷弹筒，由 mortar 规则代打）、翻译（不拿枪）。 */
 export const PLAY_PUPPET_ROLES = Object.freeze(["mortar", "mortarLoader", "interpreter"]);
@@ -95,12 +112,30 @@ function MortarIssues(mortar, at, errors) {
   }
 }
 
+function HintIssues(hint, at, errors) {
+  if (!IsObject(hint)) { errors.push(`${at} 要是对象`); return; }
+  for (const key of Object.keys(hint)) if (!["action", "keys", "text", "at", "until", "showS"].includes(key)) errors.push(`${at}.${key} 不认识（只认 action / keys / text / at / until / showS）`);
+  if (typeof hint.text !== "string" || !hint.text.trim()) errors.push(`${at}.text 要是非空字符串`);
+  const hasAction = typeof hint.action === "string" && hint.action, hasKeys = typeof hint.keys === "string" && hint.keys.trim();
+  if (!hasAction && !hasKeys) errors.push(`${at} 要有 action（键位表里的动作名）或 keys（键帽上的字）`);
+  if (hint.action !== undefined && !hasAction) errors.push(`${at}.action 要是非空字符串`);
+  if (hint.keys !== undefined && !hasKeys) errors.push(`${at}.keys 要是非空字符串`);
+  if (hint.at !== undefined) {
+    if (!IsObject(hint.at) || !Finite(hint.at.x) || !Finite(hint.at.z)) errors.push(`${at}.at 要是 {x, z, r?}`);
+    else if (hint.at.r !== undefined && !(Finite(hint.at.r) && hint.at.r > 0)) errors.push(`${at}.at.r 要是正数`);
+  }
+  if (hint.until !== undefined && !PLAY_HINT_STANCES.includes(hint.until)) errors.push(`${at}.until 要是 ${PLAY_HINT_STANCES.join(" / ")}`);
+  if (hint.showS !== undefined && !(Finite(hint.showS) && hint.showS > 0)) errors.push(`${at}.showS 要是正数（秒）`);
+}
+
 function StepIssues(step, at, errors, warnings, kf) {
   if (!IsObject(step)) { errors.push(`${at} 要是对象`); return; }
   if (step.mode !== undefined && !BLOCKOUT_PLAY_MODES.includes(step.mode)) errors.push(`${at}.mode 要是 ${BLOCKOUT_PLAY_MODES.join(" / ")}`);
   if (step.clear !== undefined) ClearIssues(step.clear, `${at}.clear`, errors);
   for (const key of ["push", "keep"]) if (step[key] !== undefined && !IsNameList(step[key])) errors.push(`${at}.${key} 要是字符串数组（单位 id 或 group）`);
   if (step.mortar !== undefined) MortarIssues(step.mortar, `${at}.mortar`, errors);
+  if (step.hint !== undefined) HintIssues(step.hint, `${at}.hint`, errors);
+  if (step.face !== undefined && (!IsObject(step.face) || !Object.values(step.face).every(Finite))) errors.push(`${at}.face 要是 { 单位 id: yawDeg }`);
   if (step.objective !== undefined && typeof step.objective !== "string") errors.push(`${at}.objective 要是字符串`);
   for (const key of ["approach", "fresh", "bayonet", "alert"]) if (step[key] !== undefined && typeof step[key] !== "boolean") errors.push(`${at}.${key} 要是布尔`);
   if (step.previz !== undefined && typeof step.previz !== "boolean") errors.push(`${at}.previz 要是布尔`);
@@ -110,6 +145,9 @@ function StepIssues(step, at, errors, warnings, kf) {
   const ids = new Set(kf.units?.map(u => u.id) || []), groups = new Set((kf.units || []).map(u => u.group).filter(Boolean));
   for (const key of ["push", "keep"]) for (const name of IsNameList(step[key]) ? step[key] : []) {
     if (!ids.has(name) && !groups.has(name)) warnings.push(`${at}.${key} 的 ${name} 在关键帧 ${kf.id} 里找不到（既不是单位 id 也不是 group）`);
+  }
+  if (IsObject(step.face)) for (const id of Object.keys(step.face)) {
+    if (!ids.has(id)) warnings.push(`${at}.face 的 ${id} 不在关键帧 ${kf.id} 里`);
   }
   if (IsObject(step.mortar) && IsNameList(step.mortar.from)) for (const id of step.mortar.from) {
     if (!ids.has(id)) warnings.push(`${at}.mortar.from 的 ${id} 不在关键帧 ${kf.id} 里`);
@@ -202,6 +240,21 @@ export function PlayWeaponFor(unit) {
   return "Type38";
 }
 
+/** 按键提示归一化（校验过的）；没有 / 坏的 → null。 */
+export function NormalizePlayHint(hint) {
+  if (!IsObject(hint) || typeof hint.text !== "string" || !hint.text.trim()) return null;
+  const action = typeof hint.action === "string" && hint.action ? hint.action : null;
+  const keys = typeof hint.keys === "string" && hint.keys.trim() ? hint.keys.trim() : null;
+  if (!action && !keys) return null;
+  const at = IsObject(hint.at) && Finite(hint.at.x) && Finite(hint.at.z)
+    ? { x: hint.at.x, z: hint.at.z, r: Finite(hint.at.r) && hint.at.r > 0 ? hint.at.r : BLOCKOUT_PLAY.reachM } : null;
+  return {
+    action, keys, text: hint.text.trim(), at,
+    until: PLAY_HINT_STANCES.includes(hint.until) ? hint.until : null,
+    showS: Finite(hint.showS) && hint.showS > 0 ? hint.showS : BLOCKOUT_PLAY.hintS,
+  };
+}
+
 function NextPoint(kf) {
   return kf?.next && Finite(kf.next.x) && Finite(kf.next.z) ? { x: kf.next.x, z: kf.next.z } : null;
 }
@@ -212,7 +265,8 @@ function NextPoint(kf) {
  *   play    NormalizeBlockoutPlay 的结果
  *   killed  已经在前面步里被打死的单位 id（同一个人不复活）
  * → { index, id, mode, approach, approachM, holdM, objective, clear: { kill, reach: {x,z,r}|null, time },
- *     ai: [{ id, x, z, yawDeg, weapon, bayonet, castId, order, group, name }], aiIds: Set, mortar, watchS, previz }
+ *     ai: [{ id, x, z, yawDeg, weapon, bayonet, castId, order, group, name }], aiIds: Set, mortar, watchS, previz,
+ *     hint: NormalizePlayHint 的结果 | null }
  */
 export function PlayStepPlan(config, index, play = NormalizeBlockoutPlay(null), { killed = new Set(), first = false } = {}) {
   const kf = config.keyframes[index];
@@ -227,7 +281,7 @@ export function PlayStepPlan(config, index, play = NormalizeBlockoutPlay(null), 
       if (ai.length >= BLOCKOUT_PLAY.maxAiPerStep) break;
       ai.push({
         id: unit.id, name: unit.name || "", group: unit.group || "",
-        x: unit.x, z: unit.z, yawDeg: unit.yawDeg ?? 0,
+        x: unit.x, z: unit.z, yawDeg: IsObject(step.face) && Finite(step.face[unit.id]) ? step.face[unit.id] : (unit.yawDeg ?? 0),
         weapon: PlayWeaponFor(unit),
         bayonet: step.bayonet === true || unit.role === "bayonet",
         castId: unit.castId || null,
@@ -270,6 +324,7 @@ export function PlayStepPlan(config, index, play = NormalizeBlockoutPlay(null), 
     clear, ai, aiIds: new Set(ai.map(a => a.id)), mortar, alert: step.alert !== false,
     watchS: step.watchS || BLOCKOUT_PLAY.watchS,
     previz: step.previz !== false,
+    hint: NormalizePlayHint(step.hint),
   };
 }
 
@@ -284,6 +339,27 @@ export function PlayStepCleared(clear, ctx) {
   if (clear.reach && ctx.player && Math.hypot(ctx.player.x - clear.reach.x, ctx.player.z - clear.reach.z) <= clear.reach.r) return "reach";
   if (clear.time && ctx.elapsedS >= clear.time) return "time";
   return null;
+}
+
+/**
+ * 按键提示这一帧出不出（纯函数，原地改 state）。新一步传 state = { phase: "wait" }；phase 走 wait → on → off，一步只出一次。
+ * ctx = { dt, engaged（放兵 / 开始算过关之后为真，approach 段为假）, player: {x, z}, stance }。→ 这一帧要不要显示
+ */
+export function PlayHintStep(hint, state, ctx) {
+  if (!hint || !state || state.phase === "off") return false;
+  if (state.phase === "wait") {
+    const p = ctx.player;
+    const inside = hint.at ? !!p && Math.hypot(p.x - hint.at.x, p.z - hint.at.z) <= hint.at.r : !!ctx.engaged;
+    if (!inside) return false;
+    state.phase = "on"; state.onT = 0; state.doneT = 0;
+  }
+  state.onT += ctx.dt || 0;
+  if (hint.until) {
+    // 姿势对了（含一开打就蹲着的）先变「对了」的颜色，蹲够 hintDoneS、出满 hintMinS 才收；中途站起来重新数
+    state.doneT = ctx.stance === hint.until ? state.doneT + (ctx.dt || 0) : 0;
+    if (state.doneT >= BLOCKOUT_PLAY.hintDoneS && state.onT >= BLOCKOUT_PLAY.hintMinS) state.phase = "off";
+  } else if (state.onT >= hint.showS) state.phase = "off";
+  return state.phase === "on";
 }
 
 /** 关卡里的一段（含两头）：from / to 是关键帧 id 或下标；to 缺省 = 最后一帧。→ [下标…]（空 = 不成立） */

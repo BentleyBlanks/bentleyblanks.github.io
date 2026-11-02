@@ -1,0 +1,20 @@
+{
+  "schema": "tengxian-blockout-play/1",
+  "level": "FirstLevel0610",
+  "defaults": { "invincible": false, "infiniteAmmo": false, "previz": true },
+  "ranges": [
+    { "id": "alley", "label": "09 巷子里蹲着过窗", "from": "08-4", "to": "09-3", "note": "班长定计 → 进巷子（按键提示：蹲下）→ 窗 A、窗 B 底下蹲着过、钻进豁口 → 捂嘴过场。屋里那两个是真 AI、不知道你来了，站着走会被看见" }
+  ],
+  "steps": {
+    "08-4": { "mode": "watch" },
+    "09-1": {
+      "mode": "fight", "alert": false, "keep": ["house", "corner", "cellar"], "holdM": 1,
+      "face": { "NextDoorIja1": -90 },
+      "clear": { "reach": { "x": 65.1, "z": 450, "r": 1.5 } },
+      "objective": "顺巷子往南，两扇窗户底下蹲着过，钻进豁口",
+      "hint": { "action": "crouch", "text": "蹲下，从窗户底下悄悄过去", "until": "crouch" }
+    },
+    "09-2": { "mode": "skip" },
+    "09-3": { "mode": "watch" }
+  }
+}

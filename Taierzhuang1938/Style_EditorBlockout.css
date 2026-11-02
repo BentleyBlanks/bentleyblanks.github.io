@@ -899,6 +899,27 @@ body.blockoutTouch.blockoutMode #hud :is(.hudCombat, .hudState) { display: none 
 .boPlayGoal { flex: 1 1 auto; min-width: 0; color: var(--bo-gold-text); font-weight: 700; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .boPlayEnemy { flex: 0 0 auto; font: 12.5px/18px var(--bo-num); color: #e7a08f; font-variant-numeric: tabular-nums; }
 body.blockoutPlay .boToasts { top: 138px; }
+
+/* 试玩的按键提示（§17.2 hint）：样子照游戏 HUD 的操作提示（Style_Game.css .hudAction）——米白字、柔和黑影、实心键帽，没有底板；
+   在准星下面一截，不压底下的导航栏。字同编辑器（--bo-serif = 故事字体；它是按字表裁过的子集，编辑器文字不进字表，生字落到后面的宋体）。 */
+.boPlayKeyHint {
+  --c: #ece3cc;
+  position: absolute; left: 50%; top: 50%; transform: translateX(-50%); margin-top: 11vh; z-index: 4;
+  display: flex; align-items: center; justify-content: center; gap: 0.45em;
+  max-width: calc(100vw - 32px); box-sizing: border-box;
+  font: 700 clamp(15px, 2.2vh, 23px)/1.35 var(--bo-serif); letter-spacing: 0.06em; color: var(--c); text-align: center;
+  text-shadow: 0 0 3px rgba(0,0,0,0.9), 0 1px 1px rgba(0,0,0,0.9);
+  pointer-events: none; opacity: 0; transition: opacity 0.25s linear, color 0.2s linear;
+}
+.boPlayKeyHint.on { opacity: 1; }
+.boPlayKeyHint.done { --c: #c4d9a2; }
+.boPlayKeyHint kbd {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box; min-width: 1.4em; height: 1.4em; padding: 0 0.32em;
+  border-radius: 0.22em; background: var(--c); color: #15130f;
+  font: 700 0.85em/1 "TzUiLatin", var(--bo-num); letter-spacing: 0; text-shadow: none;
+  box-shadow: 0 0 3px rgba(0,0,0,0.6); transition: background 0.2s linear;
+}
 /* 试玩中导航栏不响应（翻关键帧会把场上的人搅乱） */
 body.blockoutPlay .boNav { pointer-events: none !important; opacity: 0.45; }
 

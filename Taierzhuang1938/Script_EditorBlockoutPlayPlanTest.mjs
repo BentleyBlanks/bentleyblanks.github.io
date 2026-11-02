@@ -10,6 +10,8 @@
 //   3. PlayStepCleared：kill all / kill n / reach / time，一个人都没放的 fight 步不卡
 //   4. PlayRange、FormatPlayTime
 //   5. 提交的 Blockout/*.play.json：通过校验、零警告；01–05 的五段预设都成立，打的几步都放得出人
+//   6. 按键提示 hint（2026-11-02）：校验正反例、归一化、PlayHintStep 出 / 收的时机；提交的编排里 action 都在游戏键位表里；
+//      06–10 巷子那一步只放窗 A、窗 B 两个、不报位置、提示是蹲下
 // ===========================================================================
 
 import assert from "node:assert/strict";
@@ -19,8 +21,10 @@ import { fileURLToPath } from "node:url";
 import { NormalizeBlockout, BLOCKOUT_SCHEMA } from "./Script_EditorBlockoutConfig.mjs";
 import {
   BLOCKOUT_PLAY, BLOCKOUT_PLAY_SCHEMA, ValidateBlockoutPlay, NormalizeBlockoutPlay, PlayStepPlan, PlayStepCleared, PlayRange,
-  FormatPlayTime, UnitCanFight, PlayWeaponFor, NamedIn,
+  FormatPlayTime, UnitCanFight, PlayWeaponFor, NamedIn, NormalizePlayHint, PlayHintStep,
 } from "./Script_EditorBlockoutPlayPlan.mjs";
+import { KEYMAP, MOUSEMAP } from "./Script_Input.mjs";
+import { L0610_ALLEY_WINDOWS } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -88,6 +92,75 @@ Check("校验：坏字段报错", () => {
   const warn = bad({ steps: { c: { push: ["Nobody"] } } });
   assert.equal(warn.ok, true);
   assert.equal(warn.warnings.length, 1);
+});
+
+Check("按键提示：校验与归一化", () => {
+  const config = Config();
+  const withHint = (hint) => ValidateBlockoutPlay({ ...PLAY, steps: { ...PLAY.steps, b: { hint } } }, { config });
+  assert.deepEqual(withHint({ action: "crouch", text: "蹲下", until: "crouch" }).errors, []);
+  assert.deepEqual(withHint({ keys: "C", text: "蹲下", at: { x: 0, z: 12, r: 4 }, showS: 5 }).errors, []);
+  assert.equal(withHint("蹲下").ok, false, "要是对象");
+  assert.equal(withHint({ action: "crouch" }).ok, false, "没有字");
+  assert.equal(withHint({ text: "蹲下" }).ok, false, "action / keys 都没有");
+  assert.equal(withHint({ action: "", keys: "C", text: "蹲下" }).ok, false, "action 空串");
+  assert.equal(withHint({ action: "crouch", text: "蹲下", until: "sit" }).ok, false);
+  assert.equal(withHint({ action: "crouch", text: "蹲下", at: { x: 1 } }).ok, false);
+  assert.equal(withHint({ action: "crouch", text: "蹲下", at: { x: 1, z: 2, r: 0 } }).ok, false);
+  assert.equal(withHint({ action: "crouch", text: "蹲下", showS: -1 }).ok, false);
+  assert.equal(withHint({ action: "crouch", text: "蹲下", when: "now" }).ok, false, "不认识的字段");
+  assert.equal(NormalizePlayHint(null), null);
+  assert.equal(NormalizePlayHint({ text: "x" }), null);
+  assert.deepEqual(NormalizePlayHint({ action: "crouch", text: " 蹲下 ", at: { x: 1, z: 2 } }),
+    { action: "crouch", keys: null, text: "蹲下", at: { x: 1, z: 2, r: BLOCKOUT_PLAY.reachM }, until: null, showS: BLOCKOUT_PLAY.hintS });
+  const plan = PlayStepPlan(config, 1, NormalizeBlockoutPlay({ ...PLAY, steps: { b: { hint: { keys: "C", text: "蹲下" } } } }));
+  assert.equal(plan.hint.keys, "C");
+  assert.equal(PlayStepPlan(config, 1, NormalizeBlockoutPlay(PLAY)).hint, null, "不写就没有");
+});
+
+Check("face：这一步放兵时改朝向，不动关键帧", () => {
+  const config = Config();
+  const doc = { ...PLAY, steps: { ...PLAY.steps, c: { ...PLAY.steps.c, face: { E1: -90 } } } };
+  assert.deepEqual(ValidateBlockoutPlay(doc, { config }).errors, []);
+  const c = PlayStepPlan(config, 2, NormalizeBlockoutPlay(doc));
+  assert.equal(c.ai.find(a => a.id === "E1").yawDeg, -90);
+  assert.equal(c.ai.find(a => a.id === "E2").yawDeg, 0, "没写的照关键帧");
+  assert.equal(config.keyframes[2].units.find(u => u.id === "E1").yawDeg ?? 0, 0, "关键帧没被改");
+  assert.equal(ValidateBlockoutPlay({ ...doc, steps: { c: { face: { E1: "east" } } } }, { config }).ok, false);
+  assert.equal(ValidateBlockoutPlay({ ...doc, steps: { c: { face: [90] } } }, { config }).ok, false);
+  assert.equal(ValidateBlockoutPlay({ ...doc, steps: { c: { face: { Nobody: 0 } } } }, { config }).warnings.length, 1, "点名对不上只警告");
+});
+
+Check("按键提示：出 / 收的时机", () => {
+  const at = (x, z) => ({ x, z });
+  const D = BLOCKOUT_PLAY.hintDoneS, M = BLOCKOUT_PLAY.hintMinS;
+  assert.ok(M > D, "至少出的秒数要比「蹲够」长，不然蹲着开打的人只看到一闪");
+  // 不写 at：开打才出；until 的姿势摆好够 hintDoneS、出满 hintMinS 才收；中间站起来重新数
+  const crouch = NormalizePlayHint({ action: "crouch", text: "蹲下", until: "crouch" });
+  let s = { phase: "wait" };
+  assert.equal(PlayHintStep(crouch, s, { dt: 0.1, engaged: false, player: at(0, 0), stance: "stand" }), false, "approach 段不出");
+  assert.equal(PlayHintStep(crouch, s, { dt: 0.1, engaged: true, player: at(0, 0), stance: "stand" }), true);
+  assert.equal(PlayHintStep(crouch, s, { dt: D * 0.6, engaged: true, stance: "crouch" }), true, "刚蹲下还留着");
+  assert.ok(s.doneT > 0, "蹲下了：「对了」");
+  assert.equal(PlayHintStep(crouch, s, { dt: 0.1, engaged: true, stance: "stand" }), true, "又站起来");
+  assert.equal(s.doneT, 0, "站起来重新数");
+  assert.equal(PlayHintStep(crouch, s, { dt: M, engaged: true, stance: "stand" }), true, "一直站着就一直出");
+  PlayHintStep(crouch, s, { dt: D * 0.6, engaged: true, stance: "crouch" });
+  assert.equal(PlayHintStep(crouch, s, { dt: D * 0.6, engaged: true, stance: "crouch" }), false, "蹲够了收");
+  assert.equal(s.phase, "off");
+  assert.equal(PlayHintStep(crouch, s, { dt: 0.1, engaged: true, stance: "stand" }), false, "一步只出一次");
+  // 一开打就蹲着（关键帧把人摆成蹲姿）：照样出，出满 hintMinS 才收
+  s = { phase: "wait" };
+  assert.equal(PlayHintStep(crouch, s, { dt: 0.1, engaged: true, stance: "crouch" }), true, "蹲着开打也出");
+  assert.equal(PlayHintStep(crouch, s, { dt: D + 0.1, engaged: true, stance: "crouch" }), true, "蹲够了但没出满还留着");
+  assert.equal(PlayHintStep(crouch, s, { dt: M, engaged: true, stance: "crouch" }), false, "出满收");
+  // 写了 at：走进那一圈才出（approach 段也算）；不写 until 就出 showS 秒
+  const area = NormalizePlayHint({ keys: "G", text: "扔", at: { x: 10, z: 0, r: 2 }, showS: 3 });
+  s = { phase: "wait" };
+  assert.equal(PlayHintStep(area, s, { dt: 0.1, engaged: true, player: at(0, 0), stance: "stand" }), false, "圈外不出");
+  assert.equal(PlayHintStep(area, s, { dt: 0.1, engaged: false, player: at(9, 0), stance: "stand" }), true, "approach 段走进圈也出");
+  assert.equal(PlayHintStep(area, s, { dt: 2.5, engaged: true, player: at(0, 0), stance: "stand" }), true, "出了就不看人在哪");
+  assert.equal(PlayHintStep(area, s, { dt: 0.5, engaged: true, player: at(0, 0), stance: "stand" }), false, "showS 到了收");
+  assert.equal(PlayHintStep(null, { phase: "wait" }, { dt: 0.1, engaged: true }), false);
 });
 
 Check("推断：watch / move / fight", () => {
@@ -192,6 +265,38 @@ Check("提交的试玩编排：通过校验、零警告，预设都成立，打�
   assert.ok(pit.ai.length >= 20, `03-3 放 ${pit.ai.length} 个`);
   assert.ok(pit.ai.every(a => !/Mortar/.test(a.id)), "掷弹筒组不变 AI");
   assert.ok(pit.mortar, "03-3 有掷弹筒");
+});
+
+Check("提交的试玩编排：按键提示的动作都在键位表里；06–10 巷子那一步是潜行", () => {
+  const dir = path.join(HERE, "Blockout");
+  const actions = new Set([...KEYMAP, ...MOUSEMAP].map(row => row.action));
+  for (const name of fs.readdirSync(dir).filter(n => n.endsWith(".play.json"))) {
+    const doc = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+    for (const [id, step] of Object.entries(doc.steps || {})) {
+      if (step.hint?.action) assert.ok(actions.has(step.hint.action), `${name} ${id} 的 hint.action ${step.hint.action} 不在键位表里`);
+    }
+  }
+  const config = NormalizeBlockout(JSON.parse(fs.readFileSync(path.join(dir, "FirstLevel0610.json"), "utf8")));
+  const play = NormalizeBlockoutPlay(JSON.parse(fs.readFileSync(path.join(dir, "FirstLevel0610.play.json"), "utf8")));
+  const alley = PlayStepPlan(config, config.keyframes.findIndex(k => k.id === "09-1"), play);
+  assert.equal(alley.mode, "fight");
+  assert.deepEqual(alley.ai.map(a => a.id).sort(), ["NextDoorIja1", "NextDoorIja2"], "只放窗 A、窗 B 里那两个");
+  assert.ok(alley.ai.every(a => a.order === "hold"), "守在屋里，不往外压");
+  assert.equal(alley.alert, false, "不报位置：得自己看见");
+  assert.equal(alley.hint?.action, "crouch");
+  assert.equal(alley.hint.until, "crouch");
+  assert.ok(alley.clear.reach && alley.clear.kill === null, "走到豁口就过，不用打");
+  // 豁口在两扇窗南边：从巷子口走过去一定经过两扇窗
+  const windows = alley.ai.map(a => config.keyframes.find(k => k.id === "09-1").units.find(u => u.id === a.id));
+  const start = config.keyframes.find(k => k.id === "09-1").player;
+  for (const w of windows) assert.ok(w.z > start.z && w.z < alley.clear.reach.z + 1, `${w.id} 在巷子口和豁口之间`);
+  // 两个人都看着自己那扇窗（AI 的正面 = (−sin yaw, −cos yaw)，同关键帧口径）：不看窗，站着走过去也没人发现，「蹲下」就教不成
+  for (const [unitId, win] of [["NextDoorIja2", L0610_ALLEY_WINDOWS.A], ["NextDoorIja1", L0610_ALLEY_WINDOWS.B]]) {
+    const a = alley.ai.find(x => x.id === unitId), yaw = a.yawDeg * Math.PI / 180;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), hx = win.x - a.x, hz = win.z - a.z, hl = Math.hypot(hx, hz);
+    const deg = Math.acos((fx * hx + fz * hz) / hl) * 180 / Math.PI;
+    assert.ok(deg < 30, `${unitId} 朝向偏开窗 ${win.id} ${deg.toFixed(0)}°`);
+  }
 });
 
 console.log(`EditorBlockoutPlayPlanTest 通过：${checks} 组检查`);

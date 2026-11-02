@@ -13,6 +13,9 @@
 //   2b. 试玩跑正式场景（2026-11-01，docs/Data_Scene.md §8）：开打时场地是 Scenes/FirstLevel（formal），编辑时是白盒；
 //   5. 阵亡：玩家倒下 → 小结写「阵亡」、玩家原地换回活人并摆回那一步的机位（不被宿主送回关卡出生点）；
 //   6. 看戏步：播过场（预演）时 N 跳过就进下一步；
+//   8. 按键提示（2026-11-02，FirstLevel0610 的 09-1 巷子）：开打出「C 蹲下……」（键帽字照键位表），站着一直出，按 C 蹲下变「对了」、
+//      过几秒收；只放窗 A、窗 B 那两个、开打时都没察觉；站着从窗 A 前走过至少起疑（窗只有 0.7 m 宽，认不认得出看赶没赶上
+//      日军想事的间隔，实测三次一次交战两次起疑），蹲着走过去没被发现；
 //   7. 全程没有未捕获错误。截图存 _shots/EditorBlockoutPlay/（不提交）。
 // ===========================================================================
 
@@ -217,6 +220,59 @@ try {
   await B(() => window.Tengxian.Debug.Blockout.Play.Close());
   await Step(2);
   Check("收尾：场上没有残留的兵", (await Rules()).ai === 0);
+
+  // 8) 按键提示 + 蹲着过窗（06–10 的 09-1）
+  console.log("--- hint (FirstLevel0610 09-1)");
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0610&kf=09-1&scale=small&audio=0`, { waitUntil: "load", timeout: 180000 });
+  await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
+  await Step(4);
+  await B(() => { window.Tengxian.Debug.Blockout.Play.Start({ from: "09-1", to: "09-3", settings: { invincible: true, infiniteAmmo: true, previz: false } }); });
+  for (let i = 0; i < 120 && !(await PlayState()).active; i++) { await Step(2); await page.waitForTimeout(500); }
+  await Step(6);
+  const Hint = () => B(() => {
+    const el = document.querySelector(".boPlayKeyHint"), game = window.Tengxian.editor.editorHost.game;
+    return { on: el.classList.contains("on"), done: el.classList.contains("done"), key: el.querySelector("kbd")?.textContent, text: el.querySelector(".boPlayKeyHintText")?.textContent,
+      stance: game.player.stance, ai: game.ai.soldiers.filter(x => x.blockoutPlayId).map(x => ({ id: x.blockoutPlayId, alert: x.alert || "unaware" })) };
+  });
+  const crouchKey = KEYMAP.find(row => row.action === "crouch").code.replace(/^Key/, "");
+  const h0 = await Hint();
+  Check("09-1 开打：出按键提示，键帽字照键位表（蹲下）", h0.on && h0.key === crouchKey && /蹲下/.test(h0.text || ""), J(h0));
+  Check("09-1 只放窗 A、窗 B 那两个，开打时都没察觉（alert 关）",
+    J(h0.ai.map(a => a.id).sort()) === J(["NextDoorIja1", "NextDoorIja2"]) && h0.ai.every(a => a.alert === "unaware"), J(h0.ai));
+  await B(() => window.Tengxian.editor.editorHost.game.player.SetStance("stand"));
+  await Step(90);
+  const h1 = await Hint();
+  Check("站着：提示一直在，不是「对了」的颜色", h1.on && !h1.done && h1.stance === "stand", J(h1));
+  await page.screenshot({ path: path.join(shotDir, "Play_KeyHint.png") });
+  await page.keyboard.press("KeyC");
+  await Step(20);
+  const h2 = await Hint();
+  await Step(60 * 4);
+  const h3 = await Hint();
+  Check("按 C 蹲下：先变「对了」，几秒后收", h2.on && h2.done && h2.stance === "crouch" && !h3.on, J({ h2, h3 }));
+  // 从窗 A 北 6 m 走到南 6 m（站着 2 m/s、蹲着 1.4 m/s），看屋里那个最坏到哪一档
+  const WalkPastA = (stance) => B(async (stance) => {
+    const T = window.Tengxian, game = T.editor.editorHost.game, p = game.player;
+    for (const s of game.ai.soldiers) if (s.blockoutPlayId) game.ai.perception.ForgetAll(s);
+    p.SetStance(stance);
+    T.StepFrames(10, 1 / 60, false);
+    const order = ["unaware", "suspicious", "alert", "engaged"], guard = game.ai.soldiers.find(x => x.blockoutPlayId === "NextDoorIja2");
+    let worst = 0;
+    for (let z = 406; z <= 418; z += 0.5) {
+      const y = game.battlefield.GroundHeight(71, z);
+      p.position.set(71, y, z); p.body?.Teleport?.(71, y, z);
+      T.StepFrames(stance === "stand" ? 15 : 21, 1 / 60, false);
+      worst = Math.max(worst, order.indexOf(guard.alert || "unaware"));
+    }
+    return order[worst];
+  }, stance);
+  const walkStand = await WalkPastA("stand");
+  const walkCrouch = await WalkPastA("crouch");
+  Check("站着从窗 A 前走过至少起疑，蹲着走过去没被发现", walkStand !== "unaware" && walkCrouch === "unaware", J({ walkStand, walkCrouch }));
+  await B(() => window.Tengxian.Debug.Blockout.Play.Stop());
+  await B(() => window.Tengxian.Debug.Blockout.Play.Close());
+  await Step(2);
+  Check("提示跟着收场收掉", !(await Hint()).on);
 
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
 } finally {

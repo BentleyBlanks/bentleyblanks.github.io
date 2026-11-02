@@ -20,13 +20,17 @@
 //
 // 2026-11-01：放出来的日军也换成 Mixamo X Bot（同预演演员，Script_EditorBlockoutXBot）：AI、命中体、开枪照旧是原身体，
 //   只是蒙皮藏起来、X Bot 照 AI 每帧交给人物的状态（速度、蹲 / 趴、据枪、开枪、倒地、投弹）播对照表里的动作；枪挪到 X Bot 手里（枪口跟着走）。
+// 2026-11-02：按键提示（编排里一步的 hint，用户：「进入巷道的时候非常简单的按键提示的引导教学」）：准星下面一截一行「键帽 + 一句话」，
+//   样子照游戏 HUD 的操作提示；键帽字照玩家此刻的键位（Script_Input.ActionKeyGlyph）。出不出由 PlayHintStep 定（走进那一圈 / 开打就出，
+//   摆成 until 的姿势一会儿就收，一步只出一次）。游戏 HUD 那条操作提示不借：它只放此刻真能按的规则查询（Script_Main 的约定），编辑器里也是藏着的。
 
 import * as THREE from "three";
 import {
-  BLOCKOUT_PLAY, NormalizeBlockoutPlay, ValidateBlockoutPlay, PlayStepPlan, PlayStepCleared, PlayRange, FormatPlayTime,
+  BLOCKOUT_PLAY, NormalizeBlockoutPlay, ValidateBlockoutPlay, PlayStepPlan, PlayStepCleared, PlayRange, FormatPlayTime, PlayHintStep,
 } from "./Script_EditorBlockoutPlayPlan.mjs";
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { ActionKeyGlyph } from "./Script_Input.mjs";
 
 export const PLAY_KEY = "KeyK";
 const DEG = Math.PI / 180;
@@ -199,7 +203,7 @@ export class BlockoutPlay {
       indices, cursor: -1, settings: { invincible: !!s.invincible, infiniteAmmo: !!s.infiniteAmmo, previz: s.previz !== false },
       soldiers: new Map(), corpses: [], killed: new Set(), step: null, phase: "", phaseT: 0, stepT: 0, engageT: 0, totalT: 0,
       stepKills: 0, stepSpawned: new Set(), kills: 0, damage: 0, log: [], lastHealth: null, mortarT: 0, rnd: Mulberry32(seed),
-      deadAt: null, previzToken: 0, hudKey: "",
+      deadAt: null, previzToken: 0, hudKey: "", hintState: { phase: "wait" }, hintKey: "",
     };
     // 先登记 run（宿主的 ApplyDebugOptions 读 Overrides），再按本关携行重新领装备、回满血
     this.game.ResetPlayer?.();
@@ -237,6 +241,8 @@ export class BlockoutPlay {
     run.stepT = 0; run.engageT = 0; run.phaseT = 0; run.stepKills = 0; run.stepSpawned = new Set();
     run.mortarT = step.mortar ? step.mortar.firstS : 0;
     run.hudKey = "";
+    run.hintState = { phase: "wait" };
+    this.UpdateKeyHint(0);
     // 上一步留下的活人：这一步还有他 → 留着（Engage 里挪守点）；没有他 / 这一步是看戏 → 撤场
     for (const [id, soldier] of run.soldiers) {
       if (!soldier.alive) continue;
@@ -394,6 +400,7 @@ export class BlockoutPlay {
     this.game.ApplyDebugOptions?.();
     document.body.classList.remove("blockoutPlay");
     this.hud.hidden = true;
+    this.ShowKeyHint(null);
     editor.markers.SetNext(null);
     if (!summary) { this.Restore(run.step?.index ?? editor.index); return; }
     this.summary = {
@@ -457,6 +464,7 @@ export class BlockoutPlay {
       run.phase = "dead";
       run.phaseT = 0;
       run.deadAt = run.step?.index ?? null;
+      this.UpdateKeyHint(0);
       this.UpdateHud(true);
       return;
     }
@@ -486,7 +494,33 @@ export class BlockoutPlay {
     } else if (run.phase === "cleared") {
       if (run.phaseT >= BLOCKOUT_PLAY.clearPauseS) { this.EnterStep(run.cursor + 1); return; }
     }
+    this.UpdateKeyHint(dt);
     this.UpdateHud(false);
+  }
+
+  /** 按键提示：只在走过去（approach）和开打（engage）时算；别的阶段（过关、阵亡、看戏）收掉，这一步不再出。 */
+  UpdateKeyHint(dt) {
+    const run = this.run, step = run?.step;
+    if (!run) { this.ShowKeyHint(null); return; }
+    let on = false;
+    if (step?.hint && (run.phase === "approach" || run.phase === "engage")) {
+      const player = this.game.player;
+      on = PlayHintStep(step.hint, run.hintState, { dt, engaged: run.phase === "engage", player: player?.position, stance: player?.stance });
+    } else if (run.hintState.phase === "on") run.hintState.phase = "off";
+    this.ShowKeyHint(on ? { keys: HintKeys(step.hint), text: step.hint.text, done: run.hintState.doneT > 0 } : null);
+  }
+
+  /** 画 / 收那一行（签名不变不碰 DOM）。view = { keys, text, done } | null */
+  ShowKeyHint(view) {
+    const key = view ? `${view.keys}|${view.text}|${view.done ? 1 : 0}` : "";
+    if (key === this.keyHintShown) return;
+    this.keyHintShown = key;
+    this.keyHint.classList.toggle("on", !!view);
+    this.keyHint.classList.toggle("done", !!view?.done);
+    if (!view) return;
+    this.keyHintKey.textContent = view.keys;
+    this.keyHintText.textContent = view.text;
+    this.keyHint.setAttribute("aria-label", `${view.keys}：${view.text}`);
   }
 
   UpdateMortar(dt) {
@@ -567,6 +601,15 @@ export class BlockoutPlay {
     this.hud.append(top, bottom);
     wire(this.hud);
     ui.root.appendChild(this.hud);
+
+    // 按键提示（准星下面一截；不接鼠标）
+    this.keyHint = El("div", "boPlayKeyHint");
+    this.keyHint.setAttribute("role", "status");
+    this.keyHintKey = El("kbd");
+    this.keyHintText = El("span", "boPlayKeyHintText");
+    this.keyHint.append(this.keyHintKey, this.keyHintText);
+    this.keyHintShown = "";
+    ui.root.appendChild(this.keyHint);
 
     // 小结
     this.summaryEl = wire(El("section", "boPlaySummary boPanel"));
@@ -811,7 +854,9 @@ export class BlockoutPlay {
         totalT: +run.totalT.toFixed(2), engageT: +run.engageT.toFixed(2), kills: run.kills, stepKills: run.stepKills,
         stepSpawned: run.stepSpawned.size, alive: this.AliveOf(run.stepSpawned), damage: Math.round(run.damage),
         killed: [...run.killed], clear: run.step ? { ...run.step.clear } : null, settings: { ...run.settings }, log: run.log.map(e => ({ ...e })),
+        hint: run.step?.hint ? { phase: run.hintState.phase, keys: HintKeys(run.step.hint), text: run.step.hint.text, until: run.step.hint.until } : null,
       } : null,
+      keyHint: this.keyHintShown ? { keys: this.keyHintKey.textContent, text: this.keyHintText.textContent, done: this.keyHint.classList.contains("done") } : null,
       soldiers,
       summary: this.summary ? { result: this.summary.result, totalT: +this.summary.totalT.toFixed(2), kills: this.summary.kills, damage: Math.round(this.summary.damage), log: this.summary.log.map(e => ({ ...e })) } : null,
     };
@@ -822,8 +867,15 @@ export class BlockoutPlay {
     this.btn.remove();
     this.panel.remove();
     this.hud.remove();
+    this.keyHint.remove();
     this.summaryEl.remove();
   }
+}
+
+/** 键帽上的字：有动作名就照玩家此刻的键位取（改键跟着变），取不到退回 keys，再不行写动作名。 */
+function HintKeys(hint) {
+  if (!hint) return "";
+  return (hint.action && ActionKeyGlyph(hint.action)) || hint.keys || hint.action || "";
 }
 
 /** AI 交给人物的状态（Script_Ai → actor.Update）→ X Bot 要的意图（同 BlockoutPuppets._SyncXBot 的字段）。 */
