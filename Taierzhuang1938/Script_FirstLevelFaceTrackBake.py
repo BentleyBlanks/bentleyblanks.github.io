@@ -50,11 +50,12 @@ def ReadData(node):
     return Node("""
 const root=process.argv[1];
 const p=await import(root+'Data_FaceTrackPhonemes.mjs');
+const ps=await import(root+'Script_FaceTrackPhonemes.mjs');   // 2026-11-02：HanReadings() 随「数据模块只放数据」搬到了 Script_FaceTrackPhonemes
 const t=await import(root+'Data_Tuning_CharacterSpeech.mjs');
-const d=await import(root+'Data_FirstLevelMissionDialogue.mjs');
+const d=await import(root+'Script_FirstLevelMissionDialogue.mjs');   // 同上：MissionVoiceAlignmentCues() 在 Script_FirstLevelMissionDialogue
 const a=await import(root+'Data_FirstLevelMissionVoiceAlignment.mjs');
 process.stdout.write(JSON.stringify({
-  readings:Object.fromEntries(p.HanReadings()), initials:p.PINYIN_INITIALS, onset:p.INITIAL_ONSET,
+  readings:Object.fromEntries(ps.HanReadings()), initials:p.PINYIN_INITIALS, onset:p.INITIAL_ONSET,
   finals:p.FINAL_VISEMES, kanaVowels:p.KANA_VOWELS, kanaOnset:p.KANA_ONSET, kanaSmall:p.KANA_SMALL,
   kanaViseme:p.KANA_VOWEL_VISEME, kanaSpecial:p.KANA_SPECIAL, visemes:p.VISEMES,
   bake:t.FACE_TRACK_BAKE, cues:d.MissionVoiceAlignmentCues(), alignment:a.MISSION_VOICE_ALIGNMENT}));

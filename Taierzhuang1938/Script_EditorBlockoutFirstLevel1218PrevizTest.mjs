@@ -1,5 +1,5 @@
 // ===========================================================================
-// Script_EditorBlockoutFirstLevel1218PrevizTest.mjs —— FirstLevel1218（11–18，2026-10-26 第三版：北沙河村与铁路桥）预演数据的纯 node 自检
+// Script_EditorBlockoutFirstLevel1218PrevizTest.mjs —— FirstLevel1218（11–18，2026-11-02 第四版：北沙河村与铁路桥）预演数据的纯 node 自检
 //
 //   node Taierzhuang1938/Script_EditorBlockoutFirstLevel1218PrevizTest.mjs           → 查 Blockout/FirstLevel1218.previz.json
 //   node Taierzhuang1938/Script_EditorBlockoutFirstLevel1218PrevizTest.mjs --fresh   → 查生成器当场生成的那份（并核对两次生成逐字相同）
@@ -7,13 +7,15 @@
 // 查（照 0610 的 PrevizTest，加了这片场地专有的几条）：运行时包的 ValidateBlockoutPreviz（关键帧 / 单位 / 台词 id / 字段）；
 // 每个片段在那具骨架上烘过（有 castId 的按 Data_FirstLevelSpeakingCast 的骨架，没有 castId 的士兵只许五具骨架都有的通用片段；
 // 程序化身体的百姓一个片段都不许——只有关键帧里写了 body:"rig" 的那几帧例外）；同一段里台词不互相压；演员走位点在场地范围内、身子不进实心块
-// （按那一刻的信号算随信号体块，路线按 0.5 m 取样）；没人走进沙河中间那股水（蹚水的老乡 Wader* 例外；铁路桥桥面是 standOn 走道，站得上去）；
-// 走位要求的速度不离谱；说话的人那一刻看得见（没藏起来，而且在镜头里）；机位与眼睛不在实心块里、不在水里；说话姿态（§14.4，空手的百姓不管）；
-// 剧本要求的（契约 2026-10-26）：33 帧一帧一段；11–12 落炮 / 「看」那一下 / 沟口喝问 / 黑子不走妮儿牵过板桥 / 钢盔冒头 / 一家人钻洞 / 女娃探头；
-// 13 两辆九四式开到沟沿外、车上机枪扫沟沿、有人往沟口跑、信号弹；14 飞机（顺战壕扫 + 小炸弹 + 掉头扫街）、黑子挨一梭车翻（CartOverturned）、
-// 揪被角（妮儿 carryRole front + PvBlanketDragR）、松手 slowmo（窗口里没台词）+ dragSolo、老耿接角拖进洞；15–17 台词按序、片段；
-// 18 担架和兵踩着枕木走桥面（脚下是枕木顶）、老乡在河床蹚水、机枪先哑顺子才喊、班长最后一个过桥、「点！」后 BridgeBlown、断孔上没人、
-// 黑场 + 日期字幕、then stay；全篇不用删掉的台词与旧地名；镜头轨每一秒都能采样。
+// （按那一刻的信号算随信号体块，路线按 0.5 m 取样）；没人走进沙河中间那股水（按 RiverFrame 的河道坐标判：离中线 offsetD ± halfW；蹚水的老乡 Wader* 例外；
+// 铁路桥桥面是 standOn 走道，站得上去）；走位要求的速度不离谱；说话的人那一刻看得见（没藏起来，而且在镜头里）；机位与眼睛不在实心块里、不在水里；
+// 说话姿态（§14.4，空手的百姓不管）；
+// 剧本要求的（契约 2026-11-02 第三节）：33 帧一帧一段；11–12 落炮 / 爬上车板那句 / 「看」那一下 / 沟口七句 / 黑子不走妮儿牵过板桥 / 钢盔冒头 / 南街口望官道桥 /
+// 军医、女娃探头、水壶；13 步兵 + 两挺机枪压沟沿 + 掷弹筒、有人往沟口跑、官道桥「轰」（GuandaoBridgeBlown 先关后开）、信号弹 t 0.5–1.2 s；
+// 14 六架两拨（第一趟顺战壕、第二趟顺街、沟口炸弹）、14-2 不等人喊先跑 + 弹坑（DugoutBombed 先关后开）、14-3 车翻（CartOverturned 先关后开）、
+// 揪被角（妮儿 carryRole front + PvBlanketDragR）、松手 slowmo（窗口里没台词）+ dragSolo、老耿接角拖进洞；15–17 台词按序、片段、F 与信；
+// 18 命令六句 → 冬瓜那句回声 → 要得、席子、桥面上的人脚下是枕木顶、老乡在河床蹚水、担架往南走进黑地、回头看南边、机枪先哑顺子才喊、班长最后一个（点头不说话）、
+// 「点！」后 BridgeBlown、断孔上没人、对岸鬼子都在北岸、黑场 + 日期字幕「1938年3月14日 夜」、眼睛看过县城的灯、then stay；全篇不用删掉的台词与旧地名；镜头轨每一秒都能采样。
 // ===========================================================================
 
 import { readFileSync, existsSync } from "node:fs";
@@ -22,9 +24,12 @@ import { fileURLToPath } from "node:url";
 import { HeightGridSampler, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Script_CharacterSelection.mjs";
-import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, SamplePrevizActor, SamplePrevizAircraft, PrevizStrafeImpacts } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, SamplePrevizActor, SamplePrevizAircraft, PrevizStrafeImpacts, PREVIZ_DEFAULTS } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
-import { L1218_RIVER as RV, L1218_RAIL_BRIDGE as RB, L1218_RAIL as RL, L1218_HEIGHTS as HT, L1218_AID as A, L1218_PLACES as PL, L1218_SIGNALS as SIG, RiverAtX } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
+import {
+  L1218_RIVER as RV, L1218_RAIL_BRIDGE as RB, L1218_RAIL as RL, L1218_HEIGHTS as HT, L1218_AID as A, L1218_PLACES as PL, L1218_SIGNALS as SIG,
+  L1218_TRENCH as TR, L1218_BANK as BK, L1218_ROADS as RD, RiverFrame,
+} from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -101,10 +106,10 @@ function BodyHit(solids, ground, x, z, { r = 0.3, tol = 0.08, fromM = 0.5, toM =
   }
   return null;
 }
-/** 在水里：沙河中间那股水（河床上的沙地不算；铁路桥桥面是 standOn 走道，站在上头不算）。 */
+/** 在水里：沙河中间那股水（河道坐标：离中线 offsetD ± halfW，顺着弯；河床上的沙地不算；铁路桥桥面是 standOn 走道，站在上头不算）。 */
 function InRiver(p, stand) {
-  const r = RiverAtX(p.x);
-  if (Math.abs(p.z - r.streamZ) >= RV.stream.halfW) return false;
+  const f = RiverFrame(p.x, p.z);
+  if (!f || Math.abs(f.d - RV.stream.offsetD) >= RV.stream.halfW) return false;
   return stand(p.x, p.z) < HT.streamTopY + 0.05;
 }
 function SignalsWith(base, overrides) {
@@ -355,7 +360,7 @@ function TalkPostureChecks(doc, config, table, errors) {
   }
 }
 
-/** 剧本要求的设计口径（只查 FirstLevel1218 第三版，契约 2026-10-26「一、故事」）。 */
+/** 剧本要求的设计口径（只查 FirstLevel1218 第四版，契约 2026-11-02 第三节「故事」）。 */
 function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, errors) {
   if (doc.level !== "FirstLevel1218") return;
   const Seq = id => doc.sequences.find(s => s.keyframe === id);
@@ -380,38 +385,50 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
   };
   /** 眼睛在 from…to 之间有没有正眼（≤ tol°）看过某个点。 */
   const Looked = (id, p, from, to, tol = 12) => { for (let t = from; t <= to; t += 0.25) { const shot = ShotAt(id, t); if (shot && Math.abs(WrapDeg(YawTo(shot.position, p) - shot.yawDeg)) <= tol) return true; } return false; };
+  /** 眼睛在 from…to 之间有没有朝某个方向（yaw ± tol）看过。 */
+  const LookedYaw = (id, yaw, from, to, tol = 30) => { for (let t = from; t <= to; t += 0.25) { const shot = ShotAt(id, t); if (shot && Math.abs(WrapDeg(shot.yawDeg - yaw)) <= tol) return true; } return false; };
   const StateAt = (id, who, t) => { const s = Seq(id), a = s.actors.find(x => x.id === who); const base = a?.spawn || Unit(id, who); return a ? SamplePrevizActor(a, t, base) : null; };
   const SegD = (st, p) => { const dx = st.to.x - st.from.x, dz = st.to.z - st.from.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - st.from.x) * dx + (p.z - st.from.z) * dz) / l2)); return Math.hypot(p.x - st.from.x - dx * k, p.z - st.from.z - dz * k); };
   const Strafes = s => (s.aircraft || []).flatMap(p => p.strafe || []);
   const HOLE = A.holes[0].mouth;
   const OnDeck = p => Math.abs(p.x - RL.x) < RB.walkW / 2 && p.z > RB.northZ + 1 && p.z < RB.southZ - 1;
   const SPAN = (RB.southZ - RB.northZ) / RB.spans;
+  const TrenchZ = x => { const L = x < 100 ? TR.west : TR.east; for (let i = 1; i < L.length; i++) { const a = L[i - 1], b = L[i]; if (x >= a.x && x <= b.x) return a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x); } return L[L.length - 1].z; };
+  const NearTrench = (p, tol = 5) => Math.abs(p.z - TrenchZ(p.x)) <= tol && p.x > 36 && p.x < 216;
   const allText = JSON.stringify(doc);
 
-  // 33 帧一帧一段；播完 then next、最后一段 stay；全篇没有旧戏的词
+  // 33 帧一帧一段；播完 then next、最后一段 stay；全篇没有旧戏的词、不用删掉的台词
   for (const id of IDS) if (!Seq(id)) errors.push(`缺 ${id} 这一段`);
   for (const s of doc.sequences) if (s.keyframe !== "18-8" && s.then !== "next") errors.push(`${s.keyframe}：播完要 then: next`);
   if (Seq("18-8")?.then !== "stay") errors.push("18-8：最后一段 then 要是 stay");
-  for (const bad of ["棉袄", "单褂子", "冻得发抖", "短褂", "临城", "犟种", "浮桥", "渡口", "石板桥", "河汊子", "接收院", "豁子", "填沟", "跟斗走"]) if (allText.includes(bad)) errors.push(`预演里还有旧戏的词「${bad}」`);
-  for (const id of ["SquadOrders", "FollowCart", "FerryCall", "AcrossTheCreek", "NierScream", "GullyBottom", "GateQueue", "Gone.", "GetUp", "BridgeOrders", "HoldTheBridge", "LastOnes", "CrossNow", "NorthGate.03"]) if (allText.includes(`"${id}`)) errors.push(`预演里还在用删掉的台词 ${id}`);
+  for (const bad of ["棉袄", "单褂子", "冻得发抖", "短褂", "临城", "犟种", "浮桥", "渡口", "石板桥", "河汊子", "接收院", "豁子", "填沟",
+    "老汉", "钻洞", "北门", "火把", "门洞", "舀水", "九四式", "tankette", "Tankette", "后头没得人了", "排到", "医官", "你嗯往哪儿走", "有地方歇脚", "送到了就回来", "村西口", "田间小路"]) if (allText.includes(bad)) errors.push(`预演里还有旧戏的词「${bad}」`);
+  for (const id of ["SquadOrders", "FollowCart", "FerryCall", "AcrossTheCreek", "NierScream", "GullyBottom", "GateQueue", "Gone.", "GetUp", "BridgeOrders", "HoldTheBridge", "LastOnes", "CrossNow",
+    "DitchSentry", "BackSoon", "OldMan", "AidArrive", "GoSeeDonggua", "InTheHole", "XiangDoorQueue", "Threshold", "NoMore", "WhatHappened", "Orders727", "HoldOn.", "KeepMoving", "NorthGate", "ComeOver.02"]) if (allText.includes(`"${id}`)) errors.push(`预演里还在用删掉的台词 ${id}`);
   // 程序化身体的百姓一个片段都不许（关键帧 body rig 的那几帧除外）
   for (const s of doc.sequences) for (const a of s.actors) { const u = a.spawn || Unit(s.keyframe, a.id); if (IsCiv(u) && u.body !== "rig" && a.keys.some(k => typeof k.clip === "string")) errors.push(`${s.keyframe}：${a.id} 是程序化身体，不许放片段`); }
 
-  // 11-1：身后一发炮落在胡同里 + 震屏；庄子里落炮冒黑烟；妮儿坐上车尾；往南看
+  // 11-1：身后一发炮落在胡同里 + 震屏；庄子里落炮冒黑烟；车停村南口；妮儿坐上车尾；往南看
   { const s = Seq("11-1");
     if (!Has(s, "explosion", e => Dist(e, PL.laneShell) < 2) || !Has(s, "shake")) errors.push("11-1：身后那发炮要落在胡同里（explosion + 震屏）");
     if (s.events.filter(e => e.type === "smoke" && e.kind === "SmokeBlack" && e.z < 545).length < 3) errors.push("11-1：庄子里要一排排落炮、冒黑烟");
     if (!Keys(s, "Nier").some(k => k.ride?.on === "GengCart")) errors.push("11-1：妮儿要坐上车尾沿（ride）");
-    if (!Cap(s, /往南看/)) errors.push("11-1：往南看土路 / 官道 / 北沙河村要有说明字"); }
-  // 11-2：班长那句 + 挥手；车动、全班跟车往南跑
-  { const s = Seq("11-2"); Need(s, ["RetreatOrder.01"]); NeedClip("11-2", "Luo", "PvStandWaveOnL", "往北沙河撤");
+    if (!Cap(s, /车停在村南口/) || !Cap(s, /往南看/)) errors.push("11-1：车停村南口、往南看要有说明字"); }
+  // 11-2：顺子爬上车板那句（HoldOnDonggua）在班长那句之前；班长挥手；车动、全班跟车往南跑
+  { const s = Seq("11-2"); InOrder(s, ["HoldOnDonggua.01", "RetreatOrder.01"]); NeedClip("11-2", "Luo", "PvStandWaveOnL", "往北沙河撤");
+    if (Line(s, "HoldOnDonggua.01")?.actor) errors.push("11-2：「冬瓜，撑到」是顺子（玩家）说的");
+    if (!Cap(s, /爬上车板/) || !Cap(s, /冬瓜没应/)) errors.push("11-2：爬上车板、冬瓜没应要有说明字");
+    const hold = Line(s, "HoldOnDonggua.01"), near = ShotAt("11-2", hold.t + 0.3);
+    if (!near || Dist(near.position, Unit("11-2", "GengCart")) > 2.0) errors.push("11-2：说「冬瓜，撑到」时眼睛要在车板上（离车 ≤ 2 m）");
     const c0 = Unit("11-2", "GengCart"), last = PosKeys(s, "GengCart").at(-1);
     if (!last || Dist(last, c0) < 10) errors.push("11-2：车要往南走（≥ 10 m）");
     if (!Keys(s, "Luo").some(k => k.x !== undefined && k.move === "run")) errors.push("11-2：全班要跟车往南跑"); }
-  // 12-1：打偏的那发落在麦地；冬瓜 / 顺子；任务字
-  { const s = Seq("12-1"); InOrder(s, ["AlmostThere.01", "AlmostThere.02"]);
+  // 12-1：打偏的那发落在麦地；到了没得 / 快了；钱、舅舅的信（刘文财抬眼看一下）；任务字
+  { const s = Seq("12-1"); InOrder(s, ["AlmostThere.01", "AlmostThere.02", "UnclesLetter.01", "UnclesLetter.02", "UnclesLetter.03"]);
     if (!Has(s, "explosion", e => Dist(e, PL.fieldShell) < 2)) errors.push("12-1：一发炮要打偏落在路边麦地");
-    if (!Cap(s, /土泼一车/) || !Cap(s, /任务字：跟车进北沙河村/)) errors.push("12-1：土泼一车、任务字要有说明字"); }
+    const letter = Line(s, "UnclesLetter.03"), glance = Keys(s, "LiuWencai").find(k => k.faceTo === "player");
+    if (!glance || !letter || glance.t < letter.t || glance.t > LineEnd(s, "UnclesLetter.03") + 1) errors.push("12-1：说到舅舅的信时刘文财要抬眼看顺子一下");
+    if (!Cap(s, /土泼一车/) || !Cap(s, /按了按胸口/) || !Cap(s, /任务字：跟车进北沙河村/)) errors.push("12-1：土泼一车、按胸口、任务字要有说明字"); }
   // 12-2：「轰」老耿家冒烟、眼睛像按了「看」一样转过去；LookBack
   { const s = Seq("12-2");
     const boom = s.events.find(e => e.type === "explosion" && Dist(e, PL.gengSmoke) < 3);
@@ -419,95 +436,135 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     if (!Cap(s, /「看」/)) errors.push("12-2：「看」的按键要有说明字");
     if (boom && !Looked("12-2", PL.gengSmoke, boom.t, boom.t + 4, 8)) errors.push("12-2：「轰」之后眼睛要像按了「看」一样转去看老耿家");
     InOrder(s, ["LookBack.01", "LookBack.02"]); }
-  // 12-3：沟口：哨兵喝问、班长答、连长交代
-  { const s = Seq("12-3"); InOrder(s, ["DitchSentry.01", "DitchSentry.02", "DitchSentry.03"]);
-    NeedClip("12-3", "Sentry", "PvStandHaltL", "端枪喝问"); NeedClip("12-3", "Captain", "PvStandPointL", "指村西头");
-    if (!Cap(s, /板桥/) || !Cap(s, /添树枝/)) errors.push("12-3：沟、板桥、添树枝要有说明字"); }
-  // 12-4：妮儿先挂回车尾、再溜下去牵黑子过板桥；老耿「驾」；钢盔冒头、七二七团机枪一响缩回去；送到了就回来
+  // 12-3：沟口七句按序；哨兵端枪、连长指；有人应声去喊工兵；顺子抢上一步；班长看刘文财
+  { const s = Seq("12-3"); InOrder(s, ["DitchGate.01", "DitchGate.02", "DitchGate.03", "DitchGate.04", "DitchGate.05", "DitchGate.06", "DitchGate.07"]);
+    NeedClip("12-3", "Sentry", "PvStandHaltL", "端枪喝问"); NeedClip("12-3", "Captain", "PvStandPointL", "指人、指村西南头");
+    if (Line(s, "DitchGate.06")?.actor) errors.push("12-3：「班长，我送冬瓜过去！」是顺子（玩家）说的");
+    const order = Line(s, "DitchGate.04"), runner = s.actors.find(a => a.spawn && PosKeys(s, a.id).some(k => k.move === "run" && k.t > (order?.t ?? 1e9)));
+    if (!runner) errors.push("12-3：「去，喊工兵把官道桥炸了」之后要有人应声跑开");
+    const ask = Line(s, "DitchGate.06"), p0 = KF("12-3").player, stepShot = ask && ShotAt("12-3", ask.t + 0.3);
+    if (!stepShot || Dist(stepShot.position, p0) < 0.4) errors.push("12-3：顺子抢上一步（说那句时眼睛比关键帧站位往前 ≥ 0.4 m）");
+    const tell = Line(s, "DitchGate.07");
+    if (!Keys(s, "Luo").some(k => k.faceTo === "LiuWencai" && tell && k.t < tell.t)) errors.push("12-3：班长答之前要看一眼刘文财");
+    if (!Cap(s, /板桥/) || !Cap(s, /添树枝/) || !Cap(s, /抢上一步/)) errors.push("12-3：沟、板桥、添树枝、抢上一步要有说明字"); }
+  // 12-4：妮儿先挂回车尾、再溜下去捧脸、牵黑子过板桥；老耿「驾」；钢盔冒头、二营机枪一响缩回去；没有「送到了就回来」
   { const s = Seq("12-4"), keys = Keys(s, "Nier");
     if (!(keys[0]?.t === 0 && keys[0].ride?.on === "GengCart")) errors.push("12-4：妮儿开场要挂回车尾（预演键 ride）");
     const off = keys.find(k => k.ride === null);
     if (!off || off.x === undefined || off.move !== "cut") errors.push("12-4：妮儿要溜下车（ride: null + 切到车尾外）");
     const last = PosKeys(s, "Nier").at(-1), heizi = PosKeys(s, "Heizi").at(-1);
     if (!last || last.z < PL.plankSouth.z || !heizi || heizi.z < PL.plankSouth.z) errors.push("12-4：妮儿要牵着黑子过了板桥");
-    InOrder(s, ["BalkingMule.01", "BackSoon.01"]);
+    Need(s, ["BalkingMule.01"]);
+    if (s.lines.length !== 1) errors.push("12-4：这一段只有老耿抽驴那一句（没有「送到了就回来」）");
     if (!Cap(s, /捧/)) errors.push("12-4：捧脸要有说明字");
     const show = Keys(s, "Helmet1").find(k => k.visible === true), hide = Keys(s, "Helmet1").filter(k => k.visible === false);
     if (!show || !hide.some(k => k.t > show.t)) errors.push("12-4：钢盔要冒出来再缩回去（visible）");
-    if (!s.events.some(e => e.type === "muzzle" && e.actor === "Mg727" && show && e.t > show.t)) errors.push("12-4：钢盔冒头后七二七团的机枪要响"); }
-  // 12-5：标语；一家人钻洞、席子盖洞口（FamilyHidden）；老汉
-  { const s = Seq("12-5"); InOrder(s, ["OldMan.01", "OldMan.02"]);
-    if (!SignalEv("12-5", "FamilyHidden", true)) errors.push("12-5：最后一个拿席子盖住洞口（FamilyHidden）");
-    if (!["Fam1", "Fam2", "Fam3"].every(id => Keys(s, id).some(k => k.visible === false))) errors.push("12-5：一家人要钻进洞里（藏掉）");
-    if (!Cap(s, /标语/)) errors.push("12-5：大字标语要有说明字"); }
-  // 12-6：枕木垛、教堂门口往里进；车往西拐
-  { const s = Seq("12-6");
-    if (!["ChurchIn1", "ChurchIn2", "ChurchIn3"].every(id => PosKeys(s, id).length)) errors.push("12-6：教堂门口要有人往里进");
-    if (!Cap(s, /枕木/) || !Cap(s, /教堂门口/) || !Cap(s, /往西拐/)) errors.push("12-6：枕木垛、教堂、车往西拐要有说明字"); }
-  // 12-7：医官、女娃探头、冬瓜 / 顺子、任务字回沟口
-  { const s = Seq("12-7"); InOrder(s, ["AidArrive.01", "AidArrive.02", "AidArrive.03"]);
+    if (!s.events.some(e => e.type === "muzzle" && e.actor === "Mg727" && show && e.t > show.t)) errors.push("12-4：钢盔冒头后二营的机枪要响"); }
+  // 12-5：不说话；扛门板的兵往沟口跑；标语、枕木垛、教堂门口有人往里进
+  { const s = Seq("12-5");
+    if (s.lines.length) errors.push("12-5：穿村不说话");
+    for (const id of ["Board1", "Board2", "Branch3"]) { const last = PosKeys(s, id).at(-1); if (!last || last.z > 660 || !PosKeys(s, id).some(k => k.move === "run")) errors.push(`12-5：${id} 要扛着东西往沟口跑（跑到 z < 660）`); }
+    if (!["ElderCarrier", "ChurchIn2"].every(id => PosKeys(s, id).length)) errors.push("12-5：教堂门口要有人往里进");
+    if (!Cap(s, /标语/) || !Cap(s, /枕木/) || !Cap(s, /教堂门口/)) errors.push("12-5：标语、枕木垛、教堂门口要有说明字"); }
+  // 12-6：眼睛看过官道桥、桥上有人跑；RiverIsTown 按序；车往西拐
+  { const s = Seq("12-6"); InOrder(s, ["RiverIsTown.01", "RiverIsTown.02"]);
+    if (!Looked("12-6", PL.guandaoBridgeMid, 0, LineEnd(s, "RiverIsTown.02") + 0.5, 10)) errors.push("12-6：眼睛要顺官道往东南看过官道桥");
+    if (!["BridgeRunner1", "BridgeRunner2", "BridgeRunner3", "BridgeRunner4"].every(id => PosKeys(s, id).some(k => k.move === "run"))) errors.push("12-6：桥上几个兵要抱着东西往桥上跑");
+    if (!Cap(s, /官道桥/) || !Cap(s, /往西拐/)) errors.push("12-6：官道桥、车往西拐要有说明字"); }
+  // 12-7：军医蹲下塞纱布勒绷带（CareMedicPress、冬瓜 CareLieWrithe）；AidDoctor → AidWater 按序；女娃探头、妮儿看女娃；水壶；任务字回沟口
+  { const s = Seq("12-7"); InOrder(s, ["AidDoctor.01", "AidDoctor.02", "AidDoctor.03", "AidDoctor.04", "AidDoctor.05", "AidWater.01", "AidWater.02", "AidWater.03", "AidWater.04", "AidWater.05", "AidWater.06"]);
+    NeedClip("12-7", "Doctor", "CareMedicPress", "蹲下塞纱布、勒绷带"); NeedClip("12-7", "Donggua", "CareLieWrithe", "疼得一挺");
     const g = Keys(s, "Girl"); if (!(g[0]?.visible === false && g.some(k => k.visible === true))) errors.push("12-7：隔壁洞口的女娃要探出头（visible false → true）");
     if (!Keys(s, "Nier").some(k => k.faceTo === "Girl")) errors.push("12-7：妮儿要看着女娃");
-    if (!Cap(s, /任务字：回沟口/)) errors.push("12-7：任务字回沟口要有说明字"); }
-  // 13-1：两辆九四式开到沟沿外停下（走到关键帧位置）；车上机枪扫我们这边的沟沿；玩家打步兵
+    if (!Cap(s, /纱布/) || !Cap(s, /水壶拧开/) || !Cap(s, /搁在东墙根/) || !Cap(s, /任务字：回沟口/)) errors.push("12-7：塞纱布、水壶拧开又拧上、搁墙根、任务字回沟口要有说明字");
+    const end = ShotAt("12-7", s.durationS - 0.2);
+    if (!end || Dist(end.position, PL.aidGateOut) > 6) errors.push("12-7：末尾顺子要被拽到院门外"); }
+  // 13-1：没有装甲车；两挺机枪各扫 ≥ 1 梭、弹着点在沟沿（东段战壕北沿的堆土）；掷弹筒小爆炸 ≥ 2 落在战壕附近；玩家开枪
   { const s = Seq("13-1");
-    for (const id of ["Tankette1", "Tankette2"]) { const u = Unit("13-1", id), last = PosKeys(s, id).at(-1); if (!last || Dist(last, u) > 0.5 || PosKeys(s, id).length < 2) errors.push(`13-1：${id} 要顺官道开到沟沿外（关键帧位置）`); }
-    const bursts = s.events.filter(e => e.type === "muzzle" && /^Tankette/.test(e.actor || "") && e.count >= 8);
-    if (bursts.length < 2) errors.push("13-1：车上的机枪要扫几梭（muzzle count ≥ 8）");
-    const puffs = s.events.filter(e => e.type === "explosion" && e.radius <= 1 && e.z > 638 && e.z < 644);
-    if (puffs.length < 8) errors.push("13-1：弹着点要扫在我们这边的沟沿上");
+    if (KF("13-1").units.some(u => u.kind === "tank") || s.actors.some(a => a.spawn?.kind === "tank")) errors.push("13-1：第四版没有装甲车");
+    for (const id of ["IjaMg1", "IjaMg2"]) if (!s.events.some(e => e.type === "muzzle" && e.actor === id && e.count >= 8)) errors.push(`13-1：${id} 要扫几梭（muzzle count ≥ 8）`);
+    const puffs = s.events.filter(e => e.type === "explosion" && e.radius <= 1 && NearTrench(e, 3));
+    if (puffs.length < 8) errors.push("13-1：弹着点要扫在我们这边的沟沿上（战壕北沿 ±3 m，≥ 8 个）");
+    const grenades = s.events.filter(e => e.type === "explosion" && e.kind === "grenade" && e.radius > 1 && e.radius <= 2.5 && NearTrench(e, 5));
+    if (grenades.length < 2 || !Has(s, "sfx", e => e.name === "mortarPop")) errors.push("13-1：掷弹筒要「嘭」着追着战壕找人（≥ 2 个小爆炸落在战壕附近）");
     if (s.events.filter(e => e.type === "muzzle" && e.actor === "player").length < 3) errors.push("13-1：玩家要开几枪");
-    if (!Cap(s, /过不去/) || !Cap(s, /真打/)) errors.push("13-1：车过不去、玩家真打要有说明字"); }
-  // 13-2：有人往沟口跑：有的倒、有的爬过板桥
+    if (!Cap(s, /步兵/) || !Cap(s, /掷弹筒/) || !Cap(s, /真打/)) errors.push("13-1：步兵、掷弹筒、玩家真打要有说明字"); }
+  // 13-2：有人倒、有人过板桥、爬；官道桥爆炸 + 长烟、GuandaoBridgeBlown 先关后开；BridgeGone 三句按序；眼睛看过烟柱
   { const s = Seq("13-2");
     const downs = ["Runner1", "Runner2", "Runner3", "Runner4", "Runner5", "Runner6"].filter(id => Keys(s, id).some(k => k.state === "down"));
     if (downs.length < 2) errors.push("13-2：要有人倒在半路（≥ 2）");
     const crossed = ["Runner1", "Runner2", "Runner6", "Crawler"].filter(id => PosKeys(s, id).some(k => k.z > PL.plankSouth.z));
     if (crossed.length < 3) errors.push("13-2：要有人扑上板桥爬过来（≥ 3 个过了板桥）");
     if (!Keys(s, "Crawler").some(k => k.move === "crawl" && Math.abs(k.x - PL.plankMid.x) < 2)) errors.push("13-2：要有人在板桥上爬");
-    if (!s.actors.filter(a => a.spawn?.side === "ija").every(a => a.keys.some(k => k.state === "down")) || !s.actors.some(a => a.spawn?.side === "ija")) errors.push("13-2：冲板桥的步兵要被打回去");
-    if (!Cap(s, /一时谁也过不去/)) errors.push("13-2：一时谁也过不去要有说明字"); }
-  // 13-3：信号弹；飞机！趴倒！
+    const boom = s.events.find(e => e.type === "explosion" && Dist(e, PL.guandaoBridgeMid) < 8);
+    const off = SignalEv("13-2", "GuandaoBridgeBlown", false), on = SignalEv("13-2", "GuandaoBridgeBlown", true);
+    if (!boom || !Has(s, "smoke", e => Dist(e, PL.guandaoBridgeMid) < 8 && e.dur >= 20)) errors.push("13-2：官道桥那里要「轰」一声 + 一柱长烟（smoke dur ≥ 20）");
+    if (!off || off.t > 0.01 || !on || !boom || on.t < boom.t) errors.push("13-2：GuandaoBridgeBlown 开场关、爆炸时开");
+    InOrder(s, ["BridgeGone.01", "BridgeGone.02", "BridgeGone.03"]);
+    const gone = Line(s, "BridgeGone.01");
+    if (gone && boom && gone.t < boom.t) errors.push("13-2：「官道桥炸了！」要在「轰」之后");
+    if (gone && !Looked("13-2", PL.guandaoBridgeMid, gone.t, LineEnd(s, "BridgeGone.02") + 0.5, 10)) errors.push("13-2：「官道桥炸了」之后顺子的眼睛要正对那股烟柱");
+    if (Line(s, "BridgeGone.02")?.actor) errors.push("13-2：「……桥。」是顺子（玩家）说的");
+    if (!Cap(s, /土烟/) || !Cap(s, /扭头看/)) errors.push("13-2：土烟、扭头看要有说明字"); }
+  // 13-3：信号弹 t 0.5–1.2；几秒后才喊；Z 卧倒说明字
   { const s = Seq("13-3");
-    if (!Has(s, "flare", e => e.preset === "SignalRed" && Math.hypot(e.atX - PL.flareAt.x, e.atZ - PL.flareAt.z) < 3)) errors.push("13-3：信号弹要用正式弹道特效（flare SignalRed）");
-    const flare = s.events.find(e => e.type === "flare"), warn = Line(s, "PlanesWarning.01");
+    const flare = s.events.find(e => e.type === "flare" && e.preset === "SignalRed" && Math.hypot(e.atX - PL.flareAt.x, e.atZ - PL.flareAt.z) < 3);
+    if (!flare) errors.push("13-3：信号弹要用正式弹道特效（flare SignalRed）");
+    else if (flare.t < 0.5 || flare.t > 1.2) errors.push(`13-3：信号弹要在 t 0.5–1.2 s（FlareEffectsBrowserTest 查 0.8 s），现在 ${flare.t}`);
+    const warn = Line(s, "PlanesWarning.01");
     if (!warn || !flare || warn.t < flare.t + 3) errors.push("13-3：信号弹打上天几秒后才喊「飞机！趴倒！」");
     NeedClip("13-3", "S727_E1", "PvStandPointL", "指着天喊");
     if (!Cap(s, /Z 卧倒/)) errors.push("13-3：卧倒的按键时刻要有说明字"); }
-  // 飞机：13-3 / 14-1…14-6 各两架；扫射只在 14-1（两趟）、14-2、14-5；不手放飞机音效
+  // 飞机：13-3 第一拨 ≥ 3；14-1 六架两拨；14-2…14-6 ≥ 3 架；航点 ≥ 3、drone、扫射低空；各段扫射段数；有镜头看飞机；不手放飞机音效
   for (const id of ["13-3", "14-1", "14-2", "14-3", "14-4", "14-5", "14-6"]) {
     const s = Seq(id), planes = s.aircraft || [];
-    if (planes.length !== 2 || planes.some(p => p.model !== "MitsubishiKi30")) errors.push(`${id}：要有两架九七式轻爆（aircraft[]），现在 ${planes.length}`);
+    const wantPlanes = id === "14-1" ? 6 : 3;
+    if (planes.length < wantPlanes || planes.some(p => p.model !== "MitsubishiKi30")) errors.push(`${id}：要有 ${id === "14-1" ? "六架（两拨）" : "至少三架"}九七式轻爆（aircraft[]），现在 ${planes.length}`);
+    if (id === "14-1" && !(["Ki30A1", "Ki30A2", "Ki30A3", "Ki30B1", "Ki30B2", "Ki30B3"].every(pid => planes.some(p => p.id === pid)))) errors.push("14-1：六架要分两拨 A1–A3 / B1–B3");
     for (const p of planes) { if ((p.path || []).length < 3) errors.push(`${id}：${p.id} 的航点太少`); if (p.sound?.drone === false) errors.push(`${id}：${p.id} 的引擎声要跟着飞机走`); }
     const strafes = Strafes(s);
-    const want = { "14-1": 2, "14-2": 1, "14-5": 1 }[id] || 0;
-    if (strafes.length !== want) errors.push(`${id}：扫射段要 ${want} 段，现在 ${strafes.length}`);
-    if (!["14-3"].includes(id) && !s.camera.some(c => c.look?.aircraft || c.lookTo?.aircraft)) errors.push(`${id}：要有一条镜头看着飞机`);
+    const want = { "14-1": 2, "14-2": 1, "14-3": 1, "14-5": 1 }[id] || 0;
+    if (strafes.length < want) errors.push(`${id}：扫射段要 ≥ ${want} 段，现在 ${strafes.length}`);
+    if (want === 0 && strafes.length) errors.push(`${id}：这一拍不扫射`);
+    if (!s.camera.some(c => c.look?.aircraft || c.lookTo?.aircraft)) errors.push(`${id}：要有一条镜头看着飞机`);
     if (s.events.some(e => e.type === "sfx" && /^(planeDrone|planeDive|strafe)/.test(e.name))) errors.push(`${id}：飞机有轨了，别再手放 planeDrone / planeDive / strafe 音效`);
     for (const st of strafes) for (const p of planes.filter(q => (q.strafe || []).includes(st))) {
       const pose = SamplePrevizAircraft(p, st.t0, { groundAt: ground });
       if (!pose.visible || pose.y - ground(pose.x, pose.z) > 60) errors.push(`${id}：${p.id} 扫射时要在低空（t ${st.t0}：高 ${R(pose.y)}）`);
     }
   }
-  // 14-1：顺着战壕扫、沟口扔小炸弹；七二七团的兵倒两个
+  // 14-1：第一趟顺着战壕扫、第二趟顺着街扫；沟口扔小炸弹；二营的兵倒两个；添树枝的被掀翻、杂木着火、房顶着火
   { const s = Seq("14-1"), st = Strafes(s);
-    if (!st.some(x => Math.abs(x.from.z - 642.5) < 2 && Math.abs(x.to.z - 642.5) < 2 && Math.abs(x.to.x - x.from.x) > 80)) errors.push("14-1：第一趟要顺着村北沿的战壕扫");
-    if (!st.some(x => SegD(x, { x: 150, z: 690.6 }) < 4)) errors.push("14-1：第二趟要掉头顺着村里的主街扫");
+    if (!st.some(x => NearTrench(x.from, 6) && NearTrench(x.to, 6) && Math.abs(x.to.x - x.from.x) > 80)) errors.push("14-1：第一趟要顺着村北沿的战壕扫");
+    if (!st.some(x => SegD(x, { x: 140, z: 730 }) < 4 && SegD(x, { x: 114, z: 690 }) < 4)) errors.push("14-1：第二趟要掉头顺着村里的主街扫");
     if (s.events.filter(e => e.type === "explosion" && e.kind === "shell" && Dist(e, PL.plankMid) < 30).length < 2) errors.push("14-1：沟口要扔小炸弹");
-    for (const id of ["S727_W2", "S727_E2"]) if (!Keys(s, id).some(k => k.state === "down")) errors.push(`14-1：${id} 要挨了倒下`); }
-  // 14-2：顺儿！去看冬瓜！跑到救护所门前；飞机顺西头的街扫，黑子挨一梭、车翻（CartOverturned）
-  { const s = Seq("14-2"); Need(s, ["GoSeeDonggua.01"]); NeedClip("14-2", "Luo", "PvCrouchTalkRifle", "推顺子");
-    const st = Strafes(s)[0], cart = SignalEv("14-2", "CartOverturned", true);
-    if (!st || SegD(st, Unit("14-2", "Heizi")) > 3) errors.push("14-2：扫射要扫到院门口的黑子");
-    if (!cart || !st || !(cart.t >= st.t0 && cart.t <= st.t1 + 0.5)) errors.push("14-2：车要在那一串弹着扫过去时翻（CartOverturned）");
-    if (!Keys(s, "Heizi").some(k => k.state === "down")) errors.push("14-2：黑子要被扫倒");
-    if (!Keys(s, "GengCart").some(k => k.visible === false)) errors.push("14-2：车翻了以后立着的车要藏掉");
+    for (const id of ["S727_W2", "S727_E2"]) if (!Keys(s, id).some(k => k.state === "down")) errors.push(`14-1：${id} 要挨了倒下`);
+    if (!s.actors.some(a => a.spawn && a.keys.some(k => k.state === "down"))) errors.push("14-1：添树枝的要被掀翻（临时加的人倒下）");
+    if (s.events.filter(e => e.type === "smoke" && e.kind === "SmokeBlack" && e.z > 655).length < 2) errors.push("14-1：第二拨往院子里扔炸弹，几处房顶着火（村里 SmokeBlack ≥ 2）");
+    if (!Cap(s, /两拨/) || !Cap(s, /杂木着火/) || !Cap(s, /房顶着火/)) errors.push("14-1：两拨、杂木着火、房顶着火要有说明字"); }
+  // 14-2：顺子不等人喊先跑；FollowHim.01 冲刘文财；DugoutBombed 先关后开、炸弹落在挨炸的洞；眼睛看过弹坑；跑到救护所门前；街上说明字
+  { const s = Seq("14-2"); Need(s, ["FollowHim.01"]);
+    const follow = Line(s, "FollowHim.01"), first = ShotAt("14-2", 1.0), start = KF("14-1").player;
+    if (!follow || !Keys(s, "Luo").some(k => k.faceTo === "LiuWencai" && k.t <= follow.t)) errors.push("14-2：「文财！跟到他！」是冲刘文财喊的（班长要先朝向他）");
+    if (!first || Dist(first.position, start) < 0.8) errors.push("14-2：顺子不等人喊就跑（1 s 时眼睛已离开战壕站位）");
+    const off = SignalEv("14-2", "DugoutBombed", false), on = SignalEv("14-2", "DugoutBombed", true);
+    const bomb = s.events.find(e => e.type === "explosion" && e.kind === "shell" && Dist(e, PL.bombedHole) < 3);
+    if (!off || off.t > 0.01 || !on || !bomb || on.t < bomb.t) errors.push("14-2：院里的洞挨炸：DugoutBombed 开场关、炸弹落在 bombedHole 时开");
+    if (bomb && !Looked("14-2", PL.bombedHole, bomb.t - 0.5, bomb.t + 4, 14)) errors.push("14-2：炸弹落下前后眼睛要看过那个坑");
     const end = ShotAt("14-2", s.durationS - 0.2);
-    if (!end || Dist(end.position, PL.aidGateOut) > 9) errors.push("14-2：顺子要跑到救护所门前"); }
-  // 14-3：黑子蹬腿；刘文财朝天打
+    if (!end || Dist(end.position, PL.aidGateOut) > 9) errors.push("14-2：顺子要跑到救护所门前");
+    if (!PosKeys(s, "StreetWoman").length) errors.push("14-2：女人拖着孩子往墙根爬要有走位");
+    if (!Cap(s, /不等人喊/) || !Cap(s, /街上躺着人/) || !Cap(s, /炸成一个坑/)) errors.push("14-2：不等人喊、街上躺着人、炸成一个坑要有说明字"); }
+  // 14-3：立着的车（Spawn）被扫到就藏掉、CartOverturned 先关后开、黑子倒；刘文财朝天打；停了一步
   { const s = Seq("14-3");
+    const st = Strafes(s)[0], off = SignalEv("14-3", "CartOverturned", false), on = SignalEv("14-3", "CartOverturned", true);
+    if (!st || SegD(st, PL.heizi) > 3) errors.push("14-3：扫射要扫到院门口的黑子");
+    if (!off || off.t > 0.01 || !on || !st || !(on.t >= st.t0 && on.t <= st.t1 + 0.5)) errors.push("14-3：车要在那一串弹着扫过去时翻（CartOverturned 开场关、扫到时开）");
+    if (!Keys(s, "Heizi").some(k => k.state === "alive") || !Keys(s, "Heizi").some(k => k.state === "down" && on && k.t >= on.t - 0.5)) errors.push("14-3：黑子开场立着（state alive），挨了一梭倒下");
+    const cart = s.actors.find(a => a.spawn?.kind === "cart");
+    if (!cart || !cart.keys.some(k => k.visible === false && on && Math.abs(k.t - on.t) < 0.5)) errors.push("14-3：开场要 Spawn 一辆立着的车，翻车那一刻藏掉");
     if (s.events.filter(e => e.type === "muzzle" && e.actor === "LiuWencai").length < 3) errors.push("14-3：刘文财在院门口朝天上打");
-    if (!Cap(s, /蹬/) || !Cap(s, /墙根露天/)) errors.push("14-3：黑子蹬腿、冬瓜一个人在墙根要有说明字"); }
+    if (!Cap(s, /停了一步/) || !Cap(s, /蹬/) || !Cap(s, /墙根露天/)) errors.push("14-3：停了一步、黑子蹬腿、冬瓜一个人在墙根要有说明字"); }
   // 14-4：老耿那句 + 任务字；妮儿揪住另一角；往洞口拖
   { const s = Seq("14-4"); Need(s, ["BringHim.01"]);
     if (!Cap(s, /任务字：把冬瓜拖进洞里/) || !Cap(s, /揪单被一个角/)) errors.push("14-4：任务字、揪被角要有说明字");
@@ -534,7 +591,6 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
           if (StateAt("14-5", "BlanketDonggua", t)?.dragSolo !== true) errors.push(`14-5：${t} s 被子要还是 dragSolo`);
         }
         if (StateAt("14-5", "BlanketDonggua", Math.max(0, solo.t - 0.5))?.dragSolo === true) errors.push("14-5：松手前被子不该 dragSolo");
-        // 关键帧 14-5 的被子单位本身写着 dragSolo: true（松手后的样子）：预演开场要先写回 false，不然运行时松手前就只剩一角
         const firstSolo = Keys(s, "BlanketDonggua").find(k => k.dragSolo !== undefined);
         if (Unit("14-5", "BlanketDonggua")?.dragSolo === true && !(firstSolo && firstSolo.t === 0 && firstSolo.dragSolo === false)) errors.push("14-5：关键帧单位是 dragSolo，开场要先写 dragSolo: false（两角都攥着）");
       }
@@ -556,50 +612,66 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     const last = PosKeys(s, "BlanketDonggua").at(-1);
     if (!last || Dist(last, Unit("14-6", "BlanketDonggua")) > 1.0) errors.push("14-6：被子要拖到洞口（关键帧位置）");
     if (!Cap(s, /往东飞走/)) errors.push("14-6：飞机往东飞走要有说明字"); }
-  // 15-1：老耿跪着按毛巾；冬瓜攥袖子 clipRelease；四句按序
-  { const s = Seq("15-1"); NeedClip("15-1", "Geng", "CareMedicPress", "跪着把毛巾按回伤口"); NeedClip("15-1", "Donggua", "PvLieGrabSleeve", "伸手攥袖子");
-    InOrder(s, ["InTheHole.01", "InTheHole.02", "InTheHole.03", "InTheHole.04"]);
-    const grab = Keys(s, "Donggua").find(k => k.clip === "PvLieGrabSleeve"), end = LineEnd(s, "InTheHole.03");
-    if (!grab || end === undefined || Math.abs(grab.t + grab.clipRelease - end) > 0.3) errors.push("15-1：冬瓜说完「抵了」才松开袖子（clipRelease 对上第三句末尾）");
+  // 15-1：老耿跪着按毛巾；HoleTalk 五句按序；「抵个锤子」那句眼睛看冬瓜；红天
+  { const s = Seq("15-1"); NeedClip("15-1", "Geng", "CareMedicPress", "跪着把毛巾按回伤口");
+    InOrder(s, ["HoleTalk.01", "HoleTalk.02", "HoleTalk.03", "HoleTalk.04", "HoleTalk.05"]);
+    const retort = Line(s, "HoleTalk.04");
+    if (retort?.actor) errors.push("15-1：「抵个锤子」是顺子（玩家）说的");
+    if (retort && !Looked("15-1", Unit("15-1", "BlanketDonggua"), retort.t, LineEnd(s, "HoleTalk.04"), 14)) errors.push("15-1：「抵个锤子」那句眼睛要看着冬瓜");
     if (!Cap(s, /红天/)) errors.push("15-1：洞顶漏下一条红天要有说明字"); }
-  // 15-2：没对白；抬出洞到厢房门口
+  // 15-2：没对白；抬出洞到厢房门口；天一点点黑
   { const s = Seq("15-2");
     if (s.lines.length) errors.push("15-2：这一段没有对白");
     const last = PosKeys(s, "BlanketDonggua").at(-1);
     if (!last || Dist(last, Unit("15-3", "BlanketDonggua")) > 0.5) errors.push("15-2：被子要抬到厢房门口（15-3 的位置）");
     if (!Cap(s, /天一点点黑/)) errors.push("15-2：天一点点黑要有说明字"); }
-  // 15-3：守门的兵、画驴、算账、犟、下一副
-  { const s = Seq("15-3"); InOrder(s, ["XiangDoorQueue.01", "XiangDoorQueue.02", "XiangDoorQueue.03", "XiangDoorQueue.04", "XiangDoorQueue.05"]);
-    NeedClip("15-3", "Nier", "PvKneelDig", "蹲着画驴"); NeedClip("15-3", "LiuWencai", "PvCrouchCountFingers", "算驴腿的账"); NeedClip("15-3", "DoorGuard", "PvStandHaltL", "把人往外推");
-    if (!Cap(s, /把脸转开/) || !Cap(s, /画驴/)) errors.push("15-3：画驴、老耿把脸转开要有说明字"); }
-  // 16-1：过门槛
-  { const s = Seq("16-1"); InOrder(s, ["Threshold.01", "Threshold.02", "Threshold.03"]);
+  // 15-3：DoorPush 四句 → ShellCasings 五句按序；守门的推人、画驴、掂弹壳、把脸转开
+  { const s = Seq("15-3"); InOrder(s, ["DoorPush.01", "DoorPush.02", "DoorPush.03", "DoorPush.04", "ShellCasings.01", "ShellCasings.02", "ShellCasings.03", "ShellCasings.04", "ShellCasings.05"]);
+    NeedClip("15-3", "Nier", "PvKneelDig", "蹲着画驴"); NeedClip("15-3", "LiuWencai", "PvCrouchCountFingers", "掂弹壳算账"); NeedClip("15-3", "DoorGuard", "PvStandHaltL", "把人往外推");
+    if (Line(s, "DoorPush.02")?.actor) errors.push("15-3：「兄弟，让一哈」是顺子（玩家）说的");
+    const beg = Line(s, "DoorPush.02"), p0 = KF("15-3").player, shot = beg && ShotAt("15-3", beg.t + 0.3);
+    if (!shot || Dist(shot.position, p0) < 0.8) errors.push("15-3：顺子要起身去挤门（说那句时眼睛离开门槛边的站位 ≥ 0.8 m）");
+    if (!Cap(s, /挤门/) || !Cap(s, /塞回被子/) || !Cap(s, /画驴/) || !Cap(s, /把脸转开/)) errors.push("15-3：挤门、把手塞回被子、画驴、老耿把脸转开要有说明字"); }
+  // 16-1：DoorSill 三句；门槛；抬进厢房靠墙的空地；慢慢放
+  { const s = Seq("16-1"); InOrder(s, ["DoorSill.01", "DoorSill.02", "DoorSill.03"]);
+    if (Line(s, "DoorSill.03")?.actor) errors.push("16-1：「……有门槛。抬高点。」是顺子（玩家）说的");
     const last = PosKeys(s, "BlanketDonggua").at(-1);
     if (!last || Dist(last, A.dongguaInside) > 0.5) errors.push("16-1：被子要抬进厢房靠墙的空地");
     if (!Cap(s, /门槛/) || !Cap(s, /慢慢放/)) errors.push("16-1：门槛、慢慢放要有说明字"); }
-  // 17-1：没了；老耿用单被盖脸
-  { const s = Seq("17-1"); InOrder(s, ["NoMore.01", "NoMore.02", "NoMore.03"]); NeedClip("17-1", "Geng", "PvKneelPullBlanket", "单被盖脸");
-    if (!Cap(s, /单被盖住/)) errors.push("17-1：单被盖脸要有说明字"); }
-  // 17-2：铜板 F；院里抬进抬出、马灯
+  // 17-1：Passed 三句；老耿用单被盖脸；妮儿看两个大人
+  { const s = Seq("17-1"); InOrder(s, ["Passed.01", "Passed.02", "Passed.03"]); NeedClip("17-1", "Geng", "PvKneelPullBlanket", "单被盖脸");
+    if (!Keys(s, "Nier").some(k => k.faceTo === "Geng") || !Keys(s, "Nier").some(k => k.faceTo === "LiuWencai")) errors.push("17-1：妮儿要看看这个大人、又看看那个");
+    if (!Cap(s, /盖住了他的脸/)) errors.push("17-1：单被盖脸要有说明字"); }
+  // 17-2：只亮一个 F、摸出信、塞进钱袋；退到门槛坐下的机位；院门外二营的兵跑过（走位）
   { const s = Seq("17-2");
-    if (!s.actors.some(a => a.spawn?.kind === "litter")) errors.push("17-2：院子里要有人抬进抬出");
-    if (!Cap(s, /F/) || !Cap(s, /马灯/)) errors.push("17-2：按 F、点马灯要有说明字"); }
-  // 17-3：班长进院、掀被角、四句
-  { const s = Seq("17-3"); InOrder(s, ["WhatHappened.01", "WhatHappened.02", "WhatHappened.03", "WhatHappened.04"]); NeedClip("17-3", "Luo", "LuoKneelCheck", "掀开被角看一眼");
-    if (!Cap(s, /铜板/)) errors.push("17-3：幺娃看见铜板要有说明字"); }
-  // 18-1：命令五句；担架抬出去、医官跟最后一副
-  { const s = Seq("18-1"); InOrder(s, ["Orders727.01", "Orders727.02", "Orders727.03", "Orders727.04", "Orders727.05"]);
+    if (s.lines.length) errors.push("17-2：这一段没有台词");
+    if (!Cap(s, /只亮一个 F/) || !Cap(s, /汗湿了的信/) || !Cap(s, /塞进自己的钱袋/) || !Cap(s, /门槛上坐下/)) errors.push("17-2：F、信、钱袋、门槛上坐下要有说明字");
+    let seated = false;
+    for (let t = 0; t <= s.durationS; t += 0.5) { const shot = ShotAt("17-2", t); if (shot && Dist(shot.position, PL.thresholdSeat) < 1.0) { seated = true; break; } }
+    if (!seated) errors.push("17-2：要有退到门槛上坐下的机位（眼睛在 thresholdSeat 1 m 内）");
+    for (const id of ["Passing1", "Passing2", "Passing3"]) { const last = PosKeys(s, id).at(-1), u = Unit("17-2", id); if (!last || last.z - u.z < 8) errors.push(`17-2：${id} 要从院门外跑过（往南 ≥ 8 m）`); }
+    if (!Cap(s, /一拨拨跑过/)) errors.push("17-2：院门外二营的兵一拨拨跑过要有说明字"); }
+  // 17-3：StandUp 五句按序；LuoKneelCheck；幺娃挪开眼
+  { const s = Seq("17-3"); InOrder(s, ["StandUp.01", "StandUp.02", "StandUp.03", "StandUp.04", "StandUp.05"]); NeedClip("17-3", "Luo", "LuoKneelCheck", "掀开被角看了看");
+    if (!Cap(s, /把眼睛挪开/) || !Cap(s, /钱袋塞回怀里/)) errors.push("17-3：幺娃挪开眼、钱袋塞回怀里要有说明字"); }
+  // 18-1：Orders3rdBn 六句 → DongguaEcho.01（不写说话人；压低发闷字段 + 说明字）→ Yaode.01 按序；担架抬出去、军医跟最后一副
+  { const s = Seq("18-1"); InOrder(s, ["Orders3rdBn.01", "Orders3rdBn.02", "Orders3rdBn.03", "Orders3rdBn.04", "Orders3rdBn.05", "Orders3rdBn.06", "DongguaEcho.01", "Yaode.01"]);
+    const echo = Line(s, "DongguaEcho.01");
+    if (echo && echo.actor && echo.actor !== "player") errors.push("18-1：冬瓜那句是耳朵里响起的（冬瓜不在场，不写说话人或写 player）");
+    if (echo && !(echo.volume < 1)) errors.push("18-1：冬瓜那句要压低（台词条目写 volume < 1）");
+    if (!Cap(s, /耳朵里响起/) || !Cap(s, /按了按胸口/)) errors.push("18-1：耳朵里响起、按胸口要有说明字");
     for (const id of ["AidLitter1", "AidLitter2", "AidLitter3", "Doctor"]) { const last = PosKeys(s, id).at(-1); if (!last || last.x < A.box.maxX) errors.push(`18-1：${id} 要从院门出去`); }
     const l3 = PosKeys(s, "AidLitter3").find(k => k.t > 0), doc3 = PosKeys(s, "Doctor").find(k => k.t > 0);
-    if (!(doc3?.t > l3?.t)) errors.push("18-1：医官跟着最后一副走");
+    if (!(doc3?.t > l3?.t)) errors.push("18-1：军医跟着最后一副走");
     if (!Cap(s, /盖着脸/)) errors.push("18-1：屋里只剩盖着脸的要有说明字"); }
-  // 18-2：老耿冲洞口喊；女人摇头、拉席子盖洞口（GirlHoleCovered 先关后开）
-  { const s = Seq("18-2"); Need(s, ["GoNow.01"]);
+  // 18-2：LetsGo.01 → GoNow.01；GirlHoleCovered 先关后开；女人摇头、缩回去；妮儿看席子
+  { const s = Seq("18-2"); InOrder(s, ["LetsGo.01", "GoNow.01"]);
     const off = SignalEv("18-2", "GirlHoleCovered", false), on = SignalEv("18-2", "GirlHoleCovered", true), say = Line(s, "GoNow.01");
     if (!off || off.t > 0.01 || !on || !say || on.t < say.t) errors.push("18-2：洞口开场没盖、喊完以后女人才把席子拉上（GirlHoleCovered 先关后开）");
     if (!Keys(s, "GirlMother").some(k => k.visible === false)) errors.push("18-2：女人要缩回洞里");
-    if (!Cap(s, /摇摇头/)) errors.push("18-2：摇头要有说明字"); }
-  // 18-3：担架、兵、老耿妮儿踩着枕木走桥面（脚下是枕木顶）；老乡在河床里蹚水
+    if (!Keys(s, "Nier").some(k => k.faceTo && Dist(k.faceTo, PL.girlHole) < 1)) errors.push("18-2：妮儿要看着那张席子");
+    if (!Cap(s, /摇摇头/) || !Cap(s, /停了一下/)) errors.push("18-2：摇头、顺子停了一下要有说明字"); }
+  // 18-3：桥面上的人脚下是枕木顶；老乡在河床里蹚水；工兵在北头两墩附近；ChargesSet 不动；路上几个定镜的说明字
   { const s = Seq("18-3"), n = NSeq("18-3"), kf = KF("18-3");
     const crossers = [];
     for (const a of s.actors) {
@@ -617,31 +689,43 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     }
     for (const id of ["AidLitter2", "AidLitter3", "Geng", "Nier"]) if (!crossers.includes(id)) errors.push(`18-3：${id} 要走在铁路桥桥面上（现在走桥面的：${crossers.join("、") || "没有"}）`);
     for (const id of ["Wader1", "Wader2", "Wader3"]) {
-      const last = PosKeys(s, id).at(-1);
-      if (!last || ground(last.x, last.z) > HT.riverBedY + 0.3) errors.push(`18-3：${id} 要在河床里蹚水`);
+      const inBed = PosKeys(s, id).some(k => ground(k.x, k.z) <= HT.riverBedY + 0.3);
+      if (!inBed) errors.push(`18-3：${id} 要在河床里蹚水`);
     }
+    for (const [id, pier] of [["Sapper1", 0], ["Sapper2", 1]]) { const p = Unit("18-3", id), pz = RB.northZ + SPAN * (pier + 1); if (!p || Math.abs(p.z - pz) > 3 || Math.abs(p.x - RL.x) > 4) errors.push(`18-3：${id} 要在北头第 ${pier + 1} 座桥墩附近`); }
     let deckShots = 0;
     for (let t = 0; t <= s.durationS; t += 0.5) { const shot = ShotAt("18-3", t); if (shot && OnDeck(shot.position) && shot.position.y > HT.sleeperTopY + 1.0) deckShots++; }
     if (deckShots < 4) errors.push(`18-3：顺子要跟着担架走上桥面（眼睛在桥面上的采样只有 ${deckShots} 个）`);
-    if (!Cap(s, /枕木/) || !Cap(s, /蹚水/) || !Cap(s, /光路基/)) errors.push("18-3：枕木桥面、蹚水、光路基要有说明字"); }
-  // 18-4：工兵绑炸药；机枪压住土坎后的班长他们；四句
-  { const s = Seq("18-4"); InOrder(s, ["HoldOn.01", "HoldOn.02", "HoldOn.03", "HoldOn.04"]); NeedClip("18-4", "Sapper1", "PvKneelDig", "桥墩上绑炸药");
+    if (!Cap(s, /枕木/) || !Cap(s, /蹚水/) || !Cap(s, /光路基/) || !Cap(s, /李子行/) || !Cap(s, /席子/) || !Cap(s, /太阳落到铁路那头/) || !Cap(s, /绑炸药/)) errors.push("18-3：枕木桥面、蹚水、光路基、李子行、席子、太阳、绑炸药要有说明字"); }
+  // 18-4：担架往南走进黑地；顺子回头看南边 + WhoCares.01；机枪扫、弹着在土坎顶上；班长他们在土坎后；NotYet 四句按序；任务字
+  { const s = Seq("18-4");
+    for (const id of ["AidLitter1", "AidLitter2", "Geng", "Nier", "Doctor"]) { const last = PosKeys(s, id).at(-1); if (!last || last.z < PL.leveePlayer.z + 20) errors.push(`18-4：${id} 要往南走进黑地（z > 河堤 + 20）`); }
+    const who = Line(s, "WhoCares.01");
+    if (!who) errors.push("18-4：要有 WhoCares.01"); else {
+      if (who.actor) errors.push("18-4：「……哪个管得到。」是顺子（玩家）说的");
+      if (!LookedYaw("18-4", 180, who.t - 3, LineEnd(s, "WhoCares.01") + 0.5, 30)) errors.push("18-4：说那句前后顺子要回头看南边那条路（yaw 180 ± 30）");
+    }
     if (!s.events.some(e => e.type === "muzzle" && e.actor === "IjaMg18" && e.count >= 8)) errors.push("18-4：田里那挺机枪要扫");
-    if (s.events.filter(e => e.type === "explosion" && e.radius <= 1 && Math.abs(e.z - 729.3) < 2).length < 6) errors.push("18-4：弹着点要压在土坎上");
-    for (const id of ["Luo", "Yaowa", "HeYoutian"]) { const last = PosKeys(s, id).at(-1), u = Unit("18-4", id); if (!last || Dist(last, u) > 0.5) errors.push(`18-4：${id} 要跳回土坎后头（关键帧位置）`); }
-    if (!Cap(s, /土坎/)) errors.push("18-4：压在土坎后头要有说明字"); }
-  // 18-5：玩家压机枪 → 机枪哑 → 顺子喊「快过来」 → 班长他们跑过桥面，班长最后一个 → 「后头没得人了」
+    if (s.events.filter(e => e.type === "explosion" && e.radius <= 1 && Math.abs(e.z - BK.z) < 1.5 && e.x >= BK.fromX - 1 && e.x <= BK.toX + 1).length < 6) errors.push("18-4：弹着点要压在土坎顶上");
+    const burst = s.events.find(e => e.type === "muzzle" && e.actor === "IjaMg18");
+    if (who && burst && burst.t < LineEnd(s, "WhoCares.01")) errors.push("18-4：北边枪响要在「哪个管得到」之后");
+    for (const id of ["Luo", "Yaowa", "HeYoutian"]) { const last = PosKeys(s, id).at(-1), u = Unit("18-4", id); if (!last || Dist(last, u) > 0.5) errors.push(`18-4：${id} 要缩在土坎后头（关键帧位置）`); }
+    InOrder(s, ["WhoCares.01", "NotYet.01", "NotYet.02", "NotYet.03", "NotYet.04"]);
+    if (!Cap(s, /土坎/) || !Cap(s, /走进黑地/) || !Cap(s, /任务字：压住那挺机枪/) || !Cap(s, /把脸从南边转回来/)) errors.push("18-4：土坎、走进黑地、任务字、把脸转回来要有说明字"); }
+  // 18-5：玩家压机枪 → 机枪哑 → 顺子喊「快过来」 → 班长他们跑过桥面，班长最后一个 → 点一下头，不说话（没有 ComeOver.02）
   { const s = Seq("18-5");
-    const mgDown = Keys(s, "IjaMg18").find(k => k.state === "down"), come = Line(s, "ComeOver.01"), last = Line(s, "ComeOver.02");
+    const mgDown = Keys(s, "IjaMg18").find(k => k.state === "down"), come = Line(s, "ComeOver.01");
     if (!mgDown || !come || come.t < mgDown.t) errors.push("18-5：机枪哑了顺子才站起来喊「快过来」");
     if (come?.actor) errors.push("18-5：「快过来！快过来！」是顺子（玩家）喊的");
+    if (s.lines.length !== 1) errors.push("18-5：这一段只有「快过来」一句（班长点头不说话）");
     const arrive = id => PosKeys(s, id).filter(k => k.z > RB.southZ).map(k => k.t)[0];
     const luoT = arrive("Luo");
     if (luoT === undefined) errors.push("18-5：班长要跑过桥到南岸");
     for (const id of ["Yaowa", "HeYoutian", "Squad1", "Squad2"]) { const t = arrive(id); if (t === undefined) errors.push(`18-5：${id} 要跑过桥到南岸`); else if (luoT !== undefined && t > luoT) errors.push(`18-5：班长要最后一个过桥（${id} 比他晚）`); }
     const crossesDeck = id => PosKeys(s, id).some(k => (k.path || []).some(p => Math.abs(p.x - RL.x) < 0.5));
     if (!["Luo", "Yaowa", "HeYoutian"].every(crossesDeck)) errors.push("18-5：班长他们要走铁路桥桥面（路线过桥面中线）");
-    if (!last || luoT === undefined || last.t < luoT - 1.0) errors.push("18-5：班长踏上南岸才喊「后头没得人了」"); }
+    const nod = s.events.find(e => e.type === "caption" && /点一下头/.test(e.text) && /不说话/.test(e.text));
+    if (!nod || luoT === undefined || Math.abs(nod.t - luoT) > 2.0) errors.push("18-5：班长扑到河堤后冲军官点一下头、不说话（说明字对上他到南岸那一刻）"); }
   // 18-6：「点！」之后北头两孔炸断（BridgeBlown 先关后开）；炸断以后没人站在断孔上
   { const s = Seq("18-6"); Need(s, ["LightIt.01"]);
     const off = SignalEv("18-6", "BridgeBlown", false), on = SignalEv("18-6", "BridgeBlown", true), say = Line(s, "LightIt.01");
@@ -661,21 +745,40 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
       }
     }
   }
-  // 18-7：北岸路基上鬼子开枪、村里亮灯、班长「走！」
-  { const s = Seq("18-7"); Need(s, ["KeepMoving.01"]);
+  // 18-7：鬼子都在北岸（z < 北坎顶）、北岸路基上开枪；村子方向远枪声或说明字；SecondBattalion 按序；往南走
+  { const s = Seq("18-7"); InOrder(s, ["SecondBattalion.01", "SecondBattalion.02"]);
     if (s.events.filter(e => e.type === "muzzle" && /^BankIja/.test(e.actor || "")).length < 6) errors.push("18-7：北岸路基上要有鬼子枪口火（若干）");
-    if (!Cap(s, /亮着灯/)) errors.push("18-7：村里亮灯要有说明字"); }
-  // 18-8：先黑场 + 日期字幕；幺娃 / 老耿；舀水；进门洞、黑场收尾
+    for (const a of s.actors) { const u = a.spawn || Unit("18-7", a.id); if (u?.side !== "ija") continue; for (const k of PosKeys(s, a.id)) if (k.z >= RB.northZ) errors.push(`18-7：${a.id} 过不来（要留在北岸 z < ${RB.northZ}）`); }
+    for (const u of KF("18-7").units) if (u.side === "ija" && u.z >= RB.northZ) errors.push(`18-7：关键帧里 ${u.id} 要在北岸`);
+    if (!Has(s, "sfx", e => /rifleShot|mgBurst/.test(e.name) && e.x > 50 && e.z < 760) && !Cap(s, /村那头枪声/)) errors.push("18-7：东北边北沙河村那头要有枪声（远处音效或说明字）");
+    if (!Cap(s, /二营/)) errors.push("18-7：二营还在打要有说明字");
+    const last = PosKeys(s, "Luo").at(-1);
+    if (!last || last.z < PL.leveePlayer.z + 12) errors.push("18-7：末尾要往南走"); }
+  // 18-8：开头黑场 ≥ 3 s + 日期字幕恰好「1938年3月14日 夜」；NightRoad 三句按序；眼睛看过县城的灯；队伍沿南岸路往南走 ≥ 15 m；末尾黑场；then stay
   { const s = Seq("18-8");
     const black = s.events.filter(e => e.type === "black").sort((a, b) => a.t - b.t);
     if (!black.length || black[0].t > 0.01 || black[0].dur < 3) errors.push("18-8：开头要先黑几秒");
-    if (!Has(s, "caption", e => e.text === "1938年3月14日 夜｜滕县北门" && e.t < 3)) errors.push("18-8：黑场上要有日期字幕「1938年3月14日 夜｜滕县北门」");
+    if (!Has(s, "caption", e => e.text === "1938年3月14日 夜" && e.t < 3)) errors.push("18-8：黑场上要有日期字幕「1938年3月14日 夜」");
+    if (allText.includes("滕县北门")) errors.push("18-8：字幕里不要「滕县北门」");
     if (black.length < 2 || black[black.length - 1].t < s.durationS - 10) errors.push("18-8：末尾要黑场收尾");
-    InOrder(s, ["NorthGate.01", "NorthGate.02"]);
-    if (!Cap(s, /舀/)) errors.push("18-8：有人给进城的人舀水要有说明字");
-    const endShot = ShotAt("18-8", s.durationS - 0.5);
-    if (!endShot || endShot.position.z < PL.northGate.z) errors.push("18-8：最后眼睛要进门洞"); }
-  for (const s of doc.sequences) if (s.events.some(e => e.type === "signal" && e.name === "ChargesSet")) errors.push(`${s.keyframe}：ChargesSet 18-4 起本来就开，预演里别动它`);
+    InOrder(s, ["NightRoad.01", "NightRoad.02", "NightRoad.03"]);
+    if (Line(s, "NightRoad.03")?.actor) errors.push("18-8：「……进了城再说。」是顺子（玩家）说的");
+    if (!Looked("18-8", PL.cityLights, black[0]?.dur ?? 6, s.durationS, 12)) errors.push("18-8：眼睛要看过县城的灯");
+    for (const id of ["Luo", "Geng", "Nier", "HeYoutian"]) { const ks = PosKeys(s, id); if (ks.length < 2 || Dist(ks[0], ks[ks.length - 1]) < 15 || ks[ks.length - 1].z <= ks[0].z) errors.push(`18-8：${id} 要顺南岸路往南走 ≥ 15 m`); }
+    const road = RD.southRoad.line, nearRoad = p => { let best = Infinity; for (let i = 1; i < road.length; i++) { const a = road[i - 1], b = road[i]; const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)); best = Math.min(best, Math.hypot(p.x - a.x - dx * k, p.z - a.z - dz * k)); } return best; };
+    for (const id of ["Luo", "Geng"]) for (const k of PosKeys(s, id)) if (nearRoad(k) > 6) errors.push(`18-8：${id} 的走位要在南岸路上（离中线 ${R(nearRoad(k))} m）`);
+    if (!Cap(s, /几点灯/) || !Cap(s, /第一关结束/) || !Cap(s, /攥着钱袋和信/)) errors.push("18-8：几点灯、第一关结束、攥着钱袋和信要有说明字"); }
+  for (const s of doc.sequences) if (s.events.some(e => e.type === "signal" && e.name === "ChargesSet")) errors.push(`${s.keyframe}：ChargesSet 18-3 起本来就开，预演里别动它`);
+  // 写死点的机位（from / to 与 look 都是点）：起幅、落幅都不能悬在看的那个点正上方（< 0.5 m）或往下看超过 60°（10-23 用户；同 PrevizPlanTest「没有朝正下方的镜头」）
+  for (const s of doc.sequences) for (const c of s.camera) {
+    if (c.eye) continue;
+    for (const [tag, at, look] of [["起幅", c.from, c.look], ["落幅", c.to || c.from, c.lookTo || c.look]]) {
+      if (!at || !look || look.actor || look.aircraft || at.actor || at.aircraft) continue;
+      const d = Math.hypot(at.x - look.x, at.z - look.z), dh = (look.h ?? PREVIZ_DEFAULTS.pointH) - (at.h ?? PREVIZ_DEFAULTS.pointH);
+      const pitch = Math.atan2(dh, d) * 180 / Math.PI;
+      if (d < 0.5 || pitch < -60) errors.push(`${s.keyframe} 镜头@${c.t} ${tag}：离看的点 ${R(d)} m、往下 ${R(-pitch)}°（落幅离看点要 ≥ 0.5 m、俯角 ≤ 60°）`);
+    }
+  }
   // 镜头轨：每一刻都能采样
   for (const n of norm.sequences) {
     for (let t = 0; t <= n.durationS; t += 1.0) {
@@ -685,7 +788,7 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
       } catch (e) { errors.push(`${n.keyframe}：镜头在 ${t} s 采样出错：${e.message}`); break; }
     }
   }
-  void layout; void SIG;
+  void layout; void SIG; void PrevizStrafeImpacts;
 }
 
 async function Main(argv) {

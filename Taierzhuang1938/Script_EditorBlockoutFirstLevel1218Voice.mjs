@@ -1,7 +1,9 @@
 // 白盒关卡 FirstLevel1218 的占位配音：整段一次生成 → 母带 → 按逐字时间戳切句 → 写清单（只在 node 里跑）。
 // 完全照 Script_EditorBlockoutFirstLevel0610Voice.mjs（那份与 0105 的都不动），只换了台词表、路径与本关借嗓子的人设：
-// 同一个借来的嗓子在 11–18 里演两个人（第三版 10-26：guard 演七二七团连长和守门的兵、bearer 演医官和门里有人、shouter 演哨兵和喊飞机的），
+// 同一个借来的嗓子在 11–18 里演两个人（第四版 11-02：guard 演二营连长和守门的兵、bearer 演军医和门里有人、shouter 演哨兵 / 二营的兵 / 喊飞机的），
 // 所以人设先按显示名查、再按 who 查（PersonaOf）。
+// 第四版（11-02）另加 `scene.reuse`：整场不生成、不发请求，把别的关那一句现成录音原样拷过来（18-1 DongguaEcho 复用 0105 LastTwo.05 的原录音，
+// sha256 与源一致；口型轨从源关的 FaceTracks 按 sha 抄）。
 //
 //   node Taierzhuang1938/Script_EditorBlockoutFirstLevel1218Voice.mjs [--dry-run] [--only=A,B] [--force=Scene[,Scene]]
 //        [--pick=Scene:n] [--no-judge] [--face]
@@ -308,6 +310,28 @@ function Install(r, manifest, timings) {
   manifest.scenes.push(entry);
 }
 
+/** 复用别的关的现成录音（scene.reuse）：拷文件、核 sha、写清单；不发请求、不切句、不核对。 */
+function InstallReuse(scene, manifest) {
+  const { level, lineId, file } = scene.reuse;
+  const src = path.join(here, file);
+  const srcManifest = ReadJson(path.join(here, "Blockout", `${level}.voice.json`), { scenes: [] });
+  const srcLine = srcManifest.scenes.flatMap((s) => s.lines || []).find((l) => l.id === lineId);
+  if (!srcLine || !fs.existsSync(src)) throw new Error(`${scene.id}: 复用的录音不在：${level} ${lineId}（${file}）`);
+  if (scene.lines.length !== 1 || scene.lines[0].text !== srcLine.text) throw new Error(`${scene.id}: 复用场只能有一句，且字要与 ${level} ${lineId} 一样`);
+  const line = scene.lines[0], dest = LineFile(scene, 0);
+  fs.copyFileSync(src, dest);
+  const sha256 = Sha256(dest), durationS = +MeasureVoice(dest).seconds.toFixed(3);
+  if (sha256 !== srcLine.sha256) throw new Error(`${scene.id}: 拷过来的文件 sha 与 ${level} 清单不一致`);
+  const entry = { id: scene.id, beat: scene.beat, keyframe: scene.keyframe, label: scene.label, attempt: 0, attempts: 0,
+    reuse: { level, lineId, file, sha256 }, references: [], targetDb: null, cutMethod: "reuse", hard: [],
+    flags: [`复用 ${level} ${lineId} 的原录音（${path.basename(file)}），没重配`],
+    lines: [{ id: line.id, keyframe: line.keyframe, who: line.who, speaker: line.speaker, lang: line.lang, subtitle: line.subtitle, text: line.text,
+      file: `./Audio/Blockout1218/${path.basename(dest)}`, durationS, gapBeforeS: 0, sha256, reuse: { level, lineId } }] };
+  manifest.scenes = manifest.scenes.filter((x) => x.id !== entry.id);
+  manifest.scenes.push(entry);
+  console.log(`\n${scene.id}: 复用 ${level} ${lineId} → ${Rel(dest)}（${durationS} s，sha ${sha256.slice(0, 12)}）`);
+}
+
 function FaceBake(manifest) {
   // 现成烘焙器（Script_FirstLevelFaceTrackBake.py --lines）只认 <lines-dir>/AudioVoice_FirstLevel<Scene>_<NN>.mp3：
   // 把片段按这个名字复制进临时目录（字节不变、sha256 不变），口型轨写到我们自己的文件，再把 file 改回真文件名。
@@ -333,6 +357,15 @@ function FaceBake(manifest) {
   if (!fs.existsSync(faceTracksPath)) { console.warn(`口型轨没烘出来（status ${result.status}）：${(result.stderr || "").slice(-400)}`); return; }
   const body = JSON.parse(fs.readFileSync(faceTracksPath, "utf8"));
   for (const [sha, track] of Object.entries(body.tracks)) if (real.has(sha)) track.file = real.get(sha);
+  // 复用别的关的录音：口型轨从源关的 FaceTracks 按 sha 抄过来（字节一样，轨就一样），只改 file 名
+  for (const scene of manifest.scenes.filter((s) => s.reuse)) {
+    const srcTracks = ReadJson(path.join(here, "Audio", `Blockout${scene.reuse.level.replace("FirstLevel", "")}`, `Data_Blockout${scene.reuse.level.replace("FirstLevel", "")}FaceTracks.json`), null);
+    for (const line of scene.lines) {
+      const track = srcTracks?.tracks?.[line.sha256];
+      if (track) body.tracks[line.sha256] = { ...track, id: line.id, file: path.basename(line.file) };
+      else console.warn(`${scene.id}: 源关没有 ${line.id} 的口型轨`);
+    }
+  }
   body.generator = "Script_FirstLevelFaceTrackBake.py（由 Script_EditorBlockoutFirstLevel1218Voice.mjs --face 调用）";
   const text = "{\n" + Object.entries(body).filter(([k]) => k !== "tracks").map(([k, v]) => ` ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n")
     + ',\n "tracks": {\n' + Object.entries(body.tracks).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n") + "\n }\n}\n";
@@ -341,7 +374,8 @@ function FaceBake(manifest) {
 }
 
 async function Main() {
-  const scenes = L1218_VOICE_SCENES.filter((s) => !only || only.includes(s.id));
+  const all = L1218_VOICE_SCENES.filter((s) => !only || only.includes(s.id));
+  const reused = all.filter((s) => s.reuse), scenes = all.filter((s) => !s.reuse);
   const pickups = scenes.flatMap(Pickups);
   if (dry) {
     for (const scene of [...scenes, ...pickups]) {
@@ -350,6 +384,7 @@ async function Main() {
       refs.forEach((r, i) => console.log(`  @音频${i + 1} = ${r.who.join("/")} ← ${Rel(r.file)} sha ${r.sha256.slice(0, 12)}`));
       console.log(prompt);
     }
+    for (const scene of reused) console.log(`\n=== ${scene.id}（${scene.beat} / ${scene.keyframe}）：复用 ${scene.reuse.level} ${scene.reuse.lineId}，不发请求`);
     return;
   }
   fs.mkdirSync(work, { recursive: true });
@@ -386,6 +421,7 @@ async function Main() {
     r.slices.forEach((s, i) => console.log(`  ${r.scene.lines[i].id} ${r.scene.lines[i].speaker.padEnd(4, "　")} ${(s.endS - s.startS).toFixed(2)}s gap ${s.gapBeforeS} cos ${s.speakerCos ?? "-"} cer ${s.cer ?? "-"}「${s.transcript ?? ""}」${s.issues?.length ? " ← " + s.issues.join("；") : ""}`));
     Install(r, manifest, timings);
   }
+  for (const scene of reused) InstallReuse(scene, manifest);
   // 台词表里删掉的场（10-23 第二版删了 RoadWest 等九场）：清单不留，mp3 一并删掉；tmp 里的原始返回留着（git 忽略）
   const order = L1218_VOICE_SCENES.map((s) => s.id);
   for (const gone of manifest.scenes.filter((x) => !order.includes(x.id))) {
