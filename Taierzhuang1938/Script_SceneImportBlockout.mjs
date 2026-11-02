@@ -85,8 +85,8 @@ function StitchTerrain(segs, report) {
   return { terrain: { file: `${SceneFileName(SCENE_ID).replace(/\.json$/, "")}.height.bin`, encoding: SCENE_HEIGHT_ENCODING, minX, minZ, cellM, cols, rows }, heights };
 }
 
-/** 旧体块 → 场景物件。 */
-function BlockToObject(block, group, report) {
+/** 旧体块 → 场景物件（Script_SceneRebuild1218 重建 11–18 时也用它）。 */
+export function BlockToObject(block, group, report) {
   const material = WhiteboxMaterialFor(block.semantic);
   if (!material) throw new Error(`体块 ${block.id} 的 semantic ${block.semantic} 没有对应的白盒材质（Data_SceneAssets）`);
   const meta = {};

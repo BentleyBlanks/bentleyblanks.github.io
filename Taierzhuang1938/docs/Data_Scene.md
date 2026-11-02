@@ -80,7 +80,7 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.trench.bin   有壕沟时：挖沟基准�
 `Script_EditorBlockoutLevels.BLOCKOUT_LEVELS` 里第一关新剧本三段的 `scene` 是 `{ kind: "scene", url, region, priorSignals, objectMarginM, heightTint? }`：
 
 - `Prepare()` 读场景 JSON 与高度图，`BlockoutSliceDoc(level, scene, heights)` → `Script_SceneDoc.BlockoutDocFromScene` 按 `region` 取一块，转成白盒场景形状（`tengxian-blockout-scene/1`，terrain 直接带解好的 `heights`），再走原来的 `LayoutFromSceneDoc`。**建场、渲染、物理一行没改。**
-- `region` = 这一段原来的场地范围（01–05 `x −110…320, z −480…200`；06–10 `x −20…320, z 120…560`；11–18 `x −160…236, z 480…980`），地形按格点裁，玩家走不出去。物件取到范围外 `objectMarginM`（缺省 1 m：贴边的空气墙；11–18 是 64 m，站在场地边看得见的村子带上）。
+- `region` = 这一段原来的场地范围（01–05 `x −110…320, z −480…200`；06–10 `x −20…320, z 120…560`；11–18 `x −160…320, z 480…1080`，2026-11-02 第四版加长），地形按格点裁，玩家走不出去。物件取到范围外 `objectMarginM`（缺省 1 m：贴边的空气墙；11–18 是 64 m，站在场地边看得见的村子带上）。
 - `priorSignals`：前面段落出现过的信号都当已经发生——06–10 带 01–05 的三个 + `Stage0105Done`，11–18 带 01–05 与 06–10 的全部（`Script_SceneDocTest` 拿各段配置核对）。`hideOn` 它的物件直接不要，`showOn` 它的物件已经出现。
 - `futureSignals`：这一段里不会发生的信号（01–05 的 `Stage0105Done`）——`hideOn` 它的物件当常驻块，`showOn` 它的不要。随信号的块在建场里是一个一个单独的模型、不合批，1207 段空气墙不能那样建。
 - `heightTint: null` = 这一块按自己的最低 / 最高定色带（06–10、11–18 原来就是这样）。
@@ -147,6 +147,16 @@ Taierzhuang1938/Scenes/<Id>/Scene_<Id>.trench.bin   有壕沟时：挖沟基准�
 - **白盒编辑器怎么切**：关卡注册表的 `scene.playUrl` 是正式场景；phase 的 `blockout.variant`（edit / play）决定建哪个。试玩「开打」先整片重建成正式场景（`UseSceneVariant("play")`，无头浏览器约 18–25 s），关小结「回到编辑」换回白盒；换关回到白盒。地址栏 `scene=FirstLevel` 进关后直接换成正式场景（试玩中刷新、场景编辑器「在白盒编辑器里看（正式场景）」都走这条）。`Debug.Blockout.Play.Scene()` / `UseScene(variant)` 给测试与 agent。
 - **场景编辑器**：下拉里两个场景（显示标题）；正式场景的资产页列白盒体块、道具、树与远景，材质下拉两个场景一样是 `Whitebox/*`；道具画成按语义色提亮的盒子、树画成锥。
 - 门禁：`Script_SceneFormalTest`（纯 node）、`Script_SceneFormalBrowserTest`（真浏览器：白盒 / 正式互换、体块仍是米格线且道具材质没被刷白、分层地表、道具全摆上、体块数同白盒、试玩换正式 / 回编辑换白盒、06–10 / 11–18 建得起来、场景编辑器两个场景）。截图 `_shots/SceneFormal/`。
+
+## 8.1 11–18 第四版重建（2026-11-02）
+
+集成负责人 11-02 的《FirstLevel1218 白盒第四版契约》（`tmp/Contract1218_v4.md`）把 11–18 整片换掉。做法是**可重跑的脚本** `Script_SceneRebuild1218.mjs`（一次性重建、可重放，同 Script_SceneForkFormal 的口径，不进 TestRunner）：读两份场景文件（`.json` / `.height.bin` / `.trench.bin`）→ 高度图往南加长到 z 1080（`bounds.maxZ`、`terrain.rows` 2920 → 3120）→ 删掉 z ≥ 556 的物件 / 地标 / 伸到 z > 556 的涂色、路、沟中线 → 按新锚点 `Data_EditorBlockoutFirstLevel1218Space` 生成（`Script_EditorBlockoutFirstLevel1218Scene.BuildFirstLevel1218Site`）、`Script_SceneImportBlockout.BlockToObject` 转物件、`Script_SceneGroupHierarchy.HierarchyPaths` 归层级、正式场景过 `FormalObject` → 写回。同一输入跑两次逐字相同（`source.importedAt` / `forkedAt` 原样留着）。
+
+- z < 556 的格点与物件一个不动（0610 的耿家庄，含 group 是 `11–18/…` 但 z < 556 的借来的块）；只有 x < −20、z 480…556 这一条（0610 场地没盖到，合并时是往外延的边缘值 + 第三版 x −104 的路基）按 0610 的解析地面重算、叠第四版 x −80 的路基。
+- 高度图仍是「沟没挖之前」的地面：村口反坦克沟烘进去（不归样条网络，中线在 `ways.trenches`）；村北沿战壕两段 `VillageNorthWest` / `VillageNorthEast` 换成第四版的点（契约 2.3），`depthAlong` 按基准面算到壕底 −0.9；基准面第二块重烘（x 30…222、z 641…668，1 m 格）、`.trench.bin` 重写；`noBerm` 里旧的 11–18 那一条换成板桥 / 官道那条线。
+- 剧情事件（`Data_SceneEvents`）：新加 `GuandaoBridgeBlown`（13-2）、`DugoutBombed`（14-2）、`RaidAftermath`（15-1）；`ChargesSet` 改到 18-3 起；`FamilyHidden` 删了（场景里没有用它的物件了）。
+- 结果：两个场景各 5144 个物件（11–18 南片 877 个：体块 762 + 随信号 115）、246 个地标、226 项涂色、28 段样条沟；正式场景的 11–18 换了 61 件道具、67 棵树。`Script_SceneDocTest` 里「随信号的块 < 80」放到 < 140。
+- 再改 11–18 的空间：改锚点 → `node Taierzhuang1938/Script_SceneRebuild1218.mjs`（`--check` 只算不写）；别手改高度图。
 
 ## 9. 场景里的样条壕沟（2026-11-01）
 

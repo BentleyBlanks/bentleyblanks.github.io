@@ -56,15 +56,17 @@ export const BLOCKOUT_LEVELS = Object.freeze([
   // 2026-10-19：12–18 新剧本，与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space。2026-10-23 按 11–14 改稿重做、把 11 也放进来（11 出村 → 石板桥 → 空袭 → 渡口 → 北门），关卡键不变
   // 2026-10-25：Notion 剧本第一关分四大段，11–14 与 15–18 一路连着走、共用这一片场地，下拉里按 parts 拆成两行（见 BLOCKOUT_MENU）
   // 2026-10-26：第三版（北沙河村）：出村 → 土路 → 官道 → 村口沟与板桥 → 北沙河村 → 铁路桥过沙河 → 北门
+  // 2026-11-02：第四版（契约 tmp/Contract1218_v4.md）：官道斜穿村子当主街、北中南三条街、南街口望官道桥（二营炸了它）、出村小路 → 北岸土路 → 李子行 → 铁路桥 → 南岸路（没有北门、村西口）；
+  //   场地 x −160…320、z 480…1080（Script_SceneRebuild1218 把两份场景的 11–18 南片重建、高度图加长）
   Object.freeze({ key: "FirstLevel1218", label: "第一关 11–18 · 北沙河村与铁路桥（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
-    era: "rewrite", badge: "新剧本", short: "11–18", note: "11–18：出村 → 官道 → 村口沟 → 北沙河村 → 空袭 → 铁路桥 → 北门（10-26 第三版）",
+    era: "rewrite", badge: "新剧本", short: "11–18", note: "11–18：出村 → 官道 → 村口沟 → 北沙河村 → 空袭 → 救护所 → 北岸土路 → 铁路桥 → 南岸路（11-02 第四版）",
     parts: Object.freeze([
       Object.freeze({ id: "FirstLevel1218", from: "11-1", label: "第一关 11–14 · 转运与空袭（新剧本）", short: "11–14",
-        note: "11–14：出村 → 进北沙河村 → 沟口顶住追兵 → 空袭 → 救护所院里松手（10-26 第三版）" }),
+        note: "11–14：出村 → 进北沙河村 → 沟口顶住追兵 → 空袭 → 救护所院里松手（11-02 第四版）" }),
       Object.freeze({ id: "FirstLevel1218_15", from: "15-1", label: "第一关 15–18 · 冬瓜之死与炸桥（新剧本）", short: "15–18",
-        note: "15–18：洞里 → 厢房门口 → 门槛 → 撤过铁路桥、炸桥 → 北门（与 11–14 同一片场地）" }),
+        note: "15–18：洞里 → 厢房门口 → 门槛 → 出村小路、北岸土路 → 撤过铁路桥、炸桥 → 南岸路往县城（与 11–14 同一片场地）" }),
     ]),
-    scene: WhiteboxSceneSlice({ minX: -160, maxX: 236, minZ: 480, maxZ: 980 }, { x: 117, z: 547.4, yawDeg: 180 }, [...SIGNALS_0105, ...SIGNALS_0610], null, 64) }),
+    scene: WhiteboxSceneSlice({ minX: -160, maxX: 320, minZ: 480, maxZ: 1080 }, { x: 117, z: 547.4, yawDeg: 180 }, [...SIGNALS_0105, ...SIGNALS_0610], null, 64) }),
 ]);
 
 // 关卡下拉的行（2026-10-25）：一片场地一行；写了 parts 的场地按剧本段落拆成几行、共用同一个关卡键。

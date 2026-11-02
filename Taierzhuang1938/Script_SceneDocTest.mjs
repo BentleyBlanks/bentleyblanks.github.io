@@ -78,7 +78,8 @@ for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]) {
   const sv = ValidateBlockoutScene(slice);
   Check(sv.ok, `${level} 取出来的一块过白盒场景校验：${sv.errors.slice(0, 3).join("；")}`);
   const layout = LayoutFromSceneDoc(slice);
-  Check(layout.blocks.length > 500 && layout.gates.length < 80 && layout.bounds.minX === slice.bounds.minX, `${level} 能建布局（${layout.blocks.length} 块、${layout.gates.length} 个随信号的块）`);
+  // 随信号的块是一个一个单独的模型（不合批）：11–18 第四版七个剧情事件（炸桥两座、弹坑、空袭过后的席子……）共 115 个，上限放到 140
+  Check(layout.blocks.length > 500 && layout.gates.length < 140 && layout.bounds.minX === slice.bounds.minX, `${level} 能建布局（${layout.blocks.length} 块、${layout.gates.length} 个随信号的块）`);
 }
 const spec = (key) => BLOCKOUT_LEVELS.find(l => l.key === key).scene;
 // Stage0105Done：01–05 演完（KeepIn_* 空气墙随它消失），关键帧里不写，只在后两段的 priorSignals 里

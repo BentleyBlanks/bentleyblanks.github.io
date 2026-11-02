@@ -20,10 +20,13 @@ export const SCENE_EVENTS = Object.freeze({
   NorthYardGatesBroken: Object.freeze({ label: "北院门被撞开", from: "10-3" }),
   BarrageHit: Object.freeze({ label: "炮弹落下来", from: "10-5" }),
   LaneWallCollapse: Object.freeze({ label: "巷子墙塌了", from: "10-6" }),
-  FamilyHidden: Object.freeze({ label: "那家人藏好了", from: "12-6" }),
+  // 11–18 第四版（2026-11-02）：FamilyHidden（钻洞的那一家）删了
+  GuandaoBridgeBlown: Object.freeze({ label: "官道桥炸了", from: "13-2", note: "二营炸的木桥：中间几跨没了、断木砸进河床" }),
+  DugoutBombed: Object.freeze({ label: "院里的洞挨了炸弹", from: "14-2", note: "南街那家院里：弹坑 + 碎砖 + 塌了的洞顶" }),
   CartOverturned: Object.freeze({ label: "车翻了", from: "14-3" }),
+  RaidAftermath: Object.freeze({ label: "空袭过后", from: "15-1", note: "街上、门前、路头上一排排盖着席子的人、几处碎砖堆" }),
   GirlHoleCovered: Object.freeze({ label: "藏人的洞口盖上了", from: "18-2" }),
-  ChargesSet: Object.freeze({ label: "炸药装好了", from: "18-4" }),
+  ChargesSet: Object.freeze({ label: "炸药装好了", from: "18-3" }),
   BridgeBlown: Object.freeze({ label: "桥炸了", from: "18-6" }),
 });
 

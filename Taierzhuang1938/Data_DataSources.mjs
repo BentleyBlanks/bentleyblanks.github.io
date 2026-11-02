@@ -14,7 +14,7 @@ const RULE = (match, role, by, note) => Object.freeze({ match, role, by: Object.
 
 export const DATA_SOURCE_RULES = Object.freeze([
   // --- 关卡内容 ---------------------------------------------------------------------------------------------
-  RULE("Scenes/*/Scene_*.json", "source", ["SceneEditor.html", "../scripts/Script_LocalPreview.mjs"],
+  RULE("Scenes/*/Scene_*.json", "source", ["SceneEditor.html", "../scripts/Script_LocalPreview.mjs", "Script_SceneRebuild1218.mjs"],
     "场景文件：资产编号引用列表。场景编辑器经本机 /__scene/save 存，agent 直接改它；白盒场景与正式场景两份并存（用户 2026-11-01 定）"),
   RULE("Blockout/*.previz.json", "generated", ["Script_EditorBlockoutFirstLevel0105Previz.mjs", "Script_EditorBlockoutFirstLevel0610Previz.mjs", "Script_EditorBlockoutFirstLevel1218Previz.mjs", "Script_TimelineCli.mjs"],
     "白盒预演：预演生成器按白盒与剧本排出来"),
