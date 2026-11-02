@@ -24,7 +24,29 @@ export function XBotLook({ faction = "nra", castId = null, unitId = null } = {})
 export const XBOT = Object.freeze({
   base: "./Animation/Mixamo/",
   model: "Model_MixamoXBot.glb",
+  /**
+   * 换动作（2026-11-02 用户：好几个日军动作衔接不顺）：从上一帧看到的姿势淡到新动作，不用 mixer 的交叉淡入 ——
+   * 那个只在两条 mixer 动作之间淡，进出「当场换算」、同一条动作里跳时间都是硬切。胯挪得越远淡得越久：
+   * fadeS + 每米 fadePerM 秒，封顶 fadeMaxS（站 → 趴、站 → 蹲着扇耳光，0.2 s 一下子塌下去像掉帧）。
+   */
   fadeS: 0.2,
+  fadePerM: 0.4,
+  fadeMaxS: 0.5,
+  /**
+   * 换动作的同一帧人被挪了这么远以内（片段自带位移，预演在片段交接时把根挪到片段末尾骨盆的位置）：胯从上一帧在世界里的
+   * 位置接着淡，不跟着根跳一下再淡回来；更远的当真瞬移，胯照本地姿势淡（人跟着根走）。
+   */
+  rerootM: 3,
+  /** 倒地那一刻头离地不到这么高（片段已经把人摔在地上了；跪着的头在 0.75 m 上下）：停在这个姿势，不再从站着放一遍倒地动作 */
+  downHoldHeadM: 0.5,
+  /** 枪在手里 ↔ 背上换了（不据枪就背枪的步态）：从上一帧看到的那支的位置挪过去，不一帧瞬移 */
+  rifleSwapS: 0.3,
+  /**
+   * 走上 / 走下白盒的台阶块（站人的地面一帧高出 0.35 m，沟壁的坡也是一级级 0.6 m 往下掉的，§5.6）：这么高以内的高差按时间常数 stepS 秒跟过去，不一帧蹦上去；
+   * 更高的照跟（换根、跳沟由换动作的过渡接住）
+   */
+  stepM: 0.8,
+  stepS: 0.12,
   /** 跑和走的分界（m/s），同原生步态 */
   runMps: 2.2,
   /** 原地循环动作的播放速率夹在这个范围里（太慢像慢动作、太快像抽搐） */
@@ -272,6 +294,29 @@ export class XBotSkin {
     this.wasDown = null;
     this.rifleOnLeft = null;
     this.H = (n) => this.bones.get(n);
+    // 换动作的过渡（XBOT.fadeS）：mixer 只在值变了的时候才写骨头（three PropertyMixer），过渡和握枪 IK 改过的骨头
+    // 下一帧要先还原成 mixer 上一次写的值（base），不然停住的动作会把改过的值留着
+    this.base = this.boneList.map(() => new THREE.Quaternion());
+    this.baseHips = new THREE.Vector3();
+    this.baseValid = false;
+    // 上一帧最后看到的姿势（过渡、IK 之后）：本地朝向，胯另记世界 / 本地两份
+    this.shownQ = this.boneList.map(() => new THREE.Quaternion());
+    this.shownHips = new THREE.Vector3();
+    this.shownHipsLocal = new THREE.Vector3();
+    this.shownAt = new THREE.Vector3();
+    this.shownContainer = new THREE.Matrix4();
+    this.holdLocal = null;   // 停在倒地姿势时容器挂在人物根下的位姿
+    this.shownHeadY = 0;
+    this.shownValid = false;
+    this.stepY = 0;          // 容器跟着根的高度（XBOT.stepM 以内的台阶平滑跟）
+    this.rawY = 0;
+    this.blend = null;       // { q, hips（本地）, t, dur }
+    this.pickKey = null;
+    this.jumped = false;
+    this.downHold = false;
+    this.prevDown = false;
+    this.rifleShown = null;  // { which: "hand" | "back", local }
+    this.rifleSwap = null;
   }
 
   get visible() { return this.container.visible; }
@@ -292,10 +337,23 @@ export class XBotSkin {
     const visible = actor.root.visible !== false && rig.root.visible !== false;
     this.container.visible = visible;
     for (const mesh of this.hidden) mesh.visible = false;
-    if (!visible) return;
+    // 藏起来过：再出来时没人看见它之前的样子，直接摆当前姿势（不从藏起来那一刻的姿势淡）
+    if (!visible) { this.shownValid = false; this.blend = null; this._EndRifleSwap(); this.rifleShown = null; return; }
     this.container.position.copy(rig.root.position);
     this.container.quaternion.copy(rig.root.quaternion);
     this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
+    this.container.updateMatrixWorld(true);
+    // 台阶：地面高度在人物根（容器的上两层）上，按世界高度平滑，再把差值折回容器的本地 y
+    // 按原始高度这一帧变了多少判断是台阶还是瞬移（顺着一级级的坡往下走，平滑出来的高度会越落越后，不能拿它比）
+    const worldY = this.container.matrixWorld.elements[13], rawStep = worldY - this.rawY;
+    this.rawY = worldY;
+    if (this.shownValid && Math.abs(rawStep) < XBOT.stepM) this.stepY += (worldY - this.stepY) * (1 - Math.exp(-Math.max(dt, 0) / XBOT.stepS));
+    else this.stepY = worldY;
+    if (Math.abs(this.stepY - worldY) > 1e-5) {
+      this.container.parent.matrixWorld.decompose(_p, _q, _s);
+      this.container.position.y += (this.stepY - worldY) / (_s.y || 1);
+      this.container.updateMatrixWorld(true);
+    }
     if (intent.shadow !== undefined && !!intent.shadow !== this.shadow) {
       this.shadow = !!intent.shadow;
       this.model.traverse(o => { if (o.isMesh) o.castShadow = this.shadow; });
@@ -303,15 +361,108 @@ export class XBotSkin {
 
     this.fireT = intent.firing ? XBOT.fireHoldS : Math.max(0, (this.fireT || 0) - dt);
     const pick = this._Pick(intent);
-    if (pick.mode === "mirror" || !pick.file) this._Mirror(dt);
+    this.jumped = false;
+    // 停在倒地姿势时，藏起来的原身体还在放它自己的倒地、布娃娃（actor.body 一上一下、在坡上会滑）：X Bot 改挂到人物根
+    // （actor.root：只有预演摆它 —— 位置、朝向、藏不藏），停住那一刻相对它在哪就一直在哪；预演挪人（下一段换位置）照样跟着走
+    const root = this.actor.root;
+    if (pick.mode === "hold") {
+      if (!this.holdLocal) {
+        root.updateWorldMatrix(true, false);
+        this.holdLocal = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(this.shownContainer);
+        if (this.container.parent !== root) root.add(this.container);
+      }
+      this.holdLocal.decompose(this.container.position, this.container.quaternion, this.container.scale);
+      this.container.updateMatrixWorld(true);
+      this.stepY = this.rawY = this.container.matrixWorld.elements[13];
+    } else {
+      this.holdLocal = null;
+      // 站起来了（预演把倒地的人扶起来）：挂回原来的位置
+      if (this.container.parent === root && rig.root.parent && rig.root.parent !== root) {
+        rig.root.parent.add(this.container);
+        this.container.position.copy(rig.root.position);
+        this.container.quaternion.copy(rig.root.quaternion);
+        this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
+        this.container.updateMatrixWorld(true);
+      }
+    }
+    if (pick.mode === "hold") this._Hold();
+    else if (pick.mode === "mirror" || !pick.file) this._Mirror(dt);
     else this._Play(pick, intent, dt);
+    // 换了动作（或同一条动作跳了时间）：从上一帧看到的姿势淡过去
+    // 按这一帧实际摆出来的算（动作还没读到时照原身体换算，读到那一帧也是换动作）
+    const key = pick.mode === "hold" ? this.pickKey : !this.current || this.current.mirror ? "mirror" : pick.file + (pick.death ? "|death" : "");
+    if (this.shownValid && (key !== this.pickKey || this.jumped)) this._BeginBlend();
+    this.pickKey = key;
+    this._ApplyBlend(dt);
     this.container.updateMatrixWorld(true);
-    this._Reanchor(pick, dt);
+    this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
+    this._Remember(intent);
+  }
+
+  /** 这一帧最后看到的姿势（IK、枪都摆完之后）：下一次换动作从它淡过去。 */
+  _Remember(intent) {
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.shownQ[i].copy(this.boneList[i].quaternion);
+    const hips = this.H("Hips"), head = this.H("Head");
+    if (hips) { hips.getWorldPosition(this.shownHips); this.shownHipsLocal.copy(hips.position); }
+    this.shownHeadY = head ? head.getWorldPosition(_p).y : this.shownHips.y;
+    this.container.getWorldPosition(this.shownAt);
+    this.shownContainer.copy(this.container.matrixWorld);
+    this.shownValid = !!hips;
+    this.prevDown = !!intent.down;
+  }
+
+  /** 从上一帧看到的姿势起一段过渡。根这一帧挪了 rerootM 以内：胯照它在世界里的位置换到新的根下（片段换根不跳）。 */
+  _BeginBlend() {
+    const hips = this.H("Hips");
+    const b = this.blend || (this.blend = { q: this.boneList.map(() => new THREE.Quaternion()), hips: new THREE.Vector3(), t: 0, dur: null });
+    for (let i = 0; i < this.boneList.length; i++) b.q[i].copy(this.shownQ[i]);
+    const moved = this.container.getWorldPosition(_p).distanceTo(this.shownAt);
+    if (moved <= XBOT.rerootM) {
+      hips.parent.updateWorldMatrix(true, false);
+      b.hips.copy(this.shownHips).applyMatrix4(_m.copy(hips.parent.matrixWorld).invert());
+    } else b.hips.copy(this.shownHipsLocal);
+    b.t = 0;
+    b.dur = null;
+  }
+
+  _ApplyBlend(dt) {
+    const b = this.blend, hips = this.H("Hips");
+    if (!b || !hips) return;
+    if (b.dur === null) {
+      // 胯要挪多远（世界米）定这段过渡多长
+      hips.parent.updateWorldMatrix(true, false);
+      const from = _p.copy(b.hips).applyMatrix4(hips.parent.matrixWorld), to = hips.getWorldPosition(_p2);
+      b.dur = THREE.MathUtils.clamp(XBOT.fadeS + XBOT.fadePerM * from.distanceTo(to), XBOT.fadeS, XBOT.fadeMaxS);
+    }
+    b.t += Math.max(dt, 0);
+    const k = Math.min(1, b.t / b.dur), e = k * k * (3 - 2 * k);
+    for (let i = 0; i < this.boneList.length; i++) {
+      const bone = this.boneList[i];
+      if (!bone) continue;
+      _q.copy(bone.quaternion);
+      if (_q.dot(b.q[i]) < 0) _q.set(-_q.x, -_q.y, -_q.z, -_q.w);
+      bone.quaternion.slerpQuaternions(b.q[i], _q, e);
+    }
+    hips.position.lerpVectors(b.hips, _p.copy(hips.position), e);
+    if (k >= 1) this.blend = null;
+  }
+
+  /** 停在倒地前最后那个姿势（XBOT.downHoldHeadM）：骨头还原成 mixer 上一次写的值，不推时间。 */
+  _Hold() {
+    // 倒下那一刻还在当场换算（动作文件还没读到）：没有 mixer 的值，就停在最后看到的那个姿势
+    if (!this.baseValid) {
+      for (let i = 0; i < this.boneList.length; i++) this.base[i].copy(this.shownQ[i]);
+      this.baseHips.copy(this.shownHipsLocal);
+      this.baseValid = true;
+    }
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.boneList[i].quaternion.copy(this.base[i]);
+    this.H("Hips")?.position.copy(this.baseHips);
   }
 
   /** 这一帧播什么：{ mode: "clip" | "mirror", file, time?, rate?, loop, once, hold, rifleHand } */
   _Pick(intent) {
     const skins = this.skins;
+    if (!intent.down) this.downHold = false;
     if (intent.exact) return { mode: "mirror" };
     // 白刃战：刺刀的上步 / 退步 / 刺 / 挡 / 砸 / 推用「刺刀专项」（XBOT_MELEE）；戒备、僵持、倒地和大刀照原身体当场换算
     if (intent.melee) {
@@ -323,6 +474,12 @@ export class XBotSkin {
       return { mode: "clip", file: entry.file, once: true, normalized: THREE.MathUtils.clamp(n, 0, 1), hold: lib?.hold, key: "melee" + m.action };
     }
     if (intent.down) {
+      // 预演片段已经把人摔在地上了（中枪倒地、被砍倒放完、按住不动）：就停在这个姿势。原来在这里从站着放一遍倒地动作，
+      // 等于死了的人站起来再死一次（11-02 取证：02-2 的七个日军和翻译全是这样）
+      if (this.downHold || (!this.prevDown && this.shownValid && this.shownHeadY - this.shownAt.y < XBOT.downHoldHeadM)) {
+        this.downHold = true;
+        return { mode: "hold" };
+      }
       const death = XBOT_DEATHS[this.rig.deathVariantId] || XBOT_DEATHS.DeathCollapseA;
       return { mode: "clip", file: death.file, once: true, death: true };
     }
@@ -371,19 +528,25 @@ export class XBotSkin {
     }
     let cur = this.current;
     if (!cur || cur.file !== pick.file) {
+      // 换动作：旧的停掉、绑定全扔（新绑定第一帧每根骨都写，不会留着上一条 / 当场换算的值），淡入交给 _BeginBlend
+      this.mixer.stopAllAction();
+      this.mixer.uncacheRoot(this.model);
+      this.baseValid = false;
       const action = this.mixer.clipAction(clip);
       action.reset();
       action.setLoop(pick.once || !pick.loop ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
       action.clampWhenFinished = true;
-      action.timeScale = 0;              // 时间自己管（按原片段秒数 / 实际速度），mixer 只推淡入淡出
+      action.timeScale = 0;              // 时间自己管（按原片段秒数 / 实际速度）
       action.enabled = true;
       action.setEffectiveWeight(1);
-      // 从上一条动作淡过来；从「当场换算」或第一次进来就直接切（只有一条动作时淡入会混进 T 姿势）
-      if (cur?.action && !cur.mirror) action.crossFadeFrom(cur.action, XBOT.fadeS, false);
       action.play();
       // 一进来就是倒着的人（造出来就倒在地上）：直接到最后一帧
       const startAtEnd = pick.death && this.wasDown === null;
-      cur = this.current = { file: pick.file, action, clock: startAtEnd ? clip.duration : 0, mirror: false };
+      cur = this.current = { file: pick.file, action, clock: startAtEnd ? clip.duration : 0, mirror: false, lastT: null };
+    } else if (this.baseValid) {
+      // 同一条动作：先还原 mixer 上一次写的值（过渡、IK 改过的骨头 mixer 不会重写）
+      for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.boneList[i].quaternion.copy(this.base[i]);
+      this.H("Hips")?.position.copy(this.baseHips);
     }
     const D = clip.duration;
     let t;
@@ -405,9 +568,19 @@ export class XBotSkin {
       cur.clock += dt * rate;
       t = pick.loop && !pick.once ? cur.clock % D : Math.min(D, cur.clock);
     }
+    // 同一条动作里时间跳了（预演换了一个片段却映到同一条 Mixamo 动作、重新从头放、Seek）：也要淡，不硬切
+    if (cur.lastT !== null) {
+      let d = Math.abs(t - cur.lastT);
+      if (pick.loop && !pick.once) d = Math.min(d, D - d);
+      if (d > 0.2 + 2.5 * Math.max(dt, 0)) this.jumped = true;
+    }
+    cur.lastT = t;
     cur.action.time = t;
     this.wasDown = !!pick.death;
     this.mixer.update(dt);
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.base[i].copy(this.boneList[i].quaternion);
+    this.H("Hips") && this.baseHips.copy(this.H("Hips").position);
+    this.baseValid = true;
     this.pick = pick;
   }
 
@@ -415,11 +588,11 @@ export class XBotSkin {
   _Mirror(dt) {
     const source = this.source;
     if (!source) return;
-    if (this.current && !this.current.mirror) {
+    if (!this.current?.mirror) {
       this.mixer.stopAllAction();
       this.current = { mirror: true };
     }
-    this.mixer.update(dt);
+    this.baseValid = false;
     const rig = this.rig;
     rig.root.updateMatrixWorld(true);
     _inv.copy(rig.root.matrixWorld).invert();
@@ -463,6 +636,52 @@ export class XBotSkin {
       if (a === weapon && placed) continue;
       this._ReanchorOne(a, a === weapon);
     }
+    this._RifleSwapStep(placed ? weapon : null, dt);
+  }
+
+  /**
+   * 枪从手里换到背上（不据枪就背枪，Script_RelaxedGait）或反过来：背上那支是手里那支的克隆（原点一样），
+   * 新露出来的那支从上一帧看到的位置（容器本地）XBOT.rifleSwapS 秒挪到它该在的地方。
+   */
+  _RifleSwapStep(weapon, dt) {
+    const hand = weapon ? this.actor.weaponGroup : null;
+    const backRifle = this.rig.relaxedGaitRifle;
+    let back = null;
+    if (!hand && backRifle) { back = backRifle; for (let o = backRifle; o; o = o.parent) if (o.visible === false) { back = null; break; } }
+    const now = hand || back, which = hand ? "hand" : back ? "back" : null;
+    if (this.rifleSwap && this.rifleSwap.object !== now) this._EndRifleSwap();
+    if (now && this.rifleShown && this.rifleShown.which !== which) {
+      this.rifleSwap = { object: now, from: this.rifleShown.local.clone(), t: 0, rest: now === back ? now.matrix.clone() : null, weapon };
+    }
+    const swap = this.rifleSwap;
+    if (swap) {
+      swap.t += Math.max(dt, 0);
+      const k = Math.min(1, swap.t / XBOT.rifleSwapS), e = k * k * (3 - 2 * k);
+      // 背上那支的本地位姿游戏只在造它时写一次：每帧从原值算目标，淡完还原
+      if (swap.rest) swap.rest.decompose(now.position, now.quaternion, now.scale);
+      now.updateMatrix();
+      now.updateWorldMatrix(true, false);
+      const target = new THREE.Matrix4().copy(this.container.matrixWorld).invert().multiply(now.matrixWorld);
+      const world = new THREE.Matrix4().copy(this.container.matrixWorld).multiply(BlendMatrix(swap.from, target, e));
+      new THREE.Matrix4().copy(now.parent.matrixWorld).invert().multiply(world).decompose(now.position, now.quaternion, now.scale);
+      now.updateMatrix();
+      // 手里那支：_PlaceWeapon 下一帧按 wWritten 认出这是自己写的，不当成游戏的本意
+      if (swap.weapon && now === hand) swap.weapon.wWritten = now.matrix.clone();
+      now.updateMatrixWorld(true);
+      if (k >= 1) this._EndRifleSwap();
+    }
+    if (now) {
+      now.updateWorldMatrix(true, false);
+      const local = this.rifleShown?.local || new THREE.Matrix4();
+      this.rifleShown = { which, local: local.copy(this.container.matrixWorld).invert().multiply(now.matrixWorld) };
+    } else this.rifleShown = null;
+  }
+
+  _EndRifleSwap() {
+    const s = this.rifleSwap;
+    if (!s) return;
+    if (s.rest) { s.rest.decompose(s.object.position, s.object.quaternion, s.object.scale); s.object.updateMatrix(); s.object.updateMatrixWorld(true); }
+    this.rifleSwap = null;
   }
 
   _Write(a, world) {
@@ -785,6 +1004,7 @@ export class XBotSkin {
   }
 
   Dispose() {
+    this._EndRifleSwap();
     this.mixer.stopAllAction();
     this.container.removeFromParent();
     for (const mesh of this.hidden) mesh.visible = true;
