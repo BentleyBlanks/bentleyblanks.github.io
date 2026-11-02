@@ -38,7 +38,7 @@ import {
   L1218_AT_DITCH as AT, L1218_PLANK as PK, L1218_TRENCH as TR, L1218_VILLAGE as VL, L1218_CHURCH as CH, L1218_AID as A, L1218_GIRL_YARD as GY,
   L1218_CART_PARK as CPK, L1218_RAIL as RL, L1218_RAIL_RAMPS, L1218_RAIL_BRIDGE as RB, L1218_RIVER as RV, L1218_BANK as BK, L1218_LEVEE as LV,
   L1218_GUANDAO_BRIDGE as GB, L1218_BOMBED_YARD as BY, L1218_GRAVES, L1218_RIDGES, L1218_SIGNALS as SIG, L1218_FROM_0610, L1218_LIZIHANG as LZ,
-  L1218_SPAWN, L1218_HEIGHTS as H, StripFrame, RiverAtX, RiverPoint, RiverArcAtX,
+  L1218_SPAWN, L1218_HEIGHTS as H, L1218_TELEGRAPH, StripFrame, RiverAtX, RiverPoint, RiverArcAtX,
 } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 
 export const FIRST_LEVEL_1218_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel1218";
@@ -351,7 +351,8 @@ const Poi = (id, name, kind, at, radiusM = 2) => ({ id, name, kind, x: R2(at.x),
 const ArcTo = (from, to, halfDeg, extraM = 6) => ({ halfDeg, rangeM: R1(Dist(from, to) + extraM), yawDeg: Yaw(from, to) });
 
 const G = (id) => L1218_GRAVES.find((g) => g.id === id);
-const SUN_WEST = Pt(Math.max(PL.sunWest.x, L1218_BOUNDS.minX + 4), PL.sunWest.z);
+const SUN_WEST = Pt(PL.sunWest.x, PL.sunWest.z);   // 第二轮起 sunWest 本身就在场地里（土路长直段 → 桥北头的延长线上）
+const TELE_POLE_NEAR_BRIDGE = Pt(L1218_TELEGRAPH.x, 885);   // 桥北头边上那根电线杆（TelegraphPoleZs 里 z 885）
 const SLEEPER_PILE_DA1 = YardAt("DA1", YARD.DA1.gate.s + 2.6, YARD.DA1.d0 - 0.85);     // Scene 里 SleeperPile_DA1 的位置
 const SLOGAN_DA1 = YardAt("DA1", YARD.DA1.gate.s - 3.6, YARD.DA1.d0 - 0.3);            // Slogan_DA1 大致在院门西边的前墙上
 const RAID_WALL_SR1 = YardAt("SR1", YARD.SR1.s0 - 0.9, YARD.SR1.d0 + 5.5);              // 出村小路边那家塌了半截的墙（RaidAftermath）
@@ -394,10 +395,13 @@ const POI = {
   threshold: () => Poi("Threshold", "门槛", "poi", A.thresholdSeat, 0.8),
   passing: () => Poi("Passing2nd", "院门外二营的兵一拨拨跑过", "poi", Pt(EXIT_X, A.gate.z + 4), 4),
   girlYard: () => Poi("GirlYard", "隔壁院：女娃她娘把席子拉上盖住洞口", "poi", GY.hole.mouth, 1.4),
-  raidWall: () => Poi("RaidWall", "路边挨了炸的院子墙塌了一半、房梁冒烟", "landmark", RAID_WALL_SR1, 3),
-  raidMats: () => Poi("RaidMats", "一排人躺在墙根盖着席子露着脚", "poi", Pt(EXIT_X + 2.4, 832), 6),
+  // 18 引导（第二轮）：三处路边小场景按走路顺序沿北岸土路排（村里 SR1 的塌墙、出村小路的席子还在，18-3 的 POI 不再指它们）
+  raidWall: () => Poi("RaidWall", "一出村南头，路北边一个孤零零的院子挨了炸：墙塌了半边，房梁在冒烟", "landmark", PL.roadsideYard, 4),
+  raidMats: () => Poi("RaidMats", "路北边一道土墙，墙根一排人盖着席子、露着脚", "poi", PL.roadsideMats, 5),
   lizihang: () => Poi("Lizihang", "路过李子行，村里空了", "landmark", PL.liziHang, 8),
-  sunWest: () => Poi("SunWest", "太阳落到铁路那头", "landmark", SUN_WEST, 6),
+  liziGate: () => Poi("LiziGate", "李子行朝路的院门：门板歪着斜靠在门框上，地上掉着一只鞋", "poi", PL.liziSouthGate, 2),
+  sunWest: () => Poi("SunWest", "顺着土路往西南看，夕阳正落在铁路桥那头", "landmark", SUN_WEST, 6),
+  telegraph: () => Poi("Telegraph", "路基边一排电线杆（7 m 高、35 m 一根），远远标着铁路和桥在哪", "landmark", TELE_POLE_NEAR_BRIDGE, 3),
   railBridge: (kind = "objective") => Poi("RailBridge", "铁路桥（几孔钢梁架在石墩上，桥面只有枕木）", kind, PL.bridgeMid, 4),
   wade: () => Poi("Wade", "有老乡顺着陡岸滑下河床，蹚水过去", "poi", PL.wadeAt, 3),
   sappers: () => Poi("Sappers", "两个工兵在桥墩上绑炸药，引线拉到南岸河堤后", "poi", Pt(RL.x + 2, RB.northZ + (RB.southZ - RB.northZ) / RB.spans), 2),
@@ -1294,22 +1298,27 @@ function Keyframes() {
   Add({
     id: "18-3", ...s18, stageLabel: "18B", name: "出村、铁路桥",
     player: { x: p183.x, z: p183.z, yawDeg: 180, pitchDeg: -10, stance: "stand" },
-    what: "铁路桥北边只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木。三营守桥头，两个工兵在桥墩上绑炸药。担架踩着枕木一格一格过。",
+    what: "跟着担架队顺北岸土路走到铁路桥北头：桥北只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木。三营守桥头，两个工兵在桥墩上绑炸药。",
     next: { text: "过铁路桥", x: BR_S.x, z: BR_S.z, radiusM: 3 },
-    how: ["出村小路往南接北岸土路往西南；路边挨了炸的院子墙塌了一半、房梁冒烟；一排人躺在墙根盖着席子露着脚。路过李子行，村里空了。太阳落到铁路那头",
+    how: ["有人可跟：担架队排成一溜走在顺子前头（三四副担架连抬的人、军医、几个走得动的伤兵和百姓、老耿牵着妮儿、三营一两个押队的兵），刘文财跟在顺子后头。队伍按走路速度走；顺子落后十来米，队头就停下、押队的兵回头等（白盒表现不了，说明字）",
+      "远处有目标：一出村南头顺着土路往西南看，夕阳正落在铁路桥那头；路基边一排电线杆远远标着铁路和桥在哪",
+      "路上隔一阵有点东西（按走路顺序，约每 45–60 m 一处，都从路上看得见）：①一出村南头，路北边一个孤零零的院子挨了炸，墙塌了半边、房梁在冒烟；②再往前路北边一道土墙，墙根一排人躺着盖着席子露着脚；③李子行朝路那一面开着一个院门，门板歪着斜靠在门框上，地上掉着一只鞋，村里空了",
       "铁路桥北边只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木", "三营的兵守桥头，两个工兵在桥墩上绑炸药，引线拉到南岸河堤后",
       "担架踩着枕木一格一格过；有老乡顺陡岸滑下河床蹚水过去；老耿牵着妮儿走桥面"],
-    notes: `ChargesSet 从这一帧起。玩家在桥北头路基上 (${p183.x},${p183.z})（上路基的土坡顶在 (${PL.railRampTop.x},${PL.railRampTop.z})）。桥面上的人站在枕木顶上（每孔一条看不见的 standOn 走道）：担架、老耿牵着妮儿、三营的兵踩着枕木过桥；`
-      + `蹚水的老乡在河床那一股水里（齐小腿，蹚水点 (${PL.wadeAt.x},${PL.wadeAt.z})）。北沙河村到铁路桥约 ${Math.round(Dist(PL.villageSouthEnd, PL.bridgeNorth))} m（白盒压短，真实 1.2 km）。`,
+    notes: `ChargesSet 从这一帧起。这一帧是到桥北头那一刻：玩家在桥北头路基上 (${p183.x},${p183.z})（上路基的土坡顶在 (${PL.railRampTop.x},${PL.railRampTop.z})）；队头的担架已经在桥面上、队尾那副和军医在顺子前头的路基上、押队的三营兵回头等着，刘文财在顺子身后的土坡上。`
+      + `队伍在北岸土路上走的样子在预演里演（18-3 段：顺子的眼睛沿路四个定镜，每个都看得见前头的队伍，路过三处路边小场景，朝西南时夕阳 / 铁路桥 / 电线杆在画面里）。`
+      + `桥面上的人站在枕木顶上（每孔一条看不见的 standOn 走道）：担架、老耿牵着妮儿、三营的兵踩着枕木过桥；蹚水的老乡在河床那一股水里（齐小腿，蹚水点 (${PL.wadeAt.x},${PL.wadeAt.z})）。`
+      + `北沙河村到铁路桥约 ${Math.round(Dist(PL.villageSouthEnd, PL.bridgeNorth))} m（白盒压短，真实 1.2 km）。夕阳锚点 sunWest (${PL.sunWest.x},${PL.sunWest.z}) 在土路长直段 → 桥北头的延长线上；电线杆是创作。`,
     signals: S18B_SIG,
     units: [
       N("AidLitter1", BR_S, { kind: "litter", name: "院里抬出去的担架", group: "aidEvac", yaw: 180, climb: true, to: RAMP_S.from }),
       N("AidLitter2", Pt(RL.x, (RB.northZ + RB.southZ) / 2 + 3), { kind: "litter", group: "aidEvac", yaw: 180, climb: true }),
-      N("AidLitter3", Pt(RAMP_N.from.x + 2.4, RAMP_N.from.z - 0.4), { kind: "litter", group: "aidEvac", yaw: 90 }),
+      N("AidLitter3", Pt(RL.x + 0.3, RB.northZ - 2.6), { kind: "litter", group: "aidEvac", yaw: 180, climb: true }),   // 队尾那副：顺子前头的路基上，正要上桥
       N("AidLitter4", Pt(RL.x - 0.2, RB.northZ + 36), { kind: "litter", group: "aidEvac", yaw: 180, climb: true, from: PL.railRampTop }),
-      N("Doctor", Pt(RAMP_N.from.x + 4.6, RAMP_N.from.z - 2.2), { face: PL.bridgeNorth }),
+      N("Doctor", Pt(RL.x - 1.5, RB.northZ - 3.0), { face: PL.bridgeNorth, climb: true }),
       C("Geng", Pt(RL.x - 0.4, RB.northZ + 9.0), { yaw: 180, climb: true }), C("Nier", Pt(RL.x + 0.5, RB.northZ + 9.6), { yaw: 180, climb: true }),
-      N("LiuWencai", Pt(RL.x - 1.4, RB.northZ - 2.4), { yaw: 180, climb: true }),
+      N("LiuWencai", Pt(RAMP_N.from.x - 6.5, RAMP_N.from.z + 0.2), { face: p183, climb: true }),   // 跟在顺子后头（土坡上）
+      N("B3Rear", Pt(RL.x - 0.6, RB.northZ - 0.6), { name: "三营兵（押队，回头等）", role: "rifleman3rd", group: "bridge3rd", face: p183, climb: true }),
       N("B3Guard1", Pt(RL.x - 2.0, RB.northZ - 8.6), { name: "三营兵（守桥头）", role: "rifleman3rd", group: "bridge3rd", stance: "crouch", aim: true, face: Pt(RL.x - 2, RB.northZ - 60) }),
       N("B3Guard2", Pt(RL.x + 2.2, RB.northZ - 9.4), { role: "rifleman3rd", group: "bridge3rd", stance: "crouch", aim: true, face: MG18 }),
       N("B3Guard3", Pt(RL.x - 4.8, RB.northZ - 4.4), { role: "rifleman3rd", group: "bridge3rd", face: Pt(RL.x - 20, RB.northZ - 40) }),
@@ -1321,7 +1330,7 @@ function Keyframes() {
       C("Wader2", STREAM_AT(-64.5, -1.0), { role: "refugeeWithBundle", group: "waders", face: STREAM_AT(-64.5, 12), wade: true }),
       C("Wader3", STREAM_AT(-63.2, 2.0), { role: "refugeeCarryingElder", group: "waders", face: STREAM_AT(-63.2, 12), wade: true }),
     ],
-    pois: [POI.raidWall(), POI.raidMats(), POI.lizihang(), POI.sunWest(), POI.railBridge("objective"), POI.sappers(), POI.wade()],
+    pois: [POI.raidWall(), POI.raidMats(), POI.liziGate(), POI.lizihang(), POI.sunWest(), POI.telegraph(), POI.railBridge("objective"), POI.sappers(), POI.wade()],
   });
 
   // 18-4 南头等：顺子、刘文财趴河堤；担架一副副往南走进黑地；鬼子顺路基摸下来、机枪压土坎后的班长他们
@@ -1441,9 +1450,11 @@ function Keyframes() {
     what: "夜里，一长溜队伍顺南岸路往南走：有兵、有担架、有老百姓，老耿牵着妮儿在百姓堆里。黑地里远远有几点灯，是县城。",
     next: { text: "往南走", x: SR(80).x, z: SR(80).z, radiusM: 4 },
     how: ["黑场只有脚步声，字幕「1938年3月14日 夜」；淡入：一长溜队伍在夜里顺南岸路往南走，有兵、有担架、有老百姓，老耿牵着妮儿在百姓堆里",
+      "有人可跟、远处有目标：前头队伍里两三个人提着马灯（队头的三营军官、第一副担架的杠头、百姓堆里一个），黑地里一溜晃着的小亮点就是路；再远处几点不动的灯，是县城",
       "何有田：「老人家，跟到我们进城做啥子？鬼子明天就撵到城底下了。」老耿：「……城里有城墙，比庄上牢靠。」（没人接话）",
       "顺子走在队伍后头，手伸进怀里攥着钱袋和信（低声）：「……进了城再说。」", "黑地里远远有几点灯，是县城。黑场，第一关结束"],
-    notes: `南岸路从土坡脚 (${RD.southRoad.line[0].x},${RD.southRoad.line[0].z}) 往南到场地南边；队伍前后有兵、担架、百姓。县城的灯在路尽头 (${PL.cityLights.x},${PL.cityLights.z})（马灯 / 灯桩，几点亮），没有城墙、没有城门。`,
+    notes: `南岸路从土坡脚 (${RD.southRoad.line[0].x},${RD.southRoad.line[0].z}) 往南到场地南边；队伍前后有兵、担架、百姓。县城的灯在路尽头 (${PL.cityLights.x},${PL.cityLights.z})（马灯 / 灯桩，几点亮），没有城墙、没有城门。`
+      + `手提马灯（18 引导第二轮）：白盒单位挂不了手持道具、预演也没有跟人走的灯光事件，队伍里的三盏马灯（Officer18、AidLitter1 杠头、Refugee3）这轮只写在这里和预演说明字里，等预演支持手持道具 / 跟人的点光再挂。`,
     signals: S18C_SIG,
     units: [
       N("Officer18", SR(76, -0.9), { yaw: SR_YAW, to: SR(100, -0.9) }),

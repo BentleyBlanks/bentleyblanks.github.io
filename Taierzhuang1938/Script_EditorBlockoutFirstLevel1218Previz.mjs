@@ -1759,51 +1759,111 @@ function S1802(ctx) {
   return s.Done({ durationS: no + 9.2 });
 }
 
+/** 折线上弧长 s 处、横向 lat（顺着走的方向右手 = 北岸土路的北侧为正）的点，带那一截的朝向。 */
+function AlongLine(line, s, lat = 0) {
+  let walked = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i], len = Dist(a, b);
+    if (s <= walked + len + 1e-9 || i === line.length - 1) {
+      const k = Math.max(0, Math.min(1, (s - walked) / len)), ux = (b.x - a.x) / len, uz = (b.z - a.z) / len;
+      return { ...Pt(a.x + ux * len * k - uz * lat, a.z + uz * len * k + ux * lat), yaw: Yaw(a, b), seg: i };
+    }
+    walked += len;
+  }
+  return null;
+}
+/** 折线上弧长 s0…s1 之间的折点（不含两头）。 */
+function LineVerts(line, s0, s1) {
+  const out = []; let d = 0;
+  for (let i = 1; i < line.length; i++) { d += Dist(line[i - 1], line[i]); if (d > s0 + 0.3 && d < s1 - 0.3) out.push(Pt(line[i].x, line[i].z)); }
+  return out;
+}
+
+/**
+ * 18-3 路上的担架队（18 引导第二轮：有人可跟）：按离顺子的弧长排——队头押队的兵、担架、老耿牵妮儿、走得动的伤兵和百姓、队尾那副担架和军医、回头等的押队兵；
+ * 刘文财跟在顺子后头。spawn 的那几个（走得动的伤兵、百姓）只在这一段的路上出现，到桥头那一刻跟着上桥。
+ */
+const ROAD_COLUMN = Object.freeze([
+  { id: "B3Escort", ahead: 30.5, lat: -0.6 }, { id: "AidLitter4", ahead: 27.2 }, { id: "AidLitter2", ahead: 23.6 },
+  { id: "Geng", ahead: 20.6, lat: -0.7 }, { id: "Nier", ahead: 20.1, lat: 0.4 },
+  { id: "RoadWounded1", ahead: 17.6, lat: -0.9, spawn: { side: "nra", weapon: null, role: "wounded", name: "走得动的伤兵" } },
+  { id: "RoadWounded2", ahead: 16.4, lat: 0.8, spawn: { side: "nra", weapon: null, role: "wounded" } },
+  { id: "RoadCiv1", ahead: 14.4, lat: -1.0, spawn: { side: "civ", kind: "civilian", body: "procedural", role: "refugeeWithBundle" } },
+  { id: "RoadCiv2", ahead: 13.4, lat: 0.7, spawn: { side: "civ", kind: "civilian", body: "procedural", role: "refugee" } },
+  { id: "AidLitter3", ahead: 11.2 }, { id: "Doctor", ahead: 9.2, lat: 1.0 }, { id: "B3Rear", ahead: 7.2, lat: -0.9 },
+  { id: "LiuWencai", ahead: -4.2, lat: 0.6 },
+]);
+
 function S1803(ctx) {
-  const s = new Seq(ctx, "18-3", "出村、铁路桥：担架踩着枕木一格一格过；老乡顺陡岸滑下河床蹚水");
+  const s = new Seq(ctx, "18-3", "出村、铁路桥：跟着担架队走北岸土路；担架踩着枕木一格一格过；老乡顺陡岸滑下河床蹚水");
   const P = KP(ctx, "18-3");
   const K = id => KXZ(ctx, "18-3", id);
   const deckEnd = DECK(RB.southZ + 1.5);
-  // 路上几个定镜：路边挨了炸的院子墙塌了一半、房梁冒烟；墙根一排盖着席子露着脚的人；路过李子行，村里空了；太阳落到铁路那头
-  const raidWall = Pt(130.1, 789.2);
-  s.Ev(0, "smoke", { x: raidWall.x + 0.8, z: raidWall.z + 0.6, kind: "SmokeBlack", dur: 60 });
-  s.Cam(0, 3.0, { from: { x: 121.6, z: 799.0, h: 1.6 }, look: { ...raidWall, h: 1.0 } });
-  s.Caption(0.2, 3.0, "（出村小路：路边挨了炸的院子墙塌了一半，房梁冒烟）");
-  s.Cam(3.0, 3.0, { from: { x: 121.6, z: 823.0, h: 1.5 }, look: { x: 123.4, z: 833, h: 0.2 } });
-  s.Caption(3.2, 3.0, "（墙根一排人躺着，盖着席子、露着脚）");
-  s.Cam(6.0, 3.0, { from: { x: -12, z: 895.6, h: 1.6 }, look: { ...LIZI, h: 1.2 } });
-  s.Caption(6.2, 3.0, "（北岸土路往西南；路过李子行，村里空了）");
-  s.Cam(9.0, 3.0, { from: { x: -58, z: 905.6, h: 1.6 }, look: { ...SUN, h: 30 } });
-  s.Caption(9.2, 3.0, "（太阳落到铁路那头）");
-  s.Cam(12.0, 3.6, { from: { x: RAMP_N_FOOT.x - 2.0, z: RAMP_N_FOOT.z - 0.5, h: 1.7 }, look: { ...DECK(942), h: 2.8 } });
-  s.Caption(12.2, 3.6, "（铁路桥北边只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木；三营的兵守桥头）");
+  const ROAD = NORTH_BANK_ROAD, WALK = 1.2;
+  // 一出村南头，路北边孤零零那个院子的房梁在冒烟（RaidAftermath 起塌的；烟是预演事件，scale 2.5、一出来就是整根）
+  const beam = Pt(PL.roadsideYard.x, PL.roadsideYard.z);
+  s.Ev(0, "smoke", { x: beam.x, z: beam.z, kind: "SmokeBlack", dur: 60, scale: 2.5, prewarm: true });
+  // 路上四个定镜（顺子的眼睛在北岸土路上，前头是排成一溜的担架队）：①孤院 ②土墙席子 ③李子行院门 ④夕阳 / 铁路桥 / 电线杆
+  const SHOT = 4.5;
+  const ROAD_SHOTS = [
+    { sEye: 27, look: Lerp(beam, AlongLine(ROAD, 46), 0.5), lookH: 1.0, pitch: -2,   // 刚拐上北岸土路：隔着塌了的东南角看得见院里冒烟的房梁
+      cap: "（出村南头顺北岸土路往西南：担架队排成一溜走在前头，刘文财跟在后头；路北边一个孤零零的院子挨了炸，墙塌了半边，房梁在冒烟）" },
+    { sEye: 80, look: Lerp(Pt(PL.roadsideMats.x, PL.roadsideMats.z), AlongLine(ROAD, 98), 0.5), lookH: 0.8, pitch: -3,
+      cap: "（路北边一道土墙，墙根一排人躺着，盖着席子、露着脚。顺子落后十来米，队头就停下、押队的兵回头等——白盒表现不了，说明字）" },
+    { sEye: 128, look: Lerp(Pt(PL.liziSouthGate.x, PL.liziSouthGate.z), AlongLine(ROAD, 146), 0.5), lookH: 1.0, pitch: -2,
+      cap: "（路过李子行，村里空了；朝路的院门开着，门板歪着斜靠在门框上，地上掉着一只鞋）" },
+    { sEye: 160, look: Pt(-110, 926), lookH: 8, pitch: 0,
+      cap: "（太阳落到铁路那头——顺着土路看，夕阳正对着铁路桥；路基边一排电线杆远远标着铁路和桥在哪）" },
+  ];
+  const members = ROAD_COLUMN.map(m => ({ ...m, present: s.pos.has(m.id) }));
+  ROAD_SHOTS.forEach((sh, i) => {
+    const t0 = R(i * SHOT), t1 = R(t0 + SHOT);
+    const eye = AlongLine(ROAD, sh.sEye);
+    s.Eye(t0, SHOT, { stance: "stand", x: eye.x, z: eye.z, look: sh.look, pitch: sh.pitch });
+    s.Caption(t0 + 0.2, SHOT - 0.2, sh.cap);
+    for (const m of members) {
+      const sa = sh.sEye + m.ahead, sb = sa + WALK * SHOT, a = AlongLine(ROAD, sa, m.lat || 0), b = AlongLine(ROAD, sb, m.lat || 0);
+      if (i === 0 && m.spawn) s.Spawn(m.id, { ...m.spawn, x: a.x, z: a.z, yawDeg: a.yaw }, { visible: true });
+      else s.Place(m.id, t0, a.x, a.z, { yawDeg: a.yaw, aim: false });
+      s.Go(m.id, t0, t1, b.x, b.z, { move: "walk", path: LineVerts(ROAD, sa, sb), yawDeg: b.yaw });
+    }
+  });
+  // 到桥北头那一刻（关键帧的摆法）：大家切回关键帧位置，spawn 的几个已经在桥面上老耿前头
+  const T0 = R(ROAD_SHOTS.length * SHOT);
+  for (const m of members) if (m.present) s.Place(m.id, T0, K(m.id).x, K(m.id).z, { yawDeg: KU(ctx, "18-3", m.id).yawDeg });
+  const EXTRA_DECK = { RoadWounded1: Pt(RL.x - 0.5, RB.northZ + 3.0), RoadWounded2: Pt(RL.x + 0.6, RB.northZ + 4.6), RoadCiv1: Pt(RL.x - 0.4, RB.northZ + 6.2), RoadCiv2: Pt(RL.x + 0.5, RB.northZ + 7.4) };
+  for (const [id, p] of Object.entries(EXTRA_DECK)) s.Place(id, T0, p.x, p.z, { yawDeg: 180 });
+  s.Cam(T0, 3.6, { from: { x: RAMP_N_FOOT.x - 2.0, z: RAMP_N_FOOT.z - 0.5, h: 1.7 }, look: { ...DECK(942), h: 2.8 } });
+  s.Caption(T0 + 0.2, 3.6, "（铁路桥北边只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木；三营的兵守桥头）");
   // 两个工兵在北头两墩上绑炸药，引线拉到南岸河堤后（ChargesSet 关键帧 18-3 起就开，预演不动它）
   for (const id of ["Sapper1", "Sapper2"]) s.Key(id, 0, { clip: KNEEL_DIG });
-  s.Cam(15.6, 3.4, { from: { x: RL.x + 3.0, z: RB.northZ - 1.0, h: 1.7 }, look: { actor: "Sapper1", offset: [0, 0.8, 0] } });
-  s.Caption(15.8, 3.4, "（两个工兵在北头两座桥墩上绑炸药，引线拉到南岸河堤后）");
+  s.Cam(T0 + 3.6, 3.4, { from: { x: RL.x + 3.0, z: RB.northZ - 1.0, h: 1.7 }, look: { actor: "Sapper1", offset: [0, 0.8, 0] } });
+  s.Caption(T0 + 3.8, 3.4, "（两个工兵在北头两座桥墩上绑炸药，引线拉到南岸河堤后）");
   // 担架和兵踩着枕木一格一格过（standOn 走道：演员站在枕木顶上）
-  s.Walk("AidLitter3", 0.4, DECK(RB.northZ + 30), { speed: 1.2 });
-  s.Walk("Doctor", 1.2, DECK(RB.northZ + 26), { speed: 1.2 });
-  s.Walk("AidLitter2", 0.2, Pt(RAMP_S_FOOT.x + 1.0, RAMP_S_FOOT.z + 1.0), { speed: 1.2 });
-  s.Walk("AidLitter4", 0.2, Pt(RAMP_S_FOOT.x + 2.4, RAMP_S_FOOT.z + 4.6), { speed: 1.2 });
-  s.Walk("AidLitter1", 0.2, Pt(-64, 990), { speed: 1.2 });
-  s.Walk("B3Escort", 0.6, DECK(RB.southZ - 2), { speed: 1.2, aim: false });
-  s.Walk("Geng", 0.8, Off(deckEnd, -0.4, -4.0), { speed: 1.0 });
-  s.Walk("Nier", 0.8, Off(deckEnd, 0.5, -3.6), { speed: 1.0 });
-  s.Walk("LiuWencai", 4.0, DECK(RB.northZ + 8), { speed: 1.1, aim: false });
-  s.Cam(19.0, 4.0, { from: { x: RL.x + 4.0, z: RB.northZ - 0.6, h: 1.7 }, look: { actor: "AidLitter3", offset: [0, 1.0, 0] } });
-  s.Caption(19.2, 3.8, "（担架踩着枕木一格一格过；老耿牵着妮儿走桥面）");
+  s.Walk("AidLitter3", T0 + 0.4, DECK(RB.northZ + 30), { speed: 1.2 });
+  s.Walk("Doctor", T0 + 1.2, DECK(RB.northZ + 26), { speed: 1.2 });
+  s.Walk("AidLitter2", T0 + 0.2, Pt(RAMP_S_FOOT.x + 1.0, RAMP_S_FOOT.z + 1.0), { speed: 1.2 });
+  s.Walk("AidLitter4", T0 + 0.2, Pt(RAMP_S_FOOT.x + 2.4, RAMP_S_FOOT.z + 4.6), { speed: 1.2 });
+  s.Walk("AidLitter1", T0 + 0.2, Pt(-64, 990), { speed: 1.2 });
+  s.Walk("B3Escort", T0 + 0.6, DECK(RB.southZ - 2), { speed: 1.2, aim: false });
+  s.Walk("Geng", T0 + 0.8, Off(deckEnd, -0.4, -4.0), { speed: 1.1 });
+  s.Walk("Nier", T0 + 0.8, Off(deckEnd, 0.5, -3.6), { speed: 1.1 });
+  for (const [id, dz] of [["RoadWounded1", -12.0], ["RoadWounded2", -10.6], ["RoadCiv1", -9.0], ["RoadCiv2", -7.8]]) s.Walk(id, T0 + 0.8, Off(deckEnd, id.endsWith("1") ? -0.5 : 0.5, dz), { speed: 1.1 });
+  s.Walk("LiuWencai", T0 + 4.0, DECK(RB.northZ + 8), { speed: 1.1, aim: false });
+  s.Key("B3Rear", T0 + 1.0, { faceTo: "player" });
+  s.Cam(T0 + 7.0, 4.0, { from: { x: RL.x + 4.0, z: RB.northZ - 0.6, h: 1.7 }, look: { actor: "AidLitter3", offset: [0, 1.0, 0] } });
+  s.Caption(T0 + 7.2, 3.8, "（担架踩着枕木一格一格过；老耿牵着妮儿走桥面）");
   // 有老乡顺着陡岸滑下河床，蹚水过去
-  s.Go("Wader1", 0.6, 6.0, SlideN(SLIDE_N.lenM - 0.5).x, SlideN(SLIDE_N.lenM - 0.5).z, { move: "walk", yawDeg: 180 });
-  s.Go("Wader1", 6.2, 14.0, WADE.x, WADE.z, { move: "walk", yawDeg: 180 });
-  s.Go("Wader1", 14.2, 24.0, SlideS(SLIDE_S.lenM - 0.5).x, SlideS(SLIDE_S.lenM - 0.5).z, { move: "walk", yawDeg: 180 });
-  s.Go("Wader2", 2.0, 10.0, SlideS(SLIDE_S.lenM - 1.0).x - 1.0, SlideS(SLIDE_S.lenM - 1.0).z, { move: "walk", yawDeg: 180 });
-  s.Go("Wader3", 2.6, 10.8, SlideS(SLIDE_S.lenM - 0.4).x + 0.4, SlideS(SLIDE_S.lenM - 0.4).z, { move: "walk", yawDeg: 180 });
-  s.Cam(23.0, 4.0, { from: { x: SLIDE_N.x + 4.0, z: RB.northZ - 1.0, h: 1.8 }, look: { actor: "Wader1", offset: [0, 0.6, 0] } });
-  s.Caption(23.2, 3.6, "（有老乡顺着陡岸滑下河床，蹚水过去）");
+  s.Go("Wader1", T0 + 0.6, T0 + 6.0, SlideN(SLIDE_N.lenM - 0.5).x, SlideN(SLIDE_N.lenM - 0.5).z, { move: "walk", yawDeg: 180 });
+  s.Go("Wader1", T0 + 6.2, T0 + 14.0, WADE.x, WADE.z, { move: "walk", yawDeg: 180 });
+  s.Go("Wader1", T0 + 14.2, T0 + 24.0, SlideS(SLIDE_S.lenM - 0.5).x, SlideS(SLIDE_S.lenM - 0.5).z, { move: "walk", yawDeg: 180 });
+  s.Go("Wader2", T0 + 2.0, T0 + 10.0, SlideS(SLIDE_S.lenM - 1.0).x - 1.0, SlideS(SLIDE_S.lenM - 1.0).z, { move: "walk", yawDeg: 180 });
+  s.Go("Wader3", T0 + 2.6, T0 + 10.8, SlideS(SLIDE_S.lenM - 0.4).x + 0.4, SlideS(SLIDE_S.lenM - 0.4).z, { move: "walk", yawDeg: 180 });
+  s.Cam(T0 + 11.0, 4.0, { from: { x: SLIDE_N.x + 4.0, z: RB.northZ - 1.0, h: 1.8 }, look: { actor: "Wader1", offset: [0, 0.6, 0] } });
+  s.Caption(T0 + 11.2, 3.6, "（有老乡顺着陡岸滑下河床，蹚水过去）");
   // 顺子跟上桥：缝里看得见底下的沙和一股水
   const deck0 = Pt(P.x, P.z), deck1 = DECK(RB.northZ + 13);
-  const walk = R(27.0), T2 = R(walk + RouteLen(deck0, StreetRoute(deck0, deck1)) / 1.2);
+  const walk = R(T0 + 15.0), T2 = R(walk + RouteLen(deck0, StreetRoute(deck0, deck1)) / 1.2);
   const w = Walker(s, deck0, deck1, walk, T2);
   w.shot(walk, T2, { actor: "AidLitter3", offset: [0, 1.0, 0] });
   s.Caption(walk + 0.2, 3.0, "（顺子跟着担架走上桥面）");
@@ -2005,6 +2065,7 @@ function S1808(ctx) {
   for (const id of column) { const p = K(id); const a = along(p, -D1), b = along(p, D2); s.Place(id, T1 - 0.4, a.x, a.z, { yawDeg: yawS, aim: false }); s.Go(id, T1 - 0.2, T2, b.x, b.z, { move: "walk", yawDeg: yawS, aim: false }); }
   s.WalkEye(T1 - 0.6, T2 - T1 + 0.6, along(P, -D1), along(P, D2), { ...CITY_LIGHTS, h: 1.0 });
   s.Caption(T1 + 0.5, 4.0, "（一长溜队伍顺南岸路往南走，有兵，有担架，有老百姓；老耿牵着妮儿在百姓堆里）");
+  s.Caption(T1 + 4.6, 3.2, "（前头队伍里两三个人提着马灯：队头的军官、第一副担架的杠头、百姓堆里一个——白盒挂不了手持道具，说明字顶）");
   // 队伍接着走；何有田：老人家，跟到我们进城做啥子？老耿：……城里有城墙，比庄上牢靠。（没人接话）
   const D3 = 22.0, T3 = R(T2 + (D3 - D2) / 1.4);   // 第二截按自然步速走满，台词时人还在走
   for (const id of column) { const p = K(id); const b = along(p, D3); s.Go(id, T2, T3, b.x, b.z, { move: "walk", yawDeg: yawS, aim: false }); }

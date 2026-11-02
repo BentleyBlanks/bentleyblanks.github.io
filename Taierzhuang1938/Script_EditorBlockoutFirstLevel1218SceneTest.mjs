@@ -14,6 +14,8 @@
 //   ⑩ 七个剧情事件的体块齐、事件名有中文；
 //   ⑪ 场地 bounds 与高度图加长后这一块取得出来、过校验（0105 / 0610 的门禁另跑）。
 // 另查：村子（35–45 个院子、随街转、离路 ≥ 0.6、每家有房有顶有门）、教堂比民房高、三口井、两处水塘、三垛枕木、四条标语、亮灯的院子、李子行五个空院、地标与涂色。
+// ⑫ 18 引导（2026-11-02 第二轮）：北岸土路边三处小场景离路中线 ≤ 10 m、按走路顺序相邻 40–80 m、从路上看得见；铁路沿线电线杆 ≥ 12 根、7 m 高、35 m 一根、两岸都有；
+//    夕阳 sunWest 在土路长直段 (100,868) → 桥北头 (−80,918) 延长线 ±5° 内、在场地里；路上 (60,880) 看得见桥北头与桥边的电线杆顶。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene, NormalizeLandmarks } from "./Script_EditorBlockoutConfig.mjs";
@@ -21,13 +23,14 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { SCENE_EVENTS } from "./Data_SceneEvents.mjs";
 import {
-  CompareWith0610, RouteProfile, BlocksNearLine, L1218SightChecks, BlockCenterY, SolidBlocks, L1218_CART_ROUTE, L1218_STRETCHER_ROUTE, L1218_HOLES,
-  HoleWorld, HECHA_FLOOR_Y, HECHA_END, DitchZAtX, AllYards, YardConflicts, YardCorners, PlainHeight,
+  CompareWith0610, RouteProfile, BlocksNearLine, L1218SightChecks, BlockCenterY, SolidBlocks, BlockSight, L1218_CART_ROUTE, L1218_STRETCHER_ROUTE, L1218_HOLES,
+  HoleWorld, HECHA_FLOOR_Y, HECHA_END, DitchZAtX, AllYards, YardConflicts, YardCorners, PlainHeight, L1218RoadsideSpots, TelegraphPoleZs,
 } from "./Script_EditorBlockoutFirstLevel1218Scene.mjs";
 import {
   L1218_GROUND, L1218_HEIGHTS as H, L1218_AT_DITCH as AT, L1218_PLANK as PK, L1218_TRENCH as TR, L1218_VILLAGE as VL, L1218_CHURCH as CH,
   L1218_AID as A, L1218_GIRL_YARD as GY, L1218_RAIL as RL, L1218_RAIL_BRIDGE as RB, L1218_RIVER as RV, L1218_BANK as BK, L1218_LEVEE as LV, L1218_GUANDAO_BRIDGE as GB,
   L1218_ROADS, L1218_RAIL_RAMPS, L1218_SIGNALS as SIG, L1218_PLACES as PL, L1218_BOUNDS as B, L1218_WELLS, L1218_PONDS, L1218_LIZIHANG as LZ, L1218_SLOGAN_TEXTS,
+  L1218_ROADSIDE as RS, L1218_TELEGRAPH as TG,
   RiverAtX, RiverFrame, RiverPoint, RiverArcAtX,
 } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
@@ -299,13 +302,52 @@ assert.ok(a.gates.filter((g) => /^BombedCrater_/.test(g.id) && g.appearSignal ==
 assert.ok(a.gates.filter((g) => /^RaidMat_/.test(g.id) && g.appearSignal === SIG.raidAftermath).length >= 12 && a.gates.filter((g) => /^RaidRubble_/.test(g.id)).length >= 3, "空袭过后：一排排盖着席子的人 + 碎砖堆随 RaidAftermath");
 assert.ok(a.gates.some((g) => /_WallL_Intact$/.test(g.id) && g.signal === SIG.raidAftermath) && a.gates.some((g) => /_WallL_Stub$/.test(g.id) && g.appearSignal === SIG.raidAftermath), "出村小路边那家墙塌了半截（RaidAftermath）");
 
+// --- ⑫ 18 引导：路边三处小场景、电线杆、夕阳方向 ---
+const spots = L1218RoadsideSpots(yards);
+assert.deepEqual(spots.map((sp) => sp.id), [RS.lonelyYard.id, RS.wallMats.id, RS.liziGate.id], "北岸土路边三处小场景按走路顺序：孤院、土墙席子、李子行院门");
+for (const sp of spots) assert.ok(sp.roadDist <= 10 && sp.roadDist >= 1.5, `${sp.id} 离土路中线 ${sp.roadDist} m（要 1.5–10 m）`);
+for (let i = 1; i < spots.length; i++) { const gap = spots[i].roadS - spots[i - 1].roadS; assert.ok(gap >= 40 && gap <= 80, `${spots[i - 1].id} → ${spots[i].id} 顺路相隔 ${gap.toFixed(1)} m（要 40–80）`); }
+assert.ok(spots[0].roadS >= 20 && spots[0].roadS <= 60, `第一处离村南头 ${spots[0].roadS} m（一出村就看得见）`);
+for (const r of s.roadside) Clear(r, `北岸土路上要看得见 ${r.id}`);
+const LY = RS.lonelyYard;
+assert.ok(a.blocks.some((x) => x.id === `${LY.id}_WallN`) && a.blocks.some((x) => x.id === `${LY.id}_HouseW`) && a.blocks.filter((x) => x.id.startsWith(`${LY.id}_WallF`) && !x.signal && !x.appearSignal).length >= 1, "孤院有墙、有正房西半间、前墙西段");
+assert.ok(byId.get(`${LY.id}_WallF_Intact`)?.signal === SIG.raidAftermath && byId.get(`${LY.id}_WallF_Stub`)?.appearSignal === SIG.raidAftermath && byId.get(`${LY.id}_WallF_Stub`).h <= 0.8, "孤院前墙东半截随 RaidAftermath 塌成墙根");
+assert.ok(byId.get(`${LY.id}_WallE_Intact`)?.signal === SIG.raidAftermath && byId.get(`${LY.id}_WallE_Stub`)?.appearSignal === SIG.raidAftermath && byId.get(`${LY.id}_WallE_Stub`).h <= 0.8 && byId.get(`${LY.id}_CornerRubble`)?.appearSignal === SIG.raidAftermath, "孤院东墙南半截也塌了（东南角整个塌、角外一堆碎砖）：从村南头走过来先看见");
+{ const eye = { x: 104.1, z: 865.7, eye: stand(104.1, 865.7) - sample(104.1, 865.7) + 1.62 }, afterRaid = SolidBlocks(a, [SIG.raidAftermath]);
+  const r = BlockSight(afterRaid, sample, eye, { x: LY.beam.x, z: LY.beam.z, eye: LY.house.heapH + 0.3 });
+  assert.ok(r === null, `从村南头刚拐上北岸土路 (104.1,865.7) 隔着塌了的东南角看得见孤院里的房梁（被 ${r?.id} 挡）`); }
+assert.ok(byId.get(`${LY.id}_HouseE`)?.signal === SIG.raidAftermath && byId.get(`${LY.id}_HouseE_Heap`)?.appearSignal === SIG.raidAftermath && byId.get(`${LY.id}_Beam`)?.appearSignal === SIG.raidAftermath && byId.get(`${LY.id}_Beam`).beam, "孤院正房东半间随 RaidAftermath 塌成一堆、房梁斜搭在堆上");
+assert.ok(LY.box.minX >= 78 && LY.box.maxX <= 97 && LY.box.minZ >= 848 && LY.box.maxZ <= 868 && LY.box.maxZ < PL.northBankRoadA.z, "孤院在 x 80–95、z 850–866 一带、路北侧");
+const roadWall = byId.get(RS.wallMats.id);
+assert.ok(roadWall && roadWall.h >= 1.5 && roadWall.w >= 12 && Math.abs(roadWall.ry) > 0.1, "路北边一道顺着路的土墙");
+const wallMats = a.gates.filter((g) => g.id.startsWith(`RaidMat_${RS.wallMats.id}_`));
+assert.ok(wallMats.length >= 5 && wallMats.every((g) => g.appearSignal === SIG.raidAftermath && g.prop === "Mat" && Math.hypot(g.x - roadWall.x, g.z - roadWall.z) < 10), "土墙根一排 ≥ 5 张席子随 RaidAftermath 出现");
+assert.ok(wallMats.every((g) => Math.hypot(g.x - spots[1].road.x, g.z - spots[1].road.z) < Math.hypot(roadWall.x - spots[1].road.x, roadWall.z - spots[1].road.z) + 1), "席子在墙朝路的那一面");
+assert.ok(a.blocks.filter((x) => x.id.startsWith(`${RS.liziGate.yard}_WallB`)).length === 2, "李子行 LzS2 朝路的南墙开了院门（墙分两段）");
+assert.ok(byId.get(`${RS.liziGate.id}_DoorBoard`)?.prop === "DoorBoard" && Math.hypot(byId.get(`${RS.liziGate.id}_DoorBoard`).x - PL.liziSouthGate.x, byId.get(`${RS.liziGate.id}_DoorBoard`).z - PL.liziSouthGate.z) < 1.2, "门板歪着靠在门框上");
+assert.ok(byId.get(`${RS.liziGate.id}_Shoe`)?.prop === "Shoe" && byId.get(`${RS.liziGate.id}_Shoe`).h < 0.15 && byId.get(`${RS.liziGate.id}_Shoe`).z > LZ.box.maxZ, "门外地上掉着一只鞋（小体块）");
+for (const [i, p] of [PL.roadsideYard, PL.roadsideMats, PL.liziSouthGate].entries()) assert.ok(Math.hypot(p.x - spots[i].x, p.z - spots[i].z) < 12, `地名表 ${["roadsideYard", "roadsideMats", "liziSouthGate"][i]} 对得上第 ${i + 1} 处`);
+const poles = a.blocks.filter((x) => x.pole && x.telegraph);
+assert.ok(poles.length >= 12 && poles.length === TelegraphPoleZs().length, `铁路沿线电线杆 ${poles.length} 根`);
+assert.ok(poles.every((p) => Math.abs(p.h - 7) <= 0.5 && Math.abs(p.x - TG.x) < 0.01 && Math.abs(p.x - RL.x) >= 6 && Math.abs(p.x - RL.x) <= 9), "电线杆 7 m 高、在路基坡脚外一排");
+{ const zs = poles.map((p) => p.z).sort((p, q) => p - q); for (let i = 1; i < zs.length; i++) assert.ok(Math.abs(zs[i] - zs[i - 1] - TG.everyM) < 0.01 || (zs[i - 1] < RB.northZ && zs[i] > RB.southZ), `电线杆间距 ${(zs[i] - zs[i - 1]).toFixed(1)}（要 ${TG.everyM}，只在沙河那一截断开）`);
+  assert.ok(zs.some((z) => z < RB.northZ - 20) && zs.some((z) => z > RB.southZ + 20) && !zs.some((z) => z > RB.northZ - 4 && z < RB.southZ + 10), "两岸都有电线杆，坎沿与河堤那一截不放"); }
+assert.ok(a.blocks.filter((x) => x.telegraph && /^TeleWire_/.test(x.id)).length >= poles.length - 2 && a.blocks.filter((x) => x.telegraph && /^TeleArm_/.test(x.id)).length === poles.length, "杆顶横担、杆间一根线");
+Clear(s.roadToBridge, "北岸土路 (60,880) 看得见铁路桥北头");
+Clear(s.roadToPole, "北岸土路 (60,880) 看得见桥边那根电线杆的顶");
+{ const sun = PL.sunWest, a0 = PL.northBankRoadA, bn = PL.bridgeNorth;
+  const Deg = (p, q) => Math.atan2(q.x - p.x, q.z - p.z) * 180 / Math.PI;
+  const diff = Math.abs(((Deg(a0, bn) - Deg(a0, sun) + 540) % 360) - 180);
+  assert.ok(diff <= 5, `夕阳 sunWest (${sun.x},${sun.z}) 要在土路长直段 (${a0.x},${a0.z}) → 桥北头 (${bn.x},${bn.z}) 的延长线 ±5° 内（差 ${diff.toFixed(1)}°）`);
+  assert.ok(sun.x >= B.minX && sun.x <= B.maxX && sun.z >= B.minZ && sun.z <= B.maxZ && Math.hypot(sun.x - bn.x, sun.z - bn.z) > 60, "夕阳锚点在场地里、在桥那头更远处"); }
+
 // --- 地标与涂色 ---
 assert.ok(Array.isArray(a.landmarks) && a.landmarks.filter((l) => l.z >= L1218_GROUND.seamZ).length >= 45, "地标齐");
 const lms = NormalizeLandmarks(a.landmarks);
 assert.equal(lms.length, a.landmarks.length, "地标都过归一化");
 for (const lm of lms) assert.ok(lm.x >= B.minX && lm.x <= B.maxX && lm.z >= B.minZ && lm.z <= B.maxZ, `地标 ${lm.id} 在场地外`);
 const LM = new Map(lms.map((x) => [x.id, x]));
-for (const id of ["LmDirtRoad", "LmJunction", "LmPostRoad_1218", "LmAtDitch", "LmPlank", "LmTrenchSquad", "LmMg727", "LmMainStreet_1218", "LmNorthStreet", "LmMidStreet", "LmSouthStreet", "LmSouthStreetCorner", "LmChurch", "LmBombedYard", "LmGateYard", "LmAid", "LmAidGate", "LmXiangDoor", "LmGirlYard", "LmGuandaoBridge", "LmNorthBankRoad", "LmLizihang", "LmRailNorth", "LmRailBridge", "LmRiver_1218", "LmBank", "LmMg18", "LmLevee", "LmSouthRoad", "LmCityLights"]) assert.ok(LM.has(id), `缺地标 ${id}`);
+for (const id of ["LmDirtRoad", "LmJunction", "LmPostRoad_1218", "LmAtDitch", "LmPlank", "LmTrenchSquad", "LmMg727", "LmMainStreet_1218", "LmNorthStreet", "LmMidStreet", "LmSouthStreet", "LmSouthStreetCorner", "LmChurch", "LmBombedYard", "LmGateYard", "LmAid", "LmAidGate", "LmXiangDoor", "LmGirlYard", "LmGuandaoBridge", "LmNorthBankRoad", "LmLizihang", "LmRailNorth", "LmRailBridge", "LmRiver_1218", "LmBank", "LmMg18", "LmLevee", "LmSouthRoad", "LmCityLights", "LmLoneYard", "LmRoadWall", "LmLiziGate", "LmTelegraph"]) assert.ok(LM.has(id), `缺地标 ${id}`);
 for (const id of ["LmNorthGate", "LmOldMan", "LmVillageWest", "LmFieldPath", "LmTankettes", "LmWestTurn"]) assert.ok(!LM.has(id), `第三版的地标 ${id} 不该还在`);
 assert.ok(Math.abs(LM.get("LmPlank").x - PK.x) < 0.05 && Math.abs(LM.get("LmPlank").z - PK.z) < 0.05, "板桥的地标框对得上");
 assert.ok(LM.get("LmAidHoleA").y < H.plain && LM.get("LmAidHoleA").y - LM.get("LmAidHoleA").h / 2 <= H.holeFloorY + 0.05, "洞的地标框从洞底立到地面");
@@ -314,4 +356,5 @@ assert.ok(a.paint.filter((p) => /^Wheat_/.test(p.id)).length >= 10, "四周的�
 
 console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；接缝最大差 ${cmp.worst} m；`
   + `驴车路最陡 ${route.maxStep}、横向 ${route.maxLat}；沟深 ${(H.plain - AT.floorY).toFixed(1)}；战壕→坟 ${s.trenchToGraves[0].distM} m；机枪→坎后被挡 ${s.mgToCover.ground}；河堤→机枪 ${s.leveeToMg.distM} m；南街口→官道桥 ${s.cornerToBridge.distM} m；`
-  + `院门 ${gateW.toFixed(2)}、厢房门 ${doorW.toFixed(2)}；枕木 ${sleepers.length} 根；村里 ${villageYards.length} 个院子`);
+  + `院门 ${gateW.toFixed(2)}、厢房门 ${doorW.toFixed(2)}；枕木 ${sleepers.length} 根；村里 ${villageYards.length} 个院子；`
+  + `18 引导：路边三处 s ${spots.map((sp) => sp.roadS).join(" / ")} m、离中线 ${spots.map((sp) => sp.roadDist).join(" / ")} m，电线杆 ${poles.length} 根，夕阳偏差 ≤ 5°`);

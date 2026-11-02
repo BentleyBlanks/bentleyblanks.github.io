@@ -209,6 +209,22 @@ for (const uid of ["Wader2", "Wader3"]) { const w = Unit("18-3", uid), r = River
 for (const uid of ["Sapper1", "Sapper2"]) assert.ok(Math.abs(Unit("18-3", uid).x - RL.x) < 4 && Unit("18-3", uid).z > RB.northZ && Unit("18-3", uid).z < RB.northZ + (RB.southZ - RB.northZ) / 2 + 1, `18-3 ${uid} 在北头的桥墩上绑炸药`);
 for (const id of ["18-3", "18-4"]) assert.ok(KF(id).pois.some((p) => p.id === "Sappers"), `${id} 工兵 POI`);
 assert.ok(KF("18-3").pois.some((p) => p.id === "Lizihang") && KF("18-3").pois.some((p) => p.id === "SunWest") && KF("18-3").pois.some((p) => p.id === "RaidMats"), "18-3 李子行空了、太阳落到铁路那头、盖席子的一排人");
+// 18 引导（第二轮）：18-3 的 POI 指路边三处小场景与新的夕阳方向、电线杆；how 写了担架队在前 / 刘文财在后 / 落后就停下等；刘文财在顺子身后、押队的兵回头等；18-8 马灯
+{ const Poi3 = (id) => KF("18-3").pois.find((p) => p.id === id);
+  assert.ok(Poi3("RaidWall") && DistXZ(Poi3("RaidWall"), P.roadsideYard) < 0.1 && Poi3("RaidMats") && DistXZ(Poi3("RaidMats"), P.roadsideMats) < 0.1 && Poi3("LiziGate") && DistXZ(Poi3("LiziGate"), P.liziSouthGate) < 0.1, "18-3 三处路边小场景的 POI（孤院、土墙席子、李子行院门）");
+  assert.ok(DistXZ(Poi3("SunWest"), P.sunWest) < 0.1 && P.sunWest.x >= B.minX && Poi3("Telegraph"), "18-3 夕阳 POI 就是 sunWest（在场地里）、电线杆 POI");
+  for (const p of [Poi3("RaidWall"), Poi3("RaidMats"), Poi3("LiziGate")]) {
+    let best = Infinity; const L = L1218_ROADS.northBank.line;
+    for (let i = 1; i < L.length; i++) { const a0 = L[i - 1], b0 = L[i], dx = b0.x - a0.x, dz = b0.z - a0.z, l2 = dx * dx + dz * dz, k = Math.max(0, Math.min(1, ((p.x - a0.x) * dx + (p.z - a0.z) * dz) / l2)); best = Math.min(best, Math.hypot(p.x - a0.x - dx * k, p.z - a0.z - dz * k)); }
+    assert.ok(best <= 16, `18-3 POI ${p.id} 要在北岸土路边（离中线 ${best.toFixed(1)} m；孤院的看点是院里冒烟的房梁，离路 14 m）`);
+  }
+  const how3 = KF("18-3").how.join("\n");
+  for (const w of ["担架队排成一溜走在顺子前头", "刘文财跟在顺子后头", "落后十来米，队头就停下", "回头等", "夕阳正落在铁路桥那头", "电线杆", "孤零零的院子", "盖着席子露着脚", "门板歪着", "一只鞋"]) assert.ok(how3.includes(w), `18-3 how 要写「${w}」`);
+  const pl3 = KF("18-3").player, liu = Unit("18-3", "LiuWencai"), rear = Unit("18-3", "B3Rear");
+  assert.ok(liu && DistXZ(liu, P.bridgeNorth) > DistXZ(pl3, P.bridgeNorth) + 2 && DistXZ(liu, pl3) < 9, "18-3 刘文财跟在顺子后头（离桥头比顺子远）");
+  assert.ok(rear && /押队/.test(rear.name) && DistXZ(rear, P.bridgeNorth) < DistXZ(pl3, P.bridgeNorth) && Math.abs(((rear.yawDeg - Math.atan2(-(pl3.x - rear.x), -(pl3.z - rear.z)) * 180 / Math.PI + 540) % 360) - 180) < 25, "18-3 押队的三营兵在顺子前头、回头看着他");
+  assert.ok(Unit("18-3", "AidLitter3") && DistXZ(Unit("18-3", "AidLitter3"), P.bridgeNorth) < DistXZ(pl3, P.bridgeNorth) && Unit("18-3", "Doctor") && DistXZ(Unit("18-3", "Doctor"), P.bridgeNorth) < DistXZ(pl3, P.bridgeNorth), "18-3 队尾那副担架和军医在顺子前头");
+  assert.ok(KF("18-8").how.join("\n").includes("马灯") && /马灯/.test(KF("18-8").notes), "18-8 前头队伍里有人提着马灯（how + notes 说明挂不了手持道具）"); }
 const last = ["Luo", "Yaowa", "HeYoutian", "Squad1", "Squad2"].map((id) => Unit("18-4", id));
 assert.ok(last.every((u) => u.stance === "crouch" && u.z > BK.z && u.z < BK.hollow.toZ && u.x > BK.fromX && u.x < BK.toX), "18-4 班长他们缩在桥北土坎背后");
 assert.ok(DistXZ(Unit("18-4", "IjaMg18"), P.ijaMg18) < 0.05 && Unit("18-4", "IjaMg18").weapon === "Type11" && Unit("18-4", "IjaMg18").arc, "18-4 路基脚那挺机枪");

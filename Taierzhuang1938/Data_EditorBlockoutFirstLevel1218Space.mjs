@@ -27,6 +27,14 @@
 //   · 铁路路基从场地北边 z 480 起（契约写「从 z 556 到 1080」）：x < −20 这一条 0610 的场地没盖到，路基到 556 突然断头不像样；0610 场地（x ≥ −20）一个格点不动。
 //   · 北岸土路尽头 (−68,912) 离北坎顶约 3.4 m（契约「≥ 5 m」）：那一点已经是上路基的土坡脚，再往北挪就压不到坡；路的其余各点离坎顶 7–15 m。
 //   · 教堂中心约 (110,710)（契约「约 (104,710)」）：院门要开在朝官道的前墙上、前墙离官道中线 4 m，院子 22×20 m，中心就在这里；再往西就要把院子做成 32 m 宽。
+//
+// 18 的引导（2026-11-02 第二轮，用户看截图：「两截长路两边空空荡荡，不知道往哪走」；批了 1 / 3 / 4 三条，2 堤顶路与 5 离路喊话这轮不做）：
+//   · 有人可跟：担架队排成一溜走在顺子前头、刘文财跟在后头，顺子落后十来米队头就停下、押队的兵回头等（关键帧 how / notes + 预演）。
+//   · 远处有目标：夕阳 sunWest 挪到「土路长直段 (100,868) → 铁路桥北头 (−80,918) 再往外延」的方向上（场地西沿内 (−158,940)），一出村南头顺着路看，太阳正落在铁路桥那头；
+//     铁路路基西边一排电线杆 L1218_TELEGRAPH_POLES（7 m 高、35 m 一根、两岸都有）远远标出铁路和桥的位置——这是创作（津浦线沿线有电报线是常识，位置、间距、哪一边没有出处）。
+//   · 路上隔一阵有点东西 L1218_ROADSIDE（沿北岸土路按走路顺序每 45–60 m 一处，都从路上看得见）：①一出村南头路北边一个孤零零的院子挨了炸（墙塌半边、房梁冒烟，RaidAftermath 起）；
+//     ②再往前路北边一道土墙、墙根一排盖着席子露着脚的人（RaidAftermath 起）；③李子行朝路那一面（LzS2 的南墙）开一个院门，门板歪着斜靠在门框上、地上掉着一只鞋。
+//     村里原来那两处（SR1 塌墙、出村小路的席子）保留。
 // ===========================================================================
 
 import { L0610_VILLAGE, L0610_GENG, L0610_RIVER, L0610_PLACES, L0610_SOUTH_LANE, L0610_STREETS, L0610_BOUNDS } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
@@ -293,9 +301,50 @@ export const L1218_LIZIHANG = F({
   lane: F({ z: 868, halfW: 1.2, fromX: -42, toX: 20 }),
   yards: F([
     F({ id: "LzN1", box: Box(-40, -24, 850, 866), gate: "s" }), F({ id: "LzN2", box: Box(-22, -6, 850, 866), gate: "s" }), F({ id: "LzN3", box: Box(-4, 14, 850, 866), gate: "s" }),
-    F({ id: "LzS1", box: Box(-32, -16, 870, 886), gate: "n" }), F({ id: "LzS2", box: Box(-12, 6, 870, 886), gate: "n" }),
+    F({ id: "LzS1", box: Box(-32, -16, 870, 886), gate: "n" }), F({ id: "LzS2", box: Box(-12, 6, 870, 886), gate: "n", backGate: F({ w: 1.6 }) }),   // LzS2 南墙再开一个朝北岸土路的院门（18 引导 ③）
   ]),
 });
+
+/** 北岸土路中心线上 x 处的点、那一截的方向 u（顺着走的方向，往西南）与朝北的法向 n。路的 x 从东往西单调减。 */
+export function NorthBankAtX(x) {
+  const L = L1218_ROADS.northBank.line;
+  for (let i = 1; i < L.length; i++) {
+    const a = L[i - 1], b = L[i];
+    if (x <= a.x && x >= b.x) {
+      const len = Math.hypot(b.x - a.x, b.z - a.z), u = { x: (b.x - a.x) / len, z: (b.z - a.z) / len };
+      const t = a.x === b.x ? 0 : (a.x - x) / (a.x - b.x);
+      let walked = 0;
+      for (let k = 1; k < i; k++) walked += Math.hypot(L[k].x - L[k - 1].x, L[k].z - L[k - 1].z);
+      return { x, z: R2(a.z + (b.z - a.z) * t), u, n: { x: -u.z, z: u.x }, s: R2(walked + len * t) };
+    }
+  }
+  return null;
+}
+/**
+ * 18 引导：北岸土路边三处小场景（2026-11-02 第二轮，见文件头）。按走路顺序排，相邻约 46 m，都离路中线 ≤ 10 m、从路上看得见（SceneTest 查）。
+ *   lonelyYard：一出村南头、路北边一个孤零零的院子（x 80…95、z 851…866，院门朝路）；RaidAftermath 起东南角塌了（前墙东半截 + 东墙南半截成 0.6 墙根、角外一堆碎砖）、
+ *               正房东半间塌成一堆、一根房梁斜搭在堆上冒烟（烟是预演 smoke 事件）。
+ *   wallMats：再往前路北边一道土墙（顺着路，离路中线 5.5 m，长 17、高 1.8），墙根朝路那一面一排 6 张席子（RaidAftermath 起）。
+ *   liziGate：李子行 LzS2 朝路的南墙开一个院门，门板歪着斜靠在门框上、门外地上掉着一只鞋（没有鞋的资产：小体块，prop Shoe）。
+ */
+export const L1218_ROADSIDE = F({
+  lonelyYard: F({
+    id: "LoneYard", name: "路北边孤零零挨了炸的院子", box: Box(80, 95, 851, 866), wallH: 2.0,
+    gate: F({ x: 87.5, w: 1.6 }),                       // 前墙（南墙 z 866）上的院门
+    collapsedFromX: 88.3,                               // 前墙从这儿到东头随 RaidAftermath 塌成 0.6 墙根
+    collapsedFromZ: 857,                                // 东墙从这儿到南头也塌了（东南角整个塌：从村南头走过来先看见的就是这个角）
+    house: F({ box: Box(82, 93, 851.5, 857), h: 2.7, splitX: 87.5, heapH: 1.1 }),   // 正房：西半间完好、东半间塌成一堆
+    beam: F({ x: 90.6, z: 856.2, len: 4.2, ry: 0.55 }),  // 斜搭在堆上的房梁（冒烟的地方）
+    rubble: P(90.2, 863.8),
+  }),
+  wallMats: F({ id: "RoadWall", name: "路北边的土墙（墙根一排盖席子的人）", atX: 42, offM: 5.5, len: 17, h: 1.8, t: 0.4, mats: F({ n: 6, stepM: 1.7, offM: 4.1 }) }),
+  liziGate: F({ id: "LiziGate", name: "李子行朝路的院门（门板歪着、地上一只鞋）", yard: "LzS2", doorBoard: F({ dx: 0.35, dz: 0.3, ry: 0.5 }), shoe: F({ dx: -0.9, dz: 1.6, ry: 1.1 }) }),
+});
+/**
+ * 津浦铁路沿线的电线杆（18 引导：远远一排竖线标出铁路和桥的位置；创作）：路基西边 7 m（坡脚外 1 m）、7 m 高、35 m 一根，从 z 570 起到场地南边，
+ * 沙河两岸的坎沿与河堤那一截不放（两岸各自接着排）；杆顶一根横担、杆与杆之间一根线。
+ */
+export const L1218_TELEGRAPH = F({ x: -87, fromZ: 570, everyM: 35, h: 7.0, w: 0.22, crossArm: F({ len: 1.4, t: 0.1, belowTopM: 0.4 }), wireT: 0.03, riverGapM: 4 });
 
 /** 村里村外的树（脚印 ≤ 1 m、高 ≥ 2 m 的 foliage 块 = 编辑器种枯树）。离路 ≥ 1 m、不进院子（生成器查）。 */
 export const L1218_TREES = F([
@@ -455,6 +504,7 @@ export const L1218_PROP_KINDS = F({
   Branches: F({ w: 1.6, d: 1.0, h: 0.6, semantic: "foliage", name: "一抱树枝" }),
   Rubble: F({ w: 2.0, d: 1.2, h: 0.35, semantic: "earthDark", name: "碎砖堆" }),
   SleeperPile: F({ w: 1.0, d: 2.6, h: 1.0, semantic: "timber", name: "枕木垛" }),
+  Shoe: F({ w: 0.27, d: 0.1, h: 0.09, semantic: "timber", name: "一只鞋（没有资产，小体块）" }),
 });
 const Prop = (id, x, z, ry = 0) => F({ id, kind: id.split("_")[0], x, z, ry });
 export const L1218_PROPS = F([
@@ -525,6 +575,9 @@ export const L1218_PLACES = F({
   northBankRoadA: P(100, 868), northBankRoadB: P(60, 880), northBankRoadC: P(20, 890), northBankRoadD: P(-20, 897), northBankRoadE: P(-55, 905),
   liziHang: P(-11, 868),                                            // 李子行的土巷（路过时看空了的院子）
   liziHangGate: P(-14, 867.4),
+  roadsideYard: P(90.6, 856.2),                                     // 18 引导 ①：路北边孤零零挨了炸的院子（冒烟的房梁）
+  roadsideMats: P(40.7, 880.5),                                     // 18 引导 ②：路北边土墙根一排盖席子的人
+  liziSouthGate: P(-3, 886),                                        // 18 引导 ③：李子行 LzS2 朝路的院门（门板歪着、地上一只鞋）
   railRampFoot: P(-68, 912), railRampTop: P(-77.2, 912), railRampFootSouth: P(-68, 980), railRampTopSouth: P(-77.2, 980),
   bridgeNorth: P(L1218_RAIL.x, R2(AT_RAIL.northTop.z)), bridgeSouth: P(L1218_RAIL.x, R2(AT_RAIL.southTop.z)),
   bridgeMid: P(L1218_RAIL.x, R2((AT_RAIL.northTop.z + AT_RAIL.southTop.z) / 2)),
@@ -536,7 +589,7 @@ export const L1218_PLACES = F({
   wadeAt: RiverPoint(RiverArcAtX(-64), -4),                         // 18 老乡蹚水过去的地方（北滑坡道下来、沙床上）
   southRoadMid: P(-55, 1030),
   cityLights: P(-40, 1076),                                         // 远处县城的灯
-  sunWest: P(-400, 900),                                            // 太阳落到铁路那头（西边）
+  sunWest: P(-158, 940),                                            // 太阳落到铁路桥那头：在土路长直段 (100,868) → 桥北头 (−80,918) 的延长线上（场地西沿内；18 引导）
 });
 
 /** 出生点：11-1 耿家庄村南口，朝南（往南看土路、官道、北沙河村）。 */

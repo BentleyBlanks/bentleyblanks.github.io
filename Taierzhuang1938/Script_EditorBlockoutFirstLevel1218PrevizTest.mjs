@@ -696,7 +696,30 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     let deckShots = 0;
     for (let t = 0; t <= s.durationS; t += 0.5) { const shot = ShotAt("18-3", t); if (shot && OnDeck(shot.position) && shot.position.y > HT.sleeperTopY + 1.0) deckShots++; }
     if (deckShots < 4) errors.push(`18-3：顺子要跟着担架走上桥面（眼睛在桥面上的采样只有 ${deckShots} 个）`);
-    if (!Cap(s, /枕木/) || !Cap(s, /蹚水/) || !Cap(s, /光路基/) || !Cap(s, /李子行/) || !Cap(s, /席子/) || !Cap(s, /太阳落到铁路那头/) || !Cap(s, /绑炸药/)) errors.push("18-3：枕木桥面、蹚水、光路基、李子行、席子、太阳、绑炸药要有说明字"); }
+    if (!Cap(s, /枕木/) || !Cap(s, /蹚水/) || !Cap(s, /光路基/) || !Cap(s, /李子行/) || !Cap(s, /席子/) || !Cap(s, /太阳落到铁路那头/) || !Cap(s, /绑炸药/)) errors.push("18-3：枕木桥面、蹚水、光路基、李子行、席子、太阳、绑炸药要有说明字");
+    // 18 引导（第二轮）：开头是顺子在北岸土路上的几个定镜，每个都看得见前头的队伍；依次路过孤院、土墙席子、李子行院门；朝西南那条看着夕阳 / 铁路桥的方向；房梁冒烟
+    if (!Cap(s, /担架队排成一溜/) || !Cap(s, /孤零零的院子/) || !Cap(s, /门板歪着/) || !Cap(s, /一只鞋/) || !Cap(s, /电线杆/) || !Cap(s, /回头等/)) errors.push("18-3：担架队在前、孤院、门板、鞋、电线杆、押队的兵回头等要有说明字");
+    const road = RD.northBank.line, NearRoad = p => { let best = Infinity; for (let i = 1; i < road.length; i++) { const a = road[i - 1], b = road[i]; const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)); best = Math.min(best, Math.hypot(p.x - a.x - dx * k, p.z - a.z - dz * k)); } return best; };
+    const roadEyes = s.camera.filter(c => c.eye && NearRoad(c.eye) <= 3 && c.eye.z < RB.northZ - 6 && c.eye.x > PL.railRampFoot.x + 10).sort((p, q) => p.t - q.t);
+    if (roadEyes.length < 4) errors.push(`18-3：顺子在北岸土路上的定镜要 ≥ 4 条（现在 ${roadEyes.length}）`);
+    else {
+      const xs = roadEyes.map(c => c.eye.x);
+      if (!xs.every((x, i) => !i || x < xs[i - 1])) errors.push("18-3：路上的定镜要按走路顺序（x 从村南头往西减）");
+      const ActorAtT = (id, t) => { const a = s.actors.find(x => x.id === id); const base = a?.spawn || Unit("18-3", id); return a && base ? ActorAt(a, base, t) : null; };
+      for (const c of roadEyes) {
+        const t = c.t + c.dur / 2, eye = c.eye;
+        const ahead = ["AidLitter3", "AidLitter2", "Geng", "Nier", "Doctor", "B3Rear"].map(id => ActorAtT(id, t)).filter(Boolean)
+          .filter(p => NearRoad(p) <= 4 && Dist(p, eye) >= 4 && Dist(p, eye) <= 40 && Math.abs(WrapDeg(YawTo(eye, p) - eye.yawDeg)) <= 40);
+        if (ahead.length < 3) errors.push(`18-3 路上定镜@${c.t}：前头画面里要有 ≥ 3 个队伍里的人（现在 ${ahead.length}）`);
+        const liu = ActorAtT("LiuWencai", t);
+        if (!liu || Dist(liu, eye) > 12 || Math.abs(WrapDeg(YawTo(eye, liu) - eye.yawDeg)) < 90) errors.push(`18-3 路上定镜@${c.t}：刘文财要跟在顺子后头（身后 12 m 内）`);
+      }
+      const last = roadEyes[roadEyes.length - 1];
+      if (Math.abs(WrapDeg(YawTo(last.eye, PL.sunWest) - last.eye.yawDeg)) > 20 || Math.abs(WrapDeg(YawTo(last.eye, PL.bridgeNorth) - last.eye.yawDeg)) > 20) errors.push("18-3：最后一条路上定镜要朝着夕阳 / 铁路桥的方向（±20°）");
+      const spots = [PL.roadsideYard, PL.roadsideMats, PL.liziSouthGate];
+      spots.forEach((p, i) => { const c = roadEyes[i]; if (Dist(c.eye, p) > 45 || Math.abs(WrapDeg(YawTo(c.eye, p) - c.eye.yawDeg)) > 45) errors.push(`18-3 第 ${i + 1} 条路上定镜要看得见第 ${i + 1} 处路边小场景（(${p.x},${p.z})）`); });
+    }
+    if (!Has(s, "smoke", e => Dist(e, PL.roadsideYard) < 2 && e.prewarm === true && (e.scale ?? 1) >= 2)) errors.push("18-3：孤院的房梁要冒烟（smoke 在 roadsideYard，scale ≥ 2、prewarm）"); }
   // 18-4：担架往南走进黑地；顺子回头看南边 + WhoCares.01；机枪扫、弹着在土坎顶上；班长他们在土坎后；NotYet 四句按序；任务字
   { const s = Seq("18-4");
     for (const id of ["AidLitter1", "AidLitter2", "Geng", "Nier", "Doctor"]) { const last = PosKeys(s, id).at(-1); if (!last || last.z < PL.leveePlayer.z + 20) errors.push(`18-4：${id} 要往南走进黑地（z > 河堤 + 20）`); }
@@ -767,7 +790,8 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     for (const id of ["Luo", "Geng", "Nier", "HeYoutian"]) { const ks = PosKeys(s, id); if (ks.length < 2 || Dist(ks[0], ks[ks.length - 1]) < 15 || ks[ks.length - 1].z <= ks[0].z) errors.push(`18-8：${id} 要顺南岸路往南走 ≥ 15 m`); }
     const road = RD.southRoad.line, nearRoad = p => { let best = Infinity; for (let i = 1; i < road.length; i++) { const a = road[i - 1], b = road[i]; const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)); best = Math.min(best, Math.hypot(p.x - a.x - dx * k, p.z - a.z - dz * k)); } return best; };
     for (const id of ["Luo", "Geng"]) for (const k of PosKeys(s, id)) if (nearRoad(k) > 6) errors.push(`18-8：${id} 的走位要在南岸路上（离中线 ${R(nearRoad(k))} m）`);
-    if (!Cap(s, /几点灯/) || !Cap(s, /第一关结束/) || !Cap(s, /攥着钱袋和信/)) errors.push("18-8：几点灯、第一关结束、攥着钱袋和信要有说明字"); }
+    if (!Cap(s, /几点灯/) || !Cap(s, /第一关结束/) || !Cap(s, /攥着钱袋和信/)) errors.push("18-8：几点灯、第一关结束、攥着钱袋和信要有说明字");
+    if (!Cap(s, /马灯/)) errors.push("18-8：前头队伍里提着马灯要有说明字（白盒挂不了手持道具）"); }
   for (const s of doc.sequences) if (s.events.some(e => e.type === "signal" && e.name === "ChargesSet")) errors.push(`${s.keyframe}：ChargesSet 18-3 起本来就开，预演里别动它`);
   // 写死点的机位（from / to 与 look 都是点）：起幅、落幅都不能悬在看的那个点正上方（< 0.5 m）或往下看超过 60°（10-23 用户；同 PrevizPlanTest「没有朝正下方的镜头」）
   for (const s of doc.sequences) for (const c of s.camera) {

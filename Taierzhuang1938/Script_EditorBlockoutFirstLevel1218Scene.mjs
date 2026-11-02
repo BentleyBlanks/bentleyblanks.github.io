@@ -26,8 +26,8 @@ import {
   L1218_VILLAGE, L1218_VILLAGE_OUTLINE, L1218_YARD_STRIPS, L1218_BOMBED_YARD, L1218_WELLS, L1218_PONDS, L1218_GARDENS, L1218_CHURCH, L1218_AID, L1218_GIRL_YARD,
   L1218_CART_PARK, L1218_SLOGAN_TEXTS, L1218_LIZIHANG, L1218_TREES, L1218_FIELD_PATCHES,
   L1218_RIVER, L1218_GUANDAO_BRIDGE, L1218_RAIL, L1218_RAIL_RAMPS, L1218_RAIL_BRIDGE, L1218_BANK, L1218_IJA_MG, L1218_LEVEE, L1218_CITY_LIGHTS,
-  L1218_PROP_KINDS, L1218_PROPS, L1218_SIGNALS, L1218_PLACES, L1218_SPAWN, L1218_FROM_0610,
-  StripFrame, RiverFrame, RiverAtS, RiverArcAtX, RiverPoint, RiverAtX, RIVER_LENGTH,
+  L1218_PROP_KINDS, L1218_PROPS, L1218_SIGNALS, L1218_PLACES, L1218_SPAWN, L1218_FROM_0610, L1218_ROADSIDE, L1218_TELEGRAPH,
+  StripFrame, RiverFrame, RiverAtS, RiverArcAtX, RiverPoint, RiverAtX, RIVER_LENGTH, NorthBankAtX,
 } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 
 export { SightBlock, BlockSight, BlockCenterY, SolidBlocks };
@@ -499,6 +499,7 @@ export function AllYards() {
     const mainLen = Math.min(w - 3.2, 11), ms = w / 2 - mainLen / 2;
     yards.push({
       id: lz.id, name: `李子行的院子 ${lz.id}`, strip: "Lz", frame, s0: 0, s1: w, d0: 0, d1: depth, inner, gate: { s: w / 2, w: 1.6 },
+      backGate: lz.backGate ? { s: w / 2, w: lz.backGate.w } : null,   // 18 引导 ③：LzS2 南墙再开一个朝北岸土路的院门
       houses: [{ s0: ms, s1: ms + mainLen, d0: inner.d1 - 5.2, d1: inner.d1 - 0.3 }], empty: true, first: true, last: true,
     });
   }
@@ -517,7 +518,7 @@ function YardBlocks(y, sample, gates) {
     gates.push(...(() => { const g = []; FrameWall(g, f, `${y.id}_WallS_Intact`, { s0: y.s1, s1: y.s1, d0: b0, d1: b1 }, [], VL.wallH, WALL, { signal: SIG.dugoutBombed }); return g; })());
     gates.push(FrameBox(f, `${y.id}_WallS_Stub`, { s0: y.s1 - T / 2, s1: y.s1 + T / 2, d0: b0, d1: b1 }, 0.5, WALL, { collapsed: true, appearSignal: SIG.dugoutBombed }));
   } else {
-    FrameWall(out, f, `${y.id}_WallB`, { s0: y.s0, s1: y.s1, d0: y.d1, d1: y.d1 });
+    FrameWall(out, f, `${y.id}_WallB`, { s0: y.s0, s1: y.s1, d0: y.d1, d1: y.d1 }, y.backGate ? [Gap(y.backGate.s, y.backGate.w)] : []);
   }
   if (!y.bombed) FrameWall(out, f, `${y.id}_WallR`, { s0: y.s1, s1: y.s1, d0: y.d0 + T / 2, d1: y.d1 - T / 2 });
   if (y.bombed) FrameWall(out, f, `${y.id}_WallBack`, { s0: y.s0, s1: y.s1, d0: y.d1, d1: y.d1 });
@@ -815,6 +816,95 @@ function CityLightBlocks(sample) {
 /** 日常摆件 → 体块。 */
 export function PropBlocks() { return L1218_PROPS.map((p) => PropBlock(p.id, p.kind, p.x, p.z, p.ry)); }
 
+/**
+ * 18 引导（2026-11-02 第二轮）：北岸土路边三处小场景（L1218_ROADSIDE）。
+ *   ① 孤零零挨了炸的院子：四面墙 + 朝路的院门；RaidAftermath 起前墙东半截塌成 0.6 墙根、正房东半间塌成一堆、一根房梁斜搭在堆上（烟是预演 smoke 事件）、院里一堆碎砖。
+ *   ② 路北边一道土墙（顺着路），墙根朝路那一面一排席子（RaidAftermath 起）。
+ *   ③ 李子行 LzS2 朝路的院门（门洞在 YardBlocks 里开）：门板歪着斜靠在门框上（只能转 ry，斜靠用说明字）、门外地上一只鞋（小体块）。
+ */
+function RoadsideBlocks(sample, yards) {
+  const blocks = [], gates = [];
+  const RS = L1218_ROADSIDE, LY = RS.lonelyYard, b = LY.box, hb = LY.house.box;
+  // ① 院墙：北、西整面；东南角塌了（从村南头走过来先看见的那个角）：前墙（南）东段 + 东墙南段随 RaidAftermath 换成 0.6 墙根；前墙西段 + 院门照旧
+  Wall(blocks, `${LY.id}_WallN`, "x", b.minZ, b.minX, b.maxX, [], LY.wallH);
+  Wall(blocks, `${LY.id}_WallW`, "z", b.minX, b.minZ + T / 2, b.maxZ - T / 2, [], LY.wallH);
+  Wall(blocks, `${LY.id}_WallE`, "z", b.maxX, b.minZ + T / 2, b.maxZ - T / 2, [{ from: LY.collapsedFromZ, to: b.maxZ + 1 }], LY.wallH);
+  Wall(blocks, `${LY.id}_WallF`, "x", b.maxZ, b.minX, b.maxX, [Gap(LY.gate.x, LY.gate.w), { from: LY.collapsedFromX, to: b.maxX + 1 }], LY.wallH);
+  const eastRun = [LY.collapsedFromX, b.maxX + T / 2], southRun = [LY.collapsedFromZ, b.maxZ - T / 2];
+  gates.push(Block(`${LY.id}_WallF_Intact`, (eastRun[0] + eastRun[1]) / 2, b.maxZ, eastRun[1] - eastRun[0], T, LY.wallH, WALL, { signal: SIG.raidAftermath }));
+  gates.push(Block(`${LY.id}_WallF_Stub`, (eastRun[0] + eastRun[1]) / 2, b.maxZ, eastRun[1] - eastRun[0], T, 0.6, WALL, { collapsed: true, appearSignal: SIG.raidAftermath }));
+  gates.push(Block(`${LY.id}_WallE_Intact`, b.maxX, (southRun[0] + southRun[1]) / 2, T, southRun[1] - southRun[0], LY.wallH, WALL, { signal: SIG.raidAftermath }));
+  gates.push(Block(`${LY.id}_WallE_Stub`, b.maxX, (southRun[0] + southRun[1]) / 2, T, southRun[1] - southRun[0], 0.6, WALL, { collapsed: true, appearSignal: SIG.raidAftermath }));
+  gates.push(PropBlock(`${LY.id}_CornerRubble`, "Rubble", b.maxX + 1.1, b.maxZ - 2.2, 0.9, { solid: false, appearSignal: SIG.raidAftermath }));
+  // 正房：西半间完好（墙 + 草顶），东半间完好的随信号没了、换成一堆 + 斜搭的房梁
+  const hw = { minX: hb.minX, maxX: LY.house.splitX, minZ: hb.minZ, maxZ: hb.maxZ }, he = { minX: LY.house.splitX, maxX: hb.maxX, minZ: hb.minZ, maxZ: hb.maxZ };
+  const Half = (id, box, extra = {}) => {
+    const cx = (box.minX + box.maxX) / 2, cz = (box.minZ + box.maxZ) / 2, w = box.maxX - box.minX, d = box.maxZ - box.minZ;
+    return [Block(id, cx, cz, w, d, LY.house.h, WALL, { house: true, ...extra }), Block(`${id}_Roof`, cx, cz, w + 0.6, d + 0.6, VL.roofH, ROOF, { y: R2(sample(cx, cz) + LY.house.h + VL.roofH / 2), ...extra })];
+  };
+  blocks.push(...Half(`${LY.id}_HouseW`, hw));
+  gates.push(...Half(`${LY.id}_HouseE`, he, { signal: SIG.raidAftermath }));
+  const hc = { x: (he.minX + he.maxX) / 2, z: (he.minZ + he.maxZ) / 2 };
+  gates.push(Block(`${LY.id}_HouseE_Heap`, hc.x, hc.z + 0.2, he.maxX - he.minX + 0.4, he.maxZ - he.minZ + 0.8, LY.house.heapH, EARTH, { ry: 0.06, collapsed: true, appearSignal: SIG.raidAftermath }));
+  const bm = LY.beam;
+  gates.push(Block(`${LY.id}_Beam`, bm.x, bm.z, bm.len, 0.22, 0.22, WOOD, { ry: R3(bm.ry), y: R2(sample(bm.x, bm.z) + LY.house.heapH + 0.11), beam: true, appearSignal: SIG.raidAftermath }));
+  gates.push(PropBlock(`${LY.id}_Rubble`, "Rubble", LY.rubble.x, LY.rubble.z, 0.4, { solid: false, appearSignal: SIG.raidAftermath }));
+  // ② 路北边的土墙 + 墙根一排席子
+  const WM = RS.wallMats, r = NorthBankAtX(WM.atX), wry = R3(Math.atan2(-r.u.z, r.u.x));
+  const wc = { x: r.x + r.n.x * WM.offM, z: r.z + r.n.z * WM.offM };
+  blocks.push(Block(`${WM.id}`, wc.x, wc.z, WM.len, WM.t, WM.h, WALL, { ry: wry, roadWall: true }));
+  const mry = Math.atan2(-r.n.z, r.n.x);
+  for (let i = 0; i < WM.mats.n; i++) {
+    const sv = (i - (WM.mats.n - 1) / 2) * WM.mats.stepM, p = { x: r.x + r.n.x * WM.mats.offM + r.u.x * sv, z: r.z + r.n.z * WM.mats.offM + r.u.z * sv };
+    gates.push(PropBlock(`RaidMat_${WM.id}_${i + 1}`, "Mat", p.x, p.z, mry + ((i % 3) - 1) * 0.1, { solid: false, appearSignal: SIG.raidAftermath }));
+  }
+  // ③ 李子行朝路的院门：门板歪着斜靠在门框上、门外地上一只鞋
+  const LG = RS.liziGate, lz = yards.find((y) => y.id === LG.yard);
+  if (!lz || !lz.backGate) throw new Error(`李子行 ${LG.yard} 没有朝路的院门（backGate）`);
+  const g = lz.frame.World(lz.backGate.s, lz.d1);
+  blocks.push(PropBlock(`${LG.id}_DoorBoard`, "DoorBoard", g.x + LG.doorBoard.dx, g.z + LG.doorBoard.dz, LG.doorBoard.ry, { leaning: true }));
+  blocks.push(PropBlock(`${LG.id}_Shoe`, "Shoe", g.x + LG.shoe.dx, g.z + LG.shoe.dz, LG.shoe.ry, { solid: false }));
+  return { blocks, gates, liziGateAt: { x: R2(g.x), z: R2(g.z) }, matsAt: { x: R2(r.x + r.n.x * WM.mats.offM), z: R2(r.z + r.n.z * WM.mats.offM) }, wallAt: { x: R2(wc.x), z: R2(wc.z), ry: wry } };
+}
+
+/** 津浦铁路沿线的电线杆（L1218_TELEGRAPH，创作）：杆 + 杆顶横担 + 杆间一根线；沙河两岸的坎沿与河堤那一截不放。 */
+export function TelegraphPoleZs() {
+  const TG = L1218_TELEGRAPH, r = RiverAtX(TG.x), out = [];
+  const gapN = r.northTop.z - TG.riverGapM, gapS = RiverPoint(r.s, RVR.halfTop + LV.offD + LV.baseHalfW).z + TG.riverGapM;
+  for (let z = TG.fromZ; z <= L1218_BOUNDS.maxZ - 5; z += TG.everyM) if (!(z > gapN && z < gapS)) out.push(z);
+  return out;
+}
+function TelegraphBlocks(sample) {
+  const TG = L1218_TELEGRAPH, out = [], zs = TelegraphPoleZs();
+  zs.forEach((z, i) => {
+    const top = sample(TG.x, z) + TG.h;
+    out.push(Block(`TelePole_${String(i + 1).padStart(2, "0")}`, TG.x, z, TG.w, TG.w, TG.h, WOOD, { telegraph: true, pole: true }));
+    out.push(Block(`TeleArm_${String(i + 1).padStart(2, "0")}`, TG.x, z, TG.crossArm.len, TG.crossArm.t, TG.crossArm.t, WOOD, { y: R2(top - TG.crossArm.belowTopM), telegraph: true }));
+    if (i && zs[i] - zs[i - 1] <= TG.everyM + 0.5) {
+      const z0 = zs[i - 1], z1 = zs[i];
+      out.push(Block(`TeleWire_${String(i).padStart(2, "0")}`, TG.x, (z0 + z1) / 2, TG.wireT, z1 - z0 - TG.w, TG.wireT, METAL, { y: null, lift: TG.h - TG.crossArm.belowTopM + TG.crossArm.t, telegraph: true, solid: false }));
+    }
+  });
+  return out;
+}
+
+/**
+ * 三处路边小场景在北岸土路上的位置：x / z = 离路最近的那件东西（①塌了的前墙、②席子、③门板），按它量弧长 s、离中线多远、路上对着它的点；
+ * look = 从路上看它的那一点与眼高（①院里冒烟的房梁、②席子、③门板朝路那一面的上沿）。SceneTest 与关键帧用。
+ */
+export function L1218RoadsideSpots(yards = AllYards()) {
+  const RS = L1218_ROADSIDE, LY = RS.lonelyYard, WM = RS.wallMats, r = NorthBankAtX(WM.atX);
+  const lz = yards.find((y) => y.id === RS.liziGate.yard), g = lz.frame.World(lz.backGate.s, lz.d1);
+  const road = L1218_ROADS.northBank.line;
+  const mats = { x: R2(r.x + r.n.x * WM.mats.offM), z: R2(r.z + r.n.z * WM.mats.offM) };
+  const board = { x: R2(g.x + RS.liziGate.doorBoard.dx), z: R2(g.z + RS.liziGate.doorBoard.dz) };
+  return [
+    { id: LY.id, name: LY.name, x: R2((LY.collapsedFromX + LY.box.maxX - T / 2) / 2), z: LY.box.maxZ, look: { x: LY.beam.x, z: LY.beam.z, eye: LY.house.heapH + 0.3 } },
+    { id: WM.id, name: WM.name, ...mats, look: { ...mats, eye: 0.3 } },
+    { id: RS.liziGate.id, name: RS.liziGate.name, ...board, look: { x: board.x, z: R2(board.z + 0.5), eye: 1.6 } },
+  ].map((sp) => { const n = NearestOnLine(road, sp.x, sp.z); return { ...sp, roadS: R2(n.at), roadDist: R2(n.dist), road: { x: R2(n.q.x), z: R2(n.q.z) } }; });
+}
+
 /** 14-3 救护所门前翻倒的驴车（CartOverturned 起出现；立着的车是单位 GengCart，从 14-3 起不再摆）。 */
 function CartGates(sample) {
   const c = L1218_CART_PARK, k = L1218_PROP_KINDS.OverturnedCart;
@@ -925,15 +1015,16 @@ export function L1218Blocks(sample, report = []) {
   const gates = [];
   const yardBlocks = yards.flatMap((y) => YardBlocks(y, sample, gates));
   const extras = YardExtras(yards, sample);
-  const rail = RailBlocks(sample), guandao = GuandaoBridgeBlocks(sample), roofs = HoleRoofs(sample);
+  const rail = RailBlocks(sample), guandao = GuandaoBridgeBlocks(sample), roofs = HoleRoofs(sample), roadside = RoadsideBlocks(sample, yards);
   const blocks = ResolveLift([
     ...GateOfVillageBlocks(), ...yardBlocks, ...extras.blocks, ...ChurchBlocks(sample), ...AidBlocks(sample), ...roofs.blocks, ...WellsAndPonds(sample),
-    ...guandao.blocks, ...rail.blocks, ...WaterBlocks(), ...CityLightBlocks(sample), ...PropBlocks(), ...TreeBlocks(yards, report),
+    ...guandao.blocks, ...rail.blocks, ...WaterBlocks(), ...CityLightBlocks(sample), ...PropBlocks(), ...roadside.blocks, ...TelegraphBlocks(sample), ...TreeBlocks(yards, report),
   ], sample);
-  gates.push(...roofs.gates, ...BombedGates(sample), ...CartGates(sample), ...RaidGates(sample), ...guandao.gates, ...rail.gates);
+  gates.push(...roofs.gates, ...BombedGates(sample), ...CartGates(sample), ...RaidGates(sample), ...roadside.gates, ...guandao.gates, ...rail.gates);
   const GH = L1218_GIRL_YARD.hole, gm = HoleWorld(GH, 0.6, 0);
   gates.push(Block("GirlHoleMat", gm.x, gm.z, GH.mat.w, GH.mat.d, 0.04, "canvas", { y: R2(sample(GH.mouth.x, GH.mouth.z) + 0.02), solid: false, prop: "Mat", appearSignal: SIG.girlHoleCovered }));
   report.push(`院子 ${yards.length} 个（村里 ${yards.filter((y) => y.strip !== "Lz").length}、李子行 ${yards.filter((y) => y.strip === "Lz").length}）；标语 ${extras.counts.slogans}、枕木垛 ${extras.counts.piles}、亮灯的院子 ${extras.counts.lights}`);
+  report.push(`18 引导：电线杆 ${TelegraphPoleZs().length} 根（x ${L1218_TELEGRAPH.x}、z ${TelegraphPoleZs().join("/")}）；路边三处：${L1218RoadsideSpots(yards).map((sp) => `${sp.id} 路上 s ${sp.roadS} m、离中线 ${sp.roadDist} m`).join("；")}`);
   return { blocks, gates: ResolveLift(gates, sample), yards };
 }
 
@@ -1019,6 +1110,15 @@ export function L1218Landmarks(sample, yards) {
     L("LmGuandaoBridge", "官道桥（木桥）", "area", PL.guandaoBridgeMid.x, PL.guandaoBridgeMid.z, { w: 52.8, d: GB.deckW, ry: StripFrame({ a: GB.north, b: GB.south, side: 1 }).ry, note: "二营 13 炸了它（GuandaoBridgeBlown）；过了河往南 8 km 是滕县城" }),
     L("LmNorthBankRoad", "北岸土路", "place", 40, 885, { radiusM: 2, note: "村南头顺北岸往西南到铁路桥" }),
     L("LmLizihang", "李子行（空了的小村）", "area", (LZ.box.minX + LZ.box.maxX) / 2, (LZ.box.minZ + LZ.box.maxZ) / 2, { w: LZ.box.maxX - LZ.box.minX, d: LZ.box.maxZ - LZ.box.minZ, note: "18 路过，村里没人（创作）" }),
+    ...(() => {
+      const RS = L1218_ROADSIDE, LY = RS.lonelyYard, spots = L1218RoadsideSpots(yards), tele = TelegraphPoleZs();
+      return [
+        L("LmLoneYard", LY.name, "area", (LY.box.minX + LY.box.maxX) / 2, (LY.box.minZ + LY.box.maxZ) / 2, { w: LY.box.maxX - LY.box.minX, d: LY.box.maxZ - LY.box.minZ, note: "18 引导 ①：一出村南头路北边；RaidAftermath 起墙塌半边、房梁冒烟（预演 smoke）" }),
+        L("LmRoadWall", RS.wallMats.name, "place", spots[1].x, spots[1].z, { radiusM: 3, note: "18 引导 ②：墙根一排盖席子露着脚的人（RaidAftermath 起）" }),
+        L("LmLiziGate", RS.liziGate.name, "door", spots[2].x, spots[2].z, { w: 1.6, d: 0.6, h: 2.2, note: "18 引导 ③：门板歪着斜靠在门框上、地上掉着一只鞋" }),
+        L("LmTelegraph", "铁路沿线的电线杆（创作）", "area", L1218_TELEGRAPH.x, (tele[0] + tele[tele.length - 1]) / 2, { w: 2, d: tele[tele.length - 1] - tele[0], note: `18 引导：${tele.length} 根、${L1218_TELEGRAPH.h} m 高、${L1218_TELEGRAPH.everyM} m 一根，远远标出铁路和桥` }),
+      ];
+    })(),
     L("LmRailNorth", "津浦铁路（北段光路基）", "area", RL.x, (RL.fromZ + RB.northZ) / 2, { w: RL.topW, d: RB.northZ - RL.fromZ, note: "2 月工兵拆了轨，枕木让老乡拿去当柴" }),
     ...L1218_RAIL_RAMPS.map((rp) => L(`Lm${rp.id}`, rp.name, "place", rp.from.x - 3, rp.from.z, { radiusM: 1.5 })),
     L("LmRailBridge", "铁路桥（钢梁四孔）", "area", RL.x, rbMid, { w: 6, d: RB.southZ - RB.northZ, note: "桥面只有枕木和两根轨；18 炸北头两孔" }),
@@ -1194,7 +1294,13 @@ export function L1218SightChecks(scene, sample, stand = sample) {
   const streetToCrater = Check(bombedBlocks, Eye({ x: 154, z: 775.4 }, EYE.stand), { x: crater.x, z: crater.z, eye: 0.6 });
   // ⑩ 救护所院里（冬瓜搁的墙根）到洞口中间无挡（拖被子那一路）
   const dragLine = BlocksNearLine(base, [A.wallRootDonggua, A.holes[0].mouth], 0.7, 0.4);
-  return { ditchToNorth, ditchToSouth, trenchToGraves, trenchToRidge, mgToVillageSouth, mgToCover, mgToExposed, leveeToMg, wallToGirlHole, villageSouthToDitch, streetToChurch, leveeToNorthBank, cornerToBridge, streetToCrater, dragLine, eyes: { inDitch, tr, mg, wall } };
+  // ⑪ 18 引导：北岸土路上站着（RaidAftermath 之后）看得见路边三处小场景；路上 (60,880) 看得见铁路桥北头与桥边的电线杆顶
+  const afterRaid = SolidBlocks(scene, [SIG.raidAftermath]);
+  const roadside = L1218RoadsideSpots().map((sp) => ({ id: sp.id, ...Check(afterRaid, Eye(sp.road, EYE.stand), sp.look) }));
+  const tele = TelegraphPoleZs(), poleNearBridge = tele.filter((z) => z < L1218_RAIL_BRIDGE.northZ).at(-1);
+  const roadToBridge = Check(afterRaid, Eye(PL.northBankRoadB, EYE.stand), { x: L1218_RAIL.x, z: L1218_RAIL_BRIDGE.northZ - 2, eye: 1.6 });
+  const roadToPole = Check(afterRaid, Eye(PL.northBankRoadB, EYE.stand), { x: L1218_TELEGRAPH.x + 0.5, z: poleNearBridge, eye: L1218_TELEGRAPH.h - 0.5 });   // 杆顶边上一点（打在杆身里算被它自己挡）
+  return { ditchToNorth, ditchToSouth, trenchToGraves, trenchToRidge, mgToVillageSouth, mgToCover, mgToExposed, leveeToMg, wallToGirlHole, villageSouthToDitch, streetToChurch, leveeToNorthBank, cornerToBridge, streetToCrater, dragLine, roadside, roadToBridge, roadToPole, eyes: { inDitch, tr, mg, wall } };
 }
 
 // ---------------------------------------------------------------------------
@@ -1240,7 +1346,8 @@ export function BuildFirstLevel1218Site(sample, { report = [] } = {}) {
   report.push(`视线：①沟底→北沿外 ${Say(s.ditchToNorth)} / →南沿外 ${Say(s.ditchToSouth)}（要挡住） · ②战壕→坟 ${s.trenchToGraves.map((g) => `${g.id} ${Say(g)}`).join(" / ")} / →田埂 ${Say(s.trenchToRidge)} / 机枪→村南口 ${Say(s.mgToVillageSouth)}`
     + ` · ③机枪→坎后 ${Say(s.mgToCover)}（要挡住） / →离开土坎 ${Say(s.mgToExposed)} / 河堤→机枪 ${Say(s.leveeToMg)}`
     + ` · ④墙根→女娃家洞口 ${Say(s.wallToGirlHole)} · ⑤村南口→板桥 ${Say(s.villageSouthToDitch)} · ⑥主街→教堂院门 ${Say(s.streetToChurch)} · ⑦河堤→北岸路基 ${Say(s.leveeToNorthBank)}`
-    + ` · ⑧南街口→官道桥 ${Say(s.cornerToBridge)} · ⑨南街→弹坑 ${Say(s.streetToCrater)} · ⑩墙根→洞口中间挡的块 ${s.dragLine.length ? s.dragLine.join(",") : "无"}`);
+    + ` · ⑧南街口→官道桥 ${Say(s.cornerToBridge)} · ⑨南街→弹坑 ${Say(s.streetToCrater)} · ⑩墙根→洞口中间挡的块 ${s.dragLine.length ? s.dragLine.join(",") : "无"}`
+    + ` · ⑪路上→路边三处 ${s.roadside.map((r) => `${r.id} ${Say(r)}`).join(" / ")} / 路上→桥北头 ${Say(s.roadToBridge)} / →电线杆顶 ${Say(s.roadToPole)}`);
   return { scene, yards, report };
 }
 
