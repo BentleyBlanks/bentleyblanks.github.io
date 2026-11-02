@@ -93,7 +93,7 @@ export const WEAPONS = {
     // 起播：完整抬柄约 0.26 s，推回仍从 0.52 s 开始，闭锁约 0.79 s；其后留出回握。
     // 从旧 0.20 s 等待中借 0.13 s 给手部动作，总周期仍为 1.02 s，射击间隔不变。
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
-    // 2026-11-02 起玩家第一人称的拉栓按参考视频逐帧对标（Data_Tuning_FpsReload.FPS_BOLT_CYCLE，播放 1.60 s），
+    // 2026-11-02 起玩家第一人称的拉栓按参考视频逐帧对标（Data_Tuning_FpsReload.FPS_BOLT_CYCLE，参考同速 2.30 s），
     // 玩家射击间隔跟那张表走（Viewmodel.FireIntervalS）；下面两项仍是 AI / 第三人称的节奏。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
     boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.1,
