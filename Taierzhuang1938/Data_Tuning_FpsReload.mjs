@@ -220,13 +220,17 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // The cycle ends with the head settled on the stock; it starts with the shot.
     // Every beat below is in reference seconds. `pace` maps them to played seconds
     // ([reference s, played s], piecewise linear; the player's fire interval follows,
-    // AI keeps fireIntervalS). Played at the reference's own speed: a 1.60 s pace
-    // (reach x1.6, pull/hold/push x1.5, return x1.38, re-shoulder x1.6, knob x1.1)
-    // was tried on 2026-11-02 and the user found it too fast. The re-shoulder is the
-    // exception: the reference settles the head for .40 s after the rifle reaches the
-    // cheek, which the user found sluggish, so it settles in .22 s (ends at 2.12 s).
-    durationS: 2.12, startS: 0.02,
-    pace: [[0, 0], [2.12, 2.12]],
+    // AI keeps fireIntervalS). The motion is matched to the Gew88 references; its timing
+    // follows the user's COD WWII Type 38 clip (2026-11-02, 三八式_01_开镜开火拉栓, shot at
+    // 1.70 s): drop .20-.35, grasp .42, lift done .50, back .57, push .74-.86, locked .90,
+    // re-aimed 1.27-1.30 s after the shot. Gates cap a few beats: the grasp x1.1 (2 mm
+    // skin), the lift and the press x1.15/x1.1 (20 deg a frame on the working wrist), the
+    // hand's return x1.55 (55 mm a frame), so the lock lands at .98 and the rifle is back
+    // on aim at 1.32 s. The rifle rises to the cheek while the hand travels back, as in
+    // the clip (the 2.30 s reference shouldered only after the regrip).
+    durationS: 1.95, startS: 0.02,
+    pace: [[0, 0], [0.13, 0.13], [0.62, 0.388], [0.68, 0.443], [0.81, 0.556], [0.90, 0.612],
+      [1.02, 0.722], [1.26, 0.850], [1.41, 0.975], [1.95, 1.322]],
     // Low working pose, relative to the player's (undipped) look: the muzzle 9.5 deg above
     // level and turned 19 deg left, so the barrel runs toward the horizon as in the
     // reference. The head really dips `headPitchRad` (the camera pitches down; the rifle
@@ -239,8 +243,8 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     headPitchRad: 0.18,
     // [s, weight]; the knob holds high until .40, is down by .60; the rifle
     // rises to the cheek in .09 s and the head settles onto the stock last.
-    lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.88, 1], [1.94, 0.55], [1.985, 0.06], [2.01, 0]],
-    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.90, 1], [1.97, 0.60], [2.02, 0.27], [2.07, 0.08], [2.12, 0]],
+    lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.60, 1], [1.68, 0.55], [1.74, 0.06], [1.77, 0]],
+    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.62, 1], [1.70, 0.60], [1.78, 0.27], [1.86, 0.08], [1.95, 0]],
     // Shot response on the held pose, rotating about the aiming eye (rig
     // space): [s, x, y, z, rx, ry, rz]. Hip fire keeps `hipRiseScale` of it.
     risePivot: [0, 0.065, 0.159],

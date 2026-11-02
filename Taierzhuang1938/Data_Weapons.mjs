@@ -93,12 +93,12 @@ export const WEAPONS = {
     // 起播：完整抬柄约 0.26 s，推回仍从 0.52 s 开始，闭锁约 0.79 s；其后留出回握。
     // 从旧 0.20 s 等待中借 0.13 s 给手部动作，总周期仍为 1.02 s，射击间隔不变。
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
-    // 2026-11-02 起玩家第一人称的拉栓按参考视频逐帧对标（Data_Tuning_FpsReload.FPS_BOLT_CYCLE，整套 2.12 s），
+    // 2026-11-02 起玩家第一人称的拉栓按参考视频逐帧对标（Data_Tuning_FpsReload.FPS_BOLT_CYCLE，节奏按 COD 三八式，整套 1.35 s），
     // 玩家射击间隔跟那张表走（Viewmodel.FireIntervalS）；下面两项仍是 AI / 第三人称的节奏。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
     boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.1,
     recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
-    swayScale: 1.12, adsTimeS: 0.32, adsFovScale: 0.74,
+    swayScale: 1.12, adsTimeS: 0.12, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,
     bayonet: true, bayonetLengthM: 0.395,
     note: "枪管外有薄套筒 —— 这是它区别于中正式的剪影特征。枪龄大，膛线磨得厉害。",

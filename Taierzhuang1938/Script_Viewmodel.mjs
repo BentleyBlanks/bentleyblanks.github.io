@@ -2389,6 +2389,9 @@ export class Viewmodel {
 
   _ConfigureRifleView() {
     const profile = FPS_RIFLE_VIEW[this.weaponId];
+    const [adsStiffness, adsDamping] = profile?.adsSpring || [240, 0.72];
+    this.adsSpring.stiffness = adsStiffness;
+    this.adsSpring.damping = 2 * adsDamping * Math.sqrt(adsStiffness);
     this.rifleViewPosition.set(0, 0, 0);
     this.rifleViewRotation.identity();
     if (profile) {

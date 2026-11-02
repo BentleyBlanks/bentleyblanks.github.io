@@ -9,7 +9,9 @@ const Pose = (position, rotation) => Object.freeze({
 export const FPS_RIFLE_VIEW = Object.freeze({
   Type38: Object.freeze({ fovDeg: 52, hip: Pose([.084, -.078, -.075], [.012, 0, 0]) }),
   ZhongZheng: Object.freeze({ fovDeg: 52, hip: Pose([.087, -.072, -.105], [.010, -.005, 0]) }),
-  HanYang: Object.freeze({ fovDeg: 52, hip: Pose([.096, -.082, -.085], [.018, -.005, 0]) }),
+  // adsSpring [stiffness, damping ratio] overrides the viewmodel's 240 / .72: HanYang
+  // comes up to the eye in ~.17 s like the user's COD clip (2026-11-02).
+  HanYang: Object.freeze({ fovDeg: 52, hip: Pose([.096, -.082, -.085], [.018, -.005, 0]), adsSpring: Object.freeze([2000, 0.9]) }),
 });
 
 // The working hand needs room above the receiver. Retain a little of the close

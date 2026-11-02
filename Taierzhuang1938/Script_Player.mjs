@@ -832,7 +832,9 @@ export class PlayerController {
     // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
     this.wantAds = wantAds === 1;
     const adsSpeed = 1 / Math.max(0.08, weapon?.adsTimeS ?? 0.3);
-    this.ads += Clamp((wantAds - this.ads) * dt * adsSpeed * 3, -dt * 6, dt * 6);
+    // 封顶 6/s（≥0.17 s 满开镜）；开镜时间短于 0.17 s 的枪（汉阳造 0.12，对标 COD 三八式）按自己的时间放宽。
+    const adsCap = Math.max(6, adsSpeed);
+    this.ads += Clamp((wantAds - this.ads) * dt * adsSpeed * 3, -dt * adsCap, dt * adsCap);
     this.ads = Clamp01(this.ads);
     // 卧姿按住 Shift = 快速匍匐（ER2 有匍匐速度档）。它不是冲刺：不进 sprint 弹簧，
     // 只把速度从 0.72 提到 1.25，并把脚步声放大 —— 快就得响，这是一对取舍。
