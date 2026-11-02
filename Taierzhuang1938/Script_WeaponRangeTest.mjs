@@ -43,10 +43,15 @@ const hanYangCycle = FPS_BOLT_CYCLE.HanYang;
 const { turn: hanYangTurn, slide: hanYangSlide } = hanYangCycle;
 const hanYangBeats = [hanYangTurn.find(([, v], i) => v === 0 && hanYangTurn[i + 1]?.[1] > 0)[0],
   hanYangSlide.find(([, v]) => v === 1)[0], hanYangSlide.at(-1)[0], hanYangTurn.at(-1)[0]];
-const hanYangCueAt = hanYangCycle.sounds.map((cue, i) => cue.at + [0.23, 0.25, 0.61, 0.68][i] - cue.offset);
+// Beats are written in reference seconds; pace maps them to played seconds (piecewise linear).
+const HanYangPlayedS = s => { const k = hanYangCycle.pace; for (let i = 1; i < k.length; i++) if (s <= k[i][0])
+  return k[i - 1][1] + (s - k[i - 1][0]) * (k[i][1] - k[i - 1][1]) / (k[i][0] - k[i - 1][0]); return k.at(-1)[1]; };
+// The cue starts at its beat (reference time) and its transient follows in real recording time.
+const hanYangCueAt = hanYangCycle.sounds.map((cue, i) => HanYangPlayedS(cue.at) + [0.23, 0.25, 0.61, 0.68][i] - cue.offset);
+const hanYangBeatsPlayed = () => hanYangBeats.map(HanYangPlayedS);
 Check("HanYang bolt cue cuts sound on their mechanical beats", hanYang.boltCue === "boltHanYang" && hanYangCycle.sounds.length === 4
-  && hanYangCueAt.every((at, i) => Math.abs(at - hanYangBeats[i]) <= 0.03),
-{ cueAtS: hanYangCueAt, beatsS: hanYangBeats });
+  && hanYangCueAt.every((at, i) => Math.abs(at - hanYangBeatsPlayed()[i]) <= 0.03),
+{ cueAtS: hanYangCueAt, beatsS: hanYangBeatsPlayed() });
 const hanYangBoltDelayS = hanYang.boltDelayS ?? 0.20;
 // The 2026-09-13 single recording forced a 1.65 s wait; the hand must leave the wrist right after the shot.
 Check("HanYang player cycle starts moving right after the shot", hanYangCycle.startS <= 0.05
@@ -246,8 +251,8 @@ try {
         { ...report.firing.audio, boltCuts });
       Check("HanYang starts the bolt within 0.3 s of the shot and its first recorded cut lands on the lift beat",
         report.firing.cycle.fired && report.firing.cycle.boltActionS !== null && report.firing.cycle.boltActionS <= 0.30
-          && Math.abs(report.firing.cycle.boltCueS - hanYangCycle.sounds[0].at) <= 1 / 30,
-        { ...report.firing.cycle, liftCueAtS: hanYangCycle.sounds[0].at });
+          && Math.abs(report.firing.cycle.boltCueS - HanYangPlayedS(hanYangCycle.sounds[0].at)) <= 1 / 30,
+        { ...report.firing.cycle, liftCueAtS: HanYangPlayedS(hanYangCycle.sounds[0].at) });
     }
     if (!smoke) Check(`${weapon.id}: R plays and completes a real reload`, report.reload.action === "reload" && report.reload.complete && report.reload.ammo === weapon.magazine, report.reload);
   }

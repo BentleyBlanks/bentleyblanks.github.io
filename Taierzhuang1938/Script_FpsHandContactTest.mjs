@@ -461,7 +461,7 @@ try {
           let prop=null,side="r",digits=[0,1],kind="";
           // Frame-matched cycles hold the knob between their first and last "bolt" hand keys.
           const cycle=action==="bolt"&&vm.action?.cycle;
-          const CycleT=s=>(s-cycle.startS)/(cycle.durationS-cycle.startS);
+          const CycleT=s=>vm.BoltCycleActionT(s,cycle);
           const boltWindow=cycle?[CycleT(cycle.hand.find(f=>f.anchor==="bolt").at+.04),CycleT(cycle.hand.findLast(f=>f.anchor==="bolt").at-.04)]:[.25,.78];
           if(action==="bolt"&&t>boltWindow[0]&&t<boltWindow[1]){prop=vm.rig.parts.bolt;kind="bolt";}
           if(action.startsWith("reload")){

@@ -211,8 +211,13 @@ Smith 的开栓剖视说明明确记载 Gewehr 88 需抬柄 90° 后再后拉。
 开镜端稳时的浮动 `FPS_ADS_FLOAT`：参考 04 瞄准段（29.6–31.3、37.3–38.2、40.5–41.4 s）跟踪机匣相对头部，
 上下约 ±1.3°、周期约 1.05 s，左右更小更慢；运行时整套手臂+枪绕眼睛浮动，走动或拉栓落低时淡出。
 
-整套拉栓按参考同速是 2.30 s（原 1.02 s）。玩家射击间隔改读 `Viewmodel.FireIntervalS`，拉完之前打不出下一发；
-`WEAPONS.HanYang.fireIntervalS / boltTimeS` 不动，AI 与第三人称照旧。嫌慢时改 `playbackRate`（>1 等比加快每一拍）。
+表里的节拍按参考视频的秒数写（整套 2.30 s），实际播放由 `pace`（[参考秒, 播放秒] 分段线性）映射。
+按参考同速上线后用户要求「整体加快一些」：够柄段 ×1.6、后拉/停顿/前推 ×1.5、手回枪颈 ×1.38、回肩 ×1.6，
+合手抓柄、抬柄与压柄只 ×1.1（工作手 20°/帧与 2 mm 皮肤门限在这几拍已经很紧；抓柄压到 ×1.6 时手指来不及合拢，穿 3.4 mm），
+整套播放 1.60 s（原程序化拉栓 1.02 s）。
+各段压缩倍数按实测余量定：同速时三段的工作手单帧最大位移 / 转角是够柄前 23 mm / 6°、拉栓 20 mm / 16°、松手到回肩 36 mm / 5°。
+玩家射击间隔改读 `Viewmodel.FireIntervalS`（播放时长 + 0.02 s = 1.62 s），拉完之前打不出下一发；
+`WEAPONS.HanYang.fireIntervalS / boltTimeS` 不动，AI 与第三人称照旧。再要快慢就改 `pace` 的播放秒，节拍顺序与对位不变。
 
 和参考仍有的差别（门禁优先）：抬柄、压柄各放宽到 0.12 s（参考约 0.07 s），否则工作手一帧转过 20° 的门限；
 松开枪颈、离开机柄都按已校准的「先平移出 5–6 cm 再走」路线（`HanYangReloadClearanceTest` 2 mm 闭壳门限），
@@ -220,7 +225,7 @@ Smith 的开栓剖视说明明确记载 Gewehr 88 需抬柄 90° 后再后拉。
 
 验收（本地）：逐帧对比把参考 04 的 34.80 s 拉栓与游戏开镜 / 腰射按开枪后同一时刻成对排版，机柄在画面上的竖向位置
 在上扬、落低、回肩三段相差约 0.03–0.05 画面高；`HanYangReloadClearanceTest --case=HanYangBolt` 最深 0.894 mm；
-`FpsReloadMechanicsTest`（工作手单帧最大位移 36 mm、转角 16.4°）、`FpsHandContactTest --only=HanYang`（698 帧）、
+`FpsReloadMechanicsTest`（同速时工作手单帧最大位移 36 mm、转角 16.4°；加快后 49 mm、18°）、`FpsHandContactTest --only=HanYang`（698 帧）、
 `FirearmResponseBrowserTest`、`FpsArmTest`、`GunFeelTest` 通过。`FirearmResponseBrowserTest` / `FpsHandContactTest` /
 `WeaponRangeTest` / `AudioTest` 里按旧 1 s 节奏写死的等待与接触时间窗改为读这张表，断言门限不变。
 

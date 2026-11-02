@@ -163,6 +163,22 @@ const Ease = {
 
 // Monotone cubic with shared tangents: carry velocity through intermediate
 // poses, stop at genuine holds, and never overshoot the authored contact range.
+// Frame-matched bolt cycles (FPS_BOLT_CYCLE) keep their beats in reference
+// seconds; `pace` maps them to played seconds, piecewise linear both ways.
+function CyclePace(cycle, value, from, to) {
+  const keys = cycle.pace || [[0, 0], [cycle.durationS, cycle.durationS]];
+  if (value <= keys[0][from]) return keys[0][to] + value - keys[0][from];
+  for (let i = 1; i < keys.length; i++) {
+    if (value <= keys[i][from]) {
+      const a = keys[i - 1], b = keys[i];
+      return a[to] + (value - a[from]) * (b[to] - a[to]) / (b[from] - a[from]);
+    }
+  }
+  return keys.at(-1)[to] + value - keys.at(-1)[from];
+}
+const CyclePlayedS = (cycle, referenceS) => CyclePace(cycle, referenceS, 0, 1);
+const CycleReferenceS = (cycle, playedS) => CyclePace(cycle, playedS, 1, 0);
+
 function ReloadTrack(keys, t, column = 1) {
   if (t <= keys[0][0]) return keys[0][column];
   if (t >= keys.at(-1)[0]) return keys.at(-1)[column];
@@ -2511,7 +2527,7 @@ export class Viewmodel {
       // 它跟着 onBoltStart 在动作真正开始时起播。
       // 有逐帧对标拉栓（FPS_BOLT_CYCLE）的枪按那份表的起手时刻排。
       const cycle = FPS_BOLT_CYCLE[this.weaponId];
-      this.pendingBoltAt = cycle ? cycle.startS / cycle.playbackRate : this.weapon.boltDelayS ?? 0.20;
+      this.pendingBoltAt = cycle ? CyclePlayedS(cycle, cycle.startS) : this.weapon.boltDelayS ?? 0.20;
     }
     if (this.weapon.kind === "boltRifle") this.spentCasePending = true;
 
@@ -2539,7 +2555,7 @@ export class Viewmodel {
     // 汉阳造走逐帧对标的整套拉栓（FPS_BOLT_CYCLE，时刻按开枪后的秒数写）；
     // 其余栓动枪仍是 boltTimeS 那段程序化拉栓。
     const cycle = FPS_BOLT_CYCLE[this.weaponId] || null;
-    this._StartAction("bolt", cycle ? (cycle.durationS - cycle.startS) / cycle.playbackRate : this.weapon.boltTimeS || 1.05);
+    this._StartAction("bolt", cycle ? CyclePlayedS(cycle, cycle.durationS) - CyclePlayedS(cycle, cycle.startS) : this.weapon.boltTimeS || 1.05);
     this.action.roundsRemaining = this.visualAmmo;
     this.action.startedOpen = this.boltOpen;
     this.action.ejectSpent = this.spentCasePending;
@@ -2557,7 +2573,14 @@ export class Viewmodel {
   FireIntervalS(weapon = this.weapon) {
     const base = weapon?.fireIntervalS ?? 1.2;
     const cycle = weapon && FPS_BOLT_CYCLE[weapon.id];
-    return cycle ? Math.max(base, cycle.durationS / cycle.playbackRate + 0.02) : base;
+    return cycle ? Math.max(base, CyclePlayedS(cycle, cycle.durationS) + 0.02) : base;
+  }
+
+  /** 逐帧拉栓里某个参考秒（表里写的时刻）对应的动作进度 0..1；没有逐帧拉栓时为 null。 */
+  BoltCycleActionT(referenceS, cycle = this.action?.cycle) {
+    if (!cycle) return null;
+    const start = CyclePlayedS(cycle, cycle.startS);
+    return Clamp01((CyclePlayedS(cycle, referenceS) - start) / (CyclePlayedS(cycle, cycle.durationS) - start));
   }
 
   /**
@@ -3412,9 +3435,10 @@ export class Viewmodel {
    */
   _AnimBoltCycle(a, holdOpen) {
     const cycle = a.cycle, rig = this.rig, bolt = rig.parts.bolt;
-    // 曲线按参考视频的秒数取；playbackRate 只改播放快慢，不改节拍之间的比例。
-    const span = cycle.durationS - cycle.startS, since = cycle.startS + a.t * span;
-    const Phase = seconds => Clamp01((seconds - cycle.startS) / span);
+    // 曲线按参考视频的秒数取；pace 把它们映射到实际播放的秒数（分段压缩，节拍顺序不变）。
+    const playedStart = CyclePlayedS(cycle, cycle.startS), played = playedStart + a.t * a.duration;
+    const since = CycleReferenceS(cycle, played);
+    const Phase = seconds => this.BoltCycleActionT(seconds, cycle);
     // 空仓挂机：抬到顶、拉到底以后两条曲线都停住，不推回。
     const Held = keys => holdOpen ? Math.min(since, keys.find(key => key[1] >= 1)[0]) : since;
     const turn = ReloadTrack(cycle.turn, Held(cycle.turn));
@@ -3473,7 +3497,7 @@ export class Viewmodel {
     const effort = cycle.effort, pose = [0, 0, 0, 0, 0, 0];
     for (const event of effort.events) {
       if (holdOpen && event.at > cycle.slide.find(key => key[1] >= 1)[0] + 0.05) continue;
-      const age = since - event.at;
+      const age = played - CyclePlayedS(cycle, event.at);   // 余势按实际时间衰减
       if (age <= 0 || age >= effort.tailS) continue;
       const response = Math.exp(-effort.decayPerS * age) * Math.sin(2 * Math.PI * effort.frequencyHz * age) * effort.gain
         * (1 - Ease.InOut(Ease.Seg(age, effort.tailS * 0.6, effort.tailS)));
@@ -3615,7 +3639,7 @@ export class Viewmodel {
         const phase=Ease.Seg(t,at,end.at);return phase*phase*(3-2*phase);
       });
       const cycle=this.action?.kind==='bolt'?this.action.cycle:null;
-      const CyclePhase=seconds=>Clamp01((seconds-cycle.startS)/(cycle.durationS-cycle.startS));
+      const CyclePhase=seconds=>this.BoltCycleActionT(seconds,cycle);
       const handoff=side==='right'&&this.weaponId==='HanYang'
         ?this.action?.kind==='reload'?FPS_PACKET_RELOAD.thumbHandoff
           :cycle?{releaseStart:CyclePhase(cycle.thumb.releaseStart),releaseEnd:CyclePhase(cycle.thumb.releaseEnd),

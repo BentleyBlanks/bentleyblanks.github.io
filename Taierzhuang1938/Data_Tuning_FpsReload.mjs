@@ -218,9 +218,15 @@ export const FPS_BOLT_HAND = Object.freeze({
 export const FPS_BOLT_CYCLE = Object.freeze({
   HanYang: Object.freeze({
     // The cycle ends with the head settled on the stock; it starts with the shot.
-    // playbackRate 1 plays it at the reference's own speed; >1 shortens every
-    // beat in proportion (player fire interval follows, AI keeps fireIntervalS).
-    durationS: 2.30, startS: 0.02, playbackRate: 1,
+    // Every beat below is in reference seconds. `pace` maps them to played seconds
+    // ([reference s, played s], piecewise linear; the player's fire interval follows,
+    // AI keeps fireIntervalS). 2026-11-02 user: faster overall. The reach (x1.6),
+    // the pull/hold/push (x1.5), the hand's return (x1.38) and the re-shoulder (x1.6)
+    // are compressed; closing on the knob, the lift and the press keep x1.1 (the
+    // working wrist gate, 20 deg a frame, and the 2 mm skin gate bind there).
+    // 2.30 s of reference -> 1.60 s played.
+    durationS: 2.30, startS: 0.02,
+    pace: [[0, 0], [0.60, 0.375], [0.81, 0.566], [1.29, 0.886], [1.41, 0.995], [1.92, 1.365], [2.30, 1.602]],
     work: Object.freeze({ position: [0.0255, -0.2151, -0.1218], rotation: [0.3336, 0.2081, -0.0778] }),
     headPitchRad: 0.35,
     // [s, weight]; the knob holds high until .40, is down by .60; the rifle
