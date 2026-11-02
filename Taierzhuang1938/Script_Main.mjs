@@ -4457,11 +4457,17 @@ async function WarmStaticShadowBatch(phase) {
   return report;
 }
 
+/** 上一次走完关卡预热时的画质设置（JSON）。设置变过就不许跳过第一人称逐把出画（见 WarmLevel 第二段）。 */
+let warmedGraphicsKey = null;
+
 async function WarmLevel(phase) {
   const started = performance.now();
   const report = { pool: {}, viewmodel: 0, picks: 0, ms: 0, stepMs: {} };
   let stepStart = started;
   const Lap = (name) => { const now = performance.now(); report.stepMs[name] = Math.round(now - stepStart); stepStart = now; };
+  const graphicsKey = JSON.stringify(graphics);
+  const sameGraphics = warmedGraphicsKey === graphicsKey;
+  const NewProgramSince = (known) => renderer.info.programs.some((program) => !known.has(program));
   // 提交编译 + 轮询就绪，与 WarmupShaders 同一套：按出画时的场景状态编（CompileAsRendered），
   // 链接交给 KHR_parallel_shader_compile 的线程，主线程逐帧问
   // isReady()，就绪后再真画一帧。直接 compile 完就画 = 逐个 program 阻塞等链接：实测 3A 管线
@@ -4480,9 +4486,12 @@ async function WarmLevel(phase) {
   // --- 一、人物对象池 ---------------------------------------------------------
   const pool = phase.whitebox?.actorPool || null;
   if (pool && actorFactory?.characterAssets) {
-    const total = Object.values(pool).reduce((n, c) => n + c, 0);
+    // 补到目标数，不是每次再加一整批：池子跨关留着，上一关没用完的还在（2026-11-02 实测原来每跳一段
+    // nra 多出 20–27 具、一路涨上去）。开机那次池子是空的，补的就是整批，与原来一样。
+    const need = Object.entries(pool).map(([kind, count]) => [kind, Math.max(0, count - actorFactory.PoolSize(kind))]);
+    const total = need.reduce((n, [, count]) => n + count, 0);
     let built = 0;
-    for (const [kind, count] of Object.entries(pool)) {
+    for (const [kind, count] of need) {
       for (let done = 0; done < count; done += 6) {
         const chunk = Math.min(6, count - done);
         actorFactory.Prewarm(kind, chunk);
@@ -4504,12 +4513,16 @@ async function WarmLevel(phase) {
         ...SLOT_ORDER.map((slot) => SlotWeaponId(slot)),
         "Grenade", "GrenadeBundle",
       ].filter((id) => id && WEAPONS[id]))];
+      const known = new Set(renderer.info.programs);
       for (const id of ids) {
         viewmodel.Equip(id, 0);
         SubmitCompile(viewmodel.root, id);
       }
       await WaitProgramsReady(20000);
-      for (const [i, id] of ids.entries()) {
+      // 第一人称跨关不重建：各把枪的 program（含自阴影深度）上一关就编好了。提交一个新的都没建、
+      // 画质也没变，逐把出画就是把同一批再画一遍，跳过。
+      report.viewmodelSkipped = sameGraphics && !NewProgramSince(known);
+      if (!report.viewmodelSkipped) for (const [i, id] of ids.entries()) {
         viewmodel.Equip(id, 0);
         SetBootStep(T("boot.step.warmViewmodel", { done: i + 1, total: ids.length }), BootProgress(BOOT.progress.warmViewmodel, (i + 1) / ids.length));
         RenderScene(0);
@@ -4719,6 +4732,9 @@ async function WarmLevel(phase) {
       state.ready = true;
       warmLevelDof = true;
       report.settleFrames = [];
+      // 别按「这一关没新 program」砍结账帧（2026-11-02 试过）：回到去过的段一个新 program 都没有，第一帧照样
+      // 0.4–2.8 s（新场地的贴图 / 缓冲 / 静态合批上传与驱动那一层），只推两帧时余下的全漏进开局，
+      // 头 30 帧 13 帧过 200 ms、最长 1.6 s。结账帧靠「连续两帧够快」自己停，留着（渲染管线 §18.10）。
       try {
         let quiet = 0;
         for (let i = 0; i < 12; i += 1) {
@@ -4761,6 +4777,7 @@ async function WarmLevel(phase) {
   }
   report.ms = Math.round(performance.now() - started);
   state.levelWarm = report;
+  warmedGraphicsKey = graphicsKey;
   return report;
 }
 
