@@ -2399,6 +2399,43 @@ define，热切不重编译视模材质；滤波半径按米给（默认 6 mm）
 写回就把它永久留在 `true` 上，等于这一趟偷偷改掉了视模的预通道口径。反过来，它也**不许**
 在打补丁时把 `allowOverride` 写死成 `false`：那一位归下面的前景预通道口径管。
 
+#### 6.12.1 第一人称取光：太阳在眼睛处取 + 本地反射图（2026-11-02）
+
+用户：背向太阳时枪这么黑。量下来（白盒 02 交通沟，太阳在身后，枪身像素 sRGB 中位数 6–7、七成以上低于 20）
+病根有三层：
+
+1. **汉阳造 173R 的钢件是纯金属**（ORM 金属度 ≈ 1），没有漫反射，只能映出别处的光。背光时镜面方向对着
+   前方晒亮的地面与沟壁，视模却只有天空 IBL（×0.34，下半球是一块暗地色）可映 —— 主因。
+2. 视模按**压缩过的位置**逐像素采世界阴影图，玩家影子替身的头肩、沟壁的影子一块块落到枪上，还不准 —— 次因。
+3. 钢件底色本身暗（Dots 原厂底色 × `exposureGain` 2.5 之后，机匣 F0 ≈ 0.08、枪管 ≈ 0.12，真钢约 0.5）：
+   金属的反光比例就是底色，光照再对也只反回一成。**这一层是材质，不在本节范围**（2026-10-29 用户定过要原版质感）。
+
+照 COD 的做法改前两层（出处：COD4 反编译源码 `cg_weapons.cpp` 把视模的 `lightingOrigin` 取在眼睛、
+`r_model_lighting.cpp` 在那一个点取光照网格 / 反射探针 / 太阳可见度；《Rendering of COD: Infinite Warfare》
+2017 第 23–25 页视模单独做屏幕空间阴影、第 53–63 页反射探针是一等公民；黑色行动 2 的 SIGGRAPH 2013 笔记
+「environment map normalization」反射跟着当地亮度走）。参数全在 `Data_Tuning_FirstPersonLighting`，
+两项都只作用在本节上面那份视模材质克隆上，世界材质不动：
+
+* **太阳在眼睛处取**（`FirstPersonSelfShadow.UpdateEyeSun`）：相机局部三个点（眼睛、真实尺寸的枪身中段、枪口一带）
+  朝太阳各打一条物理射线（静态世界 + 解析地表，160 m），被挡的比例平滑 0.12 s 成 `uFirstPersonSunVisibility`。
+  视模材质把 `lights_fragment_begin` 就地展开、只把级联那一行 `gCsmSunVisibility = CsmSunVisibility()`
+  换成它（`uFirstPersonEyeSun` 是 uniform，热切不重编译）；接触阴影照旧取 min，手—枪遮挡照旧归自阴影小图，
+  点光（簇状光、枪口焰）不经过这一行。low 档没装级联就找不到那一行、原样不换。
+* **本地反射图**（`Script_FirstPersonReflectionProbe`）：眼睛处拍 256 立方体（只到 40 m，外面用天空 IBL 当背景，
+  亮度按当前 `environmentIntensity`），PMREM 预滤波后换成视模材质的 `envMap`（`envMapIntensity` 1，图里是真实辐亮度）。
+  每 2 帧拍一面，六面拍完整张换；走开 4 m 或满 4 s 重拍，站着不动没有额外开销。排在 `post.Render` 之后
+  （阴影图本帧已烘、骨头不再动），拍的时候临时归零 AO / SSIL / 接触阴影 / SSR 强度与簇状光开关（都按
+  `gl_FragCoord` 或主相机簇表取数，立方体面里全是错位的），第一人称身体与枪手根临时藏。边长与天空 IBL 的
+  PMREM 同为 256：CUBEUV 常量一致，换上时不另编程序。
+  从已经换过的材质克隆出来的伤口 / 皮肤变体进来就带着这张图 —— 第一次见到就登记（原样记成 null），
+  否则关掉时还不回去（浏览器闸门抓到过三只手皮材质）。
+
+画质面板两个开关「第一人称：眼睛处取阳光」「第一人称：本地反射」（`graphics.firstPersonEyeSun` /
+`firstPersonReflection`，出厂开），关掉就是改之前的样子。实测（无头，同一背光镜头，枪身平均亮度）：
+改之前 21.8–22.5 → 新做法 25.2–25.5（+12–15%），侧光 24.4 → 31.4；防炮洞里眼睛处可见度 0、沟里 2/3–1。
+一面立方体无头约 3.9 ms（60 m 时）、预滤波 0.3 ms，剖析器桶 `firstPersonProbe`。
+回归口 `Script_FirstPersonLightingBrowserTest`。
+
 ---
 
 ### 6.13 静态投影体合批（2026-09-27）
@@ -6277,7 +6314,7 @@ program），1 → 5 → 9 → 5 三跳 56 / 39 / 24 s 里：
 
 **取证**（包住 `linkProgram` 记出生在哪一趟，开机结束后把主场景趟出生的 program 与提交编译的逐位比缓存键）：三类，都不是漏交而是孪生。
 
-1. **视模 8 个**（`X_FirstPerson`）：与提交编译的 `X` 只差自定义键一段 —— `…|ssr1|…` 对 `…|firstPersonSelfShadow1`。第一人称自阴影
+1. **视模 8 个**（`X_FirstPerson`）：与提交编译的 `X` 只差自定义键一段 —— `…|ssr1|…` 对 `…|firstPersonSelfShadow2`。第一人称自阴影
    （`Script_FirstPersonSelfShadow`）要到出画时 `Render → Sync` 才把手臂 / 枪的材质换成自己那份克隆（摘 SSR、挂自阴影）；
    `WarmLevel` 第二段换枪后直接 `SubmitCompile(viewmodel.root)`，挂着的还是源材质。`WarmupShaders` 挑代表按材质认热没热，
    源材质（`John_All Body` 等）早被人物编过，视模网格整件被跳过，克隆那份从没人交。

@@ -107,7 +107,7 @@ const ACTIVE_STATES = new Set(["play", "cutscene"]);
  * 其余根桶（AI、物理、剧情、玩家……）都是「逻辑」（Game）。`overlay` 是剖析面板自己，
  * 单列，不算进任何一边。
  */
-export const RENDER_BUCKETS = ["post", "matrix", "shadowBatch", "actorBatch", "frameSetup", "firstPersonShadow", "gi"];
+export const RENDER_BUCKETS = ["post", "matrix", "shadowBatch", "actorBatch", "frameSetup", "firstPersonShadow", "firstPersonProbe", "gi"];
 const RENDER_BUCKET_SET = new Set(RENDER_BUCKETS);
 
 /** 卡顿三档的下限（ms）：≥50 轻、≥100 中、≥250 重。 */

@@ -68,6 +68,7 @@ const ROOT_COLORS = {
   frameSetup: "#5f9f72",
   matrix: "#73b578",
   firstPersonShadow: "#7aa96e",
+  firstPersonProbe: "#9fbf8a",
   actorBatch: "#8cc788",
   post: "#4c9361",
   other: "#4d5048",

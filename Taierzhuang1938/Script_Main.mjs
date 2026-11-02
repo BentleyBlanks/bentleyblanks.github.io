@@ -105,6 +105,8 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
+import { FirstPersonReflectionProbe } from "./Script_FirstPersonReflectionProbe.mjs";
+import { GetActiveClusteredLights } from "./Script_ClusteredLights.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 // 断肢：视觉/物理层与预热代理在 Script_CharacterGore，运行时总闸在规则层
 //（`SetGoreEnabled` 同时被 `?gore=0` 与 `Debug.Gore.SetEnabled` 使用）。
@@ -891,6 +893,7 @@ const ctx = {
   get fireEdge() { return fireEdge; }, set fireEdge(v) { fireEdge = v; },
   get firePunch() { return firePunch; }, set firePunch(v) { firePunch = v; },
   get firstPersonSelfShadow() { return firstPersonSelfShadow; },
+  get firstPersonReflection() { return firstPersonReflection; },
   get flare() { return flare; },
   get gi() { return gi; },
   get gore() { return gore; },
@@ -1073,6 +1076,7 @@ let vfx = null;
 let gore = null;
 let viewmodel = null;
 let firstPersonSelfShadow = null;
+let firstPersonReflection = null;
 let actorFactory = null;
 let actorBatch = null;
 let story = null;
@@ -1615,8 +1619,18 @@ async function Boot() {
   firstPersonSelfShadow = new FirstPersonSelfShadow(renderer, scene, camera, viewmodel.root, {
     size: QUALITY === "low" ? 512 : 1024,
     soft: graphics.firstPersonSelfShadowSoft === true,
+    // 太阳在眼睛处取（Script_FirstPersonSelfShadow 头注 2026-11-02）：朝太阳的射线打静态世界 + 解析地表。
+    // physics 每换一关换一份，所以现读变量，不在这里抓住旧的那份。
+    eyeSun: graphics.firstPersonEyeSun !== false,
+    sunBlocked: (origin, direction, maxDistance) => !!physics?.Raycast(origin, direction, maxDistance, { terrain: true }),
   });
   firstPersonSelfShadow.SetEnabled(graphics.shadows && graphics.firstPersonSelfShadow);
+  firstPersonReflection = new FirstPersonReflectionProbe(renderer, scene, {
+    materials: () => firstPersonSelfShadow?.ownedMaterials || [],
+    hidden: () => [viewmodel?.root, viewmodel?.body?.root],
+    suspendScreenSpace: SuspendScreenSpaceForProbe,
+    enabled: graphics.firstPersonReflection !== false,
+  });
 
   player = new PlayerController(camera, {
     colliders: battlefield.colliders,
@@ -2431,6 +2445,7 @@ async function Boot() {
       game: {
         graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
         get firstPersonSelfShadow() { return firstPersonSelfShadow; },
+        get firstPersonReflection() { return firstPersonReflection; },
       },
     },
     OnOpen: () => audio.SetPaused(true),
@@ -8490,7 +8505,7 @@ function RenderSceneContent(dt) {
   if (firstPersonSelfShadow?.enabled) {
     profiler.B("firstPersonShadow");
     profiler.GpuPush("firstPersonShadow");
-    firstPersonSelfShadow.Render(sky.sunDirection);
+    firstPersonSelfShadow.Render(sky.sunDirection, dt);
     profiler.GpuPop();
     profiler.E("firstPersonShadow");
   }
@@ -8584,8 +8599,47 @@ function RenderSceneContent(dt) {
     nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
   }, openingLens));
   profiler.E("post");
+  // 第一人称本地反射图：排在主画面之后（阴影图本帧已烘过、骨头还没再动），拍的是下一帧给枪映的那张。
+  if (firstPersonReflection?.enabled) {
+    profiler.B("firstPersonProbe");
+    profiler.GpuPush("firstPersonProbe");
+    firstPersonReflection.Update(dt, camera.position, !!viewmodel?.root?.visible && !state.menu && !state.cutscene);
+    profiler.GpuPop();
+    profiler.E("firstPersonProbe");
+  }
   profiler.GpuFrameEnd();
   skeletonPassGuard = false;
+}
+
+/**
+ * 拍第一人称本地反射图时临时归零的屏幕空间输入（Script_FirstPersonReflectionProbe 头注）：
+ * AO / SSIL / 接触阴影按 gl_FragCoord 采主画面那张靶，SSR 同理，簇状光的簇表按主相机建 ——
+ * 在立方体面里全是错位的。返回还原函数。
+ */
+const PROBE_NEUTRAL_SSIL = (() => {
+  // rgb = 没有近场反弹，alpha = 1 = 接触阴影没挡住（与 GTAO 关着时的傅底图同一个中性值）
+  const texture = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+  texture.needsUpdate = true;
+  return texture;
+})();
+function SuspendScreenSpaceForProbe() {
+  const cluster = GetActiveClusteredLights()?.uniforms?.uClusterParams?.value || null;
+  const saved = {
+    ao: ssao.strength.value, ssil: ssao.ssilStrength?.value, ssilMap: ssao.ssilMap?.value,
+    ssr: ssrUniforms?.strength?.value, cluster: cluster ? cluster.w : null,
+  };
+  ssao.strength.value = 0;
+  if (ssao.ssilStrength) ssao.ssilStrength.value = 0;
+  if (ssao.ssilMap) ssao.ssilMap.value = PROBE_NEUTRAL_SSIL;
+  if (ssrUniforms?.strength) ssrUniforms.strength.value = 0;
+  if (cluster) cluster.w = 0;
+  return () => {
+    ssao.strength.value = saved.ao;
+    if (ssao.ssilStrength) ssao.ssilStrength.value = saved.ssil;
+    if (ssao.ssilMap) ssao.ssilMap.value = saved.ssilMap;
+    if (ssrUniforms?.strength) ssrUniforms.strength.value = saved.ssr;
+    if (cluster) cluster.w = saved.cluster;
+  };
 }
 
 /** 近爆身体反应的眼皮（Script_BlastFlinch，开了 phase.blastReaction 才有）：菜单 / 过场时不叠。 */
@@ -8896,6 +8950,9 @@ function ApplyGraphics() {
   // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。
   firstPersonSelfShadow?.SetEnabled(!!graphics.shadows && graphics.firstPersonSelfShadow !== false);
   firstPersonSelfShadow?.SetSoft(graphics.firstPersonSelfShadowSoft === true);
+  // 第一人称取光（Data_Tuning_FirstPersonLighting）：两位都是运行时开关，关掉 = 改之前的样子
+  firstPersonSelfShadow?.SetEyeSun(graphics.firstPersonEyeSun !== false);
+  firstPersonReflection?.SetEnabled(graphics.firstPersonReflection !== false);
 
   // 阴影总闸。**故意不碰 `renderer.shadowMap.enabled`**（见 ApplyGraphics 抬头）：
   // 那一位在 cache key 上，翻一次是几百毫秒的整场重编译。

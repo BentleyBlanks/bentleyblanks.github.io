@@ -9,13 +9,28 @@
 //   2) 用正交相机 + MeshDepthMaterial 只画 29 层的 RGBA packed depth；
 //   3) 只在 Viewmodel 自己的材质克隆里注入 3×3 PCF，压低直射漫反射 / 镜面反射。
 // 世界不采这张图，Viewmodel 也仍保持 castShadow=false，所以两张阴影图绝不串线。
+//
+// 【2026-11-02 太阳改在眼睛处取】视模也不再逐像素采世界阴影图（用户：背向太阳时枪这么黑）。
+// 视模是按压缩过的位置去采的，玩家影子替身的头肩、沟壁的影子会一块块落到枪上，而且不准。
+// 照 COD 的做法（COD4 的 lightingOrigin 取在眼睛、IW 给视模单独做屏幕空间阴影）：太阳照不照得到
+// 在眼睛与真实握枪位置朝太阳打几条物理射线、平滑成一个数（UpdateEyeSun），级联那一行
+// `gCsmSunVisibility = CsmSunVisibility()` 在视模这份材质里换成它；接触阴影（屏幕空间）照旧取 min，
+// 手—枪之间的遮挡照旧归本文件这张小图。点光（簇状光、枪口焰）不经过这一行，不受影响。
+// 画质面板「第一人称：眼睛处取阳光」关掉就退回逐像素（uFirstPersonEyeSun = 0，不重编译）。
+// 参数在 Data_Tuning_FirstPersonLighting.sun。
 
 import * as THREE from "three";
 // 视模那一份材质要重挂一次间接光补丁（去掉 SSR，见 CloneOwnedMaterial 的账）。
 import { ApplyPatches, IndirectLightingPatches, PatchesOf, SSR_PATCH_KEY } from "./Script_MaterialPatches.mjs";
 import { OverrideVariants } from "./Script_OverrideVariants.mjs";
+import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
 export const FIRST_PERSON_SHADOW_LAYER = 29;
+
+// 级联阴影 chunk（Script_Csm.CsmDirectionalGlsl）里那一行太阳可见度。视模这份材质把整个
+// lights_fragment_begin 就地展开、只换这一行；找不到（low 档没装级联、三方改了写法）就不换，退回原样。
+const CSM_SUN_LINE = "gCsmSunVisibility = CsmSunVisibility();";
+const EYE_SUN_LINE = "gCsmSunVisibility = uFirstPersonEyeSun > 0.5 ? uFirstPersonSunVisibility : CsmSunVisibility();";
 
 const SHADOW_BIAS_MATRIX = new THREE.Matrix4().set(
   0.5, 0.0, 0.0, 0.5,
@@ -34,6 +49,8 @@ uniform float uFirstPersonShadowSoft;        // 1 = 软化路径：双线性 Poi
 uniform float uFirstPersonShadowRadius;      // 软化滤波半径（texel）
 uniform float uFirstPersonShadowSoftBias;    // 软化路径的常数偏置；斜率交给平面偏置，所以比硬路径小
 uniform float uFirstPersonShadowPlaneClamp;  // 平面偏置的梯度钳制：掠射角下导数会爆，不钳就是几十厘米的漏光
+uniform float uFirstPersonEyeSun;            // 1 = 太阳可见度取眼睛处那一个数（下一行），0 = 照旧逐像素采世界阴影图
+uniform float uFirstPersonSunVisibility;     // 眼睛与真实握枪位置朝太阳的射线平均（CPU 每帧算、平滑过）
 varying vec4 vFirstPersonShadowCoord;
 
 // 12 点 Poisson 盘，固定图案不转：转起来的噪点在近距离的手背上比锯齿更显眼。
@@ -172,8 +189,12 @@ export class FirstPersonSelfShadow {
    *                                            出厂关；画质面板「自阴影软化」热切（SetSoft）。
    * @param {number} [options.softSize=2048]    软化路径的阴影图边长
    * @param {number} [options.softRadius=0.006] 软化滤波半径（米）；按当前 texel 换算成 uniform
+   * @param {boolean} [options.eyeSun=true]     太阳可见度在眼睛处取（见文件头 2026-11-02 一段）
+   * @param {(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number) => boolean} [options.sunBlocked]
+   *                                            朝太阳的一条射线被挡住没有（Script_Main 接物理世界）；没有就当照得到
    */
-  constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35, soft = false, softSize = 2048, softRadius = 0.006 } = {}) {
+  constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35, soft = false, softSize = 2048, softRadius = 0.006,
+    eyeSun = true, sunBlocked = null } = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
@@ -201,7 +222,15 @@ export class FirstPersonSelfShadow {
       softBias: { value: 0.0006 },
       // 梯度钳在 1.0：5 texel 的 tap 在 2048 图上最多带 ~1.5 cm 的平面偏置
       planeClamp: { value: 1.0 },
+      // 眼睛处的太阳可见度。eyeSun 也是 uniform 不是 define：面板热切不重编译。
+      eyeSun: { value: 0 },
+      sunVisibility: { value: 1 },
     };
+    this.eyeSunWanted = eyeSun !== false;
+    this.sunBlocked = typeof sunBlocked === "function" ? sunBlocked : null;
+    this.eyeSunRaw = 1;
+    this._sunOrigin = new THREE.Vector3();
+    this._sunRay = new THREE.Vector3();
 
     this.target = null;
     this._BuildTarget(this.size);
@@ -313,6 +342,15 @@ export class FirstPersonSelfShadow {
       shader.uniforms.uFirstPersonShadowRadius = uniforms.radius;
       shader.uniforms.uFirstPersonShadowSoftBias = uniforms.softBias;
       shader.uniforms.uFirstPersonShadowPlaneClamp = uniforms.planeClamp;
+      shader.uniforms.uFirstPersonEyeSun = uniforms.eyeSun;
+      shader.uniforms.uFirstPersonSunVisibility = uniforms.sunVisibility;
+      // 太阳可见度换成眼睛处那个数：把 lights_fragment_begin 就地展开、只换级联那一行。
+      // 注册表补丁（簇状光循环等）挂在这个 include **之后**，previousCompile 已经插好，展开不碰它们。
+      const lightsBegin = THREE.ShaderChunk.lights_fragment_begin;
+      if (lightsBegin.includes(CSM_SUN_LINE) && shader.fragmentShader.includes("#include <lights_fragment_begin>")) {
+        shader.fragmentShader = shader.fragmentShader.replace("#include <lights_fragment_begin>",
+          () => lightsBegin.replace(CSM_SUN_LINE, EYE_SUN_LINE));
+      }
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", `#include <common>
         uniform mat4 uFirstPersonShadowMatrix;
@@ -339,7 +377,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
         }`);
     };
     material.customProgramCacheKey = function FirstPersonShadowCacheKey() {
-      return `${previousKey.call(this)}|firstPersonSelfShadow1`;
+      return `${previousKey.call(this)}|firstPersonSelfShadow2`;
     };
     material.userData.firstPersonSelfShadow = true;
     // **不要在这里动 allowOverride**。预通道归属由 Script_Post.MarkForegroundPrepass
@@ -372,7 +410,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
   /**
    * 提交编译之前调（Script_Main.CompileAsRendered / WarmupShaders）：视模材质要到 Render 里 Sync 才换成
    * 自阴影那一份，换枪、挂伤口变体之后到下一次出画之间网格上挂的还是源材质，这时 compile 编到的是
-   * 用不上的孪生（键只差 `ssr1` / `firstPersonSelfShadow1`），真用的那份在出画时现编（渲染管线 §18.11）。
+   * 用不上的孪生（键只差 `ssr1` / `firstPersonSelfShadow2`），真用的那份在出画时现编（渲染管线 §18.11）。
    * 关着时出画不换，这里也不换。
    */
   SyncForCompile() {
@@ -382,7 +420,47 @@ ${SHADOW_FRAGMENT_GLSL}`)
   SetEnabled(on) {
     this.enabled = !!on;
     this.uniforms.enabled.value = this.enabled ? 1 : 0;
+    // 自阴影关掉（或阴影总闸关）时这一趟不跑、眼睛处的数也不再更新：视模材质退回逐像素采级联
+    this.uniforms.eyeSun.value = this.enabled && this.eyeSunWanted ? 1 : 0;
     return this.enabled;
+  }
+
+  /** 画质面板「第一人称：眼睛处取阳光」：只翻 uniform，不重编译。 */
+  SetEyeSun(on) {
+    this.eyeSunWanted = on !== false;
+    this.uniforms.eyeSun.value = this.enabled && this.eyeSunWanted ? 1 : 0;
+    return this.eyeSunWanted;
+  }
+
+  /**
+   * 眼睛处的太阳可见度：相机局部的几个取样点（真实握枪尺寸）各朝太阳打一条射线，
+   * 没被挡的比例按时间常数平滑。每帧 3 条射线，在主颜色 pass 之前由 Render 调。
+   */
+  UpdateEyeSun(sunDirection, dt) {
+    if (!this.eyeSunWanted) return this.uniforms.sunVisibility.value;
+    const S = FIRST_PERSON_LIGHTING.sun;
+    let lit = 1;
+    if (this.sunBlocked && sunDirection) {
+      this._sunRay.copy(sunDirection);
+      if (this._sunRay.lengthSq() > 1e-8 && this._sunRay.y > -0.05) {
+        this._sunRay.normalize();
+        this.camera.updateWorldMatrix(true, false);
+        let open = 0;
+        for (const p of S.samples) {
+          this._sunOrigin.set(p[0], p[1], p[2]).applyMatrix4(this.camera.matrixWorld);
+          if (!this.sunBlocked(this._sunOrigin, this._sunRay, S.maxDistance)) open += 1;
+        }
+        lit = open / S.samples.length;
+      }
+    }
+    this.eyeSunRaw = lit;
+    const step = Math.max(0, Number(dt) || 0);
+    const k = S.smoothS > 0 ? 1 - Math.exp(-step / S.smoothS) : 1;
+    // 第一次没有历史可平滑：直接落到当前值
+    const current = this.uniforms.sunVisibility.value;
+    this.uniforms.sunVisibility.value = this._eyeSunPrimed ? current + (lit - current) * k : lit;
+    this._eyeSunPrimed = true;
+    return this.uniforms.sunVisibility.value;
   }
 
   _FitCamera(sunDirection) {
@@ -403,8 +481,10 @@ ${SHADOW_FRAGMENT_GLSL}`)
       .multiply(this.shadowCamera.matrixWorldInverse);
   }
 
-  Render(sunDirection) {
-    if (!this.enabled || !this.root?.visible) return false;
+  Render(sunDirection, dt = 0) {
+    if (!this.enabled) return false;
+    this.UpdateEyeSun(sunDirection, dt);
+    if (!this.root?.visible) return false;
     this.Sync();
     if (!this.casters.length) return false;
     this._FitCamera(sunDirection);
@@ -509,6 +589,9 @@ ${SHADOW_FRAGMENT_GLSL}`)
       materials: this.ownedMaterials.size,
       isolated,
       worldCasterLeak: this.meshes.some((mesh) => mesh.castShadow),
+      eyeSun: this.uniforms.eyeSun.value > 0.5,
+      sunVisibility: this.uniforms.sunVisibility.value,
+      sunVisibilityRaw: this.eyeSunRaw,
     };
   }
 

@@ -35,6 +35,7 @@ export function InstallDebugApi(ctx) {
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: ctx.shadingUniforms, RecompileAllMaterials: ctx.RecompileAllMaterials,
     get gi() { return ctx.gi; }, get firstPersonSelfShadow() { return ctx.firstPersonSelfShadow; },
+    get firstPersonReflection() { return ctx.firstPersonReflection; },
     get Particles() { return ctx.vfx.particles; },
     get ParticleEditor() { return ctx.editor?.activeId === 'vfx' ? ctx.editor.active : null; },
     get MenuParticles() { return ctx.commandRoom?.atmosphere?.particles ?? null; },

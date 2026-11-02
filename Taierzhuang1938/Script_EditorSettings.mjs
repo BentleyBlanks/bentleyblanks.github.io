@@ -237,6 +237,15 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadowSoft = on;
       this.Apply();
     });
+    // 第一人称取光（Data_Tuning_FirstPersonLighting）：关掉退回改之前的样子，对照用
+    Toggle(shadowBox, "第一人称：眼睛处取阳光", gfx.firstPersonEyeSun !== false, (on) => {
+      gfx.firstPersonEyeSun = on;
+      this.Apply();
+    });
+    Toggle(shadowBox, "第一人称：本地反射", gfx.firstPersonReflection !== false, (on) => {
+      gfx.firstPersonReflection = on;
+      this.Apply();
+    });
     // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
     // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
     Toggle(shadowBox, "接触阴影", gfx.contactShadows !== false, (on) => {
@@ -485,6 +494,8 @@ export class GraphicsSettings {
     gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
+    gfx.firstPersonEyeSun = true;
+    gfx.firstPersonReflection = true;
     gfx.atmosphere = true;
     gfx.contactShadows = true;
     gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;

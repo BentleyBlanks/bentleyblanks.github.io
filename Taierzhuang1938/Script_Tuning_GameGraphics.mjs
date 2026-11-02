@@ -19,6 +19,10 @@ return {
   // 自阴影软化：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。出厂关（2026-09-05），
   // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
   firstPersonSelfShadowSoft: false,
+  // 第一人称取光（2026-11-02，背光枪发黑；Data_Tuning_FirstPersonLighting）。都只作用在自阴影那份视模材质上，
+  // 关掉就是改之前的样子：眼睛处取阳光 = 视模不再逐像素采世界阴影图；本地反射 = 跟着玩家拍的反射图。
+  firstPersonEyeSun: true,
+  firstPersonReflection: true,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
   // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
   // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
