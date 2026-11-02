@@ -1727,6 +1727,7 @@ export class VfxSystem {
     const id = this.nextSourceId;
     this.nextSourceId += 1;
     const kind = opts.kind || "dust";
+    const plume = Math.sqrt(Number.isFinite(opts.plumeScale) && opts.plumeScale > 0 ? opts.plumeScale : 1);
     const palette = kind === "black"
       ? [VFX_PALETTE.blackCore, VFX_PALETTE.blackSmoke]
       : kind === "screen"
@@ -1737,11 +1738,12 @@ export class VfxSystem {
       seed: opts.backdrop?.seed ?? id * 7919,
       position: new THREE.Vector3(position.x, position.y, position.z),
       rate: (opts.rate ?? 10) * this.spawnScale,
-      radius: opts.radius ?? 0.35,
-      rise: opts.rise ?? (kind === "screen" ? 0.35 : 1.5),
-      sizeStart: opts.sizeStart ?? 0.35,
-      sizeEnd: opts.sizeEnd ?? (kind === "screen" ? 2.4 : 3.0),
-      life: opts.life ?? 4.5,
+      // plumeScale（白盒预演 smoke 事件的 scale）：冒的高度 × plumeScale —— 上升速度与寿命各 × √plumeScale，烟团大小、飘散 × √plumeScale
+      radius: (opts.radius ?? 0.35) * plume,
+      rise: (opts.rise ?? (kind === "screen" ? 0.35 : 1.5)) * plume,
+      sizeStart: (opts.sizeStart ?? 0.35) * plume,
+      sizeEnd: (opts.sizeEnd ?? (kind === "screen" ? 2.4 : 3.0)) * plume,
+      life: (opts.life ?? 4.5) * plume,
       opacity: opts.opacity ?? 0.42,
       // 黑烟是持续上升的羽流，不能套爆炸烟“半程已膨到终值”的曲线。
       // turbulence 让每个烟团以不同相位轻轻摆动：层级来自上升流，不是堆

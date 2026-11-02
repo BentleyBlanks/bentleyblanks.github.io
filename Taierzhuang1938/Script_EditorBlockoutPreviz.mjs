@@ -633,7 +633,12 @@ export class BlockoutPreviz {
       const handle = run.smoke.get(i);
       if (live && handle == null && this.host.vfx?.SmokeSource) {
         const y = this.editor.standAt(e.x, e.z);
-        run.smoke.set(i, this.host.vfx.SmokeSource({ x: e.x, y, z: e.z }, { kind: SMOKE_KIND[e.kind] || "dust" }));
+        // scale：冒的高度乘几倍（10-31 删简易烟时丢了，11-02 接到 VfxSystem）；prewarm：一出来就是冒了一阵的整根烟柱
+        // （大爆炸掀起的土柱）；Seek 进烟的窗口中间也先铺满，免得跳过去的那一秒烟才刚开始冒
+        const opts = { kind: SMOKE_KIND[e.kind] || "dust" };
+        if (Number.isFinite(e.scale)) opts.plumeScale = e.scale;
+        if (e.prewarm === true || (seek && t - e.t > 0.3)) opts.prewarm = true;
+        run.smoke.set(i, this.host.vfx.SmokeSource({ x: e.x, y, z: e.z }, opts));
       } else if (!live && handle != null) { try { this.host.vfx.RemoveSmokeSource(handle); } catch (error) { /* */ } run.smoke.delete(i); }
     });
     if (fire) for (const e of run.seq.events) if (e.t > from && e.t <= t) this.FireEvent(e);

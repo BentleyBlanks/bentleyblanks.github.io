@@ -947,8 +947,10 @@ function S1302(ctx) {
   const boom = 9.4;
   s.Sfx(boom, "shellBlast", { x: GUANDAO_MID.x, z: GUANDAO_MID.z, volume: 0.75 });
   s.Ev(boom, "explosion", { x: GUANDAO_MID.x, z: GUANDAO_MID.z, kind: "shell", radius: 9, h: 1.5 });
-  s.Ev(boom + 0.1, "smoke", { x: GUANDAO_MID.x, z: GUANDAO_MID.z, kind: "SmokeDust", dur: 14 });
-  s.Ev(boom + 0.6, "smoke", { x: GUANDAO_MID.x + 1.5, z: GUANDAO_MID.z - 1, kind: "SmokeBlack", dur: 40 });
+  // 桥在 260 m 外、隔着整个村子（北街房顶在沟里看是仰角 7° 左右，要冒过 31 m 才露头）：烟放大 6 倍、冒到四十米；
+  // 炸药掀起的土柱一出来就是整根（prewarm），黑烟跟着慢慢往上冒
+  s.Ev(boom + 0.1, "smoke", { x: GUANDAO_MID.x, z: GUANDAO_MID.z, kind: "SmokeDust", dur: 14, scale: 6, prewarm: true });
+  s.Ev(boom + 0.6, "smoke", { x: GUANDAO_MID.x + 1.5, z: GUANDAO_MID.z - 1, kind: "SmokeBlack", dur: 40, scale: 6 });
   s.Shake(boom, 0.8, 0.35);
   s.Signal(boom + 0.1, SIG.guandaoBridgeBlown, true);
   s.Eye(boom, 0.01, { stance: "crouch", look: GUANDAO_MID, pitch: 10 });

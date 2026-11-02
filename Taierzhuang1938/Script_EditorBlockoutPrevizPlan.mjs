@@ -393,7 +393,8 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         NeedPoint();
         if (e.kind !== undefined && !PREVIZ_SMOKE_KINDS.includes(e.kind)) errors.push(`${eat}.kind 要是 ${PREVIZ_SMOKE_KINDS.join(" / ")}`);
         if (e.dur !== undefined && !(Finite(e.dur) && e.dur > 0)) errors.push(`${eat}.dur 要是正数`);
-        if (e.scale !== undefined && !(Finite(e.scale) && e.scale >= 0.3 && e.scale <= 6)) errors.push(`${eat}.scale 要是 0.3–6（白盒简易烟放大几倍）`);
+        if (e.scale !== undefined && !(Finite(e.scale) && e.scale >= 0.3 && e.scale <= 6)) errors.push(`${eat}.scale 要是 0.3–6（烟冒的高度放大几倍）`);
+        if (e.prewarm !== undefined && typeof e.prewarm !== "boolean") errors.push(`${eat}.prewarm 要是 true / false（一出来就是整根烟柱）`);
       } else if (e.type === "muzzle") {
         if (typeof e.actor === "string") { if (units && e.actor !== "player" && !units.has(e.actor) && !SpawnIds(seq).has(e.actor)) errors.push(`${eat}.actor 在关键帧 ${seq.keyframe} 里找不到：${e.actor}`); }
         else NeedPoint();

@@ -962,7 +962,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - **台词** `lines[]`：`line` 是 `voice` 清单里的句子 id；`actor` 可省（省了 = 当前关键帧里 `castId` 等于这句 `who` 的单位；找不到就从玩家头上放、不动嘴）。字幕显示这句的 `speaker` + `subtitle`；有口型轨按 sha256 用口型轨，否则用音频包络张嘴（单位要有带面部的身体：`castId` 属于 `Data_FirstLevelSpeakingCast`）。
 - **事件** `events[]`（`type` 必填）：
   - `flash` `{dur, strength?}` 白光；`black` `{dur, fade?}` 黑场（`fade` 渐入渐出秒数）；`caption` `{text, dur}` 非台词的说明字（弱显示，如「（耳鸣）」）。
-  - `explosion` `{x, z, h?, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`；`h` 2026-10-18 第三轮加，爆点离地高 0–10 m，如炸在车尾铁板上写 1.5，缺省 0.3）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
+  - `explosion` `{x, z, h?, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`；`h` 2026-10-18 第三轮加，爆点离地高 0–10 m，如炸在车尾铁板上写 1.5，缺省 0.3）；`smoke` `{x, z, kind?, dur?, scale?, prewarm?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`；`scale` 0.3–6 冒的高度乘几倍、上升速度 / 寿命 / 烟团大小 / 飘散各乘 √scale——10-31 删简易烟时这一项被丢了，11-02 接到 `VfxSystem.SmokeSource` 的 `plumeScale`；`prewarm: true` 一出来就是冒了一阵的整根烟柱，大爆炸掀起的土柱用；Seek 进烟的窗口中间时也自动先铺满）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
   - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
   - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
 - **飞机** `aircraft[]`（2026-10-19，用户「有飞机模型，你自己看下」）：一段里可以放几架，每架一条轨：

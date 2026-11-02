@@ -5243,7 +5243,9 @@
      "x": 257,
      "z": 868,
      "kind": "SmokeDust",
-     "dur": 14
+     "dur": 14,
+     "scale": 6,
+     "prewarm": true
     },
     {
      "t": 9.5,
@@ -5263,7 +5265,8 @@
      "x": 258.5,
      "z": 867,
      "kind": "SmokeBlack",
-     "dur": 40
+     "dur": 40,
+     "scale": 6
     },
     {
      "t": 12.64,
