@@ -16,7 +16,8 @@
 //   · 手：换算只搬朝向，X Bot 胳膊长、躯干大腿比例不同，手会扎进身体 / 离攥着的东西差几厘米 —— 逐帧给掌心一个目标，
 //     两节骨 IK 去够：攥着别的东西的手（ANCHORED_HANDS）对准原手位置 ÷ 运行时缩放，原手贴着自己身体的贴着 X Bot 身体，
 //     仍扎进去的推出来（推的方向、远近分开前后平滑）；
-//   · 几种做法（换目标 + 推出 / 只推出 / 手不动）各烘一遍，按审查口径挑超标最少的（不会比只去抽搐差）；可循环的首尾接回去；
+//   · 几种做法（换目标 + 推出 / 只推出 / 手不动 / 最多推 6 cm）各烘一遍，按审查口径的超标量加「原手贴着身体、修完离开」的分
+//     挑最少的（POSE_GUARD：不为了不进身体把手甩走）；可循环的首尾接回去；
 //   · 镜像的只推出、去抽搐。
 //   每条改过的写调整记录 _import/MixamoFixes/Animation_XBot_<名>.Derive.fix.json（改前改后按审查脚本同一套量法）。
 import fs from "node:fs";
@@ -39,6 +40,15 @@ const MIXAMO_FPS = 30;
 /** 去抽搐：源片段（重采样到 30 fps 后）与 X Bot 输出的门槛（度，同审查脚本的「离前后两帧中间姿势」；审查报 > 15°）。 */
 const DESPIKE_SOURCE = Object.freeze({ lo: 8, hi: 12 });
 const DESPIKE_OUTPUT = Object.freeze({ lo: 8, hi: 11 });
+/**
+ * 挑做法时护住原动作（11-02 复查加）：只按「进身体多少」挑，会挑中把手推走一大截的做法 —— PvCaptiveButtHit 挨枪托捂脸，
+ * 手指进 X Bot 的大脑袋 8.5 cm，推干净要推 25 cm，右臂被甩到头顶上（02-1 冬瓜）；CaptiveStabbedCurl 蜷着、手夹在两腿间，
+ * 推出来胳膊竖到半空（只限推的距离时肘又翘起来）。所以每条胳膊：手推出（不含攥着东西的换目标）超过 freePushM 的部分、
+ * 肘比手不动那种挪开超过 freeElbowM 的部分、「原手贴着自己身体（≤ touchM）、修完离 X Bot 身体超过 keepM」比手不动那种
+ * 多出来的部分，每厘米记 perCm 分（肘 perElbowCm：整条胳膊挪开比夹在腿间、贴着脸的几厘米显眼），跟超标量加在一起挑；
+ * 另烘「最多推 capM」的几种给它挑（宁可手指留一点在身体里，也不把手甩走）。
+ */
+const POSE_GUARD = Object.freeze({ touchM: 0.03, keepM: 0.04, freePushM: 0.08, freeElbowM: 0.08, perCm: 0.5, perElbowCm: 0.6, capM: 0.06 });
 /**
  * 「手里攥着别的东西」的手（R / L）：这些手的目标掌心取原身体掌心位置 ÷ 运行时缩放（白盒里正好落在原来那只手的位置，
  * 被角、担架杆、衣领、伤员、墙头、地面都不跑；挪到碰到 X Bot 身体为止）。没列的手保持换算结果，只做贴身体与推出：
@@ -287,23 +297,44 @@ function Retarget(id, spec, sources) {
   //   push  不换目标，只把扎进身体的推出来；
   //   plain 手不动，只去抽搐。
   const hands = ANCHORED_HANDS[id] || "";
+  // 护住原动作（POSE_GUARD）：原手贴着自己身体的帧修完离 X Bot 身体多远、手推出去多远
+  const srcGap = new Fix.ArmFixer(xbot, { rest, volumes: S.volumes, scaleK: S.scaleK }).SourceGaps(plain);
+  const ContactLoss = (fr) => {
+    const depth = new Fix.ArmFixer(xbot).HandDepths(fr), loss = {};
+    for (const s of ["Right", "Left"]) {
+      let worst = 0;
+      // 攥着别的东西的手（ANCHORED_HANDS）目标是那样东西，不是自己身体：不算
+      if (!hands.includes(s[0])) depth[s].forEach((d, f) => { if (srcGap[s][f] <= POSE_GUARD.touchM) worst = Math.max(worst, -d - POSE_GUARD.keepM); });
+      loss[s] = +(worst * 100).toFixed(1);
+    }
+    return loss;
+  };
   const Variant = (mode) => {
     const fr = plain.map(x => ({ localQ: x.localQ.map(q => q.clone()), hips: x.hips, srcW: x.srcW }));
-    const swivel = mode.endsWith("Swivel"), opts = { swivel, ...(mode.endsWith("Soft") ? { smoothFrames: 3, dirSmooth: 5, dilate: 3 } : {}) };
+    const swivel = mode.endsWith("Swivel"), opts = { swivel, ...(mode.endsWith("Soft") ? { smoothFrames: 3, dirSmooth: 5, dilate: 3 } : {}),
+      ...(mode.includes("Cap") ? { maxPush: POSE_GUARD.capM } : {}) };
     let armLog = null;
     if (mode.startsWith("full")) armLog = new Fix.ArmFixer(xbot, { rest, volumes: S.volumes, scaleK: S.scaleK }, { ...opts, contact: mode.startsWith("fullPalm") ? "palm" : "hand" })
       .Run(fr, { Right: hands.includes("R") ? 1 : 0, Left: hands.includes("L") ? 1 : 0 });
     if (mode.startsWith("push")) armLog = new Fix.ArmFixer(xbot, null, opts).Run(fr);
     const post = PostDespike(fr, retarget, mode !== "plain", opts);
     const after = MeasureClip(fr, post.tracks);
-    return { mode, fr, armLog, ...post, after, score: Excess(after) };
+    const pushedCm = {};
+    for (const s of ["Right", "Left"]) pushedCm[s] = Math.max(0, ...(armLog?.[s]?.pushed || []).map(d => d * 100)) + Math.max(0, ...(post.touchups?.[s] || []).map(t => t.cm));
+    return { mode, fr, armLog, ...post, after, score: Excess(after), lost: ContactLoss(fr), pushedCm, elbows: new Fix.ArmFixer(xbot).Elbows(fr) };
   };
-  const variants = ["full", "fullPalm", "push", "plain"].map(Variant);
+  let untouched = null;   // 「手不动、只去抽搐」那种：肘挪多少、手离身体多出多少都跟它比
+  const ElbowCm = (v, s) => (untouched ? Math.max(0, ...v.elbows[s].map((e, f) => e.distanceTo(untouched.elbows[s][f]) * 100)) : 0);
+  const Guard = (v) => ["Right", "Left"].reduce((t, s) => t + (Math.max(0, v.lost[s] - (untouched?.lost[s] ?? 0)) + Math.max(0, v.pushedCm[s] - POSE_GUARD.freePushM * 100)) * POSE_GUARD.perCm
+    + (hands.includes(s[0]) ? 0 : Math.max(0, ElbowCm(v, s) - POSE_GUARD.freeElbowM * 100) * POSE_GUARD.perElbowCm), 0);   // 攥着东西的手肘本来就要跟着挪
+  const Total = (v) => v.score + Guard(v);
+  const variants = ["full", "fullPalm", "push", "plain", "fullCap", "fullCapSwivel", "pushCap"].map(Variant);
+  untouched = variants.find(v => v.mode === "plain");
   // 还超标的再加带肘外转的几种（已达标的不动）
-  if (Math.min(...variants.map(v => v.score)) > 0) variants.push(...["fullSwivel", "fullPalmSwivel", "pushSwivel"].map(Variant));
+  if (Math.min(...variants.map(Total)) > 0) variants.push(...["fullSwivel", "fullPalmSwivel", "pushSwivel"].map(Variant));
   // 还超标的（多半是快动作里推出来的手一帧一拐）：推的轨迹平滑得更狠再试
-  if (Math.min(...variants.map(v => v.score)) > 0) variants.push(...["fullSoft", "fullPalmSoft", "pushSoft"].map(Variant));
-  const pick = variants.reduce((a, b) => (b.score < a.score - 1e-6 ? b : a));
+  if (Math.min(...variants.map(Total)) > 0) variants.push(...["fullSoft", "fullPalmSoft", "pushSoft"].map(Variant));
+  const pick = variants.reduce((a, b) => (Total(b) < Total(a) - 1e-6 ? b : a));
   const { tracks, fr: outFrames } = pick;
   let after = pick.after;
   // 可循环的：修手 / 去抽搐让首尾两帧不再一样，把差在最后几帧里慢慢补上（原片段首尾本来接得上）
@@ -313,6 +344,7 @@ function Retarget(id, spec, sources) {
   armLog.touchups = pick.touchups;
   armLog.mode = pick.mode;
   armLog.scores = Object.fromEntries(variants.map(v => [v.mode, +v.score.toFixed(2)]));
+  armLog.guard = Object.fromEntries(variants.map(v => [v.mode, +Guard(v).toFixed(1)]));
   despiked.push(...pick.despiked);
   const rotations = targetNames.map((_, i) => (retarget.srcIndex[i] >= 0 ? tracks[i] : null));
   const hipsTrack = new Float32Array(frames * 3);
@@ -610,13 +642,14 @@ function FixRecord(id, file, baked) {
   if (!changes.length) return null;
   const MODE = { full: "手从原身体换目标（贴身体按手上各点量）+ 推出", fullPalm: "手从原身体换目标（贴身体按掌心量）+ 推出",
     fullSoft: "手从原身体换目标（按手上各点）+ 推出（轨迹平滑加倍）", fullPalmSoft: "手从原身体换目标（按掌心）+ 推出（轨迹平滑加倍）", pushSoft: "只推出（轨迹平滑加倍）",
-    fullSwivel: "手从原身体换目标（按手上各点）+ 推出 + 肘外转", fullPalmSwivel: "手从原身体换目标（按掌心）+ 推出 + 肘外转", pushSwivel: "只推出 + 肘外转", push: "只推出（不换目标）", plain: "手不动、只去抽搐" };
-  if (r.armLog.mode) changes.push(`几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「${MODE[r.armLog.mode]}」：${Object.entries(r.armLog.scores).map(([k, v]) => `${MODE[k]} ${v}`).join("，")}`);
+    fullSwivel: "手从原身体换目标（按手上各点）+ 推出 + 肘外转", fullPalmSwivel: "手从原身体换目标（按掌心）+ 推出 + 肘外转", pushSwivel: "只推出 + 肘外转", push: "只推出（不换目标）", plain: "手不动、只去抽搐",
+    fullCap: "手从原身体换目标（按手上各点）+ 推出（最多推 6 cm）", fullCapSwivel: "手从原身体换目标（按手上各点）+ 推出（最多推 6 cm）+ 肘外转", pushCap: "只推出（最多推 6 cm）" };
+  if (r.armLog.mode) changes.push(`几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4），加上护住原动作的分（手推出去超过 8 cm、原手贴着身体修完离开 4 cm 以上每厘米 0.5 分，肘挪开超过 8 cm 每厘米 0.6 分），挑了「${MODE[r.armLog.mode]}」：${Object.entries(r.armLog.scores).map(([k, v]) => `${MODE[k]} ${v}${r.armLog.guard?.[k] ? ` + ${r.armLog.guard[k]}` : ""}`).join("，")}`);
   const B = r.before, A = r.after, bits = [];
   for (const [k, label] of [["handCm", "手"], ["forearmCm", "前臂"]]) for (const s of ["Right", "Left"]) if (B[k][s] > 1.5) bits.push(`${SIDE[s]}${label}进身体 ${B[k][s]} cm`);
   if (B.glitchDeg > 15) bits.push(`${B.glitchAt.split("@")[0]} 一帧抽 ${B.glitchDeg}°`);
   const HOW = { full: "手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出", push: "扎进去的手沿身体表面推出", plain: null };
-  const baseHow = HOW[(r.armLog.mode || "push").replace("Palm", "").replace("Swivel", "").replace("Soft", "")];
+  const baseHow = HOW[(r.armLog.mode || "push").replace("Palm", "").replace("Swivel", "").replace("Soft", "").replace("Cap", "")];
   const how = [baseHow && baseHow + (/Swivel/.test(r.armLog.mode || "") ? "（推不干净的帧肘绕肩—腕连线外转）" : ""), r.despiked.length ? "抽搐的帧拉回前后中间" : null].filter(Boolean).join("，") || "没改";
   return {
     file: `Derived/${file}`, topic: "Derive", kind: "anim", date: "2026-11-02", author: "Claude Opus 5.5",

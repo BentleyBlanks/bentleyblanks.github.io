@@ -530,6 +530,37 @@ export class ArmFixer {
     return log;
   }
 
+  /** 原身体逐帧每只手离自己身体多近（米，手上各点里最近的那个；负 = 扎进去了）：{ Right: [], Left: [] }；没有原身体（镜像）→ null。 */
+  SourceGaps(frames) {
+    if (!this.src) return null;
+    const keep = this.o.contact, out = { Right: [], Left: [] };
+    this.o.contact = "hand";
+    for (const fr of frames) for (const s of ["Right", "Left"]) out[s].push(fr.srcW ? this.SourcePalm(fr.srcW, s).ds : Infinity);
+    this.o.contact = keep;
+    return out;
+  }
+
+  /** 逐帧每条胳膊肘（ForeArm 骨原点）的位置（模型空间）：{ Right: Vector3[], Left: Vector3[] }。 */
+  Elbows(frames) {
+    const worlds = [], out = { Right: [], Left: [] };
+    for (const fr of frames) {
+      ForwardKinematics(this.x.rest.bones, fr.localQ, this.x.above, worlds, this.hips, fr.hips);
+      for (const s of ["Right", "Left"]) out[s].push(new THREE.Vector3().setFromMatrixPosition(worlds[this.body.side[s].fore]));
+    }
+    return out;
+  }
+
+  /** 逐帧每只手手掌指节进 X Bot 身体最深（米，负 = 离表面多远）：{ Right: [], Left: [] }。 */
+  HandDepths(frames) {
+    const worlds = [], out = { Right: [], Left: [] };
+    for (const fr of frames) {
+      ForwardKinematics(this.x.rest.bones, fr.localQ, this.x.above, worlds, this.hips, fr.hips);
+      this.body.Update(worlds);
+      for (const s of ["Right", "Left"]) out[s].push(this.body.MeasureSide(worlds, s).hand.depth);
+    }
+    return out;
+  }
+
   /** 量一整条：每只手 { hand: {depth, frame, part, bone}, fore: {depth, frame, bone} }（同审查脚本）。 */
   Measure(frames) {
     const worlds = [], res = {};

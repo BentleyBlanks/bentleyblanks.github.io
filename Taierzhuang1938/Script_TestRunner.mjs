@@ -1196,7 +1196,7 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Texture\/Editor\//i },
   // Mixamo 动作库（Animation/Mixamo：X Bot 与通用动作）和它的预览窗口（Script_EditorMixamoPreview 开的独立页）：
   // 只有预览工具与白盒编辑器读，游戏正片不读，改了跑 editor 域。白盒人物换成 X Bot 的对照表与换算（Data_BlockoutXBotClips、Script_XBotRetarget）同理。
-  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html|Animation\/Mixamo\/|XBot/i },
+  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html|Animation\/Mixamo\/|XBot|MixamoProps/i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
