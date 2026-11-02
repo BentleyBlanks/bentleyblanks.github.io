@@ -1197,40 +1197,35 @@
               "z": 60.2,
               "move": "cut",
               "yawDeg": 180,
-              "stance": "crouch"
+              "stance": "crouch",
+              "aim": true
             },
             {
-              "t": 1.6,
-              "stance": "stand",
-              "clip": "IjaDropInPoint"
+              "t": 1.5,
+              "x": 56.8,
+              "z": 61.75,
+              "move": "run"
             },
             {
               "t": 1.6,
               "x": 56.8,
-              "z": 60.2,
-              "move": "cut"
-            },
-            {
-              "t": 2.8,
-              "x": 56.6,
-              "z": 64.2,
-              "move": "run",
-              "yawDeg": 90
+              "z": 63.35,
+              "move": "cut",
+              "stance": "stand",
+              "clip": "IjaDropInPoint"
             },
             {
               "t": 2.9,
-              "clip": "PvIjaSignalSplit"
+              "x": 56.8,
+              "z": 63.45,
+              "move": "cut",
+              "clip": "PvIjaSignalSplit",
+              "yawDeg": 90
             },
             {
               "t": 4.9,
               "clip": null,
               "aim": true
-            },
-            {
-              "t": 10,
-              "x": 56.6,
-              "z": 64.2,
-              "move": "cut"
             },
             {
               "t": 12.6,
@@ -1304,7 +1299,8 @@
           "keys": [
             {
               "t": 1.8,
-              "stance": "stand"
+              "stance": "stand",
+              "aim": true
             },
             {
               "t": 1.8,
@@ -1313,26 +1309,47 @@
               "move": "cut"
             },
             {
-              "t": 4.2,
-              "x": 50.5,
-              "z": 65.3,
+              "t": 2.2,
+              "x": 57.65,
+              "z": 61.65,
+              "move": "run",
+              "stance": "crouch"
+            },
+            {
+              "t": 3.31,
+              "x": 57.6,
+              "z": 63.4,
+              "move": "walk",
+              "stance": "crouch"
+            },
+            {
+              "t": 3.35,
+              "stance": "stand"
+            },
+            {
+              "t": 4.55,
+              "x": 53.6,
+              "z": 65,
               "move": "run",
               "yawDeg": 90
             },
             {
-              "t": 4.5,
+              "t": 4.6,
               "clip": "VilIjaHelmetGrenadeLob",
               "yawDeg": 90
             },
             {
-              "t": 4.5,
-              "stance": "stand"
-            },
-            {
-              "t": 6.8,
+              "t": 6.9,
               "stance": "crouch",
               "aim": true,
               "clip": null,
+              "yawDeg": 90
+            },
+            {
+              "t": 10.5,
+              "x": 50.5,
+              "z": 65.3,
+              "move": "walk",
               "yawDeg": 90
             }
           ]
@@ -1347,40 +1364,37 @@
               "move": "cut",
               "yawDeg": 180,
               "stance": "crouch",
-              "aim": false
+              "aim": true
             },
             {
-              "t": 2.2,
-              "stance": "stand",
-              "clip": "IjaDropInStand"
+              "t": 2.1,
+              "x": 55,
+              "z": 61.95,
+              "move": "run"
             },
             {
               "t": 2.2,
               "x": 55,
-              "z": 60.3,
-              "move": "cut"
+              "z": 63.55,
+              "move": "cut",
+              "stance": "stand",
+              "clip": "IjaDropInStand"
             },
             {
-              "t": 3.6,
-              "x": 54.8,
-              "z": 65.2,
-              "move": "run",
-              "yawDeg": 90
-            },
-            {
-              "t": 4.4,
-              "x": 54.8,
-              "z": 65.2,
-              "move": "cut"
+              "t": 3.9,
+              "x": 55.06,
+              "z": 63.81,
+              "move": "cut",
+              "yawDeg": -90,
+              "clip": null,
+              "aim": true
             },
             {
               "t": 6.2,
               "x": 52.5,
               "z": 65.6,
               "move": "walk",
-              "aim": true,
-              "yawDeg": 90,
-              "clip": null
+              "yawDeg": 90
             }
           ]
         },
@@ -1407,66 +1421,74 @@
               "move": "cut",
               "yawDeg": 180,
               "stance": "crouch",
-              "aim": false
+              "aim": true
             },
             {
-              "t": 1.9,
-              "stance": "stand",
-              "clip": "IjaDropInKneel"
+              "t": 1.8,
+              "x": 58.8,
+              "z": 61.7,
+              "move": "run"
             },
             {
               "t": 1.9,
               "x": 58.8,
-              "z": 60.2,
-              "move": "cut"
+              "z": 63.4,
+              "move": "cut",
+              "stance": "stand",
+              "clip": "IjaDropInKneel"
             },
             {
-              "t": 3.3,
-              "x": 54.2,
-              "z": 64.7,
-              "move": "run",
+              "t": 3.65,
+              "x": 58.86,
+              "z": 63.76,
+              "move": "cut",
+              "yawDeg": -115.78,
+              "clip": null,
+              "aim": true
+            },
+            {
+              "t": 4.85,
+              "x": 55.56,
+              "z": 65.94,
+              "move": "run"
+            },
+            {
+              "t": 4.9,
+              "clip": "IjaWalkStabProne",
+              "yawDeg": 90
+            },
+            {
+              "t": 6.57,
+              "x": 53.91,
+              "z": 65.88,
+              "move": "cut",
+              "clip": null,
+              "yawDeg": 90
+            },
+            {
+              "t": 8.35,
+              "x": 59.54,
+              "z": 63.46,
+              "move": "run"
+            },
+            {
+              "t": 8.4,
+              "clip": "IjaWalkStabProne",
               "yawDeg": -90
             },
             {
-              "t": 3.4,
-              "aim": true,
+              "t": 10.07,
+              "x": 61.19,
+              "z": 63.52,
+              "move": "cut",
               "clip": null,
-              "faceTo": "BodyNra3"
+              "yawDeg": -90
             },
             {
-              "t": 3.5,
-              "clip": "IjaWalkStabProne"
-            },
-            {
-              "t": 5.2,
-              "x": 54.2,
-              "z": 64.7,
-              "move": "cut"
-            },
-            {
-              "t": 7.6,
-              "x": 60.1,
-              "z": 64.5,
-              "move": "walk",
-              "faceTo": "BodyNra2",
-              "clip": null
-            },
-            {
-              "t": 7.7,
-              "clip": "IjaWalkStabProne"
-            },
-            {
-              "t": 9.4,
-              "x": 60.1,
-              "z": 64.5,
-              "move": "cut"
-            },
-            {
-              "t": 10.6,
+              "t": 11.2,
               "x": 61.4,
               "z": 64,
               "move": "walk",
-              "clip": null,
               "yawDeg": -90
             }
           ]
@@ -1484,7 +1506,8 @@
           "keys": [
             {
               "t": 2,
-              "stance": "stand"
+              "stance": "stand",
+              "aim": true
             },
             {
               "t": 2,
@@ -1493,16 +1516,32 @@
               "move": "cut"
             },
             {
-              "t": 3.4,
+              "t": 2.5,
+              "x": 59.6,
+              "z": 61.6,
+              "move": "run",
+              "stance": "crouch"
+            },
+            {
+              "t": 3.66,
+              "x": 59.1,
+              "z": 63.4,
+              "move": "walk",
+              "stance": "crouch"
+            },
+            {
+              "t": 3.7,
+              "stance": "stand"
+            },
+            {
+              "t": 4.3,
               "x": 58.4,
               "z": 65.2,
               "move": "run",
               "yawDeg": -90
             },
             {
-              "t": 3.5,
-              "aim": true,
-              "clip": null,
+              "t": 4.35,
               "faceTo": "BodyNra1"
             },
             {
@@ -2119,7 +2158,7 @@
           "z": 59.5
         },
         {
-          "t": 4.2,
+          "t": 5.61,
           "type": "sfx",
           "name": "stab",
           "x": 54,
@@ -2148,7 +2187,7 @@
           "radius": 4
         },
         {
-          "t": 8.4,
+          "t": 9.11,
           "type": "sfx",
           "name": "stab",
           "x": 60.9,
@@ -2798,21 +2837,16 @@
               "clip": "InterpreterCrouchAsk"
             },
             {
-              "t": 16.01,
-              "x": 57.4,
-              "z": 63.9,
-              "move": "cut"
-            },
-            {
               "t": 16.95,
               "x": 57.45,
               "z": 64.2,
-              "move": "walk",
+              "move": "cut",
               "faceTo": "Donggua"
             },
             {
               "t": 16.95,
-              "clip": "InterpreterGrabCollar"
+              "clip": "InterpreterGrabCollar",
+              "clipHold": true
             },
             {
               "t": 23.4,
@@ -2873,37 +2907,38 @@
             {
               "t": 40.18,
               "clip": "IjaRecruitChargeThrust",
-              "faceTo": "Donggua"
-            },
-            {
-              "t": 40.18,
-              "x": 58.7,
-              "z": 66,
-              "move": "cut"
-            },
-            {
-              "t": 41.18,
               "x": 58.2,
               "z": 65.9,
-              "move": "walk",
-              "faceTo": "Donggua"
+              "move": "cut",
+              "yawDeg": 49.4
             },
             {
               "t": 42.69,
               "clip": "PvIjaBayonetRaiseThreat",
-              "clipHold": true
+              "clipHold": true,
+              "x": 58.5,
+              "z": 66.23,
+              "move": "cut",
+              "yawDeg": 49.4
             },
             {
               "t": 47.3,
               "clip": "IjaRecruitChargeThrust",
               "clipFrom": 2.45,
-              "clipHold": true
+              "clipHold": true,
+              "x": 58.2,
+              "z": 65.9,
+              "move": "cut",
+              "yawDeg": 49.4
             },
             {
               "t": 54.99,
               "clip": "PvIjaBayonetRaiseThreat",
               "clipHold": true,
-              "faceTo": "Donggua"
+              "x": 58.41,
+              "z": 66.27,
+              "move": "cut",
+              "yawDeg": 49.4
             }
           ]
         },
@@ -3843,12 +3878,12 @@
           "keys": [
             {
               "t": 0,
-              "x": 58.2,
-              "z": 65.9,
+              "x": 58.41,
+              "z": 66.27,
               "move": "cut",
               "state": "alive",
               "stance": "stand",
-              "faceTo": "Donggua",
+              "yawDeg": 49.4,
               "clip": "PvIjaBayonetRaiseThreat",
               "clipFrom": 0.6,
               "clipHold": true
@@ -3856,25 +3891,13 @@
             {
               "t": 3.25,
               "clip": "ShotCollapse",
-              "clipHold": true
-            },
-            {
-              "t": 3.25,
-              "x": 58.2,
-              "z": 65.9,
-              "move": "cut"
-            },
-            {
-              "t": 4.85,
-              "x": 61.38,
-              "z": 64.2,
-              "move": "walk"
+              "clipHold": true,
+              "yawDeg": 49.4
             },
             {
               "t": 4.95,
               "state": "down",
-              "clip": null,
-              "yawDeg": -90
+              "clip": null
             }
           ]
         },
@@ -3905,48 +3928,26 @@
             {
               "t": 3.45,
               "stance": "stand",
-              "clip": "IjaShotStaggerAway"
-            },
-            {
-              "t": 3.45,
-              "x": 59,
-              "z": 65.4,
-              "move": "cut"
-            },
-            {
-              "t": 5.35,
-              "x": 59.3,
-              "z": 64,
-              "move": "walk",
-              "yawDeg": -60
+              "clip": "IjaShotStaggerAway",
+              "yawDeg": 90.95
             },
             {
               "t": 7.76,
-              "clip": "IjaGrenadeBitePin",
-              "faceTo": "Luo"
+              "clip": "IjaGrenadeBitePin"
             },
             {
               "t": 9.76,
+              "x": 60.41,
+              "z": 65.46,
+              "move": "cut",
               "clip": "IjaParriedChoppedFall",
-              "clipHold": true
-            },
-            {
-              "t": 9.76,
-              "x": 59.3,
-              "z": 64,
-              "move": "cut"
-            },
-            {
-              "t": 10.96,
-              "x": 59.79,
-              "z": 63.5,
-              "move": "walk"
+              "clipHold": true,
+              "yawDeg": 90.95
             },
             {
               "t": 11.76,
               "state": "down",
-              "clip": null,
-              "yawDeg": 90
+              "clip": null
             }
           ]
         },
@@ -3965,8 +3966,7 @@
             },
             {
               "t": 4.8,
-              "faceTo": "CounterNra3",
-              "aim": false
+              "faceTo": "CounterNra3"
             },
             {
               "t": 5.2,
@@ -3976,16 +3976,12 @@
               "t": 6.8,
               "clip": "ShotCollapse",
               "clipHold": true,
-              "faceTo": {
-                "x": 55.3,
-                "z": 69.2
-              }
+              "yawDeg": -100.3
             },
             {
               "t": 7.8,
               "state": "down",
-              "clip": null,
-              "yawDeg": 90
+              "clip": null
             }
           ]
         },
@@ -4002,43 +3998,32 @@
               "faceTo": "Donggua"
             },
             {
+              "t": 3,
+              "yawDeg": -90
+            },
+            {
               "t": 4.35,
               "stance": "stand",
               "clip": "InterpreterFlee"
             },
             {
-              "t": 4.35,
-              "x": 57.45,
-              "z": 64.2,
-              "move": "cut"
-            },
-            {
               "t": 5.95,
-              "x": 55.6,
-              "z": 64,
-              "move": "run"
-            },
-            {
-              "t": 8.36,
-              "clip": "InterpreterShotStagger"
-            },
-            {
-              "t": 8.36,
-              "x": 55.6,
-              "z": 64,
-              "move": "cut"
-            },
-            {
-              "t": 10.36,
-              "x": 55.39,
-              "z": 63.68,
-              "move": "walk"
-            },
-            {
-              "t": 10.56,
-              "state": "down",
+              "x": 56.13,
+              "z": 64.33,
+              "move": "cut",
               "clip": null,
-              "yawDeg": -60
+              "yawDeg": 89.9,
+              "stance": "prone"
+            },
+            {
+              "t": 8.1,
+              "x": 55.13,
+              "z": 64.45,
+              "move": "crawl"
+            },
+            {
+              "t": 8.55,
+              "state": "down"
             }
           ]
         },
@@ -4056,27 +4041,9 @@
               "yawDeg": 90
             },
             {
-              "t": 2,
-              "stance": "crouch",
-              "aim": false,
-              "yawDeg": 92
-            },
-            {
               "t": 3.03,
               "clip": "IjaLmgGunnerShotOnGun",
               "clipHold": true
-            },
-            {
-              "t": 3.05,
-              "x": 56,
-              "z": 61.6,
-              "move": "cut"
-            },
-            {
-              "t": 4.85,
-              "x": 56,
-              "z": 63.6,
-              "move": "walk"
             },
             {
               "t": 5.05,
@@ -4098,14 +4065,11 @@
               "yawDeg": 90
             },
             {
-              "t": 3.1,
-              "stance": "stand",
-              "yawDeg": 92
-            },
-            {
               "t": 3.15,
               "clip": "PvBlastThrownBack",
-              "clipHold": true
+              "clipHold": true,
+              "stance": "stand",
+              "yawDeg": 92
             }
           ]
         },
@@ -4133,8 +4097,7 @@
             },
             {
               "t": 5,
-              "faceTo": "CounterNra4",
-              "aim": false
+              "faceTo": "CounterNra4"
             },
             {
               "t": 5.1,
@@ -4525,7 +4488,7 @@
             },
             {
               "t": 8.3,
-              "x": 56.3,
+              "x": 55.93,
               "z": 64.6,
               "move": "run"
             }
@@ -4595,20 +4558,32 @@
             },
             {
               "t": 9.16,
-              "x": 58.6,
-              "z": 64.4,
+              "x": 61.1,
+              "z": 64.86,
               "move": "run",
-              "faceTo": "IjaJia"
+              "faceTo": {
+                "x": 60.5,
+                "z": 65.46
+              },
+              "path": [
+                {
+                  "x": 58.9,
+                  "z": 64.1
+                }
+              ]
             },
             {
               "t": 9.26,
               "clip": "LuoDadaoChopRear",
-              "faceTo": "IjaJia"
+              "faceTo": {
+                "x": 60.5,
+                "z": 65.46
+              }
             },
             {
               "t": 14.16,
-              "x": 58.6,
-              "z": 64.4,
+              "x": 61.1,
+              "z": 64.86,
               "move": "cut",
               "clip": null
             },
@@ -5203,8 +5178,8 @@
           "spawn": {
             "side": "ija",
             "kind": "soldier",
-            "x": 50.9,
-            "z": 65.6,
+            "x": 50.15,
+            "z": 65.05,
             "stance": "prone",
             "state": "down",
             "yawDeg": 90
@@ -5216,8 +5191,8 @@
           "spawn": {
             "side": "ija",
             "kind": "soldier",
-            "x": 56.4,
-            "z": 64.4,
+            "x": 56.79,
+            "z": 64.17,
             "stance": "prone",
             "state": "down",
             "yawDeg": 60
@@ -5333,7 +5308,7 @@
           "spawn": {
             "side": "nra",
             "kind": "soldier",
-            "x": 56.3,
+            "x": 55.93,
             "z": 64.6,
             "stance": "stand",
             "yawDeg": 90,
@@ -5603,6 +5578,90 @@
               "z": 66.32,
               "move": "walk",
               "yawDeg": 93.6
+            }
+          ]
+        },
+        {
+          "id": "IjaJia",
+          "keys": [
+            {
+              "t": 0,
+              "x": 60.41,
+              "z": 65.46,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": 90.95
+            }
+          ]
+        },
+        {
+          "id": "IjaDing",
+          "keys": [
+            {
+              "t": 0,
+              "x": 58.41,
+              "z": 66.27,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": 49.4
+            }
+          ]
+        },
+        {
+          "id": "IjaYi",
+          "keys": [
+            {
+              "t": 0,
+              "x": 52.3,
+              "z": 65.7,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": -100.3
+            }
+          ]
+        },
+        {
+          "id": "Interpreter",
+          "keys": [
+            {
+              "t": 0,
+              "x": 55.13,
+              "z": 64.45,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": 89.9
+            }
+          ]
+        },
+        {
+          "id": "IjaMgGunner",
+          "keys": [
+            {
+              "t": 0,
+              "x": 56,
+              "z": 61.6,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": 90
+            }
+          ]
+        },
+        {
+          "id": "IjaMgLoader",
+          "keys": [
+            {
+              "t": 0,
+              "x": 57.3,
+              "z": 61.4,
+              "move": "cut",
+              "state": "down",
+              "stance": "prone",
+              "yawDeg": 92
             }
           ]
         }
