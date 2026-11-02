@@ -1,0 +1,13 @@
+{
+  "schema": "tengxian-env-scene/1",
+  "scene": "FirstLevelCampaign",
+  "time": {
+    "hour": 12,
+    "speed": 0.1,
+    "paused": true
+  },
+  "volumes": [
+    {"id": "Fallback", "name": "兜底（全关）", "shape": "global", "priority": 0, "blendS": 0, "mode": "full", "preset": "FirstLevel"}
+  ],
+  "stages": {}
+}

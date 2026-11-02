@@ -14,6 +14,8 @@ export const ENV_RUNTIME = Object.freeze({
   defaultOverridePriority: 100,
   // 旧天空预设（Debug.ApplySky、过场换天、特效编辑器换天）在有场景环境时变成这个优先级的临时覆盖
   skyOverridePriority: 1000,
+  // 顺着往下一拍走（关键帧带过渡）、这一拍的时间又没写 blendS 时，钟点往前拨过去用几秒
+  beatBlendS: 2,
   // 时间指针离关键帧这么近（小时）算「在这一帧上」：编辑参数改这一帧，而不是另插一帧
   keySnapH: 0.05,
   // 新建盒子区域的缺省尺寸（米）

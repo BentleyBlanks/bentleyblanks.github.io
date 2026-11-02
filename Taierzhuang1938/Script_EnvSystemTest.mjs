@@ -4,6 +4,8 @@
 // 关键帧编辑（联动 tag、插帧、挪帧、删帧）；预设与区域文件的校验与写法（读回逐字相同）；旧天空预设 → 组件 → 拼回去
 // 与原预设在渲染侧读的每一项上一致；按组件选来源（局部只盖自己有的组件、完全覆盖截断、走出区域退回下层）；
 // 来源切换从当时的实际表现过渡、过渡中时钟照走；临时覆盖的句柄释放；仓库里两个场景的兜底区域与三套表现。
+// 第二轮（2026-11-02）：角色光照组件；一拍几点（关键帧的 time、预演 / Timeline 的 time 事件、正片关卡 stages）与往前拨钟；
+// 正片第一关的区域文件（Data_EnvLevels → Environment/Level_FirstLevelCampaign.json，复用 EnvPreset_FirstLevel）。
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -21,6 +23,13 @@ import {
 import { EnvironmentSystem, OffValues, EvaluatePreset } from "./Script_EnvSystem.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { SCENE_LIST } from "./Data_SceneAssets.mjs";
+import { TimeSpecErrors, BeatTime, LevelEnvRepoPath, LEVEL_ENV_FILE_RE, ZoneFileUrl } from "./Script_EnvPreset.mjs";
+import { ENV_LEVELS } from "./Data_EnvLevels.mjs";
+import { EnvTargetForPhase } from "./Script_EnvLoader.mjs";
+import { PrevizHourAt } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { ValidateBlockout } from "./Script_EditorBlockoutConfig.mjs";
+import { FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
+import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
@@ -235,6 +244,99 @@ for (const sceneId of ["FirstLevelWhitebox", "FirstLevel"]) {
   const afternoon = at(15);
   Check(afternoon.sunElevation < day.sunElevation && afternoon.sunElevation > dusk.sunElevation, `${sceneId} 下午 3 点太阳在正午与黄昏之间`);
   Check(WrapHour(25) === 1, "时钟回绕");
+}
+
+// --- 8. 角色光照组件 ------------------------------------------------------------------------------------------
+const charDecl = ENV_COMPONENTS.find((d) => d.type === "CharacterLight");
+Check(charDecl && charDecl.category === "character", "角色光照组件在「人物」分类");
+Check(OffValues(charDecl).fill === 0 && OffValues(charDecl).rim === 0, "角色光照关闭值两路强度为 0");
+const legacyChar = ComposePreset(EnvPresetFromSkyPreset(SKY_PRESETS.firstLevelBattleDay, "firstLevelBattleDay"), 12).characterLight;
+Check(legacyChar.fill === 0 && legacyChar.rim === 0, "旧天空预设（临时覆盖）里没有角色光照 = 关");
+{
+  const preset = JSON.parse(fs.readFileSync(path.join(repo, EnvPresetRepoPath("FirstLevel")), "utf8"));
+  const at = (h) => EvaluatePreset(preset, h).CharacterLight;
+  Check(at(12).fill === 0 && at(12).rim === 0, "白天不开角色光照（画面和以前一样）");
+  Check(at(18).rim > 0.3 && at(18).rimColor === "#ffb072", "黄昏一圈暖色轮廓光");
+  Check(at(22).fill > 0.1 && at(22).rim > 0.25, "晚上冷色补光 + 轮廓光");
+  Check(at(15).rim > 0 && at(15).rim < at(18).rim, "下午往黄昏渐强（对数插，0 那头按线性）");
+}
+
+// --- 9. 一拍几点 ------------------------------------------------------------------------------------------------
+Check(TimeSpecErrors({ hour: 17 }).length === 0 && TimeSpecErrors({ look: "dusk", blendS: 2 }).length === 0, "时间写法：hour 或 look");
+Check(TimeSpecErrors({ hour: 17, look: "dusk" }).length === 1 && TimeSpecErrors({}).length === 1 && TimeSpecErrors({ hour: 25 }).length === 1, "两样都写 / 都不写 / 超出 24 是错");
+const order = ["a", "b", "c", "d"];
+Check(BeatTime({ b: { hour: 9 } }, order, "a") === null, "第一次写之前的拍：没有（用默认时刻）");
+Check(BeatTime({ b: { hour: 9 } }, order, "d").from === "b", "后面的拍不写沿用前面的");
+Check(BeatTime({ b: { hour: 9 }, d: { look: "night" } }, order, "d").spec.look === "night", "这一拍写了用自己的");
+{
+  const sys = new EnvironmentSystem();
+  const doc = JSON.parse(fs.readFileSync(path.join(repo, SceneEnvRepoPath("FirstLevel")), "utf8"));
+  const preset = JSON.parse(fs.readFileSync(path.join(repo, EnvPresetRepoPath("FirstLevel")), "utf8"));
+  sys.SetScene("FirstLevel", doc, new Map([["FirstLevel", preset]]));
+  Check(sys.ResolveTime({ look: "dusk" }) === 18 && sys.ResolveTime({ hour: 25 }) === 1 && sys.ResolveTime({ look: "nope" }) === null, "look 按兜底预设的几套表现查");
+  sys.SetHour(18);
+  sys.ApplyTime({ look: "night" }, { blendS: 4 });
+  sys.Update(2, { x: 0, y: 0, z: 0 });
+  Check(sys.clock.hour > 18 && sys.clock.hour < 22, `往前拨到一半（${sys.clock.hour.toFixed(2)}）`);
+  sys.Update(2.01, { x: 0, y: 0, z: 0 });
+  Check(sys.clock.hour === 22 && !sys.tween, "拨到位");
+  sys.TweenHour(4, 6);
+  sys.Update(3, { x: 0, y: 0, z: 0 });
+  Check(sys.clock.hour > 22 || sys.clock.hour < 4, "22 → 4 点跨午夜往前走（不倒拨）");
+  sys.SetHour(12);
+  Check(!sys.tween && sys.clock.hour === 12, "手拨钟点打断往前拨");
+  Check(sys.DefaultHour() === 12, "区域文件的默认时刻");
+}
+// 预演 / Timeline 的 time 事件：确定性，Seek 到哪就是几点
+{
+  const resolve = (s) => (Number.isFinite(s.hour) ? s.hour : s.look === "dusk" ? 18 : s.look === "night" ? 22 : null);
+  const seq = { events: [{ t: 1, type: "time", look: "dusk" }, { t: 3, type: "time", hour: 22, dur: 4 }] };
+  Check(PrevizHourAt(seq, 0.5, 12, resolve) === 12, "第一个 time 事件之前：这一段开头的钟点");
+  Check(PrevizHourAt(seq, 2, 12, resolve) === 18, "立刻拨到黄昏");
+  const mid = PrevizHourAt(seq, 5, 12, resolve);
+  Check(mid > 18 && mid < 22, `4 秒里往前走到 22 点（第 2 秒 ${mid.toFixed(2)}）`);
+  Check(PrevizHourAt(seq, 9, 12, resolve) === 22 && PrevizHourAt(seq, 5, 12, resolve) === mid, "走完到位；同一 t 同一结果");
+  Check(PrevizHourAt({ events: [{ t: 0, type: "flash", dur: 1 }] }, 2, 12, resolve) === null, "没有 time 事件不碰时钟");
+  Check(PrevizHourAt(seq, 0.2, 12, resolve) === 12 && PrevizHourAt(seq, 2, 12, resolve) === 18, "Seek 往回拖过事件，钟点跟着回去");
+}
+// 第一关 11–18 的关键帧：16-1 傍晚、18-3 黄昏、18-8 晚上，其余沿用
+{
+  const cfg = JSON.parse(fs.readFileSync(path.join(here, "Blockout/FirstLevel1218.json"), "utf8"));
+  Check(ValidateBlockout(cfg).ok, "11–18 关键帧（带 time）过校验");
+  const times = Object.fromEntries(cfg.keyframes.filter((k) => k.time).map((k) => [k.id, k.time]));
+  Check(JSON.stringify(times) === JSON.stringify({ "16-1": { hour: 17 }, "18-3": { look: "dusk" }, "18-8": { look: "night" } }), `只在剧本写了时间的三拍写（${JSON.stringify(times)}）`);
+  const ids = cfg.keyframes.map((k) => k.id);
+  Check(BeatTime(times, ids, "12-1") === null && BeatTime(times, ids, "17-2").from === "16-1" && BeatTime(times, ids, "18-6").from === "18-3", "12 拍没写（默认 12:00）、17 沿用 16-1、18-6 沿用 18-3");
+  const bad = JSON.parse(JSON.stringify(cfg));
+  bad.keyframes[0].time = { hour: 30 };
+  Check(!ValidateBlockout(bad).ok, "关键帧 time 写错是校验错误");
+}
+
+// --- 10. 正片第一关的区域文件 ----------------------------------------------------------------------------------------
+{
+  Check(ENV_LEVELS[FIRST_LEVEL_MISSION_PHASE.id] === "FirstLevelCampaign", "第一关（?whitebox=p012）登记了区域文件");
+  const target = EnvTargetForPhase(FIRST_LEVEL_MISSION_PHASE);
+  Check(target?.kind === "level" && target.id === "FirstLevelCampaign" && ZoneFileUrl(target) === "./Environment/Level_FirstLevelCampaign.json", "正片关卡按登记表认区域文件");
+  Check(EnvTargetForPhase({ id: "Nope" }) === null && EnvTargetForPhase({ blockout: { SceneUrl: () => "./Scenes/FirstLevel/Scene_FirstLevel.json" } }).kind === "scene", "没登记的不读、白盒场景按场景读");
+  Check(LEVEL_ENV_FILE_RE.test(LevelEnvRepoPath("FirstLevelCampaign")), "关卡区域文件路径闸");
+  const text = fs.readFileSync(path.join(repo, LevelEnvRepoPath("FirstLevelCampaign")), "utf8");
+  const doc = JSON.parse(text);
+  Check(text === FormatEnvJson(doc), "关卡区域文件按统一写法");
+  Check(ValidateSceneEnv(doc, { presetIds: new Set(["FirstLevel"]) }).ok && !ValidateSceneEnv(doc).warnings.length, "关卡区域文件合规、有兜底区域");
+  Check(doc.volumes.find((v) => v.shape === "global").preset === "FirstLevel", "兜底区域复用正式场景那份预设");
+  Check(ValidateSceneEnv({ ...doc, stages: { NightMarch: { look: "night" } } }).ok && !ValidateSceneEnv({ ...doc, stages: { NightMarch: { hour: -1 } } }).ok, "stages 的时间按同一套写法校验");
+  const steps = FIRST_LEVEL_STAGES.flatMap((s) => s.steps);
+  Check(BeatTime({ BridgeOrders: { look: "dusk" } }, steps, "NightMarch").from === "BridgeOrders", "任务步骤按第一关的先后沿用");
+  const preset = JSON.parse(fs.readFileSync(path.join(repo, EnvPresetRepoPath("FirstLevel")), "utf8"));
+  const sys = new EnvironmentSystem();
+  sys.SetScene("FirstLevelCampaign", doc, new Map([["FirstLevel", preset]]), { kind: "level" });
+  const out = sys.Update(0, { x: 0, y: 0, z: 0 }).preset;
+  for (const field of RENDER_FIELDS) {
+    const want = GetPath(SKY_PRESETS[FIRST_LEVEL_MISSION_PHASE.sky], field);
+    if (want !== undefined) Check(SameDeep(GetPath(out, field), want), `正片第一关 12:00 = 它原来的天 ${FIRST_LEVEL_MISSION_PHASE.sky}（${field}）`);
+  }
+  Check(out.profile === FIRST_LEVEL_MISSION_PHASE.sky, "后期档案 = 本关天空（逐关自动曝光锚点照用）");
+  Check(sys.targetKind === "level" && sys.State().kind === "level", "环境系统记着这是正片关卡的区域文件");
 }
 
 console.log(`EnvSystemTest：${checks} 项通过`);

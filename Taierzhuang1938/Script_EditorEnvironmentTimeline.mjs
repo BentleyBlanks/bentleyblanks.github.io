@@ -114,7 +114,7 @@ export class EnvTimelinePanel {
     this.editor.SaveUi();
     this.open = true;
     this.root.hidden = false;
-    this.editor.editor.ui.root.classList.add("envTimelineOpen");
+    this.editor.SetRootClass("envTimelineOpen", true);
     this.editor.btnTimeline?.classList.add("on");
     this.Changed({ structure: true });
     if (type && key) requestAnimationFrame(() => this.rows.find((r) => r.id === `${type}.${key}`)?.lane.scrollIntoView({ block: "nearest" }));
@@ -125,7 +125,7 @@ export class EnvTimelinePanel {
     if (!remember) { this.editor.ui.timeline = false; this.editor.SaveUi(); }
     this.open = false;
     if (this.root) this.root.hidden = true;
-    this.editor.editor.ui.root.classList.remove("envTimelineOpen");
+    this.editor.SetRootClass("envTimelineOpen", false);
     this.editor.btnTimeline?.classList.remove("on");
     return this.State();
   }

@@ -399,8 +399,8 @@ export const testDefs = {
   SceneSaveTest: { file: "Script_SceneSaveTest.mjs", desc: "场景文件存盘口 /__scene/*：真起本地预览（根目录指向临时副本），写盘 / 拒绝矩阵 / 版本号 409 / 校验不过不落盘（纯 Node，秒级）" },
   SceneFormalTest: { file: "Script_SceneFormalTest.mjs", desc: "第一关正式场景 Scenes/FirstLevel：过校验、道具（Prop/*）与树（Tree/*）是正式资产、体块与白盒逐个一样、道具模型在外部道具目录里、三段试玩跑它（playUrl）、正式那一块不走 PBR 外观 / 带道具清单 / 分层地表权重、植被与碎砖瓦按场景的路与沟撒、转换脚本只换道具与树不动布局（纯 Node）" },
   SceneFormalBrowserTest: { file: "Script_SceneFormalBrowserTest.mjs", timeoutMs: 900000, desc: "第一关正式场景真浏览器：白盒编辑器进关是白盒、换成正式场景（体块仍是米格线、道具材质没被刷白、分层地表、道具模型、体块数同白盒）、试玩开打换正式 / 关小结换回白盒、06–10 / 11–18 正式场景建得起来、场景编辑器下拉两个场景与正式资产页" },
-  EnvSystemTest: { file: "Script_EnvSystemTest.mjs", desc: "组件式环境系统（docs/Data_Environment.md）：组件声明与逻辑对得上、固定值 / 昼夜关键帧求值与插值、关键帧编辑、预设与区域文件校验与写法、旧天空预设逐项拼回、按组件选来源 / 完全覆盖 / 过渡 / 临时覆盖、两个场景的兜底区域与白天 / 黄昏 / 晚上、过渡中间亮度单调（纯 Node，秒级）" },
-  EnvironmentBrowserTest: { file: "Script_EnvironmentBrowserTest.mjs", timeoutMs: 600000, desc: "环境编辑器实机：白盒页开机打开面板、12:00 = 原来的天、外部改文件 2 s 重读、拨时间画面变且夜比昼暗、加盒子区域 + 面板里加雾组件、进出区域按 blendS 过渡且时钟照走、Ctrl+Z / Y、拖手柄、时间轴整列复制、保存顺序与版本号、409 横幅、旧换天变临时覆盖、切正式场景；存盘口页面内拦截不写盘" },
+  EnvSystemTest: { file: "Script_EnvSystemTest.mjs", desc: "组件式环境系统（docs/Data_Environment.md）：组件声明与逻辑对得上、固定值 / 昼夜关键帧求值与插值、关键帧编辑、预设与区域文件校验与写法、旧天空预设逐项拼回、按组件选来源 / 完全覆盖 / 过渡 / 临时覆盖、两个场景的兜底区域与白天 / 黄昏 / 晚上、过渡中间亮度单调、角色光照、一拍几点（关键帧 / 预演 time 事件 / 任务步骤）与往前拨钟、正片第一关区域文件 12:00 = 原来的天（纯 Node，秒级）" },
+  EnvironmentBrowserTest: { file: "Script_EnvironmentBrowserTest.mjs", timeoutMs: 1200000, desc: "环境编辑器实机：白盒页开机打开面板、12:00 = 原来的天、外部改文件 2 s 重读、拨时间画面变且夜比昼暗、加盒子区域 + 面板里加雾组件、进出区域按 blendS 过渡且时钟照走、Ctrl+Z / Y、拖手柄、时间轴整列复制、保存顺序与版本号、409 横幅、旧换天变临时覆盖、关键帧一拍几点（跳帧拨钟 / 沿用 / 顺走往前拨 / 写进这一拍）、角色光照夜开昼关、切正式场景、正片第一关读关卡区域文件 + 游戏内面板写任务步骤时间并存盘；存盘口页面内拦截不写盘" },
   SceneEditorBrowserTest: { file: "Script_SceneEditorBrowserTest.mjs", timeoutMs: 240000, desc: "场景编辑器 SceneEditor.html 真浏览器：开起来数像素、拖 X 箭头 / 金圈 / Esc 取消、加删撤销、信号显隐、保存带版本号与 409 横幅、外部改动 2 s 内重读；存盘口页面内拦截不写盘" },
   EditorBlockoutSaveTest: { file: "Script_EditorBlockoutSaveTest.mjs", desc: "白盒关卡编辑器存档口：真起本地预览，写盘 / 拒绝矩阵 / 版本号 409 / 嵌套过深不崩 / 零字节落盘（纯 Node，秒级）" },
   EditorBlockoutPlayPlanTest: { file: "Script_EditorBlockoutPlayPlanTest.mjs", desc: "白盒试玩（§17，2026-10-31）：试玩编排校验正反例、每一步怎么打（推断 / 谁变 AI / push / fresh / 上限）、过关判断、提交的 *.play.json 零错零警告且 01–05 每帧都写了（纯 Node，秒级）" },
@@ -1187,7 +1187,7 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Scenes\/|Script_Scene(Doc|Node|ImportBlockout|Edit)|Data_SceneAssets|SceneEditor|WhiteboxGrid|WhiteboxMaterial/i },
   // 组件式环境系统与环境编辑器（docs/Data_Environment.md）：预设、区域文件、组件、框架、编辑器面板。接在白盒编辑器的场景上，改了跑 editor 域；
   // 它同时改天穹 / 灯 / 后期的输入，render 域另由下面那条按文件名（Sky / Light / Post）命中。
-  { domain: "editor", pattern: /Environment\/|Script_Env(System|Track|Components|Preset|Apply|Loader|VolumeGizmo|PresetSeed)|Data_EnvComponents|Data_Tuning_Environment|EditorEnvironment|Style_EditorEnvironment/i },
+  { domain: "editor", pattern: /Environment\/|Script_Env(System|Track|Components|Preset|Apply|Loader|VolumeGizmo|PresetSeed)|Data_Env(Components|Levels)|Data_Tuning_Environment|EditorEnvironment|Style_EditorEnvironment|Script_CharacterLight/i },
   // 白盒预演额外加载的占位动作库（Animation/Previz*/，烘在 NRA02 上、只有编辑器的预演读）与它们的名单：游戏正片不读，改了跑 editor 域。
   { domain: "editor", pattern: /Animation\/Previz[A-Za-z0-9]+\/|Data_BlockoutPrevizClips/i },
   // 村子占位库的源脚本、烘焙入口与门禁（_import/Script_PrevizVillage*.py、Script_PrevizVillageClipsTest）。

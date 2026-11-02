@@ -341,7 +341,19 @@ export class EditorBlockout {
     // Timeline 过场面板（docs/Data_EditorSuite.md「Timeline 过场」）：?timeline=<Id> 时开机就打开；它驱动的是上面这一个预演播放器
     this.timeline = new TimelinePanel(this);
     // 环境面板（docs/Data_Environment.md §8）：顶栏「环境」按钮开；?env=1 开机就打开
-    this.environment = new EnvironmentEditor(this, Environment);
+    this.environment = new EnvironmentEditor({
+      post: host.post, camera: host.camera, renderer: host.renderer,
+      uiRoot: () => this.ui.root,
+      addTopBarControl: (el) => this.ui.AddTopBarControl(el),
+      setRootClass: (name, on) => this.ui.root.classList.toggle(name, !!on),
+      groundAt: (x, z) => this.groundAt(x, z),
+      isLocked: () => this.PointerLocked(),
+      // 这一关此刻建的场景（编辑 / 预演 = 白盒，试玩 = 正式）的区域文件
+      target: () => { const id = SceneIdOfUrl(SceneUrlOf(this.level, this.phase)); return id ? { kind: "scene", id } : null; },
+      fallbackSky: () => this.phase?.sky,
+      flyTo: (pose) => { if (this.flying) this.SetFlyPose(pose); else this.EnterFly(pose, { quiet: true }); return true; },
+      beat: () => this.BeatInfo(),
+    }, Environment);
     this.play = new BlockoutPlay(this);
     // 手机验收（§4.5）：触屏设备或 ?touch=1 才建；画面不动，只加触屏输入与大按钮
     this.touch = WantsTouch(this.params) ? new BlockoutTouch({
@@ -371,6 +383,8 @@ export class EditorBlockout {
       SetLayers: (partial) => this.SetLayers(partial),
       Config: () => (this.doc ? JSON.parse(JSON.stringify(this.doc)) : null),
       SavePose: () => this.SavePose(),
+      // 这一拍几点写进当前关键帧（{ hour } / { look } / null 去掉；docs/Data_Environment.md §8.6）
+      SaveKeyframeTime: (time) => this.SaveKeyframeTime(time),
       // 「复制当前位置」（§4.2）：Snapshot() 是快照对象，SnapshotText() 是贴给 agent 的那段文字，
       // CopySnapshot() 真去写剪贴板（→ { ok, method, text }）。
       Snapshot: () => this.Snapshot(),
@@ -1017,6 +1031,8 @@ export class EditorBlockout {
     this.toUnitData = null;
     this.index = index;
     this.ApplySignals(kf);
+    // 这一拍几点（关键帧的 time，后面的帧不写沿用前面的；docs/Data_Environment.md §8.6）：顺着往下一帧走时按过渡慢慢拨过去
+    this.environment?.ApplyBeatTime({ animate: animate && !!prevKf && index === prevIndex + 1 });
     if (!keepPlayer) this.PlacePlayer(kf.player);
     this.host.camera.getWorldPosition(this._cam);
     let promise = Promise.resolve(true);
@@ -1642,26 +1658,61 @@ export class EditorBlockout {
    * 这里重读一次（玩家不挪）并请用户再记一次。没存成（校验不过、存档口拒绝）就把 player 还原。
    */
   async SavePose() {
-    const kf = this.keyframe, player = this.game.player;
-    if (!this.rawDoc || !kf || !player) { this.ui.Toast("没有可写的配置（先修好配置文件）", "error"); return { ok: false }; }
+    const player = this.game.player;
+    if (!player) { this.ui.Toast("没有可写的配置（先修好配置文件）", "error"); return { ok: false }; }
+    return this.SaveKeyframeField("player", (raw) => {
+      const pose = {
+        ...(raw.player && typeof raw.player === "object" ? raw.player : {}),
+        x: Round(player.position.x, 2), z: Round(player.position.z, 2),
+        yawDeg: Round(WrapDeg(player.yaw / DEG), 1), pitchDeg: Round(player.pitch / DEG, 1),
+        stance: ["stand", "crouch", "prone"].includes(player.stance) ? player.stance : "stand",
+      };
+      delete pose.faceTo;
+      return pose;
+    }, { what: "机位", saved: "机位已保存", retry: "「记下当前机位」" });
+  }
+
+  /** 环境面板的「这一拍」：当前关键帧、各关键帧写的时间（后面的不写沿用前面的）、写进去的办法。 */
+  BeatInfo() {
+    const kf = this.keyframe;
+    if (!this.doc || !kf) return null;
+    const times = {};
+    for (const k of this.doc.keyframes) if (k.time) times[k.id] = k.time;
+    return {
+      kind: "keyframe", id: kf.id, label: `关键帧 ${kf.id}`, order: this.doc.keyframes.map((k) => k.id), times,
+      write: (spec) => this.SaveKeyframeTime(spec),
+    };
+  }
+
+  /**
+   * 这一拍几点写进当前关键帧（环境面板「写进这一拍」，docs/Data_Environment.md §8.6）。
+   * time = { hour } / { look }；null = 去掉（沿用前面的关键帧）。存法同「记下当前机位」（带版本号、409 重读）。
+   */
+  async SaveKeyframeTime(time) {
+    return this.SaveKeyframeField("time", () => (time ? { ...time } : undefined),
+      { what: "这一拍的时间", saved: time ? "这一拍的时间已写进关键帧" : "这一拍的时间已去掉（沿用前面的关键帧）", retry: "「写进这一拍」" });
+  }
+
+  /**
+   * 改当前关键帧的一个字段并存盘（记机位、写时间共用）。make(raw) → 新值（undefined = 删掉这个字段）。
+   * 配置坏着 / 正在存 / 找不到关键帧都不写；校验不过、409、存档口拒绝一律还原。
+   */
+  async SaveKeyframeField(field, make, { what, saved, retry }) {
+    const kf = this.keyframe;
+    if (!this.rawDoc || !kf) { this.ui.Toast("没有可写的配置（先修好配置文件）", "error"); return { ok: false }; }
     if (this.staleConfig) {
-      const reason = `配置文件现在有错，先修好再记机位：${this.configMessage}`;
+      const reason = `配置文件现在有错，先修好再记${what}：${this.configMessage}`;
       this.ui.Toast(reason, "error");
       return { ok: false, reason };
     }
-    if (this.saving) return { ok: false, reason: "正在保存上一次的机位" };
+    if (this.saving) return { ok: false, reason: "正在保存上一次的改动" };
     const raw = this.rawDoc.keyframes?.find(item => item?.id === kf.id);
     if (!raw) { this.ui.Toast("配置里找不到这个关键帧", "error"); return { ok: false }; }
-    const hadPlayer = Object.prototype.hasOwnProperty.call(raw, "player");
-    const before = hadPlayer ? JSON.stringify(raw.player) : null;
-    const Restore = () => { if (hadPlayer) raw.player = JSON.parse(before); else delete raw.player; };
-    raw.player = {
-      ...(raw.player && typeof raw.player === "object" ? raw.player : {}),
-      x: Round(player.position.x, 2), z: Round(player.position.z, 2),
-      yawDeg: Round(WrapDeg(player.yaw / DEG), 1), pitchDeg: Round(player.pitch / DEG, 1),
-      stance: ["stand", "crouch", "prone"].includes(player.stance) ? player.stance : "stand",
-    };
-    delete raw.player.faceTo;
+    const had = Object.prototype.hasOwnProperty.call(raw, field);
+    const before = had ? JSON.stringify(raw[field]) : null;
+    const Restore = () => { if (had) raw[field] = JSON.parse(before); else delete raw[field]; };
+    const value = make(raw);
+    if (value === undefined) delete raw[field]; else raw[field] = value;
     const check = ValidateBlockout(this.rawDoc);
     if (!check.ok) {
       Restore();
@@ -1686,18 +1737,18 @@ export class EditorBlockout {
       this.configText = `${JSON.stringify(this.rawDoc, null, 2)}\n`;
       this.revision = result.revision;   // 端点按写下去的字节算的；没给就是不知道，下次保存先重读
       this.writable = true; this.saveReason = "";
-      this.ui.Toast("机位已保存", "ok");
+      this.ui.Toast(saved, "ok");
     } else if (result.ok && result.mode === "local") {
-      // 本地草稿：盘上的文件没变，手里这份带着新机位（草稿里也是它），并给一份下载
+      // 本地草稿：盘上的文件没变，手里这份带着新改动（草稿里也是它），并给一份下载
       this.writable = false; this.saveReason = result.reason || "";
       this.store.Download(this.levelKey, this.rawDoc);
-      this.ui.Toast(`机位存成了本地草稿并下载了配置：${result.reason || ""}`, "warn");
+      this.ui.Toast(`${what}存成了本地草稿并下载了配置：${result.reason || ""}`, "warn");
     } else if (result.conflict) {
       Restore();
       const reloaded = await this.Reload({ holdPlayer: true, quiet: true });
       this.ui.Toast(reloaded
-        ? "配置文件刚在外面被改过，已经重新读取；人还在原地，请再点一次「记下当前机位」"
-        : "配置文件刚在外面被改过，重新读取没成功；等编辑器读到好的配置后再记一次机位", "warn");
+        ? `配置文件刚在外面被改过，已经重新读取；人还在原地，请再点一次${retry}`
+        : `配置文件刚在外面被改过，重新读取没成功；等编辑器读到好的配置后再点一次${retry}`, "warn");
       this.PushStatus();
       return result;
     } else {

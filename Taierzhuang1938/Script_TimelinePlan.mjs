@@ -72,7 +72,7 @@ export function OverlayTimelinePreviz(previzDoc, timelineDocs) {
 /** 事件的中文名（轨道上的标签与 CLI 输出共用）。 */
 export const TIMELINE_EVENT_LABELS = Object.freeze({
   flash: "白光", black: "黑场", caption: "说明字", explosion: "爆炸", smoke: "烟", muzzle: "枪口火",
-  shake: "震屏", signal: "信号", sfx: "音效", flare: "照明弹", slowmo: "慢动作",
+  shake: "震屏", signal: "信号", sfx: "音效", flare: "照明弹", slowmo: "慢动作", time: "时间",
 });
 
 const IsObject = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -184,10 +184,11 @@ export function TimelineTracks(doc, layout, { lineInfo = null } = {}) {
     });
     (seq.events || []).forEach((e, j) => {
       if (!Finite(e?.t)) return;
-      const ranged = Finite(e.dur) && ["flash", "black", "caption", "smoke", "shake"].includes(e.type);
+      const ranged = Finite(e.dur) && ["flash", "black", "caption", "smoke", "shake", "time"].includes(e.type);
       const name = TIMELINE_EVENT_LABELS[e.type] || e.type;
       const detail = e.type === "signal" ? `${e.name}${e.on === false ? " 关" : ""}`
-        : e.type === "sfx" ? e.name : e.type === "caption" ? e.text : e.type === "explosion" ? (e.kind || "") : "";
+        : e.type === "sfx" ? e.name : e.type === "caption" ? e.text : e.type === "explosion" ? (e.kind || "")
+        : e.type === "time" ? (e.look || (Finite(e.hour) ? `${String(Math.floor(e.hour)).padStart(2, "0")}:${String(Math.round((e.hour % 1) * 60)).padStart(2, "0")}` : "")) : "";
       events.push({
         t0: Round(base + e.t), t1: ranged ? Round(Math.min(end, base + e.t + e.dur)) : null,
         type: e.type, label: detail ? `${name} ${detail}` : name, src: `sequences[${seg.index}].events[${j}]`,

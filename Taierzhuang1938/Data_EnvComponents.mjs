@@ -1,6 +1,6 @@
 // 环境组件的声明表（docs/Data_Environment.md §2）。
 //
-// 组件是环境能力的基本单元：主光、环境光、反射、天空、云层、物理大气、雾、曝光与调色各是一种。
+// 组件是环境能力的基本单元：主光、环境光、反射、天空、云层、物理大气、雾、角色光照、曝光与调色各是一种。
 // 这张表只声明「是什么」——名字、分类、图标、参数（类型 / 范围 / 默认值 / 能不能随昼夜变 / 怎么插值 /
 // 写进环境参数的哪一项）、关掉时取什么。执行逻辑在 Script_EnvComponents（同名 type 一个，多数走通用写法）；
 // 框架（Script_EnvSystem）按这张表发现组件、求值、过渡、调度，编辑器（Script_EditorEnvironment*）按它生成
@@ -31,6 +31,7 @@ export const ENV_CATEGORIES = Object.freeze([
   Object.freeze({ id: "sky", label: "天空", icon: "☁" }),
   Object.freeze({ id: "fog", label: "雾", icon: "≋" }),
   Object.freeze({ id: "reflection", label: "反射", icon: "◇" }),
+  Object.freeze({ id: "character", label: "人物", icon: "♟" }),
   Object.freeze({ id: "post", label: "后期", icon: "◑" }),
 ]);
 
@@ -156,6 +157,18 @@ export const ENV_COMPONENTS = Object.freeze([
       P({ key: "flatten", label: "远处压平", kind: "number", min: 0, max: 0.3, step: 0.005, default: 0.03, out: "fog.flatten", group: "颜色" }),
     ]),
     off: Object.freeze({ density: 0, max: 0 }),
+  }),
+  Object.freeze({
+    type: "CharacterLight", label: "角色光照", category: "character", icon: "♟",
+    summary: "只打在人物身上的正面补光与轮廓光：夜里、背光时把人从背景里分出来（材质补丁 Script_CharacterLight，不影响场景）。",
+    params: Object.freeze([
+      P({ key: "fill", label: "补光", kind: "number", min: 0, max: 2, step: 0.01, default: 0, lerp: "log", out: "characterLight.fill", group: "补光", hint: "正对镜头的面最亮；加在间接光上，GTAO 照常压" }),
+      P({ key: "fillColor", label: "补光色", kind: "color", default: "#ffffff", out: "characterLight.fillColor", group: "补光" }),
+      P({ key: "rim", label: "轮廓光", kind: "number", min: 0, max: 2, step: 0.01, default: 0, lerp: "log", out: "characterLight.rim", group: "轮廓光", hint: "只亮人物边缘一圈" }),
+      P({ key: "rimColor", label: "轮廓光色", kind: "color", default: "#ffffff", out: "characterLight.rimColor", group: "轮廓光" }),
+      P({ key: "rimPower", label: "轮廓收拢", kind: "number", min: 1, max: 8, step: 0.1, default: 3, out: "characterLight.rimPower", group: "轮廓光", hint: "越大轮廓越细" }),
+    ]),
+    off: Object.freeze({ fill: 0, rim: 0 }),
   }),
   Object.freeze({
     type: "Grade", label: "曝光与调色", category: "post", icon: "◑",

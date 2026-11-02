@@ -2,6 +2,8 @@
 //
 //   Environment/EnvPreset_<Id>.json         预设 = 组件容器（每种组件只留一份），可被多个区域、多个场景复用
 //   Scenes/<Scene>/Environment_<Scene>.json 场景的环境：昼夜时钟的默认值 + 区域列表（区域引用预设、管影响范围）
+//   Environment/Level_<Id>.json             正片关卡（不是场景文件建的关，例如第一关 ?whitebox=p012）的区域文件，格式同上；
+//                                           哪一关用哪份在 Data_EnvLevels，多一节 stages（任务步骤 → 这一步几点）
 //
 // 纯函数，零 three 依赖：框架、编辑器、本机存盘口（scripts/Script_LocalPreview.mjs）、测试共用。
 
@@ -15,6 +17,9 @@ export const ENV_SCENE_SCHEMA = "tengxian-env-scene/1";
 export const ENV_ID_RE = /^[A-Z][A-Za-z0-9]{0,63}$/;
 export const ENV_PRESET_FILE_RE = /^Taierzhuang1938\/Environment\/EnvPreset_[A-Z][A-Za-z0-9]{0,63}\.json$/;
 export const SCENE_ENV_FILE_RE = /^Taierzhuang1938\/Scenes\/([A-Z][A-Za-z0-9]{0,63})\/Environment_\1\.json$/;
+export const LEVEL_ENV_FILE_RE = /^Taierzhuang1938\/Environment\/Level_[A-Z][A-Za-z0-9]{0,63}\.json$/;
+/** 区域文件的两种归属：scene = 场景文件建的关（白盒编辑器），level = 正片关卡（Data_EnvLevels 登记）。 */
+export const ENV_TARGET_KINDS = Object.freeze(["scene", "level"]);
 export const VOLUME_SHAPES = Object.freeze(["global", "box", "sphere"]);
 export const VOLUME_MODES = Object.freeze(["partial", "full"]);
 const INTERPS = new Set(["smooth", "linear", "step"]);
@@ -24,6 +29,11 @@ export const EnvPresetRepoPath = (id) => `Taierzhuang1938/Environment/EnvPreset_
 export const EnvPresetUrl = (id) => `./Environment/EnvPreset_${id}.json`;
 export const SceneEnvRepoPath = (scene) => `Taierzhuang1938/Scenes/${scene}/Environment_${scene}.json`;
 export const SceneEnvUrl = (scene) => `./Scenes/${scene}/Environment_${scene}.json`;
+export const LevelEnvRepoPath = (id) => `Taierzhuang1938/Environment/Level_${id}.json`;
+export const LevelEnvUrl = (id) => `./Environment/Level_${id}.json`;
+/** target = { kind: "scene" | "level", id } → 区域文件地址 / 仓库路径。 */
+export const ZoneFileUrl = (target) => (target.kind === "level" ? LevelEnvUrl(target.id) : SceneEnvUrl(target.id));
+export const ZoneFileRepoPath = (target) => (target.kind === "level" ? LevelEnvRepoPath(target.id) : SceneEnvRepoPath(target.id));
 
 const DECLS = new Map(ENV_COMPONENTS.map((d) => [d.type, d]));
 export function ComponentDecl(type) { return DECLS.get(type) || null; }
@@ -82,6 +92,36 @@ export function ValidateEnvPreset(doc) {
     }
   }
   return { ok: errors.length === 0, errors, warnings };
+}
+
+/**
+ * 一拍的时间（关键帧的 time、Timeline / 预演的 time 事件、正片关卡区域文件的 stages）：
+ *   { "hour": 17 } 拨到几点 · { "look": "dusk" } 拨到兜底预设里那一套表现的时刻 · 可带 "blendS"（按真实秒数往前走过去）
+ * → 错误列表
+ */
+export function TimeSpecErrors(spec, at = "time") {
+  const errors = [];
+  if (!IsObject(spec)) return [`${at} 要是对象 { hour } 或 { look }`];
+  const hasHour = spec.hour !== undefined, hasLook = spec.look !== undefined;
+  if (hasHour === hasLook) errors.push(`${at} 要写 hour 或 look（只写一个）`);
+  if (hasHour && !(IsFiniteNumber(spec.hour) && spec.hour >= 0 && spec.hour < 24)) errors.push(`${at}.hour 要在 0–24 之间`);
+  if (hasLook && (typeof spec.look !== "string" || !spec.look)) errors.push(`${at}.look 要是那一套表现的 id（day / dusk / night…）`);
+  if (spec.blendS !== undefined && !(IsFiniteNumber(spec.blendS) && spec.blendS >= 0)) errors.push(`${at}.blendS 要是 ≥ 0 的秒数`);
+  return errors;
+}
+
+/**
+ * 这一拍几点：按顺序表从这一拍往前找最近写了时间的那一拍（后面的拍不写就沿用前面的）。
+ * @param {object} times id → 时间
+ * @param {string[]} order 拍的顺序
+ * → { spec, from } 或 null（之前都没写 = 用区域文件的默认时间）
+ */
+export function BeatTime(times, order, current) {
+  if (!times) return null;
+  const i = order.indexOf(current);
+  if (i < 0) return times[current] ? { spec: times[current], from: current } : null;
+  for (let k = i; k >= 0; k -= 1) if (times[order[k]]) return { spec: times[order[k]], from: order[k] };
+  return null;
 }
 
 /** 一个区域在不在给的点（{x,y,z}）里。 */
@@ -149,6 +189,10 @@ export function ValidateSceneEnv(doc, { presetIds = null } = {}) {
       if (v.enabled !== undefined && typeof v.enabled !== "boolean") errors.push(`${at}.enabled 要是 true / false`);
     });
     if (!globals) warnings.push("没有兜底区域（shape: global）：走出所有区域时没有环境来源，各组件取关闭值");
+  }
+  if (doc.stages !== undefined) {
+    if (!IsObject(doc.stages)) errors.push("stages 要是对象（任务步骤 id → { hour } / { look }）");
+    else for (const [step, spec] of Object.entries(doc.stages)) errors.push(...TimeSpecErrors(spec, `stages.${step}`));
   }
   return { ok: errors.length === 0, errors, warnings };
 }

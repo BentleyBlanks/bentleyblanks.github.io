@@ -22,6 +22,7 @@
 // 出发时刻 = max(上一个位置键 t, 本键 t − 路长 / 速度)；窗口不够就从上一个位置键起匀速赶到。
 // t = 0 的位置键 = 开场直接摆在那里。move:"cut" = 到点瞬移。
 
+import { TimeSpecErrors } from "./Script_EnvPreset.mjs";
 import { RideIssues, NormalizeRide, BLOCKOUT_RIDE_CARRIER_KINDS } from "./Script_EditorBlockoutConfig.mjs";
 
 export const BLOCKOUT_PREVIZ_SCHEMA = "tengxian-blockout-previz/1";
@@ -31,7 +32,7 @@ export const PREVIZ_MOVE_SPEED = Object.freeze({ walk: 1.4, run: 3.5, crawl: 0.5
 export const PREVIZ_MOVES = Object.freeze(["walk", "run", "crawl", "drag", "cut"]);
 export const PREVIZ_STANCES = Object.freeze(["stand", "crouch", "prone"]);
 export const PREVIZ_DEFAULTS = Object.freeze({ pointH: 1.6, fov: 60, ease: "inOut", turnS: 0.4, subtitleHoldS: 0.35 });
-export const PREVIZ_EVENT_TYPES = Object.freeze(["flash", "black", "caption", "explosion", "smoke", "muzzle", "shake", "signal", "sfx", "flare"]);
+export const PREVIZ_EVENT_TYPES = Object.freeze(["flash", "black", "caption", "explosion", "smoke", "muzzle", "shake", "signal", "sfx", "flare", "time"]);
 export const PREVIZ_SMOKE_KINDS = Object.freeze(["SmokeDust", "SmokeWhite", "SmokeBlack"]);
 export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
@@ -379,6 +380,12 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
       if (e.type === "flash") { NeedDur(); if (e.strength !== undefined && !(Finite(e.strength) && e.strength >= 0 && e.strength <= 1)) errors.push(`${eat}.strength 要在 0–1`); }
       else if (e.type === "black") { NeedDur(); if (e.fade !== undefined && !(Finite(e.fade) && e.fade >= 0)) errors.push(`${eat}.fade 要是非负数`); }
       else if (e.type === "caption") { NeedDur(); if (typeof e.text !== "string" || !e.text) errors.push(`${eat}.text 要是非空字符串`); }
+      else if (e.type === "time") {
+        // 拨环境时钟（docs/Data_Environment.md §8.6）：{ hour } 或 { look }，dur 秒内往前走过去（不写 = 立刻）
+        const { t: _t, type: _type, dur: _dur, ...spec } = e;
+        errors.push(...TimeSpecErrors(spec, eat));
+        if (e.dur !== undefined && !(Finite(e.dur) && e.dur >= 0)) errors.push(`${eat}.dur 要是非负数`);
+      }
       else if (e.type === "explosion") {
         NeedPoint();
         if (e.radius !== undefined && !(Finite(e.radius) && e.radius > 0)) errors.push(`${eat}.radius 要是正数`);
@@ -1002,6 +1009,29 @@ export function PrevizOverlays(seq, t) {
     else if (e.type === "shake" && local < dur) shake = Math.max(shake, (e.strength || 0) * (1 - local / dur));
   }
   return { flash, black, shake, captions };
+}
+
+/**
+ * t 秒时环境时钟该在几点（time 事件，确定性：同一 t 同一结果，Seek 拖到哪就是哪）。
+ * startHour = 这一段开始时的钟点（关键帧的 time 已经拨过）；resolve(spec) 把 { hour } / { look } 换成小时（look 查不到 → null）。
+ * 一个事件 dur 秒内从它之前的钟点往前走到目标（只往前：18 → 22 走 4 小时）；没有 time 事件 → null（不碰时钟）。
+ * 有 time 事件时，第一个事件之前给 startHour（Seek 往回拖过事件，钟点要跟着回去）。
+ */
+export function PrevizHourAt(seq, t, startHour, resolve) {
+  let hour = startHour, touched = false;
+  for (const e of seq?.events || []) {
+    if (e.type !== "time") continue;
+    const target = resolve({ hour: e.hour, look: e.look });
+    if (!Finite(target)) continue;
+    touched = true;
+    if (e.t > t) continue;
+    const dur = Finite(e.dur) ? e.dur : 0;
+    const k = dur > 0 ? Clamp01((t - e.t) / dur) : 1;
+    const delta = ((target - hour) % 24 + 24) % 24;
+    const eased = k * k * (3 - 2 * k);
+    hour = ((hour + delta * eased) % 24 + 24) % 24;
+  }
+  return touched ? hour : null;
 }
 
 /** 震屏偏移（确定性的几路正弦和）：→ {x,y,z 米, yawDeg, pitchDeg}。 */

@@ -340,7 +340,9 @@ FOV 按正片相同的 `adsFovScale` 收窄。红十字是枪口真实弹道在�
 
 ### 环境 `Script_EditorEnvironment.mjs`（2026-11-02）
 
-高级工具 → 场景 → 「环境」（`Script_EditorEnvironmentEntry`，同 Timeline 过场是跳转入口：整页切到白盒编辑器并打开面板，已在白盒编辑器里就只开面板）。
+高级工具 → 场景 → 「环境」（`Script_EditorEnvironmentEntry`，同 Timeline 过场是跳转入口：整页切到白盒编辑器并打开面板，已在白盒编辑器里就只开面板；
+在登记了区域文件的正片关卡里（第一关 `?whitebox=p012`）改开游戏内叠加层 `Script_EditorEnvironmentGame`——同一个面板放左边，「这一拍」是任务步骤，
+不暂停玩法，退出菜单栏后还在；只在高级工具里，Debug工具菜单里没有）。
 白盒编辑器右侧的环境面板：时间条、总览（当前生效 / 区域与覆盖）、区域检查器、预设资源检查器，三处共用一套预设 / 组件 / 参数视图；
 底部昼夜时间轴；场景里画区域框、拖手柄改范围。口径见 [环境系统](Data_Environment.md) §8。
 

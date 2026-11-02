@@ -28,7 +28,7 @@ function Signature(preset, fields) {
 
 export class EnvRenderBridge {
   /**
-   * @param {object} host { sky, lights, scene, gi: () => gi|null, giStrength: () => number, now?: () => ms }
+   * @param {object} host { sky, lights, scene, gi: () => gi|null, giStrength: () => number, characterLight?: { Set }, now?: () => ms }
    */
   constructor(host) {
     this.host = host;
@@ -45,7 +45,7 @@ export class EnvRenderBridge {
   }
 
   /** 下一次 Apply 当作全新（换关、整片重建之后：天穹与灯被别的路套过一遍）。 */
-  Invalidate() { this.version = -1; this.skySig = null; this.lightSig = null; this.dirSig = null; this.envIntensity = null; }
+  Invalidate() { this.version = -1; this.skySig = null; this.lightSig = null; this.dirSig = null; this.envIntensity = null; this.applyValues.clear(); }
 
   /**
    * @param {object} output EnvironmentSystem.Update 的输出

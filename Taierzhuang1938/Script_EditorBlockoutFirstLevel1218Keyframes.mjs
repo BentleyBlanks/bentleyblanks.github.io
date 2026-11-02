@@ -1144,6 +1144,8 @@ function Keyframes() {
   const guard161 = AY(10.6, 21.6);
   Add({
     id: "16-1", ...s16, name: "门槛",
+    // 这一拍几点（docs/Data_Environment.md §8.6，2026-11-02）：剧本「院里点起马灯」—— 傍晚；17、18-1、18-2 沿用
+    time: { hour: 17 },
     player: { x: p161.x, z: p161.z, yawDeg: 90, pitchDeg: -22, stance: "stand" },
     what: "院里点起马灯。军医：又挨了？抬进来！表堵到门口！过门槛，冬瓜：脚……慢点。顺子：……有门槛。抬高点。",
     next: { text: "把冬瓜慢慢放下", x: A.dongguaInside.x, z: A.dongguaInside.z, radiusM: 1.2 },
@@ -1297,6 +1299,8 @@ function Keyframes() {
   const sappers = [PIER(1), PIER(2)];
   Add({
     id: "18-3", ...s18, stageLabel: "18B", name: "出村、铁路桥",
+    // 剧本「夕阳正落在铁路桥那头」—— 黄昏那一套；18-4…18-7 沿用
+    time: { look: "dusk" },
     player: { x: p183.x, z: p183.z, yawDeg: 180, pitchDeg: -10, stance: "stand" },
     what: "跟着担架队顺北岸土路走到铁路桥北头：桥北只剩光路基；桥是几孔钢梁架在石墩上，桥面只有枕木。三营守桥头，两个工兵在桥墩上绑炸药。",
     next: { text: "过铁路桥", x: BR_S.x, z: BR_S.z, radiusM: 3 },
@@ -1446,6 +1450,8 @@ function Keyframes() {
   const p188 = SR(50);
   Add({
     id: "18-8", ...s18, stageLabel: "18夜", stageTitle: "夜里", name: "夜里",
+    // 剧本「夜里，一长溜队伍……黑地里远远有几点灯」—— 晚上那一套
+    time: { look: "night" },
     player: { x: p188.x, z: p188.z, yawDeg: p188.heading, pitchDeg: 2, stance: "stand" },
     what: "夜里，一长溜队伍顺南岸路往南走：有兵、有担架、有老百姓，老耿牵着妮儿在百姓堆里。黑地里远远有几点灯，是县城。",
     next: { text: "往南走", x: SR(80).x, z: SR(80).z, radiusM: 4 },
@@ -1505,7 +1511,7 @@ function OrderUnit(u) {
   return out;
 }
 
-const KF_KEY_ORDER = ["id", "stage", "stageLabel", "stageTitle", "name", "player", "what", "next", "how", "notes", "signals", "units", "pois"];
+const KF_KEY_ORDER = ["id", "stage", "stageLabel", "stageTitle", "name", "time", "player", "what", "next", "how", "notes", "signals", "units", "pois"];
 function OrderKeyframe(kf) {
   const out = {};
   for (const k of KF_KEY_ORDER) if (kf[k] !== undefined) out[k] = kf[k];

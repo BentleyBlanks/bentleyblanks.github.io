@@ -619,6 +619,9 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Script_EnvVolumeGizmo.mjs`）。浏览器 `window.Tengxian.Debug.Lighting`（游戏侧）、`Debug.Blockout.Environment`（编辑器侧）；
   本机存盘 `/__environment/save`。门禁 `Script_EnvSystemTest.mjs`（纯 Node）、`Script_EnvironmentBrowserTest.mjs`。口径见 [环境系统](Data_Environment.md)。
   没有区域文件的关卡仍按 `phase.sky` 套 `Script_Sky.SKY_PRESETS`。
+  同日第二轮：正片关卡的区域文件 `Environment/Level_<Id>.json`（`Data_EnvLevels.mjs` 按 `phase.id` 登记，第一关 = `FirstLevelCampaign`，
+  游戏内面板 `Script_EditorEnvironmentGame.mjs`）；角色光照组件的材质补丁 `Script_CharacterLight.mjs`；「这一拍几点」写在白盒关键帧 `time`、
+  预演 / Timeline 的 `time` 事件、正片区域文件的 `stages`（口径 §8.6）。
 
 ### 过场 / 剧情
 - **Timeline 过场**（2026-10-31 起，取代已删的 `Script_Cutscene.mjs` / `Data_Cutscene*.mjs`）：数据 `Timeline/<Id>.timeline.json`

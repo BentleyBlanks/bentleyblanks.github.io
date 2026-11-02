@@ -2,6 +2,8 @@
 // 主文件里的状态、服务、函数一律从工具箱 ctx 取；名字与签名是测试脚本的契约，改名要同步改测试。
 
 import { COMBAT, DIFFICULTY } from "./Data_Battle.mjs";
+import { CharacterLightState, CHARACTER_LIGHT_PATCH_KEY } from "./Script_CharacterLight.mjs";
+import { PatchKeysOf } from "./Script_MaterialPatches.mjs";
 
 export function WorldDebugApi(ctx) {
   return {
@@ -143,6 +145,7 @@ export function WorldDebugApi(ctx) {
        *   Debug.Lighting.Output()                 拼出来交给渲染的那份环境参数（与 SKY_PRESETS 同形）
        *   Debug.Lighting.PushOverride({ preset, priority, blendS, mode }) → id；ReleaseOverride(id, blendS)
        *   Debug.Lighting.Observer("pinned", {x,y,z}) / Observer("camera")
+       *   Debug.Lighting.CharacterLight()         角色光照此刻的 uniform，与场景里挂了这段补丁的材质数
        * 场景没有环境文件时 State().active = false，天光照旧按 phase.sky。
        */
       Lighting: {
@@ -156,6 +159,11 @@ export function WorldDebugApi(ctx) {
         Output: () => (ctx.env.output ? JSON.parse(JSON.stringify(ctx.env.output.preset)) : null),
         PushOverride: (spec) => ctx.env.PushOverride(spec).id,
         ReleaseOverride: (id, blendS) => ctx.env.ReleaseOverride(id, blendS),
+        CharacterLight: () => {
+          const materials = new Set();
+          ctx.scene?.traverse((o) => { for (const m of [].concat(o.material || [])) if ((PatchKeysOf(m) || []).includes(CHARACTER_LIGHT_PATCH_KEY)) materials.add(m); });
+          return { ...CharacterLightState(), patched: materials.size };
+        },
         Observer: (mode, at = null) => {
           ctx.env.observerMode = mode === "pinned" || mode === "player" ? mode : "camera";
           ctx.env.pinnedAt = at ? { x: at.x, y: at.y ?? 0, z: at.z } : null;

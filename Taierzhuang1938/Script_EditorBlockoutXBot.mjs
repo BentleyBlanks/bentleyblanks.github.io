@@ -13,6 +13,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
+import { ApplyPatches } from "./Script_MaterialPatches.mjs";
+import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
@@ -226,7 +228,10 @@ export class XBotSkins {
   Material(look, part) {
     const key = `${look.key}:${part}`;
     if (!this.materials.has(key)) {
-      this.materials.set(key, new THREE.MeshStandardMaterial({ color: part === "joints" ? look.joints : look.surface, roughness: 0.62, metalness: 0.05 }));
+      const material = new THREE.MeshStandardMaterial({ color: part === "joints" ? look.joints : look.surface, roughness: 0.62, metalness: 0.05 });
+      // 角色光照（环境系统 CharacterLight 组件）：替身也吃同一份补光 / 轮廓光，白盒里调人物光照看得到
+      ApplyPatches(material, [CHARACTER_LIGHT_PATCH]);
+      this.materials.set(key, material);
     }
     return this.materials.get(key);
   }

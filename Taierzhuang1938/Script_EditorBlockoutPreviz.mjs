@@ -36,7 +36,7 @@
 import * as THREE from "three";
 import {
   ValidateBlockoutPreviz, NormalizeBlockoutPreviz, PrevizSequenceFor, PrevizSequenceDuration, SamplePrevizActor, SamplePrevizCamera,
-  PrevizOverlays, PrevizShakeOffset, PrevizActiveLines, PrevizSignalsAt, PREVIZ_EYE_HEIGHT, PREVIZ_DEFAULTS, PrevizTimeScale, PrevizWallTime,
+  PrevizOverlays, PrevizShakeOffset, PrevizActiveLines, PrevizSignalsAt, PREVIZ_EYE_HEIGHT, PREVIZ_DEFAULTS, PrevizTimeScale, PrevizWallTime, PrevizHourAt,
   PREVIZ_FREE_LOOK, PrevizFreeLookSegment, WrapDeg,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BlockoutPrevizAircraft } from "./Script_EditorBlockoutPrevizAircraft.mjs";
@@ -626,6 +626,13 @@ export class BlockoutPreviz {
     // 信号：关键帧的 + 事件改过的
     const overrides = PrevizSignalsAt(run.seq, t);
     this.editor.SetPrevizSignals(overrides.size ? overrides : null);
+    // 环境时钟（time 事件，docs/Data_Environment.md §8.6）：这一段开头的钟点记一次，之后每一刻按事件确定性求值；没有 time 事件不碰时钟
+    const env = this.editor.environment?.system;
+    if (env?.active) {
+      if (run.startHour === undefined) run.startHour = env.clock.hour;
+      const hour = PrevizHourAt(run.seq, t, run.startHour, (spec) => env.ResolveTime(spec));
+      if (hour !== null) env.SetHour(hour);
+    }
     // 持续的烟：在窗口里就有，不在就收
     run.seq.events.forEach((e, i) => {
       if (e.type !== "smoke") return;

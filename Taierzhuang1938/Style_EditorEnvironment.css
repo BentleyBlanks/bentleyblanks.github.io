@@ -10,6 +10,10 @@
 }
 .boRoot.envTimelineOpen .envPanel { bottom: 16px; }
 .boRoot.envTimelineOpen :is(.boNav, .boMini) { display: none; }
+/* 正片关卡里的环境面板（Script_EditorEnvironmentGame）：放左边，不压高级工具右侧的 Inspector；时间轴让到面板右边 */
+.envGameRoot { z-index: 40; }
+.boRoot.envGameRoot .envPanel { left: 16px; right: auto; top: 56px; }
+.boRoot.envGameRoot .envTimeline { left: 464px; right: 16px; }
 .envTopBtn { height: 34px; padding: 0 12px; letter-spacing: 0.16em; color: var(--bo-text); border-color: var(--bo-edge) !important; background: #13140b99 !important; }
 .envTopBtn.on { color: var(--bo-gold-text); border-color: var(--bo-gold) !important; background: var(--bo-sel-strong) !important; }
 
@@ -49,6 +53,12 @@
 .envLook:hover { border-color: var(--bo-gold); color: var(--bo-bright); }
 .envLook.on { border-color: var(--bo-gold); background: var(--bo-sel-strong); color: var(--bo-gold-text); border-left-width: 2px; }
 .envSpeed { width: 92px; }
+.envBeatRow[hidden] { display: none; }
+.envBeat { flex: 1 1 auto; min-width: 0; color: var(--bo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envBeat.own { color: var(--bo-gold-text); }
+/* Timeline 面板（Style_EditorBlockout.css）里的 time 事件：青色，和信号的金色分开 */
+.boRoot .tlItem.ev-time.mark { width: 2px; background: #9fb4e8; }
+.boRoot .tlItem.ev-time.range { background: #9fb4e830; border-left: 1px solid #9fb4e8; }
 
 /* --- 页签与正文 ------------------------------------------------------------- */
 .envTabs { display: flex; border-bottom: 1px solid var(--bo-line-strong); flex: 0 0 auto; }

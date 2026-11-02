@@ -6,6 +6,8 @@
 // 朝向一律 yawDeg：0 = 朝北（−Z），+90 = 朝西，−90 = 朝东；前方 = (−sin, −cos)，
 // 与玩家 / 演员 rotation.y 同号（rotation.y = yawDeg·π/180）。
 
+import { TimeSpecErrors } from "./Script_EnvPreset.mjs";
+
 export const BLOCKOUT_SCHEMA = "tengxian-blockout/1";
 export const BLOCKOUT_SCENE_SCHEMA = "tengxian-blockout-scene/1";
 /** 场景文件 paint（地面涂色，§2.2）最多几项。 */
@@ -257,6 +259,8 @@ function CheckKeyframe(errors, warnings, at, kf) {
   if (kf.how !== undefined && (!Array.isArray(kf.how) || kf.how.some(item => typeof item !== "string"))) errors.push(`${at}.how 要是字符串数组`);
   if (kf.notes !== undefined && typeof kf.notes !== "string") errors.push(`${at}.notes 要是字符串`);
   if (kf.signals !== undefined && (!Array.isArray(kf.signals) || kf.signals.some(item => typeof item !== "string" || !item))) errors.push(`${at}.signals 要是非空字符串数组`);
+  // 这一拍几点（docs/Data_Environment.md §8.6）：{ hour } 或 { look }；后面的关键帧不写就沿用前面的
+  if (kf.time !== undefined) errors.push(...TimeSpecErrors(kf.time, `${at}.time`));
   if (kf.units !== undefined) {
     if (!Array.isArray(kf.units)) errors.push(`${at}.units 要是数组`);
     else {

@@ -24,6 +24,7 @@ import {
 } from "./Data_Tuning_Materials.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
+import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 
 // 补丁 key 只随 GLSL 变，部件之间的差异全走 uniform（key 不同 = 程序不同 = 进关多编一份，见 Data_Tuning_Materials 抬头）。
 export const CHARACTER_SURFACE_PATCH_KEYS = Object.freeze({
@@ -524,7 +525,8 @@ vec4 ijaWeave = vec4(0.5);
  */
 export function CharacterClothPatches(part, offset = [0, 0]) {
   const seed = Seed(`${part?.modelId || "nra"}|cloth`);
-  return [COMMON_PATCH, GrimePatch("nraCloth", [seed[0] + offset[0] * 7, seed[1], seed[2] + offset[1] * 7], 0, part)];
+  // 角色光照（环境系统 CharacterLight 组件）跟在泥污后面：只有 uniform，强度 0 时整段跳过
+  return [COMMON_PATCH, GrimePatch("nraCloth", [seed[0] + offset[0] * 7, seed[1], seed[2] + offset[1] * 7], 0, part), CHARACTER_LIGHT_PATCH];
 }
 
 const variantsBySource = new WeakMap();
@@ -579,6 +581,7 @@ export function CharacterSurfaceMaterial(material, { rigid = false } = {}) {
     mine.push(WoolPatch(part));
   }
   mine.push(GrimePatch(part.gear ? "gear" : part.role, seed, heightOffset, part));
+  mine.push(CHARACTER_LIGHT_PATCH);
   ApplyPatches(variant, [...(PatchesOf(variant) || []), ...mine]);
   variant.userData.characterSurfaceRole = part.role;
   variant.needsUpdate = true;

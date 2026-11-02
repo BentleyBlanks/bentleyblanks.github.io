@@ -3,7 +3,7 @@
 //   Compose(decl, values, out)        把求值 + 过渡之后的参数写进这一帧的环境参数 out（与 Script_Sky.SKY_PRESETS 同形，
 //                                     天空、灯、反射、雾、后期都认这个形状 —— 渲染侧一行没改，见 Script_EnvApply）
 //   FromLegacy(decl, legacy, values)  从一份旧天空预设读回这个组件的参数（预设种子、旧预设当临时覆盖）
-//   Apply(decl, values, host)         可选：每帧直接改灯 / 材质 / 渲染接口（不走环境参数的新能力用；现有八种都不需要）
+//   Apply(decl, values, host)         可选：值变了就直接改灯 / 材质 / 渲染接口（不走环境参数的能力用，现在是角色光照）
 //
 // 多数组件只要声明里的 out 路径就够了（通用写法 ComposeByPath / ReadByPath）；只有换算或旧预设的缺省值依赖别的字段时才写自己的。
 // 零 three 依赖（纯 Node 能测）。
@@ -98,6 +98,13 @@ export const ENV_COMPONENT_LOGIC = Object.freeze({
   Clouds: Generic,
   Atmosphere: Generic,
   Fog: Generic,
+  // 角色光照：环境参数里照样写一份（Debug.Lighting.Output 看得到），真正起作用的是 Apply ——
+  // 直接改人物材质补丁的全局 uniform（Script_CharacterLight），不经天穹 / 灯。旧天空预设里没有它 = 关（强度 0）。
+  CharacterLight: Object.freeze({
+    Compose: ComposeByPath,
+    FromLegacy: ReadByPath,
+    Apply(decl, values, host) { host.characterLight?.Set(values); },
+  }),
   Grade: Object.freeze({
     Compose: ComposeByPath,
     FromLegacy(decl, legacy, values, name) {

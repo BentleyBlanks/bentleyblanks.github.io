@@ -16,6 +16,7 @@ import { ENV_RUNTIME } from "./Data_Tuning_Environment.mjs";
 import { CloneValue, Ease, EvalParamValue, LerpParamValue, SameValue, WrapHour } from "./Script_EnvTrack.mjs";
 import { ComposeEnvironment, ENV_COMPONENT_LOGIC } from "./Script_EnvComponents.mjs";
 import { VolumeContains } from "./Script_EnvPreset.mjs";
+export { BeatTime } from "./Script_EnvPreset.mjs";
 
 /** 组件全部参数的默认值。 */
 export function DefaultValues(decl) {
@@ -94,7 +95,11 @@ export class EnvironmentSystem {
     this.decls = decls;
     this.logic = logic;
     this.sceneId = null;
+    /** 区域文件归谁：scene（场景文件建的关）/ level（正片关卡，Data_EnvLevels） */
+    this.targetKind = null;
     this.sceneDoc = null;
+    /** 往前拨时间的过渡（TweenHour）：{ from, delta, t, duration } */
+    this.tween = null;
     /** id → 预设文档（编辑器改的就是这里的那一份对象，改完调 Touch()） */
     this.presets = new Map();
     this.overrides = [];
@@ -121,9 +126,10 @@ export class EnvironmentSystem {
   // 数据
 
   /** 换场景：区域文件 + 它引用的预设。keepClock：同一场景重读（外面改了文件）时时钟不动。 */
-  SetScene(sceneId, sceneDoc, presets, { keepClock = false, errors = [] } = {}) {
-    const same = sceneId === this.sceneId;
+  SetScene(sceneId, sceneDoc, presets, { keepClock = false, errors = [], kind = "scene" } = {}) {
+    const same = sceneId === this.sceneId && kind === this.targetKind;
     this.sceneId = sceneId;
+    this.targetKind = kind;
     this.sceneDoc = sceneDoc;
     this.presets = new Map(presets);
     this.errors = [...errors];
@@ -138,6 +144,8 @@ export class EnvironmentSystem {
 
   Clear() {
     this.sceneId = null;
+    this.targetKind = null;
+    this.tween = null;
     this.sceneDoc = null;
     this.presets = new Map();
     this.overrides = [];
@@ -170,7 +178,35 @@ export class EnvironmentSystem {
   // -------------------------------------------------------------------------
   // 时钟
 
-  SetHour(hour) { const h = WrapHour(hour); if (h !== this.clock.hour) { this.clock.hour = h; this.dirty = true; } }
+  SetHour(hour) { this.tween = null; const h = WrapHour(hour); if (h !== this.clock.hour) { this.clock.hour = h; this.dirty = true; } }
+
+  /** 用 seconds 真实秒数往前拨到 target 点（只往前走：18 → 22 走 4 小时，22 → 4 走 6 小时）。 */
+  TweenHour(target, seconds) {
+    const delta = WrapHour(target - this.clock.hour);
+    if (!(seconds > 0) || delta < 1e-6) { this.SetHour(target); return; }
+    this.tween = { from: this.clock.hour, delta, t: 0, duration: seconds };
+    this.dirty = true;
+  }
+
+  /** 一拍的时间（{ hour } / { look }）→ 小时；look 在兜底预设里查不到 → null。 */
+  ResolveTime(spec) {
+    if (!spec) return null;
+    if (Number.isFinite(spec.hour)) return WrapHour(spec.hour);
+    const look = this.Looks().find((l) => l.id === spec.look);
+    return look ? look.hour : null;
+  }
+
+  /** 拨到这一拍的时间。blendS（参数优先，其次 spec.blendS）> 0 就往前走过去，否则立刻。→ 目标小时 / null */
+  ApplyTime(spec, { blendS } = {}) {
+    const hour = this.ResolveTime(spec);
+    if (hour === null) return null;
+    const seconds = blendS ?? spec.blendS ?? 0;
+    if (seconds > 0) this.TweenHour(hour, seconds); else this.SetHour(hour);
+    return hour;
+  }
+
+  /** 区域文件的默认时刻（进场景时的那一刻）。 */
+  DefaultHour() { return WrapHour(this.sceneDoc?.time?.hour ?? 12); }
   SetPaused(paused) { this.clock.paused = !!paused; }
   SetSpeed(speed) { this.clock.speed = Math.max(0, Number(speed) || 0); }
   /** 按预设里的 look（白天 / 黄昏 / 晚上）拨时间：找兜底区域那份预设的 looks。→ 拨到的小时，没有这个 look → null */
@@ -244,7 +280,13 @@ export class EnvironmentSystem {
   Update(dt, observer) {
     if (!this.active) return null;
     const step = Math.max(0, Number(dt) || 0);
-    if (!this.clock.paused && this.clock.speed > 0 && step > 0) { this.clock.hour = WrapHour(this.clock.hour + this.clock.speed * step); this.dirty = true; }
+    if (this.tween && step > 0) {
+      const tw = this.tween;
+      tw.t = Math.min(1, tw.t + step / tw.duration);
+      this.clock.hour = WrapHour(tw.from + tw.delta * Ease("smooth", tw.t));
+      if (tw.t >= 1) this.tween = null;
+      this.dirty = true;
+    } else if (!this.clock.paused && this.clock.speed > 0 && step > 0) { this.clock.hour = WrapHour(this.clock.hour + this.clock.speed * step); this.dirty = true; }
     if (observer) {
       const moved = observer.x !== this.observer.x || observer.y !== this.observer.y || observer.z !== this.observer.z;
       if (moved) { this.observer = { x: observer.x, y: observer.y, z: observer.z }; this.dirty = true; }
@@ -313,7 +355,7 @@ export class EnvironmentSystem {
 
   State() {
     return {
-      active: this.active, sceneId: this.sceneId, clock: { ...this.clock }, observerMode: this.observerMode,
+      active: this.active, sceneId: this.sceneId, kind: this.targetKind, clock: { ...this.clock }, tween: this.tween ? { ...this.tween } : null, observerMode: this.observerMode,
       observer: { ...this.observer }, looks: this.Looks(), errors: [...this.errors],
       presets: [...this.presets.keys()], overrides: this.overrides.map((o) => o.id),
       components: this.output ? Object.fromEntries(Object.entries(this.output.components).map(([type, c]) => [type, {

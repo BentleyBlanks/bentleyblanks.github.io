@@ -56,6 +56,7 @@ import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { SceneEditorEntry } from "./Script_EditorSceneEntry.mjs";
 import { EnvironmentEntry } from "./Script_EditorEnvironmentEntry.mjs";
+import { EnvironmentGameOverlay } from "./Script_EditorEnvironmentGame.mjs";
 import { MixamoPreviewEditor } from "./Script_EditorMixamoPreview.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
@@ -72,11 +73,12 @@ const EDITORS = [
 // 第一人称持枪移动检查（2026-10-23）也是叠加层：玩法照跑、外部机位边走边看，所以不能是暂停玩法的互斥编辑器；
 // 它是在「武器」菜单里找的东西，不进 Debug工具 列表。
 const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor,
-  FirstPersonMotionEditor];
+  FirstPersonMotionEditor, EnvironmentGameOverlay];
 // 「Debug工具」= 除第一人称持枪移动检查外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
 // 菜单 设置 → Debug工具，和高级工具菜单栏右侧、音量条旁边的「Debug工具」下拉（2026-10-22，用户：高级工具里也要能开
 // Profiler / Debug Rendering / Frame Debugger）。
-const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== FirstPersonMotionEditor);
+// 正片关卡的环境面板（EnvironmentGameOverlay，2026-11-02）也是叠加层，但它是「场景」菜单里「环境」那一项开的，同样不进 Debug工具。
+const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== FirstPersonMotionEditor && editor !== EnvironmentGameOverlay);
 // Debug工具里弹独立浏览器窗口的几项，下拉条目后缀 ↗（同 WINDOW_TOOLS）
 const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id]);
 
@@ -163,6 +165,8 @@ export class EditorSuite {
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio,
       game: host.game,
+      // 组件式环境系统（docs/Data_Environment.md）：正片关卡的环境面板编辑它
+      environment: host.environment || null,
       studio: suite.studio, flycam: suite.flycam, viewport: suite.viewport,
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
       hideInStudio: host.viewmodel ? [host.viewmodel.root] : [],
@@ -437,7 +441,8 @@ export class EditorSuite {
     document.body.classList.toggle("edToolsOpen", this.panelOpen);
     this.root.classList.toggle("toolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
-      const on = id === this.activeId || this.overlays.has(id) || (id === BlockoutEntry.id && BlockoutEntry.Active());
+      const on = id === this.activeId || this.overlays.has(id) || (id === BlockoutEntry.id && BlockoutEntry.Active())
+        || (id === EnvironmentEntry.id && this.overlays.has(EnvironmentGameOverlay.id));
       button.classList.toggle("on", on);
       button.setAttribute("aria-checked", String(on));
     }
@@ -617,7 +622,9 @@ export class EditorSuite {
       try { return TimelineEditor.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
+    // 环境：白盒编辑器里开它自己的面板；正片关卡有区域文件（Data_EnvLevels）时开游戏内叠加层；都不是就跳到白盒编辑器
     if (id === EnvironmentEntry.id) {
+      if (!BlockoutEntry.Active() && EnvironmentGameOverlay.Available(this.host)) return this.ToggleOverlay(EnvironmentGameOverlay.id);
       try { return EnvironmentEntry.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }

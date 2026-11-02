@@ -421,6 +421,7 @@ export class BlockoutMap {
 - `GoTo(index, { animate })`：玩家立即传送到新关键帧的 `player`（保留武器弹药，不走 `player.Spawn` 的整套复位）；卡片 / 导航 / 地图立即换成新关键帧。
 - `animate` 只在「从第 i 个到第 i+1 个」（`.` 或导航栏点下一个）时为真；其余跳转（后退、跨多个、切关、首次载入）一律直接到位。
 - `Y` 重播：先把单位摆回上一关键帧，再播进入当前关键帧的过渡。
+- 关键帧可选 `time`（2026-11-02，`{hour}` 或 `{look}`，可加 `blendS`）：这一拍几点。跳到某帧时拨到这一帧或之前最近写过的那一帧的时间，顺着往下一帧走时按 `blendS` 往前拨；口径见 [环境系统 §8.6](Data_Environment.md)。
 
 ### 5.2 过渡规划（`PlanTransition(prevKf, nextKf)`，纯函数）
 
@@ -965,6 +966,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
   - `explosion` `{x, z, h?, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`；`h` 2026-10-18 第三轮加，爆点离地高 0–10 m，如炸在车尾铁板上写 1.5，缺省 0.3）；`smoke` `{x, z, kind?, dur?, scale?, prewarm?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`；`scale` 0.3–6 冒的高度乘几倍、上升速度 / 寿命 / 烟团大小 / 飘散各乘 √scale——10-31 删简易烟时这一项被丢了，11-02 接到 `VfxSystem.SmokeSource` 的 `plumeScale`；`prewarm: true` 一出来就是冒了一阵的整根烟柱，大爆炸掀起的土柱用；Seek 进烟的窗口中间时也自动先铺满）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
   - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
   - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
+  - `time` `{hour | look, dur?}`（2026-11-02）：播到这一刻拨钟（`look` = 兜底预设的白天 / 黄昏 / 晚上），写了 `dur` 在这几秒里往前走过去；Seek 可复现（`PrevizHourAt`），没有区域文件的关卡不起作用。见 [环境系统 §8.6](Data_Environment.md)。
 - **飞机** `aircraft[]`（2026-10-19，用户「有飞机模型，你自己看下」）：一段里可以放几架，每架一条轨：
   ```json
   "aircraft": [{

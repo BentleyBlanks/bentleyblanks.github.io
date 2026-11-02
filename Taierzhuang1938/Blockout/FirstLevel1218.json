@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel1218",
     "gameVersion": "11–18 白盒第四版契约（2026-11-02，集成负责人；tmp/Contract1218_v4.md 第三节）· 2026-11-02 第四版空间（契约：土路 → 交叉口 → 官道 → 村口反坦克沟与板桥 → 北沙河村（主街斜穿 / 北中南三条街 / 胡同 / 教堂 / 救护所 / 女娃家）→ 南街口望官道桥 → 出村小路 → 北岸土路 → 李子行 → 铁路桥过沙河 → 南头河堤 → 南岸路）",
-    "commit": "b6155813327167cd3515020c1a28478f7d204643",
-    "generatedAt": "2026-11-02T05:05:52.777Z"
+    "commit": "f845836b1b18b3c5af2158d87c01856e9ea77230",
+    "generatedAt": "2026-11-02T08:02:09.872Z"
   },
   "zones": [
     {
@@ -10525,6 +10525,9 @@
       "stage": 16,
       "stageTitle": "过门槛",
       "name": "门槛",
+      "time": {
+        "hour": 17
+      },
       "player": {
         "x": 90.75,
         "z": 807,
@@ -12698,6 +12701,9 @@
       "stageLabel": "18B",
       "stageTitle": "撤过铁路桥",
       "name": "出村、铁路桥",
+      "time": {
+        "look": "dusk"
+      },
       "player": {
         "x": -78.2,
         "z": 913.4,
@@ -15835,6 +15841,9 @@
       "stageLabel": "18夜",
       "stageTitle": "夜里",
       "name": "夜里",
+      "time": {
+        "look": "night"
+      },
       "player": {
         "x": -55.39,
         "z": 1028.27,

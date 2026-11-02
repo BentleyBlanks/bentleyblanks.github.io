@@ -1,7 +1,10 @@
-// 环境编辑器（docs/Data_Environment.md §8）：白盒编辑器（?editor=blockout）右侧的「环境」面板 + 底部昼夜时间轴 + 场景里的区域框。
+// 环境编辑器（docs/Data_Environment.md §8）：右侧的「环境」面板 + 底部昼夜时间轴 + 场景里的区域框。
+// 两处用：白盒编辑器（?editor=blockout，场景的区域文件）与正片关卡（高级工具 → 场景 → 环境，Data_EnvLevels 登记的区域文件）。
+// 宿主差别全在构造时给的 host 适配器里（见 constructor 的参数说明），面板本身一行不分。
 //
 // 层级「总览 — 区域 — 预设 — 组件 — 参数」：
-//   时间条（一直在最上面）  拖动拨时间 · 白天 / 黄昏 / 晚上一键跳 · 播放 / 暂停 / 调速 · 设为场景默认时间
+//   时间条（一直在最上面）  拖动拨时间 · 白天 / 黄昏 / 晚上一键跳 · 播放 / 暂停 / 调速 · 设为场景默认时间 ·
+//                           这一拍几点（关键帧 / 任务步骤写的时间，写进这一拍 / 去掉，§8.6）
 //   总览                    当前生效：每种组件此刻由谁提供（基础 / 区域 / 临时 + 过渡进度）；区域与覆盖按优先级排，
 //                           点一行选中该区域并飞过去看；下面直接编辑选中区域引用的那份预设
 //   区域                    区域列表 + 检查器（名字、形状、中心 / 尺寸 / 朝向、优先级、过渡时长、覆盖模式、引用的预设）+ 同一套预设视图；
@@ -19,10 +22,9 @@ import { ENV_RUNTIME, ENV_EDITOR } from "./Data_Tuning_Environment.mjs";
 import { CloneValue } from "./Script_EnvTrack.mjs";
 import { DefaultValues } from "./Script_EnvSystem.mjs";
 import {
-  NewEnvPreset, NewSceneEnv, NewVolume, UniqueId, NumberedId, ValidateEnvPreset, ValidateSceneEnv, EnvPresetUrl, SceneEnvUrl, FormatEnvJson,
+  NewEnvPreset, NewSceneEnv, NewVolume, UniqueId, NumberedId, ValidateEnvPreset, ValidateSceneEnv, EnvPresetUrl, ZoneFileUrl, FormatEnvJson, BeatTime,
   ParamDecl, EnvPresetFromSkyPreset, VOLUME_SHAPES, ENV_ID_RE,
 } from "./Script_EnvPreset.mjs";
-import { SceneIdOfUrl } from "./Script_EnvLoader.mjs";
 import {
   PresetView, El, IconButton, FormatHour, WriteParamValue, ToggleParamValue, ToggleKeyValue, GuardPanelEvents, IsTyping,
 } from "./Script_EditorEnvironmentViews.mjs";
@@ -78,16 +80,26 @@ function Field(parent, label, control) {
 
 export class EnvironmentEditor {
   /**
-   * @param {import("./Script_EditorBlockout.mjs").EditorBlockout} editor
+   * @param {object} host 宿主适配器：
+   *   post / camera / renderer        画区域框、取相机
+   *   uiRoot()                        面板挂在哪（要有 .boRoot：用它的 --bo-* 变量与 pointer-events 规矩）
+   *   addTopBarControl(el)?           顶栏「环境」按钮放哪（没有就不放）
+   *   setRootClass(name, on)?         时间轴开着时给根加 envTimelineOpen（白盒编辑器借它让开导航栏）
+   *   groundAt(x, z) / isLocked()     地面高度 / 鼠标锁着没有（锁着时手柄不能拖）
+   *   target()                        → { kind: "scene" | "level", id } 这一关的区域文件归谁；没有 → null
+   *   fallbackSky()                   这一关原来的天空预设名（新建环境时照它抄一份预设）
+   *   flyTo(pose)?                    飞到某个机位看区域（白盒编辑器的飞行观察；没有就不显示「飞过去看」）
+   *   beat()?                         → 这一拍：{ kind, id, label, order, times, write(spec|null) }（§8.6）；没有拍 → null
    * @param {{ system: import("./Script_EnvSystem.mjs").EnvironmentSystem, bridge }} environment
    */
-  constructor(editor, environment) {
-    this.editor = editor;
+  constructor(host, environment) {
+    this.host = host;
     this.system = environment?.system || null;
     this.bridge = environment?.bridge || null;
     this.ui = LoadUi();
     this.open = false;
     this.loadedScene = null;
+    this.loadedKind = "scene";
     this.revisions = new Map();     // "scene" / "preset:<Id>" → 读文件时原始字节的 sha1（null = 盘上还没有）
     this.dirty = new Set();
     this.history = [];
@@ -101,8 +113,8 @@ export class EnvironmentEditor {
     this.loading = null;
     this.views = new Map();
     this.gizmo = new EnvVolumeGizmo({
-      post: editor.host.post, camera: editor.host.camera, canvas: editor.host.renderer?.domElement || null,
-      groundAt: editor.groundAt, isLocked: () => editor.PointerLocked(),
+      post: host.post, camera: host.camera, canvas: host.renderer?.domElement || null,
+      groundAt: host.groundAt, isLocked: () => !!host.isLocked?.(),
       onEdit: (id, patch, { commit }) => this.SetVolume(id, patch, { merge: `gizmo:${id}`, commit }),
       onPick: (id) => this.SelectVolume(id),
     });
@@ -113,7 +125,12 @@ export class EnvironmentEditor {
 
   get sceneDoc() { return this.system?.sceneDoc || null; }
   get hour() { return this.system?.clock.hour ?? 12; }
-  get sceneId() { return SceneIdOfUrl(this.editor.phase?.blockout?.SceneUrl?.()) || null; }
+  /** 这一关的区域文件归谁（{ kind, id }）；没有区域文件可言 → null。 */
+  get target() { return this.host.target?.() || null; }
+  get sceneId() { return this.target?.id || null; }
+  get targetKind() { return this.target?.kind || "scene"; }
+  /** 盘上那份区域文件叫什么（状态条、下载用）。 */
+  ZoneFileName(kind = this.loadedKind, id = this.loadedScene) { return kind === "level" ? `Environment/Level_${id}.json` : `Scenes/${id}/Environment_${id}.json`; }
   PresetDoc(id) { return id ? this.system?.presets.get(id) || null : null; }
   PresetIds() { return [...new Set([...this.diskPresets, ...(this.system ? this.system.presets.keys() : [])])].sort(); }
   Volume(id) { return this.sceneDoc?.volumes.find((v) => v.id === id) || null; }
@@ -173,7 +190,17 @@ export class EnvironmentEditor {
     row1.append(this.btnPlay, this.elClock, this.timeRange);
     const row2 = El("div", "envTimeRow");
     row2.append(this.looksBar, this.speedSelect, defaults);
-    time.append(row1, row2);
+    // 这一拍几点（§8.6）：当前关键帧 / 任务步骤写的时间，没写就沿用前一拍、都没写用区域文件的默认时刻
+    const row3 = El("div", "envTimeRow envBeatRow");
+    this.elBeat = El("span", "envBeat");
+    this.btnBeatWrite = El("button", "envBtn", "写进这一拍"); this.btnBeatWrite.type = "button";
+    this.btnBeatWrite.title = "把现在的钟点写进当前关键帧（正片关卡写进区域文件的这一步）；正好是白天 / 黄昏 / 晚上的时刻就写那一套的名字";
+    this.btnBeatWrite.addEventListener("click", () => this.WriteBeatTime(this.CurrentTimeSpec()));
+    this.btnBeatClear = El("button", "envBtn", "去掉"); this.btnBeatClear.type = "button";
+    this.btnBeatClear.title = "这一拍不写时间（沿用前一拍）";
+    this.btnBeatClear.addEventListener("click", () => this.WriteBeatTime(null));
+    row3.append(this.elBeat, this.btnBeatWrite, this.btnBeatClear);
+    time.append(row1, row2, row3);
 
     const tabs = El("div", "envTabs");
     this.tabButtons = new Map();
@@ -189,18 +216,86 @@ export class EnvironmentEditor {
     this.pages = new Map(TABS.map((t) => [t.id, El("div", `envPage envPage-${t.id}`)]));
     for (const page of this.pages.values()) this.body.appendChild(page);
     root.append(head, this.elStatus, time, tabs, this.body);
-    // 挂在白盒界面的 .boRoot 里：用它的 --bo-* 变量与 pointer-events 规矩
-    this.editor.ui.root.appendChild(root);
-    this.timeline.Mount(this.editor.ui.root);
+    // 挂在宿主给的 .boRoot 里：用它的 --bo-* 变量与 pointer-events 规矩
+    this.host.uiRoot().appendChild(root);
+    this.timeline.Mount(this.host.uiRoot());
 
-    // 白盒编辑器顶栏的「环境」按钮
-    this.topButton = El("button", "boBtn envTopBtn", "环境");
-    this.topButton.type = "button";
-    this.topButton.dataset.tip = "环境：区域 / 预设 / 昼夜";
-    this.topButton.dataset.tipSide = "below";
-    this.topButton.addEventListener("click", (e) => { e.stopPropagation(); this.Toggle(); });
-    this.topButton.addEventListener("pointerdown", (e) => e.stopPropagation());
-    this.editor.ui.AddTopBarControl(this.topButton);
+    // 顶栏的「环境」按钮（白盒编辑器有顶栏；正片关卡从高级工具菜单开，没有这个按钮）
+    this.topButton = null;
+    if (this.host.addTopBarControl) {
+      this.topButton = El("button", "boBtn envTopBtn", "环境");
+      this.topButton.type = "button";
+      this.topButton.dataset.tip = "环境：区域 / 预设 / 昼夜";
+      this.topButton.dataset.tipSide = "below";
+      this.topButton.addEventListener("click", (e) => { e.stopPropagation(); this.Toggle(); });
+      this.topButton.addEventListener("pointerdown", (e) => e.stopPropagation());
+      this.host.addTopBarControl(this.topButton);
+    }
+  }
+
+  /** 时间轴开关时让宿主知道（白盒编辑器让开导航栏与小地图）。 */
+  SetRootClass(name, on) { this.host.setRootClass?.(name, on); }
+
+  // -------------------------------------------------------------------------
+  // 这一拍几点（§8.6）
+
+  /** 当前这一拍与它的时间来源：→ { beat, found: { spec, from } | null, hour } 或 null（宿主没有拍）。 */
+  BeatState() {
+    const beat = this.host.beat?.();
+    if (!beat) return null;
+    const found = BeatTime(beat.times, beat.order, beat.id);
+    const hour = found ? this.system?.ResolveTime(found.spec) : this.system?.DefaultHour();
+    return { beat, found, hour: hour ?? null };
+  }
+
+  /**
+   * 跳到一拍时按它的时间拨钟（白盒编辑器 GoTo、正片关卡换任务步骤时调）。
+   * 这一关一拍都没写时间 → 不碰时钟（不打断面板里手拨的时间）；写过 → 这一拍或往前最近一拍的时间，都没有 → 区域文件的默认时刻。
+   * animate：顺着往下一拍走（关键帧带过渡）时按 blendS（缺省 ENV_RUNTIME.beatBlendS）往前拨过去。
+   */
+  ApplyBeatTime({ animate = false } = {}) {
+    if (!this.system?.active) return null;
+    const state = this.BeatState();
+    if (!state || !Object.keys(state.beat.times || {}).length) return null;
+    const blendS = animate ? (state.found?.spec.blendS ?? ENV_RUNTIME.beatBlendS) : 0;
+    if (state.found) return this.system.ApplyTime(state.found.spec, { blendS });
+    const hour = this.system.DefaultHour();
+    if (blendS > 0) this.system.TweenHour(hour, blendS); else this.system.SetHour(hour);
+    return hour;
+  }
+
+  /** 现在的钟点写成一拍的时间：正好是某一套表现的时刻就写它的名字（look），否则写钟点（保留到分钟）。 */
+  CurrentTimeSpec() {
+    const hour = this.hour;
+    const look = this.system?.Looks().find((l) => Math.abs(l.hour - hour) < 1 / 120);
+    return look ? { look: look.id } : { hour: Math.round(hour * 60) / 60 };
+  }
+
+  /** 写进这一拍（null = 去掉）。白盒编辑器写进关键帧并存盘；正片关卡写进区域文件的 stages（进撤销栈，点保存才落盘）。 */
+  async WriteBeatTime(spec) {
+    const state = this.BeatState();
+    if (!state) { this.Flash("这里没有可以写时间的拍（关键帧 / 任务步骤）", true); return { ok: false }; }
+    const result = await state.beat.write(spec);
+    this.ApplyBeatTime();
+    this.RenderBeat();
+    return result;
+  }
+
+  RenderBeat() {
+    if (!this.elBeat) return;
+    const state = this.BeatState();
+    const row = this.elBeat.parentElement;
+    row.hidden = !state;
+    if (!state) return;
+    const { beat, found, hour } = state;
+    const at = hour === null ? "—" : FormatHour(hour);
+    const name = (spec) => (spec.look ? (this.system?.Looks().find((l) => l.id === spec.look)?.label || spec.look) : FormatHour(spec.hour));
+    const own = found && found.from === beat.id;
+    this.elBeat.textContent = found
+      ? `${beat.label}：${own ? "写在这一拍" : `沿用 ${found.from}`} · ${name(found.spec)}（${at}）`
+      : `${beat.label}：没写 · 区域文件默认 ${at}`;
+    this.elBeat.classList.toggle("own", !!own);
+    this.btnBeatClear.disabled = !own;
   }
 
   /** 预设视图的宿主：三处各一个，只差「看的是哪份预设」。 */
@@ -247,7 +342,7 @@ export class EnvironmentEditor {
     if (tab) this.ui.tab = tab;
     this.SaveUi();
     this.root.hidden = false;
-    this.topButton.classList.add("on");
+    this.topButton?.classList.add("on");
     await this.EnsureLoaded();
     this.Render();
     if (this.ui.timeline) this.timeline.Open({});
@@ -259,7 +354,7 @@ export class EnvironmentEditor {
     this.ui.open = false;
     this.SaveUi();
     this.root.hidden = true;
-    this.topButton.classList.remove("on");
+    this.topButton?.classList.remove("on");
     this.timeline.Close({ remember: true });
     this.gizmo.SetVolumes([], null);
     return this.State();
@@ -289,10 +384,12 @@ export class EnvironmentEditor {
   /** 重读区域文件与它引用的预设（discard：丢掉没存的改动）。时钟不动。 */
   async Reload({ discard = false } = {}) {
     const sceneId = this.sceneId;
+    const kind = this.targetKind;
     if (!discard && this.dirty.size) { this.Flash("有没保存的改动：先保存，或点状态条里的「重新读取」放弃改动", true); return false; }
     const dropped = sceneId !== this.loadedScene && this.dirty.size ? [...this.dirty].map((k) => (k === "scene" ? `${this.loadedScene} 的区域` : k.slice(7))) : null;
     await this.RefreshStatus();
     this.loadedScene = sceneId;
+    this.loadedKind = kind;
     this.dirty.clear();
     this.history = [];
     this.future = [];
@@ -301,7 +398,7 @@ export class EnvironmentEditor {
     if (!sceneId || !this.system) { this.Render(); return false; }
     let sceneText = null;
     try {
-      const response = await fetch(`${SceneEnvUrl(sceneId)}?t=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch(`${ZoneFileUrl({ kind, id: sceneId })}?t=${Date.now()}`, { cache: "no-store" });
       if (response.ok) sceneText = await response.text();
       else if (response.status !== 404) throw new Error(`HTTP ${response.status}`);
     } catch (error) { this.Flash(`区域文件读不了：${error.message}`, true); this.Render(); return false; }
@@ -325,7 +422,7 @@ export class EnvironmentEditor {
         this.revisions.set(`preset:${id}`, await Sha1(text));
       } catch (error) { errors.push(`预设 ${id} 读不了：${error.message}`); }
     }));
-    this.system.SetScene(sceneId, sceneDoc, presets, { keepClock: true, errors });
+    this.system.SetScene(sceneId, sceneDoc, presets, { keepClock: true, errors, kind });
     if (errors.length) this.Flash(errors.join("；"), true);
     // 换场景（切到正式场景试玩、换段到别的场景）时手上还有没存的改动：环境系统已经换成新场景，那些改动丢了，明说
     if (dropped) this.Flash(`换到场景 ${sceneId}：之前没保存的环境改动已放弃（${dropped.join("、")}）。切场景前先保存`, true);
@@ -356,7 +453,7 @@ export class EnvironmentEditor {
     const status = await this.RefreshStatus();
     if (!status || !this.loadedScene) return;
     const changed = [];
-    const sceneRev = status.scenes?.[this.loadedScene] ?? null;
+    const sceneRev = (this.loadedKind === "level" ? status.levels : status.scenes)?.[this.loadedScene] ?? null;
     if (this.revisions.has("scene") && sceneRev !== this.revisions.get("scene")) changed.push("scene");
     for (const [key, rev] of this.revisions) {
       if (!key.startsWith("preset:")) continue;
@@ -552,7 +649,7 @@ export class EnvironmentEditor {
 
   /** 相机前方 distance 米的地面点。 */
   PointAhead(distance) {
-    const cam = this.editor.host.camera;
+    const cam = this.host.camera;
     const dir = { x: 0, z: -1 };
     if (cam) {
       const e = cam.matrixWorld.elements;
@@ -561,21 +658,20 @@ export class EnvironmentEditor {
       dir.x = fx / len; dir.z = fz / len;
     }
     const x = (cam?.position.x ?? 0) + dir.x * distance, z = (cam?.position.z ?? 0) + dir.z * distance;
-    const y = this.editor.groundAt?.(x, z) ?? 0;
+    const y = this.host.groundAt?.(x, z) ?? 0;
     return [Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10];
   }
 
   /** 飞到能看清这个区域的机位（飞行观察）。全场区域不飞。 */
   FlyTo(id) {
     const v = this.Volume(id);
-    if (!v || v.shape === "global" || !v.center) return false;
+    if (!v || v.shape === "global" || !v.center || !this.host.flyTo) return false;
     const span = v.shape === "sphere" ? v.radius * 2 : Math.max(v.size[0], v.size[2]);
     const [cx, cy, cz] = v.center;
     const pos = { x: cx, y: cy + Math.max(6, span * 0.55), z: cz + Math.max(10, span * 1.1) };
     const dx = cx - pos.x, dy = cy - pos.y, dz = cz - pos.z;
     const pose = { ...pos, yawDeg: Math.atan2(-dx, -dz) / DEG, pitchDeg: Math.atan2(dy, Math.hypot(dx, dz)) / DEG };
-    if (this.editor.flying) this.editor.SetFlyPose(pose); else this.editor.EnterFly(pose, { quiet: true });
-    return true;
+    return this.host.flyTo ? !!this.host.flyTo(pose) : false;
   }
 
   // --- 预设 -------------------------------------------------------------------
@@ -608,11 +704,12 @@ export class EnvironmentEditor {
     const sceneId = this.sceneId;
     if (!sceneId || !this.system || this.sceneDoc) return false;
     const presetId = UniqueId(sceneId, this.PresetIds());
-    const skyName = this.editor.phase?.sky || "firstLevelBattleDay";
+    const skyName = this.host.fallbackSky?.() || "firstLevelBattleDay";
     const preset = EnvPresetFromSkyPreset(SKY_PRESETS[skyName] || SKY_PRESETS.firstLevelBattleDay, skyName, { id: presetId, title: `${sceneId} · 环境` });
     const sceneDoc = NewSceneEnv(sceneId, presetId);
-    this.system.SetScene(sceneId, sceneDoc, new Map([[presetId, preset]]));
+    this.system.SetScene(sceneId, sceneDoc, new Map([[presetId, preset]]), { kind: this.targetKind });
     this.loadedScene = sceneId;
+    this.loadedKind = this.targetKind;
     this.revisions.set("scene", null);
     this.revisions.set(`preset:${presetId}`, null);
     this.dirty.add("scene");
@@ -643,7 +740,7 @@ export class EnvironmentEditor {
     if (!this.status.writable) {
       for (const key of this.dirty) {
         const doc = this.DocFor(key);
-        if (doc) Download(key === "scene" ? `Environment_${this.loadedScene}.json` : `EnvPreset_${key.slice(7)}.json`, FormatEnvJson(doc));
+        if (doc) Download(key === "scene" ? this.ZoneFileName().split("/").pop() : `EnvPreset_${key.slice(7)}.json`, FormatEnvJson(doc));
       }
       this.Flash("线上没有存盘口：已下载改过的 JSON，换掉仓库里的文件再提交");
       return { ok: true, downloaded: [...this.dirty] };
@@ -656,8 +753,8 @@ export class EnvironmentEditor {
       for (const key of order) {
         const doc = this.DocFor(key);
         if (!doc) { this.dirty.delete(key); continue; }
-        const kind = key === "scene" ? "scene" : "preset";
-        const id = kind === "scene" ? this.loadedScene : key.slice(7);
+        const kind = key === "scene" ? this.loadedKind : "preset";
+        const id = key === "scene" ? this.loadedScene : key.slice(7);
         const response = await fetch("/__environment/save", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ kind, id, doc, revision: this.revisions.get(key) ?? null }),
@@ -665,7 +762,7 @@ export class EnvironmentEditor {
         const result = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
         if (response.status === 409) {
           this.status.conflict = [key];
-          this.Flash(`${kind === "scene" ? "区域文件" : `预设 ${id}`}在别处改过，没存（可以重新读取，或先下载自己的版本）`, true);
+          this.Flash(`${kind === "preset" ? `预设 ${id}` : "区域文件"}在别处改过，没存（可以重新读取，或先下载自己的版本）`, true);
           return { ok: false, conflict: key, saved };
         }
         if (!result.ok) { this.Flash(`保存失败：${result.error}${result.details ? `（${result.details.slice(0, 2).join("；")}）` : ""}`, true); return { ok: false, error: result.error, saved }; }
@@ -699,6 +796,7 @@ export class EnvironmentEditor {
     this.RenderHead();
     this.RenderStatus();
     this.RenderLooks();
+    this.RenderBeat();
     this.SyncTime(true);
     for (const [id, b] of this.tabButtons) b.classList.toggle("on", id === this.ui.tab);
     this.RenderPage();
@@ -792,7 +890,7 @@ export class EnvironmentEditor {
 
   RenderEmpty(page) {
     page.textContent = "";
-    page.append(El("div", "envEmpty", this.sceneId ? `场景 ${this.sceneId} 还没有环境文件（Scenes/${this.sceneId}/Environment_${this.sceneId}.json），现在用的是本关的天空预设。` : "这一段不是场景关卡，没有环境区域。"));
+    page.append(El("div", "envEmpty", this.sceneId ? `${this.targetKind === "level" ? "关卡" : "场景"} ${this.sceneId} 还没有区域文件（${this.ZoneFileName(this.targetKind, this.sceneId)}），现在用的是本关的天空预设。` : "这一关没有登记区域文件（场景关卡读 Scenes/<Id>/Environment_<Id>.json，正片关卡在 Data_EnvLevels 登记）。"));
     if (this.sceneId) {
       const b = El("button", "envBtn primary", "新建环境（兜底区域 + 按本关天空抄一份预设）");
       b.type = "button";
@@ -976,12 +1074,15 @@ export class EnvironmentEditor {
       ahead.addEventListener("click", () => { const p = this.PointAhead(18); const v = this.Volume(selected.id); if (v.shape === "box") p[1] += v.size[1] / 2 - 1; this.SetVolume(selected.id, { center: p }); });
       const ground = El("button", "envBtn", "底面落地"); ground.type = "button";
       ground.addEventListener("click", () => {
-        const v = this.Volume(selected.id); const g = this.editor.groundAt?.(v.center[0], v.center[2]) ?? 0;
+        const v = this.Volume(selected.id); const g = this.host.groundAt?.(v.center[0], v.center[2]) ?? 0;
         this.SetVolume(selected.id, { center: [v.center[0], g + (v.shape === "box" ? v.size[1] / 2 : 0), v.center[2]] });
       });
-      const fly = El("button", "envBtn", "飞过去看"); fly.type = "button";
-      fly.addEventListener("click", () => this.FlyTo(selected.id));
-      place.append(ahead, ground, fly);
+      place.append(ahead, ground);
+      if (this.host.flyTo) {
+        const fly = El("button", "envBtn", "飞过去看"); fly.type = "button";
+        fly.addEventListener("click", () => this.FlyTo(selected.id));
+        place.append(fly);
+      }
       Field(insp, "", place);
     }
     this.volFields.priority = NumberField(selected.priority, 1, (v) => this.SetVolume(selected.id, { priority: v }));
@@ -1111,6 +1212,7 @@ export class EnvironmentEditor {
     if (now - this.syncAt > 100) {
       this.syncAt = now;
       this.SyncTime();
+      this.RenderBeat();
       const version = this.system.output?.version;
       if (version !== this.syncedVersion || !this.system.clock.paused) {
         this.syncedVersion = version;
@@ -1131,7 +1233,8 @@ export class EnvironmentEditor {
       open: this.open, tab: this.ui.tab, scene: this.loadedScene, dirty: [...this.dirty], history: this.history.length, future: this.future.length,
       writable: this.status.writable, conflict: this.status.conflict, message: this.status.message,
       selectedVolume: this.SelectedVolume()?.id || null, selectedPreset: this.SelectedPresetId(),
-      presets: this.PresetIds(), timeline: this.timeline.State(), gizmo: this.gizmo.State(),
+      presets: this.PresetIds(), timeline: this.timeline.State(), gizmo: this.gizmo.State(), kind: this.loadedKind,
+      beat: (() => { const b = this.BeatState(); return b ? { id: b.beat.id, kind: b.beat.kind, from: b.found?.from ?? null, spec: b.found?.spec ?? null, hour: b.hour } : null; })(),
       ui: { filter: this.ui.filter, search: this.ui.search, collapsed: { ...this.ui.collapsed }, scroll: { ...this.ui.scroll } },
     };
   }
@@ -1165,6 +1268,10 @@ export class EnvironmentEditor {
       Filter: (filter, search = "") => { this.ui.filter = filter; this.ui.search = search; this.SaveUi(); this.Render(); return this.State().ui; },
       Collapse: (type, on) => { this.ui.collapsed[type] = !!on; this.SaveUi(); this.SyncViews(); return !!on; },
       CreateSceneEnvironment: () => this.CreateSceneEnvironment(),
+      // 这一拍几点（§8.6）：Beat() 现状；WriteBeat({ hour } / { look } / null) 写进这一拍；ApplyBeat() 按这一拍拨钟
+      Beat: () => this.State().beat,
+      WriteBeat: (spec) => this.WriteBeatTime(spec),
+      ApplyBeat: () => this.ApplyBeatTime(),
       Timeline: this.timeline.api,
       Gizmo: this.gizmo.api,
     };
@@ -1175,6 +1282,6 @@ export class EnvironmentEditor {
     this.gizmo.Dispose();
     this.timeline.Dispose();
     this.root.remove();
-    this.topButton.remove();
+    this.topButton?.remove();
   }
 }

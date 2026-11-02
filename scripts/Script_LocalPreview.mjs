@@ -47,10 +47,12 @@ import { BLOCKOUT_LEVEL_KEYS, BLOCKOUT_CONFIG_FILE_RE, BlockoutConfigPath, Valid
 //   POST /__scene/save   { scene, doc, revision } → 写 Taierzhuang1938/Scenes/<SceneId>/Scene_<SceneId>.json
 import { SCENE_IDS, SCENE_FILE_RE, SceneRepoPath, ValidateScene, FormatSceneJson } from "../Taierzhuang1938/Script_SceneDoc.mjs";
 // 环境编辑器的存盘（Taierzhuang1938/docs/Data_Environment.md §8）。同场景那套闸；只写环境预设与场景的区域文件：
-//   GET  /__environment/status → { writable, root, presets: { <Id>: sha1 }, scenes: { <SceneId>: sha1 | null } }
-//   POST /__environment/save   { kind: "preset" | "scene", id, doc, revision } → 写 Environment/EnvPreset_<Id>.json 或 Scenes/<Id>/Environment_<Id>.json
+//   GET  /__environment/status → { writable, root, presets: { <Id>: sha1 }, scenes: { <SceneId>: sha1 | null }, levels: { <Id>: sha1 } }
+//   POST /__environment/save   { kind: "preset" | "scene" | "level", id, doc, revision }
+//        → 写 Environment/EnvPreset_<Id>.json / Scenes/<Id>/Environment_<Id>.json / Environment/Level_<Id>.json（正片关卡，Data_EnvLevels）
 import {
-  ENV_ID_RE, ENV_PRESET_FILE_RE, SCENE_ENV_FILE_RE, EnvPresetRepoPath, SceneEnvRepoPath, ValidateEnvPreset, ValidateSceneEnv, FormatEnvJson,
+  ENV_ID_RE, ENV_PRESET_FILE_RE, SCENE_ENV_FILE_RE, LEVEL_ENV_FILE_RE, EnvPresetRepoPath, SceneEnvRepoPath, LevelEnvRepoPath,
+  ValidateEnvPreset, ValidateSceneEnv, FormatEnvJson,
 } from "../Taierzhuang1938/Script_EnvPreset.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -767,24 +769,29 @@ async function HandleSceneSave(request, response, rootDir) {
 // status 列出盘上全部预设（编辑器的预设下拉靠它；线上没有这个口，只认场景引用到的那几份）。
 const ENVIRONMENT_BODY_LIMIT = 2 * 1024 * 1024;
 
-function EnvironmentPresetIds(rootDir) {
+function EnvironmentFileIds(rootDir, prefix) {
   try {
+    const re = new RegExp(`^${prefix}_([A-Z][A-Za-z0-9]{0,63})\\.json$`);
     return fs.readdirSync(path.join(rootDir, "Taierzhuang1938", "Environment"))
-      .map((name) => /^EnvPreset_([A-Z][A-Za-z0-9]{0,63})\.json$/.exec(name)?.[1]).filter(Boolean).sort();
+      .map((name) => re.exec(name)?.[1]).filter(Boolean).sort();
   } catch { return []; }
 }
+const EnvironmentPresetIds = (rootDir) => EnvironmentFileIds(rootDir, "EnvPreset");
 
 function SendEnvironmentStatus(request, response, rootDir) {
   if (request.method !== "GET" && request.method !== "HEAD") { SendJson(response, 405, { ok: false, error: "只收 GET" }); return; }
-  const presets = {}, scenes = {};
+  const presets = {}, scenes = {}, levels = {};
   for (const id of EnvironmentPresetIds(rootDir)) {
     try { presets[id] = BlockoutRevision(path.join(rootDir, EnvPresetRepoPath(id))); } catch { presets[id] = null; }
+  }
+  for (const id of EnvironmentFileIds(rootDir, "Level")) {
+    try { levels[id] = BlockoutRevision(path.join(rootDir, LevelEnvRepoPath(id))); } catch { levels[id] = null; }
   }
   for (const id of SCENE_IDS) {
     try { scenes[id] = BlockoutRevision(path.join(rootDir, SceneEnvRepoPath(id))); } catch { scenes[id] = null; }
   }
   const writable = IsLocalPage(request);
-  SendJson(response, 200, { writable, root: rootDir, presets, scenes, ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }) });
+  SendJson(response, 200, { writable, root: rootDir, presets, scenes, levels, ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }) });
 }
 
 async function HandleEnvironmentSave(request, response, rootDir) {
@@ -799,11 +806,11 @@ async function HandleEnvironmentSave(request, response, rootDir) {
   try { payload = JSON.parse(body); } catch { Reject(400, "body 不是 JSON"); return; }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) { Reject(400, "body 要是 { kind, id, doc, revision }"); return; }
   const { kind, id, doc, revision } = payload;
-  if (kind !== "preset" && kind !== "scene") { Reject(400, "kind 只能是 preset / scene"); return; }
+  if (kind !== "preset" && kind !== "scene" && kind !== "level") { Reject(400, "kind 只能是 preset / scene / level"); return; }
   if (typeof id !== "string" || !ENV_ID_RE.test(id)) { Reject(403, "id 要是大写字母开头的英文字母数字"); return; }
   if (kind === "scene" && !SCENE_IDS.includes(id)) { Reject(403, `场景只能是 ${SCENE_IDS.join(" / ")}`); return; }
-  const relative = kind === "preset" ? EnvPresetRepoPath(id) : SceneEnvRepoPath(id);
-  if (!(kind === "preset" ? ENV_PRESET_FILE_RE : SCENE_ENV_FILE_RE).test(relative)) { Reject(403, "路径不在白名单里"); return; }
+  const relative = kind === "preset" ? EnvPresetRepoPath(id) : kind === "level" ? LevelEnvRepoPath(id) : SceneEnvRepoPath(id);
+  if (!(kind === "preset" ? ENV_PRESET_FILE_RE : kind === "level" ? LEVEL_ENV_FILE_RE : SCENE_ENV_FILE_RE).test(relative)) { Reject(403, "路径不在白名单里"); return; }
   const filePath = path.resolve(rootDir, relative);
   if (filePath !== path.join(rootDir, relative) || !filePath.startsWith(rootDir + path.sep)) { Reject(403, "路径不在服务根之下"); return; }
   if (revision !== null && typeof revision !== "string") { Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）"); return; }
@@ -816,6 +823,7 @@ async function HandleEnvironmentSave(request, response, rootDir) {
     } else {
       check = ValidateSceneEnv(doc, { presetIds: new Set(EnvironmentPresetIds(rootDir)) });
       if (check.ok && doc.scene !== id) { Reject(400, `区域文件里的 scene 是 ${doc.scene}，和请求的 ${id} 不是一回事`); return; }
+      // 正片关卡的区域文件只能新建在 Environment/Level_<Id>.json：id 要在 Data_EnvLevels 里登记过才会被读到（这里不拦，只是读不到）
     }
     if (!check.ok) { Reject(400, kind === "preset" ? "预设不合规" : "区域文件不合规", { details: check.errors.slice(0, 50), warnings: check.warnings }); return; }
     text = FormatEnvJson(doc);
@@ -922,7 +930,8 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   过 ValidateScene 后按场景文件的写法原子写 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json（body ≤ 16 MB）；其余同上。
 环境保存口（环境编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__environment/status；POST /__environment/save
   { kind: "preset" | "scene", id: "FirstLevel", doc: {...}, revision: "<读文件时那份原始字节的 sha1；新文件写 null>" }
-  预设写 Taierzhuang1938/Environment/EnvPreset_<Id>.json（可新建），区域文件写 Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json（body ≤ 2 MB）；其余同上。`;
+  预设写 Taierzhuang1938/Environment/EnvPreset_<Id>.json（可新建），场景的区域文件写 Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json，
+  正片关卡的区域文件（kind: "level"）写 Taierzhuang1938/Environment/Level_<Id>.json（body ≤ 2 MB）；其余同上。`;
 
 async function Main() {
   const args = process.argv.slice(2);

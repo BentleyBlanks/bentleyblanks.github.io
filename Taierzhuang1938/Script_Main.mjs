@@ -144,8 +144,9 @@ import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BLOCKOUT_EDITOR_FILL } from "./Data_Tuning_WhiteboxMaterial.mjs";
 import { EnvironmentSystem } from "./Script_EnvSystem.mjs";
 import { EnvRenderBridge } from "./Script_EnvApply.mjs";
-import { LoadSceneEnvironment, SceneIdOfUrl } from "./Script_EnvLoader.mjs";
-import { EnvPresetFromSkyPreset } from "./Script_EnvPreset.mjs";
+import { LoadEnvironment, EnvTargetForPhase } from "./Script_EnvLoader.mjs";
+import { EnvPresetFromSkyPreset, BeatTime } from "./Script_EnvPreset.mjs";
+import { CHARACTER_LIGHT_HOST } from "./Script_CharacterLight.mjs";
 import { ENV_RUNTIME } from "./Data_Tuning_Environment.mjs";
 import { LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { BootPaper } from "./Script_BootPaper.mjs";
@@ -699,9 +700,12 @@ if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
 // 组件式环境系统（docs/Data_Environment.md）：场景有 Scenes/<Id>/Environment_<Id>.json 时由它出天光
 //（区域 + 预设 + 昼夜时钟），否则照旧按 phase.sky 套 SKY_PRESETS。出画前每帧 UpdateEnvironment。
 const env = new EnvironmentSystem();
-const envBridge = new EnvRenderBridge({ sky, lights, scene, gi: () => gi, giStrength: () => graphics.giStrength });
+const envBridge = new EnvRenderBridge({ sky, lights, scene, gi: () => gi, giStrength: () => graphics.giStrength, characterLight: CHARACTER_LIGHT_HOST });
 /** 旧天空预设在有场景环境时变成的那个临时覆盖（ApplySkyPreset / RestoreLevelSky）。 */
 let envSkyOverride = null;
+/** 正片关卡：上一次按区域文件 stages 拨钟时的任务步骤（换了才拨）；第一关内部步骤的先后（stages 后面的步骤不写沿用前面的）。 */
+let envStep = null;
+const FIRST_LEVEL_STEP_ORDER = FIRST_LEVEL_STAGES.flatMap((stage) => stage.steps);
 const graphicsProfileApi = CreateGraphicsProfileApi({ profile: GRAPHICS_PROFILE, post });
 // 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
 // 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
@@ -2444,6 +2448,8 @@ async function Boot() {
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = CreateDevTools({
     renderer, scene, camera, canvas, library, lights, post, vfx,
+    // 环境面板（docs/Data_Environment.md §8）：正片关卡里从 高级工具 → 场景 → 环境 打开，编辑的是这一套
+    environment: { system: env, bridge: envBridge, FirstLevelStep: () => missionRuntime?.flow?.phase?.id || null, PointerLocked },
     actorFactory, viewmodel, audio, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
@@ -2841,28 +2847,54 @@ function DisposeSandbox() {
 }
 
 /**
- * 这一片用哪个场景的环境（docs/Data_Environment.md §6）：白盒编辑器的文件场景（白盒 / 正式两份）读
- * Scenes/<Id>/Environment_<Id>.json；没有区域文件、或不是场景关卡 → 关掉环境系统，照旧按 phase.sky。
- * 同一个场景换段（01–05 → 06–10）不重读、时钟不动；场景换了才重读。读坏了报警告，退回旧天空，不挡建关。
+ * 这一片用哪一关的环境（docs/Data_Environment.md §6）：白盒编辑器的文件场景（白盒 / 正式两份）读
+ * Scenes/<Id>/Environment_<Id>.json；正片关卡按 Data_EnvLevels 读 Environment/Level_<Id>.json；
+ * 都没有 → 关掉环境系统，照旧按 phase.sky。同一份区域文件换段（01–05 → 06–10）不重读、时钟不动；换了才重读。
+ * 读坏了报警告，退回旧天空，不挡建关。
  */
 async function SyncPhaseEnvironment(phase) {
-  const sceneId = SceneIdOfUrl(phase.blockout?.SceneUrl?.());
-  if (!sceneId) { if (env.active) env.Clear(); return; }
-  if (env.active && env.sceneId === sceneId) return;
+  const target = EnvTargetForPhase(phase);
+  if (!target) { ClearEnvironment(); return; }
+  if (env.active && env.sceneId === target.id && env.targetKind === target.kind) return;
+  envStep = null;
   try {
-    const loaded = await LoadSceneEnvironment(sceneId);
-    if (!loaded) { env.Clear(); return; }
-    env.SetScene(sceneId, loaded.sceneDoc, loaded.presets, { errors: loaded.errors });
-    if (loaded.errors.length) console.warn(`[Environment] ${sceneId}：${loaded.errors.join("；")}`);
+    const loaded = await LoadEnvironment(target);
+    if (!loaded) { ClearEnvironment(); return; }
+    env.SetScene(target.id, loaded.sceneDoc, loaded.presets, { errors: loaded.errors, kind: target.kind });
+    if (loaded.errors.length) console.warn(`[Environment] ${target.id}：${loaded.errors.join("；")}`);
   } catch (error) {
-    console.warn(`[Environment] ${sceneId} 的环境读不进来，退回本关天空预设：`, error);
-    env.Clear();
+    console.warn(`[Environment] ${target.id} 的环境读不进来，退回本关天空预设：`, error);
+    ClearEnvironment();
   }
+}
+
+/** 关掉环境系统（这一关没有区域文件）：角色光照这类直接改材质的组件一起归零，渲染桥下次全量重套。 */
+function ClearEnvironment() {
+  if (!env.active) return;
+  env.Clear();
+  CHARACTER_LIGHT_HOST.Set(null);
+  envBridge.Invalidate();
+  envStep = null;
+}
+
+/**
+ * 正片关卡的「这一拍几点」：任务步骤换了就按区域文件 stages 拨钟（这一步或往前最近一步写的时间，都没写回默认时刻）；
+ * 整关一步都没写不碰时钟（docs/Data_Environment.md §8.6）。
+ */
+function ApplyStageTime(step) {
+  const stages = env.sceneDoc?.stages;
+  if (!step || !stages || !Object.keys(stages).length) return;
+  const found = BeatTime(stages, FIRST_LEVEL_STEP_ORDER, step);
+  if (found) env.ApplyTime(found.spec); else env.SetHour(env.DefaultHour());
 }
 
 /** 环境系统这一帧：按观察点挑来源、求值、过渡，再交给天穹 / 灯 / 反射。→ 输出（没开环境系统 → null） */
 function UpdateEnvironment(dt, { force = false } = {}) {
   if (!env.active) return null;
+  if (env.targetKind === "level") {
+    const step = missionRuntime?.flow?.phase?.id || null;
+    if (step !== envStep) { envStep = step; ApplyStageTime(step); }
+  }
   const out = env.Update(dt, env.ObserverFrom(camera.position, player?.position || null));
   envBridge.Apply(out, { force });
   return out;
@@ -8501,7 +8533,8 @@ function RenderSceneContent(dt) {
     skyPreset: skyName,
     // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
     // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
-    exposureAnchor: skyOverride || envOut ? null : phase.id,
+    // 环境系统出的是本关自己那一档天（profile = phase.sky，例如第一关 12:00）时照样用逐关锚点；换了时段就不用（锚点是按那一档量的）
+    exposureAnchor: skyOverride || (envOut && envOut.profile !== phase.sky) ? null : phase.id,
     dt,
     bloom: preset.bloom * graphics.bloom,
     // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。

@@ -5,6 +5,7 @@
 //   白天 12:00 = firstLevelBattleDay（白盒编辑器原来的天，默认时刻打开和以前一模一样）
 //   黄昏 18:00 = dusk（城里那几关标定过的黄昏），云层不整个撤掉：留一层暖色层积云，免得 12→18 点之间云凭空消失
 //   晚上 22:00 与 04:00 = firstLevelNight（第一关关尾的阴云夜）；两帧同一套（tag 联动），夜里那段不会被插成半个白天
+//   角色光照（第二轮补）：白天不开；黄昏一圈暖色轮廓光；晚上冷色补光 + 轮廓光
 //
 // **生成完以后预设文件就是唯一真相**：编辑器 / agent 直接改 Environment/EnvPreset_<Id>.json，别回头重跑这个脚本
 //（重跑要带 --write --force，会把手改的覆盖掉）。
@@ -32,13 +33,23 @@ function FirstLevelDusk() {
     cloudShape: [3.2, 0.30, 0.68, 0.25],
     cloudDeck: { structure: 0.75, underside: 0.45, gap: 1.6, silver: 0.6,
       scale: 1.1, coverage: 0.52, softness: 0.55, warp: 0.35, shade: [0.62, 0.44, 0.33] },
+    // 角色光照（2026-11-02 第二轮）：低太阳逆光时人物边缘挂一圈暖光，从烟尘里分出来
+    characterLight: { fill: 0, fillColor: "#ffffff", rim: 0.35, rimColor: "#ffb072", rimPower: 3 },
+  };
+}
+
+/** 晚上：firstLevelNight 原样，加一点冷色补光与轮廓光（阴云夜里人物不至于糊进背景）。 */
+function FirstLevelNight() {
+  return {
+    ...SKY_PRESETS.firstLevelNight,
+    characterLight: { fill: 0.12, fillColor: "#9fb4e8", rim: 0.3, rimColor: "#9fb4e8", rimPower: 2.6 },
   };
 }
 
 const LOOKS = [
   { id: "day", label: "白天", hours: [12], legacy: SKY_PRESETS.firstLevelBattleDay, name: "firstLevelBattleDay" },
   { id: "dusk", label: "黄昏", hours: [18], legacy: FirstLevelDusk(), name: "dusk" },
-  { id: "night", label: "晚上", hours: [22, 4], legacy: SKY_PRESETS.firstLevelNight, name: "firstLevelNight" },
+  { id: "night", label: "晚上", hours: [22, 4], legacy: FirstLevelNight(), name: "firstLevelNight" },
 ];
 
 const SCENES = [

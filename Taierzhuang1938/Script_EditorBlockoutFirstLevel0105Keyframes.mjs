@@ -1269,7 +1269,7 @@ function OrderUnit(u) {
   return out;
 }
 
-const KF_KEY_ORDER = ["id", "stage", "stageLabel", "stageTitle", "name", "player", "what", "next", "how", "notes", "signals", "units", "pois"];
+const KF_KEY_ORDER = ["id", "stage", "stageLabel", "stageTitle", "name", "time", "player", "what", "next", "how", "notes", "signals", "units", "pois"];
 function OrderKeyframe(kf) {
   const out = {};
   for (const k of KF_KEY_ORDER) if (kf[k] !== undefined) out[k] = kf[k];

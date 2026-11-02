@@ -497,6 +497,56 @@
         }
       }
     },
+    "CharacterLight": {
+      "enabled": true,
+      "params": {
+        "fill": {
+          "keys": [
+            {"h": 4, "v": 0.12, "tag": "night"},
+            {"h": 12, "v": 0, "tag": "day"},
+            {"h": 18, "v": 0, "tag": "dusk"},
+            {"h": 22, "v": 0.12, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "fillColor": {
+          "keys": [
+            {"h": 4, "v": "#9fb4e8", "tag": "night"},
+            {"h": 12, "v": "#ffffff", "tag": "day"},
+            {"h": 18, "v": "#ffffff", "tag": "dusk"},
+            {"h": 22, "v": "#9fb4e8", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "rim": {
+          "keys": [
+            {"h": 4, "v": 0.3, "tag": "night"},
+            {"h": 12, "v": 0, "tag": "day"},
+            {"h": 18, "v": 0.35, "tag": "dusk"},
+            {"h": 22, "v": 0.3, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "rimColor": {
+          "keys": [
+            {"h": 4, "v": "#9fb4e8", "tag": "night"},
+            {"h": 12, "v": "#ffffff", "tag": "day"},
+            {"h": 18, "v": "#ffb072", "tag": "dusk"},
+            {"h": 22, "v": "#9fb4e8", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "rimPower": {
+          "keys": [
+            {"h": 4, "v": 2.6, "tag": "night"},
+            {"h": 12, "v": 3, "tag": "day"},
+            {"h": 18, "v": 3, "tag": "dusk"},
+            {"h": 22, "v": 2.6, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
     "Grade": {
       "enabled": true,
       "params": {
