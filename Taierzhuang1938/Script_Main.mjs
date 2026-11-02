@@ -37,6 +37,7 @@ import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCast
 import { ShadowInstanceCulling, InstallShadowInstanceCulling } from "./Script_ShadowInstanceCulling.mjs";
 import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassStaticBatch.mjs";
 import { WithShadowDepthRekey } from "./Script_ShadowDepth.mjs";
+import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
@@ -841,6 +842,8 @@ const state = {
 };
 
 let battlefield = null;
+/** 换关拆下来的旧材质：等新场地预热完（EnterLevel 末尾）再真释放，同键的着色器留给新材质接着用。 */
+const retiredMaterials = new DeferredMaterialDispose();
 const BodyGroundAt = (x, z) => battlefield ? battlefield.GroundHeight(x, z) : NaN;
 // 第一人称玩家的整身影子替身（Script_FirstPersonShadow）：人物素材到位后第一次出画时建，建不起来记 false 不再试。
 let firstPersonShadow = null;
@@ -2876,19 +2879,22 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   await phase.blockout?.Prepare?.();
   // 场景的环境（区域 + 预设）跟着场景走：EnterLevel 套完 phase.sky 之后由它接管天光
   await SyncPhaseEnvironment(phase);
-  // 断肢先收：肢块挂在**上一关**那具 PhysicsWorld 上，而这一关会 Dispose 它；
-  // 身体几何也要还原回共享原件，否则对象池里的 rig 带着缺口进下一关。
-  gore?.ReleaseAll();
-  // 测试场排在断肢之后收（断肢测试场的木桩兵身上可能还挂着肢块）。
-  DisposeSandbox();
-  // 通用开关（phase.groundImpactDust）：离开本关（换关 / 重建）一律先关掉炮弹落地扬尘，进关时再按新一关的开关打开。
-  vfx?.SetGroundImpactDust?.(false); vfx?.SetGroundSampler?.(null);
-  // 通用开关（phase.blastReaction）：近爆身体反应与耳朵模型同理，离开本关先关，进关再按新一关的开关打开。
-  player?.SetBlastReaction?.(false); audio?.SetEarModel?.("legacy");
-  aircraft?.SetPhase(phase);
-  ClearExternalProps();
-  if(phase.whitebox?.p012)ClearTrimProps(scene);
-  if (battlefield) { battlefield.deformation?.Dispose(); battlefield.Dispose(); battlefield = null; }
+  // 拆旧场地释放的材质先记着，EnterLevel 预热完再真释放（Script_DeferredMaterialDispose 抬头）。
+  retiredMaterials.Collect(() => {
+    // 断肢先收：肢块挂在**上一关**那具 PhysicsWorld 上，而这一关会 Dispose 它；
+    // 身体几何也要还原回共享原件，否则对象池里的 rig 带着缺口进下一关。
+    gore?.ReleaseAll();
+    // 测试场排在断肢之后收（断肢测试场的木桩兵身上可能还挂着肢块）。
+    DisposeSandbox();
+    // 通用开关（phase.groundImpactDust）：离开本关（换关 / 重建）一律先关掉炮弹落地扬尘，进关时再按新一关的开关打开。
+    vfx?.SetGroundImpactDust?.(false); vfx?.SetGroundSampler?.(null);
+    // 通用开关（phase.blastReaction）：近爆身体反应与耳朵模型同理，离开本关先关，进关再按新一关的开关打开。
+    player?.SetBlastReaction?.(false); audio?.SetEarModel?.("legacy");
+    aircraft?.SetPhase(phase);
+    ClearExternalProps();
+    if(phase.whitebox?.p012)ClearTrimProps(scene);
+    if (battlefield) { battlefield.deformation?.Dispose(); battlefield.Dispose(); battlefield = null; }
+  });
   levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 || SandboxForPhase(phase)?.entry.tightBounds ? 1 : 10);
   const World = WorldClassFor(phase);
   battlefield = new World(scene, library, {
@@ -3265,7 +3271,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
     ShowBoot(true);
     bootStart.disabled = true;
     bootStart.textContent = "……";
-    ClearRuntime();
+    retiredMaterials.Collect(() => ClearRuntime());
     await BuildField(phase, SetBootStep, 0, 1);
     navGrid = MakeNavGrid(battlefield);
     ai.ctx.battlefield = battlefield;
@@ -3833,6 +3839,10 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
     }
   }
 
+  // 上一关的旧材质到这里才真释放：新场地的材质刚在预热里按同一缓存键接走了着色器，
+  // 这时放掉旧的，引用数归不了零，着色器不删也不重编（Script_DeferredMaterialDispose 抬头）。
+  state.materialDisposeFlush = retiredMaterials.Flush(MaterialsInUse());
+
   if (!initial) {
     ShowBoot(false);
     bootStart.textContent = BootStartLabel();
@@ -3863,6 +3873,24 @@ function EndOfficialCampaign(phase) {
   }
   state.outcome = "campaignEnd";
   hud.ShowEpilogue([note, "", T("menu.notice.campaignEndDetail")]);
+}
+
+/**
+ * 新一关还挂着的材质：场景树（含藏着的）、不在场景里的第一人称与身体、人物对象池。
+ * 换关延后释放旧材质时跳过它们 —— 旧主人释放了、新一关又接着用的同一只，现在放掉就是下一帧现编。
+ */
+function MaterialsInUse() {
+  const used = new Set();
+  const Visit = (object) => {
+    for (const material of [object.material, object.customDepthMaterial, object.customDistanceMaterial].flat()) {
+      if (material) used.add(material);
+    }
+  };
+  scene.traverse(Visit);
+  viewmodel?.root?.traverse(Visit);
+  viewmodel?.body?.root?.traverse(Visit);
+  for (const pool of actorFactory?.pool?.values() || []) for (const actor of pool) actor.root?.traverse(Visit);
+  return used;
 }
 
 /**

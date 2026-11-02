@@ -15,7 +15,10 @@
 //   2. 提交编译建的 program 至少一半在开机结束前真被用上（修前 0/135）。故意留到以后用的
 //      （伤口变体、断肢块）不多，阈值只拦「整批编错状态」。
 //   3. 点「进城」后连跑 300 帧，program 一个不新编。
-//   4. 页面没有 pageerror / console.error。
+//   4. 阶段跳转（2026-11-02）：跳到第 5 段是整关重建，旧场地的材质要等新场地预热完才释放
+//      （Script_DeferredMaterialDispose），跳段新编的 program 里不许有跳之前就有的同一份缓存键
+//      （修前每跳一次重编 35–39 个）；跳完连跑 300 帧不新编。
+//   5. 页面没有 pageerror / console.error。
 //
 // 用法：node Taierzhuang1938/Script_WhiteboxShaderWarmTest.mjs
 // ===========================================================================
@@ -138,6 +141,25 @@ try {
     `running=${play.running}，program ${play.before} → ${play.after}`
     + (unexpected.length ? `（新编：${unexpected.map((entry) => entry.name).slice(0, 8).join("、")}）` : "")
     + (tolerated.length ? `；已知待修 ${tolerated.map((entry) => `${entry.known}:${entry.name}`).join("、")}` : ""));
+
+  const jump = await page.evaluate(async ({ frames }) => {
+    const T = window.Taierzhuang;
+    const before = new Set(T.renderer.info.programs);
+    const keys = new Set([...before].map((program) => program.cacheKey));
+    await T.Debug.FirstLevelJump(5);
+    const born = T.renderer.info.programs.filter((program) => !before.has(program));
+    const rebuilt = born.filter((program) => keys.has(program.cacheKey)).map((program) => program.name || "(unnamed)");
+    const afterJump = new Set(T.renderer.info.programs);
+    T.StepFrames(frames);
+    const late = T.renderer.info.programs.filter((program) => !afterJump.has(program)).map((program) => program.name || "(unnamed)");
+    return { born: born.length, rebuilt, late, flush: T.state.materialDisposeFlush, running: T.state.running };
+  }, { frames: PLAY_FRAMES });
+  Report(jump.rebuilt.length === 0, "跳段不重编旧场地已有的着色器",
+    `跳到第 5 段新编 ${jump.born} 个，其中跳之前就有的同一份 ${jump.rebuilt.length} 个（修前 35–39）`
+    + (jump.rebuilt.length ? `：${jump.rebuilt.slice(0, 8).join("、")}` : "")
+    + `；旧材质延后释放 ${jump.flush?.disposed ?? "?"} 只、新一关还在用而跳过 ${jump.flush?.kept ?? "?"} 只`);
+  Report(jump.running && jump.late.length === 0, `跳段后 ${PLAY_FRAMES} 帧不现编着色器`,
+    `running=${jump.running}` + (jump.late.length ? `，新编：${jump.late.slice(0, 8).join("、")}` : "，0 个"));
   Report(errors.length === 0, "页面无报错", errors.length ? errors.slice(0, 5).join(" | ") : "0 条");
 } finally {
   await browser.close();

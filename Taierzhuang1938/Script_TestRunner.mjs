@@ -555,6 +555,8 @@ export const testDefs = {
     desc: "采样器预算：四档×gi 八轮正片，每个程序都链接成功且 sampler uniform ≤ MAX_TEXTURE_IMAGE_UNITS" },
   CsmTest: { file: "Script_CsmTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "级联阴影 / PCSS / 接触阴影：逐级图与分割 / 纹素吸附 / 级间重叠 / 节流排班 / 痤疮比例 / 三张调试图" },
+  DeferredMaterialDisposeTest: { file: "Script_DeferredMaterialDisposeTest.mjs",
+    desc: "换关延后释放旧材质（纯 Node）：拆场地时的 dispose 只记下不发事件、各材质子类都截得到、抛错/嵌套原型照样还原、Flush 跳过还在用的" },
   ShadowSkipTest: { file: "Script_ShadowSkipTest.mjs",
     desc: "阴影烘焙子树跳过（纯 Node）：登记根只在烘那一刻藏、烘完/抛错都还原、三方早退不翻位、幂等、与外层包装叠加" },
   BonePruneTest: { file: "Script_BonePruneTest.mjs",
@@ -579,8 +581,9 @@ export const testDefs = {
     desc: "换人那一帧不编着色器：进关预热覆盖全部人物模型号" },
   SavedGraphicsWarmTest: { file: "Script_SavedGraphicsWarmTest.mjs", timeoutMs: 10 * 60 * 1000,
     desc: "存档画质在着色器预热前生效：第一颗手榴弹炸三名日军不现编着色器" },
-  WhiteboxShaderWarmTest: { file: "Script_WhiteboxShaderWarmTest.mjs", timeoutMs: 10 * 60 * 1000,
-    desc: "白盒画质（出厂默认档）着色器预热编对那一份：预热不漏交、提交编译真被用上、进城后不现编" },
+  // 2026-11-02 加了一次阶段跳转（整关重建 + 一轮预热），上限 10 → 15 分钟。
+  WhiteboxShaderWarmTest: { file: "Script_WhiteboxShaderWarmTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "第一关着色器预热编对那一份：预热不漏交、提交编译真被用上、进城后不现编；跳段不重编旧场地已有的、跳完不现编" },
   // 出图已按 URL 参数组分批（并入西郊机位后 45 张只建 19 次城），实测 ~6.5 分钟；
   // 上限从 30 分钟降到 15 分钟，保持与旧口径相同的 ~2.5 倍裕量。
   ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 15 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
@@ -964,7 +967,7 @@ export const domains = {
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
     // 第一关开机预热编对没有，看 WhiteboxShaderWarmTest（约一分半，high 档）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "DeferredMaterialDisposeTest", "ShadowSkipTest","BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -1090,7 +1093,8 @@ const changedDomainRules = [
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_ShadowBatchWarm|Script_InstanceFrustumScope|Script_StaticInstanceCulling|Script_ShadowInstanceCulling|Script_FlareShadowInstances|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
+  // 换关延后释放旧材质（DeferredMaterialDisposeTest 是它的纯 Node 门禁，跳段不重编靠 WhiteboxShaderWarmTest 一类的预热门）。
+  { domain: "render", pattern: /Script_DeferredMaterialDispose|Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_ShadowBatchWarm|Script_InstanceFrustumScope|Script_StaticInstanceCulling|Script_ShadowInstanceCulling|Script_FlareShadowInstances|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},
