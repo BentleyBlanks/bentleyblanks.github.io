@@ -1161,6 +1161,12 @@ const changedDomainRules = [
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView|SoldierArchetypes|SoldierForeignWrites/i },
   { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLabRuntime/ },
   { domain: "dataRules", pattern: /Data_DataSources|Script_Data(Sources|Json|Refs)Test/ },
+  // 数据模块的配套函数（2026-11-02 从 Data_X 搬到 Script_X）：领域跟着原来的数据模块走。
+  { domain: "render", pattern: /Script_(CharacterSelection|Tengxian|Tuning_Gtao).mjs$/ },
+  { domain: "terrain", pattern: /Script_Tengxian.mjs$/ },
+  { domain: "editor", pattern: /Script_Tengxian.mjs$/ },
+  { domain: "firstLevel", pattern: /Script_Tuning_FirstLevel(Front|Mid).mjs$/ },
+  { domain: "particles", pattern: /Script_Tuning_Particles.mjs$/ },
   { domain: "infra", pattern: /Data_FrameSchedule|Script_FrameModes|Script_FrameSteps|Script_FrameFlatSource|Script_DebugApi|Data_DebugApiKeys/ },
   { domain: "repoSize", pattern: /\.(glb|gltf|bin|fbx|blend|png|jpe?g|webp|ktx2|tga|exr|hdr|mp3|wav|ogg|mp4|webm)$/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
