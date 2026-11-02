@@ -1,4 +1,4 @@
-import { FIRE_CONTROL, RELOAD_EVENTS } from "./Data_Tuning_FirearmActions.mjs";
+import { FIRE_CONTROL, RELOAD_EVENTS, RELOAD_CLIP_EVENTS } from "./Data_Tuning_FirearmActions.mjs";
 import { WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
 
 // Retain sub-frame overshoot only during uninterrupted automatic fire.
@@ -33,6 +33,16 @@ export function GunReadyFromCover(clearance, visualLower = 0) {
 // event, and repeated evaluation / completion cannot duplicate ammo or sounds.
 export class FirearmReloadTimeline {
   constructor(weapon, action = {}) {
+    const clip = action.skeletal && RELOAD_CLIP_EVENTS[weapon?.id];
+    if (clip) {
+      // Clip seconds -> this reload's normalized time; a reload that starts part-way
+      // (bolt already open) has neither the opening beats nor their sounds.
+      const {startS} = action.skeletal;
+      this.events = clip.filter(event => event.atS >= startS && (!event.partialOnly || action.packetRounds > 0))
+        .map(event => ({ ...event, at: (event.atS - startS) / action.duration }));
+      this.next = 0;
+      return;
+    }
     const kind=weapon?.reloadKind==="enBloc"&&action.packetRounds>0?"enBlocPartial":weapon?.reloadKind;
     this.events = RELOAD_EVENTS[kind] || RELOAD_EVENTS.stripper;
     if(action.startedOpen)this.events=this.events.filter(event=>event.id!=="open");

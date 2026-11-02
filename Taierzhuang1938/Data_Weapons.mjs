@@ -95,6 +95,8 @@ export const WEAPONS = {
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
     // 2026-11-02 起玩家第一人称的拉栓按参考视频逐帧对标（Data_Tuning_FpsReload.FPS_BOLT_CYCLE，节奏按 COD 三八式，整套 1.35 s），
     // 玩家射击间隔跟那张表走（Viewmodel.FireIntervalS）；下面两项仍是 AI / 第三人称的节奏。
+    // 玩家换弹同理：2026-11-02 起播 Blender 换弹片段（对标 COD 三八式，3.40 s；枪机已挂空则从松柄那拍起，2.54 s），
+    // 时长取片段（Data_FpsSkeletalAnimation.FPS_SKELETAL_RELOADS），reloadTimeS 只剩 AI 与程序化备用。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
     boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.1,
     // adsKickScale：开镜贴得近（眼距 0.33 m，对标 COD），后推只留 15%，头跟着枪托一起走。

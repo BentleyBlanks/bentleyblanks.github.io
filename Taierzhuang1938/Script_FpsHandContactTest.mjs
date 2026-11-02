@@ -429,6 +429,9 @@ try {
         const previousThumb=id==='HanYang'?arms._FingerRoot('r',0).quaternion.clone():null;
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],skinSamples:[],worstGrip:null,worstWrist:null};
+        // A Blender reload clip (FPS_SKELETAL_RELOADS) poses the bones itself: no IK goals or procedural
+        // operation shapes; its contact windows are the clip's own seconds.
+        const clip=action.startsWith('reload')&&vm.action?.skeletal;row.skeletal=!!clip;
         if(id==="HanYang"){row.handDirectionSamples=[];row.thumbBoundarySamples=[];row.maxThumbBoundaryStepDeg=0;}
         for(let frame=0;vm.action&&frame<1200;frame++){
           editor.Update(1/60);Refresh();result.samples++;
@@ -465,7 +468,11 @@ try {
           const boltWindow=cycle?[CycleT(cycle.hand.find(f=>f.anchor==="bolt").at+.04),CycleT(cycle.hand.findLast(f=>f.anchor==="bolt").at-.04)]:[.25,.78];
           if(action==="bolt"&&t>boltWindow[0]&&t<boltWindow[1]){prop=vm.rig.parts.bolt;kind="bolt";}
           if(action.startsWith("reload")){
-            if(["ZhongZheng","HanYang","Type38"].includes(id)){
+            if(clip){
+              const s=clip.startS+t*vm.action.duration;
+              if(s>1.40&&s<1.72){prop=vm.packetProp;kind="packet";}   // the fingers open as it drops into the guides
+              else if(s>1.98&&s<2.12){prop=vm.packetProp.userData.rounds;digits=[0];kind="press";}
+            }else if(["ZhongZheng","HanYang","Type38"].includes(id)){
               const packet=id==="HanYang",partial=packet&&action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;
               const packetHand=FPS_PACKET_RELOAD.tactical.hand;
               const partialClipAt=packetHand.find(point=>point.anchor==="clip").at;
@@ -558,7 +565,7 @@ try {
     Check(report.poses.some(pose=>pose.id===id&&pose.pose==='ads'&&pose.adsSupportArm),`${id}: ADS support arm was not measured`);
   for(const action of report.actions){
     if(action.id==='HanYang')Check(action.maxThumbBoundaryStepDeg<30,`HanYang ${action.action}: thumb holding/action handoff jumps ${action.maxThumbBoundaryStepDeg.toFixed(2)}deg in one 60fps frame`);
-    Check(action.maxGrip<FPS_ARM_LIMITS.positionResidualM,`${action.id} ${action.action}: hand leaves target ${JSON.stringify(action.worstGrip)}`);
+    if(!action.skeletal)Check(action.maxGrip<FPS_ARM_LIMITS.positionResidualM,`${action.id} ${action.action}: hand leaves target ${JSON.stringify(action.worstGrip)}`);
     Check(action.maxWrist<FPS_ARM_LIMITS.wristBendDeg,`${action.id} ${action.action}: wrist bends beyond its limit ${JSON.stringify(action.worstWrist)}`);
     Check(action.maxFingerTranslation<1e-6,`${action.id}: finger bone lengths change during animation`);
     Check(action.unreachable===0,`${action.id} ${action.action}: ${action.unreachable} unreachable frames`);
@@ -588,7 +595,7 @@ try {
       for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`HanYang bolt: finger skin penetrates ${(sample.maxDepth*1000).toFixed(2)} mm`);
     }
     if(action.id==="HanYang"){
-      Check(action.handDirectionSamples.length>0,"HanYang: no actual palm-frame finger directions recorded");
+      if(!action.skeletal)Check(action.handDirectionSamples.length>0,"HanYang: no actual palm-frame finger directions recorded");
       for(const sample of action.handDirectionSamples)Check(sample.digits.length===5&&sample.digits.every(digit=>
         digit.tipSkinVertices>=3&&[...digit.mcpToPipPalm,...digit.pipToDipPalm,...digit.distalBoneAxisPalm,...digit.distalSkinTipPalm,
           digit.distalSagittalDeg,digit.distalLateralDeg].every(Number.isFinite)),

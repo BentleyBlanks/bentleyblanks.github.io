@@ -138,9 +138,9 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 再按本项目护木尺寸校正。`fingerRotations` 同时用于持枪骨骼片段和实时持枪状态，避免切换后回到旧手型。
 `_import/Script_ExportHanYangHands.py` 在设置 `FPS_PROJECT_ROOT` 后只导出该模型，不生成动作。
 
-动作表仅含 `Idle` 一个 4 秒持枪循环，60 fps，共 241 个采样点（不是 241 段动画）。
+动作表有 `Idle`（4 秒持枪循环，60 fps，241 个采样点，不是 241 段动画）与 `Reload`（2026-11-02 起汉阳造玩家换弹，3.40 s、205 帧，对标 COD 三八式换弹，制作与回放见 [换弹真实度](Data_RifleReloadRealism.md)「汉阳造换弹对标 COD 三八式」）。
 独立 Blender 工程只有一个 Action，以 9 个关键姿势驱动骨骼和枪械挂点；旧工程已独立备份。
-`runtimeEnabled` 为 `true`，站立腰射持枪时播放；开镜、移动、开火、拉栓和换弹沿用原有逻辑。
+`runtimeEnabled` 为 `true`，`Idle` 在站立腰射持枪时播放；开镜、移动、开火、拉栓沿用原有逻辑，汉阳造换弹播 `Reload`。
 `_import/Script_HanYangHoldingAnimation.py` 只重建这一段持枪动作，输入为已校准的单个握姿。
 播放定位测试通过不代表手型、接触或动作已经验收。
 三八式复用这套裸手、土灰袖口与固定骨段模型，保留三八式自身的左右握点、扳机、护木、拉栓与换弹手型。

@@ -2409,7 +2409,7 @@ export class Viewmodel {
     // 逐帧拉栓的低位是在开镜（无近景构图）空间里解出来的：落得越低，腰射构图让得越多。
     const weight = FPS_RIFLE_VIEW[this.weaponId] && !this.mount
       ? (1 - Clamp01(ads)) * (1 - Clamp01(sprint))
-        * (this.boltCycleState ? 1 - this.boltCycleState.lower : RifleActionFraming(this.action?.kind, this.action?.t)) : 0;
+        * (this.boltCycleState ? 1 - this.boltCycleState.lower : this.action?.skeletal ? 1 : RifleActionFraming(this.action?.kind, this.action?.t)) : 0;
     this.rifleViewPivot.position.copy(this.rifleViewPosition).multiplyScalar(weight);
     this.rifleViewPivot.quaternion.identity().slerp(this.rifleViewRotation, weight);
     this._rootMatrixFresh = false;
@@ -2616,6 +2616,14 @@ export class Viewmodel {
     this.action.loadRounds = (this.weapon.magazine || 5) - this.action.packetRounds;
     if (kind === "stripper") this._ConfigureReloadProp(this.clipProp, this.clipProp.userData.profile, this.action.loadRounds);
     if (kind === "enBloc") this._ConfigureReloadProp(this.usedPacketProp, "HanYang", this.action.packetRounds);
+    // A Blender reload clip (FPS_SKELETAL_RELOADS) replaces the procedural tracks; a bolt
+    // already held open skips the opening beats, so that reload is shorter.
+    const skeletal = this.skeletalAnimation?.ReloadSpec();
+    if (skeletal) {
+      const startS = this.boltOpen ? skeletal.openSkipS : 0;
+      this.action.skeletal = { ...skeletal, startS, blendInS: Mix(skeletal.blendInS, skeletal.adsBlendInS, Clamp01(this.adsSpring.value)) };
+      this.action.duration = this.skeletalAnimation.Clip(skeletal.clip).duration - startS;
+    }
     this.action.reloadTimeline = new FirearmReloadTimeline(this.weapon,this.action);
     return true;
   }
@@ -2836,7 +2844,9 @@ export class Viewmodel {
     // 否则枪都甩出画面了视野还是窄的 —— 玩家读到的是「视野卡住」而不是「在拉栓」。
     // 让相机读这条曲线（而不是自己另起一个定时器 snap 出去再 snap 回来），
     // 因果才是对的：**视野丢失是因为枪动了**，两者本来就该是同一条曲线。
-    this.adsSuppress = (cycle ? 1 - cycleAway : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
+    // A Blender reload clip holds the rifle in its own hip-based poses throughout: aiming is
+    // dropped for the whole reload (its first frames ease down from the sights) and comes back after.
+    this.adsSuppress = this.action?.skeletal ? 0 : (cycle ? 1 - cycleAway : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
     // 逐帧拉栓期间开镜姿态照旧是底座（枪从开镜位落下、回到开镜位），离开瞄准线由 cycle.lower 负责。
     const adsInput = Clamp01(input.ads ?? 0) * (cycle ? 1 - this.wallLower : this.adsSuppress) * (1 - sprint * 0.9);
 
@@ -3693,6 +3703,8 @@ export class Viewmodel {
   }
 
   _AnimReload(t, kind) {
+    // The Blender clip poses everything later this frame (FpsSkeletalAnimation.UpdateReload).
+    if (this.action?.skeletal) { this.clipProp.visible = false; return; }
     const family = this.actionSpec?.reload?.family || kind;
     if (family === "stripFeed") return this._AnimReloadStripFeed(t);
     if (family === "topMag") return this._AnimReloadTopMag(t);

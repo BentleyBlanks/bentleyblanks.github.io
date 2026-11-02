@@ -26,7 +26,7 @@ try {
     const g=window.Tengxian,D=g.Debug,range=D.WeaponRange;
     const { WEAPONS }=await import("./Data_Weapons.mjs");
     const { PlayerController }=await import("./Script_Player.mjs");
-    const { RELOAD_EVENTS }=await import("./Data_Tuning_FirearmActions.mjs");
+    const { RELOAD_EVENTS, RELOAD_CLIP_EVENTS }=await import("./Data_Tuning_FirearmActions.mjs");
     const Step=(n,dt=1/60,render=false)=>g.StepFrames(n,dt,render);
     const Click=()=>{D.Mouse(0,true);Step(1);D.Mouse(0,false);Step(1);};
     const Equip=id=>{
@@ -83,12 +83,15 @@ try {
     for(const id of ["HanYang","Zb26","Type11","Type92Hmg"])for(const startingAmmo of id==="Type11"?[0,1]:[1]){
       Equip(id);range.SetAmmoMode("reload");g.state.ammo=startingAmmo;events.length=0;
       const start=g.state.elapsed;D.Key("KeyR");const immediate=g.state.ammo;
+      // A Blender reload clip carries its own length and event seconds (RELOAD_CLIP_EVENTS).
+      const action=g.viewmodel.action,clip=action?.skeletal&&RELOAD_CLIP_EVENTS[id];
       let commitS=null,maxOperatingTravelM=0;
-      for(let n=0;n<Math.ceil((WEAPONS[id].reloadTimeS+.2)*60);n++){
+      for(let n=0;n<Math.ceil(((clip?action.duration:WEAPONS[id].reloadTimeS)+.2)*60);n++){
         Step(1);if(commitS===null&&g.state.ammo>startingAmmo)commitS=g.state.elapsed-start;
         maxOperatingTravelM=Math.max(maxOperatingTravelM,g.viewmodel.rig.parts.operatingHandle?.position.z||0);
       }
-      data.reloads.push({id,startingAmmo,immediate,commitS,maxOperatingTravelM,expectedCommitS:RELOAD_EVENTS[WEAPONS[id].reloadKind].find(e=>e.id==="loaded").at*WEAPONS[id].reloadTimeS,
+      data.reloads.push({id,startingAmmo,immediate,commitS,maxOperatingTravelM,expectedCommitS:clip?clip.find(e=>e.id==="loaded").atS-action.skeletal.startS
+          :RELOAD_EVENTS[WEAPONS[id].reloadKind].find(e=>e.id==="loaded").at*WEAPONS[id].reloadTimeS,
         ammo:g.state.ammo,capacity:WEAPONS[id].magazine,complete:!g.viewmodel.action,sounds:events.filter(e=>/bolt|magIn|stripperLoad/.test(e.cue)).map(e=>({cue:e.cue,at:e.t-start}))});
     }
     Equip("HanYang");range.SetAmmoMode("reload");g.state.ammo=1;D.Key("KeyR");Step(20);D.Key("Digit3");Step(15);

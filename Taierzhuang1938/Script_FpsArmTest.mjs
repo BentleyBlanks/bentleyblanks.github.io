@@ -103,6 +103,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
   };
   const Metrics = (weapon, state, painted = null) => ({
     weapon, state, painted, fixedRestLengths: arms.fixedRestLengths,
+    skeletalClip: vm.action?.skeletal?.clip || null,
     gripError: { ...arms.gripError }, rotationError: { ...arms.rotationError },
     handTranslation: { ...arms.handTranslation }, stretch: { ...arms.stretch },
     reachRatio: { ...arms.reachRatio }, reachable: { ...arms.reachable },
@@ -215,11 +216,20 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       const motion = { weapon, adsEntry, maxHandStepM: 0, maxHandTurnDeg: 0, maxGunTurnDeg: 0,
         midSupportTravelM: 0, midFrames: 0, longestStillS: 0, stillS: 0 };
       let previous = null;
+      const ClipHand = () => {
+        vm.root.updateWorldMatrix(true, true);
+        const m = vm.recoilPivot.matrixWorld.clone().invert().multiply(vm.skeletalAnimation.boneMap.get('bip002rhand').matrixWorld);
+        return { position: new THREE.Vector3().setFromMatrixPosition(m), quaternion: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(m)) };
+      };
+      const clipHandStart = vm.action?.skeletal ? ClipHand().position : null;
       const TraceStep = () => {
         Step(1, { ads: adsEntry });
         if (!traceMotion) return;
+        if (clipHandStart && !vm.action) return;   // after a clip ends, a held ADS raises the rifle at its own speed
         const hand = vm.handRight.group, gun = vm.reloadPivot;
-        const current = { t: vm.action?.t ?? 1, hand: hand.position.clone(), rotation: hand.quaternion.clone(),
+        // A Blender reload clip poses the bones (the IK targets stay put): trace the actual hand bone.
+        const bone = clipHandStart && ClipHand();
+        const current = { t: vm.action?.t ?? 1, hand: bone ? bone.position : hand.position.clone(), rotation: bone ? bone.quaternion : hand.quaternion.clone(),
           leftHand:vm.handLeft.group.position.clone(),leftRotation:vm.handLeft.group.quaternion.clone(),
           gun: gun.position.clone(), gunRotation: gun.quaternion.clone() };
         if (previous) {
@@ -255,7 +265,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
         out.reloadCases.push({ weapon, adsEntry, t: targetT,
           supportTravelM: actual.distanceTo(expected),
           cameraLayerRotation: Math.hypot(vm.actionPivot.rotation.x, vm.actionPivot.rotation.y, vm.actionPivot.rotation.z),
-          workingHandTravelM: workingHand.position.distanceTo(vm.handBase[working]),
+          workingHandTravelM: clipHandStart ? ClipHand().position.distanceTo(clipHandStart) : workingHand.position.distanceTo(vm.handBase[working]),
           supportWeight: arms.contactWeight[support === "right" ? "r" : "l"],
           supportOperation: arms.operationPose[support === "right" ? "r" : "l"]?.shape,
           supportNextOperation: arms.operationPose[support === "right" ? "r" : "l"]?.nextShape,
@@ -427,8 +437,10 @@ for (const entry of report.cases) {
   for (const side of ["r", "l"]) {
     const twist = entry.jointTwist[side];
     const total = Object.values(twist).reduce((sum, value) => sum + Math.abs(value), 0);
+    // A Blender clip's measured pose reports the whole forearm/hand twist on the hand (the other
+    // joints read 0), so only the limit applies there; the clip splits the twist itself.
     checks.push([`${label} ${side} 腕 twist 有限且不集中`, Math.abs(twist.hand) <= report.limits.handTwistDeg + 0.01
-      && (total < 1 || Math.abs(twist.hand) <= total * 0.5), JSON.stringify(twist)]);
+      && (entry.skeletalClip || total < 1 || Math.abs(twist.hand) <= total * 0.5), JSON.stringify(twist)]);
   }
 }
 checks.push(["页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | ")]);

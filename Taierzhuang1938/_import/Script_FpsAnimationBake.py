@@ -16,7 +16,8 @@ def ExportFpsAnimation(projectRoot, clip):
         raise ValueError('Specify one existing HanYang clip: '+', '.join(allowed))
     outputPath=Path(projectRoot)/'Animation/FirstPerson/Data_FpsHanYangAnimations.json'
     output=json.loads(outputPath.read_text(encoding='utf-8'))
-    output['clips']={}
+    # Keep the other shipped clips (Reload is authored by _blender/Script_HanYangReloadAuthor.py).
+    output.setdefault('clips',{})
     metadata=json.loads(scene['fpsAnimationMetadata'])
     original=metadata['weapons']['HanYang']['clips'][clip]
     action=bpy.data.actions.get('Animation_FpsHanYang'+clip)

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {FPS_SKELETAL_ANIMATION} from './Data_FpsSkeletalAnimation.mjs';
+import {FPS_SKELETAL_ANIMATION,FPS_SKELETAL_RELOADS} from './Data_FpsSkeletalAnimation.mjs';
 
 export async function LoadFpsSkeletalAnimations() {
   const entries=await Promise.all(FPS_SKELETAL_ANIMATION.weaponIds.map(async id=>{
@@ -43,6 +43,7 @@ export class FpsSkeletalAnimation {
       actionPivot:vm.actionPivot,bobPivot:vm.bobPivot,recoilPivot:vm.recoilPivot,
       handRight:vm.handRight.group,handLeft:vm.handLeft.group,contactRight:vm.gripContactRight,contactLeft:vm.gripContactLeft,
       clipProp:vm.clipProp,clipRounds:vm.clipProp.userData.rounds,magazineProp:vm.magazineProp,offhandGrenade:vm.offhandGrenade,
+      packetProp:vm.packetProp,packetRounds:vm.packetProp?.userData.rounds,usedPacketProp:vm.usedPacketProp,usedPacketRounds:vm.usedPacketProp?.userData.rounds,
       ...Object.fromEntries(Object.entries(vm.rig?.parts||{}).map(([key,obj])=>['part_'+key,obj]))};
   }
 
@@ -94,10 +95,42 @@ export class FpsSkeletalAnimation {
     return clip.state[a].map((value,i)=>THREE.MathUtils.lerp(value,clip.state[b][i],phase-a));
   }
 
+  /** Reload variant of this weapon that plays a Blender clip, if its clip shipped. */
+  ReloadSpec() {
+    const spec=FPS_SKELETAL_RELOADS[this.vm.weaponId];
+    return spec&&this.Clip(spec.clip)?spec:null;
+  }
+
+  // The clip owns the arms, the rifle and its moving parts for the whole reload;
+  // the procedural reload is skipped (see Viewmodel._AnimReload). A reload that
+  // starts part-way in eases in from the pose the previous frame left.
+  UpdateReload() {
+    const vm=this.vm,a=vm.action,s=a?.kind==='reload'?a.skeletal:null;
+    if(!s||!this.Clip(s.clip))return false;
+    const elapsed=a.t*a.duration,weight=s.blendInS>0?Math.min(1,elapsed/s.blendInS):1;
+    // Cross-fade from the pose the reload started in (held aim, open-bolt idle) to the clip.
+    const objects=this.Controls(),asset=this.assets[vm.weaponId];
+    const targets=[...asset.bones.map(name=>this.boneMap.get(Normalize(name))),...s.controls.map(key=>objects[key])].filter(Boolean);
+    s.from??=targets.map(o=>({o,p:o.position.clone(),q:o.quaternion.clone()}));
+    this.Apply(s.clip,s.startS+elapsed,{controls:s.controls,visible:true});
+    if(weight<1){
+      const w=weight*weight*(3-2*weight);
+      for(const {o,p,q} of s.from){o.position.lerpVectors(p,o.position,w);o.quaternion.copy(q.clone().slerp(o.quaternion,w));}
+    }
+    if(!(a.packetRounds>0))for(const key of s.usedPacket)vm[key].visible=false;
+    for(const side of ['r','l'])vm.riggedArms.operationPose[side]=vm.riggedArms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
+    vm.root.updateWorldMatrix(true,true);
+    vm._EjectReloadChamber();
+    vm.riggedArms.MeasureSkeletalPose();
+    this.current.constrained=false;
+    return true;
+  }
+
   Update(dt,input={}) {
     const vm=this.vm,arms=vm.riggedArms;
     if(!arms||!this.Clip('Idle')||vm.skeletalAnimationDisabled||(!this.preview&&!FPS_SKELETAL_ANIMATION.runtimeEnabled))return false;
     vm.armAnchor.position.set(0,0,0);vm.armAnchor.quaternion.identity();vm.armAnchor.scale.set(1,1,1);
+    if(!this.preview&&this.UpdateReload())return true;
     if(this.preview){
       const preview=this.preview,clip=this.Clip(preview.name);
       if(preview.playing){

@@ -112,10 +112,25 @@ try {
               "HanYang: the open bolt has no supporting rear plug");
           }
         }
-        if(t>=.107&&t<=.150) {
-          const hand = vm.handRight.group.quaternion;
-          const turn = vm.rig.parts.bolt.rotation.z;
-          if(tracking) maxTurnMismatch=Math.max(maxTurnMismatch,Math.abs(hand.angleTo(previous)-Math.abs(turn-row.previousTurn)));
+        // The Blender reload clip poses the bones directly. Its COD-style hold flicks the handle up /
+        // presses it down with the fingers (reference 0.60-0.70 s), so the knob rolls in the thumb/index
+        // crotch instead of the palm turning rigidly: there the knob must stay in that crotch.
+        const turnNow = vm.rig.parts.bolt.rotation.z, skeletal = !!vm.action?.skeletal;
+        const turning = skeletal ? turnNow>1e-4&&turnNow<vm._BoltLiftAngle()-1e-4&&vm.rig.parts.bolt.position.z<1e-6 : t>=.107&&t<=.150;
+        if(!turning) tracking = false;   // lift and press-down are separate windows
+        if(turning) {
+          const hand = skeletal ? new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(vm.rig.group.matrixWorld.clone().invert()
+            .multiply(vm.skeletalAnimation.boneMap.get('bip002rhand').matrixWorld))) : vm.handRight.group.quaternion;
+          const turn = turnNow;
+          if(!tracking) row.turnWindows=(row.turnWindows||0)+1;
+          // Lifting is checked; at the press-down the hand already lets go of the knob.
+          if(skeletal&&row.turnWindows===1) {
+            const bone=name=>Point(vm.skeletalAnimation.boneMap.get(name),new THREE.Vector3());
+            const slip=bone('bip002rfinger1').add(bone('bip002rfinger01')).multiplyScalar(.5).distanceTo(Point(vm.rig.boltHandleNode,new THREE.Vector3()));
+            if(!tracking) row.knobCrotchStartM=slip;
+            row.maxKnobSlipM=Math.max(row.maxKnobSlipM||0,Math.abs(slip-row.knobCrotchStartM));
+            if(tracking){row.palmTurnRad=(row.palmTurnRad||0)+hand.angleTo(previous);row.handleTurnRad=(row.handleTurnRad||0)+Math.abs(turn-row.previousTurn);}
+          } else if(!skeletal&&tracking) maxTurnMismatch=Math.max(maxTurnMismatch,Math.abs(hand.angleTo(previous)-Math.abs(turn-row.previousTurn)));
           previous.copy(hand); row.previousTurn=turn; tracking=true;
         }
         const prop = id==="HanYang"?vm.packetProp:vm.clipProp;
@@ -136,7 +151,10 @@ try {
         if(t>.95&&vm.action) returned=vm.rig.parts.bolt.position.z;
       }
       Check(Math.abs(atBack-vm.rig.boltTravel)<.001,`${id}: the complete bolt body does not travel through the opening`);
-      Check(maxTurnMismatch<.002,`${id}: the working palm does not rotate with the bolt handle`);
+      if(row.handleTurnRad){
+        Check(row.maxKnobSlipM<.012,`${id}: the knob leaves the thumb/index crotch while the handle turns`);
+        Check(row.palmTurnRad>.3*row.handleTurnRad,`${id}: the working palm does not follow the bolt handle`);
+      } else Check(maxTurnMismatch<.002,`${id}: the working palm does not rotate with the bolt handle`);
       Check(row.packetPullbackM<.001,`${id}: the newly inserted packet is pulled back out`);
       Check(returned<.001,`${id}: bolt is not home after closing`);
       if(id==="HanYang")Check(row.maxRearTangDriftM<.00001,"HanYang: the receiver tang travels with the bolt tail");

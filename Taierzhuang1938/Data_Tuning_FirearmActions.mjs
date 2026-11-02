@@ -56,6 +56,24 @@ export const RELOAD_EVENTS = Object.freeze({
   ]),
 });
 
+// Reloads played as one Blender clip (Data_FpsSkeletalAnimation.FPS_SKELETAL_RELOADS) carry
+// their events in clip seconds, where the clip's own beats land. HanYang's bolt sounds are
+// the recorded boltHanYang cut at its transients (lift click .23, rear stop .25, forward
+// slam .61, lock .68), as in FPS_BOLT_CYCLE; the reference's own hits are 0.88 (rear stop),
+// 2.18 (packet in the guides), 2.47 (packet home), 3.10-3.23 (forward), 3.34 (lock).
+// `partialOnly`: only when a partial packet is ejected first.
+export const RELOAD_CLIP_EVENTS = Object.freeze({
+  HanYang: Object.freeze([
+    Object.freeze({ atS: 0.30, id: "open", cue: "boltHanYang", offset: 0.215, maxDuration: 0.035, volume: 0.42 }),
+    Object.freeze({ atS: 0.55, id: "rear", cue: "boltHanYang", offset: 0.240, maxDuration: 0.085, volume: 0.42 }),
+    Object.freeze({ atS: 0.98, id: "releasePacket", cue: "bolt", maxDuration: 0.06, volume: 0.30, partialOnly: true }),
+    Object.freeze({ atS: 1.85, id: "insert", cue: "stripperLoad", maxDuration: 0.55, volume: 0.75 }),
+    Object.freeze({ atS: 2.14, id: "loaded", cue: null }),
+    Object.freeze({ atS: 2.86, id: "close", cue: "boltHanYang", offset: 0.555, maxDuration: 0.110, volume: 0.42 }),
+    Object.freeze({ atS: 2.97, id: "lock", cue: "boltHanYang", offset: 0.665, maxDuration: 0.100, volume: 0.42 }),
+  ]),
+});
+
 // A 30-round rigid strip, cartridges pointing along local -Z. The mouth is
 // on the receiver's left; the working hand inserts the strip laterally.
 export const STRIP_FEED_RELOAD = Object.freeze({
