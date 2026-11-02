@@ -237,24 +237,31 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // turns back about the eye by the same angle and stays put in the world): the
     // reference's horizon climbs ~0.17 of the frame, i.e. ~10 deg. Faking the dip by
     // turning only the rifle left the horizon mid-screen and read as the rifle pointing
-    // 60-70 deg up (user, 2026-11-02). Held far enough out that the pulled-back right
-    // hand stays a fist at the lower right instead of filling the top of the frame.
+    // 60-70 deg up (user, 2026-11-02). Held out at arm's length (nearer, the pulled-back
+    // hand reaches the near plane); `workDepthScale` then brings the whole layer up close.
     work: Object.freeze({ position: [0.0547, -0.1742, -0.1448], rotation: [0.1653, 0.3259, 0.0197] }),
     headPitchRad: 0.18,
+    // Depth of the first-person layer at the low pose (1 = unchanged): the COD clip keeps
+    // the working rifle and hand big and close; squeezing the whole layer's depth does
+    // that without moving the hand nearer the shoulder (which tears the arm skin).
+    workDepthScale: 0.6,
     // [s, weight]; the knob holds high until .40, is down by .60; the rifle
     // rises to the cheek in .09 s and the head settles onto the stock last.
     lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.60, 1], [1.68, 0.55], [1.74, 0.06], [1.77, 0]],
     head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.62, 1], [1.70, 0.60], [1.78, 0.27], [1.86, 0.08], [1.95, 0]],
-    // Shot response on the held pose, rotating about the aiming eye (rig
-    // space): [s, x, y, z, rx, ry, rz]. Hip fire keeps `hipRiseScale` of it.
-    risePivot: [0, 0.065, 0.159],
+    // Shot response on the held pose, rotating about the aiming eye (worked out from
+    // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
+    // Hip fire keeps `hipRiseScale` of it.
     rise: [
       [0, 0, 0, 0, 0, 0, 0], [0.035, 0.003, 0.002, 0.006, 0.030, 0, 0.150],
       [0.067, 0.004, 0.003, 0.008, 0.060, -0.008, 0.240], [0.100, 0.003, 0.003, 0.005, 0.170, -0.008, 0.120],
       [0.133, 0.002, 0.002, 0.003, 0.190, 0, 0.040], [0.200, 0, 0.002, 0.002, 0.185, 0, 0.012],
       [0.333, 0, 0.001, 0, 0.180, 0, 0], [0.420, 0, 0.001, 0, 0.170, 0, 0], [0.600, 0, 0, 0, 0, 0, 0],
     ],
-    hipRiseScale: 0.3,
+    // Aimed shots keep `adsRiseScale` of it: the COD Type 38 clip the timing follows only
+    // bumps ~2 deg, and with the eye 0.33 m from the sight the full 11 deg lift swings the
+    // right forearm into the near plane at the bottom of the frame.
+    hipRiseScale: 0.3, adsRiseScale: 0.3,
     // Handle quarter-turn and bolt travel, 0..1.
     // The lift spreads over .12 s so the working wrist stays under 20 deg a frame.
     turn: [[0, 0], [0.690, 0], [0.750, 0.5], [0.810, 1], [1.290, 1], [1.350, 0.5], [1.410, 0]],

@@ -97,7 +97,8 @@ export const WEAPONS = {
     // 玩家射击间隔跟那张表走（Viewmodel.FireIntervalS）；下面两项仍是 AI / 第三人称的节奏。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
     boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.1,
-    recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
+    // adsKickScale：开镜贴得近（眼距 0.33 m，对标 COD），后推只留 15%，头跟着枪托一起走。
+    recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0, adsKickScale: 0.15 },
     swayScale: 1.12, adsTimeS: 0.12, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,
     bayonet: true, bayonetLengthM: 0.395,

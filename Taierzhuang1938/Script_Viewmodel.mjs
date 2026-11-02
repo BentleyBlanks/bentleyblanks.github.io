@@ -2502,8 +2502,10 @@ export class Viewmodel {
     const adsAim = Mix(1.0, 0.6, Clamp01(this.adsSpring.value));   // 只压准星
     const adsGun = recoilScale;                                    // 枪自己该跳多少就跳多少
 
-    this.recoilKick.Impulse(recoil.kick * adsGun);
-    this.recoilRise.Impulse(recoil.kick * 0.35 * adsGun);
+    // 开镜贴腮时头跟着枪托一起被顶回去：眼距贴得近的枪（adsKickScale）后推只留一小截，否则枪尾撞进近裁面。
+    const adsKick = Mix(1, recoil.adsKickScale ?? 1, Clamp01(this.adsSpring.value));
+    this.recoilKick.Impulse(recoil.kick * adsGun * adsKick);
+    this.recoilRise.Impulse(recoil.kick * 0.35 * adsGun * adsKick);
     this.recoilPitchSpring.Impulse(recoil.pitch * DEG * adsGun);
     this.recoilYawSpring.Impulse(yawAmount * adsGun);
 
@@ -2996,7 +2998,7 @@ export class Viewmodel {
       if (cycle) {
         // 开枪后的上扬左滚叠在当前持枪姿态上（腰射打折扣），再整体落到拉栓低位。
         const spec = this.action.cycle;
-        finalPose = this._RisePose(finalPose, cycle.rise, spec.risePivot, Mix(spec.hipRiseScale, 1, Clamp01(ads)));
+        finalPose = this._RisePose(finalPose, cycle.rise, spec.risePivot ?? this._AdsEyeInRig(), Mix(spec.hipRiseScale, spec.adsRiseScale ?? 1, Clamp01(ads)));
         finalPose = this._MixPose(finalPose, this._PoseFromSpec({ mode: "fixed", ...spec.work }), cycle.lower);
         // 腰射没有「先回到脸颊、头再贴上去」那一拍：低头跟着枪一起回。
         const head = Mix(Math.min(cycle.head, cycle.lower), cycle.head, Clamp01(ads));
@@ -3040,6 +3042,12 @@ export class Viewmodel {
       this._lastWorldFov = worldFov;
       if (adsInput < 0.02) this.worldFovBase = worldFov;   // 只在没开镜时校准基准
       this._RecomputeCompensation(worldFov);
+    }
+    // 逐帧拉栓落到低位时第一人称这一层的视角再收窄（workDepthScale 压深度）：枪和手一起变大、凑近，
+    // 像 COD 三八式那样拉栓也是近景；整层一起压，手臂 IK 的相对位置不变，不会把手拉变形。
+    if (!this.mount) {
+      const depth = cycle && this.action?.cycle?.workDepthScale ? Mix(1, this.action.cycle.workDepthScale, cycle.lower) : 1;
+      this.fovRig.scale.set(this.compensation.x, this.compensation.y, this.compensation.z * depth);
     }
 
     // --- 枪焰 / 碎屑 ---------------------------------------------------------
@@ -3522,6 +3530,17 @@ export class Viewmodel {
     const head = ReloadTrack(cycle.head, since);
     const rise = Array.from({ length: 6 }, (_, i) => a.afterShot ? ReloadTrack(cycle.rise, since, i + 1) : 0);
     this.boltCycleState = { lower: ReloadTrack(cycle.lower, since), head, rise, since };
+  }
+
+  /** 满开镜时眼睛（相机原点）在枪局部的位置：开镜眼距一改，开枪上扬的支点跟着走。 */
+  _AdsEyeInRig() {
+    const pose = this.adsPose;
+    if (this._adsEyeFor !== pose) {
+      this._adsEyeFor = pose;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.rx, pose.ry, pose.rz, "YXZ")).invert();
+      this._adsEye = new THREE.Vector3(-pose.px, -pose.py, -pose.pz).applyQuaternion(q).toArray();
+    }
+    return this._adsEye;
   }
 
   /** 绕枪局部 pivot（瞄准眼位）转一个小角度再平移：开枪后枪口上扬、左滚那一下；pivot 为空时绕眼睛转。 */
