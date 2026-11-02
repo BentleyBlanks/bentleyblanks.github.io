@@ -16,6 +16,24 @@ export const HANYANG_173R = Object.freeze({
   // 36/31; the Blender overview's wood is 51.
   exposureGain: 2.5,
   textureAnisotropy: 16,
+  // 2026-11-03 底色校准（用户看过候选后定：「确实好很多，改了推吧」）。只调材质球上的底色倍率（material.color），
+  // 贴图与 GLB 字节不动；`?gunBase=authored` 可切回旧的单一 exposureGain 对照。
+  // 依据见 _shots/BaseColorCompare：木头 3.3% 低于实测最暗木材（≈9%）与 COD 二战木托（粗估 ≈9%）；
+  // 钢件的来源素材 blue_metal_plate 在 Poly Haven 是金属度 0 的涂层漫反射色，被当成了金属反射率，
+  // 发蓝层（四氧化三铁）约 20%。只动底色倍率，粗糙度 / 金属度 / 贴图一个字节不动。
+  //   wood   三件木头共用一组逐通道倍率（乘在原始底色上，替代 exposureGain）：大件 MainWood 落到
+  //          线性 ≈(0.151,0.077,0.039)、亮度 ≈9%，色相从 Poly Haven 那张橙棕（1:0.48:0.22）收一点到 1:0.51:0.26，
+  //          再冷就会在蓝天光下发紫灰（HanYang173RBrowserTest 的暖色断言抓到过 1:0.6:0.4 与 1:0.52:0.28 两版）
+  //          （10-29 被否的「浅橙色木头」是直接把橙棕拉亮）；三件之间原有的明暗差别保留。
+  //   steel  每件按 gain = clamp((target / 现亮度)^exponent, 1, maxGain) 乘在 exposureGain 上：
+  //          朝 20% 拉但按 0.75 次方压缩，件与件的高低顺序保留（被否的「灰漆」是全拉成一个值）；
+  //          本来就亮于 20% 的不动，准星座这类深件最多 ×3、继续偏暗。
+  //   partBaseY 各金属件原始底色贴图的线性亮度均值（GLB 原图缩到 64² 求均值）。
+  baseCandidate: {
+    wood: [5.72, 6.01, 6.76],
+    steel: { target: 0.2, exponent: 0.75, maxGain: 3 },
+    partBaseY: { ButtCap_LimitedProfileBlend: 0.0618, FrontBandSideStrip: 0.0478, FrontBand_ContinuousEnvelopeContact: 0.0344, FrontSideBoss_LowRoundedExterior: 0.0396, HY150_ExteriorSideRelief_Neg: 0.0146, HY150_ExteriorSideRelief_Pos: 0.0146, HY150_RoundedUpperExterior: 0.0151, HY150_VisualFrontSleeve: 0.0177, HY151_LowRearShoulder: 0.0145, HY153_VisualMouthLipAndShallowRecess: 0.0318, HY155_ContinuousInnerEdgeTrim_Neg: 0.0367, HY155_ContinuousInnerEdgeTrim_Pos: 0.0377, HandleNeck: 0.0725, HandleRoot: 0.0844, HandleSphere: 0.1478, HandledCylinder: 0.1119, LongOuterSteel_TrueRound: 0.0487, LowerPlateGuard_FlatSideNarrowReturn: 0.043, MiddleSideDisk: 0.0901, PlateExterior_ShallowSurfaceMark_1: 0.1035, PlateExterior_ShallowSurfaceMark_2: 0.0919, PlateExterior_ShallowSurfaceMark_3: 0.11, RearBand_ControlledCrown: 0.0372, RearBand_ExternalAttachmentBridge: 0.0989, RearBand_ExternalAttachmentLoop: 0.099, RearCockingExterior: 0.082, RearOuterCover_RoundedSideReturn: 0.0316, RearSmallCover: 0.081, RearSmallPin: 0.0817, RearStock_ExternalAttachmentBridge: 0.099, RearStock_ExternalAttachmentLoop: 0.099, RearTab: 0.0815, RearTopExternalLever: 0.0335, ReceiverOuterCollar: 0.031, SideWoodButton: 0.0941, Sight_LowContinuousLeaf_NoUnknownNumbers: 0.0385, Sight_LowCrossPiece: 0.0302, Sight_ShallowRoundSeat: 0.083, 'Sight_SideRoundHead_-1': 0.083, Sight_SideRoundHead_1: 0.083, Trigger_FlatCurvedExternalStrip: 0.0283 },
+  },
   bolt: ['HandledCylinder', 'HandleRoot', 'HandleNeck', 'HandleSphere'],
   cocking: ['RearCockingExterior', 'RearOuterCover_RoundedSideReturn', 'RearSmallCover', 'RearSmallPin', 'RearTab', 'RearTopExternalLever'],
   frontSight: ['HY150_RoundedUpperExterior', 'HY150_ExteriorSideRelief_Neg', 'HY150_ExteriorSideRelief_Pos', 'HY151_LowRearShoulder'],

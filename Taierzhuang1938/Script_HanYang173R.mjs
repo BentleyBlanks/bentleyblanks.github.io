@@ -31,6 +31,22 @@ export function RepairHanYangWinding(geometry) {
   index.needsUpdate=true;
 }
 
+// 2026-11-03 底色校准（Data_HanYang173R.baseCandidate 头注，用户已定）。`?gunBase=authored` 退回旧样（一个 exposureGain），对照用。
+export const HANYANG_BASE_MODE = (typeof location !== 'undefined'
+  && new URLSearchParams(location.search).get('gunBase') === 'authored') ? 'authored' : 'candidate';
+
+/** 某个部件的底色倍率 [r,g,b]（乘在原始底色贴图上）。mode = 'authored' | 'candidate'。 */
+export function HanYang173RBaseGain(part, mode = HANYANG_BASE_MODE) {
+  const g = D.exposureGain, C = D.baseCandidate;
+  if(mode === 'authored' || !C) return [g, g, g];
+  if(D.wood.includes(part)) return [...C.wood];
+  const y = C.partBaseY[part];
+  if(!(y > 0)) return [g, g, g];
+  const S = C.steel;
+  const k = Math.min(S.maxGain, Math.max(1, Math.pow(S.target / (g * y), S.exponent)));
+  return [g * k, g * k, g * k];
+}
+
 export function ConfigureHanYang173R(asset, library) {
   if(!asset) return;
   const anisotropy=Math.min(D.textureAnisotropy,library?.anisotropy||1);
@@ -38,7 +54,7 @@ export function ConfigureHanYang173R(asset, library) {
     if(!mesh.isMesh) return;
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
-    material.color.setScalar(D.exposureGain);
+    material.color.fromArray(HanYang173RBaseGain(mesh.name));
     for(const slot of ['map','normalMap','roughnessMap','metalnessMap'])
       if(material[slot]&&material[slot].anisotropy!==anisotropy) {material[slot].anisotropy=anisotropy;material[slot].needsUpdate=true;}
     library.ConfigureExternalPbr(material,{mesh});

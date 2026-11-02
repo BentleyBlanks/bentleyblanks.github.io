@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {HANYANG_173R as D} from './Data_HanYang173R.mjs';
 import {MaterialLibrary} from './Script_Materials.mjs';
 import {PatchesOf} from './Script_MaterialPatches.mjs';
-import {ConfigureHanYang173R,InstantiateHanYang173R,RepairHanYangWinding} from './Script_HanYang173R.mjs';
+import {ConfigureHanYang173R,HanYang173RBaseGain,InstantiateHanYang173R,RepairHanYangWinding} from './Script_HanYang173R.mjs';
 import { MESHES } from './Data_Meshes.mjs';
 import { AllMeshUrls } from './Script_Meshes.mjs';
 import {DEFAULT_PLAYER_WEAPON,LOADOUTS} from './Data_Weapons.mjs';
@@ -52,11 +52,26 @@ assert(PatchesOf(mat).some(p=>String(p.key).includes('orm')),'folded ORM must ke
 assert(!D.wood.includes('SideWoodButton'),'source ORM defines the side button as metal');
 // Island texels are the delivered bytes; only empty texels outside the islands are filled.
 assert(report.texturePayloads.every(t=>/^[0-9a-f]{64}$/.test(t.sourceSha256)&&t.sourceSha256!==t.sha256&&t.islandCoverage>0));
-// One shared exposure gain; roughness and metalness stay authored.
+// Base colour (2026-11-03): only the material colour multiplier changes; roughness, metalness and texture bytes stay authored.
 const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,map:new THREE.Texture(),roughnessMap:orm,metalnessMap:orm}));
 mesh.name='ReceiverOuterCollar';const scene=new THREE.Group();scene.add(mesh);
 const asset={gltf:{scene},materials:new Map()};library.anisotropy=16;ConfigureHanYang173R(asset,library);ConfigureHanYang173R(asset,library);
-assert.deepEqual([mesh.material.color.toArray(),mesh.material.roughness,mesh.material.metalness],[[D.exposureGain,D.exposureGain,D.exposureGain],1,1]);
+assert.deepEqual([mesh.material.color.toArray(),mesh.material.roughness,mesh.material.metalness],[HanYang173RBaseGain('ReceiverOuterCollar'),1,1]);
+{
+  const C=D.baseCandidate,g=D.exposureGain;
+  // Every metal part is listed; each gain stays within [exposureGain, exposureGain*maxGain] and keeps the authored order.
+  const metal=Object.keys(C.partBaseY);assert.equal(metal.length+D.wood.length,44);
+  const after=metal.map(p=>[C.partBaseY[p],C.partBaseY[p]*HanYang173RBaseGain(p)[0]]).sort((a,b)=>a[0]-b[0]);
+  for(let i=1;i<after.length;i++)assert(after[i][1]>=after[i-1][1]-1e-9,'steel calibration must keep the part order');
+  for(const p of metal){const k=HanYang173RBaseGain(p)[0]/g;assert(k>=1&&k<=C.steel.maxGain+1e-9,p);}
+  assert(Math.abs(HanYang173RBaseGain('HandleSphere')[0]-g)<1e-9,'parts already above the target stay as authored');
+  assert(C.partBaseY.ReceiverOuterCollar*HanYang173RBaseGain('ReceiverOuterCollar')[0]>0.15,'large receiver steel reaches the blued-steel range');
+  // Wood: one shared per-channel multiplier, less orange than the source scan (blue lifted most).
+  for(const p of D.wood)assert.deepEqual(HanYang173RBaseGain(p),C.wood);
+  assert(C.wood[2]>C.wood[1]&&C.wood[1]>C.wood[0]&&C.wood[0]>g*2);
+  // `authored` keeps the retired single gain as the comparison reference.
+  assert.deepEqual(HanYang173RBaseGain('ReceiverOuterCollar','authored'),[g,g,g]);
+}
 assert.equal(mesh.material.map.anisotropy,16);assert.equal(mesh.material.roughnessMap.anisotropy,16);
 assert(PatchesOf(mesh.material).some(p=>String(p.key).includes('orm')));
 assert(!PatchesOf(mesh.material).some(p=>/hanYang/.test(String(p.key))),'retired reflectance clamp must not return');
