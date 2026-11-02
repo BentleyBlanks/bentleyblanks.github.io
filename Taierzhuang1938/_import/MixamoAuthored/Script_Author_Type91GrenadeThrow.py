@@ -18,13 +18,13 @@
 #   帧  37-46  1.20-1.50  咬销：头埋低，右手贴嘴前，引信帽尖离嘴 1.6 cm，掌心离嘴 7-8 cm（原动作）
 #   帧  46-52  1.50-1.70  头一扭、手拉开，把销拔掉（原动作）
 #   帧  52-68  1.70-2.23  右手从嘴前绕到头右侧（离头骨网格 ≥ 5 cm）、再抬到钢盔顶右上方，腕后扣；躯干头颈直起，右肩耸起
-#   帧  68-71  2.23-2.33  磕：腕往下快敲 3 帧，掌心速度 0.7 -> 1.8 -> 2.9 m/s；头同时略低迎上去；帧 71 = 引信帽尖碰到钢盔顶
+#   帧  68-71  2.23-2.33  磕：腕往下快敲 3 帧，掌心速度 0.9 -> 1.9 -> 2.5 m/s（腕的翻转比手先走，2026-11-02 审查改）；头同时略低迎上去；帧 71 = 引信帽尖碰到钢盔顶
 #   帧  71-74  2.33-2.43  敲实后微弹（手速 < 0.3 m/s）
 #   帧  74-78  2.43-2.57  停一拍，手几乎不动
 #   帧  78-94  2.57-3.10  右手绕开脸，慢慢落回原动作第 52 帧的位置（峰值 2.2 m/s），头颈躯干回原姿势
 #   帧  94 起  3.10       接原动作第 53 帧（左臂前伸、躯干后仰引臂），帧 144 = 出手（预览挑出的出手帧，右手 5.6 m/s），之后收势
 #   整条 194 帧 = 6.43 s，单次（loop: false）。磕盔到引臂开始约 0.77 s。
-#   磕盔接触帧（帧 71）：帽尖在 HeadTop_End 正上方 3.0 cm；掌心在 HeadTop_End 右侧 5.8 cm、上方 6.4 cm；拇指侧（帽）方向 (0.87, 0, -0.50) 朝左下。
+#   磕盔接触帧（帧 71）：帽尖在 HeadTop_End 正上方 4.0 cm（2026-11-02 由 3.0 提高：右手拇指根原来进头 2 cm）；掌心在 HeadTop_End 右侧 5.8 cm、上方 7.4 cm；拇指侧（帽）方向 (0.87, 0, -0.50) 朝左下。
 #
 # 史实：日军九一式手榴弹：拔掉保险销，把引信帽往钢盔（或石头、硬物）上用力一磕才点着，再扔；延时 7-8 秒，
 #   所以磕完常常停一拍再扔。
@@ -54,11 +54,15 @@ F_RELEASE = 102 + N              # 原动作第 102 帧是右手峰值（出手�
 RAMP_IN, RAMP_OUT = 6, 6
 
 CAP_LEN = 0.067                  # 预览里引信帽尖离掌心
-FUSE_ABOVE = 0.030               # 磕盔时帽尖在 HeadTop_End 上方
+FUSE_ABOVE = 0.040               # 磕盔时帽尖在 HeadTop_End 上方
 RISE_ABOVE = 0.15                # 手从多高落下来（掌心）
 AX_KNOCK = Vector((0.86, 0.0, -0.5)).normalized()      # 磕的时候拇指侧（引信帽）方向：向左下
 AX_COCK = Vector((0.88, 0.25, 0.40)).normalized()      # 举起时：腕后扣，帽朝左略向上
-STRIKE_S = (0.08, 0.40, 1.0)                           # 磕 3 帧的累计路程比例（0.06 / 0.084 / 0.096 m 每帧 -> 1.8 / 2.5 / 2.9 m/s）
+STRIKE_S = (0.12, 0.48, 1.0)                           # 磕 3 帧的累计路程比例（原 (0.08, 0.40, 1.0)；现在掌心 0.9 / 1.9 / 2.5 m/s）
+# 2026-11-02 审查：原来腕的转动也按 STRIKE_S 走（最后一帧一下转 34° 再骤停），第 71 帧右手腕「去了又回来」19°、单帧转角突刺 38°。
+# 腕的翻转提前（STRIKE_ROT），手的路程稍匀（STRIKE_S），敲实后腕顺势再扣一点（KNOCK_REBOUND），手微弹 0.8 cm（原 1.6 cm）；落点不变
+STRIKE_ROT = (0.18, 0.70, 1.0)
+KNOCK_REBOUND = -0.06            # 负值：帽尖顶住盔以后腕顺势再扣 6%（约 3°），不往回弹（往回弹会让第 71 帧成为「去了又回来」）
 
 UP_DEG = {"Spine1": 8.0, "Spine2": 8.0, "Neck": 10.0, "Head": 12.0}    # 直起（-X）总量
 DIP_DEG = {"Neck": 2.0, "Head": 7.0}
@@ -203,11 +207,13 @@ def QRot(a, b):
 
 Q_COCK = QRot(AX_BASE, AX_COCK) @ Q_BASE
 Q_KNOCK = QRot(AX_BASE, AX_KNOCK) @ Q_BASE
+_D_KNOCK = Q_KNOCK @ Q_COCK.inverted()                           # 举起 -> 磕 的腕翻转（世界）
+Q_REB = Quaternion(_D_KNOCK.axis, _D_KNOCK.angle * (1.0 - KNOCK_REBOUND)) @ Q_COCK   # 敲实后腕的去向（负 = 顺势再扣一点）
 
 # ------------------------------------------------------------------ 3. 右手轨迹（掌心 = 头顶 TOP(f) + 相对偏移）
 REL_C = -AX_KNOCK * CAP_LEN + Vector((0, 0, FUSE_ABOVE))        # 帽尖在 Top 上方 FUSE_ABOVE -> 掌心
 REL_HI = REL_C + Vector((-0.012, 0.012, RISE_ABOVE))
-REL_REB = REL_C + Vector((0.0, 0.0, 0.016))
+REL_REB = REL_C + Vector((0.0, 0.0, 0.008))
 REL_W = Vector((-0.25, 0.03, -0.02))                              # 绕开脸：头顶高度、右侧 20 cm
 
 
@@ -228,15 +234,15 @@ def RelAt(f):
     if f <= F_C:
         i = f - F_RISE                                           # 1..3
         s = STRIKE_S[i - 1]
-        return REL_HI.lerp(REL_C, s), Q_COCK.slerp(Q_KNOCK, s)
+        return REL_HI.lerp(REL_C, s), Q_COCK.slerp(Q_KNOCK, STRIKE_ROT[i - 1])
     if f <= F_REB:
         k = Smooth((f - F_C) / float(F_REB - F_C))
-        return REL_C.lerp(REL_REB, k), Q_KNOCK
+        return REL_C.lerp(REL_REB, k), Q_KNOCK.slerp(Q_REB, k)
     if f <= F_HOLD:
-        return REL_REB.copy(), Q_KNOCK
+        return REL_REB.copy(), Q_REB
     if f <= F_BACK:
         u = Ease((f - F_HOLD) / float(F_BACK - F_HOLD))
-        return Bez(REL_REB, REL_W, rel_e, u), Q_KNOCK.slerp(Q_BASE, u)
+        return Bez(REL_REB, REL_W, rel_e, u), Q_REB.slerp(Q_BASE, u)
     return rel_e, Q_BASE
 
 

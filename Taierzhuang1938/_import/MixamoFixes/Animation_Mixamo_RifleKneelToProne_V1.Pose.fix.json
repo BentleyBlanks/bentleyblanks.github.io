@@ -1,0 +1,36 @@
+{
+  "file": "Animation_Mixamo_RifleKneelToProne_V1.glb",
+  "topic": "Pose",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "跪→卧途中枪身擦进头 2.3 cm（第 24 帧）：两手连枪背离头同推 2 cm",
+  "changes": [
+    "第 18–30 帧 两手同推 2 cm（背离 Head，第 23–25 帧满量、前后 6 帧渐入渐出），两节骨 IK、手腕世界朝向不变，手里的道具跟着平移、相对两手不变"
+  ],
+  "before": {
+    "rifleBodyCm": {
+      "RightForeArm": 3.7,
+      "Head": 2.3,
+      "RightArm": 2.1,
+      "RightShoulder": 0.2,
+      "LeftForeArm": 1
+    },
+    "rifleSnapDeg": 17.6
+  },
+  "after": {
+    "rifleBodyCm": {
+      "RightForeArm": 3.7,
+      "Head": 1.1,
+      "RightArm": 2.1,
+      "RightShoulder": 0.2,
+      "LeftForeArm": 1
+    },
+    "rifleSnapDeg": 17.6
+  },
+  "original": "Original/Animation_Mixamo_RifleKneelToProne_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

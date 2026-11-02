@@ -1,0 +1,41 @@
+{
+  "file": "Animation_Claude_StickGrenadeCrouch.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "蹲姿木柄弹：左手接回原动作时腕压在左膝上（进小腿 3.4 cm）；出手前后右手腕和手指一帧抽动 31.6°（原动作 ThrowGrenade_V2 自带）",
+  "changes": [
+    "左臂 IK 窗口末帧 43 → 47（接回原动作第 42 帧的左手，手已抬离膝盖），之后 7 帧渐出",
+    "第 57–67 帧右手和右手 15 根指骨的本地旋转做 4 遍 [1,2,1]/4 平滑（原动作第 55–58 帧那一下抽动）；右手腕剩 < 6°，右手指最大 8.4°（第 79 帧收势）；出手时刻、甩臂轨迹不变",
+    "第 11 / 17 / 23 帧左手腕 13° 是拧盖三下的来回（设计动作），没改"
+  ],
+  "before": {
+    "handCm": {
+      "Left": 3.4
+    },
+    "forearmCm": {
+      "Left": 2.1
+    },
+    "glitchDeg": {
+      "RightHand": 31.6,
+      "RightHandPinky1": 16.1
+    }
+  },
+  "after": {
+    "handCm": {
+      "Left": 0.0
+    },
+    "forearmCm": {
+      "Left": 0.0
+    },
+    "glitchDeg": {
+      "RightHand": 0.0,
+      "RightHandThumb2": 8.4,
+      "LeftHand": 13.0
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StickGrenadeCrouch.py"
+  ]
+}

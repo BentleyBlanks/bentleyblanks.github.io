@@ -1,0 +1,28 @@
+{
+  "file": "Animation_Mixamo_WalkingToDying_V2.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 16.3°→13.9°）",
+  "changes": [
+    "RightToeBase 第 65 帧：原来离前后帧中间姿势最多 16.3°，换成两端好帧之间的球面插值",
+    "RightForeArm 第 61 帧：原来离前后帧中间姿势最多 16.1°，换成两端好帧之间的球面插值（同链 RightShoulder、RightArm、RightHand 同几帧一起插值）",
+    "RightHand 第 55 帧：原来离前后帧中间姿势最多 15.1°，换成两端好帧之间的球面插值（同链 RightShoulder、RightArm、RightForeArm 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 16.3,
+    "worst": "RightToeBase@65",
+    "over15": 3
+  },
+  "after": {
+    "glitchDeg": 13.9,
+    "worst": "RightHandThumb1@36",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_WalkingToDying_V2.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

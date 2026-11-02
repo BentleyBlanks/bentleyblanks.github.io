@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Claude_StretcherLowerFront.glb",
+  "topic": "Stretcher",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "前头放下：蹲到一半屁股往后坐时身后担架横档扫到屁股 1.5 cm，下蹲段两手往后让 7 cm；第 78 帧起的 6.4 cm 是预览挂法（松手后担架还跟着手）",
+  "changes": [
+    "下蹲段第 17–47 帧（0.55–1.55 s）两手额外往后让最多 7 cm（sin² 包络，肩到掌心距离不变）；握杆段（第 0–68 帧）担架进胯 1.5 → 1.0 cm",
+    "第 78–106 帧（2.25 s 已松手站起）量到的担架进胯 6.4 cm 不是动作的问题：预览把担架一直挂在手上；动作没改这段"
+  ],
+  "before": {
+    "stretcherCm": {
+      "Hips": 6.4
+    },
+    "stretcherHeldCm": {
+      "Hips": 1.5
+    }
+  },
+  "after": {
+    "stretcherCm": {
+      "Hips": 6.4
+    },
+    "stretcherHeldCm": {
+      "Hips": 1.0
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherLowerFront.py",
+    "Taierzhuang1938/_import/MixamoAuthored/Script_StretcherAuthorCommon.py"
+  ]
+}

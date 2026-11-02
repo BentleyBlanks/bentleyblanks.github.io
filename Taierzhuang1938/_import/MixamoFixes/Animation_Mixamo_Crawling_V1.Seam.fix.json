@@ -1,0 +1,22 @@
+{
+  "file": "Animation_Mixamo_Crawling_V1.glb",
+  "topic": "Seam",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "循环首尾不接：尾段渐变到首帧姿势（首尾差 14.7°→0.2°）",
+  "changes": [
+    "第 45–55 帧 全身 3 根骨头尾段渐变到第 1 帧的姿势（smoothstep，尾帧 = 首帧），首尾差大的：LeftForeArm 14.7°、LeftHand 7.8°、LeftArm 7.2°"
+  ],
+  "before": {
+    "seamDeg": 14.7
+  },
+  "after": {
+    "seamDeg": 0.2
+  },
+  "original": "Original/Animation_Mixamo_Crawling_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

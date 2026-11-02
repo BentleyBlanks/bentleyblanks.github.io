@@ -1,0 +1,36 @@
+{
+  "file": "Animation_Mixamo_KneelingPointing_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（右手进身体 7.1→0.8 cm）",
+  "changes": [
+    "第 1–29、79–118 帧 右手：右臂两节骨 IK（RightArm 最多转 4.2°、RightForeArm 最多转 8.9°）：手腕往外推最多 3.1 cm（第 11 帧，朝上）；手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 20°、Thumb1 30°、Index1 30°、Middle1 30°、Ring1 28°、Pinky1 16°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 7.1,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0.2
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.8,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0.2
+    }
+  },
+  "original": "Original/Animation_Mixamo_KneelingPointing_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

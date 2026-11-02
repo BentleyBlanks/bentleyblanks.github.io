@@ -28,7 +28,7 @@
     ],
     "end": 3.5
   },
-  "note": "抬后头走到地方后放担架：起点是抬着担架的站姿（两掌心 0.58 m、离地约 0.77 m）→ 屈膝下蹲（背直），手随髋同步下降，杆到地 → 手型张开松手 → 站起。结尾等于 PuttingDown_V1 最后一帧，开头是抬着担架的站姿（设计上不同于 base 开头）。预览里担架在人前方，松手后还会跟着手，看手就行。",
+  "note": "抬后头走到地方后放担架：起点是抬着担架的站姿（两掌心 0.58 m、离地约 0.78 m、在髋前约 10 cm）→ 屈膝下蹲（背直），手随髋同步下降，杆到地 → 手型张开松手 → 站起。结尾等于 PuttingDown_V1 最后一帧，开头是抬着担架的站姿（设计上不同于 base 开头）。预览里担架在人前方，松手后还会跟着手，看手就行。",
   "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherLowerRear.py",
   "blend": "Taierzhuang1938/_import/Mixamo/Authored/StretcherLowerRear.blend"
 }

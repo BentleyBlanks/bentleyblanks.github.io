@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_GrenadeThrow_V2.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 17.2°→14.5°）",
+  "changes": [
+    "RightHandThumb1 第 62 帧：原来离前后帧中间姿势最多 16.5°，换成两端好帧之间的球面插值",
+    "RightHandMiddle1 第 63 帧：原来离前后帧中间姿势最多 17.2°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 17.2,
+    "worst": "RightHandMiddle1@63",
+    "over15": 3
+  },
+  "after": {
+    "glitchDeg": 14.5,
+    "worst": "RightHandIndex2@63",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_GrenadeThrow_V2.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_ShoulderHitAndFall_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 23°→13.3°）",
+  "changes": [
+    "LeftShoulder 第 42 帧：原来离前后帧中间姿势最多 15.6°，换成两端好帧之间的球面插值（同链 LeftArm、LeftForeArm、LeftHand 同几帧一起插值）",
+    "LeftToeBase 第 34 帧：原来离前后帧中间姿势最多 23.0°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 23,
+    "worst": "LeftToeBase@34",
+    "over15": 3
+  },
+  "after": {
+    "glitchDeg": 13.3,
+    "worst": "RightToeBase@20",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_ShoulderHitAndFall_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

@@ -13,7 +13,7 @@
     "hipsLowest": 0.3,
     "end": 1.2
   },
-  "note": "担架后头：两臂伸直下垂吃重，两手握杆在大腿前外侧，掌心相距 0.58 m、离地约 0.77 m，肩下沉，上身略后仰，步子短而沉。原地循环，预览自动挂担架。",
+  "note": "担架后头：两臂伸直下垂吃重，两手握杆在大腿前外侧（掌心在髋关节前约 10 cm，臂略前伸，迈腿时大腿不碰担架布那头的横档），掌心相距 0.58 m、离地约 0.79 m，肩下沉，上身略后仰，步子短而沉。原地循环，预览自动挂担架。",
   "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherRearWalk.py",
   "blend": "Taierzhuang1938/_import/Mixamo/Authored/StretcherRearWalk.blend"
 }

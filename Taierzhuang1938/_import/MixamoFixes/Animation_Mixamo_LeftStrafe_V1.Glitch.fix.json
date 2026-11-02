@@ -1,0 +1,29 @@
+{
+  "file": "Animation_Mixamo_LeftStrafe_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 27.5°→18.4°）",
+  "changes": [
+    "RightLeg 第 17–18 帧：原来离前后帧中间姿势最多 22.1°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightFoot 同几帧一起插值）",
+    "LeftLeg 第 7 帧：原来离前后帧中间姿势最多 16.6°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftFoot 同几帧一起插值）",
+    "RightToeBase 第 5 帧：原来离前后帧中间姿势最多 21.8°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 14 帧：原来离前后帧中间姿势最多 25.2°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 27.5,
+    "worst": "RightFoot@18",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 18.4,
+    "worst": "LeftForeArm@1",
+    "over15": 1
+  },
+  "original": "Original/Animation_Mixamo_LeftStrafe_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

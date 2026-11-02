@@ -1,0 +1,21 @@
+{
+  "file": "Animation_Mixamo_Turn90Right_V1.glb",
+  "topic": "Loop",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一次性转 90° 的动作原来标成可循环（首尾差 90°，循环播放每圈跳回去）：改成单次",
+  "changes": [
+    "整理表 Data_MixamoLibraryCurate.mjs 给这条加 loop: false；动作数据没动"
+  ],
+  "before": {
+    "seamDeg": 90,
+    "loop": true
+  },
+  "after": {
+    "loop": false
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs"
+  ]
+}

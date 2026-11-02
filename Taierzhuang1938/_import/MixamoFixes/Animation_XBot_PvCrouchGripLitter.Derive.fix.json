@@ -1,0 +1,63 @@
+{
+  "file": "Derived/Animation_XBot_PvCrouchGripLitter.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后右手进身体 7.4 cm、左手进身体 7.2 cm、右前臂进身体 8.5 cm、左前臂进身体 8.3 cm：扎进去的手沿身体表面推出，抽搐的帧拉回前后中间",
+  "changes": [
+    "第 0–20 帧 右臂两节骨 IK 换手的位置：掌心比原换算挪了最多 16.5 cm（第 12 帧），手腕朝向、肘弯平面不变；第 0–22、28、36–37、54 帧再沿 X Bot 身体表面外推（最多 16.5 cm，前后平滑）",
+    "第 0–20 帧 左臂两节骨 IK 换手的位置：掌心比原换算挪了最多 16.5 cm（第 12 帧），手腕朝向、肘弯平面不变；第 0–22、24、28–29、32、35、47、49、51–52 帧再沿 X Bot 身体表面外推（最多 16.5 cm，前后平滑）",
+    "去抽搐后第 0–18、22–60 帧右手 / 前臂又扎进身体，同一套推法补推（最多 23 cm）",
+    "去抽搐后第 4–18 帧左手 / 前臂又扎进身体，同一套推法补推（最多 22 cm）",
+    "去抽搐（X Bot 输出）：RightArm 第 10–13、19 帧拉回前后两帧的中间姿势（原来离中间最多 20.2°）",
+    "去抽搐（X Bot 输出）：RightForeArm 第 5、7–15 帧拉回前后两帧的中间姿势（原来离中间最多 43.3°）",
+    "去抽搐（X Bot 输出）：RightHand 第 8–15 帧拉回前后两帧的中间姿势（原来离中间最多 29.7°）",
+    "去抽搐（X Bot 输出）：LeftArm 第 9–15、19 帧拉回前后两帧的中间姿势（原来离中间最多 19.1°）",
+    "去抽搐（X Bot 输出）：LeftForeArm 第 7–15 帧拉回前后两帧的中间姿势（原来离中间最多 40.8°）",
+    "去抽搐（X Bot 输出）：LeftHand 第 7–15 帧拉回前后两帧的中间姿势（原来离中间最多 28.3°）",
+    "去抽搐（X Bot 输出（不让手扎回去））：RightForeArm 第 9 帧拉回前后两帧的中间姿势（原来离中间最多 22.8°）",
+    "去抽搐（X Bot 输出（不让手扎回去））：RightHand 第 7–9 帧拉回前后两帧的中间姿势（原来离中间最多 19.7°）",
+    "去抽搐（X Bot 输出（不让手扎回去））：RightArm 第 9–10 帧拉回前后两帧的中间姿势（原来离中间最多 17.3°）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「只推出（不换目标）」：手从原身体换目标（贴身体按手上各点量）+ 推出 9.2，手从原身体换目标（贴身体按掌心量）+ 推出 8.2，只推出（不换目标） 1.55，手不动、只去抽搐 24.4，手从原身体换目标（按手上各点）+ 推出 + 肘外转 9.2，手从原身体换目标（按掌心）+ 推出 + 肘外转 8.2，只推出 + 肘外转 1.55，手从原身体换目标（按手上各点）+ 推出（轨迹平滑加倍） 10.2，手从原身体换目标（按掌心）+ 推出（轨迹平滑加倍） 5.9，只推出（轨迹平滑加倍） 9.7"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 7.4,
+      "Left": 7.2
+    },
+    "forearmCm": {
+      "Right": 8.5,
+      "Left": 8.3
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Thumb3→RightUpLeg@6",
+      "handLeft": "Thumb3→LeftUpLeg@6",
+      "foreRight": "→RightUpLeg@12",
+      "foreLeft": "→LeftUpLeg@12"
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0.4
+    },
+    "forearmCm": {
+      "Right": 0.9,
+      "Left": 1.2
+    },
+    "glitchDeg": 21.2,
+    "glitchAt": "RightForeArm@8",
+    "at": {
+      "handRight": null,
+      "handLeft": "Middle4→LeftUpLeg@9",
+      "foreRight": "→RightUpLeg@24",
+      "foreLeft": "→LeftUpLeg@36"
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

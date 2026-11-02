@@ -48,6 +48,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
 .clip .tag { display: inline-block; margin-left: 6px; padding: 0 5px; font-size: 10.5px; letter-spacing: 0.04em; border: 1px solid var(--ed-edge); color: var(--ed-text-3); vertical-align: 1px; }
 .clip .tag.warn { color: var(--ed-gold-text); border-color: var(--ed-gold); }
 .clip .tag.made { color: var(--ed-good); border-color: var(--ed-good); }
+.clip .tag.fix { border-style: dashed; }
+#info .fix { margin: 2px 0 6px; font-size: 12px; line-height: 1.55; color: var(--ed-text); }
+#info .fix .d { color: var(--ed-text-4); font: 11px var(--ui-mono); }
+#info .fix ul { margin: 2px 0 0; padding-left: 16px; color: var(--ed-text-3); }
 #info .src { font: 11px/1.5 var(--ui-mono); color: var(--ed-text-3); word-break: break-all; }
 #info .edRow > .l { flex-basis: 64px; }
 #info .edRow > .c { color: var(--ed-text); font-size: 12.5px; }
@@ -99,6 +103,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
           <label class="edChip on"><input id="loop" type="checkbox" checked>循环</label>
           <label class="edChip"><input id="lock" type="checkbox">锁定原地</label>
           <label class="edChip on"><input id="follow" type="checkbox" checked>镜头跟随</label>
+          <label class="edChip" id="origWrap" title="这条修过：切到修改前的那份（Mixamo 原样转出来的）对比" hidden><input id="orig" type="checkbox">看原版</label>
         </div>
       </div>
       <div class="edSection"><div class="h">道具</div>
@@ -115,6 +120,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { LoadModel } from "./Script_MeshLoad.mjs";
+import { AimAt, AimBandFor, AIM_AT_POMMEL, PrepareRifleTrack, RifleTrackPose } from "./Script_MixamoProps.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const FPS = 30;
@@ -191,11 +197,14 @@ function Resize() {
 }
 new ResizeObserver(Resize).observe($("view"));
 
-async function LoadClip(entry) {
-  if (!clipCache.has(entry.file)) {
-    clipCache.set(entry.file, loader.loadAsync(BASE + entry.file).then(gltf => gltf.animations[0]));
+// 「看原版」勾上、这条又有修改前那份（清单 original，_import/MixamoFixes 的调整记录）时读原版。
+function ClipPath(entry) { return $("orig").checked && entry.original ? entry.original : entry.file; }
+
+async function LoadClip(entry, file = entry.file) {
+  if (!clipCache.has(file)) {
+    clipCache.set(file, loader.loadAsync(BASE + file).then(gltf => gltf.animations[0]));
   }
-  return clipCache.get(entry.file);
+  return clipCache.get(file);
 }
 
 // ---------- rifle ----------
@@ -204,11 +213,12 @@ async function LoadClip(entry) {
 // 用一条端枪瞄准动作的第 0 帧标定一次——握把放进右手掌心、枪管指向左手掌心、准星朝上——
 // 记下枪相对右手骨的位置和朝向，之后每帧照抄。左手不去够枪，读数显示它离护木握点差多远。
 // 只有清单里 hold 为「端枪」的动作挂枪；空手和拿着别的动作不挂。
-// 刺刀、横枪格挡这类两手握距比瞄准时宽的，照抄会让枪管偏开左手，所以左手在枪管前方
-// （离右手 0.2–0.75 m、偏角 100° 以内）时，再把枪管转过去对准左手掌心，只转方向不改滚转。
-// 换弹时左手去拉枪栓，离右手不到 0.2 m；中弹、扔弹时左手要么甩远、要么跑到身后，都不会被误转。
+// 刺刀、横枪格挡这类两手握距比瞄准时宽的，照抄会让枪管偏开左手，所以左手在枪管前方时再把枪管转过去对准左手掌心，
+// 只转方向不改滚转。转多少按左手的距离和偏角渐变（Script_MixamoProps.mjs 的 AimAt：偏角 35° 内全转、55° 外不转；
+// 清单标 rifleAim: "wide" 的刺刀白刃宽握几条 90° / 110°）；
+// 原来是 0.2–0.75 m、100° 以内整个转过去的开关，死亡、揉眼、挡脸这类左手一甩，枪一帧拧过去近 100°（2026-11-02 审查）。
+// 清单的 rifleTrack 写枪什么时候不在右手：死亡动作脱手掉地、取枪 / 背枪动作枪在背上（同一个模块的 RifleTrackPose）。
 const RIFLE_CALIBRATION_CLIP = "Rifle Aiming Idle";
-const AIM_AT_LEFT = { near: 0.2, far: 0.75, maxAngle: THREE.MathUtils.degToRad(100) };
 const RIFLE_MATERIALS = {
   wood: new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.7 }),
   steel: new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.45, metalness: 0.6 }),
@@ -265,7 +275,7 @@ async function SelectRifle(id) {
   scene.add(rifle);
 }
 
-// 枪跟右手（照标定），左手在枪管前方时再转过去对准左手。
+// 枪跟右手（照标定），左手在枪管前方时再按权重转过去对准左手。
 function RifleFromRightHand(position, quaternion) {
   rightHand.matrixWorld.decompose(handP, handQ, handS);
   position.copy(rifleOffset.position).applyQuaternion(handQ).add(handP);
@@ -273,10 +283,7 @@ function RifleFromRightHand(position, quaternion) {
   Palm(leftHand, leftMiddle, palmL);
   muzzle.set(0, 0, -1).applyQuaternion(quaternion);
   toLeft.copy(palmL).sub(position);
-  const reach = toLeft.length();
-  if (reach > AIM_AT_LEFT.near && reach < AIM_AT_LEFT.far && muzzle.angleTo(toLeft) < AIM_AT_LEFT.maxAngle) {
-    quaternion.premultiply(turn.setFromUnitVectors(muzzle, toLeft.divideScalar(reach)));
-  }
+  AimAt(quaternion, muzzle, toLeft, toLeft.length(), AimBandFor(current));
 }
 
 // 两手掌心定枪：握把点在右手掌心，枪口朝左手掌心，准星朝上。跟 _import/Script_MixamoAuthorKit.py 的
@@ -301,18 +308,61 @@ function PinRifleToLeftHand(fromPalms) {
   rifleOnLeft = { position: position.sub(handP).applyQuaternion(inv), quaternion: inv.multiply(quaternion) };
 }
 
+// 枪在手里的位姿：钉在左手的那种，或右手照标定。
+function RifleInHand(position, quaternion) {
+  if (rifleOnLeft) {
+    leftHand.matrixWorld.decompose(handP, handQ, handS);
+    position.copy(rifleOnLeft.position).applyQuaternion(handQ).add(handP);
+    quaternion.copy(handQ).multiply(rifleOnLeft.quaternion);
+    Palm(leftHand, leftMiddle, palmL);
+  } else {
+    RifleFromRightHand(position, quaternion);
+  }
+}
+
+// 清单 rifleTrack（枪什么时候不在右手：背上 / 交接换握法 / 脱手掉地）：选中时把交接那几刻过一遍
+// （Script_MixamoProps.mjs 的 PrepareRifleTrack），每帧按 RifleTrackPose 摆。
+let rifleTrack = null, rifleMode = "hand", spine2 = null;
+let rifleNow = null;
+const ONE = new THREE.Vector3(1, 1, 1), rifleP = new THREE.Vector3(), rifleQ = new THREE.Quaternion();
+function RifleSample() {
+  RifleInHand(rifleP, rifleQ);
+  const W = (o) => o.getWorldPosition(new THREE.Vector3());
+  return {
+    rifle: new THREE.Matrix4().compose(rifleP, rifleQ, ONE),
+    hand: (rifleOnLeft ? leftHand : rightHand).matrixWorld.clone(), spine: spine2.matrixWorld.clone(),
+    body: { right: W(character.getObjectByName("RightShoulder")).sub(W(character.getObjectByName("LeftShoulder"))).normalize(),
+      up: W(character.getObjectByName("Neck")).sub(W(spine2)).normalize(), spine: W(spine2) },
+    palm: rifleOnLeft ? Palm(leftHand, leftMiddle, new THREE.Vector3()) : Palm(rightHand, rightMiddle, new THREE.Vector3()),
+  };
+}
+function PrepareRifle(entry) {
+  rifleTrack = null;
+  if (!entry.rifleTrack || entry.hold !== "端枪" || !rifleOffset || !action) return;
+  const saved = action.time, d = action.getClip().duration - 1e-4;
+  rifleTrack = PrepareRifleTrack(entry.rifleTrack, (t) => {
+    action.time = Math.min(Math.max(t, 0), d); mixer.update(0); character.updateMatrixWorld(true);
+    return RifleSample();
+  }, FPS);
+  action.time = saved; mixer.update(0); character.updateMatrixWorld(true);
+}
+
+const RIFLE_MODE_TEXT = { back: "枪背在背上", regrip: "交接：换握法", drop: "枪已脱手" };
 function PlaceRifle() {
   if (!rifle || !rifleOffset) return;
   rifle.visible = current?.hold === "端枪";
   if (!rifle.visible) { $("grip").textContent = ""; return; }
-  if (rifleOnLeft) {
-    leftHand.matrixWorld.decompose(handP, handQ, handS);
-    rifle.position.copy(rifleOnLeft.position).applyQuaternion(handQ).add(handP);
-    rifle.quaternion.copy(handQ).multiply(rifleOnLeft.quaternion);
-    Palm(leftHand, leftMiddle, palmL);
-  } else {
-    RifleFromRightHand(rifle.position, rifle.quaternion);
+  if (rifleTrack && action) {
+    rifleNow = RifleSample();
+    rifleMode = RifleTrackPose(rifleTrack, action.time, rifleNow, 0, rifle);
+    if (rifleMode !== "hand") {
+      rifle.updateMatrixWorld(true);
+      $("grip").textContent = RIFLE_MODE_TEXT[rifleMode];
+      return;
+    }
   }
+  rifleMode = "hand";
+  RifleInHand(rifle.position, rifle.quaternion);
   rifle.updateMatrixWorld(true);
   if (rifleGripL) {
     rifleGripL.getWorldPosition(gripW);
@@ -326,10 +376,10 @@ function PlaceRifle() {
 // 手榴弹：选中动作时先把整条过一遍，挥得最快的那只手是投弹手，最快那一帧算出手。出手前握在掌心
 // （弹头从拳头的拇指一侧伸出去），出手后按出手那一刻的速度走抛物线落地，循环回开头再回到手里。
 // 大刀：跟步枪一样，用一条双手大刀待机的第 0 帧标定——前握点进右手掌心、刀尾朝左手、刃口朝指节——
-// 之后每帧照抄右手；两手都握在刀柄上时，再以前握点为轴把刀尾转过去对准左手。
+// 之后每帧照抄右手；两手都握在刀柄上时，再以前握点为轴把刀尾转过去对准左手（按距离和偏角渐变，Script_MixamoProps.mjs 的
+// AIM_AT_POMMEL；原来 70° 以内整个转过去，砍劈时左手离柄一下刀一帧拧 30–70°）。
 const DADAO_CALIBRATION_CLIP = "Great Sword Idle";
 const DADAO_GRIP_R = new THREE.Vector3(0, 0, 0.03);          // Model_Dadao 的 gripR 挂点
-const AIM_AT_POMMEL = { near: 0.04, far: 0.4, maxAngle: THREE.MathUtils.degToRad(70) };
 const GRAVITY = 9.8, GRENADE_REST_Y = 0.03;
 const textureLoader = new THREE.TextureLoader();
 let rightThumb = null, leftThumb = null;
@@ -434,9 +484,7 @@ function PlaceDadao() {
   const grip = DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion).add(dadao.position);
   const pommel = new THREE.Vector3(0, 0, 1).applyQuaternion(dadao.quaternion);
   toLeft.copy(Palm(leftHand, leftMiddle, palmL)).sub(grip);
-  const reach = toLeft.length();
-  if (reach > AIM_AT_POMMEL.near && reach < AIM_AT_POMMEL.far && pommel.angleTo(toLeft) < AIM_AT_POMMEL.maxAngle) {
-    dadao.quaternion.premultiply(turn.setFromUnitVectors(pommel, toLeft.divideScalar(reach)));
+  if (AimAt(dadao.quaternion, pommel, toLeft, toLeft.length(), AIM_AT_POMMEL) > 0) {
     dadao.position.copy(grip).sub(DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion));
   }
 }
@@ -445,6 +493,8 @@ function PlaceDadao() {
 // 两头各 19 cm 光杆当把手）。prop 为「担架」的动作把一头的两根把手放进两只手掌心：
 // stretcherEnd "rear" = 抬后头的人（面朝担架，担架在他前面），"front" = 抬前头的人（背对担架，两手在身后，担架在他后面）。
 // 担架保持水平（另一头在另一个人手里），只跟着两手的中点和左右方向走。
+// 自制的抬起 / 放下只有一段握着杆（清单 stretcherHeld：{ from } 这之后才握住、{ to } 这之后松手）：没握着的时候担架停在
+// 握住 / 松开那一刻的位置（那时掌心离地 0.14 m，担架正好在地上），不跟着空手悬在半空（11-02 审查：进胯 6 cm 全在这几段）。
 const STRETCHER_GRIP = { rear: new THREE.Vector3(0, 0.12, 0.98), front: new THREE.Vector3(0, 0.12, -0.98) };
 let stretcher = null;
 loader.loadAsync("./Model/Model_BambooStretcher.glb").then(gltf => {
@@ -454,17 +504,41 @@ loader.loadAsync("./Model/Model_BambooStretcher.glb").then(gltf => {
   scene.add(stretcher);
 });
 const palmR = new THREE.Vector3();
-function PlaceStretcher() {
-  if (!stretcher) return;
-  stretcher.visible = current?.prop === "担架";
-  if (!stretcher.visible) return;
+let stretcherRest = null;
+function StretcherFromHands(position, quaternion) {
   Palm(rightHand, rightMiddle, palmR); Palm(leftHand, leftMiddle, palmL);
   axisX.copy(palmR).sub(palmL).setY(0).normalize();             // 担架的 +X 杆在右手
   axisY.set(0, 1, 0);
   axisZ.crossVectors(axisX, axisY);                              // -Z 朝人的前方
-  stretcher.quaternion.setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
-  const grip = STRETCHER_GRIP[current.stretcherEnd === "front" ? "front" : "rear"].clone().applyQuaternion(stretcher.quaternion);
-  stretcher.position.copy(palmR).add(palmL).multiplyScalar(0.5).sub(grip);
+  quaternion.setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+  const grip = STRETCHER_GRIP[current.stretcherEnd === "front" ? "front" : "rear"].clone().applyQuaternion(quaternion);
+  position.copy(palmR).add(palmL).multiplyScalar(0.5).sub(grip);
+}
+
+// 握住 / 松开那一刻的担架位姿（选中后第一次用到时把动作摆到那一刻量一次）
+function StretcherRest(entry) {
+  const held = entry.stretcherHeld, t = held?.from ?? held?.to;
+  if (!Number.isFinite(t) || !action) return null;
+  if (stretcherRest?.entry !== entry) {
+    const saved = action.time;
+    action.time = Math.min(t, action.getClip().duration - 1e-4); mixer.update(0); character.updateMatrixWorld(true);
+    const position = new THREE.Vector3(), quaternion = new THREE.Quaternion();
+    StretcherFromHands(position, quaternion);
+    action.time = saved; mixer.update(0); character.updateMatrixWorld(true);
+    stretcherRest = { entry, position, quaternion };
+  }
+  return stretcherRest;
+}
+
+function PlaceStretcher() {
+  if (!stretcher) return;
+  stretcher.visible = current?.prop === "担架";
+  if (!stretcher.visible) return;
+  const held = current.stretcherHeld, t = action?.time ?? 0;
+  const loose = held && ((Number.isFinite(held.from) && t < held.from) || (Number.isFinite(held.to) && t > held.to));
+  const rest = loose ? StretcherRest(current) : null;
+  if (rest) { stretcher.position.copy(rest.position); stretcher.quaternion.copy(rest.quaternion); return; }
+  StretcherFromHands(stretcher.position, stretcher.quaternion);
 }
 
 // 把投弹动作过一遍，找挥得最快的那只手和那一刻（出手）。用的是当前 action，过完把时间放回去。
@@ -596,8 +670,9 @@ async function Select(entry, { keepTime = false } = {}) {
   $("loop").checked = entry.loop;
   ShowInfo(entry, null);
   $("status").textContent = "加载动作…";
+  $("origWrap").hidden = !entry.original;
   let clip;
-  try { clip = await LoadClip(entry); } catch (error) { $("status").textContent = "加载失败：" + error; return; }
+  try { clip = await LoadClip(entry, ClipPath(entry)); } catch (error) { $("status").textContent = "加载失败：" + error; return; }
   if (current !== entry) return;
   const time = keepTime && action ? action.time : 0;
   mixer.stopAllAction();
@@ -608,6 +683,7 @@ async function Select(entry, { keepTime = false } = {}) {
   if (entry.rifleHand === "L") {
     action.time = 0; mixer.update(0); character.updateMatrixWorld(true); PinRifleToLeftHand(Boolean(entry.author));
   }
+  PrepareRifle(entry);
   // 投弹手：枪在哪只手，就用另一只手扔；空着手的两只都看。
   const throwSides = entry.hold !== "端枪" ? ["R", "L"] : entry.rifleHand === "L" ? ["R"] : ["L"];
   throwInfo = entry.prop === "手榴弹" ? AnalyseThrow(action.getClip(), throwSides) : null;
@@ -637,6 +713,9 @@ function ShowInfo(entry, clip) {
     + Row("时长", dur) + Row("位移", flags) + Row("可顶替", entry.replaces || "—")
     + (entry.author ? Row("制作", `${entry.author} · 基于 Mixamo`) + (entry.madeNote ? Row("说明", entry.madeNote) : "")
       + Row("源文件", entry.sources.map(s => `<div class="src">${s}</div>`).join("")) : "")
+    + (entry.fixes ? Row("调整", entry.fixes.map(fix => `<div class="fix"><span class="d">${fix.date || ""} · ${fix.author || ""}${fix.kind === "attach" ? " · 挂法" : ""}</span><br>${fix.summary || ""}`
+      + (fix.changes?.length ? `<ul>${fix.changes.map(c => `<li>${c}</li>`).join("")}</ul>` : "") + "</div>").join("")
+      + (entry.original ? `<div class="src">原版 ${entry.original}${$("orig").checked ? "（正在看）" : ""}</div>` : "")) : "")
     + (entry.note ? `<div class="note">${entry.note}</div>` : "");
 }
 
@@ -681,7 +760,8 @@ function BuildList(filter = "") {
       const loop = entry.loop ? `<span class="tag">循环</span>` : "";
       const warn = entry.note ? `<span class="tag warn" title="${entry.note}">注意</span>` : "";
       const made = entry.author ? `<span class="tag made" title="${entry.author} 基于 Mixamo 制作">自制</span>` : "";
-      el.innerHTML = `<div class="zh">${entry.label}${made}${variant}${loop}${warn}</div><div class="en">${entry.name}${entry.description && entry.description !== entry.name ? " — " + entry.description : ""}</div>`;
+      const fixed = entry.fixes ? `<span class="tag fix" title="${entry.fixes.map(f => f.summary).join("；")}">已修正</span>` : "";
+      el.innerHTML = `<div class="zh">${entry.label}${made}${fixed}${variant}${loop}${warn}</div><div class="en">${entry.name}${entry.description && entry.description !== entry.name ? " — " + entry.description : ""}</div>`;
       el.onclick = () => Select(entry);
       details.appendChild(el);
       rows.push({ entry, el });
@@ -713,6 +793,7 @@ function SyncToggles() {
 $("play").onclick = () => SetPlaying(!playing);
 $("loop").onchange = () => { ApplyLoop(); if (action && playing) { action.enabled = true; action.paused = false; } };
 $("lock").onchange = () => current && Select(current, { keepTime: true });
+$("orig").onchange = () => current && Select(current, { keepTime: true });
 $("search").oninput = e => BuildList(e.target.value);
 $("scrub").oninput = e => { if (!action) return; SetPlaying(false); action.time = Number(e.target.value); mixer.update(0); };
 addEventListener("keydown", e => {
@@ -768,12 +849,17 @@ async function Boot() {
     character.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
     scene.add(character);
     hips = character.getObjectByName("Hips");
+    spine2 = character.getObjectByName("Spine2");
     [rightHand, rightMiddle, leftHand, leftMiddle, rightThumb, leftThumb] = ["RightHand", "RightHandMiddle1", "LeftHand",
       "LeftHandMiddle1", "RightHandThumb1", "LeftHandThumb1"].map(name => character.getObjectByName(name));
     mixer = new THREE.AnimationMixer(character);
+    // 审查脚本（_import/Script_MixamoLibraryAudit.mjs）用：选中某条、按当前时间摆好所有挂件。
     window.__preview = { scene, camera, renderer, character, orbit, get action() { return action; },
       get grenade() { return grenade; }, get dadao() { return dadao; }, get throwInfo() { return throwInfo; },
-      get rifle() { return rifle; } };
+      get rifle() { return rifle; }, get rifleGripL() { return rifleGripL; }, get stretcher() { return stretcher; },
+      get current() { return current; }, get manifest() { return manifest; }, get rifleMode() { return rifleMode; },
+      SelectFile: (file) => Select(manifest.clips.find(clip => clip.file === file)),
+      Place: () => { character.updateMatrixWorld(true); PlaceRifle(); PlaceGrenade(); PlaceDadao(); PlaceStretcher(); } };
   } catch (error) {
     // 动作库读不到（稀疏检出没带 Animation/Mixamo、文件被挪走）才会走到这里。
     $("summary").textContent = "读不到动作库 Animation/Mixamo/Data_MixamoLibrary.json";

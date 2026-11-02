@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Mixamo_TossGrenade_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 21.6°→20.6°）",
+  "changes": [
+    "RightHandThumb1 第 1、3–4、55 帧：原来离前后帧中间姿势最多 18.9°，换成两端好帧之间的球面插值",
+    "RightHandMiddle1 第 54–56 帧：原来离前后帧中间姿势最多 21.6°，换成两端好帧之间的球面插值",
+    "RightHandPinky1 第 54–55 帧：原来离前后帧中间姿势最多 20.5°，换成两端好帧之间的球面插值",
+    "RightHandMiddle2 第 54–55 帧：原来离前后帧中间姿势最多 15.4°，换成两端好帧之间的球面插值",
+    "RightHandMiddle3 第 52–53 帧：原来离前后帧中间姿势最多 18.0°，换成两端好帧之间的球面插值",
+    "未消掉：RightForeArm 还有 2 帧 > 15.0°（最大 16.5° @ 第 54 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightHand 还有 1 帧 > 15.0°（最大 20.6° @ 第 55 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 21.6,
+    "worst": "RightHandMiddle1@55",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 20.6,
+    "worst": "RightHand@55",
+    "over15": 3
+  },
+  "original": "Original/Animation_Mixamo_TossGrenade_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

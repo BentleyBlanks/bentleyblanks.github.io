@@ -1,0 +1,59 @@
+{
+  "file": "Derived/Animation_XBot_PvBlanketReleaseTurn.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后右手进身体 6.4 cm、左手进身体 6.3 cm、LeftForeArm 一帧抽 19.5°：手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出，抽搐的帧拉回前后中间",
+  "changes": [
+    "第 6–10、30–60 帧 右臂两节骨 IK 换手的位置：掌心比原换算挪了最多 6 cm（第 46 帧），手腕朝向、肘弯平面不变；第 7–10、31–60 帧原手贴着自己身体，X Bot 掌心沿最近那段身体的表面法向挪到同样远；第 32–60 帧再沿 X Bot 身体表面外推（最多 6 cm，前后平滑）",
+    "第 0–60 帧 左臂两节骨 IK 换手的位置：掌心比原换算挪了最多 20.5 cm（第 25 帧），手腕朝向、肘弯平面不变；第 0–60 帧原手贴着自己身体，X Bot 掌心沿最近那段身体的表面法向挪到同样远；第 20–32 帧再沿 X Bot 身体表面外推（最多 20.5 cm，前后平滑）",
+    "去抽搐后第 18–34 帧左手 / 前臂又扎进身体，同一套推法补推（最多 20 cm）",
+    "去抽搐（源片段）：RightLeg 第 31–32 帧拉回前后两帧的中间姿势（原来离中间最多 14.4°）",
+    "去抽搐（源片段）：LeftForeArm 第 26、28、30 帧拉回前后两帧的中间姿势（原来离中间最多 19.5°）",
+    "去抽搐（源片段）：RightForeArm 第 11、15 帧拉回前后两帧的中间姿势（原来离中间最多 16.4°）",
+    "去抽搐（X Bot 输出）：LeftArm 第 26、41、43 帧拉回前后两帧的中间姿势（原来离中间最多 18.1°）",
+    "去抽搐（X Bot 输出）：LeftForeArm 第 22、26–27、32、40–44 帧拉回前后两帧的中间姿势（原来离中间最多 24.4°）",
+    "去抽搐（X Bot 输出）：LeftHand 第 26、33、41、43 帧拉回前后两帧的中间姿势（原来离中间最多 18.5°）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「手从原身体换目标（贴身体按手上各点量）+ 推出」：手从原身体换目标（贴身体按手上各点量）+ 推出 0，手从原身体换目标（贴身体按掌心量）+ 推出 0，只推出（不换目标） 0.2，手不动、只去抽搐 9.8"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 6.4,
+      "Left": 6.3
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 19.5,
+    "glitchAt": "LeftForeArm@26",
+    "at": {
+      "handRight": "Middle4→Head@46",
+      "handLeft": "Pinky3→LeftUpLeg@28",
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.5,
+      "Left": 0.4
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 1.1
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Middle4→Head@57",
+      "handLeft": "Pinky4→LeftUpLeg@23",
+      "foreRight": null,
+      "foreLeft": "→Spine1@30"
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

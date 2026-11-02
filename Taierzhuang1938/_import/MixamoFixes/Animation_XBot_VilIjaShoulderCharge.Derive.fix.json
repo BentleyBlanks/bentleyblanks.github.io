@@ -1,0 +1,50 @@
+{
+  "file": "Derived/Animation_XBot_VilIjaShoulderCharge.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后左手进身体 4.6 cm：手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出",
+  "changes": [
+    "第 0–42 帧 左臂两节骨 IK 换手的位置：掌心比原换算挪了最多 5 cm（第 25 帧），手腕朝向、肘弯平面不变；第 0–42 帧原手贴着自己身体，X Bot 掌心沿最近那段身体的表面法向挪到同样远；第 0–42 帧再沿 X Bot 身体表面外推（最多 5 cm，前后平滑）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「手从原身体换目标（贴身体按手上各点量）+ 推出」：手从原身体换目标（贴身体按手上各点量）+ 推出 0，手从原身体换目标（贴身体按掌心量）+ 推出 0，只推出（不换目标） 0，手不动、只去抽搐 3.1"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 1.1,
+      "Left": 4.6
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Thumb4→Spine1@5",
+      "handLeft": "Index4→Head@5",
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.6,
+      "Left": 0.6
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0.5
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Thumb4→Spine1@5",
+      "handLeft": "腕→Spine1@2",
+      "foreRight": null,
+      "foreLeft": "→Spine1@42"
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

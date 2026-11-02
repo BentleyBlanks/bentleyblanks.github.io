@@ -1,0 +1,41 @@
+{
+  "file": "Animation_Mixamo_Sprint_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 36.7°→20°）",
+  "changes": [
+    "LeftLeg 第 10–11 帧：原来离前后帧中间姿势最多 17.4°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftFoot 同几帧一起插值）",
+    "RightFoot 第 6–7 帧：原来离前后帧中间姿势最多 16.7°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightLeg 同几帧一起插值）",
+    "LeftFoot 第 1 帧：原来离前后帧中间姿势最多 19.4°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftLeg 同几帧一起插值）",
+    "RightToeBase 第 4 帧：原来离前后帧中间姿势最多 16.3°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 10 帧：原来离前后帧中间姿势最多 23.1°，换成两端好帧之间的球面插值",
+    "RightArm 第 1、16 帧：原来离前后帧中间姿势最多 15.4°，换成两端好帧之间的球面插值（同链 RightShoulder、RightForeArm、RightHand 同几帧一起插值）",
+    "RightHandThumb1 第 3 帧：原来离前后帧中间姿势最多 36.7°，换成两端好帧之间的球面插值",
+    "RightHandIndex1 第 3 帧：原来离前后帧中间姿势最多 22.3°，换成两端好帧之间的球面插值",
+    "RightHandMiddle1 第 3 帧：原来离前后帧中间姿势最多 21.5°，换成两端好帧之间的球面插值",
+    "RightHandRing1 第 3 帧：原来离前后帧中间姿势最多 17.1°，换成两端好帧之间的球面插值",
+    "RightHandPinky1 第 3 帧：原来离前后帧中间姿势最多 24.3°，换成两端好帧之间的球面插值",
+    "LeftHandMiddle1 第 3–5、8–10 帧：原来离前后帧中间姿势最多 21.7°，换成两端好帧之间的球面插值",
+    "LeftHandRing1 第 3–4 帧：原来离前后帧中间姿势最多 16.9°，换成两端好帧之间的球面插值",
+    "RightHandThumb2 第 4 帧：原来离前后帧中间姿势最多 15.8°，换成两端好帧之间的球面插值",
+    "未消掉：RightLeg 还有 2 帧 > 15.0°（最大 20.0° @ 第 13 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightFoot 还有 2 帧 > 15.0°（最大 17.7° @ 第 12 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 36.7,
+    "worst": "RightHandThumb1@3",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 20,
+    "worst": "RightLeg@13",
+    "over15": 4
+  },
+  "original": "Original/Animation_Mixamo_Sprint_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "file": "Animation_Mixamo_OneShoulderLean_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（左手进身体 5→0.9 cm，左前臂 2.7→1.3 cm）",
+  "changes": [
+    "第 1–61 帧 左手：左臂两节骨 IK（LeftArm 最多转 1.8°、LeftForeArm 最多转 1.2°）：手腕往外推最多 1.8 cm（第 26 帧，朝外），前臂同推最多 1.8 cm；手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 11°、Pinky1 28°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 0,
+      "Left": 5
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 2.7
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0.9
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 1.3
+    }
+  },
+  "original": "Original/Animation_Mixamo_OneShoulderLean_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

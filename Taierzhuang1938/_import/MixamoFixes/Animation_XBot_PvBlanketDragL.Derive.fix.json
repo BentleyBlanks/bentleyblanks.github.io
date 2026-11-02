@@ -1,0 +1,54 @@
+{
+  "file": "Derived/Animation_XBot_PvBlanketDragL.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后右手进身体 7.4 cm：手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出，抽搐的帧拉回前后中间",
+  "changes": [
+    "第 8–28 帧 右臂两节骨 IK 换手的位置：掌心比原换算挪了最多 15 cm（第 15 帧），手腕朝向、肘弯平面不变；第 9–28 帧原手贴着自己身体，X Bot 掌心沿最近那段身体的表面法向挪到同样远；第 8–28 帧再沿 X Bot 身体表面外推（最多 15 cm，前后平滑）",
+    "第 0–36 帧 左臂两节骨 IK 换手的位置：掌心比原换算挪了最多 15.7 cm（第 27 帧），手腕朝向、肘弯平面不变；这只手攥着东西，目标取原身体掌心位置 ÷ 头高比 1.033（运行时缩放后落在原来那只手的位置）",
+    "去抽搐后第 13–21 帧右手 / 前臂又扎进身体，同一套推法补推（最多 5 cm）",
+    "去抽搐（X Bot 输出）：RightForeArm 第 17 帧拉回前后两帧的中间姿势（原来离中间最多 15.2°）",
+    "去抽搐（X Bot 输出）：RightHand 第 17 帧拉回前后两帧的中间姿势（原来离中间最多 11.1°）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「手从原身体换目标（贴身体按手上各点量）+ 推出」：手从原身体换目标（贴身体按手上各点量）+ 推出 0，手从原身体换目标（贴身体按掌心量）+ 推出 0，只推出（不换目标） 0，手不动、只去抽搐 5.9"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 7.4,
+      "Left": 0.7
+    },
+    "forearmCm": {
+      "Right": 0.3,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Pinky2→RightUpLeg@22",
+      "handLeft": "Thumb4→LeftUpLeg@23",
+      "foreRight": "→RightUpLeg@18",
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.4,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0.7
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Pinky4→RightUpLeg@17",
+      "handLeft": null,
+      "foreRight": null,
+      "foreLeft": "→Hips@9"
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

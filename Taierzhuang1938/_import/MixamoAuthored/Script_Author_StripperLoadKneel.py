@@ -134,6 +134,11 @@ BUMPS = [
     (4.25, 0.07, (0.0, 0.0, -0.010), 0.0),
 ]
 
+# 2026-11-02 审查：收枪 / 放回的半路左肘朝下、左前臂从左膝上扫过去（进腿 8 cm），半路左肘往外让（见极点那段）。
+# 首尾仍是原件跪姿：左前臂搭在左膝上，审查量出的 3.1 cm 是原件自带的接触
+LEFT_ELBOW_OUT = 1.6                       # 收枪 / 放回半路左肘往外让的权重
+LEFT_ELBOW_WIN = [(0.25, 1.25), (5.00, 5.85)]   # 实际时间（秒）：收枪 0.30-0.95、放回 5.22-5.79 前后各多留一点；5.79 起 IK 淡出
+
 # 躯干/头/右肩/髋姿态（度、厘米）：(胸俯仰, 胸偏航, 胸侧倾, 头俯仰, 头偏航, 头侧倾, 右肩向后, 髋下沉, 髋后移)
 # 符号：俯仰 + = 前倾；偏航 + = 向左转；侧倾 + = 向右倾；右肩向后 + = 肩往后收
 BODY_POSES = {
@@ -679,7 +684,12 @@ def Main():
     for f in frames:
         w = track.Blend(Tm(f))
         pole_r[f] = (sho0["Right"] + wr_keys[f]) * 0.5 + (dir0["Right"] * (1 - w) + design["Right"] * w).normalized() * 0.5
-        pole_l[f] = (sho0["Left"] + left_keys[f]) * 0.5 + (dir0["Left"] * (1 - w) + design["Left"] * w).normalized() * 0.5
+        # 2026-11-02 审查：收枪 / 放回的半路左肘额外往外（左）、略往上让，前臂不从左大腿 / 膝上扫过。
+        # 包络按时间（LEFT_ELBOW_WIN 每段 sin²），比枪的移动段宽，肘摆得慢（每帧 < 10°）；段外为 0，首尾姿势不变
+        t_ = Tm(f)
+        env = sum(math.sin(math.pi * (t_ - a_) / (b_ - a_)) ** 2 for a_, b_ in LEFT_ELBOW_WIN if a_ < t_ < b_)
+        out_l = hips.Dir(-1.0, 0.0, 0.35) * (env * LEFT_ELBOW_OUT)
+        pole_l[f] = (sho0["Left"] + left_keys[f]) * 0.5 + (dir0["Left"] * (1 - w) + design["Left"] * w + out_l).normalized() * 0.5
     ang_r = PoleMatch(arm, "RightForeArm", "RightArm", wr0["Right"], (sho0["Right"] + wr0["Right"]) * 0.5 + dir0["Right"] * 0.5, el0["Right"])
     ang_l = PoleMatch(arm, "LeftForeArm", "LeftArm", wr0["Left"], (sho0["Left"] + wr0["Left"]) * 0.5 + dir0["Left"] * 0.5, el0["Left"])
     objs = []

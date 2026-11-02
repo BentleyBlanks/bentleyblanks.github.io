@@ -19,6 +19,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LIBRARY = path.resolve(HERE, "..", "Animation", "Mixamo"); // GLB + 清单：预览工具与白盒编辑器读这里
 const RAW = path.join(HERE, "Mixamo", "Raw");
 const AUTHORED_DIR = path.join(HERE, "Mixamo", "Authored");
+const FIXES_DIR = path.join(HERE, "MixamoFixes");
 
 // 名字 → [中文名, 现有动作里它可以顶替谁（空 = 补缺口）]
 const LABELS = {
@@ -287,7 +288,7 @@ function Curate(clips) {
     clip.category = Category(clip);
     if (LABELS[clip.name]) [clip.label, clip.replaces] = LABELS[clip.name];
     const key = ShortStem(clip.file);
-    for (const field of ["dropped", "prop", "note", "rifleHand"]) delete clip[field];
+    for (const field of ["dropped", "prop", "note", "rifleHand", "rifleTrack", "rifleAim"]) delete clip[field];
     if (DROP[key]) {
       clip.dropped = DROP[key];
       kept.push(clip);
@@ -357,10 +358,43 @@ function DerivedClips(byFile) {
   });
 }
 
+// 调整记录（2026-11-02 起，全库审查后修过的动作）：_import/MixamoFixes/<文件名词干>.<主题>.fix.json，一条动作可以有好几份
+// （挂法、手、枪……各一份，几个人分头改不撞文件）。格式见 _import/MixamoFixes/README.md。按 file 归到清单条目上：
+//   fixes     [{ topic, kind, date, author, summary, changes, before, after, sources }]（kind: anim 动作数据改过 / attach 只改了挂法）
+//   original  修改前的那份 GLB（相对 Animation/Mixamo，一般是 Original/<同名>.glb），预览工具「对比原版」读它
+function Fixes() {
+  const byFile = new Map();
+  if (!fs.existsSync(FIXES_DIR)) return byFile;
+  for (const name of fs.readdirSync(FIXES_DIR).filter(n => n.endsWith(".fix.json")).sort()) {
+    const record = JSON.parse(fs.readFileSync(path.join(FIXES_DIR, name), "utf8"));
+    if (!record.file) { console.warn(`[MixamoFetch] ${name}: no "file"`); continue; }
+    if (!byFile.has(record.file)) byFile.set(record.file, []);
+    byFile.get(record.file).push(record);
+  }
+  return byFile;
+}
+
+function ApplyFixes(clips) {
+  const fixes = Fixes();
+  for (const clip of clips) {
+    delete clip.fixes; delete clip.original;
+    const list = fixes.get(clip.file);
+    if (!list) continue;
+    clip.fixes = list.map(({ file, original, ...record }) => record).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const original = list.map(r => r.original).find(Boolean);
+    if (original && fs.existsSync(path.join(LIBRARY, original))) clip.original = original;
+    else if (original) console.warn(`[MixamoFetch] ${clip.file}: original ${original} not found`);
+    fixes.delete(clip.file);
+  }
+  if (fixes.size) console.warn(`[MixamoFetch] fix records for clips not in the manifest: ${[...fixes.keys()].join(", ")}`);
+}
+
 function WriteManifest(manifestPath, clips) {
   const mixamo = clips.filter(clip => !clip.author);
   const byFile = new Map(mixamo.map(clip => [clip.file, clip]));
-  const curated = [...Curate(mixamo), ...AuthoredClips(byFile), ...DerivedClips(byFile)].sort((a, b) =>
+  const all = [...Curate(mixamo), ...AuthoredClips(byFile), ...DerivedClips(byFile)];
+  ApplyFixes(all);
+  const curated = all.sort((a, b) =>
     Boolean(a.dropped) - Boolean(b.dropped)
     || CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)
     || HOLDS.indexOf(a.hold) - HOLDS.indexOf(b.hold)

@@ -1,7 +1,7 @@
 # StretcherRearJog「担架·抬后头小跑」 (Claude, 2026-11-01)
 #
 # 这是什么：两个人抬担架小跑，走在后头的那一个。两臂换成「吃重下垂握杆」的姿势（两手不摆臂），
-#   两手在大腿前外侧各握一根杆，掌心相距 0.58 m，离地约 0.75 m；上身因负重略后仰、肩下沉；
+#   两手在大腿前外侧各握一根杆，掌心相距 0.58 m，离地约 0.785 m、在髋关节前约 11 cm；上身因负重略后仰、肩下沉；
 #   步幅、身体起伏照小跑，但比空手慢跑小一点。原地循环（loop: true），预览自动挂担架。
 #
 # 改自：Animation_Mixamo_SlowRun_V1（空手慢跑，原地循环，第 23 帧 = 第 1 帧）。
@@ -25,8 +25,8 @@ JOG = dict(W.WALK)
 JOG.update(
     name="StretcherRearJog", base="Animation_Mixamo_SlowRun_V1", label="担架·抬后头小跑",
     cycle=22, M=30, kappa=0.80, hips_smooth=5, ankle_smooth=2, bounce=0.35, foot_smooth=3, toe_smooth=4, sway=0.60, lean=-1.0, hip_share=0.35, depress=12.0,
-    palm_z=0.772, reach=0.538, stance_knee=146.0, sh_comp=0.60, hunch=6.0, depress_max=20.0, lam_z=0.5, lam_xy=0.50, palm_fwd=-0.05,
-    note="担架后头小跑：两臂下垂吃重不摆臂（肘微屈约 125-165 度），两手握杆在大腿前外侧，掌心相距 0.58 m、离地约 0.75 m，肩下沉，上身略后仰，步幅比空手慢跑小。原地循环，预览自动挂担架。",
+    palm_z=0.785, reach=0.538, stance_knee=146.0, sh_comp=0.60, hunch=6.0, depress_max=20.0, lam_z=0.5, lam_xy=0.50, palm_fwd=-0.11,
+    note="担架后头小跑：两臂下垂吃重不摆臂（肘微屈约 140-160 度），两手握杆在大腿前外侧（掌心在髋关节前约 11 cm，臂略前伸，迈腿时大腿不碰担架布那头的横档），掌心相距 0.58 m、离地约 0.785 m，肩下沉，上身略后仰，步幅比空手慢跑小。原地循环，预览自动挂担架。",
 )
 
 if __name__ == "__main__":

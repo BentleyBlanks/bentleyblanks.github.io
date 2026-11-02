@@ -1,0 +1,29 @@
+{
+  "file": "Animation_Mixamo_FallingForwardDeath_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 40.8°→13°）",
+  "changes": [
+    "RightToeBase 第 56 帧：原来离前后帧中间姿势最多 22.4°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 21–22 帧：原来离前后帧中间姿势最多 40.8°，换成两端好帧之间的球面插值",
+    "LeftHandIndex1 第 29 帧：原来离前后帧中间姿势最多 21.2°，换成两端好帧之间的球面插值",
+    "LeftHandPinky1 第 29 帧：原来离前后帧中间姿势最多 16.3°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 40.8,
+    "worst": "LeftToeBase@22",
+    "over15": 5
+  },
+  "after": {
+    "glitchDeg": 13,
+    "worst": "LeftArm@28",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_FallingForwardDeath_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

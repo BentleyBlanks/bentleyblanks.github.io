@@ -1,0 +1,45 @@
+{
+  "file": "Animation_Mixamo_RifleKneelHitToBack_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（右手进身体 5.3→0.5 cm，左手进身体 6.8→0.8 cm，左前臂 6→2.5 cm）",
+  "changes": [
+    "第 1–40 帧 右手：右臂两节骨 IK（RightArm 最多转 13.6°、RightForeArm 最多转 30.2°）：手腕往外推最多 12.0 cm（第 4 帧，朝外），手腕世界朝向不变（两手同推一个位移，枪在两手间的相对关系不变）；前后约 6 帧渐入渐出",
+    "第 1–40 帧 左手：左臂两节骨 IK（LeftArm 最多转 34.0°、LeftForeArm 最多转 61.2°）：手腕往外推最多 12.0 cm（第 4 帧，朝外），前臂同推最多 12.0 cm，手腕世界朝向不变（两手同推一个位移，枪在两手间的相对关系不变）；前后约 6 帧渐入渐出",
+    "未消掉：右手第 3–4 帧要推超过 12 cm，封顶",
+    "未消掉：左手第 3–4 帧要推超过 12 cm，封顶"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 5.3,
+      "Left": 6.8
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 6
+    },
+    "rifleBodyCm": 3.7,
+    "rifleSnapDeg": 15.6,
+    "rifleLeftOn": 0.22
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.5,
+      "Left": 0.8
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 2.5
+    },
+    "rifleBodyCm": 3.7,
+    "rifleSnapDeg": 16.6,
+    "rifleLeftOn": 0.2
+  },
+  "original": "Original/Animation_Mixamo_RifleKneelHitToBack_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "file": "Animation_Claude_StretcherLiftRear.glb",
+  "topic": "Stretcher",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "后头抬起：站稳后担架横档顶进大腿 1.7 cm、起身时进小腿（膝）3.5 cm、右拇指蹭膝 3.5 cm；结尾手位往前 8 cm，起身段手再往前让 5 cm",
+  "changes": [
+    "结尾站姿（第 91–107 帧，状态 C）掌心从髋前 2 cm 挪到髋前 10 cm，高 0.77 → 0.78 m，肩多压 1.5 cm（臂够得着，IK 腕误差 0.15 cm）",
+    "起身段第 53–91 帧（1.75–3.00 s）两手额外往前让最多 5 cm（sin² 包络，肩到掌心距离不变），手从膝前往上收",
+    "下蹲、握杆、腿 IK 不变"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 3.5
+    },
+    "stretcherCm": {
+      "RightLeg": 3.5,
+      "LeftLeg": 2.4,
+      "RightUpLeg": 1.5,
+      "LeftUpLeg": 1.7
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.2
+    },
+    "stretcherCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherLiftRear.py",
+    "Taierzhuang1938/_import/MixamoAuthored/Script_StretcherAuthorCommon.py"
+  ]
+}

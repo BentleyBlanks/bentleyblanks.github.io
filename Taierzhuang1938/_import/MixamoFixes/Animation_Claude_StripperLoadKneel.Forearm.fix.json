@@ -1,0 +1,26 @@
+{
+  "file": "Animation_Claude_StripperLoadKneel.glb",
+  "topic": "Forearm",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "跪姿压桥夹：收枪 / 放回半路左肘朝下，左前臂从左膝上扫过进腿 8 cm；半路左肘往外（左）略往上让",
+  "changes": [
+    "左臂 IK 的极点：第 8–38 帧（0.25–1.25 s，收枪）和第 151–176 帧（5.00–5.85 s，放回）额外往左、略往上（sin² 包络，权重 1.6），左肘每帧转动 ≤ 9°",
+    "首尾仍逐帧等于 RifleKneelIdle_V1 第 1 帧；那时左前臂搭在左膝上，量到 3.1 cm，是原件自带的接触（改了就接不上别的跪姿动作），中间段不超过它",
+    "左手相对枪的位置、枪的轨迹、右手全程不变"
+  ],
+  "before": {
+    "forearmCm": {
+      "Left": 8.0
+    }
+  },
+  "after": {
+    "forearmCm": {
+      "Left": 3.1
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StripperLoadKneel.py"
+  ]
+}

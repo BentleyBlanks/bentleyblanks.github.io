@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_BayonetStab_V1.glb",
+  "topic": "Rifle",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "宽握刺刀动作枪管跟住左手：一帧拧 10.1° → 10.1°、一帧抽 3° → 3°，枪进身体最深 0 → 0 cm",
+  "changes": [
+    "枪管对准左手从开关改成按左手距离与偏角渐变（Script_MixamoProps.mjs 的 AimAt）：原来左手一跨过 0.2 / 0.75 m 或 100° 那条线枪一帧拧过去，这条最大一帧拧 10.1°（第 24 帧）",
+    "这条左手一直握在枪上、握得比标定宽，清单标 rifleAim: \"wide\"，角度档 100°–120°（默认 35°–55°）"
+  ],
+  "before": {
+    "snapDeg": 10.1,
+    "glitchDeg": 3,
+    "bodyCm": {}
+  },
+  "after": {
+    "snapDeg": 10.1,
+    "glitchDeg": 3,
+    "bodyCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

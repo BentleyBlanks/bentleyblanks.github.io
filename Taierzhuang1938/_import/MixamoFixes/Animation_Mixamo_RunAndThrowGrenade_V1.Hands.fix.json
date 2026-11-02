@@ -1,0 +1,36 @@
+{
+  "file": "Animation_Mixamo_RunAndThrowGrenade_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（右手进身体 3.5→1 cm）",
+  "changes": [
+    "第 16–38 帧 右手：手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 4°、Thumb1 4°、Index1 29°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 3.5,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 1,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    }
+  },
+  "original": "Original/Animation_Mixamo_RunAndThrowGrenade_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

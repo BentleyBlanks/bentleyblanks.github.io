@@ -430,6 +430,16 @@ def Build(cfg):
                     o0, o1 = fol_off[(n0, side)], fol_off[(n1, side)]
                     loc = body.Local(sho[side][f])
                     des = (des[0], loc[1] + Lerp(o0[0], o1[0], sf), loc[2] - Lerp(o0[1], o1[1], sf))
+            # hand_bump [(t0, t1, 前后 m)]：这段时间两手额外往前（负 = 往后）挪一点，sin² 包络（两端速度为 0）。
+            # 2026-11-02 审查：前头起身 / 下蹲到一半时屁股往后坐，身后担架布那一头的横档（掌心后 12 cm）会扫到屁股，手往后让 6 cm；
+            # 后头起身时手从膝前往上收，手往前让 5 cm，拇指不蹭膝盖。肩到掌心的距离保持不变（手跟着略抬），臂不被拉长
+            for (bt0, bt1, dfw) in cfg.get("hand_bump", ()):
+                if bt0 < t_now < bt1:
+                    loc = body.Local(sho[side][f])
+                    reach2 = sum((a_ - b_) ** 2 for a_, b_ in zip(des, loc))
+                    nf_ = des[1] + dfw * math.sin(math.pi * (t_now - bt0) / (bt1 - bt0)) ** 2
+                    vz = math.sqrt(max(0.0, reach2 - (des[0] - loc[0]) ** 2 - (nf_ - loc[1]) ** 2))
+                    des = (des[0], nf_, loc[2] - vz if des[2] < loc[2] else des[2])
             palm = body.P(*des)
             qa, qb = q_neu[side], q_grip[side]
             if qa.dot(qb) < 0:

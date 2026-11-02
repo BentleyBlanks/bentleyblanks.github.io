@@ -1,0 +1,37 @@
+{
+  "file": "Animation_Mixamo_SittingTalking_V2.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（右手进身体 7.5→1.4 cm，右前臂 3.4→1.5 cm，左手进身体 7→1.3 cm，左前臂 2.9→1.5 cm）",
+  "changes": [
+    "第 1–179、185–246、277–521、531–576、684–1323 帧 右手：右臂两节骨 IK（RightArm 最多转 9.9°、RightForeArm 最多转 23.5°）：手腕往外推最多 10.2 cm（第 990 帧，朝上），前臂同推最多 10.2 cm；手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 20°、Index1 4°、Ring1 12°、Pinky1 28°；前后约 6 帧渐入渐出",
+    "第 1–181、186–246、278–735、785–1323 帧 左手：左臂两节骨 IK（LeftArm 最多转 12.0°、LeftForeArm 最多转 15.2°）：手腕往外推最多 9.5 cm（第 89 帧，朝上），前臂同推最多 8.9 cm；手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 20°、Thumb1 18°、Index1 28°、Middle1 30°、Ring1 29°、Pinky1 30°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 7.5,
+      "Left": 7
+    },
+    "forearmCm": {
+      "Right": 3.4,
+      "Left": 2.9
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 1.4,
+      "Left": 1.3
+    },
+    "forearmCm": {
+      "Right": 1.5,
+      "Left": 1.5
+    }
+  },
+  "original": "Original/Animation_Mixamo_SittingTalking_V2.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

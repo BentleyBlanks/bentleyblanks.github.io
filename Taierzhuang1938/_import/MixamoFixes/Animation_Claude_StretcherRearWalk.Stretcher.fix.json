@@ -1,0 +1,25 @@
+{
+  "file": "Animation_Claude_StretcherRearWalk.glb",
+  "topic": "Stretcher",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "抬后头走：两手只在髋前 2.6 cm，担架布那头的横档（掌心前 12 cm）迈腿时扫进大腿 3.1 cm；两手往前挪 5 cm（臂略前伸）、掌心提高 1.7 cm",
+  "changes": [
+    "整条（循环 36 帧）两臂 IK 目标：掌心从髋关节前 5 cm 挪到前 10 cm（palm_fwd -0.05 → -0.10），担架横档跟着往前，迈腿时大腿不碰",
+    "掌心平均高度 0.778 → 0.795 m：手往前后原高度臂够不着（锁骨压到上限仍超长，肘锁死 180°、腕差 1.5 cm），提高后肘 149–162°、腕误差 0.04 cm",
+    "腿、骨盆、躯干、步态不变"
+  ],
+  "before": {
+    "stretcherCm": {
+      "LeftUpLeg": 3.1,
+      "RightUpLeg": 2.4
+    }
+  },
+  "after": {
+    "stretcherCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherRearWalk.py"
+  ]
+}

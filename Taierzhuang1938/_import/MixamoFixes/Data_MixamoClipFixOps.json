@@ -1,0 +1,1094 @@
+{
+ "clips": {
+  "Animation_Mixamo_OneShoulderLean_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SadIdle_V2": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SadIdle_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_WalkWithRifle_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_SneakingForward_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_WalkWithRifle_V3": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_SprintForward_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Walking_V18": {
+   "ops": [
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    }
+   ]
+  },
+  "Animation_Mixamo_Sprint_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Walking_V22": {
+   "ops": [
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchedRun_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchWalkStrafeLeft_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleRun_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleRun_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchedToSprinting_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_FastRun_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RunLookBack_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Running_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_SlowRun_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Running_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RunRight_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    }
+   ]
+  },
+  "Animation_Mixamo_RunLeft_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RightStrafe_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_LeftStrafe_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleCrouchIdleToWalk_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchToProne_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleKneelToStand_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleStandToKneel_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleAimToKneel_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_FallOver_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ProneToCrouchTransition_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleProneToKneel_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Crawling_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_ProneRoll_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ProneRoll_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ThrowGrenade_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_GrenadeThrow_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ThrowObject_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_RunAndThrowGrenade_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_HitReaction_V4": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_TossGrenade_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleRunToDying_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_DeathFromTheBack_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingReactLargeFromBack_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_WalkingToDying_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchDeath_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_GrenadeThrow_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_FallingBackDeath_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_DeathFromBackHeadshot_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_FallingBackDeath_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingReactDeathRight_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ThrowGrenade_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingReactDeathForward_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_DeathCrouchingHeadshotFront_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_BeingCarried_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_HoldingDown_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "capCm": 4
+    }
+   ]
+  },
+  "Animation_Mixamo_Dying_V3": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleKneelHitToBack_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_InjuredWaveIdle_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingReactDeathBackward_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ShoulderHitAndFall_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_InjuredIdle_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleDeath_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_InjuredRun_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_DeathFromFrontHeadshot_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Dying_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_FallingForwardDeath_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingReactDeathLeft_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_CoverToStand_V2": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_InjuredHurtingIdle_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_Ducking_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleRubbingEyes_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_CrouchCoverToCover_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleShieldingFace_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ],
+     "link": true
+    }
+   ]
+  },
+  "Animation_Mixamo_Terrified_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_CoverToStand_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordSlash_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_Waving_V3": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandingArguing_V2": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingIdle_V3": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingIdle_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SitToStand_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_KneelingPointing_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingIdle_V2": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_JumpingDown_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingRubbingArm_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_Charge_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_StandToSit_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingTalking_V2": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_Lifting_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_SittingTalking_V1": {
+   "ops": [
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_JumpingDown_V2": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "hands",
+     "topic": "Hands",
+     "sides": [
+      "Right",
+      "Left"
+     ]
+    }
+   ]
+  },
+  "Animation_Mixamo_JumpOver_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_VaultOverBox_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    }
+   ]
+  },
+  "Animation_Mixamo_ClimbingLadder_V1": {
+   "ops": [
+    {
+     "op": "glitch",
+     "topic": "Glitch"
+    },
+    {
+     "op": "seam",
+     "topic": "Seam",
+     "frames": 10
+    }
+   ]
+  },
+  "Animation_Mixamo_HitReaction_V6": {
+   "ops": [
+    {
+     "op": "shift",
+     "topic": "Pose",
+     "frames": [
+      32,
+      36
+     ],
+     "cm": 3,
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "summary": "受击时枪管扫进左大腿 / 左小腿 2.7 cm（第 33–35 帧）：两手连枪往上抬 3 cm"
+    }
+   ]
+  },
+  "Animation_Mixamo_RifleKneelToProne_V1": {
+   "ops": [
+    {
+     "op": "shift",
+     "topic": "Pose",
+     "frames": [
+      23,
+      25
+     ],
+     "cm": 2,
+     "awayFrom": "Head",
+     "summary": "跪→卧途中枪身擦进头 2.3 cm（第 24 帧）：两手连枪背离头同推 2 cm"
+    }
+   ]
+  }
+ }
+}

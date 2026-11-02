@@ -1,0 +1,25 @@
+{
+  "file": "Animation_Claude_StripperLoadStand.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "站姿压桥夹：右手伸进子弹盒时小指尖戳进右大腿 5.2 cm；盒子往前 4 cm、往上 2 cm（仍在腰带前右侧）",
+  "changes": [
+    "子弹盒点（右手取夹的目标，第 67–83 帧前后）：右髋关节 + (外 0.06, 前 0.03, 上 0.055) → (外 0.07, 前 0.07, 上 0.075) m",
+    "取夹的手型、朝向、时间不变"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 5.2
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 1.0
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StripperLoadStand.py"
+  ]
+}

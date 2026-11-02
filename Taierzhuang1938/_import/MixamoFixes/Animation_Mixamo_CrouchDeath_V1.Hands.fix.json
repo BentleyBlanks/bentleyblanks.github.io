@@ -1,0 +1,37 @@
+{
+  "file": "Animation_Mixamo_CrouchDeath_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（左手进身体 4.6→1 cm）",
+  "changes": [
+    "第 22–42 帧 右手：手指 / 手掌往外抬（绕指根 / 手腕转）最多：Thumb1 7°；前后约 6 帧渐入渐出",
+    "第 25–45 帧 左手：手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 8°、Index1 28°、Middle1 4°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 1.2,
+      "Left": 4.6
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.3,
+      "Left": 1
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    }
+  },
+  "original": "Original/Animation_Mixamo_CrouchDeath_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

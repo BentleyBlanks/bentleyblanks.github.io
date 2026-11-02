@@ -1,0 +1,37 @@
+{
+  "file": "Animation_Mixamo_ThrowObject_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 32.1°→32.1°）",
+  "changes": [
+    "RightHandMiddle1 第 73 帧：原来离前后帧中间姿势最多 20.0°，换成两端好帧之间的球面插值",
+    "RightHandRing1 第 73 帧：原来离前后帧中间姿势最多 18.2°，换成两端好帧之间的球面插值",
+    "RightHandPinky1 第 73 帧：原来离前后帧中间姿势最多 15.8°，换成两端好帧之间的球面插值",
+    "RightHandIndex2 第 73 帧：原来离前后帧中间姿势最多 20.8°，换成两端好帧之间的球面插值",
+    "RightHandMiddle2 第 73 帧：原来离前后帧中间姿势最多 20.6°，换成两端好帧之间的球面插值",
+    "RightHandPinky2 第 73 帧：原来离前后帧中间姿势最多 15.8°，换成两端好帧之间的球面插值",
+    "RightHandIndex3 第 73 帧：原来离前后帧中间姿势最多 20.6°，换成两端好帧之间的球面插值",
+    "RightHandMiddle3 第 73 帧：原来离前后帧中间姿势最多 20.6°，换成两端好帧之间的球面插值",
+    "RightHandPinky3 第 73 帧：原来离前后帧中间姿势最多 15.8°，换成两端好帧之间的球面插值",
+    "未消掉：RightArm 还有 3 帧 > 15.0°（最大 23.3° @ 第 74 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightForeArm 还有 4 帧 > 15.0°（最大 32.1° @ 第 74 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightHand 还有 2 帧 > 15.0°（最大 26.8° @ 第 74 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 32.1,
+    "worst": "RightForeArm@74",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 32.1,
+    "worst": "RightForeArm@74",
+    "over15": 6
+  },
+  "original": "Original/Animation_Mixamo_ThrowObject_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

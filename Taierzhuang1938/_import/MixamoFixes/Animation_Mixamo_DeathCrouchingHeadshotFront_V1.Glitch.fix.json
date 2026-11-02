@@ -1,0 +1,30 @@
+{
+  "file": "Animation_Mixamo_DeathCrouchingHeadshotFront_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 29.9°→13.7°）",
+  "changes": [
+    "LeftFoot 第 32–33 帧：原来离前后帧中间姿势最多 15.1°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftLeg 同几帧一起插值）",
+    "RightToeBase 第 41 帧：原来离前后帧中间姿势最多 18.5°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 33–34 帧：原来离前后帧中间姿势最多 29.9°，换成两端好帧之间的球面插值",
+    "LeftArm 第 44 帧：原来离前后帧中间姿势最多 16.4°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftForeArm、LeftHand 同几帧一起插值）",
+    "LeftHand 第 37 帧：原来离前后帧中间姿势最多 17.8°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftArm、LeftForeArm 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 29.9,
+    "worst": "LeftToeBase@34",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 13.7,
+    "worst": "LeftFoot@35",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_DeathCrouchingHeadshotFront_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

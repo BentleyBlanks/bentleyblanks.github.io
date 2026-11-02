@@ -76,6 +76,7 @@ LEFT_ON_TAIL = 0.025                                    # 左掌心超出尾端
 PULL_DIR = Vector((0.35, 0.93, -0.10)).normalized()
 ELBOW_R_DESIGN = Vector((-0.30, -0.60, 0.05))
 ELBOW_L_DESIGN = Vector((0.30, -0.62, 0.10))
+BACKSWING_WIN, BACKSWING_OUT = (57, 79), 0.08          # 带臂段右手 / 右肘离身体的额外量（见右手目标那段）
 
 
 def Smooth(t):
@@ -251,6 +252,12 @@ for f in range(1, W_R_END + 1):
     palm = palm + Vector((0, 0, 0.04 * math.sin(math.pi * max(0.0, min(1.0, (f - 84) / 16.0)))))   # 收势时手指别蹭地
     elbow_mine = Lerp(nat[1]["Rightelbow"], ELBOW_R_DESIGN, ready_k)
     elbow = Lerp(elbow_mine, n["Rightelbow"], w_pos)
+    # 2026-11-02 审查：带臂往后那一段（原动作的轨迹）右小臂扫进胯 4.5 cm、右手进右大腿 3.6 cm。
+    # 这段手和肘一起沿「身体右侧」（两肩连线方向，侧翻后朝上）离开身体 BACKSWING_OUT，sin² 包络，手仍贴着身侧往后滑
+    if BACKSWING_WIN[0] < f < BACKSWING_WIN[1]:
+        side_w = (n["Rightsh"] - n["Leftsh"]).normalized()
+        push = side_w * (BACKSWING_OUT * math.sin(math.pi * (f - BACKSWING_WIN[0]) / (BACKSWING_WIN[1] - BACKSWING_WIN[0])) ** 2)
+        palm, elbow = palm + push, elbow + push
     a_w = AxisAt(f)
     fore = palm - elbow
     q_mine, _ = RightOrient(a_w, fore)

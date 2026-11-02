@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_DeathFromFrontHeadshot_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 18°→12.7°）",
+  "changes": [
+    "RightToeBase 第 34 帧：原来离前后帧中间姿势最多 15.9°，换成两端好帧之间的球面插值",
+    "LeftHand 第 41–42、64 帧：原来离前后帧中间姿势最多 18.0°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftArm、LeftForeArm 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 18,
+    "worst": "LeftHand@64",
+    "over15": 4
+  },
+  "after": {
+    "glitchDeg": 12.7,
+    "worst": "LeftHand@43",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_DeathFromFrontHeadshot_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

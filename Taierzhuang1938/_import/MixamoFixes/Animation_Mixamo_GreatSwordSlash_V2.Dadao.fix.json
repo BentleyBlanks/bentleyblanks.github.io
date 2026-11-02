@@ -1,0 +1,30 @@
+{
+  "file": "Animation_Mixamo_GreatSwordSlash_V2.glb",
+  "topic": "Dadao",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "大刀刀尾对准左手改成渐变：一帧拧 28.7° → 28.7°、一帧抽 12.5° → 12.5°",
+  "changes": [
+    "大刀刀尾对准左手从开关（70° 以内整个转过去）改成按距离与偏角渐变（AIM_AT_POMMEL 45°–75°）：原来最大一帧拧 28.7°（第 31 帧）"
+  ],
+  "before": {
+    "snapDeg": 28.7,
+    "glitchDeg": 12.5,
+    "bodyCm": {
+      "LeftForeArm": 3.4
+    }
+  },
+  "after": {
+    "snapDeg": 28.7,
+    "glitchDeg": 12.5,
+    "bodyCm": {
+      "LeftForeArm": 3.4
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

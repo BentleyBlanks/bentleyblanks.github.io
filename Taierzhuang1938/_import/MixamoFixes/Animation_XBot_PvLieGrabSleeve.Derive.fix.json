@@ -1,0 +1,52 @@
+{
+  "file": "Derived/Animation_XBot_PvLieGrabSleeve.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后手与原身体对不上：手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出，抽搐的帧拉回前后中间",
+  "changes": [
+    "第 0–90 帧 右臂两节骨 IK 换手的位置：掌心比原换算挪了最多 19.3 cm（第 82 帧），手腕朝向、肘弯平面不变；这只手攥着东西，目标取原身体掌心位置 ÷ 头高比 1.033（运行时缩放后落在原来那只手的位置）",
+    "去抽搐（源片段）：RightHand 第 17、21、76 帧拉回前后两帧的中间姿势（原来离中间最多 13.8°）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「手从原身体换目标（贴身体按手上各点量）+ 推出」：手从原身体换目标（贴身体按手上各点量）+ 推出 0，手从原身体换目标（贴身体按掌心量）+ 推出 0，只推出（不换目标） 0，手不动、只去抽搐 0"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0.7
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 13.8,
+    "glitchAt": "RightHand@76",
+    "at": {
+      "handRight": null,
+      "handLeft": "Ring4→RightUpLeg@55",
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0.5
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": null,
+      "handLeft": "Ring4→RightUpLeg@46",
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

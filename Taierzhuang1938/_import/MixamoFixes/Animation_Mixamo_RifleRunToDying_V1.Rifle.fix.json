@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Mixamo_RifleRunToDying_V1.glb",
+  "topic": "Rifle",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "死亡时枪脱手落地：一帧拧 40.6° → 6.4°、一帧抽 20.1° → 8.4°，枪进身体最深 2.6 → 3.5 cm",
+  "changes": [
+    "枪管对准左手从开关改成按左手距离与偏角渐变（Script_MixamoProps.mjs 的 AimAt）：原来左手一跨过 0.2 / 0.75 m 或 100° 那条线枪一帧拧过去，这条最大一帧拧 40.6°（第 45 帧）",
+    "死亡：1.1 s 左手离枪后枪脱手（rifleTrack.dropAt），按脱手那一刻的速度往外偏右甩出、0.45 s 内转平落地，不再攥在手里跟着身体穿腿"
+  ],
+  "before": {
+    "snapDeg": 40.6,
+    "glitchDeg": 20.1,
+    "bodyCm": {
+      "RightUpLeg": 2.6
+    }
+  },
+  "after": {
+    "snapDeg": 6.4,
+    "glitchDeg": 8.4,
+    "bodyCm": {
+      "RightUpLeg": 3.5,
+      "LeftForeArm": 1.3
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

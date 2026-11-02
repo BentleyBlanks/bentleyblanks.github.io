@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Mixamo_HitReaction_V6.glb",
+  "topic": "Pose",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "受击时枪管扫进左大腿 / 左小腿 2.7 cm（第 33–35 帧）：两手连枪往上抬 3 cm",
+  "changes": [
+    "第 27–41 帧 两手同推 3 cm（朝 [0, 0, 1]，第 32–36 帧满量、前后 6 帧渐入渐出），两节骨 IK、手腕世界朝向不变，手里的道具跟着平移、相对两手不变"
+  ],
+  "before": {
+    "rifleBodyCm": {
+      "RightForeArm": 3.7,
+      "LeftLeg": 2.7,
+      "LeftUpLeg": 2.7
+    },
+    "rifleSnapDeg": 9.1
+  },
+  "after": {
+    "rifleBodyCm": {
+      "RightForeArm": 3.7,
+      "LeftUpLeg": 1,
+      "LeftLeg": 0.1
+    },
+    "rifleSnapDeg": 9.1
+  },
+  "original": "Original/Animation_Mixamo_HitReaction_V6.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

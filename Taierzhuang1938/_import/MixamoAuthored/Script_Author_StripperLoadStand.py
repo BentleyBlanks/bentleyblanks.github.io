@@ -577,7 +577,8 @@ def Main():
     # --- 右手手指关键帧
     hipj = hip0["Right"]
     hipf = hips.Local(hipj)
-    pouch_b = (hipf[0] + 0.06, hipf[1] + 0.03, hipj.z + 0.055)
+    # 2026-11-02 审查：原 (+0.06, +0.03, +0.055) 时手伸进盒里小指尖戳进右大腿 5 cm，盒子往前 4 cm、往上 2 cm（还在腰带前右侧）
+    pouch_b = (hipf[0] + 0.07, hipf[1] + 0.07, hipj.z + 0.075)
     log(f"pouch point (hips right, fwd, z) {Fmt(pouch_b)}; right hip joint {Fmt(hipf)}")
     rkeys = RightKeys(pouch_b)
     for k in rkeys:

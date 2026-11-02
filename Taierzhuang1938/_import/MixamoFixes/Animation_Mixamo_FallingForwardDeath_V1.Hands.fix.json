@@ -1,0 +1,37 @@
+{
+  "file": "Animation_Mixamo_FallingForwardDeath_V1.glb",
+  "topic": "Hands",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（左手进身体 5.3→1 cm）",
+  "changes": [
+    "第 52–78 帧 右手：右臂两节骨 IK（RightArm 最多转 0.5°、RightForeArm 最多转 0.3°）：手腕往外推最多 0.3 cm（第 66 帧，朝外），前臂同推最多 0.3 cm；前后约 6 帧渐入渐出",
+    "第 7–47 帧 左手：手指 / 手掌往外抬（绕指根 / 手腕转）最多：手腕 10°、Thumb1 23°、Index1 26°、Middle1 29°、Ring1 30°、Pinky1 22°；前后约 6 帧渐入渐出"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 0,
+      "Left": 5.3
+    },
+    "forearmCm": {
+      "Right": 1.3,
+      "Left": 0
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0,
+      "Left": 1
+    },
+    "forearmCm": {
+      "Right": 1.1,
+      "Left": 0
+    }
+  },
+  "original": "Original/Animation_Mixamo_FallingForwardDeath_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

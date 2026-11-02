@@ -1,0 +1,50 @@
+{
+  "file": "Derived/Animation_XBot_PvStandWaveOnL.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后手与原身体对不上：扎进去的手沿身体表面推出",
+  "changes": [
+    "第 17、123 帧 右臂两节骨 IK：手掌 / 前臂扎进身体，掌心沿身体表面外推（最多 1 cm，第 123 帧），前后平滑，手腕朝向不变",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「只推出（不换目标）」：只推出（不换目标） 0，手不动、只去抽搐 0"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 1.1,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 1.1,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Index4→RightUpLeg@125",
+      "handLeft": null,
+      "foreRight": "→RightUpLeg@108",
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.6,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0.7,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": "Thumb3→RightUpLeg@143",
+      "handLeft": null,
+      "foreRight": "→RightUpLeg@108",
+      "foreLeft": null
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "file": "Animation_Claude_StretcherLiftRear.glb",
+  "topic": "StretcherHold",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "担架只在握着杆那一段跟手：握杆前担架停在地上，不再悬在空手上",
+  "changes": [
+    "清单 stretcherHeld { from: 1.33 }（取制作 timings 的 grip 起点 / release 终点，预览比 Blender 晚 1/30 s）；段外担架停在握住 / 松开那一刻的位置（那时掌心离地 0.14 m，担架正好在地上）"
+  ],
+  "before": {},
+  "after": {
+    "stretcherCm": 1
+  },
+  "sources": [
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs"
+  ]
+}

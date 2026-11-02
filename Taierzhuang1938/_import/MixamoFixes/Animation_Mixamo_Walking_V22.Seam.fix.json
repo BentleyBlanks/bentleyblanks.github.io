@@ -1,0 +1,22 @@
+{
+  "file": "Animation_Mixamo_Walking_V22.glb",
+  "topic": "Seam",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "循环首尾不接：尾段渐变到首帧姿势（首尾差 8.8°→0.2°）",
+  "changes": [
+    "第 43–53 帧 全身 5 根骨头尾段渐变到第 1 帧的姿势（smoothstep，尾帧 = 首帧），首尾差大的：LeftFoot 8.8°、LeftLeg 7.4°、LeftUpLeg 2.0°、RightFoot 1.2°"
+  ],
+  "before": {
+    "seamDeg": 8.8
+  },
+  "after": {
+    "seamDeg": 0.2
+  },
+  "original": "Original/Animation_Mixamo_Walking_V22.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

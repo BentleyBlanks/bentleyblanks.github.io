@@ -1,0 +1,33 @@
+{
+  "file": "Animation_Mixamo_RifleKneelToProne_V1.glb",
+  "topic": "Rifle",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "枪管对准左手改成渐变：一帧拧 98.4° → 17.6°、一帧抽 50.9° → 8.7°，枪进身体最深 6.4 → 2.3 cm",
+  "changes": [
+    "枪管对准左手从开关改成按左手距离与偏角渐变（Script_MixamoProps.mjs 的 AimAt）：原来左手一跨过 0.2 / 0.75 m 或 100° 那条线枪一帧拧过去，这条最大一帧拧 98.4°（第 27 帧）"
+  ],
+  "before": {
+    "snapDeg": 98.4,
+    "glitchDeg": 50.9,
+    "bodyCm": {
+      "Head": 6.4,
+      "RightArm": 2.2,
+      "RightShoulder": 1.5
+    }
+  },
+  "after": {
+    "snapDeg": 17.6,
+    "glitchDeg": 8.7,
+    "bodyCm": {
+      "Head": 2.3,
+      "RightArm": 2.1
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

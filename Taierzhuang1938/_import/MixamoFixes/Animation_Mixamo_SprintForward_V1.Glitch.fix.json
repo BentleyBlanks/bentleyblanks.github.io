@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Mixamo_SprintForward_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 26.6°→26.6°）",
+  "changes": [
+    "RightLeg 第 13–14 帧：原来离前后帧中间姿势最多 21.3°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightFoot 同几帧一起插值）",
+    "LeftFoot 第 11–12 帧：原来离前后帧中间姿势最多 19.9°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftLeg 同几帧一起插值）",
+    "RightToeBase 第 3 帧：原来离前后帧中间姿势最多 23.4°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 10–11 帧：原来离前后帧中间姿势最多 17.7°，换成两端好帧之间的球面插值",
+    "未消掉：LeftLeg 还有 1 帧 > 15.0°（最大 26.6° @ 第 6 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightFoot 还有 1 帧 > 15.0°（最大 17.5° @ 第 2 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：LeftFoot 还有 1 帧 > 15.0°（最大 16.7° @ 第 6 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 26.6,
+    "worst": "LeftLeg@6",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 26.6,
+    "worst": "LeftLeg@6",
+    "over15": 3
+  },
+  "original": "Original/Animation_Mixamo_SprintForward_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

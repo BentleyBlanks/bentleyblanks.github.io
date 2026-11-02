@@ -1,0 +1,37 @@
+{
+  "file": "Animation_Mixamo_CrouchedToSprinting_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 27.1°→24°）",
+  "changes": [
+    "LeftLeg 第 12–13 帧：原来离前后帧中间姿势最多 16.6°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftFoot 同几帧一起插值）",
+    "RightShoulder 第 15 帧：原来离前后帧中间姿势最多 15.5°，换成两端好帧之间的球面插值（同链 RightArm、RightForeArm、RightHand 同几帧一起插值）",
+    "RightToeBase 第 7、12 帧：原来离前后帧中间姿势最多 22.9°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 10–11 帧：原来离前后帧中间姿势最多 27.1°，换成两端好帧之间的球面插值",
+    "LeftArm 第 5–6 帧：原来离前后帧中间姿势最多 15.7°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftForeArm、LeftHand 同几帧一起插值）",
+    "LeftHand 第 9 帧：原来离前后帧中间姿势最多 22.1°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftArm、LeftForeArm 同几帧一起插值）",
+    "未消掉：RightShoulder 还有 1 帧 > 15.0°（最大 15.1° @ 第 13 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightArm 还有 2 帧 > 15.0°（最大 21.6° @ 第 13 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：LeftArm 还有 1 帧 > 15.0°（最大 21.4° @ 第 11 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：LeftForeArm 还有 2 帧 > 15.0°（最大 18.4° @ 第 14 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：RightHand 还有 4 帧 > 15.0°（最大 23.7° @ 第 13 帧，2 帧以内的插值消不掉，按真快的动作留着）",
+    "未消掉：LeftHand 还有 2 帧 > 15.0°（最大 24.0° @ 第 12 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 27.1,
+    "worst": "LeftToeBase@11",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 24,
+    "worst": "LeftHand@12",
+    "over15": 6
+  },
+  "original": "Original/Animation_Mixamo_CrouchedToSprinting_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

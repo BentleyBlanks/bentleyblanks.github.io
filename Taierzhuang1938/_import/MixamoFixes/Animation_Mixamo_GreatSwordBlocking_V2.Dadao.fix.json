@@ -1,0 +1,26 @@
+{
+  "file": "Animation_Mixamo_GreatSwordBlocking_V2.glb",
+  "topic": "Dadao",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "大刀刀尾对准左手改成渐变：一帧拧 10.8° → 8.7°、一帧抽 7.5° → 5.5°",
+  "changes": [
+    "大刀刀尾对准左手从开关（70° 以内整个转过去）改成按距离与偏角渐变（AIM_AT_POMMEL 45°–75°）：原来最大一帧拧 10.8°（第 3 帧）"
+  ],
+  "before": {
+    "snapDeg": 10.8,
+    "glitchDeg": 7.5,
+    "bodyCm": {}
+  },
+  "after": {
+    "snapDeg": 8.7,
+    "glitchDeg": 5.5,
+    "bodyCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

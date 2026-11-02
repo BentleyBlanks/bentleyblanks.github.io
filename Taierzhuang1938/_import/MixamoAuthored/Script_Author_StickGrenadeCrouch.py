@@ -41,7 +41,8 @@ F_REACH = 8                   # 左掌心到尾端
 TWIST = [(8, 14), (14, 20), (20, 26)]     # 三下拧盖，每下 6 帧
 F_HOOK0, F_HOOK1, F_PULL0, F_PULL1 = 26, 30, 29, 35     # 手型捏->勾 26-30（4 帧过渡），拽绳 29-35
 F_R_IN = 6                    # 右手到位
-F_L_END = 43                  # 左臂 IK 窗口末帧（之后 4 帧渐出）
+F_L_END = 47                  # 左臂 IK 窗口末帧（之后 7 帧渐出）。2026-11-02 审查：原 43 时接回点是原动作第 38 帧的左手，
+                              # 正压在左膝上（腕进小腿 3.4 cm）；挪到 47（原动作第 42 帧，手已抬离膝盖）
 F_R_END = NJ                  # 右臂 IK 窗口末帧（之后 4 帧渐出）
 SQUEEZE = 1.0                 # 原第 36-57 帧压快倍数
 TOTAL = 111                   # 总帧数
@@ -569,6 +570,33 @@ for pb in pbs:                                    # 四元数符号连续（烘�
     for fc in fcs:
         fc.update()
 print("[Crouch] quaternion sign fixes:", fixed)
+
+# 2026-11-02 审查：原动作（ThrowGrenade_V2 第 55-58 帧 = 这里第 60-63 帧，出手前后）右手腕连同手指有一帧去了又回来的抽动
+# （右手 31.6° / 26.1°、手指 16°）。在这段对右手和右手手指的本地旋转做 [1,2,1]/4 平滑（只动这几帧，出手时刻不变）
+SMOOTH_R = (57, 67, 4)                            # 首帧, 末帧, 遍数
+_smoothed = []
+for pb in pbs:
+    if not pb.name.startswith("RightHand"):
+        continue
+    fcs = [cb.fcurves.find(f'pose.bones["{pb.name}"].rotation_quaternion', index=i) for i in range(4)]
+    if not all(fcs):
+        continue
+    idx = {int(round(kp.co[0])): k for k, kp in enumerate(fcs[0].keyframe_points)}
+    if not all(f in idx for f in range(SMOOTH_R[0] - 1, SMOOTH_R[1] + 2)):
+        continue
+    def _Q(f):
+        return Quaternion([fc.keyframe_points[idx[f]].co[1] for fc in fcs])
+    for _ in range(SMOOTH_R[2]):
+        old = {f: _Q(f) for f in range(SMOOTH_R[0] - 1, SMOOTH_R[1] + 2)}
+        for f in range(SMOOTH_R[0], SMOOTH_R[1] + 1):
+            q = old[f].slerp(old[f - 1].slerp(old[f + 1], 0.5), 0.5)
+            for i, fc in enumerate(fcs):
+                kp = fc.keyframe_points[idx[f]]
+                kp.co = (kp.co[0], q[i])
+    for fc in fcs:
+        fc.update()
+    _smoothed.append(pb.name)
+print("[Crouch] smoothed right hand / fingers frames", SMOOTH_R, len(_smoothed), "bones")
 
 TIMINGS = {"开始": 0.0, "左手到尾端": round((F_REACH - 1) / 30, 2), "拧盖三下": [round((TWIST[0][0] - 1) / 30, 2), round((TWIST[-1][1] - 1) / 30, 2)],
            "小指勾绳": round((F_HOOK0 - 1) / 30, 2), "拽绳": [round((F_PULL0 - 1) / 30, 2), round((F_PULL1 - 1) / 30, 2)],

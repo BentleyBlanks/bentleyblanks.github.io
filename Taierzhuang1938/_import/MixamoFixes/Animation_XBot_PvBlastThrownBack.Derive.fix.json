@@ -1,0 +1,65 @@
+{
+  "file": "Derived/Animation_XBot_PvBlastThrownBack.glb",
+  "topic": "Derive",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "换算后LeftForeArm 一帧抽 36.4°：手按原身体换目标位置两节骨 IK（攥着东西的对准原手位置、贴身体的贴着）、仍扎进去的推出，抽搐的帧拉回前后中间",
+  "changes": [
+    "第 0–1 帧 右臂两节骨 IK 换手的位置：掌心比原换算挪了最多 2.7 cm（第 1 帧），手腕朝向、肘弯平面不变；第 0 帧原手贴着自己身体，X Bot 掌心沿最近那段身体的表面法向挪到同样远；第 35、38 帧再沿 X Bot 身体表面外推（最多 0.5 cm，前后平滑）",
+    "第 0 帧 左臂两节骨 IK 换手的位置：掌心比原换算挪了最多 3.6 cm（第 0 帧），手腕朝向、肘弯平面不变；第 41 帧再沿 X Bot 身体表面外推（最多 0.5 cm，前后平滑）；1 帧伸直也够不着，手停在伸直处",
+    "去抽搐（源片段）：LeftUpLeg 第 14 帧拉回前后两帧的中间姿势（原来离中间最多 13.1°）",
+    "去抽搐（源片段）：LeftLeg 第 2、4 帧拉回前后两帧的中间姿势（原来离中间最多 12.3°）",
+    "去抽搐（源片段）：RightUpLeg 第 14 帧拉回前后两帧的中间姿势（原来离中间最多 19.3°）",
+    "去抽搐（源片段）：RightLeg 第 4、12、14 帧拉回前后两帧的中间姿势（原来离中间最多 22.1°）",
+    "去抽搐（源片段）：RightFoot 第 14 帧拉回前后两帧的中间姿势（原来离中间最多 17.7°）",
+    "去抽搐（源片段）：LeftArm 第 2–7 帧拉回前后两帧的中间姿势（原来离中间最多 28.1°）",
+    "去抽搐（源片段）：LeftForeArm 第 1–6 帧拉回前后两帧的中间姿势（原来离中间最多 36.4°）",
+    "去抽搐（源片段）：LeftHand 第 1–5 帧拉回前后两帧的中间姿势（原来离中间最多 17.2°）",
+    "去抽搐（源片段）：RightArm 第 2–5 帧拉回前后两帧的中间姿势（原来离中间最多 20.8°）",
+    "去抽搐（源片段）：RightForeArm 第 1–5 帧拉回前后两帧的中间姿势（原来离中间最多 32.5°）",
+    "去抽搐（源片段）：RightHand 第 1–5 帧拉回前后两帧的中间姿势（原来离中间最多 25.9°）",
+    "去抽搐（X Bot 输出）：RightForeArm 第 2、4、33 帧拉回前后两帧的中间姿势（原来离中间最多 14.5°）",
+    "去抽搐（X Bot 输出）：LeftForeArm 第 5、33 帧拉回前后两帧的中间姿势（原来离中间最多 15.4°）",
+    "几种做法按审查口径的超标量（手 > 1.5 cm、前臂 > 2 cm 的厘米数 + 抽搐 > 15° 的度数 ÷ 4）挑了「手从原身体换目标（贴身体按手上各点量）+ 推出」：手从原身体换目标（贴身体按手上各点量）+ 推出 0，手从原身体换目标（贴身体按掌心量）+ 推出 0，只推出（不换目标） 0，手不动、只去抽搐 0"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 36.4,
+    "glitchAt": "LeftForeArm@4",
+    "at": {
+      "handRight": null,
+      "handLeft": null,
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "forearmCm": {
+      "Right": 0,
+      "Left": 0
+    },
+    "glitchDeg": 0,
+    "at": {
+      "handRight": null,
+      "handLeft": null,
+      "foreRight": null,
+      "foreLeft": null
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/Script_XBotDeriveClips.mjs",
+    "Taierzhuang1938/_import/Script_XBotDeriveFix.mjs"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Claude_StretcherLowerRear.glb",
+  "topic": "Stretcher",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "后头放下：开头站姿担架横档顶进大腿 1.8 cm、下蹲时进小腿 2.5 cm；开头手位往前 8 cm",
+  "changes": [
+    "开头站姿（第 1–14 帧，状态 C）掌心从髋前 2 cm 挪到髋前 10 cm，高 0.77 → 0.78 m，肩多压 1.5 cm；下蹲段手跟着肩，从新手位开始往下",
+    "蹲住、松手、站起不变"
+  ],
+  "before": {
+    "stretcherCm": {
+      "RightUpLeg": 1.8,
+      "LeftUpLeg": 1.6,
+      "RightLeg": 2.5,
+      "LeftLeg": 2.4
+    }
+  },
+  "after": {
+    "stretcherCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherLowerRear.py",
+    "Taierzhuang1938/_import/MixamoAuthored/Script_StretcherAuthorCommon.py"
+  ]
+}

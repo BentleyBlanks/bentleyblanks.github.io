@@ -1,0 +1,30 @@
+{
+  "file": "Animation_Mixamo_DeathFromTheBack_V1.glb",
+  "topic": "Rifle",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "死亡时枪脱手落地：一帧拧 98° → 17.3°、一帧抽 54° → 12°，枪进身体最深 2.3 → 0 cm",
+  "changes": [
+    "枪管对准左手从开关改成按左手距离与偏角渐变（Script_MixamoProps.mjs 的 AimAt）：原来左手一跨过 0.2 / 0.75 m 或 100° 那条线枪一帧拧过去，这条最大一帧拧 98°（第 49 帧）",
+    "死亡：0.35 s 左手离枪后枪脱手（rifleTrack.dropAt），按脱手那一刻的速度往外偏右甩出、0.45 s 内转平落地，不再攥在手里跟着身体穿腿"
+  ],
+  "before": {
+    "snapDeg": 98,
+    "glitchDeg": 54,
+    "bodyCm": {
+      "Hips": 2.3,
+      "Spine1": 1.7
+    }
+  },
+  "after": {
+    "snapDeg": 17.3,
+    "glitchDeg": 12,
+    "bodyCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

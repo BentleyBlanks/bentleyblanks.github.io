@@ -1,0 +1,35 @@
+{
+  "file": "Animation_Mixamo_RifleRunToDying_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 43.1°→14.7°）",
+  "changes": [
+    "LeftLeg 第 19 帧：原来离前后帧中间姿势最多 17.5°，换成两端好帧之间的球面插值（同链 LeftUpLeg、LeftFoot 同几帧一起插值）",
+    "RightToeBase 第 31 帧：原来离前后帧中间姿势最多 43.1°，换成两端好帧之间的球面插值",
+    "LeftHandIndex1 第 40 帧：原来离前后帧中间姿势最多 20.0°，换成两端好帧之间的球面插值",
+    "LeftHandMiddle1 第 40 帧：原来离前后帧中间姿势最多 20.0°，换成两端好帧之间的球面插值",
+    "LeftHandRing1 第 41 帧：原来离前后帧中间姿势最多 20.0°，换成两端好帧之间的球面插值",
+    "LeftHandPinky1 第 41 帧：原来离前后帧中间姿势最多 20.0°，换成两端好帧之间的球面插值",
+    "LeftHandIndex2 第 40 帧：原来离前后帧中间姿势最多 21.7°，换成两端好帧之间的球面插值",
+    "LeftHandMiddle2 第 41 帧：原来离前后帧中间姿势最多 21.7°，换成两端好帧之间的球面插值",
+    "LeftHandRing2 第 41 帧：原来离前后帧中间姿势最多 21.7°，换成两端好帧之间的球面插值",
+    "LeftHandPinky2 第 41 帧：原来离前后帧中间姿势最多 21.6°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 43.1,
+    "worst": "RightToeBase@31",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 14.7,
+    "worst": "LeftToeBase@11",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_RifleRunToDying_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

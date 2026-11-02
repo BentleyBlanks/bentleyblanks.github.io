@@ -1,0 +1,38 @@
+{
+  "file": "Animation_Claude_StickGrenadeProne.glb",
+  "topic": "Arm",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "卧姿木柄弹：带臂往后（原动作轨迹）右小臂扫进胯 4.5 cm、右手进右大腿 3.6 cm；这段手和肘一起离开身体 8 cm",
+  "changes": [
+    "第 57–79 帧右手掌心和右肘（IK 极点）一起沿身体右侧（两肩连线方向，侧翻后朝上）外移，最多 8 cm（sin² 包络，第 68 帧最大），手仍贴身侧往后滑、肘不过肩",
+    "出手（第 77 帧）掌心只偏约 0.6 cm（包络已收到 8%）；拧盖、拉绳、翻身不变",
+    "第 77 帧右手腕 12.5° 抽动是原来就有的（出手那一刻小臂甩得最快），没改"
+  ],
+  "before": {
+    "handCm": {
+      "Right": 3.6
+    },
+    "forearmCm": {
+      "Right": 4.5
+    },
+    "glitchDeg": {
+      "RightHand": 12.5
+    }
+  },
+  "after": {
+    "handCm": {
+      "Right": 0.4
+    },
+    "forearmCm": {
+      "Right": 1.6
+    },
+    "glitchDeg": {
+      "RightHand": 12.6
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StickGrenadeProne.py"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "file": "Animation_Mixamo_PutBackRifle_V1.glb",
+  "topic": "Rifle",
+  "kind": "attach",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "枪按取枪 / 背枪的时刻在背上与手里交接：一帧拧 23.7° → 16°、一帧抽 10.8° → 13.6°，枪进身体最深 11.1 → 0 cm",
+  "changes": [
+    "枪管对准左手从开关改成按左手距离与偏角渐变（Script_MixamoProps.mjs 的 AimAt）：原来左手一跨过 0.2 / 0.75 m 或 100° 那条线枪一帧拧过去，这条最大一帧拧 23.7°（第 10 帧）",
+    "背枪：1.15 s 手把枪送到肩后时放到背上（rifleTrack.stowAt），之前 0.3 s 从握把换成握着枪身、再拿 0.1 s（原来放下后枪还攥在空手里）"
+  ],
+  "before": {
+    "snapDeg": 23.7,
+    "glitchDeg": 10.8,
+    "bodyCm": {
+      "Hips": 11.1,
+      "RightUpLeg": 6.6,
+      "LeftUpLeg": 6.3,
+      "LeftForeArm": 1.2
+    }
+  },
+  "after": {
+    "snapDeg": 16,
+    "glitchDeg": 13.6,
+    "bodyCm": {}
+  },
+  "sources": [
+    "Taierzhuang1938/Script_MixamoProps.mjs",
+    "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
+  ]
+}

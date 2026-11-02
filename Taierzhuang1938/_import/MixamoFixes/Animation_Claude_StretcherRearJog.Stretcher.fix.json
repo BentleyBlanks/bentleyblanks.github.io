@@ -1,0 +1,28 @@
+{
+  "file": "Animation_Claude_StretcherRearJog.glb",
+  "topic": "Stretcher",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "抬后头小跑：担架横档扫进大腿 4.8 cm；两手往前挪 6 cm、掌心提高 1.3 cm",
+  "changes": [
+    "整条（循环 30 帧）两臂 IK 目标：掌心从髋关节前 5 cm 挪到前 11 cm（palm_fwd -0.05 → -0.11）",
+    "掌心平均高度 0.772 → 0.785 m（臂够得着，肘 138–159°）",
+    "腿、骨盆、躯干、步态不变"
+  ],
+  "before": {
+    "stretcherCm": {
+      "LeftUpLeg": 4.8,
+      "RightUpLeg": 4.1
+    }
+  },
+  "after": {
+    "stretcherCm": {
+      "LeftUpLeg": 0.4
+    }
+  },
+  "sources": [
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherRearJog.py",
+    "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherRearWalk.py"
+  ]
+}

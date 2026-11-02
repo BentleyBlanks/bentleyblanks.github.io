@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_StandingReactDeathLeft_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 23.3°→14°）",
+  "changes": [
+    "RightFoot 第 73–74 帧：原来离前后帧中间姿势最多 21.9°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightLeg 同几帧一起插值）",
+    "RightForeArm 第 15–16 帧：原来离前后帧中间姿势最多 23.3°，换成两端好帧之间的球面插值（同链 RightShoulder、RightArm、RightHand 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 23.3,
+    "worst": "RightForeArm@15",
+    "over15": 3
+  },
+  "after": {
+    "glitchDeg": 14,
+    "worst": "RightFoot@76",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_StandingReactDeathLeft_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

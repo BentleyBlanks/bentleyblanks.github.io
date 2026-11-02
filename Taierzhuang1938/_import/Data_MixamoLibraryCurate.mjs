@@ -11,6 +11,14 @@
 // 端枪的典型读数是掌心相距 0.22–0.33 m、两手都在胸前 0.2 m 以外、握距抖动不到 1 cm。
 //
 // 剔除的条目文件留在本地，只是不进清单。理由写在 DROP 里。
+//
+// 挂枪的附加项（2026-11-02 全库审查后加，摆法见 Script_MixamoProps.mjs）：
+//   rifleAim: "wide"  左手一直握在枪上、但握得比标定宽（刺刀突刺 / 劈砍 / 横托 / 枪托砸 / 枪身砸、正面受击偏向左）：枪管对准左手的角度档放宽到 100°–120°
+//   rifleTrack        枪什么时候不在右手：{ dropAt } 死亡动作这之后脱手掉地（取左手离枪那一刻再晚一点）；
+//                     { grabAt } 这之前背在背上，手伸到背后那一刻接过来；{ stowAt } 手把枪送到肩后那一刻放到背上；
+//                     grabHoldS / settleS、stowS / stowHoldS 是交接前后「握着枪身」拿多久、换握法用多久（默认 0 / 0.6、0.5 / 0）。
+//                     交接时刻按逐帧量的手的位置取，换握时长按逐帧量的枪进身体与一帧跳动挑（记录在 _import/MixamoFixes/<词干>.Rifle.fix.json）。
+const DROP_AT = (dropAt) => ({ rifleTrack: { dropAt } });
 export const HOLDS = ["端枪", "空手", "拿着别的"];
 
 // Claude 在 Mixamo 动作上改出来的动作（2026-11-01 起）。Mixamo 没有、但这个游戏必须有的：栓动步枪拉栓与压桥夹、
@@ -38,10 +46,11 @@ export const AUTHORED = {
   StretcherRearJog: { ...LITTER, stretcherEnd: "rear", loop: true, base: "Animation_Mixamo_SlowRun_V1", label: "担架·抬后头小跑" },
   StretcherFrontWalk: { ...LITTER, stretcherEnd: "front", loop: true, base: "Animation_Mixamo_Walking_V21", label: "担架·抬前头走" },
   StretcherFrontJog: { ...LITTER, stretcherEnd: "front", loop: true, base: "Animation_Mixamo_SlowRun_V1", label: "担架·抬前头小跑" },
-  StretcherLiftRear: { ...LITTER, stretcherEnd: "rear", base: "Animation_Mixamo_PickingUp_V1", label: "担架·后头抬起" },
-  StretcherLowerRear: { ...LITTER, stretcherEnd: "rear", base: "Animation_Mixamo_PuttingDown_V1", label: "担架·后头放下" },
-  StretcherLiftFront: { ...LITTER, stretcherEnd: "front", base: "Animation_Mixamo_PickingUp_V1", label: "担架·前头抬起" },
-  StretcherLowerFront: { ...LITTER, stretcherEnd: "front", base: "Animation_Mixamo_PuttingDown_V1", label: "担架·前头放下" },
+  // stretcherHeld：只有这一段手握着杆（预览在段外让担架停在地上）；取 timings 的 grip 起点 / release 终点，预览比 Blender 晚 1/30 s
+  StretcherLiftRear: { ...LITTER, stretcherEnd: "rear", stretcherHeld: { from: 1.33 }, base: "Animation_Mixamo_PickingUp_V1", label: "担架·后头抬起" },
+  StretcherLowerRear: { ...LITTER, stretcherEnd: "rear", stretcherHeld: { to: 2.28 }, base: "Animation_Mixamo_PuttingDown_V1", label: "担架·后头放下" },
+  StretcherLiftFront: { ...LITTER, stretcherEnd: "front", stretcherHeld: { from: 1.33 }, base: "Animation_Mixamo_PickingUp_V1", label: "担架·前头抬起" },
+  StretcherLowerFront: { ...LITTER, stretcherEnd: "front", stretcherHeld: { to: 2.28 }, base: "Animation_Mixamo_PuttingDown_V1", label: "担架·前头放下" },
   BandageKneel: { category: "伤员与救护", hold: "空手", loop: true, base: "Animation_Mixamo_KneelingIdle_V1", label: "跪着给伤员包扎", replaces: "CollectionCare 医护包扎" },
   DragRunForward: { category: "伤员与救护", hold: "拿着别的", loop: true, base: "Animation_Mixamo_UnarmedRunForward_V1", label: "单手在身后拖着往前跑", replaces: "缺：拖被子 / 拖伤员跑（FL29）" },
 };
@@ -181,8 +190,8 @@ export const CURATE = {
   RifleSideStep_V1: ["端枪", "端枪向右侧步", { category: BAYONET }],
   RifleTurn_V1: ["端枪", "端枪左转 45°"],
   RifleTurn_V2: ["端枪", "端枪右转 45°"],
-  Turn90Left_V1: ["端枪", "端枪左转 90°"],
-  Turn90Right_V1: ["端枪", "端枪右转 90°"],
+  Turn90Left_V1: ["端枪", "端枪左转 90°", { loop: false }],   // 一次性转 90°，首尾差 90°（11-02 审查）
+  Turn90Right_V1: ["端枪", "端枪右转 90°", { loop: false }],
   UnarmedWalkBack_V1: ["空手", "空手后退走"],
   UnarmedRunBack_V1: ["空手", "空手后退跑"],
   RunLeft_V1: ["端枪", "端枪向左跑"],
@@ -254,30 +263,30 @@ export const CURATE = {
   HitReaction_V3: ["端枪", "端枪站着受击"],
   HitReaction_V4: ["端枪", "端枪跑动受击"],
   HitReaction_V5: ["端枪", "端枪站着受击·短"],
-  HitReaction_V6: ["端枪", "端枪受击·正面打偏向左"],
+  HitReaction_V6: ["端枪", "端枪受击·正面打偏向左", { rifleAim: "wide" }],
   WalkingHitReaction_V1: ["端枪", "瞄准走动受击"],
   GettingHit_V1: ["空手", "背后挨打"],
   // 死亡：开始时端着枪的算端枪，枪一直跟着右手（游戏里会脱手掉地）
   CrouchDeath_V1: ["空手", "蹲着死去"],
-  DeathCrouchingHeadshotFront_V1: ["端枪", "蹲姿被爆头"],
-  DeathFromBackHeadshot_V1: ["端枪", "背后被爆头"],
-  DeathFromFrontHeadshot_V1: ["端枪", "正面被爆头"],
-  DeathFromTheBack_V1: ["端枪", "背后中弹死"],
-  DeathFromTheFront_V1: ["端枪", "正面中弹死"],
+  DeathCrouchingHeadshotFront_V1: ["端枪", "蹲姿被爆头", DROP_AT(0.4)],
+  DeathFromBackHeadshot_V1: ["端枪", "背后被爆头", DROP_AT(0.5)],
+  DeathFromFrontHeadshot_V1: ["端枪", "正面被爆头", DROP_AT(0.65)],
+  DeathFromTheBack_V1: ["端枪", "背后中弹死", DROP_AT(0.35)],
+  DeathFromTheFront_V1: ["端枪", "正面中弹死", DROP_AT(0.7)],
   Dying_V1: ["空手", "头部中弹单膝跪倒"],
   Dying_V2: ["空手", "躺在地上咽气"],
   Dying_V3: ["空手", "头部中弹双膝跪倒"],
   FallingBackDeath_V1: ["空手", "向后倒下"],
   FallingBackDeath_V2: ["空手", "向后倒下·二"],
   FallingForwardDeath_V1: ["空手", "向前扑倒"],
-  ProneDeath_V1: ["端枪", "卧姿死去"],
-  RifleDeath_V1: ["端枪", "端枪站着中弹死"],
-  RifleRunToDying_V1: ["端枪", "端枪跑动中弹扑倒"],
+  ProneDeath_V1: ["端枪", "卧姿死去", DROP_AT(1.2)],
+  RifleDeath_V1: ["端枪", "端枪站着中弹死", DROP_AT(0.45)],
+  RifleRunToDying_V1: ["端枪", "端枪跑动中弹扑倒", DROP_AT(1.1)],
   StandingReactDeathBackward_V1: ["空手", "中弹向后倒"],
   StandingReactDeathForward_V1: ["空手", "中弹向前倒"],
   StandingReactDeathLeft_V1: ["空手", "中弹向左倒"],
   StandingReactDeathRight_V1: ["空手", "中弹向右倒"],
-  WalkingToDying_V2: ["端枪", "瞄准走中弹倒地"],
+  WalkingToDying_V2: ["端枪", "瞄准走中弹倒地", DROP_AT(0.88)],
   // 伤员与救护
   HoldingDown_V1: ["空手", "跪着按住伤员"],
   InjuredWaveIdle_V1: ["空手", "伤员挥手求救"],
@@ -300,11 +309,11 @@ export const CURATE = {
   LayingIdle_V1: ["空手", "躺着"],
   LayingIdle_V2: ["空手", "仰躺张望"],
   // 背枪与取枪：枪一直在右手里，算端枪
-  GrabRifleFromBack_V1: ["端枪", "从背上取枪"],
-  PutBackRifleBehindShoulder_V1: ["端枪", "把枪背上肩"],
-  GrabRifleFromBehindShoulder_V1: ["端枪", "从肩后取枪"],
-  GrabAndPutBackRifle_V1: ["端枪", "从肩上取枪再背回去"],
-  PutBackRifle_V1: ["端枪", "收枪背回"],
+  GrabRifleFromBack_V1: ["端枪", "从背上取枪", { rifleTrack: { grabAt: 0.93, settleS: 0.8 } }],
+  PutBackRifleBehindShoulder_V1: ["端枪", "把枪背上肩", { rifleTrack: { stowAt: 2.25, stowHoldS: 0.8, stowS: 0.6 } }],
+  GrabRifleFromBehindShoulder_V1: ["端枪", "从肩后取枪", { rifleTrack: { grabAt: 1.0, grabHoldS: 0.6, settleS: 0.6 } }],
+  GrabAndPutBackRifle_V1: ["端枪", "从肩上取枪再背回去", { rifleTrack: { grabAt: 1.0, grabHoldS: 0.6, settleS: 0.6, stowAt: 5.75, stowHoldS: 0.8, stowS: 0.6 } }],
+  PutBackRifle_V1: ["端枪", "收枪背回", { rifleTrack: { stowAt: 1.15, stowHoldS: 0.1, stowS: 0.3 } }],
   // 躲避与掩护
   CoverIdle_V1: ["空手", "蹲着贴掩体"],
   CoverIdle_V2: ["空手", "站着贴掩体"],
@@ -322,13 +331,13 @@ export const CURATE = {
   LeftCoverSneakWRifle_V1: ["端枪", "端枪贴墙向左挪", { replaces: "缺：贴墙移动" }],
   RightCoverSneakWRifle_V1: ["端枪", "端枪贴墙向右挪", { replaces: "缺：贴墙移动" }],
   // 近战
-  BayonetStab_V1: ["端枪", "刺刀突刺", { category: BAYONET }],
+  BayonetStab_V1: ["端枪", "刺刀突刺", { category: BAYONET, rifleAim: "wide" }],
   BlockWithRifle_V1: ["端枪", "横枪格挡", { category: BAYONET }],
-  RifleBlock_V1: ["端枪", "端枪格挡·双手横托", { category: BAYONET }],
-  RiflePunch_V1: ["端枪", "枪托前砸", { category: BAYONET }],
+  RifleBlock_V1: ["端枪", "端枪格挡·双手横托", { category: BAYONET, rifleAim: "wide" }],
+  RiflePunch_V1: ["端枪", "枪托前砸", { category: BAYONET, rifleAim: "wide" }],
   // 11-01 刺刀专项补下（Mixamo 上专门的刺刀动作只有这些；步法是端枪瞄准的上步 / 退步 / 侧步，上了刺刀就是对峙步）
-  SlashAdvance_V1: ["端枪", "刺刀·上步劈砍", { category: BAYONET }],
-  Smash_V1: ["端枪", "枪身前砸", { category: BAYONET }],
+  SlashAdvance_V1: ["端枪", "刺刀·上步劈砍", { category: BAYONET, rifleAim: "wide" }],
+  Smash_V1: ["端枪", "枪身前砸", { category: BAYONET, rifleAim: "wide" }],
   Dodging_V1: ["端枪", "端枪闪躲", { category: BAYONET }],
   Bash_V1: ["端枪", "枪托·过头砸", { category: BAYONET }],
   PikeWalk_V1: ["端枪", "平端长枪前进", { category: BAYONET }],

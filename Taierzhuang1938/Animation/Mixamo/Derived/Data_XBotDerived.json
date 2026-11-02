@@ -8,7 +8,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.5,
       "loop": false,
-      "frames": 37
+      "frames": 46
     },
     "CaptiveCurledPulledUp": {
       "file": "Animation_XBot_CaptiveCurledPulledUp.glb",
@@ -17,7 +17,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3.5,
       "loop": false,
-      "frames": 85
+      "frames": 106
     },
     "CaptiveDraggedFromDirt": {
       "file": "Animation_XBot_CaptiveDraggedFromDirt.glb",
@@ -26,7 +26,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4.4,
       "loop": false,
-      "frames": 107
+      "frames": 133
     },
     "CaptiveStabbedCurl": {
       "file": "Animation_XBot_CaptiveStabbedCurl.glb",
@@ -35,7 +35,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 5.5,
       "loop": false,
-      "frames": 133
+      "frames": 166
     },
     "CareLieTreated": {
       "file": "Animation_XBot_CareLieTreated.glb",
@@ -44,7 +44,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4,
       "loop": true,
-      "frames": 97
+      "frames": 121
     },
     "CareLieWrithe": {
       "file": "Animation_XBot_CareLieWrithe.glb",
@@ -53,7 +53,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4.8,
       "loop": true,
-      "frames": 117
+      "frames": 145
     },
     "CareMedicPress": {
       "file": "Animation_XBot_CareMedicPress.glb",
@@ -62,7 +62,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3.2,
       "loop": true,
-      "frames": 78
+      "frames": 97
     },
     "CreepDadao": {
       "file": "Animation_XBot_CreepDadao.glb",
@@ -71,7 +71,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.8,
       "loop": true,
-      "frames": 45
+      "frames": 55
     },
     "DadaoAmbush": {
       "file": "Animation_XBot_DadaoAmbush.glb",
@@ -80,7 +80,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 0.85,
       "loop": false,
-      "frames": 22
+      "frames": 27
     },
     "HeHelmetSleepSitUp": {
       "file": "Animation_XBot_HeHelmetSleepSitUp.glb",
@@ -89,7 +89,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 6.25,
       "loop": false,
-      "frames": 151
+      "frames": 189
     },
     "HeLiftTimber": {
       "file": "Animation_XBot_HeLiftTimber.glb",
@@ -98,7 +98,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4167,
       "loop": false,
-      "frames": 59
+      "frames": 74
     },
     "IjaCrouchHairHold": {
       "file": "Animation_XBot_IjaCrouchHairHold.glb",
@@ -107,7 +107,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 3.75,
       "loop": false,
-      "frames": 91
+      "frames": 114
     },
     "IjaDragCollarFromDirt": {
       "file": "Animation_XBot_IjaDragCollarFromDirt.glb",
@@ -116,7 +116,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 4.4,
       "loop": false,
-      "frames": 107
+      "frames": 133
     },
     "IjaDropInKneel": {
       "file": "Animation_XBot_IjaDropInKneel.glb",
@@ -125,7 +125,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 2.5,
       "loop": false,
-      "frames": 61
+      "frames": 76
     },
     "IjaDropInPoint": {
       "file": "Animation_XBot_IjaDropInPoint.glb",
@@ -134,7 +134,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 3.3333,
       "loop": false,
-      "frames": 81
+      "frames": 101
     },
     "IjaDropInStand": {
       "file": "Animation_XBot_IjaDropInStand.glb",
@@ -143,7 +143,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 2.3333,
       "loop": false,
-      "frames": 57
+      "frames": 71
     },
     "IjaFoundLook": {
       "file": "Animation_XBot_IjaFoundLook.glb",
@@ -152,7 +152,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 2.25,
       "loop": false,
-      "frames": 55
+      "frames": 69
     },
     "IjaGrenadeBitePin": {
       "file": "Animation_XBot_IjaGrenadeBitePin.glb",
@@ -161,7 +161,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "IjaHeaveCorpseLip": {
       "file": "Animation_XBot_IjaHeaveCorpseLip.glb",
@@ -170,7 +170,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 2.6667,
       "loop": false,
-      "frames": 65
+      "frames": 81
     },
     "IjaParriedChoppedFall": {
       "file": "Animation_XBot_IjaParriedChoppedFall.glb",
@@ -179,7 +179,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 2.4,
       "loop": false,
-      "frames": 59
+      "frames": 73
     },
     "IjaRecruitChargeThrust": {
       "file": "Animation_XBot_IjaRecruitChargeThrust.glb",
@@ -188,7 +188,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 4.5,
       "loop": false,
-      "frames": 109
+      "frames": 136
     },
     "IjaRecruitSlapped": {
       "file": "Animation_XBot_IjaRecruitSlapped.glb",
@@ -197,7 +197,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "IjaShotStaggerAway": {
       "file": "Animation_XBot_IjaShotStaggerAway.glb",
@@ -206,7 +206,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 3.3333,
       "loop": false,
-      "frames": 81
+      "frames": 101
     },
     "IjaSlapBackhand": {
       "file": "Animation_XBot_IjaSlapBackhand.glb",
@@ -215,7 +215,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 1.5,
       "loop": false,
-      "frames": 37
+      "frames": 46
     },
     "IjaSlapForehand": {
       "file": "Animation_XBot_IjaSlapForehand.glb",
@@ -224,7 +224,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 1.5,
       "loop": false,
-      "frames": 37
+      "frames": 46
     },
     "IjaSlapRecruit": {
       "file": "Animation_XBot_IjaSlapRecruit.glb",
@@ -233,7 +233,7 @@
       "sourceModel": "TengxianIja02",
       "duration": 1.5,
       "loop": false,
-      "frames": 37
+      "frames": 46
     },
     "IjaStompStabTwist": {
       "file": "Animation_XBot_IjaStompStabTwist.glb",
@@ -242,7 +242,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 2.5833,
       "loop": false,
-      "frames": 63
+      "frames": 79
     },
     "IjaWalkStabProne": {
       "file": "Animation_XBot_IjaWalkStabProne.glb",
@@ -251,7 +251,7 @@
       "sourceModel": "TengxianIja01",
       "duration": 1.6667,
       "loop": false,
-      "frames": 41
+      "frames": 51
     },
     "InterpreterCrouchAsk": {
       "file": "Animation_XBot_InterpreterCrouchAsk.glb",
@@ -260,7 +260,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3.2,
       "loop": true,
-      "frames": 78
+      "frames": 97
     },
     "InterpreterFlee": {
       "file": "Animation_XBot_InterpreterFlee.glb",
@@ -269,7 +269,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.6,
       "loop": false,
-      "frames": 40
+      "frames": 49
     },
     "InterpreterGrabCollar": {
       "file": "Animation_XBot_InterpreterGrabCollar.glb",
@@ -278,7 +278,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "InterpreterShotStagger": {
       "file": "Animation_XBot_InterpreterShotStagger.glb",
@@ -287,7 +287,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "LiuBoxUpGo": {
       "file": "Animation_XBot_LiuBoxUpGo.glb",
@@ -296,7 +296,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.5,
       "loop": false,
-      "frames": 61
+      "frames": 76
     },
     "LiuDivideAmmoToss": {
       "file": "Animation_XBot_LiuDivideAmmoToss.glb",
@@ -305,7 +305,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4,
       "loop": false,
-      "frames": 97
+      "frames": 121
     },
     "LuoDadaoChopRear": {
       "file": "Animation_XBot_LuoDadaoChopRear.glb",
@@ -314,7 +314,7 @@
       "sourceModel": "TengxianNra05",
       "duration": 1.3,
       "loop": false,
-      "frames": 33
+      "frames": 40
     },
     "LuoHandRifle": {
       "file": "Animation_XBot_LuoHandRifle.glb",
@@ -323,7 +323,7 @@
       "sourceModel": "TengxianNra05",
       "duration": 5.4167,
       "loop": false,
-      "frames": 131
+      "frames": 164
     },
     "LuoKneelCheck": {
       "file": "Animation_XBot_LuoKneelCheck.glb",
@@ -332,7 +332,7 @@
       "sourceModel": "TengxianNra05",
       "duration": 3.4,
       "loop": false,
-      "frames": 83
+      "frames": 103
     },
     "MessengerReport": {
       "file": "Animation_XBot_MessengerReport.glb",
@@ -341,7 +341,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": true,
-      "frames": 73
+      "frames": 91
     },
     "PullComrade": {
       "file": "Animation_XBot_PullComrade.glb",
@@ -350,7 +350,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvBlanketDragL": {
       "file": "Animation_XBot_PvBlanketDragL.glb",
@@ -359,7 +359,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "PvBlanketDragR": {
       "file": "Animation_XBot_PvBlanketDragR.glb",
@@ -368,7 +368,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "PvBlanketReleaseTurn": {
       "file": "Animation_XBot_PvBlanketReleaseTurn.glb",
@@ -377,7 +377,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvBlastThrownBack": {
       "file": "Animation_XBot_PvBlastThrownBack.glb",
@@ -386,7 +386,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.6,
       "loop": false,
-      "frames": 40
+      "frames": 49
     },
     "PvCaptiveButtHit": {
       "file": "Animation_XBot_PvCaptiveButtHit.glb",
@@ -395,7 +395,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.4,
       "loop": false,
-      "frames": 35
+      "frames": 43
     },
     "PvClimbOutTrench": {
       "file": "Animation_XBot_PvClimbOutTrench.glb",
@@ -404,7 +404,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.5,
       "loop": false,
-      "frames": 61
+      "frames": 76
     },
     "PvCrawlCarryBundle": {
       "file": "Animation_XBot_PvCrawlCarryBundle.glb",
@@ -413,7 +413,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "PvCrouchCountFingers": {
       "file": "Animation_XBot_PvCrouchCountFingers.glb",
@@ -422,7 +422,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": true,
-      "frames": 73
+      "frames": 91
     },
     "PvCrouchGripLitter": {
       "file": "Animation_XBot_PvCrouchGripLitter.glb",
@@ -431,7 +431,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvCrouchPointL": {
       "file": "Animation_XBot_PvCrouchPointL.glb",
@@ -448,7 +448,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1,
       "loop": true,
-      "frames": 25
+      "frames": 31
     },
     "PvIjaBayonetRaiseThreat": {
       "file": "Animation_XBot_PvIjaBayonetRaiseThreat.glb",
@@ -457,7 +457,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.4,
       "loop": false,
-      "frames": 35
+      "frames": 43
     },
     "PvIjaCrouchHairLift": {
       "file": "Animation_XBot_PvIjaCrouchHairLift.glb",
@@ -466,7 +466,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3.5,
       "loop": false,
-      "frames": 85
+      "frames": 106
     },
     "PvIjaLauncherFire": {
       "file": "Animation_XBot_PvIjaLauncherFire.glb",
@@ -475,7 +475,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "PvIjaLauncherLoad": {
       "file": "Animation_XBot_PvIjaLauncherLoad.glb",
@@ -484,7 +484,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "PvIjaLungeParriedFall": {
       "file": "Animation_XBot_PvIjaLungeParriedFall.glb",
@@ -493,7 +493,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.2,
       "loop": false,
-      "frames": 54
+      "frames": 67
     },
     "PvIjaSignalSplit": {
       "file": "Animation_XBot_PvIjaSignalSplit.glb",
@@ -502,7 +502,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvKneelDig": {
       "file": "Animation_XBot_PvKneelDig.glb",
@@ -511,7 +511,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "PvKneelHaulBody": {
       "file": "Animation_XBot_PvKneelHaulBody.glb",
@@ -520,7 +520,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.5,
       "loop": true,
-      "frames": 61
+      "frames": 76
     },
     "PvKneelPullBlanket": {
       "file": "Animation_XBot_PvKneelPullBlanket.glb",
@@ -529,7 +529,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "PvLegHitKneelClutch": {
       "file": "Animation_XBot_PvLegHitKneelClutch.glb",
@@ -538,7 +538,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvLieGrabSleeve": {
       "file": "Animation_XBot_PvLieGrabSleeve.glb",
@@ -547,7 +547,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "PvProneBeckonL": {
       "file": "Animation_XBot_PvProneBeckonL.glb",
@@ -556,7 +556,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.6,
       "loop": true,
-      "frames": 40
+      "frames": 49
     },
     "PvShoulderShove": {
       "file": "Animation_XBot_PvShoulderShove.glb",
@@ -565,7 +565,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": false,
-      "frames": 30
+      "frames": 37
     },
     "PvSitGrabHand": {
       "file": "Animation_XBot_PvSitGrabHand.glb",
@@ -574,7 +574,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.5,
       "loop": false,
-      "frames": 61
+      "frames": 76
     },
     "PvSitOfferArm": {
       "file": "Animation_XBot_PvSitOfferArm.glb",
@@ -583,7 +583,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvSitRestRifle": {
       "file": "Animation_XBot_PvSitRestRifle.glb",
@@ -592,7 +592,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4,
       "loop": true,
-      "frames": 97
+      "frames": 121
     },
     "PvSitStuffPack": {
       "file": "Animation_XBot_PvSitStuffPack.glb",
@@ -601,7 +601,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": true,
-      "frames": 73
+      "frames": 91
     },
     "PvStandBeckonL": {
       "file": "Animation_XBot_PvStandBeckonL.glb",
@@ -610,7 +610,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.8,
       "loop": true,
-      "frames": 45
+      "frames": 55
     },
     "PvStandHaltL": {
       "file": "Animation_XBot_PvStandHaltL.glb",
@@ -619,7 +619,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.0125,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "PvStandShakeHead": {
       "file": "Animation_XBot_PvStandShakeHead.glb",
@@ -628,7 +628,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.6,
       "loop": false,
-      "frames": 40
+      "frames": 49
     },
     "PvStandToProneDive": {
       "file": "Animation_XBot_PvStandToProneDive.glb",
@@ -637,7 +637,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": false,
-      "frames": 30
+      "frames": 37
     },
     "PvStandWaveOnL": {
       "file": "Animation_XBot_PvStandWaveOnL.glb",
@@ -654,7 +654,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "PvSupportWalkL": {
       "file": "Animation_XBot_PvSupportWalkL.glb",
@@ -663,7 +663,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "PvSupportWalkR": {
       "file": "Animation_XBot_PvSupportWalkR.glb",
@@ -672,7 +672,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "VilBiteWrist": {
       "file": "Animation_XBot_VilBiteWrist.glb",
@@ -681,7 +681,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.6,
       "loop": false,
-      "frames": 40
+      "frames": 49
     },
     "VilClingHem": {
       "file": "Animation_XBot_VilClingHem.glb",
@@ -690,7 +690,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "VilCowerWhimper": {
       "file": "Animation_XBot_VilCowerWhimper.glb",
@@ -699,7 +699,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": true,
-      "frames": 49
+      "frames": 61
     },
     "VilCrawlHole": {
       "file": "Animation_XBot_VilCrawlHole.glb",
@@ -708,7 +708,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "VilCrouchHold": {
       "file": "Animation_XBot_VilCrouchHold.glb",
@@ -717,7 +717,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": true,
-      "frames": 73
+      "frames": 91
     },
     "VilDraggedByArm": {
       "file": "Animation_XBot_VilDraggedByArm.glb",
@@ -726,7 +726,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "VilDuckProne": {
       "file": "Animation_XBot_VilDuckProne.glb",
@@ -735,7 +735,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.0542,
       "loop": false,
-      "frames": 50
+      "frames": 63
     },
     "VilHandsUpClimbOut": {
       "file": "Animation_XBot_VilHandsUpClimbOut.glb",
@@ -744,7 +744,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 5,
       "loop": false,
-      "frames": 121
+      "frames": 151
     },
     "VilHugLegs": {
       "file": "Animation_XBot_VilHugLegs.glb",
@@ -753,7 +753,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2,
       "loop": false,
-      "frames": 49
+      "frames": 61
     },
     "VilIjaBayonetLiftFling": {
       "file": "Animation_XBot_VilIjaBayonetLiftFling.glb",
@@ -762,7 +762,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.2,
       "loop": false,
-      "frames": 54
+      "frames": 67
     },
     "VilIjaClimbWall": {
       "file": "Animation_XBot_VilIjaClimbWall.glb",
@@ -771,7 +771,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3.4,
       "loop": false,
-      "frames": 83
+      "frames": 103
     },
     "VilIjaDragByArm": {
       "file": "Animation_XBot_VilIjaDragByArm.glb",
@@ -780,7 +780,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "VilIjaPinBayonet": {
       "file": "Animation_XBot_VilIjaPinBayonet.glb",
@@ -789,7 +789,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": false,
-      "frames": 73
+      "frames": 91
     },
     "VilIjaShoulderCharge": {
       "file": "Animation_XBot_VilIjaShoulderCharge.glb",
@@ -798,7 +798,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.4,
       "loop": false,
-      "frames": 35
+      "frames": 43
     },
     "VilKneelCrawlToPit": {
       "file": "Animation_XBot_VilKneelCrawlToPit.glb",
@@ -807,7 +807,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4,
       "loop": true,
-      "frames": 59
+      "frames": 73
     },
     "VilNraCarryOnBack": {
       "file": "Animation_XBot_VilNraCarryOnBack.glb",
@@ -816,7 +816,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "VilNraYankBack": {
       "file": "Animation_XBot_VilNraYankBack.glb",
@@ -825,7 +825,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4,
       "loop": false,
-      "frames": 59
+      "frames": 73
     },
     "VilReachPinned": {
       "file": "Animation_XBot_VilReachPinned.glb",
@@ -834,7 +834,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4,
       "loop": false,
-      "frames": 59
+      "frames": 73
     },
     "VilRideOnBack": {
       "file": "Animation_XBot_VilRideOnBack.glb",
@@ -843,7 +843,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 1.2,
       "loop": true,
-      "frames": 30
+      "frames": 37
     },
     "VilSitEdge": {
       "file": "Animation_XBot_VilSitEdge.glb",
@@ -852,7 +852,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4,
       "loop": true,
-      "frames": 59
+      "frames": 73
     },
     "VilStabbedFall": {
       "file": "Animation_XBot_VilStabbedFall.glb",
@@ -861,7 +861,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.4,
       "loop": false,
-      "frames": 59
+      "frames": 73
     },
     "VilUnboltDoor": {
       "file": "Animation_XBot_VilUnboltDoor.glb",
@@ -870,7 +870,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 2.6,
       "loop": false,
-      "frames": 64
+      "frames": 79
     },
     "WoundedSitRifleIdle": {
       "file": "Animation_XBot_WoundedSitRifleIdle.glb",
@@ -879,7 +879,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 4,
       "loop": true,
-      "frames": 97
+      "frames": 121
     },
     "YaowaSitLoad": {
       "file": "Animation_XBot_YaowaSitLoad.glb",
@@ -888,7 +888,7 @@
       "sourceModel": "TengxianNra02",
       "duration": 3,
       "loop": true,
-      "frames": 73
+      "frames": 91
     }
   }
 }

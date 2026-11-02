@@ -1,0 +1,28 @@
+{
+  "file": "Animation_Mixamo_JumpingDown_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 28.1°→22°）",
+  "changes": [
+    "RightHand 第 50 帧：原来离前后帧中间姿势最多 28.1°，换成两端好帧之间的球面插值（同链 RightShoulder、RightArm、RightForeArm 同几帧一起插值）",
+    "LeftHand 第 44–45 帧：原来离前后帧中间姿势最多 24.8°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftArm、LeftForeArm 同几帧一起插值）",
+    "未消掉：LeftHand 还有 1 帧 > 15.0°（最大 22.0° @ 第 47 帧，2 帧以内的插值消不掉，按真快的动作留着）"
+  ],
+  "before": {
+    "glitchDeg": 28.1,
+    "worst": "RightHand@50",
+    "over15": 4
+  },
+  "after": {
+    "glitchDeg": 22,
+    "worst": "LeftHand@47",
+    "over15": 1
+  },
+  "original": "Original/Animation_Mixamo_JumpingDown_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

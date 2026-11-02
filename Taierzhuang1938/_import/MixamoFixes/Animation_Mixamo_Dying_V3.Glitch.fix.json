@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_Dying_V3.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 76.6°→14.4°）",
+  "changes": [
+    "RightToeBase 第 76–79 帧：原来离前后帧中间姿势最多 76.6°，换成两端好帧之间的球面插值",
+    "LeftToeBase 第 79–80 帧：原来离前后帧中间姿势最多 27.5°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 76.6,
+    "worst": "RightToeBase@78",
+    "over15": 4
+  },
+  "after": {
+    "glitchDeg": 14.4,
+    "worst": "RightToeBase@112",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_Dying_V3.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

@@ -13,7 +13,7 @@
     "hipsLowest": 0.767,
     "end": 1.0
   },
-  "note": "担架后头小跑：两臂下垂吃重不摆臂（肘微屈约 125-165 度），两手握杆在大腿前外侧，掌心相距 0.58 m、离地约 0.75 m，肩下沉，上身略后仰，步幅比空手慢跑小。原地循环，预览自动挂担架。",
+  "note": "担架后头小跑：两臂下垂吃重不摆臂（肘微屈约 140-160 度），两手握杆在大腿前外侧（掌心在髋关节前约 11 cm，臂略前伸，迈腿时大腿不碰担架布那头的横档），掌心相距 0.58 m、离地约 0.785 m，肩下沉，上身略后仰，步幅比空手慢跑小。原地循环，预览自动挂担架。",
   "script": "Taierzhuang1938/_import/MixamoAuthored/Script_Author_StretcherRearJog.py",
   "blend": "Taierzhuang1938/_import/Mixamo/Authored/StretcherRearJog.blend"
 }

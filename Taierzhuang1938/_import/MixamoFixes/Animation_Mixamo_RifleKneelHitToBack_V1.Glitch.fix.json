@@ -1,0 +1,29 @@
+{
+  "file": "Animation_Mixamo_RifleKneelHitToBack_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 33.5°→13.1°）",
+  "changes": [
+    "LeftShoulder 第 20 帧：原来离前后帧中间姿势最多 16.3°，换成两端好帧之间的球面插值（同链 LeftArm、LeftForeArm、LeftHand 同几帧一起插值）",
+    "RightToeBase 第 2 帧：原来离前后帧中间姿势最多 16.2°，换成两端好帧之间的球面插值",
+    "LeftArm 第 18–19 帧：原来离前后帧中间姿势最多 15.2°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftForeArm、LeftHand 同几帧一起插值）",
+    "LeftHand 第 23–24 帧：原来离前后帧中间姿势最多 16.6°，换成两端好帧之间的球面插值（同链 LeftShoulder、LeftArm、LeftForeArm 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 33.5,
+    "worst": "LeftHand@20",
+    "over15": 6
+  },
+  "after": {
+    "glitchDeg": 13.1,
+    "worst": "LeftForeArm@4",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_RifleKneelHitToBack_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

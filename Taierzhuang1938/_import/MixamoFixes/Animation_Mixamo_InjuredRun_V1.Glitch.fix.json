@@ -1,0 +1,26 @@
+{
+  "file": "Animation_Mixamo_InjuredRun_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 17°→14.4°）",
+  "changes": [
+    "RightFoot 第 14 帧：原来离前后帧中间姿势最多 17.0°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightLeg 同几帧一起插值）"
+  ],
+  "before": {
+    "glitchDeg": 17,
+    "worst": "RightFoot@14",
+    "over15": 1
+  },
+  "after": {
+    "glitchDeg": 14.4,
+    "worst": "LeftToeBase@14",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_InjuredRun_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

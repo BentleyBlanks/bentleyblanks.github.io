@@ -1,0 +1,27 @@
+{
+  "file": "Animation_Mixamo_CrouchedRun_V1.glb",
+  "topic": "Glitch",
+  "kind": "anim",
+  "date": "2026-11-02",
+  "author": "Claude Opus 5.5",
+  "summary": "一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 16.9°→12.9°）",
+  "changes": [
+    "RightLeg 第 8 帧：原来离前后帧中间姿势最多 16.4°，换成两端好帧之间的球面插值（同链 RightUpLeg、RightFoot 同几帧一起插值）",
+    "LeftToeBase 第 21 帧：原来离前后帧中间姿势最多 16.9°，换成两端好帧之间的球面插值"
+  ],
+  "before": {
+    "glitchDeg": 16.9,
+    "worst": "LeftToeBase@21",
+    "over15": 2
+  },
+  "after": {
+    "glitchDeg": 12.9,
+    "worst": "LeftToeBase@19",
+    "over15": 0
+  },
+  "original": "Original/Animation_Mixamo_CrouchedRun_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

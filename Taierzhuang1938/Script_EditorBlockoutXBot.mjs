@@ -8,7 +8,9 @@
 //   · 原生状态 → XBOT_NATIVE（姿势 × 动作 × 手里 × 据枪），倒地 → XBOT_DEATHS；
 //   · 表里没有的、要精确贴位置的（顺着躺在被子 / 担架上、坐车）→ 当场把原身体的姿势换算到 X Bot（Script_XBotRetarget）。
 // 原身体骨头上挂的东西（枪、背着的枪、手榴弹、刺刀这类道具）每帧挪到 X Bot 的同一根骨上：
-// 播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手（握把在右手掌心，枪管指向左手）；其余时候照原身体手和枪的相对位置。
+// 播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手（握把在右手掌心，枪管按权重转向左手；清单 rifleTrack 的背上 / 掉地，
+// 同预览工具，共用 Script_MixamoProps.mjs）；其余时候照原身体手和枪的相对位置。贴躯干的挂件（背着的枪）按 X Bot 体型推开。
+// 运行时取证：_import/Script_XBotAttachmentProbe.mjs。
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
@@ -16,6 +18,7 @@ import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER }
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
+import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -57,8 +60,7 @@ export const XBOT = Object.freeze({
   rifleCalibration: "Animation_Mixamo_RifleAimingIdle_V1.glb",
   /** 开一枪之后播开枪动作这么久（试玩里 AI 的 state.firing 只亮一帧） */
   fireHoldS: 0.35,
-  /** 左手在枪管前方时把枪管转过去对准左手（同 Tool_MixamoAnimationPreview.html 的 AIM_AT_LEFT） */
-  aimAtLeft: { near: 0.2, far: 0.75, maxAngle: THREE.MathUtils.degToRad(100) },
+  // 枪管对准左手、动作里枪换地方（rifleTrack：背上 / 掉地）：同动作预览工具，共用 Script_MixamoProps.mjs
 });
 
 const SOLDIER_OF_XBOT = new Map(Object.entries(XBOT_FROM_SOLDIER).map(([s, x]) => [x, s]));
@@ -66,8 +68,15 @@ const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vect
 const _p2 = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _s2 = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _rel = new THREE.Matrix4(), _inv = new THREE.Matrix4();
 
-/** 枪与手（_PlaceWeapon）：原身体掌心离枪身这么近算握着；X Bot 掌心离握点 near 内全拉、far 外不拉；淡入淡出时长。 */
-const XBOT_GRIP = Object.freeze({ heldM: 0.2, near: 0.3, far: 0.5, blendS: 0.2, weightS: 0.12 });
+/**
+ * 枪与手（_PlaceWeapon）：原身体掌心离枪身这么近算握着；X Bot 掌心离握点 near 内全拉、far 外不拉；淡入淡出时长。
+ * 照原身体手与枪的相对位置放枪时（handR / handL），这个相对位置按时间常数 relTauS 跟、每秒最多转 relDegPerS 度、挪 relMps 米：
+ * 藏起来的原身体有时一帧一个样（11-02 取证：02-1 丁兵说话时原身体左手握点在 0.41 / 0.81 m 之间来回跳，枪跟着原身体左手转，
+ * 一帧转 80–170°），X Bot 手里的枪不跟着抽。原身体松手不到 releaseS 秒（没倒地）还当握着、照最后的相对位置拿在 X Bot 手里：
+ * 片段交接换根那一下原身体的手和枪会分开零点几秒（11-02 取证：01-4 丁兵跳进沟，原身体掌心离枪 2.4 m → 0.25 m 用了 0.3 s），
+ * 原来枪就在这几帧改照「贴躯干」挂，一帧跳 3.15 m。
+ */
+const XBOT_GRIP = Object.freeze({ heldM: 0.2, near: 0.3, far: 0.5, blendS: 0.2, weightS: 0.12, relTauS: 0.05, relDegPerS: 360, relMps: 1.5, releaseS: 0.5 });
 
 /** 点到线段（[a, b]，b 为空时就是到点 a）的距离；点为空 → Infinity。 */
 function SegmentDistance(p, [a, b]) {
@@ -77,11 +86,19 @@ function SegmentDistance(p, [a, b]) {
   return p.distanceTo(a.clone().addScaledVector(ab, t));
 }
 
-/** 两个矩阵按 e 插值（位置线性、朝向球面、缩放线性）。 */
-function BlendMatrix(from, to, e) {
-  const p1 = new THREE.Vector3(), q1 = new THREE.Quaternion(), s1 = new THREE.Vector3(), p2 = new THREE.Vector3(), q2 = new THREE.Quaternion(), s2 = new THREE.Vector3();
-  from.decompose(p1, q1, s1); to.decompose(p2, q2, s2);
-  return new THREE.Matrix4().compose(p1.lerp(p2, e), q1.slerp(q2, e), s1.lerp(s2, e));
+/**
+ * 挂件的过渡（换挂法、手里 ↔ 背上）：开始那一帧记下起点相对目标的偏移，之后每帧「此刻的目标 × 偏移」，偏移按 e 衰减成单位。
+ * 不直接在起点与目标之间插值：目标跟着身体动，两头朝向差近 180° 时最短的那条弧会走着走着换一边（11-02 取证：
+ * 背枪 0.3 s 挪动中途一帧翻 122°）；偏移只在开始时定一次，绕哪边就定了。
+ */
+function OffsetFrom(from, target) {
+  const off = { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() };
+  new THREE.Matrix4().copy(target).invert().multiply(from).decompose(off.p, off.q, off.s);
+  return off;
+}
+const _one = new THREE.Vector3(1, 1, 1), _zero = new THREE.Vector3(), _idq = new THREE.Quaternion();
+function ApplyOffset(target, off, e) {
+  return new THREE.Matrix4().copy(target).multiply(new THREE.Matrix4().compose(off.p.clone().lerp(_zero, e), off.q.clone().slerp(_idq, e), off.s.clone().lerp(_one, e)));
 }
 
 /** 朝 target 指数逼近（时间常数 tau 秒）。 */
@@ -102,6 +119,34 @@ function SetBoneWorldQuaternion(bone, world) {
 function Palm(hand, middle, out) {
   hand.getWorldPosition(out);
   return middle ? out.lerp(middle.getWorldPosition(_p2), 0.55) : out;
+}
+
+/**
+ * 端枪动作里枪的世界位姿（同动作预览工具）：握把照标定放进右手掌心，左手在枪管前方时按 AimAt 的权重把枪管转过去对准左手掌心
+ * （11-02 前是「够得着就整个转过去」的开关，左手一跨线枪一帧拧过去最多 100°）。B(name) 取骨，k = 人物缩放，band = AimBandFor(清单条目)。
+ */
+function CalibratedRifle(B, off, k, band, out) {
+  B("RightHand").matrixWorld.decompose(_p2, _q2, _s2);
+  out.position.copy(off.position).multiplyScalar(k).applyQuaternion(_q2).add(_p2);
+  out.quaternion.copy(_q2).multiply(off.quaternion);
+  const palmL = Palm(B("LeftHand"), B("LeftHandMiddle1"), new THREE.Vector3());
+  const muzzle = new THREE.Vector3(0, 0, -1).applyQuaternion(out.quaternion);
+  const toLeft = palmL.sub(out.position);
+  out.aimWeight = AimAt(out.quaternion, muzzle, toLeft, toLeft.length() / Math.max(k, 1e-6), band);
+  return out;
+}
+
+/** 给 PrepareRifleTrack 的一刻：枪（照标定）、右手骨、Spine2 的世界矩阵，人物右方 / 上方，掌心。 */
+function RifleTrackSample(B, off, k, band) {
+  const R = CalibratedRifle(B, off, k, band, { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() });
+  const P = (n) => B(n).getWorldPosition(new THREE.Vector3());
+  const spine = P("Spine2");
+  return {
+    rifle: new THREE.Matrix4().compose(R.position, R.quaternion, new THREE.Vector3(k, k, k)),
+    hand: B("RightHand").matrixWorld.clone(), spine: B("Spine2").matrixWorld.clone(),
+    body: { right: P("RightArm").sub(P("LeftArm")).normalize(), up: P("Neck").sub(spine).normalize(), spine },
+    palm: Palm(B("RightHand"), B("RightHandMiddle1"), new THREE.Vector3()),
+  };
 }
 
 /**
@@ -128,6 +173,71 @@ function FirstSkinnedMesh(root) {
   return found;
 }
 
+/**
+ * X Bot 的身体按骨头拟合成椭圆截面胶囊（同 _import/Script_MixamoLibraryAudit.mjs：骨头本地 +Y 指向子骨，截面半轴取挂在这根骨上的
+ * 蒙皮顶点的第 85 百分位，偏瘦）。贴躯干的挂件（背着的枪）按它推开，取证脚本也按它量。→ [{ name, cx, cz, rx, rz, y0, y1 }]（骨头本地单位）
+ */
+export const XBOT_BODY_BONES = ["Hips", "Spine", "Spine1", "Spine2", "Neck", "Head", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm",
+  "LeftForeArm", "RightForeArm", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg"];
+export function FitBodyVolumes(model, names = XBOT_BODY_BONES) {
+  const samples = new Map(names.map((n) => [n, []])), v = new THREE.Vector3();
+  model.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    const pos = o.geometry.attributes.position, si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, bones = o.skeleton.bones;
+    for (let i = 0; i < pos.count; i += 1) {
+      let best = -1, bw = 0;
+      for (let k = 0; k < 4; k += 1) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+      if (bw < 0.6 || !samples.has(bones[best].name)) continue;
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.bindMatrix).applyMatrix4(o.skeleton.boneInverses[best]);
+      samples.get(bones[best].name).push([v.x, v.y, v.z]);
+    }
+  });
+  const Pct = (arr, q) => { const t = [...arr].sort((a, b) => a - b); return t[Math.min(t.length - 1, Math.floor(q * t.length))]; };
+  const out = [];
+  for (const [name, pts] of samples) {
+    if (pts.length < 20) continue;
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), zs = pts.map((p) => p[2]);
+    const cx = Pct(xs, 0.5), cz = Pct(zs, 0.5);
+    out.push({ name, cx, cz, rx: Pct(xs.map((x) => Math.abs(x - cx)), 0.85), rz: Pct(zs.map((z) => Math.abs(z - cz)), 0.85), y0: Pct(ys, 0.05), y1: Pct(ys, 0.95) });
+  }
+  return out;
+}
+
+/** 点（骨头本地）离这段胶囊表面的有符号距离（骨头本地单位，> 0 在里面）；椭圆归一化后按短半轴折算，近表面准。 */
+export function VolumeSigned(vol, local) {
+  const k = Math.min(vol.rx, vol.rz);
+  const dy = local.y < vol.y0 ? vol.y0 - local.y : local.y > vol.y1 ? local.y - vol.y1 : 0;
+  return (1 - Math.hypot((local.x - vol.cx) / vol.rx, (local.z - vol.cz) / vol.rz, dy / k)) * k;
+}
+
+/** 挂件上看得见的网格的点（挂件自己的坐标），按 voxel 抽稀；skip(mesh) 为真的网格不算。 */
+function PropPoints(root, voxel, skip = null) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), seen = new Map(), v = new THREE.Vector3();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isSkinnedMesh || !o.geometry?.attributes?.position || skip?.(o)) return;
+    for (let p = o; p && p !== root; p = p.parent) if (p.visible === false) return;
+    const rel = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(rel);
+      const key = Math.round(v.x / voxel) + "," + Math.round(v.y / voxel) + "," + Math.round(v.z / voxel);
+      if (!seen.has(key)) seen.set(key, v.clone());
+    }
+  });
+  return [...seen.values()];
+}
+
+/**
+ * 贴在躯干上的挂件（背着的枪……）对 X Bot 体型（11-02 取证：照原身体搬过来，三八式背在 X Bot 背上，枪托一截插进屁股
+ * 9–10 cm、上段进背 4–5 cm —— X Bot 的背和屁股比士兵厚；挂在背后的钢盔（Spine2 下的 Object005）反过来离 X Bot 背 10–23 cm 悬着）。
+ * 在 X Bot 初始姿势里（站直，模型空间）找最省的「前后挪 d + 绕挂件最高点倾 θ」，让挂件上最深的点在躯干胶囊表面外 marginM、
+ * 最近的点离表面不超过 maxGapM；背带（名字带 Sling）本来就绕着胸口，不算（_KeepSling）。
+ */
+const XBOT_TORSO_FIT = Object.freeze({
+  bones: ["Hips", "Spine", "Spine1", "Spine2", "Neck", "LeftShoulder", "RightShoulder"],
+  marginM: 0.01, maxGapM: 0.03, maxPushM: 0.16, maxPullM: 0.25, pushStepM: 0.01, maxTiltDeg: 24, tiltStepDeg: 2, tiltCostPerDeg: 0.004,
+});
+
 /** 整套 X Bot 资源（一份）+ 每个人一份的 XBotSkin。 */
 export class XBotSkins {
   constructor({ base = XBOT.base } = {}) {
@@ -139,6 +249,7 @@ export class XBotSkins {
     this.loaded = new Map();      // file → AnimationClip（读完的）
     this.sourceRests = new Map(); // 原身体模型号 → { rest, retarget, headY }
     this.materials = new Map();
+    this.rifleTracks = new Map(); // file → PrepareRifleTrack 的结果（X Bot 模型空间、缩放 1）| null
     this.loading = null;
   }
 
@@ -164,6 +275,10 @@ export class XBotSkins {
     this.rootParent = new THREE.Matrix4().copy(this.source.matrixWorld).invert().multiply(hips.parent.matrixWorld);
     this.hipsParentInv = this.rootParent.clone().invert();
     this.headY = rest.worldP[rest.Find("Head")].y;
+    // 身体胶囊（初始姿势、模型空间）：贴躯干的挂件按它推开（XBOT_TORSO_FIT）
+    this.bodyVolumes = FitBodyVolumes(this.source);
+    this.restBones = new Map();
+    this.source.traverse(o => { if (o.isBone) this.restBones.set(o.name, o); });
     await this._CalibrateRifle();
     this.ready = true;
   }
@@ -186,6 +301,30 @@ export class XBotSkins {
     const inv = _q.clone().invert();
     this.rifleOffset = { position: right.sub(_p).applyQuaternion(inv), quaternion: inv.multiply(rifleQ) };
     mixer.stopAllAction();
+  }
+
+  /**
+   * 清单条目写了 rifleTrack 的端枪动作（枪在动作里背到背上 / 掉地，Script_MixamoProps.mjs）：在一具不显示的 X Bot 上把动作
+   * 摆到交接那几刻，交给 PrepareRifleTrack（模型空间、缩放 1）。动作还没读到返回 null（不缓存，下次再来）。
+   */
+  RifleTrack(file) {
+    if (this.rifleTracks.has(file)) return this.rifleTracks.get(file);
+    const lib = this.library?.get(file), clip = this.loaded.get(file);
+    if (!lib?.rifleTrack || !this.rifleOffset) { this.rifleTracks.set(file, null); return null; }
+    if (!clip) return null;
+    const model = this.scratch || (this.scratch = CloneSkinned(this.source));
+    const bones = new Map(); model.traverse(o => { if (o.isBone) bones.set(o.name, o); });
+    const B = (n) => bones.get(n);
+    const mixer = new THREE.AnimationMixer(model), action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
+    const band = AimBandFor(lib);
+    const info = PrepareRifleTrack(lib.rifleTrack, (t) => {
+      action.time = THREE.MathUtils.clamp(t, 0, clip.duration); mixer.update(0); model.updateMatrixWorld(true);
+      return RifleTrackSample(B, this.rifleOffset, 1, band);
+    }, 30);
+    mixer.stopAllAction(); mixer.uncacheRoot(model);
+    this.rifleTracks.set(file, info);
+    return info;
   }
 
   /**
@@ -277,6 +416,8 @@ export class XBotSkin {
     });
     this.container = new THREE.Group();
     this.container.name = "XBotSkin";
+    // 取证脚本（_import/Script_XBotAttachmentProbe.mjs）从场景里找回这个人
+    this.container.userData.xbotSkin = this;
     this.container.add(this.model);
     this.rig.root.parent?.add(this.container);
     this.bones = new Map();
@@ -365,6 +506,7 @@ export class XBotSkin {
     }
 
     this.fireT = intent.firing ? XBOT.fireHoldS : Math.max(0, (this.fireT || 0) - dt);
+    this.down = !!intent.down;
     const pick = this._Pick(intent);
     this.jumped = false;
     // 停在倒地姿势时，藏起来的原身体还在放它自己的倒地、布娃娃（actor.body 一上一下、在坡上会滑）：X Bot 改挂到人物根
@@ -486,7 +628,9 @@ export class XBotSkin {
         return { mode: "hold" };
       }
       const death = XBOT_DEATHS[this.rig.deathVariantId] || XBOT_DEATHS.DeathCollapseA;
-      return { mode: "clip", file: death.file, once: true, death: true };
+      const lib = skins.library.get(death.file);
+      // 清单给这条倒地动作写了 rifleTrack（枪什么时候脱手）：枪照端枪动作的挂法放，脱手后掉地；没写的照原身体手里的位置
+      return { mode: "clip", file: death.file, once: true, death: true, hold: lib?.rifleTrack ? lib.hold : undefined, rifleHand: lib?.rifleHand };
     }
     if (Number.isFinite(intent.throwSeconds)) {
       const entry = this.faction === "ija" ? XBOT_NATIVE.grenadeIja : XBOT_NATIVE.grenadeNra;
@@ -635,7 +779,7 @@ export class XBotSkin {
     }
     const weapon = this._RifleInHands() ? this.attachments.find(a => a.holdsWeapon) : null;
     const placed = weapon ? this._PlaceWeapon(weapon, pick, dt) : false;
-    if (!weapon) { this.lastMount = null; this.contact = null; }
+    if (!weapon) { this.lastMount = null; this.contact = null; for (const a of this.attachments) if (a.holdsWeapon) { a.looseDrop = null; a.handRel = null; } }
     if (!placed) { this.ikR = 0; this.ikL = 0; }
     for (const a of this.attachments) {
       if (a === weapon && placed) continue;
@@ -646,7 +790,7 @@ export class XBotSkin {
 
   /**
    * 枪从手里换到背上（不据枪就背枪，Script_RelaxedGait）或反过来：背上那支是手里那支的克隆（原点一样），
-   * 新露出来的那支从上一帧看到的位置（容器本地）XBOT.rifleSwapS 秒挪到它该在的地方。
+   * 新露出来的那支从上一帧看到的位置（X Bot 胯的坐标系，同 _PlaceWeapon 的换挂法）XBOT.rifleSwapS 秒挪到它该在的地方。
    */
   _RifleSwapStep(weapon, dt) {
     const hand = weapon ? this.actor.weaponGroup : null;
@@ -666,8 +810,10 @@ export class XBotSkin {
       if (swap.rest) swap.rest.decompose(now.position, now.quaternion, now.scale);
       now.updateMatrix();
       now.updateWorldMatrix(true, false);
-      const target = new THREE.Matrix4().copy(this.container.matrixWorld).invert().multiply(now.matrixWorld);
-      const world = new THREE.Matrix4().copy(this.container.matrixWorld).multiply(BlendMatrix(swap.from, target, e));
+      const frame = this.H("Hips").matrixWorld;
+      const target = new THREE.Matrix4().copy(frame).invert().multiply(now.matrixWorld);
+      if (!swap.off) swap.off = OffsetFrom(swap.from, target);
+      const world = new THREE.Matrix4().copy(frame).multiply(ApplyOffset(target, swap.off, e));
       new THREE.Matrix4().copy(now.parent.matrixWorld).invert().multiply(world).decompose(now.position, now.quaternion, now.scale);
       now.updateMatrix();
       // 手里那支：_PlaceWeapon 下一帧按 wWritten 认出这是自己写的，不当成游戏的本意
@@ -678,7 +824,7 @@ export class XBotSkin {
     if (now) {
       now.updateWorldMatrix(true, false);
       const local = this.rifleShown?.local || new THREE.Matrix4();
-      this.rifleShown = { which, local: local.copy(this.container.matrixWorld).invert().multiply(now.matrixWorld) };
+      this.rifleShown = { which, local: local.copy(this.H("Hips").matrixWorld).invert().multiply(now.matrixWorld) };
     } else this.rifleShown = null;
   }
 
@@ -721,8 +867,112 @@ export class XBotSkin {
     const C = ti >= 0 && retarget ? retarget.correction[ti] : null;
     if (C) { const Ci = C.clone().invert(); relPos.applyQuaternion(Ci); relRot.premultiply(Ci); }
     xbotBone.matrixWorld.decompose(_p2, _q2, _s2);
-    this._Write(a, _m2.compose(relPos.applyQuaternion(_q2).add(_p2), _q2.clone().multiply(relRot), worldScale));
+    const world = _m2.compose(relPos.applyQuaternion(_q2).add(_p2), _q2.clone().multiply(relRot), worldScale);
+    // 贴躯干的挂件按 X Bot 体型推开（XBOT_TORSO_FIT；没握在手里的枪不推）
+    let unfitted = null;
+    if (!looseWeapon && xbotBone === a.xbotBone && XBOT_TORSO_FIT.bones.includes(xbotBone.name)) {
+      const fit = this._TorsoFit(a, xbotBone, world);
+      if (fit) { unfitted = world.clone(); world.premultiply(_m.copy(xbotBone.matrixWorld).invert()).premultiply(fit).premultiply(xbotBone.matrixWorld); }
+    }
+    this._Write(a, world);
+    this._KeepSling(a, unfitted);
     if (looseWeapon) { this.lastMount = "body"; this.contact = null; }
+  }
+
+  /**
+   * 背带（挂件下直接挂着、名字带 Sling 的网格，Script_RelaxedGait 的 Model_BackRifleSling）不跟着 XBOT_TORSO_FIT 往后推：
+   * 它绕在胸前，跟着推会切进胸口（11-02 取证：推了之后背带进身体 > 3 cm 的帧从 3% 涨到 99%）。留在推之前的位置。
+   * unfitted = 推之前挂件的世界矩阵（null = 没推，背带还原成游戏的本地位姿）。
+   */
+  _KeepSling(a, unfitted) {
+    for (const c of a.object.children) {
+      if (!c.isMesh || !/Sling/i.test(c.name)) continue;
+      const rests = a.slingRest || (a.slingRest = new Map());
+      if (!rests.has(c)) rests.set(c, c.matrix.clone());
+      const rest = rests.get(c);
+      if (unfitted) c.matrix.copy(_m.copy(a.object.matrixWorld).invert().multiply(unfitted).multiply(rest));
+      else c.matrix.copy(rest);
+      c.matrix.decompose(c.position, c.quaternion, c.scale);
+      c.updateMatrixWorld(true);
+    }
+  }
+
+  /**
+   * XBOT_TORSO_FIT：这个挂件相对 X Bot 那节躯干骨要再挪多少（骨头本地的矩阵，null = 不用挪）。挂件的本意变了（换枪）、
+   * 看得见的网格变了（背上那支露出来了）才重算；手里 ↔ 背上正在挪的那 0.3 s 不算（点的位置不对）。
+   */
+  _TorsoFit(a, bone, world) {
+    let sig = 0;
+    a.object.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && o.visible) sig += 1 + (o.id % 997) * 1e-3; });
+    const f = a.torsoFit;
+    if (f && f.sig === sig && f.intended && a.intended && f.intended.equals(a.intended)) return f.G;
+    if (!sig || this.rifleSwap) return f?.G || null;
+    // 同一种挂件挂在同一节骨上的相对位置各人差不多（只差身高缩放）：按相对矩阵（取两位小数）共用一份，几十个人不各搜一遍
+    const rel = new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(world);
+    const key = bone.name + "|" + a.object.name + "|" + sig.toFixed(3) + "|" + rel.elements.map(x => x.toFixed(2)).join(",");
+    const cache = this.skins.torsoFits || (this.skins.torsoFits = new Map());
+    if (!cache.has(key)) cache.set(key, this._SolveTorsoFit(a, bone, world));
+    a.torsoFit = { sig, intended: a.intended?.clone() || null, G: cache.get(key) };
+    return a.torsoFit.G;
+  }
+
+  _SolveTorsoFit(a, bone, world) {
+    const skins = this.skins, rest = skins.restBones, B = rest?.get(bone.name);
+    if (!B || !skins.bodyVolumes?.length) return null;
+    skins.source.updateMatrixWorld(true);
+    // 挂件在初始姿势（模型空间）里的位姿：同样的「相对这节骨」搬过去
+    const Wm = new THREE.Matrix4().copy(B.matrixWorld).multiply(new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(world));
+    const pts = PropPoints(a.object, 0.025, o => /Sling/i.test(o.name)).map(p => p.applyMatrix4(Wm));
+    if (!pts.length) return null;
+    const vols = skins.bodyVolumes.filter(v => XBOT_TORSO_FIT.bones.includes(v.name)).map(v => {
+      const b = rest.get(v.name);
+      return { ...v, inv: new THREE.Matrix4().copy(b.matrixWorld).invert(), scale: b.matrixWorld.getMaxScaleOnAxis() };
+    });
+    const P = (n) => rest.get(n).getWorldPosition(new THREE.Vector3());
+    const right = P("RightArm").sub(P("LeftArm")).setY(0).normalize(), up = new THREE.Vector3(0, 1, 0);
+    const back = new THREE.Vector3().crossVectors(right, up).normalize();   // 人朝 up × right，背后取反（right × up）
+    let pivot = pts[0];
+    for (const q of pts) if (q.y > pivot.y) pivot = q;
+    const tmp = new THREE.Vector3(), loc = new THREE.Vector3();
+    const Depth = (M) => {
+      let worst = -Infinity;
+      for (const q of pts) {
+        tmp.copy(q).applyMatrix4(M);
+        for (const v of vols) { const d = VolumeSigned(v, loc.copy(tmp).applyMatrix4(v.inv)) * v.scale; if (d > worst) worst = d; }
+      }
+      return worst;
+    };
+    const Fit = (d, deg) => new THREE.Matrix4().makeTranslation(back.x * d, back.y * d, back.z * d)
+      .multiply(new THREE.Matrix4().makeTranslation(pivot.x, pivot.y, pivot.z))
+      .multiply(new THREE.Matrix4().makeRotationAxis(right, THREE.MathUtils.degToRad(deg)))
+      .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z));
+    const C = XBOT_TORSO_FIT;
+    // 合格：最深的点在表面外 marginM，最近的点离表面不超过 maxGapM（不嵌进去，也不悬空）
+    const Miss = (w) => Math.max(0, w + C.marginM, -C.maxGapM - w);
+    const depth0 = Depth(new THREE.Matrix4()), miss0 = Miss(depth0);
+    if (miss0 === 0) return null;
+    const ds = [];
+    for (let d = -C.maxPullM; d <= C.maxPushM + 1e-6; d += C.pushStepM) ds.push(Math.round(d * 1000) / 1000);
+    ds.sort((x, y) => Math.abs(x) - Math.abs(y));
+    let best = null, bestCost = Infinity, fallback = null, fallbackMiss = miss0;
+    // 倾角两个方向都试（绕「右」转正角是下端往前还是往后，看挂件在哪边）
+    for (const sign of [1, -1]) {
+      for (let deg = 0; deg <= C.maxTiltDeg + 1e-6; deg += C.tiltStepDeg) {
+        for (const d of ds) {
+          const cost = Math.abs(d) + deg * C.tiltCostPerDeg;
+          if (cost >= bestCost) break;
+          const M = Fit(d, sign * deg), miss = Miss(Depth(M));
+          if (miss === 0) { best = M; bestCost = cost; break; }
+          if (miss < fallbackMiss) { fallbackMiss = miss; fallback = M; }
+        }
+      }
+    }
+    // 找不到合格的：差得少了 1 cm 以上才挪（挂件不在背后、往前后挪帮不上忙的不动）
+    if (!best && !(fallbackMiss < miss0 - 0.01)) fallback = null;
+    const F = best || fallback;
+    if (!F) return null;
+    // 模型空间的挪法换成这节骨本地的：G = B⁻¹ F B
+    return new THREE.Matrix4().copy(B.matrixWorld).invert().multiply(F).multiply(B.matrixWorld);
   }
 
   /** 枪的中心离原身体躯干（骨盆、脊柱、胸、颈）0.35 m 内 → 那节骨与 X Bot 对应的骨；否则 null（在地上）。 */
@@ -769,43 +1019,87 @@ export class XBotSkin {
     const srcPalm = { R: this._SrcPalm("R"), L: this._SrcPalm("L") };
     const srcGap = { R: SegmentDistance(srcPalm.R, srcSeg), L: SegmentDistance(srcPalm.L, srcSeg) };
     const mixamo = pick?.mode === "clip" && pick.hold === "端枪" && this.skins.rifleOffset;
-    let mode, W;
+    let mode, W, trackMode = "hand";
     if (mixamo) {
       if (pick.rifleHand === "L") { if (!this.rifleOnLeft || this.rifleOnLeft.file !== pick.file) this.rifleOnLeft = this._PinLeft(pick.file); }
       else this.rifleOnLeft = null;
-      const R = this._RifleWorld();
+      const lib = this.skins.library.get(pick.file);
+      const R = this._RifleWorld(AimBandFor(lib));
       w.matrixWorld.decompose(_p2, _q2, _s2);
-      W = new THREE.Matrix4().compose(R.position, R.quaternion, _s2);
+      const weaponScale = _s2.clone();
+      W = new THREE.Matrix4().compose(R.position, R.quaternion, weaponScale);
       mode = this.rifleOnLeft ? "rifleL" : "rifle";
+      // 动作里枪换地方（清单 rifleTrack）：背上 / 换握 / 掉地，左手不拉
+      const track = !this.rifleOnLeft && lib?.rifleTrack ? this._RifleTrack(a, pick, W, weaponScale, dt) : null;
+      if (track) { W = track.W; trackMode = track.mode; }
+      else if (!lib?.rifleTrack) { a.rifleDrop = null; a.rifleTrackLast = null; }
+      a.looseDrop = null; a.unheldT = 0;
+      // 记下枪相对右手的位姿：原身体刚松手时按它拿着（换成照原身体握法时不从它平滑，那一下交给换挂法的 0.2 s 淡）
+      if (trackMode === "hand" && !this.rifleOnLeft) {
+        const rel = new THREE.Matrix4().copy(this.H("RightHand").matrixWorld).invert().multiply(W), h = { side: "R", p: new THREE.Vector3(), q: new THREE.Quaternion(), sc: new THREE.Vector3(), fromMixamo: true };
+        rel.decompose(h.p, h.q, h.sc); a.handRel = h;
+      } else a.handRel = null;
     } else {
       this.rifleOnLeft = null;
-      const side = srcGap.R <= srcGap.L ? "R" : "L";
-      if (!(srcGap[side] <= XBOT_GRIP.heldM)) {
+      a.rifleDrop = null; a.rifleTrackLast = null;
+      // 两只手都握着时哪只算主手：上一帧那只还握着就不换（两边离枪差不多远时一帧左一帧右，枪在两只手之间来回淡）
+      const prevSide = a.weaponMode === "handR" ? "R" : a.weaponMode === "handL" ? "L" : null;
+      const side = prevSide && srcGap[prevSide] <= XBOT_GRIP.heldM ? prevSide : srcGap.R <= srcGap.L ? "R" : "L";
+      const held = srcGap[side] <= XBOT_GRIP.heldM;
+      if (!held && !this.down && a.handRel && (a.unheldT = (a.unheldT || 0) + Math.max(dt, 0)) < XBOT_GRIP.releaseS) {
+        // 原身体刚松手（没倒地）：先当还握着（XBOT_GRIP.releaseS）
+        const hand = this.H(a.handRel.side === "R" ? "RightHand" : "LeftHand");
+        W = new THREE.Matrix4().copy(hand.matrixWorld).multiply(new THREE.Matrix4().compose(a.handRel.p, a.handRel.q, a.handRel.sc));
+        mode = "hand" + a.handRel.side;
+      } else if (!held && (a.looseDrop || (a.weaponMode && a.weaponLocal)) && (this.down || a.looseDrop || !this._NearTorso(srcW))) {
+        // 原身体松手、枪不贴着它的躯干（倒地扔枪、扔投弹前把枪放下、被炸飞）：原身体藏着、跟 X Bot 不在一处，照它的枪会一下跳到
+        // 别处（11-02 取证：02-2 丁兵倒地一帧跳 0.95 m、转 103°；09-7 投弹前放枪一帧跳 1.9 m）。改成从上一帧看到的位置自己落到
+        // X Bot 脚下的地面（DropPose），直到又握回手里
+        if (!a.looseDrop) {
+          new THREE.Matrix4().copy(this.H("Hips").matrixWorld).multiply(a.weaponLocal).decompose(_p, _q, _s);
+          a.looseDrop = { release: { position: _p.clone(), quaternion: _q.clone(), velocity: new THREE.Vector3() }, since: 0, groundY: this.container.matrixWorld.elements[13] };
+        } else a.looseDrop.since += Math.max(dt, 0);
+        const out = DropPose(a.looseDrop.release, a.looseDrop.since, a.looseDrop.groundY, { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() });
+        w.matrixWorld.decompose(_p2, _q2, _s2);
+        W = new THREE.Matrix4().compose(out.position, out.quaternion, _s2.clone());
+        mode = "drop"; trackMode = "drop"; a.handRel = null;
+      } else if (!held) {
         // 没人握着：枪还原成游戏的本意，挂点交给 _ReanchorOne（地上的原地不动、贴着躯干的跟躯干走）
         if (a.wWritten) { w.matrix.copy(a.wIntended); w.matrix.decompose(w.position, w.quaternion, w.scale); w.updateMatrix(); a.wWritten = null; w.updateMatrixWorld(true); }
-        a.weaponBlend = null; a.weaponMode = null; return false;
+        a.weaponBlend = null; a.weaponMode = null; a.looseDrop = null; a.handRel = null; return false;
+      } else {
+        a.looseDrop = null; a.unheldT = 0;
+        W = this._SmoothHandRelative(a, side, this._HandRelative(side, srcW), dt);
+        mode = "hand" + side;
       }
-      W = this._HandRelative(side, srcW);
-      mode = "hand" + side;
     }
-    // 挂法变了：从上一帧放的位姿（容器本地，人走着也不拖）淡过去
-    const local = new THREE.Matrix4().copy(this.container.matrixWorld).invert().multiply(W);
-    if (a.weaponMode && a.weaponMode !== mode && a.weaponLocal) a.weaponBlend = { from: a.weaponLocal.clone(), t: 0 };
+    // 挂法变了：从上一帧放的位姿淡过去。位姿记在 X Bot 胯的坐标系里：人走着不拖；片段交接换根时容器一帧挪几米、胯是接着淡的，
+    // 记在容器里会跟着容器跳（11-02 取证：01-4 丁兵跳进沟那帧枪落到 2 m 以下）
+    const frame = this.H("Hips").matrixWorld;
+    const local = new THREE.Matrix4().copy(frame).invert().multiply(W);
+    if (a.weaponMode && a.weaponMode !== mode && a.weaponLocal) {
+      // 差得越多淡得越久：0.2 s + 每 180° 0.35 s + 每米 0.4 s（照标定 → 照原身体握法常差一百多度，0.2 s 转完一帧要拧四十多度）
+      const off = OffsetFrom(a.weaponLocal, local);
+      const deg = THREE.MathUtils.radToDeg(2 * Math.acos(Math.min(1, Math.abs(off.q.w))));
+      const metres = new THREE.Vector3().setFromMatrixPosition(a.weaponLocal).distanceTo(new THREE.Vector3().setFromMatrixPosition(local)) * frame.getMaxScaleOnAxis();
+      a.weaponBlend = { off, t: 0, dur: XBOT_GRIP.blendS + 0.35 * deg / 180 + 0.4 * Math.min(metres, 1) };
+    }
     a.weaponMode = mode;
     if (a.weaponBlend) {
       a.weaponBlend.t += dt;
-      const k = Math.min(1, a.weaponBlend.t / XBOT_GRIP.blendS), e = k * k * (3 - 2 * k);
-      local.copy(BlendMatrix(a.weaponBlend.from, local, e));
+      const k = Math.min(1, a.weaponBlend.t / (a.weaponBlend.dur || XBOT_GRIP.blendS)), e = k * k * (3 - 2 * k);
+      local.copy(ApplyOffset(local, a.weaponBlend.off, e));
       if (k >= 1) a.weaponBlend = null;
     }
     a.weaponLocal = local.clone();
-    W = new THREE.Matrix4().copy(this.container.matrixWorld).multiply(local);
+    W = new THREE.Matrix4().copy(frame).multiply(local);
     // 双手 IK
     const target = { R: null, L: null };
     if (mixamo) {
-      if (this.rifleOnLeft) target.R = new THREE.Vector3().setFromMatrixPosition(W);
+      if (trackMode !== "hand") { /* 枪在背上 / 换握 / 掉地：两只手都不拉 */ }
+      else if (this.rifleOnLeft) target.R = new THREE.Vector3().setFromMatrixPosition(W);
       else if (front) target.L = this._Reachable("L", new THREE.Vector3().setFromMatrixPosition(W), front.clone().applyMatrix4(W));
-    } else {
+    } else if (trackMode === "hand") {
       // 原动作里另一只手也握着枪：照它在枪上的位置（换到 X Bot 的枪上）
       const other = mode === "handR" ? "L" : "R";
       if (srcGap[other] <= XBOT_GRIP.heldM) target[other] = srcPalm[other].clone().applyMatrix4(srcW.clone().invert()).applyMatrix4(W);
@@ -826,8 +1120,50 @@ export class XBotSkin {
     w.updateMatrix();
     a.wWritten = w.matrix.clone();
     w.updateMatrixWorld(true);
-    this.lastMount = mode;
+    this.lastMount = trackMode !== "hand" ? "rifle-" + trackMode : mode;
     return true;
+  }
+
+  /**
+   * 清单 rifleTrack 的这一刻（Script_MixamoProps.RifleTrackPose）。在「人物参考系」里算：容器的世界位姿去掉缩放（F，
+   * 原点在脚下地面、y 朝上，米制不变），所以掉地按真重力、地面高度 0；算完换回世界。
+   * 掉地：脱手那一帧用这一帧之前实际看到的枪（位置、速度），不用预算的那一刻（换动作的过渡还在淡时两者不一样，会跳一下）；
+   * 脱手之后按真实时间往下落（倒地停住 _Hold 时动作时间不走，枪照样落地）。→ { W, mode } | null（"hand" 照常）
+   */
+  _RifleTrack(a, pick, W, weaponScale, dt) {
+    const info0 = this.skins.RifleTrack(pick.file);
+    const cur = this.current;
+    if (!info0 || !cur || cur.mirror || cur.lastT === null) { a.rifleDrop = null; a.rifleTrackLast = null; return null; }
+    const k = this.container.matrixWorld.getMaxScaleOnAxis() || 1;
+    this.container.matrixWorld.decompose(_p, _q, _s);
+    const F = new THREE.Matrix4().compose(_p, _q, new THREE.Vector3(1, 1, 1)), Finv = F.clone().invert();
+    const toF = (m) => new THREE.Matrix4().multiplyMatrices(Finv, m);
+    const P = (n) => this.H(n).getWorldPosition(new THREE.Vector3()).applyMatrix4(Finv);
+    const spine = P("Spine2");
+    const now = { rifle: toF(W), hand: toF(this.H("RightHand").matrixWorld), spine: toF(this.H("Spine2").matrixWorld),
+      body: { right: P("RightArm").sub(P("LeftArm")).normalize(), up: P("Neck").sub(spine).normalize(), spine },
+      palm: Palm(this.H("RightHand"), this.H("RightHandMiddle1"), new THREE.Vector3()).applyMatrix4(Finv) };
+    // 模型空间的脱手位姿按人物缩放换到 F（模型挂在容器原点，容器 = F × 缩放 k）
+    const info = { ...info0 };
+    if (info0.release) info.release = { position: info0.release.position.clone().multiplyScalar(k), quaternion: info0.release.quaternion.clone(), velocity: info0.release.velocity.clone().multiplyScalar(k) };
+    let t = cur.lastT;
+    const dropAt = info0.track.dropAt;
+    if (info.release && t >= dropAt) {
+      let d = a.rifleDrop;
+      if (!d || d.file !== pick.file) {
+        d = a.rifleDrop = { file: pick.file, since: t - dropAt, release: null };
+        // 上一帧还在手里（同一条动作）：从实际看到的位姿落下（速度照预算的，含往外甩的那一份）
+        const last = a.rifleTrackLast;
+        if (last && last.file === pick.file) d.release = { position: last.p.clone(), quaternion: last.q.clone(), velocity: info.release.velocity.clone() };
+      } else d.since += Math.max(dt, 0);
+      if (d.release) info.release = d.release;
+      t = dropAt + d.since;
+    } else a.rifleDrop = null;
+    const out = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+    const mode = RifleTrackPose(info, t, now, 0, out);
+    if (mode !== "drop") a.rifleTrackLast = { file: pick.file, p: out.position.clone(), q: out.quaternion.clone() };
+    if (mode === "hand") return null;
+    return { mode, W: new THREE.Matrix4().multiplyMatrices(F, new THREE.Matrix4().compose(out.position, out.quaternion, weaponScale)) };
   }
 
   /**
@@ -841,6 +1177,23 @@ export class XBotSkin {
     const reach = (A.distanceTo(B) + B.distanceTo(Cw)) * 0.97 + Palm(hand, this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(Cw);
     for (let t = 1; t >= 0.45; t -= 0.05) { const p = grip.clone().lerp(front, t); if (p.distanceTo(A) <= reach) return p; }
     return grip.clone().lerp(front, 0.45);
+  }
+
+  /** X Bot 手里的枪相对那只手的位姿（XBOT_GRIP.relTauS / relDegPerS / relMps）跟着原身体走，但不跟着它一帧一个样地抽。 */
+  _SmoothHandRelative(a, side, W, dt) {
+    const hand = this.H(side === "R" ? "RightHand" : "LeftHand");
+    const rel = new THREE.Matrix4().copy(hand.matrixWorld).invert().multiply(W);
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    rel.decompose(p, q, sc);
+    const s = a.handRel;
+    if (!s || s.side !== side || s.fromMixamo) { a.handRel = { side, p, q, sc }; return W; }
+    const step = Math.max(dt, 0), k = 1 - Math.exp(-step / XBOT_GRIP.relTauS);
+    const ang = s.q.angleTo(q), maxA = THREE.MathUtils.degToRad(XBOT_GRIP.relDegPerS) * step;
+    if (ang > 1e-6) s.q.slerp(q, Math.min(ang * k, maxA) / ang);
+    const d = s.p.distanceTo(p);
+    if (d > 1e-6) s.p.lerp(p, Math.min(d * k, XBOT_GRIP.relMps * step) / d);
+    s.sc.copy(sc);
+    return new THREE.Matrix4().copy(hand.matrixWorld).multiply(new THREE.Matrix4().compose(s.p, s.q, s.sc));
   }
 
   /** 原身体某只手与枪的相对位姿，搬到 X Bot 同一只手上（两套骨手的初始朝向差按换算的修正量补）。 */
@@ -949,8 +1302,8 @@ export class XBotSkin {
     return best;
   }
 
-  /** 枪的世界位姿：右手照标定（左手在枪管前方时枪管对准左手），或开头钉在左手上的那份。 */
-  _RifleWorld() {
+  /** 枪的世界位姿：右手照标定（左手在枪管前方时按权重把枪管转过去对准左手，CalibratedRifle），或开头钉在左手上的那份。 */
+  _RifleWorld(band) {
     const off = this.skins.rifleOffset, k = this.container.matrixWorld.getMaxScaleOnAxis();
     const out = this._rifleOut || (this._rifleOut = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() });
     if (this.rifleOnLeft) {
@@ -959,23 +1312,13 @@ export class XBotSkin {
       out.quaternion.copy(_q2).multiply(this.rifleOnLeft.quaternion);
       return out;
     }
-    this.H("RightHand").matrixWorld.decompose(_p2, _q2, _s2);
-    out.position.copy(off.position).multiplyScalar(k).applyQuaternion(_q2).add(_p2);
-    out.quaternion.copy(_q2).multiply(off.quaternion);
-    const palmL = Palm(this.H("LeftHand"), this.H("LeftHandMiddle1"), new THREE.Vector3());
-    const muzzle = new THREE.Vector3(0, 0, -1).applyQuaternion(out.quaternion);
-    const toLeft = palmL.sub(out.position), reach = toLeft.length() / Math.max(k, 1e-6);
-    const A = XBOT.aimAtLeft;
-    if (reach > A.near && reach < A.far && muzzle.angleTo(toLeft) < A.maxAngle) {
-      out.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(muzzle, toLeft.normalize()));
-    }
-    return out;
+    return CalibratedRifle(this.H, off, k, band, out);
   }
 
   /** 右手腾出来干别的、枪留在左手的动作（清单 rifleHand: "L"）：动作开头按右手标定放好枪，记下它相对左手的位姿。 */
   _PinLeft(file) {
     this.rifleOnLeft = null;
-    const W = this._RifleWorld(), k = this.container.matrixWorld.getMaxScaleOnAxis();
+    const W = this._RifleWorld(AimBandFor(this.skins.library.get(file))), k = this.container.matrixWorld.getMaxScaleOnAxis();
     this.H("LeftHand").matrixWorld.decompose(_p2, _q2, _s2);
     const inv = _q2.clone().invert();
     return { file, position: W.position.clone().sub(_p2).applyQuaternion(inv).divideScalar(k), quaternion: inv.multiply(W.quaternion.clone()) };
@@ -1013,7 +1356,10 @@ export class XBotSkin {
     this.mixer.stopAllAction();
     this.container.removeFromParent();
     for (const mesh of this.hidden) mesh.visible = true;
-    for (const a of this.attachments) if (a.intended) { a.object.matrix.copy(a.intended); a.object.matrix.decompose(a.object.position, a.object.quaternion, a.object.scale); }
+    for (const a of this.attachments) {
+      if (a.intended) { a.object.matrix.copy(a.intended); a.object.matrix.decompose(a.object.position, a.object.quaternion, a.object.scale); }
+      if (a.slingRest) for (const [c, m] of a.slingRest) { c.matrix.copy(m); c.matrix.decompose(c.position, c.quaternion, c.scale); }
+    }
   }
 }
 
