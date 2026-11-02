@@ -302,7 +302,9 @@ Smith 的开栓剖视说明明确记载 Gewehr 88 需抬柄 90° 后再后拉。
   `FpsHandContactTest --only=HanYang`、`FpsArmTest --only=HanYang`、`FirearmResponseBrowserTest`、`FpsAnimationTest`。
   这几项里原来按程序化换弹写的时间窗和 IK 目标改成认片段：机构测试对片段查「抬柄时机柄球留在虎口（< 1.2 cm）且手掌同向转过 30% 以上」，
   手指接触按片段秒数取捏夹 1.40–1.72 s、压弹 1.98–2.12 s，手臂测试追踪真实手骨；片段的 `MeasureSkeletalPose` 只在手腕上报扭转，
-  所以「扭转不集中在手腕」只留 18° 上限。门限数值没有放宽。
+  所以「扭转不集中在手腕」只留 18° 上限。`FpsRifleViewTest` 原要求换弹全程装填口在画面 x .35–.90、y .16–.88 内
+  （程序化换弹「给装填口留出画面」的设计）；参考里取夹那段机匣在画面右下沿外，片段照参考，
+  改为从入槽到压到底（1.75–2.14 s）装填口必须在画面里（实测最低 0.95 画面高）。其余门限数值没有放宽。
 
 源工程：`OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/HanYangReload_20261102/Animation_HanYangReload.blend`
 （由 `HanYang173RIdle_20261025` 复制；同目录 `Data_Capture.json`、参考视频与对比图）。改节拍：改 Author 脚本的节拍表，
