@@ -222,15 +222,20 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // ([reference s, played s], piecewise linear; the player's fire interval follows,
     // AI keeps fireIntervalS). Played at the reference's own speed: a 1.60 s pace
     // (reach x1.6, pull/hold/push x1.5, return x1.38, re-shoulder x1.6, knob x1.1)
-    // was tried on 2026-11-02 and the user found it too fast.
-    durationS: 2.30, startS: 0.02,
-    pace: [[0, 0], [2.30, 2.30]],
-    work: Object.freeze({ position: [0.0255, -0.2151, -0.1218], rotation: [0.3336, 0.2081, -0.0778] }),
+    // was tried on 2026-11-02 and the user found it too fast. The re-shoulder is the
+    // exception: the reference settles the head for .40 s after the rifle reaches the
+    // cheek, which the user found sluggish, so it settles in .22 s (ends at 2.12 s).
+    durationS: 2.12, startS: 0.02,
+    pace: [[0, 0], [2.12, 2.12]],
+    // Low working pose. The rifle leans ~17 deg on screen like the reference (it read
+    // as standing too upright at 13 deg): turned 9 deg about the knob in the view
+    // plane, its muzzle 3.4 deg lower, and 4 cm nearer along the ray through the knob.
+    work: Object.freeze({ position: [0.0417, -0.1914, -0.0807], rotation: [0.2410, 0.3312, 0.0460] }),
     headPitchRad: 0.35,
     // [s, weight]; the knob holds high until .40, is down by .60; the rifle
-    // rises to the cheek in .09 s and the head lifts onto the stock last.
+    // rises to the cheek in .09 s and the head settles onto the stock last.
     lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.88, 1], [1.94, 0.55], [1.985, 0.06], [2.01, 0]],
-    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.90, 1], [1.98, 0.62], [2.10, 0.42], [2.17, 0.26], [2.23, 0.12], [2.30, 0]],
+    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.90, 1], [1.97, 0.60], [2.02, 0.27], [2.07, 0.08], [2.12, 0]],
     // Shot response on the held pose, rotating about the aiming eye (rig
     // space): [s, x, y, z, rx, ry, rz]. Hip fire keeps `hipRiseScale` of it.
     risePivot: [0, 0.065, 0.159],
