@@ -241,6 +241,9 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // hand reaches the near plane); `workDepthScale` then brings the whole layer up close.
     work: Object.freeze({ position: [0.0547, -0.1742, -0.1448], rotation: [0.1653, 0.3259, 0.0197] }),
     headPitchRad: 0.18,
+    // Hand shape on the knob (FPS_HAND_SHAPES.boltFist): closed round the knob like the COD clip;
+    // the reach before the grasp is laid out from it so the hand does not jump onto the knob.
+    boltShape: "boltFist",
     // Depth of the first-person layer at the low pose (1 = unchanged): the COD clip keeps
     // the working rifle and hand big and close; squeezing the whole layer's depth does
     // that without moving the hand nearer the shoulder (which tears the arm skin).
@@ -285,17 +288,17 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.175, anchor: "gripClear" },
       { at: 0.250, anchor: "grip", offset: [0.068, 0.015, -0.012], shape: "packetRecover", through: true },
       { at: 0.360, anchor: "grip", offset: [0.078, 0.000, -0.040], shape: "packetRecover", through: true },
-      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.35, through: true },
-      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.6, through: true },
+      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.42, through: true },
+      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.72, through: true },
       { at: 0.620, anchor: "boltClear", through: true },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
       // Press the handle down on the knob, slip off along the handle, then swing
       // the open hand up outside the knob (never across it) and down to the wrist.
       { at: 1.410, anchor: "bolt" },
       { at: 1.465, anchor: "boltClear" },
-      { at: 1.560, anchor: "knob", offset: [0.085, 0.048, -0.005], shape: "packetClear", turnMix: 0.5, through: true },
-      { at: 1.630, anchor: "knob", offset: [0.090, 0.015, 0.030], shape: "packetRelax", turnMix: 0.4, through: true },
-      { at: 1.710, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
+      { at: 1.560, anchor: "knob", offset: [0.085, 0.048, -0.005], shape: "packetRecover", turnMix: 0.5, through: true },
+      { at: 1.630, anchor: "knob", offset: [0.090, 0.015, 0.030], shape: "packetRecover", turnMix: 0.4, through: true },
+      { at: 1.710, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRecover", through: true },
       { at: 1.800, anchor: "gripClear" },
       { at: 1.920, anchor: "grip", weight: 0 },
     ],
@@ -305,8 +308,8 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.175, anchor: "gripClear" },
       { at: 0.250, anchor: "grip", offset: [0.068, 0.015, -0.012], shape: "packetRecover", through: true },
       { at: 0.360, anchor: "grip", offset: [0.078, 0.000, -0.040], shape: "packetRecover", through: true },
-      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.35, through: true },
-      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.6, through: true },
+      { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.42, through: true },
+      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.72, through: true },
       { at: 0.620, anchor: "boltClear", through: true },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
       { at: 0.950, anchor: "bolt" },

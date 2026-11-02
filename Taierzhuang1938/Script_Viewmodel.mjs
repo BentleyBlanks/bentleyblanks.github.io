@@ -3490,12 +3490,16 @@ export class Viewmodel {
     }
 
     // 右手：握着 → 松开枪颈 → 绕到机匣右侧张开 → 抓柄 → 跟着机柄走 → 松手上扬 → 落回枪颈。
-    const placement = this._BoltHandPlacement();
+    // 握机柄的手型可由表指定（cycle.boltShape，对标 COD 的攥拳）；伸手路线跟着它算，抓上去那一下不跳。
+    const placement = cycle.boltShape ? this._BoltHandPlacement(cycle.boltShape) : this._BoltHandPlacement();
     const clearance = FPS_PACKET_RELOAD.handClearance;
     const gripRotation = this.handBaseRot.right.toArray().slice(0, 3);
     const Offset = (point, offset) => ({ ...point, position: point.position.clone().add(new THREE.Vector3(...offset)) });
     const grip = { position: this.handBase.right.clone(), rotation: gripRotation, shape: "packetClear" };
     const knob = this._BoltHandPoint().sub(new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset));
+    // 伸手的点（抓柄之前）按握机柄的手心算，抓上去那一下不跳；松手后的点仍按机柄球算。
+    const reach = cycle.boltShape ? placement.position.clone() : knob;
+    const grasp = cycle.hand.find(frame => frame.anchor === "bolt")?.at ?? 0;
     const gripQ = new THREE.Quaternion().setFromEuler(this.handBaseRot.right);
     const boltQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(...placement.rotation, "YXZ"));
     const anchors = {
@@ -3507,7 +3511,7 @@ export class Viewmodel {
       let point;
       if (frame.anchor === "knob") {
         const rotation = new THREE.Euler().setFromQuaternion(gripQ.clone().slerp(boltQ, frame.turnMix ?? 0.3), "YXZ");
-        point = { position: knob.clone(), rotation: rotation.toArray().slice(0, 3), shape: frame.shape };
+        point = { position: (frame.at < grasp ? reach : knob).clone(), rotation: rotation.toArray().slice(0, 3), shape: frame.shape };
       } else point = { ...anchors[frame.anchor] };
       if (frame.offset) point = Offset(point, frame.offset);
       return { ...point, ...frame, position: point.position, rotation: point.rotation, at: Phase(frame.at) };
@@ -3594,12 +3598,13 @@ export class Viewmodel {
     return point.add(new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset));
   }
 
-  _BoltHandPlacement() {
+  _BoltHandPlacement(shape = this.weaponId==="HanYang"?"packetBolt":"bolt") {
     const offset = new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset);
     const knob = this._BoltHandPoint().sub(offset);
+    // turnFollow < 1：攥住机柄球的拳头只跟机柄转一部分（球朝哪都一样），机柄放平时拳头不钻到机柄下面。
     const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1),
-      (this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad);
-    return this._HandPlacement(this.weaponId==="HanYang"?"packetBolt":"bolt", knob, turn);
+      ((this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad) * (FPS_HAND_SHAPES[shape]?.turnFollow ?? 1));
+    return this._HandPlacement(shape, knob, turn);
   }
 
   _HandPlacement(shape, anchor, quaternion = null) {

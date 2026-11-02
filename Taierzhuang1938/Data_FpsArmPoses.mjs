@@ -73,6 +73,17 @@ export const FPS_HAND_SHAPES = Freeze({
   packetBolt: Freeze({side:"r",palmOffset:V(.053730633,-.025207960,.005244321),rotation:V(.403990256,2.830473596,.901371334),
     fingers:Freeze([V(0,20,12),V(48,68,38),V(50,60,35),V(66,84,43),V(68,86,44)]),
     thumbDirection:V(-.4,-.35,.9),thumbRoll:0,fingerSplay:Freeze([0,-4.5,3,12.3,23.6])}),
+  // HanYang frame-matched bolt cycle (FPS_BOLT_CYCLE.boltShape): the hand closes round the
+  // knob from the right, knuckles to the camera, index hooked under the ball, as in the
+  // user's COD WWII Type 38 clip (2026-11-03). It follows only `turnFollow` of the handle's
+  // quarter-turn (a ball looks the same from any side), so with the handle down the hand
+  // stays beside the knob instead of rolling under it into the receiver. The bolt body sits
+  // right under the shank, so the middle/ring/little fingers stay half closed rather than a
+  // full COD fist. Fitted on the live cycle (thumb/index skin on the knob, no skin inside the
+  // bolt/cocking piece/receiver); frame at boltContactReferenceRad.
+  boltFist: Freeze({side:"r",palmOffset:V(.0178,-.0032,-.0248),rotation:V(-1.0538,3.1426,1.6495),turnFollow:.2,
+    fingers:Freeze([V(0,38.9,30.4),V(75,100.1,62.6),V(41,55.7,32.3),V(29.3,42.6,22.1),V(24.9,38.1,19.1)]),
+    thumbDirection:V(-.1463,-.1203,1.3584),thumbRoll:4.8,fingerSplay:PacketFingerSplay}),
   packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
     thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),
