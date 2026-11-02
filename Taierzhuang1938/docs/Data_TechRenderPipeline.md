@@ -6265,10 +6265,44 @@ program），1 → 5 → 9 → 5 三跳 56 / 39 / 24 s 里：
 
 **门禁**：`Script_DeferredMaterialDisposeTest`（纯 Node：截住、原型还原、跳过还在用的）；`Script_WhiteboxShaderWarmTest`
 第 4 条（跳到第 5 段，新编里不许有跳之前已有的缓存键；跳完 300 帧不现编）。同一测试的第 1 条在本条之前的 master 上
-就红：开机预热帧里现编 11 个（天空 + 第一人称手臂 / 汉阳造的 `*_FirstPerson` 材质），改前改后同名同数，与本条无关、另案。
+就红：开机预热帧里现编 11 个（天空 + 第一人称手臂 / 汉阳造的 `*_FirstPerson` 材质），改前改后同名同数，与本条无关，见 §18.11。
 
 **规矩**：换关链里新加的拆除代码放进 `Collect` 包着的那段（只能是同步代码，跨 await 会截到不相干的释放）；
 别为了「建完再放」另写一套绕开它的延后释放。
+
+### 18.11 开机主场景趟那 11 个现编：视模材质出画时才换、烘环境图弄脏天空的程序（2026-11-02）
+
+**症状**：`Script_WhiteboxShaderWarmTest` 第 1 条红 —— 开机预热帧里主场景那一趟现建 11 个 program（天空、第一人称手臂、
+汉阳造），全在 `WarmupShaders` / `WarmLevel` 的 `RenderScene` 里，加载画面挡着、玩家感觉不到，但说明提交编译交的不是出画那一份。
+
+**取证**（包住 `linkProgram` 记出生在哪一趟，开机结束后把主场景趟出生的 program 与提交编译的逐位比缓存键）：三类，都不是漏交而是孪生。
+
+1. **视模 8 个**（`X_FirstPerson`）：与提交编译的 `X` 只差自定义键一段 —— `…|ssr1|…` 对 `…|firstPersonSelfShadow1`。第一人称自阴影
+   （`Script_FirstPersonSelfShadow`）要到出画时 `Render → Sync` 才把手臂 / 枪的材质换成自己那份克隆（摘 SSR、挂自阴影）；
+   `WarmLevel` 第二段换枪后直接 `SubmitCompile(viewmodel.root)`，挂着的还是源材质。`WarmupShaders` 挑代表按材质认热没热，
+   源材质（`John_All Body` 等）早被人物编过，视模网格整件被跳过，克隆那份从没人交。
+2. **双后缀 2 个**（`X_FirstPerson_FirstPerson`）：人物预热的 `PrepareWoundVariants(viewmodel.root)` 给视模手臂挂零伤口变体，
+   变体是 `CloneShadedMaterial(X_FirstPerson)`，走注册表重挂补丁、自阴影钩子不在表里被丢掉，所以 `Sync` 再克隆一次 ——
+   这一次是必须的（中弹后手臂真画的就是它），**错在克隆的做法**：`CloneOwnedMaterial` 只在源带 SSR 时重挂补丁，变体没有 SSR，
+   掉进「只抄钩子」那一支，钩子闭包认的是变体、`material.clone()` 又不抄自定义 defines，键里缺 `CSM_CONTACT` /
+   `USE_MATERIAL_SKIN` 那一串（与 §18.2 ③ 同一类：下一次重取键就是一份逐字节相同的孪生）。
+3. **天空 1 个**：与 `SkyDome.BakeEnvironment` 里 PMREM 烘的那份只差灯光数（平行光 3 对 0、投影 3 对 0、光照探针 1 对 0）。
+   烘环境图的穹顶原来共用天穹材质，烘完它的 currentProgram 是「没有灯的小场景」那份，挑代表时被当成已热跳过；
+   主场景趟里 three 仍判要换程序，按关卡灯光的键现编。
+
+**修法**：
+
+- `FirstPersonSelfShadow.SyncForCompile()`（开着才换），`CompileAsRendered` 开头与 `WarmupShaders` 挑代表之前各调一次 ——
+  先换成出画那一份再交、再挑。
+- `CloneOwnedMaterial`：源有注册表补丁就重挂（有 SSR 摘掉），先照 `CloneShadedMaterial` 抄 defines；名字不再叠后缀。
+- 天空：`BakeEnvironment` 的穹顶用自己的 `bakeMaterial`（同一批 uniform 对象），天穹材质只在主场景里出画。
+
+**实测**（同机 `?whitebox=p012&quality=high`，机器很忙、只比个数）：开机主场景趟现建 11 → 0；开机 link 237 → 232、
+开机结束 program 234 → 229（孪生没了）；提交编译 159 个用上 143 → 165 个用上 154；跳第 5 段新编 16 → 13；
+进城 300 帧、跳段后 300 帧仍 0 现编。视模那几份现在全在提交编译里出生，天空主程序也是（烘焙那份 0 灯程序照旧由 PMREM 编）。
+
+**规矩**：出画路径上「画之前才换材质」的系统（这里是视模自阴影），提交编译前要先换；查主场景趟现编，先拿缓存键跟提交编译那份逐位比，
+差在自定义键就是换了材质，差在灯光数就是这只材质先在别的场景（烘焙、探针）里画过。
 
 ## 19. 坑（按被踩频率排序）
 

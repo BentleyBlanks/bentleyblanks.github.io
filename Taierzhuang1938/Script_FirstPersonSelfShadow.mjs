@@ -127,10 +127,17 @@ float FirstPersonSelfShadow() {
  *     ⚠️ 这是逼出来的取舍，不是 SSR 的设计意图：谁要把 SSR 还给视模，得先给这只材质
  *     腾出一个采样器槽（合并 ORM、簇表打包成一张、或探针 GI 的三张合并）。
  *     回归口：`Script_EditorTest` 的「自阴影软化可热切」那一条断言 `glError === 0`。
+ *
+ * 源也可能是视模这一份派生出来的：伤口变体（`Script_CharacterWounds` 对 `X_FirstPerson` 做的
+ * `CloneShadedMaterial`）走注册表重挂补丁，自阴影钩子不在表里、被丢掉了，所以要再克隆一次。
+ * 这种源已经没有 SSR，以前按「有 SSR 才重挂」判，掉进了只抄钩子那一支：钩子闭包认的是源材质，
+ * `material.clone()` 又不抄自定义 defines（MeshStandardMaterial.copy 把它重置成 STANDARD），
+ * 第一次取键缺 `CSM_CONTACT` / `USE_MATERIAL_SKIN` 那一串，与渲染管线 §18.2 ③ 同一类孪生。
  */
 function CloneOwnedMaterial(material) {
   const clone = material.clone();
-  clone.name = `${material.name || material.type}_FirstPerson`;
+  clone.name = `${(material.name || material.type).replace(/_FirstPerson$/, "")}_FirstPerson`;
+  if (material.defines) clone.defines = Object.assign({}, clone.defines, material.defines);
   clone.onBeforeCompile = material.onBeforeCompile;
   clone.customProgramCacheKey = material.customProgramCacheKey;
   clone.userData = { ...(material.userData || {}) };
@@ -138,7 +145,7 @@ function CloneOwnedMaterial(material) {
   // 顺手把材质着色与国军军装换色/布纹补丁也丢了 —— 高画质下第一人称袖子一直是
   // GLB 里的土黄纯色，与低头看见的灰蓝军装两个颜色（2026-09-27 查到）。
   const sourcePatches = PatchesOf(material);
-  if (sourcePatches && clone.userData.ssrUniforms) {
+  if (sourcePatches) {
     clone.userData.ssrUniforms = null;
     ApplyPatches(clone, sourcePatches.filter((patch) => patch.key !== SSR_PATCH_KEY));
   } else if (clone.userData.indirectLightingInjected && clone.userData.ssrUniforms) {
@@ -360,6 +367,16 @@ ${SHADOW_FRAGMENT_GLSL}`)
       const opaque = owned.every((material) => !material?.transparent && (material?.opacity ?? 1) >= 1);
       if (opaque && !object.userData?.debris) this.casters.push(object);
     });
+  }
+
+  /**
+   * 提交编译之前调（Script_Main.CompileAsRendered / WarmupShaders）：视模材质要到 Render 里 Sync 才换成
+   * 自阴影那一份，换枪、挂伤口变体之后到下一次出画之间网格上挂的还是源材质，这时 compile 编到的是
+   * 用不上的孪生（键只差 `ssr1` / `firstPersonSelfShadow1`），真用的那份在出画时现编（渲染管线 §18.11）。
+   * 关着时出画不换，这里也不换。
+   */
+  SyncForCompile() {
+    if (this.enabled) this.Sync();
   }
 
   SetEnabled(on) {

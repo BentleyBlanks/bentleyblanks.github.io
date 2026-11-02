@@ -932,7 +932,7 @@ export class SkyDome {
       // 把 sky.uniforms 整表拷进 trace 材质，于是探针的漏空射线自动问同一片天。
       ...this.atmosphere.sampleUniforms,
     };
-    this.material = new THREE.ShaderMaterial({
+    const SkyMaterial = () => new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
@@ -942,6 +942,11 @@ export class SkyDome {
       fog: false,
       toneMapped: false,
     });
+    this.material = SkyMaterial();
+    // 烘环境图（BakeEnvironment）那只穹顶用自己的一只，uniform 是同一批对象。烘的是没有灯的小场景：
+    // 天穹材质要是拿那一份 program 当 currentProgram，WarmupShaders 挑代表时当它「已热」跳过，
+    // 主场景趟里 three 仍判要换程序，按关卡灯光的键现编（渲染管线 §18.11）。
+    this.bakeMaterial = SkyMaterial();
     // r165+ 起 scene.overrideMaterial 只放过 allowOverride === false 的材质。
     // 天空穹的顶点着色器把 z 顶到远平面，被覆盖材质换掉之后它会以真实的
     // 4000 米深度参与深度法线预通道 —— SSAO 与体积光的天空判据当场作废。
@@ -1060,7 +1065,7 @@ export class SkyDome {
   BakeEnvironment(scene) {
     if (!this.pmrem) return null;
     const skyScene = new THREE.Scene();
-    const dome = new THREE.Mesh(this.mesh.geometry, this.material);
+    const dome = new THREE.Mesh(this.mesh.geometry, this.bakeMaterial);
     dome.frustumCulled = false;
     skyScene.add(dome);
     if (this.envTarget) this.envTarget.dispose();
@@ -1079,6 +1084,7 @@ export class SkyDome {
 
   Dispose() {
     this.material.dispose();
+    this.bakeMaterial.dispose();
     this.mesh.geometry.dispose();
     if (this.envTarget) this.envTarget.dispose();
     if (this.pmrem) this.pmrem.dispose();

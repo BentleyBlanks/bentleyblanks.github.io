@@ -3898,9 +3898,12 @@ function MaterialsInUse() {
  * 孪生 program —— 白链一遍，真正那份到出画时还得同步现编现等。两处会让两边不一样：
  *   ① 绑着的靶：键里的 `outputColorSpace` 按当前靶算，场景网格只画进 HDR 主靶（§18.2 ②）；
  *   ② （2026-10-31 删）原来这里还有一条「白盒画质出画前换材质、换灯光」的规矩，白盒档没了、编出来的就是出画的那一份。
+ *   ③ 视模材质：第一人称自阴影出画时（FirstPersonSelfShadow.Render → Sync）才把手臂 / 枪的材质换成自己那份克隆，
+ *      换枪之后先换好再交（§18.11）。
  * @returns {boolean} 提交成功（失败时调用方退回「用到时现编」）
  */
 function CompileAsRendered(root, label = "submit") {
+  firstPersonSelfShadow?.SyncForCompile();
   const restoreTarget = renderer.getRenderTarget();
   if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
   try {
@@ -3970,6 +3973,9 @@ function SelectShaderRepresentatives(objects, seen) {
  */
 async function WarmupShaders(root, onStep = null, shouldStop = null) {
   if (!root) return 0;
+  // 挑代表按材质认「热没热」：视模网格上还挂着源材质（多半已被人物编过）就会被跳过，
+  // 自阴影那份克隆一直没人交。先换成出画那一份再挑（CompileAsRendered ③）。
+  firstPersonSelfShadow?.SyncForCompile();
   const meshes = [];
   root.traverse((object) => {
     if (object.isMesh || object.isPoints || object.isLine || object.isSprite) meshes.push(object);
