@@ -227,11 +227,16 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // cheek, which the user found sluggish, so it settles in .22 s (ends at 2.12 s).
     durationS: 2.12, startS: 0.02,
     pace: [[0, 0], [2.12, 2.12]],
-    // Low working pose. The rifle leans ~17 deg on screen like the reference (it read
-    // as standing too upright at 13 deg): turned 9 deg about the knob in the view
-    // plane, its muzzle 3.4 deg lower, and 4 cm nearer along the ray through the knob.
-    work: Object.freeze({ position: [0.0417, -0.1914, -0.0807], rotation: [0.2410, 0.3312, 0.0460] }),
-    headPitchRad: 0.35,
+    // Low working pose, relative to the player's (undipped) look: the muzzle 9.5 deg above
+    // level and turned 19 deg left, so the barrel runs toward the horizon as in the
+    // reference. The head really dips `headPitchRad` (the camera pitches down; the rifle
+    // turns back about the eye by the same angle and stays put in the world): the
+    // reference's horizon climbs ~0.17 of the frame, i.e. ~10 deg. Faking the dip by
+    // turning only the rifle left the horizon mid-screen and read as the rifle pointing
+    // 60-70 deg up (user, 2026-11-02). Held far enough out that the pulled-back right
+    // hand stays a fist at the lower right instead of filling the top of the frame.
+    work: Object.freeze({ position: [0.0547, -0.1742, -0.1448], rotation: [0.1653, 0.3259, 0.0197] }),
+    headPitchRad: 0.18,
     // [s, weight]; the knob holds high until .40, is down by .60; the rifle
     // rises to the cheek in .09 s and the head settles onto the stock last.
     lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.88, 1], [1.94, 0.55], [1.985, 0.06], [2.01, 0]],
@@ -313,13 +318,15 @@ export const FPS_BOLT_CYCLE = Object.freeze({
   }),
 });
 
-// Aimed hold drift measured on reference 04's aimed windows (29.6-31.3,
-// 37.3-38.2, 40.5-41.4 s): the receiver rides about +-1.3 deg vertically on a
-// ~1.05 s period, with a smaller, slower sideways wander.
+// Hold drift while standing still with the rifle up (hip and aimed). Reference 04's aimed
+// windows show the receiver riding on a ~1 s period; the user (2026-11-02) wanted it slow
+// and as small as possible, and the sights and crosshair drifting together. So it drifts
+// the whole line of sight (camera + aim, Script_FrameStepsPlayer / Player.AimDirection):
+// about +-0.2 deg on 3-5 s periods. hipScale = share of it while not aimed.
 export const FPS_ADS_FLOAT = Object.freeze({
   HanYang: Object.freeze({
-    pitchRad: 0.014, yawRad: 0.009, liftM: 0.0020,
-    pitchHz: 0.95, pitchHz2: 0.61, yawHz: 0.43, yawHz2: 0.27, blendS: 0.35,
+    pitchRad: 0.0040, yawRad: 0.0030, hipScale: 1,
+    pitchHz: 0.30, pitchHz2: 0.19, yawHz: 0.16, yawHz2: 0.10, blendS: 0.35,
   }),
 });
 

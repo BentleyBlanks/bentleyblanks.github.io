@@ -398,16 +398,19 @@ export class PlayerController {
     return this.gunClearance;
   }
 
-  /** 视线方向（相机朝向）。 */
+  /** 视线方向（相机朝向）。端枪的轻微漂移（holdDrift*，Viewmodel 给、FrameStepsPlayer 写进来）算在内。 */
   ViewDirection(target = new THREE.Vector3()) {
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    return target.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp).normalize();
+    const y = this.yaw + (this.holdDriftYaw || 0);
+    const p = this.pitch + (this.holdDriftPitch || 0);
+    const cp = Math.cos(p), sp = Math.sin(p);
+    return target.set(-Math.sin(y) * cp, sp, -Math.cos(y) * cp).normalize();
   }
 
   /** 枪口指向 —— 自由瞄准偏移之后的方向。命中判定用这个，不是视线。 */
   AimDirection(target = new THREE.Vector3()) {
-    const y = this.yaw + this.aimYaw;
-    const p = Clamp(this.pitch + this.aimPitch, -1.5, 1.5);
+    // 端枪漂移是整条视线在飘（相机、枪、准心一起），子弹跟着它走。
+    const y = this.yaw + this.aimYaw + (this.holdDriftYaw || 0);
+    const p = Clamp(this.pitch + this.aimPitch + (this.holdDriftPitch || 0), -1.5, 1.5);
     const cp = Math.cos(p), sp = Math.sin(p);
     return target.set(-Math.sin(y) * cp, sp, -Math.cos(y) * cp).normalize();
   }

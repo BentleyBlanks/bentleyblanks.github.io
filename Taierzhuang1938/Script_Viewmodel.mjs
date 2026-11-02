@@ -2916,17 +2916,23 @@ export class Viewmodel {
     const breathY = Math.sin(this.elapsed * 1.15) * 0.0026 * idle;
     const breathX = Math.sin(this.elapsed * 0.73 + 1.3) * 0.0020 * idle;
 
-    // 开镜端稳时手的轻微浮动（参考 04 的瞄准段实测，FPS_ADS_FLOAT）：整套手臂+枪绕眼睛上下、
-    // 左右慢慢飘，照门照星一起动；走动、拉栓落低时淡掉。
-    const float = FPS_ADS_FLOAT[this.weaponId], aimHold = float ? adsVisual * (1 - gait) * (1 - cycleAway) : 0;
+    // 端枪时的轻微漂移（参考 04 的瞄准段，FPS_ADS_FLOAT）：慢慢地上下、左右飘，腰射站定也有。
+    // 飘的是整条视线（Script_FrameStepsPlayer 转相机、Player.AimDirection 加同一角度）：
+    // 手、照门、准心在画面里一起不动，世界在动，子弹打向飘到的地方。走动、拉栓落低时淡掉。
+    // 有这张表的枪不再给腰射呼吸那点枪身平移（那会让手和准心各飘各的）。
+    const float = FPS_ADS_FLOAT[this.weaponId];
+    const aimHold = float && !this.mount ? Mix(float.hipScale ?? 1, 1, adsVisual) * (1 - gait) * (1 - cycleAway) : 0;
     this.adsFloat = (this.adsFloat || 0) + (aimHold - (this.adsFloat || 0)) * (1 - Math.exp(-step / (float?.blendS ?? 0.35)));
     const e = this.elapsed, TAU = Math.PI * 2;
     const floatPitch = float ? (0.72 * Math.sin(e * TAU * float.pitchHz) + 0.28 * Math.sin(e * TAU * float.pitchHz2 + 1.7)) * this.adsFloat : 0;
     const floatYaw = float ? (0.65 * Math.sin(e * TAU * float.yawHz + 0.6) + 0.35 * Math.sin(e * TAU * float.yawHz2 + 2.4)) * this.adsFloat : 0;
-    this.bobPivot.position.set(bobX + breathX, bobY + breathY + floatPitch * (float?.liftM ?? 0), 0);
+    const drift = this.holdDrift || (this.holdDrift = { pitch: 0, yaw: 0 });
+    drift.pitch = floatPitch * (float?.pitchRad ?? 0); drift.yaw = floatYaw * (float?.yawRad ?? 0);
+    const breath = float ? 0 : 1;
+    this.bobPivot.position.set(bobX + breathX * breath, bobY + breathY * breath, 0);
     this.bobPivot.rotation.set(
-      Math.sin(phase * 2) * 0.010 * bobScale + floatPitch * (float?.pitchRad ?? 0),
-      Math.sin(phase) * 0.014 * bobScale + floatYaw * (float?.yawRad ?? 0),
+      Math.sin(phase * 2) * 0.010 * bobScale,
+      Math.sin(phase) * 0.014 * bobScale,
       -Math.sin(phase) * 0.018 * bobScale);
 
     // --- 状态层：起跳收枪 / 滞空换重心 / 落地下沉 / 蹲低 / 掏枪 / 贴墙收枪 ---
@@ -2977,6 +2983,7 @@ export class Viewmodel {
     // 转，交给指数逼近会先回一趟腰射姿态再斜端起来，画面上是明显的一下回弹。
     if (fixing && this.carryOverride != null) this.bayonetCarry = this.carryOverride;
     this.bayonetCarry += (carryTarget - this.bayonetCarry) * (1 - Math.exp(-step * 7));
+    this.headDipRad = 0;
     if (this.rig) {
       const hip = this.bayonetCarry > 1e-3
         ? this._AddPose(this.hipPose, BAYONET_CARRY, this.bayonetCarry)
@@ -2991,6 +2998,8 @@ export class Viewmodel {
         // 腰射没有「先回到脸颊、头再贴上去」那一拍：低头跟着枪一起回。
         const head = Mix(Math.min(cycle.head, cycle.lower), cycle.head, Clamp01(ads));
         finalPose = this._RisePose(finalPose, [0, 0, 0, spec.headPitchRad, 0, 0], null, head);
+        // 相机真的低这么多头（Script_FrameStepsPlayer 压相机），上面这一转把枪留在世界里原处。
+        this.headDipRad = spec.headPitchRad * head;
       }
       this.weaponMount.position.set(finalPose.px, finalPose.py, finalPose.pz);
       this.weaponMount.rotation.set(finalPose.rx, finalPose.ry, finalPose.rz, "YXZ");

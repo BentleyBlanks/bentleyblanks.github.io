@@ -268,6 +268,8 @@ export function PlayStepCameraFov(ctx, f) {
   f.weapon = weapon;
 }
 
+const NO_DRIFT = Object.freeze({ pitch: 0, yaw: 0 });
+
 export function PlayStepView(ctx, f) {
   const dt = f.dt;
   // 枪感方子 3：**把视线增量接进 sway。**
@@ -292,6 +294,14 @@ export function PlayStepView(ctx, f) {
   if (!ctx.player.Alive && ctx.viewmodel.deathHands) ctx.UpdatePlayerDeath();
   else {
   if (ctx.mountView.active) ctx.MountedViewPose();
+  // 逐帧拉栓的低头是真低头（Viewmodel.headDipRad，枪绕眼睛反向转同一角度，在世界里不动）。
+  // 先按上一帧的角度压相机：这一帧拉栓里抛壳读的还是上一帧的枪位，两者要对得上；
+  // 更新完再补上这一帧的差。玩家的 pitch 本体不动。
+  // 端枪漂移（Viewmodel.holdDrift）同理：整条视线在飘，相机、枪、准心一起动，子弹读 Player.holdDrift*。
+  const dipBefore = ctx.viewmodel.headDipRad || 0;
+  const driftBefore = ctx.viewmodel.holdDrift || NO_DRIFT;
+  ctx.camera.rotation.x += driftBefore.pitch - dipBefore;
+  ctx.camera.rotation.y += driftBefore.yaw;
   ctx.viewmodel.Update(dt, {
     // 被冲击波掀倒时枪跟着放下去（借贴墙收枪那一层；Script_PlayerKnockback.GunLower）
     wallLower: ctx.mountView.active ? 0 : Math.max(ctx.player.gunClearance.lower, ctx.player.knock?.GunLower ?? 0),
@@ -321,6 +331,11 @@ export function PlayStepView(ctx, f) {
     // 近爆的身体反应：收枪、缩肩、手臂慢半拍、之后手抖（Script_BlastFlinch.arms；没在反应时是 null）。
     blastFlinch: ctx.player.flinch?.Active ? ctx.player.flinch.arms : null,
   });
+  const drift = ctx.viewmodel.holdDrift || NO_DRIFT;
+  ctx.camera.rotation.x += drift.pitch - driftBefore.pitch - ((ctx.viewmodel.headDipRad || 0) - dipBefore);
+  ctx.camera.rotation.y += drift.yaw - driftBefore.yaw;
+  ctx.player.holdDriftPitch = drift.pitch;
+  ctx.player.holdDriftYaw = drift.yaw;
   // 弯腰捡震脱手的枪：抓到之前右手（空手）伸向地上那把（Script_LooseGun.GunReachPose）。
   if (ctx.looseGun.recover && !ctx.viewmodel.weapon && ctx.looseGun.recover.reach > 0) ctx.viewmodel.ReachWorld(ctx.looseGun.recover.atV, ctx.looseGun.recover.reach);
   }
