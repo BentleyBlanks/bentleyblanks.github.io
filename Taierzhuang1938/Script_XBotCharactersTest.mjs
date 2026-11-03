@@ -1,9 +1,10 @@
-// 顶替 X Bot 的人物（Data_XBotCharacters.mjs）：转出来的 GLB 骨架与 X Bot 一致、清单数值对得上、动作换人的处理（纯 Node，秒级）。
+// 顶替 X Bot 的人物（Data_XBotCharacters.mjs，日兵甲、何有田）：转出来的 GLB 骨架与 X Bot 一致、清单数值对得上、动作换人的处理（纯 Node，秒级）。
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import * as THREE from "./vendor/three/build/three.module.js";
-import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTER_LOOKS } from "./Data_BlockoutXBotClips.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 
 const here = import.meta.dirname;
@@ -30,6 +31,10 @@ const xbot = ReadGlb(path.join(here, XBOT_CHARACTERS.xbot.file));
 const xw = Worlds(xbot.doc);
 const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
 for (const key of new Set(Object.values(XBOT_FACTION_CHARACTERS))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
+for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
+  assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);
+  assert.ok(XBOT_CHARACTERS[key], `角色表指向的人物 ${key} 要登记`);
+}
 
 for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   if (key === "xbot") continue;

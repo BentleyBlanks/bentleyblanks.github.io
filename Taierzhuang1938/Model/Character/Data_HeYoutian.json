@@ -1,0 +1,61 @@
+{
+ "schema": 1,
+ "built": "2026-11-03",
+ "script": "_import/Script_BuildXBotRigCharacter.mjs",
+ "source": {
+  "file": "HeYoutian_Merged_V1_Bones_NeckFix.glb",
+  "bytes": 43510656,
+  "sha256": "228ec7e50a97bc2554d56daff3114a8d610a0139bd9984031eef1673fed29158",
+  "heightM": 1
+ },
+ "output": {
+  "file": "Model/Character/Model_HeYoutian.glb",
+  "bytes": 9891108,
+  "sha256": "6921bd9fd402470bfdccaa317b7d1a7af2d4d6c4fefac9b2f8d237fc7dcca780"
+ },
+ "scale": 1.826299,
+ "crownM": 1.8263,
+ "triangles": 54365,
+ "vertices": 48700,
+ "sourceVertices": 156273,
+ "bones": 65,
+ "addedEndBones": [],
+ "rigidHead": {
+  "aboveHeadJointM": [
+   0.015,
+   0.09
+  ],
+  "vertices": 25444
+ },
+ "hipsY": 1.0023,
+ "xbotHipsY": 1.0427,
+ "hipsScale": 0.9612,
+ "headY": 1.6087,
+ "xbotHeadY": 1.5993,
+ "images": [
+  {
+   "index": 0,
+   "role": "baseColor",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 16214545,
+   "bytes": 2831058
+  },
+  {
+   "index": 1,
+   "role": "metallicRoughness",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 4794268,
+   "bytes": 1593308
+  },
+  {
+   "index": 2,
+   "role": "normal",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 13066601,
+   "bytes": 2257188
+  }
+ ]
+}

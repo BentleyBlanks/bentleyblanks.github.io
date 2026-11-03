@@ -11,6 +11,7 @@
 // ClipForCharacter；比例是 Data_XBotCharacters.mjs 的 hipsScale，本脚本写进报告，测试核两边一致）。
 //
 // 用法：node _import/Script_BuildXBotRigCharacter.mjs [源.glb] [--crown 1.8142] [--out Model/Character/Model_JapaneseSoldierJia.glb]
+//   何有田：… 05_何有田/HeYoutian_Merged_V1_Bones_NeckFix.glb --crown 1.8263 --out Model/Character/Model_HeYoutian.glb
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -170,14 +171,25 @@ for (let i = 0; i < count; i++) {
   rigidVerts++;
 }
 
+// 合并完全相同的点（位置 / 法线 / UV / 骨头 / 权重逐字节一样）：何有田那次 Tripo 绑骨把每个面的角都存成单独的点
+// （15.6 万点，去重后 4.87 万），文件大三倍、显卡也白算；日兵甲本来就没有重复，合并不改变它
+const parts = [[outPos, 12], [outNrm, 12], [uv, 8], [outJoints, 4], [weights, 16]].map(([a, size]) => [Buffer.from(a.buffer, a.byteOffset, a.byteLength), size]);
+const firstOf = new Map(), newIndex = new Uint32Array(count), keepVerts = [];
+for (let i = 0; i < count; i++) {
+  const key = parts.map(([b, size]) => b.toString("latin1", i * size, (i + 1) * size)).join("");
+  if (!firstOf.has(key)) { firstOf.set(key, keepVerts.length); keepVerts.push(i); }
+  newIndex[i] = firstOf.get(key);
+}
+const Pick = (a, w) => { const out = new a.constructor(keepVerts.length * w); keepVerts.forEach((v, j) => out.set(a.subarray(v * w, v * w + w), j * w)); return out; };
+const outIdx = idx.map((i) => newIndex[i]);
 const attrs = {
-  POSITION: AddAccessor(outPos, 5126, "VEC3", 34962, { min: lo.toArray(), max: hi.toArray() }),
-  NORMAL: AddAccessor(outNrm, 5126, "VEC3", 34962),
-  TEXCOORD_0: AddAccessor(uv, 5126, "VEC2", 34962),
-  JOINTS_0: AddAccessor(outJoints, 5121, "VEC4", 34962),
-  WEIGHTS_0: AddAccessor(weights, 5126, "VEC4", 34962),
+  POSITION: AddAccessor(Pick(outPos, 3), 5126, "VEC3", 34962, { min: lo.toArray(), max: hi.toArray() }),
+  NORMAL: AddAccessor(Pick(outNrm, 3), 5126, "VEC3", 34962),
+  TEXCOORD_0: AddAccessor(Pick(uv, 2), 5126, "VEC2", 34962),
+  JOINTS_0: AddAccessor(Pick(outJoints, 4), 5121, "VEC4", 34962),
+  WEIGHTS_0: AddAccessor(Pick(weights, 4), 5126, "VEC4", 34962),
 };
-const indices = AddAccessor(idx, 5125, "SCALAR", 34963);
+const indices = AddAccessor(outIdx, 5125, "SCALAR", 34963);
 const ibmAcc = AddAccessor(ibm, 5126, "MAT4");
 
 // 贴图：底色 / 粗糙度有损 WebP 90，法线 96
@@ -244,7 +256,7 @@ const report = {
   schema: 1, built: new Date().toISOString().slice(0, 10), script: "_import/Script_BuildXBotRigCharacter.mjs",
   source: { file: path.basename(SOURCE), bytes: src.bytes.length, sha256: Hash(src.bytes), heightM: +(maxY - minY).toFixed(4) },
   output: { file: path.relative(PROJECT, OUT).replace(/\\/g, "/"), bytes: glb.length, sha256: Hash(glb) },
-  scale: +scale.toFixed(6), crownM: CROWN, triangles: idx.length / 3, vertices: count,
+  scale: +scale.toFixed(6), crownM: CROWN, triangles: idx.length / 3, vertices: keepVerts.length, sourceVertices: count,
   bones: xbBones.length, addedEndBones: missing, rigidHead: { aboveHeadJointM: RIGID_HEAD, vertices: rigidVerts },
   hipsY: +hipsY(target.get("Hips")).toFixed(4), xbotHipsY: +hipsY(xbHips).toFixed(4),
   hipsScale: +(hipsY(target.get("Hips")) / hipsY(xbHips)).toFixed(4),
