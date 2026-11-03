@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "assetSet": "K09_KitchenUtensils",
+  "selectedConcept": "C",
+  "conceptMd5": "84a80346b4a38c346718333ff01de06d",
+  "generator": "Build_K09_KitchenUtensils.py",
+  "generatorSha256": "72e62dc0f8dd358cc269676140379bc4e280a74d3cf406e6404f4b8b8a869b30",
+  "localAssetRoot": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/VillageInteriorProps/K09_KitchenUtensils",
+  "localAcceptedSnapshot": "Refinement/WholeSurfaceRebuild/Versions/9bd4544d0d15",
+  "rebuild": {
+    "command": "node scripts/Script_BlenderMcp.mjs start --batch Taierzhuang1938/_blender/VillageInteriorProps/Build_K09_KitchenUtensils.py --task K09Rebuild",
+    "blenderVersion": "5.2.1",
+    "optionalEnvironment": {
+      "K09_NO_RENDER": "1",
+      "K09_ARTIFACT_ROOT": "Separate output directory for isolated validation"
+    },
+    "requiredRetainedInputs": [
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_BlackenedIron_AlbedoSource.png",
+        "sha256": "a6bc1178f4475bd0d371d954189fc4c938fdf441f13c43e0d2a1415a51deea21"
+      },
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_AgedElm_AlbedoSource.png",
+        "sha256": "ef05961499ec1717920084d79bf68ceaf14a28464ebd6a96f035af58742add97"
+      },
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_SpatulaFineGrip_AlbedoSource.png",
+        "sha256": "9afbb78ff816401cddcd2e1079235efe2f9f07a702c9ac1e7e9bf0509ac87662"
+      },
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_WillowSurface_AlbedoSource.png",
+        "sha256": "f769bf7fe84ce60fefadbba5ba6135363c75aedfb77865c116ac23c121179c85"
+      },
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_SpatulaOxideFieldV56_AlbedoSource.png",
+        "sha256": "70afbe18ea1a7a43e4975b7bdf0c2ebeb7083fc8f7a71de50973fffe4e559423"
+      },
+      {
+        "path": "Refinement/MaterialSources/Texture_K09_SpatulaGrayOxide_AlbedoSource.png",
+        "sha256": "dec2e2e621a1b4e935eca26870c626bbce8e41199d000bd9969ced9aa26079a5"
+      }
+    ],
+    "normalReuseInputs": "Refinement/DoubleBindingV90/ValidatedNormalInputsFromV88",
+    "currentWillowBakeCache": "Refinement/WillowSurfaceBake/DoubleBindingV90"
+  },
+  "coordinateContract": {
+    "unit": "metre",
+    "gltfUpAxis": "Y",
+    "origin": "bottom centre of each independent item",
+    "pose": "flat resting",
+    "handleDirectionGltf": "+Z"
+  },
+  "models": [
+    {
+      "name": "WillowSkimmer",
+      "file": "Model_K09_WillowSkimmer.glb",
+      "triangles": 3462,
+      "bytes": 90853292,
+      "sha256": "9bf9c9df050d3e868c25946adbacec9a4c59baf0438a257a49010e9444830e8d",
+      "sizeBlenderXyzMetres": [
+        0.2097078338265419,
+        0.3589361906051636,
+        0.06824751943349838
+      ],
+      "materials": [
+        "OldFibreBinding",
+        "VillageTimber_Grip",
+        "Wicker_AgedSurface"
+      ]
+    },
+    {
+      "name": "WokSpatula",
+      "file": "Model_K09_WokSpatula.glb",
+      "triangles": 2948,
+      "bytes": 24428072,
+      "sha256": "1e8c89dd587778e65e7ba002828cc4511cd1549308b0b2e0ad12bd34bbba8084",
+      "sizeBlenderXyzMetres": [
+        0.10119999945163727,
+        0.2528804540634155,
+        0.038719192147254944
+      ],
+      "materials": [
+        "ForgedIron",
+        "ForgedIron_SpatulaFace",
+        "ForgedIron_TarnishedBinding",
+        "VillageTimber_SpatulaGrip"
+      ]
+    },
+    {
+      "name": "SweetPotatoGrater",
+      "file": "Model_K09_SweetPotatoGrater.glb",
+      "triangles": 2970,
+      "bytes": 30008352,
+      "sha256": "6390e2def3ef0eb79e49e911ead96c676155aedbb06dd4b2b82eb798958363f9",
+      "sizeBlenderXyzMetres": [
+        0.15931447595357895,
+        0.3195533901453018,
+        0.02636333554983139
+      ],
+      "materials": [
+        "ForgedIron",
+        "ForgedIron_CuttingEdge",
+        "ForgedIron_Worn",
+        "ForgedIron_WornCuttingFlap",
+        "VillageTimber",
+        "VillageTimber_GraterHandle",
+        "VillageTimber_RepairElm",
+        "VillageTimber_Worn"
+      ]
+    }
+  ],
+  "verification": {
+    "localCompletionAudit": "Data_LocalCompletionAuditV90.json",
+    "nativeSourceTangents": true,
+    "realOpaqueRimWindingLoops": 28,
+    "graterOpenings": 39,
+    "graterExitProbes": 117,
+    "bidirectionalExitRegionRays": 936,
+    "spatulaContourMaxAnchorErrorPixels": 1.3806151424954578,
+    "matchedWillowHighObjects": 45,
+    "mutedWebGlViews": 18
+  },
+  "reconstructionScope": "Shapes, dimensions, textures and hidden structure are design reconstruction from the user-selected concept; not historical measurements or a scan.",
+  "deliveryScope": "Publish this generator and provenance JSON only. Individual GLBs, packed Blender sources, retained photos, preview pages and QA evidence remain in the local asset root. Room packing, game registration and placement belong to later integration."
+}
