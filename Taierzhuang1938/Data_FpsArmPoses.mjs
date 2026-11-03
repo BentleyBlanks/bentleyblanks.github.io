@@ -100,6 +100,11 @@ export const FPS_HAND_SHAPES = Freeze({
   // the knob); the little finger stays tucked as in boltHook.
   boltHookClear: Freeze({side:"r",fingers:Freeze([V(0,25,15),V(60,85,45),V(42,105,65),V(80,100,70),V(66.3,93.5,61.1)]),
     thumbDirection:V(-.2449,-.4119,1.1171),thumbRoll:4.8,fingerSplay:Freeze([0,8,2,13,34.8])}),
+  // HanYang bolt cycle, the hand leaving the locked handle (FPS_BOLT_CYCLE.HanYang.hand): a loose
+  // fist, knuckles to the camera, as it rides back to the wrist in the COD Type 38 clip instead of
+  // opening the fingers out.
+  boltRest: Freeze({side:"r",fingers:Freeze([V(0,30,18),V(52,78,44),V(58,84,48),V(62,88,50),V(66,90,52)]),
+    thumbDirection:V(.2,-.5,.8),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
     thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),

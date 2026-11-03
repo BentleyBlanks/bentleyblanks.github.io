@@ -222,15 +222,15 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // ([reference s, played s], piecewise linear; the player's fire interval follows,
     // AI keeps fireIntervalS). The motion is matched to the Gew88 references; its timing
     // follows the user's COD WWII Type 38 clip (2026-11-02, 三八式_01_开镜开火拉栓, shot at
-    // 1.70 s): drop .20-.35, grasp .42, lift done .50, back .57, push .74-.86, locked .90,
-    // re-aimed 1.27-1.30 s after the shot. Gates cap a few beats: the grasp x1.1 (2 mm
-    // skin), the lift and the press x1.15/x1.1 (20 deg a frame on the working wrist), the
-    // hand's return x1.55 (55 mm a frame), so the lock lands at .98 and the rifle is back
-    // on aim at 1.32 s. The rifle rises to the cheek while the hand travels back, as in
+    // 1.70 s): drop .20-.35, grasp .40, lift done .47, back .53-.57, push .77-.83, locked .93,
+    // re-aimed 1.27-1.30 s after the shot. Played: grasp .40, lift .42-.505, back .51-.56,
+    // push .70-.83, locked .95, on aim 1.32 s. The reach before the grasp cannot go faster
+    // (55 mm a frame on the working hand) and the hand's return is held to it too.
+    // The rifle rises to the cheek while the hand travels back, as in
     // the clip (the 2.30 s reference shouldered only after the regrip).
     durationS: 1.95, startS: 0.02,
-    pace: [[0, 0], [0.13, 0.13], [0.62, 0.388], [0.68, 0.443], [0.81, 0.556], [0.90, 0.612],
-      [1.02, 0.722], [1.26, 0.850], [1.41, 0.975], [1.95, 1.322]],
+    pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
+      [1.02, 0.700], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
     // Low working pose, relative to the player's (undipped) look, placed on the COD Type 38
     // clip frame by frame (2026-11-03, user: the rifle's motion with the hand did not match):
     // the rifle barely leaves the aim line. The front sight stays just above the centre
@@ -257,15 +257,18 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     head: [[0, 0], [0.25, 0], [0.40, 0.6], [0.50, 1], [1.30, 1], [1.42, 0.5], [1.56, 0.15], [1.70, 0]],
     // The rifle riding on the working hand, rotating about the eye ([s, -, -, -, rx, ry, rz]),
     // from the COD clip's front sight frame by frame: it dips ~0.03 of the frame as the rifle
-    // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, climbs further as the bolt comes back so the knob and
-    // hand leave through the top of the frame as in the clip (.57-.73 s), and is driven
-    // back down by the push and the lock. While the bolt is back the rifle also goes ~3 cm out
-    // and 1 cm up ([s, x, y, z, ...] in the rifle's parent space; the low pose's depth squeeze
-    // makes it ~1.8 cm): the hand on the pulled-back knob otherwise comes within 5 cm of the
-    // eye and the near plane (6 cm) slices it open (user, 2026-11-03).
+    // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, and is driven back down by
+    // the push and the lock. While the bolt is back (.56-.70 s played) the clip shows only the
+    // rifle running steeply down to the lower right: hand and knob are out of the frame. Here the
+    // muzzle keeps its climb (that is what keeps the rifle line steep) while the rifle drops 7.5 cm
+    // and slides 6 cm right ([s, x, y, z, ...] in the rifle's parent space), so the front sight
+    // returns to ~0.43 of the frame and the receiver, knob and hand leave through the lower right
+    // (HanYang's 3 cm handle cannot reach the top of the frame like the Type 38's). Yawing the
+    // muzzle instead lays the rifle flat; drawing it toward the eye brings the hand under the
+    // 6 cm near plane, which slices it open (user, 2026-11-03/04). Closest skin then 6.8 cm.
     sway: [[0, 0, 0, 0, 0, 0, 0], [0.22, 0, 0, 0, 0, 0, 0], [0.30, 0, 0, 0, -0.026, 0, 0], [0.44, 0, 0, 0, 0, 0, 0],
-      [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0, 0.010, -0.036, 0.070, -0.006, 0.010], [0.963, 0, 0.010, -0.036, 0.078, -0.006, 0.010],
-      [1.09, 0, 0.004, -0.014, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
+      [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0.06, -0.075, -0.026, 0.070, -0.006, 0.010], [0.963, 0.06, -0.075, -0.026, 0.078, -0.006, 0.010],
+      [1.09, 0.0300, -0.0375, -0.0090, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
     // Shot response on the held pose, rotating about the aiming eye (worked out from
     // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
     // Hip fire keeps `hipRiseScale` of it.
@@ -313,7 +316,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 1.420, anchor: "bolt" },
       { at: 1.450, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
       { at: 1.500, anchor: "boltClear" },
-      { at: 1.680, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRecover", through: true },
+      { at: 1.680, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "boltRest", through: true },
       { at: 1.800, anchor: "gripClear" },
       { at: 1.920, anchor: "grip", weight: 0 },
     ],

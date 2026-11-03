@@ -267,6 +267,21 @@ COD 片段按 30 帧拆成「开枪后毫秒」命名的图，游戏同一毫秒
 `FirearmResponseBrowserTest`、`FpsArmTest`、`GunFeelTest` 通过。`FirearmResponseBrowserTest` / `FpsHandContactTest` /
 `WeaponRangeTest` / `AudioTest` 里按旧 1 s 节奏写死的等待与接触时间窗改为读这张表，断言门限不变。
 
+**11-04 第三轮：抓栓提前、后拉时手出画、锁栓后攥拳**（用户：「动作的差距还是有点大……尤其是手指、枪械的细微运动」）。
+把 COD 与游戏右上 60% 画面按同一毫秒裁成对比条（会话 scratchpad `HandPair.py`）逐帧看手指，再用 `TryCycle.mjs` 在同一个浏览器里连续试 `sway` 候选：
+- 节拍：COD 0.40 s 手指已垫在机柄下、0.47 s 柄已立直；原来晚约 60 ms。`pace` 改为抓栓 0.40 → 抬完 0.505 s，推栓 0.70–0.83、压柄到 0.95 s；
+  再往前压伸手那段，`FpsReloadMechanicsTest` 的手单帧 55 mm 门限会红（57–58 mm）。
+- 后拉那段（0.56–0.70 s）COD 只剩一支陡斜的枪，手和机柄球都在画外。原来那版靠抬枪口让手从上方出画，汉阳造机柄只有约 3 cm，
+  球停在画面顶边、手大块留在画面右半。现改为保留抬枪口（枪身斜度靠它），整枪下压 7.5 cm、右移 6 cm、略拉近，准星回到约 0.43 屏高，
+  机匣、球和手从右下出画；最近的皮肤 6.8 cm（近裁面 6 cm）。试过的另两条路都不行：转枪口（ry）把枪身放平到 20–30°（COD 约 50°），
+  顺枪管拉近会让手进出画时被近裁面切开。
+- 锁栓后回握把那段用新手型 `boltRest`（半握拳，指节朝镜头），不再五指张开。
+
+还差（下一轮）：COD 推栓是手从上方压下来、掌根推机柄再按下，这里仍是手指勾着推；后拉结束后枪回位比 COD 早约 40 ms，球先回到画面里；
+锁栓后 COD 的拳头压在机柄上停一下再往右滑走，这里手往下掉出画面；后拉段枪比 COD 细一圈（不能再拉近，近裁面）。
+验收：`HanYangReloadClearanceTest` 拉栓 1.209 mm、空仓 / 三发 1.814、开栓换弹 1.577；`FpsReloadMechanicsTest`、`FpsArmTest` 1014/1014、`GunFeelTest` 12/12、
+`FirearmResponseBrowserTest`、`FirearmActionsTest`、`WeaponRangeTest`、`DataJsonTest`、`FpsAnimationTest` 过；`FpsHandContactTest` 只剩护木 NaN（11-03 起 master 同样红，汉阳造重烘后测试找不到护木表面）。
+
 ### 汉阳造换弹对标 COD 三八式（2026-11-02，Blender 骨骼片段）
 
 参考：`OneDrive/Sync/饮河/FPS/动画/三八式/COD_WWII_三八式_02_换弹_有声.mp4`（4.0 s，29.97 fps），
