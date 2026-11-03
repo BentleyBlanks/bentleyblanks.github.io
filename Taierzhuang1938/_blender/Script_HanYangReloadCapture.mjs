@@ -22,6 +22,14 @@ try{
  await fs.mkdir(folder,{recursive:true});
  await fs.writeFile(path.join(folder,'Data_Capture.json'),JSON.stringify(capture));
  console.log(`Captured idle + ${Object.keys(capture.runs).length} procedural reloads; fov ${capture.info.fov}`);
+ // The knob grasp the clip uses: FPS_HAND_SHAPES.boltFist as the live bolt cycle solves it,
+ // once just closed on the knob with the handle down and once with the handle lifted.
+ await page.reload();await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
+ const frames=await page.evaluate(CaptureBoltFist);
+ const down=frames.find(f=>f.shape==='boltFist'&&f.next==='boltFist'&&f.turn<.01&&f.mix<.05),up=frames.find(f=>f.turn>Math.PI/2-1e-3);
+ if(!down||!up)throw Error('boltFist grasp frames not found');
+ await fs.writeFile(path.join(folder,'Data_BoltFistCapture.json'),JSON.stringify({source:'live HanYang bolt cycle, FPS_HAND_SHAPES.boltFist',down,up}));
+ console.log(`boltFist grasp: frames ${down.i} (handle down) and ${up.i} (lifted)`);
 }finally{await browser.close();if(server)await new Promise(r=>server.close(r));}
 
 async function Capture(){
@@ -56,4 +64,17 @@ async function Capture(){
   runs[name]={duration:dur,frames};
  }
  return {info,idle,runs};
+}
+
+async function CaptureBoltFist(){
+ const T=window.Taierzhuang;T.Debug.OpenEditor('firstPerson');const e=T.editor.active;e.SetWeapon('HanYang');e.SetPose('hip');T.StepFrames(90,1/60,true);
+ const vm=T.viewmodel,a=vm.riggedArms,an=vm.skeletalAnimation,asset=an.assets.HanYang;
+ const bones=asset.bones.map(n=>an.boneMap.get(n.toLowerCase().replace(/[^a-z0-9]/g,'')));
+ const A=m=>m.toArray().map(v=>+v.toFixed(7));
+ vm.TriggerFire();const out=[];
+ for(let i=0;i<150&&(i<5||vm.action);i++){T.StepFrames(1,1/60,true);vm.root.updateWorldMatrix(true,true);
+  const ri=a.root.matrixWorld.clone().invert(),b=vm.rig.parts.bolt,op=a.operationPose.r;
+  out.push({i,turn:b.rotation.z,slide:b.position.z,shape:op?.shape,next:op?.nextShape,mix:op?.shapeMix,
+   bolt:A(ri.clone().multiply(b.matrixWorld)),bones:bones.map(x=>({root:A(ri.clone().multiply(x.matrixWorld))}))});}
+ return out;
 }

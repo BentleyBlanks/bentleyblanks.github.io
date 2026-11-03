@@ -114,7 +114,7 @@ try {
         }
         // The Blender reload clip poses the bones directly. Its COD-style hold flicks the handle up /
         // presses it down with the fingers (reference 0.60-0.70 s), so the knob rolls in the thumb/index
-        // crotch instead of the palm turning rigidly: there the knob must stay in that crotch.
+        // fingers instead of the palm turning rigidly: there the knob must stay in that grip.
         const turnNow = vm.rig.parts.bolt.rotation.z, skeletal = !!vm.action?.skeletal;
         const turning = skeletal ? turnNow>1e-4&&turnNow<vm._BoltLiftAngle()-1e-4&&vm.rig.parts.bolt.position.z<1e-6 : t>=.107&&t<=.150;
         if(!turning) tracking = false;   // lift and press-down are separate windows
@@ -153,7 +153,8 @@ try {
       Check(Math.abs(atBack-vm.rig.boltTravel)<.001,`${id}: the complete bolt body does not travel through the opening`);
       if(row.handleTurnRad){
         Check(row.maxKnobSlipM<.012,`${id}: the knob leaves the thumb/index crotch while the handle turns`);
-        Check(row.palmTurnRad>.3*row.handleTurnRad,`${id}: the working palm does not follow the bolt handle`);
+        // FPS_HAND_SHAPES.boltFist follows ~20% of the quarter-turn (turnFollow): the knob rolls in the fingers.
+        Check(row.palmTurnRad>.15*row.handleTurnRad,`${id}: the working palm does not follow the bolt handle`);
       } else Check(maxTurnMismatch<.002,`${id}: the working palm does not rotate with the bolt handle`);
       Check(row.packetPullbackM<.001,`${id}: the newly inserted packet is pulled back out`);
       Check(returned<.001,`${id}: bolt is not home after closing`);
