@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import * as THREE from "./vendor/three/build/three.module.js";
-import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS, FactionCharacterKeys } from "./Data_XBotCharacters.mjs";
 import { XBOT_CHARACTER_LOOKS } from "./Data_BlockoutXBotClips.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 
@@ -30,7 +30,7 @@ const Float = (glb, i) => {
 const xbot = ReadGlb(path.join(here, XBOT_CHARACTERS.xbot.file));
 const xw = Worlds(xbot.doc);
 const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
-for (const key of new Set(Object.values(XBOT_FACTION_CHARACTERS))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
+for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);
   assert.ok(XBOT_CHARACTERS[key], `角色表指向的人物 ${key} 要登记`);

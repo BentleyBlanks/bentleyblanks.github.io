@@ -777,7 +777,7 @@ export class BlockoutPuppets {
     if (!this.xbot?.ready) return;
     // 配色：有名字的角色各一种（castId，或顺子 / 老耿 / 妮儿这类按单位 id）；抬担架的、普通人按阵营素色
     if (!human.skin && human.body === "rig") human.skin = this.xbot.Attach(human.actor, { faction: human.faction,
-      castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null });
+      castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null, seed: `${puppet.unit.id}:${human.slot}` });
     if (!human.skin) return;
     const playing = clipState && human.soldier.openingStoryboardPose ? human.clipName : null;
     const meta = playing ? this.opening?.api?.OpeningClipMeta?.(playing) || {} : {};
@@ -1426,7 +1426,7 @@ export class BlockoutPuppets {
     const humans = [];
     for (const puppet of this.puppets.values()) for (const human of puppet.humans) {
       const pick = human.skin?.pick;
-      humans.push({ id: puppet.id, slot: human.slot, faction: human.faction, look: human.skin?.look.key ?? null, skin: !!human.skin, clip: human.clipName || null,
+      humans.push({ id: puppet.id, slot: human.slot, faction: human.faction, look: human.skin?.look.key ?? null, skin: !!human.skin, kit: human.skin?.kit.key ?? null, clip: human.clipName || null,
         pick: !pick ? null : pick.mode === "mirror" ? "mirror" : pick.key || pick.file,
         scale: human.skin ? +human.skin.container.scale.x.toFixed(3) : null, ...(human.skin ? human.skin.Probe() : {}) });
     }

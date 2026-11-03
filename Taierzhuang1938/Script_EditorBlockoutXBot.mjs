@@ -11,7 +11,8 @@
 // 播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手（握把在右手掌心，枪管按权重转向左手；清单 rifleTrack 的背上 / 掉地，
 // 同预览工具，共用 Script_MixamoProps.mjs）；其余时候照原身体手和枪的相对位置。贴躯干的挂件（背着的枪）按 X Bot 体型推开。
 // 运行时取证：_import/Script_XBotAttachmentProbe.mjs。
-// 2026-11-03 起普通日军换成日兵甲（Data_XBotCharacters.mjs 的 XBOT_FACTION_CHARACTERS），11-04 起何有田换成他自己的模型（XBOT_CAST_CHARACTERS）：
+// 2026-11-03 起普通日军换成日兵甲（Data_XBotCharacters.mjs 的 XBOT_FACTION_CHARACTERS），11-04 起何有田换成他自己的模型（XBOT_CAST_CHARACTERS），
+// 11-04 起普通日军日兵甲、日军士兵A 按兵的编号各一半：
 // 同一副骨架、自己的贴图，动作去掉 X Bot 的骨长、胯高按比例缩；别的有专属配色的人、别的阵营照用 X Bot。读不到就退回 X Bot。
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -21,7 +22,7 @@ import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
-import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS, FactionCharacterKeys } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
@@ -312,7 +313,7 @@ export class XBotSkins {
     this.source.traverse(o => { if (o.isBone) this.restBones.set(o.name, o); });
     // 每种人物一套（模型、头高、身体胶囊、初始骨头）；X Bot 之外的按阵营表读，读不到不影响 X Bot
     this.kits = new Map([["xbot", { key: "xbot", def: XBOT_CHARACTERS.xbot, source: this.source, headY: this.headY, bodyVolumes: this.bodyVolumes, restBones: this.restBones }]]);
-    await Promise.all([this._CalibrateRifle(), ...[...new Set([...Object.values(XBOT_FACTION_CHARACTERS), ...Object.values(XBOT_CAST_CHARACTERS)])].map(key => this._LoadKit(key))]);
+    await Promise.all([this._CalibrateRifle(), ...[...new Set([...Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys), ...Object.values(XBOT_CAST_CHARACTERS)])].map(key => this._LoadKit(key))]);
     this.ready = true;
   }
 
@@ -344,9 +345,18 @@ export class XBotSkins {
     return { from: [a.cx, a.cz], to: [b.cx, b.cz], k: [Math.max(1, b.hx / a.hx), Math.max(1, b.hz / a.hz)] };
   }
 
-  /** 这个配色的人用哪套人物：有名字的人（look.key 是角色键）按 XBOT_CAST_CHARACTERS，阵营素色（look.key 就是阵营）按 XBOT_FACTION_CHARACTERS，其余 X Bot。 */
-  KitFor(look) {
-    return this.kits.get(XBOT_CAST_CHARACTERS[look.key] || XBOT_FACTION_CHARACTERS[look.key]) || this.kits.get("xbot");
+  /**
+   * 这个配色的人用哪套人物：有名字的人（look.key 是角色键）按 XBOT_CAST_CHARACTERS，阵营素色（look.key 就是阵营）按
+   * XBOT_FACTION_CHARACTERS（写了几个人就按 seed —— 兵的编号 —— 的字符串哈希固定挑一个，读不到的跳过），其余 X Bot。
+   */
+  KitFor(look, seed = "") {
+    const cast = this.kits.get(XBOT_CAST_CHARACTERS[look.key]);
+    if (cast) return cast;
+    const kits = FactionCharacterKeys(look.key).map(key => this.kits.get(key)).filter(Boolean);
+    if (!kits.length) return this.kits.get("xbot");
+    let h = 2166136261;
+    for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    return kits[h % kits.length];
   }
 
   /** 同动作预览工具：端枪瞄准待机第 0 帧，握把放进右手掌心、枪管指向左手掌心、准星朝上，记下枪相对右手的位置朝向。 */
@@ -457,21 +467,21 @@ export class XBotSkins {
   }
 
   /** 给一个人挂 X Bot；资源没读完或这个人没有骨骼身体（旧的体块 / tzm 百姓）返回 null。 */
-  Attach(actor, { faction = "nra", castId = null, unitId = null } = {}) {
+  Attach(actor, { faction = "nra", castId = null, unitId = null, seed = unitId || "" } = {}) {
     if (!this.ready || !actor?.characterRig?.root) return null;
-    return new XBotSkin(this, actor, faction, XBotLook({ faction, castId, unitId }));
+    return new XBotSkin(this, actor, faction, XBotLook({ faction, castId, unitId }), seed);
   }
 }
 
 /** 一个人身上的 X Bot。 */
 export class XBotSkin {
-  constructor(skins, actor, faction, look) {
+  constructor(skins, actor, faction, look, seed = "") {
     this.skins = skins;
     this.actor = actor;
     this.rig = actor.characterRig;
     this.faction = faction;
     this.look = look;
-    this.kit = skins.KitFor(look);
+    this.kit = skins.KitFor(look, seed);
     this.model = CloneSkinned(this.kit.source);
     this.model.name = "XBot";
     this.model.traverse((o) => {
