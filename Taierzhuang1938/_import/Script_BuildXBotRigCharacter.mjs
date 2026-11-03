@@ -12,6 +12,7 @@
 //
 // 用法：node _import/Script_BuildXBotRigCharacter.mjs [源.glb] [--crown 1.8142] [--out Model/Character/Model_JapaneseSoldierJia.glb]
 //   何有田：… 05_何有田/HeYoutian_Merged_V1_Bones_NeckFix.glb --crown 1.8263 --out Model/Character/Model_HeYoutian.glb
+//   罗班长：… 02_罗班长/SquadLeaderLuo_Merged_V13_Bones.glb --crown 1.791 --out Model/Character/Model_SquadLeaderLuo.glb
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";

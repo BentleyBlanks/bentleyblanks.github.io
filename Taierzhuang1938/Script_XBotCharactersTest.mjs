@@ -1,4 +1,4 @@
-// 顶替 X Bot 的人物（Data_XBotCharacters.mjs，日兵甲、何有田）：转出来的 GLB 骨架与 X Bot 一致、清单数值对得上、动作换人的处理（纯 Node，秒级）。
+// 顶替 X Bot 的人物（Data_XBotCharacters.mjs，日兵甲、何有田、罗班长）：转出来的 GLB 骨架与 X Bot 一致、清单数值对得上、动作换人的处理（纯 Node，秒级）。
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";

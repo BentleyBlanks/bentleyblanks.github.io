@@ -1,0 +1,72 @@
+{
+ "schema": 1,
+ "built": "2026-11-03",
+ "script": "_import/Script_BuildXBotRigCharacter.mjs",
+ "source": {
+  "file": "SquadLeaderLuo_Merged_V13_Bones.glb",
+  "bytes": 14046328,
+  "sha256": "de4593fcc920af51d9a8bb0ef175d814052c338a07c2734eda6da2ff51fa1c9f",
+  "heightM": 1
+ },
+ "output": {
+  "file": "Model/Character/Model_SquadLeaderLuo.glb",
+  "bytes": 11045656,
+  "sha256": "643047adfec7216b844d3c4de02bd4aa14399d39a44b9ef1aac04dc2d296b4fa"
+ },
+ "scale": 1.791,
+ "crownM": 1.791,
+ "triangles": 49656,
+ "vertices": 49782,
+ "sourceVertices": 49782,
+ "bones": 65,
+ "addedEndBones": [
+  "HeadTop_End",
+  "RightHandThumb4",
+  "RightHandIndex4",
+  "RightHandMiddle4",
+  "RightHandRing4",
+  "RightHandPinky4",
+  "LeftHandThumb4",
+  "LeftHandMiddle4",
+  "LeftHandRing4",
+  "LeftHandPinky4"
+ ],
+ "rigidHead": {
+  "aboveHeadJointM": [
+   0.015,
+   0.09
+  ],
+  "vertices": 7158
+ },
+ "hipsY": 0.934,
+ "xbotHipsY": 1.0427,
+ "hipsScale": 0.8957,
+ "headY": 1.5846,
+ "xbotHeadY": 1.5993,
+ "images": [
+  {
+   "index": 0,
+   "role": "baseColor",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 4717634,
+   "bytes": 3179100
+  },
+  {
+   "index": 1,
+   "role": "metallicRoughness",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 2958012,
+   "bytes": 1500338
+  },
+  {
+   "index": 2,
+   "role": "normal",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 2959428,
+   "bytes": 3156792
+  }
+ ]
+}

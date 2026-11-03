@@ -13,10 +13,13 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 何有田：Tripo 部件合并（角色\Tripo\05_何有田），用户在 Tripo 绑的骨，后颈接缝补过权重（_NeckFix）；hipsScale 同 Model/Character/Data_HeYoutian.json
   heYoutian: Object.freeze({ name: "何有田", file: "./Model/Character/Model_HeYoutian.glb", hipsScale: 0.9612, ownMaterial: true,
     report: "./Model/Character/Data_HeYoutian.json" }),
+  // 罗班长：Tripo 部件合并（角色\Tripo\02_罗班长，V13 补了袖子里的小臂），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_SquadLeaderLuo.json
+  luo: Object.freeze({ name: "罗班长", file: "./Model/Character/Model_SquadLeaderLuo.glb", hipsScale: 0.8957, ownMaterial: true,
+    report: "./Model/Character/Data_SquadLeaderLuo.json" }),
 });
 
 /** 白盒里这个阵营的普通士兵（没有专属配色的）换成哪个人；没写的阵营照用 X Bot。 */
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: "ijaJia" });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo" });
