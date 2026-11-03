@@ -3010,6 +3010,7 @@ export class Viewmodel {
         const spec = this.action.cycle;
         finalPose = this._RisePose(finalPose, cycle.rise, spec.risePivot ?? this._AdsEyeInRig(), Mix(spec.hipRiseScale, spec.adsRiseScale ?? 1, Clamp01(ads)));
         finalPose = this._MixPose(finalPose, this._PoseFromSpec({ mode: "fixed", ...spec.work }), cycle.lower);
+        if (cycle.sway) finalPose = this._RisePose(finalPose, cycle.sway, null, 1);
         // 腰射没有「先回到脸颊、头再贴上去」那一拍：低头跟着枪一起回。
         const head = Mix(Math.min(cycle.head, cycle.lower), cycle.head, Clamp01(ads));
         finalPose = this._RisePose(finalPose, [0, 0, 0, spec.headPitchRad, 0, 0], null, head);
@@ -3516,7 +3517,7 @@ export class Viewmodel {
     const boltQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(...placement.rotation, "YXZ"));
     const anchors = {
       grip, gripUnwrap: Offset(grip, clearance.unwrap), gripClear: Offset(grip, clearance.grip),
-      bolt: placement, boltClear: { ...Offset(placement, clearance.bolt), shape: "packetBoltClear" },
+      bolt: placement, boltClear: { ...Offset(placement, cycle.boltClear ?? clearance.bolt), shape: cycle.boltClearShape ?? "packetBoltClear" },
       boltExit: { ...Offset(placement, clearance.boltExit), shape: "packetBolt" },
     };
     this._WorkingHandPath("right", a.t, (holdOpen ? cycle.holdOpenHand : cycle.hand).map(frame => {
@@ -3545,7 +3546,9 @@ export class Viewmodel {
     // 肩锚不跟着转——第一人称双臂的肩是贴镜头摆的，一起转会把左小臂横进画面中间。
     const head = ReloadTrack(cycle.head, since);
     const rise = Array.from({ length: 6 }, (_, i) => a.afterShot ? ReloadTrack(cycle.rise, since, i + 1) : 0);
-    this.boltCycleState = { lower: ReloadTrack(cycle.lower, since), head, rise, since };
+    // 枪跟着手的大摆（COD 三八式逐帧量的准星走位）：绕眼睛转，整把枪在画面里一起挪。
+    const sway = cycle.sway ? Array.from({ length: 6 }, (_, i) => ReloadTrack(cycle.sway, since, i + 1)) : null;
+    this.boltCycleState = { lower: ReloadTrack(cycle.lower, since), head, rise, sway, since };
   }
 
   /** 满开镜时眼睛（相机原点）在枪局部的位置：开镜眼距一改，开枪上扬的支点跟着走。 */
@@ -3616,7 +3619,12 @@ export class Viewmodel {
     // turnFollow < 1：攥住机柄球的拳头只跟机柄转一部分（球朝哪都一样），机柄放平时拳头不钻到机柄下面。
     const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1),
       ((this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad) * (FPS_HAND_SHAPES[shape]?.turnFollow ?? 1));
-    return this._HandPlacement(shape, knob, turn);
+    const placement = this._HandPlacement(shape, knob, turn);
+    // downOffset：机柄放平时手整体再挪开这么多（随抬柄线性收回），勾杆的手在机柄平放时不压进机匣。
+    const down = FPS_HAND_SHAPES[shape]?.downOffset;
+    if (down) placement.position.addScaledVector(new THREE.Vector3().fromArray(down),
+      1 - Clamp01((this.rig.parts.bolt?.rotation.z || 0) / this._BoltLiftAngle()));
+    return placement;
   }
 
   _HandPlacement(shape, anchor, quaternion = null) {

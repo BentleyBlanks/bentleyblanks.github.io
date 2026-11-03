@@ -84,6 +84,22 @@ export const FPS_HAND_SHAPES = Freeze({
   boltFist: Freeze({side:"r",palmOffset:V(.0178,-.0032,-.0248),rotation:V(-1.0538,3.1426,1.6495),turnFollow:.2,
     fingers:Freeze([V(0,38.9,30.4),V(75,100.1,62.6),V(41,55.7,32.3),V(29.3,42.6,22.1),V(24.9,38.1,19.1)]),
     thumbDirection:V(-.1463,-.1203,1.3584),thumbRoll:4.8,fingerSplay:PacketFingerSplay}),
+  // HanYang frame-matched bolt cycle, pulling hand (FPS_BOLT_CYCLE.boltShape), from the user's
+  // COD WWII Type 38 clip frame by frame (2026-11-03, "pull with the middle, ring and little
+  // fingers"): the hand comes up under the knob palm up and the fingers hook round the front of
+  // the shank, the index over the ball and the thumb behind it. HanYang's shank is ~3 cm, so
+  // the middle and ring fingers take it and the little finger tucks into the palm beside the
+  // bolt body. It follows `turnFollow` of the handle's turn and, with the handle down, stands off
+  // `downOffset` (fading out as it lifts) so the hooked hand clears the receiver. Fitted on the
+  // live cycle; frame at boltContactReferenceRad (handle up: palm in, fingers round the front).
+  boltHook: Freeze({side:"r",palmOffset:V(.0056,-.0311,-.024),rotation:V(.3015,-2.367,1.8362),turnFollow:.749,downOffset:V(.0086,.0003,.0016),
+    fingers:Freeze([V(0,32,21.3),V(76.1,104,55.5),V(41.1,115,75.2),V(95,115,85),V(67.3,104.4,63.9)]),
+    thumbDirection:V(-.2539,-.4615,1.2895),thumbRoll:4.8,fingerSplay:Freeze([0,6.6,1.9,13.4,36.4])}),
+  // boltHook eased open for coming onto / leaving the shank: only the thumb, index and the
+  // middle/ring hook loosen a little (opening them further sweeps the tips through the shank and
+  // the knob); the little finger stays tucked as in boltHook.
+  boltHookClear: Freeze({side:"r",fingers:Freeze([V(0,25,15),V(60,85,45),V(42,105,65),V(80,100,70),V(66.3,93.5,61.1)]),
+    thumbDirection:V(-.2449,-.4119,1.1171),thumbRoll:4.8,fingerSplay:Freeze([0,8,2,13,34.8])}),
   packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
     thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),

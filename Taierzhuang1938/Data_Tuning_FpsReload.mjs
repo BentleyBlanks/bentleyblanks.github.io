@@ -231,35 +231,46 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     durationS: 1.95, startS: 0.02,
     pace: [[0, 0], [0.13, 0.13], [0.62, 0.388], [0.68, 0.443], [0.81, 0.556], [0.90, 0.612],
       [1.02, 0.722], [1.26, 0.850], [1.41, 0.975], [1.95, 1.322]],
-    // Low working pose, relative to the player's (undipped) look: the muzzle 9.5 deg above
-    // level and turned 19 deg left, so the barrel runs toward the horizon as in the
-    // reference. The head really dips `headPitchRad` (the camera pitches down; the rifle
-    // turns back about the eye by the same angle and stays put in the world): the
-    // reference's horizon climbs ~0.17 of the frame, i.e. ~10 deg. Faking the dip by
-    // turning only the rifle left the horizon mid-screen and read as the rifle pointing
-    // 60-70 deg up (user, 2026-11-02). Held out at arm's length (nearer, the pulled-back
-    // hand reaches the near plane); `workDepthScale` then brings the whole layer up close.
-    work: Object.freeze({ position: [0.0547, -0.1742, -0.1448], rotation: [0.1653, 0.3259, 0.0197] }),
-    headPitchRad: 0.18,
-    // Hand shape on the knob (FPS_HAND_SHAPES.boltFist): closed round the knob like the COD clip;
-    // the reach before the grasp is laid out from it so the hand does not jump onto the knob.
-    boltShape: "boltFist",
+    // Low working pose, relative to the player's (undipped) look, placed on the COD Type 38
+    // clip frame by frame (2026-11-03, user: the rifle's motion with the hand did not match):
+    // the rifle barely leaves the aim line. The front sight stays just above the centre
+    // (0.42 of the frame), the receiver runs down to the lower right, the closed knob sits at
+    // the right edge, the lifted knob near the top (COD .68/.20) and the pulled-back knob
+    // leaves through the top right. The Gew88-matched pose before it swung the muzzle off
+    // the top left. The head dips `headPitchRad` (camera down, the rifle stays put in the
+    // world): the clip's horizon climbs ~0.05 of the frame.
+    work: Object.freeze({ position: [0.055, -0.08, -0.04], rotation: [0.0035, 0.048, 0.05] }),
+    headPitchRad: 0.06,
+    // Hand shape on the handle (FPS_HAND_SHAPES.boltHook): the middle/ring/little fingers hook the
+    // shank like the COD clip; the reach before the grasp is laid out from it so the hand does
+    // not jump onto the knob.
+    boltShape: "boltHook",
+    // The hooked fingers come onto / leave the shank from the front (rig axes, m), opened.
+    boltClear: [0.040, -0.030, -0.035], boltClearShape: "boltHookClear",
     // Depth of the first-person layer at the low pose (1 = unchanged): the COD clip keeps
     // the working rifle and hand big and close; squeezing the whole layer's depth does
     // that without moving the hand nearer the shoulder (which tears the arm skin).
     workDepthScale: 0.6,
-    // [s, weight]; the knob holds high until .40, is down by .60; the rifle
-    // rises to the cheek in .09 s and the head settles onto the stock last.
-    lower: [[0, 0], [0.34, 0], [0.47, 0.4], [0.62, 1], [1.60, 1], [1.68, 0.55], [1.74, 0.06], [1.77, 0]],
-    head: [[0, 0], [0.33, 0], [0.42, 0.5], [0.50, 0.9], [0.58, 1], [1.62, 1], [1.70, 0.60], [1.78, 0.27], [1.86, 0.08], [1.95, 0]],
+    // [s, weight]; the rifle leaves the cheek .19-.35 s played and is back on it by 1.13 s
+    // (COD .20-.33 and ~1.13), rising while the hand still presses the handle down.
+    lower: [[0, 0], [0.25, 0], [0.40, 0.45], [0.55, 1], [1.24, 1], [1.36, 0.5], [1.50, 0.2], [1.65, 0]],
+    head: [[0, 0], [0.25, 0], [0.40, 0.6], [0.50, 1], [1.30, 1], [1.42, 0.5], [1.56, 0.15], [1.70, 0]],
+    // The rifle riding on the working hand, rotating about the eye ([s, -, -, -, rx, ry, rz]),
+    // from the COD clip's front sight frame by frame: it dips ~0.03 of the frame as the rifle
+    // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, climbs another ~0.05
+    // while the bolt is back and the hand comes round to push (.67-.80 s), and is driven
+    // back down by the push and the lock.
+    sway: [[0, 0, 0, 0, 0, 0, 0], [0.22, 0, 0, 0, 0, 0, 0], [0.30, 0, 0, 0, -0.026, 0, 0], [0.44, 0, 0, 0, 0, 0, 0],
+      [0.92, 0, 0, 0, 0, 0, 0], [0.963, 0, 0, 0, 0.046, -0.006, 0.010], [1.166, 0, 0, 0, 0.048, -0.008, 0.012],
+      [1.29, 0, 0, 0, 0, 0, 0]],
     // Shot response on the held pose, rotating about the aiming eye (worked out from
     // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
     // Hip fire keeps `hipRiseScale` of it.
     rise: [
       [0, 0, 0, 0, 0, 0, 0], [0.035, 0.003, 0.002, 0.006, 0.030, 0, 0.150],
-      [0.067, 0.004, 0.003, 0.008, 0.060, -0.008, 0.240], [0.100, 0.003, 0.003, 0.005, 0.170, -0.008, 0.120],
-      [0.133, 0.002, 0.002, 0.003, 0.190, 0, 0.040], [0.200, 0, 0.002, 0.002, 0.185, 0, 0.012],
-      [0.333, 0, 0.001, 0, 0.180, 0, 0], [0.420, 0, 0.001, 0, 0.170, 0, 0], [0.600, 0, 0, 0, 0, 0, 0],
+      [0.067, 0.004, 0.003, 0.008, 0.060, -0.008, 0.240], [0.100, 0.003, 0.003, 0.005, 0.150, -0.008, 0.120],
+      [0.133, 0.002, 0.002, 0.003, 0.130, 0, 0.040], [0.200, 0, 0.001, 0.001, 0.050, 0, 0.010],
+      [0.300, 0, 0, 0, 0, 0, 0],
     ],
     // Aimed shots keep `adsRiseScale` of it: the COD Type 38 clip the timing follows only
     // bumps ~2 deg, and with the eye 0.33 m from the sight the full 11 deg lift swings the
@@ -289,16 +300,17 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.250, anchor: "grip", offset: [0.068, 0.015, -0.012], shape: "packetRecover", through: true },
       { at: 0.360, anchor: "grip", offset: [0.078, 0.000, -0.040], shape: "packetRecover", through: true },
       { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.42, through: true },
-      { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.72, through: true },
+      { at: 0.560, anchor: "knob", offset: [0.070, -0.050, 0.010], shape: "packetRelax", turnMix: 0.72, through: true },
       { at: 0.620, anchor: "boltClear", through: true },
+      { at: 0.655, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
-      // Press the handle down on the knob, slip off along the handle, then swing
-      // the open hand up outside the knob (never across it) and down to the wrist.
-      { at: 1.410, anchor: "bolt" },
-      { at: 1.465, anchor: "boltClear" },
-      { at: 1.560, anchor: "knob", offset: [0.085, 0.048, -0.005], shape: "packetRecover", turnMix: 0.5, through: true },
-      { at: 1.630, anchor: "knob", offset: [0.090, 0.015, 0.030], shape: "packetRecover", turnMix: 0.4, through: true },
-      { at: 1.710, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRecover", through: true },
+      // Start the handle down with the hooked fingers and open them off the shank (downward
+      // and back) as it drops: following it all the way down rolls the palm into the
+      // receiver. Then down to the wrist.
+      { at: 1.420, anchor: "bolt" },
+      { at: 1.450, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
+      { at: 1.500, anchor: "boltClear" },
+      { at: 1.680, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRecover", through: true },
       { at: 1.800, anchor: "gripClear" },
       { at: 1.920, anchor: "grip", weight: 0 },
     ],
@@ -311,9 +323,11 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.470, anchor: "knob", offset: [0.060, -0.100, 0.130], shape: "packetClear", turnMix: 0.42, through: true },
       { at: 0.560, anchor: "knob", offset: [0.085, -0.060, 0.060], shape: "packetRelax", turnMix: 0.72, through: true },
       { at: 0.620, anchor: "boltClear", through: true },
+      { at: 0.655, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
       { at: 0.950, anchor: "bolt" },
-      { at: 1.010, anchor: "boltClear" },
+      { at: 0.980, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
+      { at: 1.030, anchor: "boltClear" },
       { at: 1.120, anchor: "knob", offset: [0.070, 0.060, 0.020], shape: "packetRelax", turnMix: 0.5, through: true },
       { at: 1.320, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
       { at: 1.760, anchor: "gripClear" },

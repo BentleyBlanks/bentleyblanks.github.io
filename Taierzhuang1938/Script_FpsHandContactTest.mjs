@@ -447,7 +447,7 @@ try {
           if(!arms.reachable.r||!arms.reachable.l)row.unreachable++;
           arms.fingerBones.r.concat(arms.fingerBones.l).forEach((b,i)=>row.maxFingerTranslation=Math.max(row.maxFingerTranslation,b.position.distanceTo(originalPositions[i])));
           if(id==="HanYang"&&vm.action){
-            const operation=arms.operationPose.r,phase={packetClip:"packet",packetPress:"press",packetBolt:"bolt",boltFist:"bolt"};
+            const operation=arms.operationPose.r,phase={packetClip:"packet",packetPress:"press",packetBolt:"bolt",boltFist:"bolt",boltHook:"bolt"};
             const dominant=(operation?.shapeMix||0)<.5?operation?.shape:operation?.nextShape;
             let kind=phase[dominant]||phase[operation?.shape]||phase[operation?.nextShape];
             if(kind){
