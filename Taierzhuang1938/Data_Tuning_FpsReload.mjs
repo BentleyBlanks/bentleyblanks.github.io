@@ -257,12 +257,15 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     head: [[0, 0], [0.25, 0], [0.40, 0.6], [0.50, 1], [1.30, 1], [1.42, 0.5], [1.56, 0.15], [1.70, 0]],
     // The rifle riding on the working hand, rotating about the eye ([s, -, -, -, rx, ry, rz]),
     // from the COD clip's front sight frame by frame: it dips ~0.03 of the frame as the rifle
-    // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, climbs another ~0.05
-    // while the bolt is back and the hand comes round to push (.67-.80 s), and is driven
-    // back down by the push and the lock.
+    // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, climbs further as the bolt comes back so the knob and
+    // hand leave through the top of the frame as in the clip (.57-.73 s), and is driven
+    // back down by the push and the lock. While the bolt is back the rifle also goes ~3 cm out
+    // and 1 cm up ([s, x, y, z, ...] in the rifle's parent space; the low pose's depth squeeze
+    // makes it ~1.8 cm): the hand on the pulled-back knob otherwise comes within 5 cm of the
+    // eye and the near plane (6 cm) slices it open (user, 2026-11-03).
     sway: [[0, 0, 0, 0, 0, 0, 0], [0.22, 0, 0, 0, 0, 0, 0], [0.30, 0, 0, 0, -0.026, 0, 0], [0.44, 0, 0, 0, 0, 0, 0],
-      [0.92, 0, 0, 0, 0, 0, 0], [0.963, 0, 0, 0, 0.046, -0.006, 0.010], [1.166, 0, 0, 0, 0.048, -0.008, 0.012],
-      [1.29, 0, 0, 0, 0, 0, 0]],
+      [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0, 0.010, -0.036, 0.070, -0.006, 0.010], [0.963, 0, 0.010, -0.036, 0.078, -0.006, 0.010],
+      [1.09, 0, 0.004, -0.014, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
     // Shot response on the held pose, rotating about the aiming eye (worked out from
     // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
     // Hip fire keeps `hipRiseScale` of it.

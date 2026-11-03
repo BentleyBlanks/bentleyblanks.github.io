@@ -3010,7 +3010,10 @@ export class Viewmodel {
         const spec = this.action.cycle;
         finalPose = this._RisePose(finalPose, cycle.rise, spec.risePivot ?? this._AdsEyeInRig(), Mix(spec.hipRiseScale, spec.adsRiseScale ?? 1, Clamp01(ads)));
         finalPose = this._MixPose(finalPose, this._PoseFromSpec({ mode: "fixed", ...spec.work }), cycle.lower);
-        if (cycle.sway) finalPose = this._RisePose(finalPose, cycle.sway, null, 1);
+        if (cycle.sway) {
+          finalPose = this._RisePose(finalPose, cycle.sway, null, 1);
+          finalPose.px += cycle.sway[0]; finalPose.py += cycle.sway[1]; finalPose.pz += cycle.sway[2];
+        }
         // 腰射没有「先回到脸颊、头再贴上去」那一拍：低头跟着枪一起回。
         const head = Mix(Math.min(cycle.head, cycle.lower), cycle.head, Clamp01(ads));
         finalPose = this._RisePose(finalPose, [0, 0, 0, spec.headPitchRad, 0, 0], null, head);
