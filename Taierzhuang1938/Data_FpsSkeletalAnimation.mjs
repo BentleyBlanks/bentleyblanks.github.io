@@ -1,6 +1,6 @@
 // Blender-authored first-person animation assets and presentation settings.
 export const FPS_SKELETAL_ANIMATION = Object.freeze({
-  version: "20261103140000", fps: 60,
+  version: "20261103230000", fps: 60,
   weaponIds: Object.freeze(['HanYang']),
   clips: Object.freeze(['Idle', 'Reload']),
   runtimeEnabled: true,
@@ -20,6 +20,15 @@ export const FPS_SKELETAL_RELOADS = Object.freeze({
     controls: Object.freeze(['weaponMount', 'reloadPivot', 'part_bolt', 'part_cockingPiece',
       'packetProp', 'packetRounds', 'usedPacketProp', 'usedPacketRounds']),
     usedPacket: Object.freeze(['usedPacketProp']),
+    // First-person layer while the clip plays ([clip s, weight], eased): depth squeezed by
+    // `depthScale` (a narrower view; the arms keep their layout), so the rifle and hands read
+    // ~1.5x bigger, as the reference's stock and support hand do at the same muzzle position.
+    // The bolt cycle's low pose does the same (FPS_BOLT_CYCLE.HanYang.workDepthScale 0.6).
+    // Not while the bolt is opened: closer in, the knob and the working hand leave the frame (the
+    // reference's rifle points straighter in than our arms can hold it); it closes in as the
+    // rifle turns to take the packet.
+    view: Object.freeze({ depthScale: 0.65,
+      weight: Object.freeze([[0, 0], [0.72, 0], [1.15, 1], [2.98, 1], [3.38, 0]]) }),
   }),
 });
 

@@ -11,7 +11,7 @@ Script_HanYangReloadSetup.py has built its camera-space scene:
 Everything is computed per 60 fps frame and keyed into one Action
 (Animation_FpsHanYangReload): the rifle pose (reloadPivot, screen-fitted to the
 reference's muzzle / knob / support-hand positions under the game's 55 deg
-camera), bolt turn/slide, the Mannlicher packet, and both arms. The arms use an
+camera and the clip's narrower reload view, Script_HanYangReloadSway.py), bolt turn/slide, the Mannlicher packet, and both arms. The arms use an
 analytic two-bone solve in rig-root space that keeps the fixed bone lengths and
 the idle elbow-plane relation; hand frames and finger shapes come from the
 calibrated procedural reload captured from the game (Script_HanYangReloadCapture),
@@ -94,13 +94,14 @@ WRIST_MAX=28
 # (the handle is flicked up / pressed down with the fingers; the knob rolls in the crotch
 # rather than the palm turning the full 90 degrees with it, as in the reference)
 PIVOT=(-0.0116,-0.0005,-0.4027)        # left palm on the fore-stock, gun space
-# gun poses: (dp xyz recoil space, rx pitch up, ry yaw left, rz roll right-side-up) about PIVOT
-POSES={
- 'idle':((0,0,0),0,0,0),
- 'A':((0.0076,-0.0129,0.0473),0.1031,-0.1121,0.0025),
- 'B':((0.0235,-0.0094,0.0011),0.3386,0.2901,-0.1412),
- 'C':((-0.0046,-0.0158,0.0042),0.0283,0.0414,0.2233),
-}
+# gun poses: (dp xyz recoil space, rx pitch up, ry yaw left, rz roll right-side-up) about PIVOT,
+# set under the reload view by Script_HanYangReloadSway.py (muzzle on the reference's)
+SWAY_DATA=json.load(open(PROJECT+'/_blender/Data_HanYangReloadSway.json',encoding='utf-8'))
+POSES={k:(tuple(v[0]),*v[1:]) for k,v in SWAY_DATA['poses'].items()}
+# the game must play the clip under the same view (Data_FpsSkeletalAnimation HanYang `view`)
+import re
+_vm=re.search(r"view: Object\.freeze\(\{ depthScale: ([\d.]+),\s*weight: Object\.freeze\((\[.*?\]\])\)",open(PROJECT+'/Data_FpsSkeletalAnimation.mjs',encoding='utf-8').read(),re.S)
+assert _vm and abs(float(_vm[1])-SWAY_DATA['view']['depthScale'])<1e-6 and json.loads(_vm[2])==SWAY_DATA['view']['weight'],    ('Data_FpsSkeletalAnimation HanYang view != Data_HanYangReloadSway view',_vm and _vm.groups(),SWAY_DATA['view'])
 # gun keys (t, pose); eased between keys
 GUN=[(0,'idle'),(0.25,'A'),(0.72,'A'),(1.15,'B'),(2.52,'B'),(2.74,'C'),(2.98,'C'),(3.38,'idle'),(3.40,'idle')]
 TURN=[(0,0),(0.27,0),(0.37,1),(2.88,1),(2.98,0),(3.40,0)]
@@ -117,22 +118,28 @@ PACKET_IN_HAND=(1.30,1.76,1.84)
 USED=[(0.98,0,0.051-0.068,-0.187,0,0,0),(1.03,0,0.125,-0.19,0.1,0,0.1),(1.13,0.10,0.20,-0.15,0.6,0.2,1.2),(1.25,0.25,0.18,-0.05,1.2,0.4,2.4)]
 USED_VISIBLE=(0.98,1.25)
 # right hand keys: (t, anchor, pose, offset in anchor-local metres)
-# The fist comes on / off the knob along these (bolt-local, handle down / lifted; 2.2x for the far point)
+# The hand comes on / off the knob over these distances (handle down / lifted; 2.2x for the far point);
+# their direction is replaced by the bolt-to-palm radial once the grasp is built (palm_out)
 OFF_DOWN=(0.033,0.023,0.0); OFF_UP=(0.04,0.0,0.0)
 # the fist turned about the knob towards the top (degrees, bore axis), as the reference hand comes from above
 KNOB_ROLL_DEG=35
+# then the opened hand turned about the knob (bolt-local XYZ Euler, degrees), fitted in Blender with
+# KNOB_HOOK_X and the ring / little curl: seen from the eye at 0.4 s index and middle finger point left
+# over the knob and the wrist runs out to the right as in the reference, while fingers and palm (as
+# capsules) stay out of the bolt and the ring finger lies on the stalk
+KNOB_HOLD_DEG=(33.0,32.8,39.6)
 # Keys marked T are waypoints the hand passes through without stopping.
 T=True
 RIGHT=[
  (0.00,'gun','grip',None),(0.06,'gun','gripClear',None,T),(0.10,'gun','gripClear',(0.05,0.07,0.03),T),
- (0.21,'bolt','fist0',tuple(2.2*v for v in OFF_DOWN),T),(0.245,'bolt','fist0',OFF_DOWN,T),(0.27,'bolt','fist0',None),
- (0.37,'bolt','fistUp',None),(0.67,'bolt','fistUp',None),(0.71,'bolt','fistUp',OFF_UP,T),
+ (0.21,'bolt','fist0',tuple(2.2*v for v in OFF_DOWN),T),(0.245,'bolt','fist0',OFF_DOWN,T),(0.27,'bolt','fist0',tuple(0.15*v for v in OFF_DOWN)),
+ (0.32,'bolt','fistMid',tuple(0.3*v for v in OFF_UP),T),(0.37,'bolt','fistUp',None),(0.67,'bolt','fistUp',None),(0.71,'bolt','fistUp',OFF_UP,T),
  (0.75,'bolt','fistUp',tuple(2.2*v for v in OFF_UP),T),(0.90,'gun','gripClear',(0.10,0.02,0.04),T),(0.98,'gun','latch',None),(1.10,'gun','latch',(0.08,-0.13,0.07),T),
  (1.30,'packet','packet',None),(1.80,'packet','packet',(0.012,0.016,0.0),T),(1.85,'packet','packet',(0.012,0.018,0.0)),
- (1.93,'packet','press',(0.01,0.04,0.01)),(2.00,'packet','press',None),(2.14,'packet','press',None),
+ (1.95,'packet','press',(0.01,0.04,0.01)),(2.00,'packet','press',None),(2.14,'packet','press',None),
  (2.22,'packet','press',(0.03,0.05,0.02),T),(2.45,'gun','gripClear',(0.12,0.10,0.10),T),
  (2.64,'bolt','fistUp',tuple(2.2*v for v in OFF_UP),T),(2.715,'bolt','fistUp',OFF_UP,T),(2.75,'bolt','fistUp',None),(2.88,'bolt','fistUp',None),
- (2.95,'bolt','fist0',OFF_DOWN,T),(3.02,'bolt','fist0',tuple(2.2*v for v in OFF_DOWN),T),(3.14,'gun','gripClear',(0.10,0.05,0.03),T),
+ (2.93,'bolt','fistMid',tuple(0.3*v for v in OFF_UP),T),(2.98,'bolt','fist0',tuple(0.15*v for v in OFF_DOWN)),(3.03,'bolt','fist0',OFF_DOWN,T),(3.09,'bolt','fist0',tuple(2.2*v for v in OFF_DOWN),T),(3.18,'gun','gripClear',(0.10,0.05,0.03),T),
  (3.28,'gun','gripClear',None,T),(3.38,'gun','grip',None),(3.40,'gun','grip',None),
 ]
 
@@ -224,7 +231,7 @@ def gun_base(t):
         if t<=b[0]:
             u=smooth((t-a[0])/(b[0]-a[0]) if b[0]>a[0] else 1);return blendM(pose_matrix(a[1]),pose_matrix(b[1]),u)
     return pose_matrix(GUN[-1][1])
-SWAY=json.load(open(PROJECT+'/_blender/Data_HanYangReloadSway.json',encoding='utf-8'))['rows']
+SWAY=SWAY_DATA['rows']
 def gun_at(t):
     # The rifle follows the reference's own motion between the key poses: the support hand's rise
     # and fall, the swing as it settles and the kicks of the working hand, tracked frame by frame
@@ -273,7 +280,60 @@ def roll_about_knob(rel,deg):
     k=Vector((0.0515,0,0));R=Matrix.Translation(k)@Matrix.Rotation(math.radians(deg),4,'Z')@Matrix.Translation(-k)
     return R@rel
 for key in ('fist0','fistUp'):LIB[key]=(roll_about_knob(LIB[key][0],KNOB_ROLL_DEG),LIB[key][1])
+# The reference does not close the whole fist: index and middle finger lie straight over the
+# bolt towards the muzzle while the ring and little finger stay hooked round the knob and drag
+# the bolt; the thumb stays off the bolt. Each joint of a finger is turned back by this share of
+# its flexion (negative: closed further).
+OPEN_FINGERS={'0':0.6,'1':1.0,'2':0.9,'3':-0.25,'4':-0.3}
+def open_right(locs,amount):
+    locs=[m.copy() for m in locs];acc={RH:Matrix.Identity(4)}
+    for i,L in zip(FING,locs):acc[i]=acc[PARENT[i]]@L
+    for f,share in amount.items():
+        chain=[IDX['Bip002_R_Finger%s%s'%(f,j)] for j in ('','1','2')]
+        for k,i in enumerate(chain):
+            head=acc[i].translation
+            d=(acc[chain[k+1]].translation-head) if k<2 else acc[i].to_3x3()@Vector((1,0,0))
+            prev=head-(acc[chain[k-1]].translation if k else Vector())
+            ax=prev.cross(d)
+            if share==0 or ax.length<1e-9:continue
+            R=Matrix.Translation(head)@Matrix.Rotation(-share*prev.angle(d),4,ax.normalized())@Matrix.Translation(-head)
+            for j in chain[k:]:acc[j]=R@acc[j]
+        for i in chain:locs[FING.index(i)]=acc[PARENT[i]].inverted()@acc[i]
+    return locs
+for key in ('fist0','fistUp'):LIB[key]=(LIB[key][0],open_right(LIB[key][1],OPEN_FINGERS))
+# then turned about the knob as fitted (KNOB_HOLD_DEG) ...
+_k=Vector((0.0515,0,0));_hold=Matrix.Translation(_k)@Euler(tuple(map(math.radians,KNOB_HOLD_DEG)),'XYZ').to_matrix().to_4x4()@Matrix.Translation(-_k)
+for key in ('fist0','fistUp'):LIB[key]=(_hold@LIB[key][0],LIB[key][1])
+# ... and slid (not turned) until the ring finger's hook, the centre of the circle through its three
+# joints, is on the stalk just under the ball (KNOB_HOOK_X along the handle): ring and little finger
+# drag the bolt, the ball resting on the ring finger as in the reference.
+KNOB_HOOK_X=0.0384
+def circumcentre(a,b,c):
+    ab,ac=b-a,c-a;n=ab.cross(ac)
+    return a+(n.cross(ab)*ac.length_squared+ac.cross(n)*ab.length_squared)/(2*n.length_squared)
+def seat_on_knob(rel,locs):
+    acc={RH:Matrix.Identity(4)}
+    for i,L in zip(FING,locs):acc[i]=acc[PARENT[i]]@L
+    P=circumcentre(*[acc[IDX['Bip002_R_Finger3'+j]].translation for j in ('','1','2')])
+    return Matrix.Translation(Vector((KNOB_HOOK_X,0,0))-rel@P)@rel
+for key in ('fist0','fistUp'):LIB[key]=(seat_on_knob(*LIB[key]),LIB[key][1])
 KH=LIB['fist0'][0].inverted()@Vector((0.0515,0,0))   # the knob in the hand's frame
+# half way through the handle's quarter-turn (the hand clears the bolt there on a waypoint)
+LIB['fistMid']=(blendM(LIB['fist0'][0],LIB['fistUp'][0],0.5),[blendM(x,y,0.5) for x,y in zip(LIB['fist0'][1],LIB['fistUp'][1])])
+# The hand comes onto the knob straight out from the bolt and leaves the same way: the approach /
+# release offsets (RIGHT keys on the bolt) point from the bolt's axis to the palm, at the authored
+# lengths (1x / 2.2x of OFF_DOWN / OFF_UP); the old sideways ones swept the new grasp through the bolt.
+def palm_out(rel,locs):
+    acc={RH:Matrix.Identity(4)}
+    for i,L in zip(FING,locs):acc[i]=acc[PARENT[i]]@L
+    c=rel@((acc[IDX['Bip002_R_Finger2']].translation+acc[IDX['Bip002_R_Finger4']].translation)/4)
+    return Vector((c.x,c.y,0)).normalized()
+def remouth(key):
+    t,anc,name,off=key[:4]
+    if anc!='bolt' or not off:return key
+    old=Vector(OFF_DOWN if name=='fist0' else OFF_UP);k=Vector(off).length/old.length
+    return (t,anc,name,tuple(palm_out(*LIB[name])*old.length*k),*key[4:])
+RIGHT=[remouth(k) for k in RIGHT]
 
 # Support hand: the idle cradle holds the fore-stock with straight fingers, which reads as an open
 # palm once the rifle is turned to load. Through the reload the fingers close round the stock as in

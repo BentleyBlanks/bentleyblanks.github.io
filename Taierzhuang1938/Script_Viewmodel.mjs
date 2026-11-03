@@ -3055,9 +3055,11 @@ export class Viewmodel {
     }
     // 逐帧拉栓落到低位时第一人称这一层的视角再收窄（workDepthScale 压深度）：枪和手一起变大、凑近，
     // 像 COD 三八式那样拉栓也是近景；整层一起压，手臂 IK 的相对位置不变，不会把手拉变形。
+    // A Blender reload clip with a `view` narrows it the same way while it plays.
     if (!this.mount) {
       const depth = cycle && this.action?.cycle?.workDepthScale ? Mix(1, this.action.cycle.workDepthScale, cycle.lower) : 1;
-      this.fovRig.scale.set(this.compensation.x, this.compensation.y, this.compensation.z * depth);
+      const view = this.action?.skeletal?.view, viewW = view ? this.skeletalAnimation.ReloadViewWeight() : 0;
+      this.fovRig.scale.set(this.compensation.x, this.compensation.y, this.compensation.z * depth * Mix(1, view?.depthScale ?? 1, viewW));
     }
 
     // --- 枪焰 / 碎屑 ---------------------------------------------------------

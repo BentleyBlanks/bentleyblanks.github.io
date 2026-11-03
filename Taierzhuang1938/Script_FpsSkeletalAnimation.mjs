@@ -101,6 +101,20 @@ export class FpsSkeletalAnimation {
     return spec&&this.Clip(spec.clip)?spec:null;
   }
 
+  /** How far a playing reload clip has taken the first-person view to its `view` (0..1). */
+  ReloadViewWeight() {
+    const a=this.vm.action,s=a?.kind==='reload'?a.skeletal:null,keys=s?.view?.weight;
+    if(!keys||!this.Clip(s.clip))return 0;
+    const elapsed=a.t*a.duration,clipS=s.startS+elapsed;
+    let w=keys[keys.length-1][1];
+    for(let i=1;i<keys.length;i++)if(clipS<=keys[i][0]){
+      const [t0,w0]=keys[i-1],[t1,w1]=keys[i],u=THREE.MathUtils.clamp((clipS-t0)/Math.max(1e-6,t1-t0),0,1);
+      w=w0+(w1-w0)*u*u*(3-2*u);break;
+    }
+    const blend=s.blendInS>0?Math.min(1,elapsed/s.blendInS):1;
+    return w*blend*blend*(3-2*blend);
+  }
+
   // The clip owns the arms, the rifle and its moving parts for the whole reload;
   // the procedural reload is skipped (see Viewmodel._AnimReload). A reload that
   // starts part-way in eases in from the pose the previous frame left.
