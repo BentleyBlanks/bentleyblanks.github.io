@@ -85,7 +85,8 @@ ch=cap['info']['chain'][0];camRec=M(cap['idle']['camRoot'])@np.linalg.inv(TRS(ch
 wm=cap['idle']['controls']['weaponMount'];G0=TRS(wm['p'],wm['q'])
 FOV=math.radians(55);ASP=16/9
 PIV=np.array([-0.0116,-0.0005,-0.4027]);MUZ=np.array([0,0.03857,-0.995])
-GUN=[(0,'idle'),(0.25,'A'),(0.72,'A'),(1.15,'B'),(2.52,'B'),(2.74,'C'),(2.98,'C'),(3.38,'idle'),(3.40,'idle')]
+# A2: A with the rifle pushed forward along the bore while the bolt comes back (clip 0.40-0.55)
+GUN=[(0,'idle'),(0.25,'A'),(0.40,'A'),(0.55,'A2'),(0.72,'A2'),(1.15,'B'),(2.52,'B'),(2.74,'C'),(2.98,'C'),(3.38,'idle'),(3.40,'idle')]
 def euler(rx,ry,rz):return Rot.from_euler('yxz',[ry,rx,rz]).as_matrix()   # mathutils Euler((rx,ry,rz),'YXZ') = Rz Rx Ry
 def about_piv(dp,rx,ry,rz,base):
     R=np.eye(4);R[:3,:3]=euler(rx,ry,rz);T=np.eye(4);T[:3,3]=PIV;Ti=np.eye(4);Ti[:3,3]=-PIV;D=np.eye(4);D[:3,3]=dp
@@ -127,6 +128,14 @@ for n,uv in MUZZLE_MARK.items():
     else:r=least_squares(lambda v:proj(about_piv(dp,v[0],v[1],rz,G0),MUZ,w)-np.array(uv),[rx,ry])
     POSES[n]=(dp,round(r.x[0],4),round(r.x[1],4),rz);G=about_piv(*POSES[n],G0)
     print(n,'view %.2f pitch/yaw %.4f %.4f -> %.4f %.4f'%(w,rx,ry,r.x[0],r.x[1]),'dp',dp,'muzzle',proj(G,MUZ,w).round(3),'port',proj(G,FEED,w).round(3))
+# The reference's bolt hardly moves on screen as it comes back (its rifle sits farther from the eye
+# under a narrower view: weaker perspective); ours, close to the eye, would carry the knob and the
+# working hand a quarter of the frame down to the right. The support hand pushes the rifle forward
+# along the bore as the bolt is pulled (PULL_PUSH, gun-space units, of the 0.078 travel), which keeps
+# the knob near the reference's and leaves the muzzle where it is.
+PULL_PUSH=0.07
+dp,rx,ry,rz=POSES['A'];POSES['A2']=(tuple(round(float(v),4) for v in np.array(dp)+about_piv(*POSES['A'],G0)[:3,:3]@[0,0,-PULL_PUSH]),rx,ry,rz)
+print('A2 dp',POSES['A2'][0])
 
 # ---------------- 3. sway ----------------
 # ---- reference track (640x360, 29.97 fps), repaired at the idle ends
@@ -147,6 +156,7 @@ cs=lambda a,b:np.linspace(a,b,30)
 FIT={'idle':(IDLE_M/[640,360],IDLE_H/[640,360])}
 for name,(a,b) in {'A':(0.25,0.72),'B':(1.15,2.52),'C':(2.74,2.98)}.items():
     FIT[name]=(np.mean([ref_at(mz,c) for c in cs(a,b)],0),np.mean([ref_at(hd,c) for c in cs(a,b)],0))
+FIT['A2']=FIT['A']
 def ref_base(arr,c):
     j=0 if arr is mz else 1
     for a,b in zip(GUN,GUN[1:]):
@@ -167,7 +177,7 @@ rows=np.array(rows)
 k5=np.array([1,4,6,4,1])/16;sm=np.vstack([np.convolve(np.pad(rows[:,i],2,mode='edge'),k5,'valid') for i in range(6)]).T
 w=np.array([smooth(k/6) for k in range(N)])*np.array([smooth((N-1-k)/6) for k in range(N)]);sm*=w[:,None]
 json.dump({'fps':60,'source':'COD WWII Type 38 reload, muzzle + support-hand screen track (clip s = ref s - 0.33)',
-  'view':{'depthScale':VIEW,'weight':VIEW_WEIGHT},'poses':{k:[list(v[0]),*v[1:]] for k,v in POSES.items()},
+  'view':{'depthScale':VIEW,'weight':VIEW_WEIGHT},'gun':GUN,'poses':{k:[list(v[0]),*v[1:]] for k,v in POSES.items()},
   'columns':['dx','dy','dz','rx','ry','rz'],'rows':[[round(v,5) for v in r] for r in sm]},open(os.path.join(HERE,'Data_HanYangReloadSway.json'),'w'))
 print('max |d| m',np.abs(sm[:,:3]).max(0).round(4),'max rot deg',np.degrees(np.abs(sm[:,3:]).max(0)).round(2))
 for k in range(0,N,15):print(round(k/60,2),np.round(sm[k],4),out[k]['rm'],out[k]['rh'])
