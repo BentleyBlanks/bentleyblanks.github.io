@@ -171,6 +171,18 @@ export const ENV_COMPONENTS = Object.freeze([
     off: Object.freeze({ fill: 0, rim: 0 }),
   }),
   Object.freeze({
+    type: "WeaponLight", label: "武器补光", category: "character", icon: "⌖",
+    summary: "只照第一人称那把枪的补光（材质补丁在 Script_FirstPersonSelfShadow，手和场景都不受影响）：接近从镜头方向来，强度 = 当地环境亮度 × 倍数，洞里、夜里自动变弱，太阳被挡时多补一些；带一片宽高光，钢件才照得亮。「枪的环境光」「枪受的阳光」单独压低照到枪上的那两份（黄昏太阳低、天边亮，枪容易亮成一片）。",
+    params: Object.freeze([
+      P({ key: "fill", label: "漫反射补光", kind: "number", min: 0, max: 4, step: 0.01, default: 0, lerp: "log", out: "weaponLight.fill", group: "补光", hint: "当地环境亮度的几倍；加在间接光上，GTAO 照常压" }),
+      P({ key: "spec", label: "高光补光", kind: "number", min: 0, max: 4, step: 0.01, default: 0, lerp: "log", out: "weaponLight.spec", group: "补光", hint: "金属件靠它：宽而柔的一片高光" }),
+      P({ key: "color", label: "补光色", kind: "color", default: "#ffffff", out: "weaponLight.color", group: "补光" }),
+      P({ key: "ambient", label: "枪的环境光", kind: "number", min: 0.1, max: 1.5, step: 0.01, default: 1, lerp: "log", out: "weaponLight.ambient", group: "环境光", hint: "天空、反射图、环境探针、GI 照到枪上的那份整体乘它；1 = 跟场景一样" }),
+      P({ key: "sun", label: "枪受的阳光", kind: "number", min: 0.1, max: 1.5, step: 0.01, default: 1, lerp: "log", out: "weaponLight.sun", group: "环境光", hint: "太阳直射照到枪上的那份乘它（枪口焰、点光不受影响）；1 = 跟场景一样" }),
+    ]),
+    off: Object.freeze({ fill: 0, spec: 0, ambient: 1, sun: 1 }),
+  }),
+  Object.freeze({
     type: "Grade", label: "曝光与调色", category: "post", icon: "◑",
     summary: "曝光、饱和度、对比、泛光与分离调色；「后期档案」决定自动曝光锚点、体积雾与颗粒按哪一档走。",
     params: Object.freeze([

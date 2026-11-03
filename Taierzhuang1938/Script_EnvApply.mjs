@@ -28,7 +28,7 @@ function Signature(preset, fields) {
 
 export class EnvRenderBridge {
   /**
-   * @param {object} host { sky, lights, scene, gi: () => gi|null, giStrength: () => number, characterLight?: { Set }, now?: () => ms }
+   * @param {object} host { sky, lights, scene, gi: () => gi|null, giStrength: () => number, characterLight?: { Set }, weaponLight?: { Set }, now?: () => ms }
    */
   constructor(host) {
     this.host = host;

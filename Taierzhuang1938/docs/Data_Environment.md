@@ -38,6 +38,7 @@
 | `Fog` | 雾 | 雾 | `fog.*`：浓度、高度衰减、最浓、雾色、朝阳增亮、去饱和 |
 | `Grade` | 曝光与调色 | 后期 | 曝光、饱和、对比、泛光、光束、镜头光晕、分离调色 `fog.grade.*`；**后期档案**（`profile`）决定自动曝光锚点、体积雾参数、胶片颗粒、照明弹昼夜口径按哪一档 `SKY_PRESETS` 查 |
 | `CharacterLight` | 角色光照 | 人物 | 补光强度 / 色（迎着镜头那面提亮，加在间接漫反射上）、轮廓光强度 / 色 / 收边（侧对镜头的边缘一圈，加在直接漫反射上）→ `characterLight.*`，由组件的 `Apply` 写进人物材质补丁 |
+| `WeaponLight` | 武器补光 | 人物 | 只照第一人称那把枪：补光 `fill`、高光 `spec`、色 `color`，枪的环境光 `ambient`、枪受的阳光 `sun`（1 = 跟场景一样）→ `weaponLight.*`，`Apply` 调 `host.weaponLight.Set` 写 `Script_FirstPersonSelfShadow` 的 uniform；口径见渲染管线 §6.12.1 |
 
 - **角色光照怎么生效**：不进天穹 / 灯，组件逻辑的 `Apply(decl, values, host)` 调 `host.characterLight.Set(values)`，写 `Script_CharacterLight` 的一组共享 uniform（`uCharLight` = 补光、轮廓、收边幂次；两种颜色）。补丁 `charLight1` 挂在 `#include <lights_fragment_end>` 后面：零采样器，两路都是 0 时整段跳过（白天的画面和以前逐像素一样）。挂了的材质：`Script_CharacterSurface` 的人物衣服 / 皮肤 / 装备（`CharacterClothPatches` 与 `CharacterSurfaceMaterial`，NPC 与第一人称看得见的自己身子都走它），白盒的 X Bot 替身。没有区域文件的关卡、或换到没有区域文件的关卡时 `Set(null)` 关掉。
 - 补光按「法线对着镜头多少」乘，所以只提亮正对镜头的那面，不会把背光面也抬起来；轮廓光是 `(1 − 正对度)^收边`，收边越大边越细。都乘材质本身的漫反射色（黑衣服不会被描成白边）。

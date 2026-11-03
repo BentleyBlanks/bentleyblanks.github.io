@@ -23,6 +23,8 @@ return {
   // 关掉就是改之前的样子：眼睛处取阳光 = 视模不再逐像素采世界阴影图；本地反射 = 跟着玩家拍的反射图。
   firstPersonEyeSun: true,
   firstPersonReflection: true,
+  // 武器补光（环境系统 WeaponLight 组件给强度）：关掉 = 强度归零，对照用
+  firstPersonWeaponLight: true,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
   // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
   // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。

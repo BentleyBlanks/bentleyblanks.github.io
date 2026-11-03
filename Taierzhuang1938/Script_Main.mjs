@@ -702,7 +702,10 @@ if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
 // 组件式环境系统（docs/Data_Environment.md）：场景有 Scenes/<Id>/Environment_<Id>.json 时由它出天光
 //（区域 + 预设 + 昼夜时钟），否则照旧按 phase.sky 套 SKY_PRESETS。出画前每帧 UpdateEnvironment。
 const env = new EnvironmentSystem();
-const envBridge = new EnvRenderBridge({ sky, lights, scene, gi: () => gi, giStrength: () => graphics.giStrength, characterLight: CHARACTER_LIGHT_HOST });
+// 武器补光（环境系统组件 WeaponLight → 第一人称视模材质）：环境系统可能先于视模建好就出值，先记下、建好时补一次
+let weaponLightValues = null;
+const WEAPON_LIGHT_HOST = { Set: (values) => { weaponLightValues = values; firstPersonSelfShadow?.SetWeaponLight(values); } };
+const envBridge = new EnvRenderBridge({ sky, lights, scene, gi: () => gi, giStrength: () => graphics.giStrength, characterLight: CHARACTER_LIGHT_HOST, weaponLight: WEAPON_LIGHT_HOST });
 /** 旧天空预设在有场景环境时变成的那个临时覆盖（ApplySkyPreset / RestoreLevelSky）。 */
 let envSkyOverride = null;
 /** 正片关卡：上一次按区域文件 stages 拨钟时的任务步骤（换了才拨）；第一关内部步骤的先后（stages 后面的步骤不写沿用前面的）。 */
@@ -1625,6 +1628,8 @@ async function Boot() {
     sunBlocked: (origin, direction, maxDistance) => !!physics?.Raycast(origin, direction, maxDistance, { terrain: true }),
   });
   firstPersonSelfShadow.SetEnabled(graphics.shadows && graphics.firstPersonSelfShadow);
+  firstPersonSelfShadow.SetWeaponLightEnabled(graphics.firstPersonWeaponLight !== false);
+  firstPersonSelfShadow.SetWeaponLight(weaponLightValues);
   firstPersonReflection = new FirstPersonReflectionProbe(renderer, scene, {
     materials: () => firstPersonSelfShadow?.ownedMaterials || [],
     hidden: () => [viewmodel?.root, viewmodel?.body?.root],
@@ -8952,6 +8957,7 @@ function ApplyGraphics() {
   firstPersonSelfShadow?.SetSoft(graphics.firstPersonSelfShadowSoft === true);
   // 第一人称取光（Data_Tuning_FirstPersonLighting）：两位都是运行时开关，关掉 = 改之前的样子
   firstPersonSelfShadow?.SetEyeSun(graphics.firstPersonEyeSun !== false);
+  firstPersonSelfShadow?.SetWeaponLightEnabled(graphics.firstPersonWeaponLight !== false);
   firstPersonReflection?.SetEnabled(graphics.firstPersonReflection !== false);
 
   // 阴影总闸。**故意不碰 `renderer.shadowMap.enabled`**（见 ApplyGraphics 抬头）：

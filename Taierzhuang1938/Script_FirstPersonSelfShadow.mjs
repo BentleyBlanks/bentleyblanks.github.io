@@ -29,8 +29,40 @@ export const FIRST_PERSON_SHADOW_LAYER = 29;
 
 // 级联阴影 chunk（Script_Csm.CsmDirectionalGlsl）里那一行太阳可见度。视模这份材质把整个
 // lights_fragment_begin 就地展开、只换这一行；找不到（low 档没装级联、三方改了写法）就不换，退回原样。
+const WEAPON_LIGHT_GLSL = /* glsl */`
+// 枪的环境光倍数：天空、本地反射图、环境探针、GI 给枪的那份间接光整体乘它（AO 之前）。
+// 黄昏天边很亮，枪上大片面映着它，背光也亮成一片，压一点才读得出逆光；别的时段 1 = 不动。
+float wlEnv = mix( 1.0, uWeaponEnv, uWeaponLightOn );
+reflectedLight.indirectDiffuse *= wlEnv;
+reflectedLight.indirectSpecular *= wlEnv;
+if ( uWeaponLightOn * ( uWeaponLight.x + uWeaponLight.y ) > 0.0 ) {
+  // 当地环境亮度：视模此刻映的那张图（本地反射图，关掉时是天空 IBL）在「朝上」与「朝镜头」两个方向的
+  // 平均辐亮度。洞里、夜里它就小，补光跟着变弱；不读回 CPU，不加采样器。
+  #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+    vec3 wlUp = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );
+    vec3 wlAmbient = ( getIBLIrradiance( wlUp ) + getIBLIrradiance( vec3( 0.0, 0.0, 1.0 ) ) ) * ( 0.5 * RECIPROCAL_PI );
+  #else
+    vec3 wlAmbient = ambientLightColor;
+  #endif
+  float wlLevel = dot( wlAmbient, vec3( 0.2126, 0.7152, 0.0722 ) );
+  wlLevel = uWeaponLightLevel.x * max( pow( max( wlLevel, 1e-5 ) / uWeaponLightLevel.x, uWeaponLightLevel.y ), uWeaponLightLevel.z );
+  // 背阴加成：眼睛处太阳被挡时补得多（「眼睛处取阳光」关着时不知道挡没挡，按照得到算）
+  float wlSun = uFirstPersonEyeSun > 0.5 ? uFirstPersonSunVisibility : 1.0;
+  wlLevel *= mix( uWeaponLightLevel.w, 1.0, wlSun ) * wlEnv;
+  float wlNdl = dot( normal, uWeaponLightDir );
+  // 漫反射：相当于多一份「当地环境 × 倍数」的光，按柔和衰减分到各个面上
+  float wlWrap = clamp( ( wlNdl + uWeaponLight.z ) / ( 1.0 + uWeaponLight.z ), 0.0, 1.0 );
+  reflectedLight.indirectDiffuse += uWeaponLightColor * ( uWeaponLight.x * wlLevel * wlWrap ) * material.diffuseColor;
+  // 高光：同一盏灯的 GGX，粗糙度抬到下限，金属件得到一片宽柔光
+  PhysicalMaterial wlMaterial = material;
+  wlMaterial.roughness = max( material.roughness, uWeaponLight.w );
+  reflectedLight.indirectSpecular += uWeaponLightColor * ( uWeaponLight.y * PI * wlLevel * saturate( wlNdl ) )
+    * BRDF_GGX( uWeaponLightDir, geometryViewDir, normal, wlMaterial );
+}`;
+
 const CSM_SUN_LINE = "gCsmSunVisibility = CsmSunVisibility();";
-const EYE_SUN_LINE = "gCsmSunVisibility = uFirstPersonEyeSun > 0.5 ? uFirstPersonSunVisibility : CsmSunVisibility();";
+// 枪受的阳光（武器补光组件 sun）乘在可见度上：只动太阳这一盏，枪口焰、簇状点光照旧
+const EYE_SUN_LINE = "gCsmSunVisibility = ( uFirstPersonEyeSun > 0.5 ? uFirstPersonSunVisibility : CsmSunVisibility() ) * mix( 1.0, uWeaponSun, uWeaponLightOn );";
 
 const SHADOW_BIAS_MATRIX = new THREE.Matrix4().set(
   0.5, 0.0, 0.0, 0.5,
@@ -51,6 +83,13 @@ uniform float uFirstPersonShadowSoftBias;    // 软化路径的常数偏置；�
 uniform float uFirstPersonShadowPlaneClamp;  // 平面偏置的梯度钳制：掠射角下导数会爆，不钳就是几十厘米的漏光
 uniform float uFirstPersonEyeSun;            // 1 = 太阳可见度取眼睛处那一个数（下一行），0 = 照旧逐像素采世界阴影图
 uniform float uFirstPersonSunVisibility;     // 眼睛与真实握枪位置朝太阳的射线平均（CPU 每帧算、平滑过）
+uniform vec4 uWeaponLight;                   // 武器补光：x 漫反射倍数, y 高光倍数, z 柔和衰减 wrap, w 高光粗糙度下限
+uniform vec3 uWeaponLightColor;
+uniform vec3 uWeaponLightDir;                // 镜头坐标（= 视空间）里指向灯的方向
+uniform float uWeaponLightOn;                // 这只材质照不照（只照枪：非蒙皮网格）
+uniform float uWeaponEnv;                    // 枪的环境光倍数（武器补光组件 ambient，1 = 不动）
+uniform float uWeaponSun;                    // 枪受的阳光倍数（武器补光组件 sun，1 = 不动）
+uniform vec4 uWeaponLightLevel;              // 当地亮度压缩：x ref, y gamma, z 保底, w 背阴加成（Data_Tuning_FirstPersonLighting.weaponLight）
 varying vec4 vFirstPersonShadowCoord;
 
 // 12 点 Poisson 盘，固定图案不转：转起来的噪点在近距离的手背上比锯齿更显眼。
@@ -225,7 +264,16 @@ export class FirstPersonSelfShadow {
       // 眼睛处的太阳可见度。eyeSun 也是 uniform 不是 define：面板热切不重编译。
       eyeSun: { value: 0 },
       sunVisibility: { value: 1 },
+      // 武器补光（环境系统「武器补光」组件 → SetWeaponLight；画质面板关掉 = 0）
+      weaponLight: { value: new THREE.Vector4(0, 0, 0.5, 0.55) },
+      weaponLightColor: { value: new THREE.Color(1, 1, 1) },
+      weaponLightDir: { value: new THREE.Vector3(-0.25, 0.35, 0.9).normalize() },
+      weaponLightLevel: { value: new THREE.Vector4(0.3, 0.35, 0.25, 3.5) },
+      weaponEnv: { value: 1 },
+      weaponSun: { value: 1 },
     };
+    this.weaponLightValues = null;
+    this.weaponLightWanted = true;
     this.eyeSunWanted = eyeSun !== false;
     this.sunBlocked = typeof sunBlocked === "function" ? sunBlocked : null;
     this.eyeSunRaw = 1;
@@ -330,6 +378,9 @@ export class FirstPersonSelfShadow {
     const previousCompile = material.onBeforeCompile;
     const previousKey = material.customProgramCacheKey;
     const uniforms = this.uniforms;
+    // 每只材质自己一份「照不照」：Sync 按网格定（枪 = 非蒙皮网格），手臂袖子不照，否则本来就亮的手会过曝
+    // 一定新建：克隆来的 userData 是浅拷，沿用就会和源材质共用一份开关
+    const weaponLightOn = material.userData.weaponLightOn = { value: 0 };
     material.onBeforeCompile = function FirstPersonShadowCompile(shader, activeRenderer) {
       previousCompile.call(this, shader, activeRenderer);
       shader.uniforms.uFirstPersonShadowMap = uniforms.map;
@@ -344,6 +395,13 @@ export class FirstPersonSelfShadow {
       shader.uniforms.uFirstPersonShadowPlaneClamp = uniforms.planeClamp;
       shader.uniforms.uFirstPersonEyeSun = uniforms.eyeSun;
       shader.uniforms.uFirstPersonSunVisibility = uniforms.sunVisibility;
+      shader.uniforms.uWeaponLight = uniforms.weaponLight;
+      shader.uniforms.uWeaponLightColor = uniforms.weaponLightColor;
+      shader.uniforms.uWeaponLightDir = uniforms.weaponLightDir;
+      shader.uniforms.uWeaponLightOn = weaponLightOn;
+      shader.uniforms.uWeaponLightLevel = uniforms.weaponLightLevel;
+      shader.uniforms.uWeaponEnv = uniforms.weaponEnv;
+      shader.uniforms.uWeaponSun = uniforms.weaponSun;
       // 太阳可见度换成眼睛处那个数：把 lights_fragment_begin 就地展开、只换级联那一行。
       // 注册表补丁（簇状光循环等）挂在这个 include **之后**，previousCompile 已经插好，展开不碰它们。
       const lightsBegin = THREE.ShaderChunk.lights_fragment_begin;
@@ -369,6 +427,8 @@ export class FirstPersonSelfShadow {
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>
 ${SHADOW_FRAGMENT_GLSL}`)
+        .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
+${WEAPON_LIGHT_GLSL}`)
         .replace("#include <aomap_fragment>", `#include <aomap_fragment>
         {
           float firstPersonShadow = FirstPersonSelfShadow();
@@ -377,7 +437,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
         }`);
     };
     material.customProgramCacheKey = function FirstPersonShadowCacheKey() {
-      return `${previousKey.call(this)}|firstPersonSelfShadow2`;
+      return `${previousKey.call(this)}|firstPersonSelfShadow4`;
     };
     material.userData.firstPersonSelfShadow = true;
     // **不要在这里动 allowOverride**。预通道归属由 Script_Post.MarkForegroundPrepass
@@ -398,6 +458,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
       if (!list.some((material) => material?.isMeshStandardMaterial)) return;
       const owned = list.map((material) => this._Owned(material));
       object.material = Array.isArray(object.material) ? owned : owned[0];
+      for (const material of owned) if (material?.userData?.weaponLightOn) material.userData.weaponLightOn.value = object.isSkinnedMesh ? 0 : 1;
       object.layers.set(FIRST_PERSON_SHADOW_LAYER);
       // 战场太阳阴影仍不得收这棵压缩几何；本系统的深度 pass 不读 castShadow。
       object.castShadow = false;
@@ -410,7 +471,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
   /**
    * 提交编译之前调（Script_Main.CompileAsRendered / WarmupShaders）：视模材质要到 Render 里 Sync 才换成
    * 自阴影那一份，换枪、挂伤口变体之后到下一次出画之间网格上挂的还是源材质，这时 compile 编到的是
-   * 用不上的孪生（键只差 `ssr1` / `firstPersonSelfShadow2`），真用的那份在出画时现编（渲染管线 §18.11）。
+   * 用不上的孪生（键只差 `ssr1` / `firstPersonSelfShadow3`），真用的那份在出画时现编（渲染管线 §18.11）。
    * 关着时出画不换，这里也不换。
    */
   SyncForCompile() {
@@ -423,6 +484,29 @@ ${SHADOW_FRAGMENT_GLSL}`)
     // 自阴影关掉（或阴影总闸关）时这一趟不跑、眼睛处的数也不再更新：视模材质退回逐像素采级联
     this.uniforms.eyeSun.value = this.enabled && this.eyeSunWanted ? 1 : 0;
     return this.enabled;
+  }
+
+  /**
+   * 武器补光的强度（环境系统「武器补光」组件：fill / spec 倍数、color #rrggbb、ambient 枪的环境光 / sun 枪受的阳光倍数）。null = 关。
+   * 形状（方向、柔和衰减、高光粗糙度下限）在 Data_Tuning_FirstPersonLighting.weaponLight。
+   */
+  SetWeaponLight(values) {
+    this.weaponLightValues = values || null;
+    const v = values || {}, W = FIRST_PERSON_LIGHTING.weaponLight, on = this.weaponLightWanted ? 1 : 0;
+    this.uniforms.weaponLight.value.set(on * Math.max(0, Number(v.fill) || 0), on * Math.max(0, Number(v.spec) || 0), W.wrap, W.minRoughness);
+    if (typeof v.color === "string") this.uniforms.weaponLightColor.value.set(v.color);
+    const Scale = (x) => (on && x != null && Number.isFinite(Number(x)) ? Math.max(0, Number(x)) : 1);
+    this.uniforms.weaponEnv.value = Scale(v.ambient);
+    this.uniforms.weaponSun.value = Scale(v.sun);
+    this.uniforms.weaponLightDir.value.fromArray(W.direction).normalize();
+    this.uniforms.weaponLightLevel.value.set(W.levelRef, W.levelGamma, W.levelFloor, W.shadeBoost);
+  }
+
+  /** 画质面板「第一人称：武器补光」：关掉 = 强度归零（不重编译）。 */
+  SetWeaponLightEnabled(on) {
+    this.weaponLightWanted = on !== false;
+    this.SetWeaponLight(this.weaponLightValues);
+    return this.weaponLightWanted;
   }
 
   /** 画质面板「第一人称：眼睛处取阳光」：只翻 uniform，不重编译。 */
@@ -592,6 +676,10 @@ ${SHADOW_FRAGMENT_GLSL}`)
       eyeSun: this.uniforms.eyeSun.value > 0.5,
       sunVisibility: this.uniforms.sunVisibility.value,
       sunVisibilityRaw: this.eyeSunRaw,
+      weaponLight: this.uniforms.weaponLight.value.toArray(),
+      weaponEnv: this.uniforms.weaponEnv.value,
+      weaponSun: this.uniforms.weaponSun.value,
+      weaponLightMaterials: [...this.ownedMaterials].filter((m) => m.userData?.weaponLightOn?.value > 0).length,
     };
   }
 

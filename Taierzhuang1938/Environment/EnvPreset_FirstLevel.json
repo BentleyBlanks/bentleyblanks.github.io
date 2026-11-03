@@ -547,6 +547,56 @@
         }
       }
     },
+    "WeaponLight": {
+      "enabled": true,
+      "params": {
+        "fill": {
+          "keys": [
+            {"h": 4, "v": 0.3, "tag": "night"},
+            {"h": 12, "v": 0.55, "tag": "day"},
+            {"h": 18, "v": 0.5, "tag": "dusk"},
+            {"h": 22, "v": 0.3, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "spec": {
+          "keys": [
+            {"h": 4, "v": 0.14, "tag": "night"},
+            {"h": 12, "v": 0.25, "tag": "day"},
+            {"h": 18, "v": 0.22, "tag": "dusk"},
+            {"h": 22, "v": 0.14, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "color": {
+          "keys": [
+            {"h": 4, "v": "#b4c4e8", "tag": "night"},
+            {"h": 12, "v": "#ffffff", "tag": "day"},
+            {"h": 18, "v": "#ffe2c4", "tag": "dusk"},
+            {"h": 22, "v": "#b4c4e8", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "ambient": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 1, "tag": "day"},
+            {"h": 18, "v": 0.5, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
+        "sun": {
+          "keys": [
+            {"h": 4, "v": 1, "tag": "night"},
+            {"h": 12, "v": 1, "tag": "day"},
+            {"h": 18, "v": 0.6, "tag": "dusk"},
+            {"h": 22, "v": 1, "tag": "night"}
+          ],
+          "interp": "smooth"
+        }
+      }
+    },
     "Grade": {
       "enabled": true,
       "params": {

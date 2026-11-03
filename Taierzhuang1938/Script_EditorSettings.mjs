@@ -246,6 +246,10 @@ export class GraphicsSettings {
       gfx.firstPersonReflection = on;
       this.Apply();
     });
+    Toggle(shadowBox, "第一人称：武器补光", gfx.firstPersonWeaponLight !== false, (on) => {
+      gfx.firstPersonWeaponLight = on;
+      this.Apply();
+    });
     // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
     // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
     Toggle(shadowBox, "接触阴影", gfx.contactShadows !== false, (on) => {
@@ -496,6 +500,7 @@ export class GraphicsSettings {
     gfx.firstPersonSelfShadowSoft = false;
     gfx.firstPersonEyeSun = true;
     gfx.firstPersonReflection = true;
+    gfx.firstPersonWeaponLight = true;
     gfx.atmosphere = true;
     gfx.contactShadows = true;
     gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;

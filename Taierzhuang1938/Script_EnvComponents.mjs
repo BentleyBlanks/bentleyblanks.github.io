@@ -105,6 +105,12 @@ export const ENV_COMPONENT_LOGIC = Object.freeze({
     FromLegacy: ReadByPath,
     Apply(decl, values, host) { host.characterLight?.Set(values); },
   }),
+  // 武器补光：同角色光照，Apply 直接改第一人称视模材质补丁的 uniform（Script_FirstPersonSelfShadow.SetWeaponLight）。
+  WeaponLight: Object.freeze({
+    Compose: ComposeByPath,
+    FromLegacy: ReadByPath,
+    Apply(decl, values, host) { host.weaponLight?.Set(values); },
+  }),
   Grade: Object.freeze({
     Compose: ComposeByPath,
     FromLegacy(decl, legacy, values, name) {
