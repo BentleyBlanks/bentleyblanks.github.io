@@ -277,8 +277,11 @@ COD 片段按 30 帧拆成「开枪后毫秒」命名的图，游戏同一毫秒
   顺枪管拉近会让手进出画时被近裁面切开。
 - 锁栓后回握把那段用新手型 `boltRest`（半握拳，指节朝镜头），不再五指张开。
 
-还差（下一轮）：COD 推栓是手从上方压下来、掌根推机柄再按下，这里仍是手指勾着推；后拉结束后枪回位比 COD 早约 40 ms，球先回到画面里；
-锁栓后 COD 的拳头压在机柄上停一下再往右滑走，这里手往下掉出画面；后拉段枪比 COD 细一圈（不能再拉近，近裁面）。
+- 同日第二步：后拉位多停到参考 1.02（播放 0.70 s）再回，667–700 ms 画面里只有枪（COD 767 才见手）；锁栓后勾着的手留在机柄上到参考 1.58
+  （播放约 1.08 s），再按原路线松手回枪颈（COD 约 1.13 s 离手）。试过把手换成 `boltFist` 的握法罩在球上（指节朝镜头，更像 COD），
+  但机柄放平后中指穿进枪机 8–10 mm、手腕一帧转 31–40°，两道门禁都过不了，撤回。
+
+还差（下一轮）：COD 推栓、压柄是手从机柄上方握（掌心朝下、手指往下包住球），这里仍是从下方勾着；后拉段枪比 COD 细一圈（不能再拉近，近裁面）。
 验收：`HanYangReloadClearanceTest` 拉栓 1.209 mm、空仓 / 三发 1.814、开栓换弹 1.577；`FpsReloadMechanicsTest`、`FpsArmTest` 1014/1014、`GunFeelTest` 12/12、
 `FirearmResponseBrowserTest`、`FirearmActionsTest`、`WeaponRangeTest`、`DataJsonTest`、`FpsAnimationTest` 过；`FpsHandContactTest` 只剩护木 NaN（11-03 起 master 同样红，汉阳造重烘后测试找不到护木表面）。
 

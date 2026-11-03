@@ -267,8 +267,8 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // muzzle instead lays the rifle flat; drawing it toward the eye brings the hand under the
     // 6 cm near plane, which slices it open (user, 2026-11-03/04). Closest skin then 6.8 cm.
     sway: [[0, 0, 0, 0, 0, 0, 0], [0.22, 0, 0, 0, 0, 0, 0], [0.30, 0, 0, 0, -0.026, 0, 0], [0.44, 0, 0, 0, 0, 0, 0],
-      [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0.06, -0.075, -0.026, 0.070, -0.006, 0.010], [0.963, 0.06, -0.075, -0.026, 0.078, -0.006, 0.010],
-      [1.09, 0.0300, -0.0375, -0.0090, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
+      [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0.06, -0.075, -0.026, 0.070, -0.006, 0.010], [1.02, 0.06, -0.075, -0.026, 0.078, -0.006, 0.010],
+      [1.10, 0.0300, -0.0375, -0.0090, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
     // Shot response on the held pose, rotating about the aiming eye (worked out from
     // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
     // Hip fire keeps `hipRiseScale` of it.
@@ -314,11 +314,12 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       // and back) as it drops: following it all the way down rolls the palm into the
       // receiver. Then down to the wrist.
       { at: 1.420, anchor: "bolt" },
-      { at: 1.450, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
-      { at: 1.500, anchor: "boltClear" },
-      { at: 1.680, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "boltRest", through: true },
-      { at: 1.800, anchor: "gripClear" },
-      { at: 1.920, anchor: "grip", weight: 0 },
+      { at: 1.580, anchor: "bolt" },
+      { at: 1.610, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
+      { at: 1.660, anchor: "boltClear" },
+      { at: 1.800, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "boltRest", through: true },
+      { at: 1.870, anchor: "gripClear" },
+      { at: 1.935, anchor: "grip", weight: 0 },
     ],
     // Last round: the bolt stays back; the hand lets go after the pull.
     holdOpenHand: [
