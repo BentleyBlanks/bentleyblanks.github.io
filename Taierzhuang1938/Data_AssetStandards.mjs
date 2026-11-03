@@ -118,10 +118,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({id:'HanYang173R',name:'汉阳造173R（当前手持与世界模型）',pack:'HanYang173R/Model_HanYang173R.glb',
-    sourceTriangles:295470,actualTriangles:59901,targetTriangles:60000,policy:'target',
+    sourceTriangles:295470,actualTriangles:68657,targetTriangles:69000,policy:'target',
     sourceTexture:'用户提供的Dots 173R完整源与标准PBR烘焙图；来源限制见随附说明',
-    runtimeTexture:'44独立部件、132张原字节PBR图；Base sRGB、线性ORM及16-bit OpenGL法线',
-    note:'按用户2026-10-25指定的6万三角目标。原高源留OneDrive；未改部件双向顶点/表面误差≤0.463mm；照门缺口为游戏瞄准补件。第一人称、角色和掉落枪共用米制-Z朝向；这是唯一运行时汉阳造模型。'}),
+    runtimeTexture:'44独立部件、132张PBR图（18件2026-11-03从作者源按均匀密度重烘，其余原字节）；Base sRGB、线性ORM及16-bit OpenGL法线',
+    note:'用户2026-10-25指定6万三角（减面后59,901）；2026-11-03重烘贴图时长件沿枪身每6cm横切以排开均匀密度UV，+8,756三角（形状不变），用户看过定稿。原高源留OneDrive；未改部件双向顶点/表面误差≤0.463mm；照门缺口为游戏瞄准补件。第一人称、角色和掉落枪共用米制-Z朝向；这是唯一运行时汉阳造模型。'}),
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
     sourceTriangles: 1462012, selectedGameSourceTriangles: 419856, selectedGameVisibleSourceTriangles: 417264, actualTriangles: 417130, exportRemovedZeroAreaTriangles: 132, exportTriangulationZeroAreaTriangles: 2, exportRemovedWhollyEnclosedTriangles: 2592, targetTriangles: 400000, policy: "target",
     sourceTexture: "土浦保存车同车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV14：9材质25张内嵌图；4K底色/8K法线/4K ORM装甲，细浅漆膜与铸纹、褪色失光、凸棱掉漆和接缝薄积尘，实孔排气罩MASK",

@@ -134,7 +134,7 @@ try {
           const fixed = factory.WeaponGeometry(weaponId, 0, { includeBayonet: true });
           const expectModel = modeled || weaponId === "HanYang";
           check((bare.source === "model") === expectModel, `${weaponId}: wrong geometry source tested`);
-          if(weaponId==='HanYang')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===59901,
+          if(weaponId==='HanYang')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===68657,
             'HanYang must retain its authored GLB even when the TZM cache is empty');
           const bareCount = VertexCount(bare.geometries);
           check(VertexCount(fixed.geometries) > bareCount,

@@ -1,8 +1,8 @@
 // Dots 173R author-space metres, +Y up, muzzle -Z. Values are measured in the
 // delivered GLB; weapon operation remains driven by the existing game timeline.
 export const HANYANG_173R = Object.freeze({
-  version: '173R-20261029',
-  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261029',
+  version: '173R-20261103',
+  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261103',
   sourceSha256: '3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c',
   // SideWoodButton is metal in the source ORM despite its object name.
   wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'],
@@ -29,6 +29,7 @@ export const HANYANG_173R = Object.freeze({
   //          朝 20% 拉但按 0.75 次方压缩，件与件的高低顺序保留（被否的「灰漆」是全拉成一个值）；
   //          本来就亮于 20% 的不动，准星座这类深件最多 ×3、继续偏暗。
   //   partBaseY 各金属件原始底色贴图的线性亮度均值（GLB 原图缩到 64² 求均值）。
+  //   2026-11-03 重烘的件沿用这里的旧值（岛内平均亮度只差 −13…+7%，定过的颜色不动）。
   baseCandidate: {
     wood: [5.72, 6.01, 6.76],
     steel: { target: 0.2, exponent: 0.75, maxGain: 3 },

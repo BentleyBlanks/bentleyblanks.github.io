@@ -131,7 +131,7 @@ else CheckServicePistolGrip();
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
 Check(EXTERNAL_GLB_STANDARDS.length === 68
-  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===59901&&record.targetTriangles===60000)
+  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===68657&&record.targetTriangles===69000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)
   && ["DongguaQuilt", "DoorCurtain", "SichuanBanner"].every(id => EXTERNAL_GLB_STANDARDS.some(record => record.id === id
     && record.pack === `ClothLab/Model_${id}.glb` && record.actualTriangles === 13712 && record.sourceTriangles === 13712 && record.targetTriangles === 13712))

@@ -42,7 +42,8 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
   assert.equal(Math.abs(ts[i][3]),1);
  }
 }
-assert.equal(triangles,report.triangles);assert(triangles>=59000&&triangles<=60000);
+// 59,901 after the 60k decimation; the 2026-11-03 rebake slices long parts every 6 cm for uniform-density UVs (+8,756, shape unchanged).
+assert.equal(triangles,report.triangles);assert.equal(triangles,68657);
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 for(const p of report.parts.filter(p=>!p.gameplayAdaptation))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
 // A no-effects material must still decode the folded packed metalness channel.
@@ -50,7 +51,7 @@ const library=new MaterialLibrary(null),orm=new THREE.Texture(),mat=new THREE.Me
 library.ConfigureExternalPbr(mat);assert.equal(mat.metalnessMap,null);
 assert(PatchesOf(mat).some(p=>String(p.key).includes('orm')),'folded ORM must keep its shader patch without post effects');
 assert(!D.wood.includes('SideWoodButton'),'source ORM defines the side button as metal');
-// Island texels are the delivered bytes; only empty texels outside the islands are filled.
+// Island texels are the delivered bytes (or, for the 18 rebaked parts, the raw rebake); only texels outside the islands are filled.
 assert(report.texturePayloads.every(t=>/^[0-9a-f]{64}$/.test(t.sourceSha256)&&t.sourceSha256!==t.sha256&&t.islandCoverage>0));
 // Base colour (2026-11-03): only the material colour multiplier changes; roughness, metalness and texture bytes stay authored.
 const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,map:new THREE.Texture(),roughnessMap:orm,metalnessMap:orm}));
@@ -80,4 +81,4 @@ const tri=new THREE.BufferGeometry();tri.setAttribute('position',new THREE.Float
 tri.setAttribute('normal',new THREE.Float32BufferAttribute(Array(6).fill([0,0,1]).flat(),3));tri.setIndex([0,1,2,3,4,5]);
 RepairHanYangWinding(tri);assert.deepEqual(Array.from(tri.index.array),[0,1,2,3,5,4]);
 mesh.geometry.dispose();mesh.material.dispose();
-console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 island-exact PBR images with filled margins, authored materials, finite tangent frames and ORM decoding`);
+console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 PBR images (18 parts rebaked at uniform density) with filled margins, authored materials, finite tangent frames and ORM decoding`);
