@@ -405,6 +405,7 @@ export const testDefs = {
   EditorBlockoutSaveTest: { file: "Script_EditorBlockoutSaveTest.mjs", desc: "白盒关卡编辑器存档口：真起本地预览，写盘 / 拒绝矩阵 / 版本号 409 / 嵌套过深不崩 / 零字节落盘（纯 Node，秒级）" },
   EditorBlockoutPlayPlanTest: { file: "Script_EditorBlockoutPlayPlanTest.mjs", desc: "白盒试玩（§17，2026-10-31）：试玩编排校验正反例、每一步怎么打（推断 / 谁变 AI / push / fresh / 上限）、过关判断、提交的 *.play.json 零错零警告且 01–05 每帧都写了（纯 Node，秒级）" },
   EditorBlockoutPlayBrowserTest: { file: "Script_EditorBlockoutPlayBrowserTest.mjs", timeoutMs: 600000, desc: "白盒试玩（§17，2026-10-31）实机：面板预设与开关、开打后不再无敌、02-4 追兵是真 AI 且站在沟底、打光进下一步先走过去再放兵、fresh 重放、中止出小结收兵还原、K 再来一遍、阵亡后摆回那一步机位、看戏步播预演 N 跳过" },
+  XBotCharactersTest: { file: "Script_XBotCharactersTest.mjs", desc: "顶替 X Bot 的人物（日兵甲）：骨名层级与初始朝向同 X Bot、初始即绑定姿势、hipsScale 同转换报告、权重与头顶收 Head、动作换人去骨长位移（纯 Node，秒级）" },
   EditorBlockoutPrevizPlanTest: { file: "Script_EditorBlockoutPrevizPlanTest.mjs", desc: "白盒编辑器预演（§14）：校验器正反例、演员键到达时刻与阶跃字段、镜头 eye / from-look 采样、提交的 previz 文件过校验（纯 Node，秒级）" },
   EditorBlockoutFirstLevel0105SceneTest: { file: "Script_EditorBlockoutFirstLevel0105SceneTest.mjs", desc: "01–05 新剧本白盒场地：生成两次逐字相同、锚点处沟 / 坑 / 洞深度、沟底宽 ≥3.4 m、坡顶挡住集结处看前沿的视线（纯 Node）" },
   EditorBlockoutFirstLevel0105KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0105KeyframesTest.mjs", desc: "01–05 新剧本白盒关键帧：生成可复现、校验通过、人不进实心块 / 不重叠、走位沿沟不翻沟壁（纯 Node）" },
@@ -752,6 +753,7 @@ export const tier0Fast = [
   "SceneFormalTest",
   "EditorBlockoutSaveTest",
   "EditorBlockoutPrevizPlanTest",
+  "XBotCharactersTest",
   "EditorBlockoutPlayPlanTest",
   "EditorBlockoutFirstLevel0105SceneTest",
   "EditorBlockoutFirstLevel0105KeyframesTest",
@@ -954,7 +956,7 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "AmbBedVariantTest", "BattleBedLayersTest", "AmbBedVariantBrowserTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "FirstLevelAudioNodeBudgetTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "ToolsHomeTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneFormalTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "EnvSystemTest", "EnvironmentBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneFormalTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "EnvSystemTest", "EnvironmentBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "XBotCharactersTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/Timeline/剧本派发/车厢生活动作",
     // LEVEL_CUES 的构建在 Script_Story 与组装层里，碰剧本的改动要连着 MissionHooksTest 一起跑（毫秒级）。
@@ -1199,7 +1201,8 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Texture\/Editor\//i },
   // Mixamo 动作库（Animation/Mixamo：X Bot 与通用动作）和它的预览窗口（Script_EditorMixamoPreview 开的独立页）：
   // 只有预览工具与白盒编辑器读，游戏正片不读，改了跑 editor 域。白盒人物换成 X Bot 的对照表与换算（Data_BlockoutXBotClips、Script_XBotRetarget）同理。
-  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html|Animation\/Mixamo\/|XBot|MixamoProps/i },
+  // 顶替 X Bot 的人物（Data_XBotCharacters、转换脚本 Script_BuildXBotRigCharacter、日兵甲模型）同理。
+  { domain: "editor", pattern: /Tool_MixamoAnimationPreview\.html|Animation\/Mixamo\/|XBot|MixamoProps|Model_JapaneseSoldierJia/i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

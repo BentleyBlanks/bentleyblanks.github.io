@@ -117,7 +117,8 @@ function SetupInPage() {
     "LeftForeArm", "RightForeArm", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg"];
   const Pct = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
   const v = new THREEV(), tmp = new THREEV(), q = new THREEQ(), q2 = new THREEQ(), sc = new THREEV();
-  let volumeFit = null;
+  // 身体胶囊按人物各拟合一份（X Bot / 日兵甲身材不同，2026-11-03）；旧版 XBotSkin 没有 kit，都算 X Bot
+  const volumeFits = new Map();
   function FitVolumes(model) {
     const samples = new Map(VOLUME_BONES.map((n) => [n, []]));
     model.traverse((o) => {
@@ -214,8 +215,9 @@ function SetupInPage() {
     }
   }
   function BodyVolumes(skin) {
-    if (!volumeFit) volumeFit = FitVolumes(skin.model);
-    return volumeFit.map((f) => {
+    const kind = skin.kit?.key || "xbot";
+    if (!volumeFits.has(kind)) volumeFits.set(kind, FitVolumes(skin.model));
+    return volumeFits.get(kind).map((f) => {
       const bone = skin.H(f.name);
       const inv = new THREEM().copy(bone.matrixWorld).invert(), scale = bone.matrixWorld.getMaxScaleOnAxis();
       const center = new THREEV(f.cx, (f.y0 + f.y1) / 2, f.cz).applyMatrix4(bone.matrixWorld);

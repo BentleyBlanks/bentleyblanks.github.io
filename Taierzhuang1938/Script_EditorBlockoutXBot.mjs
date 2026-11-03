@@ -11,6 +11,8 @@
 // 播 Mixamo 端枪动作时枪按动作预览工具的标定放进右手（握把在右手掌心，枪管按权重转向左手；清单 rifleTrack 的背上 / 掉地，
 // 同预览工具，共用 Script_MixamoProps.mjs）；其余时候照原身体手和枪的相对位置。贴躯干的挂件（背着的枪）按 X Bot 体型推开。
 // 运行时取证：_import/Script_XBotAttachmentProbe.mjs。
+// 2026-11-03 起普通日军换成日兵甲（Data_XBotCharacters.mjs 的 XBOT_FACTION_CHARACTERS）：同一副骨架、自己的贴图，动作去掉 X Bot 的骨长、
+// 胯高按比例缩；有专属配色的人、别的阵营照用 X Bot。日兵甲没读到就退回 X Bot。
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
@@ -19,6 +21,8 @@ import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -233,6 +237,32 @@ function PropPoints(root, voxel, skip = null) {
  * 在 X Bot 初始姿势里（站直，模型空间）找最省的「前后挪 d + 绕挂件最高点倾 θ」，让挂件上最深的点在躯干胶囊表面外 marginM、
  * 最近的点离表面不超过 maxGapM；背带（名字带 Sling）本来就绕着胸口，不算（_KeepSling）。
  */
+/**
+ * 换了身材的人背带往外撑多少（XBotSkins._SlingFit）：在 bone 的本地（初始姿势，cm）里取胸口那一段网格（y 在 yCm 内、|x| < xCm 不算胳膊），
+ * 宽、厚取第 pct 百分位。按网格量、不按权重：日兵甲的 Tripo 权重把胸口大多分给了 Spine1，按挂在 Spine2 上的顶点拟合，中心偏 10 cm。
+ */
+const XBOT_SLING_FIT = Object.freeze({ bone: "Spine2", yCm: [-25, 12], xCm: 17, pct: 0.95 });
+
+/** 胸口截面（XBOT_SLING_FIT）：{ cx, cz, hx, hz }（骨头本地 cm，中心与半宽、半厚）。 */
+function TorsoSection(model, fit = XBOT_SLING_FIT) {
+  const xs = [], zs = [], v = new THREE.Vector3();
+  model.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    const bi = o.skeleton.bones.findIndex(b => b.name === fit.bone);
+    if (bi < 0) return;
+    const pos = o.geometry.attributes.position, M = new THREE.Matrix4().multiplyMatrices(o.skeleton.boneInverses[bi], o.bindMatrix);
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(M);
+      if (v.y < fit.yCm[0] || v.y > fit.yCm[1] || Math.abs(v.x) > fit.xCm) continue;
+      xs.push(v.x); zs.push(v.z);
+    }
+  });
+  if (xs.length < 50) return null;
+  const Pct = (arr, q) => { const t = [...arr].sort((a, b) => a - b); return t[Math.min(t.length - 1, Math.floor(q * t.length))]; };
+  const x0 = Pct(xs, 1 - fit.pct), x1 = Pct(xs, fit.pct), z0 = Pct(zs, 1 - fit.pct), z1 = Pct(zs, fit.pct);
+  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2 };
+}
+
 const XBOT_TORSO_FIT = Object.freeze({
   bones: ["Hips", "Spine", "Spine1", "Spine2", "Neck", "LeftShoulder", "RightShoulder"],
   marginM: 0.01, maxGapM: 0.03, maxPushM: 0.16, maxPullM: 0.25, pushStepM: 0.01, maxTiltDeg: 24, tiltStepDeg: 2, tiltCostPerDeg: 0.004,
@@ -277,10 +307,46 @@ export class XBotSkins {
     this.headY = rest.worldP[rest.Find("Head")].y;
     // 身体胶囊（初始姿势、模型空间）：贴躯干的挂件按它推开（XBOT_TORSO_FIT）
     this.bodyVolumes = FitBodyVolumes(this.source);
+    this.torsoSection = TorsoSection(this.source);
     this.restBones = new Map();
     this.source.traverse(o => { if (o.isBone) this.restBones.set(o.name, o); });
-    await this._CalibrateRifle();
+    // 每种人物一套（模型、头高、身体胶囊、初始骨头）；X Bot 之外的按阵营表读，读不到不影响 X Bot
+    this.kits = new Map([["xbot", { key: "xbot", def: XBOT_CHARACTERS.xbot, source: this.source, headY: this.headY, bodyVolumes: this.bodyVolumes, restBones: this.restBones }]]);
+    await Promise.all([this._CalibrateRifle(), ...[...new Set(Object.values(XBOT_FACTION_CHARACTERS))].map(key => this._LoadKit(key))]);
     this.ready = true;
+  }
+
+  async _LoadKit(key) {
+    const def = XBOT_CHARACTERS[key];
+    try {
+      const gltf = await this.loader.loadAsync(def.file);
+      const source = gltf.scene, mesh = FirstSkinnedMesh(source);
+      const { rest } = SkinRest(source, mesh);
+      const restBones = new Map();
+      source.traverse(o => {
+        if (o.isBone) restBones.set(o.name, o);
+        // 自己的贴图材质，补上角色光照（同 X Bot 的素色材质）；克隆出来的人共用这份
+        if (o.isMesh && def.ownMaterial && !o.material.userData.characterLight) { ApplyPatches(o.material, [CHARACTER_LIGHT_PATCH]); o.material.userData.characterLight = true; }
+      });
+      const bodyVolumes = FitBodyVolumes(source);
+      this.kits.set(key, { key, def, source, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)) });
+    } catch (error) { console.warn(`[XBot] ${def.name} load failed, using X Bot`, error); }
+  }
+
+  /**
+   * 背带（_KeepSling）是照 X Bot 的胸口摆的：别的身材按胸口截面（TorsoSection）之比，在 XBOT_SLING_FIT.bone 的本地横截面里
+   * 从 X Bot 的胸口中心挪到这个人的、宽厚按比例放大（日兵甲胸口比 X Bot 厚，11-03 取证：不撑时背带进身体 > 3 cm 的帧 92%，
+   * 正面看不到斜挎的带子）。→ { from, to, k } | null
+   */
+  _SlingFit(b) {
+    const a = this.torsoSection;
+    if (!a || !b) return null;
+    return { from: [a.cx, a.cz], to: [b.cx, b.cz], k: [Math.max(1, b.hx / a.hx), Math.max(1, b.hz / a.hz)] };
+  }
+
+  /** 这个配色的人用哪套人物：阵营素色（look.key 就是阵营）按 XBOT_FACTION_CHARACTERS，其余 X Bot。 */
+  KitFor(look) {
+    return this.kits.get(XBOT_FACTION_CHARACTERS[look.key]) || this.kits.get("xbot");
   }
 
   /** 同动作预览工具：端枪瞄准待机第 0 帧，握把放进右手掌心、枪管指向左手掌心、准星朝上，记下枪相对右手的位置朝向。 */
@@ -405,14 +471,15 @@ export class XBotSkin {
     this.rig = actor.characterRig;
     this.faction = faction;
     this.look = look;
-    this.model = CloneSkinned(skins.source);
+    this.kit = skins.KitFor(look);
+    this.model = CloneSkinned(this.kit.source);
     this.model.name = "XBot";
     this.model.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow = true; o.receiveShadow = true;
       // 蒙皮包围球冻在第一帧的姿势（趴下、倒地会被误剔），编辑器里人不多，不剔
       o.frustumCulled = false;
-      o.material = skins.Material(look, /joint/i.test(o.material?.name || "") ? "joints" : "surface");
+      if (!this.kit.def.ownMaterial) o.material = skins.Material(look, /joint/i.test(o.material?.name || "") ? "joints" : "surface");
     });
     this.container = new THREE.Group();
     this.container.name = "XBotSkin";
@@ -425,7 +492,7 @@ export class XBotSkin {
     this.boneList = skins.rest.bones.map(b => this.bones.get(b.name));
     this.mixer = new THREE.AnimationMixer(this.model);
     this.source = skins.SourceRest(this.rig);
-    this.scaleK = this.source ? this.source.headY / skins.headY : 0.97;
+    this.scaleK = this.source ? this.source.headY / this.kit.headY : 0.97;
     this.hidden = [];
     this.rig.root.traverse(o => { if (o.isSkinnedMesh) this.hidden.push(o); });
     this.srcBones = this.source ? this.source.rest.bones.map(b => this.rig.root.getObjectByName(b.name)) : [];
@@ -668,7 +735,7 @@ export class XBotSkin {
   }
 
   _Play(pick, intent, dt) {
-    const clip = this.skins.loaded.get(pick.file);
+    const clip = ClipForCharacter(this.skins.loaded.get(pick.file), this.kit.def);
     if (!clip) {
       // 还没读到：先读着，这一帧照原身体换算（不站着发呆）
       this.skins.Clip(pick.file);
@@ -757,7 +824,7 @@ export class XBotSkin {
     const pelvisPos = pelvis ? pelvis.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv) : new THREE.Vector3();
     source.retarget.Solve(this.srcQ, pelvisPos, this.outQ, this.outHips);
     this.boneList.forEach((bone, i) => { if (bone) bone.quaternion.copy(this.outQ[i]); });
-    this.H("Hips")?.position.copy(this.outHips);
+    this.H("Hips")?.position.copy(this.outHips).multiplyScalar(this.kit.def.hipsScale);
     this.pick = { mode: "mirror" };
   }
 
@@ -892,6 +959,16 @@ export class XBotSkin {
       const rest = rests.get(c);
       if (unfitted) c.matrix.copy(_m.copy(a.object.matrixWorld).invert().multiply(unfitted).multiply(rest));
       else c.matrix.copy(rest);
+      const fit = this.kit.slingFit, torso = fit && this.H(XBOT_SLING_FIT.bone);
+      if (torso) {
+        // 骨头本地：挪到 X Bot 胶囊中心 → 横截面放大 → 挪回这个人的胶囊中心；再换回挂件本地
+        const S = new THREE.Matrix4().makeTranslation(fit.to[0], 0, fit.to[1])
+          .multiply(new THREE.Matrix4().makeScale(fit.k[0], 1, fit.k[1]))
+          .multiply(new THREE.Matrix4().makeTranslation(-fit.from[0], 0, -fit.from[1]));
+        const B = torso.matrixWorld, world = new THREE.Matrix4().copy(a.object.matrixWorld).multiply(c.matrix);
+        world.premultiply(new THREE.Matrix4().copy(B).invert()).premultiply(S).premultiply(B);
+        c.matrix.copy(_m.copy(a.object.matrixWorld).invert().multiply(world));
+      }
       c.matrix.decompose(c.position, c.quaternion, c.scale);
       c.updateMatrixWorld(true);
     }
@@ -909,7 +986,7 @@ export class XBotSkin {
     if (!sig || this.rifleSwap) return f?.G || null;
     // 同一种挂件挂在同一节骨上的相对位置各人差不多（只差身高缩放）：按相对矩阵（取两位小数）共用一份，几十个人不各搜一遍
     const rel = new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(world);
-    const key = bone.name + "|" + a.object.name + "|" + sig.toFixed(3) + "|" + rel.elements.map(x => x.toFixed(2)).join(",");
+    const key = this.kit.key + "|" + bone.name + "|" + a.object.name + "|" + sig.toFixed(3) + "|" + rel.elements.map(x => x.toFixed(2)).join(",");
     const cache = this.skins.torsoFits || (this.skins.torsoFits = new Map());
     if (!cache.has(key)) cache.set(key, this._SolveTorsoFit(a, bone, world));
     a.torsoFit = { sig, intended: a.intended?.clone() || null, G: cache.get(key) };
@@ -917,14 +994,14 @@ export class XBotSkin {
   }
 
   _SolveTorsoFit(a, bone, world) {
-    const skins = this.skins, rest = skins.restBones, B = rest?.get(bone.name);
-    if (!B || !skins.bodyVolumes?.length) return null;
-    skins.source.updateMatrixWorld(true);
+    const kit = this.kit, rest = kit.restBones, B = rest?.get(bone.name);
+    if (!B || !kit.bodyVolumes?.length) return null;
+    kit.source.updateMatrixWorld(true);
     // 挂件在初始姿势（模型空间）里的位姿：同样的「相对这节骨」搬过去
     const Wm = new THREE.Matrix4().copy(B.matrixWorld).multiply(new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(world));
     const pts = PropPoints(a.object, 0.025, o => /Sling/i.test(o.name)).map(p => p.applyMatrix4(Wm));
     if (!pts.length) return null;
-    const vols = skins.bodyVolumes.filter(v => XBOT_TORSO_FIT.bones.includes(v.name)).map(v => {
+    const vols = kit.bodyVolumes.filter(v => XBOT_TORSO_FIT.bones.includes(v.name)).map(v => {
       const b = rest.get(v.name);
       return { ...v, inv: new THREE.Matrix4().copy(b.matrixWorld).invert(), scale: b.matrixWorld.getMaxScaleOnAxis() };
     });
