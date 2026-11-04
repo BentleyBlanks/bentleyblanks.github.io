@@ -70,7 +70,7 @@ export const RELOAD_CLIP_EVENTS = Object.freeze({
     Object.freeze({ atS: 1.85, id: "insert", cue: "stripperLoad", maxDuration: 0.55, volume: 0.75 }),
     Object.freeze({ atS: 2.14, id: "loaded", cue: null }),
     Object.freeze({ atS: 2.86, id: "close", cue: "boltHanYang", offset: 0.555, maxDuration: 0.110, volume: 0.42 }),
-    Object.freeze({ atS: 2.97, id: "lock", cue: "boltHanYang", offset: 0.665, maxDuration: 0.100, volume: 0.42 }),
+    Object.freeze({ atS: 2.99, id: "lock", cue: "boltHanYang", offset: 0.665, maxDuration: 0.100, volume: 0.42 }),
   ]),
 });
 

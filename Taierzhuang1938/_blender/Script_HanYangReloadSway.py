@@ -119,14 +119,23 @@ MUZZLE_MARK={'A':(0.595,0.492),'B':(0.4875,0.311),'C':(0.517,0.492)}
 # While the packet is pressed in (B) the loading port stays on the frame's right edge as in the
 # reference (it goes in at ~0.9, 0.85): B may also shift a few cm sideways / up to keep it there.
 FEED=np.array([0,0.041,-0.187]);FEED_MARK=(0.90,0.85)
+# Closing the bolt (C) the reference holds the rifle low and nearly level: its barrel runs ~23 deg
+# below the horizontal on screen (muzzle to rear sight), the receiver and the working hand out on the
+# right edge. C is also rolled until our barrel lies at that angle.
+SIGHT=np.array([0,0.0632,-0.321]);BARREL_DEG={'C':23.0}
+def barrel_deg(G,w):
+    d=(proj(G,SIGHT,w)-proj(G,MUZ,w))*[ASP,1];return math.degrees(math.atan2(d[1],d[0]))
 for n,uv in MUZZLE_MARK.items():
     dp,rx,ry,rz=POSES[n];w=view_w({'A':0.5,'B':2.0,'C':2.85}[n])
     if n=='B':
         f=lambda v:np.concatenate([proj(about_piv((dp[0]+v[2],dp[1]+v[3],dp[2]),v[0],v[1],rz,G0),MUZ,w)-np.array(uv),
             proj(about_piv((dp[0]+v[2],dp[1]+v[3],dp[2]),v[0],v[1],rz,G0),FEED,w)-np.array(FEED_MARK),[v[2]*0.3,v[3]*0.3]])
         r=least_squares(f,[rx,ry,0,0]);dp=(round(dp[0]+r.x[2],4),round(dp[1]+r.x[3],4),dp[2])
-    else:r=least_squares(lambda v:proj(about_piv(dp,v[0],v[1],rz,G0),MUZ,w)-np.array(uv),[rx,ry])
+    if n in BARREL_DEG:
+        r=least_squares(lambda v:np.concatenate([proj(about_piv(dp,v[0],v[1],v[2],G0),MUZ,w)-np.array(uv),[(barrel_deg(about_piv(dp,v[0],v[1],v[2],G0),w)-BARREL_DEG[n])/100]]),[rx,ry,rz]);rz=round(r.x[2],4)
+    elif n!='B':r=least_squares(lambda v:proj(about_piv(dp,v[0],v[1],rz,G0),MUZ,w)-np.array(uv),[rx,ry])
     POSES[n]=(dp,round(r.x[0],4),round(r.x[1],4),rz);G=about_piv(*POSES[n],G0)
+    print(n,'barrel %.1f deg'%barrel_deg(G,w))
     print(n,'view %.2f pitch/yaw %.4f %.4f -> %.4f %.4f'%(w,rx,ry,r.x[0],r.x[1]),'dp',dp,'muzzle',proj(G,MUZ,w).round(3),'port',proj(G,FEED,w).round(3))
 # The reference's bolt hardly moves on screen as it comes back (its rifle sits farther from the eye
 # under a narrower view: weaker perspective); ours, close to the eye, would carry the knob and the
