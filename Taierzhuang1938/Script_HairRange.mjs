@@ -4,27 +4,41 @@ import * as THREE from 'three';
 import { ManagedGLTFLoader } from './Script_ModelImports.mjs';
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset, HairAssetUrl } from './Script_HairGroom.mjs';
 import { T } from './Script_Text.mjs';
+import { Panel } from './Script_EditorUi.mjs';
+import { HAIR_CAMERA as CAMERA } from './Data_Tuning_Hair.mjs';
 import { HAIR_RANGE_ROWS, HAIR_RANGE_PEDESTAL } from './Data_HairRange.mjs';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const HAIR_ROOT = './Hair/';
 const Style = `
-#hair-range-panel{position:fixed;left:16px;top:16px;bottom:52px;width:312px;z-index:24;background:rgba(25,27,29,.94);color:#e9e4d5;border:1px solid #6f7366;border-radius:8px;box-shadow:0 8px 32px #0005;font:13px/1.45 system-ui,sans-serif;overflow:auto;pointer-events:auto;padding:16px;box-sizing:border-box}
-#hair-range-panel *{box-sizing:border-box}#hair-range-panel h2{font-size:19px;margin:0 0 3px;font-weight:650}#hair-range-panel h3{font-size:12px;color:#bdbaab;font-weight:500;letter-spacing:.08em;margin:16px 0 7px}#hair-range-panel p{font-size:12px;color:#c2c4b8;margin:7px 0}
-#hair-range-panel button{background:#373b3d;border:1px solid #63676b;color:#e9e4d5;border-radius:4px;font:inherit;font-size:12px;padding:6px 8px;cursor:pointer}#hair-range-panel button:hover{background:#4d5254}#hair-range-panel button[aria-pressed=true]{background:#d2bf85;color:#252922;border-color:#d2bf85}
-#hair-range-panel .hair-buttons{display:flex;flex-wrap:wrap;gap:5px}#hair-range-panel .hair-list{display:grid;grid-template-columns:1fr;gap:3px}#hair-range-panel .hair-list button{text-align:left}
-#hair-range-panel .hair-control{display:grid;grid-template-columns:1fr 80px;gap:2px 8px;margin:6px 0;align-items:center}#hair-range-panel output{color:#dcc487;text-align:right;font-variant-numeric:tabular-nums}#hair-range-panel input[type=range]{grid-column:1/3;width:100%;margin:2px 0;accent-color:#c8b77d;cursor:pointer}
-#hair-range-panel .hair-stats{font:11px/1.5 ui-monospace,monospace;color:#bfc2af;margin:8px 0}#hair-range-panel .hair-note{border-left:2px solid #c2ad74;padding-left:9px;margin-top:12px}#hair-range-panel .hair-limit{font-size:11px;color:#a5aaa0;border-top:1px solid #535a50;padding-top:10px}
-#hair-range-toggle{position:fixed;left:16px;bottom:16px;z-index:25;background:#252a2d;color:#e7dfc9;border:1px solid #777c68;border-radius:4px;padding:7px 12px;font:12px system-ui;cursor:pointer}#hair-range-hint{position:fixed;right:16px;bottom:16px;z-index:23;background:#202426bd;color:#eee8d5;padding:8px 14px;border-radius:4px;font:12px system-ui;pointer-events:none}
-#hair-range-labels{position:fixed;inset:0;z-index:22;pointer-events:none}#hair-range-labels button{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;background:#202426e0;color:#eee8d5;border:1px solid #9b9f83;border-radius:4px;padding:3px 7px;white-space:nowrap;font:11px system-ui;cursor:pointer}#hair-range-labels button small{color:#d2bf85;margin-left:4px}
-@media(max-width:700px){#hair-range-panel{width:250px;left:8px;top:8px;bottom:48px;padding:12px}#hair-range-hint{max-width:45%;font-size:10px;right:8px}#hair-range-toggle{left:8px;bottom:8px}}
+#hair-range-ui{position:fixed;inset:0;z-index:24;pointer-events:none}
+#hair-range-panel.edPanel{position:fixed;left:14px;right:auto;top:14px;bottom:54px;width:344px;max-width:calc(100vw - 28px)}
+#hair-range-panel[hidden]{display:none}
+#hair-range-panel .edTitle{font-family:var(--ui-story-font);font-size:18px}
+#hair-range-panel .hair-buttons{display:flex;flex-wrap:wrap;gap:4px}
+#hair-range-panel .hair-list{display:grid;gap:3px}
+#hair-range-panel .hair-list .edBtn{text-align:left}
+#hair-range-panel .hair-control{gap:8px;margin:9px 0}
+#hair-range-panel .hair-control>output{flex:0 0 48px;text-align:right;color:var(--ui-gold);font:11px var(--ui-mono)}
+#hair-range-panel .hair-control input{display:block}
+#hair-range-panel p{font-size:12px;line-height:1.55;color:var(--ui-muted);margin:7px 0}
+#hair-range-panel .hair-stats{font:11px/1.6 var(--ui-mono),var(--ui-font);color:var(--ui-muted);padding:8px 10px;border:1px solid var(--ui-line);background:var(--ui-black);margin-bottom:12px}
+#hair-range-panel .hair-note{border-left:2px solid var(--ui-gold);padding-left:10px;margin-top:16px}
+#hair-range-panel .hair-limit{border-top:1px solid var(--ui-line);padding-top:10px}
+#hair-range-toggle{position:fixed;left:14px;bottom:14px;z-index:25;pointer-events:auto}
+#hair-range-hint{position:fixed;right:14px;bottom:14px;z-index:23;max-width:calc(100vw - 160px);padding:8px 12px;background:var(--ui-panel);border:1px solid var(--ui-line);font-size:12px;color:var(--ui-muted);pointer-events:none}
+#hair-range-labels{position:fixed;inset:0;z-index:22;pointer-events:none}
+#hair-range-labels button{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;background:var(--ui-panel);font-size:11px;white-space:nowrap}
+#hair-range-labels button small{color:var(--ui-gold);margin-left:5px}
+@media(max-width:700px){#hair-range-panel.edPanel{width:268px;left:8px;top:8px;bottom:48px}#hair-range-hint{max-width:45%;font-size:10px;right:8px}#hair-range-toggle{left:8px;bottom:8px}}
 `;
-const CAMERA = Object.freeze({ turn: 0.0055, pan: 0.0011, zoom: 0.0011, min: 0.18, max: 40 });
 
 export class HairRange {
   constructor(host) {
     this.host = host; this.lightRig = host.ctx?.lights || null;
     this.root = new THREE.Group(); this.root.name = 'HairRangeSpecimens'; host.scene.add(this.root);
+    this.keys = new Set();
+    this.oldZoom = host.camera.zoom; this.lens = this.oldZoom;
     this.stations = []; this.assets = new Map(); this.heads = new Map(); this.listeners = [];
     this.ready = false; this.error = null; this.loaded = 0; this.total = 0;
     this.force = 'auto'; this.showHair = true; this.showBeard = true; this.showLabels = true; this.panelShown = true;
@@ -110,11 +124,13 @@ export class HairRange {
       const k = 0.5 - 0.5 * Math.cos((this.walkT / 14) * Math.PI * 2);
       this.target.copy(s.center); this.radius = 0.55 * Math.pow(50, k); this.azimuth = Math.PI * 0.92; this.elevation = 0.06;
     }
+    this.MoveCamera(dt);
     const camera = this.host.camera, horizontal = this.radius * Math.cos(this.elevation);
+    camera.zoom = this.lens;
     camera.position.set(this.target.x + Math.sin(this.azimuth) * horizontal, Math.max(0.12, this.target.y + this.radius * Math.sin(this.elevation)), this.target.z + Math.cos(this.azimuth) * horizontal);
     camera.lookAt(this.target); camera.updateMatrixWorld();
     const width = window.innerWidth, height = window.innerHeight;
-    const panelWidth = this.panelShown ? (width <= 700 ? 258 : 344) : 0;
+    const panelWidth = this.panelShown ? (width <= 700 ? 284 : 372) : 0;
     if (camera.setViewOffset) camera.setViewOffset(width, height, -panelWidth / 2, 0, width, height);
     camera.updateProjectionMatrix?.();
     const renderer = this.host.renderer;
@@ -130,6 +146,7 @@ export class HairRange {
   Current() { return this.stations[this.selected] || null; }
   Camera(id = 'front') {
     this.view = id;
+    this.lens = this.oldZoom;
     const s = this.Current();
     if (id === 'overview' || !s) { this.target.set(0, 1.3, 0.2); this.radius = 8.2; this.azimuth = Math.PI * 0.86; this.elevation = 0.36; }
     else if (id === 'walk') { this.walkT = 0; this.selected = Math.max(0, this.stations.findIndex((station) => station.lod === 'auto')); }
@@ -143,7 +160,9 @@ export class HairRange {
       this.target.copy(s.center);
       const views = { front: [Math.PI, 0.05, 0.62], side: [Math.PI * 0.5, 0.05, 0.62], back: [0, 0.12, 0.62], top: [Math.PI * 0.85, 1.25, 0.6], close: [Math.PI * 1.15, 0.12, 0.34] };
       const [az, el, r] = views[id] || views.front;
-      this.azimuth = az; this.elevation = el; this.radius = r;
+      this.azimuth = az; this.elevation = el;
+      this.lens = this.oldZoom * CAMERA.portraitMagnification;
+      this.radius = r * CAMERA.portraitMagnification;
     }
     this.Cut(); this.UpdateCamera(0); this.PaintPanel(); return true;
   }
@@ -187,13 +206,37 @@ export class HairRange {
       stations: this.stations.map((s, i) => ({ index: i, row: s.row, groom: s.groomId, fixedLod: s.lod, ...s.groom.stats })),
     };
   }
+  MoveCamera(dt) {
+    if (this.host.CanUse?.() === false || document.hidden || this.EditingControl()) { this.keys.clear(); return; }
+    const forward = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
+    const right = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
+    const length = Math.hypot(forward, right);
+    if (!length || !(dt > 0)) return;
+    if (this.view !== 'free') { this.view = 'free'; this.PaintPanel(); }
+    const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? CAMERA.boost : 1;
+    const distance = CAMERA.moveSpeed * boost * dt / length;
+    this.target.x += (-Math.sin(this.azimuth) * forward + Math.cos(this.azimuth) * right) * distance;
+    this.target.z += (-Math.cos(this.azimuth) * forward - Math.sin(this.azimuth) * right) * distance;
+  }
+  EditingControl(target = document.activeElement) {
+    return !!target?.closest?.('input,textarea,select,[contenteditable="true"]');
+  }
   // ---- 相机输入
   BindCamera() {
     const canvas = this.host.canvas || this.host.renderer?.domElement;
     if (!canvas) return;
+    const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight']);
+    this.Listen(window, 'keydown', (event) => {
+      if (!movementKeys.has(event.code) || event.ctrlKey || event.altKey || event.metaKey || this.EditingControl(event.target) || this.host.CanUse?.() === false) return;
+      this.keys.add(event.code);
+      if (event.code.startsWith('Key')) event.preventDefault();
+    }, true);
+    this.Listen(window, 'keyup', (event) => this.keys.delete(event.code), true);
+    this.Listen(document, 'visibilitychange', () => { if (document.hidden) this.keys.clear(); });
     this.Listen(canvas, 'contextmenu', (event) => event.preventDefault());
     this.Listen(canvas, 'pointerdown', (event) => {
       if (this.host.CanUse?.() === false) return;
+      if (this.EditingControl()) document.activeElement.blur();
       if (this.view === 'walk') this.view = 'free';
       this.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, pan: event.button === 2 || event.shiftKey };
       canvas.setPointerCapture?.(event.pointerId); event.preventDefault();
@@ -201,11 +244,15 @@ export class HairRange {
     this.Listen(canvas, 'pointermove', (event) => {
       const p = this.pointer; if (!p || p.id !== event.pointerId) return;
       const dx = event.clientX - p.x, dy = event.clientY - p.y; p.x = event.clientX; p.y = event.clientY;
-      if (p.pan) { const right = V(1, 0, 0).applyQuaternion(this.host.camera.quaternion); this.target.addScaledVector(right, -dx * this.radius * CAMERA.pan); this.target.y += dy * this.radius * CAMERA.pan; }
+      if (p.pan) {
+        const right = V(1, 0, 0).applyQuaternion(this.host.camera.quaternion), panRadius = this.radius * this.oldZoom / this.lens;
+        this.target.addScaledVector(right, -dx * panRadius * CAMERA.pan); this.target.y += dy * panRadius * CAMERA.pan;
+      }
       else { this.azimuth -= dx * CAMERA.turn; this.elevation = Math.max(-0.5, Math.min(1.45, this.elevation + dy * CAMERA.turn)); }
     });
     const End = () => { this.pointer = null; };
-    this.Listen(canvas, 'pointerup', End); this.Listen(canvas, 'pointercancel', End); this.Listen(window, 'blur', End);
+    this.Listen(canvas, 'pointerup', End); this.Listen(canvas, 'pointercancel', End);
+    this.Listen(window, 'blur', () => { End(); this.keys.clear(); });
     this.Listen(canvas, 'wheel', (event) => {
       if (this.host.CanUse?.() === false) return; event.preventDefault();
       if (this.view === 'walk') this.view = 'free';
@@ -216,10 +263,12 @@ export class HairRange {
   // ---- 面板
   MakePanel() {
     this.style = document.createElement('style'); this.style.textContent = Style; document.head.appendChild(this.style);
-    this.panel = document.createElement('section'); this.panel.id = 'hair-range-panel'; this.panel.setAttribute('aria-label', T('hair.title')); document.body.appendChild(this.panel);
-    this.toggle = document.createElement('button'); this.toggle.id = 'hair-range-toggle'; this.toggle.textContent = T('hair.hide'); document.body.appendChild(this.toggle);
-    this.hint = document.createElement('div'); this.hint.id = 'hair-range-hint'; this.hint.textContent = T('hair.instructions'); document.body.appendChild(this.hint);
-    this.labelRoot = document.createElement('div'); this.labelRoot.id = 'hair-range-labels'; document.body.appendChild(this.labelRoot);
+    this.uiRoot = document.createElement('div'); this.uiRoot.id = 'hair-range-ui'; this.uiRoot.className = 'uiToolSurface'; document.body.appendChild(this.uiRoot);
+    const panel = Panel({title: T('hair.title'), sub: T('hair.subtitle'), onClose: () => this.ShowPanel(false)});
+    this.panel = panel.root; this.panel.id = 'hair-range-panel'; this.panel.setAttribute('aria-label', T('hair.title')); this.panelBody = panel.body; this.uiRoot.appendChild(this.panel);
+    this.toggle = document.createElement('button'); this.toggle.id = 'hair-range-toggle'; this.toggle.className = 'edBtn'; this.toggle.textContent = T('hair.hide'); this.uiRoot.appendChild(this.toggle);
+    this.hint = document.createElement('div'); this.hint.id = 'hair-range-hint'; this.hint.textContent = T('hair.instructions'); this.uiRoot.appendChild(this.hint);
+    this.labelRoot = document.createElement('div'); this.labelRoot.id = 'hair-range-labels'; this.uiRoot.appendChild(this.labelRoot);
     this.Listen(this.toggle, 'click', () => this.ShowPanel(!this.panelShown));
     this.Listen(this.panel, 'pointerdown', (event) => event.stopPropagation());
     this.Listen(this.panel, 'keydown', (event) => { if (event.code !== 'Escape') event.stopPropagation(); });
@@ -240,7 +289,7 @@ export class HairRange {
   MakeLabels() {
     this.labelRoot.textContent = '';
     this.labels = this.stations.map((s, i) => {
-      const b = document.createElement('button'); b.type = 'button';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'edChip';
       b.innerHTML = '';
       b.append(document.createTextNode(s.meta.label));
       if (s.lod) { const small = document.createElement('small'); small.textContent = T(`hair.lodLabel.${s.lod}`); b.append(small); }
@@ -264,30 +313,30 @@ export class HairRange {
     if (!this.panel || this.disposed) return;
     const s = this.Current();
     const rows = HAIR_RANGE_ROWS.map((row) => {
-      const list = this.stations.map((st, i) => (st.row === row.id ? `<button data-station="${i}" aria-pressed="${i === this.selected}">${Esc(st.meta.label)}${st.lod ? ` · ${T(`hair.lodLabel.${st.lod}`)}` : ''}</button>` : '')).join('');
-      return `<h3>${T(`hair.row.${row.id}`)}</h3><div class="hair-list">${list}</div>`;
+      const list = this.stations.map((st, i) => (st.row === row.id ? `<button class="edBtn${i === this.selected ? ' on' : ''}" data-station="${i}" aria-pressed="${i === this.selected}">${Esc(st.meta.label)}${st.lod ? ` · ${T(`hair.lodLabel.${st.lod}`)}` : ''}</button>` : '')).join('');
+      return `<section class="edSection"><h3 class="h">${T(`hair.row.${row.id}`)}</h3><div class="b hair-list">${list}</div></section>`;
     }).join('');
-    const lodButtons = ['auto', 'strands', 'cards', 'shell', 'none'].map((m) => `<button data-lod="${m}" aria-pressed="${this.force === m}">${T(`hair.lod.${m}`)}</button>`).join('');
-    const views = ['overview', 'compareShort', 'compareLong', 'front', 'side', 'back', 'top', 'close', 'walk'].map((v) => `<button data-view="${v}" aria-pressed="${this.view === v}">${T(`hair.view.${v}`)}</button>`).join('');
-    const toggles = [['hair', this.showHair], ['beard', this.showBeard], ['labels', this.showLabels]].map(([k, on]) => `<button data-toggle="${k}" aria-pressed="${on}">${T(`hair.toggle.${k}`)}</button>`).join('');
+    const lodButtons = ['auto', 'strands', 'cards', 'shell', 'none'].map((m) => `<button class="edBtn${this.force === m ? ' on' : ''}" data-lod="${m}" aria-pressed="${this.force === m}">${T(`hair.lod.${m}`)}</button>`).join('');
+    const views = ['overview', 'compareShort', 'compareLong', 'front', 'side', 'back', 'top', 'close', 'walk'].map((v) => `<button class="edBtn${this.view === v ? ' on' : ''}" data-view="${v}" aria-pressed="${this.view === v}">${T(`hair.view.${v}`)}</button>`).join('');
+    const toggles = [['hair', this.showHair], ['beard', this.showBeard], ['labels', this.showLabels]].map(([k, on]) => `<button class="edBtn${on ? ' on' : ''}" data-toggle="${k}" aria-pressed="${on}">${T(`hair.toggle.${k}`)}</button>`).join('');
     const u = s?.groom.strandUniforms, p = s?.params || {};
-    const Slider = (key, min, max, step, value) => `<label class="hair-control"><span>${T(`hair.param.${key}`)}</span><output data-out="${key}">${Number(value).toFixed(3)}</output><input type="range" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${value}"></label>`;
+    const Slider = (key, min, max, step, value) => `<label class="edRow hair-control"><span class="l">${T(`hair.param.${key}`)}</span><span class="c"><input type="range" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${value}"></span><output class="edVal" data-out="${key}">${Number(value).toFixed(3)}</output></label>`;
     const params = u ? [
       Slider('clump', 0, 1, 0.01, p.clump ?? u.uClump.value), Slider('frizz', 0, 1.5, 0.01, p.frizz ?? u.uFrizz.value),
       Slider('curlRadius', 0, 0.02, 0.0005, p.curlRadius ?? u.uCurl.value.x), Slider('curlPitch', 0.005, 0.1, 0.001, p.curlPitch ?? u.uCurl.value.y),
-      Slider('melanin', 0, 1, 0.01, p.melanin ?? s.asset?.hair?.render.color.melanin ?? s.groom.asset.hair.render.color.melanin),
+      Slider('melanin', 0, 1, 0.01, p.melanin ?? s.groom.asset.hair.render.color.melanin),
       Slider('roughness', 0.1, 0.9, 0.01, p.roughness ?? s.groom.asset.hair.render.roughness),
       Slider('fraction', 0.05, 1, 0.01, p.fraction ?? 1),
     ].join('') : '';
-    const SunSlider = (key, min, max) => `<label class="hair-control"><span>${T(`hair.light.${key}`)}</span><output data-out="sun-${key}">${this.sun[key]}°</output><input type="range" data-sun="${key}" min="${min}" max="${max}" step="1" value="${this.sun[key]}"></label>`;
-    this.panel.innerHTML = `<h2>${T('hair.title')}</h2><p>${T('hair.subtitle')}</p>
-      <div data-hair-status class="hair-stats"></div>
+    const SunSlider = (key, min, max) => `<label class="edRow hair-control"><span class="l">${T(`hair.light.${key}`)}</span><span class="c"><input type="range" data-sun="${key}" min="${min}" max="${max}" step="1" value="${this.sun[key]}"></span><output class="edVal" data-out="sun-${key}">${this.sun[key]}°</output></label>`;
+    const Section = (title, content) => `<section class="edSection"><h3 class="h">${T(title)}</h3><div class="b">${content}</div></section>`;
+    this.panelBody.innerHTML = `<div data-hair-status class="hair-stats"></div>
       ${this.error ? `<p>${Esc(T('hair.error', { error: this.error }))}</p>` : ''}
-      <h3>${T('hair.view')}</h3><div class="hair-buttons">${views}</div>
-      <h3>${T('hair.lodTitle')}</h3><div class="hair-buttons">${lodButtons}</div><p>${T('hair.lodNote')}</p>
-      <h3>${T('hair.toggles')}</h3><div class="hair-buttons">${toggles}</div>
-      <h3>${T('hair.light')}</h3>${SunSlider('azimuth', -180, 180)}${SunSlider('elevation', -10, 85)}
-      ${params ? `<h3>${T('hair.params')}</h3>${params}` : ''}
+      ${Section('hair.view', `<div class="hair-buttons">${views}</div>`)}
+      ${Section('hair.lodTitle', `<div class="hair-buttons">${lodButtons}</div><p>${T('hair.lodNote')}</p>`)}
+      ${Section('hair.toggles', `<div class="hair-buttons">${toggles}</div>`)}
+      ${Section('hair.light', SunSlider('azimuth', -180, 180) + SunSlider('elevation', -10, 85))}
+      ${params ? Section('hair.params', params) : ''}
       ${rows}
       <p class="hair-note">${T('hair.note')}</p><p class="hair-limit">${T('hair.limit')}</p>`;
     this.PaintStatus();
@@ -321,11 +370,12 @@ export class HairRange {
   }
   Dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.ready = false;
+    this.disposed = true; this.ready = false; this.keys.clear();
     for (const remove of this.listeners) remove(); this.listeners.length = 0;
-    for (const element of [this.panel, this.toggle, this.hint, this.labelRoot, this.style]) element?.remove();
+    for (const element of [this.panel, this.toggle, this.hint, this.labelRoot, this.style, this.uiRoot]) element?.remove();
     this.ReleaseAssets(); this.root.removeFromParent();
-    this.host.camera.clearViewOffset?.(); const canvas = this.host.canvas || this.host.renderer?.domElement; if (canvas) canvas.style.touchAction = this.oldTouchAction || '';
+    this.host.camera.zoom = this.oldZoom; this.host.camera.clearViewOffset?.(); this.host.camera.updateProjectionMatrix?.();
+    const canvas = this.host.canvas || this.host.renderer?.domElement; if (canvas) canvas.style.touchAction = this.oldTouchAction || '';
     this.host.SetViewmodelHidden?.(false);
   }
 }

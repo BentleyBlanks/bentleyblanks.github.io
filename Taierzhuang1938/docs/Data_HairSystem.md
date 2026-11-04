@@ -18,6 +18,8 @@
 
 源表 `Hair/Data_HairStyles.json`：`hair` / `beard` 定义造型，`grooms` 是实验室套装，`gameGrooms` 是绑定到游戏模型的套装。发长、梳向、静态刚度、毛躁、卷曲、发色、密度、胡子部位均从这里读取。
 
+六个人物展示与游戏挂件通过 `referenceLook` 引用 `Hair/Data_HairReferences.json` 的本人配方，覆盖通用实验造型。每份配方记录 OneDrive 原始头部定妆图的相对路径、SHA-256、观察及独立发际线 / 长度 / 胡须轮廓；原图只读，不复制进运行时。个人胡须区分八字须、唇下须、圆形下巴区域、下颌窄带和脸颊稀疏短茬，避免用矩形或整片下脸代替。二进制和清单同时记录原图身份及配方哈希，改个人配方后必须重烘对应展示与游戏套装。
+
 ```powershell
 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs HeYoutian_Cast
 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs Game_HeYoutian
@@ -50,7 +52,7 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 
 ## 6. 实验室操作
 
-拖动旋转、右键平移、滚轮缩放；点面板条目或台座名牌选样本；正、侧、背、俯视和特写按钮切相机。「走远看切档」沿往返路径展示自动档。太阳方向可调；聚簇、毛躁、卷曲、黑色素、粗糙度与发丝数量只现场改变当前发丝实例，不存盘。资源错误显示在面板内，不能把加载失败当作光头成功。
+WASD 沿相机朝向在水平面移动，Shift 三倍加速，斜向速度归一化；拖动旋转、右键平移、滚轮缩放。编辑滑条 / 输入框时不移动相机；点击场景恢复相机操作，窗口失焦、页面隐藏、暂停或退出时释放移动键。点面板条目或台座名牌选样本；正、侧、背、俯视和特写按钮切相机。单人观察采用更远机位和相应放大，减少贴脸广角的鼻部 / 须型变形；全场、并排和自动切档演示沿用原镜头，退出时恢复原相机放大。「走远看切档」沿往返路径展示自动档，手动移动会退出自动演示。面板复用编辑器 `Panel` / `edPanel` / `edBtn` 与全局冷灰、旧金、方角主题，标题固定、内容滚动。太阳方向可调；聚簇、毛躁、卷曲、黑色素、粗糙度与发丝数量只现场改变当前发丝实例，不存盘。资源错误显示在面板内，不能把加载失败当作光头成功。
 
 ## 7. 游戏角色消费方
 
@@ -61,12 +63,14 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 ## 8. 验收
 
 ```powershell
-node Taierzhuang1938/Script_TestRunner.mjs --only=HairGroomTest,HairRangeBrowserTest --fail-fast
+node Taierzhuang1938/Script_TestRunner.mjs --only=HairGroomTest,HairReferenceBrowserTest,HairRangeBrowserTest --fail-fast
 node Taierzhuang1938/Script_TestRunner.mjs --only=MotionVectorContractTest,CarriagePropVelocityTest --fail-fast
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
 通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出。
+
+`HairReferenceBrowserTest` 验证 WASD 位移、斜向归一化、加速、控件焦点与失焦停移、共用 UI 主题，并将原始个人参考图与实际浏览器渲染并排，另存侧 / 背截图到本地 `tmp/HairLab/ReferenceReview/`。需要本机 OneDrive 原图；`HAIR_REF_SUBJECTS=Luo,HeYoutian` 可限制迭代样本。数字门禁不能替代六人的图像对照复核。
 
 证据只放本地忽略目录 `tmp/HairLab/Verified/`：截图与 `Data_HairVerification.json`。其中逐帧 `StepFrames + gl.finish` 数值是合成帧时成本，不是 rAF 游戏帧率；机器有并行任务时不作独占 GPU 性能承诺。视觉复核、性能实测与部署状态在本次交付记录中分别说明。
 

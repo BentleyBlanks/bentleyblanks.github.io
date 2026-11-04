@@ -19,6 +19,12 @@ const ARRAY_TYPES = { Float32Array, Uint16Array, Uint32Array, Uint8Array, Int8Ar
 const styles = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairStyles.json'), 'utf8'));
 const manifest = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairGrooms.json'), 'utf8'));
 const heads = JSON.parse(fs.readFileSync(path.join(HAIR, 'Heads', 'Data_HairHeads.json'), 'utf8')).heads;
+const references = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8'));
+const ReferenceMeta = (key) => {
+  const recipe = references.looks[key];
+  return recipe && {look:key, source:recipe.source, sha256:recipe.sha256, version:references.version,
+    recipeSha256:createHash('sha256').update(JSON.stringify(recipe)).digest('hex')};
+};
 
 Check(fs.existsSync(path.join(HAIR, manifest.atlas.file)), `发片图集 ${manifest.atlas.file} 存在`);
 for (const [key, h] of Object.entries(manifest.heads)) {
@@ -32,6 +38,14 @@ for (const entry of entries) {
   Check(!entry.hair || !!styles.hair[entry.hair], `${entry.id}：发型 ${entry.hair} 在造型表里`);
   Check(!entry.beard || !!styles.beard[entry.beard], `${entry.id}：胡子 ${entry.beard} 在造型表里`);
   Check(!!heads[entry.head], `${entry.id}：头 ${entry.head} 有关键点`);
+  if (entry.row === 'cast' || entry.model) {
+    const meta = ReferenceMeta(entry.referenceLook);
+    Check(entry.referenceLook === (entry.labHead || entry.head) && !!meta, `${entry.id}：使用本人参考配方`);
+    if (meta) {
+      Check(/^[a-f0-9]{64}$/.test(meta.sha256) && !path.isAbsolute(meta.source) && !meta.source.includes('..'), `${entry.id}：参考图路径与 SHA-256 完整`);
+      Check(!!references.looks[entry.referenceLook].beard.referenceShape, `${entry.id}：包含个人胡须轮廓`);
+    }
+  }
 }
 Check(manifest.grooms.length === entries.length && ids.size === entries.length, `清单 ${manifest.grooms.length} 套 = 造型表 ${entries.length} 套，编号唯一`);
 for (const def of Object.values(XBOT_CHARACTERS)) if (def.groom) Check(fs.existsSync(path.join(here, def.groom)), `${def.name} 游戏头发文件存在`);
@@ -61,6 +75,14 @@ for (const g of manifest.grooms) {
   totalBytes += bytes;
   Check(bytes === g.bytes, `${g.id}：清单记的大小与文件一致（${bytes}）`);
   Check(header.id === g.id && header.head === g.head, `${g.id}：文件头 id / head 对得上`);
+  const entry = entries.find((e) => e.id === g.id);
+  if (entry.referenceLook) {
+    const expected = JSON.stringify(ReferenceMeta(entry.referenceLook));
+    Check(JSON.stringify(header.reference) === expected && JSON.stringify(g.reference) === expected, `${g.id}：二进制与清单均基于当前个人参考和配方（修改后必须重烘）`);
+    Check(header.beard?.stubble.perVertexLength === true, `${g.id}：远景短茬沿用个人分区长度`);
+    const data = sec('beardStubbleData'), shape = header.sections.beardStubbleData;
+    Check(!!data && shape?.quant?.comps === 2 && data.some((v, i) => i % 2 === 1 && v > 1), `${g.id}：短茬长度已写入逐顶点数据`);
+  }
   if (header.model) {
     Check(fs.existsSync(path.join(here, header.model)), `${g.id} 游戏人物存在`);
     Check(header.modelSha256 === createHash('sha256').update(fs.readFileSync(path.join(here, header.model))).digest('hex'), `${g.id} 基于当前人物与帽子（模型更新后要重烘）`);

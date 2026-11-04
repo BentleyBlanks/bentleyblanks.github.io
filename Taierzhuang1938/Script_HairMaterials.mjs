@@ -531,6 +531,8 @@ uniform float uMelanin;
 uniform float uRedness;
 uniform float uDensity;
 uniform float uStubLength;
+uniform float uPerVertexLength;
+uniform float uCoverageScale;
 uniform float uCell;
 uniform float uPixelScale;
 uniform float uFade;
@@ -547,7 +549,8 @@ void main() {
   float px = uPixelScale * max(-vViewPos.z, 0.01);
   // 平均覆盖：一格里一根茬（长 × 宽）占的面积
   float width = 0.00009;
-  float avg = clamp(uStubLength * width / (uCell * uCell), 0.0, 1.0) * 6.0;
+  float stubLength = max(0.0006, mix(uStubLength, vData.y, uPerVertexLength));
+  float avg = clamp(stubLength * width / (uCell * uCell), 0.0, 1.0);
   // 近看：在格子里找最近的茬（3×3×3 邻格），算到茬线段的距离
   vec3 q = vLocalPos / uCell;
   vec3 cell = floor(q);
@@ -557,14 +560,16 @@ void main() {
     if (StubHash(c * 1.37) > density) continue;
     vec3 a = (c + vec3(StubHash(c), StubHash(c + 17.1), StubHash(c + 31.7))) * uCell;
     vec3 dir = normalize(vec3(StubHash(c + 3.3) - 0.5, -1.0, StubHash(c + 5.9) - 0.5));
-    vec3 b = a + dir * uStubLength;
+    vec3 b = a + dir * stubLength;
     vec3 pa = vLocalPos - a, ba = b - a;
     float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     best = min(best, length(pa - ba * t));
   }
   float stub = 1.0 - smoothstep(width * 0.5, width * 0.5 + px, best);
-  float alpha = mix(stub, avg * density, smoothstep(0.00015, 0.0006, px));
-  alpha = clamp(alpha * uFade, 0.0, 0.95);
+  // A beard fibre is already unresolved once a pixel spans its 90 µm
+  // diameter. Delaying this transition to 0.6 mm leaves only isolated dots.
+  float alpha = mix(stub * width / (width + px), avg * density, smoothstep(0.00004, 0.00015, px));
+  alpha = clamp(alpha * uCoverageScale * uFade, 0.0, 0.85);
   if (alpha < 0.004) discard;
   vec3 base = HairMelaninColor(uMelanin, uRedness);
   fragColor = HairOutput(base * 0.5 + 0.004);
@@ -646,7 +651,7 @@ export function MakeStrandMaterials(hair, shared, lightRig) {
 }
 export function MakeCardMaterials(part, atlas, shared, lightRig, density) {
   const r = part.render;
-  const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale },
+  const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale * (part.stubble?.perVertexLength ? HAIR_SHADING.referenceBeardAlphaScale : 1) },
     uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter } };
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(density) };
   const main = LitMaterial(MESH_VERTEX(false), CARD_FRAGMENT, uniforms, { lightRig });
@@ -664,7 +669,9 @@ export function MakeShellMaterials(hair, shared, lightRig) {
 }
 export function MakeStubbleMaterial(beard, shared) {
   const own = { uMelanin: { value: beard.render.color.melanin }, uRedness: { value: beard.render.color.redness },
-    uDensity: { value: 1 }, uStubLength: { value: Math.max(0.0006, beard.stubble.length) }, uCell: { value: HAIR_SHADING.stubbleCell }, uFade: { value: 1 } };
+    uDensity: { value: 1 }, uStubLength: { value: Math.max(0.0006, beard.stubble.length) }, uPerVertexLength: { value: beard.stubble.perVertexLength ? 1 : 0 },
+    uCoverageScale: { value: beard.stubble.perVertexLength ? HAIR_SHADING.referenceStubbleCoverageScale : 1 },
+    uCell: { value: HAIR_SHADING.stubbleCell }, uFade: { value: 1 } };
   const m = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false), fragmentShader: STUBBLE_FRAGMENT,
     uniforms: { uPixelScale: shared.uPixelScale, ...own }, transparent: true, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });

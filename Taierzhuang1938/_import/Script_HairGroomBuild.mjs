@@ -25,6 +25,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT = path.dirname(HERE);
 const HAIR = path.join(PROJECT, 'Hair');
 const STYLES = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairStyles.json'), 'utf8'));
+const REFERENCE_DATA = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8'));
+const REFERENCES = REFERENCE_DATA.looks;
 const HEADS = JSON.parse(fs.readFileSync(path.join(HAIR, 'Heads', 'Data_HairHeads.json'), 'utf8')).heads;
 const FORMAT_VERSION = 1;
 
@@ -280,6 +282,55 @@ class HeadFrame {
 
 // ---------------------------------------------------------------------------------------------------------------
 // 在头部网格上按面积撒点（带区域权重）。返回 { p, n, w }。
+function ReferenceBeardParts(p, frame, shape) {
+  const x = Math.abs(p[0]), y = p[1], phi = frame.Phi(p), L = frame.L, fw = frame.m.ear.halfWidth;
+  if (p[2] > frame.zc || phi > frame.earFront - 3 || y < frame.men - .002) return [];
+  if (phi < 40 && y > frame.sub + .001) return [];
+  const out = [], side = p[0] < 0 ? -1 : 1;
+  const AddPart = (part, density, length, dir) => { if (density > .005) out.push({part, density, length, dir: Norm(dir)}); };
+  const mu = shape.mustache;
+  if (mu) {
+    const width = fw * mu.halfWidth, t = Clamp(x / width, 0, 1), height = frame.sub - frame.st;
+    // Follow the upper lip's arch: high beneath the nose, dipping towards
+    // the corners. Filling the whole subnasale/stomion interval makes a box.
+    const arch = Math.pow(t, 1.25);
+    const top = frame.sub - height * (.06 + (.50 + mu.droop * .55) * arch);
+    const bottom = top - height * (mu.thickness ?? .35) * Mix(1, .7, t);
+    const edge = Smooth(width, width - .0025, x) * Smooth(mu.gap * .3, mu.gap, x);
+    const w = edge * Smooth(bottom, bottom + .0015, y) * Smooth(top, top - .0015, y);
+    AddPart('mustache', w * mu.density, mu.length * Mix(.8, 1.1, t), [side * Mix(.2, .85, t), -1, -.08]);
+  }
+  const soul = shape.soul;
+  if (soul) {
+    const top = frame.st - soul.top * L, bottom = frame.st - soul.bottom * L;
+    const w = fw * soul.halfWidth;
+    const mask = Smooth(w, w * .55, x) * Smooth(bottom, bottom + .002, y) * Smooth(top, top - .002, y);
+    AddPart('soul', mask * soul.density, soul.length, [side * .08, -1, -.1]);
+  }
+  const chin = shape.chin;
+  if (chin) {
+    const w = fw * chin.halfWidth, radiusY = L * chin.height;
+    const centreY = frame.men + radiusY * .45;
+    const ellipse = Math.hypot(x / w, (y - centreY) / radiusY);
+    const mask = Smooth(1, .72, ellipse) * Smooth(frame.men - .002, frame.men + .001, y);
+    const taper = Mix(1, Mix(.25, 1.15, Math.pow(Clamp(1 - x / w, 0, 1), .7)), chin.point);
+    AddPart('chin', mask * chin.density, chin.length * taper * Mix(.4, 1, Smooth(1, .25, ellipse)), [side * .10 * x / w, -1, -.12]);
+  }
+  const jaw = shape.jaw, q = Clamp(phi / (frame.earFront - 3), 0, 1);
+  const jawY = Lerp1D([[0, frame.men + .06 * L], [.35, frame.men + .11 * L], [.65, frame.men + .26 * L], [1, frame.m.ear.yMin + frame.earH * .08]], q);
+  if (jaw && x > fw * .20) {
+    const band = L * jaw.band;
+    const mask = Smooth(band, band * .45, Math.abs(y - jawY)) * Smooth(fw * .20, fw * .28, x);
+    AddPart('jaw', mask * jaw.density, jaw.length, [side * .08, -1, .08]);
+  }
+  const cheek = shape.cheek;
+  if (cheek && x > fw * .24 && y > jawY && y < frame.sub + .28 * L) {
+    const mask = Smooth(frame.sub + .28 * L, frame.sub + .05 * L, y) * Smooth(jawY, jawY + .008, y);
+    AddPart('cheek', mask * cheek.density, cheek.length, [side * .04, -1, 0]);
+  }
+  return out;
+}
+
 class SurfaceSampler {
   constructor(mesh) {
     this.mesh = mesh;
@@ -810,8 +861,8 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
 function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = null) {
   const rng = Rng(HashString(groomId + ':beard'));
   const K = style.points;
-  const PartsAt = (p) => (exclude && exclude(p) ? [] : frame.BeardParts(p, style.parts));
-  const Weight = (p) => { let w = 0; for (const q of PartsAt(p)) if (q.part !== 'cheek') w = Math.max(w, q.density); return w; };
+  const PartsAt = (p) => (exclude && exclude(p) ? [] : style.referenceShape ? ReferenceBeardParts(p, frame, style.referenceShape) : frame.BeardParts(p, style.parts));
+  const Weight = (p) => { let w = 0; for (const q of PartsAt(p)) if (style.referenceShape || q.part !== 'cheek') w = Math.max(w, q.density); return w; };
   const cards = { pos: [], tan: [], nrm: [], uv: [], data: [], idx: [] };
   const cfg = style.cards, tileList = tiles[cfg.tile];
   let cardCount = 0;
@@ -821,7 +872,7 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
       const lrng = Rng(HashString(groomId + ':beardcards:' + layer));
       const picks = PoissonRoots(sampler, lrng, cfg.spacing * (1 + 0.12 * layer), (p) => Weight(p), 14000);
       for (const pk of picks) {
-        const parts = PartsAt(pk.p).filter((q) => q.part !== 'cheek');
+        const parts = PartsAt(pk.p).filter((q) => style.referenceShape || q.part !== 'cheek');
         if (!parts.length) continue;
         parts.sort((a, b) => b.density - a.density);
         const q = parts[0];
@@ -843,9 +894,19 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
   const stParts = st ? Object.fromEntries(st.parts.map((k) => [k, { ...(style.parts[k] || {}), length: 0.001, density: 1, cheek: style.parts.jaw?.cheek ?? 0.45 }])) : null;
   if (stParts) { stParts.jaw ||= { length: 0.001, density: 1, cheek: 0.5 }; if (!st.parts.includes('jaw')) delete stParts.jaw; }
   const stubble = st ? ScalpPatch(mesh, (p) => {
-    let w = 0; for (const q of frame.BeardParts(p, stParts)) w = Math.max(w, q.part === 'cheek' ? q.density * 0.5 : q.density);
+    if (exclude && exclude(p)) return 0;
+    let w = 0; for (const q of (style.referenceShape ? PartsAt(p) : frame.BeardParts(p, stParts))) w = Math.max(w, q.part === 'cheek' ? q.density * 0.5 : q.density);
     return w * st.density;
   }, () => 0.00025, (p, n) => Norm(Project([0, -1, 0.1], n)), 0.01) : null;
+  if (stubble && style.referenceShape) {
+    // Match the subpixel mean to each local short-hair region. A single
+    // global stubble length loses the moustache or darkens the cheeks.
+    for (let i = 0; i < stubble.pos.length / 3; i++) {
+      const p = stubble.pos.slice(i * 3, i * 3 + 3);
+      const parts = PartsAt(p).sort((a, b) => b.density - a.density);
+      stubble.data[2 * i + 1] = Math.min(.004, parts[0]?.length ?? .001);
+    }
+  }
   return { cards, stubble, cardCount };
 }
 
@@ -1133,8 +1194,12 @@ function BuildGroom(entry, tiles) {
   const header = { format: 'tengxian.hairGroom', version: FORMAT_VERSION, id: entry.id, head: entry.head, label: entry.label, frame: 'head', units: 'm' };
   if (game) Object.assign(header, { model: entry.model, modelSha256: createHash('sha256').update(fs.readFileSync(path.join(PROJECT, entry.model))).digest('hex'), bone: game.bone, attach: game.attach, icpErrorM: game.icpErrorM });
   const sections = {};
+  const reference = entry.referenceLook ? REFERENCES[entry.referenceLook] : null;
+  if (entry.referenceLook && !reference) throw new Error(`Missing reference look: ${entry.referenceLook}`);
+  if (reference) header.reference = {look: entry.referenceLook, source: reference.source, sha256: reference.sha256, version: REFERENCE_DATA.version,
+    recipeSha256: createHash('sha256').update(JSON.stringify(reference)).digest('hex')};
   if (entry.hair) {
-    const style = DeepMerge(STYLES.hair[entry.hair], entry.hairOverrides);
+    const style = DeepMerge(DeepMerge(STYLES.hair[entry.hair], entry.hairOverrides), reference?.hair);
     const h = BuildHair(entry.id, style, frame, mesh, sdf, sampler, tiles, exclude);
     const G = h.guides.length, K = h.K;
     const guideData = new Float32Array(G * K * 4);
@@ -1163,12 +1228,12 @@ function BuildGroom(entry, tiles) {
     };
   }
   if (entry.beard) {
-    const style = STYLES.beard[entry.beard];
+    const style = DeepMerge(STYLES.beard[entry.beard], reference?.beard);
     const b = BuildBeard(entry.id, style, frame, mesh, sdf, sampler, tiles, exclude);
     if (b.cards.idx.length) Object.assign(sections, MeshSections('beardCard', b.cards, { uv: true }));
     if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { dataScale: [1, 0.05] }));
     header.beard = { style: entry.beard, name: style.name, cards: b.cardCount, triangles: b.cards.idx.length / 3,
-      stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0 },
+      stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0, perVertexLength: !!style.referenceShape },
       render: { color: style.color, roughness: 0.42, specular: 0.5, scatter: 0.5 } };
   }
   const buf = Pack(header, sections);
@@ -1177,7 +1242,7 @@ function BuildGroom(entry, tiles) {
   fs.writeFileSync(file, buf);
   const sec = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`${entry.id}: ${(buf.length / 1e6).toFixed(2)} MB  hair ${header.hair ? `${header.hair.guides} guides × ${header.hair.points}, ${header.hair.strands} strands, cards ${header.hair.cards.triangles} tri, shell ${header.hair.shell.triangles} tri` : '-'}  beard ${header.beard ? `${header.beard.cards} cards, stubble ${header.beard.stubble.triangles} tri` : '-'}  (${sec} s)`);
-  return { id: entry.id, head: entry.head, hair: entry.hair, beard: entry.beard, row: entry.row || null, label: entry.label, model: entry.model || null, file: `Grooms/Groom_${entry.id}.bin`, bytes: buf.length,
+  return { id: entry.id, head: entry.head, hair: entry.hair, beard: entry.beard, reference: header.reference || null, row: entry.row || null, label: entry.label, model: entry.model || null, file: `Grooms/Groom_${entry.id}.bin`, bytes: buf.length,
     strands: header.hair?.strands ?? 0, guides: header.hair?.guides ?? 0, cardTriangles: (header.hair?.cards.triangles ?? 0) + (header.beard?.triangles ?? 0),
     shellTriangles: header.hair?.shell.triangles ?? 0 };
 }

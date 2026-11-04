@@ -1,7 +1,7 @@
 export const TEXT = Object.freeze({
   'hair.title': '头发胡子测试场', 'hair.subtitle': '发丝 · 发片 · 头发壳 三档对比',
   'hair.loading': '正在载入头发…（{done} / {total}）', 'hair.error': '头发加载失败：{error}',
-  'hair.instructions': '拖动转动 · 右键平移 · 滚轮缩放 · 点名字飞过去',
+  'hair.instructions': 'WASD 平移 · Shift 加速 · 拖动旋转 · 右键平移 · 滚轮缩放',
   'hair.show': '显示面板', 'hair.hide': '隐藏面板',
   'hair.row.lod': '三档对比（同一套头发）', 'hair.row.cast': '人物（各自的头发胡子）', 'hair.row.length': '发型：长短与软硬', 'hair.row.beard': '胡子（发片 + 胡茬贴片）',
   'hair.lod.auto': '自动', 'hair.lod.strands': '发丝', 'hair.lod.cards': '发片', 'hair.lod.shell': '头发壳', 'hair.lod.none': '不画',

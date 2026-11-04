@@ -789,7 +789,8 @@
    "hair": "Crew",
    "beard": "StubbleLight",
    "row": "cast",
-   "label": "顺子：寸头 + 淡胡茬"
+   "label": "顺子（个人参考）：短寸头 + 淡短茬",
+   "referenceLook": "Shunzi"
   },
   {
    "id": "Luo_Cast",
@@ -797,15 +798,8 @@
    "hair": "Crew",
    "beard": "BoxedShort",
    "row": "cast",
-   "label": "罗班长：寸头 + 短络腮",
-   "hairOverrides": {
-    "length": {
-     "top": 0.019,
-     "front": 0.016,
-     "side": 0.007,
-     "back": 0.009
-    }
-   }
+   "label": "罗班长（个人参考）：短寸头 + 下颌薄短须",
+   "referenceLook": "Luo"
   },
   {
    "id": "HeYoutian_Cast",
@@ -813,7 +807,8 @@
    "hair": "Crew",
    "beard": "GoateeThin",
    "row": "cast",
-   "label": "何有田：寸头 + 细八字山羊胡"
+   "label": "何有田（个人参考）：碎寸头 + 细唇须下颌短须",
+   "referenceLook": "HeYoutian"
   },
   {
    "id": "SoldierA_Cast",
@@ -821,7 +816,8 @@
    "hair": "Crew",
    "beard": "PointedGoatee",
    "row": "cast",
-   "label": "日军士兵A：寸头 + 尖下巴胡"
+   "label": "日军士兵A（个人参考）：短寸头 + 浓唇须尖下巴胡",
+   "referenceLook": "SoldierA"
   },
   {
    "id": "Jia_Cast",
@@ -829,15 +825,8 @@
    "hair": "Crew",
    "beard": "MustacheThick",
    "row": "cast",
-   "label": "日兵甲：寸头 + 浓八字",
-   "hairOverrides": {
-    "length": {
-     "top": 0.016,
-     "front": 0.014,
-     "side": 0.006,
-     "back": 0.008
-    }
-   }
+   "label": "日兵甲（个人参考）：短平头 + 浓短唇须淡下颌茬",
+   "referenceLook": "Jia"
   },
   {
    "id": "Yi_Cast",
@@ -845,7 +834,8 @@
    "hair": "Crew",
    "beard": "MustacheChin",
    "row": "cast",
-   "label": "日兵乙：寸头 + 八字下巴须"
+   "label": "日兵乙（个人参考）：短寸头 + 宽唇须 U 形短须",
+   "referenceLook": "Yi"
   },
   {
    "id": "Jia_Buzz",
@@ -944,7 +934,8 @@
    "labHead": "HeYoutian",
    "hair": "Crew",
    "beard": "GoateeThin",
-   "label": "游戏里的何有田（戴帽）：寸头 + 细八字山羊胡"
+   "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
+   "referenceLook": "HeYoutian"
   },
   {
    "id": "Game_JapaneseSoldierJia",
@@ -957,15 +948,8 @@
    ],
    "hair": "Crew",
    "beard": "MustacheThick",
-   "label": "游戏里的日兵甲（戴帽）：寸头 + 浓八字",
-   "hairOverrides": {
-    "length": {
-     "top": 0.016,
-     "front": 0.014,
-     "side": 0.006,
-     "back": 0.008
-    }
-   }
+   "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
+   "referenceLook": "Jia"
   },
   {
    "id": "Game_SquadLeaderLuo",
@@ -974,15 +958,8 @@
    "labHead": "Luo",
    "hair": "Crew",
    "beard": "BoxedShort",
-   "label": "罗班长（戴帽）：寸头 + 短络腮",
-   "hairOverrides": {
-    "length": {
-     "top": 0.019,
-     "front": 0.016,
-     "side": 0.007,
-     "back": 0.009
-    }
-   }
+   "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
+   "referenceLook": "Luo"
   },
   {
    "id": "Game_JapaneseSoldierA",
@@ -991,7 +968,8 @@
    "labHead": "SoldierA",
    "hair": "Crew",
    "beard": "PointedGoatee",
-   "label": "日军士兵A（戴帽）：寸头 + 尖下巴胡"
+   "label": "日军士兵A（游戏挂接）：短寸头 + 浓唇须尖下巴胡",
+   "referenceLook": "SoldierA"
   },
   {
    "id": "Game_Shunzi",
@@ -1000,7 +978,8 @@
    "labHead": "Shunzi",
    "hair": "Crew",
    "beard": "StubbleLight",
-   "label": "顺子（戴帽）：寸头 + 淡胡茬"
+   "label": "顺子（游戏挂接）：短寸头 + 淡短茬",
+   "referenceLook": "Shunzi"
   },
   {
    "id": "Game_JapaneseSoldierYi",
@@ -1009,7 +988,8 @@
    "labHead": "Yi",
    "hair": "Crew",
    "beard": "MustacheChin",
-   "label": "日兵乙（戴盔）：寸头 + 八字下巴须"
+   "label": "日兵乙（游戏挂接）：短寸头 + 宽唇须 U 形短须",
+   "referenceLook": "Yi"
   }
  ]
 }
