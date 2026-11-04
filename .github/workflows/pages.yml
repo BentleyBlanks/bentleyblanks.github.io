@@ -5,7 +5,7 @@
 # 2026-08-06 起连续 errored，线上因此卡在旧版本好几轮没人发现。
 # `.nojekyll` 只是关掉 Jekyll 处理，救不了超时。
 #
-# Actions 使用「导出静态站 → 构建与校验 GPU 资源 → 合并滕县脚本 → 验证 → 上传 → 发布」，没有 Jekyll。
+# Actions 只导出滕县与两件必需的共用草席模型；其他项目、旧首页与完整历史仅在 Git / 本地保留。
 name: Deploy Pages
 
 on:
@@ -50,7 +50,8 @@ jobs:
           npm install --ignore-scripts --no-package-lock --no-audit --no-fund
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
-          git archive HEAD | tar -x -C "$RUNNER_TEMP/pages"
+          node scripts/Script_PublishScopeTest.mjs
+          git archive HEAD Taierzhuang1938 Model/StrawSleepingMat/Model_StrawSleepingMatFlat.glb Model/StrawSleepingMat/Model_StrawSleepingMatRolled.glb | tar -x -C "$RUNNER_TEMP/pages"
       - uses: actions/cache/restore@v4
         id: gpu-assets
         with:
@@ -95,9 +96,11 @@ jobs:
         run: |
           node scripts/Script_PublishPrune.mjs --check
           node scripts/Script_PublishPrune.mjs "$RUNNER_TEMP/pages"
+          node scripts/Script_PublishScope.mjs "$RUNNER_TEMP/pages"
+          node scripts/Script_PublishScope.mjs --check "$RUNNER_TEMP/pages"
           node scripts/Script_PublishPrune.mjs --report "$RUNNER_TEMP/pages"
       - uses: actions/configure-pages@v5
-      # 其余静态页面保持原样；只在 staging 内替换滕县入口，依赖与本地临时文件不发布。
+      # 仅上传滕县发布副本；仓库原始首页、其他项目与历史资产继续供本地预览。
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/pages

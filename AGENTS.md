@@ -37,6 +37,8 @@
 
 ## 验证与发布
 
+- **Pages 仅发布滕县（2026-11-04）。** 发布源白名单是 `Taierzhuang1938/` 与 `Model/StrawSleepingMat/` 中运行时使用的两件 GLB；再按 `Script_PublishPrune.mjs` 剔除制作源文件。`scripts/Script_PublishScope.mjs` 在独立发布副本生成直接进入 `/Taierzhuang1938/` 的首页与提交版本戳，并阻止其他项目混入。滕县现行编辑器、测试场与资源契约继续保留；其他项目、旧网站首页及其历史均保留在 Git，继续用本地预览入口访问，不再上传 Pages。新增跨目录运行时依赖时同步工作流白名单、范围检查与验收；不得为了减小发布包删除仓库资产或改写历史。
+
 - 模型验收网页、验收截图和演示视频只留本地，不提交到 github.io 仓库。游戏实际使用的资产与验收脚本按各项目规则交付；临时预览产物放入已忽略目录。
 
 - 站点由 [.github/workflows/pages.yml](.github/workflows/pages.yml) 从 **master** 部署。通常直接快进推送；需要评审或分支保护要求时走 PR，无需同时做两套发布流程。

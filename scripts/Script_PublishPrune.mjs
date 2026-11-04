@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { IsPublishedSource } from "./Script_PublishScope.mjs";
 
 /** 不进发布包的路径（相对仓库根；以 / 结尾的是目录，带 * 的是通配）。 */
 export const PUBLISH_EXCLUDE = Object.freeze([
@@ -32,7 +33,7 @@ export const PUBLISH_EXCLUDE = Object.freeze([
 ]);
 
 /** 发布包（站点目录原始字节）上限，单位 MiB。只降不升：每做完一步瘦身就把它压到新体积上面一点。 */
-export const PUBLISH_BUDGET_MIB = 2750;
+export const PUBLISH_BUDGET_MIB = 2000;
 /** GitHub Pages 规定的发布站点上限。 */
 const PAGES_LIMIT_MIB = 1024;
 
@@ -86,7 +87,7 @@ export function Prune(siteDir) {
 export function SiteBytes(siteDir) { return SizeOf(siteDir); }
 
 /** 在仓库里核清单：每一项都还在；运行代码（网页、JS 模块，不含测试 / 工具 / 被拿掉的目录本身）没有去加载这些路径。 */
-export function CheckRepo({ root = repoRoot, tracked = null } = {}) {
+export function CheckRepo({ root = repoRoot, tracked = null, runtimeFilter = () => true } = {}) {
   const problems = [];
   tracked ??= execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   const excluded = PUBLISH_EXCLUDE.map((e) => (e.path.includes("*") ? Glob(e.path) : null));
@@ -104,7 +105,7 @@ export function CheckRepo({ root = repoRoot, tracked = null } = {}) {
     !e.path.endsWith("/") && (excluded[i] ? excluded[i].test(f) : f === e.path))).map((f) => path.posix.basename(f)))];
   const fileReference = fileNames.length ? new RegExp(fileNames.map(Esc).join("|")) : null;
   const LOAD = /(fetch\(|import\(|new URL\(|\.load(?:Async)?\(|src\s*=|href\s*=|<script[^>]*src=|<link[^>]*href=)/;
-  const runtime = tracked.filter((f) => /\.(html|mjs|js|css|gltf)$/.test(f) && !IsExcluded(f)
+  const runtime = tracked.filter((f) => runtimeFilter(f) && /\.(html|mjs|js|css|gltf)$/.test(f) && !IsExcluded(f)
     && !/(Test|Probe|Shot|Cli|Bake|Audit|Bench|Build|Export|Author|Verify|Migrate)[A-Za-z0-9_]*\.(mjs|js)$/.test(f) && !f.startsWith("scripts/") && !f.includes("/_shots/"));
   for (const file of runtime) {
     const lines = fs.readFileSync(path.join(root, file), "utf8").split(/\r?\n/);
@@ -124,7 +125,7 @@ function Main(argv) {
   if (argv[0] === "--check") {
     // CI 已在裁剪前调用 --check；把回归放在同一入口，手工运行也不会漏掉。
     execFileSync(process.execPath, [path.join(repoRoot, "scripts/Script_PublishPruneTest.mjs")], { stdio: "inherit" });
-    const problems = CheckRepo();
+    const problems = CheckRepo({ runtimeFilter: IsPublishedSource });
     if (problems.length) { console.error(`[publish] 发布包清单：${problems.length} 处要看\n  ${problems.join("\n  ")}`); process.exit(1); }
     console.log(`[publish] 发布包清单：${PUBLISH_EXCLUDE.length} 项都还在，运行代码没有加载它们`);
     return;
