@@ -159,13 +159,13 @@ try {
   await page.waitForFunction(()=>{
     const T=window.Tengxian;T.StepFrames(1,1/60,false);
     const keys=new Set();T.scene.traverse(o=>{const skin=o.userData?.xbotSkin;if(skin&&o.visible&&skin.shownValid)keys.add(skin.kit.key);});
-    let nativeYi=false;T.scene.traverse(o=>{const skin=o.userData?.xbotSkin;if(skin?.shownValid&&skin.kit.key==="ijaYi"&&skin.current?.file)nativeYi=true;});
+    let nativeYi=false;T.scene.traverse(o=>{const skin=o.userData?.xbotSkin;if(skin?.shownValid&&skin.kit.key==="ijaYi"&&skin.actor.weaponData?.kind==="lmg"&&skin.current?.file)nativeYi=true;});
     return nativeYi&&["ijaJia","ijaA","ijaYi"].every(key=>keys.has(key));
   },null,{timeout:120000});
   const game = await page.evaluate(()=>{
     const T=window.Tengxian,counts={},skins=[];
     T.scene.traverse(o=>{const skin=o.userData?.xbotSkin;if(skin&&o.visible&&skin.shownValid){counts[skin.kit.key]=(counts[skin.kit.key]||0)+1;skins.push(skin);}});
-    const yi=skins.find(skin=>skin.kit.key==="ijaYi"&&skin.current?.file);
+    const yi=skins.find(skin=>skin.kit.key==="ijaYi"&&skin.actor.weaponData?.kind==="lmg"&&skin.current?.file);
     T.StepFrames(60,1/60,false);
     const V=T.camera.position.constructor,head=yi.H("Head").getWorldPosition(new V()),hip=yi.H("Hips").getWorldPosition(new V());
     const eye=hip.clone().add(new V(1.8,.5,1.8)),focus=hip.clone().lerp(head,.4),direction=focus.clone().sub(eye).normalize();
@@ -174,7 +174,18 @@ try {
       pitchDeg:Math.asin(direction.y)*180/Math.PI});
     T.StepFrames(16,1/60,true);
     T.camera.updateMatrixWorld(true);
-    return {counts,kit:yi.kit.key,shownValid:yi.shownValid,clip:yi.current?.file||(yi.current?.mirror?"mirror":null),grip:yi.Probe(),
+    let mesh,template;yi.model.traverse(o=>{if(o.isSkinnedMesh)mesh=o;});yi.kit.source.updateMatrixWorld(true);yi.kit.source.traverse(o=>{if(o.isSkinnedMesh&&o.geometry===mesh.geometry)template=o;});
+    const palm=new V(),point=new V();let samples=0;
+    const position=mesh.geometry.attributes.position;
+    for(let i=0;i<position.count;i++){
+      point.fromBufferAttribute(position,i).applyMatrix4(template.matrixWorld);
+      if(point.x<.718||point.x>.755||point.y<1.425||point.y>1.470||point.z<-.070||point.z>.015)continue;
+      palm.add(mesh.getVertexPosition(i,new V()).applyMatrix4(mesh.matrixWorld));samples++;
+    }
+    palm.divideScalar(samples);
+    let meshPalmGap=Infinity;
+    yi.actor.weaponGroup.traverse(o=>{const a=o.geometry?.attributes.position;if(o.isMesh&&a&&!o.isInstancedMesh&&!o.isBatchedMesh)for(let i=0;i<a.count;i++){point.fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld);meshPalmGap=Math.min(meshPalmGap,point.distanceTo(palm));}});
+    return {counts,kit:yi.kit.key,weaponId:yi.actor.weaponId,shownValid:yi.shownValid,clip:yi.current?.file||(yi.current?.mirror?"mirror":null),grip:yi.Probe(),meshPalmGap,palmSamples:samples,visualOffset:yi.weaponVisualOffset.toArray(),
       headScreen:yi.H("Head").getWorldPosition(new V()).project(T.camera).toArray(),canvas:T.renderer.domElement.toDataURL("image/png")};
   });
   fs.writeFileSync(path.join(out,"BlockoutYi.png"),Buffer.from(game.canvas.split(",")[1],"base64"));
@@ -184,6 +195,7 @@ try {
   assert.match(game.grip.mount,/^rifle/,"game capture uses a held rifle pose");
   assert.ok(game.grip.gripR<.04,`game right palm grip ${game.grip.gripR}`);
   assert.ok(game.grip.contactL!==null&&game.grip.contactL<.04,`game left palm contact ${game.grip.contactL}`);
+  assert.ok(game.palmSamples>20&&game.meshPalmGap<.06,`actual visible weapon-to-skinned-palm gap ${game.meshPalmGap}`);
   console.log(`[Yi] whitebox variants ${JSON.stringify(game.counts)}`);
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(out,"Data_Review.json"), JSON.stringify({ origin,setup,results,game,errors },null,2));

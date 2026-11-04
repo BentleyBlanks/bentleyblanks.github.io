@@ -26,6 +26,7 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 日兵乙：五部件 V2；本地用已验证的日兵甲骨架拟合并传递权重，保留头形，补齐护颈布内衬。
   ijaYi: Object.freeze({ name: "日兵乙", file: "./Model/Character/Model_JapaneseSoldierYi.glb", hipsScale: 0.9418, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierYi.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierYi.bin",
+    weaponVisualOriginFit: Object.freeze({ kinds: Object.freeze(["lmg"]), muzzleSampleDepthM: 0.012, minCorrectionM: 0.02, maxCorrectionM: 0.25 }),
     clipOverrides: Object.freeze({ "Animation_Mixamo_Crawling_V1.glb": "./Animation/JapaneseSoldierYi/Animation_JapaneseSoldierYi_Crawling.glb" }) }),
 });
 

@@ -21,7 +21,7 @@ import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER }
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
-import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
+import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose, MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
@@ -577,6 +577,8 @@ export class XBotSkin {
     this.prevDown = false;
     this.rifleShown = null;  // { which: "hand" | "back", local }
     this.rifleSwap = null;
+    this.weaponVisualFit = null;
+    this.weaponVisualOffset = new THREE.Vector3();
   }
 
   get visible() { return this.container.visible; }
@@ -1245,6 +1247,7 @@ export class XBotSkin {
       ? +Palm(this.H(n[side] + "Hand"), this.H(n[side] + "HandMiddle1"), new THREE.Vector3()).distanceTo(target[side]).toFixed(3) : null]));
     this.container.updateMatrixWorld(true);
     // 枪的本地矩阵 = 挂点世界矩阵⁻¹ × 目标（整矩阵乘，不拆缩放：枪在挂点里有自己的缩放抵消身高缩放）
+    this._WeaponVisualOrigin();
     w.matrix.copy(_inv.copy(w.parent.matrixWorld).invert().multiply(W));
     w.matrix.decompose(w.position, w.quaternion, w.scale);
     w.updateMatrix();
@@ -1252,6 +1255,42 @@ export class XBotSkin {
     w.updateMatrixWorld(true);
     this.lastMount = trackMode !== "hand" ? "rifle-" + trackMode : mode;
     return true;
+  }
+
+  /** Cache a model-backed origin fit for the opted-in character, never mutate
+   * shared weapon geometry or another character's mount configuration. */
+  _WeaponVisualOrigin() {
+    const w=this.actor.weaponGroup,settings=this.kit.def.weaponVisualOriginFit;
+    if (this.weaponVisualFit?.weapon===w) return this.weaponVisualOffset;
+    this._RestoreWeaponVisualOrigin();
+    this.weaponVisualFit={weapon:w,buckets:[]};this.weaponVisualOffset.set(0,0,0);
+    if (!w||!settings?.kinds.includes(this.actor.weaponData?.kind)) return this.weaponVisualOffset;
+    w.updateWorldMatrix(true,true);
+    const inverse=new THREE.Matrix4().copy(w.matrixWorld).invert(),point=new THREE.Vector3(),points=[];
+    w.traverse(o=>{
+      const position=o.geometry?.attributes?.position;
+      if (!o.isMesh||!position||o.isInstancedMesh||o.isBatchedMesh) return;
+      const local=new THREE.Matrix4().multiplyMatrices(inverse,o.matrixWorld);
+      for(let i=0;i<position.count;i++)points.push(point.fromBufferAttribute(position,i).applyMatrix4(local).clone());
+    });
+    this.weaponVisualOffset.copy(MeasureWeaponVisualOrigin(points,this.actor.weaponMuzzle,settings));
+    // Actor's weapon group is its logical socket frame (also used by muzzle
+    // effects and firing). Correct only this instance's rendered bucket meshes;
+    // keep that group and every grip/muzzle marker in the established frame.
+    for (const child of w.children) if (child.isMesh) {
+      const original=child.position.clone();
+      child.position.sub(this.weaponVisualOffset);child.updateMatrix();
+      this.weaponVisualFit.buckets.push({object:child,original,written:child.position.clone()});
+    }
+    w.updateMatrixWorld(true);
+    return this.weaponVisualOffset;
+  }
+
+  _RestoreWeaponVisualOrigin() {
+    for (const entry of this.weaponVisualFit?.buckets||[]) if (entry.object.position.equals(entry.written)) {
+      entry.object.position.copy(entry.original);entry.object.updateMatrix();
+    }
+    this.weaponVisualFit=null;this.weaponVisualOffset.set(0,0,0);
   }
 
   /**
@@ -1482,6 +1521,7 @@ export class XBotSkin {
   }
 
   Dispose() {
+    this._RestoreWeaponVisualOrigin();
     this._EndRifleSwap();
     this.mixer.stopAllAction();
     this.hair?.Dispose();

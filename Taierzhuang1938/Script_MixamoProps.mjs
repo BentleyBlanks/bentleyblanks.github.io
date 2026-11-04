@@ -18,6 +18,27 @@
 //    之后跟着 Spine2 走。掉地：从脱手那一刻的位姿和速度落下，0.45 s 内转成枪身水平侧躺，落到地面停住。
 import * as THREE from "three";
 
+/**
+ * A model's socket markers can retain an old lateral/vertical origin while its
+ * imported solid geometry has moved. Measure the actual muzzle cross section
+ * in weapon-local coordinates. Preserve the axial muzzle clearance and return
+ * only the perpendicular correction; callers keep logical grip frames intact.
+ * Points are supplied by the consumer, so this shared maths touches no scene.
+ */
+export function MeasureWeaponVisualOrigin(points, muzzle, settings) {
+  const offset = new THREE.Vector3();
+  if (!points.length || !muzzle || !settings) return offset;
+  let minZ = Infinity;
+  for (const p of points) minZ = Math.min(minZ,p.z);
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const p of points) if (p.z <= minZ+settings.muzzleSampleDepthM) {
+    minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+  }
+  offset.set((minX+maxX)*.5-muzzle.x,(minY+maxY)*.5-muzzle.y,0);
+  const length=offset.length();
+  return Number.isFinite(length)&&length>=settings.minCorrectionM&&length<=settings.maxCorrectionM ? offset : offset.set(0,0,0);
+}
+
 export const AIM_AT_LEFT = Object.freeze({
   near: 0.2, nearFull: 0.26,      // 左手离握把 0.2 m 以内不转（拉栓、压弹的手在机匣上），0.26 m 起全转
   farFull: 0.68, far: 0.75,       // 0.68 m 以外渐弱、0.75 m 不转（手伸出去干别的）
