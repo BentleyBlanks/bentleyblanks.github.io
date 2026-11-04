@@ -503,7 +503,7 @@ async function CalibrateDadao() {
   const left = Palm(leftHand, leftMiddle, new THREE.Vector3());
   axisZ.copy(left).sub(right).normalize();                       // 刀的 +Z 朝刀尾（刀尖是 -Z）
   const fingers = new THREE.Vector3(); HandAxes(rightHand, rightMiddle, rightThumb, fingers, new THREE.Vector3());
-  axisY.copy(fingers).addScaledVector(axisZ, -fingers.dot(axisZ)).normalize().negate();   // 刃口（-Y）朝指节
+  axisY.copy(fingers).addScaledVector(axisZ, -fingers.dot(axisZ)).normalize();   // 刃口（+Y，Model_Dadao 实测薄刃那侧，同 Data_FpsDadaoSwing 的 sourceEdgeDirection）朝指节
   axisX.crossVectors(axisY, axisZ);
   const q = new THREE.Quaternion().setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
   const origin = right.clone().sub(DADAO_GRIP_R.clone().applyQuaternion(q));
