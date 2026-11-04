@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **PC 资产发布按路径自动处理（2026-11-05）**：配置 `Data_PublishPathRules.json`，默认递归发现发布副本的 `Model/` 与 `Texture/`，包括 GLB 内嵌图和 glTF 外链图；不再逐件登记压缩模型。目录规则控制格式／最大尺寸／质量，`source` 例外要写理由。每个输入必须有发布结果或明确保留原因，覆盖检查缺项会阻止发布。此规则不迁移目录或修改制作源；说明与验证见 [贴图管理](docs/Data_TextureImporter.md) 的自动 GPU 发布章节。
+
 - **场景文件：第一关白盒三段合一（2026-10-31）**：场景 = `Scenes/<Id>/Scene_<Id>.json`（物件只写资产编号 + 位置 / 朝向 / 尺寸 / 开关，资产目录 `Data_SceneAssets`）+ 同目录高度图 `.height.bin`。白盒编辑器第一关新剧本 01–05 / 06–10 / 11–18 的场地合成一个场景 `FirstLevelWhitebox`，**以场景文件为准**，人 / agent 直接改它，场景生成器（`scene FirstLevel0105` 等）退休；每段按原场地范围取一块建场，后面段落把前面出现过的信号当已发生。旧的三份 `Blockout/*.scene.json` 已删（git 历史 `763c66ea0` 还在）。格式、取一块的规矩、转换记录见 [场景文件](docs/Data_Scene.md)；门禁 `SceneDocTest` + 三段的 Scene / Keyframes / Previz 测试。同日用户还删了高级工具「场景」菜单里的场景关卡、地形编辑器、完整场景预览、采样点（构件目录挪到 `Script_PlaceableCatalog`，出图脚本改用不进菜单的 `Script_EditorShotCamera`）。
 - **第一关正式场景（2026-11-01）**：场景清单 `Data_SceneAssets.SCENE_LIST` 两个场景——`FirstLevelWhitebox`（编辑、预演）与 `FirstLevel`（试玩跑它，单独打磨细节）。正式场景照白盒布局复制（`Script_SceneForkFormal.mjs`），有正式资产的用正式的：`Prop/*` 外部道具模型、`Tree/*`、分层地表（`Data_SceneGroundLayers`）、枯草丛与碎砖瓦；**体块（房子、墙、工事）不是正式资产，仍是白盒灰面 + 米格线，别给它自己挑贴图外观**（用户 2026-11-01）；**转完以后它自己是唯一真相**，改正式场景直接改 `Scenes/FirstLevel/Scene_FirstLevel.json`，别回头重跑转换。口径 [场景文件 §8](docs/Data_Scene.md)；门禁 `SceneFormalTest` + `SceneFormalBrowserTest`。场景物件的 `group` 是「/」分层的层级路径（`06–10/建筑/WN1`），`hideOn` / `showOn` 写的是剧情事件，新事件名要在 `Data_SceneEvents` 补中文名；不可见、只挡玩家的墙统一叫**空气墙**。
 - **场景里的壕沟（2026-11-01）**：场景的沟是 `trenches.segments` 里的样条（高度图存没挖的地面，读场景时现挖），改沟就改控制点 / 断面，别去改高度图。护壁、踏板、射击位、杂物、土崖、土团、草根、碎土、干草、碎石每段单独开关调参数：先按剧情选表现套餐（`fresh` / `bare` / `abandoned` / `scrape`），再在 `details` 里单改；射击位挡人，人要走的沟先核对走位。参数表 [docs/Data_TrenchDetails.md](docs/Data_TrenchDetails.md)，格式 [场景文件 §9](docs/Data_Scene.md)。

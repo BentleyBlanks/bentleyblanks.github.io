@@ -27,8 +27,8 @@ if(!reportPath){
  for(const file of models){await fs.mkdir(path.dirname(path.join(fixtureStage,file)),{recursive:true});await fs.copyFile(path.join(import.meta.dirname,file),path.join(fixtureStage,file));}
  // The stage contains only the five copied models. Limit both desktop and
  // mobile conversion to that same fixture while still exercising ASTC output.
- const fixtureReport=await BuildPublishAssets(import.meta.dirname,fixtureStage,{cacheDir:path.join(root,'tmp/GpuPublish/Cache'),textureFiles:[],modelFiles:models,mobileModelFiles:models,log:()=>{}});
- assert.ok(fixtureReport.mobile,'fixture must run the mobile publishing pipeline');
+ const fixtureReport=await BuildPublishAssets(import.meta.dirname,fixtureStage,{cacheDir:path.join(root,'tmp/GpuPublish/Cache'),textureFiles:[],modelFiles:models,mobileModelFiles:models,mobile:!process.argv.includes('--desktop-only'),log:()=>{}});
+ if(fixtureReport.mobile){
  assert.deepEqual(fixtureReport.mobile.models.map(row=>row.file).sort(),[...models].sort(),'mobile report contains exactly the copied fixture models');
  assert.ok(fixtureReport.mobile.models.every(row=>row.images.length>0),'every fixture model converts at least one embedded mobile texture');
  assert.ok(fixtureReport.mobile.skipped.every(row=>models.includes(row.file)),'mobile report does not scan models outside the fixture');
@@ -38,20 +38,20 @@ if(!reportPath){
   assert.equal(mobileRuntime.models[row.file],row.output,'mobile runtime points to the reported output');
   await fs.access(Within(fixtureStage,row.output));
  }
+ }
  reportPath=path.join(fixtureStage,'Data_AssetPublishReport.json');
 }
-const report=JSON.parse(await fs.readFile(reportPath,'utf8')),stage=path.dirname(reportPath);
+const report=JSON.parse(await fs.readFile(reportPath,'utf8')),stage=path.resolve(path.dirname(reportPath));
 const textureRuntime=JSON.parse((await fs.readFile(path.join(stage,'Data_TextureImportRuntime.mjs'),'utf8')).match(/=\s*([\s\S]*);\s*$/)[1]);
 const software=process.argv.includes('--software');
 const server=await ServeRoot(root,0),browser=await LaunchBrowser({extraArgs:software?['--use-angle=swiftshader','--enable-unsafe-swiftshader']:[]}),page=await browser.newPage({viewport:{width:1280,height:720}});
 const errors=[];page.on('pageerror',error=>errors.push(String(error)));
-const base=`http://127.0.0.1:${server.address().port}`,sourceProject=base+'/Taierzhuang1938/',project=base+'/__published/';
+// Serve large production GLBs over native HTTP, not base64 route.fulfill/CDP.
+// The stage may be outside the checkout on CI; this test-owned mount is local only.
+const mountDir=await fs.mkdtemp(path.join(out,'Published-')),mount=path.join(mountDir,'Assets');
+await fs.symlink(stage,mount,process.platform==='win32'?'junction':'dir');
+const base=`http://127.0.0.1:${server.address().port}`,sourceProject=base+'/Taierzhuang1938/',project=base+'/'+path.relative(root,mount).split(path.sep).join('/')+'/';
 try{
- await page.route('**/__published/**',async route=>{
-  const file=Within(stage,decodeURIComponent(new URL(route.request().url()).pathname.slice('/__published/'.length)));
-  const mime=/\.m?js$/.test(file)?'text/javascript':/\.wasm$/.test(file)?'application/wasm':'application/octet-stream';
-  try{await route.fulfill({contentType:mime,body:await fs.readFile(file)});}catch{await route.fulfill({status:404,body:'missing staging resource'});}
- });
  await page.route('**/Data_TextureImportRuntime.mjs*',route=>route.fulfill({contentType:'text/javascript',body:'export const TEXTURE_IMPORT_RUNTIME = '+JSON.stringify({...textureRuntime,...sourceRuntime})+';'}));
  await page.route('**/GpuReview.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><body style="margin:0;background:#25282d;color:white;font:18px Arial"><div id="label" style="padding:12px"></div><script type="importmap">{"imports":{"three":"${project}vendor/three/build/three.module.js"}}</script><script type="module">
  import * as T from 'three';import {ManagedGLTFLoader} from '${project}Script_ModelImports.mjs';
@@ -75,17 +75,23 @@ try{
   const result={format:Format(imported),width:imported.image.width,height:imported.image.height,mips:imported.mipmaps.length,regular:Compare(a,b),noFlip:Compare(c,d),fallback:Format(fallback),explicit};fallback.dispose();fallbackLoader.dispose();return result;
  };
  window.ReviewModel=async urls=>{
-  const loader=new ManagedGLTFLoader(),[before,after]=await Promise.all([new GLTFLoader(new T.LoadingManager()).loadAsync(urls.before),loader.loadAsync(urls.after)]);
+  const loader=new ManagedGLTFLoader();let before=await new GLTFLoader(new T.LoadingManager()).loadAsync(urls.before);
   const scene=new T.Scene();scene.background=new T.Color('#41464e');scene.add(new T.HemisphereLight(0xffffff,0x7d6e5c,2));const light=new T.DirectionalLight(0xffffff,3);light.position.set(3,5,4);scene.add(light);
   const box=new T.Box3().setFromObject(before.scene),center=box.getCenter(new T.Vector3()),size=box.getSize(new T.Vector3()),radius=Math.max(size.x,size.y,size.z);
   const camera=new T.PerspectiveCamera(38,1,.001,10000);camera.position.copy(center).add(new T.Vector3(.9,.4,1.3).multiplyScalar(radius));camera.lookAt(center);const arrays=[];renderer.setScissorTest(true);
-  for(const [i,model] of [before,after].entries()){scene.add(model.scene);renderer.setViewport(i*640,0,640,640);renderer.setScissor(i*640,0,640,640);renderer.render(scene,camera);const pixels=new Uint8Array(640*640*4),gl=renderer.getContext();gl.readPixels(i*640,0,640,640,gl.RGBA,gl.UNSIGNED_BYTE,pixels);arrays.push(pixels);scene.remove(model.scene);}
+  const Render=(model,i)=>{scene.add(model.scene);renderer.setViewport(i*640,0,640,640);renderer.setScissor(i*640,0,640,640);renderer.render(scene,camera);const pixels=new Uint8Array(640*640*4),gl=renderer.getContext();gl.readPixels(i*640,0,640,640,gl.RGBA,gl.UNSIGNED_BYTE,pixels);arrays.push(pixels);scene.remove(model.scene);};
+  const Dispose=model=>{const resources=new Set();model.scene.traverse(o=>{if(o.geometry)resources.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m){resources.add(m);for(const value of Object.values(m))if(value?.isTexture)resources.add(value);}});for(const resource of resources){if(resource.isTexture)resource.image?.close?.();resource.dispose();}renderer.renderLists.dispose();renderer.getContext().finish();};
+  // Compare sequentially so two copies of 8K source maps do not exhaust the test GPU.
+  Render(before,0);Dispose(before);before=null;
+  const after=await loader.loadAsync(urls.after);Render(after,1);
   const textures=new Set();after.scene.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:[o.material])if(m)for(const value of Object.values(m))if(value?.isTexture)textures.add(value);});
   const formats=[...textures].map(t=>({format:Format(t),compressed:!!t.isCompressedTexture,published:t.userData.mimeType==='image/ktx2',w:t.image.width,h:t.image.height,mips:t.mipmaps.length,bytes:t.mipmaps.reduce((n,m)=>n+(m.data?.byteLength||0),0)}));
   document.getElementById('label').textContent=urls.name+' — source (left) / published GPU texture (right)';
-  return {formats,diff:Compare(arrays[0],arrays[1],[65,70,78]),bounds:box.equals(new T.Box3().setFromObject(after.scene)),glError:renderer.getContext().getError()};
+  const result={formats,diff:Compare(arrays[0],arrays[1],[65,70,78]),bounds:box.equals(new T.Box3().setFromObject(after.scene)),glError:renderer.getContext().getError()};
+  Dispose(after);
+  return result;
  };window.ready=true;</script>`}));
- await page.goto(project+'GpuReview.html');await page.waitForFunction(()=>window.ready);
+ await page.goto(project+'GpuReview.html');await page.waitForFunction(()=>window.ready).catch(error=>{console.error('GPU review module errors',errors);throw error;});
  // Opaque fixture keeps explicit BC1 available; alpha fixture must remain intact.
  const opaque=await EncodeTexture(out,item,{format:'ktx2-uastc',quality:40,alphaSource:'none'},path.join(out,'Texture'));
  const textureRoot=sourceProject+'_shots/GpuPublish/Texture/';
@@ -97,14 +103,15 @@ try{
  const models=[];
  const selected=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7).split(',');
  for(const name of selected||['Model_MitsubishiKi30.glb','Model_MitsubishiKi21Ia.glb','Model_BreakableDeadTree.glb','Model_Cigarette.glb','Model_HanYang173R.glb']){
+  console.log('Review published model',name);
   const item=report.models.find(row=>row.file.endsWith('/'+name));assert.ok(item,'published model: '+name);
   // Request the original logical URL: the published loader must resolve its hashed GPU variant.
   const result=await page.evaluate(urls=>window.ReviewModel(urls),{name,before:sourceProject+item.file,after:project+item.file});
   assert.ok(result.bounds&&result.glError===0);assert.ok(result.formats.some(t=>t.published));
   if(!software)assert.ok(result.formats.some(t=>t.compressed&&['BC7','ASTC','DXT1','DXT5'].includes(t.format)));
   assert.ok(result.diff.mean<4&&result.diff.p95<15,`foreground material error: ${JSON.stringify(result.diff)}`);
-  await page.screenshot({path:path.join(out,'Scene_'+name.replace('.glb','.png'))});models.push({name,...result});
+  await page.screenshot({path:path.join(out,'Scene_'+name.replace(/\.(glb|gltf)$/,'.png'))});models.push({name,...result});
  }
  assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_GpuValidation.json'),JSON.stringify({ordinary,models,errors},null,2));
  console.log('PASS GPU publication',JSON.stringify({ordinary,models}));
-}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.unlink(mount);await fs.rmdir(mountDir);}

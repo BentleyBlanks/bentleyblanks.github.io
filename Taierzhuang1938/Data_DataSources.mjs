@@ -13,6 +13,7 @@
 const RULE = (match, role, by, note) => Object.freeze({ match, role, by: Object.freeze(by), note });
 
 export const DATA_SOURCE_RULES = Object.freeze([
+  RULE("Data_PublishPathRules.json", "source", ["Script_PublishAssetPaths.mjs"], "PC 发布路径规则：递归发现模型和图片，后面的匹配规则覆盖格式、质量与尺寸；不逐件登记模型"),
   // --- 关卡内容 ---------------------------------------------------------------------------------------------
   RULE("Scenes/*/Environment_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],
     "场景的环境：昼夜时钟默认值 + 区域列表（区域引用环境预设、管影响范围）。环境编辑器经本机 /__environment/save 存，agent 直接改它（docs/Data_Environment.md §4）"),

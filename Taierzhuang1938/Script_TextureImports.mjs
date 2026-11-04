@@ -7,9 +7,14 @@ let renderer, ktxPromise, mobileAssets = null;
 export function SetTextureImportRenderer(value) {
   renderer = value;
   mobileAssets = null;
-  THREE.DefaultLoadingManager.setURLModifier((url) => ResolveTextureImportUrl(url));
+  THREE.DefaultLoadingManager.setURLModifier((url) => {const entry=TextureImportOf(url);return entry?.managedOnly?url:ResolveTextureImportUrl(url,entry);});
+}
+function ReplacePublicationPath(url, before, after) {
+  const text=String(url), index=text.lastIndexOf(before);
+  return index<0?url:text.slice(0,index)+after+text.slice(index+before.length);
 }
 export function ResolveTextureImportUrl(url, entry = TextureImportOf(url)) {
+  if(entry?.publicationFile)return ReplacePublicationPath(url,entry.publicationFile,entry.publicationOutput);
   return entry?.output ? String(url).replace(/Texture\/[^?#]+/, `Texture/${entry.output}`) : url;
 }
 
@@ -51,7 +56,8 @@ export function ResolvePublishedModelUrl(url) {
 }
 export function TextureImportOf(url) {
   const pathname = String(url).split(/[?#]/)[0];
-  const entry = TEXTURE_IMPORT_RUNTIME[pathname.slice(pathname.lastIndexOf("/Texture/") + 9)]
+  const modelIndex=pathname.lastIndexOf('Model/');
+  const entry = (modelIndex>=0 && TEXTURE_IMPORT_RUNTIME[pathname.slice(modelIndex)]) || TEXTURE_IMPORT_RUNTIME[pathname.slice(pathname.lastIndexOf("/Texture/") + 9)]
     || TEXTURE_IMPORT_RUNTIME[pathname.replace(/^\.\/Texture\//, "")];
   return SelectTextureImportVariant(entry);
 }
@@ -80,6 +86,7 @@ export function ApplyTextureImport(texture, entry, device = renderer) {
 }
 export function ImportedSidecarUrl(url, filename) {
   const absolute = new URL(url, globalThis.location?.href || import.meta.url);
+  if(filename.startsWith('Model/')) {const index=absolute.pathname.lastIndexOf('Model/');absolute.pathname=absolute.pathname.slice(0,index)+filename;absolute.search='';return absolute.href;}
   absolute.pathname = absolute.pathname.includes("/Texture/") ? absolute.pathname.replace(/Texture\/.*$/, `Texture/${filename}`) : absolute.pathname.replace(/[^/]+$/, filename.split("/").at(-1));
   absolute.search = ""; return absolute.href;
 }
@@ -138,7 +145,7 @@ export class ManagedTextureLoader extends THREE.TextureLoader {
     }, onProgress, onError);
     const texture = new THREE.CompressedTexture();
     texture.flipY = false;
-    const sourceUrl = this.importFlipY ? url : url.replace(/Texture\/[^?]+/, `Texture/${entry.unflipped}`);
+    const sourceUrl = this.importFlipY ? url : entry.publicationFile?ImportedSidecarUrl(url,entry.unflipped):url.replace(/Texture\/[^?]+/, `Texture/${entry.unflipped}`);
     LoadKtxTexture(sourceUrl, entry.format).then(async loaded => {
       texture.image = loaded.image; texture.mipmaps = loaded.mipmaps;
       texture.format = loaded.format; texture.type = loaded.type;

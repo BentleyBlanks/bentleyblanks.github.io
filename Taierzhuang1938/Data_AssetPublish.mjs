@@ -9,16 +9,7 @@ export const ASSET_PUBLISH = Object.freeze({
   // Avoid spending encoder time on images already far smaller than GPU blocks.
   // Explicit import settings bypass automatic policy and can force a GPU format.
   minSourceToGpuRatio: 0.2,
-  // These are production models. Reference/review models and unused legacy assets remain source-only.
-  models: Object.freeze([
-    'Model/HanYang173R/Model_HanYang173R.glb',
-    'Model/BaconHandoff/Model_CuredPork.glb',
-    ...['Ija01','Ija02','Ija03','Ija06','Nra02','Nra05','Nra06'].map(id => `Model/Character/Model_Tengxian${id}.glb`),
-    ...['AsianHousePair','AsianHouseRow','BreakableDeadTree','ChineseRuralHouse','Cigarette',
-      'FirstPersonBody','FpsArmsNraSkeletal01','FpsHanYangHands','MitsubishiKi21Ia','MitsubishiKi30','Type24Grenade','WardProps']
-      .map(id => `Model/Model_${id}.glb`),
-    ...['WoodenEvacCart','WorkingHorse','WorkingOx'].map(id => `Model/OxCart/Model_${id}.glb`),
-  ]),
+  // PC models/images are discovered recursively from Data_PublishPathRules.json.
 });
 
 // 手机版贴图（2026-10-26 用户定：手机上大部分贴图 1024 + ASTC 6×6；法线图 1024 + ASTC 4×4，6×6 压法线会起颗粒）。

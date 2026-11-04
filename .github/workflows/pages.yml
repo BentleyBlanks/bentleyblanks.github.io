@@ -49,21 +49,24 @@ jobs:
         run: |
           npm install --ignore-scripts --no-package-lock --no-audit --no-fund
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
+          node Taierzhuang1938/Script_PublishAssetPathsTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
           node scripts/Script_PublishScopeTest.mjs
           git archive HEAD Taierzhuang1938 Model/StrawSleepingMat/Model_StrawSleepingMatFlat.glb Model/StrawSleepingMat/Model_StrawSleepingMatRolled.glb | tar -x -C "$RUNNER_TEMP/pages"
+          node scripts/Script_PublishPrune.mjs "$RUNNER_TEMP/pages"
       - uses: actions/cache/restore@v4
         id: gpu-assets
         with:
           path: ${{ runner.temp }}/tengxian-gpu-cache
-          key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**/*.glb', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
+          key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Data_PublishPathRules.json', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
           restore-keys: |
+            tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Data_PublishPathRules.json', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}-
             tengxian-gpu-${{ runner.os }}-v1-
       - name: Build and validate GPU publication assets
         run: |
           set -o pipefail
           # Keep live encoder output and expose the actionable error in check annotations.
-          if node Taierzhuang1938/Script_BuildPublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache" 2>&1 | tee "$RUNNER_TEMP/gpu-build.log"; then
+          if node Taierzhuang1938/Script_BuildPublishAssets.mjs --desktop-only --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache" 2>&1 | tee "$RUNNER_TEMP/gpu-build.log"; then
             :
           else
             message=$(tail -c 6000 "$RUNNER_TEMP/gpu-build.log")
@@ -76,10 +79,12 @@ jobs:
           node Taierzhuang1938/Script_ValidatePublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
           node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### GPU assets\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache,retained:r.skipped.length},null,2)+"\n```\n");'
       - uses: actions/cache/save@v4
-        if: steps.gpu-assets.outputs.cache-hit != 'true'
+        # Preserve completed, individually verified encodings even after an error
+        # or superseding push. Unique snapshots can grow an earlier partial cache.
+        if: always() && steps.gpu-assets.outcome == 'success'
         with:
           path: ${{ runner.temp }}/tengxian-gpu-cache
-          key: ${{ steps.gpu-assets.outputs.cache-primary-key }}
+          key: ${{ steps.gpu-assets.outputs.cache-primary-key }}-${{ github.run_id }}-${{ github.run_attempt }}
       # 仓库里的 import map 只登记、不写 ?v=：按每个文件此刻的内容盖戳（排在 GPU 资源改写之后、打包读 index.html 之前）。
       - name: Stamp the Tengxian import maps by content
         run: node Taierzhuang1938/Script_StampImportMaps.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"

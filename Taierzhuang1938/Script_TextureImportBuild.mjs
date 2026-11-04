@@ -91,7 +91,10 @@ export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRd
             if (settings.mipBorder) args.push("-mip_clamp");
             if (settings.textureType === "normal") args.push("-mip_renorm");
           }
-          await run(encoder.executable, args, { timeout: 180000, windowsHide: true, maxBuffer: 1024 * 1024 });
+          // Full-resolution PC assets include 8K maps. Keep the 4K allowance and
+          // scale it by pixel count; changing a time limit does not alter encoding.
+          const timeout = Math.max(180000, Math.ceil(levels[level].width * levels[level].height / (4096 * 4096)) * 180000);
+          await run(encoder.executable, args, { timeout, windowsHide: true, maxBuffer: 1024 * 1024 });
           const bytes = await fs.readFile(encoded);
           if (customMips) containers.push(ReadKtx(new Uint8Array(bytes)));
           else await fs.writeFile(output, bytes);

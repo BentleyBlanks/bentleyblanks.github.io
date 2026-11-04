@@ -9,6 +9,15 @@ export class ManagedGLTFLoader extends GLTFLoader {
     this.setKTX2Loader({load(url, onLoad, _onProgress, onError) {
       LoadKtxTexture(url).then(onLoad, onError);
     }});
+    this.register(parser=>({
+      name:'KHR_texture_basisu',
+      loadTexture(index) {
+        const source=parser.json.textures[index].extensions?.KHR_texture_basisu?.source;
+        if(source===undefined)return null;
+        const format=parser.json.images[source].extras?.publicationFormat||'ktx2-uastc';
+        return parser.loadTextureImage(index,source,{load(url,onLoad,_progress,onError){LoadKtxTexture(url,format).then(onLoad,onError);}});
+      },
+    }));
   }
   load(url, onLoad, onProgress, onError) {
     return super.load(ResolvePublishedModelUrl(url), onLoad, onProgress, onError);
