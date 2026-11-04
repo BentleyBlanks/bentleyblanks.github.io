@@ -211,6 +211,19 @@ export function PlayerDebugApi(ctx) {
         stats: { ...ctx.identify.stats },
         cone: IDENTIFY.coneDeg,
       }),
+      // 开镜摇摆（2026-11-05）：给 enabled 就开关整套摇摆（视线呼吸漂移 + 照门惯性 / 走动晃动）；
+      // 无关弹道、姿态的测试用 AimSway(false) 把它关掉。返回的都是拷贝。
+      AimSway: (enabled) => {
+        if (enabled !== undefined) ctx.viewmodel.aimSwayEnabled = !!enabled;
+        return {
+          enabled: ctx.viewmodel.aimSwayEnabled,
+          holdDrift: { ...ctx.viewmodel.holdDrift },
+          sightSway: { ...ctx.viewmodel.sightSway },
+          condition: ctx.player.SwayCondition(ctx.viewmodel.weapon),
+          gasp: ctx.player.breathGasp,
+          breathHold: ctx.player.breathHold,
+        };
+      },
       AdsOffset: () => ({ x: ctx.viewmodel.adsOffset.x, y: ctx.viewmodel.adsOffset.y }),
       Ammo: () => ({ ammo: ctx.state.ammo, clips: ctx.state.clips, grenades: ctx.state.grenades, bundles: ctx.state.bundles }),
       // --- 枪感第 2 轮的取证口 ---

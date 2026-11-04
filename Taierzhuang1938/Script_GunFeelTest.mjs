@@ -271,6 +271,114 @@ Check("开镜按住 Shift 会屏息并自然放大约 1.1×，松开后恢复",
     && report.breathFov.adsFov / report.breathFov.heldFov <= 1.13
     && Math.abs(report.breathFov.releasedFov - report.breathFov.adsFov) < 0.02,
   `${report.breathFov.adsFov.toFixed(2)}° -> ${report.breathFov.heldFov.toFixed(2)}° -> ${report.breathFov.releasedFov.toFixed(2)}°`);
+// 开镜摇摆（2026-11-05，照 COD）：静止时整条视线呼吸、照门仍在屏幕中心；屏息稳、松开喘；
+// 转向 / 走动时照门短暂偏开，子弹跟着照门走。
+// 重开一页：前面的冲刺、开火把人带离了出生点，这里要一块站得住的地。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
+const sway = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug, DEG = 180 / Math.PI;
+  T.player.health = 100;
+  T.player.spawnGrace = 99;
+  for (const soldier of T.ai.soldiers) if (soldier.side === "ija") soldier.position.x += 500;
+  D.Key("ShiftLeft", false); D.Key("KeyW", false); D.Mouse(2, false);
+  T.player.stamina = 1; T.player.suppression = 0; T.player.SetStance("stand");
+  T.player.aimYaw = 0; T.player.aimPitch = 0;
+  T.StepFrames(60);
+  T.viewmodel.Equip("HanYang");
+  T.player.yaw = 0; T.player.pitch = 0;
+  D.Mouse(2, true);
+  // 出生后约 7 s 战场会有一次近弹（压制 + 视角被踢一下），等它过去再量静止的摇摆。
+  Array.from({ length: 420 }, () => { T.player.yaw = 0; T.player.pitch = 0; T.StepFrames(1); });
+  T.player.stamina = 1; T.player.suppression = 0;
+
+  const pixels = (p) => ({ x: p.x * innerWidth * 0.5, y: p.y * innerHeight * 0.5 });
+  const Sights = () => {
+    T.camera.updateMatrixWorld(true);
+    const vm = T.viewmodel, rear = vm.rig.sight.clone(), axis = vm.rig.sight.clone();
+    axis.z -= 0.40;
+    vm.rig.group.localToWorld(rear); vm.rig.group.localToWorld(axis);
+    rear.project(T.camera); axis.project(T.camera);
+    const target = T.player.EyePosition.clone().addScaledVector(T.player.AimDirection(), 100).project(T.camera);
+    const r = pixels(rear), a = pixels(axis), t = pixels(target);
+    return { rearError: Math.hypot(r.x, r.y), axis: a, aimGap: Math.hypot(a.x - t.x, a.y - t.y), rearGap: Math.hypot(r.x - t.x, r.y - t.y) };
+  };
+  const Run = (frames, fn) => { for (let i = 0; i < frames; i += 1) { fn(i); T.StepFrames(1); } };
+
+  const idle = { min: Infinity, max: -Infinity, abs: 0, sights: [] };
+  let restedCondition = 0;
+  Run(360, (i) => {
+    T.player.yaw = 0; T.player.pitch = 0;
+    if (i >= 60) {
+      const p = D.AimSway().holdDrift.pitch;
+      idle.min = Math.min(idle.min, p); idle.max = Math.max(idle.max, p); idle.abs = Math.max(idle.abs, Math.abs(p));
+    }
+    if (i === 150 || i === 250 || i === 340) idle.sights.push(Sights());
+    if (i === 340) restedCondition = D.AimSway().condition;
+  });
+
+  D.Key("ShiftLeft", true);
+  let heldMax = 0, heldFrames = 0;
+  Run(156, (i) => { T.player.yaw = 0; T.player.pitch = 0; if (i >= 36) heldMax = Math.max(heldMax, Math.abs(D.AimSway().holdDrift.pitch)); });
+  const heldHolding = T.player.breathHold;
+  for (let i = 0; i < 900 && T.player.breathHold; i += 1) { T.StepFrames(1); heldFrames += 1; }
+  D.Key("ShiftLeft", false);
+  T.StepFrames(2);
+  const gasp = D.AimSway();
+  T.StepFrames(300);
+  const gaspAfter = D.AimSway();
+
+  T.player.yaw = 0; T.player.pitch = 0;
+  T.StepFrames(60);
+  let turnPeak = 0, turnPeakGap = 0, turnPeakAngle = 0, turnAngleErr = 0, turnHonesty = 0;
+  Run(18, (i) => {
+    D.Look(30, 0);
+    if (i >= 6) {
+      const s = D.AimSway().sightSway, mag = Math.hypot(s.yaw, s.pitch);
+      const angle = T.player.AimDirection().angleTo(T.player.ViewDirection());
+      turnPeak = Math.max(turnPeak, Math.abs(s.yaw));
+      turnAngleErr = Math.max(turnAngleErr, Math.abs(angle - mag) * DEG);
+      turnPeakAngle = Math.max(turnPeakAngle, angle);
+      turnHonesty = Math.max(turnHonesty, Sights().rearGap);
+    }
+  });
+  const turnMid = D.AimSway().sightSway;
+  T.StepFrames(60);
+  const turnAfter = D.AimSway().sightSway;
+
+  T.player.yaw = 0; T.player.pitch = 0;
+  T.StepFrames(30);
+  D.Key("KeyW", true);
+  let walkPeak = 0, walkPitchPeak = 0;
+  Run(90, (i) => { const s = D.AimSway().sightSway; walkPeak = Math.max(walkPeak, Math.abs(s.yaw)); walkPitchPeak = Math.max(walkPitchPeak, Math.abs(s.pitch)); });
+  D.Key("KeyW", false);
+  D.Mouse(2, false);
+  return {
+    idle: { p2pDeg: (idle.max - idle.min) * DEG, maxDeg: idle.abs * DEG, sights: idle.sights, restedCondition },
+    held: { holding: heldHolding, maxDeg: heldMax * DEG, heldFrames, gasp: gasp.gasp, condition: gasp.condition,
+      gaspAfter: gaspAfter.gasp },
+    turn: { peakDeg: turnPeak * DEG, angleErrDeg: turnAngleErr, angleDeg: turnPeakAngle * DEG, honestyPx: turnHonesty,
+      midDeg: Math.hypot(turnMid.yaw, turnMid.pitch) * DEG, afterDeg: Math.hypot(turnAfter.yaw, turnAfter.pitch) * DEG },
+    walk: { peakYawDeg: walkPeak * DEG, peakPitchDeg: walkPitchPeak * DEG },
+  };
+});
+console.log(JSON.stringify(sway));
+Check("开镜静止：整条视线呼吸（HanYang 6 s 俯仰峰峰 0.4–1.6°），照门仍在屏幕中心",
+  sway.idle.p2pDeg >= 0.4 && sway.idle.p2pDeg <= 1.6
+    && sway.idle.sights.length === 3 && sway.idle.sights.every((s) => s.rearError <= 1.5
+      && Math.hypot(s.axis.x - sway.idle.sights[0].axis.x, s.axis.y - sway.idle.sights[0].axis.y) <= 1.5),
+  `p2p ${sway.idle.p2pDeg.toFixed(2)}° · 后照门偏心 ${sway.idle.sights.map((s) => s.rearError.toFixed(2)).join(" ")} px`);
+Check("屏息把摇摆压到静止的一半以下，松开后喘气并抬高摇摆",
+  sway.held.holding && sway.held.maxDeg <= sway.idle.maxDeg * 0.5
+    && sway.held.gasp > 0.5 && sway.held.condition > sway.idle.restedCondition * 1.4,
+  `屏息峰值 ${sway.held.maxDeg.toFixed(2)}° / 静止 ${sway.idle.maxDeg.toFixed(2)}° · 喘气 ${sway.held.gasp.toFixed(2)} · 摇摆系数 ${sway.idle.restedCondition.toFixed(2)} -> ${sway.held.condition.toFixed(2)}`);
+Check("开镜转向：照门短暂落后，子弹跟着照门走，停下 1 s 后归位",
+  sway.turn.peakDeg >= 0.15 && sway.turn.angleErrDeg <= 0.01 && sway.turn.honestyPx <= 2 && sway.turn.afterDeg < 0.01,
+  `落后 ${sway.turn.peakDeg.toFixed(2)}° · 瞄准-视线夹角误差 ${sway.turn.angleErrDeg.toFixed(4)}° · 后照门与瞄准方向相距 ${sway.turn.honestyPx.toFixed(2)} px · 1 s 后 ${sway.turn.afterDeg.toFixed(4)}°`);
+Check("开镜走动：照门随步伐晃动",
+  sway.walk.peakYawDeg >= 0.15,
+  `偏航峰值 ${sway.walk.peakYawDeg.toFixed(2)}° · 俯仰峰值 ${sway.walk.peakPitchDeg.toFixed(2)}°`);
 Check("页面无运行时错误", errors.length === 0, errors.join(" | "));
 
 await browser.close();

@@ -109,9 +109,15 @@ report.wall = await page.evaluate(() => {
     T.Debug.Fire();
     const shot = range.LastShot();
     if (T.state.playerShots !== before + 1) throw new Error("Wall trigger did not fire");
-    const radius = Math.tan(shot.spreadRad / 2) * (eye.x - shot.end[0]);
-    samples.push({ x: (shot.end[2] - eye.z) / radius,
-      y: (shot.end[1] - eye.y) / radius, wall: shot.hitKind === "wall",
+    // Idle sway moves the aim, so each hit is measured against the trigger-time aim.
+    const aim = eye.clone().set(...shot.aimAtTrigger).normalize();
+    const rightAxis = aim.clone().cross(eye.clone().set(0, 1, 0)).normalize();
+    const upAxis = rightAxis.clone().cross(aim).normalize();
+    const offset = { x: shot.end[0] - eye.x, y: shot.end[1] - eye.y, z: shot.end[2] - eye.z };
+    const dot = (v, a) => v.x * a.x + v.y * a.y + v.z * a.z;
+    const radius = Math.tan(shot.spreadRad / 2) * dot(offset, aim);
+    samples.push({ x: dot(offset, rightAxis) / radius,
+      y: dot(offset, upAxis) / radius, wall: shot.hitKind === "wall",
       originError: Math.hypot(...shot.from.map((v, j) => v - eye.toArray()[j])),
       triggerError: Math.hypot(...shot.aimDirection.map((v, j) => v - shot.aimAtTrigger[j])) });
     T.StepFrames(150 + i % 11, 1 / 60, false);

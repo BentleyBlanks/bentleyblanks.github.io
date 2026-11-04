@@ -27,9 +27,21 @@
 
 用户反馈：稍快地转镜头枪就大幅晃动，停下时还有一个大回弹。原因是旧的欠阻尼弹簧（阻尼比 0.42）：一次约 125°/s 的转身枪偏 5.2°、停下后反向回弹 1.2°、来回晃约 1 秒，最大能偏 12.6°。
 
-现在照 COD 引擎（COD2 / WaW / COD4 同一套 `BG_CalculateWeaponPosition_Sway` + `DiffTrack`，读的是 KisakCOD 反编译源码）实现在 `Script_FirearmHandling.LookSway`：这一帧视角转了多少，先折成「度 / (1/60 s)」再限幅，乘比例得到枪该落后多少（转向与位移都落在转向后面），再用一阶跟随追过去 —— 一阶跟随数学上不会过冲，停手就是平顺回位。数值取 WaW 栓动步枪 Kar98k 的武器文件（`swayMaxAngle 5`、`swayLerpSpeed 5`、俯仰/偏航比例 0.1、横 0.08 in、纵 0.12 in），唯一来源 `Data_Tuning_FirearmHandling.LOOK_SWAY`；各枪 `Data_Weapons.swayScale` 照乘，开镜仍没有转视角摇摆（2026-08-21 的中心瞄准口径）。实测同一次转身：偏转 0.19°、回弹 0、0.25 s 回稳，20/30/60 fps 一致。
+现在照 COD 引擎（COD2 / WaW / COD4 同一套 `BG_CalculateWeaponPosition_Sway` + `DiffTrack`，读的是 KisakCOD 反编译源码）实现在 `Script_FirearmHandling.LookSway`：这一帧视角转了多少，先折成「度 / (1/60 s)」再限幅，乘比例得到枪该落后多少（转向与位移都落在转向后面），再用一阶跟随追过去 —— 一阶跟随数学上不会过冲，停手就是平顺回位。数值取 WaW 栓动步枪 Kar98k 的武器文件（`swayMaxAngle 5`、`swayLerpSpeed 5`、俯仰/偏航比例 0.1、横 0.08 in、纵 0.12 in），唯一来源 `Data_Tuning_FirearmHandling.LOOK_SWAY`；各枪 `Data_Weapons.swayScale` 照乘，开镜仍没有转视角摇摆（2026-08-21 的中心瞄准口径；2026-11-05 起被下面「开镜摇摆」取代，腰射这套不变）。实测同一次转身：偏转 0.19°、回弹 0、0.25 s 回稳，20/30/60 fps 一致。
 
 验收：`Script_FirearmHandlingTest.mjs`（限幅、不过冲且单调回位、鼠标分帧抖动被滤掉、各帧率一致、开镜为零）。
+
+## 开镜摇摆（2026-11-05，照 COD）
+
+用户（2026-11-05）：「开镜完全稳定很假，要对标 COD」。根因：开镜时腰射的转向摇摆、走路晃动、站定呼吸三条都乘 `(1 - adsVisual)` 归零，只有汉阳造有一份 `FPS_ADS_FLOAT`（走动时淡掉），`Player.SwayAmount`（姿态 / 体力 / 压制 / 臂伤 / 屏息 / 两脚架）一个像素都没驱动，按 Shift 屏息什么也稳不了。现在分两层，守住 2026-08-21 的契约：**停稳（鼠标不动、人不走）的满开镜铁瞄仍在屏幕中心，子弹始终打向照门指的方向。**
+
+- **A 层：整条视线呼吸（所有枪）。** `AimIdleSway`（`Script_FirearmHandling`）输出俯仰 / 偏航角，经 `viewmodel.holdDrift` 同时转相机并加进 `Player.holdDriftPitch/Yaw`（`ViewDirection` 与 `AimDirection` 都读）。枪是相机的子物体，所以手、照门、准星在画面里不动，动的是世界。呼吸 8 字（水平 0.20 Hz、体力见底 0.34 Hz，垂直两倍频）+ 慢游走 + 细颤；开镜满幅，腰射 ×0.5，走动 ×0.5，拉栓落低时淡出；种类限 `AIM_IDLE_SWAY.kinds`（栓动 / 轻机枪 / 重机枪 / 手枪），上了固定枪位不算。幅度乘 `Player.SwayCondition`（姿态、体力、压制、臂伤、屏息、两脚架、喘气，不含开镜折扣），1 阶平滑 0.35 s，状态突变不会跳。
+- **B 层：照门摇摆（转向惯性 + 走动晃动）。** 只转 `viewmodel.root`（在 FOV 压扁层之上，屏幕角 = 施加角，枪口焰与抛壳自动跟随），静止时归零：`ADS_LOOK_SWAY` 与腰射同一个 COD DiffTrack 模型（`LookSway`，数学没改），只转不平移，限幅 4°/帧 × 0.5（最多落后 2°），一阶回位无过冲；`ADS_MOVE_BOB` 是走动时随步伐的零均值晃动（满步幅偏航 1.0°、俯仰 0.6°、横滚 1.5°，蹲姿 ×0.55）。`Player.AimDirection`（不是 `ViewDirection`）加同一角度（`sightSwayPitch/Yaw`），所以转向 / 走动时照门短暂偏开，子弹跟着照门走。腰射的枪身摇摆（swayPivot）仍不影响弹道。
+- **屏息与喘气。** 屏息把 `SwayCondition` 乘 `SWAY.breathHold`（0.28），摇摆立刻压到约三成。松开要付喘气的代价（COD `player_breath_gasp`）：按得越久（满值 `SWAY.gaspFullHoldS` 2.5 s）松开后 `breathGasp` 越高，摇摆乘 `1 + breathGasp × gaspGain`，再按 `gaspRecoverS`（1.6 s）落回。呼吸速率随体力消耗变快。
+
+数值：`Data_Tuning_FirearmHandling` 的 `ADS_LOOK_SWAY` / `ADS_MOVE_BOB` / `AIM_IDLE_SWAY`，喘气在 `Data_Tuning_Player.SWAY`。`FPS_ADS_FLOAT` 已删。关闭整套（弹道 / 姿态等无关测试）：`Debug.AimSway(false)`；`Debug.AimSway()` 读 `holdDrift`、`sightSway`、摇摆系数、喘气（都是拷贝）。
+
+验收：`Script_FirearmHandlingTest.mjs`（ADS 转向惯性限幅 / 不过冲 / 帧率一致、视线呼吸幅度与帧率无关、屏息与体力、状态突变不跳、走动晃动零均值）；`Script_GunFeelTest.mjs`（汉阳造开镜呼吸峰峰、静止照门仍在中心、屏息压低与喘气、转向 / 走动照门偏开且后照门与瞄准方向相距 ≤ 2 px、停下 1 s 归位）；`Script_FixedCenterAimTest.mjs` 的墙面弹着点改为相对扳机时刻的瞄准方向量（视线呼吸会移动瞄准方向，子弹要对准的是瞄准方向）。
 
 ## 枪口焰与瞬时照明（2026-09-14 起，2026-10-21 重做）
 

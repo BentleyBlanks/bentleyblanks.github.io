@@ -1,4 +1,4 @@
-import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY, LOOK_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
+import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY, LOOK_SWAY, AIM_IDLE_SWAY, ADS_MOVE_BOB } from "./Data_Tuning_FirearmHandling.mjs";
 
 const Clamp01 = (value) => Math.max(0, Math.min(1, value));
 export const IsAutomaticGun = (weapon) => weapon?.kind === "lmg" || weapon?.kind === "hmg";
@@ -99,4 +99,45 @@ export class LookSway {
     this.strafeRoll += (-(strafe || 0) * S.strafeRollRad * gain - this.strafeRoll) * (1 - Math.exp(-S.strafeLerpSpeed * dt));
     return this;
   }
+}
+
+const Mix = (a, b, t) => a + (b - a) * t;
+const TAU = Math.PI * 2;
+
+// Idle sway of the whole line of sight (camera + aim together). Breathing is a
+// figure 8 on a phase accumulator (rate changes never jump), plus slow wander and
+// fine tremor. `level` follows the stance / stamina / breath condition, `weight`
+// the aimed / moving / reloading state, both with first-order smoothing.
+export class AimIdleSway {
+  constructor(tuning = AIM_IDLE_SWAY) { this.tuning = tuning; this.Reset(); }
+  Reset() { this.weight = 0; this.level = 1; this.breathPhase = 0; this.pitch = 0; this.yaw = 0; return this; }
+  // Returns { pitch, yaw } in radians (pitch + = up, yaw + = left).
+  Step(dt, { elapsed = 0, ads = 0, gait = 0, cycleAway = 0, active = true, condition = 1, exertion = 0 } = {}) {
+    const out = { pitch: this.pitch, yaw: this.yaw };
+    if (!(dt > 1e-5)) return out;
+    const S = this.tuning;
+    this.level += (condition - this.level) * (1 - Math.exp(-dt / S.conditionS));
+    const target = active ? Mix(S.hipScale, 1, ads) * Mix(1, S.moveKeep, gait) * (1 - cycleAway) : 0;
+    this.weight += (target - this.weight) * (1 - Math.exp(-dt / S.blendS));
+    this.breathPhase += dt * TAU * Mix(S.breathHzRest, S.breathHzTired, Clamp01(exertion));
+    const b = this.breathPhase, e = elapsed, share = S.wanderShare;
+    const [w0, w1] = S.wanderHz, [t0, t1] = S.tremorHz;
+    const pitchDeg = S.adsPitchDeg * ((1 - share) * Math.sin(2 * b) + share * Math.sin(TAU * w0 * e + 0.9))
+      + S.tremorDeg * (0.6 * Math.sin(TAU * t0 * e) + 0.4 * Math.sin(TAU * t1 * e + 1.3));
+    const yawDeg = S.adsYawDeg * ((1 - share) * Math.sin(b + 0.6) + share * Math.sin(TAU * w1 * e + 2.1))
+      + S.tremorDeg * (0.6 * Math.sin(TAU * t1 * e + 0.4) + 0.4 * Math.sin(TAU * t0 * e + 2.2));
+    this.pitch = pitchDeg * DEG * this.level * this.weight;
+    this.yaw = yawDeg * DEG * this.level * this.weight;
+    return { pitch: this.pitch, yaw: this.yaw };
+  }
+}
+
+// Aimed walking bob: zero-mean sway of the sights on the step phase (radians out).
+export function AdsMoveBob(phase, weight, tuning = ADS_MOVE_BOB) {
+  const k = weight * DEG;
+  return {
+    yaw: -Math.sin(phase) * tuning.yawDeg * k,
+    pitch: Math.sin(2 * phase) * tuning.pitchDeg * k,
+    roll: -Math.sin(phase) * tuning.rollDeg * k,
+  };
 }

@@ -34,13 +34,41 @@ export const WALL_CARRY = Object.freeze({
 // tracker at lerpSpeed per second, so it settles without overshoot. Values are
 // WaW's Kar98k hip weapon file (swayMaxAngle 5, swayLerpSpeed 5, swayPitchScale /
 // swayYawScale 0.1, swayHorizScale 0.08 in, swayVertScale 0.12 in), inches in
-// metres. Data_Weapons.swayScale multiplies; ADS keeps no look sway (2026-08-21).
+// metres. Data_Weapons.swayScale multiplies; aimed sight sway is ADS_LOOK_SWAY (2026-11-05).
 export const LOOK_SWAY = Object.freeze({
   maxDegPerFrame: 5, lerpSpeed: 5,
   yawScale: 0.1, pitchScale: 0.1,                 // degrees of lag per degree/frame
   horizM: 0.08 * 0.0254, vertM: 0.12 * 0.0254,    // metres of lag per degree/frame
   rollScale: 0.06,                                // slight bank into the turn
   strafeRollRad: 0.045, strafeLerpSpeed: 6,       // existing strafe lean, now without rebound
+});
+
+// Aimed sight sway (2026-11-05 user: fully steady ADS feels fake, match COD). Same
+// COD DiffTrack model as LOOK_SWAY, applied as rotation only on the viewmodel root
+// (Script_Viewmodel) so the sights lag a turn for a moment and settle back to the
+// screen centre; Player.AimDirection adds the same angle so bullets follow the sights.
+export const ADS_LOOK_SWAY = Object.freeze({
+  maxDegPerFrame: 4, lerpSpeed: 6,
+  yawScale: 0.5, pitchScale: 0.5,
+  horizM: 0, vertM: 0,            // rotation only: the sight line stays a straight line through the eye
+  rollScale: 0.2,
+  strafeRollRad: 0.025, strafeLerpSpeed: 6,
+});
+
+// Walking while aimed: sights sway on the step cycle (zero-mean, rotation only).
+export const ADS_MOVE_BOB = Object.freeze({ yawDeg: 1.0, pitchDeg: 0.6, rollDeg: 1.5, crouchScale: 0.55 });
+
+// Idle aim sway of the whole line of sight (camera + aim together, so settled sights
+// stay centred and the world moves). COD-style: breathing figure 8 (vertical at twice
+// the horizontal rate), slow wander, fine tremor. Scaled by Player.SwayCondition
+// (stance, stamina, wounds, held breath, gasp). Replaces FPS_ADS_FLOAT (HanYang only).
+export const AIM_IDLE_SWAY = Object.freeze({
+  kinds: ["boltRifle", "lmg", "hmg", "pistol"],
+  adsPitchDeg: 0.40, adsYawDeg: 0.32, hipScale: 0.5,
+  breathHzRest: 0.20, breathHzTired: 0.34,   // horizontal; vertical runs at twice this (figure 8)
+  wanderHz: [0.061, 0.093], wanderShare: 0.35,
+  tremorDeg: 0.035, tremorHz: [2.1, 3.3],
+  moveKeep: 0.5, blendS: 0.35, conditionS: 0.35,
 });
 
 // Shared first-person muzzle flash, COD view-flash recipe (WaW raw/fx/weapon/

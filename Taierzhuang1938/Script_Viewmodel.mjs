@@ -59,9 +59,9 @@ import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
-import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
-import { LookSway } from "./Script_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_ADS_FLOAT, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
+import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH, ADS_LOOK_SWAY, ADS_MOVE_BOB, AIM_IDLE_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
+import { LookSway, AimIdleSway, AdsMoveBob } from "./Script_FirearmHandling.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 
@@ -1642,6 +1642,13 @@ export class Viewmodel {
     // 转视角的摇摆不用弹簧（2026-10-20）：原先 0.42 阻尼比的欠阻尼弹簧在鼠标停下时
     // 甩过头 23%、来回晃一秒，且最大能偏 12.6°。改成 COD 的一阶跟随，见 LookSway。
     this.lookSway = new LookSway();
+    // 开镜的照门摇摆（2026-11-05，照 COD）：转向惯性 + 走动晃动只转 root（gun-relative，静止归零），
+    // 整条视线的呼吸漂移走 holdDrift（相机与瞄准一起动）。
+    this.adsLookSway = new LookSway(ADS_LOOK_SWAY);
+    this.aimIdleSway = new AimIdleSway();
+    this.sightSway = { pitch: 0, yaw: 0, roll: 0 };
+    this.holdDrift = { pitch: 0, yaw: 0 };
+    this.aimSwayEnabled = true;
     // 开镜带一点点过冲（0.72 阻尼比），到位那一下有"顿"感；再低就晃得看不清准星
     this.adsSpring = new Spring(240, 0.72);
     this.sprintSpring = new Spring(90, 0.95);
@@ -2781,7 +2788,7 @@ export class Viewmodel {
    * @param {number} dt 秒
    * @param {object} input { moveSpeed, strafe, grounded, verticalVelocity, sprint, ads,
    *                         lookDeltaYaw, lookDeltaPitch, freeAimYaw, freeAimPitch,
-   *                         crouch, elapsed, lowAmmo, wallDistance }
+   *                         crouch, elapsed, lowAmmo, wallDistance, swayCondition, exertion }
    */
   AddBulletWound(part, direction, info = {}) {
     this.woundBlood ||= new Map();
@@ -2902,12 +2909,13 @@ export class Viewmodel {
     // HUD、弹道与机械瞄具共用屏幕中心，不再让枪口先在画面里游动。
     const freeAimYaw = Clamp(input.freeAimYaw ?? 0, -0.25, 0.25);
     const freeAimPitch = Clamp(input.freeAimPitch ?? 0, -0.25, 0.25);
-    this.root.rotation.set(freeAimPitch, freeAimYaw, 0, "YXZ");
 
     // --- 摇摆：枪滞后于视线，停下后平顺回位（COD，不过冲）---------------------
     // 传进来的是"这一帧转了多少弧度"；LookSway 先折成「度 / (1/60 s)」再限幅，
     // 帧率怎么变手感都不变。枪口朝向与位置都落在转向的后面。
     const adsVisual = Clamp01(ads);
+    const idleKind = AIM_IDLE_SWAY.kinds.includes(this.weapon?.kind);
+    const swayOn = idleKind && !this.mount && this.aimSwayEnabled;
     const swayGain = (this.weapon ? this.weapon.swayScale ?? 1 : 1) * (1 - adsVisual);
     const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0, swayGain, strafe);
     this.swayPivot.rotation.set(sway.pitch, sway.yaw, sway.roll + sway.strafeRoll, "YXZ");
@@ -2931,19 +2939,32 @@ export class Viewmodel {
     const breathY = Math.sin(this.elapsed * 1.15) * 0.0026 * idle;
     const breathX = Math.sin(this.elapsed * 0.73 + 1.3) * 0.0020 * idle;
 
-    // 端枪时的轻微漂移（参考 04 的瞄准段，FPS_ADS_FLOAT）：慢慢地上下、左右飘，腰射站定也有。
+    // 照门摇摆（B 层，只转 root，在 FOV 压扁层之上，屏幕角 = 施加角）：开镜转向惯性 + 走动晃动，
+    // 静止时归零，所以停稳的照门仍在屏幕中心；Player.AimDirection 加同一角度，子弹跟照门走。
+    const adsSway = this.adsLookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0,
+      swayOn ? adsVisual * (this.weapon.swayScale ?? 1) : 0, strafe);
+    const bob = swayOn
+      ? AdsMoveBob(this.bobPhase, adsVisual * gait * Mix(1, ADS_MOVE_BOB.crouchScale, crouchValue))
+      : { pitch: 0, yaw: 0, roll: 0 };
+    const sightSway = this.sightSway;
+    sightSway.pitch = swayOn ? adsSway.pitch + bob.pitch : 0;
+    sightSway.yaw = swayOn ? adsSway.yaw + bob.yaw : 0;
+    sightSway.roll = swayOn ? adsSway.roll + adsSway.strafeRoll + bob.roll : 0;
+    this.root.rotation.set(freeAimPitch + sightSway.pitch, freeAimYaw + sightSway.yaw, sightSway.roll, "YXZ");
+
+    // 整条视线的呼吸漂移（A 层，所有枪，腰射减半）：呼吸 8 字 + 慢游走 + 细颤，
+    // 由 Player.SwayCondition（姿态、体力、伤、屏息、喘气）缩放。
     // 飘的是整条视线（Script_FrameStepsPlayer 转相机、Player.AimDirection 加同一角度）：
     // 手、照门、准心在画面里一起不动，世界在动，子弹打向飘到的地方。走动、拉栓落低时淡掉。
-    // 有这张表的枪不再给腰射呼吸那点枪身平移（那会让手和准心各飘各的）。
-    const float = FPS_ADS_FLOAT[this.weaponId];
-    const aimHold = float && !this.mount ? Mix(float.hipScale ?? 1, 1, adsVisual) * (1 - gait) * (1 - cycleAway) : 0;
-    this.adsFloat = (this.adsFloat || 0) + (aimHold - (this.adsFloat || 0)) * (1 - Math.exp(-step / (float?.blendS ?? 0.35)));
-    const e = this.elapsed, TAU = Math.PI * 2;
-    const floatPitch = float ? (0.72 * Math.sin(e * TAU * float.pitchHz) + 0.28 * Math.sin(e * TAU * float.pitchHz2 + 1.7)) * this.adsFloat : 0;
-    const floatYaw = float ? (0.65 * Math.sin(e * TAU * float.yawHz + 0.6) + 0.35 * Math.sin(e * TAU * float.yawHz2 + 2.4)) * this.adsFloat : 0;
-    const drift = this.holdDrift || (this.holdDrift = { pitch: 0, yaw: 0 });
-    drift.pitch = floatPitch * (float?.pitchRad ?? 0); drift.yaw = floatYaw * (float?.yawRad ?? 0);
-    const breath = float ? 0 : 1;
+    // 这些枪不再给腰射呼吸那点枪身平移（那会让手和准心各飘各的）。
+    if (!this.aimSwayEnabled) this.aimIdleSway.Reset();
+    const idleDrift = this.aimSwayEnabled
+      ? this.aimIdleSway.Step(step, { elapsed: this.elapsed, ads: adsVisual, gait, cycleAway,
+        active: idleKind && !this.mount, condition: input.swayCondition ?? 1, exertion: input.exertion ?? 0 })
+      : { pitch: 0, yaw: 0 };
+    const drift = this.holdDrift;
+    drift.pitch = idleDrift.pitch; drift.yaw = idleDrift.yaw;
+    const breath = idleKind ? 0 : 1;
     this.bobPivot.position.set(bobX + breathX * breath, bobY + breathY * breath, 0);
     this.bobPivot.rotation.set(
       Math.sin(phase * 2) * 0.010 * bobScale,

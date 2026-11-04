@@ -370,18 +370,6 @@ export const FPS_BOLT_CYCLE = Object.freeze({
   }),
 });
 
-// Hold drift while standing still with the rifle up (hip and aimed). Reference 04's aimed
-// windows show the receiver riding on a ~1 s period; the user (2026-11-02) wanted it slow
-// and as small as possible, and the sights and crosshair drifting together. So it drifts
-// the whole line of sight (camera + aim, Script_FrameStepsPlayer / Player.AimDirection):
-// about +-0.2 deg on 3-5 s periods. hipScale = share of it while not aimed.
-export const FPS_ADS_FLOAT = Object.freeze({
-  HanYang: Object.freeze({
-    pitchRad: 0.0040, yawRad: 0.0030, hipScale: 1,
-    pitchHz: 0.30, pitchHz2: 0.19, yawHz: 0.16, yawHz2: 0.10, blendS: 0.35,
-  }),
-});
-
 export const FPS_TOP_MAG_RELOAD = Object.freeze({
   blend:[[0,0],[.15,1],[.88,1],[1,0]],
   bodyOffset:{shoulders:{right:[.055,.010,-.035],left:[0,.012,0]},elbowPoles:{right:[.20,0,0],left:[-.02,0,0]},authoredElbows:{right:true}},

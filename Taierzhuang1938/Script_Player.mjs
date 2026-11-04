@@ -167,6 +167,10 @@ export class PlayerController {
     this.lean = 0;                          // -1 左, +1 右
     this.breath = 0;                        // 屏息剩余
     this.breathHold = false;
+    this.holdDriftPitch = 0; this.holdDriftYaw = 0;
+    this.sightSwayPitch = 0; this.sightSwayYaw = 0;
+    this.breathHeldS = 0;                   // 本次屏息已按住的秒数
+    this.breathGasp = 0;                    // 屏息松开后的喘气（0-1），抬高摇摆
 
     this.health = 100;
     this.bleeding = 0;                      // 每秒失血
@@ -398,7 +402,7 @@ export class PlayerController {
     return this.gunClearance;
   }
 
-  /** 视线方向（相机朝向）。端枪的轻微漂移（holdDrift*，Viewmodel 给、FrameStepsPlayer 写进来）算在内。 */
+  /** 视线方向（相机朝向）。整条视线的呼吸漂移（holdDrift*，Viewmodel 给、FrameStepsPlayer 写进来）算在内；照门摇摆（sightSway*）不算：它只转枪，相机不动。 */
   ViewDirection(target = new THREE.Vector3()) {
     const y = this.yaw + (this.holdDriftYaw || 0);
     const p = this.pitch + (this.holdDriftPitch || 0);
@@ -408,9 +412,10 @@ export class PlayerController {
 
   /** 枪口指向 —— 自由瞄准偏移之后的方向。命中判定用这个，不是视线。 */
   AimDirection(target = new THREE.Vector3()) {
-    // 端枪漂移是整条视线在飘（相机、枪、准心一起），子弹跟着它走。
-    const y = this.yaw + this.aimYaw + (this.holdDriftYaw || 0);
-    const p = Clamp(this.pitch + this.aimPitch + (this.holdDriftPitch || 0), -1.5, 1.5);
+    // 视线漂移是整条视线在飘（相机、枪、准心一起），照门摇摆（转向惯性 / 走动晃动，2026-11-05）
+    // 只转枪：子弹都跟着照门指的方向走。腰射的枪身摇摆（swayPivot）不算。
+    const y = this.yaw + this.aimYaw + (this.holdDriftYaw || 0) + (this.sightSwayYaw || 0);
+    const p = Clamp(this.pitch + this.aimPitch + (this.holdDriftPitch || 0) + (this.sightSwayPitch || 0), -1.5, 1.5);
     const cp = Math.cos(p), sp = Math.sin(p);
     return target.set(-Math.sin(y) * cp, sp, -Math.cos(y) * cp).normalize();
   }
@@ -872,6 +877,13 @@ export class PlayerController {
       this.breathHold = false;
     }
 
+    // 屏息松开要付喘气的代价（COD player_breath_gasp）：按得越久，松开后晃得越久越大。
+    if (this.breathHold) this.breathHeldS += dt;
+    else if (this.breathHeldS > 0) {
+      this.breathGasp = Math.max(this.breathGasp, Clamp01(this.breathHeldS / SWAY.gaspFullHoldS));
+      this.breathHeldS = 0;
+    } else this.breathGasp = Math.max(0, this.breathGasp - dt / SWAY.gaspRecoverS);
+
     // --- 移动 ---------------------------------------------------------------
     // 这条乘法链就是「移动的账只有一本」那条纪律；每个系数的账在 MOVE 里。
     let speed = target.speed;
@@ -1019,6 +1031,7 @@ export class PlayerController {
     const K = this.knock;
     this.ResetLean();
     this.ads = 0; this.sprint = 0; this.wantAds = false; this.breathHold = false; this.bipod = false; this.fastCrawl = false;
+    this.breathHeldS = 0; this.breathGasp = 0;
     this.jump.buffer = 0;
     // 自由瞄准那一点偏移并回视线（人倒着谈不上据枪微调），躺着、爬起来时鼠标直接转头
     this.yaw += this.aimYaw; this.pitch += this.aimPitch; this.aimYaw = 0; this.aimPitch = 0;
@@ -1620,17 +1633,22 @@ export class PlayerController {
     this.velocity.set(0, 0, 0);
   }
 
-  /** 当前的瞄准摇摆幅度（度）。给视图模型与散布计算共用。 */
-  SwayAmount(weapon) {
+  /** 摇摆状况系数（姿态、体力、压制、臂伤、屏息、喘气、两脚架），不含开镜折扣。Viewmodel 的视线呼吸漂移乘它。 */
+  SwayCondition(weapon) {
     const stanceScale = STANCE[this.stance].sway;
     let sway = SWAY.base * stanceScale * (weapon?.swayScale ?? 1);
-    sway *= 1 - this.ads * SWAY.adsDamp;
     sway *= this.ArmPenalty();
     sway *= 1 + this.suppression * SWAY.suppressionGain;
     sway *= 1 + (1 - this.stamina) * SWAY.staminaGain;
     if (this.breathHold) sway *= SWAY.breathHold;
     if (this.bipod) sway *= SWAY.bipod;            // 架上去之后枪自己稳住了
+    sway *= 1 + this.breathGasp * SWAY.gaspGain;
     return sway;
+  }
+
+  /** 当前的瞄准摇摆幅度（度）。给散布计算与调试面板用。 */
+  SwayAmount(weapon) {
+    return this.SwayCondition(weapon) * (1 - this.ads * SWAY.adsDamp);
   }
 
   /**

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { SampleShotDisk, FirearmHandling, GunClearance, LookSway } from "./Script_FirearmHandling.mjs";
-import { LOOK_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
+import { SampleShotDisk, FirearmHandling, GunClearance, LookSway, AimIdleSway, AdsMoveBob } from "./Script_FirearmHandling.mjs";
+import { LOOK_SWAY, ADS_LOOK_SWAY, ADS_MOVE_BOB } from "./Data_Tuning_FirearmHandling.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 
@@ -49,13 +49,13 @@ assert.ok(bank > 0 && bank < Surface(1.0, [0, 0, 1]).lower, "a 45 degree bank si
 assert.ok(Surface(0.4, {x:0, y:1, z:0}).blocked, "ground right at the barrel (prone) still lowers it");
 // COD look sway: a fast mouse turn, uneven per-frame mouse chunks, then a dead stop.
 const DEG = Math.PI / 180;
-function Flick(fps, turnDegPerS, flickS = 0.35, settleS = 1.2) {
-  const sway = new LookSway(), dt = 1 / fps, trace = [];
+function Flick(fps, turnDegPerS, flickS = 0.35, settleS = 1.2, tuning = LOOK_SWAY) {
+  const sway = new LookSway(tuning), dt = 1 / fps, trace = [];
   const flickFrames = Math.round(flickS * fps);
   for (let i = 0; i < flickFrames + Math.round(settleS * fps); i += 1) {
     const chunk = i < flickFrames ? turnDegPerS * DEG * dt * (i % 2 ? 1.45 : 0.55) : 0;
     sway.Step(dt, -chunk, chunk * 0.3, 1, 0);   // turning right and a little up
-    trace.push({ flick: i < flickFrames, yaw: sway.yaw, pitch: sway.pitch, x: sway.x, roll: sway.roll });
+    trace.push({ flick: i < flickFrames, yaw: sway.yaw, pitch: sway.pitch, x: sway.x, y: sway.y, roll: sway.roll });
   }
   return trace;
 }
@@ -81,6 +81,78 @@ const moderate = (fps) => Math.max(...Flick(fps, 150).map((s) => Math.abs(s.yaw)
 assert.ok(Math.abs(moderate(20) - moderate(60)) < moderate(60) * 0.15, "same response at 20 and 60 fps");
 const aimed = new LookSway().Step(1 / 60, -0.2, 0, 0, 0);
 assert.equal(aimed.yaw, 0, "no look sway when the weapon's gain is zero (ADS)");
+// ADS look sway: same model, rotation only, bigger lag than the hip.
+const adsCap = ADS_LOOK_SWAY.maxDegPerFrame * ADS_LOOK_SWAY.yawScale * DEG;
+for (const fps of [144, 60, 30, 20]) {
+  const fast = Flick(fps, 900, 0.35, 1.2, ADS_LOOK_SWAY), after = fast.filter((s) => !s.flick);
+  const peak = Math.max(...fast.map((s) => Math.abs(s.yaw)));
+  assert.ok(peak <= adsCap * 1.0001 && peak > adsCap * 0.5, `${fps} fps: ADS flick trails by at most the cap (${peak / DEG} deg)`);
+  assert.ok(fast.every((s) => s.x === 0 && s.y === 0), `${fps} fps: ADS sway is rotation only`);
+  for (let i = 1; i < after.length; i += 1) assert.ok(after[i].yaw >= 0 && after[i].yaw <= after[i - 1].yaw + 1e-12, `${fps} fps: ADS settles without overshoot`);
+  assert.ok(Math.abs(after.at(-1).yaw) < adsCap * 0.01, `${fps} fps: ADS settled within 1.2 s`);
+}
+const adsModerate = (fps) => Math.max(...Flick(fps, 150, 0.35, 1.2, ADS_LOOK_SWAY).map((s) => Math.abs(s.yaw)));
+assert.ok(Math.abs(adsModerate(20) - adsModerate(60)) < adsModerate(60) * 0.15, "ADS: same response at 20 and 60 fps");
+
+// Idle aim sway: HanYang standing rested (condition 1.12), fully aimed, standing still.
+function IdleRun(fps, seconds, args, settleS = 1) {
+  const sway = new AimIdleSway(), dt = 1 / fps, peaks = { pitch: 0, yaw: 0 };
+  let signChanges = 0, lastSign = 0, last = { pitch: 0, yaw: 0 };
+  for (let i = 0; i < Math.round(seconds * fps); i += 1) {
+    const arg = typeof args === "function" ? args(i * dt) : args;
+    last = sway.Step(dt, { elapsed: i * dt, ...arg });
+    if (i * dt < settleS) continue;
+    peaks.pitch = Math.max(peaks.pitch, Math.abs(last.pitch)); peaks.yaw = Math.max(peaks.yaw, Math.abs(last.yaw));
+    const sign = Math.abs(last.yaw) > 0.1 * DEG ? Math.sign(last.yaw) : 0;   // hysteresis: tremor chatter near zero is not a breath
+    if (sign && lastSign && sign !== lastSign) signChanges += 1;
+    if (sign) lastSign = sign;
+  }
+  return { ...peaks, signChanges, last };
+}
+const rested = { ads: 1, gait: 0, active: true, condition: 1.12, exertion: 0 };
+const ads60 = IdleRun(60, 20, rested);
+assert.ok(ads60.pitch / DEG >= 0.25 && ads60.pitch / DEG <= 0.75, `ADS idle pitch peak ${ads60.pitch / DEG} deg`);
+assert.ok(ads60.yaw / DEG >= 0.20 && ads60.yaw / DEG <= 0.60, `ADS idle yaw peak ${ads60.yaw / DEG} deg`);
+const hip60 = IdleRun(60, 20, { ...rested, ads: 0 });
+const hipRatio = Math.max(hip60.pitch, hip60.yaw) / Math.max(ads60.pitch, ads60.yaw);
+assert.ok(hipRatio >= 0.4 && hipRatio <= 0.6, `hip / ADS idle peak ${hipRatio}`);
+const held = IdleRun(60, 20, { ...rested, condition: 1.12 * 0.28 });
+assert.ok(held.pitch <= ads60.pitch * 0.35 && held.yaw <= ads60.yaw * 0.35, "held breath keeps at most 0.35x of the rested sway");
+const tired = IdleRun(60, 20, { ...rested, exertion: 1 });
+assert.ok(tired.signChanges >= ads60.signChanges * 1.4, `exhausted breathing is faster (${tired.signChanges} vs ${ads60.signChanges} yaw sign changes)`);
+{
+  const sway = new AimIdleSway(), dt = 1 / 60;
+  let prev = { pitch: 0, yaw: 0 }, jump = 0;
+  for (let i = 0; i < 600; i += 1) {
+    const out = sway.Step(dt, { elapsed: i * dt, ...rested, condition: i < 300 ? 1.12 : 0.31 });
+    if (i >= 300) jump = Math.max(jump, Math.abs(out.pitch - prev.pitch));
+    prev = out;
+  }
+  assert.ok(jump / DEG < 0.02, `condition jump changes pitch by ${jump / DEG} deg per frame`);
+}
+const ads30 = IdleRun(30, 20, rested), ads144 = IdleRun(144, 20, rested);
+assert.ok(Math.abs(ads30.pitch - ads144.pitch) < ads144.pitch * 0.10 && Math.abs(ads30.yaw - ads144.yaw) < ads144.yaw * 0.10, "idle sway amplitude is frame-rate independent");
+const off = IdleRun(60, 4, (t) => ({ ...rested, active: t < 1 }), 99);
+assert.ok(Math.abs(off.last.pitch) < 1e-4 && Math.abs(off.last.yaw) < 1e-4, "inactive sway fades to zero");
+
+// Aimed walking bob.
+const bobZero = AdsMoveBob(1.3, 0);
+assert.ok(Math.abs(bobZero.yaw) + Math.abs(bobZero.pitch) + Math.abs(bobZero.roll) === 0, "zero weight gives no bob");
+{
+  const n = 3600; let maxYaw = 0, meanYaw = 0, meanPitch = 0, pitchCrossings = 0, yawCrossings = 0, prev = AdsMoveBob(0.0001, 1);
+  for (let i = 1; i <= n; i += 1) {
+    const b = AdsMoveBob(i / n * Math.PI * 2 + 0.0001, 1);
+    maxYaw = Math.max(maxYaw, Math.abs(b.yaw)); meanYaw += b.yaw / n; meanPitch += b.pitch / n;
+    if (b.pitch * prev.pitch < 0) pitchCrossings += 1;
+    if (b.yaw * prev.yaw < 0) yawCrossings += 1;
+    prev = b;
+  }
+  assert.ok(Math.abs(maxYaw - ADS_MOVE_BOB.yawDeg * DEG) < ADS_MOVE_BOB.yawDeg * DEG * 0.01, "bob yaw reaches its tuned amplitude");
+  assert.ok(Math.abs(meanYaw) < 1e-6 && Math.abs(meanPitch) < 1e-6, "bob is zero-mean");
+  assert.equal(pitchCrossings, 2 * yawCrossings, "pitch runs two cycles per yaw cycle");
+}
+console.log(JSON.stringify({ adsIdleDeg: { pitch: ads60.pitch / DEG, yaw: ads60.yaw / DEG, hipRatio, held: [held.pitch / DEG, held.yaw / DEG] },
+  yawSignChanges: { rested: ads60.signChanges, tired: tired.signChanges }, adsLookCapDeg: adsCap / DEG }));
 console.log(JSON.stringify({centerHalfFraction:inner/count, mean:[sumX/count,sumY/count], quadrants,
   lookSwayPeakDeg: { at60: moderate(60) / DEG, at20: moderate(20) / DEG, cap: capYaw / DEG }}));
 console.log("FirearmHandlingTest OK");

@@ -291,8 +291,11 @@ export function PlayStepView(ctx, f) {
   // 第一人称持枪移动检查：替身眼睛抄这一帧的玩家眼睛，Viewmodel 挂在它下面（没开工具 = 空操作）。
   ctx.editor?.SyncOverlayEye(ctx.camera);
   ctx.profiler.B("viewmodel");
-  if (!ctx.player.Alive && ctx.viewmodel.deathHands) ctx.UpdatePlayerDeath();
-  else {
+  if (!ctx.player.Alive && ctx.viewmodel.deathHands) {
+    ctx.UpdatePlayerDeath();
+    ctx.player.sightSwayPitch = 0;
+    ctx.player.sightSwayYaw = 0;
+  } else {
   if (ctx.mountView.active) ctx.MountedViewPose();
   // 逐帧拉栓的低头是真低头（Viewmodel.headDipRad，枪绕眼睛反向转同一角度，在世界里不动）。
   // 先按上一帧的角度压相机：这一帧拉栓里抛壳读的还是上一帧的枪位，两者要对得上；
@@ -330,12 +333,16 @@ export function PlayStepView(ctx, f) {
     meleeCombat: ctx.sandbox?.PreviewPose?.(ctx.player, ctx.meleeCombat?.ViewPose()) ?? (ctx.meleeCombat?.ViewPose() || null),
     // 近爆的身体反应：收枪、缩肩、手臂慢半拍、之后手抖（Script_BlastFlinch.arms；没在反应时是 null）。
     blastFlinch: ctx.player.flinch?.Active ? ctx.player.flinch.arms : null,
+    // 整条视线的呼吸漂移幅度（姿态 / 体力 / 伤 / 屏息 / 喘气）与体力消耗（呼吸变急）。
+    swayCondition: ctx.player.SwayCondition(ctx.viewmodel.weapon), exertion: 1 - ctx.player.stamina,
   });
   const drift = ctx.viewmodel.holdDrift || NO_DRIFT;
   ctx.camera.rotation.x += drift.pitch - driftBefore.pitch - ((ctx.viewmodel.headDipRad || 0) - dipBefore);
   ctx.camera.rotation.y += drift.yaw - driftBefore.yaw;
   ctx.player.holdDriftPitch = drift.pitch;
   ctx.player.holdDriftYaw = drift.yaw;
+  ctx.player.sightSwayPitch = ctx.viewmodel.sightSway.pitch;
+  ctx.player.sightSwayYaw = ctx.viewmodel.sightSway.yaw;
   // 弯腰捡震脱手的枪：抓到之前右手（空手）伸向地上那把（Script_LooseGun.GunReachPose）。
   if (ctx.looseGun.recover && !ctx.viewmodel.weapon && ctx.looseGun.recover.reach > 0) ctx.viewmodel.ReachWorld(ctx.looseGun.recover.atV, ctx.looseGun.recover.reach);
   }

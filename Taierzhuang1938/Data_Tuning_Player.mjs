@@ -240,7 +240,7 @@ export const HIT_FEEDBACK = Object.freeze({
   aimKickPitchBias: 0.03,
 });
 
-/** 瞄准摇摆。视图模型与散布计算共用（Script_Player.SwayAmount）。 */
+/** 瞄准摇摆。Script_Player.SwayCondition 驱动视图模型的视线呼吸漂移（AIM_IDLE_SWAY），SwayAmount 另乘开镜折扣供散布 / 调试面板用。 */
 export const SWAY = Object.freeze({
   base: 1.0,
   adsDamp: 0.55,
@@ -248,6 +248,10 @@ export const SWAY = Object.freeze({
   staminaGain: 0.6,
   breathHold: 0.28,
   bipod: 0.25,                // 架上去之后枪自己稳住了
+  // COD player_breath_gasp：屏息能稳住，松开要付一次摇摆的代价。
+  gaspGain: 1.0,              // 喘气满值时摇摆乘 1 + gaspGain
+  gaspFullHoldS: 2.5,         // 屏息按满这么久，喘气取满
+  gaspRecoverS: 1.6,          // 喘气从满值落回 0 的秒数
 });
 
 /**
