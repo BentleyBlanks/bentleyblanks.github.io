@@ -285,6 +285,16 @@ COD 片段按 30 帧拆成「开枪后毫秒」命名的图，游戏同一毫秒
 验收：`HanYangReloadClearanceTest` 拉栓 1.209 mm、空仓 / 三发 1.814、开栓换弹 1.577；`FpsReloadMechanicsTest`、`FpsArmTest` 1014/1014、`GunFeelTest` 12/12、
 `FirearmResponseBrowserTest`、`FirearmActionsTest`、`WeaponRangeTest`、`DataJsonTest`、`FpsAnimationTest` 过；`FpsHandContactTest` 只剩护木 NaN（11-03 起 master 同样红，汉阳造重烘后测试找不到护木表面）。
 
+#### Codex 续做：上方握球与腕角（2026-11-04）
+
+保全 Claude 未提交第三轮后继续校准。`boltTop` 用完整掌面压住球头；抬柄与平放时分别取掌面角度，前推时顺腕、闭锁时转回。`boltTopClear` 先松指再抬离球头，`rotationTo` / `rotationMix` 将换手、回握的转腕分配到相邻关键点。三指勾杆、枪身低位及前送避免袖口近裁的运动保留；完整装填烘焙 JSON、模型和参考素材未重生。留栓回手沿用资产的 `openGripOffset`，避免回到后移的枪机尾上。
+
+最终普通循环实际 60 fps、79 动作帧加 12 稳定帧，完整双臂／衣袖闭壳深度最大 1.648 mm、左侧 0，腕角最高 64.00°；65°／2 mm 限值不变。新增实际球头承压检查的四个采样点中，掌面 3 mm 内最小承压面积 127.9 mm²，最近 40 点平均间隙最大 2.192 mm，拇指到球面最大间隙 2.624 mm。接触探针与完整净空探针采用相同的零面积面过滤规则，消除原枪木件八个退化面引发的 NaN，所有距离限值保留。
+
+接触（642 动作帧）、机械、运动向量、双臂、衣袖、枪感、开火响应与靶场专项通过。早前四案完整净空报告的空仓／余三发／留栓装填深度为 1.814／1.814／1.577 mm；后续只重跑修改的短拉栓，未改写并行作者的装填片段。1280×720 打包版实际开镜、腰射和最后一发留栓检查完成；留栓回手最高腕角 64.15°，弹药 0、枪栓后置。听音未开启，前推撞击瞬态按机械拍点核对，静态误差约 0.25 ms。
+
+限制：有限表面交叉和开放枪壳仍沿用完整报告的证据边界，2 mm 通过不代表零交叉。修复版实际手网格的操作姿势十组指对检查已消除拇指／食指横穿；静态持枪及回到同一持枪姿势时，既有环／小指交叉仍保留，未更改其握姿与持枪片段。完整 prepush 在既有字体缺九字的 `TextTest` 中止；独立 `DataJsonTest` 仍报告 `Data_XBotCharacters.FactionCharacterKeys` 导出函数。两项都不是本次新增，未放宽门禁。本地完整证据在本任务 worktree 的 `tmp/HanYangBoltResume/`。
+
 ### 汉阳造换弹对标 COD 三八式（2026-11-02，Blender 骨骼片段）
 
 参考：`OneDrive/Sync/饮河/FPS/动画/三八式/COD_WWII_三八式_02_换弹_有声.mp4`（4.0 s，29.97 fps），

@@ -1,6 +1,8 @@
 // Authored first-person reload. Times are normalized to the weapon's current
 // weapon reload duration; distances are metres and rotations are YXZ radians.
 // Support poses describe the load through the left palm, not camera movement.
+import { HANYANG_173R } from "./Data_HanYang173R.mjs";
+
 export const FPS_RIFLE_RELOAD = Object.freeze({
   // A load acts on the supporting hand before the elbow settles. Responses
   // use seconds so preview scrubbing and a different frame rate agree.
@@ -230,7 +232,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // the clip (the 2.30 s reference shouldered only after the regrip).
     durationS: 1.95, startS: 0.02,
     pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
-      [1.02, 0.700], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
+      [1.02, 0.740], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
     // Low working pose, relative to the player's (undipped) look, placed on the COD Type 38
     // clip frame by frame (2026-11-03, user: the rifle's motion with the hand did not match):
     // the rifle barely leaves the aim line. The front sight stays just above the centre
@@ -247,6 +249,9 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     boltShape: "boltHook",
     // The hooked fingers come onto / leave the shank from the front (rig axes, m), opened.
     boltClear: [0.040, -0.030, -0.035], boltClearShape: "boltHookClear",
+    // Push and lock from the top of the knob (FPS_HAND_SHAPES.boltTop); the change of grip happens
+    // while the rifle is dropped and the hand is out of the frame.
+    boltTopShape: "boltTop",
     // Depth of the first-person layer at the low pose (1 = unchanged): the COD clip keeps
     // the working rifle and hand big and close; squeezing the whole layer's depth does
     // that without moving the hand nearer the shoulder (which tears the arm skin).
@@ -268,7 +273,8 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // 6 cm near plane, which slices it open (user, 2026-11-03/04). Closest skin then 6.8 cm.
     sway: [[0, 0, 0, 0, 0, 0, 0], [0.22, 0, 0, 0, 0, 0, 0], [0.30, 0, 0, 0, -0.026, 0, 0], [0.44, 0, 0, 0, 0, 0, 0],
       [0.82, 0, 0, 0, 0, 0, 0], [0.90, 0.06, -0.075, -0.026, 0.070, -0.006, 0.010], [1.02, 0.06, -0.075, -0.026, 0.078, -0.006, 0.010],
-      [1.10, 0.0300, -0.0375, -0.0090, 0.070, -0.008, 0.012], [1.166, 0, 0, 0, 0.048, -0.008, 0.012], [1.29, 0, 0, 0, 0, 0, 0]],
+      [1.10, 0.0350, -0.0375, -0.0450, 0.070, -0.008, 0.012], [1.166, 0.015, 0, -0.045, 0.048, -0.008, 0.012],
+      [1.26, 0.008, 0, -0.045, 0.020, -0.003, 0.005], [1.33, 0.003, 0, -0.025, 0, 0, 0], [1.40, 0, 0, 0, 0, 0, 0]],
     // Shot response on the held pose, rotating about the aiming eye (worked out from
     // the ADS pose, so it follows the ADS eye distance): [s, x, y, z, rx, ry, rz].
     // Hip fire keeps `hipRiseScale` of it.
@@ -310,13 +316,22 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.620, anchor: "boltClear", through: true },
       { at: 0.655, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
-      // Start the handle down with the hooked fingers and open them off the shank (downward
-      // and back) as it drops: following it all the way down rolls the palm into the
-      // receiver. Then down to the wrist.
-      { at: 1.420, anchor: "bolt" },
-      { at: 1.580, anchor: "bolt" },
-      { at: 1.610, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
-      { at: 1.660, anchor: "boltClear" },
+      // Roll the pads onto the ball during the lift, retaining the fully raised grip.
+      { at: 0.735, anchor: "bolt", offset: [-0.000840, -0.001432, 0.000543] },
+      { at: 0.810, anchor: "bolt" },
+      // Change over to the top of the knob while the bolt is back (out of the frame), push the
+      // bolt forward and the handle down from there.
+      { at: 0.900, anchor: "bolt" },
+      { at: 0.915, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.012] },
+      { at: 0.940, anchor: "boltClear", offset: [0.035, -0.010, -0.025], rotationTo: "boltTop", rotationMix: 0.4 },
+      { at: 0.985, anchor: "boltTop", offset: [0.080, 0.050, -0.020], shape: "boltTopClear" },
+      { at: 1.025, anchor: "boltTop", shape: "boltTopClear" },
+      { at: 1.055, anchor: "boltTop" },
+      { at: 1.580, anchor: "boltTop" },
+      // Loosen before lifting, then turn back toward the stock above the ball.
+      { at: 1.595, anchor: "boltTop", shape: "boltTopClear", offset: [0.001, 0.005, 0] },
+      { at: 1.630, anchor: "boltTop", shape: "boltTopClear", offset: [0.008, 0.060, -0.005] },
+      { at: 1.660, anchor: "boltTop", shape: "boltRest", offset: [0.040, 0.070, 0.020], rotationTo: "grip", rotationMix: 0.4, through: true },
       { at: 1.800, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "boltRest", through: true },
       { at: 1.870, anchor: "gripClear" },
       { at: 1.935, anchor: "grip", weight: 0 },
@@ -332,13 +347,15 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.620, anchor: "boltClear", through: true },
       { at: 0.655, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
       { at: 0.680, anchor: "bolt", fingerLagS: [0, 0.004, 0.012, 0.020, 0.028] },
+      { at: 0.735, anchor: "bolt", offset: [-0.000840, -0.001432, 0.000543] },
+      { at: 0.810, anchor: "bolt" },
       { at: 0.950, anchor: "bolt" },
-      { at: 0.980, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.005] },
+      { at: 0.980, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.020] },
       { at: 1.030, anchor: "boltClear" },
-      { at: 1.120, anchor: "knob", offset: [0.070, 0.060, 0.020], shape: "packetRelax", turnMix: 0.5, through: true },
+      { at: 1.120, anchor: "knob", offset: [0.070, 0.052, 0.020], shape: "packetRelax", turnMix: 0.5, through: true },
       { at: 1.320, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
       { at: 1.760, anchor: "gripClear" },
-      { at: 1.880, anchor: "grip", weight: 0 },
+      { at: 1.880, anchor: "grip", offset: [...HANYANG_173R.openGripOffset], weight: 0 },
     ],
     // Thumb leaves / regains its holding opposition, seconds.
     thumb: Object.freeze({ releaseStart: 0.10, releaseEnd: 0.19, recoverStart: 1.82, recoverEnd: 1.94 }),
@@ -347,7 +364,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     sounds: [
       { at: 0.700, offset: 0.215, maxDuration: 0.035 },
       { at: 0.880, offset: 0.240, maxDuration: 0.085 },
-      { at: 1.205, offset: 0.555, maxDuration: 0.110, closing: true },
+      { at: 1.114, offset: 0.555, maxDuration: 0.110, closing: true },
       { at: 1.395, offset: 0.665, maxDuration: 0.100, closing: true },
     ],
   }),

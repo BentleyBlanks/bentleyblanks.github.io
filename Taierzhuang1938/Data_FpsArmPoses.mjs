@@ -93,18 +93,31 @@ export const FPS_HAND_SHAPES = Freeze({
   // `downOffset` (fading out as it lifts) so the hooked hand clears the receiver. Fitted on the
   // live cycle; frame at boltContactReferenceRad (handle up: palm in, fingers round the front).
   boltHook: Freeze({side:"r",palmOffset:V(.0056,-.0311,-.024),rotation:V(.3015,-2.367,1.8362),turnFollow:.749,downOffset:V(.0086,.0003,.0016),
-    fingers:Freeze([V(0,32,21.3),V(76.1,104,55.5),V(41.1,115,75.2),V(95,115,85),V(67.3,104.4,63.9)]),
-    thumbDirection:V(-.2539,-.4615,1.2895),thumbRoll:4.8,fingerSplay:Freeze([0,6.6,1.9,13.4,36.4])}),
+    fingers:Freeze([V(0.000000,39.709327,23.047939),V(50.872838,94.311449,53.623484),V(41.100000,115.000000,75.200000),V(95.000000,115.000000,85.000000),V(67.300000,104.400000,63.900000)]),
+    thumbDirection:V(-0.229884,-0.858249,1.337838),thumbRoll:10.086157,fingerSplay:Freeze([0.000000,11.755108,1.900000,13.400000,36.400000])}),
   // boltHook eased open for coming onto / leaving the shank: only the thumb, index and the
   // middle/ring hook loosen a little (opening them further sweeps the tips through the shank and
   // the knob); the little finger stays tucked as in boltHook.
-  boltHookClear: Freeze({side:"r",fingers:Freeze([V(0,25,15),V(60,85,45),V(42,105,65),V(80,100,70),V(66.3,93.5,61.1)]),
-    thumbDirection:V(-.2449,-.4119,1.1171),thumbRoll:4.8,fingerSplay:Freeze([0,8,2,13,34.8])}),
+  boltHookClear: Freeze({side:"r",fingers:Freeze([V(0.000000,32.000000,16.000000),V(40.698270,75.449159,42.898787),V(42.000000,105.000000,65.000000),V(80.000000,100.000000,70.000000),V(66.300000,93.500000,61.100000)]),
+    thumbDirection:V(-0.229884,-0.858249,1.337838),thumbRoll:10.086157,fingerSplay:Freeze([0,11.755108,2,13,34.8])}),
+  // HanYang bolt cycle, pushing and locking hand (FPS_BOLT_CYCLE.HanYang.boltTopShape): after the pull
+  // the hand changes over to the top of the knob as in the COD Type 38 clip, palm on the ball,
+  // fingers curled down over its front, wrist coming from above and behind, and drives the bolt
+  // forward and the handle down from there. Frame at boltContactReferenceRad.
+  // Straighten the palm during the extended forward push, then roll back onto
+  // the ball as the handle closes; retaining the push pitch at lock sweeps the ring finger into the bolt.
+  boltTop: Freeze({side:"r",palmOffset:V(0.012723,-0.012362,-0.023564),rotation:V(0.310254,-2.619318,0.571534),liftedRotation:V(0.190254,-2.619318,0.571534),turnFollow:0.606027,downOffset:V(0.005558,0.001321,0.007341),
+    fingers:Freeze([V(0.000000,34.192568,19.863324),V(50.309923,81.066013,55.071655),V(24.000000,58.000000,30.000000),V(80.800000,82.400000,54.300000),V(42.100000,49.100000,28.000000)]),
+    thumbDirection:V(-0.481073,-0.515588,1.104229),thumbRoll:-2.163979,fingerSplay:Freeze([0.000000,-6.428255,5.900000,13.100000,24.400000])}),
+  // Relax the fingers before settling onto / lifting off the ball; the thumb
+  // opens away from the index. The palm still follows the boltTop anchor.
+  boltTopClear: Freeze({side:"r",fingers:Freeze([V(0.000000,32.500000,21.600000),V(30.185954,48.639608,33.042993),V(14.400000,34.800000,18.000000),V(48.480000,49.440000,32.580000),V(25.260000,29.460000,16.800000)]),
+    thumbDirection:V(-0.229884,-0.858249,1.337838),thumbRoll:10.086157,fingerSplay:Freeze([0.000000,-6.428255,5.900000,13.100000,24.400000])}),
   // HanYang bolt cycle, the hand leaving the locked handle (FPS_BOLT_CYCLE.HanYang.hand): a loose
   // fist, knuckles to the camera, as it rides back to the wrist in the COD Type 38 clip instead of
   // opening the fingers out.
-  boltRest: Freeze({side:"r",fingers:Freeze([V(0,30,18),V(52,78,44),V(58,84,48),V(62,88,50),V(66,90,52)]),
-    thumbDirection:V(.2,-.5,.8),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  boltRest: Freeze({side:"r",fingers:Freeze([V(0.000000,30.000000,18.000000),V(52.000000,78.000000,44.000000),V(58.000000,84.000000,48.000000),V(62.000000,88.000000,50.000000),V(66.000000,90.000000,52.000000)]),
+    thumbDirection:V(0.350000,-0.500000,0.920000),thumbRoll:10.000000,fingerSplay:Freeze([0.000000,-4.500000,4.700000,12.300000,23.600000])}),
   packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
     thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),

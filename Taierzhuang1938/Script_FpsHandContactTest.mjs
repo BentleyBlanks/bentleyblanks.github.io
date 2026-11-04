@@ -63,7 +63,14 @@ try {
       root.traverse(o=>{
         if(!o.isMesh||o.isSkinnedMesh||(filter&&!filter(o)))return;
         const g=o.geometry,p=g.attributes.position,index=g.index,m=inverse.clone().multiply(o.matrixWorld);
-        for(let i=0;i<(index?.count||p.count);i+=3)triangles.push(new THREE.Triangle(...[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(p,index?index.getX(i+j):i+j).applyMatrix4(m))));
+        for(let i=0;i<(index?.count||p.count);i+=3){
+          const triangle=new THREE.Triangle(...[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(p,index?index.getX(i+j):i+j).applyMatrix4(m)));
+          const area=triangle.getArea();
+          if(!Number.isFinite(area))throw Error('Non-finite contact surface: '+o.name);
+          // Match the complete-arm surface probe: a zero-area GLB face has no
+          // bearing surface, and closestPointToPoint can return NaN for it.
+          if(area>=1e-16)triangles.push(triangle);
+        }
       });return triangles;
     };
     const Nearest=(point,triangles)=>{let distance=Infinity;const closest=new THREE.Vector3();for(const tri of triangles){tri.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));}return distance;};
@@ -91,9 +98,11 @@ try {
     };
     // Select the Hand-owned volar palm in bind space. Distal fingertips must
     // never be allowed to stand in for the rear palm bearing on the stock.
-    const palmCache=new WeakMap(),palmGeometry=CreateReloadClearanceGeometry(THREE);
-    const HanYangRearPalm=()=>{
-      let entries=palmCache.get(arms);
+    const palmCache=new WeakMap(),topPalmCache=new WeakMap(),palmGeometry=CreateReloadClearanceGeometry(THREE);
+    const HanYangRearPalm=(contactTriangles=null)=>{
+      // A stock bears on the rear palm; the small ball can also bear nearer
+      // the heel or MCPs. Keep the reviewed stock selection unchanged.
+      const cache=contactTriangles?topPalmCache:palmCache;let entries=cache.get(arms);
       if(!entries){
         entries=[];const hand=arms.bones.r.hand,forward=new THREE.Vector3(0,0,1).applyQuaternion(arms.anatomy.r.frame.quaternion),dorsal=new THREE.Vector3(0,1,0).applyQuaternion(arms.anatomy.r.frame.quaternion);
         arms.root.traverse(mesh=>{
@@ -105,17 +114,17 @@ try {
           const ids=[];for(let i=0;i<a.position.count;i++){
             let owned=0,handWeight=0;for(let k=0;k<4;k++){const b=bones[a.skinIndex.getComponent(i,k)],w=a.skinWeight.getComponent(i,k);if(b===hand)handWeight+=w;if(/r(hand|finger[0-4][12]?)$/.test(b.name.toLowerCase().replace(/[^a-z0-9]/g,'')))owned+=w;}
             const along=new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(toHand).dot(forward)/length;
-            if(handWeight>.8&&owned>.9999&&along>.25&&along<.98&&normal[i].applyMatrix3(nm).normalize().dot(dorsal)<-.35)ids.push(i);
+            if(handWeight>.8&&owned>.9999&&(contactTriangles||(along>.25&&along<.98))&&normal[i].applyMatrix3(nm).normalize().dot(dorsal)<-.35)ids.push(i);
           }
           const selected=new Set(ids);entries.push({mesh,ids,triangles:triangles.filter(tri=>tri.every(i=>selected.has(i)))});
         });
-        if(entries.reduce((n,e)=>n+e.ids.length,0)<100)throw Error('Missing actual Hand-owned rear palm surface');palmCache.set(arms,entries);
+        if(entries.reduce((n,e)=>n+e.ids.length,0)<100)throw Error('Missing actual Hand-owned volar palm surface');cache.set(arms,entries);
       }
-      const surface=palmGeometry.Surface(Triangles(vm.rig.group,o=>o.name==='HanYang_body_wood')),distances=[];let areaWithin3Mm=0,areaWithin5Mm=0,palmSurfaceCrossings=0;
+      const surface=palmGeometry.Surface(contactTriangles??Triangles(vm.rig.group,o=>o.name==='HanYang_body_wood')),distances=[];let areaWithin3Mm=0,areaWithin5Mm=0,palmSurfaceCrossings=0;
       for(const {mesh,ids,triangles}of entries){const points=new Map(),gaps=new Map();for(const i of ids){const p=vm.rig.group.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld)),gap=palmGeometry.Nearest(surface.tree,p).distance;points.set(i,p);gaps.set(i,gap);distances.push(gap*1000);}
         for(const ids of triangles){const tri=new THREE.Triangle(...ids.map(i=>points.get(i))),area=tri.getArea()*1e6;if(palmGeometry.Crossing(tri,surface))palmSurfaceCrossings++;if(ids.every(i=>gaps.get(i)<.003))areaWithin3Mm+=area;if(ids.every(i=>gaps.get(i)<.005))areaWithin5Mm+=area;}
       }
-      distances.sort((a,b)=>a-b);return {vertices:distances.length,minimumGapMm:distances[0],meanClosest40Mm:distances.slice(0,40).reduce((a,b)=>a+b,0)/40,areaWithin3Mm,areaWithin5Mm,palmSurfaceCrossings,method:'Actual bind-selected Hand-owned volar palm skin and finite triangles against wood; excludes all distal finger substitutes'};
+      distances.sort((a,b)=>a-b);return {vertices:distances.length,minimumGapMm:distances[0],meanClosest40Mm:distances.slice(0,40).reduce((a,b)=>a+b,0)/40,areaWithin3Mm,areaWithin5Mm,palmSurfaceCrossings,method:contactTriangles?'Actual complete Hand-owned volar palm against the isolated ball; excludes distal finger substitutes':'Actual bind-selected Hand-owned volar rear palm against wood; excludes distal finger substitutes'};
     };
     const leftVolarCache=new WeakMap();
     const HanYangVolarGap=(side,digit,triangles)=>{
@@ -429,6 +438,7 @@ try {
         const previousThumb=id==='HanYang'?arms._FingerRoot('r',0).quaternion.clone():null;
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],skinSamples:[],worstGrip:null,worstWrist:null};
+        row.topGripExpected=action==='bolt'&&!!vm.action?.cycle?.boltTopShape&&!vm.pendingHoldOpen;row.topPalmSamples=[];
         // A Blender reload clip (FPS_SKELETAL_RELOADS) poses the bones itself: no IK goals or procedural
         // operation shapes; its contact windows are the clip's own seconds.
         const clip=action.startsWith('reload')&&vm.action?.skeletal;row.skeletal=!!clip;
@@ -447,12 +457,12 @@ try {
           if(!arms.reachable.r||!arms.reachable.l)row.unreachable++;
           arms.fingerBones.r.concat(arms.fingerBones.l).forEach((b,i)=>row.maxFingerTranslation=Math.max(row.maxFingerTranslation,b.position.distanceTo(originalPositions[i])));
           if(id==="HanYang"&&vm.action){
-            const operation=arms.operationPose.r,phase={packetClip:"packet",packetPress:"press",packetBolt:"bolt",boltFist:"bolt",boltHook:"bolt"};
+            const operation=arms.operationPose.r,phase={packetClip:"packet",packetPress:"press",packetBolt:"bolt",boltFist:"bolt",boltHook:"bolt",boltTop:"boltTop",boltTopClear:"boltTopClear"};
             const dominant=(operation?.shapeMix||0)<.5?operation?.shape:operation?.nextShape;
             let kind=phase[dominant]||phase[operation?.shape]||phase[operation?.nextShape];
             if(kind){
               if(kind==="packet"&&vm.usedPacketProp.visible)kind="oldPacket";
-              const contactDigits=kind==="press"?[0]:[0,1];
+              const contactDigits=kind==="press"||kind==="boltTop"?[0]:kind==="boltTopClear"?[]:[0,1];
               row.handDirectionSamples.push({frame,t,kind,side:"r",shape:operation.shape,nextShape:operation.nextShape,
                 shapeMix:operation.shapeMix,digitMix:operation.digitMix,contactWeight:arms.contactWeight.r,thumbHoldingWeight:operation.thumbHoldingWeight??null,
                 packetVisible:vm.packetProp.visible,oldPacketVisible:vm.usedPacketProp.visible,
@@ -467,6 +477,10 @@ try {
           const CycleT=s=>vm.BoltCycleActionT(s,cycle);
           const boltWindow=cycle?[CycleT(cycle.hand.find(f=>f.anchor==="bolt").at+.04),CycleT(cycle.hand.findLast(f=>f.anchor==="bolt").at-.04)]:[.25,.78];
           if(action==="bolt"&&t>boltWindow[0]&&t<boltWindow[1]){prop=vm.rig.parts.bolt;kind="bolt";}
+          const topFrames=cycle?.hand?.filter(f=>f.anchor==='boltTop'&&!f.offset&&!f.shape)||[];
+          if(action==='bolt'&&cycle?.boltTopShape&&!vm.pendingHoldOpen&&topFrames.length>=2&&t>CycleT(topFrames[0].at+.04)&&t<CycleT(topFrames.at(-1).at-.04)){
+            prop=vm.rig.parts.bolt;kind='boltTop';digits=[0];
+          }
           if(action.startsWith("reload")){
             if(clip){
               const s=clip.startS+t*vm.action.duration;
@@ -493,13 +507,14 @@ try {
           }
           if(prop){
             const zbMagazine=id==="Zb26"&&kind==="magazine";
-            const hanBolt=id==="HanYang"&&kind==="bolt";
+            const hanBolt=id==="HanYang"&&["bolt","boltTop"].includes(kind);
             const hanLoading=id==="HanYang"&&["packet","oldPacket","press"].includes(kind);
-            const skinContact=(id==="HanYang"&&["packet","oldPacket","press","bolt"].includes(kind))||kind==="hopperClip"||zbMagazine;
+            const skinContact=(id==="HanYang"&&["packet","oldPacket","press","bolt","boltTop"].includes(kind))||kind==="hopperClip"||zbMagazine;
             // The opposed knob grip bears on the volar thumb across its IP
             // crease. Measure that actual skin against the isolated knob,
             // rather than a box-derived marker on the other side of the digit.
             const triangles=hanBolt?BoltKnobTriangles(prop):Triangles(prop);
+            if(kind==='boltTop')row.topPalmSamples.push({t,...HanYangRearPalm(triangles)});
             for(const digit of digits)row.propSamples.push({t,kind,digit,skinContact,
               distance:skinContact?SkinGap(side,digit,triangles,!hanBolt):Nearest(Pad(side,digit),triangles)});
             if(skinContact&&frame%15===0){
@@ -593,6 +608,11 @@ try {
     if(action.id==="HanYang"&&action.action==="bolt"){
       Check(action.skinSamples.length>0&&action.skinSamples.every(sample=>sample.vertices>4000),"HanYang: knob grasp must inspect complete finger skin");
       for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`HanYang bolt: finger skin penetrates ${(sample.maxDepth*1000).toFixed(2)} mm`);
+      if(action.topGripExpected){
+        Check(action.topPalmSamples.length>0,'HanYang: top grip did not inspect the actual volar palm');
+        for(const palm of action.topPalmSamples)Check(palm.minimumGapMm<2&&palm.meanClosest40Mm<3&&palm.areaWithin3Mm>50,
+          `HanYang top grip: palm lacks a bearing patch on the ball (${JSON.stringify(palm)})`);
+      }
     }
     if(action.id==="HanYang"){
       if(!action.skeletal)Check(action.handDirectionSamples.length>0,"HanYang: no actual palm-frame finger directions recorded");

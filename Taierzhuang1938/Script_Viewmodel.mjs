@@ -3521,6 +3521,8 @@ export class Viewmodel {
     const anchors = {
       grip, gripUnwrap: Offset(grip, clearance.unwrap), gripClear: Offset(grip, clearance.grip),
       bolt: placement, boltClear: { ...Offset(placement, cycle.boltClear ?? clearance.bolt), shape: cycle.boltClearShape ?? "packetBoltClear" },
+      // 推栓、压柄换成从上面握（cycle.boltTopShape，对标 COD：掌心压在球顶、手指往前下包住球）；没有就沿用拉栓的握法。
+      boltTop: cycle.boltTopShape ? { ...this._BoltHandPlacement(cycle.boltTopShape), shape: cycle.boltTopShape } : placement,
       boltExit: { ...Offset(placement, clearance.boltExit), shape: "packetBolt" },
     };
     this._WorkingHandPath("right", a.t, (holdOpen ? cycle.holdOpenHand : cycle.hand).map(frame => {
@@ -3529,6 +3531,11 @@ export class Viewmodel {
         const rotation = new THREE.Euler().setFromQuaternion(gripQ.clone().slerp(boltQ, frame.turnMix ?? 0.3), "YXZ");
         point = { position: (frame.at < grasp ? reach : knob).clone(), rotation: rotation.toArray().slice(0, 3), shape: frame.shape };
       } else point = { ...anchors[frame.anchor] };
+      if (frame.rotationTo) {
+        const target = new THREE.Quaternion().setFromEuler(new THREE.Euler(...anchors[frame.rotationTo].rotation, "YXZ"));
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...point.rotation, "YXZ")).slerp(target, frame.rotationMix ?? 1);
+        point = { ...point, rotation: new THREE.Euler().setFromQuaternion(rotation, "YXZ").toArray().slice(0, 3) };
+      }
       if (frame.offset) point = Offset(point, frame.offset);
       return { ...point, ...frame, position: point.position, rotation: point.rotation, at: Phase(frame.at) };
     }));
@@ -3622,18 +3629,20 @@ export class Viewmodel {
     // turnFollow < 1：攥住机柄球的拳头只跟机柄转一部分（球朝哪都一样），机柄放平时拳头不钻到机柄下面。
     const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1),
       ((this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad) * (FPS_HAND_SHAPES[shape]?.turnFollow ?? 1));
-    const placement = this._HandPlacement(shape, knob, turn);
+    const spec = FPS_HAND_SHAPES[shape];
+    const downWeight = 1 - Clamp01((this.rig.parts.bolt?.rotation.z || 0) / this._BoltLiftAngle());
+    const rotation = spec.liftedRotation?.map((value, axis) => Mix(value, spec.rotation[axis], downWeight));
+    const placement = this._HandPlacement(shape, knob, turn, rotation);
     // downOffset：机柄放平时手整体再挪开这么多（随抬柄线性收回），勾杆的手在机柄平放时不压进机匣。
     const down = FPS_HAND_SHAPES[shape]?.downOffset;
-    if (down) placement.position.addScaledVector(new THREE.Vector3().fromArray(down),
-      1 - Clamp01((this.rig.parts.bolt?.rotation.z || 0) / this._BoltLiftAngle()));
+    if (down) placement.position.addScaledVector(new THREE.Vector3().fromArray(down), downWeight);
     return placement;
   }
 
-  _HandPlacement(shape, anchor, quaternion = null) {
+  _HandPlacement(shape, anchor, quaternion = null, rotationOverride = null) {
     const spec = FPS_HAND_SHAPES[shape];
     const position = new THREE.Vector3().fromArray(spec.palmOffset);
-    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rotation,"YXZ"));
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(rotationOverride ?? spec.rotation),"YXZ"));
     if (quaternion) { position.applyQuaternion(quaternion); rotation.premultiply(quaternion); }
     position.add(anchor);
     return {position,shape,rotation:new THREE.Euler().setFromQuaternion(rotation,"YXZ").toArray().slice(0,3)};
