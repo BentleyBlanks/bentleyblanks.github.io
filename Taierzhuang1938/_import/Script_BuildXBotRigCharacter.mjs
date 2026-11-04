@@ -182,7 +182,9 @@ for (let i = 0; i < count; i++) {
   newIndex[i] = firstOf.get(key);
 }
 const Pick = (a, w) => { const out = new a.constructor(keepVerts.length * w); keepVerts.forEach((v, j) => out.set(a.subarray(v * w, v * w + w), j * w)); return out; };
-const outIdx = idx.map((i) => newIndex[i]);
+// Blender may export Uint16 indices. The output accessor is Uint32, so promote
+// the backing array too; TypedArray.map otherwise silently keeps Uint16 storage.
+const outIdx = Uint32Array.from(idx, (i) => newIndex[i]);
 const attrs = {
   POSITION: AddAccessor(Pick(outPos, 3), 5126, "VEC3", 34962, { min: lo.toArray(), max: hi.toArray() }),
   NORMAL: AddAccessor(Pick(outNrm, 3), 5126, "VEC3", 34962),

@@ -406,6 +406,7 @@ export const testDefs = {
   EditorBlockoutPlayPlanTest: { file: "Script_EditorBlockoutPlayPlanTest.mjs", desc: "白盒试玩（§17，2026-10-31）：试玩编排校验正反例、每一步怎么打（推断 / 谁变 AI / push / fresh / 上限）、过关判断、提交的 *.play.json 零错零警告且 01–05 每帧都写了（纯 Node，秒级）" },
   EditorBlockoutPlayBrowserTest: { file: "Script_EditorBlockoutPlayBrowserTest.mjs", timeoutMs: 600000, desc: "白盒试玩（§17，2026-10-31）实机：面板预设与开关、开打后不再无敌、02-4 追兵是真 AI 且站在沟底、打光进下一步先走过去再放兵、fresh 重放、中止出小结收兵还原、K 再来一遍、阵亡后摆回那一步机位、看戏步播预演 N 跳过" },
   XBotCharactersTest: { file: "Script_XBotCharactersTest.mjs", desc: "顶替 X Bot 的人物（日兵甲、何有田、罗班长）：骨名层级与初始朝向同 X Bot、初始即绑定姿势、hipsScale 同转换报告、权重与头顶收 Head、动作换人去骨长位移（纯 Node，秒级）" },
+  ShunziCharacterBrowserTest: { file: "Script_ShunziCharacterBrowserTest.mjs", timeoutMs: 300000, desc: "顺子 V5：真实动作预览、六个代表动作逐帧蒙皮、原头部与帽子刚性、播放交互及 720p 取证" },
   EditorBlockoutPrevizPlanTest: { file: "Script_EditorBlockoutPrevizPlanTest.mjs", desc: "白盒编辑器预演（§14）：校验器正反例、演员键到达时刻与阶跃字段、镜头 eye / from-look 采样、提交的 previz 文件过校验（纯 Node，秒级）" },
   EditorBlockoutFirstLevel0105SceneTest: { file: "Script_EditorBlockoutFirstLevel0105SceneTest.mjs", desc: "01–05 新剧本白盒场地：生成两次逐字相同、锚点处沟 / 坑 / 洞深度、沟底宽 ≥3.4 m、坡顶挡住集结处看前沿的视线（纯 Node）" },
   EditorBlockoutFirstLevel0105KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0105KeyframesTest.mjs", desc: "01–05 新剧本白盒关键帧：生成可复现、校验通过、人不进实心块 / 不重叠、走位沿沟不翻沟壁（纯 Node）" },
@@ -683,7 +684,7 @@ export const browserTests = new Set([
   "FrontStoryboardShotsTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest",
+  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -878,6 +879,7 @@ export const domains = {
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest","SpeakerGestureTest","SpeakerGestureClipsBrowserTest","SpeakerGestureLayerBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
+  shunziCharacter: {label:'顺子 V5 外观与动作预览',tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
   beishaheBridge: {label:'北沙河独立史料复原桥资产（不改变剧情）',tests:['BeishaheBridgeTest']},
@@ -999,6 +1001,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'shunziCharacter',pattern:/Shunzi/i},
   {domain:'particles',pattern:/FallingSoil/},
   {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|Glare|Lifecycle|Bloom|Spark|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|RenderBudget|Shadow(?:Coverage|Bounds|Instances)?|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
@@ -1279,6 +1282,7 @@ const ignoredChangeRules = [
 ];
 
 const prepushGateRules = [
+  {pattern:/Shunzi/i,tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},
   // Every production module can introduce an asynchronously attached renderer.
   // This small fixture must not depend on recognizing an old asset/factory name.
   {pattern:/\/(?:Script_|Data_).*\.mjs$|\.(?:glb|gltf)$/i,tests:['MotionVectorContractTest']},

@@ -1,0 +1,82 @@
+{
+ "schema": 1,
+ "built": "2026-11-04",
+ "script": "_import/Script_ShunziBuild.mjs",
+ "source": {
+  "file": "Shunzi_Merged_V5_Bones.glb",
+  "bytes": 11879120,
+  "sha256": "573756f88b5731fdac2394c0ee2f1454afa76d1b251d5cd7c5b8c9290c06a5cc",
+  "heightM": 1.8313
+ },
+ "output": {
+  "file": "Model/Character/Model_Shunzi.glb",
+  "bytes": 9536208,
+  "sha256": "9bcd75b1bdeabbd77d1822f0195e1863876aee743798bb310f06cea8e3a70d9e"
+ },
+ "scale": 1,
+ "crownM": 1.8312904834747314,
+ "triangles": 53260,
+ "vertices": 47033,
+ "sourceVertices": 47051,
+ "bones": 65,
+ "addedEndBones": [],
+ "rigidHead": {
+  "aboveHeadJointM": [
+   0.015,
+   0.09
+  ],
+  "vertices": 4238,
+  "correctedVertices": 0
+ },
+ "hipsY": 0.98,
+ "xbotHipsY": 1.0427,
+ "hipsScale": 0.9398,
+ "headY": 1.6087,
+ "xbotHeadY": 1.5993,
+ "images": [
+  {
+   "index": 0,
+   "role": "normal",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 1900478,
+   "bytes": 2017374
+  },
+  {
+   "index": 1,
+   "role": "baseColor",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 4246466,
+   "bytes": 2881154
+  },
+  {
+   "index": 2,
+   "role": "metallicRoughness",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 2943761,
+   "bytes": 1528070
+  }
+ ],
+ "preservation": {
+  "restShapeMaxErrorM": 3.4582288033997396e-7,
+  "bindingPreservesEmbeddedImages": true,
+  "nonCapSourcePositionsUnchanged": true,
+  "sourceHeadAboveChinMaxErrorM": 4.768953658640385e-7
+ },
+ "capRevision": {
+  "source": "Shunzi_Merged_V4.glb",
+  "version": 5,
+  "bandWidthIncrease": 0.08,
+  "liningTriangles": 192,
+  "sourceSha256": "b9ebaf0ee8ed806d1720d81c3eb28bd3f7578aabb47ac9da6ea74e614f53b6d1",
+  "mergedSha256": "b568406e7ae0d844614005684bce589c503189cce236f4bf87f27620988fa01f"
+ },
+ "binding": {
+  "method": "fitted project X Bot rig with barycentric weight transfer, rigid original head/cap and shared wrist weights",
+  "skeletonAndWeightDonor": "Model_SquadLeaderLuo.glb",
+  "donorAppearanceExported": false,
+  "sharedWristVertices": 2702
+ }
+}

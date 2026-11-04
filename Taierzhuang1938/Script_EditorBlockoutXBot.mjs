@@ -22,8 +22,8 @@ import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
 import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
-import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS, FactionCharacterKeys } from "./Data_XBotCharacters.mjs";
-import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {

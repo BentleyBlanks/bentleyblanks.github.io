@@ -1,5 +1,8 @@
 // 动作换到顶替 X Bot 的人物身上（人物表与为什么要换见 Data_XBotCharacters.mjs）。动作预览工具与白盒共用。
-import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
+
+/** 阵营表里这个阵营的人物键（写一个或几个都行），数据表本身保持可序列化。 */
+export function FactionCharacterKeys(faction) { return [].concat(XBOT_FACTION_CHARACTERS[faction] || []); }
 
 const converted = new WeakMap();
 

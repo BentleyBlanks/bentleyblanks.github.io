@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import * as THREE from "./vendor/three/build/three.module.js";
-import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS, FactionCharacterKeys } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { XBOT_CHARACTER_LOOKS } from "./Data_BlockoutXBotClips.mjs";
-import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
+import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 
 const here = import.meta.dirname;
 function ReadGlb(file) {
@@ -70,6 +70,15 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   assert.ok(Math.abs(report.headY - report.xbotHeadY) < 0.05, `${key}: 头高 ${report.headY} 与 X Bot ${report.xbotHeadY}`);
   // 权重：每点和为 1；头顶（头骨关节 9 cm 以上）只跟 Head
   const prim = doc.meshes[0].primitives[0];
+  // Declared component types must match the actual view byte spans (Blender can
+  // emit Uint16 indices, while the runtime converter writes a Uint32 accessor).
+  for (const [label, index] of [...Object.entries(prim.attributes), ["indices", prim.indices]]) {
+    const accessor = doc.accessors[index], view = doc.bufferViews[accessor.bufferView];
+    const components = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[accessor.type];
+    const bytes = { 5121: 1, 5123: 2, 5125: 4, 5126: 4 }[accessor.componentType] * components;
+    const end = (accessor.byteOffset || 0) + (accessor.count - 1) * (view.byteStride || bytes) + bytes;
+    assert.ok(end <= view.byteLength, `${key}: ${label} accessor exceeds its buffer view`);
+  }
   const W4 = Float(glb, prim.attributes.WEIGHTS_0);
   for (let i = 0; i < W4.length; i += 4) assert.ok(Math.abs(W4[i] + W4[i + 1] + W4[i + 2] + W4[i + 3] - 1) < 0.01, `${key}: 第 ${i / 4} 点权重和`);
   assert.ok(report.rigidHead?.vertices > 0, `${key}: 头顶 / 帽子权重收到 Head`);
