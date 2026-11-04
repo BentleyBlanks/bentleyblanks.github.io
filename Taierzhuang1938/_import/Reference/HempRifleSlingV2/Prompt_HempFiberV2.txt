@@ -1,0 +1,7 @@
+Use case: photorealistic-natural
+Asset type: seamless diffuse/albedo texture for an unwrapped, dry old hemp cord in a real-time 3D game.
+Primary request: one square full-bleed macro material swatch of dense natural hemp/flax fibres. The 3D model will provide the large three-strand rope twist; this image must supply only realistic fine longitudinal fibre texture.
+Composition: completely flat orthographic surface, fibres predominantly running vertically, consistent scale, seamless tile on all four edges, 2048 by 2048 preferred.
+Material: muted desaturated warm grey-tan, dry rough matte natural plant fibres, fine individual filaments, subtle darker worn fibres and dust, modest irregular fuzz embedded in the surface. Authentic close-up fibre detail, restrained contrast, no stylized giant grooves.
+Lighting: uniform neutral diffuse illumination, no directional lighting baked in, no cast shadows, no specular highlights, no ambient vignette.
+Constraints: texture covers the entire image; no rope silhouette, no background border, no knots, no metal, no cloth weave crossing, no labels, no watermark, no text. No rubber, plastic, polished leather, or cartoon rendering.

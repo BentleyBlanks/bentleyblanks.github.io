@@ -1033,7 +1033,7 @@ const changedDomainRules = [
   { domain: "combat", pattern: /Script_FirstPersonGait\.mjs/ },
   { domain: "japaneseSoldierYi", pattern: /JapaneseSoldierYi/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
-  { domain: "rifleSling", pattern: /RifleSlingCloth|RelaxedGait|FirstLevelP012BackRifle|BackRifleRun/ },
+  { domain: "rifleSling", pattern: /RifleSling|HempRifleSling|RelaxedGait|FirstLevelP012BackRifle|BackRifleRun/ },
   { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|ClothBlood|DongguaQuilt|DoorCurtain|SichuanBanner/ },
   { domain: "hair", pattern: /(?:Hair\/|(?:Script|Data)(?:_Tuning|_Text)?_Hair)/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },

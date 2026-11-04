@@ -18,7 +18,7 @@
 // weapon track takes over (UpdateRelaxedGaitWeapon).
 import { AnimationClip } from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
-import { RegisterRifleSling } from "./Script_RifleSlingCloth.mjs";
+import { RegisterRifleSling, SetRifleSlingWeapon } from "./Script_RifleSlingCloth.mjs";
 import { ACTOR_LOCOMOTION_PROFILES } from "./Data_ActorLocomotion.mjs";
 import { ACTOR_LOCOMOTION, RELAXED_GAIT as C } from "./Data_Tuning_ActorLocomotion.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
@@ -159,7 +159,7 @@ export function UpdateRelaxedGaitWeapon(soldier, slung) {
     mount.name = "RelaxedGaitBackRifleMount"; rig.bones.chest.add(mount);
     const sling = source.getObjectByName("Model_BackRifleSling")?.clone();
     // 带子换成布料模拟（Script_RifleSlingCloth）：这条原带子留着当参照、不画
-    if (sling) { mount.add(sling); rig.relaxedGaitSling = sling; RegisterRifleSling(sling, actor.root); }
+    if (sling) { mount.add(sling); rig.relaxedGaitSling = sling; RegisterRifleSling(sling, actor.root, actor.factory?.library); }
   }
   if (slung && rig.relaxedGaitMount && rig.relaxedGaitRifleSource !== weapon) {
     rig.relaxedGaitRifle?.parent?.remove(rig.relaxedGaitRifle);
@@ -168,6 +168,7 @@ export function UpdateRelaxedGaitWeapon(soldier, slung) {
     rig.relaxedGaitMount.add(copy);
     copy.position.set(0, 0, 0); copy.rotation.set(-Math.PI / 2, 0, 0);
     copy.scale.setScalar(actor._SocketScaleCompensation?.(rig.relaxedGaitMount) ?? 1);
+    SetRifleSlingWeapon(rig.relaxedGaitSling, copy, actor.weaponId);
     // Bone attachments write real motion (docs/Data_MotionVectorContract.md); the old diagnostic
     // mark is kept as the P012 back rifle does.
     rig.relaxedGaitMount.traverse(object => { if (object.isMesh && !object.isSkinnedMesh) MarkDynamicPrepass(object); });

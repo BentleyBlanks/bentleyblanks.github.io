@@ -1,7 +1,7 @@
 // P012-only use of the supplied BackRifleRun. Original cast, weapons and combat clips stay owned by Actor.
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
-import { RegisterRifleSling } from "./Script_RifleSlingCloth.mjs";
+import { RegisterRifleSling, SetRifleSlingWeapon } from "./Script_RifleSlingCloth.mjs";
 let libraryPromise;
 
 /**
@@ -39,7 +39,7 @@ export async function InstallP012BackRifle(soldier) {
   mount.name="P012BackRifleMount";rig.bones.chest.add(mount);
   const sling=sourceMount.getObjectByName("Model_BackRifleSling").clone();mount.add(sling);sling.visible=false;
   MarkMountVelocity(sling);
-  RegisterRifleSling(sling,actor.root);   // 带子换成布料模拟（Script_RifleSlingCloth），原带子当参照、不画
+  RegisterRifleSling(sling,actor.root,actor.factory?.library);
   const select=rig._ActionForState;
   rig._ActionForState=function SelectP012BackRifle(state={}){
     const id=select.call(this,state);
@@ -57,6 +57,7 @@ export async function InstallP012BackRifle(soldier) {
       if(this.weaponGroup.parent!==mount){mount.add(this.weaponGroup);MarkMountVelocity(this.weaponGroup);}
       this.weaponGroup.position.set(0,0,0);this.weaponGroup.rotation.set(-Math.PI/2,0,0);
       this.weaponGroup.scale.setScalar(this._SocketScaleCompensation(mount));this.weaponGroup.visible=true;
+      SetRifleSlingWeapon(sling,this.weaponGroup,this.weaponId);
       mounted=true;
     }else if(mounted&&this.weaponGroup){this._MountRiggedWeapon(this.weaponGroup);this._UpdateRiggedWeaponMount();mounted=false;}
     sling.visible=!!active;return result;

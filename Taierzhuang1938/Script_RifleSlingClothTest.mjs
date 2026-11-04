@@ -33,8 +33,11 @@ const hooks = registerHooks({
 const THREE = await import("three");
 const { GLTFLoader } = await import("./vendor/three/examples/jsm/loaders/GLTFLoader.js");
 const M = await import("./Script_RifleSlingCloth.mjs");
+const { PrepareRifleSlingVisual } = await import("./Script_RifleSlingVisual.mjs");
+const { RIFLE_SLING_MOUNTS } = await import("./Data_RifleSlingMounts.mjs");
+const {SlingPinPosition}=await import('./Script_RifleSlingGunContacts.mjs');
 hooks.deregister();
-const { RIFLE_SLING_CLOTH: CFG, ExtractSlingRest, SlingRope, RegisterRifleSling, SetRifleSlingAnchors, StepRifleSlings, SetRifleSlingClothEnabled, ClearRifleSlings, RifleSlingClothStats } = M;
+const { RIFLE_SLING_CLOTH: CFG, ExtractSlingRest, SlingRope, RegisterRifleSling, SetRifleSlingWeapon, SetRifleSlingAnchors, StepRifleSlings, SetRifleSlingClothEnabled, ClearRifleSlings, RifleSlingClothStats } = M;
 
 let checks = 0;
 const Check = (ok, label, detail = "") => { checks += 1; assert.ok(ok, `${label}${detail ? `: ${detail}` : ""}`); console.log(`ok   ${label}${detail ? `  — ${detail}` : ""}`); };
@@ -66,6 +69,24 @@ function StripTextures(bytes) {
 }
 const glb = StripTextures(fs.readFileSync(new URL("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb", import.meta.url)));
 const Load = () => new Promise((resolve, reject) => new GLTFLoader().parse(glb, "", resolve, reject));
+const hempBytes = StripTextures(fs.readFileSync(new URL("./Model/HempRifleSlingV2/Model_RifleSlingHempV2.glb", import.meta.url)));
+const hempSource = await new GLTFLoader().parseAsync(hempBytes, "");
+const hemp = PrepareRifleSlingVisual(hempSource);
+{
+  const geometry = hempSource.scene.getObjectByName('RopeHemp_Skinned').geometry, position = geometry.attributes.position;
+  let radius = 0, minZ = Infinity, maxZ = -Infinity, weightError = 0;
+  for (let i = 0; i < position.count; i++) {
+    radius = Math.max(radius, Math.hypot(position.getX(i), position.getY(i)));
+    minZ = Math.min(minZ, position.getZ(i)); maxZ = Math.max(maxZ, position.getZ(i));
+    let sum = 0;
+    for (let j = 0; j < 4; j++) sum += geometry.attributes.skinWeight.getComponent(i, j);
+    weightError = Math.max(weightError, Math.abs(sum - 1));
+  }
+  Check(hemp.inverseBinds.length === CFG.count && hemp.bindRotations.length === CFG.count, "真实 Blender 麻绳具有 32 根完整绑定骨");
+  Check(radius > .0034 && radius < .0036 && maxZ - minZ > 1.59 && maxZ - minZ < 1.61,
+    "三股绳外径 7 mm，静止长 1.6 m，沿 glTF +Z", `${F(radius * 2000, 2)} mm / ${F(maxZ-minZ,3)} m`);
+  Check(weightError < 1e-6 && geometry.index.count / 3 === 18432, "真实绳股几何与归一蒙皮权重", `${geometry.index.count / 3} triangles`);
+}
 
 // ---------------------------------------------------------------------------
 // 1. 资产带子 → 中线
@@ -84,7 +105,7 @@ Check(rest.width > 0.02 && rest.width < 0.035, "带子宽 2–3.5 cm", `${F(rest
   const lastA = new THREE.Vector3().fromBufferAttribute(pos, pos.count - 2), lastB = new THREE.Vector3().fromBufferAttribute(pos, pos.count - 1);
   const last = lastA.add(lastB).multiplyScalar(0.5);
   const p0 = new THREE.Vector3().fromArray(rest.points, 0), pN = new THREE.Vector3().fromArray(rest.points, (rest.count - 1) * 3);
-  Check(p0.distanceTo(first) < 0.002 && pN.distanceTo(last) < 0.002, "两头 = 资产带子的两个端点（背带环）", `${F(p0.distanceTo(first) * 1000, 2)} / ${F(pN.distanceTo(last) * 1000, 2)} mm`);
+  Check(p0.distanceTo(first) < 0.002 && pN.distanceTo(last) < 0.002, "保留源引导路径的两端（实际枪环另核）", `${F(p0.distanceTo(first) * 1000, 2)} / ${F(pN.distanceTo(last) * 1000, 2)} mm`);
   let worstUnit = 0, worstDot = 0;
   for (let i = 0; i < rest.count; i += 1) {
     const n = new THREE.Vector3().fromArray(rest.normals, i * 3), w = new THREE.Vector3().fromArray(rest.widthDirs, i * 3);
@@ -215,18 +236,24 @@ Step(world, 1 / 60);
   Check(!underActor, "不在人物底下（X Bot 层藏人物底下的蒙皮网格、伤口扫人物的蒙皮网格，都碰不到它）");
   Check(sling.layers.mask === 0 && sling.visible, "原带子不画（layers 全关），显隐照旧", `mask=${sling.layers.mask} visible=${sling.visible}`);
   Check(cloth.samples.count > 150 && cloth.samples.count < 1500, "身体表面采样点数量合理（体素抽稀）", `${cloth.samples.count}`);
-  // 蒙皮网格的环 = 质点
+  // The exporter reorders vertices. Measure actual skinned vertices against the adjacent
+  // centreline segments by rest Z, rather than assuming the old eight-vertices-per-bone layout.
   const mesh = cloth.mesh, v = new THREE.Vector3(), F0 = FrameOf(sling);
-  let worstCenter = 0, worstWidth = 0;
-  for (let i = 0; i < cloth.rope.count; i += 1) {
-    const ring = [];
-    for (let k = 0; k < 8; k += 1) ring.push(mesh.getVertexPosition(i * 8 + k, v.set(0, 0, 0)).clone().applyMatrix4(mesh.matrixWorld));
-    const center = ring.slice(0, 4).reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(0.25);
-    const want = new THREE.Vector3().fromArray(cloth.rope.p, i * 3).applyMatrix4(F0);
-    worstCenter = Math.max(worstCenter, center.distanceTo(want));
-    worstWidth = Math.max(worstWidth, Math.abs(ring[0].distanceTo(ring[1]) - (CFG.widthM || rest.width)));
+  mesh.skeleton.update();
+  let worstRadius = 0, pinError = 0;
+  for (let k=0;k<mesh.geometry.attributes.position.count;k+=7) {
+    let s=0;for(let j=0;j<4;j++)s+=mesh.geometry.attributes.skinIndex.getComponent(k,j)*mesh.geometry.attributes.skinWeight.getComponent(k,j);
+    const a=Math.min(30,Math.floor(THREE.MathUtils.clamp(s,0,31)));
+    mesh.getVertexPosition(k,v).applyMatrix4(mesh.matrixWorld);
+    const line=new THREE.Line3(new THREE.Vector3().fromArray(cloth.rope.p,a*3).applyMatrix4(F0),new THREE.Vector3().fromArray(cloth.rope.p,(a+1)*3).applyMatrix4(F0));
+    const d=line.closestPointToPoint(v,true,new THREE.Vector3()).distanceTo(v);
+    worstRadius=Math.max(worstRadius,d);
   }
-  Check(worstCenter < 1e-4 && worstWidth < 1e-4, "CPU 蒙皮：每个环的中心 = 质点、环宽 = 带子宽", `${F(worstCenter * 1000, 3)} mm / ${F(worstWidth * 1000, 3)} mm`);
+  for(let i=0;i<CFG.count;i++) {
+    const actual=new THREE.Vector3().applyMatrix4(mesh.skeleton.boneInverses[i]).applyMatrix4(cloth.bones[i].matrixWorld);
+    pinError=Math.max(pinError,actual.distanceTo(new THREE.Vector3().fromArray(cloth.rope.p,i*3).applyMatrix4(F0)));
+  }
+  Check(worstRadius < .0042 && pinError<1e-6, "真实三股绳 CPU 蒙皮贴合中线与骨固定点", `外半径 ${F(worstRadius*1000,3)} mm / 骨误差 ${F(pinError*1000,5)} mm`);
   const m = Measure(world);
   Check(m.pin < 1e-6, "两头钉在背带环上", `${m.pin.toExponential(1)} m`);
   // 身体表面按 3 cm 一个点采样、切平面由最近三个点插，曲面上会差几毫米；小部件（腰包）采样稀，差得多一点
@@ -275,6 +302,29 @@ console.log("--- 3. 跑 4 s");
 }
 
 // ---------------------------------------------------------------------------
+// Hemp must settle after an abrupt stop. Freeze the actual body pose so residual
+// movement is the cord's own response, not continued animation input.
+{
+  world.mixer.timeScale=0;
+  const positions=[],lengths=[];
+  for(let frame=0;frame<60;frame++){
+    Step(world,1/60);positions.push(Float64Array.from(world.cloth.rope.p));lengths.push(world.cloth.rope.Stats().length);
+  }
+  const span=(from,to)=>{
+    let max=0;
+    for(let i=3;i<positions[0].length-3;i+=3){
+      const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];
+      for(let f=from;f<to;f++)for(let axis=0;axis<3;axis++){lo[axis]=Math.min(lo[axis],positions[f][i+axis]);hi[axis]=Math.max(hi[axis],positions[f][i+axis]);}
+      max=Math.max(max,Math.hypot(...hi.map((v,k)=>v-lo[k])));
+    }
+    return max;
+  };
+  const early=span(0,15),late=span(45,60),variation=(Math.max(...lengths)-Math.min(...lengths))/lengths[0];
+  Check(late<.001 && (early<.005||late<early*.2),"急停后自行衰减，末 0.25 s 余振 < 1 mm",`初段 ${F(early*1000,2)} / 末段 ${F(late*1000,3)} mm`);
+  Check(variation<.025,"急停中整条绳长变化 < 2.5%",`${F(variation*100,2)}%`);
+  world.mixer.timeScale=1;
+}
+
 // 4. 瞬移 / 暂停 / 藏起来 / 关掉 / 丢掉
 // ---------------------------------------------------------------------------
 console.log("--- 4. 瞬移 / 暂停 / 藏起来 / 关掉 / 丢掉");
@@ -384,5 +434,93 @@ for (const disabled of [false, true]) {
   }
   Check(error<1e-6,"身体贴合参考带反推时，两个端点仍跟着实际枪架",`${F(error*1000,3)} mm`);
   ClearRifleSlings();
+}
+console.log('--- 7. 实际汉阳造前后背带环');
+{
+  const bytes=StripTextures(fs.readFileSync(new URL('./Model/HanYang173R/Model_HanYang173R.glb',import.meta.url)));
+  const model=await new GLTFLoader().parseAsync(bytes,'');model.scene.updateMatrixWorld(true);
+  const wood=[];
+  model.scene.traverse(mesh=>{
+    if(!mesh.isMesh||!/Wood/.test(mesh.name))return;
+    const geometry=mesh.geometry,index=geometry.index,count=index?index.count:geometry.attributes.position.count;
+    for(let i=0;i<count;i+=3){
+      const vertices=[0,1,2].map(j=>mesh.getVertexPosition(index?index.getX(i+j):i+j,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
+      wood.push(new THREE.Triangle(...vertices));
+    }
+  });
+  for(const end of ['front','rear']){
+    const spec=RIFLE_SLING_MOUNTS.HanYang[end],loop=model.scene.getObjectByName(spec.part),point=new THREE.Vector3().fromArray(spec.position);
+    Check(!!loop?.isMesh,`汉阳造 ${end} 使用原枪金属背带环部件`);
+    const box=new THREE.Box3().setFromObject(loop),center=box.getCenter(new THREE.Vector3());
+    let clearance=Infinity;
+    for(let i=0;i<loop.geometry.attributes.position.count;i++)clearance=Math.min(clearance,loop.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(loop.matrixWorld).distanceTo(point));
+    Check(center.distanceTo(point)<.00001&&clearance>.0035&&clearance<.012,`汉阳造 ${end} 定位于实测环孔，容得下 7 mm 绳`,`${F(clearance*1000,2)} mm 净半径`);
+  }
+  const w=await Setup(),mount=w.sling.parent;w.scene.updateMatrixWorld(true);
+  const gun=model.scene;mount.add(gun);gun.rotation.set(-Math.PI/2,0,0);gun.scale.setScalar(1/mount.getWorldScale(new THREE.Vector3()).y);
+  SetRifleSlingWeapon(w.sling,gun,'HanYang');
+  let error=0,maxStretch=0,woodCrossings=0;
+  for(let frame=0;frame<120;frame++){
+    Step(w,1/60,frame>30?3.2:0);
+    for(const [end,i] of [['front',0],['rear',31]]){
+      const wanted=SlingPinPosition(RIFLE_SLING_MOUNTS.HanYang[end]).applyMatrix4(gun.matrixWorld);
+      error=Math.max(error,wanted.distanceTo(new THREE.Vector3().setFromMatrixPosition(w.cloth.bones[i].matrixWorld)));
+    }
+    maxStretch=Math.max(maxStretch,w.cloth.rope.Stats().maxStretch);
+    if(frame%30===0||frame===119){
+      const r=w.cloth.rope,ray=new THREE.Ray(),hit=new THREE.Vector3();
+      for(const i of [0,1,2,28,29,30]){
+        ray.origin.fromArray(r.p,i*3).applyMatrix4(r.gun.toGun);
+        const end=new THREE.Vector3().fromArray(r.p,(i+1)*3).applyMatrix4(r.gun.toGun),length=end.distanceTo(ray.origin);
+        ray.direction.subVectors(end,ray.origin).normalize();
+        for(const triangle of wood)if(ray.intersectTriangle(triangle.a,triangle.b,triangle.c,false,hit)){
+          const along=hit.distanceTo(ray.origin);if(along>.0001&&along<length-.0001)woodCrossings++;
+        }
+      }
+    }
+  }
+  Check(error<1e-6&&Number.isFinite(maxStretch)&&maxStretch<1.25,'真实武器缩放与背架旋转下，跑动两端始终钉在金属环',`${F(error*1000,4)} mm / ${F(maxStretch,3)} stretch`);
+  Check(wood.length>0&&woodCrossings===0,'两端绳段不穿越实际汉阳造木托三角面',`${woodCrossings} 处 / ${wood.length} 木托三角`);
+  ClearRifleSlings();
+}
+// The legacy Type38 has no named swivel nodes. Reconstruct welded loose components
+// independently of its material labels (the two actual U-loops are in the wood batch).
+function TzmMeshes(id){
+  const doc=JSON.parse(fs.readFileSync(new URL(`./Model/Model_${id}.tzm.json`,import.meta.url),'utf8')),matrices=[];
+  return doc.nodes.flatMap((node,index)=>{
+    const matrix=new THREE.Matrix4().compose(new THREE.Vector3().fromArray(node.t),new THREE.Quaternion().setFromEuler(new THREE.Euler(...node.r)),new THREE.Vector3(1,1,1));
+    if(node.parent>=0)matrix.premultiply(matrices[node.parent]);matrices[index]=matrix;
+    return (node.meshes||[]).map(id=>{
+      const mesh=doc.meshes[id],bytes=Buffer.from(mesh.pos,'base64'),points=[];
+      for(let i=0;i<mesh.count;i++)points.push(new THREE.Vector3(...[0,1,2].map(axis=>bytes.readUInt16LE((i*3+axis)*2)*mesh.posScale[axis]+mesh.posMin[axis])).applyMatrix4(matrix));
+      const raw=Buffer.from(mesh.idx,'base64'),stride=mesh.idxBits/8,indices=[];
+      for(let i=0;i<raw.length;i+=stride)indices.push(stride===2?raw.readUInt16LE(i):raw.readUInt32LE(i));
+      return {points,indices};
+    });
+  });
+}
+{
+  const components=[];
+  for(const {points,indices} of TzmMeshes('Type38')){
+    const welded=new Map(),canonical=[],parent=[];
+    points.forEach((p,i)=>{const key=p.toArray().map(v=>Math.round(v*1e5)).join(',');let at=welded.get(key);if(at===undefined){at=i;welded.set(key,i);}canonical[i]=at;parent[i]=i;});
+    const Root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+    for(let i=0;i<indices.length;i+=3){const root=Root(canonical[indices[i]]);for(let j=1;j<3;j++)parent[Root(canonical[indices[i+j]])]=root;}
+    const boxes=new Map();points.forEach((p,i)=>{const root=Root(canonical[i]);if(!boxes.has(root))boxes.set(root,new THREE.Box3());boxes.get(root).expandByPoint(p);});
+    for(const box of boxes.values()){const size=box.getSize(new THREE.Vector3());if(size.x>.03&&size.x<.05&&size.y>.01&&size.y<.03&&size.z<.01)components.push(box);}
+  }
+  for(const end of ['front','rear']){
+    const candidates=components.filter(box=>{const c=box.getCenter(new THREE.Vector3());return end==='front'?c.z<-.5&&c.z>-.75&&c.y<.01:c.z>0&&c.z<.12&&c.y<-.04;});
+    Check(candidates.length===1&&candidates[0].getCenter(new THREE.Vector3()).distanceTo(new THREE.Vector3().fromArray(RIFLE_SLING_MOUNTS.Type38[end].position))<.00001,
+      `三八式 ${end} 挂点对齐独立焊接还原的现有 U 形环`);
+  }
+  const points=TzmMeshes('ZhongZheng').flatMap(mesh=>mesh.points);
+  for(const [end,name] of [['front','RopeHemp_LashingFront'],['rear','RopeHemp_LashingRear']]){
+    const spec=RIFLE_SLING_MOUNTS.ZhongZheng[end],section=points.filter(p=>Math.abs(p.z-spec.bindingPosition[2])<.006);
+    const stock=new THREE.Box3().setFromPoints(section),lashing=new THREE.Box3().setFromObject(hempSource.scene.getObjectByName(name));
+    lashing.translate(new THREE.Vector3().fromArray(spec.bindingPosition));
+    Check(section.length>0&&lashing.min.x<stock.min.x&&lashing.max.x>stock.max.x&&lashing.min.y<stock.min.y&&lashing.max.y>stock.max.y,
+      `中正式 ${end} 实体捆扎圈围住实际护箍或枪托截面`);
+  }
 }
 console.log(`\n${checks} checks passed`);

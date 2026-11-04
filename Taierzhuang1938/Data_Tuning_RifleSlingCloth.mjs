@@ -1,16 +1,15 @@
-// Runtime sling solver, metres/seconds. Fits the existing BackRifleRun sling to the visible body;
-// no weapon, character, or animation assets are altered. User request 2026-11-04.
+// Hemp cord solver, metres/seconds. The old BackRifleRun path supplies the over-shoulder topology;
+// the Blender rope supplies the surface and measured weapon swivels supply both pins.
 export const RIFLE_SLING_CLOTH = Object.freeze({
   count: 32,
-  widthM: 0, // 0 = the original sling width.
-  thicknessM: 0.0045,
+  ropeRadiusM: 0.0035,
   substepS: 1 / 90,
   maxSubsteps: 3,
-  iterations: 10,
+  iterations: 20,
   gravity: 9.81,
-  airDamping: 2.5,
-  inertia: 0.8,
-  inertiaMaxM: 0.02,
+  airDamping: 14,
+  inertia: 0.15,
+  inertiaMaxM: 0.003,
   slack: 0.02,
   wrapShrink: 0.75,
   wrapIterations: 40,
@@ -18,16 +17,16 @@ export const RIFLE_SLING_CLOTH = Object.freeze({
   fitsPerFrame: 2,
   stretch: 1,
   compress: 0.5,
-  bend: 0.12,
+  bend: 0.08,
   restBias: 0.002,
   // Central chest section: replace an off-body artist guide with this body's settled fit.
   guideFromFraction: 0.25,
-  guideToFraction: 0.5,
-  surfaceGapM: 0.006,
+  guideToFraction: 0.6,
+  surfaceGapM: 0.007,
   contactM: 0.012,
   friction: 0.45,
   maxSpeedMps: 5,
-  sampleVoxelM: 0.03,
+  sampleVoxelM: 0.015,
   sampleRadiusM: 0.16,
   candidateRadiusM: 0.1,
   candidateRefreshFrames: 4,

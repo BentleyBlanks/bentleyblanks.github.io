@@ -1,37 +1,23 @@
-// 背着的步枪那根枪带的布料模拟（2026-11-04，用户：国军日军身上背着的步枪有一根带子，希望有布料模拟的效果，
-// 至少看起来符合物理，现在那样子很奇怪）。
+// 2026-11-05 hemp rifle sling. The original BackRifleRun belt provides the over-shoulder /
+// under-arm guide and visibility; measured weapon swivels provide both pins. The 32-particle
+// PBD solver fits the current visible body, refits the thinner cord by arc length, and applies
+// strongly damped inertia and inelastic contact. The old rigid belt stays hidden by layers.
 //
-// 原来的带子（BackRifleRun GLB 的 Model_BackRifleSling，Script_RelaxedGait / Script_FirstLevelP012BackRifle 挂到胸骨
-// 下的背枪挂点上）是照原国军模型的胸口捏死的一条扁带，整条跟着胸骨走、一点不动。换了身材（白盒的 X Bot、日兵甲、何有田）
-// 就不贴身：X Bot 身上过右肩那段悬空翘成一个钩、斜挎过胸那段离开胸口；胖的人反过来切进身体。
+// Script_RifleSlingVisual loads Blender-authored helical strands, fibre PBR, eyes and lashings.
+// Only bone matrices change each frame. The new meshes live at scene root, beyond actor skin
+// replacement and wound scans. Script_Main calls StepRifleSlings after the final world-matrix
+// update, before rendering; the production prepass records the bones and rigid bindings.
 //
-// 现在：带子是一根绳（count 个质点），两头钉在枪的上、下背带环上（资产带子的两个端点，跟着枪走），中间受重力、
-// 有惯性、碰身体。身体 = 这个人此刻看得见的蒙皮网格本身：带子附近的顶点按体素抽稀成表面采样点（带法线），
-// 每帧 CPU 蒙皮（逐点四骨线性混合，跟 GPU 同一个公式），每个质点按最近三个采样点插出的局部切平面推出去；
-// 开口下摆、胯边另用真实三角面拦住线段穿越。长度按这个人的身材定：装上时先把带子收紧裹到身上（PBD 把段长压短、
-// 碰身体），量出裹紧的长度，再放松 slack 当绳长，所以每种身材都是「刚好挎紧、略有余量」。
-//
-// 求解：位置动力学（PBD），坐标系 = 枪的挂点（刚体，米制、去掉缩放）。匀速走、跑时带子跟着躯干走；躯干变速
-// （起跑、急停、每一步的上下颠、转身）时把变了的那一截按 inertia 传给带子 —— 带子有甩动和滞后，又不会被几米每秒的
-// 平移拖散。子步 substepS、每子步 iterations 轮：钉两头 → 段长（不许拉长、压短较软）→ 抗弯（皮带比绳硬）→ 很弱地
-// 拉回资产形状（只管「从右肩过、从左肋下绕」这个走向，免得滑脱）→ 碰身体（最后做，身体说了算）。贴着身体的点有摩擦。
-//
-// 渲染：一个质点一根骨头的 SkinnedMesh（GPU 蒙皮、运动矢量按骨骼历史自动对，见 docs/Data_MotionVectorContract.md：
-// 不许 CPU 改顶点），截面 = 宽 × 厚的扁方条。骨头朝向：沿带子、贴身处带面贴着身体表面（宽度方向 = 切线 × 表面法线），
-// 悬空处与两头照资产带子的朝向。这个网格挂在场景根下的 RifleSlingCloth 组里，**不挂在人物底下**：白盒 X Bot 层会把
-// 人物底下所有蒙皮网格藏掉，伤口 / 血迹也扫人物的蒙皮网格。原带子留在原地当参照（位置、显隐都由原来的代码管，
-// X Bot 的 _KeepSling 照常改它），只是不画（layers 全关）；模拟出来的带子每帧照它的显隐。
-//
-// 接线：原带子造出来时 RegisterRifleSling(原带子, 人物根)；Script_Main.RenderScene 在整帧唯一一次 updateMatrixWorld
-// 之后调 StepRifleSlings（这时姿势、挂点都是这一帧的终值）。没注册 / 没人调 Step 的页面原带子照旧画。
-// halfRateM 外隔帧算、simRangeM 外不模拟（带子按挂点刚性跟着走）；装上每帧限 fitsPerFrame 根；藏起来超过 hiddenResetS
-// 再出现时重新挎上。
-// 口径：docs/Data_RifleSlingCloth.md；门禁 Script_RifleSlingClothTest（纯 Node）、Script_RifleSlingClothBrowserTest（白盒实机）。
+// Registration: RelaxedGait and FirstLevelP012BackRifle pass the material library and actual gun.
+// Distance throttling, pause, refit, layer restoration and disposal are shared with the old path.
+// Contract: docs/Data_RifleSlingCloth.md. Gates: RifleSlingClothTest / RifleSlingClothBrowserTest.
 
 import * as THREE from "three";
 
 import { RIFLE_SLING_CLOTH as TUNING } from "./Data_Tuning_RifleSlingCloth.mjs";
-import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import {LoadRifleSlingVisual,RifleSlingVisualReady,CreateRifleSlingVisual,SetRifleSlingBindingGeometry} from './Script_RifleSlingVisual.mjs';
+import {RIFLE_SLING_MOUNTS} from './Data_RifleSlingMounts.mjs';
+import {RifleSlingGunContacts,SlingPinPosition} from './Script_RifleSlingGunContacts.mjs';
 
 export const RIFLE_SLING_CLOTH = Object.freeze({
   ...TUNING,
@@ -248,7 +234,7 @@ export class BodySurfaceSamples {
    */
   Update(frame = null, only = null, positionsOnly = false) {
     const S = only ? only.length : this.count;
-    if (!this.count) return;
+    if (!this.count) return false;
     let changed = false;
     for (let m = 0; m < this.meshes.length; m += 1) {
       const mesh = this.meshes[m];
@@ -264,7 +250,7 @@ export class BodySurfaceSamples {
       for (let k = 0; k < 16 && !changed; k++) changed = elements[k] !== this._lastBoneE[b * 16 + k];
       this._lastBoneE.set(elements, b * 16); B.set(elements, b * 16);
     }
-    if (!changed && (this._fullValid || only === this._updatedOnly)) return;
+    if (!changed && (this._fullValid || only === this._updatedOnly)) return false;
     if (changed) this._fullValid = false;
     if (!only) this._fullValid = true;
     this._updatedOnly = only;
@@ -297,6 +283,7 @@ export class BodySurfaceSamples {
         N[s * 3] = ax / len; N[s * 3 + 1] = ay / len; N[s * 3 + 2] = az / len;
       }
     }
+    return true;
   }
 }
 
@@ -318,6 +305,7 @@ class BodyTrianglePatches extends BodySurfaceSamples {
     }
     this.triangles = Int32Array.from(triangles);
     this.bounds = new Float32Array(triangles.length * 2);
+    this.faceNormals = new Float32Array(triangles.length);
     this.activeTriangles = null;
     this.candidates = [];
     this.narrowLists = [];
@@ -325,16 +313,11 @@ class BodyTrianglePatches extends BodySurfaceSamples {
     this.narrowCounts = null;
     this.narrowValid = null;
     this.active = null;
-    this.ray = new THREE.Ray();
-    this.triangle = new THREE.Triangle();
-    this.hit = new THREE.Vector3();
-    this.normalV = new THREE.Vector3();
-    this.endpoint = new THREE.Vector3();
     return this;
   }
 
   Update(frame = null, only = null) {
-    super.Update(frame, only, true);
+    if(!super.Update(frame, only, true))return;
     this.narrowValid?.fill(0);
     const list = only ? this.activeTriangles : null, T = this.triangles, P = this.position, B = this.bounds;
     for (let j = 0; j < (list ? list.length : T.length / 3); j++) {
@@ -343,6 +326,9 @@ class BodyTrianglePatches extends BodySurfaceSamples {
         B[at + axis] = Math.min(P[a + axis], P[b + axis], P[c + axis]);
         B[at + axis + 3] = Math.max(P[a + axis], P[b + axis], P[c + axis]);
       }
+      const ux=P[b]-P[a],uy=P[b+1]-P[a+1],uz=P[b+2]-P[a+2],vx=P[c]-P[a],vy=P[c+1]-P[a+1],vz=P[c+2]-P[a+2];
+      const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,length=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      this.faceNormals[t]=nx/length;this.faceNormals[t+1]=ny/length;this.faceNormals[t+2]=nz/length;
     }
   }
 
@@ -375,23 +361,19 @@ class BodyTrianglePatches extends BodySurfaceSamples {
   }
 
   Collide(rope, broad = false) {
-    const p = rope.p, P = this.position, T = this.triangles, B = this.bounds;
-    const ray = this.ray, triangle = this.triangle, hit = this.hit, normal = this.normalV;
-    let needsBroad = false;
-    for (let i = this.start; i < rope.count - 1; i++) {
-      let list = this.candidates[i];
-      if (!list?.length) continue;
-      const from = i * 3, to = from + 3;
-      ray.origin.fromArray(p, from); this.endpoint.fromArray(p, to);
-      let length = ray.direction.subVectors(this.endpoint, ray.origin).length();
-      if (length < 1e-9) continue;
-      ray.direction.multiplyScalar(1 / length);
+    const p=rope.p,P=this.position,T=this.triangles,B=this.bounds,N=this.faceNormals;
+    let needsBroad=false;
+    for(let i=this.start;i<rope.count-1;i++){
+      let list=this.candidates[i];if(!list?.length)continue;
+      const from=i*3,to=from+3;
+      let dx=p[to]-p[from],dy=p[to+1]-p[from+1],dz=p[to+2]-p[from+2];
+      if(dx*dx+dy*dy+dz*dz<1e-18)continue;
       let minX=Math.min(p[from],p[to]),maxX=Math.max(p[from],p[to]),minY=Math.min(p[from+1],p[to+1]),maxY=Math.max(p[from+1],p[to+1]),minZ=Math.min(p[from+2],p[to+2]),maxZ=Math.max(p[from+2],p[to+2]);
       let count=list.length;
       const useNarrow=!broad&&!rope.hard,E=this.narrowBounds,off=i*6;
-      if(useNarrow) {
-        if(!this.narrowValid[i]||minX<E[off]||minY<E[off+1]||minZ<E[off+2]||maxX>E[off+3]||maxY>E[off+4]||maxZ>E[off+5]) {
-          const margin=rope.cfg.contactM;
+      if(useNarrow){
+        if(!this.narrowValid[i]||minX<E[off]||minY<E[off+1]||minZ<E[off+2]||maxX>E[off+3]||maxY>E[off+4]||maxZ>E[off+5]){
+          const margin=rope.cfg.ropeRadiusM+.0005;
           E[off]=minX-margin;E[off+1]=minY-margin;E[off+2]=minZ-margin;E[off+3]=maxX+margin;E[off+4]=maxY+margin;E[off+5]=maxZ+margin;
           const nearby=this.narrowLists[i];let selected=0;
           for(const t of list){const at=t*2;if(B[at+3]>=E[off]&&B[at]<=E[off+3]&&B[at+4]>=E[off+1]&&B[at+1]<=E[off+4]&&B[at+5]>=E[off+2]&&B[at+2]<=E[off+5])nearby[selected++]=t;}
@@ -399,33 +381,33 @@ class BodyTrianglePatches extends BodySurfaceSamples {
         }
         list=this.narrowLists[i];count=this.narrowCounts[i];
       }
-      for (let candidate=0;candidate<count;candidate++) {
-        const t=list[candidate];
-        const at = t * 2;
-        if (maxX < B[at] || minX > B[at+3] || maxY < B[at+1] || minY > B[at+4] || maxZ < B[at+2] || minZ > B[at+5]) continue;
-        const a = T[t] * 3, b = T[t + 1] * 3, c = T[t + 2] * 3;
-        triangle.a.fromArray(P, a); triangle.b.fromArray(P, b); triangle.c.fromArray(P, c);
-        if (!ray.intersectTriangle(triangle.a, triangle.b, triangle.c, false, hit) || hit.distanceToSquared(ray.origin) > length * length) continue;
-        triangle.getNormal(normal);
-        for (const endpoint of [i, i + 1]) {
-          if (endpoint === 0 || endpoint === rope.count - 1) continue;
-          const at = endpoint * 3;
-          const distance = (p[at] - hit.x) * normal.x + (p[at + 1] - hit.y) * normal.y + (p[at + 2] - hit.z) * normal.z;
-          if (distance < rope.radius) {
-            const correction = rope.radius - distance;
-            p[at] += normal.x * correction; p[at + 1] += normal.y * correction; p[at + 2] += normal.z * correction;
-          }
+      for(let candidate=0;candidate<count;candidate++){
+        const t=list[candidate],at=t*2;
+        if(maxX<B[at]||minX>B[at+3]||maxY<B[at+1]||minY>B[at+4]||maxZ<B[at+2]||minZ>B[at+5])continue;
+        const a=T[t]*3,b=T[t+1]*3,c=T[t+2]*3;
+        const ax=P[a],ay=P[a+1],az=P[a+2],ux=P[b]-ax,uy=P[b+1]-ay,uz=P[b+2]-az,vx=P[c]-ax,vy=P[c+1]-ay,vz=P[c+2]-az;
+        // Double-sided Moller-Trumbore with the unnormalized segment direction.
+        // Its parameter is directly in [0,1]. No per-candidate vector objects or ray normalization.
+        const hx=dy*vz-dz*vy,hy=dz*vx-dx*vz,hz=dx*vy-dy*vx,det=ux*hx+uy*hy+uz*hz;
+        if(Math.abs(det)<1e-14)continue;
+        const inverse=1/det,sx=p[from]-ax,sy=p[from+1]-ay,sz=p[from+2]-az,u=(sx*hx+sy*hy+sz*hz)*inverse;
+        if(u<0||u>1)continue;
+        const qx=sy*uz-sz*uy,qy=sz*ux-sx*uz,qz=sx*uy-sy*ux,v=(dx*qx+dy*qy+dz*qz)*inverse;
+        if(v<0||u+v>1)continue;
+        const along=(vx*qx+vy*qy+vz*qz)*inverse;if(along<0||along>1)continue;
+        const nx=N[t],ny=N[t+1],nz=N[t+2];
+        for(let endpoint=i;endpoint<=i+1;endpoint++){
+          if(endpoint===0||endpoint===rope.count-1)continue;
+          const at=endpoint*3,distance=(p[at]-ax)*nx+(p[at+1]-ay)*ny+(p[at+2]-az)*nz;
+          if(distance<rope.radius){const correction=rope.radius-distance;p[at]+=nx*correction;p[at+1]+=ny*correction;p[at+2]+=nz*correction;}
         }
-        ray.origin.fromArray(p, from); this.endpoint.fromArray(p, to);
-        length = ray.direction.subVectors(this.endpoint, ray.origin).length();
-        if (length < 1e-9) break;
-        ray.direction.multiplyScalar(1 / length);
+        dx=p[to]-p[from];dy=p[to+1]-p[from+1];dz=p[to+2]-p[from+2];
+        if(dx*dx+dy*dy+dz*dz<1e-18)break;
         minX=Math.min(p[from],p[to]);maxX=Math.max(p[from],p[to]);minY=Math.min(p[from+1],p[to+1]);maxY=Math.max(p[from+1],p[to+1]);minZ=Math.min(p[from+2],p[to+2]);maxZ=Math.max(p[from+2],p[to+2]);
-        if(useNarrow&&(minX<E[off]||minY<E[off+1]||minZ<E[off+2]||maxX>E[off+3]||maxY>E[off+4]||maxZ>E[off+5])) needsBroad=true;
+        if(useNarrow&&(minX<E[off]||minY<E[off+1]||minZ<E[off+2]||maxX>E[off+3]||maxY>E[off+4]||maxZ>E[off+5]))needsBroad=true;
       }
     }
-    // A projection which leaves the cached envelope gets the complete broad list immediately.
-    // The cache can therefore omit no triangle that could intersect the current segment.
+    // A projection outside the cached envelope gets the full broad list immediately.
     if(needsBroad)this.Collide(rope,true);
   }
 }
@@ -445,7 +427,7 @@ export class SlingRope {
     this.rest = new Float64Array(count * 3);
     this.guide = null;
     this.segment = 0.03;
-    this.radius = cfg.thicknessM / 2 + cfg.surfaceGapM;
+    this.radius = cfg.ropeRadiusM + cfg.surfaceGapM;
     this.candidates = [];                       // 每个质点的候选采样点号
     this.plane = new Int32Array(count).fill(-1); // 这一子步最近的采样点（-1 = 附近没有身体）
     this.planeP = new Float64Array(count * 3);   // 这一子步的切平面：过哪一点、外法线（PickPlanes）
@@ -587,6 +569,7 @@ export class SlingRope {
   Fit(gravity = [0, -this.cfg.gravity, 0]) {
     const cfg = this.cfg, n = this.count;
     this.guide = null;
+    this.plane.fill(-1);
     this.p.set(this.rest);
     let restLength = 0;
     for (let i = 0; i < n - 1; i += 1) restLength += this._SegmentLength(i);
@@ -603,6 +586,7 @@ export class SlingRope {
       this.PickPlanes();
       this.Collide();
       this.patches?.Collide(this);
+      this.gun?.Collide(this);
     }
     this.hard = false;
     let wrapped = 0;
@@ -629,13 +613,33 @@ export class SlingRope {
       const at = i * 3, P = surface.position, N = surface.normal;
       let nearest = -1, best = Infinity;
       for (let sampleIndex = 0; sampleIndex < surface.count; sampleIndex++) {
-        const j = sampleIndex * 3, dx = this.rest[at] - P[j], dy = this.rest[at + 1] - P[j + 1], dz = this.rest[at + 2] - P[j + 2];
+        const j = sampleIndex * 3, dx = this.p[at] - P[j], dy = this.p[at + 1] - P[j + 1], dz = this.p[at + 2] - P[j + 2];
         const distance = dx * dx + dy * dy + dz * dz;
         if (distance < best) { best = distance; nearest = j; }
       }
-      const j = nearest, gap = (this.rest[at] - P[j]) * N[j] + (this.rest[at + 1] - P[j + 1]) * N[j + 1] + (this.rest[at + 2] - P[j + 2]) * N[j + 2];
-      if (gap > this.radius + cfg.contactM) for (let axis = 0; axis < 3; axis++) this.guide[at + axis] = this.p[at + axis];
+      // Use a body-specific chest path. The old belt's normals can point inward
+      // after a body replacement, so its signed gap cannot decide whether to refit.
+      const j=nearest,gap=(this.p[at]-P[j])*N[j]+(this.p[at+1]-P[j+1])*N[j+1]+(this.p[at+2]-P[j+2])*N[j+2];
+      const pull=Math.max(0,gap-this.radius);
+      for(let axis=0;axis<3;axis++)this.guide[at+axis]=this.p[at+axis]-N[j+axis]*pull;
+      for(let axis=0;axis<3;axis++)this.p[at+axis]=this.guide[at+axis];
     }
+    // A thinner cord needs a shorter, uniformly sampled fitted path than the old
+    // wide belt. Keeping the old length makes compression constraints arch it away
+    // from the chest even when its new guide lies directly on the surface.
+    const path=Float64Array.from(this.p),arc=new Float64Array(n);
+    for(let i=1;i<n;i++)arc[i]=arc[i-1]+Math.hypot(path[i*3]-path[(i-1)*3],path[i*3+1]-path[(i-1)*3+1],path[i*3+2]-path[(i-1)*3+2]);
+    let part=0;
+    for(let i=1;i<n-1;i++){
+      const distance=arc[n-1]*i/(n-1);
+      while(part<n-2&&arc[part+1]<distance)part++;
+      const t=(distance-arc[part])/Math.max(1e-9,arc[part+1]-arc[part]);
+      for(let axis=0;axis<3;axis++)this.p[i*3+axis]=path[part*3+axis]*(1-t)+path[(part+1)*3+axis]*t;
+    }
+    this.guide.set(this.p);this.segment=arc[n-1]*(1+cfg.slack)/(n-1);
+    this.prev.set(this.p);this.RefreshCandidates();
+    for(let s=0;s<steps;s++){this.Substep(cfg.substepS,gravity);if(s%clearEvery===0)this.prev.set(this.p);}
+    this.prev.set(this.p);
     this.RefreshCandidates();
   }
 
@@ -665,7 +669,11 @@ export class SlingRope {
       this._Bias(cfg.restBias);
       if (it === 0) this.PickPlanes();
       this.Collide();
-      this.patches?.Collide(this);
+      // Resolve exact faces after each pair of distance sweeps and on the final
+      // iteration. Coarse contact remains every sweep; the final segment cannot
+      // leave the solver without the exact crossing check.
+      if(it%2===1||it===cfg.iterations-1)this.patches?.Collide(this);
+      this.gun?.Collide(this);
     }
     // 摩擦：贴着身体的点去掉一部分切向位移；再限速（身体一下顶出来的那一推不弹飞）
     const S = this.samples;
@@ -675,8 +683,9 @@ export class SlingRope {
       if (S && this.plane[i] >= 0 && this.distance[i] < cfg.contactM) {
         const N = this.planeN, nx = N[a], ny = N[a + 1], nz = N[a + 2], dn = dx * nx + dy * ny + dz * nz;
         const tx = dx - nx * dn, ty = dy - ny * dn, tz = dz - nz * dn, f = cfg.friction;
-        q[a] += tx * f; q[a + 1] += ty * f; q[a + 2] += tz * f;
-        dx -= tx * f; dy -= ty * f; dz -= tz * f;
+        // Hemp contact is inelastic: a collision projection must not become a rebound impulse.
+        q[a] += tx * f + nx * dn; q[a + 1] += ty * f + ny * dn; q[a + 2] += tz * f + nz * dn;
+        dx = p[a] - q[a]; dy = p[a + 1] - q[a + 1]; dz = p[a + 2] - q[a + 2];
       }
       const v = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (v > vmax) { const k = 1 - vmax / v; q[a] += dx * k; q[a + 1] += dy * k; q[a + 2] += dz * k; }
@@ -715,58 +724,13 @@ export class SlingRope {
   }
 }
 
-// ---------------------------------------------------------------- 带子网格（一个质点一根骨头）
-
-const skinnedMaterials = new WeakMap();
-/** 原带子的材质拷一份给蒙皮的用（同一个材质被蒙皮 / 不蒙皮的网格交替画会每次重选着色器）。 */
-function SkinnedMaterialFor(material) {
-  if (Array.isArray(material)) return material.map(SkinnedMaterialFor);
-  if (!skinnedMaterials.has(material)) {
-    const copy = CloneShadedMaterial(material);
-    copy.name = `${material.name || "Sling"}_Skinned`;
-    skinnedMaterials.set(material, copy);
-  }
-  return skinnedMaterials.get(material);
-}
-
-/** 截面 = 宽 × 厚的扁方条，每个环 8 个点（上下两面、左右两侧各自的法线），环 i 全绑骨头 i。 */
-export function BuildStrapGeometry(count, width, thickness) {
-  const hw = width / 2, ht = thickness / 2;
-  // [x, y, nx, ny]：上面 L R、下面 L R、+x 侧 下 上、-x 侧 下 上
-  const ring = [[-hw, ht, 0, 1], [hw, ht, 0, 1], [-hw, -ht, 0, -1], [hw, -ht, 0, -1], [hw, -ht, 1, 0], [hw, ht, 1, 0], [-hw, -ht, -1, 0], [-hw, ht, -1, 0]];
-  const V = count * 8, position = new Float32Array(V * 3), normal = new Float32Array(V * 3);
-  const skinIndex = new Uint16Array(V * 4), skinWeight = new Float32Array(V * 4);
-  for (let i = 0; i < count; i += 1) {
-    for (let k = 0; k < 8; k += 1) {
-      const v = i * 8 + k, [x, y, nx, ny] = ring[k];
-      position.set([x, y, 0], v * 3); normal.set([nx, ny, 0], v * 3);
-      skinIndex[v * 4] = i; skinWeight[v * 4] = 1;
-    }
-  }
-  const index = [];
-  for (let i = 0; i < count - 1; i += 1) {
-    const a = i * 8, b = a + 8;
-    // 上（+y）、下（-y）、+x 侧、-x 侧；绕向让面法线与顶点法线同向
-    index.push(a, b, b + 1, a, b + 1, a + 1);
-    index.push(a + 2, b + 3, b + 2, a + 2, a + 3, b + 3);
-    index.push(a + 4, a + 5, b + 5, a + 4, b + 5, b + 4);
-    index.push(a + 6, b + 7, a + 7, a + 6, b + 6, b + 7);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
-  geometry.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
-  geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(skinIndex, 4));
-  geometry.setAttribute("skinWeight", new THREE.BufferAttribute(skinWeight, 4));
-  geometry.setIndex(index);
-  return geometry;
-}
-
 // ---------------------------------------------------------------- 一根带子（原带子 ↔ 模拟 ↔ 网格）
 
 const restCache = new WeakMap();   // 原带子几何 → ExtractSlingRest 的结果
 const _F = new THREE.Matrix4(), _Fi = new THREE.Matrix4(), _R = new THREE.Matrix4(), _T = new THREE.Matrix4();
 const _pos = new THREE.Vector3(), _quat = new THREE.Quaternion(), _scale = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
 const _t = new THREE.Vector3(), _n = new THREE.Vector3(), _w = new THREE.Vector3(), _m = new THREE.Matrix4(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const _rearBindingRotation = new THREE.Matrix4().makeRotationY(Math.PI);
 
 function SceneOf(object) {
   let o = object;
@@ -818,28 +782,30 @@ export class RifleSlingCloth {
   }
 
   _Build(scene) {
+    if(!RifleSlingVisualReady())return false;
     const source = this.sling.geometry;
     let rest = restCache.get(source);
     if (rest === undefined) { rest = ExtractSlingRest(source, this.cfg.count); restCache.set(source, rest); }
     if (!rest) { this.failed = true; return false; }
     this.rest = rest;
-    const n = rest.count, width = this.cfg.widthM || rest.width;
+    const n = rest.count;
     this.rope = new SlingRope(n, this.cfg);
     this.restLocal = new Float64Array(n * 3);
     this.normalsLocal = new Float64Array(n * 3);
     this.widthLocal = new Float64Array(n * 3);
-    const bones = [], inverses = [];
+    const bones = [];
     for (let i = 0; i < n; i += 1) {
       const b = new THREE.Bone();
       b.name = `SlingClothBone${i}`;
       b.matrixAutoUpdate = false;   // _Write 直接写 matrix / matrixWorld（父节点是单位阵），不拆成位置、朝向
-      bones.push(b); inverses.push(new THREE.Matrix4());
+      bones.push(b);
     }
-    const mesh = new THREE.SkinnedMesh(BuildStrapGeometry(n, width, this.cfg.thicknessM), SkinnedMaterialFor(this.sling.material));
+    const visual=CreateRifleSlingVisual(bones,this.library);
+    const {mesh}=visual;this.bindRotations=visual.bindRotations;this.bindings=visual.bindings;
+    SetRifleSlingBindingGeometry(this.bindings,this.weaponMounts);
+    this.endFrames=[new THREE.Matrix4(),new THREE.Matrix4()];
     mesh.name = "RifleSlingClothStrap";
     mesh.layers.mask = this.originalLayerMask;
-    mesh.add(...bones);
-    mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1);
     mesh.userData.rifleSlingCloth = this;
     mesh.raycast = () => {};   // 不给拾取 / 射线打中（原带子 layers 全关，本来也打不中）
@@ -847,6 +813,9 @@ export class RifleSlingCloth {
     this.bones = bones;
     this.normalSign = 1;
     this._Reparent(scene);
+    for(const binding of this.bindings)for(const object of [binding.eye,binding.whip]){
+      object.matrixAutoUpdate=false;object.raycast=()=>{};object.name='RifleSlingHempBinding';object.visible=false;mesh.parent.add(object);
+    }
     // 原带子不画（显隐、位置照旧由原来的代码管）
     this.sling.layers.disableAll();
     return true;
@@ -871,7 +840,15 @@ export class RifleSlingCloth {
         _a.fromArray(r.widthDirs, i * 3).transformDirection(_R).toArray(this.widthLocal, i * 3);
       }
     }
-    if (this.anchorRoot && this.anchorLocal) {
+    if(this.weaponRoot&&this.weaponMounts){
+      _T.multiplyMatrices(_Fi,this.weaponRoot.matrixWorld);
+      for(const [side,i] of [[this.weaponMounts.front,0],[this.weaponMounts.rear,n-1]]){
+        SlingPinPosition(side,_a).applyMatrix4(_T).toArray(this.restLocal,i*3);
+        _a.fromArray(side.bar).transformDirection(_T).toArray(this.normalsLocal,i*3);
+      }
+      if(this.rope.gun?.root!==this.weaponRoot)this.rope.gun=new RifleSlingGunContacts(this.weaponRoot);
+      this.rope.gun.SetFrame(_F);
+    }else if (this.anchorRoot && this.anchorLocal) {
       _T.multiplyMatrices(_Fi, this.anchorRoot.matrixWorld).multiply(this.anchorLocal);
       for (const i of [0, n - 1]) {
         _a.fromArray(r.points, i * 3).applyMatrix4(_T).toArray(this.restLocal, i * 3);
@@ -995,6 +972,7 @@ export class RifleSlingCloth {
       scene.userData.rifleSlingClothGroup = group;
     }
     group.add(this.mesh);
+    for(const binding of this.bindings||[])group.add(binding.eye,binding.whip);
   }
 
   /** 资产法线朝向统一成「离开身体」：挎上之后贴身那些点的表面法线投票。 */
@@ -1038,6 +1016,9 @@ export class RifleSlingCloth {
       _w.normalize();
       _n.crossVectors(_t, _w).normalize();
       _m.makeBasis(_w, _n, _t).setPosition(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]).premultiply(_F);
+      if(i===0)this.endFrames[0].copy(_m);
+      if(i===n-1)this.endFrames[1].copy(_m);
+      if(this.bindRotations)_m.multiply(this.bindRotations[i]);
       const bone = this.bones[i];
       bone.matrix.copy(_m);
       bone.matrixWorld.copy(_m);
@@ -1048,9 +1029,19 @@ export class RifleSlingCloth {
     const sphere = this.mesh.boundingSphere;
     sphere.center.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
     sphere.radius = Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2 + 0.05;
+    if(this.weaponRoot&&this.weaponMounts)for(let end=0;end<2;end++){
+      const spec=end===0?this.weaponMounts.front:this.weaponMounts.rear,binding=this.bindings[end];
+      _n.fromArray(spec.bar).normalize();_t.fromArray(spec.up).normalize();_w.crossVectors(_n,_t).normalize();
+      _m.makeBasis(_w,_n,_t).setPosition(...spec.position).premultiply(this.weaponRoot.matrixWorld);
+      if(this.weaponMounts.lashing)_m.makeTranslation(...spec.bindingPosition).premultiply(this.weaponRoot.matrixWorld);
+      binding.eye.matrix.copy(_m);binding.eye.matrixWorld.copy(_m);
+      _m.copy(this.endFrames[end]);if(end===1)_m.multiply(_rearBindingRotation);
+      binding.whip.matrix.copy(_m);binding.whip.matrixWorld.copy(_m);
+    }
   }
 
   Dispose() {
+    for(const binding of this.bindings||[])for(const object of [binding.eye,binding.whip]){object.removeFromParent();object.geometry.dispose();}
     if (this.mesh) { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mesh.skeleton?.dispose?.(); }
     this.sling.layers.mask = this.originalLayerMask;
     this.mesh = null;
@@ -1065,12 +1056,22 @@ let enabled = true;
 const stats = { count: 0, simulated: 0, ms: 0 };
 
 /** 原带子造出来时调一次：sling = 挂在枪挂点下的原带子网格，body = 这个人的根（找身体网格用）。重复注册无害。 */
-export function RegisterRifleSling(sling, body) {
+export function RegisterRifleSling(sling, body, library = null) {
   if (!sling?.isMesh || registry.has(sling)) return registry.get(sling) || null;
   const cloth = new RifleSlingCloth(sling, body);
+  cloth.library=library;
+  LoadRifleSlingVisual().catch(()=>{});
   cloth.phase = registered++ & 1;
   registry.set(sling, cloth);
   return cloth;
+}
+
+/** Pin to measured swivel centres in the actual, scale-compensated weapon coordinates. */
+export function SetRifleSlingWeapon(sling,weaponRoot,weaponId){
+  const cloth=registry.get(sling),mounts=RIFLE_SLING_MOUNTS[weaponId];
+  if(!cloth||!weaponRoot||!mounts)return false;
+  if(cloth.weaponRoot!==weaponRoot||cloth.weaponMounts!==mounts)cloth.ready=false;
+  cloth.weaponRoot=weaponRoot;cloth.weaponMounts=mounts;SetRifleSlingBindingGeometry(cloth.bindings,mounts);return true;
 }
 
 /** The editor counter-fits the old rigid sling for body shape. Keep that path as a guide,
@@ -1100,6 +1101,9 @@ export function StepRifleSlings(dt, camera) {
       cloth.gone = SceneOf(sling) ? 0 : cloth.gone + Math.max(0, dt || 0);
     } else if (cloth.Frame(dt, camera, budget) === "sim") simulated += 1;
     cloth.ms = performance.now() - clothStart;
+    for(const binding of cloth.bindings||[])for(const object of [binding.eye,binding.whip]){
+      object.visible=!!(enabled&&cloth.mesh?.visible&&cloth.ready&&cloth.weaponRoot);object.castShadow=cloth.sling.castShadow;object.receiveShadow=cloth.sling.receiveShadow;
+    }
     // Removing the actor or its mount leaves sling.parent intact. Those detached subtrees
     // still need to release the simulated mesh and skeleton, including while disabled.
     if (cloth.failed || cloth.gone > cloth.cfg.disposeAfterS) { cloth.Dispose(); registry.delete(sling); }

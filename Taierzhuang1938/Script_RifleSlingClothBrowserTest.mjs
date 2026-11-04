@@ -76,7 +76,12 @@ const Probe = () => B(() => {
       let pin = 0, nan = false, contact = 0, upper = 0;
       for (const i of [0, r.count - 1]) pin = Math.max(pin, Math.hypot(r.p[i * 3] - r.rest[i * 3], r.p[i * 3 + 1] - r.rest[i * 3 + 1], r.p[i * 3 + 2] - r.rest[i * 3 + 2]));
       let gunPin=0;
-      if(c.anchorRoot&&c.anchorLocal) {
+      if(c.weaponRoot&&c.weaponMounts) {
+        const point=c.sling.position.clone(),actual=point.clone();
+        for(const [spec,i] of [[c.weaponMounts.front,0],[c.weaponMounts.rear,r.count-1]]){
+          point.fromArray(spec.position);if(spec.throat)point.add(new point.constructor().fromArray(spec.throat));point.applyMatrix4(c.weaponRoot.matrixWorld);actual.setFromMatrixPosition(c.bones[i].matrixWorld);gunPin=Math.max(gunPin,point.distanceTo(actual));
+        }
+      } else if(c.anchorRoot&&c.anchorLocal) {
         const matrix=c.anchorRoot.matrixWorld.clone().multiply(c.anchorLocal),point=c.sling.position.clone(),actual=point.clone();
         for(const i of [0,r.count-1]){point.fromArray(c.rest.points,i*3).applyMatrix4(matrix);actual.setFromMatrixPosition(c.bones[i].matrixWorld);gunPin=Math.max(gunPin,point.distanceTo(actual));}
       }
@@ -101,7 +106,8 @@ async function VerifySlingVelocity() {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/__SlingVelocity`);
   const result = await B(async () => {
     const T = await import('three');
-    const { BuildStrapGeometry } = await import('./Script_RifleSlingCloth.mjs');
+    const { LoadRifleSlingVisual, CreateRifleSlingVisual } = await import('./Script_RifleSlingVisual.mjs');
+    await LoadRifleSlingVisual();
     const { PrepassPass } = await import('./Script_PostPrepass.mjs');
     const { MakeRenderTarget, MakeFullscreenMaterial } = await import('./Script_PostCommon.mjs');
     const renderer = new T.WebGLRenderer({canvas:document.querySelector('canvas')}); renderer.setSize(320,240);
@@ -109,8 +115,7 @@ async function VerifySlingVelocity() {
     const scene = new T.Scene(), bones = Array.from({length:32}, () => new T.Bone());
     for (const bone of bones) bone.matrixAutoUpdate = false;
     const material = new T.MeshStandardMaterial({side:T.DoubleSide});
-    const strap = new T.SkinnedMesh(BuildStrapGeometry(32,.027,.0045), material);
-    strap.add(...bones); strap.bind(new T.Skeleton(bones, bones.map(() => new T.Matrix4())),new T.Matrix4());
+    const visual=CreateRifleSlingVisual(bones),strap=visual.mesh;strap.material=material;
     strap.frustumCulled = false; scene.add(strap);
     const camera = new T.OrthographicCamera(-8/15,8/15,.4,-.4,.01,100); camera.position.z=2; camera.updateMatrixWorld(true);
     const vp = new T.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
@@ -123,6 +128,7 @@ async function VerifySlingVelocity() {
       // Exactly like the production rig: write the 32 bone matrices after the scene update.
       bones.forEach((bone,i) => {
         bone.matrix.makeRotationX(-Math.PI/2).setPosition(offset+bend*Math.sin(i/31*Math.PI),-.31+i*.02,0);
+        bone.matrix.multiply(visual.bindRotations[i]);
         bone.matrixWorld.copy(bone.matrix);
       });
       pass.Render({renderer,scene,camera,viewProjection:vp,prevViewProjection:vp,hasPrev:name!=='first'});
@@ -141,7 +147,7 @@ async function VerifySlingVelocity() {
   });
   await fs.writeFile(path.join(shotDir,'Data_SlingVelocity.json'),JSON.stringify(result,null,2));
   const get=name=>result.samples.find(s=>s.name===name), zero=name=>Math.max(Math.abs(get(name).min),Math.abs(get(name).max))<.08;
-  Check('枪带真实 32 骨网格写入 RT1：首帧、停止均为零速度',result.glError===0&&result.samples.every(s=>s.count>500&&s.other<.08)&&zero('first')&&zero('stop')&&zero('deformStop'),J(result.samples));
+  Check('真实 Blender 7 mm 三股麻绳写入 RT1：首帧、停止均为零速度',result.glError===0&&result.samples.every(s=>s.count>200&&s.other<.08)&&zero('first')&&zero('stop')&&zero('deformStop'),J(result.samples));
   Check('枪带真实网格平移 2 cm = 6 px 速度',Math.abs(get('translate').min-6)<.08&&Math.abs(get('translate').max-6)<.08);
   Check('枪带非刚性弯曲与回摆写出方向正确的逐骨速度',get('deform').min>-.08&&get('deform').max>2.8&&get('deform').max<3.08&&get('deform').mean>1
     &&get('return').min< -2.8&&get('return').min> -3.08&&get('return').max<.08&&get('return').mean< -1);
@@ -150,6 +156,10 @@ async function VerifySlingVelocity() {
 try {
   await VerifySlingVelocity();
   console.log("--- boot");
+  await page.addInitScript(()=>{
+    localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
+    localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
+  });
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=02-7&audio=0`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000, polling: 200 });
   await B(async () => { window.__sling = await import("./Script_RifleSlingCloth.mjs"); });
@@ -244,6 +254,13 @@ try {
         camera.updateMatrixWorld = function(force) {
           const review = window.__slingReview;
           const cloth = review.chosen[review.index], V = camera.position.constructor;
+          if(review.end&&cloth.weaponRoot&&cloth.weaponMounts){
+            const target=new V().fromArray(cloth.weaponMounts[review.end].position).applyMatrix4(cloth.weaponRoot.matrixWorld);
+            const offset=new V(.14,-.045,.10).applyQuaternion(cloth.weaponRoot.getWorldQuaternion(camera.quaternion.clone()));
+            camera.position.copy(target).add(offset);camera.lookAt(target);
+            if(T.viewmodel?.root)T.viewmodel.root.visible=false;
+            return saved.update.call(camera,force);
+          }
           const center = cloth.sling.parent.parent.getWorldPosition(new V()); center.y -= 0.12;
           const forward = new V(0,0,-1).applyQuaternion(cloth.body.getWorldQuaternion(camera.quaternion.clone()));
           const angle = Math.atan2(forward.x, forward.z) + review.angle;
@@ -273,6 +290,12 @@ try {
       }
       await fs.writeFile(path.join(shotDir,'NearSnapshots.json'),JSON.stringify(nearSnapshots));
       await fs.writeFile(path.join(shotDir,'Data_NearBodyContacts.json'),JSON.stringify(nearContacts,null,2));
+      const mounts=await B(()=>window.__slingReview.chosen.map(c=>({body:c.body.name,source:c.weaponMounts?.source,bindings:c.bindings?.map(b=>b.kind)})));
+      Check('全部可见枪绳均使用实际武器挂点与相应绳扣',mounts.every(m=>m.source&&m.bindings?.length===2),J(mounts));
+      for(let index=0;index<subjects.length;index++)for(const end of ['front','rear']){
+        await B(({index,end})=>{Object.assign(window.__slingReview,{index,end});},{index,end});await Frames(4);
+        await page.screenshot({path:path.join(shotDir,`Scene_${subjects[index]}_Mount_${end}.png`)});
+      }
       await B(() => {
         const T = window.Tengxian, camera = T.camera, saved = window.__slingReview.saved;
         camera.updateMatrixWorld = saved.update; camera.position.copy(saved.position); camera.quaternion.copy(saved.quaternion);
