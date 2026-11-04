@@ -1483,7 +1483,7 @@ async function CheckMissionList() {
 }
 
 // ===========================================================================
-// 5b) 齿轮设置 -> 返回主菜单
+// 5b) 高级工具菜单栏 -> 返回主菜单
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.StartLevel(2));
@@ -1491,13 +1491,12 @@ async function CheckMissionList() {
   await page.keyboard.press("Backquote");
   const option = await page.evaluate(() => ({
     panelOpen: window.Taierzhuang.Debug.Editor().panelOpen,
-    text: document.querySelector('[data-action="main-menu"]')?.textContent || "",
+    text: document.querySelector('#edRoot .edMenuBar [data-action="main-menu"]')?.textContent || "",
   }));
-  Check("高级工具的「游戏」菜单里有返回主菜单选项",
+  Check("高级工具菜单栏上有「返回主菜单」按钮",
     option.panelOpen && option.text.trim() === "返回主菜单", JSON.stringify(option));
 
-  await page.click('#edRoot .edMenu[data-menu="game"] > .edMenuTitle');
-  await page.click('[data-action="main-menu"]');
+  await page.click('#edRoot .edMenuBar [data-action="main-menu"]');
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   const returned = await page.evaluate(() => ({
     menu: window.Taierzhuang.Debug.Menu(),

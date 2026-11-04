@@ -2474,7 +2474,7 @@ async function Boot() {
     actorFactory, viewmodel, audio, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
-    ReturnToMainMenu: TOOLS_HOME ? ReturnToTitlePage : MENU_AT_BOOT ? () => OpenMenu() : null,
+    ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : ReturnToTitlePage,
     SettingsOpen: () => !!settings?.IsOpen,
     // 高级工具首页：没有关卡，空 Inspector 换成整页的工具首页（Script_Editor.BuildHome）
     home: TOOLS_HOME,

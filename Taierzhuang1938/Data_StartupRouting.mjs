@@ -10,7 +10,7 @@ export function IsMenuStartup(params) {
 
 export function SandboxUrl(href, key, {stage = null} = {}) {
   const url = new URL(href);
-  for (const name of ['menuPreview', 'menuPreviewUi', ...SANDBOX_RANGE_KEYS, 'whitebox', 'missionStage', 'jiehe', 'phase', 'preview', 'menu', 'editor']) url.searchParams.delete(name);
+  for (const name of ['menuPreview', 'menuPreviewUi', ...SANDBOX_RANGE_KEYS, 'whitebox', 'missionStage', 'jiehe', 'phase', 'preview', 'menu', 'editor', 'level', 'kf', 'tool']) url.searchParams.delete(name);
   const params = {...Object.fromEntries(SANDBOX_RANGE_KEYS.map(id => [id, id])), firstLevelP012Whitebox: 'whitebox', jiehe: 'jiehe'};
   if (params[key]) url.searchParams.set(params[key], key === 'firstLevelP012Whitebox' ? 'p012' : '1');
   if (key === 'firstLevelP012Whitebox' && stage != null) url.searchParams.set('missionStage', stage);

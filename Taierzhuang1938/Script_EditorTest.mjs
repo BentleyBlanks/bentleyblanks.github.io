@@ -130,7 +130,7 @@ Check("右上入口改为同风格图标并保留无障碍名称",
 await page.click(".edGear");
 const byGear = await page.evaluate(() => window.Taierzhuang.Debug.Editor().panelOpen);
 Check("没拿指针锁时鼠标点齿轮能开", byGear);
-await page.click(".edMenuExit");   // 收起来（开着时齿轮让位给菜单栏右端的 ×），下面走键盘那条
+await page.keyboard.press("Backquote");   // 收起来，下面走键盘那条
 
 await page.click("#bootStart");
 await Step(20);
@@ -161,11 +161,11 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 第一人称持枪移动检查（叠加层，2026-10-23）
+// 菜单栏：六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 第一人称持枪移动检查（叠加层，2026-10-23）
 // + 贴图管理 + 场景编辑器（独立窗口，2026-10-31 加）+ 白盒关卡编辑器（整页跳转入口）= 16 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景 / 关卡编排；
 // 出图机位 shotCamera 是不进菜单的测试工具，不计入）
 Check("菜单栏列出全部编辑器入口", afterGear.entries === 16
-  && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产,Debug工具"
+  && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
   && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
@@ -215,7 +215,8 @@ if(process.argv.includes('--launcher-only')){
   const windows = page.context().pages().length;
   await ClickTool("textures");
   Check("再次点击聚焦原窗口", page.context().pages().length === windows && !texturePopup.isClosed());
-  await page.click(".edMenuExit");
+  await page.bringToFront();
+  await page.keyboard.press("Backquote");
   Check("退出高级工具不关闭贴图窗口", !texturePopup.isClosed());
   await texturePopup.close();
   await browser.close();server.close();
@@ -224,22 +225,22 @@ if(process.argv.includes('--launcher-only')){
   process.exit(failed.length||errors.length?1:0);
 }
 
-// 菜单栏右端：× 只关当前工具（没开工具时藏起来），⏻（.edMenuExit）才退出高级工具（2026-10-22）
-const closeIdle = await page.isVisible("#edRoot .edMenuCloseTool");
+// 菜单栏右端（2026-11-05）：没有「游戏」菜单、菜单栏 ×、⏻；只有「返回主菜单」。关工具用工作窗自己的 ×
 await ClickTool("assetStandards");
 await Step(1);
-const closeWithTool = await page.isVisible("#edRoot .edMenuCloseTool");
-await page.click("#edRoot .edMenuCloseTool");
+await page.click("#edRoot .edPanel .edX");
 const afterCloseTool = await page.evaluate(() => ({
   panelOpen: window.Taierzhuang.Debug.Editor().panelOpen, active: window.Taierzhuang.Debug.Editor().active,
 }));
-Check("菜单栏 × 只关当前工具、留在高级工具里，没开工具时不显示",
-  !closeIdle && closeWithTool && afterCloseTool.panelOpen && !afterCloseTool.active && !(await page.isVisible("#edRoot .edMenuCloseTool")),
-  JSON.stringify({ closeIdle, closeWithTool, ...afterCloseTool }));
-Check("退出按钮是图标、标着「退出高级工具」",
+Check("工作窗的 × 只关当前工具、留在高级工具里",
+  afterCloseTool.panelOpen && !afterCloseTool.active, JSON.stringify(afterCloseTool));
+Check("菜单栏没有「游戏」菜单、× 与 ⏻，最后一个按钮是「返回主菜单」",
   await page.evaluate(() => {
-    const exit = document.querySelector("#edRoot .edMenuExit");
-    return !!exit?.querySelector("svg") && exit.getAttribute("aria-label") === "退出高级工具" && exit.textContent.trim() === "";
+    const buttons = [...document.querySelectorAll("#edRoot .edMenuBar > button")];
+    const last = buttons[buttons.length - 1];
+    return !document.querySelector(".edMenuCloseTool") && !document.querySelector(".edMenuExit")
+      && !document.querySelector('#edRoot .edMenu[data-menu="game"]')
+      && last?.classList.contains("edMenuMainMenu") && last.textContent.trim() === "返回主菜单" && last.dataset.action === "main-menu";
   }));
 
 // 资产规范是构件库之外的独立只读分类。它不摆模型，但必须把原始/实际/限制/贴图

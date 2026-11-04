@@ -8,6 +8,7 @@
 
 ## 条目
 
+- **高级工具菜单栏右端改成「返回主菜单」（2026-11-05）**：用户反馈 ⏻ 与「退出高级工具」重复、「关闭当前工具」没用，且白盒编辑器 / 正片第一关 / 测试场上从没出现过「返回主菜单」（`ReturnToMainMenu` 在无主菜单页面是 null）。按用户选择删掉「游戏」菜单（关闭当前工具、退出高级工具）、菜单栏 × 与 ⏻，右端换成文字按钮 `.edMenuMainMenu`「返回主菜单」：标题页活场景页内开主菜单，其余页面 `ReturnToTitlePage` 整页回标题页（`SandboxUrl` 另去掉 `level` / `kf` / `tool`）；退出高级工具只走 Esc / `，关工具用工作窗自己的 ×。口径 [编辑器套件](Data_EditorSuite.md)；验证 ToolsHomeTest、MenuStartupTest、EditorBlockoutBrowserTest（含点击跳转）通过，EditorTest 剩 5 项与主检出相同的既有失败，MenuTest 5b 通过（其余 12 项失败在章节列表、指挥室渲染、大刀切换，未做基线对照）。
 - **动作预览工具大刀刃向修正（2026-11-05）**：用户反馈 Mixamo 动作预览工具里大刀都拿反了（刀背朝前、刃口朝自己）。`Tool_MixamoAnimationPreview.html` 的 `CalibrateDadao` 把模型 -Y 当刃口对准指节，而 `Model_Dadao` 实测薄刃在 +Y（第一人称 `Script_Viewmodel` 与 `Data_FpsDadaoSwing.sourceEdgeDirection` 同口径），现改为 +Y 朝指节；只动预览工具（及照它挂法的 `Script_MixamoLibraryAudit` / `Script_MixamoClipSheet`），游戏内第一 / 第三人称挂法不变。验证：9 条 GreatSword 动作在 0 / 0.25 / 0.5 / 0.75 时长处，刃向与指节方向点积改前 -0.975…-1，改后 +0.975…+1；9 条审查 snapDeg / glitchDeg 全部不变，进人体深度只在 5 条里小幅变化（前臂最深 0.036 m），无新增穿插。
 - **补齐标题菜单的头发胡子入口（2026-11-05）**：独立测试场网址与游戏宿主已登记，但轻量标题菜单 `Script_MenuStartup` 的场景列表漏了 `HAIR_RANGE_PHASE`，导致玩家从主菜单「测试场景」找不到。补入该条目与暂停菜单模式识别；MenuStartupTest 以 `SANDBOX_RANGE_KEYS` 对账可见条目和跳转，实测源码 / 合并发布包中滚到列表底部、选中头发胡子并点击进入 `?hair=1`，保留手机布局与轻量菜单预算门禁。
 

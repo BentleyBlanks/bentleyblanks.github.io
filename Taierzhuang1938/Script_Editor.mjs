@@ -9,8 +9,8 @@
 // 互斥编辑器里多数要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
 // 所以菜单栏里的工具语义是「换到这一个」：开新的自动关旧的；再点一次当前那个就关掉它。
-// 关掉当前工具（Inspector 上的 ×）只回到空 Inspector，不退出高级工具；
-// 退出走菜单栏右端 ×、Esc 或 `。
+// 关掉当前工具（工作窗右上的 ×，或再点一次菜单里打勾的那项）只回到空 Inspector，不退出高级工具；
+// 退出走 Esc 或 `；菜单栏右端只有「返回主菜单」。
 //
 // ## 打开高级工具 = 暂停玩法
 // 与过场同一条通道：Script_Main 的 Frame() 看到 editor.Capturing 就只走
@@ -84,7 +84,7 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
 
 /**
  * 菜单栏。顺序就是栏上的顺序；每个工具只登记一次（同一项画两遍就有两处开关）。
- * 「游戏」菜单（退出、回主菜单）不在这张表里，由 BuildDom 单独画。
+ * 菜单栏右端的「返回主菜单」按钮不在这张表里，由 BuildDom 单独画。
  * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
  */
 const TOOL_MENUS = [
@@ -107,7 +107,7 @@ export class EditorSuite {
    *   renderer / scene / camera / canvas / library / lights / vfx —— 渲染侧
    *   actorFactory / viewmodel / audio / cutscene             —— 各编辑器要用的系统
    *   game        { state, player, PHASES, JumpToLevel, get battlefield, get currentWeapon }
-   *   ReturnToMainMenu  从高级工具退出当前战局并打开主菜单；无主菜单的测试模式不传
+   *   ReturnToMainMenu  从高级工具放弃当前战局回主菜单（菜单栏右端按钮）：标题页活场景页内开主菜单，其余页面整页回干净的标题页；不传则不画按钮
    *   SettingsOpen      玩家设置页开着时返回 true（那时 ` 不开高级工具）
    *   shot        出图模式（整棵 DOM 藏起来）
    */
@@ -233,23 +233,22 @@ export class EditorSuite {
       this.volumeControl = ToolsVolumeControl(this.toolsVolume, () => this.SyncToolsVolume());
       bar.appendChild(this.volumeControl.root);
     }
-    // 最右两颗分开管（2026-10-22，用户：一个 × 既像关工具又是退出，看不懂）：
-    // × 只关当前工具、留在高级工具里，没开工具时藏起来；⏻ 才是退出高级工具。
-    const closeTool = El("button", "edMenuCloseTool", "×");
-    closeTool.type = "button";
-    closeTool.title = "关闭当前工具（留在高级工具里）";
-    closeTool.setAttribute("aria-label", "关闭当前工具");
-    closeTool.addEventListener("click", () => this.CloseTool());
-    bar.appendChild(closeTool);
-    this.closeToolButton = closeTool;
-    const exit = El("button", "edMenuExit");
-    exit.type = "button";
-    exit.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.3 5.6a6.2 6.2 0 1 0 7.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
-      + '<path d="M10 2.6v7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-    exit.title = "退出高级工具（Esc / `）";
-    exit.setAttribute("aria-label", "退出高级工具");
-    exit.addEventListener("click", () => this.TogglePanel(false));
-    bar.appendChild(exit);
+    // 最右端：「返回主菜单」文字按钮（退出高级工具只走 Esc / `）。
+    if (this.host.ReturnToMainMenu) {
+      const mainMenu = El("button", "edMenuMainMenu", "返回主菜单");
+      mainMenu.type = "button";
+      mainMenu.title = "返回主菜单（放弃当前战局）";
+      mainMenu.setAttribute("aria-label", "返回主菜单");
+      mainMenu.dataset.action = "main-menu";
+      mainMenu.addEventListener("click", () => {
+        // 先让编辑器归还相机、HUD 与声音，再由游戏装配层切换菜单状态。
+        // 顺序反过来会让退出时在主菜单已经打开后又改一次暂停状态。
+        this.OpenMenu(null);
+        this.TogglePanel(false);
+        this.host.ReturnToMainMenu();
+      });
+      bar.appendChild(mainMenu);
+    }
     root.appendChild(bar);
     this.menuBar = bar;
 
@@ -282,21 +281,6 @@ export class EditorSuite {
       drop.appendChild(button);
       return button;
     };
-
-    const game = Menu("game", "游戏");
-    this.closeToolItem = Item(game, "关闭当前工具", () => this.CloseTool(), { hint: "关掉 Inspector 里的工具，留在高级工具里" });
-    this.closeToolItem.dataset.action = "close-tool";
-    if (this.host.ReturnToMainMenu) {
-      const mainMenu = Item(game, "返回主菜单", () => {
-        // 先让编辑器归还相机、HUD 与声音，再由游戏装配层切换菜单状态。
-        // 顺序反过来会让退出时在主菜单已经打开后又改一次暂停状态。
-        this.TogglePanel(false);
-        this.host.ReturnToMainMenu();
-      }, { hint: "放弃当前战局，回到主菜单" });
-      mainMenu.dataset.action = "main-menu";
-    }
-    const quit = Item(game, "退出高级工具", () => this.TogglePanel(false), { hint: "Esc / `" });
-    quit.dataset.action = "exit-tools";
 
     for (const menu of TOOL_MENUS) {
       const drop = Menu(menu.id, menu.label);
@@ -336,7 +320,7 @@ export class EditorSuite {
       + '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18M14.5 8.5V20"/><path d="M17 12h1.5M17 15h1.5"/></svg>';
     empty.body.appendChild(art);
     empty.body.appendChild(El("div", "edEmptyTitle", "未选择工具"));
-    Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点右上的 × 就关掉它。");
+    Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点工作窗右上的 × 就关掉它。");
     Note(empty.body, "Debug Rendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 与 FPS 显示在菜单栏右边的「Debug工具」里（设置 → Debug工具 是同一套开关）。");
     const keys = El("div", "edEmptyKeys");
     for (const [key, text] of [["`", "打开 / 退出"], ["Esc", "退出"]]) {
@@ -374,7 +358,7 @@ export class EditorSuite {
     const target = this.inspectorCollapsed ? this.menuBar
       : this.active ? this.inspectorElement?.querySelector(".edHead") : this.root;
     if (target && this.inspectorToggle.parentElement !== target) {
-      target.insertBefore(this.inspectorToggle, target === this.menuBar ? this.menuBar.querySelector(".edMenuCloseTool") : null);
+      target.insertBefore(this.inspectorToggle, target === this.menuBar ? this.menuBar.querySelector(".edMenuMainMenu") : null);
     }
     this.root.classList.toggle("inspectorCollapsed", this.inspectorCollapsed);
     const label = this.inspectorCollapsed ? "展开 Inspector" : "收起 Inspector";
@@ -447,8 +431,6 @@ export class EditorSuite {
       button.setAttribute("aria-checked", String(on));
     }
     this.RefreshDebugMenu();
-    if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
-    if (this.closeToolButton) this.closeToolButton.hidden = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     const homeShown = !!this.home && this.panelOpen && !this.active;
     this.home?.Show(homeShown);

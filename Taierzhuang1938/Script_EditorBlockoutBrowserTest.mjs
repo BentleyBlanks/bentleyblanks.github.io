@@ -1112,6 +1112,19 @@ try {
   await page.screenshot({ path: path.join(shotDir, "FirstLevel0610_09-5_Landmarks.png") });
 
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
+
+  // 菜单栏右端「返回主菜单」：整页回干净的标题页（只核对跳转地址；放最后，跳页不影响前面的段落）
+  if (!(await page.evaluate(() => window.Tengxian.editor.panelOpen))) await page.keyboard.press("Backquote");
+  await page.waitForSelector("#edRoot .edMenuMainMenu", { state: "visible" });
+  Check("白盒编辑器的高级工具菜单栏右端有「返回主菜单」按钮",
+    (await page.locator("#edRoot .edMenuMainMenu").innerText()).trim() === "返回主菜单");
+  await page.route("**/Taierzhuang1938/**", (route) => route.request().resourceType() === "document"
+    ? route.fulfill({ contentType: "text/html", body: "<title>nav fixture</title>" }) : route.continue());
+  await page.click("#edRoot .edMenuMainMenu");
+  await page.waitForURL((url) => !url.searchParams.has("editor"), { timeout: 30000 });
+  const home = new URL(page.url());
+  Check("点「返回主菜单」回到干净的标题页地址（没有 editor / level / kf）",
+    !home.searchParams.has("editor") && !home.searchParams.has("level") && !home.searchParams.has("kf"), home.href);
 } finally {
   const after = await fs.readFile(configPath);
   Check("Blockout/FirstLevel.json 没被测试改动（前后逐字节相同）", Buffer.compare(after, originalConfig) === 0);
