@@ -1,0 +1,19 @@
+{
+  "schema": "tengxian-rifle-sling-visual/3",
+  "version": "20261105FlatV3",
+  "generator": "_blender/Script_FlatRifleSlingBakeV3.py",
+  "model": "Model_RifleSlingFlatV3.glb",
+  "sha256": "b90a361f279102b894f89a4ccb6ff1c6d21b0c407d5ba6f29add2157bb366df5",
+  "shape": "flat brown strap; not rope",
+  "widthM": 0.025,
+  "endWidthM": 0.016,
+  "thicknessM": 0.002,
+  "restLengthM": 1.6,
+  "bones": 63,
+  "strapTriangles": 3084,
+  "totalTriangles": 6584,
+  "sourceImageTier": 1,
+  "reconstructionScope": "The user used hemp rope as a low-rebound physics analogy, not a visual request. Flat brown strap, folded ends, stitching and lashing appearance are creative reconstruction; no standardized 1938 issue is asserted.",
+  "historicalReferences": [],
+  "simulationPoints": 32
+}

@@ -1,4 +1,4 @@
-// Hemp cord solver, metres/seconds. The old BackRifleRun path supplies the over-shoulder topology;
+// Low-rebound flat strap, metres/seconds. The BackRifleRun path supplies the over-shoulder topology;
 // the Blender rope supplies the surface and measured weapon swivels supply both pins.
 export const RIFLE_SLING_CLOTH = Object.freeze({
   count: 32,

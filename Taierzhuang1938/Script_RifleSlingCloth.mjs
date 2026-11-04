@@ -1,9 +1,9 @@
-// 2026-11-05 hemp rifle sling. The original BackRifleRun belt provides the over-shoulder /
+// 2026-11-05 flat rifle sling. The original BackRifleRun belt provides the over-shoulder /
 // under-arm guide and visibility; measured weapon swivels provide both pins. The 32-particle
 // PBD solver fits the current visible body, refits the thinner cord by arc length, and applies
 // strongly damped inertia and inelastic contact. The old rigid belt stays hidden by layers.
 //
-// Script_RifleSlingVisual loads Blender-authored helical strands, fibre PBR, eyes and lashings.
+// Script_RifleSlingVisual loads Blender-authored flat strap, brown PBR, folded ends and lashings.
 // Only bone matrices change each frame. The new meshes live at scene root, beyond actor skin
 // replacement and wound scans. Script_Main calls StepRifleSlings after the final world-matrix
 // update, before rendering; the production prepass records the bones and rigid bindings.
@@ -15,7 +15,7 @@
 import * as THREE from "three";
 
 import { RIFLE_SLING_CLOTH as TUNING } from "./Data_Tuning_RifleSlingCloth.mjs";
-import {LoadRifleSlingVisual,RifleSlingVisualReady,CreateRifleSlingVisual,SetRifleSlingBindingGeometry} from './Script_RifleSlingVisual.mjs';
+import {LoadRifleSlingVisual,RifleSlingVisualReady,RifleSlingVisualBoneCount,CreateRifleSlingVisual,SetRifleSlingBindingGeometry} from './Script_RifleSlingVisual.mjs';
 import {RIFLE_SLING_MOUNTS} from './Data_RifleSlingMounts.mjs';
 import {RifleSlingGunContacts,SlingPinPosition} from './Script_RifleSlingGunContacts.mjs';
 
@@ -683,7 +683,7 @@ export class SlingRope {
       if (S && this.plane[i] >= 0 && this.distance[i] < cfg.contactM) {
         const N = this.planeN, nx = N[a], ny = N[a + 1], nz = N[a + 2], dn = dx * nx + dy * ny + dz * nz;
         const tx = dx - nx * dn, ty = dy - ny * dn, tz = dz - nz * dn, f = cfg.friction;
-        // Hemp contact is inelastic: a collision projection must not become a rebound impulse.
+        // Low-rebound strap contact is inelastic: a collision projection must not become a rebound impulse.
         q[a] += tx * f + nx * dn; q[a + 1] += ty * f + ny * dn; q[a + 2] += tz * f + nz * dn;
         dx = p[a] - q[a]; dy = p[a + 1] - q[a + 1]; dz = p[a + 2] - q[a + 2];
       }
@@ -730,6 +730,7 @@ const restCache = new WeakMap();   // 原带子几何 → ExtractSlingRest 的�
 const _F = new THREE.Matrix4(), _Fi = new THREE.Matrix4(), _R = new THREE.Matrix4(), _T = new THREE.Matrix4();
 const _pos = new THREE.Vector3(), _quat = new THREE.Quaternion(), _scale = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
 const _t = new THREE.Vector3(), _n = new THREE.Vector3(), _w = new THREE.Vector3(), _m = new THREE.Matrix4(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const _previousWidth = new THREE.Vector3();
 const _rearBindingRotation = new THREE.Matrix4().makeRotationY(Math.PI);
 
 function SceneOf(object) {
@@ -794,7 +795,7 @@ export class RifleSlingCloth {
     this.normalsLocal = new Float64Array(n * 3);
     this.widthLocal = new Float64Array(n * 3);
     const bones = [];
-    for (let i = 0; i < n; i += 1) {
+    for (let i = 0; i < RifleSlingVisualBoneCount(); i += 1) {
       const b = new THREE.Bone();
       b.name = `SlingClothBone${i}`;
       b.matrixAutoUpdate = false;   // _Write 直接写 matrix / matrixWorld（父节点是单位阵），不拆成位置、朝向
@@ -810,11 +811,13 @@ export class RifleSlingCloth {
     mesh.userData.rifleSlingCloth = this;
     mesh.raycast = () => {};   // 不给拾取 / 射线打中（原带子 layers 全关，本来也打不中）
     this.mesh = mesh;
-    this.bones = bones;
+    this.renderBones=bones;
+    this.renderPositions=new Float64Array(bones.length*3);
+    this.bones=Array.from({length:n},(_,i)=>bones[i*2]);
     this.normalSign = 1;
     this._Reparent(scene);
     for(const binding of this.bindings)for(const object of [binding.eye,binding.whip]){
-      object.matrixAutoUpdate=false;object.raycast=()=>{};object.name='RifleSlingHempBinding';object.visible=false;mesh.parent.add(object);
+      object.matrixAutoUpdate=false;object.raycast=()=>{};object.name='RifleSlingFlatBinding';object.visible=false;mesh.parent.add(object);
     }
     // 原带子不画（显隐、位置照旧由原来的代码管）
     this.sling.layers.disableAll();
@@ -1006,20 +1009,43 @@ export class RifleSlingCloth {
         for (let j = 0; j < 3; j += 1) normals[i * 3 + j] = (normals[(i - 1) * 3 + j] + 2 * normals[i * 3 + j] + normals[(i + 1) * 3 + j]) / 4;
       }
     }
+    const q=this.renderPositions,count=this.renderBones.length;
+    for(let j=0;j<count;j++){
+      const i=j>>1;
+      if(!(j&1)){q.set(p.subarray(i*3,i*3+3),j*3);continue;}
+      let lengthSq=0;
+      for(let axis=0;axis<3;axis++){
+        const delta=(p[i*3+axis]+p[(i+1)*3+axis]-p[Math.max(0,i-1)*3+axis]-p[Math.min(n-1,i+2)*3+axis])*.0625;
+        _scale.setComponent(axis,delta);lengthSq+=delta*delta;
+      }
+      if(lengthSq>.002**2)_scale.multiplyScalar(.002/Math.sqrt(lengthSq));
+      for(let axis=0;axis<3;axis++)q[j*3+axis]=(p[i*3+axis]+p[(i+1)*3+axis])*.5+_scale.getComponent(axis);
+    }
     let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (let i = 0; i < n; i += 1) {
-      const a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1);
-      _t.set(p[b * 3] - p[a * 3], p[b * 3 + 1] - p[a * 3 + 1], p[b * 3 + 2] - p[a * 3 + 2]).normalize();
-      _n.fromArray(normals, i * 3);
+    for (let i = 0; i < count; i += 1) {
+      const a = Math.max(0, i - 1), b = Math.min(count - 1, i + 1),at=i>>1;
+      _t.set(q[b * 3] - q[a * 3], q[b * 3 + 1] - q[a * 3 + 1], q[b * 3 + 2] - q[a * 3 + 2]).normalize();
+      _n.fromArray(normals, at * 3);
+      if(i&1)_n.add(_a.fromArray(normals,(at+1)*3)).normalize();
       _w.crossVectors(_n, _t);
-      if (_w.lengthSq() < 1e-8) _w.fromArray(this.widthLocal, i * 3);
+      if (_w.lengthSq() < 1e-8) _w.fromArray(this.widthLocal, at * 3);
       _w.normalize();
       _n.crossVectors(_t, _w).normalize();
-      _m.makeBasis(_w, _n, _t).setPosition(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]).premultiply(_F);
+      if((i===0||i===count-1)&&this.weaponRoot&&this.weaponMounts){
+        const spec=i===0?this.weaponMounts.front:this.weaponMounts.rear;
+        _w.fromArray(spec.bar).transformDirection(this.weaponRoot.matrixWorld).transformDirection(_Fi);
+        _w.addScaledVector(_t,-_w.dot(_t));
+        if(_w.lengthSq()>1e-8){_w.normalize();_n.crossVectors(_t,_w).normalize();}
+      }
+      // The two faces of a flat strap are symmetric. Choose the continuous width
+      // direction so skinning cannot interpolate opposite frames into a pinched tip.
+      if(i>0&&_w.dot(_previousWidth)<0){_w.negate();_n.negate();}
+      _previousWidth.copy(_w);
+      _m.makeBasis(_w, _n, _t).setPosition(q[i * 3], q[i * 3 + 1], q[i * 3 + 2]).premultiply(_F);
       if(i===0)this.endFrames[0].copy(_m);
-      if(i===n-1)this.endFrames[1].copy(_m);
+      if(i===count-1)this.endFrames[1].copy(_m);
       if(this.bindRotations)_m.multiply(this.bindRotations[i]);
-      const bone = this.bones[i];
+      const bone = this.renderBones[i];
       bone.matrix.copy(_m);
       bone.matrixWorld.copy(_m);
       const e = _m.elements;

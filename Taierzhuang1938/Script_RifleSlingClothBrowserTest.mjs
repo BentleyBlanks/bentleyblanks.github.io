@@ -106,13 +106,13 @@ async function VerifySlingVelocity() {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/__SlingVelocity`);
   const result = await B(async () => {
     const T = await import('three');
-    const { LoadRifleSlingVisual, CreateRifleSlingVisual } = await import('./Script_RifleSlingVisual.mjs');
+    const { LoadRifleSlingVisual, CreateRifleSlingVisual, RifleSlingVisualBoneCount } = await import('./Script_RifleSlingVisual.mjs');
     await LoadRifleSlingVisual();
     const { PrepassPass } = await import('./Script_PostPrepass.mjs');
     const { MakeRenderTarget, MakeFullscreenMaterial } = await import('./Script_PostCommon.mjs');
     const renderer = new T.WebGLRenderer({canvas:document.querySelector('canvas')}); renderer.setSize(320,240);
     const pass = new PrepassPass({preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:T.HalfFloatType,targets:{}}); pass.Resize(320,240);
-    const scene = new T.Scene(), bones = Array.from({length:32}, () => new T.Bone());
+    const scene = new T.Scene(), bones = Array.from({length:RifleSlingVisualBoneCount()}, () => new T.Bone());
     for (const bone of bones) bone.matrixAutoUpdate = false;
     const material = new T.MeshStandardMaterial({side:T.DoubleSide});
     const visual=CreateRifleSlingVisual(bones),strap=visual.mesh;strap.material=material;
@@ -127,7 +127,8 @@ async function VerifySlingVelocity() {
       scene.updateMatrixWorld(true);
       // Exactly like the production rig: write the 32 bone matrices after the scene update.
       bones.forEach((bone,i) => {
-        bone.matrix.makeRotationX(-Math.PI/2).setPosition(offset+bend*Math.sin(i/31*Math.PI),-.31+i*.02,0);
+        const along=i/(bones.length-1);
+        bone.matrix.makeRotationX(-Math.PI/2).setPosition(offset+bend*Math.sin(along*Math.PI),-.31+along*.62,0);
         bone.matrix.multiply(visual.bindRotations[i]);
         bone.matrixWorld.copy(bone.matrix);
       });
@@ -147,7 +148,7 @@ async function VerifySlingVelocity() {
   });
   await fs.writeFile(path.join(shotDir,'Data_SlingVelocity.json'),JSON.stringify(result,null,2));
   const get=name=>result.samples.find(s=>s.name===name), zero=name=>Math.max(Math.abs(get(name).min),Math.abs(get(name).max))<.08;
-  Check('真实 Blender 7 mm 三股麻绳写入 RT1：首帧、停止均为零速度',result.glError===0&&result.samples.every(s=>s.count>200&&s.other<.08)&&zero('first')&&zero('stop')&&zero('deformStop'),J(result.samples));
+  Check('真实 Blender 扁平枪带写入 RT1：首帧、停止均为零速度',result.glError===0&&result.samples.every(s=>s.count>500&&s.other<.08)&&zero('first')&&zero('stop')&&zero('deformStop'),J(result.samples));
   Check('枪带真实网格平移 2 cm = 6 px 速度',Math.abs(get('translate').min-6)<.08&&Math.abs(get('translate').max-6)<.08);
   Check('枪带非刚性弯曲与回摆写出方向正确的逐骨速度',get('deform').min>-.08&&get('deform').max>2.8&&get('deform').max<3.08&&get('deform').mean>1
     &&get('return').min< -2.8&&get('return').min> -3.08&&get('return').max<.08&&get('return').mean< -1);

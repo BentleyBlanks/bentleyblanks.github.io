@@ -117,11 +117,11 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
-  Object.freeze({id:'HempRifleSlingV2',name:'步枪三股麻绳背带',pack:'HempRifleSlingV2/Model_RifleSlingHempV2.glb',
-    sourceTriangles:24576,actualTriangles:24576,targetTriangles:24576,policy:'source',
-    sourceTexture:'内置 imagegen 一级生成的自然麻纤维；BlenderMCP 实体三股绳与细纤维法线烘焙',
-    runtimeTexture:'1024 Base / OpenGL Normal，无损 WebP 内嵌；哑光非金属',
-    note:'32 骨、7mm 外径、1.6m 静止源；主绳18432三角，闭合绳扣与收束线、两款中正式捆扎圈共6144三角。运行时按身材定长，端点量自实际枪环；材质、捻法与捆法属创作。源工程留OneDrive；仓库脚本可重建。'}),
+  Object.freeze({id:'RifleSlingFlatV3',name:'棕色扁平步枪背带',pack:'RifleSlingV3/Model_RifleSlingFlatV3.glb',
+    sourceTriangles:6584,actualTriangles:6584,targetTriangles:6584,policy:'source',
+    sourceTexture:'内置 imagegen 一级生成的细皮纹；BlenderMCP 扁带、折返收口与缝线',
+    runtimeTexture:'1024 Base / OpenGL Normal，WebP 内嵌；哑光非金属',
+    note:'32 物理点、63 蒙皮骨、25mm 宽、2mm 厚、端部16mm，源长1.6m；主带3084三角。棕色扁平枪带，低回弹、重阻尼运动。按实际枪环定位，表面、收口与缝线属美术复原；源工程留OneDrive，仓库脚本可重建。'}),
   Object.freeze({id:'HanYang173R',name:'汉阳造173R（当前手持与世界模型）',pack:'HanYang173R/Model_HanYang173R.glb',
     sourceTriangles:295470,actualTriangles:68657,targetTriangles:69000,policy:'target',
     sourceTexture:'用户提供的Dots 173R完整源与标准PBR烘焙图；来源限制见随附说明',

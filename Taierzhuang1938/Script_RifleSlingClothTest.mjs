@@ -69,11 +69,12 @@ function StripTextures(bytes) {
 }
 const glb = StripTextures(fs.readFileSync(new URL("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb", import.meta.url)));
 const Load = () => new Promise((resolve, reject) => new GLTFLoader().parse(glb, "", resolve, reject));
-const hempBytes = StripTextures(fs.readFileSync(new URL("./Model/HempRifleSlingV2/Model_RifleSlingHempV2.glb", import.meta.url)));
-const hempSource = await new GLTFLoader().parseAsync(hempBytes, "");
-const hemp = PrepareRifleSlingVisual(hempSource);
+const flatBytes = StripTextures(fs.readFileSync(new URL("./Model/RifleSlingV3/Model_RifleSlingFlatV3.glb", import.meta.url)));
+const flatSource = await new GLTFLoader().parseAsync(flatBytes, "");
+const flat = PrepareRifleSlingVisual(flatSource);
 {
-  const geometry = hempSource.scene.getObjectByName('RopeHemp_Skinned').geometry, position = geometry.attributes.position;
+  const geometry = flatSource.scene.getObjectByName('SlingFlat_Skinned').geometry, position = geometry.attributes.position;
+  const box=new THREE.Box3().setFromBufferAttribute(position),size=box.getSize(new THREE.Vector3());
   let radius = 0, minZ = Infinity, maxZ = -Infinity, weightError = 0;
   for (let i = 0; i < position.count; i++) {
     radius = Math.max(radius, Math.hypot(position.getX(i), position.getY(i)));
@@ -82,10 +83,10 @@ const hemp = PrepareRifleSlingVisual(hempSource);
     for (let j = 0; j < 4; j++) sum += geometry.attributes.skinWeight.getComponent(i, j);
     weightError = Math.max(weightError, Math.abs(sum - 1));
   }
-  Check(hemp.inverseBinds.length === CFG.count && hemp.bindRotations.length === CFG.count, "真实 Blender 麻绳具有 32 根完整绑定骨");
-  Check(radius > .0034 && radius < .0036 && maxZ - minZ > 1.59 && maxZ - minZ < 1.61,
-    "三股绳外径 7 mm，静止长 1.6 m，沿 glTF +Z", `${F(radius * 2000, 2)} mm / ${F(maxZ-minZ,3)} m`);
-  Check(weightError < 1e-6 && geometry.index.count / 3 === 18432, "真实绳股几何与归一蒙皮权重", `${geometry.index.count / 3} triangles`);
+  Check(flat.inverseBinds.length === 63 && flat.bindRotations.length === 63, "32 个物理点、63 根平滑蒙皮骨，扁平带形保持");
+  Check(Math.abs(size.x-.025)<1e-5&&Math.abs(size.y-.002)<1e-5&&maxZ-minZ>1.59&&maxZ-minZ<1.61,
+    "保留扁带：25 mm 宽、2 mm 厚、1.6 m 长", `${F(size.x*1000,2)} × ${F(size.y*1000,2)} mm`);
+  Check(weightError < 1e-6 && geometry.index.count / 3 === 3084, "真实扁带几何与归一蒙皮权重", `${geometry.index.count / 3} triangles`);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,18 +243,34 @@ Step(world, 1 / 60);
   mesh.skeleton.update();
   let worstRadius = 0, pinError = 0;
   for (let k=0;k<mesh.geometry.attributes.position.count;k+=7) {
-    let s=0;for(let j=0;j<4;j++)s+=mesh.geometry.attributes.skinIndex.getComponent(k,j)*mesh.geometry.attributes.skinWeight.getComponent(k,j);
-    const a=Math.min(30,Math.floor(THREE.MathUtils.clamp(s,0,31)));
+    const center=new THREE.Vector3();
+    for(let j=0;j<4;j++)center.addScaledVector(new THREE.Vector3().setFromMatrixPosition(mesh.skeleton.bones[mesh.geometry.attributes.skinIndex.getComponent(k,j)].matrixWorld),mesh.geometry.attributes.skinWeight.getComponent(k,j));
     mesh.getVertexPosition(k,v).applyMatrix4(mesh.matrixWorld);
-    const line=new THREE.Line3(new THREE.Vector3().fromArray(cloth.rope.p,a*3).applyMatrix4(F0),new THREE.Vector3().fromArray(cloth.rope.p,(a+1)*3).applyMatrix4(F0));
-    const d=line.closestPointToPoint(v,true,new THREE.Vector3()).distanceTo(v);
+    const d=center.distanceTo(v);
     worstRadius=Math.max(worstRadius,d);
   }
   for(let i=0;i<CFG.count;i++) {
-    const actual=new THREE.Vector3().applyMatrix4(mesh.skeleton.boneInverses[i]).applyMatrix4(cloth.bones[i].matrixWorld);
+    const actual=new THREE.Vector3().applyMatrix4(mesh.skeleton.boneInverses[i*2]).applyMatrix4(cloth.bones[i].matrixWorld);
     pinError=Math.max(pinError,actual.distanceTo(new THREE.Vector3().fromArray(cloth.rope.p,i*3).applyMatrix4(F0)));
   }
-  Check(worstRadius < .0042 && pinError<1e-6, "真实三股绳 CPU 蒙皮贴合中线与骨固定点", `外半径 ${F(worstRadius*1000,3)} mm / 骨误差 ${F(pinError*1000,5)} mm`);
+  Check(worstRadius>.010&&worstRadius<.014&&pinError<1e-6, "真实扁带 CPU 蒙皮保持带宽与骨固定点", `半宽范围 ${F(worstRadius*1000,3)} mm / 骨误差 ${F(pinError*1000,5)} mm`);
+  let curveDeviation=0;
+  for(let i=0;i<31;i++)curveDeviation=Math.max(curveDeviation,new THREE.Vector3().fromArray(cloth.renderPositions,(i*2+1)*3).distanceTo(new THREE.Vector3().fromArray(cloth.rope.p,i*3).lerp(new THREE.Vector3().fromArray(cloth.rope.p,(i+1)*3),.5)));
+  Check(curveDeviation<=.002001,"空间平滑偏移不超过 2 mm，物理固定点保持精确",`${F(curveDeviation*1000,3)} mm`);
+  const sourcePositions=flatSource.scene.getObjectByName('SlingFlat_Skinned').geometry.attributes.position,rings=new Map();
+  for(let i=0;i<sourcePositions.count;i++){
+    const key=Math.round(sourcePositions.getZ(i)*120000);let ring=rings.get(key);
+    if(!ring){ring={lo:i,hi:i};rings.set(key,ring);}
+    if(sourcePositions.getX(i)<sourcePositions.getX(ring.lo))ring.lo=i;
+    if(sourcePositions.getX(i)>sourcePositions.getX(ring.hi))ring.hi=i;
+  }
+  let minWidthRatio=Infinity;
+  for(const ring of rings.values()){
+    const width=sourcePositions.getX(ring.hi)-sourcePositions.getX(ring.lo);
+    const left=mesh.getVertexPosition(ring.lo,new THREE.Vector3()),right=mesh.getVertexPosition(ring.hi,new THREE.Vector3());
+    minWidthRatio=Math.min(minWidthRatio,left.distanceTo(right)/width);
+  }
+  Check(minWidthRatio>.65,"真实蒙皮截面不夹成尖角或沙漏",`最窄保留 ${F(minWidthRatio*100,1)}% 带宽`);
   const m = Measure(world);
   Check(m.pin < 1e-6, "两头钉在背带环上", `${m.pin.toExponential(1)} m`);
   // 身体表面按 3 cm 一个点采样、切平面由最近三个点插，曲面上会差几毫米；小部件（腰包）采样稀，差得多一点
@@ -454,7 +471,7 @@ console.log('--- 7. 实际汉阳造前后背带环');
     const box=new THREE.Box3().setFromObject(loop),center=box.getCenter(new THREE.Vector3());
     let clearance=Infinity;
     for(let i=0;i<loop.geometry.attributes.position.count;i++)clearance=Math.min(clearance,loop.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(loop.matrixWorld).distanceTo(point));
-    Check(center.distanceTo(point)<.00001&&clearance>.0035&&clearance<.012,`汉阳造 ${end} 定位于实测环孔，容得下 7 mm 绳`,`${F(clearance*1000,2)} mm 净半径`);
+    Check(center.distanceTo(point)<.00001&&clearance>.0035&&clearance<.012,`汉阳造 ${end} 定位于实测环孔`,`${F(clearance*1000,2)} mm 净半径`);
   }
   const w=await Setup(),mount=w.sling.parent;w.scene.updateMatrixWorld(true);
   const gun=model.scene;mount.add(gun);gun.rotation.set(-Math.PI/2,0,0);gun.scale.setScalar(1/mount.getWorldScale(new THREE.Vector3()).y);
@@ -515,9 +532,9 @@ function TzmMeshes(id){
       `三八式 ${end} 挂点对齐独立焊接还原的现有 U 形环`);
   }
   const points=TzmMeshes('ZhongZheng').flatMap(mesh=>mesh.points);
-  for(const [end,name] of [['front','RopeHemp_LashingFront'],['rear','RopeHemp_LashingRear']]){
+  for(const [end,name] of [['front','SlingFlat_LashingFront'],['rear','SlingFlat_LashingRear']]){
     const spec=RIFLE_SLING_MOUNTS.ZhongZheng[end],section=points.filter(p=>Math.abs(p.z-spec.bindingPosition[2])<.006);
-    const stock=new THREE.Box3().setFromPoints(section),lashing=new THREE.Box3().setFromObject(hempSource.scene.getObjectByName(name));
+    const stock=new THREE.Box3().setFromPoints(section),lashing=new THREE.Box3().setFromObject(flatSource.scene.getObjectByName(name));
     lashing.translate(new THREE.Vector3().fromArray(spec.bindingPosition));
     Check(section.length>0&&lashing.min.x<stock.min.x&&lashing.max.x>stock.max.x&&lashing.min.y<stock.min.y&&lashing.max.y>stock.max.y,
       `中正式 ${end} 实体捆扎圈围住实际护箍或枪托截面`);

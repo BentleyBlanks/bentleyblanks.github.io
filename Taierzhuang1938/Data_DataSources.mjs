@@ -44,7 +44,7 @@ export const DATA_SOURCE_RULES = Object.freeze([
   RULE("Font/*.json", "generated", ["Font/Script_FontSubset.py"], "字体子集清单"),
   RULE("Volume/*.json", "generated", ["_import/Script_ParticleVolumeBake.py"], "体积烟雾"),
   RULE("Model/**/*.tzm.json", "source", ["Script_TzmShot.mjs"], "程序化模型（项目自有格式，移植前要导成 glTF）"),
-  RULE("Model/HempRifleSlingV2/Data_RifleSlingHempV2.json", "generated", ["_blender/Script_HempRifleSlingBakeV2.py"], "三股麻绳几何、纹理与绑定合同；原图来自内置 imagegen 一级"),
+  RULE("Model/RifleSlingV3/Data_RifleSlingFlatV3.json", "generated", ["_blender/Script_FlatRifleSlingBakeV3.py"], "扁平棕色背带、折返收口与绑定合同；原图来自内置 imagegen 一级"),
   RULE("Model/**/*.json", "generated", ["_blender", "_import"], "模型清单、打包与贴图记录：各资产的构建脚本（_blender/<资产>/Build_*.py、_import/*）写"),
   RULE("_blender/**/*.json", "generated", ["_blender"], "Blender 构建脚本的输入快照与打包记录"),
   RULE("docs/Data_FirstLevelMissionAnimationStatus.json", "generated", ["_import/Script_FirstLevelAnimationStatus.py"], "第一关动作进度表"),
@@ -64,7 +64,9 @@ export const DATA_SOURCE_RULES = Object.freeze([
 ]);
 
 /** 退役：已经删掉的数据文件，不许再出现（删的时候在这里记一行：路径、哪天、为什么）。 */
-export const DATA_RETIRED = Object.freeze([]);
+export const DATA_RETIRED = Object.freeze([
+  {file:'Model/HempRifleSlingV2/Data_RifleSlingHempV2.json',why:'2026-11-05 用户澄清麻绳仅指低回弹手感，撤销圆绳外形，改用扁平枪带 V3'},
+]);
 
 /** 门禁扫哪些文件：数据模块、JSON（这些目录与根目录），不扫第三方、导入工作区、取证输出。 */
 export const DATA_SCAN = Object.freeze({
