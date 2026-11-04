@@ -32,6 +32,9 @@ export const DATA_SOURCE_RULES = Object.freeze([
   RULE("Timeline/*.timeline.json", "source", ["Script_TimelineCli.mjs"], "Timeline 过场：白盒页底部 Timeline 面板与 agent 写"),
   RULE("Heightmap/Data_*.mjs", "generated", ["Script_HeightmapCli.mjs"], "高程表"),
   // --- 资产清单与烘焙产物 -------------------------------------------------------------------------------------
+  RULE("Hair/Data_HairStyles.json", "source", ["_import/Script_HairGroomBuild.mjs"], "头发胡子造型、人物挂接与实验室样本源表"),
+  RULE("Hair/Data_HairGrooms.json", "generated", ["_import/Script_HairGroomBuild.mjs"], "三档头发与胡子二进制资产清单"),
+  RULE("Hair/Heads/*.json", "generated", ["_import/Script_HairLabHeads.py"], "只读角色光头来源转换的关键点与米制朝向"),
   RULE("Animation/**/*.json", "generated", ["_import", "_blender"],
     "动作：源头在 Blender / 视频转骨骼 / Mixamo，JSON 是烘焙脚本（_import/Script_*Bake.*、_blender/*）导出的"),
   RULE("Audio/**/*.json", "generated", ["Script_SeedAudioFirstLevelBake.mjs", "Script_SeedAudioSquadBarkBake.mjs", "Script_SeedAudioCastBake.mjs", "Script_SeedAudioVoiceKit.mjs", "Script_AmbBake.mjs", "Script_MusicBake.mjs", "Script_FirstLevelMusicBake.mjs", "Script_AudioNormalize.mjs", "Script_EditorBlockoutFirstLevel0105Voice.mjs", "Script_EditorBlockoutFirstLevel0610Voice.mjs", "Script_EditorBlockoutFirstLevel1218Voice.mjs"],
@@ -62,7 +65,7 @@ export const DATA_RETIRED = Object.freeze([]);
 /** 门禁扫哪些文件：数据模块、JSON（这些目录与根目录），不扫第三方、导入工作区、取证输出。 */
 export const DATA_SCAN = Object.freeze({
   include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
-    "Audio/**/*.json", "Font/*.json", "Volume/*.json", "Model/**/*.json", "_blender/**/*.json", "docs/*.json"]),
+    "Audio/**/*.json", "Font/*.json", "Volume/*.json", "Hair/**/*.json", "Model/**/*.json", "_blender/**/*.json", "docs/*.json"]),
   exclude: Object.freeze(["vendor/**", "node_modules/**", "_import/**", "_shots/**", "tmp/**"]),
 });
 

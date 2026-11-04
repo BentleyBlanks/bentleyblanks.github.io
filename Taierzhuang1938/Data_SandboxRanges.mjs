@@ -40,6 +40,8 @@ export const SANDBOX_RANGES = Object.freeze([
   RANGE({ id: "reactions", bootLabel: "boot.start.reactionRange", invincible: true, trimProps: false }),
   RANGE({ id: "cloth", bootLabel: "boot.start.clothRange", invincible: true, externalProps: false, trimProps: false,
     tightBounds: true, muteAudio: true, ownsFrame: true }),
+  RANGE({ id: "hair", bootLabel: "boot.start.hairRange", invincible: true, externalProps: false, trimProps: false,
+    tightBounds: true, muteAudio: true, ownsFrame: true }),
 ]);
 
 /** 测试场的网址开关名（开机路由用）。 */

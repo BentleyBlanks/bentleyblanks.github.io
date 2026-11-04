@@ -301,6 +301,8 @@ export class EditorBlockout {
     this.root.appendChild(this.labelRoot);
 
     this.puppets = new BlockoutPuppets({ scene: host.scene, actorFactory: host.actorFactory, library: host.library, groundAt: this.standAt });
+    // X Bot 人物的头发切档要看相机、吃太阳阴影（docs/Data_HairSystem.md §7）
+    if (this.puppets.xbot) this.puppets.xbot.view = { camera: host.camera, renderer: host.renderer, post: host.post, lightRig: host.lights || null };
     // 树：布局里标 blockoutTree 的块种游戏里的枯树模型（2026-10-20，§5.7）
     this.trees = new BlockoutTrees({ scene: host.scene, groundAt: this.groundAt });
     // 远景层（场景文件 backdrop，§2.2 / §6.3，2026-10-20）：只看不走；地面叠同一套米格线，接缝两边对得上

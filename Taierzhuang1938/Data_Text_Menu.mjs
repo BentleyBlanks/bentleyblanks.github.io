@@ -224,6 +224,11 @@ export const TEXT = Object.freeze({
   "boot.start.clothRange": "进入布料模拟测试场",
   "range.build.clothFixtures": "搭建布料试验台",
   "range.build.clothReady": "布料试验台就绪",
+  "menu.sandbox.hair.where": "头发胡子测试场",
+  "menu.sandbox.hair.exit": "退出头发胡子测试场",
+  "boot.start.hairRange": "进入头发胡子测试场",
+  "range.build.hairFixtures": "摆台座",
+  "range.build.hairReady": "台座就绪",
   // 第一关现在就是 P0/P1/P2 白盒（Data_Menu.CAMPAIGN_ENTRIES），玩家面前只叫「第一关」。
   "menu.sandbox.firstLevelP012Whitebox.where": "第一关",
   "menu.sandbox.firstLevelP012Whitebox.exit": "退出第一关",

@@ -47,6 +47,9 @@ import { BattleReactionRange } from "./Script_BattleReactionRange.mjs";
 import { CLOTH_RANGE_PHASE } from "./Data_ClothRange.mjs";
 import { ClothRangeField } from "./Script_ClothRangeField.mjs";
 import { ClothRange } from "./Script_ClothRange.mjs";
+import { HAIR_RANGE_PHASE } from "./Data_HairRange.mjs";
+import { HairRangeField } from "./Script_HairRangeField.mjs";
+import { HairRange } from "./Script_HairRange.mjs";
 
 /** 把一个测试场运行时包成统一接口；`hooks` 里给的才接，没给的装配层一律不调。 */
 function Instance(runtime, hooks = {}) {
@@ -159,6 +162,21 @@ const PLUGINS = {
       // 实验室自己管轨道相机与模拟时间，不走第一人称移动与战斗。
       return Instance(runtime, {
         debugName: "ClothRange", ownsFrame: true, dropDebugOnDispose: true,
+        UpdateCamera: (dt) => runtime.UpdateCamera(dt),
+      });
+    },
+  },
+  hair: {
+    phase: HAIR_RANGE_PHASE, World: HairRangeField,
+    Create: (h) => {
+      const runtime = new HairRange({
+        scene: h.scene, camera: h.camera, canvas: h.canvas, renderer: h.renderer, post: h.post, ctx: h.ctx,
+        CanUse: h.CanUse, SetViewmodelHidden: h.SetViewmodelHidden,
+      });
+      runtime.UpdateCamera(0);
+      // 实验室自己管轨道相机；头发切档要等相机放好，所以每帧的头发更新也在 UpdateCamera 里。
+      return Instance(runtime, {
+        debugName: "HairRange", ownsFrame: true, dropDebugOnDispose: true,
         UpdateCamera: (dt) => runtime.UpdateCamera(dt),
       });
     },

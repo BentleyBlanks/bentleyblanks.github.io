@@ -1329,6 +1329,8 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 
 ## 3. 深度法线预通道 + HZB + 速度缓冲
 
+2026-11-04 头发接入：自定义插值几何可提供 `mesh.userData.ownPrepass` MRT 材质，沿用同一 RT0 / RT1 格式。Prepass 临时换材质，在真实 draw 时同步物体历史；发丝还保留相机细带展开的上一帧位置，透明胡茬层仍排除。接口与资源所有权见 [头发系统 §5](Data_HairSystem.md#5-预通道与生命周期)，GPU 门禁为 `HairRangeBrowserTest` 和 `MotionVectorContractTest`。
+
 > **现役契约在 §1.6（速度口径与 HZB）与 §1.5（MRT 的硬约束）。** 这一节是那一格的
 > 实现细节：覆盖材质长什么样、谁能进这一趟、第一人称怎么标。
 > 模块 `Script_PostPrepass.mjs`；回归口 `Script_PostFrameGraphTest.mjs` /

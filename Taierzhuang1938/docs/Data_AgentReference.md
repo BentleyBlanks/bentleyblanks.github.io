@@ -4,6 +4,8 @@
 
 ## 操作参考
 
+头发胡子测试场：`?hair=1` → `Data_HairRange` / `Script_HairRangeField` / `Script_HairRange`；导向插值发丝、发片、头发壳、胡子发片与头骨挂接见 [头发系统](Data_HairSystem.md)。不是完整 UE Groom 移植；验证 `HairGroomTest` / `HairRangeBrowserTest`。
+
 布料测试场：`?cloth=1` → `Data_ClothRange` / `Script_ClothRangeField` / `Script_ClothRange`，独立预设 `Data_Tuning_ClothRange`、风压 `Script_ClothLabSimulation`。厚棉被、门帘、锦旗及隔离契约见 [布料测试场](Data_ClothRange.md)；旧被子默认值保持不变。
 
 可炸断枯树：`Data_BreakableTreePlacements` / `Script_BreakableTrees`；

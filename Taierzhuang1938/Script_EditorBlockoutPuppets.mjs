@@ -1444,6 +1444,7 @@ export class BlockoutPuppets {
 
   Dispose() {
     for (const puppet of this.puppets.values()) this._Destroy(puppet);
+    this.xbot?.DisposeHair();
     this.puppets.clear();
     this.plan = null;
     this.root.removeFromParent();

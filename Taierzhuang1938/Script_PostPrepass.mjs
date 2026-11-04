@@ -408,6 +408,8 @@ export class PrepassPass {
     this._skipAlways = [];             // 分类缓存：无条件藏出这一趟的
     this._skipRanged = [];             // 分类缓存：带 normalDepthMaxDistance，每帧按相机距离判
     this._skipSkinned = [];            // 分类缓存：场景里的蒙皮网格（每帧按 visible 收骨骼）
+    this._ownPrepass = [];             // 分类缓存：自带预通道材质的网格（userData.ownPrepass）
+    this._ownSwapped = [];             // 这一趟换过材质的 [对象, 原材质]
     this._skipScene = null;            // 分类缓存是对哪只 scene 做的（换关必然换 scene）
     this._skipDirty = true;
     this._skipMarkStamp = -1;
@@ -591,9 +593,10 @@ export class PrepassPass {
   }
 
   _JoinSkipClassification() {
-    const always = this._skipAlways, ranged = this._skipRanged, skinned = this._skipSkinned;
-    always.length = 0; ranged.length = 0; skinned.length = 0;
+    const always = this._skipAlways, ranged = this._skipRanged, skinned = this._skipSkinned, own = this._ownPrepass;
+    always.length = 0; ranged.length = 0; skinned.length = 0; own.length = 0;
     for (const bucket of this._skipTops.values()) {
+      if (bucket.own) for (const object of bucket.own) own.push(object);
       if (bucket.always) for (const object of bucket.always) always.push(object);
       if (bucket.ranged) for (const object of bucket.ranged) ranged.push(object);
       if (bucket.skinned) for (const object of bucket.skinned) skinned.push(object);
@@ -626,6 +629,12 @@ export class PrepassPass {
       }
       if (object.userData.skipNormalDepth) {
         Push("always", object);
+        return;
+      }
+      // 自带预通道材质的网格（头发：顶点着色器里现插发丝、按视线展开，覆盖材质画不出来）：
+      // 这一趟临时换成 userData.ownPrepass（两输出、同格式），速度矩阵由本 pass 给（_BeginOwnPrepass）。
+      if (object.isMesh && object.userData.ownPrepass?.isMaterial) {
+        Push("own", object);
         return;
       }
       // **MRT 的硬约束**：WebGL2 里「有一个 enabled 的 draw buffer 却没有对应的
@@ -788,6 +797,77 @@ export class PrepassPass {
   }
 
   /**
+   * 自带预通道材质的网格：换上 userData.ownPrepass，并给它这一帧的速度矩阵。上一帧模型矩阵的历史
+   * 与普通刚体共用 _objectHistory（连续画才有效、矩阵没变就不给），帧末同一处推进。
+   * 材质约定：uniforms 里有 uViewProjection / uPrevViewProjection / uPrevModelMatrix / uPrevModelValid /
+   * uVelocityValid / uVelocityClamp（没有就只换材质），两个输出：RT0 视空间法线 + 视深，RT1 速度。
+   */
+  _BeginOwnPrepass(ctx) {
+    const swapped = this._ownSwapped;
+    swapped.length = 0;
+    for (const object of this._ownPrepass) {
+      if (!object.visible) continue;
+      const material = object.userData.ownPrepass;
+      const hook = material.onBeforeRender;
+      swapped.push(object, object.material, material, hook);
+      // Track draws, not merely visible flags: hidden parents and culled meshes
+      // must not acquire a fictitious previous frame. Preserve object draw hooks.
+      material.onBeforeRender = (...args) => {
+        hook?.apply(material, args);
+        this._OwnVelocity(object, material, ctx);
+      };
+      object.material = material;
+    }
+  }
+
+  _OwnVelocity(object, material, ctx) {
+      const U = material.uniforms;
+      if (U?.uPrevModelMatrix && U.uViewProjection) {
+        let valid = 0;
+        if (this.velocityEnabled && !this._foregroundObjects.has(object)) {
+          let history = this._objectHistory.get(object);
+          if (!history) {
+            history = { object, matrix: object.matrixWorld.clone(), frame: -1, queued: -1, skeleton: null, bind: null };
+            this._objectHistory.set(object, history);
+          }
+          if (history.frame === this._velocityFrame - 1) {
+            U.uPrevModelMatrix.value.copy(history.matrix);
+            valid = 1;
+          }
+          if (U.uPrevCameraLocal && U.uCameraLocal) {
+            U.uPrevCameraLocal.value.copy(valid && history.cameraLocal ? history.cameraLocal : U.uCameraLocal.value);
+            history.cameraLocal ||= new THREE.Vector3();
+            history.cameraLocal.copy(U.uCameraLocal.value);
+          }
+          if (U.uPrevPixelScale && U.uPixelScale) {
+            U.uPrevPixelScale.value = valid ? history.pixelScale : U.uPixelScale.value;
+            history.pixelScale = U.uPixelScale.value;
+          }
+          if (U.uPrevModelScale && U.uModelScale) {
+            U.uPrevModelScale.value = valid ? history.modelScale : U.uModelScale.value;
+            history.modelScale = U.uModelScale.value;
+          }
+          if (history.queued !== this._velocityFrame) { history.queued = this._velocityFrame; this._objectsDrawn.push(history); }
+          U.uViewProjection.value.copy(ctx.viewProjection);
+          U.uPrevViewProjection.value.copy(ctx.prevViewProjection);
+        }
+        U.uPrevModelValid.value = valid;
+        U.uVelocityValid.value = this.velocityEnabled && ctx.hasPrev && this.hasPrevVelocity && !this._foregroundObjects.has(object) ? 1 : 0;
+        U.uVelocityClamp.value = VELOCITY.clampUv;
+        material.uniformsNeedUpdate = true;
+      }
+  }
+
+  _EndOwnPrepass() {
+    const swapped = this._ownSwapped;
+    for (let i = 0; i < swapped.length; i += 4) {
+      swapped[i].material = swapped[i + 1];
+      swapped[i + 2].onBeforeRender = swapped[i + 3];
+    }
+    swapped.length = 0;
+  }
+
+  /**
    * 收进静态合批、这一趟没自己画的成员：照样记一份逐物体历史，被踢出来那一帧（它开始动了）
    * 才有上一帧矩阵可比。不碰任何 uniform。
    */
@@ -875,9 +955,11 @@ export class PrepassPass {
       staticBatch.Update();
       staticBatch.BeginPrepass(this._NoteStatic);
     }
+    this._BeginOwnPrepass(ctx);
     try {
       this.variants.Run(renderer, () => renderer.render(scene, camera));
     } finally {
+      this._EndOwnPrepass();
       staticBatch?.EndPrepass();
       renderer.setOpaqueSort(null);
     }

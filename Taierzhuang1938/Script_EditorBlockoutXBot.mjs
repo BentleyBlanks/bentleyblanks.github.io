@@ -24,6 +24,8 @@ import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
+import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
+import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -332,8 +334,33 @@ export class XBotSkins {
       const bodyVolumes = FitBodyVolumes(source);
       const clips = new Map(await Promise.all(Object.entries(def.clipOverrides || {}).map(async ([file, url]) =>
         [file, (await this.loader.loadAsync(url)).animations[0]])));
-      this.kits.set(key, { key, def, source, clips, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)) });
+      // 头发胡子（有就挂，读不到照样用这个人物，只是光头）
+      let groom = null;
+      if (def.groom) {
+        try {
+          this.hairAtlas ||= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png");
+          const [g, a] = await Promise.allSettled([LoadHairGroom(def.groom), this.hairAtlas]);
+          if (g.status === "fulfilled") groom = g.value;
+          if (a.status === "fulfilled") this.hairAtlasTexture = a.value;
+          if (g.status === "rejected" || a.status === "rejected" || this.hairDisposed) {
+            DisposeHairGroomAsset(groom); groom = null;
+            if (this.hairDisposed) this.hairAtlasTexture?.dispose();
+            if (g.status === "rejected") throw g.reason;
+            if (a.status === "rejected") throw a.reason;
+          }
+        } catch (error) { console.warn(`[XBot] ${def.name} hair load failed`, error); }
+      }
+      this.kits.set(key, { key, def, source, clips, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)), groom });
     } catch (error) { console.warn(`[XBot] ${def.name} load failed, using X Bot`, error); }
+  }
+
+  /** Instances are removed by BlockoutPuppets first; shared hair belongs to this cache. */
+  DisposeHair() {
+    if (this.hairDisposed) return;
+    this.hairDisposed = true;
+    for (const kit of this.kits?.values() || []) { DisposeHairGroomAsset(kit.groom); kit.groom = null; }
+    this.hairAtlas?.then((atlas) => atlas.dispose()).catch(() => {});
+    this.hairAtlasTexture = null;
   }
 
   /**
@@ -499,6 +526,13 @@ export class XBotSkin {
     this.container.userData.xbotSkin = this;
     this.container.add(this.model);
     this.rig.root.parent?.add(this.container);
+    // 头发挂在 Head 骨下（docs/Data_HairSystem.md §7）；切档要相机，由 skins.view 给（白盒编辑器装）
+    this.hair = null;
+    const headBone = this.model.getObjectByName("Head");
+    if (this.kit.groom && headBone) {
+      this.hair = new HairGroom(this.kit.groom, { atlas: skins.hairAtlasTexture, lightRig: skins.view?.lightRig || null, name: this.kit.key });
+      headBone.add(this.hair.root);
+    }
     this.bones = new Map();
     this.model.traverse(o => { if (o.isBone) this.bones.set(o.name, o); });
     this.boneList = skins.rest.bones.map(b => this.bones.get(b.name));
@@ -581,7 +615,7 @@ export class XBotSkin {
     }
     if (intent.shadow !== undefined && !!intent.shadow !== this.shadow) {
       this.shadow = !!intent.shadow;
-      this.model.traverse(o => { if (o.isMesh) o.castShadow = this.shadow; });
+      this.model.traverse(o => { if (o.isMesh && !o.userData.hairGroom) o.castShadow = this.shadow; });
     }
 
     this.fireT = intent.firing ? XBOT.fireHoldS : Math.max(0, (this.fireT || 0) - dt);
@@ -623,6 +657,11 @@ export class XBotSkin {
     this.container.updateMatrixWorld(true);
     this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
     this._Remember(intent);
+    const view = this.skins.view;
+    if (this.hair && view?.camera) {
+      this.hair.maxLod = HAIR_QUALITY[view.post?.quality || 'high'];
+      this.hair.Update(dt, view.camera, view.renderer);
+    }
   }
 
   /** 这一帧最后看到的姿势（IK、枪都摆完之后）：下一次换动作从它淡过去。 */
@@ -1443,6 +1482,7 @@ export class XBotSkin {
   Dispose() {
     this._EndRifleSwap();
     this.mixer.stopAllAction();
+    this.hair?.Dispose();
     this.container.removeFromParent();
     for (const mesh of this.hidden) mesh.visible = true;
     for (const a of this.attachments) {

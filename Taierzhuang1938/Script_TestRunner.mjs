@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
+  HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
   HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity and high wood/metal lighting'},
   HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
@@ -594,6 +596,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "HairRangeBrowserTest",
   "NakajimaKi4ReleaseBrowserTest",
   "WeaponRangeStartupBrowserTest",
   "FallingSoilBrowserTest",
@@ -720,6 +723,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "HairGroomTest",
   "TimelineTest",
   "FlareSurfaceTest",
   "FlareShadowBoundsTest",
@@ -861,6 +865,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairRangeBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
   flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
@@ -1024,6 +1029,7 @@ const changedDomainRules = [
   { domain: "japaneseSoldierYi", pattern: /JapaneseSoldierYi/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|ClothBlood|DongguaQuilt|DoorCurtain|SichuanBanner/ },
+  { domain: "hair", pattern: /(?:Hair\/|(?:Script|Data)(?:_Tuning|_Text)?_Hair)/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },

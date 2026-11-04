@@ -20,6 +20,7 @@ import { TEXT as FIRSTLEVEL } from "./Data_Text_FirstLevel.mjs";
 import { TEXT as SHELLIMPACT } from "./Data_Text_ShellImpact.mjs";
 import { TEXT as BATTLEREACTION } from "./Data_Text_BattleReaction.mjs";
 import { TEXT as CLOTHRANGE } from "./Data_Text_ClothRange.mjs";
+import { TEXT as HAIRRANGE } from "./Data_Text_HairRange.mjs";
 
 const TABLES = [
   ["Data_Text_Hud", HUD],
@@ -37,6 +38,7 @@ const TABLES = [
   ["Data_Text_ShellImpact", SHELLIMPACT],
   ["Data_Text_BattleReaction", BATTLEREACTION],
   ["Data_Text_ClothRange", CLOTHRANGE],
+  ["Data_Text_HairRange", HAIRRANGE],
 ];
 
 /** 拼表；重复键抛错并点名两份来源。导出给测试与其他语言的拼表复用。 */

@@ -4,27 +4,28 @@
 //
 // 动作库是 X Bot 的：每根骨都有位移轨（X Bot 的骨长），胯的位移是 X Bot 的胯高。别的身材照放会被拉成 X Bot 的骨长、脚离地，
 // 所以 Script_XBotCharacters.mjs 的 ClipForCharacter 去掉 Hips 以外的位移轨、Hips 位移整条乘 hipsScale（胯高之比，转换脚本写在 Data_<名>.json）。
+// groom：头发胡子（docs/Data_HairSystem.md §7），_import/Script_HairGroomBuild.mjs 按这个模型出、挂在 Head 骨下（帽子罩住的发根已剔掉）。
 
 export const XBOT_CHARACTERS = Object.freeze({
   xbot: Object.freeze({ name: "X Bot", file: "./Animation/Mixamo/Model_MixamoXBot.glb", hipsScale: 1, ownMaterial: false }),
   // 日兵甲：Tripo 部件合并（角色\Tripo\14_日兵甲），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierJia.json
   ijaJia: Object.freeze({ name: "日兵甲", file: "./Model/Character/Model_JapaneseSoldierJia.glb", hipsScale: 0.9074, ownMaterial: true,
-    report: "./Model/Character/Data_JapaneseSoldierJia.json" }),
+    report: "./Model/Character/Data_JapaneseSoldierJia.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierJia.bin" }),
   // 何有田：Tripo 部件合并（角色\Tripo\05_何有田），用户在 Tripo 绑的骨，后颈接缝补过权重（_NeckFix）；hipsScale 同 Model/Character/Data_HeYoutian.json
   heYoutian: Object.freeze({ name: "何有田", file: "./Model/Character/Model_HeYoutian.glb", hipsScale: 0.9612, ownMaterial: true,
-    report: "./Model/Character/Data_HeYoutian.json" }),
+    report: "./Model/Character/Data_HeYoutian.json", groom: "./Hair/Grooms/Groom_Game_HeYoutian.bin" }),
   // 罗班长：Tripo 部件合并（角色\Tripo\02_罗班长，V13 补了袖子里的小臂），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_SquadLeaderLuo.json
   luo: Object.freeze({ name: "罗班长", file: "./Model/Character/Model_SquadLeaderLuo.glb", hipsScale: 0.8957, ownMaterial: true,
-    report: "./Model/Character/Data_SquadLeaderLuo.json" }),
+    report: "./Model/Character/Data_SquadLeaderLuo.json", groom: "./Hair/Grooms/Groom_Game_SquadLeaderLuo.bin" }),
   // 顺子 V5：保留原始头部，仅修帽箍/内侧布边；本地绑定使用共用骨架与权重，外观全部来自顺子。
   shunzi: Object.freeze({ name: "顺子", file: "./Model/Character/Model_Shunzi.glb", hipsScale: 0.9398, ownMaterial: true,
-    report: "./Model/Character/Data_Shunzi.json" }),
+    report: "./Model/Character/Data_Shunzi.json", groom: "./Hair/Grooms/Groom_Game_Shunzi.bin" }),
   // 日军士兵A：Tripo 部件合并（角色\Tripo\10_日军士兵A，V7：下巴带、去掉帽檐下挂环），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierA.json
   ijaA: Object.freeze({ name: "日军士兵A", file: "./Model/Character/Model_JapaneseSoldierA.glb", hipsScale: 0.9396, ownMaterial: true,
-    report: "./Model/Character/Data_JapaneseSoldierA.json" }),
+    report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
   // 日兵乙：五部件 V2；本地用已验证的日兵甲骨架拟合并传递权重，保留头形，补齐护颈布内衬。
   ijaYi: Object.freeze({ name: "日兵乙", file: "./Model/Character/Model_JapaneseSoldierYi.glb", hipsScale: 0.9418, ownMaterial: true,
-    report: "./Model/Character/Data_JapaneseSoldierYi.json",
+    report: "./Model/Character/Data_JapaneseSoldierYi.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierYi.bin",
     clipOverrides: Object.freeze({ "Animation_Mixamo_Crawling_V1.glb": "./Animation/JapaneseSoldierYi/Animation_JapaneseSoldierYi_Crawling.glb" }) }),
 });
 

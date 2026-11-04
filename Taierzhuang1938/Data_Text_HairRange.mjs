@@ -1,0 +1,25 @@
+export const TEXT = Object.freeze({
+  'hair.title': '头发胡子测试场', 'hair.subtitle': '发丝 · 发片 · 头发壳 三档对比',
+  'hair.loading': '正在载入头发…（{done} / {total}）', 'hair.error': '头发加载失败：{error}',
+  'hair.instructions': '拖动转动 · 右键平移 · 滚轮缩放 · 点名字飞过去',
+  'hair.show': '显示面板', 'hair.hide': '隐藏面板',
+  'hair.row.lod': '三档对比（同一套头发）', 'hair.row.cast': '人物（各自的头发胡子）', 'hair.row.length': '发型：长短与软硬', 'hair.row.beard': '胡子（发片 + 胡茬贴片）',
+  'hair.lod.auto': '自动', 'hair.lod.strands': '发丝', 'hair.lod.cards': '发片', 'hair.lod.shell': '头发壳', 'hair.lod.none': '不画',
+  'hair.lodTitle': '全场强制档位', 'hair.lodNote': '自动 = 按头发在屏幕上的大小切档；三档对比那一排始终固定。',
+  'hair.view': '视角', 'hair.view.overview': '全场', 'hair.view.front': '正面', 'hair.view.side': '侧面', 'hair.view.back': '背面',
+  'hair.view.compareShort': '短发三档并排', 'hair.view.compareLong': '长发三档并排',
+  'hair.view.top': '俯视', 'hair.view.close': '特写', 'hair.view.walk': '走远看切档',
+  'hair.toggles': '显示', 'hair.toggle.hair': '头发', 'hair.toggle.beard': '胡子', 'hair.toggle.labels': '名牌',
+  'hair.light': '太阳', 'hair.light.azimuth': '方位', 'hair.light.elevation': '高度',
+  'hair.params': '当前这套发丝的造型（现场调，不存盘）', 'hair.param.clump': '聚簇', 'hair.param.frizz': '毛躁',
+  'hair.param.curlRadius': '卷曲半径', 'hair.param.curlPitch': '卷曲节距', 'hair.param.melanin': '黑色素', 'hair.param.roughness': '粗糙度',
+  'hair.param.fraction': '发丝数量',
+  'hair.selected': '当前：{label}', 'hair.selectedLod': '{lod} · 屏幕 {px} px',
+  'hair.stats': '发丝 {strands} 根 · 导向 {guides} 根 · 发片 {cards} 三角 · 头发壳 {shell} 三角 · 文件 {mb} MB',
+  'hair.scene': '头发启用几何：{tris} 万三角 · 渲染计数 {calls} 次 · {fps} fps',
+  'hair.lodLabel.strands': '发丝', 'hair.lodLabel.cards': '发片', 'hair.lodLabel.shell': '头发壳', 'hair.lodLabel.auto': '自动切档',
+  'hair.note': '高档采用导向发丝插值、Marschner 三瓣着色近似、体素自阴影与 TAA 覆盖率积分。发片、头发壳由同一套造型烘出，可并排观察细节和成本。',
+  'hair.limit': '这是网页渲染器对 UE strand 思路的实现，未移植完整 UE Groom：没有实时发丝物理、深阴影图、逐发丝散射或光线追踪。柔顺与粗硬体现静态造型；胡子使用发片与胡茬贴片。',
+});
+export const GATED_MODULES = Object.freeze(['Script_HairRange.mjs']);
+export const DYNAMIC_PREFIXES = Object.freeze(['hair.']);

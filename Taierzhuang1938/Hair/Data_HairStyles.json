@@ -1,0 +1,1015 @@
+{
+ "schema": "tengxian.hairStyles",
+ "version": 1,
+ "note": "头发 / 胡子的造型表（docs/Data_HairSystem.md §3）。源头，手写；改完跑 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs 重出 Hair/Grooms/*.bin。长度、宽度单位米。发际线 front/temple/templeLow 是「眉间到头顶」的比例，sideburn 是耳高比例，nape 是耳垂以下米数。",
+ "hair": {
+  "Buzz": {
+   "name": "推子头（3 毫米）",
+   "family": "Short",
+   "strands": 70000,
+   "guideSpacing": 0.004,
+   "points": 3,
+   "length": {
+    "top": 0.0045,
+    "front": 0.004,
+    "side": 0.003,
+    "back": 0.0035
+   },
+   "lengthJitter": 0.35,
+   "lift": {
+    "top": 0.78,
+    "side": 0.6,
+    "back": 0.65
+   },
+   "stiffness": 0.97,
+   "gravity": 0.0,
+   "comb": {
+    "type": "whorl",
+    "whorl": [
+     0.0,
+     -0.025,
+     0.06
+    ]
+   },
+   "hairline": {
+    "front": 0.4,
+    "temple": 0.46,
+    "templeLow": 0.2,
+    "sideburn": 0.35,
+    "nape": 0.03,
+    "band": 0.006
+   },
+   "volume": 0.0,
+   "clump": 0.0,
+   "frizz": 0.25,
+   "curl": [
+    0,
+    0
+   ],
+   "width": [
+    9e-05,
+    5e-05
+   ],
+   "color": {
+    "melanin": 0.97,
+    "redness": 0.06,
+    "gray": 0.0
+   },
+   "roughness": 0.45,
+   "specular": 0.45,
+   "scatter": 0.5,
+   "cards": {
+    "spacing": 0.009,
+    "width": 0.014,
+    "layers": 1,
+    "tile": "Short"
+   },
+   "shell": {
+    "kind": "scalp",
+    "opacity": 0.75
+   }
+  },
+  "Crew": {
+   "name": "寸头（军中平头，2 厘米）",
+   "family": "Short",
+   "strands": 46000,
+   "guideSpacing": 0.0045,
+   "points": 6,
+   "length": {
+    "top": 0.021,
+    "front": 0.018,
+    "side": 0.008,
+    "back": 0.01
+   },
+   "lengthJitter": 0.3,
+   "lift": {
+    "top": 0.52,
+    "side": 0.2,
+    "back": 0.26
+   },
+   "stiffness": 0.9,
+   "gravity": 0.12,
+   "comb": {
+    "type": "whorl",
+    "whorl": [
+     0.0,
+     -0.022,
+     0.055
+    ],
+    "forward": 0.55
+   },
+   "hairline": {
+    "front": 0.42,
+    "temple": 0.47,
+    "templeLow": 0.22,
+    "sideburn": 0.42,
+    "nape": 0.035,
+    "band": 0.008
+   },
+   "volume": 0.0009,
+   "clump": 0.2,
+   "frizz": 0.13,
+   "curl": [
+    0,
+    0
+   ],
+   "width": [
+    9e-05,
+    4e-05
+   ],
+   "color": {
+    "melanin": 0.96,
+    "redness": 0.08,
+    "gray": 0.0
+   },
+   "roughness": 0.4,
+   "specular": 0.55,
+   "scatter": 0.55,
+   "cards": {
+    "spacing": 0.009,
+    "width": 0.019,
+    "layers": 3,
+    "tile": "Short"
+   },
+   "shell": {
+    "kind": "scalp",
+    "opacity": 0.9
+   }
+  },
+  "SidePart": {
+   "name": "分头（抹油，8 厘米）",
+   "family": "Medium",
+   "strands": 52000,
+   "guideSpacing": 0.0045,
+   "points": 10,
+   "length": {
+    "top": 0.085,
+    "front": 0.08,
+    "side": 0.03,
+    "back": 0.035
+   },
+   "lengthJitter": 0.12,
+   "lift": {
+    "top": 0.22,
+    "side": 0.08,
+    "back": 0.1
+   },
+   "stiffness": 0.55,
+   "gravity": 0.55,
+   "comb": {
+    "type": "part",
+    "partX": -0.032,
+    "back": 0.45
+   },
+   "hairline": {
+    "front": 0.44,
+    "temple": 0.5,
+    "templeLow": 0.24,
+    "sideburn": 0.4,
+    "nape": 0.03,
+    "band": 0.007
+   },
+   "volume": 0.0035,
+   "clump": 0.45,
+   "frizz": 0.06,
+   "curl": [
+    0,
+    0
+   ],
+   "width": [
+    8e-05,
+    4e-05
+   ],
+   "color": {
+    "melanin": 0.95,
+    "redness": 0.1,
+    "gray": 0.0
+   },
+   "roughness": 0.26,
+   "specular": 0.85,
+   "scatter": 0.5,
+   "cards": {
+    "spacing": 0.011,
+    "width": 0.019,
+    "layers": 2,
+    "tile": "Long"
+   },
+   "shell": {
+    "kind": "scalp",
+    "opacity": 1
+   }
+  },
+  "Messy": {
+   "name": "乱发（6 厘米，没剪没洗）",
+   "family": "Medium",
+   "strands": 52000,
+   "guideSpacing": 0.0045,
+   "points": 9,
+   "length": {
+    "top": 0.06,
+    "front": 0.055,
+    "side": 0.035,
+    "back": 0.045
+   },
+   "lengthJitter": 0.3,
+   "lift": {
+    "top": 0.5,
+    "side": 0.2,
+    "back": 0.25
+   },
+   "stiffness": 0.72,
+   "gravity": 0.35,
+   "comb": {
+    "type": "whorl",
+    "whorl": [
+     0.0,
+     -0.022,
+     0.055
+    ],
+    "forward": 0.3
+   },
+   "hairline": {
+    "front": 0.42,
+    "temple": 0.47,
+    "templeLow": 0.22,
+    "sideburn": 0.5,
+    "nape": 0.045,
+    "band": 0.008
+   },
+   "volume": 0.004,
+   "clump": 0.55,
+   "frizz": 0.38,
+   "curl": [
+    0.004,
+    0.05
+   ],
+   "width": [
+    0.0001,
+    4e-05
+   ],
+   "color": {
+    "melanin": 0.92,
+    "redness": 0.14,
+    "gray": 0.0
+   },
+   "roughness": 0.52,
+   "specular": 0.4,
+   "scatter": 0.6,
+   "cards": {
+    "spacing": 0.011,
+    "width": 0.018,
+    "layers": 2,
+    "tile": "Wavy"
+   },
+   "shell": {
+    "kind": "scalp",
+    "opacity": 1
+   }
+  },
+  "LongStraight": {
+   "name": "长直发（28 厘米，柔顺）",
+   "family": "Long",
+   "strands": 64000,
+   "guideSpacing": 0.005,
+   "points": 20,
+   "length": {
+    "top": 0.28,
+    "front": 0.2,
+    "side": 0.25,
+    "back": 0.28
+   },
+   "lengthJitter": 0.08,
+   "lift": {
+    "top": 0.18,
+    "side": 0.05,
+    "back": 0.06
+   },
+   "stiffness": 0.25,
+   "gravity": 1.0,
+   "comb": {
+    "type": "part",
+    "partX": 0.0,
+    "back": 0.3
+   },
+   "hairline": {
+    "front": 0.44,
+    "temple": 0.5,
+    "templeLow": 0.24,
+    "sideburn": 0.5,
+    "nape": 0.04,
+    "band": 0.007
+   },
+   "volume": 0.004,
+   "clump": 0.72,
+   "frizz": 0.015,
+   "curl": [
+    0,
+    0
+   ],
+   "width": [
+    7e-05,
+    3e-05
+   ],
+   "color": {
+    "melanin": 0.9,
+    "redness": 0.12,
+    "gray": 0.0
+   },
+   "roughness": 0.24,
+   "specular": 0.9,
+   "scatter": 0.7,
+   "cards": {
+    "spacing": 0.012,
+    "width": 0.022,
+    "layers": 3,
+    "tile": "Long"
+   },
+   "shell": {
+    "kind": "hull",
+    "opacity": 1
+   }
+  },
+  "LongWavy": {
+   "name": "长卷发（22 厘米，粗硬起卷）",
+   "family": "Long",
+   "strands": 60000,
+   "guideSpacing": 0.005,
+   "points": 22,
+   "length": {
+    "top": 0.2,
+    "front": 0.07,
+    "side": 0.18,
+    "back": 0.22
+   },
+   "lengthJitter": 0.2,
+   "lift": {
+    "top": 0.35,
+    "side": 0.12,
+    "back": 0.12
+   },
+   "stiffness": 0.45,
+   "gravity": 0.8,
+   "comb": {
+    "type": "part",
+    "partX": 0.0,
+    "back": 0.9
+   },
+   "hairline": {
+    "front": 0.42,
+    "temple": 0.47,
+    "templeLow": 0.22,
+    "sideburn": 0.5,
+    "nape": 0.04,
+    "band": 0.008
+   },
+   "volume": 0.005,
+   "clump": 0.7,
+   "frizz": 0.3,
+   "curl": [
+    0.009,
+    0.035
+   ],
+   "width": [
+    0.0001,
+    4e-05
+   ],
+   "color": {
+    "melanin": 0.82,
+    "redness": 0.22,
+    "gray": 0.0
+   },
+   "roughness": 0.46,
+   "specular": 0.5,
+   "scatter": 0.75,
+   "cards": {
+    "spacing": 0.012,
+    "width": 0.022,
+    "layers": 3,
+    "tile": "Wavy"
+   },
+   "shell": {
+    "kind": "hull",
+    "opacity": 1
+   }
+  }
+ },
+ "beard": {
+  "StubbleLight": {
+   "name": "淡胡茬（顺子）",
+   "guideSpacing": 0.0028,
+   "points": 3,
+   "parts": {
+    "mustache": {
+     "length": 0.003,
+     "density": 0.55,
+     "width": 0.9
+    },
+    "chin": {
+     "length": 0.003,
+     "density": 0.5,
+     "width": 0.85
+    }
+   },
+   "stubble": {
+    "density": 0.35,
+    "length": 0.0012,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw"
+    ]
+   },
+   "lift": 0.45,
+   "stiffness": 0.95,
+   "curl": [
+    0,
+    0
+   ],
+   "frizz": 0.35,
+   "color": {
+    "melanin": 0.96,
+    "redness": 0.08,
+    "gray": 0.0
+   },
+   "cards": {
+    "spacing": 0.0022,
+    "width": 0.0026,
+    "layers": 2,
+    "tile": "Stubble"
+   }
+  },
+  "BoxedShort": {
+   "name": "短络腮（罗班长）",
+   "guideSpacing": 0.0026,
+   "points": 4,
+   "parts": {
+    "mustache": {
+     "length": 0.008,
+     "density": 1.0,
+     "width": 1.0,
+     "droop": 0.4
+    },
+    "chin": {
+     "length": 0.012,
+     "density": 1.0,
+     "width": 1.1
+    },
+    "jaw": {
+     "length": 0.006,
+     "density": 0.8,
+     "cheek": 0.45
+    },
+    "neck": {
+     "length": 0.005,
+     "density": 0.55
+    }
+   },
+   "stubble": {
+    "density": 0.85,
+    "length": 0.0015,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw",
+     "neck",
+     "cheek"
+    ]
+   },
+   "lift": 0.3,
+   "stiffness": 0.85,
+   "curl": [
+    0.0012,
+    0.006
+   ],
+   "frizz": 0.45,
+   "color": {
+    "melanin": 0.95,
+    "redness": 0.1,
+    "gray": 0.08
+   },
+   "cards": {
+    "spacing": 0.0019,
+    "width": 0.0028,
+    "layers": 3,
+    "tile": "Beard"
+   }
+  },
+  "GoateeThin": {
+   "name": "细八字 + 山羊胡（何有田）",
+   "guideSpacing": 0.0025,
+   "points": 4,
+   "parts": {
+    "mustache": {
+     "length": 0.008,
+     "density": 0.75,
+     "width": 0.95,
+     "droop": 0.7,
+     "thin": 0.55
+    },
+    "chin": {
+     "length": 0.014,
+     "density": 0.85,
+     "width": 0.65,
+     "point": 0.4
+    }
+   },
+   "stubble": {
+    "density": 0.45,
+    "length": 0.0012,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw"
+    ]
+   },
+   "lift": 0.28,
+   "stiffness": 0.85,
+   "curl": [
+    0.001,
+    0.006
+   ],
+   "frizz": 0.35,
+   "color": {
+    "melanin": 0.95,
+    "redness": 0.1,
+    "gray": 0.0
+   },
+   "cards": {
+    "spacing": 0.0019,
+    "width": 0.0028,
+    "layers": 3,
+    "tile": "Beard"
+   }
+  },
+  "PointedGoatee": {
+   "name": "浓八字 + 尖下巴胡（日军士兵A）",
+   "guideSpacing": 0.0025,
+   "points": 6,
+   "parts": {
+    "mustache": {
+     "length": 0.013,
+     "density": 1.0,
+     "width": 1.15,
+     "droop": 0.9
+    },
+    "chin": {
+     "length": 0.03,
+     "density": 1.0,
+     "width": 0.85,
+     "point": 0.85
+    },
+    "jaw": {
+     "length": 0.004,
+     "density": 0.45,
+     "cheek": 0.3
+    }
+   },
+   "stubble": {
+    "density": 0.7,
+    "length": 0.0015,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw",
+     "cheek"
+    ]
+   },
+   "lift": 0.3,
+   "stiffness": 0.75,
+   "curl": [
+    0.0015,
+    0.008
+   ],
+   "frizz": 0.4,
+   "color": {
+    "melanin": 0.94,
+    "redness": 0.08,
+    "gray": 0.22
+   },
+   "cards": {
+    "spacing": 0.0019,
+    "width": 0.0028,
+    "layers": 3,
+    "tile": "Beard"
+   }
+  },
+  "MustacheThick": {
+   "name": "浓八字（日兵甲）",
+   "guideSpacing": 0.0024,
+   "points": 4,
+   "parts": {
+    "mustache": {
+     "length": 0.0075,
+     "density": 0.8,
+     "width": 1.0,
+     "droop": 0.3,
+     "thin": 0.25
+    },
+    "chin": {
+     "length": 0.003,
+     "density": 0.4,
+     "width": 0.9
+    }
+   },
+   "stubble": {
+    "density": 0.6,
+    "length": 0.0012,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw"
+    ]
+   },
+   "lift": 0.14,
+   "stiffness": 0.85,
+   "curl": [
+    0.001,
+    0.006
+   ],
+   "frizz": 0.35,
+   "color": {
+    "melanin": 0.96,
+    "redness": 0.08,
+    "gray": 0.0
+   },
+   "cards": {
+    "spacing": 0.0019,
+    "width": 0.0028,
+    "layers": 3,
+    "tile": "Beard"
+   }
+  },
+  "MustacheChin": {
+   "name": "八字 + 下巴短须（日兵乙）",
+   "guideSpacing": 0.0025,
+   "points": 4,
+   "parts": {
+    "mustache": {
+     "length": 0.009,
+     "density": 0.95,
+     "width": 1.0,
+     "droop": 0.55
+    },
+    "chin": {
+     "length": 0.01,
+     "density": 0.9,
+     "width": 1.0
+    },
+    "jaw": {
+     "length": 0.004,
+     "density": 0.45,
+     "cheek": 0.2
+    }
+   },
+   "stubble": {
+    "density": 0.6,
+    "length": 0.0013,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw"
+    ]
+   },
+   "lift": 0.28,
+   "stiffness": 0.85,
+   "curl": [
+    0.0012,
+    0.006
+   ],
+   "frizz": 0.4,
+   "color": {
+    "melanin": 0.95,
+    "redness": 0.1,
+    "gray": 0.0
+   },
+   "cards": {
+    "spacing": 0.0019,
+    "width": 0.0028,
+    "layers": 3,
+    "tile": "Beard"
+   }
+  },
+  "Stubble": {
+   "name": "胡茬（只有贴片）",
+   "guideSpacing": 0.003,
+   "points": 2,
+   "parts": {},
+   "stubble": {
+    "density": 1.0,
+    "length": 0.0018,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw",
+     "neck",
+     "cheek"
+    ]
+   },
+   "lift": 0.5,
+   "stiffness": 1.0,
+   "curl": [
+    0,
+    0
+   ],
+   "frizz": 0.3,
+   "color": {
+    "melanin": 0.96,
+    "redness": 0.08,
+    "gray": 0.0
+   },
+   "cards": {
+    "spacing": 0.0024,
+    "width": 0.0026,
+    "layers": 1,
+    "tile": "Stubble"
+   }
+  },
+  "FullLong": {
+   "name": "长络腮（12 厘米）",
+   "guideSpacing": 0.0028,
+   "points": 10,
+   "parts": {
+    "mustache": {
+     "length": 0.03,
+     "density": 1.0,
+     "width": 1.15,
+     "droop": 1.0
+    },
+    "chin": {
+     "length": 0.12,
+     "density": 1.0,
+     "width": 1.3,
+     "point": 0.3
+    },
+    "jaw": {
+     "length": 0.07,
+     "density": 1.0,
+     "cheek": 0.55
+    },
+    "neck": {
+     "length": 0.05,
+     "density": 0.8
+    }
+   },
+   "stubble": {
+    "density": 0.9,
+    "length": 0.0015,
+    "parts": [
+     "mustache",
+     "chin",
+     "jaw",
+     "neck",
+     "cheek"
+    ]
+   },
+   "lift": 0.22,
+   "stiffness": 0.5,
+   "curl": [
+    0.003,
+    0.02
+   ],
+   "frizz": 0.4,
+   "color": {
+    "melanin": 0.85,
+    "redness": 0.14,
+    "gray": 0.35
+   },
+   "cards": {
+    "spacing": 0.0034,
+    "width": 0.0055,
+    "layers": 3,
+    "tile": "BeardLong"
+   }
+  }
+ },
+ "grooms": [
+  {
+   "id": "Shunzi_Cast",
+   "head": "Shunzi",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "cast",
+   "label": "顺子：寸头 + 淡胡茬"
+  },
+  {
+   "id": "Luo_Cast",
+   "head": "Luo",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "row": "cast",
+   "label": "罗班长：寸头 + 短络腮",
+   "hairOverrides": {
+    "length": {
+     "top": 0.019,
+     "front": 0.016,
+     "side": 0.007,
+     "back": 0.009
+    }
+   }
+  },
+  {
+   "id": "HeYoutian_Cast",
+   "head": "HeYoutian",
+   "hair": "Crew",
+   "beard": "GoateeThin",
+   "row": "cast",
+   "label": "何有田：寸头 + 细八字山羊胡"
+  },
+  {
+   "id": "SoldierA_Cast",
+   "head": "SoldierA",
+   "hair": "Crew",
+   "beard": "PointedGoatee",
+   "row": "cast",
+   "label": "日军士兵A：寸头 + 尖下巴胡"
+  },
+  {
+   "id": "Jia_Cast",
+   "head": "Jia",
+   "hair": "Crew",
+   "beard": "MustacheThick",
+   "row": "cast",
+   "label": "日兵甲：寸头 + 浓八字",
+   "hairOverrides": {
+    "length": {
+     "top": 0.016,
+     "front": 0.014,
+     "side": 0.006,
+     "back": 0.008
+    }
+   }
+  },
+  {
+   "id": "Yi_Cast",
+   "head": "Yi",
+   "hair": "Crew",
+   "beard": "MustacheChin",
+   "row": "cast",
+   "label": "日兵乙：寸头 + 八字下巴须"
+  },
+  {
+   "id": "Jia_Buzz",
+   "head": "Jia",
+   "hair": "Buzz",
+   "beard": null,
+   "row": "length",
+   "label": "推子头 3 毫米"
+  },
+  {
+   "id": "HeYoutian_Crew",
+   "head": "HeYoutian",
+   "hair": "Crew",
+   "beard": null,
+   "row": "length",
+   "label": "寸头 2 厘米"
+  },
+  {
+   "id": "Shunzi_SidePart",
+   "head": "Shunzi",
+   "hair": "SidePart",
+   "beard": null,
+   "row": "length",
+   "label": "分头 8 厘米（抹油，顺）"
+  },
+  {
+   "id": "Luo_Messy",
+   "head": "Luo",
+   "hair": "Messy",
+   "beard": null,
+   "row": "length",
+   "label": "乱发 6 厘米（毛躁）"
+  },
+  {
+   "id": "Yi_LongStraight",
+   "head": "Yi",
+   "hair": "LongStraight",
+   "beard": null,
+   "row": "length",
+   "label": "长直发 28 厘米（柔顺）"
+  },
+  {
+   "id": "SoldierA_LongWavy",
+   "head": "SoldierA",
+   "hair": "LongWavy",
+   "beard": null,
+   "row": "length",
+   "label": "长卷发 22 厘米（粗硬）"
+  },
+  {
+   "id": "Shunzi_Stubble",
+   "head": "Shunzi",
+   "hair": "Buzz",
+   "beard": "Stubble",
+   "row": "beard",
+   "label": "胡茬（贴片）"
+  },
+  {
+   "id": "Jia_Mustache",
+   "head": "Jia",
+   "hair": "Buzz",
+   "beard": "MustacheThick",
+   "row": "beard",
+   "label": "浓八字"
+  },
+  {
+   "id": "HeYoutian_Goatee",
+   "head": "HeYoutian",
+   "hair": "Buzz",
+   "beard": "GoateeThin",
+   "row": "beard",
+   "label": "细八字 + 山羊胡"
+  },
+  {
+   "id": "Luo_Boxed",
+   "head": "Luo",
+   "hair": "Buzz",
+   "beard": "BoxedShort",
+   "row": "beard",
+   "label": "短络腮"
+  },
+  {
+   "id": "SoldierA_FullLong",
+   "head": "SoldierA",
+   "hair": "Buzz",
+   "beard": "FullLong",
+   "row": "beard",
+   "label": "长络腮 12 厘米"
+  }
+ ],
+ "gameGrooms": [
+  {
+   "id": "Game_HeYoutian",
+   "model": "Model/Character/Model_HeYoutian.glb",
+   "head": "HeYoutian",
+   "labHead": "HeYoutian",
+   "hair": "Crew",
+   "beard": "GoateeThin",
+   "label": "游戏里的何有田（戴帽）：寸头 + 细八字山羊胡"
+  },
+  {
+   "id": "Game_JapaneseSoldierJia",
+   "model": "Model/Character/Model_JapaneseSoldierJia.glb",
+   "head": "Jia",
+   "labHead": "Jia",
+   "icpScales": [
+    1.0,
+    1.15
+   ],
+   "hair": "Crew",
+   "beard": "MustacheThick",
+   "label": "游戏里的日兵甲（戴帽）：寸头 + 浓八字",
+   "hairOverrides": {
+    "length": {
+     "top": 0.016,
+     "front": 0.014,
+     "side": 0.006,
+     "back": 0.008
+    }
+   }
+  },
+  {
+   "id": "Game_SquadLeaderLuo",
+   "model": "Model/Character/Model_SquadLeaderLuo.glb",
+   "head": "Luo",
+   "labHead": "Luo",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "label": "罗班长（戴帽）：寸头 + 短络腮",
+   "hairOverrides": {
+    "length": {
+     "top": 0.019,
+     "front": 0.016,
+     "side": 0.007,
+     "back": 0.009
+    }
+   }
+  },
+  {
+   "id": "Game_JapaneseSoldierA",
+   "model": "Model/Character/Model_JapaneseSoldierA.glb",
+   "head": "SoldierA",
+   "labHead": "SoldierA",
+   "hair": "Crew",
+   "beard": "PointedGoatee",
+   "label": "日军士兵A（戴帽）：寸头 + 尖下巴胡"
+  },
+  {
+   "id": "Game_Shunzi",
+   "model": "Model/Character/Model_Shunzi.glb",
+   "head": "Shunzi",
+   "labHead": "Shunzi",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "顺子（戴帽）：寸头 + 淡胡茬"
+  },
+  {
+   "id": "Game_JapaneseSoldierYi",
+   "model": "Model/Character/Model_JapaneseSoldierYi.glb",
+   "head": "Yi",
+   "labHead": "Yi",
+   "hair": "Crew",
+   "beard": "MustacheChin",
+   "label": "日兵乙（戴盔）：寸头 + 八字下巴须"
+  }
+ ]
+}
