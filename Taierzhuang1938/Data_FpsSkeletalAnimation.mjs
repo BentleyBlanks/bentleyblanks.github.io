@@ -1,6 +1,6 @@
 // Blender-authored first-person animation assets and presentation settings.
 export const FPS_SKELETAL_ANIMATION = Object.freeze({
-  version: "20261103230000", fps: 60,
+  version: "20261104180000", fps: 60,
   weaponIds: Object.freeze(['HanYang']),
   clips: Object.freeze(['Idle', 'Reload']),
   runtimeEnabled: true,
@@ -26,9 +26,10 @@ export const FPS_SKELETAL_RELOADS = Object.freeze({
     // The bolt cycle's low pose does the same (FPS_BOLT_CYCLE.HanYang.workDepthScale 0.6).
     // Not while the bolt is opened: closer in, the knob and the working hand leave the frame (the
     // reference's rifle points straighter in than our arms can hold it); it closes in as the
-    // rifle turns to take the packet.
+    // rifle turns to take the packet. The closing stroke eases the squeeze back
+    // to 40% so the camera-side fist and wrist stay beyond the near plane.
     view: Object.freeze({ depthScale: 0.65,
-      weight: Object.freeze([[0, 0], [0.72, 0], [1.15, 1], [2.98, 1], [3.38, 0]]) }),
+      weight: Object.freeze([[0, 0], [0.72, 0], [1.15, 1], [2.45, 1], [2.70, 0.4], [2.98, 0.4], [3.38, 0]]) }),
   }),
 });
 

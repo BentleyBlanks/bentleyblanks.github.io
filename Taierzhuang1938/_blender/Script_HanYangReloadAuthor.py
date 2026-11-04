@@ -3,7 +3,7 @@
 Digitised beat by beat from the COD WWII Type 38 reload reference (OneDrive
 饮河/FPS/动画/三八式/COD_WWII_三八式_02_换弹_有声.mp4; clip second = reference
 second - 0.33). Runs through BlenderMCP inside the task project
-HanYang173R/HanYangReload_20261102/Animation_HanYangReload.blend, after
+HanYang173R/HanYangReload_20261104/Animation_HanYangReload.blend, after
 Script_HanYangReloadSetup.py has built its camera-space scene:
 
   node scripts/Script_BlenderMcp.mjs exec --code "HANYANG_PROJECT_ROOT=r'<worktree>/Taierzhuang1938';HANYANG_RELOAD_EXPORT=True;exec(open(HANYANG_PROJECT_ROOT+'/_blender/Script_HanYangReloadAuthor.py').read())"
@@ -15,13 +15,15 @@ camera and the clip's narrower reload view, Script_HanYangReloadSway.py), bolt t
 analytic two-bone solve in rig-root space that keeps the fixed bone lengths and
 the idle elbow-plane relation; hand frames and finger shapes come from the
 calibrated procedural reload captured from the game (Script_HanYangReloadCapture),
-except the knob holds (POLE_GRIPS), fitted to the joints marked on the reference.
+except the knob holds (FULL_GRIPS), fitted to the marked reference joints and the actual hand mesh.
+The opening/closing grasps have separate paths: the closing library retains its calibrated
+clearances, while the rolled opening fist keeps its wrist beyond the game near plane.
 HANYANG_RELOAD_EXPORT=True also writes clip `Reload` into
 Animation/FirstPerson/Data_FpsHanYangAnimations.json (Idle is kept).
 """
 import os
 PROJECT=globals().get('HANYANG_PROJECT_ROOT') or os.environ['HANYANG_PROJECT_ROOT']
-FOLDER=globals().get('HANYANG_RELOAD_FOLDER') or os.environ.get('HANYANG_RELOAD_FOLDER') or r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/HanYangReload_20261102'
+FOLDER=globals().get('HANYANG_RELOAD_FOLDER') or os.environ.get('HANYANG_RELOAD_FOLDER') or r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/HanYangReload_20261104'
 EXPORT=globals().get('HANYANG_RELOAD_EXPORT',False)
 
 # ---------------- rig helpers ----------------
@@ -107,14 +109,14 @@ GUN=[tuple(k) for k in SWAY_DATA['gun']]
 TURN=[(0,0),(0.27,0),(0.37,1),(2.87,1),(3.00,0),(3.40,0)]
 SLIDE=[(0,0),(0.40,0),(0.55,1),(2.75,1),(2.88,0),(3.40,0)]
 # packet in gun space: (t, x,y,z, rx,ry,rz)
-PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.58,0.16,-0.12,0.03,0.6,0,0.8),(1.73,0.06,0.09,-0.14,0.25,0.04,0.25),
-        (1.85,0,0.051,-0.187,0,0,0),(2.00,0,0.051,-0.187,0,0,0),(2.14,0,0.051-0.068,-0.187,0,0,0),(3.40,0,0.051-0.068,-0.187,0,0,0)]
+PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.50,0.16,-0.12,0.03,0.6,0,0.8),(1.67,0.035,0.08,-0.16,0.25,0.04,0.25),
+        (1.85,0,0.051,-0.187,0,0,0),(1.90,0,0.051,-0.187,0,0,0),(2.04,0,0.051-0.068,-0.187,0,0,0),(3.40,0,0.051-0.068,-0.187,0,0,0)]
 PACKET_VISIBLE=(1.30,2.20)
 # support fingers close round the stock: degrees at (knuckle, middle, end) joints; ramp in/out times
 LEFT_CURL={'1':(30,40,25),'2':(32,42,25),'3':(34,44,25),'4':(36,46,25)}
 LEFT_CURL_T=(0.10,0.30,3.08,3.34)
 # (from, last full, released): the packet rides in the solved hand, then eases back to PACKET
-PACKET_IN_HAND=(1.30,1.76,1.84)
+PACKET_IN_HAND=(1.30,1.70,1.82)
 USED=[(0.98,0,0.051-0.068,-0.187,0,0,0),(1.03,0,0.125,-0.19,0.1,0,0.1),(1.13,0.10,0.20,-0.15,0.6,0.2,1.2),(1.25,0.25,0.18,-0.05,1.2,0.4,2.4)]
 USED_VISIBLE=(0.98,1.25)
 # right hand keys: (t, anchor, pose, offset in anchor-local metres)
@@ -137,19 +139,19 @@ OFF_DOWN=(0.033,0.023,0.0); OFF_UP=(0.04,0.0,0.0)
 POLE_GRIPS={'fistUp': [-2.2022, -0.0406, 0.1078, 0.0375, -0.2484, -0.1312], 'fistBack': [-2.9047, 0.6188, 0.4781, 0.051, -0.4434, -0.3984, -0.0047, 0.7, 0.042]}
 # off the rolled-over hold (on the ball's camera side) the hand first rises up the handle out of the
 # fingers' curl, then goes back and down towards the eye, as the reference drops it to the receiver
-RELEASE_OFF=(0.07,0,0.06)
-REST_APPROACH=(0.02,0,0.03);LIFT_OFF=(0.025,0,0.02);GRAB_LEAD=math.radians(45);REST_OVER=(0.08,0,0.05);OPEN_OFF=(0.03,0,0.04)
-KNOB_HOLDS=('fistUpOpen','fistUp','fistRoll','rollToBack','fistBack','fistBackOpen','openToBack')
+RELEASE_OFF=(0.025,0,-0.035)
+REST_APPROACH=(0.012,0,0.007);LIFT_OFF=(0.025,0,0.02);GRAB_LEAD=math.radians(45);REST_OVER=(0.025,0,0);OPEN_OFF=(0.015,0,-0.012)
+KNOB_HOLDS=('fistUpOpen','fistUp','fistRoll','rollToBack','fistBack','fistBackOpen','openToBack')+('closeBack','closeBackOpen','closeMid')
 CLOSE_FAR,CLOSE_NEAR=(0.04,0,0.08),(0.015,0,0.03)
 # Keys marked T are waypoints the hand passes through without stopping.
 T=True
 RIGHT=[
  (0.00,'gun','grip',None),(0.06,'gun','gripClear',None,T),(0.10,'gun','gripClear',(0.05,0.07,0.03),T),
  (0.21,'bolt','fistUpOpen',tuple(2.2*v for v in OFF_DOWN),T),(0.245,'bolt','fistUpOpen',OFF_DOWN,T),(0.27,'bolt','fistUpOpen',None),(0.34,'bolt','fistUp',None),
- (0.41,'bolt','fistUp',None),(0.51,'bolt','fistRoll',None,T),(0.56,'bolt','fistBackOpen',None,T),(0.585,'bolt','openToBack',None,T),(0.61,'bolt','fistBack',None),(0.64,'bolt','fistBack',None),(0.67,'bolt','fistBackOpen',OPEN_OFF,T),(0.70,'bolt','fistBackOpen',RELEASE_OFF,T),
+ (0.41,'bolt','fistUp',None),(0.51,'bolt','fistRoll',None,T),(0.56,'bolt','fistBackOpen',None,T),(0.585,'bolt','openToBack',None,T),(0.61,'bolt','fistBack',None),(0.64,'bolt','fistBack',None),(0.67,'bolt','fistBackOpen',OPEN_OFF,T),(0.68,'bolt','fistBackOpen',RELEASE_OFF,T),
  (0.74,'bolt','boltRestOpen',REST_OVER,T),(0.77,'bolt','boltRestOpen',REST_APPROACH,T),(0.80,'bolt','boltRest',None),(0.92,'bolt','boltRest',None),(0.96,'bolt','boltRestOpen',REST_APPROACH,T),(1.00,'bolt','boltRestOpen',REST_OVER,T),(1.15,'via',0.67,None,T),
- (1.30,'packet','packet',None),(1.80,'packet','packet',(0.012,0.016,0.0),T),(1.85,'packet','packet',(0.012,0.018,0.0)),
- (1.95,'packet','press',(0.01,0.04,0.01)),(2.00,'packet','press',None),(2.14,'packet','press',None),
+ (1.30,'packet','packet',None),(1.70,'packet','packet',(0.012,0.016,0.0),T),(1.78,'packet','packet',(0.012,0.018,0.0)),
+ (1.90,'packet','press',(0.01,0.04,0.01)),(1.97,'packet','press',None),(2.14,'packet','press',None),
  (2.22,'packet','press',(0.03,0.05,0.02),T),(2.45,'gun','gripClear',(0.12,0.10,0.10),T),
  (2.62,'bolt','fistBackOpen',CLOSE_FAR,T),(2.70,'bolt','fistBackOpen',CLOSE_NEAR,T),(2.74,'bolt','fistBackOpen',None),(2.755,'bolt','openToBack',None,T),(2.77,'bolt','fistBack',None),(3.00,'bolt','fistBack',None),(3.04,'bolt','fistBack',LIFT_OFF,T),(3.10,'bolt','fistBackOpen',RELEASE_OFF,T),(3.18,'gun','gripClear',(0.10,0.05,0.03),T),
  (3.28,'gun','gripClear',None,T),(3.38,'gun','grip',None),(3.40,'gun','grip',None),
@@ -162,7 +164,7 @@ POLE_L=[(0,0,0,0),(0.03,0,0,0),(0.17,0.15,-0.25,0),(0.72,0.15,-0.25,0),(1.15,0.2
 POLE_R=[(0,0,0,0),(0.12,0,0,0),(0.27,0.05,0.30,0.05),(0.67,0.05,0.30,0.05),(0.82,0,0,0),(2.60,0,0,0),(2.75,0.05,0.25,0),(2.98,0.05,0.25,0),(3.20,0,0,0),(3.40,0,0,0)]
 
 # right shoulder reach (root space, metres; the clavicle turns to carry it) on the bolt beats
-SHOULDER_R=[(0,0,0,0),(0.10,0,0,0),(0.27,0.0,0.03,-0.06),(0.67,0.0,0.03,-0.06),(0.85,0,0,0),(1.45,0,0,0),(1.70,0.0,0.02,-0.06),(2.20,0.0,0.02,-0.06),(2.45,0,0,0),(2.55,0,0,0),(2.74,0.03,0.03,-0.07),(2.98,0.03,0.03,-0.07),(3.20,0,0,0),(3.40,0,0,0)]
+SHOULDER_R=[(0,0,0,0),(0.10,0,0,0),(0.27,0.0,0.03,-0.06),(0.67,0.0,0.03,-0.06),(0.85,0,0,0),(1.45,0,0,0),(1.70,0.0,0.03,-0.08),(2.20,0.0,0.03,-0.08),(2.45,0,0,0),(2.55,0,0,0),(2.74,0.03,0.03,-0.07),(2.98,0.03,0.03,-0.07),(3.20,0,0,0),(3.40,0,0,0)]
 
 # ---------------- authoring ----------------
 from mathutils import Euler
@@ -352,8 +354,7 @@ def full_fingers(fp):
 def full_grip(x):
     rel=Matrix.Translation(Vector(x[0:3]))@Euler(x[3:6],'XYZ').to_matrix().to_4x4()@Matrix.Diagonal((*POLE_SCALE,1))
     return rel,full_fingers(x[6:26])
-FULL_GRIPS={'fistUp': [0.0697, -0.0837, 0.0119, 2.2759, 0.6314, 1.8407, -0.9256, 7.9228, 24.375, 17.0625, -0.3107, -5, -5, -3.5, 3, 46.3751, 86.308, 60.4156, 6, 65.8294, 70, 49.0, -34.4523, -18.0389, -12.8911, 32.6376], 'fistBack': [0.0636, -0.0035, 0.1173, -1.3073, 1.5797, -0.8371, -3, 57.4021, 45, 31.5, 0, 41.2385, 45, 31.5, 3, 95, 98.0053, 68.6037, 6, 95, 80, 56.0, 23.9671, -15.3016, 26.9877, -19.9491], 'boltRest': [0.0988, -0.0203, 0.0173, 2.3506, 1.0682, 2.8149, -3, 25.544, 30, 21.0, 0, 10, 42.1875, 29.5312, 3, 80, 75.5771, 52.904, 6, 80, 30, 21.0, -7.1387, -50.2481, 32.0668, 17.8078], 'fistRoll': [0.0768, -0.0522, 0.0721, -1.0304, 1.3584, -1.1656, -0.2088, 32.5072, 34.6965, 24.2876, -0.125, 18.0028, 20.1335, 14.0934, 11.8326, 22.2618, 81.9098, 57.3368, 11.9458, 94.375, 110, 77.0, -5.1894, -16.85, 7.022, 6.2808], 'fistBackOpen': [0.0634, -0.0097, 0.1179, -1.3133, 1.436, -0.8301, -3, 17.2981, 13.8113, 9.6679, 0, 12.0397, 13.1749, 9.2224, 3, 22.5794, 29.9813, 20.9869, 6, 28.425, 23.9755, 16.7829, 23.8515, -15.1608, 27.2042, -20.0], 'rollToBack': [0.1258, -0.0116, 0.164, -1.5075, 2.2947, -1.1718, -0.2886, 45.1017, 40.2752, 28.1926, 0.0319, 29.3382, 32.5177, 22.7624, -8.4188, 95, 95.7557, 67.029, 0.8488, 95, 73.453, 51.4171, 9.2867, -16.0633, 17.1435, -7.1842], 'openToBack': [0.0782, 0.0106, 0.1693, -1.2949, 1.6254, -0.7469, -0.754, 37.0691, 29.6357, 20.745, 0.1267, 19.6823, 43.0541, 30.1379, 14.3534, 38.1959, 85.0985, 59.569, 1.1698, 60.8851, 49.2736, 34.4915, 23.6613, -15.5021, 27.3925, -19.8414]}
-FULL_GRIPS.update(globals().get('FULL_GRIPS_OVERRIDE',{}))
+FULL_GRIPS={'fistUp': [0.06007, -0.04364, 0.05048, 1.11888, 1.13423, 1.3378, 9.99999, 17.07934, 25.0, 17.58146, -10.0, 19.48074, 25.0, 18.58094, 8.70185, 22.51981, 86.18008, 61.24226, -9.99994, 30.81114, 114.48267, 80.02909, 37.85093, 9.9152, -23.92, 32.6376], 'fistBack': [0.02329, -0.05866, 0.04429, 3.80502, 2.46324, 3.8012, 9.1253, 93.54235, 30.0, 20.97465, 10.0, 95.0, 30.0, 20.96529, 10.0, 30.0, 110.0, 77.0041, -10.0, 83.20852, 110.0, 77.00413, -31.51234, -39.75246, -14.37952, -19.9491], 'boltRest': [0.0988, -0.0203, 0.0173, 2.3506, 1.0682, 2.8149, -3, 25.544, 30, 21.0, 0, 10, 42.1875, 29.5312, 3, 80, 75.5771, 52.904, 6, 80, 30, 21.0, -7.1387, -50.2481, 32.0668, 17.8078], 'fistRoll': [0.03187, -0.02138, 0.06113, -0.36194, 1.35834, -0.14176, 25.0, 49.35881, -5.0, -3.46916, -25.0, 33.11675, -4.9972, -3.47852, -15.26821, 97.11983, 115.0, 80.47429, -25.0, 100.0, 115.0, 80.49612, -32.77685, 31.58512, 16.49188, 6.2808], 'fistBackOpen': [0.02329, -0.05866, 0.04429, 3.80502, 2.46324, 3.8012, 9.1253, 32.73982, 10.5, 7.34113, 10.0, 33.25, 10.5, 7.33785, 10.0, 10.5, 38.5, 26.95143, -10.0, 29.12298, 38.5, 26.95145, -31.51234, -39.75246, -14.37952, -19.9491], 'rollToBack': [0.1258, -0.0116, 0.164, -1.5075, 2.2947, -1.1718, -0.2886, 45.1017, 40.2752, 28.1926, 0.0319, 29.3382, 32.5177, 22.7624, -8.4188, 95, 95.7557, 67.029, 0.8488, 95, 73.453, 51.4171, 9.2867, -16.0633, 17.1435, -7.1842], 'openToBack': [0.02329, -0.05866, 0.04429, 3.80502, 2.46324, 3.8012, 9.1253, 65.47964, 21.0, 14.68225, 10.0, 66.5, 21.0, 14.6757, 10.0, 21.0, 77.0, 53.90287, -10.0, 58.24596, 77.0, 53.90289, -31.51234, -39.75246, -14.37952, -19.9491], 'closeBack': [0.0636, -0.0035, 0.1173, -1.3073, 1.5797, -0.8371, -3, 57.4021, 45, 31.5, 0, 41.2385, 45, 31.5, 3, 95, 98.0053, 68.6037, 6, 95, 80, 56.0, 23.9671, -15.3016, 26.9877, -19.9491], 'closeBackOpen': [0.0634, -0.0097, 0.1179, -1.3133, 1.436, -0.8301, -3, 17.2981, 13.8113, 9.6679, 0, 12.0397, 13.1749, 9.2224, 3, 22.5794, 29.9813, 20.9869, 6, 28.425, 23.9755, 16.7829, 23.8515, -15.1608, 27.2042, -20.0], 'closeMid': [0.0782, 0.0106, 0.1693, -1.2949, 1.6254, -0.7469, -0.754, 37.0691, 29.6357, 20.745, 0.1267, 19.6823, 43.0541, 30.1379, 14.3534, 38.1959, 85.0985, 59.569, 1.1698, 60.8851, 49.2736, 34.4915, 23.6613, -15.5021, 27.3925, -19.8414]}
 for key,x in FULL_GRIPS.items():LIB[key]=full_grip(x)
 def _mid_grip(a,b):
     q=Euler(a[3:6],'XYZ').to_quaternion().slerp(Euler(b[3:6],'XYZ').to_quaternion(),0.5)
@@ -384,7 +385,7 @@ def _boltfist(sample):
 LIB['fist0'],LIB['fistKnob']=_boltfist('down'),_boltfist('up')
 # half way through the handle's quarter-turn (the hand clears the bolt there on a waypoint)
 LIB['fistMid']=(blendM(LIB['fist0'][0],LIB['fistKnob'][0],0.5),[blendM(x,y,0.5) for x,y in zip(LIB['fist0'][1],LIB['fistKnob'][1])])
-KH={k:LIB[k][0].inverted()@Vector((0.0515,0,0)) for k in ('fist0','fistMid','fistKnob','fistUpOpen','fistUp','fistRoll','fistBack','fistBackOpen','boltRest','boltRestOpen','rollToBack','openToBack')}   # the knob in each grasp's hand frame
+KH={k:LIB[k][0].inverted()@Vector((0.0515,0,0)) for k in ('fist0','fistMid','fistKnob','fistUpOpen','fistUp','fistRoll','fistBack','fistBackOpen','boltRest','boltRestOpen','rollToBack','openToBack','closeBack','closeBackOpen','closeMid')}   # the knob in each grasp's hand frame
 # (the boltFist grasps keep turning about fist0's: their calibrated paths round the turning handle)
 KH['fistMid']=KH['fistKnob']=KH['fist0']
 # The hand comes onto the knob straight out from the bolt and leaves the same way: the approach /
@@ -401,6 +402,9 @@ def remouth(key):
     old=Vector(OFF_DOWN if name=='fist0' else OFF_UP);k=Vector(off).length/old.length
     return (t,anc,name,tuple(palm_out(*LIB[name])*old.length*k),*key[4:])
 RIGHT=[remouth(k) for k in RIGHT]
+closingNames={'fistBack':'closeBack','fistBackOpen':'closeBackOpen','openToBack':'closeMid'}
+RIGHT=[(k[0],k[1],closingNames.get(k[2],k[2]) if k[0]>=2.5 else k[2],(0.07,0,0.06) if k[0]==3.10 else k[3],*k[4:]) for k in RIGHT]
+
 
 # Support hand: the idle cradle holds the fore-stock with straight fingers, which reads as an open
 # palm once the rifle is turned to load. Through the reload the fingers close round the stock as in

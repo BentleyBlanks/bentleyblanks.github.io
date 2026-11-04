@@ -105,7 +105,8 @@ def base(t):
         if t<=b[0]:return blend(pose(a[1]),pose(b[1]),smooth((t-a[0])/(b[0]-a[0]) if b[0]>a[0] else 1))
     return pose(GUN[-1][1])
 VIEW=0.65   # = Data_FpsSkeletalAnimation HanYang view.depthScale / .weight
-VIEW_WEIGHT=[(0,0),(0.72,0),(1.15,1),(2.98,1),(3.38,0)]
+# Ease the view back before the closing grasp, keeping its real skin off the near plane.
+VIEW_WEIGHT=[(0,0),(0.72,0),(1.15,1),(2.45,1),(2.70,0.4),(2.98,0.4),(3.38,0)]
 def proj(G,p,w=1.0):
     """Screen point (0..1) of gun-space p with the reload view at weight w (camera depth squeezed)."""
     c=camRec@G@np.array([*p,1]);x,y,z=c[:3];z*=1+(VIEW-1)*w;tt=math.tan(FOV/2)
