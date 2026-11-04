@@ -64,6 +64,7 @@ export const testDefs = {
   NakajimaKi4ReleaseBrowserTest: {file:"Script_NakajimaKi4ReleaseBrowserTest.mjs",timeoutMs:300000,desc:"Manual Ki4 release/library viewer; requires a local preview server"},
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishAssetPathsTest: {file:"Script_PublishAssetPathsTest.mjs",timeoutMs:120000,desc:"PC path publication: recursive new GLB/glTF and external images, path overrides, complete inventory and source preservation"},
+  PublishCacheSnapshotTest: {file:"Script_PublishCacheSnapshotTest.mjs",desc:"Completed cache snapshots: valid entries only, immutable archive input and interrupted encoder safety"},
   PublishMobileAssetsTest: {file:"Script_PublishMobileAssetsTest.mjs",timeoutMs:600000,desc:"手机版贴图（2026-10-26）：1024 + ASTC 6×6 / 法线 4×4 的尺寸、格式、mip、解回像素与原图一致（抓逐通道缩放错）、翻转、模型只换图，SwiftShader 里 ?mobileAssets=1/0 加载器拿到 ASTC / 电脑版"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
   MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
@@ -1010,7 +1011,7 @@ export const domains = {
   // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
   textureAssets: {
     label: "贴图资产规范与烘焙",
-    tests: ["PublishAssetPathsTest", "PublishAssetsTest", "PublishAssetsBrowserTest", "PublishMobileAssetsTest", "EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+    tests: ["PublishCacheSnapshotTest", "PublishAssetPathsTest", "PublishAssetsTest", "PublishAssetsBrowserTest", "PublishMobileAssetsTest", "EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
   },
 };
 

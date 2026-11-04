@@ -50,6 +50,7 @@ jobs:
           npm install --ignore-scripts --no-package-lock --no-audit --no-fund
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
           node Taierzhuang1938/Script_PublishAssetPathsTest.mjs
+          node Taierzhuang1938/Script_PublishCacheSnapshotTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
           node scripts/Script_PublishScopeTest.mjs
           git archive HEAD Taierzhuang1938 Model/StrawSleepingMat/Model_StrawSleepingMatFlat.glb Model/StrawSleepingMat/Model_StrawSleepingMatRolled.glb | tar -x -C "$RUNNER_TEMP/pages"
@@ -57,11 +58,24 @@ jobs:
       - uses: actions/cache/restore@v4
         id: gpu-assets
         with:
-          path: ${{ runner.temp }}/tengxian-gpu-cache
+          path: ${{ runner.temp }}/tengxian-gpu-snapshot
           key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Data_PublishPathRules.json', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
           restore-keys: |
             tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Data_PublishPathRules.json', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}-
             tengxian-gpu-${{ runner.os }}-v1-
+      # Cache versions include the archived path. Read old live-directory caches
+      # only until the first immutable snapshot is available.
+      - uses: actions/cache/restore@v4
+        if: steps.gpu-assets.outputs.cache-matched-key == ''
+        with:
+          path: ${{ runner.temp }}/tengxian-gpu-cache
+          key: ${{ steps.gpu-assets.outputs.cache-primary-key }}
+          restore-keys: |
+            ${{ steps.gpu-assets.outputs.cache-primary-key }}-
+            tengxian-gpu-${{ runner.os }}-v1-
+      - name: Activate the restored GPU cache
+        run: |
+          node --input-type=module -e 'import fs from "node:fs/promises";import path from "node:path";const live=path.join(process.env.RUNNER_TEMP,"tengxian-gpu-cache"),snapshot=path.join(process.env.RUNNER_TEMP,"tengxian-gpu-snapshot");try{await fs.rename(snapshot,live);}catch(error){if(error.code!=="ENOENT")throw error;}await fs.mkdir(live,{recursive:true});'
       - name: Build and validate GPU publication assets
         run: |
           set -o pipefail
@@ -78,12 +92,16 @@ jobs:
           fi
           node Taierzhuang1938/Script_ValidatePublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
           node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### GPU assets\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache,retained:r.skipped.length},null,2)+"\n```\n");'
+      - name: Snapshot completed GPU cache entries
+        id: gpu-snapshot
+        if: always() && steps.gpu-assets.outcome == 'success'
+        run: node Taierzhuang1938/Script_SnapshotPublishCache.mjs --input-dir "$RUNNER_TEMP/tengxian-gpu-cache" --output-dir "$RUNNER_TEMP/tengxian-gpu-snapshot"
       - uses: actions/cache/save@v4
         # Preserve completed, individually verified encodings even after an error
         # or superseding push. Unique snapshots can grow an earlier partial cache.
-        if: always() && steps.gpu-assets.outcome == 'success'
+        if: always() && steps.gpu-snapshot.outcome == 'success' && steps.gpu-snapshot.outputs.entries != '0'
         with:
-          path: ${{ runner.temp }}/tengxian-gpu-cache
+          path: ${{ runner.temp }}/tengxian-gpu-snapshot
           key: ${{ steps.gpu-assets.outputs.cache-primary-key }}-${{ github.run_id }}-${{ github.run_attempt }}
       # 仓库里的 import map 只登记、不写 ?v=：按每个文件此刻的内容盖戳（排在 GPU 资源改写之后、打包读 index.html 之前）。
       - name: Stamp the Tengxian import maps by content
