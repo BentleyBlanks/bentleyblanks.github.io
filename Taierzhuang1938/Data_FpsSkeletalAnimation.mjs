@@ -26,10 +26,12 @@ export const FPS_SKELETAL_RELOADS = Object.freeze({
     // The bolt cycle's low pose does the same (FPS_BOLT_CYCLE.HanYang.workDepthScale 0.6).
     // Not while the bolt is opened: closer in, the knob and the working hand leave the frame (the
     // reference's rifle points straighter in than our arms can hold it); it closes in as the
-    // rifle turns to take the packet. The closing stroke eases the squeeze back
-    // to 40% so the camera-side fist and wrist stay beyond the near plane.
+    // rifle turns to take the packet.
     view: Object.freeze({ depthScale: 0.65,
-      weight: Object.freeze([[0, 0], [0.72, 0], [1.15, 1], [2.45, 1], [2.70, 0.4], [2.98, 0.4], [3.38, 0]]) }),
+      weight: Object.freeze([[0, 0], [0.72, 0], [1.15, 1], [2.98, 1], [3.38, 0]]),
+      // Projection-preserving expansion, separate from the FOV squeeze above:
+      // keeps the real close-up fist beyond the render near plane.
+      cameraScale: 3 }),
   }),
 });
 

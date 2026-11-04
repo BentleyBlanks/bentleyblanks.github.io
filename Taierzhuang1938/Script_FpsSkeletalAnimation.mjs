@@ -12,6 +12,14 @@ export async function LoadFpsSkeletalAnimations() {
 
 const Normalize=name=>name.toLowerCase().replace(/[^a-z0-9]/g,'');
 const LoopTime=(time,duration)=>((time%duration)+duration)%duration;
+const ViewWeightAt=(view,time)=>{
+  const keys=view?.weight;if(!keys?.length)return 0;
+  for(let i=1;i<keys.length;i++)if(time<=keys[i][0]){
+    const [t0,w0]=keys[i-1],[t1,w1]=keys[i],u=THREE.MathUtils.clamp((time-t0)/Math.max(1e-6,t1-t0),0,1);
+    return w0+(w1-w0)*u*u*(3-2*u);
+  }
+  return keys[keys.length-1][1];
+};
 
 /** Playback of bone transforms evaluated and exported by Blender. */
 export class FpsSkeletalAnimation {
@@ -22,7 +30,31 @@ export class FpsSkeletalAnimation {
     this.other=new THREE.Quaternion();this.matrix=new THREE.Matrix4();
     this.unit=new THREE.Vector3(1,1,1);
     this.boneMap=new Map();
+    this.cameraScaleRig=null;
+    if(viewmodel.fovRig?.parent===viewmodel.root){
+      this.cameraScaleRig=new THREE.Group();this.cameraScaleRig.name='FpsReloadCameraScale';
+      viewmodel.root.add(this.cameraScaleRig);this.cameraScaleRig.add(viewmodel.fovRig);
+    }
     viewmodel.riggedArms?.root.traverse(o=>{if(o.isBone)this.boneMap.set(Normalize(o.name),o);});
+  }
+
+  // Uniform camera-space scale changes depth while preserving x/z and y/z.
+  // Keep the public root directly under its camera (FOV/mount/disposal use it).
+  SetCameraScale(scale=1) {
+    const root=this.vm.root;
+    const enabled=root?.parent?.isPerspectiveCamera&&root.position.lengthSq()<1e-12;
+    const value=enabled&&Number.isFinite(scale)?THREE.MathUtils.clamp(scale,1,4):1;
+    if(this.cameraScaleRig&&this.cameraScaleRig.scale.x!==value){
+      this.cameraScaleRig.scale.setScalar(value);this.UpdateMatrices();
+    }
+  }
+
+  UpdateMatrices() {
+    // Object3D.updateWorldMatrix does not run SkinnedMesh.updateMatrixWorld's
+    // attached-bind refresh. CPU probes and borrowed foreground scenes need the
+    // same bind matrices as the real renderer, including on entry/exit frames.
+    this.vm.root.updateWorldMatrix(true,false);
+    this.vm.root.updateMatrixWorld(true);
   }
 
   Clips() {return Object.keys(this.assets?.[this.vm.weaponId]?.clips||{});}
@@ -106,11 +138,7 @@ export class FpsSkeletalAnimation {
     const a=this.vm.action,s=a?.kind==='reload'?a.skeletal:null,keys=s?.view?.weight;
     if(!keys||!this.Clip(s.clip))return 0;
     const elapsed=a.t*a.duration,clipS=s.startS+elapsed;
-    let w=keys[keys.length-1][1];
-    for(let i=1;i<keys.length;i++)if(clipS<=keys[i][0]){
-      const [t0,w0]=keys[i-1],[t1,w1]=keys[i],u=THREE.MathUtils.clamp((clipS-t0)/Math.max(1e-6,t1-t0),0,1);
-      w=w0+(w1-w0)*u*u*(3-2*u);break;
-    }
+    const w=ViewWeightAt(s.view,clipS);
     const blend=s.blendInS>0?Math.min(1,elapsed/s.blendInS):1;
     return w*blend*blend*(3-2*blend);
   }
@@ -121,6 +149,7 @@ export class FpsSkeletalAnimation {
   UpdateReload() {
     const vm=this.vm,a=vm.action,s=a?.kind==='reload'?a.skeletal:null;
     if(!s||!this.Clip(s.clip))return false;
+    this.SetCameraScale(s.view?.cameraScale??1);
     const elapsed=a.t*a.duration,weight=s.blendInS>0?Math.min(1,elapsed/s.blendInS):1;
     // Cross-fade from the pose the reload started in (held aim, open-bolt idle) to the clip.
     const objects=this.Controls(),asset=this.assets[vm.weaponId];
@@ -133,7 +162,7 @@ export class FpsSkeletalAnimation {
     }
     if(!(a.packetRounds>0))for(const key of s.usedPacket)vm[key].visible=false;
     for(const side of ['r','l'])vm.riggedArms.operationPose[side]=vm.riggedArms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
-    vm.root.updateWorldMatrix(true,true);
+    this.UpdateMatrices();
     vm._EjectReloadChamber();
     vm.riggedArms.MeasureSkeletalPose();
     this.current.constrained=false;
@@ -142,7 +171,10 @@ export class FpsSkeletalAnimation {
 
   Update(dt,input={}) {
     const vm=this.vm,arms=vm.riggedArms;
-    if(!arms||!this.Clip('Idle')||vm.skeletalAnimationDisabled||(!this.preview&&!FPS_SKELETAL_ANIMATION.runtimeEnabled))return false;
+    const spec=FPS_SKELETAL_RELOADS[vm.weaponId];
+    const nativePresentation=this.preview?this.preview.name===spec?.clip:vm.action?.kind==='reload'&&vm.action.skeletal&&this.Clip(vm.action.skeletal.clip);
+    if(!nativePresentation)this.SetCameraScale(1);
+    if(!arms||!this.Clip('Idle')||vm.skeletalAnimationDisabled||(!this.preview&&!FPS_SKELETAL_ANIMATION.runtimeEnabled)){this.SetCameraScale(1);return false;}
     vm.armAnchor.position.set(0,0,0);vm.armAnchor.quaternion.identity();vm.armAnchor.scale.set(1,1,1);
     if(!this.preview&&this.UpdateReload())return true;
     if(this.preview){
@@ -157,6 +189,12 @@ export class FpsSkeletalAnimation {
       vm.root.rotation.set(0,0,0);vm.swayPivot.position.set(0,0,0);vm.swayPivot.quaternion.identity();
       vm.statePivot.position.set(0,0,0);vm.statePivot.quaternion.identity();
       vm.flash.visible=false;vm.flashTime=99;
+      const spec=FPS_SKELETAL_RELOADS[vm.weaponId],view=preview.name===spec?.clip?spec.view:null;
+      if(view&&vm.root.parent?.isPerspectiveCamera){
+        this.SetCameraScale(view.cameraScale??1);
+        if(vm.fovRig&&vm.compensation)vm.fovRig.scale.set(vm.compensation.x,vm.compensation.y,
+          vm.compensation.z*THREE.MathUtils.lerp(1,view.depthScale??1,ViewWeightAt(view,preview.time)));
+      }
       this.Apply(preview.name,preview.time,{visible:true});
       for(const side of ['r','l'])arms.operationPose[side]=arms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
     }else{
@@ -168,7 +206,7 @@ export class FpsSkeletalAnimation {
       // mechanism. An Idle bake from a closed rifle must not close a held bolt.
       this.Apply('Idle',LoopTime(this.clock,this.Clip('Idle').duration),{preserveParts:true});
     }
-    vm.root.updateWorldMatrix(true,true);
+    this.UpdateMatrices();
     arms.MeasureSkeletalPose();
     this.current.constrained=false;
     return true;

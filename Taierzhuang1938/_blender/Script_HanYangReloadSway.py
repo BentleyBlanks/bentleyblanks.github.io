@@ -105,8 +105,8 @@ def base(t):
         if t<=b[0]:return blend(pose(a[1]),pose(b[1]),smooth((t-a[0])/(b[0]-a[0]) if b[0]>a[0] else 1))
     return pose(GUN[-1][1])
 VIEW=0.65   # = Data_FpsSkeletalAnimation HanYang view.depthScale / .weight
-# Ease the view back before the closing grasp, keeping its real skin off the near plane.
-VIEW_WEIGHT=[(0,0),(0.72,0),(1.15,1),(2.45,1),(2.70,0.4),(2.98,0.4),(3.38,0)]
+CAMERA_SCALE=3   # uniform camera-relative scale: projection unchanged, near-plane margin restored
+VIEW_WEIGHT=[(0,0),(0.72,0),(1.15,1),(2.98,1),(3.38,0)]
 def proj(G,p,w=1.0):
     """Screen point (0..1) of gun-space p with the reload view at weight w (camera depth squeezed)."""
     c=camRec@G@np.array([*p,1]);x,y,z=c[:3];z*=1+(VIEW-1)*w;tt=math.tan(FOV/2)
@@ -187,7 +187,7 @@ rows=np.array(rows)
 k5=np.array([1,4,6,4,1])/16;sm=np.vstack([np.convolve(np.pad(rows[:,i],2,mode='edge'),k5,'valid') for i in range(6)]).T
 w=np.array([smooth(k/6) for k in range(N)])*np.array([smooth((N-1-k)/6) for k in range(N)]);sm*=w[:,None]
 json.dump({'fps':60,'source':'COD WWII Type 38 reload, muzzle + support-hand screen track (clip s = ref s - 0.33)',
-  'view':{'depthScale':VIEW,'weight':VIEW_WEIGHT},'gun':GUN,'poses':{k:[list(v[0]),*v[1:]] for k,v in POSES.items()},
+  'view':{'depthScale':VIEW,'weight':VIEW_WEIGHT,'cameraScale':CAMERA_SCALE},'gun':GUN,'poses':{k:[list(v[0]),*v[1:]] for k,v in POSES.items()},
   'columns':['dx','dy','dz','rx','ry','rz'],'rows':[[round(v,5) for v in r] for r in sm]},open(os.path.join(HERE,'Data_HanYangReloadSway.json'),'w'))
 print('max |d| m',np.abs(sm[:,:3]).max(0).round(4),'max rot deg',np.degrees(np.abs(sm[:,3:]).max(0)).round(2))
 for k in range(0,N,15):print(round(k/60,2),np.round(sm[k],4),out[k]['rm'],out[k]['rh'])

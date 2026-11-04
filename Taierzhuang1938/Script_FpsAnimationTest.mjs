@@ -33,6 +33,38 @@ for(const id of FPS_SKELETAL_ANIMATION.weaponIds){
   }
 }
 console.log(`PASS ${count} Blender bone clips: finite transforms, normalized rotations, complete loops`);
+// A close-up hand can cross the world camera's near plane. Expanding its
+// camera-relative presentation must preserve framing and reset without drift.
+{
+  const camera=new THREE.PerspectiveCamera(55,16/9,.066,50),root=new THREE.Group(),fovRig=new THREE.Group(),armsRoot=new THREE.Group();
+  camera.add(root);root.add(fovRig);fovRig.add(armsRoot);root.rotation.set(.04,-.03,0);fovRig.scale.set(1,1,.65);
+  const point=new THREE.Object3D();point.position.set(.02,-.01,-.08);armsRoot.add(point);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute([.02,-.01,-.08],3));
+  geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute([0,0,0,0],4));
+  geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute([1,0,0,0],4));
+  const skin=new THREE.SkinnedMesh(geometry,new THREE.MeshBasicMaterial()),bone=new THREE.Bone();armsRoot.add(skin,bone);
+  camera.updateMatrixWorld(true);skin.bind(new THREE.Skeleton([bone]));
+  const vm={weaponId:'HanYang',root,fovRig,riggedArms:{root:armsRoot}};
+  const animation=new FpsSkeletalAnimation(vm,{});
+  const CameraPoint=()=>{camera.updateWorldMatrix(true,true);return camera.worldToLocal(point.getWorldPosition(new THREE.Vector3()));};
+  const SkinPoint=()=>{camera.updateWorldMatrix(true,true);const p=skin.applyBoneTransform(0,new THREE.Vector3().fromBufferAttribute(geometry.attributes.position,0));return camera.worldToLocal(skin.localToWorld(p));};
+  const before=CameraPoint(),screen=before.clone().project(camera);
+  const skinBefore=SkinPoint();assert(skinBefore.distanceTo(before)<1e-8,'the attached skin starts at the same camera point');
+  assert(-before.z<camera.near,'fixture starts inside the actual near plane');
+  animation.SetCameraScale(3);const after=CameraPoint(),projected=after.clone().project(camera);
+  assert(Math.abs(projected.x-screen.x)<1e-10&&Math.abs(projected.y-screen.y)<1e-10,'uniform expansion preserves projected framing');
+  assert(-after.z>camera.near&&Math.abs(after.z/before.z-3)<1e-10,'the same real geometry is beyond the unchanged near plane');
+  assert(SkinPoint().distanceTo(after)<1e-8,'attached skin expands exactly once, including without a renderer matrix pass');
+  fovRig.scale.z=.5;animation.UpdateMatrices();
+  assert(SkinPoint().distanceTo(CameraPoint())<1e-8,'the skin and rigid geometry keep the same projection while the reload FOV depth changes');
+  fovRig.scale.z=.65;animation.UpdateMatrices();
+  animation.SetCameraScale(3);assert(CameraPoint().distanceTo(after)<1e-10,'repeated updates do not accumulate scale');
+  assert.equal(root.parent,camera,'the public root retains the camera used for FOV and mount logic');
+  animation.Update(0);assert(CameraPoint().distanceTo(before)<1e-10,'leaving native reload playback restores the original camera space');
+  assert(SkinPoint().distanceTo(skinBefore)<1e-8,'the attached skin bind is restored on the exit frame');
+  console.log('PASS close-up camera space: unchanged framing, near-plane margin and idempotent reset');
+}
 // Exercise the shipped holding clip against a genuinely open mechanism. The
 // body must keep animating without the old closed-rifle bake resetting the bolt.
 {
@@ -66,7 +98,7 @@ if(process.argv.includes('--browser')){
   const {LaunchBrowser}=await import('../PrairieFire1937/Script_BrowserTestKit.mjs');
   const {ServeRoot}=await import('./Script_DevServer.mjs');
   const server=await ServeRoot(path.resolve(project,'..'),0),browser=await LaunchBrowser();
-  const page=await browser.newPage({viewport:{width:1600,height:900}}),errors=[];
+  const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
   page.on('pageerror',error=>errors.push(String(error)));
   const output=path.join(project,'_shots/FirstPersonSkeleton/Playback');await fs.mkdir(output,{recursive:true});
   try{
