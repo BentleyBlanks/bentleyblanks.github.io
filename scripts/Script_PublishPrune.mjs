@@ -6,7 +6,7 @@
 //
 //   node scripts/Script_PublishPrune.mjs <站点目录>                 删掉清单里的路径，打印每一项省了多少
 //   node scripts/Script_PublishPrune.mjs --report <站点目录>        报总大小；超过 PUBLISH_BUDGET_MIB 就失败，超过 1 GB 发警告
-//   node scripts/Script_PublishPrune.mjs --check                    在仓库里核清单：每一项都还在，运行代码没有去「加载」这些路径
+//   node scripts/Script_PublishPrune.mjs --check                    先跑瘦身回归，再核仓库清单：每一项都还在，运行代码没有去「加载」这些路径
 //
 // 要从发布包里拿掉一类东西：先确认没有页面加载它（--check 会扫 fetch / import / new URL / loader.load 这类加载写法），
 // 再在 PUBLISH_EXCLUDE 加一行写清理由。要用的东西放进这些目录，线上就是 404。
@@ -24,6 +24,10 @@ export const PUBLISH_EXCLUDE = Object.freeze([
   { path: "TunnelLight1943/StyleConceptShots/", why: "地道里的光的风格概念图与两个 zip 包，没有页面引用" },
   { path: "Model/StrawSleepingMat/Source/", why: "随身草席的 Blender 源文件" },
   { path: "Taierzhuang1938/Model/TrainReference/Reference/", why: "火车参考图" },
+  { path: "Taierzhuang1938/Model/Character/Model_TengxianLuoReference.glb", why: "未接入运行时的旧罗班长参考模型；现用 Model_SquadLeaderLuo.glb 保留" },
+  { path: "Taierzhuang1938/Model/Character/Model_TengxianCivilianWomanReference.glb", why: "未接入运行时的独立村妇参考模型，保留在仓库供制作使用" },
+  { path: "Model/PatchedTimberBed/Texture_*Source.png", why: "木床制作源图；运行时 GLB 已内嵌成品贴图，不读这些源图" },
+  { path: "Taierzhuang1938/Model/SichuanBlanketPack/Texture_Sichuan*.png", why: "背包烘焙源图；运行时 glTF 只读 Texture_ProjectedV13_*.webp 成品" },
   { path: "**/*.blend", why: "Blender 工程文件，浏览器不读" },
 ]);
 
@@ -63,7 +67,8 @@ export function Prune(siteDir) {
       const target = path.join(siteDir, entry.path);
       if (fs.existsSync(target)) {
         bytes = SizeOf(target);
-        Walk(target, (_, f, isDir) => { if (!isDir) files += 1; });
+        if (fs.statSync(target).isDirectory()) Walk(target, (_, f, isDir) => { if (!isDir) files += 1; });
+        else files = 1;
         fs.rmSync(target, { recursive: true, force: true });
       }
     } else {
@@ -81,25 +86,34 @@ export function Prune(siteDir) {
 export function SiteBytes(siteDir) { return SizeOf(siteDir); }
 
 /** 在仓库里核清单：每一项都还在；运行代码（网页、JS 模块，不含测试 / 工具 / 被拿掉的目录本身）没有去加载这些路径。 */
-export function CheckRepo() {
+export function CheckRepo({ root = repoRoot, tracked = null } = {}) {
   const problems = [];
-  const tracked = execFileSync("git", ["ls-files"], { cwd: repoRoot, encoding: "utf8" }).split("\n").filter(Boolean);
+  tracked ??= execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   const excluded = PUBLISH_EXCLUDE.map((e) => (e.path.includes("*") ? Glob(e.path) : null));
-  const IsExcluded = (file) => PUBLISH_EXCLUDE.some((e, i) => (excluded[i] ? excluded[i].test(file) : file.startsWith(e.path)));
+  const IsExcluded = (file) => PUBLISH_EXCLUDE.some((e, i) => (excluded[i] ? excluded[i].test(file)
+    : e.path.endsWith("/") ? file.startsWith(e.path) : file === e.path));
   for (const [i, e] of PUBLISH_EXCLUDE.entries()) {
-    const hit = excluded[i] ? tracked.some((f) => excluded[i].test(f)) : tracked.some((f) => f.startsWith(e.path));
+    const hit = excluded[i] ? tracked.some((f) => excluded[i].test(f))
+      : tracked.some((f) => e.path.endsWith("/") ? f.startsWith(e.path) : f === e.path);
     if (!hit) problems.push(`清单里的 ${e.path} 在仓库里已经没有了，删掉这一行`);
   }
   const prefixes = PUBLISH_EXCLUDE.filter((e) => !e.path.includes("*")).map((e) => e.path);
   const tails = prefixes.map((p) => p.split("/").filter(Boolean).slice(1).join("/")).filter(Boolean);
+  // 文件规则（含通配）也要拦：文件名常先写进常量，再由 loader 加载；glTF 的 uri 同样会被浏览器读取。
+  const fileNames = [...new Set(tracked.filter((f) => IsExcluded(f) && PUBLISH_EXCLUDE.some((e, i) =>
+    !e.path.endsWith("/") && (excluded[i] ? excluded[i].test(f) : f === e.path))).map((f) => path.posix.basename(f)))];
+  const fileReference = fileNames.length ? new RegExp(fileNames.map(Esc).join("|")) : null;
   const LOAD = /(fetch\(|import\(|new URL\(|\.load(?:Async)?\(|src\s*=|href\s*=|<script[^>]*src=|<link[^>]*href=)/;
-  const runtime = tracked.filter((f) => /\.(html|mjs|js|css)$/.test(f) && !IsExcluded(f)
+  const runtime = tracked.filter((f) => /\.(html|mjs|js|css|gltf)$/.test(f) && !IsExcluded(f)
     && !/(Test|Probe|Shot|Cli|Bake|Audit|Bench|Build|Export|Author|Verify|Migrate)[A-Za-z0-9_]*\.(mjs|js)$/.test(f) && !f.startsWith("scripts/") && !f.includes("/_shots/"));
   for (const file of runtime) {
-    const lines = fs.readFileSync(path.join(repoRoot, file), "utf8").split(/\r?\n/);
+    const lines = fs.readFileSync(path.join(root, file), "utf8").split(/\r?\n/);
     lines.forEach((line, index) => {
       const code = line.replace(/\/\/.*$/, "").trim();
-      if (!code || code.startsWith("*") || !LOAD.test(code)) return;
+      if (!code || code.startsWith("*")) return;
+      const reference = fileReference && code.match(fileReference);
+      if (reference) problems.push(`${file}:${index + 1} 引用了不进发布包的 ${reference[0]}：${code.slice(0, 120)}`);
+      if (!LOAD.test(code)) return;
       for (const tail of tails) if (code.includes(`${tail}/`)) problems.push(`${file}:${index + 1} 看起来在加载 ${tail}/ 里的文件，而它不进发布包：${code.slice(0, 120)}`);
     });
   }
@@ -108,6 +122,8 @@ export function CheckRepo() {
 
 function Main(argv) {
   if (argv[0] === "--check") {
+    // CI 已在裁剪前调用 --check；把回归放在同一入口，手工运行也不会漏掉。
+    execFileSync(process.execPath, [path.join(repoRoot, "scripts/Script_PublishPruneTest.mjs")], { stdio: "inherit" });
     const problems = CheckRepo();
     if (problems.length) { console.error(`[publish] 发布包清单：${problems.length} 处要看\n  ${problems.join("\n  ")}`); process.exit(1); }
     console.log(`[publish] 发布包清单：${PUBLISH_EXCLUDE.length} 项都还在，运行代码没有加载它们`);
