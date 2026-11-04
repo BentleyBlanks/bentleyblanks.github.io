@@ -109,19 +109,20 @@ _cameraScale=re.search(r'cameraScale:\s*([\d.]+)',open(PROJECT+'/Data_FpsSkeleta
 assert _cameraScale and float(_cameraScale[1])==SWAY_DATA['view'].get('cameraScale',1),'Reload camera scale must match its authoring view'
 # gun keys (t, pose); eased between keys (A2: pushed forward while the bolt comes back)
 GUN=[tuple(k) for k in SWAY_DATA['gun']]
-TURN=[(0,0),(0.27,0),(0.37,1),(2.87,1),(3.00,0),(3.40,0)]
-SLIDE=[(0,0),(0.40,0),(0.55,1),(2.75,1),(2.88,0),(3.40,0)]
+TURN=[(0,0),(0.23,0),(0.36,1),(2.76,1),(2.88,0),(3.40,0)]
+SLIDE=[(0,0),(0.40,0),(0.55,1),(2.62,1),(2.76,0),(3.40,0)]
 # packet in gun space: (t, x,y,z, rx,ry,rz)
-PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.50,0.16,-0.12,0.03,0.6,0,0.8),(1.67,0.035,0.08,-0.16,0.25,0.04,0.25),
-        (1.85,0,0.051,-0.187,0,0,0),(1.90,0,0.051,-0.187,0,0,0),(2.04,0,0.051-0.068,-0.187,0,0,0),(3.40,0,0.051-0.068,-0.187,0,0,0)]
+PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.50,0.16,-0.12,0.03,0.6,0,1.15),(1.67,0.025,0.065,-0.16,0.25,0.04,1.15),
+        (1.78,0.01,0.065,-0.18,0.12,0,0.65),(1.90,0,0.051,-0.187,0,0,0),(2.04,0,0.051-0.068,-0.187,0,0,0),(3.40,0,0.051-0.068,-0.187,0,0,0)]
 PACKET_VISIBLE=(1.30,2.20)
 # support fingers close round the stock: degrees at (knuckle, middle, end) joints; ramp in/out times
-LEFT_CURL={'1':(30,40,25),'2':(32,42,25),'3':(34,44,25),'4':(36,46,25)}
+LEFT_CURL={'1':(50,65,35),'2':(50,65,35),'3':(8,12,8),'4':(8,12,8)}
 LEFT_CURL_T=(0.10,0.30,3.08,3.34)
-LEFT_SLIDE=[(0,0),(0.06,0),(0.25,0.055),(3.08,0.055),(3.34,0),(3.40,0)]
-# (from, last full, released): the packet rides in the solved hand, then eases back to PACKET
-PACKET_IN_HAND=(1.30,1.70,1.82)
-USED=[(0.98,0,0.051-0.068,-0.187,0,0,0),(1.03,0,0.125,-0.19,0.1,0,0.1),(1.13,0.10,0.20,-0.15,0.6,0.2,1.2),(1.25,0.25,0.18,-0.05,1.2,0.4,2.4)]
+LEFT_SLIDE=[(0,0),(0.06,0),(0.25,0.13),(0.72,0.13),(1.15,0),(3.40,0)]
+LEFT_ROLL=[(0,0),(0.08,0),(0.25,math.radians(65)),(0.72,math.radians(65)),(1.15,0),(3.40,0)]
+LEFT_DROP=[(0,0),(.08,0),(.20,.006),(.72,.006),(1.10,0),(3.40,0)]
+PACKET_IN_HAND=(1.30,1.74,1.88)
+USED=[(0.98,0,0.051-0.068,-0.187,0,0,0),(1.03,-0.01,0.125,-0.19,0.1,0,0.1),(1.13,-0.10,0.20,-0.15,0.6,0.2,1.2),(1.25,-0.25,0.18,-0.05,1.2,0.4,2.4)]
 USED_VISIBLE=(0.98,1.25)
 # right hand keys: (t, anchor, pose, offset in anchor-local metres)
 # The hand comes on / off the knob over these distances (handle down / lifted; 2.2x for the far point);
@@ -145,26 +146,26 @@ POLE_GRIPS={'fistUp': [-2.2022, -0.0406, 0.1078, 0.0375, -0.2484, -0.1312], 'fis
 # fingers' curl, then goes back and down towards the eye, as the reference drops it to the receiver
 RELEASE_OFF=(0.025,0,0.015)
 REST_APPROACH=(0.012,0,0.007);LIFT_OFF=(0.025,0,0.02);GRAB_LEAD=math.radians(70);REST_OVER=(0.025,0,0);OPEN_OFF=(0.027,0,0.023)
-KNOB_HOLDS=('fistUpOpen','fistUp','fistRoll','rollToBack','fistBack','fistBackOpen','openToBack')+('closeBack','closeBackOpen','closeMid')
+KNOB_HOLDS=('fistUpOpen','fistUp','fistRoll','rollToBack','fistBack','fistBackOpen','fistBackLoose','openToBack')+('closeBack','closeBackOpen','closeMid')
 CLOSE_FAR,CLOSE_NEAR=(0.04,0,0.08),(0.015,0,0.03)
 # Keys marked T are waypoints the hand passes through without stopping.
 T=True
 RIGHT=[
  (0.00,'gun','grip',None),(0.06,'gun','gripClear',None,T),(0.10,'gun','gripClear',(0.05,0.07,0.03),T),
- (0.21,'bolt','fistUpOpen',tuple(2.2*v for v in OFF_DOWN),T),(0.245,'bolt','fistUpOpen',OFF_DOWN,T),(0.27,'bolt','fistUpOpen',None),(0.37,'bolt','fistUp',None),
- (0.41,'bolt','fistUp',None),(0.51,'bolt','fistRoll',None,T),(0.56,'bolt','fistBackOpen',None,T),(0.585,'bolt','openToBack',None,T),(0.61,'bolt','fistBack',None),(0.64,'bolt','fistBack',None),(0.67,'bolt','fistBackOpen',OPEN_OFF,T),(0.68,'bolt','fistBackOpen',RELEASE_OFF,T),
- (0.75,'bolt','boltRestOpen',REST_OVER,T),(0.77,'bolt','boltRestOpen',REST_APPROACH,T),(0.80,'bolt','boltRest',None),(0.92,'bolt','boltRest',None),(0.96,'bolt','boltRestOpen',REST_APPROACH,T),(1.00,'bolt','boltRestOpen',REST_OVER,T),(1.15,'via',0.67,None,T),
- (1.30,'packet','packet',None),(1.70,'packet','packet',(0.012,0.016,0.0),T),(1.78,'packet','packet',(0.012,0.018,0.0)),
+ (0.19,'bolt','fistUpOpen',tuple(2.2*v for v in OFF_DOWN),T),(0.215,'bolt','fistUpOpen',OFF_DOWN,T),(0.23,'bolt','fistUpOpen',None),(0.36,'bolt','fistUp',None),
+ (0.41,'bolt','fistUp',None),(0.50,'bolt','fistRoll',None,T),(0.56,'bolt','openToBack',None,T),(0.60,'bolt','fistBack',None),(0.64,'bolt','fistBack',None),(0.66,'bolt','fistBack',RELEASE_OFF,T),(0.68,'bolt','fistBackLoose',(0.04,0,0.04),T),
+ (0.735,'bolt','boltRestOpen',REST_OVER,T),(0.75,'bolt','boltRestOpen',REST_APPROACH,T),(0.77,'bolt','boltRest',None),(0.92,'bolt','boltRest',None),(0.96,'bolt','boltRestOpen',(0.01,-0.025,0),T),(1.00,'bolt','boltRestOpen',(0.02,-0.06,0.015),T),(1.15,'via',0.67,None,T),
+ (1.30,'packet','packet',None),(1.70,'packet','packet',None,T),(1.78,'packet','packet',None),
  (1.90,'packet','press',(0.01,0.04,0.01)),(1.97,'packet','press',None),(2.14,'packet','press',None),
- (2.22,'packet','press',(0.03,0.05,0.02),T),(2.45,'gun','gripClear',(0.12,0.10,0.10),T),
- (2.62,'bolt','fistBackOpen',CLOSE_FAR,T),(2.70,'bolt','fistBackOpen',CLOSE_NEAR,T),(2.74,'bolt','fistBackOpen',None),(2.755,'bolt','openToBack',None,T),(2.77,'bolt','fistBack',None),(3.00,'bolt','fistBack',None),(3.04,'bolt','fistBack',LIFT_OFF,T),(3.10,'bolt','fistBackOpen',RELEASE_OFF,T),(3.18,'gun','gripClear',(0.10,0.05,0.03),T),
- (3.28,'gun','gripClear',None,T),(3.38,'gun','grip',None),(3.40,'gun','grip',None),
+ (2.22,'packet','press',(0.03,0.05,0.02),T),(2.40,'gun','gripClear',(0.12,0.10,0.10),T),
+ (2.48,'bolt','fistBackOpen',CLOSE_FAR,T),(2.52,'bolt','fistBackOpen',CLOSE_NEAR,T),(2.56,'bolt','openToBack',None,T),(2.62,'bolt','fistBack',None),(2.88,'bolt','fistBack',None),(2.92,'bolt','fistBack',LIFT_OFF,T),(2.98,'bolt','fistBackOpen',(0.07,0,0.06),T),(3.08,'gun','gripClear',(0.10,0.05,0.03),T),
+ (3.20,'gun','gripClear',None,T),(3.32,'gun','grip',None),(3.40,'gun','grip',None),
 ]
 
 
 # right elbow pole offsets (root space, metres): the forearm comes in from above on the bolt beats
 # left elbow tucked in and down while the rifle is turned to the bolt (keeps the sleeve off the receiver)
-POLE_L=[(0,0,0,0),(0.03,0,0,0),(0.17,0.15,-0.25,0),(0.72,0.15,-0.25,0),(1.15,0.20,-0.35,0),(2.52,0.20,-0.35,0),(2.74,0.12,-0.22,0),(2.98,0.12,-0.22,0),(3.30,0.12,-0.22,0),(3.40,0,0,0)]
+POLE_L=[(0,0,0,0),(0.03,0,0,0),(0.17,-0.35,-0.60,0),(0.72,-0.35,-0.60,0),(1.15,-0.35,-0.65,0),(2.52,-0.35,-0.65,0),(2.74,-0.15,-0.42,0),(2.98,-0.15,-0.42,0),(3.30,-0.15,-0.42,0),(3.40,0,0,0)]
 POLE_R=[(0,0,0,0),(0.12,0,0,0),(0.27,0.05,0.30,0.05),(0.67,0.05,0.30,0.05),(0.82,0,0,0),(2.60,0,0,0),(2.75,0.05,0.25,0),(2.98,0.05,0.25,0),(3.20,0,0,0),(3.40,0,0,0)]
 
 # right shoulder reach (root space, metres; the clavicle turns to carry it) on the bolt beats
@@ -229,15 +230,18 @@ def solve(a,target,poleOffset=Vector(),S=None):
             excess=max(0,bend-math.radians(WRIST_MAX))
             return (1000+excess*10000 if excess>1e-5 else 0)+a['swivelPole']*abs(wrap(phi))+SWIVEL_CONTINUITY*abs(wrap(phi-prev))
         return bend+a['swivelPole']*abs(phi)+SWIVEL_CONTINUITY*abs(phi-prev)
-    extent=180 if a.get('hardWrist') else 120
-    phi=min((math.radians(x) for x in range(-extent,extent+1,3)),key=cost)
-    phi=min((phi+math.radians(x/2) for x in range(-6,7)),key=cost)
-    if a.get('isRight'):
-        desiredPhi=phi if a.get('hardWrist') else 0
-        previous=a['swivel']
-        rate=math.radians(8 if a.get('hardWrist') else 12)
-        delta=0 if previous is None else wrap(desiredPhi-previous)
-        phi=desiredPhi if previous is None else previous+max(-rate,min(rate,delta))
+    if a.get('plannedSwivel') is not None:phi=a['plannedSwivel']
+    elif a.get('fixedSwivel') is not None:phi=a['fixedSwivel']
+    else:
+        extent=180 if a.get('hardWrist') else 120
+        phi=min((math.radians(x) for x in range(-extent,extent+1,3)),key=cost)
+        phi=min((phi+math.radians(x/2) for x in range(-6,7)),key=cost)
+        if a.get('isRight'):
+            desiredPhi=phi if a.get('hardWrist') else 0
+            previous=a['swivel']
+            rate=math.radians(8 if a.get('hardWrist') else 12)
+            delta=0 if previous is None else wrap(desiredPhi-previous)
+            phi=desiredPhi if previous is None else previous+max(-rate,min(rate,delta))
     a['swivel']=phi;Ep=S+u*ax+(Quaternion(u,phi)@v)*hh
     n=(Ep-S).cross(W-Ep).normalized()
     rua=frame(Ep-S,n)@a['rua'];rfa=frame(W-Ep,n)@a['rfa']
@@ -282,6 +286,8 @@ act['duration']=DURATION
 rp,wm,bolt,ck,pk,used=ctl('reloadPivot'),ctl('weaponMount'),ctl('part_bolt'),ctl('part_cockingPiece'),ctl('packetProp'),ctl('usedPacketProp')
 wm.matrix_basis=G0
 N=round(DURATION*FPS)+1;unreach=[];wristFit=[];leftWristFit=[]
+contactPath=Path(PROJECT)/'_blender/Data_HanYangReloadContact.json'
+CONTACT_ROWS=json.loads(contactPath.read_text(encoding='utf-8'))['rows'] if contactPath.exists() else [(0,0,0)]*N
 anchors={'gun':ctl('gunRoot'),'bolt':bolt,'packet':pk,'usedPacket':used}
 # Hand frames measured on the idle hand: finger direction, palm normal, knob contact (index root / thumb crotch).
 def hand_frame():
@@ -386,18 +392,21 @@ def full_fingers(fp,legacy=False):
             rot_chain(chain[k:],head,axis,deg)
     ta,tb,t1,t2=fp[16:20];chain=[IDX['Bip002_R_Finger0%s'%j] for j in ('','1','2')]
     h0=acc[chain[0]].translation;rot_chain(chain,h0,palmNormal,ta);rot_chain(chain,h0,fingerDirection,tb)
+    thumbHinge=(acc[chain[1]].translation-acc[chain[0]].translation).cross(acc[chain[2]].translation-acc[chain[1]].translation)
+    if thumbHinge.length<1e-6:thumbHinge=fingerDirection.cross(palmNormal)
+    thumbHinge.normalize()
     for k,deg in ((1,t1),(2,t2)):
         i=chain[k];head=acc[i].translation;nxt=acc[chain[k+1]].translation if k<2 else acc[i]@Vector((1,0,0))
         ax=(head-acc[chain[k-1]].translation).cross(nxt-head)
         if ax.length<1e-6:ax=(nxt-head).cross(palmNormal)
-        rot_chain(chain[k:],head,ax.normalized(),deg)
+        rot_chain(chain[k:],head,ax.normalized() if legacy else thumbHinge,deg)
     for i in FING:locs[FING.index(i)]=acc[PARENT[i]].inverted()@acc[i]
     return locs
 def full_grip(x,legacy=False):
     rel=Matrix.Translation(Vector(x[0:3]))@Euler(x[3:6],'XYZ').to_matrix().to_4x4()@Matrix.Diagonal((*POLE_SCALE,1))
     return rel,full_fingers(x[6:26],legacy)
-FULL_GRIPS={'fistUp': [0.05697, -0.04498, 0.04238, 1.13986, 1.17502, 1.23517, 10.0, 12.35564, 25.0, 17.49983, 10.0, 7.17539, 25.0, 17.49983, 10.0, 40.0, 115.0, 80.49976, -10.0, 40.0, 112.9057, 79.03378, -29.30284, 24.13782, 88.99999, 20.0], 'fistBack': [0.05103, 0.00863, 0.10076, -1.16611, 1.01002, 0.0299, -10.0, 95.0, 110.0, 76.99969, 10.0, 95.0, 109.96348, 76.9645, 10.0, 94.99902, 60.00002, 41.99947, 9.99996, 70.81323, 60.0, 41.99668, 28.11339, 12.45938, -25.30495, 15.0], 'boltRest': [0.0988, -0.0203, 0.0173, 2.3506, 1.0682, 2.8149, -3, 25.544, 30, 21.0, 0, 10, 42.1875, 29.5312, 3, 80, 75.5771, 52.904, 6, 80, 30, 21.0, -7.1387, -50.2481, 32.0668, 17.8078], 'fistRoll': [0.03035, -0.03473, 0.03908, -0.39457, 1.08787, 0.03087, 9.99999, 45.5632, 69.73362, 48.80673, 10.0, 46.67354, 110.0, 76.99694, -2.20738, 57.60446, 109.99994, 76.98041, 2.79288, 92.11126, 76.83912, 53.80884, -37.64481, -15.81059, -14.59409, 17.5], 'fistBackOpen': [0.05503, -0.00237, 0.08976, -1.16611, 1.01002, 0.0299, -10.0, 33.25, 38.5, 26.94989, 10.0, 33.25, 38.48722, 26.93757, 10.0, 33.24966, 21.00001, 14.69981, 9.99996, 24.78463, 21.0, 14.69884, 28.11339, 12.45938, -25.30495, 15.0], 'rollToBack': [0.1258, -0.0116, 0.164, -1.5075, 2.2947, -1.1718, -0.2886, 45.1017, 40.2752, 28.1926, 0.0319, 29.3382, 32.5177, 22.7624, -8.4188, 95, 95.7557, 67.029, 0.8488, 95, 73.453, 51.4171, 9.2867, -16.0633, 17.1435, -7.1842], 'openToBack': [0.05803, 0.00513, 0.10576, -1.16611, 1.01002, 0.0299, -10.0, 93.1, 107.8, 75.4597, 10.0, 93.1, 107.76421, 75.42521, 10.0, 93.09904, 58.80002, 41.15948, 9.99996, 69.39697, 58.8, 41.15675, 28.11339, 12.45938, -25.30495, 15.0], 'closeBack': [0.0636, -0.0035, 0.1173, -1.3073, 1.5797, -0.8371, -3, 57.4021, 45, 31.5, 0, 41.2385, 45, 31.5, 3, 95, 98.0053, 68.6037, 6, 95, 80, 56.0, 23.9671, -15.3016, 26.9877, -19.9491], 'closeBackOpen': [0.0634, -0.0097, 0.1179, -1.3133, 1.436, -0.8301, -3, 17.2981, 13.8113, 9.6679, 0, 12.0397, 13.1749, 9.2224, 3, 22.5794, 29.9813, 20.9869, 6, 28.425, 23.9755, 16.7829, 23.8515, -15.1608, 27.2042, -20.0], 'closeMid': [0.0782, 0.0106, 0.1693, -1.2949, 1.6254, -0.7469, -0.754, 37.0691, 29.6357, 20.745, 0.1267, 19.6823, 43.0541, 30.1379, 14.3534, 38.1959, 85.0985, 59.569, 1.1698, 60.8851, 49.2736, 34.4915, 23.6613, -15.5021, 27.3925, -19.8414]}
-for key,x in FULL_GRIPS.items():LIB[key]=full_grip(x,key.startswith('close') or key in ('boltRest','rollToBack'))
+FULL_GRIPS={'fistUp': [0.05455, -0.04371, 0.03927, 1.37122, 1.22622, 1.31826, 5.36326, 10.01603, 25.0, 16.57344, 10.0, 1.39961, 25.0, 16.87024, 10.0, 39.99999, 92.65826, 50.93728, 5.90413, 40.0, 100.54752, 72.9677, -55.0, -14.79, 30.0, 25.0], 'fistBack': [0.02191, -0.02181, 0.05132, 2.42199, 2.23459, 3.21874, 10.0, 58.01299, 105.0, 65.0, 7.98575, 90.0, 87.90132, 54.28163, -2.84953, 89.99999, 90.0, 35.67348, 10.0, 73.61903, 90.0, 35.0, -15.59258, 45.0, 8.09702, 24.9982], 'boltRest': [0.05757, 0.02518, 0.03204, 1.44616, 1.87158, 1.99081, 8.0, 10.00015, 85.0, 50.0, 8.0, 22.10356, 25.0, 10.95907, 4.25946, 21.13301, 25.0, 10.0, -8.0, 19.78249, 25.0, 12.82964, 40.0, -50.0, 0.0, 27.26519], 'fistRoll': [0.02951, -0.01467, 0.06681, -0.73014, 1.05359, -0.20577, 10.0, 47.00722, 70.70794, 47.75338, 10.0, 55.69655, 82.25194, 62.86636, 10.0, 56.37423, 75.00004, 52.5991, 10.0, 66.6805, 75.0, 50.67206, 12.54844, 13.26415, -10.51611, 25.0], 'fistBackOpen': [0.02591, -0.03281, 0.04032, 2.42199, 2.23459, 3.21874, 10.0, 20.30455, 36.75, 22.75, 7.98575, 31.5, 30.76546, 18.99857, -2.84953, 31.5, 31.5, 12.48572, 10.0, 25.76666, 31.5, 12.25, -15.59258, 45.0, 8.09702, 24.9982], 'rollToBack': [0.1258, -0.0116, 0.164, -1.5075, 2.2947, -1.1718, -0.2886, 45.1017, 40.2752, 28.1926, 0.0319, 29.3382, 32.5177, 22.7624, -8.4188, 95, 95.7557, 67.029, 0.8488, 95, 73.453, 51.4171, 9.2867, -16.0633, 17.1435, -7.1842], 'openToBack': [0.02891, -0.02531, 0.05632, 2.42199, 2.23459, 3.21874, 10.0, 56.85273, 102.9, 63.7, 7.98575, 88.2, 86.14329, 53.196, -2.84953, 88.19999, 88.2, 34.96001, 10.0, 72.14665, 88.2, 34.3, -15.59258, 45.0, 8.09702, 24.9982], 'closeBack': [0.0636, -0.0035, 0.1173, -1.3073, 1.5797, -0.8371, -3, 57.4021, 45, 31.5, 0, 41.2385, 45, 31.5, 3, 95, 98.0053, 68.6037, 6, 95, 80, 56.0, 23.9671, -15.3016, 26.9877, -19.9491], 'closeBackOpen': [0.0634, -0.0097, 0.1179, -1.3133, 1.436, -0.8301, -3, 17.2981, 13.8113, 9.6679, 0, 12.0397, 13.1749, 9.2224, 3, 22.5794, 29.9813, 20.9869, 6, 28.425, 23.9755, 16.7829, 23.8515, -15.1608, 27.2042, -20.0], 'closeMid': [0.0782, 0.0106, 0.1693, -1.2949, 1.6254, -0.7469, -0.754, 37.0691, 29.6357, 20.745, 0.1267, 19.6823, 43.0541, 30.1379, 14.3534, 38.1959, 85.0985, 59.569, 1.1698, 60.8851, 49.2736, 34.4915, 23.6613, -15.5021, 27.3925, -19.8414], 'fistBackLoose': [0.02191, -0.02181, 0.05132, 2.42199, 2.23459, 3.21874, 10.0, 46.41039, 84.0, 52.0, 7.98575, 72.0, 70.32106, 43.4253, -2.84953, 71.99999, 72.0, 28.53878, 10.0, 58.89522, 72.0, 28.0, -15.59258, 45.0, 8.09702, 24.9982]}
+for key,x in FULL_GRIPS.items():LIB[key]=full_grip(x,key.startswith('close') or key=='rollToBack')
 def _mid_grip(a,b):
     q=Euler(a[3:6],'XYZ').to_quaternion().slerp(Euler(b[3:6],'XYZ').to_quaternion(),0.5)
     return [(u+v)/2 for u,v in zip(a[:3],b[:3])]+list(q.to_euler('XYZ'))+[(u+v)/2 for u,v in zip(a[6:26],b[6:26])]
@@ -407,10 +416,10 @@ LIB['fistBackOpen']=full_grip(FULL_GRIPS['fistBackOpen']) if 'fistBackOpen' in F
 # taking the handle down the ring and little finger come on open and close round the stalk as it rises
 # (the hand is turned GRAB_LEAD about the knob towards its raised hold: it turns with the handle only
 # by the rest, which keeps the wrist inside FpsArmTest's 20 deg a frame)
-_u=FULL_GRIPS['fistUp'];_r,_l=full_grip(_u[:14]+[v*(0.35 if i%4 else 1) for i,v in enumerate(_u[14:22])]+_u[22:26]);_k=Vector((0.0515,0,0))
-LIB['fistUpOpen']=(Matrix.Translation(Vector((.015,-.014,.010)))@Matrix.Translation(_k)@Matrix.Rotation(GRAB_LEAD,4,'Z')@Matrix.Translation(-_k)@_r,_l)
+_u=FULL_GRIPS['fistUp'];_r,_l=full_grip(_u[:14]+[v*(0.8 if i%4 else 1) for i,v in enumerate(_u[14:22])]+_u[22:26]);_k=Vector((0.0515,0,0))
+LIB['fistUpOpen']=(Matrix.Translation(_k)@Matrix.Rotation(GRAB_LEAD,4,'Z')@Matrix.Translation(-_k)@_r,_l)
 # onto / off the receiver the fingers stay straightened (they would sweep the knob curled)
-_r=FULL_GRIPS['boltRest'];LIB['boltRestOpen']=full_grip(_r[:6]+[v*(0.3 if i%4 else 1) for i,v in enumerate(_r[6:22])]+_r[22:26],True)
+_r=FULL_GRIPS['boltRest'];LIB['boltRestOpen']=full_grip(_r[:6]+[v*(0.3 if i%4 else 1) for i,v in enumerate(_r[6:22])]+_r[22:26])
 # While the handle turns (up and back down) the pole grip's little finger would lie on the bolt body and
 # the receiver: there the hand holds the knob as the live bolt cycle's boltFist (sampled handle down /
 # up: fist0 / fistKnob), opened like the others, turned about the knob from the upper right
@@ -427,9 +436,14 @@ def _boltfist(sample):
 LIB['fist0'],LIB['fistKnob']=_boltfist('down'),_boltfist('up')
 # half way through the handle's quarter-turn (the hand clears the bolt there on a waypoint)
 LIB['fistMid']=(blendM(LIB['fist0'][0],LIB['fistKnob'][0],0.5),[blendM(x,y,0.5) for x,y in zip(LIB['fist0'][1],LIB['fistKnob'][1])])
-KH={k:LIB[k][0].inverted()@Vector((0.0515,0,0)) for k in ('fist0','fistMid','fistKnob','fistUpOpen','fistUp','fistRoll','fistBack','fistBackOpen','boltRest','boltRestOpen','rollToBack','openToBack','closeBack','closeBackOpen','closeMid')}   # the knob in each grasp's hand frame
+KH={k:LIB[k][0].inverted()@Vector((0.0515,0,0)) for k in ('fist0','fistMid','fistKnob','fistUpOpen','fistUp','fistRoll','fistBack','fistBackOpen','fistBackLoose','boltRest','boltRestOpen','rollToBack','openToBack','closeBack','closeBackOpen','closeMid')}   # the knob in each grasp's hand frame
 # (the boltFist grasps keep turning about fist0's: their calibrated paths round the turning handle)
 KH['fistMid']=KH['fistKnob']=KH['fist0']
+# Actual captured pad witnesses: the carrying index rests on the top round;
+# pressing changes to the thumb. Using an idle thumb/index crotch here put
+# the rotation pivot 65 mm outside the packet and detached the working digit.
+PACKET_POINTS={'packet':(.0065,.0525,-.0071),'press':(-.0103,.0557,.0049)}
+PACKET_CONTACT={name:LIB[name][0].inverted()@Vector(point) for name,point in PACKET_POINTS.items()}
 # The hand comes onto the knob straight out from the bolt and leaves the same way: the approach /
 # release offsets (RIGHT keys on the bolt) point from the bolt's axis to the palm, at the authored
 # lengths (1x / 2.2x of OFF_DOWN / OFF_UP); the old sideways ones swept the new grasp through the bolt.
@@ -440,7 +454,7 @@ def palm_out(rel,locs):
     return Vector((c.x,c.y,0)).normalized()
 def remouth(key):
     t,anc,name,off=key[:4]
-    if anc!='bolt' or not off or name in ('fistRoll','fistBack','fistBackOpen','boltRest','boltRestOpen','rollToBack','openToBack'):return key
+    if anc!='bolt' or not off or name in ('fistRoll','fistBack','fistBackOpen','fistBackLoose','boltRest','boltRestOpen','rollToBack','openToBack'):return key
     old=Vector(OFF_DOWN if name=='fist0' else OFF_UP);k=Vector(off).length/old.length
     return (t,anc,name,tuple(palm_out(*LIB[name])*old.length*k),*key[4:])
 RIGHT=[remouth(k) for k in RIGHT]
@@ -454,8 +468,11 @@ RIGHT=[(k[0],k[1],closingNames.get(k[2],k[2]) if k[0]>=2.5 else k[2],(0.07,0,0.0
 def left_palm_normal():
     acc={LH:Matrix.Identity(4)}
     for i,L in zip(FINGL,LGRIP[1]):acc[i]=acc[PARENT[i]]@L
-    base=acc[IDX['Bip002_L_Finger2']].translation;tip=acc[IDX['Bip002_L_Finger22']].translation
-    fd=base.normalized();c=tip-base;return (c-c.dot(fd)*fd).normalized()
+    fd=acc[IDX['Bip002_L_Finger2']].translation.normalized()
+    across=acc[IDX['Bip002_L_Finger1']].translation-acc[IDX['Bip002_L_Finger4']].translation
+    normal=across.cross(fd).normalized()
+    curl=acc[IDX['Bip002_L_Finger32']].translation-acc[IDX['Bip002_L_Finger3']].translation
+    return normal if curl.dot(normal)>0 else -normal
 PN_L=left_palm_normal()
 def curl_left(locs,w):
     if w<=0:return locs
@@ -463,9 +480,9 @@ def curl_left(locs,w):
     for n,(i,L) in enumerate(zip(FINGL,locs)):acc[i]=acc[PARENT[i]]@L
     for f,angles in LEFT_CURL.items():
         chain=[IDX['Bip002_L_Finger%s%s'%(f,j)] for j in ('','1','2')]
+        ax=(acc[chain[1]].translation-acc[chain[0]].translation).normalized().cross(PN_L).normalized()
         for k,(i,deg) in enumerate(zip(chain,angles)):
             W=acc[i];head=W.translation;nxt=acc[chain[k+1]].translation if k<2 else W@Vector((1,0,0))
-            d=(nxt-head).normalized();ax=d.cross(PN_L).normalized()
             R=Matrix.Translation(head)@Matrix.Rotation(math.radians(deg*w),4,ax)@Matrix.Translation(-head)
             for j in chain[k:]:acc[j]=R@acc[j]
         for i in chain:locs[FINGL.index(i)]=acc[PARENT[i]].inverted()@acc[i]
@@ -479,20 +496,13 @@ def keyM(key):
     anc,name,off=key[1:4];rel,locs=LIB[name];A=rootM(anchors[anc]);M=A@rel
     if off:M=Matrix.Translation(A.to_quaternion()@Vector(off)*A.to_scale()[0])@M
     return M,locs
-for k in range(N):
-    t=k/FPS;f=1+k
-    AR['twistShare']=lin(TWIST_R,t)
-    AR['hardWrist']=0.18<=t<=0.70 or 1.30<=t<=2.20
+def SetControlsAt(t):
     rp.matrix_basis=G0.inverted()@gun_at(t)
     bolt.rotation_quaternion=Quaternion((0,0,1),math.pi/2*lin(TURN,t));bolt.location=(0,0,0.078*lin(SLIDE,t));ck.location=(0,0,0.078*lin(SLIDE,t))
     pv=track(PACKET,t);pk.location=pv[:3];pk.rotation_quaternion=Euler(pv[3:],'YXZ').to_quaternion()
     uv=track(USED,t);used.location=uv[:3];used.rotation_quaternion=Euler(uv[3:],'YXZ').to_quaternion()
-    for o in (rp,wm,bolt,ck,pk,used,ctl('packetRounds'),ctl('usedPacketRounds')):key_obj(o,f)
-    for names,(lo,hi) in ((('Mesh_Packet','Mesh_Rounds'),PACKET_VISIBLE),(('Mesh_PacketUsed','Mesh_RoundsUsed'),USED_VISIBLE)):
-        for n in names:
-            o=bpy.data.objects[n];o.hide_render=not(lo<=t<hi);o.hide_viewport=o.hide_render
-            o.keyframe_insert('hide_render',frame=f);o.keyframe_insert('hide_viewport',frame=f)
     bpy.context.view_layer.update()
+def RightAt(t):
     for a,b in zip(RIGHT,RIGHT[1:]):
         if t<=b[0]:break
     x=max(0,min(1,(t-a[0])/(b[0]-a[0]) if b[0]>a[0] else 1));ta,tb=len(a)>4,len(b)>4
@@ -507,7 +517,56 @@ for k in range(N):
         # (blending about the wrist would swing the fingers through the bolt)
         ka,kb=KH[a[2]],KH[b[2]];pa,pb=MA@ka,MB@kb;kh=ka.lerp(kb,u)
         Mh=Matrix.Translation(pa.lerp(pb,u)-(Mh.to_3x3()@kh))@Matrix.LocRotScale(Vector(),*Mh.decompose()[1:])
-    ml=rootM(anchors['gun'])@Matrix.Translation((0,0,lin(LEFT_SLIDE,t)))@LGRIP[0]
+    return Mh,locs,a,b,u
+def PlanRightSwivel():
+    # Offline look-ahead avoids choosing the wrong feasible elbow branch before
+    # a fast palm roll. The hand target stays authored; the elbow moves smoothly.
+    import numpy as np
+    angles=np.radians(np.arange(-180,180,2));count=len(angles);bendRows=[];costRows=[]
+    ci=IDX['Bip002_R_Clavicle'];C=IB[ci].translation;S0=AR['S'];limit=math.radians(WRIST_MAX)
+    for k in range(N):
+        t=k/FPS;SetControlsAt(t);target=RightAt(t)[0];off=Vector(track(SHOULDER_R,t));q=(S0-C).rotation_difference(S0+off-C);S=C+q@(S0-C)
+        W=target.translation;d=min((W-S).length,AR['L1']+AR['L2']-1e-4);axis=(W-S).normalized();W=S+axis*d
+        pole=AR['pole']+Vector(track(POLE_R,t));v=(pole-S)-axis*(pole-S).dot(axis);v.normalize()
+        ax=(AR['L1']**2-AR['L2']**2+d*d)/(2*d);height=math.sqrt(max(0,AR['L1']**2-ax*ax));center=np.array(S+axis*ax)
+        elbows=center+np.cos(angles)[:,None]*np.array(v)*height+np.sin(angles)[:,None]*np.array(axis.cross(v))*height
+        directions=np.array(W)-elbows;directions/=np.linalg.norm(directions,axis=1)[:,None];want=np.array(target.to_quaternion()@AR['faInHand'])
+        bends=np.arccos(np.clip(directions@want,-1,1));hard=.18<=t<=.70 or 1.30<=t<=2.20
+        costs=(np.where(bends>limit+1e-5,1000+(bends-limit)*10000,0)+np.abs(angles)*.15) if hard else np.abs(angles)*2+bends*.02
+        bendRows.append(bends);costRows.append(costs)
+    bends=np.array(bendRows);local=np.array(costRows);zero=int(np.argmin(np.abs(angles)));critical=np.array([.37<=k/FPS<=.64 for k in range(N)])
+    choices=[]
+    for rate in [8,10,12]:
+        shifts=list(range(-rate//2,rate//2+1));previous=np.full(count,np.inf);previous[zero]=local[0,zero];back=[]
+        for k in range(1,N):
+            options=np.stack([np.roll(previous,shift)+(math.radians(shift*2)**2)*.8 for shift in shifts]);which=np.argmin(options,axis=0)
+            previous=local[k]+options[which,np.arange(count)];back.append((np.arange(count)-np.array(shifts)[which])%count)
+        indices=[zero]
+        for row in reversed(back):indices.append(int(row[indices[-1]]))
+        indices=np.array(list(reversed(indices)));path=angles[indices];selected=bends[np.arange(N),indices];maximum=float(np.max(selected[critical]))
+        choices.append((maximum,rate,path,selected))
+        if maximum<=limit+.002:break
+    maximum,rate,path,selected=min(choices,key=lambda item:(max(0,item[0]-limit-.002),item[1]))
+    sc['fpsReloadSwivelPlan']=json.dumps([[round(k/FPS,5),round(math.degrees(path[k]),3),round(math.degrees(selected[k]),3)] for k in range(N)])
+    print('planned elbow rate / held wrist target',rate,round(math.degrees(maximum),3))
+    return path
+rightSwivelPlan=PlanRightSwivel();packetCarryWeights=[]
+for k in range(N):
+    t=k/FPS;f=1+k
+    AR['twistShare']=lin(TWIST_R,t);AR['plannedSwivel']=float(rightSwivelPlan[k])
+    AR['hardWrist']=0.18<=t<=0.70 or 1.30<=t<=2.20
+    AL['hardWrist']=.12<=t<=1.05
+    AL['swivelPole']=.15 if AL['hardWrist'] else SWIVEL_POLE_L
+    AL['twistShare']=.8 if AL['hardWrist'] else TWIST_SHARE_L
+    SetControlsAt(t)
+    for o in (rp,wm,bolt,ck,pk,used,ctl('packetRounds'),ctl('usedPacketRounds')):key_obj(o,f)
+    for names,(lo,hi) in ((('Mesh_Packet','Mesh_Rounds'),PACKET_VISIBLE),(('Mesh_PacketUsed','Mesh_RoundsUsed'),USED_VISIBLE)):
+        for n in names:
+            o=bpy.data.objects[n];o.hide_render=not(lo<=t<hi);o.hide_viewport=o.hide_render
+            o.keyframe_insert('hide_render',frame=f);o.keyframe_insert('hide_viewport',frame=f)
+    Mh,locs,a,b,u=RightAt(t)
+    Mh.translation+=rootM(bolt).to_3x3()@Vector(CONTACT_ROWS[k])
+    ml=rootM(anchors['gun'])@Matrix.Translation((0,-lin(LEFT_DROP,t),lin(LEFT_SLIDE,t)))@Matrix.Rotation(lin(LEFT_ROLL,t),4,'Z')@LGRIP[0]
     mats=[None]*len(BONES)
     lc=smooth((t-LEFT_CURL_T[0])/(LEFT_CURL_T[1]-LEFT_CURL_T[0]))*(1-smooth((t-LEFT_CURL_T[2])/(LEFT_CURL_T[3]-LEFT_CURL_T[2])))
     for side,a_,Mt,fing,fl in (('R',AR,Mh,FING,locs),('L',AL,ml,FINGL,curl_left(LGRIP[1],lc))):
@@ -519,17 +578,21 @@ for k in range(N):
         pole=Vector(track(POLE_R if side=='R' else POLE_L,t))
         # Wrist limit: past WRIST_MAX away from the idle hand/forearm relation the hand turns
         # about the thumb/index crotch (the knob, the packet's pinch) instead of bending further.
-        desiredRotation=Mt.to_quaternion()
+        desiredRotation=Mt.to_quaternion();a_.pop('fixedSwivel',None)
         for _ in range(4):
             swivel=a_['swivel'];mu,mf,mh,ok=solve(a_,Mt,pole,Snew)
+            if side=='R':a_['fixedSwivel']=a_['swivel']
             fdir=(mh.translation-mf.translation).normalized();rh=Mt.to_quaternion();want=rh@a_['faInHand']
             dev=fdir.angle(want)
             limit=WRIST_MAX
             if dev<=math.radians(limit)+1e-4:break
-            a_['swivel']=swivel
+            if side!='R':a_['swivel']=swivel
             R=want.rotation_difference(fdir);R=Quaternion().slerp(R,(dev-math.radians(limit))/dev)
-            _near=a if u<0.5 else b;pivot=Mt@((KH[_near[2]] if _near[1]=='bolt' else CLOC) if side=='R' else CLOC_L)
+            _near=a if u<0.5 else b
+            localPivot=KH[_near[2]] if _near[1]=='bolt' else PACKET_CONTACT[_near[2]] if _near[1]=='packet' else CLOC
+            pivot=Mt@(localPivot if side=='R' else CLOC_L)
             Mt=Matrix.Translation(pivot)@R.to_matrix().to_4x4()@Matrix.Translation(-pivot)@Mt
+        a_.pop('fixedSwivel',None)
         if not ok:unreach.append((side,round(t,3)))
         if side=='R':
             correction=math.degrees(desiredRotation.rotation_difference(mh.to_quaternion()).angle);correction=min(correction,360-correction)
@@ -541,12 +604,13 @@ for k in range(N):
         cur={a_['h']:mh}
         for i,L in zip(fing,fl):
             cur[i]=cur[PARENT[i]]@L;mats[i]=cur[i]
-    # While the hand carries the packet the packet sits in the hand as finally solved (the wrist
-    # limit may have turned the hand about its pinch); it is handed back to its own path for seating.
+    # The calibrated carrying pinch is rigid: both digits and the packet follow
+    # the solved hand. Its wrist rotation is about the real index pad above,
+    # so this no longer swings the packet around an idle crotch 65 mm away.
     w=1-smooth((t-PACKET_IN_HAND[1])/(PACKET_IN_HAND[2]-PACKET_IN_HAND[1])) if t>=PACKET_IN_HAND[0] else 0
+    packetCarryWeights.append(w)
     if w>0:
-        held=mats[RH]@LIB['packet'][0].inverted()
-        own=rootM(pk);P=blendM(own,held,w)
+        held=mats[RH]@LIB['packet'][0].inverted();P=blendM(rootM(pk),held,w)
         pk.matrix_basis=rootM(rp).inverted()@P;key_obj(pk,f)
     set_pose_root(mats)
     key_bones(f)
@@ -554,6 +618,8 @@ sc.frame_start=1;sc.frame_end=N
 print('frames',N,'unreachable (s)',[t_ for i_,(s_,t_) in enumerate(unreach) if i_==0 or abs(unreach[i_-1][1]-t_)>0.02 or i_==len(unreach)-1 or abs(unreach[i_+1][1]-t_)>0.02])
 sc['fpsReloadWristFit']=json.dumps(wristFit)
 sc['fpsReloadLeftWristFit']=json.dumps(leftWristFit)
+sc['fpsReloadPacketCarryWeights']=json.dumps(packetCarryWeights)
+sc['fpsReloadContactRows']=json.dumps(CONTACT_ROWS)
 print('wrist pose corrections: all / held knob / packet',max(r[2] for r in wristFit),max(r[2] for r in wristFit if .37<=r[0]<=.64),max(r[2] for r in wristFit if 1.50<=r[0]<=2.14))
 print('left support pose correction',max(r[1] for r in leftWristFit))
 bpy.ops.wm.save_mainfile()

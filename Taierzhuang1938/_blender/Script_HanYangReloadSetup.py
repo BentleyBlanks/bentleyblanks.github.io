@@ -1,8 +1,9 @@
 """Build the camera-space authoring scene for the HanYang reload clip.
 
 Open a copy of HanYang173RIdle_20261025/Animation_HanYang173RIdle.blend as
-HanYangReload_20261102/Animation_HanYangReload.blend (with Data_Capture.json from
-Script_HanYangReloadCapture.mjs beside it), then run once through BlenderMCP with
+HanYangReload_20261104/Animation_HanYangReload.blend (with Data_Capture.json from
+Script_HanYangReloadCapture.mjs and Data_HanYangReloadProps.json from
+Script_HanYangReloadProps.mjs beside it), then run once through BlenderMCP with
 HANYANG_PROJECT_ROOT set. Blender world becomes the game camera space (camera at the
 origin looking +Y, 55 deg vertical, 16:9): VM_Space carries camera^-1 * arms root
 (including the non-uniform FOV depth compression), Ctl_* empties replicate the
@@ -13,7 +14,7 @@ Script_HanYangReloadAuthor.py for the clip itself.
 """
 import os
 PROJECT=globals().get('HANYANG_PROJECT_ROOT') or os.environ['HANYANG_PROJECT_ROOT']
-FOLDER=globals().get('HANYANG_RELOAD_FOLDER') or os.environ.get('HANYANG_RELOAD_FOLDER') or r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/HanYangReload_20261102'
+FOLDER=globals().get('HANYANG_RELOAD_FOLDER') or os.environ.get('HANYANG_RELOAD_FOLDER') or r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/HanYangReload_20261104'
 import bpy,json,math
 from mathutils import Matrix,Vector,Quaternion
 cap=json.load(open(FOLDER+'/Data_Capture.json'))
@@ -162,3 +163,5 @@ for o in new:
     if o.name in bpy.data.objects and not o.name.startswith('Mesh_Game'):bpy.data.objects.remove(o)
 bpy.ops.wm.save_mainfile()
 print('scene ready')
+HANYANG_RELOAD_FOLDER=FOLDER
+exec(compile(open(PROJECT+'/_blender/Script_HanYangReloadProps.py',encoding='utf-8').read(),'Script_HanYangReloadProps.py','exec'))

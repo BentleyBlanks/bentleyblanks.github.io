@@ -1,0 +1,19 @@
+{
+  "source": "COD_WWII_三八式_02_换弹_有声.mp4",
+  "viewport": [1280, 720],
+  "clipOffsetSeconds": 0.33,
+  "durationSeconds": 3.4,
+  "openingKnob": [[0.30, 1200, 450], [0.40, 985, 402], [0.50, 970, 430], [0.60, 968, 468]],
+  "beats": [
+    [0.23, "Lift the handle with ring/little fingers hooked; index/middle stay open"],
+    [0.40, "Handle upright; thumb raised and palm beside the ball"],
+    [0.60, "Bolt pulled; hand rolls over the ball, four fingers close under the thumb"],
+    [0.73, "Working hand drops directly beside the receiver"],
+    [1.15, "Right hand out of frame; support hand raises the rifle"],
+    [1.67, "Five-round packet enters from lower right with thumb on its top"],
+    [2.04, "Packet pressed into the receiver"],
+    [2.62, "Hand returns to the bolt and pushes forward"],
+    [2.88, "Handle locked down; hand releases"],
+    [3.32, "Right hand returns to the rifle grip"]
+  ]
+}

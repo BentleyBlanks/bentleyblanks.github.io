@@ -186,6 +186,33 @@ rows=np.array(rows)
 # 30 fps source: light 5-tap smoothing at 60 fps removes tracking jitter, ends pinned to zero
 k5=np.array([1,4,6,4,1])/16;sm=np.vstack([np.convolve(np.pad(rows[:,i],2,mode='edge'),k5,'valid') for i in range(6)]).T
 w=np.array([smooth(k/6) for k in range(N)])*np.array([smooth((N-1-k)/6) for k in range(N)]);sm*=w[:,None]
+# Match the visible knob as well as the muzzle during the opening pull.
+# Tracking only the support hand let the knob drift across the screen while
+# the reference keeps the grasp almost stationary as the bolt comes back.
+reference=json.load(open(os.path.join(HERE,'Data_HanYangReloadReference.json'),encoding='utf-8'))
+knobMarks=np.array(reference['openingKnob'],float)
+def keyed(keys,t):
+    return float(np.interp(t,np.array(keys)[:,0],np.array(keys)[:,1]))
+def raised_knob(t):
+    turn=smooth((t-.23)/(.36-.23));slide=smooth((t-.40)/(.55-.40))
+    a=math.pi/2*turn
+    return np.array([.0515*math.cos(a),.04194+.0515*math.sin(a),-.1468+.078*slide])
+for k in range(N):
+    c=k/60
+    if not .30<=c<=.60:continue
+    B=base(c);v=sm[k].copy();G=about_piv(v[:3],v[3],v[4],v[5],B);w=view_w(c)
+    muzzleTarget=proj(G,MUZ,w)
+    knobTarget=np.array([keyed(knobMarks[:,[0,1]],c)/1280,keyed(knobMarks[:,[0,2]],c)/720])
+    def align(delta):
+        adjusted=about_piv(v[:3]+[delta[0],delta[1],0],v[3]+delta[2],v[4]+delta[3],v[5],B)
+        return np.r_[(proj(adjusted,MUZ,w)-muzzleTarget)*20,(proj(adjusted,raised_knob(c),w)-knobTarget)*20,delta*.05]
+    delta=least_squares(align,np.zeros(4)).x
+    sm[k,:2]+=delta[:2];sm[k,3:5]+=delta[2:]
+# Taper the two ends of this correction into the neighboring tracked motion.
+start,end=18,36
+before=sm[start].copy()-rows[start];after=sm[end].copy()-rows[end]
+for k in range(12,start):sm[k]+=before*smooth((k-12)/(start-12))
+for k in range(end+1,45):sm[k]+=after*(1-smooth((k-end)/(45-end)))
 json.dump({'fps':60,'source':'COD WWII Type 38 reload, muzzle + support-hand screen track (clip s = ref s - 0.33)',
   'view':{'depthScale':VIEW,'weight':VIEW_WEIGHT,'cameraScale':CAMERA_SCALE},'gun':GUN,'poses':{k:[list(v[0]),*v[1:]] for k,v in POSES.items()},
   'columns':['dx','dy','dz','rx','ry','rz'],'rows':[[round(v,5) for v in r] for r in sm]},open(os.path.join(HERE,'Data_HanYangReloadSway.json'),'w'))
