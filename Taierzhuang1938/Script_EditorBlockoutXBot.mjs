@@ -12,10 +12,10 @@
 // 同预览工具，共用 Script_MixamoProps.mjs）；其余时候照原身体手和枪的相对位置。贴躯干的挂件（背着的枪）按 X Bot 体型推开。
 // 运行时取证：_import/Script_XBotAttachmentProbe.mjs。
 // 2026-11-03 起普通日军换成日兵甲（Data_XBotCharacters.mjs 的 XBOT_FACTION_CHARACTERS），11-04 起何有田换成他自己的模型（XBOT_CAST_CHARACTERS），
-// 11-04 起普通日军日兵甲、日军士兵A 按兵的编号各一半：
+// 11-04 起普通日军日兵甲、日军士兵A、日兵乙按兵的编号固定分配：
 // 同一副骨架、自己的贴图，动作去掉 X Bot 的骨长、胯高按比例缩；别的有专属配色的人、别的阵营照用 X Bot。读不到就退回 X Bot。
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
@@ -330,7 +330,9 @@ export class XBotSkins {
         if (o.isMesh && def.ownMaterial && !o.material.userData.characterLight) { ApplyPatches(o.material, [CHARACTER_LIGHT_PATCH]); o.material.userData.characterLight = true; }
       });
       const bodyVolumes = FitBodyVolumes(source);
-      this.kits.set(key, { key, def, source, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)) });
+      const clips = new Map(await Promise.all(Object.entries(def.clipOverrides || {}).map(async ([file, url]) =>
+        [file, (await this.loader.loadAsync(url)).animations[0]])));
+      this.kits.set(key, { key, def, source, clips, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)) });
     } catch (error) { console.warn(`[XBot] ${def.name} load failed, using X Bot`, error); }
   }
 
@@ -745,7 +747,7 @@ export class XBotSkin {
   }
 
   _Play(pick, intent, dt) {
-    const clip = ClipForCharacter(this.skins.loaded.get(pick.file), this.kit.def);
+    const clip = ClipForCharacter(this.kit.clips?.get(pick.file) || this.skins.loaded.get(pick.file), this.kit.def);
     if (!clip) {
       // 还没读到：先读着，这一帧照原身体换算（不站着发呆）
       this.skins.Clip(pick.file);

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import * as THREE from "./vendor/three/build/three.module.js";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { XBOT_CHARACTER_LOOKS } from "./Data_BlockoutXBotClips.mjs";
@@ -30,6 +31,9 @@ const Float = (glb, i) => {
 const xbot = ReadGlb(path.join(here, XBOT_CHARACTERS.xbot.file));
 const xw = Worlds(xbot.doc);
 const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
+assert.ok(["ijaJia", "ijaA", "ijaYi"].every(key => FactionCharacterKeys("ija").includes(key)), "普通日军保留甲和 A，并接入乙");
+assert.equal(XBOT_CAST_CHARACTERS.heyoutian, "heYoutian", "何有田映射保留");
+assert.equal(XBOT_CAST_CHARACTERS.luo, "luo", "班长映射保留");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);
@@ -42,6 +46,13 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   const doc = glb.doc;
   assert.equal(doc.meshes.length, 1, `${key}: 一个网格`);
   assert.equal(doc.materials.length, 1, `${key}: 一个材质`);
+  for (const [index, accessor] of doc.accessors.entries()) {
+    const view = doc.bufferViews[accessor.bufferView];
+    const bytes = { 5121: 1, 5123: 2, 5125: 4, 5126: 4 }[accessor.componentType];
+    const width = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[accessor.type];
+    assert.ok((accessor.byteOffset || 0) + accessor.count * width * bytes <= view.byteLength,
+      `${key}: accessor ${index} 的分量类型、数量与实际二进制长度一致`);
+  }
   const names = doc.skins[0].joints.map((i) => doc.nodes[i].name);
   assert.deepEqual(names, xNames, `${key}: 骨名与顺序同 X Bot`);
   const w = Worlds(doc);
@@ -82,7 +93,17 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   const W4 = Float(glb, prim.attributes.WEIGHTS_0);
   for (let i = 0; i < W4.length; i += 4) assert.ok(Math.abs(W4[i] + W4[i + 1] + W4[i + 2] + W4[i + 3] - 1) < 0.01, `${key}: 第 ${i / 4} 点权重和`);
   assert.ok(report.rigidHead?.vertices > 0, `${key}: 头顶 / 帽子权重收到 Head`);
+  for (const [original, replacement] of Object.entries(def.clipOverrides || {})) {
+    assert.ok(fs.existsSync(path.join(here,"Animation/Mixamo",original)), `${key}: 专用动作保留原件`);
+    const own=ReadGlb(path.join(here,replacement));
+    assert.equal(own.doc.animations.length,1,`${key}: 专用动作能解析`);
+    assert.ok(own.doc.animations[0].channels.length>=65,`${key}: 专用动作保留完整身体曲线`);
+  }
 }
+
+const yiContacts=JSON.parse(fs.readFileSync(path.join(here,"Animation/JapaneseSoldierYi/Data_JapaneseSoldierYiContacts.json"),"utf8"));
+for(const item of [yiContacts.model,yiContacts.source,yiContacts.output])assert.equal(
+  createHash("sha256").update(fs.readFileSync(path.join(here,item.file))).digest("hex"),item.sha256,"乙的接触烘焙对应实际模型与源动作");
 
 // 动作换人：X Bot 原样；别的人去掉 Hips 以外的位移轨、Hips 位移乘 hipsScale，同一条动作同一个人只换一次
 const clip = new THREE.AnimationClip("t", 1, [

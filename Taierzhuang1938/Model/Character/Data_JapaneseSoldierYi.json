@@ -1,0 +1,61 @@
+{
+ "schema": 1,
+ "built": "2026-11-04",
+ "script": "_import/Script_BuildXBotRigCharacter.mjs",
+ "source": {
+  "file": "JapaneseSoldierYi_Merged_V2_Bones.glb",
+  "bytes": 10953744,
+  "sha256": "1326248249827669612d706b7968fc9a162831422a5e31068ec1b839944c7864",
+  "heightM": 1.8268
+ },
+ "output": {
+  "file": "Model/Character/Model_JapaneseSoldierYi.glb",
+  "bytes": 8547568,
+  "sha256": "d44b326e217fb6cb3b07f4cc083101d4bfa0162c41889087fe17987a3f0e7c81"
+ },
+ "scale": 1.000027,
+ "crownM": 1.8268,
+ "triangles": 44468,
+ "vertices": 41356,
+ "sourceVertices": 41356,
+ "bones": 65,
+ "addedEndBones": [],
+ "rigidHead": {
+  "aboveHeadJointM": [
+   0.015,
+   0.09
+  ],
+  "vertices": 3382
+ },
+ "hipsY": 0.982,
+ "xbotHipsY": 1.0427,
+ "hipsScale": 0.9418,
+ "headY": 1.615,
+ "xbotHeadY": 1.5993,
+ "images": [
+  {
+   "index": 0,
+   "role": "normal",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 1577274,
+   "bytes": 1711878
+  },
+  {
+   "index": 1,
+   "role": "baseColor",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 3810500,
+   "bytes": 2498422
+  },
+  {
+   "index": 2,
+   "role": "metallicRoughness",
+   "width": 4096,
+   "height": 4096,
+   "sourceBytes": 3126098,
+   "bytes": 1628252
+  }
+ ]
+}

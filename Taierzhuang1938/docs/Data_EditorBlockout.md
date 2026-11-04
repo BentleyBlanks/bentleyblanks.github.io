@@ -1385,3 +1385,5 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
   - **看过的**：动作预览端枪站 / 张望；白盒 01–05 的 04-1 / 05-1 与 06–10 的 09-1 普通日军两种模型都有（05-1：七个里士兵A 三个、日兵甲四个；09-1：十四个里士兵A 八个），05-1 截图里钢盔、下巴带、斜挎背带都对。
 - **顺子 V5（2026-11-04）**：保留原始头部形状和贴图，仅修帽箍与开口内侧布边，另存未绑骨 V5 与本地绑定版。`Model/Character/Model_Shunzi.glb` 登记为 `shunzi`，`XBOT_CAST_CHARACTERS.shunzi` 只给白盒中的顺子单位使用；动作预览可选「顺子」（`?who=shunzi`）。65 骨、53,260 三角面，帽顶 1.831 m，胯高比 0.9398。源文件、保全断言、绑定方法和重建/验收命令见 [顺子角色](Data_ShunziCharacter.md)。
 - **取证**：`Tengxian.Debug.Blockout.XBot()` 给出读没读完、每个人播哪条（mirror = 当场换算）、X Bot 与原身体胯部的世界坐标。挂件运行时取证 `node Taierzhuang1938/_import/Script_XBotAttachmentProbe.mjs`：三关预演逐帧（1/30 s）量每个 X Bot 的挂件进身体多深、离身体多远、一帧跳多少、手离握点多远（人体按审查脚本同样的椭圆胶囊），`--kf` 只跑几段、`--shot` 出图、`--xbot-src` 拿另一份 `Script_EditorBlockoutXBot.mjs`（如 `git show HEAD:` 存下来的）量改前。
+
+- **日兵乙（2026-11-04）**：普通日军池在保留日兵甲、日军士兵 A 的基础上追加 `ijaYi`；有名字角色的映射保留。乙 V2 修补护颈布实际透缝、校正两手残余偏转，经本地 65 骨架拟合、权重传递和现有 X Bot 转换器接入。乙的专用爬行曲线修正手、膝与靴底接触，动作预览与白盒共用 `clipOverrides`，原 Mixamo 动作和其他人物不变。来源、重建步骤及验收入口见 [日兵乙 V2](Data_JapaneseSoldierYi.md)。

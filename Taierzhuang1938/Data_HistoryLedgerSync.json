@@ -417,6 +417,26 @@
       },
       "assetContract": "Model/IsuzuType94Truck/Data_IsuzuType94Truck.json",
       "note": "V79canvas accepted by user;localized metal rust/contact abrasion and lower-body grime remain artistic reconstruction,not exact1938damage evidence. User requested publication after this round."
+    },
+    {
+      "asset": "JapaneseSoldierYi",
+      "date": "2026-11-04",
+      "scope": "Yi reference appearance only; preserve global review anchors and unrelated source-page cursors.",
+      "runtimeAsset": "Model/Character/Model_JapaneseSoldierYi.glb",
+      "assetContract": "docs/Data_JapaneseSoldierYi.md",
+      "decision": "Creative appearance assembled from the user-provided references and five generated parts. Face shape, uniform colour and pattern, cap visor/havelock, puttees and boots do not identify a documented 1938 Tengxian soldier or establish a uniform specification. Rigging and animation adaptation are game presentation. No historical claim upgraded.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-04T10:28:27.056Z",
+          "scope": "Added only Yi appearance creative row and dated status note; fetched the saved page and verified the row."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-04T10:28:28.029Z",
+          "scope": "Added only Yi appearance creative bullet; fetched the saved page and verified it."
+        }
+      ]
     }
   ],
   "notionPages": [
