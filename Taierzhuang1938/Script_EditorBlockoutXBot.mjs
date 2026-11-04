@@ -26,6 +26,7 @@ import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
+import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -1005,6 +1006,7 @@ export class XBotSkin {
   _KeepSling(a, unfitted) {
     for (const c of a.object.children) {
       if (!c.isMesh || !/Sling/i.test(c.name)) continue;
+      SetRifleSlingAnchors(c, a.object);
       const rests = a.slingRest || (a.slingRest = new Map());
       if (!rests.has(c)) rests.set(c, c.matrix.clone());
       const rest = rests.get(c);

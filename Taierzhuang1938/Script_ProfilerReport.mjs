@@ -36,6 +36,7 @@ export const CPU_LABELS = {
   matrix: "场景矩阵（updateMatrixWorld）",
   frameSetup: "出画前接线（雾/水面/听者/簇表）",
   shadowBatch: "阴影静态合批（逐帧对账）",
+  slingCloth: "背枪枪带布料模拟",
   firstPersonShadow: "视模自阴影",
   firstPersonProbe: "视模本地反射图",
   gi: "GI 探针（CPU）",

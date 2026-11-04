@@ -23,7 +23,11 @@ const approvedAppearanceHash=repair?.revision==='20260906NraEyesShoulders'
   &&repair.sourceSha256===config.sourceModelSha256
   ? 'd9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170' : config.sourceModelSha256;
 assert.equal(sourceModelHash,approvedAppearanceHash,'Production character matches the approved source or appearance revision');
-assert.equal(sha(path.join(root,config.sourceWeapon)),config.sourceWeaponSha256,'Production rifle remains original');
+const sourceWeaponHash=sha(path.join(root,config.sourceWeapon));
+// 7b339eff3 published the articulated rifle mechanism after this animation was baked.
+// Preserve the bake's provenance; accept only the original or that exact delivered asset.
+const approvedWeaponHashes=[config.sourceWeaponSha256,'8df097cdb820ab7f53561d8ccb66c9b9b1f7a1b450cce4f0f1b7d6be0b286532'];
+assert.ok(approvedWeaponHashes.includes(sourceWeaponHash),'Production rifle matches the original or audited mechanism revision');
 function ReadGlb(file){const data=fs.readFileSync(file);assert.equal(data.readUInt32LE(0),0x46546c67);const length=data.readUInt32LE(12);const json=JSON.parse(data.toString('utf8',20,20+length));return {json,bin:data.subarray(28+length)};}
 const {json,bin}=ReadGlb(path.join(assetDir,'Animation_TengxianNraBackRifleRun.glb'));
 const original=ReadGlb(path.join(root,config.sourceModel)).json;
@@ -42,7 +46,7 @@ let maxSeam=0,maxRotationExcursion=0;
 for(const channel of json.animations[0].channels){const values=Values(json.animations[0].samplers[channel.sampler].output);const first=values[0],last=values.at(-1);let gap=Math.max(...first.map((x,i)=>Math.abs(x-last[i])));if(channel.target.path==='rotation'){gap=Math.min(gap,Math.max(...first.map((x,i)=>Math.abs(x+last[i]))));maxRotationExcursion=Math.max(maxRotationExcursion,...values.map(v=>Math.min(...[1,-1].map(sign=>Math.hypot(...v.map((x,i)=>x-sign*first[i]))))));}maxSeam=Math.max(maxSeam,gap);}
 assert(maxSeam<0.0001,'Matched loop endpoints');assert(maxRotationExcursion>0.35,'Clip contains real limb motion');
 const server=await ServeRoot(root,0),browser=await LaunchBrowser();
-const errors=[];const page=await browser.newPage({viewport:{width:1320,height:1100},deviceScaleFactor:1});
+const errors=[];const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1});
 page.on('pageerror',error=>errors.push(error.message));
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/Animation/BackRifleRun/`,{waitUntil:'networkidle'});
@@ -93,7 +97,7 @@ try{
  assert(maxRootDrift<0.0001,`In-place root drifts ${maxRootDrift}`);
  assert(maxSeamVelocityJump<0.85,`Loop velocity jump ${worstSeamJoint}: ${maxSeamVelocityJump}`);
  assert.equal(sha(path.join(root,config.sourceModel)),sourceModelHash,'Review never modifies the production character');
- assert.equal(sha(path.join(root,config.sourceWeapon)),config.sourceWeaponSha256,'Review never modifies the production rifle');
+ assert.equal(sha(path.join(root,config.sourceWeapon)),sourceWeaponHash,'Review never modifies the production rifle');
  const summary={productionSourceCompatible:true,clip:config.clip,revision:config.revision,sampleCount:report.samples.length,maxChannelSeam:maxSeam,maxWorldSeamMeters:worldSeam,minSoleHeightMeters:minSole,maxSupportClearanceMeters:maxSupportClearance,maxSupportSlideMeters:maxSlide,maxToeSlideMeters:maxToeSlide,maxLimbLengthErrorMeters:maxLimbLengthError,kneeFlexDegrees:[minKneeFlex,maxKneeFlex],maxRootDriftMeters:maxRootDrift,maxSeamVelocityJumpMps:maxSeamVelocityJump,maxChestMountMatrixError:report.maxMountError,durationSeconds:report.clipDuration,triangles:first.triangles,drawCalls:first.drawCalls,productionHashesUnchanged:true,boneCount:json.skins[0].joints.length};
  fs.mkdirSync(shotDir,{recursive:true});fs.writeFileSync(path.join(shotDir,'Data_BackRifleRunVerification.json'),JSON.stringify(summary,null,2));
  fs.writeFileSync(path.join(shotDir,'Data_BackRifleRunSamples.json'),JSON.stringify(report.samples));

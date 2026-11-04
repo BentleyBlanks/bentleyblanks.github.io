@@ -18,6 +18,7 @@
 // weapon track takes over (UpdateRelaxedGaitWeapon).
 import { AnimationClip } from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
+import { RegisterRifleSling } from "./Script_RifleSlingCloth.mjs";
 import { ACTOR_LOCOMOTION_PROFILES } from "./Data_ActorLocomotion.mjs";
 import { ACTOR_LOCOMOTION, RELAXED_GAIT as C } from "./Data_Tuning_ActorLocomotion.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
@@ -157,7 +158,8 @@ export function UpdateRelaxedGaitWeapon(soldier, slung) {
     const mount = rig.relaxedGaitMount = source.clone(false);
     mount.name = "RelaxedGaitBackRifleMount"; rig.bones.chest.add(mount);
     const sling = source.getObjectByName("Model_BackRifleSling")?.clone();
-    if (sling) { mount.add(sling); rig.relaxedGaitSling = sling; }
+    // 带子换成布料模拟（Script_RifleSlingCloth）：这条原带子留着当参照、不画
+    if (sling) { mount.add(sling); rig.relaxedGaitSling = sling; RegisterRifleSling(sling, actor.root); }
   }
   if (slung && rig.relaxedGaitMount && rig.relaxedGaitRifleSource !== weapon) {
     rig.relaxedGaitRifle?.parent?.remove(rig.relaxedGaitRifle);

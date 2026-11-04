@@ -405,6 +405,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
 - 背枪走 / 空手走与放松站姿：`Animation/RelaxedGait/`（生成器 `_import/Script_RelaxedGaitBake.mjs`，运行时 `Script_RelaxedGait.SetRelaxedGait`，目前只有 01–02 开场导演用；门禁 `Script_RelaxedGaitTest`），契约见该目录 `Data_RelaxedGait.md`。
+- 背枪的枪带布料模拟（国军日军背枪时那根带子）：`Script_RifleSlingCloth`（原带子注册 `RegisterRifleSling`、每帧 `StepRifleSlings` 在 `Script_Main.RenderScene` 矩阵更新之后；模拟的带子挂场景根 `RifleSlingCloth` 组、原带子 layers 全关当参照），口径 [背枪枪带布料模拟](Data_RifleSlingCloth.md)，门禁 `Script_RifleSlingClothTest` / `Script_RifleSlingClothBrowserTest`。
 - 第一关友军稳定俯身蹲走 / 单手提枪行进与待机：`Script_AllyGait`，BlenderMCP 重建和接线见 [AllyGait](../Animation/AllyGait/Data_AllyGait.md)；`Script_AllyGaitTest`、`Script_AllyGaitBrowserTest`。
 - 扛枪行军走（右肩扛中正式、原地循环，BlenderMCP 重建；资产已交付、运行时尚未接入）：`Animation/RifleShoulderMarch/`，口径、八项物理闸实测与接入点见 [RifleShoulderMarch](../Animation/RifleShoulderMarch/Data_RifleShoulderMarch.md)；门禁 `Script_RifleShoulderMarchTest`（animation 域）。
 - 背枪跑步源包：`Animation/BackRifleRun/`（P012 的 `Script_FirstLevelP012BackRifle` 在领械后行军使用，其他关卡仍用原动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。

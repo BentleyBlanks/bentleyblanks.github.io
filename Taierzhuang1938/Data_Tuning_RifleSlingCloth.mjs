@@ -1,0 +1,50 @@
+// Runtime sling solver, metres/seconds. Fits the existing BackRifleRun sling to the visible body;
+// no weapon, character, or animation assets are altered. User request 2026-11-04.
+export const RIFLE_SLING_CLOTH = Object.freeze({
+  count: 32,
+  widthM: 0, // 0 = the original sling width.
+  thicknessM: 0.0045,
+  substepS: 1 / 90,
+  maxSubsteps: 3,
+  iterations: 10,
+  gravity: 9.81,
+  airDamping: 2.5,
+  inertia: 0.8,
+  inertiaMaxM: 0.02,
+  slack: 0.02,
+  wrapShrink: 0.75,
+  wrapIterations: 40,
+  settleS: 0.25,
+  fitsPerFrame: 2,
+  stretch: 1,
+  compress: 0.5,
+  bend: 0.12,
+  restBias: 0.002,
+  // Central chest section: replace an off-body artist guide with this body's settled fit.
+  guideFromFraction: 0.25,
+  guideToFraction: 0.5,
+  surfaceGapM: 0.006,
+  contactM: 0.012,
+  friction: 0.45,
+  maxSpeedMps: 5,
+  sampleVoxelM: 0.03,
+  sampleRadiusM: 0.16,
+  candidateRadiusM: 0.1,
+  candidateRefreshFrames: 4,
+  // A sampled tangent plane is a LOCAL patch. An infinite plane incorrectly separates
+  // adjacent particles above/below a garment hem, stretching the belt by up to 67%.
+  surfaceSupportM: 0.06,
+  // The open lower jacket needs actual triangle contacts; nearest-plane signs are ambiguous there.
+  triangleFromFraction: 0.55,
+  triangleRadiusM: 0.24,
+  skipBonesPattern: 'fore|hand|finger|thumb|index|middle|ring|pinky|calf|(?<!up)leg|foot|toe',
+  softBonesPattern: 'thigh|upleg',
+  softPush: 0.35,
+  endBlend: 3,
+  simRangeM: 30,
+  halfRateM: 12,
+  teleportM: 0.8,
+  teleportDeg: 50,
+  hiddenResetS: 0.5,
+  disposeAfterS: 5,
+});

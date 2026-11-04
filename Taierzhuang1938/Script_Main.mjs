@@ -33,6 +33,7 @@ import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip } from "./Script_ShadowSkip.mjs";
 import { FirstPersonShadow } from "./Script_FirstPersonShadow.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
+import { StepRifleSlings } from "./Script_RifleSlingCloth.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
 import { ShadowInstanceCulling, InstallShadowInstanceCulling } from "./Script_ShadowInstanceCulling.mjs";
 import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassStaticBatch.mjs";
@@ -8497,6 +8498,11 @@ function RenderSceneContent(dt) {
   aircraft?.RestoreFit();
   profiler.GpuPop();
   profiler.E("matrix");
+  // 背枪的枪带（Script_RifleSlingCloth）：要这一帧姿势、挂点的终值，所以排在整帧那次矩阵更新之后；
+  // 它直接写带子骨头的 matrixWorld，必须排在本帧第一次 renderer.render（阴影烘焙在那里）之前。
+  profiler.B("slingCloth");
+  StepRifleSlings(dt, camera);
+  profiler.E("slingCloth");
   // 阴影趟静态投影体合批的逐帧对账：读的是刚更新完的 matrixWorld，必须排在它之后、
   // 本帧第一次 renderer.render（阴影烘焙在那里）之前。
   profiler.B("shadowBatch");
