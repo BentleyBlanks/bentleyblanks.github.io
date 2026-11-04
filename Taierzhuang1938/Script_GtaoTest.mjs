@@ -399,6 +399,28 @@ try {
       P.StepFrames(2, 1 / 60);
     }
 
+    // Tagged first-person depth / zero velocity cannot identify the previous
+    // skinned surface. Feed deliberately different current/history AO and SSIL
+    // through the real GPU temporal shader; world pixels must still accumulate.
+    {
+      const pass=post.gtaoPass,U=pass.uniformsTemporal,saved=Object.fromEntries(Object.entries(U).map(([k,u])=>[k,u.value]));
+      const textures=[],target=new THREE.WebGLRenderTarget(4,4,{count:2,type:THREE.HalfFloatType,format:THREE.RGBAFormat,depthBuffer:false});
+      const Texture=rgba=>{const data=new Float32Array(4*4*4);for(let i=0;i<data.length;i+=4)data.set(rgba,i);const t=new THREE.DataTexture(data,4,4,THREE.RGBAFormat,THREE.FloatType);t.needsUpdate=true;textures.push(t);return t;};
+      const Run=depth=>{
+        U.uCurrentAo.value=Texture([.85,.5,.5,depth]);U.uHistoryAo.value=Texture([.1,.5,.5,depth]);
+        U.uCurrentIl.value=Texture([.1,.2,.7,1]);U.uHistoryIl.value=Texture([.6,.1,.1,1]);
+        U.uNormalDepth.value=Texture([0,0,1,depth]);U.uVelocity.value=Texture([0,0,0,0]);
+        U.uInvView.value=new THREE.Matrix4();U.uPrevViewProjection.value=new THREE.PerspectiveCamera(55,1,.066,50).projectionMatrix;
+        U.uProjScale.value=new THREE.Vector2(1,1);U.uFullResolution.value=new THREE.Vector2(4,4);
+        U.uHasHistory.value=1;U.uUseVelocity.value=1;U.uAlpha.value=.1;U.uForegroundDepth.value=1;
+        post._Blit(pass.materialTemporal,target);
+        const Read=attachment=>{const data=new Uint16Array(4*4*4);renderer.readRenderTargetPixels(target,0,0,4,4,data,0,attachment);return Array.from(data.slice(20,24),HalfToFloat);};
+        return {ao:Read(0),il:Read(1)};
+      };
+      try{out.foregroundHistory={foreground:Run(1),world:Run(2)};}
+      finally{for(const [k,value]of Object.entries(saved))U[k].value=value;for(const t of textures)t.dispose();target.dispose();}
+    }
+
     // --- 10) 稳态不再编译新程序 -------------------------------------------
     P.StepFrames(10, 1 / 60);
     const programsBefore = renderer.info.programs.length;
@@ -502,6 +524,12 @@ if (!result) {
   Check("平移 0.5 m 无重投影残影（与清历史重收敛的结果一致）",
     result.ghosting.meanDelta < 0.03 && result.ghosting.maxDelta < 0.30,
     JSON.stringify(result.ghosting));
+  Check("前景 AO/SSIL 不残留旧手型；世界表面仍做时域累积",
+    Math.abs(result.foregroundHistory.foreground.ao[0]-.85)<.002
+    && Math.abs(result.foregroundHistory.foreground.il[2]-.7)<.002
+    && Math.abs(result.foregroundHistory.world.ao[0]-.175)<.002
+    && Math.abs(result.foregroundHistory.world.il[2]-.16)<.002,
+    JSON.stringify(result.foregroundHistory));
   // 门槛按几何算出来的，不是拍的：取证点在墙前 0.10 m，实测可见度 0.75，
   // 即缺了约四分之一个半球 —— 对应的弯曲法线偏转约 17°（cos ≈ 0.955）。
   // 所以「墙根 < 0.975 且比空旷地低 0.02 以上」是有余量又抓得住的判据；

@@ -369,6 +369,7 @@ uniform float uHasHistory;
 uniform float uAlpha;
 uniform float uDepthReject;
 uniform float uUseVelocity;
+uniform float uForegroundDepth;
 varying vec2 vUv;
 
 layout(location = 0) out vec4 oAo;
@@ -391,6 +392,11 @@ void main() {
   #endif
   float viewZ = cur.a;
   if (uHasHistory < 0.5 || viewZ <= 0.0) return;
+  // Foreground skin/guns deliberately write constant tagged depth and zero
+  // velocity. A changing hand pose therefore cannot reproject its AO history:
+  // old finger occlusion would otherwise remain painted across the palm.
+  // Retain this frame's AO, bent normal and SSIL; spatial denoising still runs.
+  if (uForegroundDepth > 0.0 && abs(viewZ - uForegroundDepth) < 0.002) return;
 
   // 期望的「上一帧视深」：把本帧的世界坐标用上一帧的 viewProjection 投一次，
   // 透视矩阵的 clip.w 就是线性视深 —— 不必再往 ctx 上加一个 prevView 矩阵。
@@ -665,6 +671,7 @@ export class GtaoPass {
       uAlpha: { value: GTAO.temporalAlpha },
       uDepthReject: { value: GTAO.temporalDepthReject },
       uUseVelocity: { value: 1 },
+      uForegroundDepth: { value: 0 },
     };
     this.uniformsBlur = {
       uAo: { value: null }, uIl: { value: null }, uNormalDepth: { value: null },
@@ -830,6 +837,7 @@ export class GtaoPass {
       V.uProjScale.value.copy(ctx.projScale);
       V.uHasHistory.value = this.hasHistory && ctx.hasPrev ? 1 : 0;
       V.uUseVelocity.value = ctx.velocityTexture ? 1 : 0;
+      V.uForegroundDepth.value = this.pipeline.foregroundViewDepth ?? 0;
       ctx.blitter.Blit(this.materialTemporal, write);
       this.historyFlip = !this.historyFlip;
       this.hasHistory = true;
