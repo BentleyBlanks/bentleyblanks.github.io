@@ -228,30 +228,32 @@
    "head": "Yi",
    "hair": "LongStraight",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "长直发 28 厘米（柔顺）",
    "model": null,
    "file": "Grooms/Groom_Yi_LongStraight.bin",
-   "bytes": 2581136,
+   "bytes": 2611592,
    "strands": 64000,
    "guides": 1800,
    "cardTriangles": 37202,
-   "shellTriangles": 14008
+   "shellTriangles": 16015
   },
   {
    "id": "SoldierA_LongWavy",
    "head": "SoldierA",
    "hair": "LongWavy",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "长卷发 22 厘米（粗硬）",
    "model": null,
    "file": "Grooms/Groom_SoldierA_LongWavy.bin",
-   "bytes": 3493160,
+   "bytes": 3523448,
    "strands": 60000,
    "guides": 2570,
    "cardTriangles": 57834,
-   "shellTriangles": 17552
+   "shellTriangles": 19585
   },
   {
    "id": "Shunzi_Stubble",

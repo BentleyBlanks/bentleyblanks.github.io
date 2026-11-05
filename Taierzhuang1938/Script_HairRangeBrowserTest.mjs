@@ -45,7 +45,7 @@ try {
     await page.evaluate((view) => window.Taierzhuang.Debug.HairRange.Camera(view), view);
     await Shot(view);
   }
-  for (const [index, name] of [[7, 'Shunzi'], [8, 'Luo'], [9, 'HeYoutian'], [10, 'SoldierA'], [11, 'Jia'], [12, 'Yi'], [16, 'LongStraight'], [17, 'LongWavy'], [23, 'LongBeard']]) {
+  for (const [index, name] of [[7, 'Shunzi'], [8, 'Luo'], [9, 'HeYoutian'], [10, 'SoldierA'], [11, 'Jia'], [12, 'Yi'], [17, 'LongStraight'], [18, 'LongWavy'], [23, 'LongBeard']]) {
     await page.evaluate((index) => window.Taierzhuang.Debug.HairRange.Focus(index, 'front'), index);
     await Shot(name);
   }
@@ -61,6 +61,7 @@ try {
   await page.locator('[data-toggle="beard"]').click(); await Step();
   assert.equal(await page.evaluate(() => window.Taierzhuang.scene.getObjectByName('Hair_cast_HeYoutian_Cast').getObjectByName('HairBeardCards').visible), false);
   await page.locator('[data-toggle="beard"]').click();
+  await page.locator('[data-fold="appearance"] summary').click();
   const clump = page.locator('[data-param="clump"]'); await clump.scrollIntoViewIfNeeded();
   const initialClump = +await clump.inputValue();
   await clump.focus(); await clump.press('Home'); await clump.press('ArrowRight');
@@ -68,6 +69,11 @@ try {
   await page.evaluate((value) => window.Taierzhuang.Debug.HairRange.Set('clump', value), initialClump);
   await page.evaluate(() => window.Taierzhuang.Debug.HairRange.ShowPanel(false));
 
+  for (const [index,name] of [[6,'LongStraightShellCrown'],[18,'LongWavyCrown']]) {
+    await page.evaluate(index=>{const api=Taierzhuang.Debug.HairRange;api.Focus(index,'top');api.Lod('shell');},index);
+    await Shot(name);
+  }
+  await page.evaluate(()=>Taierzhuang.Debug.HairRange.Lod('auto'));
   console.log('--- Hair lab: forced tiers, automatic distance transitions and costs');
   result.cost = await page.evaluate(() => {
     const t = window.Taierzhuang, a = t.Debug.HairRange;

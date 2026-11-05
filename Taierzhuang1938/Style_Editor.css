@@ -345,12 +345,12 @@ body.edFpMotionObserver .hudCrosshair { display: none !important; }
 .edPanel input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--ui-gold); }
 
 /* =========================================================================
-   高级工具外观：沿用启动界面（指挥室菜单 / 设置页）的视觉语言，只作用于 #edRoot。
+   高级工具外观：沿用启动界面（指挥室菜单 / 设置页）的视觉语言；独立工具用 .edThemedSurface 接入。
    半透明暗色渐变底、象牙白文字、橄榄灰细线、左侧金边 + 渐变的选中条、宽字距小标题、
    衬线标题（TzTitleText）、金色填充细轨 + 竖条滑块、直角控件。取值与 Style_Menu.css 的
    设置页 / 声音页同源，改那边的口径时这里一起改。
    ========================================================================= */
-#edRoot {
+:is(#edRoot, .edThemedSurface) {
   --ed-panel: linear-gradient(90deg, #080907f0, #11120ee8 65%, #14150ce0);
   --ed-panel-r: linear-gradient(270deg, #080907f2, #0e0f0cec 55%, #13140fe6);
   --ed-black: #070807;
@@ -613,108 +613,108 @@ body.edFpMotionObserver .hudCrosshair { display: none !important; }
 }
 
 /* --- 高级工具：面板与控件 ------------------------------------------------ */
-#edRoot .edPanel { background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 0; box-shadow: 0 20px 50px #000b; color: var(--ed-text); }
-#edRoot .edHead { padding: 8px 14px 16px 22px; gap: 6px 10px; background: transparent; border-bottom: 1px solid var(--ed-rule); }
-#edRoot .edHead .edTitle { color: var(--ed-text-hi); font: 700 21px/1.35 var(--ed-serif); letter-spacing: 0.08em; }
-#edRoot .edHead .edSub { color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.1em; white-space: normal; }
-#edRoot .edHead .edX { width: 32px; height: 32px; line-height: 30px; border: 0; background: none; color: #bbbbae; font-size: 24px; }
-#edRoot .edHead .edX:hover { color: var(--ed-gold-hi); }
+:is(#edRoot, .edThemedSurface) .edPanel { background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 0; box-shadow: 0 20px 50px #000b; color: var(--ed-text); }
+:is(#edRoot, .edThemedSurface) .edHead { padding: 8px 14px 16px 22px; gap: 6px 10px; background: transparent; border-bottom: 1px solid var(--ed-rule); }
+:is(#edRoot, .edThemedSurface) .edHead .edTitle { color: var(--ed-text-hi); font: 700 21px/1.35 var(--ed-serif); letter-spacing: 0.08em; }
+:is(#edRoot, .edThemedSurface) .edHead .edSub { color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.1em; white-space: normal; }
+:is(#edRoot, .edThemedSurface) .edHead .edX { width: 32px; height: 32px; line-height: 30px; border: 0; background: none; color: #bbbbae; font-size: 24px; }
+:is(#edRoot, .edThemedSurface) .edHead .edX:hover { color: var(--ed-gold-hi); }
 /* 叠加浮窗（Debug Rendering / 敌军 AI）的标题栏不带眉题，顶上留白收紧 */
-#edRoot :is(.edPanel.debugRendering, .edPanel.ai) .edHead { padding-top: 16px; }
-#edRoot .edBody { padding: 8px 22px 26px; }
+:is(#edRoot, .edThemedSurface) :is(.edPanel.debugRendering, .edPanel.ai) .edHead { padding-top: 16px; }
+:is(#edRoot, .edThemedSurface) .edBody { padding: 8px 22px 26px; }
 /* 标题下固定的一条工具栏（特效编辑器的播放栏）：不随正文滚动 */
 .edPanelBar { flex: 0 0 auto; padding: 0 14px 8px; background: #101416; border-bottom: 1px solid #363d40; }
-#edRoot .edPanelBar { padding: 0 22px 10px; background: #0a0b0999; border-bottom: 1px solid var(--ed-rule); }
+:is(#edRoot, .edThemedSurface) .edPanelBar { padding: 0 22px 10px; background: #0a0b0999; border-bottom: 1px solid var(--ed-rule); }
 
 /* 分组 = 声音设置页的 audioGroup：宽字距灰字 + 一条细线 */
-#edRoot .edSection { margin: 20px 0 4px; padding: 0; border: 0; background: none; }
-#edRoot .edSection:first-child { margin-top: 12px; }
-#edRoot .edSection > .h {
+:is(#edRoot, .edThemedSurface) .edSection { margin: 20px 0 4px; padding: 0; border: 0; background: none; }
+:is(#edRoot, .edThemedSurface) .edSection:first-child { margin-top: 12px; }
+:is(#edRoot, .edThemedSurface) .edSection > .h {
   margin: 0 0 10px; padding: 0 0 9px; border-bottom: 1px solid var(--ed-rule-2);
   color: var(--ed-text-3); font-size: 12px; font-weight: 400; letter-spacing: 0.2em;
 }
-#edRoot .edRow { gap: 12px; margin: 7px 0; min-height: 28px; }
-#edRoot .edRow > .l { flex-basis: 96px; color: var(--ed-text-2); font-size: 13px; letter-spacing: 0.04em; }
+:is(#edRoot, .edThemedSurface) .edRow { gap: 12px; margin: 7px 0; min-height: 28px; }
+:is(#edRoot, .edThemedSurface) .edRow > .l { flex-basis: 96px; color: var(--ed-text-2); font-size: 13px; letter-spacing: 0.04em; }
 
 /* 按钮 = 设置页开关：细描边、直角、宽字距；按下态金字金边 + 5 px 金方块 */
-#edRoot .edBtn {
+:is(#edRoot, .edThemedSurface) .edBtn {
   min-height: 31px; padding: 4px 13px; border: 1px solid var(--ed-edge); border-radius: 0; background: #13140b55;
   color: #c6c7bd; font: 400 13px/1.4 var(--ui-font); letter-spacing: 0.08em;
   transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-#edRoot .edBtn:hover { color: var(--ed-gold-hi); border-color: #cdb77b88; background: var(--ed-sel); }
-#edRoot .edBtn.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
-#edRoot .edBtn[aria-pressed]::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; background: currentColor; opacity: 0.3; }
-#edRoot .edBtn[aria-pressed="true"]::before { opacity: 1; }
-#edRoot .edBtn:disabled { opacity: 0.45; cursor: default; }
-#edRoot .edBtn.danger:hover { color: #f0a08f; border-color: #d6604a99; background: linear-gradient(90deg, #d6604a22, transparent); }
-#edRoot .edBtns { gap: 6px; margin: 8px 0; }
+:is(#edRoot, .edThemedSurface) .edBtn:hover { color: var(--ed-gold-hi); border-color: #cdb77b88; background: var(--ed-sel); }
+:is(#edRoot, .edThemedSurface) .edBtn.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
+:is(#edRoot, .edThemedSurface) .edBtn[aria-pressed]::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; background: currentColor; opacity: 0.3; }
+:is(#edRoot, .edThemedSurface) .edBtn[aria-pressed="true"]::before { opacity: 1; }
+:is(#edRoot, .edThemedSurface) .edBtn:disabled { opacity: 0.45; cursor: default; }
+:is(#edRoot, .edThemedSurface) .edBtn.danger:hover { color: #f0a08f; border-color: #d6604a99; background: linear-gradient(90deg, #d6604a22, transparent); }
+:is(#edRoot, .edThemedSurface) .edBtns { gap: 6px; margin: 8px 0; }
 
 /* 选项 chips：同一套描边，选中 = 金字金边 + 渐变 */
-#edRoot .edChips { gap: 6px; margin: 8px 0 10px; }
-#edRoot .edChip {
+:is(#edRoot, .edThemedSurface) .edChips { gap: 6px; margin: 8px 0 10px; }
+:is(#edRoot, .edThemedSurface) .edChip {
   min-height: 28px; padding: 3px 12px; border: 1px solid var(--ed-rule-2); border-radius: 0; background: transparent;
   color: #b9bcb7; font: 400 12.5px/1.5 var(--ui-font); letter-spacing: 0.08em; transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-#edRoot .edChip:hover { color: var(--ed-gold-hi); border-color: var(--ed-edge); background: var(--ed-sel); }
-#edRoot .edChip.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
+:is(#edRoot, .edThemedSurface) .edChip:hover { color: var(--ed-gold-hi); border-color: var(--ed-edge); background: var(--ed-sel); }
+:is(#edRoot, .edThemedSurface) .edChip.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
 
-#edRoot .edPanel :is(select, input[type="text"], input[type="number"], textarea) {
+:is(#edRoot, .edThemedSurface) .edPanel :is(select, input[type="text"], input[type="number"], textarea) {
   min-height: 31px; padding: 4px 9px; border: 1px solid var(--ed-edge); border-radius: 0; box-sizing: border-box;
   background: var(--ed-field); color: var(--ed-text); font: 13px/1.4 var(--ui-font); letter-spacing: 0.03em;
 }
-#edRoot .edPanel textarea { font: 11.5px/1.6 var(--ui-mono); letter-spacing: 0; }
-#edRoot .edPanel :is(select, input, textarea):focus { border-color: var(--ed-gold); outline: none; }
-#edRoot .edPanel select option { background: #11120e; color: var(--ed-text); }
+:is(#edRoot, .edThemedSurface) .edPanel textarea { font: 11.5px/1.6 var(--ui-mono); letter-spacing: 0; }
+:is(#edRoot, .edThemedSurface) .edPanel :is(select, input, textarea):focus { border-color: var(--ed-gold); outline: none; }
+:is(#edRoot, .edThemedSurface) .edPanel select option { background: #11120e; color: var(--ed-text); }
 
 /* 滑杆 = 声音设置页：3 px 金色填充细轨 + 7×17 竖条滑块（--fill 由 Script_EditorUi.Slider 写） */
-#edRoot .edPanel input[type="range"] { height: 26px; --fill: 50%; cursor: pointer; }
-#edRoot .edPanel input[type="range"]::-webkit-slider-runnable-track {
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"] { height: 26px; --fill: 50%; cursor: pointer; }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]::-webkit-slider-runnable-track {
   height: 3px; border-radius: 0; background: linear-gradient(to right, var(--ed-gold-fill) var(--fill), #a4a59450 var(--fill));
 }
-#edRoot .edPanel input[type="range"]::-moz-range-track { height: 3px; background: #a4a59450; }
-#edRoot .edPanel input[type="range"]::-moz-range-progress { height: 3px; background: var(--ed-gold-fill); }
-#edRoot .edPanel input[type="range"]::-webkit-slider-thumb { width: 7px; height: 17px; margin-top: -7px; border-radius: 1px; background: var(--ed-thumb); }
-#edRoot .edPanel input[type="range"]::-moz-range-thumb { width: 7px; height: 17px; border: 0; border-radius: 1px; background: var(--ed-thumb); }
-#edRoot .edPanel input[type="range"]:is(:hover, :focus-visible)::-webkit-slider-thumb { background: var(--ed-gold-hi); box-shadow: 0 0 0 3px #dfbd6844; }
-#edRoot .edPanel input[type="range"]:focus-visible { outline: none; }
-#edRoot .edVal { color: var(--ed-text); font-size: 12.5px; }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]::-moz-range-track { height: 3px; background: #a4a59450; }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]::-moz-range-progress { height: 3px; background: var(--ed-gold-fill); }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]::-webkit-slider-thumb { width: 7px; height: 17px; margin-top: -7px; border-radius: 1px; background: var(--ed-thumb); }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]::-moz-range-thumb { width: 7px; height: 17px; border: 0; border-radius: 1px; background: var(--ed-thumb); }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]:is(:hover, :focus-visible)::-webkit-slider-thumb { background: var(--ed-gold-hi); box-shadow: 0 0 0 3px #dfbd6844; }
+:is(#edRoot, .edThemedSurface) .edPanel input[type="range"]:focus-visible { outline: none; }
+:is(#edRoot, .edThemedSurface) .edVal { color: var(--ed-text); font-size: 12.5px; }
 /* 滑杆读数那一格是行内写死的 44px，「10.00 s」会折成两行：放宽并不许折行 */
-#edRoot .edRow > .l:has(> .edVal) { flex: 0 0 auto !important; min-width: 48px; white-space: nowrap; }
+:is(#edRoot, .edThemedSurface) .edRow > .l:has(> .edVal) { flex: 0 0 auto !important; min-width: 48px; white-space: nowrap; }
 
 /* 列表 = 选章列表：左侧金边 + 渐变的选中条 */
-#edRoot .edList { border: 1px solid var(--ed-rule-2); background: #0a0b0999; }
-#edRoot .edList .it {
+:is(#edRoot, .edThemedSurface) .edList { border: 1px solid var(--ed-rule-2); background: #0a0b0999; }
+:is(#edRoot, .edThemedSurface) .edList .it {
   min-height: 30px; padding: 4px 12px 4px 11px; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid #c1bdab14;
   align-items: center; color: #c6c7bd; letter-spacing: 0.04em;
 }
-#edRoot .edList .it:hover { background: #d8d4c30f; color: var(--ed-text-hi); }
-#edRoot .edList .it.on { border-left-color: var(--ed-gold); background: var(--ed-sel-strong); color: var(--ed-gold); }
-#edRoot .edList .it .t { color: var(--ed-text-4); letter-spacing: 0.02em; }
+:is(#edRoot, .edThemedSurface) .edList .it:hover { background: #d8d4c30f; color: var(--ed-text-hi); }
+:is(#edRoot, .edThemedSurface) .edList .it.on { border-left-color: var(--ed-gold); background: var(--ed-sel-strong); color: var(--ed-gold); }
+:is(#edRoot, .edThemedSurface) .edList .it .t { color: var(--ed-text-4); letter-spacing: 0.02em; }
 
 /* 读数：灰键名 + 象牙白等宽值，细线分行 */
-#edRoot .edFacts { margin: 8px 0 2px; }
-#edRoot .edFacts .f { padding: 5px 0; border-bottom: 1px solid #c1bdab1a; font-size: 12.5px; }
-#edRoot .edFacts .f:last-child { border-bottom: 0; }
-#edRoot .edFacts .f .k { color: var(--ed-text-4); letter-spacing: 0.04em; }
-#edRoot .edFacts .f .v { color: var(--ed-text); }
-#edRoot .edFacts .f .v.warn { color: var(--ed-gold-text); }
-#edRoot .edFacts .f .v.bad { color: var(--ed-bad); }
-#edRoot .edFacts .f .v.good { color: var(--ed-good); }
+:is(#edRoot, .edThemedSurface) .edFacts { margin: 8px 0 2px; }
+:is(#edRoot, .edThemedSurface) .edFacts .f { padding: 5px 0; border-bottom: 1px solid #c1bdab1a; font-size: 12.5px; }
+:is(#edRoot, .edThemedSurface) .edFacts .f:last-child { border-bottom: 0; }
+:is(#edRoot, .edThemedSurface) .edFacts .f .k { color: var(--ed-text-4); letter-spacing: 0.04em; }
+:is(#edRoot, .edThemedSurface) .edFacts .f .v { color: var(--ed-text); }
+:is(#edRoot, .edThemedSurface) .edFacts .f .v.warn { color: var(--ed-gold-text); }
+:is(#edRoot, .edThemedSurface) .edFacts .f .v.bad { color: var(--ed-bad); }
+:is(#edRoot, .edThemedSurface) .edFacts .f .v.good { color: var(--ed-good); }
 
 /* 说明 = 声音页右栏的正文：灰字宽行距，左侧一条细线；告警用金色 */
-#edRoot .edNote {
+:is(#edRoot, .edThemedSurface) .edNote {
   margin: 8px 0; padding: 1px 0 1px 11px; border: 0; border-left: 1px solid var(--ed-edge); border-radius: 0; background: none;
   color: var(--ed-text-4); font-size: 12.5px; line-height: 1.85;
 }
-#edRoot .edNote.warn { border-left-color: var(--ed-gold); color: var(--ed-gold-text); }
-#edRoot .edJsonFold > summary { border-radius: 0; border-color: var(--ed-rule-2); background: transparent; letter-spacing: 0.08em; padding: 6px 10px; }
-#edRoot .edJsonFold[open] > summary { color: var(--ed-gold-text); border-color: #cdb77b66; }
-#edRoot .edAssetTable th { background: var(--ed-black); color: var(--ed-text-3); letter-spacing: 0.12em; font-weight: 400; border-bottom-color: var(--ed-rule); }
-#edRoot .edAssetTable td { border-bottom-color: #c1bdab1a; }
-#edRoot .edAssetTable tbody tr:hover { background: var(--ed-sel); }
-#edRoot .edAssetRuleCard { border-radius: 0; border-color: var(--ed-rule-2); background: #0a0b0999; }
-#edRoot :is(.edFacialTimeline, .edFpsLegend) { border-radius: 0; border-color: var(--ed-edge); background: var(--ed-panel); }
+:is(#edRoot, .edThemedSurface) .edNote.warn { border-left-color: var(--ed-gold); color: var(--ed-gold-text); }
+:is(#edRoot, .edThemedSurface) .edJsonFold > summary { border-radius: 0; border-color: var(--ed-rule-2); background: transparent; letter-spacing: 0.08em; padding: 6px 10px; }
+:is(#edRoot, .edThemedSurface) .edJsonFold[open] > summary { color: var(--ed-gold-text); border-color: #cdb77b66; }
+:is(#edRoot, .edThemedSurface) .edAssetTable th { background: var(--ed-black); color: var(--ed-text-3); letter-spacing: 0.12em; font-weight: 400; border-bottom-color: var(--ed-rule); }
+:is(#edRoot, .edThemedSurface) .edAssetTable td { border-bottom-color: #c1bdab1a; }
+:is(#edRoot, .edThemedSurface) .edAssetTable tbody tr:hover { background: var(--ed-sel); }
+:is(#edRoot, .edThemedSurface) .edAssetRuleCard { border-radius: 0; border-color: var(--ed-rule-2); background: #0a0b0999; }
+:is(#edRoot, .edThemedSurface) :is(.edFacialTimeline, .edFpsLegend) { border-radius: 0; border-color: var(--ed-edge); background: var(--ed-panel); }
 
 /* 右上角入口（高级工具关着时）与屏幕中央的提示 */
 #edRoot .edGear { background-color: #070807d9; border-color: #c1bdab47; }

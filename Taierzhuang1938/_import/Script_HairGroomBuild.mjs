@@ -918,6 +918,13 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     }
     for (let v = 0; v < acc.length; v += 3) { const nn = Norm([acc[v], acc[v + 1], acc[v + 2]]); nrm[v] = nn[0]; nrm[v + 1] = nn[1]; nrm[v + 2] = nn[2]; }
     shell = { pos: net.pos, nrm, tan, data, idx: net.idx };
+    // Strand density can be hollow at the crown. The coarse volume must also
+    // cover the roots, including where the hanging hair parts around the scalp.
+    const cap = ScalpPatch(mesh, Weight, () => .0015, (p, n) => CombDir(style, frame, p, n));
+    const baseVertex = shell.pos.length / 3;
+    for (const key of ['pos', 'nrm', 'tan', 'data']) shell[key].push(...cap[key]);
+    shell.idx.push(...cap.idx.map(index => index + baseVertex));
+    shell.rootCapTriangles = cap.idx.length / 3;
   }
   // 6. 头皮染色片：贴着头皮 0.15 mm，发丝 / 发片档下压暗发根之间透出来的光头皮（UE MetaHuman 靠头皮贴图做同一件事）
   const projection = frame.referenceProjection;
@@ -1306,7 +1313,7 @@ function BuildGroom(entry, tiles) {
       style: entry.hair, name: style.name, family: style.family, guides: G, points: K, strands: S,
       bounds: { min: h.bmin, max: h.bmax }, density: { res: h.vn, voxel: h.vox, min: h.bmin, extinctionMax: h.extMax, encoding: 'sqrt' },
       cards: { count: h.cards.idx.length / 6 / (K - 1 || 1), triangles: h.cards.idx.length / 3 },
-      shell: { kind: style.shell.kind, triangles: h.shell.idx.length / 3, opacity: style.shell.opacity },
+      shell: { kind: style.shell.kind, triangles: h.shell.idx.length / 3, opacity: style.shell.opacity, ...(h.shell.rootCapTriangles ? {rootCapTriangles: h.shell.rootCapTriangles} : {}) },
       scalp: { triangles: h.scalp.idx.length / 3, tint: style.scalpTint ?? { Short: 0.8, Medium: 0.6, Long: 0.55 }[style.family] ?? 0.6 },
       render: { width: style.width, clump: style.clump, frizz: style.frizz, curl: style.curl, color: style.color,
         roughness: style.roughness, specular: style.specular, scatter: style.scatter, length: Math.max(...Object.values(style.length)) },

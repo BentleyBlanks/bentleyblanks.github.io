@@ -1,6 +1,6 @@
 // 头发 / 胡子的手感数值（docs/Data_HairSystem.md §4–§6）。纯数据、零 import。
 // 造型（长短、密度、发色、梳向）在 Hair/Data_HairStyles.json；这里只有着色与远近切档。
-export const HAIR_ASSET_VERSION = '20261106ref3b';
+export const HAIR_ASSET_VERSION = '20261106crown';
 
 export const HAIR_SHADING = Object.freeze({
   // 黑色素 → 底色（UE GetHairColorFromMelanin + ColorFromAbsorption）的吸收倍率，1 = UE 原口径：
@@ -44,4 +44,4 @@ export const HAIR_LOD = Object.freeze({
 export const HAIR_QUALITY = Object.freeze({ low: 'shell', medium: 'cards', high: 'strands', ultra: 'strands' });
 
 // Independent gallery camera, metres per second; used only by HairRange.
-export const HAIR_CAMERA = Object.freeze({ turn: 0.0055, pan: 0.0011, zoom: 0.0011, min: 0.18, max: 40, moveSpeed: 1.8, boost: 3, portraitMagnification: 2.4 });
+export const HAIR_CAMERA = Object.freeze({ turn: 0.0055, zoom: 0.0011, min: 0.18, max: 40, moveSpeed: 1.8, boost: 3, flySpeedMin: .1, flySpeedMax: 20, overviewRadius: 10.4, overviewElevation: .55, portraitMagnification: 2.4 });

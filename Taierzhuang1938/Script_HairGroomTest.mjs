@@ -132,6 +132,21 @@ for (const g of manifest.grooms) {
     Check(maxId < G, `${g.id}：插值下标最大 ${maxId} < 导向发丝 ${G}`);
     Check(badW === 0, `${g.id}：重心权重都在 [-0.5, 1.5] 内（坏 ${badW} 根）`);
     const [nx, ny, nz] = H.density.res;
+    if (H.shell.kind === 'hull') {
+      const raw = sec('hairShellPos'), indices = sec('hairShellIndex'), q = header.sections.hairShellPos.quant;
+      const points = Array.from(raw, (value, i) => q.min[i % 3] + value / 65535 * (q.max[i % 3] - q.min[i % 3]));
+      const [x, top, z] = heads[entry.head].top;
+      let surfaceY = -Infinity;
+      for (let i = 0; i < indices.length; i += 3) {
+        const [a,b,c] = Array.from(indices.slice(i,i+3),index=>points.slice(index*3,index*3+3));
+        const d=(b[2]-c[2])*(a[0]-c[0])+(c[0]-b[0])*(a[2]-c[2]);
+        if(Math.abs(d)<1e-12)continue;
+        const u=((b[2]-c[2])*(x-c[0])+(c[0]-b[0])*(z-c[2]))/d;
+        const v=((c[2]-a[2])*(x-c[0])+(a[0]-c[0])*(z-c[2]))/d;
+        if(u>=-1e-5 && v>=-1e-5 && u+v<=1.00001)surfaceY=Math.max(surfaceY,u*a[1]+v*b[1]+(1-u-v)*c[1]);
+      }
+      Check(surfaceY > top + .0002, `${g.id}：远档头顶有真实几何覆盖头皮（${surfaceY-top} m）`);
+    }
     Check(sec('hairDensity').length === nx * ny * nz && H.density.voxel > 0, `${g.id}：消光体素 ${nx}×${ny}×${nz}`);
     for (const part of ['hairCard', 'hairShell', 'hairScalp']) {
       const pos = sec(`${part}Pos`), idx = sec(`${part}Index`);

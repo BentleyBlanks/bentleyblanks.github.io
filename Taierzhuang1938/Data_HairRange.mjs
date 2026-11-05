@@ -41,7 +41,7 @@ export const HAIR_RANGE_PHASE = Object.freeze({
   sky: 'testSceneDay', ambience: 'overcast', music: null, minutes: 600,
   story: HAIR_RANGE_ID,
   brief: ['六个人物的光头胸像配上各自的头发胡子，另有不同长短、软硬的发型与胡子样本，以及同一套头发三档（发丝 / 发片 / 头发壳）的并排对比。',
-    'WASD 移动相机，Shift 加速；拖动画面转动观察，右键平移，滚轮缩放；点台座上的名字或面板里的条目飞过去看。'],
+    '按住右键转向，配合 WASD 移动、Q/E 升降、Shift 加速；中键平移，Alt + 左键环绕，滚轮缩放，F 聚焦。场景右上角有四排展示的用途导览。'],
   objectives: ['对比发丝、发片、头发壳三档与各种发型胡子'],
   mechanic: '测试场：独立观察相机，玩家无敌，无敌军与武器。',
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],

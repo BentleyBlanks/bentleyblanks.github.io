@@ -47,7 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
-  HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, WASD, diagonal/boost/input/blur controls"},
+  HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
