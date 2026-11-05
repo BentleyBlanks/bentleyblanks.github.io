@@ -98,4 +98,5 @@ triangles=lambda obj:sum(len(p.vertices)-2 for p in obj.data.polygons)
 contract={'schema':'tengxian-rifle-sling-visual/3','version':'20261105NylonV4','generator':'_blender/Script_FlatRifleSlingBakeV3.py','model':asset.name,'sha256':hashlib.sha256(asset.read_bytes()).hexdigest(),'shape':'flat woven nylon webbing','material':'nylon','textureTileM':.016,'widthM':.025,'endWidthM':.016,'thicknessM':.002,'restLengthM':length,'bones':count,'strapTriangles':triangles(strap),'totalTriangles':sum(triangles(o) for o in [strap,eye,tab,*lashings]),'sourceImageTier':1,'reconstructionScope':'Fine nylon weave, khaki olive colour, folded ends, stitching and lashings follow the requested art direction. Material appearance and movement parameters are creative reconstruction.','historicalReferences':[]}
 contract['simulationPoints']=32
 (out/'Data_RifleSlingFlatV3.json').write_text(json.dumps(contract,indent=2),encoding='utf-8')
+bpy.ops.file.pack_all()
 bpy.ops.wm.save_as_mainfile(filepath=str(project/'Model_NylonRifleSlingV4.blend'));print('FLAT_SLING_ASSET',json.dumps(contract))
