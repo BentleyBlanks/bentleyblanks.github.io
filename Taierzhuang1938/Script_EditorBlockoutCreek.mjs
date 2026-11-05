@@ -1,3 +1,4 @@
+import {ManagedTextureLoader} from './Script_TextureImports.mjs';
 // 白盒关卡编辑器的河沟示意（docs/Data_EditorBlockout.md §6.3，2026-10-22）。
 //
 // 用户：「河汊子最好简单的表现一下他的材质，不然我想象不出来」。只改编辑器这一层，不碰 Space / Scene 生成器 / 场景 JSON：
@@ -22,7 +23,7 @@ function TileTexture(url) {
   if (typeof document === "undefined") return null;
   let texture = textures.get(url);
   if (texture) return texture;
-  texture = new THREE.TextureLoader().load(url);
+  texture = new ManagedTextureLoader().load(url);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;

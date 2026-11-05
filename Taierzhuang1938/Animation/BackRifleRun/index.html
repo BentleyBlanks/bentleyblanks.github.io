@@ -19,7 +19,7 @@
 <footer>BlenderMCP 规范 · NRA02 与中正式几何 · 原有背枪跑步</footer>
 <script type="module">
 import * as THREE from 'three';
-import {GLTFLoader} from '../../vendor/three/examples/jsm/loaders/GLTFLoader.js';
+import {ManagedGLTFLoader as GLTFLoader} from '../../Script_ModelImports.mjs';
 import {clone as CloneSkeleton} from '../../vendor/three/examples/jsm/utils/SkeletonUtils.js';
 let playing=true,phaseSeconds=0,previous=performance.now(),rate=1,travelMeters=0;
 const assetRevision='20260926HumanoidV1';

@@ -1,6 +1,7 @@
 // Data_BootPapers.mjs 的配套函数（2026-11-02 从数据模块搬出来：数据模块只放能导出成 JSON 的数据，见 docs/Data_DataSources.md「数据模块只放数据」）。
 
 import { BOOT_PAPERS, BOOT_PAPER_DIR, BOOT_PAPER_PBR_STAMP, BOOT_PAPER_STAMP, BOOT_PAPER_TILT } from "./Data_BootPapers.mjs";
+import {ResolvePublishedImageUrl} from './Script_PublicationUrls.mjs';
 
 /** 随机抽一张，尽量不与 lastId 重复。rand 默认 Math.random，测试里可注入。 */
 export function PickBootPaper(lastId = null, rand = Math.random) {
@@ -9,15 +10,15 @@ export function PickBootPaper(lastId = null, rand = Math.random) {
 }
 
 export function BootPaperUrl(paper) {
-  return `${BOOT_PAPER_DIR}${paper.file}?v=${BOOT_PAPER_STAMP}`;
+  return ResolvePublishedImageUrl(`${BOOT_PAPER_DIR}${paper.file}?v=${BOOT_PAPER_STAMP}`);
 }
 
 export function BootPaperPbrUrls(paper) {
   const stem = `${BOOT_PAPER_DIR}Texture_BootPaper${paper.id}`;
   return {
     base: BootPaperUrl(paper),
-    normal: `${stem}Normal.webp?v=${BOOT_PAPER_PBR_STAMP}`,
-    roughness: `${stem}RoughnessMask.webp?v=${BOOT_PAPER_PBR_STAMP}`,
+    normal: ResolvePublishedImageUrl(`${stem}Normal.webp?v=${BOOT_PAPER_PBR_STAMP}`),
+    roughness: ResolvePublishedImageUrl(`${stem}RoughnessMask.webp?v=${BOOT_PAPER_PBR_STAMP}`),
   };
 }
 

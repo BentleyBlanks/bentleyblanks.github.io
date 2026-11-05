@@ -64,6 +64,7 @@ export const testDefs = {
   NakajimaKi4ReleaseBrowserTest: {file:"Script_NakajimaKi4ReleaseBrowserTest.mjs",timeoutMs:300000,desc:"Manual Ki4 release/library viewer; requires a local preview server"},
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishAssetPathsTest: {file:"Script_PublishAssetPathsTest.mjs",timeoutMs:120000,desc:"PC path publication: recursive new GLB/glTF and external images, path overrides, complete inventory and source preservation"},
+  StrictTexturesTest: {file:"Script_StrictTexturesTest.mjs",timeoutMs:120000,desc:"All published images: exact path formats and caps, embedded/shared/Hair coverage, no original copies or silent skips"},
   PublishCacheSnapshotTest: {file:"Script_PublishCacheSnapshotTest.mjs",desc:"Completed cache snapshots: valid entries only, immutable archive input and interrupted encoder safety"},
   PublishMobileAssetsTest: {file:"Script_PublishMobileAssetsTest.mjs",timeoutMs:600000,desc:"手机版贴图（2026-10-26）：1024 + ASTC 6×6 / 法线 4×4 的尺寸、格式、mip、解回像素与原图一致（抓逐通道缩放错）、翻转、模型只换图，SwiftShader 里 ?mobileAssets=1/0 加载器拿到 ASTC / 电脑版"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
@@ -1011,7 +1012,7 @@ export const domains = {
   // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
   textureAssets: {
     label: "贴图资产规范与烘焙",
-    tests: ["PublishCacheSnapshotTest", "PublishAssetPathsTest", "PublishAssetsTest", "PublishAssetsBrowserTest", "PublishMobileAssetsTest", "EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+    tests: ["StrictTexturesTest", "PublishCacheSnapshotTest", "PublishAssetPathsTest", "PublishAssetsTest", "PublishAssetsBrowserTest", "PublishMobileAssetsTest", "EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
   },
 };
 
@@ -1042,7 +1043,7 @@ const changedDomainRules = [
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
-  {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|PublishAssetPaths|PublishPathRules|PublishMobileAssets|AstcEncoder|MobileAssetRuntime|TextureImports|ModelImports)/},
+  {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|StrictTexture|PublicationUrls|PublishCache|PublishAssets|PublishAssetPaths|PublishPathRules|PublishMobileAssets|AstcEncoder|MobileAssetRuntime|TextureImports|ModelImports)/},
   {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens|About)/},
   {domain: "textureAssets", pattern: /EmbeddedTexture/},
   {domain:"particles",pattern:/Script_Particle|Data_ParticleSmoke|Data_ParticleVolume|Data_Tuning_Particles|Script_Vfx|Script_EditorVfx|Script_EditorParticleInspector|\/Volume\//},

@@ -2,8 +2,10 @@ import { TextureCatalog, IMPORT_DEFAULTS, PLATFORM_FIELDS, ImportSettingsForPlat
 import { RECIPES } from "./Script_TexBake.mjs";
 import { T } from "./Script_Text.mjs";
 import { BuildTextureManagerFields, ReadTextureManagerFields, SyncTextureManagerFields } from "./Script_TextureManagerFields.mjs";
+import {TextureImportOf,ResolveTextureImportUrl} from './Script_TextureImports.mjs';
 
 const $ = id => document.getElementById(id), catalog = TextureCatalog();
+$('save').textContent='保存预览设置';
 const procedural = [...Object.keys(RECIPES), "DetailNormal", "SkinLut"];
 const batchSelection = new Set(); let filteredFiles = [];
 const draftKey = `TengxianTextureImporter:${location.host}${location.pathname}`;
@@ -26,7 +28,7 @@ async function Load() {
   try {
     const state = await Json("/__textures/status");
     config = ValidateImportDocument(state.document); revision = state.revision; writable = state.writable;
-    Status(`本地配置：${state.root} · 保存后随下次发布生效`);
+    Status(`本地配置：${state.root} · 单图预览设置；发布格式和尺寸由路径规则控制`);
   } catch {
     config = ValidateImportDocument(await Json("./Data_TextureImportSettings.json")); writable = false;
     Status("在线浏览模式：可编辑、导入／导出配置和预览程序化贴图。实际压缩预览与保存请从本地预览服务打开。");
@@ -105,6 +107,8 @@ async function Select(name) {
   $("kind").textContent = `${item.kind} / ${item.channel}`;
   $("metadata").textContent = `${item.width} × ${item.height} · ${item.colorSpace} · ${item.consumers.join("，")}`;
   try {
+    const published=TextureImportOf(`./Texture/${name}`);
+    if(published?.siteRelative){const image=await PreviewImage({...published,url:ResolveTextureImportUrl(`./Texture/${name}`,published)});if(id!==requestId)return;image.name='发布贴图';images=[image];Draw();return;}
     const response = await fetch(`./Texture/${name}`), blob = await response.blob();
     if (!response.ok) throw new Error(`源图读取失败：${response.status}`);
     const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
@@ -193,7 +197,7 @@ async function Preview() {
     images = [images[0], image].filter(Boolean); Draw();
     const total = result.downloadBytes || result.bytes, delta = (total / result.sourceBytes - 1) * 100;
     $("result").textContent = `源文件 ${Bytes(result.sourceBytes)} → ${Bytes(total)}（${delta > 0 ? "增加" : "减少"} ${Math.abs(delta).toFixed(1)}%） · ${result.width} × ${result.height} · ${result.format}${result.mipFiles?.length ? ` · ${result.mipLevels} 层离线 Mip` : ""}${result.cpuFile ? " · 含 CPU 可读写副本" : ""}`;
-    Status("预览已完成。点击“保存发布配置”，使这组设置随下次发布生效。");
+    Status("预览已完成。可保存单图预览设置；发布使用 Data_PublishPathRules.json 的路径规则。");
   } catch (error) { Status(error.message, true); }
   finally { busy = false; SyncForm(); Dirty(); }
 }
@@ -226,10 +230,10 @@ $("settings").oninput = event => {
   requestId++; SyncForm(); Dirty(); List(); Draw();
 };
 $("settings").onsubmit = event => event.preventDefault();
-$("reset").onclick = () => { delete config.textures[selected]; requestId++; images = images.slice(0, 1); $("result").textContent = "已恢复默认设置；保存后发布生效。"; SyncForm(); Dirty(); List(); Draw(); };
-$("save").onclick = async () => { try { const result = await Json("/__textures/save", { document: config, revision }); config = result.document; revision = result.revision; saved = JSON.stringify(config); Dirty(); Status("已保存到仓库 Data_TextureImportSettings.json，下次发布自动应用。"); } catch (error) { Status(error.message, true); } };
+$("reset").onclick = () => { delete config.textures[selected]; requestId++; images = images.slice(0, 1); $("result").textContent = "已恢复默认预览设置。"; SyncForm(); Dirty(); List(); Draw(); };
+$("save").onclick = async () => { try { const result = await Json("/__textures/save", { document: config, revision }); config = result.document; revision = result.revision; saved = JSON.stringify(config); Dirty(); Status("已保存到仓库的单图预览设置。发布格式和尺寸由 Data_PublishPathRules.json 控制。"); } catch (error) { Status(error.message, true); } };
 $("export").onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(config, null, 2) + "\n"], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "Data_TextureImportSettings.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-$("import").onchange = async event => { try { config = ValidateImportDocument(JSON.parse(await event.target.files[0].text())); SyncForm(); List(); Dirty(); Status("配置已导入为草稿，保存后才会用于发布。"); } catch (error) { Status(error.message, true); } event.target.value = ""; };
+$("import").onchange = async event => { try { config = ValidateImportDocument(JSON.parse(await event.target.files[0].text())); SyncForm(); List(); Dirty(); Status("预览配置已导入为草稿。"); } catch (error) { Status(error.message, true); } event.target.value = ""; };
 $("reload").onclick = () => { if (JSON.stringify(config) !== saved && !confirm("丢弃未保存修改并重新读取仓库配置？")) return; localStorage.removeItem(draftKey); Load().catch(error => Status(error.message, true)); };
 for (const next of ["ordinary", "procedural"]) $(next).onclick = () => { mode = next; selected = null; for (const name of ["ordinary", "procedural"]) $(name).classList.toggle("active", name === mode); $("search").value = ""; Select(mode === "ordinary" ? catalog[0].file : procedural[0]); };
 $("search").oninput = List; $("channel").onchange = Draw; $("zoom").onchange = () => $("previews").classList.toggle("pixel", $("zoom").checked);
@@ -253,7 +257,7 @@ $("applySelected").onclick = () => {
     catch { skipped.push(name); }
   }
   requestId++; images = images.slice(0, 1); SyncForm(); Dirty(); List(); Draw();
-  Status(`已修改 ${applied} 张的全部导入设置；保存后发布生效。${skipped.length ? ` ${skipped.length} 张消费方式不兼容，已跳过：${skipped.join("、")}` : ""}`);
+  Status(`已修改 ${applied} 张的全部导入设置；保存后保留预览设置。${skipped.length ? ` ${skipped.length} 张消费方式不兼容，已跳过：${skipped.join("、")}` : ""}`);
 };
 $("mipLevel").onchange = async () => {
   if (!previewResult || previewResult.id !== requestId) return;

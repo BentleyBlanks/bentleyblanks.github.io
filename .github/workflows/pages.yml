@@ -50,6 +50,7 @@ jobs:
           npm install --ignore-scripts --no-package-lock --no-audit --no-fund
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
           node Taierzhuang1938/Script_PublishAssetPathsTest.mjs
+          node Taierzhuang1938/Script_StrictTexturesTest.mjs
           node Taierzhuang1938/Script_PublishCacheSnapshotTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
           node scripts/Script_PublishScopeTest.mjs
@@ -91,7 +92,7 @@ jobs:
             exit 1
           fi
           node Taierzhuang1938/Script_ValidatePublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
-          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### GPU assets\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache,retained:r.skipped.length},null,2)+"\n```\n");'
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### PC textures\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache},null,2)+"\n```\n");'
       - name: Snapshot completed GPU cache entries
         id: gpu-snapshot
         if: always() && steps.gpu-assets.outcome == 'success'
@@ -113,6 +114,7 @@ jobs:
         run: |
           npx playwright-core install --with-deps chromium
           node Taierzhuang1938/Script_PublishAssetsBrowserTest.mjs --software --report="$RUNNER_TEMP/pages/Taierzhuang1938/Data_AssetPublishReport.json"
+          node scripts/Script_PublishSiteTest.mjs --software --site-root="$RUNNER_TEMP/pages"
       # 发布包瘦身：删掉网页不加载的源文件与工具目录（清单与理由在 scripts/Script_PublishPrune.mjs），再报体积；
       # 超过预算就失败（GitHub Pages 规定发布站点不超过 1 GB，现在超，先按预算只降不升）。排在 GPU 资源验收之后、上传之前。
       - name: Prune non-runtime files and check the publication size

@@ -6,6 +6,7 @@ import os from "node:os";
 import sharp from "sharp";
 import { HandleTextureImportRequest } from "./Script_TextureImportServer.mjs";
 import { TextureCatalog } from "./Script_TextureImportRules.mjs";
+import { RECIPES } from './Script_TexBake.mjs';
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 const here = import.meta.dirname, root = path.dirname(here), temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianTextureUi-"));
 const out = path.join(here, "_shots", "TextureManager"); await fs.mkdir(out, { recursive: true });
@@ -24,6 +25,7 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`, browser = await LaunchBrowser();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 940 } }), errors = [];
+  const Shot=async options=>{await page.setViewportSize({width:1280,height:720});await page.screenshot(options);await page.setViewportSize({width:1440,height:940});};
   page.on("pageerror", error => errors.push(String(error)));
   await page.goto(`${origin}/Taierzhuang1938/TextureManager.html`);
   await page.waitForFunction(() => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas"));
@@ -42,7 +44,7 @@ try {
   await page.locator("#preview").click();
   await page.waitForFunction(() => document.querySelectorAll(".preview-card").length === 2, null, { timeout: 60000 });
   assert.match(await page.locator("#result").textContent(), /128 × 128/);
-  await page.screenshot({ path: path.join(out, "Image_FileImport.png") });
+  await Shot({ path: path.join(out, "Image_FileImport.png") });
   await page.locator("#save").click(); await page.waitForFunction(() => document.querySelector("#status").textContent.includes("已保存到仓库"));
   const saved = JSON.parse(await fs.readFile(path.join(temp, "Taierzhuang1938", "Data_TextureImportSettings.json"), "utf8"));
   assert.equal(saved.textures["Texture_WeaponSteelV2Base.webp"].maxSize, 128);
@@ -57,7 +59,7 @@ try {
   assert.match(await page.locator("#result").textContent(), /ktx2-bc3/);
   assert.match(await page.locator(".caption").last().textContent(), /8 层 mip/);
   assert.match(await page.locator(".caption").last().textContent(), /实际 DXT5 \/ BC3/);
-  await page.screenshot({ path: path.join(out, "Image_GpuImport.png") });
+  await Shot({ path: path.join(out, "Image_GpuImport.png") });
   await page.locator("#mipLevel").selectOption("7");
   await page.waitForFunction(() => [...document.querySelectorAll(".preview-card canvas")].at(-1)?.width === 1);
   await page.locator("#mipLevel").selectOption("0");
@@ -84,11 +86,11 @@ try {
   await page.locator("#clearSelected").click();
   assert.equal(await page.locator("#applySelected").isDisabled(), true);
   await page.locator("#procedural").click();
-  assert.equal(await page.locator("#list .asset").count(), 52);
+  assert.equal(await page.locator("#list .asset").count(), Object.keys(RECIPES).length+2, 'all current recipes plus DetailNormal and SkinLut');
   await page.waitForFunction(() => document.querySelectorAll(".preview-card").length === 3, null, { timeout: 60000 });
   assert.equal(await page.locator("#settings").isVisible(), false);
   await page.locator("#channel").selectOption("a");
-  await page.screenshot({ path: path.join(out, "Image_ProceduralPreview.png") });
+  await Shot({ path: path.join(out, "Image_ProceduralPreview.png") });
   await page.locator('[data-name="SkinLut"]').click();
   await page.waitForFunction(() => document.querySelector("canvas")?.width === 128 && document.querySelector("canvas")?.height === 32);
   const state = await (await fetch(origin + "/__textures/status")).json();

@@ -1,3 +1,4 @@
+import {TextureVariantUrl} from './Script_TextureImports.mjs';
 // 《台儿庄：血战滕县》材质库：把 Script_TexBake 烘出的裸字节包成 three 纹理与
 // MeshStandardMaterial，并把屏幕空间 AO 注入到**间接光**里。
 //
@@ -538,7 +539,7 @@ export class MaterialLibrary {
     const desktop = TextureImportOf(url), imported = MobileTextureImportOf(url, desktop) || desktop;
     url = ResolveTextureImportUrl(url, imported);
     if (imported?.format.startsWith("ktx2")) {
-      const path = flipY ? url : url.replace(/Texture\/[^?]+/, `Texture/${imported.unflipped}`);
+      const path = TextureVariantUrl(url,imported,flipY);
       return new Promise((resolve, reject) => {
         let settled = false;
         const timer = setTimeout(() => { settled = true; reject(new Error(`${url} 超时 ${timeoutMs} ms`)); }, timeoutMs);

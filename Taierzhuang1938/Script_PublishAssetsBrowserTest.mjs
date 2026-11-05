@@ -6,7 +6,7 @@ import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 import {EncodeTexture} from './Script_TextureImportBuild.mjs';
 import {Within} from './Script_PublishCache.mjs';
-import {BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
+import {BuildLegacyPublishFixture as BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
 
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(import.meta.dirname,'_shots/GpuPublish');
 await fs.mkdir(path.join(out,'Texture'),{recursive:true});
@@ -49,8 +49,8 @@ const errors=[];page.on('pageerror',error=>errors.push(String(error)));
 // Serve large production GLBs over native HTTP, not base64 route.fulfill/CDP.
 // The stage may be outside the checkout on CI; this test-owned mount is local only.
 const mountDir=await fs.mkdtemp(path.join(out,'Published-')),mount=path.join(mountDir,'Assets');
-await fs.symlink(stage,mount,process.platform==='win32'?'junction':'dir');
-const base=`http://127.0.0.1:${server.address().port}`,sourceProject=base+'/Taierzhuang1938/',project=base+'/'+path.relative(root,mount).split(path.sep).join('/')+'/';
+await fs.symlink(report.version===3?path.dirname(stage):stage,mount,process.platform==='win32'?'junction':'dir');
+const base=`http://127.0.0.1:${server.address().port}`,sourceProject=base+'/Taierzhuang1938/',publication=base+'/'+path.relative(root,mount).split(path.sep).join('/')+'/',project=publication+(report.version===3?'Taierzhuang1938/':'');
 try{
  await page.route('**/Data_TextureImportRuntime.mjs*',route=>route.fulfill({contentType:'text/javascript',body:'export const TEXTURE_IMPORT_RUNTIME = '+JSON.stringify({...textureRuntime,...sourceRuntime})+';'}));
  await page.route('**/GpuReview.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><body style="margin:0;background:#25282d;color:white;font:18px Arial"><div id="label" style="padding:12px"></div><script type="importmap">{"imports":{"three":"${project}vendor/three/build/three.module.js"}}</script><script type="module">
@@ -106,7 +106,7 @@ try{
   console.log('Review published model',name);
   const item=report.models.find(row=>row.file.endsWith('/'+name));assert.ok(item,'published model: '+name);
   // Request the original logical URL: the published loader must resolve its hashed GPU variant.
-  const result=await page.evaluate(urls=>window.ReviewModel(urls),{name,before:sourceProject+item.file,after:project+item.file});
+  const result=await page.evaluate(urls=>window.ReviewModel(urls),{name,before:(report.version===3?base+'/':sourceProject)+item.file,after:(report.version===3?publication:project)+item.file});
   assert.ok(result.bounds&&result.glError===0);assert.ok(result.formats.some(t=>t.published));
   if(!software)assert.ok(result.formats.some(t=>t.compressed&&['BC7','ASTC','DXT1','DXT5'].includes(t.format)));
   assert.ok(result.diff.mean<4&&result.diff.p95<15,`foreground material error: ${JSON.stringify(result.diff)}`);

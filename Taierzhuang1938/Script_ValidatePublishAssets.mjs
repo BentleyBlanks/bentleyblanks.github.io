@@ -4,9 +4,11 @@ import {fileURLToPath} from 'node:url';
 import {Hash,Within} from './Script_PublishCache.mjs';
 import {InspectKtx} from './Script_BuildPublishAssets.mjs';
 import {DiscoverPublishInputs, ExpectedPublishInputs, LoadPathRules, ReadPublishModel, LocalModelImage} from './Script_PublishAssetPaths.mjs';
+import {ValidateStrictTextures} from './Script_ValidateStrictTextures.mjs';
 
 export async function ValidatePublishAssets(projectDir, outputDir) {
   const report=JSON.parse(await fs.readFile(Within(outputDir,'Data_AssetPublishReport.json'),'utf8'));
+  if(report.version===3)return ValidateStrictTextures(projectDir,outputDir);
   if(report.version!==2)throw Error('Unsupported asset report version');
   const rules=await LoadPathRules(projectDir);
   if(JSON.stringify(rules)!==JSON.stringify(report.pathRules))throw Error('Publication path rules changed');
@@ -61,5 +63,5 @@ export async function ValidatePublishAssets(projectDir, outputDir) {
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const i=process.argv.indexOf('--output-dir');if(i<0||!process.argv[i+1])throw Error('Required: --output-dir');
-  console.log('PASS publish assets',JSON.stringify(await ValidatePublishAssets(path.dirname(fileURLToPath(import.meta.url)),path.resolve(process.argv[i+1]))));
+  console.log('PASS publish assets',JSON.stringify(await ValidateStrictTextures(path.dirname(fileURLToPath(import.meta.url)),path.resolve(process.argv[i+1]))));
 }

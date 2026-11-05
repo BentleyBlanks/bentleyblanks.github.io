@@ -12,6 +12,8 @@ import {BuildTextureImports} from './Script_BuildTextureImports.mjs';
 import {CachedFiles, Hash, Within} from './Script_PublishCache.mjs';
 import {read as ReadKtx} from './vendor/three/examples/jsm/libs/ktx-parse.module.js';
 import {BuildMobileAssets} from './Script_PublishMobileAssets.mjs';
+import {BuildStrictTextures} from './Script_StrictTexturePublish.mjs';
+export {BuildStrictTextures as BuildPublishAssets};
 import {LoadPathRules, ResolvePathRule, DiscoverPublishInputs, ExpectedPublishInputs, IsPublishModel, ReadPublishModel, LocalModelImage} from './Script_PublishAssetPaths.mjs';
 
 const require = createRequire(import.meta.url);
@@ -108,11 +110,13 @@ function NormalImages(doc) {
   for(const material of doc.materials||[])Visit(material);
   return found;
 }
-export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null, textureFiles = null, modelFiles = null, mobile = true, mobileModelFiles = null, log = console.log} = {}) {
+// Historical encoder fixtures only. Production API and CLI both use the strict site compiler.
+export async function BuildLegacyPublishFixture(projectDir, outputDir, {cacheDir = null, textureFiles = null, modelFiles = null, mobile = true, mobileModelFiles = null, log = console.log} = {}) {
   projectDir = path.resolve(projectDir); outputDir = path.resolve(outputDir);
   if (projectDir === outputDir) throw Error('Publish assets require a separate staging directory');
   const toolchain = await Toolchain(projectDir), stats = {hits: 0, misses: 0};
-  const pathRules=await LoadPathRules(projectDir);
+  const requested=await fs.readFile(Within(projectDir,'Data_PublishPathRules.json'),'utf8').then(JSON.parse).catch(()=>null);
+  const pathRules=requested?.version===1?requested:{version:1,roots:['Model','Texture'],rules:[]};
   const previous=await fs.readFile(Within(outputDir,'Data_AssetPublishReport.json'),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return {};throw error;});
   const generated=new Set(previous.generated||[]);
   for(const file of [...(modelFiles||[]),...(textureFiles||[]).map(file=>'Texture/'+file)]) {
@@ -326,6 +330,6 @@ export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const Arg = key => {const i=process.argv.indexOf(key);return i<0?null:process.argv[i+1];};
   if (!Arg('--output-dir')) throw Error('Required: --output-dir <staging>/Taierzhuang1938');
-  const report=await BuildPublishAssets(ownDir,Arg('--output-dir'),{cacheDir:Arg('--cache-dir'),mobile:!process.argv.includes('--desktop-only')});
-  console.log(JSON.stringify({summary:report.summary,cache:report.cache,skipped:report.skipped.length}));
+  const report=await BuildStrictTextures(ownDir,Arg('--output-dir'),{cacheDir:Arg('--cache-dir')});
+  console.log(JSON.stringify({summary:report.summary,cache:report.cache,unprocessedImages:report.summary.unprocessedImages}));
 }

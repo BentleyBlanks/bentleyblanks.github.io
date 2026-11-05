@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import {BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
+import {BuildLegacyPublishFixture as BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
 import {ValidatePublishAssets} from './Script_ValidatePublishAssets.mjs';
 import {PathPattern,ResolvePathRule,ValidatePathRules,ReadPublishModel} from './Script_PublishAssetPaths.mjs';
 import {ASSET_PUBLISH} from './Data_AssetPublish.mjs';

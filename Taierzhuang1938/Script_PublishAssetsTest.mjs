@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
-import {BuildPublishAssets,GlbImageRoles,InspectKtx} from './Script_BuildPublishAssets.mjs';
+import {BuildLegacyPublishFixture as BuildPublishAssets,GlbImageRoles,InspectKtx} from './Script_BuildPublishAssets.mjs';
 import {ValidatePublishAssets} from './Script_ValidatePublishAssets.mjs';
 import {Within,Hash} from './Script_PublishCache.mjs';
 
@@ -15,6 +15,7 @@ try{
  const source=path.join(temporary,'source'),out=path.join(temporary,'out'),cache=path.join(temporary,'cache');
  await fs.mkdir(path.join(source,'Texture'),{recursive:true});await fs.mkdir(path.join(out,'Texture'),{recursive:true});
  for(const file of ['Script_TextureImportBuild.mjs','Script_TextureImportPixels.mjs','Script_TextureImportRules.mjs'])await fs.copyFile(new URL(file,import.meta.url),path.join(source,file));
+ await fs.writeFile(path.join(source,'Data_PublishPathRules.json'),JSON.stringify({version:1,roots:['Model','Texture'],rules:[]}));
  await fs.writeFile(path.join(source,'Data_TextureImportSettings.json'),'{"version":1,"textures":{}}');
  await fs.writeFile(path.join(out,'index.html'),'<script type="importmap">{"imports":{}}</script>');
  const file='Texture_WeaponSteelV2Base.webp',width=128,height=128,data=Buffer.alloc(width*height*4);

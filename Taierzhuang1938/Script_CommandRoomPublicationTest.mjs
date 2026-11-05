@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import {BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
+import {BuildLegacyPublishFixture as BuildPublishAssets} from './Script_BuildPublishAssets.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 const root=path.resolve(import.meta.dirname,'..'),project=path.join(root,'Taierzhuang1938');

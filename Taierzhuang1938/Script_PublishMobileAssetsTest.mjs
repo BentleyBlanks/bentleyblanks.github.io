@@ -23,7 +23,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { BuildPublishAssets } from "./Script_BuildPublishAssets.mjs";
+import { BuildLegacyPublishFixture as BuildPublishAssets } from "./Script_BuildPublishAssets.mjs";
 import { AstcEncoderInfo } from "./Script_AstcEncoder.mjs";
 import { read as ReadKtx, KHR_SUPERCOMPRESSION_ZSTD, VK_FORMAT_ASTC_6x6_SRGB_BLOCK, VK_FORMAT_ASTC_6x6_UNORM_BLOCK, VK_FORMAT_ASTC_4x4_UNORM_BLOCK }
   from "./vendor/three/examples/jsm/libs/ktx-parse.module.js";

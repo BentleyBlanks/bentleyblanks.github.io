@@ -1,8 +1,28 @@
 {
-  "version": 1,
-  "roots": ["Model", "Texture"],
+  "version": 2,
   "rules": [
-    { "path": "Model/**", "format": "auto", "maxSize": 0 },
-    { "path": "Texture/**", "format": "auto", "maxSize": 0 }
+    { "path": "**", "format": "ktx2-bc7", "maxSize": 2048, "quality": 40 },
+    { "path": "**/*.hdr", "format": "hdr", "maxSize": 2048 },
+    { "path": "**/Icon_*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Menu/**", "format": "webp-lossless", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Menu/BootPaper/*Normal*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Menu/BootPaper/*Roughness*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Hud/**", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_CommandRoom*Image.*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_CommandRoomLightingImage.*", "format": "png", "maxSize": 2048, "colorSpace": "linear" },
+    { "path": "Taierzhuang1938/Texture/OxCart/**", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_Terrain*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_Trench*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_OpeningTimber*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_OpeningCrate*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_RuralHouse*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_Paper*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_BunkerPoster*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_*Detail.webp", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Texture/Texture_BloodSplatter*", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Hair/Textures/**", "format": "png", "maxSize": 2048, "colorSpace": "linear" },
+    { "path": "Taierzhuang1938/Heightmap/**", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Scene/**", "format": "webp-lossless", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Animation/**/*.webp", "format": "webp-lossless", "maxSize": 2048 }
   ]
 }

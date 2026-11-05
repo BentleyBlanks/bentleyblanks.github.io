@@ -14,7 +14,7 @@ export function IsPublishedSource(file) {
   return file.startsWith("Taierzhuang1938/") || PUBLISH_SOURCE_PATHS.slice(1).includes(file);
 }
 export function IsPublishedPath(file) {
-  return rootFiles.has(file) || IsPublishedSource(file);
+  return rootFiles.has(file) || IsPublishedSource(file) || /^Model\/StrawSleepingMat\/Model_StrawSleepingMat(?:Flat|Rolled)_Publish[a-f0-9]{24}\.glb$/.test(file);
 }
 export function PublicationHome() {
   return `<!doctype html>
@@ -32,7 +32,9 @@ function Files(dir, relative = "") {
 }
 export function CheckPublication(siteDir) {
   const problems = Files(siteDir).filter(file => !IsPublishedPath(file)).map(file => `不应发布：${file}`);
-  for (const file of ["Taierzhuang1938/index.html", ...PUBLISH_SOURCE_PATHS.slice(1), ...rootFiles]) {
+  const mapFile=path.join(siteDir,'Taierzhuang1938/Data_AssetPublishRuntime.mjs');
+  const models=fs.existsSync(mapFile)?JSON.parse(fs.readFileSync(mapFile,'utf8').match(/=\s*([\s\S]*);\s*$/)[1]):{};
+  for (const file of ["Taierzhuang1938/index.html", ...PUBLISH_SOURCE_PATHS.slice(1).map(file=>models[file]||file), ...rootFiles]) {
     if (!fs.existsSync(path.join(siteDir, file))) problems.push(`发布文件缺失：${file}`);
   }
   if (fs.existsSync(path.join(siteDir, "index.html")) && fs.readFileSync(path.join(siteDir, "index.html"), "utf8") !== PublicationHome())

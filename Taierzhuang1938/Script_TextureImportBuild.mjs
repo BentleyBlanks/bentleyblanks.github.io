@@ -32,6 +32,7 @@ export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRd
   const sharp = require("sharp"), settings = NormalizeImportSettings(input, item);
   const source = await fs.readFile(path.join(projectDir, "Texture", item.file)), meta = await sharp(source).metadata();
   const dimensions = ImportDimensions(meta.width, meta.height, settings.maxSize, settings.npot);
+  if(settings.format.startsWith('ktx2'))for(const key of ['width','height'])dimensions[key]=dimensions[key]>=4?Math.floor(dimensions[key]/4)*4:dimensions[key]===3?2:dimensions[key];
   const colorSpace = ImportColorSpace(settings, item);
   if (!orientations.length || orientations.some(value => typeof value !== 'boolean')) throw new Error('Invalid texture orientations');
   const key = Hash(Buffer.concat([source, Buffer.from(JSON.stringify({ settings, colorSpace, pipeline: 3, uastcRdo, orientations }))])).slice(0, 24);
@@ -48,8 +49,10 @@ export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRd
   if (resized) {
     const raw = { width: meta.width, height: meta.height, channels: 4 };
     if (colorSpace === "linear") {
-      const channels = await Promise.all([0, 1, 2, 3].map(channel => sharp(data, { raw }).extractChannel(channel)
-        .resize(dimensions.width, dimensions.height, { fit: "fill", kernel: settings.resizeFilter }).greyscale().raw().toBuffer()));
+      const channels = await Promise.all([0,1,2,3].map(channel=>{
+        const plane=Buffer.alloc(meta.width*meta.height);for(let i=0;i<plane.length;i++)plane[i]=data[i*4+channel];
+        return sharp(plane,{raw:{width:meta.width,height:meta.height,channels:1}}).resize(dimensions.width,dimensions.height,{fit:'fill',kernel:settings.resizeFilter}).toColourspace('b-w').raw().toBuffer();
+      }));
       data = new Uint8Array(dimensions.width * dimensions.height * 4);
       for (let i = 0; i < channels[0].length; i++) for (let c = 0; c < 4; c++) data[i * 4 + c] = channels[c][i];
     } else data = await sharp(data, { raw }).resize(dimensions.width, dimensions.height, { fit: "fill", kernel: settings.resizeFilter }).raw().toBuffer();

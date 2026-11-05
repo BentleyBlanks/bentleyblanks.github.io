@@ -1,3 +1,19 @@
+# 当前发布规则（2026-11-05）
+
+发布只使用 `Data_PublishPathRules.json` v2：每条为仓库相对路径 `path`、明确的 `format` 和正数 `maxSize`，可附 `quality`、`colorSpace`。最后匹配的规则覆盖前面的字段。没有 `auto`、`source` 或“原图小就不处理”分支。
+
+默认 PC 3D 图片为 KTX2/BC7，最大边长 2048；界面、CPU 读像素、纹理数组、独立数据 Alpha 等路径明确使用 PNG／无损 WebP，上限同为 2048；HDR 明确使用 HDR。规则可按目录或 glob 修改。已有格式和尺寸都符合的 HDR 仍需实际检查。无法执行规则的文件使构建失败，不能静默保留。
+
+扫描整个导出的站点，不再限定 Model／Texture 两个目录；制作源依据根发布排除规则过滤。独立图片、GLB／glTF 内每张图片、外链图、动画目录的模型和两件共用草席全部登记。模型几何、骨骼、动画逐字节核对。格式或尺寸变更只写发布副本。
+
+产物按内容散列命名；运行时 URL 映射、HTML／CSS／数据中的引用同步更新。发布副本移除原始图片和含原图的模型，Git／本地原件保留。`Data_AssetPublishReport.json` v3 是实际产物审计，校验器重新枚举站点并检查来源散列、每张图片实际格式与最大边长、模型内部图片数量、几何不变、原件无残留。任何漏图／超尺寸／格式不符都失败。
+
+入口 `Script_BuildPublishAssets.mjs --output-dir <site>/Taierzhuang1938 --cache-dir <cache>` 调用严格编译器；`Script_ValidatePublishAssets.mjs` 的 CLI 只接受 v3。`BuildLegacyPublishFixture` 仅供历史编码器回归夹具，不参与发布。原单图导入窗口继续用于本地预览；发布格式、尺寸由路径规则统一决定。
+
+验收：`Script_StrictTexturesTest.mjs`（新目录、模型内图、共用模型、尺寸／格式、数据 Alpha、移除原图、漏图失败）、完整真实资产构建及浏览器运行。下文保留早期单图工具和发布实现记录；与本节冲突时以本节为准。
+
+---
+
 # 贴图管理与发布导入
 
 2026-10-03：游戏「高级工具 → 资产 → 贴图管理」打开独立窗口，再次点击复用窗口；关闭游戏编辑器不关闭贴图窗口，也不改变当前编辑器状态。可直接打开 `TextureManager.html`，入口不启动游戏；本地运行 `node scripts/Script_LocalPreview.mjs --no-open` 后访问 `/Taierzhuang1938/TextureManager.html`。

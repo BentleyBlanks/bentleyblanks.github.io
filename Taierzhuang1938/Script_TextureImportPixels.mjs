@@ -3,6 +3,7 @@ const Clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const Byte = value => Math.round(Clamp(value, 0, 255));
 export function TransformImportPixels(input, width, height, settings) {
   const data = new Uint8Array(input), index = { r: 0, g: 1, b: 2, a: 3 };
+  if(settings.swizzle==='rgba'&&settings.alphaSource==='input'&&settings.textureType!=='single'&&!settings.normalFromHeight&&!settings.flipGreen&&!settings.alphaTransparency)return data;
   for (let i = 0; i < data.length; i += 4) {
     const pixel = data.slice(i, i + 4);
     for (let c = 0; c < 4; c++) {

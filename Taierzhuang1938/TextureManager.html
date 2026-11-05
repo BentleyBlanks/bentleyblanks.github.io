@@ -21,6 +21,6 @@
       <label>压缩质量 <output id="qualityValue">85</output><input id="quality" type="range" min="1" max="100" value="85"></label>
       <label>Mipmap<select id="mipmaps"><option value="inherit">沿用当前材质</option><option value="true">开启</option><option value="false">关闭</option></select></label>
       <p id="formatHint" class="hint"></p><p id="restriction" class="hint"></p><button id="preview" type="button" class="primary">重新导入并预览</button><button id="reset" type="button">恢复此图默认设置</button>
-    </form><div class="notes"><h3>发布方式</h3><p>本地保存写入仓库配置，下次 Pages 发布自动应用。在线页面可编辑并导出配置，放回项目后发布。</p><p>WebP / PNG / JPEG 控制文件体积；KTX2 同时提供 GPU 压缩。程序化配方按需预览，暂不参与发布压缩。</p></div></section>
+    </form><div class="notes"><h3>发布方式</h3><p>本页保存单图预览设置。发布图片统一按 Data_PublishPathRules.json 中的路径、格式和最大边长执行。</p><p>WebP / PNG / JPEG 控制文件体积；KTX2 同时提供 GPU 压缩。程序化配方按需预览，暂不参与发布压缩。</p></div></section>
   </main><script type="module" src="./Script_TextureManager.mjs"></script>
 </body></html>

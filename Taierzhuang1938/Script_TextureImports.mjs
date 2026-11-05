@@ -3,17 +3,21 @@ import { TEXTURE_IMPORT_RUNTIME } from "./Data_TextureImportRuntime.mjs";
 import { ASSET_PUBLISH_RUNTIME } from "./Data_AssetPublishRuntime.mjs";
 import { MOBILE_ASSET_RUNTIME } from "./Data_MobileAssetRuntime.mjs";
 
-let renderer, ktxPromise, mobileAssets = null;
+let renderer, ktxPromise, cpuKtxPromise, mobileAssets = null;
+const PublicationBase = new URL('../',import.meta.url);
+function SiteKey(url){try{const value=new URL(url,globalThis.location?.href||import.meta.url);return value.origin===PublicationBase.origin&&value.pathname.startsWith(PublicationBase.pathname)?decodeURIComponent(value.pathname.slice(PublicationBase.pathname.length)):null;}catch{return null;}}
+function SiteUrl(url,output){const original=new URL(url,globalThis.location?.href||import.meta.url),result=new URL(output,PublicationBase);result.search=original.search;result.hash=original.hash;return result.href;}
 export function SetTextureImportRenderer(value) {
   renderer = value;
   mobileAssets = null;
-  THREE.DefaultLoadingManager.setURLModifier((url) => {const entry=TextureImportOf(url);return entry?.managedOnly?url:ResolveTextureImportUrl(url,entry);});
+  THREE.DefaultLoadingManager.setURLModifier((url) => {url=ResolvePublishedModelUrl(url);const entry=TextureImportOf(url);return entry?.managedOnly&&entry.format.startsWith('ktx2')?url:ResolveTextureImportUrl(url,entry);});
 }
 function ReplacePublicationPath(url, before, after) {
   const text=String(url), index=text.lastIndexOf(before);
   return index<0?url:text.slice(0,index)+after+text.slice(index+before.length);
 }
 export function ResolveTextureImportUrl(url, entry = TextureImportOf(url)) {
+  if(entry?.siteRelative){const key=SiteKey(url);return key===entry.publicationOutput||key===entry.publicationUnflipped?url:SiteUrl(url,entry.publicationOutput);}
   if(entry?.publicationFile)return ReplacePublicationPath(url,entry.publicationFile,entry.publicationOutput);
   return entry?.output ? String(url).replace(/Texture\/[^?#]+/, `Texture/${entry.output}`) : url;
 }
@@ -50,11 +54,13 @@ export function MobileTextureImportOf(url, desktop = TextureImportOf(url)) {
 }
 
 export function ResolvePublishedModelUrl(url) {
+  const siteOutput=ASSET_PUBLISH_RUNTIME[SiteKey(url)];if(siteOutput)return SiteUrl(url,siteOutput);
   const match = String(url).match(/(^|\/)(Model\/[^?#]+)/);
   const output = match && ((MobileAssetsActive() && MOBILE_ASSET_RUNTIME.models[match[2]]) || ASSET_PUBLISH_RUNTIME[match[2]]);
   return output ? String(url).replace(match[2], output) : url;
 }
 export function TextureImportOf(url) {
+  const siteEntry=TEXTURE_IMPORT_RUNTIME[SiteKey(url)];if(siteEntry)return siteEntry;
   const pathname = String(url).split(/[?#]/)[0];
   const modelIndex=pathname.lastIndexOf('Model/');
   const entry = (modelIndex>=0 && TEXTURE_IMPORT_RUNTIME[pathname.slice(modelIndex)]) || TEXTURE_IMPORT_RUNTIME[pathname.slice(pathname.lastIndexOf("/Texture/") + 9)]
@@ -90,6 +96,7 @@ export function ImportedSidecarUrl(url, filename) {
   absolute.pathname = absolute.pathname.includes("/Texture/") ? absolute.pathname.replace(/Texture\/.*$/, `Texture/${filename}`) : absolute.pathname.replace(/[^/]+$/, filename.split("/").at(-1));
   absolute.search = ""; return absolute.href;
 }
+export function TextureVariantUrl(url,entry,flipY=true){return flipY?url:entry.siteRelative?SiteUrl(url,entry.publicationUnflipped):entry.publicationFile?ImportedSidecarUrl(url,entry.unflipped):url.replace(/Texture\/[^?]+/,`Texture/${entry.unflipped}`);}
 export async function PrepareImportedTexture(texture, entry, url, sourceFlipY = texture.flipY) {
   if (!entry) return texture;
   if (entry.mipFiles?.length && !texture.isCompressedTexture) {
@@ -122,11 +129,10 @@ export function WriteImportedTexture(texture, data) {
   texture.generateMipmaps = pixels.mipmaps !== false; texture.needsUpdate = true;
 }
 export async function LoadKtxTexture(url, format = "ktx2-uastc") {
-  if (!renderer) throw new Error("Texture importer needs a renderer before GPU texture loading");
-  ktxPromise ??= import("./vendor/three/examples/jsm/loaders/KTX2Loader.js").then(({ KTX2Loader }) =>
+  const MakeLoader=device=>import("./vendor/three/examples/jsm/loaders/KTX2Loader.js").then(({ KTX2Loader }) =>
     new KTX2Loader().setTranscoderPath(new URL("./vendor/three/examples/jsm/libs/basis/", import.meta.url).href)
-      .setWorkerLimit(2).detectSupport(renderer));
-  const loader = await ktxPromise;
+      .setWorkerLimit(2).detectSupport(device));
+  const loader=await(renderer?(ktxPromise??=MakeLoader(renderer)):(cpuKtxPromise??=MakeLoader({extensions:{has:()=>false},capabilities:{isWebGL2:true}})));
   // UASTC auto mode uses ASTC/BC7 or RGBA. Do not silently degrade normal/ORM data
   // to ETC1/DXT1 on older devices. Explicit importer target choices stay available.
   const gpuFormat = format === "ktx2-uastc" ? "high-quality" : format === "ktx2-etc1s" ? "color-compact" : format.slice(5);
@@ -145,7 +151,7 @@ export class ManagedTextureLoader extends THREE.TextureLoader {
     }, onProgress, onError);
     const texture = new THREE.CompressedTexture();
     texture.flipY = false;
-    const sourceUrl = this.importFlipY ? url : entry.publicationFile?ImportedSidecarUrl(url,entry.unflipped):url.replace(/Texture\/[^?]+/, `Texture/${entry.unflipped}`);
+    const sourceUrl = TextureVariantUrl(url,entry,this.importFlipY);
     LoadKtxTexture(sourceUrl, entry.format).then(async loaded => {
       texture.image = loaded.image; texture.mipmaps = loaded.mipmaps;
       texture.format = loaded.format; texture.type = loaded.type;
