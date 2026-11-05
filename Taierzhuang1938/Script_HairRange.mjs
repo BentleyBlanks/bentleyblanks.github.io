@@ -351,6 +351,7 @@ export class HairRange {
       const narrow=innerWidth<=700;
       if(narrow!==this.narrow){this.map.open=!narrow;this.narrow=narrow;}
       if(this.view==='overview')this.radius=CAMERA.overviewRadius*Math.max(1,1.25*innerHeight/innerWidth);
+      this.Cut();
     });
     this.Listen(this.map,'pointerdown',()=>{this.canvasFocused=false;this.EndNavigation();});
     this.Listen(this.map,'click',event=>{const button=event.target.closest('[data-row]');if(button)this.FrameRow(button.dataset.row);});

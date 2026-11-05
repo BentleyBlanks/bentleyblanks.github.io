@@ -109,10 +109,21 @@ try {
   assert.ok(result.theme.background.includes('linear-gradient'),'the standalone lab uses the actual advanced-tools gradient theme');
   if (!detail) {
     await page.screenshot({path:path.join(output,'Scene_ThemedPanel.png')});
-    await page.setViewportSize({width:390,height:720});await Step(5);
+    await page.setViewportSize({width:390,height:720});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await Step(30);
     const bounds=await page.locator('#hair-range-panel').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390&&bounds.y>=300,'narrow layout leaves the upper scene visible');
-    await page.screenshot({path:path.join(output,'Scene_NarrowPanel.png')});
-    await page.setViewportSize(viewport);await Step(5);
+    const narrowShot=await page.screenshot({path:path.join(output,'Scene_NarrowPanel.png')});
+    result.narrow=await page.evaluate(async bytes=>{
+      const bitmap=await createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/png'}));
+      const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+      const ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
+      const data=ctx.getImageData(0,0,180,300).data;let visible=0;
+      for(let i=0;i<data.length;i+=4)if(data[i]+data[i+1]+data[i+2]>30)visible++;
+      return {visible,camera:Taierzhuang.Debug.HairRange.State().camera,far:Taierzhuang.camera.far,size:[Taierzhuang.renderer.domElement.width,Taierzhuang.renderer.domElement.height]};
+    },Array.from(narrowShot));
+    fs.writeFileSync(path.join(output,'Data_NarrowReview.json'),JSON.stringify(result.narrow,null,2));
+    assert.ok(result.narrow.visible>2000,'the narrow viewport actually renders the scene above the drawer');
+    await page.setViewportSize(viewport);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await Step(30);
   }
   const compare = await browser.newPage({viewport:{width:1280,height:720}});
   for (const [key,index] of Object.entries(subjects)) {
