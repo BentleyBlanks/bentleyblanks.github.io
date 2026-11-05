@@ -18,11 +18,12 @@ import { LoadDocument } from "./Script_MeshLoad.mjs";
 import {
   ExternalPropCatalog, InstantiateExternalProp, LoadExternalWorldModels,
 } from "./Script_ExternalProps.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 export class PropLibraryEditor {
   static id = "props";
-  static label = "构件库预览";
-  static hint = "逐项预览场景可布设的全部 Prop、构件与模型";
+  static label = TOOL_INFO.props.label;
+  static hint = TOOL_INFO.props.hint;
 
   constructor(host) {
     this.host = host;

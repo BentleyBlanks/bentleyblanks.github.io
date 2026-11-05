@@ -8,13 +8,12 @@
 import { El } from "./Script_EditorUi.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 /** 编辑一关真实场景的工具：首页上点它们要先选关卡。 */
-const CHAPTER_TOOLS = new Set(["splines", "propPcg"]);
-
 /** 某个工具要先载入什么。返回 null = 不用载入，直接开。 */
 export function HomeLevelChoices(toolId, href) {
-  if (!CHAPTER_TOOLS.has(toolId)) return null;
+  if (!TOOL_INFO[toolId]?.level) return null;
   return PHASES.map((phase, index) => {
     const url = new URL(SandboxUrl(href, null));
     url.searchParams.set("phase", String(index));

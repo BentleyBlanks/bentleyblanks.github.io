@@ -6,13 +6,14 @@
 // 默认进新剧本 01–05（BLOCKOUT_DEFAULT_LEVEL，2026-10-20；旧版第一关在关卡下拉里）。已经在白盒编辑器里时这个按钮显示为当前项，点了不重载。
 
 import { BLOCKOUT_DEFAULT_LEVEL } from "./Script_EditorBlockoutLevels.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const KEEP_PARAMS = ["scale", "audio"];
 
 export class BlockoutEntry {
   static id = "blockout";
-  static label = "白盒关卡编辑器";
-  static hint = "关卡白盒预览：分关卡的纯高度图场景、关键帧敌我布设与去向、俯视图与导航栏（打开后整页切换）";
+  static label = TOOL_INFO.blockout.label;
+  static hint = TOOL_INFO.blockout.hint;
 
   /** 当前页面就是白盒编辑器。 */
   static Active(search = globalThis.location?.search || "") {

@@ -64,6 +64,7 @@ import {
 } from "./Script_TrenchSpline.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const STORE_KEY = "tz1938.sceneSplines.v1";
 const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板存档，读得懂就迁
@@ -391,8 +392,8 @@ export function CollectSceneSplineRoutes(levelId = null, layout = null) {
 
 export class SplineEditor {
   static id = "splines";
-  static label = "场景样条PCG";
-  static hint = "铁路/道路/大街/围墙的样条中心线：预览、拖点、调参、导出（数据仍在各源文件）";
+  static label = TOOL_INFO.splines.label;
+  static hint = TOOL_INFO.splines.hint;
 
   constructor(host) {
     this.host = host;

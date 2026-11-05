@@ -54,8 +54,10 @@ try {
     await CheckMenuResponse(page, deployed);
     await page.click('[data-act="settings"]'); await page.click('[data-setting="sound"]');
     await page.locator('#audio-master').fill('64');
-    await page.getByRole('button', {name: '返回', exact: true}).click();
+    await page.locator('.mnSettingsDetailBody .audioAction', {hasText: '返回'}).click();
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset.setting), 'sound', 'sound page back returns focus to the settings list');
     await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => window.Tengxian.menu.mode), 'title');
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('tengxian1938_audio_v1')).master), .64);
     assert.ok(!requests.some(url => /\/Audio\//.test(url)), 'menu settings/preview do not fetch gameplay sound packs');
     await page.route('**/*whitebox=p012*', route => route.fulfill({contentType: 'text/html', body: '<title>Campaign navigation</title>'}));

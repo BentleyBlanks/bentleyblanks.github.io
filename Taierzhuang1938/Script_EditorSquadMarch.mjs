@@ -4,6 +4,7 @@ import { SQUAD_MARCH as C,SQUAD_MARCH_EDITOR as E,SQUAD_MARCH_PRESETS } from './
 import { SquadMarch,SquadMarchRandom,ValidateSquadMarchConfig } from './Script_SquadMarch.mjs';
 import { InstallSquadMarchActor } from './Script_SquadMarchActor.mjs';
 import { MarkNoPrepass } from './Script_Post.mjs';
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const COLORS={running:'#a7cbe3',starting:'#6f7d88',braking:'#ddb668',resting:'#f2cd75',pausing:'#f2cd75',easing:'#5f8fc4',alert:'#e0675a',
   catchup:'#8bdbc4',waiting:'#efaa80',yielding:'#c49fe1',arrived:'#98c58e'};
@@ -17,8 +18,8 @@ const Angle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 
 export class SquadMarchEditor {
   static id='squadMarch';
-  static label='小队行进';
-  static hint='配置人数、路线与随机样式，预览真实人物的错峰跑停';
+  static label = TOOL_INFO.squadMarch.label;
+  static hint = TOOL_INFO.squadMarch.hint;
   constructor(host){
     this.host=host;this.studio=host.studio;this.cameraMode='studio';
     this.config=ValidateSquadMarchConfig({count:E.count,seed:E.seed,leaderIndex:E.leaderIndex,preset:E.preset,route:Clone(E.route)});

@@ -385,6 +385,12 @@ export const TEXT = Object.freeze({
   "menu.debug.infiniteGrenades.label": "无限手榴弹",
   "menu.debug.infiniteGrenades.note": "普通手榴弹不会消耗；开启时会补给一枚",
 
+  // --- 设置 → 高级工具（右栏列出全部工具，清单在 Data_DevTools.TOOL_MENUS） ------
+  "menu.tools.intro": "开发用的工作台。点下面的工具直接打开；也可以先进高级工具首页再挑。按 ` 随时打开 / 退出。",
+  "menu.tools.open": "打开高级工具",
+  "menu.tools.tag.window": "独立窗口 ↗",
+  "menu.tools.tag.level": "先选关卡",
+
   // --- 设置 → Debug工具（id 与 Data_DevTools.DEBUG_TOOL_IDS 同一套） ------------
   // 开发用的观察工具；打包剔除开发工具后这一页整个不出现。
   "menu.debugTools.intro": "观察正在进行的战局：在这里打开后继续游戏即可边打边看，再点一次关闭。独立窗口类工具会弹出新的浏览器窗口。",

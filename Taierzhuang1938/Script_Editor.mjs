@@ -29,7 +29,7 @@
 // 不许出现任何编辑器痕迹。API 仍然在，测试可以直接调 Open()。
 
 import { El, Panel, Note } from "./Script_EditorUi.mjs";
-import { DEBUG_TOOL_IDS } from "./Data_DevTools.mjs";
+import { DEBUG_TOOL_IDS, TOOL_INFO, TOOL_MENUS as TOOL_MENU_DEFS } from "./Data_DevTools.mjs";
 import { T } from "./Script_Text.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
@@ -87,19 +87,22 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
  * 菜单栏右端的「返回主菜单」按钮不在这张表里，由 BuildDom 单独画。
  * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
  */
-const TOOL_MENUS = [
-  // 场景编辑器打开独立窗口 SceneEditor.html（摆 Scenes/ 场景文件，docs/Data_Scene.md §6），同贴图管理不进互斥表。
-  // 环境（docs/Data_Environment.md）是白盒编辑器右侧的面板：同 Timeline 过场是跳转入口，已在白盒编辑器里就只开面板。
-  { id: "scene", label: "场景", items: [SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor] },
-  // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
-  { id: "level", label: "关卡", items: [BlockoutEntry, TimelineEditor, SquadMarchEditor] },
-  // Mixamo 动作预览同贴图管理一样是独立窗口，不进互斥表（2026-11-01）。
-  { id: "character", label: "角色", items: [ActorEditor, FacialEditor, MixamoPreviewEditor] },
-  { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor] },
-  { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
-  { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
-];
-const WINDOW_TOOLS = new Set([TextureEditor.id, SceneEditorEntry.id, MixamoPreviewEditor.id]);
+// 分组与顺序在 Data_DevTools.TOOL_MENUS（标题菜单的设置页共用），这里只补 id -> 编辑器类。
+// 场景编辑器 / 贴图管理 / Mixamo 动作预览打开独立窗口，白盒关卡编辑器 / 环境 / Timeline 是整页跳转入口，都不进互斥表。
+const TOOL_CLASSES = new Map([
+  SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, SquadMarchEditor,
+  ActorEditor, FacialEditor, MixamoPreviewEditor, WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor,
+  VfxEditor, AudioEditor, PropLibraryEditor, AssetStandardsEditor, TextureEditor,
+].map((Editor) => [Editor.id, Editor]));
+const TOOL_MENUS = TOOL_MENU_DEFS.map((menu) => ({
+  id: menu.id, label: menu.label,
+  items: menu.items.map((id) => {
+    const Editor = TOOL_CLASSES.get(id);
+    if (!Editor) throw new Error(`TOOL_MENUS 里的工具 ${id} 没有对应的编辑器类`);
+    return Editor;
+  }),
+}));
+const WINDOW_TOOLS = new Set(Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].window));
 
 export class EditorSuite {
   /**

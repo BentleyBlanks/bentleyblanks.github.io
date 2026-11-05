@@ -3,3 +3,5 @@
 
 export const DEV_TOOLS_ENABLED = false;
 export const DEBUG_TOOL_IDS = Object.freeze([]);
+export const TOOL_INFO = Object.freeze({});
+export const TOOL_MENUS = Object.freeze([]);

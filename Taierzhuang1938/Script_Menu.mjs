@@ -29,6 +29,7 @@ import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
 import { DRIFT, CAMERA, PRESENTATION } from "./Data_Tuning_Menu.mjs";
 import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
 import { HistoryCodex } from "./Script_HistoryCodex.mjs";
+import { TOOL_INFO, TOOL_MENUS } from "./Data_DevTools.mjs";
 
 /** 主菜单四项与两行标题的内容 id（`menu.<字段>`，译文放 `content.menu.<字段>`）。 */
 function MenuTextId(field) { return `menu.${field}`; }
@@ -217,6 +218,7 @@ export class MainMenu {
     this.selected = 0;             // 选章里选中的关号
     this.itemIndex = 0;            // 主列表里高亮第几项
     this.panelReturnMode = "title";
+    this.settingsSection = "graphics";
     this.target = new THREE.Vector3();
 
     this.el = {};
@@ -686,6 +688,7 @@ export class MainMenu {
     this.SetCommandRoomPreviewUi(false);
     this.ClearSandboxComplete();
     this.DismissConfirm();
+    this.host.CloseSettings?.();
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
@@ -762,11 +765,13 @@ export class MainMenu {
   }
 
   Show(mode) {
+    if (mode === "debug" || mode === "debugTools") { this.settingsSection = mode; mode = "settings"; }
     this.CancelNavigation();
     this.SetCommandRoomPreviewUi(false);
     this.root.classList.toggle("commandRoom", !!this.host.staticBackdrop && this.live);
     const wasMode = this.mode;
     this.mode = mode;
+    if (mode !== "settings") this.host.CloseSettings?.();
     this.RefreshCommandRoomPreview();
     if (mode === "title" || mode === "pause") {
       const title = Localize(MenuTextId("title"), MENU.title);
@@ -779,10 +784,9 @@ export class MainMenu {
     this.el.pauseObjective.hidden = !objective;
     this.el.pauseObjective.scrollTop = 0;
     this.RenderObjectiveProgress(mode === "pause" ? this.host.CurrentObjectiveProgress?.() : null);
-    const panel = ["levels","codex","credits","debug","debugTools","settings"].includes(mode);
+    const panel = ["levels","codex","credits","settings"].includes(mode);
     if (panel && (wasMode === "pause" || wasMode === "title")) this.settingsReturnMode = this.panelReturnMode = wasMode;
-    if (mode === "debug" || mode === "debugTools") this.panelReturnMode = "settings";
-    else if (mode === "settings") this.panelReturnMode = this.settingsReturnMode || "title";
+    if (mode === "settings") this.panelReturnMode = this.settingsReturnMode || "title";
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     this.root.classList.toggle("levelsOn", mode === "levels");
@@ -812,29 +816,122 @@ export class MainMenu {
       this.about.Open();
     } else if (mode === "settings") {
       this.el.panelTitle.textContent = T("menu.item.settings");
-      this.el.panelBody.textContent = "";
-      const list = document.createElement("div"); list.className = "mnSettingsList";
-      // 开发工具两项（Debug工具 / 高级工具）打包剔除后不列：宿主不给 DevToolsAvailable 就没有。
-      const ids = ["graphics","sound","controls","debug"];
-      if (this.host.DevToolsAvailable) ids.push("debugTools","tools");
-      for (const id of ids) {
-        const button = document.createElement("button"); button.type = "button";
-        button.className = "mnSettingsItem";button.dataset.setting = id;
-        button.textContent = T(id === "debug" ? "menu.item.debug" : `menu.settings.${id}`);
-        button.addEventListener("click",()=>id === "debug" || id === "debugTools" ? this.Show(id) : this.host.Settings?.(id));
-        list.appendChild(button);
-      }
-      this.el.panelBody.appendChild(list);
-    } else if (mode === "debug") {
-      this.el.panelTitle.textContent = T("menu.item.debug");
-      this.BuildDebugOptions();
-    } else if (mode === "debugTools") {
-      this.el.panelTitle.textContent = T("menu.settings.debugTools");
-      this.BuildDebugTools();
+      this.BuildSettings();
     }
     if (!panel && (wasMode === "levels" || wasMode === "credits")) {
       this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
     }
+  }
+
+  /**
+   * 设置页：左列表 + 右栏。右栏随左栏选中项切换，不换页、不弹浮窗。
+   * 画面 / 声音 / 操作由宿主（SettingsHost 嵌入模式）画进右栏，其余三项自己画。
+   */
+  BuildSettings() {
+    const body = this.el.panelBody;
+    body.textContent = "";
+    // 开发工具两项（Debug工具 / 高级工具）打包剔除后不列：宿主不给 DevToolsAvailable 就没有。
+    const ids = ["graphics","sound","controls","debug"];
+    if (this.host.DevToolsAvailable) ids.push("debugTools","tools");
+    const list = document.createElement("div"); list.className = "mnSettingsList";
+    for (const id of ids) {
+      const button = document.createElement("button"); button.type = "button";
+      button.className = "mnSettingsItem"; button.dataset.setting = id;
+      button.textContent = this.SettingsLabel(id);
+      button.addEventListener("click", () => this.SelectSettingsSection(id));
+      button.addEventListener("keydown", (event) => {
+        if (!["Enter", " ", "ArrowRight"].includes(event.key) || event.repeat) return;
+        event.preventDefault();
+        this.SelectSettingsSection(id, { focusDetail: true });
+      });
+      list.appendChild(button);
+    }
+    const detail = document.createElement("section"); detail.className = "mnSettingsDetail";
+    const head = document.createElement("h2"); head.className = "mnSettingsDetailHead";
+    const content = document.createElement("div"); content.className = "mnSettingsDetailBody";
+    detail.append(head, content);
+    // 右栏里的按键不往外传（R 之类不落到玩法键位），Esc 例外：交给菜单把焦点收回左栏。
+    detail.addEventListener("keydown", (event) => { if (event.key !== "Escape") event.stopPropagation(); });
+    body.append(list, detail);
+    Object.assign(this.el, { settingsList: list, settingsDetail: detail, settingsHead: head, settingsContent: content });
+    if (!ids.includes(this.settingsSection)) this.settingsSection = "graphics";
+    this.SelectSettingsSection(this.settingsSection, { focusList: true });
+  }
+
+  SettingsLabel(id) { return T(id === "debug" ? "menu.item.debug" : `menu.settings.${id}`); }
+
+  SelectSettingsSection(id, { focusList = false, focusDetail = false } = {}) {
+    const { settingsList: list, settingsHead: head, settingsContent: content } = this.el;
+    if (!list || this.mode !== "settings") return;
+    if (id === this.settingsSection && content.childElementCount) {
+      if (focusList) this.FocusSettingsList();
+      if (focusDetail) this.FocusSettingsDetail();
+      return;
+    }
+    this.settingsSection = id;
+    for (const button of list.children) {
+      const on = button.dataset.setting === id;
+      button.classList.toggle("on", on);
+      if (on) button.setAttribute("aria-current", "true"); else button.removeAttribute("aria-current");
+    }
+    head.textContent = this.SettingsLabel(id);
+    const hosted = ["graphics", "sound", "controls"].includes(id);
+    if (!hosted) this.host.CloseSettings?.();
+    content.textContent = "";
+    content.scrollTop = 0;
+    if (hosted) this.host.Settings?.(id, { mount: content, onBack: () => this.FocusSettingsList() });
+    else if (id === "debug") this.BuildDebugOptions();
+    else if (id === "debugTools") this.BuildDebugTools();
+    else if (id === "tools") this.BuildToolsPane();
+    if (focusList) this.FocusSettingsList();
+    if (focusDetail) this.FocusSettingsDetail();
+  }
+
+  FocusSettingsList() {
+    this.el.settingsList?.querySelector(`[data-setting="${this.settingsSection}"]`)?.focus({ preventScroll: true });
+  }
+
+  FocusSettingsDetail() {
+    const candidates = this.el.settingsContent?.querySelectorAll(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [];
+    [...candidates].find((el) => el.getClientRects().length)?.focus({ preventScroll: true });
+  }
+
+  /** 设置 → 高级工具：把全部工具按分组列出来，点一下直接开。清单在 Data_DevTools（标题菜单不 import 编辑器）。 */
+  BuildToolsPane() {
+    const wrap = document.createElement("div");
+    wrap.className = "mnDebug mnTools";
+    const intro = document.createElement("p"); intro.className = "mnDebugIntro";
+    intro.textContent = T("menu.tools.intro");
+    const open = document.createElement("button"); open.type = "button";
+    open.className = "mnDebugAdvance mnToolsOpen"; open.dataset.action = "openTools";
+    open.textContent = T("menu.tools.open");
+    open.addEventListener("click", () => this.host.Settings?.("tools"));
+    wrap.append(intro, open);
+    for (const group of TOOL_MENUS) {
+      const section = document.createElement("div"); section.className = "mnToolGroup"; section.dataset.group = group.id;
+      const title = document.createElement("h3"); title.className = "mnToolGroupTitle"; title.textContent = group.label;
+      section.appendChild(title);
+      for (const id of group.items) {
+        const info = TOOL_INFO[id];
+        const row = document.createElement("button"); row.type = "button";
+        row.className = "mnDebugRow mnToolItem"; row.dataset.toolId = id;
+        const copy = document.createElement("span"); copy.className = "mnDebugCopy";
+        const name = document.createElement("b"); name.textContent = info.label;
+        const note = document.createElement("small"); note.textContent = info.hint;
+        copy.append(name, note);
+        row.appendChild(copy);
+        const tagKey = info.window ? "window" : info.level ? "level" : null;
+        if (tagKey) {
+          const tag = document.createElement("span"); tag.className = "mnToolTag"; tag.textContent = T(`menu.tools.tag.${tagKey}`);
+          row.appendChild(tag);
+        }
+        row.addEventListener("click", () => this.host.OpenTool?.(id));
+        section.appendChild(row);
+      }
+      wrap.appendChild(section);
+    }
+    this.el.settingsContent.appendChild(wrap);
   }
 
   /** 选章默认落在「继续」那一关上（只在正式章节里挑）。 */
@@ -949,14 +1046,14 @@ export class MainMenu {
       input.addEventListener("change", () => {
         this.host.ToggleDebugTool?.(tool.id);
         this.BuildDebugTools();
-        this.el.panelBody.querySelector(`[data-tool="${tool.id}"] input`)?.focus({ preventScroll: true });
+        this.el.settingsContent.querySelector(`[data-tool="${tool.id}"] input`)?.focus({ preventScroll: true });
       });
       control.append(input, state);
       row.append(copy, control);
       wrap.appendChild(row);
     }
-    this.el.panelBody.textContent = "";
-    this.el.panelBody.appendChild(wrap);
+    this.el.settingsContent.textContent = "";
+    this.el.settingsContent.appendChild(wrap);
   }
 
   BuildDebugOptions() {
@@ -1096,8 +1193,8 @@ export class MainMenu {
       action.addEventListener("click", () => this.host.ContinueCheckpoint?.());
       wrap.appendChild(action);
     }
-    this.el.panelBody.textContent = "";
-    this.el.panelBody.appendChild(wrap);
+    this.el.settingsContent.textContent = "";
+    this.el.settingsContent.appendChild(wrap);
   }
 
   SelectLevel(i, {refresh = false} = {}) {
@@ -1278,8 +1375,7 @@ export class MainMenu {
       case "levels": this.Navigate("levels"); return;
       case "codex": this.Show("codex"); return;
       case "credits": this.Show("credits"); return;
-      case "debug": this.Show("debug"); return;
-      case "debugTools": this.Show("debugTools"); return;
+      case "debug": case "debugTools": this.settingsSection = id; this.Show("settings"); return;
       case "resume": this.host.Resume?.(); return;
       case "settings": this.Show("settings"); return;
       case "exitSandbox": this.host.ExitSandbox?.(); return;
@@ -1349,6 +1445,9 @@ export class MainMenu {
           if (event.repeat) { event.preventDefault(); return; }
           if (this.mode === "credits" && this.about.Back()) { event.preventDefault(); return; }
           if (panel) {
+            if (this.mode === "settings" && this.el.settingsDetail?.contains(document.activeElement)) {
+              this.FocusSettingsList(); event.preventDefault(); return;
+            }
             if (this.mode === "levels") this.BackFromLevels();
             else this.Show(this.panelReturnMode);
             event.preventDefault();
@@ -1366,8 +1465,10 @@ export class MainMenu {
           }
           else if (panel && this.mode === "settings") {
             const choices=[...this.el.panelBody.querySelectorAll(".mnSettingsItem")];
-            const index=choices.indexOf(document.activeElement);
-            choices[(index+delta+choices.length)%choices.length]?.focus();
+            let index=choices.indexOf(document.activeElement);
+            if (index<0) index=choices.findIndex(item=>item.dataset.setting===this.settingsSection);
+            const next=choices[(index+delta+choices.length)%choices.length];
+            if (next) { this.SelectSettingsSection(next.dataset.setting); next.focus(); }
           }
           else if (!panel) {
             this.Highlight(this.itemIndex + delta);

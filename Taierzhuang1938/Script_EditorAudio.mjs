@@ -24,6 +24,7 @@ import { Panel, Section, Slider, Chips, ButtonRow, Button, Facts, Note, ListBox,
   from "./Script_EditorUi.mjs";
 import { SOUND_NAMES, AMBIENCE_PRESETS, MUSIC_CUES } from "./Script_Audio.mjs";
 import { VOICE_LINES } from "./Data_Voice.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 /**
  * 配方 → 「这是什么声音、什么时候响」。
@@ -184,8 +185,8 @@ function FirstError(list) {
 
 export class AudioEditor {
   static id = "audio";
-  static label = "音效音乐";
-  static hint = "全部配方的试听、混音参数与盲听指认";
+  static label = TOOL_INFO.audio.label;
+  static hint = TOOL_INFO.audio.hint;
 
   constructor(host) {
     this.host = host;

@@ -25,6 +25,7 @@ import {
   BasePlacements, ExternalPropCatalog, InstantiateExternalProp,
 } from "./Script_ExternalProps.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const STORE_KEY = "tengxian1938_propPcg_v2";
 const DEFAULT_FAR = 2200;
@@ -72,8 +73,8 @@ function MakeInput(value, onInput) {
 
 export class PropPcgEditor {
   static id = "propPcg";
-  static label = "PCG 撒点";
-  static hint = "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶";
+  static label = TOOL_INFO.propPcg.label;
+  static hint = TOOL_INFO.propPcg.hint;
 
   constructor(host) {
     this.host = host;

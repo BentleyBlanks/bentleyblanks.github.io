@@ -14,6 +14,7 @@ import { WEAPONS, AMMO, LOADOUTS } from "./Data_Weapons.mjs";
 import { MESHES, WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const KIND_LABEL = {
   boltRifle: "栓动步枪", lmg: "轻机枪", hmg: "重机枪", pistol: "手枪",
@@ -88,8 +89,8 @@ function CanPreviewBayonet(id) {
 
 export class WeaponEditor {
   static id = "weapon";
-  static label = "枪械";
-  static hint = "台架 + 数据卡";
+  static label = TOOL_INFO.weapon.label;
+  static hint = TOOL_INFO.weapon.hint;
 
   constructor(host) {
     this.host = host;

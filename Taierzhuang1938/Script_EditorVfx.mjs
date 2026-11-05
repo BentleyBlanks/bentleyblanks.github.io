@@ -18,6 +18,7 @@ import {FlarePreviewField} from './Script_EditorFlareField.mjs';
 import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
 import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
 import {NormalizeFallingSoil,NormalizeSoilPreview} from './Script_FallingSoilRules.mjs';
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const INSTANT_EFFECTS = [
   ...Object.entries(FALLING_SOIL_PRESETS).map(([id,spec])=>({id,name:spec.label,note:spec.note,soil:true})),
@@ -62,8 +63,8 @@ const ALL_EFFECTS = [...CONTINUOUS, ...INSTANT_EFFECTS];
 
 export class VfxEditor {
   static id = "vfx";
-  static label = "特效预览";
-  static hint = "查看火焰、烟雾、爆炸、命中、枪口焰与曳光";
+  static label = TOOL_INFO.vfx.label;
+  static hint = TOOL_INFO.vfx.hint;
 
   constructor(host) {
     this.host = host;

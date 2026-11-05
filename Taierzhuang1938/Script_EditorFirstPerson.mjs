@@ -21,6 +21,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { WeaponShelved } from "./Script_Weapons.mjs";
 import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FPS_ANIMATION_LABELS } from "./Data_FpsSkeletalAnimation.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const MOUNT_NAMES = Object.freeze(["muzzle", "gripR", "gripL", "sight", "magazine"]);
 const MOUNT_STYLE = Object.freeze({
@@ -142,8 +143,8 @@ function RestoreTransform(object, saved) {
 
 export class FirstPersonEditor {
   static id = "firstPerson";
-  static label = "第一人称持枪检查";
-  static hint = "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差、准心校准";
+  static label = TOOL_INFO.firstPerson.label;
+  static hint = TOOL_INFO.firstPerson.hint;
 
   constructor(host) {
     this.host = host;

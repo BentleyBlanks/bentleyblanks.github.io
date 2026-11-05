@@ -68,7 +68,7 @@ import { BLAST_LOOSE_GUN } from "./Data_Tuning_BlastKnockback.mjs";
 import { LooseGunLaunch, LooseGunRod, GunReachPose } from "./Script_LooseGun.mjs";
 import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
 import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
-import { DEV_TOOLS_ENABLED } from "./Data_DevTools.mjs";
+import { DEV_TOOLS_ENABLED, TOOL_INFO } from "./Data_DevTools.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
 import {
   FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
@@ -2455,7 +2455,7 @@ async function Boot() {
       },
     },
     OnOpen: () => audio.SetPaused(true),
-    OnClose: () => FinishSettings(),
+    OnClose: (id, { embedded } = {}) => (embedded ? FinishEmbeddedSettings() : FinishSettings()),
   });
   try {
     ApplySavedSettings(settings.pageHost);
@@ -2666,9 +2666,16 @@ async function Boot() {
       Resume: () => ResumeFromPause(),
       // 画面 / 声音 / 操作走玩家设置页（SettingsHost，关掉回到设置目录，见 FinishSettings）；
       // 「高级工具」是开发工具，走 OpenDevTools。
-      Settings: (section = "tools") => {
+      Settings: (section = "tools", options) => {
         if (section === "tools") OpenDevTools();
-        else if (SETTINGS_PAGE_IDS.includes(section)) settings.Open(section);
+        else if (SETTINGS_PAGE_IDS.includes(section)) settings.Open(section, options);
+      },
+      CloseSettings: () => settings?.Close(),
+      OpenTool: (id) => {
+        if (!editor || !TOOL_INFO[id]) return;
+        if (TOOL_INFO[id].window) { editor.Open(id); return; }
+        OpenDevTools();
+        if (editor.ActiveId !== id && !editor.overlays.has(id)) editor.Toggle(id);
       },
       // 开发工具：剔除后菜单里不列「Debug工具」「高级工具」
       DevToolsAvailable: !!editor,
@@ -2725,7 +2732,7 @@ async function Boot() {
     editor.TogglePanel(true);
     // 首页选了要关卡的工具后整页换过来，带着 ?tool= 直接打开它
     const tool = params.get("tool");
-    if (tool) editor.Open(tool);
+    if (tool) editor.Toggle(tool);
   }
   if (EDITOR_PARAM === "squadMarch" && !SHOT) {
     ShowBoot(false);
@@ -5892,6 +5899,11 @@ function FinishSettings() {
   if (!menu) return;
   if ((menu.settingsReturnMode || "title") !== "pause") audio.SetPaused(false);
   menu.Show("settings");
+}
+
+/** 右栏里嵌入的设置页收起（菜单自己在切分区 / 离开设置页）：只管背景声，菜单层不动。 */
+function FinishEmbeddedSettings() {
+  if (menu && (menu.settingsReturnMode || "title") !== "pause") audio.SetPaused(false);
 }
 
 /** 高级工具首页退出 = 回独立的标题菜单（去掉 editor 与各关卡参数后重载）。 */

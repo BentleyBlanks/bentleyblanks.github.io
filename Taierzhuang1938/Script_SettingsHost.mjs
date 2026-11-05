@@ -19,8 +19,11 @@ export class SettingsHost {
    * @param {object} options
    *   host     设置页要用的系统：renderer / canvas / camera / post / lights / audio / game
    *            （game 至少有 graphics / ApplyGraphics / GraphicsProfile）
-   *   OnOpen   (id) => void   页面打开后
-   *   OnClose  (id) => void   页面关掉后（Esc、× 与页内「返回」都走这里）
+   *   OnOpen   (id, { embedded }) => void   页面打开后
+   *   OnClose  (id, { embedded }) => void   页面关掉后（Esc、× 与页内「返回」都走这里）
+   *
+   * 两种打开方式：Open(id) 是浮窗（#settingsRoot 铺满一屏）；Open(id, { mount }) 是嵌入 ——
+   * 页面画进调用方给的容器（主菜单设置页的右栏），#settingsRoot 保持收起，Esc 交给菜单。
    */
   constructor({ host, OnOpen = null, OnClose = null } = {}) {
     this.host = host;
@@ -28,6 +31,8 @@ export class SettingsHost {
     this.OnClose = OnClose;
     this.active = null;
     this.activeId = null;
+    this.embedded = false;
+    this.onBack = null;
     const root = document.createElement("div");
     root.id = "settingsRoot";
     root.className = "off";
@@ -37,7 +42,7 @@ export class SettingsHost {
     root.addEventListener("keydown", (event) => event.stopPropagation());
     // Esc 关页：捕获阶段先拿，免得菜单把同一下当成「返回上一层」再退一级。
     this._onKeyDown = (event) => {
-      if (!this.active || event.key !== "Escape") return;
+      if (!this.active || this.embedded || event.key !== "Escape") return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (!event.repeat) this.Close();
@@ -50,35 +55,40 @@ export class SettingsHost {
 
   /** 设置页共用的宿主接口；Close 指回这里。 */
   get pageHost() {
-    return { ...this.host, Close: () => this.Close() };
+    return { ...this.host, embedded: this.embedded, Close: () => (this.embedded && this.onBack ? this.onBack() : this.Close()) };
   }
 
-  Open(id) {
+  Open(id, { mount = null, onBack = null } = {}) {
     const Page = SETTINGS_PAGES.find((page) => page.id === id);
     if (!Page) return null;
     if (this.active) this.ExitActive();
+    this.embedded = !!mount;
+    this.onBack = mount ? onBack : null;
     this.active = new Page(this.pageHost);
     this.activeId = id;
-    this.root.classList.remove("off");
+    if (!mount) this.root.classList.remove("off");
     try {
-      this.active.Enter(this.root);
+      this.active.Enter(mount || this.root);
     } catch (error) {
       console.error(`[Settings] ${id} 打不开：`, error);
       this.active = null;
       this.activeId = null;
+      this.embedded = false;
+      this.onBack = null;
       this.root.classList.add("off");
       return null;
     }
-    this.OnOpen?.(id);
+    this.OnOpen?.(id, { embedded: this.embedded });
     return this.active;
   }
 
   Close() {
     if (!this.active) return;
     const id = this.activeId;
+    const embedded = this.embedded;
     this.ExitActive();
     this.root.classList.add("off");
-    this.OnClose?.(id);
+    this.OnClose?.(id, { embedded });
   }
 
   /** 不回调地收起（宿主自己要切到别的层时用，比如暂停里直接「继续」）。 */
@@ -92,6 +102,8 @@ export class SettingsHost {
     try { this.active?.Exit(); } catch (error) { console.error("[Settings] 关闭出错：", error); }
     this.active = null;
     this.activeId = null;
+    this.embedded = false;
+    this.onBack = null;
   }
 
   Update(dt) {

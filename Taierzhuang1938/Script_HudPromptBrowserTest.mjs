@@ -29,8 +29,8 @@ try {
     const T = window.Taierzhuang;
     return {
       active: T.Debug.Editor().settings,
-      rows: document.querySelectorAll("#settingsRoot .edControlRow").length,
-      text: document.querySelector("#settingsRoot .edPanel.work")?.textContent || "",
+      rows: document.querySelectorAll("#menu .mnSettingsDetail .edControlRow").length,
+      text: document.querySelector("#menu .mnSettingsDetail .edPanel.work")?.textContent || "",
     };
   });
   assert.equal(controls.active, "controls");
@@ -38,7 +38,6 @@ try {
   assert.match(controls.text, /拾枪、换枪/);
   assert.match(controls.text, /包扎止血/);
   assert.match(controls.text, /M显示 \/ 隐藏战场地图/);
-  await page.locator('#settingsRoot .edPanel.work .edX').click();
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
   assert.equal(await page.evaluate(() => window.Taierzhuang.menu.open),false,"settings closes back into the live game");
 

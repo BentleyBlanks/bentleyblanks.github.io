@@ -8,6 +8,7 @@ import {
   ReductionPercent, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS,
   ThresholdTriangleTarget, TRIANGLE_RULES,
 } from "./Data_AssetStandards.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const Num = (value) => Number.isFinite(value) ? value.toLocaleString("en-US") : "—";
 
@@ -131,8 +132,8 @@ function RenderRuleCards(parent, group) {
 
 export class AssetStandardsEditor {
   static id = "assetStandards";
-  static label = "资产规范";
-  static hint = "原始/实际面数、减面阈值、目标、贴图策略与合规状态总表";
+  static label = TOOL_INFO.assetStandards.label;
+  static hint = TOOL_INFO.assetStandards.hint;
 
   constructor(host) {
     this.host = host;

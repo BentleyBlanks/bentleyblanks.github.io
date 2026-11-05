@@ -20,6 +20,7 @@ import * as THREE from "three";
 import { Panel, Section, Chips, Toggle, Slider, Facts, Note, ButtonRow } from "./Script_EditorUi.mjs";
 import { InjectDepthPull } from "./Script_Post.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -94,8 +95,8 @@ class LineLayer {
 
 export class FirstPersonMotionEditor {
   static id = "fpMotion";
-  static label = "第一人称持枪移动检查";
-  static hint = "玩法照跑，画面换到玩家身旁的外部机位，看第一人称看不到的腿脚、身体朝向、枪和双手的实际位置；J 换机位、K 慢放、L 切回第一人称";
+  static label = TOOL_INFO.fpMotion.label;
+  static hint = TOOL_INFO.fpMotion.hint;
   /** 关掉高级工具（回去走动开枪）时不收：这个工具就是边玩边看的。停它：再点一次菜单项或面板的 ×。 */
   static keepOnClose = true;
 

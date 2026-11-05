@@ -5,14 +5,16 @@
 // 动作库在 Animation/Mixamo（GLB + Data_MixamoLibrary.json），源 FBX 与自制动作的 .blend 在 _import/Mixamo。
 // 整理与下载流程见 _import/Script_MixamoLibraryFetch.mjs、_import/Data_MixamoLibraryCurate.mjs。
 
+import { TOOL_INFO } from "./Data_DevTools.mjs";
+
 export class MixamoPreviewEditor {
   static id = "mixamoPreview";
-  static label = "Mixamo 动作预览";
-  static hint = "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，挂项目的步枪、手榴弹、大刀、担架";
+  static label = TOOL_INFO.mixamoPreview.label;
+  static hint = TOOL_INFO.mixamoPreview.hint;
   static win = null;
   static Open() {
     if (!this.win || this.win.closed) {
-      this.win = window.open(new URL("./Tool_MixamoAnimationPreview.html", import.meta.url), "TengxianMixamoPreview", "popup,width=1600,height=1000");
+      this.win = window.open(new URL(TOOL_INFO.mixamoPreview.window.url, import.meta.url), TOOL_INFO.mixamoPreview.window.name, TOOL_INFO.mixamoPreview.window.features);
     }
     if (!this.win) throw new Error("动作预览窗口被拦截，请允许弹窗后重试");
     this.win.focus();

@@ -27,7 +27,7 @@ try {
   result.title = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom().presentation);
   for (const mode of ["levels", "codex", "credits", "settings"]) {
     await page.evaluate(m => window.Taierzhuang.menu.Show(m), mode);
-    await Settled(mode);
+    await Settled(mode === "settings" ? "graphics" : mode);
     if (mode === "levels") await page.waitForFunction(() => [...document.querySelectorAll(".mnPanel img")].filter(i => i.offsetParent).every(i => i.complete && i.naturalWidth));
     const sharpUi = await page.locator(mode === "codex" ? ".hcHeader h1" : ".mnPanelTitle").evaluate(el => {
       const styles = [];
@@ -71,14 +71,16 @@ try {
   });
   await page.getByRole("button", { name: "试听音效", exact: true }).click();
   assert.equal(await page.evaluate(() => window.previewCue), "rifleNra");
-  await page.keyboard.press("Escape"); await Settled("settings");
-  assert.equal(await page.locator(".audioSettings").count(), 0);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.setting), "sound", "Escape inside the right pane returns focus to the list");
   for (const mode of ["graphics", "controls"]) {
     await page.click(`[data-setting="${mode}"]`); await Settled(mode);
-    await page.keyboard.press("Escape"); await Settled("settings");
+    assert.equal(await page.locator(".audioSettings").count(), 0);
   }
-  await page.click('[data-setting="debug"]'); await Settled("debug");
+  await page.click('[data-setting="debug"]'); await Settled("settings");
+  await page.locator(".mnSettingsDetailBody input").first().focus();
   await page.keyboard.press("Escape"); await Settled("settings");
+  assert.equal(await page.evaluate(() => window.Taierzhuang.menu.mode), "settings");
   await page.keyboard.press("Escape"); await Settled("title");
   result.returned = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom().presentation);
   await page.reload({ timeout: 120000 }); await WaitRoom();
@@ -103,7 +105,8 @@ try {
   assert.ok(!mobile.overflow && mobile.fits && mobile.controls.every(h => h >= 44), "Phone layout must retain visible actions and usable controls");
   await page.locator("#audio-ambience").fill("36");
   assert.equal(await page.evaluate(() => window.Taierzhuang.audio.mix.ambience), .36);
-  await page.getByRole("button", { name: "返回", exact: true }).click(); await Settled("settings");
+  await page.locator(".audioAction", { hasText: "返回" }).click();
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.setting), "sound");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.keyboard.press("Escape"); await Settled("title");
   result.mobile = mobile;

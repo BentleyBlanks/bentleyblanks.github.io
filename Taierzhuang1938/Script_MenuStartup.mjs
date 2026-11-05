@@ -8,7 +8,7 @@ import {BootPaper} from './Script_BootPaper.mjs';
 import {AudioEngine} from './Script_Audio.mjs';
 import {ApplySavedSettings, NormalizeGraphicsDetails} from './Script_EditorSettings.mjs';
 import {SettingsHost, SETTINGS_PAGE_IDS} from './Script_SettingsHost.mjs';
-import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS} from './Data_DevTools.mjs';
+import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS, TOOL_INFO} from './Data_DevTools.mjs';
 import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
 import { CreateGameGraphics } from './Script_Tuning_GameGraphics.mjs';
@@ -55,17 +55,29 @@ let menu, frameId = 0;
 // 画面 / 声音 / 操作三页：与游戏宿主共用 Script_SettingsHost，这里只管藏菜单与背景声。
 const settings = new SettingsHost({
   host: {renderer, camera, canvas, audio, post: null, game: {graphics, GraphicsProfile: graphicsProfile, ApplyGraphics() {}}},
-  OnOpen: () => { menu.root.classList.add('off'); audio.SetPaused(true); },
-  OnClose: () => { audio.SetPaused(false); menu?.root.classList.remove('off'); menu?.Show('settings'); },
+  OnOpen: (id, {embedded} = {}) => { if (!embedded) menu.root.classList.add('off'); audio.SetPaused(true); },
+  OnClose: (id, {embedded} = {}) => {
+    audio.SetPaused(false);
+    if (embedded) return;
+    menu?.root.classList.remove('off'); menu?.Show('settings');
+  },
 });
 ApplySavedSettings(settings.pageHost);
 const room = new CommandRoom(renderer, {isActive: () => !!menu?.open || settings.IsOpen,
   getMenuMode: () => settings.ActiveId || menu?.mode || 'title'});
 const previewValue = params.get('menuPreview');
 const preview = new CommandRoomPreview(room, () => Progress.Read(), /^[0-6]$/.test(previewValue ?? '') ? Number(previewValue) : null);
-function OpenSettings(id) {
+function OpenSettings(id, options) {
   if (id === 'tools') return OpenTools();
-  if (SETTINGS_PAGE_IDS.includes(id)) settings.Open(id);
+  if (SETTINGS_PAGE_IDS.includes(id)) settings.Open(id, options);
+}
+// 设置页右栏里点的工具：独立窗口工具就地弹窗、留在设置页；弹窗被拦或不是窗口类工具，整页换到高级工具并直接打开它。
+function OpenTool(id) {
+  if (!DEV_TOOLS_ENABLED || !TOOL_INFO[id]) return;
+  const win = TOOL_INFO[id].window;
+  if (win && window.open(new URL(win.url, location.href), win.name, win.features)) return;
+  const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('editor', 'tools'); url.searchParams.set('tool', id);
+  location.assign(url.href);
 }
 // 高级工具要游戏宿主：标题菜单不装编辑器，点了才带 editor=tools 换到游戏入口。剔除开发工具后不响应。
 // 不带关卡参数 = 工具首页：不建任何关卡，等人自己选工具（Data_ToolsHome）。
@@ -107,7 +119,7 @@ await preview.Load();
 menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdrop: true,
   campaign: CAMPAIGN_ENTRIES, sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE, BATTLE_REACTION_RANGE_PHASE, CLOTH_RANGE_PHASE, HAIR_RANGE_PHASE],
   CommandRoomPreview: () => preview.State(), PreviewCommandRoom, PrepareBackdrop: () => preview.Load(),
-  SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings,
+  SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings, CloseSettings: () => settings.Close(), OpenTool,
   DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,
   PlaySandbox: GoToSandbox, ExitSandbox: () => GoToSandbox(null), Play: StartLevel,
   DebugOptions: () => debugOptions.Get(), SetDebugOption: (id, enabled) => debugOptions.Set(id, enabled),

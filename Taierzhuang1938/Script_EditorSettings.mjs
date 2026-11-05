@@ -665,7 +665,7 @@ export class AudioSettings {
     });
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
-    this.controls?.[0]?.input.focus({ preventScroll: true });
+    if (!this.host.embedded) this.controls?.[0]?.input.focus({ preventScroll: true });
     return this;
   }
 

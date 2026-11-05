@@ -3,13 +3,14 @@
 // 已经在白盒编辑器里：直接开面板，不重载；否则整页跳到 ?editor=blockout&level=<默认段>&env=1。
 
 import { BLOCKOUT_DEFAULT_LEVEL } from "./Script_EditorBlockoutLevels.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const KEEP_PARAMS = ["scale", "audio", "quality"];
 
 export class EnvironmentEntry {
   static id = "environment";
-  static label = "环境";
-  static hint = "组件式环境：区域（兜底 / 局部）、预设（主光 / 环境光 / 天空 / 雾……）、昼夜时间轴（打开后整页切到白盒编辑器）";
+  static label = TOOL_INFO.environment.label;
+  static hint = TOOL_INFO.environment.hint;
 
   static Url(href = globalThis.location?.href || "") {
     const current = new URL(href);

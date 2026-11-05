@@ -22,6 +22,7 @@ import {
   TIMELINES, DEFAULT_TIMELINE_ID, FindTimeline, TIMELINE_FPS, TIMELINE_LINE_FALLBACK_S,
   TimelineAsPreviz, ValidateTimeline, TimelineLayout, TimelineTracks, TracksAt, LocateTime, FormatTimecode,
 } from "./Script_TimelinePlan.mjs";
+import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const KEEP_PARAMS = ["scale", "audio", "quality"];
 const POLL_MS = 2000;
@@ -30,8 +31,8 @@ const FRAME_S = 1 / TIMELINE_FPS;
 /** 菜单入口（静态，不进互斥编辑器表）。 */
 export class TimelineEditor {
   static id = "timeline";
-  static label = "Timeline 过场";
-  static hint = "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）";
+  static label = TOOL_INFO.timeline.label;
+  static hint = TOOL_INFO.timeline.hint;
 
   /** 目标地址：?editor=blockout&level=<关卡>&kf=<第一段>&timeline=<Id>，只带上规模 / 音频 / 画质。 */
   static Url(href = globalThis.location?.href || "", id = DEFAULT_TIMELINE_ID) {

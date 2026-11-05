@@ -527,37 +527,62 @@
 .mnCampaignBack,.mnBack { font-weight:400;font-size:var(--menu-font-body);letter-spacing:.1em;padding-left:0;color:#d5d4ca; }
 .mnText,.mnDebug { padding:3vh 5.1%;color:#c9c9be;font-size:var(--menu-font-body); }
 .mnText h4 { font-family:var(--ui-title-font);font-size:var(--menu-font-section);font-weight:500; }
-.mnSettingsList { padding:4vh 5.1%;width:min(560px,70vw);min-height:0;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;gap:1vh; }
+.mnSettingsList { flex:0 0 clamp(210px,23vw,330px);box-sizing:border-box;padding:4vh 1.6vw 4vh 5.1%;min-height:0;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;gap:1vh; }
 .mnSettingsItem { appearance:none;cursor:pointer;text-align:left;background:none;color:#c6c7bd;border:0;border-left:4px solid transparent;
   font:400 var(--menu-font-nav)/1.6 var(--ui-font);padding:7px 24px;letter-spacing:.16em;min-height:48px; }
-.mnSettingsItem:hover,.mnSettingsItem:focus-visible { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);border-left-color:#edca83;outline:none; }
-/* 玩家设置页（Script_SettingsHost）画在 #settingsRoot：与开发工具的 #settingsRoot 分开，打包剔除工具不影响这里。 */
+.mnSettingsItem:hover,.mnSettingsItem:focus-visible,.mnSettingsItem.on { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);border-left-color:#edca83;outline:none; }
+#menu .mnSettingsItem:focus-visible { outline:none;background:linear-gradient(90deg,#e6dfc55c,#bbb7a924);box-shadow:inset 0 0 0 1px #edca8333; }
+.mnSettingsDetail { flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;margin:3vh 5.1% 2vh 0;padding-left:3vw;border-left:1px solid #c1bdab40;color:#c9c9be; }
+.mnSettingsDetailHead { flex:0 0 auto;margin:0;padding:0 0 14px;font:700 var(--menu-font-heading)/1.3 var(--ui-title-font);letter-spacing:.10em;color:#eeeee7;border-bottom:1px solid #c1bdab55; }
+.mnSettingsDetailBody { flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;padding:6px 1vw 4vh 0;scroll-padding-bottom:96px; }
+.mnSettingsDetailBody:has(.audioFooter) { padding-bottom:0; }
+.mnSettingsDetailBody .mnDebug { flex:none;overflow:visible;padding:0; }
+.mnSettingsDetailBody .mnDebugIntro { margin-top:12px; }
+.mnToolsOpen { margin:0 0 6px;min-height:44px;font-size:var(--menu-font-body);letter-spacing:.1em; }
+.mnToolGroup { margin-top:20px; }
+.mnToolGroupTitle { margin:0 0 6px;padding:0 0 10px;border-bottom:1px solid var(--ui-line);font:400 var(--menu-font-section)/1.4 var(--ui-title-font);letter-spacing:.08em;color:var(--ui-gold); }
+.mnToolItem { appearance:none;width:100%;box-sizing:border-box;text-align:left;background:transparent;border-width:1px 0 0;border-style:solid;border-color:rgba(214,217,209,.10);color:inherit;font:inherit; }
+.mnToolItem:focus-visible { outline:2px solid var(--ui-gold);outline-offset:-2px; }
+.mnToolTag { flex:0 0 auto;padding:3px 9px;border:1px solid #c1bdab55;font-size:var(--menu-font-small);letter-spacing:.08em;color:#c4b58d; }
+/* 玩家设置页（Script_SettingsHost）：浮窗模式画在 #settingsRoot，嵌入模式画进设置页右栏 .mnSettingsDetail，两处共用同一套控件样式。 */
 body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
-#settingsRoot .edPanel.work { inset:6vh 5.1% 6vh;width:auto;max-width:none;border:0;background:linear-gradient(90deg,#080907f5,#11120ede 64%,#14150cb8);box-shadow:none;backdrop-filter:none; }
-#settingsRoot .edHead { padding:2vh 3vw 2.5vh;background:none;border-bottom:1px solid #c1bdab55; }
-#settingsRoot .edTitle { font-family:var(--ui-title-font);font-size:var(--menu-font-page);letter-spacing:.10em;color:#eeeee7; }
-#settingsRoot .edBody { padding:2vh 3vw;max-width:1000px; }
-#settingsRoot .edSection>.h { font-size:var(--menu-font-section);font-weight:400;padding:16px 0 12px; }
-#settingsRoot .edRow { margin:12px 0;gap:20px; }
-#settingsRoot .edRow>.l { flex-basis:160px;font-size:var(--menu-font-body);color:#c8c8bd; }
-#settingsRoot .edBtn,#settingsRoot .edChip { font-size:14px;min-height:34px;background:#17191355;border-color:#c1bdab40; }
-#settingsRoot .edControlRow span { font-size:var(--menu-font-meta); }
-#settingsRoot .edControlRow kbd { font-size:var(--menu-font-small); }
+:is(#settingsRoot, .mnSettingsDetail) .edPanel.work { inset:6vh 5.1% 6vh;width:auto;max-width:none;border:0;background:linear-gradient(90deg,#080907f5,#11120ede 64%,#14150cb8);box-shadow:none;backdrop-filter:none; }
+:is(#settingsRoot, .mnSettingsDetail) .edHead { padding:2vh 3vw 2.5vh;background:none;border-bottom:1px solid #c1bdab55; }
+:is(#settingsRoot, .mnSettingsDetail) .edTitle { font-family:var(--ui-title-font);font-size:var(--menu-font-page);letter-spacing:.10em;color:#eeeee7; }
+:is(#settingsRoot, .mnSettingsDetail) .edBody { padding:2vh 3vw;max-width:1000px; }
+:is(#settingsRoot, .mnSettingsDetail) .edSection>.h { font-size:var(--menu-font-section);font-weight:400;padding:16px 0 12px; }
+:is(#settingsRoot, .mnSettingsDetail) .edRow { margin:12px 0;gap:20px; }
+:is(#settingsRoot, .mnSettingsDetail) .edRow>.l { flex-basis:160px;font-size:var(--menu-font-body);color:#c8c8bd; }
+:is(#settingsRoot, .mnSettingsDetail) .edBtn,:is(#settingsRoot, .mnSettingsDetail) .edChip { font-size:14px;min-height:34px;background:#17191355;border-color:#c1bdab40; }
+:is(#settingsRoot, .mnSettingsDetail) .edControlRow span { font-size:var(--menu-font-meta); }
+:is(#settingsRoot, .mnSettingsDetail) .edControlRow kbd { font-size:var(--menu-font-small); }
+#menu .mnSettingsDetail .edPanel.work { position:static;inset:auto;display:block;width:auto;max-width:none;height:auto;border:0;background:none;box-shadow:none;backdrop-filter:none; }
+#menu .mnSettingsDetail .edPanel.work .edHead { display:none; }
+#menu .mnSettingsDetail .edPanel.work .edBody { overflow:visible;max-width:none;padding:0; }
+#menu .mnSettingsDetail .edPanel.audioSettings .edBody { padding:16px 0 28px;gap:3vw; }
+#menu .mnSettingsDetail .audioFooter { position:sticky;bottom:0;z-index:1;margin:0;background:#0d0e0b; }
 @media(max-width:760px){
  .mnPanelHead{min-height:15vh}.mnPanelHead::after{display:none}.mnCampaignMain{grid-template-columns:1fr;gap:20px;overflow-y:auto}
- .mnSettingsList{width:80vw}.mnLevelList{max-height:40vh;flex-shrink:0}.mnLevel{min-height:44px}.mnText{font-size:14px}.mnCodexRow{grid-template-columns:1fr;gap:3px}
- #settingsRoot .edRow>.l{flex-basis:110px;font-size:13px}
+ #menu.panelOn .mnPanelBody:has(.mnSettingsDetail){flex-direction:column}
+ .mnSettingsList{flex:0 0 auto;width:auto;padding:1.5vh 5.1%;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px}
+ .mnSettingsItem{flex:0 0 auto;min-height:44px;padding:4px 14px;letter-spacing:.08em;border-left:0;border-bottom:3px solid transparent;font-size:var(--menu-font-body);white-space:nowrap}
+ .mnSettingsItem:hover,.mnSettingsItem:focus-visible,.mnSettingsItem.on{border-bottom-color:#edca83}
+ .mnSettingsDetail{flex:1 1 0;margin:0 5.1% 1vh;padding-left:0;border-left:0;border-top:1px solid #c1bdab40}
+ .mnSettingsDetailHead{padding:12px 0 10px;font-size:var(--menu-font-section)}
+ .mnSettingsDetailBody{padding-right:0}
+ #menu .mnSettingsDetail .audioFooter{padding:9px 0}.mnLevelList{max-height:40vh;flex-shrink:0}.mnLevel{min-height:44px}.mnText{font-size:14px}.mnCodexRow{grid-template-columns:1fr;gap:3px}
+ :is(#settingsRoot, .mnSettingsDetail) .edRow>.l{flex-basis:110px;font-size:13px}
 }
 
 /* Player audio settings: shared menu typography, grouped controls and contextual help. */
-#settingsRoot .edPanel.audioSettings { inset:6vh 5.1%;width:auto;max-width:none;border:0;
+:is(#settingsRoot, .mnSettingsDetail) .edPanel.audioSettings { inset:6vh 5.1%;width:auto;max-width:none;border:0;
   color:#deddd2;background:linear-gradient(90deg,#080907eb,#11120ed6 65%,#14150cab);box-shadow:none;backdrop-filter:none;
   font-family:var(--ui-font);font-weight:400; }
-#settingsRoot .audioSettings .edHead { position:relative;padding:42px 3vw 22px;background:none;border-bottom:1px solid #c1bdab55; }
-#settingsRoot .audioSettings .edTitle { font:700 var(--menu-font-page)/1.3 var(--ui-title-font);letter-spacing:.1em;color:#eeeee7; }
-#settingsRoot .audioSettings .edSub { position:absolute;grid-area:auto;top:16px;left:3vw;font-size:12px;letter-spacing:.18em;color:#aaa99b; }
-#settingsRoot .audioSettings .edX { font-size:27px;color:#bbbbae;background:none;border:0; }
-#settingsRoot .audioSettings .edBody { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr);align-items:start;gap:5vw;
+:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { position:relative;padding:42px 3vw 22px;background:none;border-bottom:1px solid #c1bdab55; }
+:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edTitle { font:700 var(--menu-font-page)/1.3 var(--ui-title-font);letter-spacing:.1em;color:#eeeee7; }
+:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edSub { position:absolute;grid-area:auto;top:16px;left:3vw;font-size:12px;letter-spacing:.18em;color:#aaa99b; }
+:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edX { font-size:27px;color:#bbbbae;background:none;border:0; }
+:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr);align-items:start;gap:5vw;
   max-width:none;min-height:0;padding:24px 3vw 30px;overflow:auto; }
 .audioOptions { min-width:0; }
 .audioGroup { margin:0 0 8px;padding:0 18px 12px;border-bottom:1px solid #c1bdab30;
@@ -568,13 +593,13 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 .audioRow.selected { border-left-color:#edca83;background:linear-gradient(90deg,#d8d4c324,#bbb7a906);color:#edca83; }
 .audioLabel { font-size:var(--menu-font-body);letter-spacing:.055em;cursor:pointer; }
 .audioValue { font-size:14px;font-variant-numeric:tabular-nums;text-align:right;color:#deddd2; }
-#settingsRoot .audioRange { appearance:none;width:100%;height:44px;margin:0;cursor:pointer;background:transparent;outline:none; }
-#settingsRoot .audioRange::-webkit-slider-runnable-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
-#settingsRoot .audioRange::-moz-range-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
-#settingsRoot .audioRange::-webkit-slider-thumb { appearance:none;width:7px;height:17px;margin-top:-7px;border:0;border-radius:1px;background:#e4d9bb; }
-#settingsRoot .audioRange::-moz-range-thumb { width:7px;height:17px;border:0;border-radius:1px;background:#e4d9bb; }
-#settingsRoot .audioRange:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
-#settingsRoot .audioRange:focus-visible::-moz-range-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange { appearance:none;width:100%;height:44px;margin:0;cursor:pointer;background:transparent;outline:none; }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange::-webkit-slider-runnable-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange::-moz-range-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange::-webkit-slider-thumb { appearance:none;width:7px;height:17px;margin-top:-7px;border:0;border-radius:1px;background:#e4d9bb; }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange::-moz-range-thumb { width:7px;height:17px;border:0;border-radius:1px;background:#e4d9bb; }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
+:is(#settingsRoot, .mnSettingsDetail) .audioRange:focus-visible::-moz-range-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
 .audioSwitch { justify-self:end;width:116px;min-height:38px;border:1px solid #c1bdab40;background:#13140b44;color:#a7a89e;
   font:inherit;font-size:14px;letter-spacing:.12em;cursor:pointer; }
 .audioSwitch[aria-checked="true"] { color:#e6cb91;border-color:#cdb77b88; }
@@ -592,14 +617,14 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 .audioAction:hover { color:#ffe0a1; }
 .audioSave { margin-left:auto;color:#979c8d;font-size:12px;letter-spacing:.08em; }
 @media(max-width:900px){
- #settingsRoot .audioSettings .edBody { gap:24px;grid-template-columns:minmax(0,1.7fr) minmax(170px,1fr); }
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { gap:24px;grid-template-columns:minmax(0,1.7fr) minmax(170px,1fr); }
  .audioRow { grid-template-columns:minmax(100px,1fr) minmax(90px,1fr) 42px;gap:10px;padding:0 10px; }
  .audioLabel { font-size:14px; }.audioValue{font-size:12px}.audioDetail p{font-size:13px}
 }
 @media(max-width:640px){
- #settingsRoot .edPanel.audioSettings { inset:3vh 4%; }
- #settingsRoot .audioSettings .edHead { padding-top:36px;padding-bottom:15px; }
- #settingsRoot .audioSettings .edBody { display:block;padding-top:16px; }
+ :is(#settingsRoot, .mnSettingsDetail) .edPanel.audioSettings { inset:3vh 4%; }
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { padding-top:36px;padding-bottom:15px; }
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { display:block;padding-top:16px; }
  .audioRow { min-height:58px; }.audioGroup:not(:first-child){margin-top:20px}
  .audioDetail { min-height:0;margin-top:24px;padding:20px 10px 0;border-left:0;border-top:1px solid #c1bdab30; }
  .audioDetail h2{margin:12px 0 8px;font-size:22px}.audioDefault{margin-top:16px;padding-top:12px}
@@ -607,9 +632,9 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
  .audioSave{width:100%;margin:0;font-size:10px;padding-bottom:3px}
 }
 @media(max-height:650px) and (min-width:641px){
- #settingsRoot .audioSettings .edHead { padding-top:30px;padding-bottom:10px; }.audioRow{min-height:47px}
- #settingsRoot .audioSettings .edSub {top:9px}.audioGroup:not(:first-child){margin-top:14px}
- #settingsRoot .audioSettings .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { padding-top:30px;padding-bottom:10px; }.audioRow{min-height:47px}
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edSub {top:9px}.audioGroup:not(:first-child){margin-top:14px}
+ :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
 }
 @media(prefers-reduced-motion:reduce){.audioRow{transition:none}}
 

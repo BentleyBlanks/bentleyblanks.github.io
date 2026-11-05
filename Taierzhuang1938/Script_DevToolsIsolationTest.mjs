@@ -128,12 +128,14 @@ if (process.argv.includes("--browser")) {
       const entries = await page.evaluate(() => [...document.querySelectorAll("[data-setting]")].map((el) => el.dataset.setting));
       Check(`${fixture.name}：设置目录只剩玩家设置与调试选项`, entries.join(",") === "graphics,sound,controls,debug", entries.join(","));
       await page.click('[data-setting="graphics"]');
-      const opened = await page.evaluate(() => ({ visible: !document.getElementById("settingsRoot")?.classList.contains("off"),
-        title: document.querySelector("#settingsRoot .edTitle")?.textContent }));
-      Check(`${fixture.name}：画面设置能打开`, opened.visible && !!opened.title, JSON.stringify(opened));
+      const opened = await page.evaluate(() => ({ embedded: !!document.querySelector(".mnSettingsDetailBody .edPanel.work"),
+        floating: !document.getElementById("settingsRoot")?.classList.contains("off"),
+        head: document.querySelector(".mnSettingsDetailHead")?.textContent,
+        title: document.querySelector(".mnSettingsDetailBody .edTitle")?.textContent }));
+      Check(`${fixture.name}：画面设置在右栏里打开`, opened.embedded && !opened.floating && opened.head === "画面" && !!opened.title, JSON.stringify(opened));
       await page.keyboard.press("Escape");
-      Check(`${fixture.name}：Esc 关设置回到设置目录`, await page.evaluate(() => window.Tengxian.Debug.Menu().mode === "settings"
-        && document.getElementById("settingsRoot").classList.contains("off")));
+      Check(`${fixture.name}：Esc 退出设置并收起嵌入的设置页`, await page.evaluate(() => window.Tengxian.Debug.Menu().mode !== "settings"
+        && window.Tengxian.Debug.Editor().settings === null && document.getElementById("settingsRoot").classList.contains("off")));
       await page.keyboard.press("Backquote");
       Check(`${fixture.name}：\` 不再打开任何工具`, await page.evaluate(() => !document.getElementById("edRoot") && !/editor=tools/.test(location.search)));
       Check(`${fixture.name}：没有页面错误`, errors.length === 0, errors.slice(0, 3).join(" | "));
