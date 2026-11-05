@@ -8494,8 +8494,137 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.7,
+            "dadaoBodyCm": {
+              "RightForeArm": 1.5
+            },
+            "dadaoSnapDeg": 5.1
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 1.7
+            },
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 –→1.2 mm、–→1.7 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–27 帧：手腕最多移 7.1 cm、手掌最多转 25.2°（其中绕掌心法线摆正手指方向最多 0.0°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 3.2 mm；左手松开的帧保持原动作）",
+            "右手 第 1–27 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–27 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 43°、中指 19°、无名指 20°、小指 21°、拇指 28°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 3.8,
+                "Index": 0,
+                "Middle": 1,
+                "Ring": 0,
+                "Pinky": 1.7
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 3.7,
+                "Index": 0,
+                "Middle": 1,
+                "Ring": 0,
+                "Pinky": 1.7
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 1.2,
+                "Middle": 0,
+                "Ring": 0.2,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordImpact_V2.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordIdle_V1.glb",
@@ -8511,7 +8640,156 @@
       "replaces": "Melee 大刀（双手刀顶替）",
       "mixamoId": "c9cc7140-b96c-11e4-a802-0aaa78deedf9",
       "hold": "拿着别的",
-      "prop": "大刀"
+      "prop": "大刀",
+      "fixes": [
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.1,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 0.1
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 12.9→2 mm、7.9→2.8 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–61 帧：手腕最多移 1.5 cm、手掌最多转 27.7°（其中绕掌心法线摆正手指方向最多 11.5°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 4.3 mm；左手松开的帧保持原动作）",
+            "右手 第 1–61 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–61 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 62°、中指 40°、无名指 19°、小指 77°、拇指 38°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 9.4,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.9,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.9,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.5,
+                "Middle": 0,
+                "Ring": 1.5,
+                "Pinky": 12.9
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 1.8,
+                "Index": 2.2,
+                "Middle": 2.8,
+                "Ring": 2.4,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 1.7,
+                "Index": 2.2,
+                "Middle": 2.8,
+                "Ring": 2.3,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 2
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
+        }
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordIdle_V1.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordAttack_V1.glb",
@@ -8557,8 +8835,158 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.7,
+            "dadaoBodyCm": {
+              "RightForeArm": 2.8,
+              "LeftForeArm": 1.2
+            },
+            "dadaoSnapDeg": 13.4
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 1.3→0 mm、9.7→4.4 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–37 帧：手腕最多移 6.1 cm、手掌最多转 21.0°（其中绕掌心法线摆正手指方向最多 9.2°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 6.9 mm；左手松开的帧保持原动作）",
+            "右手 第 1–37 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–37 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 69°、中指 61°、无名指 45°、小指 64°、拇指 31°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0.84,
+              "palmPenMm": 9.7,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 9.2,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 9.7
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 9.1,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 9.7
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 1.3,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 0
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 3.6,
+                "Middle": 4.3,
+                "Ring": 4,
+                "Pinky": 6.5
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.6,
+                "Index": 3.3,
+                "Middle": 3.9,
+                "Ring": 3.9,
+                "Pinky": 4.4
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordAttack_V1.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordSlash_V2.glb",
@@ -8628,6 +9056,160 @@
             "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
             "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.7,
+            "dadaoBodyCm": {
+              "RightForeArm": 0.7,
+              "LeftForeArm": 3.4
+            },
+            "dadaoSnapDeg": 28.7
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "RightForeArm": 2.5,
+              "LeftForeArm": 3,
+              "Head": 5.2
+            },
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 23.7→0 mm、9.6→9.7 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–56 帧：手腕最多移 8.6 cm、手掌最多转 33.6°（其中绕掌心法线摆正手指方向最多 29.9°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 14.2 mm；左手松开的帧保持原动作）",
+            "右手 第 1–56 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–56 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 73°、中指 52°、无名指 39°、小指 53°、拇指 42°",
+            "未消掉：LeftIndex 有 1 帧优化完仍陷进刀柄 > 1 mm"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0.37,
+              "palmPenMm": 9.7,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 5.5
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 9.6,
+                "Middle": 9.6,
+                "Ring": 8.3,
+                "Pinky": 5
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.5,
+                "Middle": 0,
+                "Ring": 5.4,
+                "Pinky": 23.7
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 3.8,
+                "Middle": 6.3,
+                "Ring": 9.7,
+                "Pinky": 7.5
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.6,
+                "Index": 3.6,
+                "Middle": 4,
+                "Ring": 9.7,
+                "Pinky": 5.8
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
       ],
       "original": "Original/Animation_Mixamo_GreatSwordSlash_V2.glb"
@@ -8672,8 +9254,157 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.5,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 8.7
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 1
+            },
+            "dadaoSnapDeg": 0
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 34.8→0.1 mm、7.5→3.4 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–16 帧：手腕最多移 7.0 cm、手掌最多转 27.8°（其中绕掌心法线摆正手指方向最多 9.3°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 4.9 mm；左手松开的帧保持原动作）",
+            "右手 第 1–16 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–16 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 58°、中指 38°、无名指 19°、小指 43°、拇指 45°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0.35,
+              "palmPenMm": 9.6,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.5,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.5,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 10.2,
+                "Middle": 0,
+                "Ring": 16.1,
+                "Pinky": 34.8
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.4,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.4,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 3,
+                "Middle": 3.4,
+                "Ring": 2.6,
+                "Pinky": 2.8
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 3,
+                "Middle": 3.4,
+                "Ring": 2.6,
+                "Pinky": 2.8
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.1,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordBlocking_V2.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordBlocking_V1.glb",
@@ -8689,7 +9420,136 @@
       "replaces": "Melee 大刀格挡",
       "mixamoId": "c9cc815e-b96c-11e4-a802-0aaa78deedf9",
       "hold": "拿着别的",
-      "prop": "大刀"
+      "prop": "大刀",
+      "fixes": [
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 8.7,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 0.2
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 1
+            },
+            "dadaoSnapDeg": 0
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 –→1.2 mm、–→1.7 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–30 帧：手腕最多移 7.1 cm、手掌最多转 25.2°（其中绕掌心法线摆正手指方向最多 0.0°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 3.2 mm；左手松开的帧保持原动作）",
+            "右手 第 1–30 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–30 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 42°、中指 18°、无名指 18°、小指 21°、拇指 26°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 3.1,
+                "Index": 0,
+                "Middle": 1,
+                "Ring": 0.1,
+                "Pinky": 1.7
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 3.1,
+                "Index": 0,
+                "Middle": 1,
+                "Ring": 0.1,
+                "Pinky": 1.7
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 1.2,
+                "Middle": 0,
+                "Ring": 0.2,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
+        }
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordBlocking_V1.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordSlash_V1.glb",
@@ -8735,8 +9595,164 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 3.3,
+              "RightForeArm": 1
+            },
+            "dadaoSnapDeg": 32.1
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 2.7,
+              "RightForeArm": 3.5
+            },
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 14.1→1.6 mm、9.7→6.7 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–107 帧：手腕最多移 11.1 cm、手掌最多转 35.1°（其中绕掌心法线摆正手指方向最多 18.4°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 21.0 mm；左手松开的帧保持原动作）",
+            "右手 第 1–107 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–107 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 77°、中指 54°、无名指 39°、小指 86°、拇指 42°",
+            "未消掉：LeftIndex 有 1 帧优化完仍陷进刀柄 > 1 mm",
+            "未消掉：LeftPinky 有 1 帧优化完仍陷进刀柄 > 1 mm",
+            "未消掉：LeftPinky 有 3 帧离刀柄 > 3 mm（够不到或在柄尾环上）"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0.29,
+              "palmPenMm": 9.7,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 9.7
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 5.9
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.2,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 14.1
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.4,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 3.9,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 5.8,
+                "Middle": 9.2,
+                "Ring": 9.7,
+                "Pinky": 7.5
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 2.7,
+                "Middle": 3.6,
+                "Ring": 6.7,
+                "Pinky": 3.7
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.4,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 1.6
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordSlash_V1.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordHighSpinAttack_V1.glb",
@@ -8778,8 +9794,161 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.7,
+            "dadaoBodyCm": {
+              "RightForeArm": 1.5,
+              "LeftForeArm": 0.4
+            },
+            "dadaoSnapDeg": 30.2
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {
+              "LeftForeArm": 2.6,
+              "RightForeArm": 3.4
+            },
+            "dadaoSnapDeg": 0.1
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 1.1→1.1 mm、陷进 P95 9.7→1.4 mm，左手 2.9→0 mm、9.7→9.6 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–57 帧：手腕最多移 11.3 cm、手掌最多转 36.1°（其中绕掌心法线摆正手指方向最多 16.4°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 25.1 mm；左手松开的帧保持原动作）",
+            "右手 第 1–57 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 100°、无名指 34°、小指 23°、拇指 22°",
+            "左手 第 1–57 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 57°、中指 58°、无名指 51°、小指 46°、拇指 49°"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.6,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 2.1
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.6,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 2
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 1.1
+              }
+            },
+            "Left": {
+              "onFrac": 0.41,
+              "palmPenMm": 9.7,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 9.6
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.6,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.7,
+                "Pinky": 9.6
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 2.9
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 1.4,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 1.4,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 1.1,
+                "Index": 1.1,
+                "Middle": 0,
+                "Ring": 0.7,
+                "Pinky": 0.4
+              }
+            },
+            "Left": {
+              "onFrac": 1,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 6.5,
+                "Middle": 7,
+                "Ring": 9.7,
+                "Pinky": 9.7
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 4.2,
+                "Middle": 4.4,
+                "Ring": 9.6,
+                "Pinky": 9.6
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 0
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordHighSpinAttack_V1.glb"
     },
     {
       "file": "Animation_Mixamo_GreatSwordImpact_V1.glb",
@@ -8821,8 +9990,159 @@
             "Taierzhuang1938/_import/Data_MixamoLibraryCurate.mjs",
             "Taierzhuang1938/Tool_MixamoAnimationPreview.html"
           ]
+        },
+        {
+          "topic": "DadaoMount",
+          "kind": "attach",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+          "changes": [
+            "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+            "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+            "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+          ],
+          "before": {
+            "rightPalmPenMm": 9.5,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 33.9
+          },
+          "after": {
+            "rightPalmPenMm": 1.7,
+            "dadaoBodyCm": {},
+            "dadaoSnapDeg": 0
+          },
+          "sources": [
+            "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+            "Taierzhuang1938/Script_MixamoProps.mjs"
+          ]
+        },
+        {
+          "topic": "Grip",
+          "kind": "anim",
+          "date": "2026-11-05",
+          "author": "Devin",
+          "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 29.7→1 mm、7.5→4.6 mm；右手掌陷进 1.7→2.3 mm）",
+          "changes": [
+            "左手两节骨 IK 到刀柄尾段第 1–11、20–39 帧：手腕最多移 21.7 cm、手掌最多转 31.7°（其中绕掌心法线摆正手指方向最多 24.5°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 27.3 mm；左手松开的帧保持原动作）",
+            "右手 第 1–39 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+            "左手 第 1–12、19–39 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 59°、中指 58°、无名指 63°、小指 82°、拇指 39°",
+            "未消掉：LeftIndex 有 13 帧离刀柄 > 3 mm（够不到或在柄尾环上）",
+            "未消掉：LeftMiddle 有 14 帧离刀柄 > 3 mm（够不到或在柄尾环上）",
+            "未消掉：LeftRing 有 14 帧离刀柄 > 3 mm（够不到或在柄尾环上）",
+            "未消掉：LeftPinky 有 14 帧离刀柄 > 3 mm（够不到或在柄尾环上）"
+          ],
+          "before": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 1.7,
+              "fingerPenMm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 8.3,
+                "Index": 9.7,
+                "Middle": 9.7,
+                "Ring": 9.6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 3
+              }
+            },
+            "Left": {
+              "onFrac": 0.28,
+              "palmPenMm": 9,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.5,
+                "Ring": 6,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 0,
+                "Middle": 7.5,
+                "Ring": 6,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 11.2,
+                "Middle": 0,
+                "Ring": 10.7,
+                "Pinky": 29.7
+              }
+            }
+          },
+          "after": {
+            "Right": {
+              "onFrac": 1,
+              "palmPenMm": 2.3,
+              "fingerPenMm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 0.3,
+                "Index": 0,
+                "Middle": 0.3,
+                "Ring": 0,
+                "Pinky": 0
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0.7,
+                "Middle": 0,
+                "Ring": 0.9,
+                "Pinky": 0.7
+              }
+            },
+            "Left": {
+              "onFrac": 0.45,
+              "palmPenMm": 0,
+              "fingerPenMm": {
+                "Thumb": 9.7,
+                "Index": 3.3,
+                "Middle": 4.3,
+                "Ring": 3.7,
+                "Pinky": 4.6
+              },
+              "fingerPenP95Mm": {
+                "Thumb": 9.7,
+                "Index": 3.3,
+                "Middle": 4.3,
+                "Ring": 3.7,
+                "Pinky": 4.6
+              },
+              "fingerGapMedMm": {
+                "Thumb": 0,
+                "Index": 0,
+                "Middle": 0,
+                "Ring": 0,
+                "Pinky": 1
+              }
+            }
+          },
+          "sources": [
+            "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+            "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+          ]
         }
-      ]
+      ],
+      "original": "Original/Animation_Mixamo_GreatSwordImpact_V1.glb"
     },
     {
       "file": "Animation_Mixamo_SlashAdvance_V1.glb",

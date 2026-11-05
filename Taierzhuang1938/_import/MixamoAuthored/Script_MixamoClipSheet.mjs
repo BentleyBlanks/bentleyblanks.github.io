@@ -1,5 +1,5 @@
 // Claude 自制动作的审核工具（2026-11-01 起，审 Animation_Claude_*.glb；见 Data_MixamoLibraryCurate.mjs 的 AUTHORED）。
-//   node Taierzhuang1938/_import/MixamoAuthored/Script_MixamoClipSheet.mjs <clip.glb> <out.png> [times...] [--target=hips|hands|chest|head|feet] [--dist=1.6] [--views=front,right,left,top,rear,back]
+//   node Taierzhuang1938/_import/MixamoAuthored/Script_MixamoClipSheet.mjs <clip.glb> <out.png> [times...] [--target=hips|hands|chest|head|feet] [--dist=1.6] [--views=front,right,left,top,rear,back] [--who=<人物键>] [--clip-dir=<相对 Taierzhuang1938/ 的目录>] [--max=640]
 // Contact sheet of one clip in Tool_MixamoAnimationPreview.html (rifle / grenade / dadao attached as in the tool).
 // times: seconds, or fractions like 0.25f (of clip duration). Default: 8 evenly spaced.
 // Prints JSON: duration, per-time right-palm / left-palm world positions, rifle knob distances if a rifle is shown.
@@ -22,8 +22,14 @@ const base = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/Tool_Mix
 try {
   const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
   const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(`${base}#${encodeURIComponent(clip)}`);
+  await page.goto(`${base}${flags.who ? `?who=${flags.who}` : ""}#${encodeURIComponent(clip)}`);
   await page.waitForFunction((f) => window.__preview?.action && decodeURIComponent(location.hash).includes(f.split(".")[0]) && document.getElementById("clipTitle").textContent !== "—", clip, { timeout: 120000 });
+  if (flags["clip-dir"]) {
+    await page.evaluate(async ({ file, dir }) => {
+      window.__preview.manifest.clips.find((c) => c.file === file).file = `../../${dir}/${file}`;
+      await window.__preview.SelectFile(`../../${dir}/${file}`);
+    }, { file: clip, dir: flags["clip-dir"] });
+  }
   await page.waitForTimeout(800);
   await page.evaluate(({ rifle, grenade }) => {
     document.getElementById("edRoot").style.display = "none";
@@ -65,9 +71,11 @@ try {
       shots.push({ t: sample.t, view, png: (await page.screenshot({ type: "png" })).toString("base64") });
     }
   }
-  const sheet = await browser.newPage({ viewport: { width: 300 * views.length, height: 300 * times.length } });
-  await sheet.setContent(`<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(${views.length},300px)">${shots.map((s) =>
-    `<div style="position:relative;width:300px;height:300px"><img src="data:image/png;base64,${s.png}" style="width:300px;height:300px"><span style="position:absolute;left:6px;top:4px;color:#ffd;font:13px monospace;text-shadow:0 0 3px #000">t=${s.t}s ${s.view}</span></div>`).join("")}</body>`);
+  // 整张图长边不超过 --max（默认 640 px）：格子按行列数缩小，最大 300
+  const maxSide = Number(flags.max || 640), tile = Math.max(40, Math.min(300, Math.floor(maxSide / Math.max(views.length, times.length))));
+  const sheet = await browser.newPage({ viewport: { width: tile * views.length, height: tile * times.length } });
+  await sheet.setContent(`<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(${views.length},${tile}px)">${shots.map((s) =>
+    `<div style="position:relative;width:${tile}px;height:${tile}px"><img src="data:image/png;base64,${s.png}" style="width:${tile}px;height:${tile}px"><span style="position:absolute;left:3px;top:2px;color:#ffd;font:${tile < 150 ? 8 : 13}px monospace;text-shadow:0 0 3px #000">t=${s.t}s ${s.view}</span></div>`).join("")}</body>`);
   await sheet.screenshot({ path: outPng, fullPage: true });
   console.log(JSON.stringify({ clip, duration: +duration.toFixed(3), samples: samples.map(({ focus, facing, ...s }) => s), errors }));
 } finally { await browser.close(); server.close(); }

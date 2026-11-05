@@ -7,7 +7,8 @@
 //    全库量过左手相对标定枪管的偏角：普通端枪动作 0–30°；刺刀突刺、劈砍、横托格挡、枪托砸、枪身砸这 5 条左手一直握着、
 //    握得比标定宽，20–100°；死亡、挡脸、取枪时甩开的左手 80–170°。所以默认 35° 内全转、55° 外不转（AIM_AT_LEFT），
 //    清单标 rifleAim: "wide" 的那几条（还有「端枪受击·正面打偏向左」，左手握着、偏到 60°）用 100° / 120°（AIM_AT_LEFT_WIDE）。
-// 2. 大刀刀尾对准左手：同上（AIM_AT_POMMEL，45° / 75°；原来 70° 以内整个转过去）。
+// 2. 大刀不再转向左手（11-05 删除 AIM_AT_POMMEL：原来 70° 以内整个转过去，后来 45° / 75°、8° / 15°）：刀固定在右手里，
+//    两手握刀的动作由 Script_MixamoClipFix.py 的 grip 把左手放到刀轴上。
 // 3. 枪在动作里换地方（清单条目的 rifleTrack，PrepareRifleTrack + RifleTrackPose）：
 //      grabAt  这之前枪背在背上，手伸到背后那一刻接过来；接过来先「握着枪身」拿 grabHoldS 秒，再用 settleS 秒换成标定的握把
 //      stowAt  这一刻把枪放到背上，之后背着；放之前先用 stowS 秒从握把换成「握着枪身」，再这样拿 stowHoldS 秒
@@ -45,7 +46,6 @@ export const AIM_AT_LEFT = Object.freeze({
   fullDeg: 35, zeroDeg: 55,       // 左手偏离标定枪管方向 ≤ 35° 全转、≥ 55° 不转（放到 45° / 65° 试过：死亡、取枪几条一帧跳 30° 多）
 });
 export const AIM_AT_LEFT_WIDE = Object.freeze({ ...AIM_AT_LEFT, fullDeg: 100, zeroDeg: 120 });
-export const AIM_AT_POMMEL = Object.freeze({ near: 0.04, nearFull: 0.07, farFull: 0.34, far: 0.4, fullDeg: 45, zeroDeg: 75 });
 
 /** 这条动作用哪一档（清单条目 rifleAim: "wide" = 刺刀白刃那几条宽握）。 */
 export function AimBandFor(entry) { return entry?.rifleAim === "wide" ? AIM_AT_LEFT_WIDE : AIM_AT_LEFT; }

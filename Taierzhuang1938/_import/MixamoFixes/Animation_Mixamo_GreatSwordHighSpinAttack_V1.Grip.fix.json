@@ -1,0 +1,122 @@
+{
+  "file": "Animation_Mixamo_GreatSwordHighSpinAttack_V1.glb",
+  "topic": "Grip",
+  "kind": "anim",
+  "date": "2026-11-05",
+  "author": "Devin",
+  "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 1.1→1.1 mm、陷进 P95 9.7→1.4 mm，左手 2.9→0 mm、9.7→9.6 mm；右手掌陷进 1.7→2.3 mm）",
+  "changes": [
+    "左手两节骨 IK 到刀柄尾段第 1–57 帧：手腕最多移 11.3 cm、手掌最多转 36.1°（其中绕掌心法线摆正手指方向最多 16.4°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 25.1 mm；左手松开的帧保持原动作）",
+    "右手 第 1–57 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 100°、无名指 34°、小指 23°、拇指 22°",
+    "左手 第 1–57 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 57°、中指 58°、无名指 51°、小指 46°、拇指 49°"
+  ],
+  "before": {
+    "Right": {
+      "onFrac": 1,
+      "palmPenMm": 1.7,
+      "fingerPenMm": {
+        "Thumb": 8.6,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 2.1
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 8.6,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 2
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 1.1
+      }
+    },
+    "Left": {
+      "onFrac": 0.41,
+      "palmPenMm": 9.7,
+      "fingerPenMm": {
+        "Thumb": 9.7,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 9.6
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 9.6,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 9.6
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 2.9
+      }
+    }
+  },
+  "after": {
+    "Right": {
+      "onFrac": 1,
+      "palmPenMm": 2.3,
+      "fingerPenMm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 1.4,
+        "Ring": 0,
+        "Pinky": 0
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 1.4,
+        "Ring": 0,
+        "Pinky": 0
+      },
+      "fingerGapMedMm": {
+        "Thumb": 1.1,
+        "Index": 1.1,
+        "Middle": 0,
+        "Ring": 0.7,
+        "Pinky": 0.4
+      }
+    },
+    "Left": {
+      "onFrac": 1,
+      "palmPenMm": 0,
+      "fingerPenMm": {
+        "Thumb": 9.7,
+        "Index": 6.5,
+        "Middle": 7,
+        "Ring": 9.7,
+        "Pinky": 9.7
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 9.7,
+        "Index": 4.2,
+        "Middle": 4.4,
+        "Ring": 9.6,
+        "Pinky": 9.6
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 0
+      }
+    }
+  },
+  "original": "Original/Animation_Mixamo_GreatSwordHighSpinAttack_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

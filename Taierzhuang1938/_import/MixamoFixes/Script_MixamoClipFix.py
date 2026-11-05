@@ -24,16 +24,34 @@
 #     "sides": ["Right","Left"], "ramp": 6 }
 #       手本身没穿、是手里的枪 / 刀穿进身体时用：两只手腕同推 cm（背离某根骨的人体胶囊中心，或按世界方向），
 #       第 a–b 帧满量、前后 ramp 帧 smoothstep 渐入渐出，两节骨 IK、手腕世界朝向不变，道具相对两手不变。
+#   { "op": "grip", "topic": "Grip", "marginMm": 0, "tolMm": 0.5, "sigma": 1 }
+#       大刀动作的两手贴刀柄（2026-11-05，只给挂大刀的 GreatSword 九条；量法 Script_DadaoGripAudit.mjs，挂法 = 预览工具 Tool_MixamoAnimationPreview.html）：
+#       挂法移植：刀固定在右手里（标定 = GreatSwordIdle_V1 第 0 帧），握点 = 掌心点（手腕 → 中指根 0.72）沿掌心法线推出
+#       「该人物掌心皮肤厚度（X Bot 绑定网格量）+ 刀柄在掌心方向的支撑距离（圆角矩形截面）+ 2 mm」，标定做两遍（掌心对着窄边还是宽面取决于刀的朝向）。
+#       1) 左手两节骨 IK（LeftReach）：握持权重 h = 左手握点离刀轴 z 0.13–0.20 段的距离（0.12–0.18 m 渐变），时间上取 ±3 帧最大值再高斯 σ=2；
+#          目标点 = 刀轴上 z 0.13–0.17 处；手掌最小转动让刀柄落进掌平面，再绕掌心法线把手指与「朝护手」方向的夹角限在 40–90°；
+#          掌心离轴线的距离按手掌 + 拇指根顶点（X Bot 绑定网格，LeftHand + LeftHandThumb1 主权重 ≥ 0.5）对刀柄 SDF 求到陷进 0.5 mm（二分），
+#          腕位置 = 目标 − 转后的手的掌心偏移，SolveArm 两节骨 IK（左肩不动），按 h 混合；左手松开的帧（h = 0）保持原动作；手是反的帧不动并记日志。
+#       2) 手指（四指各 3 节，拇指第 1 节两个自由度 + 第 2、3 节）：每节骨 = swing ⊗ 绕本地轴的转角（保留原来的外展 / 扭转），
+#          胶囊（半径 = 皮肤顶点到骨头线距离的第 90 百分位，指尖一端缩到指尖关节）对刀柄解析 SDF（圆角矩形柄、椭圆护手板，柄尾环用 BVH）的净空：
+#          E = Σ wᵢ·max(cᵢ,0)² + 1000·Σ max(−cᵢ−tol,0)² + 7.4e-5·(θ₃ − 0.7·θ₂)²，首帧 5° 全网格 + 1° 细化，之后在上一帧解附近细化，
+#          陷进 > 1 mm 或 E 变大 4 倍回全网格；拇指另和同手食指 / 中指胶囊互相避让；Thumb1 不进接触测试（它是掌根肌肉）。
+#          按握持权重 g（右手恒 1，左手由握点离柄距离定）混合、时间上 σ=1 平滑（循环动作首尾仍是同一帧）。
+#       刀固定在右手里，不再有「刀尾朝左手转」（AIM_AT_POMMEL 已从 Script_MixamoProps.mjs 删掉）。
 # 人体量法照搬 Script_MixamoLibraryAudit.mjs 的 SetupInPage：X Bot 蒙皮按每根骨一段椭圆截面胶囊拟合（第 85 百分位）。
 # 改前第一次覆盖时把当时的 GLB 拷到 Animation/Mixamo/Original/（已有就不拷）。每条写一份日志 JSON 到 --log 目录，
 # Script_MixamoClipFixRecords.mjs 拿它和审查数生成 <词干>.<主题>.fix.json。
+import base64
 import bpy
+import itertools
 import json
 import math
 import os
 import shutil
+import struct
 import sys
 from mathutils import Matrix, Quaternion, Vector
+from mathutils.bvhtree import BVHTree
 
 PREFIX = "mixamorig:"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -996,7 +1014,772 @@ def OpShift(clip, op, ctx):
             f"两节骨 IK、手腕世界朝向不变，手里的道具跟着平移、相对两手不变"]
 
 
-OPS_FN = {"seam": OpSeam, "glitch": OpGlitch, "hands": OpHands, "shift": OpShift}
+# ---------------------------------------------------------------- grip
+GRIP_CAL_STEM = "Animation_Mixamo_GreatSwordIdle_V1"
+GRIP_R = Vector((0.0, 0.0, 0.03))          # Model_Dadao gripR, metres (same as the tool)
+GRIP_PALM_ALONG = 0.72                      # palm point = wrist -> middle MCP at this fraction (tool: DADAO_PALM_ALONG)
+GRIP_SKIN = {"Right": 0.0, "Left": 0.0}     # palm skin distance per side, armature units (measured from the X Bot rest mesh in GripSetup; tool: PalmSkin)
+GRIP_SC = 0.01                              # metres per armature unit (set in GripSetup)
+GRIP_PALM_MARGIN = 0.002                    # metres added to the grip-point offset (tool: DADAO_PALM_MARGIN)
+# Dadao solid, dadao-local metres; same constants as Script_DadaoGripAudit.mjs (handle = rounded rectangle, guard = elliptical plate)
+GRIP_HANDLE = dict(hx=0.0097, hy=0.0210, cy=-0.0005, rc=0.006, z0=0.0, z1=0.205)
+GRIP_GUARD = dict(hx=0.0086, ay=0.0485, cy=0.0045, az=0.020, cz=-0.0275)
+GRIP_RING_Z = 0.205                         # pommel ring: BVH of the triangles above this z, queried only above 0.19
+GRIP_SAMPLE_M = 0.004
+GRIP_FINGERS = ["Index", "Middle", "Ring", "Pinky"]
+FINGER_LIMITS = [(-10.0, 90.0), (0.0, 105.0), (0.0, 80.0)]
+THUMB_LIMITS = [(-35.0, 35.0), (-25.0, 25.0), (-20.0, 60.0), (-20.0, 80.0)]
+GRIP_NAMES = {"Index": "食指", "Middle": "中指", "Ring": "无名指", "Pinky": "小指", "Thumb": "拇指"}
+
+
+def GaussSmooth(vals, sigma, cyc):
+    if sigma <= 0:
+        return list(vals)
+    R = int(math.ceil(3 * sigma))
+    w = [math.exp(-(i * i) / (2 * sigma * sigma)) for i in range(-R, R + 1)]
+    n, out = len(vals), []
+    for k in range(n):
+        s = ws = 0.0
+        for j, i in enumerate(range(-R, R + 1)):
+            idx = k + i
+            if cyc:
+                idx %= n
+            elif not 0 <= idx < n:
+                continue
+            s += w[j] * vals[idx]
+            ws += w[j]
+        out.append(s / ws)
+    return out
+
+
+def MaxFilter(vals, radius, cyc):
+    n, out = len(vals), []
+    for k in range(n):
+        m = 0.0
+        for i in range(-radius, radius + 1):
+            idx = k + i
+            if cyc:
+                idx %= n
+            elif not 0 <= idx < n:
+                continue
+            m = max(m, vals[idx])
+        out.append(m)
+    return out
+
+
+def Smooth3(e0, e1, x):
+    t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+    return t * t * (3 - 2 * t)
+
+
+def PalmNormal(P, side):
+    h, m = P[f"{side}Hand"].translation, P[f"{side}HandMiddle1"].translation
+    w = P[f"{side}HandIndex1"].translation - P[f"{side}HandPinky1"].translation
+    f = m - h
+    return (w.cross(f) if side == "Right" else f.cross(w)).normalized()
+
+
+def HandleSupport(ux, uy):
+    """Distance from the handle axis to the handle surface along (ux, uy) in the dadao xy plane, metres (tool: HandleSupport)."""
+    E = GRIP_HANDLE
+    ln = math.hypot(ux, uy) or 1.0
+    ux, uy = ux / ln, uy / ln
+    return E["cy"] * uy + (E["hx"] - E["rc"]) * abs(ux) + (E["hy"] - E["rc"]) * abs(uy) + E["rc"]
+
+
+def GripPoint(P, side, rot=None):
+    """Palm point (wrist -> middle MCP at GRIP_PALM_ALONG) pushed out along the palm normal by the palm skin distance plus the handle's
+    support distance toward the palm; rot = the dadao rotation (3x3, armature space), None = palm on a wide face (tool: GripPoint)."""
+    h, m = P[f"{side}Hand"].translation, P[f"{side}HandMiddle1"].translation
+    n = PalmNormal(P, side)
+    support = GRIP_HANDLE["hx"]
+    if rot is not None:
+        u = rot.transposed() @ (-n)
+        support = HandleSupport(u.x, u.y)
+    return h.lerp(m, GRIP_PALM_ALONG) + n * (GRIP_SKIN[side] + (support + GRIP_PALM_MARGIN) / GRIP_SC)
+
+
+def RigidRot(P, cal):
+    """Rotation (3x3) of the dadao riding rigidly on the right hand."""
+    return (P["RightHand"] @ cal["offset"]).to_quaternion().to_matrix()
+
+
+def DadaoPlacement(clip, P, cal):
+    """Port of the tool's PlaceDadao: the dadao rides rigidly on the right hand (calibration offset). Returns (rot 3x3, translation)
+    in armature space (units)."""
+    M = P["RightHand"] @ cal["offset"]
+    rot = M.to_quaternion().to_matrix()
+    return rot, M @ (GRIP_R / clip.scale) - rot @ (GRIP_R / clip.scale)
+
+
+# ---- dadao signed distance (negative inside); ported from Script_DadaoGripAudit.mjs
+def GripExtrude(d2, dl):
+    if d2 < 0 and dl < 0:
+        return max(d2, dl)
+    return math.hypot(max(d2, 0.0), max(dl, 0.0))
+
+
+def GripEllipseSd(u, v, a, b):
+    px, py = abs(u), abs(v)
+    tx = ty = 0.70710678
+    for _ in range(4):
+        x, y = a * tx, b * ty
+        ex, ey = (a * a - b * b) * tx ** 3 / a, (b * b - a * a) * ty ** 3 / b
+        rx, ry, qx, qy = x - ex, y - ey, px - ex, py - ey
+        r, q = math.hypot(rx, ry), math.hypot(qx, qy)
+        if q < 1e-12:
+            break
+        tx, ty = min(1.0, max(0.0, (qx * r / q + ex) / a)), min(1.0, max(0.0, (qy * r / q + ey) / b))
+        t = math.hypot(tx, ty)
+        tx, ty = tx / t, ty / t
+    d = math.hypot(px - a * tx, py - b * ty)
+    return -d if (u / a) ** 2 + (v / b) ** 2 < 1 else d
+
+
+def GripHandleSd(x, y, z):
+    E = GRIP_HANDLE
+    qx, qy = abs(x) - (E["hx"] - E["rc"]), abs(y - E["cy"]) - (E["hy"] - E["rc"])
+    d2 = math.hypot(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - E["rc"]
+    return GripExtrude(d2, max(E["z0"] - z, z - E["z1"]))
+
+
+def GripGuardSd(x, y, z):
+    G = GRIP_GUARD
+    return GripExtrude(GripEllipseSd(y - G["cy"], z - G["cz"], G["ay"], G["az"]), abs(x) - G["hx"])
+
+
+def DecodeDadaoRing():
+    """BVH of the pommel ring (triangles with any vertex above GRIP_RING_Z); unsigned, the ring is thin."""
+    with open(os.path.join(TZ, "Model", "Model_Dadao.tzm.json"), encoding="utf-8") as f:
+        asset = json.load(f)
+
+    def Dec(text, code):
+        data = base64.b64decode(text)
+        return struct.unpack("<" + code * (len(data) // struct.calcsize(code)), data)
+
+    verts, polys = [], []
+    for block in asset["meshes"]:
+        pos = Dec(block["pos"], "H")
+        idx = Dec(block["idx"], "I" if block["idxBits"] == 32 else "H")
+        base = len(verts)
+        for i in range(block["count"]):
+            verts.append(Vector([block["posMin"][j] + pos[i * 3 + j] * block["posScale"][j] for j in range(3)]))
+        for i in range(0, len(idx), 3):
+            tri = (base + idx[i], base + idx[i + 1], base + idx[i + 2])
+            if any(verts[v].z > GRIP_RING_Z for v in tri):
+                polys.append(tri)
+    return BVHTree.FromPolygons(verts, polys)
+
+
+def FitFingers():
+    """Finger capsule radii: 90th percentile of the radial distance sqrt((x-cx)^2+(z-cz)^2) of the bone's skin vertices (dominant weight >= 0.6,
+    bone-local, cx/cz medians; the tip bone is merged into the last joint). Returns radii in metres."""
+    arm = Import(os.path.join(RAW, "Model_MixamoXBot.fbx"))
+    sc = arm.matrix_world.to_scale()[0]
+    armInv = arm.matrix_world.inverted()
+    boneInv = {b.name: b.matrix_local.inverted() for b in arm.data.bones}
+    want = {f"{s}Hand{f}{k}": f"{s}Hand{f}{min(k, 3)}" for s in ("Right", "Left") for f in FINGERS for k in (1, 2, 3, 4)}
+    samples = {}
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        names = {g.index: (g.name[len(PREFIX):] if g.name.startswith(PREFIX) else g.name) for g in obj.vertex_groups}
+        toArm = armInv @ obj.matrix_world
+        for v in obj.data.vertices:
+            best, bw = None, 0.0
+            for g in v.groups:
+                if g.weight > bw:
+                    bw, best = g.weight, names.get(g.group)
+            if bw < 0.6 or best not in want:
+                continue
+            p = boneInv[best] @ (toArm @ v.co)
+            samples.setdefault(want[best], []).append((p.x, p.z))
+    radii = {}
+    for name, pts in samples.items():
+        if len(pts) < 8:
+            continue
+        cx, cz = Pct([p[0] for p in pts], 0.5), Pct([p[1] for p in pts], 0.5)
+        radii[name] = Pct([math.hypot(p[0] - cx, p[1] - cz) for p in pts], 0.9) * sc
+    palmSet = []
+    leftHead, leftRest = arm.data.bones["LeftHand"].head_local.copy(), arm.data.bones["LeftHand"].matrix_local.to_quaternion().to_matrix()
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        names = {g.index: (g.name[len(PREFIX):] if g.name.startswith(PREFIX) else g.name) for g in obj.vertex_groups}
+        toArm = armInv @ obj.matrix_world
+        for v in obj.data.vertices:
+            top, tw = None, 0.0
+            for g in v.groups:
+                if g.weight > tw:
+                    tw, top = g.weight, names.get(g.group)
+            if tw >= 0.5 and top in ("LeftHand", "LeftHandThumb1"):
+                palmSet.append(leftRest.transposed() @ (toArm @ v.co - leftHead))
+    skin = {}
+    for side in ("Right", "Left"):
+        hb = {k: arm.data.bones[f"{side}Hand{k}"].head_local.copy() for k in ("", "Middle1", "Index1", "Pinky1")}
+        f = hb["Middle1"] - hb[""]
+        w = hb["Index1"] - hb["Pinky1"]
+        n = (w.cross(f) if side == "Right" else f.cross(w)).normalized()
+        point = hb[""].lerp(hb["Middle1"], GRIP_PALM_ALONG)
+        best = None
+        for obj in bpy.data.objects:
+            if obj.type != "MESH":
+                continue
+            names = {g.index: (g.name[len(PREFIX):] if g.name.startswith(PREFIX) else g.name) for g in obj.vertex_groups}
+            toArm = armInv @ obj.matrix_world
+            for v in obj.data.vertices:
+                top, tw = None, 0.0
+                for g in v.groups:
+                    if g.weight > tw:
+                        tw, top = g.weight, names.get(g.group)
+                if tw < 0.5 or top != f"{side}Hand":
+                    continue
+                d = toArm @ v.co - point
+                along = d.dot(n)
+                if (d - n * along).length * sc < 0.025 and (best is None or along > best):
+                    best = along
+        skin[side] = (best if best is not None else 0.25 * f.length) * sc
+    return radii, skin, palmSet
+
+
+def SwingTwist(q, A):
+    """q = swing @ twist about unit axis A; returns (swing, twist angle in degrees)."""
+    q = q.copy()
+    if q.w < 0:
+        q.negate()
+    v = Vector((q.x, q.y, q.z))
+    d = v.dot(A)
+    twist = Quaternion((q.w, A.x * d, A.y * d, A.z * d))
+    if twist.magnitude < 1e-9:
+        return q, 0.0
+    twist.normalize()
+    return q @ twist.inverted(), math.degrees(2 * math.atan2(d, q.w))
+
+
+def ChainHeads(clip, P, k, side, finger, qs):
+    """Joint heads (4) of a finger given local rotations for its first three bones (None = the clip's own)."""
+    prev, heads = P[f"{side}Hand"], []
+    for i in range(4):
+        name = f"{side}Hand{finger}{i + 1}"
+        mat = prev @ clip.rel[name] @ clip.Basis(name, k, qs[i] if i < 3 and qs else None)
+        heads.append(mat.translation.copy())
+        prev = mat
+    return heads
+
+
+class GripWorld:
+    def __init__(self, ring, radii, cal):
+        self.ring, self.radii, self.cal = ring, radii, cal
+        self.flexA = {}     # side -> unit axis with sign so +theta flexes toward the palm normal
+        self.thumbA = {}    # side -> unit axis for Thumb2 / Thumb3
+        self.thumb1A = {}   # side -> unit axis for Thumb1
+
+    def Sdf(self, p):
+        x, y, z = p
+        d = GripHandleSd(x, y, z)
+        if z < 0.01:
+            d = min(d, GripGuardSd(x, y, z))
+        if z > 0.19:
+            h = self.ring.find_nearest(Vector(p), 0.05)
+            if h[0] is not None:
+                d = min(d, h[3])
+        return d
+
+
+def GRIP_SC_SET(sc):
+    global GRIP_SC
+    GRIP_SC = sc
+
+
+def GripSetup(ctx):
+    radii, skin, palmSet = FitFingers()
+    Log("left palm vertex set (LeftHand + LeftHandThumb1, dominant weight >= 0.5):", len(palmSet))
+    Log("palm skin distance mm (X Bot rest mesh, ALONG %.2f)" % GRIP_PALM_ALONG, {k: round(v * 1000, 2) for k, v in skin.items()})
+    Log("finger radii mm (p90 radial)", {k: round(v * 1000, 1) for k, v in radii.items() if k.startswith("Right")})
+    ring = DecodeDadaoRing()
+    arm = Import(os.path.join(RAW, GRIP_CAL_STEM + ".fbx"))
+    clip = Clip(arm, GRIP_CAL_STEM)
+    sc = clip.scale
+    GRIP_SC_SET(sc)
+    for side in skin:
+        GRIP_SKIN[side] = skin[side] / sc
+    P = clip.Pose(0)
+    fingers = P["RightHandMiddle1"].translation - P["RightHand"].translation
+    rot = None
+    for _pass in range(2):
+        R, L = GripPoint(P, "Right", rot), GripPoint(P, "Left", rot)
+        z = (L - R).normalized()
+        y = (fingers - z * fingers.dot(z)).normalized()
+        x = y.cross(z)
+        rot = Matrix((x, y, z)).transposed()
+        origin = R - rot @ (GRIP_R / sc)
+    M0 = Matrix.Translation(origin) @ rot.to_4x4()
+    cal = {"offset": P["RightHand"].inverted() @ M0}
+    world = GripWorld(ring, radii, cal)
+    world.leftPalm = palmSet
+    rotT0 = rot.transposed()
+    for side in ("Right", "Left"):
+        n = PalmNormal(P, side)
+        gain = {}
+        for sign in (1.0, -1.0):
+            A = Vector((sign, 0.0, 0.0))
+            swing = [SwingTwist(clip.Q[f"{side}HandIndex{i + 1}"][0], A)[0] for i in range(3)]
+            base = ChainHeads(clip, P, 0, side, "Index", swing)[3]
+            qs = [q @ Quaternion(A, math.radians(5.0)) for q in swing]
+            gain[sign] = (ChainHeads(clip, P, 0, side, "Index", qs)[3] - base).dot(n)
+        sign = 1.0 if gain[1.0] >= gain[-1.0] else -1.0
+        world.flexA[side] = Vector((sign, 0.0, 0.0))
+        Log(f"flexion check {side}: from the straight index (twist removed) +X 5deg moves the tip along the palm normal by {gain[1.0] * sc * 1000:.2f} mm, -X by {gain[-1.0] * sc * 1000:.2f} mm -> sign {sign:+.0f}")
+        tip0 = ChainHeads(clip, P, 0, side, "Thumb", None)[3]
+        d0 = (rotT0 @ (tip0 - origin)) * sc
+        for label, joints in (("Thumb2/3", (1, 2)), ("Thumb1", (0,))):
+            best = None
+            for axis in (0, 2):
+                for sgn in (1.0, -1.0):
+                    A = Vector((0.0, 0.0, 0.0))
+                    A[axis] = sgn
+                    qs = [clip.Q[f"{side}HandThumb{i + 1}"][0] @ (Quaternion(A, math.radians(5.0)) if i in joints else Quaternion()) for i in range(3)]
+                    d1 = (rotT0 @ (ChainHeads(clip, P, 0, side, "Thumb", qs)[3] - origin)) * sc
+                    gainT = math.hypot(d0.x, d0.y + 0.0005) - math.hypot(d1.x, d1.y + 0.0005)
+                    Log(f"{label} axis test {side}: {'XYZ'[axis]}{'+' if sgn > 0 else '-'} 5deg -> {gainT * 1000:+.2f} mm toward the handle axis")
+                    if best is None or gainT > best[0]:
+                        best = (gainT, A)
+            (world.thumbA if label == "Thumb2/3" else world.thumb1A)[side] = best[1]
+            Log(f"{label} flexion axis {side}: {best[1][0]:+.0f} {best[1][1]:+.0f} {best[1][2]:+.0f}")
+    ctx["gripWorld"] = world
+
+
+# ---------------------------------------------------------------- left-hand reach
+def WeightedSmooth(vals, weights, sigma, cyc):
+    """Gaussian smoothing of Vector samples, weighted by `weights` (frames with no hold weight do not drag their neighbours)."""
+    n, R = len(vals), int(math.ceil(3 * sigma))
+    out = []
+    for k in range(n):
+        acc, ws = Vector((0.0, 0.0, 0.0)), 0.0
+        for i in range(-R, R + 1):
+            idx = k + i
+            if cyc:
+                idx %= n
+            elif not 0 <= idx < n:
+                continue
+            w = math.exp(-(i * i) / (2 * sigma * sigma)) * weights[idx]
+            acc += vals[idx] * w
+            ws += w
+        out.append(acc / ws if ws > 1e-9 else Vector((0.0, 0.0, 0.0)))
+    return out
+
+
+def LeftReach(clip, world, ctx):
+    """Left-arm IK: with the dadao rigid in the right hand, move the left wrist so the left grip point sits on the rear handle axis
+    (z 0.13-0.20) and turn the hand minimally so the handle lies in its palm plane. Weighted by a holding weight, so frames where the
+    left hand lets go keep the original motion. Shoulder fixed, two-bone IK. Returns (changes, stats)."""
+    n, sc, cyc = clip.n, clip.scale, ctx["loop"]
+    Ps = [clip.Pose(k) for k in range(n)]
+    rows, hraw, zraw = [], [], []
+    for P in Ps:
+        M = P["RightHand"] @ world.cal["offset"]
+        rot, org = M.to_quaternion().to_matrix(), M.translation.copy()
+        G0 = GripPoint(P, "Left", rot)
+        Gl = (rot.transposed() @ (G0 - org)) * sc
+        zh = max(0.13, min(0.20, Gl.z))
+        hraw.append(1 - Smooth3(0.12, 0.18, math.hypot(math.hypot(Gl.x, Gl.y), Gl.z - zh)))
+        zraw.append(max(0.13, min(0.17, Gl.z)))
+        rows.append((rot, org, G0))
+    h = [max(0.0, min(1.0, v)) for v in GaussSmooth(MaxFilter(hraw, 3, cyc), 2.0, cyc)]
+    zt = GaussSmooth(zraw, 2.0, cyc)
+    rvs, R0s, W0s, pls, swv, reversed_ = [], [], [], [], [], []
+    for k, P in enumerate(Ps):
+        rot, org, G0 = rows[k]
+        a = rot @ Vector((0.0, 0.0, 1.0))
+        W0 = P["LeftHand"].translation.copy()
+        q0 = P["LeftHand"].to_quaternion()
+        R0 = q0.to_matrix()
+        nL = PalmNormal(P, "Left")
+        nt = nL - a * nL.dot(a)
+        nt = nt.normalized() if nt.length > 1e-6 else nL
+        qfix = nL.rotation_difference(nt)
+        axis, ang = qfix.to_axis_angle()
+        rvs.append(axis * ang)
+        Rf = qfix.to_matrix()
+        mid0 = P["LeftHandMiddle1"].translation
+        pls.append(R0.transposed() @ (W0.lerp(mid0, GRIP_PALM_ALONG) - W0))
+        # swivel about the new palm normal: the angle between the finger direction (in the palm plane) and -a (toward the guard) into [40, 90] deg
+        fp = Rf @ (mid0 - W0)
+        fp = fp - nt * fp.dot(nt)
+        negA = -a
+        phi = math.atan2(nt.dot(negA.cross(fp)), negA.dot(fp)) if fp.length > 1e-9 else math.radians(60.0)
+        sgn = 1.0 if phi >= 0 else -1.0
+        target = sgn * max(math.radians(40.0), min(math.radians(90.0), abs(phi)))
+        swivel = target - phi
+        swv.append(swivel)
+        across0 = P["LeftHandIndex1"].translation - P["LeftHandPinky1"].translation
+        reversed_.append((Quaternion(nt, swivel).to_matrix() @ Rf @ across0).dot(a) > 0)
+        R0s.append(q0)
+        W0s.append(W0)
+    rvsm = WeightedSmooth(rvs, h, 2.0, cyc)
+    swsm = GaussSmooth([v * hv for v, hv in zip(swv, h)], 2.0, cyc)
+    swsm = [v / hv if hv > 1e-3 else 0.0 for v, hv in zip(GaussSmooth([v * hv for v, hv in zip(swv, h)], 2.0, cyc), GaussSmooth(h, 2.0, cyc))]
+    for k in range(n):
+        if reversed_[k]:
+            h[k] = 0.0
+    nLoc = []
+    for P in Ps:
+        S0, E0, W0 = (P[f"Left{x}"].translation for x in ("Arm", "ForeArm", "Hand"))
+        c = (E0 - S0).normalized().cross((W0 - E0).normalized())
+        nLoc.append(P["LeftArm"].to_3x3().transposed() @ c.normalized() if c.length > 0.17 else None)
+    have = [k for k in range(n) if nLoc[k] is not None]
+    nLoc = [v if v is not None else (nLoc[min(have, key=lambda j: abs(j - k))] if have else Vector((1.0, 0.0, 0.0))) for k, v in enumerate(nLoc)]
+    used, maxMove, maxTurn, short, maxSwivel, maxCorr = [], 0.0, 0.0, [], 0.0, 0.0
+    for k, P in enumerate(Ps):
+        if h[k] < 1e-3:
+            continue
+        mag = rvsm[k].length
+        qs = Quaternion(rvsm[k] / mag, mag) if mag > 1e-9 else Quaternion()
+        Rfix = qs.to_matrix()
+        nLk = PalmNormal(P, "Left")
+        ntk = (Rfix @ nLk).normalized()
+        Rn = Quaternion(ntk, swsm[k]).to_matrix() @ Rfix @ R0s[k].to_matrix()
+        maxSwivel = max(maxSwivel, abs(math.degrees(swsm[k])))
+        qn = Rn.to_quaternion()
+        if R0s[k].dot(qn) < 0:
+            qn.negate()
+        qb = R0s[k].slerp(qn, h[k])
+        rot, org, _ = rows[k]
+        T = org + rot @ Vector((0.0, 0.0, zt[k])) / sc
+        # palm offset: the smallest distance from the axis along the palm normal where the palm vertex set (LeftHand + Thumb1) penetrates
+        # the handle by no more than 0.5 mm (bisection), instead of the skin + support formula
+        rotT = rot.transposed()
+        LC = [(rotT @ (Rn @ c)) * sc for c in world.leftPalm]
+        base = rotT @ (T - Rn @ pls[k] - org) * sc
+        step = rotT @ ntk
+
+        def Pen(delta):
+            w0 = base - step * delta
+            return max(-GripHandleSd(w0.x + c.x, w0.y + c.y, w0.z + c.z) for c in LC)
+
+        lo, hi = 0.005, 0.07
+        if Pen(lo) <= 0.0005:
+            delta = lo
+        elif Pen(hi) > 0.0005:
+            delta = hi
+        else:
+            for _b in range(14):
+                mid = (lo + hi) / 2
+                if Pen(mid) > 0.0005:
+                    lo = mid
+                else:
+                    hi = mid
+            delta = hi
+        formula = GRIP_SKIN["Left"] * sc + HandleSupport(*(rotT @ (-ntk))[:2]) + GRIP_PALM_MARGIN
+        maxCorr = max(maxCorr, abs(delta - formula) * 1000)
+        Ppalm = T - ntk * (delta / sc)
+        dW = (Ppalm - Rn @ pls[k] - W0s[k]) * h[k]
+        over = SolveArm(clip, P, k, "Left", dW, Vector(), P["LeftArm"].to_3x3() @ nLoc[k])
+        Pn = dict(P)
+        clip.RePose(Pn, k, "LeftArm", over)
+        parHa = (Pn["LeftForeArm"] @ clip.rel["LeftHand"]).to_3x3()
+        qh = (parHa.inverted() @ qb.to_matrix()).to_quaternion()
+        qh.normalize()
+        if qh.dot(clip.Q0["LeftHand"][k]) < 0:
+            qh.negate()
+        over["LeftHand"] = qh
+        for name, q in over.items():
+            clip.Q[name][k] = q
+        for name in over:
+            clip.dirty.add(name)
+        Pn2 = dict(P)
+        clip.RePose(Pn2, k, "LeftArm", over)
+        left = (Pn2["LeftHand"].translation - (W0s[k] + dW)).length * sc * 100
+        maxMove = max(maxMove, dW.length * sc * 100)
+        maxTurn = max(maxTurn, Angle(R0s[k], qb))
+        used.append(k)
+        if left > 1.0:
+            short.append((clip.frames[k], left))
+    changes, stats = [], {"frames": len(used), "maxMoveCm": round(maxMove, 1), "maxTurnDeg": round(maxTurn, 1), "maxSwivelDeg": round(maxSwivel, 1), "offsetCorrMm": round(maxCorr, 1), "reversed": sum(reversed_), "short": len(short)}
+    if used:
+        changes.append(f"左手两节骨 IK 到刀柄尾段第 {Ranges([clip.frames[k] for k in used if h[k] > 0.01])} 帧：手腕最多移 {maxMove:.1f} cm、手掌最多转 {maxTurn:.1f}°（其中绕掌心法线摆正手指方向最多 {maxSwivel:.1f}°），左肩不动"
+                       f"（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 {maxCorr:.1f} mm；左手松开的帧保持原动作）")
+    if sum(reversed_):
+        ctx["unresolved"].append(f"左手有 {sum(reversed_)} 帧手是反的（食指侧朝刀柄尾端），这几帧不动：第 {Ranges([clip.frames[k] for k in range(n) if reversed_[k]])} 帧")
+    if short:
+        ctx["unresolved"].append(f"左手 IK 有 {len(short)} 帧够不到目标（两节骨臂长限制），最多差 {max(s[1] for s in short):.1f} cm，第 {Ranges([s[0] for s in short])} 帧")
+    return changes, stats
+
+
+# ---------------------------------------------------------------- finger / thumb optimisation
+def Frange(lo, hi, step):
+    out, v = [], lo
+    while v <= hi + 1e-9:
+        out.append(round(v, 4))
+        v += step
+    return out
+
+
+class ChainEval:
+    """One finger (or the thumb) on one frame. Fingers: (th1, th2, th3) in degrees. Thumb: (Thumb1 flexion delta, Thumb1 delta about local X,
+    th2, th3). Joint heads / capsule clearances are cached per joint level."""
+
+    def __init__(self, clip, world, P, k, side, finger, info, frame, tol, fingerSegs=None):
+        self.clip, self.world, self.k, self.sc = clip, world, k, clip.scale
+        self.thumb = finger == "Thumb"
+        self.names = [f"{side}Hand{finger}{i}" for i in (1, 2, 3, 4)]
+        self.rad = [world.radii.get(b, 0.009 if self.thumb else 0.008) for b in self.names[:3]]
+        self.rel = [clip.rel[b] for b in self.names]
+        self.hand = P[f"{side}Hand"]
+        self.info, self.rotT, self.trans, self.tol = info, frame[0], frame[1], tol
+        self.fingerSegs = fingerSegs or []
+        self.th0 = [0.0, 0.0] + [info[b]["th0"][k] for b in self.names[1:3]] if self.thumb else None
+        self.c1, self.c2, self.c3 = {}, {}, {}
+
+    def Q(self, j, th, x=0.0):
+        inf = self.info[self.names[j]]
+        if self.thumb and j == 0:
+            return inf["q0"][self.k] @ Quaternion(inf["A"], math.radians(th)) @ Quaternion(Vector((1.0, 0.0, 0.0)), math.radians(x))
+        return inf["sw"][self.k] @ Quaternion(inf["A"], math.radians(th))
+
+    def Clear(self, a, b, r, cap=False):
+        sc = self.sc
+        if cap:
+            d = b - a
+            if d.length > 1e-9:
+                b = b - d.normalized() * (r / sc)
+                if (b - a).dot(d) < 0:
+                    b = a
+        n = max(1, int(math.ceil((b - a).length * sc / GRIP_SAMPLE_M)))
+        best = 1e9
+        for t in range(n + 1):
+            p = a.lerp(b, t / n)
+            loc = (self.rotT @ (p - self.trans)) * sc
+            c = self.world.Sdf(loc) - r
+            for fa, fb, fr in self.fingerSegs:
+                ab = fb - fa
+                u = max(0.0, min(1.0, (p - fa).dot(ab) / max(ab.dot(ab), 1e-12)))
+                c = min(c, ((fa + ab * u) - p).length * sc - r - fr)
+            best = min(best, c)
+        return best, (a, b)
+
+    def L1(self, a, x):
+        key = (a, x)
+        if key not in self.c1:
+            M = self.hand @ self.rel[0] @ self.clip.Basis(self.names[0], self.k, self.Q(0, a, x))
+            h1, h2 = (self.hand @ self.rel[0]).translation, (M @ self.rel[1]).translation
+            self.c1[key] = (M, h2, None if self.thumb else self.Clear(h1, h2, self.rad[0])[0], (h1, h2))
+        return self.c1[key]
+
+    def L2(self, a, x, b):
+        key = (a, x, b)
+        if key not in self.c2:
+            M1, h2, _, _ = self.L1(a, x)
+            M = M1 @ self.rel[1] @ self.clip.Basis(self.names[1], self.k, self.Q(1, b))
+            h3 = (M @ self.rel[2]).translation
+            c, seg = self.Clear(h2, h3, self.rad[1])
+            self.c2[key] = (M, h3, c, seg)
+        return self.c2[key]
+
+    def L3(self, a, x, b, c):
+        key = (a, x, b, c)
+        if key not in self.c3:
+            M2, h3, _, _ = self.L2(a, x, b)
+            M = M2 @ self.rel[2] @ self.clip.Basis(self.names[2], self.k, self.Q(2, c))
+            h4 = (M @ self.rel[3]).translation
+            self.c3[key] = self.Clear(h3, h4, self.rad[2], cap=True)
+        return self.c3[key]
+
+    def Split(self, th):
+        th = [round(t, 4) for t in th]
+        return (th[0], th[1], th[2], th[3]) if self.thumb else (th[0], 0.0, th[1], th[2])
+
+    def Clearances(self, th):
+        a, x, b, c = self.Split(th)
+        return [self.L1(a, x)[2], self.L2(a, x, b)[2], self.L3(a, x, b, c)[0]]
+
+    def E(self, th, w=(0.25, 1.0, 1.0)):
+        tol = self.tol
+        cs = self.Clearances(th)
+        if self.thumb:
+            e = 0.5 * max(cs[1], 0.0) ** 2 + max(cs[2], 0.0) ** 2
+            e += 1000.0 * sum(max(-v - tol, 0.0) ** 2 for v in cs[1:])
+            e += 5e-6 * sum(math.radians(t - t0) ** 2 for t, t0 in zip(th, self.th0))
+        else:
+            e = sum(wi * max(v, 0.0) ** 2 for wi, v in zip(w, cs))
+            e += 1000.0 * sum(max(-v - tol, 0.0) ** 2 for v in cs)
+            e += 7.4e-5 * (math.radians(th[2]) - 0.7 * math.radians(th[1])) ** 2
+        return e
+
+    def Segs(self, th):
+        a, x, b, c = self.Split(th)
+        l1, l2, l3 = self.L1(a, x)[3], self.L2(a, x, b)[3], self.L3(a, x, b, c)[1]
+        return [(l1[0], l1[1], self.rad[0]), (l2[0], l2[1], self.rad[1]), (l3[0], l3[1], self.rad[2])]
+
+
+def GridSearch(ev, lists):
+    best = None
+    for th in itertools.product(*lists):
+        e = ev.E(th)
+        if best is None or e < best[0]:
+            best = (e, tuple(th))
+    return best
+
+
+def Refine(ev, center, half, step, limits):
+    lists = [Frange(max(lo, c - hf), min(hi, c + hf), st) for c, hf, st, (lo, hi) in zip(center, half, step, limits)]
+    return GridSearch(ev, lists)
+
+
+def SolveChain(ev, prev, limits):
+    """Full grid on the first frame of a run (or on fallback), then refine; later frames refine around the previous raw solution."""
+    thumb, nd = ev.thumb, len(limits)
+    pen0 = 1 if thumb else 0
+    if prev is not None:
+        e, th = Refine(ev, prev[1], [6.0] * nd, [3.0 if thumb else 2.0] * nd, limits)
+        e, th = Refine(ev, th, [1.5] * nd, [0.75 if thumb else 0.5] * nd, limits)
+        if min(ev.Clearances(th)[pen0:]) >= -0.001 and e <= 4 * max(prev[0], 2e-6):
+            return e, th, False
+    if thumb:
+        full = [Frange(limits[0][0], limits[0][1], 7.0), Frange(limits[1][0], limits[1][1], 5.0), Frange(limits[2][0], limits[2][1], 10.0), Frange(limits[3][0], limits[3][1], 10.0)]
+        e, th = GridSearch(ev, full)
+        e, th = Refine(ev, th, [7.0, 5.0, 10.0, 10.0], [3.5, 2.5, 5.0, 5.0], limits)
+        e, th = Refine(ev, th, [2.0] * 4, [1.0] * 4, limits)
+    else:
+        full = [Frange(lo, hi, 5.0) for lo, hi in limits]
+        e, th = GridSearch(ev, full)
+        e, th = Refine(ev, th, [5.0] * 3, [1.0] * 3, limits)
+    return e, th, True
+
+
+def OpGrip(clip, op, ctx):
+    world = ctx["gripWorld"]
+    margin = float(op.get("marginMm", 0.0)) / 1000.0
+    tol = float(op.get("tolMm", 0.5)) / 1000.0
+    sigma = float(op.get("sigma", 1.0))
+    n, sc, cyc = clip.n, clip.scale, ctx["loop"]
+
+    def Frames(Ps):
+        out = []
+        for P in Ps:
+            rot, trans = DadaoPlacement(clip, P, world.cal)
+            out.append((rot.transposed(), trans))
+        return out
+
+    def LeftWeights(Ps, frames):
+        raw = []
+        for k in range(n):
+            G = (frames[k][0] @ (GripPoint(Ps[k], "Left", RigidRot(Ps[k], world.cal)) - frames[k][1])) * sc
+            rho = math.hypot(G.x, G.y + 0.0003)
+            raw.append((1 - Smooth3(0.015, 0.04, rho)) * Smooth3(-0.03, 0.0, G.z) * (1 - Smooth3(0.25, 0.29, G.z)))
+        return raw, [max(0.0, min(1.0, v)) for v in GaussSmooth(MaxFilter(raw, 3, cyc), 2.0, cyc)]
+
+    changes, measure = [], {}
+    ikLines, ikStats = LeftReach(clip, world, ctx)
+    changes.extend(ikLines)
+    measure["ik"] = ikStats
+    Ps = [clip.Pose(k) for k in range(n)]
+    frames = Frames(Ps)
+    _, gsL = LeftWeights(Ps, frames)
+    gs = {"Right": [1.0] * n, "Left": gsL}
+
+    for side in ("Right", "Left"):
+        solveAt = [k for k in range(n) if gs[side][k] > 0.01]
+        if not solveAt:
+            continue
+        names = GRIP_FINGERS + ["Thumb"]
+        stat = {"frames": len(solveAt), "grid": 0, "pen": {f: 0 for f in names}, "far": {f: 0 for f in names}, "touch": 0.0}
+        bones = {f: [f"{side}Hand{f}{i}" for i in (1, 2, 3)] for f in names}
+        info = {}
+        for f, bs in bones.items():
+            for i, b in enumerate(bs):
+                A = (world.thumb1A[side] if i == 0 else world.thumbA[side]) if f == "Thumb" else world.flexA[side]
+                sw, th0 = [], []
+                for k in range(n):
+                    if f == "Thumb" and i == 0:
+                        sw.append(clip.Q[b][k].copy())
+                        th0.append(0.0)
+                    else:
+                        s_, t_ = SwingTwist(clip.Q[b][k], A)
+                        sw.append(s_)
+                        th0.append(t_)
+                info[b] = {"sw": sw, "th0": th0, "A": A, "q0": [q.copy() for q in clip.Q[b]]}
+        fit = {b: list(info[b]["th0"]) for b in info}
+        fitX = [0.0] * n
+        solved = {b: [False] * n for b in info}
+        prevSol = {f: None for f in bones}
+        lastK = None
+        pinLast = (cyc and solveAt[0] == 0 and solveAt[-1] == n - 1 and Angle(clip.Q0["RightHand"][0], clip.Q0["RightHand"][-1]) < 0.5
+                   and Angle(clip.Q0["LeftHand"][0], clip.Q0["LeftHand"][-1]) < 0.5)   # loop clip whose last frame repeats the first: solve it once
+        for k in (solveAt[:-1] if pinLast else solveAt):
+            if lastK is None or k != lastK + 1:
+                prevSol = {f: None for f in bones}
+            lastK = k
+            fingerSegs = []
+            for f in names:
+                thumb = f == "Thumb"
+                ev = ChainEval(clip, world, Ps[k], k, side, f, info, frames[k], tol, fingerSegs if thumb else None)
+                for j in range(3):
+                    ev.rad[j] += margin
+                e, th, grid = SolveChain(ev, prevSol[f], THUMB_LIMITS if thumb else FINGER_LIMITS)
+                stat["grid"] += int(grid)
+                prevSol[f] = (e, th)
+                cs = ev.Clearances(th)
+                pen0 = 1 if thumb else 0
+                if min(cs[pen0:]) < -0.001:
+                    stat["pen"][f] += 1
+                if min(cs[pen0:]) > 0.003:
+                    stat["far"][f] += 1
+                if not thumb:
+                    stat["touch"] += sum(1 for v in cs if v <= 0.0015)
+                if thumb:
+                    fitX[k] = th[1]
+                    vals = [th[0], th[2], th[3]]
+                else:
+                    vals = list(th)
+                for i, b in enumerate(bones[f]):
+                    fit[b][k] = vals[i]
+                    solved[b][k] = True
+                if f in ("Index", "Middle"):
+                    fingerSegs.extend(ev.Segs(th))
+        if pinLast:
+            for b in fit:
+                fit[b][n - 1], solved[b][n - 1] = fit[b][0], solved[b][0]
+            fitX[n - 1] = fitX[0]
+        stat["touchMean"] = round(stat["touch"] / (len(solveAt) * 4), 3)
+        del stat["touch"]
+        measure[side] = stat
+        g = gs[side]
+        worst = {f: 0.0 for f in bones}
+        smX = GaussSmooth(fitX, sigma, cyc)
+        for f, bs in bones.items():
+            for bi, b in enumerate(bs):
+                inf = info[b]
+                seq = GaussSmooth(fit[b], sigma, cyc)
+                for k in range(n):
+                    if f == "Thumb" and bi == 0:
+                        qf = inf["q0"][k] @ Quaternion(inf["A"], math.radians(seq[k])) @ Quaternion(Vector((1.0, 0.0, 0.0)), math.radians(smX[k]))
+                    else:
+                        qf = inf["sw"][k] @ Quaternion(inf["A"], math.radians(seq[k]))
+                    q0 = inf["q0"][k]
+                    if q0.dot(qf) < 0:
+                        qf.negate()
+                    qn = q0.slerp(qf, g[k])
+                    worst[f] = max(worst[f], Angle(q0, qn))
+                    clip.Q[b][k] = qn
+                clip.dirty.add(b)
+        who = "右手" if side == "Right" else "左手"
+        fr = [clip.frames[k] for k in range(n) if g[k] > 0.01]
+        changes.append(f"{who} 第 {Ranges(fr)} 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），"
+                       f"最大改动 {'、'.join(f'{GRIP_NAMES[f]} {worst[f]:.0f}°' for f in bones)}")
+        for f in names:
+            if stat["pen"][f]:
+                ctx["unresolved"].append(f"{side}{f} 有 {stat['pen'][f]} 帧优化完仍陷进刀柄 > 1 mm")
+            if stat["far"][f]:
+                ctx["unresolved"].append(f"{side}{f} 有 {stat['far'][f]} 帧离刀柄 > 3 mm（够不到或在柄尾环上）")
+    if cyc and Angle(clip.Q0["RightHand"][0], clip.Q0["RightHand"][-1]) < 0.5 and Angle(clip.Q0["LeftHand"][0], clip.Q0["LeftHand"][-1]) < 0.5:
+        for b in clip.dirty:   # loop clip whose last frame repeats the first: keep it that way after the temporal smoothing
+            clip.Q[b][-1] = clip.Q[b][0].copy()
+    ctx["measure"]["grip"] = measure
+    return changes
+
+
+OPS_FN = {"seam": OpSeam, "glitch": OpGlitch, "hands": OpHands, "shift": OpShift, "grip": OpGrip}
 
 
 def Diag(clip, ctx):
@@ -1024,6 +1807,9 @@ def Main():
             extra = sorted(w for w in want if w not in stems)
             stems += extra
     vols, rest = FitBody()
+    setupCtx = {}
+    if any(o["op"] == "grip" for st in stems for o in table[st].get("ops", [])):
+        GripSetup(setupCtx)
     Log("body volumes", {k: round(v["rx"], 2) for k, v in vols.items()})
     os.makedirs(ORIG, exist_ok=True)
     if opts["log"]:
@@ -1041,7 +1827,7 @@ def Main():
                            for b in rest if b in arm.data.bones)
             Log(stem, "rest diff vs X Bot (units / deg)", round(restDiff, 4))
             clip = Clip(arm, stem)
-            ctx = {"vols": vols, "loop": IsLoop(manifest, stem), "unresolved": [], "measure": {}}
+            ctx = {"vols": vols, "loop": IsLoop(manifest, stem), "unresolved": [], "measure": {}, **setupCtx}
             if opts["diag"]:
                 for line in Diag(clip, ctx):
                     Log(stem, line)

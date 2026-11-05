@@ -1,5 +1,6 @@
 // 把 Script_MixamoClipFix.py 的日志和改前 / 改后两份审查结果合成调整记录 <词干>.<主题>.fix.json（格式见 README.md）。
 //   node Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFixRecords.mjs --log=<Blender 日志目录> --before=<改前 audit.jsonl> --after=<改后 audit.jsonl>
+//                                                                          [--grip-before=<Script_DadaoGripAudit 的 jsonl> --grip-after=<同>]
 // 改前那份就是 Mixamo 原样的审查（Original/ 下那份 GLB 的数）；主题对应修法表 Data_MixamoClipFixOps.json 里 op 的 topic。
 // 每个主题记它自己的数：Hands → 手 / 前臂进身体（端枪动作另记枪的数，确认没变坏）；Glitch → 抽搐最大角；Seam → 首尾差；
 // Pose → 手里的道具进身体多深。--rifle-before=<jsonl> 可另给一份「新挂法下的原版」审查，端枪动作的枪数从它取（挂法改过之后旧审查的枪数不可比）。
@@ -12,6 +13,7 @@ const ops = JSON.parse(fs.readFileSync(path.join(HERE, "Data_MixamoClipFixOps.js
 const Rows = (file) => new Map(fs.readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l)).map((r) => [r.file, r]));
 const before = Rows(flags.before), after = Rows(flags.after);
 const rifleBefore = flags["rifle-before"] ? Rows(flags["rifle-before"]) : new Map();
+const gripBefore = flags["grip-before"] ? Rows(flags["grip-before"]) : new Map(), gripAfter = flags["grip-after"] ? Rows(flags["grip-after"]) : new Map();
 const cm = (d) => (d ? +(d * 100).toFixed(1) : 0);
 const today = new Date().toISOString().slice(0, 10);
 
@@ -32,6 +34,8 @@ function Glitch(r, bones) {
   return { glitchDeg: top ? top.deg : "≤12", worst: top ? `${top.bone}@${top.frame}` : null, over15: (r.glitches || []).filter((g) => g.deg > 15).length };
 }
 const Seam = (r) => ({ seamDeg: r.seam ?? null });
+// Grip：手指贴大刀刀柄，量的是 Script_DadaoGripAudit.mjs 的 grip（--grip-before / --grip-after 各给一份它的 jsonl）
+const Grip = (r) => r.grip;
 // Pose：手没穿、是手里的枪 / 刀穿进身体，记道具进各骨头多深（cm）和枪相对右手一帧拧的最大角
 function Pose(r) {
   const o = {};
@@ -42,7 +46,7 @@ function Pose(r) {
   }
   return o;
 }
-const METRIC = { Hands, Glitch, Seam, Pose };
+const METRIC = { Hands, Glitch, Seam, Pose, Grip };
 
 function Summary(topic, b, a, entryOps) {
   const custom = entryOps.find((o) => (o.topic || o.op) === topic && o.summary);
@@ -57,6 +61,12 @@ function Summary(topic, b, a, entryOps) {
     return `手 / 前臂陷进身体：先抬手指 / 手掌，不够再两节骨 IK 把整只手往外推到贴着（${parts.join("，")}）`;
   }
   if (topic === "Glitch") return `一帧抽搐（去了又回来）：坏帧换成前后好帧之间的插值（最大 ${b.glitchDeg}°→${a.glitchDeg}°）`;
+  if (topic === "Grip") {
+    const F4 = ["Index", "Middle", "Ring", "Pinky"], gap = (g, s) => (g?.[s]?.fingerGapMedMm ? Math.max(...F4.map((f) => g[s].fingerGapMedMm[f])) : "–");
+    const pen = (g, s) => (g?.[s]?.fingerPenP95Mm ? Math.max(...F4.map((f) => g[s].fingerPenP95Mm[f])) : "–");
+    return `手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 ${gap(b, "Right")}→${gap(a, "Right")} mm、陷进 P95 ${pen(b, "Right")}→${pen(a, "Right")} mm，`
+      + `左手 ${gap(b, "Left")}→${gap(a, "Left")} mm、${pen(b, "Left")}→${pen(a, "Left")} mm；右手掌陷进 ${b?.Right?.palmPenMm ?? "–"}→${a?.Right?.palmPenMm ?? "–"} mm）`;
+  }
   if (topic === "Seam") return `循环首尾不接：尾段渐变到首帧姿势（首尾差 ${b.seamDeg}°→${a.seamDeg}°）`;
   return topic;
 }
@@ -67,9 +77,11 @@ for (const name of fs.readdirSync(flags.log).filter((n) => n.endsWith(".json")).
   if (!log.exported) continue;
   const file = `${log.stem}.glb`;
   let b = before.get(file);
-  const a = after.get(file);
+  let a = after.get(file);
   const rb = rifleBefore.get(file);
   if (b && rb) b = { ...b, rifle: rb.rifle, dadao: rb.dadao };
+  if (b && gripBefore.get(file)) b = { ...b, grip: gripBefore.get(file).grip };
+  if (a && gripAfter.get(file)) a = { ...a, grip: gripAfter.get(file).grip };
   if (!b || !a) { console.warn(`[FixRecords] ${file}: 缺改前或改后审查，跳过`); continue; }
   const entryOps = ops[log.stem]?.ops || [];
   for (const [topic, lines] of Object.entries(log.topics)) {
@@ -79,11 +91,11 @@ for (const name of fs.readdirSync(flags.log).filter((n) => n.endsWith(".json")).
     const mb = metric(b, op?.bones), ma = metric(a, op?.bones);
     const changes = [...lines];
     for (const u of log.unresolved || []) {
-      const handLine = /^[左右]手/.test(u);
-      if ((topic === "Hands" && handLine) || (topic === "Glitch" && !handLine)) changes.push(`未消掉：${u}`);
+      const handLine = /^([左右]手|Right|Left)/.test(u), gripLine = /^(Right|Left|左手 IK)/.test(u);
+      if ((topic === "Hands" && handLine && !gripLine) || (topic === "Glitch" && !handLine) || (topic === "Grip" && gripLine)) changes.push(`未消掉：${u}`);
     }
     const record = {
-      file, topic, kind: "anim", date: today, author: "Claude Opus 5.5",
+      file, topic, kind: "anim", date: today, author: flags.author || "Claude Opus 5.5",
       summary: Summary(topic, mb, ma, entryOps),
       changes, before: mb, after: ma,
       original: `Original/${file}`,

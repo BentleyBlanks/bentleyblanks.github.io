@@ -1,0 +1,125 @@
+{
+  "file": "Animation_Mixamo_GreatSwordSlash_V1.glb",
+  "topic": "Grip",
+  "kind": "anim",
+  "date": "2026-11-05",
+  "author": "Devin",
+  "summary": "手指贴大刀刀柄：左手 IK 到柄尾段，两手手指按刀柄外形逐帧合拢（右手四指离刀面中位 3→0.9 mm、陷进 P95 9.7→0.3 mm，左手 14.1→1.6 mm、9.7→6.7 mm；右手掌陷进 1.7→2.3 mm）",
+  "changes": [
+    "左手两节骨 IK 到刀柄尾段第 1–107 帧：手腕最多移 11.1 cm、手掌最多转 35.1°（其中绕掌心法线摆正手指方向最多 18.4°），左肩不动（刀固定在右手里，左手落到刀轴 z 0.13–0.17 处，手掌转到刀柄落进掌平面、手指与朝护手方向夹角 40–90°；掌心离轴线的距离按手掌和拇指根的顶点逐帧求（陷进刀柄 0.5 mm），比公式最多差 21.0 mm；左手松开的帧保持原动作）",
+    "右手 第 1–107 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 112°、中指 48°、无名指 31°、小指 23°、拇指 24°",
+    "左手 第 1–107 帧：手指逐帧按刀柄外形优化合拢（每节骨绕本地轴转、保留原来的外展 / 扭转；四指各自在关节限位里搜最贴刀柄的角度，拇指第 1 节两个自由度 + 第 2、3 节），最大改动 食指 77°、中指 54°、无名指 39°、小指 86°、拇指 42°",
+    "未消掉：LeftIndex 有 1 帧优化完仍陷进刀柄 > 1 mm",
+    "未消掉：LeftPinky 有 1 帧优化完仍陷进刀柄 > 1 mm",
+    "未消掉：LeftPinky 有 3 帧离刀柄 > 3 mm（够不到或在柄尾环上）"
+  ],
+  "before": {
+    "Right": {
+      "onFrac": 1,
+      "palmPenMm": 1.7,
+      "fingerPenMm": {
+        "Thumb": 8.3,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.6,
+        "Pinky": 0
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 8.3,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.6,
+        "Pinky": 0
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 3
+      }
+    },
+    "Left": {
+      "onFrac": 0.29,
+      "palmPenMm": 9.7,
+      "fingerPenMm": {
+        "Thumb": 9.7,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 9.7
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 9.7,
+        "Index": 9.7,
+        "Middle": 9.7,
+        "Ring": 9.7,
+        "Pinky": 5.9
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0.2,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 14.1
+      }
+    }
+  },
+  "after": {
+    "Right": {
+      "onFrac": 1,
+      "palmPenMm": 2.3,
+      "fingerPenMm": {
+        "Thumb": 0.4,
+        "Index": 0,
+        "Middle": 0.3,
+        "Ring": 0,
+        "Pinky": 0
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 0.3,
+        "Index": 0,
+        "Middle": 0.3,
+        "Ring": 0,
+        "Pinky": 0
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0.7,
+        "Middle": 0,
+        "Ring": 0.9,
+        "Pinky": 0.7
+      }
+    },
+    "Left": {
+      "onFrac": 1,
+      "palmPenMm": 3.9,
+      "fingerPenMm": {
+        "Thumb": 9.7,
+        "Index": 5.8,
+        "Middle": 9.2,
+        "Ring": 9.7,
+        "Pinky": 7.5
+      },
+      "fingerPenP95Mm": {
+        "Thumb": 9.7,
+        "Index": 2.7,
+        "Middle": 3.6,
+        "Ring": 6.7,
+        "Pinky": 3.7
+      },
+      "fingerGapMedMm": {
+        "Thumb": 0,
+        "Index": 0.4,
+        "Middle": 0,
+        "Ring": 0,
+        "Pinky": 1.6
+      }
+    }
+  },
+  "original": "Original/Animation_Mixamo_GreatSwordSlash_V1.glb",
+  "sources": [
+    "Taierzhuang1938/_import/MixamoFixes/Script_MixamoClipFix.py",
+    "Taierzhuang1938/_import/MixamoFixes/Data_MixamoClipFixOps.json"
+  ]
+}

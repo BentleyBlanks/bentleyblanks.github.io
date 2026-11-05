@@ -844,6 +844,10 @@
     {
      "op": "glitch",
      "topic": "Glitch"
+    },
+    {
+     "op": "grip",
+     "topic": "Grip"
     }
    ]
   },
@@ -1087,6 +1091,70 @@
      "cm": 2,
      "awayFrom": "Head",
      "summary": "跪→卧途中枪身擦进头 2.3 cm（第 24 帧）：两手连枪背离头同推 2 cm"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordIdle_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordImpact_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordImpact_V2": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordAttack_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordSlash_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordBlocking_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordBlocking_V2": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
+    }
+   ]
+  },
+  "Animation_Mixamo_GreatSwordHighSpinAttack_V1": {
+   "ops": [
+    {
+     "op": "grip",
+     "topic": "Grip"
     }
    ]
   }

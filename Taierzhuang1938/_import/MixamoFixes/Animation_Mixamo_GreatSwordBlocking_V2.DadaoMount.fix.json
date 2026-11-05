@@ -1,0 +1,29 @@
+{
+  "file": "Animation_Mixamo_GreatSwordBlocking_V2.glb",
+  "topic": "DadaoMount",
+  "kind": "attach",
+  "date": "2026-11-05",
+  "author": "Devin",
+  "summary": "预览工具大刀挂法：刃口改 +Y 朝指节；刀柄轴线沿掌心法线推到「该人物掌心皮肤厚度 + 刀柄在掌心方向的支撑距离」处（掌心点取手腕到中指根 0.72）；刀固定在右手里，删掉朝左手的转向",
+  "changes": [
+    "刃口：Model_Dadao 实测薄刃在 +Y，原来把 -Y 对准指节，改成 +Y（Data_FpsDadaoSwing.sourceEdgeDirection 同口径）",
+    "握点：原来刀柄轴线过手的骨头线（陷进掌心约 1 cm），改成掌心点沿掌心法线外推 皮肤厚度（每个人物按绑定网格量）+ 刀柄圆角矩形截面的支撑距离 + 2 mm",
+    "删掉大刀刀尾朝左手的转向（AIM_AT_POMMEL）：刀固定在右手里，两手握刀由修过的动作（Grip 记录）把左手放到刀轴上"
+  ],
+  "before": {
+    "rightPalmPenMm": 9.5,
+    "dadaoBodyCm": {},
+    "dadaoSnapDeg": 8.7
+  },
+  "after": {
+    "rightPalmPenMm": 1.7,
+    "dadaoBodyCm": {
+      "LeftForeArm": 1
+    },
+    "dadaoSnapDeg": 0
+  },
+  "sources": [
+    "Taierzhuang1938/Tool_MixamoAnimationPreview.html",
+    "Taierzhuang1938/Script_MixamoProps.mjs"
+  ]
+}

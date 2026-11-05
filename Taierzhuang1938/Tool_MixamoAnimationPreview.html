@@ -121,7 +121,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { LoadModel } from "./Script_MeshLoad.mjs";
-import { AimAt, AimBandFor, AIM_AT_POMMEL, PrepareRifleTrack, RifleTrackPose } from "./Script_MixamoProps.mjs";
+import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 
@@ -227,8 +227,9 @@ async function LoadCharacter(key) {
   scene.add(character);
   hips = character.getObjectByName("Hips");
   spine2 = character.getObjectByName("Spine2");
-  [rightHand, rightMiddle, leftHand, leftMiddle, rightThumb, leftThumb] = ["RightHand", "RightHandMiddle1", "LeftHand",
-    "LeftHandMiddle1", "RightHandThumb1", "LeftHandThumb1"].map(name => character.getObjectByName(name));
+  [rightHand, rightMiddle, leftHand, leftMiddle, rightThumb, leftThumb, rightIndex, rightPinky, leftIndex, leftPinky] = ["RightHand",
+    "RightHandMiddle1", "LeftHand", "LeftHandMiddle1", "RightHandThumb1", "LeftHandThumb1", "RightHandIndex1", "RightHandPinky1",
+    "LeftHandIndex1", "LeftHandPinky1"].map(name => character.getObjectByName(name));
   mixer = new THREE.AnimationMixer(character);
   action = null;
   if (window.__preview) window.__preview.character = character;
@@ -414,14 +415,21 @@ function PlaceRifle() {
 // 清单里 prop 为「手榴弹」的投弹动作挂手榴弹，为「大刀」的挂项目里的二十九军大刀；模型和贴图跟游戏里同一套。
 // 手榴弹：选中动作时先把整条过一遍，挥得最快的那只手是投弹手，最快那一帧算出手。出手前握在掌心
 // （弹头从拳头的拇指一侧伸出去），出手后按出手那一刻的速度走抛物线落地，循环回开头再回到手里。
-// 大刀：跟步枪一样，用一条双手大刀待机的第 0 帧标定——前握点进右手掌心、刀尾朝左手、刃口朝指节——
-// 之后每帧照抄右手；两手都握在刀柄上时，再以前握点为轴把刀尾转过去对准左手（按距离和偏角渐变，Script_MixamoProps.mjs 的
-// AIM_AT_POMMEL；原来 70° 以内整个转过去，砍劈时左手离柄一下刀一帧拧 30–70°）。
+// 大刀：跟步枪一样，用一条双手大刀待机的第 0 帧标定——前握点进右手握点、刀尾朝左手握点、刃口朝指节——
+// 之后每帧照抄右手，刀固定在右手里（11-05 删掉了「把刀尾转过去对准左手」的 AIM_AT_POMMEL：砍劈时左手离柄，刀一帧拧 30–70°；
+// 两手握刀由修过的动作 Script_MixamoClipFix.py 的 grip 把左手放到刀轴上）。
+// 握点 = 掌心点（手腕 → 中指根 DADAO_PALM_ALONG）沿掌心法线推出「该人物的掌心皮肤厚度 + 刀柄在掌心方向上的支撑距离」（GripPoint）：
+// 皮肤厚度每个人物从绑定姿势的网格量一次（PalmSkin）；刀柄截面是圆角矩形，掌心对着窄边时比对着宽面深得多（HandleSupport）。
+// 11-05 以前刀柄轴线直接穿过手的骨头线，2 cm 粗的刀柄陷进手掌约 1 cm。
 const DADAO_CALIBRATION_CLIP = "Great Sword Idle";
 const DADAO_GRIP_R = new THREE.Vector3(0, 0, 0.03);          // Model_Dadao 的 gripR 挂点
+const DADAO_PALM_ALONG = 0.72;
+const DADAO_PALM_MARGIN = 0.002;   // 握点再往外留 2 mm
+const DADAO_HANDLE = { hx: 0.0097, hy: 0.0210, cy: -0.0005, rc: 0.006 };   // Model_Dadao 刀柄截面（圆角矩形，与 Script_DadaoGripAudit.mjs 同）
+const dadaoPalmSkin = { Right: 0, Left: 0 };
 const GRAVITY = 9.8, GRENADE_REST_Y = 0.03;
 const textureLoader = new THREE.TextureLoader();
-let rightThumb = null, leftThumb = null;
+let rightThumb = null, leftThumb = null, rightIndex = null, rightPinky = null, leftIndex = null, leftPinky = null;
 let dadao = null, dadaoOffset = null, throwInfo = null;
 let grenade = null;
 const grenades = new Map();
@@ -492,6 +500,74 @@ function HandAxes(hand, middle, thumb, fingers, thumbSide) {
   thumbSide.addScaledVector(fingers, -thumbSide.dot(fingers)).normalize();
 }
 
+// 刀柄轴线到刀柄表面、沿 (ux, uy)（刀坐标 xy 平面里的方向）的距离
+function HandleSupport(ux, uy) {
+  const { hx, hy, cy, rc } = DADAO_HANDLE, l = Math.hypot(ux, uy) || 1;
+  ux /= l; uy /= l;
+  return cy * uy + (hx - rc) * Math.abs(ux) + (hy - rc) * Math.abs(uy) + rc;
+}
+
+function HandBones(left) {
+  return left ? [leftHand, leftMiddle, leftIndex, leftPinky] : [rightHand, rightMiddle, rightIndex, rightPinky];
+}
+
+// 手的几何：掌心点（手腕 → 中指根 DADAO_PALM_ALONG）和掌心法线
+function PalmFrame(left, h, m, i, p) {
+  const finger = m.clone().sub(h), across = i.clone().sub(p);
+  const normal = (left ? finger.clone().cross(across) : across.cross(finger)).normalize();
+  return { point: h.clone().lerp(m, DADAO_PALM_ALONG), normal, length: finger.length() };
+}
+
+// 掌心皮肤厚度：绑定姿势下，掌心点周围 2.5 cm（掌心平面内）、主权重在 <Side>Hand 的顶点沿法线最远多远（米，按当前世界尺寸）
+function PalmSkin(left) {
+  const side = left ? "Left" : "Right", names = [`${side}Hand`, `${side}HandMiddle1`, `${side}HandIndex1`, `${side}HandPinky1`];
+  const rest = {};
+  let skinned = null;
+  character.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    o.skeleton.bones.forEach((bone, k) => {
+      if (names.includes(bone.name) && !rest[bone.name]) rest[bone.name] = new THREE.Vector3().setFromMatrixPosition(o.skeleton.boneInverses[k].clone().invert());
+    });
+    skinned = skinned || o;
+  });
+  const [h, m, i, p] = names.map(n => rest[n]);
+  if (!h || !m || !i || !p) return 0;
+  const frame = PalmFrame(left, h, m, i, p);
+  const [wh, wm] = HandBones(left), ratio = wh.getWorldPosition(new THREE.Vector3()).distanceTo(wm.getWorldPosition(new THREE.Vector3())) / frame.length;
+  let skin = -Infinity;
+  const v = new THREE.Vector3(), d = new THREE.Vector3();
+  character.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, pos = o.geometry.attributes.position;
+    for (let k = 0; k < si.count; k++) {
+      let best = -1, bw = 0;
+      for (let q = 0; q < 4; q++) { const w = sw.getComponent(k, q); if (w > bw) { bw = w; best = si.getComponent(k, q); } }
+      if (bw < 0.5 || o.skeleton.bones[best].name !== names[0]) continue;
+      v.fromBufferAttribute(pos, k).applyMatrix4(o.bindMatrix);
+      d.copy(v).sub(frame.point);
+      const along = d.dot(frame.normal);
+      if (d.addScaledVector(frame.normal, -along).length() * ratio < 0.025) skin = Math.max(skin, along);
+    }
+  });
+  return (skin === -Infinity ? 0.25 * frame.length : skin) * ratio;
+}
+
+// 握点：掌心点沿掌心法线推出「皮肤厚度 + 刀柄在掌心方向上的支撑距离」；frameQ = 刀此刻的朝向（空 = 当作掌心对着宽面）
+function GripPoint(left, out, frameQ) {
+  const [hand, middle, index, pinky] = HandBones(left);
+  const f = PalmFrame(left, hand.getWorldPosition(new THREE.Vector3()), middle.getWorldPosition(new THREE.Vector3()),
+    index.getWorldPosition(new THREE.Vector3()), pinky.getWorldPosition(new THREE.Vector3()));
+  let support = DADAO_HANDLE.hx;
+  if (frameQ) { const u = f.normal.clone().negate().applyQuaternion(frameQ.clone().invert()); support = HandleSupport(u.x, u.y); }
+  return out.copy(f.point).addScaledVector(f.normal, dadaoPalmSkin[left ? "Left" : "Right"] + support + DADAO_PALM_MARGIN);
+}
+
+// 右手里的刀（不含朝左手的那一转）此刻的朝向
+function RigidDadaoQuaternion() {
+  rightHand.matrixWorld.decompose(handP, handQ, handS);
+  return handQ.clone().multiply(dadaoOffset.quaternion);
+}
+
 async function CalibrateDadao() {
   const entry = manifest.clips.find(clip => clip.name === DADAO_CALIBRATION_CLIP);
   if (!entry) return;
@@ -499,14 +575,17 @@ async function CalibrateDadao() {
   const probe = mixer.clipAction(clip);
   probe.reset().play(); probe.time = 0; mixer.update(0);
   character.updateMatrixWorld(true);
-  const right = Palm(rightHand, rightMiddle, new THREE.Vector3());
-  const left = Palm(leftHand, leftMiddle, new THREE.Vector3());
-  axisZ.copy(left).sub(right).normalize();                       // 刀的 +Z 朝刀尾（刀尖是 -Z）
+  dadaoPalmSkin.Right = PalmSkin(false); dadaoPalmSkin.Left = PalmSkin(true);
   const fingers = new THREE.Vector3(); HandAxes(rightHand, rightMiddle, rightThumb, fingers, new THREE.Vector3());
-  axisY.copy(fingers).addScaledVector(axisZ, -fingers.dot(axisZ)).normalize();   // 刃口（+Y，Model_Dadao 实测薄刃那侧，同 Data_FpsDadaoSwing 的 sourceEdgeDirection）朝指节
-  axisX.crossVectors(axisY, axisZ);
-  const q = new THREE.Quaternion().setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
-  const origin = right.clone().sub(DADAO_GRIP_R.clone().applyQuaternion(q));
+  let q = null, origin = null;
+  for (let pass = 0; pass < 2; pass++) {   // 握点取决于刀的朝向（掌心对着窄边还是宽面），第一遍当宽面，第二遍用第一遍的朝向重算
+    const right = GripPoint(false, new THREE.Vector3(), q), left = GripPoint(true, new THREE.Vector3(), q);
+    axisZ.copy(left).sub(right).normalize();                       // 刀的 +Z 朝刀尾（刀尖是 -Z）
+    axisY.copy(fingers).addScaledVector(axisZ, -fingers.dot(axisZ)).normalize();   // 刃口（+Y，Model_Dadao 实测薄刃那侧，同 Data_FpsDadaoSwing 的 sourceEdgeDirection）朝指节
+    axisX.crossVectors(axisY, axisZ);
+    q = new THREE.Quaternion().setFromRotationMatrix(basis.makeBasis(axisX, axisY, axisZ));
+    origin = right.clone().sub(DADAO_GRIP_R.clone().applyQuaternion(q));
+  }
   rightHand.matrixWorld.decompose(handP, handQ, handS);
   const inv = handQ.clone().invert();
   dadaoOffset = { position: origin.sub(handP).applyQuaternion(inv), quaternion: inv.multiply(q) };
@@ -520,12 +599,6 @@ function PlaceDadao() {
   rightHand.matrixWorld.decompose(handP, handQ, handS);
   dadao.quaternion.copy(handQ).multiply(dadaoOffset.quaternion);
   dadao.position.copy(dadaoOffset.position).applyQuaternion(handQ).add(handP);
-  const grip = DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion).add(dadao.position);
-  const pommel = new THREE.Vector3(0, 0, 1).applyQuaternion(dadao.quaternion);
-  toLeft.copy(Palm(leftHand, leftMiddle, palmL)).sub(grip);
-  if (AimAt(dadao.quaternion, pommel, toLeft, toLeft.length(), AIM_AT_POMMEL) > 0) {
-    dadao.position.copy(grip).sub(DADAO_GRIP_R.clone().applyQuaternion(dadao.quaternion));
-  }
 }
 
 // 担架（项目的 Model_BambooStretcher.glb：两杆中心相距 0.58 m、杆粗 5.6 cm，担架布在 z ±0.88 m 之间，
@@ -889,6 +962,7 @@ async function Boot() {
       get grenade() { return grenade; }, get dadao() { return dadao; }, get throwInfo() { return throwInfo; },
       get rifle() { return rifle; }, get rifleGripL() { return rifleGripL; }, get stretcher() { return stretcher; },
       get current() { return current; }, get manifest() { return manifest; }, get rifleMode() { return rifleMode; },
+      get dadaoPalmSkin() { return dadaoPalmSkin; }, DadaoGripPoint: (side) => GripPoint(side === "Left", new THREE.Vector3(), RigidDadaoQuaternion()),
       SelectFile: (file) => Select(manifest.clips.find(clip => clip.file === file)),
       Place: () => { character.updateMatrixWorld(true); PlaceRifle(); PlaceGrenade(); PlaceDadao(); PlaceStretcher(); } };
   } catch (error) {
