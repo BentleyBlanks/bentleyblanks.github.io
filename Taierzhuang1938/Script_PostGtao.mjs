@@ -142,6 +142,7 @@ uniform float uPixelTooClose;
 uniform vec2 uFade;
 uniform float uFrame;
 uniform float uTemporalCycle;
+uniform float uForegroundDepth;
 uniform float uSsilClamp;
 uniform float uSsilThickness;
 varying vec2 vUv;
@@ -194,7 +195,10 @@ void main() {
   // 空间噪声（交错梯度）+ 帧序轮转（R2 低差异序列）。两者相加保证：
   // 同一帧里相邻像素取到不同的切片相位（空间去噪能吃掉），
   // 同一像素在连续几帧里扫遍整圈（时域累积能吃掉）。
-  float tIndex = floor(mod(uFrame, max(uTemporalCycle, 1.0)));
+  // Tagged foreground has no valid temporal history. Keep its sample phase
+  // spatially varied but stationary, so rejecting history does not shimmer.
+  bool foreground = uForegroundDepth > 0.0 && abs(viewZ - uForegroundDepth) < 0.002;
+  float tIndex = foreground ? 0.0 : floor(mod(uFrame, max(uTemporalCycle, 1.0)));
   float spatialNoise = Ign(gl_FragCoord.xy);
   vec2 noise2 = fract(vec2(spatialNoise, fract(spatialNoise * 1.6180339887 + 0.5))
     + tIndex * vec2(0.75487766624669276, 0.56984029099805327));
@@ -656,6 +660,7 @@ export class GtaoPass {
       uFade: { value: new THREE.Vector2(GTAO.fadeStart, GTAO.fadeEnd) },
       uFrame: { value: 0 },
       uTemporalCycle: { value: this.tier.temporalCycle },
+      uForegroundDepth: { value: 0 },
       uSsilClamp: { value: SSIL.clamp },
       uSsilThickness: { value: SSIL.thickness },
     };
@@ -811,6 +816,7 @@ export class GtaoPass {
     U.uPrevViewProjection.value.copy(ctx.prevViewProjection);
     U.uHasPrevColor.value = this.hasColorHistory && ctx.hasPrev ? 1 : 0;
     U.uFrame.value = ctx.frame;
+    U.uForegroundDepth.value = this.pipeline.foregroundViewDepth ?? 0;
     // 半径与强度允许调用方逐帧改（编辑器旋钮 / 测试消融），默认取数值表。
     // SSIL 开着时**搜索半径**放大到 SSIL.radius：巷子对面那堵墙要进得来。
     // AO 的衰减半径不跟着放大，否则整面墙会发灰（那正是旧 SSAO 的老毛病）。

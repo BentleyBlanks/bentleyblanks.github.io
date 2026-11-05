@@ -421,6 +421,34 @@ try {
       finally{for(const [k,value]of Object.entries(saved))U[k].value=value;for(const t of textures)t.dispose();target.dispose();}
     }
 
+    // Fixed foreground sampling must be stable without relying on stale AO
+    // history; retain the rotating R2 samples for ordinary world surfaces.
+    {
+      const pass=post.gtaoPass,U=pass.uniformsTrace,saved=Object.fromEntries(Object.entries(U).map(([k,u])=>[k,u.value]));
+      const size=64,data=new Float32Array(size*size*4);
+      for(let y=0;y<size;y++)for(let x=0;x<size;x++)data.set([0,0,1,x<24?.7:1],(y*size+x)*4);
+      const texture=new THREE.DataTexture(data,size,size,THREE.RGBAFormat,THREE.FloatType);texture.needsUpdate=true;
+      const target=new THREE.WebGLRenderTarget(size,size,{count:2,type:THREE.HalfFloatType,format:THREE.RGBAFormat,depthBuffer:false});
+      const Run=tag=>{
+        U.uNormalDepth.value=texture;U.uPrevColor.value=pass.blackPixel;U.uHasPrevColor.value=0;
+        U.uAoResolution.value=new THREE.Vector2(size,size);U.uFullResolution.value=new THREE.Vector2(size,size);
+        U.uProjScale.value=new THREE.Vector2(1,1);U.uForegroundDepth.value=tag;
+        let first=null,maximumDelta=0,minimumAo=1;
+        for(let frame=0;frame<8;frame++){
+          U.uFrame.value=frame;post._Blit(pass.materialTrace,target);
+          const pixels=new Uint16Array(size*size*4);renderer.readRenderTargetPixels(target,0,0,size,size,pixels,0,0);
+          if(!first)first=pixels;
+          for(let y=8;y<size-8;y++)for(let x=24;x<48;x++){
+            const i=(y*size+x)*4,value=HalfToFloat(pixels[i]);minimumAo=Math.min(minimumAo,value);
+            maximumDelta=Math.max(maximumDelta,Math.abs(value-HalfToFloat(first[i])));
+          }
+        }
+        return {maximumDelta,minimumAo};
+      };
+      try{out.foregroundSampling={foreground:Run(1),world:Run(0)};}
+      finally{for(const [k,value]of Object.entries(saved))U[k].value=value;texture.dispose();target.dispose();}
+    }
+
     // --- 10) 稳态不再编译新程序 -------------------------------------------
     P.StepFrames(10, 1 / 60);
     const programsBefore = renderer.info.programs.length;
@@ -530,6 +558,11 @@ if (!result) {
     && Math.abs(result.foregroundHistory.world.ao[0]-.175)<.002
     && Math.abs(result.foregroundHistory.world.il[2]-.16)<.002,
     JSON.stringify(result.foregroundHistory));
+  Check("前景当前帧 AO 采样稳定且仍有遮蔽；世界采样保留帧序轮转",
+    result.foregroundSampling.foreground.maximumDelta<1e-6
+    && result.foregroundSampling.foreground.minimumAo<.99
+    && result.foregroundSampling.world.maximumDelta>1e-4,
+    JSON.stringify(result.foregroundSampling));
   // 门槛按几何算出来的，不是拍的：取证点在墙前 0.10 m，实测可见度 0.75，
   // 即缺了约四分之一个半球 —— 对应的弯曲法线偏转约 17°（cos ≈ 0.955）。
   // 所以「墙根 < 0.975 且比空旷地低 0.02 以上」是有余量又抓得住的判据；
