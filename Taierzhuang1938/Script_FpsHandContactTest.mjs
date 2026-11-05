@@ -289,12 +289,18 @@ try {
             vertices.sort((a,b)=>b.along-a.along);entry.cap.push(...vertices.slice(0,Math.max(3,Math.ceil(vertices.length*.10))));
           });
           if(entry.cap.length<3||!entry.padBone)throw Error('Missing actual Hanyang thumb end cap');
-          const plate=arms.gltf.parser.json.asset.extras.handSurfaceRepair.nails.find(n=>n.side===side&&n.digit===0),outward=new THREE.Vector3();let topTriangles=0;
+          const extras=arms.gltf.parser.json.asset.extras;
+          // Nail-only repairs retain the original hand repair metadata so its
+          // body audit stays byte-exact. The current nail layer owns its ranges.
+          const plate=(extras.nailSurfaceRepair?.nails??extras.handSurfaceRepair.nails).find(n=>n.side===side&&n.digit===0),outward=new THREE.Vector3();let topTriangles=0;
+          if(!plate)throw Error('Missing current thumb nail metadata');
           arms.root.traverse(mesh=>{
             if(!mesh.isSkinnedMesh||!mesh.userData.firstPersonNailSurface)return;
             const bi=mesh.skeleton.bones.indexOf(bone);if(bi<0)return;
             const toBone=mesh.skeleton.boneInverses[bi].clone().multiply(mesh.bindMatrix),a=mesh.geometry.attributes,index=mesh.geometry.index,[start,count]=plate.vertices,end=start+count/2;
-            for(let t=0;t<index.count;t+=3){const ids=[index.getX(t),index.getX(t+1),index.getX(t+2)];if(!ids.every(i=>i>=start&&i<end))continue;const p=ids.map(i=>new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(toBone));outward.add(p[1].clone().sub(p[0]).cross(p[2].clone().sub(p[0])));topTriangles++;}
+            for(let t=0;t<index.count;t+=3){const ids=[index.getX(t),index.getX(t+1),index.getX(t+2)];if(!ids.every(i=>i>=start&&i<end))continue;
+              for(const i of ids){let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===bi)weight+=a.skinWeight.getComponent(i,k);if(weight<.999)throw Error('Thumb nail metadata selects another digit');}
+              const p=ids.map(i=>new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(toBone));outward.add(p[1].clone().sub(p[0]).cross(p[2].clone().sub(p[0])));topTriangles++;}
           });
           if(topTriangles<100)throw Error('Missing actual thumb nail top surface');entry.nailTopTriangles=topTriangles;entry.nailDorsalDot=outward.normalize().dot(entry.padBone.clone().negate());
           return entry;
