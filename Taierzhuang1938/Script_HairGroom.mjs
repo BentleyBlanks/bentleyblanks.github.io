@@ -18,6 +18,7 @@ export function HairAssetUrl(url) { return `${url}${url.includes('?') ? '&' : '?
 export const HAIR_LODS = Object.freeze(['strands', 'cards', 'shell', 'none']);
 
 const ARRAY_TYPES = { Float32Array, Uint16Array, Uint32Array, Uint8Array, Int8Array };
+const referenceAtlases = new WeakMap();
 
 // 量化段解回 float（Script_HairGroomBuild 的 MeshSections）
 function Dequantize(raw, q) {
@@ -35,13 +36,30 @@ function Dequantize(raw, q) {
 
 /** 发片图集（所有发型共用一张）。flipY 关：builder 的 v 从图片第一行算起。 */
 export async function LoadHairAtlas(url) {
-  const texture = await new THREE.TextureLoader().loadAsync(HairAssetUrl(url));
-  texture.flipY = false;
-  texture.colorSpace = THREE.NoColorSpace;
-  texture.anisotropy = 8;
-  texture.generateMipmaps = true;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.needsUpdate = true;
+  const loader = new THREE.TextureLoader();
+  const referenceUrl = new URL('Texture_HairReferenceMasks.png', new URL(url, document.baseURI)).href;
+  const loaded = await Promise.allSettled([loader.loadAsync(HairAssetUrl(url)), loader.loadAsync(HairAssetUrl(referenceUrl))]);
+  const failure = loaded.find(result => result.status === 'rejected');
+  if (failure) {
+    for (const result of loaded) if (result.status === 'fulfilled') result.value.dispose();
+    throw failure.reason;
+  }
+  const [texture, reference] = loaded.map(result => result.value);
+  for (const atlas of [texture, reference]) {
+    atlas.flipY = false;
+    atlas.colorSpace = THREE.NoColorSpace;
+    atlas.anisotropy = 8;
+    atlas.generateMipmaps = true;
+    atlas.minFilter = THREE.LinearMipmapLinearFilter;
+    atlas.needsUpdate = true;
+  }
+  referenceAtlases.set(texture, reference);
+  const ReleaseReference = () => {
+    texture.removeEventListener('dispose', ReleaseReference);
+    referenceAtlases.delete(texture);
+    reference.dispose();
+  };
+  texture.addEventListener('dispose', ReleaseReference);
   return texture;
 }
 
@@ -132,15 +150,17 @@ export async function LoadHairGroom(url) {
       header: H, points: K, guides: G, strands: S, renderPoints: P, render: H.render, family: H.family, name: H.name,
       guideTexture, strandAttributes, sphere, density, shellOpacity: H.shell.opacity ?? 1,
       cardGeometry: MeshGeometry(sec, 'hairCard'), shellGeometry: MeshGeometry(sec, 'hairShell', false),
-      scalpGeometry: MeshGeometry(sec, 'hairScalp', false), scalpTint: H.scalp?.tint ?? 0.6,
+      scalpGeometry: MeshGeometry(sec, 'hairScalp', !!H.referenceScalp), scalpTint: H.scalp?.tint ?? 0.6,
+      referenceScalp: H.referenceScalp || null,
     };
   }
   if (header.beard) {
     const B = header.beard;
     asset.beard = {
       header: B, name: B.name, render: B.render, stubble: B.stubble,
+      referenceMask: B.referenceMask ? {...B.referenceMask, chinY: header.portrait.center[1] - header.portrait.height * .5} : null,
       density: EmptyDensity(),
-      cardGeometry: MeshGeometry(sec, 'beardCard'), stubbleGeometry: MeshGeometry(sec, 'beardStubble', false),
+      cardGeometry: MeshGeometry(sec, 'beardCard'), stubbleGeometry: MeshGeometry(sec, 'beardStubble', !!B.referenceMask),
     };
   }
   return asset;
@@ -186,17 +206,17 @@ export class HairGroom {
       sg.instanceCount = h.strands;
       sg.boundingSphere = h.sphere.clone();
       this.ownGeometries.push(sg);
-      const strand = MakeStrandMaterials(h, this.shared, lightRig);
+      const strand = MakeStrandMaterials(h, this.shared, lightRig, referenceAtlases.get(atlas));
       this.strandUniforms = strand.own;
       this.meshes.strands = this.Mesh(sg, strand, 'Strands');
-      if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density), 'Cards');
+      if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density, referenceAtlases.get(atlas)), 'Cards');
       if (h.shellGeometry) this.meshes.shell = this.Mesh(h.shellGeometry, MakeShellMaterials(h, this.shared, lightRig), 'Shell');
-      if (h.scalpGeometry) this.meshes.scalp = this.Overlay(h.scalpGeometry, MakeScalpTintMaterial(h), 'ScalpTint', 1);
+      if (h.scalpGeometry) this.meshes.scalp = this.Overlay(h.scalpGeometry, MakeScalpTintMaterial(h, referenceAtlases.get(atlas), lightRig), 'ScalpTint', 1);
     }
     const b = asset.beard;
     if (b) {
       if (b.cardGeometry) this.meshes.beardCards = this.Mesh(b.cardGeometry, MakeCardMaterials(b, atlas, this.shared, lightRig, b.density), 'BeardCards');
-      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared), 'Stubble', 2);
+      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared, referenceAtlases.get(atlas)), 'Stubble', 2);
     }
     for (const mesh of Object.values(this.meshes)) mesh.visible = false;
   }

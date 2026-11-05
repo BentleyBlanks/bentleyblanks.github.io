@@ -12,19 +12,27 @@ const references = JSON.parse(fs.readFileSync(path.join(here, 'Hair/Data_HairRef
 const referenceRoot = path.join(process.env.USERPROFILE, 'OneDrive/Sync/饮河/FPS/角色/Tripo');
 const subjects = {Shunzi:7, Luo:8, HeYoutian:9, SoldierA:10, Jia:11, Yi:12};
 const only = process.env.HAIR_REF_SUBJECTS?.split(',');
+const detail = process.env.HAIR_REF_DETAIL === '1';
+const viewport = detail ? {width:1920,height:1080} : {width:1280,height:720};
 const server = process.env.HAIR_PREVIEW ? null : await ServeRoot(root,0);
 const base = process.env.HAIR_PREVIEW || `http://127.0.0.1:${server.address().port}`;
 const browser = await LaunchBrowser({extraArgs:['--mute-audio']});
-const errors = [], result = {viewport:[1280,720], subjects:{}};
+const errors = [], result = {viewport:[viewport.width,viewport.height], quality:detail?'ultra':'high', subjects:{}};
+function FramedImage(bytes, width, height, crop) {
+  const scale = Math.min(616 / crop.width, 648 / crop.height);
+  const left = (640 - crop.width * scale) / 2 - crop.x * scale;
+  const top = (672 - crop.height * scale) / 2 - crop.y * scale;
+  return `<div class="portrait"><img src="data:image/png;base64,${bytes.toString('base64')}" style="width:${width*scale}px;height:${height*scale}px;left:${left}px;top:${top}px"></div>`;
+}
 try {
-  const page = await browser.newPage({viewport:{width:1280,height:720}});
+  const page = await browser.newPage({viewport});
   page.on('pageerror', error=>errors.push(String(error)));
   page.on('console', message=>{if(message.type()==='error')errors.push(message.text());});
   await page.addInitScript(()=>{
     localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
     localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
   });
-  await page.goto(`${base}/Taierzhuang1938/?hair=1&quality=high&manual=1&shot=1`,{waitUntil:'domcontentloaded'});
+  await page.goto(`${base}/Taierzhuang1938/?hair=1&quality=${result.quality}&manual=1&shot=1`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>{
     const state=window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.HairRange.State();
     if(state?.error)throw new Error(state.error);
@@ -68,14 +76,47 @@ try {
   });
   assert.match(result.theme.panelClass,/edPanel/); assert.equal(result.theme.radius,'0px'); assert.equal(result.theme.buttonRadius,'0px');
   assert.match(result.theme.font,/TzUiSans/); assert.equal(result.theme.scheme,'dark');
-  await page.screenshot({path:path.join(output,'Scene_ThemedPanel.png')});
+  if (!detail) await page.screenshot({path:path.join(output,'Scene_ThemedPanel.png')});
   const compare = await browser.newPage({viewport:{width:1280,height:720}});
   for (const [key,index] of Object.entries(subjects)) {
     if(only && !only.includes(key))continue;
     const reference=references[key],source=path.join(referenceRoot,reference.source);
     const bytes=fs.readFileSync(source);assert.equal(createHash('sha256').update(bytes).digest('hex'),reference.sha256);
-    await page.evaluate(index=>{const a=Taierzhuang.Debug.HairRange;a.ShowPanel(false);a.Focus(index,'front');a.Toggle('labels',false);},index);
-    await page.mouse.move(950,350); await page.mouse.wheel(0,-350); await Step(36);
+    const baldBytes = fs.readFileSync(path.join(referenceRoot, reference.baldSource));
+    assert.equal(createHash('sha256').update(baldBytes).digest('hex'), reference.baldSha256);
+    const loaded = await page.evaluate(index => Taierzhuang.Debug.HairRange.State().stations[index].reference, index);
+    assert.equal(loaded.look, key);
+    assert.equal(loaded.recipeSha256, createHash('sha256').update(JSON.stringify(reference)).digest('hex'), 'browser loaded the current registered groom');
+    await page.evaluate(({index,key})=>{
+      const api=Taierzhuang.Debug.HairRange;
+      api.ShowPanel(false);api.Focus(index,'front');api.Toggle('labels',false);
+      const specimens=Taierzhuang.scene.getObjectByName('HairRangeSpecimens');
+      for(const head of specimens.children)head.visible=head.name===`HairHead_cast_${key}_Cast`;
+    },{index,key});
+    const portraitRadius = await page.evaluate(() => Taierzhuang.Debug.HairRange.State().camera.radius);
+    await page.mouse.move(950,350); await page.mouse.wheel(0,-350);
+    await page.waitForFunction(radius => Taierzhuang.Debug.HairRange.State().camera.radius < radius, portraitRadius);
+    await Step(180);
+    const actualCrop = await page.evaluate(({key,marks})=>{
+      const head=Taierzhuang.scene.getObjectByName(`HairHead_cast_${key}_Cast`);
+      const point=Taierzhuang.camera.position.clone();
+      const min=[Infinity,Infinity],max=[-Infinity,-Infinity];
+      const minimumY=marks.menton[1]-(key==='SoldierA'?.025:.015);
+      head.traverse(mesh=>{
+        if(!mesh.isMesh || mesh.geometry.isInstancedBufferGeometry)return;
+        const positions=mesh.geometry.attributes.position;
+        for(let i=0;i<positions.count;i++){
+          point.fromBufferAttribute(positions,i);
+          if(point.y<minimumY)continue;
+          point.applyMatrix4(mesh.matrixWorld).project(Taierzhuang.camera);
+          const x=(point.x*.5+.5)*window.innerWidth,y=(-point.y*.5+.5)*window.innerHeight;
+          min[0]=Math.min(min[0],x);min[1]=Math.min(min[1],y);
+          max[0]=Math.max(max[0],x);max[1]=Math.max(max[1],y);
+        }
+      });
+      const x=Math.max(0,min[0]-8),y=Math.max(0,min[1]-8);
+      return {x,y,width:Math.min(window.innerWidth,max[0]+8)-x,height:Math.min(window.innerHeight,max[1]+8)-y};
+    },{key,marks:reference.landmarks});
     const file=path.join(output,`Scene_${key}_Front.png`);await page.screenshot({path:file});
     if (process.env.HAIR_REF_MARKS) {
       const marks=JSON.parse(fs.readFileSync(path.join(here,'Hair/Heads/Data_HairHeads.json'))).heads[key];
@@ -93,11 +134,12 @@ try {
       await page.screenshot({path:path.join(output,`Scene_${key}_Landmarks.png`)});
       await page.locator('.hairReviewMark').evaluateAll(tags=>tags.forEach(t=>t.remove()));
     }
-    const actual=fs.readFileSync(file).toString('base64');
-    await compare.setContent(`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#101314;color:#eeefec;font:14px system-ui}.head{height:48px;display:flex;align-items:center;border-bottom:1px solid #c4c6bb33}.head span{width:50%;padding:0 20px}.pair{display:grid;grid-template-columns:1fr 1fr;height:672px}.pair img{width:100%;height:100%;min-width:0;object-fit:contain;background:#e9e9e7}.pair img.actual{object-fit:cover;background:#101314}</style><div class="head"><span>${key} · 原始个人头部参考</span><span>当前浏览器实际渲染 · 发丝 / 发片胡子</span></div><div class="pair"><img src="data:image/png;base64,${bytes.toString('base64')}"><img class="actual" src="data:image/png;base64,${actual}"></div>`);
+    const actual=fs.readFileSync(file), landmarks=reference.registration.reference;
+    const referenceCrop={x:landmarks.centerX-landmarks.faceHalfWidth*1.5,y:Math.max(0,landmarks.hairTopY-40),width:landmarks.faceHalfWidth*3,height:landmarks.chinY+100-Math.max(0,landmarks.hairTopY-40)};
+    await compare.setContent(`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#101314;color:#eeefec;font:14px system-ui}.head{height:48px;display:flex;align-items:center;border-bottom:1px solid #c4c6bb33}.head span{width:50%;padding:0 20px}.pair{display:grid;grid-template-columns:1fr 1fr;height:672px}.portrait{position:relative;overflow:hidden;background:#e9e9e7}.portrait img{position:absolute;max-width:none}</style><div class="head"><span>${key} · 原始个人头部参考</span><span>实机单人观察 · ${detail?'1080p 极高画质':'720p 高画质'}</span></div><div class="pair">${FramedImage(bytes,2048,2048,referenceCrop)}${FramedImage(actual,viewport.width,viewport.height,actualCrop)}</div>`);
     await compare.locator('img').evaluateAll(imgs=>Promise.all(imgs.map(img=>img.decode())));
     await compare.screenshot({path:path.join(output,`Compare_${key}.png`)});
-    result.subjects[key]={reference:reference.source,sha256:reference.sha256,actual:file};
+    result.subjects[key]={reference:reference.source,sha256:reference.sha256,actual:file,referenceCrop,actualCrop};
     for(const view of ['side','back']){
       await page.evaluate(({index,view})=>Taierzhuang.Debug.HairRange.Focus(index,view),{index,view});await Step(24);
       await page.screenshot({path:path.join(output,`Scene_${key}_${view}.png`)});

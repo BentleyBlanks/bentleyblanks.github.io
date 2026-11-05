@@ -1,7 +1,7 @@
 {
  "schema": "tengxian.hairReferenceLooks",
- "version": 2,
- "note": "逐人核对 OneDrive 原始头部定妆图后的轮廓与透肤短须配方。原图只读，哈希用于溯源。参数按各自头部关键点归一化；不是以标签代替视觉对照。",
+ "version": 3,
+ "note": "个人原图和剃净参考配对，正投影校准模型五官，再烘焙原图细须覆盖与发根分布。",
  "looks": {
   "Shunzi": {
    "source": "01_顺子/Parts_V1_20261103/Ref_Shunzi_Head_2K_V1.png",
@@ -13,16 +13,16 @@
    "hair": {
     "name": "Shunzi reference crew",
     "length": {
-     "top": 0.024,
-     "front": 0.02,
-     "side": 0.008,
-     "back": 0.01
+     "top": 0.015,
+     "front": 0.012,
+     "side": 0.005,
+     "back": 0.008
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.12,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.49,
@@ -32,52 +32,21 @@
      "nape": 0.018,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.19,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.4,
-      "length": 0.0016,
-      "halfWidth": 0.28,
-      "droop": 0.1,
-      "gap": 0.0015
-     },
-     "soul": {
-      "density": 0.22,
-      "length": 0.0015,
-      "halfWidth": 0.065,
-      "top": 0.1,
-      "bottom": 0.26
-     },
-     "chin": {
-      "density": 0.25,
-      "length": 0.0013,
-      "halfWidth": 0.34,
-      "height": 0.17,
-      "point": 0.15
-     },
-     "jaw": {
-      "density": 0.1,
-      "length": 0.001,
-      "band": 0.1
-     },
-     "cheek": {
-      "density": 0.015,
-      "length": 0.001
-     }
-    },
     "points": 4,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -85,9 +54,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0015,
+     "width": 0.0016,
      "layers": 1,
-     "tile": "Stubble"
+     "tile": "Stubble",
+     "alphaScale": 0.3,
+     "rootScale": 0.18
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -101,7 +72,125 @@
      "redness": 0.08,
      "gray": 0
     },
-    "name": "顺子参考：淡上唇须与下巴短茬"
+    "name": "顺子参考：淡上唇须与下巴短茬",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.0016,
+      "density": 0.4
+     },
+     "soul": {
+      "length": 0.0015,
+      "density": 0.22
+     },
+     "chin": {
+      "length": 0.0013,
+      "density": 0.25,
+      "point": 0.15
+     },
+     "jaw": {
+      "length": 0.001,
+      "density": 0.1
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0.015
+     }
+    },
+    "referenceMask": "Shunzi"
+   },
+   "baldSource": "01_顺子/Parts_V1_20261103/Ref_Shunzi_HeadBald_2K_V1.png",
+   "baldSha256": "e1dfcf5cc211ebef52d74fe5c75f588f90b47a339d50f4475e93e5ee07e9bdef",
+   "landmarks": {
+    "centerX": 0.00031,
+    "glabella": [
+     0.00031,
+     0.204,
+     -0.12173
+    ],
+    "subnasale": [
+     0.00031,
+     0.134
+    ],
+    "stomion": [
+     0.00031,
+     0.107
+    ],
+    "menton": [
+     0.00031,
+     0.057,
+     -0.13399
+    ],
+    "ear": {
+     "yMin": 0.13,
+     "yMax": 0.198,
+     "zFront": 0.025810426101088524,
+     "zBack": 0.043267183005809784,
+     "halfWidth": 0.11291411519050598
+    }
+   },
+   "registration": {
+    "centerX": 0.00031,
+    "reference": {
+     "centerX": 1024,
+     "browY": 925,
+     "noseY": 1320,
+     "mouthY": 1460,
+     "chinY": 1740,
+     "mouthHalfWidth": 205,
+     "faceHalfWidth": 440,
+     "skullTopY": 283,
+     "hairTopY": 220
+    },
+    "rows": [
+     {
+      "y": 0.31954,
+      "imageY": 283,
+      "innerX": 0.03,
+      "innerImageX": 176.0,
+      "outerX": 0.087,
+      "outerImageX": 440
+     },
+     {
+      "y": 0.204,
+      "imageY": 925,
+      "innerX": 0.03,
+      "innerImageX": 176.0,
+      "outerX": 0.087,
+      "outerImageX": 440
+     },
+     {
+      "y": 0.134,
+      "imageY": 1320,
+      "innerX": 0.032,
+      "innerImageX": 205,
+      "outerX": 0.087,
+      "outerImageX": 440
+     },
+     {
+      "y": 0.107,
+      "imageY": 1460,
+      "innerX": 0.032,
+      "innerImageX": 205,
+      "outerX": 0.08264999999999999,
+      "outerImageX": 440
+     },
+     {
+      "y": 0.057,
+      "imageY": 1740,
+      "innerX": 0.028800000000000003,
+      "innerImageX": 205,
+      "outerX": 0.06525,
+      "outerImageX": 334.4
+     },
+     {
+      "y": 0.032,
+      "imageY": 1910,
+      "innerX": 0.028800000000000003,
+      "innerImageX": 205,
+      "outerX": 0.06525,
+      "outerImageX": 334.4
+     }
+    ]
    }
   },
   "Luo": {
@@ -114,16 +203,16 @@
    "hair": {
     "name": "Luo reference crew",
     "length": {
-     "top": 0.023,
-     "front": 0.022,
-     "side": 0.009,
-     "back": 0.011
+     "top": 0.011,
+     "front": 0.009,
+     "side": 0.004,
+     "back": 0.00715
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.12,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.46,
@@ -133,52 +222,21 @@
      "nape": 0.02,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.19,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0.025
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.65,
-      "length": 0.006,
-      "halfWidth": 0.32,
-      "droop": 0.18,
-      "gap": 0.0015
-     },
-     "soul": {
-      "density": 0.6,
-      "length": 0.0035,
-      "halfWidth": 0.065,
-      "top": 0.1,
-      "bottom": 0.26
-     },
-     "chin": {
-      "density": 0.6,
-      "length": 0.006,
-      "halfWidth": 0.46,
-      "height": 0.23,
-      "point": 0.15
-     },
-     "jaw": {
-      "density": 0.45,
-      "length": 0.0035,
-      "band": 0.16
-     },
-     "cheek": {
-      "density": 0.15,
-      "length": 0.0025
-     }
-    },
     "points": 4,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -186,9 +244,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0015,
+     "width": 0.0016,
      "layers": 1,
-     "tile": "Beard"
+     "tile": "Beard",
+     "alphaScale": 0.3,
+     "rootScale": 0.18
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -202,7 +262,125 @@
      "redness": 0.08,
      "gray": 0.025
     },
-    "name": "罗班长参考：窄上唇须与透肤下颌短须"
+    "name": "罗班长参考：窄上唇须与透肤下颌短须",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.006,
+      "density": 0.65
+     },
+     "soul": {
+      "length": 0.0035,
+      "density": 0.6
+     },
+     "chin": {
+      "length": 0.006,
+      "density": 0.6,
+      "point": 0.15
+     },
+     "jaw": {
+      "length": 0.0035,
+      "density": 0.45
+     },
+     "cheek": {
+      "length": 0.0025,
+      "density": 0.15
+     }
+    },
+    "referenceMask": "Luo"
+   },
+   "baldSource": "02_罗班长/Ref_SquadLeaderLuo_HeadBald_2K_V3.png",
+   "baldSha256": "4c391efdeedb4d9fde66ff7ee887bace1bf8f50aa49c04465e8e0ce25fd3c1e5",
+   "landmarks": {
+    "centerX": -0.00947,
+    "glabella": [
+     -0.00947,
+     0.23,
+     -0.09046
+    ],
+    "subnasale": [
+     -0.00947,
+     0.168
+    ],
+    "stomion": [
+     -0.00947,
+     0.145
+    ],
+    "menton": [
+     -0.00947,
+     0.094,
+     -0.09751
+    ],
+    "ear": {
+     "yMin": 0.154,
+     "yMax": 0.216,
+     "zFront": 0.034642621874809265,
+     "zBack": 0.05581311136484146,
+     "halfWidth": 0.09346994757652283
+    }
+   },
+   "registration": {
+    "centerX": -0.00947,
+    "reference": {
+     "centerX": 1000,
+     "browY": 723,
+     "noseY": 1088,
+     "mouthY": 1216,
+     "chinY": 1490,
+     "mouthHalfWidth": 190,
+     "faceHalfWidth": 405,
+     "skullTopY": 164,
+     "hairTopY": 119
+    },
+    "rows": [
+     {
+      "y": 0.32782,
+      "imageY": 164,
+      "innerX": 0.03,
+      "innerImageX": 162.0,
+      "outerX": 0.078,
+      "outerImageX": 405
+     },
+     {
+      "y": 0.23,
+      "imageY": 723,
+      "innerX": 0.03,
+      "innerImageX": 162.0,
+      "outerX": 0.078,
+      "outerImageX": 405
+     },
+     {
+      "y": 0.168,
+      "imageY": 1088,
+      "innerX": 0.029,
+      "innerImageX": 190,
+      "outerX": 0.078,
+      "outerImageX": 405
+     },
+     {
+      "y": 0.145,
+      "imageY": 1216,
+      "innerX": 0.029,
+      "innerImageX": 190,
+      "outerX": 0.0741,
+      "outerImageX": 405
+     },
+     {
+      "y": 0.094,
+      "imageY": 1490,
+      "innerX": 0.0261,
+      "innerImageX": 190,
+      "outerX": 0.058499999999999996,
+      "outerImageX": 307.8
+     },
+     {
+      "y": 0.069,
+      "imageY": 1660,
+      "innerX": 0.0261,
+      "innerImageX": 190,
+      "outerX": 0.058499999999999996,
+      "outerImageX": 307.8
+     }
+    ]
    }
   },
   "HeYoutian": {
@@ -215,16 +393,16 @@
    "hair": {
     "name": "HeYoutian reference crew",
     "length": {
-     "top": 0.025,
-     "front": 0.022,
-     "side": 0.009,
-     "back": 0.011
+     "top": 0.024,
+     "front": 0.018,
+     "side": 0.008,
+     "back": 0.008
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.3,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.6,
@@ -234,52 +412,21 @@
      "nape": 0.019,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.19,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.55,
-      "length": 0.006,
-      "halfWidth": 0.31,
-      "droop": 0.23,
-      "gap": 0.0015
-     },
-     "soul": {
-      "density": 0.6,
-      "length": 0.0035,
-      "halfWidth": 0.065,
-      "top": 0.1,
-      "bottom": 0.26
-     },
-     "chin": {
-      "density": 0.5,
-      "length": 0.0045,
-      "halfWidth": 0.34,
-      "height": 0.18,
-      "point": 0.15
-     },
-     "jaw": {
-      "density": 0.3,
-      "length": 0.0025,
-      "band": 0.11
-     },
-     "cheek": {
-      "density": 0.08,
-      "length": 0.0025
-     }
-    },
     "points": 4,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -287,9 +434,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0015,
+     "width": 0.0016,
      "layers": 1,
-     "tile": "Beard"
+     "tile": "Beard",
+     "alphaScale": 0.3,
+     "rootScale": 0.18
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -303,7 +452,125 @@
      "redness": 0.08,
      "gray": 0
     },
-    "name": "何有田参考：细八字、唇下须与下巴边缘短须"
+    "name": "何有田参考：细八字、唇下须与下巴边缘短须",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.006,
+      "density": 0.55
+     },
+     "soul": {
+      "length": 0.0035,
+      "density": 0.6
+     },
+     "chin": {
+      "length": 0.0045,
+      "density": 0.5,
+      "point": 0.15
+     },
+     "jaw": {
+      "length": 0.0025,
+      "density": 0.3
+     },
+     "cheek": {
+      "length": 0.0025,
+      "density": 0.08
+     }
+    },
+    "referenceMask": "HeYoutian"
+   },
+   "baldSource": "05_何有田/Parts_V1_20261103/Ref_HeYoutian_HeadBald_2K_V1.png",
+   "baldSha256": "db6c82a7a7c9ed99f6103b67395ca789b61b875ea4e41dda3085594a9739bbe9",
+   "landmarks": {
+    "centerX": -0.00069,
+    "glabella": [
+     -0.00069,
+     0.207,
+     -0.11803
+    ],
+    "subnasale": [
+     -0.00069,
+     0.135
+    ],
+    "stomion": [
+     -0.00069,
+     0.109
+    ],
+    "menton": [
+     -0.00069,
+     0.061,
+     -0.12822
+    ],
+    "ear": {
+     "yMin": 0.13,
+     "yMax": 0.195,
+     "zFront": 0.03555893898010254,
+     "zBack": 0.058116547763347626,
+     "halfWidth": 0.10703158378601074
+    }
+   },
+   "registration": {
+    "centerX": -0.00069,
+    "reference": {
+     "centerX": 1024,
+     "browY": 874,
+     "noseY": 1283,
+     "mouthY": 1450,
+     "chinY": 1710,
+     "mouthHalfWidth": 212,
+     "faceHalfWidth": 465,
+     "skullTopY": 319,
+     "hairTopY": 217
+    },
+    "rows": [
+     {
+      "y": 0.30616,
+      "imageY": 319,
+      "innerX": 0.03,
+      "innerImageX": 186.0,
+      "outerX": 0.084,
+      "outerImageX": 465
+     },
+     {
+      "y": 0.207,
+      "imageY": 874,
+      "innerX": 0.03,
+      "innerImageX": 186.0,
+      "outerX": 0.084,
+      "outerImageX": 465
+     },
+     {
+      "y": 0.135,
+      "imageY": 1283,
+      "innerX": 0.033,
+      "innerImageX": 212,
+      "outerX": 0.084,
+      "outerImageX": 465
+     },
+     {
+      "y": 0.109,
+      "imageY": 1450,
+      "innerX": 0.033,
+      "innerImageX": 212,
+      "outerX": 0.0798,
+      "outerImageX": 465
+     },
+     {
+      "y": 0.061,
+      "imageY": 1710,
+      "innerX": 0.0297,
+      "innerImageX": 212,
+      "outerX": 0.063,
+      "outerImageX": 353.4
+     },
+     {
+      "y": 0.036,
+      "imageY": 1880,
+      "innerX": 0.0297,
+      "innerImageX": 212,
+      "outerX": 0.063,
+      "outerImageX": 353.4
+     }
+    ]
    }
   },
   "SoldierA": {
@@ -317,15 +584,15 @@
     "name": "SoldierA reference crew",
     "length": {
      "top": 0.024,
-     "front": 0.022,
-     "side": 0.009,
-     "back": 0.011
+     "front": 0.018,
+     "side": 0.008,
+     "back": 0.008
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.3,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.59,
@@ -335,53 +602,21 @@
      "nape": 0.019,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.19,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.95,
-      "length": 0.009,
-      "halfWidth": 0.34,
-      "droop": 0.5,
-      "gap": 0.0015,
-      "thickness": 0.75
-     },
-     "soul": {
-      "density": 0.85,
-      "length": 0.006,
-      "halfWidth": 0.075,
-      "top": 0.1,
-      "bottom": 0.34
-     },
-     "chin": {
-      "density": 0.8,
-      "length": 0.016,
-      "halfWidth": 0.42,
-      "height": 0.27,
-      "point": 0.55
-     },
-     "jaw": {
-      "density": 0.13,
-      "length": 0.0017,
-      "band": 0.12
-     },
-     "cheek": {
-      "density": 0.08,
-      "length": 0.0025
-     }
-    },
     "points": 7,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -389,9 +624,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0015,
-     "layers": 2,
-     "tile": "Beard"
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Beard",
+     "alphaScale": 0.35,
+     "rootScale": 0.35
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -405,7 +642,125 @@
      "redness": 0.08,
      "gray": 0.12
     },
-    "name": "日军士兵 A 参考：下垂八字须与较长下巴胡"
+    "name": "日军士兵 A 参考：下垂八字须与较长下巴胡",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.009,
+      "density": 0.95
+     },
+     "soul": {
+      "length": 0.006,
+      "density": 0.85
+     },
+     "chin": {
+      "length": 0.02,
+      "density": 0.8,
+      "point": 0.55
+     },
+     "jaw": {
+      "length": 0.0017,
+      "density": 0.13
+     },
+     "cheek": {
+      "length": 0.0025,
+      "density": 0.08
+     }
+    },
+    "referenceMask": "SoldierA"
+   },
+   "baldSource": "10_日军士兵A/Parts_V1_20261102/Ref_JapaneseSoldierA_HeadBald_2K_V1.png",
+   "baldSha256": "12a7a7a27e2e849ab14073f97a602f57c60044f1a0918c32a1cb33184e705beb",
+   "landmarks": {
+    "centerX": 0.00032,
+    "glabella": [
+     0.00032,
+     0.223,
+     -0.10974
+    ],
+    "subnasale": [
+     0.00032,
+     0.146
+    ],
+    "stomion": [
+     0.00032,
+     0.119
+    ],
+    "menton": [
+     0.00032,
+     0.056,
+     -0.13256
+    ],
+    "ear": {
+     "yMin": 0.136,
+     "yMax": 0.21,
+     "zFront": 0.03456519916653633,
+     "zBack": 0.0637274831533432,
+     "halfWidth": 0.11560806632041931
+    }
+   },
+   "registration": {
+    "centerX": 0.00032,
+    "reference": {
+     "centerX": 1024,
+     "browY": 845,
+     "noseY": 1270,
+     "mouthY": 1414,
+     "chinY": 1770,
+     "mouthHalfWidth": 225,
+     "faceHalfWidth": 485,
+     "skullTopY": 225,
+     "hairTopY": 130
+    },
+    "rows": [
+     {
+      "y": 0.34297,
+      "imageY": 225,
+      "innerX": 0.03,
+      "innerImageX": 194.0,
+      "outerX": 0.091,
+      "outerImageX": 485
+     },
+     {
+      "y": 0.223,
+      "imageY": 845,
+      "innerX": 0.03,
+      "innerImageX": 194.0,
+      "outerX": 0.091,
+      "outerImageX": 485
+     },
+     {
+      "y": 0.146,
+      "imageY": 1270,
+      "innerX": 0.035,
+      "innerImageX": 225,
+      "outerX": 0.091,
+      "outerImageX": 485
+     },
+     {
+      "y": 0.119,
+      "imageY": 1414,
+      "innerX": 0.035,
+      "innerImageX": 225,
+      "outerX": 0.08645,
+      "outerImageX": 485
+     },
+     {
+      "y": 0.056,
+      "imageY": 1770,
+      "innerX": 0.03150000000000001,
+      "innerImageX": 225,
+      "outerX": 0.06825,
+      "outerImageX": 368.6
+     },
+     {
+      "y": 0.031,
+      "imageY": 1940,
+      "innerX": 0.03150000000000001,
+      "innerImageX": 225,
+      "outerX": 0.06825,
+      "outerImageX": 368.6
+     }
+    ]
    }
   },
   "Jia": {
@@ -418,16 +773,16 @@
    "hair": {
     "name": "Jia reference crew",
     "length": {
-     "top": 0.018,
-     "front": 0.016,
-     "side": 0.006,
-     "back": 0.008
+     "top": 0.005,
+     "front": 0.004,
+     "side": 0.003,
+     "back": 0.0032500000000000003
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.12,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.39,
@@ -437,53 +792,21 @@
      "nape": 0.015,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.12,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.9,
-      "length": 0.006,
-      "halfWidth": 0.31,
-      "droop": 0.18,
-      "gap": 0.0015,
-      "thickness": 0.4
-     },
-     "soul": {
-      "density": 0.7,
-      "length": 0.0035,
-      "halfWidth": 0.065,
-      "top": 0.1,
-      "bottom": 0.26
-     },
-     "chin": {
-      "density": 0.26,
-      "length": 0.0028,
-      "halfWidth": 0.39,
-      "height": 0.15,
-      "point": 0.15
-     },
-     "jaw": {
-      "density": 0.2,
-      "length": 0.0025,
-      "band": 0.1
-     },
-     "cheek": {
-      "density": 0.09,
-      "length": 0.0025
-     }
-    },
     "points": 4,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -491,9 +814,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0015,
+     "width": 0.0016,
      "layers": 1,
-     "tile": "Beard"
+     "tile": "Beard",
+     "alphaScale": 0.3,
+     "rootScale": 0.18
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -507,7 +832,125 @@
      "redness": 0.08,
      "gray": 0
     },
-    "name": "日兵甲参考：浓上唇须与淡下颌短茬"
+    "name": "日兵甲参考：浓上唇须与淡下颌短茬",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.006,
+      "density": 0.9
+     },
+     "soul": {
+      "length": 0.0035,
+      "density": 0.7
+     },
+     "chin": {
+      "length": 0.0028,
+      "density": 0.26,
+      "point": 0.15
+     },
+     "jaw": {
+      "length": 0.0025,
+      "density": 0.2
+     },
+     "cheek": {
+      "length": 0.0025,
+      "density": 0.09
+     }
+    },
+    "referenceMask": "Jia"
+   },
+   "baldSource": "14_日兵甲/Parts_V1_20261102/Ref_JapaneseSoldierJia_HeadBald_2K_V1.png",
+   "baldSha256": "c498a59cd0eb23623e2fb0d29f1d9971f98744dbf33e777d1632e6274c1b6c62",
+   "landmarks": {
+    "centerX": -0.00047,
+    "glabella": [
+     -0.00047,
+     0.171,
+     -0.09863
+    ],
+    "subnasale": [
+     -0.00047,
+     0.111
+    ],
+    "stomion": [
+     -0.00047,
+     0.085
+    ],
+    "menton": [
+     -0.00047,
+     0.035,
+     -0.12003
+    ],
+    "ear": {
+     "yMin": 0.092,
+     "yMax": 0.155,
+     "zFront": 0.007828074507415295,
+     "zBack": 0.03183416277170181,
+     "halfWidth": 0.08892437815666199
+    }
+   },
+   "registration": {
+    "centerX": -0.00047,
+    "reference": {
+     "centerX": 1024,
+     "browY": 934,
+     "noseY": 1341,
+     "mouthY": 1514,
+     "chinY": 1860,
+     "mouthHalfWidth": 215,
+     "faceHalfWidth": 460,
+     "skullTopY": 299,
+     "hairTopY": 276
+    },
+    "rows": [
+     {
+      "y": 0.26668,
+      "imageY": 299,
+      "innerX": 0.03,
+      "innerImageX": 184.0,
+      "outerX": 0.074,
+      "outerImageX": 460
+     },
+     {
+      "y": 0.171,
+      "imageY": 934,
+      "innerX": 0.03,
+      "innerImageX": 184.0,
+      "outerX": 0.074,
+      "outerImageX": 460
+     },
+     {
+      "y": 0.111,
+      "imageY": 1341,
+      "innerX": 0.028,
+      "innerImageX": 215,
+      "outerX": 0.074,
+      "outerImageX": 460
+     },
+     {
+      "y": 0.085,
+      "imageY": 1514,
+      "innerX": 0.028,
+      "innerImageX": 215,
+      "outerX": 0.07029999999999999,
+      "outerImageX": 460
+     },
+     {
+      "y": 0.035,
+      "imageY": 1860,
+      "innerX": 0.0252,
+      "innerImageX": 215,
+      "outerX": 0.055499999999999994,
+      "outerImageX": 349.6
+     },
+     {
+      "y": 0.010000000000000002,
+      "imageY": 2030,
+      "innerX": 0.0252,
+      "innerImageX": 215,
+      "outerX": 0.055499999999999994,
+      "outerImageX": 349.6
+     }
+    ]
    }
   },
   "Yi": {
@@ -520,16 +963,16 @@
    "hair": {
     "name": "Yi reference crew",
     "length": {
-     "top": 0.022,
-     "front": 0.019,
-     "side": 0.008,
-     "back": 0.01
+     "top": 0.004,
+     "front": 0.004,
+     "side": 0.003,
+     "back": 0.0026000000000000003
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.62,
-     "side": 0.16,
-     "back": 0.23
+     "top": 0.55,
+     "side": 0.12,
+     "back": 0.18
     },
     "hairline": {
      "front": 0.58,
@@ -539,53 +982,21 @@
      "nape": 0.016,
      "band": 0.003
     },
-    "clump": 0.12,
-    "frizz": 0.12,
+    "clump": 0.08,
+    "frizz": 0.08,
     "scalpTint": 0.85,
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
      "gray": 0
-    }
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
    },
    "beard": {
-    "referenceShape": {
-     "mustache": {
-      "density": 0.95,
-      "length": 0.007,
-      "halfWidth": 0.33,
-      "droop": 0.25,
-      "gap": 0.0015,
-      "thickness": 0.45
-     },
-     "soul": {
-      "density": 0.8,
-      "length": 0.005,
-      "halfWidth": 0.065,
-      "top": 0.1,
-      "bottom": 0.26
-     },
-     "chin": {
-      "density": 0.7,
-      "length": 0.0065,
-      "halfWidth": 0.45,
-      "height": 0.23,
-      "point": 0.15
-     },
-     "jaw": {
-      "density": 0.5,
-      "length": 0.004,
-      "band": 0.16
-     },
-     "cheek": {
-      "density": 0.14,
-      "length": 0.0025
-     }
-    },
     "points": 4,
-    "parts": {
-     "reference": {}
-    },
     "stubble": {
      "density": 1,
      "length": 0.0012,
@@ -593,9 +1004,11 @@
     },
     "cards": {
      "spacing": 0.00115,
-     "width": 0.0018,
+     "width": 0.0016,
      "layers": 1,
-     "tile": "Beard"
+     "tile": "Beard",
+     "alphaScale": 0.3,
+     "rootScale": 0.18
     },
     "lift": 0.25,
     "stiffness": 0.85,
@@ -609,7 +1022,125 @@
      "redness": 0.08,
      "gray": 0
     },
-    "name": "日兵乙参考：宽上唇须与 U 形下颌短须"
+    "name": "日兵乙参考：宽上唇须与 U 形下颌短须",
+    "referenceParts": {
+     "mustache": {
+      "length": 0.007,
+      "density": 0.95
+     },
+     "soul": {
+      "length": 0.005,
+      "density": 0.8
+     },
+     "chin": {
+      "length": 0.0065,
+      "density": 0.7,
+      "point": 0.15
+     },
+     "jaw": {
+      "length": 0.004,
+      "density": 0.5
+     },
+     "cheek": {
+      "length": 0.0025,
+      "density": 0.14
+     }
+    },
+    "referenceMask": "Yi"
+   },
+   "baldSource": "15_日兵乙/Parts_V1_20261104/Ref_JapaneseSoldierYi_HeadBald_2K_V1.png",
+   "baldSha256": "4cdb8c48c4d7e3e76374441558e2172b73bcc5198d04150ee36005c8ff0478b1",
+   "landmarks": {
+    "centerX": -0.00024,
+    "glabella": [
+     -0.00024,
+     0.192,
+     -0.11097
+    ],
+    "subnasale": [
+     -0.00024,
+     0.123
+    ],
+    "stomion": [
+     -0.00024,
+     0.091
+    ],
+    "menton": [
+     -0.00024,
+     0.043,
+     -0.12345
+    ],
+    "ear": {
+     "yMin": 0.118,
+     "yMax": 0.18,
+     "zFront": 0.010830585844814777,
+     "zBack": 0.0331568643450737,
+     "halfWidth": 0.09751018136739731
+    }
+   },
+   "registration": {
+    "centerX": -0.00024,
+    "reference": {
+     "centerX": 1024,
+     "browY": 710,
+     "noseY": 1168,
+     "mouthY": 1325,
+     "chinY": 1690,
+     "mouthHalfWidth": 220,
+     "faceHalfWidth": 455,
+     "skullTopY": 66,
+     "hairTopY": 70
+    },
+    "rows": [
+     {
+      "y": 0.29886,
+      "imageY": 66,
+      "innerX": 0.03,
+      "innerImageX": 182.0,
+      "outerX": 0.082,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.192,
+      "imageY": 710,
+      "innerX": 0.03,
+      "innerImageX": 182.0,
+      "outerX": 0.082,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.123,
+      "imageY": 1168,
+      "innerX": 0.03,
+      "innerImageX": 220,
+      "outerX": 0.082,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.091,
+      "imageY": 1325,
+      "innerX": 0.03,
+      "innerImageX": 220,
+      "outerX": 0.0779,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.043,
+      "imageY": 1690,
+      "innerX": 0.027,
+      "innerImageX": 220,
+      "outerX": 0.0615,
+      "outerImageX": 345.8
+     },
+     {
+      "y": 0.017999999999999995,
+      "imageY": 1860,
+      "innerX": 0.027,
+      "innerImageX": 220,
+      "outerX": 0.0615,
+      "outerImageX": 345.8
+     }
+    ]
    }
   }
  }

@@ -18,9 +18,10 @@
 
 源表 `Hair/Data_HairStyles.json`：`hair` / `beard` 定义造型，`grooms` 是实验室套装，`gameGrooms` 是绑定到游戏模型的套装。发长、梳向、静态刚度、毛躁、卷曲、发色、密度、胡子部位均从这里读取。
 
-六个人物展示与游戏挂件通过 `referenceLook` 引用 `Hair/Data_HairReferences.json` 的本人配方，覆盖通用实验造型。每份配方记录 OneDrive 原始头部定妆图的相对路径、SHA-256、观察及独立发际线 / 长度 / 胡须轮廓；原图只读，不复制进运行时。个人胡须区分八字须、唇下须、圆形下巴区域、下颌窄带和脸颊稀疏短茬，避免用矩形或整片下脸代替。二进制和清单同时记录原图身份及配方哈希，改个人配方后必须重烘对应展示与游戏套装。
+六个人物展示与游戏挂件通过 `referenceLook` 引用 `Hair/Data_HairReferences.json` 的本人配方。v3 对照原始定妆图、剃净参考与模型正投影，记录两张图的 SHA-256、模型五官校准、分段投影关系、发长及梳向。`landmarks` 覆盖旧自动关键点中偏移的口裂、下巴、耳界和面部中心，`registration` 将原图细须映射到模型。`_import/Script_HairReferenceBake.py` 烘出 `Hair/Data_HairReferenceMasks.json` 的发根采样和发际线，以及共用的 `Texture_HairReferenceMasks.png`，R 为胡须覆盖、G 为额前发根覆盖、B 为分离皮肤色后的发丝灰度。发丝和发片都读取局部空间中的原图明暗细节，以浓密毛发区域的中位数归一亮度。发根灰度随场景光照变化，黑色素旋钮保留染色作用；三维发丝保留体积、梳向与覆盖率，胡须发片补充轮廓。二进制同时记录配方、图集与原图哈希，修改校准或配方后重烘相应展示与游戏套装。
 
 ```powershell
+python Taierzhuang1938/_import/Script_HairReferenceBake.py
 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs HeYoutian_Cast
 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs Game_HeYoutian
 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
@@ -48,7 +49,7 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 
 `PrepassPass` 在该趟临时换材质并保留原网格和材质的绘制钩子；在**实际绘制**时记录模型、相机在局部空间的位置、像素尺度及模型缩放，帧末推进历史。细带展开使用上一帧的相机与宽度重建上一帧位置。隐藏父节点或被剔除时不虚构历史，重新出现时不带旧物体速度；前景速度归零。造型旋钮变化通知相机切换以清除旧 TAA 历史。
 
-`HairGroom.Dispose()` 只释放实例材质、独立几何外壳并移除节点；共享几何、导向纹理和密度纹理由 `DisposeHairGroomAsset()` 在最后一个消费者退出后释放。实验室退出会回收全部共享资产、头部贴图与 DOM；加载中退出也会释放迟到资源。游戏里的共享 groom / atlas 归 `XBotSkins`，人物先销毁实例，再由 `BlockoutPuppets.Dispose()` 释放共享头发；单个人物消失不能销毁其他人的共用资源。
+`HairGroom.Dispose()` 只释放实例材质、独立几何外壳并移除节点；共享几何、导向纹理和密度纹理由 `DisposeHairGroomAsset()` 在最后一个消费者退出后释放。`LoadHairAtlas()` 共同持有发片图集和个人参考图集，加载部分失败会回收已完成纹理，释放主图集时一并释放参考图集。实验室退出会回收全部共享资产、头部贴图与 DOM；加载中退出也会释放迟到资源。游戏里的共享 groom / atlas 归 `XBotSkins`，人物先销毁实例，再由 `BlockoutPuppets.Dispose()` 释放共享头发；单个人物消失不能销毁其他人的共用资源。
 
 ## 6. 实验室操作
 
@@ -71,6 +72,10 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出。
 
 `HairReferenceBrowserTest` 验证 WASD 位移、斜向归一化、加速、控件焦点与失焦停移、共用 UI 主题，并将原始个人参考图与实际浏览器渲染并排，另存侧 / 背截图到本地 `tmp/HairLab/ReferenceReview/`。需要本机 OneDrive 原图；`HAIR_REF_SUBJECTS=Luo,HeYoutian` 可限制迭代样本。数字门禁不能替代六人的图像对照复核。
+
+默认截图为 1280×720 高画质。核对细须与发际线像素细节时可设 `HAIR_REF_DETAIL=1`，取 1920×1080 极高画质近景，再按完整头部取景生成并排图。测试核对浏览器实际加载的配方哈希，并将轮廓以外的其他展示头隐藏，避免背景人物干扰对照。
+
+`HairRangeBrowserTest` 包含真实编辑器试玩，使用根目录 `scripts/Script_LocalPreview.mjs <端口> --no-open`，并把 `HAIR_PREVIEW` 设为该服务地址后经 TestRunner 执行；简单静态服务器没有 `/__environment/status` 与 `/__blockout/status`，会产生与毛发资源无关的 404。测试保留全部失败请求的完整 URL，不忽略资源错误。
 
 证据只放本地忽略目录 `tmp/HairLab/Verified/`：截图与 `Data_HairVerification.json`。其中逐帧 `StepFrames + gl.finish` 数值是合成帧时成本，不是 rAF 游戏帧率；机器有并行任务时不作独占 GPU 性能承诺。视觉复核、性能实测与部署状态在本次交付记录中分别说明。
 

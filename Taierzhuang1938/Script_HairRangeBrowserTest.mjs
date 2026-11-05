@@ -18,7 +18,12 @@ const errors = [], failedRequests = [], result = { viewport: [1280, 720], base }
 const gameKeys = Object.entries(XBOT_CHARACTERS).filter(([, def]) => def.groom).map(([key]) => key);
 page.on('pageerror', (error) => errors.push(String(error)));
 page.on('console', (message) => { if (message.type() === 'error' && !message.text().includes('HairInjectedFailure')) errors.push(message.text()); });
-page.on('response', (response) => { if (response.status() >= 400 && /\/Hair\//.test(response.url())) failedRequests.push(`${response.status()} ${response.url()}`); });
+page.on('response', (response) => {
+  if (response.status() < 400) return;
+  const failure = `${response.status()} ${response.url()}`;
+  failedRequests.push(failure);
+  console.error(`[hair] resource request failed: ${failure}`);
+});
 await page.addInitScript(() => {
   localStorage.setItem('tengxian1938_audio_v1', JSON.stringify({ master: 0 }));
   localStorage.setItem('tengxian1938_tools_volume_v1', JSON.stringify({ volume: 0, muted: true }));
@@ -205,6 +210,10 @@ try {
     const asset = await LoadHairGroom('./Hair/Grooms/Groom_HeYoutian_Cast.bin');
     const atlas = await LoadHairAtlas('./Hair/Textures/Texture_HairCardAtlas.png');
     const groom = new HairGroom(asset, { atlas, lod: 'strands' }); scene.add(groom.root);
+    const referenceAtlas = groom.meshes.stubble.material.uniforms.uReferenceMask.value;
+    Check(groom.meshes.scalp.material.uniforms.uReferenceMask.value === referenceAtlas, 'scalp and facial hair share the original-reference atlas');
+    let referenceAtlasDisposals = 0;
+    referenceAtlas.addEventListener('dispose', () => referenceAtlasDisposals++);
     const pass = new PrepassPass({ preset: { velocity: true, hzb: false }, hdrCapable: true, hdrType: T.HalfFloatType, targets: {} }); pass.Resize(320, 240);
     const target = MakeRenderTarget(320, 240, { type: T.HalfFloatType });
     const copy = MakeFullscreenMaterial('uniform sampler2D uV;uniform sampler2D uD;varying vec2 vUv;void main(){gl_FragColor=vec4(texture2D(uV,vUv).xy,texture2D(uD,vUv).w,1.);}', { uV: { value: null }, uD: { value: null } });
@@ -256,6 +265,7 @@ try {
     const before = renderer.info.memory.geometries;
     renderer.render(scene, camera); Check(renderer.info.render.calls > 0 && !asset.disposed, 'sibling survives instance disposal');
     sibling.Dispose(); DisposeHairGroomAsset(asset); atlas.dispose();
+    Check(referenceAtlasDisposals === 1, 'shared original-reference atlas released exactly once with its owner');
     renderer.render(scene, camera); const after = renderer.info.memory.geometries;
     Check(after < before, 'GPU geometries fall after hair asset release');
     const original = ManagedGLTFLoader.prototype.loadAsync, resources = new Set(), disposed = new Set();
@@ -274,7 +284,7 @@ try {
       Check(range.heads.size === 0 && range.assets.size === 0 && range.root.children.length === 0 && !document.querySelector('#hair-range-panel'), 'async exit leaves no assets, objects or DOM');
     } finally { release(); ManagedGLTFLoader.prototype.loadAsync = original; range?.Dispose(); }
     pass.Dispose(); target.dispose(); quad.geometry.dispose(); copy.dispose(); renderer.dispose();
-    return { still, moved, rotated, tracking, hidden, reappear, modes, coverage, qualityCaps, memory: { before, after }, lateResources: resources.size, releasedLateResources: disposed.size };
+    return { still, moved, rotated, tracking, hidden, reappear, modes, coverage, qualityCaps, memory: { before, after }, referenceAtlasDisposals, lateResources: resources.size, releasedLateResources: disposed.size };
   });
   }
   result.failedRequests = failedRequests; result.errors = errors;

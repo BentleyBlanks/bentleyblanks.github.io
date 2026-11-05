@@ -116,6 +116,7 @@ uniform float uSpecular;
 uniform float uScatter;
 uniform float uBacklit;
 uniform float uAmbient;
+uniform float uEnvironmentReflection;
 uniform vec3 uLightLocal;
 uniform float uSelfShadow;
 vec3 HairLight(vec3 T, vec3 V, vec3 base, vec3 worldPos, vec3 localPos, float occlusion, float jitter) {
@@ -134,6 +135,10 @@ vec3 HairLight(vec3 T, vec3 V, vec3 base, vec3 worldPos, vec3 localPos, float oc
   irradiance += getLightProbeIrradiance(lightProbe, fakeN);
 #endif
   color += irradiance * (base + sqrt(base) * uScatter * 0.35) * 0.31831 * occlusion * uAmbient;
+  // Integrate the neutral surface-reflection lobe over the sky hemisphere.
+  // Melanin absorbs transmitted light; this surface reflection keeps black
+  // fibres readable under broad lighting even away from the sun highlight.
+  color += irradiance * (uEnvironmentReflection * uSpecular * 2.0) * 0.31831 * occlusion * uAmbient;
   return color;
 }
 `;
@@ -324,8 +329,51 @@ void main() {
   ${prepass ? PREPASS_VELOCITY : ''}
 }
 `;
-const STRAND_FRAGMENT = /* glsl */`
+// Registered portrait detail is fixed in head-local space, including on the
+// actual fibres. The original strand coverage still owns colour and prepass.
+const GLSL_REFERENCE_COLOUR = /* glsl */`
+uniform sampler2D uReferenceMask;
+uniform vec4 uReferenceRows[6];
+uniform vec2 uReferenceWidths[6];
+uniform vec4 uReferenceCrop;
+uniform vec4 uReferenceTile;
+uniform vec2 uReferenceCenter;
+uniform float uReferenceImageCenter;
+uniform vec2 uReferenceCrown;
+uniform float uReferenceMean;
+uniform float uReferenceMelanin;
+vec2 ReferenceHairDetail(vec3 p) {
+  vec4 upper = uReferenceRows[0], lower = uReferenceRows[1];
+  vec2 upperWidth = uReferenceWidths[0], lowerWidth = uReferenceWidths[1];
+  for (int i = 1; i < 6; i++) {
+    upper = uReferenceRows[i-1]; lower = uReferenceRows[i];
+    upperWidth = uReferenceWidths[i-1]; lowerWidth = uReferenceWidths[i];
+    if (p.y >= lower.x || i == 5) break;
+  }
+  float t = min(1.0, (upper.x-p.y) / max(upper.x-lower.x, .0001));
+  vec4 row = mix(upper, lower, t);
+  vec2 widths = mix(upperWidth, lowerWidth, t);
+  float dx = p.x-uReferenceCenter.x;
+  float distanceX = abs(dx);
+  float imageX = distanceX <= row.z ? distanceX/row.z*row.w
+    : row.w+(distanceX-row.z)/(widths.x-row.z)*(widths.y-row.w);
+  vec2 imagePosition = vec2(uReferenceImageCenter-sign(dx)*imageX, row.y);
+  vec2 localUv = (imagePosition-uReferenceCrop.xy)/uReferenceCrop.zw;
+  float inside = step(0.0,localUv.x)*step(0.0,localUv.y)*step(localUv.x,1.0)*step(localUv.y,1.0);
+  vec2 uv = uReferenceTile.xy+clamp(localUv,.001,.999)*uReferenceTile.zw;
+  vec3 sampleValue = texture(uReferenceMask,uv).rgb;
+  float phi = degrees(atan(abs(dx)+.000001,-(p.z-uReferenceCenter.y)));
+  float front = 1.0-smoothstep(65.0,85.0,phi);
+  float crown = smoothstep(uReferenceCrown.x,uReferenceCrown.y,p.y);
+  float weight = inside*max(front,crown)*smoothstep(.02,.3,sampleValue.g);
+  float detail = clamp(sqrt(max(pow(sampleValue.b,2.2),.0001)/uReferenceMean),.4,2.5);
+  return vec2(weight,detail);
+}
+`;
+
+const STRAND_FRAGMENT = (reference) => /* glsl */`
 ${FRAGMENT_HEAD}
+${reference ? GLSL_REFERENCE_COLOUR : ''}
 uniform float uFrame;
 uniform float uFade;
 uniform float uMelanin;
@@ -341,15 +389,17 @@ in float vSeed;
 in float vOpen;
 layout(location = 0) out vec4 fragColor;
 void main() {
+  ${reference ? 'vec2 photo = ReferenceHairDetail(vLocalPos);' : ''}
   float h = HairCoverageHash(gl_FragCoord.xy, uFrame, vSeed);
   if (h > vCoverage * uFade) discard;
   vec3 T = normalize(vTangent);
   vec3 V = normalize(-vViewPos);
   float gray = step(vSeed, uGray);
   vec3 base = HairColorFromMelanin(uMelanin * mix(0.94, 1.0, fract(vSeed * 7.31)) * mix(1.0, 0.9, vT * 0.4), uRedness);
+  ${reference ? 'base = mix(base, vec3(dot(base,vec3(.3,.59,.11))), photo.x*(1.0-clamp(abs(uMelanin-uReferenceMelanin)*4.0,0.0,1.0)));' : ''}
   base = mix(base, vec3(0.62, 0.6, 0.56), gray);
   float occ = mix(0.25, 1.0, vOpen);
-  fragColor = HairOutput(HairLight(T, V, base, vWorldPos, vLocalPos, occ, fract(h * 7.0)));
+  fragColor = HairOutput(HairLight(T, V, base, vWorldPos, vLocalPos, occ, fract(h * 7.0)) ${reference ? '* mix(1.0,photo.y,photo.x)' : ''});
 }
 `;
 const STRAND_PREPASS_FRAGMENT = /* glsl */`
@@ -400,8 +450,9 @@ void main() {
   ${prepass ? PREPASS_VELOCITY : ''}
 }
 `;
-const CARD_FRAGMENT = /* glsl */`
+const CARD_FRAGMENT = (reference) => /* glsl */`
 ${FRAGMENT_HEAD}
+${reference ? GLSL_REFERENCE_COLOUR : ''}
 uniform sampler2D uAtlas;
 uniform float uFrame;
 uniform float uFade;
@@ -418,6 +469,7 @@ in vec2 vUv;
 in vec3 vData;
 layout(location = 0) out vec4 fragColor;
 void main() {
+  ${reference ? 'vec2 photo = ReferenceHairDetail(vLocalPos);' : ''}
   vec4 t = texture(uAtlas, vUv);
   float h = HairCoverageHash(gl_FragCoord.xy, uFrame, t.b + vData.y);
   if (h > t.r * uAlphaScale * uFade) discard;
@@ -430,9 +482,10 @@ void main() {
   float seed = fract(t.b * 3.7 + vData.y);
   float gray = step(seed, uGray);
   vec3 base = HairColorFromMelanin(uMelanin * mix(0.94, 1.0, fract(seed * 7.31)) * mix(1.0, 0.9, t.g * 0.4), uRedness);
+  ${reference ? 'base = mix(base, vec3(dot(base,vec3(.3,.59,.11))), photo.x*(1.0-clamp(abs(uMelanin-uReferenceMelanin)*4.0,0.0,1.0)));' : ''}
   base = mix(base, vec3(0.62, 0.6, 0.56), gray);
   float occ = mix(0.3, 1.0, (1.0 - t.a) * 0.6 + vData.z * 0.4) * mix(0.55, 1.0, t.g);
-  fragColor = HairOutput(HairLight(T, V, base, vWorldPos, vLocalPos, occ, fract(h * 7.0)));
+  fragColor = HairOutput(HairLight(T, V, base, vWorldPos, vLocalPos, occ, fract(h * 7.0)) ${reference ? '* mix(1.0,photo.y,photo.x)' : ''});
 }
 `;
 const CARD_PREPASS_FRAGMENT = /* glsl */`
@@ -577,10 +630,35 @@ void main() {
 }
 `;
 
-// 头皮染色：贴着头皮的半透明深色，发根之间不透出光头皮。覆盖率按发际线渐变，再加一点细噪声免得像一块贴纸。
-const SCALP_FRAGMENT = /* glsl */`
+const REFERENCE_BEARD_FRAGMENT = /* glsl */`
 precision highp float;
 #include <common>
+${GLSL_OUTPUT}
+${GLSL_MELANIN}
+uniform sampler2D uReferenceMask;
+uniform float uChinY;
+uniform float uMelanin;
+uniform float uRedness;
+uniform float uFade;
+in vec2 vUv;
+in vec3 vData;
+in vec3 vLocalPos;
+layout(location = 0) out vec4 fragColor;
+void main() {
+  float coverage = texture(uReferenceMask, vUv).r * vData.x * uFade;
+  coverage *= smoothstep(uChinY - .001, uChinY + .002, vLocalPos.y);
+  if (coverage < .003) discard;
+  vec3 color = HairMelaninColor(uMelanin, uRedness);
+  fragColor = HairOutput(color * .5 + .004);
+  fragColor.a = coverage;
+}
+`;
+
+// 头皮染色：贴着头皮的半透明深色，发根之间不透出光头皮。覆盖率按发际线渐变，再加一点细噪声免得像一块贴纸。
+const SCALP_FRAGMENT = (reference) => /* glsl */`
+precision highp float;
+#include <common>
+${reference ? '#include <lights_pars_begin>\n' + SUN_SHADOW_GLSL : ''}
 ${GLSL_OUTPUT}
 ${GLSL_MELANIN}
 ${GLSL_STREAKS}
@@ -588,6 +666,7 @@ uniform float uMelanin;
 uniform float uRedness;
 uniform float uStrength;
 uniform float uFade;
+${reference ? 'uniform sampler2D uReferenceMask; uniform float uReferenceMelanin; in vec2 vUv; in vec3 vNormalV; in vec3 vWorldPos;' : ''}
 in vec3 vLocalPos;
 in vec3 vData;
 in vec3 vTangentL;
@@ -595,9 +674,30 @@ layout(location = 0) out vec4 fragColor;
 void main() {
   float st = HairStreaks(vLocalPos, normalize(vTangentL), 900.0);
   float alpha = clamp(pow(vData.x, 0.8) * uStrength * (0.8 + 0.35 * st), 0.0, 0.92) * uFade;
+  ${reference ? 'alpha = mix(alpha, texture(uReferenceMask, vUv).g * uFade, vData.z);' : ''}
   if (alpha < 0.004) discard;
   vec3 base = HairMelaninColor(uMelanin, uRedness);
-  fragColor = HairOutput(base * 0.6 + 0.003);
+  vec3 color = base * 0.6 + 0.003;
+  ${reference ? `
+  vec3 normalV = normalize(vNormalV);
+  vec3 illumination = ambientLightColor;
+#ifdef USE_LIGHT_PROBES
+  illumination += getLightProbeIrradiance(lightProbe, normalV);
+#endif
+#if NUM_DIR_LIGHTS > 0
+  vec3 worldNormal = inverseTransformDirection(normalV, viewMatrix);
+  float visibility = SunShadowVisibility(vWorldPos, worldNormal);
+  illumination += directionalLights[0].color * max(0.0, dot(normalV, directionalLights[0].direction)) * visibility;
+#endif
+  float fibreLuminance = pow(texture(uReferenceMask, vUv).b, 2.2);
+  vec3 pigment = sqrt(base);
+  float pigmentLuminance = max(dot(pigment, vec3(.3, .59, .11)), .0001);
+  float originalLuminance = max(dot(sqrt(HairMelaninColor(uReferenceMelanin, uRedness)), vec3(.3, .59, .11)), .0001);
+  float dyeAmount = clamp(abs(uMelanin-uReferenceMelanin)*4.0, 0.0, 1.0);
+  vec3 dye = mix(vec3(1.0), pigment/pigmentLuminance, dyeAmount) * sqrt(pigmentLuminance/originalLuminance);
+  color = mix(color, vec3(fibreLuminance) * dye * illumination * 0.31831, vData.z);
+  ` : ''}
+  fragColor = HairOutput(color);
   fragColor.a = alpha;
 }
 `;
@@ -609,6 +709,7 @@ export function MakeHairSharedUniforms() {
     uFrame: { value: 0 }, uLightLocal: { value: new THREE.Vector3(0, 1, 0) }, uCameraLocal: { value: new THREE.Vector3() },
     uPixelScale: { value: 0.001 }, uModelScale: { value: 1 }, uMinPixels: { value: HAIR_SHADING.minPixels },
     uSelfShadow: { value: 1 }, uAmbient: { value: HAIR_SHADING.ambient }, uBacklit: { value: HAIR_SHADING.backlit },
+    uEnvironmentReflection: {value: HAIR_SHADING.environmentReflection},
   };
 }
 function DensityUniforms(density) {
@@ -635,26 +736,48 @@ function PrepassMaterial(vertexShader, fragmentShader, uniforms, side = THREE.Do
 function ColorUniforms(color) {
   return { uMelanin: { value: color.melanin }, uRedness: { value: color.redness }, uGray: { value: color.gray ?? 0 } };
 }
+function ReferenceColourUniforms(reference, atlas, melanin) {
+  if (!atlas) throw new Error('Missing original-reference fibre atlas');
+  const registration = reference.projection;
+  if (registration.rows.length !== 6) throw new Error('Hair reference requires six registered height rows');
+  const [left, top, right, bottom] = reference.crop;
+  return {
+    uReferenceMask: {value: atlas},
+    uReferenceRows: {value: registration.rows.map(row => new THREE.Vector4(row.y, row.imageY, row.innerX, row.innerImageX))},
+    uReferenceWidths: {value: registration.rows.map(row => new THREE.Vector2(row.outerX, row.outerImageX))},
+    uReferenceCrop: {value: new THREE.Vector4(left, top, right-left, bottom-top)},
+    uReferenceTile: {value: new THREE.Vector4().fromArray(reference.tile)},
+    uReferenceCenter: {value: new THREE.Vector2(registration.centerX, reference.centerZ)},
+    uReferenceImageCenter: {value: registration.reference.centerX},
+    uReferenceCrown: {value: new THREE.Vector2(reference.top-.065, reference.top-.02)},
+    uReferenceMean: {value: Math.max(reference.normalizationLuminance ?? reference.meanLuminance ?? .005, .0001)},
+    uReferenceMelanin: {value: melanin},
+  };
+}
 
-export function MakeStrandMaterials(hair, shared, lightRig) {
+export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = null) {
   const r = hair.render;
+  const reference = !!hair.referenceScalp?.projection;
   const own = {
     uGuides: { value: hair.guideTexture }, uK: { value: hair.points }, uWidth: { value: new THREE.Vector2(r.width[0], r.width[1]) },
     uWidthScale: { value: 1 }, uClump: { value: r.clump }, uFrizz: { value: r.frizz }, uCurl: { value: new THREE.Vector2(r.curl[0], r.curl[1]) },
     uHairLength: { value: r.length }, uFade: { value: 1 },
     uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter },
   };
+  if (reference) Object.assign(own, ReferenceColourUniforms(hair.referenceScalp, referenceAtlas, r.color.melanin));
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density) };
-  const main = LitMaterial(STRAND_VERTEX(false), STRAND_FRAGMENT, uniforms, { lightRig });
+  const main = LitMaterial(STRAND_VERTEX(false), STRAND_FRAGMENT(reference), uniforms, { lightRig });
   const prepass = PrepassMaterial(STRAND_VERTEX(true), STRAND_PREPASS_FRAGMENT, { ...shared, ...own });
   return { main, prepass, own };
 }
-export function MakeCardMaterials(part, atlas, shared, lightRig, density) {
+export function MakeCardMaterials(part, atlas, shared, lightRig, density, referenceAtlas = null) {
   const r = part.render;
-  const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale * (part.stubble?.perVertexLength ? HAIR_SHADING.referenceBeardAlphaScale : 1) },
+  const reference = !!part.referenceScalp?.projection;
+  const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale * (part.render.cardAlphaScale ?? (part.stubble?.perVertexLength ? HAIR_SHADING.referenceBeardAlphaScale : 1)) },
     uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter } };
+  if (reference) Object.assign(own, ReferenceColourUniforms(part.referenceScalp, referenceAtlas, r.color.melanin));
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(density) };
-  const main = LitMaterial(MESH_VERTEX(false), CARD_FRAGMENT, uniforms, { lightRig });
+  const main = LitMaterial(MESH_VERTEX(false), CARD_FRAGMENT(reference), uniforms, { lightRig });
   const prepass = PrepassMaterial(MESH_VERTEX(true), CARD_PREPASS_FRAGMENT, { ...shared, ...own });
   return { main, prepass, own };
 }
@@ -667,7 +790,19 @@ export function MakeShellMaterials(hair, shared, lightRig) {
   const prepass = PrepassMaterial(MESH_VERTEX(true), SHELL_PREPASS_FRAGMENT, { ...shared, ...own }, THREE.FrontSide);
   return { main, prepass, own };
 }
-export function MakeStubbleMaterial(beard, shared) {
+export function MakeStubbleMaterial(beard, shared, referenceAtlas = null) {
+  if (beard.referenceMask) {
+    if (!referenceAtlas) throw new Error('Missing character reference beard atlas');
+    const own = {
+      uReferenceMask: {value: referenceAtlas}, uChinY: {value: beard.referenceMask.chinY}, uMelanin: {value: beard.render.color.melanin},
+      uRedness: {value: beard.render.color.redness}, uFade: {value: 1},
+    };
+    const material = new THREE.ShaderMaterial({glslVersion: THREE.GLSL3,
+      vertexShader: MESH_VERTEX(false), fragmentShader: REFERENCE_BEARD_FRAGMENT, uniforms: own,
+      transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
+    material.allowOverride = false;
+    return {main: material, own};
+  }
   const own = { uMelanin: { value: beard.render.color.melanin }, uRedness: { value: beard.render.color.redness },
     uDensity: { value: 1 }, uStubLength: { value: Math.max(0.0006, beard.stubble.length) }, uPerVertexLength: { value: beard.stubble.perVertexLength ? 1 : 0 },
     uCoverageScale: { value: beard.stubble.perVertexLength ? HAIR_SHADING.referenceStubbleCoverageScale : 1 },
@@ -679,11 +814,19 @@ export function MakeStubbleMaterial(beard, shared) {
   return { main: m, own };
 }
 
-export function MakeScalpTintMaterial(hair) {
+export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = null) {
   const own = { uMelanin: { value: hair.render.color.melanin }, uRedness: { value: hair.render.color.redness },
     uStrength: { value: hair.scalpTint }, uFade: { value: 1 } };
-  const m = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false), fragmentShader: SCALP_FRAGMENT,
-    uniforms: own, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  if (hair.referenceScalp) {
+    if (!referenceAtlas) throw new Error('Missing character reference scalp atlas');
+    own.uReferenceMask = {value: referenceAtlas};
+    own.uReferenceMelanin = {value: hair.render.color.melanin};
+  }
+  const m = hair.referenceScalp
+    ? LitMaterial(MESH_VERTEX(false), SCALP_FRAGMENT(true), own, {lightRig, transparent: true, side: THREE.FrontSide})
+    : new THREE.ShaderMaterial({glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false), fragmentShader: SCALP_FRAGMENT(false), uniforms: own, transparent: true});
+  m.depthWrite = false;
+  m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1;
   m.allowOverride = false;
   return { main: m, own };
 }

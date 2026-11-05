@@ -100,8 +100,10 @@ export class HairRange {
         const groom = new HairGroom(asset, { atlas: this.atlas, lightRig: this.lightRig, lod: item.lod || this.force, name: `${item.row}_${item.groom}` });
         head.add(groom.root);
         this.root.add(head);
-        this.stations.push({ row: item.row, groomId: item.groom, lod: item.lod || null, x: item.x, z: item.z, head, groom, meta,
-          center: V(item.x, HAIR_RANGE_PEDESTAL.height + (asset.header.hair?.bounds ? (asset.header.hair.bounds.min[1] + asset.header.hair.bounds.max[1]) * 0.5 : 0.18), item.z) });
+        const portrait = asset.header.portrait?.center;
+        const center = portrait ? V(item.x + portrait[0], HAIR_RANGE_PEDESTAL.height + portrait[1], item.z + portrait[2])
+          : V(item.x, HAIR_RANGE_PEDESTAL.height + (asset.header.hair?.bounds ? (asset.header.hair.bounds.min[1] + asset.header.hair.bounds.max[1]) * .5 : .18), item.z);
+        this.stations.push({ row: item.row, groomId: item.groom, lod: item.lod || null, x: item.x, z: item.z, head, groom, meta, center });
       }
       this.MakeLabels();
       this.ready = true; this.SetSun(this.sun.azimuth, this.sun.elevation);
@@ -203,7 +205,8 @@ export class HairRange {
     return {
       ready: this.ready, error: this.error, loaded: this.loaded, total: this.total, force: this.force, view: this.view, selected: this.selected,
       sun: { ...this.sun }, camera: { target: this.target.toArray(), radius: this.radius, azimuth: this.azimuth, elevation: this.elevation },
-      stations: this.stations.map((s, i) => ({ index: i, row: s.row, groom: s.groomId, fixedLod: s.lod, ...s.groom.stats })),
+      stations: this.stations.map((s, i) => ({ index: i, row: s.row, groom: s.groomId, fixedLod: s.lod,
+        reference: s.groom.asset.header.reference || null, ...s.groom.stats })),
     };
   }
   MoveCamera(dt) {

@@ -20,6 +20,10 @@ const styles = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairStyles.json'
 const manifest = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairGrooms.json'), 'utf8'));
 const heads = JSON.parse(fs.readFileSync(path.join(HAIR, 'Heads', 'Data_HairHeads.json'), 'utf8')).heads;
 const references = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8'));
+const referenceMasks = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferenceMasks.json'), 'utf8'));
+const referenceText = fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8').replace(/\r\n/g, '\n');
+Check(referenceMasks.definitionSha256 === createHash('sha256').update(referenceText).digest('hex'), '参考覆盖图基于当前五官校准与配方');
+Check(referenceMasks.atlasSha256 === createHash('sha256').update(fs.readFileSync(path.join(HAIR, referenceMasks.atlas))).digest('hex'), '参考覆盖图集校验和一致');
 const ReferenceMeta = (key) => {
   const recipe = references.looks[key];
   return recipe && {look:key, source:recipe.source, sha256:recipe.sha256, version:references.version,
@@ -43,7 +47,11 @@ for (const entry of entries) {
     Check(entry.referenceLook === (entry.labHead || entry.head) && !!meta, `${entry.id}：使用本人参考配方`);
     if (meta) {
       Check(/^[a-f0-9]{64}$/.test(meta.sha256) && !path.isAbsolute(meta.source) && !meta.source.includes('..'), `${entry.id}：参考图路径与 SHA-256 完整`);
-      Check(!!references.looks[entry.referenceLook].beard.referenceShape, `${entry.id}：包含个人胡须轮廓`);
+      const look = references.looks[entry.referenceLook];
+      Check(!!look.beard.referenceParts && !!referenceMasks.looks[entry.referenceLook], `${entry.id}：使用本人细须覆盖与发根分布`);
+      Check(/^[a-f0-9]{64}$/.test(look.baldSha256), `${entry.id}：剃净参考也记录来源哈希`);
+      const marks = look.landmarks;
+      Check(marks.glabella[1] > marks.subnasale[1] && marks.subnasale[1] > marks.stomion[1] && marks.stomion[1] > marks.menton[1], `${entry.id}：校准的眉间、鼻下、口裂、下巴次序正确`);
     }
   }
 }
@@ -79,9 +87,24 @@ for (const g of manifest.grooms) {
   if (entry.referenceLook) {
     const expected = JSON.stringify(ReferenceMeta(entry.referenceLook));
     Check(JSON.stringify(header.reference) === expected && JSON.stringify(g.reference) === expected, `${g.id}：二进制与清单均基于当前个人参考和配方（修改后必须重烘）`);
-    Check(header.beard?.stubble.perVertexLength === true, `${g.id}：远景短茬沿用个人分区长度`);
-    const data = sec('beardStubbleData'), shape = header.sections.beardStubbleData;
-    Check(!!data && shape?.quant?.comps === 2 && data.some((v, i) => i % 2 === 1 && v > 1), `${g.id}：短茬长度已写入逐顶点数据`);
+    const mask = header.beard?.referenceMask, look = references.looks[entry.referenceLook];
+    Check(mask?.look === entry.referenceLook && mask?.atlasSha256 === referenceMasks.atlasSha256
+      && mask?.sourceSha256 === look.sha256 && mask?.baldSha256 === look.baldSha256, `${g.id}：使用当前本人的原图覆盖图集`);
+    const uv = sec('beardStubbleUv'), pos = sec('beardStubblePos');
+    Check(!!uv && !!pos && uv.length === pos.length / 3 * 2, `${g.id}：细须投影 UV 与网格匹配`);
+    const tile = referenceMasks.looks[entry.referenceLook].tile;
+    Check(!!uv && uv.every((value, index) => {
+      const axis = index % 2, unit = value / 65535;
+      return unit >= tile[axis] - .0001 && unit <= tile[axis] + tile[axis + 2] + .0001;
+    }), `${g.id}：UV 始终在本人的图集区域内`);
+    const scalpUv = sec('hairScalpUv'), scalpPos = sec('hairScalpPos');
+    Check(header.hair?.referenceScalp?.look === entry.referenceLook && header.hair?.referenceScalp?.atlasSha256 === referenceMasks.atlasSha256,
+      `${g.id}：额前发根使用本人的参考覆盖图`);
+    const scalpReference = header.hair?.referenceScalp;
+    Check(scalpReference?.projection?.rows.length === 6 && scalpReference?.normalizationLuminance === referenceMasks.looks[entry.referenceLook].normalizationLuminance,
+      `${g.id}：实际发丝使用当前的参考投影与浓密头发亮度基准`);
+    Check(!!scalpUv && !!scalpPos && scalpUv.length === scalpPos.length / 3 * 2, `${g.id}：额前投影 UV 与头皮几何匹配`);
+    Check(header.portrait?.height > .15 && header.portrait?.height < .35, `${g.id}：单人观察按校准后的完整头部取景`);
   }
   if (header.model) {
     Check(fs.existsSync(path.join(here, header.model)), `${g.id} 游戏人物存在`);

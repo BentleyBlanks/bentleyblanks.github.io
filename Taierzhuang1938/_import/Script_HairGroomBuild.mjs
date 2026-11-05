@@ -25,8 +25,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT = path.dirname(HERE);
 const HAIR = path.join(PROJECT, 'Hair');
 const STYLES = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairStyles.json'), 'utf8'));
-const REFERENCE_DATA = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8'));
+const REFERENCE_TEXT = fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8').replace(/\r\n/g, '\n');
+const REFERENCE_DATA = JSON.parse(REFERENCE_TEXT);
 const REFERENCES = REFERENCE_DATA.looks;
+const REFERENCE_MASKS = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairReferenceMasks.json'), 'utf8'));
+if (REFERENCE_MASKS.definitionSha256 !== createHash('sha256').update(REFERENCE_TEXT).digest('hex')) {
+  throw new Error('Reference registration changed. Run _import/Script_HairReferenceBake.py before baking grooms.');
+}
 const HEADS = JSON.parse(fs.readFileSync(path.join(HAIR, 'Heads', 'Data_HairHeads.json'), 'utf8')).heads;
 const FORMAT_VERSION = 1;
 
@@ -48,6 +53,17 @@ function Rng(seed) {
   return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 function HashString(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+function WriteAsset(file, content) {
+  const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content);
+  if (fs.existsSync(file) && fs.readFileSync(file).equals(bytes)) return;
+  const temporary = `${file}.tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(temporary, bytes);
+    fs.renameSync(temporary, file);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
 function Lerp1D(table, x) { // [[x, y], ...] 按 x 升序，两端夹住
   if (x <= table[0][0]) return table[0][1];
   for (let i = 1; i < table.length; i++) if (x <= table[i][0]) {
@@ -170,6 +186,7 @@ class MeshSdf {
 class HeadFrame {
   constructor(marks) {
     this.m = marks;
+    this.centerX = marks.centerX || 0;
     const e = marks.ear;
     this.zc = (marks.glabella[2] + marks.skullBack) * 0.5;
     this.top = marks.top[1]; this.gl = marks.glabella[1]; this.T = this.top - this.gl;
@@ -180,7 +197,7 @@ class HeadFrame {
     this.earBack = this.Deg(Math.atan2(e.halfWidth, -(e.zBack - this.zc)));
   }
   Deg(r) { return (r * 180) / Math.PI; }
-  Phi(p) { return this.Deg(Math.atan2(Math.abs(p[0]), -(p[2] - this.zc))); }  // 0 = 正前，180 = 正后
+  Phi(p) { return this.Deg(Math.atan2(Math.abs(p[0] - this.centerX), -(p[2] - this.zc))); }  // 0 = 正前，180 = 正后
   HairlineY(phi, hl) {
     const m = this.m, e = m.ear, ef = this.earFront, eb = this.earBack, gl = this.gl, T = this.T;
     return Lerp1D([
@@ -201,15 +218,30 @@ class HeadFrame {
     const n = 0.0016 * Math.sin(phi * 0.21 + side * 1.7) + 0.0011 * Math.sin(phi * 0.57 + side * 4.1) + 0.0007 * Math.sin(phi * 1.31 + side * 2.3);
     return this.HairlineY(phi, hl) + n;
   }
+  IsEar(p) {
+    const phi = this.Phi(p), ear = this.m.ear;
+    return phi > this.earFront - 4 && phi < this.earBack + 6 && p[1] < ear.yMax + .012
+      && Math.abs(p[0] - this.centerX) > ear.halfWidth * .8;
+  }
   ScalpMask(p, hl) {
     const phi = this.Phi(p), y = p[1], band = hl.band ?? 0.008;
-    const e = this.m.ear;
     // 耳朵本身：耳朵那一段方位角、耳尖以下，横向伸出头骨的点。
-    if (phi > this.earFront - 4 && phi < this.earBack + 6 && y < e.yMax + 0.012 && Math.abs(p[0]) > e.halfWidth * 0.8) return 0;
+    if (this.IsEar(p)) return 0;
     if (p[2] < this.m.glabella[2] + 0.012 && y < this.gl + 0.15 * this.T) return 0;   // 眉骨、脸
     // 过渡带按头皮上到发际线的距离算（方位角换成弧长），不只按高度差：鬓角、耳前这些发际线陡的地方也软
-    const side = p[0] >= 0 ? 1 : -1, arc = (0.085 * Math.PI) / 180;
-    const h0 = this.NoisyHairlineY(phi, hl, side), inside = y > h0;
+    const side = p[0] >= this.centerX ? 1 : -1, arc = (0.085 * Math.PI) / 180;
+    let h0 = this.NoisyHairlineY(phi, hl, side);
+    if (this.referenceProjection && phi < 95) {
+      const photoY = this.referenceProjection.HairlineY(p);
+      h0 = Mix(photoY, h0, Smooth(75, 95, phi));
+      if (phi < 75) {
+        const left = this.referenceProjection.HairlineY([p[0] - .001, y, p[2]]);
+        const right = this.referenceProjection.HairlineY([p[0] + .001, y, p[2]]);
+        const distance = (y - h0) / Math.hypot(1, (right - left) / .002);
+        return Smooth(0, band, distance);
+      }
+    }
+    const inside = y > h0;
     let d = Math.abs(y - h0);
     for (let dp = -24; dp <= 24; dp += 2) {
       const ph = phi + dp;
@@ -282,53 +314,75 @@ class HeadFrame {
 
 // ---------------------------------------------------------------------------------------------------------------
 // 在头部网格上按面积撒点（带区域权重）。返回 { p, n, w }。
-function ReferenceBeardParts(p, frame, shape) {
-  const x = Math.abs(p[0]), y = p[1], phi = frame.Phi(p), L = frame.L, fw = frame.m.ear.halfWidth;
-  if (p[2] > frame.zc || phi > frame.earFront - 3 || y < frame.men - .002) return [];
-  if (phi < 40 && y > frame.sub + .001) return [];
-  const out = [], side = p[0] < 0 ? -1 : 1;
-  const AddPart = (part, density, length, dir) => { if (density > .005) out.push({part, density, length, dir: Norm(dir)}); };
-  const mu = shape.mustache;
-  if (mu) {
-    const width = fw * mu.halfWidth, t = Clamp(x / width, 0, 1), height = frame.sub - frame.st;
-    // Follow the upper lip's arch: high beneath the nose, dipping towards
-    // the corners. Filling the whole subnasale/stomion interval makes a box.
-    const arch = Math.pow(t, 1.25);
-    const top = frame.sub - height * (.06 + (.50 + mu.droop * .55) * arch);
-    const bottom = top - height * (mu.thickness ?? .35) * Mix(1, .7, t);
-    const edge = Smooth(width, width - .0025, x) * Smooth(mu.gap * .3, mu.gap, x);
-    const w = edge * Smooth(bottom, bottom + .0015, y) * Smooth(top, top - .0015, y);
-    AddPart('mustache', w * mu.density, mu.length * Mix(.8, 1.1, t), [side * Mix(.2, .85, t), -1, -.08]);
+class ReferenceProjection {
+  constructor(look, frame, settings) {
+    this.look = look;
+    this.frame = frame;
+    this.settings = settings;
+    this.alpha = Buffer.from(look.grid.alpha, 'base64');
+    this.parts = Buffer.from(look.grid.parts, 'base64');
   }
-  const soul = shape.soul;
-  if (soul) {
-    const top = frame.st - soul.top * L, bottom = frame.st - soul.bottom * L;
-    const w = fw * soul.halfWidth;
-    const mask = Smooth(w, w * .55, x) * Smooth(bottom, bottom + .002, y) * Smooth(top, top - .002, y);
-    AddPart('soul', mask * soul.density, soul.length, [side * .08, -1, -.1]);
+  Project(p) {
+    const registration = this.look.projection;
+    const rows = registration.rows;
+    let upper = rows[0], lower = rows[1];
+    for (let i = 1; i < rows.length; i++) {
+      upper = rows[i - 1]; lower = rows[i];
+      if (p[1] >= lower.y) break;
+    }
+    const t = Clamp((upper.y - p[1]) / (upper.y - lower.y), 0, 1);
+    const Value = (key) => Mix(upper[key], lower[key], t);
+    const dx = p[0] - registration.centerX;
+    const x = Math.abs(dx), inner = Value('innerX');
+    const innerPixels = Value('innerImageX');
+    const offset = x <= inner ? x / inner * innerPixels
+      : innerPixels + (x - inner) / (Value('outerX') - inner) * (Value('outerImageX') - innerPixels);
+    return [registration.reference.centerX - Math.sign(dx) * offset, Value('imageY')];
   }
-  const chin = shape.chin;
-  if (chin) {
-    const w = fw * chin.halfWidth, radiusY = L * chin.height;
-    const centreY = frame.men + radiusY * .45;
-    const ellipse = Math.hypot(x / w, (y - centreY) / radiusY);
-    const mask = Smooth(1, .72, ellipse) * Smooth(frame.men - .002, frame.men + .001, y);
-    const taper = Mix(1, Mix(.25, 1.15, Math.pow(Clamp(1 - x / w, 0, 1), .7)), chin.point);
-    AddPart('chin', mask * chin.density, chin.length * taper * Mix(.4, 1, Smooth(1, .25, ellipse)), [side * .10 * x / w, -1, -.12]);
+  LocalUv(p) {
+    const [x, y] = this.Project(p), [left, top, right, bottom] = this.look.crop;
+    return [(x - left) / (right - left), (y - top) / (bottom - top)];
   }
-  const jaw = shape.jaw, q = Clamp(phi / (frame.earFront - 3), 0, 1);
-  const jawY = Lerp1D([[0, frame.men + .06 * L], [.35, frame.men + .11 * L], [.65, frame.men + .26 * L], [1, frame.m.ear.yMin + frame.earH * .08]], q);
-  if (jaw && x > fw * .20) {
-    const band = L * jaw.band;
-    const mask = Smooth(band, band * .45, Math.abs(y - jawY)) * Smooth(fw * .20, fw * .28, x);
-    AddPart('jaw', mask * jaw.density, jaw.length, [side * .08, -1, .08]);
+  AtlasUv(p) {
+    const uv = this.LocalUv(p), tile = this.look.tile;
+    return [tile[0] + Clamp(uv[0], .001, .999) * tile[2], tile[1] + Clamp(uv[1], .001, .999) * tile[3]];
   }
-  const cheek = shape.cheek;
-  if (cheek && x > fw * .24 && y > jawY && y < frame.sub + .28 * L) {
-    const mask = Smooth(frame.sub + .28 * L, frame.sub + .05 * L, y) * Smooth(jawY, jawY + .008, y);
-    AddPart('cheek', mask * cheek.density, cheek.length, [side * .04, -1, 0]);
+  ScalpUv(p) {
+    const [x, y] = this.Project(p), [left, top, right, bottom] = this.look.hairCrop, tile = this.look.tile;
+    return [tile[0] + Clamp((x - left) / (right - left), .001, .999) * tile[2],
+      tile[1] + Clamp((y - top) / (bottom - top), .001, .999) * tile[3]];
   }
-  return out;
+  Contains(p) {
+    const uv = this.LocalUv(p);
+    return p[2] < this.frame.zc - .005 && p[1] >= this.frame.men - .005 && p[1] < this.frame.gl
+      && uv[0] >= 0 && uv[0] <= 1 && uv[1] >= 0 && uv[1] <= 1;
+  }
+  PartsAt(p) {
+    if (!this.Contains(p)) return [];
+    const uv = this.LocalUv(p), size = this.look.grid.size;
+    const fx = uv[0] * (size - 1), fy = uv[1] * (size - 1);
+    const x = Math.floor(fx), y = Math.floor(fy), nx = Math.min(x + 1, size - 1), ny = Math.min(y + 1, size - 1);
+    const coverage = Mix(Mix(this.alpha[y * size + x], this.alpha[y * size + nx], fx - x),
+      Mix(this.alpha[ny * size + x], this.alpha[ny * size + nx], fx - x), fy - y) / 255;
+    const partIndex = this.parts[Math.round(fy) * size + Math.round(fx)] - 1;
+    const part = REFERENCE_MASKS.parts[partIndex], setting = this.settings[part];
+    if (!setting || coverage < .015) return [];
+    const side = Math.sign(p[0] - this.frame.centerX);
+    const density = Math.sqrt(coverage) * setting.density;
+    let length = setting.length;
+    if (part === 'chin' && setting.point) {
+      const width = this.look.projection.reference.faceHalfWidth * .72;
+      const x = Math.abs(this.Project(p)[0] - this.look.projection.reference.centerX) / width;
+      length *= Mix(1, .35, Clamp(x, 0, 1) * setting.point);
+    }
+    const dir = part === 'mustache' ? [side * .6, -1, -.1] : [side * .08, -1, .1];
+    return [{part, density, length, dir: Norm(dir)}];
+  }
+  HairlineY(p) {
+    const x = this.Project(p)[0];
+    const imageY = Lerp1D(this.look.hairline, x);
+    return Lerp1D(this.look.projection.rows.map(row => [row.imageY, row.y]), imageY);
+  }
 }
 
 class SurfaceSampler {
@@ -378,6 +432,16 @@ function PoissonRoots(sampler, rng, spacing, Weight, maxCount = 20000) {
 // 梳向（头皮切面上的方向）
 function CombDir(style, frame, p, n) {
   const c = style.comb, m = frame.m;
+  if (c.type === 'crew') {
+    const region = frame.Regions(p);
+    const front = 1 - Smooth(45, 85, frame.Phi(p));
+    const sideFlow = Project([0, -1, .15], n);
+    const side = Math.sign(p[0] - frame.centerX);
+    const frontFlow = Project([side * .12, 1, .65], n);
+    const crownFlow = Project([side * .12, -.08, 1], n);
+    const flow = Add(Scale(sideFlow, 1 - front), Scale(frontFlow, front));
+    return Norm(Add(Scale(flow, 1 - region.top), Scale(crownFlow, region.top)));
+  }
   if (c.type === 'whorl') {
     const W = [c.whorl[0], m.top[1] + c.whorl[1], m.top[2] + c.whorl[2]];
     let r = Project(Sub(p, W), n);
@@ -585,7 +649,7 @@ function WritePng(file, w, h, rgba) {
   for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; rgba.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4); }
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Chunk('IHDR', ihdr),
+  WriteAsset(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Chunk('IHDR', ihdr),
     Chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), Chunk('IEND', Buffer.alloc(0))]));
 }
 
@@ -852,7 +916,19 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     shell = { pos: net.pos, nrm, tan, data, idx: net.idx };
   }
   // 6. 头皮染色片：贴着头皮 0.15 mm，发丝 / 发片档下压暗发根之间透出来的光头皮（UE MetaHuman 靠头皮贴图做同一件事）
-  const scalp = ScalpPatch(mesh, (p) => Weight(p), () => 0.00015, (p, n) => CombDir(style, frame, p, n));
+  const projection = frame.referenceProjection;
+  const FrontalScalp = (p) => projection && !frame.IsEar(p) && (!exclude || !exclude(p)) && frame.Phi(p) < 75
+    && p[1] > projection.HairlineY(p) - .012;
+  const scalp = ScalpPatch(mesh, p => FrontalScalp(p) ? 1 : Weight(p), () => 0.00015, (p, n) => CombDir(style, frame, p, n));
+  if (projection) {
+    scalp.uv = []; scalp.data = [];
+    for (let i = 0; i < scalp.pos.length; i += 3) {
+      const p = scalp.pos.slice(i, i + 3);
+      scalp.uv.push(...projection.ScalpUv(p));
+      const blend = !frame.IsEar(p) && (!exclude || !exclude(p)) ? 1 - Smooth(65, 85, frame.Phi(p)) : 0;
+      scalp.data.push(Weight(p), .00015, blend);
+    }
+  }
   return { guides, open, strands, K, bmin, bmax, density, vn, vox, extMax, cards, shell, scalp, guideCount: guides.length };
 }
 
@@ -861,22 +937,23 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
 function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = null) {
   const rng = Rng(HashString(groomId + ':beard'));
   const K = style.points;
-  const PartsAt = (p) => (exclude && exclude(p) ? [] : style.referenceShape ? ReferenceBeardParts(p, frame, style.referenceShape) : frame.BeardParts(p, style.parts));
-  const Weight = (p) => { let w = 0; for (const q of PartsAt(p)) if (style.referenceShape || q.part !== 'cheek') w = Math.max(w, q.density); return w; };
+  const projection = style.referenceMask ? new ReferenceProjection(REFERENCE_MASKS.looks[style.referenceMask], frame, style.referenceParts) : null;
+  const PartsAt = (p) => (exclude && exclude(p) ? [] : projection ? projection.PartsAt(p) : frame.BeardParts(p, style.parts));
+  const Weight = (p) => { let w = 0; for (const q of PartsAt(p)) if (projection || q.part !== 'cheek') w = Math.max(w, q.density); return w; };
   const cards = { pos: [], tan: [], nrm: [], uv: [], data: [], idx: [] };
   const cfg = style.cards, tileList = tiles[cfg.tile];
   let cardCount = 0;
   // 很多窄小发片：每片沿生长方向随机偏一点、翘起角度各不同（胡须是戳出来的，不是贴在脸上的），叠几层出体积。
-  if (Object.keys(style.parts).length) {
+  if (projection || Object.keys(style.parts).length) {
     for (let layer = 0; layer < cfg.layers; layer++) {
       const lrng = Rng(HashString(groomId + ':beardcards:' + layer));
       const picks = PoissonRoots(sampler, lrng, cfg.spacing * (1 + 0.12 * layer), (p) => Weight(p), 14000);
       for (const pk of picks) {
-        const parts = PartsAt(pk.p).filter((q) => style.referenceShape || q.part !== 'cheek');
+        const parts = PartsAt(pk.p).filter((q) => projection || q.part !== 'cheek');
         if (!parts.length) continue;
         parts.sort((a, b) => b.density - a.density);
         const q = parts[0];
-        if (lrng() > q.density) continue;
+        if (lrng() > q.density * (cfg.rootScale ?? 1)) continue;
         let comb = Norm(Project(q.dir, pk.n));
         const turn = (lrng() - 0.5) * 0.7;
         comb = Norm(Add(Scale(comb, Math.cos(turn)), Scale(Cross(pk.n, comb), Math.sin(turn))));
@@ -893,18 +970,17 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
   const st = style.stubble;
   const stParts = st ? Object.fromEntries(st.parts.map((k) => [k, { ...(style.parts[k] || {}), length: 0.001, density: 1, cheek: style.parts.jaw?.cheek ?? 0.45 }])) : null;
   if (stParts) { stParts.jaw ||= { length: 0.001, density: 1, cheek: 0.5 }; if (!st.parts.includes('jaw')) delete stParts.jaw; }
-  const stubble = st ? ScalpPatch(mesh, (p) => {
+  let stubble = st && !projection ? ScalpPatch(mesh, (p) => {
     if (exclude && exclude(p)) return 0;
-    let w = 0; for (const q of (style.referenceShape ? PartsAt(p) : frame.BeardParts(p, stParts))) w = Math.max(w, q.part === 'cheek' ? q.density * 0.5 : q.density);
+    let w = 0; for (const q of frame.BeardParts(p, stParts)) w = Math.max(w, q.part === 'cheek' ? q.density * 0.5 : q.density);
     return w * st.density;
   }, () => 0.00025, (p, n) => Norm(Project([0, -1, 0.1], n)), 0.01) : null;
-  if (stubble && style.referenceShape) {
-    // Match the subpixel mean to each local short-hair region. A single
-    // global stubble length loses the moustache or darkens the cheeks.
-    for (let i = 0; i < stubble.pos.length / 3; i++) {
-      const p = stubble.pos.slice(i * 3, i * 3 + 3);
-      const parts = PartsAt(p).sort((a, b) => b.density - a.density);
-      stubble.data[2 * i + 1] = Math.min(.004, parts[0]?.length ?? .001);
+  if (projection) {
+    stubble = ScalpPatch(mesh, p => (!exclude || !exclude(p)) && projection.Contains(p) ? 1 : 0,
+      () => .00035, (p, n) => Norm(Project([0, -1, .1], n)));
+    stubble.uv = [];
+    for (let i = 0; i < stubble.pos.length; i += 3) {
+      stubble.uv.push(...projection.AtlasUv(stubble.pos.slice(i, i + 3)));
     }
   }
   return { cards, stubble, cardCount };
@@ -1190,12 +1266,17 @@ function HeadAssets(key) {
 function BuildGroom(entry, tiles) {
   const t0 = Date.now();
   const game = entry.model ? GameHeadAssets(entry) : null;
-  const { mesh, sdf, sampler, frame, exclude = null } = game || HeadAssets(entry.head);
+  const { mesh, sdf, sampler, frame: baseFrame, exclude = null } = game || HeadAssets(entry.head);
   const header = { format: 'tengxian.hairGroom', version: FORMAT_VERSION, id: entry.id, head: entry.head, label: entry.label, frame: 'head', units: 'm' };
   if (game) Object.assign(header, { model: entry.model, modelSha256: createHash('sha256').update(fs.readFileSync(path.join(PROJECT, entry.model))).digest('hex'), bone: game.bone, attach: game.attach, icpErrorM: game.icpErrorM });
   const sections = {};
   const reference = entry.referenceLook ? REFERENCES[entry.referenceLook] : null;
   if (entry.referenceLook && !reference) throw new Error(`Missing reference look: ${entry.referenceLook}`);
+  const frame = reference ? new HeadFrame(DeepMerge(baseFrame.m, reference.landmarks)) : baseFrame;
+  if (reference) {
+    frame.referenceProjection = new ReferenceProjection(REFERENCE_MASKS.looks[entry.referenceLook], frame, reference.beard.referenceParts);
+    header.portrait = {center: [frame.centerX, (frame.top + frame.men) * .5, frame.zc], height: frame.top - frame.men};
+  }
   if (reference) header.reference = {look: entry.referenceLook, source: reference.source, sha256: reference.sha256, version: REFERENCE_DATA.version,
     recipeSha256: createHash('sha256').update(JSON.stringify(reference)).digest('hex')};
   if (entry.hair) {
@@ -1215,7 +1296,7 @@ function BuildGroom(entry, tiles) {
       hairGuides: guideData, hairStrandGuides: sg, hairStrandBary: sb, hairStrandSeed: ss, hairDensity: h.density,
       ...MeshSections('hairCard', h.cards, { uv: true }),
       ...MeshSections('hairShell', h.shell, { dataScale: [1, 0.05] }),
-      ...MeshSections('hairScalp', h.scalp, { dataScale: [1, 0.05] }),
+      ...MeshSections('hairScalp', h.scalp, { uv: !!reference, dataScale: [1, 0.05, 1] }),
     });
     header.hair = {
       style: entry.hair, name: style.name, family: style.family, guides: G, points: K, strands: S,
@@ -1226,20 +1307,30 @@ function BuildGroom(entry, tiles) {
       render: { width: style.width, clump: style.clump, frizz: style.frizz, curl: style.curl, color: style.color,
         roughness: style.roughness, specular: style.specular, scatter: style.scatter, length: Math.max(...Object.values(style.length)) },
     };
+    if (reference) {
+      const mask = REFERENCE_MASKS.looks[entry.referenceLook];
+      header.hair.referenceScalp = {look: entry.referenceLook, atlasSha256: REFERENCE_MASKS.atlasSha256,
+        projection: mask.projection, crop: mask.hairCrop, tile: mask.tile,
+        centerZ: frame.zc, top: frame.top, normalizationLuminance: mask.normalizationLuminance};
+    }
   }
   if (entry.beard) {
     const style = DeepMerge(STYLES.beard[entry.beard], reference?.beard);
     const b = BuildBeard(entry.id, style, frame, mesh, sdf, sampler, tiles, exclude);
     if (b.cards.idx.length) Object.assign(sections, MeshSections('beardCard', b.cards, { uv: true }));
-    if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { dataScale: [1, 0.05] }));
+    if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { uv: !!style.referenceMask, dataScale: [1, 0.05] }));
     header.beard = { style: entry.beard, name: style.name, cards: b.cardCount, triangles: b.cards.idx.length / 3,
-      stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0, perVertexLength: !!style.referenceShape },
-      render: { color: style.color, roughness: 0.42, specular: 0.5, scatter: 0.5 } };
+      stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0 },
+      render: { color: style.color, roughness: 0.42, specular: 0.5, scatter: 0.5, cardAlphaScale: style.cards.alphaScale ?? 1 } };
+    if (style.referenceMask) header.beard.referenceMask = {
+      look: style.referenceMask, atlas: REFERENCE_MASKS.atlas, atlasSha256: REFERENCE_MASKS.atlasSha256,
+      sourceSha256: reference.sha256, baldSha256: reference.baldSha256,
+    };
   }
   const buf = Pack(header, sections);
   const file = path.join(HAIR, 'Grooms', `Groom_${entry.id}.bin`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, buf);
+  WriteAsset(file, buf);
   const sec = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`${entry.id}: ${(buf.length / 1e6).toFixed(2)} MB  hair ${header.hair ? `${header.hair.guides} guides × ${header.hair.points}, ${header.hair.strands} strands, cards ${header.hair.cards.triangles} tri, shell ${header.hair.shell.triangles} tri` : '-'}  beard ${header.beard ? `${header.beard.cards} cards, stubble ${header.beard.stubble.triangles} tri` : '-'}  (${sec} s)`);
   return { id: entry.id, head: entry.head, hair: entry.hair, beard: entry.beard, reference: header.reference || null, row: entry.row || null, label: entry.label, model: entry.model || null, file: `Grooms/Groom_${entry.id}.bin`, bytes: buf.length,
@@ -1266,7 +1357,7 @@ function main() {
     heads: Object.fromEntries(Object.keys(HEADS).map((k) => [k, { file: `Heads/Model_HairHead_${k}.glb`, name: HEADS[k].name }])),
     grooms: entries.map((e) => byId.get(e.id)).filter(Boolean),
   };
-  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 1));
+  WriteAsset(manifestFile, JSON.stringify(manifest, null, 1));
 }
 
 main();

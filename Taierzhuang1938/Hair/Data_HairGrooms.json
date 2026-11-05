@@ -44,18 +44,18 @@
     "look": "Shunzi",
     "source": "01_顺子/Parts_V1_20261103/Ref_Shunzi_Head_2K_V1.png",
     "sha256": "89d54bedf82ec246052264158f13ceaccf0b5a698f0ed133c2b5275118e2446b",
-    "version": 2,
-    "recipeSha256": "7582fbf70b3f90856fb0b04498497ef8788b93406e5ec26d9be18da540a7869b"
+    "version": 3,
+    "recipeSha256": "0a7c9e90f57734a6088fbfa82daf69998dac37b74d4d2073f152f49ee74cc18c"
    },
    "row": "cast",
    "label": "顺子（个人参考）：短寸头 + 淡短茬",
    "model": null,
    "file": "Grooms/Groom_Shunzi_Cast.bin",
-   "bytes": 1615860,
+   "bytes": 1738652,
    "strands": 46000,
-   "guides": 2595,
-   "cardTriangles": 20964,
-   "shellTriangles": 2227
+   "guides": 2699,
+   "cardTriangles": 21124,
+   "shellTriangles": 2459
   },
   {
    "id": "Luo_Cast",
@@ -66,18 +66,18 @@
     "look": "Luo",
     "source": "02_罗班长/Ref_SquadLeaderLuo_Head_2K_V3.png",
     "sha256": "1913082e939b51736e892ac348063894db43eaa14455776246fbf82f7832c9d6",
-    "version": 2,
-    "recipeSha256": "0d8c429ac7952b828e2e909a3336707fa382e0b2fa60741bdc92af71c01dbc08"
+    "version": 3,
+    "recipeSha256": "c0aaae390db2a5ac5e9c424186e6ff31e5b46621f7404b31758844d9575980e1"
    },
    "row": "cast",
    "label": "罗班长（个人参考）：短寸头 + 下颌薄短须",
    "model": null,
    "file": "Grooms/Groom_Luo_Cast.bin",
-   "bytes": 1744188,
+   "bytes": 1554100,
    "strands": 46000,
-   "guides": 2035,
-   "cardTriangles": 26544,
-   "shellTriangles": 1142
+   "guides": 2152,
+   "cardTriangles": 18310,
+   "shellTriangles": 1295
   },
   {
    "id": "HeYoutian_Cast",
@@ -88,18 +88,18 @@
     "look": "HeYoutian",
     "source": "05_何有田/Parts_V1_20261103/Ref_HeYoutian_Head_2K_V1.png",
     "sha256": "04b5896de7803fac6a7262fd0f277ff59ed7e2b8ae42fd99e2ac9d2d21e869b4",
-    "version": 2,
-    "recipeSha256": "b14f42689abf0eabb28497799234d35e74a2bdae337e20c812cdc365ca2be1b9"
+    "version": 3,
+    "recipeSha256": "2e0692ddb5b4e54988d76d3fb2fcb1772bd7c451eb0cbc6cb92e2e5a661750dc"
    },
    "row": "cast",
    "label": "何有田（个人参考）：碎寸头 + 细唇须下颌短须",
    "model": null,
    "file": "Grooms/Groom_HeYoutian_Cast.bin",
-   "bytes": 1688336,
+   "bytes": 1670332,
    "strands": 46000,
-   "guides": 2446,
-   "cardTriangles": 23660,
-   "shellTriangles": 1632
+   "guides": 2434,
+   "cardTriangles": 19654,
+   "shellTriangles": 1685
   },
   {
    "id": "SoldierA_Cast",
@@ -110,18 +110,18 @@
     "look": "SoldierA",
     "source": "10_日军士兵A/Parts_V1_20261102/Ref_JapaneseSoldierA_Head_2K_V1.png",
     "sha256": "c760047920b1397439134f3c2b82484b1ccd7013f0d1b30308a857501953ebae",
-    "version": 2,
-    "recipeSha256": "3a4b77454b8e6f8bd71d1f94fd333752b9ffd180ae767f4da25d54aa1a64601d"
+    "version": 3,
+    "recipeSha256": "0db100bd31d12de9d1cda6e39779bb73bd588f64769b06184cef093b42fc66f0"
    },
    "row": "cast",
    "label": "日军士兵A（个人参考）：短寸头 + 浓唇须尖下巴胡",
    "model": null,
    "file": "Grooms/Groom_SoldierA_Cast.bin",
-   "bytes": 2517304,
+   "bytes": 2058992,
    "strands": 46000,
-   "guides": 2950,
-   "cardTriangles": 51432,
-   "shellTriangles": 1877
+   "guides": 3103,
+   "cardTriangles": 31984,
+   "shellTriangles": 2066
   },
   {
    "id": "Jia_Cast",
@@ -132,18 +132,18 @@
     "look": "Jia",
     "source": "14_日兵甲/Parts_V1_20261102/Ref_JapaneseSoldierJia_Head_2K_V1.png",
     "sha256": "2e435447ff8009f179d40e07183607e6e60e3a6634a56021f1d19992b1b9ba84",
-    "version": 2,
-    "recipeSha256": "09813293176b183821f27b81b369b44769848fbbba97f719bb88d79ef4b0d9fb"
+    "version": 3,
+    "recipeSha256": "c3d66766a3fd4bf25b984d116fb3888d61bf10ed65f8a28088167203fc6fb65c"
    },
    "row": "cast",
    "label": "日兵甲（个人参考）：短平头 + 浓短唇须淡下颌茬",
    "model": null,
    "file": "Grooms/Groom_Jia_Cast.bin",
-   "bytes": 1478124,
+   "bytes": 1562416,
    "strands": 46000,
-   "guides": 1738,
-   "cardTriangles": 18416,
-   "shellTriangles": 1277
+   "guides": 2101,
+   "cardTriangles": 16918,
+   "shellTriangles": 1620
   },
   {
    "id": "Yi_Cast",
@@ -154,18 +154,18 @@
     "look": "Yi",
     "source": "15_日兵乙/Parts_V1_20261104/Ref_JapaneseSoldierYi_Head_2K_V1.png",
     "sha256": "923db4f959b0001d6db5ec22633d14aefd499c73f891d72e5029f695da863ee6",
-    "version": 2,
-    "recipeSha256": "ff5865a37f6c4cb7af7c6e76bd9209efae11aa63e2f45344a827834f1e4633d6"
+    "version": 3,
+    "recipeSha256": "ce4f7f485f8a27832f51939a2ee8af49f75b861c3fa4e0d065b979397c0ae1ce"
    },
    "row": "cast",
    "label": "日兵乙（个人参考）：短寸头 + 宽唇须 U 形短须",
    "model": null,
    "file": "Grooms/Groom_Yi_Cast.bin",
-   "bytes": 1699316,
+   "bytes": 1733128,
    "strands": 46000,
-   "guides": 2107,
-   "cardTriangles": 24150,
-   "shellTriangles": 1884
+   "guides": 2408,
+   "cardTriangles": 22528,
+   "shellTriangles": 2379
   },
   {
    "id": "Jia_Buzz",
@@ -332,18 +332,18 @@
     "look": "HeYoutian",
     "source": "05_何有田/Parts_V1_20261103/Ref_HeYoutian_Head_2K_V1.png",
     "sha256": "04b5896de7803fac6a7262fd0f277ff59ed7e2b8ae42fd99e2ac9d2d21e869b4",
-    "version": 2,
-    "recipeSha256": "b14f42689abf0eabb28497799234d35e74a2bdae337e20c812cdc365ca2be1b9"
+    "version": 3,
+    "recipeSha256": "2e0692ddb5b4e54988d76d3fb2fcb1772bd7c451eb0cbc6cb92e2e5a661750dc"
    },
    "row": null,
    "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
    "model": "Model/Character/Model_HeYoutian.glb",
    "file": "Grooms/Groom_Game_HeYoutian.bin",
-   "bytes": 1171080,
+   "bytes": 1166128,
    "strands": 46000,
-   "guides": 724,
-   "cardTriangles": 11430,
-   "shellTriangles": 687
+   "guides": 817,
+   "cardTriangles": 8546,
+   "shellTriangles": 824
   },
   {
    "id": "Game_JapaneseSoldierJia",
@@ -354,18 +354,18 @@
     "look": "Jia",
     "source": "14_日兵甲/Parts_V1_20261102/Ref_JapaneseSoldierJia_Head_2K_V1.png",
     "sha256": "2e435447ff8009f179d40e07183607e6e60e3a6634a56021f1d19992b1b9ba84",
-    "version": 2,
-    "recipeSha256": "09813293176b183821f27b81b369b44769848fbbba97f719bb88d79ef4b0d9fb"
+    "version": 3,
+    "recipeSha256": "c3d66766a3fd4bf25b984d116fb3888d61bf10ed65f8a28088167203fc6fb65c"
    },
    "row": null,
    "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
    "model": "Model/Character/Model_JapaneseSoldierJia.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierJia.bin",
-   "bytes": 1059188,
+   "bytes": 1105332,
    "strands": 46000,
-   "guides": 437,
-   "cardTriangles": 8934,
-   "shellTriangles": 399
+   "guides": 667,
+   "cardTriangles": 6546,
+   "shellTriangles": 717
   },
   {
    "id": "Game_SquadLeaderLuo",
@@ -376,18 +376,18 @@
     "look": "Luo",
     "source": "02_罗班长/Ref_SquadLeaderLuo_Head_2K_V3.png",
     "sha256": "1913082e939b51736e892ac348063894db43eaa14455776246fbf82f7832c9d6",
-    "version": 2,
-    "recipeSha256": "0d8c429ac7952b828e2e909a3336707fa382e0b2fa60741bdc92af71c01dbc08"
+    "version": 3,
+    "recipeSha256": "c0aaae390db2a5ac5e9c424186e6ff31e5b46621f7404b31758844d9575980e1"
    },
    "row": null,
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "model": "Model/Character/Model_SquadLeaderLuo.glb",
    "file": "Grooms/Groom_Game_SquadLeaderLuo.bin",
-   "bytes": 1208824,
+   "bytes": 941992,
    "strands": 46000,
-   "guides": 275,
-   "cardTriangles": 15026,
-   "shellTriangles": 282
+   "guides": 299,
+   "cardTriangles": 4778,
+   "shellTriangles": 361
   },
   {
    "id": "Game_JapaneseSoldierA",
@@ -398,18 +398,18 @@
     "look": "SoldierA",
     "source": "10_日军士兵A/Parts_V1_20261102/Ref_JapaneseSoldierA_Head_2K_V1.png",
     "sha256": "c760047920b1397439134f3c2b82484b1ccd7013f0d1b30308a857501953ebae",
-    "version": 2,
-    "recipeSha256": "3a4b77454b8e6f8bd71d1f94fd333752b9ffd180ae767f4da25d54aa1a64601d"
+    "version": 3,
+    "recipeSha256": "0db100bd31d12de9d1cda6e39779bb73bd588f64769b06184cef093b42fc66f0"
    },
    "row": null,
    "label": "日军士兵A（游戏挂接）：短寸头 + 浓唇须尖下巴胡",
    "model": "Model/Character/Model_JapaneseSoldierA.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierA.bin",
-   "bytes": 2490660,
+   "bytes": 1983256,
    "strands": 46000,
-   "guides": 2725,
-   "cardTriangles": 51258,
-   "shellTriangles": 1738
+   "guides": 2880,
+   "cardTriangles": 30232,
+   "shellTriangles": 1916
   },
   {
    "id": "Game_Shunzi",
@@ -420,18 +420,18 @@
     "look": "Shunzi",
     "source": "01_顺子/Parts_V1_20261103/Ref_Shunzi_Head_2K_V1.png",
     "sha256": "89d54bedf82ec246052264158f13ceaccf0b5a698f0ed133c2b5275118e2446b",
-    "version": 2,
-    "recipeSha256": "7582fbf70b3f90856fb0b04498497ef8788b93406e5ec26d9be18da540a7869b"
+    "version": 3,
+    "recipeSha256": "0a7c9e90f57734a6088fbfa82daf69998dac37b74d4d2073f152f49ee74cc18c"
    },
    "row": null,
    "label": "顺子（游戏挂接）：短寸头 + 淡短茬",
    "model": "Model/Character/Model_Shunzi.glb",
    "file": "Grooms/Groom_Game_Shunzi.bin",
-   "bytes": 1450472,
+   "bytes": 1576140,
    "strands": 46000,
-   "guides": 2053,
-   "cardTriangles": 17210,
-   "shellTriangles": 1871
+   "guides": 2152,
+   "cardTriangles": 17630,
+   "shellTriangles": 2109
   },
   {
    "id": "Game_JapaneseSoldierYi",
@@ -442,18 +442,18 @@
     "look": "Yi",
     "source": "15_日兵乙/Parts_V1_20261104/Ref_JapaneseSoldierYi_Head_2K_V1.png",
     "sha256": "923db4f959b0001d6db5ec22633d14aefd499c73f891d72e5029f695da863ee6",
-    "version": 2,
-    "recipeSha256": "ff5865a37f6c4cb7af7c6e76bd9209efae11aa63e2f45344a827834f1e4633d6"
+    "version": 3,
+    "recipeSha256": "ce4f7f485f8a27832f51939a2ee8af49f75b861c3fa4e0d065b979397c0ae1ce"
    },
    "row": null,
    "label": "日兵乙（游戏挂接）：短寸头 + 宽唇须 U 形短须",
    "model": "Model/Character/Model_JapaneseSoldierYi.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierYi.bin",
-   "bytes": 1534172,
+   "bytes": 1581452,
    "strands": 46000,
-   "guides": 1595,
-   "cardTriangles": 20634,
-   "shellTriangles": 1509
+   "guides": 1886,
+   "cardTriangles": 19140,
+   "shellTriangles": 1999
   }
  ]
 }

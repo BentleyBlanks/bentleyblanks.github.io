@@ -34,7 +34,8 @@ export const DATA_SOURCE_RULES = Object.freeze([
   RULE("Heightmap/Data_*.mjs", "generated", ["Script_HeightmapCli.mjs"], "高程表"),
   // --- 资产清单与烘焙产物 -------------------------------------------------------------------------------------
   RULE("Hair/Data_HairStyles.json", "source", ["_import/Script_HairGroomBuild.mjs"], "头发胡子造型、人物挂接与实验室样本源表"),
-  RULE("Hair/Data_HairReferences.json", "source", ["_import/Script_HairGroomBuild.mjs"], "六个人物原始头部参考图路径、哈希、观察记录与逐人轮廓配方"),
+  RULE("Hair/Data_HairReferences.json", "source", ["_import/Script_HairGroomBuild.mjs", "_import/Script_HairReferenceBake.py"], "个人原图、剃净参考、模型五官校准及头发胡子配方"),
+  RULE("Hair/Data_HairReferenceMasks.json", "generated", ["_import/Script_HairReferenceBake.py"], "原图细须覆盖图集与发根采样、发际线轮廓"),
   RULE("Hair/Data_HairGrooms.json", "generated", ["_import/Script_HairGroomBuild.mjs"], "三档头发与胡子二进制资产清单"),
   RULE("Hair/Heads/*.json", "generated", ["_import/Script_HairLabHeads.py"], "只读角色光头来源转换的关键点与米制朝向"),
   RULE("Animation/**/*.json", "generated", ["_import", "_blender"],

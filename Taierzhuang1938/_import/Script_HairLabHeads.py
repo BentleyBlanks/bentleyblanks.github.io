@@ -10,6 +10,7 @@
 #   3. 贴图：底色 2048 JPEG、法线 / 粗糙度 1024（实验室近看够用，不把 4K 原图塞进仓库）；
 #   4. 量关键点（头顶、眉间、鼻根、鼻尖、鼻下、口裂、下巴底、耳朵包围盒、头骨中心），写 Data_HairHeads.json。
 #      长头发的发际线、胡子区域都按这些点在 Script_HairGroomBuild.mjs 里定义，不手抠坐标。
+#      个人定妆采用 Hair/Data_HairReferences.json 的正投影校准覆盖项，特别是口裂、下巴和耳界。
 import io, json, math, os, struct, sys
 import numpy as np
 from PIL import Image
