@@ -372,6 +372,33 @@ COD 片段按 30 帧拆成「开枪后毫秒」命名的图，游戏同一毫秒
 之前的前臂、手腕、权重与握持修形检查继续通过。原 Idle、骨架、poses 与最新 master 保持相同，
 `Data_FpsArmPoses`、`Data_Tuning_FpsReload`、`Script_Viewmodel` 不在本次差异中。
 
+本轮完整执行 prepush 选择清单及补充的发布/GPU 检查，共 238 项：223 项通过，15 项失败在
+干净 master `afb6a4d6d` 上复现；没有把整体 prepush 报告为全绿，也没有放宽断言。
+其中原指甲朝向测量误用旧顶点范围的问题已修正，完整手部接触复测为 15 姿态 / 2,664 动作帧通过；
+前景拒绝历史后新增的静止噪声已通过固定空间采样修复，GTAO、帧图和运动向量复测通过。
+TAAU 当前为 21/22，仅余 master 同样失败的运动/静止像素对照；原静止门限 0.6 保持不变。
+
+| 既有失败门禁 | 本轮与 master 对照 |
+|---|---|
+| OpeningSetTest | 仍读取已删除的 `Model_HanYang.tzm.json` |
+| HeadshotTest | 远处跪姿头部未判为 head，诊断对象相同 |
+| FixedCenterAimTest | 汉阳造蹲姿轴线偏差均约 5.41936 px |
+| FirstPersonEmbodimentTest | Stand 低头身体像素占比断言失败 |
+| FpsHandLeftSelfContactTest | leftHolding 指 1/2 均有 60 个横穿皮肤三角形 |
+| MeleeAnimationTest | BayonetLight 手部可见帧均为 10/31 |
+| HanYang173RDefaultTest | 只读 ServeRoot 的 `__environment/status` 均返回 404 |
+| EmplacementViewBrowserTest | 架设 Zb26 左手同一顶点深度约 0.0428412 mm |
+| TestSceneLightingTest | 前十个角色仅 7 种模型 ID，旧断言要求 10 种 |
+| TaauTest | 当前剩余速度缓冲像素对照失败在 master 中同样存在 |
+| PropInstancingTest | phase 2/4/5 提交数同为 692→715、719→722、941→968 |
+| FrameDebuggerTest | 切换编辑器未释放捕获资源；基线用其支持的 `--gpu`，原全套运行用 SwiftShader，两者各自的像素回放均通过 |
+| SavedGraphicsWarmTest | 手榴弹均未出手，爆炸帧 −1，击杀 0/3 |
+| WhiteboxShaderWarmTest | 主场景首次绘制均新编 1 个程序 |
+| BootTest | 七个旧切片的爆炸灯/贴图标记与日军远景材质标记失败类别相同 |
+
+完整结果在本地 `tmp/HanYangReload/Data_FinalValidation.json` 与 `Data_BaselineComparisons.json`，
+同步归档到源工程的 `Review_20261105/`。发布包浏览器、发布资产浏览器、12 档采样器预算、近景道具速度检查均通过。
+
 ## 用户反馈后的节奏修订
 
 针对“速度慢、动作仍僵硬”的反馈，缩短装填时长，并重新分配手部转移与闭锁时间。
