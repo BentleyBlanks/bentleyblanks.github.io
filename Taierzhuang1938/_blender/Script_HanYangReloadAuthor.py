@@ -112,7 +112,7 @@ GUN=[tuple(k) for k in SWAY_DATA['gun']]
 TURN=[(0,0),(0.23,0),(0.36,1),(2.76,1),(2.88,0),(3.40,0)]
 SLIDE=[(0,0),(0.40,0),(0.55,1),(2.62,1),(2.76,0),(3.40,0)]
 # packet in gun space: (t, x,y,z, rx,ry,rz)
-PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.50,0.16,-0.12,0.03,0.6,0,1.15),(1.67,0.025,0.065,-0.16,0.25,0.04,1.15),
+PACKET=[(1.30,0.18,-0.22,0.08,0.9,0,1.2),(1.50,0.16,-0.12,0.03,0.6,0,1.15),(1.59,0.11,-0.04,-0.14,0.4,0.04,1.15),(1.67,0.025,0.065,-0.16,0.25,0.04,1.15),
         (1.78,0.01,0.065,-0.18,0.12,0,0.65),(1.90,0,0.051,-0.187,0,0,0),(2.04,0,0.051-0.068,-0.187,0,0,0),(3.40,0,0.051-0.068,-0.187,0,0,0)]
 PACKET_VISIBLE=(1.30,2.20)
 # support fingers close round the stock: degrees at (knuckle, middle, end) joints; ramp in/out times
@@ -122,6 +122,9 @@ LEFT_SLIDE=[(0,0),(0.06,0),(0.25,0.13),(0.72,0.13),(1.15,0),(3.40,0)]
 LEFT_ROLL=[(0,0),(0.08,0),(0.25,math.radians(65)),(0.72,math.radians(65)),(1.15,0),(3.40,0)]
 LEFT_DROP=[(0,0),(.08,0),(.20,.006),(.72,.006),(1.10,0),(3.40,0)]
 PACKET_IN_HAND=(1.30,1.74,1.88)
+# Lift the complete carrying grasp above the raised knob before crossing it.
+# The short local arc also remains clear at held-open subframe sample times.
+PACKET_CLEAR_LIFT=[(0,0),(97/60,0),(98/60,.008),(99/60,.012),(100/60,.008),(101/60,0),(3.40,0)]
 USED=[(0.98,0,0.051-0.068,-0.187,0,0,0),(1.03,-0.01,0.125,-0.19,0.1,0,0.1),(1.13,-0.10,0.20,-0.15,0.6,0.2,1.2),(1.25,-0.25,0.18,-0.05,1.2,0.4,2.4)]
 USED_VISIBLE=(0.98,1.25)
 # right hand keys: (t, anchor, pose, offset in anchor-local metres)
@@ -155,7 +158,7 @@ RIGHT=[
  (0.19,'bolt','fistUpOpen',tuple(2.2*v for v in OFF_DOWN),T),(0.215,'bolt','fistUpOpen',OFF_DOWN,T),(0.23,'bolt','fistUpOpen',None),(0.36,'bolt','fistUp',None),
  (0.41,'bolt','fistUp',None),(0.50,'bolt','fistRoll',None,T),(0.56,'bolt','openToBack',None,T),(0.60,'bolt','fistBack',None),(0.64,'bolt','fistBack',None),(0.66,'bolt','fistBack',RELEASE_OFF,T),(0.68,'bolt','fistBackLoose',(0.04,0,0.04),T),
  (0.735,'bolt','boltRestOpen',REST_OVER,T),(0.75,'bolt','boltRestOpen',REST_APPROACH,T),(0.77,'bolt','boltRest',None),(0.92,'bolt','boltRest',None),(0.96,'bolt','boltRestOpen',(0.01,-0.025,0),T),(1.00,'bolt','boltRestOpen',(0.02,-0.06,0.015),T),(1.15,'via',0.67,None,T),
- (1.30,'packet','packet',None),(1.70,'packet','packet',None,T),(1.78,'packet','packet',None),
+ (1.30,'packet','packet',None),(1.70,'packet','packet',None,T),(1.78,'packet','packet',None),(1.82,'packet','packet',(0.025,0.035,0.015),T),
  (1.90,'packet','press',(0.01,0.04,0.01)),(1.97,'packet','press',None),(2.14,'packet','press',None),
  (2.22,'packet','press',(0.03,0.05,0.02),T),(2.40,'gun','gripClear',(0.12,0.10,0.10),T),
  (2.48,'bolt','fistBackOpen',CLOSE_FAR,T),(2.52,'bolt','fistBackOpen',CLOSE_NEAR,T),(2.56,'bolt','openToBack',None,T),(2.62,'bolt','fistBack',None),(2.88,'bolt','fistBack',None),(2.92,'bolt','fistBack',LIFT_OFF,T),(2.98,'bolt','fistBackOpen',(0.07,0,0.06),T),(3.08,'gun','gripClear',(0.10,0.05,0.03),T),
@@ -566,6 +569,7 @@ for k in range(N):
             o.keyframe_insert('hide_render',frame=f);o.keyframe_insert('hide_viewport',frame=f)
     Mh,locs,a,b,u=RightAt(t)
     Mh.translation+=rootM(bolt).to_3x3()@Vector(CONTACT_ROWS[k])
+    Mh.translation+=rootM(bolt).to_3x3()@Vector((lin(PACKET_CLEAR_LIFT,t),0,0))
     ml=rootM(anchors['gun'])@Matrix.Translation((0,-lin(LEFT_DROP,t),lin(LEFT_SLIDE,t)))@Matrix.Rotation(lin(LEFT_ROLL,t),4,'Z')@LGRIP[0]
     mats=[None]*len(BONES)
     lc=smooth((t-LEFT_CURL_T[0])/(LEFT_CURL_T[1]-LEFT_CURL_T[0]))*(1-smooth((t-LEFT_CURL_T[2])/(LEFT_CURL_T[3]-LEFT_CURL_T[2])))

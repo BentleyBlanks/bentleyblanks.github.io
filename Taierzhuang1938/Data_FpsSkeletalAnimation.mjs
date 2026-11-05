@@ -16,7 +16,7 @@ export const FPS_SKELETAL_ANIMATION = Object.freeze({
 // nodes the clip owns; `usedPacket` only shows when a partial packet is ejected.
 export const FPS_SKELETAL_RELOADS = Object.freeze({
   HanYang: Object.freeze({
-    clip: 'Reload', openSkipS: 1.12, blendInS: 0.16, adsBlendInS: 0.28,
+    clip: 'Reload', openSkipS: 1.12, blendInS: 0.16, adsBlendInS: 0.34,
     controls: Object.freeze(['weaponMount', 'reloadPivot', 'part_bolt', 'part_cockingPiece',
       'packetProp', 'packetRounds', 'usedPacketProp', 'usedPacketRounds']),
     usedPacket: Object.freeze(['usedPacketProp']),

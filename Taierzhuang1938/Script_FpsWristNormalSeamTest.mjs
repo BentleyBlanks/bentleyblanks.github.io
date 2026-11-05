@@ -8,6 +8,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {UndoFpsNailRepair} from './Script_FpsNailRepairTest.mjs';
 
 const project=path.dirname(fileURLToPath(import.meta.url));
 export const FPS_WRIST_NORMAL_SEAM_RECIPE='Model/Data_FpsWristNormalSeam.json';
@@ -44,6 +45,7 @@ function Splice(text,edits,forward){
 }
 
 export function UndoFpsWristNormalSeam(bytes,recipe,asset){
+  bytes=UndoFpsNailRepair(bytes,asset);
   assert.equal(recipe.version,1,'supported wrist-seam recipe');
   const row=recipe.assets.find(r=>r.asset===asset);assert(row,'asset belongs to the reviewed wrist-seam layer');
   assert.equal(Hash(bytes),row.after.sha256,'exact reviewed wrist-seam asset');
@@ -224,7 +226,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   assert.deepEqual(recipe.assets.map(r=>r.asset),taper.assets.map(r=>r.asset),'both hand GLBs carry the wrist-seam layer');
   let images=null;const lines=[];
   for(const row of recipe.assets){
-    const bytes=fs.readFileSync(path.join(project,row.asset)),restored=UndoFpsWristNormalSeam(bytes,recipe,row.asset);
+    const bytes=UndoFpsNailRepair(fs.readFileSync(path.join(project,row.asset)),row.asset),restored=UndoFpsWristNormalSeam(bytes,recipe,row.asset);
     assert.equal(Hash(restored),taper.assets.find(r=>r.asset===row.asset).after.sha256,`${row.asset}: undo lands on the reviewed forearm taper`);
     const pair=ValidateFpsWristNormalSeamStructure(restored,bytes,recipe,row.asset);
     if(images)assert(images.newImage.equals(pair.newImage)&&images.oldImage.equals(pair.oldImage),'both GLBs share one normal map');else images=pair;
