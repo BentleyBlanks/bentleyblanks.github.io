@@ -5,9 +5,11 @@ export const RIFLE_SLING_CLOTH = Object.freeze({
   ropeRadiusM: 0.0035,
   substepS: 1 / 90,
   maxSubsteps: 3,
-  iterations: 20,
+  iterations: 18,
   gravity: 9.81,
   airDamping: 14,
+  // Hold the resolved contact fit after the body, pins, gravity and inertia stay still.
+  sleepDelayS: 0.35,
   inertia: 0.15,
   inertiaMaxM: 0.003,
   slack: 0.02,

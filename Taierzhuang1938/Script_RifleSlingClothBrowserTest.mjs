@@ -186,6 +186,41 @@ try {
   // 2. 站着
   console.log("--- 2. 站着");
   {
+    const materialCheck = await B(() => window.__sling.RifleSlingClothStats().cloths
+      .filter(c => c.mesh?.visible && c.ready)
+      .map(c => {
+        const m = c.mesh.material;
+        return { name: m.name, map: !!m.map, normal: !!m.normalMap, metalness: m.metalness, roughness: m.roughness };
+      }));
+    Check('实机人物加载尼龙织纹 Base 与细法线', materialCheck.length >= 2
+      && materialCheck.every(m => m.name === 'Material_RifleSlingNylonV4' && m.map && m.normal && m.metalness === 0 && m.roughness >= .82), J(materialCheck));
+    const stationary = await B(() => {
+      const T = window.Tengxian, result = [];
+      for (const cloth of window.__sling.RifleSlingClothStats().cloths.filter(c => c.mesh?.visible && c.ready)) {
+        const camera = T.camera.clone();
+        cloth.sling.getWorldPosition(camera.position);
+        const rope = cloth.rope, lo = new Float64Array(rope.p.length).fill(Infinity), hi = new Float64Array(rope.p.length).fill(-Infinity);
+        const times = [1 / 40, 1 / 144, 1 / 72, 1 / 55, 1 / 100];
+        let elapsed = 0, frame = 0;
+        while (elapsed < 4) {
+          const dt = times[frame++ % times.length];
+          cloth.Frame(dt, camera);
+          elapsed += dt;
+          if (elapsed > 3) for (let i = 3; i < rope.p.length - 3; i++) {
+            lo[i] = Math.min(lo[i], rope.p[i]); hi[i] = Math.max(hi[i], rope.p[i]);
+          }
+        }
+        let motion = 0;
+        for (let i = 3; i < rope.p.length - 3; i += 3)
+          motion = Math.max(motion, Math.hypot(hi[i] - lo[i], hi[i + 1] - lo[i + 1], hi[i + 2] - lo[i + 2]));
+        result.push({ body: cloth.body.name, motion, sleeping: rope.sleeping });
+        cloth.ready = false;
+      }
+      return result;
+    });
+    Check('真实人物固定姿势与波动帧率下，末 1 s 自抖 < 0.1 mm', stationary.length >= 2
+      && stationary.every(c => c.sleeping && c.motion < .0001), J(stationary));
+    await Frames(40);
     const p = await Probe();
     const shown = p.cloths.filter(c => c.slingShown && c.ready);
     Check("两头钉在背带环上（< 1 mm）、不出 NaN", shown.every(c => c.pin < 0.001 && !c.nan), J(shown.map(c => +c.pin.toFixed(5))));

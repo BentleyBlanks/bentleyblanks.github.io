@@ -1,18 +1,20 @@
-# 枪带低回弹模拟与扁平外形
+# 尼龙枪带与贴身模拟
 
-2026-11-05 用户澄清：“像麻绳”指低回弹的物理手感，外观仍是扁平枪带。圆麻绳 V2 是误解，已撤出运行时，源工程保留在 OneDrive 作为被否决的历史。
+2026-11-05 用户指定扁平枪带采用尼龙织物质感，并修复贴身时持续的细小抖动。
 
 ## 当前资产
 
-`Model/RifleSlingV3/Model_RifleSlingFlatV3.glb`：棕色扁带，宽 25 mm、厚 2 mm，两端收至 16 mm；源长 1.6 m。主带 3,084 三角，折返环、14 mm 短收口、实际缝线与两款束带合计 6,584 三角。
+`Model/RifleSlingV3/Model_RifleSlingFlatV3.glb` 当前版本 `20261105NylonV4`。卡其橄榄色尼龙扁带，宽 25 mm、厚 2 mm，两端收至 16 mm，源长 1.6 m。主带 3,084 三角，折返环、14 mm 短收口、实际缝线与两款束带合计 6,584 三角。
 
-内置 imagegen **一级**生成细皮纹，BlenderMCP 建模并烘焙细法线；1024px Base / OpenGL Normal 以 WebP 内嵌，非金属、粗糙度 0.86。纹理来源与提示词在 `_import/Reference/FlatRifleSlingV3/`。皮面、收口及缝线属美术复原，Notion 与资料馆同轮改正，不保留“用户要求麻绳外观”的错误说明。
+内置 imagegen 生成细密尼龙织纹，仓库 Blender 管理入口重建并烘焙细法线。1024px Base / OpenGL Normal 以 WebP 内嵌，非金属、粗糙度 0.84，纹理以 16 mm 正方形周期重复，凹凸高度尺度 25 μm。纹理来源与完整提示词在 `_import/Reference/FlatRifleSlingV3/`。织纹、配色、收口及缝线按本作美术设计，Notion 与资料馆同轮同步。
 
-源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FlatRifleSlingV3_20261105/Model_FlatRifleSlingV3.blend`。重建脚本 `_blender/Script_FlatRifleSlingBakeV3.py`，通过仓库 BlenderMCP 入口运行；任务名 FlatRifleSlingV3。用 runpy 执行脚本时由脚本路径推导仓库根，也可传 REPO_ROOT。源工程、截图与验收网页不提交。
+源工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NylonRifleSlingV4_20261105/Model_NylonRifleSlingV4.blend`。重建脚本 `_blender/Script_FlatRifleSlingBakeV3.py` 从仓库读取尼龙源贴图。通过 `Script_BlenderMcp start` 运行，任务名 `NylonRifleSlingV4`，也支持该入口的 `--batch` 模式。使用 runpy 时由脚本路径推导仓库根，也可传 `REPO_ROOT`。源工程与完整生成 PNG 留在 OneDrive，验收图留在本地忽略目录。
 
 ## 物理与渲染
 
-`Data_Tuning_RifleSlingCloth` 保留低回弹参数：32 个物理点，1/90 s 子步，20 轮约束，空气阻尼 14、惯性系数 0.15、惯性输入上限 3 mm。身体接触消除法向回弹、保留摩擦；接触半径只是中线求解器的余量，不定义带子外形。
+`Data_Tuning_RifleSlingCloth` 使用 32 个物理点，固定 1/90 s 子步，18 轮约束，空气阻尼 14、惯性系数 0.15、惯性输入上限 3 mm。帧时间余量累计至下次物理步，避免渲染帧率改变 Verlet 历史和接触平衡。身体接触消除法向回弹，并施加摩擦。
+
+身体、挂点、重力与惯性输入持续静止 0.35 s 后，保持最后一次完成碰撞解算的贴合状态，消除长度、弯曲与碰撞约束反复交换修正造成的自抖。身体姿态、挂点、重力或惯性变化立即唤醒。身体采样的姿态版本单独跟踪，候选缓存刷新继续使用同一姿态版本。
 
 装上时按当前可见身体收紧、定长、留 2% 余量并垂稳；胸前引导及均匀采样按当前身材更新。旧 BackRifleRun 带子只提供过肩绕腋路径与显隐。暂停、瞬移、换身体、远距重返、长期隐藏后重现与释放规则保留。
 
@@ -28,8 +30,8 @@
 
 ## 验证
 
-- 最新扁带 Node 专项 57 项通过：25×2 mm 轮廓、63 蒙皮骨、固定点、空间平滑上限、截面宽度不塌陷、身体和木托穿越、三枪挂点、暂停与释放；低回弹参数未改。停步末 0.25 s 残余运动约 0.98 mm，总长变化约 0.03%。
-- 最新扁带浏览器专项 33/33：真实新 GLB 的 RT1、七人近景接触、前后挂点、连续走动、长度与 0.8 ms 中位数门禁通过；截图 1280×720。圆绳版的旧结果不能代替本版。
-- 共用 MotionVector、CarriagePropVelocity、BackRifleRun 与 P012 接入此前已通过；本轮按新增渲染骨及扁带 GLB 重新执行相应门禁。
-- 全库 prepush 既有 OpeningSetTest 引用已退役 Model_HanYang.tzm.json，仍单列基线，不称全仓全绿。模块图、资产、数据、字体与史实账本随最终提交核对。
-- 两轮 BlenderMCP 实例均已保存并停止；status --scan 无本任务实例。
+- 本轮 Node 专项 65/65、浏览器专项 35/35。七名角色的固定姿态自抖为数值误差级，连续行走时每根中位数约 0.656 ms，原有 0.8 ms 预算通过。共用 MotionVector 的 49 个 GPU 场景通过。
+- Node 专项包含真实 GLB 的尼龙材质、16 mm 纹理密度、25×2 mm 轮廓、63 蒙皮骨、固定点、空间平滑、身体和木托穿越、三枪挂点、暂停与释放。
+- 新增 60 fps、144 fps 与波动帧率的静止回归，检查固定物理步长、末 1 s 自抖低于 0.1 mm，以及身体恢复动作、挂点移动和重力变化时唤醒。
+- 浏览器专项沿用真实新 GLB 的 RT1、人物近景接触、前后挂点、连续走动、长度与 0.8 ms 中位数门禁。验收图存本地 `_shots/RifleSlingCloth/`，供模型观察时缩至长边 640px。
+- 本轮重建使用仓库管理的 Blender 无界面模式，源工程已保存。收尾运行 `Script_BlenderMcp status --scan` 核对实例状态。

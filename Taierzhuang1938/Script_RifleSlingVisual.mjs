@@ -1,10 +1,10 @@
-// Flat brown strap. Hemp was only a low-rebound physics analogy.
+// Flat khaki nylon webbing with a fine woven normal map.
 import * as THREE from 'three';
 import {ManagedGLTFLoader} from './Script_ModelImports.mjs';
 import {CloneShadedMaterial} from './Script_Materials.mjs';
 import {ApplyPatches,IndirectLightingPatches} from './Script_MaterialPatches.mjs';
 
-export const RIFLE_SLING_VISUAL_URL='./Model/RifleSlingV3/Model_RifleSlingFlatV3.glb?v=20261105FlatV3';
+export const RIFLE_SLING_VISUAL_URL='./Model/RifleSlingV3/Model_RifleSlingFlatV3.glb?v=20261105NylonV4';
 let visual=null,loading=null;
 const materials=new WeakMap();
 export function PrepareRifleSlingVisual(gltf){
@@ -52,7 +52,7 @@ export function CreateRifleSlingVisual(bones,library=null){
   const key=library||visual.material;
   let pair=materials.get(key);
   if(!pair){
-    const plain=visual.material.clone();plain.name='Material_RifleSlingFlatV3';plain.metalness=0;plain.roughness=Math.max(.82,plain.roughness);
+    const plain=visual.material.clone();plain.name='Material_RifleSlingNylonV4';plain.metalness=0;plain.roughness=Math.max(.82,plain.roughness);
     if(library)library.ConfigureExternalPbr(plain,{metalness:0,minRoughness:.82});
     else ApplyPatches(plain,IndirectLightingPatches());
     pair={plain,skin:CloneShadedMaterial(plain)};materials.set(key,pair);

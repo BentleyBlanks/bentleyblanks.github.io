@@ -87,6 +87,15 @@ const flat = PrepareRifleSlingVisual(flatSource);
   Check(Math.abs(size.x-.025)<1e-5&&Math.abs(size.y-.002)<1e-5&&maxZ-minZ>1.59&&maxZ-minZ<1.61,
     "保留扁带：25 mm 宽、2 mm 厚、1.6 m 长", `${F(size.x*1000,2)} × ${F(size.y*1000,2)} mm`);
   Check(weightError < 1e-6 && geometry.index.count / 3 === 3084, "真实扁带几何与归一蒙皮权重", `${geometry.index.count / 3} triangles`);
+  const contract = JSON.parse(fs.readFileSync(new URL('./Model/RifleSlingV3/Data_RifleSlingFlatV3.json', import.meta.url), 'utf8'));
+  const material = flatSource.scene.getObjectByName('SlingFlat_Skinned').material;
+  Check(contract.material === 'nylon' && contract.textureTileM === 0.016
+    && material.name === 'Material_RifleSlingNylonV4' && material.metalness === 0 && material.roughness >= 0.82,
+    "正式 GLB 使用非金属尼龙织带材质与 16 mm 细纹周期");
+  const uv = geometry.attributes.uv;
+  let minU = Infinity, maxU = -Infinity;
+  for (let i = 0; i < uv.count; i++) { minU = Math.min(minU, uv.getX(i)); maxU = Math.max(maxU, uv.getX(i)); }
+  Check(Math.abs(maxU - minU - 0.025 / contract.textureTileM) < 1e-5, "织纹按真实尺寸重复，25 mm 带宽覆盖 1.5625 个纹理周期");
 }
 
 // ---------------------------------------------------------------------------
@@ -379,8 +388,66 @@ console.log("--- 4. 瞬移 / 暂停 / 藏起来 / 关掉 / 丢掉");
 }
 
 // ---------------------------------------------------------------------------
-// 5. 逐位确定
+// 5. 帧率、静止贴合与逐位确定
 // ---------------------------------------------------------------------------
+// A stationary body must settle under real render-time variation as well as a fixed FPS.
+{
+  const cases = [[1 / 60], [1 / 144], [1 / 40, 1 / 144, 1 / 72, 1 / 55, 1 / 100]];
+  const results = [];
+  for (const times of cases) {
+    ClearRifleSlings();
+    const w = await Setup();
+    for (let frame = 0; frame < 30; frame++) Step(w, 1 / 60);
+    w.mixer.timeScale = 0;
+    const rope = w.cloth.rope, substep = rope.Substep.bind(rope);
+    let minStep = Infinity, maxStep = 0, elapsed = 0, frame = 0;
+    const lo = new Float64Array(rope.p.length).fill(Infinity);
+    const hi = new Float64Array(rope.p.length).fill(-Infinity);
+    rope.Substep = (h, gravity) => {
+      minStep = Math.min(minStep, h);
+      maxStep = Math.max(maxStep, h);
+      substep(h, gravity);
+    };
+    while (elapsed < 4) {
+      const dt = times[frame++ % times.length];
+      Step(w, dt);
+      elapsed += dt;
+      if (elapsed > 3) for (let i = 3; i < rope.p.length - 3; i++) {
+        lo[i] = Math.min(lo[i], rope.p[i]);
+        hi[i] = Math.max(hi[i], rope.p[i]);
+      }
+    }
+    let motion = 0;
+    for (let i = 3; i < rope.p.length - 3; i += 3)
+      motion = Math.max(motion, Math.hypot(hi[i] - lo[i], hi[i + 1] - lo[i + 1], hi[i + 2] - lo[i + 2]));
+    const sleeping = rope.sleeping;
+    w.mixer.timeScale = 1;
+    Step(w, 1 / 60);
+    results.push({ times, minStep, maxStep, motion, sleeping, wokeOnBodyMotion: !rope.sleeping });
+  }
+  console.log('stationary render-rate probe', JSON.stringify(results));
+  Check(results.every(r => Math.abs(r.minStep - CFG.substepS) < 1e-12 && Math.abs(r.maxStep - CFG.substepS) < 1e-12),
+    "60 / 144 fps 与波动帧率均使用固定物理步长");
+  Check(results.every(r => r.motion < 0.0001), "固定身体在多种帧率下收敛，末 1 s 自抖 < 0.1 mm",
+    results.map(r => F(r.motion * 1000, 4)).join(' / ') + ' mm');
+  Check(results.every(r => r.sleeping && r.wokeOnBodyMotion), "静止贴合会休眠，身体恢复动作的第一帧立即唤醒");
+  ClearRifleSlings();
+}
+
+{
+  const rope = new SlingRope(4);
+  const rest = new Float64Array([0, 0, 0, 0.03, -0.01, 0, 0.06, -0.01, 0, 0.09, 0, 0]);
+  rope.SetRest(rest);
+  rope.Fit();
+  for (let i = 0; i < 60; i++) rope.Substep(CFG.substepS, [0, -CFG.gravity, 0]);
+  Check(rope.sleeping, "固定挂点与重力下完成静止贴合");
+  rest[0] += 0.002;
+  rope.SetRest(rest);
+  Check(!rope.sleeping, "挂点移动 2 mm 立即唤醒");
+  for (let i = 0; i < 60; i++) rope.Substep(CFG.substepS, [0, -CFG.gravity, 0]);
+  rope.Substep(CFG.substepS, [0.1, -CFG.gravity, 0]);
+  Check(!rope.sleeping, "重力方向改变立即唤醒");
+}
 console.log("--- 5. 逐位确定");
 {
   const Run = async () => {

@@ -1,30 +1,29 @@
-"""Flat brown rifle strap; hemp was a physics analogy, not the requested geometry."""
+"""Flat rifle sling with fine khaki nylon webbing and a baked textile normal map."""
 import bpy,math,json,hashlib
 from pathlib import Path
 from mathutils import Vector
 repo=Path(globals().get('REPO_ROOT') or (Path(__file__).resolve().parents[2] if '__file__' in globals() else bpy.context.scene['TaskRepoRoot']))
-project=Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FlatRifleSlingV3_20261105')
-assert bpy.context.scene.get('BlenderMcpTask')=='FlatRifleSlingV3'
-assert not bpy.data.filepath or Path(bpy.data.filepath)==project/'Model_FlatRifleSlingV3.blend'
+project=Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NylonRifleSlingV4_20261105')
+assert bpy.context.scene.get('BlenderMcpTask')=='NylonRifleSlingV4'
+assert not bpy.data.filepath or Path(bpy.data.filepath)==project/'Model_NylonRifleSlingV4.blend'
 for obj in list(bpy.data.objects):bpy.data.objects.remove(obj,do_unlink=True)
 scene=bpy.context.scene;scene['TaskRepoRoot']=str(repo);scene.unit_settings.system='METRIC'
 out=repo/'Taierzhuang1938/Model/RifleSlingV3';out.mkdir(parents=True,exist_ok=True)
 reference=repo/'Taierzhuang1938/_import/Reference/FlatRifleSlingV3';reference.mkdir(parents=True,exist_ok=True)
-material=bpy.data.materials.new('Material_RifleSlingFlatV3');material.use_nodes=True;material.use_backface_culling=True
+material=bpy.data.materials.new('Material_RifleSlingNylonV4');material.use_nodes=True;material.use_backface_culling=True
 nodes=material.node_tree.nodes;nodes.clear();links=material.node_tree.links
-surface=nodes.new('ShaderNodeBsdfPrincipled');surface.inputs['Roughness'].default_value=.86;surface.inputs['Metallic'].default_value=0
+surface=nodes.new('ShaderNodeBsdfPrincipled');surface.inputs['Roughness'].default_value=.84;surface.inputs['Metallic'].default_value=0
 output=nodes.new('ShaderNodeOutputMaterial');links.new(surface.outputs['BSDF'],output.inputs['Surface'])
-image=bpy.data.images.load(str(project/'Source/Texture_RifleSlingLeatherSourceV3.png'));image.colorspace_settings.name='sRGB'
+image=bpy.data.images.load(str(reference/'Texture_RifleSlingNylonSourceV4.webp'));image.colorspace_settings.name='sRGB'
 base=nodes.new('ShaderNodeTexImage');base.image=image;base.extension='REPEAT';links.new(base.outputs['Color'],surface.inputs['Base Color'])
-bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.3;bump.inputs['Distance'].default_value=.00006
+bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.3;bump.inputs['Distance'].default_value=.000025
 links.new(base.outputs['Color'],bump.inputs['Height']);links.new(bump.outputs['Normal'],surface.inputs['Normal'])
-bpy.ops.mesh.primitive_plane_add(size=1);plane=bpy.context.object;plane.scale=(.025,.05,1);bpy.ops.object.transform_apply(location=False,rotation=False,scale=True);plane.data.materials.append(material)
-normal=bpy.data.images.new('Texture_RifleSlingLeatherNormalV3',width=1024,height=1024,alpha=False);normal.colorspace_settings.name='Non-Color'
+bpy.ops.mesh.primitive_plane_add(size=1);plane=bpy.context.object;plane.scale=(.016,.016,1);bpy.ops.object.transform_apply(location=False,rotation=False,scale=True);plane.data.materials.append(material)
+normal=bpy.data.images.new('Texture_RifleSlingNylonNormalV4',width=1024,height=1024,alpha=False);normal.colorspace_settings.name='Non-Color'
 target=nodes.new('ShaderNodeTexImage');target.image=normal;nodes.active=target
 scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=16;scene.render.bake.margin=4;scene.render.bake.use_selected_to_active=False
 bpy.ops.object.bake(type='NORMAL')
-normal.filepath_raw=str(project/'Source/Texture_RifleSlingLeatherNormalV3.webp');normal.file_format='WEBP';normal.save()
-image.scale(1024,1024);image.filepath_raw=str(reference/'Texture_RifleSlingLeatherSourceV3.webp');image.file_format='WEBP';image.save()
+normal.filepath_raw=str(project/'Source/Texture_RifleSlingNylonNormalV4.webp');normal.file_format='WEBP';normal.save()
 for link in list(surface.inputs['Normal'].links):links.remove(link)
 mapNode=nodes.new('ShaderNodeNormalMap');mapNode.inputs['Strength'].default_value=.65;links.new(target.outputs['Color'],mapNode.inputs['Color']);links.new(mapNode.outputs['Normal'],surface.inputs['Normal']);nodes.remove(bump)
 bpy.data.objects.remove(plane,do_unlink=True)
@@ -47,7 +46,7 @@ def Strip(name,path,width,thickness,frames=None,offset=Vector((0,0,0)),closed=Fa
   if ring:arc+=(Vector(p)-Vector(path[ring-1])).length
   w,n=(Vector((1,0,0)),Vector((0,1,0))) if frames is None else frames[ring]
   for x,y in Section(width(ring) if callable(width) else width,thickness):
-   vertices.append(tuple(Vector(p)+w*x+n*y+offset));uvs.append((.5+x/.025,arc/.05))
+   vertices.append(tuple(Vector(p)+w*x+n*y+offset));uvs.append((.5+x/.016,arc/.016))
  for i in range(len(path)-1):
   for j in range(8):a=i*8+j;d=i*8+(j+1)%8;b=a+8;c=d+8;faces.extend([(a,d,c),(a,c,b)])
  if not closed:faces.extend([tuple(reversed(range(8))),tuple((len(path)-1)*8+j for j in range(8))])
@@ -96,7 +95,7 @@ bpy.context.view_layer.objects.active=rig
 asset=out/'Model_RifleSlingFlatV3.glb'
 bpy.ops.export_scene.gltf(filepath=str(asset),export_format='GLB',use_selection=True,export_yup=True,export_skins=True,export_animations=False,export_materials='EXPORT',export_image_format='WEBP')
 triangles=lambda obj:sum(len(p.vertices)-2 for p in obj.data.polygons)
-contract={'schema':'tengxian-rifle-sling-visual/3','version':'20261105FlatV3','generator':'_blender/Script_FlatRifleSlingBakeV3.py','model':asset.name,'sha256':hashlib.sha256(asset.read_bytes()).hexdigest(),'shape':'flat brown strap; not rope','widthM':.025,'endWidthM':.016,'thicknessM':.002,'restLengthM':length,'bones':count,'strapTriangles':triangles(strap),'totalTriangles':sum(triangles(o) for o in [strap,eye,tab,*lashings]),'sourceImageTier':1,'reconstructionScope':'The user used hemp rope as a low-rebound physics analogy, not a visual request. Flat brown strap, folded ends, stitching and lashing appearance are creative reconstruction; no standardized 1938 issue is asserted.','historicalReferences':[]}
+contract={'schema':'tengxian-rifle-sling-visual/3','version':'20261105NylonV4','generator':'_blender/Script_FlatRifleSlingBakeV3.py','model':asset.name,'sha256':hashlib.sha256(asset.read_bytes()).hexdigest(),'shape':'flat woven nylon webbing','material':'nylon','textureTileM':.016,'widthM':.025,'endWidthM':.016,'thicknessM':.002,'restLengthM':length,'bones':count,'strapTriangles':triangles(strap),'totalTriangles':sum(triangles(o) for o in [strap,eye,tab,*lashings]),'sourceImageTier':1,'reconstructionScope':'Fine nylon weave, khaki olive colour, folded ends, stitching and lashings follow the requested art direction. Material appearance and movement parameters are creative reconstruction.','historicalReferences':[]}
 contract['simulationPoints']=32
 (out/'Data_RifleSlingFlatV3.json').write_text(json.dumps(contract,indent=2),encoding='utf-8')
-bpy.ops.wm.save_as_mainfile(filepath=str(project/'Model_FlatRifleSlingV3.blend'));print('FLAT_SLING_ASSET',json.dumps(contract))
+bpy.ops.wm.save_as_mainfile(filepath=str(project/'Model_NylonRifleSlingV4.blend'));print('FLAT_SLING_ASSET',json.dumps(contract))

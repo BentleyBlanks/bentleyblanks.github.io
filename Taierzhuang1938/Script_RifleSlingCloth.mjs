@@ -3,7 +3,7 @@
 // PBD solver fits the current visible body, refits the thinner cord by arc length, and applies
 // strongly damped inertia and inelastic contact. The old rigid belt stays hidden by layers.
 //
-// Script_RifleSlingVisual loads Blender-authored flat strap, brown PBR, folded ends and lashings.
+// Script_RifleSlingVisual loads Blender-authored nylon webbing, woven PBR, folded ends and lashings.
 // Only bone matrices change each frame. The new meshes live at scene root, beyond actor skin
 // replacement and wound scans. Script_Main calls StepRifleSlings after the final world-matrix
 // update, before rendering; the production prepass records the bones and rigid bindings.
@@ -224,6 +224,7 @@ export class BodySurfaceSamples {
     this._lastBoneE = new Float64Array(this.bones.length * 16).fill(NaN);
     this._lastMeshE = new Float64Array(this.meshes.length * 16).fill(NaN);
     this._fullValid = false;
+    this.poseRevision = 0;
     this._updatedOnly = undefined;
     return this;
   }
@@ -251,7 +252,7 @@ export class BodySurfaceSamples {
       this._lastBoneE.set(elements, b * 16); B.set(elements, b * 16);
     }
     if (!changed && (this._fullValid || only === this._updatedOnly)) return false;
-    if (changed) this._fullValid = false;
+    if (changed) { this._fullValid = false; this.poseRevision += 1; }
     if (!only) this._fullValid = true;
     this._updatedOnly = only;
     const P = this.position, N = this.normal, lp = this.lp, ln = this.ln, W = this.weight, bo = this.boneOf;
@@ -438,12 +439,23 @@ export class SlingRope {
     this.samples = null;                        // { count, position, normal }
     this.active = new Int32Array(0);            // 所有候选的并集（每帧只用更新这些采样点）
     this.candidateAge = Infinity;               // 候选算了多少帧了（调用方数）
+    this.sleeping = false;
+    this.stillInputS = 0;
+    this.lastGravity = [NaN, NaN, NaN];
   }
 
   /** rest：Float32Array / Float64Array（count × 3）。 */
-  SetRest(rest) { this.rest.set(rest); }
+  SetRest(rest) {
+    for (let i = 0; i < rest.length; i++) if (Math.abs(rest[i] - this.rest[i]) > 1e-8) {
+      this.Wake();
+      break;
+    }
+    this.rest.set(rest);
+  }
 
-  SetSamples(samples) { this.samples = samples; this.candidateAge = Infinity; }
+  SetSamples(samples) { this.samples = samples; this.candidateAge = Infinity; this.Wake(); }
+
+  Wake() { this.sleeping = false; this.stillInputS = 0; }
 
   /** 每个质点的候选采样点：此刻离它 candidateRadiusM 以内的（采样点要是这一刻的全部位置）。 */
   RefreshCandidates() {
@@ -568,6 +580,7 @@ export class SlingRope {
   /** 装上：从资产形状起收紧裹到身上，量裹紧的长度定绳长，再垂一会儿。gravity = [x, y, z]（这个坐标系里）。 */
   Fit(gravity = [0, -this.cfg.gravity, 0]) {
     const cfg = this.cfg, n = this.count;
+    this.Wake();
     this.guide = null;
     this.plane.fill(-1);
     this.p.set(this.rest);
@@ -637,6 +650,7 @@ export class SlingRope {
       for(let axis=0;axis<3;axis++)this.p[i*3+axis]=path[part*3+axis]*(1-t)+path[(part+1)*3+axis]*t;
     }
     this.guide.set(this.p);this.segment=arc[n-1]*(1+cfg.slack)/(n-1);
+    this.Wake();
     this.prev.set(this.p);this.RefreshCandidates();
     for(let s=0;s<steps;s++){this.Substep(cfg.substepS,gravity);if(s%clearEvery===0)this.prev.set(this.p);}
     this.prev.set(this.p);
@@ -652,6 +666,11 @@ export class SlingRope {
   /** 一个子步：Verlet（重力、阻尼、限速）→ iterations 轮约束 → 贴身的点摩擦、限速。gravity = [x, y, z]（这个坐标系里）。 */
   Substep(h, gravity) {
     const cfg = this.cfg, n = this.count, p = this.p, q = this.prev;
+    for (let axis = 0; axis < 3; axis++) {
+      if (Math.abs(gravity[axis] - this.lastGravity[axis]) > 1e-8 || !Number.isFinite(this.lastGravity[axis])) this.Wake();
+      this.lastGravity[axis] = gravity[axis];
+    }
+    if (this.sleeping) return;
     const damp = Math.max(0, 1 - cfg.airDamping * h), vmax = cfg.maxSpeedMps * h;
     const gx = gravity[0] * h * h, gy = gravity[1] * h * h, gz = gravity[2] * h * h;
     for (let i = 1; i < n - 1; i += 1) {
@@ -690,6 +709,11 @@ export class SlingRope {
       const v = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (v > vmax) { const k = 1 - vmax / v; q[a] += dx * k; q[a + 1] += dy * k; q[a + 2] += dz * k; }
     }
+    // Static contact can keep exchanging distance/bend corrections forever.
+    // Hold the last collision-resolved fit after a settling window with unchanged
+    // inputs. Moving body samples, pins, gravity or inertia wake it immediately.
+    this.stillInputS += h;
+    if (this.stillInputS >= cfg.sleepDelayS) { this.sleeping = true; this.Still(); }
   }
 
   /**
@@ -709,6 +733,7 @@ export class SlingRope {
       let dx = ux - r * vx, dy = uy - r * vy, dz = uz - r * vz;
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 > m2) { const s = maxM / Math.sqrt(d2); dx *= s; dy *= s; dz *= s; }
+      if (dx * dx + dy * dy + dz * dz > 1e-16) this.Wake();
       p[a] += k * dx; p[a + 1] += k * dy; p[a + 2] += k * dz;
     }
   }
@@ -771,6 +796,7 @@ export class RifleSlingCloth {
     this.triangleSamples = new BodyTrianglePatches();
     this.prevFrame = new THREE.Matrix4();
     this.pendingDt = 0;
+    this.simulationRemainder = 0;
     this.phase = 0;                // 远处隔帧算的相位（RegisterRifleSling 按注册顺序错开）
     this.originalLayerMask = sling.layers.mask;
     this.originalLocal = sling.matrix.clone();
@@ -929,6 +955,7 @@ export class RifleSlingCloth {
       this._OrientNormals();
       this.prevFrame.copy(_F);
       this.pendingDt = 0;
+      this.simulationRemainder = 0;
       this.lastMove = null;
       this.ready = true;
       this._Write();
@@ -947,6 +974,7 @@ export class RifleSlingCloth {
     this.pendingDt = 0;
     if (jumped || dist > cfg.simRangeM || !(step > 0)) {
       if (jumped) rope.Still();
+      this.simulationRemainder = 0;
       this.lastMove = null;
       this._Write();
       return "rigid";
@@ -955,13 +983,24 @@ export class RifleSlingCloth {
     (this.lastMove ||= new THREE.Matrix4()).copy(_T);
     this.lastDt = step;
     // 采样点：每 candidateRefreshFrames 帧全算一遍、重挑候选；其余帧只算候选用得着的
-    if (++rope.candidateAge >= cfg.candidateRefreshFrames) { this.samples.Update(_Fi); this.triangleSamples.Update(_Fi); rope.RefreshCandidates(); }
-    else { this.samples.Update(_Fi, rope.active); this.triangleSamples.Update(_Fi, this.triangleSamples.active); }
+    const bodyRevision = this.samples.poseRevision;
+    if (++rope.candidateAge >= cfg.candidateRefreshFrames) {
+      this.samples.Update(_Fi);
+      this.triangleSamples.Update(_Fi);
+      rope.RefreshCandidates();
+    } else {
+      this.samples.Update(_Fi, rope.active);
+      this.triangleSamples.Update(_Fi, this.triangleSamples.active);
+    }
+    if (this.samples.poseRevision !== bodyRevision) rope.Wake();
     _a.set(0, -1, 0).transformDirection(_Fi).multiplyScalar(cfg.gravity);
     const g = [_a.x, _a.y, _a.z];
-    const steps = Math.min(cfg.maxSubsteps, Math.max(1, Math.round(step / cfg.substepS)));
-    const h = Math.min(step, cfg.maxSubsteps * cfg.substepS) / steps;
-    for (let s = 0; s < steps; s += 1) rope.Substep(h, g);
+    // Verlet history represents one fixed step. Varying h with render time changes
+    // gravity, apparent velocity and contact equilibrium on every frame.
+    this.simulationRemainder = Math.min(this.simulationRemainder + step, cfg.maxSubsteps * cfg.substepS);
+    const steps = Math.floor((this.simulationRemainder + 1e-10) / cfg.substepS);
+    this.simulationRemainder = Math.max(0, this.simulationRemainder - steps * cfg.substepS);
+    for (let s = 0; s < steps; s += 1) rope.Substep(cfg.substepS, g);
     this._Write();
     return "sim";
   }
