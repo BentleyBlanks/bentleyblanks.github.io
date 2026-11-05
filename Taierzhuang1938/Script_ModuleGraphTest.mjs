@@ -100,6 +100,12 @@ async function TestModuleGraphIsCacheBusted() {
   assert.equal(unstamped.length, 0, `盖戳工具没给这些模块盖上内容戳：${unstamped.slice(0, 10).join(", ")}`);
   assert.ok(/<script type="module" src="\.\/Script_Entry\.mjs\?v=\d+"><\/script>/.test(result.html), "盖戳工具给入口 <script> 盖戳");
   assert.ok(/\?v=\d+$/.test(stampedMap.three ?? ""), "盖戳工具给 three 盖戳");
+  const reviewDir=path.join(dirHere,'Animation/BackRifleRun');
+  const review=await StampHtml(fs.readFileSync(path.join(reviewDir,'index.html'),'utf8'),reviewDir);
+  assert.deepEqual(review.missing,[],'nested publication page has no missing modules');
+  const reviewMap=JSON.parse(review.html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]).imports;
+  for(const name of ['Script_ModelImports.mjs','Script_TextureImports.mjs','Data_TextureImportRuntime.mjs','Data_AssetPublishRuntime.mjs','Data_MobileAssetRuntime.mjs'])
+    assert.equal(reviewMap['../../'+name],'../../'+name+'?v='+ContentStamp(fs.readFileSync(path.join(dirHere,name))),'nested page refreshes its publication loader/table');
 
   console.log(`ok  import map 登记满整张模块图（${browserModules.length} 个模块，仓库不写戳）；发布时按内容盖戳 ${result.stamped.length} 条`);
 }

@@ -23,7 +23,7 @@ export function ContentStamp(bytes) {
 
 /** 第一方的文件地址：相对路径、不是前缀映射（以 / 结尾）、不是别的协议。 */
 function LocalFile(value) {
-  return typeof value === "string" && value.startsWith("./") && !value.split("?")[0].endsWith("/");
+  return typeof value === "string" && /^\.\.?\//.test(value) && !value.split("?")[0].endsWith("/");
 }
 
 /**
@@ -60,10 +60,14 @@ export async function StampHtml(html, dir, cache = new Map()) {
   return { html: out, stamped, missing };
 }
 
-/** 给一个目录顶层的全部 .html 盖戳（Pages staging 里的滕县目录）。 */
+/** 给发布目录及子目录的全部 .html 盖戳，包括独立动作预览页。 */
 export async function StampDirectory(dir, { write = true } = {}) {
   const cache = new Map(), report = [];
   for (const item of await fs.readdir(dir, { withFileTypes: true })) {
+    if (item.isDirectory() && item.name !== 'vendor') {
+      for(const row of await StampDirectory(path.join(dir,item.name),{write}))report.push({...row,page:item.name+'/'+row.page});
+      continue;
+    }
     if (!item.isFile() || !item.name.endsWith(".html")) continue;
     const file = path.join(dir, item.name);
     const html = await fs.readFile(file, "utf8");
