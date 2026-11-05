@@ -331,13 +331,21 @@ void main() {
 `;
 // Registered portrait detail is fixed in head-local space, including on the
 // actual fibres. The original strand coverage still owns colour and prepass.
+const GLSL_REFERENCE_FRONT = /* glsl */`
+uniform vec2 uReferenceCenter;
+uniform vec2 uReferenceFrontFade;
+float ReferenceFrontWeight(vec3 p) {
+  float phi = degrees(atan(abs(p.x-uReferenceCenter.x)+.000001,-(p.z-uReferenceCenter.y)));
+  return 1.0-smoothstep(uReferenceFrontFade.x,uReferenceFrontFade.y,phi);
+}
+`;
 const GLSL_REFERENCE_COLOUR = /* glsl */`
+${GLSL_REFERENCE_FRONT}
 uniform sampler2D uReferenceMask;
 uniform vec4 uReferenceRows[6];
 uniform vec2 uReferenceWidths[6];
 uniform vec4 uReferenceCrop;
 uniform vec4 uReferenceTile;
-uniform vec2 uReferenceCenter;
 uniform float uReferenceImageCenter;
 uniform vec2 uReferenceCrown;
 uniform float uReferenceMean;
@@ -362,8 +370,7 @@ vec2 ReferenceHairDetail(vec3 p) {
   float inside = step(0.0,localUv.x)*step(0.0,localUv.y)*step(localUv.x,1.0)*step(localUv.y,1.0);
   vec2 uv = uReferenceTile.xy+clamp(localUv,.001,.999)*uReferenceTile.zw;
   vec3 sampleValue = texture(uReferenceMask,uv).rgb;
-  float phi = degrees(atan(abs(dx)+.000001,-(p.z-uReferenceCenter.y)));
-  float front = 1.0-smoothstep(65.0,85.0,phi);
+  float front = ReferenceFrontWeight(p);
   float crown = smoothstep(uReferenceCrown.x,uReferenceCrown.y,p.y);
   float weight = inside*max(front,crown)*smoothstep(.02,.3,sampleValue.g);
   float detail = clamp(sqrt(max(pow(sampleValue.b,2.2),.0001)/uReferenceMean),.4,2.5);
@@ -635,6 +642,7 @@ precision highp float;
 #include <common>
 ${GLSL_OUTPUT}
 ${GLSL_MELANIN}
+${GLSL_REFERENCE_FRONT}
 uniform sampler2D uReferenceMask;
 uniform float uChinY;
 uniform float uMelanin;
@@ -645,7 +653,7 @@ in vec3 vData;
 in vec3 vLocalPos;
 layout(location = 0) out vec4 fragColor;
 void main() {
-  float coverage = texture(uReferenceMask, vUv).r * vData.x * uFade;
+  float coverage = texture(uReferenceMask, vUv).r * vData.x * uFade * ReferenceFrontWeight(vLocalPos);
   coverage *= smoothstep(uChinY - .001, uChinY + .002, vLocalPos.y);
   if (coverage < .003) discard;
   vec3 color = HairMelaninColor(uMelanin, uRedness);
@@ -662,6 +670,7 @@ ${reference ? '#include <lights_pars_begin>\n' + SUN_SHADOW_GLSL : ''}
 ${GLSL_OUTPUT}
 ${GLSL_MELANIN}
 ${GLSL_STREAKS}
+${reference ? GLSL_REFERENCE_FRONT : ''}
 uniform float uMelanin;
 uniform float uRedness;
 uniform float uStrength;
@@ -674,7 +683,7 @@ layout(location = 0) out vec4 fragColor;
 void main() {
   float st = HairStreaks(vLocalPos, normalize(vTangentL), 900.0);
   float alpha = clamp(pow(vData.x, 0.8) * uStrength * (0.8 + 0.35 * st), 0.0, 0.92) * uFade;
-  ${reference ? 'alpha = mix(alpha, texture(uReferenceMask, vUv).g * uFade, vData.z);' : ''}
+  ${reference ? 'float referenceBlend = vData.z * ReferenceFrontWeight(vLocalPos); alpha = mix(alpha, texture(uReferenceMask, vUv).g * uFade, referenceBlend);' : ''}
   if (alpha < 0.004) discard;
   vec3 base = HairMelaninColor(uMelanin, uRedness);
   vec3 color = base * 0.6 + 0.003;
@@ -695,7 +704,7 @@ void main() {
   float originalLuminance = max(dot(sqrt(HairMelaninColor(uReferenceMelanin, uRedness)), vec3(.3, .59, .11)), .0001);
   float dyeAmount = clamp(abs(uMelanin-uReferenceMelanin)*4.0, 0.0, 1.0);
   vec3 dye = mix(vec3(1.0), pigment/pigmentLuminance, dyeAmount) * sqrt(pigmentLuminance/originalLuminance);
-  color = mix(color, vec3(fibreLuminance) * dye * illumination * 0.31831, vData.z);
+  color = mix(color, vec3(fibreLuminance) * dye * illumination * 0.31831, referenceBlend);
   ` : ''}
   fragColor = HairOutput(color);
   fragColor.a = alpha;
@@ -736,6 +745,12 @@ function PrepassMaterial(vertexShader, fragmentShader, uniforms, side = THREE.Do
 function ColorUniforms(color) {
   return { uMelanin: { value: color.melanin }, uRedness: { value: color.redness }, uGray: { value: color.gray ?? 0 } };
 }
+function ReferenceFrontUniforms(center) {
+  return {
+    uReferenceCenter: {value: new THREE.Vector2().fromArray(center)},
+    uReferenceFrontFade: {value: new THREE.Vector2().fromArray(HAIR_SHADING.referenceFrontFadeDegrees)},
+  };
+}
 function ReferenceColourUniforms(reference, atlas, melanin) {
   if (!atlas) throw new Error('Missing original-reference fibre atlas');
   const registration = reference.projection;
@@ -747,7 +762,7 @@ function ReferenceColourUniforms(reference, atlas, melanin) {
     uReferenceWidths: {value: registration.rows.map(row => new THREE.Vector2(row.outerX, row.outerImageX))},
     uReferenceCrop: {value: new THREE.Vector4(left, top, right-left, bottom-top)},
     uReferenceTile: {value: new THREE.Vector4().fromArray(reference.tile)},
-    uReferenceCenter: {value: new THREE.Vector2(registration.centerX, reference.centerZ)},
+    ...ReferenceFrontUniforms([registration.centerX, reference.centerZ]),
     uReferenceImageCenter: {value: registration.reference.centerX},
     uReferenceCrown: {value: new THREE.Vector2(reference.top-.065, reference.top-.02)},
     uReferenceMean: {value: Math.max(reference.normalizationLuminance ?? reference.meanLuminance ?? .005, .0001)},
@@ -794,6 +809,7 @@ export function MakeStubbleMaterial(beard, shared, referenceAtlas = null) {
   if (beard.referenceMask) {
     if (!referenceAtlas) throw new Error('Missing character reference beard atlas');
     const own = {
+      ...ReferenceFrontUniforms(beard.referenceMask.center),
       uReferenceMask: {value: referenceAtlas}, uChinY: {value: beard.referenceMask.chinY}, uMelanin: {value: beard.render.color.melanin},
       uRedness: {value: beard.render.color.redness}, uFade: {value: 1},
     };
@@ -821,6 +837,7 @@ export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = nu
     if (!referenceAtlas) throw new Error('Missing character reference scalp atlas');
     own.uReferenceMask = {value: referenceAtlas};
     own.uReferenceMelanin = {value: hair.render.color.melanin};
+    Object.assign(own, ReferenceFrontUniforms([hair.referenceScalp.projection.centerX, hair.referenceScalp.centerZ]));
   }
   const m = hair.referenceScalp
     ? LitMaterial(MESH_VERTEX(false), SCALP_FRAGMENT(true), own, {lightRig, transparent: true, side: THREE.FrontSide})

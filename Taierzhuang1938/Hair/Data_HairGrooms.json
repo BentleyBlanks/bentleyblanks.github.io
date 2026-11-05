@@ -51,11 +51,11 @@
    "label": "顺子（个人参考）：短寸头 + 淡短茬",
    "model": null,
    "file": "Grooms/Groom_Shunzi_Cast.bin",
-   "bytes": 1738652,
+   "bytes": 1728184,
    "strands": 46000,
-   "guides": 2699,
-   "cardTriangles": 21124,
-   "shellTriangles": 2459
+   "guides": 2659,
+   "cardTriangles": 20844,
+   "shellTriangles": 2418
   },
   {
    "id": "Luo_Cast",
@@ -73,11 +73,11 @@
    "label": "罗班长（个人参考）：短寸头 + 下颌薄短须",
    "model": null,
    "file": "Grooms/Groom_Luo_Cast.bin",
-   "bytes": 1554100,
+   "bytes": 1557564,
    "strands": 46000,
-   "guides": 2152,
-   "cardTriangles": 18310,
-   "shellTriangles": 1295
+   "guides": 2166,
+   "cardTriangles": 18390,
+   "shellTriangles": 1303
   },
   {
    "id": "HeYoutian_Cast",
@@ -95,11 +95,11 @@
    "label": "何有田（个人参考）：碎寸头 + 细唇须下颌短须",
    "model": null,
    "file": "Grooms/Groom_HeYoutian_Cast.bin",
-   "bytes": 1670332,
+   "bytes": 1645092,
    "strands": 46000,
-   "guides": 2434,
-   "cardTriangles": 19654,
-   "shellTriangles": 1685
+   "guides": 2342,
+   "cardTriangles": 19074,
+   "shellTriangles": 1597
   },
   {
    "id": "SoldierA_Cast",
@@ -117,11 +117,11 @@
    "label": "日军士兵A（个人参考）：短寸头 + 浓唇须尖下巴胡",
    "model": null,
    "file": "Grooms/Groom_SoldierA_Cast.bin",
-   "bytes": 2058992,
+   "bytes": 2032160,
    "strands": 46000,
-   "guides": 3103,
-   "cardTriangles": 31984,
-   "shellTriangles": 2066
+   "guides": 3035,
+   "cardTriangles": 31374,
+   "shellTriangles": 1994
   },
   {
    "id": "Jia_Cast",
@@ -139,11 +139,11 @@
    "label": "日兵甲（个人参考）：短平头 + 浓短唇须淡下颌茬",
    "model": null,
    "file": "Grooms/Groom_Jia_Cast.bin",
-   "bytes": 1562416,
+   "bytes": 1552364,
    "strands": 46000,
-   "guides": 2101,
-   "cardTriangles": 16918,
-   "shellTriangles": 1620
+   "guides": 2044,
+   "cardTriangles": 16788,
+   "shellTriangles": 1595
   },
   {
    "id": "Yi_Cast",
@@ -161,11 +161,11 @@
    "label": "日兵乙（个人参考）：短寸头 + 宽唇须 U 形短须",
    "model": null,
    "file": "Grooms/Groom_Yi_Cast.bin",
-   "bytes": 1733128,
+   "bytes": 1704220,
    "strands": 46000,
-   "guides": 2408,
-   "cardTriangles": 22528,
-   "shellTriangles": 2379
+   "guides": 2324,
+   "cardTriangles": 21918,
+   "shellTriangles": 2250
   },
   {
    "id": "Jia_Buzz",
@@ -339,11 +339,11 @@
    "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
    "model": "Model/Character/Model_HeYoutian.glb",
    "file": "Grooms/Groom_Game_HeYoutian.bin",
-   "bytes": 1166128,
+   "bytes": 1136448,
    "strands": 46000,
-   "guides": 817,
-   "cardTriangles": 8546,
-   "shellTriangles": 824
+   "guides": 734,
+   "cardTriangles": 7876,
+   "shellTriangles": 740
   },
   {
    "id": "Game_JapaneseSoldierJia",
@@ -361,11 +361,11 @@
    "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
    "model": "Model/Character/Model_JapaneseSoldierJia.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierJia.bin",
-   "bytes": 1105332,
+   "bytes": 1091156,
    "strands": 46000,
-   "guides": 667,
-   "cardTriangles": 6546,
-   "shellTriangles": 717
+   "guides": 630,
+   "cardTriangles": 6216,
+   "shellTriangles": 674
   },
   {
    "id": "Game_SquadLeaderLuo",
@@ -383,11 +383,11 @@
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "model": "Model/Character/Model_SquadLeaderLuo.glb",
    "file": "Grooms/Groom_Game_SquadLeaderLuo.bin",
-   "bytes": 941992,
+   "bytes": 934788,
    "strands": 46000,
-   "guides": 299,
-   "cardTriangles": 4778,
-   "shellTriangles": 361
+   "guides": 293,
+   "cardTriangles": 4688,
+   "shellTriangles": 341
   },
   {
    "id": "Game_JapaneseSoldierA",
@@ -405,11 +405,11 @@
    "label": "日军士兵A（游戏挂接）：短寸头 + 浓唇须尖下巴胡",
    "model": "Model/Character/Model_JapaneseSoldierA.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierA.bin",
-   "bytes": 1983256,
+   "bytes": 1968656,
    "strands": 46000,
-   "guides": 2880,
-   "cardTriangles": 30232,
-   "shellTriangles": 1916
+   "guides": 2826,
+   "cardTriangles": 30002,
+   "shellTriangles": 1848
   },
   {
    "id": "Game_Shunzi",
@@ -427,11 +427,11 @@
    "label": "顺子（游戏挂接）：短寸头 + 淡短茬",
    "model": "Model/Character/Model_Shunzi.glb",
    "file": "Grooms/Groom_Game_Shunzi.bin",
-   "bytes": 1576140,
+   "bytes": 1560284,
    "strands": 46000,
-   "guides": 2152,
-   "cardTriangles": 17630,
-   "shellTriangles": 2109
+   "guides": 2116,
+   "cardTriangles": 17250,
+   "shellTriangles": 2065
   },
   {
    "id": "Game_JapaneseSoldierYi",
@@ -449,11 +449,11 @@
    "label": "日兵乙（游戏挂接）：短寸头 + 宽唇须 U 形短须",
    "model": "Model/Character/Model_JapaneseSoldierYi.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierYi.bin",
-   "bytes": 1581452,
+   "bytes": 1553492,
    "strands": 46000,
-   "guides": 1886,
-   "cardTriangles": 19140,
-   "shellTriangles": 1999
+   "guides": 1798,
+   "cardTriangles": 18580,
+   "shellTriangles": 1870
   }
  ]
 }

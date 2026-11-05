@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { HAIR_RANGE_ROWS } from './Data_HairRange.mjs';
 import { XBOT_CHARACTERS } from './Data_XBotCharacters.mjs';
+import { HAIR_SHADING } from './Data_Tuning_Hair.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HAIR = path.join(here, 'Hair');
@@ -101,6 +102,8 @@ for (const g of manifest.grooms) {
     Check(header.hair?.referenceScalp?.look === entry.referenceLook && header.hair?.referenceScalp?.atlasSha256 === referenceMasks.atlasSha256,
       `${g.id}：额前发根使用本人的参考覆盖图`);
     const scalpReference = header.hair?.referenceScalp;
+    Check(JSON.stringify(scalpReference?.frontFadeDegrees) === JSON.stringify(HAIR_SHADING.referenceFrontFadeDegrees),
+      `${g.id}：几何发际线与运行时侧面投影过渡一致（调参后必须重烘）`);
     Check(scalpReference?.projection?.rows.length === 6 && scalpReference?.normalizationLuminance === referenceMasks.looks[entry.referenceLook].normalizationLuminance,
       `${g.id}：实际发丝使用当前的参考投影与浓密头发亮度基准`);
     Check(!!scalpUv && !!scalpPos && scalpUv.length === scalpPos.length / 3 * 2, `${g.id}：额前投影 UV 与头皮几何匹配`);

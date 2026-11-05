@@ -158,7 +158,7 @@ export async function LoadHairGroom(url) {
     const B = header.beard;
     asset.beard = {
       header: B, name: B.name, render: B.render, stubble: B.stubble,
-      referenceMask: B.referenceMask ? {...B.referenceMask, chinY: header.portrait.center[1] - header.portrait.height * .5} : null,
+      referenceMask: B.referenceMask ? {...B.referenceMask, center: [header.portrait.center[0], header.portrait.center[2]], chinY: header.portrait.center[1] - header.portrait.height * .5} : null,
       density: EmptyDensity(),
       cardGeometry: MeshGeometry(sec, 'beardCard'), stubbleGeometry: MeshGeometry(sec, 'beardStubble', !!B.referenceMask),
     };

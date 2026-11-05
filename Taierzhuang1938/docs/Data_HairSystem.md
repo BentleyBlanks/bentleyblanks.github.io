@@ -75,6 +75,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 
 默认截图为 1280×720 高画质。核对细须与发际线像素细节时可设 `HAIR_REF_DETAIL=1`，取 1920×1080 极高画质近景，再按完整头部取景生成并排图。测试核对浏览器实际加载的配方哈希，并将轮廓以外的其他展示头隐藏，避免背景人物干扰对照。
 
+正面参考在侧脸会因投影切向拉伸形成横纹，因此 `HAIR_SHADING.referenceFrontFadeDegrees` 统一控制参考着色、胡茬覆盖与几何发际线的转接区；侧面由三维发片和按耳界定义的鬓角轮廓接续。转接在头部局部坐标中计算，不随观察相机转动。该参数写入烘焙头部元数据，门禁要求几何与运行时一致；更改后须重烘六套展示及六套游戏挂件。
+
 `HairRangeBrowserTest` 包含真实编辑器试玩，使用根目录 `scripts/Script_LocalPreview.mjs <端口> --no-open`，并把 `HAIR_PREVIEW` 设为该服务地址后经 TestRunner 执行；简单静态服务器没有 `/__environment/status` 与 `/__blockout/status`，会产生与毛发资源无关的 404。测试保留全部失败请求的完整 URL，不忽略资源错误。
 
 证据只放本地忽略目录 `tmp/HairLab/Verified/`：截图与 `Data_HairVerification.json`。其中逐帧 `StepFrames + gl.finish` 数值是合成帧时成本，不是 rAF 游戏帧率；机器有并行任务时不作独占 GPU 性能承诺。视觉复核、性能实测与部署状态在本次交付记录中分别说明。

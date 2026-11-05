@@ -1,6 +1,6 @@
 // 头发 / 胡子的手感数值（docs/Data_HairSystem.md §4–§6）。纯数据、零 import。
 // 造型（长短、密度、发色、梳向）在 Hair/Data_HairStyles.json；这里只有着色与远近切档。
-export const HAIR_ASSET_VERSION = '20261106ref3';
+export const HAIR_ASSET_VERSION = '20261106ref3b';
 
 export const HAIR_SHADING = Object.freeze({
   // 黑色素 → 底色（UE GetHairColorFromMelanin + ColorFromAbsorption）的吸收倍率，1 = UE 原口径：
@@ -12,6 +12,8 @@ export const HAIR_SHADING = Object.freeze({
   ambient: 1.0,
   // 发丝表面反射天空的白色 R 分量，折射率约 1.55 对应 F0 约 0.046。
   environmentReflection: 0.046,
+  // 正面参考投影在脸颊转向侧面前淡出，侧面保留真实发片，避免照片纹理被拉成长条。
+  referenceFrontFadeDegrees: [35, 65],
   // 逆光透射（TT）强度，UE 的 Backlit
   backlit: 1.0,
   // 消光体素的倍率：1 = 按发丝真实截面算的消光；真头发层层叠叠多次散射，体感更「实」，取 2.5

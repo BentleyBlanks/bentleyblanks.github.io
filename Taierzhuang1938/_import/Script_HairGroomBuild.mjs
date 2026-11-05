@@ -20,6 +20,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { HAIR_SHADING } from '../Data_Tuning_Hair.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT = path.dirname(HERE);
@@ -231,15 +232,18 @@ class HeadFrame {
     // 过渡带按头皮上到发际线的距离算（方位角换成弧长），不只按高度差：鬓角、耳前这些发际线陡的地方也软
     const side = p[0] >= this.centerX ? 1 : -1, arc = (0.085 * Math.PI) / 180;
     let h0 = this.NoisyHairlineY(phi, hl, side);
-    if (this.referenceProjection && phi < 95) {
-      const photoY = this.referenceProjection.HairlineY(p);
-      h0 = Mix(photoY, h0, Smooth(75, 95, phi));
-      if (phi < 75) {
-        const left = this.referenceProjection.HairlineY([p[0] - .001, y, p[2]]);
-        const right = this.referenceProjection.HairlineY([p[0] + .001, y, p[2]]);
-        const distance = (y - h0) / Math.hypot(1, (right - left) / .002);
-        return Smooth(0, band, distance);
-      }
+    if (this.referenceProjection) {
+      // A frontal image has no usable depth at the temples. Join its hairline
+      // to the ear-aware side outline before projection becomes tangential.
+      const [start, end] = HAIR_SHADING.referenceFrontFadeDegrees;
+      const Height = (q) => {
+        const angle = this.Phi(q), base = this.NoisyHairlineY(angle, hl, side);
+        return angle >= end ? base : Mix(this.referenceProjection.HairlineY(q), base, Smooth(start, end, angle));
+      };
+      h0 = Height(p);
+      const dx = (Height([p[0]+.001,y,p[2]])-Height([p[0]-.001,y,p[2]]))/.002;
+      const dz = (Height([p[0],y,p[2]+.001])-Height([p[0],y,p[2]-.001]))/.002;
+      return Smooth(0, band, (y-h0)/Math.hypot(1,dx,dz));
     }
     const inside = y > h0;
     let d = Math.abs(y - h0);
@@ -917,7 +921,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
   }
   // 6. 头皮染色片：贴着头皮 0.15 mm，发丝 / 发片档下压暗发根之间透出来的光头皮（UE MetaHuman 靠头皮贴图做同一件事）
   const projection = frame.referenceProjection;
-  const FrontalScalp = (p) => projection && !frame.IsEar(p) && (!exclude || !exclude(p)) && frame.Phi(p) < 75
+  const FrontalScalp = (p) => projection && !frame.IsEar(p) && (!exclude || !exclude(p)) && frame.Phi(p) < HAIR_SHADING.referenceFrontFadeDegrees[1]
     && p[1] > projection.HairlineY(p) - .012;
   const scalp = ScalpPatch(mesh, p => FrontalScalp(p) ? 1 : Weight(p), () => 0.00015, (p, n) => CombDir(style, frame, p, n));
   if (projection) {
@@ -1310,6 +1314,7 @@ function BuildGroom(entry, tiles) {
     if (reference) {
       const mask = REFERENCE_MASKS.looks[entry.referenceLook];
       header.hair.referenceScalp = {look: entry.referenceLook, atlasSha256: REFERENCE_MASKS.atlasSha256,
+        frontFadeDegrees: HAIR_SHADING.referenceFrontFadeDegrees,
         projection: mask.projection, crop: mask.hairCrop, tile: mask.tile,
         centerZ: frame.zc, top: frame.top, normalizationLuminance: mask.normalizationLuminance};
     }
