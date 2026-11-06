@@ -172,6 +172,22 @@ for (let i = 0; i < count; i++) {
   rigidVerts++;
 }
 
+// Some automatic rigs also leak shoulder or spine influence into the cap.
+// Enforce the same upper-head contract after the neck blend has been repaired.
+let otherHeadVerts = 0;
+for (let i = 0; i < count; i++) {
+  if (shown[i * 3 + 1] * scale <= headUp + RIGID_HEAD[1]) continue;
+  const offset = i * 4;
+  let headWeight = 0;
+  for (let k = 0; k < 4; k++) if (outJoints[offset + k] === headIndex) headWeight += weights[offset + k];
+  if (headWeight >= 1 - 1e-6) continue;
+  outJoints.fill(0, offset, offset + 4);
+  weights.fill(0, offset, offset + 4);
+  outJoints[offset] = headIndex;
+  weights[offset] = 1;
+  otherHeadVerts++;
+}
+
 // 合并完全相同的点（位置 / 法线 / UV / 骨头 / 权重逐字节一样）：何有田那次 Tripo 绑骨把每个面的角都存成单独的点
 // （15.6 万点，去重后 4.87 万），文件大三倍、显卡也白算；日兵甲本来就没有重复，合并不改变它
 const parts = [[outPos, 12], [outNrm, 12], [uv, 8], [outJoints, 4], [weights, 16]].map(([a, size]) => [Buffer.from(a.buffer, a.byteOffset, a.byteLength), size]);
@@ -260,7 +276,7 @@ const report = {
   source: { file: path.basename(SOURCE), bytes: src.bytes.length, sha256: Hash(src.bytes), heightM: +(maxY - minY).toFixed(4) },
   output: { file: path.relative(PROJECT, OUT).replace(/\\/g, "/"), bytes: glb.length, sha256: Hash(glb) },
   scale: +scale.toFixed(6), crownM: CROWN, triangles: idx.length / 3, vertices: keepVerts.length, sourceVertices: count,
-  bones: xbBones.length, addedEndBones: missing, rigidHead: { aboveHeadJointM: RIGID_HEAD, vertices: rigidVerts },
+  bones: xbBones.length, addedEndBones: missing, rigidHead: { aboveHeadJointM: RIGID_HEAD, vertices: rigidVerts, otherInfluenceVertices: otherHeadVerts },
   hipsY: +hipsY(target.get("Hips")).toFixed(4), xbotHipsY: +hipsY(xbHips).toFixed(4),
   hipsScale: +(hipsY(target.get("Hips")) / hipsY(xbHips)).toFixed(4),
   headY: +hipsY(target.get("Head")).toFixed(4), xbotHeadY: +hipsY(xbW.world[xb.doc.nodes.findIndex((nd) => nd.name === "Head")]).toFixed(4),

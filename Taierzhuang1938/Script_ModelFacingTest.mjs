@@ -701,5 +701,18 @@ Check(Math.abs(frontRight[12]-frontLeft[12]-1.5)<.00001&&Math.abs(rearOne[14]-fr
  "九四式货车真实轮轴节点保持1.5m前轮距、2.8+1.1m轴距");
 }
 
+const taniFile = path.join(projectDir, "Model/Character/Model_TaniHisao.glb");
+const tani = LoadGlb(taniFile);
+const taniMesh = tani.json.nodes.find(node => node.mesh === 0);
+const taniCloud = RiggedGlbPoints(taniFile, taniMesh.name);
+const taniSoles = taniCloud.filter(point => point[1] < .09);
+const taniFront = Math.max(...taniSoles.map(point => point[2]));
+const taniBack = Math.min(...taniSoles.map(point => point[2]));
+const taniFacing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_TaniHisao.json"))).facing;
+Check(taniSoles.length > 100 && taniFront > Math.abs(taniBack) + .02,
+  "谷寿夫真实靴尖顶点云朝源+Z", JSON.stringify({ front: taniFront, back: taniBack }));
+Check(taniFacing.sourceForward === "+Z" && taniFacing.actorForward === "-Z",
+  "谷寿夫沿用X Bot源+Z至角色-Z的共用桥接");
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

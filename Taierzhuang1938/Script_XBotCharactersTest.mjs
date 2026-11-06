@@ -8,7 +8,7 @@ import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "
 import { XBOT_CHARACTER_LOOKS } from "./Data_BlockoutXBotClips.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 import { MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
-import { XBotSkin } from "./Script_EditorBlockoutXBot.mjs";
+import { XBotLook, XBotSkin } from "./Script_EditorBlockoutXBot.mjs";
 
 const here = import.meta.dirname;
 const fitSettings=XBOT_CHARACTERS.ijaYi.weaponVisualOriginFit;
@@ -59,6 +59,10 @@ assert.ok(["ijaJia", "ijaA", "ijaYi", "ijaC"].every(key => FactionCharacterKeys(
 assert.equal(XBOT_CAST_CHARACTERS.heyoutian, "heYoutian", "何有田映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.luo, "luo", "班长映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.comrade, "donggua", "冬瓜使用已登记的专属外观");
+assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登记的专属外观");
+assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
+assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
+assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);

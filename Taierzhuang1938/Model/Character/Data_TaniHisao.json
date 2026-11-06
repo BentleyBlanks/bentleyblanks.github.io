@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "built": "2026-11-06",
+  "script": "_import/Script_BuildTaniHisao.mjs",
+  "source": {
+    "file": "TaniHisao_Merged_V4_Bones.glb.glb",
+    "bytes": 34350668,
+    "sha256": "b7fb6178e2b0cd6ab80b8eccc113dbe938a30a6a11f3da98f9df00e0a262b3db",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_TaniHisao.glb",
+    "bytes": 7761716,
+    "sha256": "42ada3697012cf62cad4dc722ecee18ac1ae2ddb51386146d5a57d10aeee1e31"
+  },
+  "scale": 1.830591,
+  "crownM": 1.8305917978286743,
+  "triangles": 43149,
+  "vertices": 32698,
+  "sourceVertices": 32698,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandIndex4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4",
+    "RightToe_End",
+    "LeftToe_End"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 5654,
+    "otherInfluenceVertices": 1250
+  },
+  "hipsY": 0.9761,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.9361,
+  "headY": 1.591,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 16138734,
+      "bytes": 2514096
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 4838953,
+      "bytes": 1362722
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 10996756,
+      "bytes": 1641926
+    }
+  ],
+  "input": {
+    "file": "TaniHisao_Merged_V4_Bones.glb.glb",
+    "sha256": "b7fb6178e2b0cd6ab80b8eccc113dbe938a30a6a11f3da98f9df00e0a262b3db",
+    "skins": 1,
+    "joints": 52
+  },
+  "reconstructionScope": [
+    "谷寿夫角色的脸型、军官帽、卡其军服、马裤、长筒皮靴与肩章按角色参考图设计，属于本作创作外观。",
+    "无发无须头部、肩章细节和身体比例是建模取舍，骨架及动作适配属于游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

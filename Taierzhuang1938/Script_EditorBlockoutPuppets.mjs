@@ -391,7 +391,8 @@ export class BlockoutPuppets {
       else if (bodyKind === "nra" || bodyKind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
       else if (bodyKind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
     } catch (error) { /* 同上 */ }
-    return { actor, soldier, kind, bodyKind, slot, animDt: 0, castId: cast.castId || null, baseWeapon: actor.weaponId ?? weapon ?? null, lieLocal: null,
+    // Appearance identities also exist outside the first-level dialogue cast.
+    return { actor, soldier, kind, bodyKind, slot, animDt: 0, castId: slot === "main" ? unit.castId || null : null, baseWeapon: actor.weaponId ?? weapon ?? null, lieLocal: null,
       body: actor.characterRig ? "rig" : "procedural", skin: null, faction: kind === "civilian" ? "civilian" : bodyKind === "ija" || bodyKind === "ijaOfficer" ? "ija" : "nra" };
   }
 
