@@ -58,6 +58,7 @@ const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
 assert.ok(["ijaJia", "ijaA", "ijaYi", "ijaC"].every(key => FactionCharacterKeys("ija").includes(key)), "普通日军的四款外观均已登记");
 assert.equal(XBOT_CAST_CHARACTERS.heyoutian, "heYoutian", "何有田映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.luo, "luo", "班长映射保留");
+assert.equal(XBOT_CAST_CHARACTERS.comrade, "donggua", "冬瓜使用已登记的专属外观");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);

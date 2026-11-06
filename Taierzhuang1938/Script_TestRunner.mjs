@@ -415,6 +415,7 @@ export const testDefs = {
   EditorBlockoutPlayBrowserTest: { file: "Script_EditorBlockoutPlayBrowserTest.mjs", timeoutMs: 600000, desc: "白盒试玩（§17，2026-10-31）实机：面板预设与开关、开打后不再无敌、02-4 追兵是真 AI 且站在沟底、打光进下一步先走过去再放兵、fresh 重放、中止出小结收兵还原、K 再来一遍、阵亡后摆回那一步机位、看戏步播预演 N 跳过" },
   XBotCharactersTest: { file: "Script_XBotCharactersTest.mjs", desc: "顶替 X Bot 的人物（日兵甲、何有田、罗班长）：骨名层级与初始朝向同 X Bot、初始即绑定姿势、hipsScale 同转换报告、权重与头顶收 Head、动作换人去骨长位移（纯 Node，秒级）" },
   ShunziCharacterBrowserTest: { file: "Script_ShunziCharacterBrowserTest.mjs", timeoutMs: 300000, desc: "顺子 V5：真实动作预览、六个代表动作逐帧蒙皮、原头部与帽子刚性、播放交互及 720p 取证" },
+  DongguaCharacterBrowserTest: { file: "Script_DongguaCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "冬瓜 V3：65骨蒙皮、八个代表动作、头帽刚性和场景角色映射" },
   JapaneseSoldierYiBrowserTest: { file: "Script_JapaneseSoldierYiBrowserTest.mjs", timeoutMs: 600000, desc: "日兵乙 V2：65 骨真实蒙皮、17 条代表性动作逐帧、贴地与握枪、正背面及护颈布/手部 720p 取证" },
   JapaneseSoldierCBrowserTest: { file: "Script_JapaneseSoldierCBrowserTest.mjs", timeoutMs: 600000, desc: "日军士兵C V4：65骨蒙皮、代表动作逐帧、头帽与手脚近景、普通日军实际混用" },
   EditorBlockoutPrevizPlanTest: { file: "Script_EditorBlockoutPrevizPlanTest.mjs", desc: "白盒编辑器预演（§14）：校验器正反例、演员键到达时刻与阶跃字段、镜头 eye / from-look 采样、提交的 previz 文件过校验（纯 Node，秒级）" },
@@ -697,7 +698,7 @@ export const browserTests = new Set([
   "FrontStoryboardShotsTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest",
+  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -899,6 +900,7 @@ export const domains = {
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest","SpeakerGestureTest","SpeakerGestureClipsBrowserTest","SpeakerGestureLayerBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   shunziCharacter: {label:'顺子 V5 外观与动作预览',tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},
+  dongguaCharacter: {label:'冬瓜 V3 外观与动作',tests:['XBotCharactersTest','DongguaCharacterBrowserTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
   beishaheBridge: {label:'北沙河独立史料复原桥资产（不改变剧情）',tests:['BeishaheBridgeTest']},
@@ -1021,6 +1023,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:'shunziCharacter',pattern:/Shunzi/i},
+  {domain:'dongguaCharacter',pattern:/Donggua/i},
   {domain:'particles',pattern:/FallingSoil/},
   {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|Glare|Lifecycle|Bloom|Spark|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|RenderBudget|Shadow(?:Coverage|Bounds|Instances)?|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
@@ -1307,6 +1310,7 @@ const ignoredChangeRules = [
 const prepushGateRules = [
   {pattern:/JapaneseSoldierC/,tests:['XBotCharactersTest','JapaneseSoldierCBrowserTest']},
   {pattern:/Shunzi/i,tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},
+  {pattern:/Donggua/i,tests:['XBotCharactersTest','DongguaCharacterBrowserTest']},
   // Every production module can introduce an asynchronously attached renderer.
   // This small fixture must not depend on recognizing an old asset/factory name.
   {pattern:/\/(?:Script_|Data_).*\.mjs$|\.(?:glb|gltf)$/i,tests:['MotionVectorContractTest']},

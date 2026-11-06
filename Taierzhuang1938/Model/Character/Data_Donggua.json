@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "built": "2026-11-06",
+  "script": "_import/Script_BuildDonggua.mjs",
+  "source": {
+    "file": "Donggua_Merged_V3_Local_Bones.glb",
+    "bytes": 35386180,
+    "sha256": "c1a62de50316288d5b7baec3b94e74892108bcc010651e6594bc9d0f9257d011",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_Donggua.glb",
+    "bytes": 8483660,
+    "sha256": "a860c660e2454c4ce771f49378802e89bfe43e760e766e112d4ee718a82ac76e"
+  },
+  "scale": 1.835,
+  "crownM": 1.8350000381469727,
+  "triangles": 43628,
+  "vertices": 36267,
+  "sourceVertices": 36267,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 4606
+  },
+  "hipsY": 0.9211,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.8833,
+  "headY": 1.6092,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 14932992,
+      "bytes": 2548826
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 5208098,
+      "bytes": 1472686
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 12662971,
+      "bytes": 2027832
+    }
+  ],
+  "input": {
+    "file": "Donggua_Merged_V3_Local_Bones.glb",
+    "sha256": "c1a62de50316288d5b7baec3b94e74892108bcc010651e6594bc9d0f9257d011",
+    "skins": 1
+  },
+  "reconstructionScope": [
+    "冬瓜的脸型、灰色旧军服、补丁、软军帽、绑腿和草鞋按参考图设计，属于本作创作外观。",
+    "人物骨架、蒙皮与动作适配属于游戏表现。"
+  ],
+  "historicalReferences": []
+}

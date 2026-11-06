@@ -457,6 +457,26 @@
           "scope": "Added soldier C creative appearance."
         }
       ]
+    },
+    {
+      "asset": "Donggua",
+      "date": "2026-11-06",
+      "scope": "Asset-scoped creative appearance and runtime rig integration review.",
+      "runtimeAsset": "Model/Character/Model_Donggua.glb",
+      "assetContract": "docs/Data_Donggua.md",
+      "decision": "Face, grey uniform, patches, soft cap, puttees and straw sandals are reference-based creative appearance design. Rigging and motion adaptation are game presentation.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-06T12:22:19.961Z",
+          "scope": "Added the Donggua appearance creative row and dated status."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-06T12:22:21.105Z",
+          "scope": "Added the Donggua appearance creative bullet."
+        }
+      ]
     }
   ],
   "notionPages": [
