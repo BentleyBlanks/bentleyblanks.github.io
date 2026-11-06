@@ -559,7 +559,7 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 #menu .mnSettingsDetail .edPanel.work { position:static;inset:auto;display:block;width:auto;max-width:none;height:auto;border:0;background:none;box-shadow:none;backdrop-filter:none; }
 #menu .mnSettingsDetail .edPanel.work .edHead { display:none; }
 #menu .mnSettingsDetail .edPanel.work .edBody { overflow:visible;max-width:none;padding:0; }
-#menu .mnSettingsDetail .edPanel.audioSettings .edBody { padding:16px 0 28px;gap:3vw; }
+#menu .mnSettingsDetail .edPanel:is(.audioSettings, .gfxSettings) .edBody { padding:16px 0 28px;gap:3vw; }
 #menu .mnSettingsDetail .audioFooter { position:sticky;bottom:0;z-index:1;margin:0;background:#0d0e0b; }
 @media(max-width:760px){
  .mnPanelHead{min-height:15vh}.mnPanelHead::after{display:none}.mnCampaignMain{grid-template-columns:1fr;gap:20px;overflow-y:auto}
@@ -575,14 +575,14 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 }
 
 /* Player audio settings: shared menu typography, grouped controls and contextual help. */
-:is(#settingsRoot, .mnSettingsDetail) .edPanel.audioSettings { inset:6vh 5.1%;width:auto;max-width:none;border:0;
+:is(#settingsRoot, .mnSettingsDetail) .edPanel:is(.audioSettings, .gfxSettings) { inset:6vh 5.1%;width:auto;max-width:none;border:0;
   color:#deddd2;background:linear-gradient(90deg,#080907eb,#11120ed6 65%,#14150cab);box-shadow:none;backdrop-filter:none;
   font-family:var(--ui-font);font-weight:400; }
-:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { position:relative;padding:42px 3vw 22px;background:none;border-bottom:1px solid #c1bdab55; }
-:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edTitle { font:700 var(--menu-font-page)/1.3 var(--ui-title-font);letter-spacing:.1em;color:#eeeee7; }
-:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edSub { position:absolute;grid-area:auto;top:16px;left:3vw;font-size:12px;letter-spacing:.18em;color:#aaa99b; }
-:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edX { font-size:27px;color:#bbbbae;background:none;border:0; }
-:is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr);align-items:start;gap:5vw;
+:is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edHead { position:relative;padding:42px 3vw 22px;background:none;border-bottom:1px solid #c1bdab55; }
+:is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edTitle { font:700 var(--menu-font-page)/1.3 var(--ui-title-font);letter-spacing:.1em;color:#eeeee7; }
+:is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edSub { position:absolute;grid-area:auto;top:16px;left:3vw;font-size:12px;letter-spacing:.18em;color:#aaa99b; }
+:is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edX { font-size:27px;color:#bbbbae;background:none;border:0; }
+:is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edBody { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr);align-items:start;gap:5vw;
   max-width:none;min-height:0;padding:24px 3vw 30px;overflow:auto; }
 .audioOptions { min-width:0; }
 .audioGroup { margin:0 0 8px;padding:0 18px 12px;border-bottom:1px solid #c1bdab30;
@@ -616,15 +616,59 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 .audioAction.primary { color:#edca83; }
 .audioAction:hover { color:#ffe0a1; }
 .audioSave { margin-left:auto;color:#979c8d;font-size:12px;letter-spacing:.08em; }
+/* 画面设置：同声音页的两栏范式（左选项、右说明侧栏），开关一行一个，次要调参收进折叠分组。 */
+.gfxOptions { min-width:0; }
+.gfxCommon { margin:0 0 8px; }
+.gfxRow { border-left:3px solid transparent;padding:0 18px;transition:background .15s,color .15s; }
+.gfxRow.selected { border-left-color:#edca83;background:linear-gradient(90deg,#d8d4c324,#bbb7a906);color:#edca83; }
+:is(#settingsRoot, .mnSettingsDetail) .gfxRow .edRow { margin:0;min-height:40px;gap:16px; }
+:is(#settingsRoot, .mnSettingsDetail) .gfxRow .edRow>.l:first-child { flex:0 0 8.5em;font-size:var(--menu-font-body);line-height:1.35;color:inherit;letter-spacing:.04em; }
+.gfxRow .edVal { font-size:14px;color:#deddd2; }
+.gfxRow.selected .edVal { color:#edca83; }
+.gfxChipRow { display:flex;align-items:center;gap:16px;min-height:40px; }
+:is(#settingsRoot, .mnSettingsDetail) .gfxChipRow>.l { flex:0 0 10em;font-size:var(--menu-font-body);line-height:1.35;color:inherit;letter-spacing:.04em; }
+.gfxChipRow .edChips { margin:0;gap:6px; }
+:is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch,
+:is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch:hover,
+:is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch.on { display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:40px;padding:0;
+  border:0;background:none;color:inherit;font:inherit;font-size:var(--menu-font-body);letter-spacing:.055em;text-align:left;cursor:pointer; }
+.gfxSwitchState { flex:0 0 auto;min-width:76px;box-sizing:border-box;padding:6px 0;border:1px solid #c1bdab40;background:#13140b44;color:#a7a89e;
+  font-size:14px;letter-spacing:.12em;text-align:center; }
+.gfxSwitchState::before { content:"";display:inline-block;width:5px;height:5px;margin:0 8px 2px 0;background:currentColor; }
+.gfxSwitch.on .gfxSwitchState { color:#e6cb91;border-color:#cdb77b88; }
+:is(#settingsRoot, .mnSettingsDetail) .gfxSwitch:focus-visible { outline:1px solid #edca83;outline-offset:2px; }
+.gfxRowNote { display:none;padding:0 0 12px;font-size:13px;line-height:1.7;color:#aaa99b; }
+.gfxGroup { margin-top:8px;border-top:1px solid #c1bdab30; }
+.gfxGroup>summary { display:flex;align-items:center;gap:12px;min-height:44px;padding:0 18px;cursor:pointer;list-style:none;
+  font:400 var(--menu-font-section)/1.4 var(--ui-title-font);letter-spacing:.08em;color:#d5d4ca; }
+.gfxGroup>summary::-webkit-details-marker { display:none; }
+.gfxGroup>summary::before { content:"";flex:0 0 auto;width:7px;height:7px;margin:0 4px 3px 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;
+  color:#c4b58d;transform:rotate(-45deg);transition:transform .15s; }
+.gfxGroup[open]>summary::before { transform:rotate(45deg); }
+.gfxGroup>summary:hover { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c31a,#bbb7a906); }
+:is(#settingsRoot, .mnSettingsDetail) .gfxGroup>summary:focus-visible { outline:none;color:#ffe0a1;background:linear-gradient(90deg,#e6dfc54a,#bbb7a91a); }
+.gfxCount { margin-left:auto;font:400 12px/1 var(--ui-font);letter-spacing:.08em;color:#979c8d; }
+.gfxGroupBody { padding:0 0 6px; }
+.gfxDetail { position:sticky;top:0; }
+.gfxStats { margin-top:32px;padding-top:16px;border-top:1px solid #c1bdab30;font-size:13px; }
+.gfxStats .edFacts { margin:0; }
+.gfxAction.danger:hover { color:#f0a08f; }
 @media(max-width:900px){
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { gap:24px;grid-template-columns:minmax(0,1.7fr) minmax(170px,1fr); }
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edBody { gap:24px;grid-template-columns:minmax(0,1.7fr) minmax(170px,1fr); }
  .audioRow { grid-template-columns:minmax(100px,1fr) minmax(90px,1fr) 42px;gap:10px;padding:0 10px; }
  .audioLabel { font-size:14px; }.audioValue{font-size:12px}.audioDetail p{font-size:13px}
 }
 @media(max-width:640px){
- :is(#settingsRoot, .mnSettingsDetail) .edPanel.audioSettings { inset:3vh 4%; }
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { padding-top:36px;padding-bottom:15px; }
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody { display:block;padding-top:16px; }
+ :is(#settingsRoot, .mnSettingsDetail) .edPanel:is(.audioSettings, .gfxSettings) { inset:3vh 4%; }
+ .gfxDetail { display:none; }
+ .gfxRow.selected .gfxRowNote { display:block; }
+ .gfxRow { padding:0 10px; }
+ :is(#settingsRoot, .mnSettingsDetail) .gfxRow .edRow,.gfxChipRow { min-height:52px; }
+ :is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch,:is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch:hover,:is(#settingsRoot, .mnSettingsDetail) .gfxRow .gfxSwitch.on { min-height:52px; }
+ :is(#settingsRoot, .mnSettingsDetail) .gfxRow .edRow>.l:first-child,:is(#settingsRoot, .mnSettingsDetail) .gfxChipRow>.l { flex-basis:6.5em; }
+ .gfxChipRow { flex-wrap:wrap;padding:8px 0; }
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edHead { padding-top:36px;padding-bottom:15px; }
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edBody { display:block;padding-top:16px; }
  .audioRow { min-height:58px; }.audioGroup:not(:first-child){margin-top:20px}
  .audioDetail { min-height:0;margin-top:24px;padding:20px 10px 0;border-left:0;border-top:1px solid #c1bdab30; }
  .audioDetail h2{margin:12px 0 8px;font-size:22px}.audioDefault{margin-top:16px;padding-top:12px}
@@ -632,9 +676,9 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
  .audioSave{width:100%;margin:0;font-size:10px;padding-bottom:3px}
 }
 @media(max-height:650px) and (min-width:641px){
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edHead { padding-top:30px;padding-bottom:10px; }.audioRow{min-height:47px}
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edSub {top:9px}.audioGroup:not(:first-child){margin-top:14px}
- :is(#settingsRoot, .mnSettingsDetail) .audioSettings .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edHead { padding-top:30px;padding-bottom:10px; }.audioRow{min-height:47px}
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edSub {top:9px}.audioGroup:not(:first-child){margin-top:14px}
+ :is(#settingsRoot, .mnSettingsDetail) :is(.audioSettings, .gfxSettings) .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
 }
 @media(prefers-reduced-motion:reduce){.audioRow{transition:none}}
 

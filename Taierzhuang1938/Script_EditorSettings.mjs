@@ -21,7 +21,7 @@
 // **不是 xxxBus.gain** —— 那几个是系统自己的配平（每段音乐的 level 由 LoopLayer 施加，
 // duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
-import { El, Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
+import { El, Panel, Section, Slider, Chips, Facts, Note } from "./Script_EditorUi.mjs";
 import { T } from "./Script_Text.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
@@ -145,6 +145,31 @@ export function ApplySavedSettings(host) {
 // ===========================================================================
 // 画质
 // ===========================================================================
+// 折叠分组的展开状态：同一会话内重建 / 恢复出厂后保持。
+const OPEN_GFX_GROUPS = new Set();
+
+/** 画面页的开关行：整行是一颗 button.edBtn，左标签右「开 / 关」状态框。接口同 Script_EditorUi.Toggle。 */
+function GfxSwitch(parent, label, value, onChange) {
+  let on = !!value;
+  const btn = El("button", "edBtn gfxSwitch");
+  btn.type = "button";
+  const state = El("span", "gfxSwitchState");
+  btn.append(El("span", "gfxSwitchLabel", label), state);
+  const Apply = () => {
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", String(on));
+    state.textContent = on ? "开" : "关";
+  };
+  Apply();
+  btn.addEventListener("click", () => { on = !on; Apply(); onChange(on); });
+  parent.appendChild(btn);
+  return {
+    root: btn,
+    Set: (v) => { on = !!v; Apply(); },
+    get value() { return on; },
+  };
+}
+
 export class GraphicsSettings {
   static id = "graphics";
   static label = "画质";
@@ -162,10 +187,19 @@ export class GraphicsSettings {
   Enter(root) {
     this.panel = Panel({
       title: "画质设置", sub: "",
-      variant: "work", onClose: () => this.host.Close(),
+      variant: "work gfxSettings", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
+    const foot = El("footer", "audioFooter gfxFooter");
+    const Action = (label, onClick, cls = "") => {
+      const button = El("button", `audioAction gfxAction ${cls}`.trim(), label);
+      button.type = "button"; button.addEventListener("click", onClick); foot.appendChild(button);
+    };
+    Action("返回", () => this.host.Close());
+    Action("全部恢复出厂", () => this.Reset(), "danger");
+    foot.appendChild(El("span", "audioSave", "更改自动保存"));
+    this.panel.root.appendChild(foot);
     return this;
   }
 
@@ -187,296 +221,344 @@ export class GraphicsSettings {
   BuildUi(body) {
     const gfx = this.gfx;
     const controls = GraphicsDetailControls(this.host.post);
-    const Details = (parent, group) => {
+    const preset = this.host.post?.preset || {};
+    const DEFAULT_HINT = "把鼠标移到某一项上（或用方向键聚焦），这里会显示它的说明。";
+    const NO_NOTE = "这一项没有额外说明。";
+
+    body.textContent = "";
+    const options = El("div", "gfxOptions");
+    const detail = El("aside", "audioDetail gfxDetail");
+    body.append(options, detail);
+    detail.appendChild(El("div", "audioEyebrow", "选项说明"));
+    const detailTitle = El("h2", "", "画面");
+    const detailText = El("p", "", DEFAULT_HINT);
+    detail.append(detailTitle, detailText);
+    const stats = El("div", "gfxStats");
+    detail.appendChild(stats);
+    this.facts = Facts(stats, ["帧率（渲染）"]);
+
+    let selected = null;
+    const Select = (row) => {
+      if (selected === row) return;
+      selected?.classList.remove("selected");
+      selected = row;
+      row.classList.add("selected");
+      detailTitle.textContent = row.dataset.gfxName;
+      detailText.textContent = row.dataset.gfxNote || NO_NOTE;
+    };
+    const Row = (parent, name, desc = "") => {
+      const row = El("div", "gfxRow");
+      row.dataset.gfxName = name;
+      if (desc) row.dataset.gfxNote = desc;
+      row.addEventListener("pointerenter", () => Select(row));
+      row.addEventListener("focusin", () => Select(row));
+      parent.appendChild(row);
+      if (desc) row.appendChild(El("div", "gfxRowNote", desc));
+      const owner = parent.closest?.(".gfxGroup");
+      if (owner) owner.dataset.count = String(Number(owner.dataset.count || 0) + 1);
+      return row;
+    };
+    const Switch = (parent, label, value, onChange, desc = "") => {
+      const row = Row(parent, label, desc);
+      const toggle = GfxSwitch(row, label, value, onChange);
+      row.insertBefore(toggle.root, row.firstChild);
+      return toggle;
+    };
+    const Range = (parent, spec, desc = "") => {
+      const row = Row(parent, spec.label, desc);
+      const slider = Slider(row, spec);
+      row.insertBefore(slider.root, row.firstChild);
+      const tail = slider.root.lastElementChild;
+      tail.style.flex = "0 0 80px";
+      tail.style.whiteSpace = "nowrap";
+      return slider;
+    };
+    const Choice = (parent, label, choices, value, onChange, desc = "") => {
+      const row = Row(parent, label, desc);
+      const line = El("div", "gfxChipRow");
+      line.appendChild(El("div", "l", label));
+      const chips = Chips(line, choices, value, onChange);
+      row.insertBefore(line, row.firstChild);
+      return chips;
+    };
+    const Details = (parent, group, descs = {}) => {
       for (const control of controls[group]) {
-        const slider = Slider(parent, {
+        Range(parent, {
           ...control, value: gfx[control.key],
           // 逐项可以自带 format（阴影距离的 0 要显示成「档位默认」而不是「0 m」）
           format: control.format
             ?? ((v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? "")),
           onInput: (v) => { gfx[control.key] = v; this.Apply(); },
-        });
-        slider.root.lastElementChild.style.whiteSpace = "nowrap";
+        }, descs[control.key] || "");
       }
     };
-    const perf = Section(body, "分辨率与阴影");
-    this.resSlider = Slider(perf, {
+    const Multiplier = (parent, label, key, desc = "", save = false) => Range(parent, {
+      label, min: 0, max: 2, step: 0.05, value: gfx[key],
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx[key] = v; if (save) this.Save(); else this.Apply(); },
+    }, desc);
+    const Group = (id, title) => {
+      const details = El("details", "gfxGroup");
+      details.dataset.group = id;
+      details.dataset.count = "0";
+      const summary = El("summary", "");
+      summary.appendChild(El("span", "gfxGroupName", title));
+      const count = El("span", "gfxCount", "");
+      summary.appendChild(count);
+      const box = El("div", "gfxGroupBody");
+      details.append(summary, box);
+      details.open = OPEN_GFX_GROUPS.has(id);
+      details.addEventListener("toggle", () => {
+        if (details.open) OPEN_GFX_GROUPS.add(id); else OPEN_GFX_GROUPS.delete(id);
+      });
+      options.appendChild(details);
+      return { box, Done: () => { count.textContent = `${details.dataset.count} 项`; } };
+    };
+
+    // --- 常用 ---------------------------------------------------------------
+    options.appendChild(El("div", "audioGroup", "常用"));
+    const common = El("div", "gfxCommon");
+    options.appendChild(common);
+    this.resSlider = Range(common, {
       label: "渲染分辨率", min: 0.4, max: 1.6, step: 0.05, value: gfx.renderScale,
       format: (v) => `${Math.round(v * 100)}%`,
       onInput: (v) => { gfx.renderScale = v; this.Apply(); },
-    });
-    Note(perf, this.host.post?.preset.taaUpscale
+    }, this.host.post?.preset.taaUpscale
       ? "TAA 开着时低于 100% 走 TAAU 超分：主场景在这个分辨率跑，TAA 解算回满分辨率，末趟不再有拉伸。"
       : "本档没有 TAAU：低于 100% 时末趟做一次双线性放大。");
 
     // 自动降档（docs §13）。它给的是**乘在上面那根滑杆上**的倍率，不覆盖玩家的值。
     const autoQuality = this.host.game?.autoQuality;
     if (autoQuality) {
-      const autoBox = document.createElement("div");
-      autoBox.className = "edBtns";
-      perf.appendChild(autoBox);
       // 只写 gfx 那一位；同步到规则层是 ApplyGraphics 的事（存档回灌走同一条路）。
-      Toggle(autoBox, "自动降档", gfx.autoQuality !== false, (on) => {
+      Switch(common, "自动降档", gfx.autoQuality !== false, (on) => {
         gfx.autoQuality = on;
         this.Apply();
-      });
-      Note(perf, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（再往下依次摘掉"
+      }, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（再往下依次摘掉"
         + "SSR、接触阴影，最后才摘近级每帧阴影烘焙），<13 ms 持续 8 s 才升回去，每次降级锁 30 s。"
         + "只动运行时旋钮，不整档切换 —— 换档要重编译全场材质，在已经掉帧时更糟。");
     }
-
-    const shadowBox = document.createElement("div");
-    shadowBox.className = "edBtns";
-    perf.appendChild(shadowBox);
-    Toggle(shadowBox, "阴影", gfx.shadows, (on) => { gfx.shadows = on; this.Apply(); });
-    Toggle(shadowBox, "第一人称自阴影", gfx.firstPersonSelfShadow !== false, (on) => {
-      gfx.firstPersonSelfShadow = on;
-      this.Apply();
-    });
-    Toggle(shadowBox, "自阴影软化", gfx.firstPersonSelfShadowSoft === true, (on) => {
-      gfx.firstPersonSelfShadowSoft = on;
-      this.Apply();
-    });
-    // 第一人称取光（Data_Tuning_FirstPersonLighting）：关掉退回改之前的样子，对照用
-    Toggle(shadowBox, "第一人称：眼睛处取阳光", gfx.firstPersonEyeSun !== false, (on) => {
-      gfx.firstPersonEyeSun = on;
-      this.Apply();
-    });
-    Toggle(shadowBox, "第一人称：本地反射", gfx.firstPersonReflection !== false, (on) => {
-      gfx.firstPersonReflection = on;
-      this.Apply();
-    });
-    Toggle(shadowBox, "第一人称：武器补光", gfx.firstPersonWeaponLight !== false, (on) => {
-      gfx.firstPersonWeaponLight = on;
-      this.Apply();
-    });
-    // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
-    // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
-    Toggle(shadowBox, "接触阴影", gfx.contactShadows !== false, (on) => {
-      gfx.contactShadows = on;
-      this.Apply();
-    });
+    Switch(common, "阴影", gfx.shadows, (on) => { gfx.shadows = on; this.Apply(); });
     // 级联之后这一栏是**每一级**的图边长（high/ultra 四级、medium 三级、low 两级）。
     // 「默认」= 档位值（high/ultra 2k、medium/low 1k）；4k × 四级 = 半 GB 显存，
     // 留着是给取证用的，不是给玩家日常开的。
-    const shadowSize = Section(perf, "阴影分辨率（每级）");
-    Chips(shadowSize, [
+    Choice(common, "阴影分辨率（每级）", [
       { value: 0, label: "默认" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
-
-    Details(perf, "shadow");
-
-    const giBox = Section(body, "全局光照 GI");
-    const giRow = document.createElement("div");
-    giRow.className = "edBtns";
-    giBox.appendChild(giRow);
-    Toggle(giRow, "实时全局光照", gfx.gi === true, (on) => { gfx.gi = on; this.Apply(); });
-    Slider(giBox, {
-      label: "间接光强度", min: 0, max: 2, step: 0.05, value: gfx.giStrength ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.giStrength = v; this.Apply(); },
-    });
-
-    Details(giBox, "gi");
-    if (this.host.post?.quality === "low") Note(giBox, "GI 需 medium 及以上档位。");
-
-    // 簇状局部光：把动态光预算从 6 盏解到 32/64/128 盏。总闸是运行时 uniform
-    // （关掉不重编译）；英雄光阴影是编译期的，翻它会重编译一次整场材质。
-    const clusterBox = Section(body, "局部光源（簇状前向）");
-    const clusterRow = document.createElement("div");
-    clusterRow.className = "edBtns";
-    clusterBox.appendChild(clusterRow);
-    const clusterToggle = Toggle(clusterRow, "簇状多光源", gfx.clusteredLights !== false, (on) => {
-      gfx.clusteredLights = on;
-      this.Apply();
-    });
-    clusterToggle.root.dataset.role = "clusteredLights";
-    clusterToggle.root.title = "关掉就退回 2026-09 之前的固定灯池（同时只有几盏火有光）";
-    const heroToggle = Toggle(clusterRow, "英雄光阴影", gfx.clusterHeroShadow === true, (on) => {
-      gfx.clusterHeroShadow = on;
-      this.Apply();
-    });
-    heroToggle.root.dataset.role = "clusterHeroShadow";
-    heroToggle.root.title = "给优先级最高的那一盏局部光加立方体阴影：整城几何多画六遍，很贵";
-    this.clusterFacts = Facts(clusterBox, ["局部光", "簇均值 / 峰值", "簇表构建"]);
-    if (!this.host.lights?.clustered) {
-      Note(clusterBox, "当前画质档不跑簇（low 档保持固定灯池），面板开关无效。");
-    }
-    const atmoBox = Section(body, "大气");
-    const atmoRow = document.createElement("div");
-    atmoRow.className = "edBtns";
-    atmoBox.appendChild(atmoRow);
-    Toggle(atmoRow, "物理大气", gfx.atmosphere !== false, (on) => { gfx.atmosphere = on; this.Apply(); });
-    Details(atmoBox, "atmosphere");
-    Note(atmoBox, "关掉退回旧的解析天空（等同 ?skyLegacy=1）。烟霾倍率乘在预设的 Mie 密度上。");
-    // 材质着色（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）。
-    // 开关是**编译期**的：翻一次要把全场材质重编译（几百毫秒，一次性）——
-    // 与阴影总闸、GI 采样层同一个先例，所以放 Toggle 不放滑杆。
-    // 出厂值跟画质档走（Data_Tuning_Graphics 的 pom / detailNormal / … 那几位）：
-    // 面板上显示的是「这一档实际编了没有」，不是一个独立的偏好。
-    const mat = Section(body, "材质细节");
-    const matRow = document.createElement("div");
-    matRow.className = "edBtns";
-    mat.appendChild(matRow);
-    const preset = this.host.post?.preset || {};
-    const Bit = (key, fallback) => (typeof gfx[key] === "boolean" ? gfx[key] : !!fallback);
-    // 出厂值由 Script_Main 从画质档拷进 graphics（与 taa 同款），所以这里读的是
-    // 玩家的实际选择；fallback 只在旧存档缺项时兜底。
-    Toggle(matRow, "视差遮蔽 POM", Bit("pom", (preset.pom || 0) > 0),
-      (on) => { gfx.pom = on; this.Apply(); });
-    Toggle(matRow, "POM 自阴影", Bit("pomSelfShadow", preset.pomSelfShadow),
-      (on) => { gfx.pomSelfShadow = on; this.Apply(); });
-    Toggle(matRow, "细节法线", Bit("detailNormal", preset.detailNormal),
-      (on) => { gfx.detailNormal = on; this.Apply(); });
-    const matRow2 = document.createElement("div");
-    matRow2.className = "edBtns";
-    mat.appendChild(matRow2);
-    Toggle(matRow2, "微阴影", Bit("microShadow", preset.microShadow),
-      (on) => { gfx.microShadow = on; this.Apply(); });
-    Toggle(matRow2, "地平线镜面遮蔽", Bit("horizonOcclusion", preset.horizonOcclusion),
-      (on) => { gfx.horizonOcclusion = on; this.Apply(); });
-    Toggle(matRow2, "皮肤预积分散射", Bit("skinSss", preset.skinSss),
-      (on) => { gfx.skinSss = on; this.Apply(); });
-    Details(mat, "material");
-    if ((preset.pom || 0) === 0) Note(mat, "POM 需 medium 及以上档位；步数由档位决定。");
-    else if (!preset.pomSelfShadow) Note(mat, "POM 自阴影只在 ultra 档编译进材质。");
-
-    const aa = Section(body, "抗锯齿 TAA");
-    const aaRow = document.createElement("div");
-    aaRow.className = "edBtns";
-    aa.appendChild(aaRow);
-    Toggle(aaRow, "TAA（时域抗锯齿）", gfx.taa !== false, (on) => {
-      gfx.taa = on;
-      this.Apply();
-    });
-
-    Details(aa, "taa");
-
-    // 屏幕空间反射：布尔总闸 + 强度倍率。**不重编译材质** —— 强度归零时材质
-    // 那一行等价于「radiance 原样」，成本只剩一次纹理取样（GI 那种编译期开关
-    // 是因为探针采样层占着一堆采样器与寄存器，SSR 的补丁没有那个体量）。
-    const reflect = Section(body, "屏幕空间反射 SSR");
-    const ssrRow = document.createElement("div");
-    ssrRow.className = "edBtns";
-    reflect.appendChild(ssrRow);
-    Toggle(ssrRow, "屏幕空间反射", gfx.ssr !== false, (on) => { gfx.ssr = on; this.Apply(); });
-    Slider(reflect, {
-      label: "反射强度", min: 0, max: 2, step: 0.05, value: gfx.ssrStrength ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.ssrStrength = v; this.Apply(); },
-    });
-    if (this.host.post && !this.host.post.preset.ssr) {
-      Note(reflect, "SSR 需 medium 及以上档位（low 档连追踪靶都不建）。");
-    }
-
-    // froxel 体积雾。low 档没有 froxel 网格，这一位打开也只是空转；面板照常给，
-    // 因为「读数」那一栏会照实说当前用的是体积雾还是解析雾（不跟着开关喊）。
-    const fogSection = Section(body, "体积雾 / 体积光");
-    const fogBox = document.createElement("div");
-    fogBox.className = "edBtns";
-    fogSection.appendChild(fogBox);
-    Toggle(fogBox, "froxel 体积雾", gfx.volumetrics !== false, (on) => {
-      gfx.volumetrics = on;
-      this.Apply();
-    });
-    Note(fogSection, "带阴影的体积雾：光柱会被建筑切断，火与照明弹会照亮周围的空气。"
-      + "关掉退回合成 pass 里的解析式高度雾（low 档出厂就是那一条）。"
-      + "透过率与解析雾逐像素相同，开关它不改变七十米外的能见度。");
-
-    const post = Section(body, "后处理强度（倍率）");
-    const godBox = document.createElement("div");
-    godBox.className = "edBtns";
-    post.appendChild(godBox);
-    Toggle(godBox, "屏幕空间体积光（体积雾关时才生效）", gfx.godEnabled === true,
-      (on) => { gfx.godEnabled = on; this.Save(); });
-    const Mul = (key, label) => Slider(post, {
-      label, min: 0, max: 2, step: 0.05, value: gfx[key],
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx[key] = v; this.Save(); },
-    });
-    Mul("ssao", "环境光遮蔽");
-    // SSIL 只在给了它的档位上才有意义（构造期开关，见 Data_Tuning_Graphics.ssil）。
-    // 档位没给就不画这一行 —— 一根拖了没反应的滑杆比没有滑杆更糟。
-    if (this.host.post?.preset?.ssil) {
-      Mul("ssil", "屏幕空间间接光");
-      Note(post, "SSIL 与 GTAO 共用同一趟地平线搜索；拖到 0 会把那一趟一起停掉。");
-    }
-    Mul("bloom", "泛光");
-    Mul("god", "体积光");
-    Mul("motionBlur", "运动模糊");
-    Mul("grain", "颗粒");
-    Mul("vignette", "暗角");
-
-    // --- 相机（曝光 / 色调映射 / 光晕 / 分级）--------------------------------
-    // 与上面那一栏分开：那一栏是「后处理开多重」，这一栏是「这是一台什么相机」。
-    const camera = Section(body, "相机");
-    const cameraRow = document.createElement("div");
-    cameraRow.className = "edBtns";
-    camera.appendChild(cameraRow);
-    Toggle(cameraRow, "自动曝光", gfx.autoExposure !== false, (on) => {
-      gfx.autoExposure = on;
-      this.Apply();
-    });
-    Toggle(cameraRow, "3D LUT 分级", gfx.lut !== false, (on) => { gfx.lut = on; this.Apply(); });
-    Toggle(cameraRow, "泛光 Karis 平均", gfx.bloomKaris === true, (on) => {
-      gfx.bloomKaris = on;
-      this.Apply();
-    });
-    Slider(camera, {
-      label: "曝光补偿", min: -3, max: 3, step: 0.1, value: gfx.exposureCompensation ?? 0,
-      format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)} EV`,
-      onInput: (v) => { gfx.exposureCompensation = v; this.Apply(); },
-    });
-    const tone = Section(camera, "色调映射");
-    Chips(tone, [
-      { value: "aces", label: "ACES" },
-      { value: "agx", label: "AgX" },
-    ], gfx.tonemap || "aces", (v) => { gfx.tonemap = String(v); this.Apply(); });
-    Slider(camera, {
-      label: "镜头光晕", min: 0, max: 2, step: 0.05, value: gfx.lensFlare ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.lensFlare = v; this.Apply(); },
-    });
-    Slider(camera, {
-      label: "镜头脏污", min: 0, max: 2, step: 0.05, value: gfx.lensDirt ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.lensDirt = v; this.Apply(); },
-    });
-    Slider(camera, {
-      label: "输出抖动", min: 0, max: 2, step: 0.1, value: gfx.dither ?? 0,
-      format: (v) => (v <= 0 ? "关" : `${v.toFixed(1)} / 255`),
-      onInput: (v) => { gfx.dither = v; this.Apply(); },
-    });
-    if (this.host.post && !this.host.post.preset.lensFlare) {
-      Note(camera, "镜头光晕需 high 及以上档位。");
-    }
-
-    const view = Section(body, "视场");
-    Slider(view, {
+    Range(common, {
       label: "视野角度", min: 40, max: 90, step: 1, value: gfx.fov,
       format: (v) => `${v.toFixed(0)}°`,
       onInput: (v) => { gfx.fov = v; this.Save(); },
     });
-
-    // --- 内容 ---------------------------------------------------------------
-    // **不是画质项**：断肢既不省时间也不改画风，它决定的是玩家愿不愿意看到这个。
-    // 所以单开一节，不塞进上面任何一栏（口径见 docs/Data_Dismemberment.md §1 最后一行）。
-    // 存的是 gfx.gore 那一位，落地由 Script_Main 的 ApplyGraphics 转给 GoreSystem；
-    // 关掉时场上已经飞出去的肢块会立刻收回（GoreSystem.SetEnabled → ReleaseAll）。
-    const content = Section(body, "内容");
-    const contentRow = document.createElement("div");
-    contentRow.className = "edBtns";
-    content.appendChild(contentRow);
-    Toggle(contentRow, "断肢表现", gfx.gore !== false, (on) => { gfx.gore = on; this.Apply(); });
-    Note(content, "关掉之后子弹与爆炸不再卸掉肢体，断肢音效也一并不响；血迹与倒地不受影响。"
+    Range(common, {
+      label: "曝光补偿", min: -3, max: 3, step: 0.1, value: gfx.exposureCompensation ?? 0,
+      format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)} EV`,
+      onInput: (v) => { gfx.exposureCompensation = v; this.Apply(); },
+    });
+    // **不是画质项**：断肢既不省时间也不改画风，它决定的是玩家愿不愿意看到这个
+    // （口径见 docs/Data_Dismemberment.md §1 最后一行）。存的是 gfx.gore 那一位，
+    // 落地由 Script_Main 的 ApplyGraphics 转给 GoreSystem；关掉时场上已经飞出去的肢块会立刻收回。
+    Switch(common, "断肢表现", gfx.gore !== false, (on) => { gfx.gore = on; this.Apply(); },
+      "关掉之后子弹与爆炸不再卸掉肢体，断肢音效也一并不响；血迹与倒地不受影响。"
       + "带 ?gore=0 打开时这一位被强制关掉（出图与回归要确定的画面）。");
 
-    const stat = Section(body, "读数");
-    this.facts = Facts(stat, ["帧率（渲染）"]);
-    ButtonRow(stat, [
-      { label: "全部恢复出厂", onClick: () => this.Reset(), cls: "danger" },
-    ]);
+    // --- 阴影细节 ------------------------------------------------------------
+    const shadow = Group("shadow", "阴影细节");
+    Switch(shadow.box, "第一人称自阴影", gfx.firstPersonSelfShadow !== false, (on) => {
+      gfx.firstPersonSelfShadow = on;
+      this.Apply();
+    });
+    Switch(shadow.box, "自阴影软化", gfx.firstPersonSelfShadowSoft === true, (on) => {
+      gfx.firstPersonSelfShadowSoft = on;
+      this.Apply();
+    });
+    // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
+    // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
+    Switch(shadow.box, "接触阴影", gfx.contactShadows !== false, (on) => {
+      gfx.contactShadows = on;
+      this.Apply();
+    });
+    Details(shadow.box, "shadow");
+    shadow.Done();
+
+    // --- 第一人称光照 --------------------------------------------------------
+    // 第一人称取光（Data_Tuning_FirstPersonLighting）：关掉退回改之前的样子，对照用
+    const fpLight = Group("fplight", "第一人称光照");
+    Switch(fpLight.box, "第一人称：眼睛处取阳光", gfx.firstPersonEyeSun !== false, (on) => {
+      gfx.firstPersonEyeSun = on;
+      this.Apply();
+    });
+    Switch(fpLight.box, "第一人称：本地反射", gfx.firstPersonReflection !== false, (on) => {
+      gfx.firstPersonReflection = on;
+      this.Apply();
+    });
+    Switch(fpLight.box, "第一人称：武器补光", gfx.firstPersonWeaponLight !== false, (on) => {
+      gfx.firstPersonWeaponLight = on;
+      this.Apply();
+    });
+    fpLight.Done();
+
+    // --- 全局光照与反射 ------------------------------------------------------
+    const gi = Group("gi", "全局光照与反射");
+    Switch(gi.box, "实时全局光照", gfx.gi === true, (on) => { gfx.gi = on; this.Apply(); },
+      this.host.post?.quality === "low" ? "GI 需 medium 及以上档位。" : "");
+    Range(gi.box, {
+      label: "间接光强度", min: 0, max: 2, step: 0.05, value: gfx.giStrength ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.giStrength = v; this.Apply(); },
+    });
+    Details(gi.box, "gi");
+    // 屏幕空间反射：布尔总闸 + 强度倍率。**不重编译材质** —— 强度归零时材质
+    // 那一行等价于「radiance 原样」，成本只剩一次纹理取样。
+    const ssrNote = this.host.post && !this.host.post.preset.ssr
+      ? "SSR 需 medium 及以上档位（low 档连追踪靶都不建）。" : "";
+    Switch(gi.box, "屏幕空间反射", gfx.ssr !== false, (on) => { gfx.ssr = on; this.Apply(); }, ssrNote);
+    Range(gi.box, {
+      label: "反射强度", min: 0, max: 2, step: 0.05, value: gfx.ssrStrength ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.ssrStrength = v; this.Apply(); },
+    }, ssrNote);
+    gi.Done();
+
+    // --- 局部光源 ------------------------------------------------------------
+    // 簇状局部光：把动态光预算从 6 盏解到 32/64/128 盏。总闸是运行时 uniform
+    // （关掉不重编译）；英雄光阴影是编译期的，翻它会重编译一次整场材质。
+    const cluster = Group("cluster", "局部光源（簇状前向）");
+    const clusterToggle = Switch(cluster.box, "簇状多光源", gfx.clusteredLights !== false, (on) => {
+      gfx.clusteredLights = on;
+      this.Apply();
+    }, !this.host.lights?.clustered
+      ? "当前画质档不跑簇（low 档保持固定灯池），面板开关无效。"
+      : "关掉就退回 2026-09 之前的固定灯池（同时只有几盏火有光）");
+    clusterToggle.root.dataset.role = "clusteredLights";
+    clusterToggle.root.title = "关掉就退回 2026-09 之前的固定灯池（同时只有几盏火有光）";
+    const heroToggle = Switch(cluster.box, "英雄光阴影", gfx.clusterHeroShadow === true, (on) => {
+      gfx.clusterHeroShadow = on;
+      this.Apply();
+    }, "给优先级最高的那一盏局部光加立方体阴影：整城几何多画六遍，很贵");
+    heroToggle.root.dataset.role = "clusterHeroShadow";
+    heroToggle.root.title = "给优先级最高的那一盏局部光加立方体阴影：整城几何多画六遍，很贵";
+    this.clusterFacts = Facts(cluster.box, ["局部光", "簇均值 / 峰值", "簇表构建"]);
+    cluster.Done();
+
+    // --- 大气与雾 ------------------------------------------------------------
+    const atmo = Group("atmo", "大气与雾");
+    const atmoNote = "关掉退回旧的解析天空（等同 ?skyLegacy=1）。烟霾倍率乘在预设的 Mie 密度上。";
+    Switch(atmo.box, "物理大气", gfx.atmosphere !== false, (on) => { gfx.atmosphere = on; this.Apply(); }, atmoNote);
+    Details(atmo.box, "atmosphere", { atmosphereHaze: atmoNote });
+    // froxel 体积雾。low 档没有 froxel 网格，这一位打开也只是空转；面板照常给，
+    // 因为「读数」会照实说当前用的是体积雾还是解析雾（不跟着开关喊）。
+    Switch(atmo.box, "froxel 体积雾", gfx.volumetrics !== false, (on) => {
+      gfx.volumetrics = on;
+      this.Apply();
+    }, "带阴影的体积雾：光柱会被建筑切断，火与照明弹会照亮周围的空气。"
+      + "关掉退回合成 pass 里的解析式高度雾（low 档出厂就是那一条）。"
+      + "透过率与解析雾逐像素相同，开关它不改变七十米外的能见度。");
+    Switch(atmo.box, "屏幕空间体积光（体积雾关时才生效）", gfx.godEnabled === true,
+      (on) => { gfx.godEnabled = on; this.Save(); });
+    atmo.Done();
+
+    // --- 材质细节 ------------------------------------------------------------
+    // 材质着色（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）。
+    // 开关是**编译期**的：翻一次要把全场材质重编译（几百毫秒，一次性）——
+    // 与阴影总闸、GI 采样层同一个先例，所以放开关不放滑杆。
+    // 出厂值跟画质档走：面板上显示的是「这一档实际编了没有」，不是一个独立的偏好。
+    const mat = Group("material", "材质细节");
+    const Bit = (key, fallback) => (typeof gfx[key] === "boolean" ? gfx[key] : !!fallback);
+    // 出厂值由 Script_Main 从画质档拷进 graphics（与 taa 同款），所以这里读的是
+    // 玩家的实际选择；fallback 只在旧存档缺项时兜底。
+    Switch(mat.box, "视差遮蔽 POM", Bit("pom", (preset.pom || 0) > 0),
+      (on) => { gfx.pom = on; this.Apply(); },
+      (preset.pom || 0) === 0 ? "POM 需 medium 及以上档位；步数由档位决定。" : "");
+    Switch(mat.box, "POM 自阴影", Bit("pomSelfShadow", preset.pomSelfShadow),
+      (on) => { gfx.pomSelfShadow = on; this.Apply(); },
+      (preset.pom || 0) !== 0 && !preset.pomSelfShadow ? "POM 自阴影只在 ultra 档编译进材质。" : "");
+    Switch(mat.box, "细节法线", Bit("detailNormal", preset.detailNormal),
+      (on) => { gfx.detailNormal = on; this.Apply(); });
+    Switch(mat.box, "微阴影", Bit("microShadow", preset.microShadow),
+      (on) => { gfx.microShadow = on; this.Apply(); });
+    Switch(mat.box, "地平线镜面遮蔽", Bit("horizonOcclusion", preset.horizonOcclusion),
+      (on) => { gfx.horizonOcclusion = on; this.Apply(); });
+    Switch(mat.box, "皮肤预积分散射", Bit("skinSss", preset.skinSss),
+      (on) => { gfx.skinSss = on; this.Apply(); });
+    Details(mat.box, "material");
+    mat.Done();
+
+    // --- 抗锯齿 --------------------------------------------------------------
+    const aa = Group("aa", "抗锯齿");
+    Switch(aa.box, "TAA（时域抗锯齿）", gfx.taa !== false, (on) => {
+      gfx.taa = on;
+      this.Apply();
+    });
+    Details(aa.box, "taa");
+    aa.Done();
+
+    // --- 后处理强度 ----------------------------------------------------------
+    const post = Group("post", "后处理强度（倍率）");
+    Multiplier(post.box, "环境光遮蔽", "ssao", "", true);
+    // SSIL 只在给了它的档位上才有意义（构造期开关，见 Data_Tuning_Graphics.ssil）。
+    // 档位没给就不画这一行 —— 一根拖了没反应的滑杆比没有滑杆更糟。
+    if (preset.ssil) {
+      Multiplier(post.box, "屏幕空间间接光", "ssil",
+        "SSIL 与 GTAO 共用同一趟地平线搜索；拖到 0 会把那一趟一起停掉。", true);
+    }
+    Multiplier(post.box, "泛光", "bloom", "", true);
+    Multiplier(post.box, "体积光", "god", "", true);
+    Multiplier(post.box, "运动模糊", "motionBlur", "", true);
+    Multiplier(post.box, "颗粒", "grain", "", true);
+    Multiplier(post.box, "暗角", "vignette", "", true);
+    post.Done();
+
+    // --- 相机与调色 ----------------------------------------------------------
+    // 与上面那一栏分开：那一栏是「后处理开多重」，这一栏是「这是一台什么相机」。
+    const camera = Group("camera", "相机与调色");
+    Switch(camera.box, "自动曝光", gfx.autoExposure !== false, (on) => {
+      gfx.autoExposure = on;
+      this.Apply();
+    });
+    Switch(camera.box, "3D LUT 分级", gfx.lut !== false, (on) => { gfx.lut = on; this.Apply(); });
+    Switch(camera.box, "泛光 Karis 平均", gfx.bloomKaris === true, (on) => {
+      gfx.bloomKaris = on;
+      this.Apply();
+    });
+    Choice(camera.box, "色调映射", [
+      { value: "aces", label: "ACES" },
+      { value: "agx", label: "AgX" },
+    ], gfx.tonemap || "aces", (v) => { gfx.tonemap = String(v); this.Apply(); });
+    const flareNote = this.host.post && !this.host.post.preset.lensFlare ? "镜头光晕需 high 及以上档位。" : "";
+    Range(camera.box, {
+      label: "镜头光晕", min: 0, max: 2, step: 0.05, value: gfx.lensFlare ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.lensFlare = v; this.Apply(); },
+    }, flareNote);
+    Range(camera.box, {
+      label: "镜头脏污", min: 0, max: 2, step: 0.05, value: gfx.lensDirt ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.lensDirt = v; this.Apply(); },
+    });
+    Range(camera.box, {
+      label: "输出抖动", min: 0, max: 2, step: 0.1, value: gfx.dither ?? 0,
+      format: (v) => (v <= 0 ? "关" : `${v.toFixed(1)} / 255`),
+      onInput: (v) => { gfx.dither = v; this.Apply(); },
+    });
+    camera.Done();
+
+    // ↑↓ 在各行的主控件之间移动（滑杆的 ↑↓ 本来会改值，同声音页：改成换行，←→ 才调值）。
+    options.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      if (event.target.closest?.("select, textarea")) return;
+      const stops = [...options.querySelectorAll("summary, .gfxSwitch, .gfxRow input[type=range], .gfxRow .edChip:first-child")]
+        .filter((el) => el.getClientRects().length);
+      const rep = (el) => {
+        const row = el.closest(".gfxRow");
+        return row ? stops.find((s) => s.closest(".gfxRow") === row) : el;
+      };
+      const index = stops.indexOf(rep(event.target));
+      if (index < 0) return;
+      event.preventDefault(); event.stopPropagation();
+      stops[(index + (event.key === "ArrowDown" ? 1 : -1) + stops.length) % stops.length].focus();
+    });
   }
 
   Reload(quality) {

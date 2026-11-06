@@ -52,7 +52,8 @@ try {
     assert.ok(snapshot.bytes < 35 * 1024 * 1024, 'uncompressed title payload has a full-resource budget');
     await page.screenshot({path: path.join(out, `Scene_${deployed ? 'Bundle' : 'Source'}.png`)});
     await CheckMenuResponse(page, deployed);
-    await page.click('[data-act="settings"]'); await page.click('[data-setting="sound"]');
+    await page.click('[data-act="settings"]'); await CheckGraphicsPage(page);
+    await page.click('[data-setting="sound"]');
     await page.locator('#audio-master').fill('64');
     await page.locator('.mnSettingsDetailBody .audioAction', {hasText: '返回'}).click();
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.setting), 'sound', 'sound page back returns focus to the settings list');
@@ -73,6 +74,39 @@ try {
     await browser.close(); browser = null;
   }
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
+
+// 画面页整理（常用 + 折叠分组）只改组织，不许少选项：期望清单是整理前页面的全部控件。
+async function CheckGraphicsPage(page) {
+  const GRAPHICS_TOGGLES = ["阴影", "第一人称自阴影", "自阴影软化", "第一人称：眼睛处取阳光", "第一人称：本地反射", "第一人称：武器补光", "接触阴影", "实时全局光照", "簇状多光源", "英雄光阴影", "物理大气", "视差遮蔽 POM", "POM 自阴影", "细节法线", "微阴影", "地平线镜面遮蔽", "皮肤预积分散射", "TAA（时域抗锯齿）", "屏幕空间反射", "froxel 体积雾", "屏幕空间体积光（体积雾关时才生效）", "自动曝光", "3D LUT 分级", "泛光 Karis 平均", "断肢表现"];
+  const GRAPHICS_SLIDERS = ["渲染分辨率", "深度偏移", "法线偏移", "阴影距离", "阴影强度", "间接光强度", "采样偏移", "反射遮蔽", "光照历史权重", "遮挡历史权重", "烟霾倍率", "视差深度", "细节法线", "微阴影", "地平线遮蔽", "皮肤散射", "当前帧权重", "抖动幅度", "锐化强度", "反射强度", "环境光遮蔽", "泛光", "体积光", "运动模糊", "颗粒", "暗角", "曝光补偿", "镜头光晕", "镜头脏污", "输出抖动", "视野角度"];
+  const GRAPHICS_CHIPS = [["默认", "512", "1k", "2k", "4k"], ["ACES", "AgX"]];
+  const GRAPHICS_COMMON = ['渲染分辨率', '阴影', '阴影分辨率（每级）', '视野角度', '曝光补偿', '断肢表现'];
+  const GRAPHICS_GROUPS = ['shadow', 'fplight', 'gi', 'cluster', 'atmo', 'material', 'aa', 'post', 'camera'];
+  const sorted = list => [...list].sort();
+  const report = await page.evaluate(() => {
+    const root = document.querySelector(".mnSettingsDetailBody .edPanel.gfxSettings");
+    const label = (el) => (el.querySelector(".gfxSwitchLabel")?.textContent ?? el.textContent).trim();
+    return {
+      toggles: [...root.querySelectorAll(".edBtn:not(.danger):not(.gfxAction)")].map(label),
+      sliders: [...root.querySelectorAll(".edRow")].map((r) => r.firstElementChild.textContent.trim()),
+      chips: [...root.querySelectorAll(".edChips")].map((c) => [...c.querySelectorAll(".edChip")].map((x) => x.textContent.trim())),
+      common: [...root.querySelectorAll(".gfxCommon > .gfxRow")].map((r) => r.dataset.gfxName),
+      groups: [...root.querySelectorAll(".gfxGroup")].map((d) => [d.dataset.group, d.open]),
+    };
+  });
+  assert.deepEqual(sorted(report.toggles), sorted(GRAPHICS_TOGGLES), 'graphics page keeps every toggle');
+  assert.deepEqual(sorted(report.sliders), sorted(GRAPHICS_SLIDERS), 'graphics page keeps every slider');
+  assert.deepEqual(sorted(report.chips.map(chips => chips.join('|'))), sorted(GRAPHICS_CHIPS.map(chips => chips.join('|'))), 'graphics page keeps every chip option');
+  assert.deepEqual(report.common, GRAPHICS_COMMON, 'common block lists the everyday options');
+  assert.deepEqual(report.groups.map(([id]) => id), GRAPHICS_GROUPS, 'nine folding groups');
+  assert.ok(report.groups.every(([, open]) => !open), 'groups start collapsed');
+  await page.locator('.gfxGroup[data-group="shadow"] summary').click();
+  await page.locator('.gfxFooter .danger').click();
+  assert.equal(await page.locator('.gfxGroup[data-group="shadow"]').evaluate(el => el.open), true, 'expanded group stays open after reset');
+  await page.locator('.gfxGroup[data-group="shadow"] summary').click();
+  await page.locator('.gfxCommon .gfxRow[data-gfx-name="曝光补偿"]').hover();
+  assert.equal(await page.locator('.gfxDetail h2').textContent(), '曝光补偿', 'hovering a row retitles the side panel');
+}
 
 async function CheckMenuResponse(page, deployed) {
   await page.locator('[data-act="levels"]').hover();

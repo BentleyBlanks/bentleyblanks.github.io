@@ -803,7 +803,7 @@ await page.click('.mnItem[data-act="settings"]');
   Check("进设置默认右栏显示画面，菜单仍在设置页", defaults.mode === "settings" && defaults.head === "画面" && defaults.on === "graphics"
     && defaults.current === "graphics" && defaults.embedded && !defaults.floating && defaults.focused === "graphics", JSON.stringify(defaults));
 }
-for (const [id, head, probe] of [["graphics", "画面", ".edSection"], ["sound", "声音", ".audioSettings .audioRange"], ["controls", "操作", ".edControlRow"],
+for (const [id, head, probe] of [["graphics", "画面", ".gfxGroup"], ["sound", "声音", ".audioSettings .audioRange"], ["controls", "操作", ".edControlRow"],
   ["debug", "调试选项", ".mnDebugRow[data-option]"], ["debugTools", "Debug工具", ".mnDebugRow[data-tool]"], ["tools", "高级工具", ".mnToolItem"]]) {
   await page.click(`.mnSettingsItem[data-setting="${id}"]`);
   const state = await page.evaluate(([id, probe]) => ({
@@ -1340,6 +1340,30 @@ async function CheckMissionList() {
   Check("暂停菜单能打开设置，战斗仍冻结",
     !settings.editor.panelOpen && settings.menu.mode === "settings" && !settings.running,
     JSON.stringify(settings));
+  {
+    // 画面页整理只改组织：游戏页（有自动降档、SSIL）的全部控件一个不少
+    const GAME_TOGGLES = ["自动降档", "阴影", "第一人称自阴影", "自阴影软化", "第一人称：眼睛处取阳光", "第一人称：本地反射", "第一人称：武器补光", "接触阴影", "实时全局光照", "簇状多光源", "英雄光阴影", "物理大气", "视差遮蔽 POM", "POM 自阴影", "细节法线", "微阴影", "地平线镜面遮蔽", "皮肤预积分散射", "TAA（时域抗锯齿）", "屏幕空间反射", "froxel 体积雾", "屏幕空间体积光（体积雾关时才生效）", "自动曝光", "3D LUT 分级", "泛光 Karis 平均", "断肢表现"];
+    const GAME_SLIDERS = ["渲染分辨率", "深度偏移", "法线偏移", "阴影距离", "阴影强度", "间接光强度", "采样偏移", "反射遮蔽", "光照历史权重", "遮挡历史权重", "烟霾倍率", "视差深度", "细节法线", "微阴影", "地平线遮蔽", "皮肤散射", "当前帧权重", "抖动幅度", "锐化强度", "反射强度", "环境光遮蔽", "屏幕空间间接光", "泛光", "体积光", "运动模糊", "颗粒", "暗角", "曝光补偿", "镜头光晕", "镜头脏污", "输出抖动", "视野角度"];
+    const GAME_CHIPS = [["默认", "512", "1k", "2k", "4k"], ["ACES", "AgX"]];
+    const sorted = list => [...list].sort();
+    const hasSsil = await page.evaluate(() => !!window.Taierzhuang.post?.preset?.ssil);
+    const report = await page.evaluate(() => {
+    const root = document.querySelector(".mnSettingsDetailBody .edPanel.gfxSettings");
+    const label = (el) => (el.querySelector(".gfxSwitchLabel")?.textContent ?? el.textContent).trim();
+    return {
+      toggles: [...root.querySelectorAll(".edBtn:not(.danger):not(.gfxAction)")].map(label),
+      sliders: [...root.querySelectorAll(".edRow")].map((r) => r.firstElementChild.textContent.trim()),
+      chips: [...root.querySelectorAll(".edChips")].map((c) => [...c.querySelectorAll(".edChip")].map((x) => x.textContent.trim())),
+      common: [...root.querySelectorAll(".gfxCommon > .gfxRow")].map((r) => r.dataset.gfxName),
+      groups: [...root.querySelectorAll(".gfxGroup")].map((d) => [d.dataset.group, d.open]),
+    };
+  });
+    Check("画面页（游戏）开关一个不少", JSON.stringify(sorted(report.toggles)) === JSON.stringify(sorted(GAME_TOGGLES)), report.toggles.join());
+    Check("画面页（游戏）滑杆一个不少", JSON.stringify(sorted(report.sliders)) === JSON.stringify(sorted(GAME_SLIDERS.filter(name => hasSsil || name !== "屏幕空间间接光"))), report.sliders.join());
+    Check("画面页（游戏）选项按钮一个不少", JSON.stringify(sorted(report.chips.map(c => c.join("|")))) === JSON.stringify(sorted(GAME_CHIPS.map(c => c.join("|")))), JSON.stringify(report.chips));
+    Check("画面页（游戏）常用块含七项（带自动降档）", report.common.length === 7 && report.common.includes("自动降档"), report.common.join());
+    Check("画面页（游戏）九个分组默认收起", report.groups.length === 9 && report.groups.every(([, open]) => !open), JSON.stringify(report.groups));
+  }
   await page.keyboard.press("Escape");
   const settingsClosed = await page.evaluate(() => ({
     editor: window.Taierzhuang.Debug.Editor(), menu: window.Taierzhuang.Debug.Menu(),
