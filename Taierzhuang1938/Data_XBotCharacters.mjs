@@ -23,6 +23,10 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 日军士兵A：Tripo 部件合并（角色\Tripo\10_日军士兵A，V7：下巴带、去掉帽檐下挂环），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierA.json
   ijaA: Object.freeze({ name: "日军士兵A", file: "./Model/Character/Model_JapaneseSoldierA.glb", hipsScale: 0.9396, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
+  // 日军士兵C V4：用户下载件为静态网格，经本地拟合骨架和表面权重传递后转换为共用骨架。
+  ijaC: Object.freeze({ name: "日军士兵C", file: "./Model/Character/Model_JapaneseSoldierC.glb", hipsScale: 0.9417, ownMaterial: true,
+    report: "./Model/Character/Data_JapaneseSoldierC.json",
+    clipOverrides: Object.freeze({ "Animation_Mixamo_Crawling_V1.glb": "./Animation/JapaneseSoldierC/Animation_JapaneseSoldierC_Crawling.glb" }) }),
   // 日兵乙：五部件 V2；本地用已验证的日兵甲骨架拟合并传递权重，保留头形，补齐护颈布内衬。
   ijaYi: Object.freeze({ name: "日兵乙", file: "./Model/Character/Model_JapaneseSoldierYi.glb", hipsScale: 0.9418, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierYi.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierYi.bin",
@@ -32,9 +36,9 @@ export const XBOT_CHARACTERS = Object.freeze({
 
 /**
  * 白盒里这个阵营的普通士兵（没有专属配色的）换成哪些人；没写的阵营照用 X Bot。写几个就按兵的编号固定分（XBotSkins.KitFor，
- * 同一个兵每次进来都是同一张脸）。11-04 起普通日军在日兵甲、日军士兵A、日兵乙中固定取一款。
+ * 同一个兵每次进来都是同一张脸）。11-06 起普通日军在日兵甲、日军士兵A、日兵乙、日军士兵C中固定取一款。
  */
-export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi"]) });
+export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
 export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi" });

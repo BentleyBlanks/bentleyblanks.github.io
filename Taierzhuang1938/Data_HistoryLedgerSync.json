@@ -437,6 +437,26 @@
           "scope": "Added only Yi appearance creative bullet; fetched the saved page and verified it."
         }
       ]
+    },
+    {
+      "asset": "JapaneseSoldierC",
+      "date": "2026-11-06",
+      "scope": "Asset-scoped creative appearance and runtime rig integration review.",
+      "runtimeAsset": "Model/Character/Model_JapaneseSoldierC.glb",
+      "assetContract": "docs/Data_JapaneseSoldierC.md",
+      "decision": "Face, uniform colour and wear, cap, puttees and boots are creative reference-based appearance design. Rigging, contacts and motion adaptation are game presentation.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-06T05:01:09.291Z",
+          "scope": "Added soldier C creative appearance and dated status."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-06T05:01:10.540Z",
+          "scope": "Added soldier C creative appearance."
+        }
+      ]
     }
   ],
   "notionPages": [

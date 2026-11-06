@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "built": "2026-11-06",
+  "script": "_import/Script_BuildXBotRigCharacter.mjs",
+  "source": {
+    "file": "JapaneseSoldierC_Merged_V4_Local_Bones.glb",
+    "bytes": 31289776,
+    "sha256": "8a67f1f048a66e9f47b73aaff7d3ae886df7c0bea5483caf80ccf873c03dce6c",
+    "heightM": 1.8368
+  },
+  "output": {
+    "file": "Model/Character/Model_JapaneseSoldierC.glb",
+    "bytes": 7349384,
+    "sha256": "6efd16287130f188057475ee492f1840c40212560bdfa332a2a25a14a51d83ce"
+  },
+  "scale": 1,
+  "crownM": 1.8367732763290405,
+  "triangles": 36419,
+  "vertices": 29454,
+  "sourceVertices": 29456,
+  "bones": 65,
+  "addedEndBones": [],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 0
+  },
+  "hipsY": 0.982,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.9417,
+  "headY": 1.615,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 10778686,
+      "bytes": 1581024
+    },
+    {
+      "index": 1,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 13958529,
+      "bytes": 2331460
+    },
+    {
+      "index": 2,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 4779797,
+      "bytes": 1443400
+    }
+  ],
+  "input": {
+    "file": "JapaneseSoldierC_Merged_V4_Bones.glb",
+    "sha256": "b94d27968061058bd9abb5aec72f1dda28a4293ab31f88969aa07c8bfc4fd6d9",
+    "skins": 0
+  },
+  "localBinding": {
+    "script": "_import/Script_BindJapaneseSoldierC.py",
+    "method": "fitted-canonical-surface-transfer",
+    "donorFile": "Model/Character/Model_JapaneseSoldierJia.glb",
+    "donorSha256": "8f5f681741dff0f532d54e80a4d1b7297159e31f0c2ecf2163031ce65608272e",
+    "bones": 65,
+    "maximumInfluences": 4,
+    "unweightedVertices": 0,
+    "bodyTransferDistanceM": {
+      "50": 0.011003246065229177,
+      "95": 0.03405610844492912,
+      "99": 0.04084230761975049,
+      "100": 0.048891715705394745
+    },
+    "normalizationScale": 1.8367732763290405,
+    "normalizationMatrix": [
+      [
+        -8.028791143033231e-8,
+        1.8367732763290405,
+        0,
+        0
+      ],
+      [
+        -1.8367732763290405,
+        -8.028791143033231e-8,
+        0,
+        -0.0008173584938049316
+      ],
+      [
+        0,
+        0,
+        1.8367732763290405,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "maximumSourceAlignmentErrorM": 0.00008834739855956286
+  },
+  "reconstructionScope": [
+    "日军士兵C的脸型、军服配色与旧化、军帽、绑腿和皮靴按参考图设计，属于本作创作外观。",
+    "骨架拟合、蒙皮、持枪和动作适配属于游戏表现。"
+  ],
+  "historicalReferences": []
+}

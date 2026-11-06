@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeJapaneseSoldierCContacts.mjs",
+  "character": "ijaC",
+  "model": {
+    "file": "Model/Character/Model_JapaneseSoldierC.glb",
+    "sha256": "6efd16287130f188057475ee492f1840c40212560bdfa332a2a25a14a51d83ce"
+  },
+  "source": {
+    "file": "Animation/Mixamo/Animation_Mixamo_Crawling_V1.glb",
+    "sha256": "5030042e14065d9f296af5331fc0c0926f051d60930d738f7e5505c2d8e7c847"
+  },
+  "output": {
+    "file": "Animation/JapaneseSoldierC/Animation_JapaneseSoldierC_Crawling.glb",
+    "sha256": "ba7735c499bfefde0f8f0d4e2268ab6a9081bcaac37a8ddd87001af24873c66a"
+  },
+  "duration": 1.8333333730697632,
+  "frames": 57,
+  "kneeContactJointHeightM": 0.075,
+  "maxPelvisLiftM": 0.11573103852052367,
+  "minSkinnedY": -0.005117768712240487,
+  "minFeetY": 0.001999988599217933,
+  "minHandsY": 0.0019999755568506175,
+  "maxBodyBoneLengthErrorM": 0
+}

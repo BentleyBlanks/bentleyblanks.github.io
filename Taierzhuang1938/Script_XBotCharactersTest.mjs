@@ -48,14 +48,14 @@ function Worlds(doc) {
   return { parent, world };
 }
 const Float = (glb, i) => {
-  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { VEC4: 4, MAT4: 16 }[a.type];
+  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { VEC3: 3, VEC4: 4, MAT4: 16 }[a.type];
   const out = new Float32Array(a.count * w); new Uint8Array(out.buffer).set(glb.bin.subarray(v.byteOffset, v.byteOffset + out.byteLength)); return out;
 };
 
 const xbot = ReadGlb(path.join(here, XBOT_CHARACTERS.xbot.file));
 const xw = Worlds(xbot.doc);
 const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
-assert.ok(["ijaJia", "ijaA", "ijaYi"].every(key => FactionCharacterKeys("ija").includes(key)), "普通日军保留甲和 A，并接入乙");
+assert.ok(["ijaJia", "ijaA", "ijaYi", "ijaC"].every(key => FactionCharacterKeys("ija").includes(key)), "普通日军的四款外观均已登记");
 assert.equal(XBOT_CAST_CHARACTERS.heyoutian, "heYoutian", "何有田映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.luo, "luo", "班长映射保留");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
@@ -116,7 +116,29 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   }
   const W4 = Float(glb, prim.attributes.WEIGHTS_0);
   for (let i = 0; i < W4.length; i += 4) assert.ok(Math.abs(W4[i] + W4[i + 1] + W4[i + 2] + W4[i + 3] - 1) < 0.01, `${key}: 第 ${i / 4} 点权重和`);
-  assert.ok(report.rigidHead?.vertices > 0, `${key}: 头顶 / 帽子权重收到 Head`);
+  // A locally bound character may already have rigid head weights before conversion.
+  // Verify the shipped weights directly, including characters requiring no repair.
+  const positions = Float(glb, prim.attributes.POSITION);
+  const jointAccessor = doc.accessors[prim.attributes.JOINTS_0];
+  const jointView = doc.bufferViews[jointAccessor.bufferView];
+  assert.ok([5121, 5123].includes(jointAccessor.componentType), `${key}: supported joint index component type`);
+  const jointBytes = jointAccessor.componentType === 5121 ? 1 : 2;
+  const jointOffset = (jointView.byteOffset || 0) + (jointAccessor.byteOffset || 0);
+  const headIndex = names.indexOf("Head"), point = new THREE.Vector3();
+  let rigidHeadVertices = 0;
+  for (let i = 0; i < positions.length / 3; i++) {
+    point.fromArray(positions, i * 3).applyMatrix4(M);
+    if (point.y <= report.headY + 0.09 + 1e-5) continue;
+    let headWeight = 0;
+    for (let slot = 0; slot < 4; slot++) {
+      const offset = jointOffset + (i * 4 + slot) * jointBytes;
+      const jointIndex = jointBytes === 1 ? glb.bin[offset] : glb.bin.readUInt16LE(offset);
+      if (jointIndex === headIndex) headWeight += W4[i * 4 + slot];
+    }
+    assert.ok(headWeight > 0.999, `${key}: upper head vertex ${i} follows Head (${headWeight})`);
+    rigidHeadVertices++;
+  }
+  assert.ok(rigidHeadVertices > 0, `${key}: upper head and cap weights were checked`);
   for (const [original, replacement] of Object.entries(def.clipOverrides || {})) {
     assert.ok(fs.existsSync(path.join(here,"Animation/Mixamo",original)), `${key}: 专用动作保留原件`);
     const own=ReadGlb(path.join(here,replacement));
@@ -125,9 +147,12 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   }
 }
 
-const yiContacts=JSON.parse(fs.readFileSync(path.join(here,"Animation/JapaneseSoldierYi/Data_JapaneseSoldierYiContacts.json"),"utf8"));
-for(const item of [yiContacts.model,yiContacts.source,yiContacts.output])assert.equal(
-  createHash("sha256").update(fs.readFileSync(path.join(here,item.file))).digest("hex"),item.sha256,"乙的接触烘焙对应实际模型与源动作");
+for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
+  const contacts = JSON.parse(fs.readFileSync(path.join(here, "Animation", character, `Data_${character}Contacts.json`), "utf8"));
+  for (const item of [contacts.model, contacts.source, contacts.output]) assert.equal(
+    createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,
+    `${character}: 接触烘焙对应实际模型与源动作`);
+}
 
 // 动作换人：X Bot 原样；别的人去掉 Hips 以外的位移轨、Hips 位移乘 hipsScale，同一条动作同一个人只换一次
 const clip = new THREE.AnimationClip("t", 1, [

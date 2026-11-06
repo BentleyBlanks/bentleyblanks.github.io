@@ -416,6 +416,7 @@ export const testDefs = {
   XBotCharactersTest: { file: "Script_XBotCharactersTest.mjs", desc: "顶替 X Bot 的人物（日兵甲、何有田、罗班长）：骨名层级与初始朝向同 X Bot、初始即绑定姿势、hipsScale 同转换报告、权重与头顶收 Head、动作换人去骨长位移（纯 Node，秒级）" },
   ShunziCharacterBrowserTest: { file: "Script_ShunziCharacterBrowserTest.mjs", timeoutMs: 300000, desc: "顺子 V5：真实动作预览、六个代表动作逐帧蒙皮、原头部与帽子刚性、播放交互及 720p 取证" },
   JapaneseSoldierYiBrowserTest: { file: "Script_JapaneseSoldierYiBrowserTest.mjs", timeoutMs: 600000, desc: "日兵乙 V2：65 骨真实蒙皮、17 条代表性动作逐帧、贴地与握枪、正背面及护颈布/手部 720p 取证" },
+  JapaneseSoldierCBrowserTest: { file: "Script_JapaneseSoldierCBrowserTest.mjs", timeoutMs: 600000, desc: "日军士兵C V4：65骨蒙皮、代表动作逐帧、头帽与手脚近景、普通日军实际混用" },
   EditorBlockoutPrevizPlanTest: { file: "Script_EditorBlockoutPrevizPlanTest.mjs", desc: "白盒编辑器预演（§14）：校验器正反例、演员键到达时刻与阶跃字段、镜头 eye / from-look 采样、提交的 previz 文件过校验（纯 Node，秒级）" },
   EditorBlockoutFirstLevel0105SceneTest: { file: "Script_EditorBlockoutFirstLevel0105SceneTest.mjs", desc: "01–05 新剧本白盒场地：生成两次逐字相同、锚点处沟 / 坑 / 洞深度、沟底宽 ≥3.4 m、坡顶挡住集结处看前沿的视线（纯 Node）" },
   EditorBlockoutFirstLevel0105KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0105KeyframesTest.mjs", desc: "01–05 新剧本白盒关键帧：生成可复现、校验通过、人不进实心块 / 不重叠、走位沿沟不翻沟壁（纯 Node）" },
@@ -704,7 +705,7 @@ export const browserTests = new Set([
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'RifleShoulderMarchTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'FpsDadaoProjectionTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
-  "HitReactionBrowserTest", "NeckDeathBrowserTest", "JapaneseSoldierYiBrowserTest",
+  "HitReactionBrowserTest", "NeckDeathBrowserTest", "JapaneseSoldierYiBrowserTest", "JapaneseSoldierCBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest", "RifleSlingClothBrowserTest", "EditorBlockoutPlayBrowserTest", "FirstPersonLightingBrowserTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "TimelineBrowserTest", "EnvironmentBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -880,6 +881,7 @@ export const domains = {
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
   japaneseSoldierYi: { label: "日兵乙模型与动作", tests: ["XBotCharactersTest", "JapaneseSoldierYiBrowserTest"] },
+  japaneseSoldierC: { label: "日军士兵C模型与动作", tests: ["XBotCharactersTest", "JapaneseSoldierCBrowserTest"] },
   rifleSling: { label: "背枪枪带布料模拟", tests: ["RifleSlingClothTest", "RifleSlingClothBrowserTest", "MotionVectorContractTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
@@ -1037,6 +1039,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Icon_TabSeal(?:16|32|180)\.png/ },
   { domain: "combat", pattern: /Script_FirstPersonGait\.mjs/ },
   { domain: "japaneseSoldierYi", pattern: /JapaneseSoldierYi/ },
+  { domain: "japaneseSoldierC", pattern: /JapaneseSoldierC/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "rifleSling", pattern: /RifleSling|HempRifleSling|RelaxedGait|FirstLevelP012BackRifle|BackRifleRun/ },
   { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|ClothBlood|DongguaQuilt|DoorCurtain|SichuanBanner/ },
@@ -1302,6 +1305,7 @@ const ignoredChangeRules = [
 ];
 
 const prepushGateRules = [
+  {pattern:/JapaneseSoldierC/,tests:['XBotCharactersTest','JapaneseSoldierCBrowserTest']},
   {pattern:/Shunzi/i,tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},
   // Every production module can introduce an asynchronously attached renderer.
   // This small fixture must not depend on recognizing an old asset/factory name.

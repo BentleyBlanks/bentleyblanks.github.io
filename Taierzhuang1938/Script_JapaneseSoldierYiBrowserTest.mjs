@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const supplied = process.env.YI_TEST_URL || process.argv.find(arg=>arg.startsWith("--url="))?.slice(6);
@@ -153,9 +154,29 @@ try {
   }
   // The editor/whitebox must instantiate the same registered variant, not only
   // offer it in the standalone model selector.
+  // Select a real Yi unit for the weapon-contact fixture independently of the
+  // number of appearances currently registered in the faction pool.
+  let machineGunFixture = null;
+  await page.route("**/Blockout/FirstLevel0105.json*", async route => {
+    const response = await route.fetch();
+    const fixture = await response.json();
+    const pool = FactionCharacterKeys("ija");
+    const frame = fixture.keyframes.find(item => item.id === "05-1");
+    const unit = frame.units.find(item => {
+      if (item.side !== "ija" || item.kind === "tank" || item.castId) return false;
+      let hash = 2166136261;
+      for (const character of `${item.id}:main`) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0;
+      return pool[hash % pool.length] === "ijaYi";
+    });
+    assert.ok(unit, "fixture has a deterministically selected Yi soldier");
+    unit.weapon = "Type11";
+    machineGunFixture = unit.id;
+    await route.fulfill({ response, json: fixture });
+  });
   await page.goto(`${origin}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=05-1&scale=small&audio=0&manual=1&quality=high`,
     { waitUntil:"load",timeout:300000 });
   await page.waitForFunction(()=>window.Tengxian?.Debug?.Blockout?.State?.().ready,null,{timeout:300000});
+  assert.ok(machineGunFixture, "weapon fixture was delivered through the level loader");
   await page.waitForFunction(()=>{
     const T=window.Tengxian;T.StepFrames(1,1/60,false);
     const keys=new Set();T.scene.traverse(o=>{const skin=o.userData?.xbotSkin;if(skin&&o.visible&&skin.shownValid)keys.add(skin.kit.key);});
