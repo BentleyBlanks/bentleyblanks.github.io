@@ -10,6 +10,7 @@ const root = path.resolve(import.meta.dirname, "..");
 const custom = process.argv.find(arg => arg.startsWith("--url="))?.slice(6);
 const server = custom ? null : await ServeRoot(root, 0);
 const origin = custom || `http://127.0.0.1:${server.address().port}`;
+const sceneTimeout = custom ? 600000 : 300000;
 const output = path.join(root, "tmp", custom?.includes("github.io") ? "LiuWencaiOnline" : "LiuWencai");
 fs.mkdirSync(output, { recursive: true });
 const browser = await LaunchBrowser({ extraArgs: ["--mute-audio"] });
@@ -51,6 +52,21 @@ async function Samplers(page) {
 }
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  let publishedNormalRequests = 0;
+  if (!custom) {
+    // Exercise the dynamic prop filename after publication removes its source.
+    await page.route("**/Data_TextureImportRuntime.mjs*", route => route.fulfill({
+      contentType: "text/javascript",
+      body: `export const TEXTURE_IMPORT_RUNTIME = ${JSON.stringify({
+        "Texture_DadaoNormal.webp": { format: "webp", output: "Texture_DadaoNormal_ImportFixture.webp", colorSpace: "linear", mipmaps: true },
+      })};`,
+    }));
+    await page.route("**/Texture/Texture_DadaoNormal.webp*", route => route.abort("failed"));
+    await page.route("**/Texture/Texture_DadaoNormal_ImportFixture.webp*", route => {
+      publishedNormalRequests++;
+      return route.fulfill({ contentType: "image/webp", body: fs.readFileSync(path.join(root, "Taierzhuang1938/Texture/Texture_DadaoNormal.webp")) });
+    });
+  }
   page.on("pageerror", error => errors.push(String(error)));
   page.on("console", message => {
     if (message.type() !== "error") return;
@@ -70,6 +86,12 @@ try {
   });
   await page.goto(`${origin}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=liuWencai`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.action && document.querySelector("#who")?.value === "liuWencai", null, { timeout: 180000 });
+  await page.waitForFunction(() => {
+    let loaded = false;
+    window.__preview.dadao?.traverse(object => { if (object.material?.normalMap?.image?.width > 0) loaded = true; });
+    return loaded;
+  }, null, { timeout: 180000 });
+  if (!custom) assert.ok(publishedNormalRequests > 0, "preview props resolve published texture paths");
   const info = await page.evaluate(() => {
     const P = window.__preview, mesh = P.character.getObjectByProperty("isSkinnedMesh", true);
     const head = mesh.skeleton.getBoneByName("Head"), headIndex = mesh.skeleton.bones.indexOf(head);
@@ -134,8 +156,8 @@ try {
   const previewSamplers = await Samplers(page);
   assert.ok(previewSamplers.programs.every(program => program.linked && program.count <= previewSamplers.limit));
   assert.equal(previewSamplers.error, 0);
-  await page.goto(`${origin}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=01-1&scale=small&audio=0&manual=1&quality=high`, { waitUntil: "load", timeout: 300000 });
-  await page.waitForFunction(() => window.Tengxian?.Debug?.Blockout?.State?.().ready, null, { timeout: 300000 });
+  await page.goto(`${origin}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&kf=01-1&scale=small&audio=0&manual=1&quality=high`, { waitUntil: "load", timeout: sceneTimeout });
+  await page.waitForFunction(() => window.Tengxian?.Debug?.Blockout?.State?.().ready, null, { timeout: sceneTimeout });
   await page.waitForFunction(() => {
     const T = window.Tengxian;
     T.StepFrames(2, 1 / 60, false);
@@ -167,7 +189,7 @@ try {
     const T = window.Tengxian;
     T.StepFrames(2, 1 / 60, false);
     return T.Debug.Blockout.Play.State().run?.step === "02-4";
-  }, null, { timeout: 300000 });
+  }, null, { timeout: sceneTimeout });
   const play = await page.evaluate(() => {
     const T = window.Tengxian, skins = [];
     T.scene.traverse(object => { const skin = object.userData?.xbotSkin; if (skin?.shownValid && skin.kit.key === "liuWencai") skins.push(skin); });
