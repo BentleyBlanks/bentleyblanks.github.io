@@ -173,7 +173,8 @@ export const XBOT_CHARACTER_LOOKS = Object.freeze({
   geng: Object.freeze({ name: "老耿", surface: 0x8b5a2b, joints: 0x24170b }),
   nier: Object.freeze({ name: "妮儿", surface: 0xf0a3bb, joints: 0x3a2229 }),
   taniHisao: Object.freeze({ name: "谷寿夫", surface: 0x746548, joints: 0x292116 }),
+  azumaShiro: Object.freeze({ name: "东史郎", surface: 0x968451, joints: 0x342c1b }),
 });
 
 /** 没有 castId 的有名字角色：单位 id → XBOT_CHARACTER_LOOKS 的键。 */
-export const XBOT_CHARACTER_UNITS = Object.freeze({ Shunzi: "shunzi", Geng: "geng", Nier: "nier", Yaowa: "yaowa", TaniHisao: "taniHisao", LiuWencai: "liuwencai", nier: "nier", GengNier: "nier" });
+export const XBOT_CHARACTER_UNITS = Object.freeze({ Shunzi: "shunzi", Geng: "geng", Nier: "nier", Yaowa: "yaowa", TaniHisao: "taniHisao", AzumaShiro: "azumaShiro", LiuWencai: "liuwencai", nier: "nier", GengNier: "nier" });

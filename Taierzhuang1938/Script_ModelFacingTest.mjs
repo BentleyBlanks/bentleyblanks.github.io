@@ -701,7 +701,7 @@ Check(Math.abs(frontRight[12]-frontLeft[12]-1.5)<.00001&&Math.abs(rearOne[14]-fr
  "九四式货车真实轮轴节点保持1.5m前轮距、2.8+1.1m轴距");
 }
 
-for (const [id, name] of [["TaniHisao", "谷寿夫"], ["OldGeng", "老耿"]]) {
+for (const [id, name] of [["TaniHisao", "谷寿夫"], ["OldGeng", "老耿"], ["AzumaShiro", "东史郎"]]) {
   const file = path.join(projectDir, `Model/Character/Model_${id}.glb`);
   const model = LoadGlb(file);
   const mesh = model.json.nodes.find(node => node.mesh === 0);

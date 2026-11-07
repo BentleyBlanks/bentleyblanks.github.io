@@ -75,6 +75,10 @@ assert.equal(XBotLook({ faction: "nra", unitId: "LiuWencai" }).key, "liuwencai")
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
 assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
+assert.equal(XBOT_CAST_CHARACTERS.azumaShiro, "azumaShiro", "东史郎使用V12专属外观");
+assert.equal(XBotLook({ faction: "ija", castId: "azumaShiro", unitId: "ReviewSoldier" }).key, "azumaShiro");
+assert.equal(XBotLook({ faction: "ija", unitId: "AzumaShiro" }).key, "azumaShiro");
+assert.ok(!FactionCharacterKeys("ija").includes("azumaShiro"), "东史郎按命名角色选择");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);
@@ -182,7 +186,7 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-for (const character of ["Yaowa", "OldGeng", "Nier"]) {
+for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro"]) {
   const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
   for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
     assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,

@@ -42,6 +42,16 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 谷寿夫 V4：用户下载的完整绑骨件，转换为共用骨架。
   taniHisao: Object.freeze({ name: "谷寿夫", file: "./Model/Character/Model_TaniHisao.glb", hipsScale: 0.9361, ownMaterial: true,
     report: "./Model/Character/Data_TaniHisao.json" }),
+  // 东史郎 V12：用户下载的完整绑骨件，保留颈根和背部底色修复。
+  azumaShiro: Object.freeze({ name: "东史郎", file: "./Model/Character/Model_AzumaShiro.glb", hipsScale: 0.9684, heightM: 1.840000033378601, ownMaterial: true,
+    report: "./Model/Character/Data_AzumaShiro.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_WalkWithRifle_V3.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_WalkWithRifle_V3.glb",
+      "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_IdleCrouchingAiming_V1.glb",
+      "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_ProneFiringRifle_V2.glb",
+      "Animation_Mixamo_Dying_V3.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_Dying_V3.glb",
+      "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_SittingIdle_V2.glb",
+    }) }),
   // 刘文财 V9：用户下载的 Mixamo 绑骨件，转换为共用骨架。
   liuWencai: Object.freeze({ name: "刘文财", file: "./Model/Character/Model_LiuWencai.glb", hipsScale: 0.9153, ownMaterial: true,
     report: "./Model/Character/Data_LiuWencai.json",
@@ -81,4 +91,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", liuwencai: "liuWencai", nier: "nier" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier" });

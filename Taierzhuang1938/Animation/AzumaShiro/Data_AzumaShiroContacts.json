@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeAzumaShiroContacts.mjs",
+  "character": "azumaShiro",
+  "model": {
+    "file": "Model/Character/Model_AzumaShiro.glb",
+    "sha256": "6056916b9dfaa06d2da00f48f40b16979b05a1347c32ed01733964d12dd6169a"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_WalkWithRifle_V3.glb",
+        "sha256": "bbfeb008dc9477c36a1d02c1c64665503cbffa98492e71ef0601f59bde22c733"
+      },
+      "output": {
+        "file": "Animation/AzumaShiro/Animation_AzumaShiro_WalkWithRifle_V3.glb",
+        "sha256": "4e55c70191ffcacc4dab363fa6468cf3f07a6d4dc0a1b201aa30f845d4a10713"
+      },
+      "frames": 205,
+      "duration": 3.4000000953674316,
+      "minBefore": -0.030544185461851673,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.03254418546185167
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_IdleCrouchingAiming_V1.glb",
+        "sha256": "fef15da7324d1273acfb66509c01d4c0882d92c160c0c92bc20af6684825648c"
+      },
+      "output": {
+        "file": "Animation/AzumaShiro/Animation_AzumaShiro_IdleCrouchingAiming_V1.glb",
+        "sha256": "b2f93661216a4a803c2e5dd5e29f46d30375abeed5a02863f3903d9a77ab6a2d"
+      },
+      "frames": 129,
+      "duration": 2.133333444595337,
+      "minBefore": -0.041923531260157416,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.04392353126015742
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_ProneFiringRifle_V2.glb",
+        "sha256": "86dd0ec5403dd73f9bff5d13d8d6286cc046e3b4f676539b4d06c57357a4032f"
+      },
+      "output": {
+        "file": "Animation/AzumaShiro/Animation_AzumaShiro_ProneFiringRifle_V2.glb",
+        "sha256": "0028d93c993d0aa378d387f5a459f79a90adf3e2df76017703d5ffba4ee3ab32"
+      },
+      "frames": 29,
+      "duration": 0.46666666865348816,
+      "minBefore": -0.07140911075195562,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.07340911075195562
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_Dying_V3.glb",
+        "sha256": "1056e10c5dc10cd37f58826410beec268d0012c75de68660d13c1bf42de31467"
+      },
+      "output": {
+        "file": "Animation/AzumaShiro/Animation_AzumaShiro_Dying_V3.glb",
+        "sha256": "5d6f48adaa9e24f7794ef1f2dcd9d649a79d3b89c1ae625cbf21bf9c3b0d9e07"
+      },
+      "frames": 273,
+      "duration": 4.5333333015441895,
+      "minBefore": -0.08212613049300198,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.08412613049300198
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/AzumaShiro/Animation_AzumaShiro_SittingIdle_V2.glb",
+        "sha256": "5d45c68ecda60ffc1286b07357c9311f4062943920dcb00b150549265f4b3f02"
+      },
+      "frames": 655,
+      "duration": 10.899999618530273,
+      "minBefore": -0.08953077881355115,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.09153077881355115
+    }
+  ]
+}

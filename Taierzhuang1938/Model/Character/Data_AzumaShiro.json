@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "built": "2026-11-07",
+  "script": "_import/Script_BuildAzumaShiro.mjs",
+  "source": {
+    "file": "AzumaShiro_Merged_V12_Bones.glb",
+    "bytes": 31475000,
+    "sha256": "54193ef9237777ab3881fa5b798fc45099c67e6d2399f049422871e1be482230",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_AzumaShiro.glb",
+    "bytes": 7466896,
+    "sha256": "6056916b9dfaa06d2da00f48f40b16979b05a1347c32ed01733964d12dd6169a"
+  },
+  "scale": 1.84,
+  "crownM": 1.840000033378601,
+  "triangles": 36877,
+  "vertices": 30164,
+  "sourceVertices": 30164,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandIndex4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 3745,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 1.0098,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.9684,
+  "headY": 1.5992,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 12621224,
+      "bytes": 2156324
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 7624912,
+      "bytes": 1550486
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 9069743,
+      "bytes": 1724174
+    }
+  ],
+  "input": {
+    "file": "AzumaShiro_Merged_V12_Bones.glb",
+    "sha256": "54193ef9237777ab3881fa5b798fc45099c67e6d2399f049422871e1be482230",
+    "skins": 1,
+    "joints": 54
+  },
+  "reconstructionScope": [
+    "东史郎角色的脸型、钢盔、下巴带、卡其军服、三颗星的肩章、绑腿、皮靴和身体比例按角色参考图设计，属于本作创作外观。",
+    "采用用户修复后的V12绑骨件，保留颈根与背部底色修复；骨架与动作适配属于游戏表现，不主张精确还原历史人物的实际相貌或装备细节。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

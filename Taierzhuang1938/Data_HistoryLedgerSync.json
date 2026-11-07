@@ -517,6 +517,26 @@
           "scope": "Added one Nier model-appearance bullet under the creative section."
         }
       ]
+    },
+    {
+      "asset": "AzumaShiro",
+      "date": "2026-11-07",
+      "scope": "Azuma Shiro V12 reference appearance and runtime rig integration only; preserve unrelated global review cursors.",
+      "runtimeAsset": "Model/Character/Data_AzumaShiro.json",
+      "assetContract": "docs/Data_AzumaShiro.md",
+      "decision": "Face, helmet, chin straps, khaki uniform, shoulder boards, puttees and boots are reference-led creative appearance design. Neck and back-albedo repairs, body proportions, skeleton and animation adaptation are game presentation, not proof of the historical individual’s exact appearance or equipment.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-07T08:07:40.801Z",
+          "scope": "Added one Azuma Shiro creative-appearance row and dated status."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-07T08:07:42.003Z",
+          "scope": "Added one Azuma Shiro creative-appearance bullet."
+        }
+      ]
     }
   ],
   "notionPages": [
