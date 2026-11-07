@@ -119,6 +119,7 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   // 清单与真实骨架一致。比较头关节在全身的比例，兼容幺娃等较矮角色。
   const report = JSON.parse(fs.readFileSync(path.join(here, def.report), "utf8"));
   assert.equal(def.hipsScale, report.hipsScale, `${key}: hipsScale 同 ${def.report}`);
+  if (def.heightM) assert.ok(Math.abs(report.crownM - def.heightM) < .00001, `${key}: authored crown height`);
   const measuredHeadY = new THREE.Vector3().setFromMatrixPosition(w.world[doc.skins[0].joints[names.indexOf("Head")]]).y;
   assert.ok(Math.abs(measuredHeadY - report.headY) < .0001, `${key}: 头关节报告与实际骨架一致`);
   assert.ok(Math.abs(measuredHeadY * xbotCrownY / report.crownM - report.xbotHeadY) < .05,
@@ -139,6 +140,13 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   // A locally bound character may already have rigid head weights before conversion.
   // Verify the shipped weights directly, including characters requiring no repair.
   const positions = Float(glb, prim.attributes.POSITION);
+  if (def.heightM) {
+    let crown = -Infinity;
+    const vertex = new THREE.Vector3();
+    for (let i = 0; i < positions.length; i += 3) crown = Math.max(crown, vertex.fromArray(positions, i).applyMatrix4(M).y);
+    assert.ok(Math.abs(crown - def.heightM) < .0001, `${key}: actual mesh crown matches authored stature`);
+  }
+
   const jointAccessor = doc.accessors[prim.attributes.JOINTS_0];
   const jointView = doc.bufferViews[jointAccessor.bufferView];
   assert.ok([5121, 5123].includes(jointAccessor.componentType), `${key}: supported joint index component type`);
@@ -174,7 +182,7 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-for (const character of ["Yaowa", "OldGeng"]) {
+for (const character of ["Yaowa", "OldGeng", "Nier"]) {
   const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
   for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
     assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,

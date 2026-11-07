@@ -24,6 +24,7 @@ import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose, MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
+import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
@@ -539,7 +540,9 @@ export class XBotSkin {
     this.boneList = skins.rest.bones.map(b => this.bones.get(b.name));
     this.mixer = new THREE.AnimationMixer(this.model);
     this.source = skins.SourceRest(this.rig);
-    this.scaleK = this.source ? this.source.headY / this.kit.headY : 0.97;
+    this.scaleK = this.kit.def.heightM
+      ? CharacterScaleHeight(this.rig.asset.record) / this.kit.def.heightM
+      : this.source ? this.source.headY / this.kit.headY : 0.97;
     this.hidden = [];
     this.rig.root.traverse(o => { if (o.isSkinnedMesh) this.hidden.push(o); });
     this.srcBones = this.source ? this.source.rest.bones.map(b => this.rig.root.getObjectByName(b.name)) : [];
@@ -830,7 +833,9 @@ export class XBotSkin {
       else if (pick.loop) t = ((pick.sourceSeconds % S) / S) * D;
       else t = Math.min(D, (pick.sourceSeconds / S) * D);
     } else {
-      const k = this.container.scale.x || 1;
+      const k = this.kit.def.heightM
+        ? this.container.getWorldScale(_s2).x * this.kit.def.hipsScale
+        : this.container.scale.x || 1;
       const mps = intent.mps || 0;
       const nominal = pick.speedMps || pick.travel;
       let rate = 1;

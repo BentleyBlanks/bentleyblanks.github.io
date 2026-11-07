@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeNierContacts.mjs",
+  "character": "nier",
+  "model": {
+    "file": "Model/Character/Model_Nier.glb",
+    "sha256": "3be8ad2c367a314998109e8f0cddec652f1bba90c00ff2678fd45276cd9ed70e"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_KneelingIdle_V1.glb",
+        "sha256": "3b0ecd6e08d23b84805e1f7bb5340b1f0898aa942c3afdc39bf2804db5cfce4b"
+      },
+      "output": {
+        "file": "Animation/Nier/Animation_Nier_KneelingIdle_V1.glb",
+        "sha256": "8b3726fdce34ed2620711032c345745da3837049d93496b1f429e96129b349f6"
+      },
+      "frames": 259,
+      "duration": 4.300000190734863,
+      "minBefore": -0.014548616359464287,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.016548616359464287
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_CrouchWalking_V1.glb",
+        "sha256": "046e80b4c43917b1a14c24ec1e96c8e078bb49f5d55b428765c70df459dd7b02"
+      },
+      "output": {
+        "file": "Animation/Nier/Animation_Nier_CrouchWalking_V1.glb",
+        "sha256": "5b77e9d07b2cc508d6662305335750aa7f3b5d20bdd9244b7fe20325b38e9c58"
+      },
+      "frames": 73,
+      "duration": 1.2000000476837158,
+      "minBefore": -0.05177954748824773,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.05377954748824773
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_KneelingInspecting_V1.glb",
+        "sha256": "6dbac4e8ca127d90fadd54c6cf263a07b2b12a5e56a38f886172e11594629142"
+      },
+      "output": {
+        "file": "Animation/Nier/Animation_Nier_KneelingInspecting_V1.glb",
+        "sha256": "05221bb0ddf91f9c15976e3199eecd64b78bd1999ef159eb68fc900ec3586536"
+      },
+      "frames": 299,
+      "duration": 4.9666666984558105,
+      "minBefore": -0.031402812894264207,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.03340281289426421
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/Nier/Animation_Nier_SittingIdle_V2.glb",
+        "sha256": "e9d79f43a5e24f695de142ef6c1564f1fd1d98f81f693c69fb89315ce0befcd6"
+      },
+      "frames": 655,
+      "duration": 10.899999618530273,
+      "minBefore": -0.06978575050663074,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.07178575050663075
+    }
+  ]
+}

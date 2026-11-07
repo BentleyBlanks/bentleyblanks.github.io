@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "built": "2026-11-07",
+  "script": "_import/Script_BuildNier.mjs",
+  "source": {
+    "file": "Nier_Merged_V11_Bones.glb",
+    "bytes": 12341320,
+    "sha256": "3fb890c5bb826034d37a01538468ec10c653c246fcf42a92f7b61ede9dd77ce9",
+    "heightM": 0.9979
+  },
+  "output": {
+    "file": "Model/Character/Model_Nier.glb",
+    "bytes": 7232100,
+    "sha256": "3be8ad2c367a314998109e8f0cddec652f1bba90c00ff2678fd45276cd9ed70e"
+  },
+  "scale": 1.291409,
+  "crownM": 1.2887294292449951,
+  "triangles": 36611,
+  "vertices": 29532,
+  "sourceVertices": 29532,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandIndex4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 3563,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.6671,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.6397,
+  "headY": 1.1261,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 4855368,
+      "bytes": 2493210
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 3479568,
+      "bytes": 1320038
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 1886082,
+      "bytes": 1419016
+    }
+  ],
+  "headSkinRepair": {
+    "headVertices": 7195,
+    "changedVertices": 5194,
+    "faceVertices": 5646,
+    "neckBlendStartM": 1.04,
+    "rigidFaceStartM": 1.08,
+    "minFaceHeadWeightBefore": 0.06666667014360428,
+    "maxFacePullBeforeAt45DegM": 0.04615600157291344,
+    "minFaceHeadWeightAfter": 0.9999994039535522
+  },
+  "endBoneFits": [
+    {
+      "name": "HeadTop_End",
+      "before": [
+        0.00252230488202859,
+        1.3464951530653073,
+        0.06744370042900191
+      ],
+      "after": [
+        0.002522283527890829,
+        1.2837294292449952,
+        -0.010510466344929295
+      ]
+    },
+    {
+      "name": "RightHandThumb4",
+      "before": [
+        -0.5940805712616932,
+        1.0027973102147583,
+        0.04116558304866844
+      ],
+      "after": [
+        -0.5907485438541363,
+        1.0125111727681728,
+        0.03971701340039221
+      ]
+    },
+    {
+      "name": "RightHandIndex4",
+      "before": [
+        -0.6500015110619859,
+        1.0258378109168915,
+        0.011651737997455218
+      ],
+      "after": [
+        -0.6367267396519172,
+        1.0218978189576435,
+        0.014278599684395966
+      ]
+    },
+    {
+      "name": "RightHandMiddle4",
+      "before": [
+        -0.6571221736852623,
+        1.0250700852991719,
+        -0.004478571036895332
+      ],
+      "after": [
+        -0.6442359797657796,
+        1.0204276216195265,
+        -0.002487328861759561
+      ]
+    },
+    {
+      "name": "RightHandRing4",
+      "before": [
+        -0.6502036059423345,
+        1.0212300480992746,
+        -0.019828522063888937
+      ],
+      "after": [
+        -0.6395192523635105,
+        1.0178160778691265,
+        -0.019155184279087117
+      ]
+    },
+    {
+      "name": "RightHandPinky4",
+      "before": [
+        -0.6349887694003229,
+        1.017389378922665,
+        -0.03369967167295968
+      ],
+      "after": [
+        -0.6247679425912497,
+        1.0148163782002249,
+        -0.03301959409586457
+      ]
+    },
+    {
+      "name": "LeftHandThumb4",
+      "before": [
+        0.5963418066372538,
+        0.9996049654493635,
+        0.029640872171047772
+      ],
+      "after": [
+        0.5946794676502316,
+        1.011145730250923,
+        0.026865391131600455
+      ]
+    },
+    {
+      "name": "LeftHandIndex4",
+      "before": [
+        0.6517833248535032,
+        1.0233105686695194,
+        -0.001279881815745841
+      ],
+      "after": [
+        0.6382092643178416,
+        1.0202291874390212,
+        0.0005692543062042774
+      ]
+    },
+    {
+      "name": "LeftHandMiddle4",
+      "before": [
+        0.658885944754659,
+        1.0217901817071011,
+        -0.018767018857743702
+      ],
+      "after": [
+        0.6442286168781463,
+        1.0176261759161398,
+        -0.018172779754688423
+      ]
+    },
+    {
+      "name": "LeftHandRing4",
+      "before": [
+        0.6504780515078862,
+        1.0179885932347177,
+        -0.03321372381887277
+      ],
+      "after": [
+        0.6383446146130285,
+        1.0148777446640567,
+        -0.033214285927732054
+      ]
+    },
+    {
+      "name": "LeftHandPinky4",
+      "before": [
+        0.6323637959542239,
+        1.0134266710427924,
+        -0.04682539541052201
+      ],
+      "after": [
+        0.6225089415019861,
+        1.0108932487637208,
+        -0.04753389938934852
+      ]
+    }
+  ],
+  "input": {
+    "file": "Nier_Merged_V11_Bones.glb",
+    "sha256": "3fb890c5bb826034d37a01538468ec10c653c246fcf42a92f7b61ede9dd77ce9",
+    "skins": 1,
+    "joints": 54
+  },
+  "reconstructionScope": [
+    "妮儿的脸型、旧棉衣、补丁裤和布鞋来自用户确认的合并件，属于本作创作外观。",
+    "人物骨架、蒙皮与动作适配属于游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

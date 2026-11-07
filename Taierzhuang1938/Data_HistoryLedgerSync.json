@@ -497,6 +497,26 @@
           "scope": "Added the Old Geng appearance creative bullet."
         }
       ]
+    },
+    {
+      "asset": "Nier",
+      "date": "2026-11-07",
+      "scope": "Nier V11 runtime model appearance and skeletal adaptation. Preserve unrelated global review cursors.",
+      "runtimeAsset": "Model/Character/Data_Nier.json",
+      "assetContract": "docs/Data_Nier.md",
+      "decision": "The face, bald head, padded outfit, patched trousers and cloth shoes follow user references and generated components. Stature, skeleton, skin weights and animation contact fitting are game presentation choices.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-07T02:19:07.802Z",
+          "scope": "Added one Nier creative-appearance row and dated status note."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-07T02:19:09.166Z",
+          "scope": "Added one Nier model-appearance bullet under the creative section."
+        }
+      ]
     }
   ],
   "notionPages": [

@@ -52,6 +52,14 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_Dying_V3.glb": "./Animation/LiuWencai/Animation_LiuWencai_Dying.glb",
       "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
     }) }),
+  nier: Object.freeze({ name: "妮儿", file: "./Model/Character/Model_Nier.glb", hipsScale: 0.6397, heightM: 1.2887294292449951, ownMaterial: true,
+    report: "./Model/Character/Data_Nier.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_KneelingIdle_V1.glb": "./Animation/Nier/Animation_Nier_KneelingIdle_V1.glb",
+      "Animation_Mixamo_CrouchWalking_V1.glb": "./Animation/Nier/Animation_Nier_CrouchWalking_V1.glb",
+      "Animation_Mixamo_KneelingInspecting_V1.glb": "./Animation/Nier/Animation_Nier_KneelingInspecting_V1.glb",
+      "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/Nier/Animation_Nier_SittingIdle_V2.glb",
+    }) }),
   // 日军士兵A：Tripo 部件合并（角色\Tripo\10_日军士兵A，V7：下巴带、去掉帽檐下挂环），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierA.json
   ijaA: Object.freeze({ name: "日军士兵A", file: "./Model/Character/Model_JapaneseSoldierA.glb", hipsScale: 0.9396, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
@@ -73,4 +81,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", liuwencai: "liuWencai" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", liuwencai: "liuWencai", nier: "nier" });

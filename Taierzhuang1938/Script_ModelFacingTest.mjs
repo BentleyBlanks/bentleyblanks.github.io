@@ -749,5 +749,18 @@ Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
     "刘文财使用共用源+Z至角色-Z桥接");
 }
 
+const nierFile = path.join(projectDir, "Model/Character/Model_Nier.glb");
+const nier = LoadGlb(nierFile);
+const nierMesh = nier.json.nodes.find(node => node.mesh === 0);
+const nierCloud = RiggedGlbPoints(nierFile, nierMesh.name);
+const nierSoles = nierCloud.filter(point => point[1] < .06);
+const nierFront = Math.max(...nierSoles.map(point => point[2]));
+const nierBack = Math.min(...nierSoles.map(point => point[2]));
+const nierFacing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_Nier.json"))).facing;
+Check(nierSoles.length > 100 && nierFront > Math.abs(nierBack) + .02,
+  "妮儿真实布鞋鞋尖顶点云朝源+Z", JSON.stringify({ front: nierFront, back: nierBack }));
+Check(nierFacing.sourceForward === "+Z" && nierFacing.actorForward === "-Z",
+  "妮儿沿用X Bot源+Z至角色-Z的共用桥接");
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

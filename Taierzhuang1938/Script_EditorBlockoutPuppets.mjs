@@ -101,7 +101,8 @@ import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCart
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
 import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
-import { XBotSkins } from "./Script_EditorBlockoutXBot.mjs";
+import { XBotSkins, XBotLook } from "./Script_EditorBlockoutXBot.mjs";
+import { XBOT_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -369,17 +370,20 @@ export class BlockoutPuppets {
     // 百姓的骨骼占位身体（2026-10-19，文件头）：造一个空手的 NRA02，布换百姓色；body:"procedural" 还是旧的 tzm 身体
     const civilianRig = kind === "civilian" && CivilianBodyMode(unit) === "rig";
     const bodyKind = civilianRig ? CIVILIAN_RIG_LOOK.bodyKind : kind;
+    const appearance = XBotLook({ castId: unit.castId, unitId: unit.id });
+    const authoredHeight = slot === "main" ? XBOT_CHARACTERS[XBOT_CAST_CHARACTERS[appearance.key]]?.heightM : null;
+    const heightOptions = authoredHeight ? { sizeScale: authoredHeight / this.actorFactory.KindGeometry(bodyKind).dims.height } : {};
     const look = civilianRig ? { modelVariant: CIVILIAN_RIG_LOOK.modelVariant, noPool: true, weapon: null,
       uniformPalette: unit.kind === "child" ? CIVILIAN_RIG_LOOK.childCloth : CIVILIAN_RIG_LOOK.cloth[seed % CIVILIAN_RIG_LOOK.cloth.length] } : {};
     if (civilianRig) weapon = null;
     try {
-      actor = this.actorFactory.Create(bodyKind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}), ...look });
+      actor = this.actorFactory.Create(bodyKind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}), ...look, ...heightOptions });
     } catch (error) {
       console.warn("[BlockoutPuppets] actor create failed", unit.id, error);
       return null;
     }
     if (civilianRig) this._DressCivilian(actor);
-    if (unit.kind === "child") actor.root.scale.setScalar(BLOCKOUT_PUPPETS.childScale);
+    if (unit.kind === "child" && !authoredHeight) actor.root.scale.setScalar(BLOCKOUT_PUPPETS.childScale);
     this.root.add(actor.root);
     // 步态安装器吃一个「假士兵」：只要 id / actor / position / yaw 与几个开关。
     const soldier = { id: `blockout:${unit.id}:${slot}`, actor, position: actor.root.position, yaw: 0, alive: true,
