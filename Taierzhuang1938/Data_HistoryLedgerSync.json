@@ -477,6 +477,26 @@
           "scope": "Added the Donggua appearance creative bullet."
         }
       ]
+    },
+    {
+      "asset": "OldGeng",
+      "date": "2026-11-07",
+      "scope": "Asset-scoped creative appearance and runtime rig integration review.",
+      "runtimeAsset": "Model/Character/Model_OldGeng.glb",
+      "assetContract": "docs/Data_OldGeng.md",
+      "decision": "Face, bald head, grey Chinese-style jacket, belt, trousers, puttees and straw sandals are reference-based creative appearance design. Seam repairs, rigging and motion adaptation are game presentation.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-07T01:25:54.722Z",
+          "scope": "Added the Old Geng appearance creative row and dated status."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-07T02:04:22.583Z",
+          "scope": "Added the Old Geng appearance creative bullet."
+        }
+      ]
     }
   ],
   "notionPages": [

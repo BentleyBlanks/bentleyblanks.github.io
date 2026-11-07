@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "built": "2026-11-07",
+  "script": "_import/Script_BuildOldGeng.mjs",
+  "source": {
+    "file": "Model_OldGeng_Merged_V10_Bones.glb",
+    "bytes": 28681792,
+    "sha256": "6ac9a4be629898139ca797d0f6ad6c1e9023a47ed145fb13c5c681cc86756ac7",
+    "heightM": 0.9711
+  },
+  "output": {
+    "file": "Model/Character/Model_OldGeng.glb",
+    "bytes": 9506580,
+    "sha256": "c649156f1a755c0e1a1b9e88038f5ea56be0212de5fe3941ca99aa6517206dc7"
+  },
+  "scale": 1.862989,
+  "crownM": 1.809205174446106,
+  "triangles": 44485,
+  "vertices": 42627,
+  "sourceVertices": 42627,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 5673,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.9883,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.9478,
+  "headY": 1.6069,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 8192,
+      "height": 8192,
+      "sourceBytes": 25733781,
+      "bytes": 6731624
+    }
+  ],
+  "input": {
+    "file": "Model_OldGeng_Merged_V10_Bones.glb",
+    "sha256": "6ac9a4be629898139ca797d0f6ad6c1e9023a47ed145fb13c5c681cc86756ac7",
+    "skins": 1,
+    "joints": 55
+  },
+  "reconstructionScope": [
+    "老耿的脸型、光头、灰色旧中式上衣、腰带、裤装、绑腿和草鞋按角色参考图设计，属于本作创作外观。",
+    "手腕、领口与下肢衔接修整，以及骨架、蒙皮和动作适配属于游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

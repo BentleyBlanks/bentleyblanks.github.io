@@ -701,18 +701,19 @@ Check(Math.abs(frontRight[12]-frontLeft[12]-1.5)<.00001&&Math.abs(rearOne[14]-fr
  "九四式货车真实轮轴节点保持1.5m前轮距、2.8+1.1m轴距");
 }
 
-const taniFile = path.join(projectDir, "Model/Character/Model_TaniHisao.glb");
-const tani = LoadGlb(taniFile);
-const taniMesh = tani.json.nodes.find(node => node.mesh === 0);
-const taniCloud = RiggedGlbPoints(taniFile, taniMesh.name);
-const taniSoles = taniCloud.filter(point => point[1] < .09);
-const taniFront = Math.max(...taniSoles.map(point => point[2]));
-const taniBack = Math.min(...taniSoles.map(point => point[2]));
-const taniFacing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_TaniHisao.json"))).facing;
-Check(taniSoles.length > 100 && taniFront > Math.abs(taniBack) + .02,
-  "谷寿夫真实靴尖顶点云朝源+Z", JSON.stringify({ front: taniFront, back: taniBack }));
-Check(taniFacing.sourceForward === "+Z" && taniFacing.actorForward === "-Z",
-  "谷寿夫沿用X Bot源+Z至角色-Z的共用桥接");
+for (const [id, name] of [["TaniHisao", "谷寿夫"], ["OldGeng", "老耿"]]) {
+  const file = path.join(projectDir, `Model/Character/Model_${id}.glb`);
+  const model = LoadGlb(file);
+  const mesh = model.json.nodes.find(node => node.mesh === 0);
+  const soles = RiggedGlbPoints(file, mesh.name).filter(point => point[1] < .09);
+  const front = Math.max(...soles.map(point => point[2]));
+  const back = Math.min(...soles.map(point => point[2]));
+  const facing = JSON.parse(fs.readFileSync(path.join(projectDir, `Model/Character/Data_${id}.json`))).facing;
+  Check(soles.length > 100 && front > Math.abs(back) + .02,
+    `${name}真实鞋尖顶点云朝源+Z`, JSON.stringify({ front, back }));
+  Check(facing.sourceForward === "+Z" && facing.actorForward === "-Z",
+    `${name}沿用X Bot源+Z至角色-Z的共用桥接`);
+}
 
 const yaowaFile = path.join(projectDir, "Model/Character/Model_Yaowa.glb");
 const yaowa = LoadGlb(yaowaFile);

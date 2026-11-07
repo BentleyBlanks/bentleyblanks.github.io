@@ -65,6 +65,9 @@ assert.equal(XBOT_CAST_CHARACTERS.comrade, "donggua", "冬瓜使用已登记的�
 assert.equal(XBOT_CAST_CHARACTERS.yaowa, "yaowa", "幺娃使用V6专属外观");
 assert.equal(XBotLook({ faction: "nra", castId: "yaowa" }).key, "yaowa");
 assert.equal(XBotLook({ faction: "nra", unitId: "Yaowa" }).key, "yaowa");
+assert.equal(XBOT_CAST_CHARACTERS.geng, "oldGeng", "老耿使用已登记的专属外观");
+assert.equal(XBotLook({ faction: "civ", castId: "geng", unitId: "Villager" }).key, "geng");
+assert.equal(XBotLook({ faction: "civ", unitId: "Geng" }).key, "geng");
 assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登记的专属外观");
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
@@ -168,24 +171,26 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-const yaowaContacts = JSON.parse(fs.readFileSync(path.join(here, "Animation/Yaowa/Data_YaowaContacts.json"), "utf8"));
-for (const item of [yaowaContacts.model, ...yaowaContacts.clips.flatMap(clip => [clip.source, clip.output])]) {
-  assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,
-    `幺娃贴地校正对应实际模型和动作 ${item.file}`);
-}
-assert.ok(yaowaContacts.clips.every(clip => clip.minAfter >= .0019 && clip.maxLiftM < .15));
-for (const clip of yaowaContacts.clips) {
-  const source = ReadGlb(path.join(here, clip.source.file)), output = ReadGlb(path.join(here, clip.output.file));
-  for (const channel of source.doc.animations[0].channels) {
-    const original = source.doc.animations[0].samplers[channel.sampler];
-    const corrected = output.doc.animations[0].samplers[channel.sampler];
-    if (channel.target.path === "translation" && source.doc.nodes[channel.target.node].name === "Hips") {
-      const times = Float(output, corrected.input);
-      assert.ok(times.slice(1).every((time, index) => time > times[index]), "幺娃贴地曲线时间严格递增");
-      continue;
+for (const character of ["Yaowa", "OldGeng"]) {
+  const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
+  for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
+    assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,
+      `${character}: contact bake matches actual model and animation ${item.file}`);
+  }
+  assert.ok(contacts.clips.every(clip => clip.minAfter >= .0019 && clip.maxLiftM < .15));
+  for (const clip of contacts.clips) {
+    const source = ReadGlb(path.join(here, clip.source.file)), output = ReadGlb(path.join(here, clip.output.file));
+    for (const channel of source.doc.animations[0].channels) {
+      const original = source.doc.animations[0].samplers[channel.sampler];
+      const corrected = output.doc.animations[0].samplers[channel.sampler];
+      if (channel.target.path === "translation" && source.doc.nodes[channel.target.node].name === "Hips") {
+        const times = Float(output, corrected.input);
+        assert.ok(times.slice(1).every((time, index) => time > times[index]), `${character}: strictly increasing hip key times`);
+        continue;
+      }
+      assert.deepEqual(Float(output, corrected.input), Float(source, original.input), `${character}: other curve key times preserved`);
+      assert.deepEqual(Float(output, corrected.output), Float(source, original.output), `${character}: other body curves preserved`);
     }
-    assert.deepEqual(Float(output, corrected.input), Float(source, original.input), "幺娃贴地校正保留其他曲线的时间");
-    assert.deepEqual(Float(output, corrected.output), Float(source, original.output), "幺娃贴地校正保留其他身体曲线");
   }
 }
 

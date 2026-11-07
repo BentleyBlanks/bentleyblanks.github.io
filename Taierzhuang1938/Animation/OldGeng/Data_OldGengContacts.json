@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeOldGengContacts.mjs",
+  "character": "oldGeng",
+  "model": {
+    "file": "Model/Character/Model_OldGeng.glb",
+    "sha256": "c649156f1a755c0e1a1b9e88038f5ea56be0212de5fe3941ca99aa6517206dc7"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_IdleCrouchingAiming_V1.glb",
+        "sha256": "fef15da7324d1273acfb66509c01d4c0882d92c160c0c92bc20af6684825648c"
+      },
+      "output": {
+        "file": "Animation/OldGeng/Animation_OldGeng_IdleCrouchingAiming_V1.glb",
+        "sha256": "73f3f5acd9f8a87c41dea832d06dbe5fbba6dea388fef1559623799cc4daaae0"
+      },
+      "frames": 129,
+      "duration": 2.133333444595337,
+      "minBefore": -0.037396851898751804,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.039396851898751806
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_ProneFiringRifle_V2.glb",
+        "sha256": "86dd0ec5403dd73f9bff5d13d8d6286cc046e3b4f676539b4d06c57357a4032f"
+      },
+      "output": {
+        "file": "Animation/OldGeng/Animation_OldGeng_ProneFiringRifle_V2.glb",
+        "sha256": "995c7728e4f737647cf2f8bf9753f5bd1b72eae59dd1bc72b33cc5732b14d630"
+      },
+      "frames": 29,
+      "duration": 0.46666666865348816,
+      "minBefore": -0.08107145993835911,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.08307145993835911
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_Dying_V3.glb",
+        "sha256": "1056e10c5dc10cd37f58826410beec268d0012c75de68660d13c1bf42de31467"
+      },
+      "output": {
+        "file": "Animation/OldGeng/Animation_OldGeng_Dying_V3.glb",
+        "sha256": "d9428f306daf53d364abfb7b96e04d0e0bf96f4fc295ba0e4f2428e317d931d7"
+      },
+      "frames": 273,
+      "duration": 4.5333333015441895,
+      "minBefore": -0.10581451457323593,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.10781451457323593
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/OldGeng/Animation_OldGeng_SittingIdle_V2.glb",
+        "sha256": "a6a585d612d43b36b8011bb606f0f46b1d04e4f319c4845395451bef8bd7d9e1"
+      },
+      "frames": 655,
+      "duration": 10.899999618530273,
+      "minBefore": -0.06791343312925849,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.06991343312925849
+    }
+  ]
+}
