@@ -43,6 +43,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=XBotCharactersTest,ModelFacing
 
 广泛quick通过113项，随后在 `OpeningSetTest` 的旧路径 `Model/Model_HanYang.tzm.json` 缺失处失败。已核对该文件在本轮远端基线中也不存在，相关测试源码与远端一致。
 
+2026-11-07 后续已修复该旧路径及迁移后预算统计，广泛quick共120项全部通过。修复依据见[开场重构契约](Data_OpeningRedraft20261011Contract.md)。
+
 本轮提交前的最近两次Pages部署已失败，发布包约1.7GiB，超过1GiB限制。幺娃资产的转换与验收通过，整站发布状态需以对应部署运行记录为准。
 
 ## 创作标注

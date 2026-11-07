@@ -37,6 +37,9 @@ import { MISSION_LAYOUT as L } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_SPACE as SP } from "./Data_FirstLevelFrontRoute.mjs";
 import { Sight, Eye, RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
 import { SPACE_KEYFRAMES } from "./Data_FirstLevelSpaceKeyframes.mjs";
+import { HANYANG_173R } from "./Data_HanYang173R.mjs";
+import { MESHES } from "./Data_Meshes.mjs";
+import { LoadGlb } from "./_import/Script_LugouGlbPose.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEG = Math.PI / 180;
@@ -987,7 +990,7 @@ function FakeVfx() {
 // ---------------------------------------------------------------- 6. 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5）
 // 标记名、净空、贴地 / 叠放、跳下点、手榴弹停点、折角爆点、道具接口、离开收走、三角形预算。地面一律用游戏里的高度场（P012，宿主的 groundAt）。
 {
-  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL, CORPSE_RENDER } = await import("./Data_OpeningSet0103.mjs");
+  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, REDRAFT_TRIANGLE_BUDGETS, CorpseFootprint, COMRADE_KNEEL, CORPSE_RENDER } = await import("./Data_OpeningSet0103.mjs");
   const { MISSION_PLACEMENT } = await import("./Data_FirstLevelMissionLayout.mjs");
   const { MISSION_STAGE_ROUTES } = await import("./Data_FirstLevelMissionTopology.mjs");
   const { BuildRedraftProp, CountTriangles } = await import("./Script_OpeningProps.mjs");
@@ -1321,18 +1324,28 @@ function FakeVfx() {
     assert.equal(live(), 0, "leaving 01–02 retires a live fold-blast smoke emitter");
     s4.Exit();
   }
-  // ---- 6h. 三角形预算（≤ 60k）：尸体按原型实测三角形数（BODY_POSES.triangles，第 tier 档）+ 本页建出的程序化道具
-  //      + 两支现成武器模型（Model_*.tzm.json 的 triangles）+ 弹药箱 GLB 那一个节点（按 accessor 数）。浏览器里另量实际建出的（报告）。
+  // ---- 6h. 三角形预算：尸体按原型实测三角形数（BODY_POSES.triangles，第 tier 档）+ 本页建出的程序化道具
+  //      + 两支现行武器模型 + 弹药箱 GLB 那一个节点（按 accessor 数）。浏览器里另量实际建出的（报告）。
   const corpseTriangles = CORPSES.reduce((sum, row) => sum + BODY_POSES[row.mark.pose].triangles[row.mark.tier ?? 0], 0);
   const propTriangles = set.props.Stats().triangles;
-  const weaponTriangles = Object.fromEntries(["HanYang", "Type11"].map((id) => [id, JSON.parse(fs.readFileSync(path.join(HERE, `Model/Model_${id}.tzm.json`), "utf8")).triangles]));
+  const rifle = LoadGlb(new URL(HANYANG_173R.url, import.meta.url)).json;
+  const weaponTriangles = {
+    HanYang: rifle.meshes.reduce((sum, mesh) => sum + mesh.primitives.reduce((count, primitive) =>
+      count + rifle.accessors[primitive.indices ?? primitive.attributes.POSITION].count / 3, 0), 0),
+    Type11: JSON.parse(fs.readFileSync(path.join(HERE, "Model", MESHES.Type11.file), "utf8")).triangles,
+  };
   const crateTriangles = (() => {
     const glb = fs.readFileSync(path.join(HERE, "Model/Model_MilitaryCrateSet.glb")), json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString());
     const node = json.nodes.find((n) => n.name === "MilitaryCrateOpen");
     return json.meshes[node.mesh].primitives.reduce((sum, p) => sum + json.accessors[p.indices].count / 3, 0);
   })();
-  const totalTriangles = corpseTriangles + propTriangles + weaponTriangles.HanYang + weaponTriangles.Type11 + crateTriangles;
-  report.redraft.triangles = { corpses: corpseTriangles, procedural: propTriangles, weapons: weaponTriangles, crate: crateTriangles, total: totalTriangles, budget: REDRAFT_TRIANGLE_BUDGET };
+  const otherTriangles = corpseTriangles + propTriangles + weaponTriangles.Type11 + crateTriangles;
+  const totalTriangles = otherTriangles + weaponTriangles.HanYang;
+  report.redraft.triangles = { corpses: corpseTriangles, procedural: propTriangles, weapons: weaponTriangles, crate: crateTriangles, total: totalTriangles, budget: REDRAFT_TRIANGLE_BUDGET, budgets: REDRAFT_TRIANGLE_BUDGETS };
+  assert.ok(otherTriangles <= REDRAFT_TRIANGLE_BUDGETS.otherAssets,
+    `other corpses and props retain their original allocation: ${otherTriangles}/${REDRAFT_TRIANGLE_BUDGETS.otherAssets}`);
+  assert.ok(weaponTriangles.HanYang <= REDRAFT_TRIANGLE_BUDGETS.hanYang,
+    `HanYang fits its approved asset allocation: ${weaponTriangles.HanYang}/${REDRAFT_TRIANGLE_BUDGETS.hanYang}`);
   assert.ok(totalTriangles <= REDRAFT_TRIANGLE_BUDGET, `new corpses and props <= ${REDRAFT_TRIANGLE_BUDGET} triangles: ${JSON.stringify(report.redraft.triangles)}`);
 
   // ---- 6i. 离开 01–02（进 03）：尸体层、道具全部收走；自建几何 / 材质 dispose，借来的尸体几何不碰
