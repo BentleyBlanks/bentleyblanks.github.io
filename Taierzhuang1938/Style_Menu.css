@@ -527,9 +527,10 @@
 .mnCampaignBack,.mnBack { font-weight:400;font-size:var(--menu-font-body);letter-spacing:.1em;padding-left:0;color:#d5d4ca; }
 .mnText,.mnDebug { padding:3vh 5.1%;color:#c9c9be;font-size:var(--menu-font-body); }
 .mnText h4 { font-family:var(--ui-title-font);font-size:var(--menu-font-section);font-weight:500; }
-.mnSettingsList { flex:0 0 clamp(210px,23vw,330px);box-sizing:border-box;padding:4vh 1.6vw 4vh 5.1%;min-height:0;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;gap:1vh; }
+/* Keep the viewport gutter outside the bounded navigation width, even on ultrawide screens. */
+.mnSettingsList { flex:0 0 auto;width:clamp(180px,18vw,280px);min-width:max-content;box-sizing:border-box;margin-left:5.1%;padding:4vh clamp(12px,1.6vw,32px) 4vh 0;min-height:0;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;gap:1vh; }
 .mnSettingsItem { appearance:none;cursor:pointer;text-align:left;background:none;color:#c6c7bd;border:0;border-left:4px solid transparent;
-  font:400 var(--menu-font-nav)/1.6 var(--ui-font);padding:7px 24px;letter-spacing:.16em;min-height:48px; }
+  flex:0 0 auto;white-space:nowrap;font:400 var(--menu-font-nav)/1.6 var(--ui-font);padding:7px 24px;letter-spacing:.16em;min-height:48px; }
 .mnSettingsItem:hover,.mnSettingsItem:focus-visible,.mnSettingsItem.on { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);border-left-color:#edca83;outline:none; }
 #menu .mnSettingsItem:focus-visible { outline:none;background:linear-gradient(90deg,#e6dfc55c,#bbb7a924);box-shadow:inset 0 0 0 1px #edca8333; }
 .mnSettingsDetail { flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;margin:3vh 5.1% 2vh 0;padding-left:3vw;border-left:1px solid #c1bdab40;color:#c9c9be; }
@@ -564,7 +565,7 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 @media(max-width:760px){
  .mnPanelHead{min-height:15vh}.mnPanelHead::after{display:none}.mnCampaignMain{grid-template-columns:1fr;gap:20px;overflow-y:auto}
  #menu.panelOn .mnPanelBody:has(.mnSettingsDetail){flex-direction:column}
- .mnSettingsList{flex:0 0 auto;width:auto;padding:1.5vh 5.1%;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px}
+ .mnSettingsList{flex:0 0 auto;width:auto;min-width:0;margin-left:0;padding:1.5vh 5.1%;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px}
  .mnSettingsItem{flex:0 0 auto;min-height:44px;padding:4px 14px;letter-spacing:.08em;border-left:0;border-bottom:3px solid transparent;font-size:var(--menu-font-body);white-space:nowrap}
  .mnSettingsItem:hover,.mnSettingsItem:focus-visible,.mnSettingsItem.on{border-bottom-color:#edca83}
  .mnSettingsDetail{flex:1 1 0;margin:0 5.1% 1vh;padding-left:0;border-left:0;border-top:1px solid #c1bdab40}
