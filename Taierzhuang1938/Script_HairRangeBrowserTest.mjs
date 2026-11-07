@@ -185,11 +185,15 @@ try {
   }));
   assert.equal(result.play.scene.variant, 'play');
   assert.equal(result.play.scene.style, 'formal');
-  assert.ok(result.play.hair.length > 0 && result.play.hair.every((s) => s.bone === 'Head' && s.hair), 'actual AI soldiers wear their character groom');
+  const configuredAi = result.play.hair.filter((s) => XBOT_CHARACTERS[s.kit]?.groom);
+  assert.ok(configuredAi.length > 0 && configuredAi.every((s) => s.bone === 'Head' && s.hair),
+    'actual AI soldiers with configured grooms wear their hair and beard');
+  assert.ok(result.play.hair.filter((s) => !XBOT_CHARACTERS[s.kit]?.groom).every((s) => !s.hair),
+    'unconfigured character variants keep their authored appearance');
   const shadowSafety = await page.evaluate(() => {
     const t = window.Taierzhuang, skins = t.ai.soldiers.filter((s) => s.alive && s.xbotSkin).map((s) => s.xbotSkin);
     for (const skin of skins) { skin.Sync({ exact: true, shadow: false }, 0); skin.Sync({ exact: true, shadow: true }, 0); }
-    return skins.every((skin) => Object.values(skin.hair.meshes).every((mesh) => !mesh.castShadow));
+    return skins.every((skin) => !skin.hair || Object.values(skin.hair.meshes).every((mesh) => !mesh.castShadow));
   });
   assert.ok(shadowSafety, 'body shadow toggles must preserve the custom hair shadow policy');
   await page.screenshot({ path: path.join(out, 'FormalPlay.png') });

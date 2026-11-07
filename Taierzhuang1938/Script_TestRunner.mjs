@@ -50,6 +50,7 @@ export const testDefs = {
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
+  MixamoGroomBrowserTest: { file: "Script_MixamoGroomBrowserTest.mjs", timeoutMs: 360000, desc: "Mixamo preview: six configured characters render hair and beard across character switches" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
   HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity and high wood/metal lighting'},
   HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
@@ -612,6 +613,7 @@ export const testDefs = {
 export const browserTests = new Set([
   "HairReferenceBrowserTest",
   "HairRangeBrowserTest",
+  "MixamoGroomBrowserTest",
   "NakajimaKi4ReleaseBrowserTest",
   "WeaponRangeStartupBrowserTest",
   "FallingSoilBrowserTest",
@@ -881,7 +883,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairReferenceBrowserTest", "HairRangeBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
+  hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairReferenceBrowserTest", "HairRangeBrowserTest", "MixamoGroomBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
   flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
@@ -1274,7 +1276,8 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirearmEffects|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
+  // HairRange 是毛发测试场；其中的 Range 不代表武器测试场。
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirearmEffects|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|(?<!Hair)Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|MountedGrip|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|LitterBlock|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
@@ -1582,14 +1585,18 @@ export function InferDomains(files) {
       matched = true;
     }
 
-    for (const rule of changedDomainRules) {
-      if (rule.pattern.test(file)) {
-        found.add(rule.domain);
-        matched = true;
+    // Registered test files already declare their affected domains. Generic filename rules
+    // (Range, Scene, Browser, etc.) describe production modules and over-select unrelated suites.
+    if (!testName) {
+      for (const rule of changedDomainRules) {
+        if (rule.pattern.test(file)) {
+          found.add(rule.domain);
+          matched = true;
+        }
       }
-    }
-    for (const rule of prepushGateRules) {
-      if (rule.pattern.test(file)) for (const name of rule.tests) prepushGates.add(name);
+      for (const rule of prepushGateRules) {
+        if (rule.pattern.test(file)) for (const name of rule.tests) prepushGates.add(name);
+      }
     }
     if (!matched) unmatchedProjectFiles.push(file);
   }

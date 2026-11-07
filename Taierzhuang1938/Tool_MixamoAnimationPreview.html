@@ -126,6 +126,7 @@ import { LoadModel } from "./Script_MeshLoad.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
+import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const FPS = 30;
@@ -219,14 +220,32 @@ async function LoadClip(entry, file = entry.file) {
 
 // ---------- character ----------
 const characterCache = new Map();
+const groomCache = new Map();
+let hairAtlas = null, activeGroom = null, characterSwitch = 0;
+function GroomAsset(def) {
+  if (!def.groom) return null;
+  if (!groomCache.has(def.groom)) groomCache.set(def.groom, LoadHairGroom(def.groom));
+  hairAtlas ||= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png");
+  return Promise.all([groomCache.get(def.groom), hairAtlas]);
+}
 async function LoadCharacter(key) {
   const def = XBOT_CHARACTERS[key];
+  const serial = ++characterSwitch;
   if (!characterCache.has(key)) characterCache.set(key, loader.loadAsync(key === "xbot" ? BASE + manifest.character : def.file).then(gltf => gltf.scene));
-  const next = await characterCache.get(key);
+  const [next, hair] = await Promise.all([characterCache.get(key), GroomAsset(def)]);
+  if (serial !== characterSwitch) return false;
+  const head = hair && next.getObjectByName("Head");
+  if (hair && !head) throw new Error(`${def.name} 缺少 Head 骨，无法挂接头发胡子`);
   if (character) { mixer.stopAllAction(); mixer.uncacheRoot(character); scene.remove(character); }
+  activeGroom?.Dispose();
+  activeGroom = null;
   who = key;
   character = next;
-  character.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  if (hair) {
+    activeGroom = new HairGroom(hair[0], { atlas: hair[1], name: key });
+    head.add(activeGroom.root);
+  }
+  character.traverse(o => { if (o.isMesh) { if (!o.userData.hairGroom) o.castShadow = true; o.frustumCulled = false; } });
   scene.add(character);
   hips = character.getObjectByName("Hips");
   spine2 = character.getObjectByName("Spine2");
@@ -236,11 +255,12 @@ async function LoadCharacter(key) {
   mixer = new THREE.AnimationMixer(character);
   action = null;
   if (window.__preview) window.__preview.character = character;
+  return true;
 }
 
 async function SwitchCharacter(key) {
   $("status").textContent = "加载人物…";
-  try { await LoadCharacter(key); } catch (error) { $("status").textContent = "人物加载失败：" + error; return; }
+  try { if (!await LoadCharacter(key)) return; } catch (error) { $("status").textContent = "人物加载失败：" + error; $("who").value = who; return; }
   const url = new URL(location.href);
   if (key === "xbot") url.searchParams.delete("who"); else url.searchParams.set("who", key);
   history.replaceState(null, "", url);
@@ -949,8 +969,16 @@ function Frame() {
     t.y + orbit.dist * Math.sin(orbit.pitch),
     t.z + orbit.dist * Math.cos(orbit.pitch) * Math.cos(orbit.yaw));
   camera.lookAt(t);
+  activeGroom?.Update(dt, camera, renderer);
   renderer.render(scene, camera);
 }
+
+addEventListener("pagehide", event => {
+  if (event.persisted) return;
+  activeGroom?.Dispose();
+  for (const promise of groomCache.values()) promise.then(DisposeHairGroomAsset).catch(() => {});
+  hairAtlas?.then(atlas => atlas.dispose()).catch(() => {});
+});
 
 async function Boot() {
   Resize();
@@ -961,7 +989,7 @@ async function Boot() {
     manifest.holds ||= ["端枪", "空手", "拿着别的"];
     await LoadCharacter(who);
     // 审查脚本（_import/Script_MixamoLibraryAudit.mjs）用：选中某条、按当前时间摆好所有挂件。
-    window.__preview = { scene, camera, renderer, character, orbit, get action() { return action; },
+    window.__preview = { scene, camera, renderer, character, orbit, get hair() { return activeGroom; }, get action() { return action; },
       get grenade() { return grenade; }, get dadao() { return dadao; }, get throwInfo() { return throwInfo; },
       get rifle() { return rifle; }, get rifleGripL() { return rifleGripL; }, get stretcher() { return stretcher; },
       get current() { return current; }, get manifest() { return manifest; }, get rifleMode() { return rifleMode; },

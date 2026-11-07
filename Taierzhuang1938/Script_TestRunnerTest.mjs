@@ -105,6 +105,10 @@ const inferred = InferDomains([
 Check(inferred.domains.includes("combat"), "战斗文件自动映射 combat");
 Check(inferred.domains.includes("render") && inferred.domains.includes("perf"), "烟雾文件映射 render/perf");
 Check(inferred.domains.includes("render"), "灯光文件自动映射 render");
+const hairDomains = InferDomains(["Taierzhuang1938/Script_HairRangeBrowserTest.mjs"]);
+Check(hairDomains.domains.includes("hair") && !hairDomains.domains.includes("combat"), "毛发测试场的 Range 不误选战斗域");
+const sceneTestDomains = InferDomains(["Taierzhuang1938/Script_SceneFormalBrowserTest.mjs"]);
+Check(sceneTestDomains.domains.includes("editor") && !sceneTestDomains.domains.includes("render"), "已登记测试只按其领域归类，不按文件名误选渲染域");
 assert.deepEqual(inferred.unmatchedProjectFiles, ["Taierzhuang1938/Unknown_NewModule.mjs"]);
 checks += 1;
 

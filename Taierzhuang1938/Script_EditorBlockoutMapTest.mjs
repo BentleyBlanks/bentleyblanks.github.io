@@ -87,7 +87,8 @@ const HARNESS = `<!doctype html>
 </script>
 <script type="module">
   import { MISSION_LAYOUT } from "../../Data_FirstLevelMissionLayout.mjs";
-  import { SampleMissionTerrain, SampleMissionNaturalHeight } from "../../Data_FirstLevelMissionTerrain.mjs";
+  import { SampleMissionNaturalHeight } from "../../Data_FirstLevelMissionTerrain.mjs";
+  import { SampleMissionTerrain } from "../../Script_FirstLevelMissionTerrain.mjs";
   import { FIRST_LEVEL_STAGES } from "../../Data_FirstLevelMissionStages.mjs";
   import { NormalizeBlockout, ValidateBlockout, YawDegFromTo } from "../../Script_EditorBlockoutConfig.mjs";
   import { BlockoutUi } from "../../Script_EditorBlockoutUi.mjs";

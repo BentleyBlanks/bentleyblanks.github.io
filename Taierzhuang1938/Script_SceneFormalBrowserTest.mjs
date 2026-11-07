@@ -34,6 +34,10 @@ const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+// The static test server does not implement editor status endpoints; keep this review read-only.
+for (const route of ["**/__blockout/status", "**/__scene/status", "**/__environment/status"]) {
+  await page.route(route, request => request.fulfill({ json: { writable: false } }));
+}
 const errors = [];
 page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 300)}`));
 page.on("console", (message) => {
