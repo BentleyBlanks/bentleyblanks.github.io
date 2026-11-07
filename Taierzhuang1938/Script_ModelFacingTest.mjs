@@ -729,6 +729,25 @@ Check(yaowaReport.facing.sourceForward === "+Z" && yaowaReport.facing.actorForwa
   "幺娃沿用X Bot源+Z至角色-Z的共用桥接");
 Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
   "幺娃保留V6的1.615米帽顶高度");
+{
+  const file = path.join(projectDir, "Model/Character/Model_LiuWencai.glb");
+  const model = LoadGlb(file), doc = model.json;
+  const mesh = doc.nodes.find(node => node.mesh === 0);
+  const cloud = RiggedGlbPoints(file, mesh.name);
+  const soles = cloud.filter(point => point[1] < .09);
+  const parents = new Map();
+  doc.nodes.forEach((node, index) => (node.children || []).forEach(child => parents.set(child, index)));
+  const World = index => parents.has(index) ? Mat4Mul(World(parents.get(index)), NodeMatrix(doc.nodes[index])) : NodeMatrix(doc.nodes[index]);
+  const footZ = ["LeftFoot", "RightFoot"].map(name => World(doc.nodes.findIndex(node => node.name === name))[14]);
+  const ankleZ = (footZ[0] + footZ[1]) / 2;
+  const toeReach = Math.max(...soles.map(point => point[2])) - ankleZ;
+  const heelReach = ankleZ - Math.min(...soles.map(point => point[2]));
+  const facing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_LiuWencai.json"))).facing;
+  Check(soles.length > 100 && toeReach > heelReach + .03,
+    "刘文财草鞋顶点云相对踝骨向源+Z伸出", JSON.stringify({ toeReach, heelReach, ankleZ }));
+  Check(facing.sourceForward === "+Z" && facing.actorForward === "-Z",
+    "刘文财使用共用源+Z至角色-Z桥接");
+}
 
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

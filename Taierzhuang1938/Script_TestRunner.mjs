@@ -419,6 +419,7 @@ export const testDefs = {
   TaniHisaoCharacterBrowserTest: { file: "Script_TaniHisaoCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "谷寿夫 V4：共用骨架、代表动作、头帽刚性和场景角色配置" },
   OldGengCharacterBrowserTest: { file: "Script_OldGengCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "老耿 V10：共用骨架、代表动作、头部刚性和第一关真实角色映射" },
   YaowaCharacterBrowserTest: { file: "Script_YaowaCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "幺娃V6：代表动作、颈手脚骨长、头帽刚性、场景角色与正式场景试玩" },
+  LiuWencaiCharacterBrowserTest: { file: "Script_LiuWencaiCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "刘文财 V9：共用骨架、代表动作逐帧蒙皮、头帽刚性和实际场景角色" },
   JapaneseSoldierYiBrowserTest: { file: "Script_JapaneseSoldierYiBrowserTest.mjs", timeoutMs: 600000, desc: "日兵乙 V2：65 骨真实蒙皮、17 条代表性动作逐帧、贴地与握枪、正背面及护颈布/手部 720p 取证" },
   JapaneseSoldierCBrowserTest: { file: "Script_JapaneseSoldierCBrowserTest.mjs", timeoutMs: 600000, desc: "日军士兵C V4：65骨蒙皮、代表动作逐帧、头帽与手脚近景、普通日军实际混用" },
   EditorBlockoutPrevizPlanTest: { file: "Script_EditorBlockoutPrevizPlanTest.mjs", desc: "白盒编辑器预演（§14）：校验器正反例、演员键到达时刻与阶跃字段、镜头 eye / from-look 采样、提交的 previz 文件过校验（纯 Node，秒级）" },
@@ -701,7 +702,7 @@ export const browserTests = new Set([
   "FrontStoryboardShotsTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest", "TaniHisaoCharacterBrowserTest", "YaowaCharacterBrowserTest", "OldGengCharacterBrowserTest",
+  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest", "TaniHisaoCharacterBrowserTest", "YaowaCharacterBrowserTest", "OldGengCharacterBrowserTest", "LiuWencaiCharacterBrowserTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -907,6 +908,7 @@ export const domains = {
   taniHisaoCharacter: {label:'谷寿夫 V4 外观与动作',tests:['XBotCharactersTest','TaniHisaoCharacterBrowserTest']},
   oldGengCharacter: {label:'老耿 V10 外观与动作',tests:['XBotCharactersTest','OldGengCharacterBrowserTest','ModelFacingTest']},
   yaowaCharacter: {label:'幺娃V6外观与动作',tests:['XBotCharactersTest','YaowaCharacterBrowserTest']},
+  liuWencaiCharacter: {label:'刘文财 V9 外观与动作',tests:['XBotCharactersTest','LiuWencaiCharacterBrowserTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
   beishaheBridge: {label:'北沙河独立史料复原桥资产（不改变剧情）',tests:['BeishaheBridgeTest']},
@@ -1030,6 +1032,7 @@ export const domains = {
 const changedDomainRules = [
   {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
+  {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},
   {domain:'taniHisaoCharacter',pattern:/TaniHisao/i},
   {domain:'shunziCharacter',pattern:/Shunzi/i},
   {domain:'dongguaCharacter',pattern:/Donggua/i},
@@ -1319,6 +1322,7 @@ const ignoredChangeRules = [
 const prepushGateRules = [
   {pattern:/OldGeng/i,tests:['XBotCharactersTest','OldGengCharacterBrowserTest','ModelFacingTest']},
   {pattern:/Yaowa/i,tests:['XBotCharactersTest','YaowaCharacterBrowserTest','ModelFacingTest']},
+  {pattern:/LiuWencai/i,tests:['XBotCharactersTest','LiuWencaiCharacterBrowserTest']},
   {pattern:/TaniHisao/i,tests:['XBotCharactersTest','TaniHisaoCharacterBrowserTest']},
   {pattern:/JapaneseSoldierC/,tests:['XBotCharactersTest','JapaneseSoldierCBrowserTest']},
   {pattern:/Shunzi/i,tests:['XBotCharactersTest','ShunziCharacterBrowserTest']},

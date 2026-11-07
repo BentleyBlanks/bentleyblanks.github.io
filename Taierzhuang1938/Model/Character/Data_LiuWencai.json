@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "built": "2026-11-07",
+  "script": "_import/Script_BuildLiuWencai.mjs",
+  "source": {
+    "file": "LiuWencai_Merged_V9_Bones.glb",
+    "bytes": 36224272,
+    "sha256": "86f476ef313014dc10d6f0375c3ec40103a5b931aec7909a3d4a99d5bceae2cf",
+    "heightM": 0.9972
+  },
+  "output": {
+    "file": "Model/Character/Model_LiuWencai.glb",
+    "bytes": 8986472,
+    "sha256": "01fe7034fce12e90c9d981a196737ab2e38a008ce970463e3ac74095b109f024"
+  },
+  "scale": 1.835228,
+  "crownM": 1.8300752639770508,
+  "triangles": 47400,
+  "vertices": 40434,
+  "sourceVertices": 40434,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandIndex4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.075
+    ],
+    "vertices": 5358,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.9545,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.9153,
+  "headY": 1.6068,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 14802957,
+      "bytes": 2637908
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 5158700,
+      "bytes": 1541032
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 13402113,
+      "bytes": 2111286
+    }
+  ],
+  "input": {
+    "file": "LiuWencai_Merged_V9_Bones.glb",
+    "sha256": "86f476ef313014dc10d6f0375c3ec40103a5b931aec7909a3d4a99d5bceae2cf",
+    "skins": 1,
+    "joints": 54
+  },
+  "reconstructionScope": [
+    "刘文财的脸型、灰色旧军服、软军帽、绑腿和草鞋按角色参考图设计，属于本作创作外观。",
+    "V9 帽沿贴合修复、原始小臂轮廓恢复、骨架转换与动作适配属于建模及游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

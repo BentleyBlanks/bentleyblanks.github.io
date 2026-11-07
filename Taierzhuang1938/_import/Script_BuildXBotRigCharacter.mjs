@@ -25,6 +25,9 @@ const Flag = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ?
 const OUT = path.resolve(PROJECT, Flag("--out", "Model/Character/Model_JapaneseSoldierJia.glb"));
 // 帽顶高度：合并时整体缩放到头顶 1.809 m（同 X Bot），帽顶 1.8142 m；Tripo 绑骨时又把整个人缩到 1 m，这里放回去
 const CROWN = Number(Flag("--crown", "1.8142"));
+// Per-character upper limit of the neck-to-head blend, in metres above Head.
+const rigidHeadTop = Number(Flag("--rigid-head-max", "0.09"));
+if (!Number.isFinite(rigidHeadTop) || rigidHeadTop <= 0.015 || rigidHeadTop > 0.2) throw Error("Invalid rigid head blend height");
 const SOURCE = args[0] || "C:/Users/Bentl/OneDrive/Sync/饮河/FPS/角色/Tripo/14_日兵甲/JapaneseSoldierJia_Merged_V1_Bones.glb";
 const XBOT = path.join(PROJECT, "Animation/Mixamo/Model_MixamoXBot.glb");
 const Hash = (b) => createHash("sha256").update(b).digest("hex");
@@ -153,7 +156,7 @@ xbBones.forEach((name, k) => ibm.set(target.get(name).clone().invert().multiply(
 
 // 头顶和帽子只跟头骨：Tripo 自动权重把 Neck 一路漏到帽顶（日兵甲耳朵高度约 19%、帽子上还有 10%），转头时帽子跟着扭。
 // 头骨关节以上 RIGID_HEAD[0] 起，Neck 的份额按 smoothstep 减到 RIGID_HEAD[1] 处为 0，减下来的给 Head。
-const RIGID_HEAD = [0.015, 0.09];
+const RIGID_HEAD = [0.015, rigidHeadTop];
 const headIndex = xbBones.indexOf("Head"), neckIndex = xbBones.indexOf("Neck");
 const headUp = new THREE.Vector3().setFromMatrixPosition(target.get("Head")).y;   // 模型空间
 let rigidVerts = 0;

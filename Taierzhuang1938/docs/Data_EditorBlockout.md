@@ -1391,3 +1391,5 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - **日兵乙（2026-11-04）**：普通日军池在保留日兵甲、日军士兵 A 的基础上追加 `ijaYi`；有名字角色的映射保留。乙 V2 修补护颈布实际透缝、校正两手残余偏转，经本地 65 骨架拟合、权重传递和现有 X Bot 转换器接入。乙的专用爬行曲线修正手、膝与靴底接触，动作预览与白盒共用 `clipOverrides`，原 Mixamo 动作和其他人物不变。来源、重建步骤及验收入口见 [日兵乙 V2](Data_JapaneseSoldierYi.md)。
 
 - **冬瓜 V3（2026-11-06）**。`XBOT_CAST_CHARACTERS.comrade` 指向 `donggua`，沿用原有冬瓜身份。模型为 `Model/Character/Model_Donggua.glb`，供动作预览、白盒预演和场景试玩共用。用户最新绑骨件转换为共用65骨，帽顶1.835米，胯高比0.8833。输入、重建与验收见[冬瓜接入记录](Data_Donggua.md)。
+
+- **刘文财 V9（2026-11-07）**。`XBOT_CAST_CHARACTERS.liuwencai` 指向 `liuWencai`，单位编号 `LiuWencai` 也可识别。用户下载的绑骨件转换为共用65骨，帽顶约1.830米，胯高比0.9153，供人物预览、场景摆放和试玩使用。输入、重建与验收见[刘文财接入记录](Data_LiuWencai.md)。

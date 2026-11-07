@@ -69,6 +69,9 @@ assert.equal(XBOT_CAST_CHARACTERS.geng, "oldGeng", "老耿使用已登记的专�
 assert.equal(XBotLook({ faction: "civ", castId: "geng", unitId: "Villager" }).key, "geng");
 assert.equal(XBotLook({ faction: "civ", unitId: "Geng" }).key, "geng");
 assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登记的专属外观");
+assert.equal(XBOT_CAST_CHARACTERS.liuwencai, "liuWencai", "刘文财使用已登记的专属外观");
+assert.equal(XBotLook({ faction: "nra", castId: "liuwencai", unitId: "Companion" }).key, "liuwencai");
+assert.equal(XBotLook({ faction: "nra", unitId: "LiuWencai" }).key, "liuwencai");
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
 assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
@@ -145,7 +148,7 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   let rigidHeadVertices = 0;
   for (let i = 0; i < positions.length / 3; i++) {
     point.fromArray(positions, i * 3).applyMatrix4(M);
-    if (point.y <= report.headY + 0.09 + 1e-5) continue;
+    if (point.y <= report.headY + report.rigidHead.aboveHeadJointM[1] + 1e-5) continue;
     let headWeight = 0;
     for (let slot = 0; slot < 4; slot++) {
       const offset = jointOffset + (i * 4 + slot) * jointBytes;
@@ -192,6 +195,15 @@ for (const character of ["Yaowa", "OldGeng"]) {
       assert.deepEqual(Float(output, corrected.output), Float(source, original.output), `${character}: other body curves preserved`);
     }
   }
+}
+
+const liuContacts = JSON.parse(fs.readFileSync(path.join(here, "Animation/LiuWencai/Data_LiuWencaiContacts.json"), "utf8"));
+for (const item of [liuContacts.model, ...liuContacts.results.flatMap(result => [result.source, result.output])]) {
+  assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256, "刘文财接触修正对应实际模型与源动作");
+}
+assert.equal(liuContacts.results.length, 5);
+for (const result of liuContacts.results) {
+  assert.ok(result.minSkinnedY > -.012 && result.maxBodyBoneLengthErrorM < 1e-6, `${result.id}: 贴地与骨长约束`);
 }
 
 // 动作换人：X Bot 原样；别的人去掉 Hips 以外的位移轨、Hips 位移乘 hipsScale，同一条动作同一个人只换一次

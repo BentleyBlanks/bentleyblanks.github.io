@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeLiuWencaiContacts.mjs",
+  "character": "liuWencai",
+  "model": {
+    "file": "Model/Character/Model_LiuWencai.glb",
+    "sha256": "01fe7034fce12e90c9d981a196737ab2e38a008ce970463e3ac74095b109f024"
+  },
+  "results": [
+    {
+      "id": "Crawling",
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_Crawling_V1.glb",
+        "sha256": "5030042e14065d9f296af5331fc0c0926f051d60930d738f7e5505c2d8e7c847"
+      },
+      "output": {
+        "file": "Animation/LiuWencai/Animation_LiuWencai_Crawling.glb",
+        "sha256": "8599ab2f217c93302199da4740ae6e3b557ad2669f384973f02ab46f09ce135a"
+      },
+      "frames": 57,
+      "minSkinnedY": -0.0007025900587375863,
+      "maxPelvisLiftM": 0.12379699287861023,
+      "maxBodyBoneLengthErrorM": 0
+    },
+    {
+      "id": "ProneFiringRifle",
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_ProneFiringRifle_V2.glb",
+        "sha256": "86dd0ec5403dd73f9bff5d13d8d6286cc046e3b4f676539b4d06c57357a4032f"
+      },
+      "output": {
+        "file": "Animation/LiuWencai/Animation_LiuWencai_ProneFiringRifle.glb",
+        "sha256": "02f5998980f9478de8518d5488538673001d9344c0c0682fdbc36f7cde753a12"
+      },
+      "frames": 16,
+      "minSkinnedY": 0.002000002287690816,
+      "maxPelvisLiftM": 0.07851285608648938,
+      "maxBodyBoneLengthErrorM": 0
+    },
+    {
+      "id": "SittingIdle",
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/LiuWencai/Animation_LiuWencai_SittingIdle.glb",
+        "sha256": "0d8e9bae9dd41641bbd4aa424deab84cfa63ca91ac37b3fa31fb6888c3b8936a"
+      },
+      "frames": 328,
+      "minSkinnedY": 0.00043711983864848185,
+      "maxPelvisLiftM": 0.06985901764055308,
+      "maxBodyBoneLengthErrorM": 0
+    },
+    {
+      "id": "Dying",
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_Dying_V3.glb",
+        "sha256": "1056e10c5dc10cd37f58826410beec268d0012c75de68660d13c1bf42de31467"
+      },
+      "output": {
+        "file": "Animation/LiuWencai/Animation_LiuWencai_Dying.glb",
+        "sha256": "7e03bf71a48170a9ba49fe4007fde7ccfd95ab89322c427acdd14338b88d0922"
+      },
+      "frames": 137,
+      "minSkinnedY": 0.0020000000000001132,
+      "maxPelvisLiftM": 0.10960317571657162,
+      "maxBodyBoneLengthErrorM": 0
+    },
+    {
+      "id": "CrouchingAiming",
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_IdleCrouchingAiming_V1.glb",
+        "sha256": "fef15da7324d1273acfb66509c01d4c0882d92c160c0c92bc20af6684825648c"
+      },
+      "output": {
+        "file": "Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
+        "sha256": "25ab3ec85e3e3c3e1303be157d35974fd84da79b3decc9c3335a29da2786ecd6"
+      },
+      "frames": 66,
+      "minSkinnedY": 0.002000000742385272,
+      "maxPelvisLiftM": 0.02551781576825908,
+      "maxBodyBoneLengthErrorM": 0
+    }
+  ]
+}

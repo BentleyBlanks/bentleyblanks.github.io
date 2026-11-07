@@ -42,6 +42,16 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 谷寿夫 V4：用户下载的完整绑骨件，转换为共用骨架。
   taniHisao: Object.freeze({ name: "谷寿夫", file: "./Model/Character/Model_TaniHisao.glb", hipsScale: 0.9361, ownMaterial: true,
     report: "./Model/Character/Data_TaniHisao.json" }),
+  // 刘文财 V9：用户下载的 Mixamo 绑骨件，转换为共用骨架。
+  liuWencai: Object.freeze({ name: "刘文财", file: "./Model/Character/Model_LiuWencai.glb", hipsScale: 0.9153, ownMaterial: true,
+    report: "./Model/Character/Data_LiuWencai.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_Crawling_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_Crawling.glb",
+      "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/LiuWencai/Animation_LiuWencai_ProneFiringRifle.glb",
+      "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/LiuWencai/Animation_LiuWencai_SittingIdle.glb",
+      "Animation_Mixamo_Dying_V3.glb": "./Animation/LiuWencai/Animation_LiuWencai_Dying.glb",
+      "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
+    }) }),
   // 日军士兵A：Tripo 部件合并（角色\Tripo\10_日军士兵A，V7：下巴带、去掉帽檐下挂环），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierA.json
   ijaA: Object.freeze({ name: "日军士兵A", file: "./Model/Character/Model_JapaneseSoldierA.glb", hipsScale: 0.9396, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
@@ -63,4 +73,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", liuwencai: "liuWencai" });
