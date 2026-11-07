@@ -36,7 +36,11 @@ try {
     }
   });
   // The static test server has no editor write backend. Supply its read-only status.
-  if (!custom) await page.route("**/__blockout/status", route => route.fulfill({ json: { writable: false, revisions: {} } }));
+  if (!custom) {
+    for (const route of ["**/__blockout/status", "**/__environment/status"]) {
+      await page.route(route, request => request.fulfill({ json: { writable: false } }));
+    }
+  }
   await page.addInitScript(() => {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
@@ -171,8 +175,34 @@ try {
   assert.ok(Number.isFinite(game.movementRate) && Math.abs(game.movementRate - game.expectedMovementRate) < .0001,
     "Child locomotion timing uses world scale and its own skeleton length");
   await Capture(page, "Scene_Nier.jpg");
+  await page.evaluate(() => window.Tengxian.Debug.Blockout.Play.Start({
+    from: "06-2", to: "06-3", settings: { invincible: true, infiniteAmmo: true, previz: false },
+  }));
+  await page.waitForFunction(() => {
+    const T = window.Tengxian;
+    T.StepFrames(4, 1 / 60, false);
+    const scene = T.Debug.Blockout.Play.Scene();
+    return scene.variant === "play" && scene.style === "formal" && document.body.classList.contains("blockoutPlay");
+  }, null, { timeout: 180000 });
+  const play = await page.evaluate(() => {
+    const T = window.Tengxian, skins = [], V = T.camera.position.constructor;
+    T.StepFrames(30, 1 / 60, true);
+    T.scene.traverse(object => {
+      const skin = object.userData?.xbotSkin;
+      if (skin?.shownValid && skin.kit.key === "nier") {
+        skins.push({ actorHeightM: skin.actor.height, worldScale: skin.container.getWorldScale(new V()).toArray(), probe: skin.Probe() });
+      }
+    });
+    return { scene: T.Debug.Blockout.Play.Scene(), skins };
+  });
+  assert.ok(play.skins.length > 0, "Nier remains present during actual formal-scene play");
+  for (const skin of play.skins) {
+    assert.ok(Math.abs(skin.actorHeightM - XBOT_CHARACTERS.nier.heightM) < .00001);
+    assert.ok(skin.worldScale.every(value => Math.abs(value - 1) < .0001));
+  }
+  await Capture(page, "Play_Nier.jpg");
   const contactObservations = results.filter(result => result.minY < -.02).map(result => ({ file: result.file, minimumYBelowPreviewFloorM: result.minY }));
-  fs.writeFileSync(path.join(output, "Data_BrowserReview.json"), `${JSON.stringify({ info, results, headTurn, game, contactObservations, errors, resourceFailures }, null, 2)}\n`);
+  fs.writeFileSync(path.join(output, "Data_BrowserReview.json"), `${JSON.stringify({ info, results, headTurn, game, play, contactObservations, errors, resourceFailures }, null, 2)}\n`);
   assert.deepEqual(errors, []);
   assert.deepEqual(resourceFailures, []);
   console.log("NierCharacterBrowserTest ok", JSON.stringify({ info, clips: results.length, headTurn, game }));
