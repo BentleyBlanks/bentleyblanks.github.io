@@ -714,5 +714,20 @@ Check(taniSoles.length > 100 && taniFront > Math.abs(taniBack) + .02,
 Check(taniFacing.sourceForward === "+Z" && taniFacing.actorForward === "-Z",
   "谷寿夫沿用X Bot源+Z至角色-Z的共用桥接");
 
+const yaowaFile = path.join(projectDir, "Model/Character/Model_Yaowa.glb");
+const yaowa = LoadGlb(yaowaFile);
+const yaowaMesh = yaowa.json.nodes.find(node => node.mesh === 0);
+const yaowaCloud = RiggedGlbPoints(yaowaFile, yaowaMesh.name);
+const yaowaSoles = yaowaCloud.filter(point => point[1] < .055);
+const yaowaFront = Math.max(...yaowaSoles.map(point => point[2]));
+const yaowaBack = Math.min(...yaowaSoles.map(point => point[2]));
+const yaowaReport = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_Yaowa.json")));
+Check(yaowaSoles.length > 100 && yaowaFront > Math.abs(yaowaBack) + .01,
+  "幺娃真实草鞋和脚趾顶点云朝源+Z", JSON.stringify({ front: yaowaFront, back: yaowaBack }));
+Check(yaowaReport.facing.sourceForward === "+Z" && yaowaReport.facing.actorForward === "-Z",
+  "幺娃沿用X Bot源+Z至角色-Z的共用桥接");
+Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
+  "幺娃保留V6的1.615米帽顶高度");
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

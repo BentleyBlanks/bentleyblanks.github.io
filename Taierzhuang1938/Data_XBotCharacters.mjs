@@ -23,6 +23,13 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 冬瓜 V3：保留帽壳和袖口修复，用户下载的绑骨模型转换为共用骨架。
   donggua: Object.freeze({ name: "冬瓜", file: "./Model/Character/Model_Donggua.glb", hipsScale: 0.8833, ownMaterial: true,
     report: "./Model/Character/Data_Donggua.json" }),
+  // 幺娃 V6：用户下载的完整绑骨件，保留修复后的颈部、手指和脚踝比例。
+  yaowa: Object.freeze({ name: "幺娃", file: "./Model/Character/Model_Yaowa.glb", hipsScale: 0.8394, ownMaterial: true,
+    report: "./Model/Character/Data_Yaowa.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/Yaowa/Animation_Yaowa_ProneFiringRifle_V2.glb",
+      "Animation_Mixamo_Dying_V3.glb": "./Animation/Yaowa/Animation_Yaowa_Dying_V3.glb",
+    }) }),
   // 谷寿夫 V4：用户下载的完整绑骨件，转换为共用骨架。
   taniHisao: Object.freeze({ name: "谷寿夫", file: "./Model/Character/Model_TaniHisao.glb", hipsScale: 0.9361, ownMaterial: true,
     report: "./Model/Character/Data_TaniHisao.json" }),
@@ -47,4 +54,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", taniHisao: "taniHisao" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", taniHisao: "taniHisao" });

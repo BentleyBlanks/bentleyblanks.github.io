@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "built": "2026-11-07",
+  "script": "_import/Script_BuildYaowa.mjs",
+  "source": {
+    "file": "Yaowa_Merged_V6_Bones.glb",
+    "bytes": 25602956,
+    "sha256": "ba4ac8b1cc1ea9cc5ce0903fa197e0df605e515358095e45d937200b33a32867",
+    "heightM": 0.9773
+  },
+  "output": {
+    "file": "Model/Character/Model_Yaowa.glb",
+    "bytes": 5968980,
+    "sha256": "170afd6b252ae97c42c564b2fe227697233a25ff100595bc4e884e978aedf8f6"
+  },
+  "scale": 1.652521,
+  "crownM": 1.615,
+  "triangles": 26544,
+  "vertices": 22942,
+  "sourceVertices": 22942,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 1920,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.8753,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.8394,
+  "headY": 1.4433,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 20550896,
+      "bytes": 3202456
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 1265885,
+      "bytes": 870960
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 2155517,
+      "bytes": 359158
+    }
+  ],
+  "input": {
+    "file": "Yaowa_Merged_V6_Bones.glb",
+    "sha256": "ba4ac8b1cc1ea9cc5ce0903fa197e0df605e515358095e45d937200b33a32867",
+    "skins": 1,
+    "joints": 55
+  },
+  "reconstructionScope": [
+    "幺娃V6的脸型、无发无须头部、软军帽、灰色旧军服、草鞋和身体比例沿用用户确认的角色外观，属于本作创作设计。",
+    "保留V6的完整颈部皮肤、手指长度和脚踝形状，骨架、蒙皮及动作适配属于游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

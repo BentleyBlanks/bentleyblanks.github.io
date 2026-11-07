@@ -48,17 +48,23 @@ function Worlds(doc) {
   return { parent, world };
 }
 const Float = (glb, i) => {
-  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { VEC3: 3, VEC4: 4, MAT4: 16 }[a.type];
-  const out = new Float32Array(a.count * w); new Uint8Array(out.buffer).set(glb.bin.subarray(v.byteOffset, v.byteOffset + out.byteLength)); return out;
+  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { SCALAR: 1, VEC3: 3, VEC4: 4, MAT4: 16 }[a.type];
+  const offset = (v.byteOffset || 0) + (a.byteOffset || 0);
+  const out = new Float32Array(a.count * w); new Uint8Array(out.buffer).set(glb.bin.subarray(offset, offset + out.byteLength)); return out;
 };
 
 const xbot = ReadGlb(path.join(here, XBOT_CHARACTERS.xbot.file));
 const xw = Worlds(xbot.doc);
 const xNames = xbot.doc.skins[0].joints.map((i) => xbot.doc.nodes[i].name);
+const xbotCrownY = new THREE.Vector3().setFromMatrixPosition(
+  xw.world[xbot.doc.skins[0].joints[xNames.indexOf("HeadTop_End")]]).y;
 assert.ok(["ijaJia", "ijaA", "ijaYi", "ijaC"].every(key => FactionCharacterKeys("ija").includes(key)), "普通日军的四款外观均已登记");
 assert.equal(XBOT_CAST_CHARACTERS.heyoutian, "heYoutian", "何有田映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.luo, "luo", "班长映射保留");
 assert.equal(XBOT_CAST_CHARACTERS.comrade, "donggua", "冬瓜使用已登记的专属外观");
+assert.equal(XBOT_CAST_CHARACTERS.yaowa, "yaowa", "幺娃使用V6专属外观");
+assert.equal(XBotLook({ faction: "nra", castId: "yaowa" }).key, "yaowa");
+assert.equal(XBotLook({ faction: "nra", unitId: "Yaowa" }).key, "yaowa");
 assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登记的专属外观");
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
@@ -104,10 +110,13 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
     const d = e.reduce((m, v, i) => Math.max(m, Math.abs(v - M.elements[i])), 0);
     assert.ok(d < 1e-4, `${key}: ${names[k]} 初始姿势 = 绑定姿势（差 ${d}）`);
   });
-  // 清单：hipsScale 同转换脚本写的报告；头高与 X Bot 差不出 5 cm（白盒按头高缩放）
+  // 清单与真实骨架一致。比较头关节在全身的比例，兼容幺娃等较矮角色。
   const report = JSON.parse(fs.readFileSync(path.join(here, def.report), "utf8"));
   assert.equal(def.hipsScale, report.hipsScale, `${key}: hipsScale 同 ${def.report}`);
-  assert.ok(Math.abs(report.headY - report.xbotHeadY) < 0.05, `${key}: 头高 ${report.headY} 与 X Bot ${report.xbotHeadY}`);
+  const measuredHeadY = new THREE.Vector3().setFromMatrixPosition(w.world[doc.skins[0].joints[names.indexOf("Head")]]).y;
+  assert.ok(Math.abs(measuredHeadY - report.headY) < .0001, `${key}: 头关节报告与实际骨架一致`);
+  assert.ok(Math.abs(measuredHeadY * xbotCrownY / report.crownM - report.xbotHeadY) < .05,
+    `${key}: 等比归一后头关节与X Bot相差不到5厘米`);
   // 权重：每点和为 1；头顶（头骨关节 9 cm 以上）只跟 Head
   const prim = doc.meshes[0].primitives[0];
   // Declared component types must match the actual view byte spans (Blender can
@@ -157,6 +166,27 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
   for (const item of [contacts.model, contacts.source, contacts.output]) assert.equal(
     createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,
     `${character}: 接触烘焙对应实际模型与源动作`);
+}
+
+const yaowaContacts = JSON.parse(fs.readFileSync(path.join(here, "Animation/Yaowa/Data_YaowaContacts.json"), "utf8"));
+for (const item of [yaowaContacts.model, ...yaowaContacts.clips.flatMap(clip => [clip.source, clip.output])]) {
+  assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,
+    `幺娃贴地校正对应实际模型和动作 ${item.file}`);
+}
+assert.ok(yaowaContacts.clips.every(clip => clip.minAfter >= .0019 && clip.maxLiftM < .15));
+for (const clip of yaowaContacts.clips) {
+  const source = ReadGlb(path.join(here, clip.source.file)), output = ReadGlb(path.join(here, clip.output.file));
+  for (const channel of source.doc.animations[0].channels) {
+    const original = source.doc.animations[0].samplers[channel.sampler];
+    const corrected = output.doc.animations[0].samplers[channel.sampler];
+    if (channel.target.path === "translation" && source.doc.nodes[channel.target.node].name === "Hips") {
+      const times = Float(output, corrected.input);
+      assert.ok(times.slice(1).every((time, index) => time > times[index]), "幺娃贴地曲线时间严格递增");
+      continue;
+    }
+    assert.deepEqual(Float(output, corrected.input), Float(source, original.input), "幺娃贴地校正保留其他曲线的时间");
+    assert.deepEqual(Float(output, corrected.output), Float(source, original.output), "幺娃贴地校正保留其他身体曲线");
+  }
 }
 
 // 动作换人：X Bot 原样；别的人去掉 Hips 以外的位移轨、Hips 位移乘 hipsScale，同一条动作同一个人只换一次

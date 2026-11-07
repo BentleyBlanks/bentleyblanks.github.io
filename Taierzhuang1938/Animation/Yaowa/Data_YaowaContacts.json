@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeYaowaContacts.mjs",
+  "character": "yaowa",
+  "model": {
+    "file": "Model/Character/Model_Yaowa.glb",
+    "sha256": "170afd6b252ae97c42c564b2fe227697233a25ff100595bc4e884e978aedf8f6"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_ProneFiringRifle_V2.glb",
+        "sha256": "86dd0ec5403dd73f9bff5d13d8d6286cc046e3b4f676539b4d06c57357a4032f"
+      },
+      "output": {
+        "file": "Animation/Yaowa/Animation_Yaowa_ProneFiringRifle_V2.glb",
+        "sha256": "5c01cd6eefb290717cfaf834bd2fdb34998df72ab5e3f842c17224e28d088a61"
+      },
+      "frames": 29,
+      "duration": 0.46666666865348816,
+      "minBefore": -0.06227371299995401,
+      "minAfter": 0.001999999999999995,
+      "maxLiftM": 0.064273712999954
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_Dying_V3.glb",
+        "sha256": "1056e10c5dc10cd37f58826410beec268d0012c75de68660d13c1bf42de31467"
+      },
+      "output": {
+        "file": "Animation/Yaowa/Animation_Yaowa_Dying_V3.glb",
+        "sha256": "02f637d05542abb5d667a850882dd788440e494292420e8f52346df26ca305bb"
+      },
+      "frames": 273,
+      "duration": 4.5333333015441895,
+      "minBefore": -0.09970364966226655,
+      "minAfter": 0.002,
+      "maxLiftM": 0.10170364966226655
+    }
+  ]
+}
