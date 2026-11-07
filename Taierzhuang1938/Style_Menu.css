@@ -536,7 +536,7 @@
 .mnSettingsDetail { flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;margin:3vh 5.1% 2vh 0;padding-left:3vw;border-left:1px solid #c1bdab40;color:#c9c9be; }
 .mnSettingsDetailHead { flex:0 0 auto;margin:0;padding:0 0 14px;font:700 var(--menu-font-heading)/1.3 var(--ui-title-font);letter-spacing:.10em;color:#eeeee7;border-bottom:1px solid #c1bdab55; }
 .mnSettingsDetailBody { flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;padding:6px 1vw 4vh 0;scroll-padding-bottom:96px; }
-.mnSettingsDetailBody:has(.audioFooter) { padding-bottom:0; }
+.mnSettingsDetailBody:has(.audioFooter) { display:flex;overflow:hidden;padding-bottom:0; }
 .mnSettingsDetailBody .mnDebug { flex:none;overflow:visible;padding:0; }
 .mnSettingsDetailBody .mnDebugIntro { margin-top:12px; }
 .mnToolsOpen { margin:0 0 6px;min-height:44px;font-size:var(--menu-font-body);letter-spacing:.1em; }
@@ -560,8 +560,10 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
 #menu .mnSettingsDetail .edPanel.work { position:static;inset:auto;display:block;width:auto;max-width:none;height:auto;border:0;background:none;box-shadow:none;backdrop-filter:none; }
 #menu .mnSettingsDetail .edPanel.work .edHead { display:none; }
 #menu .mnSettingsDetail .edPanel.work .edBody { overflow:visible;max-width:none;padding:0; }
-#menu .mnSettingsDetail .edPanel:is(.audioSettings, .gfxSettings) .edBody { padding:16px 0 28px;gap:3vw; }
-#menu .mnSettingsDetail .audioFooter { position:sticky;bottom:0;z-index:1;margin:0;background:#0d0e0b; }
+/* Scroll only the options; the transparent footer has its own space below them. */
+#menu .mnSettingsDetail .edPanel:is(.audioSettings, .gfxSettings) { display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0; }
+#menu .mnSettingsDetail .edPanel:is(.audioSettings, .gfxSettings) .edBody { flex:1 1 0;overflow:auto;scrollbar-width:thin;padding:16px 0 28px;gap:3vw; }
+#menu .mnSettingsDetail .audioFooter { margin:0;background:none; }
 @media(max-width:760px){
  .mnPanelHead{min-height:15vh}.mnPanelHead::after{display:none}.mnCampaignMain{grid-template-columns:1fr;gap:20px;overflow-y:auto}
  #menu.panelOn .mnPanelBody:has(.mnSettingsDetail){flex-direction:column}
