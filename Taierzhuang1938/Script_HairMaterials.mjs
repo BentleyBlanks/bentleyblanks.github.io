@@ -640,24 +640,49 @@ void main() {
 const REFERENCE_BEARD_FRAGMENT = /* glsl */`
 precision highp float;
 #include <common>
+#include <lights_pars_begin>
+${SUN_SHADOW_GLSL}
 ${GLSL_OUTPUT}
 ${GLSL_MELANIN}
 ${GLSL_REFERENCE_FRONT}
 uniform sampler2D uReferenceMask;
 uniform float uChinY;
+uniform sampler2D uReferenceBeardLuminance;
+uniform float uUseReferenceLuminance;
+uniform float uReferenceLuminanceGain;
+uniform float uReferenceMelanin;
 uniform float uMelanin;
 uniform float uRedness;
+uniform float uGray;
+uniform float uCoverageGain;
+uniform float uCoverageScale;
 uniform float uFade;
 in vec2 vUv;
 in vec3 vData;
 in vec3 vLocalPos;
+in vec3 vNormalV;
+in vec3 vWorldPos;
 layout(location = 0) out vec4 fragColor;
 void main() {
-  float coverage = texture(uReferenceMask, vUv).r * vData.x * uFade * ReferenceFrontWeight(vLocalPos);
+  float coverage = min(1.0, texture(uReferenceMask, vUv).r * uCoverageGain) * uCoverageScale * vData.x * uFade * ReferenceFrontWeight(vLocalPos);
   coverage *= smoothstep(uChinY - .001, uChinY + .002, vLocalPos.y);
   if (coverage < .003) discard;
-  vec3 color = HairMelaninColor(uMelanin, uRedness);
-  fragColor = HairOutput(color * .5 + .004);
+  vec3 normalV = normalize(vNormalV);
+  vec3 illumination = ambientLightColor;
+#ifdef USE_LIGHT_PROBES
+  illumination += getLightProbeIrradiance(lightProbe, normalV);
+#endif
+#if NUM_DIR_LIGHTS > 0
+  vec3 worldNormal = inverseTransformDirection(normalV, viewMatrix);
+  illumination += directionalLights[0].color * max(0.0, dot(normalV, directionalLights[0].direction)) * SunShadowVisibility(vWorldPos, worldNormal);
+#endif
+  vec3 color = mix(HairMelaninColor(uMelanin, uRedness)*.5+.004,
+    vec3(.62, .6, .56)*illumination*.31831+.004, uGray);
+  float originalPigment = max(dot(HairMelaninColor(uReferenceMelanin,uRedness),vec3(.3,.59,.11)),.0001);
+  float pigment = max(dot(HairMelaninColor(uMelanin,uRedness),vec3(.3,.59,.11)),.0001);
+  float luminance = min(.6,pow(texture(uReferenceBeardLuminance,vUv).r,2.2)*uReferenceLuminanceGain);
+  color = mix(color,vec3(luminance)*illumination*.31831*sqrt(pigment/originalPigment),uUseReferenceLuminance);
+  fragColor = HairOutput(color);
   fragColor.a = coverage;
 }
 `;
@@ -805,18 +830,25 @@ export function MakeShellMaterials(hair, shared, lightRig) {
   const prepass = PrepassMaterial(MESH_VERTEX(true), SHELL_PREPASS_FRAGMENT, { ...shared, ...own }, THREE.FrontSide);
   return { main, prepass, own };
 }
-export function MakeStubbleMaterial(beard, shared, referenceAtlas = null) {
+export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightRig = null, referenceLuminance = null) {
   if (beard.referenceMask) {
     if (!referenceAtlas) throw new Error('Missing character reference beard atlas');
+    if (beard.render.referenceLuminance && !referenceLuminance) throw new Error('Missing character beard luminance atlas');
     const own = {
       ...ReferenceFrontUniforms(beard.referenceMask.center),
       uReferenceMask: {value: referenceAtlas}, uChinY: {value: beard.referenceMask.chinY}, uMelanin: {value: beard.render.color.melanin},
       uRedness: {value: beard.render.color.redness}, uFade: {value: 1},
+      uGray: {value: beard.render.color.gray ?? 0},
+      uCoverageGain: {value: beard.render.referenceCoverageGain ?? 1},
+      uCoverageScale: {value: beard.render.referenceCoverageScale ?? 1},
+      uReferenceBeardLuminance: {value: referenceLuminance || referenceAtlas},
+      uUseReferenceLuminance: {value: beard.render.referenceLuminance ? 1 : 0},
+      uReferenceLuminanceGain: {value: beard.render.referenceLuminanceGain ?? 1},
+      uReferenceMelanin: {value: beard.render.color.melanin},
     };
-    const material = new THREE.ShaderMaterial({glslVersion: THREE.GLSL3,
-      vertexShader: MESH_VERTEX(false), fragmentShader: REFERENCE_BEARD_FRAGMENT, uniforms: own,
-      transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
-    material.allowOverride = false;
+    const material = LitMaterial(MESH_VERTEX(false), REFERENCE_BEARD_FRAGMENT, own, {lightRig, transparent:true, side:THREE.FrontSide});
+    material.depthWrite = false; material.polygonOffset = true;
+    material.polygonOffsetFactor = -2; material.polygonOffsetUnits = -2;
     return {main: material, own};
   }
   const own = { uMelanin: { value: beard.render.color.melanin }, uRedness: { value: beard.render.color.redness },

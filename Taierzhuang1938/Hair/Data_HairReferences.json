@@ -1,6 +1,6 @@
 {
  "schema": "tengxian.hairReferenceLooks",
- "version": 3,
+ "version": 4,
  "note": "个人原图和剃净参考配对，正投影校准模型五官，再烘焙原图细须覆盖与发根分布。",
  "looks": {
   "Shunzi": {
@@ -1142,6 +1142,1450 @@
      }
     ]
    }
+  },
+  "Donggua": {
+   "source": "03_冬瓜/HairReference_20261107/Ref_Donggua_HeadHair_1K_V1.png",
+   "sha256": "b5b6685f35ee06865a86639ab108d69c988f0056209c46f20b96da33a6460f57",
+   "baldSource": "03_冬瓜/Parts_V1_20261106/Ref_Donggua_HeadBald_2K_V1.png",
+   "baldSha256": "50ec2f81749d663f0927c98e35993c785ab4e2b78ceeb848f28b4b84823db1a1",
+   "observations": [
+    "冬瓜：短碎发与淡短茬"
+   ],
+   "hair": {
+    "name": "冬瓜：短碎发与淡短茬",
+    "length": {
+     "top": 0.021,
+     "front": 0.017,
+     "side": 0.006,
+     "back": 0.009
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.45,
+     "side": 0.1,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.58,
+     "templeLow": 0.28,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.13,
+    "frizz": 0.09,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
+   },
+   "beard": {
+    "name": "冬瓜：短碎发与淡短茬",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.0016,
+      "density": 0.32
+     },
+     "soul": {
+      "length": 0.001,
+      "density": 0.08
+     },
+     "chin": {
+      "length": 0.0015,
+      "density": 0.18
+     },
+     "jaw": {
+      "length": 0.0008,
+      "density": 0.03
+     },
+     "cheek": {
+      "length": 0.0005,
+      "density": 0.01
+     }
+    },
+    "referenceMask": "Donggua"
+   },
+   "landmarks": {
+    "centerX": 9.443610906600952e-05,
+    "glabella": [
+     9.443610906600952e-05,
+     0.3492,
+     -0.10309228301048279
+    ],
+    "subnasale": [
+     9.443610906600952e-05,
+     0.2792
+    ],
+    "stomion": [
+     9.443610906600952e-05,
+     0.2498
+    ],
+    "menton": [
+     9.443610906600952e-05,
+     0.203,
+     -0.07971259951591492
+    ],
+    "ear": {
+     "yMin": 0.2732,
+     "yMax": 0.3532,
+     "zFront": 0.01457,
+     "zBack": 0.04354,
+     "halfWidth": 0.10272
+    }
+   },
+   "registration": {
+    "centerX": 9.443610906600952e-05,
+    "reference": {
+     "centerX": 1024,
+     "browY": 640,
+     "noseY": 896,
+     "mouthY": 1008,
+     "chinY": 1120,
+     "mouthHalfWidth": 90,
+     "faceHalfWidth": 335,
+     "skullTopY": 290,
+     "hairTopY": 240
+    },
+    "rows": [
+     {
+      "y": 0.43422,
+      "imageY": 290,
+      "innerX": 0.03,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     },
+     {
+      "y": 0.3492,
+      "imageY": 640,
+      "innerX": 0.03,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     },
+     {
+      "y": 0.2792,
+      "imageY": 896,
+      "innerX": 0.029,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     },
+     {
+      "y": 0.2498,
+      "imageY": 1008,
+      "innerX": 0.03,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     },
+     {
+      "y": 0.203,
+      "imageY": 1120,
+      "innerX": 0.028,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     },
+     {
+      "y": 0.18100000000000002,
+      "imageY": 1245,
+      "innerX": 0.028,
+      "innerImageX": 90,
+      "outerX": 0.079,
+      "outerImageX": 335
+     }
+    ]
+   },
+   "faceCrop": [
+    555,
+    646,
+    1493,
+    1280
+   ]
+  },
+  "Yaowa": {
+   "source": "04_幺娃/HairReference_20261107/Ref_Yaowa_HeadHair_1K_V1.png",
+   "sha256": "5c324cf2c767b869ec8a210d06c52eb7cbe7c58f635961ae54721e4284a4b155",
+   "baldSource": "04_幺娃/Parts_V1_20261106/Ref_Yaowa_HeadBald_2K_V1.png",
+   "baldSha256": "905ed371600b7d912655bcb52bcc5b02b5fecf404ae49fa5a2b0078b1d328f9b",
+   "observations": [
+    "幺娃：细碎短发、净面"
+   ],
+   "hair": {
+    "name": "幺娃：细碎短发、净面",
+    "length": {
+     "top": 0.019,
+     "front": 0.015,
+     "side": 0.004,
+     "back": 0.006
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.45,
+     "side": 0.1,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.58,
+     "templeLow": 0.28,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.13,
+    "frizz": 0.09,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
+   },
+   "beard": {
+    "name": "幺娃：细碎短发、净面",
+    "enabled": false,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.001,
+      "density": 0
+     },
+     "soul": {
+      "length": 0.001,
+      "density": 0
+     },
+     "chin": {
+      "length": 0.001,
+      "density": 0
+     },
+     "jaw": {
+      "length": 0.001,
+      "density": 0
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0
+     }
+    },
+    "referenceMask": "Yaowa"
+   },
+   "landmarks": {
+    "centerX": 0.0,
+    "glabella": [
+     0.0,
+     0.2492,
+     -0.10006534308195114
+    ],
+    "subnasale": [
+     0.0,
+     0.1798
+    ],
+    "stomion": [
+     0.0,
+     0.1523
+    ],
+    "menton": [
+     0.0,
+     0.1123,
+     -0.08909696340560913
+    ],
+    "ear": {
+     "yMin": 0.17379999999999998,
+     "yMax": 0.2532,
+     "zFront": -0.0081,
+     "zBack": 0.01839,
+     "halfWidth": 0.10538
+    }
+   },
+   "registration": {
+    "centerX": 0.0,
+    "reference": {
+     "centerX": 1024,
+     "browY": 643,
+     "noseY": 1050,
+     "mouthY": 1190,
+     "chinY": 1424,
+     "mouthHalfWidth": 145,
+     "faceHalfWidth": 455,
+     "skullTopY": 160,
+     "hairTopY": 115
+    },
+    "rows": [
+     {
+      "y": 0.34542,
+      "imageY": 160,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.2492,
+      "imageY": 643,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.1798,
+      "imageY": 1050,
+      "innerX": 0.029,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.1523,
+      "imageY": 1190,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.1123,
+      "imageY": 1424,
+      "innerX": 0.028,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.09029999999999999,
+      "imageY": 1549,
+      "innerX": 0.028,
+      "innerImageX": 145,
+      "outerX": 0.079,
+      "outerImageX": 455
+     }
+    ]
+   },
+   "faceCrop": [
+    387,
+    800,
+    1661,
+    1584
+   ]
+  },
+  "LiuWencai": {
+   "source": "06_刘文财/HairReference_20261107/Ref_LiuWencai_HeadHair_1K_V1.png",
+   "sha256": "908603453d5cb5531510dc965408be04adba85db820b5e40c766221eb46d84e3",
+   "baldSource": "06_刘文财/Parts_V1_20261105/Ref_LiuWencai_HeadBald_2K_V1.png",
+   "baldSha256": "0f4d43959638a383fac79234dcb94218d2ee9fe504c302388df80d5a7fd2068d",
+   "observations": [
+    "刘文财：短发、细唇须与下巴短茬"
+   ],
+   "hair": {
+    "name": "刘文财：短发、细唇须与下巴短茬",
+    "length": {
+     "top": 0.026,
+     "front": 0.023,
+     "side": 0.006,
+     "back": 0.01
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.6,
+     "side": 0.1,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.58,
+     "templeLow": 0.28,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.12,
+    "frizz": 0.18,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "comb": {
+     "type": "whorl",
+     "whorl": [
+      0,
+      -0.015,
+      0.04
+     ],
+     "forward": 0.55
+    },
+    "strands": 46000,
+    "crownHalfWidth": 0.045,
+    "crownBlend": 0.035
+   },
+   "beard": {
+    "name": "刘文财：短发、细唇须与下巴短茬",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.0025,
+      "density": 0.5
+     },
+     "soul": {
+      "length": 0.0012,
+      "density": 0.12
+     },
+     "chin": {
+      "length": 0.002,
+      "density": 0.28
+     },
+     "jaw": {
+      "length": 0.001,
+      "density": 0.08
+     },
+     "cheek": {
+      "length": 0.0005,
+      "density": 0.02
+     }
+    },
+    "referenceMask": "LiuWencai"
+   },
+   "landmarks": {
+    "centerX": 0.00017384439706802368,
+    "glabella": [
+     0.00017384439706802368,
+     0.3161,
+     -0.10913804173469543
+    ],
+    "subnasale": [
+     0.00017384439706802368,
+     0.2455
+    ],
+    "stomion": [
+     0.00017384439706802368,
+     0.2143
+    ],
+    "menton": [
+     0.00017384439706802368,
+     0.1718,
+     -0.0915442630648613
+    ],
+    "ear": {
+     "yMin": 0.2395,
+     "yMax": 0.3201,
+     "zFront": 0.00603,
+     "zBack": 0.04031,
+     "halfWidth": 0.1008
+    }
+   },
+   "registration": {
+    "centerX": 0.00017384439706802368,
+    "reference": {
+     "centerX": 1024,
+     "browY": 608,
+     "noseY": 947,
+     "mouthY": 1072,
+     "chinY": 1267,
+     "mouthHalfWidth": 128,
+     "faceHalfWidth": 425,
+     "skullTopY": 190,
+     "hairTopY": 96
+    },
+    "rows": [
+     {
+      "y": 0.40363,
+      "imageY": 190,
+      "innerX": 0.03,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     },
+     {
+      "y": 0.3161,
+      "imageY": 608,
+      "innerX": 0.03,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     },
+     {
+      "y": 0.2455,
+      "imageY": 947,
+      "innerX": 0.029,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     },
+     {
+      "y": 0.2143,
+      "imageY": 1072,
+      "innerX": 0.03,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     },
+     {
+      "y": 0.1718,
+      "imageY": 1267,
+      "innerX": 0.028,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     },
+     {
+      "y": 0.14980000000000002,
+      "imageY": 1392,
+      "innerX": 0.028,
+      "innerImageX": 128,
+      "outerX": 0.078,
+      "outerImageX": 425
+     }
+    ]
+   },
+   "faceCrop": [
+    429,
+    697,
+    1619,
+    1427
+   ]
+  },
+  "OldGeng": {
+   "source": "07_老耿/HairReference_20261107/Ref_OldGeng_HeadHair_1K_V1.png",
+   "sha256": "875b43bcb65459cf49e4e238813155426feebc13f50bb9194cb007feec64545f",
+   "baldSource": "07_老耿/Ref_OldGeng_HeadBald_2K_V1.png",
+   "baldSha256": "0f848688284c78e9ace2c529e362ce249708d60c35aef55464f9730babeea194",
+   "observations": [
+    "老耿：退后灰短发、灰唇须与下巴须"
+   ],
+   "hair": {
+    "name": "老耿：退后灰短发、灰唇须与下巴须",
+    "length": {
+     "top": 0.019,
+     "front": 0.01,
+     "side": 0.011,
+     "back": 0.014
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.65,
+     "side": 0.1,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.7,
+     "temple": 0.83,
+     "templeLow": 0.28,
+     "sideburn": 0.5,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.13,
+    "frizz": 0.09,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0.45
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 44000,
+    "guideSpacing": 0.0045
+   },
+   "beard": {
+    "name": "老耿：退后灰短发、灰唇须与下巴须",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0025,
+     "width": 0.002,
+     "layers": 2,
+     "tile": "Beard",
+     "alphaScale": 0.75,
+     "rootScale": 0.65
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.75,
+     "redness": 0.08,
+     "gray": 0.8
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.006,
+      "density": 0.85
+     },
+     "soul": {
+      "length": 0.003,
+      "density": 0.3
+     },
+     "chin": {
+      "length": 0.008,
+      "density": 0.9,
+      "point": 0.7,
+      "tipBelowChin": 0.004
+     },
+     "jaw": {
+      "length": 0.003,
+      "density": 0.18
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0.02
+     }
+    },
+    "referenceMask": "OldGeng",
+    "coverageGain": 2,
+    "coverageScale": 1,
+    "proportionalRegions": true,
+    "coverageWeights": {
+     "mustache": 1,
+     "soul": 1,
+     "chin": 1,
+     "jaw": 0.25,
+     "cheek": 0.1
+    },
+    "grayCoverage": true,
+    "referenceLuminance": true,
+    "luminanceGain": 1.5,
+    "portraitLuminance": true
+   },
+   "landmarks": {
+    "centerX": 0.0,
+    "glabella": [
+     0.0,
+     0.2376,
+     -0.10392384976148605
+    ],
+    "subnasale": [
+     0.0,
+     0.1738
+    ],
+    "stomion": [
+     0.0,
+     0.1431
+    ],
+    "menton": [
+     0.0,
+     0.0956,
+     -0.10715380311012268
+    ],
+    "ear": {
+     "yMin": 0.1678,
+     "yMax": 0.2416,
+     "zFront": -0.0025,
+     "zBack": 0.02317,
+     "halfWidth": 0.10279
+    }
+   },
+   "registration": {
+    "centerX": 0.0,
+    "reference": {
+     "centerX": 1024,
+     "browY": 665,
+     "noseY": 954,
+     "mouthY": 1059,
+     "chinY": 1254,
+     "mouthHalfWidth": 130,
+     "faceHalfWidth": 350,
+     "skullTopY": 310,
+     "hairTopY": 256
+    },
+    "rows": [
+     {
+      "y": 0.33059,
+      "imageY": 310,
+      "innerX": 0.03,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     },
+     {
+      "y": 0.2376,
+      "imageY": 665,
+      "innerX": 0.03,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     },
+     {
+      "y": 0.1738,
+      "imageY": 954,
+      "innerX": 0.029,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     },
+     {
+      "y": 0.1431,
+      "imageY": 1059,
+      "innerX": 0.03,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     },
+     {
+      "y": 0.0956,
+      "imageY": 1254,
+      "innerX": 0.028,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     },
+     {
+      "y": 0.0736,
+      "imageY": 1379,
+      "innerX": 0.028,
+      "innerImageX": 130,
+      "outerX": 0.077,
+      "outerImageX": 350
+     }
+    ]
+   },
+   "faceCrop": [
+    534,
+    704,
+    1514,
+    1414
+   ]
+  },
+  "Nier": {
+   "source": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadShortHair_2K_V1.png",
+   "sha256": "06fbf5bb6aedce4cdec8fbc88136460c28c7bbf8ab53723ba2ade0b66cf9ae56",
+   "baldSource": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadBald_2K_V1.png",
+   "baldSha256": "09eacea94d76872bda1b04eb7ce3cd0f164a87dd7e7e889cbaa1ee0e29f7535f",
+   "observations": [
+    "妮儿：齐颈短发与碎刘海"
+   ],
+   "hair": {
+    "name": "妮儿：齐颈短发与碎刘海",
+    "length": {
+     "top": 0.24,
+     "front": 0.085,
+     "side": 0.15,
+     "back": 0.2
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.14,
+     "side": 0.04,
+     "back": 0.05
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.6,
+     "templeLow": 0.32,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004,
+     "reference": false
+    },
+    "clump": 0.42,
+    "frizz": 0.035,
+    "scalpTint": 0.7,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "comb": {
+     "type": "bob",
+     "partX": -0.015,
+     "fringeClearance": 0.004,
+     "fringeMinLength": 0.008,
+     "hemOffset": 0.008,
+     "hemMinLength": 0.02,
+     "crownTravel": 0.015,
+     "tipTuck": 0.015
+    },
+    "strands": 60000,
+    "family": "Long",
+    "points": 18,
+    "guideSpacing": 0.004,
+    "stiffness": 0.28,
+    "gravity": 0.85,
+    "volume": 0.002,
+    "cards": {
+     "spacing": 0.008,
+     "width": 0.014,
+     "layers": 3,
+     "tile": "Long"
+    },
+    "shell": {
+     "kind": "hull",
+     "opacity": 1
+    }
+   },
+   "beard": {
+    "name": "妮儿：齐颈短发与碎刘海",
+    "enabled": false,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.001,
+      "density": 0
+     },
+     "soul": {
+      "length": 0.001,
+      "density": 0
+     },
+     "chin": {
+      "length": 0.001,
+      "density": 0
+     },
+     "jaw": {
+      "length": 0.001,
+      "density": 0
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0
+     }
+    },
+    "referenceMask": "Nier"
+   },
+   "landmarks": {
+    "centerX": 0.0,
+    "glabella": [
+     0.0,
+     0.2123,
+     -0.0932297334074974
+    ],
+    "subnasale": [
+     0.0,
+     0.1517
+    ],
+    "stomion": [
+     0.0,
+     0.1273
+    ],
+    "menton": [
+     0.0,
+     0.0917,
+     -0.08042006194591522
+    ],
+    "ear": {
+     "yMin": 0.1457,
+     "yMax": 0.2163,
+     "zFront": 0.00917,
+     "zBack": 0.03607,
+     "halfWidth": 0.08993
+    }
+   },
+   "registration": {
+    "centerX": 0.0,
+    "reference": {
+     "centerX": 1024,
+     "browY": 768,
+     "noseY": 1110,
+     "mouthY": 1235,
+     "chinY": 1434,
+     "mouthHalfWidth": 155,
+     "faceHalfWidth": 455,
+     "skullTopY": 250,
+     "hairTopY": 109
+    },
+    "rows": [
+     {
+      "y": 0.29667,
+      "imageY": 250,
+      "innerX": 0.03,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.2123,
+      "imageY": 768,
+      "innerX": 0.03,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.1517,
+      "imageY": 1110,
+      "innerX": 0.029,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.1273,
+      "imageY": 1235,
+      "innerX": 0.03,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.0917,
+      "imageY": 1434,
+      "innerX": 0.028,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     },
+     {
+      "y": 0.06970000000000001,
+      "imageY": 1559,
+      "innerX": 0.028,
+      "innerImageX": 155,
+      "outerX": 0.073,
+      "outerImageX": 455
+     }
+    ]
+   },
+   "faceCrop": [
+    387,
+    860,
+    1661,
+    1594
+   ]
+  },
+  "TaniHisao": {
+   "source": "09_谷寿夫/HairReference_20261107/Ref_TaniHisao_HeadHair_1K_V1.png",
+   "sha256": "b6725b63fb7b5cfa6bb33da10288a308189d4c6e5b6a19f928e56c23190c8fc5",
+   "baldSource": "09_谷寿夫/Parts_V1_20261106/Ref_TaniHisao_HeadBald_2K_V1.png",
+   "baldSha256": "485d780dfca9bf85131089d1fdebb31b9cffcc8fb4c41f6fc8b227dfd21e17de",
+   "observations": [
+    "谷寿夫：整齐短发与修剪唇须"
+   ],
+   "hair": {
+    "name": "谷寿夫：整齐短发与修剪唇须",
+    "length": {
+     "top": 0.025,
+     "front": 0.016,
+     "side": 0.005,
+     "back": 0.007
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.55,
+     "side": 0.1,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.58,
+     "templeLow": 0.28,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.13,
+    "frizz": 0.09,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0.2
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
+   },
+   "beard": {
+    "name": "谷寿夫：整齐短发与修剪唇须",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0.2
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.0048,
+      "density": 0.95
+     },
+     "soul": {
+      "length": 0.0005,
+      "density": 0
+     },
+     "chin": {
+      "length": 0.0005,
+      "density": 0
+     },
+     "jaw": {
+      "length": 0.0005,
+      "density": 0
+     },
+     "cheek": {
+      "length": 0.0005,
+      "density": 0
+     }
+    },
+    "referenceMask": "TaniHisao"
+   },
+   "landmarks": {
+    "centerX": 3.375113010406494e-05,
+    "glabella": [
+     3.375113010406494e-05,
+     0.29,
+     -0.10575196892023087
+    ],
+    "subnasale": [
+     3.375113010406494e-05,
+     0.215
+    ],
+    "stomion": [
+     3.375113010406494e-05,
+     0.189
+    ],
+    "menton": [
+     3.375113010406494e-05,
+     0.1395,
+     -0.10507303476333618
+    ],
+    "ear": {
+     "yMin": 0.209,
+     "yMax": 0.294,
+     "zFront": 0.01616,
+     "zBack": 0.05554,
+     "halfWidth": 0.10037
+    }
+   },
+   "registration": {
+    "centerX": 3.375113010406494e-05,
+    "reference": {
+     "centerX": 1024,
+     "browY": 675,
+     "noseY": 970,
+     "mouthY": 1101,
+     "chinY": 1290,
+     "mouthHalfWidth": 140,
+     "faceHalfWidth": 390,
+     "skullTopY": 235,
+     "hairTopY": 141
+    },
+    "rows": [
+     {
+      "y": 0.37454,
+      "imageY": 235,
+      "innerX": 0.03,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.29,
+      "imageY": 675,
+      "innerX": 0.03,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.215,
+      "imageY": 970,
+      "innerX": 0.029,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.189,
+      "imageY": 1101,
+      "innerX": 0.03,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.1395,
+      "imageY": 1290,
+      "innerX": 0.028,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.11750000000000002,
+      "imageY": 1415,
+      "innerX": 0.028,
+      "innerImageX": 140,
+      "outerX": 0.08,
+      "outerImageX": 390
+     }
+    ]
+   },
+   "faceCrop": [
+    478,
+    720,
+    1570,
+    1450
+   ]
+  },
+  "SoldierC": {
+   "source": "12_日军士兵C/HairReference_20261107/Ref_JapaneseSoldierC_HeadHair_1K_V1.png",
+   "sha256": "da94bd98d311ecc7a6f55862d9f7d5310c11ee8f4ab359b61c92827aba85d27b",
+   "baldSource": "12_日军士兵C/Parts_V1_20261105/Ref_JapaneseSoldierC_HeadBald_2K_V1.png",
+   "baldSha256": "0787cbeccd397285e5120315efd6d6786410b65a36bbf2e61c1280be072bee0d",
+   "observations": [
+    "日军士兵 C：侧梳乱短发与唇须下巴胡"
+   ],
+   "hair": {
+    "name": "日军士兵 C：侧梳乱短发与唇须下巴胡",
+    "length": {
+     "top": 0.045,
+     "front": 0.038,
+     "side": 0.018,
+     "back": 0.027
+    },
+    "lengthJitter": 0.22,
+    "lift": {
+     "top": 0.45,
+     "side": 0.15,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.48,
+     "temple": 0.58,
+     "templeLow": 0.28,
+     "sideburn": 0.54,
+     "nape": 0.018,
+     "band": 0.004
+    },
+    "clump": 0.25,
+    "frizz": 0.16,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.94,
+     "redness": 0.08,
+     "gray": 0.1
+    },
+    "comb": {
+     "type": "whorl",
+     "whorl": [
+      0.015,
+      -0.015,
+      0.04
+     ],
+     "forward": 0.6
+    },
+    "strands": 46000,
+    "points": 10,
+    "stiffness": 0.72,
+    "gravity": 0.18,
+    "volume": 0.003,
+    "curl": [
+     0.001,
+     0.014
+    ],
+    "crownHalfWidth": 0.05,
+    "crownBlend": 0.035
+   },
+   "beard": {
+    "name": "日军士兵 C：侧梳乱短发与唇须下巴胡",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.002,
+     "width": 0.0022,
+     "layers": 2,
+     "tile": "Beard",
+     "alphaScale": 0.85,
+     "rootScale": 0.85
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0.1
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.007,
+      "density": 0.95
+     },
+     "soul": {
+      "length": 0.005,
+      "density": 0.7
+     },
+     "chin": {
+      "length": 0.013,
+      "density": 0.95,
+      "point": 0.7,
+      "tipBelowChin": 0.009
+     },
+     "jaw": {
+      "length": 0.005,
+      "density": 0.45
+     },
+     "cheek": {
+      "length": 0.002,
+      "density": 0.12
+     }
+    },
+    "referenceMask": "SoldierC",
+    "coverageGain": 1.5,
+    "coverageScale": 1,
+    "proportionalRegions": true,
+    "coverageWeights": {
+     "mustache": 1,
+     "soul": 1,
+     "chin": 1,
+     "jaw": 0.25,
+     "cheek": 0.1
+    },
+    "referenceLuminance": true,
+    "portraitLuminance": true
+   },
+   "landmarks": {
+    "centerX": -0.00018306821584701538,
+    "glabella": [
+     -0.00018306821584701538,
+     0.3236,
+     -0.10541150718927383
+    ],
+    "subnasale": [
+     -0.00018306821584701538,
+     0.2599
+    ],
+    "stomion": [
+     -0.00018306821584701538,
+     0.2311
+    ],
+    "menton": [
+     -0.00018306821584701538,
+     0.1849,
+     -0.09100625663995743
+    ],
+    "ear": {
+     "yMin": 0.2539,
+     "yMax": 0.3276,
+     "zFront": 0.00975,
+     "zBack": 0.04437,
+     "halfWidth": 0.1008
+    }
+   },
+   "registration": {
+    "centerX": -0.00018306821584701538,
+    "reference": {
+     "centerX": 1024,
+     "browY": 742,
+     "noseY": 1040,
+     "mouthY": 1139,
+     "chinY": 1331,
+     "mouthHalfWidth": 150,
+     "faceHalfWidth": 390,
+     "skullTopY": 270,
+     "hairTopY": 173
+    },
+    "rows": [
+     {
+      "y": 0.41861,
+      "imageY": 270,
+      "innerX": 0.03,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.3236,
+      "imageY": 742,
+      "innerX": 0.03,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.2599,
+      "imageY": 1040,
+      "innerX": 0.029,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.2311,
+      "imageY": 1139,
+      "innerX": 0.03,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.1849,
+      "imageY": 1331,
+      "innerX": 0.028,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     },
+     {
+      "y": 0.16290000000000002,
+      "imageY": 1456,
+      "innerX": 0.028,
+      "innerImageX": 150,
+      "outerX": 0.077,
+      "outerImageX": 390
+     }
+    ]
+   },
+   "faceCrop": [
+    478,
+    790,
+    1570,
+    1491
+   ]
   }
  }
 }

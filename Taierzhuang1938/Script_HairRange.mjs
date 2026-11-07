@@ -54,7 +54,7 @@ export class HairRange {
     this.oldZoom = host.camera.zoom; this.lens = this.oldZoom;
     this.stations = []; this.assets = new Map(); this.heads = new Map(); this.listeners = [];
     this.ready = false; this.error = null; this.loaded = 0; this.total = 0;
-    this.category = 'cast'; this.openSections = new Set(); this.canvasFocused = false; this.flySpeed = 1;
+    this.category = 'newCast'; this.openSections = new Set(); this.canvasFocused = false; this.flySpeed = 1;
     this.force = 'auto'; this.showHair = true; this.showBeard = true; this.showLabels = true; this.panelShown = true;
     this.selected = 0; this.view = 'overview'; this.walkT = 0; this.fps = 60; this.disposed = false;
     this.target = V(0, 1.4, 0); this.radius = 7.5; this.azimuth = Math.PI * 0.86; this.elevation = 0.28;
@@ -119,7 +119,7 @@ export class HairRange {
           : V(item.x, HAIR_RANGE_PEDESTAL.height + (asset.header.hair?.bounds ? (asset.header.hair.bounds.min[1] + asset.header.hair.bounds.max[1]) * .5 : .18), item.z);
         this.stations.push({ row: item.row, groomId: item.groom, lod: item.lod || null, x: item.x, z: item.z, head, groom, meta, center });
       }
-      this.selected = this.stations.findIndex(station => station.row === 'cast');
+      this.selected = this.stations.findIndex(station => station.row === 'newCast');
       this.MakeLabels();
       this.ready = true; this.SetSun(this.sun.azimuth, this.sun.elevation);
       this.PaintPanel(); this.Cut();
@@ -167,7 +167,7 @@ export class HairRange {
     this.view = id;
     this.lens = this.oldZoom;
     const s = this.Current();
-    if (id === 'overview' || !s) { this.target.set(0, 1.3, 0.2); this.radius = CAMERA.overviewRadius * Math.max(1, 1.25 * innerHeight / innerWidth); this.azimuth = Math.PI * 0.86; this.elevation = CAMERA.overviewElevation; }
+    if (id === 'overview' || !s) { this.target.fromArray(CAMERA.overviewTarget); this.radius = CAMERA.overviewRadius * Math.max(1, 1.25 * innerHeight / innerWidth); this.azimuth = Math.PI * 0.86; this.elevation = CAMERA.overviewElevation; }
     else if (id === 'walk') { this.walkT = 0; this.selected = Math.max(0, this.stations.findIndex((station) => station.lod === 'auto')); }
     else if (id === 'compareShort' || id === 'compareLong') {
       const group = this.stations.slice(id === 'compareShort' ? 0 : 4, id === 'compareShort' ? 3 : 7);
@@ -423,7 +423,7 @@ export class HairRange {
     }
     const s=this.Current(),u=s?.groom.strandUniforms,p=s?.params||{};
     const Button=(attr,value,label,on=false)=>`<button type="button" class="edBtn${on?' on':''}" data-${attr}="${value}"${attr==='action'?'':` aria-pressed="${on}"`}>${Esc(label)}</button>`;
-    const categories=['cast','length','beard','lod'].map(id=>Button('row',id,T(`hair.category.${id}`),this.category===id)).join('');
+    const categories=['newCast','cast','length','beard','lod'].map(id=>Button('row',id,T(`hair.category.${id}`),this.category===id)).join('');
     const options=this.stations.map((st,i)=>st.row===this.category?`<option value="${i}" ${i===this.selected?'selected':''}>${Esc(st.meta.label)}${st.lod?` · ${T(`hair.lodLabel.${st.lod}`)}`:''}</option>`:'').join('');
     const views=['front','side','back','top'].map(id=>Button('view',id,T(`hair.view.${id}`),this.view===id)).join('')+Button('action','focus',T('hair.focus'))+Button('view','overview',T('hair.view.overview'),this.view==='overview');
     const toggles=[['hair',this.showHair],['beard',this.showBeard],['labels',this.showLabels]].map(([key,on])=>Button('toggle',key,T(`hair.toggle.${key}`),on)).join('');

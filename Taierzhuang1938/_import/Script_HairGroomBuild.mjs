@@ -232,7 +232,7 @@ class HeadFrame {
     // 过渡带按头皮上到发际线的距离算（方位角换成弧长），不只按高度差：鬓角、耳前这些发际线陡的地方也软
     const side = p[0] >= this.centerX ? 1 : -1, arc = (0.085 * Math.PI) / 180;
     let h0 = this.NoisyHairlineY(phi, hl, side);
-    if (this.referenceProjection) {
+    if (this.referenceProjection && hl.reference !== false) {
       // A frontal image has no usable depth at the temples. Join its hairline
       // to the ear-aware side outline before projection becomes tangential.
       const [start, end] = HAIR_SHADING.referenceFrontFadeDegrees;
@@ -379,6 +379,8 @@ class ReferenceProjection {
       const x = Math.abs(this.Project(p)[0] - this.look.projection.reference.centerX) / width;
       length *= Mix(1, .35, Clamp(x, 0, 1) * setting.point);
     }
+    if (setting.tipBelowChin !== undefined) length = Math.min(length,
+      Math.max(.0005, p[1]-this.frame.men+setting.tipBelowChin));
     const dir = part === 'mustache' ? [side * .6, -1, -.1] : [side * .08, -1, .1];
     return [{part, density, length, dir: Norm(dir)}];
   }
@@ -436,6 +438,14 @@ function PoissonRoots(sampler, rng, spacing, Weight, maxCount = 20000) {
 // 梳向（头皮切面上的方向）
 function CombDir(style, frame, p, n) {
   const c = style.comb, m = frame.m;
+  if (c.type === 'bob') {
+    const side = p[0] >= c.partX ? 1 : -1;
+    const front = 1 - Smooth(38, 70, frame.Phi(p));
+    const crown = frame.Regions(p).top;
+    const fringe = Norm(Project([side * .22, -.95, -.4], n));
+    const sides = Norm(Project([side * (.3 + crown * .65), -.9, .12], n));
+    return Norm(Add(Scale(sides, 1 - front), Scale(fringe, front)));
+  }
   if (c.type === 'crew') {
     const region = frame.Regions(p);
     const front = 1 - Smooth(45, 85, frame.Phi(p));
@@ -763,7 +773,16 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     const r = frame.Regions(p), L = style.length;
     const sideBack = Mix(L.side, L.back, r.back);
     const topFront = Mix(L.top, L.front, r.front);
-    return Mix(sideBack, topFront, r.top);
+    let length = Mix(sideBack, topFront, r.top);
+    if (style.crownHalfWidth) length = Mix(length, sideBack,
+      Smooth(style.crownHalfWidth, style.crownHalfWidth + style.crownBlend, Math.abs(p[0]-frame.centerX)));
+    if (style.comb.type === 'bob') {
+      const c = style.comb, front = 1 - Smooth(38, 70, frame.Phi(p));
+      const fringe = Clamp(p[1] - frame.gl - c.fringeClearance, c.fringeMinLength, L.front);
+      const hem = Clamp((p[1]-frame.men-c.hemOffset)*1.05 + r.top*c.crownTravel, c.hemMinLength, L.top);
+      return Mix(hem, fringe, front);
+    }
+    return length;
   };
   const LiftAt = (p) => { const r = frame.Regions(p), l = style.lift; return Mix(Mix(l.side, l.back, r.back), l.top, r.top); };
   // 1. 导向发丝
@@ -773,6 +792,10 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     const comb = CombDir(style, frame, r.p, r.n);
     const len = LengthAt(r.p) * Mix(0.45, 1, r.w);
     const pts = GrowGuide(r.p, r.n, comb, len, K, { lift: LiftAt(r.p), stiffness: style.stiffness, gravity: style.gravity, volume: style.volume }, sdf, rng);
+    if (style.comb.tipTuck) for (let k = 1; k < K; k++) {
+      pts[k][0] -= Math.sign(pts[k][0]-frame.centerX) * style.comb.tipTuck * Smooth(.5, 1, k/(K-1));
+      sdf.PushOut(pts[k], .0005);
+    }
     guides.push(pts); guideRoots.push(r.p); guideNormals.push(r.n); guideComb.push(comb);
   }
   // 发丝点的「开阔度」（被别的发丝盖住多少）：给环境光遮蔽用。
@@ -1334,9 +1357,14 @@ function BuildGroom(entry, tiles) {
     header.beard = { style: entry.beard, name: style.name, cards: b.cardCount, triangles: b.cards.idx.length / 3,
       stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0 },
       render: { color: style.color, roughness: 0.42, specular: 0.5, scatter: 0.5, cardAlphaScale: style.cards.alphaScale ?? 1 } };
+    header.beard.render.referenceCoverageGain = style.coverageGain ?? 1;
+    header.beard.render.referenceCoverageScale = style.coverageScale ?? 1;
+    header.beard.render.referenceLuminance = !!style.referenceLuminance;
+    header.beard.render.referenceLuminanceGain = style.luminanceGain ?? 1;
     if (style.referenceMask) header.beard.referenceMask = {
       look: style.referenceMask, atlas: REFERENCE_MASKS.atlas, atlasSha256: REFERENCE_MASKS.atlasSha256,
       sourceSha256: reference.sha256, baldSha256: reference.baldSha256,
+      ...(style.referenceLuminance ? {luminanceAtlasSha256:REFERENCE_MASKS.luminanceAtlasSha256} : {}),
     };
   }
   const buf = Pack(header, sections);

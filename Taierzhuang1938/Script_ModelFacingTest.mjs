@@ -762,5 +762,18 @@ Check(nierSoles.length > 100 && nierFront > Math.abs(nierBack) + .02,
 Check(nierFacing.sourceForward === "+Z" && nierFacing.actorForward === "-Z",
   "妮儿沿用X Bot源+Z至角色-Z的共用桥接");
 
+// Hair lab busts are converted external heads too. Measure their actual nose
+// prominence relative to the brow, including Nier's differently oriented source.
+const hairHeads = JSON.parse(fs.readFileSync(path.join(projectDir, 'Hair/Heads/Data_HairHeads.json'), 'utf8')).heads;
+const hairReferences = JSON.parse(fs.readFileSync(path.join(projectDir, 'Hair/Data_HairReferences.json'), 'utf8')).looks;
+for (const [key, head] of Object.entries(hairHeads)) {
+  const points = GlbPoints(path.join(projectDir, `Hair/Heads/Model_HairHead_${key}.glb`));
+  const marks = hairReferences[key].landmarks, centerX = marks.centerX || 0;
+  const Front = y => Math.min(...points.filter(p=>Math.abs(p[0]-centerX)<.012 && Math.abs(p[1]-y)<.007).map(p=>p[2]));
+  const browZ = Front(marks.glabella[1]), noseZ = Front(head.noseTip[1]);
+  Check(Number.isFinite(noseZ) && noseZ < -.05 && noseZ < browZ-.004,
+    `${key} 实验室头部的实际鼻尖朝 -Z`, `nose=${noseZ.toFixed(4)} brow=${browZ.toFixed(4)}`);
+}
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
-console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");
+console.log("PASS ModelFacingTest: 飞机/战车/人物头部朝向及独立布料米制/绑定方向均通过几何复量");

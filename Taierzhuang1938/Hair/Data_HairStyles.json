@@ -924,6 +924,69 @@
    "beard": "FullLong",
    "row": "beard",
    "label": "长络腮 12 厘米"
+  },
+  {
+   "id": "Donggua_Cast",
+   "head": "Donggua",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "newCast",
+   "label": "冬瓜（个人参考）",
+   "referenceLook": "Donggua"
+  },
+  {
+   "id": "Yaowa_Cast",
+   "head": "Yaowa",
+   "hair": "Crew",
+   "beard": null,
+   "row": "newCast",
+   "label": "幺娃（个人参考）",
+   "referenceLook": "Yaowa"
+  },
+  {
+   "id": "LiuWencai_Cast",
+   "head": "LiuWencai",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "newCast",
+   "label": "刘文财（个人参考）",
+   "referenceLook": "LiuWencai"
+  },
+  {
+   "id": "OldGeng_Cast",
+   "head": "OldGeng",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "newCast",
+   "label": "老耿（个人参考）",
+   "referenceLook": "OldGeng"
+  },
+  {
+   "id": "Nier_Cast",
+   "head": "Nier",
+   "hair": "LongStraight",
+   "beard": null,
+   "row": "newCast",
+   "label": "妮儿（个人参考）",
+   "referenceLook": "Nier"
+  },
+  {
+   "id": "TaniHisao_Cast",
+   "head": "TaniHisao",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "newCast",
+   "label": "谷寿夫（个人参考）",
+   "referenceLook": "TaniHisao"
+  },
+  {
+   "id": "SoldierC_Cast",
+   "head": "SoldierC",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "row": "newCast",
+   "label": "日军士兵C（个人参考）",
+   "referenceLook": "SoldierC"
   }
  ],
  "gameGrooms": [

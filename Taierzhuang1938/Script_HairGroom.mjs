@@ -19,6 +19,7 @@ export const HAIR_LODS = Object.freeze(['strands', 'cards', 'shell', 'none']);
 
 const ARRAY_TYPES = { Float32Array, Uint16Array, Uint32Array, Uint8Array, Int8Array };
 const referenceAtlases = new WeakMap();
+const beardLuminanceAtlases = new WeakMap();
 
 // 量化段解回 float（Script_HairGroomBuild 的 MeshSections）
 function Dequantize(raw, q) {
@@ -38,14 +39,15 @@ function Dequantize(raw, q) {
 export async function LoadHairAtlas(url) {
   const loader = new THREE.TextureLoader();
   const referenceUrl = new URL('Texture_HairReferenceMasks.png', new URL(url, document.baseURI)).href;
-  const loaded = await Promise.allSettled([loader.loadAsync(HairAssetUrl(url)), loader.loadAsync(HairAssetUrl(referenceUrl))]);
+  const luminanceUrl = new URL('Texture_HairReferenceBeardLuminance.png', new URL(url, document.baseURI)).href;
+  const loaded = await Promise.allSettled([loader.loadAsync(HairAssetUrl(url)), loader.loadAsync(HairAssetUrl(referenceUrl)), loader.loadAsync(HairAssetUrl(luminanceUrl))]);
   const failure = loaded.find(result => result.status === 'rejected');
   if (failure) {
     for (const result of loaded) if (result.status === 'fulfilled') result.value.dispose();
     throw failure.reason;
   }
-  const [texture, reference] = loaded.map(result => result.value);
-  for (const atlas of [texture, reference]) {
+  const [texture, reference, luminance] = loaded.map(result => result.value);
+  for (const atlas of [texture, reference, luminance]) {
     atlas.flipY = false;
     atlas.colorSpace = THREE.NoColorSpace;
     atlas.anisotropy = 8;
@@ -54,10 +56,13 @@ export async function LoadHairAtlas(url) {
     atlas.needsUpdate = true;
   }
   referenceAtlases.set(texture, reference);
+  beardLuminanceAtlases.set(texture, luminance);
   const ReleaseReference = () => {
     texture.removeEventListener('dispose', ReleaseReference);
     referenceAtlases.delete(texture);
+    beardLuminanceAtlases.delete(texture);
     reference.dispose();
+    luminance.dispose();
   };
   texture.addEventListener('dispose', ReleaseReference);
   return texture;
@@ -216,8 +221,9 @@ export class HairGroom {
     const b = asset.beard;
     if (b) {
       if (b.cardGeometry) this.meshes.beardCards = this.Mesh(b.cardGeometry, MakeCardMaterials(b, atlas, this.shared, lightRig, b.density), 'BeardCards');
-      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared, referenceAtlases.get(atlas)), 'Stubble', 2);
+      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared, referenceAtlases.get(atlas), lightRig, beardLuminanceAtlases.get(atlas)), 'Stubble', 2);
     }
+    for (const material of this.materials) if (material.uniforms.uMelanin) material.userData.hairBaseMelanin = material.uniforms.uMelanin.value;
     for (const mesh of Object.values(this.meshes)) mesh.visible = false;
   }
   Mesh(geometry, mats, label) {
@@ -271,7 +277,11 @@ export class HairGroom {
     else if (key === 'curlRadius') u.uCurl.value.x = value;
     else if (key === 'curlPitch') u.uCurl.value.y = value;
     else if (key === 'roughness') for (const m of this.materials) { if (m.uniforms.uRoughness) m.uniforms.uRoughness.value = value; }
-    else if (key === 'melanin') for (const m of this.materials) { if (m.uniforms.uMelanin) m.uniforms.uMelanin.value = value; }
+    else if (key === 'melanin') {
+      const base = this.asset.hair?.render.color.melanin ?? this.asset.beard?.render.color.melanin ?? value;
+      const delta = value-base;
+      for (const m of this.materials) if (m.uniforms.uMelanin) m.uniforms.uMelanin.value = THREE.MathUtils.clamp(m.userData.hairBaseMelanin + delta, 0, 1);
+    }
   }
   PickLod(px) {
     if (!this.showHair) return 'none';

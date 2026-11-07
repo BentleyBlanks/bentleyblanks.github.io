@@ -29,6 +29,13 @@ HEADS = {
     "SoldierA":  {"name": "日军士兵A", "src": "10_日军士兵A/human head 3d model.glb"},
     "Jia":       {"name": "日兵甲",   "src": "14_日兵甲/bald head 3d model.glb"},
     "Yi":        {"name": "日兵乙",   "src": "15_日兵乙/bald head 3d model.glb"},
+    "Donggua":   {"name": "冬瓜",     "src": "03_冬瓜/human character 3d model.glb"},
+    "Yaowa":     {"name": "幺娃",     "src": "04_幺娃/human head 3d model.glb"},
+    "LiuWencai": {"name": "刘文财",   "src": "06_刘文财/bald head 3d model.glb"},
+    "OldGeng":   {"name": "老耿",     "src": "07_老耿/elderly male head 3d model.glb", "mentonY": 0.289},
+    "Nier":      {"name": "妮儿",     "src": "08_妮儿/bald head 3d model.glb", "heightM": 0.205, "sourceFacing": "+Z", "mentonY": 0.309},
+    "TaniHisao": {"name": "谷寿夫",   "src": "09_谷寿夫/bald man head 3d model.glb", "mentonY": 0.3405},
+    "SoldierC":  {"name": "日军士兵C", "src": "12_日军士兵C/bald man bust 3d model.glb"},
 }
 
 
@@ -145,8 +152,22 @@ def Build(key):
     I = Accessor(j, blob, prim["indices"]).reshape(-1).astype(np.uint32)
     node = j["nodes"][0]
     P += np.array(node.get("translation", [0, 0, 0]))
+    # Some exported sources use centimetres. Landmark search works in a
+    # normalized source space, independently of that export's unit scale.
+    sourceHeight = float(np.ptp(P[:, 1]))
+    if sourceHeight > 2:
+        P /= sourceHeight
+    if spec.get("sourceFacing") == "+Z":
+        # Nier's exported bust faces +Z, confirmed by its nose projection;
+        # other Tripo busts face +X. Use the same +X landmark workspace.
+        P = np.stack([P[:, 2], P[:, 1], -P[:, 0]], axis=-1)
+        N = np.stack([N[:, 2], N[:, 1], -N[:, 0]], axis=-1)
     L = Landmarks(P)
-    scale = HEAD_HEIGHT_M / (L["top"] - L["menton"])
+    # These source chins were checked against a frontal orthographic render;
+    # their smooth jaw/neck profile fools the automatic depth-step detector.
+    if "mentonY" in spec:
+        L["menton"] = spec["mentonY"]
+    scale = spec.get("heightM", HEAD_HEIGHT_M) / (L["top"] - L["menton"])
     # 胸像底面中心 → 原点：x 取头骨中心，z 取 0（左右本来对称），y 取最低点。
     base = np.array([L["skullX"], P[:, 1].min(), 0.0])
 
@@ -167,6 +188,7 @@ def Build(key):
     eb = L["earBox"]
     marks = {
         "name": spec["name"], "source": spec["src"], "scale": round(float(scale), 6),
+        "sourceFacing": spec.get("sourceFacing", "+X"), "sourceUnitScale": 1 / sourceHeight if sourceHeight > 2 else 1,
         "top": [0, Y(L["top"]), Z(P[np.argmax(P[:, 1]), 0])],
         "glabella": [0, Y(L["glabella"]), Z(L["browFront"])],
         "nasion": [0, Y(L["nasion"])],
@@ -183,10 +205,12 @@ def Build(key):
 
     mat = j["materials"][prim.get("material", 0)]
     pbr = mat.get("pbrMetallicRoughness", {})
+    normal = ImageOf(j, blob, mat["normalTexture"]["index"]) if "normalTexture" in mat else Image.new("RGB", (4, 4), (128, 128, 255))
+    orm = ImageOf(j, blob, pbr["metallicRoughnessTexture"]["index"]) if "metallicRoughnessTexture" in pbr else Image.new("RGB", (4, 4), (255, 210, 0))
     images = [
         ("base", Encode(ImageOf(j, blob, pbr["baseColorTexture"]["index"]), BASE_SIZE, "jpeg", "RGB"), "image/jpeg"),
-        ("normal", Encode(ImageOf(j, blob, mat["normalTexture"]["index"]), DETAIL_SIZE, "png", "RGB"), "image/png"),
-        ("orm", Encode(ImageOf(j, blob, pbr["metallicRoughnessTexture"]["index"]), DETAIL_SIZE, "jpeg", "RGB"), "image/jpeg"),
+        ("normal", Encode(normal, DETAIL_SIZE, "png", "RGB"), "image/png"),
+        ("orm", Encode(orm, DETAIL_SIZE, "jpeg", "RGB"), "image/jpeg"),
     ]
     WriteGlb(os.path.join(OUT_DIR, f"Model_HairHead_{key}.glb"), key, P2, N2, UV, I, images)
     return marks

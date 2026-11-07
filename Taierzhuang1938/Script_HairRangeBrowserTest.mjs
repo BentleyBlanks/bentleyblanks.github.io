@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
 import { XBOT_CHARACTERS } from './Data_XBotCharacters.mjs';
+import { HAIR_RANGE_ROWS } from './Data_HairRange.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, 'tmp', 'HairLab', 'Verified');
@@ -37,7 +38,8 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && (window.Taierzhuang.Debug.HairRange?.State().ready || window.Taierzhuang.Debug.HairRange?.State().error), null, { timeout: 400000, polling: 1000 });
   result.lab = await State();
   assert.equal(result.lab.error, null);
-  assert.equal(result.lab.stations.length, 24);
+  assert.equal(result.lab.stations.length, HAIR_RANGE_ROWS.reduce((sum,row)=>sum+row.items.length,0));
+  assert.equal(result.lab.stations.filter(station=>station.row==='newCast').length,7);
   assert.equal(result.lab.loaded, result.lab.total);
   await Shot('LabPanel');
   await page.evaluate(() => window.Taierzhuang.Debug.HairRange.ShowPanel(false));
@@ -49,6 +51,21 @@ try {
     await page.evaluate((index) => window.Taierzhuang.Debug.HairRange.Focus(index, 'front'), index);
     await Shot(name);
   }
+  result.newCast = {};
+  for (const [index,station] of result.lab.stations.entries()) {
+    if (station.row !== 'newCast') continue;
+    const tiers = {};
+    await page.evaluate(index=>Taierzhuang.Debug.HairRange.Focus(index,'front'),index);
+    for (const lod of ['strands','cards','shell']) {
+      await page.evaluate(lod=>Taierzhuang.Debug.HairRange.Lod(lod),lod);await Step(24);
+      tiers[lod]=(await State()).stations[index];
+      assert.equal(tiers[lod].lod,lod,`${station.groom}: ${lod} tier is actually selected`);
+      assert.ok(tiers[lod].triangles>0,`${station.groom}: ${lod} has active geometry`);
+      await page.screenshot({path:path.join(out,`${station.groom}_${lod}.png`)});
+    }
+    result.newCast[station.groom]=tiers;
+  }
+  await page.evaluate(()=>Taierzhuang.Debug.HairRange.Lod('auto'));
   await page.evaluate(() => { const a = window.Taierzhuang.Debug.HairRange; a.ShowPanel(true); a.Focus(9, 'front'); });
   await page.locator('[data-toggle="hair"]').click(); await Step();
   const hairHidden = await page.evaluate(() => {
@@ -224,6 +241,9 @@ try {
     Check(groom.meshes.scalp.material.uniforms.uReferenceMask.value === referenceAtlas, 'scalp and facial hair share the original-reference atlas');
     let referenceAtlasDisposals = 0;
     referenceAtlas.addEventListener('dispose', () => referenceAtlasDisposals++);
+    const beardLuminance = groom.meshes.stubble.material.uniforms.uReferenceBeardLuminance.value;
+    let luminanceDisposals = 0;
+    beardLuminance.addEventListener('dispose', () => luminanceDisposals++);
     const pass = new PrepassPass({ preset: { velocity: true, hzb: false }, hdrCapable: true, hdrType: T.HalfFloatType, targets: {} }); pass.Resize(320, 240);
     const target = MakeRenderTarget(320, 240, { type: T.HalfFloatType });
     const copy = MakeFullscreenMaterial('uniform sampler2D uV;uniform sampler2D uD;varying vec2 vUv;void main(){gl_FragColor=vec4(texture2D(uV,vUv).xy,texture2D(uD,vUv).w,1.);}', { uV: { value: null }, uD: { value: null } });
@@ -276,6 +296,7 @@ try {
     renderer.render(scene, camera); Check(renderer.info.render.calls > 0 && !asset.disposed, 'sibling survives instance disposal');
     sibling.Dispose(); DisposeHairGroomAsset(asset); atlas.dispose();
     Check(referenceAtlasDisposals === 1, 'shared original-reference atlas released exactly once with its owner');
+    Check(luminanceDisposals === 1, 'shared beard luminance atlas released exactly once with its owner');
     renderer.render(scene, camera); const after = renderer.info.memory.geometries;
     Check(after < before, 'GPU geometries fall after hair asset release');
     const original = ManagedGLTFLoader.prototype.loadAsync, resources = new Set(), disposed = new Set();
@@ -294,7 +315,7 @@ try {
       Check(range.heads.size === 0 && range.assets.size === 0 && range.root.children.length === 0 && !document.querySelector('#hair-range-panel'), 'async exit leaves no assets, objects or DOM');
     } finally { release(); ManagedGLTFLoader.prototype.loadAsync = original; range?.Dispose(); }
     pass.Dispose(); target.dispose(); quad.geometry.dispose(); copy.dispose(); renderer.dispose();
-    return { still, moved, rotated, tracking, hidden, reappear, modes, coverage, qualityCaps, memory: { before, after }, referenceAtlasDisposals, lateResources: resources.size, releasedLateResources: disposed.size };
+    return { still, moved, rotated, tracking, hidden, reappear, modes, coverage, qualityCaps, memory: { before, after }, referenceAtlasDisposals, luminanceDisposals, lateResources: resources.size, releasedLateResources: disposed.size };
   });
   }
   result.failedRequests = failedRequests; result.errors = errors;

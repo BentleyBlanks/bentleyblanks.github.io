@@ -5,17 +5,21 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
+import {HAIR_RANGE_ROWS} from './Data_HairRange.mjs';
 
 const root = path.resolve(import.meta.dirname, '..'), here = import.meta.dirname;
 const output = path.join(here, 'tmp/HairLab/ReferenceReview'); fs.mkdirSync(output, {recursive:true});
 const references = JSON.parse(fs.readFileSync(path.join(here, 'Hair/Data_HairReferences.json'))).looks;
 const referenceRoot = path.join(process.env.USERPROFILE, 'OneDrive/Sync/饮河/FPS/角色/Tripo');
-const subjects = {Shunzi:7, Luo:8, HeYoutian:9, SoldierA:10, Jia:11, Yi:12};
+const stations = HAIR_RANGE_ROWS.flatMap(row=>row.items.map(item=>({...item,row:row.id})));
+const subjects = Object.fromEntries(stations.map((station,index)=>[station.groom.replace(/_Cast$/,''),index])
+  .filter(([key,index])=>stations[index].groom.endsWith('_Cast') && !stations[index].lod));
 const only = process.env.HAIR_REF_SUBJECTS?.split(',');
 const detail = process.env.HAIR_REF_DETAIL === '1';
 const viewport = detail ? {width:1920,height:1080} : {width:1280,height:720};
 const server = process.env.HAIR_PREVIEW ? null : await ServeRoot(root,0);
 const base = process.env.HAIR_PREVIEW || `http://127.0.0.1:${server.address().port}`;
+const revisionTag = process.env.HAIR_VERIFY_REVISION ? `&verify=${encodeURIComponent(process.env.HAIR_VERIFY_REVISION)}` : '';
 const browser = await LaunchBrowser({extraArgs:['--mute-audio']});
 const errors = [], result = {viewport:[viewport.width,viewport.height], quality:detail?'ultra':'high', subjects:{}};
 function FramedImage(bytes, width, height, crop) {
@@ -32,7 +36,7 @@ try {
     localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
     localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
   });
-  await page.goto(`${base}/Taierzhuang1938/?hair=1&quality=${result.quality}&manual=1&shot=1`,{waitUntil:'domcontentloaded'});
+  await page.goto(`${base}/Taierzhuang1938/?hair=1&quality=${result.quality}&manual=1&shot=1${revisionTag}`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>{
     const state=window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.HairRange.State();
     if(state?.error)throw new Error(state.error);
@@ -87,15 +91,23 @@ try {
   const click=await page.evaluate(async()=>{const T=await import('three');const t=Taierzhuang,p=new T.Vector3(...t.Debug.HairRange.State().camera.target).project(t.camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};});
   await page.mouse.click(click.x,click.y);assert.equal(await page.evaluate(()=>Taierzhuang.Debug.HairRange.State().selected),8,'left click selects the visible head');
   assert.equal(await page.locator('#hair-range-panel input[type="range"]:visible').count(),0,'fine controls start collapsed');
-  assert.equal(await page.locator('#hair-range-map [data-row]').count(),4,'all four rows have a persistent purpose guide');
+  assert.equal(await page.locator('#hair-range-map [data-row]').count(),HAIR_RANGE_ROWS.length,'every row has a persistent purpose guide');
   await page.locator('#hair-range-map [data-row="beard"]').click();
   assert.equal(await page.locator('[data-sample] option').count(),5,'guide selects the beard row and its samples');
   await page.locator('#hair-range-panel [data-row="cast"]').click();
   assert.equal(await page.locator('[data-sample] option').count(),6,'character category only lists six personal looks');
+  await page.locator('#hair-range-panel [data-row="newCast"]').click();
+  assert.equal(await page.locator('[data-sample] option').count(),7,'new character category lists all seven additions');
   await page.locator('[data-fold="appearance"] summary').click();
   const slider=page.locator('[data-param="clump"]'),defaultClump=await slider.inputValue();
   await slider.focus();const guarded=await Target();await page.keyboard.down('w');await Step(15);await page.keyboard.up('w');assert.deepEqual(await Target(),guarded,'form editing never flies');
   await slider.press('End');await page.locator('[data-action="reset"]').click();assert.equal(await slider.inputValue(),defaultClump,'restore returns the selected sample to its baked appearance');
+  const resetBeard = await page.evaluate(()=>{
+    const state=Taierzhuang.Debug.HairRange.State(),station=state.stations[state.selected];
+    const root=Taierzhuang.scene.getObjectByName(`Hair_${station.row}_${station.groom}`);
+    return {look:station.reference.look,melanin:root.getObjectByName('HairStubble').material.uniforms.uMelanin.value};
+  });
+  assert.equal(resetBeard.melanin,references[resetBeard.look].beard.color.melanin,'restore preserves the beard pigment independently of scalp hair');
   assert.ok(await page.locator('[data-fold="appearance"]').evaluate(el=>el.open),'editing keeps the fold open');
   await page.locator('[data-fold="appearance"] summary').click();
   await page.evaluate(()=>{Taierzhuang.Debug.HairRange.Camera('overview');Taierzhuang.Debug.HairRange.ShowPanel(true);});await Step(20);
@@ -135,18 +147,19 @@ try {
     const loaded = await page.evaluate(index => Taierzhuang.Debug.HairRange.State().stations[index].reference, index);
     assert.equal(loaded.look, key);
     assert.equal(loaded.recipeSha256, createHash('sha256').update(JSON.stringify(reference)).digest('hex'), 'browser loaded the current registered groom');
-    await page.evaluate(({index,key})=>{
+    const headName=`HairHead_${stations[index].row}_${key}_Cast`;
+    await page.evaluate(({index,headName})=>{
       const api=Taierzhuang.Debug.HairRange;
       api.ShowPanel(false);api.Focus(index,'front');api.Toggle('labels',false);
       const specimens=Taierzhuang.scene.getObjectByName('HairRangeSpecimens');
-      for(const head of specimens.children)head.visible=head.name===`HairHead_cast_${key}_Cast`;
-    },{index,key});
+      for(const head of specimens.children)head.visible=head.name===headName;
+    },{index,headName});
     const portraitRadius = await page.evaluate(() => Taierzhuang.Debug.HairRange.State().camera.radius);
     await page.mouse.move(950,350); await page.mouse.wheel(0,-350);
     await page.waitForFunction(radius => Taierzhuang.Debug.HairRange.State().camera.radius < radius, portraitRadius);
     await Step(180);
-    const actualCrop = await page.evaluate(({key,marks})=>{
-      const head=Taierzhuang.scene.getObjectByName(`HairHead_cast_${key}_Cast`);
+    const actualCrop = await page.evaluate(({key,marks,headName})=>{
+      const head=Taierzhuang.scene.getObjectByName(headName);
       const point=Taierzhuang.camera.position.clone();
       const min=[Infinity,Infinity],max=[-Infinity,-Infinity];
       const minimumY=marks.menton[1]-(key==='SoldierA'?.025:.015);
@@ -155,7 +168,7 @@ try {
         const positions=mesh.geometry.attributes.position;
         for(let i=0;i<positions.count;i++){
           point.fromBufferAttribute(positions,i);
-          if(point.y<minimumY)continue;
+          if(point.y<minimumY && !mesh.userData.hairGroom)continue;
           point.applyMatrix4(mesh.matrixWorld).project(Taierzhuang.camera);
           const x=(point.x*.5+.5)*window.innerWidth,y=(-point.y*.5+.5)*window.innerHeight;
           min[0]=Math.min(min[0],x);min[1]=Math.min(min[1],y);
@@ -164,12 +177,12 @@ try {
       });
       const x=Math.max(0,min[0]-8),y=Math.max(0,min[1]-8);
       return {x,y,width:Math.min(window.innerWidth,max[0]+8)-x,height:Math.min(window.innerHeight,max[1]+8)-y};
-    },{key,marks:reference.landmarks});
+    },{key,marks:reference.landmarks,headName});
     const file=path.join(output,`Scene_${key}_Front.png`);await page.screenshot({path:file});
     if (process.env.HAIR_REF_MARKS) {
       const marks=JSON.parse(fs.readFileSync(path.join(here,'Hair/Heads/Data_HairHeads.json'))).heads[key];
-      await page.evaluate(({key,marks})=>{
-        const host=Taierzhuang,head=host.scene.getObjectByName(`HairHead_cast_${key}_Cast`);
+      await page.evaluate(({key,marks,headName})=>{
+        const host=Taierzhuang,head=host.scene.getObjectByName(headName);
         let mesh;head.traverse(o=>{if(!mesh&&o.isMesh&&!o.userData.hairGroom)mesh=o;});
         const pos=mesh.geometry.attributes.position;
         for(const [name,mark] of Object.entries(marks)){
@@ -178,13 +191,15 @@ try {
           const v=host.camera.position.clone().fromBufferAttribute(pos,id).applyMatrix4(mesh.matrixWorld).project(host.camera);
           const tag=document.createElement('div');tag.className='hairReviewMark';tag.textContent=name;tag.style.cssText=`position:fixed;z-index:9999;left:${(v.x*.5+.5)*1280}px;top:${(-v.y*.5+.5)*720}px;background:#ffae00;color:#000;font:12px sans-serif`;document.body.appendChild(tag);
         }
-      },{key,marks});
+      },{key,marks,headName});
       await page.screenshot({path:path.join(output,`Scene_${key}_Landmarks.png`)});
       await page.locator('.hairReviewMark').evaluateAll(tags=>tags.forEach(t=>t.remove()));
     }
     const actual=fs.readFileSync(file), landmarks=reference.registration.reference;
     const referenceCrop={x:landmarks.centerX-landmarks.faceHalfWidth*1.5,y:Math.max(0,landmarks.hairTopY-40),width:landmarks.faceHalfWidth*3,height:landmarks.chinY+100-Math.max(0,landmarks.hairTopY-40)};
-    await compare.setContent(`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#101314;color:#eeefec;font:14px system-ui}.head{height:48px;display:flex;align-items:center;border-bottom:1px solid #c4c6bb33}.head span{width:50%;padding:0 20px}.pair{display:grid;grid-template-columns:1fr 1fr;height:672px}.portrait{position:relative;overflow:hidden;background:#e9e9e7}.portrait img{position:absolute;max-width:none}</style><div class="head"><span>${key} · 原始个人头部参考</span><span>实机单人观察 · ${detail?'1080p 极高画质':'720p 高画质'}</span></div><div class="pair">${FramedImage(bytes,2048,2048,referenceCrop)}${FramedImage(actual,viewport.width,viewport.height,actualCrop)}</div>`);
+    const sourceWidth=bytes.readUInt32BE(16),sourceHeight=bytes.readUInt32BE(20),sourceScale=sourceWidth/2048;
+    const sourceCrop=Object.fromEntries(Object.entries(referenceCrop).map(([key,value])=>[key,value*sourceScale]));
+    await compare.setContent(`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#101314;color:#eeefec;font:14px system-ui}.head{height:48px;display:flex;align-items:center;border-bottom:1px solid #c4c6bb33}.head span{width:50%;padding:0 20px}.pair{display:grid;grid-template-columns:1fr 1fr;height:672px}.portrait{position:relative;overflow:hidden;background:#e9e9e7}.portrait img{position:absolute;max-width:none}</style><div class="head"><span>${key} · 原始个人头部参考</span><span>实机单人观察 · ${detail?'1080p 极高画质':'720p 高画质'}</span></div><div class="pair">${FramedImage(bytes,sourceWidth,sourceHeight,sourceCrop)}${FramedImage(actual,viewport.width,viewport.height,actualCrop)}</div>`);
     await compare.locator('img').evaluateAll(imgs=>Promise.all(imgs.map(img=>img.decode())));
     await compare.screenshot({path:path.join(output,`Compare_${key}.png`)});
     result.subjects[key]={reference:reference.source,sha256:reference.sha256,actual:file,referenceCrop,actualCrop};

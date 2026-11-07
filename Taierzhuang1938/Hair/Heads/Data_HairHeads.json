@@ -374,6 +374,454 @@
      0.1123
     ]
    }
+  },
+  "Donggua": {
+   "name": "冬瓜",
+   "source": "03_冬瓜/human character 3d model.glb",
+   "scale": 0.443396,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.43422,
+    0.00377
+   ],
+   "glabella": [
+    0,
+    0.38544,
+    -0.08935
+   ],
+   "nasion": [
+    0,
+    0.38101
+   ],
+   "noseTip": [
+    0,
+    0.2879,
+    -0.1268
+   ],
+   "subnasale": [
+    0,
+    0.27016
+   ],
+   "stomion": [
+    0,
+    0.24462
+   ],
+   "menton": [
+    0,
+    0.19922,
+    -0.11525
+   ],
+   "ear": {
+    "yMin": 0.28146,
+    "yMax": 0.33621,
+    "zFront": 0.01457,
+    "zBack": 0.04354,
+    "halfWidth": 0.10272
+   },
+   "skullCenter": [
+    0,
+    0.38544,
+    0.0
+   ],
+   "skullBack": 0.08949,
+   "bounds": {
+    "min": [
+     -0.1949,
+     0.0,
+     -0.1268
+    ],
+    "max": [
+     0.1951,
+     0.4342,
+     0.1522
+    ]
+   }
+  },
+  "Yaowa": {
+   "name": "幺娃",
+   "source": "04_幺娃/human head 3d model.glb",
+   "scale": 0.345588,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.34542,
+    0.01282
+   ],
+   "glabella": [
+    0,
+    0.25211,
+    -0.10007
+   ],
+   "nasion": [
+    0,
+    0.23483
+   ],
+   "noseTip": [
+    0,
+    0.1899,
+    -0.12386
+   ],
+   "subnasale": [
+    0,
+    0.17263
+   ],
+   "stomion": [
+    0,
+    0.15023
+   ],
+   "menton": [
+    0,
+    0.11042,
+    -0.11306
+   ],
+   "ear": {
+    "yMin": 0.18579,
+    "yMax": 0.23523,
+    "zFront": -0.0081,
+    "zBack": 0.01839,
+    "halfWidth": 0.10538
+   },
+   "skullCenter": [
+    0,
+    0.25211,
+    0.0
+   ],
+   "skullBack": 0.10007,
+   "bounds": {
+    "min": [
+     -0.1223,
+     0.0,
+     -0.1239
+    ],
+    "max": [
+     0.1223,
+     0.3454,
+     0.1153
+    ]
+   }
+  },
+  "LiuWencai": {
+   "name": "刘文财",
+   "source": "06_刘文财/bald head 3d model.glb",
+   "scale": 0.412281,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.40363,
+    0.00775
+   ],
+   "glabella": [
+    0,
+    0.34179,
+    -0.10149
+   ],
+   "nasion": [
+    0,
+    0.33355
+   ],
+   "noseTip": [
+    0,
+    0.25521,
+    -0.1297
+   ],
+   "subnasale": [
+    0,
+    0.2346
+   ],
+   "stomion": [
+    0,
+    0.21085
+   ],
+   "menton": [
+    0,
+    0.16863,
+    -0.11844
+   ],
+   "ear": {
+    "yMin": 0.24672,
+    "yMax": 0.30116,
+    "zFront": 0.00603,
+    "zBack": 0.04031,
+    "halfWidth": 0.1008
+   },
+   "skullCenter": [
+    0,
+    0.34179,
+    0.0
+   ],
+   "skullBack": 0.1022,
+   "bounds": {
+    "min": [
+     -0.2007,
+     0.0,
+     -0.1297
+    ],
+    "max": [
+     0.201,
+     0.4036,
+     0.1552
+    ]
+   }
+  },
+  "OldGeng": {
+   "name": "老耿",
+   "source": "07_老耿/elderly male head 3d model.glb",
+   "scale": 0.330748,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.33059,
+    0.00396
+   ],
+   "glabella": [
+    0,
+    0.24459,
+    -0.10473
+   ],
+   "nasion": [
+    0,
+    0.24128
+   ],
+   "noseTip": [
+    0,
+    0.18836,
+    -0.13025
+   ],
+   "subnasale": [
+    0,
+    0.16852
+   ],
+   "stomion": [
+    0,
+    0.14828
+   ],
+   "menton": [
+    0,
+    0.09559,
+    -0.11701
+   ],
+   "ear": {
+    "yMin": 0.16683,
+    "yMax": 0.22416,
+    "zFront": -0.0025,
+    "zBack": 0.02317,
+    "halfWidth": 0.10279
+   },
+   "skullCenter": [
+    0,
+    0.24459,
+    0.0
+   ],
+   "skullBack": 0.10473,
+   "bounds": {
+    "min": [
+     -0.1028,
+     0.0,
+     -0.1302
+    ],
+    "max": [
+     0.1028,
+     0.3306,
+     0.1047
+    ]
+   }
+  },
+  "Nier": {
+   "name": "妮儿",
+   "source": "08_妮儿/bald head 3d model.glb",
+   "scale": 0.296671,
+   "sourceFacing": "+Z",
+   "sourceUnitScale": 0.010213479264818378,
+   "top": [
+    0,
+    0.29667,
+    0.00394
+   ],
+   "glabella": [
+    0,
+    0.21657,
+    -0.09323
+   ],
+   "nasion": [
+    0,
+    0.2136
+   ],
+   "noseTip": [
+    0,
+    0.1602,
+    -0.10407
+   ],
+   "subnasale": [
+    0,
+    0.14537
+   ],
+   "stomion": [
+    0,
+    0.13255
+   ],
+   "menton": [
+    0,
+    0.09167,
+    -0.09736
+   ],
+   "ear": {
+    "yMin": 0.15317,
+    "yMax": 0.19967,
+    "zFront": 0.00917,
+    "zBack": 0.03607,
+    "halfWidth": 0.08993
+   },
+   "skullCenter": [
+    0,
+    0.21657,
+    0.0
+   ],
+   "skullBack": 0.09329,
+   "bounds": {
+    "min": [
+     -0.1416,
+     0.0,
+     -0.1041
+    ],
+    "max": [
+     0.1416,
+     0.2967,
+     0.1006
+    ]
+   }
+  },
+  "TaniHisao": {
+   "name": "谷寿夫",
+   "source": "09_谷寿夫/bald man head 3d model.glb",
+   "scale": 0.409802,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.37454,
+    0.01129
+   ],
+   "glabella": [
+    0,
+    0.31307,
+    -0.09749
+   ],
+   "nasion": [
+    0,
+    0.30897
+   ],
+   "noseTip": [
+    0,
+    0.23111,
+    -0.12678
+   ],
+   "subnasale": [
+    0,
+    0.21062
+   ],
+   "stomion": [
+    0,
+    0.16636
+   ],
+   "menton": [
+    0,
+    0.13954,
+    -0.11682
+   ],
+   "ear": {
+    "yMin": 0.20388,
+    "yMax": 0.27078,
+    "zFront": 0.01616,
+    "zBack": 0.05554,
+    "halfWidth": 0.10037
+   },
+   "skullCenter": [
+    0,
+    0.31307,
+    0.0
+   ],
+   "skullBack": 0.09749,
+   "bounds": {
+    "min": [
+     -0.2004,
+     0.0,
+     -0.1268
+    ],
+    "max": [
+     0.2005,
+     0.3745,
+     0.1771
+    ]
+   }
+  },
+  "SoldierC": {
+   "name": "日军士兵C",
+   "source": "12_日军士兵C/bald man bust 3d model.glb",
+   "scale": 0.427273,
+   "sourceFacing": "+X",
+   "sourceUnitScale": 1,
+   "top": [
+    0,
+    0.41861,
+    0.00541
+   ],
+   "glabella": [
+    0,
+    0.34171,
+    -0.102
+   ],
+   "nasion": [
+    0,
+    0.33743
+   ],
+   "noseTip": [
+    0,
+    0.2648,
+    -0.12113
+   ],
+   "subnasale": [
+    0,
+    0.24771
+   ],
+   "stomion": [
+    0,
+    0.22463
+   ],
+   "menton": [
+    0,
+    0.18361,
+    -0.10774
+   ],
+   "ear": {
+    "yMin": 0.26154,
+    "yMax": 0.3161,
+    "zFront": 0.00975,
+    "zBack": 0.04437,
+    "halfWidth": 0.1008
+   },
+   "skullCenter": [
+    0,
+    0.34171,
+    0.0
+   ],
+   "skullBack": 0.10204,
+   "bounds": {
+    "min": [
+     -0.1564,
+     0.0,
+     -0.1211
+    ],
+    "max": [
+     0.1561,
+     0.4186,
+     0.1532
+    ]
+   }
   }
  }
 }

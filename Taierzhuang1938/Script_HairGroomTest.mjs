@@ -25,6 +25,10 @@ const referenceMasks = JSON.parse(fs.readFileSync(path.join(HAIR, 'Data_HairRefe
 const referenceText = fs.readFileSync(path.join(HAIR, 'Data_HairReferences.json'), 'utf8').replace(/\r\n/g, '\n');
 Check(referenceMasks.definitionSha256 === createHash('sha256').update(referenceText).digest('hex'), '参考覆盖图基于当前五官校准与配方');
 Check(referenceMasks.atlasSha256 === createHash('sha256').update(fs.readFileSync(path.join(HAIR, referenceMasks.atlas))).digest('hex'), '参考覆盖图集校验和一致');
+Check(referenceMasks.luminanceAtlasSha256 === createHash('sha256').update(fs.readFileSync(path.join(HAIR, referenceMasks.luminanceAtlas))).digest('hex'), '胡须原图亮度图集校验和一致');
+const referenceTiles = Object.values(referenceMasks.looks).map(look=>look.tile);
+Check(referenceTiles.every(([x,y,w,h])=>x>=0 && y>=0 && w>0 && h>0 && x+w<=1.00001 && y+h<=1.00001), '所有人物覆盖图均落在扩展图集内');
+Check(referenceTiles.every((a,i)=>referenceTiles.slice(i+1).every(b=>a[0]+a[2]<=b[0]+1e-6 || b[0]+b[2]<=a[0]+1e-6 || a[1]+a[3]<=b[1]+1e-6 || b[1]+b[3]<=a[1]+1e-6)), '人物覆盖区域互不重叠');
 const ReferenceMeta = (key) => {
   const recipe = references.looks[key];
   return recipe && {look:key, source:recipe.source, sha256:recipe.sha256, version:references.version,
@@ -43,7 +47,7 @@ for (const entry of entries) {
   Check(!entry.hair || !!styles.hair[entry.hair], `${entry.id}：发型 ${entry.hair} 在造型表里`);
   Check(!entry.beard || !!styles.beard[entry.beard], `${entry.id}：胡子 ${entry.beard} 在造型表里`);
   Check(!!heads[entry.head], `${entry.id}：头 ${entry.head} 有关键点`);
-  if (entry.row === 'cast' || entry.model) {
+  if (entry.referenceLook || entry.model) {
     const meta = ReferenceMeta(entry.referenceLook);
     Check(entry.referenceLook === (entry.labHead || entry.head) && !!meta, `${entry.id}：使用本人参考配方`);
     if (meta) {
@@ -53,6 +57,14 @@ for (const entry of entries) {
       Check(/^[a-f0-9]{64}$/.test(look.baldSha256), `${entry.id}：剃净参考也记录来源哈希`);
       const marks = look.landmarks;
       Check(marks.glabella[1] > marks.subnasale[1] && marks.subnasale[1] > marks.stomion[1] && marks.stomion[1] > marks.menton[1], `${entry.id}：校准的眉间、鼻下、口裂、下巴次序正确`);
+      if (look.beard.proportionalRegions) {
+        const mask = referenceMasks.looks[entry.referenceLook], ref = look.registration.reference;
+        const [left,top,right,bottom] = mask.crop, size = mask.grid.size;
+        const x = Math.round((ref.centerX-left)/(right-left)*(size-1));
+        const y = Math.round((ref.mouthY+(ref.chinY-ref.mouthY)*.75-top)/(bottom-top)*(size-1));
+        const part = Buffer.from(mask.grid.parts, 'base64')[y*size+x]-1;
+        Check(referenceMasks.parts[part] === 'chin', `${entry.id}：较远取景的下巴仍归下巴胡，唇下框不会吞掉下巴`);
+      }
     }
   }
 }
@@ -88,16 +100,22 @@ for (const g of manifest.grooms) {
   if (entry.referenceLook) {
     const expected = JSON.stringify(ReferenceMeta(entry.referenceLook));
     Check(JSON.stringify(header.reference) === expected && JSON.stringify(g.reference) === expected, `${g.id}：二进制与清单均基于当前个人参考和配方（修改后必须重烘）`);
-    const mask = header.beard?.referenceMask, look = references.looks[entry.referenceLook];
-    Check(mask?.look === entry.referenceLook && mask?.atlasSha256 === referenceMasks.atlasSha256
-      && mask?.sourceSha256 === look.sha256 && mask?.baldSha256 === look.baldSha256, `${g.id}：使用当前本人的原图覆盖图集`);
-    const uv = sec('beardStubbleUv'), pos = sec('beardStubblePos');
-    Check(!!uv && !!pos && uv.length === pos.length / 3 * 2, `${g.id}：细须投影 UV 与网格匹配`);
-    const tile = referenceMasks.looks[entry.referenceLook].tile;
-    Check(!!uv && uv.every((value, index) => {
-      const axis = index % 2, unit = value / 65535;
-      return unit >= tile[axis] - .0001 && unit <= tile[axis] + tile[axis + 2] + .0001;
-    }), `${g.id}：UV 始终在本人的图集区域内`);
+    const look = references.looks[entry.referenceLook];
+    if (look.beard.referenceLuminance) Check(header.beard?.render.referenceLuminance === true
+      && header.beard.referenceMask?.luminanceAtlasSha256 === referenceMasks.luminanceAtlasSha256,
+      `${g.id}：使用当前本人胡须的原图亮度`);
+    if (entry.beard) {
+      const mask = header.beard?.referenceMask;
+      Check(mask?.look === entry.referenceLook && mask?.atlasSha256 === referenceMasks.atlasSha256
+        && mask?.sourceSha256 === look.sha256 && mask?.baldSha256 === look.baldSha256, `${g.id}：使用当前本人的原图覆盖图集`);
+      const uv = sec('beardStubbleUv'), pos = sec('beardStubblePos');
+      Check(!!uv && !!pos && uv.length === pos.length / 3 * 2, `${g.id}：细须投影 UV 与网格匹配`);
+      const tile = referenceMasks.looks[entry.referenceLook].tile;
+      Check(!!uv && uv.every((value, index) => {
+        const axis = index % 2, unit = value / 65535;
+        return unit >= tile[axis] - .0001 && unit <= tile[axis] + tile[axis + 2] + .0001;
+      }), `${g.id}：UV 始终在本人的图集区域内`);
+    } else Check(!header.beard && look.beard.enabled === false, `${g.id}：净面参考不生成胡须或胡茬`);
     const scalpUv = sec('hairScalpUv'), scalpPos = sec('hairScalpPos');
     Check(header.hair?.referenceScalp?.look === entry.referenceLook && header.hair?.referenceScalp?.atlasSha256 === referenceMasks.atlasSha256,
       `${g.id}：额前发根使用本人的参考覆盖图`);
