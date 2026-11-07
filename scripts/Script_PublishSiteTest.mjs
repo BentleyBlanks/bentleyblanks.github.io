@@ -17,6 +17,7 @@ try{
     {name:'Menu',route:'?quality=low&scale=small',ready:()=>window.Tengxian?.state?.ready},
     {name:'TextureManager',route:'TextureManager.html',ready:()=>document.querySelectorAll('.asset').length>250&&!!document.querySelector('canvas')},
     {name:'Animation',route:'Animation/BackRifleRun/index.html',ready:()=>window.BackRifleReview?.ready&&document.getElementById('status')?.textContent.includes('独立 GLB 已载入')},
+    {name:'MixamoPreview',route:'Tool_MixamoAnimationPreview.html?who=oldGeng',ready:()=>window.__preview?.action&&document.getElementById('who')?.value==='oldGeng'},
     ...(process.argv.includes('--gameplay')?[{name:'Gameplay',route:'?whitebox=p012&quality=low&scale=small',ready:()=>window.Tengxian?.state?.ready}]:[]),
   ]){
     const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],missing=[];
@@ -29,6 +30,7 @@ try{
     try{
       await page.goto(base+'/Taierzhuang1938/'+fixture.route,{waitUntil:'commit',timeout:60000});
       await page.waitForFunction(fixture.ready,null,{timeout:180000});
+      if(fixture.name==='MixamoPreview')await page.waitForLoadState('networkidle');
       if(fixture.name==='Gameplay'){
         await page.locator('#bootStart').click();
         await page.waitForFunction(()=>window.Tengxian.state.running&&window.Tengxian.Debug.FirstLevelMission().time>1,null,{timeout:60000});

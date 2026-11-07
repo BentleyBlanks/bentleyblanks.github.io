@@ -120,6 +120,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
 <script type="module">
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
+import { ManagedTextureLoader, SetTextureImportRenderer } from "./Script_TextureImports.mjs";
 import { LoadModel } from "./Script_MeshLoad.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -132,6 +133,7 @@ const loader = new GLTFLoader();
 
 // ---------- scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+SetTextureImportRenderer(renderer);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -428,7 +430,7 @@ const DADAO_PALM_MARGIN = 0.002;   // 握点再往外留 2 mm
 const DADAO_HANDLE = { hx: 0.0097, hy: 0.0210, cy: -0.0005, rc: 0.006 };   // Model_Dadao 刀柄截面（圆角矩形，与 Script_DadaoGripAudit.mjs 同）
 const dadaoPalmSkin = { Right: 0, Left: 0 };
 const GRAVITY = 9.8, GRENADE_REST_Y = 0.03;
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new ManagedTextureLoader();
 let rightThumb = null, leftThumb = null, rightIndex = null, rightPinky = null, leftIndex = null, leftPinky = null;
 let dadao = null, dadaoOffset = null, throwInfo = null;
 let grenade = null;
