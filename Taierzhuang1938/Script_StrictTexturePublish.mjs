@@ -96,8 +96,8 @@ export async function BuildStrictTextures(projectDir,outputDir,{cacheDir=null,lo
     await fs.mkdir(path.join(work,'Texture'));
     const encoder=await BasisEncoderInfo();
     const toolchain={sharp:sharp.versions,encoder:encoder.sha256,pipeline:4,scripts:await Promise.all(['Script_TextureImportBuild.mjs','Script_TextureImportPixels.mjs','Script_TextureImportRules.mjs'].map(async file=>Hash(await fs.readFile(new URL(file,import.meta.url)))))};
-    const Encode=async(bytes,file,colorSpace,normal,orientations,mipmaps=true)=>{
-      const rule=StrictRule(rules,file),format=rule.format;
+    const Encode=async(bytes,file,colorSpace,normal,orientations,mipmaps=true,rule=StrictRule(rules,file))=>{
+      const format=rule.format;
       if(format==='hdr'){
         const dimensions=HdrDimensions(bytes);if(Math.max(dimensions.width,dimensions.height)>rule.maxSize)throw Error('HDR exceeds explicit maximum: '+file);
         return {bytes,format,...dimensions,mipLevels:1};
@@ -162,9 +162,9 @@ export async function BuildStrictTextures(projectDir,outputDir,{cacheDir=null,lo
             pixels=ModelView(model.doc,buffers,image.bufferView);imageViews.add(image.bufferView);
           }else throw Error('Unsupported embedded image: '+file+'#'+index);
           const roles=uses.get(index);if(roles?.size>1)throw Error('Conflicting embedded image color spaces: '+file+'#'+index);
-          const rule=StrictRule(rules,file),colorSpace=rule.colorSpace||(roles?.size?[...roles][0]:'linear');
+          const rule=StrictRule(rules,file,index),colorSpace=rule.colorSpace||(roles?.size?[...roles][0]:'linear');
           const mipmaps=(doc.textures||[]).some(t=>ImageIndex(t)===index&&![9728,9729].includes(doc.samplers?.[t.sampler]?.minFilter));
-          const result=await Encode(pixels,file,colorSpace,normals.has(index),[false],mipmaps);encoded=result.bytes;
+          const result=await Encode(pixels,file,colorSpace,normals.has(index),[false],mipmaps,rule);encoded=result.bytes;
           record={index,file,sourceBytes:pixels.length,sourceSha256:Hash(pixels),format:result.format,width:result.width,height:result.height,mipLevels:result.mipLevels||1,colorSpace,bytes:encoded.length,sha256:Hash(encoded)};
         }
         if(!external){const viewIndex=doc.bufferViews?.length||0;doc.bufferViews??=[];doc.bufferViews.push({buffer:0,byteLength:encoded.length});chunks.push(encoded);image.bufferView=viewIndex;delete image.uri;}

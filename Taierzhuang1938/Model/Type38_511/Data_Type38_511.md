@@ -84,6 +84,13 @@ against the separate vertex/combined limits.
 Pages uses the existing automatic GPU-image publication path, including its
 explicit 2048 maximum and KTX2 rules. Original source images stay in Git/the local
 source package; GPU compression is not a claim of pixel-identical online images.
+Four packed data images (indices14,83,91,96) contain valid RGB at zero alpha.
+Their explicit `#image/N` rules use lossless PNG, retaining all four channels;
+the other112 images use BC7. Publication tests compare the actual four decoded
+RGBA buffers exactly and read zero-alpha RGB back from a real GPU upload.
+The local publication candidate is29,703,856 bytes versus37,566,608 source bytes.
+Source/published rendering measures foreground RGB mean difference0.519/255
+and95th-percentile difference2/255, with unchanged bounds and zero GL errors.
 
 ## Rebuild and verification
 

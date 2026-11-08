@@ -23,6 +23,10 @@
     { "path": "Taierzhuang1938/Hair/Textures/**", "format": "png", "maxSize": 2048, "colorSpace": "linear" },
     { "path": "Taierzhuang1938/Heightmap/**", "format": "png", "maxSize": 2048 },
     { "path": "Taierzhuang1938/Scene/**", "format": "webp-lossless", "maxSize": 2048 },
-    { "path": "Taierzhuang1938/Animation/**/*.webp", "format": "webp-lossless", "maxSize": 2048 }
+    { "path": "Taierzhuang1938/Animation/**/*.webp", "format": "webp-lossless", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/14", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/83", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/91", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/96", "format": "png", "maxSize": 2048 }
   ]
 }

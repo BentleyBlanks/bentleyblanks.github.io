@@ -20,9 +20,14 @@ export async function ReadStrictRules(projectDir){
   }
   return doc;
 }
-export function StrictRule(doc,file){
+export function StrictRule(doc,file,imageIndex=undefined){
+  // Embedded selectors inherit the model rule, then override only image N.
+  // Names need not be unique: use the stable glTF image index, never its label.
+  if(imageIndex!==undefined&&(!Number.isInteger(imageIndex)||imageIndex<0))throw Error('Invalid embedded image index');
+  const embedded=imageIndex===undefined?null:file+'#image/'+imageIndex;
   let result;
-  for(const rule of doc.rules)if(PathPattern(rule.path).test(file))result={...result,...rule};
+  for(const rule of doc.rules)if(PathPattern(rule.path).test(file)
+    ||embedded&&rule.path.includes('#image/')&&PathPattern(rule.path).test(embedded))result={...result,...rule};
   if(!result)throw Error('No texture publication rule: '+file);
   return result;
 }

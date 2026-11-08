@@ -25,7 +25,7 @@ export async function ValidateStrictTextures(projectDir,outputDir){
   }
   const Read=async(file,bytes,sha)=>{const value=await fs.readFile(Within(siteRoot,file));if(value.length!==bytes||Hash(value)!==sha)throw Error('Publication bytes mismatch: '+file);return value;};
   const Check=async(bytes,record)=>{
-    const rule=StrictRule(rules,record.file),actual=await InspectImage(bytes,rule.format);
+    const rule=StrictRule(rules,record.file,record.index),actual=await InspectImage(bytes,rule.format);
     if(record.format!==rule.format||actual.format!==rule.format||Math.max(actual.width,actual.height)>rule.maxSize||actual.width!==record.width||actual.height!==record.height)throw Error('Image violates path format/size: '+record.file);
     if(rule.format.startsWith('ktx2')&&actual.codec!== (rule.format==='ktx2-etc1s'?163:166))throw Error('Wrong GPU texture codec');
   };
