@@ -130,7 +130,8 @@ else CheckServicePistolGrip();
 
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
-Check(EXTERNAL_GLB_STANDARDS.length === 69
+Check(EXTERNAL_GLB_STANDARDS.length === 70
+  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='Type38_511'&&record.actualTriangles===69586&&record.targetTriangles===70000)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='RifleSlingFlatV3'&&record.actualTriangles===6584&&record.targetTriangles===6584)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===68657&&record.targetTriangles===69000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)
@@ -142,7 +143,7 @@ Check(EXTERNAL_GLB_STANDARDS.length === 69
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === type89Contract.sourceTrianglesBeforeExportCleanup && record.selectedGameSourceTriangles === type89Contract.selectedGameSourceTrianglesBeforeCleanup && record.actualTriangles === type89Contract.runtimeRenderedTriangles && record.targetTriangles === type89Contract.runtimeTriangleTarget)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 266946 && record.actualTriangles === 79944 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
-  "外部 GLB 分类登记既有资产、独立布料测试三件、飞机战车、汉阳造173R与扁平背带，共 69 项");
+  "外部 GLB 分类登记既有资产、独立布料测试三件、飞机战车、汉阳造173R、三八式511与扁平背带，共 70 项");
 
 Check(ExternalComplianceFor({actualTriangles:82202,targetTriangles:80000,selectedGameSourceTriangles:82202,policy:"target"}).retained
   && ExternalComplianceFor({actualTriangles:81906,targetTriangles:80000,selectedGameSourceTriangles:82202,exportRemovedZeroAreaTriangles:296,policy:"target"}).retained

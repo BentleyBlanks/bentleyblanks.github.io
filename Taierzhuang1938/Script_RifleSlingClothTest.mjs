@@ -36,6 +36,7 @@ const M = await import("./Script_RifleSlingCloth.mjs");
 const { PrepareRifleSlingVisual } = await import("./Script_RifleSlingVisual.mjs");
 const { RIFLE_SLING_MOUNTS } = await import("./Data_RifleSlingMounts.mjs");
 const {SlingPinPosition}=await import('./Script_RifleSlingGunContacts.mjs');
+const {TYPE38_511}=await import('./Data_Type38_511.mjs');
 hooks.deregister();
 const { RIFLE_SLING_CLOTH: CFG, ExtractSlingRest, SlingRope, RegisterRifleSling, SetRifleSlingWeapon, SetRifleSlingAnchors, StepRifleSlings, SetRifleSlingClothEnabled, ClearRifleSlings, RifleSlingClothStats } = M;
 
@@ -585,7 +586,13 @@ function TzmMeshes(id){
 }
 {
   const components=[];
-  for(const {points,indices} of TzmMeshes('Type38')){
+  const type38=await new GLTFLoader().parseAsync(StripTextures(fs.readFileSync(new URL('./Model/Type38_511/Model_Type38_511.glb',import.meta.url))), '');
+  type38.scene.updateMatrixWorld(true);
+  const actual=[];type38.scene.traverse(mesh=>{if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,points=[];
+    for(let i=0;i<p.count;i++)points.push(new THREE.Vector3().fromBufferAttribute(p,i).applyMatrix4(mesh.matrixWorld).add(new THREE.Vector3(...TYPE38_511.frameOffset)));
+    actual.push({points,indices:Array.from(index.array)});
+  });
+  for(const {points,indices} of actual){
     const welded=new Map(),canonical=[],parent=[];
     points.forEach((p,i)=>{const key=p.toArray().map(v=>Math.round(v*1e5)).join(',');let at=welded.get(key);if(at===undefined){at=i;welded.set(key,i);}canonical[i]=at;parent[i]=i;});
     const Root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
@@ -596,7 +603,7 @@ function TzmMeshes(id){
   for(const end of ['front','rear']){
     const candidates=components.filter(box=>{const c=box.getCenter(new THREE.Vector3());return end==='front'?c.z<-.5&&c.z>-.75&&c.y<.01:c.z>0&&c.z<.12&&c.y<-.04;});
     Check(candidates.length===1&&candidates[0].getCenter(new THREE.Vector3()).distanceTo(new THREE.Vector3().fromArray(RIFLE_SLING_MOUNTS.Type38[end].position))<.00001,
-      `三八式 ${end} 挂点对齐独立焊接还原的现有 U 形环`);
+      `三八式511 ${end} 挂点对齐实际 GLB 独立焊接还原的 U 形环`);
   }
   const points=TzmMeshes('ZhongZheng').flatMap(mesh=>mesh.points);
   for(const [end,name] of [['front','SlingFlat_LashingFront'],['rear','SlingFlat_LashingRear']]){

@@ -32,6 +32,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
 import { LoadHanYang173R, ConfigureHanYang173R, InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
+import { LoadType38_511, ConfigureType38_511, InstantiateType38_511 } from "./Script_Type38_511.mjs";
 import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
@@ -3684,15 +3685,19 @@ export class ActorFactory {
         try { await this.library.LoadExternalSet(set.name, set); }
         catch { textureFailures.push(set.name); }
       }));
-      const [docs, riggedAssets, characterAssets, hanYang173R] = await Promise.all([
+      const [docs, riggedAssets, characterAssets, hanYang173R, type38] = await Promise.all([
         Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
         LoadRiggedAssets(),
         LoadLugouCharacterAssets(),
         LoadHanYang173R(),
+        LoadType38_511(),
       ]);
       ConfigureHanYang173R(hanYang173R,this.library);
       this.hanYang173R=hanYang173R;
       riggedAssets.hanYang173R=hanYang173R;
+      ConfigureType38_511(type38,this.library);
+      this.type38=type38;
+      riggedAssets.type38=type38;
       ids.forEach((id, i) => { if (docs[i]) this.meshDocs.set(id, docs[i]); });
       this.riggedAssets = riggedAssets;
       this.characterAssets = characterAssets;
@@ -3726,6 +3731,7 @@ export class ActorFactory {
    */
   ModelInstance(meshId, materials) {
     if(meshId==='HanYang')return InstantiateHanYang173R(this.hanYang173R,{batch:true});
+    if(meshId==='Type38'||meshId==='Type38_511')return InstantiateType38_511(this.type38,{batch:true});
     const doc = this.meshDocs.get(meshId);
     const entry = MESHES[meshId];
     if (!doc || !entry) return null;
@@ -3742,6 +3748,7 @@ export class ActorFactory {
 
   _InstantiateMesh(id) {
     if(id==='HanYang')return InstantiateHanYang173R(this.hanYang173R,{batch:true});
+    if(id==='Type38'||id==='Type38_511')return InstantiateType38_511(this.type38,{batch:true});
     const doc = this.meshDocs.get(id);
     const entry = MESHES[id];
     if (!doc || !entry) return null;
@@ -4028,9 +4035,9 @@ export class ActorFactory {
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
   _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = false, detail = false) {
     const id = WeaponMeshId(weaponId, variant);
-    if (!id || (id!=='HanYang'&&!this.meshDocs.has(id))) return null;
+    if (!id || (!['HanYang','Type38_511'].includes(id)&&!this.meshDocs.has(id))) return null;
     const data = WEAPONS[weaponId];
-    const built = this._InstantiateMesh(id);
+    const built = id==='Type38_511' ? InstantiateType38_511(this.type38,{batch:true,npcLod:!detail}) : this._InstantiateMesh(id);
     if (!built || !built.nodes.has("muzzle")) return null;
 
     // 枪模型一根关节都没有（MESHES[id].joints === 0），所以整把枪的网格都挂在
@@ -4172,6 +4179,7 @@ export class ActorFactory {
 
     return {
       ...Object.fromEntries(this.hanYang173R?.materials||[]),
+      ...Object.fromEntries(this.type38?.materials||[]),
       uniform,
       trouser,
       accessory,

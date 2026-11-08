@@ -44,8 +44,9 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
   Zb26: { name: "ZB-26", group: "firearm", sourceTriangles: 29967,
     sourceTexture: "BlenderMCP 作者材质", runtimeTexture: "专用 1K 原 UV 钢件 / 胡桃木 Base + Normal + Orm",
     note: "历史照片、馆藏两侧照片与用户选定的 imagegen C 旧化参考重建；未减面，TZM 编译跳过 37 个不可见微小三角。" },
-  Type38: { name: "三八式", group: "firearm", sourceTriangles: 12475,
-    sourceTexture: "有（占位纹理）", runtimeTexture: SharedWeaponPbr },
+  Type38: { name: "三八式旧TZM（离线回归）", group: "firearm", sourceTriangles: 12475,
+    sourceTexture: "有（占位纹理）", runtimeTexture: SharedWeaponPbr,
+    note: "仅保留旧源构建与离线回归；正式武器使用Type38_511外部GLB。" },
   ServicePistol: { name: "九毫米军用手枪", group: "firearm", sourceTriangles: 7265,
     sourceTexture: "有", runtimeTexture: SharedWeaponPbr,
     note: "只取闭锁状态 A；展示弹匣、子弹与空仓挂机状态 B 不进游戏。" },
@@ -117,6 +118,11 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({id:'Type38_511',name:'三八式511（当前手持与世界模型）',pack:'Type38_511/Model_Type38_511.glb',
+    sourceTriangles:473796,actualTriangles:69586,npcTriangles:64978,targetTriangles:70000,policy:'target',
+    sourceTexture:'用户提供Dots 511工程；高模及作者程序材质留OneDrive',
+    runtimeTexture:'45部件、116张原字节PBR图；保留UV法线/切线场与clearcoat/specular',
+    note:'用户2026-11-08要求参考游戏汉阳造68657面，并尽量保细节。减面版69454面，双向采样最大0.209mm；运行时照门补4.5mm缺口增加132面。116图像保留原字节；原工程、高低模工程和对照图留OneDrive。外观旧化为美术创作，非逐痕实物扫描。'}),
   Object.freeze({id:'RifleSlingFlatV3',name:'尼龙织带步枪背带',pack:'RifleSlingV3/Model_RifleSlingFlatV3.glb',
     sourceTriangles:6584,actualTriangles:6584,targetTriangles:6584,policy:'source',
     sourceTexture:'内置 imagegen 一级生成的细密尼龙织纹；BlenderMCP 扁带、折返收口与缝线',

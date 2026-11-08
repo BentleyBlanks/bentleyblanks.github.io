@@ -142,7 +142,10 @@ const report = await page.evaluate(({ flashKinds, firearms }) => {
         vm.Update(1 / 60, { ads: 1, moveSpeed: 0, grounded: true });
       }
       const parts = [];
-      vm.rig.group.traverse(part=>{if(part.isMesh&&/adsNear/.test(part.name))parts.push(part);});
+      // 511 retains the complete rifle as named GLB parts rather than the old
+      // two TZM "adsNear" buckets. Inspect every actual part, keeping the same
+      // no-hidden-mesh / no-visible-near-cut assertions and ultrawide margin.
+      vm.rig.group.traverse(part=>{if(part.isMesh&&(part.userData.type38Part||/adsNear/.test(part.name)))parts.push(part);});
       vm.root.updateWorldMatrix(true,true);T.camera.updateMatrixWorld(true);
       const inverse=T.camera.matrixWorld.clone().invert(),point=T.camera.position.clone();
       const near=T.camera.near,halfH=near*Math.tan(T.camera.fov*Math.PI/360)*1.25,halfW=halfH*2.4;

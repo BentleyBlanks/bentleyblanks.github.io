@@ -14,7 +14,7 @@ import { TextureBaker } from "./Script_TextureBaker.mjs";
 import { TextureImportOf, MobileTextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
-  ApplyPatches, IndirectLightingPatches, FoldOrmMaps, PatchesOf,
+  ApplyPatches, IndirectLightingPatches, FoldOrmMaps, PatchesOf, MakePatch,
 } from "./Script_MaterialPatches.mjs";
 import { MakeMaterialShadingPatch, MakeShadingFeatures } from "./Script_MaterialShading.mjs";
 import {
@@ -176,9 +176,21 @@ export function InjectIndirectLighting(material,
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
   material.userData.ssrUniforms = ssrUniforms;
-  ApplyPatches(material, IndirectLightingPatches({
+  // Authored glTF clearcoat R/G channels can share the exact same Texture.
+  // Keep both slots/UV transforms, but route the G lookup to the R sampler.
+  // The unused sampler declaration is eliminated by GLSL, saving one unit
+  // without changing any image, channel, material factor or filtered lookup.
+  // Type38 needs this at high/ultra + GI + three world-shadow cascades (16 units).
+  const sharedClearcoat = material.userData.preserveAuthoredPbr
+    && material.clearcoatMap && material.clearcoatMap === material.clearcoatRoughnessMap;
+  const clearcoatPatch = sharedClearcoat ? MakePatch({
+    key: "sharedClearcoat1",
+    fragment: [["#include <clearcoat_pars_fragment>",
+      "#define clearcoatRoughnessMap clearcoatMap"]],
+  }) : null;
+  ApplyPatches(material, [clearcoatPatch, ...IndirectLightingPatches({
     orm, ssao, gi, ssr: ssrUniforms, shading, surface,
-  }));
+  })]);
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
   material.userData.indirectLightingInjected = true;
@@ -281,7 +293,7 @@ export class MaterialLibrary {
    * 金属桶，因此运行时明确归零 metalness；roughness 仍保留作者标量与贴图，调试视图
    * 显示的是 three 真正参与 BRDF 的 roughnessFactor。
    */
-  ConfigureExternalPbr(material, { metalness = null, minRoughness = null, mesh = null } = {}) {
+  ConfigureExternalPbr(material, { metalness = null, minRoughness = null, mesh = null, preserveAuthored = false } = {}) {
     const list = Array.isArray(material) ? material : [material];
     const out = [];
     let rebind = false;
@@ -290,6 +302,7 @@ export class MaterialLibrary {
         out.push(source);
         continue;
       }
+      if (preserveAuthored) source.userData.preserveAuthoredPbr = true;
       // 类型升级只在调用方交出网格时做（`mesh`）：换类等于换对象，拿不到网格
       // 就没法把新材质挂回去，那只会造出一份没人用的 MeshPhysicalMaterial。
       const item = mesh ? this._UpgradeExternal(source) : source;
@@ -348,6 +361,12 @@ export class MaterialLibrary {
    * 逐网格各换一份等于逐网格一份程序（换人那一帧要现编几十个）。
    */
   _UpgradeExternal(source) {
+    // Some author part names contain "Skin"/"Head" for metal surface shells.
+    // Explicit PBR authoring takes priority over the character-name heuristic.
+    if (source.userData.preserveAuthoredPbr) {
+      source.userData.externalMaterialClass = "authored";
+      return source;
+    }
     if (source.isMeshPhysicalMaterial && source.userData.externalMaterialClass) return source;
     const existing = this.upgradedExternal.get(source);
     if (existing) return existing;

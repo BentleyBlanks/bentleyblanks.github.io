@@ -673,6 +673,17 @@ for (const spec of CLOTH_LAB_ASSETS) {
     `${spec.id} 真实逆绑定矩阵确认头端+Z、左角+X与217骨格`, JSON.stringify({ headL, headR, tailL }));
 }
 const hanYangFile=path.join(projectDir,'Model/HanYang173R/Model_HanYang173R.glb');
+const type38File=path.join(projectDir,'Model/Type38_511/Model_Type38_511.glb');
+{
+  const doc=LoadGlb(type38File).json;
+  const Part=name=>doc.nodes.find(node=>node.extras?.SourceObject===name)?.name;
+  const mouth=GlbPoints(type38File,Part('Exterior_FrontOuterTube76'));
+  const butt=GlbPoints(type38File,Part('Exterior_ButtCap04'));
+  const Mean=points=>points.reduce((sum,p)=>sum+p[2],0)/points.length;
+  const all=GlbPoints(type38File),length=Math.max(...all.map(p=>p[2]))-Math.min(...all.map(p=>p[2]));
+  Check(mouth.length>100&&butt.length>100&&Mean(mouth)<-.90&&Mean(butt)>.20&&Math.abs(length-1.276)<.002,
+    'Type38 511 枪口与托底顶点云确认米制、枪口-Z',JSON.stringify({muzzleZ:Mean(mouth),buttZ:Mean(butt),length}));
+}
 const hanYangMouth=GlbPoints(hanYangFile,'HY153_VisualMouthLipAndShallowRecess');
 const hanYangButt=GlbPoints(hanYangFile,'ButtCap_LimitedProfileBlend');
 const Center=points=>[0,1,2].map(axis=>points.reduce((sum,p)=>sum+p[axis],0)/points.length);

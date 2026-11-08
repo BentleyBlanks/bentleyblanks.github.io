@@ -29,7 +29,9 @@ try {
     const hanYangHoldingProbes={r:CreateReloadClearanceProbe(THREE,{side:'r',includeUpperArm:true}),l:CreateReloadClearanceProbe(THREE,{side:'l',includeUpperArm:true})};
     const T=window.Taierzhuang,vm=T.viewmodel;let arms=vm.riggedArms;
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
-    const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[.003,-.021,-.1288],
+    // The 511 trigger is 5.3 mm wide; the old 3 mm lateral ray missed it and
+    // measured the rear trigger guard instead. Keep the actual trigger axis.
+    const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[0,-.021,-.1288],
       Zb26:[.002,-.045,-.1229],Type11:[.002,-.040,-.124],ServicePistol:[.002,-.007,-.0531]};
     const result={poses:[],actions:[],samples:0,hanYangDirectionDiagnostics:{schema:1,
       frame:"Actual hand bone matrix multiplied by its captured anatomical palm frame; +Z is palm-forward and +Y dorsal. Full matrix inversion removes foreground/FOV scale.",

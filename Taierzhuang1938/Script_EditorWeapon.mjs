@@ -367,7 +367,8 @@ export class WeaponEditor {
 
     const meshId = WEAPON_MESH_BY_ID[this.weaponId];
     const mesh = meshId ? MESHES[meshId] : null;
-    const authored = this.weaponId==='HanYang' ? EXTERNAL_GLB_STANDARDS.find(asset=>asset.id==='HanYang173R') : null;
+    const authoredId=this.weaponId==='HanYang'?'HanYang173R':this.weaponId==='Type38'?'Type38_511':null;
+    const authored = authoredId ? EXTERNAL_GLB_STANDARDS.find(asset=>asset.id===authoredId) : null;
     if (authored) {
       F("模型", `${authored.pack} · ${authored.actualTriangles} 三角`);
     } else if (mesh) {

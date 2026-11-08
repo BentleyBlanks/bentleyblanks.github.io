@@ -387,7 +387,7 @@ export const MESHES = {
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
 export const WEAPON_MESH_BY_ID = {
   // HanYang is resolved by its required GLB loader, not the TZM registry above.
-  ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38",
+  ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38_511",
   ServicePistol: "ServicePistol", Type11: "Type11", Type92Hmg: "Type92Hmg",
   Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；

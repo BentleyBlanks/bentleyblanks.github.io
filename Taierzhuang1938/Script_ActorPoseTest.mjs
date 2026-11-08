@@ -132,10 +132,12 @@ try {
           for (const weaponId of ["ZhongZheng", "HanYang", "Type38"]) {
           const bare = factory.WeaponGeometry(weaponId);
           const fixed = factory.WeaponGeometry(weaponId, 0, { includeBayonet: true });
-          const expectModel = modeled || weaponId === "HanYang";
+          const expectModel = modeled || weaponId === "HanYang" || weaponId === "Type38";
           check((bare.source === "model") === expectModel, `${weaponId}: wrong geometry source tested`);
           if(weaponId==='HanYang')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===68657,
             'HanYang must retain its authored GLB even when the TZM cache is empty');
+          if(weaponId==='Type38')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===64978,
+            'Type38 NPC must use its measured sight-frame LOD even when the TZM cache is empty');
           const bareCount = VertexCount(bare.geometries);
           check(VertexCount(fixed.geometries) > bareCount,
             `${quality}/${modeled}: fixed bayonet has no additional vertices`);

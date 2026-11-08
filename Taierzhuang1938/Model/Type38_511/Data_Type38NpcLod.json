@@ -1,0 +1,18 @@
+{
+  "schema": "Type38NpcSightLod",
+  "version": 1,
+  "generator": "_blender/Script_Type38NpcLod.py",
+  "sourceSha256": "77768c563db9fe7a3db3b0fd937279b4b6d05eb058cc441cafb3bcda0e668ad5",
+  "sha256": "a2bc96ecb436b06d1f3bcc6843d0be8ac77d7c5bd9d931abd54b7cc7d6245809",
+  "part": "Exterior_FoldedFrame12",
+  "before": 5760,
+  "after": 1152,
+  "fpsTriangles": 69586,
+  "npcTriangles": 64978,
+  "collapseRatio": 0.2,
+  "maxSampledSurfaceDeviationM": 0.00015557683946099132,
+  "maxUvProjectionDistance": 0.0002437234070384875,
+  "uvShadingFramesTransferred": true,
+  "imagesAdded": 0,
+  "sourceImagesChanged": 0
+}

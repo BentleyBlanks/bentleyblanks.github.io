@@ -52,6 +52,8 @@ export const testDefs = {
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
   MixamoGroomBrowserTest: { file: "Script_MixamoGroomBrowserTest.mjs", timeoutMs: 360000, desc: "Mixamo preview: six configured characters render hair and beard across character switches" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
+  Type38_511AssetTest: {file:'Script_Type38_511AssetTest.mjs',desc:'Type38 511 actual geometry, source image identity, playable notch and independent moving parts'},
+  Type38_511BrowserTest: {file:'Script_Type38_511BrowserTest.mjs',timeoutMs:600000,desc:'Actual Type38 511 FPS/NPC/world, PBR identity, ADS, independent cover and held-open reload'},
   HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity and high wood/metal lighting'},
   HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
   Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: declared400k target/420k ceiling, wheel profiles, cast openings, texel density, rigid hinges and finite tangent bases"},
@@ -574,7 +576,7 @@ export const testDefs = {
   GtaoTest: { file: "Script_GtaoTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "GTAO / 弯曲法线 / 镜面遮蔽 / SSIL：接触暗带、时域收敛、无重投影残影、色板反弹" },
   SamplerBudgetTest: { file: "Script_SamplerBudgetTest.mjs", timeoutMs: 40 * 60 * 1000,
-    desc: "采样器预算：四档×gi 八轮正片，每个程序都链接成功且 sampler uniform ≤ MAX_TEXTURE_IMAGE_UNITS" },
+    desc: "采样器预算：四档×gi 八轮正片，每个程序链接成功且片元、顶点、合计 sampler 均不超设备上限" },
   CsmTest: { file: "Script_CsmTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "级联阴影 / PCSS / 接触阴影：逐级图与分割 / 纹素吸附 / 级间重叠 / 节流排班 / 痤疮比例 / 三张调试图" },
   DeferredMaterialDisposeTest: { file: "Script_DeferredMaterialDisposeTest.mjs",
@@ -706,7 +708,7 @@ export const browserTests = new Set([
   "FrontStoryboardShotsTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest", "TaniHisaoCharacterBrowserTest", "AzumaShiroCharacterBrowserTest", "NierCharacterBrowserTest", "YaowaCharacterBrowserTest", "OldGengCharacterBrowserTest", "LiuWencaiCharacterBrowserTest",
+  "MotionVectorContractTest", "FpsRifleViewTest", "Type38_511BrowserTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest", "TaniHisaoCharacterBrowserTest", "AzumaShiroCharacterBrowserTest", "NierCharacterBrowserTest", "YaowaCharacterBrowserTest", "OldGengCharacterBrowserTest", "LiuWencaiCharacterBrowserTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -941,7 +943,7 @@ export const domains = {
     tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsForearmTaperTest", "FpsWristNormalSeamTest", "FpsNailRepairTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
-      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "HanYang173RAssetTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ModelFacingTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "Type38_511AssetTest", "Type38_511BrowserTest", "HanYang173RAssetTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -1047,6 +1049,7 @@ const changedDomainRules = [
   {domain:'particles',pattern:/FallingSoil/},
   {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|Glare|Lifecycle|Bloom|Spark|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|RenderBudget|Shadow(?:Coverage|Bounds|Instances)?|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
+  {domain:'combat',pattern:/Type38_511/},
   {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_EditorPropLibrary/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},

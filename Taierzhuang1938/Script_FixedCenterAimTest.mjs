@@ -19,12 +19,16 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&weapons=1&manual=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
 const report = await page.evaluate((firearms) => {
   const T = window.Taierzhuang;
+  // A clear firing line keeps crouching long guns out of the campaign spawn's
+  // parapet/wall-lowering state. The separate close-wall section below still
+  // drives the real trigger and ballistic marcher against an actual wall.
+  T.Debug.WeaponRange.GoTo('firing');
   T.player.health = 100;
   T.player.spawnGrace = 99;
   for (const soldier of T.ai.soldiers) if (soldier.side === "ija") soldier.position.x += 500;
@@ -57,18 +61,33 @@ const report = await page.evaluate((firearms) => {
   // 蹲姿的持枪下沉曾叠在开镜姿势外面：照门低 20 px，弹孔落在准星上方。
   const rows = [...firearms.map((id) => [id, "stand"]), ...firearms.map((id) => [id, "crouch"])];
   for (const [id, stance] of rows) {
+    document.dispatchEvent(new MouseEvent("mouseup", {button:2,bubbles:true}));
+    T.interact.hooks.TakeWeapon(id,5);
     T.player.SetStance(stance);
     T.player.aimYaw = 0;
     T.player.aimPitch = 0;
-    T.viewmodel.Equip(id);
+    document.dispatchEvent(new MouseEvent("mousedown", {button:2,bubbles:true}));
     T.StepFrames(240);
     T.camera.updateMatrixWorld(true);
     const vm = T.viewmodel;
     const rear = vm.rig.sight.clone();
-    const axis = vm.rig.sight.clone();
-    axis.z -= 0.40;
+    // A horizontal proxy at the rear-sight height is not the mechanical sight
+    // line of an authored, pitched rifle. Measure the real front crown as in
+    // AdsSightTest, retaining the same 1.5px standing/crouching threshold.
+    const inverse=vm.rig.group.matrixWorld.clone().invert(),region=vm.rig.ironSights?.frontRegion;
+    const vertices=[];let top=-Infinity;
+    for(const mesh of vm.rig.ironSights?.front||[]){const p=mesh.geometry.attributes.position;
+      for(let i=0;i<p.count;i++){
+        const world=T.camera.position.clone().fromBufferAttribute(p,i).applyMatrix4(mesh.matrixWorld),local=world.clone().applyMatrix4(inverse);
+        if(mesh.name==='VmIronSight_FrontBlade'||(region&&Math.abs(local.x-region.x)<=.004&&Math.abs(local.z-region.z)<=.016&&local.y>region.base)){
+          vertices.push({world,local});top=Math.max(top,local.y);
+        }
+      }
+    }
+    const crown=vertices.filter(v=>v.local.y>=top-.00005);
+    if(!crown.length)throw new Error('Missing actual front sight crown: '+id);
+    const axis=T.camera.position.clone().set(0,0,0);for(const v of crown)axis.add(v.world);axis.divideScalar(crown.length);
     vm.rig.group.localToWorld(rear);
-    vm.rig.group.localToWorld(axis);
     rear.project(T.camera);
     axis.project(T.camera);
     const toPixels = (p) => ({

@@ -8,9 +8,9 @@ export const RIFLE_SLING_MOUNTS = {
     rear: {position:[0,-.036744,.043710],throat:[0,-.007,0],bar:[0,0,1],up:[0,1,0],part:'RearStock_ExternalAttachmentLoop'},
   },
   Type38: {
-    source:'Model/Model_Type38.tzm.json',
-    front:{position:[.000420,-.003034,-.652613],throat:[0,-.007,0],bar:[1,0,0],up:[0,1,0],part:'front swivel, wood mesh loose component'},
-    rear:{position:[.000420,-.080926,.069831],throat:[0,-.007,0],bar:[1,0,0],up:[0,1,0],part:'rear swivel, wood mesh loose component'},
+    source:'Model/Type38_511/Model_Type38_511.glb',
+    front:{position:[.000419725,-.002786136,-.629531075],throat:[0,-.007,0],bar:[1,0,0],up:[0,1,0],part:'Exterior_RetainedImportedBody74'},
+    rear:{position:[.000419710,-.070384779,.042830589],throat:[0,-.007,0],bar:[1,0,0],up:[0,1,0],part:'Mesh_Type38_adsNear_3'},
   },
   ZhongZheng: {
     source:'Model/Model_ZhongZheng.tzm.json',lashing:true,

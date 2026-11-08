@@ -495,6 +495,14 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
   `MaterialLibrary.Get/Plain/Static/ConfigureExternalPbr` 与 `ActorFactory` 那条路
   全部经它，行为不变。
 
+2026-11-08 Type38 511：显式 `preserveAuthoredPbr` 且 clearcoat 两槽为同一个 Texture
+时，在调用方补丁列表加入 `sharedClearcoat1`。`<clearcoat_pars_fragment>` 之后把
+粗糙度采样器引用映射到 clearcoat 采样器，仍读原 G 通道和原 UV；未使用的重复
+uniform 由 GLSL 剔除。源图、材质标量和两槽均保留，NPC 合批 + GI + SSR + 三级
+太阳阴影的片元采样器为 16。`SamplerBudgetTest` 分别校验片元、顶点、合计上限；
+BatchedMesh 的两张顶点索引表不应误算到片元的 16 个槽里。按各阶段源码声明对
+active uniform 保守计数，同时要求驱动 LINK_STATUS 成功。
+
 **锚点表**（three r185 的 chunk 名；每个锚点处能拿到什么）
 
 | 锚点 | 着色器 | 那里有什么 |

@@ -14,7 +14,8 @@
 //
 // ## 断言
 //   1. `renderer.info.programs` 里每一个程序都 `LINK_STATUS === true`；
-//   2. 每个程序的 sampler uniform 数 ≤ `gl.getParameter(MAX_TEXTURE_IMAGE_UNITS)`；
+//   2. active sampler 按着色器声明分别计入片元、顶点与合计上限；
+//      BatchedMesh 的顶点索引表不占片元的 MAX_TEXTURE_IMAGE_UNITS；
 //      （数组型 sampler 按 `getActiveUniform().size` 计，`sampler2D u[4]` 算 4 个）
 //   3. 推 60 帧之后 `gl.getError() === 0`；
 //   4. 页面没有 pageerror / console.error。
@@ -85,6 +86,8 @@ const COUNT_SAMPLERS = `(async () => {
   const renderer = T.renderer;
   const gl = renderer.getContext();
   const maxUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+  const maxVertexUnits = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
+  const maxCombinedUnits = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
   // GLSL ES 3.00 的全部 sampler 类型（含整型/无符号整型与 shadow —— 簇表用的是
   // usampler2D，太阳阴影用的是 sampler2DShadow，漏掉任何一类都会少数几个）。
   const SAMPLER_TYPES = new Set([
@@ -100,14 +103,28 @@ const COUNT_SAMPLERS = `(async () => {
     const program = entry.program;
     if (!program) continue;
     const linked = !!gl.getProgramParameter(program, gl.LINK_STATUS);
-    let samplers = 0;
+    let samplers = 0, vertexSamplers = 0, combinedSamplers = 0;
     const names = [];
     if (linked) {
+      const sources = gl.getAttachedShaders(program).map(shader => ({
+        type: gl.getShaderParameter(shader, gl.SHADER_TYPE), source: gl.getShaderSource(shader),
+      }));
       const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
       for (let i = 0; i < count; i++) {
         const info = gl.getActiveUniform(program, i);
         if (!info || !SAMPLER_TYPES.has(info.type)) continue;
-        samplers += info.size;                    // sampler2D u[4] 占 4 个单元
+        // BatchedMesh has two vertex-only table samplers. They belong to the
+        // vertex/combined limits, not the fragment limit of 16. Count active
+        // uniforms against each shader's declarations (conservative if both
+        // stages declare one); LINK_STATUS also enforces the driver's limits.
+        const base = info.name.replace(/\\[0\\]$/, "");
+        const declaration = new RegExp("\\\\buniform\\\\s+(?:(?:lowp|mediump|highp)\\\\s+)?[iu]?sampler\\\\w+\\\\s+" + base + "\\\\s*(?:\\\\[|;)");
+        const fragment = sources.some(s => s.type === gl.FRAGMENT_SHADER && declaration.test(s.source));
+        const vertex = sources.some(s => s.type === gl.VERTEX_SHADER && declaration.test(s.source));
+        if (!fragment && !vertex) throw new Error("Unclassified active sampler: " + info.name);
+        if (fragment) samplers += info.size;
+        if (vertex) vertexSamplers += info.size;
+        combinedSamplers += info.size * (Number(fragment) + Number(vertex));
         names.push(info.size > 1 ? info.name + "x" + info.size : info.name);
       }
     }
@@ -116,11 +133,12 @@ const COUNT_SAMPLERS = `(async () => {
       cacheKey: entry.cacheKey || "",
       linked,
       samplers,
+      vertexSamplers, combinedSamplers,
       names,
       log: linked ? "" : String(gl.getProgramInfoLog(program) || "").slice(0, 200),
     });
   }
-  return { maxUnits, rows };
+  return { maxUnits, maxVertexUnits, maxCombinedUnits, rows };
 })()`;
 
 try {
@@ -146,7 +164,7 @@ try {
       await page.evaluate((frames) => window.Taierzhuang.StepFrames(frames, 1 / 60), FRAMES);
       // 白盒编辑器出生点的视野里不一定有体块：把场景里所有材质都提交编译一遍（compile 不看视锥），白盒材质才一定在表里
       if (item.blockout) await page.evaluate(() => { const T = window.Taierzhuang; T.renderer.compile(T.scene, T.camera); });
-      const { maxUnits, rows } = await page.evaluate(COUNT_SAMPLERS);
+      const { maxUnits, maxVertexUnits, maxCombinedUnits, rows } = await page.evaluate(COUNT_SAMPLERS);
       const glError = await page.evaluate(() => {
         const gl = window.Taierzhuang.renderer.getContext();
         let last = 0;
@@ -176,7 +194,8 @@ try {
       }
       const worst = rows[0];
       const unlinked = rows.filter((row) => !row.linked);
-      const over = rows.filter((row) => row.linked && row.samplers > maxUnits);
+      const over = rows.filter((row) => row.linked && (row.samplers > maxUnits
+        || row.vertexSamplers > maxVertexUnits || row.combinedSamplers > maxCombinedUnits));
       Report(unlinked.length === 0, `${item.name} 全部程序链接成功`,
         unlinked.length ? unlinked.map((r) => `${r.name}[${r.cacheKey}] ${r.log}`).join(" / ") : `${rows.length} 个`);
       Report(over.length === 0, `${item.name} 采样器数 ≤ ${maxUnits}`,
