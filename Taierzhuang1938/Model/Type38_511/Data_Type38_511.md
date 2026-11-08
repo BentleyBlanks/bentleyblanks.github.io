@@ -74,6 +74,11 @@ must not become skin scattering or lose physical material layers.
 A uniform colour gain of 2.5 compensates for author studio exposure, matching the
 existing authored-rifle policy; relative part colours, roughness, metalness and
 image pixels are retained. Texture anisotropy is capped at the device's 16 limit.
+Published KTX2 normal/ORM/coat/specular-intensity maps are explicitly tagged
+`NoColorSpace`, matching the source numeric-data slots; base colour retains sRGB.
+This normalizes decoder metadata without modifying pixels, mips or GPU format.
+The actual published mixed-format GLB passes the complete gameplay acceptance,
+including the unchanged strict normal/ORM tag assertions.
 The original clearcoat strength/roughness slots share one texture. The
 `sharedClearcoat1` registry patch makes their R/G lookups use one sampler;
 both slots, UV transforms and filtered channel values remain intact. This

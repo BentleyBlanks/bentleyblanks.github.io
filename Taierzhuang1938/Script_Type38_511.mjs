@@ -27,6 +27,14 @@ export function ConfigureType38_511(asset,library) {
     const part=mesh.userData.SourceObject;
     mesh.material.name=`Type38_511_${part}`;
     mesh.material.color.setScalar(D.exposureGain);
+    // KTX2 decoders may label linear numeric maps as LinearSRGBColorSpace.
+    // Normal/ORM/coat/specular-intensity slots are data, in both source and
+    // published models. Keep their original bits and use the same data tag.
+    for(const slot of ['normalMap','roughnessMap','metalnessMap','aoMap','clearcoatMap',
+      'clearcoatRoughnessMap','clearcoatNormalMap','specularIntensityMap']){
+      const texture=mesh.material[slot];
+      if(texture&&texture.colorSpace!==THREE.NoColorSpace){texture.colorSpace=THREE.NoColorSpace;texture.needsUpdate=true;}
+    }
     for(const value of Object.values(mesh.material))
       if(value?.isTexture&&value.anisotropy!==anisotropy){value.anisotropy=anisotropy;value.needsUpdate=true;}
     library.ConfigureExternalPbr(mesh.material,{mesh,preserveAuthored:true});
