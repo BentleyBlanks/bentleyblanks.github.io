@@ -67,6 +67,12 @@ export const BLOCKOUT_LEVELS = Object.freeze([
         note: "15–18：洞里 → 厢房门口 → 门槛 → 出村小路、北岸土路 → 撤过铁路桥、炸桥 → 南岸路往县城（与 11–14 同一片场地）" }),
     ]),
     scene: WhiteboxSceneSlice({ minX: -160, maxX: 320, minZ: 480, maxZ: 1080 }, { x: 117, z: 547.4, yawDeg: 180 }, [...SIGNALS_0105, ...SIGNALS_0610], null, 64) }),
+  // 2026-11-09：第一关新剧本 01–07（撤退与凹路）：防炮洞 → 支沟刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气，
+  //   一个场地从本班机枪坑一直取到耿家庄村口路沟；位置来自空间图生成器（docs/Data_EditorBlockout.md §19）。
+  //   Stage0105Done 当已发生：01–05 那圈出不了沟的空气墙把干沟口堵死，这一关要走出去。
+  Object.freeze({ key: "FirstLevel0107", label: "第一关 01–07 · 撤退与凹路（新剧本 11-09）", configUrl: "./Blockout/FirstLevel0107.json",
+    era: "rewrite", badge: "新剧本", short: "01–07", note: "01–07：防炮洞 → 刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气（11-09 新剧本）",
+    scene: WhiteboxSceneSlice({ minX: -40, maxX: 320, minZ: -40, maxZ: 460 }, { x: 66.5, z: 64.2, yawDeg: 90 }, [STAGE_0105_DONE], undefined) }),
 ]);
 
 // 关卡下拉的行（2026-10-25）：一片场地一行；写了 parts 的场地按剧本段落拆成几行、共用同一个关卡键。
@@ -835,8 +841,8 @@ function EmptySceneLayout(phase) {
 /** 模块求值时建好；phase 对象本身可改（文件场景在 Prepare 里填布局）。 */
 export const BLOCKOUT_PHASES = Object.freeze(BLOCKOUT_LEVELS.map(MakeBlockoutPhase));
 
-/** 没写 ?level=（或写错）时进哪一关：新剧本 01–05（2026-10-20 用户：白盒工具默认开新剧本，不开旧版）。 */
-export const BLOCKOUT_DEFAULT_LEVEL = "FirstLevel0105";
+/** 没写 ?level=（或写错）时进哪一关：新剧本 01–07（2026-11-09；原来是 01–05，2026-10-20 用户：白盒工具默认开新剧本，不开旧版）。 */
+export const BLOCKOUT_DEFAULT_LEVEL = "FirstLevel0107";
 
 export function BlockoutLevelIndex(key) {
   // ?level= 也认菜单行 id（FirstLevel1218_15 → FirstLevel1218 那片场地）

@@ -22,6 +22,7 @@
 | `FirstLevel1218.json` | 第一关 12–18 新剧本（10-19 扩写稿，还没进 Notion）的 19 个关键帧 12-1…18-5：出村 → 北沙河北岸大路上的车边 → 空袭、松手 → 排水沟 → 桥头接收院、过门槛、门槛上 → 守桥头、过浮桥、炸桥 → 北门 | `export FirstLevel1218` 从 `Data_EditorBlockoutFirstLevel1218Space.mjs` 的锚点生成，之后以手改的 JSON 为准 |
 | `FirstLevel1218.scene.json` | 12–18 的场地（与 0105 / 0610 同一套坐标，村南那一截逐点等于 0610）：0.5 m 高度网格（出村小路、大路与路边浅沟、拐弯往西的河汊子、排水沟、两道河堤、北沙河、浮桥引道、散兵坑、土坎）+ 体块（14 段浮桥与船、接收院与厢房门槛、旁边院子、远处铁路桥、北门城墙与门洞、日常摆件）+ 随信号体块（CartOverturned / ChargesSet / BridgeBlown，契约 §16） | `scene FirstLevel1218` |
 | `FirstLevel1218.voice.json` | 12–18 台词的占位配音清单，mp3 在 `../Audio/Blockout1218/` | `Script_EditorBlockoutFirstLevel1218Voice.mjs` |
+| `FirstLevel0107.json` | 第一关 01–07 新剧本（2026-11-09）的 28 个关键帧 01-1…07-2：防炮洞 → 刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气；手写数据，位置取自 01–07 空间图（契约 §19），场景用 `Scenes/FirstLevelWhitebox` 取 x −40…320、z −40…460 | 手写，以文件为准；`Script_EditorBlockoutFirstLevel0107KeyframesTest.mjs` 把关 |
 
 第一关（`FirstLevel`）的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。`FirstLevel0105` 是另一片场地，坐标原点在沟口，和游戏里的第一关无关。
 

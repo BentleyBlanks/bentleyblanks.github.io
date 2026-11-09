@@ -64,7 +64,7 @@ const Near = (a, b, eps) => Math.abs(a - b) <= eps;
 // 0) node 里的纯规则
 console.log("--- node checks");
 Check("关卡注册表 key 都在 BLOCKOUT_LEVEL_KEYS 里", BLOCKOUT_LEVELS.every(l => BLOCKOUT_LEVEL_KEYS.includes(l.key)));
-Check("BlockoutLevelIndex 找不到 / 没写时回到新剧本 01–05", BLOCKOUT_LEVELS[BlockoutLevelIndex("Nope")].key === "FirstLevel0105" && BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key === "FirstLevel0105" && BlockoutLevelIndex("SecondLevel") === 1);
+Check("BlockoutLevelIndex 找不到 / 没写时回到新剧本 01–07", BLOCKOUT_LEVELS[BlockoutLevelIndex("Nope")].key === "FirstLevel0107" && BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key === "FirstLevel0107" && BlockoutLevelIndex("SecondLevel") === 1);
 for (const phase of BLOCKOUT_PHASES) {
   const banned = ["contentId", "p012", "fullMission", "smokeColumns", "roster", "chapter"].filter(k => k in phase || k in (phase.whitebox || {}));
   Check(`${phase.id}：不带任务 / 故事 / 同伴字段`, banned.length === 0, banned.join(","));

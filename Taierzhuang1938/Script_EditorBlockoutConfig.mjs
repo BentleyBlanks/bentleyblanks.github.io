@@ -29,7 +29,7 @@ export const BLOCKOUT_BACKDROP = Object.freeze({
  */
 export const BLOCKOUT_LANDMARK_KINDS = Object.freeze(["hole", "door", "window", "pit", "area", "prop", "place"]);
 export const BLOCKOUT_LANDMARK_LIMITS = Object.freeze({ maxItems: 400, nameMax: 24, noteMax: 60, sizeMax: 2000 });
-export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]);
+export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105", "FirstLevel0610", "FirstLevel1218", "FirstLevel0107"]);
 export const BLOCKOUT_LEVEL_RE = /^[A-Za-z0-9]+$/;
 export const BLOCKOUT_CONFIG_FILE_RE = /^Taierzhuang1938\/Blockout\/[A-Za-z0-9]+\.json$/;
 export const BLOCKOUT_KEYFRAME_ID_RE = /^[A-Za-z0-9_-]+$/;

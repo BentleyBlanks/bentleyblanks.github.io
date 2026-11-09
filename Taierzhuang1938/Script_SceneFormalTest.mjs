@@ -52,8 +52,8 @@ Check(scene.objects.some(o => o.asset.startsWith("Prop/")) && scene.objects.some
 
 // 3) 白盒编辑器三段
 const sliced = BLOCKOUT_LEVELS.filter(l => l.scene?.kind === "scene");
-Check(sliced.length === 3 && sliced.every(l => /FirstLevelWhitebox/.test(l.scene.url) && /Scenes\/FirstLevel\/Scene_FirstLevel\.json$/.test(l.scene.playUrl)),
-  "三段：编辑跑白盒场景、试玩跑正式场景（scene.playUrl）");
+Check(sliced.length === 4 && sliced.every(l => /FirstLevelWhitebox/.test(l.scene.url) && /Scenes\/FirstLevel\/Scene_FirstLevel\.json$/.test(l.scene.playUrl)),
+  "三段 + 01–07（11-09 起共四个关卡）：编辑跑白盒场景、试玩跑正式场景（scene.playUrl）");
 for (const level of sliced) {
   const layout = LayoutFromSceneDoc(BlockoutSliceDoc(level, scene, heights));
   Check(layout.style === "formal" && !layout.materialLooks && layout.ground.terrainLayers === "MissionPlain" && typeof layout.SampleGroundSurface === "function",

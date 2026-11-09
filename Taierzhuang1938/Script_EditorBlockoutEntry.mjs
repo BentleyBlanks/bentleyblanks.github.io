@@ -3,7 +3,7 @@
 // 不进互斥编辑器表 —— 白盒编辑器是一整套独立入口（?editor=blockout），打开就是换页面。
 //
 // 跳转时保留规模 / 音频参数；画质由白盒编辑器自己的偏好决定，去掉关卡类参数（whitebox / missionStage / phase …），
-// 默认进新剧本 01–05（BLOCKOUT_DEFAULT_LEVEL，2026-10-20；旧版第一关在关卡下拉里）。已经在白盒编辑器里时这个按钮显示为当前项，点了不重载。
+// 默认进新剧本 01–07（BLOCKOUT_DEFAULT_LEVEL，2026-11-09 起；2026-10-20 原为 01–05；旧版第一关在关卡下拉里）。已经在白盒编辑器里时这个按钮显示为当前项，点了不重载。
 
 import { BLOCKOUT_DEFAULT_LEVEL } from "./Script_EditorBlockoutLevels.mjs";
 import { TOOL_INFO } from "./Data_DevTools.mjs";

@@ -5977,6 +5977,14 @@
     {"id":"RailCharge_2","asset":"Whitebox/Box","material":"Whitebox/Danger","pos":[-78.3,0.75,940],"size":[0.5,0.3,0.4],"hideOn":"BridgeBlown","showOn":"ChargesSet","group":"11–18/铁路","meta":{"prop":"Charge"}},
     {"id":"RailFuse_Bridge","asset":"Whitebox/Box","material":"Whitebox/Danger","pos":[-78.5,1.23,945.5],"size":[0.05,0.04,33],"solid":false,"hideOn":"BridgeBlown","showOn":"ChargesSet","group":"11–18/铁路"},
     {"id":"RailFuse_Bank","asset":"Whitebox/Box","material":"Whitebox/Danger","pos":[-74.6,1.78,967.05],"yawDeg":-53.2278,"size":[11.36,0.04,0.05],"solid":false,"hideOn":"BridgeBlown","showOn":"ChargesSet","group":"11–18/铁路"},
-    {"id":"GirlHoleMat","asset":"Whitebox/Box","material":"Whitebox/Canvas","pos":[97,0.23,830.2],"size":[1.6,0.04,1.4],"solid":false,"showOn":"GirlHoleCovered","group":"11–18/道具/铺草","meta":{"prop":"Mat"}}
+    {"id":"GirlHoleMat","asset":"Whitebox/Box","material":"Whitebox/Canvas","pos":[97,0.23,830.2],"size":[1.6,0.04,1.4],"solid":false,"showOn":"GirlHoleCovered","group":"11–18/道具/铺草","meta":{"prop":"Mat"}},
+    {"id":"TrunkOfBattalionCommander","asset":"Whitebox/Box","material":"Whitebox/Timber","pos":[55.2,null,149.4],"yawDeg":20,"size":[0.8,0.4,0.5],"hideOn":"L1TrunkLoaded","group":"01–07/道具/皮箱","meta":{"prop":"Trunk"}},
+    {"id":"TrunkOnRoad","asset":"Whitebox/Box","material":"Whitebox/Timber","pos":[88.6,null,248.4],"yawDeg":70,"size":[0.8,0.4,0.5],"showOn":"L1TrunkTossed","group":"01–07/道具/皮箱","meta":{"prop":"Trunk"}},
+    {"id":"AmmoCrateOpened","asset":"Whitebox/Box","material":"Whitebox/Timber","pos":[84.5,null,250.4],"yawDeg":-20,"size":[0.55,0.32,0.38],"showOn":"L1TrunkTossed","group":"01–07/道具/弹药箱","meta":{"prop":"AmmoCrate"}},
+    {"id":"AmbushRidgeEast_1","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[91.48,null,269.5],"size":[0.7,0.45,2.6],"cover":{"faceX":-1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
+    {"id":"AmbushRidgeEast_2","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[93.25,null,276.6],"size":[0.7,0.45,2.6],"cover":{"faceX":-1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
+    {"id":"AmbushRidgeEast_3","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[95.2,null,283.4],"size":[0.7,0.45,2.6],"cover":{"faceX":-1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
+    {"id":"AmbushRidgeWest_1","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[89.53,null,285],"size":[0.7,0.45,2.6],"cover":{"faceX":1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
+    {"id":"WreckTankette","asset":"Whitebox/Box","material":"Whitebox/Metal","pos":[90.6,null,278.6],"size":[5.8,1.7,2.2],"showOn":"L1SunkenRoadBlocked","group":"01–07/凹路伏击弯/残车","meta":{"prop":"Wreck"}}
   ]
 }

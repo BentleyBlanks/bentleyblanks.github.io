@@ -20,6 +20,10 @@ export const SCENE_EVENTS = Object.freeze({
   NorthYardGatesBroken: Object.freeze({ label: "北院门被撞开", from: "10-3" }),
   BarrageHit: Object.freeze({ label: "炮弹落下来", from: "10-5" }),
   LaneWallCollapse: Object.freeze({ label: "巷子墙塌了", from: "10-6" }),
+  // 01–07 新剧本（FirstLevel0107，2026-11-09）：from 是 Blockout/FirstLevel0107.json 里的关键帧
+  L1TrunkLoaded: Object.freeze({ label: "营长的皮箱装上了车", from: "04-3", note: "干沟里地上那只皮箱消失（抬上老耿的车）" }),
+  L1TrunkTossed: Object.freeze({ label: "皮箱被掀下了车", from: "06-4", note: "凹路里车尾边出现皮箱、打开的弹药箱" }),
+  L1SunkenRoadBlocked: Object.freeze({ label: "凹路被残车堵死", from: "06-8", note: "最高的弯下面第一辆九四式横在路底" }),
   // 11–18 第四版（2026-11-02）：FamilyHidden（钻洞的那一家）删了
   GuandaoBridgeBlown: Object.freeze({ label: "官道桥炸了", from: "13-2", note: "二营炸的木桥：中间几跨没了、断木砸进河床" }),
   DugoutBombed: Object.freeze({ label: "院里的洞挨了炸弹", from: "14-2", note: "南街那家院里：弹坑 + 碎砖 + 塌了的洞顶" }),
