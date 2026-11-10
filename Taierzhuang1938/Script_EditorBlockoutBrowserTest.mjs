@@ -109,8 +109,8 @@ const sceneText = await fs.readFile(path.join(projectDir, "Blockout", "SecondLev
 }
 {
   const url = new URL(BlockoutEntry.Url("http://127.0.0.1:9/Taierzhuang1938/?whitebox=p012&missionStage=3&phase=2&quality=high&scale=small&audio=0"));
-  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留规模 / 音频（画质档跟玩家存的走）", url.pathname === "/Taierzhuang1938/"
-    && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel0105"
+  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0107（新剧本），只保留规模 / 音频（画质档跟玩家存的走）", url.pathname === "/Taierzhuang1938/"
+    && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel0107"
     && !url.searchParams.has("quality") && url.searchParams.get("scale") === "small" && url.searchParams.get("audio") === "0"
     && !url.searchParams.has("whitebox") && !url.searchParams.has("missionStage") && !url.searchParams.has("phase"), url.search);
   Check("启动面板入口：已经在编辑器里时认得出", BlockoutEntry.Active("?editor=blockout&level=SecondLevel") && !BlockoutEntry.Active("?editor=tools"));

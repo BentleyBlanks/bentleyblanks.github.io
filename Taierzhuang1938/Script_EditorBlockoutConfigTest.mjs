@@ -802,9 +802,12 @@ Check("单位可选 ride（2026-10-20）：挂到车 / 战车 / 担架上；对�
 
 // ---------------------------------------------------------------------------
 // 关卡下拉的行（2026-10-25）：新剧本照 Notion 分四段，11–14 / 15–18 共用 FirstLevel1218 一片场地
-Check("关卡下拉：新剧本五行（11-09 起多 01–07）、15–18 跳 15-1、当前行随关键帧变、?level= 认行 id", () => {
+Check("关卡下拉：新剧本一行 01–07、10 月稿四行、15–18 跳 15-1、当前行随关键帧变、?level= 认行 id", () => {
   const rewrites = BLOCKOUT_MENU.filter(r => r.era === "rewrite");
-  assert.deepEqual(rewrites.map(r => r.short), ["01–05", "06–10", "11–14", "15–18", "01–07"]);
+  assert.deepEqual(rewrites.map(r => r.short), ["01–07"]);
+  const superseded = BLOCKOUT_MENU.filter(r => r.era === "superseded");
+  assert.deepEqual(superseded.map(r => r.short), ["01–05", "06–10", "11–14", "15–18"]);
+  assert.ok(superseded.every(r => r.badge === "10月稿" && r.label.includes("（10月稿）")));
   assert.equal(new Set(BLOCKOUT_MENU.map(r => r.id)).size, BLOCKOUT_MENU.length, "行 id 不重");
   for (const level of BLOCKOUT_LEVELS) assert.ok(BLOCKOUT_MENU.some(r => r.id === level.key && r.key === level.key), `${level.key} 的第一行沿用关卡键`);
   const r15 = BlockoutMenuRow("FirstLevel1218_15");

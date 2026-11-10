@@ -500,7 +500,7 @@ export class BlockoutUi {
     if (this.elMapHint) this.elMapHint.textContent = text || this.mapHintDefault || "";
   }
 
-  /** @param {Array<{key,label,era?,badge?,note?,short?}>} levels  era: "rewrite" 新剧本 / "legacy" 游戏现行旧版 / "draft" 草稿 */
+  /** @param {Array<{key,label,era?,badge?,note?,short?}>} levels  era: "rewrite" 新剧本 / "superseded" 10 月稿 / "legacy" 游戏现行旧版 / "draft" 草稿 */
   SetLevels(levels, currentKey) {
     const Opt = (v) => (typeof v === "string" && v ? v : "");
     this.levels = (Array.isArray(levels) ? levels : []).map(l => ({
@@ -517,7 +517,7 @@ export class BlockoutUi {
     this.elMapLevel.textContent = current ? (current.badge ? `${current.badge}｜${current.label}` : current.label) : "";
     this.levelMenu.replaceChildren();
     // 分组：新剧本在上，旧版 / 草稿在下；没写 era 的（老调用方）归到最后一组，不加组头
-    const GROUPS = [["rewrite", "新剧本"], ["legacy", "旧版 · 游戏现行"], ["draft", "草稿"], ["", ""]];
+    const GROUPS = [["rewrite", "新剧本"], ["superseded", "10 月旧稿 · 已被新剧本取代"], ["legacy", "旧版 · 游戏现行"], ["draft", "草稿"], ["", ""]];
     const tagged = this.levels.some(l => l.era);
     for (const [era, title] of GROUPS) {
       const members = this.levels.filter(l => (GROUPS.some(([e]) => e && e === l.era) ? l.era : "") === era);

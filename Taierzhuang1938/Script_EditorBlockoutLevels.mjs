@@ -22,57 +22,57 @@ import { SCENE_ASSETS } from "./Data_SceneAssets.mjs";
 // 2026-10-31：第一关新剧本三段（01–05 / 06–10 / 11–18）共用一个场景 Scenes/FirstLevelWhitebox（docs/Data_Scene.md），
 // 每段按原来的场地范围取一块来建场；后面的段落把前面段落出现过的信号都当已经发生（塌了的还塌着、开了的门还开着）。
 const FIRST_LEVEL_WHITEBOX_SCENE = "./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json";
-// 2026-11-01：第一关的正式场景（照白盒布局复制、换现行第一关的外观与道具模型，之后单独打磨）。编辑与预演跑白盒，试玩跑它（§17）。
+// 2026-11-01：第一关的正式场景（照白盒布局复制、换现行第一关的外观与道具模型，之后单独打磨）。编辑与预演跑白盒，试玩跑它（§17）；11-09 新剧本的关卡不写 playUrl，试玩与预演同在白盒场景。
 const FIRST_LEVEL_FORMAL_SCENE = "./Scenes/FirstLevel/Scene_FirstLevel.json";
 // Stage0105Done：01–05 演完。那圈「玩家出不了沟」的空气墙（KeepIn_*）随它消失，后两段不挡人；01–05 里它不会发生（futureSignals）
 const STAGE_0105_DONE = "Stage0105Done";
 const SIGNALS_0105 = Object.freeze(["DugoutCollapsed", "PitShelled", "TankDisabled", STAGE_0105_DONE]);
 const SIGNALS_0610 = Object.freeze(["CartDeparted", "CellarBlast", "SideGateOpen", "EastGateBurst", "MgSilenced", "NorthYardGatesBroken", "BarrageHit", "LaneWallCollapse"]);
-function WhiteboxSceneSlice(region, spawn, priorSignals, heightTint, objectMarginM = 1, futureSignals = []) {
-  return Object.freeze({ kind: "scene", url: FIRST_LEVEL_WHITEBOX_SCENE, playUrl: FIRST_LEVEL_FORMAL_SCENE, region: Object.freeze(region), priorSignals: Object.freeze([...priorSignals]),
+function WhiteboxSceneSlice(region, spawn, priorSignals, heightTint, objectMarginM = 1, futureSignals = [], playUrl = FIRST_LEVEL_FORMAL_SCENE) {
+  return Object.freeze({ kind: "scene", url: FIRST_LEVEL_WHITEBOX_SCENE, ...(playUrl ? { playUrl } : {}), region: Object.freeze(region), priorSignals: Object.freeze([...priorSignals]),
     futureSignals: Object.freeze([...futureSignals]), ...(heightTint !== undefined ? { heightTint } : {}), objectMarginM,
     placeholder: Object.freeze({ bounds: region, spawn }) });
 }
 
-// 新旧标记（2026-10-19，用户看着旧版第一关以为是新做的）：era 分 "rewrite"（按新剧本重做）/ "legacy"（游戏里现行的旧版）/
+// 新旧标记（2026-10-19，用户看着旧版第一关以为是新做的）：era 分 "rewrite"（11-09 新剧本）/ "superseded"（10 月稿，已被新剧本取代）/ "legacy"（游戏里现行的旧版）/
 // "draft"（空间草稿）；badge 是关卡名前的小标，note 是下拉里的一行说明，short 是旧版提示条上跳转按钮的短名。
 // 数组顺序别动：levelIndex 同时索引 BLOCKOUT_PHASES，下拉里的分组顺序由界面自己排。
 export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel", label: "第一关 · 往南的路", configUrl: "./Blockout/FirstLevel.json",
-    era: "legacy", badge: "旧版", note: "游戏里现行的第一关（旧剧本：老周、破墙机枪、拔刀军官）；新剧本分 01–05 / 06–10 / 11–14 / 15–18 四段",
+    era: "legacy", badge: "旧版", note: "游戏里现行的第一关（旧剧本：老周、破墙机枪、拔刀军官）；新剧本（11-09 稿）现有 01–07；10 月稿四段在下面",
     scene: Object.freeze({ kind: "firstLevelMission" }) }),
   Object.freeze({ key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）", configUrl: "./Blockout/SecondLevel.json",
     era: "draft", badge: "草稿", note: "第二关的空间草稿",
     scene: Object.freeze({ kind: "file", url: "./Blockout/SecondLevel.scene.json",
       placeholder: Object.freeze({ bounds: { minX: 400, maxX: 640, minZ: -250, maxZ: 60 }, spawn: { x: 470, z: -65, yawDeg: -90 } }) }) }),
   // 2026-10-18：按 Notion 定稿的 01–05（空间拓扑关系）新建的独立场地，坐标原点在沟口；不碰游戏里的第一关
-  Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（新剧本）", configUrl: "./Blockout/FirstLevel0105.json",
-    era: "rewrite", badge: "新剧本", short: "01–05", note: "01–05：防炮洞 → 支沟拖冬瓜 → 集结处 → 机枪坑 → 路口板桥（10-18 剧本）",
+  Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（10月稿）", configUrl: "./Blockout/FirstLevel0105.json",
+    era: "superseded", badge: "10月稿", short: "01–05", note: "01–05：防炮洞 → 支沟拖冬瓜 → 集结处 → 机枪坑 → 路口板桥（10-18 剧本）",
     scene: WhiteboxSceneSlice({ minX: -110, maxX: 320, minZ: -480, maxZ: 200 }, { x: 66.5, z: 64.2, yawDeg: 90 }, [], undefined, 1, [STAGE_0105_DONE]) }),
   // 2026-10-18：06–10 新剧本（干沟 → 凹路 → 耿家庄），与 0105 同一套坐标、另一片场地；锚点 Data_EditorBlockoutFirstLevel0610Space
-  Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（新剧本）", configUrl: "./Blockout/FirstLevel0610.json",
-    era: "rewrite", badge: "新剧本", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
+  Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（10月稿）", configUrl: "./Blockout/FirstLevel0610.json",
+    era: "superseded", badge: "10月稿", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
     scene: WhiteboxSceneSlice({ minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, { x: 35, z: 147, yawDeg: -90 }, SIGNALS_0105, null) }),
   // 2026-10-19：12–18 新剧本，与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space。2026-10-23 按 11–14 改稿重做、把 11 也放进来（11 出村 → 石板桥 → 空袭 → 渡口 → 北门），关卡键不变
   // 2026-10-25：Notion 剧本第一关分四大段，11–14 与 15–18 一路连着走、共用这一片场地，下拉里按 parts 拆成两行（见 BLOCKOUT_MENU）
   // 2026-10-26：第三版（北沙河村）：出村 → 土路 → 官道 → 村口沟与板桥 → 北沙河村 → 铁路桥过沙河 → 北门
   // 2026-11-02：第四版（契约 tmp/Contract1218_v4.md）：官道斜穿村子当主街、北中南三条街、南街口望官道桥（二营炸了它）、出村小路 → 北岸土路 → 李子行 → 铁路桥 → 南岸路（没有北门、村西口）；
   //   场地 x −160…320、z 480…1080（Script_SceneRebuild1218 把两份场景的 11–18 南片重建、高度图加长）
-  Object.freeze({ key: "FirstLevel1218", label: "第一关 11–18 · 北沙河村与铁路桥（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
-    era: "rewrite", badge: "新剧本", short: "11–18", note: "11–18：出村 → 官道 → 村口沟 → 北沙河村 → 空袭 → 救护所 → 北岸土路 → 铁路桥 → 南岸路（11-02 第四版）",
+  Object.freeze({ key: "FirstLevel1218", label: "第一关 11–18 · 北沙河村与铁路桥（10月稿）", configUrl: "./Blockout/FirstLevel1218.json",
+    era: "superseded", badge: "10月稿", short: "11–18", note: "11–18：出村 → 官道 → 村口沟 → 北沙河村 → 空袭 → 救护所 → 北岸土路 → 铁路桥 → 南岸路（11-02 第四版）",
     parts: Object.freeze([
-      Object.freeze({ id: "FirstLevel1218", from: "11-1", label: "第一关 11–14 · 转运与空袭（新剧本）", short: "11–14",
+      Object.freeze({ id: "FirstLevel1218", from: "11-1", label: "第一关 11–14 · 转运与空袭（10月稿）", short: "11–14",
         note: "11–14：出村 → 进北沙河村 → 沟口顶住追兵 → 空袭 → 救护所院里松手（11-02 第四版）" }),
-      Object.freeze({ id: "FirstLevel1218_15", from: "15-1", label: "第一关 15–18 · 冬瓜之死与炸桥（新剧本）", short: "15–18",
+      Object.freeze({ id: "FirstLevel1218_15", from: "15-1", label: "第一关 15–18 · 冬瓜之死与炸桥（10月稿）", short: "15–18",
         note: "15–18：洞里 → 厢房门口 → 门槛 → 出村小路、北岸土路 → 撤过铁路桥、炸桥 → 南岸路往县城（与 11–14 同一片场地）" }),
     ]),
     scene: WhiteboxSceneSlice({ minX: -160, maxX: 320, minZ: 480, maxZ: 1080 }, { x: 117, z: 547.4, yawDeg: 180 }, [...SIGNALS_0105, ...SIGNALS_0610], null, 64) }),
   // 2026-11-09：第一关新剧本 01–07（撤退与凹路）：防炮洞 → 支沟刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气，
   //   一个场地从本班机枪坑一直取到耿家庄村口路沟；位置来自空间图生成器（docs/Data_EditorBlockout.md §19）。
   //   Stage0105Done 当已发生：01–05 那圈出不了沟的空气墙把干沟口堵死，这一关要走出去。
-  Object.freeze({ key: "FirstLevel0107", label: "第一关 01–07 · 撤退与凹路（新剧本 11-09）", configUrl: "./Blockout/FirstLevel0107.json",
+  Object.freeze({ key: "FirstLevel0107", label: "第一关 01–07 · 撤退与凹路（新剧本）", configUrl: "./Blockout/FirstLevel0107.json",
     era: "rewrite", badge: "新剧本", short: "01–07", note: "01–07：防炮洞 → 刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气（11-09 新剧本）",
-    scene: WhiteboxSceneSlice({ minX: -40, maxX: 320, minZ: -40, maxZ: 460 }, { x: 66.5, z: 64.2, yawDeg: 90 }, [STAGE_0105_DONE], undefined) }),
+    scene: WhiteboxSceneSlice({ minX: -40, maxX: 320, minZ: -40, maxZ: 460 }, { x: 66.5, z: 64.2, yawDeg: 90 }, [STAGE_0105_DONE], undefined, 1, [], null) }),
 ]);
 
 // 关卡下拉的行（2026-10-25）：一片场地一行；写了 parts 的场地按剧本段落拆成几行、共用同一个关卡键。
@@ -763,7 +763,7 @@ export function MakeBlockoutPhase(level) {
     scene: level.scene,
     sceneError: null,
     /**
-     * 这一关现在建哪个场景：edit = 白盒场景（编辑、预演）；play = 正式场景（试玩，scene.playUrl，没有就还是白盒）。
+     * 这一关现在建哪个场景：edit = 白盒场景（编辑、预演）；play = 正式场景（试玩，scene.playUrl，没有就还是白盒；11-09 新剧本的关卡不写 playUrl，试玩与预演同在白盒场景）。
      * 总控改它再 JumpToLevel 整片重建（Script_EditorBlockout.UseSceneVariant）。
      */
     variant: "edit",

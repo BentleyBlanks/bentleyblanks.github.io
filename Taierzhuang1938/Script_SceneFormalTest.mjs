@@ -4,7 +4,7 @@
 //   1. 场景清单：两个场景，白盒 + 正式；正式场景过校验、高度图格点数对；
 //   2. 正式场景里正式资产只有道具（Prop/*，模型都在外部道具目录里）与树（Tree/*）；体块不是正式资产，
 //      和白盒场景逐个一样（Whitebox/Box + Whitebox/*，灰面 + 米格线，用户 2026-11-01：不给它自己造外观）；
-//   3. 白盒编辑器三段：试玩跑正式场景（scene.playUrl），编辑跑白盒；正式那一块转出来是 formal 样子、
+//   3. 白盒编辑器 10 月稿三段：试玩跑正式场景（scene.playUrl），编辑跑白盒；11-09 新剧本 01–07 试玩也跑白盒；正式那一块转出来是 formal 样子、
 //      体块不走 PBR 外观、道具清单、分层地表（四层权重都在 0..1、加起来不超过 1），树照旧种模型；
 //   4. 正式场景的撒点环境（植被、碎砖瓦）按场景的路与沟算得出来；
 //   5. 转换脚本：道具与树换资产、布局字段一个不动，其余体块原样。
@@ -52,8 +52,13 @@ Check(scene.objects.some(o => o.asset.startsWith("Prop/")) && scene.objects.some
 
 // 3) 白盒编辑器三段
 const sliced = BLOCKOUT_LEVELS.filter(l => l.scene?.kind === "scene");
-Check(sliced.length === 4 && sliced.every(l => /FirstLevelWhitebox/.test(l.scene.url) && /Scenes\/FirstLevel\/Scene_FirstLevel\.json$/.test(l.scene.playUrl)),
-  "三段 + 01–07（11-09 起共四个关卡）：编辑跑白盒场景、试玩跑正式场景（scene.playUrl）");
+Check(sliced.length === 4 && sliced.every(l => /FirstLevelWhitebox/.test(l.scene.url)),
+  "三段 + 01–07（11-09 起共四个关卡）：编辑都跑白盒场景");
+Check(sliced.filter(l => l.era === "superseded").length === 3 && sliced.filter(l => l.era === "superseded").every(l => /Scenes\/FirstLevel\/Scene_FirstLevel\.json$/.test(l.scene.playUrl)),
+  "10 月稿三段：试玩跑正式场景（scene.playUrl）");
+const level0107 = sliced.find(l => l.key === "FirstLevel0107");
+Check(level0107 && !("playUrl" in level0107.scene) && /FirstLevelWhitebox/.test(level0107.scene.url),
+  "11-09 新剧本 FirstLevel0107：不写 playUrl，试玩与预演同跑白盒场景");
 for (const level of sliced) {
   const layout = LayoutFromSceneDoc(BlockoutSliceDoc(level, scene, heights));
   Check(layout.style === "formal" && !layout.materialLooks && layout.ground.terrainLayers === "MissionPlain" && typeof layout.SampleGroundSurface === "function",

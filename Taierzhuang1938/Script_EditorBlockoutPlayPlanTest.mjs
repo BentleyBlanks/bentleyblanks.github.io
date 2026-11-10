@@ -240,7 +240,7 @@ Check("段落与时间格式", () => {
 Check("提交的试玩编排：通过校验、零警告，预设都成立，打的几步放得出人", () => {
   const dir = path.join(HERE, "Blockout");
   const files = fs.readdirSync(dir).filter(name => name.endsWith(".play.json"));
-  assert.ok(files.includes("FirstLevel0105.play.json"));
+  assert.ok(files.includes("FirstLevel0105.play.json") && files.includes("FirstLevel0107.play.json"));
   for (const name of files) {
     const level = name.replace(/\.play\.json$/, "");
     const config = NormalizeBlockout(JSON.parse(fs.readFileSync(path.join(dir, `${level}.json`), "utf8")));

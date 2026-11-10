@@ -1,0 +1,40 @@
+{
+  "schema": "tengxian-blockout-play/1",
+  "level": "FirstLevel0107",
+  "defaults": { "invincible": false, "infiniteAmmo": false, "previz": true },
+  "ranges": [
+    { "id": "all", "label": "01–07 全程", "from": "01-1", "to": "07-2", "note": "防炮洞 → 刺刀 → 拖冬瓜三回追兵 → 集结处 → 凹路 → 坦克车 → 喘口气" },
+    { "id": "drag", "label": "03 拖冬瓜：三回追兵", "from": "02-5", "to": "03-5", "note": "接枪之后：岔口追兵、支沟中段、支沟口北沿两个，翻坡顶" },
+    { "id": "tank", "label": "06 凹路：坦克车后头的步兵", "from": "05-2", "to": "06-8", "note": "车打不透，只打坎顶的步兵；退到车边，上东坎顶。炸履带那一下暂时是看戏" }
+  ],
+  "steps": {
+    "01-1": { "mode": "watch" },
+    "01-2": { "mode": "watch" },
+    "01-3": { "mode": "watch" },
+    "02-1": { "mode": "watch" },
+    "02-2": { "mode": "watch" },
+    "02-3": { "mode": "watch" },
+    "02-4": { "mode": "watch" },
+    "02-5": { "mode": "watch" },
+    "03-1": { "mode": "move", "clear": { "reach": true }, "objective": "把冬瓜拖到支沟口" },
+    "03-2": { "mode": "fight", "push": ["pursuers"], "clear": { "kill": 1 }, "objective": "放下被角，回身把岔口的追兵打回去" },
+    "03-3": { "mode": "fight", "push": ["pursuers"], "clear": { "kill": "all" }, "objective": "打掉剩下的追兵" },
+    "03-4": { "mode": "fight", "clear": { "kill": "all" }, "objective": "支沟口北沿上有两个在往下打冬瓜" },
+    "03-5": { "mode": "move", "clear": { "reach": true }, "objective": "沿交通沟翻过坡顶" },
+    "04-1": { "mode": "move", "clear": { "reach": true }, "objective": "下到干沟集结处" },
+    "04-2": { "mode": "move", "clear": { "reach": true }, "objective": "把营长的皮箱抬上老耿的车" },
+    "04-3": { "mode": "move", "clear": { "reach": true }, "objective": "跟上后送队，殿后" },
+    "05-1": { "mode": "move", "clear": { "reach": true }, "objective": "跟在车屁股后头进凹路" },
+    "05-2": { "mode": "watch" },
+    "06-1": { "mode": "fight", "push": ["banks"], "clear": { "kill": 4, "time": 75 }, "objective": "车打不透，打坎顶上的步兵" },
+    "06-2": { "mode": "skip" },
+    "06-3": { "mode": "watch" },
+    "06-4": { "mode": "fight", "fresh": true, "push": ["banks"], "clear": { "reach": true }, "objective": "退到车边捆好手榴弹，上东坎顶" },
+    "06-5": { "mode": "watch" },
+    "06-6": { "mode": "watch" },
+    "06-7": { "mode": "watch" },
+    "06-8": { "mode": "move", "clear": { "reach": true }, "objective": "路堵死了，往南走" },
+    "07-1": { "mode": "move", "clear": { "reach": true }, "objective": "到弯南边会合" },
+    "07-2": { "mode": "watch" }
+  }
+}
