@@ -1,6 +1,6 @@
 // 头发 / 胡子的手感数值（docs/Data_HairSystem.md §4–§6）。纯数据、零 import。
 // 造型（长短、密度、发色、梳向）在 Hair/Data_HairStyles.json；这里只有着色与远近切档。
-export const HAIR_ASSET_VERSION = '20261107newcast';
+export const HAIR_ASSET_VERSION = '20261110bonebinding';
 
 export const HAIR_SHADING = Object.freeze({
   // 黑色素 → 底色（UE GetHairColorFromMelanin + ColorFromAbsorption）的吸收倍率，1 = UE 原口径：

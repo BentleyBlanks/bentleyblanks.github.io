@@ -1,4 +1,4 @@
-// Real Mixamo preview: all configured characters wear their baked hair and beard during animation and after switching.
+// Real Mixamo preview: every configured character's baked groom follows the animated Head bone across poses.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -8,8 +8,8 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
-const server = await ServeRoot(root, 0);
-const base = `http://127.0.0.1:${server.address().port}`;
+const server = process.env.HAIR_PREVIEW ? null : await ServeRoot(root, 0);
+const base = process.env.HAIR_PREVIEW || `http://127.0.0.1:${server.address().port}`;
 const browser = await LaunchBrowser({ extraArgs: ["--mute-audio"] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const errors = [], failures = [], observations = [];
@@ -41,18 +41,51 @@ try {
       assert.ok(observation.hair?.startsWith("Game_"), `${key}: game groom loaded`);
       assert.equal(observation.parent, "Head", `${key}: groom follows head bone`);
       assert.ok(observation.visible.some(name => /Hair(Strands|Cards|Shell)/.test(name)), `${key}: hair rendered`);
-      assert.ok(observation.visible.some(name => /HairBeard/.test(name)), `${key}: beard rendered`);
+      if (!["yaowa", "nier"].includes(key))
+        assert.ok(observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: beard rendered`);
+      if (["yaowa", "nier"].includes(key))
+        assert.ok(!observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: clean-shaven character`);
+      await page.evaluate(() => window.__preview.SelectFile("Animation_Mixamo_LookingAround_V2.glb"));
+      await page.waitForFunction(() => window.__preview.current?.file === "Animation_Mixamo_LookingAround_V2.glb" && window.__preview.action);
+      const duration = await page.evaluate(() => window.__preview.action.getClip().duration);
+      const poses = [];
+      for (const time of [duration * 0.1, duration * 0.6]) {
+        poses.push(await page.evaluate(time => {
+          const p = window.__preview, scrub = document.querySelector("#scrub");
+          scrub.value = time; scrub.dispatchEvent(new Event("input", { bubbles: true }));
+          p.character.updateMatrixWorld(true);
+          const head = p.character.getObjectByName("Head"), hair = p.hair.root;
+          const beard = p.hair.meshes.beardCards || p.hair.meshes.stubble;
+          const headQ = head.getWorldQuaternion(head.quaternion.clone());
+          const hairQ = hair.getWorldQuaternion(hair.quaternion.clone());
+          const result = { headQ: headQ.toArray(), hairQ: hairQ.toArray(),
+            headPos: head.getWorldPosition(head.position.clone()).toArray(),
+            hairPos: hair.getWorldPosition(hair.position.clone()).toArray(),
+            beardPos: beard?.getWorldPosition(beard.position.clone()).toArray() || null };
+          return result;
+        }, time));
+      }
+      const angularChange = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a.reduce((sum, v, i) => sum + v * b[i], 0))));
+      assert.ok(angularChange(poses[0].headQ, poses[1].headQ) > 0.03, `${key}: head bone animates`);
+      assert.ok(angularChange(poses[0].hairQ, poses[1].hairQ) > 0.03, `${key}: hair rotates with head`);
+      assert.ok(Math.abs(angularChange(poses[0].headQ, poses[1].headQ) - angularChange(poses[0].hairQ, poses[1].hairQ)) < 0.001,
+        `${key}: hair rotation matches head rotation`);
+      if (poses[0].beardPos) assert.ok(Math.hypot(...poses[0].beardPos.map((v, i) => v - poses[1].beardPos[i])) > 0.002,
+        `${key}: beard follows animated head`);
+      observation.poses = poses;
     }
-    if (key === "heYoutian" || key === "ijaYi") {
+    if (key !== "xbot" && observations.filter(o => o.key === key).length === 1) {
       await page.evaluate(() => {
         const p = window.__preview;
-        p.orbit.target.y = 1.55; p.orbit.dist = 1.5; p.orbit.yaw = 0; p.orbit.pitch = 0.1;
+        const head = p.character.getObjectByName("Head");
+        p.orbit.target.copy(head.getWorldPosition(head.position.clone()));
+        p.orbit.target.y -= 0.05; p.orbit.dist = 1; p.orbit.yaw = 0; p.orbit.pitch = 0.06;
         document.querySelector("#edRoot").style.display = "none";
       });
       await page.waitForTimeout(250);
       await sharp(await page.screenshot()).resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: 82 }).toFile(path.join(output, `${key}.jpg`));
-      await page.evaluate(() => { document.querySelector("#edRoot").style.display = ""; window.__preview.orbit.dist = 5; window.__preview.orbit.target.y = .95; });
+      await page.evaluate(() => { document.querySelector("#edRoot").style.display = ""; window.__preview.orbit.dist = 5; window.__preview.orbit.target.set(0, .95, 0); });
     }
   }
   assert.deepEqual(errors, []);
@@ -61,5 +94,5 @@ try {
   console.log("MixamoGroomBrowserTest ok", observations.map(o => `${o.key}:${o.lod}:${o.visible.join("+")}`).join(" "));
 } finally {
   await browser.close();
-  await new Promise(resolve => server.close(resolve));
+  if (server) await new Promise(resolve => server.close(resolve));
 }

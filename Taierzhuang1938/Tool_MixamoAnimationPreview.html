@@ -128,6 +128,7 @@ import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_M
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
+import { HAIR_ASSET_VERSION } from "./Data_Tuning_Hair.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const FPS = 30;
@@ -225,7 +226,7 @@ const groomCache = new Map();
 let hairAtlas = null, activeGroom = null, characterSwitch = 0;
 function GroomAsset(def) {
   if (!def.groom) return null;
-  if (!groomCache.has(def.groom)) groomCache.set(def.groom, LoadHairGroom(def.groom));
+  if (!groomCache.has(def.groom)) groomCache.set(def.groom, LoadHairGroom(`${def.groom}?v=${HAIR_ASSET_VERSION}`));
   hairAtlas ||= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png");
   return Promise.all([groomCache.get(def.groom), hairAtlas]);
 }

@@ -16,7 +16,8 @@ const base = process.env.HAIR_PREVIEW || `http://127.0.0.1:${server.address().po
 const browser = await LaunchBrowser({ extraArgs: ['--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [], failedRequests = [], result = { viewport: [1280, 720], base };
-const gameKeys = Object.entries(XBOT_CHARACTERS).filter(([, def]) => def.groom).map(([key]) => key);
+// These six are instantiated by the sampled whitebox keyframes; the full cast is covered in MixamoGroomBrowserTest.
+const keyframeKeys = ['ijaJia', 'heYoutian', 'luo', 'shunzi', 'ijaA', 'ijaYi'];
 page.on('pageerror', (error) => errors.push(String(error)));
 page.on('console', (message) => { if (message.type() === 'error' && !message.text().includes('HairInjectedFailure')) errors.push(message.text()); });
 page.on('response', (response) => {
@@ -136,7 +137,7 @@ try {
         const skin = parent?.userData.xbotSkin;
         if (skin) out[skin.kit.key] = { bone: o.parent.name, ...skin.hair.stats, matrix: o.matrixWorld.toArray() };
       }); return out;
-    }, gameKeys);
+    }, keyframeKeys);
     for (const key of Object.keys(found)) {
       if (result.characters[key]) continue;
       result.characters[key] = { keyframe, ...found[key] };
@@ -160,11 +161,11 @@ try {
         await page.screenshot({ path: path.join(out, `Game_${key}_${view}.png`) });
       }
     }
-    if (Object.keys(result.characters).length === gameKeys.length) break;
+    if (Object.keys(result.characters).length === keyframeKeys.length) break;
   }
   // Shunzi is the player: this level creates his third-person actor in the
   // drag sequence, rather than in ordinary keyframe unit lists.
-  if (gameKeys.includes('shunzi') && !result.characters.shunzi) {
+  if (keyframeKeys.includes('shunzi') && !result.characters.shunzi) {
     await page.evaluate(() => {
       window.__hairPrevizError = null;
       // Play resolves when the sequence ends; this manual-clock test seeks
@@ -190,7 +191,7 @@ try {
     await page.evaluate(() => window.Taierzhuang.Debug.Blockout.Previz.Stop());
     await Step(2);
   }
-  assert.deepEqual(Object.keys(result.characters).sort(), gameKeys.slice().sort());
+  assert.deepEqual(Object.keys(result.characters).sort(), keyframeKeys.slice().sort());
 
   const started = await page.evaluate(() => window.Taierzhuang.Debug.Blockout.Play.Start({ from: '02-4', to: '02-4', settings: { invincible: true, infiniteAmmo: true, previz: false } }));
   assert.ok(started, 'start actual AI play in the formal scene');

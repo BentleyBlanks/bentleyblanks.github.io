@@ -69,7 +69,11 @@ for (const entry of entries) {
   }
 }
 Check(manifest.grooms.length === entries.length && ids.size === entries.length, `清单 ${manifest.grooms.length} 套 = 造型表 ${entries.length} 套，编号唯一`);
-for (const def of Object.values(XBOT_CHARACTERS)) if (def.groom) Check(fs.existsSync(path.join(here, def.groom)), `${def.name} 游戏头发文件存在`);
+const gameByFile = new Map((styles.gameGrooms || []).map(entry => [`./Hair/Grooms/Groom_${entry.id}.bin`, entry]));
+for (const def of Object.values(XBOT_CHARACTERS)) if (def.groom) {
+  Check(fs.existsSync(path.join(here, def.groom)), `${def.name} 游戏头发文件存在`);
+  Check(gameByFile.get(def.groom)?.model === def.file.replace(/^\.\//, ''), `${def.name} 头发按本人游戏模型绑定`);
+}
 for (const row of HAIR_RANGE_ROWS) for (const item of row.items) Check(ids.has(item.groom), `测试场 ${row.id} 排的 ${item.groom} 在清单里`);
 
 function Open(file) {

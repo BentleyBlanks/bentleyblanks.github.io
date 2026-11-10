@@ -22,17 +22,17 @@ export const XBOT_CHARACTERS = Object.freeze({
     report: "./Model/Character/Data_Shunzi.json", groom: "./Hair/Grooms/Groom_Game_Shunzi.bin" }),
   // 冬瓜 V3：保留帽壳和袖口修复，用户下载的绑骨模型转换为共用骨架。
   donggua: Object.freeze({ name: "冬瓜", file: "./Model/Character/Model_Donggua.glb", hipsScale: 0.8833, ownMaterial: true,
-    report: "./Model/Character/Data_Donggua.json" }),
+    report: "./Model/Character/Data_Donggua.json", groom: "./Hair/Grooms/Groom_Game_Donggua.bin" }),
   // 幺娃 V6：用户下载的完整绑骨件，保留修复后的颈部、手指和脚踝比例。
   yaowa: Object.freeze({ name: "幺娃", file: "./Model/Character/Model_Yaowa.glb", hipsScale: 0.8394, ownMaterial: true,
-    report: "./Model/Character/Data_Yaowa.json",
+    report: "./Model/Character/Data_Yaowa.json", groom: "./Hair/Grooms/Groom_Game_Yaowa.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/Yaowa/Animation_Yaowa_ProneFiringRifle_V2.glb",
       "Animation_Mixamo_Dying_V3.glb": "./Animation/Yaowa/Animation_Yaowa_Dying_V3.glb",
     }) }),
   // 老耿 V10：用户下载的完整绑骨件，沿用修正后的领口、手腕和下肢外形。
   oldGeng: Object.freeze({ name: "老耿", file: "./Model/Character/Model_OldGeng.glb", hipsScale: 0.9478, ownMaterial: true,
-    report: "./Model/Character/Data_OldGeng.json",
+    report: "./Model/Character/Data_OldGeng.json", groom: "./Hair/Grooms/Groom_Game_OldGeng.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/OldGeng/Animation_OldGeng_IdleCrouchingAiming_V1.glb",
       "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/OldGeng/Animation_OldGeng_ProneFiringRifle_V2.glb",
@@ -41,7 +41,7 @@ export const XBOT_CHARACTERS = Object.freeze({
     }) }),
   // 谷寿夫 V4：用户下载的完整绑骨件，转换为共用骨架。
   taniHisao: Object.freeze({ name: "谷寿夫", file: "./Model/Character/Model_TaniHisao.glb", hipsScale: 0.9361, ownMaterial: true,
-    report: "./Model/Character/Data_TaniHisao.json" }),
+    report: "./Model/Character/Data_TaniHisao.json", groom: "./Hair/Grooms/Groom_Game_TaniHisao.bin" }),
   // 东史郎 V12：用户下载的完整绑骨件，保留颈根和背部底色修复。
   azumaShiro: Object.freeze({ name: "东史郎", file: "./Model/Character/Model_AzumaShiro.glb", hipsScale: 0.9684, heightM: 1.840000033378601, ownMaterial: true,
     report: "./Model/Character/Data_AzumaShiro.json",
@@ -54,7 +54,7 @@ export const XBOT_CHARACTERS = Object.freeze({
     }) }),
   // 刘文财 V9：用户下载的 Mixamo 绑骨件，转换为共用骨架。
   liuWencai: Object.freeze({ name: "刘文财", file: "./Model/Character/Model_LiuWencai.glb", hipsScale: 0.9153, ownMaterial: true,
-    report: "./Model/Character/Data_LiuWencai.json",
+    report: "./Model/Character/Data_LiuWencai.json", groom: "./Hair/Grooms/Groom_Game_LiuWencai.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_Crawling_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_Crawling.glb",
       "Animation_Mixamo_ProneFiringRifle_V2.glb": "./Animation/LiuWencai/Animation_LiuWencai_ProneFiringRifle.glb",
@@ -63,7 +63,7 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
     }) }),
   nier: Object.freeze({ name: "妮儿", file: "./Model/Character/Model_Nier.glb", hipsScale: 0.6397, heightM: 1.2887294292449951, ownMaterial: true,
-    report: "./Model/Character/Data_Nier.json",
+    report: "./Model/Character/Data_Nier.json", groom: "./Hair/Grooms/Groom_Game_Nier.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_KneelingIdle_V1.glb": "./Animation/Nier/Animation_Nier_KneelingIdle_V1.glb",
       "Animation_Mixamo_CrouchWalking_V1.glb": "./Animation/Nier/Animation_Nier_CrouchWalking_V1.glb",
@@ -75,7 +75,7 @@ export const XBOT_CHARACTERS = Object.freeze({
     report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
   // 日军士兵C V4：用户下载件为静态网格，经本地拟合骨架和表面权重传递后转换为共用骨架。
   ijaC: Object.freeze({ name: "日军士兵C", file: "./Model/Character/Model_JapaneseSoldierC.glb", hipsScale: 0.9417, ownMaterial: true,
-    report: "./Model/Character/Data_JapaneseSoldierC.json",
+    report: "./Model/Character/Data_JapaneseSoldierC.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierC.bin",
     clipOverrides: Object.freeze({ "Animation_Mixamo_Crawling_V1.glb": "./Animation/JapaneseSoldierC/Animation_JapaneseSoldierC_Crawling.glb" }) }),
   // 日兵乙：五部件 V2；本地用已验证的日兵甲骨架拟合并传递权重，保留头形，补齐护颈布内衬。
   ijaYi: Object.freeze({ name: "日兵乙", file: "./Model/Character/Model_JapaneseSoldierYi.glb", hipsScale: 0.9418, ownMaterial: true,

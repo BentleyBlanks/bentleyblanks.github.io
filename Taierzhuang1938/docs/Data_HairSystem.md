@@ -81,7 +81,7 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 
 ## 7. 游戏角色消费方
 
-`Data_XBotCharacters` 的可选 `groom` 字段指定人物套装。当前六人均已登记：何有田、日兵甲、罗班长、日军士兵 A、顺子 V5、日兵乙 V2；保留日军三款分配和乙的专用爬行动作。顺子的第三人称实体在 02-4 拖人预演中生成，普通关键帧的单位表没有他。构建器将实验室脸部与只读游戏模型做 trimmed ICP，按皮肤和帽子排除发根，输出 `attach` 矩阵到 `Head` 骨局部；不改模型本身。`XBotSkin` 完成当帧姿势和道具挂接后再选头发档位，预演与白盒试玩 AI 使用同一套消费方；Mixamo 动作预览也按该字段在同一根 `Head` 骨下默认挂载，并在人物切换时更新、释放实例。原有角色表和后续新增角色继续保留；未登记 groom 的模型维持原外观。正式战役中尚未采用这些 Tripo 身体的旧人物不会被自动换模。
+`Data_XBotCharacters` 的可选 `groom` 字段指定人物套装。当前十三人均已登记：原六人何有田、日兵甲、罗班长、日军士兵 A、顺子 V5、日兵乙 V2，以及冬瓜、幺娃、刘文财、老耿、妮儿、谷寿夫、日军士兵 C。幺娃和妮儿按本人参考保持净面。保留日军四款分配和乙的专用爬行动作。顺子的第三人称实体在 02-4 拖人预演中生成，普通关键帧的单位表没有他。构建器将实验室脸部与只读游戏模型做 trimmed ICP，按皮肤和帽子排除发根，输出 `attach` 矩阵到 `Head` 骨局部；不改模型本身。这相当于为毛发建立骨骼挂接：头骨的位移、转向和俯仰驱动整个发型、胡须与胡茬。`XBotSkin` 完成当帧姿势和道具挂接后再选头发档位，预演与白盒试玩 AI 使用同一套消费方；Mixamo 动作预览也按该字段在同一根 `Head` 骨下默认挂载，并在人物切换时更新、释放实例。原有角色表继续保留；未登记 groom 的模型维持原外观。正式战役中尚未采用这些 Tripo 身体的旧人物不会被自动换模。
 
 挂接误差与模型 SHA-256 由资产门禁核对，还必须看正、侧、背与远景，检查帽缘、耳前、后颈、胡须与嘴部；ICP 平均误差不能替代视觉验收。角色模型更新后应重烘其游戏 groom，不能复用旧帽子遮挡。
 
@@ -93,7 +93,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=MotionVectorContractTest,Carri
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
-通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出；试玩断言只要求已配置 `groom` 的人物有毛发。`MixamoGroomBrowserTest` 在真实预览页逐一切换六人，确认动作中的头骨挂接、头发和胡子均实际绘制，近景预览只保存在本地。
+通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出；试玩断言只要求已配置 `groom` 的人物有毛发。`MixamoGroomBrowserTest` 在真实预览页逐一切换十三人，确认头骨驱动头发和已有的胡子，并将近景预览只保存在本地。
 
 `HairReferenceBrowserTest` 验证右键原地转向、沿视线飞行、Q/E 升降、斜向归一化、加速、滚轮调速、中键平移、Alt 环绕 / 缩放、F 聚焦、点击选择、控件焦点与失焦停移、分类折叠与恢复默认、桌面 / 窄屏共用 UI 主题，并将原始个人参考图与实际浏览器渲染并排，另存侧 / 背截图到本地 `tmp/HairLab/ReferenceReview/`。需要本机 OneDrive 原图；`HAIR_REF_SUBJECTS=Luo,HeYoutian` 可限制迭代样本。数字门禁不能替代人物的图像对照复核。
 
@@ -101,7 +101,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 
 正面参考在侧脸会因投影切向拉伸形成横纹，因此 `HAIR_SHADING.referenceFrontFadeDegrees` 统一控制参考着色、胡茬覆盖与几何发际线的转接区；侧面由三维发片和按耳界定义的鬓角轮廓接续。转接在头部局部坐标中计算，不随观察相机转动。该参数写入烘焙头部元数据，门禁要求几何与运行时一致；更改后须重烘六套展示及六套游戏挂件。
 
-`HairRangeBrowserTest` 包含真实编辑器试玩，可使用根目录 `scripts/Script_LocalPreview.mjs <端口> --no-open`，并把 `HAIR_PREVIEW` 设为该服务地址后经 TestRunner 执行。`Script_DevServer` 静态测试服对编辑器状态接口返回只读能力，不提供写入；测试保留全部失败请求的完整 URL，不忽略资源错误。
+`HairRangeBrowserTest` 包含真实编辑器试玩，可使用根目录 `scripts/Script_LocalPreview.mjs <端口> --no-open`，并把 `HAIR_PREVIEW` 设为该服务地址后经 TestRunner 执行。`Script_DevServer` 静态测试服对编辑器状态接口返回只读能力，不提供写入；测试保留全部失败请求的完整 URL，不忽略资源错误。`MixamoGroomBrowserTest` 对每个已配置人物取同一段转头动作的两帧，检查头骨、发型及有须人物的胡须确实随骨骼变化；净面人物不要求胡须。
 
 证据只放本地忽略目录 `tmp/HairLab/Verified/`：截图与 `Data_HairVerification.json`。其中逐帧 `StepFrames + gl.finish` 数值是合成帧时成本，不是 rAF 游戏帧率；机器有并行任务时不作独占 GPU 性能承诺。视觉复核、性能实测与部署状态在本次交付记录中分别说明。
 

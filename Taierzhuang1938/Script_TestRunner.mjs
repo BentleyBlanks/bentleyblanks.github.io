@@ -50,7 +50,7 @@ export const testDefs = {
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
-  MixamoGroomBrowserTest: { file: "Script_MixamoGroomBrowserTest.mjs", timeoutMs: 360000, desc: "Mixamo preview: six configured characters render hair and beard across character switches" },
+  MixamoGroomBrowserTest: { file: "Script_MixamoGroomBrowserTest.mjs", timeoutMs: 360000, desc: "Mixamo preview: thirteen configured characters move baked hair and optional beard with animated head bones" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
   Type38_511AssetTest: {file:'Script_Type38_511AssetTest.mjs',desc:'Type38 511 actual geometry, source image identity, playable notch and independent moving parts'},
   Type38_511BrowserTest: {file:'Script_Type38_511BrowserTest.mjs',timeoutMs:600000,desc:'Actual Type38 511 FPS/NPC/world, PBR identity, ADS, independent cover and held-open reload'},

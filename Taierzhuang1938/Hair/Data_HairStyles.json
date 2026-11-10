@@ -1053,6 +1053,76 @@
    "beard": "MustacheChin",
    "label": "日兵乙（游戏挂接）：短寸头 + 宽唇须 U 形短须",
    "referenceLook": "Yi"
+  },
+  {
+   "id": "Game_Donggua",
+   "model": "Model/Character/Model_Donggua.glb",
+   "head": "Donggua",
+   "labHead": "Donggua",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "冬瓜（游戏挂接）",
+   "referenceLook": "Donggua"
+  },
+  {
+   "id": "Game_Yaowa",
+   "model": "Model/Character/Model_Yaowa.glb",
+   "head": "Yaowa",
+   "labHead": "Yaowa",
+   "hair": "Crew",
+   "beard": null,
+   "label": "幺娃（游戏挂接）",
+   "referenceLook": "Yaowa"
+  },
+  {
+   "id": "Game_LiuWencai",
+   "model": "Model/Character/Model_LiuWencai.glb",
+   "head": "LiuWencai",
+   "labHead": "LiuWencai",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "刘文财（游戏挂接）",
+   "referenceLook": "LiuWencai"
+  },
+  {
+   "id": "Game_OldGeng",
+   "model": "Model/Character/Model_OldGeng.glb",
+   "head": "OldGeng",
+   "labHead": "OldGeng",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "老耿（游戏挂接）",
+   "referenceLook": "OldGeng"
+  },
+  {
+   "id": "Game_Nier",
+   "model": "Model/Character/Model_Nier.glb",
+   "head": "Nier",
+   "labHead": "Nier",
+   "hair": "LongStraight",
+   "beard": null,
+   "label": "妮儿（游戏挂接）",
+   "referenceLook": "Nier"
+  },
+  {
+   "id": "Game_TaniHisao",
+   "model": "Model/Character/Model_TaniHisao.glb",
+   "head": "TaniHisao",
+   "labHead": "TaniHisao",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "谷寿夫（游戏挂接）",
+   "referenceLook": "TaniHisao"
+  },
+  {
+   "id": "Game_JapaneseSoldierC",
+   "model": "Model/Character/Model_JapaneseSoldierC.glb",
+   "head": "SoldierC",
+   "labHead": "SoldierC",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "label": "日军士兵C（游戏挂接）",
+   "referenceLook": "SoldierC"
   }
  ]
 }

@@ -638,6 +638,160 @@
    "guides": 1798,
    "cardTriangles": 18580,
    "shellTriangles": 1870
+  },
+  {
+   "id": "Game_Donggua",
+   "head": "Donggua",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "reference": {
+    "look": "Donggua",
+    "source": "03_冬瓜/HairReference_20261107/Ref_Donggua_HeadHair_1K_V1.png",
+    "sha256": "b5b6685f35ee06865a86639ab108d69c988f0056209c46f20b96da33a6460f57",
+    "version": 4,
+    "recipeSha256": "3cb3c5395a3a6e968195e7ea4e4bff9f77ee43f06fdaf915507ec042ff80a158"
+   },
+   "row": null,
+   "label": "冬瓜（游戏挂接）",
+   "model": "Model/Character/Model_Donggua.glb",
+   "file": "Grooms/Groom_Game_Donggua.bin",
+   "bytes": 107416,
+   "strands": 580,
+   "guides": 13,
+   "cardTriangles": 418,
+   "shellTriangles": 17
+  },
+  {
+   "id": "Game_Yaowa",
+   "head": "Yaowa",
+   "hair": "Crew",
+   "beard": null,
+   "reference": {
+    "look": "Yaowa",
+    "source": "04_幺娃/HairReference_20261107/Ref_Yaowa_HeadHair_1K_V1.png",
+    "sha256": "5c324cf2c767b869ec8a210d06c52eb7cbe7c58f635961ae54721e4284a4b155",
+    "version": 4,
+    "recipeSha256": "d8b867ac6135badc425056043f1b1ea52046e04b831ce3243f5ee468b74b2a3f"
+   },
+   "row": null,
+   "label": "幺娃（游戏挂接）",
+   "model": "Model/Character/Model_Yaowa.glb",
+   "file": "Grooms/Groom_Game_Yaowa.bin",
+   "bytes": 138936,
+   "strands": 6911,
+   "guides": 18,
+   "cardTriangles": 190,
+   "shellTriangles": 15
+  },
+  {
+   "id": "Game_LiuWencai",
+   "head": "LiuWencai",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "reference": {
+    "look": "LiuWencai",
+    "source": "06_刘文财/HairReference_20261107/Ref_LiuWencai_HeadHair_1K_V1.png",
+    "sha256": "908603453d5cb5531510dc965408be04adba85db820b5e40c766221eb46d84e3",
+    "version": 4,
+    "recipeSha256": "181d09b410b8ec0c6b2efec22d1a42fb732f0113b67549006f0940976043e3ba"
+   },
+   "row": null,
+   "label": "刘文财（游戏挂接）",
+   "model": "Model/Character/Model_LiuWencai.glb",
+   "file": "Grooms/Groom_Game_LiuWencai.bin",
+   "bytes": 935060,
+   "strands": 46000,
+   "guides": 575,
+   "cardTriangles": 4654,
+   "shellTriangles": 457
+  },
+  {
+   "id": "Game_OldGeng",
+   "head": "OldGeng",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "reference": {
+    "look": "OldGeng",
+    "source": "07_老耿/HairReference_20261107/Ref_OldGeng_HeadHair_1K_V1.png",
+    "sha256": "875b43bcb65459cf49e4e238813155426feebc13f50bb9194cb007feec64545f",
+    "version": 4,
+    "recipeSha256": "d48c2aebe648cff7731e63d0dc8b2465ccc09b1a75ee9042364578f68f011777"
+   },
+   "row": null,
+   "label": "老耿（游戏挂接）",
+   "model": "Model/Character/Model_OldGeng.glb",
+   "file": "Grooms/Groom_Game_OldGeng.bin",
+   "bytes": 1783788,
+   "strands": 44000,
+   "guides": 1900,
+   "cardTriangles": 24972,
+   "shellTriangles": 1028
+  },
+  {
+   "id": "Game_Nier",
+   "head": "Nier",
+   "hair": "LongStraight",
+   "beard": null,
+   "reference": {
+    "look": "Nier",
+    "source": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadShortHair_2K_V1.png",
+    "sha256": "06fbf5bb6aedce4cdec8fbc88136460c28c7bbf8ab53723ba2ade0b66cf9ae56",
+    "version": 4,
+    "recipeSha256": "361984beeb24656db0a907c1f356dfde25a0d958cb536886f9b7e44526cee947"
+   },
+   "row": null,
+   "label": "妮儿（游戏挂接）",
+   "model": "Model/Character/Model_Nier.glb",
+   "file": "Grooms/Groom_Game_Nier.bin",
+   "bytes": 3340100,
+   "strands": 60000,
+   "guides": 2046,
+   "cardTriangles": 53482,
+   "shellTriangles": 33332
+  },
+  {
+   "id": "Game_TaniHisao",
+   "head": "TaniHisao",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "reference": {
+    "look": "TaniHisao",
+    "source": "09_谷寿夫/HairReference_20261107/Ref_TaniHisao_HeadHair_1K_V1.png",
+    "sha256": "b6725b63fb7b5cfa6bb33da10288a308189d4c6e5b6a19f928e56c23190c8fc5",
+    "version": 4,
+    "recipeSha256": "a25818ab20a71272bfcad3f2d14c244123eb0e21f7298014dffd1b36210b1ea8"
+   },
+   "row": null,
+   "label": "谷寿夫（游戏挂接）",
+   "model": "Model/Character/Model_TaniHisao.glb",
+   "file": "Grooms/Groom_Game_TaniHisao.bin",
+   "bytes": 164212,
+   "strands": 2495,
+   "guides": 37,
+   "cardTriangles": 290,
+   "shellTriangles": 11
+  },
+  {
+   "id": "Game_JapaneseSoldierC",
+   "head": "SoldierC",
+   "hair": "Crew",
+   "beard": "StubbleLight",
+   "reference": {
+    "look": "SoldierC",
+    "source": "12_日军士兵C/HairReference_20261107/Ref_JapaneseSoldierC_HeadHair_1K_V1.png",
+    "sha256": "da94bd98d311ecc7a6f55862d9f7d5310c11ee8f4ab359b61c92827aba85d27b",
+    "version": 4,
+    "recipeSha256": "dc5d9083f1ee884ae7b9c444b048d1ef40fc14809bf9cc56d661d197e7993380"
+   },
+   "row": null,
+   "label": "日军士兵C（游戏挂接）",
+   "model": "Model/Character/Model_JapaneseSoldierC.glb",
+   "file": "Grooms/Groom_Game_JapaneseSoldierC.bin",
+   "bytes": 687404,
+   "strands": 43462,
+   "guides": 42,
+   "cardTriangles": 1424,
+   "shellTriangles": 15
   }
  ]
 }
