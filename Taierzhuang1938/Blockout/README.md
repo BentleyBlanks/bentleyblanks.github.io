@@ -23,6 +23,8 @@
 | `FirstLevel1218.scene.json` | 12–18 的场地（与 0105 / 0610 同一套坐标，村南那一截逐点等于 0610）：0.5 m 高度网格（出村小路、大路与路边浅沟、拐弯往西的河汊子、排水沟、两道河堤、北沙河、浮桥引道、散兵坑、土坎）+ 体块（14 段浮桥与船、接收院与厢房门槛、旁边院子、远处铁路桥、北门城墙与门洞、日常摆件）+ 随信号体块（CartOverturned / ChargesSet / BridgeBlown，契约 §16） | `scene FirstLevel1218` |
 | `FirstLevel1218.voice.json` | 12–18 台词的占位配音清单，mp3 在 `../Audio/Blockout1218/` | `Script_EditorBlockoutFirstLevel1218Voice.mjs` |
 | `FirstLevel0107.json` | 第一关 01–07 新剧本（2026-11-09）的 28 个关键帧 01-1…07-2：防炮洞 → 刺刀 → 拖冬瓜 → 干沟集结处 → 凹路 → 坦克车伏击 → 喘口气；手写数据，位置取自 01–07 空间图（契约 §19），场景用 `Scenes/FirstLevelWhitebox` 取 x −40…320、z −40…460 | 手写，以文件为准；`Script_EditorBlockoutFirstLevel0107KeyframesTest.mjs` 把关 |
+| `FirstLevel0107.voice.json` | 01–07 台词（任务书原句 70 句）的占位配音清单（每句：关键帧、说话人、actor、字幕、mp3、时长、录音里的原始间隔、核对结果），mp3 与口型轨在 `../Audio/Blockout0107/` | `Script_EditorBlockoutFirstLevel0107Voice.mjs`（SeedAudio 整场一次生成再切句，台词表 `Data_EditorBlockoutFirstLevel0107Lines.mjs`） |
+| `FirstLevel0107.previz.json` | 01–07 的最简预演（2026-11-09）：每帧一段，镜头 = 关键帧玩家站位定镜，只排台词（按录音间隔、不互压），播完 then:next——为了在编辑器里按帧听配音（契约 §19） | `Script_EditorBlockoutFirstLevel0107Previz.mjs --force` 生成（重跑覆盖手改）；`Script_EditorBlockoutFirstLevel0107PrevizTest.mjs` 把关 |
 
 第一关（`FirstLevel`）的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。`FirstLevel0105` 是另一片场地，坐标原点在沟口，和游戏里的第一关无关。
 

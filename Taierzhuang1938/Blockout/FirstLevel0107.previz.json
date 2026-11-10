@@ -1,0 +1,1021 @@
+{
+ "schema": "tengxian-blockout-previz/1",
+ "level": "FirstLevel0107",
+ "title": "第一关 01–07 预演（最简：顺子眼睛定镜 + 占位配音）",
+ "source": {
+  "generator": "node Taierzhuang1938/Script_EditorBlockoutFirstLevel0107Previz.mjs --force",
+  "note": "2026-11-09 最简预演：只为在白盒编辑器里按帧听台词（镜头 = 关键帧里玩家的站位 / 朝向，台词按录音间隔排，播完 then:next）；没有走位、动作、事件。手改前先想好：重跑生成器会覆盖"
+ },
+ "voice": "./Blockout/FirstLevel0107.voice.json",
+ "faceTracks": "./Audio/Blockout0107/Data_Blockout0107FaceTracks.json",
+ "sequences": [
+  {
+   "keyframe": "01-1",
+   "title": "今天就跑",
+   "durationS": 30.04,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 30.04,
+     "eye": {
+      "x": 66.4,
+      "z": 64.4,
+      "stance": "crouch",
+      "yawDeg": 126.87,
+      "pitchDeg": -4
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "CaveRun.01",
+     "actor": "player"
+    },
+    {
+     "t": 10.96,
+     "line": "CaveRun.02",
+     "actor": "Donggua"
+    },
+    {
+     "t": 16.12,
+     "line": "CaveRun.03",
+     "actor": "player"
+    },
+    {
+     "t": 20.28,
+     "line": "CaveRun.04",
+     "actor": "Donggua"
+    },
+    {
+     "t": 25.34,
+     "line": "CaveRun.05",
+     "actor": "player"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "01-2",
+   "title": "班长点顺子去西边坑",
+   "durationS": 11.49,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 11.49,
+     "eye": {
+      "x": 65.2,
+      "z": 64.1,
+      "stance": "crouch",
+      "yawDeg": 135,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "PitOrder.01",
+     "actor": "Luo"
+    },
+    {
+     "t": 5.88,
+     "line": "PitOrder.02",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 7.98,
+     "line": "PitOrder.03",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "01-3",
+   "title": "塌洞",
+   "durationS": 3.96,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 3.96,
+     "eye": {
+      "x": 59.4,
+      "z": 64.8,
+      "stance": "stand",
+      "yawDeg": -90,
+      "pitchDeg": 3
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "PitOrder.04",
+     "actor": "Donggua"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "02-1",
+   "title": "先头摸进支沟，按着跪在洞口外",
+   "durationS": 4.55,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 4.55,
+     "eye": {
+      "x": 61.8,
+      "z": 65.6,
+      "stance": "crouch",
+      "yawDeg": 87.27,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Interrogation.01",
+     "actor": "IjaJia"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "02-2",
+   "title": "审问：两刀",
+   "durationS": 20.78,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 20.78,
+     "eye": {
+      "x": 61.8,
+      "z": 65.6,
+      "stance": "crouch",
+      "yawDeg": 0,
+      "pitchDeg": 8
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Interrogation.02",
+     "actor": "Interpreter"
+    },
+    {
+     "t": 3.96,
+     "line": "Interrogation.03",
+     "actor": "Donggua"
+    },
+    {
+     "t": 5.72,
+     "line": "Interrogation.04",
+     "actor": "IjaJia"
+    },
+    {
+     "t": 7.81,
+     "line": "Interrogation.05",
+     "actor": "IjaJia"
+    },
+    {
+     "t": 10.18,
+     "line": "Interrogation.06",
+     "actor": "Donggua"
+    },
+    {
+     "t": 18.99,
+     "line": "Interrogation.07",
+     "actor": "Donggua"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "02-3",
+   "title": "后沟枪声停，两颗手榴弹",
+   "durationS": 4.56,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 4.56,
+     "eye": {
+      "x": 61.8,
+      "z": 65.6,
+      "stance": "crouch",
+      "yawDeg": 87.27,
+      "pitchDeg": 14
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Interrogation.08",
+     "actor": "IjaJia"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "02-4",
+   "title": "砍狗日的",
+   "durationS": 5.53,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 5.53,
+     "eye": {
+      "x": 61.8,
+      "z": 65.6,
+      "stance": "crouch",
+      "yawDeg": 86.99,
+      "pitchDeg": 18
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Charge.01",
+     "actor": "S01"
+    },
+    {
+     "t": 2.48,
+     "line": "Charge.02",
+     "actor": "S02"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "02-5",
+   "title": "混战收尾",
+   "durationS": 13.18,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 13.18,
+     "eye": {
+      "x": 60.8,
+      "z": 64.9,
+      "stance": "stand",
+      "yawDeg": 92.94,
+      "pitchDeg": -4
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Aftermath.01",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 2.45,
+     "line": "Aftermath.02",
+     "actor": "Luo"
+    },
+    {
+     "t": 4.68,
+     "line": "Aftermath.03",
+     "actor": "player"
+    },
+    {
+     "t": 6.37,
+     "line": "Aftermath.04",
+     "actor": "Donggua"
+    },
+    {
+     "t": 10.49,
+     "line": "Aftermath.05",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "03-1",
+   "title": "沿支沟往西",
+   "durationS": 8.55,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 8.55,
+     "eye": {
+      "x": 39.08,
+      "z": 66.52,
+      "stance": "crouch",
+      "yawDeg": 93.61,
+      "pitchDeg": -3
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "DragWest.01",
+     "actor": "HeYoutian"
+    },
+    {
+     "t": 4.77,
+     "line": "DragWest.02",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "03-2",
+   "title": "第一回：追兵回头",
+   "durationS": 4.85,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 4.85,
+     "eye": {
+      "x": 25.46,
+      "z": 74.08,
+      "stance": "crouch",
+      "yawDeg": 21.95,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "DragWest.03",
+     "actor": "HeYoutian"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "03-3",
+   "title": "第二回：手榴弹滚到脚边",
+   "durationS": 3.23,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 3.23,
+     "eye": {
+      "x": 29.93,
+      "z": 84.57,
+      "stance": "crouch",
+      "yawDeg": 47.78,
+      "pitchDeg": -14
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "DragWest.04",
+     "actor": "HeYoutian"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "03-4",
+   "title": "第三回：支沟口北沿的两个",
+   "durationS": 13.74,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 13.74,
+     "eye": {
+      "x": 24.6,
+      "z": 73,
+      "stance": "crouch",
+      "yawDeg": -7.13,
+      "pitchDeg": 4
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "NorthRim.01",
+     "actor": "Donggua"
+    },
+    {
+     "t": 3.59,
+     "line": "NorthRim.02",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 7.66,
+     "line": "NorthRim.03",
+     "actor": "Yaowa"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "03-5",
+   "title": "沿交通沟翻坡顶",
+   "durationS": 3.91,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 3.91,
+     "eye": {
+      "x": 35.5,
+      "z": 128.34,
+      "stance": "stand",
+      "yawDeg": -92.59,
+      "pitchDeg": 3
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "NorthRim.04",
+     "actor": "CrestNra1"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "04-1",
+   "title": "满地伤员",
+   "durationS": 5.46,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 5.46,
+     "eye": {
+      "x": 40.4,
+      "z": 140.8,
+      "stance": "stand",
+      "yawDeg": -124.99,
+      "pitchDeg": -6
+     }
+    }
+   ],
+   "actors": [
+    {
+     "id": "Captain",
+     "spawn": {
+      "side": "nra",
+      "x": 66.4,
+      "z": 150.8,
+      "kind": "officer",
+      "name": "连长",
+      "role": "captain",
+      "yawDeg": 87.14
+     },
+     "keys": []
+    }
+   ],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "WoundedFirst.01",
+     "actor": "Captain"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "04-2",
+   "title": "营长的皮箱",
+   "durationS": 13.99,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 13.99,
+     "eye": {
+      "x": 58.6,
+      "z": 148.4,
+      "stance": "stand",
+      "yawDeg": -100.3,
+      "pitchDeg": -6
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Trunk.01",
+     "actor": "Orderly"
+    },
+    {
+     "t": 5.7,
+     "line": "Trunk.02",
+     "actor": "player"
+    },
+    {
+     "t": 7.07,
+     "line": "Trunk.03",
+     "actor": "Orderly"
+    },
+    {
+     "t": 10.03,
+     "line": "Trunk.04",
+     "actor": "HeYoutian"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "04-3",
+   "title": "连长下令：殿后",
+   "durationS": 9.99,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 9.99,
+     "eye": {
+      "x": 62.4,
+      "z": 150.6,
+      "stance": "stand",
+      "yawDeg": -92.86,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "RearGuard.01",
+     "actor": "Captain"
+    },
+    {
+     "t": 5.26,
+     "line": "RearGuard.02",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "05-1",
+   "title": "进凹路，跟在车屁股后头",
+   "durationS": 10.64,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 10.64,
+     "eye": {
+      "x": 86.43,
+      "z": 246.6,
+      "stance": "stand",
+      "yawDeg": 172.87,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "StretcherTalk.01",
+     "actor": "Donggua"
+    },
+    {
+     "t": 5.92,
+     "line": "StretcherTalk.02",
+     "actor": "player"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "05-2",
+   "title": "三架日机高空飞过",
+   "durationS": 8.43,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 8.43,
+     "eye": {
+      "x": 86.43,
+      "z": 252.6,
+      "stance": "stand",
+      "yawDeg": -72.12,
+      "pitchDeg": 26
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "PlanesTanks.01",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 1.55,
+     "line": "PlanesTanks.02",
+     "actor": "Luo"
+    },
+    {
+     "t": 3.32,
+     "line": "PlanesTanks.03",
+     "actor": "HeYoutian"
+    },
+    {
+     "t": 4.87,
+     "line": "PlanesTanks.04",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-1",
+   "title": "两辆追进来",
+   "durationS": 4.3,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 4.3,
+     "eye": {
+      "x": 87.04,
+      "z": 229.6,
+      "stance": "stand",
+      "yawDeg": 0,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "PlanesTanks.05",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-2",
+   "title": "担架被打翻",
+   "durationS": 2.96,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 2.96,
+     "eye": {
+      "x": 87.04,
+      "z": 229.6,
+      "stance": "crouch",
+      "yawDeg": 8.53,
+      "pitchDeg": -4
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "LitterHit.01",
+     "actor": "player"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-3",
+   "title": "抱捆手榴弹的兵",
+   "durationS": 5.21,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 5.21,
+     "eye": {
+      "x": 87.04,
+      "z": 229.6,
+      "stance": "crouch",
+      "yawDeg": 0,
+      "pitchDeg": -4
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "LitterHit.02",
+     "actor": "BundleRunner"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-4",
+   "title": "退到车边：捆手榴弹",
+   "durationS": 14.22,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 14.22,
+     "eye": {
+      "x": 87.38,
+      "z": 247,
+      "stance": "stand",
+      "yawDeg": 165.9,
+      "pitchDeg": -10
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "BundleUp.01",
+     "actor": "Luo"
+    },
+    {
+     "t": 2.63,
+     "line": "BundleUp.02",
+     "actor": "Geng"
+    },
+    {
+     "t": 5.23,
+     "line": "BundleUp.03",
+     "actor": "player"
+    },
+    {
+     "t": 6.31,
+     "line": "BundleUp.04",
+     "actor": "Luo"
+    },
+    {
+     "t": 11.4,
+     "line": "BundleUp.05",
+     "actor": "Geng"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-5",
+   "title": "最高的弯：坎顶埋伏",
+   "durationS": 7.33,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 7.33,
+     "eye": {
+      "x": 96.15,
+      "z": 283.4,
+      "stance": "crouch",
+      "yawDeg": 21.78,
+      "pitchDeg": -12
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Ambush.01",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-6",
+   "title": "扔早了",
+   "durationS": 4.4,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 4.4,
+     "eye": {
+      "x": 96.15,
+      "z": 283.4,
+      "stance": "crouch",
+      "yawDeg": 28.08,
+      "pitchDeg": -14
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Ambush.02",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-7",
+   "title": "引开炮塔，炸断履带",
+   "durationS": 7.61,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 7.61,
+     "eye": {
+      "x": 96.15,
+      "z": 283.4,
+      "stance": "crouch",
+      "yawDeg": 50.13,
+      "pitchDeg": -22
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Ambush.03",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 3.06,
+     "line": "Ambush.04",
+     "actor": "Luo"
+    },
+    {
+     "t": 4.88,
+     "line": "Ambush.05",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "06-8",
+   "title": "堵死凹路",
+   "durationS": 9.06,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 9.06,
+     "eye": {
+      "x": 96.15,
+      "z": 283.4,
+      "stance": "crouch",
+      "yawDeg": 49.14,
+      "pitchDeg": -20
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Ambush.06",
+     "actor": "Luo"
+    },
+    {
+     "t": 5.85,
+     "line": "Ambush.07",
+     "actor": "HeYoutian"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "07-1",
+   "title": "弯南边数人头",
+   "durationS": 6.68,
+   "then": "next",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 6.68,
+     "eye": {
+      "x": 97.56,
+      "z": 301,
+      "stance": "stand",
+      "yawDeg": 151.32,
+      "pitchDeg": -2
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "RollCall.01",
+     "actor": "Luo"
+    },
+    {
+     "t": 1.62,
+     "line": "RollCall.02",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 2.59,
+     "line": "RollCall.03",
+     "actor": "HeYoutian"
+    },
+    {
+     "t": 3.44,
+     "line": "RollCall.04",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 4.52,
+     "line": "RollCall.05",
+     "actor": "player"
+    }
+   ],
+   "events": []
+  },
+  {
+   "keyframe": "07-2",
+   "title": "东北远处的大队，村东冒烟",
+   "durationS": 16.47,
+   "then": "stay",
+   "camera": [
+    {
+     "t": 0,
+     "dur": 16.47,
+     "eye": {
+      "x": 100.01,
+      "z": 312,
+      "stance": "stand",
+      "yawDeg": -112,
+      "pitchDeg": 3
+     }
+    }
+   ],
+   "actors": [],
+   "lines": [
+    {
+     "t": 0.8,
+     "line": "Column.01",
+     "actor": "HeYoutian"
+    },
+    {
+     "t": 3.78,
+     "line": "Column.02",
+     "actor": "Donggua"
+    },
+    {
+     "t": 6.09,
+     "line": "Column.03",
+     "actor": "Donggua"
+    },
+    {
+     "t": 9.47,
+     "line": "Column.04",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 13.04,
+     "line": "Column.05",
+     "actor": "Luo"
+    }
+   ],
+   "events": []
+  }
+ ]
+}

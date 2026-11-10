@@ -12,6 +12,8 @@
 
 - **十三名角色毛发随骨骼动画（2026-11-10）**：核对发现原六名游戏角色的毛发已挂到 `Head` 骨，但既有预览测试只检查父节点名称；11-07 新增的七人仍只有静态测试场造型。按本人参考与现行游戏模型重烘冬瓜、幺娃、刘文财、老耿、妮儿、谷寿夫、日军士兵 C 的七套游戏 groom，ICP 生成各自头骨局部 `attach` 矩阵，登记到角色表，由白盒和 Mixamo 动作预览共用。幺娃、妮儿保持净面；毛发二进制和预览页更新缓存戳。动作预览对十三人取同一段转头动作两帧，头骨和毛发均转约 39.3°，有须人物的胡须世界位置随动；近景图只留 `tmp/MixamoGroom/`。`HairGroomTest` 1354/1354、真实本地预览的 `MixamoGroomBrowserTest`、`HairRangeBrowserTest`、按改动选出的 quick 123/123 及 `BrowserBundleTest` 通过。毛发仍是随头骨整体移动的静态造型，没有实时发丝动力学；现行能力边界见[头发系统](Data_HairSystem.md)。
 
+- **01–07 白盒占位配音与最简预演（2026-11-09）**：`FirstLevel0107` 的 70 句任务书原句配上 SeedAudio 占位配音（台词表 `Data_EditorBlockoutFirstLevel0107Lines.mjs`，生成 `Script_EditorBlockoutFirstLevel0107Voice.mjs` → `Audio/Blockout0107/` + `Blockout/FirstLevel0107.voice.json` + 口型轨；17 场、32 次请求，6 场抽满 3 次仍有串嗓句，挑最好的一次装上、问题记在清单里待人耳核对）；编辑器只在预演里播配音，所以另出最简预演 `Blockout/FirstLevel0107.previz.json`（每帧一段、顺子眼睛定镜、台词按录音间隔排，`Script_EditorBlockoutFirstLevel0107Previz.mjs --force`），关键帧里 7 处与原句不一致的 `how` 同步改了。门禁 `Script_EditorBlockoutFirstLevel0107PrevizTest`。试玩编排没做。口径见 [白盒编辑器 §19](Data_EditorBlockout.md)。
+
 - **01–07 新剧本白盒关卡（2026-11-09）**：白盒关卡编辑器新增 `FirstLevel0107`（默认关卡，`?editor=blockout&level=FirstLevel0107`）：28 个关键帧 01-1…07-2，手写 `Blockout/FirstLevel0107.json`，位置取自 01–07 空间图；场景 `FirstLevelWhitebox` 增量（皮箱、伏击点土埂、残车，事件 `L1TrunkLoaded` / `L1TrunkTossed` / `L1SunkenRoadBlocked`）；门禁 `Script_EditorBlockoutFirstLevel0107KeyframesTest`。预演 / 试玩 / 配音这轮没做。口径与偏差见 [白盒编辑器 §19](Data_EditorBlockout.md)。
 
 - **三八式压缩数据图标记统一（2026-11-08）**：线上实机严格检查发现 KTX2 解码器给线性数值图带回颜色空间标记；接入配置现在明确把法线、ORM、清漆和镜面强度槽设为 `NoColorSpace`，基础色保留 sRGB，不改像素、mip 或 GPU 格式。增加模拟解码器标记的回归断言，并用真实发布版混合格式 GLB 跑完玩家／NPC、开镜、枪机、防尘盖、换弹和 GI 合批检查，保持原有数据贴图严格断言。
