@@ -428,10 +428,12 @@ void main() {
 
 // ---------------------------------------------------------------------------------------------------------------
 // 发片 / 头发壳 / 胡茬：普通网格，局部空间顶点
-const MESH_VERTEX = (prepass) => /* glsl */`
+const MESH_VERTEX = (prepass, skinBeard = false) => /* glsl */`
 precision highp float;
 attribute vec3 aTangent;
 attribute vec3 aData;
+${skinBeard ? 'attribute vec4 aBoneIndices; attribute vec4 aBoneWeights; uniform mat4 uBeardBones[8];' : ''}
+${skinBeard && prepass ? 'uniform mat4 uPrevBeardBones[8];' : ''}
 out vec3 vTangent;
 out vec3 vNormalV;
 out vec3 vViewPos;
@@ -442,15 +444,30 @@ out vec3 vData;
 out vec3 vTangentL;
 ${prepass ? PREPASS_VERTEX_UNIFORMS : ''}
 void main() {
+  ${skinBeard ? `
+  vec3 hairLocal = vec3(0.0), hairTangent = vec3(0.0), hairNormal = vec3(0.0);
+  ${prepass ? 'vec3 hairLocalPrev = vec3(0.0);' : ''}
+  for (int k = 0; k < 4; k++) {
+    int bone = int(aBoneIndices[k]);
+    float weight = aBoneWeights[k];
+    hairLocal += (uBeardBones[bone] * vec4(position, 1.0)).xyz * weight;
+    hairTangent += mat3(uBeardBones[bone]) * aTangent * weight;
+    hairNormal += mat3(uBeardBones[bone]) * normal * weight;
+    ${prepass ? 'hairLocalPrev += (uPrevBeardBones[bone] * vec4(position, 1.0)).xyz * weight;' : ''}
+  }
+  hairTangent = normalize(hairTangent);
+  hairNormal = normalize(hairNormal);` : `
   vec3 hairLocal = position;
-  ${prepass ? 'vec3 hairLocalPrev = position;' : ''}
-  vTangentL = aTangent;
+  vec3 hairTangent = aTangent;
+  vec3 hairNormal = normal;
+  ${prepass ? 'vec3 hairLocalPrev = position;' : ''}`}
+  vTangentL = hairTangent;
   vec4 mv = modelViewMatrix * vec4(hairLocal, 1.0);
   vViewPos = mv.xyz;
   vLocalPos = position;
-  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  vTangent = normalize(mat3(modelViewMatrix) * aTangent);
-  vNormalV = normalize(normalMatrix * normal);
+  vWorldPos = (modelMatrix * vec4(hairLocal, 1.0)).xyz;
+  vTangent = normalize(mat3(modelViewMatrix) * hairTangent);
+  vNormalV = normalize(normalMatrix * hairNormal);
   vUv = uv;
   vData = aData;
   gl_Position = projectionMatrix * mv;
@@ -810,15 +827,15 @@ export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = nul
   const prepass = PrepassMaterial(STRAND_VERTEX(true), STRAND_PREPASS_FRAGMENT, { ...shared, ...own });
   return { main, prepass, own };
 }
-export function MakeCardMaterials(part, atlas, shared, lightRig, density, referenceAtlas = null) {
+export function MakeCardMaterials(part, atlas, shared, lightRig, density, referenceAtlas = null, skinBeard = null) {
   const r = part.render;
   const reference = !!part.referenceScalp?.projection;
   const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale * (part.render.cardAlphaScale ?? (part.stubble?.perVertexLength ? HAIR_SHADING.referenceBeardAlphaScale : 1)) },
     uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter } };
   if (reference) Object.assign(own, ReferenceColourUniforms(part.referenceScalp, referenceAtlas, r.color.melanin));
-  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(density) };
-  const main = LitMaterial(MESH_VERTEX(false), CARD_FRAGMENT(reference), uniforms, { lightRig });
-  const prepass = PrepassMaterial(MESH_VERTEX(true), CARD_PREPASS_FRAGMENT, { ...shared, ...own });
+  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(density), ...(skinBeard || {}) };
+  const main = LitMaterial(MESH_VERTEX(false, !!skinBeard), CARD_FRAGMENT(reference), uniforms, { lightRig });
+  const prepass = PrepassMaterial(MESH_VERTEX(true, !!skinBeard), CARD_PREPASS_FRAGMENT, { ...shared, ...own, ...(skinBeard || {}) });
   return { main, prepass, own };
 }
 export function MakeShellMaterials(hair, shared, lightRig) {
@@ -830,7 +847,7 @@ export function MakeShellMaterials(hair, shared, lightRig) {
   const prepass = PrepassMaterial(MESH_VERTEX(true), SHELL_PREPASS_FRAGMENT, { ...shared, ...own }, THREE.FrontSide);
   return { main, prepass, own };
 }
-export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightRig = null, referenceLuminance = null) {
+export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightRig = null, referenceLuminance = null, skinBeard = null) {
   if (beard.referenceMask) {
     if (!referenceAtlas) throw new Error('Missing character reference beard atlas');
     if (beard.render.referenceLuminance && !referenceLuminance) throw new Error('Missing character beard luminance atlas');
@@ -846,7 +863,7 @@ export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightR
       uReferenceLuminanceGain: {value: beard.render.referenceLuminanceGain ?? 1},
       uReferenceMelanin: {value: beard.render.color.melanin},
     };
-    const material = LitMaterial(MESH_VERTEX(false), REFERENCE_BEARD_FRAGMENT, own, {lightRig, transparent:true, side:THREE.FrontSide});
+    const material = LitMaterial(MESH_VERTEX(false, !!skinBeard), REFERENCE_BEARD_FRAGMENT, { ...own, ...(skinBeard || {}) }, {lightRig, transparent:true, side:THREE.FrontSide});
     material.depthWrite = false; material.polygonOffset = true;
     material.polygonOffsetFactor = -2; material.polygonOffsetUnits = -2;
     return {main: material, own};
@@ -855,8 +872,8 @@ export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightR
     uDensity: { value: 1 }, uStubLength: { value: Math.max(0.0006, beard.stubble.length) }, uPerVertexLength: { value: beard.stubble.perVertexLength ? 1 : 0 },
     uCoverageScale: { value: beard.stubble.perVertexLength ? HAIR_SHADING.referenceStubbleCoverageScale : 1 },
     uCell: { value: HAIR_SHADING.stubbleCell }, uFade: { value: 1 } };
-  const m = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false), fragmentShader: STUBBLE_FRAGMENT,
-    uniforms: { uPixelScale: shared.uPixelScale, ...own }, transparent: true, depthWrite: false,
+  const m = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false, !!skinBeard), fragmentShader: STUBBLE_FRAGMENT,
+    uniforms: { uPixelScale: shared.uPixelScale, ...own, ...(skinBeard || {}) }, transparent: true, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   m.allowOverride = false;
   return { main: m, own };

@@ -128,7 +128,6 @@ import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_M
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
-import { HAIR_ASSET_VERSION } from "./Data_Tuning_Hair.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const FPS = 30;
@@ -226,7 +225,7 @@ const groomCache = new Map();
 let hairAtlas = null, activeGroom = null, characterSwitch = 0;
 function GroomAsset(def) {
   if (!def.groom) return null;
-  if (!groomCache.has(def.groom)) groomCache.set(def.groom, LoadHairGroom(`${def.groom}?v=${HAIR_ASSET_VERSION}`));
+  if (!groomCache.has(def.groom)) groomCache.set(def.groom, LoadHairGroom(def.groom));
   hairAtlas ||= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png");
   return Promise.all([groomCache.get(def.groom), hairAtlas]);
 }
@@ -244,7 +243,7 @@ async function LoadCharacter(key) {
   who = key;
   character = next;
   if (hair) {
-    activeGroom = new HairGroom(hair[0], { atlas: hair[1], name: key });
+    activeGroom = new HairGroom(hair[0], { atlas: hair[1], name: key, boneRoot: next });
     head.add(activeGroom.root);
   }
   character.traverse(o => { if (o.isMesh) { if (!o.userData.hairGroom) o.castShadow = true; o.frustumCulled = false; } });

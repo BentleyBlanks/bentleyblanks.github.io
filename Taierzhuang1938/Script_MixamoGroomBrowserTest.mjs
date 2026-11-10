@@ -32,7 +32,7 @@ try {
       return { key: document.querySelector("#who").value, action: p.action?.getClip().name,
         hair: h?.asset.id || null, lod: h?.stats.lod || null,
         visible: h ? Object.values(h.meshes).filter(mesh => mesh.visible).map(mesh => mesh.name) : [],
-        parent: h?.root.parent?.name || null };
+        parent: h?.root.parent?.name || null, beardBones: h?.beardSkin?.bones.map(bone => bone.name) || [] };
     });
     observations.push(observation);
     assert.ok(observation.action, `${key}: animation continues`);
@@ -43,6 +43,8 @@ try {
       assert.ok(observation.visible.some(name => /Hair(Strands|Cards|Shell)/.test(name)), `${key}: hair rendered`);
       if (!["yaowa", "nier"].includes(key))
         assert.ok(observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: beard rendered`);
+      if (!["yaowa", "nier"].includes(key))
+        assert.ok(observation.beardBones.includes("Head"), `${key}: beard uses the animated facial bones`);
       if (["yaowa", "nier"].includes(key))
         assert.ok(!observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: clean-shaven character`);
       await page.evaluate(() => window.__preview.SelectFile("Animation_Mixamo_LookingAround_V2.glb"));

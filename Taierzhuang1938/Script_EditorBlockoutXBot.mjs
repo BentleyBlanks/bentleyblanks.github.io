@@ -26,7 +26,7 @@ import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
-import { HAIR_ASSET_VERSION, HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
+import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
@@ -341,7 +341,7 @@ export class XBotSkins {
       if (def.groom) {
         try {
           this.hairAtlas ||= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png");
-          const [g, a] = await Promise.allSettled([LoadHairGroom(`${def.groom}?v=${HAIR_ASSET_VERSION}`), this.hairAtlas]);
+          const [g, a] = await Promise.allSettled([LoadHairGroom(def.groom), this.hairAtlas]);
           if (g.status === "fulfilled") groom = g.value;
           if (a.status === "fulfilled") this.hairAtlasTexture = a.value;
           if (g.status === "rejected" || a.status === "rejected" || this.hairDisposed) {
@@ -532,7 +532,8 @@ export class XBotSkin {
     this.hair = null;
     const headBone = this.model.getObjectByName("Head");
     if (this.kit.groom && headBone) {
-      this.hair = new HairGroom(this.kit.groom, { atlas: skins.hairAtlasTexture, lightRig: skins.view?.lightRig || null, name: this.kit.key });
+      this.hair = new HairGroom(this.kit.groom, { atlas: skins.hairAtlasTexture, lightRig: skins.view?.lightRig || null,
+        name: this.kit.key, boneRoot: this.model });
       headBone.add(this.hair.root);
     }
     this.bones = new Map();

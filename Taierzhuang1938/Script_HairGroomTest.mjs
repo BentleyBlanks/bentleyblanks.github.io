@@ -177,6 +177,20 @@ for (const g of manifest.grooms) {
     }
   }
   if (header.beard) {
+    if (header.model) {
+      const skin = header.beard.skinning;
+      Check(skin?.bones.length > 0 && skin.bones.length <= 8 && skin.attach.length === skin.bones.length
+        && skin.attach.every(matrix => matrix.length === 16 && matrix.every(Number.isFinite))
+        && skin.maxDroppedWeight >= 0 && skin.maxDroppedWeight <= 0.02,
+      `${g.id} 胡须骨骼调色板与反绑矩阵有效，丢弃权重 ≤2%`);
+      for (const part of ['beardCard', 'beardStubble']) {
+        const pos = sec(`${part}Pos`), indices = sec(`${part}BoneIndices`), weights = sec(`${part}BoneWeights`);
+        if (pos) Check(!!indices && !!weights && indices.length === pos.length / 3 * 4 && weights.length === indices.length
+          && indices.every(index => index < skin.bones.length) && weights.every((_, i) => i % 4 ||
+            Math.abs(weights[i] + weights[i + 1] + weights[i + 2] + weights[i + 3] - 65535) <= 2),
+        `${g.id} ${part} 每个顶点继承本人脸部的骨骼权重`);
+      }
+    }
     const pos = sec('beardCardPos'), idx = sec('beardCardIndex');
     if (header.beard.cards > 0) { Check(!!pos && pos.length > 0, `${g.id}：胡子发片有几何`); if (pos) CheckIndex(`${g.id} beardCard`, idx, pos.length / 3); }
     const st = sec('beardStubblePos');

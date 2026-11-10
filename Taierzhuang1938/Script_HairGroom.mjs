@@ -84,6 +84,11 @@ function MeshGeometry(sec, prefix, withUv = true) {
   const uv = withUv && sec(`${prefix}Uv`); if (uv) g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   const data = sec(`${prefix}Data`);
   if (data) g.setAttribute('aData', new THREE.BufferAttribute(data, data.length / (pos.length / 3)));
+  const boneIndices = sec(`${prefix}BoneIndices`), boneWeights = sec(`${prefix}BoneWeights`);
+  if (boneIndices && boneWeights) {
+    g.setAttribute('aBoneIndices', new THREE.BufferAttribute(boneIndices, 4));
+    g.setAttribute('aBoneWeights', new THREE.BufferAttribute(boneWeights, 4));
+  }
   g.setIndex(new THREE.BufferAttribute(sec(`${prefix}Index`), 1));
   g.computeBoundingSphere();
   return g;
@@ -187,9 +192,9 @@ const shadowSyncFrames = new WeakMap();
 export class HairGroom {
   /**
    * @param asset   LoadHairGroom 的结果
-   * @param opts    { atlas, lightRig, name, lod: 'auto' | 'strands' | 'cards' | 'shell' | 'none', beard: true }
+   * @param opts    { atlas, lightRig, name, lod: 'auto' | 'strands' | 'cards' | 'shell' | 'none', beard: true, boneRoot }
    */
-  constructor(asset, { atlas, lightRig = null, name = asset.id, lod = 'auto', beard = true } = {}) {
+  constructor(asset, { atlas, lightRig = null, name = asset.id, lod = 'auto', beard = true, boneRoot = null } = {}) {
     this.asset = asset; this.lightRig = lightRig; this.force = lod; this.showBeard = beard;
     this.showHair = true; this.disposed = false;
     this.root = new THREE.Group(); this.root.name = `Hair_${name}`;
@@ -199,6 +204,15 @@ export class HairGroom {
       this.root.matrix.fromArray(asset.header.attach);
       this.root.matrix.decompose(this.root.position, this.root.quaternion, this.root.scale);
     }
+    const binding = asset.beard?.header.skinning;
+    if (binding && !boneRoot) throw new Error(`${asset.id}: beard needs the animated skeleton`);
+    const bones = binding?.bones.map(name => boneRoot.getObjectByName(name));
+    if (bones?.some(bone => !bone?.isBone) || binding?.bones.length > 8) throw new Error(`${asset.id}: beard skeleton does not match the baked asset`);
+    this.beardSkin = binding ? {
+      bones, attach: binding.attach.map(matrix => new THREE.Matrix4().fromArray(matrix)), ready: false,
+      uniforms: { uBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) },
+        uPrevBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) } },
+    } : null;
     this.shared = MakeHairSharedUniforms();
     this.materials = []; this.meshes = {}; this.ownGeometries = [];
     this.current = null; this.previous = null; this.fade = 1;
@@ -220,8 +234,8 @@ export class HairGroom {
     }
     const b = asset.beard;
     if (b) {
-      if (b.cardGeometry) this.meshes.beardCards = this.Mesh(b.cardGeometry, MakeCardMaterials(b, atlas, this.shared, lightRig, b.density), 'BeardCards');
-      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared, referenceAtlases.get(atlas), lightRig, beardLuminanceAtlases.get(atlas)), 'Stubble', 2);
+      if (b.cardGeometry) this.meshes.beardCards = this.Mesh(b.cardGeometry, MakeCardMaterials(b, atlas, this.shared, lightRig, b.density, null, this.beardSkin?.uniforms), 'BeardCards');
+      if (b.stubbleGeometry) this.meshes.stubble = this.Overlay(b.stubbleGeometry, MakeStubbleMaterial(b, this.shared, referenceAtlases.get(atlas), lightRig, beardLuminanceAtlases.get(atlas), this.beardSkin?.uniforms), 'Stubble', 2);
     }
     for (const material of this.materials) if (material.uniforms.uMelanin) material.userData.hairBaseMelanin = material.uniforms.uMelanin.value;
     for (const mesh of Object.values(this.meshes)) mesh.visible = false;
@@ -304,6 +318,18 @@ export class HairGroom {
     const sh = this.shared;
     sh.uFrame.value = (sh.uFrame.value + 1) % 4096;
     this.root.updateWorldMatrix(true, false);
+    if (this.beardSkin) {
+      const skin = this.beardSkin;
+      const current = skin.uniforms.uBeardBones.value, previous = skin.uniforms.uPrevBeardBones.value;
+      _m.copy(this.root.matrixWorld).invert();
+      for (let i = 0; i < skin.bones.length; i++) {
+        if (skin.ready) previous[i].copy(current[i]);
+        skin.bones[i].updateWorldMatrix(true, false);
+        current[i].copy(_m).multiply(skin.bones[i].matrixWorld).multiply(skin.attach[i]);
+        if (!skin.ready) previous[i].copy(current[i]);
+      }
+      skin.ready = true;
+    }
     const scale = this.root.matrixWorld.getMaxScaleOnAxis();
     sh.uModelScale.value = scale;
     // 太阳方向（世界 → 头发局部），给体素自阴影

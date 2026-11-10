@@ -29,7 +29,7 @@ export const TOOL_INFO = Object.freeze({
   actor: { label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换" },
   facial: { label: "人物面部", hint: "配套对白、口型与表情近景检查" },
   mixamoPreview: { label: "Mixamo 动作预览", hint: "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，角色默认带已配置的头发胡子及项目道具",
-    window: { url: "./Tool_MixamoAnimationPreview.html?v=20261110bonebinding", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
+    window: { url: "./Tool_MixamoAnimationPreview.html?v=20261111beardskin", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
   weapon: { label: "枪械", hint: "台架 + 数据卡" },
   firstPerson: { label: "第一人称持枪检查", hint: "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差、准心校准" },
   fpMotion: { label: "第一人称持枪移动检查", hint: "玩法照跑，画面换到玩家身旁的外部机位，看第一人称看不到的腿脚、身体朝向、枪和双手的实际位置；J 换机位、K 慢放、L 切回第一人称" },

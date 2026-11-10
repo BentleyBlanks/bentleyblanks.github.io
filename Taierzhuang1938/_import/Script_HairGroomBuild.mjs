@@ -415,7 +415,7 @@ class SurfaceSampler {
     const w = 1 - u - v, t = lo * 3, ia = idx[t], ib = idx[t + 1], ic = idx[t + 2];
     const P = (k) => w * pos[3 * ia + k] + u * pos[3 * ib + k] + v * pos[3 * ic + k];
     const N = (k) => w * nrm[3 * ia + k] + u * nrm[3 * ib + k] + v * nrm[3 * ic + k];
-    return { p: [P(0), P(1), P(2)], n: Norm([N(0), N(1), N(2)]) };
+    return { p: [P(0), P(1), P(2)], n: Norm([N(0), N(1), N(2)]), vertices: [ia, ib, ic], bary: [w, u, v] };
   }
 }
 
@@ -669,7 +669,7 @@ function WritePng(file, w, h, rgba) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // 发片：沿脊线两侧展开成带子。spine = [[x,y,z]...]，n = 根部法线，comb = 根部梳向，width = 宽，tile = 图集格
-function CardStrip(out, spine, n, comb, width, tile, cardRandom, layer) {
+function CardStrip(out, spine, n, comb, width, tile, cardRandom, layer, skin = null) {
   const K = spine.length, base = out.pos.length / 3;
   const across = Norm(Cross(comb, n));
   for (let i = 0; i < K; i++) {
@@ -685,6 +685,7 @@ function CardStrip(out, spine, n, comb, width, tile, cardRandom, layer) {
       out.nrm.push(n[0], n[1], n[2]);
       out.uv.push(Mix(tile.u0, tile.u1, side < 0 ? 0 : 1), Mix(tile.v0, tile.v1, s));
       out.data.push(s, cardRandom, layer);
+      if (out.boneJoints) { out.boneJoints.push(...skin.joints); out.boneWeights.push(...skin.weights); }
     }
   }
   for (let i = 0; i < K - 1; i++) {
@@ -697,6 +698,7 @@ function CardStrip(out, spine, n, comb, width, tile, cardRandom, layer) {
 function ScalpPatch(mesh, Weight, offsetFn, tangentFn, minW = 0.02) {
   const { pos, nrm, idx } = mesh;
   const map = new Map(), out = { pos: [], nrm: [], tan: [], data: [], idx: [] };
+  if (mesh.boneJoints) { out.boneJoints = []; out.boneWeights = []; }
   const wOf = new Float32Array(pos.length / 3).fill(-1);
   const W = (i) => { if (wOf[i] < 0) wOf[i] = Weight([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], [nrm[3 * i], nrm[3 * i + 1], nrm[3 * i + 2]]); return wOf[i]; };
   for (let t = 0; t < idx.length; t += 3) {
@@ -708,6 +710,10 @@ function ScalpPatch(mesh, Weight, offsetFn, tangentFn, minW = 0.02) {
         const h = offsetFn(p, n, W(i)), q = Add(p, Scale(n, h)), tg = tangentFn(p, n);
         map.set(i, out.pos.length / 3);
         out.pos.push(q[0], q[1], q[2]); out.nrm.push(n[0], n[1], n[2]); out.tan.push(tg[0], tg[1], tg[2]); out.data.push(W(i), h);
+        if (out.boneJoints) for (let k = 0; k < 4; k++) {
+          out.boneJoints.push(mesh.boneJoints[4 * i + k]);
+          out.boneWeights.push(mesh.boneWeights[4 * i + k]);
+        }
       }
       out.idx.push(map.get(i));
     }
@@ -968,6 +974,17 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
 
 // ---------------------------------------------------------------------------------------------------------------
 // 一套胡子（发片 + 胡茬贴片）
+function SampleSkinWeights(mesh, sample) {
+  const byJoint = new Map();
+  for (let corner = 0; corner < 3; corner++) for (let k = 0; k < 4; k++) {
+    const index = 4 * sample.vertices[corner] + k, weight = mesh.boneWeights[index] * sample.bary[corner];
+    if (weight > 0) byJoint.set(mesh.boneJoints[index], (byJoint.get(mesh.boneJoints[index]) || 0) + weight);
+  }
+  const ranked = [...byJoint].sort((a, b) => b[1] - a[1]), strongest = ranked.slice(0, 4);
+  const kept = strongest.reduce((sum, pair) => sum + pair[1], 0);
+  return { joints: Array.from({ length: 4 }, (_, i) => strongest[i]?.[0] ?? strongest[0][0]),
+    weights: Array.from({ length: 4 }, (_, i) => (strongest[i]?.[1] || 0) / kept), dropped: 1 - kept };
+}
 function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = null) {
   const rng = Rng(HashString(groomId + ':beard'));
   const K = style.points;
@@ -975,6 +992,8 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
   const PartsAt = (p) => (exclude && exclude(p) ? [] : projection ? projection.PartsAt(p) : frame.BeardParts(p, style.parts));
   const Weight = (p) => { let w = 0; for (const q of PartsAt(p)) if (projection || q.part !== 'cheek') w = Math.max(w, q.density); return w; };
   const cards = { pos: [], tan: [], nrm: [], uv: [], data: [], idx: [] };
+  if (mesh.boneJoints) { cards.boneJoints = []; cards.boneWeights = []; }
+  let maxDroppedWeight = 0;
   const cfg = style.cards, tileList = tiles[cfg.tile];
   let cardCount = 0;
   // 很多窄小发片：每片沿生长方向随机偏一点、翘起角度各不同（胡须是戳出来的，不是贴在脸上的），叠几层出体积。
@@ -995,7 +1014,9 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
         const lift = Clamp(style.lift + (lrng() - 0.5) * 0.35 + layer * 0.06, 0.05, 0.85);
         const pts = GrowGuide(pk.p, pk.n, comb, len, Math.max(3, K), { lift, stiffness: style.stiffness, gravity: len > 0.03 ? 0.6 : 0.1, volume: len * 0.05 }, sdf, lrng);
         const sp = pts.map((p) => Add(p, Scale(pk.n, 0.0002 + layer * 0.0004)));
-        CardStrip(cards, sp, pk.n, comb, cfg.width * Mix(0.8, 1.2, lrng()), tileList[Math.floor(lrng() * tileList.length)], lrng(), layer / Math.max(1, cfg.layers - 1));
+        const skin = mesh.boneJoints ? SampleSkinWeights(mesh, pk) : null;
+        if (skin) maxDroppedWeight = Math.max(maxDroppedWeight, skin.dropped);
+        CardStrip(cards, sp, pk.n, comb, cfg.width * Mix(0.8, 1.2, lrng()), tileList[Math.floor(lrng() * tileList.length)], lrng(), layer / Math.max(1, cfg.layers - 1), skin);
         cardCount++;
       }
     }
@@ -1017,7 +1038,34 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
       stubble.uv.push(...projection.AtlasUv(stubble.pos.slice(i, i + 3)));
     }
   }
-  return { cards, stubble, cardCount };
+  return { cards, stubble, cardCount, maxDroppedWeight };
+}
+function BindBeardSkin(beard, game) {
+  const parts = [beard.cards, beard.stubble].filter(part => part?.boneJoints?.length);
+  const used = new Set();
+  for (const part of parts) for (let i = 0; i < part.boneJoints.length; i++)
+    if (part.boneWeights[i] > 0.001) used.add(part.boneJoints[i]);
+  const joints = [...used].sort((a, b) => a - b);
+  if (!joints.length || joints.length > 8) throw new Error(`${game.jointNames[0]}: beard needs ${joints.length} bones (maximum 8)`);
+  const palette = new Map(joints.map((joint, index) => [joint, index]));
+  let maxDroppedWeight = beard.maxDroppedWeight;
+  for (const part of parts) {
+    part.boneIndices = []; part.boundWeights = [];
+    for (let vertex = 0; vertex < part.pos.length / 3; vertex++) {
+      let kept = 0;
+      for (let k = 0; k < 4; k++) {
+        const i = 4 * vertex + k, weight = part.boneWeights[i];
+        part.boneIndices.push(weight > 0.001 ? palette.get(part.boneJoints[i]) : 0);
+        part.boundWeights.push(weight > 0.001 ? weight : 0);
+        if (weight > 0.001) kept += weight;
+      }
+      if (kept <= 0) throw new Error('Beard vertex has no skin weights');
+      maxDroppedWeight = Math.max(maxDroppedWeight, Math.abs(1 - kept));
+      for (let k = 0; k < 4; k++) part.boundWeights[4 * vertex + k] /= kept;
+    }
+  }
+  if (maxDroppedWeight > 0.02) throw new Error(`Beard skin transfer dropped ${(maxDroppedWeight * 100).toFixed(1)}% weight`);
+  return { bones: joints.map(joint => game.jointNames[joint]), attach: joints.map(joint => game.attachBones[joint]), maxDroppedWeight };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1032,7 +1080,7 @@ function QPos(a) {
 }
 function QDir(a) { const q = new Int8Array(a.length); for (let i = 0; i < a.length; i++) q[i] = Math.round(Clamp(a[i], -1, 1) * 127); return { array: q, quant: { kind: 'snorm' } }; }
 function QUnit16(a) { const q = new Uint16Array(a.length); for (let i = 0; i < a.length; i++) q[i] = Math.round(Clamp(a[i], 0, 1) * 65535); return { array: q, quant: { kind: 'unorm' } }; }
-function MeshSections(prefix, m, { uv = false, dataScale = null } = {}) {
+function MeshSections(prefix, m, { uv = false, dataScale = null, skinning = false } = {}) {
   const out = {};
   out[prefix + 'Pos'] = QPos(m.pos);
   out[prefix + 'Nrm'] = QDir(m.nrm);
@@ -1046,6 +1094,10 @@ function MeshSections(prefix, m, { uv = false, dataScale = null } = {}) {
     const q = new Uint8Array(m.data.length);
     for (let i = 0; i < m.data.length; i++) q[i] = Math.round(Clamp(m.data[i] / scales[i % comps], 0, 1) * 255);
     out[prefix + 'Data'] = { array: q, quant: { kind: 'unorm', comps, scales } };
+  }
+  if (skinning && m.boneIndices) {
+    out[prefix + 'BoneIndices'] = { array: Uint8Array.from(m.boneIndices) };
+    out[prefix + 'BoneWeights'] = QUnit16(m.boundWeights);
   }
   return out;
 }
@@ -1205,7 +1257,7 @@ function GameHeadAssets(def) {
   const g = ReadSkinnedGlb(path.join(PROJECT, def.model));
   const J = (name) => g.jointNames.findIndex((n) => n === name || n.endsWith(':' + name));
   const head = J('Head'), neck = J('Neck');
-  if (head < 0) throw new Error(`${def.model}: 没有 Head 骨`);
+  if (head < 0 || neck < 0) throw new Error(`${def.model}: 缺少 Head / Neck 骨`);
   const root = g.root;
   const W = M4.FromTRS(root.translation || [0, 0, 0], root.rotation || [0, 0, 0, 1], root.scale || [1, 1, 1]);   // 模型（骨架空间）→ 工作坐标（米、y 上）
   const V = g.pos.length / 3, sel = new Uint8Array(V), work = [];
@@ -1247,7 +1299,7 @@ function GameHeadAssets(def) {
   }
   const S = best.T, Sinv = M4.Invert(S);
   // 游戏头部网格 → 实验室坐标
-  const map = new Int32Array(V).fill(-1), pos = [], nrm = [], idx = [];
+  const map = new Int32Array(V).fill(-1), pos = [], nrm = [], idx = [], boneJoints = [], boneWeights = [];
   for (let t = 0; t < g.idx.length; t += 3) {
     const tri = [g.idx[t], g.idx[t + 1], g.idx[t + 2]];
     if (!sel[tri[0]] || !sel[tri[1]] || !sel[tri[2]]) continue;
@@ -1257,32 +1309,37 @@ function GameHeadAssets(def) {
         const p = M4.Apply(Sinv, work[i]);
         const n = Norm(M4.ApplyDir(Sinv, M4.ApplyDir(W, [g.nrm[3 * i], g.nrm[3 * i + 1], g.nrm[3 * i + 2]])));
         pos.push(...p); nrm.push(...n);
+        for (let k = 0; k < 4; k++) { boneJoints.push(g.joints[4 * i + k]); boneWeights.push(g.weights[4 * i + k]); }
       }
       idx.push(map[i]);
     }
   }
-  const all = { pos: Float32Array.from(pos), nrm: Float32Array.from(nrm), idx: Uint32Array.from(idx) };
+  const all = { pos: Float32Array.from(pos), nrm: Float32Array.from(nrm), idx: Uint32Array.from(idx),
+    boneJoints: Uint16Array.from(boneJoints), boneWeights: Float32Array.from(boneWeights) };
   // 分皮肤 / 帽子：离实验室皮肤面的距离
   const vn = all.pos.length / 3, skinV = new Uint8Array(vn);
   for (let i = 0; i < vn; i++) { const d = lab.sdf.Sample([all.pos[3 * i], all.pos[3 * i + 1], all.pos[3 * i + 2]]); skinV[i] = Math.abs(d) < 0.004 ? 1 : 0; }
   const Split = (keepSkin) => {
-    const mp = new Int32Array(vn).fill(-1), p2 = [], n2 = [], i2 = [];
+    const mp = new Int32Array(vn).fill(-1), p2 = [], n2 = [], i2 = [], joints2 = [], weights2 = [];
     for (let t = 0; t < all.idx.length; t += 3) {
       const tri = [all.idx[t], all.idx[t + 1], all.idx[t + 2]];
       const isSkin = skinV[tri[0]] && skinV[tri[1]] && skinV[tri[2]];
       if (keepSkin !== !!isSkin) continue;
-      for (const i of tri) { if (mp[i] < 0) { mp[i] = p2.length / 3; p2.push(all.pos[3 * i], all.pos[3 * i + 1], all.pos[3 * i + 2]); n2.push(all.nrm[3 * i], all.nrm[3 * i + 1], all.nrm[3 * i + 2]); } i2.push(mp[i]); }
+      for (const i of tri) { if (mp[i] < 0) { mp[i] = p2.length / 3; p2.push(all.pos[3 * i], all.pos[3 * i + 1], all.pos[3 * i + 2]); n2.push(all.nrm[3 * i], all.nrm[3 * i + 1], all.nrm[3 * i + 2]); for (let k = 0; k < 4; k++) { joints2.push(all.boneJoints[4 * i + k]); weights2.push(all.boneWeights[4 * i + k]); } } i2.push(mp[i]); }
     }
-    return { pos: Float32Array.from(p2), nrm: Float32Array.from(n2), idx: Uint32Array.from(i2) };
+    return { pos: Float32Array.from(p2), nrm: Float32Array.from(n2), idx: Uint32Array.from(i2),
+      boneJoints: Uint16Array.from(joints2), boneWeights: Float32Array.from(weights2) };
   };
   const skin = Split(true), cap = Split(false);
   const sdf = new MeshSdf(all);                         // 碰撞：皮肤 + 帽子（帽子是实心的，发丝推到帽子外面）
   const capSdf = cap.idx.length ? new MeshSdf(cap) : null;
   const exclude = capSdf ? (p) => capSdf.Sample(p) < 0.003 || lab.sdf.Sample(p) < -0.004 : null;   // 帽子罩住的、被压进帽壳的头顶
-  const ibmHead = Array.from(g.ibm.slice(16 * head, 16 * head + 16));
-  const attach = M4.Mul(ibmHead, M4.Mul(M4.Invert(W), S));
+  const base = M4.Mul(M4.Invert(W), S);
+  const attachBones = g.jointNames.map((_, i) => M4.Mul(Array.from(g.ibm.slice(16 * i, 16 * i + 16)), base));
+  const attach = attachBones[head];
   console.log(`  game head ${def.id}: ${dst.length} head verts, ICP ${(best.err * 1000).toFixed(2)} mm, scale ${Math.cbrt(Math.abs(S[0] * (S[5] * S[10] - S[9] * S[6]) - S[4] * (S[1] * S[10] - S[9] * S[2]) + S[8] * (S[1] * S[6] - S[5] * S[2]))).toFixed(3)}, skin ${skin.idx.length / 3} tri, cap ${cap.idx.length / 3} tri (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
-  return { mesh: skin, sdf, sampler: new SurfaceSampler(skin), frame: lab.frame, exclude, attach, icpErrorM: best.err, bone: 'Head' };
+  return { mesh: skin, sdf, sampler: new SurfaceSampler(skin), frame: lab.frame, exclude, attach, attachBones,
+    jointNames: g.jointNames, icpErrorM: best.err, bone: 'Head' };
 }
 
 const headCache = new Map();
@@ -1352,9 +1409,11 @@ function BuildGroom(entry, tiles) {
   if (entry.beard) {
     const style = DeepMerge(STYLES.beard[entry.beard], reference?.beard);
     const b = BuildBeard(entry.id, style, frame, mesh, sdf, sampler, tiles, exclude);
-    if (b.cards.idx.length) Object.assign(sections, MeshSections('beardCard', b.cards, { uv: true }));
-    if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { uv: !!style.referenceMask, dataScale: [1, 0.05] }));
+    const skinning = game ? BindBeardSkin(b, game) : null;
+    if (b.cards.idx.length) Object.assign(sections, MeshSections('beardCard', b.cards, { uv: true, skinning: !!game }));
+    if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { uv: !!style.referenceMask, dataScale: [1, 0.05], skinning: !!game }));
     header.beard = { style: entry.beard, name: style.name, cards: b.cardCount, triangles: b.cards.idx.length / 3,
+      ...(skinning ? { skinning } : {}),
       stubble: { triangles: b.stubble ? b.stubble.idx.length / 3 : 0, density: style.stubble?.density ?? 0, length: style.stubble?.length ?? 0 },
       render: { color: style.color, roughness: 0.42, specular: 0.5, scatter: 0.5, cardAlphaScale: style.cards.alphaScale ?? 1 } };
     header.beard.render.referenceCoverageGain = style.coverageGain ?? 1;
