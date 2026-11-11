@@ -2058,6 +2058,17 @@ export class Viewmodel {
     return rounds.spent;
   }
 
+  /** World-space ejected rounds use a plain PBR program absent from the held gun. */
+  CreateActionDebrisWarmProxy() {
+    const profileId = this.clipProp.userData.profile;
+    const group = new THREE.Group();
+    group.name = "VmActionDebrisWarm";
+    group.add(new THREE.Mesh(this._LooseRoundGeometry(profileId),
+      [this.materials.brass, this.materials[FPS_RELOAD_PROPS.profiles[profileId].jacket]]));
+    group.add(new THREE.Mesh(this._SpentCaseGeometry(profileId), this.materials.brass));
+    return group;
+  }
+
   // -------------------------------------------------------------------------
   // 装备
   // -------------------------------------------------------------------------

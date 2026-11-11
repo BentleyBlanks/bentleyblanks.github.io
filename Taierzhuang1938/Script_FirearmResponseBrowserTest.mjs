@@ -29,6 +29,19 @@ try {
     const { RELOAD_EVENTS, RELOAD_CLIP_EVENTS }=await import("./Data_Tuning_FirearmActions.mjs");
     const Step=(n,dt=1/60,render=false)=>g.StepFrames(n,dt,render);
     const Click=()=>{D.Mouse(0,true);Step(1);D.Mouse(0,false);Step(1);};
+    // A cold bolt ejection used to compile an unmapped plain-metal program in
+    // the middle of the animation, blocking the first action for seconds.
+    Step(1,1/60,true);
+    const programsBeforeBolt=new Set(g.renderer.info.programs);
+    const firstBoltStarted=g.viewmodel.TriggerBolt();
+    let firstBoltPeakMs=0,firstBoltEjected=false;
+    for(let i=0;i<40;i++){
+      const frameStart=performance.now();Step(1,1/60,true);
+      firstBoltPeakMs=Math.max(firstBoltPeakMs,performance.now()-frameStart);
+      firstBoltEjected ||= !!g.viewmodel.action?.ejected;
+    }
+    const firstBoltPrograms=g.renderer.info.programs.filter(program=>!programsBeforeBolt.has(program)).map(program=>program.name);
+    Step(100);
     const Equip=id=>{
       D.Mouse(0,false);D.Mouse(2,false);D.Key("KeyW",false);D.Key("ShiftLeft",false);Step(400);
       range.GoTo("table",id);Step(15);D.Key("KeyF");Step(120);range.GoTo("firing");range.SetMoving(false);range.SetAmmoMode("infinite");Step(150);
@@ -43,7 +56,8 @@ try {
         sources:voice?.nodes.filter(n=>n.constructor.name==="AudioBufferSourceNode").length??0});
       return voice;
     };
-    const data={audioReady:g.audio.sfxReady,audioErrors:g.audio.sfxErrors,firearms:[],mounted:[],cadence:[],reloads:[],images};
+    const data={firstBoltWarm:{started:firstBoltStarted,ejected:firstBoltEjected,newPrograms:firstBoltPrograms,peakMs:firstBoltPeakMs},
+      audioReady:g.audio.sfxReady,audioErrors:g.audio.sfxErrors,firearms:[],mounted:[],cadence:[],reloads:[],images};
     const starts=[],createSource=g.audio.ctx.createBufferSource.bind(g.audio.ctx);
     g.audio.ctx.createBufferSource=()=>{const source=createSource(),start=source.start.bind(source);
       source.start=(at,offset,duration)=>{starts.push({offset,duration});return start(at,offset,duration);};return source;};
@@ -145,6 +159,8 @@ try {
   });
   for(const item of report.images){fs.writeFileSync(path.join(out,`Scene_${item.id}Reload.png`),Buffer.from(item.png.split(",")[1],"base64"));}
   delete report.images;
+  Check("First bolt ejection uses a prewarmed shader",report.firstBoltWarm.started&&report.firstBoltWarm.ejected
+    &&report.firstBoltWarm.newPrograms.length===0,report.firstBoltWarm);
   Check("Decoded production audio is ready",report.audioReady&&report.audioErrors.length===0,report.audioErrors);
   Check("Reload mechanics use the requested recording segment",report.audioSlice.some(s=>Math.abs(s.offset-.50)<1e-6&&s.duration>.15&&s.duration<=.260001),report.audioSlice);
   for(const row of report.firearms){

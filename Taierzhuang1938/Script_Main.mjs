@@ -4312,6 +4312,9 @@ async function WarmActorShaders(phase, onStep = null) {
   let goreProxies = 0;
   try { goreProxies = AddGoreWarmProxies(group, proxies); }
   catch (error) { console.warn("[Main] 断肢材质预热代理建失败", error); }
+  // 拉栓与换弹抛出的弹壳/整弹在世界场景里绘制。它们的无贴图金属 program
+  // 不会被手中枪的材质覆盖；第一次抛出时现编会让动作停数秒。
+  if (viewmodel?.CreateActionDebrisWarmProxy) group.add(viewmodel.CreateActionDebrisWarmProxy());
   group.position.set(player.position.x, player.position.y, player.position.z);
   scene.add(group);
   group.updateMatrixWorld(true);
