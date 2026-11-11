@@ -523,11 +523,11 @@
    "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
    "model": "Model/Character/Model_HeYoutian.glb",
    "file": "Grooms/Groom_Game_HeYoutian.bin",
-   "bytes": 1203020,
+   "bytes": 1226768,
    "strands": 46000,
-   "guides": 734,
-   "cardTriangles": 7876,
-   "shellTriangles": 740
+   "guides": 802,
+   "cardTriangles": 8646,
+   "shellTriangles": 800
   },
   {
    "id": "Game_JapaneseSoldierJia",
@@ -545,11 +545,11 @@
    "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
    "model": "Model/Character/Model_JapaneseSoldierJia.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierJia.bin",
-   "bytes": 1156356,
+   "bytes": 1197064,
    "strands": 46000,
-   "guides": 630,
-   "cardTriangles": 6216,
-   "shellTriangles": 674
+   "guides": 741,
+   "cardTriangles": 7276,
+   "shellTriangles": 781
   },
   {
    "id": "Game_SquadLeaderLuo",
@@ -567,11 +567,11 @@
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "model": "Model/Character/Model_SquadLeaderLuo.glb",
    "file": "Grooms/Groom_Game_SquadLeaderLuo.bin",
-   "bytes": 987192,
+   "bytes": 1187536,
    "strands": 46000,
-   "guides": 293,
-   "cardTriangles": 4688,
-   "shellTriangles": 341
+   "guides": 1080,
+   "cardTriangles": 10318,
+   "shellTriangles": 1088
   },
   {
    "id": "Game_JapaneseSoldierA",
@@ -655,11 +655,11 @@
    "label": "冬瓜（游戏挂接）",
    "model": "Model/Character/Model_Donggua.glb",
    "file": "Grooms/Groom_Game_Donggua.bin",
-   "bytes": 130484,
-   "strands": 580,
-   "guides": 13,
-   "cardTriangles": 418,
-   "shellTriangles": 17
+   "bytes": 854380,
+   "strands": 46000,
+   "guides": 400,
+   "cardTriangles": 3598,
+   "shellTriangles": 253
   },
   {
    "id": "Game_Yaowa",
@@ -677,11 +677,11 @@
    "label": "幺娃（游戏挂接）",
    "model": "Model/Character/Model_Yaowa.glb",
    "file": "Grooms/Groom_Game_Yaowa.bin",
-   "bytes": 138936,
-   "strands": 6911,
-   "guides": 18,
-   "cardTriangles": 190,
-   "shellTriangles": 15
+   "bytes": 806120,
+   "strands": 46000,
+   "guides": 436,
+   "cardTriangles": 3480,
+   "shellTriangles": 241
   },
   {
    "id": "Game_LiuWencai",
@@ -765,11 +765,11 @@
    "label": "谷寿夫（游戏挂接）",
    "model": "Model/Character/Model_TaniHisao.glb",
    "file": "Grooms/Groom_Game_TaniHisao.bin",
-   "bytes": 168124,
-   "strands": 2495,
-   "guides": 37,
-   "cardTriangles": 290,
-   "shellTriangles": 11
+   "bytes": 987456,
+   "strands": 46000,
+   "guides": 738,
+   "cardTriangles": 5470,
+   "shellTriangles": 530
   },
   {
    "id": "Game_JapaneseSoldierC",
@@ -787,11 +787,11 @@
    "label": "日军士兵C（游戏挂接）",
    "model": "Model/Character/Model_JapaneseSoldierC.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierC.bin",
-   "bytes": 699260,
-   "strands": 43462,
-   "guides": 42,
-   "cardTriangles": 1424,
-   "shellTriangles": 15
+   "bytes": 1026616,
+   "strands": 46000,
+   "guides": 603,
+   "cardTriangles": 9074,
+   "shellTriangles": 375
   }
  ]
 }

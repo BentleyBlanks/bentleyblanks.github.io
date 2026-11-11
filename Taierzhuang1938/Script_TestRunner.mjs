@@ -52,6 +52,7 @@ export const testDefs = {
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
+  HairCapBrowserTest: { file: "Script_HairCapBrowserTest.mjs", timeoutMs: 180000, desc: "Luo idle: right and rear cap seams render short hair without a bald strip" },
   MixamoGroomBrowserTest: { file: "Script_MixamoGroomBrowserTest.mjs", timeoutMs: 360000, desc: "Mixamo preview: thirteen configured characters move baked hair and optional beard with animated head bones" },
   BeardSkinBrowserTest: { file: "Script_BeardSkinBrowserTest.mjs", timeoutMs: 180000, desc: "Luo idle and head turns: beard vertices preserve clearance from the skinned facial surface" },
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
@@ -624,6 +625,7 @@ export const browserTests = new Set([
   "LevelFlowBrowserTest",
   "HairReferenceBrowserTest",
   "HairRangeBrowserTest",
+  "HairCapBrowserTest",
   "MixamoGroomBrowserTest",
   "BeardSkinBrowserTest",
   "NakajimaKi4ReleaseBrowserTest",
@@ -898,7 +900,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairReferenceBrowserTest", "HairRangeBrowserTest", "MixamoGroomBrowserTest", "BeardSkinBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
+  hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairReferenceBrowserTest", "HairRangeBrowserTest", "HairCapBrowserTest", "MixamoGroomBrowserTest", "BeardSkinBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
   flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },

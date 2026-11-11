@@ -1,7 +1,7 @@
 {
  "schema": "tengxian.hairStyles",
  "version": 1,
- "note": "头发 / 胡子的造型表（docs/Data_HairSystem.md §3）。源头，手写；改完跑 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs 重出 Hair/Grooms/*.bin。长度、宽度单位米。发际线 front/temple/templeLow 是「眉间到头顶」的比例，sideburn 是耳高比例，nape 是耳垂以下米数。",
+ "note": "头发 / 胡子的造型表（docs/Data_HairSystem.md §3）。源头，手写；改完跑 node Taierzhuang1938/_import/Script_HairGroomBuild.mjs 重出 Hair/Grooms/*.bin。长度、宽度单位米。发际线 front/temple/templeLow 是「眉间到头顶」的比例，sideburn 是耳高比例，nape 是耳垂以下米数。游戏挂件的 hairRootFit=hatSeam 只用于已验收的帽缘头皮补全，胡须仍用原脸部网格。",
  "hair": {
   "Buzz": {
    "name": "推子头（3 毫米）",
@@ -997,6 +997,7 @@
    "labHead": "HeYoutian",
    "hair": "Crew",
    "beard": "GoateeThin",
+   "hairRootFit": "hatSeam",
    "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
    "referenceLook": "HeYoutian"
   },
@@ -1011,6 +1012,7 @@
    ],
    "hair": "Crew",
    "beard": "MustacheThick",
+   "hairRootFit": "hatSeam",
    "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
    "referenceLook": "Jia"
   },
@@ -1021,6 +1023,8 @@
    "labHead": "Luo",
    "hair": "Crew",
    "beard": "BoxedShort",
+   "hairRootFit": "hatSeam",
+   "hairOverrides": { "hairline": { "backEarDrop": 0.85, "earMaskHalfWidth": 1.0 } },
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "referenceLook": "Luo"
   },
@@ -1061,6 +1065,7 @@
    "labHead": "Donggua",
    "hair": "Crew",
    "beard": "StubbleLight",
+   "hairRootFit": "hatSeam",
    "label": "冬瓜（游戏挂接）",
    "referenceLook": "Donggua"
   },
@@ -1071,6 +1076,7 @@
    "labHead": "Yaowa",
    "hair": "Crew",
    "beard": null,
+   "hairRootFit": "hatSeam",
    "label": "幺娃（游戏挂接）",
    "referenceLook": "Yaowa"
   },
@@ -1111,6 +1117,7 @@
    "labHead": "TaniHisao",
    "hair": "Crew",
    "beard": "StubbleLight",
+   "hairRootFit": "hatSeam",
    "label": "谷寿夫（游戏挂接）",
    "referenceLook": "TaniHisao"
   },
@@ -1121,6 +1128,7 @@
    "labHead": "SoldierC",
    "hair": "Crew",
    "beard": "StubbleLight",
+   "hairRootFit": "hatSeam",
    "label": "日军士兵C（游戏挂接）",
    "referenceLook": "SoldierC"
   }

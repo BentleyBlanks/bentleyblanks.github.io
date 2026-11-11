@@ -16,7 +16,7 @@
 
 ## 3. 离线资产
 
-源表 `Hair/Data_HairStyles.json`：`hair` / `beard` 定义造型，`grooms` 是实验室套装，`gameGrooms` 是绑定到游戏模型的套装。发长、梳向、静态刚度、毛躁、卷曲、发色、密度、胡子部位均从这里读取。
+源表 `Hair/Data_HairStyles.json`：`hair` / `beard` 定义造型，`grooms` 是实验室套装，`gameGrooms` 是绑定到游戏模型的套装。发长、梳向、静态刚度、毛躁、卷曲、发色、密度、胡子部位均从这里读取。仅帽缘实际出现头皮过裁的游戏套装标 `hairRootFit: "hatSeam"`。
 
 人物展示与游戏挂件通过 `referenceLook` 引用 `Hair/Data_HairReferences.json` 的本人配方。v4 对照原始定妆图、剃净参考与模型正投影，记录两张图的 SHA-256、模型五官校准、分段投影关系、发长及梳向。`landmarks` 覆盖旧自动关键点中偏移的口裂、下巴、耳界和面部中心，`registration` 将原图细须映射到模型。`_import/Script_HairReferenceBake.py` 烘出 `Hair/Data_HairReferenceMasks.json` 的发根采样和发际线，以及共用的 `Texture_HairReferenceMasks.png`，R 为胡须覆盖、G 为额前发根覆盖、B 为分离皮肤色后的发丝灰度。灰须和浓胡须另用 `Texture_HairReferenceBeardLuminance.png` 存胡须区域的原图亮度（人像亮度／中性毛发分离两种采样方式），按本人脸部 UV 读取、校准照片曝光，并随场景光照变化；旧个人套装保留既有颜色路径。发丝和发片都读取局部空间中的原图明暗细节，以浓密毛发区域的中位数归一亮度。发根灰度随场景光照变化，黑色素旋钮保留染色作用；三维发丝保留体积、梳向与覆盖率，胡须发片补充轮廓。二进制同时记录配方、图集与原图哈希，修改校准或配方后重烘相应展示与游戏套装。
 
@@ -85,15 +85,17 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 
 挂接误差与模型 SHA-256 由资产门禁核对，还必须看正、侧、背与远景，检查帽缘、耳前、后颈、胡须与嘴部；ICP 平均误差不能替代视觉验收。角色模型更新后应重烘其游戏 groom，不能复用旧帽子遮挡。
 
+帽缘补全（2026-11-12）：原来的游戏头皮只保留离实验室光头 ±4 mm 的面，再把距非皮肤网格 3 mm 内的发根裁掉。班长耳后可见皮肤偏离实验室头皮达 8–11 mm，因而被当作帽布；头皮染色层在外推 0.15 mm 后还重复裁剪一次。对已验收的七套帽缘游戏挂件，构建器以游戏模型正脸皮肤的纹理色作本人基准，只在耳后帽缘区域补入肤色相符、离参考头皮不超过 15–18 mm 的三角面，并把小缝补为连续采样面；发根及贴肤层各自按来源顶点的肤色权重筛选，帽布颜色仍排除。帽缘以下放宽发根距离，帽内深处继续裁剪；贴肤层保留原始发根权重，前额沿旧边界。班长游戏挂件另将耳后发际线下移，避免耳后楔形缺口。实验室套装、未标记的游戏套装和胡须网格仍走原路径。资产头 `hair.rootFit` 与源表逐项对账。
+
 ## 8. 验收
 
 ```powershell
-node Taierzhuang1938/Script_TestRunner.mjs --only=HairGroomTest,HairReferenceBrowserTest,HairRangeBrowserTest,MixamoGroomBrowserTest,BeardSkinBrowserTest --fail-fast
+node Taierzhuang1938/Script_TestRunner.mjs --only=HairGroomTest,HairReferenceBrowserTest,HairRangeBrowserTest,HairCapBrowserTest,MixamoGroomBrowserTest,BeardSkinBrowserTest --fail-fast
 node Taierzhuang1938/Script_TestRunner.mjs --only=MotionVectorContractTest,CarriagePropVelocityTest --fail-fast
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
-通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵、骨骼权重与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出；试玩断言只要求已配置 `groom` 的人物有毛发。`MixamoGroomBrowserTest` 在真实预览页逐一切换十三人，确认骨骼驱动头发和已有的胡子；`BeardSkinBrowserTest` 在班长待机与转头的八个姿势量取胡茬到真实蒙皮脸部的距离与法线方向间隙。近景预览只保存在本地。
+通过 TestRunner 使用共用浏览器槽，默认静音、截图 1280×720。`HairGroomTest` 核对二进制段、有限坐标、插值下标、几何索引、密度、人物矩阵、骨骼权重、帽缘拟合标记与匹配误差。`HairRangeBrowserTest` 检查真实场景、开关与滑条、固定 / 自动切档、三档绘制成本、游戏消费方、实际 RT1 像素、共享实例存活和加载中退出；试玩断言只要求已配置 `groom` 的人物有毛发。`HairCapBrowserTest` 用班长待机的右侧与背面画面检查帽缘裸露肤色面积；`MixamoGroomBrowserTest` 在真实预览页逐一切换十三人，确认骨骼驱动头发和已有的胡子；`BeardSkinBrowserTest` 在班长待机与转头的八个姿势量取胡茬到真实蒙皮脸部的距离与法线方向间隙。近景预览只保存在本地。
 
 `HairReferenceBrowserTest` 验证右键原地转向、沿视线飞行、Q/E 升降、斜向归一化、加速、滚轮调速、中键平移、Alt 环绕 / 缩放、F 聚焦、点击选择、控件焦点与失焦停移、分类折叠与恢复默认、桌面 / 窄屏共用 UI 主题，并将原始个人参考图与实际浏览器渲染并排，另存侧 / 背截图到本地 `tmp/HairLab/ReferenceReview/`。需要本机 OneDrive 原图；`HAIR_REF_SUBJECTS=Luo,HeYoutian` 可限制迭代样本。数字门禁不能替代人物的图像对照复核。
 
