@@ -232,22 +232,27 @@ function WaveActors(time,player) {
       const born = beat.start + index * wave.interval;
       if (time < born) continue;
       const fall = wave.cyclic ? born+44 : beat.start + Lerp(wave.lastFall * 0.35, wave.lastFall, (index + 1) / wave.count);
-      const routeTime = Math.min(17, Math.max(5, (fall - born) * 0.7));
       const path = wave.route.map((p) => [p[0] + (index % 3 - 1) * 0.65, p[1] - index * 0.6]);
-      const p = SampleRoute(path, (Math.min(time, fall) - born) / routeTime);
+      const routeLength=path.slice(1).reduce((sum,point,pathIndex)=>sum+Distance(path[pathIndex],point),0);
+      const routeTime=Math.max(routeLength/3.2,Math.min(17,Math.max(5,(fall-born)*0.7)));
+      let p = SampleRoute(path, (Math.min(time, fall) - born) / routeTime);
       if (wave.id.startsWith("Tank")) {
         const tank = Track(tankKeys,Math.min(time,fall));
         p[1] = Math.min(p[1],tank[1]-4-index*0.7);
         p[0] = tank[0]+(index%2 ? -0.8 : 0.8);
       }
-      if(!wave.transfer && wave.id !== "GengHouse" && Distance(p,player)<4.2) {
+      if(time<fall && !wave.transfer && wave.id !== "GengHouse" && Distance(p,player)<4.2) {
         const length=Math.max(0.01,Distance(wave.source,player));
         p[0]=player[0]+(wave.source[0]-player[0])/length*4.2;
         p[1]=player[1]+(wave.source[1]-player[1])/length*4.2;
       }
       const leaving=wave.transfer || (wave.id === "GengHouse" && index>=4);
       if(leaving && time>=end-1) continue;
-      const pose=time>=fall&&!leaving ? "dead" : leaving ? "run" : "shoot";
+      let pose=time>=fall&&!leaving ? "dead" : leaving ? "run" : "shoot";
+      if(time>=end && pose !== "dead") {
+        p=SampleRoute([p,wave.source],(time-end)/8);
+        pose="run";
+      }
       actors.push(Actor(`${wave.id}${index}`, `${wave.label} ${index+1}`, "enemy", "person", p, pose,
         { born, fall, target: wave.target, wave: wave.id, elevation:wave.id === "Rim"?1.8:0 }));
     }

@@ -51,4 +51,5 @@ assert.equal(EvaluateFlow(-20).time,0);
 assert.equal(EvaluateFlow(Infinity).time,0);
 assert.equal(EvaluateFlow(99999).time,FLOW_DURATION);
 assert.equal(EvaluateFlow(BeatById("10f").start).stretchersPassed,12);
+assert.equal(EvaluateFlow(BeatById("10f").start+1).effects.filter((effect)=>effect.kind === "fire").length,0,"whistle stops hostile fire before artillery");
 console.log("ok  LevelFlow 68 beats, 10 stages, fixed 03/06 waves, capped replenishment, 3741 deterministic samples and cameras");
