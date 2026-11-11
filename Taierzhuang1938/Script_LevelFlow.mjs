@@ -31,8 +31,9 @@ function SetPlaying(value) {
 }
 
 function Seek(value,{fit=false}={}) {
+  const previousStage=frame.stage.id;
   time=Clamp(value,0,FLOW_DURATION);frame=EvaluateFlow(time);
-  if(fit) {map.Fit(frame.stage.bounds);fitted=true;}
+  if(fit || previousStage!==frame.stage.id) {map.Fit(frame.stage.bounds);fitted=true;}
   Render();
 }
 

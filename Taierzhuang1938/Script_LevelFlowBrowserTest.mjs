@@ -30,7 +30,9 @@ try {
   };
   await Capture("03a","Drag");
   const before=await page.evaluate(()=>window.LevelFlow.Inspect());
+  const priorScale=await page.locator("#mapScale").textContent();
   await page.evaluate(()=>window.LevelFlow.Seek(1500));
+  assert.notEqual(await page.locator("#mapScale").textContent(),priorScale,"cross-stage seeking reframes the destination");
   await page.evaluate((time)=>window.LevelFlow.Seek(time),before.time);
   assert.deepEqual(await page.evaluate(()=>window.LevelFlow.Inspect()),before);
   await page.locator("#flowMap").focus();

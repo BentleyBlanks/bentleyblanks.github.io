@@ -354,6 +354,10 @@ export function DrawFlowCamera(canvas,frame,mode) {
     }
   }
   if(mode === "player") DrawHands(context,width,height,frame);
+  const pressure=context.createRadialGradient(width/2,height/2,height*0.15,width/2,height/2,Math.max(width,height)*0.6);
+  pressure.addColorStop(0,"#49170d00");
+  pressure.addColorStop(1,`rgba(78,28,13,${frame.beat.intensity*0.035})`);
+  context.fillStyle=pressure;context.fillRect(0,0,width,height);
   return camera;
 }
 
