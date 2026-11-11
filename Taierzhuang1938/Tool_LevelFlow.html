@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>关卡调度 · 血战滕县</title>
+  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261101230000">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261112a">
+  <script>
+    (function () {
+      var request = new XMLHttpRequest();
+      request.open("GET", "./index.html", false);
+      request.send();
+      var match = /<script type="importmap">([\s\S]*?)<\/script>/.exec(request.responseText);
+      var map = document.createElement("script");
+      map.type = "importmap";
+      map.textContent = match ? match[1] : '{"imports":{}}';
+      document.currentScript.after(map);
+    })();
+  </script>
+  <script type="module" src="./Script_LevelFlow.mjs"></script>
+</head>
+<body class="lfBody">
+  <header class="seBar lfHeader">
+    <div class="seTitle"><span class="seEyebrow">血战滕县 · 第一关</span><h1>关卡调度</h1></div>
+    <span id="flowNotice" class="lfMuted"></span>
+    <a class="lfReturn" href="./index.html?editor=tools">返回高级工具</a>
+  </header>
+  <main class="lfWorkspace">
+    <nav class="lfStages" aria-label="阶段"><div class="lfSectionTitle">往南的路</div><div id="stageList"></div></nav>
+    <section class="lfViewport" aria-label="空间关系图">
+      <canvas id="flowMap" tabindex="0" aria-label="空间关系图，拖动平移，滚轮缩放"></canvas>
+      <div class="lfMapToolbar">
+        <button id="fitStage">本段</button><button id="fitAll">全程</button><button id="followPlayer" aria-pressed="false">跟随</button>
+        <span id="mapScale"></span>
+      </div>
+      <div id="cameraPanel" class="lfCamera">
+        <div class="lfCameraBar"><span>镜头</span><select id="cameraMode" aria-label="镜头模式"><option value="player">玩家视角</option><option value="tracking">跟拍</option><option value="overview">俯瞰</option></select><button id="expandCamera" aria-label="放大镜头">放大</button></div>
+        <canvas id="flowCamera" aria-label="镜头与动作动画"></canvas>
+        <div class="lfCameraCaption"><span id="cameraAction"></span><span id="cameraHeight"></span></div>
+      </div>
+      <div id="mapTooltip" class="lfTooltip" hidden></div>
+      <div class="lfLegend"><span class="lfDot player"></span>顺子 <span class="lfDot friend"></span>我方 <span class="lfDot enemy"></span>日军 <span class="lfDot civilian"></span>后送队 <span class="lfZoneKey"></span>触发区 <span>△ 生成口</span></div>
+    </section>
+    <aside class="lfInspector">
+      <div class="lfBeatHeading"><span id="beatId"></span><span id="stageStatus"></span></div>
+      <h2 id="beatTitle"></h2>
+      <div class="lfTask" id="taskText"></div>
+      <dl class="lfFacts"><dt>玩家动作</dt><dd id="actionText"></dd><dt>来火方向</dt><dd id="threatText"></dd><dt>触发条件</dt><dd id="gateText"></dd><dt>这一拍完成</dt><dd id="exitText"></dd></dl>
+      <div class="lfReadings"><span id="enemyCount"></span><span id="nearestEnemy"></span></div>
+      <details id="spawnDetails"><summary>出兵与补充</summary><div id="spawnText"></div></details>
+      <details id="sourceDetails"><summary>对应剧本文字</summary><blockquote id="sourcePassage"></blockquote><a id="sourceLink" target="_blank" rel="noopener">Notion 原稿 ↗</a></details>
+      <div class="lfSectionTitle lfEventHeading">本段调度</div>
+      <div id="beatList" class="lfBeatList"></div>
+    </aside>
+  </main>
+  <footer class="lfTimeline">
+    <div class="lfTransport"><button id="previousBeat" title="上一拍（[）">上一拍</button><button id="playFlow" class="sePrimary" aria-label="播放或暂停">播放</button><button id="nextBeat" title="下一拍（]）">下一拍</button><output id="flowTime"></output><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option><option value="4" selected>4×</option><option value="8">8×</option><option value="16">16×</option></select><label><input id="loopStage" type="checkbox">循环本段</label><span class="lfMuted lfShortcuts">空格播放 · ← → 回溯 · [ ] 换拍</span></div>
+    <div id="timelineSegments" class="lfSegments"></div>
+    <input id="flowSeek" type="range" min="0" max="1" step="0.05" value="0" aria-label="全程时间轴">
+    <div class="lfLayers" aria-label="图层"><label><input data-layer="fire" type="checkbox" checked>火力</label><label><input data-layer="zones" type="checkbox" checked>触发区</label><label><input data-layer="spawns" type="checkbox" checked>生成口</label><label><input data-layer="routes" type="checkbox" checked>路线</label><label><input data-layer="covers" type="checkbox" checked>掩体</label><label><input data-layer="camera" type="checkbox" checked>视域</label><label><input data-layer="labels" type="checkbox" checked>人名</label><span id="selectionText" class="lfMuted"></span></div>
+  </footer>
+  <div id="flowError" class="seBanner" role="alert" hidden></div>
+</body>
+</html>

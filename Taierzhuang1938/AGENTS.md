@@ -37,6 +37,8 @@
 
 ## 跨系统契约
 
+- **第一关抽象关卡调度（2026-11-12）**位于高级工具 → 关卡 → 关卡调度，独立入口 `Tool_LevelFlow.html`。01–07 对应 Notion 11-11 定稿，08–10 对应现行草稿。空间点位、触发、火力与镜头共用可回溯时间轴。数据 `Data_LevelFlow.mjs`，采样 `Script_LevelFlowModel.mjs`。演示点位与节奏需经玩法白盒验证，口径见 [关卡调度](docs/Data_LevelFlow.md)，门禁 `LevelFlowTest` / `LevelFlowBrowserTest`。
+
 - **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣；第一人称身体反应与耳朵模型 trauma 也只走这一个入口（`phase.blastReaction` 开关），不在关卡里另写扭头、闭眼或耳鸣；近爆眩晕画面（边缘色散 / 拖影 / 重影 / 发灰，`Script_BlastStun`）同样只走这一个入口且全关卡常开，不看 `phase.blastReaction`。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
 
 1. **浏览器模块的缓存戳不手写（2026-11-01 起）。** 新增模块在 `index.html` 的 import map 登记一行 `"./X.mjs": "./X.mjs"`（不带 `?v=`）；改已有模块**不碰** `index.html`。Pages 发布时 `Script_StampImportMaps` 在 staging 里按每个文件的内容给全部条目与入口 `<script>` 盖戳（排在 GPU 资源改写之后、打包之前）；本地预览与测试服务器发 no-store，用不着戳。源码 import 不自带 `?v=`，避免同一模块形成两个实例。图标、字体、样式表这类非模块资源的 `?v=` 照旧手动维护。验收：`Script_ModuleGraphTest.mjs`（登记满模块图、仓库里没有手写模块戳、盖戳工具能盖满）。

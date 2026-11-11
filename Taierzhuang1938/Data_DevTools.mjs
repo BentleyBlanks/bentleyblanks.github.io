@@ -25,6 +25,8 @@ export const TOOL_INFO = Object.freeze({
   propPcg: { label: "PCG 撒点", hint: "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶", level: true },
   blockout: { label: "白盒关卡编辑器", hint: "关卡白盒预览：分关卡的纯高度图场景、关键帧敌我布设与去向、俯视图与导航栏（打开后整页切换）" },
   timeline: { label: "Timeline 过场", hint: "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）" },
+  levelFlow: { label: "关卡调度", hint: "第一关线性流程的空间点位、敌军生成与火力、角色动作和镜头动画，可回溯时间轴",
+    window: { url: "./Tool_LevelFlow.html", name: "TengxianLevelFlow", features: "popup,width=1280,height=720" } },
   squadMarch: { label: "小队行进", hint: "配置人数、路线与随机样式，预览真实人物的错峰跑停" },
   actor: { label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换" },
   facial: { label: "人物面部", hint: "配套对白、口型与表情近景检查" },
@@ -44,7 +46,7 @@ export const TOOL_INFO = Object.freeze({
 // 菜单栏与工具首页的分组与顺序（Script_Editor 按它生成，缺编辑器类直接 throw）。
 export const TOOL_MENUS = Object.freeze([
   { id: "scene", label: "场景", items: ["sceneEditor", "environment", "splines", "propPcg"] },
-  { id: "level", label: "关卡", items: ["blockout", "timeline", "squadMarch"] },
+  { id: "level", label: "关卡", items: ["blockout", "timeline", "levelFlow", "squadMarch"] },
   { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson", "fpMotion"] },
   { id: "media", label: "特效与声音", items: ["vfx", "audio"] },

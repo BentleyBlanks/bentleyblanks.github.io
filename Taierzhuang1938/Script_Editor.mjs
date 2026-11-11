@@ -30,6 +30,7 @@
 
 import { El, Panel, Note } from "./Script_EditorUi.mjs";
 import { DEBUG_TOOL_IDS, TOOL_INFO, TOOL_MENUS as TOOL_MENU_DEFS } from "./Data_DevTools.mjs";
+import { LevelFlowEntry } from "./Script_EditorLevelFlow.mjs";
 import { T } from "./Script_Text.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
@@ -90,7 +91,7 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
 // 分组与顺序在 Data_DevTools.TOOL_MENUS（标题菜单的设置页共用），这里只补 id -> 编辑器类。
 // 场景编辑器 / 贴图管理 / Mixamo 动作预览打开独立窗口，白盒关卡编辑器 / 环境 / Timeline 是整页跳转入口，都不进互斥表。
 const TOOL_CLASSES = new Map([
-  SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, SquadMarchEditor,
+  SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, LevelFlowEntry, SquadMarchEditor,
   ActorEditor, FacialEditor, MixamoPreviewEditor, WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor,
   VfxEditor, AudioEditor, PropLibraryEditor, AssetStandardsEditor, TextureEditor,
 ].map((Editor) => [Editor.id, Editor]));
@@ -592,7 +593,7 @@ export class EditorSuite {
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
-    for (const WindowTool of [TextureEditor, SceneEditorEntry, MixamoPreviewEditor]) {
+    for (const WindowTool of [TextureEditor, SceneEditorEntry, MixamoPreviewEditor, LevelFlowEntry]) {
       if (id !== WindowTool.id) continue;
       try { return WindowTool.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
