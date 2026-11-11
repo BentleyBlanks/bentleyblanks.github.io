@@ -40,7 +40,7 @@ try {
   result.lab = await State();
   assert.equal(result.lab.error, null);
   assert.equal(result.lab.stations.length, HAIR_RANGE_ROWS.reduce((sum,row)=>sum+row.items.length,0));
-  assert.equal(result.lab.stations.filter(station=>station.row==='newCast').length,7);
+  assert.equal(result.lab.stations.filter(station=>station.row==='newCast').length,9);
   assert.equal(result.lab.loaded, result.lab.total);
   await Shot('LabPanel');
   await page.evaluate(() => window.Taierzhuang.Debug.HairRange.ShowPanel(false));

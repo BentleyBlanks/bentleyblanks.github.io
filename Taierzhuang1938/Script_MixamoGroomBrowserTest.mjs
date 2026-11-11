@@ -14,6 +14,8 @@ const browser = await LaunchBrowser({ extraArgs: ["--mute-audio"] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const errors = [], failures = [], observations = [];
 const keys = Object.entries(XBOT_CHARACTERS).filter(([, def]) => def.groom).map(([key]) => key);
+const styledBeards = new Set(JSON.parse(fs.readFileSync(path.join(root, 'Taierzhuang1938/Hair/Data_HairStyles.json'), 'utf8'))
+  .gameGrooms.filter(entry => entry.beard).map(entry => entry.id));
 const output = path.join(root, "tmp", "MixamoGroom");
 fs.mkdirSync(output, { recursive: true });
 page.on("pageerror", error => errors.push(String(error)));
@@ -41,11 +43,11 @@ try {
       assert.ok(observation.hair?.startsWith("Game_"), `${key}: game groom loaded`);
       assert.equal(observation.parent, "Head", `${key}: groom follows head bone`);
       assert.ok(observation.visible.some(name => /Hair(Strands|Cards|Shell)/.test(name)), `${key}: hair rendered`);
-      if (!["yaowa", "nier"].includes(key))
+      if (styledBeards.has(observation.hair))
         assert.ok(observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: beard rendered`);
-      if (!["yaowa", "nier"].includes(key))
+      if (styledBeards.has(observation.hair))
         assert.ok(observation.beardBones.includes("Head"), `${key}: beard uses the animated facial bones`);
-      if (["yaowa", "nier"].includes(key))
+      if (!styledBeards.has(observation.hair))
         assert.ok(!observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: clean-shaven character`);
       await page.evaluate(() => window.__preview.SelectFile("Animation_Mixamo_LookingAround_V2.glb"));
       await page.waitForFunction(() => window.__preview.current?.file === "Animation_Mixamo_LookingAround_V2.glb" && window.__preview.action);

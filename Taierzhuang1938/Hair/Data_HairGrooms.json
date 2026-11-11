@@ -60,6 +60,14 @@
   "SoldierC": {
    "file": "Heads/Model_HairHead_SoldierC.glb",
    "name": "日军士兵C"
+  },
+  "AzumaShiro": {
+   "file": "Heads/Model_HairHead_AzumaShiro.glb",
+   "name": "东史郎"
+  },
+  "Interpreter": {
+   "file": "Heads/Model_HairHead_Interpreter.glb",
+   "name": "翻译"
   }
  },
  "grooms": [
@@ -79,7 +87,7 @@
    "label": "顺子（个人参考）：短寸头 + 淡短茬",
    "model": null,
    "file": "Grooms/Groom_Shunzi_Cast.bin",
-   "bytes": 1728236,
+   "bytes": 1728292,
    "strands": 46000,
    "guides": 2659,
    "cardTriangles": 20844,
@@ -101,7 +109,7 @@
    "label": "罗班长（个人参考）：短寸头 + 下颌薄短须",
    "model": null,
    "file": "Grooms/Groom_Luo_Cast.bin",
-   "bytes": 1557616,
+   "bytes": 1557672,
    "strands": 46000,
    "guides": 2166,
    "cardTriangles": 18390,
@@ -123,7 +131,7 @@
    "label": "何有田（个人参考）：碎寸头 + 细唇须下颌短须",
    "model": null,
    "file": "Grooms/Groom_HeYoutian_Cast.bin",
-   "bytes": 1645144,
+   "bytes": 1645200,
    "strands": 46000,
    "guides": 2342,
    "cardTriangles": 19074,
@@ -145,7 +153,7 @@
    "label": "日军士兵A（个人参考）：短寸头 + 浓唇须尖下巴胡",
    "model": null,
    "file": "Grooms/Groom_SoldierA_Cast.bin",
-   "bytes": 2032216,
+   "bytes": 2032268,
    "strands": 46000,
    "guides": 3035,
    "cardTriangles": 31374,
@@ -167,7 +175,7 @@
    "label": "日兵甲（个人参考）：短平头 + 浓短唇须淡下颌茬",
    "model": null,
    "file": "Grooms/Groom_Jia_Cast.bin",
-   "bytes": 1552420,
+   "bytes": 1552472,
    "strands": 46000,
    "guides": 2044,
    "cardTriangles": 16788,
@@ -189,7 +197,7 @@
    "label": "日兵乙（个人参考）：短寸头 + 宽唇须 U 形短须",
    "model": null,
    "file": "Grooms/Groom_Yi_Cast.bin",
-   "bytes": 1704272,
+   "bytes": 1704328,
    "strands": 46000,
    "guides": 2324,
    "cardTriangles": 21918,
@@ -369,7 +377,7 @@
    "label": "冬瓜（个人参考）",
    "model": null,
    "file": "Grooms/Groom_Donggua_Cast.bin",
-   "bytes": 1367724,
+   "bytes": 1367776,
    "strands": 46000,
    "guides": 1803,
    "cardTriangles": 14204,
@@ -413,7 +421,7 @@
    "label": "刘文财（个人参考）",
    "model": null,
    "file": "Grooms/Groom_LiuWencai_Cast.bin",
-   "bytes": 1465968,
+   "bytes": 1466020,
    "strands": 46000,
    "guides": 2091,
    "cardTriangles": 17118,
@@ -479,7 +487,7 @@
    "label": "谷寿夫（个人参考）",
    "model": null,
    "file": "Grooms/Groom_TaniHisao_Cast.bin",
-   "bytes": 1456088,
+   "bytes": 1456140,
    "strands": 46000,
    "guides": 1946,
    "cardTriangles": 16158,
@@ -506,6 +514,50 @@
    "guides": 2030,
    "cardTriangles": 43146,
    "shellTriangles": 1209
+  },
+  {
+   "id": "AzumaShiro_Cast",
+   "head": "AzumaShiro",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "reference": {
+    "look": "AzumaShiro",
+    "source": "13_东史郎/HairReference_20261112/Ref_AzumaShiro_HeadHair_1254_V1.png",
+    "sha256": "f0495a33f01092f6d7d299899bf9d6067fb6459375fd0ba8ca690b23dc24650c",
+    "version": 4,
+    "recipeSha256": "a88555ec2d4f3f405cee030dd2df2eda6b6b6df93b44334524d120b6db1995fc"
+   },
+   "row": "newCast",
+   "label": "东史郎（个人参考）：钢盔下短发、唇须和短下巴胡",
+   "model": null,
+   "file": "Grooms/Groom_AzumaShiro_Cast.bin",
+   "bytes": 1755056,
+   "strands": 46000,
+   "guides": 2463,
+   "cardTriangles": 24956,
+   "shellTriangles": 1522
+  },
+  {
+   "id": "Interpreter_Cast",
+   "head": "Interpreter",
+   "hair": "Messy",
+   "beard": null,
+   "reference": {
+    "look": "Interpreter",
+    "source": "16_翻译/HairReference_20261112/Ref_Interpreter_HeadHair_1254_V1.png",
+    "sha256": "826170887f64da9892111abe44cc6d4c45f25209af3cc05f6957b190dd675fc2",
+    "version": 4,
+    "recipeSha256": "1955ddb19b47d1162c1ed5ddb3a02e5e26bf45122a5cdbd4cab09afe6f2bf85b"
+   },
+   "row": "newCast",
+   "label": "翻译（个人参考）：凌乱短发、净面",
+   "model": null,
+   "file": "Grooms/Groom_Interpreter_Cast.bin",
+   "bytes": 1734732,
+   "strands": 52000,
+   "guides": 2156,
+   "cardTriangles": 22352,
+   "shellTriangles": 1370
   },
   {
    "id": "Game_HeYoutian",
@@ -792,6 +844,50 @@
    "guides": 603,
    "cardTriangles": 9074,
    "shellTriangles": 375
+  },
+  {
+   "id": "Game_AzumaShiro",
+   "head": "AzumaShiro",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "reference": {
+    "look": "AzumaShiro",
+    "source": "13_东史郎/HairReference_20261112/Ref_AzumaShiro_HeadHair_1254_V1.png",
+    "sha256": "f0495a33f01092f6d7d299899bf9d6067fb6459375fd0ba8ca690b23dc24650c",
+    "version": 4,
+    "recipeSha256": "a88555ec2d4f3f405cee030dd2df2eda6b6b6df93b44334524d120b6db1995fc"
+   },
+   "row": null,
+   "label": "东史郎（游戏挂接）：钢盔下短发、唇须和短下巴胡",
+   "model": "Model/Character/Model_AzumaShiro.glb",
+   "file": "Grooms/Groom_Game_AzumaShiro.bin",
+   "bytes": 1441900,
+   "strands": 46000,
+   "guides": 1048,
+   "cardTriangles": 15536,
+   "shellTriangles": 635
+  },
+  {
+   "id": "Game_Interpreter",
+   "head": "Interpreter",
+   "hair": "Messy",
+   "beard": null,
+   "reference": {
+    "look": "Interpreter",
+    "source": "16_翻译/HairReference_20261112/Ref_Interpreter_HeadHair_1254_V1.png",
+    "sha256": "826170887f64da9892111abe44cc6d4c45f25209af3cc05f6957b190dd675fc2",
+    "version": 4,
+    "recipeSha256": "1955ddb19b47d1162c1ed5ddb3a02e5e26bf45122a5cdbd4cab09afe6f2bf85b"
+   },
+   "row": null,
+   "label": "翻译（游戏挂接）：凌乱短发、净面",
+   "model": "Model/Character/Model_Interpreter.glb",
+   "file": "Grooms/Groom_Game_Interpreter.bin",
+   "bytes": 1752704,
+   "strands": 52000,
+   "guides": 2229,
+   "cardTriangles": 22608,
+   "shellTriangles": 1370
   }
  ]
 }

@@ -36,6 +36,8 @@ HEADS = {
     "Nier":      {"name": "妮儿",     "src": "08_妮儿/bald head 3d model.glb", "heightM": 0.205, "sourceFacing": "+Z", "mentonY": 0.309},
     "TaniHisao": {"name": "谷寿夫",   "src": "09_谷寿夫/bald man head 3d model.glb", "mentonY": 0.3405},
     "SoldierC":  {"name": "日军士兵C", "src": "12_日军士兵C/bald man bust 3d model.glb"},
+    "AzumaShiro": {"name": "东史郎", "src": "13_东史郎/bald man 3d model.glb"},
+    "Interpreter": {"name": "翻译", "src": "16_翻译/tripo_convert_5da2338f-4861-4513-961c-bce86690937e.glb"},
 }
 
 

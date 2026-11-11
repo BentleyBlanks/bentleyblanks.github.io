@@ -76,7 +76,7 @@ assert.equal(XBOT_CAST_CHARACTERS.interpreter, "interpreter", "翻译使用V6专
 assert.equal(XBotLook({ faction: "nra", castId: "interpreter" }).key, "interpreter");
 assert.equal(XBotLook({ faction: "nra", unitId: "Interpreter" }).key, "interpreter");
 assert.ok(!Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys).includes("interpreter"), "翻译由命名角色映射选择");
-assert.equal(XBOT_CHARACTERS.interpreter.groom, undefined, "翻译沿用用户选择的光头");
+assert.equal(XBOT_CHARACTERS.interpreter.groom, "./Hair/Grooms/Groom_Game_Interpreter.bin", "翻译使用参考短发，脸部保持净面");
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
 assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
@@ -84,6 +84,7 @@ assert.equal(XBOT_CAST_CHARACTERS.azumaShiro, "azumaShiro", "东史郎使用V12�
 assert.equal(XBotLook({ faction: "ija", castId: "azumaShiro", unitId: "ReviewSoldier" }).key, "azumaShiro");
 assert.equal(XBotLook({ faction: "ija", unitId: "AzumaShiro" }).key, "azumaShiro");
 assert.ok(!FactionCharacterKeys("ija").includes("azumaShiro"), "东史郎按命名角色选择");
+assert.equal(XBOT_CHARACTERS.azumaShiro.groom, "./Hair/Grooms/Groom_Game_AzumaShiro.bin", "东史郎挂接参考短发和胡须");
 for (const key of new Set(Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys))) assert.ok(XBOT_CHARACTERS[key], `阵营表指向的人物 ${key} 要登记`);
 for (const [cast, key] of Object.entries(XBOT_CAST_CHARACTERS)) {
   assert.ok(XBOT_CHARACTER_LOOKS[cast], `角色表的 ${cast} 要是白盒里有名字的人`);

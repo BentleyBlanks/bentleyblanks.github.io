@@ -97,7 +97,7 @@ try {
   await page.locator('#hair-range-panel [data-row="cast"]').click();
   assert.equal(await page.locator('[data-sample] option').count(),6,'character category only lists six personal looks');
   await page.locator('#hair-range-panel [data-row="newCast"]').click();
-  assert.equal(await page.locator('[data-sample] option').count(),7,'new character category lists all seven additions');
+  assert.equal(await page.locator('[data-sample] option').count(),9,'new character category lists all nine additions');
   await page.locator('[data-fold="appearance"] summary').click();
   const slider=page.locator('[data-param="clump"]'),defaultClump=await slider.inputValue();
   await slider.focus();const guarded=await Target();await page.keyboard.down('w');await Step(15);await page.keyboard.up('w');assert.deepEqual(await Target(),guarded,'form editing never flies');

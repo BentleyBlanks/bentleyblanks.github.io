@@ -4,7 +4,7 @@
 
 `_import/Script_BuildAzumaShiro.mjs` 复用共用转换器，恢复 1.84 米帽顶，统一为 65 根 X Bot 骨骼的名字、顺序、层级和初始朝向，胯高比为 0.9684。转换修复 3,745 个头帽顶点的残余权重。运行时模型 `Model/Character/Model_AzumaShiro.glb` 约 7.47 MB、36,877 三角面、单网格单材质，三张贴图保持 4096×4096 并转为 WebP。发布副本另按路径贴图规则处理。输入、输出哈希和转换参数在同目录 `Data_AzumaShiro.json` 中记录。
 
-`Data_XBotCharacters.mjs` 登记 `azumaShiro` 专属外观。场景单位使用 `castId: "azumaShiro"`，或将单位编号设为 `AzumaShiro`，白盒摆位、预演和正式场景试玩共用该登记。普通日军随机池不变。此接入提供角色身份和模型，不修改既有剧情或增添出场事件。
+`Data_XBotCharacters.mjs` 登记 `azumaShiro` 专属外观。场景单位使用 `castId: "azumaShiro"`，或将单位编号设为 `AzumaShiro`，白盒摆位、预演和正式场景试玩共用该登记。运行时挂 `Groom_Game_AzumaShiro.bin`，在原钢盔下补短发、唇须与短下巴胡；脸部胡须逐顶点跟随自身蒙皮，帽缘短发按本人模型筛选可见发根。原模型不改，参考图与提示词保存在角色 OneDrive 目录 `HairReference_20261112/`；配方和验证入口见[头发系统](Data_HairSystem.md)。普通日军随机池不变。此接入不修改既有剧情或增添出场事件。
 
 ~~~json
 {

@@ -206,10 +206,10 @@ class HeadFrame {
       [0, gl + hl.front * T],
       [ef * 0.3, gl + hl.temple * T],                       // 额角（M 形，略高）
       [ef * 0.62, gl + hl.templeLow * T],                   // 太阳穴往下
-      [ef - 14, e.yMax + 0.002],                            // 鬓角前沿上端
+      [ef - 14, e.yMax + 0.002 - (hl.earFrontUpperDrop ?? 0)], // 鬓角前沿上端；个别短发需盖住耳前头皮
       [ef - 5, e.yMin + hl.sideburn * this.earH],           // 鬓角下端
-      [ef + 1.5, e.yMax + 0.006],                           // 翻过耳朵
-      [(ef + eb) * 0.5, e.yMax + 0.01],
+      [ef + 1.5, e.yMax + 0.006 - (hl.earArcDrop ?? 0)],    // 翻过耳朵
+      [(ef + eb) * 0.5, e.yMax + 0.01 - (hl.earArcDrop ?? 0)],
       [eb + 4, e.yMax - (hl.backEarDrop ?? 0.25) * this.earH], // 耳后
       [eb + 16, e.yMin],
       [180, e.yMin - hl.nape],                              // 后颈正中

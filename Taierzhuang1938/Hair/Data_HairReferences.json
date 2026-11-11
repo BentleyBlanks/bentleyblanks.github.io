@@ -146,7 +146,7 @@
       "y": 0.31954,
       "imageY": 283,
       "innerX": 0.03,
-      "innerImageX": 176.0,
+      "innerImageX": 176,
       "outerX": 0.087,
       "outerImageX": 440
      },
@@ -154,7 +154,7 @@
       "y": 0.204,
       "imageY": 925,
       "innerX": 0.03,
-      "innerImageX": 176.0,
+      "innerImageX": 176,
       "outerX": 0.087,
       "outerImageX": 440
      },
@@ -336,7 +336,7 @@
       "y": 0.32782,
       "imageY": 164,
       "innerX": 0.03,
-      "innerImageX": 162.0,
+      "innerImageX": 162,
       "outerX": 0.078,
       "outerImageX": 405
      },
@@ -344,7 +344,7 @@
       "y": 0.23,
       "imageY": 723,
       "innerX": 0.03,
-      "innerImageX": 162.0,
+      "innerImageX": 162,
       "outerX": 0.078,
       "outerImageX": 405
      },
@@ -526,7 +526,7 @@
       "y": 0.30616,
       "imageY": 319,
       "innerX": 0.03,
-      "innerImageX": 186.0,
+      "innerImageX": 186,
       "outerX": 0.084,
       "outerImageX": 465
      },
@@ -534,7 +534,7 @@
       "y": 0.207,
       "imageY": 874,
       "innerX": 0.03,
-      "innerImageX": 186.0,
+      "innerImageX": 186,
       "outerX": 0.084,
       "outerImageX": 465
      },
@@ -716,7 +716,7 @@
       "y": 0.34297,
       "imageY": 225,
       "innerX": 0.03,
-      "innerImageX": 194.0,
+      "innerImageX": 194,
       "outerX": 0.091,
       "outerImageX": 485
      },
@@ -724,7 +724,7 @@
       "y": 0.223,
       "imageY": 845,
       "innerX": 0.03,
-      "innerImageX": 194.0,
+      "innerImageX": 194,
       "outerX": 0.091,
       "outerImageX": 485
      },
@@ -906,7 +906,7 @@
       "y": 0.26668,
       "imageY": 299,
       "innerX": 0.03,
-      "innerImageX": 184.0,
+      "innerImageX": 184,
       "outerX": 0.074,
       "outerImageX": 460
      },
@@ -914,7 +914,7 @@
       "y": 0.171,
       "imageY": 934,
       "innerX": 0.03,
-      "innerImageX": 184.0,
+      "innerImageX": 184,
       "outerX": 0.074,
       "outerImageX": 460
      },
@@ -1096,7 +1096,7 @@
       "y": 0.29886,
       "imageY": 66,
       "innerX": 0.03,
-      "innerImageX": 182.0,
+      "innerImageX": 182,
       "outerX": 0.082,
       "outerImageX": 455
      },
@@ -1104,7 +1104,7 @@
       "y": 0.192,
       "imageY": 710,
       "innerX": 0.03,
-      "innerImageX": 182.0,
+      "innerImageX": 182,
       "outerX": 0.082,
       "outerImageX": 455
      },
@@ -1240,22 +1240,22 @@
     "referenceMask": "Donggua"
    },
    "landmarks": {
-    "centerX": 9.443610906600952e-05,
+    "centerX": 0.00009443610906600952,
     "glabella": [
-     9.443610906600952e-05,
+     0.00009443610906600952,
      0.3492,
      -0.10309228301048279
     ],
     "subnasale": [
-     9.443610906600952e-05,
+     0.00009443610906600952,
      0.2792
     ],
     "stomion": [
-     9.443610906600952e-05,
+     0.00009443610906600952,
      0.2498
     ],
     "menton": [
-     9.443610906600952e-05,
+     0.00009443610906600952,
      0.203,
      -0.07971259951591492
     ],
@@ -1268,7 +1268,7 @@
     }
    },
    "registration": {
-    "centerX": 9.443610906600952e-05,
+    "centerX": 0.00009443610906600952,
     "reference": {
      "centerX": 1024,
      "browY": 640,
@@ -1435,22 +1435,22 @@
     "referenceMask": "Yaowa"
    },
    "landmarks": {
-    "centerX": 0.0,
+    "centerX": 0,
     "glabella": [
-     0.0,
+     0,
      0.2492,
      -0.10006534308195114
     ],
     "subnasale": [
-     0.0,
+     0,
      0.1798
     ],
     "stomion": [
-     0.0,
+     0,
      0.1523
     ],
     "menton": [
-     0.0,
+     0,
      0.1123,
      -0.08909696340560913
     ],
@@ -1463,7 +1463,7 @@
     }
    },
    "registration": {
-    "centerX": 0.0,
+    "centerX": 0,
     "reference": {
      "centerX": 1024,
      "browY": 643,
@@ -1850,22 +1850,22 @@
     "portraitLuminance": true
    },
    "landmarks": {
-    "centerX": 0.0,
+    "centerX": 0,
     "glabella": [
-     0.0,
+     0,
      0.2376,
      -0.10392384976148605
     ],
     "subnasale": [
-     0.0,
+     0,
      0.1738
     ],
     "stomion": [
-     0.0,
+     0,
      0.1431
     ],
     "menton": [
-     0.0,
+     0,
      0.0956,
      -0.10715380311012268
     ],
@@ -1878,7 +1878,7 @@
     }
    },
    "registration": {
-    "centerX": 0.0,
+    "centerX": 0,
     "reference": {
      "centerX": 1024,
      "browY": 665,
@@ -2069,22 +2069,22 @@
     "referenceMask": "Nier"
    },
    "landmarks": {
-    "centerX": 0.0,
+    "centerX": 0,
     "glabella": [
-     0.0,
+     0,
      0.2123,
      -0.0932297334074974
     ],
     "subnasale": [
-     0.0,
+     0,
      0.1517
     ],
     "stomion": [
-     0.0,
+     0,
      0.1273
     ],
     "menton": [
-     0.0,
+     0,
      0.0917,
      -0.08042006194591522
     ],
@@ -2097,7 +2097,7 @@
     }
    },
    "registration": {
-    "centerX": 0.0,
+    "centerX": 0,
     "reference": {
      "centerX": 1024,
      "browY": 768,
@@ -2264,22 +2264,22 @@
     "referenceMask": "TaniHisao"
    },
    "landmarks": {
-    "centerX": 3.375113010406494e-05,
+    "centerX": 0.00003375113010406494,
     "glabella": [
-     3.375113010406494e-05,
+     0.00003375113010406494,
      0.29,
      -0.10575196892023087
     ],
     "subnasale": [
-     3.375113010406494e-05,
+     0.00003375113010406494,
      0.215
     ],
     "stomion": [
-     3.375113010406494e-05,
+     0.00003375113010406494,
      0.189
     ],
     "menton": [
-     3.375113010406494e-05,
+     0.00003375113010406494,
      0.1395,
      -0.10507303476333618
     ],
@@ -2292,7 +2292,7 @@
     }
    },
    "registration": {
-    "centerX": 3.375113010406494e-05,
+    "centerX": 0.00003375113010406494,
     "reference": {
      "centerX": 1024,
      "browY": 675,
@@ -2585,6 +2585,417 @@
     790,
     1570,
     1491
+   ]
+  },
+  "AzumaShiro": {
+   "source": "13_东史郎/HairReference_20261112/Ref_AzumaShiro_HeadHair_1254_V1.png",
+   "sha256": "f0495a33f01092f6d7d299899bf9d6067fb6459375fd0ba8ca690b23dc24650c",
+   "baldSource": "13_东史郎/Parts_V1_20261106/Ref_AzumaShiro_HeadBald_2K_V1.png",
+   "baldSha256": "72b0524c3858c275560601ea0618a10cd8857e5f7c1f12a31211e3fea2e95555",
+   "observations": [
+    "钢盔下短而密的黑发、近耳短鬓角；修剪过的浓唇须、唇下与下巴短胡、较薄的颌缘胡"
+   ],
+   "hair": {
+    "name": "东史郎：钢盔下黑色短发",
+    "length": {
+     "top": 0.019,
+     "front": 0.014,
+     "side": 0.006,
+     "back": 0.009
+    },
+    "lengthJitter": 0.18,
+    "lift": {
+     "top": 0.48,
+     "side": 0.12,
+     "back": 0.16
+    },
+    "hairline": {
+     "front": 0.46,
+     "temple": 0.26,
+     "templeLow": 0.02,
+     "sideburn": 0.5,
+     "nape": 0.024,
+     "earFrontUpperDrop": 0.035,
+     "earArcDrop": 0.035,
+     "band": 0.004,
+     "reference": false,
+     "earMaskHalfWidth": 1,
+     "backEarDrop": 0.5
+    },
+    "clump": 0.1,
+    "frizz": 0.08,
+    "scalpTint": 0.85,
+    "color": {
+     "melanin": 0.96,
+     "redness": 0.06,
+     "gray": 0
+    },
+    "comb": {
+     "type": "crew"
+    },
+    "strands": 46000
+   },
+   "beard": {
+    "name": "东史郎：唇须、短下巴胡与薄颌缘胡",
+    "enabled": true,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0014,
+     "width": 0.0028,
+     "layers": 3,
+     "tile": "Beard",
+     "alphaScale": 0.55,
+     "rootScale": 0.95
+    },
+    "lift": 0.28,
+    "stiffness": 0.82,
+    "frizz": 0.2,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.96,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "coverageScale": 0.85,
+    "referenceParts": {
+     "mustache": {
+      "length": 0.01,
+      "density": 1
+     },
+     "soul": {
+      "length": 0.003,
+      "density": 0.45
+     },
+     "chin": {
+      "length": 0.012,
+      "density": 0.85,
+      "point": 0.12
+     },
+     "jaw": {
+      "length": 0.005,
+      "density": 0.4
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0.03
+     }
+    },
+    "referenceMask": "AzumaShiro"
+   },
+   "landmarks": {
+    "centerX": 0,
+    "glabella": [
+     0,
+     0.40972,
+     -0.1169
+    ],
+    "subnasale": [
+     0,
+     0.30972
+    ],
+    "stomion": [
+     0,
+     0.28992
+    ],
+    "menton": [
+     0,
+     0.25472,
+     -0.13491
+    ],
+    "ear": {
+     "yMin": 0.30589,
+     "yMax": 0.42001,
+     "zFront": 0.00102,
+     "zBack": 0.04678,
+     "halfWidth": 0.10482
+    }
+   },
+   "registration": {
+    "centerX": 0,
+    "reference": {
+     "centerX": 1024,
+     "browY": 548,
+     "noseY": 810,
+     "mouthY": 907,
+     "chinY": 1075,
+     "mouthHalfWidth": 135,
+     "faceHalfWidth": 365,
+     "skullTopY": 218,
+     "hairTopY": 202
+    },
+    "rows": [
+     {
+      "y": 0.48972,
+      "imageY": 218,
+      "innerX": 0.03,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     },
+     {
+      "y": 0.40972,
+      "imageY": 548,
+      "innerX": 0.03,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     },
+     {
+      "y": 0.30972,
+      "imageY": 810,
+      "innerX": 0.028999999999999998,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     },
+     {
+      "y": 0.28992,
+      "imageY": 907,
+      "innerX": 0.03,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     },
+     {
+      "y": 0.25472,
+      "imageY": 1075,
+      "innerX": 0.03,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     },
+     {
+      "y": 0.23272,
+      "imageY": 1200,
+      "innerX": 0.03,
+      "innerImageX": 135,
+      "outerX": 0.085,
+      "outerImageX": 365
+     }
+    ]
+   },
+   "faceCrop": [
+    520,
+    680,
+    1528,
+    1200
+   ]
+  },
+  "Interpreter": {
+   "source": "16_翻译/HairReference_20261112/Ref_Interpreter_HeadHair_1254_V1.png",
+   "sha256": "826170887f64da9892111abe44cc6d4c45f25209af3cc05f6957b190dd675fc2",
+   "baldSource": "16_翻译/Parts_V1_20261107/Ref_Interpreter_HeadBald_2K_V1.png",
+   "baldSha256": "6eee08c16918b781967c6b71b102afa5ef17901a0dcb75888101dc6aee5fa88a",
+   "observations": [
+    "参考三视图的黑色凌乱短发、额前碎发和略长的后脑；脸部保持净面"
+   ],
+   "hair": {
+    "name": "翻译：黑色凌乱短发与额前碎发",
+    "length": {
+     "top": 0.052,
+     "front": 0.065,
+     "side": 0.018,
+     "back": 0.028
+    },
+    "lengthJitter": 0.27,
+    "lift": {
+     "top": 0.62,
+     "side": 0.12,
+     "back": 0.18
+    },
+    "hairline": {
+     "front": 0.47,
+     "temple": 0.54,
+     "templeLow": 0.27,
+     "sideburn": 0.48,
+     "nape": 0.033,
+     "band": 0.006
+    },
+    "clump": 0.24,
+    "frizz": 0.32,
+    "volume": 0.002,
+    "curl": [0, 0],
+    "scalpTint": 0.82,
+    "color": {
+     "melanin": 0.96,
+     "redness": 0.06,
+     "gray": 0
+    },
+    "comb": {
+     "type": "whorl",
+     "whorl": [
+      0,
+      -0.022,
+      0.055
+     ],
+     "forward": 0.55
+    },
+    "strands": 52000,
+    "cards": {
+     "spacing": 0.008,
+     "width": 0.01,
+     "layers": 2,
+     "tile": "Wavy"
+    }
+   },
+   "beard": {
+    "name": "翻译：参考净面",
+    "enabled": false,
+    "points": 5,
+    "stubble": {
+     "density": 1,
+     "length": 0.0012,
+     "parts": []
+    },
+    "cards": {
+     "spacing": 0.0015,
+     "width": 0.0016,
+     "layers": 1,
+     "tile": "Stubble",
+     "alphaScale": 0.55,
+     "rootScale": 0.5
+    },
+    "lift": 0.3,
+    "stiffness": 0.75,
+    "frizz": 0.13,
+    "curl": [
+     0,
+     0
+    ],
+    "color": {
+     "melanin": 0.9,
+     "redness": 0.08,
+     "gray": 0
+    },
+    "referenceParts": {
+     "mustache": {
+      "length": 0.001,
+      "density": 0
+     },
+     "soul": {
+      "length": 0.001,
+      "density": 0
+     },
+     "chin": {
+      "length": 0.001,
+      "density": 0
+     },
+     "jaw": {
+      "length": 0.001,
+      "density": 0
+     },
+     "cheek": {
+      "length": 0.001,
+      "density": 0
+     }
+    },
+    "referenceMask": "Interpreter"
+   },
+   "landmarks": {
+    "centerX": 0,
+    "glabella": [
+     0,
+     0.28785,
+     -0.09945
+    ],
+    "subnasale": [
+     0,
+     0.2056
+    ],
+    "stomion": [
+     0,
+     0.18445
+    ],
+    "menton": [
+     0,
+     0.14685,
+     -0.10547
+    ],
+    "ear": {
+     "yMin": 0.21345,
+     "yMax": 0.2679,
+     "zFront": 0.02192,
+     "zBack": 0.05066,
+     "halfWidth": 0.0981
+    }
+   },
+   "registration": {
+    "centerX": 0,
+    "reference": {
+     "centerX": 1024,
+     "browY": 588,
+     "noseY": 965,
+     "mouthY": 1090,
+     "chinY": 1270,
+     "mouthHalfWidth": 145,
+     "faceHalfWidth": 420,
+     "skullTopY": 70,
+     "hairTopY": 35
+    },
+    "rows": [
+     {
+      "y": 0.38185,
+      "imageY": 70,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     },
+     {
+      "y": 0.28785,
+      "imageY": 588,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     },
+     {
+      "y": 0.2056,
+      "imageY": 965,
+      "innerX": 0.028999999999999998,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     },
+     {
+      "y": 0.18445,
+      "imageY": 1090,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     },
+     {
+      "y": 0.14685,
+      "imageY": 1270,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     },
+     {
+      "y": 0.12485000000000002,
+      "imageY": 1395,
+      "innerX": 0.03,
+      "innerImageX": 145,
+      "outerX": 0.085,
+      "outerImageX": 420
+     }
+    ]
+   },
+   "faceCrop": [
+    480,
+    720,
+    1568,
+    1380
    ]
   }
  }

@@ -10,7 +10,7 @@
 
 ## 角色配置
 
-`Data_XBotCharacters.mjs` 登记 `interpreter`，`XBOT_CAST_CHARACTERS.interpreter` 指向这套模型。场景现有的 `castId: "interpreter"` 和单位编号 `Interpreter` 使用该外观，沿用用户选定的光头。
+`Data_XBotCharacters.mjs` 登记 `interpreter`，`XBOT_CAST_CHARACTERS.interpreter` 指向这套模型。场景现有的 `castId: "interpreter"` 和单位编号 `Interpreter` 使用该外观。源模型继续保留剃净头部；运行时另挂 `Groom_Game_Interpreter.bin`，按本人三视图显示黑色凌乱短发和额前碎发，脸部保持净面。参考图与生成记录在角色 OneDrive 目录 `HairReference_20261112/`，配方和头部校准见[头发系统](Data_HairSystem.md)。
 
 动作预览入口为 `Tool_MixamoAnimationPreview.html?who=interpreter`。第一关场景摆放、预演和试玩共用该模型与动画适配。
 
@@ -31,4 +31,4 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=XBotCharactersTest,Interpreter
 
 ## 创作来源
 
-翻译的光头、脸型、灰黑便服、白色翻袖、裤腿和鞋子按用户采用的角色模型设计，属于本作创作外观。手腕轮廓、袖内衔接、骨架、蒙皮和动作适配属于游戏表现。
+翻译的脸型、短发、灰黑便服、白色翻袖、裤腿和鞋子按用户采用的角色模型与参考图设计，属于本作创作外观。源模型的剃净头供头发构建使用；手腕轮廓、袖内衔接、骨架、蒙皮和动作适配属于游戏表现。

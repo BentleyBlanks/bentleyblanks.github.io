@@ -48,7 +48,7 @@ try {
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
   });
   await page.goto(`${origin}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=interpreter`, { waitUntil: "load", timeout: 180000 });
-  await page.waitForFunction(() => window.__preview?.action && document.querySelector("#who")?.value === "interpreter", null, { timeout: 180000 });
+  await page.waitForFunction(() => window.__preview?.action && window.__preview?.hair?.asset.id === "Game_Interpreter" && document.querySelector("#who")?.value === "interpreter", null, { timeout: 180000 });
   const info = await page.evaluate(() => {
     const P = window.__preview, mesh = P.character.getObjectByProperty("isSkinnedMesh", true);
     const head = mesh.skeleton.getBoneByName("Head"), headIndex = mesh.skeleton.bones.indexOf(head);
@@ -70,7 +70,7 @@ try {
   // XBotCharactersTest checks every upper-head vertex. Follow the fully rigid
   // subset here without imposing another character's tessellation density.
   assert.ok(info.rigidHeadVertices > 0);
-  assert.equal(info.hair, false, "the downloaded bald appearance is selected");
+  assert.equal(info.hair, true, "the bald source model receives the interpreter's short-hair groom");
 
   for (const file of clips) {
     const result = await page.evaluate(async file => {

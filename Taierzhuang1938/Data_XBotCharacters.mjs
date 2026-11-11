@@ -42,9 +42,9 @@ export const XBOT_CHARACTERS = Object.freeze({
   // 谷寿夫 V4：用户下载的完整绑骨件，转换为共用骨架。
   taniHisao: Object.freeze({ name: "谷寿夫", file: "./Model/Character/Model_TaniHisao.glb", hipsScale: 0.9361, ownMaterial: true,
     report: "./Model/Character/Data_TaniHisao.json", groom: "./Hair/Grooms/Groom_Game_TaniHisao.bin" }),
-  // 东史郎 V12：用户下载的完整绑骨件，保留颈根和背部底色修复。
+  // 东史郎 V12：用户下载的完整绑骨件，保留颈根和背部底色修复；游戏毛发按钢盔下短发、唇须与下巴胡参考挂接。
   azumaShiro: Object.freeze({ name: "东史郎", file: "./Model/Character/Model_AzumaShiro.glb", hipsScale: 0.9684, heightM: 1.840000033378601, ownMaterial: true,
-    report: "./Model/Character/Data_AzumaShiro.json",
+    report: "./Model/Character/Data_AzumaShiro.json", groom: "./Hair/Grooms/Groom_Game_AzumaShiro.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_WalkWithRifle_V3.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_WalkWithRifle_V3.glb",
       "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_IdleCrouchingAiming_V1.glb",
@@ -70,9 +70,9 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_KneelingInspecting_V1.glb": "./Animation/Nier/Animation_Nier_KneelingInspecting_V1.glb",
       "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/Nier/Animation_Nier_SittingIdle_V2.glb",
     }) }),
-  // 翻译 V6：用户下载的绑骨件，保留光头和修复后的手腕比例。
+  // 翻译 V6：用户下载的绑骨件保留剃净源头与修复后的手腕比例；游戏里按三视图挂凌乱短发、保持净面。
   interpreter: Object.freeze({ name: "翻译", file: "./Model/Character/Model_Interpreter.glb", hipsScale: 1.0036, heightM: 1.9343339204788208, ownMaterial: true,
-    report: "./Model/Character/Data_Interpreter.json",
+    report: "./Model/Character/Data_Interpreter.json", groom: "./Hair/Grooms/Groom_Game_Interpreter.bin",
     clipOverrides: Object.freeze({
       "Derived/Animation_XBot_InterpreterFlee.glb": "./Animation/Interpreter/Animation_Interpreter_Flee.glb",
       "Derived/Animation_XBot_InterpreterShotStagger.glb": "./Animation/Interpreter/Animation_Interpreter_ShotStagger.glb",

@@ -987,6 +987,24 @@
    "row": "newCast",
    "label": "日军士兵C（个人参考）",
    "referenceLook": "SoldierC"
+  },
+  {
+   "id": "AzumaShiro_Cast",
+   "head": "AzumaShiro",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "row": "newCast",
+   "label": "东史郎（个人参考）：钢盔下短发、唇须和短下巴胡",
+   "referenceLook": "AzumaShiro"
+  },
+  {
+   "id": "Interpreter_Cast",
+   "head": "Interpreter",
+   "hair": "Messy",
+   "beard": null,
+   "row": "newCast",
+   "label": "翻译（个人参考）：凌乱短发、净面",
+   "referenceLook": "Interpreter"
   }
  ],
  "gameGrooms": [
@@ -1131,6 +1149,27 @@
    "hairRootFit": "hatSeam",
    "label": "日军士兵C（游戏挂接）",
    "referenceLook": "SoldierC"
+  },
+  {
+   "id": "Game_AzumaShiro",
+   "model": "Model/Character/Model_AzumaShiro.glb",
+   "head": "AzumaShiro",
+   "labHead": "AzumaShiro",
+   "hair": "Crew",
+   "beard": "BoxedShort",
+   "hairRootFit": "hatSeam",
+   "label": "东史郎（游戏挂接）：钢盔下短发、唇须和短下巴胡",
+   "referenceLook": "AzumaShiro"
+  },
+  {
+   "id": "Game_Interpreter",
+   "model": "Model/Character/Model_Interpreter.glb",
+   "head": "Interpreter",
+   "labHead": "Interpreter",
+   "hair": "Messy",
+   "beard": null,
+   "label": "翻译（游戏挂接）：凌乱短发、净面",
+   "referenceLook": "Interpreter"
   }
  ]
 }
