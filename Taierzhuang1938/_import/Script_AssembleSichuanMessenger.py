@@ -9,6 +9,7 @@ import json
 import math
 from pathlib import Path
 from mathutils import Matrix, Vector
+import numpy as np
 
 source_dir = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
 project_dir = Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerPartsMerge_20261111')
@@ -79,17 +80,25 @@ for vertex in body.data.vertices:
     p.y = (p.y + math.copysign(arm_extra, p.y)) * body_scale
     p.x *= body_scale
     p.z = p.z * body_scale + 0.38
+    # The reference's standing rear collar meets the nape well above the
+    # front lapels. Lift only the fabric around the back of the neck.
+    neck_weight = max(0.0, min(1.0, (0.18 - abs(p.y)) / 0.08))
+    back_weight = max(0.0, min(1.0, (0.10 - p.x) / 0.20))
+    upper_weight = max(0.0, min(1.0, (p.z - 1.42) / 0.11))
+    p.z += 0.05 * neck_weight * back_weight * upper_weight
 body.data.update()
 body_min, body_max = bounds(body)
 
 head = duplicate(parts['HeadBald'], 'Part_HeadBald')
 head_scale = 0.38
-head_shift_z = 1.78 - 0.9791518449783325 * head_scale
+head_scale_z = 0.32
+# Preserve the chin height while shortening the generated head toward its crown.
+head_shift_z = 1.4079222989082336 + (head_scale - head_scale_z) * 0.33
 for vertex in head.data.vertices:
     p = vertex.co
     p.x *= head_scale
     p.y *= head_scale
-    p.z = p.z * head_scale + head_shift_z
+    p.z = p.z * head_scale_z + head_shift_z
     # The generated bust has broad shoulders. Only the neck goes through the collar.
     weight = max(0.0, min(1.0, (1.61 - p.z) / 0.09))
     radius = math.hypot(p.x / 0.075, p.y / 0.075)
@@ -99,25 +108,77 @@ for vertex in head.data.vertices:
         p.y *= factor
 head.data.update()
 
+hair = duplicate(head, 'Part_HairShort')
+hair_mesh = bmesh.new()
+hair_mesh.from_mesh(hair.data)
+excluded = []
+for face in hair_mesh.faces:
+    point = face.calc_center_median()
+    hairline_x = min(0.035, -0.045 + 0.65 * (point.z - 1.575))
+    if point.z < 1.575 or point.x > hairline_x:
+        excluded.append(face)
+bmesh.ops.delete(hair_mesh, geom=excluded, context='FACES')
+unused = [vertex for vertex in hair_mesh.verts if not vertex.link_faces]
+if unused:
+    bmesh.ops.delete(hair_mesh, geom=unused, context='VERTS')
+hair_mesh.to_mesh(hair.data)
+hair_mesh.free()
+hair.data.update()
+assert len(hair.data.polygons) > 100
+for vertex in hair.data.vertices:
+    vertex.co += vertex.normal * 0.0008
+hair_material = bpy.data.materials.new('Material_SichuanMessenger_ShortHair')
+hair_material.use_nodes = True
+hair_shader = hair_material.node_tree.nodes.get('Principled BSDF')
+hair_shader.inputs['Roughness'].default_value = 0.92
+noise = np.random.default_rng(1938)
+size = 512
+strand_values = noise.uniform(0.012, 0.045, size)
+grain = noise.uniform(-0.008, 0.008, (size, size))
+shade = np.clip(strand_values[None, :] + grain, 0.005, 0.065)
+pixels = np.empty((size, size, 4), dtype=np.float32)
+pixels[:, :, 0] = shade
+pixels[:, :, 1] = shade * 0.91
+pixels[:, :, 2] = shade * 0.78
+pixels[:, :, 3] = 1.0
+hair_texture = bpy.data.images.new('Texture_SichuanMessenger_ShortHair', width=size, height=size, alpha=True)
+hair_texture.pixels.foreach_set(pixels.ravel())
+hair_texture.pack()
+hair_node = hair_material.node_tree.nodes.new('ShaderNodeTexImage')
+hair_node.name = 'Image_ShortHair'
+hair_node.image = hair_texture
+hair_material.node_tree.links.new(hair_node.outputs['Color'], hair_shader.inputs['Base Color'])
+hair.data.materials.clear()
+hair.data.materials.append(hair_material)
+
 cap = duplicate(parts['FieldCap'], 'Part_FieldCap')
 for vertex in cap.data.vertices:
     p = vertex.co
-    p.x = p.x * 0.29 + 0.01
-    p.y *= 0.29
-    p.z = p.z * 0.19 + 1.705
+    p.x = p.x * 0.27 + 0.023
+    p.y *= 0.24
+    p.z = p.z * 0.21 + 1.650
+    # Keep the front brim above the brows while lowering the rear hem.
+    p.z += 0.13 * (p.x - 0.155)
 cap.data.update()
 
 hand_source = parts['LeftHand']
 hand = duplicate(hand_source, 'Part_Hand_L')
-hand_rotation = Matrix.Rotation(math.radians(135), 3, 'Y')
+# The Tripo front view shows the back of this hand. The -45 degree roll puts
+# that surface upward, leaving the palm facing down as in the T-pose reference.
+hand_rotation = Matrix.Rotation(math.radians(-45), 3, 'Y')
 raw_hand = [hand_rotation @ v.co for v in hand.data.vertices]
 wrist_candidates = [p for p in raw_hand if p.y < min(q.y for q in raw_hand) + 0.08]
 wrist = sum(wrist_candidates, Vector()) / len(wrist_candidates)
-hand_scale = 0.225
+hand_scale = 0.195
 cuff = [p for p in coords(body) if p.y > body_max[1] - 0.025]
 cuff_center = sum(cuff, Vector()) / len(cuff)
 hand_target = Vector((cuff_center.x, body_max[1] - 0.018, cuff_center.z))
 for vertex, rotated in zip(hand.data.vertices, raw_hand):
+    axial = max(0.0, rotated.y - wrist.y)
+    palm_weight = min(1.0, axial / 0.25)
+    finger_weight = max(0.0, min(1.0, (axial - 0.25) / 0.60))
+    lateral_factor = 1.0 - 0.20 * palm_weight - 0.40 * finger_weight
+    rotated.x = wrist.x + (rotated.x - wrist.x) * lateral_factor
     vertex.co = (rotated - wrist) * hand_scale + hand_target
 hand.data.update()
 
@@ -188,22 +249,23 @@ scene.camera = cam
 cam_data.type = 'ORTHO'
 cam_data.ortho_scale = 2.08
 center = Vector((0, 0, 0.93))
-for name, loc in [('Front', (3.6, 0, 1.02)), ('Side', (0, -3.6, 1.02)), ('Back', (-3.6, 0, 1.02))]:
+for name, loc in [('Front', (3.6, 0, 1.02)), ('LeftSide', (0, 3.6, 1.02)), ('Back', (-3.6, 0, 1.02))]:
     cam.location = loc
     cam.rotation_euler = (center - cam.location).to_track_quat('-Z', 'Y').to_euler()
-    scene.render.filepath = str(review_dir / f'Preview_SichuanMessenger_{name}.png')
+    scene.render.filepath = str(review_dir / f'Preview_SichuanMessenger_V5_{name}.png')
     bpy.ops.render.render(write_still=True)
 
-report = {'bodyScale': body_scale, 'headScale': head_scale, 'headShiftZ': head_shift_z,
+report = {'bodyScale': body_scale, 'headScale': head_scale, 'headScaleZ': head_scale_z,
+          'headShiftZ': head_shift_z,
           'handScale': hand_scale, 'footScale': list(foot_scale),
           'parts': {o.name: {'bounds': bounds(o), 'vertices': len(o.data.vertices),
                              'triangles': sum(len(p.vertices)-2 for p in o.data.polygons)}
                     for o in assembly.objects}}
-(project_dir / 'Data_SichuanMessengerAssembly.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+(project_dir / 'Data_SichuanMessengerAssembly_V5.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 bpy.ops.file.pack_all()
-bpy.ops.wm.save_as_mainfile(filepath=str(project_dir / 'Scene_SichuanMessenger.blend'), compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(project_dir / 'Scene_SichuanMessenger_V5.blend'), compress=True)
 
-# Keep the editable seven pieces in the source scene; join only a temporary
+# Keep the editable assembly pieces in the source scene; join only a temporary
 # duplicate for file export. Material slots remain separate at full resolution.
 for obj in bpy.context.selected_objects:
     obj.select_set(False)
@@ -221,9 +283,9 @@ bpy.ops.object.join()
 export_mesh = bpy.context.view_layer.objects.active
 export_mesh.name = 'Model_SichuanMessenger_Merged'
 export_mesh.data.name = 'Mesh_SichuanMessenger_Merged'
-bpy.ops.export_scene.gltf(filepath=str(source_dir / 'Model_SichuanMessenger_Merged_V1.glb'),
+bpy.ops.export_scene.gltf(filepath=str(source_dir / 'Model_SichuanMessenger_Merged_V5.glb'),
                           export_format='GLB', use_selection=True, export_apply=True)
-bpy.ops.export_scene.fbx(filepath=str(source_dir / 'Model_SichuanMessenger_Merged_V1.fbx'),
+bpy.ops.export_scene.fbx(filepath=str(source_dir / 'Model_SichuanMessenger_Merged_V5.fbx'),
                          use_selection=True, path_mode='COPY', embed_textures=True,
                          apply_unit_scale=True, add_leaf_bones=False)
 print('Exported', export_mesh.name, 'triangles', sum(len(p.vertices)-2 for p in export_mesh.data.polygons))
