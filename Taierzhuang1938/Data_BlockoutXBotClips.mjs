@@ -177,4 +177,4 @@ export const XBOT_CHARACTER_LOOKS = Object.freeze({
 });
 
 /** 没有 castId 的有名字角色：单位 id → XBOT_CHARACTER_LOOKS 的键。 */
-export const XBOT_CHARACTER_UNITS = Object.freeze({ Shunzi: "shunzi", Geng: "geng", Nier: "nier", Yaowa: "yaowa", TaniHisao: "taniHisao", AzumaShiro: "azumaShiro", LiuWencai: "liuwencai", nier: "nier", GengNier: "nier" });
+export const XBOT_CHARACTER_UNITS = Object.freeze({ Shunzi: "shunzi", Geng: "geng", Nier: "nier", Yaowa: "yaowa", TaniHisao: "taniHisao", AzumaShiro: "azumaShiro", LiuWencai: "liuwencai", Interpreter: "interpreter", nier: "nier", GengNier: "nier" });

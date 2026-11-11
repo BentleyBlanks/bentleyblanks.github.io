@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeInterpreterContacts.mjs",
+  "character": "interpreter",
+  "model": {
+    "file": "Model/Character/Model_Interpreter.glb",
+    "sha256": "3402933d5b9a15186ca9828932e415ac3f51e907f3cd446d3879d4fd382b9b28"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Derived/Animation_XBot_InterpreterFlee.glb",
+        "sha256": "809b350be8d564156ed984394bb108aebc21774ac1573b007719d02540d9effc"
+      },
+      "output": {
+        "file": "Animation/Interpreter/Animation_Interpreter_Flee.glb",
+        "sha256": "ad414c2d077da75b00995c82ecbf6897abee24ff73124f88afa6559e900f8b13"
+      },
+      "frames": 97,
+      "duration": 1.600000023841858,
+      "minBefore": -0.04470228196722321,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.04670228196722321
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Derived/Animation_XBot_InterpreterShotStagger.glb",
+        "sha256": "5d008b3f998998ca0a6332fc0d0b4c8a0e66c9b734087f855a53d51e576b0b6c"
+      },
+      "output": {
+        "file": "Animation/Interpreter/Animation_Interpreter_ShotStagger.glb",
+        "sha256": "a0cf4de9a3f3fafb26063632b23735c1833b49d5e0881d9d61ab5b8419b5cdb2"
+      },
+      "frames": 181,
+      "duration": 3,
+      "minBefore": -0.0527602979550466,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.054760297955046604
+    }
+  ]
+}

@@ -72,6 +72,11 @@ assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登
 assert.equal(XBOT_CAST_CHARACTERS.liuwencai, "liuWencai", "刘文财使用已登记的专属外观");
 assert.equal(XBotLook({ faction: "nra", castId: "liuwencai", unitId: "Companion" }).key, "liuwencai");
 assert.equal(XBotLook({ faction: "nra", unitId: "LiuWencai" }).key, "liuwencai");
+assert.equal(XBOT_CAST_CHARACTERS.interpreter, "interpreter", "翻译使用V6专属外观");
+assert.equal(XBotLook({ faction: "nra", castId: "interpreter" }).key, "interpreter");
+assert.equal(XBotLook({ faction: "nra", unitId: "Interpreter" }).key, "interpreter");
+assert.ok(!Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys).includes("interpreter"), "翻译由命名角色映射选择");
+assert.equal(XBOT_CHARACTERS.interpreter.groom, undefined, "翻译沿用用户选择的光头");
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
 assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
@@ -173,9 +178,17 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
   assert.ok(rigidHeadVertices > 0, `${key}: upper head and cap weights were checked`);
   for (const [original, replacement] of Object.entries(def.clipOverrides || {})) {
     assert.ok(fs.existsSync(path.join(here,"Animation/Mixamo",original)), `${key}: 专用动作保留原件`);
+    const source = ReadGlb(path.join(here, "Animation/Mixamo", original));
     const own=ReadGlb(path.join(here,replacement));
     assert.equal(own.doc.animations.length,1,`${key}: 专用动作能解析`);
-    assert.ok(own.doc.animations[0].channels.length>=65,`${key}: 专用动作保留完整身体曲线`);
+    const rotations = new Set(own.doc.animations[0].channels.filter(channel => channel.target.path === "rotation")
+      .map(channel => own.doc.nodes[channel.target.node].name));
+    for (const channel of source.doc.animations[0].channels) {
+      const name = source.doc.nodes[channel.target.node].name;
+      if (channel.target.path === "rotation" && names.includes(name)) {
+        assert.ok(rotations.has(name), `${key}: 专用动作保留 ${name} 的身体曲线`);
+      }
+    }
   }
 }
 
@@ -186,7 +199,7 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro"]) {
+for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro", "Interpreter"]) {
   const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
   for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
     assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,

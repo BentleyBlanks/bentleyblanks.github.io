@@ -740,8 +740,8 @@ Check(yaowaReport.facing.sourceForward === "+Z" && yaowaReport.facing.actorForwa
   "幺娃沿用X Bot源+Z至角色-Z的共用桥接");
 Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
   "幺娃保留V6的1.615米帽顶高度");
-{
-  const file = path.join(projectDir, "Model/Character/Model_LiuWencai.glb");
+for (const [id, name] of [["LiuWencai", "刘文财"], ["Interpreter", "翻译"]]) {
+  const file = path.join(projectDir, `Model/Character/Model_${id}.glb`);
   const model = LoadGlb(file), doc = model.json;
   const mesh = doc.nodes.find(node => node.mesh === 0);
   const cloud = RiggedGlbPoints(file, mesh.name);
@@ -753,11 +753,11 @@ Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
   const ankleZ = (footZ[0] + footZ[1]) / 2;
   const toeReach = Math.max(...soles.map(point => point[2])) - ankleZ;
   const heelReach = ankleZ - Math.min(...soles.map(point => point[2]));
-  const facing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_LiuWencai.json"))).facing;
+  const facing = JSON.parse(fs.readFileSync(path.join(projectDir, `Model/Character/Data_${id}.json`))).facing;
   Check(soles.length > 100 && toeReach > heelReach + .03,
-    "刘文财草鞋顶点云相对踝骨向源+Z伸出", JSON.stringify({ toeReach, heelReach, ankleZ }));
+    `${name}鞋子顶点云相对踝骨向源+Z伸出`, JSON.stringify({ toeReach, heelReach, ankleZ }));
   Check(facing.sourceForward === "+Z" && facing.actorForward === "-Z",
-    "刘文财使用共用源+Z至角色-Z桥接");
+    `${name}使用共用源+Z至角色-Z桥接`);
 }
 
 const nierFile = path.join(projectDir, "Model/Character/Model_Nier.glb");

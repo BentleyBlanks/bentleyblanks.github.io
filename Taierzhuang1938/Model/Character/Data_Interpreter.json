@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "built": "2026-11-11",
+  "script": "_import/Script_BuildInterpreter.mjs",
+  "source": {
+    "file": "Model_Interpreter_Merged_V6_Bones.glb",
+    "bytes": 34834392,
+    "sha256": "3e4c368dd64eef25ed3515b0a4376f222c2f44e2542672a7fc854a55ae8e7bac",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_Interpreter.glb",
+    "bytes": 7184084,
+    "sha256": "3402933d5b9a15186ca9828932e415ac3f51e907f3cd446d3879d4fd382b9b28"
+  },
+  "scale": 1.934334,
+  "crownM": 1.9343339204788208,
+  "triangles": 36874,
+  "vertices": 35288,
+  "sourceVertices": 35288,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 3349,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 1.0465,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 1.0036,
+  "headY": 1.7265,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 16461061,
+      "bytes": 2472376
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 6768038,
+      "bytes": 731098
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 9159191,
+      "bytes": 1678256
+    }
+  ],
+  "input": {
+    "file": "Model_Interpreter_Merged_V6_Bones.glb",
+    "joints": 55
+  },
+  "reconstructionScope": [
+    "翻译的光头、脸型、灰黑便服、白色翻袖、裤腿和鞋子按用户采用的角色模型设计，属于本作创作外观。",
+    "V6 手腕轮廓、袖内衔接、骨架转换、头部权重与动画适配属于建模和游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}
