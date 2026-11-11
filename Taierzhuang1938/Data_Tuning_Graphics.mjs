@@ -133,6 +133,8 @@
  *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
  *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
  *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
+ *   stunTrail     近爆眩晕的拖影（Script_PostStunTrail：composite 之后的帧反馈，两张输出分辨率 HalfFloat 靶懒建；
+ *                 还要 options.stunTrail > 0 且没开 reduced-motion 才真跑，平时不占显存与时间）
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
 
@@ -212,6 +214,7 @@ export const QUALITY_PRESETS = {
     pom: 0, pomRefine: 0, pomSelfShadow: false, detailNormal: false,
     microShadow: true, horizonOcclusion: true, skinSss: false,
     materialTexture: 256,
+    stunTrail: true,
   },
   medium: {
     ...RESERVED_OFF,
@@ -231,6 +234,7 @@ export const QUALITY_PRESETS = {
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
+    stunTrail: true,
     // 2026-09-08 分档定稿复核：**保持 0.75**。试过 0.70，但这一轮的实测说明
     // 3394×1348 下整帧根本不是像素受限（见 docs §17.2 的分档表：四档的下界都压在
     // 同一个 ~11.4 ms 上，而 CPU 提交是 12–16 ms），压内部分辨率买不到时间、
@@ -259,6 +263,7 @@ export const QUALITY_PRESETS = {
     pom: 16, pomRefine: 5, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
+    stunTrail: true,
     // 0.8 是实测背书的（省 24.2% GPU，见上面 renderScale 那一条），不是拍的
     taaUpscale: true, renderScale: 0.8,
     motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
@@ -282,6 +287,7 @@ export const QUALITY_PRESETS = {
     pom: 32, pomRefine: 6, pomSelfShadow: true, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 1024,
+    stunTrail: true,
     // ultra 是「内部 = 输出」，TAA 退回纯抗锯齿（TAAU 的上采样部分不生效，
     // 因为两组尺寸相等）。留 taaUpscale: true 是为了玩家手动下调分辨率时它照样接上。
     taaUpscale: true, renderScale: 1.0,

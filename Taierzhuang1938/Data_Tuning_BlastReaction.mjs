@@ -28,6 +28,7 @@
  *   daze    174–194：四米内才会发懵、视线发糊
  *   tremor  168–188：手抖（肾上腺素）
  *   body    166–186：之后喘粗气、听得见自己心跳
+ *   stun    163–187（^1.15）：近爆眩晕的画面（色散 / 拖影 / 重影 / 发灰，BLAST_STUN）；与耳鸣同一出闸量级，手榴弹 20 m 起、5 m 约 0.54、2 m 近满
  */
 export const BLAST_EXPOSURE = Object.freeze({
   ambientKPa: 101.325,
@@ -51,6 +52,7 @@ export const BLAST_EXPOSURE = Object.freeze({
     daze: Object.freeze([174, 194, 1.2]),
     tremor: Object.freeze([168, 188, 1.0]),
     body: Object.freeze([166, 186, 1.0]),
+    stun: Object.freeze([163, 187, 1.15]),
   }),
   /** 声速（米 / 秒）：反应从冲击波到人那一刻算起（看见火光在先，挨那一下在后）。 */
   soundSpeedMps: 343,
@@ -175,6 +177,34 @@ export const BLAST_FLINCH = Object.freeze({
    *   pupilDim  眼皮盖住瞳孔、进眼的光整体少了多少（× 闭合程度）
    */
   lidEdge: Object.freeze({ feather: 0.36, pupilDim: 0.55 }),
+});
+
+/**
+ * 近爆眩晕的画面（Script_BlastStun，全关卡常开，不看 flinch 开没开；2026-11-11 用户：「被炸弹 / 手榴弹震到后画面眩晕、
+ * 边缘色散、拖影一段时间，严重程度按震的程度 / 威力决定，声音也跟着」）。
+ *
+ * 做法参照 COD「shellshock」的帧反馈拖影 + 重影、战地一近爆的边缘色差 + 径向糊 + 听觉闷；数是本项目调的手感，不是复刻任何一款的参数。
+ * 强度 s 来自 BLAST_EXPOSURE.windows.stun（0..1，按装药 / 距离 / 遮挡）。每发是一个事件：冲击到人才开始，
+ * attackS 内涨到 s，停 holdMinS + holdSpanS·s，再按时间常数 decayMinS + decaySpanS·s 指数退；多发取最大再加其余的 stackShare，封顶 1。
+ * 各通道按总强度 level 出值：
+ *   chroma  边缘色散，加在合成的 uAberration 基准（0.0022）上，level^curve
+ *   trail   拖影 = 合成之后的帧反馈（Script_PostStunTrail）：历史权重 exp(−dt / tauS)，tauS = tau·level^curve，
+ *           上限 maxFeedback，画面中心保留 centerKeep 份清楚（便于瞄准）；level 低于 minLevel 不跑
+ *   double  并进「中弹重影」（摆动双影）
+ *   haze    并进后期合成的恍惚通道（amount 发灰 / 暗角，focus 发糊 / 静态重影）
+ *   sway    相机的慢晃（弧度），不动 yaw / pitch 本体，只叠在渲染相机上；reduced-motion 时为 0
+ *   audio   并进 Script_Audio.SetHitDisorientation（闷 + 压低），与耳鸣低通是两套串联的节点
+ */
+export const BLAST_STUN = Object.freeze({
+  attackS: 0.08, holdMinS: 0.3, holdSpanS: 1.2,
+  decayMinS: 0.6, decaySpanS: 2.6,
+  stackShare: 0.35, maxEvents: 6, minStrength: 0.03,
+  chroma: Object.freeze({ max: 0.022, curve: 0.8 }),
+  trail: Object.freeze({ tauS: 0.10, curve: 0.7, maxFeedback: 0.9, centerKeep: 0.6, minLevel: 0.02 }),
+  double: Object.freeze({ scale: 1.0 }),
+  haze: Object.freeze({ amount: 0.6, focus: 0.85 }),
+  sway: Object.freeze({ rollRad: 0.045, pitchRad: 0.02, yawRad: 0.025, hz: 0.45 }),
+  audio: Object.freeze({ scale: 0.8, max: 0.7 }),
 });
 
 /**

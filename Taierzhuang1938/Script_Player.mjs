@@ -31,6 +31,7 @@ import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { RecoilAfterInput } from "./Script_FirearmActions.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
 import { BlastFlinch } from "./Script_BlastFlinch.mjs";
+import { BlastStun } from "./Script_BlastStun.mjs";
 import { BlockPlayerStep, PLAYER_ACTOR_BLOCK } from "./Script_PlayerActorBlock.mjs";
 import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
 import { CROWD } from "./Data_Tuning_Ai.mjs";
@@ -186,6 +187,10 @@ export class PlayerController {
     // 默认关（enabled = false 时 Blast 什么都不做）；开了 phase.blastReaction 的关卡由装配层打开。
     // 相机那几项叠在震屏之后，同样不改 yaw/pitch 本体。
     this.flinch = new BlastFlinch();
+    // 近爆眩晕的画面（Script_BlastStun：色散 / 拖影 / 重影 / 发灰 / 相机慢晃）：全关卡常开，不看 flinch 开没开；
+    // 画面通道由 Script_Main 读，相机慢晃在 SyncCamera 叠。prefers-reduced-motion 时慢晃为 0（画面通道在合成里自己收）。
+    this.stun = new BlastStun();
+    this.stun.calm = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     // 冲击波推人（Script_PlayerKnockback，2026-10-28）：推一把 / 倒地 / 掀飞 / 滑 / 躺 / 爬起来。
     // 推力由 Combat.Blast 经 BlastKnockback 交进来（Script_BlastKnockback 算 Δv 与分档）。
     // knockGate：装配层的闸，返回 false 时只晃不倒（过场、白刃、抬东西）；onKnockDown：真要倒下的那一刻（机枪位先把人放下来）。
@@ -318,6 +323,7 @@ export class PlayerController {
     this.jump.runK = 0;
     this.shake.Reset();
     this.flinch.Reset();
+    this.stun.Reset();
     // 被冲击波掀倒时眼高跟着身体矮到贴地；重生直接站好，不从躺着的高度慢慢升起来
     if (this.knock.Active) { this.eyeHeight = STANCE.stand.eye; this.radius = STANCE.stand.radius; }
     this.knock.Reset();
@@ -964,6 +970,7 @@ export class PlayerController {
     // --- 脚步 / 晃动 --------------------------------------------------------
     this.shake.Update(dt);
     this.flinch.Update(dt);
+    this.stun.Update(dt);
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
     // 被掀倒在地上滑的那一段不是在走路：不攒步距（不然滑出去一路都是脚步声）
     if (!this.knock.Active) this.stepDistance += planar * dt;
@@ -1340,14 +1347,22 @@ export class PlayerController {
       cam.rotation.y += fl.yaw;
       cam.rotation.z += fl.roll;
     }
+    // 近爆眩晕的相机慢晃（Script_BlastStun）：叠在最后，同样不改 yaw/pitch 本体。
+    const st = this.stun;
+    if (st.Active) {
+      cam.rotation.x += st.pitch;
+      cam.rotation.y += st.yaw;
+      cam.rotation.z += st.roll;
+    }
   }
 
   /**
    * 一发近爆的身体反应（Combat.BlastFeedback 调；exposure / bearing 见 Script_BlastExposure）。
-   * 反应关着、人死了时什么都不做。返回登记的事件（取证用），没反应返回 null。
+   * 身体反应关着、人死了时什么都不做（眩晕画面不看开关，人活着就登记）。返回登记的事件（取证用），没反应返回 null。
    */
   BlastReaction(exposure, bearing) {
     if (!this.alive) return null;
+    this.stun.Blast(exposure);
     const flash = bearing?.at && this.flinch.enabled ? this._FlashOnScreen(bearing.at, exposure) : null;
     return this.flinch.Blast(exposure, flash ? { ...bearing, flash } : bearing);
   }

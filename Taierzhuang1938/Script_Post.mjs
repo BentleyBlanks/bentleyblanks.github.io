@@ -97,6 +97,7 @@ import { LensFlarePass } from "./Script_PostLensFlare.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
 import { LutCheckView } from "./Script_PostGrade.mjs";
 import { FxaaPass } from "./Script_PostFxaa.mjs";
+import { StunTrailPass } from "./Script_PostStunTrail.mjs";
 import { DebugPass, InjectDepthPull, SHADING_MODES, WIRE_BACKGROUND_PURE } from "./Script_PostDebug.mjs";
 import { AtmospherePass } from "./Script_Atmosphere.mjs";
 
@@ -134,7 +135,7 @@ export { POST_QUALITY_KEYS };
  * 但它帧内读的是 `ctx.sceneColor` 的纹素 —— 也是输出域。
  */
 const OUTPUT_DOMAIN_PASSES = new Set([
-  "taa", "motionBlur", "dof", "bloom", "god", "lensFlare", "composite", "fxaa",
+  "taa", "motionBlur", "dof", "bloom", "god", "lensFlare", "composite", "stunTrail", "fxaa",
 ]);
 
 export class PostPipeline {
@@ -245,6 +246,7 @@ export class PostPipeline {
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
     this.lensFlarePass = new LensFlarePass(this, this.bloomPass);
     this.compositePass = new CompositePass(this);
+    this.stunTrailPass = new StunTrailPass(this);
     this.fxaaPass = new FxaaPass(this);
     this.debugPass = new DebugPass(this);
     // 物理大气（子系统 B4）：每帧刷天空视图与大气透视两张 LUT。
@@ -360,6 +362,8 @@ export class PostPipeline {
       // 镜头光晕读的是泛光那一趟提取好的亮部图，所以只能排在它后面
       this.lensFlarePass,
       this.compositePass,
+      // 近爆眩晕的拖影（帧反馈）：读 composite 的靶，跑的时候把 targets.ldr 改指到自己的输出，fxaa 读它。
+      this.stunTrailPass,
       this.fxaaPass,
     ];
 

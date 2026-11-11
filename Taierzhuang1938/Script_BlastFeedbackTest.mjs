@@ -13,9 +13,10 @@ let browser;
 try {
   await fs.mkdir(output, {recursive:true});
   browser = await LaunchBrowser();
-  const page = await browser.newPage({viewport:{width:1280,height:720}});
+  const page = await browser.newPage({viewport:{width:640,height:360}});
   const errors = [];
   page.on("pageerror", error => errors.push(String(error)));
+  page.on("console", message => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
   const base = process.env.BLAST_PREVIEW || `http://127.0.0.1:${server.address().port}`;
   await page.goto(`${base}/Taierzhuang1938/?explosions=1&shot=1&manual=1&quality=medium`,
     {waitUntil:"domcontentloaded",timeout:180000});
@@ -63,6 +64,63 @@ try {
     cases.push(result);
   }
   await page.screenshot({path:path.join(output,"Recovered.png")});
+  // Blast stun (Script_BlastStun): always on in the campaign build (flinch is off here), driven by the same BlastFeedback entry.
+  const stunProbe = () => {
+    const t = window.Tengxian, post = t.post, U = post.compositePass.uniforms;
+    const trail = post.stunTrailPass;
+    return {level:t.player.stun.level, aberration:U.uAberration.value, trailRan:post.lastRenderedPasses.includes("stunTrail"),
+      ldrIsTrail:!!trail.Target && post.targets.ldr === trail.Target, ldrIsComposite:post.targets.ldr === post.compositePass.target,
+      hit:U.uHitDisorientation.value, chromaKeep:U.uChromaKeep.value, audio:t.audio.hitDisorientation, stun:t.player.stun.State()};
+  };
+  const runStun = async (distance, seconds, turn) => {
+    for (let i = 0; i < Math.round(seconds*60); i++) {
+      await page.evaluate(turn => { const t = window.Tengxian; t.player.yaw += turn; t.StepFrames(1,1/60,true); }, turn);
+    }
+  };
+  const stunCase = async (label, distance, shots) => {
+    await page.evaluate(distance => {
+      const t = window.Tengxian, p = t.player;
+      p.shake.Reset(); p.stun.Reset(); t.audio.ResetDeafen(); p.yaw = Math.PI * .5;
+      t.StepFrames(2,1/60,true);
+      const at = p.position.clone(); at.x += distance; at.y += 0.2;
+      t.combat.Detonate({position:at,kind:"Grenade",owner:"player",weapon:{radiusM:6.5,damage:0}});
+    }, distance);
+    await runStun(distance, .4, .012);
+    const peak = await page.evaluate(stunProbe);
+    await page.screenshot({path:path.join(output,`Stun_${label}_Peak.png`)});
+    let later = null;
+    if (shots) {
+      await runStun(distance, 1.6, .004);
+      later = await page.evaluate(stunProbe);
+      await page.screenshot({path:path.join(output,`Stun_${label}_2s.png`)});
+    }
+    return {peak, later};
+  };
+  await page.evaluate(() => { const t = window.Tengxian; t.player.stun.Reset(); t.player.yaw = Math.PI * .5; t.StepFrames(3,1/60,true); });
+  const baseAberration = (await page.evaluate(stunProbe)).aberration;
+  await page.screenshot({path:path.join(output,"Stun_Before.png")});
+  const stunNear = await stunCase("Near", 3, true);
+  assert.ok(stunNear.peak.level > .5, `3 m grenade stun level ${stunNear.peak.level}`);
+  assert.ok(stunNear.peak.aberration > baseAberration, "post chromatic aberration lifted above base");
+  assert.ok(stunNear.peak.trailRan && stunNear.peak.ldrIsTrail, "stunTrail pass runs and owns targets.ldr");
+  assert.ok(stunNear.peak.chromaKeep > 0, "uChromaKeep lifted while stunned");
+  assert.ok(stunNear.peak.hit > .3 && stunNear.peak.audio > .3, "double image and audio dizziness follow the stun");
+  assert.ok(stunNear.later.level < stunNear.peak.level, "stun decays");
+  const stunFar = await stunCase("Far", 12, false);
+  assert.ok(stunFar.peak.level > 0 && stunFar.peak.level < .3, `12 m grenade stun level ${stunFar.peak.level}`);
+  await page.evaluate(() => window.Tengxian.player.stun.Reset());
+  await page.evaluate(() => window.Tengxian.StepFrames(2,1/60,true));
+  await page.evaluate(() => { const t = window.Tengxian, p = t.player; p.stun.Reset(); const at = p.position.clone(); at.x += 3; at.y += .2;
+    t.combat.Detonate({position:at,kind:"Grenade",owner:"player",weapon:{radiusM:6.5,damage:0}}); });
+  let waited = 0;
+  while (waited < 20 && (await page.evaluate(() => window.Tengxian.player.stun.Active))) {
+    await page.evaluate(() => window.Tengxian.StepFrames(30,1/60,true)); waited += .5;
+  }
+  await page.evaluate(() => window.Tengxian.StepFrames(3,1/60,true));
+  const stunDone = await page.evaluate(stunProbe);
+  assert.equal(stunDone.level, 0); assert.equal(stunDone.chromaKeep, 0); assert.equal(stunDone.aberration, baseAberration);
+  assert.ok(!stunDone.trailRan && stunDone.ldrIsComposite, "pass idle, targets.ldr back on the composite target");
+  await page.screenshot({path:path.join(output,"Stun_Recovered.png")});
   // Real AudioNodes: a barrage refreshes one oscillator; user volume and reset own it.
   const repeated = await page.evaluate(async () => {
     const a = window.Tengxian.audio;
@@ -132,10 +190,10 @@ try {
   assert.ok(dsp.audible.recovered > .06, "hearing recovers");
   assert.ok(dsp.muted.ring < .001, "ringing respects master mute");
   assert.deepEqual(errors,[]);
-  const report={cases,repeated,dsp};
+  const report={cases,repeated,dsp,stun:{baseAberration,near:stunNear,far:stunFar,recovered:stunDone,recoverS:waited}};
   await fs.writeFile(path.join(output,"Report.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify(report));
-  console.log("PASS BlastFeedback: grenade/shell camera, distance, settling, bounded ringing, volume, reset and actual PCM");
+  console.log("PASS BlastFeedback: grenade/shell camera, distance, settling, bounded ringing, volume, reset, actual PCM and blast stun");
 } finally {
   if (browser) await browser.close();
   if (server) await new Promise(resolve=>server.close(resolve));

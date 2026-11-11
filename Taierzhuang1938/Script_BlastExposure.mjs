@@ -100,10 +100,11 @@ export function BlastExposure({ distanceM, chargeKg, occluded = false, lateral =
     daze: WindowStrength(db, W.daze),
     tremor: WindowStrength(db, W.tremor),
     body: WindowStrength(db, W.body),
+    stun: WindowStrength(db, W.stun),
     arrivalS: Math.max(0, distanceM) / E.soundSpeedMps,
   };
   out.tinnitus = Math.max(out.tinnitusLeft, out.tinnitusRight);
-  out.any = out.blink > 0 || out.flinch > 0 || out.tinnitus > 0;
+  out.any = out.blink > 0 || out.flinch > 0 || out.tinnitus > 0 || out.stun > 0;
   return out;
 }
 

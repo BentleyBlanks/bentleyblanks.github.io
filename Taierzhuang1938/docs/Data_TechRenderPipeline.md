@@ -161,7 +161,8 @@ function generateShadowMapTypeDefine( parameters ) {
 20  god                   屏幕空间太阳拖影（出厂关；体积雾开着时也一律不给，会双份）
 21  lensFlare             鬼影 / 光环 / 受遮挡星芒 + 程序化脏污（读 bloom 的亮部图）
 22  composite             色差→+泛光/拖影→雾→镜头进光→曝光→tonemap→LUT→镜头→sRGB
-23  fxaa                  FXAA + CAS 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
+23  stunTrail             近爆眩晕拖影：composite 之后的帧反馈（两张 HalfFloat 靶懒建，只在 options.stunTrail > 0 时跑，跑时 targets.ldr 改指它）
+24  fxaa                  FXAA + CAS 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
 ```
 
 体积雾三趟排在 main 之后（注入要本帧烘好的太阳阴影图）、composite 之前（apply 那一趟
@@ -172,7 +173,7 @@ function generateShadowMapTypeDefine( parameters ) {
 **两组分辨率（2026-09 TAAU）**：`SetSize(w, h, outW, outH)` 收「内部」与「输出」两套；
 `Script_Post.mjs` 里的 `OUTPUT_DOMAIN_PASSES`（模块内常量，**没有导出**；`taa` /
 `motionBlur` / `dof` / `bloom` / `god` /
-`lensFlare` / `composite` / `fxaa`）按输出分辨率建靶，其余按内部。TAAU 不跑时两者相等，
+`lensFlare` / `composite` / `stunTrail` / `fxaa`）按输出分辨率建靶，其余按内部。TAAU 不跑时两者相等，
 **只读 `ctx.width/height` 的 pass 一个字都不用改**。逐 pass 的域表见 §9.1。
 
 编排器对每个 pass 依次做：`Prepare?.(ctx)` → `Enabled(ctx)` → `GpuPush(name)` →
@@ -3210,6 +3211,7 @@ node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 =
 | `dof` | **输出** | 半分辨率 gather 靶 | CoC 的像素幅度按 `resolveWidth` |
 | `bloom` / `god` / `lensFlare` | **输出** | 亮部 1/2、拖影与光晕 1/4 封顶 | 跟着 sceneColor：按内部建的话泛光半径会随 `renderScale` 变，超分之后泛光就飘了 |
 | `composite` | **输出** | `ldr` | `uResolution` 仍是**内部**分辨率 —— 它只剩 `Script_PostDebug` 的 Motion Vector 视图在用，那张读的是内部分辨率的预通道靶 |
+| `stunTrail` | **输出** | 两张 HalfFloat 靶（懒建，Resize 重建并作废历史） | 与 composite 同域；`Enabled` 之外的帧 `Idle` 把 `targets.ldr` 还给 composite 的靶 |
 | `fxaa` | **输出** | 直接送屏 | 按 `ldr` 靶自己的纹素 |
 
 GTAO / SSR / 体积雾的时域重投影用的速度靶是**内部分辨率**的，与它们自己的靶同域，

@@ -83,6 +83,7 @@ uniform float uMotionScale;
 // 色差与运动模糊**共用同一趟圆盘采样**（分开就要再来一趟全分辨率取样）。
 // 所以 uAberration 的声明在这里，语义上归 LensEffects 那一段。
 uniform float uAberration;
+uniform float uChromaKeep;
 
 // --- SEGMENT depth-of-field -------------------------------------------------
 // 两条景深共用这一趟圆盘采样：阵亡镜头虚化远景；ADS 只虚化贴眼的枪与掩体。
@@ -257,7 +258,8 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
     // Keep the channel split of the plain tap on top of the smear (SB02 wants both at once); both effects fade
     // in smoothly from zero (no step where the radial blur crosses a threshold).
     float radialWeight=smoothstep(0.0,.01,uRadialBlur);
-    blurred+=(clear-center)*radialWeight;
+    // 近爆眩晕（options.chromaKeep）时通道分离在糊里也要留着；默认 uChromaKeep = 0，画面逐比特不变。
+    blurred+=(clear-center)*max(radialWeight,uChromaKeep);
     return mix(clear,blurred,max(smoothstep(0.0,.08,focus),radialWeight));
   }
   return clear;
@@ -647,7 +649,7 @@ export class CompositePass {
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
       uExposure: { value: 1.0 }, uExposureTex: { value: this.whitePixel },
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
-      uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uGrain: { value: 0.014 },
+      uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uChromaKeep: { value: 0 }, uGrain: { value: 0.014 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
       uContrastCurve: { value: 0 },
       uLift: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.lift) },
@@ -775,6 +777,7 @@ export class CompositePass {
     U.uGodStrength.value = ctx.godStrength;
     U.uVignette.value = options.vignette ?? 0.42;
     U.uAberration.value = options.aberration ?? 0.0022;
+    U.uChromaKeep.value = Math.max(0, Math.min(1, options.chromaKeep || 0));
     U.uGrain.value = options.grain ?? 0.014;
     U.uSaturation.value = options.saturation ?? 0.94;
     U.uContrast.value = options.contrast ?? 1.06;

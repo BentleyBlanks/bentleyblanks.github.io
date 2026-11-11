@@ -77,6 +77,7 @@ import {
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { ApplyLensToPost } from "./Script_OpeningLens.mjs";
+import { LENS_DEFAULT } from "./Data_OpeningLens.mjs";
 import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { ResolveFirstLevelStage } from "./Script_FirstLevelMissionStages.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
@@ -8540,9 +8541,10 @@ function RenderSceneContent(dt) {
   profiler.E("actorBatch");
   // 可炸断的枯树按这一帧的出画相机挑细节档（远处换聚类减面的同一棵树），排在第一次 renderer.render 之前。
   battlefield?.breakableTrees?.UpdateView(camera);
+  const stun = BlastStunView();
   const hitDisorientation = state.running && !state.menu && !state.cutscene && !UiCapturing()
     ? player?.HitDisorientation || 0 : 0;
-  audio.SetHitDisorientation(hitDisorientation);
+  audio.SetHitDisorientation(Math.max(hitDisorientation, stun?.audio || 0));
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
@@ -8560,7 +8562,7 @@ function RenderSceneContent(dt) {
   const openingLens = missionRuntime?.Perception().lens || null;
   hud.SetLens(openingLens);
   profiler.B("post");
-  post.Render(scene, camera, ApplyLensToPost({
+  post.Render(scene, camera, ApplyBlastStunToPost(ApplyLensToPost({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
@@ -8598,10 +8600,10 @@ function RenderSceneContent(dt) {
     lidLight: BlastLidLight(),
     eyeAdapt: BlastEyeAdapt(),
     afterimage: BlastAfterimage(skyName),
-    concussion: MergeBlastDaze(missionRuntime?.Perception().concussion),
+    concussion: MergeBlastDaze(missionRuntime?.Perception().concussion, stun),
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    hitDisorientation,
+    hitDisorientation: Math.max(hitDisorientation, stun?.double || 0),
     // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
     // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
     // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。
@@ -8620,7 +8622,7 @@ function RenderSceneContent(dt) {
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
-  }, openingLens));
+  }, openingLens), stun));
   profiler.E("post");
   // 第一人称本地反射图：排在主画面之后（阴影图本帧已烘过、骨头还没再动），拍的是下一帧给枪映的那张。
   if (firstPersonReflection?.enabled) {
@@ -8727,13 +8729,36 @@ function BlastAfterimage(skyName) {
  * 近爆的恍惚并进后期合成里开场那组恍惚通道（amount = 发灰、四周发暗；focus = 发糊、重影），与剧情给的取大，
  * 不覆盖剧情那份的其它字段（cheek 之类）。没在恍惚时原样返回剧情那份（正片不开反应时一字不变）。
  */
-function MergeBlastDaze(concussion) {
+function MergeBlastDaze(concussion, stun = null) {
   const flinch = player?.flinch;
-  if (!flinch?.Active || !player.Alive || state.menu || state.cutscene) return concussion;
-  const daze = flinch.daze;
-  if (!(daze.amount > 0.001 || daze.focus > 0.001)) return concussion;
-  return { ...(concussion || {}), amount: Math.max(concussion?.amount || 0, daze.amount),
-    focus: Math.max(concussion?.focus || 0, daze.focus) };
+  const fromFlinch = flinch?.Active && player.Alive && !state.menu && !state.cutscene ? flinch.daze : null;
+  const amount = Math.max(fromFlinch?.amount || 0, stun?.haze.amount || 0);
+  const focus = Math.max(fromFlinch?.focus || 0, stun?.haze.focus || 0);
+  if (!(amount > 0.001 || focus > 0.001)) return concussion;
+  return { ...(concussion || {}), amount: Math.max(concussion?.amount || 0, amount),
+    focus: Math.max(concussion?.focus || 0, focus) };
+}
+
+/**
+ * 近爆眩晕（Script_BlastStun，全关卡常开）此刻该不该出画：人活着、在玩、没开菜单 / 过场 / 高级工具，
+ * 开场导演摄像机没接管时返回 player.stun，否则 null。
+ */
+function BlastStunView() {
+  const stun = player?.stun;
+  if (!stun?.Active || !player.Alive || !state.running || state.menu || state.cutscene || UiCapturing()) return null;
+  // 开场导演相机接管的那段感知由导演曲线独占：清掉眩晕，免得近失真炮弹在还权时带着半截眩晕冒出来。
+  if (missionRuntime?.frontShow?.bunker?.CameraActive) { stun.Reset(); return null; }
+  return stun;
+}
+
+/** 眩晕的色散与拖影并进后期参数：色散在基准（合成默认 = LENS_DEFAULT.aberration）上加，与开场镜头那份取大；没有眩晕时一字不动。 */
+function ApplyBlastStunToPost(params, stun) {
+  if (!stun) return params;
+  const base = LENS_DEFAULT.aberration;
+  params.aberration = Math.max(params.aberration ?? base, base + stun.chroma);
+  params.stunTrail = stun.trailTauS;
+  params.chromaKeep = Math.min(1, stun.level / 0.15);
+  return params;
 }
 
 /**
