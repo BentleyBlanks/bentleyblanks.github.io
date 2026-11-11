@@ -194,16 +194,20 @@ export const BLAST_FLINCH = Object.freeze({
  *   haze    并进后期合成的恍惚通道（amount 发灰 / 暗角，focus 发糊 / 静态重影）
  *   sway    相机的慢晃（弧度），不动 yaw / pitch 本体，只叠在渲染相机上；reduced-motion 时为 0
  *   audio   并进 Script_Audio.SetHitDisorientation（闷 + 压低），与耳鸣低通是两套串联的节点
+ *
+ * 2026-11-11 用户二轮：「一开始的拖影眩晕感可以再猛一点，但尾巴偏长」→ 开头更猛、尾巴收短：
+ * 3 m 手榴弹（s≈0.83）停约 0.9 s、时间常数约 1.2 s，level 降到 0.02 约 5.5 s（原来约 11.6 s）；
+ * 色散 / 拖影 / 重影 / 慢晃的幅度上调（double.scale > 1 只是让中等强度更早满，输出夹到 1）。
  */
 export const BLAST_STUN = Object.freeze({
-  attackS: 0.08, holdMinS: 0.3, holdSpanS: 1.2,
-  decayMinS: 0.6, decaySpanS: 2.6,
+  attackS: 0.08, holdMinS: 0.25, holdSpanS: 0.8,
+  decayMinS: 0.35, decaySpanS: 1.05,
   stackShare: 0.35, maxEvents: 6, minStrength: 0.03,
-  chroma: Object.freeze({ max: 0.022, curve: 0.8 }),
-  trail: Object.freeze({ tauS: 0.10, curve: 0.7, maxFeedback: 0.9, centerKeep: 0.6, minLevel: 0.02 }),
-  double: Object.freeze({ scale: 1.0 }),
-  haze: Object.freeze({ amount: 0.6, focus: 0.85 }),
-  sway: Object.freeze({ rollRad: 0.045, pitchRad: 0.02, yawRad: 0.025, hz: 0.45 }),
+  chroma: Object.freeze({ max: 0.030, curve: 0.8 }),
+  trail: Object.freeze({ tauS: 0.17, curve: 0.7, maxFeedback: 0.93, centerKeep: 0.75, minLevel: 0.02 }),
+  double: Object.freeze({ scale: 1.35 }),
+  haze: Object.freeze({ amount: 0.6, focus: 1.0 }),
+  sway: Object.freeze({ rollRad: 0.075, pitchRad: 0.032, yawRad: 0.04, hz: 0.6 }),
   audio: Object.freeze({ scale: 0.8, max: 0.7 }),
 });
 

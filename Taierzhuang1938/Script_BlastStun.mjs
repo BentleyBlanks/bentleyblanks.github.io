@@ -13,7 +13,7 @@ import { Clamp, Clamp01, ValueNoise2 } from "./Script_Noise.mjs";
 import { BLAST_STUN } from "./Data_Tuning_BlastReaction.mjs";
 
 const Smooth = (x) => { const t = Clamp01(x); return t * t * (3 - 2 * t); };
-const DONE_BELOW = 0.004;
+const DONE_BELOW = 0.01;
 
 export class BlastStun {
   /** @param {object} [tuning] 默认 BLAST_STUN；测试可注入。 */
@@ -92,7 +92,7 @@ export class BlastStun {
     this.level = level;
     this.chroma = T.chroma.max * Math.pow(level, T.chroma.curve);
     this.trailTauS = level >= T.trail.minLevel ? T.trail.tauS * Math.pow(level, T.trail.curve) : 0;
-    this.double = T.double.scale * level;
+    this.double = Clamp01(T.double.scale * level);
     this.haze = { amount: Clamp01(T.haze.amount * level), focus: Clamp01(T.haze.focus * level) };
     this.audio = Math.min(T.audio.max, T.audio.scale * level);
     if (!this.calm) {
