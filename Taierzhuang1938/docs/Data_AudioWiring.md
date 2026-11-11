@@ -283,6 +283,8 @@ window.Taierzhuang.Debug.AudioZone()
 
 ### 9. 爆炸三档 + 碎屑 + 耳鸣
 
+2026-11-12 普通手榴弹由 `Combat.Detonate` 传入原始阵营对应的 `grenadeExplosionNra` / `grenadeExplosionIja`，采用用户选定的完整采样。返掷只改变伤害归属，保留原始 cue。三档的音量、声源尺寸、落屑、耳鸣和空间传播仍由同一条 `Blast` 链处理。
+
 | 听者距离 | cue |
 | --- | --- |
 | < 40 m | `explosionNear` |

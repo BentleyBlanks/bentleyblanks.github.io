@@ -183,6 +183,8 @@ const GUN_EXTRA_CUES = new Set([
  */
 const DUCK_ON = {
   explosionNear: { seconds: 1.1, amount: 0.55, range: 45 },
+  grenadeExplosionNra: { seconds: 1.1, amount: 0.55, range: 45 },
+  grenadeExplosionIja: { seconds: 1.1, amount: 0.55, range: 45 },
   explosionMid: { seconds: 0.9, amount: 0.45, range: 80 },
   explosionFar: { seconds: 0.8, amount: 0.30, range: 140 },
   shellImpact: { seconds: 0.8, amount: 0.45, range: 55 },
@@ -207,7 +209,8 @@ const DUCK_MIN_AMOUNT = 0.06;
  * 两边共用同一道距离闸 BlastHearing（2026-09-24 合并 master 的通用近爆反馈：原来的 DEAFEN_M = 12 m 硬闸
  * 换成随爆炸半径伸缩、隔墙打折的强度；默认半径 6 m 时仍是 12 m 左右出闸）。
  */
-const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3, tankCannon: 0.3 };
+const DEAFEN_ON = { explosionNear: 0.42, grenadeExplosionNra: 0.42, grenadeExplosionIja: 0.42,
+  explosionMid: 0.3, shellImpact: 0.3, tankCannon: 0.3 };
 
 export function BlastHearing(distance, radius = BLAST_HEARING.referenceRadiusM, occluded = false) {
   const H = BLAST_HEARING;
@@ -2633,6 +2636,10 @@ const RECIPES = {
   },
 };
 
+// Grenade cues retain the existing explosion synthesis until their selected samples load.
+RECIPES.grenadeExplosionNra = RECIPES.explosionNear;
+RECIPES.grenadeExplosionIja = RECIPES.explosionNear;
+
 /**
  * **只有采样、没有合成退路**的 cue（2026-10-11 开场重构，契约 §6）。
  * 刀尖划脸、拧刀、撕胸章、鞋跟碾手：合成出来的一声噪声只会被听成别的东西（与环境包那只「合成的乌鸦」
@@ -2893,7 +2900,8 @@ function RouteStorySpeech(v, route, t = null, tau = 0) {
  */
 function IsBlastCue(name) {
   // 战车主炮的炮口声同理：大半能量在 120 Hz 以下，一堵院墙挡不住（战车包 2026-09-23）。
-  return name === "explosionNear" || name === "explosionMid" || name === "shellImpact" || name.startsWith("tankCannon");
+  return name === "explosionNear" || name === "explosionMid" || name === "grenadeExplosionNra"
+    || name === "grenadeExplosionIja" || name === "shellImpact" || name.startsWith("tankCannon");
 }
 const OCCLUSION_MAX_BLAST = 0.25;
 /**
@@ -3007,7 +3015,7 @@ function WetFalloff(distance) {
  */
 const NODE_COST = {
   zb26: 19, bolt: 19, boltHanYang: 19, stripperLoad: 19, shellImpact: 19, bodyFall: 19,
-  type92: 18, explosionNear: 18,
+  type92: 18, explosionNear: 18, grenadeExplosionNra: 18, grenadeExplosionIja: 18,
   rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, tankMg: 16, bayonetHit: 16, magIn: 15,
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
   grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
@@ -3155,7 +3163,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-10-11：第一关 01–02 开场重构十二条（契约 §6），清单新增十二个 cue。
 // 2026-10-12 R4-Voice：断肢四条、breathInjured、耳光、喊杀七条成品对齐到库线（同文件名、电平变了，SAMPLE_MIX 反算复原响度）。
 // 2026-10-22：impactDirt 加 SeedAudio 打土一条、impactFlesh 加 Gamemaster 入体闷响一条（AI 弹着接上声音）。
-export const SFX_PACK_VERSION = "20261022aiimpacts";
+export const SFX_PACK_VERSION = "20261112grenades";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 // 2026-10-12 R4-Voice：AudioAmb_CarriageRearCheer 对齐到库线（同文件名、电平变了）。
 export const AMB_PACK_VERSION = "20261012battlebeds-levelline";
@@ -3301,7 +3309,7 @@ const SAMPLE_BURST = {
  *     「远处在打」和「打到我头上了」。
  */
 const SAMPLE_MIX = {
-  explosionNear: 1.0, shellImpact: 0.95, launcherPop: 0.72,
+  explosionNear: 1.0, grenadeExplosionNra: 1.0, grenadeExplosionIja: 1.0, shellImpact: 0.95, launcherPop: 0.72,
   rifleNra: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
   // 战车机枪：素材自带野地回声、>2.5 kHz 比十一年式少 3 dB（重），站得比步兵那挺轻机高一档。
   tankMg: 0.82,
@@ -3394,7 +3402,8 @@ const SAMPLE_WET = {
   rifleNra: 0.42, rifleHanYang: 0.42, boltHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
   zb26: 0.36, type11: 0.32, type92: 0.42,
   tankMg: 0.26,   // 素材里已经有野地拖出来的尾巴，send 给少一点，别把一串点射糊成一片
-  explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3, bombWhistle: 0.35,
+  explosionNear: 0.45, grenadeExplosionNra: 0.45, grenadeExplosionIja: 0.45,
+  explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3, bombWhistle: 0.35,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
   footstepDirt: 0.12, footstepRubble: 0.12, shellDrop: 0.12,
@@ -3508,7 +3517,7 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
   // 汉阳造两条：人工挑定的单条实录原样播；枪机那条的冲头还驱动动作节点，±3% 变调会把它与动画时钟拧开。
   "rifleHanYang", "boltHanYang",
   "breathInjured", // Preserve the reviewed voice and full duration without pitch jitter.
-  "bulletCrack", "bulletWhizz",
+  "bulletCrack", "bulletWhizz", "grenadeExplosionNra", "grenadeExplosionIja",
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`
   // 的头注记了每条的取舍），要的就是它们本来的样子；而近炸一次卸两三段时
   // 随机挑两条里的一条必然连出两次同一条。

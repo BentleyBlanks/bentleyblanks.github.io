@@ -36,6 +36,11 @@
 //   RMS 对齐到该值（口径同 Script_AudioNormalize 的「一次性音」组）；loop 只写进清单当
 //   元数据；组上的 pending 表示「Script_Audio 还没有同名配方」，产物落 manifest.pendingCues。
 export const SFX_LICENSES = {
+  cc0: {
+    name: "Creative Commons CC0 1.0 Universal",
+    terms: "Public domain dedication",
+    via: "https://creativecommons.org/publicdomain/zero/1.0/",
+  },
   sonniss: {
     name: "Sonniss GDC Game Audio Bundle",
     terms: "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
@@ -266,6 +271,24 @@ export const TANK_SFX = [
  * cuts[].cue 必须与 Script_Audio 的 RECIPES 同名 —— 同名才盖得上去。
  */
 export const SFX_SOURCES = [
+  {
+    id: "GrenadeExplosionIjaApproved",
+    prebaked: true,
+    credit: "unfa · Freesound 609587 · user-selected Japanese grenade explosion · 2026-11-12",
+    source: "https://freesound.org/people/unfa/sounds/609587/",
+    license: "cc0",
+    bitrate: "192k",
+    cuts: [{ cue: "grenadeExplosionIja", files: ["AudioSfx_GrenadeExplosionIja.mp3"], durS: 5.352 }],
+  },
+  {
+    id: "GrenadeExplosionNraApproved",
+    prebaked: true,
+    credit: "Volcengine SeedAudio 1.0 · approved Seed_RefRemaster_S2_take2 ground explosion · 2026-11-12",
+    source: "local://GrenadeSfxAudition_20261111/tmp/GrenadeAudition/Clearer/Seed_RefRemaster_S2_take2.wav",
+    license: "volcengine",
+    bitrate: "192k",
+    cuts: [{ cue: "grenadeExplosionNra", files: ["AudioSfx_GrenadeExplosionNra.mp3"], durS: 3.525 }],
+  },
   {
     id: "LowHealthBreathSeedAudio",
     seedAudio: true,

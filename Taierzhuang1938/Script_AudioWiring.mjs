@@ -1469,7 +1469,7 @@ export class AudioWiring {
    *   见下面那段注释。
    */
   /** earExposure（可选）：{ left, right } 两只耳朵的耳鸣强度（Combat.BlastFeedback 按 Script_BlastExposure 算），耳朵模型 trauma 用。 */
-  Blast(position, radius, occluded = false, earExposure = null) {
+  Blast(position, radius, occluded = false, earExposure = null, audioCue = null) {
     const audio = this.Audio;
     if (!audio || !position) return null;
     const d = this.DistanceToListener(position);
@@ -1477,7 +1477,7 @@ export class AudioWiring {
     // 恰恰是最不该安静的时候。
     this.NoteBlast(d);
     const near = d < BLAST_AUDIO.nearM, mid = !near && d < BLAST_AUDIO.midM;
-    const cue = near ? "explosionNear" : mid ? "explosionMid" : "explosionFar";
+    const cue = audioCue || (near ? "explosionNear" : mid ? "explosionMid" : "explosionFar");
     // 三档各自的量级（见 BLAST_AUDIO.bandScale）：一发落在身边的炮弹是全场最响的
     // 那件事，它该把总线顶到限幅器上去 —— 原来它比一句台词还小 15 dB。
     let volume = Clamp(radius / 8, 0.5, 1.2)

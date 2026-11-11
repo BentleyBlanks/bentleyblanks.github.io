@@ -1189,6 +1189,13 @@ INT3a 当时是**手工**把 `pendingCues` / `pendingNote` 两个键从 `Data_Sf
 **仍需人工试听的两处**：惨叫与痛呼是不是「克制不猎奇」、电键的「嗒」够不够干脆 ——
 这两条机器判不了。
 
+## 2026-11-12 用户选定的两军手榴弹爆炸
+
+- 日军普通手榴弹使用 `AudioSfx_GrenadeExplosionIja.mp3`，来源为用户指定的 `07_unfa_609587_Grenade-Explosion_CC0.mp3`。作者 unfa，Freesound 609587，CC0 1.0。来源页为 https://freesound.org/people/unfa/sounds/609587/ 。
+- 川军普通木柄弹在地面爆炸使用 `AudioSfx_GrenadeExplosionNra.mp3`，来源为用户指定的 `GrenadeSfxAudition_20261111/tmp/GrenadeAudition/Clearer/Seed_RefRemaster_S2_take2.wav`，已有 Volcengine SeedAudio 1.0 试听成品。
+- 两条完整保留原录音节奏与尾音，转为 44.1 kHz 单声道、192 kbps MP3，有声段 RMS 对齐 −25 dBFS，运行时原速播放。成品登记在 `Data_SfxSources`，SfxBake 以 `prebaked` 保留。
+- 普通投弹按原始阵营记录 cue，返掷沿用这枚弹的音色。爆炸接线沿用距离衰减、空气吸收、遮挡、混响、传播延迟、压低配乐与耳鸣。脚本直接调用普通手榴弹爆炸时按伤害阵营选音，缺省使用川军木柄弹。
+
 ## 手榴弹雨（第二关）·「密集多发叠放会不会糊」评估
 
 按分工只评估、不改 `Script_Audio.mjs`。第二关 brief 的口径是**集中六七十人、连续二三百枚**，

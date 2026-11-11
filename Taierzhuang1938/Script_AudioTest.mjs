@@ -154,7 +154,8 @@ const load = await page.evaluate(() => {
 // 2026-09-30: 空袭炸弹下落啸声 bombWhistle → 104.
 // 2026-09-30: 敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath → 105.
 // 2026-10-11: 第一关 01–02 开场重构十二条（契约 §6；其中四条只有采样、没有合成退路，见 SAMPLE_ONLY_CUES）→ 117.
-const RECIPE_COUNT = 117;
+// 2026-11-12 user-selected Japanese and Sichuan grenade explosions.
+const RECIPE_COUNT = 119;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -192,6 +193,26 @@ const hanYangPlayback = await page.evaluate(() => {
   return { shot: Probe("rifleHanYang", 1.3), bolt: Probe("boltHanYang", 0.8) };
 });
 const hanYangAtRate = (probe, seconds) => probe && Math.abs(probe.duration - seconds) <= 0.04 && probe.rate === 1;
+const grenadePlayback = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  return ["grenadeExplosionNra", "grenadeExplosionIja"].map((cue) => {
+    const made = [];
+    const original = a.ctx.createBufferSource;
+    a.ctx.createBufferSource = function () { const source = original.call(this); made.push(source); return source; };
+    try {
+      a.lastPlayAt.delete(cue);
+      const voice = a.Play(cue, { priority: true, volume: 0.01 });
+      const source = made.find((entry) => entry.buffer && entry.buffer.duration > 3);
+      if (voice) a.StopVoice(voice, 0.001);
+      return { cue, sampled: a.sampleCues.has(cue), duration: source?.buffer.duration,
+        rate: source?.playbackRate.value };
+    } finally { a.ctx.createBufferSource = original; }
+  });
+});
+if (grenadePlayback.some((row, index) => !row.sampled || row.rate !== 1
+  || Math.abs(row.duration - [3.525, 5.316][index]) > 0.04)) {
+  Fail(`选定手榴弹采样未完整原速播放 ${JSON.stringify(grenadePlayback)}`);
+} else Ok(`两军手榴弹采样完整原速播放 ${JSON.stringify(grenadePlayback)}`);
 if (!hanYangAtRate(hanYangPlayback.shot, 1.40) || !hanYangAtRate(hanYangPlayback.bolt, 0.91)) {
   Fail(`汉阳造专用素材未原速播放：${JSON.stringify(hanYangPlayback)}`);
 } else Ok("汉阳造枪声与枪机原速播放，枪机冲头不会与动作时钟漂移");

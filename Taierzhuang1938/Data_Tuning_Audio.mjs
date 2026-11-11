@@ -368,6 +368,12 @@ export const BODY_FOLEY = Object.freeze({
   landVolume: 0.55,
 });
 
+// User-selected single-grenade explosions, keyed by the grenade's original faction.
+export const GRENADE_BLAST_CUES = Object.freeze({
+  nra: "grenadeExplosionNra",
+  ija: "grenadeExplosionIja",
+});
+
 /**
  * 手榴弹落地与滚动。
  *

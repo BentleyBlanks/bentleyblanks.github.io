@@ -1,6 +1,11 @@
 {
   "note": "由 Script_SfxBake.mjs 生成；来源与许可见 Data_SfxSources.mjs",
   "licenses": {
+    "cc0": {
+      "name": "Creative Commons CC0 1.0 Universal",
+      "terms": "Public domain dedication",
+      "via": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
     "sonniss": {
       "name": "Sonniss GDC Game Audio Bundle",
       "terms": "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
@@ -1083,9 +1088,25 @@
       "seconds": 0.58,
       "credit": "Volcengine SeedAudio 1.0 · 军靴鞋跟在手背与泥上碾（约 0.6 秒）（BootGrind_take02.mp3） · 2026-10-11",
       "license": "volcengine"
+    },
+    "grenadeExplosionIja": {
+      "files": [
+        "AudioSfx_GrenadeExplosionIja.mp3"
+      ],
+      "seconds": 5.352,
+      "credit": "unfa · Freesound 609587 · user-selected Japanese grenade explosion · 2026-11-12",
+      "license": "cc0"
+    },
+    "grenadeExplosionNra": {
+      "files": [
+        "AudioSfx_GrenadeExplosionNra.mp3"
+      ],
+      "seconds": 3.525,
+      "credit": "Volcengine SeedAudio 1.0 · approved Seed_RefRemaster_S2_take2 ground explosion · 2026-11-12",
+      "license": "volcengine"
     }
   },
-  "bakedAt": "2026-10-22",
+  "bakedAt": "2026-11-11",
   "normalization": {
     "normalizedAt": "2026-10-12",
     "tool": "Script_AudioNormalize.mjs",

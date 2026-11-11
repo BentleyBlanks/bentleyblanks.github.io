@@ -368,7 +368,7 @@ const blast = await page.evaluate(() => {
   const Count = () => ["explosionNear", "explosionMid", "explosionFar", "debrisFall"]
     .reduce((o, n) => (o[n] = T.audio.RequestedCount(n), o), {});
   const Delta = (a, b) => Object.fromEntries(Object.keys(a).map((k) => [k, b[k] - a[k]]));
-  const b0 = Count(); T.combat.Blast(At(15), 6, 120, "grenade"); const near = Delta(b0, Count());
+  const b0 = Count(); T.combat.Blast(At(15), 6, 120, "shell"); const near = Delta(b0, Count());
   const b1 = Count(); T.combat.Blast(At(60), 6, 120, "shell"); const mid = Delta(b1, Count());
   const b2 = Count(); T.combat.Blast(At(200), 6, 120, "shell"); const far = Delta(b2, Count());
   return { near, mid, far };
@@ -381,6 +381,42 @@ Check("200 m 的爆炸走 explosionFar", blast.far.explosionFar === 1, JSON.stri
 Check("近炸之后有落屑、远炸没有",
   blast.near.debrisFall >= 2 && blast.far.debrisFall === 0,
   `近 ${blast.near.debrisFall} / 远 ${blast.far.debrisFall}`);
+
+// Exercise real projectile creation and return ownership before detonating.
+const grenadeCues = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const seen = [];
+  const originalPlay = T.audio.Play;
+  T.audio.Play = function (name, opts) {
+    if (name.startsWith("grenadeExplosion") || name.startsWith("explosion")) seen.push(name);
+    return originalPlay.call(this, name, opts);
+  };
+  const at = T.player.position.clone().addScalar(100);
+  const direction = T.player.AimDirection(at.clone());
+  const Detonate = (owner, returned = false, kind = "Grenade") => {
+    const p = T.combat.Throw(kind, 0.5, at, direction, 0, { owner });
+    if (returned) { p.pickupLeft = 0; T.combat.StepReturn(p, 0.01); p.position.copy(at); }
+    T.combat.Detonate(p);
+    return p;
+  };
+  const projectiles = [];
+  try {
+    for (const owner of ["player", "nra", "ija"]) projectiles.push(Detonate(owner));
+    const returned = Detonate("ija", true); projectiles.push(returned);
+    projectiles.push(Detonate("player", false, "GrenadeBundle"));
+    return { seen, returnedOwner: returned.owner };
+  } finally {
+    T.audio.Play = originalPlay;
+    for (const p of projectiles) {
+      T.combat.Detach(p); T.combat.HideMesh(p.mesh);
+      T.combat.projectiles.splice(T.combat.projectiles.indexOf(p), 1);
+    }
+  }
+});
+Check("两军手榴弹及返掷保留选定爆炸音色，集束弹沿用爆炸档",
+  JSON.stringify(grenadeCues.seen) === JSON.stringify([
+    "grenadeExplosionNra", "grenadeExplosionNra", "grenadeExplosionIja", "grenadeExplosionIja", "explosionFar",
+  ]) && grenadeCues.returnedOwner === "player", JSON.stringify(grenadeCues));
 
 // ---------------------------------------------------------------------------
 // 7) 玩家开枪走分层 + 压环境；跳弹只在硬面上出

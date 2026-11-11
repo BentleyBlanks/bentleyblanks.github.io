@@ -21,6 +21,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN } from "./Data_Explosives.mjs";
+import { GRENADE_BLAST_CUES } from "./Data_Tuning_Audio.mjs";
 import { ExplosiveIdFor } from "./Script_Explosives.mjs";
 import { BlastExposure, BlastBearing, ChargeKgFor } from "./Script_BlastExposure.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
@@ -63,6 +64,8 @@ class Projectile {
     this.velocity = velocity.clone();
     this.weapon = weapon;
     this.owner = owner;               // "player" | "nra" | "ija"
+    // Returning a grenade changes damage ownership while preserving its original sound.
+    this.blastCue = kind === "Grenade" ? GRENADE_BLAST_CUES[owner === "ija" ? "ija" : "nra"] : null;
     /**
      * 投掷者的 `soldier.id`（玩家为 null）。感知层要它才能把这一声爆炸
      * 写成「那个方向有个敌人」而不是一条无主的响动（docs/Data_EnemyAi.md §4.1）。
@@ -696,7 +699,7 @@ export class CombatSystem {
    * Shared sensory event, also usable by scripted demolition without changing damage.
    * explosiveId（可选）：弹种，按它查装药量算人头上的峰值超压（Script_BlastExposure）；不给就按半径反推。
    */
-  BlastFeedback(position, radius, explosiveId = null) {
+  BlastFeedback(position, radius, explosiveId = null, audioCue = null) {
     const bf = this.host.battlefield;
     const from = position.clone();
     from.y += BLAST.originRiseM;
@@ -739,12 +742,12 @@ export class CombatSystem {
     // 距离分档、落屑与按威力/距离/遮挡分级的耳鸣，
     // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。
     // 接线层缺席时（编辑器裸跑规则层）退回原来那条两档判断，一声不少。
-    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded, earExposure);
+    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded, earExposure, audioCue);
     else if (this.host.audio) {
       const audio = this.host.audio;
       const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
       const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
-      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
+      audio.Play(audioCue || (d > BLAST.nearAudioM ? "explosionFar" : "explosionNear"),
         { position: position.clone(), blastRadiusM: radius, blastOccluded, blastExposure: earExposure,
           volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
     }
@@ -757,7 +760,8 @@ export class CombatSystem {
     // 玩家本人不受 hurtSide 约束（Blast 里单独结算），所以日军手榴弹照样炸得到他。
     // byPlayer 只管「算不算玩家的战绩」，日军的弹一律 false。
     this.Blast(p.position, p.weapon.radiusM, p.weapon.damage, isBundle ? "tank" : "grenade",
-      p.owner === "ija" ? "nra" : "ija", p.owner === "player", p.OnHit, p.kind, p.ownerId);
+      p.owner === "ija" ? "nra" : "ija", p.owner === "player", p.OnHit, p.kind, p.ownerId,
+      { audioCue: p.blastCue });
   }
 
   /**
@@ -778,7 +782,9 @@ export class CombatSystem {
     const from = position.clone();
     from.y += BLAST.originRiseM;
 
-    this.BlastFeedback(position, radius, explosiveId);
+    const audioCue = options?.audioCue || ((explosiveId === "Grenade" || kind === "grenade")
+      ? GRENADE_BLAST_CUES[hurtSide === "nra" ? "ija" : "nra"] : null);
+    this.BlastFeedback(position, radius, explosiveId, audioCue);
 
     const affect = (targetPos, apply) => {
       const rel = this.tmp.subVectors(targetPos, from);
