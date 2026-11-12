@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tripo 人物拼接"
+  short_description: "从角色目录安排拼接、局部修复、三视图对标及导出回导验收"
+  default_prompt: "使用 $tripo-parts-merge 处理我提供的角色目录，复用现有部件，按三视图保留自然比例，完成拼接、接缝修复、烘焙和导出回导验收。"
