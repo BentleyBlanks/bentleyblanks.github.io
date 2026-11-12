@@ -145,6 +145,31 @@ for (const g of manifest.grooms) {
     Check(guides && guides.length === G * K * 4, `${g.id}：导向发丝 ${G} × ${K} 点`);
     let finite = true; for (const v of guides) if (!Number.isFinite(v)) { finite = false; break; }
     Check(finite, `${g.id}：导向发丝坐标都是有限数`);
+    if (entry.referenceLook) {
+      const measured = heads[entry.head], ear = measured.ear, look = references.looks[entry.referenceLook];
+      const centerX = look.landmarks?.centerX ?? measured.centerX ?? 0;
+      const zc = ((look.landmarks?.glabella?.[2] ?? measured.glabella[2]) + measured.skullBack) * .5;
+      const measuredZc = (measured.glabella[2] + measured.skullBack) * .5;
+      const angle = z => Math.atan2(ear.halfWidth, -(z - measuredZc)) * 180 / Math.PI;
+      const front = angle(ear.zFront) - 4, back = angle(ear.zBack) + 6;
+      const factor = look.hair.hairline?.earMaskHalfWidth ?? entry.hairOverrides?.hairline?.earMaskHalfWidth
+        ?? styles.hair[entry.hair].hairline.earMaskHalfWidth ?? .8;
+      const OnEar = (x, y, z, widthFactor, topMargin) => {
+        const phi = Math.atan2(Math.abs(x - centerX), -(z - zc)) * 180 / Math.PI;
+        return phi > front && phi < back && y > ear.yMin - .006 && y < ear.yMax + topMargin
+          && Math.abs(x - centerX) > ear.halfWidth * widthFactor;
+      };
+      let earRoots = 0;
+      for (let i = 0; i < G; i++) if (OnEar(guides[4 * i * K], guides[4 * i * K + 1], guides[4 * i * K + 2], factor, .006)) earRoots++;
+      Check(earRoots === 0, `${g.id}：按本人头模实测耳廓排除发根（${earRoots} 根误入）`);
+      const scalp = sec('hairScalpPos'), scalpData = sec('hairScalpData'), q = header.sections.hairScalpPos?.quant;
+      let earTint = 0;
+      if (scalp && q) for (let i = 0; i < scalp.length; i += 3) {
+        const p = [0, 1, 2].map(axis => q.min[axis] + scalp[i + axis] / 65535 * (q.max[axis] - q.min[axis]));
+        if (scalpData[i] > 5 && OnEar(...p, Math.min(factor, .85) + .02, .006)) earTint++;
+      }
+      Check(earTint === 0, `${g.id}：贴肤染色不跨上耳廓（${earTint} 个顶点误入）`);
+    }
     const sg = sec('hairStrandGuides'), sb = sec('hairStrandBary'), ss = sec('hairStrandSeed');
     Check(sg.length === S * 3 && sb.length === S * 2 && ss.length === S * 2, `${g.id}：渲染发丝 ${S} 根的插值数据长度对`);
     let maxId = 0, badW = 0;
@@ -176,6 +201,25 @@ for (const g of manifest.grooms) {
       const pos = sec(`${part}Pos`), idx = sec(`${part}Index`);
       Check(!!pos && !!idx && pos.length > 0, `${g.id}：${part} 有几何`);
       if (pos && idx) CheckIndex(`${g.id} ${part}`, idx, pos.length / 3);
+    }
+    const braid = references.looks[entry.referenceLook]?.hair?.braid;
+    Check(!!H.braid === !!braid, `${g.id}：长辫与本人三视图配方一致`);
+    if (braid) {
+      const pos = sec('hairBraidPos'), idx = sec('hairBraidIndex');
+      Check(!!pos && !!idx && H.braid.triangles === idx.length / 3 && H.braid.length === braid.length
+        && header.sections.hairBraidPos.quant.min[1] < heads[entry.head].ear.yMin - .1,
+        `${g.id}：长辫几何和长度已烘焙`);
+      if (pos && idx) CheckIndex(`${g.id} hairBraid`, idx, pos.length / 3);
+      const skin = H.braid.skinning;
+      Check(!!skin === !!header.model, `${g.id}：游戏长辫继承身体骨骼，实验室胸像保持静态`);
+      if (skin) {
+        const indices = sec('hairBraidBoneIndices'), weights = sec('hairBraidBoneWeights');
+        Check(JSON.stringify(skin.bones) === JSON.stringify(['Head', 'Neck', 'Spine2', 'Spine1'])
+          && skin.attach.length === 4 && !!indices && !!weights && indices.length === pos.length / 3 * 4
+          && weights.length === indices.length && indices.every(index => index < 4)
+          && weights.every((_, i) => i % 4 || Math.abs(weights[i] + weights[i + 1] + weights[i + 2] + weights[i + 3] - 65535) <= 2),
+          `${g.id}：辫根到辫尾的头、颈、上背蒙皮权重有效`);
+      }
     }
   }
   if (header.beard) {

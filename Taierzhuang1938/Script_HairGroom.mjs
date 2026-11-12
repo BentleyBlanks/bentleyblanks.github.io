@@ -160,6 +160,7 @@ export async function LoadHairGroom(url) {
       header: H, points: K, guides: G, strands: S, renderPoints: P, render: H.render, family: H.family, name: H.name,
       guideTexture, strandAttributes, sphere, density, shellOpacity: H.shell.opacity ?? 1,
       cardGeometry: MeshGeometry(sec, 'hairCard'), shellGeometry: MeshGeometry(sec, 'hairShell', false),
+      braidGeometry: MeshGeometry(sec, 'hairBraid', false),
       scalpGeometry: MeshGeometry(sec, 'hairScalp', !!H.referenceScalp), scalpTint: H.scalp?.tint ?? 0.6,
       referenceScalp: H.referenceScalp || null,
     };
@@ -181,7 +182,7 @@ export function DisposeHairGroomAsset(asset) {
   if (!asset || asset.disposed) return;
   asset.disposed = true;
   const h = asset.hair, b = asset.beard;
-  h?.guideTexture.dispose(); h?.density.texture.dispose(); h?.cardGeometry?.dispose(); h?.shellGeometry?.dispose(); h?.scalpGeometry?.dispose();
+  h?.guideTexture.dispose(); h?.density.texture.dispose(); h?.cardGeometry?.dispose(); h?.shellGeometry?.dispose(); h?.braidGeometry?.dispose(); h?.scalpGeometry?.dispose();
   b?.cardGeometry?.dispose(); b?.stubbleGeometry?.dispose();
   b?.density.texture.dispose();
 }
@@ -204,15 +205,17 @@ export class HairGroom {
       this.root.matrix.fromArray(asset.header.attach);
       this.root.matrix.decompose(this.root.position, this.root.quaternion, this.root.scale);
     }
-    const binding = asset.beard?.header.skinning;
-    if (binding && !boneRoot) throw new Error(`${asset.id}: beard needs the animated skeleton`);
-    const bones = binding?.bones.map(name => boneRoot.getObjectByName(name));
-    if (bones?.some(bone => !bone?.isBone) || binding?.bones.length > 8) throw new Error(`${asset.id}: beard skeleton does not match the baked asset`);
-    this.beardSkin = binding ? {
-      bones, attach: binding.attach.map(matrix => new THREE.Matrix4().fromArray(matrix)), ready: false,
-      uniforms: { uBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) },
-        uPrevBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) } },
-    } : null;
+    const MakeSkin = (binding, label) => {
+      if (!binding) return null;
+      if (!boneRoot) throw new Error(`${asset.id}: ${label} needs the animated skeleton`);
+      const bones = binding.bones.map(name => boneRoot.getObjectByName(name));
+      if (bones.some(bone => !bone?.isBone) || bones.length > 8) throw new Error(`${asset.id}: ${label} skeleton does not match the baked asset`);
+      return { bones, attach: binding.attach.map(matrix => new THREE.Matrix4().fromArray(matrix)), ready: false,
+        uniforms: { uBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) },
+          uPrevBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) } } };
+    };
+    this.beardSkin = MakeSkin(asset.beard?.header.skinning, 'beard');
+    this.braidSkin = MakeSkin(asset.hair?.header.braid?.skinning, 'braid');
     this.shared = MakeHairSharedUniforms();
     this.materials = []; this.meshes = {}; this.ownGeometries = [];
     this.current = null; this.previous = null; this.fade = 1;
@@ -230,6 +233,10 @@ export class HairGroom {
       this.meshes.strands = this.Mesh(sg, strand, 'Strands');
       if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density, referenceAtlases.get(atlas)), 'Cards');
       if (h.shellGeometry) this.meshes.shell = this.Mesh(h.shellGeometry, MakeShellMaterials(h, this.shared, lightRig), 'Shell');
+      if (h.braidGeometry) {
+        const braidLook = { ...h, render: { ...h.render, color: h.header.braid.color, roughness: .55, specular: .25, scatter: .25 } };
+        this.meshes.braid = this.Mesh(h.braidGeometry, MakeShellMaterials(braidLook, this.shared, lightRig, this.braidSkin?.uniforms), 'Braid');
+      }
       if (h.scalpGeometry) this.meshes.scalp = this.Overlay(h.scalpGeometry, MakeScalpTintMaterial(h, referenceAtlases.get(atlas), lightRig), 'ScalpTint', 1);
     }
     const b = asset.beard;
@@ -318,8 +325,7 @@ export class HairGroom {
     const sh = this.shared;
     sh.uFrame.value = (sh.uFrame.value + 1) % 4096;
     this.root.updateWorldMatrix(true, false);
-    if (this.beardSkin) {
-      const skin = this.beardSkin;
+    for (const skin of [this.beardSkin, this.braidSkin]) if (skin) {
       const current = skin.uniforms.uBeardBones.value, previous = skin.uniforms.uPrevBeardBones.value;
       _m.copy(this.root.matrixWorld).invert();
       for (let i = 0; i < skin.bones.length; i++) {
@@ -363,6 +369,7 @@ export class HairGroom {
       const f = lod === this.current ? this.fade : 1 - this.fade;
       if (mesh.userData.hairUniforms.uFade) mesh.userData.hairUniforms.uFade.value = f;
     }
+    if (this.meshes.braid) this.meshes.braid.visible = this.showHair && this.current !== 'none';
     // 头皮染色：发丝 / 发片档才要（头发壳自己盖住头皮）；淡入淡出跟着这两档
     if (this.meshes.scalp) {
       const w = (this.current === 'strands' || this.current === 'cards' ? this.fade : 0) + (this.previous === 'strands' || this.previous === 'cards' ? 1 - this.fade : 0);

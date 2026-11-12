@@ -220,9 +220,10 @@ class HeadFrame {
     const n = 0.0016 * Math.sin(phi * 0.21 + side * 1.7) + 0.0011 * Math.sin(phi * 0.57 + side * 4.1) + 0.0007 * Math.sin(phi * 1.31 + side * 2.3);
     return this.HairlineY(phi, hl) + n;
   }
-  IsEar(p, halfWidthFactor = .8) {
-    const phi = this.Phi(p), ear = this.m.ear;
-    return phi > this.earFront - 4 && phi < this.earBack + 6 && p[1] < ear.yMax + .012
+  IsEar(p, halfWidthFactor = .8, topMargin = .006) {
+    const phi = this.Phi(p), ear = this.earMask?.marks || this.m.ear;
+    const front = this.earMask?.front ?? this.earFront, back = this.earMask?.back ?? this.earBack;
+    return phi > front - 4 && phi < back + 6 && p[1] > ear.yMin - .006 && p[1] < ear.yMax + topMargin
       && Math.abs(p[0] - this.centerX) > ear.halfWidth * halfWidthFactor;
   }
   ScalpMask(p, hl) {
@@ -439,6 +440,14 @@ function PoissonRoots(sampler, rng, spacing, Weight, maxCount = 20000) {
 // 梳向（头皮切面上的方向）
 function CombDir(style, frame, p, n) {
   const c = style.comb, m = frame.m;
+  if (c.type === 'tied') {
+    const ear = frame.earMask?.marks || m.ear;
+    const tie = [frame.centerX, ear.yMax - (c.tieDrop ?? .03), m.skullBack + (c.tieBack ?? .015)];
+    const pulled = Norm(Project(Sub(tie, p), n));
+    const fringe = Norm(Project([Math.sign(p[0] - frame.centerX) * .12, -.9, -.3], n));
+    const front = (1 - Smooth(25, 55, frame.Phi(p))) * Smooth(frame.gl + .1 * frame.T, frame.gl + .45 * frame.T, p[1]);
+    return Norm(Add(Scale(pulled, 1 - front * .8), Scale(fringe, front * .8)));
+  }
   if (c.type === 'bob') {
     const side = p[0] >= c.partX ? 1 : -1;
     const front = 1 - Smooth(38, 70, frame.Phi(p));
@@ -696,7 +705,7 @@ function CardStrip(out, spine, n, comb, width, tile, cardRandom, layer, skin = n
 }
 
 // 头皮片：头部网格里区域权重 > 0 的三角形，按 offsetFn(p, n) 往外推；data = [覆盖, 厚度]
-function ScalpPatch(mesh, Weight, offsetFn, tangentFn, minW = 0.02) {
+function ScalpPatch(mesh, Weight, offsetFn, tangentFn, minW = 0.02, rejectTriangle = null) {
   const { pos, nrm, idx } = mesh;
   const map = new Map(), out = { pos: [], nrm: [], tan: [], data: [], idx: [], sourceIndex: [] };
   if (mesh.boneJoints) { out.boneJoints = []; out.boneWeights = []; }
@@ -704,6 +713,7 @@ function ScalpPatch(mesh, Weight, offsetFn, tangentFn, minW = 0.02) {
   const W = (i) => { if (wOf[i] < 0) wOf[i] = Weight([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], [nrm[3 * i], nrm[3 * i + 1], nrm[3 * i + 2]], i); return wOf[i]; };
   for (let t = 0; t < idx.length; t += 3) {
     const tri = [idx[t], idx[t + 1], idx[t + 2]];
+    if (rejectTriangle && tri.some(i => rejectTriangle([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]]))) continue;
     if (Math.max(W(tri[0]), W(tri[1]), W(tri[2])) < minW) continue;
     for (const i of tri) {
       if (!map.has(i)) {
@@ -774,6 +784,7 @@ function SurfaceNets(field, n, min, voxel, iso) {
 function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = null, scalpExclude = exclude) {
   const rng = Rng(HashString(groomId + ':hair'));
   const hl = style.hairline, K = style.points;
+  const earSurface = (p) => frame.IsEar(p, Math.min(hl.earMaskHalfWidth ?? .8, .85), .008);
   // exclude：游戏模型上帽子罩住的地方不长头发（GameHeadAssets）
   const SkinTone = (source) => {
     if (!mesh.skinScore) return 1;
@@ -912,7 +923,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     return cnt ? best / cnt : 0;
   };
   if (style.shell.kind === 'scalp') {
-    shell = ScalpPatch(mesh, Weight, (p, n, w) => 0.0004 + HeightAt(p) * 0.8 * Mix(0.4, 1, w), (p, n) => CombDir(style, frame, p, n));
+    shell = ScalpPatch(mesh, Weight, (p, n, w) => 0.0004 + HeightAt(p) * 0.8 * Mix(0.4, 1, w), (p, n) => CombDir(style, frame, p, n), .02, earSurface);
   } else {
     const blurred = Blur(Blur(fieldCells));
     let mx = 0; for (const v of blurred) mx = Math.max(mx, v);
@@ -958,7 +969,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     shell = { pos: net.pos, nrm, tan, data, idx: net.idx };
     // Strand density can be hollow at the crown. The coarse volume must also
     // cover the roots, including where the hanging hair parts around the scalp.
-    const cap = ScalpPatch(mesh, Weight, () => .0015, (p, n) => CombDir(style, frame, p, n));
+    const cap = ScalpPatch(mesh, Weight, () => .0015, (p, n) => CombDir(style, frame, p, n), .02, earSurface);
     const baseVertex = shell.pos.length / 3;
     for (const key of ['pos', 'nrm', 'tan', 'data']) shell[key].push(...cap[key]);
     shell.idx.push(...cap.idx.map(index => index + baseVertex));
@@ -968,7 +979,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
   const projection = frame.referenceProjection;
   const FrontalScalp = (p, n, source) => projection && SkinTone(source) >= .2 && !frame.IsEar(p, hl.earMaskHalfWidth ?? .8) && (!scalpExclude || !scalpExclude(p)) && frame.Phi(p) < HAIR_SHADING.referenceFrontFadeDegrees[1]
     && p[1] > projection.HairlineY(p) - .012;
-  const scalp = ScalpPatch(mesh, (p, n, source) => FrontalScalp(p, n, source) ? 1 : ScalpWeight(p, n, source), () => 0.00015, (p, n) => CombDir(style, frame, p, n));
+  const scalp = ScalpPatch(mesh, (p, n, source) => FrontalScalp(p, n, source) ? 1 : ScalpWeight(p, n, source), () => 0.00015, (p, n) => CombDir(style, frame, p, n), .02, earSurface);
   if (projection) {
     const rootWeights = scalp.data.filter((_, i) => i % 2 === 0);
     scalp.uv = []; scalp.data = [];
@@ -982,6 +993,59 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     }
   }
   return { guides, open, strands, K, bmin, bmax, density, vn, vox, extMax, cards, shell, scalp, guideCount: guides.length };
+}
+
+// A three-strand plait behind the nape. It is a separate lit mesh so it stays
+// visible at every hair LOD without tinting skin or adding a shell over the ear.
+function BuildBraid(frame, cfg) {
+  const ear = frame.earMask?.marks || frame.m.ear;
+  const startY = ear.yMax - cfg.startBelowEar;
+  const startZ = frame.m.skullBack + cfg.backOffset;
+  const segments = cfg.segments ?? 96, sides = cfg.sides ?? 8;
+  const out = {pos:[], nrm:[], tan:[], data:[], idx:[], progress:[]};
+  for (let strand = 0; strand < 3; strand++) {
+    const base = out.pos.length / 3;
+    for (let step = 0; step <= segments; step++) {
+      const t = step / segments;
+      const phase = Math.PI * 2 * (cfg.turns * t + strand / 3);
+      const orbit = cfg.orbit * Smooth(0, .12, t) * (1 - .38 * t);
+      const radius = cfg.radius * (1 - .58 * t);
+      const x = frame.centerX + cfg.sway * Math.sin(Math.PI * t) + orbit * Math.cos(phase);
+      const y = startY - cfg.length * t;
+      const z = startZ + cfg.backTravel * Math.pow(t, 1.2) + orbit * Math.sin(phase) * .72;
+      const tangent = Norm([cfg.sway * Math.PI * Math.cos(Math.PI * t), -cfg.length, cfg.backTravel * 1.2 * Math.pow(Math.max(t, .001), .2)]);
+      for (let side = 0; side < sides; side++) {
+        const angle = Math.PI * 2 * side / sides, nx = Math.cos(angle), nz = Math.sin(angle);
+        out.pos.push(x + nx * radius, y, z + nz * radius);
+        out.nrm.push(nx, 0, nz);
+        out.tan.push(...tangent);
+        out.data.push(1, 0);
+        out.progress.push(t);
+      }
+    }
+    for (let step = 0; step < segments; step++) for (let side = 0; side < sides; side++) {
+      const a = base + step * sides + side, b = base + step * sides + (side + 1) % sides;
+      const c = a + sides, d = base + (step + 1) * sides + (side + 1) % sides;
+      out.idx.push(a, b, c, b, d, c);
+    }
+  }
+  return out;
+}
+function BindBraidSkin(braid, game) {
+  const bones = ['Head', 'Neck', 'Spine2', 'Spine1'];
+  const joints = bones.map(name => game.jointNames.findIndex(joint => joint === name || joint.endsWith(':' + name)));
+  if (joints.some(index => index < 0)) throw new Error(`${game.jointNames[0]}: braid needs Head, Neck, Spine2 and Spine1`);
+  braid.boneIndices = []; braid.boundWeights = [];
+  for (const t of braid.progress) {
+    const head = 1 - Smooth(0, .2, t);
+    const neckToBack = Smooth(.2, .48, t);
+    const neck = (1 - head) * (1 - neckToBack);
+    const lowerBack = Smooth(.52, 1, t);
+    braid.boneIndices.push(0, 1, 2, 3);
+    braid.boundWeights.push(head, neck, neckToBack * (1 - lowerBack), lowerBack);
+  }
+  delete braid.progress;
+  return { bones, attach: joints.map(joint => game.attachBones[joint]), maxDroppedWeight: 0 };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1435,6 +1499,10 @@ async function BuildGroom(entry, tiles) {
   if (entry.referenceLook && !reference) throw new Error(`Missing reference look: ${entry.referenceLook}`);
   const frame = reference ? new HeadFrame(DeepMerge(baseFrame.m, reference.landmarks)) : baseFrame;
   if (reference) {
+    // Portrait registration may place the ear tens of millimetres below the
+    // actual mesh. Use measured geometry for root exclusion, while keeping the
+    // portrait landmarks for the authored hairline and facial projection.
+    frame.earMask = { marks: baseFrame.m.ear, front: baseFrame.earFront, back: baseFrame.earBack };
     frame.referenceProjection = new ReferenceProjection(REFERENCE_MASKS.looks[entry.referenceLook], frame, reference.beard.referenceParts);
     header.portrait = {center: [frame.centerX, (frame.top + frame.men) * .5, frame.zc], height: frame.top - frame.men};
   }
@@ -1443,6 +1511,8 @@ async function BuildGroom(entry, tiles) {
   if (entry.hair) {
     const style = DeepMerge(DeepMerge(STYLES.hair[entry.hair], entry.hairOverrides), reference?.hair);
     const h = BuildHair(entry.id, style, frame, game?.hairMesh || mesh, sdf, game?.hairSampler || sampler, tiles, hairExclude, game?.scalpExclude || hairExclude);
+    const braid = style.braid ? BuildBraid(frame, style.braid) : null;
+    const braidSkin = braid && game ? BindBraidSkin(braid, game) : null;
     const G = h.guides.length, K = h.K;
     const guideData = new Float32Array(G * K * 4);
     h.guides.forEach((g, gi) => g.forEach((p, k) => { const o = 4 * (gi * K + k); guideData[o] = p[0]; guideData[o + 1] = p[1]; guideData[o + 2] = p[2]; guideData[o + 3] = h.open[gi][k]; }));
@@ -1458,6 +1528,7 @@ async function BuildGroom(entry, tiles) {
       ...MeshSections('hairCard', h.cards, { uv: true }),
       ...MeshSections('hairShell', h.shell, { dataScale: [1, 0.05] }),
       ...MeshSections('hairScalp', h.scalp, { uv: !!reference, dataScale: [1, 0.05, 1] }),
+      ...(braid ? MeshSections('hairBraid', braid, { dataScale: [1, 0.05], skinning: !!braidSkin }) : {}),
     });
     header.hair = {
       style: entry.hair, name: style.name, family: style.family, guides: G, points: K, strands: S,
@@ -1466,6 +1537,8 @@ async function BuildGroom(entry, tiles) {
       cards: { count: h.cards.idx.length / 6 / (K - 1 || 1), triangles: h.cards.idx.length / 3 },
       shell: { kind: style.shell.kind, triangles: h.shell.idx.length / 3, opacity: style.shell.opacity, ...(h.shell.rootCapTriangles ? {rootCapTriangles: h.shell.rootCapTriangles} : {}) },
       scalp: { triangles: h.scalp.idx.length / 3, tint: style.scalpTint ?? { Short: 0.8, Medium: 0.6, Long: 0.55 }[style.family] ?? 0.6 },
+      ...(braid ? { braid: { triangles: braid.idx.length / 3, length: style.braid.length, color: style.braid.color || style.color,
+        ...(braidSkin ? { skinning: braidSkin } : {}) } } : {}),
       render: { width: style.width, clump: style.clump, frizz: style.frizz, curl: style.curl, color: style.color,
         roughness: style.roughness, specular: style.specular, scatter: style.scatter, length: Math.max(...Object.values(style.length)) },
     };

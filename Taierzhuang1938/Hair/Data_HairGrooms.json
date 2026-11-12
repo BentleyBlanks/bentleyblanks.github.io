@@ -87,11 +87,11 @@
    "label": "顺子（个人参考）：短寸头 + 淡短茬",
    "model": null,
    "file": "Grooms/Groom_Shunzi_Cast.bin",
-   "bytes": 1728292,
+   "bytes": 1706552,
    "strands": 46000,
-   "guides": 2659,
-   "cardTriangles": 20844,
-   "shellTriangles": 2418
+   "guides": 2642,
+   "cardTriangles": 20794,
+   "shellTriangles": 2341
   },
   {
    "id": "Luo_Cast",
@@ -109,11 +109,11 @@
    "label": "罗班长（个人参考）：短寸头 + 下颌薄短须",
    "model": null,
    "file": "Grooms/Groom_Luo_Cast.bin",
-   "bytes": 1557672,
+   "bytes": 1568908,
    "strands": 46000,
-   "guides": 2166,
-   "cardTriangles": 18390,
-   "shellTriangles": 1303
+   "guides": 2191,
+   "cardTriangles": 18590,
+   "shellTriangles": 1363
   },
   {
    "id": "HeYoutian_Cast",
@@ -131,11 +131,11 @@
    "label": "何有田（个人参考）：碎寸头 + 细唇须下颌短须",
    "model": null,
    "file": "Grooms/Groom_HeYoutian_Cast.bin",
-   "bytes": 1645200,
+   "bytes": 1641020,
    "strands": 46000,
-   "guides": 2342,
-   "cardTriangles": 19074,
-   "shellTriangles": 1597
+   "guides": 2331,
+   "cardTriangles": 19084,
+   "shellTriangles": 1522
   },
   {
    "id": "SoldierA_Cast",
@@ -153,11 +153,11 @@
    "label": "日军士兵A（个人参考）：短寸头 + 浓唇须尖下巴胡",
    "model": null,
    "file": "Grooms/Groom_SoldierA_Cast.bin",
-   "bytes": 2032268,
+   "bytes": 2027320,
    "strands": 46000,
-   "guides": 3035,
-   "cardTriangles": 31374,
-   "shellTriangles": 1994
+   "guides": 3032,
+   "cardTriangles": 31324,
+   "shellTriangles": 1898
   },
   {
    "id": "Jia_Cast",
@@ -175,11 +175,11 @@
    "label": "日兵甲（个人参考）：短平头 + 浓短唇须淡下颌茬",
    "model": null,
    "file": "Grooms/Groom_Jia_Cast.bin",
-   "bytes": 1552472,
+   "bytes": 1467792,
    "strands": 46000,
-   "guides": 2044,
-   "cardTriangles": 16788,
-   "shellTriangles": 1595
+   "guides": 1828,
+   "cardTriangles": 15118,
+   "shellTriangles": 1287
   },
   {
    "id": "Yi_Cast",
@@ -197,67 +197,75 @@
    "label": "日兵乙（个人参考）：短寸头 + 宽唇须 U 形短须",
    "model": null,
    "file": "Grooms/Groom_Yi_Cast.bin",
-   "bytes": 1704328,
+   "bytes": 1659116,
    "strands": 46000,
-   "guides": 2324,
-   "cardTriangles": 21918,
-   "shellTriangles": 2250
+   "guides": 2215,
+   "cardTriangles": 21058,
+   "shellTriangles": 1933
   },
   {
    "id": "Jia_Buzz",
    "head": "Jia",
    "hair": "Buzz",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "推子头 3 毫米",
+   "model": null,
    "file": "Grooms/Groom_Jia_Buzz.bin",
-   "bytes": 1208188,
+   "bytes": 1212408,
    "strands": 70000,
-   "guides": 2220,
-   "cardTriangles": 2754,
-   "shellTriangles": 1362
+   "guides": 2249,
+   "cardTriangles": 2808,
+   "shellTriangles": 1292
   },
   {
    "id": "HeYoutian_Crew",
    "head": "HeYoutian",
    "hair": "Crew",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "寸头 2 厘米",
+   "model": null,
    "file": "Grooms/Groom_HeYoutian_Crew.bin",
-   "bytes": 1569892,
+   "bytes": 1569524,
    "strands": 46000,
-   "guides": 2595,
-   "cardTriangles": 19920,
-   "shellTriangles": 1867
+   "guides": 2597,
+   "cardTriangles": 19930,
+   "shellTriangles": 1847
   },
   {
    "id": "Shunzi_SidePart",
    "head": "Shunzi",
    "hair": "SidePart",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "分头 8 厘米（抹油，顺）",
+   "model": null,
    "file": "Grooms/Groom_Shunzi_SidePart.bin",
-   "bytes": 1721580,
+   "bytes": 1721052,
    "strands": 52000,
    "guides": 2674,
    "cardTriangles": 16866,
-   "shellTriangles": 2298
+   "shellTriangles": 2286
   },
   {
    "id": "Luo_Messy",
    "head": "Luo",
    "hair": "Messy",
    "beard": null,
+   "reference": null,
    "row": "length",
    "label": "乱发 6 厘米（毛躁）",
+   "model": null,
    "file": "Grooms/Groom_Luo_Messy.bin",
-   "bytes": 1448088,
+   "bytes": 1450312,
    "strands": 52000,
-   "guides": 2136,
-   "cardTriangles": 11936,
-   "shellTriangles": 1217
+   "guides": 2142,
+   "cardTriangles": 12016,
+   "shellTriangles": 1188
   },
   {
    "id": "Yi_LongStraight",
@@ -269,11 +277,11 @@
    "label": "长直发 28 厘米（柔顺）",
    "model": null,
    "file": "Grooms/Groom_Yi_LongStraight.bin",
-   "bytes": 2611592,
+   "bytes": 2626404,
    "strands": 64000,
-   "guides": 1800,
-   "cardTriangles": 37202,
-   "shellTriangles": 16015
+   "guides": 1820,
+   "cardTriangles": 37544,
+   "shellTriangles": 16050
   },
   {
    "id": "SoldierA_LongWavy",
@@ -285,81 +293,91 @@
    "label": "长卷发 22 厘米（粗硬）",
    "model": null,
    "file": "Grooms/Groom_SoldierA_LongWavy.bin",
-   "bytes": 3523448,
+   "bytes": 3540712,
    "strands": 60000,
-   "guides": 2570,
-   "cardTriangles": 57834,
-   "shellTriangles": 19585
+   "guides": 2581,
+   "cardTriangles": 58170,
+   "shellTriangles": 19595
   },
   {
    "id": "Shunzi_Stubble",
    "head": "Shunzi",
    "hair": "Buzz",
    "beard": "Stubble",
+   "reference": null,
    "row": "beard",
    "label": "胡茬（贴片）",
+   "model": null,
    "file": "Grooms/Groom_Shunzi_Stubble.bin",
-   "bytes": 1365820,
+   "bytes": 1365404,
    "strands": 70000,
    "guides": 3356,
    "cardTriangles": 4176,
-   "shellTriangles": 2348
+   "shellTriangles": 2336
   },
   {
    "id": "Jia_Mustache",
    "head": "Jia",
    "hair": "Buzz",
    "beard": "MustacheThick",
+   "reference": null,
    "row": "beard",
    "label": "浓八字",
+   "model": null,
    "file": "Grooms/Groom_Jia_Mustache.bin",
-   "bytes": 1387740,
+   "bytes": 1387220,
    "strands": 70000,
-   "guides": 2233,
-   "cardTriangles": 7362,
-   "shellTriangles": 1362
+   "guides": 2251,
+   "cardTriangles": 7374,
+   "shellTriangles": 1292
   },
   {
    "id": "HeYoutian_Goatee",
    "head": "HeYoutian",
    "hair": "Buzz",
    "beard": "GoateeThin",
+   "reference": null,
    "row": "beard",
    "label": "细八字 + 山羊胡",
+   "model": null,
    "file": "Grooms/Groom_HeYoutian_Goatee.bin",
-   "bytes": 1474052,
+   "bytes": 1473412,
    "strands": 70000,
-   "guides": 3273,
+   "guides": 3275,
    "cardTriangles": 8118,
-   "shellTriangles": 1893
+   "shellTriangles": 1873
   },
   {
    "id": "Luo_Boxed",
    "head": "Luo",
    "hair": "Buzz",
    "beard": "BoxedShort",
+   "reference": null,
    "row": "beard",
    "label": "短络腮",
+   "model": null,
    "file": "Grooms/Groom_Luo_Boxed.bin",
-   "bytes": 2503696,
+   "bytes": 2502788,
    "strands": 70000,
-   "guides": 2638,
-   "cardTriangles": 42330,
-   "shellTriangles": 1205
+   "guides": 2645,
+   "cardTriangles": 42318,
+   "shellTriangles": 1173
   },
   {
    "id": "SoldierA_FullLong",
    "head": "SoldierA",
    "hair": "Buzz",
    "beard": "FullLong",
+   "reference": null,
    "row": "beard",
    "label": "长络腮 12 厘米",
+   "model": null,
    "file": "Grooms/Groom_SoldierA_FullLong.bin",
-   "bytes": 2714816,
+   "bytes": 2715052,
    "strands": 70000,
-   "guides": 3924,
-   "cardTriangles": 53202,
-   "shellTriangles": 2038
+   "guides": 3940,
+   "cardTriangles": 53220,
+   "shellTriangles": 1992
   },
   {
    "id": "Donggua_Cast",
@@ -399,11 +417,11 @@
    "label": "幺娃（个人参考）",
    "model": null,
    "file": "Grooms/Groom_Yaowa_Cast.bin",
-   "bytes": 1422980,
+   "bytes": 1424348,
    "strands": 46000,
-   "guides": 2123,
-   "cardTriangles": 16680,
-   "shellTriangles": 1093
+   "guides": 2138,
+   "cardTriangles": 16690,
+   "shellTriangles": 1083
   },
   {
    "id": "LiuWencai_Cast",
@@ -421,10 +439,10 @@
    "label": "刘文财（个人参考）",
    "model": null,
    "file": "Grooms/Groom_LiuWencai_Cast.bin",
-   "bytes": 1466020,
+   "bytes": 1476148,
    "strands": 46000,
-   "guides": 2091,
-   "cardTriangles": 17118,
+   "guides": 2122,
+   "cardTriangles": 17368,
    "shellTriangles": 1121
   },
   {
@@ -437,17 +455,17 @@
     "source": "07_老耿/HairReference_20261107/Ref_OldGeng_HeadHair_1K_V1.png",
     "sha256": "875b43bcb65459cf49e4e238813155426feebc13f50bb9194cb007feec64545f",
     "version": 4,
-    "recipeSha256": "d48c2aebe648cff7731e63d0dc8b2465ccc09b1a75ee9042364578f68f011777"
+    "recipeSha256": "f316e1814df0bbe31dee711860b4a1bacca5230727a6f30f14aa05400360d0fa"
    },
    "row": "newCast",
    "label": "老耿（个人参考）",
    "model": null,
    "file": "Grooms/Groom_OldGeng_Cast.bin",
-   "bytes": 1764320,
+   "bytes": 1764720,
    "strands": 44000,
-   "guides": 1892,
-   "cardTriangles": 24434,
-   "shellTriangles": 1028
+   "guides": 1909,
+   "cardTriangles": 24334,
+   "shellTriangles": 1006
   },
   {
    "id": "Nier_Cast",
@@ -459,17 +477,17 @@
     "source": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadShortHair_2K_V1.png",
     "sha256": "06fbf5bb6aedce4cdec8fbc88136460c28c7bbf8ab53723ba2ade0b66cf9ae56",
     "version": 4,
-    "recipeSha256": "361984beeb24656db0a907c1f356dfde25a0d958cb536886f9b7e44526cee947"
+    "recipeSha256": "afd131aff6304215365df137672e959fc7e30e1d67a748636f75f56503d616b7"
    },
    "row": "newCast",
    "label": "妮儿（个人参考）",
    "model": null,
    "file": "Grooms/Groom_Nier_Cast.bin",
-   "bytes": 3324572,
+   "bytes": 4364920,
    "strands": 60000,
-   "guides": 2021,
-   "cardTriangles": 52972,
-   "shellTriangles": 33524
+   "guides": 2057,
+   "cardTriangles": 79560,
+   "shellTriangles": 20680
   },
   {
    "id": "TaniHisao_Cast",
@@ -487,11 +505,11 @@
    "label": "谷寿夫（个人参考）",
    "model": null,
    "file": "Grooms/Groom_TaniHisao_Cast.bin",
-   "bytes": 1456140,
+   "bytes": 1464296,
    "strands": 46000,
-   "guides": 1946,
-   "cardTriangles": 16158,
-   "shellTriangles": 1169
+   "guides": 1981,
+   "cardTriangles": 16328,
+   "shellTriangles": 1170
   },
   {
    "id": "SoldierC_Cast",
@@ -509,11 +527,11 @@
    "label": "日军士兵C（个人参考）",
    "model": null,
    "file": "Grooms/Groom_SoldierC_Cast.bin",
-   "bytes": 2319696,
+   "bytes": 2330372,
    "strands": 46000,
-   "guides": 2030,
-   "cardTriangles": 43146,
-   "shellTriangles": 1209
+   "guides": 2047,
+   "cardTriangles": 43470,
+   "shellTriangles": 1195
   },
   {
    "id": "AzumaShiro_Cast",
@@ -531,11 +549,11 @@
    "label": "东史郎（个人参考）：钢盔下短发、唇须和短下巴胡",
    "model": null,
    "file": "Grooms/Groom_AzumaShiro_Cast.bin",
-   "bytes": 1755056,
+   "bytes": 1752668,
    "strands": 46000,
    "guides": 2463,
    "cardTriangles": 24956,
-   "shellTriangles": 1522
+   "shellTriangles": 1433
   },
   {
    "id": "Interpreter_Cast",
@@ -553,11 +571,11 @@
    "label": "翻译（个人参考）：凌乱短发、净面",
    "model": null,
    "file": "Grooms/Groom_Interpreter_Cast.bin",
-   "bytes": 1734732,
+   "bytes": 1734532,
    "strands": 52000,
-   "guides": 2156,
-   "cardTriangles": 22352,
-   "shellTriangles": 1370
+   "guides": 2174,
+   "cardTriangles": 22400,
+   "shellTriangles": 1323
   },
   {
    "id": "Game_HeYoutian",
@@ -575,11 +593,11 @@
    "label": "何有田（游戏挂接）：碎寸头 + 细唇须下颌短须",
    "model": "Model/Character/Model_HeYoutian.glb",
    "file": "Grooms/Groom_Game_HeYoutian.bin",
-   "bytes": 1226768,
+   "bytes": 1216376,
    "strands": 46000,
-   "guides": 802,
-   "cardTriangles": 8646,
-   "shellTriangles": 800
+   "guides": 790,
+   "cardTriangles": 8626,
+   "shellTriangles": 725
   },
   {
    "id": "Game_JapaneseSoldierJia",
@@ -597,11 +615,11 @@
    "label": "日兵甲（游戏挂接）：短平头 + 浓短唇须淡下颌茬",
    "model": "Model/Character/Model_JapaneseSoldierJia.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierJia.bin",
-   "bytes": 1197064,
+   "bytes": 1133512,
    "strands": 46000,
-   "guides": 741,
-   "cardTriangles": 7276,
-   "shellTriangles": 781
+   "guides": 601,
+   "cardTriangles": 6056,
+   "shellTriangles": 532
   },
   {
    "id": "Game_SquadLeaderLuo",
@@ -619,11 +637,11 @@
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "model": "Model/Character/Model_SquadLeaderLuo.glb",
    "file": "Grooms/Groom_Game_SquadLeaderLuo.bin",
-   "bytes": 1187536,
+   "bytes": 1186604,
    "strands": 46000,
-   "guides": 1080,
-   "cardTriangles": 10318,
-   "shellTriangles": 1088
+   "guides": 1078,
+   "cardTriangles": 10308,
+   "shellTriangles": 1026
   },
   {
    "id": "Game_JapaneseSoldierA",
@@ -641,11 +659,11 @@
    "label": "日军士兵A（游戏挂接）：短寸头 + 浓唇须尖下巴胡",
    "model": "Model/Character/Model_JapaneseSoldierA.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierA.bin",
-   "bytes": 2109972,
+   "bytes": 2106316,
    "strands": 46000,
-   "guides": 2826,
-   "cardTriangles": 30002,
-   "shellTriangles": 1848
+   "guides": 2817,
+   "cardTriangles": 29982,
+   "shellTriangles": 1782
   },
   {
    "id": "Game_Shunzi",
@@ -663,11 +681,11 @@
    "label": "顺子（游戏挂接）：短寸头 + 淡短茬",
    "model": "Model/Character/Model_Shunzi.glb",
    "file": "Grooms/Groom_Game_Shunzi.bin",
-   "bytes": 1598648,
+   "bytes": 1583104,
    "strands": 46000,
-   "guides": 2116,
-   "cardTriangles": 17250,
-   "shellTriangles": 2065
+   "guides": 2113,
+   "cardTriangles": 17180,
+   "shellTriangles": 1988
   },
   {
    "id": "Game_JapaneseSoldierYi",
@@ -685,11 +703,11 @@
    "label": "日兵乙（游戏挂接）：短寸头 + 宽唇须 U 形短须",
    "model": "Model/Character/Model_JapaneseSoldierYi.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierYi.bin",
-   "bytes": 1651596,
+   "bytes": 1613992,
    "strands": 46000,
-   "guides": 1798,
-   "cardTriangles": 18580,
-   "shellTriangles": 1870
+   "guides": 1706,
+   "cardTriangles": 17920,
+   "shellTriangles": 1566
   },
   {
    "id": "Game_Donggua",
@@ -707,11 +725,11 @@
    "label": "冬瓜（游戏挂接）",
    "model": "Model/Character/Model_Donggua.glb",
    "file": "Grooms/Groom_Game_Donggua.bin",
-   "bytes": 854380,
+   "bytes": 856364,
    "strands": 46000,
    "guides": 400,
    "cardTriangles": 3598,
-   "shellTriangles": 253
+   "shellTriangles": 243
   },
   {
    "id": "Game_Yaowa",
@@ -729,11 +747,11 @@
    "label": "幺娃（游戏挂接）",
    "model": "Model/Character/Model_Yaowa.glb",
    "file": "Grooms/Groom_Game_Yaowa.bin",
-   "bytes": 806120,
+   "bytes": 805864,
    "strands": 46000,
-   "guides": 436,
-   "cardTriangles": 3480,
-   "shellTriangles": 241
+   "guides": 438,
+   "cardTriangles": 3470,
+   "shellTriangles": 234
   },
   {
    "id": "Game_LiuWencai",
@@ -751,11 +769,11 @@
    "label": "刘文财（游戏挂接）",
    "model": "Model/Character/Model_LiuWencai.glb",
    "file": "Grooms/Groom_Game_LiuWencai.bin",
-   "bytes": 958628,
+   "bytes": 960696,
    "strands": 46000,
-   "guides": 575,
-   "cardTriangles": 4654,
-   "shellTriangles": 457
+   "guides": 578,
+   "cardTriangles": 4734,
+   "shellTriangles": 438
   },
   {
    "id": "Game_OldGeng",
@@ -767,17 +785,17 @@
     "source": "07_老耿/HairReference_20261107/Ref_OldGeng_HeadHair_1K_V1.png",
     "sha256": "875b43bcb65459cf49e4e238813155426feebc13f50bb9194cb007feec64545f",
     "version": 4,
-    "recipeSha256": "d48c2aebe648cff7731e63d0dc8b2465ccc09b1a75ee9042364578f68f011777"
+    "recipeSha256": "f316e1814df0bbe31dee711860b4a1bacca5230727a6f30f14aa05400360d0fa"
    },
    "row": null,
    "label": "老耿（游戏挂接）",
    "model": "Model/Character/Model_OldGeng.glb",
    "file": "Grooms/Groom_Game_OldGeng.bin",
-   "bytes": 2019104,
+   "bytes": 2011964,
    "strands": 44000,
-   "guides": 1900,
-   "cardTriangles": 24972,
-   "shellTriangles": 1028
+   "guides": 1898,
+   "cardTriangles": 24852,
+   "shellTriangles": 1007
   },
   {
    "id": "Game_Nier",
@@ -789,17 +807,17 @@
     "source": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadShortHair_2K_V1.png",
     "sha256": "06fbf5bb6aedce4cdec8fbc88136460c28c7bbf8ab53723ba2ade0b66cf9ae56",
     "version": 4,
-    "recipeSha256": "361984beeb24656db0a907c1f356dfde25a0d958cb536886f9b7e44526cee947"
+    "recipeSha256": "afd131aff6304215365df137672e959fc7e30e1d67a748636f75f56503d616b7"
    },
    "row": null,
    "label": "妮儿（游戏挂接）",
    "model": "Model/Character/Model_Nier.glb",
    "file": "Grooms/Groom_Game_Nier.bin",
-   "bytes": 3340100,
+   "bytes": 4473232,
    "strands": 60000,
-   "guides": 2046,
-   "cardTriangles": 53482,
-   "shellTriangles": 33332
+   "guides": 2077,
+   "cardTriangles": 81702,
+   "shellTriangles": 20940
   },
   {
    "id": "Game_TaniHisao",
@@ -817,11 +835,11 @@
    "label": "谷寿夫（游戏挂接）",
    "model": "Model/Character/Model_TaniHisao.glb",
    "file": "Grooms/Groom_Game_TaniHisao.bin",
-   "bytes": 987456,
+   "bytes": 987424,
    "strands": 46000,
-   "guides": 738,
-   "cardTriangles": 5470,
-   "shellTriangles": 530
+   "guides": 737,
+   "cardTriangles": 5480,
+   "shellTriangles": 526
   },
   {
    "id": "Game_JapaneseSoldierC",
@@ -839,11 +857,11 @@
    "label": "日军士兵C（游戏挂接）",
    "model": "Model/Character/Model_JapaneseSoldierC.glb",
    "file": "Grooms/Groom_Game_JapaneseSoldierC.bin",
-   "bytes": 1026616,
+   "bytes": 1028540,
    "strands": 46000,
-   "guides": 603,
+   "guides": 604,
    "cardTriangles": 9074,
-   "shellTriangles": 375
+   "shellTriangles": 363
   },
   {
    "id": "Game_AzumaShiro",
@@ -861,11 +879,11 @@
    "label": "东史郎（游戏挂接）：钢盔下短发、唇须和短下巴胡",
    "model": "Model/Character/Model_AzumaShiro.glb",
    "file": "Grooms/Groom_Game_AzumaShiro.bin",
-   "bytes": 1441900,
+   "bytes": 1440552,
    "strands": 46000,
    "guides": 1048,
    "cardTriangles": 15536,
-   "shellTriangles": 635
+   "shellTriangles": 599
   },
   {
    "id": "Game_Interpreter",
@@ -883,11 +901,11 @@
    "label": "翻译（游戏挂接）：凌乱短发、净面",
    "model": "Model/Character/Model_Interpreter.glb",
    "file": "Grooms/Groom_Game_Interpreter.bin",
-   "bytes": 1752704,
+   "bytes": 1753648,
    "strands": 52000,
-   "guides": 2229,
-   "cardTriangles": 22608,
-   "shellTriangles": 1370
+   "guides": 2231,
+   "cardTriangles": 22688,
+   "shellTriangles": 1323
   }
  ]
 }

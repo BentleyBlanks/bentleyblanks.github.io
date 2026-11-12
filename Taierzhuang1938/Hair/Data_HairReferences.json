@@ -1764,7 +1764,7 @@
      "templeLow": 0.28,
      "sideburn": 0.5,
      "nape": 0.018,
-     "band": 0.004
+     "band": 0.007
     },
     "clump": 0.13,
     "frizz": 0.09,
@@ -1772,7 +1772,7 @@
     "color": {
      "melanin": 0.94,
      "redness": 0.08,
-     "gray": 0.45
+     "gray": 0.72
     },
     "comb": {
      "type": "crew"
@@ -1954,21 +1954,21 @@
    "baldSource": "08_妮儿/Parts_V1_20261105/Ref_Nier_HeadBald_2K_V1.png",
    "baldSha256": "09eacea94d76872bda1b04eb7ce3cd0f164a87dd7e7e889cbaa1ee0e29f7535f",
    "observations": [
-    "妮儿：齐颈短发与碎刘海"
+    "妮儿：以本人侧、背三视图为准，额前碎发、耳后束发和一条垂到背部的长辫"
    ],
    "hair": {
-    "name": "妮儿：齐颈短发与碎刘海",
+    "name": "妮儿：额前碎发、耳后束发与长辫",
     "length": {
-     "top": 0.24,
-     "front": 0.085,
-     "side": 0.15,
-     "back": 0.2
+     "top": 0.07,
+     "front": 0.062,
+     "side": 0.035,
+     "back": 0.03
     },
     "lengthJitter": 0.22,
     "lift": {
-     "top": 0.14,
+     "top": 0.06,
      "side": 0.04,
-     "back": 0.05
+     "back": 0.03
     },
     "hairline": {
      "front": 0.48,
@@ -1979,36 +1979,44 @@
      "band": 0.004,
      "reference": false
     },
-    "clump": 0.42,
-    "frizz": 0.035,
+    "clump": 0.18,
+    "frizz": 0.1,
     "scalpTint": 0.7,
     "color": {
-     "melanin": 0.94,
+     "melanin": 0.98,
      "redness": 0.08,
      "gray": 0
     },
     "comb": {
-     "type": "bob",
-     "partX": -0.015,
-     "fringeClearance": 0.004,
-     "fringeMinLength": 0.008,
-     "hemOffset": 0.008,
-     "hemMinLength": 0.02,
-     "crownTravel": 0.015,
-     "tipTuck": 0.015
+     "type": "tied",
+     "tieDrop": 0.03,
+     "tieBack": 0.015
+    },
+    "braid": {
+     "startBelowEar": 0.03,
+     "backOffset": 0.008,
+     "length": 0.22,
+     "backTravel": 0.035,
+     "orbit": 0.0065,
+     "radius": 0.006,
+     "turns": 6.5,
+     "sway": 0.004,
+     "color": { "melanin": 1, "redness": 0, "gray": 0 },
+     "segments": 96,
+     "sides": 8
     },
     "strands": 60000,
     "family": "Long",
     "points": 18,
     "guideSpacing": 0.004,
-    "stiffness": 0.28,
-    "gravity": 0.85,
-    "volume": 0.002,
+    "stiffness": 0.78,
+    "gravity": 0.18,
+    "volume": 0.001,
     "cards": {
-     "spacing": 0.008,
-     "width": 0.014,
+     "spacing": 0.0065,
+     "width": 0.009,
      "layers": 3,
-     "tile": "Long"
+     "tile": "Wavy"
     },
     "shell": {
      "kind": "hull",
@@ -2016,7 +2024,7 @@
     }
    },
    "beard": {
-    "name": "妮儿：齐颈短发与碎刘海",
+    "name": "妮儿：净面",
     "enabled": false,
     "points": 5,
     "stubble": {

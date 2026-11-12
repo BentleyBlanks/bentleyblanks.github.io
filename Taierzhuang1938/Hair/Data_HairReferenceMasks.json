@@ -1,7 +1,7 @@
 {
  "schema": "tengxian.hairReferenceMasks",
  "version": 1,
- "definitionSha256": "9189ac5ce3c34ac25ff561cc7b7dbdeec0530710ab54a8dc70ce826b51c4f977",
+ "definitionSha256": "2a7c7747074a6f41fa3ac1ccd4b422836d39b860185325ee473271b9577ba9c5",
  "atlas": "Textures/Texture_HairReferenceMasks.png",
  "luminanceAtlas": "Textures/Texture_HairReferenceBeardLuminance.png",
  "luminanceAtlasSha256": "750ebbe9343068356d8222425f5d3f5c831183a6729307fe3eb87053c92bf7aa",

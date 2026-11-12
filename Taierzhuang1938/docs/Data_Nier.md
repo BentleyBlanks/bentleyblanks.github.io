@@ -12,11 +12,13 @@
 
 `Data_XBotCharacters.mjs` 登记 `nier`，命名角色映射覆盖编辑器的 `Nier` 和旧布局的 `nier`。人物只分配给妮儿身份。
 
+源模型的剃净头供毛发烘焙使用；游戏通过 `Groom_Game_Nier.bin` 显示本人三视图中的额前碎发、耳后束发与背部长辫。头部三档跟随 `Head` 骨，长辫从根到尾逐渐转给 `Neck`、`Spine2`、`Spine1`，待机、转头、走、跑和坐姿均保持在衣背外；脸部保持净面。侧、背参考分别是 Tripo 本人目录的 `Character_Nier_Side_2K_3x4_V6.png` 与 `Character_Nier_Back_2K_3x4_V6.png`；配方与毛发验收见[头发系统](Data_HairSystem.md)。
+
 带 `heightM` 的角色通过现有 ActorFactory 尺寸选项设置实际身高，XBotSkin 按模型高度适配该 Actor，碰撞和显示使用同一尺寸。妮儿在第六段场景中的模型世界缩放为1，Actor 身高为1.288729米。
 
 这类角色的原生行走、跑步播放速率按世界缩放与自身胯高比换算，适配缩短的步幅。
 
-本地动作预览入口为 `Tool_MixamoAnimationPreview.html?who=nier`，实际角色检查入口为 `?editor=blockout&level=FirstLevel0610&kf=06-2`。
+本地动作预览入口为 `AdvancedTools/Tool_MixamoAnimationPreview.html?who=nier`，实际角色检查入口为 `?editor=blockout&level=FirstLevel0610&kf=06-2`。
 
 ## 本次验证
 
@@ -43,4 +45,4 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=XBotCharactersTest,NierCharact
 
 ## 创作标注
 
-妮儿的脸型、光头、旧棉衣、补丁裤和布鞋按用户参考与生成部件设计，属于本作创作外观。身材、骨架、蒙皮和动作适配属于游戏表现。
+妮儿的脸型、束发长辫、旧棉衣、补丁裤和布鞋按用户参考与生成部件设计，属于本作创作外观。剃净源头、身材、骨架、蒙皮和动作适配属于游戏表现。

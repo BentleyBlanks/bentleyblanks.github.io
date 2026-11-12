@@ -551,6 +551,7 @@ uniform float uFrame;
 uniform float uFade;
 uniform float uMelanin;
 uniform float uRedness;
+uniform float uGray;
 uniform float uOpacity;
 uniform float uStreakFreq;
 in vec3 vTangent;
@@ -571,6 +572,7 @@ void main() {
   vec3 T = normalize(vTangent + normalize(vNormalV) * (st - 0.5) * 0.25);
   vec3 V = normalize(-vViewPos);
   vec3 base = HairColorFromMelanin(uMelanin * mix(0.93, 1.0, st), uRedness);
+  base = mix(base, vec3(0.62, 0.6, 0.56), uGray);
   float occ = mix(0.35, 0.85, st);
   fragColor = HairOutput(HairLight(T, V, base, vWorldPos, vLocalPos, occ, fract(h * 7.0)));
 }
@@ -838,13 +840,13 @@ export function MakeCardMaterials(part, atlas, shared, lightRig, density, refere
   const prepass = PrepassMaterial(MESH_VERTEX(true, !!skinBeard), CARD_PREPASS_FRAGMENT, { ...shared, ...own, ...(skinBeard || {}) });
   return { main, prepass, own };
 }
-export function MakeShellMaterials(hair, shared, lightRig) {
+export function MakeShellMaterials(hair, shared, lightRig, skinBones = null) {
   const r = hair.render;
   const own = { uFade: { value: 1 }, uOpacity: { value: hair.shellOpacity }, uStreakFreq: { value: HAIR_SHADING.shellStreakFrequency },
     uRoughness: { value: Math.min(0.9, r.roughness + 0.12) }, uSpecular: { value: r.specular * 0.7 }, uScatter: { value: r.scatter } };
-  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density) };
-  const main = LitMaterial(MESH_VERTEX(false), SHELL_FRAGMENT, uniforms, { lightRig, side: THREE.FrontSide });
-  const prepass = PrepassMaterial(MESH_VERTEX(true), SHELL_PREPASS_FRAGMENT, { ...shared, ...own }, THREE.FrontSide);
+  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density), ...(skinBones || {}) };
+  const main = LitMaterial(MESH_VERTEX(false, !!skinBones), SHELL_FRAGMENT, uniforms, { lightRig, side: THREE.FrontSide });
+  const prepass = PrepassMaterial(MESH_VERTEX(true, !!skinBones), SHELL_PREPASS_FRAGMENT, { ...shared, ...own, ...(skinBones || {}) }, THREE.FrontSide);
   return { main, prepass, own };
 }
 export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightRig = null, referenceLuminance = null, skinBeard = null) {

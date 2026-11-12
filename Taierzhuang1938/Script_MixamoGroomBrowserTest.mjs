@@ -43,6 +43,7 @@ try {
       assert.ok(observation.hair?.startsWith("Game_"), `${key}: game groom loaded`);
       assert.equal(observation.parent, "Head", `${key}: groom follows head bone`);
       assert.ok(observation.visible.some(name => /Hair(Strands|Cards|Shell)/.test(name)), `${key}: hair rendered`);
+      if (key === 'nier') assert.ok(observation.visible.includes('HairBraid'), 'Nier: the reference braid stays visible with animated hair');
       if (styledBeards.has(observation.hair))
         assert.ok(observation.visible.some(name => /Hair(Beard|Stubble)/.test(name)), `${key}: beard rendered`);
       if (styledBeards.has(observation.hair))

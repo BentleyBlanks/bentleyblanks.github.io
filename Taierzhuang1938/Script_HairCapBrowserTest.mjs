@@ -54,6 +54,11 @@ try {
     const skinFraction = SkinFraction(data, info, region);
     measurements.push({ view, skinFraction, ceiling, region });
     assert.ok(skinFraction < ceiling, `${view} cap seam exposes too much bald skin (${skinFraction.toFixed(3)} >= ${ceiling})`);
+    if (view === 'right') {
+      const earRegion = [325, 345, 82, 122], earSkinFraction = SkinFraction(data, info, earRegion);
+      measurements.push({ view: 'rightEar', skinFraction: earSkinFraction, floor: .82, region: earRegion });
+      assert.ok(earSkinFraction > .82, `right ear is covered by hair (${earSkinFraction.toFixed(3)} <= .82)`);
+    }
   }
   assert.deepEqual(errors, []);
   assert.deepEqual(failedRequests, []);
