@@ -166,7 +166,7 @@ UpdateGeometry(body, bodyPoints * pixelSize, bodyNormals)
 head = DuplicatePart(sources['HeadBald'], 'HeadBald')
 rawHead = Coordinates(head)
 headNormals = Normals(head)
-headScales = np.array([104.0, 122.0, 135.0])
+headScales = np.array([104.0, 133.0, 135.0])
 headPoints = rawHead * headScales
 headPoints[:, 0] += 3.0
 headPoints[:, 1] -= 5.0
@@ -180,6 +180,29 @@ neckScale = 1 - neckWeight + neckWeight * np.minimum(1, 1 / radius.clip(1e-9))
 headPoints[:, :2] = neckCenter + delta * neckScale[:, None]
 headPoints[:, 2] -= 5.0 * neckWeight
 headNormals /= headScales
+
+# The full-body bald profile calibration aligns its scalp row 18 to row 16.
+# Restore cranial depth about the nose plane, then seat the lower neck in its
+# existing collar. Smooth weights preserve the source's rounded skull surface.
+headRows = floorPixel - headPoints[:, 2]
+cranialDepthFactor = 1.23
+nosePlanePixel = 40.7
+upperDomeShiftPixels = 4.0
+depthAmount = np.clip((132 - headRows) / 30, 0, 1)
+depthWeight = depthAmount**2 * (3 - 2 * depthAmount)
+depthWeightSlope = -6 * depthAmount * (1 - depthAmount) / 30
+domeAmount = np.clip((50 - headRows) / 40, 0, 1)
+domeWeight = domeAmount**2 * (3 - 2 * domeAmount)
+domeWeightSlope = -6 * domeAmount * (1 - domeAmount) / 40
+depthDelta = ((cranialDepthFactor - 1) * (headPoints[:, 0] - nosePlanePixel)
+              - upperDomeShiftPixels * domeWeight)
+depthScales = 1 + (cranialDepthFactor - 1) * depthWeight
+depthDerivative = -(depthWeightSlope * depthDelta
+                    - upperDomeShiftPixels * depthWeight * domeWeightSlope)
+headPoints[:, 0] += depthWeight * depthDelta
+headLoops = np.array([loop.vertex_index for loop in head.data.loops])
+headNormals[:, 0] /= depthScales[headLoops]
+headNormals[:, 2] -= depthDerivative[headLoops] * headNormals[:, 0]
 UpdateGeometry(head, headPoints * pixelSize, headNormals)
 
 hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
@@ -338,6 +361,16 @@ for view, position, rotation in referenceViews:
     reference.rotation_euler = Matrix(rotation).to_euler()
     reference.hide_render = True
     reference.hide_set(True)
+calibrationPath = reviewRoot / 'HeadCorrection' / 'Ref_ErYa_LeftSideBald_Calibration.png'
+if calibrationPath.is_file():
+    calibration = reference.copy()
+    referenceCollection.objects.link(calibration)
+    calibration.name = 'Reference_LeftSideBald_GeneratedCalibration'
+    calibration.data = bpy.data.images.load(str(calibrationPath), check_existing=True)
+    calibration.location = (-20 * pixelSize, -.41, reviewCenter.z + 2 * pixelSize)
+    calibration.rotation_euler = Matrix(referenceViews[1][2]).to_euler()
+    calibration['Source'] = 'Built-in imagegen, edited from the original profile and bald head reference'
+    calibration.hide_set(True)
 for obj in reviewCollection.objects:
     obj.hide_set(True)
 for screen in bpy.data.screens:
@@ -364,6 +397,11 @@ report = {
     'referenceFrame': {'width': 640, 'height': 640, 'floorRow': floorPixel,
                        'scalpRow': scalpPixel, 'metersPerPixel': pixelSize},
     'bodySourceHeights': bodyHeights.tolist(), 'bodyReferenceRows': bodyRows.tolist(),
+    'headFit': {'widthScale': float(headScales[1]),
+                'cranialDepthFactor': cranialDepthFactor,
+                'nosePlanePixel': nosePlanePixel,
+                'upperDomeShiftPixels': upperDomeShiftPixels,
+                'calibration': str(calibrationPath)},
     'handRollDegrees': math.degrees(handRoll), 'sourceFiles': sourceFiles,
     'parts': {obj.name: {'min': Coordinates(obj).min(0).tolist(),
                         'max': Coordinates(obj).max(0).tolist(),
