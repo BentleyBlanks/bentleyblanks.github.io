@@ -27,6 +27,9 @@
     { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/14", "format": "png", "maxSize": 2048 },
     { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/83", "format": "png", "maxSize": 2048 },
     { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/91", "format": "png", "maxSize": 2048 },
-    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/96", "format": "png", "maxSize": 2048 }
+    { "path": "Taierzhuang1938/Model/Type38_511/Model_Type38_511.glb#image/96", "format": "png", "maxSize": 2048 },
+    { "path": "Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb#image/57", "format": "ktx2-bc7", "maxSize": 4096, "quality": 40 },
+    { "path": "Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb#image/58", "format": "ktx2-bc7", "maxSize": 4096, "quality": 40 },
+    { "path": "Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb#image/59", "format": "ktx2-bc7", "maxSize": 4096, "quality": 40 }
   ]
 }

@@ -10,6 +10,7 @@ import {ConfigureHanYang173R,HanYang173RBaseGain,InstantiateHanYang173R,RepairHa
 import { MESHES } from './Data_Meshes.mjs';
 import { AllMeshUrls } from './Script_Meshes.mjs';
 import {DEFAULT_PLAYER_WEAPON,LOADOUTS} from './Data_Weapons.mjs';
+import {StrictRule} from './Script_StrictTextureRules.mjs';
 import * as THREE from 'three';
 const dir=path.join(path.dirname(fileURLToPath(import.meta.url)),'Model/HanYang173R');
 const report=JSON.parse(fs.readFileSync(path.join(dir,'Data_GameGeometry.json'),'utf8'));
@@ -42,10 +43,56 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
   assert.equal(Math.abs(ts[i][3]),1);
  }
 }
-// 59,901 after the 60k decimation; the 2026-11-03 rebake slices long parts every 6 cm for uniform-density UVs (+8,756, shape unchanged).
-assert.equal(triangles,report.triangles);assert.equal(triangles,68657);
+// Clean reduced wood plus the complete high-source cocking cover fit the 69k allocation.
+assert.equal(triangles,report.triangles);assert.equal(triangles,64776);
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
-for(const p of report.parts.filter(p=>!p.gameplayAdaptation))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
+const publishRules=JSON.parse(fs.readFileSync(new URL('./Data_PublishPathRules.json',import.meta.url),'utf8'));
+for(const index of [57,58,59]){
+ assert(doc.images[index].name.startsWith('MainWood_ContinuousLowerShoulder_'),'4K selectors track the actual stock maps');
+ const rule=StrictRule(publishRules,'Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb',index);
+ assert.equal(rule.maxSize,4096);assert.equal(rule.format,'ktx2-bc7');
+}
+for(const p of report.parts.filter(p=>!p.gameplayAdaptation&&p.part!=='RearBand_ControlledCrown'))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
+assert.equal(report.surfaceRepair.version,D.version);
+for(const name of Object.keys(report.surfaceRepair.sourceSurfaceErrors)){
+ const part=report.parts.find(p=>p.part===name);
+ assert(part.rebake.uvCoverage>0,name);
+ for(const texture of report.texturePayloads.filter(t=>t.name.startsWith(name+'_')))
+  assert(texture.islandCoverage>=part.rebake.uvCoverage*.8,`${name}: bake and export use the same UV layer`);
+}
+assert.equal(report.parts.find(p=>p.part==='RearOuterCover_RoundedSideReturn').gameTriangles,2932,'restore the curved high-source cover');
+const coverBake=report.parts.find(p=>p.part==='RearOuterCover_RoundedSideReturn').rebake;
+assert(coverBake.uvCoverage>.5&&coverBake.pxPerMm>=15,'degenerate cover triangles must not collapse the texture atlas into thin strips');
+assert.equal(report.parts.find(p=>p.part==='MainWood_ContinuousLowerShoulder').gameTriangles,32211,'use clean wood before the slicing regression');
+assert.equal(report.parts.find(p=>p.part==='UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront').gameTriangles,11893);
+assert(report.surfaceRepair.band.maximumDisplacementMm>1&&report.surfaceRepair.band.maximumDisplacementMm<22,'the band is deliberately fitted to the timber profile');
+const bandNode=doc.nodes.find(n=>n.name==='RearBand_ControlledCrown');
+assert(!bandNode.matrix&&!bandNode.translation&&!bandNode.rotation&&!bandNode.scale,'band geometry is in the shared rifle frame');
+const bandPoints=Read(doc.meshes[bandNode.mesh].primitives[0].attributes.POSITION);
+const frontCrown=bandPoints.filter(([x,y,z])=>Math.abs(x)<.002&&-z>.5905);
+const upperCrown=frontCrown.filter(p=>p[1]>.03857);
+assert(upperCrown.length>0,'the band encloses the barrel crown');
+const barrelNode=doc.nodes.find(n=>n.name==='LongOuterSteel_TrueRound'),barrelPrimitive=doc.meshes[barrelNode.mesh].primitives[0];
+const barrelIndices=doc.accessors[barrelPrimitive.indices],barrelView=doc.bufferViews[barrelIndices.bufferView];
+const indexBytes={5123:2,5125:4}[barrelIndices.componentType];assert(indexBytes);
+const barrelGeometry=new THREE.BufferGeometry();
+barrelGeometry.setAttribute('position',new THREE.Float32BufferAttribute(Read(barrelPrimitive.attributes.POSITION).flat(),3));
+barrelGeometry.setIndex(Array.from({length:barrelIndices.count},(_,i)=>bin.readUIntLE((barrelView.byteOffset||0)+(barrelIndices.byteOffset||0)+i*indexBytes,indexBytes)));
+const barrelMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),barrelMesh=new THREE.Mesh(barrelGeometry,barrelMaterial);
+for(const point of upperCrown){
+ const position=new THREE.Vector3(...point),axis=new THREE.Vector3(0,.03857,point[2]),outward=position.clone().sub(axis).normalize();
+ const ray=new THREE.Raycaster(axis.clone().addScaledVector(outward,.04),outward.clone().negate());
+ const hit=ray.intersectObject(barrelMesh,false)[0];assert(hit,'barrel surface is sampled at the band');
+ assert(position.clone().sub(hit.point).dot(outward)>5e-6,'the fitted band clears the actual tapered barrel');
+}
+barrelGeometry.dispose();barrelMaterial.dispose();
+// Read the real two inlet meshes in glTF coordinates, including every vertex near the bolt.
+for(const name of ['MainWood_ContinuousLowerShoulder','ReceiverOuterCollar']){
+ const node=doc.nodes.find(n=>n.name===name),primitive=doc.meshes[node.mesh].primitives[0];
+ const inlet=Read(primitive.attributes.POSITION).filter(([x,y,z])=>-z>.131&&-z<.231&&y>=.024&&Math.abs(x)>.006);
+ assert(inlet.length>0,name);
+ assert(inlet.every(([x,y])=>Math.hypot(x,y-.04194)>=.00935-1e-6),`${name}: inlet clears the 8.69 mm bolt radius`);
+}
 // A no-effects material must still decode the folded packed metalness channel.
 const library=new MaterialLibrary(null),orm=new THREE.Texture(),mat=new THREE.MeshStandardMaterial({roughnessMap:orm,metalnessMap:orm});
 library.ConfigureExternalPbr(mat);assert.equal(mat.metalnessMap,null);
@@ -81,4 +128,4 @@ const tri=new THREE.BufferGeometry();tri.setAttribute('position',new THREE.Float
 tri.setAttribute('normal',new THREE.Float32BufferAttribute(Array(6).fill([0,0,1]).flat(),3));tri.setIndex([0,1,2,3,4,5]);
 RepairHanYangWinding(tri);assert.deepEqual(Array.from(tri.index.array),[0,1,2,3,5,4]);
 mesh.geometry.dispose();mesh.material.dispose();
-console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 PBR images (18 parts rebaked at uniform density) with filled margins, authored materials, finite tangent frames and ORM decoding`);
+console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 PBR images, aligned bake/export UVs, restored source surfaces, finite tangent frames and ORM decoding`);

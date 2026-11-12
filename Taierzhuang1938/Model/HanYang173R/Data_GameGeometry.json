@@ -1,7 +1,7 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "32fd6dbb985bc266a2c6bf17d7e3b748ab962f30369eceeba2347754f1bb06bf",
-  "triangles": 68657,
+  "gameSha256": "81c5dd54dd89d9bd18cfcbd58ee4155ca91ab09da3e0280d08ebef197fad2001",
+  "triangles": 64776,
   "repairedTangents": 45491,
   "parts": [
     {
@@ -187,13 +187,14 @@
     {
       "part": "MainWood_ContinuousLowerShoulder",
       "sourceTriangles": 183704,
-      "gameTriangles": 37337,
+      "gameTriangles": 32211,
       "gameToSourceMaxM": 2.1554073100560345e-05,
       "sourceToGameMaxM": 8.427218563156202e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 4096,
-        "pxPerMm": 6.83
+        "pxPerMm": 5.85,
+        "uvCoverage": 0.261
       }
     },
     {
@@ -244,9 +245,14 @@
       "part": "RearBand_ControlledCrown",
       "sourceTriangles": 1152,
       "gameTriangles": 1152,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
-      "gameplayAdaptation": null
+      "gameToSourceMaxM": 0.00832793116569519,
+      "sourceToGameMaxM": 0.006776297464966774,
+      "gameplayAdaptation": null,
+      "rebake": {
+        "textureSize": 1024,
+        "pxPerMm": 10.43,
+        "uvCoverage": 0.359
+      }
     },
     {
       "part": "RearBand_ExternalAttachmentBridge",
@@ -279,10 +285,15 @@
     {
       "part": "RearOuterCover_RoundedSideReturn",
       "sourceTriangles": 2936,
-      "gameTriangles": 287,
-      "gameToSourceMaxM": 3.588385879993439e-05,
-      "sourceToGameMaxM": 6.044620386091992e-05,
-      "gameplayAdaptation": null
+      "gameTriangles": 2932,
+      "gameToSourceMaxM": 0.0,
+      "sourceToGameMaxM": 9.313225746154785e-10,
+      "gameplayAdaptation": null,
+      "rebake": {
+        "textureSize": 2048,
+        "pxPerMm": 20.82,
+        "uvCoverage": 0.747
+      }
     },
     {
       "part": "RearSmallCover",
@@ -340,12 +351,13 @@
       "part": "ReceiverOuterCollar",
       "sourceTriangles": 1200,
       "gameTriangles": 1472,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameToSourceMaxM": 0.00013008873793296516,
+      "sourceToGameMaxM": 0.00013425841461867094,
       "gameplayAdaptation": null,
       "rebake": {
-        "textureSize": 1024,
-        "pxPerMm": 7.33
+        "textureSize": 2048,
+        "pxPerMm": 14.66,
+        "uvCoverage": 0.541
       }
     },
     {
@@ -365,16 +377,22 @@
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 15.12
+        "pxPerMm": 15.12,
+        "uvCoverage": 0.398
       }
     },
     {
       "part": "Sight_LowCrossPiece",
       "sourceTriangles": 188,
       "gameTriangles": 264,
-      "gameToSourceMaxM": 4.293184918680026e-09,
-      "sourceToGameMaxM": 0,
-      "gameplayAdaptation": "4.5mm rear sight notch"
+      "gameToSourceMaxM": 7.508562660518692e-09,
+      "sourceToGameMaxM": 0.0,
+      "gameplayAdaptation": "4.5mm rear sight notch",
+      "rebake": {
+        "textureSize": 1024,
+        "pxPerMm": 35.22,
+        "uvCoverage": 0.701
+      }
     },
     {
       "part": "Sight_ShallowRoundSeat",
@@ -419,13 +437,14 @@
     {
       "part": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront",
       "sourceTriangles": 41590,
-      "gameTriangles": 13293,
+      "gameTriangles": 11893,
       "gameToSourceMaxM": 5.074305136076873e-06,
       "sourceToGameMaxM": 1.1489803000586107e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 7.71
+        "pxPerMm": 7.02,
+        "uvCoverage": 0.394
       }
     }
   ],
@@ -853,25 +872,25 @@
     {
       "name": "MainWood_ContinuousLowerShoulder_Normal",
       "mimeType": "image/png",
-      "sha256": "2563af25abf33481165e93df8c04231f848bdde8425f857fb0d9f4046c3f3b29",
-      "sourceSha256": "30d40e97d956cbdb29c57bff9f935fa8ff65860b3db6e62c88bd7c5acbb2adfe",
-      "islandCoverage": 0.7441,
+      "sha256": "332a313ce19805c79be8d9bf1472bdca89500171967f6dada23a7df67c545dc2",
+      "sourceSha256": "4126f44cb4b59027794bf789e705b128fd4ec4c746076dd013001c9f43b00097",
+      "islandCoverage": 0.648,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
       "mimeType": "image/png",
-      "sha256": "2f4b7e30f5d481e66f9df9665c76cd2fdc5d1abfe0a1bf63afbc1432a21e5ac5",
-      "sourceSha256": "fe18e290a2d974f1102a11e3e166720041207a516029cae23e8b6e335a426a68",
-      "islandCoverage": 0.7441,
+      "sha256": "5067455c03a3c9136a0ee1bd71b26e8c5d1ee51762016159bb3eae413f4b4b88",
+      "sourceSha256": "db8796bd1278a7d8b70c42825e248095458c896bba683d5c2ac7e521f7af7572",
+      "islandCoverage": 0.648,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/png",
-      "sha256": "5bf4ce3d80cfe63051a98c00d6a02ad706ac4c315e092c71751b8be69027d190",
-      "sourceSha256": "3dae92ccdf9bbd663a08c2ae36377bd343e00f880bf0f849c5e6bdde83f5f978",
-      "islandCoverage": 0.7441,
+      "sha256": "f9a06de67fbf5e05cf6c22ff5fdfa879c5af65cfcfc1a59d3020a817bfc30315",
+      "sourceSha256": "ece5b2530bf1ebddd9baee07d2ee11a2b294291086d1254107999b73bcfe28f6",
+      "islandCoverage": 0.648,
       "rebake": true
     },
     {
@@ -970,23 +989,26 @@
     {
       "name": "RearBand_ControlledCrown_Normal",
       "mimeType": "image/png",
-      "sha256": "1e4046723e2b1e440dd27560e385ef3b9e76108e3fac44dbb8cec6a942b151bd",
-      "sourceSha256": "db2c9389ab0aa93f3c360f36b5a6720e05b08a6a07001eacd51a7b2528571e94",
-      "islandCoverage": 0.6044
+      "sha256": "7831d58bf69114f19d0fa5bd94fb9601b7fe014df0666ea5662af63f3f52ac86",
+      "sourceSha256": "eb65014380d2e2af17b1b8f3742fe4c4f490b250391c021d76da60f5dcdc5ee8",
+      "islandCoverage": 0.6509,
+      "rebake": true
     },
     {
       "name": "RearBand_ControlledCrown_BaseColor",
       "mimeType": "image/png",
-      "sha256": "ef5486a3439bb754c8748b62f87c62f100bf7815bc48e0c92217d191cc1ef739",
-      "sourceSha256": "c38385837a4c0f0e71238d446b7aa1a5822dec824710bf32f56896366ede932a",
-      "islandCoverage": 0.6044
+      "sha256": "2396b20d0ded7cad9426da03baf0d05b1969eb7bd13e8b9186a575e2de22608b",
+      "sourceSha256": "fb3b3e32f389f175fd3d32a73fe9acef8059e3c192d23d34324148d7cd073af4",
+      "islandCoverage": 0.6509,
+      "rebake": true
     },
     {
       "name": "RearBand_ControlledCrown_ORM",
       "mimeType": "image/png",
-      "sha256": "b4a09267f60270870fbd7fb08367cc259c08c2460374bae48f1f2e9928b1947e",
-      "sourceSha256": "8ebb4ac26aaecde27d4fd79f52c240eef6249f0835ca2ed7fbbaa34909172528",
-      "islandCoverage": 0.6044
+      "sha256": "6e57dbc4c118e80a315f6652d299500b73243a3c4b0be74cc1542e378a6d58fe",
+      "sourceSha256": "ed49042cbec17d4535993d362208992ef3ae926e739b59c20b12e56b9199ec21",
+      "islandCoverage": 0.6509,
+      "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentBridge_Normal",
@@ -1057,23 +1079,26 @@
     {
       "name": "RearOuterCover_RoundedSideReturn_Normal",
       "mimeType": "image/png",
-      "sha256": "825a1f97d22805d27d573e92705e8c3f04c09a174daa6893f7c325008b396de4",
-      "sourceSha256": "39a0224b5a39af1acb00fae8f57806425c7e7457b616def790925bca3f669e24",
-      "islandCoverage": 0.4647
+      "sha256": "4615c0d50fb9422868e136f1e784d0a6898be515b201e650087a8bf6e929576b",
+      "sourceSha256": "d60b9242bd2af1c1c129c2f8b175da9985a99c529ce7ea74613eca6f0be1a80e",
+      "islandCoverage": 0.8342,
+      "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_BaseColor",
       "mimeType": "image/png",
-      "sha256": "d1a6f0d7c96546354ab4ebfe10cce3d5b1d3fbd1a8759049255f058db643c8d3",
-      "sourceSha256": "d0d4ae704765c7eddccbf73f4d459af2e9f0c125eedc409eb65cfc5ea070f9ca",
-      "islandCoverage": 0.4647
+      "sha256": "6542d4b51a93de997c5e625583992ab64fab02e7a843a1dff3716f68bceeff95",
+      "sourceSha256": "16c533bfce1da34c151164ae09c4e7c34d18d746ec29099ef53742c6c0aab82f",
+      "islandCoverage": 0.8342,
+      "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_ORM",
       "mimeType": "image/png",
-      "sha256": "7c6d7e07213f2127c39bee61edd682c5fb30c5ef36ff092dabf06d3ecd572d2d",
-      "sourceSha256": "a1f5d8250aba6a00ccb6dab48577cbfb35041f94c2fdd40b857fcbb397f4788b",
-      "islandCoverage": 0.4647
+      "sha256": "618838bfe86cc4f275a430163388893d78965ef703af5cfd08f44329e91d91be",
+      "sourceSha256": "30b48f945f8ff3c9f80dc32c338198f97e92e376b972ca0927e6fe660555ce4b",
+      "islandCoverage": 0.8342,
+      "rebake": true
     },
     {
       "name": "RearSmallCover_Normal",
@@ -1207,25 +1232,25 @@
     {
       "name": "ReceiverOuterCollar_Normal",
       "mimeType": "image/png",
-      "sha256": "553dbb12eaeb2d981a2f07a76fcf1759fc181a713d054f4f7379085e7d2746b6",
-      "sourceSha256": "a6891891c3be1eb9c23d0c068a2510671cef4252aef9ca98a48fca99f65d9fe1",
-      "islandCoverage": 0.8766,
+      "sha256": "366e7c668de3e18b917397ad3c487be4812403d01709c8b97c8965642aa0d187",
+      "sourceSha256": "e894f6dd637a63d7773a7c23143a478176cad2c0de1ebcdf2173ca7c5d37b847",
+      "islandCoverage": 0.7863,
       "rebake": true
     },
     {
       "name": "ReceiverOuterCollar_BaseColor",
       "mimeType": "image/png",
-      "sha256": "5249a13e6ca62f51e0b1c2ca7d542919822577a6c7c39844aa5ed89d29f63c8b",
-      "sourceSha256": "bffbbbfcabb9c681459977761ba2d8693bccbb9507acdafeba664ffdb1b2eba1",
-      "islandCoverage": 0.8766,
+      "sha256": "bfc3737d866d4fd91e69c0c47b1923c4e3d69049843cb9f3a615082d717711b7",
+      "sourceSha256": "a8de0250c05e8cd17e10f4b21710e050177a5526503d1621e04c2038b601e920",
+      "islandCoverage": 0.7863,
       "rebake": true
     },
     {
       "name": "ReceiverOuterCollar_ORM",
       "mimeType": "image/png",
-      "sha256": "05c52a48c859e5c015d8d76c0c92c4fa9aca259164928fa826e4c109c5d11687",
-      "sourceSha256": "1e8fa90eb5b2de9e27ef42aa1e145256018f4aa4b2590fe04ca6f27fd3def410",
-      "islandCoverage": 0.8766,
+      "sha256": "a3f99dc44a2711da117d7677bd90801f5076a76760c8f5f4fab4932bceffb429",
+      "sourceSha256": "a24df38f32383ac2d8cdb2c0a5ddf5da2afa217f21749fda961a675a44969764",
+      "islandCoverage": 0.7863,
       "rebake": true
     },
     {
@@ -1252,47 +1277,50 @@
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_Normal",
       "mimeType": "image/png",
-      "sha256": "febcf4bdc1d3c895590c01ce40a0997456aea8c51211505f6a99b635b951d3da",
-      "sourceSha256": "da8068128abfa573e12bef313b1ae6ebde0288d06727b2f85408141806c457b9",
+      "sha256": "133d76ac048c98ec291cd9ae9ba676bea83ba28da258a7dffd726f83f15299f8",
+      "sourceSha256": "fda2ae97482a459fc67540987875689be98251e6a0ee6bdb1f8da4767808b2bd",
       "islandCoverage": 0.6093,
       "rebake": true
     },
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_BaseColor",
       "mimeType": "image/png",
-      "sha256": "0944867860556a439f693436200aa8aa77bfc8bf8a181c0def5ae9ba4c34304e",
-      "sourceSha256": "ab43343d5ecc53c87690c204949c94bda537ee5e74a38a2b8424c372042932ff",
+      "sha256": "72ccea86a4d5e7c35f86e9117a1b242ed3501d6088acf094a0f38ab0470f7c32",
+      "sourceSha256": "a03833dbc76d284febfa67b47c7bfacb411c5b153f12864cacbf1155c8bc12c7",
       "islandCoverage": 0.6093,
       "rebake": true
     },
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_ORM",
       "mimeType": "image/png",
-      "sha256": "ee004bd682b5c05267a33b7352846391ade00606389d0a6ea859ed317766f220",
-      "sourceSha256": "490987c50e2e73e670ea0503ef03fc99152611d385a8e75c42edfcefe830082a",
+      "sha256": "136e63ca36bbe96c875ccc4ab333911726d972095d18a855967e8d3e0be22492",
+      "sourceSha256": "f2f5aeae86d7665c799c3f4b58384a1e55f06744313db915515951f41c5c8570",
       "islandCoverage": 0.6093,
       "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_Normal",
       "mimeType": "image/png",
-      "sha256": "0bac92669eb6f810736727362dc092c3b5913df097a01df79ffc1dab36164892",
-      "sourceSha256": "80ddca5574f7f8f6991ce9762592320225d04e3d918f9657232bd6349d0e6407",
-      "islandCoverage": 0.8022
+      "sha256": "39456718b461c65819ffea9f1bedb10bc7717021c513193c7fb671b1efa51d3b",
+      "sourceSha256": "7943ebe4232011f3e6f0e8fabc6c3f3e7da471b0e68667413f343f179fff91fb",
+      "islandCoverage": 0.7471,
+      "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_BaseColor",
       "mimeType": "image/png",
-      "sha256": "50a37704cff78c8256be270f6aa76c62111a49e3131a4cb2e4fc597ce5b2dfdb",
-      "sourceSha256": "b7b1337501e264d60655661cfcd6a5b630154d6a8cfca14e18bddf394bdd9357",
-      "islandCoverage": 0.8022
+      "sha256": "515a1f275c873f175aefd1463c8ee7efcf762b83049c90cd7062e1ff403f37f8",
+      "sourceSha256": "aef7064a5650654d4047a220205d0848eba00f6c34fa535cbd84a3bbb30e3929",
+      "islandCoverage": 0.7471,
+      "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_ORM",
       "mimeType": "image/png",
-      "sha256": "bf364463af526c9fed93823cf278f448ba810cbab05c6dd26a2a61498d273940",
-      "sourceSha256": "9168fb7d84f3a48dc7bb717ec9f1945e4e4844a0071ecabf250f5fb5c839046c",
-      "islandCoverage": 0.8022
+      "sha256": "db6a984b1f137a24fe6a3fdb708fe1ab5c9b06ba148349182d687de638bb6ad0",
+      "sourceSha256": "4a91401facc1da66e567fc4c54ce366547d328d214eb3fe072c8b9f2f38bd469",
+      "islandCoverage": 0.7471,
+      "rebake": true
     },
     {
       "name": "Sight_ShallowRoundSeat_Normal",
@@ -1387,28 +1415,84 @@
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
       "mimeType": "image/png",
-      "sha256": "9578528c9b3f097e17e6bfda80c7ae2ead5ca7dac6ad0ba490ce538ac78ae092",
-      "sourceSha256": "b68e875ff6a501a8c01dc73e3f5e46a4b437ac135207f15436921fb96fa1bcd5",
-      "islandCoverage": 0.6799,
+      "sha256": "16dae8ef37b8e00d3e9bf13dcfa869f6715cffaaa5f0ec3eac7d597b395354a8",
+      "sourceSha256": "d3a31a39db71d4ae14383a493b256de6630691ed70e3369f28c57005bab35a9a",
+      "islandCoverage": 0.596,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
       "mimeType": "image/png",
-      "sha256": "922330619d744e536b4e4efa973c4774f7cf5158cb2b9dd01c2878be005e44ec",
-      "sourceSha256": "9cd9d2df5de5a2200ea087c4877c63ba56c6d66d856b98213c34dcbda8bd6ab9",
-      "islandCoverage": 0.6799,
+      "sha256": "e9b404cfee457f740244e6c88b799582ca33b897a897a6a11d3623a2d2d98e25",
+      "sourceSha256": "ee769d3b9a55090a81dea73ce082ea53b1bac75a8ab08a1df553159931ffcdfe",
+      "islandCoverage": 0.596,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/png",
-      "sha256": "817c6ebbb53b3164f96e7ecd1bdb6e372d11a7e8af91e1ed463246e8e2a49263",
-      "sourceSha256": "b282712632ed38681739b18a1727e2fcbae32bab8eb228b5fccaab70cfe501b2",
-      "islandCoverage": 0.6799,
+      "sha256": "ed07a26861c52ec4d3051ef341daf6b8dd025f32d68a07da4ce9159e4cbdfb7f",
+      "sourceSha256": "98e8a66cf9b77547effc090758d24f196f5842a4378601a61715f35c73a24b5d",
+      "islandCoverage": 0.596,
       "rebake": true
     }
   ],
   "textureFill": "2026-10-29 _import/Script_HanYang173RDilateTextures.py: texels outside the UV islands (ORM red = 0) pull-push filled from island texels so mipmaps do not darken island edges; island texels and bit depth unchanged. sourceSha256 is the delivered payload.",
-  "rebake": "2026-11-03 _blender/Script_HanYang173RRebake.py + _import/Script_HanYang173RRebakeAssemble.py: 18 parts get uniform-density UVs and maps rebaked from the author source onto the 60k mesh (long parts sliced every 6 cm first). For those images sourceSha256 is the raw bake and sha256 the nearest-filled payload (normals kept to 10 bits); islandCoverage is the bake hit fraction."
+  "rebake": "2026-11-03 _blender/Script_HanYang173RRebake.py + _import/Script_HanYang173RRebakeAssemble.py: 18 parts get uniform-density UVs and maps rebaked from the author source onto the 60k mesh (long parts sliced every 6 cm first). For those images sourceSha256 is the raw bake and sha256 the nearest-filled payload (normals kept to 10 bits); islandCoverage is the bake hit fraction.",
+  "surfaceRepair": {
+    "band": {
+      "maximumDisplacementMm": 8.83437220917257,
+      "steelThicknessMm": 1.1
+    },
+    "bore": {
+      "MainWood_ContinuousLowerShoulder": {
+        "movedVertices": 0,
+        "maximumDisplacementMm": 0
+      },
+      "ReceiverOuterCollar": {
+        "movedVertices": 9,
+        "maximumDisplacementMm": 0.15186890955170684
+      }
+    },
+    "version": "173R-20261112",
+    "sourceBlendSha256": "05b26cee5726188c545b8a214c53721eb58471a3636de42d4534f3e1bef1b14a",
+    "inputGameSha256": "32fd6dbb985bc266a2c6bf17d7e3b748ab962f30369eceeba2347754f1bb06bf",
+    "sourceSurfaceErrors": {
+      "RearBand_ControlledCrown": {
+        "gameToSourceMaxM": 0.00832793116569519,
+        "sourceToGameMaxM": 0.006776297464966774
+      },
+      "ReceiverOuterCollar": {
+        "gameToSourceMaxM": 0.00013008873793296516,
+        "sourceToGameMaxM": 0.00013425841461867094
+      },
+      "RearOuterCover_RoundedSideReturn": {
+        "gameToSourceMaxM": 0.0,
+        "sourceToGameMaxM": 9.313225746154785e-10
+      },
+      "Sight_LowCrossPiece": {
+        "gameToSourceMaxM": 7.508562660518692e-09,
+        "sourceToGameMaxM": 0.0
+      },
+      "Sight_LowContinuousLeaf_NoUnknownNumbers": {
+        "gameToSourceMaxM": 0.0001091946687665768,
+        "sourceToGameMaxM": 0.0003639120259322226
+      },
+      "MainWood_ContinuousLowerShoulder": {
+        "gameToSourceMaxM": 2.1554073100560345e-05,
+        "sourceToGameMaxM": 8.427218563156202e-05
+      },
+      "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
+        "gameToSourceMaxM": 5.074305136076873e-06,
+        "sourceToGameMaxM": 1.1489803000586107e-05
+      }
+    },
+    "reconstructionScope": "The band fit, bore clearance, end-grain projection and microscopic surface response are artistic reconstruction. Reference photographs guide visible shape only.",
+    "historicalReferences": [
+      {
+        "url": "https://www.icollector.com/Chinese-Hanyang-Mauser-Bolt-Action-Rifle_i13828566",
+        "note": "Viewed the auction's original photographs 3, 4 and 5. They show the curved receiver front ring, longitudinal bolt raceway, timber inlet, safety and cocking assembly. The game's finish and dimensions are artistic reconstruction."
+      }
+    ]
+  }
 }

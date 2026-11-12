@@ -35,8 +35,10 @@ def FillPng(path, hit, bits16=False):
     assert ok
     return enc.tobytes()
 
-args = sys.argv[1:]; report_path = None
+args = sys.argv[1:]; report_path = None; surface_repair = None
 if '--report' in args: k = args.index('--report'); report_path = Path(args[k + 1]); del args[k:k + 2]
+if '--surface-repair' in args:
+    k = args.index('--surface-repair'); surface_repair = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
 game, out_path, dirs = args[0], args[1], [Path(d) for d in args[2:]]
 doc, binb = ReadGlb(game)
 parts = {}
@@ -101,6 +103,8 @@ for node in doc['nodes']:
     mat = doc['materials'][prim['material']]; pbr = mat['pbrMetallicRoughness']
     slots = {'BaseColor': pbr['baseColorTexture']['index'], 'ORM': pbr['metallicRoughnessTexture']['index'], 'Normal': mat['normalTexture']['index']}
     hit = np.asarray(Image.open(d / f'{name}_ORM.png').convert('RGB'))[..., 0] > 128
+    if surface_repair:
+        assert float(hit.mean()) >= rep['unwrap']['coverage'] * .8, (name, 'baked coverage disagrees with exported UVs', float(hit.mean()), rep['unwrap']['coverage'])
     for role, ti in slots.items():
         for key in ('texCoord',):
             pass
@@ -111,7 +115,7 @@ for node in doc['nodes']:
         payloads[img['name']] = {'sha256': hashlib.sha256(data).hexdigest(), 'sourceSha256': hashlib.sha256(src.read_bytes()).hexdigest(), 'islandCoverage': round(float(hit.mean()), 4)}
     for t in ([pbr['baseColorTexture'], pbr['metallicRoughnessTexture'], mat['normalTexture']]):
         t.pop('texCoord', None)
-    log.append({'part': name, 'vertices': int(P.shape[0]), 'triangles': int(I.size // 3), 'res': rep['res'], 'pxPerMm': rep['unwrap']['pxPerMm'], 'missedFilled': int((~hit).sum())})
+    log.append({'part': name, 'vertices': int(P.shape[0]), 'triangles': int(I.size // 3), 'res': rep['res'], 'pxPerMm': rep['unwrap']['pxPerMm'], 'uvCoverage': rep['unwrap']['coverage'], 'missedFilled': int((~hit).sum())})
 
 # 清孤儿 bufferView，重新紧排
 used = sorted({a['bufferView'] for a in doc['accessors'] if 'bufferView' in a} | {im['bufferView'] for im in doc['images']})
@@ -142,7 +146,11 @@ for im in doc['images']: im['bufferView'] = vmap[im['bufferView']]
 doc['bufferViews'] = fviews
 while len(final) % 4: final.append(0)
 doc['buffers'] = [{'byteLength': len(final)}]
-doc.setdefault('asset', {}).setdefault('extras', {})['rebake'] = '2026-11-03 uniform-density UVs rebaked from the author source for %d parts' % len(log)
+extras = doc.setdefault('asset', {}).setdefault('extras', {})
+if surface_repair:
+    extras['surfaceRepair'] = surface_repair['version']
+else:
+    extras['rebake'] = '2026-11-03 uniform-density UVs rebaked from the author source for %d parts' % len(log)
 j = json.dumps(doc, separators=(',', ':')).encode(); j += b' ' * ((-len(j)) % 4)
 glb = struct.pack('<4sII', b'glTF', 2, 28 + len(j) + len(final)) + struct.pack('<II', len(j), 0x4E4F534A) + j + struct.pack('<II', len(final), 0x004E4942) + bytes(final)
 Path(out_path).write_bytes(glb)
@@ -152,12 +160,18 @@ if report_path:
     for part in rep['parts']:
         if part['part'] in byname:
             l = byname[part['part']]; part['gameTriangles'] = l['triangles']
-            part['rebake'] = {'textureSize': l['res'], 'pxPerMm': l['pxPerMm']}
+            part['rebake'] = {'textureSize': l['res'], 'pxPerMm': l['pxPerMm'], 'uvCoverage': l['uvCoverage']}
     rep['triangles'] = sum(p['gameTriangles'] for p in rep['parts'])
     for t in rep['texturePayloads']:
         if t['name'] in payloads: t.update(payloads[t['name']]); t['rebake'] = True
-    rep['rebake'] = ('2026-11-03 _blender/Script_HanYang173RRebake.py + _import/Script_HanYang173RRebakeAssemble.py: %d parts get uniform-density UVs '
-        'and maps rebaked from the author source onto the 60k mesh (long parts sliced every 6 cm first). For those images sourceSha256 is the raw bake '
-        'and sha256 the nearest-filled payload (normals kept to 10 bits); islandCoverage is the bake hit fraction.' % len(log))
+    if surface_repair:
+        rep['surfaceRepair'] = surface_repair
+        for part in rep['parts']:
+            if part['part'] in surface_repair['sourceSurfaceErrors']:
+                part.update(surface_repair['sourceSurfaceErrors'][part['part']])
+    else:
+        rep['rebake'] = ('2026-11-03 _blender/Script_HanYang173RRebake.py + _import/Script_HanYang173RRebakeAssemble.py: %d parts get uniform-density UVs '
+            'and maps rebaked from the author source onto the 60k mesh (long parts sliced every 6 cm first). For those images sourceSha256 is the raw bake '
+            'and sha256 the nearest-filled payload (normals kept to 10 bits); islandCoverage is the bake hit fraction.' % len(log))
     report_path.write_text(json.dumps(rep, indent=2) + chr(10), encoding='utf8')
 print(json.dumps({'bytes': len(glb), 'sha256': hashlib.sha256(glb).hexdigest(), 'parts': log}, indent=1, ensure_ascii=False))

@@ -5,17 +5,40 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **68,657 triangles, 44 parts, 132 embedded images**, 61,640,884 bytes (59,901 after the 60k decimation; +8,756 from the 2026-11-03 rebake slicing, see below). `Data_GameGeometry.json` is the authoritative game hash, per-part triangle/error and image-payload ledger.
-- 26 parts keep Dots' PBR image payloads byte-for-byte with their UVs; 18 parts carry the 2026-11-03 uniform-density rebake. Transferred source normals remain; degenerate tangent frames are repaired and checked.
-- The front sight crown, complete bolt cylinder/knob, collar, trigger and selected contact parts retain their original geometry. Remaining simplified parts have sampled bidirectional vertex-to-surface errors below 0.5 mm. This is a sampled surface metric, not a proof of complete Hausdorff distance.
+- Game geometry: **64,776 triangles, 44 parts, 132 embedded images**. The 2026-11-12 repair restores clean reduced wooden meshes and the complete high-source cocking cover. `Data_GameGeometry.json` records the current hash, per-part geometry comparisons and image payloads.
+- 23 parts retain the delivered PBR payloads with their UVs. The 21 rebaked parts include seven close-up surfaces rebuilt on 2026-11-12. Tangent frames and bake/export UV coverage are checked.
+- The front sight crown, complete bolt cylinder/knob, trigger and selected contact parts retain their original geometry. The receiver inlet is relieved by at most 0.152 mm. The handguard band is reshaped to the wooden profile. Other simplified parts keep sampled bidirectional vertex-to-surface errors below 0.5 mm. These measurements sample vertices against surfaces.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
-- GPU publication keeps image resolution and reduces the download to 26,936,844 bytes. Converted texture payloads allocate 98,042,896 GPU bytes versus 525,686,032 decoded RGBA bytes; these are converted-image figures, not the entire model's texture memory.
+- GPU publication uses BC7 and the explicit path rules. The three main-stock maps retain 4096 pixels, selected by embedded image indices 57–59. Other images follow their existing 2048-pixel maximum.
 
 Source packages and source Blender projects remain outside Git:
 
 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R/`
 
 `DotsDelivery/` contains the original three packages; all 605 supplied SHA256 entries were verified. `Game60k/Scene_HanYang173RGame60k.blend` is the editable reduced source. Preserve [Dots' material-source statement](Data_DotsMaterialSources.txt); it includes unresolved historical input provenance and does not assert that the whole package is CC0.
+
+## Close-up repair, 2026-11-12
+
+The original 295,470-triangle GLB and the editable author project were opened and compared with the runtime mesh. The source's 2,932-triangle cocking cover, with four zero-area source triangles removed replaces its 287-triangle reduction. Both wooden components return to the reduced source before the 6 cm slicing, preserving their source normals and recovering 6,526 triangles. The resulting complete rifle stays within its 69,000-triangle allocation.
+
+Restored source meshes contain multiple UV layers. Each restored target receives one fresh UV layer, explicitly active for rendering and export. Four zero-area cover triangles disrupted UV packing, reducing occupied area to 2.4% and density to 3.73 pixels/mm. Removing those triangles raises occupied area to 74.7% and density to 20.82 pixels/mm. The assembler also rejects a bake covering less than 80% of its measured UV surface area. Valid island texels seed margin filling.
+
+The upper handguard's transverse end receives planar grain coordinates. The receiver and cocking cover use cylindrical body coordinates and planar end coordinates for the author's existing steel film, with the previous mean base reflectance retained. Fine normal and roughness variation is baked in Blender. The handguard band follows the combined timber and tapered-barrel envelope. The asset test raycasts the actual barrel at the band crown to check clearance. Its reshape, microscopic finish and contact tolerances are artistic reconstruction.
+
+The original auction photographs 3, 4 and 5 show the curved front receiver ring, bolt raceway, stock inlet and safety/cocking assembly. They guide the visible form. The game's finish and dimensions remain production choices. [Hanyang rifle photographs](https://www.icollector.com/Chinese-Hanyang-Mauser-Bolt-Action-Rifle_i13828566)
+
+The editable revision, immutable pre-repair GLB, packed source project and raw bakes are in `SurfaceRepair_20261112/` beside `DotsDelivery/`. Rebuild from the owned worktree with the managed MCP entry, then assemble the resulting seven parts.
+
+```powershell
+node scripts/Script_BlenderMcp.mjs start --task HanYangSurfaceRepair
+node scripts/Script_BlenderMcp.mjs exec --code "import os; os.environ['HANYANG_PROJECT_ROOT']=r'<owned-worktree>/Taierzhuang1938'"
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYang173RSurfaceRepair.py --timeout 2400
+python Taierzhuang1938/_import/Script_HanYang173RRebakeAssemble.py <revision>/Model_HanYang173R_Before.glb Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb <revision>/Bake --report Taierzhuang1938/Model/HanYang173R/Data_GameGeometry.json --surface-repair <revision>/Data_SurfaceRepair.json
+node scripts/Script_BlenderMcp.mjs stop
+node scripts/Script_BlenderMcp.mjs status --scan
+```
+
+Four complete action scans pass the existing 2 mm confirmed-depth gate. Empty and partial reloads reach 1.739 mm, held-open reload 1.594 mm, ordinary bolt cycle 1.648 mm. Surface-crossing pairs remain in the saved reports and require their existing visual review. The independent left-hand finger self-contact test also reproduces 60 crossing triangles on the unmodified baseline hand asset.
 
 ## Runtime and lighting
 
