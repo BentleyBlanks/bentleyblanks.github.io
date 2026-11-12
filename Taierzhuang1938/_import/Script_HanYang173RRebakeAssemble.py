@@ -35,10 +35,12 @@ def FillPng(path, hit, bits16=False):
     assert ok
     return enc.tobytes()
 
-args = sys.argv[1:]; report_path = None; surface_repair = None
+args = sys.argv[1:]; report_path = None; surface_repair = None; mechanism_repair = None
 if '--report' in args: k = args.index('--report'); report_path = Path(args[k + 1]); del args[k:k + 2]
 if '--surface-repair' in args:
     k = args.index('--surface-repair'); surface_repair = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
+if '--mechanism-repair' in args:
+    k = args.index('--mechanism-repair'); mechanism_repair = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
 game, out_path, dirs = args[0], args[1], [Path(d) for d in args[2:]]
 doc, binb = ReadGlb(game)
 parts = {}
@@ -103,7 +105,7 @@ for node in doc['nodes']:
     mat = doc['materials'][prim['material']]; pbr = mat['pbrMetallicRoughness']
     slots = {'BaseColor': pbr['baseColorTexture']['index'], 'ORM': pbr['metallicRoughnessTexture']['index'], 'Normal': mat['normalTexture']['index']}
     hit = np.asarray(Image.open(d / f'{name}_ORM.png').convert('RGB'))[..., 0] > 128
-    if surface_repair:
+    if surface_repair or mechanism_repair:
         assert float(hit.mean()) >= rep['unwrap']['coverage'] * .8, (name, 'baked coverage disagrees with exported UVs', float(hit.mean()), rep['unwrap']['coverage'])
     for role, ti in slots.items():
         for key in ('texCoord',):
@@ -149,6 +151,8 @@ doc['buffers'] = [{'byteLength': len(final)}]
 extras = doc.setdefault('asset', {}).setdefault('extras', {})
 if surface_repair:
     extras['surfaceRepair'] = surface_repair['version']
+elif mechanism_repair:
+    extras['mechanismRepair'] = mechanism_repair['version']
 else:
     extras['rebake'] = '2026-11-03 uniform-density UVs rebaked from the author source for %d parts' % len(log)
 j = json.dumps(doc, separators=(',', ':')).encode(); j += b' ' * ((-len(j)) % 4)
@@ -164,7 +168,12 @@ if report_path:
     rep['triangles'] = sum(p['gameTriangles'] for p in rep['parts'])
     for t in rep['texturePayloads']:
         if t['name'] in payloads: t.update(payloads[t['name']]); t['rebake'] = True
-    if surface_repair:
+    if mechanism_repair:
+        rep['mechanismRepair'] = mechanism_repair
+        for part in rep['parts']:
+            if part['part'] in mechanism_repair['sourceSurfaceErrors']:
+                part.update(mechanism_repair['sourceSurfaceErrors'][part['part']])
+    elif surface_repair:
         rep['surfaceRepair'] = surface_repair
         for part in rep['parts']:
             if part['part'] in surface_repair['sourceSurfaceErrors']:

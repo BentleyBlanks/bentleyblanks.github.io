@@ -10,6 +10,8 @@
 
 ## 条目
 
+- **汉阳造开镜尾部重做与缎面修订（2026-11-13）**。用户否决上一版全表面粗颗粒。重新对照Te Papa馆藏枪机近照及实物照片，重建两侧保护耳、圆尾帽、中心销、薄保险片、顶部条、圆柄杆、48段球头和照门，共9件；16件可见钢件重烘细密缎面，整枪64,266面。2毫米完整双臂净空门禁四案通过，最大1.965毫米。独立机械运动检查的0.256相位63.2毫米手部跳变，在本轮前的同一GLB上复现。重建与参考范围见[173R资产说明](../Model/HanYang173R/Data_HanYang173R.md)。
+
 - **汉阳造拉栓去掉一顿一顿（2026-11-13）**：用户「开枪拉栓看着一顿一顿的，不自然」。根因是 `pace` 分段线性（播放速率在关键点跳变）和整枪轨道在节拍间定住、三帧猛挪。`pace` 改为过同一组点的单调三次时间曲线（`Script_FirearmHandling.CyclePlayedS / CycleReferenceS`），`lower` / `head` / `sway` 按播放秒 ±0.07 s 居中平滑（`smoothS`），压柄后抬手不再停两下；节拍、关键位姿、开枪上扬不变。照门峰值加速度 219 → 53 kpx/s²。口径 [汉阳造逐帧对标拉栓](Data_RifleReloadRealism.md)「去掉一顿一顿」；门禁 `Script_FirearmHandlingTest`（时间曲线过点、C1、反算）、`WeaponRangeTest`、`FirearmResponseBrowserTest`、`HanYangReloadClearanceTest --case=HanYangBolt`。
 
 - **腰射转视角惯性，照 COD WWII（2026-11-12）**：用户「持枪移动视角时枪要有比较自然的小小的惯性」。WaW 数值下 125°/s 转身枪只偏 0.19°，画面上看不出。腰射 `LOOK_SWAY` 改为同一限幅目标 + 近临界阻尼弹簧（2.3 Hz、阻尼比 0.8，1/240 s 定步长积分）：起转时枪慢慢落后，125°/s 偏 1.3° / 0.8 cm，快甩封顶 3° / 1.9 cm，停手 0.22 s 回到 5% 以内，过冲约 1%（看不见回弹，守住 2026-10-20 的否决）；20/60/144 fps 一致。开镜 `ADS_LOOK_SWAY` 仍是一阶 DiffTrack，不变。口径 [枪械手感](Data_FirearmHandling.md)「转视角摇摆」；门禁 `Script_FirearmHandlingTest`。

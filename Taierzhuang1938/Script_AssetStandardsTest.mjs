@@ -133,7 +133,7 @@ Check(MESHES.Type95HaGo.triangles === 82142,
 Check(EXTERNAL_GLB_STANDARDS.length === 70
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='Type38_511'&&record.actualTriangles===69586&&record.targetTriangles===70000)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='RifleSlingFlatV3'&&record.actualTriangles===6584&&record.targetTriangles===6584)
-  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===64776&&record.targetTriangles===69000)
+  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===64266&&record.targetTriangles===69000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)
   && ["DongguaQuilt", "DoorCurtain", "SichuanBanner"].every(id => EXTERNAL_GLB_STANDARDS.some(record => record.id === id
     && record.pack === `ClothLab/Model_${id}.glb` && record.actualTriangles === 13712 && record.sourceTriangles === 13712 && record.targetTriangles === 13712))

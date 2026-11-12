@@ -11,6 +11,7 @@ import { MESHES } from './Data_Meshes.mjs';
 import { AllMeshUrls } from './Script_Meshes.mjs';
 import {DEFAULT_PLAYER_WEAPON,LOADOUTS} from './Data_Weapons.mjs';
 import {StrictRule} from './Script_StrictTextureRules.mjs';
+import sharp from 'sharp';
 import * as THREE from 'three';
 const dir=path.join(path.dirname(fileURLToPath(import.meta.url)),'Model/HanYang173R');
 const report=JSON.parse(fs.readFileSync(path.join(dir,'Data_GameGeometry.json'),'utf8'));
@@ -44,7 +45,7 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
  }
 }
 // Clean reduced wood plus the complete high-source cocking cover fit the 69k allocation.
-assert.equal(triangles,report.triangles);assert.equal(triangles,64776);
+assert.equal(triangles,report.triangles);assert.equal(triangles,64266);
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 const publishRules=JSON.parse(fs.readFileSync(new URL('./Data_PublishPathRules.json',import.meta.url),'utf8'));
 for(const index of [57,58,59]){
@@ -52,17 +53,36 @@ for(const index of [57,58,59]){
  const rule=StrictRule(publishRules,'Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb',index);
  assert.equal(rule.maxSize,4096);assert.equal(rule.format,'ktx2-bc7');
 }
-for(const p of report.parts.filter(p=>!p.gameplayAdaptation&&p.part!=='RearBand_ControlledCrown'))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
-assert.equal(report.surfaceRepair.version,D.version);
+const reshaped=new Set(report.mechanismRepair.shapeParts);
+for(const p of report.parts.filter(p=>!p.gameplayAdaptation&&p.part!=='RearBand_ControlledCrown'&&!reshaped.has(p.part)))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
+assert.equal(report.mechanismRepair.version,D.version);
 for(const name of Object.keys(report.surfaceRepair.sourceSurfaceErrors)){
  const part=report.parts.find(p=>p.part===name);
  assert(part.rebake.uvCoverage>0,name);
  for(const texture of report.texturePayloads.filter(t=>t.name.startsWith(name+'_')))
   assert(texture.islandCoverage>=part.rebake.uvCoverage*.8,`${name}: bake and export use the same UV layer`);
 }
-assert.equal(report.parts.find(p=>p.part==='RearOuterCover_RoundedSideReturn').gameTriangles,2932,'restore the curved high-source cover');
 const coverBake=report.parts.find(p=>p.part==='RearOuterCover_RoundedSideReturn').rebake;
 assert(coverBake.uvCoverage>.5&&coverBake.pxPerMm>=15,'degenerate cover triangles must not collapse the texture atlas into thin strips');
+function PartPositions(name){
+ const node=doc.nodes.find(n=>n.name===name),matrix=node.matrix?new THREE.Matrix4().fromArray(node.matrix):new THREE.Matrix4().compose(new THREE.Vector3().fromArray(node.translation||[0,0,0]),new THREE.Quaternion().fromArray(node.rotation||[0,0,0,1]),new THREE.Vector3().fromArray(node.scale||[1,1,1]));
+ return Read(doc.meshes[node.mesh].primitives[0].attributes.POSITION).map(p=>new THREE.Vector3(...p).applyMatrix4(matrix));
+}
+const cheeks=PartPositions('RearOuterCover_RoundedSideReturn');
+assert(cheeks.every(p=>Math.abs(p.x)>.009),'protective cheeks leave the central cocking body exposed');
+const cap=PartPositions('RearSmallCover'),capBox=new THREE.Box3().setFromPoints(cap),capSize=capBox.getSize(new THREE.Vector3());
+assert(capSize.x>.015&&capSize.y>.015,'rear disc has a complete circular silhouette');
+const flag=PartPositions('RearTab'),flagSize=new THREE.Box3().setFromPoints(flag).getSize(new THREE.Vector3());
+assert(flagSize.z<.0025,'safety flag has the reference thin-section profile');
+assert.equal(report.parts.find(p=>p.part==='HandleSphere').gameTriangles,2208,'bolt knob silhouette uses the refined surface');
+for(const name of ['RearOuterCover_RoundedSideReturn','HandleSphere','RearSmallCover']){
+ const node=doc.nodes.find(n=>n.name===name),primitive=doc.meshes[node.mesh].primitives[0],material=doc.materials[primitive.material];
+ const image=doc.images[doc.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index].source],view=doc.bufferViews[image.bufferView];
+ const {data,info}=await sharp(bin.subarray(view.byteOffset||0,(view.byteOffset||0)+view.byteLength)).removeAlpha().raw().toBuffer({resolveWithObject:true});
+ let sum=0,squared=0;for(let index=1;index<data.length;index+=info.channels){const value=data[index]/255;sum+=value;squared+=value*value;}
+ const count=info.width*info.height,mean=sum/count,deviation=Math.sqrt(Math.max(0,squared/count-mean*mean));
+ assert(Math.abs(mean-report.mechanismRepair.finishes[name].roughness)<.008&&deviation<.015,`${name}: satin roughness retains fine variation`);
+}
 assert.equal(report.parts.find(p=>p.part==='MainWood_ContinuousLowerShoulder').gameTriangles,32211,'use clean wood before the slicing regression');
 assert.equal(report.parts.find(p=>p.part==='UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront').gameTriangles,11893);
 assert(report.surfaceRepair.band.maximumDisplacementMm>1&&report.surfaceRepair.band.maximumDisplacementMm<22,'the band is deliberately fitted to the timber profile');

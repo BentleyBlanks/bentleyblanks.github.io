@@ -32,8 +32,8 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261112');assert.equal(evidence.identity.triangles,64776);
- assert.equal(evidence.identity.worldTriangles,64776);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.version,'173R-20261113');assert.equal(evidence.identity.triangles,64266);
+ assert.equal(evidence.identity.worldTriangles,64266);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert.equal(m.normal,'');assert.equal(m.orm,'');assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
  evidence.lighting=[];
  for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
@@ -90,7 +90,7 @@ try{
  });
  assert(evidence.frame.rifle.rows.length>0,'production frame includes authored rifle draws');
  assert.deepEqual(errors,[]);
- console.log('ok HanYang173R actual game: 64776 triangles, 44 PBR parts, high day/shadow/overcast/night/ADS');
+ console.log('ok HanYang173R actual game: 64266 triangles, 44 PBR parts, high day/shadow/overcast/night/ADS');
 }finally{
  await fs.writeFile(path.join(out,'Data_Acceptance.json'),JSON.stringify({evidence,errors},null,2));
  await browser.close();await new Promise(r=>server.close(r));

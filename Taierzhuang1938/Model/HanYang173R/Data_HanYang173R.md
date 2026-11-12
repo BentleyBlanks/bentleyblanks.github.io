@@ -5,9 +5,9 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **64,776 triangles, 44 parts, 132 embedded images**. The 2026-11-12 repair restores clean reduced wooden meshes and the complete high-source cocking cover. `Data_GameGeometry.json` records the current hash, per-part geometry comparisons and image payloads.
-- 23 parts retain the delivered PBR payloads with their UVs. The 21 rebaked parts include seven close-up surfaces rebuilt on 2026-11-12. Tangent frames and bake/export UV coverage are checked.
-- The front sight crown, complete bolt cylinder/knob, trigger and selected contact parts retain their original geometry. The receiver inlet is relieved by at most 0.152 mm. The handguard band is reshaped to the wooden profile. Other simplified parts keep sampled bidirectional vertex-to-surface errors below 0.5 mm. These measurements sample vertices against surfaces.
+- Game geometry: **64,266 triangles, 44 parts, 132 embedded images**. The 2026-11-13 revision reconstructs nine visible mechanism parts from reference photographs. `Data_GameGeometry.json` records the current hash, per-part geometry comparisons and image payloads.
+- 13 parts retain the delivered PBR payloads with their UVs. The 31 rebaked parts include the clean wooden meshes and sixteen satin steel surfaces. Tangent frames and bake/export UV coverage are checked.
+- The front sight crown, trigger and selected contact parts retain their original geometry. The receiver inlet is relieved by at most 0.152 mm. The handguard band follows timber and barrel profiles. The nine mechanism reconstructions carry explicit reference scope. Other simplified parts keep sampled bidirectional vertex-to-surface errors below 0.5 mm.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
 - GPU publication uses BC7 and the explicit path rules. The three main-stock maps retain 4096 pixels, selected by embedded image indices 57–59. Other images follow their existing 2048-pixel maximum.
 
@@ -17,7 +17,27 @@ Source packages and source Blender projects remain outside Git:
 
 `DotsDelivery/` contains the original three packages; all 605 supplied SHA256 entries were verified. `Game60k/Scene_HanYang173RGame60k.blend` is the editable reduced source. Preserve [Dots' material-source statement](Data_DotsMaterialSources.txt); it includes unresolved historical input provenance and does not assert that the whole package is CC0.
 
-## Close-up repair, 2026-11-12
+## Mechanism and finish revision, 2026-11-13
+
+The user rejected the preceding full-surface coarse finish. The visible rear mechanism now uses paired protective cheeks, a stepped round cocking body, a complete circular rear disc and central pin, a thin rounded safety flag and top strip, a round bolt stem, a 48-segment knob, and a beveled rear V-notch. The 2026-11-12 wooden meshes and fitted handguard band provide the surrounding rifle body.
+
+Sixteen steel parts use restrained fine surface variation. Blackened protective parts and the worn bare mechanism have separate reflectance targets, with roughness around 0.30–0.35. The bake records the selected finish and render-active UV layer. Wood retains its 4096-pixel publication rules.
+
+The museum receiver photograph and the auction's photographs 3 and 4 were opened for visual comparison. They show the protective cheeks, rear disc, safety outline and smooth worn steel. Dimensions, fit allowances and finish parameters are artistic reconstruction. [Te Papa Hanyang Type 88](https://collections.tepapa.govt.nz/object/58119) · [Receiver photographs](https://www.icollector.com/Chinese-Hanyang-Mauser-Bolt-Action-Rifle_i13828566)
+
+The revision lives in `MechanismFinish_20261113/` beside `DotsDelivery/`. `Data_RuntimeGains.json` records the runtime colour multipliers used to derive the baked reflectance. Generate it from `HanYang173RBaseGain` before the first rebuild, then run the managed MCP builder and assembler.
+
+The revised complete-arm scans pass the 2 mm confirmed-depth gate. Empty and partial reloads reach 1.965 mm, held-open reload 1.594 mm, and the ordinary bolt cycle 1.796 mm. The independent mechanical-motion check reports a 63.2 mm hand step at phase 0.256 with both the revision and its immutable pre-revision GLB. The earlier left-finger self-contact baseline remains recorded below.
+
+```powershell
+node scripts/Script_BlenderMcp.mjs start --task HanYangSurfaceRepair
+node scripts/Script_BlenderMcp.mjs exec --code "import os; os.environ['HANYANG_PROJECT_ROOT']=r'<owned-worktree>/Taierzhuang1938'"
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYang173RMechanismRepair.py --timeout 2400
+python Taierzhuang1938/_import/Script_HanYang173RRebakeAssemble.py <revision>/Model_HanYang173R_Before.glb Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb <revision>/Bake --report Taierzhuang1938/Model/HanYang173R/Data_GameGeometry.json --mechanism-repair <revision>/Data_MechanismRepair.json
+node scripts/Script_BlenderMcp.mjs stop
+```
+
+## Earlier close-up repair, 2026-11-12
 
 The original 295,470-triangle GLB and the editable author project were opened and compared with the runtime mesh. The source's 2,932-triangle cocking cover, with four zero-area source triangles removed replaces its 287-triangle reduction. Both wooden components return to the reduced source before the 6 cm slicing, preserving their source normals and recovering 6,526 triangles. The resulting complete rifle stays within its 69,000-triangle allocation.
 
