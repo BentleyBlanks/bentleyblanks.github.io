@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261101230000">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113CoverMarks">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113AnnotationDialog">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,29 +25,46 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261113AnnotationDialog"></script>
 </head>
 <body class="lfBody">
-  <header class="lfHeader"><div class="lfBrand"><span>血战滕县 · 第一关</span><h1>Encounter Designer</h1></div><div id="frameHeading"></div><span id="saveStatus">本机草稿</span><a href="../index.html?editor=tools">返回高级工具</a></header>
-  <div class="lfToolbar">
-    <div class="lfToolGroup"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select><button id="fitStage">本段</button><button id="fitAll">全图</button><button id="followPlayer" aria-pressed="false">跟随战场</button></div>
-    <div class="lfToolGroup" id="drawTools"><button data-mode="select" class="selected">选择</button><button data-mode="arrow">箭头</button><button data-mode="rect">框</button><button data-mode="text">文字</button></div>
-    <div class="lfToolGroup"><button id="undoFlow" title="Ctrl+Z">撤销</button><button id="redoFlow" title="Ctrl+Shift+Z">重做</button></div>
-    <div class="lfToolGroup lfExport"><button id="copyFrame">复制定位</button><button id="exportFrame" class="sePrimary">导出标注图</button><button id="exportProject">导出工程</button><button id="importProject">导入</button><input id="importFile" type="file" accept=".json,.png" hidden></div>
-  </div>
+  <header class="lfToolbar" aria-label="遭遇设计工具栏">
+    <h1 class="lfSrOnly">Encounter Designer</h1>
+    <span id="frameHeading" title="当前阶段与节拍"></span>
+    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select><button id="fitStage">本段</button><button id="fitAll">全图</button><button id="followPlayer" aria-pressed="false">跟随战场</button></div>
+    <div class="lfToolGroup lfHistory"><button id="undoFlow" title="Ctrl+Z">撤销</button><button id="redoFlow" title="Ctrl+Shift+Z">重做</button></div>
+    <div class="lfToolGroup lfExport"><button id="copyFrame" class="lfCopyPrimary" title="复制时间轴、世界坐标、相机与选中对象，供 AI 定位">复制定位</button><button id="markScreenshot" class="sePrimary">截图标记</button></div>
+    <button id="copyViewports" title="把当前所有视口合成一张图片并复制到剪贴板">复制视口截图</button>
+    <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
+    <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
+  </header>
   <main class="lfWorkspace">
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapReadout"></div><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
-      <div class="lfTabs"><button data-tab="script" class="selected">原文</button><button data-tab="edit">布设</button><button data-tab="notes">标注</button></div>
-      <section id="scriptPane" class="lfPane"><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><section id="planningSection" hidden><h3>当前编排</h3><p id="planningPassage"></p></section><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <div class="lfTabs"><button data-tab="script" class="selected">原文</button><button data-tab="edit">布设</button></div>
+      <section id="scriptPane" class="lfPane"><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
       <section id="editPane" class="lfPane" hidden><div class="lfInline"><select id="objectList" aria-label="当前布设"></select><button id="focusObject" title="定位选中的区域">定位</button></div><div class="lfInline"><button id="addTrigger">＋触发区</button><button id="addGroup">＋生成区</button></div><form id="objectForm"></form><div id="objectPreview" class="lfPreviewStatus"></div><div id="objectActions" class="lfInline" hidden><button id="addRoutePoint">加路点</button><button id="deleteObject">删除</button></div></section>
-      <section id="notesPane" class="lfPane" hidden><div class="lfNoteHint">标注后导出 PNG 原文件，可连同帧时间、坐标和布设一起回读。</div><label class="lfField">文字<textarea id="annotationText" rows="3" placeholder="选中标注后填写"></textarea></label><div class="lfInline"><button id="deleteAnnotation">删除选中</button></div><div id="annotationFrames"></div></section>
+
     </aside>
   </main>
   <footer class="lfTimeline">
-    <div class="lfTransport"><button id="previousBeat">上一拍</button><button id="playFlow" class="sePrimary">播放</button><button id="nextBeat">下一拍</button><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label><input id="loopStage" type="checkbox">循环本段</label><div class="lfLayers"><label><input data-layer="fire" type="checkbox" checked>火力</label><label><input data-layer="triggers" type="checkbox" checked>触发</label><label><input data-layer="spawns" type="checkbox" checked>生成</label><label><input data-layer="routes" type="checkbox" checked>路线</label><label><input data-layer="names" type="checkbox" checked>人名</label></div></div>
+    <div class="lfTransport"><div class="lfPlayback"><button id="previousBeat" title="上一拍" aria-label="上一拍">⏮</button><button id="playFlow" class="sePrimary" aria-pressed="false">播放</button><button id="nextBeat" title="下一拍" aria-label="下一拍">⏭</button></div><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label class="lfLoop"><input id="loopStage" type="checkbox"><span>循环本段</span></label></div>
     <div id="timelineAxis" class="lfTimeAxis"><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1870" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
   </footer>
+  <dialog id="annotationDialog" class="lfAnnotationDialog" aria-labelledby="annotationTitle">
+    <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图标记</h2><span id="annotationHeading"></span></div><button id="closeAnnotations" aria-label="关闭截图标记">关闭 ×</button></div>
+    <div class="lfAnnotationTools">
+      <div class="lfToolGroup"><button data-mark-tool="arrow" aria-pressed="true">箭头</button><button data-mark-tool="rect" aria-pressed="false">框</button><button data-mark-tool="text" aria-pressed="false">文字</button></div>
+      <input id="screenshotText" type="text" maxlength="2000" placeholder="点击截图添加文字" aria-label="标记文字" disabled>
+      <div class="lfToolGroup"><button id="undoAnnotation" title="Ctrl+Z">撤销</button><button id="redoAnnotation" title="Ctrl+Shift+Z">重做</button><button id="deleteScreenshotAnnotation">删除选中</button></div>
+      <div class="lfToolGroup lfExport"><button id="copyScreenshot" class="lfCopyPrimary">复制图片</button><button id="exportFrame" class="sePrimary">导出 PNG</button></div>
+    </div>
+    <div id="annotationStage" class="lfAnnotationStage"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas></div>
+    <div class="lfAnnotationFooter"><span>拖画箭头或框 · 点击添加文字 · 拖动已有标记可移动</span><output id="annotationStatus" role="status"></output></div>
+    <details id="legacyAnnotations" hidden><summary>原有空间标注</summary>
+      <section id="notesPane" class="lfPane"><div class="lfNoteHint">标注后导出 PNG 原文件，可保留帧时间、坐标和布设。</div><label class="lfField">文字<textarea id="annotationText" rows="3" placeholder="选中标注后填写"></textarea></label><div class="lfInline"><button id="deleteAnnotation">删除选中</button></div><div id="annotationFrames"></div></section>
+    </details>
+  </dialog>
   <div id="flowError" role="status" hidden></div>
 </body>
 </html>

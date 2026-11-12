@@ -21,11 +21,22 @@ export class EncounterViewports {
       bar.append(target);
       const fit=document.createElement("button");fit.textContent="复位";fit.title=`复位视口 ${index+1}`;bar.append(fit);
       const rotate=document.createElement("button");rotate.textContent="↻";rotate.title="旋转 45°";bar.append(rotate);
+      const layerMenu=document.createElement("details");layerMenu.className="lfViewLayers";
+      const layerSummary=document.createElement("summary");layerSummary.textContent="显示";layerMenu.append(layerSummary);
+      const layerOptions=document.createElement("div");layerMenu.append(layerOptions);bar.append(layerMenu);
+      const layers={fire:true,triggers:true,spawns:true,routes:true,names:true};
+      for(const [key,label] of [["fire","火力"],["triggers","触发"],["spawns","生成"],["routes","路线"],["names","人名"]]) {
+        const wrapper=document.createElement("label"),input=document.createElement("input");
+        input.type="checkbox";input.checked=true;input.dataset.layer=key;input.setAttribute("aria-label",`视口 ${index+1} ${label}`);
+        input.onchange=()=>{layers[key]=input.checked;this.callbacks.change();};
+        wrapper.append(input,document.createTextNode(label));layerOptions.append(wrapper);
+      }
+      layerMenu.addEventListener("toggle",()=>{if(layerMenu.open) for(const other of this.entries) if(other.index!==index) other.layerMenu.open=false;});
       const canvas=document.createElement("canvas");canvas.id=index===0?"flowMap":`flowMap${index+1}`;canvas.tabIndex=0;
       canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
       const status=document.createElement("div");status.className="lfViewStatus";
       pane.append(bar,canvas,status);element.append(pane);
-      const entry={index,pane,bar,canvas,select,target,rotate,status,type,mode:type==="plan"?"stage":"follow",map:this.MakeView(canvas,type),size:null};
+      const entry={index,pane,bar,canvas,select,target,rotate,status,type,layers,layerMenu,mode:type==="plan"?"stage":"follow",map:this.MakeView(canvas,type),size:null};
       this.entries.push(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
       select.onchange=()=>this.SetType(index,select.value);
@@ -97,7 +108,7 @@ export class EncounterViewports {
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.rotate.hidden=!perspective||entry.type==="scene";
       if(entry.mode==="follow") entry.map.Follow(frame);
-      entry.map.Draw(frame,layers,selection,annotations,draft);
+      entry.map.Draw(frame,entry.layers,selection,annotations,draft);
       entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"跟随":entry.mode==="manual"?"自由取景":entry.mode==="all"?"全图":"本段"}`;
     }
   }
@@ -105,7 +116,7 @@ export class EncounterViewports {
   Serialize() {
     return {count:this.count,active:this.activeIndex,views:this.Visible().map((entry)=>{
       const rect=entry.canvas.getBoundingClientRect();
-      return {type:entry.type,mode:entry.mode,center:[...entry.map.center],scale:entry.map.scale,
+      return {type:entry.type,mode:entry.mode,layers:{...entry.layers},center:[...entry.map.center],scale:entry.map.scale,
         yaw:entry.map.yaw||0,pitch:entry.map.pitch||0.67,target:entry.map.target||"player",viewport:{width:rect.width,height:rect.height},
         ...(entry.map.type?{far:entry.map.far,freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20}:{})};
     })};
@@ -118,6 +129,10 @@ export class EncounterViewports {
     for(const [index,saved] of layout.views.entries()) {
       this.SetType(index,saved.type);
       const entry=this.entries[index],rect=entry.canvas.getBoundingClientRect();
+      if(saved.layers) {
+        Object.assign(entry.layers,saved.layers);
+        for(const input of entry.layerMenu.querySelectorAll("input")) input.checked=entry.layers[input.dataset.layer];
+      }
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
       if(entry.map.type) {entry.map.far=saved.far||1500;entry.map.freeCamera=saved.freeCamera?structuredClone(saved.freeCamera):entry.map.freeCamera;entry.map.focusDistance=saved.focusDistance||20;}
       const ratio=saved.viewport?Math.min(rect.width/saved.viewport.width,rect.height/saved.viewport.height):1;

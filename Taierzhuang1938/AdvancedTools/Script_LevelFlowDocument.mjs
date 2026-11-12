@@ -14,9 +14,21 @@ export function ValidateViewportLayout(layout) {
       &&(view.focusDistance===undefined||Number.isFinite(view.focusDistance)&&view.focusDistance>0&&view.focusDistance<=10000)
       &&(view.freeCamera==null||Array.isArray(view.freeCamera.eye)&&view.freeCamera.eye.length===3&&view.freeCamera.eye.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000)
         &&Number.isFinite(view.freeCamera.yaw)&&Number.isFinite(view.freeCamera.pitch)&&Math.abs(view.freeCamera.pitch)<Math.PI/2)
+      &&(view.layers===undefined||view.layers&&["fire","triggers","spawns","routes","names"].every(key=>typeof view.layers[key]==="boolean"))
       &&Number.isFinite(view.viewport?.width)&&view.viewport.width>0&&Number.isFinite(view.viewport?.height)&&view.viewport.height>0);
   if(!valid) throw new Error("多视口定位数据无效");
   return structuredClone(layout);
+}
+
+export function ValidateScreenshot(value) {
+  const Point = (entry) => Array.isArray(entry) && entry.length === 2 && entry.every(Number.isFinite);
+  if (!value || value.version !== 1 || !Number.isInteger(value.width) || !Number.isInteger(value.height)
+    || value.width < 1 || value.height < 1 || value.width > 16384 || value.height > 16384
+    || typeof value.image !== "string" || !value.image.startsWith("data:image/png;base64,")
+    || !Array.isArray(value.marks) || value.marks.length > 2000
+    || !value.marks.every(mark => mark && ["arrow", "rect", "text"].includes(mark.kind) && Point(mark.a) && Point(mark.b)
+      && typeof mark.text === "string" && mark.text.length <= 2000)) throw new Error("截图标记数据无效");
+  return structuredClone(value);
 }
 
 function ValidateSavedDocument(value,timeline) {
@@ -95,6 +107,7 @@ export function ReadFramePacket(value,timeline) {
     ||!Number.isFinite(context.viewport?.width)||!Number.isFinite(context.viewport?.height)
     ||context.viewport.width<=0||context.viewport.height<=0) throw new Error("帧定位坐标或时间无效");
   if(context.viewports) ValidateViewportLayout(context.viewports);
+  if(value.screenshot) ValidateScreenshot(value.screenshot);
   return {...value,context:structuredClone(context),document:ValidateSavedDocument(value.document,timeline)};
 }
 

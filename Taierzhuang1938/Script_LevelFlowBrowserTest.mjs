@@ -4,6 +4,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser,ServeProject} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {FLOW_TIMELINE} from "./AdvancedTools/Script_LevelFlowModel.mjs";
+import {FLOW_SOURCE_EXCERPTS} from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import {ReadPngFrameMetadata} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),out=path.join(root,"tmp","EncounterEditor");
@@ -12,6 +13,11 @@ const server=await ServeProject(root),base=`http://127.0.0.1:${server.address().
 const browser=await LaunchBrowser();
 try {
   const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
+  await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+  await page.addInitScript(()=>{
+    localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
+    localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
+  });
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
   assert.equal(await page.locator("h1").textContent(),"Encounter Designer");
@@ -61,7 +67,12 @@ try {
   assert.deepEqual(independentAfter[0],independentBefore[0],"zooming viewport 2 leaves viewport 1 unchanged");
   assert.notEqual(independentAfter[1].scale,independentBefore[1].scale);
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await page.waitForFunction(()=>window.LevelFlow);
-  for(const input of await page.locator('[data-layer]').all()) await input.uncheck();
+  for(const menu of await page.locator('.lfViewPane:visible .lfViewLayers').all()) {
+    await menu.locator('summary').click();
+    for(const input of await menu.locator('input').all()) await input.uncheck();
+    await menu.locator('summary').click();
+  }
+  await page.evaluate(()=>LevelFlow.ActivateView(0));
   const junctionPixels=await page.evaluate(()=>{
     const canvas=document.querySelector('#flowMap'),context=canvas.getContext('2d');
     const samples=[63,64.5,66,67.1,69,70].map(z=>[12+(z-44)*18/42,z]);
@@ -77,6 +88,7 @@ try {
   for(const beat of FLOW_TIMELINE) {
     await page.evaluate((time)=>window.LevelFlow.Seek(time),beat.start+beat.duration*0.5);
     assert.equal(await page.locator("#beatTitle").textContent(),beat.title);
+    assert.equal(await page.locator("#sourcePassage").textContent(),FLOW_SOURCE_EXCERPTS[beat.id],"paragraph formatting retains all script wording");
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight),false);
   }
   await page.evaluate(()=>window.LevelFlow.Seek(384));
@@ -108,57 +120,83 @@ try {
   await page.reload();await page.waitForFunction(()=>window.LevelFlow);
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8,"draft survives reload");
   await page.evaluate(()=>window.LevelFlow.Seek(384));
+  assert.equal(await page.locator('#exportProject,#importProject,#importFile,#planningSection,[data-tab="notes"]').count(),0);
+  const layout=await page.evaluate(()=>({toolbar:document.querySelector('.lfToolbar').getBoundingClientRect().height,
+    passage:document.querySelector('#sourcePassage').textContent,paragraphs:document.querySelectorAll('#sourcePassage p').length}));
+  assert.ok(layout.toolbar<=52,'all navigation fits in one compact row at 720p');
+  assert.ok(layout.paragraphs>1,'source passage is broken into readable paragraphs');
+  await page.click('#copyFrame');
+  const locationText=await page.evaluate(()=>navigator.clipboard.readText());
+  assert.ok(!locationText.includes('http'),'AI location contains no URL');
+  const location=JSON.parse(locationText);
+  assert.equal(location.timeline.timeSeconds,384);
+  assert.equal(location.timeline.secondsIntoBeat,384-location.timeline.beatStartSeconds);
+  assert.equal(location.viewports.length,2);assert.ok(location.player.x&&Number.isFinite(location.player.y));
+  assert.equal(location.coordinates.unit,'metres');
+  const fireMenu=page.locator('.lfViewPane').first().locator('.lfViewLayers');
+  await fireMenu.locator('summary').click();await fireMenu.locator('[data-layer="fire"]').uncheck();
+  const layerState=await page.evaluate(()=>LevelFlow.Inspect().viewports.views.map(view=>view.layers));
+  assert.equal(layerState[0].fire,false);assert.equal(layerState[1].fire,true,'display settings belong to each viewport');
+  await fireMenu.locator('[data-layer="fire"]').check();await fireMenu.locator('summary').click();
+  let downloads=0;page.on('download',()=>downloads++);
+  await page.click('#copyViewports');
+  await page.waitForFunction(()=>document.querySelector('#flowError').textContent.includes('已复制 2 个视口'));
+  const clipboard=await page.evaluate(async()=>{
+    const [item]=await navigator.clipboard.read(),blob=await item.getType('image/png'),bitmap=await createImageBitmap(blob);
+    const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+    const context=canvas.getContext('2d');context.drawImage(bitmap,0,0);
+    const grid=document.querySelector('#viewportGrid').getBoundingClientRect();
+    const samples=[...document.querySelectorAll('.lfViewPane:not([hidden]) canvas')].map(source=>{
+      const rect=source.getBoundingClientRect(),x=Math.floor(rect.width/2),y=Math.floor(rect.height/2);
+      return {original:[...source.getContext('2d').getImageData(x,y,1,1).data],
+        copied:[...context.getImageData(Math.round(rect.x-grid.x+x),Math.round(rect.y-grid.y+y),1,1).data]};
+    });
+    return {types:item.types,width:bitmap.width,height:bitmap.height,samples};
+  });
+  for(const sample of clipboard.samples) assert.deepEqual(sample.copied,sample.original,'clipboard image includes pixels from both viewport canvases');
+  assert.ok(clipboard.types.includes('image/png'));assert.ok(clipboard.width>900&&clipboard.height>350);
+  assert.equal(downloads,0,'copy viewport screenshot writes clipboard without downloading');
+  await page.click('#markScreenshot');
+  assert.ok(await page.locator('#annotationDialog').isVisible());
+  const frozen=await page.evaluate(()=>LevelFlow.Inspect().time);
   async function Draw(kind,a,b,text) {
-    await page.click(`[data-mode="${kind}"]`);
-    const points=await page.evaluate(([a,b])=>[window.LevelFlow.ToScreen(a),window.LevelFlow.ToScreen(b)],[a,b]);
-    const rect=await page.locator('#flowMap').boundingBox();
-    await page.mouse.move(rect.x+points[0][0],rect.y+points[0][1]);await page.mouse.down();
-    await page.mouse.move(rect.x+points[1][0],rect.y+points[1][1],{steps:8});await page.mouse.up();
-    await page.locator('#annotationText').fill(text);await page.locator('#annotationText').press('Tab');
+    await page.click(`[data-mark-tool="${kind}"]`);
+    const rect=await page.locator('#annotationCanvas').boundingBox();
+    await page.mouse.move(rect.x+rect.width*a[0],rect.y+rect.height*a[1]);await page.mouse.down();
+    await page.mouse.move(rect.x+rect.width*b[0],rect.y+rect.height*b[1],{steps:8});await page.mouse.up();
+    if(text) {await page.locator('#screenshotText').fill(text);await page.locator('#screenshotText').press('Tab');}
   }
-  await Draw("arrow",[60,90],[35,105],"这里加两名追兵");
-  await Draw("rect",[24,123],[46,134],"我方交叉掩护");
-  await Draw("text",[54,119],[54,119],"03H 边打边撤");
-  const annotated=await page.evaluate(()=>window.LevelFlow.Inspect());
-  assert.equal(annotated.document.annotations.length,3);
-  assert.ok(annotated.document.annotations.every(note=>note.time===384));
-  await page.screenshot({path:path.join(out,"AnnotatedFrame.png")});
+  await Draw('arrow',[0.1,0.2],[0.3,0.4]);
+  await Draw('rect',[0.6,0.2],[0.85,0.6]);
+  await Draw('text',[0.3,0.75],[0.3,0.75],'这里加两名追兵');
+  assert.ok((await page.locator('#annotationStatus').textContent()).includes('3 处'));
+  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('3 处'));
+  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('2 处'));
+  await page.click('#redoAnnotation');await page.click('#redoAnnotation');
+  await page.click('#copyScreenshot');await page.waitForFunction(()=>document.querySelector('#annotationStatus').textContent.includes('已复制标记截图'));
+  assert.equal(downloads,0,'annotated image copies without downloading');
+  await page.screenshot({path:path.join(out,'AnnotationDialog.png')});
   const downloadPromise=page.waitForEvent('download');await page.click('#exportFrame');const download=await downloadPromise;
   const imagePath=path.join(out,'FrameWithMetadata.png');await download.saveAs(imagePath);
   const metadata=ReadPngFrameMetadata(Uint8Array.from(fs.readFileSync(imagePath)).buffer);
-  assert.equal(metadata.context.time,384);assert.deepEqual(metadata.document.annotations,annotated.document.annotations);
-  assert.equal(metadata.context.mapSource.sha256.length,64);
-  assert.equal(metadata.context.viewports.count,2);
+  assert.equal(metadata.context.time,384);assert.equal(metadata.screenshot.marks.length,3);
+  assert.equal(metadata.screenshot.marks[2].text,'这里加两名追兵');
+  assert.equal(metadata.context.mapSource.sha256.length,64);assert.equal(metadata.context.viewports.count,2);
   assert.equal(metadata.document.groups.find(group=>group.id==='Fork').count,8);
-  await page.evaluate(()=>window.LevelFlow.Seek(1400));await page.setInputFiles('#importFile',imagePath);
-  await page.waitForFunction(()=>window.LevelFlow.Inspect().time===384);
-  const restored=await page.evaluate(()=>window.LevelFlow.Inspect());
-  assert.deepEqual(restored.view,metadata.context.view);assert.deepEqual(restored.document,metadata.document);
-  await page.setViewportSize({width:1024,height:720});
-  const smallerViewport=await page.locator('#flowMap').boundingBox();
-  const expectedScale=metadata.context.view.scale*Math.min(smallerViewport.width/metadata.context.viewport.width,smallerViewport.height/metadata.context.viewport.height);
-  await page.setInputFiles('#importFile',imagePath);
-  await page.waitForFunction((scale)=>Math.abs(LevelFlow.Inspect().view.scale-scale)<0.01,expectedScale);
-  const smaller=await page.evaluate(()=>({state:window.LevelFlow.Inspect(),width:document.getElementById('flowMap').clientWidth}));
-  assert.ok(Math.abs(smaller.state.view.scale-expectedScale)<0.01,"cross-viewport import preserves the full framed world area");
-  await page.setViewportSize({width:1280,height:720});await page.setInputFiles('#importFile',imagePath);
-  await page.waitForFunction((scale)=>Math.abs(window.LevelFlow.Inspect().view.scale-scale)<0.001,metadata.context.view.scale);
-  await page.setInputFiles('#importFile',{name:'Invalid.json',mimeType:'application/json',buffer:Buffer.from('{"schema":"bad"}')});
-  await page.waitForFunction(()=>document.getElementById('flowError').textContent.includes('导入失败'));
-  assert.deepEqual((await page.evaluate(()=>window.LevelFlow.Inspect())).document,metadata.document,"invalid import leaves current edits intact");
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),frozen,'annotation dialog freezes the captured timeline');
+  await page.click('#closeAnnotations');
   await page.selectOption('#viewportLayout','4');
   await page.evaluate(()=>{LevelFlow.SetViewType(1,'chase');LevelFlow.SetViewType(2,'oblique');LevelFlow.SetViewType(3,'eye');});
   await page.screenshot({path:path.join(out,'FourViewports.png')});
+  await page.click('#markScreenshot');
   const multiDownloadPromise=page.waitForEvent('download');await page.click('#exportFrame');const multiDownload=await multiDownloadPromise;
   const multiPath=path.join(out,'FourViewportFrame.png');await multiDownload.saveAs(multiPath);
   const multiMetadata=ReadPngFrameMetadata(Uint8Array.from(fs.readFileSync(multiPath)).buffer);
   assert.equal(multiMetadata.context.viewports.count,4);
   assert.deepEqual(multiMetadata.context.viewports.views.map(view=>view.type),['plan','chase','oblique','eye']);
-  await page.selectOption('#viewportLayout','1');await page.setInputFiles('#importFile',multiPath);
-  await page.waitForFunction(()=>LevelFlow.Inspect().viewports.count===4);
-  assert.equal(await page.locator('.lfViewPane:visible').count(),4,"PNG restores the four independently configured viewports");
+  await page.click('#closeAnnotations');
   await page.evaluate(()=>{LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
-  await page.click('[data-mode="select"]');await page.locator('#flowMap').focus();await page.keyboard.press('Space');
+  await page.locator('#flowMap').focus();await page.keyboard.press('Space');
   await page.waitForFunction(()=>window.LevelFlow.Inspect().time>384.2);await page.keyboard.press('Space');
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).playing,false);
   await page.click('[data-stage="01"]');assert.ok(await page.locator('.lfBeats .cinematic').count()>0);
@@ -229,11 +267,10 @@ try {
   const dollied=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);assert.notDeepEqual(dollied.freeCamera.eye,orbited.freeCamera.eye,"Alt RMB dollies");
   await page.mouse.wheel(0,-100);await page.locator('#flowMap2').focus();await page.keyboard.press('f');
   const focused=await page.evaluate(()=>LevelFlow.Inspect());assert.deepEqual(focused.viewports.views[1].center,focused.actors[0].p,"F focuses the player when no object is selected");
-  const navigationPacket=await page.evaluate(()=>LevelFlow.Packet());
-  await page.evaluate(()=>LevelFlow.SetViewType(1,'eye'));
-  await page.setInputFiles('#importFile',{name:'SceneFrame.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(navigationPacket))});
-  await page.waitForFunction(()=>LevelFlow.Inspect().viewports.views[1].type==='scene');
-  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).viewports.views[1],focused.viewports.views[1],"frame import restores the exact free-camera pose and far plane");
+  await page.click('#copyFrame');
+  const cameraLocation=JSON.parse(await page.evaluate(()=>navigator.clipboard.readText()));
+  assert.deepEqual(cameraLocation.viewports[1].camera.eye,focused.viewports.views[1].freeCamera.eye.map(value=>Math.round(value*1000)/1000));
+  assert.equal(cameraLocation.viewports[1].camera.farMetres,1500);
   await page.screenshot({path:path.join(out,'SceneNavigation.png')});
 
   const depth=await page.evaluate(async()=>{
@@ -297,8 +334,7 @@ try {
   await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=227.14&x=45&z=65&zoom=9`);
   await page.waitForFunction(()=>window.LevelFlow);
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('① 北侧五人'));
-  assert.equal(await page.locator('#planningSection').isVisible(),true);
+  assert.equal(await page.locator('#planningSection').count(),0);
   await page.evaluate(()=>LevelFlow.Seek(186.63));
   const deployed=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'));
   assert.equal(deployed.length,5);
@@ -320,7 +356,7 @@ try {
     packet.context.viewports.views[0].yaw+=Math.atan2(75-camera.eye[0],44-camera.eye[2])-heading;
     return packet;
   });
-  await page.setInputFiles('#importFile',{name:'SpawnEye.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(spawnEyePacket))});
+  await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),spawnEyePacket.context.viewports);
   const hiddenSpawns=await page.evaluate(()=>LevelFlow.Inspect().rendering[0].actors.filter(actor=>actor.id.startsWith('Fork_')));
   assert.equal(hiddenSpawns.length,5);
   assert.ok(hiddenSpawns.every(actor=>actor.visible===0&&actor.hidden>0&&actor.labelOpacity===0),"all five dispersed spawns are fully hidden from the real player camera");
@@ -329,7 +365,6 @@ try {
   await page.evaluate(()=>LevelFlow.Seek(227.14));
   await page.screenshot({path:path.join(out,'DragDoorPressure.png')});
   await page.evaluate(()=>LevelFlow.Seek(252));
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('② 第一拨之后'));
   const rampEnemy=await page.evaluate(()=>LevelFlow.Inspect().actors.find(actor=>actor.groupId==='Corner'&&actor.pose!=='dead'));
   assert.ok(rampEnemy,'second pressure reaches the door ramp after the first wave');
   await page.screenshot({path:path.join(out,'DragRampPressure.png')});
@@ -337,28 +372,24 @@ try {
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='TrafficFlank').length),0);
   await page.evaluate(()=>LevelFlow.Seek(369));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.some(actor=>actor.groupId==='TrafficFlank')));
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('X30、Z86'));
   await page.screenshot({path:path.join(out,'TrafficSecondRampPressure.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=26.14&x=45&z=58&zoom=6`);
   await page.waitForFunction(()=>window.LevelFlow);
   const opening=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(opening.actors.filter(actor=>actor.id==='yao'||actor.id.startsWith('openingGun')).length,4);
   assert.equal(opening.actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')).length,12);
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('十二人'));
   await page.screenshot({path:path.join(out,'OpeningDeparture.png')});
   await page.evaluate(()=>LevelFlow.Seek(40.05));
   const approaching=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>/^opening\d+$/.test(actor.id)));
   assert.equal(approaching.length,9);
   assert.ok(approaching.some(actor=>actor.pose==='run'));
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('三路'));
   await page.screenshot({path:path.join(out,'OpeningEnemyApproach.png')});
   await page.evaluate(()=>LevelFlow.Seek(85));
-  assert.ok((await page.locator('#planningPassage').textContent()).includes('闻声'));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.p[1]<LevelFlow.Evaluate(84).actors.find(previous=>previous.id===actor.id).p[1])));
   await page.screenshot({path:path.join(out,'OpeningReturn.png')});
   await page.evaluate(()=>LevelFlow.Seek(107));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.pose==='kneel')));
   await page.screenshot({path:path.join(out,'OpeningSouthBerm.png')});
   assert.deepEqual(errors,[]);
-  console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, PNG export/import and playback');
+  console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

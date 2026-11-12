@@ -4,7 +4,7 @@ import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMEN
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
-import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
+import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
@@ -443,4 +443,11 @@ for(let stamp=BeatById("10d").start;stamp<BeatById("10f").end;stamp+=0.5) {
   if(cart.p[1]>=470) assert.ok(Math.min(...south.slice(1).map((b,index)=>SegmentDistance(cart.p,south[index],b)))<1e-6,"cart uses each south-alley turn");
   assert.equal(winter.parentId,"cart");assert.equal(winter.elevation,1.05);assert.equal(winter.heading,cart.heading);assert.ok(Distance(winter.p,cart.p)<0.2);
 }
+
+
+const screenshot={version:1,width:1280,height:720,image:"data:image/png;base64,AA==",marks:[{kind:"arrow",a:[2,3],b:[40,50],text:""}]};
+assert.deepEqual(ValidateScreenshot(screenshot),screenshot);
+assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"world",a:[2,3],b:[4,5],text:""}]}));
+assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"text",a:[NaN,3],b:[4,5],text:"x"}]}));
+assert.throws(()=>ValidateScreenshot({...screenshot,width:0}));
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

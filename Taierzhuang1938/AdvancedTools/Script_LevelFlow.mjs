@@ -2,17 +2,19 @@ import { FLOW_SOURCE } from "./Data_LevelFlow.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
 import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATION, FLOW_TIMELINE, FormatFlowTime, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
 import { ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
-import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, DownloadBlob } from "./Script_LevelFlowDocument.mjs";
+import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
+import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
+import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation;
+let canvas,workspace,navigation,annotationEditor;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
-const layers=Object.fromEntries([...document.querySelectorAll("[data-layer]")].map((input)=>[input.dataset.layer,input.checked]));
+
 let map, time=0, playing=false, mode="select", tab="script", selection=null;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, objectFormKey="", renderPending=false;
@@ -31,11 +33,14 @@ function SetMode(value) {
   mode=value;
   for(const entry of workspace.Visible()) entry.canvas.dataset.mode=value;
   for(const button of document.querySelectorAll("[data-mode]")) button.classList.toggle("selected",button.dataset.mode===value);
-  if(value!=="select") {SetPlaying(false);ShowTab("notes");}
+  if(value!=="select") SetPlaying(false);
 }
 function ShowTab(value) {
+  if(value==="notes") {
+    OpenAnnotations();Element("legacyAnnotations").open=true;Element("notesPane").hidden=false;return;
+  }
   tab=value;
-  for(const name of ["script","edit","notes"]) Element(`${name}Pane`).hidden=name!==value;
+  for(const name of ["script","edit"]) Element(`${name}Pane`).hidden=name!==value;
   for(const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected",button.dataset.tab===value);
   objectFormKey="";UpdateObjects();UpdateAnnotations();Render();
 }
@@ -87,11 +92,16 @@ function PopulateTimeline() {
   for(const beat of FLOW_TIMELINE) {
     const cinematic=ENCOUNTER_CINEMATICS.includes(beat.id);
     const button=Button(beat.id.toUpperCase(),()=>JumpBeat(beat.id));
+    button.setAttribute("aria-label",`${beat.id.toUpperCase()} ${beat.title}`);
     button.dataset.beat=beat.id;button.style.left=`${beat.start/FLOW_DURATION*100}%`;button.style.width=`${beat.duration/FLOW_DURATION*100}%`;
     button.classList.toggle("cinematic",cinematic);
     button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
     Element("timelineBeats").append(button);
   }
+  const beats=Element("timelineBeats");
+  new ResizeObserver(()=>{
+    for(const button of beats.children) button.classList.toggle("lfShortBeat",button.getBoundingClientRect().width<25);
+  }).observe(beats);
   Element("flowSeek").max=String(FLOW_DURATION);Element("sourceLink").href=FLOW_SOURCE.url;
 }
 function UpdateTimeline() {
@@ -104,8 +114,7 @@ function UpdateTimeline() {
     shownBeat=frame.beat.id;
     Element("timelineMode").hidden=!ENCOUNTER_CINEMATICS.includes(frame.beat.id);Element("timelineMode").textContent=`${frame.beat.id.toUpperCase()} 镜头动画`;
     Element("beatId").textContent=frame.beat.id.toUpperCase();Element("beatTitle").textContent=frame.beat.title;
-    Element("stageStatus").textContent=frame.stage.status;Element("sourcePassage").textContent=FLOW_SOURCE_EXCERPTS[frame.beat.id];
-    Element("planningSection").hidden=!frame.beat.planning;Element("planningPassage").textContent=frame.beat.planning||"";
+    Element("stageStatus").textContent=frame.stage.status;FormatSourcePassage(Element("sourcePassage"),FLOW_SOURCE_EXCERPTS[frame.beat.id]);
     for(const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected",button.dataset.beat===shownBeat);
   }
   Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
@@ -200,6 +209,7 @@ function UpdateObjectPreview() {
   }
 }
 function UpdateAnnotations() {
+  Element("legacyAnnotations").hidden=!project.value.annotations.length;
   const list=Element("annotationFrames");list.replaceChildren();
   const times=[...new Set(project.value.annotations.map((item)=>item.time))].sort((a,b)=>a-b);
   for(const stamp of times) {
@@ -217,7 +227,7 @@ function Render() {
   if(!map||!workspace) return;
   renderPending=false;
   frame=EvaluateFlow(time,project.value);UpdateTimeline();
-  workspace.Draw(frame,layers,selection,project.value.annotations,draft);
+  workspace.Draw(frame,null,selection,project.value.annotations,draft);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
   UpdateObjectPreview();
 }
@@ -310,10 +320,14 @@ function BindMap(entry) {
   surface.addEventListener("pointerleave",()=>{Element("mapTooltip").hidden=true;});
 }
 
+function OpenAnnotations() {
+  navigation.Clear();SetPlaying(false);SetMode("select");Render();
+  annotationEditor.Open(workspace.Capture(),Packet());
+}
+
 function BindControls() {
   for(const button of document.querySelectorAll("[data-tab]")) button.onclick=()=>ShowTab(button.dataset.tab);
   for(const button of document.querySelectorAll("[data-mode]")) button.onclick=()=>SetMode(button.dataset.mode);
-  for(const input of document.querySelectorAll("[data-layer]")) input.onchange=()=>{layers[input.dataset.layer]=input.checked;Render();};
   Element("playFlow").onclick=()=>{if(time>=FLOW_DURATION) Seek(0);SetMode("select");SetPlaying(!playing);};
   Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
   Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
@@ -343,40 +357,23 @@ function BindControls() {
   Element("addTrigger").onclick=()=>AddObject("trigger");Element("addGroup").onclick=()=>AddObject("group");
   Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
   Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
-  Element("exportProject").onclick=()=>DownloadBlob(new Blob([JSON.stringify(Packet(),null,2)],{type:"application/json"}),`Encounter_${frame.beat.id}_${Math.round(time*100)}.json`);
-  Element("exportFrame").onclick=async()=>{
-    try {
-      SetPlaying(false);Render();const packet=Packet(),capture=workspace.Capture(),output=document.createElement("canvas");
-      output.width=capture.width;output.height=capture.height+92;
-      const context=output.getContext("2d");context.drawImage(capture,0,0);context.fillStyle="#131a13";context.fillRect(0,capture.height,output.width,92);
-      context.fillStyle="#e8d9b6";context.font="16px Microsoft YaHei, sans-serif";
-      context.fillText(`${packet.frameId}  |  ${frame.beat.title}`,18,capture.height+29);
-      context.font="13px Microsoft YaHei, sans-serif";
-      const viewLabel=map.type?`立体视角 ${map.type}`:`${map.scale.toFixed(3)} px/m`;
-      context.fillText(`时间 ${time.toFixed(2)} s  ·  玩家 X ${frame.player[0].toFixed(2)} / Z ${frame.player[1].toFixed(2)}  ·  视图中心 ${map.center.map((value)=>value.toFixed(2)).join(', ')}  ·  ${viewLabel}`,18,capture.height+55);
-      context.fillStyle="#a9b49f";context.fillText("PNG 内含完整帧定位、标注与布设，可导入继续编辑",18,capture.height+78);
-      const blob=await new Promise((resolve)=>output.toBlob(resolve,"image/png"));
-      const enriched=AddPngFrameMetadata(await blob.arrayBuffer(),packet);
-      DownloadBlob(new Blob([enriched],{type:"image/png"}),`${packet.frameId}.png`);Toast("已导出带帧定位的标注图");
-    } catch(error) {Toast(error.message);}
-  };
+  Element("markScreenshot").onclick=OpenAnnotations;
   Element("copyFrame").onclick=async()=>{
-    const packet=Packet(),url=new URL(location.href);url.search="";url.searchParams.set("t",time.toFixed(2));url.searchParams.set("x",map.center[0].toFixed(2));url.searchParams.set("z",map.center[1].toFixed(2));url.searchParams.set("zoom",map.scale.toFixed(3));
-    const notes=project.value.annotations.filter((item)=>Math.abs(item.time-time)<0.06).map((item)=>`${item.kind} [${item.a.map((v)=>v.toFixed(2))}] → [${item.b.map((v)=>v.toFixed(2))}] ${item.text}`);
-    const text=`${packet.frameId}\n${frame.beat.title}\n时间 ${time.toFixed(2)} s · 玩家 X ${frame.player[0].toFixed(2)} Z ${frame.player[1].toFixed(2)}\n${notes.join('\n')}\n${url.href}`;
-    try {await navigator.clipboard.writeText(text);Toast("已复制帧时间、世界坐标和定位链接");}
-    catch {DownloadBlob(new Blob([text],{type:"text/plain"}),`${packet.frameId}.txt`);Toast("定位已保存为文本");}
+    Render();
+    const text=CreateLocationText(frame,workspace,selection,project.value);
+    try {await navigator.clipboard.writeText(text);Toast("已复制时间轴、空间坐标和相机定位");}
+    catch(error) {Toast(`复制定位失败 · ${error.message}`);}
   };
-  Element("importProject").onclick=()=>Element("importFile").click();
-  Element("importFile").onchange=async(event)=>{
-    const file=event.target.files[0];if(!file) return;
+  Element("copyViewports").onclick=async()=>{
+    const button=Element("copyViewports");button.disabled=true;
     try {
-      const raw=/\.png$/i.test(file.name)?ReadPngFrameMetadata(await file.arrayBuffer()):JSON.parse(await file.text());
-      const packet=ReadFramePacket(raw,FLOW_TIMELINE);SetPlaying(false);project.Replace(packet.document);Seek(packet.context.time);
-      if(packet.context.viewports) {workspace.Restore(packet.context.viewports);Element("viewportLayout").value=String(workspace.count);}
-      else {workspace.SetType(0,"plan");workspace.Activate(0);RestoreView(packet.context.view,packet.context.viewport);}
-      selection=null;Changed();Toast(`已回到 ${packet.frameId}`);
-    } catch(error) {Toast(`导入失败 · ${error.message}`);} finally {event.target.value="";}
+      Render();const capture=workspace.Capture();
+      if(!navigator.clipboard?.write||!window.ClipboardItem) throw new Error("当前浏览器不支持复制图片");
+      const image=new Promise((resolve,reject)=>capture.toBlob(blob=>blob?resolve(blob):reject(new Error("截图生成失败")),"image/png"));
+      await navigator.clipboard.write([new ClipboardItem({"image/png":image})]);
+      Toast(`已复制 ${workspace.count} 个视口的截图`);
+    } catch(error) {Toast(`复制截图失败 · ${error.message}`);}
+    finally {button.disabled=false;}
   };
   document.addEventListener("keydown",(event)=>{
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
@@ -394,7 +391,7 @@ function BindControls() {
   });
 }
 function Tick(timestamp) {
-  const navigated=navigation.Tick(lastTimestamp?Math.min(0.1,(timestamp-lastTimestamp)/1000):0);
+  const navigated=!Element("annotationDialog").open&&navigation.Tick(lastTimestamp?Math.min(0.1,(timestamp-lastTimestamp)/1000):0);
   if(playing&&lastTimestamp) {
     const previousStage=frame.stage.id,delta=Math.min(0.1,(timestamp-lastTimestamp)/1000)*Number(Element("flowSpeed").value);
     const end=Element("loopStage").checked?frame.stage.end:FLOW_DURATION;
@@ -416,16 +413,18 @@ async function Start() {
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
+  annotationEditor=new ScreenshotAnnotations();
   Element("mapLoading").hidden=true;
   BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
     SetViewType:(index,type)=>workspace.SetType(index,type),
     ActivateView:(index)=>workspace.Activate(index),
+    RestoreViewports:(layout)=>{workspace.Restore(layout);Element("viewportLayout").value=String(workspace.count);Render();},
   };
   const stage=STAGE_TIMELINE.find((item)=>item.id===params.get("stage")?.padStart(2,"0"));
   if(params.has("beat")) JumpBeat(params.get("beat"));else Seek(params.has("t")?Number(params.get("t")):stage?.start||0,{fit:true});
