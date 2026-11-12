@@ -32,6 +32,26 @@ function Label(context,text,x,y,color="#e4e2cd",size=12,background=false) {
   context.lineWidth=3;context.strokeStyle="#252b22dc";context.strokeText(text,x,y);context.fillStyle=color;context.fillText(text,x,y);
 }
 
+function AnnotationText(context,text,anchor,width,height) {
+  context.font="13px system-ui, Microsoft YaHei, sans-serif";
+  const maxWidth=Math.max(80,Math.min(340,width-24)),lines=[];
+  for(const paragraph of text.split("\n")) {
+    let line="";
+    for(const character of paragraph) {
+      if(line&&context.measureText(line+character).width>maxWidth) {lines.push(line);line="";}
+      line+=character;
+    }
+    lines.push(line);
+  }
+  const maxLines=Math.max(1,Math.floor((height-24)/17));
+  if(lines.length>maxLines) {lines.length=maxLines;lines[maxLines-1]+="…";}
+  const boxWidth=Math.max(...lines.map((line)=>context.measureText(line).width))+12,boxHeight=lines.length*17+8;
+  const left=Clamp(anchor[0]+8,8,width-boxWidth-8),top=Clamp(anchor[1]-20,8,height-boxHeight-8);
+  Line(context,[anchor,[left,top+12]],"#ffe29888",1);
+  context.fillStyle="#151b17eb";context.fillRect(left,top,boxWidth,boxHeight);
+  lines.forEach((line,index)=>Label(context,line,left+6,top+12+index*17,"#ffe298",13));
+}
+
 export class FlowMapView {
   constructor(canvas,mapData) {
     this.canvas=canvas;this.mapData=mapData;this.center=[52,76];this.scale=5;this.hits=[];
@@ -218,7 +238,7 @@ export class FlowMapView {
       const a=Screen(annotation.a),b=Screen(annotation.b),color="#ffe298";
       if(annotation.kind==="arrow") Arrow(context,a,b,color,2.5);
       if(annotation.kind==="rect") {context.strokeStyle=color;context.lineWidth=2;context.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}
-      if(annotation.text) annotation.text.split("\n").forEach((line,index)=>Label(context,line,b[0]+5,b[1]-14+index*17,color,13,true));
+      if(annotation.text) AnnotationText(context,annotation.text,b,width,height);
       Circle(context,a,3,"#ffe298");this.hits.push({type:"annotation",id:annotation.id,screen:a,radius:10,text:annotation.text||annotation.kind});
       if(selection?.type==="annotation"&&selection.id===annotation.id) for(const [handle,screen] of [["a",a],["b",b]]) {
         context.fillStyle="#ffe298";context.fillRect(screen[0]-4,screen[1]-4,8,8);
