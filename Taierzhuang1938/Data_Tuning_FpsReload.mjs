@@ -237,7 +237,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // sway). 2026-11-13 (user: the bolt cycle moved in jerks): the rifle froze between beats
     // and then lurched 7.5 cm in three frames; the window rounds every start and stop without
     // lag and never leaves the range of the keyed poses.
-    smoothS: 0.07,
+    smoothS: 0.15,
     // Low working pose, relative to the player's (undipped) look, placed on the COD Type 38
     // clip frame by frame (2026-11-03, user: the rifle's motion with the hand did not match):
     // the rifle barely leaves the aim line. The front sight stays just above the centre
