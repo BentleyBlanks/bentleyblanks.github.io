@@ -25,7 +25,7 @@ export const TOOL_INFO = Object.freeze({
   propPcg: { label: "PCG 撒点", hint: "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶", level: true },
   blockout: { label: "白盒关卡编辑器", hint: "关卡白盒预览：分关卡的纯高度图场景、关键帧敌我布设与去向、俯视图与导航栏（打开后整页切换）" },
   timeline: { label: "Timeline 过场", hint: "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）" },
-  levelFlow: { label: "遭遇设计", hint: "第一关遭遇编排：编辑触发区、生成区与行为，沿玩家路线预演，导出带帧定位的标注图",
+  levelFlow: { label: "遭遇设计", hint: "用空间总览、战斗局部、立体俯视、跟拍与玩家视线同步预演，编辑布设并导出定位标注",
     window: { url: "./Tool_LevelFlow.html", name: "TengxianLevelFlow", features: "popup,width=1280,height=720" } },
   squadMarch: { label: "小队行进", hint: "配置人数、路线与随机样式，预览真实人物的错峰跑停" },
   actor: { label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换" },

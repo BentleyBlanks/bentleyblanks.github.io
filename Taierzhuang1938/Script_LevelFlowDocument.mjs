@@ -3,6 +3,24 @@ import { ValidateEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_v2";
 export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
 
+export function ValidateViewportLayout(layout) {
+  const types=["plan","battle","oblique","chase","eye"],modes=["stage","all","manual","follow"];
+  const valid=layout&&[1,2,4].includes(layout.count)&&Number.isInteger(layout.active)&&layout.active>=0&&layout.active<layout.count
+    &&Array.isArray(layout.views)&&layout.views.length===layout.count&&layout.views.every((view)=>types.includes(view.type)&&modes.includes(view.mode)
+      &&Array.isArray(view.center)&&view.center.length===2&&view.center.every((value)=>Number.isFinite(value)&&Math.abs(value)<=10000)
+      &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=80&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)
+      &&["player","winter","luo","tank1"].includes(view.target)
+      &&Number.isFinite(view.viewport?.width)&&view.viewport.width>0&&Number.isFinite(view.viewport?.height)&&view.viewport.height>0);
+  if(!valid) throw new Error("多视口定位数据无效");
+  return structuredClone(layout);
+}
+
+function ValidateSavedDocument(value,timeline) {
+  const document=ValidateEncounterDocument(value,timeline);
+  for(const annotation of document.annotations) if(annotation.viewports) ValidateViewportLayout(annotation.viewports);
+  return document;
+}
+
 export class EncounterDocument {
   constructor(defaults,timeline,storage) {
     this.defaults=defaults;
@@ -12,12 +30,12 @@ export class EncounterDocument {
     this.undo=[];this.redo=[];this.warning="";
     try {
       const saved=storage?.getItem(ENCOUNTER_STORAGE_KEY);
-      if(saved) this.value=ValidateEncounterDocument(JSON.parse(saved),timeline);
+      if(saved) this.value=ValidateSavedDocument(JSON.parse(saved),timeline);
     } catch(error) { this.warning=`草稿未载入 · ${error.message}`; }
   }
 
   Replace(value) {
-    const validated=ValidateEncounterDocument(value,this.timeline);
+    const validated=ValidateSavedDocument(value,this.timeline);
     this.undo.push(this.value);
     if(this.undo.length>40) this.undo.shift();
     this.redo=[];this.value=validated;this.Save();
@@ -51,7 +69,8 @@ export function CreateFramePacket(document,frame,view,viewport) {
     frameId:`L1-${frame.beat.id.toUpperCase()}-${Math.round(frame.time*1000)}`,
     context:{level:"FirstLevel",stage:frame.stage.id,beat:frame.beat.id,title:frame.beat.title,time:frame.time,
       player:[...frame.player],view:{center:[...view.center],scale:view.scale},viewport,
-      bounds:[view.center[0]-viewport.width/(2*view.scale),view.center[0]+viewport.width/(2*view.scale),view.center[1]-viewport.height/(2*view.scale),view.center[1]+viewport.height/(2*view.scale)],
+      bounds:view.Bounds?view.Bounds():[view.center[0]-viewport.width/(2*view.scale),view.center[0]+viewport.width/(2*view.scale),view.center[1]-viewport.height/(2*view.scale),view.center[1]+viewport.height/(2*view.scale)],
+      projection:view.type||"plan",camera:view.eye?{eye:[...view.eye],aim:[...view.aim]}:null,
       mapSource:view.mapData?.source??null,
       coordinates:"X east, Z south, metres",sourceRevision:document.revision},
     document:structuredClone(document),
@@ -67,7 +86,8 @@ export function ReadFramePacket(value,timeline) {
     ||context.view.scale<0.1||context.view.scale>80
     ||!Number.isFinite(context.viewport?.width)||!Number.isFinite(context.viewport?.height)
     ||context.viewport.width<=0||context.viewport.height<=0) throw new Error("帧定位坐标或时间无效");
-  return {...value,context:structuredClone(context),document:ValidateEncounterDocument(value.document,timeline)};
+  if(context.viewports) ValidateViewportLayout(context.viewports);
+  return {...value,context:structuredClone(context),document:ValidateSavedDocument(value.document,timeline)};
 }
 
 function Crc32(bytes) {

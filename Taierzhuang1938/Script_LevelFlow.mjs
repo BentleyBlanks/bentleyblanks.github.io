@@ -4,15 +4,15 @@ import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATIO
 import { ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, DownloadBlob } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
-import { FlowMapView } from "./Script_LevelFlowView.mjs";
+import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 
 const Element = (id) => document.getElementById(id);
-const canvas = Element("flowMap");
+let canvas,workspace;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
 const layers=Object.fromEntries([...document.querySelectorAll("[data-layer]")].map((input)=>[input.dataset.layer,input.checked]));
-let map, time=0, playing=false, viewMode="stage", mode="select", tab="script", selection=null;
+let map, time=0, playing=false, mode="select", tab="script", selection=null;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, objectFormKey="";
 const params=new URLSearchParams(location.search);
@@ -27,7 +27,8 @@ function SetPlaying(value) {
   Element("playFlow").setAttribute("aria-pressed",String(value));
 }
 function SetMode(value) {
-  mode=value;canvas.dataset.mode=value;
+  mode=value;
+  for(const entry of workspace.Visible()) entry.canvas.dataset.mode=value;
   for(const button of document.querySelectorAll("[data-mode]")) button.classList.toggle("selected",button.dataset.mode===value);
   if(value!=="select") {SetPlaying(false);ShowTab("notes");}
 }
@@ -58,6 +59,7 @@ function Select(value) {
 }
 function StageBounds() {
   const points=frame.stage.beats.flatMap((beat)=>beat.p);
+  if(Number(frame.stage.id)<=2) points.push([0,-10],[76,82]);
   if(frame.stage.id==="05") points.push([88,112],[92,98]);
   for(const group of frame.groups.filter((item)=>item.beat.slice(0,2)===frame.stage.id)) points.push(group.area.center,...group.route);
   const xs=points.map((point)=>point[0]),zs=points.map((point)=>point[1]);
@@ -67,16 +69,16 @@ function Seek(value,{fit=false}={}) {
   const previousStage=frame.stage.id;
   time=Clamp(Number(value)||0,0,FLOW_DURATION);frame=EvaluateFlow(time,project.value);
   if(previousStage!==frame.stage.id) {selection=null;objectFormKey="";}
-  if(map&&(fit||viewMode==="stage"&&previousStage!==frame.stage.id)) map.Fit(StageBounds());
+  if(map&&(fit||previousStage!==frame.stage.id)) workspace.FrameStage();
   draft=null;Render();
 }
-function JumpBeat(id) {const beat=BeatById(id);if(beat) Seek(beat.start,{fit:viewMode==="stage"});}
+function JumpBeat(id) {const beat=BeatById(id);if(beat) Seek(beat.start,{fit:workspace.active.mode==="stage"});}
 function StepBeat(direction) {const index=FLOW_TIMELINE.indexOf(frame.beat);JumpBeat(FLOW_TIMELINE[Clamp(index+direction,0,FLOW_TIMELINE.length-1)].id);}
 function Button(text,action) {const button=document.createElement("button");button.type="button";button.textContent=text;button.addEventListener("click",action);return button;}
 
 function PopulateTimeline() {
   for(const stage of STAGE_TIMELINE) {
-    const button=Button(`${stage.id} ${stage.title}`,()=>{viewMode="stage";Seek(stage.start,{fit:true});});
+    const button=Button(`${stage.id} ${stage.title}`,()=>{workspace.active.mode="stage";Seek(stage.start,{fit:true});});
     button.dataset.stage=stage.id;button.title=`${stage.status} · ${FormatFlowTime(stage.start)}—${FormatFlowTime(stage.end)}`;
     button.classList.toggle("draft",stage.status==="草稿");Element("timelineStages").append(button);
   }
@@ -105,7 +107,7 @@ function UpdateTimeline() {
   Element("flowTime").textContent=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
   Element("flowSeek").value=String(time);
   Element("undoFlow").disabled=!project.undo.length;Element("redoFlow").disabled=!project.redo.length;
-  Element("followPlayer").setAttribute("aria-pressed",String(viewMode==="follow"));
+  Element("followPlayer").setAttribute("aria-pressed",String(workspace.active.mode==="follow"));
 }
 function WritePath(object,path,value) {
   const keys=path.split(".");let parent=object;
@@ -187,53 +189,68 @@ function UpdateAnnotations() {
   for(const stamp of times) {
     const notes=project.value.annotations.filter((item)=>item.time===stamp),beat=EvaluateFlow(stamp,project.value).beat;
     const button=Button(`${FormatFlowTime(stamp)} · ${beat.id.toUpperCase()} · ${notes.length} 处`,()=>{
-      SetPlaying(false);Seek(stamp);const view=notes[0].view;if(view) RestoreView(view,notes[0].viewport);Render();
+      SetPlaying(false);Seek(stamp);
+      if(notes[0].viewports) {workspace.Restore(notes[0].viewports);Element("viewportLayout").value=String(workspace.count);}
+      else {workspace.SetType(0,"plan");workspace.Activate(0);const view=notes[0].view;if(view) RestoreView(view,notes[0].viewport);}
+      Render();
     });button.className="lfFrameBookmark";button.dataset.annotationTime=String(stamp);list.append(button);
   }
 }
 function Render() {
-  if(!map) return;
+  if(!map||!workspace) return;
   frame=EvaluateFlow(time,project.value);UpdateTimeline();
-  if(viewMode==="follow"&&!pointer) map.Follow(frame);
-  map.Draw(frame,layers,selection,project.value.annotations,draft,tab==="edit");
+  workspace.Draw(frame,layers,selection,project.value.annotations,draft);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
   UpdateObjectPreview();
 }
-function Hit(point) {
+function Hit(point,view=map) {
   const priority={areaHandle:6,routeHandle:6,annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
-  return map.hits.filter((item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1])<=item.radius)
+  return view.hits.filter((item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1])<=item.radius)
     .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0))[0];
 }
-function LocalPoint(event) {const rect=canvas.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
-function Packet() {const rect=canvas.getBoundingClientRect();return CreateFramePacket(project.value,frame,map,{width:rect.width,height:rect.height});}
+function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
+function Packet() {
+  const rect=canvas.getBoundingClientRect();
+  const packet=CreateFramePacket(project.value,frame,map,{width:rect.width,height:rect.height});
+  packet.context.viewports=workspace.Serialize();return packet;
+}
 
 function RestoreView(view,viewport) {
   map.center=[...view.center];
   const rect=canvas.getBoundingClientRect();
   const ratio=viewport?Math.min(rect.width/viewport.width,rect.height/viewport.height):1;
-  map.scale=Clamp(view.scale*ratio,0.15,40);viewMode="manual";
+  map.scale=Clamp(view.scale*ratio,0.15,40);workspace.active.mode="manual";
 }
 
-function BindMap() {
-  canvas.addEventListener("pointerdown",(event)=>{
+function BindMap(entry) {
+  const surface=entry.canvas;
+  surface.addEventListener("pointerdown",(event)=>{
     if(event.button!==0&&event.button!==1) return;
-    canvas.focus();canvas.setPointerCapture(event.pointerId);
+    workspace.Activate(entry.index);
+    surface.focus();surface.setPointerCapture(event.pointerId);
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
     if(mode==="route"&&selection?.type==="group") {Apply((document)=>document.groups.find((item)=>item.id===selection.id).route.push(world));SetMode("select");ShowTab("edit");return;}
     const action=event.button===1?"pan":mode!=="select"?"annotate":["areaHandle","routeHandle","annotationHandle"].includes(hit?.type)?"edit":"pan";
     if(action!=="pan") SetPlaying(false);
-    pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value};
+    pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
-      draft={id:`Note_${Date.now()}`,kind:mode,time:Math.round(time*100)/100,a:world,b:[...world],text:"",view:{center:[...map.center],scale:map.scale},viewport:{width:rect.width,height:rect.height}};
+      draft={id:`Note_${Date.now()}`,kind:mode,time:Math.round(time*100)/100,a:world,b:[...world],text:"",view:{center:[...map.center],scale:map.scale},viewport:{width:rect.width,height:rect.height},viewports:workspace.Serialize()};
       if(mode==="text") draft.text="文字";
     }
   });
-  canvas.addEventListener("pointermove",(event)=>{
-    const screen=LocalPoint(event),world=map.ToWorld(screen);
-    if(pointer) {
+  surface.addEventListener("pointermove",(event)=>{
+    const screen=LocalPoint(event,surface),world=entry.map.ToWorld(screen);
+    if(pointer&&pointer.viewport===entry.index) {
       const dx=screen[0]-pointer.screen[0],dy=screen[1]-pointer.screen[1];if(Math.hypot(dx,dy)>3) pointer.moved=true;
-      if(pointer.action==="pan"&&pointer.moved) {viewMode="manual";map.center=[pointer.center[0]-dx/map.scale,pointer.center[1]-dy/map.scale];}
+      if(pointer.action==="pan"&&pointer.moved) {
+        if(pointer.rotate&&map.type) map.yaw=pointer.yaw-dx*0.007;
+        else {
+          workspace.active.mode="manual";
+          const current=map.ToWorld(screen);
+          map.center=map.center.map((value,index)=>value+pointer.world[index]-current[index]);
+        }
+      }
       if(pointer.action==="annotate") draft.b=world;
       if(pointer.action==="edit") {
         const candidate=structuredClone(pointer.original),hit=pointer.hit;
@@ -247,11 +264,11 @@ function BindMap() {
       }
       Element("mapTooltip").hidden=true;Render();return;
     }
-    const hit=Hit(screen),tip=Element("mapTooltip");tip.hidden=!hit?.text;
-    if(hit?.text) {tip.textContent=hit.text;tip.style.left=`${Clamp(screen[0]+14,5,canvas.clientWidth-270)}px`;tip.style.top=`${Clamp(screen[1]+15,5,canvas.clientHeight-50)}px`;}
+    const hit=Hit(screen,entry.map),tip=Element("mapTooltip");tip.hidden=!hit?.text;
+    if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
   });
-  canvas.addEventListener("pointerup",()=>{
-    if(!pointer) return;
+  surface.addEventListener("pointerup",()=>{
+    if(!pointer||pointer.viewport!==entry.index) return;
     const action=pointer.action;
     if(action==="edit") {const candidate=project.value;project.value=pointer.original;try {project.Replace(candidate);Changed();} catch(error) {Toast(error.message);}}
     if(action==="annotate"&&draft&&(pointer.moved||draft.kind==="text")) {
@@ -263,9 +280,9 @@ function BindMap() {
     }
     pointer=null;draft=null;Render();
   });
-  canvas.addEventListener("pointercancel",()=>{if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
-  canvas.addEventListener("wheel",(event)=>{event.preventDefault();viewMode="manual";map.Zoom(Math.exp(-event.deltaY*0.001),LocalPoint(event));Render();},{passive:false});
-  canvas.addEventListener("pointerleave",()=>{Element("mapTooltip").hidden=true;});
+  surface.addEventListener("pointercancel",()=>{if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
+  surface.addEventListener("wheel",(event)=>{event.preventDefault();workspace.Activate(entry.index);workspace.active.mode="manual";map.Zoom(Math.exp(-event.deltaY*0.001),LocalPoint(event,surface));Render();},{passive:false});
+  surface.addEventListener("pointerleave",()=>{Element("mapTooltip").hidden=true;});
 }
 
 function BindControls() {
@@ -275,13 +292,14 @@ function BindControls() {
   Element("playFlow").onclick=()=>{if(time>=FLOW_DURATION) Seek(0);SetMode("select");SetPlaying(!playing);};
   Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
   Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
-  Element("fitStage").onclick=()=>{viewMode="stage";map.Fit(StageBounds());Render();};
-  Element("fitAll").onclick=()=>{viewMode="all";map.Fit(map.mapData.bounds);Render();};
-  Element("followPlayer").onclick=()=>{viewMode=viewMode==="follow"?"manual":"follow";Render();};
+  Element("viewportLayout").onchange=(event)=>{workspace.SetLayout(Number(event.target.value));Render();};
+  Element("fitStage").onclick=()=>{workspace.active.mode="stage";map.Fit(StageBounds());Render();};
+  Element("fitAll").onclick=()=>{workspace.active.mode="all";map.Fit(map.mapData.bounds);Render();};
+  Element("followPlayer").onclick=()=>{workspace.active.mode=workspace.active.mode==="follow"?"manual":"follow";Render();};
   Element("undoFlow").onclick=()=>{project.Undo();Changed();};Element("redoFlow").onclick=()=>{project.Redo();Changed();};
   Element("objectList").onchange=(event)=>{const [type,id]=event.target.value.split(":");Select(id?{type,id}:null);};
   Element("objectForm").onsubmit=(event)=>event.preventDefault();
-  Element("focusObject").onclick=()=>{const object=SelectedObject();if(object) {viewMode="manual";map.center=[...object.area.center];map.scale=Math.max(map.scale,7);Render();}};
+  Element("focusObject").onclick=()=>{const object=SelectedObject();if(object) {workspace.active.mode="manual";map.center=[...object.area.center];map.scale=Math.max(map.scale,7);Render();}};
   Element("addRoutePoint").onclick=()=>{mode="route";canvas.dataset.mode="route";SetPlaying(false);Toast("在地图上点击新的路点");};
   Element("deleteObject").onclick=()=>{
     if(!SelectedObject()) return;
@@ -303,14 +321,15 @@ function BindControls() {
   Element("exportProject").onclick=()=>DownloadBlob(new Blob([JSON.stringify(Packet(),null,2)],{type:"application/json"}),`Encounter_${frame.beat.id}_${Math.round(time*100)}.json`);
   Element("exportFrame").onclick=async()=>{
     try {
-      SetPlaying(false);Render();const packet=Packet(),output=document.createElement("canvas");
-      output.width=canvas.width;output.height=canvas.height+92;
-      const context=output.getContext("2d");context.drawImage(canvas,0,0);context.fillStyle="#131a13";context.fillRect(0,canvas.height,output.width,92);
+      SetPlaying(false);Render();const packet=Packet(),capture=workspace.Capture(),output=document.createElement("canvas");
+      output.width=capture.width;output.height=capture.height+92;
+      const context=output.getContext("2d");context.drawImage(capture,0,0);context.fillStyle="#131a13";context.fillRect(0,capture.height,output.width,92);
       context.fillStyle="#e8d9b6";context.font="16px Microsoft YaHei, sans-serif";
-      context.fillText(`${packet.frameId}  |  ${frame.beat.title}`,18,canvas.height+29);
+      context.fillText(`${packet.frameId}  |  ${frame.beat.title}`,18,capture.height+29);
       context.font="13px Microsoft YaHei, sans-serif";
-      context.fillText(`时间 ${time.toFixed(2)} s  ·  玩家 X ${frame.player[0].toFixed(2)} / Z ${frame.player[1].toFixed(2)}  ·  视图中心 ${map.center.map((value)=>value.toFixed(2)).join(', ')}  ·  ${map.scale.toFixed(3)} px/m`,18,canvas.height+55);
-      context.fillStyle="#a9b49f";context.fillText("PNG 内含完整帧定位、标注与布设，可导入继续编辑",18,canvas.height+78);
+      const viewLabel=map.type?`立体视角 ${map.type}`:`${map.scale.toFixed(3)} px/m`;
+      context.fillText(`时间 ${time.toFixed(2)} s  ·  玩家 X ${frame.player[0].toFixed(2)} / Z ${frame.player[1].toFixed(2)}  ·  视图中心 ${map.center.map((value)=>value.toFixed(2)).join(', ')}  ·  ${viewLabel}`,18,capture.height+55);
+      context.fillStyle="#a9b49f";context.fillText("PNG 内含完整帧定位、标注与布设，可导入继续编辑",18,capture.height+78);
       const blob=await new Promise((resolve)=>output.toBlob(resolve,"image/png"));
       const enriched=AddPngFrameMetadata(await blob.arrayBuffer(),packet);
       DownloadBlob(new Blob([enriched],{type:"image/png"}),`${packet.frameId}.png`);Toast("已导出带帧定位的标注图");
@@ -329,7 +348,9 @@ function BindControls() {
     try {
       const raw=/\.png$/i.test(file.name)?ReadPngFrameMetadata(await file.arrayBuffer()):JSON.parse(await file.text());
       const packet=ReadFramePacket(raw,FLOW_TIMELINE);SetPlaying(false);project.Replace(packet.document);Seek(packet.context.time);
-      RestoreView(packet.context.view,packet.context.viewport);selection=null;Changed();Toast(`已回到 ${packet.frameId}`);
+      if(packet.context.viewports) {workspace.Restore(packet.context.viewports);Element("viewportLayout").value=String(workspace.count);}
+      else {workspace.SetType(0,"plan");workspace.Activate(0);RestoreView(packet.context.view,packet.context.viewport);}
+      selection=null;Changed();Toast(`已回到 ${packet.frameId}`);
     } catch(error) {Toast(`导入失败 · ${error.message}`);} finally {event.target.value="";}
   };
   document.addEventListener("keydown",(event)=>{
@@ -348,7 +369,7 @@ function Tick(timestamp) {
     if(time+delta>=end) {if(Element("loopStage").checked) time=frame.stage.start;else {time=FLOW_DURATION;SetPlaying(false);}}
     else time+=delta;
     frame=EvaluateFlow(time,project.value);
-    if(previousStage!==frame.stage.id&&viewMode==="stage") map.Fit(StageBounds());
+    if(previousStage!==frame.stage.id) workspace.FrameStage();
     Render();
   }
   lastTimestamp=timestamp;requestAnimationFrame(Tick);
@@ -356,18 +377,25 @@ function Tick(timestamp) {
 
 async function Start() {
   PopulateTimeline();
-  const mapData=await LoadEncounterMap();map=new FlowMapView(canvas,mapData);Element("mapLoading").hidden=true;
-  BindControls();BindMap();
-  new ResizeObserver(()=>{if(viewMode==="stage") map.Fit(StageBounds());else if(viewMode==="all") map.Fit(map.mapData.bounds);Render();}).observe(canvas);
+  const mapData=await LoadEncounterMap();
+  workspace=new EncounterViewports(Element("viewportGrid"),mapData,{
+    activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;},
+    change:()=>Render(),bounds:StageBounds,bind:BindMap,
+  });
+  Element("mapLoading").hidden=true;
+  BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,layers:{...layers},view:{center:[...map.center],scale:map.scale},mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
-    ToScreen:(point)=>map.ToScreen(point),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
+    SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
+    SetViewType:(index,type)=>workspace.SetType(index,type),
+    ActivateView:(index)=>workspace.Activate(index),
   };
   const stage=STAGE_TIMELINE.find((item)=>item.id===params.get("stage")?.padStart(2,"0"));
   if(params.has("beat")) JumpBeat(params.get("beat"));else Seek(params.has("t")?Number(params.get("t")):stage?.start||0,{fit:true});
-  if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),0.15,40);viewMode="manual";}
+  if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),0.15,40);workspace.active.mode="manual";}
   if(project.warning) Toast(project.warning,true);
   UpdateAnnotations();Render();requestAnimationFrame(Tick);
 }

@@ -47,8 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
-  LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Linear preview source stages, deterministic seek, escort waves and camera sampling" },
-  LevelFlowBrowserTest: { file: "Script_LevelFlowBrowserTest.mjs", timeoutMs: 180000, desc: "Linear preview 720p stages, timeline, camera, layers and editor entry" },
+  LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Encounter gates, continuous passage junctions, deterministic waves and annotation data" },
+  LevelFlowBrowserTest: { file: "Script_LevelFlowBrowserTest.mjs", timeoutMs: 180000, desc: "Encounter editor 720p, connected T-junction pixels, independent viewports and PNG round-trip" },
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },

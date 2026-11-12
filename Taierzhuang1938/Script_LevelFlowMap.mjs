@@ -1,7 +1,19 @@
 import * as front from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import * as village from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 
 const Point = (point) => Array.isArray(point) ? point.slice(0, 2) : [point.x, point.z];
+
+export function EncounterFloorConnections(point,map,ignore=null) {
+  const connections=[];
+  for(const floor of map.floors) if(floor.name!==ignore&&InsidePolygon(point,floor.points)) connections.push(floor.name);
+  for(const corridor of [...map.roads,...map.trenches]) {
+    const id=corridor.id||corridor.name;
+    if(ignore&&id===ignore) continue;
+    if(corridor.points.slice(1).some((end,index)=>SegmentDistance(point,corridor.points[index],end)<=corridor.width/2+0.05)) connections.push(id||"road");
+  }
+  return connections;
+}
 
 // The same seed and strip construction used by Devin's L1Map0107/Base.mjs.
 function FrontPaperFields() {
@@ -31,7 +43,10 @@ export function BuildEncounterMap(scene) {
     { points: front.L0105_POST_ROAD_SOUTH.map(Point), width: 5 },
     ...village.L0610_ROADS.map((road) => ({ points: road.line.map(Point), width: 4 })),
     { points: village.L0610_EAST_ROAD.line.map(Point), width: 5 },
-    ...village.L0610_LANES.map((lane) => ({ points: lane.line.map(Point), width: lane.halfW * 2 })),
+    ...village.L0610_LANES.map((lane) => ({ id:lane.id, points: lane.line.map(Point), width: lane.halfW * 2,caps:village.L0610_STREETS[lane.id]?.caps||[] })),
+    ...Object.values(village.L0610_LANE_PATHS).map((lane)=>({id:lane.id,points:lane.line.map(Point),width:Math.min(...lane.halfW)*2,widths:lane.halfW.map((half)=>half*2),caps:lane.caps||[]})),
+    {id:"VillageEntryRamp",points:[[100,380],[100,385]],width:village.L0610_DITCH.rampHalfW*2},
+    {id:"VillageAlleyRamp",points:[[80,380],[80,384]],width:2},
   ];
   const trenches = scene.trenches.segments.filter((segment) => !/^11–18/.test(segment.group || ""))
     .map((segment) => ({ id: segment.id, points: segment.points.map(Point), width: segment.floorW || 3.8 }));
@@ -39,7 +54,20 @@ export function BuildEncounterMap(scene) {
   trenches.push({ id: "GullyBranch", points: front.L0105_GULLY.branch.map(Point), width: 6 });
   trenches.push({ id: "SunkenLane", points: village.L0610_LANE.line.map(Point), width: 5.5 });
   trenches.push({ id: "VillageDitch", points: [[36,380],[125,380]], width: 3 });
+  trenches.push({id:"PitEntry",points:[[0,-7],[0,0]],width:2.6});
+  const Rectangle=(name,box)=>({name,points:[[box.minX,box.minZ],[box.maxX,box.minZ],[box.maxX,box.maxZ],[box.minX,box.maxZ]]});
+  const floors=[
+    Rectangle("丁字路口",village.L0610_STREETS.square.box),
+    Rectangle("路口东北角",village.L0610_STREETS.pocket.box),
+    Rectangle("老耿家院子",village.L0610_GENG.compound),
+    Rectangle("本家院",village.L0610_BENJIA.box),
+    Rectangle("街坊家",village.L0610_JIEFANG.box),
+  ];
+  for(const place of [front.L0105_PLACES.pit,front.L0105_PLACES.dugout,front.L0105_PLACES.platoonShelter]) {
+    floors.push(Rectangle(place.name,{minX:place.x-place.w/2,maxX:place.x+place.w/2,minZ:place.z-place.d/2,maxZ:place.z+place.d/2}));
+  }
   const labels = [
+    ["旧阵地（已弃）",0,-203], ["旧警戒阵地",-22,-440], ["西邻班后撤沟",-48,90],
     ["防炮洞",68,64.5], ["西边机枪坑",0,-7], ["支沟口",21.9,67.1], ["拐角",30,86],
     ["坡顶",35,131], ["干沟集结处",56,152], ["凹路",88,238], ["收窄的弯",91,280],
     ["耿家庄",154,373], ["村口路沟",69,380], ["主街",100,429], ["老耿家",101,480],
@@ -47,7 +75,7 @@ export function BuildEncounterMap(scene) {
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   return {
-    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels,
+    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors,
     paint: scene.paint.filter((paint) => paint.poly && paint.poly.some((point) => point.z < 558)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),

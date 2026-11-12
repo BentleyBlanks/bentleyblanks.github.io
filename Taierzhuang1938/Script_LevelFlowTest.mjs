@@ -4,7 +4,7 @@ import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMEN
 import { CompileEncounters, ValidateEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 import { EnterArea } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./Script_LevelFlowDocument.mjs";
-import { BuildEncounterMap } from "./Script_LevelFlowMap.mjs";
+import { BuildEncounterMap, EncounterFloorConnections } from "./Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
@@ -79,4 +79,10 @@ const map=BuildEncounterMap(scene);
 assert.ok(map.objects.length>1000&&map.fields.length>30);
 for(const id of ["GengGateLintel","DogHoleLintel"]) assert.ok(map.objects.some((object)=>object.id===id));
 assert.ok(map.markers.some((marker)=>marker.name==="狗洞"&&marker.p[0]===92&&marker.p[1]===473));
+for(const point of [[0,-4],[0,0],[21.9,67.1],[63,64.5],[35,144.5],[56,152],[58.2,156.8],[100,380],[100,385],[80,383],[100,458],[110,465],[109,470],[124,495],[100,521],[128,525],[197.3,418],[197.25,456.25]]) {
+  assert.ok(EncounterFloorConnections(point,map).length>=2,`canonical passage joins at ${point}`);
+}
+for(const id of ["SW","ES","SE_N","SE","NE","NE_S"]) assert.ok(map.roads.some((road)=>road.id===id),`${id} curved alley is present`);
+const invalidViews=structuredClone(packet);invalidViews.context.viewports={count:4,active:0,views:[]};
+assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

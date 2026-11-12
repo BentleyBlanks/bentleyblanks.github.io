@@ -2,6 +2,22 @@ export const Clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const Lerp = (a, b, amount) => a + (b - a) * amount;
 export const Distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
+export function SegmentDistance(point,a,b) {
+  const dx=b[0]-a[0],dz=b[1]-a[1],length=dx*dx+dz*dz;
+  const t=length?Clamp(((point[0]-a[0])*dx+(point[1]-a[1])*dz)/length,0,1):0;
+  return Distance(point,[a[0]+dx*t,a[1]+dz*t]);
+}
+
+export function InsidePolygon(point,polygon) {
+  let inside=false;
+  for(let index=0,previous=polygon.length-1;index<polygon.length;previous=index++) {
+    const a=polygon[previous],b=polygon[index];
+    if(SegmentDistance(point,a,b)<1e-6) return true;
+    if((a[1]>point[1])!==(b[1]>point[1])&&point[0]<(b[0]-a[0])*(point[1]-a[1])/(b[1]-a[1])+a[0]) inside=!inside;
+  }
+  return inside;
+}
+
 export function SampleRoute(points, progress) {
   if (points.length === 1) return [...points[0]];
   const lengths = points.slice(1).map((point, index) => Distance(points[index], point));

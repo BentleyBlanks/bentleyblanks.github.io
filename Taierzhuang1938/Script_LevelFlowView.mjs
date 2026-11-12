@@ -1,35 +1,70 @@
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 
-export const FLOW_COLORS = {player:"#f1d18a",friend:"#87c4c0",enemy:"#f3957b",civilian:"#c4b4e2"};
-const fieldColors={wheat:"#424e35",plowed:"#574938",fallow:"#565541"};
-const materialColors={"Whitebox/Plaster":"#99947d","Whitebox/Roof":"#666652","Whitebox/Structure":"#777866","Whitebox/Timber":"#927651","Whitebox/EarthDark":"#5e503d","Whitebox/Cover":"#8e8265","Whitebox/Step":"#887a60","Whitebox/Canvas":"#97895e","Whitebox/Metal":"#61645b","Whitebox/Water":"#527e89"};
+export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
+const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
+const materialColors={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce"};
 
-function Line(context,points,color,width=1,dash=[]) {
+export function EncounterSignals(frame) {
+  const signals=new Set();
+  if(frame.time>=40) signals.add("DugoutCollapsed");
+  if(frame.beat.id>="04c") signals.add("L1TrunkLoaded");
+  if(frame.beat.id>="05a") signals.add("CartDeparted");
+  if(frame.beat.id>="06e") signals.add("L1TrunkTossed");
+  if(frame.beat.id>="06i") signals.add("L1SunkenRoadBlocked");
+  if(frame.beat.id>="09i") signals.add("SideGateOpen");
+  if(frame.beat.id>="10a") {signals.add("MgSilenced");signals.add("EastGateBurst");}
+  if(frame.beat.id>="10d") signals.add("NorthYardGatesBroken");
+  if(frame.beat.id>="10g") signals.add("BarrageHit");
+  if(frame.beat.id>="10i") signals.add("LaneWallCollapse");
+  return signals;
+}
+
+export function VisibleEncounterObject(object,signals) {
+  return !(object.showOn&&!signals.has(object.showOn)||object.hideOn&&signals.has(object.hideOn));
+}
+
+function SmoothLine(context,points,color,width) {
+  if(points.length<2) return;
+  context.beginPath();context.moveTo(...points[0]);
+  for(let index=1;index<points.length-1;index++) {
+    const previous=points[index-1],point=points[index],next=points[index+1];
+    const incoming=Distance(previous,point),outgoing=Distance(point,next);
+    const radius=Math.min(width*0.35,12,incoming*0.22,outgoing*0.22);
+    if(!incoming||!outgoing) continue;
+    const entry=point.map((value,axis)=>value+(previous[axis]-value)*radius/incoming);
+    const exit=point.map((value,axis)=>value+(next[axis]-value)*radius/outgoing);
+    context.lineTo(...entry);context.quadraticCurveTo(...point,...exit);
+  }
+  context.lineTo(...points.at(-1));context.lineCap="round";context.lineJoin="round";
+  context.strokeStyle=color;context.lineWidth=width;context.stroke();
+}
+
+export function Line(context,points,color,width=1,dash=[]) {
   if(!points.length) return;
   context.beginPath();context.moveTo(...points[0]);
   for(const point of points.slice(1)) context.lineTo(...point);
   context.strokeStyle=color;context.lineWidth=width;context.setLineDash(dash);context.stroke();context.setLineDash([]);
 }
-function Polygon(context,points,color,stroke) {
+export function Polygon(context,points,color,stroke) {
   if(!points.length) return;
   context.beginPath();context.moveTo(...points[0]);for(const point of points.slice(1)) context.lineTo(...point);
   context.closePath();context.fillStyle=color;context.fill();
   if(stroke) {context.strokeStyle=stroke;context.lineWidth=0.8;context.stroke();}
 }
-function Circle(context,point,radius,color,stroke) {
+export function Circle(context,point,radius,color,stroke) {
   context.beginPath();context.arc(...point,Math.max(0.1,radius),0,Math.PI*2);context.fillStyle=color;context.fill();
   if(stroke) {context.strokeStyle=stroke;context.lineWidth=1.2;context.stroke();}
 }
-function Arrow(context,a,b,color,width=2) {
+export function Arrow(context,a,b,color,width=2) {
   Line(context,[a,b],color,width);
   const angle=Math.atan2(b[1]-a[1],b[0]-a[0]);
   const size=6+width;
   Polygon(context,[b,[b[0]-Math.cos(angle-0.45)*size,b[1]-Math.sin(angle-0.45)*size],[b[0]-Math.cos(angle+0.45)*size,b[1]-Math.sin(angle+0.45)*size]],color);
 }
-function Label(context,text,x,y,color="#e4e2cd",size=12,background=false) {
+export function Label(context,text,x,y,color="#494b3d",size=12,background=false) {
   context.font=`${size}px system-ui, Microsoft YaHei, sans-serif`;context.textAlign="left";context.textBaseline="middle";
-  if(background) {context.fillStyle="#151b17e8";context.fillRect(x-4,y-size/2-3,context.measureText(text).width+8,size+6);}
-  context.lineWidth=3;context.strokeStyle="#252b22dc";context.strokeText(text,x,y);context.fillStyle=color;context.fillText(text,x,y);
+  if(background) {context.fillStyle="#faf5e8ee";context.fillRect(x-4,y-size/2-3,context.measureText(text).width+8,size+6);}
+  context.lineWidth=3;context.strokeStyle="#f1eddfcc";context.strokeText(text,x,y);context.fillStyle=color;context.fillText(text,x,y);
 }
 
 function AnnotationText(context,text,anchor,width,height) {
@@ -47,9 +82,9 @@ function AnnotationText(context,text,anchor,width,height) {
   if(lines.length>maxLines) {lines.length=maxLines;lines[maxLines-1]+="…";}
   const boxWidth=Math.max(...lines.map((line)=>context.measureText(line).width))+12,boxHeight=lines.length*17+8;
   const left=Clamp(anchor[0]+8,8,width-boxWidth-8),top=Clamp(anchor[1]-20,8,height-boxHeight-8);
-  Line(context,[anchor,[left,top+12]],"#ffe29888",1);
-  context.fillStyle="#151b17eb";context.fillRect(left,top,boxWidth,boxHeight);
-  lines.forEach((line,index)=>Label(context,line,left+6,top+12+index*17,"#ffe298",13));
+  Line(context,[anchor,[left,top+12]],"#8d601bbb",1);
+  context.fillStyle="#fff8e8ed";context.fillRect(left,top,boxWidth,boxHeight);
+  lines.forEach((line,index)=>Label(context,line,left+6,top+12+index*17,"#81520d",13));
 }
 
 export class FlowMapView {
@@ -90,60 +125,109 @@ export class FlowMapView {
 
   DrawBase(context,width,height,frame) {
     const map=this.mapData,Screen=(point)=>this.ToScreen(point),scale=this.scale;
-    context.fillStyle="#30372a";context.fillRect(0,0,width,height);
+    context.fillStyle="#e7e2d2";context.fillRect(0,0,width,height);
     for(const paint of map.paint) {
       const points=paint.poly.map((point)=>Screen([point.x,point.z]));
       if(points.every((point)=>point[1]<0)||points.every((point)=>point[1]>height)) continue;
-      const color=/road|path|lane/i.test(paint.id)?"#766e52":paint.color;
-      context.globalAlpha=0.36;Polygon(context,points,color,"#bcb49430");context.globalAlpha=1;
+      context.globalAlpha=0.15;Polygon(context,points,"#aeb48c");context.globalAlpha=1;
     }
     for(const zone of map.fieldZones) {
-      context.save();context.beginPath();zone.poly.map(Screen).forEach((point,index)=>index?context.lineTo(...point):context.moveTo(...point));context.closePath();context.clip();
+      context.save();context.beginPath();
+      zone.poly.map(Screen).forEach((point,index)=>index?context.lineTo(...point):context.moveTo(...point));
+      context.closePath();context.clip();
       for(const field of map.fields.filter((item)=>item.zone===zone.id)) {
-        const center=Screen([field.x,field.z]);context.save();context.translate(...center);context.rotate(field.angleDeg*Math.PI/180);
-        for(const strip of field.strips) {context.fillStyle=fieldColors[strip.kind];context.fillRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);context.strokeStyle="#aaa27c55";context.lineWidth=0.7;context.strokeRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);}
+        const center=Screen([field.x,field.z]);
+        context.save();context.translate(...center);context.rotate(field.angleDeg*Math.PI/180);
+        context.globalAlpha=0.48;
+        for(const strip of field.strips) {
+          context.fillStyle=fieldColors[strip.kind];
+          context.fillRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);
+          context.strokeStyle="#91876d44";context.lineWidth=0.6;
+          context.strokeRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);
+        }
         context.restore();
       }
       context.restore();
     }
-    for(const path of map.footpaths) Line(context,path.map(Screen),"#a092684c",Math.max(0.6,scale*0.6),[3,3]);
-    for(const road of map.roads) {Line(context,road.points.map(Screen),"#a59a7180",(road.width+1)*scale);Line(context,road.points.map(Screen),"#79775b",road.width*scale);}
-    Line(context,map.river.map(Screen),"#6a8f8970",12*scale);Line(context,map.river.map(Screen),"#55818c",6*scale);
-    for(const trench of map.trenches) {Line(context,trench.points.map(Screen),"#8d896055",(trench.width+3)*scale);Line(context,trench.points.map(Screen),"#20271f",trench.width*scale);Line(context,trench.points.map(Screen),"#afa37833",1);}
-    const signals=new Set();
-    if(frame.time>=40) signals.add("DugoutCollapsed");
-    if(frame.beat.id>="04c") signals.add("L1TrunkLoaded");
-    if(frame.beat.id>="05a") signals.add("CartDeparted");
-    if(frame.beat.id>="06e") signals.add("L1TrunkTossed");
-    if(frame.beat.id>="06i") signals.add("L1SunkenRoadBlocked");
-    if(frame.beat.id>="09i") signals.add("SideGateOpen");
-    if(frame.beat.id>="10a") {signals.add("MgSilenced");signals.add("EastGateBurst");}
-    if(frame.beat.id>="10d") signals.add("NorthYardGatesBroken");
-    if(frame.beat.id>="10g") signals.add("BarrageHit");
-    if(frame.beat.id>="10i") signals.add("LaneWallCollapse");
+    for(const path of map.footpaths) Line(context,path.map(Screen),"#a38e6455",Math.max(0.7,scale*0.35),[3,4]);
+    // Paint the whole bank network first, then the whole walking surface.
+    // Drawing each complete segment in turn used to seal T-junctions again.
+    for(const road of map.roads) SmoothLine(context,road.points.map(Screen),"#bdad8880",(road.width+0.8)*scale);
+    for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#a58d6870",(trench.width+1.5)*scale);
+    for(const floor of map.floors) Polygon(context,floor.points.map(Screen),"#efe3c9","#b8a68166");
+    for(const road of map.roads) SmoothLine(context,road.points.map(Screen),"#f2ebd5",road.width*scale);
+    for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#c9b18b",(trench.width+0.35)*scale);
+    for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#ead9b7",Math.max(1,(trench.width-0.3)*scale));
+    SmoothLine(context,map.river.map(Screen),"#9bb5ba66",10*scale);
+    SmoothLine(context,map.river.map(Screen),"#a6c5cf",6*scale);
+    const signals=EncounterSignals(frame);
     for(const object of map.objects) {
-      if(object.showOn&&!signals.has(object.showOn)||object.hideOn&&signals.has(object.hideOn)) continue;
-      if(/Lintel/.test(object.id)) continue;
-      const [x,,z]=object.pos,[w,,d]=object.size||[1,1,1],p=Screen([x,z]);
+      if(!VisibleEncounterObject(object,signals)||/Lintel/.test(object.id)) continue;
+      const [x,,z]=object.pos,[w,h,d]=object.size||[1,1,1],point=Screen([x,z]);
       const radius=Math.max(w,d)*scale;
-      if(p[0]+radius<0||p[1]+radius<0||p[0]-radius>width||p[1]-radius>height) continue;
-      if(object.material==="Whitebox/Foliage") {Circle(context,p,Math.max(1.2,Math.min(w,d)*scale*0.6),"#6f845a9c");continue;}
-      context.save();context.translate(...p);context.rotate(-(object.yawDeg||0)*Math.PI/180);
-      context.fillStyle=materialColors[object.material]||"#7b7961";
+      if(point[0]+radius<0||point[1]+radius<0||point[0]-radius>width||point[1]-radius>height) continue;
+      if(object.material==="Whitebox/Foliage") {
+        Circle(context,point,Math.max(1.1,Math.min(w,d)*scale*0.5),"#7d986252","#74875144");continue;
+      }
+      if(scale<4&&Math.max(w,d)<1.5) continue;
+      context.save();context.translate(...point);context.rotate(-(object.yawDeg||0)*Math.PI/180);
+      const overhead=object.material==="Whitebox/Roof"||/Roof|Lintel|Bridge/.test(object.id);
+      context.globalAlpha=overhead?0.18:object.material==="Whitebox/Step"?0.55:1;
+      context.fillStyle=materialColors[object.material]||"#c1b59c";
       context.fillRect(-w*scale/2,-d*scale/2,Math.max(0.7,w*scale),Math.max(0.7,d*scale));
-      if(w*scale>3&&d*scale>3) {context.strokeStyle="#21251cba";context.lineWidth=0.7;context.strokeRect(-w*scale/2,-d*scale/2,w*scale,d*scale);}
+      context.strokeStyle=object.material==="Whitebox/Roof"?"#706c5d":"#8b80666f";
+      context.lineWidth=object.material==="Whitebox/Plaster"&&h>1?1.1:0.7;
+      context.strokeRect(-w*scale/2,-d*scale/2,Math.max(0.7,w*scale),Math.max(0.7,d*scale));
       context.restore();
     }
-    if(scale>2) for(const marker of map.markers) {const p=Screen(marker.p);Line(context,[[p[0]-3,p[1]],[p[0]+3,p[1]]],marker.kind==="window"?"#9cc6e5":"#e4c27a",2);}
-    if(scale>0.9) for(const landmark of map.labels) {
-      const p=Screen(landmark.p);if(p[0]<15||p[0]>width-50||p[1]<25||p[1]>height-25) continue;
-      Label(context,landmark.name,p[0]+8,p[1]-13,"#dedcc4",scale>4?12:11);
+    if(scale>1.2) for(const marker of map.markers) {
+      const point=Screen(marker.p);
+      Line(context,[[point[0]-3,point[1]],[point[0]+3,point[1]]],marker.kind==="window"?"#487e9e":"#9b6329",2);
     }
-    if(scale>3) {
-      const bounds=this.Bounds();
-      for(let x=Math.ceil(bounds[0]/10)*10;x<bounds[1];x+=10) Line(context,[Screen([x,bounds[2]]),Screen([x,bounds[3]])],"#e3ddc709",1);
-      for(let z=Math.ceil(bounds[2]/10)*10;z<bounds[3];z+=10) Line(context,[Screen([bounds[0],z]),Screen([bounds[1],z])],"#e3ddc709",1);
+    if(scale>1.4) for(const road of map.roads) for(const cap of road.caps||[]) {
+      const point=Screen(cap==="from"?road.points[0]:road.points.at(-1));
+      if(point[0]<10||point[0]>width-35||point[1]<20||point[1]>height-20) continue;
+      Line(context,[[point[0]-4,point[1]-4],[point[0]+4,point[1]+4]],"#a7503f",1.5);
+      Line(context,[[point[0]-4,point[1]+4],[point[0]+4,point[1]-4]],"#a7503f",1.5);
+      Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
     }
+    const occupied=[];
+    for(const landmark of map.labels) {
+      const point=Screen(landmark.p);
+      if(point[0]<12||point[0]>width-45||point[1]<24||point[1]>height-24) continue;
+      if(scale<0.8&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
+      const labelWidth=landmark.name.length*12;
+      const position=[Clamp(point[0]+8,8,width-labelWidth-8),point[1]-15];
+      const box=[position[0],position[1]-8,labelWidth,16];
+      if(occupied.some((other)=>box[0]<other[0]+other[2]&&box[0]+box[2]>other[0]&&box[1]<other[1]+other[3]&&box[1]+box[3]>other[1])) continue;
+      occupied.push(box);Label(context,landmark.name,...position,"#62543d",12,true);
+    }
+  }
+
+  DrawActor(context,actor,frame) {
+    const p=this.ToScreen(actor.p),color=FLOW_COLORS[actor.side];
+    if(actor.pose==="dead") {Line(context,[[p[0]-3,p[1]-3],[p[0]+3,p[1]+3]],color+"66",1.3);Line(context,[[p[0]-3,p[1]+3],[p[0]+3,p[1]-3]],color+"66",1.3);}
+    else if(actor.kind==="tank"||actor.kind==="cart") {
+      context.save();context.translate(...p);context.rotate(actor.heading||0);context.fillStyle=actor.pose==="burn"?"#74432c":"#6c7258";context.strokeStyle=color;context.lineWidth=1.4;
+      const size=Clamp(this.scale,4,9);context.fillRect(-size,-size*1.5,size*2,size*3);context.strokeRect(-size,-size*1.5,size*2,size*3);
+      if(actor.kind==="tank") {context.rotate((actor.turret||0)-(actor.heading||0));Circle(context,[0,0],size*0.55,"#87856a",color);Line(context,[[0,0],[0,-size*1.8]],color,2);}
+      else {Circle(context,[-size-2,0],2.5,color);Circle(context,[size+2,0],2.5,color);}
+      context.restore();
+    } else if(actor.kind==="quilt") {
+      context.fillStyle=color;context.strokeStyle="#f1e9ca";context.fillRect(p[0]-3,p[1]-6,6,12);context.strokeRect(p[0]-3,p[1]-6,6,12);
+    } else Circle(context,p,actor.side==="player"?6:actor.side==="enemy"?4:4.5,color,"#111c17");
+  }
+
+  DrawScale(context,width,height) {
+    const metres=this.scale<2?50:10;
+    Line(context,[[18,height-30],[18+metres*this.scale,height-30]],"#655e4b",2);
+    Label(context,`${metres} m`,18,height-43,"#655e4b",10);
+  }
+
+  DrawCompass(context,width,height) {
+    const direction=this.NorthDirection?.()||[0,-1],length=Math.hypot(...direction)||1;
+    const center=[width-28,height-31],tip=[center[0]+direction[0]/length*13,center[1]+direction[1]/length*13];
+    Arrow(context,center,tip,"#655e4b",1);Label(context,"N",center[0]-4,center[1]+17,"#655e4b",10);
   }
 
   DrawArea(context,area,color,label,selection,hit) {
@@ -155,18 +239,19 @@ export class FlowMapView {
     if(label) Label(context,label,p[0]+Math.max(w/2,7)+5,p[1]-h/2-5,color,11,true);
     if(selection) {
       for(const [index,point] of [[0,area.center],[1,[area.center[0]+area.size[0]/2,area.center[1]+area.size[1]/2]]]) {
-        const screen=this.ToScreen(point);context.fillStyle="#f0d395";context.fillRect(screen[0]-4,screen[1]-4,8,8);
+        const screen=this.ToScreen(point);context.fillStyle="#ac7a16";context.fillRect(screen[0]-4,screen[1]-4,8,8);
         this.hits.push({...hit,objectType:hit.type,type:"areaHandle",handle:index,screen,radius:9});
       }
     }
   }
 
   Draw(frame,layers,selection,annotations=[],draft=null,editing=false) {
+    this.BeforeDraw?.(frame);
     const rect=this.canvas.getBoundingClientRect(),ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
-    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id]);
+    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey]);
     if(key!==this.baseKey) {
       this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);this.DrawBase(background,width,height,frame);this.baseKey=key;
@@ -174,22 +259,22 @@ export class FlowMapView {
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
-      Line(context,frame.stage.beats.flatMap((beat)=>beat.p).map(Screen),"#e7ce8b8c",2,[6,5]);
-      if(frame.stage.id==="05"||frame.stage.id==="06") {const approach=[[175,-40],[105,50],[88,112],[83,161],[83,182],[85,218]];Line(context,approach.map(Screen),"#f3957b77",2,[7,5]);}
+      Line(context,frame.stage.beats.flatMap((beat)=>beat.p).map(Screen),"#9c731b9c",2,[6,5]);
+      if(frame.stage.id==="05"||frame.stage.id==="06") {const approach=[[175,-40],[105,50],[88,112],[83,161],[83,182],[85,218]];Line(context,approach.map(Screen),"#ad453477",2,[7,5]);}
     }
     if(layers.triggers) for(const trigger of frame.triggers.filter(relevant)) {
       const selected=selection?.type==="trigger"&&selection.id===trigger.id;
-      this.DrawArea(context,trigger.area,trigger.active?"#7bc6dd":"#75a9b8",selected?`${trigger.mode==="time"?"◷ ":""}${trigger.label}`:"",selected,{type:"trigger",id:trigger.id,text:`${trigger.label} · ${trigger.firedAt===null?"路线未经过":trigger.active?"已触发":"等待触发"}`});
+      this.DrawArea(context,trigger.area,trigger.active?"#277b9a":"#54889b",selected?`${trigger.mode==="time"?"◷ ":""}${trigger.label}`:"",selected,{type:"trigger",id:trigger.id,text:`${trigger.label} · ${trigger.firedAt===null?"路线未经过":trigger.active?"已触发":"等待触发"}`});
     }
     if(layers.spawns) for(const group of frame.groups.filter(relevant)) {
       const selected=selection?.type==="group"&&selection.id===group.id,color=group.side==="friend"?FLOW_COLORS.friend:FLOW_COLORS.enemy;
       this.DrawArea(context,group.area,color,selected?group.label:"",selected,{type:"group",id:group.id,text:`${group.label} · 已出 ${group.spawned}/${group.count} · 在场 ${group.live}`});
-      const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#263025",color);
+      const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#fcf4e4",color);
       if(layers.routes||selected) {
         const route=[group.area.center,...group.route.slice(1)];Line(context,route.map(Screen),color+"77",selected?2:1,[5,4]);
         if(route.length>1) Arrow(context,Screen(route.at(-2)),Screen(route.at(-1)),color+"99",1);
         if(selected) for(let index=1;index<route.length;index++) {
-          const screen=Screen(route[index]);Circle(context,screen,4,color,"#132017");this.hits.push({type:"routeHandle",id:group.id,index,screen,radius:9});
+          const screen=Screen(route[index]);Circle(context,screen,4,color,"#f6f0df");this.hits.push({type:"routeHandle",id:group.id,index,screen,radius:9});
         }
       }
     }
@@ -197,25 +282,17 @@ export class FlowMapView {
       const a=Screen(effect.a),b=Screen(effect.b),color=FLOW_COLORS[effect.side]||FLOW_COLORS.enemy;
       Line(context,[a,b],color+"45",effect.heavy?1.6:0.8,[4,7]);
       const tip=[Lerp(a[0],b[0],0.82),Lerp(a[1],b[1],0.82)];Arrow(context,[Lerp(a[0],b[0],0.72),Lerp(a[1],b[1],0.72)],tip,color+"ae",1);
-      if(effect.phase<0.25) {Line(context,[[Lerp(a[0],b[0],effect.phase*3),Lerp(a[1],b[1],effect.phase*3)],b],color,1.5);Circle(context,a,2.5,"#ffe8ae");}
+      if(effect.phase<0.25) {Line(context,[[Lerp(a[0],b[0],effect.phase*3),Lerp(a[1],b[1],effect.phase*3)],b],color,1.5);Circle(context,a,2.5,"#edb445");}
     }
     const winter=frame.actors.find((actor)=>actor.id==="winter"),he=frame.actors.find((actor)=>actor.id==="he");
-    if(frame.actors[0].pose==="drag") Line(context,[Screen(frame.player),Screen(winter.p),Screen(he.p)],"#e3dcc1",1.5);
+    if(frame.actors[0].pose==="drag") Line(context,[Screen(frame.player),Screen(winter.p),Screen(he.p)],"#776740",1.5);
     const labelBoxes=[];
-    for(const actor of frame.actors) {
+    for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
       const p=Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&selection.id===actor.id;
       if(p[0]<-20||p[0]>width+20||p[1]<-20||p[1]>height+20) continue;
+      if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
       if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
-      if(actor.pose==="dead") {Line(context,[[p[0]-3,p[1]-3],[p[0]+3,p[1]+3]],color+"66",1.3);Line(context,[[p[0]-3,p[1]+3],[p[0]+3,p[1]-3]],color+"66",1.3);}
-      else if(actor.kind==="tank"||actor.kind==="cart") {
-        context.save();context.translate(...p);context.rotate(actor.heading||0);context.fillStyle=actor.pose==="burn"?"#74432c":"#6c7258";context.strokeStyle=color;context.lineWidth=1.4;
-        const size=Clamp(this.scale,4,9);context.fillRect(-size,-size*1.5,size*2,size*3);context.strokeRect(-size,-size*1.5,size*2,size*3);
-        if(actor.kind==="tank") {context.rotate((actor.turret||0)-(actor.heading||0));Circle(context,[0,0],size*0.55,"#87856a",color);Line(context,[[0,0],[0,-size*1.8]],color,2);}
-        else {Circle(context,[-size-2,0],2.5,color);Circle(context,[size+2,0],2.5,color);}
-        context.restore();
-      } else if(actor.kind==="quilt") {
-        context.fillStyle=color;context.strokeStyle="#f1e9ca";context.fillRect(p[0]-3,p[1]-6,6,12);context.strokeRect(p[0]-3,p[1]-6,6,12);
-      } else Circle(context,p,actor.side==="player"?6:actor.side==="enemy"?4:4.5,color,"#111c17");
+      this.DrawActor(context,actor,frame);
       this.hits.push({type:"actor",id:actor.id,screen:p,radius:9,text:`${actor.name} · X ${actor.p[0].toFixed(1)}  Z ${actor.p[1].toFixed(1)}`});
       if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected)) {
         const text=actor.name,labelWidth=text.length*12+8;
@@ -235,18 +312,20 @@ export class FlowMapView {
     }
     for(const annotation of [...annotations,...(draft?[draft]:[])]) {
       if(Math.abs(annotation.time-frame.time)>0.06) continue;
-      const a=Screen(annotation.a),b=Screen(annotation.b),color="#ffe298";
+      const a=Screen(annotation.a),b=Screen(annotation.b),color="#8d5d11";
       if(annotation.kind==="arrow") Arrow(context,a,b,color,2.5);
-      if(annotation.kind==="rect") {context.strokeStyle=color;context.lineWidth=2;context.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}
+      if(annotation.kind==="rect") {
+        const corners=[annotation.a,[annotation.b[0],annotation.a[1]],annotation.b,[annotation.a[0],annotation.b[1]],annotation.a].map(Screen);
+        Line(context,corners,color,2);
+      }
       if(annotation.text) AnnotationText(context,annotation.text,b,width,height);
-      Circle(context,a,3,"#ffe298");this.hits.push({type:"annotation",id:annotation.id,screen:a,radius:10,text:annotation.text||annotation.kind});
+      Circle(context,a,3,"#8d5d11");this.hits.push({type:"annotation",id:annotation.id,screen:a,radius:10,text:annotation.text||annotation.kind});
       if(selection?.type==="annotation"&&selection.id===annotation.id) for(const [handle,screen] of [["a",a],["b",b]]) {
-        context.fillStyle="#ffe298";context.fillRect(screen[0]-4,screen[1]-4,8,8);
+        context.fillStyle="#8d5d11";context.fillRect(screen[0]-4,screen[1]-4,8,8);
         this.hits.push({type:"annotationHandle",id:annotation.id,handle,screen,radius:9});
       }
     }
-    const scaleMeters=this.scale<2?50:10;
-    Line(context,[[18,height-30],[18+scaleMeters*this.scale,height-30]],"#d4d2b8",2);Label(context,`${scaleMeters} m`,18,height-43,"#c4c7b3",10);
-    Label(context,"N ↑",width-35,height-25,"#c4c7b3",12);
+    this.DrawScale(context,width,height);
+    this.DrawCompass(context,width,height);
   }
 }
