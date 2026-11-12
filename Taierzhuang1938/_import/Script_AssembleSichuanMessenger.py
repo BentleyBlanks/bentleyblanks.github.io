@@ -1,28 +1,33 @@
-"""Rebuild the messenger from five original Tripo GLBs and photo landmarks.
+"""Repair and assemble the original Sichuan messenger parts against the photos.
 
-Run through scripts/Script_BlenderMcp.mjs start --batch. Set
-MESSENGER_REVIEW_ONLY=1 to render the editable assembly before exporting.
+Run with scripts/Script_BlenderMcp.mjs start --batch. MESSENGER_OUTPUT_DIR
+selects a staging export directory. MESSENGER_REVIEW_ONLY=1 skips file exports.
 """
 import os
+import sys
 import math
 import json
 from pathlib import Path
-
 import bpy
-import bmesh
 import numpy as np
 from mathutils import Matrix, Vector
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from Script_SichuanMessengerHandPose import BuildHandPose
+from Script_SichuanMessengerClothFit import BuildCalfWrap, FitCapBand
+
 sourceRoot = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
-projectRoot = Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRebuild_20261112')
+projectRoot = Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRepair_20261112')
 reviewRoot = projectRoot / 'Review'
+exportRoot = Path(os.environ.get('MESSENGER_OUTPUT_DIR', str(sourceRoot)))
 reviewRoot.mkdir(parents=True, exist_ok=True)
+exportRoot.mkdir(parents=True, exist_ok=True)
 exportEnabled = os.environ.get('MESSENGER_REVIEW_ONLY') != '1'
 pixelSize = 1.75 / 631.0
 floorPixel = 635.0
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-scene['BlenderMcpTask'] = 'SichuanMessengerRebuild_20261112'
+scene['BlenderMcpTask'] = 'SichuanMessengerRepair_20261112'
 scene.unit_settings.system = 'METRIC'
 sourceCollection = bpy.data.collections.new('OriginalSources')
 assemblyCollection = bpy.data.collections.new('EditableAssembly')
@@ -56,35 +61,6 @@ def DuplicatePart(source, role):
     assemblyCollection.objects.link(obj)
     obj.hide_render = False
     obj.hide_set(False)
-    return obj
-
-
-def MirrorPart(source, role):
-    points = Coordinates(source)
-    points[:, 1] *= -1
-    mesh = bpy.data.meshes.new('Mesh_SichuanMessenger_' + role)
-    mesh.from_pydata(points.tolist(), [], [list(reversed(face.vertices)) for face in source.data.polygons])
-    mesh.update()
-    for material in source.data.materials:
-        mesh.materials.append(material)
-    for targetFace, sourceFace in zip(mesh.polygons, source.data.polygons):
-        targetFace.material_index = sourceFace.material_index
-        targetFace.use_smooth = sourceFace.use_smooth
-    for sourceUv in source.data.uv_layers:
-        targetUv = mesh.uv_layers.new(name=sourceUv.name)
-        for targetFace, sourceFace in zip(mesh.polygons, source.data.polygons):
-            for targetLoop, sourceLoop in zip(targetFace.loop_indices, reversed(sourceFace.loop_indices)):
-                targetUv.data[targetLoop].uv = sourceUv.data[sourceLoop].uv
-    sourceNormals = CornerNormals(source)
-    normals = []
-    for face in source.data.polygons:
-        for index in reversed(face.loop_indices):
-            normal = sourceNormals[index].copy()
-            normal[1] *= -1
-            normals.append(normal)
-    mesh.normals_split_custom_set(normals)
-    obj = bpy.data.objects.new('Part_' + role, mesh)
-    assemblyCollection.objects.link(obj)
     return obj
 
 
@@ -151,108 +127,83 @@ headPoints[:, :2] = neckCenter + delta * factor[:, None]
 headNormals /= np.array([108.0, 124.0, 124.0])
 UpdateGeometry(head, headPoints * pixelSize, headNormals)
 
-cap = DuplicatePart(sources['FieldCap'], 'FieldCap')
-rawCap = Coordinates(cap)
-capNormals = CornerNormals(cap)
-capX = rawCap[:, 0] * 95.0 + 12.0
-billMask = (rawCap[:, 0] > 0.30) & (rawCap[:, 2] < 0.30)
-lowerScale, upperScale = 20.0, 100.0
-for iteration in range(40):
-    capVerticalScale = (lowerScale + upperScale) / 2
-    capZ = rawCap[:, 2] * capVerticalScale + 0.05 * (capX - 58.0)
-    if capZ.max() - capZ[billMask].min() > 38.0:
-        upperScale = capVerticalScale
-    else:
-        lowerScale = capVerticalScale
-capZ += floorPixel - 4.0 - capZ.max()
-capPoints = np.column_stack([capX, rawCap[:, 1] * 83.0 - 3.0, capZ])
-capLinear = np.array([[95, 0, 0], [0, 83, 0], [4.75, 0, capVerticalScale]])
-UpdateGeometry(cap, capPoints * pixelSize, capNormals @ np.linalg.inv(capLinear))
-
-hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
-rawHand = Coordinates(hand)
-handNormals = CornerNormals(hand)
-sample = rawHand[rawHand[:, 1] > 0.10][:, [0, 2]]
-sample -= sample.mean(0)
-_, axes = np.linalg.eigh(sample.T @ sample)
-dorsal = axes[:, 0]
-if dorsal[0] < 0:
-    dorsal *= -1
-handRoll = math.atan2(-dorsal[0], dorsal[1])
-handRotation = np.array(Matrix.Rotation(handRoll, 3, 'Y'))
-preparedHand = rawHand @ handRotation.T
-handNormals = handNormals @ handRotation.T
-
-# Close each finger around its own knuckle while keeping finger thickness.
-# The four axes come from the separate distal branches of the original mesh.
-fingerSlopes = np.array([-0.69938293, -0.35432458, -0.06592974, 0.26445656])
-fingerIntercepts = np.array([-0.51921436, -0.36072850, -0.27628045, -0.17883320])
-targetRoots = np.array([-0.48, -0.38, -0.28, -0.18])
-lineDistances = np.abs(preparedHand[:, 0, None] - (preparedHand[:, 1, None] * fingerSlopes + fingerIntercepts))
-fingerIds = np.argmin(lineDistances, axis=1)
-fingerWeight = np.clip((preparedHand[:, 1] + 0.06) / 0.21, 0, 1)
-fingerWeight = fingerWeight * fingerWeight * (3 - 2 * fingerWeight)
-thumbExclusion = np.clip((preparedHand[:, 0] + 0.05) / 0.15, 0, 1) * np.clip((0.15 - preparedHand[:, 1]) / 0.15, 0, 1)
-fingerWeight *= 1.0 - thumbExclusion
-fingerAngles = np.arctan(fingerSlopes[fingerIds]) * fingerWeight
-rootX = fingerSlopes[fingerIds] * 0.05 + fingerIntercepts[fingerIds]
-dx = preparedHand[:, 0] - rootX
-dy = preparedHand[:, 1] - 0.05
-closedHand = preparedHand.copy()
-closedHand[:, 0] = rootX + np.cos(fingerAngles) * dx - np.sin(fingerAngles) * dy
-closedHand[:, 1] = 0.05 + np.sin(fingerAngles) * dx + np.cos(fingerAngles) * dy
-closedHand[:, 0] += (targetRoots[fingerIds] - rootX) * fingerWeight
-thumbWeight = np.clip((preparedHand[:, 0] + 0.12) / 0.22, 0, 1)
-thumbWeight *= preparedHand[:, 1] < 0.15
-thumbAngles = np.deg2rad(25.0) * thumbWeight
-thumbDelta = closedHand[:, :2] - np.array([-0.12, -0.25])
-closedHand[:, 0] = -0.12 + np.cos(thumbAngles) * thumbDelta[:, 0] - np.sin(thumbAngles) * thumbDelta[:, 1]
-closedHand[:, 1] = -0.25 + np.sin(thumbAngles) * thumbDelta[:, 0] + np.cos(thumbAngles) * thumbDelta[:, 1]
-handLoopVertices = np.array([loop.vertex_index for loop in hand.data.loops])
-normalAngles = (fingerAngles + thumbAngles)[handLoopVertices]
-normalX, normalY = handNormals[:, 0].copy(), handNormals[:, 1].copy()
-handNormals[:, 0] = np.cos(normalAngles) * normalX - np.sin(normalAngles) * normalY
-handNormals[:, 1] = np.sin(normalAngles) * normalX + np.cos(normalAngles) * normalY
-wristMask = preparedHand[:, 1] < preparedHand[:, 1].min() + 0.025
-wristCenter = (closedHand[wristMask].min(0) + closedHand[wristMask].max(0)) / 2
-cuffMask = rawBody[:, 1] > rawBody[:, 1].max() - 0.02
-cuffCenter = (bodyPoints[cuffMask].min(0) + bodyPoints[cuffMask].max(0)) / 2
-handScale = 61.0 / (closedHand[:, 1].max() - wristCenter[1])
-handTarget = np.array([cuffCenter[0], bodyPoints[:, 1].max() - 3.0, cuffCenter[2]])
-handPoints = (closedHand - wristCenter) * handScale + handTarget
-coveredStem = np.clip((preparedHand[:, 1].min() + 0.15 - preparedHand[:, 1]) / 0.15, 0, 1)
-coveredStem = coveredStem * coveredStem * (3 - 2 * coveredStem)
-handPoints[:, 1] -= 20.0 * coveredStem
-UpdateGeometry(hand, handPoints * pixelSize, handNormals)
-MirrorPart(hand, 'Hand_R')
+rigCollection = bpy.data.collections.new('HandPoseRigs')
+scene.collection.children.link(rigCollection)
+hand, rig, handReport, preparedHand = BuildHandPose(sources['LeftHand'], assemblyCollection, rigCollection)
+bodyPointsWorld = Coordinates(body)
+cuff = bodyPointsWorld[bodyPointsWorld[:, 1] > bodyPointsWorld[:, 1].max() - 0.025]
+cuffCenter = (cuff.min(0) + cuff.max(0)) / 2
+wrist = preparedHand[preparedHand[:, 1] < preparedHand[:, 1].min() + 0.025]
+wristCenter = (wrist.min(0) + wrist.max(0)) / 2
+targetWrist = cuffCenter.copy()
+targetWrist[1] = bodyPointsWorld[:, 1].max() - 14.0 * pixelSize
+handScale = 0.205
+handTransform = Matrix.Translation(Vector(targetWrist - wristCenter * handScale)) @ Matrix.Scale(handScale, 4)
+hand.matrix_world = handTransform
+rig.matrix_world = handTransform
+mirror = Matrix.Diagonal((1.0, -1.0, 1.0, 1.0))
+rightRig = rig.copy()
+rightRig.data = rig.data.copy()
+rightRig.name = 'Rig_HandPose_R'
+rigCollection.objects.link(rightRig)
+rightRig.matrix_world = mirror @ handTransform
+for name in rig.pose.bones.keys():
+    rightRig.pose.bones[name].rotation_quaternion = rig.pose.bones[name].rotation_quaternion
+rightHand = hand.copy()
+rightHand.name = 'Part_Hand_R'
+assemblyCollection.objects.link(rightHand)
+rightHand.matrix_world = mirror @ handTransform
+rightHand.modifiers.get('PoseWithVolumePreservation').object = rightRig
 
 foot = DuplicatePart(sources['LeftFoot'], 'Foot_L')
 rawFoot = Coordinates(foot)
-footNormals = CornerNormals(foot)
-footRows = np.array([635.0, 622.0, 600.0, 588.0, 472.0])
-footSourceZ = np.array([0.0, 0.10, 0.25, 0.35, rawFoot[:, 2].max()])
-footPoints = rawFoot.copy()
-footPoints[:, 0] *= 93.0
-footPoints[:, 1] *= 104.0
-footPoints[:, 2] = floorPixel - np.interp(rawFoot[:, 2], footSourceZ, footRows)
-toeRotation = np.array(Matrix.Rotation(math.radians(5.0), 3, 'Z'))
-footPoints = footPoints @ toeRotation.T
-legMask = (rawBody[:, 1] > 0) & (rawBody[:, 2] < 0.025)
-legCenter = (bodyPoints[legMask].min(0) + bodyPoints[legMask].max(0)) / 2
-topMask = rawFoot[:, 2] > rawFoot[:, 2].max() - 0.06
-topCenter = (footPoints[topMask].min(0) + footPoints[topMask].max(0)) / 2
-footPoints[:, :2] += legCenter[:2] - topCenter[:2]
-footSegments = np.clip(np.searchsorted(footSourceZ, rawFoot[:, 2], side='right') - 1, 0, len(footSourceZ) - 2)
-footVerticalScales = -(np.diff(footRows) / np.diff(footSourceZ))[footSegments]
-footLoopVertices = np.array([loop.vertex_index for loop in foot.data.loops])
-footNormals[:, 0] /= 93.0
-footNormals[:, 1] /= 104.0
-footNormals[:, 2] /= footVerticalScales[footLoopVertices]
-footNormals = footNormals @ toeRotation.T
-UpdateGeometry(foot, footPoints * pixelSize, footNormals)
-MirrorPart(foot, 'Foot_R')
+footScale = 0.26
+footRotation = Matrix.Rotation(math.radians(5), 4, 'Z')
+scaledFoot = rawFoot @ np.array(footRotation.to_3x3()).T * footScale
+top = scaledFoot[rawFoot[:, 2] > rawFoot[:, 2].max() - 0.06]
+topCenter = (top.min(0) + top.max(0)) / 2
+leg = bodyPointsWorld[(bodyPointsWorld[:, 1] > 0) & (bodyPointsWorld[:, 2] < bodyPointsWorld[:, 2].min() + 0.03)]
+legCenter = (leg.min(0) + leg.max(0)) / 2
+footShift = np.array([legCenter[0] - topCenter[0], legCenter[1] - topCenter[1], -scaledFoot[:, 2].min()])
+foot.matrix_world = Matrix.Translation(Vector(footShift)) @ footRotation @ Matrix.Scale(footScale, 4)
+rightFoot = foot.copy()
+rightFoot.name = 'Part_Foot_R'
+assemblyCollection.objects.link(rightFoot)
+rightFoot.matrix_world = mirror @ foot.matrix_world
+wrapLeft, wrapRight, wrapReport = BuildCalfWrap(foot, body, assemblyCollection)
 
-# The review cameras use the reference's 640 by 640 frame without perspective tilt.
+cap = DuplicatePart(sources['FieldCap'], 'FieldCap')
+rawCap = Coordinates(cap)
+capScale = 0.23
+capRotation = Matrix.Rotation(math.radians(-10), 4, 'Y')
+scaledCap = rawCap @ np.array(capRotation.to_3x3()).T * capScale
+bill = scaledCap[(rawCap[:, 0] > 0.30) & (rawCap[:, 2] < 0.30)]
+capShift = np.array([58.0 * pixelSize - bill[:, 0].max() - 0.012,
+                     -pixelSize, (floorPixel - 42.0) * pixelSize - bill[:, 2].min() + 0.002])
+cap.matrix_world = Matrix.Translation(Vector(capShift)) @ capRotation @ Matrix.Scale(capScale, 4)
+capReport = FitCapBand(cap, head)
+
+depsgraph = bpy.context.evaluated_depsgraph_get()
+bpy.context.view_layer.update()
+leftHandWorld = np.array([(hand.matrix_world @ vertex.co)[:] for vertex in hand.evaluated_get(depsgraph).data.vertices])
+rightHandWorld = np.array([(rightHand.matrix_world @ vertex.co)[:] for vertex in rightHand.evaluated_get(depsgraph).data.vertices])
+mirroredLeft = leftHandWorld.copy()
+mirroredLeft[:, 1] *= -1
+mirrorError = float(np.linalg.norm(mirroredLeft - rightHandWorld, axis=1).max())
+assert mirrorError < 1e-5
+footWorld = np.array([(foot.matrix_world @ vertex.co)[:] for vertex in foot.data.vertices])
+rng = np.random.default_rng(1938)
+first = rng.integers(0, len(rawFoot), 1200)
+second = rng.integers(0, len(rawFoot), 1200)
+sourceDistances = np.linalg.norm(rawFoot[first] - rawFoot[second], axis=1)
+targetDistances = np.linalg.norm(footWorld[first] - footWorld[second], axis=1)
+valid = sourceDistances > 1e-5
+footRatios = targetDistances[valid] / sourceDistances[valid]
+assert np.max(np.abs(footRatios - footScale)) < 1e-5
+report = {'hand': handReport, 'handMirrorMaximumErrorMeters': mirrorError,
+          'footUniformScale': footScale, 'footDistanceScaleStd': float(footRatios.std()),
+          'calfWrap': wrapReport, 'capBand': capReport}
+
 scene.render.engine = 'CYCLES'
 scene.cycles.samples = 32
 scene.render.resolution_x = 640
@@ -277,40 +228,84 @@ camera = bpy.data.objects.new('ReviewCamera', cameraData)
 scene.collection.objects.link(camera)
 scene.camera = camera
 cameraData.type = 'ORTHO'
-cameraData.ortho_scale = 640.0 * pixelSize
-reviewCenter = Vector((0, 0, (floorPixel - 320.0) * pixelSize))
-for view, direction in [('Front', Vector((4, 0, 0))), ('LeftSide', Vector((0, 4, 0))), ('Back', Vector((-4, 0, 0)))]:
-    camera.location = reviewCenter + direction
+views = [
+    ('Front', (0, 0, 315), (4, 0, 0), 640),
+    ('LeftSide', (0, 0, 315), (0, 4, 0), 640),
+    ('Back', (0, 0, 315), (-4, 0, 0), 640),
+    ('HandTop', (10, 275, 493), (0, 0, 4), 130),
+    ('WristFront', (10, 245, 493), (4, 0, 0), 90),
+    ('FootSide', (5, 0, 85), (0, 4, 0), 230),
+    ('CapFront', (0, 0, 570), (4, 0, 0), 150),
+    ('CapLeftSide', (5, 0, 570), (0, 4, 0), 150),
+    ('CapBack', (0, 0, 570), (-4, 0, 0), 150),
+]
+for name, centerPixels, directionTuple, span in views:
+    center = Vector(centerPixels) * pixelSize
+    direction = Vector(directionTuple)
+    camera.location = center + direction
     camera.rotation_euler = (-direction).to_track_quat('-Z', 'Y').to_euler()
-    if view == 'Front':
+    cameraData.ortho_scale = span * pixelSize
+    if name == 'Front':
         frontRotation = camera.rotation_euler.to_quaternion()
-    scene.render.filepath = str(reviewRoot / f'Preview_SichuanMessenger_{view}.png')
+    scene.render.filepath = str(reviewRoot / f'Preview_SichuanMessenger_{name}.png')
     bpy.ops.render.render(write_still=True)
-
-report = {'referencePixelSize': pixelSize, 'bodySourceHeights': sourceHeights.tolist(),
-          'bodyPhotoRows': photoRows.tolist(), 'handRollDegrees': math.degrees(handRoll),
-          'handPixelsPerSourceUnit': handScale, 'capVerticalPixelsPerSourceUnit': capVerticalScale,
-          'parts': {obj.name: {'min': Coordinates(obj).min(0).tolist(),
-                              'max': Coordinates(obj).max(0).tolist(),
-                              'triangles': sum(len(face.vertices) - 2 for face in obj.data.polygons)}
-                    for obj in assemblyCollection.objects}}
-(projectRoot / 'Data_AssemblyFit.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+for rigObject in rigCollection.objects:
+    rigObject.hide_set(True)
 for screen in bpy.data.screens:
     for area in screen.areas:
         if area.type == 'VIEW_3D':
             area.spaces.active.region_3d.view_rotation = frontRotation
-            area.spaces.active.region_3d.view_location = reviewCenter
+            area.spaces.active.region_3d.view_location = Vector((0, 0, 315)) * pixelSize
             area.spaces.active.region_3d.view_distance = 2.5
             area.spaces.active.region_3d.view_perspective = 'ORTHO'
 bpy.ops.file.pack_all()
 bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot / 'Scene_SichuanMessenger.blend'), compress=True)
+
+
+def BakeWorldPart(part):
+    evaluated = part.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    evaluatedMesh = bpy.data.meshes.new_from_object(evaluated, preserve_all_data_layers=True, depsgraph=bpy.context.evaluated_depsgraph_get())
+    matrix = part.matrix_world
+    linear = np.array(matrix.to_3x3())
+    reverse = matrix.determinant() < 0
+    vertices = [(matrix @ vertex.co)[:] for vertex in evaluatedMesh.vertices]
+    faces = [list(reversed(face.vertices)) if reverse else list(face.vertices) for face in evaluatedMesh.polygons]
+    mesh = bpy.data.meshes.new('Mesh_Export_' + part.name)
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    for material in evaluatedMesh.materials:
+        mesh.materials.append(material)
+    for targetFace, sourceFace in zip(mesh.polygons, evaluatedMesh.polygons):
+        targetFace.material_index = sourceFace.material_index
+        targetFace.use_smooth = sourceFace.use_smooth
+    for sourceUv in evaluatedMesh.uv_layers:
+        targetUv = mesh.uv_layers.new(name=sourceUv.name)
+        for targetFace, sourceFace in zip(mesh.polygons, evaluatedMesh.polygons):
+            sourceLoops = list(sourceFace.loop_indices)
+            if reverse:
+                sourceLoops.reverse()
+            for targetLoop, sourceLoop in zip(targetFace.loop_indices, sourceLoops):
+                targetUv.data[targetLoop].uv = sourceUv.data[sourceLoop].uv
+    sourceNormals = np.array([normal.vector[:] for normal in evaluatedMesh.corner_normals]) @ np.linalg.inv(linear)
+    sourceNormals /= np.linalg.norm(sourceNormals, axis=1, keepdims=True).clip(1e-9)
+    normals = []
+    for face in evaluatedMesh.polygons:
+        loops = list(face.loop_indices)
+        if reverse:
+            loops.reverse()
+        normals.extend(sourceNormals[loops])
+    mesh.normals_split_custom_set(normals)
+    obj = bpy.data.objects.new('Export_' + part.name, mesh)
+    scene.collection.objects.link(obj)
+    bpy.data.meshes.remove(evaluatedMesh)
+    return obj
+
+
 if exportEnabled:
     bpy.ops.object.select_all(action='DESELECT')
     exportParts = []
     for part in assemblyCollection.objects:
-        exportPart = part.copy()
-        exportPart.data = part.data.copy()
-        scene.collection.objects.link(exportPart)
+        exportPart = BakeWorldPart(part)
         exportPart.select_set(True)
         exportParts.append(exportPart)
     bpy.context.view_layer.objects.active = exportParts[0]
@@ -318,6 +313,9 @@ if exportEnabled:
     joined = bpy.context.view_layer.objects.active
     joined.name = 'Model_SichuanMessenger_Assembled'
     joined.data.name = 'Mesh_SichuanMessenger_Assembled'
-    bpy.ops.export_scene.gltf(filepath=str(sourceRoot / 'Model_SichuanMessenger_Assembled.glb'), export_format='GLB', use_selection=True, export_apply=True)
-    bpy.ops.export_scene.fbx(filepath=str(sourceRoot / 'Model_SichuanMessenger_Assembled.fbx'), use_selection=True, path_mode='COPY', embed_textures=True, add_leaf_bones=False)
+    report['exportTriangles'] = sum(len(face.vertices) - 2 for face in joined.data.polygons)
+    report['exportMaterials'] = [material.name for material in joined.data.materials]
+    bpy.ops.export_scene.gltf(filepath=str(exportRoot / 'Model_SichuanMessenger_Assembled.glb'), export_format='GLB', use_selection=True, export_apply=True)
+    bpy.ops.export_scene.fbx(filepath=str(exportRoot / 'Model_SichuanMessenger_Assembled.fbx'), use_selection=True, path_mode='COPY', embed_textures=True, add_leaf_bones=False)
+(projectRoot / 'Data_RepairVerification.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 print(json.dumps(report))
