@@ -68,7 +68,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-drag-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-junction-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -289,6 +289,15 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if (input.revision === "2026-11-13-drag-1") {
+    const value = structuredClone(input);
+    for (const collection of ["groups","triggers"]) {
+      const id = collection === "groups" ? "ForkRelief" : "Trigger_ForkRelief";
+      if (!value[collection].some((item) => item.id === id)) value[collection].push(structuredClone(defaults[collection].find((item) => item.id === id)));
+    }
+    value.revision = defaults.revision;
+    return value;
+  }
   const oldRevision=input.revision===FLOW_PREVIOUS_ENCOUNTER.revision;
   const baseline=oldRevision?FLOW_PREVIOUS_ENCOUNTER:FLOW_PREVIOUS_DRAG_ENCOUNTER;
   if(input.revision!==baseline.revision) return input;

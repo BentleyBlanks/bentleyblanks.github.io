@@ -539,6 +539,19 @@
       ]
     }
   ],
+  "encounterReviews": [
+    {
+      "id": "L1-02I-149625",
+      "date": "2026-11-13",
+      "scope": "Opening fugitives meet northeastern flanking troops in the north trench, then move south to block the branch junction during casualty evacuation. Creative encounter staging; counts, coordinates and timings are design values.",
+      "files": ["AdvancedTools/Data_LevelFlow.mjs", "AdvancedTools/Script_LevelFlowModel.mjs", "docs/Data_LevelFlow.md"],
+      "codexEntry": "HistoryAndCreation / invented / 撤退与反冲",
+      "notionSnapshots": [
+        {"id": "3fd60335331c8194aa82f0b238084d34", "lastEdited": "2026-11-12T18:36:37.885Z", "scope": "Existing counterattack creative row and dated status enhanced with the fugitives joining flanking troops and blocking casualty evacuation."},
+        {"id": "3fd60335331c818fa24deadb6d72ca70", "lastEdited": "2026-11-12T18:37:39.209Z", "scope": "Existing creative front-line staging bullet enhanced with the same junction blockade."}
+      ]
+    }
+  ],
   "notionPages": [
     {
       "id": "40260335331c81ce8b26eb0e1cd6f9cb",

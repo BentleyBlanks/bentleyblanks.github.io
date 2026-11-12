@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -309,19 +309,32 @@ function BuildCompanionTracks() {
 companionTracks=BuildCompanionTracks();
 
 function OpeningActors(time) {
-  if (time < BeatById("01c").start || time >= BeatById("03a").start) return [];
+  const retreat = FLOW_OPENING_RETREAT;
+  if (time < BeatById("01c").start || time >= BeatById(retreat.endBeat).end) return [];
   const defeated = time >= BeatById("02g").start;
   return Array.from({ length: 9 }, (_,index) => {
     const route = [...FLOW_OPENING.enemyRoutes[index < 2 ? 0 : index < 6 ? 1 : 2], FLOW_OPENING.enemyPositions[index]];
     const born = BeatById("01c").start + index * 0.4;
     const arrival = born + RouteLength(route) / FLOW_OPENING.enemySpeed;
     let p = SampleRoute(route, (time - born) / (arrival - born));
-    if (defeated && index >= 6) p = SampleRoute([p,[22,67],[12,44]], (time-BeatById("02h").start)/15);
-    let pose = "stand";
-    if (time < arrival || defeated && index >= 6 && time > BeatById("02h").start) pose = "run";
-    if (defeated && index < 6) pose = "dead";
-    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {born, arrival});
-  }).filter(actor => time >= actor.born);
+    if (time < born || index < 6 && time >= BeatById(retreat.blockBeat).start) return null;
+    if (index >= 6 && time >= BeatById(retreat.escapeBeat).start) {
+      const escape = BeatById(retreat.escapeBeat), rally = BeatById(retreat.rallyBeat);
+      const approaching = time < rally.end;
+      p = time < rally.start
+        ? SampleRoute([p,retreat.junction,retreat.rally], (time-escape.start)/escape.duration)
+        : SampleRoute([retreat.rally,retreat.junction,retreat.block], (time-rally.start)/rally.duration);
+      const spread = Clamp((time-escape.start)/escape.duration,0,1);
+      p = [p[0],p[1]+(index-7)*0.65*spread];
+      const end = BeatById(retreat.endBeat);
+      const fall = end.start+end.duration*retreat.fallFractions[index-6];
+      const dead = time >= fall;
+      return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : approaching ? "run" : "shoot",
+        {groupId:"OpeningSurvivors",firing:!dead&&!approaching,fall,born,arrival});
+    }
+    const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : "stand";
+    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {born,arrival});
+  }).filter(Boolean);
 }
 
 function Effects(beat, time, progress, actors) {
@@ -346,6 +359,12 @@ function Effects(beat, time, progress, actors) {
     if (age >= 0 && age < 5) effects.push({ kind: "blast", p: tank?.p ?? player.p, age });
   }
   const targets = actors.filter((actor) => actor.side === "enemy" && actor.pose !== "dead" && actor.kind !== "tank" && actor.pose !== "run");
+  const blockers = actors.filter((actor) => actor.groupId === "OpeningSurvivors" && actor.firing);
+  for (const actor of blockers) effects.push({kind:"fire",a:actor.p,b:player.p,side:"enemy",phase:(time*2.3+actor.p[1])%1});
+  if (blockers.length) for (const id of ["luo","liu"]) {
+    const defender = actors.find((actor) => actor.id === id);
+    effects.push({kind:"fire",a:defender.p,b:blockers[0].p,side:"friend",phase:(time*2.1+defender.p[0])%1});
+  }
   if (["shoot","retreat"].includes(beat.pose) && targets.length) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });

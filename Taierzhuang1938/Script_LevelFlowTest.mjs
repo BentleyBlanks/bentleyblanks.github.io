@@ -51,6 +51,38 @@ for(let index=1;index<FLOW_TIMELINE.length;index++) {
   assert.ok(Distance(previous.p.at(-1),beat.p[0])<0.01,`${beat.id} continuous route`);
 }
 ValidateEncounterDocument(defaults,FLOW_TIMELINE);
+// The fugitives meet the northeastern relief, then hold the branch junction.
+const survivorsAt = (time) => EvaluateFlow(time).actors.filter((actor) => actor.groupId === "OpeningSurvivors");
+assert.equal(survivorsAt(149.63).length,3);
+assert.deepEqual(survivorsAt(160).map((actor)=>actor.id),survivorsAt(149.63).map((actor)=>actor.id),"the same three survivors persist across the 02/03 boundary");
+const rallyFrame=EvaluateFlow(145);
+const reliefAtRally=rallyFrame.actors.filter((actor)=>actor.groupId==="ForkRelief");
+assert.equal(reliefAtRally.length,2);
+assert.ok([...survivorsAt(145),...reliefAtRally].every((actor)=>Distance(actor.p,[12,44])<2),"both groups meet at marked point 1");
+const blockingFrame=EvaluateFlow(165);
+const blockers=blockingFrame.actors.filter((actor)=>["OpeningSurvivors","ForkRelief"].includes(actor.groupId));
+assert.equal(blockers.length,5);
+assert.ok(blockers.every((actor)=>actor.pose==="shoot"&&actor.firing&&Distance(actor.p,[23.5,67.1])<4),"five reunited enemies block marked point 2");
+for(const actor of blockers) assert.ok(blockingFrame.effects.some((effect)=>effect.kind==="fire"&&effect.side==="enemy"&&Distance(effect.a,actor.p)<0.01&&Distance(effect.b,blockingFrame.player)<0.01),"each blocker fires toward the squad");
+for(const stamp of [130,145,160]) for(const id of ["opening6","opening7","opening8"]) {
+  const a=EvaluateFlow(stamp-0.001).actors.find((actor)=>actor.id===id);
+  const b=EvaluateFlow(stamp+0.001).actors.find((actor)=>actor.id===id);
+  assert.ok(a&&b&&Distance(a.p,b.p)<0.02,`${id} moves continuously through ${stamp}`);
+}
+assert.ok(!EvaluateFlow(BeatById("03c").start).actors.some((actor)=>actor.groupId==="OpeningSurvivors"),"junction blockers clear before the next withdrawal encounter");
+const junctionDraft=structuredClone(defaults);
+junctionDraft.revision="2026-11-13-drag-1";
+junctionDraft.groups=junctionDraft.groups.filter((group)=>!["ForkRelief","SearchNeighbor"].includes(group.id));
+junctionDraft.triggers=junctionDraft.triggers.filter((trigger)=>trigger.id!=="Trigger_ForkRelief");
+junctionDraft.groups.find((group)=>group.id==="Fork").count=8;
+const junctionUpgrade=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(junctionDraft),setItem:()=>{}}).value;
+assert.equal(junctionUpgrade.groups.find((group)=>group.id==="ForkRelief").count,2);
+assert.equal(junctionUpgrade.groups.find((group)=>group.id==="Fork").count,8);
+assert.ok(!junctionUpgrade.groups.some((group)=>group.id==="SearchNeighbor"));
+ValidateEncounterDocument(junctionUpgrade,FLOW_TIMELINE);
+const junctionDocument=new EncounterDocument(defaults,FLOW_TIMELINE,null);
+junctionDocument.Replace(junctionDraft);
+assert.deepEqual(junctionDocument.value,junctionUpgrade,"old imported projects receive the same junction reinforcement upgrade");
 const rectangle={shape:"rect",center:[0,0],size:[2,2]},circle={...rectangle,shape:"circle"};
 assert.equal(EnterArea([-4,0],[4,0],rectangle),0.375);
 assert.equal(EnterArea([-4,0],[4,0],circle),0.375);

@@ -16,6 +16,12 @@ try {
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
   assert.equal(await page.locator("h1").textContent(),"Encounter Designer");
   assert.equal(await page.title(),"Encounter Designer · 血战滕县");
+  await page.evaluate(()=>LevelFlow.Seek(165));
+  const junctionBlockers=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>["OpeningSurvivors","ForkRelief"].includes(actor.groupId));
+  assert.equal(junctionBlockers.length,5);
+  assert.ok(junctionBlockers.every(actor=>actor.pose==="shoot"));
+  await page.screenshot({path:path.join(out,"JunctionBlockade.png")});
+  await page.evaluate(()=>LevelFlow.Seek(384));
   const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
     const canvas=document.getElementById(id),context=canvas.getContext("2d");
     const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;

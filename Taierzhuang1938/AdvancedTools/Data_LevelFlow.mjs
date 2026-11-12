@@ -36,6 +36,14 @@ export const FLOW_OPENING = {
   enemyPositions: [[54.5,61.4],[57.5,61.2],[59,65],[59.8,64],[56,65],[51,65.3],[45,66],[42,66],[39,66]],
 };
 
+// The three surviving opening actors keep their identities across 02 and 03.
+// They meet the northeastern relief at point 1, then block point 2 together.
+export const FLOW_OPENING_RETREAT = {
+  escapeBeat: "02h", rallyBeat: "02i", blockBeat: "03a", endBeat: "03b",
+  rally: [12,44], junction: [21.9,67.1], block: [26,66.8],
+  fallFractions: [0.76,0.86,0.96],
+};
+
 // Authored encounter staging. Heights are relative to the planning trench floor.
 // These placements and timings are creative blocking for the design tool.
 export const FLOW_GROUND = {
@@ -135,11 +143,11 @@ export const FLOW_BEATS = [
   { id: "02g", stage: "02", duration: 15, title: "第一枪，救班长", p: [[61.8,65.6]], pose: "shoot",
     passage: "三步外丙跪着举枪瞄班长的背。任务字：打。玩家捡枪开这一枪；打慢了，班长肩上挨一下，回身把丙砍倒。", task: "捡枪，打丙", threat: "丙 → 班长后背", gate: "枪在手边", exit: "丙倒下；慢打走班长补刀分支", fire: "player" },
   { id: "02h", stage: "02", duration: 15, title: "三个日军退向岔口", p: [[61.8,65.6]], pose: "look",
-    passage: "鬼子九个倒下六个，三个从岔口退走；泥里躺着七个川军，两个挂彩。刘文财：「跑了三个！往岔口去了！」", task: "找冬瓜", threat: "三个逃兵 → 岔口 → 召援", gate: "近战结束", exit: "班长找到冬瓜" },
+    passage: "鬼子九个倒下六个，三个从岔口退走；泥里躺着七个川军，两个挂彩。刘文财：「跑了三个！往岔口去了！」", task: "找冬瓜", threat: "三个逃兵 → 北沟 → 会合绕后日军", gate: "近战结束", exit: "班长找到冬瓜", planning: "三个逃兵沿支沟向西、再向北退到标记 1。东北绕来的两名日军经北侧坡道下沟，双方在北沟会合。" },
   { id: "02i", stage: "02", duration: 15, title: "勒住伤口，找被子", p: [[61.8,65.6],[61,64.6]], pose: "kneel",
-    passage: "班长：「莫追！那三个要喊人回来的。何有田，被子！」", task: "准备拖冬瓜", threat: "追兵将从岔口回来", gate: "冬瓜止血", exit: "单被兜住冬瓜" },
+    passage: "班长：「莫追！那三个要喊人回来的。何有田，被子！」", task: "准备拖冬瓜", threat: "逃兵会合绕后日军 → 南压路口", gate: "冬瓜止血", exit: "单被兜住冬瓜", planning: "标记 1 会合的三名逃兵与两名绕后日军沿交通沟南下，在标记 2 路口转向东侧支沟，阻击准备拖冬瓜撤退的顺子一行。" },
   { id: "03a", stage: "03", duration: 18, title: "顺子和何有田揪被角", p: [[61,64.6],[46,65.6]], pose: "drag",
-    passage: "顺子和何有田揪被角拖冬瓜，班长在前带路，刘文财殿后看岔口。按住键拖，松开键举枪。", task: "把冬瓜拖到坡顶", threat: "岔口在背后", gate: "按住拖拽", exit: "单被进入箱垛后", zone: [46,65.6,3], winter: "drag" },
+    passage: "顺子和何有田揪被角拖冬瓜，班长在前带路，刘文财殿后看岔口。按住键拖，松开键举枪。", task: "把冬瓜拖到坡顶", threat: "会合后的日军从西侧路口阻击", gate: "按住拖拽", exit: "单被进入箱垛后", zone: [46,65.6,3], winter: "drag", planning: "五名日军已由北沟抵达路口，朝东侧支沟阻击。班长与刘文财交替压住路口，掩护顺子和何有田拖冬瓜。" },
   { id: "03b", stage: "03", duration: 55, title: "第一回，箱垛后松手射击", p: [[46,65.6]], pose: "shoot",
     passage: "第一拨日军从北侧地面压到防炮洞门口，朝沟内射击。玩家把被子拽到箱垛后头，利用门口沙包与折墙逐段退开，松手回身打。", task: "借箱垛压住北侧门口来的五个", threat: "① 北侧地面 → 防炮洞门外 → 沟内", gate: "冬瓜进箱垛后", exit: "五个追兵解除，接着拖", zone: [46,65.6,3], wave: "Fork", winter: "ground", fire: "player", cover: true, planning: "① 北侧地面压到门口。门外沙包、折墙和箱垛提供连续掩护，玩家松手射击后再拖冬瓜向西退。" },
   { id: "03c", stage: "03", duration: 22, title: "再拖，接近支沟拐角", p: [[46,65.6],[30,66.8]], pose: "drag",
@@ -249,6 +257,7 @@ export const FLOW_BEATS = [
 ];
 
 export const FLOW_WAVES = [
+  { id: "ForkRelief", beat: "02g", until: "03b", count: 2, source: [67,30], route: [[67,30],[40,28],[17,36],[14.5,40],[12,44],[21.9,67.1],[23,67.1]], label: "绕后日军路口阻击", interval: 0, lastFall: 116, speed: 2.2, target: "player", trigger: {mode:"time",delay:2}, repeat: "东北绕行两人经北坡下沟，与三名逃兵在标记 1 会合，再南下标记 2 路口阻击" },
   { id: "Fork", beat: "03b", count: 5, source: [75,44], route: [[75,44],[69,51],[62,57.5],[54,60.5]], label: "① 北侧地面门口压制", interval: 1.8, lastFall: 54, target: "player", repeat: "第一回五人压住洞口，玩家借沙包与箱垛后撤" },
   { id: "Corner", beat: "03c", until: "03e", count: 2, source: [77,58], route: [[77,58],[69,56],[62,55.5],[61,60.5],[60,65.6],[50,65.6],[38,66],[33,66.8]], label: "② 门外坡道下沟追兵", interval: 2.2, lastFall: 58, speed: 2.1, target: "player", repeat: "第二回两人从东侧经门外坡道下沟，投弹后追到拐角" },
   { id: "Rim", beat: "03g", count: 3, source: [20,33], route: [[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[25,72]], label: "③ 北坡下沟第一波", interval: 1.8, lastFall: 30, speed: 2.3, target: "player", repeat: "标记 1 北坡第一波三人，沿交通沟压到岔口" },
