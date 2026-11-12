@@ -1,6 +1,7 @@
 import { DecodeSceneHeights } from "../Script_SceneDoc.mjs";
 import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_SceneTrenches.mjs";
 import { Clamp, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
+import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 function LowerBound(values,target) {
   let low=0,high=values.length;
@@ -66,7 +67,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   for(const corridor of [...map.trenches,...ramps,...(map.planningPockets||[]).map(pocket=>{
     const [minX,maxX,minZ,maxZ]=pocket.box;return {width:3,points:[[minX,minZ],[maxX,minZ],[maxX,maxZ],[minX,maxZ],[minX,minZ]]};
   }),...(scene.trenches?.segments||[]).map((segment)=>({points:segment.points,width:segment.floorW||4}))]) {
-    for(let index=1;index<corridor.points.length;index++) interest.push({a:corridor.points[index-1],b:corridor.points[index],reach:corridor.width/2+3});
+    for (let index = 1; index < corridor.points.length; index++) {
+      const a = corridor.points[index - 1], b = corridor.points[index], reach = corridor.width / 2 + 3;
+      interest.push({a, b, reach, colorBounds:[
+        Math.min(a[0], b[0]) - reach - 1, Math.max(a[0], b[0]) + reach + 1,
+        Math.min(a[1], b[1]) - reach - 1, Math.max(a[1], b[1]) + reach + 1,
+      ]});
+    }
   }
   const sampleCache=new Map();
   const Sample=(x,z)=>{
@@ -85,7 +92,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     const inScene=x+size>=bounds.minX&&x<=bounds.maxX&&z+size>=bounds.minZ&&z<=bounds.maxZ;
     const center=Sample(cx,cz),average=(Sample(x,z)+Sample(x+size,z)+Sample(x,z+size)+Sample(x+size,z+size))/4;
     const split=size>1&&near||size>16&&inScene||size>2&&Math.abs(center-average)>0.18;
-    const cell={x,z,size};
+    const cell={x,z,size,near};
     if(split) cell.children=[Refine(x,z,half),Refine(cx,z,half),Refine(cx,cz,half),Refine(x,cz,half)];
     else cells.push(cell);
     cell.minHeight=cell.children?Math.min(...cell.children.map(child=>child.minHeight)):Math.min(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
@@ -104,6 +111,25 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   for(const [key,values] of rows) rows.set(key,[...values].sort((a,b)=>a-b));
   for(const [key,values] of columns) columns.set(key,[...values].sort((a,b)=>a-b));
   const Between=(values,from,to)=>values.slice(LowerBound(values,from),LowerBound(values,to+1e-8));
+  const colorCache = new Map();
+  const ColorAt = (x, z) => {
+    const key = `${x},${z}`;
+    if (colorCache.has(key)) return colorCache.get(key);
+    let soilMix = 0;
+    const point = [x, z];
+    for (const segment of interest) {
+      const [minX, maxX, minZ, maxZ] = segment.colorBounds;
+      if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+      soilMix = Math.max(soilMix, Clamp((segment.reach + 1 - SegmentDistance(point, segment.a, segment.b)) / 3, 0, 1));
+    }
+    const step = FLOW_RENDERING.terrainNormalSampleM;
+    const normal = [Sample(x - step, z) - Sample(x + step, z), 2 * step, Sample(x, z - step) - Sample(x, z + step)];
+    const light = 0.84 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) / Math.hypot(...normal) * 0.16;
+    const color = [198, 207, 169].map((channel, axis) =>
+      Clamp((channel + ([184, 164, 128][axis] - channel) * soilMix) * light, 0, 255));
+    colorCache.set(key, color);
+    return color;
+  };
   const faceCache=new WeakMap();
   const FacesForCell=(cell)=>{
     if(faceCache.has(cell)) return faceCache.get(cell);
@@ -116,19 +142,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map((value)=>[x,value]),
     ];
     const center=[x+size/2,Sample(x+size/2,z+size/2),z+size/2];
-    let soilMix=0;
-    for(const segment of interest) soilMix=Math.max(soilMix,Clamp((segment.reach+1-SegmentDistance([center[0],center[2]],segment.a,segment.b))/3,0,1));
-    const base=[198,207,169].map((channel,axis)=>channel+([184,164,128][axis]-channel)*soilMix);
     for(let index=0;index<outline.length;index++) {
       const a=outline[index],b=outline[(index+1)%outline.length];
       const points=[center,[a[0],Sample(...a),a[1]],[b[0],Sample(...b),b[1]]];
-      const a3=points[1].map((value,axis)=>value-points[0][axis]),b3=points[2].map((value,axis)=>value-points[0][axis]);
-      let normal=[a3[1]*b3[2]-a3[2]*b3[1],a3[2]*b3[0]-a3[0]*b3[2],a3[0]*b3[1]-a3[1]*b3[0]];
-      if(normal[1]<0) normal=normal.map(value=>-value);
-      const normalLength=Math.hypot(...normal)||1;
-      const normalLight=0.84+(-normal[0]*0.35+normal[1]*0.88+normal[2]*0.3)/normalLength*0.16;
-      const color="#"+base.map((channel)=>Math.round(Clamp(channel*normalLight,0,255)).toString(16).padStart(2,"0")).join("");
-      triangles.push({points,color,minX:x,maxX,minZ:z,maxZ});
+      const vertexColors = points.map(point => ColorAt(point[0], point[2]));
+      const color = "#" + vertexColors[0].map((channel, axis) =>
+        Math.round((channel + vertexColors[1][axis] + vertexColors[2][axis]) / 3).toString(16).padStart(2, "0")).join("");
+      triangles.push({points,color,vertexColors,minX:x,maxX,minZ:z,maxZ});
     }
     faceCache.set(cell,triangles);return triangles;
   };

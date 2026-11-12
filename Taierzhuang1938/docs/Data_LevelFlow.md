@@ -59,8 +59,8 @@ Agent 读取用户给的 PNG 时，可用 Pillow 的 `Image.open(path).info['Enc
 - `Script_LevelFlowModel.mjs` 按绝对时间采样人物、战车、触发状态与火力。
 - `Script_LevelFlowDocument.mjs` 管理草稿、撤销和 PNG／JSON 帧包。
 - `Script_LevelFlowView.mjs` 绘制连通的空间图与编辑手柄。
-- `Script_LevelFlowTerrain.mjs` 复用实际地形与壕沟采样，构建共享边界的地面网格。
-- `Script_LevelFlowRaster.mjs` 提供三角形深度缓冲和遮挡半透绘制。
+- `Script_LevelFlowTerrain.mjs` 复用实际地形与壕沟采样，构建共享边界的地面网格。顶点按世界坐标计算土色与平滑法线，沟沿的平坦区域也保留颜色过渡所需细分。
+- `Script_LevelFlowRaster.mjs` 提供三角形深度缓冲、透视正确的顶点颜色插值和遮挡半透绘制。
 - `Script_LevelFlowPerspective.mjs` 绘制立体视口，`Script_LevelFlowViewports.mjs` 管理视口布局与合成导出，`Script_LevelFlowControls.mjs` 管理 Scene 导航。
 - `Script_LevelFlow.mjs` 连接编辑、时间轴与标注交互。
 

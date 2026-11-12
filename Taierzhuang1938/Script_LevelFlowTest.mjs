@@ -10,6 +10,7 @@ import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
+import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 // Compare incremental depth interpolation against the original barycentric
@@ -37,6 +38,34 @@ for(const perspective of [false,true]) for(let sample=0;sample<60;sample++) {
     assert.deepEqual([...raster.image.data.slice(index*4,index*4+3)],[170,187,204]);
   }
 }
+
+// Smooth colors retain the same depth test and use perspective-correct weights.
+for (const perspective of [false, true]) {
+  const raster = {width:16, height:16, perspective, triangles:0,
+    image:{data:new Uint8ClampedArray(16 * 16 * 4)}, depth:new Float32Array(16 * 16).fill(Infinity)};
+  const vertices = [
+    {x:0, y:0, depth:2, rgb:[20, 40, 60]},
+    {x:16, y:0, depth:8, rgb:[180, 100, 80]},
+    {x:0, y:16, depth:4, rgb:[60, 200, 120]},
+  ];
+  EncounterRaster.prototype.Triangle.call(raster, ...vertices, "#000000");
+  for (let y = 0; y < 15; y++) for (let x = 0; x < 15 - y; x++) {
+    const weights = [1 - (x + y + 1) / 16, (x + 0.5) / 16, (y + 0.5) / 16];
+    const factors = weights.map((weight, index) => weight / (perspective ? vertices[index].depth : 1));
+    const total = factors.reduce((sum, value) => sum + value, 0);
+    for (let channel = 0; channel < 3; channel++) {
+      const expected = factors.reduce((sum, value, index) => sum + value * vertices[index].rgb[channel], 0) / total;
+      assert.ok(Math.abs(raster.image.data[(y * 16 + x) * 4 + channel] - expected) <= 0.51,
+        "terrain colors interpolate continuously inside a triangle");
+    }
+  }
+}
+const clipped = FlowPerspectiveView.prototype.FaceVertices.call({
+  type:"scene", freeCamera:{}, width:64, height:64, focal:32, far:1500, CameraPoint:point => point,
+}, [[0,0,0], [1,0,1], [0,1,1]], [[0,0,0], [100,100,100], [200,200,200]]);
+assert.ok(clipped.every(vertex => vertex.depth >= 0.15 && vertex.rgb.length === 3));
+assert.ok(clipped.some(vertex => Math.abs(vertex.depth - 0.15) < 1e-8 && Math.abs(vertex.rgb[0] - 15) < 1e-8),
+  "near-plane clipping interpolates terrain colors with geometry");
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
 assert.equal(FLOW_DURATION,1870);
@@ -274,8 +303,13 @@ assert.ok(terrain.heightAt(33,100)<terrain.heightAt(40,100)-1,"the gully is carv
 // A shared edge must consist of identical segments on both sides, including
 // 1 m trench cells meeting the coarse surrounding terrain.
 const terrainEdges=new Map();
+const terrainColors = new Map();
 for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) for(let index=0;index<3;index++) {
   const a=face.points[index],b=face.points[(index+1)%3];
+  const vertexKey = a.join(","), color = face.vertexColors[index];
+  assert.ok(color.length === 3 && color.every(channel => Number.isFinite(channel) && channel >= 0 && channel <= 255));
+  if (terrainColors.has(vertexKey)) assert.deepEqual(color, terrainColors.get(vertexKey), "shared terrain vertices have identical shading across cells");
+  terrainColors.set(vertexKey, color);
   const vertices=[a.join(","),b.join(",")].sort(),key=vertices.join("|");
   const boundary=Math.abs(a[0])===6144&&a[0]===b[0]||Math.abs(a[2])===6144&&a[2]===b[2];
   const edge=terrainEdges.get(key)||{count:0,boundary};edge.count++;terrainEdges.set(key,edge);

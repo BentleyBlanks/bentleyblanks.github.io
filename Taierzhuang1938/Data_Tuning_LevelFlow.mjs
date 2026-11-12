@@ -3,4 +3,5 @@
 export const FLOW_RENDERING = {
   terrainCellPixels: 10,
   terrainFlatHeightPixels: 0.5,
+  terrainNormalSampleM: 0.5,
 };

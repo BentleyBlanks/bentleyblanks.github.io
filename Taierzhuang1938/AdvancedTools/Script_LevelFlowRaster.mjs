@@ -28,7 +28,8 @@ export class EncounterRaster {
     const minX=Math.max(0,Math.floor(Math.min(a.x,b.x,c.x))),maxX=Math.min(this.width-1,Math.ceil(Math.max(a.x,b.x,c.x)));
     const minY=Math.max(0,Math.floor(Math.min(a.y,b.y,c.y))),maxY=Math.min(this.height-1,Math.ceil(Math.max(a.y,b.y,c.y)));
     if(minX>maxX||minY>maxY) return;
-    const rgb=Rgb(color),data=this.image.data,depth=this.depth;
+    const vertexColors = !!a.rgb && !!b.rgb && !!c.rgb;
+    const rgb=vertexColors ? a.rgb : Rgb(color),data=this.image.data,depth=this.depth;
     const az=this.perspective?1/a.depth:a.depth,bz=this.perspective?1/b.depth:b.depth,cz=this.perspective?1/c.depth:c.depth;
     const firstStep=(c.y-b.y)/area,secondStep=(a.y-c.y)/area;
     const firstRowStep=(b.x-c.x)/area,secondRowStep=(c.x-a.x)/area;
@@ -38,6 +39,12 @@ export class EncounterRaster {
     const weights=[firstRow,secondRow,1-firstRow-secondRow];
     const steps=[firstStep,secondStep,-firstStep-secondStep];
     const rowSteps=[firstRowStep,secondRowStep,-firstRowStep-secondRowStep];
+    const smooth = vertexColors && a.rgb.some((channel, axis) => channel !== b.rgb[axis] || channel !== c.rgb[axis]);
+    const colorA = smooth ? a.rgb.map(channel => channel * (this.perspective ? az : 1)) : rgb;
+    const colorB = smooth ? b.rgb.map(channel => channel * (this.perspective ? bz : 1)) : rgb;
+    const colorC = smooth ? c.rgb.map(channel => channel * (this.perspective ? cz : 1)) : rgb;
+    const colorStep = smooth ? colorA.map((channel, axis) =>
+      firstStep * (channel - colorC[axis]) + secondStep * (colorB[axis] - colorC[axis])) : null;
     for(let y=minY;y<=maxY;y++) {
       // Each barycentric weight is linear across a row. Intersect its three
       // valid intervals so the pixel loop only visits the triangle's span.
@@ -49,13 +56,22 @@ export class EncounterRaster {
         else if(weight<-1e-7) {to=from-1;break;}
       }
       let interpolated=weights[0]*az+weights[1]*bz+weights[2]*cz+(from-minX)*depthStep;
+      const rowColor = smooth ? colorA.map((channel, axis) =>
+        weights[0] * channel + weights[1] * colorB[axis] + weights[2] * colorC[axis] + (from - minX) * colorStep[axis]) : rgb;
       let index=y*this.width+from;
       for(let x=from;x<=to;x++,index++,interpolated+=depthStep) {
         const z=this.perspective?1/interpolated:interpolated;
         if(z>=depth[index]) continue;
         depth[index]=z;
         const offset=index*4;
-        data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];
+        if (smooth) {
+          const distance = x - from, scale = this.perspective ? z : 1;
+          data[offset] = (rowColor[0] + distance * colorStep[0]) * scale;
+          data[offset + 1] = (rowColor[1] + distance * colorStep[1]) * scale;
+          data[offset + 2] = (rowColor[2] + distance * colorStep[2]) * scale;
+        } else {
+          data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];
+        }
       }
       for(let edge=0;edge<3;edge++) weights[edge]+=rowSteps[edge];
     }

@@ -104,9 +104,16 @@ export class FlowPerspectiveView extends FlowMapView {
   Bounds() {return null;}
   NorthDirection() {return [-this.right[2],this.forward[2]];}
   DrawScale(context,width,height) {Label(context,`远裁剪 ${this.far} m`,18,height-31,"#655e4b",10);}
-  FaceVertices(points) {
-    if(this.type==="oblique"&&!this.freeCamera) return points.map(point=>this.Vertex(point));
-    let polygon=points.map(point=>this.CameraPoint(point));
+  FaceVertices(points, vertexColors = null) {
+    if(this.type==="oblique"&&!this.freeCamera) return points.map((point, index) => {
+      const vertex = this.Vertex(point);
+      if (vertexColors) vertex.rgb = vertexColors[index];
+      return vertex;
+    });
+    let polygon=points.map((point, index) => {
+      const camera = this.CameraPoint(point);
+      return vertexColors ? [...camera, ...vertexColors[index]] : camera;
+    });
     for(const [edge,sign] of [[0.15,1],[this.far,-1]]) {
       if(polygon.every(point=>(point[2]-edge)*sign>=0)) continue;
       if(polygon.every(point=>(point[2]-edge)*sign<0)) return [];
@@ -118,7 +125,8 @@ export class FlowPerspectiveView extends FlowMapView {
       }
       polygon=clipped;if(polygon.length<3) return [];
     }
-    return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2]}));
+    return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2],
+      ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
   DrawBase(context,width,height,frame) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
@@ -139,14 +147,17 @@ export class FlowPerspectiveView extends FlowMapView {
       const camera=this.CameraPoint([cx,cy,cz]);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale;
-      // Refine visible height detail at screen-sized cells. Flat ground stops
-      // early, while every selected cell retains its shared boundary vertices.
+      // Corridor color transitions need detail even where the floor is flat.
+      // Shared edge vertices keep both height and shading continuous across LODs.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
-        &&heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels) {
+        &&(cell.near||heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels)) {
         for(const child of cell.children) Visit(child);
         return;
       }
-      for(const triangle of this.mapData.terrain.facesForCell(cell)) Face(triangle.points,triangle.color);
+      for(const triangle of this.mapData.terrain.facesForCell(cell)) {
+        const vertices = this.FaceVertices(triangle.points, triangle.vertexColors);
+        if (vertices.length >= 3) this.raster.Face(vertices, triangle.color);
+      }
     };
     for(const root of this.mapData.terrain.roots) Visit(root);
     this.terrainTriangles=this.raster.triangles;
