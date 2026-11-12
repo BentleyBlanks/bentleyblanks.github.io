@@ -1,16 +1,31 @@
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
+import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 // Navigation belongs to the viewport that received the mouse press. Playback
 // and other viewports remain independent while the scene camera is moving.
 export class EncounterSceneControls {
   constructor(workspace,render) {
-    this.workspace=workspace;this.render=render;this.drag=null;this.keys=new Set();
+    this.workspace=workspace;this.render=render;this.drag=null;this.keys=new Set();this.wheelViews=new Map();
     window.addEventListener("keyup",event=>this.keys.delete(event.code));
     window.addEventListener("blur",()=>this.Clear());
     document.addEventListener("visibilitychange",()=>{if(document.hidden) this.Clear();});
   }
 
-  Clear() {this.drag=null;this.keys.clear();}
+  Clear() {
+    if(this.drag) this.Settle(this.drag.entry.map);
+    for(const view of this.wheelViews.keys()) this.Settle(view);
+    this.wheelViews.clear();this.drag=null;this.keys.clear();this.render();
+  }
+
+  Scale(view) {
+    if(!view.type) return;
+    view.navigationActive=true;view.renderScale=view.adaptiveScale;
+  }
+
+  Settle(view) {
+    if(!view.type) return;
+    view.navigationActive=false;view.renderScale=1;
+  }
 
   Free(entry) {
     const view=entry.map;
@@ -32,6 +47,7 @@ export class EncounterSceneControls {
     const view=entry.map;
     const action=!view.type?"planPan":event.button===1?"pan":event.altKey?(event.button===0?"orbit":"dolly"):"look";
     if(view.type&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
+    this.Scale(view);
     entry.mode="manual";
     const pivot=[view.center[0],view.Ground?.(view.center)||0,view.center[1]];
     const offset=view.eye?.map((value,index)=>value-pivot[index]);
@@ -43,6 +59,7 @@ export class EncounterSceneControls {
   Move(entry,event) {
     const drag=this.drag;if(!drag||drag.entry!==entry) return false;
     const dx=event.clientX-drag.x,dy=event.clientY-drag.y,view=entry.map;
+    this.Scale(view);
     drag.x=event.clientX;drag.y=event.clientY;
     if(drag.action==="planPan") view.center=[view.center[0]-dx/view.scale,view.center[1]-dy/view.scale];
     else if(drag.action==="look") {
@@ -79,6 +96,10 @@ export class EncounterSceneControls {
     event.preventDefault();this.workspace.Activate(entry.index);entry.mode="manual";
     if(entry.map.type) this.Dolly(entry,event.deltaY*0.001);
     else {const rect=entry.canvas.getBoundingClientRect();entry.map.Zoom(Math.exp(-event.deltaY*0.001),[event.clientX-rect.left,event.clientY-rect.top]);}
+    if(entry.map.type) {
+      this.Scale(entry.map);
+      this.wheelViews.set(entry.map,performance.now()+FLOW_RENDERING.navigation.wheelSettleMs);
+    }
     this.render();
   }
 
@@ -88,7 +109,11 @@ export class EncounterSceneControls {
   }
 
   Tick(delta) {
-    if(this.drag?.action!=="look"||!this.keys.size) return false;
+    let settled=false;
+    for(const [view,until] of this.wheelViews) if(performance.now()>=until&&this.drag?.entry.map!==view) {
+      this.Settle(view);this.wheelViews.delete(view);settled=true;
+    }
+    if(this.drag?.action!=="look"||!this.keys.size) return settled;
     const view=this.drag.entry.map,camera=view.freeCamera;if(!camera) return false;
     const forward=Number(this.keys.has("KeyW"))-Number(this.keys.has("KeyS"));
     const right=Number(this.keys.has("KeyD"))-Number(this.keys.has("KeyA"));
@@ -97,7 +122,7 @@ export class EncounterSceneControls {
     const movement=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*forward-Math.cos(camera.yaw)*right,
       Math.sin(camera.pitch)*forward+vertical,Math.cos(camera.yaw)*Math.cos(camera.pitch)*forward+Math.sin(camera.yaw)*right];
     camera.eye=camera.eye.map((value,index)=>value+movement[index]*speed);
-    return !!(forward||right||vertical);
+    return settled||!!(forward||right||vertical);
   }
 
   Focus(point,radius=8) {

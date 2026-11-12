@@ -2,6 +2,7 @@ import { FlowMapView } from "./Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./Script_LevelFlowPerspective.mjs";
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
 import { ValidateViewportLayout } from "./Script_LevelFlowDocument.mjs";
+import { FLOW_DEFAULT_VIEWS } from "../Data_Tuning_LevelFlow.mjs";
 
 export const ENCOUNTER_VIEW_TYPES={plan:"空间总览",battle:"战斗局部",oblique:"立体俯视",scene:"Scene 自由视角",chase:"跟拍",eye:"玩家视线"};
 
@@ -9,7 +10,7 @@ export class EncounterViewports {
   constructor(element,mapData,{activate,change,bounds,bind}) {
     this.element=element;this.mapData=mapData;this.callbacks={activate,change,bounds,bind};
     this.count=2;this.entries=[];this.activeIndex=0;
-    for(const [index,type] of ["plan","oblique","battle","eye"].entries()) {
+    for(const [index,type] of [...FLOW_DEFAULT_VIEWS.map(view=>view.type),"battle","eye"].entries()) {
       const pane=document.createElement("section");pane.className="lfViewPane";pane.dataset.viewport=String(index);
       const bar=document.createElement("div");bar.className="lfViewBar";
       const title=document.createElement("span");title.textContent=`视口 ${index+1}`;bar.append(title);
@@ -36,12 +37,16 @@ export class EncounterViewports {
       canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
       const status=document.createElement("div");status.className="lfViewStatus";
       pane.append(bar,canvas,status);element.append(pane);
-      const entry={index,pane,bar,canvas,select,target,rotate,status,type,layers,layerMenu,mode:type==="plan"?"stage":"follow",map:this.MakeView(canvas,type),size:null};
+      const entry={index,pane,bar,canvas,select,target,rotate,status,type,layers,layerMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
       this.entries.push(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
       select.onchange=()=>this.SetType(index,select.value);
       target.onchange=()=>{entry.map.target=target.value;entry.mode="follow";this.callbacks.change();};
-      fit.onclick=()=>{if(entry.type==="scene") this.SetType(index,"oblique");entry.mode=entry.type==="plan"?"stage":"follow";this.Frame(entry);this.callbacks.change();};
+      fit.onclick=()=>{
+        if(entry.type==="scene") {entry.defaultCamera=true;entry.mode="manual";}
+        else {entry.mode=entry.type==="plan"?"stage":"follow";this.Frame(entry);}
+        this.callbacks.change();
+      };
       rotate.onclick=()=>{entry.map.yaw=(entry.map.yaw||0)+Math.PI/4;this.callbacks.change();};
       this.callbacks.bind(entry);
     }
@@ -83,6 +88,7 @@ export class EncounterViewports {
   SetType(index,type) {
     if(!Object.hasOwn(ENCOUNTER_VIEW_TYPES,type)) return;
     const entry=this.entries[index],old=entry.map;
+    entry.defaultCamera=false;entry.drawKey=null;
     entry.type=type;entry.select.value=type;entry.map=this.MakeView(entry.canvas,type);
     entry.map.center=[...old.center];entry.map.scale=old.scale;
     entry.mode=type==="plan"?"stage":type==="scene"?"manual":"follow";
@@ -103,14 +109,35 @@ export class EncounterViewports {
 
   FrameStage() {for(const entry of this.Visible()) if(entry.mode==="stage") this.Frame(entry);}
 
-  Draw(frame,layers,selection,annotations,draft) {
+  DefaultCamera(entry,frame) {
+    const preset=FLOW_DEFAULT_VIEWS[entry.index]||FLOW_DEFAULT_VIEWS[0],view=entry.map;
+    const actor=frame.actors.find(actor=>actor.id==="player")||frame.actors[0];
+    const target=[actor.p[0],view.Ground(actor.p)+preset.lookHeight,actor.p[1]];
+    const forward=[Math.sin(preset.yaw)*Math.cos(preset.pitch),Math.sin(preset.pitch),Math.cos(preset.yaw)*Math.cos(preset.pitch)];
+    const eye=target.map((value,axis)=>value-forward[axis]*preset.distance);
+    eye[1]=Math.max(eye[1],view.Ground([eye[0],eye[2]])+preset.lookHeight);
+    const delta=target.map((value,axis)=>value-eye[axis]);
+    view.center=[...actor.p];view.focusDistance=Math.hypot(...delta);
+    view.freeCamera={eye,yaw:preset.yaw,pitch:Math.atan2(delta[1],Math.hypot(delta[0],delta[2]))};
+    entry.defaultCamera=false;
+  }
+
+  Draw(frame,layers,selection,annotations,draft,document=null) {
+    const contentKey=JSON.stringify([frame.time,frame.beat.id,layers,selection,draft]);
+    const contentChanged=document===null||document!==this.document||annotations!==this.annotations||contentKey!==this.contentKey;
     for(const entry of this.Visible()) {
+      if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.rotate.hidden=!perspective||entry.type==="scene";
       if(entry.mode==="follow") entry.map.Follow(frame);
+      const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
+      const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,rect.width,rect.height,window.devicePixelRatio]);
+      if(!contentChanged&&drawKey===entry.drawKey) continue;
       entry.map.Draw(frame,entry.layers,selection,annotations,draft);
+      entry.drawKey=drawKey;
       entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"跟随":entry.mode==="manual"?"自由取景":entry.mode==="all"?"全图":"本段"}`;
     }
+    this.document=document;this.annotations=annotations;this.contentKey=contentKey;
   }
 
   Serialize() {

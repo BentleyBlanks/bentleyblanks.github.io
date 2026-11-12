@@ -10,15 +10,15 @@ function Edge(a,b,x,y) {return (x-a.x)*(b.y-a.y)-(y-a.y)*(b.x-a.x);}
 export class EncounterRaster {
   constructor() {this.canvas=document.createElement("canvas");}
 
-  Begin(width,height,perspective) {
+  Begin(width,height,perspective,coordinateScale=1) {
     width=Math.max(1,Math.round(width));height=Math.max(1,Math.round(height));
     if(this.width!==width||this.height!==height) {
       this.width=width;this.height=height;this.canvas.width=width;this.canvas.height=height;
       this.image=new ImageData(width,height);this.depth=new Float32Array(width*height);
     }
-    this.perspective=perspective;this.depth.fill(Infinity);this.triangles=0;
-    const data=this.image.data;
-    for(let offset=0;offset<data.length;offset+=4) {data[offset]=220;data[offset+1]=226;data[offset+2]=219;data[offset+3]=255;}
+    this.perspective=perspective;this.coordinateScale=coordinateScale;
+    this.displayWidth=width/coordinateScale;this.displayHeight=height/coordinateScale;
+    this.depth.fill(Infinity);this.triangles=0;this.image.data.fill(0);
   }
 
   Triangle(a,b,c,color) {
@@ -40,11 +40,17 @@ export class EncounterRaster {
     const steps=[firstStep,secondStep,-firstStep-secondStep];
     const rowSteps=[firstRowStep,secondRowStep,-firstRowStep-secondRowStep];
     const smooth = vertexColors && a.rgb.some((channel, axis) => channel !== b.rgb[axis] || channel !== c.rgb[axis]);
-    const colorA = smooth ? a.rgb.map(channel => channel * (this.perspective ? az : 1)) : rgb;
-    const colorB = smooth ? b.rgb.map(channel => channel * (this.perspective ? bz : 1)) : rgb;
-    const colorC = smooth ? c.rgb.map(channel => channel * (this.perspective ? cz : 1)) : rgb;
-    const colorStep = smooth ? colorA.map((channel, axis) =>
-      firstStep * (channel - colorC[axis]) + secondStep * (colorB[axis] - colorC[axis])) : null;
+    let redA=0,greenA=0,blueA=0,redB=0,greenB=0,blueB=0,redC=0,greenC=0,blueC=0;
+    let redStep=0,greenStep=0,blueStep=0;
+    if(smooth) {
+      const scaleA=this.perspective?az:1,scaleB=this.perspective?bz:1,scaleC=this.perspective?cz:1;
+      redA=a.rgb[0]*scaleA;greenA=a.rgb[1]*scaleA;blueA=a.rgb[2]*scaleA;
+      redB=b.rgb[0]*scaleB;greenB=b.rgb[1]*scaleB;blueB=b.rgb[2]*scaleB;
+      redC=c.rgb[0]*scaleC;greenC=c.rgb[1]*scaleC;blueC=c.rgb[2]*scaleC;
+      redStep=firstStep*(redA-redC)+secondStep*(redB-redC);
+      greenStep=firstStep*(greenA-greenC)+secondStep*(greenB-greenC);
+      blueStep=firstStep*(blueA-blueC)+secondStep*(blueB-blueC);
+    }
     for(let y=minY;y<=maxY;y++) {
       // Each barycentric weight is linear across a row. Intersect its three
       // valid intervals so the pixel loop only visits the triangle's span.
@@ -56,8 +62,10 @@ export class EncounterRaster {
         else if(weight<-1e-7) {to=from-1;break;}
       }
       let interpolated=weights[0]*az+weights[1]*bz+weights[2]*cz+(from-minX)*depthStep;
-      const rowColor = smooth ? colorA.map((channel, axis) =>
-        weights[0] * channel + weights[1] * colorB[axis] + weights[2] * colorC[axis] + (from - minX) * colorStep[axis]) : rgb;
+      const distance=from-minX;
+      const rowRed=weights[0]*redA+weights[1]*redB+weights[2]*redC+distance*redStep;
+      const rowGreen=weights[0]*greenA+weights[1]*greenB+weights[2]*greenC+distance*greenStep;
+      const rowBlue=weights[0]*blueA+weights[1]*blueB+weights[2]*blueC+distance*blueStep;
       let index=y*this.width+from;
       for(let x=from;x<=to;x++,index++,interpolated+=depthStep) {
         const z=this.perspective?1/interpolated:interpolated;
@@ -66,12 +74,13 @@ export class EncounterRaster {
         const offset=index*4;
         if (smooth) {
           const distance = x - from, scale = this.perspective ? z : 1;
-          data[offset] = (rowColor[0] + distance * colorStep[0]) * scale;
-          data[offset + 1] = (rowColor[1] + distance * colorStep[1]) * scale;
-          data[offset + 2] = (rowColor[2] + distance * colorStep[2]) * scale;
+          data[offset] = (rowRed + distance * redStep) * scale;
+          data[offset + 1] = (rowGreen + distance * greenStep) * scale;
+          data[offset + 2] = (rowBlue + distance * blueStep) * scale;
         } else {
           data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];
         }
+        data[offset+3]=255;
       }
       for(let edge=0;edge<3;edge++) weights[edge]+=rowSteps[edge];
     }
@@ -87,13 +96,21 @@ export class EncounterRaster {
   }
 
   Occluded(vertex) {
-    const x=Math.round(vertex.x),y=Math.round(vertex.y);
+    const x=Math.round(vertex.x*this.coordinateScale),y=Math.round(vertex.y*this.coordinateScale);
     if(x<0||y<0||x>=this.width||y>=this.height) return false;
     return vertex.depth>this.depth[y*this.width+x]+0.025;
   }
 
   Stroke(context,a,b,color,width,stats,hiddenAlpha=0.2) {
-    const length=Math.hypot(b.x-a.x,b.y-a.y),steps=Math.max(1,Math.ceil(length/1.5));
+    const dx=b.x-a.x,dy=b.y-a.y;
+    let from=0,to=1;
+    for(const [origin,delta,limit] of [[a.x,dx,this.displayWidth],[a.y,dy,this.displayHeight]]) {
+      if(delta===0) {if(origin<-5||origin>limit+5) return;continue;}
+      const first=(-5-origin)/delta,last=(limit+5-origin)/delta;
+      from=Math.max(from,Math.min(first,last));to=Math.min(to,Math.max(first,last));
+    }
+    if(from>to) return;
+    const length=Math.hypot(dx,dy)*(to-from),steps=Math.max(1,Math.ceil(length/1.5));
     let previous=null,hidden=null,lastPoint=null;
     const Paint=(end)=>{
       if(!previous) return;
@@ -101,10 +118,10 @@ export class EncounterRaster {
       context.beginPath();context.moveTo(previous.x,previous.y);context.lineTo(end.x,end.y);context.stroke();context.restore();
     };
     for(let index=0;index<=steps;index++) {
-      const t=index/steps;
+      const t=from+(to-from)*index/steps;
       const point={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,
         depth:this.perspective?1/((1-t)/a.depth+t/b.depth):a.depth+(b.depth-a.depth)*t};
-      if(point.x<-5||point.y<-5||point.x>this.width+5||point.y>this.height+5) {if(previous&&lastPoint) Paint(lastPoint);previous=null;hidden=null;continue;}
+      if(point.x<-5||point.y<-5||point.x>this.displayWidth+5||point.y>this.displayHeight+5) {if(previous&&lastPoint) Paint(lastPoint);previous=null;hidden=null;continue;}
       const occluded=this.Occluded(point);stats[occluded?"hidden":"visible"]++;
       if(previous&&occluded!==hidden) {Paint(point);previous=point;}
       if(!previous) previous=point;
@@ -129,7 +146,7 @@ export class EncounterRaster {
 
   OverlayFace(context,vertices,color,stats,hiddenAlpha=0.2) {
     const left=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.x)))),top=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.y))));
-    const right=Math.min(this.width,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.height,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
+    const right=Math.min(this.displayWidth,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.displayHeight,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
     if(right<=left||bottom<=top) return;
     const width=right-left,height=bottom-top,image=new ImageData(width,height),rgb=Rgb(color);
     for(let triangle=1;triangle<vertices.length-1;triangle++) {

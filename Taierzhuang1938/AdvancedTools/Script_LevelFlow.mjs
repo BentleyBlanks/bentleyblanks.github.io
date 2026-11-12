@@ -227,7 +227,7 @@ function Render() {
   if(!map||!workspace) return;
   renderPending=false;
   frame=EvaluateFlow(time,project.value);UpdateTimeline();
-  workspace.Draw(frame,null,selection,project.value.annotations,draft);
+  workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
   UpdateObjectPreview();
 }
@@ -367,7 +367,7 @@ function BindControls() {
   Element("copyViewports").onclick=async()=>{
     const button=Element("copyViewports");button.disabled=true;
     try {
-      Render();const capture=workspace.Capture();
+      navigation.Clear();Render();const capture=workspace.Capture();
       if(!navigator.clipboard?.write||!window.ClipboardItem) throw new Error("当前浏览器不支持复制图片");
       const image=new Promise((resolve,reject)=>capture.toBlob(blob=>blob?resolve(blob):reject(new Error("截图生成失败")),"image/png"));
       await navigator.clipboard.write([new ClipboardItem({"image/png":image})]);
@@ -428,7 +428,13 @@ async function Start() {
   };
   const stage=STAGE_TIMELINE.find((item)=>item.id===params.get("stage")?.padStart(2,"0"));
   if(params.has("beat")) JumpBeat(params.get("beat"));else Seek(params.has("t")?Number(params.get("t")):stage?.start||0,{fit:true});
-  if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),0.15,40);workspace.active.mode="manual";}
+  if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {
+    map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),0.15,40);workspace.active.mode="manual";
+    if(map.type==="scene") {
+      const distance=Clamp(map.focal/map.scale,4,map.far/2),target=[map.center[0],map.Ground(map.center)+0.8,map.center[1]];
+      map.freeCamera.eye=target.map((value,axis)=>value-map.forward[axis]*distance);map.focusDistance=distance;
+    }
+  }
   if(project.warning) Toast(project.warning,true);
   UpdateAnnotations();Render();requestAnimationFrame(Tick);
 }

@@ -19,7 +19,43 @@ try {
     localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
   });
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
+  async function ReadyPlan() {
+    await page.waitForFunction(()=>window.LevelFlow);
+    await page.evaluate(()=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
+    const framing=await page.evaluate(()=>{
+      const params=new URLSearchParams(location.search);
+      return ['x','z','zoom'].every(key=>params.has(key))?['x','z','zoom'].map(key=>Number(params.get(key))):null;
+    });
+    if(framing) {
+      const box=await page.locator('#flowMap').boundingBox();
+      const point=await page.evaluate(point=>LevelFlow.ToScreen(point),framing.slice(0,2));
+      await page.mouse.move(box.x+point[0],box.y+point[1]);await page.mouse.down();
+      await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.up();
+      const scale=await page.evaluate(()=>LevelFlow.Inspect().view.scale);
+      await page.mouse.wheel(0,-Math.log(framing[2]/scale)*1000);
+      await page.evaluate(()=>new Promise(requestAnimationFrame));
+    }
+  }
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
+  assert.equal(defaults.count,2);
+  assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
+  assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
+  assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
+  await page.evaluate(()=>LevelFlow.Seek(600));
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views)).map(view=>view.freeCamera),defaults.views.map(view=>view.freeCamera),'scrubbing preserves both manually controlled Scene cameras');
+  await page.evaluate(()=>LevelFlow.Seek(384));
+  const skyPixels=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain:{heightAt:()=>0,roots:[]}},'scene');
+    view.freeCamera={eye:[0,1.6,0],yaw:0,pitch:0.3};view.Draw(LevelFlow.Evaluate(384),{},null);
+    const context=canvas.getContext('2d'),pixels=[20,210].map(y=>[...context.getImageData(160,y,1,1).data]);
+    canvas.remove();return pixels;
+  });
+  assert.ok(skyPixels[0][2]>skyPixels[0][0]+15&&skyPixels[0][0]<180,'the sky dome has a blue zenith');
+  assert.notDeepEqual(skyPixels[0],skyPixels[1],'the sky has an elevation gradient');
+  await page.evaluate(()=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
   assert.equal(await page.locator("h1").textContent(),"Encounter Designer");
   assert.equal(await page.title(),"Encounter Designer · 血战滕县");
   await page.evaluate(()=>LevelFlow.Seek(165));
@@ -66,7 +102,7 @@ try {
   const independentAfter=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
   assert.deepEqual(independentAfter[0],independentBefore[0],"zooming viewport 2 leaves viewport 1 unchanged");
   assert.notEqual(independentAfter[1].scale,independentBefore[1].scale);
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await ReadyPlan();
   for(const menu of await page.locator('.lfViewPane:visible .lfViewLayers').all()) {
     await menu.locator('summary').click();
     for(const input of await menu.locator('input').all()) await input.uncheck();
@@ -84,7 +120,7 @@ try {
   });
   assert.ok(junctionPixels.every(pixel=>pixel[0]>170&&pixel[1]>150&&pixel[2]>120),"the branch T-junction has a continuous floor, with no overpainted bank cap");
   await page.screenshot({path:path.join(out,'JunctionConnectivity.png')});
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await ReadyPlan();
   for(const beat of FLOW_TIMELINE) {
     await page.evaluate((time)=>window.LevelFlow.Seek(time),beat.start+beat.duration*0.5);
     assert.equal(await page.locator("#beatTitle").textContent(),beat.title);
@@ -117,7 +153,7 @@ try {
   await page.mouse.move(mapBox.x+destination[0],mapBox.y+destination[1],{steps:8});await page.mouse.up();
   const moved=(await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="RearPursuit").area.center;
   assert.ok(Math.abs(moved[0]-23)<0.1&&Math.abs(moved[1]-35)<0.1,"dragging region handles changes the actual spawn configuration");
-  await page.reload();await page.waitForFunction(()=>window.LevelFlow);
+  await page.reload();await ReadyPlan();
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8,"draft survives reload");
   await page.evaluate(()=>window.LevelFlow.Seek(384));
   assert.equal(await page.locator('#exportProject,#importProject,#importFile,#planningSection,[data-tab="notes"]').count(),0);
@@ -205,7 +241,7 @@ try {
   await page.setViewportSize({width:1024,height:720});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.setViewportSize({width:1280,height:720});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=652.25&x=86.50&z=258.85&zoom=12`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await ReadyPlan();
   const groundFrame=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(groundFrame.time,652.25);
   assert.ok(groundFrame.actors.filter(actor=>actor.kind==='tank').every(actor=>actor.p[0]>100));
@@ -224,7 +260,7 @@ try {
   await page.screenshot({path:path.join(out,'GroundTankOblique652.png')});
   await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=73&z=115&zoom=5.5`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await ReadyPlan();
   const early=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(early.actors.some(actor=>actor.kind==='tank'),'vehicle threat is present during dragging before collection');
   await page.screenshot({path:path.join(out,'EarlyGroundEncounter.png')});
@@ -244,11 +280,18 @@ try {
   await page.screenshot({path:path.join(out,'Timeline301.png')});
 
   await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
+  await page.evaluate(async()=>{
+    const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
+    const original=FlowMapView.prototype.Draw;
+    window.inactiveViewDraws=0;
+    FlowMapView.prototype.Draw=function(...args) {if(this.canvas.id==='flowMap') inactiveViewDraws++;return original.apply(this,args);};
+  });
   const firstView=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0]);
   const sceneBox=await page.locator('#flowMap2').boundingBox(),mouseX=sceneBox.x+sceneBox.width/2,mouseY=sceneBox.y+sceneBox.height/2;
   await page.mouse.move(mouseX,mouseY);await page.mouse.down({button:'right'});await page.mouse.move(mouseX+35,mouseY+12,{steps:4});
   const beforeFly=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
   assert.equal(beforeFly.type,'scene');assert.ok(beforeFly.freeCamera);assert.equal(beforeFly.far,1500);
+  await page.waitForFunction(()=>LevelFlow.Inspect().rendering[1].renderScale<1);
   await page.keyboard.down('w');
   await page.waitForFunction((eye)=>Math.hypot(...LevelFlow.Inspect().viewports.views[1].freeCamera.eye.map((value,index)=>value-eye[index]))>0.5,beforeFly.freeCamera.eye);
   await page.keyboard.up('w');await page.keyboard.down('e');
@@ -256,6 +299,8 @@ try {
   await page.waitForFunction((height)=>LevelFlow.Inspect().viewports.views[1].freeCamera.eye[1]>height+0.3,beforeUp);
   await page.keyboard.up('e');await page.mouse.up({button:'right'});
   const stopped=await page.evaluate(()=>LevelFlow.Inspect());await page.waitForTimeout(200);
+  await page.waitForFunction(()=>LevelFlow.Inspect().rendering[1].renderScale===1);
+  assert.equal(await page.evaluate(()=>inactiveViewDraws),0,'navigating the paused right Scene leaves the unchanged left canvas cached');
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).viewports.views[1],stopped.viewports.views[1],"releasing RMB stops movement while playback is paused");
   assert.equal(stopped.time,384);assert.equal(stopped.playing,false);
   assert.deepEqual(stopped.viewports.views[0],firstView,"Scene navigation leaves the other viewport unchanged");
@@ -303,6 +348,18 @@ try {
     data.objects=[-400,400].map(z=>({id:`Overview${z}`,pos:[0,5,z],size:[80,10,80],material:'Whitebox/Plaster'}));
     overview.BeforeDraw(frame);overview.DrawBase(context,640,360,frame);
     result.overviewDepths=[-400,400].map(z=>{const point=overview.Vertex([0,5,z]);return overview.raster.depth[Math.round(point.y)*640+Math.round(point.x)];});
+    data.objects=[{id:'BoxInterior',pos:[0,1.5,0],size:[4,3,2],material:'Whitebox/Plaster'}];
+    result.boxDepths=[];
+    for(const [eye,yaw,pitch,point] of [
+      [[0,1,0],0,0,[0,1,1]],
+      [[0,-2,0],0,1.54,[0,3,0]],
+      [[0,6,0],0,-1.54,[0,3,0]],
+      [[8,1.5,0],-Math.PI/2,0,[2,1.5,0]],
+    ]) {
+      view.freeCamera={eye,yaw,pitch};view.BeforeDraw(frame);view.DrawBase(context,640,360,frame);
+      const projected=view.Vertex(point);
+      result.boxDepths.push(view.raster.depth[Math.round(projected.y)*640+Math.round(projected.x)]);
+    }
     canvas.remove();return result;
   });
   const visible=depth.actors.find(actor=>actor.id==='visible'),hidden=depth.actors.find(actor=>actor.id==='hidden'),partial=depth.actors.find(actor=>actor.id==='partial');
@@ -313,6 +370,7 @@ try {
   for(let channel=0;channel<3;channel++) assert.ok(Math.abs(depth.throughWall[channel]-(depth.background[channel]*0.8+[39,109,130][channel]*0.2))<3,"hidden body strokes blend at 20 percent opacity");
   assert.ok(depth.farDepth>1000&&depth.farDepth<1500&&!depth.beyondFarVisible,"the 1500 m far plane renders distant geometry and clips beyond its range");
   assert.ok(depth.overviewDepths.every(value=>Number.isFinite(value)&&value>0&&value<1500),"zoomed-out oblique view retains geometry 400 m on both sides of the center");
+  assert.ok(depth.boxDepths.every((value,index)=>Math.abs(value-[1,5,3,6][index])<0.1),'box face culling preserves interior walls, open-bottom undersides, tops and exterior walls');
   const terrainWork=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
@@ -333,7 +391,7 @@ try {
   await page.evaluate(()=>LevelFlow.JumpBeat('06g'));await page.screenshot({path:path.join(out,'CartLane.png')});
   await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=227.14&x=45&z=65&zoom=9`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await ReadyPlan();
   assert.equal(await page.locator('#planningSection').count(),0);
   await page.evaluate(()=>LevelFlow.Seek(186.63));
   const deployed=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'));

@@ -2,6 +2,7 @@ import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEn
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
 function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
@@ -11,6 +12,19 @@ export class FlowPerspectiveView extends FlowMapView {
     super(canvas,mapData);
     this.type=type;this.yaw=type==="oblique"?-0.45:0;this.pitch=0.67;this.target="player";this.scale=10;
     this.far=1500;this.raster=new EncounterRaster();this.occlusion=new Map();this.freeCamera=null;
+    this.renderScale=1;this.adaptiveScale=FLOW_RENDERING.navigation.initialScale;
+    this.boxGeometry=new WeakMap();
+  }
+  Draw(...args) {
+    const start=performance.now();this.frameDrawing=true;
+    try {super.Draw(...args);} finally {this.frameDrawing=false;}
+    this.drawMs=performance.now()-start;
+    if(this.navigationActive) {
+      const tuning=FLOW_RENDERING.navigation;
+      if(this.drawMs>tuning.targetMs*1.15) this.adaptiveScale=Math.max(tuning.minScale,this.renderScale*0.9);
+      else if(this.drawMs<tuning.targetMs*0.65) this.adaptiveScale=Math.min(tuning.maxScale,this.renderScale*1.08);
+      this.renderScale=this.adaptiveScale;
+    }
   }
   Ground(point) {return this.mapData.terrain.heightAt(point[0],point[1]);}
   BeforeDraw(frame) {
@@ -48,7 +62,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.fov=this.type==="eye"?Clamp(105-this.scale*4,36,90):65;
     this.focal=this.width/(2*Math.tan(this.fov*Math.PI/360));
     const vehicles=frame.actors.filter(actor=>["tank","cart"].includes(actor.kind)).map(actor=>[actor.p,actor.heading,actor.turret,actor.pose]);
-    this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.far,vehicles]);
+    this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.far,this.renderScale,vehicles]);
   }
   Fit(bounds,padding=35) {this.freeCamera=null;super.Fit(bounds,padding);this.scale=Clamp(this.scale,3,12);}
   Follow(frame) {
@@ -74,7 +88,8 @@ export class FlowPerspectiveView extends FlowMapView {
   Project(point) {const vertex=this.Vertex(point);return vertex.depth<0.15?[-100000,-100000]:[vertex.x,vertex.y];}
   ToScreen(point) {return this.Project([point[0],this.Ground(point),point[1]]);}
   ToWorld(point) {
-    const depth=this.raster.depth?.[Math.round(point[1])*this.raster.width+Math.round(point[0])];
+    const rasterScale=this.raster.coordinateScale||1;
+    const depth=this.raster.depth?.[Math.round(point[1]*rasterScale)*this.raster.width+Math.round(point[0]*rasterScale)];
     if(Number.isFinite(depth)) {
       const orthographic=this.type==="oblique"&&!this.freeCamera;
       const x=orthographic?(point[0]-this.width/2)/this.scale:(point[0]-this.width/2)/this.focal*depth;
@@ -105,15 +120,23 @@ export class FlowPerspectiveView extends FlowMapView {
   NorthDirection() {return [-this.right[2],this.forward[2]];}
   DrawScale(context,width,height) {Label(context,`远裁剪 ${this.far} m`,18,height-31,"#655e4b",10);}
   FaceVertices(points, vertexColors = null) {
-    if(this.type==="oblique"&&!this.freeCamera) return points.map((point, index) => {
-      const vertex = this.Vertex(point);
+    const orthographic=this.type==="oblique"&&!this.freeCamera;
+    const projected=points.map((point,index)=>{
+      let vertex;
+      if(orthographic) vertex=this.Vertex(point);
+      else {
+        const camera=this.CameraPoint(point);
+        vertex={x:this.width/2+camera[0]*this.focal/camera[2],y:this.height*0.49-camera[1]*this.focal/camera[2],depth:camera[2]};
+      }
       if (vertexColors) vertex.rgb = vertexColors[index];
       return vertex;
     });
+    if(orthographic||projected.every(vertex=>vertex.depth>=0.15&&vertex.depth<=this.far)) return projected;
     let polygon=points.map((point, index) => {
       const camera = this.CameraPoint(point);
       return vertexColors ? [...camera, ...vertexColors[index]] : camera;
     });
+    if(polygon.some(point=>point[2]<0.15||point[2]>this.far)) {
     for(const [edge,sign] of [[0.15,1],[this.far,-1]]) {
       if(polygon.every(point=>(point[2]-edge)*sign>=0)) continue;
       if(polygon.every(point=>(point[2]-edge)*sign<0)) return [];
@@ -125,12 +148,15 @@ export class FlowPerspectiveView extends FlowMapView {
       }
       polygon=clipped;if(polygon.length<3) return [];
     }
+    }
     return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2],
       ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
   DrawBase(context,width,height,frame) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
-    this.raster.Begin(width,height,perspective);
+    const renderScale=this.renderScale;
+    DrawEncounterSky(context,width,height,this);
+    this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     const horizontal=width/(2*this.focal),top=height*0.49/this.focal,bottom=height*0.51/this.focal;
     const horizontalNormal=Math.hypot(1,horizontal),topNormal=Math.hypot(1,top),bottomNormal=Math.hypot(1,bottom);
     const SphereInView=(camera,radius)=>{
@@ -140,13 +166,17 @@ export class FlowPerspectiveView extends FlowMapView {
       const x=width/2+camera[0]*this.scale,y=height*0.57-camera[1]*this.scale,extent=radius*this.scale;
       return x+extent>=0&&x-extent<=width&&y+extent>=0&&y-extent<=height;
     };
-    const Face=(points,color)=>{const vertices=this.FaceVertices(points);if(vertices.length>=3) this.raster.Face(vertices,color);};
+    const Face=(points,color,vertexColors=null)=>{
+      const vertices=this.FaceVertices(points,vertexColors);
+      if(renderScale!==1) for(const vertex of vertices) {vertex.x*=renderScale;vertex.y*=renderScale;}
+      if(vertices.length>=3) this.raster.Face(vertices,color);
+    };
     const Visit=(cell)=>{
       const heightRange=cell.maxHeight-cell.minHeight;
       const cx=cell.x+cell.size/2,cz=cell.z+cell.size/2,cy=(cell.minHeight+cell.maxHeight)/2,radius=Math.hypot(cell.size/Math.SQRT2,heightRange/2);
       const camera=this.CameraPoint([cx,cy,cz]);
       if(!SphereInView(camera,radius)) return;
-      const projectionScale=perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale;
+      const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
       // Corridor color transitions need detail even where the floor is flat.
       // Shared edge vertices keep both height and shading continuous across LODs.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
@@ -155,21 +185,50 @@ export class FlowPerspectiveView extends FlowMapView {
         return;
       }
       for(const triangle of this.mapData.terrain.facesForCell(cell)) {
-        const vertices = this.FaceVertices(triangle.points, triangle.vertexColors);
-        if (vertices.length >= 3) this.raster.Face(vertices, triangle.color);
+        Face(triangle.points,triangle.color,triangle.vertexColors);
       }
     };
-    for(const root of this.mapData.terrain.roots) Visit(root);
-    this.terrainTriangles=this.raster.triangles;
-    const coverBoxes=[];
-    const Box=(x,z,w,d,h,color,y,yaw=0,cover=false)=>{
-      const Point=(dx,dy,dz)=>[x+dx*Math.cos(yaw)+dz*Math.sin(yaw),y+dy,z-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
-      const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)],top=bottom.map(point=>[point[0],point[1]+h,point[2]]);
-      for(let index=0;index<4;index++) Face([bottom[index],bottom[(index+1)%4],top[(index+1)%4],top[index]],color);
-      Face(top,cover?FLOW_COVER_COLORS.top:color);
+    let coverBoxes=[];
+    const Box=(x,z,w,d,h,color,y,yaw=0,cover=false,owner=null)=>{
+      let geometry=owner&&this.boxGeometry.get(owner);
+      if(!geometry||geometry.x!==x||geometry.z!==z||geometry.w!==w||geometry.d!==d||geometry.h!==h||geometry.y!==y||geometry.yaw!==yaw) {
+        const cosine=Math.cos(yaw),sine=Math.sin(yaw);
+        const Point=(dx,dy,dz)=>[x+dx*cosine+dz*sine,y+dy,z-dx*sine+dz*cosine];
+        const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)];
+        const top=bottom.map(point=>[point[0],point[1]+h,point[2]]);
+        geometry={x,z,w,d,h,y,yaw,cosine,sine,bottom,top,points:[...bottom,...top],faces:[[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7],[4,5,6,7]]};
+        if(owner) this.boxGeometry.set(owner,geometry);
+      }
+      const {cosine,sine,bottom,top}=geometry,projected=new Array(8);
+      const BoxFace=(indices,faceColor)=>{
+        const vertices=indices.map(index=>{
+          if(!projected[index]) {
+            const vertex=this.Vertex(geometry.points[index]);
+            vertex.x*=renderScale;vertex.y*=renderScale;projected[index]=vertex;
+          }
+          return projected[index];
+        });
+        if(perspective&&vertices.some(vertex=>vertex.depth<0.15||vertex.depth>this.far)) Face(indices.map(index=>geometry.points[index]),faceColor);
+        else this.raster.Face(vertices,faceColor);
+      };
+      const dx=this.eye[0]-x,dz=this.eye[2]-z,localX=dx*cosine-dz*sine,localZ=dx*sine+dz*cosine;
+      const outside=this.eye[1]>=y&&(this.eye[1]>=y+h||Math.abs(localX)>w/2||Math.abs(localZ)>d/2);
+      const visibleSides=[localZ<-d/2,localX>w/2,localZ>d/2,localX<-w/2];
+      for(let index=0;index<4;index++) if(!outside||visibleSides[index]) BoxFace(geometry.faces[index],color);
+      if(!outside||this.eye[1]>=y+h) BoxFace(geometry.faces[4],cover?FLOW_COVER_COLORS.top:color);
       if(cover) coverBoxes.push({bottom,top});
     };
     const signals=EncounterSignals(frame);
+    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,[...signals]]);
+    const cacheStatic=this.frameDrawing&&!this.navigationActive;
+    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
+    if(cached) {
+      this.raster.image.data.set(this.staticImage);this.raster.depth.set(this.staticDepth);
+      this.terrainTriangles=this.staticTerrainTriangles;this.raster.triangles=this.staticTriangles;
+      coverBoxes=this.staticCoverBoxes;
+    } else {
+    for(const root of this.mapData.terrain.roots) Visit(root);
+    this.terrainTriangles=this.raster.triangles;
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
@@ -177,9 +236,18 @@ export class FlowPerspectiveView extends FlowMapView {
       const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y-h/2:this.Ground([x,z]);
       const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
       if(!SphereInView(camera,radius)) continue;
-      if(perspective&&Math.max(w,h,d)*this.focal/Math.max(1,camera[2])<0.7) continue;
+      if(perspective&&Math.max(w,h,d)*this.focal*renderScale/Math.max(1,camera[2])<0.7) continue;
       const cover=IsEncounterCover(object);
-      Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover);
+      Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover,object);
+    }
+    if(cacheStatic) {
+      if(this.staticImage?.length!==this.raster.image.data.length) {
+        this.staticImage=new Uint8ClampedArray(this.raster.image.data.length);this.staticDepth=new Float32Array(this.raster.depth.length);
+      }
+      this.staticImage.set(this.raster.image.data);this.staticDepth.set(this.raster.depth);
+      this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;
+      this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
+    }
     }
     for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind))) {
       const [x,z]=actor.p,ground=this.Ground(actor.p),yaw=-(actor.heading||0);
@@ -301,5 +369,5 @@ export class FlowPerspectiveView extends FlowMapView {
     const vertices=this.FaceVertices([a,b,b]);
     if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],"#c47b34",1.2,{visible:0,hidden:0},0);
   }
-  Diagnostics() {return {terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
+  Diagnostics() {return {renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
 }
