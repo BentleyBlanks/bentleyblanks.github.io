@@ -21,6 +21,21 @@ export const FLOW_STAGES = [
   { id: "10", title: "守路口，撤出庄子", status: "草稿", bounds: [87, 245, 430, 555] },
 ];
 
+// User-directed opening blocking. Counts, speeds and routes are preview values.
+export const FLOW_OPENING = {
+  retreatCount: 12, retreatSpeed: 2.5, departureInterval: 0.35,
+  retreatRoute: [[63,64.5],[60,65.6],[46,65.6],[30,66.8],[23.5,67.2],[26,75],[30,86],[32.5,101],[35,114],[35,129]],
+  gunSpeed: 3, gunInterval: 0.5,
+  gunRoute: [[63,64.5],[60,65.6],[46,65.6],[30,66.8],[23.5,67.2],[22,66],[12,44],[13,21],[0,11],[0,0],[0,-7]],
+  enemySpeed: 3,
+  enemyRoutes: [
+    [[74,23],[72,36],[65,49],[59,57]],
+    [[92,26],[87,40],[77,50],[62,55.5],[61,60.5],[60,65.6]],
+    [[109,39],[104,53],[91,64],[76,70],[64,70],[60,65.6]],
+  ],
+  enemyPositions: [[54.5,61.4],[57.5,61.2],[59,65],[59.8,64],[56,65],[51,65.3],[45,66],[42,66],[39,66]],
+};
+
 // Authored encounter staging. Heights are relative to the planning trench floor.
 // These placements and timings are creative blocking for the design tool.
 export const FLOW_GROUND = {
@@ -100,15 +115,15 @@ export const FLOW_BEATS = [
   { id: "01b", stage: "01", duration: 9, title: "传令兵报信", p: [[66.5,64.5]], pose: "look",
     passage: "传令兵撞进洞口：「东边漏了！鬼子顺沟摸进来了！连长喊往后沟撤！」", task: "听撤退命令", threat: "东边缺口 → 支沟", gate: "传令兵进洞口", exit: "撤退命令说完" },
   { id: "01c", stage: "01", duration: 10, title: "幺娃去机枪坑，班长先撤", p: [[66.5,64.5]], pose: "look",
-    passage: "幺娃钻出去。班长带着一半人钻出洞往后沟去，玩家看着他们走。", task: "留在洞内", threat: "东面清沟", gate: "收到命令", exit: "洞里只剩顺子和冬瓜" },
+    passage: "幺娃跟传令兵、机枪手和副手一起去机枪坑。班长带刘文财、何有田和其他士兵沿撤退路线往后沟走。", task: "留在洞内", threat: "东面清沟", gate: "收到命令", exit: "洞里只剩顺子和冬瓜", planning: "幺娃随传令兵、机枪手和副手成队去西边机枪坑。班长一队共十二人沿支沟向西，经支沟口转向南面的后沟，继续沿后续拖冬瓜的撤退路线离开。人数与速度为预演布设。" },
   { id: "01d", stage: "01", duration: 10, title: "把短褂塞进背包", p: [[66.5,64.5]], pose: "pack",
     passage: "任务字：收拾背包。玩家按键，顺子把一件老百姓的短褂塞进包里。", task: "收拾背包", threat: "炮声逼近", gate: "按键收拾背包", exit: "短褂已装进包" },
   { id: "01e", stage: "01", duration: 3, title: "洞口塌下", p: [[66.5,64.5],[63,64.5]], pose: "down",
     passage: "冬瓜：「趴下——！」洞口塌了。黑场。", task: "趴下", threat: "塌洞冲击", gate: "收拾背包完成", exit: "黑场接被俘", fx: "collapse" },
   { id: "02a", stage: "02", duration: 24, title: "被按在沟底", p: [[63,64.5],[61.8,65.6]], pose: "kneel",
-    passage: "顺子被拖出洞，按着跪在沟底，冬瓜在左边一步远。玩家只能转头。北沿上一挺机枪朝后沟打。", task: "只能转头", threat: "北沿机枪 → 后沟；西边捷克式对射", gate: "被拖出洞", exit: "翻译开始审问", fire: "crossfire" },
+    passage: "顺子被拖出洞，按着跪在沟底，冬瓜在左边一步远。玩家只能转头。北沿上一挺机枪朝后沟打。", task: "只能转头", threat: "北沿机枪 → 后沟；西边捷克式对射", gate: "被拖出洞", exit: "翻译开始审问", fire: "crossfire", planning: "九个日军从前一拍起持续进场，按标注分三路从北面、东北面与东面绕来。机枪组登上北沿，其余从门外坡道和东侧沟沿下到支沟，陆续展开。班长一队仍沿后沟撤退。" },
   { id: "02b", stage: "02", duration: 22, title: "冬瓜引开注意，挨刺刀", p: [[61.8,65.6]], pose: "kneel",
-    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，话断成一声呜咽。", task: "看冬瓜和南沿", threat: "近身刺刀；南沿藏着援兵", gate: "审问持续", exit: "丁转向玩家", fire: "crossfire" },
+    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，话断成一声呜咽。", task: "看冬瓜和南沿", threat: "近身刺刀；南沿藏着援兵", gate: "审问持续", exit: "丁转向玩家", fire: "crossfire", planning: "冬瓜在炮火中喊骂，撤退途中的班长一队闻声停下、折返，沿来路回到支沟口，再借南沿土垄掩护接近。到喊声开始才回头，随后集结投弹救人。" },
   { id: "02c", stage: "02", duration: 10, title: "西边的枪停了", p: [[61.8,65.6]], pose: "kneel",
     passage: "西边的捷克式打着打着停了，没有再响。", task: "辨认西面的变化", threat: "西边机枪坑失守", gate: "冬瓜受伤", exit: "只剩后沟枪声", fire: "north" },
   { id: "02d", stage: "02", duration: 9, title: "刀尖对着脸", p: [[61.8,65.6]], pose: "kneel",

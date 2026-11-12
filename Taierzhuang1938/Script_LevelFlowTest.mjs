@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -250,6 +250,51 @@ for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) f
 }
 assert.ok([...terrainEdges.values()].every(edge=>edge.count===(edge.boundary?1:2)),"terrain has no open internal edges or coarse/fine T-junction cracks");
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
+// Opening regression: both friendly parties and all three hostile approaches
+// must remain continuous across beats and arbitrary backward seeks.
+const leaving = EvaluateFlow(26.14);
+const retreatIds = ["luo", "he", "liu", ...Array.from({length:9}, (_,index)=>`openingAlly${index+3}`)];
+assert.equal(leaving.actors.filter(actor=>retreatIds.includes(actor.id)).length,FLOW_OPENING.retreatCount);
+assert.ok(FLOW_OPENING.retreatCount>3);
+const gunIds = ["yao", "openingGun0", "openingGun1", "openingGun2"];
+for (const id of gunIds.slice(1)) assert.ok(Distance(ActorAt(id,26.14).p,ActorAt("yao",26.14).p)<6,"yao leaves with the messenger and gun crew");
+const pathDistance = (point,route) => Math.min(...route.slice(1).map((end,index)=>SegmentDistance(point,route[index],end)));
+for (let stamp=24;stamp<BeatById("02b").start;stamp+=0.5) {
+  for (const id of retreatIds) {
+    const actor=ActorAt(id,stamp);
+    assert.ok(pathDistance(actor.p,FLOW_OPENING.retreatRoute)<0.01,"the whole party uses the later withdrawal route");
+    assert.ok(actor.p[1]>=ActorAt(id,stamp-0.1).p[1],"the rescue party does not return before winter calls");
+  }
+}
+assert.ok(ActorAt("luo",64.5).p[1]<ActorAt("luo",64).p[1],"winter's call reverses retreat toward the branch");
+for (const [index,id] of retreatIds.entries()) {
+  const heard=BeatById("02b").start+index*0.12;
+  assert.ok(ActorAt(id,heard+0.1).p[1]<ActorAt(id,heard).p[1],"each soldier turns after hearing the call");
+}
+for (const id of retreatIds) assert.equal(ActorAt(id,107).pose,"kneel","the whole party gathers on the south berm before throwing grenades");
+assert.ok(ActorAt("luo",112).p[1]<ActorAt("luo",110).p[1],"the party jumps into the trench after the grenade blasts");
+assert.equal(EvaluateFlow(130).actors.filter(actor=>retreatIds.includes(actor.id)&&actor.pose==="dead").length,7);
+const openingIds = [...retreatIds,...gunIds,...Array.from({length:9},(_,index)=>`opening${index}`)];
+for (let stamp=0.1;stamp<161;stamp+=0.1) {
+  const before=EvaluateFlow(stamp-0.1),after=EvaluateFlow(stamp);
+  for (const id of openingIds) {
+    const previous=before.actors.find(actor=>actor.id===id),current=after.actors.find(actor=>actor.id===id);
+    if (previous&&current) assert.ok(Distance(previous.p,current.p)<0.41,`${id} moves continuously across opening beats at ${stamp}`);
+  }
+}
+const capturing=EvaluateFlow(40.05).actors.filter(actor=>/^opening\d+$/.test(actor.id));
+assert.equal(capturing.length,9);
+assert.ok(capturing.some(actor=>actor.pose==="run"),"the capture beat opens with troops still approaching");
+for (const enemy of capturing) {
+  assert.ok(enemy.born<BeatById("02a").start,"capture troops enter from the preceding scene");
+  assert.ok(Distance(ActorAt(enemy.id,enemy.born).p,[66.5,64.5])>35,"troops appear on their distant approach routes");
+  assert.ok(Distance(ActorAt(enemy.id,enemy.born+1).p,ActorAt(enemy.id,enemy.born).p)>2.9,"each approach visibly advances");
+  assert.ok(Distance(ActorAt(enemy.id,63).p,FLOW_OPENING.enemyPositions[Number(enemy.id.slice(7))])<0.01,"nine attackers reach their authored stations");
+}
+for (const stamp of [17,26.14,39.999,40.05,64,85,107,112,130,160]) {
+  const snapshot=EvaluateFlow(stamp);EvaluateFlow(0);EvaluateFlow(150);
+  assert.deepEqual(EvaluateFlow(stamp),snapshot,"opening staging survives rewind without replaying events");
+}
 const lane=L0610_LANE.line.map(point=>[point.x,point.z]);
 const south=L0610_SOUTH_LANE.line.map(point=>[point.x,point.z]);
 for(let stamp=BeatById("05a").start;stamp<BeatById("08a").end;stamp+=0.5) {

@@ -297,6 +297,26 @@ try {
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.some(actor=>actor.groupId==='TrafficFlank')));
   assert.ok((await page.locator('#planningPassage').textContent()).includes('X30、Z86'));
   await page.screenshot({path:path.join(out,'TrafficSecondRampPressure.png')});
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=26.14&x=45&z=58&zoom=6`);
+  await page.waitForFunction(()=>window.LevelFlow);
+  const opening=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(opening.actors.filter(actor=>actor.id==='yao'||actor.id.startsWith('openingGun')).length,4);
+  assert.equal(opening.actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')).length,12);
+  assert.ok((await page.locator('#planningPassage').textContent()).includes('十二人'));
+  await page.screenshot({path:path.join(out,'OpeningDeparture.png')});
+  await page.evaluate(()=>LevelFlow.Seek(40.05));
+  const approaching=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>/^opening\d+$/.test(actor.id)));
+  assert.equal(approaching.length,9);
+  assert.ok(approaching.some(actor=>actor.pose==='run'));
+  assert.ok((await page.locator('#planningPassage').textContent()).includes('三路'));
+  await page.screenshot({path:path.join(out,'OpeningEnemyApproach.png')});
+  await page.evaluate(()=>LevelFlow.Seek(85));
+  assert.ok((await page.locator('#planningPassage').textContent()).includes('闻声'));
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.p[1]<LevelFlow.Evaluate(84).actors.find(previous=>previous.id===actor.id).p[1])));
+  await page.screenshot({path:path.join(out,'OpeningReturn.png')});
+  await page.evaluate(()=>LevelFlow.Seek(107));
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.pose==='kneel')));
+  await page.screenshot({path:path.join(out,'OpeningSouthBerm.png')});
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, PNG export/import and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
