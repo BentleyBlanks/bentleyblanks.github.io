@@ -11,7 +11,7 @@ export class LevelFlowEntry {
       const info = TOOL_INFO.levelFlow.window;
       this.win = window.open(new URL(info.url, import.meta.url), info.name, info.features);
     }
-    if (!this.win) throw new Error("关卡调度窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("遭遇设计窗口被拦截，请允许弹窗后重试");
     this.win.focus();
     return this.win;
   }

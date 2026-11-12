@@ -1,0 +1,188 @@
+import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
+
+export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
+export const ENCOUNTER_BEHAVIORS = {
+  advance: "沿路线推进", suppress: "定点压制", bounds: "掩体间跃进", flank: "绕侧包抄", escort: "跟车推进", withdraw: "撤离", guard: "驻守掩护",
+};
+export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","02d","02e","02f","08f","09d","10g"];
+const Area = (center, width = 5, depth = width) => ({ shape: "rect", center: [...center], size: [width, depth] });
+
+export function CreateEncounterDocument(timeline, waves) {
+  const Find = (id) => timeline.find((beat) => beat.id === id);
+  const triggers = timeline.filter((beat) => beat.zone).map((beat) => ({
+    id: `Arrival_${beat.id}`, label: beat.title, beat: beat.id, endBeat: beat.id,
+    mode: "area", delay: 0, area: {shape:"circle",center:beat.zone.slice(0,2),size:[beat.zone[2]*2,beat.zone[2]*2]},
+  }));
+  const groups = waves.map((wave) => {
+    const beat = Find(wave.beat), end = Find(wave.until || wave.beat);
+    const triggerId = `Trigger_${wave.id}`;
+    triggers.push({id:triggerId,label:wave.label,beat:beat.id,endBeat:end.id,mode:"area",delay:0,area:Area(beat.p[0],6)});
+    return {
+      id: wave.id, label: wave.label, beat: beat.id, endBeat: end.id, triggerId, enabled: true,
+      side: "enemy", target: wave.target === "winter" ? "winter" : "player",
+      area: Area(wave.source,2.4,3), route: structuredClone(wave.route),
+      count: wave.count, interval: wave.interval, maxAlive: wave.cyclic ? 5 : wave.count,
+      lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: 2.5,
+      behavior: wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance",
+      note: wave.repeat,
+    };
+  });
+  const Add = (id,label,beat,endBeat,center,route,count,side,behavior,target,lifetime=90) => {
+    const triggerId=`Trigger_${id}`;
+    triggers.push({id:triggerId,label,beat,endBeat,mode:"time",delay:0,area:Area(Find(beat).p[0],6)});
+    groups.push({id,label,beat,endBeat,triggerId,enabled:true,side,target,area:Area(center,3,3),route,count,interval:2,maxAlive:count,lifetime,speed:2.2,behavior,note:"关卡调度布设"});
+  };
+  Add("RearPursuit","北沟追兵","03g","03h",[12,44],[[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],6,"enemy","advance","player",34);
+  const pursuit=groups.at(-1);pursuit.interval=7;pursuit.maxAlive=3;
+  Add("CrestWest","坡顶西侧接应","03g","04a",[27.5,128],[[27.5,128],[28.5,129]],2,"friend","guard","enemy",160);
+  Add("CrestEast","坡顶东侧接应","03g","04a",[43,129],[[43,129],[43,129]],2,"friend","guard","enemy",160);
+  Add("VillageGun","北屋枪眼机枪组","08a","09i",[100,471.5],[[100,471.5]],3,"enemy","suppress","ramp",700);
+  Add("VillageRifles","北屋与墙角守军","08a","09i",[104,471],[[104,471]],4,"enemy","guard","ramp",700);
+  Add("SearchYard","街坊家搜人组","09a","09d",[74,459],[[74,459]],4,"enemy","guard","none",300);
+  Add("SearchNeighbor","隔壁搜人组","09a","09d",[61,448],[[61,448]],2,"enemy","guard","none",300);
+  Add("GateGuard","门房守卫","09e","09f",[73,465.5],[[73,465.5]],1,"enemy","guard","none",40);
+  Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
+  Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
+  Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-12",triggers,groups,annotations:[]};
+}
+
+function Require(condition, message) { if (!condition) throw new Error(message); }
+function CheckPoint(point) { return Array.isArray(point) && point.length === 2 && point.every((value) => Number.isFinite(value) && Math.abs(value) <= 10000); }
+function CheckArea(area) {
+  return area && ["circle","rect"].includes(area.shape) && CheckPoint(area.center) && CheckPoint(area.size)
+    && area.size.every((value) => value >= 0.5 && value <= 500);
+}
+
+export function ValidateEncounterDocument(input, timeline) {
+  Require(input?.schema === ENCOUNTER_SCHEMA, "文件版本不匹配");
+  Require(Array.isArray(input.triggers) && input.triggers.length <= 300, "触发区数据无效");
+  Require(Array.isArray(input.groups) && input.groups.length <= 200, "生成区数据无效");
+  Require(Array.isArray(input.annotations) && input.annotations.length <= 1000, "标注数据无效");
+  const beats = new Map(timeline.map((beat) => [beat.id,beat]));
+  const triggers = new Set();
+  const CheckIdentity = (item) => {
+    Require(typeof item.id === "string" && /^[A-Za-z0-9_-]{1,90}$/.test(item.id), "对象编号无效");
+    Require(typeof item.label === "string" && item.label.length <= 150, "对象名称过长");
+    Require(beats.has(item.beat) && beats.has(item.endBeat), "对象引用的阶段不存在");
+    Require(beats.get(item.endBeat).end > beats.get(item.beat).start, "结束阶段早于开始阶段");
+    Require(CheckArea(item.area), "区域坐标或尺寸无效");
+  };
+  for (const trigger of input.triggers) {
+    CheckIdentity(trigger);
+    Require(!triggers.has(trigger.id), "触发区编号重复");triggers.add(trigger.id);
+    Require(["area","time"].includes(trigger.mode), "触发方式无效");
+    Require(Number.isFinite(trigger.delay) && trigger.delay >= 0 && trigger.delay <= 1870, "触发延迟无效");
+  }
+  const groupIds = new Set();
+  for (const group of input.groups) {
+    CheckIdentity(group);
+    Require(!groupIds.has(group.id), "生成区编号重复");groupIds.add(group.id);
+    Require(triggers.has(group.triggerId), "生成区关联的触发区不存在");
+    Require(["friend","enemy"].includes(group.side) && ["player","winter","enemy","ramp","none"].includes(group.target), "阵营或目标无效");
+    Require(typeof group.enabled === "boolean" && Object.hasOwn(ENCOUNTER_BEHAVIORS,group.behavior), "行为配置无效");
+    Require(Array.isArray(group.route) && group.route.length>0 && group.route.length<=100 && group.route.every(CheckPoint), "推进路线无效");
+    Require(Number.isInteger(group.count) && group.count>=0 && group.count<=100, "数量须在 0–100 内");
+    Require(Number.isInteger(group.maxAlive) && group.maxAlive>=1 && group.maxAlive<=40, "同时在场须在 1–40 内");
+    Require(Number.isFinite(group.interval) && group.interval>=0 && group.interval<=300, "补充间隔无效");
+    Require(Number.isFinite(group.lifetime) && group.lifetime>=2 && group.lifetime<=2000, "存续时长无效");
+    Require(Number.isFinite(group.speed) && group.speed>=0.1 && group.speed<=8, "移动速度无效");
+  }
+  const annotationIds=new Set();
+  for(const annotation of input.annotations) {
+    Require(typeof annotation.id==="string" && !annotationIds.has(annotation.id),"标注编号重复");annotationIds.add(annotation.id);
+    Require(["arrow","rect","text"].includes(annotation.kind),"标注类型无效");
+    Require(Number.isFinite(annotation.time) && annotation.time>=0 && annotation.time<=timeline.at(-1).end,"标注时间无效");
+    Require(CheckPoint(annotation.a) && CheckPoint(annotation.b),"标注坐标无效");
+    Require(typeof annotation.text==="string" && annotation.text.length<=500,"标注文字过长");
+    if(annotation.view) Require(CheckPoint(annotation.view.center)&&Number.isFinite(annotation.view.scale)&&annotation.view.scale>=0.1&&annotation.view.scale<=80,"标注视图无效");
+  }
+  return structuredClone(input);
+}
+
+function PlayerRoute(timeline) {
+  return timeline.flatMap((beat) => {
+    const lengths=beat.p.slice(1).map((point,index)=>Distance(beat.p[index],point));
+    const total=lengths.reduce((sum,value)=>sum+value,0);
+    if(total===0) return [[beat.start,...beat.p[0]],[beat.end,...beat.p[0]]];
+    let walked=0;
+    return beat.p.map((point,index)=>{
+      if(index) walked+=lengths[index-1];
+      return [beat.start+beat.duration*(beat.pace?.[index]??walked/total),...point];
+    });
+  });
+}
+
+export function CompileEncounters(document, timeline) {
+  const beats=new Map(timeline.map((beat)=>[beat.id,beat])), route=PlayerRoute(timeline);
+  const triggers=document.triggers.map((trigger)=>{
+    const start=beats.get(trigger.beat).start+trigger.delay,end=beats.get(trigger.endBeat).end;
+    let firedAt=trigger.mode === "time" && start<=end ? start : null;
+    if(trigger.mode === "area") for(let index=1;index<route.length;index++) {
+      const previous=route[index-1],next=route[index];
+      const from=Math.max(start,previous[0]),to=Math.min(end,next[0]);
+      if(to<from || next[0]<=previous[0]) continue;
+      const a=SampleRoute([previous.slice(1),next.slice(1)],(from-previous[0])/(next[0]-previous[0]));
+      const b=SampleRoute([previous.slice(1),next.slice(1)],(to-previous[0])/(next[0]-previous[0]));
+      const entered=EnterArea(a,b,trigger.area);
+      if(entered!==null) {firedAt=Lerp(from,to,entered);break;}
+    }
+    return {...trigger,start,end,firedAt};
+  });
+  const groups=document.groups.map((group)=>{
+    const trigger=triggers.find((item)=>item.id===group.triggerId);
+    const start=trigger.firedAt,end=beats.get(group.endBeat).end;
+    const lives=[];
+    if(start!==null && group.enabled) for(let index=0;index<group.count;index++) {
+      const slot=lives[index-group.maxAlive];
+      const born=Math.max(start+index*group.interval,slot?.fall??start);
+      if(born>=end) break;
+      lives.push({born,fall:born+group.lifetime});
+    }
+    return {...group,start,end,lives};
+  });
+  return {triggers,groups};
+}
+
+export function SampleEncounters(plan,time,coreActors) {
+  const actors=[],effects=[];
+  const player=coreActors.find((actor)=>actor.id==="player");
+  for(const group of plan.groups) {
+    if(group.start===null || !group.enabled || time<group.start || time>group.end+8) continue;
+    const path=[group.area.center,...group.route.slice(1)];
+    const total=path.slice(1).reduce((sum,point,index)=>sum+Distance(path[index],point),0);
+    for(let index=0;index<group.lives.length;index++) {
+      const life=group.lives[index];
+      if(time<life.born || time>life.fall+8) continue;
+      const age=Math.max(0,Math.min(time,life.fall)-life.born);
+      const movingTime=group.behavior==="bounds" ? Math.floor(age/7)*3+Math.min(3,age%7) : age;
+      const stationary=["suppress","guard"].includes(group.behavior);
+      let position=SampleRoute(path,stationary?0:total?movingTime*group.speed/total:0);
+      const slots=Math.min(group.count,group.maxAlive),slot=index%group.maxAlive;
+      const columns=Math.ceil(Math.sqrt(slots)),rows=Math.ceil(slots/columns);
+      const spread=group.area.shape==="circle"
+        ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
+        : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
+      position=[position[0]+spread[0],position[1]+spread[1]];
+      if(group.behavior==="escort") {
+        const tank=coreActors.find((actor)=>actor.id==="tank1");
+        if(tank) position[1]=Math.min(position[1],tank.p[1]-3-index*0.4);
+      }
+      let pose=time>=life.fall?"dead":group.behavior==="withdraw"?"run":"shoot";
+      if(time>=group.end && pose!=="dead") {position=SampleRoute([position,group.area.center],(time-group.end)/8);pose="run";}
+      const firing=group.behavior!=="withdraw" && group.target!=="none" && pose==="shoot";
+      actors.push({id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
+        groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,firing});
+    }
+  }
+  const enemies=actors.filter((actor)=>actor.side==="enemy" && actor.pose!=="dead");
+  for(const actor of actors.filter((item)=>item.firing)) {
+    const target=actor.target==="enemy" ? enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
+      : actor.target==="ramp" ? {p:[100,384]}
+      : coreActors.find((item)=>item.id===actor.target) ?? player;
+    if(target && Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.target==="ramp"||actor.side==="friend",phase:(time*2.3+actor.p[0])%1});
+  }
+  return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),
+    groups:plan.groups.map((group)=>({...group,spawned:group.lives.filter((life)=>time>=life.born).length,
+      live:group.lives.filter((life)=>time>=life.born&&time<Math.min(life.fall,group.end)).length}))};
+}

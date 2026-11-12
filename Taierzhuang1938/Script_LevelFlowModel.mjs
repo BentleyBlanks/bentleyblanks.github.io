@@ -1,9 +1,8 @@
 import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES } from "./Data_LevelFlow.mjs";
 
-export const Clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-export const Lerp = (a, b, amount) => a + (b - a) * amount;
-export const Distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-export const Smooth = (value) => { const t = Clamp(value, 0, 1); return t * t * (3 - 2 * t); };
+import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
+import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
+export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
 export const FLOW_TIMELINE = FLOW_BEATS.map((beat) => {
@@ -17,20 +16,6 @@ export const STAGE_TIMELINE = FLOW_STAGES.map((stage) => {
   const beats = FLOW_TIMELINE.filter((beat) => beat.stage === stage.id);
   return { ...stage, start: beats[0].start, end: beats.at(-1).end, beats };
 });
-
-export function SampleRoute(points, progress) {
-  if (points.length === 1) return [...points[0]];
-  const lengths = points.slice(1).map((point, index) => Distance(points[index], point));
-  let remaining = Clamp(progress, 0, 1) * lengths.reduce((sum, length) => sum + length, 0);
-  for (let index = 0; index < lengths.length; index++) {
-    if (remaining <= lengths[index] || index === lengths.length - 1) {
-      const t = lengths[index] ? Clamp(remaining / lengths[index], 0, 1) : 0;
-      return points[index].map((coordinate, axis) => Lerp(coordinate, points[index + 1][axis], t));
-    }
-    remaining -= lengths[index];
-  }
-  return [...points.at(-1)];
-}
 
 function Track(points, time) {
   if (time <= points[0][0]) return points[0].slice(1);
@@ -53,8 +38,8 @@ const winterKeys = Keys([
   ["01a",0,67.8,64], ["01e",1,62,64], ["02a",1,61.8,64], ["02i",1,62.2,64.6],
   ["03a",1,47.2,65.6], ["03b",1,47.2,65.6], ["03c",1,31.2,66.8],
   ["03e",1,31.2,66.8], ["03f",1,24.7,67.2], ["03g",1,24.7,67.2],
-  ["03h",0.1,26,75], ["03h",0.25,30,84], ["03h",0.42,32.5,99],
-  ["03h",0.62,35,114], ["03h",0.86,35,129], ["03h",1,35,140],
+  ["03h",0.1,26,75], ["03h",0.22,30,84], ["03h",0.32,30,84], ["03h",0.5,32.5,99], ["03h",0.6,32.5,99],
+  ["03h",0.68,35,114], ["03h",0.86,35,129], ["03h",1,35,140],
   ["04a",1,48,150], ["04b",1,48,150], ["04c",1,48,150],
   ["04d",1,60,157], ["05a",0.2,72,158.6], ["05a",0.45,83,163],
   ["05a",0.7,83,178], ["05a",1,80,201], ["05b",1,84.5,216], ["05c",1,86.5,227],
@@ -64,8 +49,8 @@ const winterKeys = Keys([
   ["07a",1,95,328], ["07b",1,97,338], ["07c",1,100,352],
   ["08a",1,115,380], ["09j",1,115,380],
   ["10a",1,109,380], ["10b",1,100,430], ["10c",1,100,462],
-  ["10d",0.25,111,465], ["10d",0.6,111,493], ["10d",1,119,505],
-  ["10e",1,112,527], ["10f",1,117,545], ["10j",1,117,552],
+  ["10d",0.25,111,465], ["10d",0.6,109,493], ["10d",1,113.25,505],
+  ["10e",1,117,527], ["10f",1,117,545], ["10j",1,117,552],
 ]);
 const cartKeys = Keys([
   ["01a",0,55,155], ["04d",0,55,155], ["04d",1,64,158],
@@ -75,14 +60,18 @@ const cartKeys = Keys([
   ["06i",1,96,314], ["07a",1,95,328], ["07b",1,97,338], ["07c",1,100,352],
   ["08a",1,115,380], ["09j",1,115,380],
   ["10a",1,109,380], ["10b",1,100,430], ["10c",1,100,462],
-  ["10d",0.25,111,465], ["10d",0.6,111,493], ["10d",1,119,505],
-  ["10e",1,112,527], ["10f",1,117,545], ["10j",1,117,552],
+  ["10d",0.25,111,465], ["10d",0.6,109,493], ["10d",1,113.25,505],
+  ["10e",1,117,527], ["10f",1,117,545], ["10j",1,117,552],
 ]);
 const tankKeys = Keys([
+  ["05a",0,175,-40], ["05a",0.55,105,50],
+  ["05b",0,88,112], ["05b",1,83,161],
   ["06a",0,83,182], ["06a",1,84,215], ["06b",1,87,234], ["06c",1,88,244],
   ["06d",1,86,255], ["06e",1,88,265], ["06f",0.7,91,278], ["06i",1,91,278],
 ]);
 const secondTankKeys = Keys([
+  ["05a",0,181,-55], ["05a",0.55,111,36],
+  ["05b",0,92,98], ["05b",1,83,149],
   ["06a",0,83,170], ["06a",1,82,198], ["06b",1,84,214], ["06c",1,85,224],
   ["06d",1,88,238], ["06e",1,86,251], ["06f",1,86,253], ["06g",1,88,264],
   ["06h",1,88,264], ["06i",1,85,218],
@@ -117,9 +106,9 @@ function CoreActors(beat, time, player, progress) {
   if (atCamp) { luo = [57,150]; he = [49,152]; liu = [52,150]; yao = [50,149]; }
   if (beat.stage === "06" && ["06g","06h"].includes(beat.id)) yao = [81,278];
   if (village && beat.stage !== "10") {
-    luo = Track(Keys([["08a",0,98,348],["08a",1,102,383],["08e",1,118,388],
-      ["08f",1,122,402],["09a",1,125,423],["09b",1,123,438],["09c",1,125,448],
-      ["09i",1,123,452],["09j",1,116,465]]),time);
+    luo = Track(Keys([["08a",0,98,348],["08a",1,102,383],["08e",1,110,386.6],
+      ["08f",1,108.3,400.5],["09a",1,104.75,411.6],["09b",1,104.75,436.4],["09c",1,104.8,441.4],
+      ["09i",1,105.8,456.5],["09j",1,106.5,460.5]]),time);
     he=[luo[0]+1,luo[1]+1.2];
     yao=time<BeatById("08a").end?offset(-2,1):[100,384];
   }
@@ -133,11 +122,11 @@ function CoreActors(beat, time, player, progress) {
     let nier = [cart[0]+1.2,cart[1]+2.2];
     if(beat.id === "08g") nier=SampleRoute([[115,380],[99,380],[80,382],[80,392]],progress);
     if(beat.stage === "09") nier=offset(-0.8,1.2);
-    if(beat.id === "09h") nier=SampleRoute([[90,486],[93,487],[94,485]],progress);
-    if(beat.stage === "10" && time < BeatById("10d").end) nier=Track(Keys([["10a",0,101,478],["10b",1,108,483],["10c",1,109,465],["10d",1,119,505]]),time);
+    if(beat.id === "09h") nier=SampleRoute([[90.7,484.6],[90.7,473],[93.3,473],[94,484.6]],progress);
+    if(beat.stage === "10" && time < BeatById("10d").end) nier=Track(Keys([["10a",0,101,478],["10b",1,108,483],["10c",1,109,465],["10d",1,113.25,505]]),time);
     actors.push(Actor("nier", "妮儿", "civilian", "child", nier, "stand"));
   }
-  if (Number(beat.stage) >= 6) {
+  if (time >= BeatById("05a").start) {
     const burned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
     const tankPosition=Track(tankKeys,time);
     const turretTarget=["06g","06h"].includes(beat.id)?yao:player;
@@ -152,31 +141,11 @@ function CoreActors(beat, time, player, progress) {
     actors.push(Actor("carrier2", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]+1.7], down ? "dead" : "walk"));
   }
   if (beat.id === "06c") actors.push(Actor("veteran", "抱捆老兵", "friend", "person", SampleRoute([[94,264],[88.5,257]], Math.min(1,progress*2)), progress > 0.5 ? "dead" : "run"));
-  if(beat.stage === "08" || beat.stage === "09") {
-    const gunners=[[99.5,472],[100.5,472],[100,473.5]];
-    if(beat.id !== "09j") {
-      for(let index=0;index<gunners.length;index++) actors.push(Actor(`loophole${index}`,"枪眼机枪组","enemy","person",gunners[index],"shoot"));
-      for(let index=0;index<3;index++) actors.push(Actor(`rifle${index}`,"北屋守军","enemy","person",[96+index*4,473],"stand"));
-      actors.push(Actor("wallGuard","墙角守军","enemy","person",[111,465],"stand"));
-      if(time<BeatById("08d").start) actors.push(Actor("messenger","将去喊援的日军","enemy","person",[113,465],"stand"));
-    }
-    if(time<BeatById("09e").start) {
-      for(let index=0;index<5;index++) actors.push(Actor(`yard${index}`,index<3?"院内搜人组":"隔壁搜人组","enemy","person",[index<3?79+index*1.8:65+(index-3)*2,444],"stand"));
-    }
-    if(beat.id <= "09i") {
-      actors.push(Actor("gateGuard","门房守卫","enemy","person",[85,451],beat.id>="09g"?"dead":"stand"));
-      actors.push(Actor("kitchenGuard","灶屋守卫","enemy","person",[94,480],"stand"));
-    }
-  }
   if(beat.stage === "10") {
-    if(time<BeatById("10f").start) {
-      actors.push(Actor("templeGun","庙后机枪","enemy","person",[206,480],"shoot"));
-      actors.push(Actor("mortar","麦秸垛掷弹筒","enemy","person",[199,449],"kneel"));
-    }
     for(let index=0;index<12;index++) {
       const cross=BeatById("10a").start+32+index*13.5;
       const p=Track([[cross-110,115,380],[cross-95,100,383],[cross-12,100,458],
-        [cross,111,465],[cross+16,111,493],[cross+30,119,505],[cross+55,112,527],[cross+80,117,552]],time);
+        [cross,111,465],[cross+16,109,493],[cross+30,113.25,505],[cross+55,117,527],[cross+80,117,552]],time);
       actors.push(Actor(`stretcher${index}`,`担架 ${index+1}`,"civilian","quilt",p,"wounded"));
     }
     if(beat.id >= "10h") actors.push(Actor("platoon","负伤排长","friend","person",offset(-1,-3),"drag"));
@@ -193,7 +162,7 @@ function BuildCompanionTracks() {
     const positions=Object.fromEntries(Object.keys(tracks).map((id)=>[id,[]]));
     for(let index=0;index<=10;index++) {
       const progress=index/10;
-      const actors=CoreActors(beat,beat.start+beat.duration*progress,SampleRoute(beat.p,progress),progress);
+      const actors=CoreActors(beat,beat.start+beat.duration*progress,SampleBeatRoute(beat,progress),progress);
       for(const id of Object.keys(tracks)) {
         const actor=actors.find((entry)=>entry.id===id);
         if(actor) positions[id].push(actor.p);
@@ -220,45 +189,6 @@ function BuildCompanionTracks() {
 }
 
 companionTracks=BuildCompanionTracks();
-
-function WaveActors(time,player) {
-  const actors = [], spawns = [];
-  for (const wave of FLOW_WAVES) {
-    const beat = BeatById(wave.beat);
-    const end = wave.until ? BeatById(wave.until).end : beat.end;
-    if (time < beat.start - 12 || time > end + 8) continue;
-    spawns.push({ ...wave, time: beat.start, active: time >= beat.start && time < end });
-    for (let index = 0; index < wave.count; index++) {
-      const born = beat.start + index * wave.interval;
-      if (time < born) continue;
-      const fall = wave.cyclic ? born+44 : beat.start + Lerp(wave.lastFall * 0.35, wave.lastFall, (index + 1) / wave.count);
-      const path = wave.route.map((p) => [p[0] + (index % 3 - 1) * 0.65, p[1] - index * 0.6]);
-      const routeLength=path.slice(1).reduce((sum,point,pathIndex)=>sum+Distance(path[pathIndex],point),0);
-      const routeTime=Math.max(routeLength/3.2,Math.min(17,Math.max(5,(fall-born)*0.7)));
-      let p = SampleRoute(path, (Math.min(time, fall) - born) / routeTime);
-      if (wave.id.startsWith("Tank")) {
-        const tank = Track(tankKeys,Math.min(time,fall));
-        p[1] = Math.min(p[1],tank[1]-4-index*0.7);
-        p[0] = tank[0]+(index%2 ? -0.8 : 0.8);
-      }
-      if(time<fall && !wave.transfer && wave.id !== "GengHouse" && Distance(p,player)<4.2) {
-        const length=Math.max(0.01,Distance(wave.source,player));
-        p[0]=player[0]+(wave.source[0]-player[0])/length*4.2;
-        p[1]=player[1]+(wave.source[1]-player[1])/length*4.2;
-      }
-      const leaving=wave.transfer || (wave.id === "GengHouse" && index>=4);
-      if(leaving && time>=end-1) continue;
-      let pose=time>=fall&&!leaving ? "dead" : leaving ? "run" : "shoot";
-      if(time>=end && pose !== "dead") {
-        p=SampleRoute([p,wave.source],(time-end)/8);
-        pose="run";
-      }
-      actors.push(Actor(`${wave.id}${index}`, `${wave.label} ${index+1}`, "enemy", "person", p, pose,
-        { born, fall, target: wave.target, wave: wave.id, elevation:wave.id === "Rim"?1.8:0 }));
-    }
-  }
-  return { actors, spawns };
-}
 
 function OpeningActors(beat, time) {
   if (beat.stage !== "02") return [];
@@ -297,9 +227,6 @@ function Effects(beat, time, progress, actors) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
-  for (const enemy of targets.filter((actor)=>actor.target && actor.pose === "shoot").slice(0,4)) {
-    effects.push({ kind:"fire", a:enemy.p, b:enemy.target === "winter" ? winter.p : player.p, side:"enemy", phase:(time*2.2+enemy.p[0])%1 });
-  }
   if (beat.fire === "tank" && tank && tank.pose !== "burn") {
     const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : player.p;
     effects.push({ kind:"fire", a:tank.p, b:target, side:"enemy", heavy:true, phase:(time*5)%1 });
@@ -312,17 +239,6 @@ function Effects(beat, time, progress, actors) {
   if (["06g","06h"].includes(beat.id)) effects.push({kind:"fire",a:[81,278],b:tank.p,side:"friend",phase:(time*5)%1});
   if (beat.fx === "planes") {
     for (let index=0;index<3;index++) effects.push({kind:"plane",p:[105+(index-1)*9,180+progress*150-index*6],height:35});
-  }
-  if(beat.fire === "loophole") {
-    // A short quiet interval is the player's reload window. The gun responds
-    // with a longer burst across the exposed road when the player stops.
-    const reload=(time-beat.start)%9>6;
-    effects.push({kind:"fire",a:[100,471],b:reload?[114,380]:[100,383],side:"enemy",heavy:true,phase:(time*(reload?7:3))%1});
-    if(beat.id === "08c"&&!reload) effects.push({kind:"fire",a:player.p,b:[100,471],side:"player",phase:(time*2)%1});
-  }
-  if(beat.fire === "street") {
-    effects.push({kind:"fire",a:[206,480],b:player.p,side:"enemy",heavy:true,phase:(time*5)%1});
-    if(beat.id === "10d") effects.push({kind:"fire",a:[123,457],b:player.p,side:"enemy",phase:(time*2)%1});
   }
   if(beat.fx === "mortar") {
     const cycle=Math.floor((time-beat.start)/12),phase=((time-beat.start)%12)/3;
@@ -344,46 +260,34 @@ function Effects(beat, time, progress, actors) {
   return effects;
 }
 
-export function EvaluateFlow(requestedTime) {
+export const DEFAULT_ENCOUNTER_DOCUMENT = CreateEncounterDocument(FLOW_TIMELINE, FLOW_WAVES);
+const compiledDocuments = new WeakMap();
+
+export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMENT) {
   const time = Clamp(Number.isFinite(requestedTime) ? requestedTime : 0, 0, FLOW_DURATION);
   const beat = FLOW_TIMELINE.find((entry) => time < entry.end) ?? FLOW_TIMELINE.at(-1);
   const stage = STAGE_TIMELINE.find((entry) => entry.id === beat.stage);
   const progress = Clamp((time - beat.start) / beat.duration, 0, 1);
-  const player = SampleRoute(beat.p, progress);
+  const player = SampleBeatRoute(beat, progress);
   const actors = CoreActors(beat,time,player,progress);
-  const waves = WaveActors(time,player);
-  actors.push(...OpeningActors(beat,time),...waves.actors);
-  const effects = Effects(beat,time,progress,actors);
+  if (!compiledDocuments.has(document)) compiledDocuments.set(document, CompileEncounters(document, FLOW_TIMELINE));
+  const encounter = SampleEncounters(compiledDocuments.get(document), time, actors);
+  actors.push(...OpeningActors(beat,time), ...encounter.actors);
+  const effects = [...Effects(beat,time,progress,actors), ...encounter.effects];
+  if (beat.id === "03h") {
+    actors[0].pose = (progress >= 0.22 && progress < 0.32) || (progress >= 0.5 && progress < 0.6) ? "shoot" : "drag";
+    const pursuer = encounter.actors.find(actor => actor.wave === "RearPursuit" && actor.pose !== "dead");
+    if (pursuer) for (const id of ["luo", "liu", ...(actors[0].pose === "shoot" ? ["player"] : [])]) {
+      const defender = actors.find(actor => actor.id === id);
+      effects.push({kind:"fire", a:defender.p, b:pursuer.p, side:defender.side, phase:(time*3.2+defender.p[0])%1});
+    }
+  }
   const zone = beat.zone ? { p:beat.zone.slice(0,2), radius:beat.zone[2], condition:beat.gate, active:progress>=0.75 } : null;
-  const previous = FLOW_TIMELINE[Math.max(0,FLOW_TIMELINE.indexOf(beat)-1)];
-  const look = SampleRoute([previous.look,beat.look],Smooth(progress*3));
+
   const nearest = actors.filter((actor)=>actor.side === "enemy" && actor.pose !== "dead")
     .reduce((value,actor)=>Math.min(value,Distance(player,actor.p)),Infinity);
   const stretchersPassed=beat.stage === "10" ? Clamp(Math.floor((time-BeatById("10a").start-32)/13.5)+1,0,12) : null;
-  return {time,beat,stage,progress,player,actors,effects,spawns:waves.spawns,zone,look,nearest,stretchersPassed};
-}
-
-export function CameraAt(frame, mode = "player") {
-  const { player, look, time, beat } = frame;
-  const eye = [player[0], 1.6, player[1]];
-  const aim = [look[0],beat.id === "03g"?2.6:0.8,look[1]];
-  if (mode === "player") {
-    if (["kneel","drag","down","crouch","hold"].includes(beat.pose)) eye[1] = beat.pose === "down" ? 0.35 : 0.85;
-    if (["walk","run","drag","retreat"].includes(beat.pose)) eye[1] += Math.sin(time*6)*0.045;
-    if (beat.pose === "pack" || beat.pose === "plant") aim[1] = -0.6;
-    if (beat.pose === "vault") eye[1]+=Math.sin(frame.progress*Math.PI)*1.5;
-  } else {
-    const direction = Math.atan2(look[0]-player[0],look[1]-player[1]);
-    const radius = mode === "overview" ? 26 : 10;
-    const orbit = mode === "overview" ? Math.sin(time*0.03)*0.25 : 0.5;
-    eye[0] -= Math.sin(direction+orbit)*radius;
-    eye[2] -= Math.cos(direction+orbit)*radius;
-    eye[1] = mode === "overview" ? 22 : 6;
-    aim[0] = player[0]; aim[1] = 0.5; aim[2] = player[1];
-  }
-  const impact = frame.effects.find((fx)=>fx.kind === "blast" && fx.age < 1);
-  if (impact) { eye[0]+=Math.sin(time*48)*0.12*(1-impact.age); eye[1]+=Math.cos(time*51)*0.1*(1-impact.age); }
-  return {eye,aim,fov:mode === "player" ? 72 : 60};
+  return {time,beat,stage,progress,player,actors,effects,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed};
 }
 
 export function FormatFlowTime(time) {

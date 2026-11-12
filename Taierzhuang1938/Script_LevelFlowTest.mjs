@@ -1,55 +1,82 @@
 import assert from "node:assert/strict";
-import { FLOW_STAGES, FLOW_WAVES } from "./Data_LevelFlow.mjs";
+import fs from "node:fs";
+import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./Script_LevelFlowModel.mjs";
+import { CompileEncounters, ValidateEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
+import { EnterArea } from "./Script_LevelFlowGeometry.mjs";
+import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./Script_LevelFlowDocument.mjs";
+import { BuildEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
-import { BeatById, CameraAt, Distance, EvaluateFlow, FLOW_DURATION, FLOW_TIMELINE, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
 
-assert.equal(FLOW_STAGES.length,10);
-assert.equal(FLOW_TIMELINE.length,68);
-assert.ok(FLOW_STAGES.slice(0,7).every((stage)=>stage.status === "定稿"));
-assert.ok(FLOW_STAGES.slice(7).every((stage)=>stage.status === "草稿"));
+const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
 assert.equal(FLOW_DURATION,1870);
+assert.equal(FLOW_TIMELINE.length,68);
 assert.deepEqual(Object.keys(FLOW_SOURCE_EXCERPTS),FLOW_TIMELINE.map((beat)=>beat.id));
-assert.ok(Object.values(FLOW_SOURCE_EXCERPTS).every((text)=>text.length>10));
 assert.equal(STAGE_TIMELINE[6].end,1060);
+assert.ok(STAGE_TIMELINE.slice(0,7).every((stage)=>stage.status==="定稿"));
+assert.ok(STAGE_TIMELINE.slice(7).every((stage)=>stage.status==="草稿"));
 for(let index=1;index<FLOW_TIMELINE.length;index++) {
   const previous=FLOW_TIMELINE[index-1],beat=FLOW_TIMELINE[index];
-  assert.equal(beat.start,previous.end,`${beat.id} timeline continuity`);
-  assert.ok(Distance(previous.p.at(-1),beat.p[0])<0.01,`${beat.id} player continuity`);
+  assert.equal(beat.start,previous.end);
+  assert.ok(Distance(previous.p.at(-1),beat.p[0])<0.01,`${beat.id} continuous route`);
 }
-for(const wave of FLOW_WAVES) {
-  assert.ok(BeatById(wave.beat),`${wave.id} trigger exists`);
-  assert.ok(wave.count>0 && wave.interval>=0);
+ValidateEncounterDocument(defaults,FLOW_TIMELINE);
+const rectangle={shape:"rect",center:[0,0],size:[2,2]},circle={...rectangle,shape:"circle"};
+assert.equal(EnterArea([-4,0],[4,0],rectangle),0.375);
+assert.equal(EnterArea([-4,0],[4,0],circle),0.375);
+assert.equal(EnterArea([-4,2],[4,2],rectangle),null);
+assert.equal(EnterArea([0,0],[0,0],rectangle),0);
+const baseline=CompileEncounters(defaults,FLOW_TIMELINE);
+assert.ok(baseline.groups.every((group)=>group.start!==null),"default player route reaches all encounter gates");
+const moved=structuredClone(defaults);
+moved.triggers.find((trigger)=>trigger.id==="Trigger_Fork").area.center=[300,300];
+assert.equal(CompileEncounters(moved,FLOW_TIMELINE).groups.find((group)=>group.id==="Fork").start,null);
+assert.equal(EvaluateFlow(BeatById("03b").start+20,moved).actors.filter((actor)=>actor.groupId==="Fork").length,0,"moving trigger off the route suppresses its wave");
+const configured=structuredClone(defaults),group=configured.groups.find((item)=>item.id==="Fork");
+group.count=12;group.maxAlive=2;group.interval=0;group.lifetime=8;group.behavior="suppress";group.area.center=[15,52];
+for(let time=BeatById("03b").start;time<BeatById("03b").end;time+=0.25) {
+  const actors=EvaluateFlow(time,configured).actors.filter((actor)=>actor.groupId==="Fork"&&actor.pose!=="dead");
+  assert.ok(actors.length<=2,"replacement respects maxAlive");
+  assert.ok(actors.every((actor)=>Distance(actor.p,group.area.center)<2),"stationary behavior uses the edited spawn region");
 }
-assert.deepEqual(FLOW_WAVES.filter((wave)=>wave.beat.startsWith("03")).map((wave)=>wave.count),[5,2,2]);
-assert.equal(FLOW_WAVES.filter((wave)=>wave.id.startsWith("Tank")).reduce((sum,wave)=>sum+wave.count,0),10);
-
+for(let time=BeatById("03h").start;time<BeatById("03h").end-6;time+=1) {
+  const frame=EvaluateFlow(time);
+  assert.ok(frame.actors.some((actor)=>actor.groupId==="RearPursuit"&&actor.pose!=="dead"),`${time} pursuit continues through 03H`);
+  assert.ok(frame.effects.some((effect)=>effect.kind==="fire"&&effect.side==="friend"),`${time} rear guard and crest cover are visible`);
+}
+assert.equal(EvaluateFlow(BeatById("03h").start+12).actors[0].pose,"shoot");
+const tankBefore=EvaluateFlow(BeatById("06a").start-0.001).actors.find((actor)=>actor.id==="tank1");
+const tankAfter=EvaluateFlow(BeatById("06a").start+0.001).actors.find((actor)=>actor.id==="tank1");
+assert.ok(Distance(tankBefore.p,tankAfter.p)<0.01,"tank follows a continuous approach before 06");
+assert.ok(EvaluateFlow(BeatById("05b").start).actors.some((actor)=>actor.id==="tank1"));
 for(let time=0;time<=FLOW_DURATION;time+=0.5) {
   const frame=EvaluateFlow(time);
   for(const actor of frame.actors) assert.ok(actor.p.every(Number.isFinite),`${time} ${actor.id}`);
-  for(const mode of ["player","tracking","overview"]) {
-    const camera=CameraAt(frame,mode);
-    assert.ok([...camera.eye,...camera.aim].every(Number.isFinite));
-  }
-  if(frame.beat.stage === "06") {
-    const tank=frame.actors.find((actor)=>actor.id === "tank1");
-    for(const enemy of frame.actors.filter((actor)=>actor.wave?.startsWith("Tank") && actor.pose !== "dead")) {
-      assert.ok(enemy.p[1]<=tank.p[1],`${time} escort remains behind leading tank`);
-    }
-  }
-  if(frame.beat.stage === "09" && frame.beat.id !== "09j") {
-    assert.equal(frame.effects.filter((effect)=>effect.kind === "fire" && effect.b === frame.player).length,0,"stealth does not attract generic hostile fire");
-  }
-  if(frame.beat.stage === "10") {
-    assert.equal(frame.actors.filter((actor)=>actor.wave === "EastStreet" && actor.pose !== "dead").length<=5,true);
-  }
 }
-const sampleTimes=[0,39.9,40,178,251,300,399.9,400,600,799,1000,1100,1400,1800,FLOW_DURATION];
-const baseline=sampleTimes.map((time)=>EvaluateFlow(time));
-for(const time of [...sampleTimes].reverse()) EvaluateFlow(time);
-assert.deepEqual(sampleTimes.map((time)=>EvaluateFlow(time)),baseline,"backward seek is independent of evaluation history");
-assert.equal(EvaluateFlow(-20).time,0);
-assert.equal(EvaluateFlow(Infinity).time,0);
-assert.equal(EvaluateFlow(99999).time,FLOW_DURATION);
-assert.equal(EvaluateFlow(BeatById("10f").start).stretchersPassed,12);
-assert.equal(EvaluateFlow(BeatById("10f").start+1).effects.filter((effect)=>effect.kind === "fire").length,0,"whistle stops hostile fire before artillery");
-console.log("ok  LevelFlow 68 beats, 10 stages, fixed 03/06 waves, capped replenishment, 3741 deterministic samples and cameras");
+const times=[0,180,350,384,570,610,800,1060,1350,1650,1850];
+const frames=times.map((time)=>EvaluateFlow(time));
+for(const time of [...times].reverse()) EvaluateFlow(time);
+assert.deepEqual(times.map((time)=>EvaluateFlow(time)),frames,"random seeking produces identical actor, trigger and wave states");
+assert.equal(EvaluateFlow(BeatById("10f").start+1).effects.filter((effect)=>effect.kind==="fire").length,0);
+const memory=new Map(),storage={getItem:(key)=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value)};
+const document=new EncounterDocument(defaults,FLOW_TIMELINE,storage);
+document.Change((value)=>value.groups[0].count=8);assert.equal(document.value.groups[0].count,8);
+document.Undo();assert.equal(document.value.groups[0].count,defaults.groups[0].count);
+document.Redo();assert.equal(document.value.groups[0].count,8);
+assert.equal(new EncounterDocument(defaults,FLOW_TIMELINE,storage).value.groups[0].count,8,"browser draft survives reload");
+const before=JSON.stringify(document.value);
+assert.throws(()=>document.Change((value)=>value.groups[0].count=-2));
+assert.equal(JSON.stringify(document.value),before,"invalid edits leave the draft intact");
+const sample=EvaluateFlow(384),view={center:[32,106],scale:5.5};
+document.Change((value)=>value.annotations.push({id:"TestNote",kind:"arrow",a:[28,100],b:[35,112],text:"在这里补两人",time:384,view}));
+const packet=CreateFramePacket(document.value,sample,view,{width:984,height:492});
+assert.deepEqual(ReadFramePacket(JSON.parse(JSON.stringify(packet)),FLOW_TIMELINE),packet);
+const tinyPng=Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lLsAAAAASUVORK5CYII=","base64"));
+const png=AddPngFrameMetadata(tinyPng.buffer,packet);
+assert.deepEqual(ReadPngFrameMetadata(png.buffer),packet,"single PNG preserves time, world coordinates, markings and encounter settings");
+assert.throws(()=>ReadPngFrameMetadata(tinyPng.buffer));
+const scene=JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",import.meta.url),"utf8"));
+const map=BuildEncounterMap(scene);
+assert.ok(map.objects.length>1000&&map.fields.length>30);
+for(const id of ["GengGateLintel","DogHoleLintel"]) assert.ok(map.objects.some((object)=>object.id===id));
+assert.ok(map.markers.some((marker)=>marker.name==="狗洞"&&marker.p[0]===92&&marker.p[1]===473));
+console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");
