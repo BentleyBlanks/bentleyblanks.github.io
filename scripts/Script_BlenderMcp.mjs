@@ -220,8 +220,10 @@ function IsLiveBlender(pid) {
 // to a different Blender. A successful ping does not establish process identity.
 function ListenerPids(port) {
   if (process.platform !== "win32") return null;
+  // Some Windows builds report listening endpoints as CIM State 0 / null.
+  // Keep the unconnected remote-port check and require one exact owning PID.
   const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-    `@(Get-NetTCPConnection -State Listen -LocalPort ${Number(port)} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique) -join ','`],
+    `@(Get-NetTCPConnection -LocalPort ${Number(port)} -ErrorAction SilentlyContinue | Where-Object { $_.RemotePort -eq 0 -and ($_.State -eq 'Listen' -or $_.CimInstanceProperties['State'].Value -eq 0) } | Select-Object -ExpandProperty OwningProcess -Unique) -join ','`],
   { encoding: "utf8", windowsHide: true });
   if (result.status !== 0) return [];
   return [...new Set((result.stdout || "").trim().split(",").map(Number).filter((pid) => Number.isInteger(pid) && pid > 0))];
