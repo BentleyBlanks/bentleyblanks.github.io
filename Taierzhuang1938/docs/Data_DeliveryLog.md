@@ -10,6 +10,8 @@
 
 ## 条目
 
+- **腰射转视角惯性，照 COD WWII（2026-11-12）**：用户「持枪移动视角时枪要有比较自然的小小的惯性」。WaW 数值下 125°/s 转身枪只偏 0.19°，画面上看不出。腰射 `LOOK_SWAY` 改为同一限幅目标 + 近临界阻尼弹簧（2.3 Hz、阻尼比 0.8，1/240 s 定步长积分）：起转时枪慢慢落后，125°/s 偏 1.3° / 0.8 cm，快甩封顶 3° / 1.9 cm，停手 0.22 s 回到 5% 以内，过冲约 1%（看不见回弹，守住 2026-10-20 的否决）；20/60/144 fps 一致。开镜 `ADS_LOOK_SWAY` 仍是一阶 DiffTrack，不变。口径 [枪械手感](Data_FirearmHandling.md)「转视角摇摆」；门禁 `Script_FirearmHandlingTest`。
+
 - **高级工具拆分与 AdvancedTool ControlCenter（2026-11-12）**：用户要求把一部分高级工具从游戏里拆出去。四个独立页面与九个摄影棚类编辑器（含只给它们用的辅助模块）`git mv` 进 `AdvancedTools/`，新增本地控制中心、独立工具宿主 `Tool_Studio.html`（自己装配渲染底座，不改 `Script_Main`；九工具与游戏宿主整页截图平均绝对差均 ≤ 2/255）和桌面启动器；游戏内入口经 `Script_DevToolsSplit` / `Data_DevToolsSplit` 两对边界保持原样，线上发布恒换 Stub、不发布该目录。详见 [编辑器套件](Data_EditorSuite.md)「AdvancedTool ControlCenter 与独立工具宿主」；门禁 `AdvancedToolsTest`、`AdvancedToolsBrowserTest`、`ToolStudioParityBrowserTest`、`DevToolsIsolationTest`。
 
 - **东史郎与翻译毛发接入（2026-11-12）**：在十五名已登记人物中补齐最后两人的游戏毛发。依据各自剃净头图和原三视图制作带发参考，原图与提示词留在角色 OneDrive `HairReference_20261112/`；实验室增加两张胸像，游戏模型分别挂钢盔下短发／唇须／下巴胡和凌乱短发／净面。东史郎的耳上发际线按本人头部单独下调，游戏帽缘沿现有 `hatSeam` 规则筛选可见发根；翻译的中档发片单独收窄。两套游戏挂件的 ICP 平均误差分别为 0.75 和 0.02 毫米，胡须延续逐顶点脸部蒙皮权重。共用遮罩图集补入两格，旧十三格像素保持原样；四套新增 groom 与受图集哈希影响的旧件一并重烘，旧件几何段不变。参考对照、侧／背近景及游戏三档视角保存在本地忽略目录。六项毛发专项门禁（其中 `HairGroomTest` 1629/1629）、两名角色动作与场景专项、文字／数据／模块图／运动矢量七项检查及发布版白盒打包入口均通过。按改动选测的 quick 在 135 项通过后停于左手持枪自接触，指面穿插 60 三角面在干净 `master` 上原样复现；本轮未改手部资产或动作。验证入口和能力边界见[头发系统](Data_HairSystem.md)。

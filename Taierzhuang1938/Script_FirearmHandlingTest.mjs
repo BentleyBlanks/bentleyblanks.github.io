@@ -63,14 +63,17 @@ const capYaw = LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.yawScale * DEG;
 for (const fps of [144, 60, 30, 20]) {
   const fast = Flick(fps, 900), during = fast.filter((s) => s.flick), after = fast.filter((s) => !s.flick);
   const peak = Math.max(...fast.map((s) => Math.abs(s.yaw)));
-  assert.ok(peak <= capYaw * 1.0001 && peak > capYaw * 0.6, `${fps} fps: a 900 deg/s flick trails by at most the COD cap (${peak / DEG} deg)`);
-  assert.ok(Math.max(...fast.map((s) => Math.abs(s.x))) <= LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.horizM * 1.0001, `${fps} fps: lateral lag is capped`);
+  assert.ok(peak <= capYaw * 1.03 && peak > capYaw * 0.6, `${fps} fps: a 900 deg/s flick trails by at most the cap (${peak / DEG} deg)`);
+  assert.ok(Math.max(...fast.map((s) => Math.abs(s.x))) <= LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.horizM * 1.03, `${fps} fps: lateral lag is capped`);
   assert.ok(during.at(-1).yaw > 0 && during.at(-1).x < 0 && during.at(-1).pitch < 0, `${fps} fps: turning right/up the muzzle trails left/down`);
-  // No rebound: after the stop the lag only shrinks and never crosses to the other side.
-  for (let i = 1; i < after.length; i += 1) {
-    assert.ok(after[i].yaw >= 0 && after[i].yaw <= after[i - 1].yaw + 1e-12, `${fps} fps: settles without overshoot`);
-    assert.ok(after[i].pitch <= 0 && after[i].x <= 0, `${fps} fps: offset never springs past centre`);
-  }
+  // Spring eases into the lag like a held mass instead of snapping to it.
+  assert.ok(during[0].yaw < peak * 0.3, `${fps} fps: the first frame of a turn only starts the lag`);
+  // No visible rebound: past centre by at most 3 % of the peak, and no ringing (one crossing at most).
+  const crossings = (key) => after.filter((s, i) => i && Math.sign(s[key]) !== Math.sign(after[i - 1][key]) && Math.abs(s[key]) > peak * 1e-3).length;
+  assert.ok(Math.min(...after.map((s) => s.yaw)) >= -peak * 0.03, `${fps} fps: settles without visible overshoot`);
+  assert.ok(Math.max(...after.map((s) => s.pitch)) <= peak * 0.03 && Math.max(...after.map((s) => s.x)) <= LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.horizM * 0.03, `${fps} fps: offset never springs visibly past centre`);
+  assert.ok(crossings("yaw") <= 1 && crossings("x") <= 1, `${fps} fps: no back-and-forth after the stop`);
+  assert.ok(after.findIndex((s) => Math.abs(s.yaw) < peak * 0.05) / fps <= 0.4, `${fps} fps: back within 5 % in 0.4 s`);
   assert.ok(Math.abs(after.at(-1).yaw) < capYaw * 0.01, `${fps} fps: settled within 1.2 s`);
   // Uneven mouse chunks (0.55x / 1.45x per frame) must not shake the gun back and forth.
   let reversals = 0;
@@ -79,6 +82,11 @@ for (const fps of [144, 60, 30, 20]) {
 }
 const moderate = (fps) => Math.max(...Flick(fps, 150).map((s) => Math.abs(s.yaw)));
 assert.ok(Math.abs(moderate(20) - moderate(60)) < moderate(60) * 0.15, "same response at 20 and 60 fps");
+// Visible hip inertia (2026-11-12): an ordinary 125 deg/s turn trails by about a degree and most of a centimetre.
+{
+  const turn = Flick(60, 125), yaw = Math.max(...turn.map((s) => s.yaw)), x = Math.min(...turn.map((s) => s.x));
+  assert.ok(yaw / DEG >= 1.0 && yaw / DEG <= 1.6 && -x >= 0.006 && -x <= 0.011, `125 deg/s hip turn trails ${yaw / DEG} deg / ${-x * 100} cm`);
+}
 const aimed = new LookSway().Step(1 / 60, -0.2, 0, 0, 0);
 assert.equal(aimed.yaw, 0, "no look sway when the weapon's gain is zero (ADS)");
 // ADS look sway: same model, rotation only, bigger lag than the hip.

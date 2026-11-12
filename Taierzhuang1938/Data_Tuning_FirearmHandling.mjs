@@ -35,11 +35,18 @@ export const WALL_CARRY = Object.freeze({
 // WaW's Kar98k hip weapon file (swayMaxAngle 5, swayLerpSpeed 5, swayPitchScale /
 // swayYawScale 0.1, swayHorizScale 0.08 in, swayVertScale 0.12 in), inches in
 // metres. Data_Weapons.swayScale multiplies; aimed sight sway is ADS_LOOK_SWAY (2026-11-05).
+// 2026-11-12 user: the hip gun should carry a small natural inertia like COD WWII.
+// The WaW numbers lagged a 125 deg/s turn by 0.19 deg (invisible), so the hip gun
+// now follows the same clamped target through a near-critically damped spring
+// (frequencyHz / damping): it eases into the lag like a held mass, trails a
+// 125 deg/s turn by about 1.2 deg and 0.8 cm, caps at 3 deg / 1.9 cm, and settles
+// in about 0.4 s with at most ~2 % overshoot (no visible rebound, see 2026-10-20).
 export const LOOK_SWAY = Object.freeze({
-  maxDegPerFrame: 5, lerpSpeed: 5,
-  yawScale: 0.1, pitchScale: 0.1,                 // degrees of lag per degree/frame
-  horizM: 0.08 * 0.0254, vertM: 0.12 * 0.0254,    // metres of lag per degree/frame
-  rollScale: 0.06,                                // slight bank into the turn
+  maxDegPerFrame: 5,
+  frequencyHz: 2.3, damping: 0.8,                 // second-order follow (omit = first-order DiffTrack at lerpSpeed)
+  yawScale: 0.6, pitchScale: 0.5,                 // degrees of lag per degree/frame
+  horizM: 0.0038, vertM: 0.0030,                  // metres of lag per degree/frame
+  rollScale: 0.45,                                // bank into the turn
   strafeRollRad: 0.045, strafeLerpSpeed: 6,       // existing strafe lean, now without rebound
 });
 
