@@ -87,7 +87,7 @@ export function CreateShortcut(dir = DesktopDir()) {
     const link = path.join(dir, `${SHORTCUT_NAME}.lnk`);
     execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1,
       "-LinkPath", link, "-Target", process.execPath, "-Arguments", `"${script}"`, "-WorkDir", REPO_ROOT,
-      "-Icon", path.join(REPO_ROOT, "favicon.ico")], { encoding: "utf8" });
+      "-Icon", path.join(REPO_ROOT, "scripts", "Icons", "Icon_ControlCenter.ico")], { encoding: "utf8" });
     return link;
   }
   if (process.platform === "darwin") {
@@ -98,7 +98,7 @@ export function CreateShortcut(dir = DesktopDir()) {
   }
   const file = path.join(dir, `${SHORTCUT_NAME}.desktop`);
   fs.writeFileSync(file, ["[Desktop Entry]", "Type=Application", `Name=${SHORTCUT_NAME}`,
-    `Exec="${process.execPath}" "${script}"`, `Path=${REPO_ROOT}`, `Icon=${path.join(REPO_ROOT, "favicon.ico")}`, "Terminal=true", ""].join("\n"));
+    `Exec="${process.execPath}" "${script}"`, `Path=${REPO_ROOT}`, `Icon=${path.join(REPO_ROOT, "scripts", "Icons", "Icon_ControlCenter.png")}`, "Terminal=true", ""].join("\n"));
   fs.chmodSync(file, 0o755);
   return file;
 }

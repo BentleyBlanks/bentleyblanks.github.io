@@ -901,7 +901,7 @@ function CreateShortcut(rootDir) {
   fs.writeFileSync(file, [
     "[Desktop Entry]", "Type=Application", `Name=${label}`,
     `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")} --open`,
-    `Path=${rootDir}`, `Icon=${path.join(rootDir, "favicon.ico")}`, "Terminal=true", "",
+    `Path=${rootDir}`, `Icon=${path.join(rootDir, "scripts", "Icons", "Icon_LocalPreview.png")}`, "Terminal=true", "",
   ].join("\n"));
   fs.chmodSync(file, 0o755);
   console.log(`快捷方式已创建：${file}`);

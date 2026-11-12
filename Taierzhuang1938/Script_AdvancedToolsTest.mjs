@@ -111,12 +111,13 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
       const link = path.join(dir, `${SHORTCUT_NAME}.lnk`);
       Check("--shortcut-dir 在目标目录建 .lnk", files.includes(`${SHORTCUT_NAME}.lnk`), output.trim().split("\n")[0]);
       const info = execFileSync("powershell", ["-NoProfile", "-Command",
-        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:LINK_PATH);'T='+$s.TargetPath;'A='+$s.Arguments;'W='+$s.WorkingDirectory"],
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:LINK_PATH);'T='+$s.TargetPath;'A='+$s.Arguments;'W='+$s.WorkingDirectory;'I='+$s.IconLocation"],
         { encoding: "utf8", env: { ...process.env, LINK_PATH: link } });
       const field = (key) => new RegExp(`^${key}=(.*)$`, "m").exec(info)?.[1]?.trim();
       Check("快捷方式目标是 node", path.resolve(field("T")) === path.resolve(process.execPath), field("T"));
       Check("快捷方式参数是本脚本", field("A") === `"${launcher}"`, field("A"));
       Check("快捷方式工作目录是仓库根", path.resolve(field("W")) === REPO_ROOT, field("W"));
+      Check("快捷方式使用控制中心专属图标", field("I") === `${path.join(REPO_ROOT,"scripts","Icons","Icon_ControlCenter.ico")},0`, field("I"));
     } else {
       Check("--shortcut-dir 在目标目录建启动文件", files.length === 1 && files[0].startsWith(SHORTCUT_NAME), files.join(","));
     }

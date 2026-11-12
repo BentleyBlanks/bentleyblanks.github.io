@@ -26,7 +26,7 @@ $shortcut = $shell.CreateShortcut($linkPath)
 $shortcut.TargetPath       = $target
 $shortcut.WorkingDirectory = $repoRoot
 $shortcut.Description      = '本地起站点预览服，并打开页面索引（关掉黑窗口即停服）'
-$icon = Join-Path $repoRoot 'favicon.ico'
+$icon = Join-Path $PSScriptRoot 'Icons\Icon_LocalPreview.ico'
 if (Test-Path -LiteralPath $icon) { $shortcut.IconLocation = "$icon,0" }
 $shortcut.Save()
 
