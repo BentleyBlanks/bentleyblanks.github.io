@@ -6,6 +6,7 @@ import bmesh
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 from mathutils.geometry import barycentric_transform
+from Script_SichuanMessengerReferenceFit import LoadReferenceProfiles, SmoothReferenceProfiles, PlaneIntersections
 
 
 def LocalPoints(obj):
@@ -66,30 +67,45 @@ def TrimSourcePart(obj, minimumWorldZ=None, maximumWorldZ=None, halfWidth=None, 
             'uniformScale': float(scales.mean())}
 
 
-def BuildCalfWrap(foot, body, assembly):
+def BuildCalfWrap(foot, body, assembly, textureSource, topZ):
+    reference = LoadReferenceProfiles()
+    profileT, profile = SmoothReferenceProfiles(reference)
+    footWorld = WorldPoints(foot)
     bodyPoints = WorldPoints(body)
     mirror = Matrix.Diagonal((1.0, -1.0, 1.0, 1.0))
-    footWorld = WorldPoints(foot)
-    topPoints = footWorld[footWorld[:, 2] > footWorld[:, 2].max() - 0.02]
-    baseCenter = (topPoints.min(0) + topPoints.max(0)) / 2
-    baseRadii = (topPoints.max(0) - topPoints.min(0))[:2] / 2 + 0.0008
-    leg = bodyPoints[(bodyPoints[:, 1] > 0) & (bodyPoints[:, 2] < bodyPoints[:, 2].min() + 0.025)]
+    section = footWorld[footWorld[:, 2] > footWorld[:, 2].max() - 0.010]
+    footCenter = (section.min(0) + section.max(0)) / 2
+    sockBaseZ = footWorld[:, 2].max() - 0.002
+    ankleZ = 0.130
+    baseZ = ankleZ - 0.004
+    leg = bodyPoints[(bodyPoints[:, 1] > 0) & (bodyPoints[:, 2] < topZ + 0.035)]
     legCenter = (leg.min(0) + leg.max(0)) / 2
-    baseZ = footWorld[:, 2].max() - 0.020
-    topZ = bodyPoints[:, 2].min() + 0.035
-    topRadii = np.minimum((leg.max(0) - leg.min(0))[:2] / 2 - 0.007, np.array([0.050, 0.052]))
-    topRadii = np.maximum(topRadii, baseRadii)
+    pixelWorldSize = (topZ - ankleZ) / (reference['ankleRow'] - reference['kneeRow'])
+    ankleCenter = footCenter[:2].copy()
+    referenceCenterStart = profile[0, 2]
 
-    footMaterial = foot.data.materials[0]
+    def CalfSection(z):
+        fraction = np.clip((z-ankleZ)/(topZ-ankleZ), 0, 1)
+        frontWidth = np.interp(fraction, profileT, profile[:, 0]) * pixelWorldSize
+        sideWidth = np.interp(fraction, profileT, profile[:, 1]) * pixelWorldSize
+        sideCenter = np.interp(fraction, profileT, profile[:, 2])
+        center = np.array([ankleCenter[0]-(sideCenter-referenceCenterStart)*pixelWorldSize,
+                           ankleCenter[1]*(1-fraction)+legCenter[1]*fraction])
+        return center, np.array([sideWidth, frontWidth])/2, fraction
+
+    topCenter, topRadii, _ = CalfSection(topZ)
+    ankleCenter, ankleRadii, _ = CalfSection(ankleZ)
+
+    footMaterial = textureSource.data.materials[0]
     baseNode = next(node for node in footMaterial.node_tree.nodes if node.type == 'TEX_IMAGE')
     sourceImage = baseNode.image
     imagePixels = np.empty(sourceImage.size[0] * sourceImage.size[1] * 4, dtype=np.float32)
     sourceImage.pixels.foreach_get(imagePixels)
     imagePixels = imagePixels.reshape(sourceImage.size[1], sourceImage.size[0], 4)
-    sourceFoot = LocalPoints(foot)
-    uv = foot.data.uv_layers.active
+    sourceFoot = LocalPoints(textureSource)
+    uv = textureSource.data.uv_layers.active
     colorSamples = []
-    for face in foot.data.polygons:
+    for face in textureSource.data.polygons:
         if np.mean(sourceFoot[list(face.vertices), 2]) > 0.50:
             for loop in face.loop_indices:
                 coordinate = uv.data[loop].uv
@@ -102,8 +118,8 @@ def BuildCalfWrap(foot, body, assembly):
     weave = 0.016 * np.sin(math.tau * gridX / 4) * np.sin(math.tau * gridY / 4)
     clothPixels = np.ones((size, size, 4), dtype=np.float32)
     clothPixels[:, :, :3] = clothColor
-    foot.data.calc_loop_triangles()
-    footTriangles = list(foot.data.loop_triangles)
+    textureSource.data.calc_loop_triangles()
+    footTriangles = list(textureSource.data.loop_triangles)
     footBvh = BVHTree.FromPolygons([Vector(point) for point in sourceFoot], [tuple(triangle.vertices) for triangle in footTriangles], all_triangles=True)
     sampledPixels = 0
     for row in range(size):
@@ -154,55 +170,141 @@ def BuildCalfWrap(foot, body, assembly):
     clothMaterial.node_tree.links.new(normalTexture.outputs['Color'], normalMap.inputs['Color'])
     clothMaterial.node_tree.links.new(normalMap.outputs['Normal'], shader.inputs['Normal'])
 
+    # The dark cloth continues the ankle shaft from the unscaled shoe piece.
+    darkSamples = []
+    for face in textureSource.data.polygons:
+        facePoints = sourceFoot[list(face.vertices)]
+        if 0.25 < facePoints[:, 2].mean() < 0.35 and facePoints[:, 0].mean() < -0.05:
+            coordinate = np.mean([uv.data[index].uv[:] for index in face.loop_indices], axis=0)
+            x = int(coordinate[0]*(sourceImage.size[0]-1)) % sourceImage.size[0]
+            y = int(coordinate[1]*(sourceImage.size[1]-1)) % sourceImage.size[1]
+            color = imagePixels[y, x, :3]
+            if color.max() < 0.40:
+                darkSamples.append(color)
+    sockColor = np.median(np.array(darkSamples), axis=0) if darkSamples else np.array([0.15, 0.15, 0.15])
+    sockPixels = clothPixels.copy()
+    sockPixels[:, :, :3] *= sockColor[None, None, :] / clothColor[None, None, :].clip(0.01)
+    sockImage = bpy.data.images.new('Texture_SichuanMessenger_AnkleCloth_BaseColor', width=size, height=size, alpha=True)
+    sockImage.colorspace_settings.name = sourceImage.colorspace_settings.name
+    sockImage.pixels.foreach_set(sockPixels.ravel())
+    sockImage.pack()
+    sockMaterial = clothMaterial.copy()
+    sockMaterial.name = 'Material_SichuanMessenger_AnkleCloth'
+    for node in sockMaterial.node_tree.nodes:
+        if node.type == 'TEX_IMAGE' and node.image == clothImage:
+            node.image = sockImage
+
     angularSteps = 96
-    bandPitch = 0.027
+    sockRows = 24
+    sockPoints, sockUvCoordinates = [], []
+    foot.data.calc_loop_triangles()
+    shaftBvh = BVHTree.FromPolygons([Vector(point) for point in footWorld], [tuple(triangle.vertices) for triangle in foot.data.loop_triangles], all_triangles=True)
+    shaftBoundary = []
+    for column in range(angularSteps+1):
+        angle = math.tau*column/angularSteps
+        radial = Vector((math.cos(angle),math.sin(angle),0))
+        origin = Vector((footCenter[0],footCenter[1],sockBaseZ))+radial
+        hit = shaftBvh.ray_cast(origin,-radial,1.5)[0]
+        assert hit is not None
+        shaftBoundary.append(np.array(hit[:2])+np.array(radial[:2])*0.0004)
+    for row in range(sockRows+1):
+        fraction = row/sockRows
+        z = sockBaseZ+(ankleZ+0.003-sockBaseZ)*fraction
+        blend = fraction*fraction*(3-2*fraction)
+        for column in range(angularSteps+1):
+            angle = math.tau*column/angularSteps
+            innerTop = ankleCenter+(ankleRadii-0.002)*np.array([math.cos(angle),math.sin(angle)])
+            point = shaftBoundary[column]*(1-blend)+innerTop*blend
+            sockPoints.append((float(point[0]),float(point[1]),z))
+            sockUvCoordinates.append((column/angularSteps,fraction))
+    sockFaces = []
+    for row in range(sockRows):
+        for column in range(angularSteps):
+            a = row*(angularSteps+1)+column
+            sockFaces.append((a,a+1,a+angularSteps+2,a+angularSteps+1))
+    sockMesh = bpy.data.meshes.new('Mesh_SichuanMessenger_AnkleCloth')
+    sockMesh.from_pydata(sockPoints,[],sockFaces)
+    sockMesh.materials.append(sockMaterial)
+    sockUv = sockMesh.uv_layers.new(name='UVMap')
+    for face in sockMesh.polygons:
+        face.use_smooth = True
+        for loop in face.loop_indices:
+            sockUv.data[loop].uv = sockUvCoordinates[sockMesh.loops[loop].vertex_index]
+    sock = bpy.data.objects.new('Part_AnkleCloth_L',sockMesh)
+    assembly.objects.link(sock)
+    rightSock = sock.copy()
+    rightSock.name = 'Part_AnkleCloth_R'
+    assembly.objects.link(rightSock)
+    rightSock.matrix_world = mirror
+
+    bandPitch = 0.026
     bandWidth = 0.033
-    turnCount = (topZ - baseZ + bandWidth) / bandPitch + 1
-    longitudinalSteps = int(math.ceil(turnCount * angularSteps))
+    turnCount = (topZ-baseZ+bandWidth)/bandPitch+2
+    longitudinalSteps = int(math.ceil(turnCount*angularSteps))
     acrossSteps = 6
-    points = []
-    coordinates = []
-    for row in range(longitudinalSteps + 1):
-        angle = math.tau * (row / angularSteps - 0.5)
-        centerZ = baseZ + bandPitch * angle / math.tau
-        for column in range(acrossSteps + 1):
-            across = column / acrossSteps
-            z = np.clip(centerZ + (across - 0.5) * bandWidth, baseZ, topZ)
-            fraction = (z - baseZ) / (topZ - baseZ)
-            center = baseCenter[:2] * (1 - fraction) + legCenter[:2] * fraction
-            radii = baseRadii * (1 - fraction) + topRadii * fraction + 0.003 * math.sin(math.pi * fraction) ** 2
-            lip = 0.0003 + 0.0010 * (1 - across) ** 4
-            points.append((center[0] + (radii[0] + lip) * math.cos(angle),
-                           center[1] + (radii[1] + lip) * math.sin(angle), float(z)))
-            coordinates.append((angle / math.tau, (float(z) - baseZ) / 0.085))
+    points, coordinates = [], []
+    for row in range(longitudinalSteps+1):
+        angle = math.tau*(row/angularSteps-1.0)
+        centerZ = baseZ+bandPitch*angle/math.tau
+        for column in range(acrossSteps+1):
+            across = column/acrossSteps
+            z = float(np.clip(centerZ+(across-0.5)*bandWidth,baseZ,topZ))
+            center,radii,fraction = CalfSection(z)
+            asymmetry = 0.06*math.sin(math.pi*fraction)**2
+            center[0] += asymmetry*radii[0]
+            cosine,sine = math.cos(angle),math.sin(angle)
+            x = radii[0]*(1-asymmetry)*cosine**1.25 if cosine>=0 else -radii[0]*(1+asymmetry)*(-cosine)**0.90
+            lip = 0.0003+0.0010*(1-across)**4
+            fold = 0.0005*math.sin(3*angle+4*fraction)*math.sin(math.pi*fraction)
+            points.append((center[0]+x+(lip+fold)*cosine,
+                           center[1]+radii[1]*sine+(lip+fold)*sine,z))
+            coordinates.append((angle/math.tau,(z-baseZ)/0.085))
     faces = []
     for row in range(longitudinalSteps):
         for column in range(acrossSteps):
-            first = row * (acrossSteps + 1) + column
-            face = (first, first + acrossSteps + 1, first + acrossSteps + 2, first + 1)
+            first = row*(acrossSteps+1)+column
+            face = (first,first+acrossSteps+1,first+acrossSteps+2,first+1)
             heights = [points[index][2] for index in face]
-            if max(heights) - min(heights) > 1e-7:
+            if max(heights)-min(heights)>1e-7:
                 faces.append(face)
     wrapMesh = bpy.data.meshes.new('Mesh_SichuanMessenger_CalfWrap')
-    wrapMesh.from_pydata(points, [], faces)
+    wrapMesh.from_pydata(points,[],faces)
     wrapMesh.materials.append(clothMaterial)
     wrapUv = wrapMesh.uv_layers.new(name='UVMap')
     for face in wrapMesh.polygons:
         face.use_smooth = True
         for loop in face.loop_indices:
             wrapUv.data[loop].uv = coordinates[wrapMesh.loops[loop].vertex_index]
-    wrap = bpy.data.objects.new('Part_CalfWrap_L', wrapMesh)
+    wrap = bpy.data.objects.new('Part_CalfWrap_L',wrapMesh)
     assembly.objects.link(wrap)
     rightWrap = wrap.copy()
     rightWrap.name = 'Part_CalfWrap_R'
     assembly.objects.link(rightWrap)
     rightWrap.matrix_world = mirror
 
-    report = {'baseZ': baseZ, 'topZ': topZ, 'color': clothColor.tolist(),
-              'textureBakeCoverage': sampledPixels / (size * size),
-              'trianglesPerSide': sum(len(face.vertices) - 2 for face in wrap.data.polygons)}
-    assert report['textureBakeCoverage'] > 0.99
-    return wrap, rightWrap, report
+    # Measure the generated ribbon surfaces, including their overlap lips.
+    wrapMesh.calc_loop_triangles()
+    triangles = np.array([triangle.vertices[:] for triangle in wrapMesh.loop_triangles])
+    pointArray = np.array(points)
+    contourChecks = []
+    for fraction in [0.05,0.15,0.30,0.45,0.60,0.75,0.85,0.95]:
+        z = ankleZ+(topZ-ankleZ)*fraction
+        contour = PlaneIntersections(pointArray,triangles,2,z)
+        actual = np.ptp(contour[:,:2],axis=0)
+        _,radii,_ = CalfSection(z)
+        error = actual-2*radii
+        contourChecks.append({'heightFraction':fraction,'frontBackWidth':float(actual[1]),'sideDepth':float(actual[0]),'maximumContourErrorMeters':float(np.abs(error).max())})
+    maximumError = max(row['maximumContourErrorMeters'] for row in contourChecks)
+    widthRatio = max(row['frontBackWidth'] for row in contourChecks)/contourChecks[0]['frontBackWidth']
+    assert maximumError<0.006
+    assert widthRatio>1.45
+    report = {'baseZ':baseZ,'ankleZ':ankleZ,'topZ':topZ,'topCenter':topCenter.tolist(),'topRadii':topRadii.tolist(),
+              'color':clothColor.tolist(),'textureBakeCoverage':sampledPixels/(size*size),
+              'referenceImages':reference['sourceImages'],'referenceFrame':reference['measurementFrame'],
+              'referenceContourChecks':contourChecks,'maximumContourErrorMeters':maximumError,
+              'calfToAnkleWidthRatio':widthRatio,'trianglesPerSide':sum(len(face.vertices)-2 for face in wrapMesh.polygons)}
+    assert report['textureBakeCoverage']>0.99
+    return wrap,rightWrap,report
 
 
 def FitCapBand(cap, head, targetTopZ):

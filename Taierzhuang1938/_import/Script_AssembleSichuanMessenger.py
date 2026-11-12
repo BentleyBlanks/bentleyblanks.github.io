@@ -14,6 +14,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from Script_SichuanMessengerClothFit import BuildCalfWrap, FitCapBand, TrimSourcePart, WorldPoints
+from Script_SichuanMessengerReferenceFit import FitSleeveCuffs, FitTrouserCuffs, RefineCapCrown
 
 sourceRoot = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
 projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRepair_20261112'))
@@ -80,7 +81,7 @@ pantsCutLocalZ = 0.14
 pantsHemWorldZ = 0.420
 bodyShiftZ = pantsHemWorldZ - pantsCutLocalZ * bodyScale
 body.matrix_world = Matrix.Translation((0, 0, bodyShiftZ)) @ Matrix.Scale(bodyScale, 4)
-bodyReport = TrimSourcePart(body, minimumWorldZ=pantsHemWorldZ)
+bodyReport = TrimSourcePart(body, minimumWorldZ=pantsHemWorldZ - 0.025)
 bodyPointsWorld = WorldPoints(body)
 bodyRaw = Coordinates(sources['Body'])
 bodyCollarTop = bodyShiftZ + bodyRaw[:, 2].max() * bodyScale
@@ -97,7 +98,7 @@ headReport = TrimSourcePart(head, minimumWorldZ=neckTransitionZ)
 neckBase = DuplicatePart(sources['HeadBald'], 'NeckBase')
 neckBase.matrix_world = head.matrix_world.copy()
 neckReport = TrimSourcePart(neckBase, maximumWorldZ=neckTransitionZ, halfWidth=0.066, minimumWorldX=-0.055)
-modelHeight = headCrownZ + 0.045
+modelHeight = headCrownZ + 0.033
 pixelSize = modelHeight / 631.0
 
 hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
@@ -125,11 +126,12 @@ rightHand = hand.copy()
 rightHand.name = 'Part_Hand_R'
 assemblyCollection.objects.link(rightHand)
 rightHand.matrix_world = mirror @ handTransform
+sleeveReport = FitSleeveCuffs(body, hand, rightHand)
 
 foot = DuplicatePart(sources['LeftFoot'], 'Foot_L')
 rawFoot = Coordinates(foot)
 footScale = 0.26
-footRotation = Matrix.Rotation(math.radians(5), 4, 'Z')
+footRotation = Matrix.Rotation(math.radians(8), 4, 'Z')
 scaledFoot = rawFoot @ np.array(footRotation.to_3x3()).T * footScale
 top = scaledFoot[rawFoot[:, 2] > rawFoot[:, 2].max() - 0.06]
 topCenter = (top.min(0) + top.max(0)) / 2
@@ -137,11 +139,13 @@ leg = bodyPointsWorld[(bodyPointsWorld[:, 1] > 0) & (bodyPointsWorld[:, 2] < pan
 legCenter = (leg.min(0) + leg.max(0)) / 2
 footShift = np.array([legCenter[0] - topCenter[0], legCenter[1] - topCenter[1], -scaledFoot[:, 2].min()])
 foot.matrix_world = Matrix.Translation(Vector(footShift)) @ footRotation @ Matrix.Scale(footScale, 4)
+shoeReport = TrimSourcePart(foot, maximumWorldZ=0.090)
 rightFoot = foot.copy()
 rightFoot.name = 'Part_Foot_R'
 assemblyCollection.objects.link(rightFoot)
 rightFoot.matrix_world = mirror @ foot.matrix_world
-wrapLeft, wrapRight, wrapReport = BuildCalfWrap(foot, body, assemblyCollection)
+wrapLeft, wrapRight, wrapReport = BuildCalfWrap(foot, body, assemblyCollection, sources['LeftFoot'], pantsHemWorldZ)
+trouserReport = FitTrouserCuffs(body, wrapReport)
 
 cap = DuplicatePart(sources['FieldCap'], 'FieldCap')
 rawCap = Coordinates(cap)
@@ -152,19 +156,20 @@ bill = scaledCap[(rawCap[:, 0] > 0.30) & (rawCap[:, 2] < 0.30)]
 headNoseX = WorldPoints(head)[:, 0].max()
 capShift = np.array([headNoseX + 0.025 - bill[:, 0].max(), 0, 0])
 cap.matrix_world = Matrix.Translation(Vector(capShift)) @ capRotation @ Matrix.Scale(capScale, 4)
+capCrownReport = RefineCapCrown(cap)
 capReport = FitCapBand(cap, head, modelHeight)
 
-report = {'body': bodyReport, 'head': headReport, 'neckBase': neckReport, 'modelHeightMeters': modelHeight,
-          'handPose': 'OriginalSpreadFingers', 'calfWrap': wrapReport, 'capBand': capReport,
+report = {'bodyPreparation': bodyReport, 'head': headReport, 'neckBase': neckReport, 'modelHeightMeters': modelHeight,
+          'handPose': 'OriginalSpreadFingers', 'sleeveFit': sleeveReport, 'trouserFit': trouserReport,
+          'shoePreparation': shoeReport, 'calfWrap': wrapReport, 'capCrown': capCrownReport, 'capBand': capReport,
           'originalPartScaleChecks': {}}
 for name, obj in [('Body', body), ('Head', head), ('Hand', hand), ('Foot', foot), ('Cap', cap)]:
     scales = np.linalg.svd(np.array(obj.matrix_world.to_3x3()), compute_uv=False)
     assert scales.max() - scales.min() < 1e-6
     report['originalPartScaleChecks'][name] = scales.tolist()
 assert np.array_equal(Coordinates(hand), Coordinates(sources['LeftHand']))
-assert np.array_equal(Coordinates(foot), Coordinates(sources['LeftFoot']))
 report['handSourceMeshUnchanged'] = True
-report['footSourceMeshUnchanged'] = True
+report['shoeSourceSurfacePreserved'] = shoeReport['sourceSurfaceMaximumErrorMeters'] < 1e-5
 handWorld = WorldPoints(hand)
 mirroredHandWorld = handWorld.copy()
 mirroredHandWorld[:, 1] *= -1
@@ -208,7 +213,10 @@ views = [
     ('ThreeQuarter', wholeCenter, Vector((4, 3, 0.5)), modelHeight * 1.10),
     ('HandTop', handCenter, Vector((0, 0, 4)), 0.36),
     ('WristFront', Vector(targetWrist) + Vector((0, 0.015, 0)), Vector((4, 0, 0)), 0.27),
+    ('WristRightFront', Vector((targetWrist[0],-targetWrist[1]-0.015,targetWrist[2])), Vector((4,0,0)), 0.27),
     ('FootSide', footCenter, Vector((0, 4, 0)), 0.66),
+    ('LegsFront', Vector((footCenter.x, 0, 0.26)), Vector((4, 0, 0)), 0.78),
+    ('LegsBack', Vector((footCenter.x, 0, 0.26)), Vector((-4, 0, 0)), 0.78),
     ('CapFront', headCenter, Vector((4, 0, 0)), 0.43),
     ('CapLeftSide', headCenter, Vector((0, 4, 0)), 0.43),
     ('CapBack', headCenter, Vector((-4, 0, 0)), 0.43),
