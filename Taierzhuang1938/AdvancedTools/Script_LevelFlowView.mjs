@@ -5,6 +5,35 @@ export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",ci
 const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
 export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
 
+export const FLOW_COVER_COLORS = {
+  side: "#476d54",
+  top: "#8daf8a",
+  edge: "#244633",
+  mark: "#fff4cf",
+};
+
+export function IsEncounterCover(object) {
+  return !!object.cover || object.planning === true || object.material === "Whitebox/Cover";
+}
+
+export function DrawCoverSymbol(context, point) {
+  const [x, y] = point;
+  context.save();
+  context.beginPath();
+  context.moveTo(x - 5, y - 5);
+  context.lineTo(x + 5, y - 5);
+  context.lineTo(x + 5, y);
+  context.quadraticCurveTo(x + 5, y + 4, x, y + 7);
+  context.quadraticCurveTo(x - 5, y + 4, x - 5, y);
+  context.closePath();
+  context.fillStyle = FLOW_COVER_COLORS.edge;
+  context.fill();
+  context.strokeStyle = FLOW_COVER_COLORS.mark;
+  context.lineWidth = 1.5;
+  context.stroke();
+  context.restore();
+}
+
 export function EncounterSignals(frame) {
   const signals=new Set();
   if(frame.time>=40) signals.add("DugoutCollapsed");
@@ -179,7 +208,27 @@ export class FlowMapView {
       context.strokeStyle=object.material==="Whitebox/Roof"?"#706c5d":"#8b80666f";
       context.lineWidth=object.material==="Whitebox/Plaster"&&h>1?1.1:0.7;
       context.strokeRect(-w*scale/2,-d*scale/2,Math.max(0.7,w*scale),Math.max(0.7,d*scale));
+      const cover = IsEncounterCover(object);
+      if (cover) {
+        const left = -w * scale / 2, top = -d * scale / 2;
+        const boxWidth = Math.max(2, w * scale), boxDepth = Math.max(2, d * scale);
+        context.globalAlpha = 1;
+        context.fillStyle = FLOW_COVER_COLORS.top;
+        context.fillRect(left, top, boxWidth, boxDepth);
+        context.save();
+        context.beginPath();
+        context.rect(left, top, boxWidth, boxDepth);
+        context.clip();
+        for (let offset = -boxDepth; offset < boxWidth; offset += 8) {
+          Line(context, [[left + offset, top + boxDepth], [left + offset + boxDepth, top]], FLOW_COVER_COLORS.mark, 1.5);
+        }
+        context.restore();
+        context.strokeStyle = FLOW_COVER_COLORS.edge;
+        context.lineWidth = 1.6;
+        context.strokeRect(left, top, boxWidth, boxDepth);
+      }
       context.restore();
+      if (cover && radius >= 8) DrawCoverSymbol(context, point);
     }
     if(scale>1.2) for(const marker of map.markers) {
       const point=Screen(marker.p);

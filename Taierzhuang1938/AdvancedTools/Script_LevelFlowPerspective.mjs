@@ -1,4 +1,4 @@
-import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
+import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
@@ -150,11 +150,13 @@ export class FlowPerspectiveView extends FlowMapView {
     };
     for(const root of this.mapData.terrain.roots) Visit(root);
     this.terrainTriangles=this.raster.triangles;
-    const Box=(x,z,w,d,h,color,y,yaw=0)=>{
+    const coverBoxes=[];
+    const Box=(x,z,w,d,h,color,y,yaw=0,cover=false)=>{
       const Point=(dx,dy,dz)=>[x+dx*Math.cos(yaw)+dz*Math.sin(yaw),y+dy,z-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
       const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)],top=bottom.map(point=>[point[0],point[1]+h,point[2]]);
       for(let index=0;index<4;index++) Face([bottom[index],bottom[(index+1)%4],top[(index+1)%4],top[index]],color);
-      Face(top,color);
+      Face(top,cover?FLOW_COVER_COLORS.top:color);
+      if(cover) coverBoxes.push({bottom,top});
     };
     const signals=EncounterSignals(frame);
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
@@ -165,7 +167,8 @@ export class FlowPerspectiveView extends FlowMapView {
       const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
       if(!SphereInView(camera,radius)) continue;
       if(perspective&&Math.max(w,h,d)*this.focal/Math.max(1,camera[2])<0.7) continue;
-      Box(x,z,w,d,h,FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180);
+      const cover=IsEncounterCover(object);
+      Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover);
     }
     for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind))) {
       const [x,z]=actor.p,ground=this.Ground(actor.p),yaw=-(actor.heading||0);
@@ -185,6 +188,30 @@ export class FlowPerspectiveView extends FlowMapView {
       }
     }
     this.raster.Flush(context,width,height);
+    for (const {bottom, top} of coverBoxes) {
+      const Stroke = (a, b, color, lineWidth) => {
+        const vertices = this.FaceVertices([a, b, b]);
+        if (vertices.length >= 2) {
+          this.raster.Stroke(context, vertices[0], vertices[1], color, lineWidth, {visible:0, hidden:0}, 0);
+        }
+      };
+      for (let index = 0; index < 4; index++) {
+        Stroke(top[index], top[(index + 1) % 4], FLOW_COVER_COLORS.edge, 1.6);
+        Stroke(bottom[index], top[index], FLOW_COVER_COLORS.edge, 1.2);
+      }
+      for (const fraction of [0.25, 0.5, 0.75]) {
+        const a = top[0].map((value, axis) => value + (top[1][axis] - value) * fraction);
+        const b = top[3].map((value, axis) => value + (top[2][axis] - value) * fraction);
+        Stroke(a, b, FLOW_COVER_COLORS.mark, 1.5);
+      }
+      const center = top[0].map((value, axis) => (value + top[2][axis]) / 2);
+      const vertex = this.Vertex(center);
+      const corners = top.map(point => this.Vertex(point));
+      const span = Math.max(...corners.map(point => point.x)) - Math.min(...corners.map(point => point.x));
+      if (vertex.depth > 0.15 && vertex.depth < this.far && !this.raster.Occluded(vertex) && span >= 8) {
+        DrawCoverSymbol(context, [vertex.x, vertex.y]);
+      }
+    }
   }
   VisibleActor(actor) {return !(this.type==="eye"&&!this.freeCamera&&actor.id===this.target);}
   DrawArea(context,area,color,label,selection,hit) {

@@ -14,6 +14,18 @@ try {
   const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  assert.equal(await page.locator("h1").textContent(),"Encounter Designer");
+  assert.equal(await page.title(),"Encounter Designer · 血战滕县");
+  const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
+    const canvas=document.getElementById(id),context=canvas.getContext("2d");
+    const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
+    let count=0;
+    for(let offset=0;offset<pixels.length;offset+=4) {
+      if(pixels[offset]===36&&pixels[offset+1]===70&&pixels[offset+2]===51) count++;
+    }
+    return count;
+  }));
+  assert.ok(coverPixels.every(count=>count>10),"plan and oblique views show dark green cover outlines and shields");
   assert.equal(await page.locator("#flowCamera").count(),0);
   assert.equal(await page.locator("#stageList").count(),0);
   assert.equal(await page.locator("[data-stage]").count(),10);

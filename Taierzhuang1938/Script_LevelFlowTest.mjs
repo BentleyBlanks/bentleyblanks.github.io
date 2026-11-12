@@ -9,6 +9,7 @@ import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from 
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
+import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 // Compare incremental depth interpolation against the original barycentric
@@ -106,6 +107,10 @@ assert.deepEqual(ReadPngFrameMetadata(png.buffer),packet,"single PNG preserves t
 assert.throws(()=>ReadPngFrameMetadata(tinyPng.buffer));
 const scene=JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",import.meta.url),"utf8"));
 const map=BuildEncounterMap(scene);
+assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="WaterVat_T2")),"cover metadata marks ordinary prop materials");
+assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="Encounter_DragWestBerm")),"authored planning berms receive cover markings");
+assert.ok(IsEncounterCover({material:"Whitebox/Cover"}));
+assert.equal(IsEncounterCover(map.objects.find(object=>object.id==="DoorBoard_T2")),false,"ordinary whitebox props keep their own appearance");
 assert.ok(map.objects.length>1000&&map.fields.length>30);
 for(const id of ["GengGateLintel","DogHoleLintel"]) assert.ok(map.objects.some((object)=>object.id===id));
 assert.ok(map.markers.some((marker)=>marker.name==="狗洞"&&marker.p[0]===92&&marker.p[1]===473));

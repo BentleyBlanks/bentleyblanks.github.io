@@ -1,7 +1,7 @@
 /* Encounter workbench inherits the game's olive, ivory, gold and square controls. */
 .lfBody { font:13px/1.6 system-ui,"Microsoft YaHei",sans-serif; }
 .lfHeader { height:59px; flex:none; display:flex; align-items:center; gap:24px; padding:9px 19px; border-bottom:1px solid var(--se-rule); background:var(--se-panel); }
-.lfBrand span { display:block; color:var(--se-gold-text); font-size:10px; letter-spacing:.16em; }.lfBrand h1 { margin:0; font:21px/1.25 var(--se-serif); letter-spacing:.12em; }
+.lfBrand span { display:block; color:var(--se-gold-text); font-size:10px; letter-spacing:.16em; }.lfBrand h1 { margin:0; font:21px/1.25 var(--se-serif); letter-spacing:.02em; }
 #frameHeading { color:var(--se-muted); font-size:12px; }#saveStatus { margin-left:auto; color:#a9b298; font-size:11px; }
 a { color:var(--se-gold-text); text-decoration:none; }a:hover { text-decoration:underline; }
 .lfToolbar { display:flex; align-items:center; gap:14px; padding:8px 12px; flex:none; background:#0f120ce8; border-bottom:1px solid var(--se-edge); }
@@ -75,3 +75,5 @@ button.selected,button[aria-pressed=true] { color:var(--se-gold-text); border-co
 .lfMapLegend .player {background:#ac7a16;}.lfMapLegend .friend {background:#276d82;}.lfMapLegend .enemy {background:#ac4031;}.lfMapLegend .trigger {border-color:#277b9a;}.lfMapLegend .spawn {color:#ac4031;}
 @media(max-width:1100px) {.lfViewBar {gap:3px;padding:2px 4px;}.lfViewBar>span {display:none;}.lfToolbar {gap:5px;}}
 @media(max-width:800px) {.lfViewGrid {gap:3px;padding:3px;}.lfViewBar {flex-wrap:wrap;height:50px;}.lfViewBar select {max-width:90px;}.lfViewTarget {max-width:52px;}}
+
+.lfMapLegend .cover {width:11px;height:13px;background:#244633;clip-path:polygon(0 0,100% 0,100% 55%,85% 78%,50% 100%,15% 78%,0 55%);margin-left:5px;}

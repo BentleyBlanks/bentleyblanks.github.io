@@ -39,7 +39,7 @@
 
 - **高级工具拆分（2026-11-12）**：场景编辑器、遭遇设计、Mixamo 动作预览、贴图管理与九个摄影棚类编辑器在 `AdvancedTools/`（本地控制中心 `ControlCenter.html`、独立宿主 `Tool_Studio.html`），口径见 [编辑器套件](docs/Data_EditorSuite.md)「AdvancedTool ControlCenter 与独立工具宿主」。**方向规则：游戏目录的非测试代码不 import `./AdvancedTools/`，唯一例外 `Script_DevToolsSplit.mjs`**；线上发布恒换成 `*Split*Stub`、不含该目录；守门 `Script_DevToolsIsolationTest` + `Script_AdvancedToolsTest`。
 
-- **第一关遭遇设计（2026-11-12）**位于高级工具 → 关卡 → 遭遇设计，入口 `Tool_LevelFlow.html`。01–07 对应 Notion 11-11 定稿，08–10 对应现行草稿。完整空间底图取自 `FirstLevelWhitebox` 场景与归档空间表，空间图的沟岸与沟底分层合并绘制，立体视口复用真实高度图与壕沟采样，连接点须保持贯通。单／双／四视口共用时间轴，各自选择空间图、战斗局部、立体俯视、Scene 自由视角、跟拍与玩家视线；触发区、生成区、数量、行为可编辑。镜头段在时间轴标记。草稿存浏览器，导出 PNG 的 `EncounterFrame` iTXt 包含帧定位、标注与布设，也支持工程 JSON。设计规则与回读方法见 [遭遇设计](docs/Data_LevelFlow.md)，门禁 `LevelFlowTest` / `LevelFlowBrowserTest`。
+- **第一关 Encounter Designer（2026-11-13）**位于高级工具 → 关卡 → Encounter Designer，入口 `Tool_LevelFlow.html`。01–07 对应 Notion 11-11 定稿，08–10 对应现行草稿。完整空间底图取自 `FirstLevelWhitebox` 场景与归档空间表，空间图的沟岸与沟底分层合并绘制，立体视口复用真实高度图与壕沟采样，连接点须保持贯通。单／双／四视口共用时间轴，各自选择空间图、战斗局部、立体俯视、Scene 自由视角、跟拍与玩家视线；触发区、生成区、数量、行为可编辑。镜头段在时间轴标记。草稿存浏览器，导出 PNG 的 `EncounterFrame` iTXt 包含帧定位、标注与布设，也支持工程 JSON。设计规则与回读方法见 [Encounter Designer](docs/Data_LevelFlow.md)，门禁 `LevelFlowTest` / `LevelFlowBrowserTest`。
 
 - **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣；第一人称身体反应与耳朵模型 trauma 也只走这一个入口（`phase.blastReaction` 开关），不在关卡里另写扭头、闭眼或耳鸣；近爆眩晕画面（边缘色散 / 拖影 / 重影 / 发灰，`Script_BlastStun`）同样只走这一个入口且全关卡常开，不看 `phase.blastReaction`。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
 
