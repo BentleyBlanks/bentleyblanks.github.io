@@ -312,7 +312,7 @@ const mainSource = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 const hitboxProfile = fs.readFileSync(path.join(here, "Data_CharacterHitbox.mjs"), "utf8");
 const actor = fs.readFileSync(path.join(here, "Script_Actor.mjs"), "utf8");
 const main = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
-const editor = fs.readFileSync(path.join(here, "Script_EditorActor.mjs"), "utf8");
+const editor = fs.readFileSync(path.join(here, "AdvancedTools", "Script_EditorActor.mjs"), "utf8");
 const bakePowerShell = fs.readFileSync(path.join(here, "_import", "Script_BakeLugouCharacters.ps1"), "utf8");
 assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?\?\s*CHARACTER_PROTAGONIST_VARIANT/,
   "protagonist selects the approved default");

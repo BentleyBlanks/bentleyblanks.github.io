@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser,ServeProject} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
-import {FLOW_TIMELINE} from "./Script_LevelFlowModel.mjs";
-import {ReadPngFrameMetadata} from "./Script_LevelFlowDocument.mjs";
+import {FLOW_TIMELINE} from "./AdvancedTools/Script_LevelFlowModel.mjs";
+import {ReadPngFrameMetadata} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),out=path.join(root,"tmp","EncounterEditor");
 fs.mkdirSync(out,{recursive:true});
@@ -13,7 +13,7 @@ const browser=await LaunchBrowser();
 try {
   const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
-  await page.goto(`${base}Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
   assert.equal(await page.locator("#flowCamera").count(),0);
   assert.equal(await page.locator("#stageList").count(),0);
   assert.equal(await page.locator("[data-stage]").count(),10);

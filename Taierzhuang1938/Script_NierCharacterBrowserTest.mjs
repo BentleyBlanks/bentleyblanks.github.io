@@ -45,7 +45,7 @@ try {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
   });
-  await page.goto(`${origin}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=nier`, { waitUntil: "load", timeout: 180000 });
+  await page.goto(`${origin}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=nier`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.action && document.querySelector("#who")?.value === "nier", null, { timeout: 180000 });
   const info = await page.evaluate(async () => {
     const P = window.__preview, THREE = await import("three");

@@ -18,7 +18,7 @@ page.on('pageerror', error => errors.push(String(error)));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
 page.on('response', response => { if (response.status() >= 400) failedRequests.push(`${response.status()} ${response.url()}`); });
 try {
-  await page.goto(`${base}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=luo`, { waitUntil: 'load', timeout: 180000 });
+  await page.goto(`${base}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=luo`, { waitUntil: 'load', timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.hair?.beardSkin && window.__preview?.action, null, { timeout: 180000 });
   for (const clip of ['Animation_Mixamo_Idle_V1.glb', 'Animation_Mixamo_LookingAround_V2.glb']) {
     await page.evaluate(file => window.__preview.SelectFile(file), clip);

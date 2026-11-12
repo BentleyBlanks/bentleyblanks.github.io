@@ -17,8 +17,8 @@ const type89Contract = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/T
 const index = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Data_ModelIndex.json"), "utf8"));
 const built = new Map(index.models.map((entry) => [entry.name, entry]));
 const pythonRules = fs.readFileSync(path.join(projectDir, "_blender", "AssetBudgets.py"), "utf8");
-const editorSource = fs.readFileSync(path.join(projectDir, "Script_EditorAssetStandards.mjs"), "utf8");
-const suiteSource = fs.readFileSync(path.join(projectDir, "Script_Editor.mjs"), "utf8");
+const editorSource = fs.readFileSync(path.join(projectDir, "AdvancedTools", "Script_EditorAssetStandards.mjs"), "utf8");
+const suiteSource = fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8");
 const bootTestSource = fs.readFileSync(path.join(projectDir, "Script_BootTest.mjs"), "utf8");
 const html = fs.readFileSync(path.join(projectDir, "index.html"), "utf8");
 
@@ -161,7 +161,7 @@ Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
 Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
-  && html.includes('"./Script_EditorAssetStandards.mjs": "./Script_EditorAssetStandards.mjs"')
+  && html.includes('"./AdvancedTools/Script_EditorAssetStandards.mjs": "./AdvancedTools/Script_EditorAssetStandards.mjs"')
   && html.includes('"./Data_AssetStandards.mjs": "./Data_AssetStandards.mjs"'),
 "资产规范编辑器已注册到套件与 import map");
 

@@ -64,7 +64,7 @@ const Shot = async (name) => { if (shots) await page.screenshot({ path: path.joi
 const Wait = (ms) => page.waitForTimeout(ms);
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/SceneEditor.html?scene=FirstLevelWhitebox`, { waitUntil: "domcontentloaded" });
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevelWhitebox`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.SceneEditor, null, { timeout: 60000 });
   await E(() => window.SceneEditor.ready);
   await Wait(500);

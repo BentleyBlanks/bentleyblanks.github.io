@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./Script_LevelFlowModel.mjs";
-import { CompileEncounters, ValidateEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
-import { EnterArea } from "./Script_LevelFlowGeometry.mjs";
-import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./Script_LevelFlowDocument.mjs";
-import { BuildEncounterMap, EncounterFloorConnections } from "./Script_LevelFlowMap.mjs";
-import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
+import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
+import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
+import { EnterArea } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
+import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
+import { BuildEncounterMap, EncounterFloorConnections } from "./AdvancedTools/Script_LevelFlowMap.mjs";
+import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
 assert.equal(FLOW_DURATION,1870);

@@ -22,7 +22,7 @@ page.on("pageerror", error => errors.push(String(error)));
 page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
 page.on("response", response => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
 try {
-  await page.goto(`${base}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=${keys[0]}`, { waitUntil: "load", timeout: 180000 });
+  await page.goto(`${base}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=${keys[0]}`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.action && window.__preview.hair?.stats.lod !== "none", null, { timeout: 180000 });
   for (const key of [...keys, "xbot", keys[0]]) {
     await page.locator("#who").selectOption(key);

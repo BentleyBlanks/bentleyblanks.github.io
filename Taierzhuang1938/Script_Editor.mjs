@@ -30,19 +30,10 @@
 
 import { El, Panel, Note } from "./Script_EditorUi.mjs";
 import { DEBUG_TOOL_IDS, TOOL_INFO, TOOL_MENUS as TOOL_MENU_DEFS } from "./Data_DevTools.mjs";
-import { LevelFlowEntry } from "./Script_EditorLevelFlow.mjs";
 import { T } from "./Script_Text.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
-import { ActorEditor } from "./Script_EditorActor.mjs";
-import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { WeaponEditor } from "./Script_EditorWeapon.mjs";
-import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
 import { FirstPersonMotionEditor } from "./Script_EditorFirstPersonMotion.mjs";
-import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
-import { AudioEditor } from "./Script_EditorAudio.mjs";
-import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
-import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
 import { PropPcgEditor } from "./Script_EditorPropPcg.mjs";
 import { SplineEditor } from "./Script_EditorSplines.mjs";
 import { ShotCameraEditor } from "./Script_EditorShotCamera.mjs";
@@ -52,20 +43,17 @@ import { PlayerStateEditor } from "./Script_EditorPlayerState.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import { FrameDebuggerEditor } from "./Script_EditorFrameDebugger.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
-import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
-import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
-import { SceneEditorEntry } from "./Script_EditorSceneEntry.mjs";
 import { EnvironmentEntry } from "./Script_EditorEnvironmentEntry.mjs";
 import { EnvironmentGameOverlay } from "./Script_EditorEnvironmentGame.mjs";
-import { MixamoPreviewEditor } from "./Script_EditorMixamoPreview.mjs";
+import { SPLIT_TOOL_CLASSES } from "./Script_DevToolsSplit.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
+// 摄影棚类里已拆进 AdvancedTools/ 的那些（人物、枪械、特效……）经 Script_DevToolsSplit 并进来，线上发布时那一组是空的。
 const EDITORS = [
-  ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
-  PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, SplineEditor,
+  ...SPLIT_TOOL_CLASSES, PropPcgEditor, SplineEditor,
   // 出图脚本与测试用的定镜小工具（不在任何菜单里，见 Script_EditorShotCamera 文件头）
   ShotCameraEditor,
 ];
@@ -91,9 +79,7 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
 // 分组与顺序在 Data_DevTools.TOOL_MENUS（标题菜单的设置页共用），这里只补 id -> 编辑器类。
 // 场景编辑器 / 贴图管理 / Mixamo 动作预览打开独立窗口，白盒关卡编辑器 / 环境 / Timeline 是整页跳转入口，都不进互斥表。
 const TOOL_CLASSES = new Map([
-  SceneEditorEntry, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, LevelFlowEntry, SquadMarchEditor,
-  ActorEditor, FacialEditor, MixamoPreviewEditor, WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor,
-  VfxEditor, AudioEditor, PropLibraryEditor, AssetStandardsEditor, TextureEditor,
+  ...SPLIT_TOOL_CLASSES, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, FirstPersonMotionEditor,
 ].map((Editor) => [Editor.id, Editor]));
 const TOOL_MENUS = TOOL_MENU_DEFS.map((menu) => ({
   id: menu.id, label: menu.label,
@@ -103,7 +89,7 @@ const TOOL_MENUS = TOOL_MENU_DEFS.map((menu) => ({
     return Editor;
   }),
 }));
-const WINDOW_TOOLS = new Set(Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].window));
+const WINDOW_TOOLS = new Set(Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].window && TOOL_CLASSES.has(id)));
 
 export class EditorSuite {
   /**
@@ -440,7 +426,7 @@ export class EditorSuite {
     this.home?.Show(homeShown);
     this.root.classList.toggle("homeShown", homeShown);
     if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active || !!this.home;
-    this.inspectorToggle.hidden = !this.panelOpen || homeShown || this.activeId === AssetStandardsEditor.id;
+    this.inspectorToggle.hidden = !this.panelOpen || homeShown || this.activeId === "assetStandards";
     const inspector = this.workHost.querySelector(".edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)") || this.emptyInspector;
     this.inspectorElement = inspector;
     if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
@@ -453,7 +439,7 @@ export class EditorSuite {
     // 音效音乐编辑器是唯一例外：它的工作就是在玩法暂停时试听环境床与音乐。
     // 以前这里只看 Capturing，结果一次性音效能响、两个背景层却永远被 SetPaused(true)
     // 掐掉，界面上的环境 / 音乐按钮因此只是改了名字，实际没有播放节点。
-    const silenceBackground = this.Capturing && this.activeId !== AudioEditor.id;
+    const silenceBackground = this.Capturing && this.activeId !== "audio";
     if (silenceBackground !== this._audioPaused) {
       this._audioPaused = silenceBackground;
       if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(silenceBackground);
@@ -461,7 +447,7 @@ export class EditorSuite {
     if (this.status) {
       const label = this.active ? (EDITORS.find((editor) => editor.id === this.activeId)?.label || this.activeId) : "未选择工具";
       const overlayNote = this.overlays.size ? ` · 叠加 ${this.overlays.size} 个` : "";
-      this.status.textContent = `${label} · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}${overlayNote}`;
+      this.status.textContent = `${label} · 玩法已暂停${this.activeId === "audio" ? " · 背景试听已启用" : ""}${overlayNote}`;
     }
     // 高级工具是一整张工作台：开着就收 HUD（空 Inspector 时也收）。
     document.body.classList.toggle("edHideHud", this.panelOpen || !!this.active);
@@ -503,7 +489,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === MixamoPreviewEditor.id || id === BlockoutEntry.id || id === TimelineEditor.id || id === EnvironmentEntry.id) return this.Open(id);
+    if (WINDOW_TOOLS.has(id) || id === BlockoutEntry.id || id === TimelineEditor.id || id === EnvironmentEntry.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -593,9 +579,8 @@ export class EditorSuite {
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
-    for (const WindowTool of [TextureEditor, SceneEditorEntry, MixamoPreviewEditor, LevelFlowEntry]) {
-      if (id !== WindowTool.id) continue;
-      try { return WindowTool.Open(); }
+    if (WINDOW_TOOLS.has(id)) {
+      try { return TOOL_CLASSES.get(id).Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。

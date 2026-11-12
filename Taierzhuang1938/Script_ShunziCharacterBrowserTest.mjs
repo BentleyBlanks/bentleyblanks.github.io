@@ -23,7 +23,7 @@ try {
    localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
    localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
  });
- await page.goto(`${base}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=shunzi`,{waitUntil:'domcontentloaded'});
+ await page.goto(`${base}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=shunzi`,{waitUntil:'domcontentloaded'});
  try {
    await page.waitForFunction(()=>{
      if(document.querySelector('#summary')?.textContent.startsWith('读不到动作库'))throw Error(document.querySelector('#status')?.textContent);

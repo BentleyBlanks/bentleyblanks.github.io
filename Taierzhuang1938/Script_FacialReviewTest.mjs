@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { FACIAL_REVIEW_DEFAULTS as defaults,FacialLineAt,BuildFacialReviewSamples,SampleFacialKeys,ValidateFacialReview } from './Script_FacialReview.mjs';
+import { FACIAL_REVIEW_DEFAULTS as defaults,FacialLineAt,BuildFacialReviewSamples,SampleFacialKeys,ValidateFacialReview } from './AdvancedTools/Script_FacialReview.mjs';
 const lines=[[0,.4],[.6,1]],cue={lines:[{who:'luo'},{who:'yaowa'}]};
 const envelope={duration:1,stepS:.02,levels:new Float32Array(50).fill(1),brightness:new Float32Array(50).fill(.5)};
 const samples=BuildFacialReviewSamples(envelope,lines,cue,'luo');

@@ -12,16 +12,19 @@ function Write(file, value = "fixture") {
 try {
   Write("Taierzhuang1938/index.html", "game");
   Write("Taierzhuang1938/Scenes/FirstLevel/Scene_FirstLevel.json");
+  Write("Taierzhuang1938/AdvancedTools/ControlCenter.html");
   for (const file of PUBLISH_SOURCE_PATHS.slice(1)) Write(file, "mat");
   for (const file of ["TunnelLight1943/index.html", "BehindTheLines/Play/index.wasm", "Model/Unused/Old.glb", "2016/index.html", "index.html"])
     Write(file, "old-project");
   assert.ok(CheckPublication(root).some(problem => problem.includes("TunnelLight1943")));
+  assert.ok(CheckPublication(root).some(problem => problem.includes("AdvancedTools")), "AdvancedTools 不属于发布范围");
   ScopePublication(root, { revision: "test-revision" });
   assert.deepEqual(CheckPublication(root), []);
   assert.equal(fs.readFileSync(path.join(root, "index.html"), "utf8"), PublicationHome());
   assert.equal(fs.readFileSync(path.join(root, "Taierzhuang1938/index.html"), "utf8"), "game");
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, "Data_Publication.json"))).revision, "test-revision");
   assert.equal(fs.existsSync(path.join(root, "TunnelLight1943")), false);
+  assert.equal(fs.existsSync(path.join(root, "Taierzhuang1938/AdvancedTools")), false);
   assert.equal(fs.existsSync(path.join(root, "Model/Unused")), false);
   assert.equal(ScopePublication(root).removedBytes, 0, "重复裁剪保持有效");
   Write(".git", "gitdir: elsewhere");

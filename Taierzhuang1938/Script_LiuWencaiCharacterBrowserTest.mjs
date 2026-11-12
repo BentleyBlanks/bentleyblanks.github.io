@@ -84,7 +84,7 @@ try {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
   });
-  await page.goto(`${origin}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=liuWencai`, { waitUntil: "load", timeout: 180000 });
+  await page.goto(`${origin}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=liuWencai`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.action && document.querySelector("#who")?.value === "liuWencai", null, { timeout: 180000 });
   await page.waitForFunction(() => {
     let loaded = false;

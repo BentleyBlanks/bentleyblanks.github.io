@@ -27,7 +27,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 940 } }), errors = [];
   const Shot=async options=>{await page.setViewportSize({width:1280,height:720});await page.screenshot(options);await page.setViewportSize({width:1440,height:940});};
   page.on("pageerror", error => errors.push(String(error)));
-  await page.goto(`${origin}/Taierzhuang1938/TextureManager.html`);
+  await page.goto(`${origin}/Taierzhuang1938/AdvancedTools/TextureManager.html`);
   await page.waitForFunction(() => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas"));
   assert.equal(await page.locator("#list .asset").count(), TextureCatalog().length);
   await page.locator('[data-name="Texture_WeaponSteelV2Base.webp"]').click();

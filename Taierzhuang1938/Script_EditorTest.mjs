@@ -210,7 +210,7 @@ if(process.argv.includes('--launcher-only')){
   await ClickTool("textures"); const texturePopup = await popupReady;
   await texturePopup.waitForFunction(count => document.querySelectorAll(".asset").length === count, TextureCatalog().length, { timeout: 30000 });
   const editorAfterPopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
-  Check("贴图管理打开真实独立窗口", texturePopup.url().includes("TextureManager.html"));
+  Check("贴图管理打开真实独立窗口", texturePopup.url().includes("AdvancedTools/TextureManager.html"));
   Check("独立窗口不改变当前编辑器状态", JSON.stringify(editorBeforePopup) === JSON.stringify(editorAfterPopup));
   const windows = page.context().pages().length;
   await ClickTool("textures");
@@ -1558,7 +1558,7 @@ const undescribed = await page.evaluate(async () => {
   const seen = new Set();
   // 分类签从编辑器模块读，**不在这里拄一份** —— 拄一份的话，
   // 那边新开一类（断肢就是）这条断言会红在一个与它无关的地方。
-  const editorAudio = await import("./Script_EditorAudio.mjs");
+  const editorAudio = await import("./AdvancedTools/Script_EditorAudio.mjs");
   for (const cat of editorAudio.CATEGORIES.filter((c) => c !== "全部")) {
     editor.category = cat;
     for (const name of editor.Names()) seen.add(name);

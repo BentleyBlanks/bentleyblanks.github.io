@@ -64,6 +64,8 @@ export async function StampHtml(html, dir, cache = new Map()) {
 export async function StampDirectory(dir, { write = true } = {}) {
   const cache = new Map(), report = [];
   for (const item of await fs.readdir(dir, { withFileTypes: true })) {
+    // AdvancedTools/ 不发布（自己的页面各自带解析方式，不盖戳）。
+    if (item.isDirectory() && item.name === 'AdvancedTools') continue;
     if (item.isDirectory() && item.name !== 'vendor') {
       for(const row of await StampDirectory(path.join(dir,item.name),{write}))report.push({...row,page:item.name+'/'+row.page});
       continue;

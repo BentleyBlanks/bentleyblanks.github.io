@@ -166,7 +166,7 @@ try {
   console.log("--- scene editor");
   const editor = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   editor.on("pageerror", (error) => errors.push(`SCENEEDITOR PAGEERROR ${String(error).slice(0, 300)}`));
-  await editor.goto(`http://127.0.0.1:${port}/Taierzhuang1938/SceneEditor.html?scene=FirstLevel`, { waitUntil: "load", timeout: 120000 });
+  await editor.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevel`, { waitUntil: "load", timeout: 120000 });
   await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0 && document.querySelectorAll("#seAssets code").length > 0, null, { timeout: 120000 });
   const se = await editor.evaluate(() => {
     const options = [...document.querySelectorAll("#seScene option")].map((o) => [o.value, o.textContent]);

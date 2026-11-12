@@ -1446,7 +1446,7 @@ if (flip.tooSlow) {
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.
 const preview = await page.evaluate(async () => {
-  const {AudioEditor} = await import("./Script_EditorAudio.mjs");
+  const {AudioEditor} = await import("./AdvancedTools/Script_EditorAudio.mjs");
   const a = window.Taierzhuang.audio;
   const root = document.createElement("div"); document.body.appendChild(root);
   const editor = new AudioEditor({audio:a, Close:()=>editor.Exit()});

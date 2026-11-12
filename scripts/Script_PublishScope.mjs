@@ -11,6 +11,7 @@ export const PUBLISH_SOURCE_PATHS = Object.freeze([
 ]);
 const rootFiles = new Set(["index.html", "404.html", ".nojekyll", "Data_Publication.json"]);
 export function IsPublishedSource(file) {
+  if (file.startsWith("Taierzhuang1938/AdvancedTools/")) return false;
   return file.startsWith("Taierzhuang1938/") || PUBLISH_SOURCE_PATHS.slice(1).includes(file);
 }
 export function IsPublishedPath(file) {

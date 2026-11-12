@@ -29,7 +29,7 @@ function SkinFraction(data, info, [x0, x1, y0, y1]) {
   return skin / count;
 }
 try {
-  await page.goto(`${base}/Taierzhuang1938/Tool_MixamoAnimationPreview.html?who=luo`, { waitUntil: 'load', timeout: 180000 });
+  await page.goto(`${base}/Taierzhuang1938/AdvancedTools/Tool_MixamoAnimationPreview.html?who=luo`, { waitUntil: 'load', timeout: 180000 });
   await page.waitForFunction(() => window.__preview?.hair?.asset.id === 'Game_SquadLeaderLuo' && window.__preview?.action, null, { timeout: 180000 });
   await page.evaluate(() => window.__preview.SelectFile('Animation_Mixamo_Idle_V1.glb'));
   for (const [view, yaw, region, ceiling] of [

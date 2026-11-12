@@ -49,6 +49,9 @@ const browserLockWriteGraceMs = 10 * 1000;
 export const testDefs = {
   LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Encounter gates, continuous passage junctions, deterministic waves and annotation data" },
   LevelFlowBrowserTest: { file: "Script_LevelFlowBrowserTest.mjs", timeoutMs: 180000, desc: "Encounter editor 720p, connected T-junction pixels, independent viewports and PNG round-trip" },
+  AdvancedToolsTest: { file: "Script_AdvancedToolsTest.mjs", timeoutMs: 180000, desc: "高级工具拆分（纯 Node）：目录表与 TOOL_INFO 对账、搬走的页面、四个入口类的窗口地址、控制中心卡片、启动器 dry-run / .lnk / 真起预览服" },
+  AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 19 张卡片与链接、九个摄影棚工具在独立工具宿主里逐个打开、四个搬走的独立页面新地址可用" },
+  ToolStudioParityBrowserTest: { file: "Script_ToolStudioParityBrowserTest.mjs", timeoutMs: 60 * 60 * 1000, desc: "独立工具宿主与游戏宿主画面对照：九个摄影棚工具各取确定状态，整页截图平均绝对差 ≤ 2/255（每个工具要开两次整套游戏，约 20+ 分钟）" },  HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, interpolation, LOD assets and character head bindings" },
   HairRangeBrowserTest: { file: "Script_HairRangeBrowserTest.mjs", timeoutMs: 900000, desc: "Hair lab, three LODs, TAA/velocity, game head attachment, cost and disposal" },
@@ -623,7 +626,8 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "LevelFlowBrowserTest",
-  "HairReferenceBrowserTest",
+  "AdvancedToolsBrowserTest",
+  "ToolStudioParityBrowserTest",  "HairReferenceBrowserTest",
   "HairRangeBrowserTest",
   "HairCapBrowserTest",
   "MixamoGroomBrowserTest",
@@ -912,7 +916,7 @@ export const domains = {
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
-  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
+  advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
@@ -1055,7 +1059,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "levelFlow", pattern: /LevelFlow/ },
-  {domain:'oldGengCharacter',pattern:/OldGeng/i},
+  { domain: "advancedTools", pattern: /AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},
     {domain:'interpreterCharacter',pattern:/Model_Interpreter|Data_Interpreter|Script_BuildInterpreter|Script_BakeInterpreterContacts|Animation_Interpreter|Script_InterpreterCharacterBrowserTest/i},

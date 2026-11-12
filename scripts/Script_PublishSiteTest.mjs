@@ -13,11 +13,10 @@ const base=(remote||`http://127.0.0.1:${server.address().port}`).replace(/\/$/,'
 const browser=await LaunchBrowser({extraArgs:['--mute-audio',...(process.argv.includes('--software')?['--use-angle=swiftshader','--enable-unsafe-swiftshader']:[])]});
 const shots=Arg('--shots');
 try{
+  // 贴图管理、Mixamo 动作预览已拆进 AdvancedTools/，不再发布（本地预览用）
   for(const fixture of [
     {name:'Menu',route:'?quality=low&scale=small',ready:()=>window.Tengxian?.state?.ready},
-    {name:'TextureManager',route:'TextureManager.html',ready:()=>document.querySelectorAll('.asset').length>250&&!!document.querySelector('canvas')},
     {name:'Animation',route:'Animation/BackRifleRun/index.html',ready:()=>window.BackRifleReview?.ready&&document.getElementById('status')?.textContent.includes('独立 GLB 已载入')},
-    {name:'MixamoPreview',route:'Tool_MixamoAnimationPreview.html?who=oldGeng',ready:()=>window.__preview?.action&&document.getElementById('who')?.value==='oldGeng'},
     ...(process.argv.includes('--gameplay')?[{name:'Gameplay',route:'?whitebox=p012&quality=low&scale=small',ready:()=>window.Tengxian?.state?.ready}]:[]),
   ]){
     const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],missing=[];

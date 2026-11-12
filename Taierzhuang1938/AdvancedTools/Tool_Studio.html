@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- 本页在 AdvancedTools/ 里，但它复用的游戏模块（模型 / 贴图 / PBR 材质 / 头发加载）都按游戏根目录写 "./Model/…"
+       这类相对路径，所以文档基准指回上一层：下面所有相对地址（样式、import map、本页入口脚本）都以 Taierzhuang1938/ 为准。 -->
+  <base href="../">
+  <title>工具宿主 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
+  <link rel="stylesheet" href="./Style_Game.css">
+  <link rel="stylesheet" href="./Style_Editor.css">
+  <style>
+    #tsBoot { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #08080a; color: var(--ed-text-3, #b8b2a2); font-size: 13px; letter-spacing: 0.12em; }
+    #tsBoot.gone { display: none; }
+    #tsBootTitle { font-size: 20px; color: var(--ed-gold-text, #d8c48a); letter-spacing: 0.2em; }
+    #tsBootTrack { width: 320px; height: 3px; background: rgba(255, 255, 255, 0.1); }
+    #tsBootBar { width: 0; height: 100%; background: var(--ed-gold, #b89b52); }
+  </style>
+  <!-- 导入表不在这里另抄一份：同步读 index.html 里那张 import map（线上发布的 index.html 也保留它）原样插进来，
+       键值按本页的文档基准（上面的 <base>）解析，与游戏页同一套，模块版本永远一致、同一模块只有一个 URL。 -->
+  <script>
+    (function () {
+      var map = '{"imports":{}}';
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "./index.html", false);
+        xhr.send();
+        var found = /<script type="importmap">([\s\S]*?)<\/script>/.exec(xhr.responseText);
+        if (found) map = found[1];
+      } catch (error) { console.error("[ToolStudio] 读不到 index.html 的 import map", error); }
+      var script = document.createElement("script");
+      script.type = "importmap";
+      script.textContent = map;
+      document.currentScript.after(script);
+    })();
+  </script>
+  <script type="module" src="./AdvancedTools/Script_ToolStudio.mjs"></script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud"></div>
+  <div id="tsBoot">
+    <div id="tsBootTitle">工具宿主</div>
+    <div id="tsBootTrack"><div id="tsBootBar"></div></div>
+    <div id="tsBootStep">正在启动……</div>
+  </div>
+</body>
+</html>

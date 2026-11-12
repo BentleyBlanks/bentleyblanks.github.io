@@ -22,6 +22,7 @@ import { IsPublishedSource } from "./Script_PublishScope.mjs";
 export const PUBLISH_EXCLUDE = Object.freeze([
   { path: "Taierzhuang1938/_import/", why: "滕县导入管线工作区：FBX / TGA / 二进制源文件、烘焙脚本与记录，网页不加载" },
   { path: "Taierzhuang1938/_blender/", why: "滕县 Blender 构建脚本与中间文件" },
+  { path: "Taierzhuang1938/AdvancedTools/", why: "已拆出游戏的高级工具与本地控制中心：只在本地预览使用；游戏里它们的入口由 Script_DevToolsSplit 的剔除版去掉，index.html 的 import map 条目在下面 StripAdvancedToolsImports 里一并摘掉" },
   { path: "TunnelLight1943/StyleConceptShots/", why: "地道里的光的风格概念图与两个 zip 包，没有页面引用" },
   { path: "Model/StrawSleepingMat/Source/", why: "随身草席的 Blender 源文件" },
   { path: "Taierzhuang1938/Model/TrainReference/Reference/", why: "火车参考图" },
@@ -61,6 +62,21 @@ function SizeOf(full) {
   return total;
 }
 
+/** 发布副本的 index.html import map 里去掉指向 AdvancedTools/ 的条目（目录已不在发布包里，留着会让盖戳报「找不到文件」）。 */
+export function StripAdvancedToolsImports(siteDir) {
+  const file = path.join(siteDir, "Taierzhuang1938/index.html");
+  if (!fs.existsSync(file)) return 0;
+  const html = fs.readFileSync(file, "utf8");
+  let removed = 0;
+  const next = html.replace(/^[ \t]*"\.\/AdvancedTools\/[^"]+":[ \t]*"[^"]*",?[ \t]*\r?\n/gm, () => { removed += 1; return ""; });
+  if (removed) {
+    const map = next.match(/<script type="importmap">([\s\S]*?)<\/script>/);
+    JSON.parse(map[1]);
+    fs.writeFileSync(file, next);
+  }
+  return removed;
+}
+
 /** 在站点目录里删掉清单上的路径，返回 [{ entry, bytes, files }]。 */
 export function Prune(siteDir) {
   const results = [];
@@ -82,6 +98,7 @@ export function Prune(siteDir) {
     }
     results.push({ entry, bytes, files });
   }
+  StripAdvancedToolsImports(siteDir);
   return results;
 }
 

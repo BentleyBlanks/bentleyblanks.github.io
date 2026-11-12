@@ -4,7 +4,7 @@
 // 「有没保存的改动」按步编号判（撤销再改不会误判成已保存）；在真场景 FirstLevelWhitebox 上走一圈改动后撤到底与原文逐字相同、仍过校验。
 
 import assert from "node:assert/strict";
-import { SceneEditModel } from "./Script_SceneEditModel.mjs";
+import { SceneEditModel } from "./AdvancedTools/Script_SceneEditModel.mjs";
 import { ReadSceneSync } from "./Script_SceneNode.mjs";
 
 let checks = 0;

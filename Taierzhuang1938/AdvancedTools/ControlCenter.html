@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AdvancedTool ControlCenter · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="../Style_Interface.css">
+  <link rel="stylesheet" href="../Style_Editor.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: #060705; }
+    a.edHomeTool { text-decoration: none; }
+    .edHomeTag[data-kind="game"] { border-color: #edca8366; color: var(--ed-gold-text); }
+    .edHomeTag[data-kind="studio"], .edHomeTag[data-kind="win"] { color: var(--ed-text-3); }
+  </style>
+  <!-- 与 SceneEditor.html 同一套：开机先同步读 ../index.html 里那张 import map，键值按 index.html 的位置解析成绝对地址再插进来，
+       本页在 AdvancedTools/ 里，不能照抄相对写法；模块版本永远跟游戏一致。 -->
+  <script>
+    (function () {
+      var map = '{"imports":{}}';
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "../index.html", false);
+        xhr.send();
+        var found = /<script type="importmap">([\s\S]*?)<\/script>/.exec(xhr.responseText);
+        if (found) {
+          var imports = JSON.parse(found[1]).imports, resolved = {};
+          Object.keys(imports).forEach(function (key) {
+            resolved[key.charAt(0) === "." ? new URL(key, xhr.responseURL).href : key] = new URL(imports[key], xhr.responseURL).href;
+          });
+          map = JSON.stringify({ imports: resolved });
+        }
+      } catch (error) { console.error("[ControlCenter] 读不到 index.html 的 import map", error); }
+      var script = document.createElement("script");
+      script.type = "importmap";
+      script.textContent = map;
+      document.currentScript.after(script);
+    })();
+  </script>
+  <script type="module" src="./Script_ControlCenter.mjs"></script>
+</head>
+<body data-control-center>
+</body>
+</html>

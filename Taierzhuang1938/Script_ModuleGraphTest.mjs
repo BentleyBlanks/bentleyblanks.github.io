@@ -50,7 +50,11 @@ async function TestModuleGraphIsCacheBusted() {
     if (file.startsWith("vendor/") || seen.has(file)) return;
     seen.add(file);
     const src = fs.readFileSync(path.join(dirHere, file), "utf8");
-    for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z0-9_/]+\.m?js)["']/g)) walk(m[1]);
+    // 相对写法按当前文件所在目录解析：AdvancedTools/ 里的模块用 ../Script_X.mjs 引游戏模块、用 ./Script_Y.mjs 引同目录的。
+    for (const m of src.matchAll(/(?:from|import\()\s*["'](\.\.?\/[A-Za-z0-9_/]+\.m?js)["']/g)) {
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1]));
+      if (!target.startsWith("../")) walk(target);
+    }
     // 源码里不许自己写版本戳：同一模块两个 URL = 浏览器加载两份实例。
     // 自带 ?v= 的 specifier 也不会被上面的正则走到，等于整棵子树失踪。
     for (const m of src.matchAll(/(?:from|import\()\s*["'][^"']*\.m?js\?v=[^"']*["']/g)) {

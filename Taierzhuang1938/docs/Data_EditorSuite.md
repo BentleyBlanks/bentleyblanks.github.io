@@ -60,6 +60,19 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
   （有人绕过边界直接 import 编辑器时报出是谁拉进来的）；标题菜单包从不带编辑器；`--browser` 真浏览器跑剔除包，
   标题菜单与第一关都能开机、设置三页可用、菜单里没有两项开发入口。2026-10-13 实测剔除省 817 KB、43 个模块。
 
+## AdvancedTool ControlCenter 与独立工具宿主（2026-11-12）
+
+一部分高级工具从游戏里拆到 `Taierzhuang1938/AdvancedTools/`，用本地控制中心和独立宿主页打开；方向只许 **AdvancedTools → 游戏**。
+
+- **范围**：独立网页 4 个整页搬走、旧网址不留跳转壳——场景编辑器 `SceneEditor.html`、遭遇设计 `Tool_LevelFlow.html`、Mixamo 动作预览 `Tool_MixamoAnimationPreview.html`、贴图管理 `TextureManager.html`（连同只给它们用的模块与样式）；摄影棚类 9 个（`assetStandards audio props actor facial squadMarch weapon firstPerson vfx`）源码搬进该目录，连同只被它们用的 `Script_EditorParticleInspector / FallingSoil / FlareField`、`Script_FacialReview`、`Script_PlaceableCatalog`。被留在游戏里的代码导入的模块一律留在原地（如 `Script_MixamoProps`、`Script_TextureImports`），AdvancedTools 里用 `../X.mjs` 引。其余场景类（environment / splines / propPcg / blockout / timeline）、fpMotion、全部 Debug工具与共用的 `Script_EditorStage / Ui / Settings / Volume / Home`、`Script_Editor` 本体不动。
+- **控制中心** `AdvancedTools/ControlCenter.html`（`Script_ControlCenter.mjs`，目录表 `Data_AdvancedTools.mjs` 零依赖）：版式照工具首页，按 `TOOL_MENUS` 六组列 19 张卡片——独立窗口页开各自页面、摄影棚类开 `Tool_Studio.html?tool=<id>`、留在游戏里的标「游戏内」并链到游戏现有入口（blockout / timeline / environment 用入口类静态 `Url()`，其余 `../index.html?editor=tools&tool=<id>`）。Debug工具不列。
+- **独立工具宿主** `AdvancedTools/Tool_Studio.html?tool=<id>`（`Script_ToolStudio.mjs` 外壳 + `Script_ToolStudioRenderBase.mjs` 渲染底座）：不改 `Script_Main`，底座照 Main 的建系统与出画顺序自己装配（画质档与玩家存档同一套，天光 / 地台照工具首页那一关），host 字段同 `EditorSuite.editorHost`，差别只有 `game` 是最小桩、`playerWeaponId` 取 `DEFAULT_PLAYER_WEAPON`。页面 `<base href="../">`，游戏模块里按游戏根写的 `./Model/…` 相对路径照旧可用；外部 PBR 清单照抄 Main 的表（`Data_ToolStudioPbrSets.mjs`，Main 改表要同步）。`?manual=1` 时钟归测试（`window.ToolStudio.StepFrames`）。
+- **搬家后的路径**：独立页面读 `../index.html` 的 import map，键值按 index.html 位置解析成绝对地址再插入（避免同一模块两个实例）；入口类用 `new URL("../", import.meta.url)` 解析 `TOOL_INFO.window.url`（相对 `Taierzhuang1938/` 根）。`index.html` 的 import map 里搬走的模块登记为 `./AdvancedTools/X.mjs`。
+- **游戏内入口暂时保留、行为不变**：两对拆分边界模块（写法同 `Script_DevTools` / `Data_DevTools`）——`Script_DevToolsSplit.mjs` 导出 `SPLIT_TOOL_CLASSES`（13 个工具类，游戏里唯一可以 import `./AdvancedTools/` 的模块）、`Data_DevToolsSplit.mjs` 导出 `SPLIT_TOOLS_AVAILABLE`（零依赖）；`TOOL_INFO` 里 13 项带 `split: true`，`TOOL_MENUS` 按 `!split || SPLIT_TOOLS_AVAILABLE` 过滤；`Script_Editor` 的类表 / 互斥表由本地类加 `SPLIT_TOOL_CLASSES` 组装。
+- **线上剔除**：Pages 发布始终把这两对换成 `*Stub`（`Script_BuildBrowserBundle --deploy` 自动带，`--strip-dev-tools` 全剔路径仍可用），发布副本不含 `AdvancedTools/`（`PUBLISH_EXCLUDE` + `Script_PublishScope.IsPublishedSource`），`Script_PublishPrune.StripAdvancedToolsImports` 摘掉 `index.html` import map 里指向它的条目（排在盖戳之前），`Script_StampImportMaps` 不进该目录。效果：线上菜单 / 设置 → 高级工具里这 13 项消失（整组拆空的「特效与声音」也不列），其余工具照旧。
+- **启动器** `AdvancedTools/Script_ControlCenterLaunch.mjs`：8080 起找 `/__preview/ping` 根目录就是本仓库的预览服，没有就后台起 `Script_LocalPreview.mjs --no-open`（端口以输出为准，关窗口即停服），再用默认浏览器开控制中心；`--dry-run` 只打印计划，`--shortcut` 在桌面建「AdvancedTool ControlCenter.lnk」（目标 node、参数本脚本、工作目录仓库根），`--shortcut-dir=<dir>` 改目标目录。
+- **门禁**：`Script_AdvancedToolsTest`（纯 Node：目录表、搬家、入口类地址、卡片、启动器）、`Script_AdvancedToolsBrowserTest`（控制中心、九个工具在独立宿主逐个打开、四个页面新地址）、`Script_ToolStudioParityBrowserTest`（九个工具游戏宿主 vs 独立宿主整页截图平均绝对差 ≤ 2/255，约 20+ 分钟，tier2）、`Script_DevToolsIsolationTest`（拆分边界导出对账、游戏不 import AdvancedTools、发布构建 / 发布副本 / 菜单剔除）。
+
 ## 精简测试界面
 
 所有设置、编辑器与渲染调试只展示选择对象、核心操作、必要参数和少量测试结果。
