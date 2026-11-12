@@ -1,10 +1,10 @@
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
+import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
 function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
-function Dot(a,b) {return a.reduce((sum,value,index)=>sum+value*b[index],0);}
 
 export class FlowPerspectiveView extends FlowMapView {
   constructor(canvas,mapData,type="oblique") {
@@ -56,7 +56,12 @@ export class FlowPerspectiveView extends FlowMapView {
     if(this.type==="oblique") this.scale=Clamp(Math.min(this.canvas.clientWidth,this.canvas.clientHeight)/35,3,12);
     else this.scale=this.type==="eye"?8:10;
   }
-  CameraPoint(point) {const delta=point.map((value,index)=>value-this.eye[index]);return [Dot(delta,this.right),Dot(delta,this.up),Dot(delta,this.forward)];}
+  CameraPoint(point) {
+    const x=point[0]-this.eye[0],y=point[1]-this.eye[1],z=point[2]-this.eye[2];
+    return [x*this.right[0]+y*this.right[1]+z*this.right[2],
+      x*this.up[0]+y*this.up[1]+z*this.up[2],
+      x*this.forward[0]+y*this.forward[1]+z*this.forward[2]];
+  }
   Vertex(point) {
     const camera=this.CameraPoint(point);
     if(this.type==="oblique"&&!this.freeCamera) {
@@ -103,6 +108,8 @@ export class FlowPerspectiveView extends FlowMapView {
     if(this.type==="oblique"&&!this.freeCamera) return points.map(point=>this.Vertex(point));
     let polygon=points.map(point=>this.CameraPoint(point));
     for(const [edge,sign] of [[0.15,1],[this.far,-1]]) {
+      if(polygon.every(point=>(point[2]-edge)*sign>=0)) continue;
+      if(polygon.every(point=>(point[2]-edge)*sign<0)) return [];
       const clipped=[];
       for(let index=0;index<polygon.length;index++) {
         const a=polygon[index],b=polygon[(index+1)%polygon.length],insideA=(a[2]-edge)*sign>=0,insideB=(b[2]-edge)*sign>=0;
@@ -116,20 +123,33 @@ export class FlowPerspectiveView extends FlowMapView {
   DrawBase(context,width,height,frame) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     this.raster.Begin(width,height,perspective);
+    const horizontal=width/(2*this.focal),top=height*0.49/this.focal,bottom=height*0.51/this.focal;
+    const horizontalNormal=Math.hypot(1,horizontal),topNormal=Math.hypot(1,top),bottomNormal=Math.hypot(1,bottom);
+    const SphereInView=(camera,radius)=>{
+      if(camera[2]+radius<0.15||camera[2]-radius>this.far) return false;
+      if(perspective) return Math.abs(camera[0])-horizontal*camera[2]<=radius*horizontalNormal
+        &&camera[1]-top*camera[2]<=radius*topNormal&&-camera[1]-bottom*camera[2]<=radius*bottomNormal;
+      const x=width/2+camera[0]*this.scale,y=height*0.57-camera[1]*this.scale,extent=radius*this.scale;
+      return x+extent>=0&&x-extent<=width&&y+extent>=0&&y-extent<=height;
+    };
     const Face=(points,color)=>{const vertices=this.FaceVertices(points);if(vertices.length>=3) this.raster.Face(vertices,color);};
     const Visit=(cell)=>{
-      const cx=cell.x+cell.size/2,cz=cell.z+cell.size/2,cy=(cell.minHeight+cell.maxHeight)/2,radius=Math.hypot(cell.size,cell.maxHeight-cell.minHeight)*0.72;
+      const heightRange=cell.maxHeight-cell.minHeight;
+      const cx=cell.x+cell.size/2,cz=cell.z+cell.size/2,cy=(cell.minHeight+cell.maxHeight)/2,radius=Math.hypot(cell.size/Math.SQRT2,heightRange/2);
       const camera=this.CameraPoint([cx,cy,cz]);
-      if(camera[2]+radius<0.15||camera[2]-radius>this.far) return;
-      const corners=[cell.minHeight,cell.maxHeight].flatMap(y=>[[cell.x,y,cell.z],[cell.x+cell.size,y,cell.z],[cell.x+cell.size,y,cell.z+cell.size],[cell.x,y,cell.z+cell.size]]).map(point=>this.Vertex(point));
-      if(!perspective||camera[2]>radius+0.2) {
-        if(corners.every(p=>p.x<0)||corners.every(p=>p.x>width)||corners.every(p=>p.y<0)||corners.every(p=>p.y>height)) return;
+      if(!SphereInView(camera,radius)) return;
+      const projectionScale=perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale;
+      // Refine visible height detail at screen-sized cells. Flat ground stops
+      // early, while every selected cell retains its shared boundary vertices.
+      if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
+        &&heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels) {
+        for(const child of cell.children) Visit(child);
+        return;
       }
-      const pixels=perspective?cell.size*this.focal/Math.max(0.1,camera[2]):cell.size*this.scale;
-      if(cell.children&&pixels>3.5) {for(const child of cell.children) Visit(child);return;}
       for(const triangle of this.mapData.terrain.facesForCell(cell)) Face(triangle.points,triangle.color);
     };
     for(const root of this.mapData.terrain.roots) Visit(root);
+    this.terrainTriangles=this.raster.triangles;
     const Box=(x,z,w,d,h,color,y,yaw=0)=>{
       const Point=(dx,dy,dz)=>[x+dx*Math.cos(yaw)+dz*Math.sin(yaw),y+dy,z-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
       const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)],top=bottom.map(point=>[point[0],point[1]+h,point[2]]);
@@ -139,10 +159,12 @@ export class FlowPerspectiveView extends FlowMapView {
     const signals=EncounterSignals(frame);
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
-      const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1],camera=this.CameraPoint([x,y??this.Ground([x,z]),z]),radius=Math.hypot(w,h,d);
-      if(camera[2]+radius<0.15||camera[2]-radius>this.far||Math.max(w,d)<0.4) continue;
-      if(perspective&&Math.max(w,h,d)*this.focal/Math.max(1,camera[2])<0.7) continue;
+      const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
+      if(Math.max(w,d)<0.4) continue;
       const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y-h/2:this.Ground([x,z]);
+      const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
+      if(!SphereInView(camera,radius)) continue;
+      if(perspective&&Math.max(w,h,d)*this.focal/Math.max(1,camera[2])<0.7) continue;
       Box(x,z,w,d,h,FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180);
     }
     for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind))) {
@@ -239,5 +261,5 @@ export class FlowPerspectiveView extends FlowMapView {
     const vertices=this.FaceVertices([a,b,b]);
     if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],"#c47b34",1.2,{visible:0,hidden:0},0);
   }
-  Diagnostics() {return {terrain:this.mapData.terrain.source,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
+  Diagnostics() {return {terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
 }

@@ -16,26 +16,48 @@ export class EncounterRaster {
       this.width=width;this.height=height;this.canvas.width=width;this.canvas.height=height;
       this.image=new ImageData(width,height);this.depth=new Float32Array(width*height);
     }
-    this.perspective=perspective;this.depth.fill(Infinity);
+    this.perspective=perspective;this.depth.fill(Infinity);this.triangles=0;
     const data=this.image.data;
     for(let offset=0;offset<data.length;offset+=4) {data[offset]=220;data[offset+1]=226;data[offset+2]=219;data[offset+3]=255;}
   }
 
   Triangle(a,b,c,color) {
+    this.triangles++;
     const area=Edge(a,b,c.x,c.y);
     if(Math.abs(area)<0.001) return;
     const minX=Math.max(0,Math.floor(Math.min(a.x,b.x,c.x))),maxX=Math.min(this.width-1,Math.ceil(Math.max(a.x,b.x,c.x)));
     const minY=Math.max(0,Math.floor(Math.min(a.y,b.y,c.y))),maxY=Math.min(this.height-1,Math.ceil(Math.max(a.y,b.y,c.y)));
+    if(minX>maxX||minY>maxY) return;
     const rgb=Rgb(color),data=this.image.data,depth=this.depth;
     const az=this.perspective?1/a.depth:a.depth,bz=this.perspective?1/b.depth:b.depth,cz=this.perspective?1/c.depth:c.depth;
-    for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) {
-      const first=Edge(b,c,x+0.5,y+0.5)/area,second=Edge(c,a,x+0.5,y+0.5)/area,third=1-first-second;
-      if(first<-1e-7||second<-1e-7||third<-1e-7) continue;
-      const interpolated=first*az+second*bz+third*cz;
-      const z=this.perspective?1/interpolated:interpolated,index=y*this.width+x;
-      if(z>=depth[index]) continue;
-      depth[index]=z;
-      const offset=index*4;data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];
+    const firstStep=(c.y-b.y)/area,secondStep=(a.y-c.y)/area;
+    const firstRowStep=(b.x-c.x)/area,secondRowStep=(c.x-a.x)/area;
+    const depthStep=firstStep*(az-cz)+secondStep*(bz-cz);
+    const firstRow=Edge(b,c,minX+0.5,minY+0.5)/area;
+    const secondRow=Edge(c,a,minX+0.5,minY+0.5)/area;
+    const weights=[firstRow,secondRow,1-firstRow-secondRow];
+    const steps=[firstStep,secondStep,-firstStep-secondStep];
+    const rowSteps=[firstRowStep,secondRowStep,-firstRowStep-secondRowStep];
+    for(let y=minY;y<=maxY;y++) {
+      // Each barycentric weight is linear across a row. Intersect its three
+      // valid intervals so the pixel loop only visits the triangle's span.
+      let from=minX,to=maxX;
+      for(let edge=0;edge<3;edge++) {
+        const weight=weights[edge],step=steps[edge];
+        if(step>0) from=Math.max(from,minX+Math.ceil((-1e-7-weight)/step));
+        else if(step<0) to=Math.min(to,minX+Math.floor((-1e-7-weight)/step));
+        else if(weight<-1e-7) {to=from-1;break;}
+      }
+      let interpolated=weights[0]*az+weights[1]*bz+weights[2]*cz+(from-minX)*depthStep;
+      let index=y*this.width+from;
+      for(let x=from;x<=to;x++,index++,interpolated+=depthStep) {
+        const z=this.perspective?1/interpolated:interpolated;
+        if(z>=depth[index]) continue;
+        depth[index]=z;
+        const offset=index*4;
+        data[offset]=rgb[0];data[offset+1]=rgb[1];data[offset+2]=rgb[2];
+      }
+      for(let edge=0;edge<3;edge++) weights[edge]+=rowSteps[edge];
     }
   }
 

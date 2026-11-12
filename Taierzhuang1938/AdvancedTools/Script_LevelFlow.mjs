@@ -15,7 +15,7 @@ const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,sto
 const layers=Object.fromEntries([...document.querySelectorAll("[data-layer]")].map((input)=>[input.dataset.layer,input.checked]));
 let map, time=0, playing=false, mode="select", tab="script", selection=null;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
-let toastTimer=0, objectFormKey="";
+let toastTimer=0, objectFormKey="", renderPending=false;
 const params=new URLSearchParams(location.search);
 
 function Toast(message,persistent=false) {
@@ -206,8 +206,10 @@ function UpdateAnnotations() {
     });button.className="lfFrameBookmark";button.dataset.annotationTime=String(stamp);list.append(button);
   }
 }
+function RequestRender() {renderPending=true;}
 function Render() {
   if(!map||!workspace) return;
+  renderPending=false;
   frame=EvaluateFlow(time,project.value);UpdateTimeline();
   workspace.Draw(frame,layers,selection,project.value.annotations,draft);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
@@ -254,7 +256,7 @@ function BindMap(entry) {
   });
   surface.addEventListener("pointermove",(event)=>{
     if(navigation.Move(entry,event)) return;
-    const screen=LocalPoint(event,surface),world=entry.map.ToWorld(screen);
+    const screen=LocalPoint(event,surface);
     if(pointer&&pointer.viewport===entry.index) {
       const dx=screen[0]-pointer.screen[0],dy=screen[1]-pointer.screen[1];if(Math.hypot(dx,dy)>3) pointer.moved=true;
       if(pointer.action==="pan"&&pointer.moved) {
@@ -265,8 +267,9 @@ function BindMap(entry) {
           map.center=map.center.map((value,index)=>value+pointer.world[index]-current[index]);
         }
       }
-      if(pointer.action==="annotate") draft.b=world;
+      if(pointer.action==="annotate") draft.b=entry.map.ToWorld(screen);
       if(pointer.action==="edit") {
+        const world=entry.map.ToWorld(screen);
         const candidate=structuredClone(pointer.original),hit=pointer.hit;
         const list=hit.type==="annotationHandle"?candidate.annotations:hit.type==="routeHandle"||hit.objectType==="group"?candidate.groups:candidate.triggers;
         const target=list.find((item)=>item.id===hit.id);
@@ -276,7 +279,7 @@ function BindMap(entry) {
         else target.area.size=[Math.max(0.5,Math.abs(world[0]-target.area.center[0])*2),Math.max(0.5,Math.abs(world[1]-target.area.center[1])*2)].map((value)=>Math.min(500,value));
         project.value=candidate;
       }
-      Element("mapTooltip").hidden=true;Render();return;
+      Element("mapTooltip").hidden=true;RequestRender();return;
     }
     const hit=Hit(screen,entry.map),tip=Element("mapTooltip");tip.hidden=!hit?.text;
     if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
@@ -395,7 +398,7 @@ function Tick(timestamp) {
     if(previousStage!==frame.stage.id) workspace.FrameStage();
     Render();
   }
-  else if(navigated) Render();
+  else if(navigated||renderPending) Render();
   lastTimestamp=timestamp;requestAnimationFrame(Tick);
 }
 
@@ -406,7 +409,7 @@ async function Start() {
     activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;},
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
-  navigation=new EncounterSceneControls(workspace,Render);
+  navigation=new EncounterSceneControls(workspace,RequestRender);
   Element("mapLoading").hidden=true;
   BindControls();
   window.LevelFlow={

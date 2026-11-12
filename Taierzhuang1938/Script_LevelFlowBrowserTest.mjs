@@ -19,6 +19,20 @@ try {
   assert.equal(await page.locator("[data-stage]").count(),10);
   assert.ok((await page.evaluate(()=>window.LevelFlow.Inspect())).mapObjects>1000);
   assert.equal(await page.locator('.lfViewPane:visible').count(),2);
+  await page.evaluate(()=>LevelFlow.SetViewType(1,'scene'));
+  const hoverPicks=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const original=FlowPerspectiveView.prototype.ToWorld;
+    let calls=0;
+    FlowPerspectiveView.prototype.ToWorld=function(...args) {calls++;return original.apply(this,args);};
+    try {
+      const canvas=document.getElementById('flowMap2'),rect=canvas.getBoundingClientRect();
+      for(let index=0;index<20;index++) canvas.dispatchEvent(new PointerEvent('pointermove',{clientX:rect.x+index+10,clientY:rect.y+10}));
+      return calls;
+    } finally {FlowPerspectiveView.prototype.ToWorld=original;}
+  });
+  assert.equal(hoverPicks,0,'Scene hover uses screen-space hits without marching a terrain ray into empty sky');
+  await page.evaluate(()=>LevelFlow.SetViewType(1,'oblique'));
   await page.selectOption('#viewportLayout','4');
   assert.equal(await page.locator('.lfViewPane:visible').count(),4);
   await page.evaluate(()=>{LevelFlow.SetViewType(1,'plan');LevelFlow.ActivateView(1);});
@@ -235,6 +249,21 @@ try {
   for(let channel=0;channel<3;channel++) assert.ok(Math.abs(depth.throughWall[channel]-(depth.background[channel]*0.8+[39,109,130][channel]*0.2))<3,"hidden body strokes blend at 20 percent opacity");
   assert.ok(depth.farDepth>1000&&depth.farDepth<1500&&!depth.beyondFarVisible,"the 1500 m far plane renders distant geometry and clips beyond its range");
   assert.ok(depth.overviewDepths.every(value=>Number.isFinite(value)&&value>0&&value<1500),"zoomed-out oblique view retains geometry 400 m on both sides of the center");
+  const terrainWork=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const canvas=document.createElement('canvas');
+    canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:640px';document.body.append(canvas);
+    const data=await LoadEncounterMap(),view=new FlowPerspectiveView(canvas,data,'scene');
+    view.center=[66.5,64.5];view.freeCamera={eye:[66.5,view.Ground(view.center)+12,46.5],yaw:0,pitch:-0.55};
+    view.Draw(LevelFlow.Evaluate(0),{},null);
+    const triangles=view.Diagnostics().terrainTriangles;
+    view.freeCamera.pitch=1.54;view.Draw(LevelFlow.Evaluate(0),{},null);
+    const skyTriangles=view.Diagnostics().triangles;
+    canvas.remove();return {triangles,skyTriangles};
+  });
+  assert.ok(terrainWork.triangles>0&&terrainWork.triangles<40000,`Scene navigation bounds terrain work by projected detail ${JSON.stringify(terrainWork)}`);
+  assert.ok(terrainWork.skyTriangles<1000,"looking at empty sky culls the terrain before projecting its faces");
   await page.evaluate(()=>{LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
   await page.screenshot({path:path.join(out,'RealTerrainGully.png')});
   await page.evaluate(()=>LevelFlow.JumpBeat('06g'));await page.screenshot({path:path.join(out,'CartLane.png')});

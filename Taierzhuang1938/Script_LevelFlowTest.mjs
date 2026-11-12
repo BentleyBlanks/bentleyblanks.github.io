@@ -8,7 +8,34 @@ import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetad
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
+import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+
+// Compare incremental depth interpolation against the original barycentric
+// equation, including either winding and triangles crossing the viewport.
+function RasterEdge(a,b,x,y) {return (x-a.x)*(b.y-a.y)-(y-a.y)*(b.x-a.x);}
+let rasterSeed=734;
+function RasterRandom() {
+  rasterSeed=(Math.imul(rasterSeed,1664525)+1013904223)>>>0;
+  return rasterSeed/4294967296;
+}
+for(const perspective of [false,true]) for(let sample=0;sample<60;sample++) {
+  const width=64,height=48;
+  const raster={width,height,perspective,triangles:0,image:{data:new Uint8ClampedArray(width*height*4)},depth:new Float32Array(width*height).fill(Infinity)};
+  const vertices=Array.from({length:3},()=>({x:RasterRandom()*128-32,y:RasterRandom()*96-24,depth:0.15+RasterRandom()*1500}));
+  const [a,b,c]=vertices,area=RasterEdge(a,b,c.x,c.y);
+  EncounterRaster.prototype.Triangle.call(raster,a,b,c,"#aabbcc");
+  if(Math.abs(area)<0.001) continue;
+  for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
+    const first=RasterEdge(b,c,x+0.5,y+0.5)/area,second=RasterEdge(c,a,x+0.5,y+0.5)/area,third=1-first-second;
+    const inside=first>=-1e-7&&second>=-1e-7&&third>=-1e-7,index=y*width+x;
+    assert.equal(Number.isFinite(raster.depth[index]),inside,"incremental raster retains triangle coverage");
+    if(!inside) continue;
+    const expected=perspective?1/(first/a.depth+second/b.depth+third/c.depth):first*a.depth+second*b.depth+third*c.depth;
+    assert.ok(Math.abs(raster.depth[index]-expected)<Math.max(1e-5,expected*1e-6),"incremental raster retains perspective-correct depth");
+    assert.deepEqual([...raster.image.data.slice(index*4,index*4+3)],[170,187,204]);
+  }
+}
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
 assert.equal(FLOW_DURATION,1870);
