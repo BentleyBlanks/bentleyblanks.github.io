@@ -42,7 +42,7 @@ for collection in list(bpy.data.collections):
 bpy.data.orphans_purge(do_recursive=True)
 scene = bpy.context.scene
 scene['BlenderMcpTask'] = 'ErYaAssembly_20261112'
-scene['ReferenceFit'] = 'Front proportions, left profile depth, back continuity'
+scene['ReferenceFit'] = 'Original head similarity transform fitted to original front and profile images'
 scene['HeightAssumptionMeters'] = heightMeters
 scene['ReferencePixelSizeMeters'] = pixelSize
 scene.unit_settings.system = 'METRIC'
@@ -165,45 +165,52 @@ UpdateGeometry(body, bodyPoints * pixelSize, bodyNormals)
 
 head = DuplicatePart(sources['HeadBald'], 'HeadBald')
 rawHead = Coordinates(head)
-headNormals = Normals(head)
-headScales = np.array([104.0, 133.0, 135.0])
-headPoints = rawHead * headScales
-headPoints[:, 0] += 3.0
-headPoints[:, 1] -= 5.0
-headPoints[:, 2] += floorPixel - scalpPixel - rawHead[:, 2].max() * headScales[2]
-headRows = floorPixel - headPoints[:, 2]
-neckWeight = np.clip((headRows - 109.0) / 20.0, 0, 1)
-neckCenter = np.array([-8.0, -5.0])
-delta = headPoints[:, :2] - neckCenter
-radius = np.sqrt(np.sum((delta / np.array([14.0, 14.0])) ** 2, axis=1))
-neckScale = 1 - neckWeight + neckWeight * np.minimum(1, 1 / radius.clip(1e-9))
-headPoints[:, :2] = neckCenter + delta * neckScale[:, None]
-headPoints[:, 2] -= 5.0 * neckWeight
-headNormals /= headScales
+# Retain the complete source mesh and its original head/neck proportions.
+# Fit the whole component using a single scale and a translation.
+headScalePixels = 133.0
+headTranslationPixels = np.array([-8.0, -5.0,
+    floorPixel - scalpPixel - rawHead[:, 2].max() * headScalePixels])
+head.scale = (headScalePixels * pixelSize,) * 3
+head.location = headTranslationPixels * pixelSize
+head['SourceGeometryPreserved'] = True
+assert np.array_equal(Coordinates(head), rawHead), 'Original head mesh was modified'
+assert head.scale.x == head.scale.y == head.scale.z, 'Head scale must remain uniform'
+bpy.context.view_layer.update()
 
-# The full-body bald profile calibration aligns its scalp row 18 to row 16.
-# Restore cranial depth about the nose plane, then seat the lower neck in its
-# existing collar. Smooth weights preserve the source's rounded skull surface.
-headRows = floorPixel - headPoints[:, 2]
-cranialDepthFactor = 1.23
-nosePlanePixel = 40.7
-upperDomeShiftPixels = 4.0
-depthAmount = np.clip((132 - headRows) / 30, 0, 1)
-depthWeight = depthAmount**2 * (3 - 2 * depthAmount)
-depthWeightSlope = -6 * depthAmount * (1 - depthAmount) / 30
-domeAmount = np.clip((50 - headRows) / 40, 0, 1)
-domeWeight = domeAmount**2 * (3 - 2 * domeAmount)
-domeWeightSlope = -6 * domeAmount * (1 - domeAmount) / 40
-depthDelta = ((cranialDepthFactor - 1) * (headPoints[:, 0] - nosePlanePixel)
-              - upperDomeShiftPixels * domeWeight)
-depthScales = 1 + (cranialDepthFactor - 1) * depthWeight
-depthDerivative = -(depthWeightSlope * depthDelta
-                    - upperDomeShiftPixels * depthWeight * domeWeightSlope)
-headPoints[:, 0] += depthWeight * depthDelta
-headLoops = np.array([loop.vertex_index for loop in head.data.loops])
-headNormals[:, 0] /= depthScales[headLoops]
-headNormals[:, 2] -= depthDerivative[headLoops] * headNormals[:, 0]
-UpdateGeometry(head, headPoints * pixelSize, headNormals)
+# Jacket lining covers the imported head's white base inside the collar.
+# The lining belongs to the garment, and the source head remains complete.
+liningFaces = [face for face in head.data.polygons
+               if max(rawHead[index, 2] for index in face.vertices) < .16]
+liningIndices = sorted({index for face in liningFaces for index in face.vertices})
+liningIndexMap = {index: position for position, index in enumerate(liningIndices)}
+liningPoints = rawHead[liningIndices].copy()
+liningPoints[:, :2] = (liningPoints[:, :2] - np.array([-.10, 0])) * 1.012 + np.array([-.10, 0])
+liningPoints[:, 2] += .002
+liningMesh = bpy.data.meshes.new('Mesh_ErYa_CollarLining')
+liningMesh.from_pydata(liningPoints.tolist(), [],
+    [[liningIndexMap[index] for index in face.vertices] for face in liningFaces])
+liningMesh.materials.append(body.data.materials[0])
+liningMesh.update()
+fabricFace = min(sources['Body'].data.polygons,
+    key=lambda face: (face.center - Vector((.14, 0, .60))).length_squared)
+sourceUvs = sources['Body'].data.uv_layers.active.data
+fabricUv = sum((sourceUvs[index].uv for index in fabricFace.loop_indices), Vector((0, 0))) / len(fabricFace.loop_indices)
+liningUvs = liningMesh.uv_layers.new(name='UVMap')
+for face in liningMesh.polygons:
+    face.use_smooth = True
+    for loopIndex in face.loop_indices:
+        point = liningPoints[liningMesh.loops[loopIndex].vertex_index]
+        angle = math.atan2(point[1], point[0] + .10)
+        liningUvs.data[loopIndex].uv = (fabricUv.x + .005 * angle / math.pi,
+                                       fabricUv.y + .005 * point[2] / .16)
+lining = bpy.data.objects.new('Part_ErYa_CollarLining', liningMesh)
+assemblyCollection.objects.link(lining)
+lining.matrix_world = head.matrix_world.copy()
+bpy.ops.object.select_all(action='DESELECT')
+body.select_set(True)
+lining.select_set(True)
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.join()
 
 hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
 rawHand = Coordinates(hand)
@@ -361,16 +368,6 @@ for view, position, rotation in referenceViews:
     reference.rotation_euler = Matrix(rotation).to_euler()
     reference.hide_render = True
     reference.hide_set(True)
-calibrationPath = reviewRoot / 'HeadCorrection' / 'Ref_ErYa_LeftSideBald_Calibration.png'
-if calibrationPath.is_file():
-    calibration = reference.copy()
-    referenceCollection.objects.link(calibration)
-    calibration.name = 'Reference_LeftSideBald_GeneratedCalibration'
-    calibration.data = bpy.data.images.load(str(calibrationPath), check_existing=True)
-    calibration.location = (-20 * pixelSize, -.41, reviewCenter.z + 2 * pixelSize)
-    calibration.rotation_euler = Matrix(referenceViews[1][2]).to_euler()
-    calibration['Source'] = 'Built-in imagegen, edited from the original profile and bald head reference'
-    calibration.hide_set(True)
 for obj in reviewCollection.objects:
     obj.hide_set(True)
 for screen in bpy.data.screens:
@@ -390,6 +387,9 @@ bpy.ops.file.pack_all()
 bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot / 'Scene_ErYa_Assembled.blend'), compress=True)
 bpy.ops.export_scene.gltf(filepath=str(sourceRoot / 'Model_ErYa_Assembled.glb'),
                           export_format='GLB', use_selection=True, export_apply=True)
+bpy.context.view_layer.update()
+partCoordinates = {obj.name: np.array([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
+                   for obj in parts}
 report = {
     'schema': 'tengxian.characterAssemblyFit', 'version': 1,
     'character': 'ErYa', 'heightMeters': heightMeters,
@@ -397,14 +397,14 @@ report = {
     'referenceFrame': {'width': 640, 'height': 640, 'floorRow': floorPixel,
                        'scalpRow': scalpPixel, 'metersPerPixel': pixelSize},
     'bodySourceHeights': bodyHeights.tolist(), 'bodyReferenceRows': bodyRows.tolist(),
-    'headFit': {'widthScale': float(headScales[1]),
-                'cranialDepthFactor': cranialDepthFactor,
-                'nosePlanePixel': nosePlanePixel,
-                'upperDomeShiftPixels': upperDomeShiftPixels,
-                'calibration': str(calibrationPath)},
+    'headFit': {'method': 'Original mesh with uniform scale and translation',
+                'uniformScale': headScalePixels * pixelSize,
+                'pixelsPerSourceUnit': headScalePixels,
+                'translationPixels': headTranslationPixels.tolist(),
+                'sourceMeshMaxVertexError': float(np.abs(Coordinates(head) - rawHead).max())},
     'handRollDegrees': math.degrees(handRoll), 'sourceFiles': sourceFiles,
-    'parts': {obj.name: {'min': Coordinates(obj).min(0).tolist(),
-                        'max': Coordinates(obj).max(0).tolist(),
+    'parts': {obj.name: {'min': partCoordinates[obj.name].min(0).tolist(),
+                        'max': partCoordinates[obj.name].max(0).tolist(),
                         'triangles': sum(len(face.vertices) - 2 for face in obj.data.polygons)}
               for obj in parts},
 }
