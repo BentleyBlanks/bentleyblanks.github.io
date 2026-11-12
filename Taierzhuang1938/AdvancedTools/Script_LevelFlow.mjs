@@ -168,11 +168,17 @@ function UpdateObjects() {
     const numbers=document.createElement("div");numbers.className="lfFieldGrid";form.append(numbers);
     for(const [label,path] of [["总人数","count"],["同时在场","maxAlive"],["补充间隔 s","interval"],["存续时长 s","lifetime"]]) Field(numbers,label,path,current[path]);
     Field(geometry,"移动速度 m/s","speed",current.speed);
+    Field(geometry,"隐蔽集结 s","deployDelay",current.deployDelay||0);
     Field(form,"跟随战车","tankId",current.tankId||"",[["","头车（默认）"],["tank1","头车"],["tank2","后车"]]);
     Field(form,"武器","weapon",current.weapon||"rifle",[["rifle","步枪"],["machineGun","机枪"]]);
     Field(form,"投弹间隔 s（0 停用）","grenadeInterval",current.grenadeInterval||0);
     Field(form,"关联触发区","triggerId",current.triggerId,project.value.triggers.map((trigger)=>[trigger.id,trigger.label]));
     Field(form,"射击目标","target",current.target,[["player","顺子"],["winter","冬瓜"],["enemy","敌军"],["ramp","村口坡道"],["none","停火"]]);
+    if(current.spawnOffsets) {
+      const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("分散生成点偏移 X, Z · 相对区域中心"));
+      const points=document.createElement("textarea");points.name="spawnOffsets";points.value=current.spawnOffsets.map(point=>point.join(", ")).join("\n");wrapper.append(points);geometry.append(wrapper);
+      points.addEventListener("change",()=>Apply(document=>{document.groups.find(item=>item.id===current.id).spawnOffsets=points.value.trim().split(/\n/).filter(Boolean).map(line=>line.split(/[,，\s]+/).map(Number));}));
+    }
     const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("路线 X, Z · 地图上可拖路点"));
     const route=document.createElement("textarea");route.name="route";route.value=current.route.map((point)=>point.join(", ")).join("\n");wrapper.append(route);geometry.append(wrapper);
     route.addEventListener("change",()=>Apply((document)=>{

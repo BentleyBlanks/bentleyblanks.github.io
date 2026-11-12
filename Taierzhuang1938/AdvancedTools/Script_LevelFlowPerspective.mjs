@@ -252,23 +252,25 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   ActorLabelOpacity(actor) {
     const stats=this.occlusion.get(actor.id);
-    if(stats&&stats.hidden>0) return stats.visible===0?0.22:0.7;
+    const hidden=this.type==="eye"&&!this.freeCamera?0:0.22;
+    if(stats&&stats.hidden>0) return stats.visible===0?hidden:0.7;
     const point=this.LabelVertex(actor);
-    return this.raster.Occluded(point)?0.22:1;
+    return this.raster.Occluded(point)?hidden:1;
   }
   OrderActors(actors) {return [...actors].sort((a,b)=>Distance(b.p,this.center)-Distance(a.p,this.center));}
   DrawActor(context,actor,frame) {
     const [x,z]=actor.p,base=this.Ground(actor.p)+(actor.elevation||0),color=FLOW_COLORS[actor.side],stats={visible:0,hidden:0};
+    const hiddenAlpha=this.type==="eye"&&!this.freeCamera?0:0.2;
     this.occlusion.set(actor.id,stats);
     const Segment=(a,b,width=2)=>{
       const vertices=this.FaceVertices([a,b,b]);
-      if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],color,width,stats);
+      if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],color,width,stats,hiddenAlpha);
     };
     if(["tank","cart"].includes(actor.kind)) return;
     if(actor.kind==="quilt") {
       const heading=actor.heading||0,Point=(dx,dz)=>[x+dx*Math.cos(heading)-dz*Math.sin(heading),base+0.12,z+dx*Math.sin(heading)+dz*Math.cos(heading)];
       const vertices=this.FaceVertices([Point(-0.4,-0.9),Point(0.4,-0.9),Point(0.4,0.9),Point(-0.4,0.9)]);
-      if(vertices.length>=3) this.raster.OverlayFace(context,vertices,"#ba9e7a",stats);return;
+      if(vertices.length>=3) this.raster.OverlayFace(context,vertices,"#ba9e7a",stats,hiddenAlpha);return;
     }
     if(actor.kind==="donkey") {
       const heading=actor.heading||0,Point=(side,y,forward)=>[x+Math.cos(heading)*side+Math.sin(heading)*forward,base+y,z+Math.sin(heading)*side-Math.cos(heading)*forward];
@@ -289,7 +291,7 @@ export class FlowPerspectiveView extends FlowMapView {
     Segment([x,base+0.55*crouch,z],[x-0.2,base+0.02,z+gait],2);Segment([x,base+0.55*crouch,z],[x+0.2,base+0.02,z-gait],2);
     Segment([x,base+height*0.65*crouch,z],[x-0.4,base+height*0.47*crouch,z+0.15],2);Segment([x,base+height*0.65*crouch,z],[x+0.4,base+height*0.47*crouch,z+0.15],2);
     const head=this.Vertex([x,base+height*0.94*crouch,z]),neck=this.Vertex([x,base+height*0.8*crouch,z]);
-    if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats);
+    if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
   }
   DrawFire(context,effect,frame) {
     if(effect.phase>=0.3) return;

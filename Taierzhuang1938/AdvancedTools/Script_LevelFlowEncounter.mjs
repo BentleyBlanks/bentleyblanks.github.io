@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -21,7 +21,9 @@ export function CreateEncounterDocument(timeline, waves) {
     return {
       id: wave.id, label: wave.label, beat: beat.id, endBeat: end.id, triggerId, enabled: true,
       side: "enemy", target: wave.target === "winter" ? "winter" : "player",
-      area: Area(wave.source,2.4,3), route: structuredClone(wave.route),
+      area: Area(wave.source,...(wave.areaSize || [2.4,3])), route: structuredClone(wave.route),
+      ...(wave.spawnOffsets ? {spawnOffsets: structuredClone(wave.spawnOffsets)} : {}),
+      ...(wave.deployDelay ? {deployDelay: wave.deployDelay} : {}),
       count: wave.count, interval: wave.interval, maxAlive: wave.cyclic ? 5 : wave.count,
       lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
       behavior: wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance",
@@ -68,7 +70,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-junction-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-batch-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -106,6 +108,8 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(["friend","enemy"].includes(group.side) && ["player","winter","enemy","ramp","none"].includes(group.target), "阵营或目标无效");
     Require(typeof group.enabled === "boolean" && Object.hasOwn(ENCOUNTER_BEHAVIORS,group.behavior), "行为配置无效");
     Require(Array.isArray(group.route) && group.route.length>0 && group.route.length<=100 && group.route.every(CheckPoint), "推进路线无效");
+    Require(group.spawnOffsets===undefined || Array.isArray(group.spawnOffsets) && group.spawnOffsets.length>0 && group.spawnOffsets.length<=40 && group.spawnOffsets.every(CheckPoint), "分散生成点无效");
+    Require(group.deployDelay===undefined || Number.isFinite(group.deployDelay) && group.deployDelay>=0 && group.deployDelay<=60, "隐蔽集结时长无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
@@ -194,15 +198,20 @@ function TimedPosition(route,time) {
   return SampleRoute([a.slice(1),b.slice(1)],(time-a[0])/(b[0]-a[0]));
 }
 
+function GroupPath(group,index) {
+  const offset=group.spawnOffsets?.[index%group.maxAlive];
+  const origin=offset?group.area.center.map((value,axis)=>value+offset[axis]):group.area.center;
+  return [origin,...group.route.slice(1)];
+}
+
 // Compile each soldier's cover-to-cover movement once, including waits for the
 // retreating front to move. Seeking samples these tracks without replaying AI.
 function BuildCoverTracks(group,playerRoute) {
-  const path=[group.area.center,...group.route.slice(1)];
-  const distances=[0];
-  for(let index=1;index<path.length;index++) distances.push(distances.at(-1)+Distance(path[index-1],path[index]));
-  return group.lives.map((life)=>{
+  return group.lives.map((life,index)=>{
+    const path=GroupPath(group,index),distances=[0];
+    for(let point=1;point<path.length;point++) distances.push(distances.at(-1)+Distance(path[point-1],path[point]));
     const track=[[life.born,0]],step=0.25;
-    let distance=0,next=1,waitUntil=life.born;
+    let distance=0,next=1,waitUntil=life.born+(group.deployDelay||0);
     for(let time=life.born+step;time<=Math.min(life.fall,group.end);time+=step) {
       const front=RouteProjection(path,TimedPosition(playerRoute,time));
       if(next<path.length&&time>=waitUntil&&distances[next]<=front+2) {
@@ -226,8 +235,10 @@ function CoverMovement(group,index,time) {
 
 function GroupActor(group,index,time,coreActors) {
   const life=group.lives[index];
-  const age=Math.max(0,Math.min(time,life.fall)-life.born);
-  const path=[group.area.center,...group.route.slice(1)];
+  const readyAt=life.born+(group.deployDelay||0);
+  const age=Math.max(0,Math.min(time,life.fall)-readyAt);
+  const slot=index%group.maxAlive,offset=group.spawnOffsets?.[slot];
+  const path=GroupPath(group,index);
   const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
   const total=lengths.reduce((sum,length)=>sum+length,0);
   const stationary=["suppress","guard"].includes(group.behavior);
@@ -241,13 +252,13 @@ function GroupActor(group,index,time,coreActors) {
     distance=Math.min(distance,limit);
   }
   let position=SampleRoute(path,total?distance/total:0);
-  const slots=Math.min(group.count,group.maxAlive),slot=index%group.maxAlive;
+  const slots=Math.min(group.count,group.maxAlive);
   const columns=Math.ceil(Math.sqrt(slots)),rows=Math.ceil(slots/columns);
-  const spread=group.area.shape==="circle"
+  const spread=offset?[0,0]:group.area.shape==="circle"
     ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
     : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
   position=[position[0]+spread[0],position[1]+spread[1]];
-  let pose=time>=life.fall?"dead":group.behavior==="withdraw"||movement.moving?"run":"shoot";
+  let pose=time>=life.fall?"dead":time<readyAt?"kneel":group.behavior==="withdraw"||movement.moving?"run":"shoot";
   if(time>=group.end&&pose!=="dead") {position=SampleRoute([position,group.area.center],(time-group.end)*group.speed/(Distance(position,group.area.center)||1));pose="run";}
   return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
@@ -289,24 +300,21 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
-  if (input.revision === "2026-11-13-drag-1") {
-    const value = structuredClone(input);
-    for (const collection of ["groups","triggers"]) {
-      const id = collection === "groups" ? "ForkRelief" : "Trigger_ForkRelief";
-      if (!value[collection].some((item) => item.id === id)) value[collection].push(structuredClone(defaults[collection].find((item) => item.id === id)));
-    }
-    value.revision = defaults.revision;
-    return value;
-  }
   const oldRevision=input.revision===FLOW_PREVIOUS_ENCOUNTER.revision;
-  const baseline=oldRevision?FLOW_PREVIOUS_ENCOUNTER:FLOW_PREVIOUS_DRAG_ENCOUNTER;
-  if(input.revision!==baseline.revision) return input;
+  // Junction drafts already know ForkRelief, so deleting it stays respected.
+  const baseline=input.revision==="2026-11-13-junction-1" ? {
+    ...FLOW_PREVIOUS_BATCH_ENCOUNTER,
+    groups:[...FLOW_PREVIOUS_BATCH_ENCOUNTER.groups,{id:"ForkRelief"}],
+    triggers:[...FLOW_PREVIOUS_BATCH_ENCOUNTER.triggers,{id:"Trigger_ForkRelief"}],
+  } : [FLOW_PREVIOUS_ENCOUNTER,FLOW_PREVIOUS_DRAG_ENCOUNTER,FLOW_PREVIOUS_BATCH_ENCOUNTER]
+    .find(previous=>previous.revision===input.revision);
+  if(!baseline) return input;
   const value=structuredClone(input);
   for(const collection of ["groups","triggers"]) {
     for(const next of defaults[collection]) {
       const current=value[collection].find((item)=>item.id===next.id);
       const previousEntry=baseline[collection].find((item)=>item.id===next.id);
-      const previous=previousEntry&&oldRevision?{...FLOW_PREVIOUS_DRAG_ENCOUNTER[collection].find((item)=>item.id===next.id),...previousEntry}:previousEntry;
+      const previous=previousEntry?{...FLOW_PREVIOUS_BATCH_ENCOUNTER[collection].find(item=>item.id===next.id),...(oldRevision?FLOW_PREVIOUS_DRAG_ENCOUNTER[collection].find(item=>item.id===next.id):{}),...previousEntry}:null;
       if(!current&&!previous) value[collection].push(structuredClone(next));
       if(!current||!previous) continue;
       for(const [key,entry] of Object.entries(next)) {

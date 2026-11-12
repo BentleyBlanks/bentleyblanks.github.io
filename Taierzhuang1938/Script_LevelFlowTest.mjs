@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -125,6 +125,7 @@ assert.equal(CompileEncounters(moved,FLOW_TIMELINE).groups.find((group)=>group.i
 assert.equal(EvaluateFlow(BeatById("03b").start+20,moved).actors.filter((actor)=>actor.groupId==="Fork").length,0,"moving trigger off the route suppresses its wave");
 const configured=structuredClone(defaults),group=configured.groups.find((item)=>item.id==="Fork");
 group.count=12;group.maxAlive=2;group.interval=0;group.lifetime=8;group.behavior="suppress";group.area.center=[15,52];
+delete group.spawnOffsets;group.area.size=[2.4,3];
 for(let time=BeatById("03b").start;time<BeatById("03b").end;time+=0.25) {
   const actors=EvaluateFlow(time,configured).actors.filter((actor)=>actor.groupId==="Fork"&&actor.pose!=="dead");
   assert.ok(actors.length<=2,"replacement respects maxAlive");
@@ -211,7 +212,7 @@ for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
 assert.ok(movingTanks>50&&waitingTanks>50,"vehicles visibly alternate advance and infantry-covering halts");
 assert.ok(grenadeFrames>50&&earlyGrenades>0,"enemy grenade attacks recur from the drag segment through the tank battle");
 assert.equal(map.ramps.length,12);
-assert.equal(map.objects.filter((object)=>object.planning).length,25);
+assert.equal(map.objects.filter((object)=>object.planning).length,27);
 for(const ramp of map.ramps) {
   assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
   assert.ok(Math.abs(EncounterHeightAt(ramp.points.at(-1),map)-FLOW_GROUND.height)<1e-6,`${ramp.id} reaches surface`);
@@ -291,6 +292,69 @@ const invalidViews=structuredClone(packet);invalidViews.context.viewports={count
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
 const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+// The annotated 03B formation is created in one hidden batch. Movement starts
+// after deployment and joins the approach around the new walls' open ends.
+const spawnWalls=map.objects.filter(object=>["Encounter_NorthSpawnWall","Encounter_EastSpawnWall"].includes(object.id));
+assert.equal(spawnWalls.length,2);
+function SpawnSightBlocked(from,to) {
+  const distance=Math.hypot(...to.map((value,axis)=>value-from[axis]));
+  const steps=Math.ceil(distance/0.08);
+  for(let index=1;index<steps;index++) {
+    const point=from.map((value,axis)=>value+(to[axis]-value)*index/steps);
+    if(terrain.heightAt(point[0],point[2])>point[1]) return true;
+    for(const wall of spawnWalls) {
+      const [x,,z]=wall.pos,[width,height,depth]=wall.size,base=terrain.heightAt(x,z);
+      if(Math.abs(point[0]-x)<width/2&&Math.abs(point[2]-z)<depth/2&&point[1]>base&&point[1]<base+height) return true;
+    }
+  }
+  return false;
+}
+for(const id of ["Fork","Corner"]) {
+  const group=Group(id),frame=EvaluateFlow(group.start);
+  assert.equal(group.interval,0);
+  assert.equal(group.lives.length,group.count);
+  assert.ok(group.lives.every(life=>life.born===group.start),`${id} deploys simultaneously`);
+  assert.ok(!EvaluateFlow(group.start-0.001).actors.some(actor=>actor.groupId===id));
+  const eye=[frame.player[0],terrain.heightAt(...frame.player)+1.65,frame.player[1]];
+  const actors=frame.actors.filter(actor=>actor.groupId===id);
+  assert.equal(new Set(actors.map(actor=>actor.p.join(","))).size,group.count);
+  for(const [index,actor] of actors.entries()) {
+    assert.deepEqual(actor.p,group.area.center.map((value,axis)=>value+group.spawnOffsets[index][axis]));
+    for(const dx of [-0.25,0,0.25]) for(const height of [0.3,1,1.8]) {
+      assert.ok(SpawnSightBlocked(eye,[actor.p[0]+dx,terrain.heightAt(...actor.p)+height,actor.p[1]]),`${actor.id} whole body is hidden at birth`);
+    }
+  }
+  for(let stamp=group.start;stamp<Math.min(group.end,group.lives[0].fall);stamp+=0.1) {
+    for(const actor of EvaluateFlow(stamp).actors.filter(actor=>actor.groupId===id)) for(const wall of spawnWalls) {
+      assert.ok(Math.abs(actor.p[0]-wall.pos[0])>wall.size[0]/2+0.25||Math.abs(actor.p[1]-wall.pos[2])>wall.size[2]/2+0.25,`${actor.id} routes around spawn walls`);
+    }
+  }
+}
+const markedFrame=EvaluateFlow(186.63).actors.filter(actor=>actor.groupId==="Fork");
+assert.equal(markedFrame.length,5);
+assert.ok(markedFrame.every(actor=>actor.pose==="kneel"&&!actor.firing));
+assert.ok(EvaluateFlow(Group("Fork").start+10.1).actors.filter(actor=>actor.groupId==="Fork").every(actor=>actor.pose==="run"));
+const batchDraft=structuredClone(defaults);batchDraft.revision=FLOW_PREVIOUS_BATCH_ENCOUNTER.revision;
+for(const collection of ["groups","triggers"]) batchDraft[collection]=FLOW_PREVIOUS_BATCH_ENCOUNTER[collection].map(previous=>{
+  const item={...structuredClone(defaults[collection].find(item=>item.id===previous.id)),...structuredClone(previous)};
+  delete item.spawnOffsets;delete item.deployDelay;return item;
+});
+batchDraft.groups.find(group=>group.id==="Corner").speed=3;
+batchDraft.groups=batchDraft.groups.filter(group=>group.id!=="SearchNeighbor");
+const batchDocument=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(batchDraft),setItem:()=>{}});
+assert.deepEqual(batchDocument.value.groups.find(group=>group.id==="Fork"),defaults.groups.find(group=>group.id==="Fork"));
+assert.equal(batchDocument.value.groups.find(group=>group.id==="Corner").speed,3);
+assert.ok(!batchDocument.value.groups.some(group=>group.id==="SearchNeighbor"));
+assert.ok(batchDocument.value.groups.some(group=>group.id==="ForkRelief"),"older drag drafts gain the junction reinforcements");
+const batchJunctionDraft=structuredClone(batchDraft);batchJunctionDraft.revision="2026-11-13-junction-1";
+const batchJunctionDocument=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(batchJunctionDraft),setItem:()=>{}});
+assert.deepEqual(batchJunctionDocument.value.groups.find(group=>group.id==="Fork"),defaults.groups.find(group=>group.id==="Fork"));
+assert.ok(!batchJunctionDocument.value.groups.some(group=>group.id==="ForkRelief"),"junction drafts preserve deleted reinforcements while upgrading spawns");
+batchDocument.Change(value=>value.groups.find(group=>group.id==="Fork").area.center[0]+=3);
+const shifted=EvaluateFlow(Group("Fork").start,batchDocument.value).actors.find(actor=>actor.id==="Fork_0");
+assert.equal(shifted.p[0],markedFrame[0].p[0]+3,"editing the region translates every authored spawn point");
+assert.throws(()=>batchDocument.Change(value=>value.groups[0].spawnOffsets=[[NaN,1]]));
+assert.throws(()=>batchDocument.Change(value=>value.groups[0].deployDelay=-1));
 for(const rampId of ["DugoutPressureRamp","NorthPursuitRamp","TrafficFlankRamp"]) {
   const ramp=map.ramps.find(ramp=>ramp.id===rampId),bottom=terrain.heightAt(...ramp.points[0]),top=terrain.heightAt(...ramp.points.at(-1));
   assert.ok(top>bottom+1,`${rampId} connects real ground to the trench floor`);

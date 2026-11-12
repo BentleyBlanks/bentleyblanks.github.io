@@ -114,20 +114,20 @@ export class EncounterRaster {
     }
   }
 
-  Head(context,point,radius,color,stats) {
+  Head(context,point,radius,color,stats,hiddenAlpha=0.2) {
     const size=Math.ceil(radius*2+2),image=new ImageData(size,size),rgb=Rgb(color);
     const left=Math.floor(point.x-radius-1),top=Math.floor(point.y-radius-1);
     for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
       const dx=left+x+0.5-point.x,dy=top+y+0.5-point.y;
       if(dx*dx+dy*dy>radius*radius) continue;
       const hidden=this.Occluded({x:left+x,y:top+y,depth:point.depth});stats[hidden?"hidden":"visible"]++;
-      const offset=(y*size+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?51:255;
+      const offset=(y*size+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?Math.round(hiddenAlpha*255):255;
     }
     const marker=this.marker||(this.marker=document.createElement("canvas"));marker.width=size;marker.height=size;
     marker.getContext("2d").putImageData(image,0,0);context.drawImage(marker,left,top);
   }
 
-  OverlayFace(context,vertices,color,stats) {
+  OverlayFace(context,vertices,color,stats,hiddenAlpha=0.2) {
     const left=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.x)))),top=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.y))));
     const right=Math.min(this.width,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.height,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
     if(right<=left||bottom<=top) return;
@@ -140,7 +140,7 @@ export class EncounterRaster {
         if(first<0||second<0||third<0) continue;
         const depth=this.perspective?1/(first/a.depth+second/b.depth+third/c.depth):first*a.depth+second*b.depth+third*c.depth;
         const hidden=this.Occluded({x:left+x,y:top+y,depth});stats[hidden?"hidden":"visible"]++;
-        const offset=(y*width+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?51:255;
+        const offset=(y*width+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?Math.round(hiddenAlpha*255):255;
       }
     }
     const marker=this.overlay||(this.overlay=document.createElement("canvas"));marker.width=width;marker.height=height;
