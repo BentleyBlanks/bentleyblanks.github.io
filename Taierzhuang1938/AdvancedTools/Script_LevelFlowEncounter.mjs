@@ -1,3 +1,4 @@
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -33,7 +34,30 @@ export function CreateEncounterDocument(timeline, waves) {
     groups.push({id,label,beat,endBeat,triggerId,enabled:true,side,target,area:Area(center,3,3),route,count,interval:2,maxAlive:count,lifetime,speed:2.2,behavior,note:"关卡调度布设"});
   };
   Add("RearPursuit","北沟追兵","03g","03h",[12,44],[[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],6,"enemy","advance","player",34);
-  const pursuit=groups.at(-1);pursuit.interval=7;pursuit.maxAlive=3;
+  const pursuit=groups.at(-1);pursuit.interval=7;pursuit.maxAlive=3;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
+  const escort=groups.find((group)=>group.id==="TankEscort");
+  Object.assign(escort,{lifetime:400,speed:1.7,tankId:"tank1",grenadeInterval:12});
+  Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([32.5,101],8,8)});
+  Add("TankRearScreen","后车行军护卫","03h","06f",[116,56],[[116,56],[112,98],[110,134],[108,166],[105,196],[103,218],[101,249]],4,"enemy","escort","player",470);
+  triggers.pop(); // Both vehicle escort groups share the player arrival trigger.
+  Object.assign(groups.at(-1),{triggerId:escort.triggerId,tankId:"tank2",speed:1.7,grenadeInterval:14});
+  const reinforcement=groups.find((group)=>group.id==="TankReinforce");
+  Object.assign(reinforcement,{tankId:"tank2",grenadeInterval:10,speed:1.8});
+  Add("GroundWest","西翼掩体跃进","03h","06f",[96,108],[[96,108],[95,156],[95,192],[96,218],[95,251]],4,"enemy","bounds","player",470);
+  Object.assign(groups.at(-1),{speed:2.8,interval:4,grenadeInterval:13});
+  Add("GroundEast","东翼掩体跃进","03h","06g",[125,109],[[125,109],[123,160],[118,189],[118,222],[118,253]],4,"enemy","bounds","player",540);
+  Object.assign(groups.at(-1),{speed:2.6,interval:5,grenadeInterval:14});
+  for(const [id,label,center,weapon] of [
+    ["DragGround","拖行段地面阻击",[20,96],"rifle"],
+    ["FieldGround","坡顶地面阻击",[48,122],"rifle"],
+    ["CampWestGun","集结处西侧机枪",[41,137],"machineGun"],
+    ["CampEastGun","集结处东侧机枪",[74,139],"machineGun"],
+    ["LaneGround","凹路西坎阻击",[72,190],"rifle"],
+    ["BendGround","弯口接应",[80,279],"machineGun"],
+  ]) {
+    Add(id,label,"03a","06h",center,[center],weapon==="machineGun"?2:3,"friend","guard","enemy",800);
+    groups.at(-1).weapon=weapon;
+  }
   Add("CrestWest","坡顶西侧接应","03g","04a",[27.5,128],[[27.5,128],[28.5,129]],2,"friend","guard","enemy",160);
   Add("CrestEast","坡顶东侧接应","03g","04a",[43,129],[[43,129],[43,129]],2,"friend","guard","enemy",160);
   Add("VillageGun","北屋枪眼机枪组","08a","09i",[100,471.5],[[100,471.5]],3,"enemy","suppress","ramp",700);
@@ -44,7 +68,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-12",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-12-ground-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -82,6 +106,9 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(["friend","enemy"].includes(group.side) && ["player","winter","enemy","ramp","none"].includes(group.target), "阵营或目标无效");
     Require(typeof group.enabled === "boolean" && Object.hasOwn(ENCOUNTER_BEHAVIORS,group.behavior), "行为配置无效");
     Require(Array.isArray(group.route) && group.route.length>0 && group.route.length<=100 && group.route.every(CheckPoint), "推进路线无效");
+    Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
+    Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
+    Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
     Require(Number.isInteger(group.count) && group.count>=0 && group.count<=100, "数量须在 0–100 内");
     Require(Number.isInteger(group.maxAlive) && group.maxAlive>=1 && group.maxAlive<=40, "同时在场须在 1–40 内");
     Require(Number.isFinite(group.interval) && group.interval>=0 && group.interval<=300, "补充间隔无效");
@@ -113,6 +140,8 @@ function PlayerRoute(timeline) {
   });
 }
 
+const coverTracks=new WeakMap();
+
 export function CompileEncounters(document, timeline) {
   const beats=new Map(timeline.map((beat)=>[beat.id,beat])), route=PlayerRoute(timeline);
   const triggers=document.triggers.map((trigger)=>{
@@ -139,50 +168,140 @@ export function CompileEncounters(document, timeline) {
       if(born>=end) break;
       lives.push({born,fall:born+group.lifetime});
     }
-    return {...group,start,end,lives};
+    const compiled={...group,start,end,lives};
+    if(group.behavior==="bounds") coverTracks.set(compiled,BuildCoverTracks(compiled,route));
+    return compiled;
   });
   return {triggers,groups};
 }
 
-export function SampleEncounters(plan,time,coreActors) {
+function RouteProjection(path,point) {
+  let traveled=0,nearest=Infinity,progress=0;
+  for(let index=1;index<path.length;index++) {
+    const a=path[index-1],b=path[index],length=Distance(a,b);
+    const fraction=length?Clamp(((point[0]-a[0])*(b[0]-a[0])+(point[1]-a[1])*(b[1]-a[1]))/(length*length),0,1):0;
+    const projected=[Lerp(a[0],b[0],fraction),Lerp(a[1],b[1],fraction)];
+    if(Distance(point,projected)<nearest) {nearest=Distance(point,projected);progress=traveled+length*fraction;}
+    traveled+=length;
+  }
+  return progress;
+}
+
+function TimedPosition(route,time) {
+  const end=route.findIndex((point)=>point[0]>=time);
+  if(end<=0) return route[end<0?route.length-1:0].slice(1);
+  const a=route[end-1],b=route[end];
+  return SampleRoute([a.slice(1),b.slice(1)],(time-a[0])/(b[0]-a[0]));
+}
+
+// Compile each soldier's cover-to-cover movement once, including waits for the
+// retreating front to move. Seeking samples these tracks without replaying AI.
+function BuildCoverTracks(group,playerRoute) {
+  const path=[group.area.center,...group.route.slice(1)];
+  const distances=[0];
+  for(let index=1;index<path.length;index++) distances.push(distances.at(-1)+Distance(path[index-1],path[index]));
+  return group.lives.map((life)=>{
+    const track=[[life.born,0]],step=0.25;
+    let distance=0,next=1,waitUntil=life.born;
+    for(let time=life.born+step;time<=Math.min(life.fall,group.end);time+=step) {
+      const front=RouteProjection(path,TimedPosition(playerRoute,time));
+      if(next<path.length&&time>=waitUntil&&distances[next]<=front+2) {
+        distance=Math.min(distances[next],distance+group.speed*step);
+        if(distance>=distances[next]) {next++;waitUntil=time+FLOW_GROUND.coverWaitS;}
+      }
+      track.push([time,distance]);
+    }
+    return track;
+  });
+}
+
+function CoverMovement(group,index,time) {
+  const track=coverTracks.get(group)?.[index];
+  if(!track?.length) return {distance:0,moving:false};
+  const end=track.findIndex((key)=>key[0]>=time);
+  if(end<=0) return {distance:track[end<0?track.length-1:0][1],moving:false};
+  const a=track[end-1],b=track[end];
+  return {distance:Lerp(a[1],b[1],(time-a[0])/(b[0]-a[0])),moving:b[1]>a[1]};
+}
+
+function GroupActor(group,index,time,coreActors) {
+  const life=group.lives[index];
+  const age=Math.max(0,Math.min(time,life.fall)-life.born);
+  const path=[group.area.center,...group.route.slice(1)];
+  const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
+  const total=lengths.reduce((sum,length)=>sum+length,0);
+  const stationary=["suppress","guard"].includes(group.behavior);
+  const movement=group.behavior==="bounds"?CoverMovement(group,index,Math.min(time,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
+  let distance=stationary?0:Math.min(total,movement.distance);
+  const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
+  if(group.behavior==="escort"&&tank) {
+    const progress=RouteProjection(path,tank.p);
+    const limit=Math.max(0,progress-3-(index%group.maxAlive)*1.1);
+    if(distance>=limit) movement.moving=tank.moving;
+    distance=Math.min(distance,limit);
+  }
+  let position=SampleRoute(path,total?distance/total:0);
+  const slots=Math.min(group.count,group.maxAlive),slot=index%group.maxAlive;
+  const columns=Math.ceil(Math.sqrt(slots)),rows=Math.ceil(slots/columns);
+  const spread=group.area.shape==="circle"
+    ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
+    : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
+  position=[position[0]+spread[0],position[1]+spread[1]];
+  let pose=time>=life.fall?"dead":group.behavior==="withdraw"||movement.moving?"run":"shoot";
+  if(time>=group.end&&pose!=="dead") {position=SampleRoute([position,group.area.center],(time-group.end)*group.speed/(Distance(position,group.area.center)||1));pose="run";}
+  return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
+    groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
+    heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing:group.behavior!=="withdraw"&&group.target!=="none"&&pose==="shoot"};
+}
+
+export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors) {
   const actors=[],effects=[];
   const player=coreActors.find((actor)=>actor.id==="player");
   for(const group of plan.groups) {
-    if(group.start===null || !group.enabled || time<group.start || time>group.end+8) continue;
-    const path=[group.area.center,...group.route.slice(1)];
-    const total=path.slice(1).reduce((sum,point,index)=>sum+Distance(path[index],point),0);
+    if(group.start===null||!group.enabled||time<group.start||time>group.end+8) continue;
     for(let index=0;index<group.lives.length;index++) {
       const life=group.lives[index];
-      if(time<life.born || time>life.fall+8) continue;
-      const age=Math.max(0,Math.min(time,life.fall)-life.born);
-      const movingTime=group.behavior==="bounds" ? Math.floor(age/7)*3+Math.min(3,age%7) : age;
-      const stationary=["suppress","guard"].includes(group.behavior);
-      let position=SampleRoute(path,stationary?0:total?movingTime*group.speed/total:0);
-      const slots=Math.min(group.count,group.maxAlive),slot=index%group.maxAlive;
-      const columns=Math.ceil(Math.sqrt(slots)),rows=Math.ceil(slots/columns);
-      const spread=group.area.shape==="circle"
-        ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
-        : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
-      position=[position[0]+spread[0],position[1]+spread[1]];
-      if(group.behavior==="escort") {
-        const tank=coreActors.find((actor)=>actor.id==="tank1");
-        if(tank) position[1]=Math.min(position[1],tank.p[1]-3-index*0.4);
-      }
-      let pose=time>=life.fall?"dead":group.behavior==="withdraw"?"run":"shoot";
-      if(time>=group.end && pose!=="dead") {position=SampleRoute([position,group.area.center],(time-group.end)/8);pose="run";}
-      const firing=group.behavior!=="withdraw" && group.target!=="none" && pose==="shoot";
-      actors.push({id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
-        groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,firing});
+      if(time<life.born||time>life.fall+8) continue;
+      actors.push(GroupActor(group,index,time,coreActors));
+      if(group.side!=="enemy"||!group.grenadeInterval||group.target==="none") continue;
+      const interval=group.grenadeInterval,first=life.born+5+index*1.7;
+      const launch=first+Math.floor((time-first)/interval)*interval,age=time-launch;
+      if(launch<first||launch>=Math.min(life.fall,group.end)||age<0||age>5) continue;
+      const then=sampleCore(launch),thrower=GroupActor(group,index,launch,then);
+      if(thrower.pose!=="shoot") continue;
+      const target=then.find((actor)=>actor.id===group.target)||then[0];
+      const range=Distance(thrower.p,target.p);
+      if(range<7||range>32) continue;
+      const landing=[target.p[0]+Math.sin(index*2.4)*1.2,target.p[1]+Math.cos(index*2.4)*1.2];
+      if(age<3.5) effects.push({kind:"grenade",a:thrower.p,b:landing,phase:Math.min(1,age/2),side:"enemy",groupId:group.id});
+      else effects.push({kind:"blast",p:landing,age:age-3.5,side:"enemy",groupId:group.id});
     }
   }
-  const enemies=actors.filter((actor)=>actor.side==="enemy" && actor.pose!=="dead");
+  const enemies=actors.filter((actor)=>actor.side==="enemy"&&actor.pose!=="dead");
   for(const actor of actors.filter((item)=>item.firing)) {
-    const target=actor.target==="enemy" ? enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
-      : actor.target==="ramp" ? {p:[100,384]}
-      : coreActors.find((item)=>item.id===actor.target) ?? player;
-    if(target && Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.target==="ramp"||actor.side==="friend",phase:(time*2.3+actor.p[0])%1});
+    const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
+      :actor.target==="ramp"?{p:[100,384]}:coreActors.find((item)=>item.id===actor.target)??player;
+    if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
   }
   return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),
     groups:plan.groups.map((group)=>({...group,spawned:group.lives.filter((life)=>time>=life.born).length,
       live:group.lives.filter((life)=>time>=life.born&&time<Math.min(life.fall,group.end)).length}))};
+}
+
+export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision!==FLOW_PREVIOUS_ENCOUNTER.revision) return input;
+  const value=structuredClone(input);
+  for(const collection of ["groups","triggers"]) {
+    for(const next of defaults[collection]) {
+      const current=value[collection].find((item)=>item.id===next.id);
+      const previous=FLOW_PREVIOUS_ENCOUNTER[collection].find((item)=>item.id===next.id);
+      if(!current&&!previous) value[collection].push(structuredClone(next));
+      if(!current||!previous) continue;
+      for(const [key,entry] of Object.entries(next)) {
+        if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
+      }
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
 }

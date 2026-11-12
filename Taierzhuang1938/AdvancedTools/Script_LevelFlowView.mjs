@@ -1,3 +1,4 @@
+import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
@@ -215,6 +216,8 @@ export class FlowMapView {
       context.restore();
     } else if(actor.kind==="quilt") {
       context.fillStyle=color;context.strokeStyle="#f1e9ca";context.fillRect(p[0]-3,p[1]-6,6,12);context.strokeRect(p[0]-3,p[1]-6,6,12);
+    } else if(actor.heavy) {
+      Circle(context,p,4.5,color,"#111c17");Line(context,[[p[0]-6,p[1]+4],[p[0]+6,p[1]+4]],color,2);Line(context,[[p[0],p[1]],[p[0],p[1]-11]],color,3);
     } else Circle(context,p,actor.side==="player"?6:actor.side==="enemy"?4:4.5,color,"#111c17");
   }
 
@@ -260,7 +263,7 @@ export class FlowMapView {
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
       Line(context,frame.stage.beats.flatMap((beat)=>beat.p).map(Screen),"#9c731b9c",2,[6,5]);
-      if(frame.stage.id==="05"||frame.stage.id==="06") {const approach=[[175,-40],[105,50],[88,112],[83,161],[83,182],[85,218]];Line(context,approach.map(Screen),"#ad453477",2,[7,5]);}
+      if(Number(frame.stage.id)>=3&&Number(frame.stage.id)<=6) Line(context,FLOW_GROUND.road.map(Screen),"#ad453499",2,[7,5]);
     }
     if(layers.triggers) for(const trigger of frame.triggers.filter(relevant)) {
       const selected=selection?.type==="trigger"&&selection.id===trigger.id;
@@ -286,6 +289,9 @@ export class FlowMapView {
     }
     const winter=frame.actors.find((actor)=>actor.id==="winter"),he=frame.actors.find((actor)=>actor.id==="he");
     if(frame.actors[0].pose==="drag") Line(context,[Screen(frame.player),Screen(winter.p),Screen(he.p)],"#776740",1.5);
+    if(layers.routes) for(const ramp of this.mapData.ramps) {
+      Arrow(context,Screen(ramp.points[0]),Screen(ramp.points.at(-1)),"#687a50",1.5);
+    }
     const labelBoxes=[];
     for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
       const p=Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&selection.id===actor.id;
@@ -293,9 +299,9 @@ export class FlowMapView {
       if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
       if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
       this.DrawActor(context,actor,frame);
-      this.hits.push({type:"actor",id:actor.id,screen:p,radius:9,text:`${actor.name} · X ${actor.p[0].toFixed(1)}  Z ${actor.p[1].toFixed(1)}`});
+      this.hits.push({type:"actor",id:actor.id,screen:p,radius:9,text:`${actor.name} · X ${actor.p[0].toFixed(1)}  Z ${actor.p[1].toFixed(1)}${actor.status?` · ${actor.status}`:""}`});
       if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected)) {
-        const text=actor.name,labelWidth=text.length*12+8;
+        const text=actor.status?`${actor.name} · ${actor.status}`:actor.name,labelWidth=text.length*12+8;
         for(const offset of [[11,-10],[11,13],[-labelWidth-10,-10],[-labelWidth-10,13],[11,-28],[11,30]]) {
           const box=[p[0]+offset[0],p[1]+offset[1]-8,labelWidth,16];
           if(box[0]<3||box[0]+box[2]>width-3||box[1]<3||box[1]+16>height-3) continue;
@@ -306,7 +312,7 @@ export class FlowMapView {
     }
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
-      if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;Circle(context,p,3.5,"#f2da98");}
+      if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;Line(context,[Screen(effect.a),Screen(effect.b)],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
       if(effect.kind==="plane") {const p=Screen(effect.p);Line(context,[[p[0]-8,p[1]],[p[0]+8,p[1]]],"#d2d7c5",2);Line(context,[[p[0],p[1]-5],[p[0],p[1]+7]],"#d2d7c5",2);}
       if(effect.kind==="column"||effect.kind==="runner") Circle(context,Screen(effect.p),3,"#f3957b");
     }

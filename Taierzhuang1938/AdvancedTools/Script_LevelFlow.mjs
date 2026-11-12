@@ -161,6 +161,9 @@ function UpdateObjects() {
     const numbers=document.createElement("div");numbers.className="lfFieldGrid";form.append(numbers);
     for(const [label,path] of [["总人数","count"],["同时在场","maxAlive"],["补充间隔 s","interval"],["存续时长 s","lifetime"]]) Field(numbers,label,path,current[path]);
     Field(geometry,"移动速度 m/s","speed",current.speed);
+    Field(form,"跟随战车","tankId",current.tankId||"",[["","头车（默认）"],["tank1","头车"],["tank2","后车"]]);
+    Field(form,"武器","weapon",current.weapon||"rifle",[["rifle","步枪"],["machineGun","机枪"]]);
+    Field(form,"投弹间隔 s（0 停用）","grenadeInterval",current.grenadeInterval||0);
     Field(form,"关联触发区","triggerId",current.triggerId,project.value.triggers.map((trigger)=>[trigger.id,trigger.label]));
     Field(form,"射击目标","target",current.target,[["player","顺子"],["winter","冬瓜"],["enemy","敌军"],["ramp","村口坡道"],["none","停火"]]);
     const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("路线 X, Z · 地图上可拖路点"));
@@ -387,7 +390,7 @@ async function Start() {
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
     SetViewType:(index,type)=>workspace.SetType(index,type),

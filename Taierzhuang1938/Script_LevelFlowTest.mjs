@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
-import { BuildEncounterMap, EncounterFloorConnections } from "./AdvancedTools/Script_LevelFlowMap.mjs";
+import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
@@ -83,6 +84,70 @@ for(const point of [[0,-4],[0,0],[21.9,67.1],[63,64.5],[35,144.5],[56,152],[58.2
   assert.ok(EncounterFloorConnections(point,map).length>=2,`canonical passage joins at ${point}`);
 }
 for(const id of ["SW","ES","SE_N","SE","NE","NE_S"]) assert.ok(map.roads.some((road)=>road.id===id),`${id} curved alley is present`);
+// Ground-level pursuit starts before the casualty collection point.
+const tankGate=baseline.groups.find((group)=>group.id==="TankEscort");
+assert.ok(tankGate.start>BeatById("03h").start&&tankGate.start<BeatById("04a").start);
+const missedTank=structuredClone(defaults);
+missedTank.triggers.find((trigger)=>trigger.id==="Trigger_TankEscort").area.center=[300,300];
+assert.ok(!EvaluateFlow(652.25,missedTank).actors.some((actor)=>actor.kind==="tank"),"moving the early trigger also controls vehicle arrival");
+const noEscort=structuredClone(defaults);noEscort.groups.find((group)=>group.id==="TankEscort").enabled=false;
+assert.ok(EvaluateFlow(652.25,noEscort).actors.some((actor)=>actor.id==="tank1"),"turning off infantry preserves the triggered vehicle");
+let movingTanks=0,waitingTanks=0,grenadeFrames=0,earlyGrenades=0;
+for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
+  const frame=EvaluateFlow(time);
+  const grenades=frame.effects.filter((effect)=>effect.kind==="grenade"&&effect.side==="enemy");
+  grenadeFrames+=grenades.length;
+  if(time<BeatById("04a").start) earlyGrenades+=grenades.length;
+  for(const tank of frame.actors.filter((actor)=>actor.kind==="tank")) {
+    if(tank.moving) movingTanks++;else waitingTanks++;
+    for(const dx of [-0.81,0.81]) for(const dz of [-1.54,1.54]) {
+      const yaw=tank.heading,corner=[tank.p[0]+dx*Math.cos(yaw)+dz*Math.sin(yaw),tank.p[1]-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
+      assert.ok(EncounterHeightAt(corner,map)>1.99,`${time} ${tank.id} entire hull remains on ground above the trench`);
+    }
+  }
+  for(const infantry of frame.actors.filter((actor)=>["GroundWest","GroundEast"].includes(actor.groupId)&&actor.pose==="shoot")) {
+    assert.ok(EncounterHeightAt(infantry.p,map)>1.99,"flanking infantry stop at surface cover away from ramps");
+  }
+  const first=frame.actors.find((actor)=>actor.id==="tank1");
+  if(first) for(const escort of frame.actors.filter((actor)=>actor.groupId==="TankEscort"&&actor.pose!=="dead")) {
+    assert.ok(escort.p[1]<first.p[1]-1,"escort remains behind its vehicle");
+  }
+}
+assert.ok(movingTanks>50&&waitingTanks>50,"vehicles visibly alternate advance and infantry-covering halts");
+assert.ok(grenadeFrames>50&&earlyGrenades>0,"enemy grenade attacks recur from the drag segment through the tank battle");
+assert.equal(map.ramps.length,9);
+assert.equal(map.objects.filter((object)=>object.planning).length,19);
+for(const ramp of map.ramps) {
+  assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
+  assert.ok(Math.abs(EncounterHeightAt(ramp.points.at(-1),map)-FLOW_GROUND.height)<1e-6,`${ramp.id} reaches surface`);
+  assert.ok(EncounterFloorConnections(ramp.points[0],map,ramp.id).length>0,`${ramp.id} opens into a canonical passage`);
+}
+const camp=EvaluateFlow(BeatById("04a").start+5);
+for(const id of ["CampWestGun","CampEastGun"]) {
+  const gunner=camp.actors.find((actor)=>actor.groupId===id&&actor.heavy);
+  assert.ok(gunner&&EncounterHeightAt(gunner.p,map)>1.99,`${id} defends collection area from a ground emplacement`);
+}
+// Upgrade untouched default fields while retaining a user's local changes.
+const oldDraft=structuredClone(defaults);oldDraft.revision=FLOW_PREVIOUS_ENCOUNTER.revision;
+for(const collection of ["groups","triggers"]) {
+  oldDraft[collection]=FLOW_PREVIOUS_ENCOUNTER[collection].map((previous)=>{
+    const item=structuredClone(defaults[collection].find((entry)=>entry.id===previous.id));
+    Object.assign(item,structuredClone(previous));
+    for(const key of ["tankId","grenadeInterval","weapon"]) delete item[key];
+    return item;
+  });
+}
+oldDraft.groups.find((group)=>group.id==="TankEscort").count=9;
+oldDraft.groups=oldDraft.groups.filter((group)=>group.id!=="SearchNeighbor");
+const oldStorage={getItem:()=>JSON.stringify(oldDraft),setItem:()=>{}};
+const upgraded=new EncounterDocument(defaults,FLOW_TIMELINE,oldStorage).value;
+const upgradedEscort=upgraded.groups.find((group)=>group.id==="TankEscort");
+assert.equal(upgradedEscort.count,9);assert.equal(upgradedEscort.beat,"03h");
+assert.deepEqual(upgradedEscort.route,defaults.groups.find((group)=>group.id==="TankEscort").route);
+assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
+assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
+ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
+
 const invalidViews=structuredClone(packet);invalidViews.context.viewports={count:4,active:0,views:[]};
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

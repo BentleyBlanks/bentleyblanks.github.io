@@ -134,6 +134,30 @@ try {
   await page.click('[data-stage="05"]');await page.evaluate(()=>window.LevelFlow.JumpBeat('05c'));await page.screenshot({path:path.join(out,'TankApproach.png')});
   await page.setViewportSize({width:1024,height:720});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.setViewportSize({width:1280,height:720});
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=652.25&x=86.50&z=258.85&zoom=12`);
+  await page.waitForFunction(()=>window.LevelFlow);
+  const groundFrame=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(groundFrame.time,652.25);
+  assert.ok(groundFrame.actors.filter(actor=>actor.kind==='tank').every(actor=>actor.p[0]>100));
+  await page.screenshot({path:path.join(out,'GroundTank652.png')});
+  const roundTrips=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const view=new FlowPerspectiveView(document.getElementById('flowMap2'),await LoadEncounterMap(),'oblique');
+    view.center=[100,246];view.scale=10;view.BeforeDraw(LevelFlow.Evaluate(652.25));
+    return [[101,240],[88,238],[96,247]].map(point=>({point,restored:view.ToWorld(view.ToScreen(point))}));
+  });
+  assert.ok(roundTrips.every(({point,restored})=>Math.hypot(point[0]-restored[0],point[1]-restored[1])<0.1),'elevated ground, trench floor and ramp keep consistent edit coordinates');
+
+  await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
+  await page.locator('.lfViewTarget').first().selectOption('tank1');
+  await page.screenshot({path:path.join(out,'GroundTankOblique652.png')});
+  await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=73&z=115&zoom=5.5`);
+  await page.waitForFunction(()=>window.LevelFlow);
+  const early=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.ok(early.actors.some(actor=>actor.kind==='tank'),'vehicle threat is present during dragging before collection');
+  await page.screenshot({path:path.join(out,'EarlyGroundEncounter.png')});
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, PNG export/import and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

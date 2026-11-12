@@ -1,4 +1,4 @@
-import { ValidateEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
+import { ValidateEncounterDocument, UpgradeEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 
 export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_v2";
 export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
@@ -30,12 +30,16 @@ export class EncounterDocument {
     this.undo=[];this.redo=[];this.warning="";
     try {
       const saved=storage?.getItem(ENCOUNTER_STORAGE_KEY);
-      if(saved) this.value=ValidateSavedDocument(JSON.parse(saved),timeline);
+      if(saved) {
+        const original=ValidateSavedDocument(JSON.parse(saved),timeline);
+        this.value=ValidateSavedDocument(UpgradeEncounterDocument(original,defaults),timeline);
+        if(this.value.revision!==original.revision) {this.Save();this.warning=this.warning||"已更新地面遭遇布设，保留草稿中自行修改的字段";}
+      }
     } catch(error) { this.warning=`草稿未载入 · ${error.message}`; }
   }
 
   Replace(value) {
-    const validated=ValidateSavedDocument(value,this.timeline);
+    const validated=ValidateSavedDocument(UpgradeEncounterDocument(value,this.defaults),this.timeline);
     this.undo.push(this.value);
     if(this.undo.length>40) this.undo.shift();
     this.redo=[];this.value=validated;this.Save();

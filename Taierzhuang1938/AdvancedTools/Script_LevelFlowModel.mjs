@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -63,19 +63,30 @@ const cartKeys = Keys([
   ["10d",0.25,111,465], ["10d",0.6,109,493], ["10d",1,113.25,505],
   ["10e",1,117,527], ["10f",1,117,545], ["10j",1,117,552],
 ]);
-const tankKeys = Keys([
-  ["05a",0,175,-40], ["05a",0.55,105,50],
-  ["05b",0,88,112], ["05b",1,83,161],
-  ["06a",0,83,182], ["06a",1,84,215], ["06b",1,87,234], ["06c",1,88,244],
-  ["06d",1,86,255], ["06e",1,88,265], ["06f",0.7,91,278], ["06i",1,91,278],
-]);
-const secondTankKeys = Keys([
-  ["05a",0,181,-55], ["05a",0.55,111,36],
-  ["05b",0,92,98], ["05b",1,83,149],
-  ["06a",0,83,170], ["06a",1,82,198], ["06b",1,84,214], ["06c",1,85,224],
-  ["06d",1,88,238], ["06e",1,86,251], ["06f",1,86,253], ["06g",1,88,264],
-  ["06h",1,88,264], ["06i",1,85,218],
-]);
+const tankKeys = Keys(FLOW_TANK_TRACKS.tank1);
+const secondTankKeys = Keys(FLOW_TANK_TRACKS.tank2);
+
+function MarchTime(seconds) {
+  const cycle=FLOW_GROUND.tankMoveS+FLOW_GROUND.tankWaitS;
+  return Math.floor(seconds/cycle)*FLOW_GROUND.tankMoveS+Math.min(FLOW_GROUND.tankMoveS,seconds%cycle);
+}
+
+function TankTrack(keys,time) {
+  const end=keys.findIndex((key)=>key[0]>time);
+  if(end<=0) return Track(keys,time);
+  const a=keys[end-1],b=keys[end],duration=b[0]-a[0],age=time-a[0];
+  return SampleRoute([a.slice(1),b.slice(1)],MarchTime(age)/MarchTime(duration));
+}
+
+function TankState(keys,time) {
+  const position=TankTrack(keys,time),next=TankTrack(keys,time+0.02);
+  const moving=Distance(position,next)>0.001;
+  // A stationary track retains the direction of its current leg.
+  const end=keys.findIndex((key)=>key[0]>time);
+  const a=keys[Math.max(0,end-1)],b=keys[end<0?keys.length-1:end];
+  const heading=Distance(a.slice(1),b.slice(1))>0.01?Math.atan2(b[1]-a[1],-(b[2]-a[2])):Math.PI;
+  return {p:position,moving,heading,status:moving?"地面推进":"停驶掩护，等待步兵"};
+}
 
 function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
   return { id, name, side, kind, p, pose, ...extra };
@@ -83,7 +94,7 @@ function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
 
 let companionTracks = null;
 
-function CoreActors(beat, time, player, progress) {
+function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").start+BeatById("03h").duration*0.5) {
   const winter = Track(winterKeys, time);
   const cart = Track(cartKeys, time);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.pose)];
@@ -126,21 +137,26 @@ function CoreActors(beat, time, player, progress) {
     if(beat.stage === "10" && time < BeatById("10d").end) nier=Track(Keys([["10a",0,101,478],["10b",1,108,483],["10c",1,109,465],["10d",1,113.25,505]]),time);
     actors.push(Actor("nier", "妮儿", "civilian", "child", nier, "stand"));
   }
-  if (time >= BeatById("05a").start) {
+  if (time >= tankStart) {
     const burned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
-    const tankPosition=Track(tankKeys,time);
+    const tankTime=time-tankStart+BeatById("03h").start+BeatById("03h").duration*0.5;
+    const first=TankState(tankKeys,tankTime),second=TankState(secondTankKeys,tankTime);
+    const disabled=time>=BeatById("06g").start;
+    if(disabled) {first.moving=false;first.status=burned?"焚毁":"履带损毁";}
+    if(time>=BeatById("06i").start) second.status="倒车撤离";
+    const tankPosition=first.p;
     const turretTarget=["06g","06h"].includes(beat.id)?yao:player;
     const turret=Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.15;
     actors.push(Actor("tank1", "九四式 · 头车", "enemy", "tank", tankPosition, burned ? "burn" : "stand",
-      { heading: Math.PI, turret, disabled: time >= BeatById("06g").start }));
-    if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", Track(secondTankKeys,time), "stand", { heading: time >= BeatById("06i").start ? 0 : Math.PI, turret: Math.PI }));
+      { ...first, surface:"ground", turret, disabled }));
+    if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, "stand", { ...second, surface:"ground", heading: Math.PI, turret: Math.PI }));
   }
   if (["06a","06b"].includes(beat.id)) {
     const down = beat.id === "06b";
     actors.push(Actor("carrier1", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]-1.7], down ? "dead" : "walk"));
     actors.push(Actor("carrier2", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]+1.7], down ? "dead" : "walk"));
   }
-  if (beat.id === "06c") actors.push(Actor("veteran", "抱捆老兵", "friend", "person", SampleRoute([[94,264],[88.5,257]], Math.min(1,progress*2)), progress > 0.5 ? "dead" : "run"));
+  if (beat.id === "06c") actors.push(Actor("veteran", "抱捆老兵", "friend", "person", SampleRoute([[94,264],[96,263],[101,263],[101,257]], Math.min(1,progress*2)), progress > 0.5 ? "dead" : "run"));
   if(beat.stage === "10") {
     for(let index=0;index<12;index++) {
       const cross=BeatById("10a").start+32+index*13.5;
@@ -227,7 +243,7 @@ function Effects(beat, time, progress, actors) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
-  if (beat.fire === "tank" && tank && tank.pose !== "burn") {
+  if ((beat.fire === "tank" || ["03h","05a","05b","05c"].includes(beat.id)) && tank && tank.pose !== "burn") {
     const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : player.p;
     effects.push({ kind:"fire", a:tank.p, b:target, side:"enemy", heavy:true, phase:(time*5)%1 });
   }
@@ -269,9 +285,15 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const stage = STAGE_TIMELINE.find((entry) => entry.id === beat.stage);
   const progress = Clamp((time - beat.start) / beat.duration, 0, 1);
   const player = SampleBeatRoute(beat, progress);
-  const actors = CoreActors(beat,time,player,progress);
   if (!compiledDocuments.has(document)) compiledDocuments.set(document, CompileEncounters(document, FLOW_TIMELINE));
-  const encounter = SampleEncounters(compiledDocuments.get(document), time, actors);
+  const tankTrigger=compiledDocuments.get(document).triggers.find((trigger)=>trigger.id==="Trigger_TankEscort");
+  const tankStart=tankTrigger?.firedAt??Infinity;
+  const actors = CoreActors(beat,time,player,progress,tankStart);
+  const encounter = SampleEncounters(compiledDocuments.get(document), time, actors, (sampleTime)=>{
+    const sampleBeat=FLOW_TIMELINE.find((entry)=>sampleTime<entry.end)??FLOW_TIMELINE.at(-1);
+    const sampleProgress=Clamp((sampleTime-sampleBeat.start)/sampleBeat.duration,0,1);
+    return CoreActors(sampleBeat,sampleTime,SampleBeatRoute(sampleBeat,sampleProgress),sampleProgress,tankStart);
+  });
   actors.push(...OpeningActors(beat,time), ...encounter.actors);
   const effects = [...Effects(beat,time,progress,actors), ...encounter.effects];
   if (beat.id === "03h") {

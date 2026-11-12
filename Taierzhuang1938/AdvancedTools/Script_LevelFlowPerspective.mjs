@@ -1,6 +1,7 @@
+import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { FlowMapView, FLOW_COLORS, EncounterSignals, VisibleEncounterObject, Polygon, Line, Circle, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
-import { EncounterFloorConnections } from "./Script_LevelFlowMap.mjs";
+import { EncounterFloorConnections, EncounterHeightAt } from "./Script_LevelFlowMap.mjs";
 
 function Normalize(vector) {
   const length=Math.hypot(...vector)||1;
@@ -8,6 +9,35 @@ function Normalize(vector) {
 }
 function Cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function Dot(a,b) { return a.reduce((sum,value,index)=>sum+value*b[index],0); }
+
+function IntersectGround(origin,direction,map) {
+  let previous=0;
+  for(let distance=0.25;distance<=200;distance+=0.25) {
+    const point=origin.map((value,axis)=>value+direction[axis]*distance);
+    if(point[1]<=EncounterHeightAt([point[0],point[2]],map)) {
+      let low=previous,high=distance;
+      for(let iteration=0;iteration<10;iteration++) {
+        const middle=(low+high)/2,sample=origin.map((value,axis)=>value+direction[axis]*middle);
+        if(sample[1]<=EncounterHeightAt([sample[0],sample[2]],map)) high=middle;else low=middle;
+      }
+      return [origin[0]+direction[0]*high,origin[2]+direction[2]*high];
+    }
+    previous=distance;
+  }
+  return [origin[0]+direction[0]*60,origin[2]+direction[2]*60];
+}
+
+const groundCache=new WeakMap();
+function GroundFaces(map) {
+  if(groundCache.has(map)) return groundCache.get(map);
+  const [minX,maxX,minZ,maxZ]=FLOW_GROUND.bounds,faces=[];
+  const Vertex=(x,z)=>[x,EncounterHeightAt([x,z],map),z];
+  for(let x=minX;x<maxX;x+=3) for(let z=minZ;z<maxZ;z+=3) {
+    const right=Math.min(maxX,x+3),south=Math.min(maxZ,z+3);
+    faces.push([Vertex(x,z),Vertex(right,z),Vertex(right,south),Vertex(x,south)]);
+  }
+  groundCache.set(map,faces);return faces;
+}
 
 const bankCache=new WeakMap();
 function TrenchBanks(map) {
@@ -42,6 +72,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.target="player";
     this.scale=10;
     this.bankRuns=TrenchBanks(mapData);
+    this.groundFaces=GroundFaces(mapData);
   }
 
   BeforeDraw(frame) {
@@ -57,8 +88,8 @@ export class FlowPerspectiveView extends FlowMapView {
     const yaw=this.yaw+heading;
     if(this.type==="eye") {
       const eyeHeight=actor.kind==="quilt"?0.55:actor.pose==="drag"?0.95:1.6;
-      this.eye=[actor.p[0],eyeHeight,actor.p[1]];
-      this.aim=[actor.p[0]+Math.sin(yaw)*20,1.25,actor.p[1]+Math.cos(yaw)*20];
+      this.eye=[actor.p[0],EncounterHeightAt(actor.p,this.mapData)+eyeHeight,actor.p[1]];
+      this.aim=[actor.p[0]+Math.sin(yaw)*20,this.eye[1]-0.25,actor.p[1]+Math.cos(yaw)*20];
     } else {
       const distance=Clamp(125/this.scale,8,42);
       this.eye=[this.center[0]-Math.sin(yaw+0.55)*distance,distance*0.52,this.center[1]-Math.cos(yaw+0.55)*distance];
@@ -101,18 +132,20 @@ export class FlowPerspectiveView extends FlowMapView {
     return [this.width/2+camera[0]*this.focal/camera[2],this.height*0.49-camera[1]*this.focal/camera[2]];
   }
 
-  ToScreen(point) { return this.Project([point[0],0,point[1]]); }
+  ToScreen(point) { return this.Project([point[0],EncounterHeightAt(point,this.mapData),point[1]]); }
 
   ToWorld(point) {
     if(this.type==="oblique") {
       const x=(point[0]-this.width/2)/this.scale;
       const z=(point[1]-this.height*0.57)/(this.scale*Math.sin(this.pitch));
-      return [this.center[0]+x*Math.cos(this.yaw)+z*Math.sin(this.yaw),this.center[1]-x*Math.sin(this.yaw)+z*Math.cos(this.yaw)];
+      const height=10,depth=z+height/Math.tan(this.pitch);
+      const origin=[this.center[0]+x*Math.cos(this.yaw)+depth*Math.sin(this.yaw),height,this.center[1]-x*Math.sin(this.yaw)+depth*Math.cos(this.yaw)];
+      const direction=Normalize([-Math.sin(this.yaw)/Math.tan(this.pitch),-1,-Math.cos(this.yaw)/Math.tan(this.pitch)]);
+      return IntersectGround(origin,direction,this.mapData);
     }
     const x=(point[0]-this.width/2)/this.focal,y=-(point[1]-this.height*0.49)/this.focal;
     const direction=Normalize(this.forward.map((value,index)=>value+x*this.right[index]+y*this.up[index]));
-    const distance=direction[1]<-0.001?Math.min(200,-this.eye[1]/direction[1]):60;
-    return [this.eye[0]+direction[0]*distance,this.eye[2]+direction[2]*distance];
+    return IntersectGround(this.eye,direction,this.mapData);
   }
 
   Bounds() {
@@ -137,7 +170,7 @@ export class FlowPerspectiveView extends FlowMapView {
   DrawBase(context,width,height,frame) {
     context.fillStyle="#dce2db";context.fillRect(0,0,width,height);
     const faces=[],signals=EncounterSignals(frame);
-    const Face=(points,color,stroke="#7d81644a")=>{
+    const Face=(points,color,stroke="#7d81644a",terrain=false)=>{
       let projected;
       if(this.type==="oblique") projected=points.map((point)=>this.Project(point));
       else {
@@ -157,7 +190,7 @@ export class FlowPerspectiveView extends FlowMapView {
       const center=points[0].map((_,axis)=>points.reduce((sum,point)=>sum+point[axis],0)/points.length);
       const depth=this.type==="oblique"?(center[0]-this.center[0])*Math.sin(this.yaw)+(center[2]-this.center[1])*Math.cos(this.yaw):this.CameraPoint(center)[2];
       const ground=points.every((point)=>point[1]<=0.08);
-      faces.push({points:projected,color,stroke,depth:ground?1000000:depth});
+      faces.push({points:projected,color,stroke,depth:ground||terrain?1000000+depth:depth});
     };
     const Box=(x,z,w,d,h,color,y=0,yaw=0)=>{
       const Point=(dx,dy,dz)=>[x+dx*Math.cos(yaw)+dz*Math.sin(yaw),y+dy,z-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
@@ -170,12 +203,16 @@ export class FlowPerspectiveView extends FlowMapView {
     const extent=this.type==="eye"?90:65;
     const [cx,cz]=this.center;
     Face([[cx-extent,-0.08,cz-extent],[cx+extent,-0.08,cz-extent],[cx+extent,-0.08,cz+extent],[cx-extent,-0.08,cz+extent]],"#d8ddc4",null);
+    for(const points of this.groundFaces) {
+      if(Distance([points[0][0],points[0][2]],this.center)<extent+5) Face(points,"#d8ddc4",null,true);
+    }
     for(const floor of this.mapData.floors) if(floor.points.some((point)=>Distance(point,this.center)<90)) Face(floor.points.map((point)=>[point[0],0.03,point[1]]),"#efe3c9");
     for(const road of this.mapData.roads) for(let index=1;index<road.points.length;index++) {
       const a=road.points[index-1],b=road.points[index];
       if(Math.min(Distance(a,this.center),Distance(b,this.center))>90) continue;
       const length=Distance(a,b),normal=[-(b[1]-a[1])/length*road.width/2,(b[0]-a[0])/length*road.width/2];
-      Face([[a[0]+normal[0],0,a[1]+normal[1]],[b[0]+normal[0],0,b[1]+normal[1]],[b[0]-normal[0],0,b[1]-normal[1]],[a[0]-normal[0],0,a[1]-normal[1]]],"#e9ddc1",null);
+      const lift=road.id==="TankGroundRoad"?FLOW_GROUND.height:0;
+      Face([[a[0]+normal[0],lift+0.04,a[1]+normal[1]],[b[0]+normal[0],lift+0.04,b[1]+normal[1]],[b[0]-normal[0],lift+0.04,b[1]-normal[1]],[a[0]-normal[0],lift+0.04,a[1]-normal[1]]],"#e9ddc1",null,true);
     }
     for(const trench of this.mapData.trenches) for(let index=1;index<trench.points.length;index++) {
       const a=trench.points[index-1],b=trench.points[index];
@@ -183,7 +220,7 @@ export class FlowPerspectiveView extends FlowMapView {
       const length=Distance(a,b),normal=[-(b[1]-a[1])/length,(b[0]-a[0])/length],half=trench.width/2;
       Face([[a[0]+normal[0]*half,0.02,a[1]+normal[1]*half],[b[0]+normal[0]*half,0.02,b[1]+normal[1]*half],[b[0]-normal[0]*half,0.02,b[1]-normal[1]*half],[a[0]-normal[0]*half,0.02,a[1]-normal[1]*half]],"#e6d4af");
       for(const side of [-1,1]) {
-        const offset=half*side,top=trench.id==="SunkenLane"?2:1.5;
+        const offset=half*side,top=2;
         for(const [from,to] of this.bankRuns.get(`${trench.id}:${index}:${side}`)||[]) {
           const start=[a[0]+(b[0]-a[0])*from,a[1]+(b[1]-a[1])*from];
           const end=[a[0]+(b[0]-a[0])*to,a[1]+(b[1]-a[1])*to];
@@ -192,6 +229,13 @@ export class FlowPerspectiveView extends FlowMapView {
           Face([[start[0]+normal[0]*offset,top,start[1]+normal[1]*offset],[end[0]+normal[0]*offset,top,end[1]+normal[1]*offset],[end[0]+normal[0]*outer,top,end[1]+normal[1]*outer],[start[0]+normal[0]*outer,top,start[1]+normal[1]*outer]],"#d2c094");
         }
       }
+    }
+    for(const ramp of this.mapData.ramps) for(let index=1;index<ramp.points.length;index++) {
+      const a=ramp.points[index-1],b=ramp.points[index],length=Distance(a,b);
+      if(Distance(a,this.center)>75) continue;
+      const nx=-(b[1]-a[1])/length*ramp.width/2,nz=(b[0]-a[0])/length*ramp.width/2;
+      const ya=EncounterHeightAt(a,this.mapData)+0.08,yb=EncounterHeightAt(b,this.mapData)+0.08;
+      Face([[a[0]+nx,ya,a[1]+nz],[b[0]+nx,yb,b[1]+nz],[b[0]-nx,yb,b[1]-nz],[a[0]-nx,ya,a[1]-nz]],"#c8bc91",null,true);
     }
     for(let index=1;index<this.mapData.river.length;index++) {
       const a=this.mapData.river[index-1],b=this.mapData.river[index];
@@ -205,8 +249,9 @@ export class FlowPerspectiveView extends FlowMapView {
       const [x,,z]=object.pos,[w,h,d]=object.size||[1,1,1];
       if(Distance([x,z],this.center)>65||Math.max(w,d)<0.7) continue;
       const heightValue=Clamp(h||0.4,0.2,5);
-      Box(x,z,w,d,heightValue,object.material==="Whitebox/Plaster"?"#c7bfaa":"#b8a786",0,(object.yawDeg||0)*Math.PI/180);
-      if(heightValue>0.6) this.visibleBoxes.push({x,z,w,d,h:heightValue});
+      const base=EncounterHeightAt([x,z],this.mapData);
+      Box(x,z,w,d,heightValue,object.material==="Whitebox/Plaster"?"#c7bfaa":"#b8a786",base,(object.yawDeg||0)*Math.PI/180);
+      if(heightValue>0.6) this.visibleBoxes.push({x,z,w,d,h:heightValue,y:base});
     }
     faces.sort((a,b)=>b.depth-a.depth);
     for(const face of faces) Polygon(context,face.points,face.color,face.stroke);
@@ -215,9 +260,9 @@ export class FlowPerspectiveView extends FlowMapView {
   VisibleActor(actor) {
     if(this.type!=="eye") return true;
     if(actor.id===this.target) return false;
-    const target=[actor.p[0],1.5,actor.p[1]],delta=target.map((value,index)=>value-this.eye[index]);
+    const target=[actor.p[0],EncounterHeightAt(actor.p,this.mapData)+1.5,actor.p[1]],delta=target.map((value,index)=>value-this.eye[index]);
     for(const box of this.visibleBoxes) {
-      const min=[box.x-box.w/2,0,box.z-box.d/2],max=[box.x+box.w/2,box.h,box.z+box.d/2];
+      const min=[box.x-box.w/2,box.y,box.z-box.d/2],max=[box.x+box.w/2,box.y+box.h,box.z+box.d/2];
       let entry=0,exit=1;
       for(let axis=0;axis<3;axis++) {
         if(Math.abs(delta[axis])<1e-8) {if(this.eye[axis]<min[axis]||this.eye[axis]>max[axis]) {entry=2;break;}}
@@ -233,9 +278,10 @@ export class FlowPerspectiveView extends FlowMapView {
   }
 
   DrawActor(context,actor,frame) {
-    const [x,z]=actor.p,color=FLOW_COLORS[actor.side];
+    const [x,z]=actor.p,color=FLOW_COLORS[actor.side],base=EncounterHeightAt(actor.p,this.mapData);
+    const Project=(point)=>this.Project([point[0],point[1]+base,point[2]]);
     const Segment=(a,b,width=2)=>{
-      const start=this.Project(a),end=this.Project(b);
+      const start=Project(a),end=Project(b);
       if(start[0]>-10000&&end[0]>-10000) Line(context,[start,end],color,width);
     };
     if(actor.kind==="tank"||actor.kind==="cart") {
@@ -243,16 +289,21 @@ export class FlowPerspectiveView extends FlowMapView {
       const Point=(dx,y,dz)=>[x+dx*Math.cos(yaw)+dz*Math.sin(yaw),y,z-dx*Math.sin(yaw)+dz*Math.cos(yaw)];
       const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)];
       const top=bottom.map((point)=>[point[0],0.95,point[2]]);
-      for(let index=0;index<4;index++) Polygon(context,[bottom[index],bottom[(index+1)%4],top[(index+1)%4],top[index]].map((point)=>this.Project(point)),"#9d9d7e",color);
-      Polygon(context,top.map((point)=>this.Project(point)),actor.pose==="burn"?"#a86a39":"#b8b395",color);
+      for(let index=0;index<4;index++) Polygon(context,[bottom[index],bottom[(index+1)%4],top[(index+1)%4],top[index]].map((point)=>Project(point)),"#9d9d7e",color);
+      Polygon(context,top.map((point)=>Project(point)),actor.pose==="burn"?"#a86a39":"#b8b395",color);
       if(actor.kind==="tank") Segment([x,1.2,z],[x+Math.sin(actor.turret||0)*1.8,1.2,z-Math.cos(actor.turret||0)*1.8],3);
       return;
     }
     if(actor.kind==="quilt") {
-      Polygon(context,[[x-0.4,0.1,z-0.9],[x+0.4,0.1,z-0.9],[x+0.4,0.1,z+0.9],[x-0.4,0.1,z+0.9]].map((point)=>this.Project(point)),"#d8c5ab",color);return;
+      Polygon(context,[[x-0.4,0.1,z-0.9],[x+0.4,0.1,z-0.9],[x+0.4,0.1,z+0.9],[x-0.4,0.1,z+0.9]].map((point)=>Project(point)),"#d8c5ab",color);return;
     }
     if(actor.pose==="dead") {Segment([x-0.5,0.1,z],[x+0.5,0.1,z]);return;}
-    const crouch=["kneel","drag","down"].includes(actor.pose)?0.65:1;
+    if(actor.heavy) {
+      Segment([x,0.85,z],[x,0.85,z-1.5],3);
+      Segment([x,0.8,z-0.5],[x-0.35,0,z-0.8]);
+      Segment([x,0.8,z-0.5],[x+0.35,0,z-0.8]);
+    }
+    const crouch=actor.heavy||["kneel","drag","down"].includes(actor.pose)?0.65:1;
     const height=actor.kind==="child"?1.05:1.65;
     const gait=["walk","run","drag"].includes(actor.pose)?Math.sin(frame.time*5+x)*0.2:0;
     Segment([x,0.55*crouch,z],[x,height*0.8*crouch,z],3.5);
@@ -260,7 +311,7 @@ export class FlowPerspectiveView extends FlowMapView {
     Segment([x,0.55*crouch,z],[x+0.2,0.02,z-gait],2);
     Segment([x,height*0.65*crouch,z],[x-0.4,height*0.47*crouch,z+0.15],2);
     Segment([x,height*0.65*crouch,z],[x+0.4,height*0.47*crouch,z+0.15],2);
-    const head=this.Project([x,height*0.94*crouch,z]),neck=this.Project([x,height*0.8*crouch,z]);
+    const head=Project([x,height*0.94*crouch,z]),neck=Project([x,height*0.8*crouch,z]);
     Circle(context,head,Clamp(Distance(head,neck)*0.75,2.5,7),color,"#f6f0de");
   }
 

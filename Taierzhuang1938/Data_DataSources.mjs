@@ -21,7 +21,7 @@ export const DATA_SOURCE_RULES = Object.freeze([
     "正片关卡的区域文件（格式同场景的 Environment_*.json，多一节 stages = 任务步骤几点）：Data_EnvLevels 按 phase.id 登记；游戏内环境面板经本机 /__environment/save 存"),
   RULE("Environment/EnvPreset_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],
     "环境预设：组件容器（主光 / 环境光 / 天空 / 雾……每种一份，参数可按昼夜关键帧），可被多个区域、场景复用。种子脚本只生成过一次，之后改文件本身"),
-  RULE("Scenes/*/Scene_*.json", "source", ["SceneEditor.html", "../scripts/Script_LocalPreview.mjs", "Script_SceneRebuild1218.mjs"],
+  RULE("Scenes/*/Scene_*.json", "source", ["AdvancedTools/SceneEditor.html", "../scripts/Script_LocalPreview.mjs", "Script_SceneRebuild1218.mjs"],
     "场景文件：资产编号引用列表。场景编辑器经本机 /__scene/save 存，agent 直接改它；白盒场景与正式场景两份并存（用户 2026-11-01 定）"),
   RULE("Blockout/*.previz.json", "generated", ["Script_EditorBlockoutFirstLevel0105Previz.mjs", "Script_EditorBlockoutFirstLevel0610Previz.mjs", "Script_EditorBlockoutFirstLevel0107Previz.mjs", "Script_EditorBlockoutFirstLevel1218Previz.mjs", "Script_TimelineCli.mjs"],
     "白盒预演：预演生成器按白盒与剧本排出来"),

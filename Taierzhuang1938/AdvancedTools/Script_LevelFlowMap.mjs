@@ -1,3 +1,4 @@
+import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import * as front from "../Data_EditorBlockoutFirstLevel0105Space.mjs";
 import * as village from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
@@ -13,6 +14,28 @@ export function EncounterFloorConnections(point,map,ignore=null) {
     if(corridor.points.slice(1).some((end,index)=>SegmentDistance(point,corridor.points[index],end)<=corridor.width/2+0.05)) connections.push(id||"road");
   }
   return connections;
+}
+
+export function EncounterHeightAt(point,map) {
+  const [minX,maxX,minZ,maxZ]=FLOW_GROUND.bounds;
+  if(point[0]<minX||point[0]>maxX||point[1]<minZ||point[1]>maxZ) return 0;
+  for(const ramp of map.ramps) {
+    let traveled=0;
+    const total=ramp.points.slice(1).reduce((sum,end,index)=>sum+Math.hypot(end[0]-ramp.points[index][0],end[1]-ramp.points[index][1]),0);
+    for(let index=1;index<ramp.points.length;index++) {
+      const a=ramp.points[index-1],b=ramp.points[index],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(SegmentDistance(point,a,b)<=ramp.width/2) {
+        const t=Math.max(0,Math.min(1,((point[0]-a[0])*(b[0]-a[0])+(point[1]-a[1])*(b[1]-a[1]))/(length*length)));
+        return FLOW_GROUND.height*(traveled+t*length)/total;
+      }
+      traveled+=length;
+    }
+  }
+  if(map.floors.some((floor)=>InsidePolygon(point,floor.points))) return 0;
+  for(const trench of map.trenches) {
+    if(trench.points.slice(1).some((end,index)=>SegmentDistance(point,trench.points[index],end)<=trench.width/2)) return 0;
+  }
+  return FLOW_GROUND.height;
 }
 
 // The same seed and strip construction used by Devin's L1Map0107/Base.mjs.
@@ -37,7 +60,10 @@ function FrontPaperFields() {
 export function BuildEncounterMap(scene) {
   const objects = scene.objects.filter((object) => object.pos && object.pos[2] < 558
     && object.layer !== "backdrop" && !/空气墙|^11–18|^远景/.test(object.group || ""));
+  const ramps=structuredClone(FLOW_GROUND.ramps);
   const roads = [
+    {id:"TankGroundRoad",points:FLOW_GROUND.road,width:5},
+    ...ramps,
     { points: front.L0105_ROAD.map(Point), width: front.L0105_ROAD_WIDTH_M },
     { points: [...front.L0105_NORTH_ROAD].reverse().map(Point), width: 5 },
     { points: front.L0105_POST_ROAD_SOUTH.map(Point), width: 5 },
@@ -57,6 +83,7 @@ export function BuildEncounterMap(scene) {
   trenches.push({id:"PitEntry",points:[[0,-7],[0,0]],width:2.6});
   const Rectangle=(name,box)=>({name,points:[[box.minX,box.minZ],[box.maxX,box.minZ],[box.maxX,box.maxZ],[box.minX,box.maxZ]]});
   const floors=[
+    ...FLOW_GROUND.pockets.map(({name,box:[minX,maxX,minZ,maxZ]})=>Rectangle(name,{minX,maxX,minZ,maxZ})),
     Rectangle("丁字路口",village.L0610_STREETS.square.box),
     Rectangle("路口东北角",village.L0610_STREETS.pocket.box),
     Rectangle("老耿家院子",village.L0610_GENG.compound),
@@ -66,7 +93,11 @@ export function BuildEncounterMap(scene) {
   for(const place of [front.L0105_PLACES.pit,front.L0105_PLACES.dugout,front.L0105_PLACES.platoonShelter]) {
     floors.push(Rectangle(place.name,{minX:place.x-place.w/2,maxX:place.x+place.w/2,minZ:place.z-place.d/2,maxZ:place.z+place.d/2}));
   }
+  for(const [id,x,z,w,h,d,material] of FLOW_GROUND.cover) objects.push({
+    id:`Encounter_${id}`,pos:[x,0,z],size:[w,h,d],material:`Whitebox/${material}`,group:"遭遇设计/地面工事",planning:true,
+  });
   const labels = [
+    ["东侧地面车道",109,174], ["地面车道收窄口",101,280], ["集结处机枪阵地",72,139],
     ["旧阵地（已弃）",0,-203], ["旧警戒阵地",-22,-440], ["西邻班后撤沟",-48,90],
     ["防炮洞",68,64.5], ["西边机枪坑",0,-7], ["支沟口",21.9,67.1], ["拐角",30,86],
     ["坡顶",35,131], ["干沟集结处",56,152], ["凹路",88,238], ["收窄的弯",91,280],
@@ -75,7 +106,7 @@ export function BuildEncounterMap(scene) {
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   return {
-    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors,
+    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors, ramps,
     paint: scene.paint.filter((paint) => paint.poly && paint.poly.some((point) => point.z < 558)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),
