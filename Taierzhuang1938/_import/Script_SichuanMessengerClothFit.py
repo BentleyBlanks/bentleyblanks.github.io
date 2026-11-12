@@ -2,6 +2,7 @@
 import math
 import numpy as np
 import bpy
+import bmesh
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 from mathutils.geometry import barycentric_transform
@@ -13,6 +14,56 @@ def LocalPoints(obj):
 
 def WorldPoints(obj):
     return np.array([(obj.matrix_world @ vertex.co)[:] for vertex in obj.data.vertices])
+
+
+def TrimSourcePart(obj, minimumWorldZ=None, maximumWorldZ=None, halfWidth=None, minimumWorldX=None):
+    originalPoints = LocalPoints(obj)
+    originalNormals = np.array([normal.vector[:] for normal in obj.data.corner_normals])
+    obj.data.calc_loop_triangles()
+    triangles = [tuple(triangle.vertices) for triangle in obj.data.loop_triangles]
+    normalTriangles = [originalNormals[list(triangle.loops)].copy() for triangle in obj.data.loop_triangles]
+    sourceBvh = BVHTree.FromPolygons([Vector(point) for point in originalPoints], triangles, all_triangles=True)
+    mesh = bmesh.new()
+    mesh.from_mesh(obj.data)
+    planes = []
+    if minimumWorldZ is not None:
+        planes.append(((0, 0, minimumWorldZ), (0, 0, 1), True))
+    if maximumWorldZ is not None:
+        planes.append(((0, 0, maximumWorldZ), (0, 0, 1), False))
+    if halfWidth is not None:
+        planes.append(((0, halfWidth, 0), (0, 1, 0), False))
+        planes.append(((0, -halfWidth, 0), (0, 1, 0), True))
+    if minimumWorldX is not None:
+        planes.append(((minimumWorldX, 0, 0), (1, 0, 0), True))
+    for worldPoint, worldNormal, keepAbove in planes:
+        planePoint = obj.matrix_world.inverted() @ Vector(worldPoint)
+        planeNormal = (obj.matrix_world.to_3x3().transposed() @ Vector(worldNormal)).normalized()
+        bmesh.ops.bisect_plane(mesh, geom=list(mesh.verts) + list(mesh.edges) + list(mesh.faces),
+                              plane_co=planePoint, plane_no=planeNormal,
+                              clear_inner=keepAbove, clear_outer=not keepAbove, dist=1e-7)
+    mesh.to_mesh(obj.data)
+    mesh.free()
+    obj.data.update()
+    normals = []
+    distances = []
+    for loop in obj.data.loops:
+        point = obj.data.vertices[loop.vertex_index].co
+        nearest, normal, triangleIndex, distance = sourceBvh.find_nearest(point)
+        triangle = triangles[triangleIndex]
+        value = barycentric_transform(nearest,
+            *[Vector(originalPoints[index]) for index in triangle],
+            *[Vector(item) for item in normalTriangles[triangleIndex]])
+        normals.append(value.normalized())
+        distances.append(distance)
+    obj.data.normals_split_custom_set(normals)
+    scales = np.linalg.svd(np.array(obj.matrix_world.to_3x3()), compute_uv=False)
+    error = float(max(distances) * scales.max())
+    assert error < 1e-5
+    assert scales.max() - scales.min() < 1e-6
+    return {'minimumWorldZ': float(minimumWorldZ) if minimumWorldZ is not None else None,
+            'maximumWorldZ': float(maximumWorldZ) if maximumWorldZ is not None else None,
+            'halfWidth': halfWidth, 'minimumWorldX': minimumWorldX, 'sourceSurfaceMaximumErrorMeters': error,
+            'uniformScale': float(scales.mean())}
 
 
 def BuildCalfWrap(foot, body, assembly):
@@ -154,10 +205,10 @@ def BuildCalfWrap(foot, body, assembly):
     return wrap, rightWrap, report
 
 
-def FitCapBand(cap, head):
+def FitCapBand(cap, head, targetTopZ):
     headWorld = WorldPoints(head)
     headBvh = BVHTree.FromPolygons([Vector(point) for point in headWorld], [tuple(face.vertices) for face in head.data.polygons])
-    cap.location.z -= max(WorldPoints(cap)[:, 2]) - 1.75
+    cap.location.z -= max(WorldPoints(cap)[:, 2]) - targetTopZ
     capSourcePoints = LocalPoints(cap)
     capSourceNormals = np.array([normal.vector[:] for normal in cap.data.corner_normals])
     cap.data.calc_loop_triangles()
@@ -187,7 +238,7 @@ def FitCapBand(cap, head):
         fitBvh = BVHTree.FromPolygons([Vector(point) for point in newPoints], triangles.tolist(), all_triangles=True)
         displacement = np.zeros(len(newPoints))
         for index, point in enumerate(newPoints):
-            if point[0] > 0.03 or point[2] > 1.65:
+            if rawUnique[index, 0] > 0.12 or rawUnique[index, 2] > 0.52:
                 continue
             origin = Vector((-1.0, float(point[1]), float(point[2])))
             direction = Vector((1, 0, 0))
@@ -196,8 +247,8 @@ def FitCapBand(cap, head):
             if capHit is None or headHit is None:
                 continue
             needed = max(0.0, capHit.x - headHit.x + 0.0025)
-            posterior = np.clip((0.03 - point[0]) / 0.06, 0, 1)
-            upper = np.clip((1.65 - point[2]) / 0.02, 0, 1)
+            posterior = np.clip((0.12 - rawUnique[index, 0]) / 0.22, 0, 1)
+            upper = np.clip((0.52 - rawUnique[index, 2]) / 0.17, 0, 1)
             displacement[index] = needed * posterior * upper
         newPoints[:, 0] -= displacement
     capMatrixInverse = cap.matrix_world.inverted()
@@ -237,8 +288,11 @@ def FitCapBand(cap, head):
               'visorMaximumShiftMeters': float(capDisplacement[rawUnique[:, 0] > 0.25].max())}
     finalBvh = BVHTree.FromPolygons([Vector(point) for point in newPoints], triangles.tolist(), all_triangles=True)
     penetrations = []
-    for y in np.linspace(-0.06, 0.06, 7):
-        for z in np.linspace(1.59, 1.66, 15):
+    headCenterY = (headWorld[:, 1].min() + headWorld[:, 1].max()) / 2
+    halfWidth = (headWorld[:, 1].max() - headWorld[:, 1].min()) * 0.32
+    headTop = headWorld[:, 2].max()
+    for y in np.linspace(headCenterY - halfWidth, headCenterY + halfWidth, 7):
+        for z in np.linspace(headTop - 0.15, headTop - 0.04, 25):
             origin = Vector((-1, float(y), float(z)))
             capHit = finalBvh.ray_cast(origin, Vector((1, 0, 0)), 2)[0]
             headHit = headBvh.ray_cast(origin, Vector((1, 0, 0)), 2)[0]

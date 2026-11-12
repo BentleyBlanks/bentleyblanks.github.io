@@ -1,4 +1,4 @@
-"""Repair and assemble the original Sichuan messenger parts against the photos.
+"""Assemble source-proportioned Sichuan messenger parts with spread fingers.
 
 Run with scripts/Script_BlenderMcp.mjs start --batch. MESSENGER_OUTPUT_DIR
 selects a staging export directory. MESSENGER_REVIEW_ONLY=1 skips file exports.
@@ -13,18 +13,15 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from Script_SichuanMessengerHandPose import BuildHandPose
-from Script_SichuanMessengerClothFit import BuildCalfWrap, FitCapBand
+from Script_SichuanMessengerClothFit import BuildCalfWrap, FitCapBand, TrimSourcePart, WorldPoints
 
 sourceRoot = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
-projectRoot = Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRepair_20261112')
+projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRepair_20261112'))
 reviewRoot = projectRoot / 'Review'
 exportRoot = Path(os.environ.get('MESSENGER_OUTPUT_DIR', str(sourceRoot)))
 reviewRoot.mkdir(parents=True, exist_ok=True)
 exportRoot.mkdir(parents=True, exist_ok=True)
 exportEnabled = os.environ.get('MESSENGER_REVIEW_ONLY') != '1'
-pixelSize = 1.75 / 631.0
-floorPixel = 635.0
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene['BlenderMcpTask'] = 'SichuanMessengerRepair_20261112'
@@ -39,18 +36,6 @@ def Coordinates(obj):
     values = np.empty(len(obj.data.vertices) * 3)
     obj.data.vertices.foreach_get('co', values)
     return values.reshape(-1, 3)
-
-
-def CornerNormals(obj):
-    return np.array([normal.vector[:] for normal in obj.data.corner_normals])
-
-
-def UpdateGeometry(obj, points, normals):
-    obj.data.vertices.foreach_set('co', np.asarray(points).ravel())
-    obj.data.update()
-    normals = np.asarray(normals)
-    normals /= np.linalg.norm(normals, axis=1, keepdims=True).clip(1e-10)
-    obj.data.normals_split_custom_set(normals.tolist())
 
 
 def DuplicatePart(source, role):
@@ -87,73 +72,59 @@ for role in ['Body', 'HeadBald', 'LeftHand', 'LeftFoot', 'FieldCap']:
     obj.select_set(False)
     sources[role] = obj
 
-# One world coordinate system corresponds to the 640-pixel reference image.
-# +X is forward, +Y is the character's left, and +Z is up.
+# Source meshes keep their three-dimensional proportions. Pants cuffs and the
+# hidden base of the head bust are trimmed along planes without moving surfaces.
 body = DuplicatePart(sources['Body'], 'Body')
-rawBody = Coordinates(body)
-bodyNormals = CornerNormals(body)
-bodyLoops = np.array([loop.vertex_index for loop in body.data.loops])
-sourceHeights = np.array([0.0, 0.16, 0.37, 0.45, 0.70, 0.814, 0.9380395412445068])
-photoRows = np.array([485.0, 430.0, 380.0, 330.0, 205.0, 137.0, 98.0])
-bodyPoints = rawBody.copy()
-bodyPoints[:, 0] = rawBody[:, 0] * 360.0 + 5.0
-bodyPoints[:, 1] = rawBody[:, 1] * 512.0 - 1.0
-bodyPoints[:, 2] = floorPixel - np.interp(rawBody[:, 2], sourceHeights, photoRows)
-backWeight = np.clip((-rawBody[:, 0] + 0.01) / 0.10, 0, 1)
-neckWeight = np.clip((0.15 - np.abs(rawBody[:, 1])) / 0.07, 0, 1)
-upperWeight = np.clip((rawBody[:, 2] - 0.87) / 0.068, 0, 1)
-bodyPoints[:, 2] += 8.0 * backWeight * neckWeight * upperWeight
-segments = np.clip(np.searchsorted(sourceHeights, rawBody[:, 2], side='right') - 1, 0, len(sourceHeights) - 2)
-verticalScales = -(np.diff(photoRows) / np.diff(sourceHeights))[segments]
-bodyNormals[:, 0] /= 360.0
-bodyNormals[:, 1] /= 512.0
-bodyNormals[:, 2] /= verticalScales[bodyLoops]
-UpdateGeometry(body, bodyPoints * pixelSize, bodyNormals)
+bodyScale = 1.4
+pantsCutLocalZ = 0.14
+pantsHemWorldZ = 0.420
+bodyShiftZ = pantsHemWorldZ - pantsCutLocalZ * bodyScale
+body.matrix_world = Matrix.Translation((0, 0, bodyShiftZ)) @ Matrix.Scale(bodyScale, 4)
+bodyReport = TrimSourcePart(body, minimumWorldZ=pantsHemWorldZ)
+bodyPointsWorld = WorldPoints(body)
+bodyRaw = Coordinates(sources['Body'])
+bodyCollarTop = bodyShiftZ + bodyRaw[:, 2].max() * bodyScale
+frontCollar = bodyRaw[(bodyRaw[:, 0] > 0.01) & (np.abs(bodyRaw[:, 1]) < 0.08)]
+frontCollarTop = bodyShiftZ + frontCollar[:, 2].max() * bodyScale
 
 head = DuplicatePart(sources['HeadBald'], 'HeadBald')
-rawHead = Coordinates(head)
-headNormals = CornerNormals(head)
-headPoints = rawHead * np.array([108.0, 124.0, 124.0])
-headPoints[:, 0] += 8.0
-headPoints[:, 1] -= 1.0
-headPoints[:, 2] += floorPixel - 17.0 - rawHead[:, 2].max() * 124.0
-photoY = floorPixel - headPoints[:, 2]
-hiddenWeight = np.clip((photoY - 103.0) / 15.0, 0, 1)
-neckCenter = np.array([3.0, -1.0])
-delta = headPoints[:, :2] - neckCenter
-radius = np.sqrt(np.sum((delta / np.array([15.0, 15.0])) ** 2, axis=1))
-factor = 1.0 - hiddenWeight + hiddenWeight * np.minimum(1.0, 1.0 / radius.clip(1e-9))
-headPoints[:, :2] = neckCenter + delta * factor[:, None]
-headNormals /= np.array([108.0, 124.0, 124.0])
-UpdateGeometry(head, headPoints * pixelSize, headNormals)
+headScale = 0.33
+headCrownZ = bodyCollarTop + 0.222
+headShiftZ = headCrownZ - Coordinates(head)[:, 2].max() * headScale
+head.matrix_world = Matrix.Translation((0.012, 0, headShiftZ)) @ Matrix.Scale(headScale, 4)
+neckTransitionZ = headShiftZ + 0.26 * headScale
+headReport = TrimSourcePart(head, minimumWorldZ=neckTransitionZ)
+neckBase = DuplicatePart(sources['HeadBald'], 'NeckBase')
+neckBase.matrix_world = head.matrix_world.copy()
+neckReport = TrimSourcePart(neckBase, maximumWorldZ=neckTransitionZ, halfWidth=0.066, minimumWorldX=-0.055)
+modelHeight = headCrownZ + 0.045
+pixelSize = modelHeight / 631.0
 
-rigCollection = bpy.data.collections.new('HandPoseRigs')
-scene.collection.children.link(rigCollection)
-hand, rig, handReport, preparedHand = BuildHandPose(sources['LeftHand'], assemblyCollection, rigCollection)
-bodyPointsWorld = Coordinates(body)
-cuff = bodyPointsWorld[bodyPointsWorld[:, 1] > bodyPointsWorld[:, 1].max() - 0.025]
-cuffCenter = (cuff.min(0) + cuff.max(0)) / 2
+hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
+rawHand = Coordinates(hand)
+sample = rawHand[rawHand[:, 1] > 0.10][:, [0, 2]]
+sample -= sample.mean(0)
+_, axes = np.linalg.eigh(sample.T @ sample)
+dorsal = axes[:, 0]
+if dorsal[0] < 0:
+    dorsal *= -1
+handRoll = math.atan2(-dorsal[0], dorsal[1])
+handRotation = Matrix.Rotation(handRoll, 4, 'Y')
+preparedHand = rawHand @ np.array(handRotation.to_3x3()).T
 wrist = preparedHand[preparedHand[:, 1] < preparedHand[:, 1].min() + 0.025]
 wristCenter = (wrist.min(0) + wrist.max(0)) / 2
+cuff = bodyPointsWorld[bodyPointsWorld[:, 1] > bodyPointsWorld[:, 1].max() - 0.025]
+cuffCenter = (cuff.min(0) + cuff.max(0)) / 2
 targetWrist = cuffCenter.copy()
 targetWrist[1] = bodyPointsWorld[:, 1].max() - 14.0 * pixelSize
 handScale = 0.205
-handTransform = Matrix.Translation(Vector(targetWrist - wristCenter * handScale)) @ Matrix.Scale(handScale, 4)
+handTransform = Matrix.Translation(Vector(targetWrist - wristCenter * handScale)) @ handRotation @ Matrix.Scale(handScale, 4)
 hand.matrix_world = handTransform
-rig.matrix_world = handTransform
 mirror = Matrix.Diagonal((1.0, -1.0, 1.0, 1.0))
-rightRig = rig.copy()
-rightRig.data = rig.data.copy()
-rightRig.name = 'Rig_HandPose_R'
-rigCollection.objects.link(rightRig)
-rightRig.matrix_world = mirror @ handTransform
-for name in rig.pose.bones.keys():
-    rightRig.pose.bones[name].rotation_quaternion = rig.pose.bones[name].rotation_quaternion
 rightHand = hand.copy()
 rightHand.name = 'Part_Hand_R'
 assemblyCollection.objects.link(rightHand)
 rightHand.matrix_world = mirror @ handTransform
-rightHand.modifiers.get('PoseWithVolumePreservation').object = rightRig
 
 foot = DuplicatePart(sources['LeftFoot'], 'Foot_L')
 rawFoot = Coordinates(foot)
@@ -162,7 +133,7 @@ footRotation = Matrix.Rotation(math.radians(5), 4, 'Z')
 scaledFoot = rawFoot @ np.array(footRotation.to_3x3()).T * footScale
 top = scaledFoot[rawFoot[:, 2] > rawFoot[:, 2].max() - 0.06]
 topCenter = (top.min(0) + top.max(0)) / 2
-leg = bodyPointsWorld[(bodyPointsWorld[:, 1] > 0) & (bodyPointsWorld[:, 2] < bodyPointsWorld[:, 2].min() + 0.03)]
+leg = bodyPointsWorld[(bodyPointsWorld[:, 1] > 0) & (bodyPointsWorld[:, 2] < pantsHemWorldZ + 0.03)]
 legCenter = (leg.min(0) + leg.max(0)) / 2
 footShift = np.array([legCenter[0] - topCenter[0], legCenter[1] - topCenter[1], -scaledFoot[:, 2].min()])
 foot.matrix_world = Matrix.Translation(Vector(footShift)) @ footRotation @ Matrix.Scale(footScale, 4)
@@ -174,35 +145,32 @@ wrapLeft, wrapRight, wrapReport = BuildCalfWrap(foot, body, assemblyCollection)
 
 cap = DuplicatePart(sources['FieldCap'], 'FieldCap')
 rawCap = Coordinates(cap)
-capScale = 0.23
+capScale = 0.24
 capRotation = Matrix.Rotation(math.radians(-10), 4, 'Y')
 scaledCap = rawCap @ np.array(capRotation.to_3x3()).T * capScale
 bill = scaledCap[(rawCap[:, 0] > 0.30) & (rawCap[:, 2] < 0.30)]
-capShift = np.array([58.0 * pixelSize - bill[:, 0].max() - 0.012,
-                     -pixelSize, (floorPixel - 42.0) * pixelSize - bill[:, 2].min() + 0.002])
+headNoseX = WorldPoints(head)[:, 0].max()
+capShift = np.array([headNoseX + 0.025 - bill[:, 0].max(), 0, 0])
 cap.matrix_world = Matrix.Translation(Vector(capShift)) @ capRotation @ Matrix.Scale(capScale, 4)
-capReport = FitCapBand(cap, head)
+capReport = FitCapBand(cap, head, modelHeight)
 
-depsgraph = bpy.context.evaluated_depsgraph_get()
-bpy.context.view_layer.update()
-leftHandWorld = np.array([(hand.matrix_world @ vertex.co)[:] for vertex in hand.evaluated_get(depsgraph).data.vertices])
-rightHandWorld = np.array([(rightHand.matrix_world @ vertex.co)[:] for vertex in rightHand.evaluated_get(depsgraph).data.vertices])
-mirroredLeft = leftHandWorld.copy()
-mirroredLeft[:, 1] *= -1
-mirrorError = float(np.linalg.norm(mirroredLeft - rightHandWorld, axis=1).max())
+report = {'body': bodyReport, 'head': headReport, 'neckBase': neckReport, 'modelHeightMeters': modelHeight,
+          'handPose': 'OriginalSpreadFingers', 'calfWrap': wrapReport, 'capBand': capReport,
+          'originalPartScaleChecks': {}}
+for name, obj in [('Body', body), ('Head', head), ('Hand', hand), ('Foot', foot), ('Cap', cap)]:
+    scales = np.linalg.svd(np.array(obj.matrix_world.to_3x3()), compute_uv=False)
+    assert scales.max() - scales.min() < 1e-6
+    report['originalPartScaleChecks'][name] = scales.tolist()
+assert np.array_equal(Coordinates(hand), Coordinates(sources['LeftHand']))
+assert np.array_equal(Coordinates(foot), Coordinates(sources['LeftFoot']))
+report['handSourceMeshUnchanged'] = True
+report['footSourceMeshUnchanged'] = True
+handWorld = WorldPoints(hand)
+mirroredHandWorld = handWorld.copy()
+mirroredHandWorld[:, 1] *= -1
+mirrorError = float(np.linalg.norm(mirroredHandWorld - WorldPoints(rightHand), axis=1).max())
 assert mirrorError < 1e-5
-footWorld = np.array([(foot.matrix_world @ vertex.co)[:] for vertex in foot.data.vertices])
-rng = np.random.default_rng(1938)
-first = rng.integers(0, len(rawFoot), 1200)
-second = rng.integers(0, len(rawFoot), 1200)
-sourceDistances = np.linalg.norm(rawFoot[first] - rawFoot[second], axis=1)
-targetDistances = np.linalg.norm(footWorld[first] - footWorld[second], axis=1)
-valid = sourceDistances > 1e-5
-footRatios = targetDistances[valid] / sourceDistances[valid]
-assert np.max(np.abs(footRatios - footScale)) < 1e-5
-report = {'hand': handReport, 'handMirrorMaximumErrorMeters': mirrorError,
-          'footUniformScale': footScale, 'footDistanceScaleStd': float(footRatios.std()),
-          'calfWrap': wrapReport, 'capBand': capReport}
+report['handMirrorMaximumErrorMeters'] = mirrorError
 
 scene.render.engine = 'CYCLES'
 scene.cycles.samples = 32
@@ -228,29 +196,45 @@ camera = bpy.data.objects.new('ReviewCamera', cameraData)
 scene.collection.objects.link(camera)
 scene.camera = camera
 cameraData.type = 'ORTHO'
+wholeCenter = Vector((0, 0, 315)) * pixelSize
+handCenter = Vector((handWorld.min(0) + handWorld.max(0)) / 2)
+footWorld = WorldPoints(foot)
+footCenter = Vector(((footWorld[:, 0].min() + footWorld[:, 0].max()) / 2, legCenter[1], wrapReport['topZ'] / 2))
+headCenter = Vector((0.012, 0, (frontCollarTop + modelHeight) / 2))
 views = [
-    ('Front', (0, 0, 315), (4, 0, 0), 640),
-    ('LeftSide', (0, 0, 315), (0, 4, 0), 640),
-    ('Back', (0, 0, 315), (-4, 0, 0), 640),
-    ('HandTop', (10, 275, 493), (0, 0, 4), 130),
-    ('WristFront', (10, 245, 493), (4, 0, 0), 90),
-    ('FootSide', (5, 0, 85), (0, 4, 0), 230),
-    ('CapFront', (0, 0, 570), (4, 0, 0), 150),
-    ('CapLeftSide', (5, 0, 570), (0, 4, 0), 150),
-    ('CapBack', (0, 0, 570), (-4, 0, 0), 150),
+    ('Front', wholeCenter, Vector((4, 0, 0)), 640 * pixelSize),
+    ('LeftSide', wholeCenter, Vector((0, 4, 0)), 640 * pixelSize),
+    ('Back', wholeCenter, Vector((-4, 0, 0)), 640 * pixelSize),
+    ('ThreeQuarter', wholeCenter, Vector((4, 3, 0.5)), modelHeight * 1.10),
+    ('HandTop', handCenter, Vector((0, 0, 4)), 0.36),
+    ('WristFront', Vector(targetWrist) + Vector((0, 0.015, 0)), Vector((4, 0, 0)), 0.27),
+    ('FootSide', footCenter, Vector((0, 4, 0)), 0.66),
+    ('CapFront', headCenter, Vector((4, 0, 0)), 0.43),
+    ('CapLeftSide', headCenter, Vector((0, 4, 0)), 0.43),
+    ('CapBack', headCenter, Vector((-4, 0, 0)), 0.43),
 ]
-for name, centerPixels, directionTuple, span in views:
-    center = Vector(centerPixels) * pixelSize
-    direction = Vector(directionTuple)
+for name, center, direction, span in views:
     camera.location = center + direction
     camera.rotation_euler = (-direction).to_track_quat('-Z', 'Y').to_euler()
-    cameraData.ortho_scale = span * pixelSize
+    cameraData.ortho_scale = span
     if name == 'Front':
         frontRotation = camera.rotation_euler.to_quaternion()
     scene.render.filepath = str(reviewRoot / f'Preview_SichuanMessenger_{name}.png')
     bpy.ops.render.render(write_still=True)
-for rigObject in rigCollection.objects:
-    rigObject.hide_set(True)
+sourceHand = sources['LeftHand']
+sourceHand.matrix_world = hand.matrix_world
+sourceHand.hide_render = False
+for part in assemblyCollection.objects:
+    part.hide_render = True
+camera.location = handCenter + Vector((0, 0, 4))
+camera.rotation_euler = Vector((0, 0, -4)).to_track_quat('-Z', 'Y').to_euler()
+cameraData.ortho_scale = 0.36
+scene.render.filepath = str(reviewRoot / 'Preview_SichuanMessenger_SourceHandTop.png')
+bpy.ops.render.render(write_still=True)
+sourceHand.matrix_world = Matrix.Identity(4)
+sourceHand.hide_render = True
+for part in assemblyCollection.objects:
+    part.hide_render = False
 for screen in bpy.data.screens:
     for area in screen.areas:
         if area.type == 'VIEW_3D':
