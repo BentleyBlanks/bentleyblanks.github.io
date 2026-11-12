@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Script_ShortcutIcon.ps1')
 
 # stdout 被捕获时 PowerShell 5.1 按 [Console]::OutputEncoding 编码，默认是
 # 系统 ANSI(cp936)；下面回的路径里含中文，调用方按 UTF-8 读就成乱码。
@@ -27,8 +28,7 @@ $shortcut.TargetPath       = $target
 $shortcut.WorkingDirectory = $repoRoot
 $shortcut.Description      = '本地起站点预览服，并打开页面索引（关掉黑窗口即停服）'
 $icon = Join-Path $PSScriptRoot 'Icons\Icon_LocalPreview.ico'
-if (Test-Path -LiteralPath $icon) { $shortcut.IconLocation = "$icon,0" }
-$shortcut.Save()
+SaveShortcutIcon -Shortcut $shortcut -LinkPath $linkPath -IconPath $icon
 
 # 输出保持纯 ASCII + 路径：中文经 PowerShell 的控制台编码转一手就成乱码，
 # 而 node 侧 console.log 走的是 WriteConsoleW，不吃代码页这一套。所以人话

@@ -11,6 +11,7 @@
 // 用法：node Taierzhuang1938/Script_AdvancedToolsTest.mjs
 
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
@@ -117,7 +118,13 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
       Check("快捷方式目标是 node", path.resolve(field("T")) === path.resolve(process.execPath), field("T"));
       Check("快捷方式参数是本脚本", field("A") === `"${launcher}"`, field("A"));
       Check("快捷方式工作目录是仓库根", path.resolve(field("W")) === REPO_ROOT, field("W"));
-      Check("快捷方式使用控制中心专属图标", field("I") === `${path.join(REPO_ROOT,"scripts","Icons","Icon_ControlCenter.ico")},0`, field("I"));
+      const iconSource=path.join(REPO_ROOT,"scripts","Icons","Icon_ControlCenter.ico");
+      const iconHash=createHash("sha256").update(fs.readFileSync(iconSource)).digest("hex").slice(0,16);
+      const iconPath=field("I").replace(/,0$/,"");
+      Check("快捷方式使用控制中心专属版本图标",path.basename(iconPath)===`Icon_ControlCenter_${iconHash}.ico`&&fs.existsSync(iconPath),field("I"));
+      Check("图标资源与源文件一致",fs.readFileSync(iconPath).equals(fs.readFileSync(iconSource)));
+      const linkBytes=fs.readFileSync(link);
+      Check("图标引用不依赖用户环境变量",(linkBytes.readUInt32LE(20)&0x4000)===0);
     } else {
       Check("--shortcut-dir 在目标目录建启动文件", files.length === 1 && files[0].startsWith(SHORTCUT_NAME), files.join(","));
     }

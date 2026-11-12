@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '..\..\scripts\Script_ShortcutIcon.ps1')
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $shell    = New-Object -ComObject WScript.Shell
@@ -18,6 +19,7 @@ $shortcut.TargetPath       = $Target
 $shortcut.Arguments        = $Arguments
 $shortcut.WorkingDirectory = $WorkDir
 $shortcut.Description      = 'AdvancedTool ControlCenter: start the local preview server and open the advanced tools control center'
-if ($Icon -and (Test-Path -LiteralPath $Icon)) { $shortcut.IconLocation = "$Icon,0" }
-$shortcut.Save()
+if ($Icon -and (Test-Path -LiteralPath $Icon)) {
+  SaveShortcutIcon -Shortcut $shortcut -LinkPath $LinkPath -IconPath $Icon
+} else { $shortcut.Save() }
 Write-Output "SHORTCUT_PATH=$LinkPath"
