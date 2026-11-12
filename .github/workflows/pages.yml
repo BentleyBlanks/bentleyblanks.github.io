@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment_retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,4 +130,14 @@ jobs:
         with:
           path: ${{ runner.temp }}/pages
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # Pages sometimes returns HTTP 500 while creating a deployment even
+      # after the artifact upload and browser checks succeed. Retry the same
+      # verified artifact once; a second failure still fails the job.
+      - name: Wait before retrying Pages deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
