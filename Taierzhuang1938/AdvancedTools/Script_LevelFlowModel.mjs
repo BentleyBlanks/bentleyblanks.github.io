@@ -141,7 +141,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   const loadingProgress=Clamp((time-BeatById("06c").start)/BeatById("06c").duration,0,1);
   const aboard=time>=BeatById("06d").start;
   const winter=aboard?CartOffset(0,-0.1):time>=BeatById("06c").start?SampleRoute(winterLoadingRoute,loadingProgress):Track(winterKeys,time);
-  const actors = [Actor("player", "顺子", "player", "person", player, beat.pose)];
+  const actors = [Actor("player", "顺子", "player", "person", player, beat.cover?"kneel":beat.pose)];
   const winterPose = time < BeatById("02b").start ? "kneel" : "wounded";
   actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose,
     aboard?{parentId:"cart",elevation:1.05,heading}:loadingProgress>0?{elevation:1.05*Clamp((loadingProgress-0.85)/0.15,0,1),heading}:{}));
@@ -278,8 +278,8 @@ function Effects(beat, time, progress, actors) {
     AddArc([58,72],[57.5,61.2],beat.start+0.4,2.5);
   }
   if (beat.fx === "returnGrenade") {
-    AddArc([21,61],[winter.p[0],winter.p[1]],beat.start,2.2);
-    AddArc(winter.p,[21,61],beat.start+4,2.1);
+    AddArc(beat.grenadeFrom??[21,61],[winter.p[0],winter.p[1]],beat.start,2.2);
+    AddArc(winter.p,beat.grenadeFrom??[21,61],beat.start+4,2.1);
   }
   if (["trackBlast","engineBlast","collapse"].includes(beat.fx)) {
     const age = time - (beat.start + beat.duration * 0.8);

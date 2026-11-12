@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -117,8 +117,8 @@ for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
 }
 assert.ok(movingTanks>50&&waitingTanks>50,"vehicles visibly alternate advance and infantry-covering halts");
 assert.ok(grenadeFrames>50&&earlyGrenades>0,"enemy grenade attacks recur from the drag segment through the tank battle");
-assert.equal(map.ramps.length,9);
-assert.equal(map.objects.filter((object)=>object.planning).length,19);
+assert.equal(map.ramps.length,12);
+assert.equal(map.objects.filter((object)=>object.planning).length,25);
 for(const ramp of map.ramps) {
   assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
   assert.ok(Math.abs(EncounterHeightAt(ramp.points.at(-1),map)-FLOW_GROUND.height)<1e-6,`${ramp.id} reaches surface`);
@@ -150,10 +150,58 @@ assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
 assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
 ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
 
+// The annotated door approach precedes the ramp chase and fork pursuit.
+const Group=(id)=>baseline.groups.find(group=>group.id===id);
+assert.ok(Group("Fork").start<Group("Corner").start&&Group("Corner").start<Group("Rim").start);
+assert.ok(Group("Fork").route.every(point=>point[1]<63),"first pressure approaches the doorway on the northern surface");
+for(const id of ["Corner","Rim","RearPursuit","TrafficFlank"]) {
+  const rampId=id==="Corner"?"DugoutPressureRamp":id==="TrafficFlank"?"TrafficFlankRamp":"NorthPursuitRamp";
+  for(const point of map.ramps.find(ramp=>ramp.id===rampId).points) {
+    assert.ok(Group(id).route.some(waypoint=>Distance(point,waypoint)<1e-6),`${id} travels through every waypoint of ${rampId}`);
+  }
+}
+assert.equal(Group("Rim").count,3);assert.equal(Group("RearPursuit").count,3);
+assert.ok(Group("RearPursuit").start>=Math.max(...Group("Rim").lives.map(life=>life.fall)),"two northern waves arrive sequentially");
+const flankStart=Group("TrafficFlank").start;
+assert.ok(flankStart>BeatById("03h").start&&flankStart<BeatById("03h").end);
+assert.ok(!EvaluateFlow(flankStart-0.01).actors.some(actor=>actor.groupId==="TrafficFlank"));
+assert.ok(EvaluateFlow(flankStart+0.01).actors.some(actor=>actor.groupId==="TrafficFlank"));
+const shiftedFlank=structuredClone(defaults);
+shiftedFlank.triggers.find(trigger=>trigger.id==="Trigger_TrafficFlank").area.center=[300,300];
+assert.equal(CompileEncounters(shiftedFlank,FLOW_TIMELINE).groups.find(group=>group.id==="TrafficFlank").start,null);
+assert.ok(!EvaluateFlow(380,shiftedFlank).actors.some(actor=>actor.groupId==="TrafficFlank"),"west-ramp reinforcement depends on reaching point 2");
+assert.equal(EvaluateFlow(227.14).actors[0].pose,"kneel","the box-stack firing pause uses a low protected posture");
+const doorCoverIds=new Set(["DugoutDoorBags","DugoutDoorReturn","DugoutInnerCrates","DragFirstShield","DragCornerShield","TrafficFlankBags"].map(id=>`Encounter_${id}`));
+const doorCovers=map.objects.filter(object=>doorCoverIds.has(object.id));
+assert.equal(doorCovers.length,6);
+for(let stamp=160;stamp<400;stamp+=0.25) {
+  for(const actor of EvaluateFlow(stamp).actors.filter(actor=>["player","winter"].includes(actor.id))) {
+    for(const cover of doorCovers) {
+      const [x,,z]=cover.pos,[width,,depth]=cover.size;
+      assert.ok(Math.abs(actor.p[0]-x)>width/2+0.35||Math.abs(actor.p[1]-z)>depth/2+0.35,"new doorway covers leave the drag route clear");
+    }
+  }
+}
+const previousDraft=structuredClone(defaults);previousDraft.revision=FLOW_PREVIOUS_DRAG_ENCOUNTER.revision;
+for(const collection of ["groups","triggers"]) previousDraft[collection]=FLOW_PREVIOUS_DRAG_ENCOUNTER[collection].map(previous=>Object.assign(structuredClone(defaults[collection].find(item=>item.id===previous.id)),previous));
+previousDraft.groups.find(group=>group.id==="Fork").count=8;
+previousDraft.groups=previousDraft.groups.filter(group=>group.id!=="SearchNeighbor");
+const updatedDraft=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(previousDraft),setItem:()=>{}}).value;
+assert.equal(updatedDraft.revision,defaults.revision);
+assert.equal(updatedDraft.groups.find(group=>group.id==="Fork").count,8);
+assert.deepEqual(updatedDraft.groups.find(group=>group.id==="Fork").route,Group("Fork").route);
+assert.ok(updatedDraft.groups.some(group=>group.id==="TrafficFlank"));
+assert.ok(!updatedDraft.groups.some(group=>group.id==="SearchNeighbor"));
+ValidateEncounterDocument(updatedDraft,FLOW_TIMELINE);
+
 const invalidViews=structuredClone(packet);invalidViews.context.viewports={count:4,active:0,views:[]};
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
 const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+for(const rampId of ["DugoutPressureRamp","NorthPursuitRamp","TrafficFlankRamp"]) {
+  const ramp=map.ramps.find(ramp=>ramp.id===rampId),bottom=terrain.heightAt(...ramp.points[0]),top=terrain.heightAt(...ramp.points.at(-1));
+  assert.ok(top>bottom+1,`${rampId} connects real ground to the trench floor`);
+}
 for(const [x,z] of [[21.9,67.1],[25,67.1],[33,100],[35,100],[40,100],[55,150],[88,238],[100,465]]) {
   const pre=terrain.preAt(x,z),expected=terrain.plan.Apply(x,z,pre,terrain.plan.natural(x,z));
   assert.equal(terrain.heightAt(x,z),expected,`real game terrain sampler at ${x},${z}`);

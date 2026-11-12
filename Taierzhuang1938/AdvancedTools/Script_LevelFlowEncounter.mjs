@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -17,13 +17,13 @@ export function CreateEncounterDocument(timeline, waves) {
   const groups = waves.map((wave) => {
     const beat = Find(wave.beat), end = Find(wave.until || wave.beat);
     const triggerId = `Trigger_${wave.id}`;
-    triggers.push({id:triggerId,label:wave.label,beat:beat.id,endBeat:end.id,mode:"area",delay:0,area:Area(beat.p[0],6)});
+    triggers.push({id:triggerId,label:wave.label,beat:beat.id,endBeat:end.id,mode:"area",delay:0,area:Area(beat.p[0],6),...structuredClone(wave.trigger||{})});
     return {
       id: wave.id, label: wave.label, beat: beat.id, endBeat: end.id, triggerId, enabled: true,
       side: "enemy", target: wave.target === "winter" ? "winter" : "player",
       area: Area(wave.source,2.4,3), route: structuredClone(wave.route),
       count: wave.count, interval: wave.interval, maxAlive: wave.cyclic ? 5 : wave.count,
-      lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: 2.5,
+      lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
       behavior: wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance",
       note: wave.repeat,
     };
@@ -33,8 +33,8 @@ export function CreateEncounterDocument(timeline, waves) {
     triggers.push({id:triggerId,label,beat,endBeat,mode:"time",delay:0,area:Area(Find(beat).p[0],6)});
     groups.push({id,label,beat,endBeat,triggerId,enabled:true,side,target,area:Area(center,3,3),route,count,interval:2,maxAlive:count,lifetime,speed:2.2,behavior,note:"关卡调度布设"});
   };
-  Add("RearPursuit","北沟追兵","03g","03h",[12,44],[[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],6,"enemy","advance","player",34);
-  const pursuit=groups.at(-1);pursuit.interval=7;pursuit.maxAlive=3;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
+  Add("RearPursuit","③ 北坡下沟第二波","03g","03h",[20,33],[[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],3,"enemy","advance","player",54);
+  const pursuit=groups.at(-1);pursuit.interval=2.5;pursuit.maxAlive=3;triggers.at(-1).delay=34;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
   const escort=groups.find((group)=>group.id==="TankEscort");
   Object.assign(escort,{lifetime:400,speed:1.7,tankId:"tank1",grenadeInterval:12});
   Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([32.5,101],8,8)});
@@ -68,7 +68,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-12-ground-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-drag-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -289,12 +289,15 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
-  if(input.revision!==FLOW_PREVIOUS_ENCOUNTER.revision) return input;
+  const oldRevision=input.revision===FLOW_PREVIOUS_ENCOUNTER.revision;
+  const baseline=oldRevision?FLOW_PREVIOUS_ENCOUNTER:FLOW_PREVIOUS_DRAG_ENCOUNTER;
+  if(input.revision!==baseline.revision) return input;
   const value=structuredClone(input);
   for(const collection of ["groups","triggers"]) {
     for(const next of defaults[collection]) {
       const current=value[collection].find((item)=>item.id===next.id);
-      const previous=FLOW_PREVIOUS_ENCOUNTER[collection].find((item)=>item.id===next.id);
+      const previousEntry=baseline[collection].find((item)=>item.id===next.id);
+      const previous=previousEntry&&oldRevision?{...FLOW_PREVIOUS_DRAG_ENCOUNTER[collection].find((item)=>item.id===next.id),...previousEntry}:previousEntry;
       if(!current&&!previous) value[collection].push(structuredClone(next));
       if(!current||!previous) continue;
       for(const [key,entry] of Object.entries(next)) {
