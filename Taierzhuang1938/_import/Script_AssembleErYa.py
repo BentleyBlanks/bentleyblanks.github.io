@@ -1,9 +1,11 @@
-"""Assemble Er Ya's downloaded Tripo parts through BlenderMCP.
+"""Assemble Er Ya from original Tripo meshes using similarity transforms.
 
-Run with scripts/Script_BlenderMcp.mjs exec --file, or start --batch.
-Original downloads remain available in the hidden OriginalSources collection.
+Run through scripts/Script_BlenderMcp.mjs exec --file or start --batch.
+The editable parts retain the source mesh, topology, UVs and custom normals.
+The head's white display base uses a visibility override in its assembled copy.
 """
 
+import hashlib
 import json
 import math
 import os
@@ -20,7 +22,7 @@ projectRoot = Path(os.environ.get('ERYA_PROJECT_ROOT',
 reviewRoot = projectRoot / 'Review'
 reviewRoot.mkdir(parents=True, exist_ok=True)
 floorPixel = 633.0
-scalpPixel = 16.0
+scalpPixel = 24.0
 heightMeters = 1.30
 pixelSize = heightMeters / (floorPixel - scalpPixel)
 sourceFiles = {
@@ -32,7 +34,6 @@ sourceFiles = {
 for filename in sourceFiles.values():
     if not (sourceRoot / filename).is_file():
         raise FileNotFoundError(sourceRoot / filename)
-
 if bpy.data.filepath and Path(bpy.data.filepath).parent != projectRoot:
     raise RuntimeError('Open the dedicated Er Ya project before rebuilding')
 for obj in list(bpy.data.objects):
@@ -41,17 +42,19 @@ for collection in list(bpy.data.collections):
     bpy.data.collections.remove(collection)
 bpy.data.orphans_purge(do_recursive=True)
 scene = bpy.context.scene
-scene['BlenderMcpTask'] = 'ErYaAssembly_20261112'
-scene['ReferenceFit'] = 'Original head similarity transform fitted to original front and profile images'
-scene['HeightAssumptionMeters'] = heightMeters
+scene['BlenderMcpTask'] = 'ErYaOriginalReassembly_20261113'
+scene['AssemblyMethod'] = 'Original meshes with uniform scale, rotation, translation and mirroring'
 scene['ReferencePixelSizeMeters'] = pixelSize
+scene['HeightAssumptionMeters'] = heightMeters
+scene['ReferenceFit'] = 'Original parts placed against original front, profile and back references'
 scene.unit_settings.system = 'METRIC'
-sourceCollection = bpy.data.collections.new('OriginalSources')
-assemblyCollection = bpy.data.collections.new('ErYa_TPose')
-reviewCollection = bpy.data.collections.new('ReviewSetup')
-referenceCollection = bpy.data.collections.new('ReferenceImages_ToggleForComparison')
-for collection in [sourceCollection, assemblyCollection, reviewCollection, referenceCollection]:
+collections = {}
+for name in ['OriginalSources', 'ErYa_TPose', 'ReviewSetup', 'ReferenceImages_ToggleForComparison']:
+    collection = bpy.data.collections.new(name)
     scene.collection.children.link(collection)
+    collections[name] = collection
+sources = {}
+placements = {}
 
 
 def Coordinates(obj):
@@ -60,56 +63,32 @@ def Coordinates(obj):
     return values.reshape(-1, 3)
 
 
-def Normals(obj):
-    return np.array([normal.vector[:] for normal in obj.data.corner_normals])
+def BoundsCenter(points):
+    return (points.min(0) + points.max(0)) / 2
 
 
-def UpdateGeometry(obj, points, normals):
-    obj.data.vertices.foreach_set('co', np.asarray(points).ravel())
-    obj.data.update()
-    normals = np.asarray(normals)
-    normals /= np.linalg.norm(normals, axis=1, keepdims=True).clip(1e-10)
-    obj.data.normals_split_custom_set(normals.tolist())
-
-
-def DuplicatePart(source, role):
+def PlacePart(sourceRole, role, scalePixels, orientation, sourceAnchor, targetPixels):
+    source = sources[sourceRole]
     obj = source.copy()
     obj.data = source.data.copy()
     obj.name = 'Part_ErYa_' + role
     obj.data.name = 'Mesh_ErYa_' + role
-    assemblyCollection.objects.link(obj)
+    collections['ErYa_TPose'].objects.link(obj)
     obj.hide_render = False
     obj.hide_set(False)
     obj.select_set(False)
+    obj.matrix_world = (Matrix.Translation(Vector(targetPixels) * pixelSize)
+                        @ orientation.to_4x4()
+                        @ Matrix.Scale(scalePixels * pixelSize, 4)
+                        @ Matrix.Translation(-Vector(sourceAnchor)))
+    obj['SourceRole'] = sourceRole
+    obj['AssemblyMethod'] = 'Similarity transform of original mesh'
+    placements[role] = {'sourceRole': sourceRole, 'pixelsPerSourceUnit': scalePixels,
+                        'sourceAnchor': list(sourceAnchor), 'targetPixels': list(targetPixels),
+                        'orientation': [list(row) for row in orientation]}
     return obj
 
 
-def MirrorPart(source, role):
-    obj = DuplicatePart(source, role)
-    reflection = Matrix.Diagonal((1.0, -1.0, 1.0, 1.0))
-    obj.data.transform(reflection)
-    # Reflection reverses winding. Preserve UVs and the reflected custom normals.
-    import bmesh
-    mesh = bmesh.new()
-    mesh.from_mesh(obj.data)
-    bmesh.ops.reverse_faces(mesh, faces=list(mesh.faces))
-    mesh.to_mesh(obj.data)
-    mesh.free()
-    obj.data.update()
-    sourceNormals = Normals(source)
-    sourceNormals[:, 1] *= -1
-    # BMesh reverses each polygon's loop order, including its first loop.
-    mirroredNormals = np.empty_like(sourceNormals)
-    for targetFace, sourceFace in zip(obj.data.polygons, source.data.polygons):
-        normalByVertex = {source.data.loops[index].vertex_index: sourceNormals[index]
-                          for index in sourceFace.loop_indices}
-        for index in targetFace.loop_indices:
-            mirroredNormals[index] = normalByVertex[obj.data.loops[index].vertex_index]
-    obj.data.normals_split_custom_set(mirroredNormals.tolist())
-    return obj
-
-
-sources = {}
 for role, filename in sourceFiles.items():
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=str(sourceRoot / filename))
@@ -120,243 +99,112 @@ for role, filename in sourceFiles.items():
     obj.data.name = 'Mesh_ErYa_Source_' + role
     for collection in list(obj.users_collection):
         collection.objects.unlink(obj)
-    sourceCollection.objects.link(obj)
+    collections['OriginalSources'].objects.link(obj)
     for material in obj.data.materials:
         material.name = 'Material_ErYa_' + role
-        for node in material.node_tree.nodes:
-            if node.type == 'TEX_IMAGE' and node.image:
-                node.image.name = 'Texture_ErYa_' + role + '_' + node.image.name
     obj.hide_render = True
     obj.hide_set(True)
     obj.select_set(False)
     sources[role] = obj
 
-# +X is forward, +Y is the character's left, +Z is up.
-# All fitting coordinates below use the 640-pixel front reference.
-body = DuplicatePart(sources['Body'], 'Body')
-rawBody = Coordinates(body)
-bodyNormals = Normals(body)
-bodyLoops = np.array([loop.vertex_index for loop in body.data.loops])
-bodyHeights = np.array([0, .16, .36, .48, .70, .80, .86, rawBody[:, 2].max()])
-bodyRows = np.array([602, 524, 421, 362, 253, 196, 160, 115])
-bodyDepth = np.interp(rawBody[:, 2], [0, .40, .48, .70, .86, .9783],
-                      [480, 480, 465, 430, 440, 420])
-bodyOffset = np.interp(rawBody[:, 2], [0, .40, .48], [-8, -8, -2])
-bodyPoints = rawBody * np.array([1.0, 491.0, 1.0])
-bodyPoints[:, 0] = rawBody[:, 0] * bodyDepth + bodyOffset
-bodyPoints[:, 1] -= 9.0
-bodyPoints[:, 2] = floorPixel - np.interp(rawBody[:, 2], bodyHeights, bodyRows)
-armWeight = np.clip((np.abs(rawBody[:, 1]) - .12) / .14, 0, 1)
-armWeight *= np.clip((rawBody[:, 2] - .70) / .10, 0, 1)
-bodyPoints[:, 0] -= 32.0 * armWeight
-bodyPoints[:, 1] += 9.0 * armWeight
-bodyPoints[:, 2] += 4.0 * armWeight
-# The right trouser cuff sits farther from the centreline in the reference.
-ankleWeight = np.clip((.24 - rawBody[:, 2]) / .20, 0, 1)
-rightWeight = np.clip(-rawBody[:, 1] / .04, 0, 1)
-bodyPoints[:, 1] -= 9.0 * ankleWeight * rightWeight
-segments = np.clip(np.searchsorted(bodyHeights, rawBody[:, 2], side='right') - 1,
-                   0, len(bodyHeights) - 2)
-verticalScales = -(np.diff(bodyRows) / np.diff(bodyHeights))[segments]
-bodyNormals[:, 0] /= bodyDepth[bodyLoops]
-bodyNormals[:, 1] /= 491.0
-bodyNormals[:, 2] /= verticalScales[bodyLoops]
-UpdateGeometry(body, bodyPoints * pixelSize, bodyNormals)
+# Pixel coordinates use +X forward, +Y towards the character's left, +Z up.
+identity = Matrix.Identity(3)
+reflection = Matrix.Diagonal((1.0, -1.0, 1.0))
+rawBody = Coordinates(sources['Body'])
+bodyScale = 500.0
+bodyTranslation = np.array([-2.0, -5.0, floorPixel - 115 - rawBody[:, 2].max() * bodyScale])
+body = PlacePart('Body', 'Body', bodyScale, identity, (0, 0, 0), bodyTranslation)
+bodyPixels = rawBody * bodyScale + bodyTranslation
 
-head = DuplicatePart(sources['HeadBald'], 'HeadBald')
-rawHead = Coordinates(head)
-# Retain the complete source mesh and its original head/neck proportions.
-# Fit the whole component using a single scale and a translation.
-headScalePixels = 133.0
-headTranslationPixels = np.array([-8.0, -5.0,
-    floorPixel - scalpPixel - rawHead[:, 2].max() * headScalePixels])
-head.scale = (headScalePixels * pixelSize,) * 3
-head.location = headTranslationPixels * pixelSize
-head['SourceGeometryPreserved'] = True
-assert np.array_equal(Coordinates(head), rawHead), 'Original head mesh was modified'
-assert head.scale.x == head.scale.y == head.scale.z, 'Head scale must remain uniform'
-bpy.context.view_layer.update()
+rawHead = Coordinates(sources['HeadBald'])
+headScale = 126.0
+headOrientation = Matrix.Rotation(math.radians(-8), 3, 'Y')
+orientedHead = rawHead @ np.array(headOrientation).T
+headTranslation = np.array([52 - orientedHead[:, 0].max() * headScale, -5.0,
+    floorPixel - scalpPixel - orientedHead[:, 2].max() * headScale])
+head = PlacePart('HeadBald', 'HeadBald', headScale, headOrientation, (0, 0, 0), headTranslation)
 
-# Jacket lining covers the imported head's white base inside the collar.
-# The lining belongs to the garment, and the source head remains complete.
-from mathutils.bvhtree import BVHTree
-liningCutHeight = .16
-liningClearanceMeters = .003
-liningThicknessMeters = .001
-liningHeadTree = BVHTree.FromPolygons(rawHead.tolist(),
-    [face.vertices[:] for face in head.data.polygons])
-liningCenter = np.array([-.12, 0.0])
-liningAngles = np.linspace(0, 2 * math.pi, 64, endpoint=False)
-liningRingSize = len(liningAngles)
-liningDirections = np.column_stack([np.cos(liningAngles), np.sin(liningAngles)])
-liningHeights = np.linspace(-.004, liningCutHeight, 18)
-liningRadii = np.empty((len(liningHeights), len(liningAngles)))
-for row, height in enumerate(liningHeights):
-    for column, direction in enumerate(liningDirections):
-        rayPosition = liningCenter + 2 * direction
-        rayOrigin = Vector((rayPosition[0], rayPosition[1], max(.001, height)))
-        rayDirection = Vector((-direction[0], -direction[1], 0))
-        hit, _, _, _ = liningHeadTree.ray_cast(rayOrigin, rayDirection, 4)
-        if hit is None:
-            raise RuntimeError('Could not measure the original neck cross-section')
-        liningRadii[row, column] = np.dot(np.array(hit[:2]) - liningCenter, direction)
-# A conservative envelope spans the source's fine folds between samples.
-liningRadii = np.maximum.reduce([liningRadii,
-    np.roll(liningRadii, 1, axis=1), np.roll(liningRadii, -1, axis=1)])
-liningRadii = np.maximum.reduce([liningRadii,
-    np.vstack([liningRadii[:1], liningRadii[:-1]]),
-    np.vstack([liningRadii[1:], liningRadii[-1:]])])
-liningRadii += liningClearanceMeters / head.scale.x
-liningThickness = liningThicknessMeters / head.scale.x
-liningHeights[-1] -= liningThickness / 2
-liningSections = [(radii, height) for radii, height in zip(liningRadii, liningHeights)]
-for amount in np.linspace(0, math.pi, 5)[1:]:
-    radius = liningRadii[-1] - liningThickness / 2 + liningThickness / 2 * math.cos(amount)
-    height = liningHeights[-1] + liningThickness / 2 * math.sin(amount)
-    liningSections.append((radius, height))
-liningSections.extend((liningRadii[row] - liningThickness, liningHeights[row])
-                       for row in range(len(liningHeights) - 2, -1, -1))
-liningPoints = np.array([(liningCenter[0] + radius * direction[0],
-                         liningCenter[1] + radius * direction[1], height)
-    for radii, height in liningSections for radius, direction in zip(radii, liningDirections)])
-liningFaces = []
-for row in range(len(liningSections)):
-    nextRow = (row + 1) % len(liningSections)
-    for column in range(liningRingSize):
-        nextColumn = (column + 1) % liningRingSize
-        liningFaces.append([row * liningRingSize + column, row * liningRingSize + nextColumn,
-                            nextRow * liningRingSize + nextColumn, nextRow * liningRingSize + column])
-liningMesh = bpy.data.meshes.new('Mesh_ErYa_CollarLining')
-liningMesh.from_pydata(liningPoints.tolist(), [], liningFaces)
-liningMesh.materials.append(body.data.materials[0])
-liningMesh.update()
-liningSeamTree = BVHTree.FromPolygons([vertex.co for vertex in liningMesh.vertices],
-    [face.vertices[:] for face in liningMesh.polygons])
-assert not liningSeamTree.overlap(liningHeadTree), 'Collar lining intersects the original neck'
-fabricFace = min(sources['Body'].data.polygons,
-    key=lambda face: (face.center - Vector((.14, 0, .60))).length_squared)
-sourceUvs = sources['Body'].data.uv_layers.active.data
-fabricUv = sum((sourceUvs[index].uv for index in fabricFace.loop_indices), Vector((0, 0))) / len(fabricFace.loop_indices)
-liningUvs = liningMesh.uv_layers.new(name='UVMap')
-for face in liningMesh.polygons:
-    face.use_smooth = True
-    for loopIndex in face.loop_indices:
-        point = liningPoints[liningMesh.loops[loopIndex].vertex_index]
-        angle = math.atan2(point[1], point[0] + .10)
-        liningUvs.data[loopIndex].uv = (fabricUv.x + .005 * angle / math.pi,
-                                       fabricUv.y + .005 * point[2] / .16)
-lining = bpy.data.objects.new('Part_ErYa_CollarLining', liningMesh)
-assemblyCollection.objects.link(lining)
-lining.matrix_world = head.matrix_world.copy()
-bpy.ops.object.select_all(action='DESELECT')
-lining.select_set(True)
-bpy.context.view_layer.objects.active = lining
-lining['NeckClearanceMeters'] = liningClearanceMeters
-lining['ThicknessMeters'] = liningThicknessMeters
-# Keep the lining separate for seam inspection and later garment edits.
-lining.select_set(False)
-body.select_set(True)
-bpy.context.view_layer.objects.active = body
+# Hide the head download's white display base in this assembled instance.
+# Its geometry remains available in both the source and editable head meshes.
+headMaterial = head.data.materials[0]
+headShader = next(node for node in headMaterial.node_tree.nodes if node.type == 'BSDF_PRINCIPLED')
+headImage = headShader.inputs['Base Color'].links[0].from_node.image
+imageWidth, imageHeight = headImage.size[:]
+headColors = np.array(headImage.pixels[:]).reshape(imageHeight, imageWidth, 4)
+headUvs = head.data.uv_layers.active.data
+headBaseFaces = []
+for face in head.data.polygons:
+    if face.center.z > .25:
+        continue
+    uv = sum((headUvs[index].uv for index in face.loop_indices), Vector((0, 0))) / len(face.loop_indices)
+    column = min(imageWidth - 1, max(0, int(uv.x * (imageWidth - 1))))
+    row = min(imageHeight - 1, max(0, int(uv.y * (imageHeight - 1))))
+    color = headColors[row, column, :3]
+    whiteBase = color.min() > .45 and color.max() - color.min() < .12
+    belowBase = max(rawHead[index, 2] for index in face.vertices) < .08
+    if whiteBase or belowBase:
+        headBaseFaces.append(face.index)
+baseMaterial = headMaterial.copy()
+baseMaterial.name = 'Material_ErYa_DisplayBaseHidden'
+baseShader = next(node for node in baseMaterial.node_tree.nodes if node.type == 'BSDF_PRINCIPLED')
+for link in list(baseShader.inputs['Alpha'].links):
+    baseMaterial.node_tree.links.remove(link)
+baseShader.inputs['Alpha'].default_value = 0
+head.data.materials.append(baseMaterial)
+for faceIndex in headBaseFaces:
+    head.data.polygons[faceIndex].material_index = len(head.data.materials) - 1
+head['DisplayBaseHiddenFaces'] = len(headBaseFaces)
 
-hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
-rawHand = Coordinates(hand)
-handNormals = Normals(hand)
-sample = rawHand[rawHand[:, 1] > 0][:, [0, 2]]
-sample -= sample.mean(0)
-_, axes = np.linalg.eigh(sample.T @ sample)
+rawHand = Coordinates(sources['LeftHand'])
+planeSample = rawHand[rawHand[:, 1] > 0][:, [0, 2]]
+planeSample -= planeSample.mean(0)
+_, axes = np.linalg.eigh(planeSample.T @ planeSample)
 dorsal = axes[:, 0]
 if dorsal[0] < 0:
     dorsal *= -1
 handRoll = math.atan2(-dorsal[0], dorsal[1])
-handRotation = np.array(Matrix.Rotation(handRoll, 3, 'Y'))
-preparedHand = rawHand @ handRotation.T
-handNormals = handNormals @ handRotation.T
-closedHand = preparedHand.copy()
-# Fit each distal branch around its own knuckle without thinning the fingers.
-fingerSlopes = np.array([-1.10, -.60, -.23, .21])
-fingerIntercepts = np.array([-.440, -.285, -.224, -.191])
-fingerBaseY = np.array([-.08, .02, .10, .12])
-fingerBaseX = fingerSlopes * fingerBaseY + fingerIntercepts
-fingerTargetX = np.array([-.400, -.300, -.185, -.075])
-lineDistances = np.abs(preparedHand[:, 0, None] -
-    (preparedHand[:, 1, None] * fingerSlopes + fingerIntercepts))
-fingerIds = np.argmin(lineDistances, axis=1)
-fingerWeight = np.clip((preparedHand[:, 1] - fingerBaseY[fingerIds]) / .13, 0, 1)
-fingerWeight = fingerWeight * fingerWeight * (3 - 2 * fingerWeight)
-thumbWeight = np.clip((preparedHand[:, 0] + .10) / .16, 0, 1)
-thumbWeight *= np.clip((.22 - preparedHand[:, 1]) / .10, 0, 1)
-fingerWeight *= 1 - thumbWeight
-fingerAngles = np.arctan(fingerSlopes[fingerIds]) * fingerWeight
-dx = preparedHand[:, 0] - fingerBaseX[fingerIds]
-dy = preparedHand[:, 1] - fingerBaseY[fingerIds]
-closedHand[:, 0] = fingerBaseX[fingerIds] + np.cos(fingerAngles) * dx - np.sin(fingerAngles) * dy
-closedHand[:, 1] = fingerBaseY[fingerIds] + np.sin(fingerAngles) * dx + np.cos(fingerAngles) * dy
-closedHand[:, 0] += (fingerTargetX[fingerIds] - fingerBaseX[fingerIds]) * fingerWeight
-thumbAngles = math.radians(35) * thumbWeight
-thumbDelta = closedHand[:, :2] - np.array([-.10, -.18])
-closedHand[:, 0] = -.10 + np.cos(thumbAngles) * thumbDelta[:, 0] - np.sin(thumbAngles) * thumbDelta[:, 1]
-closedHand[:, 1] = -.18 + np.sin(thumbAngles) * thumbDelta[:, 0] + np.cos(thumbAngles) * thumbDelta[:, 1]
-handLoops = np.array([loop.vertex_index for loop in hand.data.loops])
-normalAngles = (fingerAngles + thumbAngles)[handLoops]
-normalX, normalY = handNormals[:, 0].copy(), handNormals[:, 1].copy()
-handNormals[:, 0] = np.cos(normalAngles) * normalX - np.sin(normalAngles) * normalY
-handNormals[:, 1] = np.sin(normalAngles) * normalX + np.cos(normalAngles) * normalY
-wristMask = preparedHand[:, 1] < preparedHand[:, 1].min() + .035
-wristCenter = (closedHand[wristMask].min(0) + closedHand[wristMask].max(0)) / 2
-cuffMask = rawBody[:, 1] > rawBody[:, 1].max() - .02
-cuffCenter = (bodyPoints[cuffMask].min(0) + bodyPoints[cuffMask].max(0)) / 2
-handScales = np.array([65.0, 93.0, 70.0])
-handTarget = np.array([cuffCenter[0], bodyPoints[:, 1].max() - 21, cuffCenter[2] - 3])
-handPoints = (closedHand - wristCenter) * handScales + handTarget
-handNormals /= handScales
-UpdateGeometry(hand, handPoints * pixelSize, handNormals)
-rightHand = MirrorPart(hand, 'Hand_R')
+handOrientation = Matrix.Rotation(handRoll, 3, 'Y')
+preparedHand = rawHand @ np.array(handOrientation).T
+wristMask = rawHand[:, 1] < rawHand[:, 1].min() + .035
+wristAnchor = np.array(handOrientation).T @ BoundsCenter(preparedHand[wristMask])
+for role, direction, orientation in [('Hand_L', 1, handOrientation),
+                                      ('Hand_R', -1, reflection @ handOrientation)]:
+    cuffMask = rawBody[:, 1] * direction > (rawBody[:, 1] * direction).max() - .02
+    target = BoundsCenter(bodyPixels[cuffMask])
+    outerCuff = (rawBody[:, 1] * direction).max() * direction * bodyScale + bodyTranslation[1]
+    target[1] = outerCuff - direction * 21
+    PlacePart('LeftHand', role, 90.0, orientation, wristAnchor, target)
 
-foot = DuplicatePart(sources['LeftFoot'], 'Foot_L')
-rawFoot = Coordinates(foot)
-footNormals = Normals(foot)
-footHeights = np.array([0, .08, .20, .35, .60, rawFoot[:, 2].max()])
-footRows = np.array([633, 625, 607, 599, 591, 581])
-footPoints = rawFoot.copy()
-footPoints[:, 0] = rawFoot[:, 0] * 100.0 + 10.0
-shinWeight = np.clip((rawFoot[:, 2] - .18) / .50, 0, 1)
-footPoints[:, 0] += 12.0 * shinWeight
-footWidth = 120.0 - 34.0 * np.clip((rawFoot[:, 2] - .15) / .25, 0, 1)
-footPoints[:, 1] *= footWidth
-footPoints[:, 2] = floorPixel - np.interp(rawFoot[:, 2], footHeights, footRows)
-legMask = (rawBody[:, 1] > 0) & (rawBody[:, 2] < .025)
-legCenter = (bodyPoints[legMask].min(0) + bodyPoints[legMask].max(0)) / 2
+rawFoot = Coordinates(sources['LeftFoot'])
+footOrientation = Matrix.Rotation(math.radians(5), 3, 'Z')
 topMask = rawFoot[:, 2] > rawFoot[:, 2].max() - .06
-topCenter = (footPoints[topMask].min(0) + footPoints[topMask].max(0)) / 2
-footPoints[:, 1] += legCenter[1] - topCenter[1]
-shoeWeight = np.clip((.30 - rawFoot[:, 2]) / .15, 0, 1)
-footPoints[:, 1] += 14.0 * shoeWeight
-footSegments = np.clip(np.searchsorted(footHeights, rawFoot[:, 2], side='right') - 1,
-                       0, len(footHeights) - 2)
-footVerticalScales = -(np.diff(footRows) / np.diff(footHeights))[footSegments]
-footLoopVertices = np.array([loop.vertex_index for loop in foot.data.loops])
-footNormals[:, 0] /= 100.0
-footNormals[:, 1] /= footWidth[footLoopVertices]
-footNormals[:, 2] /= footVerticalScales[footLoopVertices]
-UpdateGeometry(foot, footPoints * pixelSize, footNormals)
-rightFoot = MirrorPart(foot, 'Foot_R')
-rightLegMask = (rawBody[:, 1] < 0) & (rawBody[:, 2] < .025)
-rightLegCenter = (bodyPoints[rightLegMask].min(0) + bodyPoints[rightLegMask].max(0)) / 2
-rightFoot.data.transform(Matrix.Translation((0, (rightLegCenter[1] + legCenter[1]) * pixelSize, 0)))
+for role, direction, orientation in [('Foot_L', 1, footOrientation),
+                                      ('Foot_R', -1, reflection @ footOrientation)]:
+    rotated = rawFoot @ np.array(orientation).T
+    topCenter = BoundsCenter(rotated[topMask])
+    legHeight = (topCenter[2] * 100 - bodyTranslation[2]) / bodyScale
+    legMask = (rawBody[:, 1] * direction > 0) & (np.abs(rawBody[:, 2] - legHeight) < .015)
+    legCenter = BoundsCenter(bodyPixels[legMask])
+    translation = np.array([10.0, legCenter[1] - topCenter[1] * 100, -rotated[:, 2].min() * 100])
+    PlacePart('LeftFoot', role, 100.0, orientation, (0, 0, 0), translation)
 
 root = bpy.data.objects.new('Model_ErYa_Assembled', None)
-assemblyCollection.objects.link(root)
-for obj in list(assemblyCollection.objects):
-    if obj != root:
-        obj.parent = root
-root['Pose'] = 'Bald T-pose'
+collections['ErYa_TPose'].objects.link(root)
+parts = [obj for obj in collections['ErYa_TPose'].objects if obj.type == 'MESH']
+for obj in parts:
+    obj.parent = root
+    source = sources[obj['SourceRole']]
+    assert np.array_equal(Coordinates(obj), Coordinates(source)), 'Source mesh coordinates changed'
+    assert [loop.vertex_index for loop in obj.data.loops] == [loop.vertex_index for loop in source.data.loops]
+    axes = np.linalg.svd(np.array(obj.matrix_world)[:3, :3], compute_uv=False)
+    assert np.ptp(axes) < 1e-6, 'Part transform has nonuniform scale'
+bpy.context.view_layer.update()
+root['Pose'] = 'Original-body T-pose with original hand and foot geometry'
 root['HeightMeters'] = heightMeters
-root['SourceDirectory'] = str(sourceRoot)
 
 scene.render.engine = 'CYCLES'
 scene.cycles.samples = 32
-scene.render.resolution_x = 640
-scene.render.resolution_y = 640
+scene.render.resolution_x = scene.render.resolution_y = 640
 scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = 'PNG'
 scene.render.film_transparent = True
@@ -366,96 +214,69 @@ scene.world.use_nodes = True
 scene.world.node_tree.nodes.get('Background').inputs['Strength'].default_value = .6
 for name, position, energy in [('Key', (3, -2, 4), 220), ('Fill', (2, 3, 2), 170),
                                 ('BackFill', (-3, -2, 3), 180)]:
-    lightData = bpy.data.lights.new('Light_' + name, 'AREA')
-    lightData.energy = energy
-    lightData.shape = 'DISK'
-    lightData.size = 4
-    light = bpy.data.objects.new('Light_' + name, lightData)
-    reviewCollection.objects.link(light)
+    data = bpy.data.lights.new('Light_' + name, 'AREA')
+    data.energy, data.size = energy, 4
+    light = bpy.data.objects.new('Light_' + name, data)
+    collections['ReviewSetup'].objects.link(light)
     light.location = position
     light.rotation_euler = (Vector((0, 0, .8)) - light.location).to_track_quat('-Z', 'Y').to_euler()
 reviewCenter = Vector((0, pixelSize, (floorPixel - 320) * pixelSize))
-frontRotation = None
 for view, direction in [('Front', (4, 0, 0)), ('LeftSide', (0, 4, 0)), ('Back', (-4, 0, 0))]:
-    cameraData = bpy.data.cameras.new('Camera_' + view)
-    camera = bpy.data.objects.new('Camera_' + view, cameraData)
-    reviewCollection.objects.link(camera)
-    cameraData.type = 'ORTHO'
-    cameraData.ortho_scale = 640 * pixelSize
-    cameraCenter = reviewCenter.copy()
+    data = bpy.data.cameras.new('Camera_' + view)
+    camera = bpy.data.objects.new('Camera_' + view, data)
+    collections['ReviewSetup'].objects.link(camera)
+    data.type, data.ortho_scale = 'ORTHO', 640 * pixelSize
+    center = reviewCenter.copy()
     if view == 'LeftSide':
-        # In the side reference, the longitudinal origin is column 300.
-        cameraCenter.x = -20 * pixelSize
-    camera.location = cameraCenter + Vector(direction)
+        center.x = -20 * pixelSize
+    camera.location = center + Vector(direction)
     camera.rotation_euler = (-Vector(direction)).to_track_quat('-Z', 'Y').to_euler()
     scene.camera = camera
     scene.render.filepath = str(reviewRoot / ('Preview_ErYa_' + view + '.png'))
     bpy.ops.render.render(write_still=True)
-    if view == 'Front':
-        frontCamera = camera
-        frontRotation = camera.rotation_euler.to_quaternion()
-scene.camera = frontCamera
+scene.camera = bpy.data.objects['Camera_Front']
 referenceViews = [
     ('Front', (-.4, pixelSize, reviewCenter.z), ((0, 0, 1), (1, 0, 0), (0, 1, 0))),
     ('LeftSide', (-20 * pixelSize, -.4, reviewCenter.z), ((-1, 0, 0), (0, 0, 1), (0, 1, 0))),
     ('Back', (.4, -pixelSize, reviewCenter.z), ((0, 0, -1), (-1, 0, 0), (0, 1, 0))),
 ]
-for view, position, rotation in referenceViews:
+for view, location, orientation in referenceViews:
     reference = bpy.data.objects.new('Reference_' + view, None)
-    referenceCollection.objects.link(reference)
+    collections['ReferenceImages_ToggleForComparison'].objects.link(reference)
     reference.empty_display_type = 'IMAGE'
-    reference.data = bpy.data.images.load(str(sourceRoot / ('Image_TPose' + view + '_2K.png')),
-                                         check_existing=True)
+    reference.data = bpy.data.images.load(str(sourceRoot / ('Image_TPose' + view + '_2K.png')))
     reference.empty_display_size = 640 * pixelSize
     reference.empty_image_depth = 'BACK'
-    reference.empty_image_side = 'FRONT'
-    reference.color[3] = .45
-    reference.location = position
-    reference.rotation_euler = Matrix(rotation).to_euler()
+    reference.location, reference.rotation_euler = location, Matrix(orientation).to_euler()
     reference.hide_render = True
     reference.hide_set(True)
-for obj in reviewCollection.objects:
+for obj in collections['ReviewSetup'].objects:
     obj.hide_set(True)
 for screen in bpy.data.screens:
     for area in screen.areas:
         if area.type == 'VIEW_3D':
-            area.spaces.active.region_3d.view_rotation = frontRotation
+            area.spaces.active.region_3d.view_rotation = scene.camera.rotation_euler.to_quaternion()
             area.spaces.active.region_3d.view_location = reviewCenter
             area.spaces.active.region_3d.view_distance = 2.1
             area.spaces.active.region_3d.view_perspective = 'ORTHO'
             area.spaces.active.shading.type = 'MATERIAL'
 bpy.ops.object.select_all(action='DESELECT')
-parts = [obj for obj in assemblyCollection.objects if obj.type == 'MESH']
-for part in parts:
-    part.select_set(True)
+for obj in parts:
+    obj.select_set(True)
 bpy.context.view_layer.objects.active = body
 bpy.ops.file.pack_all()
 bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot / 'Scene_ErYa_Assembled.blend'), compress=True)
 bpy.ops.export_scene.gltf(filepath=str(sourceRoot / 'Model_ErYa_Assembled.glb'),
                           export_format='GLB', use_selection=True, export_apply=True)
-bpy.context.view_layer.update()
-partCoordinates = {obj.name: np.array([obj.matrix_world @ vertex.co for vertex in obj.data.vertices])
-                   for obj in parts}
-report = {
-    'schema': 'tengxian.characterAssemblyFit', 'version': 1,
-    'character': 'ErYa', 'heightMeters': heightMeters,
-    'heightBasis': 'Working scale assumption, no measured height in references',
-    'referenceFrame': {'width': 640, 'height': 640, 'floorRow': floorPixel,
-                       'scalpRow': scalpPixel, 'metersPerPixel': pixelSize},
-    'bodySourceHeights': bodyHeights.tolist(), 'bodyReferenceRows': bodyRows.tolist(),
-    'headFit': {'method': 'Original mesh with uniform scale and translation',
-                'uniformScale': headScalePixels * pixelSize,
-                'pixelsPerSourceUnit': headScalePixels,
-                'translationPixels': headTranslationPixels.tolist(),
-                'sourceMeshMaxVertexError': float(np.abs(Coordinates(head) - rawHead).max())},
-    'collarFit': {'cutHeightSourceUnits': liningCutHeight,
-                  'outerClearanceMeters': liningClearanceMeters,
-                  'thicknessMeters': liningThicknessMeters},
-    'handRollDegrees': math.degrees(handRoll), 'sourceFiles': sourceFiles,
-    'parts': {obj.name: {'min': partCoordinates[obj.name].min(0).tolist(),
-                        'max': partCoordinates[obj.name].max(0).tolist(),
-                        'triangles': sum(len(face.vertices) - 2 for face in obj.data.polygons)}
-              for obj in parts},
-}
+report = {'schema': 'tengxian.originalPartsAssembly', 'version': 1,
+          'heightMeters': heightMeters, 'metersPerReferencePixel': pixelSize,
+          'sourceFiles': sourceFiles, 'placements': placements,
+          'displayBaseHiddenFaces': len(headBaseFaces),
+          'sourceSha256': {role: hashlib.sha256((sourceRoot / name).read_bytes()).hexdigest()
+                           for role, name in sourceFiles.items()},
+          'parts': {obj.name: {'sourceRole': obj['SourceRole'],
+                     'sourceMeshMaxVertexError': float(np.abs(Coordinates(obj) - Coordinates(sources[obj['SourceRole']])).max()),
+                     'worldMatrix': [list(row) for row in obj.matrix_world],
+                     'triangles': sum(len(face.vertices) - 2 for face in obj.data.polygons)} for obj in parts}}
 (projectRoot / 'Data_ErYaAssemblyFit.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 print(json.dumps(report))
