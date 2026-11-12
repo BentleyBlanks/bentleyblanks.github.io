@@ -38,7 +38,7 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-Four complete action scans pass the existing 2 mm confirmed-depth gate. Empty and partial reloads reach 1.739 mm, held-open reload 1.594 mm, ordinary bolt cycle 1.648 mm. Surface-crossing pairs remain in the saved reports and require their existing visual review. The independent left-hand finger self-contact test also reproduces 60 crossing triangles on the unmodified baseline hand asset.
+Four complete action scans pass the existing 2 mm confirmed-depth gate. Empty and partial reloads reach 1.739 mm, held-open reload 1.594 mm, ordinary bolt cycle 1.846 mm after integrating the upstream smooth bolt cycle. Surface-crossing pairs remain in the saved reports and require their existing visual review. The independent left-hand finger self-contact test also reproduces 60 crossing triangles on the unmodified baseline hand asset.
 
 ## Runtime and lighting
 
