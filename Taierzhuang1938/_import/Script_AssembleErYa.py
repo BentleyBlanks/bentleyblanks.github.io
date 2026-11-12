@@ -179,18 +179,60 @@ bpy.context.view_layer.update()
 
 # Jacket lining covers the imported head's white base inside the collar.
 # The lining belongs to the garment, and the source head remains complete.
-liningFaces = [face for face in head.data.polygons
-               if max(rawHead[index, 2] for index in face.vertices) < .16]
-liningIndices = sorted({index for face in liningFaces for index in face.vertices})
-liningIndexMap = {index: position for position, index in enumerate(liningIndices)}
-liningPoints = rawHead[liningIndices].copy()
-liningPoints[:, :2] = (liningPoints[:, :2] - np.array([-.10, 0])) * 1.012 + np.array([-.10, 0])
-liningPoints[:, 2] += .002
+from mathutils.bvhtree import BVHTree
+liningCutHeight = .16
+liningClearanceMeters = .003
+liningThicknessMeters = .001
+liningHeadTree = BVHTree.FromPolygons(rawHead.tolist(),
+    [face.vertices[:] for face in head.data.polygons])
+liningCenter = np.array([-.12, 0.0])
+liningAngles = np.linspace(0, 2 * math.pi, 64, endpoint=False)
+liningRingSize = len(liningAngles)
+liningDirections = np.column_stack([np.cos(liningAngles), np.sin(liningAngles)])
+liningHeights = np.linspace(-.004, liningCutHeight, 18)
+liningRadii = np.empty((len(liningHeights), len(liningAngles)))
+for row, height in enumerate(liningHeights):
+    for column, direction in enumerate(liningDirections):
+        rayPosition = liningCenter + 2 * direction
+        rayOrigin = Vector((rayPosition[0], rayPosition[1], max(.001, height)))
+        rayDirection = Vector((-direction[0], -direction[1], 0))
+        hit, _, _, _ = liningHeadTree.ray_cast(rayOrigin, rayDirection, 4)
+        if hit is None:
+            raise RuntimeError('Could not measure the original neck cross-section')
+        liningRadii[row, column] = np.dot(np.array(hit[:2]) - liningCenter, direction)
+# A conservative envelope spans the source's fine folds between samples.
+liningRadii = np.maximum.reduce([liningRadii,
+    np.roll(liningRadii, 1, axis=1), np.roll(liningRadii, -1, axis=1)])
+liningRadii = np.maximum.reduce([liningRadii,
+    np.vstack([liningRadii[:1], liningRadii[:-1]]),
+    np.vstack([liningRadii[1:], liningRadii[-1:]])])
+liningRadii += liningClearanceMeters / head.scale.x
+liningThickness = liningThicknessMeters / head.scale.x
+liningHeights[-1] -= liningThickness / 2
+liningSections = [(radii, height) for radii, height in zip(liningRadii, liningHeights)]
+for amount in np.linspace(0, math.pi, 5)[1:]:
+    radius = liningRadii[-1] - liningThickness / 2 + liningThickness / 2 * math.cos(amount)
+    height = liningHeights[-1] + liningThickness / 2 * math.sin(amount)
+    liningSections.append((radius, height))
+liningSections.extend((liningRadii[row] - liningThickness, liningHeights[row])
+                       for row in range(len(liningHeights) - 2, -1, -1))
+liningPoints = np.array([(liningCenter[0] + radius * direction[0],
+                         liningCenter[1] + radius * direction[1], height)
+    for radii, height in liningSections for radius, direction in zip(radii, liningDirections)])
+liningFaces = []
+for row in range(len(liningSections)):
+    nextRow = (row + 1) % len(liningSections)
+    for column in range(liningRingSize):
+        nextColumn = (column + 1) % liningRingSize
+        liningFaces.append([row * liningRingSize + column, row * liningRingSize + nextColumn,
+                            nextRow * liningRingSize + nextColumn, nextRow * liningRingSize + column])
 liningMesh = bpy.data.meshes.new('Mesh_ErYa_CollarLining')
-liningMesh.from_pydata(liningPoints.tolist(), [],
-    [[liningIndexMap[index] for index in face.vertices] for face in liningFaces])
+liningMesh.from_pydata(liningPoints.tolist(), [], liningFaces)
 liningMesh.materials.append(body.data.materials[0])
 liningMesh.update()
+liningSeamTree = BVHTree.FromPolygons([vertex.co for vertex in liningMesh.vertices],
+    [face.vertices[:] for face in liningMesh.polygons])
+assert not liningSeamTree.overlap(liningHeadTree), 'Collar lining intersects the original neck'
 fabricFace = min(sources['Body'].data.polygons,
     key=lambda face: (face.center - Vector((.14, 0, .60))).length_squared)
 sourceUvs = sources['Body'].data.uv_layers.active.data
@@ -207,10 +249,14 @@ lining = bpy.data.objects.new('Part_ErYa_CollarLining', liningMesh)
 assemblyCollection.objects.link(lining)
 lining.matrix_world = head.matrix_world.copy()
 bpy.ops.object.select_all(action='DESELECT')
-body.select_set(True)
 lining.select_set(True)
+bpy.context.view_layer.objects.active = lining
+lining['NeckClearanceMeters'] = liningClearanceMeters
+lining['ThicknessMeters'] = liningThicknessMeters
+# Keep the lining separate for seam inspection and later garment edits.
+lining.select_set(False)
+body.select_set(True)
 bpy.context.view_layer.objects.active = body
-bpy.ops.object.join()
 
 hand = DuplicatePart(sources['LeftHand'], 'Hand_L')
 rawHand = Coordinates(hand)
@@ -402,6 +448,9 @@ report = {
                 'pixelsPerSourceUnit': headScalePixels,
                 'translationPixels': headTranslationPixels.tolist(),
                 'sourceMeshMaxVertexError': float(np.abs(Coordinates(head) - rawHead).max())},
+    'collarFit': {'cutHeightSourceUnits': liningCutHeight,
+                  'outerClearanceMeters': liningClearanceMeters,
+                  'thicknessMeters': liningThicknessMeters},
     'handRollDegrees': math.degrees(handRoll), 'sourceFiles': sourceFiles,
     'parts': {obj.name: {'min': partCoordinates[obj.name].min(0).tolist(),
                         'max': partCoordinates[obj.name].max(0).tolist(),
