@@ -160,3 +160,54 @@ export function AdsMoveBob(phase, weight, tuning = ADS_MOVE_BOB) {
     roll: -Math.sin(phase) * tuning.rollDeg * k,
   };
 }
+
+// Frame-matched bolt cycles (FPS_BOLT_CYCLE) keep their beats in reference seconds;
+// `pace` ([reference s, played s] keys) maps them to played seconds. 2026-11-13 (user:
+// the bolt cycle moved in jerks): the map was piecewise linear, so the playback rate
+// jumped at every key (0.67x -> 2.67x where the bolt goes forward) and every track
+// lurched with it. It is now a monotone cubic through the same keys (C1: the rate
+// changes smoothly, every key still lands on its played second); outside the keys it
+// runs at the rate of the end segments.
+const paceSlopes = new WeakMap();
+function PaceSlopes(keys) {
+  let slopes = paceSlopes.get(keys);
+  if (slopes) return slopes;
+  const d = keys.slice(1).map((key, i) => (key[1] - keys[i][1]) / (key[0] - keys[i][0]));
+  slopes = keys.map((key, i) => {
+    if (i === 0) return d[0];
+    if (i === keys.length - 1) return d.at(-1);
+    const a = d[i - 1], b = d[i], previous = key[0] - keys[i - 1][0], next = keys[i + 1][0] - key[0];
+    if (a * b <= 0) return 0;
+    const w1 = 2 * next + previous, w2 = next + 2 * previous;
+    return (w1 + w2) / (w1 / a + w2 / b);
+  });
+  paceSlopes.set(keys, slopes);
+  return slopes;
+}
+function PaceForward(keys, slopes, i, referenceS) {
+  const a = keys[i], b = keys[i + 1], span = b[0] - a[0], u = (referenceS - a[0]) / span, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * a[1] + (u3 - 2 * u2 + u) * slopes[i] * span
+    + (-2 * u3 + 3 * u2) * b[1] + (u3 - u2) * slopes[i + 1] * span;
+}
+const DefaultPace = (cycle) => cycle.pace || [[0, 0], [cycle.durationS, cycle.durationS]];
+export function CyclePlayedS(cycle, referenceS) {
+  const keys = DefaultPace(cycle), slopes = PaceSlopes(keys);
+  if (referenceS <= keys[0][0]) return keys[0][1] + (referenceS - keys[0][0]) * slopes[0];
+  if (referenceS >= keys.at(-1)[0]) return keys.at(-1)[1] + (referenceS - keys.at(-1)[0]) * slopes.at(-1);
+  let i = 0;
+  while (referenceS > keys[i + 1][0]) i += 1;
+  return PaceForward(keys, slopes, i, referenceS);
+}
+export function CycleReferenceS(cycle, playedS) {
+  const keys = DefaultPace(cycle), slopes = PaceSlopes(keys);
+  if (playedS <= keys[0][1]) return keys[0][0] + (playedS - keys[0][1]) / slopes[0];
+  if (playedS >= keys.at(-1)[1]) return keys.at(-1)[0] + (playedS - keys.at(-1)[1]) / slopes.at(-1);
+  let i = 0;
+  while (playedS > keys[i + 1][1]) i += 1;
+  let low = keys[i][0], high = keys[i + 1][0];
+  for (let n = 0; n < 32; n += 1) {
+    const mid = (low + high) / 2;
+    if (PaceForward(keys, slopes, i, mid) < playedS) low = mid; else high = mid;
+  }
+  return (low + high) / 2;
+}

@@ -233,6 +233,11 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     durationS: 1.95, startS: 0.02,
     pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
       [1.02, 0.740], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
+    // Half-width (played s) of the centred smoothing on the whole-rifle tracks (lower, head,
+    // sway). 2026-11-13 (user: the bolt cycle moved in jerks): the rifle froze between beats
+    // and then lurched 7.5 cm in three frames; the window rounds every start and stop without
+    // lag and never leaves the range of the keyed poses.
+    smoothS: 0.07,
     // Low working pose, relative to the player's (undipped) look, placed on the COD Type 38
     // clip frame by frame (2026-11-03, user: the rifle's motion with the hand did not match):
     // the rifle barely leaves the aim line. The front sight stays just above the centre
@@ -330,7 +335,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 1.580, anchor: "boltTop" },
       // Loosen before lifting, then turn back toward the stock above the ball.
       { at: 1.595, anchor: "boltTop", shape: "boltTopClear", offset: [0.001, 0.005, 0] },
-      { at: 1.630, anchor: "boltTop", shape: "boltTopClear", offset: [0.008, 0.060, -0.005] },
+      { at: 1.630, anchor: "boltTop", shape: "boltTopClear", offset: [0.008, 0.060, -0.005], through: true },
       { at: 1.660, anchor: "boltTop", shape: "boltRest", offset: [0.040, 0.070, 0.020], rotationTo: "grip", rotationMix: 0.4, through: true },
       { at: 1.800, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "boltRest", through: true },
       { at: 1.870, anchor: "gripClear" },
@@ -351,7 +356,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 0.810, anchor: "bolt" },
       { at: 0.950, anchor: "bolt" },
       { at: 0.980, anchor: "bolt", shape: "boltHookClear", offset: [0.004, -0.004, -0.020] },
-      { at: 1.030, anchor: "boltClear" },
+      { at: 1.030, anchor: "boltClear", through: true },
       { at: 1.120, anchor: "knob", offset: [0.070, 0.052, 0.020], shape: "packetRelax", turnMix: 0.5, through: true },
       { at: 1.320, anchor: "grip", offset: [0.095, -0.035, -0.020], shape: "packetRelax", through: true },
       { at: 1.760, anchor: "gripClear" },

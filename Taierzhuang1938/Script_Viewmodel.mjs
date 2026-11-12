@@ -62,7 +62,7 @@ import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH, ADS_LOOK_SWAY, ADS_MOVE_BOB, AIM_IDLE_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
-import { LookSway, AimIdleSway, AdsMoveBob } from "./Script_FirearmHandling.mjs";
+import { LookSway, AimIdleSway, AdsMoveBob, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
 import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
@@ -166,21 +166,8 @@ const Ease = {
 // Monotone cubic with shared tangents: carry velocity through intermediate
 // poses, stop at genuine holds, and never overshoot the authored contact range.
 // Frame-matched bolt cycles (FPS_BOLT_CYCLE) keep their beats in reference
-// seconds; `pace` maps them to played seconds, piecewise linear both ways.
-function CyclePace(cycle, value, from, to) {
-  const keys = cycle.pace || [[0, 0], [cycle.durationS, cycle.durationS]];
-  if (value <= keys[0][from]) return keys[0][to] + value - keys[0][from];
-  for (let i = 1; i < keys.length; i++) {
-    if (value <= keys[i][from]) {
-      const a = keys[i - 1], b = keys[i];
-      return a[to] + (value - a[from]) * (b[to] - a[to]) / (b[from] - a[from]);
-    }
-  }
-  return keys.at(-1)[to] + value - keys.at(-1)[from];
-}
-const CyclePlayedS = (cycle, referenceS) => CyclePace(cycle, referenceS, 0, 1);
-const CycleReferenceS = (cycle, playedS) => CyclePace(cycle, playedS, 1, 0);
-
+// seconds; `pace` maps them to played seconds (Script_FirearmHandling.CyclePlayedS,
+// a smooth monotone time warp).
 function ReloadTrack(keys, t, column = 1) {
   if (t <= keys[0][0]) return keys[0][column];
   if (t >= keys.at(-1)[0]) return keys.at(-1)[column];
@@ -3591,11 +3578,30 @@ export class Viewmodel {
 
     // 低头看机匣：只把枪绕眼睛往上转（等于相机低头，但世界不动、准星不动），在 Update 里合成。
     // 肩锚不跟着转——第一人称双臂的肩是贴镜头摆的，一起转会把左小臂横进画面中间。
-    const head = ReloadTrack(cycle.head, since);
+    // 整把枪的几条大动作（落低、低头、跟手大摆）按实际秒数做一次居中平滑（cycle.smoothS，Hann 窗）：
+    // 关键帧之间「定住 → 三帧猛挪 → 再定住」会一顿一顿，平滑后起停有过渡、不滞后，值也不出关键帧的范围。
+    // 开枪上扬（rise）不平滑，那一下要脆。
+    const refs = this._BoltSmoothRefs(cycle, played, since);
+    const Smooth = (keys, column = 1) => refs.reduce((sum, [ref, weight]) => sum + weight * ReloadTrack(keys, ref, column), 0);
+    const head = Smooth(cycle.head);
     const rise = Array.from({ length: 6 }, (_, i) => a.afterShot ? ReloadTrack(cycle.rise, since, i + 1) : 0);
     // 枪跟着手的大摆（COD 三八式逐帧量的准星走位）：绕眼睛转，整把枪在画面里一起挪。
-    const sway = cycle.sway ? Array.from({ length: 6 }, (_, i) => ReloadTrack(cycle.sway, since, i + 1)) : null;
-    this.boltCycleState = { lower: ReloadTrack(cycle.lower, since), head, rise, sway, since };
+    const sway = cycle.sway ? Array.from({ length: 6 }, (_, i) => Smooth(cycle.sway, i + 1)) : null;
+    this.boltCycleState = { lower: Smooth(cycle.lower), head, rise, sway, since };
+  }
+
+  /** 平滑窗的采样点：[参考秒, 权重]，在实际秒数上居中取 2n+1 个点（Hann 权重）。 */
+  _BoltSmoothRefs(cycle, played, since) {
+    const halfS = cycle.smoothS || 0, taps = 6;
+    if (!(halfS > 0)) return [[since, 1]];
+    const out = this._boltSmoothRefs || (this._boltSmoothRefs = Array.from({ length: 2 * taps + 1 }, () => [0, 0]));
+    let total = 0;
+    for (let j = -taps; j <= taps; j += 1) {
+      const weight = Math.cos(Math.PI * j / (2 * (taps + 1))) ** 2, row = out[j + taps];
+      row[0] = CycleReferenceS(cycle, played + halfS * j / taps); row[1] = weight; total += weight;
+    }
+    for (const row of out) row[1] /= total;
+    return out;
   }
 
   /** 满开镜时眼睛（相机原点）在枪局部的位置：开镜眼距一改，开枪上扬的支点跟着走。 */

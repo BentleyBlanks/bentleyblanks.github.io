@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { SampleShotDisk, FirearmHandling, GunClearance, LookSway, AimIdleSway, AdsMoveBob } from "./Script_FirearmHandling.mjs";
+import { SampleShotDisk, FirearmHandling, GunClearance, LookSway, AimIdleSway, AdsMoveBob, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
+import { FPS_BOLT_CYCLE } from "./Data_Tuning_FpsReload.mjs";
 import { LOOK_SWAY, ADS_LOOK_SWAY, ADS_MOVE_BOB } from "./Data_Tuning_FirearmHandling.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
@@ -158,6 +159,24 @@ assert.ok(Math.abs(bobZero.yaw) + Math.abs(bobZero.pitch) + Math.abs(bobZero.rol
   assert.ok(Math.abs(maxYaw - ADS_MOVE_BOB.yawDeg * DEG) < ADS_MOVE_BOB.yawDeg * DEG * 0.01, "bob yaw reaches its tuned amplitude");
   assert.ok(Math.abs(meanYaw) < 1e-6 && Math.abs(meanPitch) < 1e-6, "bob is zero-mean");
   assert.equal(pitchCrossings, 2 * yawCrossings, "pitch runs two cycles per yaw cycle");
+}
+// Bolt-cycle time warp (2026-11-13): keys land exactly, the inverse round-trips, the playback
+// rate is monotone and continuous across every key (the piecewise-linear map jumped 0.67x -> 2.67x).
+{
+  const cycle = FPS_BOLT_CYCLE.HanYang, keys = cycle.pace, h = 1e-5;
+  for (const [reference, played] of keys) {
+    assert.ok(Math.abs(CyclePlayedS(cycle, reference) - played) < 1e-9, `pace key ${reference} lands on ${played}`);
+    const left = (CyclePlayedS(cycle, reference) - CyclePlayedS(cycle, reference - h)) / h;
+    const right = (CyclePlayedS(cycle, reference + h) - CyclePlayedS(cycle, reference)) / h;
+    assert.ok(Math.abs(left - right) < 1e-3 * Math.max(1, left), `rate is continuous at ${reference} (${left} vs ${right})`);
+  }
+  let last = -Infinity;
+  for (let s = -0.05; s <= cycle.durationS + 0.05; s += 0.001) {
+    const played = CyclePlayedS(cycle, s);
+    assert.ok(played > last, `time warp is strictly increasing at ${s}`);
+    assert.ok(Math.abs(CycleReferenceS(cycle, played) - s) < 1e-6, `inverse round-trips at ${s}`);
+    last = played;
+  }
 }
 console.log(JSON.stringify({ adsIdleDeg: { pitch: ads60.pitch / DEG, yaw: ads60.yaw / DEG, hipRatio, held: [held.pitch / DEG, held.yaw / DEG] },
   yawSignChanges: { rested: ads60.signChanges, tired: tired.signChanges }, adsLookCapDeg: adsCap / DEG }));

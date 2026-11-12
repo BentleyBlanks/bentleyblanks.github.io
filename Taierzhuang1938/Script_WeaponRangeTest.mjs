@@ -10,6 +10,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { WeaponShelved } from "./Script_Weapons.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import { FPS_BOLT_CYCLE } from "./Data_Tuning_FpsReload.mjs";
+import { CyclePlayedS } from "./Script_FirearmHandling.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 
 // --smoke runs one representative firearm without full-magazine, repeated death or menu reload checks.
@@ -43,9 +44,8 @@ const hanYangCycle = FPS_BOLT_CYCLE.HanYang;
 const { turn: hanYangTurn, slide: hanYangSlide } = hanYangCycle;
 const hanYangBeats = [hanYangTurn.find(([, v], i) => v === 0 && hanYangTurn[i + 1]?.[1] > 0)[0],
   hanYangSlide.find(([, v]) => v === 1)[0], hanYangSlide.at(-1)[0], hanYangTurn.at(-1)[0]];
-// Beats are written in reference seconds; pace maps them to played seconds (piecewise linear).
-const HanYangPlayedS = s => { const k = hanYangCycle.pace; for (let i = 1; i < k.length; i++) if (s <= k[i][0])
-  return k[i - 1][1] + (s - k[i - 1][0]) * (k[i][1] - k[i - 1][1]) / (k[i][0] - k[i - 1][0]); return k.at(-1)[1]; };
+// Beats are written in reference seconds; pace maps them to played seconds (the viewmodel's own time warp).
+const HanYangPlayedS = s => CyclePlayedS(hanYangCycle, s);
 // The cue starts at its beat (reference time) and its transient follows in real recording time.
 const hanYangCueAt = hanYangCycle.sounds.map((cue, i) => HanYangPlayedS(cue.at) + [0.23, 0.25, 0.61, 0.68][i] - cue.offset);
 const hanYangBeatsPlayed = () => hanYangBeats.map(HanYangPlayedS);
