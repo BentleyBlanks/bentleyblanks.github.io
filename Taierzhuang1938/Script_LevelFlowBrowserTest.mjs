@@ -28,7 +28,7 @@ try {
   const independentAfter=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
   assert.deepEqual(independentAfter[0],independentBefore[0],"zooming viewport 2 leaves viewport 1 unchanged");
   assert.notEqual(independentAfter[1].scale,independentBefore[1].scale);
-  await page.goto(`${base}Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await page.waitForFunction(()=>window.LevelFlow);
   for(const input of await page.locator('[data-layer]').all()) await input.uncheck();
   const junctionPixels=await page.evaluate(()=>{
     const canvas=document.querySelector('#flowMap'),context=canvas.getContext('2d');
@@ -41,7 +41,7 @@ try {
   });
   assert.ok(junctionPixels.every(pixel=>pixel[0]>170&&pixel[1]>150&&pixel[2]>120),"the branch T-junction has a continuous floor, with no overpainted bank cap");
   await page.screenshot({path:path.join(out,'JunctionConnectivity.png')});
-  await page.goto(`${base}Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
   for(const beat of FLOW_TIMELINE) {
     await page.evaluate((time)=>window.LevelFlow.Seek(time),beat.start+beat.duration*0.5);
     assert.equal(await page.locator("#beatTitle").textContent(),beat.title);
