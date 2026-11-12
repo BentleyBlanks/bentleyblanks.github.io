@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>遭遇设计 · 血战滕县</title>
   <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261101230000">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261112Viewports3">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261112TerrainScene4">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -45,8 +45,8 @@
     </aside>
   </main>
   <footer class="lfTimeline">
-    <div class="lfTransport"><button id="previousBeat">上一拍</button><button id="playFlow" class="sePrimary">播放</button><button id="nextBeat">下一拍</button><output id="flowTime"></output><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label><input id="loopStage" type="checkbox">循环本段</label><div class="lfLayers"><label><input data-layer="fire" type="checkbox" checked>火力</label><label><input data-layer="triggers" type="checkbox" checked>触发</label><label><input data-layer="spawns" type="checkbox" checked>生成</label><label><input data-layer="routes" type="checkbox" checked>路线</label><label><input data-layer="names" type="checkbox" checked>人名</label></div></div>
-    <div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1870" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="当前阶段逐拍时间轴"></div>
+    <div class="lfTransport"><button id="previousBeat">上一拍</button><button id="playFlow" class="sePrimary">播放</button><button id="nextBeat">下一拍</button><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label><input id="loopStage" type="checkbox">循环本段</label><div class="lfLayers"><label><input data-layer="fire" type="checkbox" checked>火力</label><label><input data-layer="triggers" type="checkbox" checked>触发</label><label><input data-layer="spawns" type="checkbox" checked>生成</label><label><input data-layer="routes" type="checkbox" checked>路线</label><label><input data-layer="names" type="checkbox" checked>人名</label></div></div>
+    <div id="timelineAxis" class="lfTimeAxis"><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1870" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
   </footer>
   <div id="flowError" role="status" hidden></div>
 </body>

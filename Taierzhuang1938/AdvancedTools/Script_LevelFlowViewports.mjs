@@ -3,7 +3,7 @@ import { FlowPerspectiveView } from "./Script_LevelFlowPerspective.mjs";
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
 import { ValidateViewportLayout } from "./Script_LevelFlowDocument.mjs";
 
-export const ENCOUNTER_VIEW_TYPES={plan:"空间总览",battle:"战斗局部",oblique:"立体俯视",chase:"跟拍",eye:"玩家视线"};
+export const ENCOUNTER_VIEW_TYPES={plan:"空间总览",battle:"战斗局部",oblique:"立体俯视",scene:"Scene 自由视角",chase:"跟拍",eye:"玩家视线"};
 
 export class EncounterViewports {
   constructor(element,mapData,{activate,change,bounds,bind}) {
@@ -30,7 +30,7 @@ export class EncounterViewports {
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
       select.onchange=()=>this.SetType(index,select.value);
       target.onchange=()=>{entry.map.target=target.value;entry.mode="follow";this.callbacks.change();};
-      fit.onclick=()=>{entry.mode=entry.type==="plan"?"stage":"follow";this.Frame(entry);this.callbacks.change();};
+      fit.onclick=()=>{if(entry.type==="scene") this.SetType(index,"oblique");entry.mode=entry.type==="plan"?"stage":"follow";this.Frame(entry);this.callbacks.change();};
       rotate.onclick=()=>{entry.map.yaw=(entry.map.yaw||0)+Math.PI/4;this.callbacks.change();};
       this.callbacks.bind(entry);
     }
@@ -74,7 +74,13 @@ export class EncounterViewports {
     const entry=this.entries[index],old=entry.map;
     entry.type=type;entry.select.value=type;entry.map=this.MakeView(entry.canvas,type);
     entry.map.center=[...old.center];entry.map.scale=old.scale;
-    entry.mode=type==="plan"?"stage":"follow";
+    entry.mode=type==="plan"?"stage":type==="scene"?"manual":"follow";
+    if(type==="scene") {
+      const distance=old.type==="oblique"&&Number.isFinite(old.focal)?old.focal/old.scale:22;
+      entry.map.freeCamera=old.eye?{eye:old.type==="oblique"?old.aim.map((value,axis)=>value-old.forward[axis]*distance):[...old.eye],yaw:Math.atan2(old.forward[0],old.forward[2]),pitch:Math.asin(old.forward[1])}
+        :{eye:[old.center[0],entry.map.Ground(old.center)+12,old.center[1]-18],yaw:0,pitch:-0.55};
+      entry.map.focusDistance=distance;
+    }
     entry.canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
     this.Frame(entry);this.Activate(index);
   }
@@ -89,7 +95,7 @@ export class EncounterViewports {
   Draw(frame,layers,selection,annotations,draft) {
     for(const entry of this.Visible()) {
       const perspective=!["plan","battle"].includes(entry.type);
-      entry.target.hidden=!perspective;entry.rotate.hidden=!perspective;
+      entry.target.hidden=!perspective||entry.type==="scene";entry.rotate.hidden=!perspective||entry.type==="scene";
       if(entry.mode==="follow") entry.map.Follow(frame);
       entry.map.Draw(frame,layers,selection,annotations,draft);
       entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"跟随":entry.mode==="manual"?"自由取景":entry.mode==="all"?"全图":"本段"}`;
@@ -100,7 +106,8 @@ export class EncounterViewports {
     return {count:this.count,active:this.activeIndex,views:this.Visible().map((entry)=>{
       const rect=entry.canvas.getBoundingClientRect();
       return {type:entry.type,mode:entry.mode,center:[...entry.map.center],scale:entry.map.scale,
-        yaw:entry.map.yaw||0,pitch:entry.map.pitch||0.67,target:entry.map.target||"player",viewport:{width:rect.width,height:rect.height}};
+        yaw:entry.map.yaw||0,pitch:entry.map.pitch||0.67,target:entry.map.target||"player",viewport:{width:rect.width,height:rect.height},
+        ...(entry.map.type?{far:entry.map.far,freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20}:{})};
     })};
   }
 
@@ -112,6 +119,7 @@ export class EncounterViewports {
       this.SetType(index,saved.type);
       const entry=this.entries[index],rect=entry.canvas.getBoundingClientRect();
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
+      if(entry.map.type) {entry.map.far=saved.far||1500;entry.map.freeCamera=saved.freeCamera?structuredClone(saved.freeCamera):entry.map.freeCamera;entry.map.focusDistance=saved.focusDistance||20;}
       const ratio=saved.viewport?Math.min(rect.width/saved.viewport.width,rect.height/saved.viewport.height):1;
       entry.map.scale=Clamp(saved.scale*ratio,0.15,40);
       entry.size={width:rect.width,height:rect.height};

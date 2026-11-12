@@ -5,9 +5,10 @@ import { ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEnc
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, DownloadBlob } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
+import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace;
+let canvas,workspace,navigation;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
@@ -80,25 +81,28 @@ function PopulateTimeline() {
   for(const stage of STAGE_TIMELINE) {
     const button=Button(`${stage.id} ${stage.title}`,()=>{workspace.active.mode="stage";Seek(stage.start,{fit:true});});
     button.dataset.stage=stage.id;button.title=`${stage.status} · ${FormatFlowTime(stage.start)}—${FormatFlowTime(stage.end)}`;
+    button.style.left=`${stage.start/FLOW_DURATION*100}%`;button.style.width=`${(stage.end-stage.start)/FLOW_DURATION*100}%`;
     button.classList.toggle("draft",stage.status==="草稿");Element("timelineStages").append(button);
+  }
+  for(const beat of FLOW_TIMELINE) {
+    const cinematic=ENCOUNTER_CINEMATICS.includes(beat.id);
+    const button=Button(beat.id.toUpperCase(),()=>JumpBeat(beat.id));
+    button.dataset.beat=beat.id;button.style.left=`${beat.start/FLOW_DURATION*100}%`;button.style.width=`${beat.duration/FLOW_DURATION*100}%`;
+    button.classList.toggle("cinematic",cinematic);
+    button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
+    Element("timelineBeats").append(button);
   }
   Element("flowSeek").max=String(FLOW_DURATION);Element("sourceLink").href=FLOW_SOURCE.url;
 }
 function UpdateTimeline() {
   if(shownStage!==frame.stage.id) {
-    shownStage=frame.stage.id;Element("timelineBeats").replaceChildren();
-    for(const beat of frame.stage.beats) {
-      const cinematic=ENCOUNTER_CINEMATICS.includes(beat.id);
-      const button=Button(`${cinematic?"镜头 · ":""}${beat.title}`,()=>JumpBeat(beat.id));
-      button.dataset.beat=beat.id;button.style.flex=String(beat.duration);button.classList.toggle("cinematic",cinematic);
-      button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
-      Element("timelineBeats").append(button);
-    }
+    shownStage=frame.stage.id;
     for(const button of document.querySelectorAll("[data-stage]")) button.classList.toggle("selected",button.dataset.stage===shownStage);
     UpdateObjects();
   }
   if(shownBeat!==frame.beat.id) {
     shownBeat=frame.beat.id;
+    Element("timelineMode").hidden=!ENCOUNTER_CINEMATICS.includes(frame.beat.id);Element("timelineMode").textContent=`${frame.beat.id.toUpperCase()} 镜头动画`;
     Element("beatId").textContent=frame.beat.id.toUpperCase();Element("beatTitle").textContent=frame.beat.title;
     Element("stageStatus").textContent=frame.stage.status;Element("sourcePassage").textContent=FLOW_SOURCE_EXCERPTS[frame.beat.id];
     for(const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected",button.dataset.beat===shownBeat);
@@ -106,6 +110,8 @@ function UpdateTimeline() {
   Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
   Element("flowTime").textContent=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
   Element("flowSeek").value=String(time);
+  Element("timelineAxis").style.setProperty("--progress",`${time/FLOW_DURATION*100}%`);
+  Element("flowSeek").setAttribute("aria-valuetext",`${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);
   Element("undoFlow").disabled=!project.undo.length;Element("redoFlow").disabled=!project.redo.length;
   Element("followPlayer").setAttribute("aria-pressed",String(workspace.active.mode==="follow"));
 }
@@ -227,13 +233,16 @@ function RestoreView(view,viewport) {
 
 function BindMap(entry) {
   const surface=entry.canvas;
+  surface.title="右键旋转 · 右键 + WASD 飞行 · Q/E 升降 · Shift 加速 · 中键平移 · Alt + 左键环绕 · Alt + 右键缩放 · F 聚焦";
+  surface.addEventListener("contextmenu",event=>event.preventDefault());
   surface.addEventListener("pointerdown",(event)=>{
-    if(event.button!==0&&event.button!==1) return;
+    if(navigation.Begin(entry,event)) return;
+    if(event.button!==0) return;
     workspace.Activate(entry.index);
     surface.focus();surface.setPointerCapture(event.pointerId);
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
     if(mode==="route"&&selection?.type==="group") {Apply((document)=>document.groups.find((item)=>item.id===selection.id).route.push(world));SetMode("select");ShowTab("edit");return;}
-    const action=event.button===1?"pan":mode!=="select"?"annotate":["areaHandle","routeHandle","annotationHandle"].includes(hit?.type)?"edit":"pan";
+    const action=mode!=="select"?"annotate":["areaHandle","routeHandle","annotationHandle"].includes(hit?.type)?"edit":entry.map.type?"select":"pan";
     if(action!=="pan") SetPlaying(false);
     pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey};
     if(action==="annotate") {
@@ -243,6 +252,7 @@ function BindMap(entry) {
     }
   });
   surface.addEventListener("pointermove",(event)=>{
+    if(navigation.Move(entry,event)) return;
     const screen=LocalPoint(event,surface),world=entry.map.ToWorld(screen);
     if(pointer&&pointer.viewport===entry.index) {
       const dx=screen[0]-pointer.screen[0],dy=screen[1]-pointer.screen[1];if(Math.hypot(dx,dy)>3) pointer.moved=true;
@@ -271,6 +281,7 @@ function BindMap(entry) {
     if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
   });
   surface.addEventListener("pointerup",()=>{
+    if(navigation.End(entry)) return;
     if(!pointer||pointer.viewport!==entry.index) return;
     const action=pointer.action;
     if(action==="edit") {const candidate=project.value;project.value=pointer.original;try {project.Replace(candidate);Changed();} catch(error) {Toast(error.message);}}
@@ -278,13 +289,14 @@ function BindMap(entry) {
       const annotation=draft;draft=null;Apply((document)=>document.annotations.push(annotation));Select({type:"annotation",id:annotation.id});
       if(annotation.kind==="text") {Element("annotationText").focus();Element("annotationText").select();}
     }
-    if(action==="pan"&&!pointer.moved&&pointer.hit) {
+    if(["pan","select"].includes(action)&&!pointer.moved&&pointer.hit) {
       const hit=pointer.hit;Select({type:hit.type,id:hit.id});
     }
     pointer=null;draft=null;Render();
   });
-  surface.addEventListener("pointercancel",()=>{if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
-  surface.addEventListener("wheel",(event)=>{event.preventDefault();workspace.Activate(entry.index);workspace.active.mode="manual";map.Zoom(Math.exp(-event.deltaY*0.001),LocalPoint(event,surface));Render();},{passive:false});
+  surface.addEventListener("pointercancel",()=>{navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
+  surface.addEventListener("lostpointercapture",()=>navigation.End(entry));
+  surface.addEventListener("wheel",event=>navigation.Wheel(entry,event),{passive:false});
   surface.addEventListener("pointerleave",()=>{Element("mapTooltip").hidden=true;});
 }
 
@@ -296,9 +308,9 @@ function BindControls() {
   Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
   Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
   Element("viewportLayout").onchange=(event)=>{workspace.SetLayout(Number(event.target.value));Render();};
-  Element("fitStage").onclick=()=>{workspace.active.mode="stage";map.Fit(StageBounds());Render();};
-  Element("fitAll").onclick=()=>{workspace.active.mode="all";map.Fit(map.mapData.bounds);Render();};
-  Element("followPlayer").onclick=()=>{workspace.active.mode=workspace.active.mode==="follow"?"manual":"follow";Render();};
+  Element("fitStage").onclick=()=>{if(map.type==="scene") workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="stage";map.Fit(StageBounds());Render();};
+  Element("fitAll").onclick=()=>{if(map.type==="scene") workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="all";map.Fit(map.mapData.bounds);Render();};
+  Element("followPlayer").onclick=()=>{if(map.type==="scene") {workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="follow";}else workspace.active.mode=workspace.active.mode==="follow"?"manual":"follow";Render();};
   Element("undoFlow").onclick=()=>{project.Undo();Changed();};Element("redoFlow").onclick=()=>{project.Redo();Changed();};
   Element("objectList").onchange=(event)=>{const [type,id]=event.target.value.split(":");Select(id?{type,id}:null);};
   Element("objectForm").onsubmit=(event)=>event.preventDefault();
@@ -358,14 +370,21 @@ function BindControls() {
   };
   document.addEventListener("keydown",(event)=>{
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
+    if(navigation.Key(event)) return;
+    if(event.code==="KeyF") {
+      event.preventDefault();const object=SelectedObject(),actor=frame.actors.find(item=>selection?.type==="actor"&&item.id===selection.id);
+      const note=project.value.annotations.find(item=>selection?.type==="annotation"&&item.id===selection.id);
+      navigation.Focus(object?.area.center||actor?.p||note?.b||frame.player,object?Math.max(...object.area.size)/2:6);return;
+    }
     if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z") {event.preventDefault();event.shiftKey?project.Redo():project.Undo();Changed();return;}
     if(event.code==="Space") {event.preventDefault();SetMode("select");SetPlaying(!playing);}
     if(event.key==="ArrowLeft"||event.key==="ArrowRight") {event.preventDefault();Seek(time+(event.key==="ArrowRight"?1:-1)*(event.shiftKey?5:1));}
     if(event.key==="[") StepBeat(-1);if(event.key==="]") StepBeat(1);
-    if(event.key==="Escape") {if(pointer?.action==="edit") project.value=pointer.original;SetMode("select");draft=null;pointer=null;Render();}
+    if(event.key==="Escape") {navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;SetMode("select");draft=null;pointer=null;Render();}
   });
 }
 function Tick(timestamp) {
+  const navigated=navigation.Tick(lastTimestamp?Math.min(0.1,(timestamp-lastTimestamp)/1000):0);
   if(playing&&lastTimestamp) {
     const previousStage=frame.stage.id,delta=Math.min(0.1,(timestamp-lastTimestamp)/1000)*Number(Element("flowSpeed").value);
     const end=Element("loopStage").checked?frame.stage.end:FLOW_DURATION;
@@ -375,6 +394,7 @@ function Tick(timestamp) {
     if(previousStage!==frame.stage.id) workspace.FrameStage();
     Render();
   }
+  else if(navigated) Render();
   lastTimestamp=timestamp;requestAnimationFrame(Tick);
 }
 
@@ -385,12 +405,13 @@ async function Start() {
     activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;},
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
+  navigation=new EncounterSceneControls(workspace,Render);
   Element("mapLoading").hidden=true;
   BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,layers:{...layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
     SetViewType:(index,type)=>workspace.SetType(index,type),

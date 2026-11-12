@@ -4,12 +4,16 @@ export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_v2";
 export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
 
 export function ValidateViewportLayout(layout) {
-  const types=["plan","battle","oblique","chase","eye"],modes=["stage","all","manual","follow"];
+  const types=["plan","battle","oblique","scene","chase","eye"],modes=["stage","all","manual","follow"];
   const valid=layout&&[1,2,4].includes(layout.count)&&Number.isInteger(layout.active)&&layout.active>=0&&layout.active<layout.count
     &&Array.isArray(layout.views)&&layout.views.length===layout.count&&layout.views.every((view)=>types.includes(view.type)&&modes.includes(view.mode)
       &&Array.isArray(view.center)&&view.center.length===2&&view.center.every((value)=>Number.isFinite(value)&&Math.abs(value)<=10000)
       &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=80&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)
       &&["player","winter","luo","tank1"].includes(view.target)
+      &&(view.far===undefined||Number.isFinite(view.far)&&view.far>=100&&view.far<=10000)
+      &&(view.focusDistance===undefined||Number.isFinite(view.focusDistance)&&view.focusDistance>0&&view.focusDistance<=10000)
+      &&(view.freeCamera==null||Array.isArray(view.freeCamera.eye)&&view.freeCamera.eye.length===3&&view.freeCamera.eye.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000)
+        &&Number.isFinite(view.freeCamera.yaw)&&Number.isFinite(view.freeCamera.pitch)&&Math.abs(view.freeCamera.pitch)<Math.PI/2)
       &&Number.isFinite(view.viewport?.width)&&view.viewport.width>0&&Number.isFinite(view.viewport?.height)&&view.viewport.height>0);
   if(!valid) throw new Error("多视口定位数据无效");
   return structuredClone(layout);

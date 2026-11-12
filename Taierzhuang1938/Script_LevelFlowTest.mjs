@@ -3,10 +3,12 @@ import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
-import { EnterArea } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
+import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
+import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
+import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
 assert.equal(FLOW_DURATION,1870);
@@ -150,4 +152,40 @@ ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
 
 const invalidViews=structuredClone(packet);invalidViews.context.viewports={count:4,active:0,views:[]};
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
+const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
+const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+for(const [x,z] of [[21.9,67.1],[25,67.1],[33,100],[35,100],[40,100],[55,150],[88,238],[100,465]]) {
+  const pre=terrain.preAt(x,z),expected=terrain.plan.Apply(x,z,pre,terrain.plan.natural(x,z));
+  assert.equal(terrain.heightAt(x,z),expected,`real game terrain sampler at ${x},${z}`);
+}
+assert.ok(terrain.heightAt(33,100)<terrain.heightAt(40,100)-1,"the gully is carved into actual ground");
+// A shared edge must consist of identical segments on both sides, including
+// 1 m trench cells meeting the coarse surrounding terrain.
+const terrainEdges=new Map();
+for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) for(let index=0;index<3;index++) {
+  const a=face.points[index],b=face.points[(index+1)%3];
+  const vertices=[a.join(","),b.join(",")].sort(),key=vertices.join("|");
+  const boundary=Math.abs(a[0])===6144&&a[0]===b[0]||Math.abs(a[2])===6144&&a[2]===b[2];
+  const edge=terrainEdges.get(key)||{count:0,boundary};edge.count++;terrainEdges.set(key,edge);
+}
+assert.ok([...terrainEdges.values()].every(edge=>edge.count===(edge.boundary?1:2)),"terrain has no open internal edges or coarse/fine T-junction cracks");
+const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
+const lane=L0610_LANE.line.map(point=>[point.x,point.z]);
+const south=L0610_SOUTH_LANE.line.map(point=>[point.x,point.z]);
+for(let stamp=BeatById("05a").start;stamp<BeatById("08a").end;stamp+=0.5) {
+  const cart=ActorAt("cart",stamp);
+  if(cart.p[1]>=161&&cart.p[1]<=378) assert.ok(Math.min(...lane.slice(1).map((b,index)=>SegmentDistance(cart.p,lane[index],b)))<1e-6,"cart follows every canonical road bend");
+  const next=ActorAt("cart",stamp+0.05),dx=next.p[0]-cart.p[0],dz=next.p[1]-cart.p[1],distance=Math.hypot(dx,dz);
+  if(distance>0.001) assert.ok((Math.sin(cart.heading)*dx-Math.cos(cart.heading)*dz)/distance>0.8,"cart faces its direction of travel");
+}
+for(let stamp=BeatById("06b").end;stamp<BeatById("06h").end;stamp+=1) assert.deepEqual(ActorAt("cart",stamp).p,ActorAt("cart",BeatById("06b").end).p,"stalled cart stays at its authored waiting point");
+assert.ok(Distance(ActorAt("cart",BeatById("09a").start).p,[104.6,379.3])<1e-6,"village parking matches the archived spatial diagram");
+const boardedWinter=ActorAt("winter",BeatById("06d").start),boardingWinter=ActorAt("winter",BeatById("06d").start-0.001);
+assert.equal(boardedWinter.parentId,"cart","06D opens with winter already on the cart, matching its source passage");
+assert.ok(Distance(boardedWinter.p,boardingWinter.p)<0.01&&Math.abs(boardedWinter.elevation-boardingWinter.elevation)<0.01,"boarding has a continuous position and lift");
+for(let stamp=BeatById("10d").start;stamp<BeatById("10f").end;stamp+=0.5) {
+  const cart=ActorAt("cart",stamp),winter=ActorAt("winter",stamp);
+  if(cart.p[1]>=470) assert.ok(Math.min(...south.slice(1).map((b,index)=>SegmentDistance(cart.p,south[index],b)))<1e-6,"cart uses each south-alley turn");
+  assert.equal(winter.parentId,"cart");assert.equal(winter.elevation,1.05);assert.equal(winter.heading,cart.heading);assert.ok(Distance(winter.p,cart.p)<0.2);
+}
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

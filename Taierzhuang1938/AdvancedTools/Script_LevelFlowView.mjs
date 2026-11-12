@@ -3,7 +3,7 @@ import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
-const materialColors={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce"};
+export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
 
 export function EncounterSignals(frame) {
   const signals=new Set();
@@ -174,7 +174,7 @@ export class FlowMapView {
       context.save();context.translate(...point);context.rotate(-(object.yawDeg||0)*Math.PI/180);
       const overhead=object.material==="Whitebox/Roof"||/Roof|Lintel|Bridge/.test(object.id);
       context.globalAlpha=overhead?0.18:object.material==="Whitebox/Step"?0.55:1;
-      context.fillStyle=materialColors[object.material]||"#c1b59c";
+      context.fillStyle=FLOW_MATERIAL_COLORS[object.material]||"#c1b59c";
       context.fillRect(-w*scale/2,-d*scale/2,Math.max(0.7,w*scale),Math.max(0.7,d*scale));
       context.strokeStyle=object.material==="Whitebox/Roof"?"#706c5d":"#8b80666f";
       context.lineWidth=object.material==="Whitebox/Plaster"&&h>1?1.1:0.7;
@@ -214,8 +214,11 @@ export class FlowMapView {
       if(actor.kind==="tank") {context.rotate((actor.turret||0)-(actor.heading||0));Circle(context,[0,0],size*0.55,"#87856a",color);Line(context,[[0,0],[0,-size*1.8]],color,2);}
       else {Circle(context,[-size-2,0],2.5,color);Circle(context,[size+2,0],2.5,color);}
       context.restore();
-    } else if(actor.kind==="quilt") {
-      context.fillStyle=color;context.strokeStyle="#f1e9ca";context.fillRect(p[0]-3,p[1]-6,6,12);context.strokeRect(p[0]-3,p[1]-6,6,12);
+    } else if(actor.kind==="quilt"||actor.kind==="donkey") {
+      context.save();context.translate(...p);context.rotate(actor.heading||0);
+      context.fillStyle=color;context.strokeStyle="#f1e9ca";context.fillRect(-3,-6,6,12);context.strokeRect(-3,-6,6,12);
+      if(actor.kind==="donkey") Line(context,[[0,-5],[0,-9]],color,3);
+      context.restore();
     } else if(actor.heavy) {
       Circle(context,p,4.5,color,"#111c17");Line(context,[[p[0]-6,p[1]+4],[p[0]+6,p[1]+4]],color,2);Line(context,[[p[0],p[1]],[p[0],p[1]-11]],color,3);
     } else Circle(context,p,actor.side==="player"?6:actor.side==="enemy"?4:4.5,color,"#111c17");
@@ -282,6 +285,7 @@ export class FlowMapView {
       }
     }
     if(layers.fire) for(const effect of frame.effects.filter((item)=>item.kind==="fire")) {
+      if(this.DrawFire) {this.DrawFire(context,effect,frame);continue;}
       const a=Screen(effect.a),b=Screen(effect.b),color=FLOW_COLORS[effect.side]||FLOW_COLORS.enemy;
       Line(context,[a,b],color+"45",effect.heavy?1.6:0.8,[4,7]);
       const tip=[Lerp(a[0],b[0],0.82),Lerp(a[1],b[1],0.82)];Arrow(context,[Lerp(a[0],b[0],0.72),Lerp(a[1],b[1],0.72)],tip,color+"ae",1);
@@ -294,11 +298,12 @@ export class FlowMapView {
     }
     const labelBoxes=[];
     for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
-      const p=Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&selection.id===actor.id;
-      if(p[0]<-20||p[0]>width+20||p[1]<-20||p[1]>height+20) continue;
+      const p=this.ActorScreen?this.ActorScreen(actor):Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&selection.id===actor.id;
+      if(this.ActorInView?!this.ActorInView(actor):p[0]<-20||p[0]>width+20||p[1]<-20||p[1]>height+20) continue;
       if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
-      if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
       this.DrawActor(context,actor,frame);
+      context.save();context.globalAlpha=this.ActorLabelOpacity?this.ActorLabelOpacity(actor):1;
+      if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
       this.hits.push({type:"actor",id:actor.id,screen:p,radius:9,text:`${actor.name} · X ${actor.p[0].toFixed(1)}  Z ${actor.p[1].toFixed(1)}${actor.status?` · ${actor.status}`:""}`});
       if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected)) {
         const text=actor.status?`${actor.name} · ${actor.status}`:actor.name,labelWidth=text.length*12+8;
@@ -309,6 +314,7 @@ export class FlowMapView {
           labelBoxes.push(box);Label(context,text,box[0],box[1]+8,color,12,true);break;
         }
       }
+      context.restore();
     }
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");

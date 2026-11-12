@@ -2,6 +2,7 @@ import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import * as front from "../Data_EditorBlockoutFirstLevel0105Space.mjs";
 import * as village from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
+import { LoadEncounterTerrain } from "./Script_LevelFlowTerrain.mjs";
 
 const Point = (point) => Array.isArray(point) ? point.slice(0, 2) : [point.x, point.z];
 
@@ -17,6 +18,7 @@ export function EncounterFloorConnections(point,map,ignore=null) {
 }
 
 export function EncounterHeightAt(point,map) {
+  if(map.terrain) return map.terrain.heightAt(...point);
   const [minX,maxX,minZ,maxZ]=FLOW_GROUND.bounds;
   if(point[0]<minX||point[0]>maxX||point[1]<minZ||point[1]>maxZ) return 0;
   for(const ramp of map.ramps) {
@@ -81,7 +83,8 @@ export function BuildEncounterMap(scene) {
   trenches.push({ id: "SunkenLane", points: village.L0610_LANE.line.map(Point), width: 5.5 });
   trenches.push({ id: "VillageDitch", points: [[36,380],[125,380]], width: 3 });
   trenches.push({id:"PitEntry",points:[[0,-7],[0,0]],width:2.6});
-  const Rectangle=(name,box)=>({name,points:[[box.minX,box.minZ],[box.maxX,box.minZ],[box.maxX,box.maxZ],[box.minX,box.maxZ]]});
+  trenches.push({id:"PlatoonEntry",points:[[12.695652,28],[17,28]],width:1.2});
+  const Rectangle=(name,box,trench=false)=>({name,trench,points:[[box.minX,box.minZ],[box.maxX,box.minZ],[box.maxX,box.maxZ],[box.minX,box.maxZ]]});
   const floors=[
     ...FLOW_GROUND.pockets.map(({name,box:[minX,maxX,minZ,maxZ]})=>Rectangle(name,{minX,maxX,minZ,maxZ})),
     Rectangle("丁字路口",village.L0610_STREETS.square.box),
@@ -91,7 +94,7 @@ export function BuildEncounterMap(scene) {
     Rectangle("街坊家",village.L0610_JIEFANG.box),
   ];
   for(const place of [front.L0105_PLACES.pit,front.L0105_PLACES.dugout,front.L0105_PLACES.platoonShelter]) {
-    floors.push(Rectangle(place.name,{minX:place.x-place.w/2,maxX:place.x+place.w/2,minZ:place.z-place.d/2,maxZ:place.z+place.d/2}));
+    floors.push(Rectangle(place.name,{minX:place.x-place.w/2,maxX:place.x+place.w/2,minZ:place.z-place.d/2,maxZ:place.z+place.d/2},true));
   }
   for(const [id,x,z,w,h,d,material] of FLOW_GROUND.cover) objects.push({
     id:`Encounter_${id}`,pos:[x,0,z],size:[w,h,d],material:`Whitebox/${material}`,group:"遭遇设计/地面工事",planning:true,
@@ -106,7 +109,7 @@ export function BuildEncounterMap(scene) {
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   return {
-    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors, ramps,
+    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => paint.poly && paint.poly.some((point) => point.z < 558)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),
@@ -121,10 +124,13 @@ export function BuildEncounterMap(scene) {
 }
 
 export async function LoadEncounterMap() {
-  const response = await fetch(new URL("../Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json", import.meta.url), {cache:"no-store"});
+  const sceneUrl=new URL("../Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json", import.meta.url);
+  const response = await fetch(sceneUrl, {cache:"no-store"});
   if (!response.ok) throw new Error(`空间底图读取失败 ${response.status}`);
-  const map=BuildEncounterMap(await response.json());
+  const scene=await response.json(),map=BuildEncounterMap(scene);
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(map)));
   map.source={scene:"Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
+  map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map);
+  map.farObjects=scene.objects.filter((object)=>object.pos&&!map.objects.includes(object)&&!String(object.group||"").includes("空气墙"));
   return map;
 }

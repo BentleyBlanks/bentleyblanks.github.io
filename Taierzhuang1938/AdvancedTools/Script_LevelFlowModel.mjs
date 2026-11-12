@@ -2,6 +2,7 @@ import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS } fr
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
+import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -52,17 +53,57 @@ const winterKeys = Keys([
   ["10d",0.25,111,465], ["10d",0.6,109,493], ["10d",1,113.25,505],
   ["10e",1,117,527], ["10f",1,117,545], ["10j",1,117,552],
 ]);
+const cartRoute=[[55,155],...L0610_LANE.line.map(point=>[point.x,point.z]),[104.6,379.3],
+  [100,380],[100,385],[100,458],[105,465],...L0610_SOUTH_LANE.line.map(point=>[point.x,point.z]),[117,552]];
+const cartLengths=[0];
+for(let index=1;index<cartRoute.length;index++) cartLengths.push(cartLengths.at(-1)+Distance(cartRoute[index-1],cartRoute[index]));
+
+function LaneAtZ(z) {
+  const line=L0610_LANE.line;
+  for(let index=1;index<line.length;index++) if(line[index].z>=z) {
+    const a=line[index-1],b=line[index],fraction=Clamp((z-a.z)/Math.max(0.001,b.z-a.z),0,1);
+    return [Lerp(a.x,b.x,fraction),z];
+  }
+  return [line.at(-1).x,z];
+}
+
 const cartKeys = Keys([
   ["01a",0,55,155], ["04d",0,55,155], ["04d",1,64,158],
   ["05a",0.3,80,159], ["05a",0.6,83,180], ["05a",1,83,211],
   ["05b",1,87,229], ["05c",1,88,241], ["06a",1,94,274],
   ["06b",1,97,292], ["06h",1,97,292], ["06i",0.6,97.5,300],
   ["06i",1,96,314], ["07a",1,95,328], ["07b",1,97,338], ["07c",1,100,352],
-  ["08a",1,115,380], ["09j",1,115,380],
-  ["10a",1,109,380], ["10b",1,100,430], ["10c",1,100,462],
-  ["10d",0.25,111,465], ["10d",0.6,109,493], ["10d",1,113.25,505],
+  ["08a",1,104.6,379.3], ["09j",1,104.6,379.3],
+  ["10a",1,100,385], ["10b",1,100,430], ["10c",1,103,462.2],
+  ["10d",0.25,109,470], ["10d",0.6,109,493], ["10d",1,113.25,505],
   ["10e",1,117,527], ["10f",1,117,545], ["10j",1,117,552],
-]);
+]).map(([time,x,z])=>[time,...(z>=161&&z<=378?LaneAtZ(z):[x,z])]);
+// Project authored timing anchors to a forward-only arc length. Interpolation
+// then follows every road bend instead of drawing chords between time keys.
+let previousCartDistance=0;
+const cartDistanceKeys=cartKeys.map(([time,x,z])=>{
+  let best={error:Infinity,distance:previousCartDistance};
+  for(let index=1;index<cartRoute.length;index++) {
+    const a=cartRoute[index-1],b=cartRoute[index],length=cartLengths[index]-cartLengths[index-1];
+    const fraction=Clamp(((x-a[0])*(b[0]-a[0])+(z-a[1])*(b[1]-a[1]))/(length*length),0,1);
+    const distance=cartLengths[index-1]+fraction*length;
+    if(distance<previousCartDistance-0.001) continue;
+    const error=Distance([x,z],[Lerp(a[0],b[0],fraction),Lerp(a[1],b[1],fraction)]);
+    if(error<best.error) best={error,distance};
+  }
+  previousCartDistance=best.distance;return [time,best.distance,0];
+});
+
+function CartAt(time) {
+  const distance=Track(cartDistanceKeys,time)[0],total=cartLengths.at(-1);
+  const point=SampleRoute(cartRoute,distance/total);
+  const before=SampleRoute(cartRoute,(distance-0.6)/total),after=SampleRoute(cartRoute,(distance+0.6)/total);
+  return {point,heading:Math.atan2(after[0]-before[0],-(after[1]-before[1]))};
+}
+const loadingCart=CartAt(BeatById("06d").start),loadingStart=Track(winterKeys,BeatById("06c").start);
+const winterLoadingRoute=[loadingStart,LaneAtZ(loadingStart[1]),
+  ...L0610_LANE.line.filter(point=>point.z>loadingStart[1]&&point.z<loadingCart.point[1]).map(point=>[point.x,point.z]),
+  [loadingCart.point[0]-Math.sin(loadingCart.heading)*0.1,loadingCart.point[1]+Math.cos(loadingCart.heading)*0.1]];
 const tankKeys = Keys(FLOW_TANK_TRACKS.tank1);
 const secondTankKeys = Keys(FLOW_TANK_TRACKS.tank2);
 
@@ -95,11 +136,15 @@ function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
 let companionTracks = null;
 
 function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").start+BeatById("03h").duration*0.5) {
-  const winter = Track(winterKeys, time);
-  const cart = Track(cartKeys, time);
+  const cartState=CartAt(time),cart=cartState.point,heading=cartState.heading;
+  const CartOffset=(side,forward)=>[cart[0]+Math.cos(heading)*side+Math.sin(heading)*forward,cart[1]+Math.sin(heading)*side-Math.cos(heading)*forward];
+  const loadingProgress=Clamp((time-BeatById("06c").start)/BeatById("06c").duration,0,1);
+  const aboard=time>=BeatById("06d").start;
+  const winter=aboard?CartOffset(0,-0.1):time>=BeatById("06c").start?SampleRoute(winterLoadingRoute,loadingProgress):Track(winterKeys,time);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.pose)];
   const winterPose = time < BeatById("02b").start ? "kneel" : "wounded";
-  actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose));
+  actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose,
+    aboard?{parentId:"cart",elevation:1.05,heading}:loadingProgress>0?{elevation:1.05*Clamp((loadingProgress-0.85)/0.15,0,1),heading}:{}));
   const atCamp = beat.stage === "04", village = Number(beat.stage) >= 8;
   const offset = (x, z) => [player[0] + x, player[1] + z];
   let luo = offset(-1.4, -2.5), he = offset(1.1, 0), liu = offset(-0.7, -4), yao = offset(-2, 1);
@@ -128,10 +173,11 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   actors.push(Actor("liu", "刘文财", "friend", "person", liu, beat.stage === "03" ? "shoot" : "stand"));
   actors.push(Actor("yao", "幺娃", "friend", "person", yao, ["06g","06h"].includes(beat.id) ? "shoot" : "stand"));
   if (Number(beat.stage) >= 4) {
-    actors.push(Actor("cart", "老耿的车", "civilian", "cart", cart, "stand"));
-    actors.push(Actor("geng", "老耿", "civilian", "person", [cart[0]-1.7,cart[1]], "stand"));
-    let nier = [cart[0]+1.2,cart[1]+2.2];
-    if(beat.id === "08g") nier=SampleRoute([[115,380],[99,380],[80,382],[80,392]],progress);
+    actors.push(Actor("cart", "老耿的车", "civilian", "cart", cart, "stand",{heading}));
+    actors.push(Actor("donkey", "毛驴", "civilian", "donkey", CartOffset(0,2.3), "walk",{heading}));
+    actors.push(Actor("geng", "老耿", "civilian", "person", CartOffset(-0.95,1.2), "stand"));
+    let nier = CartOffset(1,0.6);
+    if(beat.id === "08g") nier=SampleRoute([[104.6,379.3],[99,380],[80,382],[80,392]],progress);
     if(beat.stage === "09") nier=offset(-0.8,1.2);
     if(beat.id === "09h") nier=SampleRoute([[90.7,484.6],[90.7,473],[93.3,473],[94,484.6]],progress);
     if(beat.stage === "10" && time < BeatById("10d").end) nier=Track(Keys([["10a",0,101,478],["10b",1,108,483],["10c",1,109,465],["10d",1,113.25,505]]),time);
@@ -169,6 +215,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   if(companionTracks) for(const actor of actors) {
     if(companionTracks[actor.id]) actor.p=Track(companionTracks[actor.id],time);
   }
+  if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
   return actors;
 }
 

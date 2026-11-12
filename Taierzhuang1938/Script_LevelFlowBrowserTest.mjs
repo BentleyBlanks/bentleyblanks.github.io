@@ -158,6 +158,86 @@ try {
   const early=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(early.actors.some(actor=>actor.kind==='tank'),'vehicle threat is present during dragging before collection');
   await page.screenshot({path:path.join(out,'EarlyGroundEncounter.png')});
+  await page.evaluate(()=>LevelFlow.Seek(301));
+  const alignment=await page.evaluate(()=>{
+    const axis=document.querySelector('#timelineAxis').getBoundingClientRect(),range=document.querySelector('#flowSeek').getBoundingClientRect();
+    const seconds=LevelFlow.Inspect().time,duration=LevelFlow.Inspect().duration;
+    return {playhead:document.querySelector('.lfPlayhead').getBoundingClientRect().x,
+      slider:range.x+7+(range.width-14)*seconds/duration,expected:axis.x+axis.width*seconds/duration,
+      stages:[...document.querySelectorAll('[data-stage]')].map(element=>({id:element.dataset.stage,x:element.getBoundingClientRect().x})),
+      beats:[...document.querySelectorAll('[data-beat]')].map(element=>({id:element.dataset.beat,x:element.getBoundingClientRect().x,width:element.getBoundingClientRect().width})),axis:{x:axis.x,width:axis.width}};
+  });
+  assert.ok(Math.abs(alignment.playhead-alignment.expected)<0.1&&Math.abs(alignment.slider-alignment.expected)<0.1,"05:01 slider and playhead use the same global time position");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).x-(alignment.axis.x+alignment.axis.width*beat.start/1870))<0.1,"every beat uses the global time axis");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).width-alignment.axis.width*beat.duration/1870)<0.1,"short beats retain their actual duration width");
+  for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/1870))<0.1,"every stage uses the global time axis");
+  await page.screenshot({path:path.join(out,'Timeline301.png')});
+
+  await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
+  const firstView=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0]);
+  const sceneBox=await page.locator('#flowMap2').boundingBox(),mouseX=sceneBox.x+sceneBox.width/2,mouseY=sceneBox.y+sceneBox.height/2;
+  await page.mouse.move(mouseX,mouseY);await page.mouse.down({button:'right'});await page.mouse.move(mouseX+35,mouseY+12,{steps:4});
+  const beforeFly=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+  assert.equal(beforeFly.type,'scene');assert.ok(beforeFly.freeCamera);assert.equal(beforeFly.far,1500);
+  await page.keyboard.down('w');
+  await page.waitForFunction((eye)=>Math.hypot(...LevelFlow.Inspect().viewports.views[1].freeCamera.eye.map((value,index)=>value-eye[index]))>0.5,beforeFly.freeCamera.eye);
+  await page.keyboard.up('w');await page.keyboard.down('e');
+  const beforeUp=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1].freeCamera.eye[1]);
+  await page.waitForFunction((height)=>LevelFlow.Inspect().viewports.views[1].freeCamera.eye[1]>height+0.3,beforeUp);
+  await page.keyboard.up('e');await page.mouse.up({button:'right'});
+  const stopped=await page.evaluate(()=>LevelFlow.Inspect());await page.waitForTimeout(200);
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).viewports.views[1],stopped.viewports.views[1],"releasing RMB stops movement while playback is paused");
+  assert.equal(stopped.time,384);assert.equal(stopped.playing,false);
+  assert.deepEqual(stopped.viewports.views[0],firstView,"Scene navigation leaves the other viewport unchanged");
+  await page.mouse.down({button:'middle'});await page.mouse.move(mouseX+65,mouseY+30,{steps:4});await page.mouse.up({button:'middle'});
+  const panned=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);assert.notDeepEqual(panned.freeCamera.eye,stopped.viewports.views[1].freeCamera.eye,"MMB pans the scene");
+  await page.keyboard.down('Alt');await page.mouse.down();await page.mouse.move(mouseX+95,mouseY+15,{steps:4});await page.mouse.up();await page.keyboard.up('Alt');
+  const orbited=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);assert.notEqual(orbited.freeCamera.yaw,panned.freeCamera.yaw,"Alt LMB orbits the pivot");
+  await page.keyboard.down('Alt');await page.mouse.down({button:'right'});await page.mouse.move(mouseX+95,mouseY+40,{steps:4});await page.mouse.up({button:'right'});await page.keyboard.up('Alt');
+  const dollied=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);assert.notDeepEqual(dollied.freeCamera.eye,orbited.freeCamera.eye,"Alt RMB dollies");
+  await page.mouse.wheel(0,-100);await page.locator('#flowMap2').focus();await page.keyboard.press('f');
+  const focused=await page.evaluate(()=>LevelFlow.Inspect());assert.deepEqual(focused.viewports.views[1].center,focused.actors[0].p,"F focuses the player when no object is selected");
+  const navigationPacket=await page.evaluate(()=>LevelFlow.Packet());
+  await page.evaluate(()=>LevelFlow.SetViewType(1,'eye'));
+  await page.setInputFiles('#importFile',{name:'SceneFrame.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(navigationPacket))});
+  await page.waitForFunction(()=>LevelFlow.Inspect().viewports.views[1].type==='scene');
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).viewports.views[1],focused.viewports.views[1],"frame import restores the exact free-camera pose and far plane");
+  await page.screenshot({path:path.join(out,'SceneNavigation.png')});
+
+  const depth=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);canvas.width=640;canvas.height=360;
+    const data={objects:[{id:'Wall',pos:[0,1.5,5],size:[4,3,1],material:'Whitebox/Plaster'}],farObjects:[],terrain:{heightAt:()=>0,roots:[],source:'Flat regression scene'}};
+    const view=new FlowPerspectiveView(canvas,data,'scene');view.freeCamera={eye:[0,1.6,0],yaw:0,pitch:0};
+    const actors=[{id:'visible',kind:'person',side:'friend',pose:'stand',p:[0,3]},
+      {id:'hidden',kind:'person',side:'friend',pose:'stand',p:[0,10]},
+      {id:'partial',kind:'person',side:'friend',pose:'stand',p:[4.4,10]}];
+    const frame={...LevelFlow.Evaluate(384),actors};view.BeforeDraw(frame);view.DrawBase(canvas.getContext('2d'),640,360,frame);
+    const context=canvas.getContext('2d'),pixel=view.Vertex([0,1,10]);
+    const background=[...context.getImageData(Math.floor(pixel.x),Math.floor(pixel.y),1,1).data];
+    view.DrawActor(context,actors[1],frame);
+    const throughWall=[...context.getImageData(Math.floor(pixel.x),Math.floor(pixel.y),1,1).data];
+    for(const actor of [actors[0],actors[2]]) view.DrawActor(context,actor,frame);
+    const result={...view.Diagnostics(),background,throughWall};
+    data.objects=[{id:'FarBuilding',pos:[0,1.6,1100],size:[50,50,20],material:'Whitebox/Plaster'}];
+    view.DrawBase(context,640,360,frame);result.farDepth=view.raster.depth[176*640+320];
+    data.objects[0].pos[2]=1600;view.DrawBase(context,640,360,frame);result.beyondFarVisible=Number.isFinite(view.raster.depth[176*640+320]);
+    const overview=new FlowPerspectiveView(canvas,data,'oblique');overview.center=[0,0];overview.scale=0.5;
+    data.objects=[-400,400].map(z=>({id:`Overview${z}`,pos:[0,5,z],size:[80,10,80],material:'Whitebox/Plaster'}));
+    overview.BeforeDraw(frame);overview.DrawBase(context,640,360,frame);
+    result.overviewDepths=[-400,400].map(z=>{const point=overview.Vertex([0,5,z]);return overview.raster.depth[Math.round(point.y)*640+Math.round(point.x)];});
+    canvas.remove();return result;
+  });
+  const visible=depth.actors.find(actor=>actor.id==='visible'),hidden=depth.actors.find(actor=>actor.id==='hidden'),partial=depth.actors.find(actor=>actor.id==='partial');
+  assert.ok(visible.visible>0&&visible.hidden===0&&visible.labelOpacity===1,"foreground actors remain opaque");
+  assert.ok(hidden.hidden>0&&hidden.visible===0&&hidden.labelOpacity===0.22,"a wall occludes the character and dims its label");
+  assert.ok(partial.hidden>0&&partial.visible>0,"occlusion is evaluated on individual body fragments");
+  for(let channel=0;channel<3;channel++) assert.ok(Math.abs(depth.throughWall[channel]-(depth.background[channel]*0.8+[39,109,130][channel]*0.2))<3,"hidden body strokes blend at 20 percent opacity");
+  assert.ok(depth.farDepth>1000&&depth.farDepth<1500&&!depth.beyondFarVisible,"the 1500 m far plane renders distant geometry and clips beyond its range");
+  assert.ok(depth.overviewDepths.every(value=>Number.isFinite(value)&&value>0&&value<1500),"zoomed-out oblique view retains geometry 400 m on both sides of the center");
+  await page.evaluate(()=>{LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
+  await page.screenshot({path:path.join(out,'RealTerrainGully.png')});
+  await page.evaluate(()=>LevelFlow.JumpBeat('06g'));await page.screenshot({path:path.join(out,'CartLane.png')});
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, PNG export/import and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
