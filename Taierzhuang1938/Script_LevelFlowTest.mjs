@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_PURSUIT } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -293,7 +293,7 @@ groundDocument.Replace(previousGroundDraft);
 assert.equal(groundDocument.value.revision,defaults.revision,"imports receive the same ground formation migration");
 ValidateEncounterDocument(groundDocument.value,FLOW_TIMELINE);
 assert.equal(map.ramps.length,12);
-assert.equal(map.objects.filter((object)=>object.planning).length,29);
+assert.equal(map.objects.filter((object)=>object.planning).length,FLOW_GROUND.cover.length);
 for(const ramp of map.ramps) {
   assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
   assert.ok(Math.abs(EncounterHeightAt(ramp.points.at(-1),map)-FLOW_GROUND.height)<1e-6,`${ramp.id} reaches surface`);
@@ -324,6 +324,47 @@ assert.deepEqual(upgradedEscort.route,defaults.groups.find((group)=>group.id==="
 assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
 assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
 ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
+
+// The gun-pit survivors return continuously with Yaowa and pursuit stays back.
+const returnIds = ["yao","openingGun0","openingGun2","pitRifleman"];
+const returnFrame = EvaluateFlow(312.442);
+assert.equal(returnFrame.actors.filter(actor => actor.groupId === "PitSurvivors" && actor.alive && actor.wounded).length,3);
+assert.equal(returnFrame.actors.filter(actor => actor.groupId === "Rim" && actor.pose !== "dead").length,3);
+for (const stamp of [BeatById("03d").start,BeatById("03f").start,BeatById("03g").start,BeatById("03h").start]) {
+  for (const id of returnIds) {
+    const before = EvaluateFlow(stamp-0.001).actors.find(actor => actor.id === id);
+    const after = EvaluateFlow(stamp+0.001).actors.find(actor => actor.id === id);
+    assert.ok(before && after && Distance(before.p,after.p)<0.03,`${id} crosses ${stamp} without a position jump`);
+  }
+}
+for (let stamp=292;stamp<400;stamp+=0.25) {
+  const frame=EvaluateFlow(stamp);
+  const friends=frame.actors.filter(actor => ["player","friend"].includes(actor.side) && actor.pose!=="dead");
+  for (const enemy of frame.actors.filter(actor => ["Rim","RearPursuit","TrafficFlank"].includes(actor.groupId) && actor.pose!=="dead")) {
+    assert.ok(Distance(enemy.p,frame.player)>=16,`${enemy.id} maintains firing distance at ${stamp}`);
+    assert.ok(friends.every(friend => Distance(enemy.p,friend.p)>=9),`${enemy.id} stays outside the retreating group at ${stamp}`);
+  }
+}
+const plannedPursuit=structuredClone(defaults);
+const plannedRim=plannedPursuit.groups.find(group=>group.id==="Rim");
+plannedRim.memberPlans=[{delay:1,route:plannedRim.route.slice(1)}];
+const plannedFrame=EvaluateFlow(312.442,plannedPursuit);
+assert.ok(plannedFrame.actors.filter(actor=>actor.groupId==="Rim").every(actor=>Distance(actor.p,plannedRim.area.center)>40),"advance behavior supports individual plans with firing distance");
+const previousPursuit=structuredClone(defaults);
+previousPursuit.revision="2026-11-13-ground-formation-1";
+for (const collection of ["groups","triggers"]) for (const previous of FLOW_PREVIOUS_PURSUIT[collection]) {
+  previousPursuit[collection][previousPursuit[collection].findIndex(entry=>entry.id===previous.id)]=structuredClone(previous);
+}
+const LoadPursuit=value=>new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(value),setItem:()=>{}}).value;
+const upgradedPursuit=LoadPursuit(previousPursuit);
+for (const previous of FLOW_PREVIOUS_PURSUIT.groups) assert.deepEqual(upgradedPursuit.groups.find(group=>group.id===previous.id),defaults.groups.find(group=>group.id===previous.id));
+previousPursuit.groups.find(group=>group.id==="Rim").count=7;
+previousPursuit.groups.find(group=>group.id==="TrafficFlank").route=[[1,2],[3,4]];
+previousPursuit.groups=previousPursuit.groups.filter(group=>group.id!=="RearPursuit");
+const customPursuit=LoadPursuit(previousPursuit);
+assert.equal(customPursuit.groups.find(group=>group.id==="Rim").count,7);
+assert.deepEqual(customPursuit.groups.find(group=>group.id==="TrafficFlank").route,[[1,2],[3,4]]);
+assert.ok(!customPursuit.groups.some(group=>group.id==="RearPursuit"));
 
 // The annotated door approach precedes the ramp chase and fork pursuit.
 const Group=(id)=>baseline.groups.find(group=>group.id===id);
@@ -383,6 +424,13 @@ assert.equal(Group("Rim").count,3);assert.equal(Group("RearPursuit").count,3);
 assert.ok(Group("RearPursuit").start>=Math.max(...Group("Rim").lives.map(life=>life.fall)),"two northern waves arrive sequentially");
 const flankStart=Group("TrafficFlank").start;
 const flank=Group("TrafficFlank"),firstBatch=flank.lives.slice(0,3),secondBatch=flank.lives.slice(3);
+const westScreens=map.objects.filter(object=>["Encounter_WestPursuitScreen","Encounter_WestPursuitReturn"].includes(object.id));
+for (const life of flank.lives) {
+  const frame=EvaluateFlow(life.born+0.001);
+  const entrant=frame.actors.find(actor=>actor.groupId==="TrafficFlank" && actor.born===life.born);
+  assert.ok(Distance(entrant.p,frame.player)>25,"west reinforcement enters at a distance");
+  assert.ok(westScreens.some(screen=>EnterArea(entrant.p,frame.player,{shape:"rect",center:[screen.pos[0],screen.pos[2]],size:[screen.size[0],screen.size[2]]})!==null),"earth wall masks the entry from the player");
+}
 assert.equal(flank.lives.length,6);
 assert.equal(flank.maxAlive,3);
 assert.equal(flank.lifetime,30,"first-batch survival timing is preserved");

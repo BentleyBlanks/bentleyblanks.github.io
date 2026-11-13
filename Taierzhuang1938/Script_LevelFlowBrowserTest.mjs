@@ -110,6 +110,22 @@ try {
   assert.equal(junctionBlockers.length,5);
   assert.ok(junctionBlockers.every(actor=>actor.pose==="shoot"));
   await page.screenshot({path:path.join(out,"JunctionBlockade.png")});
+  const returnViews=await page.evaluate(()=>LevelFlow.Inspect().viewports);
+  await page.evaluate(()=>{
+    LevelFlow.SetViewType(0,"oblique");LevelFlow.SetViewType(1,"battle");
+    const layout=LevelFlow.Inspect().viewports;
+    for(const view of layout.views) {view.mode="manual";view.center=[18,66];view.scale=4;view.layers.triggers=false;}
+    LevelFlow.RestoreViewports(layout);
+  });
+  for(const [stamp,name] of [[312.442,"YaowaWoundedReturn"],[340,"NorthPursuitSpacing"],[368.077,"WestCoveredApproach"]]) {
+    await page.evaluate(stamp=>LevelFlow.Seek(stamp),stamp);
+    const state=await page.evaluate(()=>LevelFlow.Inspect());
+    assert.equal(state.actors.filter(actor=>actor.groupId==="PitSurvivors"&&actor.alive&&actor.wounded).length,3);
+    assert.ok(state.actors.filter(actor=>["Rim","RearPursuit","TrafficFlank"].includes(actor.groupId)&&actor.pose!=="dead")
+      .every(actor=>Math.hypot(actor.p[0]-state.actors[0].p[0],actor.p[1]-state.actors[0].p[1])>=16));
+    await page.screenshot({path:path.join(out,`${name}.png`)});
+  }
+  await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),returnViews);
   await page.evaluate(()=>LevelFlow.Seek(455.569));
   const camp = await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(camp.actors.filter(actor=>['luo','he','liu','yao'].includes(actor.id)&&actor.firing&&actor.p[1]<148).length,4);

@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -41,7 +41,7 @@ export function CreateEncounterDocument(timeline, waves) {
     groups.push({id,label,beat,endBeat,triggerId,enabled:true,side,target,area:Area(center,3,3),route,count,interval:2,maxAlive:count,lifetime,speed:2.2,behavior,note:"关卡调度布设"});
   };
   Add("RearPursuit","③ 北坡下沟第二波","03g","03h",[20,33],[[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],3,"enemy","advance","player",54);
-  const pursuit=groups.at(-1);pursuit.interval=2.5;pursuit.maxAlive=3;triggers.at(-1).delay=34;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
+  const pursuit=groups.at(-1);pursuit.interval=2.5;pursuit.maxAlive=3;triggers.at(-1).delay=36;pursuit.standoffMetres=16;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
   const escort=groups.find((group)=>group.id==="TankEscort");
   Object.assign(escort,{lifetime:400,speed:1.7,tankId:"tank1",grenadeInterval:12});
   Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([32.5,101],8,8)});
@@ -85,7 +85,7 @@ export function CreateEncounterDocument(timeline, waves) {
         || (formation.route||group.route).slice(1).map(point=>point.map((value,axis)=>value+offset[axis]))),
     }));
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-drag-pursuit-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-pit-retreat-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -198,7 +198,8 @@ export function CompileEncounters(document, timeline) {
       lives.push({born,fall:born+group.lifetime});
     }
     const compiled={...group,start,end,lives};
-    if(group.behavior==="bounds") coverTracks.set(compiled,BuildCoverTracks(compiled,route));
+    if(group.standoffMetres && !(group.behavior==="bounds" && group.memberPlans)) coverTracks.set(compiled,BuildPursuitTracks(compiled,route));
+    else if(group.behavior==="bounds") coverTracks.set(compiled,BuildCoverTracks(compiled,route));
     return compiled;
   });
   return {triggers,groups};
@@ -232,6 +233,23 @@ export function GroupPath(group,index) {
 
 // Compile each soldier's cover-to-cover movement once, including waits for the
 // retreating front to move. Seeking samples these tracks without replaying AI.
+function BuildPursuitTracks(group, playerRoute) {
+  return group.lives.map((life, index) => {
+    const path = GroupPath(group, index);
+    const total = path.slice(1).reduce((sum, point, entry) => sum + Distance(path[entry], point), 0);
+    const track = [[life.born, 0]];
+    let distance = 0;
+    const ready = life.born + (group.deployDelay || 0) + (group.memberPlans?.[index % group.maxAlive]?.delay || 0);
+    for (let time = life.born + 0.25; time <= Math.min(life.fall, group.end); time += 0.25) {
+      const next = Math.min(total, distance + group.speed * 0.25);
+      const candidate = SampleRoute(path, total ? next / total : 0);
+      if (time >= ready && Distance(candidate, TimedPosition(playerRoute, time)) >= group.standoffMetres + Math.hypot(...group.area.size) / 2) distance = next;
+      track.push([time, distance]);
+    }
+    return track;
+  });
+}
+
 function BuildCoverTracks(group,playerRoute) {
   if(group.memberPlans && group.spawnOffsets) return BuildBoundingPairTracks(group,playerRoute);
   return group.lives.map((life,index)=>{
@@ -312,7 +330,7 @@ function GroupActor(group,index,time,coreActors) {
   const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
   const total=lengths.reduce((sum,length)=>sum+length,0);
   const stationary=["suppress","guard"].includes(group.behavior);
-  const movement=group.behavior==="bounds"?CoverMovement(group,index,Math.min(time,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
+  const movement=group.standoffMetres||group.behavior==="bounds"?CoverMovement(group,index,Math.min(time,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
   let distance=stationary?0:Math.min(total,movement.distance);
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
@@ -426,11 +444,27 @@ function UpgradeDragPursuit(value,defaults) {
       current.coverWaitSeconds=next.coverWaitSeconds;
     }
   }
-  value.revision=defaults.revision;
+  return UpgradePursuit(value,defaults);
+}
+
+function UpgradePursuit(value, defaults) {
+  for (const collection of ["groups", "triggers"]) {
+    for (const previous of FLOW_PREVIOUS_PURSUIT[collection]) {
+      const current = value[collection].find(entry => entry.id === previous.id);
+      const next = defaults[collection].find(entry => entry.id === previous.id);
+      if (!current || !next) continue;
+      for (const [key, entry] of Object.entries(next)) {
+        if (JSON.stringify(current[key]) === JSON.stringify(previous[key])) current[key] = structuredClone(entry);
+      }
+    }
+  }
+  value.revision = defaults.revision;
+
   return value;
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision==="2026-11-13-drag-pursuit-1") return UpgradePursuit(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-ground-formation-1") return UpgradeDragPursuit(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-flank-refill-1") return UpgradeGroundFormations(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-formation-1") return UpgradeFlankReinforcement(structuredClone(input),defaults);

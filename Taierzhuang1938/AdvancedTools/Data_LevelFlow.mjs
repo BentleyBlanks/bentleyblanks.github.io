@@ -74,6 +74,23 @@ export const FLOW_OPENING_RETREAT = {
   fallFractions: [0.76,0.86,0.96],
 };
 
+// Return from the gun pit is shared by Yaowa and three surviving wounded men.
+// Counts, timing and spacing are user-directed creative preview blocking.
+export const FLOW_YAOWA_RETURN = {
+  startBeat: "03d", joinBeat: "03h", exitBeat: "05b", speed: 1.65, retreatInterval: 1.2,
+  route: [[0,-7],[0,11],[13,21],[12,44],[22,66],[24,73]],
+  retreatKeys: [["03h",4/44,26,76.6],["03h",9/44,30,86],["03h",17/44,32.5,101],
+    ["03h",26/44,35,116],["03h",35/44,35,131]],
+  survivors: [
+    {id:"openingGun0",name:"传令兵（负伤）",gap:3,offset:0.45,origin:[0.65,-7],
+      evacuationKeys:[["04a",1,42,146],["04d",0,42,146],["04d",1,58,161],["05a",1,80,210]]},
+    {id:"openingGun2",name:"机枪副手（负伤）",gap:5.5,offset:-0.45,origin:[1.95,-7],
+      evacuationKeys:[["04a",1,44.2,146],["04d",0,44.2,146],["04d",1,59.2,161],["05a",1,80.5,212.5]]},
+    {id:"pitRifleman",name:"川军伤兵",gap:8,offset:0.4,origin:[2.8,-8.8],
+      evacuationKeys:[["04a",1,46.4,146],["04d",0,46.4,146],["04d",1,60.4,161],["05a",1,81,215]]},
+  ],
+};
+
 // 04B–04D user-directed defense while the camp loads ammunition and casualties.
 // Keys use [beat, fraction, x, z]. The last keys rejoin the 05A marching formation.
 export const FLOW_CAMP_DEFENSE = [
@@ -139,6 +156,10 @@ export const FLOW_GROUND = {
     ["PursuitForwardBags",53,65.4,0.65,1.05,1.4,"Sandbag"],
     ["TrafficFlankBags",21,79.2,3,0.95,0.8,"Sandbag"],
     ["DragWestBerm",20,94,5,0.9,2,"Earth"],
+    ["PitPursuitScreen",-6,-13,12,2.8,1.2,"Earth"],
+    ["WestPursuitScreen",11.5,75.5,1.4,3.2,12,"Earth"],
+    ["WestPursuitReturn",3.5,81.5,17,2.6,1.2,"Earth"],
+    ["NorthPursuitBags",14.2,52,2.2,1.05,0.7,"Sandbag"],
     ["CrestWestSandbags",27.5,126.5,5,1,1,"Sandbag"],
     ["CrestEastSandbags",43,127.5,5,1,1,"Sandbag"],
     ["CampWestGun",41,135.5,5,1.1,1,"Sandbag"],
@@ -240,11 +261,11 @@ export const FLOW_BEATS = [
   { id: "03e", stage: "03", duration: 25, title: "烟里两个敌人冲出来", p: [[30,66.8]], pose: "shoot",
     passage: "沿坡道下沟的两个鬼子从东侧烟里追近，玩家借拐角沙包回身打。", task: "借拐角掩体打追近的敌人", threat: "② 坡道下沟追兵 → 东侧支沟 → 玩家", gate: "手榴弹爆炸", exit: "近敌两人解除", winter: "ground", wave: "Corner", fire: "player", cover: true, planning: "② 六名追兵停在箱垛和沙包后射击，前组两人探头、后组继续掩护。另一名殿后川军在拐角掩护时中弹牺牲。压住这拨追兵后再拖向支沟口。" },
   { id: "03f", stage: "03", duration: 24, title: "到支沟口，幺娃扛枪赶来", p: [[30,66.8],[23.5,67.2]], pose: "drag",
-    passage: "幺娃从交通沟北头连滚带爬下来，扛着捷克式：「班长！机枪手死在坑头了，后头跟起来了！」", task: "拖到支沟口，准备南拐", threat: "交通沟北头追兵", gate: "单被进入支沟口", exit: "班长接过捷克式", winter: "drag", zone: [23.5,67.2,3] },
+    passage: "幺娃从交通沟北头连滚带爬下来，扛着捷克式：「班长！机枪手死在坑头了，后头跟起来了！」", task: "拖到支沟口，准备南拐", threat: "交通沟北头追兵", gate: "单被进入支沟口", exit: "班长接过捷克式", winter: "drag", zone: [23.5,67.2,3], planning: "幺娃带传令兵、机枪副手和一名川军伤兵从机枪坑沿北沟撤回；三人均负伤存活，错开距离跟随。追兵已在后方沿同一来路推进，在北沟沙包后停步射击，保持交战距离。" },
   { id: "03g", stage: "03", duration: 40, title: "班长压北面，玩家打北沿", p: [[23.5,67.2],[25,71]], pose: "shoot",
     passage: "班长把机枪架在拐角朝北压。追兵从北侧坡道分两波下沟，沿交通沟追到岔口，玩家与班长交替掩护，把冬瓜向南拖。", task: "挡住北坡下沟的第一波，准备南撤", threat: "③ 北侧坡道 → 北沟 → 岔口", gate: "单被准备往南拐", exit: "北坡第一波解除，第二波接上，班长继续压北", planning: "③ 从标记 1 的北侧坡道先来两波，每波三人。第二波在第一波之后接入，迫使玩家从岔口向南撤。", winter: "ground", wave: "Rim", fire: "north" },
   { id: "03h", stage: "03", duration: 44, title: "边打边撤，拖过坡顶", p: [[25,71],[26,76.6],[30,86],[30,86],[32.5,101],[32.5,101],[35,116],[35,131],[35,141.5]], pace: [0,0.1,0.22,0.32,0.5,0.6,0.68,0.86,1], pose: "drag",
-    passage: "班长边打边退：「拖！往坡上拖！」翻过坡顶，别的班在沟沿上接应：「这边！快过来！」", task: "翻坡顶，进干沟", threat: "北侧追兵＋东侧地面战车提前露面，坡顶机枪接应", gate: "北沟两波追兵接上", exit: "单被过坡顶，前沿三回结束", planning: "玩家到达标记 2 的拐弯处 X30、Z86 后，西侧坡道再下沟一波三人。继续利用弯口掩体停拖回击，再向坡顶撤。", winter: "drag", zone: [35,131,4] },
+    passage: "班长边打边退：「拖！往坡上拖！」翻过坡顶，别的班在沟沿上接应：「这边！快过来！」", task: "翻坡顶，进干沟", threat: "北侧追兵＋东侧地面战车提前露面，坡顶机枪接应", gate: "北沟两波追兵接上", exit: "单被过坡顶，前沿三回结束", planning: "玩家到达标记 2 的拐弯处 X30、Z86 后，西侧追兵从土墙遮蔽的后方进入，绕墙北端经坡道下沟。两批各三人逐段追来，在弯口保留射击距离，玩家借沙包停拖回击后继续向坡顶撤。", winter: "drag", zone: [35,131,4] },
   { id: "04a", stage: "04", duration: 20, title: "下干沟，伤员等担架", p: [[35,141.5],[46,149]], pose: "walk",
     passage: "满地伤号，老乡两人抬一副担架往南送。老耿的驴车停在树下，妮儿站在车边。冬瓜躺在单被上等担架。", task: "跟到集结处", threat: "前沿在坡顶另一边", gate: "过坡顶", exit: "勤务兵叫住顺子" },
   { id: "04b", stage: "04", duration: 35, title: "先抬营长的皮箱", p: [[46,149],[52,151],[55,154]], pose: "carry",
@@ -361,8 +382,14 @@ export const FLOW_WAVES = [
     ], behavior:"bounds", standoffMetres:12, spacingMetres:0.8, coverWaitSeconds:0.8,
     route: [[77,58],[75,52],[69,52],[62,55.5],[61,60.5],[60,65.6],[54,65.4]],
     label: "② 门外坡道下沟追兵", interval: 0, lastFall: 58, speed: 3, target: "player", repeat: "第二回六人在东侧断墙后集结，分组交替掩护下沟；后组守箱垛，前组停在支沟沙包东侧射击，与撤退队保持距离" },
-  { id: "Rim", beat: "03g", count: 3, source: [20,33], route: [[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[25,72]], label: "③ 北坡下沟第一波", interval: 1.8, lastFall: 30, speed: 2.3, target: "player", repeat: "标记 1 北坡第一波三人，沿交通沟压到岔口" },
-  { id: "TrafficFlank", beat: "03h", until: "04a", count: 6, maxAlive: 3, reinforceAfterClear: true, source: [5,74], route: [[5,74],[14,77],[20,76.8],[26,76.6],[28,81],[30,86],[32.5,101],[34,117]], label: "西坡增援（到2再触发）", interval: 2, lifetime: 30, speed: 2.4, grenadeInterval: 10, target: "player", trigger: {area:{shape:"rect",center:[30,86],size:[4,4]}}, repeat: "玩家到标记 2 后从西坡下沟三人，首批全部倒下再补三人，沿交通沟追向坡顶" },
+  { id: "Rim", beat: "03d", until: "03g", count: 3, source: [-8,-20],
+    route: [[-8,-20],[2,-20],[2,-10],[0,-7],[0,11],[13,21],[17,36],[14.5,40],[12,44],[16,53],[21.9,67.1]],
+    label: "③ 追着幺娃来的日军", interval: 2, lifetime: 82, speed: 1.7, standoffMetres: 16, target: "player",
+    trigger: {mode:"time",delay:10}, repeat: "从机枪坑北侧土墙后跟进，经北坡进入交通沟，在北沟沙包处停步压制，保持十六米交战距离" },
+  { id: "TrafficFlank", beat: "03h", until: "04a", count: 6, maxAlive: 3, reinforceAfterClear: true,
+    source: [-2,70], areaSize: [3,5], route: [[-2,70],[8,68],[14,68],[14,77],[20,76.8],[26,76.6],[28,81],[30,86],[32.5,101],[34,117]],
+    label: "西坡土墙后追兵", interval: 2, lifetime: 30, speed: 3.4, standoffMetres: 16, grenadeInterval: 10, target: "player",
+    trigger: {area:{shape:"rect",center:[30,86],size:[4,4]}}, repeat: "玩家到标记 2 后，西坡两批各三人从土墙后绕行进入，逐段追击并保持十六米射击距离" },
   { id: "TankEscort", beat: "03h", until: "06e", count: 5, source: [113,72], route: [[113,72],[110,114],[108,150],[106,182],[103,212],[101,240],[101,269]], label: "头车护卫", interval: 2.2, lastFall: 195, target: "player", repeat: "头车四至五人，演示取五人" },
   { id: "TankReinforce", beat: "06g", count: 5, source: [103,222], route: [[103,222],[101,238],[101,253],[101,269]], label: "第二车护卫", interval: 3, lastFall: 70, target: "player", repeat: "第一捆后增援一拨五人，清完才放第二捆" },
   { id: "YardTransfer", beat: "09e", count: 5, source: [74,459], route: [[74,459],[68.8,459],[66.5,467.5],[66.5,468.75],[99,468.75],[106.5,465],[106.5,460]], label: "搜院组转援", interval: 1.2, lastFall: 80, target: "front", transfer: true, repeat: "原有六人中五人转去路口，门房留一人" },
@@ -633,4 +660,255 @@ export const FLOW_PREVIOUS_BATCH_ENCOUNTER = {
     {"id":"Trigger_TempleGun"},
     {"id":"Trigger_MortarTeam"},
   ],
+};
+
+// Previous pursuit defaults for field-wise upgrades of saved drafts.
+export const FLOW_PREVIOUS_PURSUIT = {
+  "groups": [
+    {
+      "id": "Rim",
+      "label": "③ 北坡下沟第一波",
+      "beat": "03g",
+      "endBeat": "03g",
+      "triggerId": "Trigger_Rim",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          20,
+          33
+        ],
+        "size": [
+          2.4,
+          3
+        ]
+      },
+      "route": [
+        [
+          20,
+          33
+        ],
+        [
+          17,
+          36
+        ],
+        [
+          14.5,
+          40
+        ],
+        [
+          12,
+          44
+        ],
+        [
+          21.9,
+          67.1
+        ],
+        [
+          25,
+          72
+        ]
+      ],
+      "count": 3,
+      "interval": 1.8,
+      "maxAlive": 3,
+      "lifetime": 26.4,
+      "speed": 2.3,
+      "grenadeInterval": 0,
+      "behavior": "advance",
+      "note": "标记 1 北坡第一波三人，沿交通沟压到岔口"
+    },
+    {
+      "id": "TrafficFlank",
+      "label": "西坡增援（到2再触发）",
+      "beat": "03h",
+      "endBeat": "04a",
+      "triggerId": "Trigger_TrafficFlank",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          5,
+          74
+        ],
+        "size": [
+          2.4,
+          3
+        ]
+      },
+      "route": [
+        [
+          5,
+          74
+        ],
+        [
+          14,
+          77
+        ],
+        [
+          20,
+          76.8
+        ],
+        [
+          26,
+          76.6
+        ],
+        [
+          28,
+          81
+        ],
+        [
+          30,
+          86
+        ],
+        [
+          32.5,
+          101
+        ],
+        [
+          34,
+          117
+        ]
+      ],
+      "reinforceAfterClear": true,
+      "count": 6,
+      "interval": 2,
+      "maxAlive": 3,
+      "lifetime": 30,
+      "speed": 2.4,
+      "grenadeInterval": 10,
+      "behavior": "advance",
+      "note": "玩家到标记 2 后从西坡下沟三人，首批全部倒下再补三人，沿交通沟追向坡顶"
+    },
+    {
+      "id": "RearPursuit",
+      "label": "③ 北坡下沟第二波",
+      "beat": "03g",
+      "endBeat": "03h",
+      "triggerId": "Trigger_RearPursuit",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          20,
+          33
+        ],
+        "size": [
+          3,
+          3
+        ]
+      },
+      "route": [
+        [
+          20,
+          33
+        ],
+        [
+          17,
+          36
+        ],
+        [
+          14.5,
+          40
+        ],
+        [
+          12,
+          44
+        ],
+        [
+          21.9,
+          67.1
+        ],
+        [
+          26,
+          76.6
+        ],
+        [
+          30,
+          86
+        ],
+        [
+          32.5,
+          101
+        ],
+        [
+          34,
+          117
+        ]
+      ],
+      "count": 3,
+      "interval": 2.5,
+      "maxAlive": 3,
+      "lifetime": 54,
+      "speed": 2.2,
+      "behavior": "bounds",
+      "note": "关卡调度布设",
+      "grenadeInterval": 11
+    }
+  ],
+  "triggers": [
+    {
+      "id": "Trigger_Rim",
+      "label": "③ 北坡下沟第一波",
+      "beat": "03g",
+      "endBeat": "03g",
+      "mode": "area",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          23.5,
+          67.2
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "id": "Trigger_TrafficFlank",
+      "label": "西坡增援（到2再触发）",
+      "beat": "03h",
+      "endBeat": "04a",
+      "mode": "area",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          30,
+          86
+        ],
+        "size": [
+          4,
+          4
+        ]
+      }
+    },
+    {
+      "id": "Trigger_RearPursuit",
+      "label": "③ 北坡下沟第二波",
+      "beat": "03g",
+      "endBeat": "03h",
+      "mode": "time",
+      "delay": 34,
+      "area": {
+        "shape": "rect",
+        "center": [
+          23.5,
+          67.2
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    }
+  ]
 };

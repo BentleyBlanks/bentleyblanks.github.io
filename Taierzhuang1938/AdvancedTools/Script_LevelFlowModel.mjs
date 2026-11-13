@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD, FLOW_YAOWA_RETURN } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -231,6 +231,39 @@ function OpeningGunTeam(time, index) {
   return {p, pose: time > departure && distance < total ? "run" : "stand"};
 }
 
+function ReturnFromPit(actors, time) {
+  const plan = FLOW_YAOWA_RETURN;
+  const start = BeatById(plan.startBeat).start;
+  const join = BeatById(plan.joinBeat).start;
+  const end = BeatById(plan.exitBeat).start;
+  if (time >= end) return;
+  const distance = Math.max(0, time - start) * plan.speed;
+  const total = RouteLength(plan.route);
+  const yao = actors.find(actor => actor.id === "yao");
+  if (time >= start && time < join) {
+    yao.p = SampleRoute(plan.route, distance / total);
+    yao.pose = distance < total ? "run" : "kneel";
+  }
+  for (const [index, member] of plan.survivors.entries()) {
+    let actor = actors.find(entry => entry.id === member.id);
+    if (!actor) {
+      actor = Actor(member.id, member.name, "friend", "person", [...member.origin]);
+      actors.push(actor);
+    }
+    if (time < start) continue;
+    const route = [member.origin, ...plan.route.slice(1)];
+    const length = RouteLength(route);
+    let p = SampleRoute(route, Math.max(0, Math.min(distance, length) - member.gap) / length);
+    if (time >= join) {
+      const last = SampleRoute(route, (length-member.gap)/length);
+      const retreat = Keys(plan.retreatKeys).map(([stamp,x,z]) => [stamp+index*plan.retreatInterval,x,z]);
+      p = Track([[join,...last],...retreat,...Keys(member.evacuationKeys)],time);
+    }
+    Object.assign(actor, {name: member.name, p:[p[0]+member.offset*Clamp(distance/5,0,1),p[1]], pose:"walk",
+      wounded:true, alive:true, status:"负伤撤退", groupId:"PitSurvivors"});
+  }
+}
+
 let companionTracks = null;
 const campDefenseTracks = FLOW_CAMP_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
 const dragRearguardTracks = FLOW_DRAG_REARGUARD.map(plan => ({...plan,track:Keys(plan.keys),
@@ -278,8 +311,8 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   const atCamp = beat.stage === "04", village = Number(beat.stage) >= 8;
   const offset = (x, z) => [player[0] + x, player[1] + z];
   let luo = offset(-1.4, -2.5), he = offset(1.1, 0), liu = offset(-0.7, -4), yao = offset(-2, 1);
-  if (beat.id === "03f") yao = SampleRoute([[0,-7],[0,11],[13,21],[12,44],[22,66]],progress);
-  if (beat.stage === "03" && beat.id < "03f") yao = [0,-7];
+
+  if (beat.stage === "03" && beat.id < "03g") yao = [0,-7];
   if (beat.pose === "drag") he = offset(0,0.95);
   if (beat.id === "03g") { luo = [22,69.5]; yao = [24,73]; }
   if (atCamp) { luo = [57,150]; he = [49,152]; liu = [52,150]; yao = [50,149]; }
@@ -356,9 +389,10 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   if (time < BeatById("04a").start) {
     for (let index = 3; index < FLOW_OPENING.retreatCount; index++) actors.push(Actor(`openingAlly${index}`, `川军 ${index - 2}`, "friend", "person", [], "stand", OpeningRetreat(time, index)));
   }
-  if (time < BeatById("03f").start) {
+  if (time < BeatById("04a").start) {
     for (const [index, name] of ["传令兵", "机枪手", "机枪副手"].entries()) {
       const state = OpeningGunTeam(time, index + 1);
+      if (index === 1 && time >= BeatById("02c").start) state.pose = "dead";
       if (index === 0 && time < BeatById("01c").start) {
         state.p = Track(Keys([["01a",0,30,66.8],["01b",0,46,65.6],["01b",1,63,64.5]]), time);
         state.pose = "run";
@@ -366,6 +400,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
       actors.push(Actor(`openingGun${index}`, name, "friend", "person", [], "stand", state));
     }
   }
+  ReturnFromPit(actors, time);
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
   return actors;
 }
