@@ -360,7 +360,16 @@ export class FlowPerspectiveView extends FlowMapView {
     const gait=["walk","run","drag"].includes(actor.pose)?Math.sin(frame.time*5+x)*0.2:0;
     Segment([x,base+0.55*crouch,z],[x,base+height*0.8*crouch,z],3.5);
     Segment([x,base+0.55*crouch,z],[x-0.2,base+0.02,z+gait],2);Segment([x,base+0.55*crouch,z],[x+0.2,base+0.02,z-gait],2);
-    Segment([x,base+height*0.65*crouch,z],[x-0.4,base+height*0.47*crouch,z+0.15],2);Segment([x,base+height*0.65*crouch,z],[x+0.4,base+height*0.47*crouch,z+0.15],2);
+    if(actor.pose==="melee") {
+      const forward=[Math.sin(actor.heading),-Math.cos(actor.heading)];
+      const thrust=0.5+Math.sin(frame.time*12)*0.2;
+      const hand=[x+forward[0]*thrust,base+1.05,z+forward[1]*thrust];
+      for(const side of [-0.25,0.25]) Segment([x+forward[1]*side,base+1.25,z-forward[0]*side],hand,2);
+      Segment([x-forward[0]*0.2,base+1.05,z-forward[1]*0.2],
+        [hand[0]+forward[0]*0.45,hand[1],hand[2]+forward[1]*0.45],2);
+    } else {
+      Segment([x,base+height*0.65*crouch,z],[x-0.4,base+height*0.47*crouch,z+0.15],2);Segment([x,base+height*0.65*crouch,z],[x+0.4,base+height*0.47*crouch,z+0.15],2);
+    }
     const head=this.Vertex([x,base+height*0.94*crouch,z]),neck=this.Vertex([x,base+height*0.8*crouch,z]);
     if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
   }

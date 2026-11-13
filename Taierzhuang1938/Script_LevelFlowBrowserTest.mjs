@@ -66,6 +66,32 @@ try {
   await page.evaluate(()=>LevelFlow.Seek(600));
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views)).map(view=>view.freeCamera),defaults.views.map(view=>view.freeCamera),'scrubbing preserves both manually controlled Scene cameras');
   await page.evaluate(()=>LevelFlow.Seek(384));
+  await page.evaluate(()=>{
+    LevelFlow.SetViewType(0,'oblique');LevelFlow.SetViewType(1,'battle');
+    const layout=LevelFlow.Inspect().viewports;
+    for(const view of layout.views) {
+      view.center=[36.5,66.5];view.scale=15;view.mode='manual';view.freeCamera=null;
+      view.yaw=-0.4;view.pitch=0.65;
+    }
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(116.4);
+  });
+  const meleeFrame=await page.evaluate(()=>LevelFlow.Inspect());
+  for(const id of ['opening6','opening7','opening8']) {
+    const enemy=meleeFrame.actors.find(actor=>actor.id===id);
+    assert.equal(enemy.pose,'melee');
+    assert.equal(meleeFrame.actors.find(actor=>actor.id===enemy.meleePartnerId).pose,'melee');
+  }
+  await page.screenshot({path:path.join(out,'OpeningRearMelee.png')});
+  await page.evaluate(()=>{
+    const layout=LevelFlow.Inspect().viewports;
+    for(const view of layout.views) {view.center=[28,63];view.scale=9;}
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(123.9);
+  });
+  const fugitives=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==='OpeningSurvivors');
+  assert.equal(fugitives.length,3);
+  assert.ok(fugitives.every(actor=>actor.pose==='run'&&actor.p[0]<27),'the three fugitives have already cleared the crowd in the reported 02G frame');
+  await page.screenshot({path:path.join(out,'OpeningMeleeDisengaged.png')});
+  await page.evaluate(defaults=>{LevelFlow.Seek(145);LevelFlow.Seek(116.4);LevelFlow.RestoreViewports(defaults);LevelFlow.Seek(384);},defaults);
   const skyPixels=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);

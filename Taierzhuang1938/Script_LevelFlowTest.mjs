@@ -82,6 +82,33 @@ for(let index=1;index<FLOW_TIMELINE.length;index++) {
 ValidateEncounterDocument(defaults,FLOW_TIMELINE);
 // The fugitives meet the northeastern relief, then hold the branch junction.
 const survivorsAt = (time) => EvaluateFlow(time).actors.filter((actor) => actor.groupId === "OpeningSurvivors");
+for (let slot = 0; slot < 3; slot++) {
+  const contact = 115.8 + slot * 0.25, escape = contact + 1.3;
+  const frame = EvaluateFlow(contact + 0.4);
+  const enemy = frame.actors.find(actor => actor.id === `opening${slot + 6}`);
+  const ally = frame.actors.find(actor => actor.id === enemy.meleePartnerId);
+  assert.equal(enemy.pose, "melee");
+  assert.equal(ally.pose, "melee");
+  assert.equal(ally.meleePartnerId, enemy.id);
+  assert.ok(Math.abs(Distance(enemy.p, ally.p) - 1.2) < 0.001, "each rear skirmish has a distinct opponent at bayonet range");
+  assert.equal(EvaluateFlow(escape + 0.01).actors.find(actor => actor.id === enemy.id).pose, "run");
+  assert.ok(["dead", "wounded"].includes(EvaluateFlow(escape + 0.01).actors.find(actor => actor.id === ally.id).pose));
+}
+const escapedFrame = EvaluateFlow(123.9);
+assert.equal(survivorsAt(123.9).length, 3, "all three disengage during the player's first shot beat");
+for (const enemy of survivorsAt(123.9)) {
+  assert.equal(enemy.pose, "run");
+  const rearAllies = escapedFrame.actors.filter(actor => ["openingAlly9", "openingAlly10", "openingAlly11"].includes(actor.id));
+  assert.ok(rearAllies.every(ally => Distance(enemy.p, ally.p) > 10), "fugitives have cleared the rear melee crowd at the reported frame");
+}
+for (let stamp = 110; stamp < 160; stamp += 0.05) for (const id of ["opening6", "opening7", "opening8", "openingAlly9", "openingAlly10", "openingAlly11"]) {
+  const before = EvaluateFlow(stamp).actors.find(actor => actor.id === id);
+  const after = EvaluateFlow(stamp + 0.05).actors.find(actor => actor.id === id);
+  assert.ok(Distance(before.p, after.p) < 0.26, `${id} approaches, fights and withdraws continuously at ${stamp}`);
+}
+const openingFrames = [111, 115, 116.4, 118, 123.9, 130, 145, 160].map(stamp => EvaluateFlow(stamp));
+for (const stamp of [160, 123.9, 116.4, 145, 111]) EvaluateFlow(stamp);
+assert.deepEqual([111, 115, 116.4, 118, 123.9, 130, 145, 160].map(stamp => EvaluateFlow(stamp)), openingFrames);
 assert.equal(survivorsAt(149.63).length,3);
 assert.deepEqual(survivorsAt(160).map((actor)=>actor.id),survivorsAt(149.63).map((actor)=>actor.id),"the same three survivors persist across the 02/03 boundary");
 const rallyFrame=EvaluateFlow(145);

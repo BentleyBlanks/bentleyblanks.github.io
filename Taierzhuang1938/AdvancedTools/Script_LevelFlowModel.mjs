@@ -186,6 +186,17 @@ function BuildOpeningRetreat(index) {
 }
 
 const openingRetreatPlans = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => BuildOpeningRetreat(index));
+const openingMeleePlans = FLOW_OPENING_RETREAT.meleeAllies.map((ally, slot) => {
+  const retreat = FLOW_OPENING_RETREAT;
+  const contact = BeatById(retreat.meleeBeat).start + retreat.contactDelay + slot * retreat.memberInterval;
+  const enemyPosition = retreat.meleePositions[slot];
+  const allyPosition = [enemyPosition[0] - retreat.meleeDistance, enemyPosition[1]];
+  const route = [enemyPosition, retreat.junction, retreat.rally];
+  const escape = contact + retreat.contactSeconds;
+  return {ally, enemyPosition, allyPosition, contact, escape, route,
+    approach: contact - retreat.approachSeconds,
+    arrival: escape + RouteLength(route) / retreat.escapeSpeed};
+});
 
 function OpeningRetreat(time, index) {
   const plan = openingRetreatPlans[index];
@@ -198,6 +209,13 @@ function OpeningRetreat(time, index) {
   const jump = BeatById("02f").start + 3 + index * 0.08;
   if (time < jump) return {p: rim, pose: "kneel", ...identity};
   if (time < BeatById("02f").end) return {p: SampleRoute([rim, landing], (time - jump) / (BeatById("02f").end - jump)), pose: "run", ...identity};
+  const melee = openingMeleePlans.find(plan => plan.ally === index);
+  if (melee) {
+    const extra = {...identity, heading: Math.PI / 2, meleePartnerId: `opening${6 + openingMeleePlans.indexOf(melee)}`};
+    if (time < melee.contact) return {p: SampleRoute([landing, melee.allyPosition],
+      (time - BeatById("02g").start) / (melee.contact - BeatById("02g").start)), pose: "run", ...extra};
+    return {p: melee.allyPosition, pose: time < melee.escape ? "melee" : index < 10 ? "dead" : "wounded", ...extra};
+  }
   let pose = "stand";
   if (index >= 3 && time >= BeatById("02h").start) pose = index < 10 ? "dead" : "wounded";
   return {p: landing, pose, ...identity};
@@ -385,18 +403,26 @@ function OpeningActors(time) {
     const arrival = born + RouteLength(route) / FLOW_OPENING.enemySpeed;
     let p = SampleRoute(route, (time - born) / (arrival - born));
     if (time < born || index < 6 && time >= BeatById(retreat.blockBeat).start) return null;
-    if (index >= 6 && time >= BeatById(retreat.escapeBeat).start) {
-      const escape = BeatById(retreat.escapeBeat), rally = BeatById(retreat.rallyBeat);
+    const melee = openingMeleePlans[index - 6];
+    if (melee && time >= melee.approach && time < melee.escape) {
+      p = SampleRoute([FLOW_OPENING.enemyPositions[index], melee.enemyPosition],
+        (time - melee.approach) / (melee.contact - melee.approach));
+      return Actor(`opening${index}`, "日军", "enemy", "person", p, time < melee.contact ? "run" : "melee",
+        {born,arrival,heading:-Math.PI / 2,meleePartnerId:`openingAlly${melee.ally}`});
+    }
+    if (melee && time >= melee.escape) {
+      const rally = BeatById(retreat.rallyBeat);
       const approaching = time < rally.end;
+      const spread = Clamp((time - melee.escape) / (melee.arrival - melee.escape), 0, 1);
       p = time < rally.start
-        ? SampleRoute([p,retreat.junction,retreat.rally], (time-escape.start)/escape.duration)
+        ? SampleRoute(melee.route, spread)
         : SampleRoute([retreat.rally,retreat.junction,retreat.block], (time-rally.start)/rally.duration);
-      const spread = Clamp((time-escape.start)/escape.duration,0,1);
       p = [p[0],p[1]+(index-7)*0.65*spread];
       const end = BeatById(retreat.endBeat);
       const fall = end.start+end.duration*retreat.fallFractions[index-6];
       const dead = time >= fall;
-      return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : approaching ? "run" : "shoot",
+      const moving = time < rally.start ? time < melee.arrival : approaching;
+      return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : moving ? "run" : approaching ? "kneel" : "shoot",
         {groupId:"OpeningSurvivors",firing:!dead&&!approaching,fall,born,arrival});
     }
     const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : "stand";

@@ -66,7 +66,10 @@ export const FLOW_OPENING_RESCUE = {
 // The three surviving opening actors keep their identities across 02 and 03.
 // They meet the northeastern relief at point 1, then block point 2 together.
 export const FLOW_OPENING_RETREAT = {
-  escapeBeat: "02h", rallyBeat: "02i", blockBeat: "03a", endBeat: "03b",
+  meleeBeat: "02g", contactDelay: 0.8, contactSeconds: 1.3, memberInterval: 0.25,
+  approachSeconds: 4, escapeSpeed: 3.6, meleeDistance: 1.2,
+  meleeAllies: [9,10,11], meleePositions: [[40.4,66],[37.8,67],[35.5,65.7]],
+  rallyBeat: "02i", blockBeat: "03a", endBeat: "03b",
   rally: [12,44], junction: [21.9,67.1], block: [26,66.8],
   fallFractions: [0.76,0.86,0.96],
 };
@@ -210,9 +213,9 @@ export const FLOW_BEATS = [
   { id: "02f", stage: "02", duration: 7, title: "南沿投弹，跳沟反击", p: [[61.8,65.6]], pose: "down",
     passage: "两颗手榴弹从南沿翻过去，落在北沿机枪组身上。十几个人跳下来，班长的大刀把丁砍翻。", task: "趴在沟底", threat: "南 → 北投弹；南沿跳下反击", gate: "南沿齐射信号", exit: "枪被踢到玩家手边", fx: "rescue" },
   { id: "02g", stage: "02", duration: 15, title: "第一枪，救班长", p: [[61.8,65.6]], pose: "shoot",
-    passage: "三步外丙跪着举枪瞄班长的背。任务字：打。玩家捡枪开这一枪；打慢了，班长肩上挨一下，回身把丙砍倒。", task: "捡枪，打丙", threat: "丙 → 班长后背", gate: "枪在手边", exit: "丙倒下；慢打走班长补刀分支", fire: "player" },
+    passage: "三步外丙跪着举枪瞄班长的背。任务字：打。玩家捡枪开这一枪；打慢了，班长肩上挨一下，回身把丙砍倒。", task: "捡枪，打丙", threat: "丙 → 班长后背", gate: "枪在手边", exit: "丙倒下；慢打走班长补刀分支", fire: "player", planning: "西侧三名日军与后排三名川军短促近战，交手后立即沿支沟向西脱离，再向北退到标记 1。三组交手略微错开，117–118 秒起撤离，本拍中段三人已离开人群。近战配对、时长和速度为预演布设。" },
   { id: "02h", stage: "02", duration: 15, title: "三个日军退向岔口", p: [[61.8,65.6]], pose: "look",
-    passage: "鬼子九个倒下六个，三个从岔口退走；泥里躺着七个川军，两个挂彩。刘文财：「跑了三个！往岔口去了！」", task: "找冬瓜", threat: "三个逃兵 → 北沟 → 会合绕后日军", gate: "近战结束", exit: "班长找到冬瓜", planning: "三个逃兵沿支沟向西、再向北退到标记 1。东北绕来的两名日军经北侧坡道下沟，双方在北沟会合。" },
+    passage: "鬼子九个倒下六个，三个从岔口退走；泥里躺着七个川军，两个挂彩。刘文财：「跑了三个！往岔口去了！」", task: "找冬瓜", threat: "三个逃兵 → 北沟 → 会合绕后日军", gate: "近战结束", exit: "班长找到冬瓜", planning: "三个逃兵已在上一拍近战后脱离，继续沿支沟向西、再向北退到标记 1。东北绕来的两名日军经北侧坡道下沟，双方在北沟会合。" },
   { id: "02i", stage: "02", duration: 15, title: "勒住伤口，找被子", p: [[61.8,65.6],[61,64.6]], pose: "kneel",
     passage: "班长：「莫追！那三个要喊人回来的。何有田，被子！」", task: "准备拖冬瓜", threat: "逃兵会合绕后日军 → 南压路口", gate: "冬瓜止血", exit: "单被兜住冬瓜", planning: "标记 1 会合的三名逃兵与两名绕后日军沿交通沟南下，在标记 2 路口转向东侧支沟，阻击准备拖冬瓜撤退的顺子一行。" },
   { id: "03a", stage: "03", duration: 18, title: "顺子和何有田揪被角", p: [[61,64.6],[46,65.6]], pose: "drag",
