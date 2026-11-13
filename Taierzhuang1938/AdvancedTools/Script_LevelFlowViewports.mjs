@@ -20,7 +20,7 @@ export class EncounterViewports {
       const target=document.createElement("select");target.className="lfViewTarget";target.setAttribute("aria-label",`视口 ${index+1} 跟随对象`);
       for(const [value,label] of [["player","顺子"],["winter","冬瓜"],["luo","班长"],["tank1","头车"]]) {const option=document.createElement("option");option.value=value;option.textContent=label;target.append(option);}
       bar.append(target);
-      const fit=document.createElement("button");fit.textContent="复位";fit.title=`复位视口 ${index+1}`;bar.append(fit);
+      const fit=document.createElement("button");fit.textContent="重置镜头";fit.title=`恢复视口 ${index+1} 的默认镜头位置`;bar.append(fit);
       const rotate=document.createElement("button");rotate.textContent="↻";rotate.title="旋转 45°";bar.append(rotate);
       const layerMenu=document.createElement("details");layerMenu.className="lfViewLayers";
       const layerSummary=document.createElement("summary");layerSummary.textContent="显示";layerMenu.append(layerSummary);
@@ -36,7 +36,17 @@ export class EncounterViewports {
       const canvas=document.createElement("canvas");canvas.id=index===0?"flowMap":`flowMap${index+1}`;canvas.tabIndex=0;
       canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
       const status=document.createElement("div");status.className="lfViewStatus";
-      pane.append(bar,canvas,status);element.append(pane);
+      const framing=document.createElement("div");framing.className="lfViewFraming";framing.setAttribute("aria-label",`视口 ${index+1} 镜头范围`);
+      for(const [mode,label,description] of [
+        ["stage","当前剧情范围","缩放到当前剧情段落的活动范围，只调整这个视口"],
+        ["all","整个关卡","缩放到整个关卡的范围，只调整这个视口"],
+        ["follow","自动跟随","镜头自动跟随顺子或所选跟随对象，再点一次停止跟随"],
+      ]) {
+        const button=document.createElement("button");button.textContent=label;button.title=description;
+        button.dataset.framing=mode;button.setAttribute("aria-pressed","false");
+        button.onclick=()=>this.SetFraming(index,mode);framing.append(button);
+      }
+      pane.append(bar,canvas,framing,status);element.append(pane);
       const entry={index,pane,bar,canvas,select,target,rotate,status,type,layers,layerMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
       this.entries.push(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
@@ -107,6 +117,16 @@ export class EncounterViewports {
     if(entry.mode==="all") entry.map.Fit(this.mapData.bounds);
   }
 
+  SetFraming(index,mode) {
+    const entry=this.entries[index];
+    if(mode==="follow"&&entry.mode==="follow") entry.mode="manual";
+    else {
+      if(entry.type==="scene"||mode!=="follow"&&["eye","chase"].includes(entry.type)) this.SetType(index,"oblique");
+      entry.mode=mode;this.Frame(entry);
+    }
+    this.Activate(index);
+  }
+
   FrameStage() {for(const entry of this.Visible()) if(entry.mode==="stage") this.Frame(entry);}
 
   DefaultCamera(entry,frame) {
@@ -130,12 +150,13 @@ export class EncounterViewports {
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.rotate.hidden=!perspective||entry.type==="scene";
       if(entry.mode==="follow") entry.map.Follow(frame);
+      for(const button of entry.pane.querySelectorAll("[data-framing]")) button.setAttribute("aria-pressed",String(button.dataset.framing===entry.mode));
       const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,rect.width,rect.height,window.devicePixelRatio]);
       if(!contentChanged&&drawKey===entry.drawKey) continue;
       entry.map.Draw(frame,entry.layers,selection,annotations,draft);
       entry.drawKey=drawKey;
-      entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"跟随":entry.mode==="manual"?"自由取景":entry.mode==="all"?"全图":"本段"}`;
+      entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"镜头自动跟随":entry.mode==="manual"?"手动移动镜头":entry.mode==="all"?"整个关卡":"当前剧情范围"}`;
     }
     this.document=document;this.annotations=annotations;this.contentKey=contentKey;
   }

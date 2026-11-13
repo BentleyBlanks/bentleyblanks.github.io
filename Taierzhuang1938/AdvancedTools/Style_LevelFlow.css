@@ -59,11 +59,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfToolGroup { display: flex; align-items: center; gap: 5px; }
 .lfToolbar button, .lfToolbar select { font-size: 12px; height: 32px; }
 .lfViewTools { gap: 3px; }
-.lfViewTools button { border-color: transparent; background: transparent; padding: 5px 8px; }
-.lfViewTools button[aria-pressed="true"] { border-color: #a48f5c80; background: var(--lf-accent-soft); }
 #viewportLayout { padding: 4px 6px; margin-right: 3px; background: #151a1a; }
-.lfHistory { padding-left: 8px; border-left: 1px solid var(--lf-line); gap: 2px; }
-.lfHistory button { min-width: 29px; padding: 1px 5px; font-size: 20px; border-color: transparent; background: transparent; }
 .lfExport { margin-left: auto; }
 .lfBack { margin-left: auto; font-size: 11px; color: #a0a79e; white-space: nowrap; }
 
@@ -118,19 +114,12 @@ textarea { resize: vertical; min-height: 64px; }
 #sourcePassage p { margin: 0 0 17px; }
 #sourcePassage .lfDialogue { padding: 9px 11px; background: #1a211e; border-left: 2px solid #a18c57; border-radius: 0; color: #e0dccb; }
 #sourceLink { display: inline-block; font-size: 11px; margin-top: 10px; padding-top: 12px; border-top: 1px solid #303832; color: #989f91; }
-.lfEditIntro { margin: 0 0 20px; font-size: 12px; line-height: 1.85; color: #9ba69c; }
 .lfInline { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
 .lfInline select { flex: 1; min-width: 0; }
 .lfInline button { padding: 5px 8px; font-size: 11px; }
 .lfField { display: flex; flex-direction: column; gap: 5px; color: #a3afa3; font-size: 11px; margin: 14px 0; }
 .lfField input, .lfField select { width: 100%; min-width: 0; font-size: 12px; color: #d5dbd0; }
 .lfField textarea { font: 12px/1.7 "IBM Plex Mono", Consolas, monospace; }
-.lfFieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.lfFieldGrid .lfField { margin: 7px 0; }
-#objectForm details { margin-top: 18px; padding-top: 13px; border-top: 1px solid #303832; }
-#objectForm summary { color: #c5cbb8; font-size: 12px; cursor: pointer; }
-.lfPreviewStatus { padding: 11px 12px; border: 1px solid #34473b; border-radius: 2px; background: #141e19; color: #a2bbaa; font-size: 11px; line-height: 1.8; white-space: pre-line; margin: 17px 0 10px; }
-#deleteObject { color: #cd9990; margin-left: auto; }
 .lfNoteHint { color: var(--lf-muted); font-size: 12px; margin-bottom: 12px; }
 .lfFrameBookmark { display: block; width: 100%; text-align: left; padding: 10px 4px; border: 0; border-bottom: 1px solid #303832; border-radius: 0; color: #b9c1b1; }
 
@@ -198,8 +187,6 @@ textarea { resize: vertical; min-height: 64px; }
   .lfToolbar { gap: 7px; padding: 9px 10px; }
   .lfToolbar button { font-size: 11px; padding: 5px 7px; }
   #frameHeading { max-width: 135px; font-size: 11px; padding-right: 9px; }
-  .lfHistory { padding-left: 5px; }
-  .lfHistory button { font-size: 18px; min-width: 25px; padding: 1px 4px; }
   .lfWorkspace { grid-template-columns: minmax(0,1fr) var(--lf-inspector-width, 360px); gap: 9px; padding: 10px 10px 0; }
   .lfPane { padding: 17px; }
   .lfViewBar { gap: 3px; padding: 4px 5px; }
@@ -208,7 +195,6 @@ textarea { resize: vertical; min-height: 64px; }
 }
 @media (max-width: 850px) {
   .lfToolbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 6px; }
-  .lfHistory { display: none; }
   #frameHeading { max-width: 160px; }
   .lfWorkspace { grid-template-columns: minmax(240px,1fr) var(--lf-inspector-width, 360px); gap: 7px; padding: 7px 7px 0; }
   .lfPane { padding: 14px; }
@@ -294,3 +280,11 @@ textarea { resize: vertical; min-height: 64px; }
 .lfResizingInspector, .lfResizingInspector * { cursor: col-resize !important; user-select: none !important; }
 .lfChatActions span { min-width: 0; overflow: hidden; }
 @media (max-width: 650px) { .lfInspectorResize { display: none; } }
+
+.lfViewFraming { position: absolute; top: 43px; left: 8px; display: flex; gap: 3px; z-index: 2; padding: 3px; background: #111817ed; border: 1px solid #4a5346; border-radius: 4px; }
+.lfViewFraming button { padding: 4px 6px; font-size: 10px; line-height: 1.5; color: #c5cfbb; background: transparent; border-color: transparent; }
+.lfViewFraming button[aria-pressed="true"] { color: #efd39b; border-color: #aa93585c; background: #9f8a4029; }
+@media (max-width: 850px) {
+  .lfViewFraming { top: 58px; left: 5px; gap: 0; padding: 2px; }
+  .lfViewFraming button { padding: 3px; font-size: 9px; }
+}

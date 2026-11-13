@@ -1,7 +1,7 @@
 import { FLOW_SOURCE } from "./Data_LevelFlow.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
 import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATION, FLOW_TIMELINE, FormatFlowTime, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
-import { GroupPath, ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
+import { GroupPath, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
 import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
@@ -16,9 +16,9 @@ let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
 
-let map, time=0, playing=false, mode="select", tab="chat", selection=null;
+let map, time=0, playing=false, mode="select", selection=null;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
-let toastTimer=0, objectFormKey="", renderPending=false;
+let toastTimer=0, renderPending=false;
 const params=new URLSearchParams(location.search);
 
 function Toast(message,persistent=false) {
@@ -40,17 +40,16 @@ function ShowTab(value) {
   if(value==="notes") {
     OpenAnnotations();Element("legacyAnnotations").open=true;Element("notesPane").hidden=false;return;
   }
-  tab=value;
-  for(const name of ["chat","script","edit"]) Element(`${name}Pane`).hidden=name!==value;
+  for(const name of ["chat","script"]) Element(`${name}Pane`).hidden=name!==value;
   for(const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected",button.dataset.tab===value);
-  objectFormKey="";UpdateObjects();UpdateAnnotations();Render();
+  UpdateAnnotations();Render();
 }
 function Apply(edit) {
   try {project.Change(edit);Changed();return true;}
   catch(error) {Toast(error.message);return false;}
 }
 function Changed() {
-  objectFormKey="";UpdateObjects();UpdateAnnotations();Render();
+  UpdateAnnotations();Render();
   Element("saveStatus").textContent=project.warning?"当前窗口草稿":"本机已保存";
   if(project.warning) Toast(project.warning,true);
 }
@@ -59,10 +58,10 @@ function SelectedObject() {
     :selection?.type==="group"?project.value.groups.find((item)=>item.id===selection.id):null;
 }
 function Select(value) {
-  selection=value;objectFormKey="";
-  if(value?.type==="group"||value?.type==="trigger") {SetMode("select");ShowTab("edit");}
+  selection=value;
+  if(value?.type==="group"||value?.type==="trigger") {SetMode("select");}
   if(value?.type==="annotation") {ShowTab("notes");Element("annotationText").value=project.value.annotations.find((item)=>item.id===value.id)?.text||"";}
-  UpdateObjects();Render();
+  Render();
 }
 function StageBounds() {
   const points=frame.stage.beats.flatMap((beat)=>beat.p);
@@ -78,7 +77,7 @@ function StageBounds() {
 function Seek(value,{fit=false}={}) {
   const previousStage=frame.stage.id;
   time=Clamp(Number(value)||0,0,FLOW_DURATION);frame=EvaluateFlow(time,project.value);
-  if(previousStage!==frame.stage.id) {selection=null;objectFormKey="";}
+  if(previousStage!==frame.stage.id) {selection=null;}
   if(map&&(fit||previousStage!==frame.stage.id)) workspace.FrameStage();
   draft=null;Render();
 }
@@ -116,7 +115,6 @@ function UpdateTimeline() {
   if(shownStage!==frame.stage.id) {
     shownStage=frame.stage.id;
     for(const button of document.querySelectorAll("[data-stage]")) button.classList.toggle("selected",button.dataset.stage===shownStage);
-    UpdateObjects();
   }
   if(shownBeat!==frame.beat.id) {
     shownBeat=frame.beat.id;
@@ -132,105 +130,6 @@ function UpdateTimeline() {
   Element("flowSeek").value=String(time);
   Element("timelineAxis").style.setProperty("--progress",`${time/FLOW_DURATION*100}%`);
   Element("flowSeek").setAttribute("aria-valuetext",`${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);
-  Element("undoFlow").disabled=!project.undo.length;Element("redoFlow").disabled=!project.redo.length;
-  Element("followPlayer").setAttribute("aria-pressed",String(workspace.active.mode==="follow"));
-}
-function WritePath(object,path,value) {
-  const keys=path.split(".");let parent=object;
-  for(const key of keys.slice(0,-1)) parent=parent[key];
-  parent[keys.at(-1)]=value;
-  if(path==="side") object.target=value==="friend"?"enemy":"player";
-  if(path.startsWith("area.center")&&object.route) object.route[0]=[...object.area.center];
-}
-function Field(parent,label,path,value,options=null) {
-  const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode(label));
-  const input=document.createElement(options?"select":typeof value==="boolean"?"select":"input");
-  input.name=path;input.setAttribute("aria-label",label);
-  const choices=typeof value==="boolean"?[["true","启用"],["false","停用"]]:options;
-  if(choices) for(const [key,text] of choices) {const option=document.createElement("option");option.value=key;option.textContent=text;input.append(option);}
-  else {input.type=typeof value==="number"?"number":"text";if(typeof value==="number") input.step="0.1";}
-  input.value=String(value);wrapper.append(input);parent.append(wrapper);
-  input.addEventListener("change",()=>{
-    const current=SelectedObject();if(!current) return;
-    const next=typeof value==="number"?Number(input.value):typeof value==="boolean"?input.value==="true":input.value;
-    Apply((document)=>{const target=(selection.type==="group"?document.groups:document.triggers).find((item)=>item.id===current.id);WritePath(target,path,next);});
-  });
-}
-function UpdateObjects() {
-  if(!map) return;
-  const selector=Element("objectList"),current=SelectedObject();
-  const candidates=[...project.value.groups.map((item)=>({type:"group",item})),...project.value.triggers.map((item)=>({type:"trigger",item}))]
-    .filter(({item})=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id||item.id===current?.id);
-  selector.replaceChildren();
-  const empty=document.createElement("option");empty.value="";empty.textContent="选择地图上的区域";selector.append(empty);
-  for(const {type,item} of candidates) {const option=document.createElement("option");option.value=`${type}:${item.id}`;option.textContent=`${type==="group"?(item.side==="friend"?"我方":"生成"):"触发"} · ${item.label}`;selector.append(option);}
-  selector.value=current?`${selection.type}:${current.id}`:"";
-  if(tab!=="edit") return;
-  const form=Element("objectForm"),key=current?JSON.stringify(current):"empty";
-  if(objectFormKey===key) return;
-  objectFormKey=key;form.replaceChildren();Element("objectActions").hidden=!current;
-  if(!current) {Element("objectPreview").textContent="点选区域，拖动中心挪位置，拖动角点改范围。";return;}
-  Field(form,"名称","label",current.label);
-  const geometry=document.createElement("details"),summary=document.createElement("summary");summary.textContent="区域、时段与路线";geometry.append(summary);geometry.open=selection.type==="trigger";
-  const positions=document.createElement("div");positions.className="lfFieldGrid";geometry.append(positions);
-  Field(positions,"中心 X","area.center.0",current.area.center[0]);Field(positions,"中心 Z","area.center.1",current.area.center[1]);
-  Field(positions,"宽度 m","area.size.0",current.area.size[0]);Field(positions,"深度 m","area.size.1",current.area.size[1]);
-  Field(geometry,"形状","area.shape",current.area.shape,[["rect","矩形"],["circle","圆形（宽度为直径）"]]);
-  const beatOptions=FLOW_TIMELINE.map((beat)=>[beat.id,`${beat.id.toUpperCase()} ${beat.title}`]);
-  Field(geometry,"起始拍","beat",current.beat,beatOptions);Field(geometry,"结束拍","endBeat",current.endBeat,beatOptions);
-  if(selection.type==="trigger") {
-    Field(form,"触发方式","mode",current.mode,[["area","玩家路线进入区域"],["time","到达指定时刻"]]);Field(form,"起始拍后延迟 s","delay",current.delay);
-  } else {
-    const identity=document.createElement("div");identity.className="lfFieldGrid";form.append(identity);
-    Field(identity,"启用","enabled",current.enabled);Field(identity,"阵营","side",current.side,[["enemy","日军"],["friend","我方"]]);
-    Field(form,"行为","behavior",current.behavior,Object.entries(ENCOUNTER_BEHAVIORS));
-    const numbers=document.createElement("div");numbers.className="lfFieldGrid";form.append(numbers);
-    for(const [label,path] of [["总人数","count"],["同时在场","maxAlive"],["补充间隔 s","interval"],["存续时长 s","lifetime"]]) Field(numbers,label,path,current[path]);
-    Field(form,"整批消灭后补充","reinforceAfterClear",current.reinforceAfterClear||false);
-    Field(geometry,"移动速度 m/s","speed",current.speed);
-    Field(geometry,"隐蔽集结 s","deployDelay",current.deployDelay||0);
-    Field(form,"跟随战车","tankId",current.tankId||"",[["","头车（默认）"],["tank1","头车"],["tank2","后车"]]);
-    Field(form,"武器","weapon",current.weapon||"rifle",[["rifle","步枪"],["machineGun","机枪"]]);
-    Field(form,"投弹间隔 s（0 停用）","grenadeInterval",current.grenadeInterval||0);
-    Field(form,"关联触发区","triggerId",current.triggerId,project.value.triggers.map((trigger)=>[trigger.id,trigger.label]));
-    Field(form,"射击目标","target",current.target,[["player","顺子"],["winter","冬瓜"],["enemy","敌军"],["ramp","村口坡道"],["none","停火"]]);
-    if(current.spawnOffsets) {
-      const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("分散生成点偏移 X, Z · 相对区域中心"));
-      const points=document.createElement("textarea");points.name="spawnOffsets";points.value=current.spawnOffsets.map(point=>point.join(", ")).join("\n");wrapper.append(points);geometry.append(wrapper);
-      points.addEventListener("change",()=>Apply(document=>{document.groups.find(item=>item.id===current.id).spawnOffsets=points.value.trim().split(/\n/).filter(Boolean).map(line=>line.split(/[,，\s]+/).map(Number));}));
-    }
-    if(current.memberPlans) {
-      const wrapper=document.createElement("label");
-      wrapper.className="lfField";
-      wrapper.append(document.createTextNode("单兵推进计划 JSON · delay 追加等待秒数，route 世界坐标路点"));
-      const plans=document.createElement("textarea");
-      plans.name="memberPlans";
-      plans.value=JSON.stringify(current.memberPlans,null,2);
-      wrapper.append(plans);
-      geometry.append(wrapper);
-      plans.addEventListener("change",()=>Apply(value=>{
-        value.groups.find(item=>item.id===current.id).memberPlans=JSON.parse(plans.value);
-      }));
-    }
-    const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("共用路线 X, Z · 未配置单兵计划时使用"));
-    const route=document.createElement("textarea");route.name="route";route.value=current.route.map((point)=>point.join(", ")).join("\n");wrapper.append(route);geometry.append(wrapper);
-    route.addEventListener("change",()=>Apply((document)=>{
-      const points=route.value.trim().split(/\n/).filter(Boolean).map((line)=>line.split(/[,，\s]+/).map(Number));
-      const group=document.groups.find((item)=>item.id===current.id);group.route=points;if(points[0]?.length===2) group.area.center=[...points[0]];
-    }));
-  }
-  form.append(geometry);
-  Element("addRoutePoint").hidden=selection.type!=="group";
-}
-function UpdateObjectPreview() {
-  const object=SelectedObject();if(!object||tab!=="edit") return;
-  if(selection.type==="trigger") {
-    const state=frame.triggers.find((item)=>item.id===object.id),count=project.value.groups.filter((group)=>group.triggerId===object.id).length;
-    Element("objectPreview").textContent=`${state.firedAt===null?"路线未经过":`触发 ${FormatFlowTime(state.firedAt)}`}\n关联 ${count} 个生成区`;
-  } else {
-    const state=frame.groups.find((item)=>item.id===object.id);
-    Element("objectPreview").textContent=`${state.start===null?"等待路线进入触发区":`触发 ${FormatFlowTime(state.start)}`}\n已出 ${state.spawned} / ${state.count} · 当前在场 ${state.live}`;
-  }
 }
 function UpdateAnnotations() {
   Element("legacyAnnotations").hidden=!project.value.annotations.length;
@@ -253,10 +152,9 @@ function Render() {
   frame=EvaluateFlow(time,project.value);UpdateTimeline();
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
-  UpdateObjectPreview();
 }
 function Hit(point,view=map) {
-  const priority={areaHandle:6,routeHandle:6,annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
+  const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
   return view.hits.filter((item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1])<=item.radius)
     .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0))[0];
 }
@@ -284,8 +182,7 @@ function BindMap(entry) {
     workspace.Activate(entry.index);
     surface.focus();surface.setPointerCapture(event.pointerId);
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
-    if(mode==="route"&&selection?.type==="group") {Apply((document)=>document.groups.find((item)=>item.id===selection.id).route.push(world));SetMode("select");ShowTab("edit");return;}
-    const action=mode!=="select"?"annotate":["areaHandle","routeHandle","annotationHandle"].includes(hit?.type)?"edit":entry.map.type?"select":"pan";
+    const action=mode!=="select"?"annotate":hit?.type==="annotationHandle"?"edit":entry.map.type?"select":"pan";
     pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
@@ -310,12 +207,8 @@ function BindMap(entry) {
       if(pointer.action==="edit") {
         const world=entry.map.ToWorld(screen);
         const candidate=structuredClone(pointer.original),hit=pointer.hit;
-        const list=hit.type==="annotationHandle"?candidate.annotations:hit.type==="routeHandle"||hit.objectType==="group"?candidate.groups:candidate.triggers;
-        const target=list.find((item)=>item.id===hit.id);
-        if(hit.type==="annotationHandle") target[hit.handle]=world;
-        else if(hit.type==="routeHandle") target.route[hit.index]=world;
-        else if(hit.handle===0) {target.area.center=world;if(target.route) target.route[0]=[...world];}
-        else target.area.size=[Math.max(0.5,Math.abs(world[0]-target.area.center[0])*2),Math.max(0.5,Math.abs(world[1]-target.area.center[1])*2)].map((value)=>Math.min(500,value));
+        const target=candidate.annotations.find((item)=>item.id===hit.id);
+        target[hit.handle]=world;
         project.value=candidate;
       }
       Element("mapTooltip").hidden=true;RequestRender();return;
@@ -355,29 +248,6 @@ function BindControls() {
   Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
   Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
   Element("viewportLayout").onchange=(event)=>{workspace.SetLayout(Number(event.target.value));Render();};
-  Element("fitStage").onclick=()=>{if(map.type==="scene") workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="stage";map.Fit(StageBounds());Render();};
-  Element("fitAll").onclick=()=>{if(map.type==="scene") workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="all";map.Fit(map.mapData.bounds);Render();};
-  Element("followPlayer").onclick=()=>{if(map.type==="scene") {workspace.SetType(workspace.activeIndex,"oblique");workspace.active.mode="follow";}else workspace.active.mode=workspace.active.mode==="follow"?"manual":"follow";Render();};
-  Element("undoFlow").onclick=()=>{project.Undo();Changed();};Element("redoFlow").onclick=()=>{project.Redo();Changed();};
-  Element("objectList").onchange=(event)=>{const [type,id]=event.target.value.split(":");Select(id?{type,id}:null);};
-  Element("objectForm").onsubmit=(event)=>event.preventDefault();
-  Element("focusObject").onclick=()=>{const object=SelectedObject();if(object) {workspace.active.mode="manual";map.center=[...object.area.center];map.scale=Math.max(map.scale,7);Render();}};
-  Element("addRoutePoint").onclick=()=>{mode="route";canvas.dataset.mode="route";SetPlaying(false);Toast("在地图上点击新的路点");};
-  Element("deleteObject").onclick=()=>{
-    if(!SelectedObject()) return;
-    if(selection.type==="trigger"&&project.value.groups.some((group)=>group.triggerId===selection.id)) {Toast("此触发区仍关联生成区，先修改关联或删除对应生成区");return;}
-    Apply((document)=>{const key=selection.type==="group"?"groups":"triggers";document[key]=document[key].filter((item)=>item.id!==selection.id);});selection=null;Changed();
-  };
-  const AddObject=(type)=>{
-    const id=`${type}_${Date.now()}`,beat=frame.beat.id,center=[...frame.player];
-    Apply((document)=>{
-      const trigger={id:`Trigger_${id}`,label:"新触发区",beat,endBeat:beat,mode:"area",delay:0,area:{shape:"rect",center,size:[6,6]}};
-      document.triggers.push(trigger);
-      if(type==="group") document.groups.push({id,label:"新生成区",beat,endBeat:beat,triggerId:trigger.id,enabled:true,side:"enemy",target:"player",area:{shape:"rect",center:[center[0]+10,center[1]-12],size:[3,3]},route:[[center[0]+10,center[1]-12],[center[0]+5,center[1]-6]],count:3,maxAlive:3,interval:3,lifetime:30,speed:2.2,behavior:"advance",note:"手工布设"});
-      selection={type,id:type==="group"?id:trigger.id};
-    });Changed();
-  };
-  Element("addTrigger").onclick=()=>AddObject("trigger");Element("addGroup").onclick=()=>AddObject("group");
   Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
   Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
   Element("markScreenshot").onclick=OpenAnnotations;

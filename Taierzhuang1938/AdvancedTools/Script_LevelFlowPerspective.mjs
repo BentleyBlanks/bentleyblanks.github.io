@@ -59,7 +59,19 @@ export class FlowPerspectiveView extends FlowMapView {
     const vehicles=frame.actors.filter(actor=>["tank","cart"].includes(actor.kind)).map(actor=>[actor.p,actor.heading,actor.turret,actor.pose]);
     this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.far,this.renderScale,vehicles]);
   }
-  Fit(bounds,padding=35) {this.freeCamera=null;super.Fit(bounds,padding);this.scale=Clamp(this.scale,3,12);}
+  Fit(bounds,padding=35) {
+    this.freeCamera=null;super.Fit(bounds,padding);
+    const {width,height}=this.canvas.getBoundingClientRect(),ground=this.Ground(this.center);
+    const corners=[[bounds[0],bounds[2]],[bounds[1],bounds[2]],[bounds[1],bounds[3]],[bounds[0],bounds[3]]];
+    const projected=corners.map(point=>{
+      const dx=point[0]-this.center[0],dz=point[1]-this.center[1];
+      return [dx*Math.cos(this.yaw)-dz*Math.sin(this.yaw),
+        (dx*Math.sin(this.yaw)+dz*Math.cos(this.yaw))*Math.sin(this.pitch)-(this.Ground(point)-ground)*Math.cos(this.pitch)];
+    });
+    const extentX=Math.max(1,...projected.map(point=>Math.abs(point[0]))),extentY=Math.max(1,...projected.map(point=>Math.abs(point[1])));
+    // Vertex places the ground center at 57% height, leaving 43% below it.
+    this.scale=Clamp(Math.min((width/2-padding)/extentX,(height*0.43-padding)/extentY),0.15,12);
+  }
   Follow(frame) {
     this.freeCamera=null;const actor=frame.actors.find(item=>item.id===this.target)||frame.actors[0];this.center=[...actor.p];
     if(this.type==="oblique") this.scale=Clamp(Math.min(this.canvas.clientWidth,this.canvas.clientHeight)/35,3,12);
@@ -305,10 +317,7 @@ export class FlowPerspectiveView extends FlowMapView {
     context.setLineDash(selection?[]:[5,4]);Polygon(context,points,color+"12",color);context.setLineDash([]);
     this.hits.push({...hit,screen:p,radius:12,area});
     if(label) Label(context,label,p[0]+10,p[1]-10,color,11,true);
-    if(selection) for(const [index,point] of [[0,area.center],[1,[x+w/2,z+d/2]]]) {
-      const screen=this.ToScreen(point);context.fillStyle="#ac7a16";context.fillRect(screen[0]-4,screen[1]-4,8,8);
-      this.hits.push({...hit,objectType:hit.type,type:"areaHandle",handle:index,screen,radius:9});
-    }
+
   }
   LabelVertex(actor) {return this.Vertex([actor.p[0],this.Ground(actor.p)+(actor.elevation||0)+(actor.kind==="tank"?1.8:actor.kind==="cart"?1.45:0.65),actor.p[1]]);}
   ActorScreen(actor) {const vertex=this.LabelVertex(actor);return vertex.depth<0.15?[-100000,-100000]:[vertex.x,vertex.y];}

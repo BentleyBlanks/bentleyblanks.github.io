@@ -228,40 +228,45 @@ try {
   }
   await page.evaluate(()=>window.LevelFlow.Seek(384));
   await page.screenshot({path:path.join(out,"Retreat.png")});
-  await page.click("#followPlayer");
+  await page.click('.lfViewPane[data-viewport="0"] [data-framing="follow"]');
   const framing=await page.evaluate(()=>{
     const state=window.LevelFlow.Inspect(),canvas=document.getElementById('flowMap');
     return state.actors.filter(actor=>actor.pose!=="dead"&&Math.hypot(actor.p[0]-state.actors[0].p[0],actor.p[1]-state.actors[0].p[1])<115).map(actor=>({name:actor.name,p:window.LevelFlow.ToScreen(actor.p),width:canvas.clientWidth,height:canvas.clientHeight}));
   });
   assert.ok(framing.every(({p,width,height})=>p[0]>20&&p[1]>20&&p[0]<width-20&&p[1]<height-20),"follow keeps the player, threats and defenders inside the viewport");
-  await page.click("#fitStage");
-  await page.click('[data-tab="edit"]');await page.selectOption("#objectList","group:Fork");
-  await page.locator('#objectForm details').evaluate(element=>element.open=true);
-  const memberPlans=await page.locator('[name="memberPlans"]').inputValue();
-  const editedPlans=JSON.parse(memberPlans);editedPlans[3].delay=10;
-  await page.locator('[name="memberPlans"]').fill(JSON.stringify(editedPlans));
-  await page.locator('[name="memberPlans"]').press("Tab");
-  assert.equal((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").memberPlans[3].delay,10);
-  await page.click("#undoFlow");
-  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").memberPlans,JSON.parse(memberPlans));
-  await page.locator('[name="count"]').fill("8");await page.locator('[name="count"]').press("Tab");
-  assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8);
-  await page.click("#undoFlow");assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,5);
-  await page.click("#redoFlow");assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8);
-  await page.selectOption("#objectList","trigger:Trigger_Fork");
-  await page.locator('[name="area.center.0"]').fill("300");await page.locator('[name="area.center.0"]').press("Tab");
-  assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).groups.find(group=>group.id==="Fork").start,null);
-  await page.click("#undoFlow");
-  await page.selectOption("#objectList","group:RearPursuit");
-  const mapBox=await page.locator("#flowMap").boundingBox();
-  const center=await page.evaluate(()=>window.LevelFlow.ToScreen([20,33]));
-  const destination=await page.evaluate(()=>window.LevelFlow.ToScreen([23,35]));
+  await page.click('.lfViewPane[data-viewport="0"] [data-framing="stage"]');
+  assert.equal(await page.locator('[data-tab="edit"],#editPane,#objectList,#objectForm,#undoFlow,#redoFlow').count(),0);
+  const firstBefore=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0]);
+  await page.click('.lfViewPane[data-viewport="1"] [data-framing="all"]');
+  const framedViews=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
+  assert.equal(framedViews[1].mode,'all');assert.deepEqual(framedViews[0],firstBefore,'viewport controls only reframe their own viewport');
+  const fullMap=await page.evaluate(async()=>{
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const {bounds}=await LoadEncounterMap(),canvas=document.getElementById('flowMap2');
+    return {width:canvas.clientWidth,height:canvas.clientHeight,corners:[[bounds[0],bounds[2]],[bounds[1],bounds[2]],[bounds[1],bounds[3]],[bounds[0],bounds[3]]].map(point=>LevelFlow.ToScreen(point,1))};
+  });
+  assert.ok(fullMap.corners.every(point=>point[0]>=20&&point[0]<=fullMap.width-20&&point[1]>=20&&point[1]<=fullMap.height-20),'the entire level fits inside the overview viewport');
+  await page.click('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
+  assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'follow');
+  await page.click('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
+  assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'manual');
+  await page.click('[data-tab="chat"]');
+  await page.evaluate(()=>LevelFlow.Select({type:'group',id:'RearPursuit'}));
+  assert.equal(await page.locator('[data-tab="chat"]').getAttribute('class'),'selected');
+  const documentBefore=await page.evaluate(()=>LevelFlow.Inspect().document);
+  const mapBox=await page.locator('#flowMap').boundingBox();
+  const center=await page.evaluate(()=>LevelFlow.ToScreen([20,33]));
   await page.mouse.move(mapBox.x+center[0],mapBox.y+center[1]);await page.mouse.down();
-  await page.mouse.move(mapBox.x+destination[0],mapBox.y+destination[1],{steps:8});await page.mouse.up();
-  const moved=(await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="RearPursuit").area.center;
-  assert.ok(Math.abs(moved[0]-23)<0.1&&Math.abs(moved[1]-35)<0.1,"dragging region handles changes the actual spawn configuration");
+  await page.mouse.move(mapBox.x+center[0]+20,mapBox.y+center[1]+10,{steps:8});await page.mouse.up();
+  assert.deepEqual(await page.evaluate(()=>LevelFlow.Inspect().document),documentBefore,'dragging a selected region only navigates the preview');
+  assert.deepEqual(await page.evaluate(()=>LevelFlow.Packet().context.selection),{type:'group',id:'RearPursuit'});
+  // Existing user drafts remain valid after the manual setup panel is removed.
+  await page.evaluate(()=>{
+    const saved=LevelFlow.Inspect().document;saved.groups.find(group=>group.id==='Fork').count=8;
+    localStorage.setItem('tengxian1938_encounter_v2',JSON.stringify(saved));
+  });
   await page.reload();await ReadyPlan();
-  assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8,"draft survives reload");
+  assert.equal((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==='Fork').count,8,'existing saved drafts survive the UI change');
   await page.evaluate(()=>window.LevelFlow.Seek(384));
   assert.equal(await page.locator('#exportProject,#importProject,#importFile,#planningSection,[data-tab="notes"]').count(),0);
   const layout=await page.evaluate(()=>({toolbar:document.querySelector('.lfToolbar').getBoundingClientRect().height,
@@ -530,14 +535,9 @@ try {
   assert.equal(new Set(deployed.map(actor=>actor.born)).size,1);
   assert.equal(new Set(deployed.map(actor=>actor.p.join(','))).size,5);
   assert.ok(deployed.every(actor=>actor.pose==='kneel'&&!actor.firing));
-  await page.click('[data-tab="edit"]');await page.selectOption('#objectList','group:Fork');
-  await page.locator('#objectForm summary').click();
-  assert.equal(await page.locator('[name="spawnOffsets"]').inputValue(),"2.3, -9.9\n10.3, -3.5\n-10.6, -5\n5.5, 3.8\n-8.4, 1.8");
-  await page.locator('[name="deployDelay"]').fill('0');await page.locator('[name="deployDelay"]').press('Tab');
-  const released=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'));
-  assert.equal(released.filter(actor=>actor.pose==='run').length,3);
-  assert.equal(released.filter(actor=>actor.pose==='kneel').length,2,'individual delays remain after clearing the shared deployment delay');
-  await page.click('#undoFlow');await page.click('[data-tab="script"]');
+  const forkDocument=(await page.evaluate(()=>LevelFlow.Inspect().document)).groups.find(group=>group.id==='Fork');
+  assert.equal(forkDocument.spawnOffsets.map(point=>point.join(', ')).join('\n'),"2.3, -9.9\n10.3, -3.5\n-10.6, -5\n5.5, 3.8\n-8.4, 1.8");
+  await page.click('[data-tab="script"]');
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   await page.screenshot({path:path.join(out,'HiddenSpawnBatch186.png')});
   await page.evaluate(()=>LevelFlow.SetViewType(0,'eye'));
@@ -592,5 +592,5 @@ try {
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='branch'&&actor.p[0]<36&&actor.p[1]<68).length,6,'branch relief stops west of the Japanese positions');
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='south'&&actor.p[1]>72).length,6,'southern relief spreads behind the berm');
   assert.deepEqual(errors,[]);
-  console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
+  console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

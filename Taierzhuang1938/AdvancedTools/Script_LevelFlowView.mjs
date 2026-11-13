@@ -297,15 +297,10 @@ export class FlowMapView {
     context.fill();context.stroke();context.setLineDash([]);
     this.hits.push({...hit,screen:p,radius:Math.max(10,Math.min(w,h)/2),area});
     if(label) Label(context,label,p[0]+Math.max(w/2,7)+5,p[1]-h/2-5,color,11,true);
-    if(selection) {
-      for(const [index,point] of [[0,area.center],[1,[area.center[0]+area.size[0]/2,area.center[1]+area.size[1]/2]]]) {
-        const screen=this.ToScreen(point);context.fillStyle="#ac7a16";context.fillRect(screen[0]-4,screen[1]-4,8,8);
-        this.hits.push({...hit,objectType:hit.type,type:"areaHandle",handle:index,screen,radius:9});
-      }
-    }
+
   }
 
-  Draw(frame,layers,selection,annotations=[],draft=null,editing=false) {
+  Draw(frame,layers,selection,annotations=[],draft=null) {
     this.BeforeDraw?.(frame);
     const rect=this.canvas.getBoundingClientRect(),ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
@@ -340,9 +335,7 @@ export class FlowMapView {
           Line(context,route.map(Screen),color+"77",selected?2:1,[5,4]);
           if(route.length>1) Arrow(context,Screen(route.at(-2)),Screen(route.at(-1)),color+"99",1);
         }
-        if(selected) for(let index=1;index<route.length;index++) {
-          const screen=Screen(route[index]);Circle(context,screen,4,color,"#f6f0df");this.hits.push({type:"routeHandle",id:group.id,index,screen,radius:9});
-        }
+
       }
     }
     if(layers.fire) for(const effect of frame.effects.filter((item)=>item.kind==="fire")) {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113ResizableChat">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113ViewportTools">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,14 +25,13 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261113SharpNavigation"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261113ViewportTools"></script>
 </head>
 <body class="lfBody">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
     <h1 class="lfSrOnly">Encounter Designer</h1>
     <span id="frameHeading" title="当前阶段与节拍"></span>
-    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select><button id="fitStage">本段</button><button id="fitAll">全图</button><button id="followPlayer" aria-pressed="false">跟随战场</button></div>
-    <div class="lfToolGroup lfHistory"><button id="undoFlow" title="撤销布设修改 · Ctrl+Z" aria-label="撤销布设修改">↶</button><button id="redoFlow" title="重做布设修改 · Ctrl+Shift+Z" aria-label="重做布设修改">↷</button></div>
+    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select></div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
@@ -40,7 +39,7 @@
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapReadout"></div><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
       <div id="inspectorResizeHandle" class="lfInspectorResize" role="separator" aria-label="调整右侧栏宽度" aria-orientation="vertical" tabindex="0" title="拖动调整侧栏宽度，方向键微调，Home 恢复默认"></div>
-      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button><button data-tab="edit" title="调整触发区域、生成波次与行动路线">布设</button></div><button id="markScreenshot" title="截取当前所有视口，可标注、复制、导出或附加到会话">截图与标注</button></div>
+      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div><button id="markScreenshot" title="截取当前所有视口，可标注、复制、导出或附加到会话">截图与标注</button></div>
       <section id="chatPane" class="lfChatPane" aria-label="Codex 会话" data-list-open="false">
         <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
@@ -56,7 +55,6 @@
         </div>
       </section>
       <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
-      <section id="editPane" class="lfPane" hidden><p class="lfEditIntro">调整触发区域、生成波次与行动路线。修改自动保存到本机草稿，可拖动时间轴查看结果。</p><div class="lfInline"><select id="objectList" aria-label="当前布设"></select><button id="focusObject" title="定位选中的区域">定位</button></div><div class="lfInline"><button id="addTrigger">＋触发区</button><button id="addGroup">＋生成区</button></div><form id="objectForm"></form><div id="objectPreview" class="lfPreviewStatus"></div><div id="objectActions" class="lfInline" hidden><button id="addRoutePoint">加路点</button><button id="deleteObject">删除</button></div></section>
 
     </aside>
   </main>
