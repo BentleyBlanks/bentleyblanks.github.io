@@ -533,7 +533,10 @@
       {"id":"CounterattackLeftAccess","preset":"communication","points":[[-61,10.64],[-59,7.640000000000001],[-62,5],[-60,2]],"floorW":2.8,"depth":1.7,"cornerRadiusM":0.25,"jitterScale":0.3,"look":"bare","group":"01–05/壕沟/逆袭出口"},
       {"id":"CounterattackLeftSteps","preset":"communication","points":[[-60,2],[-59.8,0],[-60.15,-2]],"floorW":2.8,"depth":1.7,"depthAlong":[[0,1.7],[0.8,1.36],[1.6,1.02],[2.4,0.68],[3.2,0.34],[4,0.2]],"bermSide":"none","cornerRadiusM":0.15,"jitterScale":0,"look":"bare","group":"01–05/壕沟/逆袭出口"},
       {"id":"CounterattackRightAccess","preset":"communication","points":[[81,-6.93],[83,-9.93],[83,-14],[85,-17]],"floorW":2.8,"depth":1.7,"cornerRadiusM":0.25,"jitterScale":0.3,"look":"bare","group":"01–05/壕沟/逆袭出口"},
-      {"id":"CounterattackRightSteps","preset":"communication","points":[[85,-17],[85.2,-19],[84.85,-21]],"floorW":2.8,"depth":1.7,"depthAlong":[[0,1.7],[0.8,1.36],[1.6,1.02],[2.4,0.68],[3.2,0.34],[4,0.2]],"bermSide":"none","cornerRadiusM":0.15,"jitterScale":0,"look":"bare","group":"01–05/壕沟/逆袭出口"}
+      {"id":"CounterattackRightSteps","preset":"communication","points":[[85,-17],[85.2,-19],[84.85,-21]],"floorW":2.8,"depth":1.7,"depthAlong":[[0,1.7],[0.8,1.36],[1.6,1.02],[2.4,0.68],[3.2,0.34],[4,0.2]],"bermSide":"none","cornerRadiusM":0.15,"jitterScale":0,"look":"bare","group":"01–05/壕沟/逆袭出口"},
+      {"id":"AmbushNorthDefense","preset":"fire","points":[[88,262.8],[92,264],[93,266]],"depth":0.75,"floorW":1.8,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.5,"jitterScale":0.1,"look":"scrape","group":"06–10/壕沟/弯口阻车","note":"班长与何有田守弯北壕，掩护清除跟车步兵；不占用东侧战车车道。"},
+      {"id":"AmbushRearDefense","preset":"fire","points":[[89,275],[89,277],[91,281],[93,281]],"depth":0.75,"floorW":1.8,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.5,"jitterScale":0.1,"look":"scrape","group":"06–10/壕沟/弯口阻车","note":"刘文财守后轮侧袭出发壕；与凹路相接，担架及驴车仍可沿原路南撤。"},
+      {"id":"AmbushWestGun","preset":"fire","points":[[80,275],[82,275]],"depth":0.75,"floorW":1.8,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.5,"jitterScale":0.1,"look":"scrape","group":"06–10/壕沟/弯口阻车","note":"幺娃经西侧坡道进入机枪浅壕，吸引炮塔转西，给东侧车头炸车留窗口。"}
     ]
   },
   "markers": [

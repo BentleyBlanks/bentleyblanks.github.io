@@ -1,5 +1,6 @@
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
+import { FLOW_PREVIOUS_AMBUSH } from "./Data_LevelFlowAmbushBaseline.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -43,11 +44,11 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("RearPursuit","③ 北坡下沟第二波","03g","03h",[20,33],[[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],3,"enemy","advance","player",54);
   const pursuit=groups.at(-1);pursuit.interval=2.5;pursuit.maxAlive=3;triggers.at(-1).delay=36;pursuit.standoffMetres=16;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
   const escort=groups.find((group)=>group.id==="TankEscort");
-  Object.assign(escort,{lifetime:400,speed:1.7,tankId:"tank1",grenadeInterval:12});
-  Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([32.5,101],8,8)});
-  Add("TankRearScreen","后车行军护卫","03h","06f",[116,56],[[116,56],[112,98],[110,134],[108,166],[105,196],[103,218],[101,249]],4,"enemy","escort","player",470);
+  Object.assign(escort,{lifetime:182,speed:2.2,tankId:"tank1",grenadeInterval:12});
+  Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([86,225],8,8)});
+  Add("TankRearScreen","后车行军护卫","06a","06f",[107,170],[[107,170],[105,196],[103,218],[101,249]],4,"enemy","escort","player",260);
   triggers.pop(); // Both vehicle escort groups share the player arrival trigger.
-  Object.assign(groups.at(-1),{triggerId:escort.triggerId,tankId:"tank2",speed:1.7,grenadeInterval:14});
+  Object.assign(groups.at(-1),{triggerId:escort.triggerId,tankId:"tank2",speed:2.2,grenadeInterval:14});
   const reinforcement=groups.find((group)=>group.id==="TankReinforce");
   Object.assign(reinforcement,{tankId:"tank2",grenadeInterval:10,speed:1.8});
   Add("GroundWest","西翼掩体跃进","03h","06f",[96,108],[[96,108],[95,156],[95,192],[96,218],[95,251]],4,"enemy","bounds","player",470);
@@ -64,6 +65,7 @@ export function CreateEncounterDocument(timeline, waves) {
   ]) {
     Add(id,label,"03a","06h",center,[center],weapon==="machineGun"?2:3,"friend","guard","enemy",800);
     groups.at(-1).weapon=weapon;
+    if(["LaneGround","BendGround"].includes(id)) groups.at(-1).enabled=false;
   }
   Add("CrestWest","坡顶西侧接应","03g","04a",[27.5,128],[[27.5,128],[28.5,129]],2,"friend","guard","enemy",160);
   Add("CrestEast","坡顶东侧接应","03g","04a",[43,129],[[43,129],[43,129]],2,"friend","guard","enemy",160);
@@ -97,7 +99,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-camp-cover-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-bend-ambush-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -482,6 +484,32 @@ function UpgradePursuit(value, defaults) {
   return UpgradeCampCover(value,defaults);
 }
 
+function UpgradeAmbush(value,defaults) {
+  for(const collection of ["groups","triggers"]) {
+    for(const previous of FLOW_PREVIOUS_AMBUSH[collection]) {
+      const current=value[collection].find(entry=>entry.id===previous.id);
+      const next=defaults[collection].find(entry=>entry.id===previous.id);
+      if(!current) continue;
+      if(!next) {
+        if(JSON.stringify(current)===JSON.stringify(previous)) value[collection]=value[collection].filter(entry=>entry!==current);
+        continue;
+      }
+      const routeEdited=JSON.stringify(current.route)!==JSON.stringify(previous.route);
+      for(const [key,entry] of Object.entries(next)) {
+        if(routeEdited&&["area","route","memberPlans","spawnOffsets"].includes(key)) continue;
+        if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
+      }
+    }
+  }
+  const triggerIds=new Set(value.groups.map(group=>group.triggerId));
+  for(const previous of FLOW_PREVIOUS_AMBUSH.triggers) {
+    if(!defaults.triggers.some(trigger=>trigger.id===previous.id)&&triggerIds.has(previous.id)
+      &&!value.triggers.some(trigger=>trigger.id===previous.id)) value.triggers.push(structuredClone(previous));
+  }
+  value.revision=defaults.revision;
+  return value;
+}
+
 function UpgradeCampCover(value,defaults) {
   for(const formation of FLOW_GROUND_FORMATIONS.filter(entry=>entry.holdUntil)) {
     const current=value.groups.find(group=>group.id===formation.id),next=defaults.groups.find(group=>group.id===formation.id);
@@ -543,7 +571,7 @@ function UpgradeLegacyEncounterDocument(input,defaults) {
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
-  if(upgraded===input && !["2026-11-13-pit-retreat-1","2026-11-14-friend-reinforcements-1"].includes(input.revision)) return input;
+  if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,"2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const current=value.groups.find(entry=>entry.id===reinforcement.id);
@@ -559,5 +587,5 @@ export function UpgradeEncounterDocument(input,defaults) {
     const trigger=value.triggers.find(entry=>entry.id===current.triggerId);
     if(trigger?.mode==="time" && trigger.delay===0 && trigger.beat===previous.beat) trigger.beat=next.beat;
   }
-  return UpgradeCampCover(value,defaults);
+  return UpgradeAmbush(UpgradeCampCover(value,defaults),defaults);
 }

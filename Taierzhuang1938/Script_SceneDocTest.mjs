@@ -99,12 +99,14 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   const { doc: wb, heights: carved, pre, plan } = ReadSceneSync("FirstLevelWhitebox");
   const formal = ReadSceneSync("FirstLevel");
   const campIds = ["CampNorthWestDefense", "CampNorthCenterDefense", "CampEastDefense"];
-  Check(plan && plan.segments.length === 46 && wb.trenches.segments.length === 46 && formal.doc.trenches.segments.length === 28,
-    "白盒 46 段样条沟，含前哨、翼侧折返、救护支沟与四处逆袭踏步；正式场景 28 段");
+  const ambushIds = ["AmbushNorthDefense", "AmbushRearDefense", "AmbushWestGun"];
+  Check(plan && plan.segments.length === 49 && wb.trenches.segments.length === 49 && formal.doc.trenches.segments.length === 28,
+    "白盒 49 段样条沟，含前哨、翼侧折返、救护支沟与四处逆袭踏步；正式场景 28 段");
   Check(campIds.every(id => wb.trenches.segments.some(segment => segment.id === id)), "集结处北侧两条、东侧一条阻击壕齐全");
   Check(formal.doc.trenches.segments.every(segment => wb.trenches.segments.some(entry => entry.id === segment.id)), "白盒保留原有 28 段壕沟身份");
   Check(formal.doc.trenches.segments.filter(segment => /^11/.test(segment.group || "")).every(segment =>
     JSON.stringify(segment) === JSON.stringify(wb.trenches.segments.find(entry => entry.id === segment.id))), "后段壕沟仍与原场景逐项一致");
+  Check(ambushIds.every(id => wb.trenches.segments.some(segment => segment.id === id)), "弯口北侧阻击壕、侧袭出发壕、西侧机枪浅壕齐全");
   // 高度图是没挖的；现挖之后沟底在基准面下约一个沟深
   const t = wb.terrain, at = (h, x, z) => h[Math.round((z - t.minZ) / t.cellM) * (t.cols + 1) + Math.round((x - t.minX) / t.cellM)];
   const fm = plan.segments.find((s) => s.id === "FrontMid"), st = fm.stations[Math.floor(fm.stations.length / 2)];

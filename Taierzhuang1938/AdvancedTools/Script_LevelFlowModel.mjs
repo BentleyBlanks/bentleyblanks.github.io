@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD, FLOW_YAOWA_RETURN } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD, FLOW_YAOWA_RETURN, FLOW_AMBUSH_DEFENSE } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -44,8 +44,8 @@ const winterKeys = Keys([
   ["03h",0.68,35,114], ["03h",0.86,35,129], ["03h",1,35,140],
   ["04a",1,48,150], ["04b",1,48,150], ["04c",1,48,150],
   ["04d",1,60,157], ["05a",0.2,72,158.6], ["05a",0.45,83,163],
-  ["05a",0.7,83,178], ["05a",1,80,201], ["05b",1,84.5,216], ["05c",1,86.5,227],
-  ["06a",1,87,239], ["06b",0.25,87,239], ["06b",1,93.2,243], ["06c",1,93.2,243],
+  ["05a",0.7,83,194], ["05a",1,86,225], ["05b",1,87,245], ["05c",1,89,264],
+  ["06a",1,92,280], ["06b",0.25,92,280], ["06b",1,94,280], ["06c",1,94,280],
   ["06d",0.25,92,247], ["06d",0.5,87,261], ["06d",0.75,93,277], ["06d",1,97,292],
   ["06h",1,97,292], ["06i",0.6,97.5,300], ["06i",1,96,314],
   ["07a",1,95,328], ["07b",1,97,338], ["07c",1,100,352],
@@ -70,8 +70,8 @@ function LaneAtZ(z) {
 
 const cartKeys = Keys([
   ["01a",0,55,155], ["04d",0,55,155], ["04d",1,64,158],
-  ["05a",0.3,80,159], ["05a",0.6,83,180], ["05a",1,83,211],
-  ["05b",1,87,229], ["05c",1,88,241], ["06a",1,94,274],
+  ["05a",0.3,80,159], ["05a",0.6,83,203], ["05a",1,86,240],
+  ["05b",1,87,260], ["05c",1,91,280], ["06a",1,97,292],
   ["06b",1,97,292], ["06h",1,97,292], ["06i",0.6,97.5,300],
   ["06i",1,96,314], ["07a",1,95,328], ["07b",1,97,338], ["07c",1,100,352],
   ["08a",1,104.6,379.3], ["09j",1,104.6,379.3],
@@ -100,6 +100,13 @@ function CartAt(time) {
   const point=SampleRoute(cartRoute,distance/total);
   const before=SampleRoute(cartRoute,(distance-0.6)/total),after=SampleRoute(cartRoute,(distance+0.6)/total);
   return {point,heading:Math.atan2(after[0]-before[0],-(after[1]-before[1]))};
+}
+function CartFollower(time,side,forward) {
+  const distance=Track(cartDistanceKeys,time)[0]+forward,total=cartLengths.at(-1);
+  const point=SampleRoute(cartRoute,distance/total);
+  const before=SampleRoute(cartRoute,(distance-6)/total),after=SampleRoute(cartRoute,(distance+6)/total);
+  const heading=Math.atan2(after[0]-before[0],-(after[1]-before[1]));
+  return [point[0]+Math.cos(heading)*side,point[1]+Math.sin(heading)*side];
 }
 const loadingCart=CartAt(BeatById("06d").start),loadingStart=Track(winterKeys,BeatById("06c").start);
 const winterLoadingRoute=[loadingStart,LaneAtZ(loadingStart[1]),
@@ -304,6 +311,7 @@ function ReturnFromPit(actors, time) {
 
 let companionTracks = null;
 const campDefenseTracks = FLOW_CAMP_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
+const ambushDefenseTracks = FLOW_AMBUSH_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
 const dragRearguardTracks = FLOW_DRAG_REARGUARD.map(plan => ({...plan,track:Keys(plan.keys),
   fall:BeatById(plan.fallBeat).start+BeatById(plan.fallBeat).duration*plan.fallFraction}));
 
@@ -336,7 +344,38 @@ function CampActors(actors, time) {
   }
 }
 
-function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").start+BeatById("03h").duration*0.5) {
+function AmbushActors(actors,time) {
+  if(time<BeatById("06a").start||time>=BeatById("07a").start) return;
+  for(const plan of ambushDefenseTracks) {
+    const actor=actors.find(entry=>entry.id===plan.id),p=Track(plan.track,time);
+    const moving=Distance(p,Track(plan.track,time+0.02))>0.001;
+    Object.assign(actor,{p,pose:moving?"run":"shoot",firing:!moving,heavy:plan.heavy===true&&!moving,
+      status:moving?"沿壕转移阵位":plan.heavy?"西侧浅壕吸引机枪塔":"弯北壕内交叉阻击"});
+  }
+}
+
+function EvacuationActors(actors,time,cart) {
+  if(time<BeatById("06a").start||time>=BeatById("07a").start) return;
+  const start=BeatById("06a").start,returnStart=BeatById("06h").start,finish=BeatById("06h").end;
+  const shelter=LaneAtZ(314),geng=actors.find(actor=>actor.id==="geng"),nier=actors.find(actor=>actor.id==="nier");
+  const finalTime=BeatById("06i").end,initial=CartAt(start),final=CartAt(finalTime);
+  const Offset=(state,side,forward)=>[state.point[0]+Math.cos(state.heading)*side+Math.sin(state.heading)*forward,
+    state.point[1]+Math.sin(state.heading)*side-Math.cos(state.heading)*forward];
+  for(const [index,id] of ["ammoCarrier1","ammoCarrier2"].entries()) {
+    const actor=actors.find(entry=>entry.id===id),shelter=LaneAtZ(310+index*3);
+    actor.p=Track([[start,...CartFollower(start,index?1.8:-1.8,-1-index*1.8)],
+      [start+30,...shelter],[finish,...shelter],[finalTime,...CartFollower(finalTime,index?1.8:-1.8,-1-index*1.8)]],time);
+    actor.status="先过南弯，远离阻击阵地";
+  }
+  geng.p=Track([[start,...CartFollower(start,-0.95,1.2)],[start+30,...shelter],
+    [returnStart,...shelter],[returnStart+18,96,289],[finish,96,289],
+    [finalTime,...CartFollower(finalTime,-0.95,1.2)]],time);
+  geng.status=time<returnStart?"南弯后照应老乡":"回车边递第二捆";
+  nier.p=Track([[start,...Offset(initial,1,0.6)],[start+32,...LaneAtZ(317)],
+    [finish,...LaneAtZ(317)],[BeatById("06i").end,...Offset(final,1,0.6)]],time);
+}
+
+function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").start) {
   const cartState=CartAt(time),cart=cartState.point,heading=cartState.heading;
   const CartOffset=(side,forward)=>[cart[0]+Math.cos(heading)*side+Math.sin(heading)*forward,cart[1]+Math.sin(heading)*side-Math.cos(heading)*forward];
   const loadingProgress=Clamp((time-BeatById("06c").start)/BeatById("06c").duration,0,1);
@@ -369,12 +408,12 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   if (Number(beat.stage) >= 4) {
     actors.push(Actor("cart", "老耿的车", "civilian", "cart", cart, "stand",{heading}));
     actors.push(Actor("donkey", "毛驴", "civilian", "donkey", CartOffset(0,2.3), "walk",{heading}));
-    actors.push(Actor("geng", "老耿", "civilian", "person", CartOffset(-0.95,1.2), "stand"));
+    actors.push(Actor("geng", "老耿", "civilian", "person", CartFollower(time,-0.95,1.2), "stand"));
     if(Number(beat.stage)<8) {
       const evacuating=time>=BeatById("04d").start;
       Object.assign(actors.at(-1),{pose:evacuating?"run":"stand",status:evacuating?"趁阻击带车后撤":"等待装运"});
       for(const [index,member] of FLOW_CAMP_LOADING.members.slice(1).entries()) {
-        actors.push(Actor(member.id,member.name,"civilian","person",CartOffset(index?1.8:-1.8,-1-index*1.8),evacuating?"run":"stand",
+        actors.push(Actor(member.id,member.name,"civilian","person",CartFollower(time,index?1.8:-1.8,-1-index*1.8),evacuating?"run":"stand",
           {status:evacuating?"弹药已装车，随车后撤":"等待搬运"}));
       }
     }
@@ -387,7 +426,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   }
   if (time >= tankStart) {
     const burned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
-    const tankTime=time-tankStart+BeatById("03h").start+BeatById("03h").duration*0.5;
+    const tankTime=time-tankStart+BeatById("06a").start;
     const first=TankState(tankKeys,tankTime),second=TankState(secondTankKeys,tankTime);
     const disabled=time>=BeatById("06g").start;
     if(disabled) {first.moving=false;first.status=burned?"焚毁":"履带损毁";}
@@ -419,6 +458,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
     if(companionTracks[actor.id]) actor.p=Track(companionTracks[actor.id],time);
   }
   CampActors(actors, time);
+  AmbushActors(actors,time);
   if(time>=BeatById("03a").start && time<BeatById("04a").end) {
     for(const plan of dragRearguardTracks) {
       const p=Track(plan.track,Math.min(time,plan.fall));
@@ -448,6 +488,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   }
   ReturnFromPit(actors, time);
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
+  EvacuationActors(actors,time,cart);
   return actors;
 }
 
@@ -575,7 +616,7 @@ function Effects(beat, time, progress, actors) {
     if (beat.fire === "crossfire" && westGun.pose !== "run") effects.push({kind:"fire",a:westGun.p,b:gunner.p,side:"friend",phase:(time*3)%1,heavy:true});
   }
   if (beat.id === "03g") effects.push({kind:"fire",a:[22,69.5],b:[12,44],side:"friend",phase:(time*5)%1,heavy:true});
-  if (["06g","06h"].includes(beat.id)) effects.push({kind:"fire",a:[81,278],b:tank.p,side:"friend",phase:(time*5)%1});
+  if (["06g","06h"].includes(beat.id)&&tank) effects.push({kind:"fire",a:actors.find(actor=>actor.id==="yao").p,b:tank.p,side:"friend",phase:(time*5)%1});
   if (beat.fx === "planes") {
     for (let index=0;index<3;index++) effects.push({kind:"plane",p:[105+(index-1)*9,180+progress*150-index*6],height:35});
   }

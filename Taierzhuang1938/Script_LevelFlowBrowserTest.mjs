@@ -492,7 +492,7 @@ try {
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424&x=73&z=115&zoom=5.5`);
   await ReadyPlan();
   const early=await page.evaluate(()=>LevelFlow.Inspect());
-  assert.ok(early.actors.some(actor=>actor.kind==='tank'),'vehicle threat is present during dragging before collection');
+  assert.ok(!early.actors.some(actor=>actor.kind==='tank'),'infantry pressure precedes the tank pursuit');
   await page.screenshot({path:path.join(out,'EarlyGroundEncounter.png')});
   await page.evaluate(()=>LevelFlow.Seek(341));
   const alignment=await page.evaluate(()=>{
@@ -748,6 +748,24 @@ try {
   await page.evaluate(()=>LevelFlow.JumpBeat('08c'));
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties'&&actor.pose==='dead').length),2);
   await page.screenshot({path:path.join(out,'VillageBodies08C.png')});
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${FLOW_TIMELINE.find(beat=>beat.id==='05b').start+5.8964}&x=91&z=251&zoom=4`);
+  await page.waitForFunction(()=>window.LevelFlow);
+  await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
+  const departure=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.ok(!departure.actors.some(actor=>actor.kind==='tank'||['LaneGround','BendGround'].includes(actor.groupId)));
+  assert.ok(departure.actors.find(actor=>actor.id==='geng').p[1]>240);
+  await page.screenshot({path:path.join(out,'AmbushEvacuation05B.png')});
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${FLOW_TIMELINE.find(beat=>beat.id==='06e').start+15.0142}&x=96&z=286&zoom=7`);
+  await page.waitForFunction(()=>window.LevelFlow);
+  await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
+  const ambush=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(ambush.actors.filter(actor=>actor.kind==='tank').length,2);
+  assert.equal(ambush.actors.filter(actor=>['luo','he','liu','yao'].includes(actor.id)&&actor.firing).length,4);
+  assert.ok(ambush.actors.find(actor=>actor.id==='geng').p[1]>=310);
+  await page.screenshot({path:path.join(out,'AmbushCrossfire06E.png')});
+  await page.evaluate(time=>LevelFlow.Seek(time),FLOW_TIMELINE.find(beat=>beat.id==='06h').start+35);
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.find(actor=>actor.id==='tank1').disabled),true);
+  await page.screenshot({path:path.join(out,'AmbushFrontApproach06H.png')});
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

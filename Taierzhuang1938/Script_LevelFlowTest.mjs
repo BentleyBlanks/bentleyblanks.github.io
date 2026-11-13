@@ -169,8 +169,9 @@ for(let time=BeatById("03h").start;time<BeatById("03h").end-6;time+=1) {
 assert.equal(EvaluateFlow(BeatById("03h").start+12).actors[0].pose,"shoot");
 const tankBefore=EvaluateFlow(BeatById("06a").start-0.001).actors.find((actor)=>actor.id==="tank1");
 const tankAfter=EvaluateFlow(BeatById("06a").start+0.001).actors.find((actor)=>actor.id==="tank1");
-assert.ok(Distance(tankBefore.p,tankAfter.p)<0.01,"tank follows a continuous approach before 06");
-assert.ok(EvaluateFlow(BeatById("05b").start).actors.some((actor)=>actor.id==="tank1"));
+assert.equal(tankBefore,undefined,"the infantry hold precedes the vehicle pursuit");
+assert.ok(tankAfter,"the first tank arrives at 06A, not during the camp hold");
+assert.ok(!EvaluateFlow(BeatById("05b").start).actors.some((actor)=>actor.kind==="tank"));
 for(let time=0;time<=FLOW_DURATION;time+=0.5) {
   const frame=EvaluateFlow(time);
   for(const actor of frame.actors) assert.ok(actor.p.every(Number.isFinite),`${time} ${actor.id}`);
@@ -212,14 +213,14 @@ for(const point of [[0,-4],[0,0],[21.9,67.1],[63,64.5],[35,144.5],[56,152],[58.2
 for(const id of ["SW","ES","SE_N","SE","NE","NE_S"]) assert.ok(map.roads.some((road)=>road.id===id),`${id} curved alley is present`);
 // Ground-level pursuit starts before the casualty collection point.
 const tankGate=baseline.groups.find((group)=>group.id==="TankEscort");
-assert.ok(tankGate.start>BeatById("03h").start&&tankGate.start<BeatById("04a").start);
+assert.equal(tankGate.start,BeatById("06a").start);
 const missedTank=structuredClone(defaults);
 missedTank.triggers.find((trigger)=>trigger.id==="Trigger_TankEscort").area.center=[300,300];
 assert.ok(!EvaluateFlow(ReferenceTime(652.25),missedTank).actors.some((actor)=>actor.kind==="tank"),"moving the early trigger also controls vehicle arrival");
 const noEscort=structuredClone(defaults);noEscort.groups.find((group)=>group.id==="TankEscort").enabled=false;
 assert.ok(EvaluateFlow(ReferenceTime(652.25),noEscort).actors.some((actor)=>actor.id==="tank1"),"turning off infantry preserves the triggered vehicle");
 let movingTanks=0,waitingTanks=0,grenadeFrames=0,earlyGrenades=0;
-for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
+for(let time=BeatById("03h").start;time<BeatById("06i").end;time+=0.5) {
   const frame=EvaluateFlow(time);
   const grenades=frame.effects.filter((effect)=>effect.kind==="grenade"&&effect.side==="enemy");
   grenadeFrames+=grenades.length;
@@ -294,7 +295,7 @@ assert.ok(!groundDocument.value.groups.some(group=>group.id==="TankRearScreen"))
 groundDocument.Replace(previousGroundDraft);
 assert.equal(groundDocument.value.revision,defaults.revision,"imports receive the same ground formation migration");
 ValidateEncounterDocument(groundDocument.value,FLOW_TIMELINE);
-assert.equal(map.ramps.length,12);
+assert.equal(map.ramps.length,13);
 assert.equal(map.objects.filter((object)=>object.planning).length,FLOW_GROUND.cover.length);
 for(const ramp of map.ramps) {
   assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
@@ -321,7 +322,7 @@ oldDraft.groups=oldDraft.groups.filter((group)=>group.id!=="SearchNeighbor");
 const oldStorage={getItem:()=>JSON.stringify(oldDraft),setItem:()=>{}};
 const upgraded=new EncounterDocument(defaults,FLOW_TIMELINE,oldStorage).value;
 const upgradedEscort=upgraded.groups.find((group)=>group.id==="TankEscort");
-assert.equal(upgradedEscort.count,9);assert.equal(upgradedEscort.beat,"03h");
+assert.equal(upgradedEscort.count,9);assert.equal(upgradedEscort.beat,"06a");
 assert.deepEqual(upgradedEscort.route,defaults.groups.find((group)=>group.id==="TankEscort").route);
 assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
 assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
