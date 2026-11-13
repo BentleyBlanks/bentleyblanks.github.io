@@ -8,6 +8,23 @@ export const FLOW_SOURCE = {
   notice: "调度预演 · 点位与时刻为演示值",
 };
 
+// Restore the existing 08A screenplay beat. Seconds are relative to 08A,
+// after the squad reaches the village mouth. Bodies remain on the same street.
+export const FLOW_VILLAGE_CASUALTIES = {
+  beat: "08a",
+  gunGroup: "VillageGun",
+  burstLeadSeconds: 0.65,
+  fallSeconds: 0.85,
+  members: [
+    {id: "villager2", name: "逃出院门的村民", keys: [
+      [20,104.8,432.5], [20.7,103.25,432.5], [21.4,101.2,432.5], [26,101.2,419],
+    ]},
+    {id: "villager3", name: "跟着逃上主街的村民", keys: [
+      [21.4,105.2,432.5], [22.2,103.25,432.5], [23.2,99.8,432.5], [28.4,99.8,417.8],
+    ]},
+  ],
+};
+
 export const FLOW_STAGES = [
   { id: "01", title: "防炮洞", status: "定稿", bounds: [0, 90, -15, 100] },
   { id: "02", title: "刺刀", status: "定稿", bounds: [12, 83, 37, 90] },
@@ -304,7 +321,7 @@ export const FLOW_BEATS = [
     passage: "何有田：「保长拿绳子捆来的，还给他们卖命。」冬瓜（车上）：「……一根绳子上的。」", task: "跟着车继续向南", threat: "暂时脱离近敌", gate: "报数结束", exit: "注意转向东北" },
   { id: "07c", stage: "07", duration: 18, title: "东北大队扬土，庄东冒烟", p: [[96,332],[98.5,344]], pose: "look",
     passage: "东北远处一长溜大队带着骡驮山炮扬土，耿家庄东头冒烟。班长：「耿家庄。走。」", task: "看东北，再向耿家庄走", threat: "东北大队 → 庄东；为村战建立方向", gate: "大队进入远景", exit: "接村口枪眼", fx: "column" },
-  { id: "08a", stage: "08", duration: 35, title: "村口，主街正对枪眼", p: [[98.5,344],[101.5,362],[100,378],[100,383]], pose: "crouch",
+  { id: "08a", stage: "08", duration: 35, title: "村口，主街正对枪眼", p: [[98.5,344],[101.5,362],[100,378],[100,383],[100,383]], pace: [0,0.23,0.45,0.55,1], pose: "crouch",
     passage: "主街笔直，正对着枪眼，上了街就没处躲；活下来的都是走岔路出来的。枪眼里又打出一梭。", task: "进路沟，伏在坡道", threat: "南面枪眼沿主街向北打", gate: "队伍进入村口路沟", exit: "后送队藏到东半截", fire: "loophole", zone: [100,380,4] },
   { id: "08b", stage: "08", duration: 35, title: "东边来敌，西边泥水", p: [[100,383]], pose: "crouch",
     passage: "班长：“东边是狗日的来的路，走不得。”老耿：“西边是河汊子，坎陡，水齐腰深，底下全是烂泥。”", task: "留在沟里，等班长定计", threat: "东侧进庄；南面机枪封街", gate: "后送队被枪眼拦住", exit: "确认担架走不了河汊子", fire: "loophole" },

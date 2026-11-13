@@ -3,6 +3,7 @@ import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLO
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { FLOW_VILLAGE_CASUALTIES } from "./Data_LevelFlow.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -131,6 +132,38 @@ function TankState(keys,time) {
 
 function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
   return { id, name, side, kind, p, pose, ...extra };
+}
+
+function VillageCasualties(time) {
+  const staging = FLOW_VILLAGE_CASUALTIES;
+  const start = BeatById(staging.beat).start;
+  return staging.members.flatMap(member => {
+    const keys = member.keys.map(([seconds, x, z]) => [start + seconds, x, z]);
+    if (time < keys[0][0]) return [];
+    const fall = keys.at(-1)[0];
+    const falling = time >= fall;
+    const fallProgress = Clamp((time - fall) / staging.fallSeconds, 0, 1);
+    return [Actor(member.id, member.name, "civilian", "person", Track(keys, time),
+      falling ? fallProgress < 1 ? "hit" : "dead" : "run",
+      {groupId: "VillageCasualties", born: keys[0][0], fall, heading: 0,
+        ...(falling ? {fallProgress} : {}),
+        status: falling ? fallProgress < 1 ? "机枪命中，扑倒" : "中弹身亡" : "冲出院门，沿主街逃跑"})];
+  });
+}
+
+function VillageGunfire(time, actors, effects) {
+  const staging = FLOW_VILLAGE_CASUALTIES;
+  const victim = actors.find(actor => actor.groupId === "VillageCasualties"
+    && time >= actor.fall - staging.burstLeadSeconds && time <= actor.fall + staging.fallSeconds);
+  const gunner = actors.find(actor => actor.groupId === staging.gunGroup && actor.firing);
+  if (!victim || !gunner) return;
+  // The existing gunner turns from the ramp to the escaping civilian.
+  const shot = effects.find(effect => effect.kind === "fire" && Distance(effect.a, gunner.p) < 0.01);
+  const burst = {kind: "fire", a: gunner.p, b: victim.p, side: gunner.side, heavy: true,
+    phase: time >= victim.fall && time < victim.fall + 0.15 ? 0 : ((time - victim.fall) * 8 % 1 + 1) % 1,
+    sourceId: gunner.id, targetId: victim.id};
+  if (shot) Object.assign(shot, burst);
+  else effects.push(burst);
 }
 
 function RouteLength(route) {
@@ -564,6 +597,7 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const tankTrigger=compiledDocuments.get(document).triggers.find((trigger)=>trigger.id==="Trigger_TankEscort");
   const tankStart=tankTrigger?.firedAt??Infinity;
   const actors = CoreActors(beat,time,player,progress,tankStart);
+  actors.push(...VillageCasualties(time));
   const encounter = SampleEncounters(compiledDocuments.get(document), time, actors, (sampleTime)=>{
     const sampleBeat=FLOW_TIMELINE.find((entry)=>sampleTime<entry.end)??FLOW_TIMELINE.at(-1);
     const sampleProgress=Clamp((sampleTime-sampleBeat.start)/sampleBeat.duration,0,1);
@@ -571,6 +605,7 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   });
   actors.push(...OpeningActors(time), ...encounter.actors);
   const effects = [...Effects(beat,time,progress,actors), ...encounter.effects];
+  VillageGunfire(time, actors, effects);
   if (beat.id === "03h") {
     actors[0].pose = (progress >= 0.22 && progress < 0.32) || (progress >= 0.5 && progress < 0.6) ? "shoot" : "drag";
     const pursuer = encounter.actors.find(actor => actor.wave === "RearPursuit" && actor.pose !== "dead");

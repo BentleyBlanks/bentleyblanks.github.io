@@ -665,6 +665,32 @@ try {
   const rescueReady=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')));
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='branch'&&actor.p[0]<36&&actor.p[1]<68).length,6,'branch relief stops west of the Japanese positions');
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='south'&&actor.p[1]>72).length,6,'southern relief spreads behind the berm');
+  await page.evaluate(()=>{
+    LevelFlow.SetPlaying(false);
+    LevelFlow.SetLayout(1);
+    LevelFlow.SetViewType(0,'scene');
+    const layout=LevelFlow.Packet().context.viewports;
+    Object.assign(layout.views[0],{mode:'manual',center:[100,426],freeCamera:{eye:[100,13,399],yaw:0,pitch:-0.4},focusDistance:30});
+    LevelFlow.RestoreViewports(layout);
+    LevelFlow.Seek(1084);
+  });
+  const villageRunners=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties'));
+  assert.equal(villageRunners.length,2);
+  assert.ok(villageRunners.every(actor=>actor.pose==='run'));
+  await page.screenshot({path:path.join(out,'VillageEscape.png')});
+  await page.evaluate(()=>LevelFlow.Seek(1086.05));
+  const villageHit=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(villageHit.actors.find(actor=>actor.id==='villager2').pose,'hit');
+  assert.ok(await page.evaluate(()=>LevelFlow.Evaluate(1086.05).effects.some(effect=>effect.targetId==='villager2'&&effect.phase<0.3)));
+  await page.screenshot({path:path.join(out,'VillageMachineGunHit.png')});
+  await page.evaluate(()=>{LevelFlow.Seek(1088.1);LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>1089.4);
+  await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties').every(actor=>actor.pose==='dead')));
+  await page.screenshot({path:path.join(out,'VillageBodies.png')});
+  await page.evaluate(()=>LevelFlow.JumpBeat('08c'));
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties'&&actor.pose==='dead').length),2);
+  await page.screenshot({path:path.join(out,'VillageBodies08C.png')});
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

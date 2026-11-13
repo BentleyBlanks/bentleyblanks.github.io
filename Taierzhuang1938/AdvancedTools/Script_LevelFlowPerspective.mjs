@@ -402,6 +402,18 @@ export class FlowPerspectiveView extends FlowMapView {
       for(const side of [-0.1,0.1]) Segment(Point(side,1.2,0.8),Point(side,1.5,0.75),2);
       return;
     }
+    if(actor.fallProgress !== undefined) {
+      const angle=actor.fallProgress*Math.PI/2;
+      const Point=(side,height)=>[x+side,base+0.1+height*Math.cos(angle),z-height*Math.sin(angle)];
+      Segment(Point(0,0.55),Point(0,1.3),3.5);
+      for(const side of [-1,1]) {
+        Segment(Point(0,0.55),Point(side*0.22,0),2);
+        Segment(Point(0,1.05),Point(side*0.4,0.75),2);
+      }
+      const head=this.Vertex(Point(0,1.55)),neck=this.Vertex(Point(0,1.3));
+      if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
+      return;
+    }
     if(actor.pose==="dead") {Segment([x-0.5,base+0.1,z],[x+0.5,base+0.1,z]);return;}
     if(actor.heavy) {
       Segment([x,base+0.85,z],[x,base+0.85,z-1.5],3);

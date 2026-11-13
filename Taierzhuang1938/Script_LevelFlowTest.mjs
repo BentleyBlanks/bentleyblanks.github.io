@@ -767,6 +767,35 @@ for(let stamp=BeatById("05a").start;stamp<BeatById("08a").end;stamp+=0.5) {
 }
 for(let stamp=BeatById("06b").end;stamp<BeatById("06h").end;stamp+=1) assert.deepEqual(ActorAt("cart",stamp).p,ActorAt("cart",BeatById("06b").end).p,"stalled cart stays at its authored waiting point");
 assert.ok(Distance(ActorAt("cart",BeatById("09a").start).p,[104.6,379.3])<1e-6,"village parking matches the archived spatial diagram");
+// 08A must act out the source passage, including the machine-gun targets.
+const villageStart = BeatById("08a").start;
+const VillageActors = time => EvaluateFlow(time).actors.filter(actor => actor.groupId === "VillageCasualties");
+assert.equal(VillageActors(villageStart + 19.9).length, 0);
+assert.deepEqual(EvaluateFlow(villageStart + 19.9).player, [100,383], "the player reaches the ramp before the villagers emerge");
+assert.equal(VillageActors(villageStart + 24).length, 2);
+assert.ok(VillageActors(villageStart + 24).every(actor => actor.pose === "run" && actor.p[0] > 97 && actor.p[0] < 103.25),
+  "both civilians emerge from the east gate and run north in the exposed street");
+for (const [id, seconds] of [["villager2",26], ["villager3",28.4]]) {
+  const impact = EvaluateFlow(villageStart + seconds + 0.05);
+  const victim = impact.actors.find(actor => actor.id === id);
+  const shot = impact.effects.find(effect => effect.targetId === id);
+  assert.equal(victim.pose, "hit");
+  assert.ok(victim.fallProgress > 0 && victim.fallProgress < 1);
+  assert.equal(impact.actors.find(actor => actor.id === shot.sourceId).groupId, "VillageGun");
+  assert.deepEqual(shot.b, victim.p);
+  assert.ok(shot.heavy && shot.phase < 0.3, "the visible machine-gun burst coincides with the hit");
+  const corpse = VillageActors(villageStart + seconds + 1).find(actor => actor.id === id);
+  assert.equal(corpse.pose, "dead");
+  assert.deepEqual(corpse.p, victim.p, "the body stays where the villager was shot");
+  assert.deepEqual(ActorAt(id, BeatById("08c").start).p, corpse.p);
+  assert.deepEqual(ActorAt(id, BeatById("10b").start).p, corpse.p, "returning stretchers pass the same bodies");
+}
+const villageSnapshot = EvaluateFlow(villageStart + 26.4);
+EvaluateFlow(0); EvaluateFlow(BeatById("10a").start);
+assert.deepEqual(EvaluateFlow(villageStart + 26.4), villageSnapshot, "rewinding restores the same run, burst and fall");
+const oldVillageDocument = new EncounterDocument(defaults, FLOW_TIMELINE, {getItem:()=>JSON.stringify(previousDraft), setItem:()=>{}}).value;
+assert.deepEqual(EvaluateFlow(BeatById("08c").start, oldVillageDocument).actors.filter(actor => actor.groupId === "VillageCasualties"),
+  VillageActors(BeatById("08c").start), "saved encounter drafts also receive the missing screenplay actors");
 const boardedWinter=ActorAt("winter",BeatById("06d").start),boardingWinter=ActorAt("winter",BeatById("06d").start-0.001);
 assert.equal(boardedWinter.parentId,"cart","06D opens with winter already on the cart, matching its source passage");
 assert.ok(Distance(boardedWinter.p,boardingWinter.p)<0.01&&Math.abs(boardedWinter.elevation-boardingWinter.elevation)<0.01,"boarding has a continuous position and lift");
