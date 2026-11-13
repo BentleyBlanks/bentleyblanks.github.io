@@ -11,21 +11,21 @@ import * as THREE from "three";
 import {
   Panel, Section, Row, ButtonRow, Slider, Chips, Toggle, Select, ListBox,
   Facts, Note, TextArea, El, CameraProjectionControls,
-} from "./Script_EditorUi.mjs";
-import { PickWorld, ScreenRay } from "./Script_EditorStage.mjs";
-import { MarkNoPrepass } from "./Script_Post.mjs";
-import { MakeRoadPath } from "./Script_RoadPath.mjs";
+} from "../Script_EditorUi.mjs";
+import { PickWorld, ScreenRay } from "../Script_EditorStage.mjs";
+import { MarkNoPrepass } from "../Script_Post.mjs";
+import { MakeRoadPath } from "../Script_RoadPath.mjs";
 import {
   PROP_PCG_DOCUMENT, PROP_PCG_PROFILE_OPTIONS, PROP_PCG_PROFILES,
-} from "./Data_PropPcg.mjs";
+} from "../Data_PropPcg.mjs";
 import {
   GeneratePropPcg, NormalizePropPcgDocument, PropPcgSummary, ValidatePropPcgDocument,
-} from "./Script_PropPcg.mjs";
+} from "../Script_PropPcg.mjs";
 import {
   BasePlacements, ExternalPropCatalog, InstantiateExternalProp,
-} from "./Script_ExternalProps.mjs";
-import { TownDressingFor } from "./Script_TownDressing.mjs";
-import { TOOL_INFO } from "./Data_DevTools.mjs";
+} from "../Script_ExternalProps.mjs";
+import { TownDressingFor } from "../Script_TownDressing.mjs";
+import { TOOL_INFO } from "../Data_DevTools.mjs";
 
 const STORE_KEY = "tengxian1938_propPcg_v2";
 const DEFAULT_FAR = 2200;

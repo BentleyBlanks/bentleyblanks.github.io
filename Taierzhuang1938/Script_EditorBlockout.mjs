@@ -342,11 +342,10 @@ export class EditorBlockout {
     this.previzSignals = null;
     // Timeline 过场面板（docs/Data_EditorSuite.md「Timeline 过场」）：?timeline=<Id> 时开机就打开；它驱动的是上面这一个预演播放器
     this.timeline = new TimelinePanel(this);
-    // 环境面板（docs/Data_Environment.md §8）：顶栏「环境」按钮开；?env=1 开机就打开
+    // 共用环境控制器负责关键帧时间与磁盘同步，参数窗口从 Debug工具打开。
     this.environment = new EnvironmentEditor({
       post: host.post, camera: host.camera, renderer: host.renderer,
       uiRoot: () => this.ui.root,
-      addTopBarControl: (el) => this.ui.AddTopBarControl(el),
       setRootClass: (name, on) => this.ui.root.classList.toggle(name, !!on),
       groundAt: (x, z) => this.groundAt(x, z),
       isLocked: () => this.PointerLocked(),
@@ -510,11 +509,8 @@ export class EditorBlockout {
     }
     const timelineId = this.params.get("timeline");
     if (timelineId) this.timeline.Open(timelineId).catch((error) => console.error("[Blockout] Timeline 打不开", error));
-    // 环境面板：读一遍区域与预设（拿版本号、之后外面改了文件 2 s 内同步）；?env=1 或上次开着就打开
-    this.environment.EnsureLoaded().then(() => {
-      if (this.params.get("env") === "1" || this.environment.ui.open) return this.environment.Open();
-      return null;
-    }).catch((error) => console.error("[Blockout] 环境面板读不进来", error));
+    // 读环境配置并维持外部文件同步。
+    this.environment.EnsureLoaded().catch((error) => console.error("[Blockout] 环境配置读不进来", error));
     // 存档口只问一次：界面要写明「这里能不能直接存」。
     this.store.Status().then(status => {
       this.writable = status.writable;

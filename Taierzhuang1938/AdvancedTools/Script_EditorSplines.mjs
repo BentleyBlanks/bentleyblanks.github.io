@@ -41,30 +41,30 @@
 import * as THREE from "three";
 import {
   El, Panel, Section, ButtonRow, Chips, Slider, ListBox, Facts, Note, TextArea, Toggle,
-} from "./Script_EditorUi.mjs";
-import { PHASES } from "./Data_Battle.mjs";
+} from "../Script_EditorUi.mjs";
+import { PHASES } from "../Data_Battle.mjs";
 import {
   STREETS, EAST_SUBURB, EAST_FIELD, WEST_SUBURB, NORTH_SUBURB,
-} from "./Data_Tengxian.mjs";
-import { OutfieldSpec } from "./Script_TengxianOutfield.mjs";
-import { MakeRoadPath } from "./Script_RoadPath.mjs";
-import { BuildRoadRibbon, BuildRailBed, BuildRailwayFromSpec, MakeCrownProfile } from "./Script_RoadSpline.mjs";
+} from "../Data_Tengxian.mjs";
+import { OutfieldSpec } from "../Script_TengxianOutfield.mjs";
+import { MakeRoadPath } from "../Script_RoadPath.mjs";
+import { BuildRoadRibbon, BuildRailBed, BuildRailwayFromSpec, MakeCrownProfile } from "../Script_RoadSpline.mjs";
 import {
   BuildWallSpline, WALL_PRESETS, WallPreset, SetWallPresetOverride, MakeWallAssetSet,
-} from "./Script_WallSpline.mjs";
-import { MakeInstanced, MakeBox, TILE_METERS } from "./Script_Geo.mjs";
-import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+} from "../Script_WallSpline.mjs";
+import { MakeInstanced, MakeBox, TILE_METERS } from "../Script_Geo.mjs";
+import { ResolveTengxianMaterial } from "../Script_TengxianCity.mjs";
 import {
   TRENCH_PRESETS, TrenchPreset, SetTrenchPresetOverride, ClearTrenchPresetOverrides,
   SetTrenchSegmentOverride, ClearTrenchSegmentOverrides, TrenchRevision,
   CompileTrenchNetwork, PlanTrenchDressing,
-} from "./Script_TrenchPlan.mjs";
+} from "../Script_TrenchPlan.mjs";
 import {
   BuildTrenchPreview, BuildTrenchDressingPreview, TRENCH_PREVIEW_COLORS,
-} from "./Script_TrenchSpline.mjs";
-import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
-import { SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
-import { TOOL_INFO } from "./Data_DevTools.mjs";
+} from "../Script_TrenchSpline.mjs";
+import { MISSION_TRENCH_NETWORK } from "../Data_FirstLevelMissionTrenches.mjs";
+import { SampleMissionNaturalHeight } from "../Data_FirstLevelMissionTerrain.mjs";
+import { TOOL_INFO } from "../Data_DevTools.mjs";
 
 const STORE_KEY = "tz1938.sceneSplines.v1";
 const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板存档，读得懂就迁
@@ -431,7 +431,7 @@ export class SplineEditor {
 
   get levelId() {
     const phase = this.host.game.state.builtPhase;
-    return PHASES[phase]?.id || null;
+    return this.host.game.PHASES?.[phase]?.id || PHASES[phase]?.id || null;
   }
 
   Collect() {

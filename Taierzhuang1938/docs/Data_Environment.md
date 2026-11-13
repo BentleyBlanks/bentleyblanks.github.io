@@ -142,7 +142,7 @@ Taierzhuang1938/Environment/Level_<Id>.json      格式同场景的区域文件�
 
 ## 8. 编辑器
 
-入口：白盒编辑器顶栏「环境」按钮；地址带 `?env=1` 开机就打开；高级工具 → 场景 → 「环境」：在白盒编辑器里开它自己的面板，在登记了区域文件的正片关卡里开游戏内面板（§8.7），别的关卡跳到白盒编辑器。界面状态（开没开、哪一页、筛选、搜索、折叠、选中的区域 / 预设、各页滚动位置、时间轴）记在本机 `localStorage`（`tengxian1938_env_editor_v1`）。
+入口为设置或高级工具菜单栏的 Debug工具 → 环境，弹出 `EnvironmentEditor.html`。窗口加载目标场景或正片关卡的环境配置，复用现有参数面板、昼夜时间轴和存盘口。与当前宿主同目标时连接实时环境系统。界面状态保存在 `tengxian1938_env_editor_v1`。
 
 ### 8.1 面板
 
@@ -189,7 +189,7 @@ Taierzhuang1938/Environment/Level_<Id>.json      格式同场景的区域文件�
 
 ### 8.7 正片关卡里的面板
 
-`Script_EditorEnvironmentGame.EnvironmentGameOverlay`：高级工具 → 场景 → 「环境」在登记了区域文件的正片关卡里打开（`Debug.OpenEditor("environment")` 同）。就是 `EnvironmentEditor` 那一个面板，只换宿主适配器（`post / camera / renderer / uiRoot / setRootClass / groundAt / isLocked / target / fallbackSky / flyTo? / beat`）：区域文件是 `Level_<Id>.json`（kind `level`），「这一拍」是当前任务步骤，没有飞行观察所以不显示「飞过去看」；面板放左边、时间轴让开左边，不压高级工具右侧的 Inspector；不暂停玩法、不接管相机；退出高级工具菜单栏后面板还在（keepOnClose），边打边调。只在高级工具里有，Debug工具菜单里没有。
+`Script_EditorEnvironmentWindow.EnvironmentWindowEditor` 是 Debug工具的窗口入口。`Script_EnvironmentWindow` 在窗口中装配同一 `EnvironmentEditor`，目标选择器可加载 `Scenes/<Id>/Environment_<Id>.json` 或 `Environment/Level_<Id>.json`。连接当前场景时显示关键帧或任务步骤，可写入这一拍的时间。参数、撤销重做、文件同步与 revision 冲突检查复用原实现。窗口退出后 Debug 开关复位。
 
 ## 9. 给 agent / 测试
 

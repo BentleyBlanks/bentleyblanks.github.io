@@ -81,7 +81,6 @@ export function FrameModeEditor(ctx, f) {
   // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
   // 墙地仍旧不亮，退出编辑器才突然补算一大步。
   // 高级工具开着、没有互斥编辑器时，第一人称持枪移动检查仍按外部机位出画（玩家停着，替身眼睛不重抄）
-  ctx.editor?.ApplyOverlayCamera(ctx.camera, false);
   if(ctx.editor?.activeId==='vfx')ctx.lights.Update(0,ctx.editor.active.previewTime??ctx.state.elapsed,ctx.camera.position);
   else ctx.lights.Update(dt, ctx.state.elapsed, ctx.camera.position);
   ctx.lights.UpdateShadowFrustum(ctx.camera.position, ctx._forward);

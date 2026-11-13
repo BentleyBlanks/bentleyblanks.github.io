@@ -12,14 +12,13 @@ import { El } from "../Script_EditorUi.mjs";
 import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { BlockoutEntry } from "../Script_EditorBlockoutEntry.mjs";
 import { TimelineEditor } from "../Script_EditorTimeline.mjs";
-import { EnvironmentEntry } from "../Script_EditorEnvironmentEntry.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, StudioToolUrl, GameToolUrl, GAME_PAGE } from "./Data_AdvancedTools.mjs";
 
 /** 控制中心的名字（页面标题与顶栏）。 */
 export const CONTROL_CENTER_TITLE = "AdvancedTool ControlCenter";
 
 const STUDIO_WINDOW_NAME = "TengxianToolStudio";
-const GAME_ENTRY = { blockout: BlockoutEntry, timeline: TimelineEditor, environment: EnvironmentEntry };
+const GAME_ENTRY = { blockout: BlockoutEntry, timeline: TimelineEditor };
 
 /**
  * 每个工具的卡片描述（纯数据，测试直接读）。

@@ -16,7 +16,7 @@ await fs.mkdir(out, { recursive: true });
 const server = await ServeRoot(root, 0), browser = await LaunchBrowser();
 const base = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/`;
 try {
-  for (const [name, width, height] of [["Desktop", 1600, 900], ["Mobile", 390, 844]]) {
+  for (const [name, width, height] of [["Desktop", 1280, 720], ["Mobile", 390, 844]]) {
     const page = await browser.newPage({ viewport: { width, height } }), errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
@@ -46,32 +46,26 @@ try {
       assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null);
       assert.equal(await page.locator("#edRoot .edHome").isVisible(), true, "Esc 先回首页");
 
-      // 场景类工具：先选关卡（菜单栏里点也一样），Esc 只收单子
+      // PCG 卡片打开独立验证宿主。
+      const popupReady = page.waitForEvent("popup");
       await page.click('#edRoot .edHomeTool[data-home-tool="splines"]');
-      await page.waitForSelector("#edRoot .edHomeSheet:not([hidden])");
-      const choices = await page.locator("#edRoot .edHomeChoice").count();
-      assert.equal(choices, 7, "场景样条PCG列出七章");
-      await page.screenshot({ path: path.join(out, "LevelSheet.png") });
-      await page.keyboard.press("Escape");
-      assert.equal(await page.locator("#edRoot .edHomeSheet").isHidden(), true);
-      assert.equal(await page.evaluate(() => window.Tengxian.editor.panelOpen), true, "Esc 收单子不退出");
-      await page.click('#edRoot .edMenu[data-menu="scene"] > .edMenuTitle');
-      await page.click('#edRoot [data-editor="splines"].edMenuItem');
-      await page.waitForSelector("#edRoot .edHomeSheet:not([hidden])");
-      // 只核对跳转地址，不真的建那一关
-      await page.route("**/*tool=splines*", (route) => route.fulfill({ contentType: "text/html", body: "<title>nav fixture</title>" }));
-      await page.locator("#edRoot .edHomeChoice").nth(1).click();
-      await page.waitForURL((url) => url.searchParams.get("tool") === "splines");
-      const target = new URL(page.url());
-      assert.equal(target.searchParams.get("phase"), "1");
-      assert.equal(target.searchParams.get("editor"), "tools");
-      await page.unroute("**/*tool=splines*");
+      const popup = await popupReady;
+      assert.ok(/AdvancedTools\/Tool_Pcg\.html\?tool=splines/.test(popup.url()), popup.url());
+      await popup.close();
 
-      // 首页 Esc = 回标题菜单
-      await page.goto(`${base}?editor=tools&audio=0`, { waitUntil: "domcontentloaded" });
-      await page.waitForFunction(() => window.Tengxian?.editor?.panelOpen, null, { timeout: 300000 });
+      const environmentReady = page.waitForEvent("popup");
+      await page.getByRole("button", { name: "Debug工具", exact: true }).click();
+      await page.click('[data-debug-tool="environment"]');
+      const environment = await environmentReady;
+      await environment.waitForFunction(() => window.EnvironmentWindow?.ready, null, { timeout: 30000 });
+      assert.ok(/EnvironmentEditor\.html/.test(environment.url()));
+      await environment.close();
+      await page.waitForFunction(() => !window.Tengxian.editor.DebugToolStates().find((entry) => entry.id === "environment").on);
+
+      // 首页 Esc 回标题菜单。
       await page.keyboard.press("Escape");
       await page.waitForURL((url) => !url.searchParams.has("editor"), { timeout: 30000 });
+
     }
     assert.deepEqual(errors, [], `${name} 无浏览器错误`);
     await page.close();

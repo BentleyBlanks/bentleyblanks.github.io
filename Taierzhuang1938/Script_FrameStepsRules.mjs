@@ -77,9 +77,6 @@ export function PlayStepMission(ctx, f) {
   // 测试场的自由观察相机（炮击扬尘）：玩家相机写完之后接管，阴影框跟着相机走（玩家留在原地）。
   const sandboxCamera = !!ctx.sandbox?.ApplyCamera?.(ctx.camera);
   if (sandboxCamera) { ctx.camera.getWorldDirection(ctx._forward); ctx.lights.UpdateShadowFrustum(ctx.camera.position, ctx._forward); }
-  // 第一人称持枪移动检查：白盒预演 / 飞行与测试场相机都没接管时，主相机挪到玩家身旁的外部机位
-  //（阴影框留在玩家脚下：机位就在几米内）。
-  if (!blockoutCamera && !sandboxCamera) ctx.editor?.ApplyOverlayCamera(ctx.camera, true);
   ctx.profiler.E("story/mission");
   if(ctx.missionRuntime?.completed){ctx.profiler.E('story');return STOP;}
 }

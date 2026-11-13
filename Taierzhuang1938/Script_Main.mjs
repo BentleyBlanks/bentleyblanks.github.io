@@ -1065,7 +1065,6 @@ for (const { id } of FRAME_MODES) if (!FRAME_MODE_STEPS[id]) throw new Error(`Fr
 // QTE 窗口走真实时间（meleeCombat.Update(realDt)），这里只缩玩法时间。
 clock.Add("meleeQte", (dt) => dt * (meleeCombat?.TimeScale ?? 1), CLOCK_ORDER.meleeQte);
 // 第一人称持枪移动检查的慢放（高级工具 → 武器；没开 = 原样）。
-clock.Add("editor", (dt) => (editor ? editor.ScaleDt(dt) : dt), CLOCK_ORDER.editor);
 /**
  * 物理世界（Rapier）。**与 battlefield 一一对应，换关一起换。**
  * 静态几何在 BuildField 末尾一次性灌进去；玩家、AI、抛掷物、布娃娃都挂在它上面。
@@ -2471,7 +2470,7 @@ async function Boot() {
   editor = CreateDevTools({
     renderer, scene, camera, canvas, library, lights, post, vfx,
     // 环境面板（docs/Data_Environment.md §8）：正片关卡里从 高级工具 → 场景 → 环境 打开，编辑的是这一套
-    environment: { system: env, bridge: envBridge, FirstLevelStep: () => missionRuntime?.flow?.phase?.id || null, PointerLocked },
+    environment: { system: env, bridge: envBridge, FirstLevelStep: () => missionRuntime?.flow?.phase?.id || null, Beat: () => blockout?.BeatInfo() || null, PointerLocked },
     actorFactory, viewmodel, audio, profiler,
     shot: !!SHOT,
     ReleasePointerLock,

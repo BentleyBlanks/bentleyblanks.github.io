@@ -34,6 +34,7 @@ const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "Environment");
 await fs.mkdir(shotDir, { recursive: true });
+const campaignOnly = process.argv.includes("--campaign-only");
 const withFormal = !process.argv.includes("--no-formal");
 const withCampaign = !process.argv.includes("--no-campaign");
 
@@ -104,7 +105,7 @@ async function InstallEnvironment(pg) {
     return mockDisk.has(rel) ? route.fulfill({ status: 200, contentType: "application/json", body: mockDisk.get(rel) }) : route.continue();
   });
 }
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await InstallEnvironment(page);
 await page.route(/\/Taierzhuang1938\/Blockout\/FirstLevel0105\.json(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: config0105Text }));
 
@@ -133,12 +134,14 @@ async function Luma(clip) {
     return sum / n;
   }, png.toString("base64"));
 }
-const VIEW = { x: 420, y: 120, width: 520, height: 600 };   // 卡片与环境面板之间的那块画面
+const VIEW = { x: 420, y: 120, width: 380, height: 560 };   // 卡片与环境面板之间的那块画面
 
 try {
+  if (!campaignOnly) {
   console.log("--- boot");
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel0105&env=1&scale=small`, { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
+  await B(() => window.Tengxian.Debug.Blockout.Environment.Open());
   const opened = await Wait(() => { const s = window.Tengxian.Debug.Blockout.Environment.State(); return s.open && s.scene === "FirstLevelWhitebox"; }, null, 60000);
   const boot = await B(async () => {
     const L = window.Tengxian.Debug.Lighting;
@@ -250,7 +253,11 @@ try {
   await Frames(2);
   const redone = await B((pid) => window.Tengxian.Debug.Blockout.Environment.Preset(pid).components.Fog?.params?.density, vol.preset);
   Check("Ctrl+Z 撤掉改浓度、Ctrl+Y 重做", undone !== 0.03 && redone === 0.03, J({ undone, redone, histBefore }));
-  await B((id) => { const E = window.Tengxian.Debug.Blockout.Environment; E.SelectVolume(id); E.FlyTo(id); }, vol.id);
+  await B((id) => {
+    const blk = window.Tengxian.Debug.Blockout, E = blk.Environment;
+    E.SelectVolume(id); E.FlyTo(id);
+    blk.FlyPose({ x: 35 });
+  }, vol.id);
   await Frames(10);
   await Unlock();
   // 拖左边那个面（x-）：右边的 x+ 常被环境面板挡住
@@ -402,10 +409,11 @@ try {
     await Shot("FormalDusk.png");
   }
 
+  }
   // 11) 正片第一关
   if (withCampaign) {
     console.log("--- campaign (?whitebox=p012)");
-    const game = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const game = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await InstallEnvironment(game);
     const G = (fn, arg) => game.evaluate(fn, arg);
     await game.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&quality=low&scale=small`, { waitUntil: "load", timeout: 180000 });
@@ -420,26 +428,41 @@ try {
     });
     Check("正片第一关读 Environment/Level_FirstLevelCampaign.json，兜底复用 EnvPreset_FirstLevel", c.active && c.kind === "level" && c.scene === "FirstLevelCampaign" && J(c.sources) === J(["Fallback:FirstLevel"]), J(c));
     Check("正片第一关 12:00 = 它原来的天（firstLevelBattleDay），角色光照关着", c.same && c.profile === "firstLevelBattleDay" && c.char.fill === 0 && c.char.rim === 0, J({ same: c.same, profile: c.profile, char: c.char }));
-    await G(() => window.Tengxian.Debug.OpenEditor("environment"));
-    const panel = await game.waitForFunction(() => {
-      const el = document.querySelector(".envGameRoot .envPanel:not([hidden])");
-      return el && /FirstLevelCampaign/.test(el.querySelector(".envSceneName")?.textContent || "") ? { beat: el.querySelector(".envBeat")?.textContent || "" } : null;
-    }, null, { timeout: 30000 }).then((h) => h.jsonValue()).catch(() => null);
-    Check("高级工具 → 场景 → 环境：正片关卡开游戏内面板（区域文件 FirstLevelCampaign，「这一拍」是任务步骤）", !!panel && /任务步骤/.test(panel.beat), J(panel));
+    await game.context().route("**/__environment/status", (route) => route.fulfill({ json: { writable: true, root: rootDir, presets: revisions.presets, scenes: revisions.scenes, levels: revisions.levels } }));
+    await game.context().route("**/__environment/save", async (route) => {
+      const body = route.request().postDataJSON(); saves.push(body);
+      const current = Table(body.kind)[body.id] ?? null;
+      if (body.revision !== current) return route.fulfill({ status: 409, json: { ok: false, error: "版本号对不上", revision: current } });
+      const text = FormatEnvJson(body.doc), revision = Sha1(text);
+      Table(body.kind)[body.id] = revision; mockDisk.set(DiskPath(body.kind, body.id), text);
+      return route.fulfill({ json: { ok: true, file: DiskPath(body.kind, body.id), revision } });
+    });
+    const popupReady = game.waitForEvent("popup");
+    await G(() => window.Tengxian.editor.ToggleDebugTool("environment"));
+    const popup = await popupReady;
+    await popup.setViewportSize({ width: 1280, height: 720 });
+    popup.on("pageerror", (error) => errors.push(String(error)));
+    await popup.waitForFunction(() => window.EnvironmentWindow?.ready, null, { timeout: 30000 });
+    const panel = await popup.evaluate(() => ({ kind: window.EnvironmentWindow.editor.loadedKind,
+      scene: window.EnvironmentWindow.editor.loadedScene, beat: document.querySelector(".envBeat")?.textContent }));
+    Check("Debug工具环境窗口连接正片关卡，并显示当前任务步骤", panel.kind === "level" && panel.scene === "FirstLevelCampaign" && /任务步骤/.test(panel.beat), J(panel));
     await G(() => window.Tengxian.Debug.ReleasePointerLock?.());
     await G(() => window.Tengxian.Debug.Lighting.SetHour(18));
-    await game.waitForTimeout(300);
-    await game.click(".envGameRoot .envBeatRow .envBtn:not([disabled])");
-    await game.waitForTimeout(300);
+    await popup.waitForTimeout(300);
+    await popup.click(".envBeatRow .envBtn:not([disabled])");
+    await popup.waitForTimeout(300);
     const savesBefore = saves.length;
-    await game.click(".envGameRoot .envBtn.primary");
-    await game.waitForTimeout(1500);
+    await popup.click(".envBtn.primary");
+    await popup.waitForTimeout(1500);
     const levelSave = saves.slice(savesBefore).find((s) => s.kind === "level");
     const step = await G(() => { const m = window.Tengxian.Debug.FirstLevelMission(); return m?.phase?.id ?? m?.step ?? null; });
     Check("「写进这一拍」写进区域文件的 stages（黄昏），保存走 kind: level、带读文件时的版本号", !!levelSave && levelSave.id === "FirstLevelCampaign"
       && Object.values(levelSave.doc.stages || {}).some((spec) => spec.look === "dusk") && levelSave.revision === Sha1(await fs.readFile(path.join(projectDir, "Environment", "Level_FirstLevelCampaign.json"), "utf8")),
       J({ step, stages: levelSave?.doc.stages, revision: levelSave?.revision }));
-    await game.screenshot({ path: path.join(shotDir, "CampaignPanel.png") });
+    await popup.screenshot({ path: path.join(shotDir, "CampaignPanel.png") });
+    await popup.close();
+    await game.waitForFunction(() => !window.Tengxian.editor.DebugToolStates().find((entry) => entry.id === "environment").on, null, { timeout: 5000 });
+    Check("关闭环境窗口后 Debug 开关复位", await G(() => !window.Tengxian.editor.DebugToolStates().find((entry) => entry.id === "environment").on));
     await game.close();
   }
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));

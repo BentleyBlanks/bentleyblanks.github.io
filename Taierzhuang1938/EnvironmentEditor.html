@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- 本页在 AdvancedTools/ 里，但它复用的游戏模块（模型 / 贴图 / PBR 材质 / 头发加载）都按游戏根目录写 "./Model/…"
+       这类相对路径，所以文档基准指回上一层：下面所有相对地址（样式、import map、本页入口脚本）都以 Taierzhuang1938/ 为准。 -->
+
+  <title>环境 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
+  <link rel="stylesheet" href="./Style_Game.css">
+  <link rel="stylesheet" href="./Style_Editor.css">
+  <link rel="stylesheet" href="./Style_EditorBlockout.css">
+  <link rel="stylesheet" href="./Style_EditorEnvironment.css?v=20261113ToolsSeparation">
+  <style>
+    body { margin: 0; background: #101211; color: #deddd2; overflow: hidden; }
+    .environmentWindow { position: fixed; inset: 0; display: flex; flex-direction: column; }
+    .environmentToolbar { flex: 0 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 10px; pointer-events: auto; background: #141610; border-bottom: 1px solid #c1bdab55; }
+    .environmentToolbar select { flex: 1; max-width: 420px; }
+    .environmentWindow .envPanel { position: relative; inset: auto; width: auto; flex: 1; min-height: 0; margin: 12px 16px; }
+    .environmentWindow .envClose { display: none; }
+    .environmentWindow.envTimelineOpen .envPanel { margin-bottom: 286px; }
+    .environmentWindow .envTimeline { left: 16px; right: 16px; bottom: 12px; }
+    #environmentMessage { color: #d8c48a; }
+  </style>
+  <!-- 导入表不在这里另抄一份：同步读 index.html 里那张 import map（线上发布的 index.html 也保留它）原样插进来，
+       键值按本页的文档基准（上面的 <base>）解析，与游戏页同一套，模块版本永远一致、同一模块只有一个 URL。 -->
+  <script>
+    (function () {
+      var map = '{"imports":{}}';
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "./index.html", false);
+        xhr.send();
+        var found = /<script type="importmap">([\s\S]*?)<\/script>/.exec(xhr.responseText);
+        if (found) map = found[1];
+      } catch (error) { console.error("[ToolStudio] 读不到 index.html 的 import map", error); }
+      var script = document.createElement("script");
+      script.type = "importmap";
+      script.textContent = map;
+      document.currentScript.after(script);
+    })();
+  </script>
+  <script type="module" src="./Script_EnvironmentWindow.mjs"></script>
+</head>
+<body>
+  <main class="boRoot environmentWindow" id="environmentRoot">
+    <header class="environmentToolbar">
+      <label for="environmentTarget">环境配置</label><select class="envSelect" id="environmentTarget"></select>
+      <span id="environmentMessage" role="status">正在加载……</span>
+    </header>
+  </main>
+</body>
+</html>

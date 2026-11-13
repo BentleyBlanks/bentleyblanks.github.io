@@ -32,10 +32,7 @@ import { El, Panel, Note } from "./Script_EditorUi.mjs";
 import { DEBUG_TOOL_IDS, TOOL_INFO, TOOL_MENUS as TOOL_MENU_DEFS } from "./Data_DevTools.mjs";
 import { T } from "./Script_Text.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
-import { FirstPersonMotionEditor } from "./Script_EditorFirstPersonMotion.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
-import { PropPcgEditor } from "./Script_EditorPropPcg.mjs";
-import { SplineEditor } from "./Script_EditorSplines.mjs";
 import { ShotCameraEditor } from "./Script_EditorShotCamera.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
@@ -44,8 +41,7 @@ import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import { FrameDebuggerEditor } from "./Script_EditorFrameDebugger.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
-import { EnvironmentEntry } from "./Script_EditorEnvironmentEntry.mjs";
-import { EnvironmentGameOverlay } from "./Script_EditorEnvironmentGame.mjs";
+import { EnvironmentWindowEditor } from "./Script_EditorEnvironmentWindow.mjs";
 import { SPLIT_TOOL_CLASSES } from "./Script_DevToolsSplit.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
@@ -53,23 +49,17 @@ import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 // 摄影棚类里已拆进 AdvancedTools/ 的那些（人物、枪械、特效……）经 Script_DevToolsSplit 并进来，线上发布时那一组是空的。
 const EDITORS = [
-  ...SPLIT_TOOL_CLASSES, PropPcgEditor, SplineEditor,
+  ...SPLIT_TOOL_CLASSES,
   // 出图脚本与测试用的定镜小工具（不在任何菜单里，见 Script_EditorShotCamera 文件头）
   ShotCameraEditor,
 ];
 // 叠加层：不接管相机、不参与互斥，可以叠在任意一个编辑器上，也可以关掉菜单回去边打边看。
 // 渲染调试只读地观察后处理靶；性能剖析甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-// 第一人称持枪移动检查（2026-10-23）也是叠加层：玩法照跑、外部机位边走边看，所以不能是暂停玩法的互斥编辑器；
-// 它是在「武器」菜单里找的东西，不进 Debug工具 列表。
 const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor,
-  FirstPersonMotionEditor, EnvironmentGameOverlay];
-// 「Debug工具」= 除第一人称持枪移动检查外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
-// 菜单 设置 → Debug工具，和高级工具菜单栏右侧、音量条旁边的「Debug工具」下拉（2026-10-22，用户：高级工具里也要能开
-// Profiler / Debug Rendering / Frame Debugger）。
-// 正片关卡的环境面板（EnvironmentGameOverlay，2026-11-02）也是叠加层，但它是「场景」菜单里「环境」那一项开的，同样不进 Debug工具。
-const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== FirstPersonMotionEditor && editor !== EnvironmentGameOverlay);
+  EnvironmentWindowEditor];
+const DEBUG_OVERLAYS = OVERLAYS;
 // Debug工具里弹独立浏览器窗口的几项，下拉条目后缀 ↗（同 WINDOW_TOOLS）
-const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id]);
+const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id, EnvironmentWindowEditor.id]);
 
 /**
  * 菜单栏。顺序就是栏上的顺序；每个工具只登记一次（同一项画两遍就有两处开关）。
@@ -77,9 +67,9 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
  * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
  */
 // 分组与顺序在 Data_DevTools.TOOL_MENUS（标题菜单的设置页共用），这里只补 id -> 编辑器类。
-// 场景编辑器 / 贴图管理 / Mixamo 动作预览打开独立窗口，白盒关卡编辑器 / 环境 / Timeline 是整页跳转入口，都不进互斥表。
+// 场景编辑器 / 贴图管理 / Mixamo 动作预览打开独立窗口，白盒关卡编辑器 / Timeline 是整页跳转入口，都不进互斥表。
 const TOOL_CLASSES = new Map([
-  ...SPLIT_TOOL_CLASSES, EnvironmentEntry, SplineEditor, PropPcgEditor, BlockoutEntry, TimelineEditor, FirstPersonMotionEditor,
+  ...SPLIT_TOOL_CLASSES, BlockoutEntry, TimelineEditor,
 ].map((Editor) => [Editor.id, Editor]));
 const TOOL_MENUS = TOOL_MENU_DEFS.map((menu) => ({
   id: menu.id, label: menu.label,
@@ -173,7 +163,7 @@ export class EditorSuite {
       CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
-      CloseFirstPersonMotion: () => suite.CloseOverlay(FirstPersonMotionEditor.id),
+      CloseEnvironment: () => suite.CloseOverlay(EnvironmentWindowEditor.id),
     };
   }
 
@@ -415,8 +405,7 @@ export class EditorSuite {
     document.body.classList.toggle("edToolsOpen", this.panelOpen);
     this.root.classList.toggle("toolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
-      const on = id === this.activeId || this.overlays.has(id) || (id === BlockoutEntry.id && BlockoutEntry.Active())
-        || (id === EnvironmentEntry.id && this.overlays.has(EnvironmentGameOverlay.id));
+      const on = id === this.activeId || this.overlays.has(id) || (id === BlockoutEntry.id && BlockoutEntry.Active());
       button.classList.toggle("on", on);
       button.setAttribute("aria-checked", String(on));
     }
@@ -489,7 +478,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (WINDOW_TOOLS.has(id) || id === BlockoutEntry.id || id === TimelineEditor.id || id === EnvironmentEntry.id) return this.Open(id);
+    if (WINDOW_TOOLS.has(id) || id === BlockoutEntry.id || id === TimelineEditor.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -535,6 +524,11 @@ export class EditorSuite {
   // -------------------------------------------------------------------------
   // Debug工具（菜单 设置 → Debug工具 那一页用）
   // -------------------------------------------------------------------------
+
+  /** 环境窗口使用的实时宿主与关闭回调。 */
+  EnvironmentContext() {
+    return { environment: this.host.environment, Close: () => this.CloseOverlay(EnvironmentWindowEditor.id) };
+  }
 
   /** 每项的开关状态。available=false 的项在菜单里置灰。 */
   DebugToolStates() {
@@ -593,12 +587,6 @@ export class EditorSuite {
       try { return TimelineEditor.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
-    // 环境：白盒编辑器里开它自己的面板；正片关卡有区域文件（Data_EnvLevels）时开游戏内叠加层；都不是就跳到白盒编辑器
-    if (id === EnvironmentEntry.id) {
-      if (!BlockoutEntry.Active() && EnvironmentGameOverlay.Available(this.host)) return this.ToggleOverlay(EnvironmentGameOverlay.id);
-      try { return EnvironmentEntry.Open(); }
-      catch (error) { this.SetHint(error.message); return null; }
-    }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     const Editor = EDITORS.find((e) => e.id === id);
     if (!Editor) return null;
@@ -642,7 +630,7 @@ export class EditorSuite {
   }
 
   /**
-   * 退出高级工具。keepOnClose 的叠加层（Debug工具那几个、第一人称持枪移动检查）不收：
+   * 退出高级工具。keepOnClose 的 Debug工具窗口与叠加层保持开启：
    * 它们看的、量的就是战斗中的帧，「关掉回去打」正是主用例 —— 运行时才复现的
    * 渲染 bug（第一人称手上的黑块）只能开着调试视图边打边看。要停：设置 → Debug工具
    * 里再点一次、叉掉浮窗，或 all=true（套件销毁时）。
@@ -768,36 +756,6 @@ export class EditorSuite {
         this.CloseOverlay(id);
       }
     }
-  }
-
-  // -------------------------------------------------------------------------
-  // 第一人称持枪移动检查的三处主循环接线（Script_Main 只经这里碰它；没开这个工具时全是空操作）
-  // -------------------------------------------------------------------------
-
-  /** 玩家相机与 FOV 写完、Viewmodel.Update 之前调：替身眼睛抄玩家眼睛。 */
-  SyncOverlayEye(camera) {
-    this.overlays.get(FirstPersonMotionEditor.id)?.SyncEye(camera);
-  }
-
-  /**
-   * 剧本 / 白盒预演 / 测试场相机都没接管时调：主相机挪到外部观察机位。fresh = 这一帧玩法照跑、
-   * 玩家相机是新写的；玩法停着（高级工具开着）时传 false。有互斥编辑器在用相机时不接管。→ true = 接管了。
-   */
-  ApplyOverlayCamera(camera, fresh = true) {
-    if (this.active) return false;
-    const overlay = this.overlays.get(FirstPersonMotionEditor.id);
-    if (!overlay) return false;
-    try { return overlay.ApplyCamera(camera, fresh); } catch (error) {
-      console.error(`[Editor] ${FirstPersonMotionEditor.id} 接管相机出错，已关掉：`, error);
-      this.CloseOverlay(FirstPersonMotionEditor.id);
-      return false;
-    }
-  }
-
-  /** 慢放：dt 乘上它（没开工具 = 原样）。 */
-  ScaleDt(dt) {
-    const overlay = this.overlays.get(FirstPersonMotionEditor.id);
-    return overlay ? dt * overlay.TimeScale : dt;
   }
 
   Update(dt) {

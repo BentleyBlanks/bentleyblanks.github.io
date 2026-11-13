@@ -27,18 +27,21 @@ export const STUDIO_EDITORS = Object.freeze([
   ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
   PropLibraryEditor, AssetStandardsEditor,
 ]);
-const EDITOR_BY_ID = new Map(STUDIO_EDITORS.map((Editor) => [Editor.id, Editor]));
 
 /** 菜单分组：Data_DevTools.TOOL_MENUS 里挑出这九个，空组不列。 */
-export function StudioMenus() {
+export function StudioMenus(editors = STUDIO_EDITORS) {
+  const editorById = new Map(editors.map((Editor) => [Editor.id, Editor]));
   return TOOL_MENUS
-    .map((menu) => ({ id: menu.id, label: menu.label, items: menu.items.filter((id) => EDITOR_BY_ID.has(id)).map((id) => EDITOR_BY_ID.get(id)) }))
+    .map((menu) => ({ id: menu.id, label: menu.label, items: menu.items.filter((id) => editorById.has(id)).map((id) => editorById.get(id)) }))
     .filter((menu) => menu.items.length);
 }
 
 export class ToolStudio {
   /** base 是 CreateStudioBase 的返回值。 */
-  constructor(base, { returnUrl = CONTROL_CENTER_URL } = {}) {
+  constructor(base, { returnUrl = CONTROL_CENTER_URL, editors = STUDIO_EDITORS, game = null } = {}) {
+    this.editors = editors;
+    this.editorById = new Map(editors.map((Editor) => [Editor.id, Editor]));
+    this.game = game;
     this.base = base;
     this.returnUrl = returnUrl;
     this.active = null;
@@ -65,7 +68,7 @@ export class ToolStudio {
   get editorHost() {
     const base = this.base;
     const suite = this;
-    const game = {
+    const game = this.game || {
       state: base.state, PHASES: [], graphics: base.graphics, ApplyGraphics: base.ApplyGraphics, FrameDebugger: null,
       get gi() { return base.gi; }, get firstPersonSelfShadow() { return base.firstPersonSelfShadow; },
       materialShading: base.shadingUniforms,
@@ -92,7 +95,7 @@ export class ToolStudio {
       hideInStudio: base.viewmodel ? [base.viewmodel.root] : [],
       get playerWeaponId() { return suite.weaponId; },
       get playerWeaponVariant() { return 0; },
-      SetViewmodelVisible: (on) => { if (base.viewmodel) base.viewmodel.root.visible = !!on; },
+      SetViewmodelVisible: (on) => { if (base.viewmodel) base.viewmodel.root.visible = !!on && !suite.game; },
       SetHint: (text) => suite.SetHint(text),
       SetCrosshair: (on, mode = "") => suite.SetCrosshair(on, mode),
       Close: () => suite.CloseTool(),
@@ -137,7 +140,7 @@ export class ToolStudio {
     root.appendChild(bar);
     this.menuBar = bar;
 
-    for (const menu of StudioMenus()) {
+    for (const menu of StudioMenus(this.editors)) {
       const wrap = El("div", "edMenu");
       wrap.dataset.menu = menu.id;
       const title = El("button", "edMenuTitle", menu.label);
@@ -287,9 +290,10 @@ export class ToolStudio {
 
   /** 打开一个工具。任何时候只有一个活着。 */
   Open(id) {
-    const Editor = EDITOR_BY_ID.get(id);
+    const Editor = this.editorById.get(id);
     if (!Editor) return null;
     if (this.active) this.CloseTool({ refresh: false });
+    this.savedCamera = { fov: this.base.camera.fov, far: this.base.camera.far };
     this.active = new Editor(this.editorHost);
     this.activeId = id;
     this.inspectorCollapsed = false;
@@ -311,6 +315,11 @@ export class ToolStudio {
     }
     this.active = null;
     this.activeId = null;
+    if (this.savedCamera) {
+      Object.assign(this.base.camera, this.savedCamera);
+      this.base.camera.updateProjectionMatrix();
+      this.savedCamera = null;
+    }
     this.viewport.enabled = false;
     this.SetHint("");
     this.SetCrosshair(false);

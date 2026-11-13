@@ -25,25 +25,25 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=5&menu=0`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Pcg.html?tool=propPcg&audio=0&quality=low&scale=small&phase=5&menu=0`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
-await page.click("#bootStart");
-await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+await page.waitForFunction(() => window.PcgTool?.ready, null, { timeout: 240000 });
+await page.evaluate(() => window.PcgTool.StepFrames(20));
 
+await page.evaluate(() => window.PcgTool.Close());
 const before = await page.evaluate(() => {
-  const root = window.Taierzhuang.scene.children.find((child) => child.userData?.externalProps);
-  return { visible: root?.visible, fov: window.Taierzhuang.camera.fov, far: window.Taierzhuang.camera.far };
+  const root = window.PcgTool.base.scene.children.find((child) => child.userData?.externalProps);
+  return { visible: root?.visible, fov: window.PcgTool.base.camera.fov, far: window.PcgTool.base.camera.far };
 });
 
 const opened = await page.evaluate(async () => {
-  const T = window.Taierzhuang;
-  const active = T.editor.Open("propPcg");
+  const T = window.PcgTool;
+  const active = T.studio.Open("propPcg");
   await active.RefreshPreview();
   const runtime = T.battlefield.externalStreamer?.Stats?.();
   return {
-    id: T.editor.ActiveId,
-    fly: T.editor.flycam.Active,
+    id: T.studio.ActiveId,
+    fly: T.studio.flycam.Active,
     volumes: active.document.volumes.length,
     placements: active.result.placements.length,
     anchors: active.result.stats.anchors,
@@ -53,7 +53,7 @@ const opened = await page.evaluate(async () => {
       || entry.pcgProfile === "defenseWireLine").every((entry) => entry.solid === true),
     errors: active.result.errors,
     previewChildren: active.previewRoot.children.length,
-    runtimeHidden: T.scene.children.filter((child) => child.userData?.externalProps)
+    runtimeHidden: T.base.scene.children.filter((child) => child.userData?.externalProps)
       .every((child) => child.visible === false),
     runtime,
     sections: [...active.panel.root.querySelectorAll(".edSection > .h")].map((node) => node.textContent),
@@ -74,7 +74,7 @@ Check("PCG 面板分节完整", ["撒点区", "所选区规则", "预览与相�
   .every((name) => opened.sections.includes(name)), opened.sections.join(" / "));
 
 const roundTrip = await page.evaluate(async () => {
-  const active = window.Taierzhuang.editor.active;
+  const active = window.PcgTool.studio.active;
   const beforeJson = JSON.stringify(active.document);
   active.Import(beforeJson);
   await active.RefreshPreview();
@@ -98,16 +98,22 @@ Check("JSON 导入往返不改规则", roundTrip.same, JSON.stringify(roundTrip)
 Check("volume 复制/删除会实时重跑且不污染文档", roundTrip.duplicated === opened.volumes + 1
   && roundTrip.restoredCount === opened.volumes && roundTrip.resultCount > 0, JSON.stringify(roundTrip));
 
-await page.evaluate(() => window.Taierzhuang.editor.Close());
+await page.locator('.edPanel.work input[type="range"]').first().click();
+await page.keyboard.down("w");
+const sliderHeld = await page.evaluate(() => window.PcgTool.studio.flycam.keys.has("KeyW"));
+await page.keyboard.up("w");
+Check("独立工具在滑杆取得焦点后仍响应 WASD", sliderHeld && await page.evaluate(() => !window.PcgTool.studio.flycam.keys.has("KeyW")));
+
+await page.evaluate(() => window.PcgTool.studio.CloseTool());
 const after = await page.evaluate(() => {
-  const root = window.Taierzhuang.scene.children.find((child) => child.userData?.externalProps);
+  const root = window.PcgTool.base.scene.children.find((child) => child.userData?.externalProps);
   return {
-    active: window.Taierzhuang.editor.ActiveId,
-    fly: window.Taierzhuang.editor.flycam.Active,
+    active: window.PcgTool.studio.ActiveId,
+    fly: window.PcgTool.studio.flycam.Active,
     visible: root?.visible,
-    preview: !!window.Taierzhuang.scene.getObjectByName("EditorPropPcgPreview"),
-    fov: window.Taierzhuang.camera.fov,
-    far: window.Taierzhuang.camera.far,
+    preview: !!window.PcgTool.base.scene.getObjectByName("EditorPropPcgPreview"),
+    fov: window.PcgTool.base.camera.fov,
+    far: window.PcgTool.base.camera.far,
   };
 });
 Check("退出恢复正片实例根并清除预览", !after.active && !after.fly && after.visible === before.visible
@@ -115,14 +121,13 @@ Check("退出恢复正片实例根并清除预览", !after.active && !after.fly 
 Check("退出恢复相机投影", Math.abs(after.fov - before.fov) < 0.01
   && Math.abs(after.far - before.far) < 0.01, `${before.fov}/${before.far} -> ${after.fov}/${after.far}`);
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=2&menu=0`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Pcg.html?tool=propPcg&audio=0&quality=low&scale=small&phase=2&menu=0`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
-await page.click("#bootStart");
-await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+await page.waitForFunction(() => window.PcgTool?.ready, null, { timeout: 240000 });
+await page.evaluate(() => window.PcgTool.StepFrames(20));
 const eastBreach = await page.evaluate(async () => {
-  const T = window.Taierzhuang;
-  const active = T.editor.Open("propPcg");
+  const T = window.PcgTool;
+  const active = T.studio.Open("propPcg");
   await active.RefreshPreview();
   const wireIds = ["WireEastBreachNorth", "WireEastBreachSouth"];
   const firingIds = [
@@ -144,7 +149,7 @@ Check("城防图指定的东墙／东门／东寨门短散兵线均有真实落�
   eastBreach.firingPlacements >= 5
   && Object.values(eastBreach.firingByVolume).every((stats) => stats?.placements >= 1),
   JSON.stringify(eastBreach));
-await page.evaluate(() => window.Taierzhuang.editor.Close());
+await page.evaluate(() => window.PcgTool.studio.CloseTool());
 
 await browser.close();
 server.close();

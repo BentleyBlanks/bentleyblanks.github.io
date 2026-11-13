@@ -94,6 +94,7 @@ export class EnvironmentEditor {
    */
   constructor(host, environment) {
     this.host = host;
+    this.disposed = false;
     this.system = environment?.system || null;
     this.bridge = environment?.bridge || null;
     this.ui = LoadUi();
@@ -375,7 +376,7 @@ export class EnvironmentEditor {
   /** 场景换了（换段、切到正式场景）就按新场景重读一遍，拿到版本号。 */
   async EnsureLoaded() {
     const sceneId = this.sceneId;
-    if (sceneId === this.loadedScene && !this.loading) return;
+    if (sceneId === this.loadedScene && this.targetKind === this.loadedKind && !this.loading) return;
     if (this.loading) return this.loading;
     this.loading = this.Reload({ discard: true }).finally(() => { this.loading = null; });
     return this.loading;
@@ -383,6 +384,7 @@ export class EnvironmentEditor {
 
   /** 重读区域文件与它引用的预设（discard：丢掉没存的改动）。时钟不动。 */
   async Reload({ discard = false } = {}) {
+    if (this.disposed) return false;
     const sceneId = this.sceneId;
     const kind = this.targetKind;
     if (!discard && this.dirty.size) { this.Flash("有没保存的改动：先保存，或点状态条里的「重新读取」放弃改动", true); return false; }
@@ -422,6 +424,7 @@ export class EnvironmentEditor {
         this.revisions.set(`preset:${id}`, await Sha1(text));
       } catch (error) { errors.push(`预设 ${id} 读不了：${error.message}`); }
     }));
+    if (this.disposed || this.sceneId !== sceneId || this.targetKind !== kind) return false;
     this.system.SetScene(sceneId, sceneDoc, presets, { keepClock: true, errors, kind });
     if (errors.length) this.Flash(errors.join("；"), true);
     // 换场景（切到正式场景试玩、换段到别的场景）时手上还有没存的改动：环境系统已经换成新场景，那些改动丢了，明说
@@ -449,9 +452,9 @@ export class EnvironmentEditor {
 
   /** 外面改了文件：这边没改过就重读（时钟不动），改过就挂横幅。 */
   async Poll() {
-    if (!this.status.writable || this.saving || this.loading || document.hidden) return;
+    if (this.disposed || !this.status.writable || this.saving || this.loading || document.hidden) return;
     const status = await this.RefreshStatus();
-    if (!status || !this.loadedScene) return;
+    if (this.disposed || !status || !this.loadedScene) return;
     const changed = [];
     const sceneRev = (this.loadedKind === "level" ? status.levels : status.scenes)?.[this.loadedScene] ?? null;
     if (this.revisions.has("scene") && sceneRev !== this.revisions.get("scene")) changed.push("scene");
@@ -501,7 +504,7 @@ export class EnvironmentEditor {
 
   ApplySnapshot(key, text) {
     const doc = text === "null" ? null : JSON.parse(text);
-    if (key === "scene") this.system.SetScene(this.system.sceneId, doc, this.system.presets, { keepClock: true, errors: this.system.errors });
+    if (key === "scene") this.system.SetScene(this.system.sceneId, doc, this.system.presets, { keepClock: true, errors: this.system.errors, kind: this.targetKind });
     else if (doc) this.system.SetPreset(doc);
     else { this.system.presets.delete(key.slice(7)); this.system.Touch(); }
     this.dirty.add(key);
@@ -730,6 +733,11 @@ export class EnvironmentEditor {
   // 存盘
 
   async Save() {
+    if (this.disposed || this.loading || this.saving) return { ok: false, busy: true };
+    if (this.sceneId !== this.loadedScene || this.targetKind !== this.loadedKind) {
+      this.Flash("场景已切换，请读取当前环境配置后保存", true);
+      return { ok: false, error: "targetChanged" };
+    }
     if (!this.dirty.size) { this.Flash("没有要保存的改动"); return { ok: true, saved: [] }; }
     for (const key of this.dirty) {
       const doc = this.DocFor(key);
@@ -751,6 +759,7 @@ export class EnvironmentEditor {
       // 预设先存（区域文件校验时要认得它引用的新预设）
       const order = [...this.dirty].sort((a, b) => (a === "scene") - (b === "scene"));
       for (const key of order) {
+        if (this.sceneId !== this.loadedScene || this.targetKind !== this.loadedKind) return { ok: false, error: "targetChanged", saved };
         const doc = this.DocFor(key);
         if (!doc) { this.dirty.delete(key); continue; }
         const kind = key === "scene" ? this.loadedKind : "preset";
@@ -1278,6 +1287,7 @@ export class EnvironmentEditor {
   }
 
   Dispose() {
+    this.disposed = true;
     clearTimeout(this.flashTimer);
     this.gizmo.Dispose();
     this.timeline.Dispose();

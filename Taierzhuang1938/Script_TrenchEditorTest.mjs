@@ -58,22 +58,22 @@ function Check(name, ok, detail = "") {
 try {
   console.log(`Data_FirstLevelMissionTrenches 有 ${EXPECTED_SEGMENTS} 条段`);
   await page.goto(
-    `http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low&scale=small`,
+    `http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Pcg.html?tool=splines&audio=0&whitebox=p012&manual=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 180000 });
-  await page.waitForFunction(() => window.Taierzhuang?.state?.ready && window.Taierzhuang?.editor,
+  await page.waitForFunction(() => window.PcgTool?.ready && window.PcgTool?.studio,
     null, { timeout: 300000 });
 
   // -------------------------------------------------------------------------
   // 1) 列表：七条壕沟、键/标签/来源/角色都对
   // -------------------------------------------------------------------------
   const listed = await page.evaluate(() => {
-    const T = window.Taierzhuang;
-    const ok = T.Debug.OpenEditor("splines");
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const ok = !!T.studio.Open("splines");
+    const tool = T.studio.active;
     const trenches = tool.routes.filter((r) => r.kind === "trench");
     return {
       ok,
-      id: T.editor.ActiveId,
+      id: T.studio.ActiveId,
       total: tool.routes.length,
       count: trenches.length,
       ids: trenches.map((r) => r.id),
@@ -105,8 +105,8 @@ try {
   // 2) 预览：横断面带 + 三岔口标记（两条段各来一次）
   // -------------------------------------------------------------------------
   const Preview = (segmentId) => page.evaluate((id) => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const route = tool.routes.find((r) => r.kind === "trench" && r.id === id);
     tool.Select(route.key);
     T.StepFrames(4, 1 / 60, true);
@@ -156,8 +156,8 @@ try {
   // 3) 段级滑杆：改的是规划层那张表（TrenchRevision 递增），导出带得上
   // -------------------------------------------------------------------------
   const segmentEdit = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const { TrenchRevision, CompileTrenchNetwork } = await import("./Script_TrenchPlan.mjs");
     const { SampleMissionNaturalHeight } = await import("./Data_FirstLevelMissionTerrain.mjs");
     const route = tool.routes.find((r) => r.id === "FrontCommunication" && r.kind === "trench");
@@ -200,8 +200,8 @@ try {
   // 4) 壕沟预设：滑杆表换成 TRENCH_PARAMS，改动进 TRENCH_PRESETS 覆盖
   // -------------------------------------------------------------------------
   const presetEdit = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const { TrenchPreset, TrenchRevision } = await import("./Script_TrenchPlan.mjs");
     tool.SelectPreset("trench:communication");
     const wallBoxHidden = tool.wallParamBox.style.display === "none";
@@ -258,8 +258,8 @@ try {
   //     （「布设参数」被拆成两只盒子、预设键加了前缀，这一刀最容易伤到隔壁）
   // -------------------------------------------------------------------------
   const stillWall = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const { WallPreset } = await import("./Script_WallSpline.mjs");
     const wall = tool.routes.find((r) => r.kind === "wall");
     tool.Select(wall.key, { fly: false });
@@ -305,8 +305,8 @@ try {
   // 5) 导入往返：导出的那串能读回来
   // -------------------------------------------------------------------------
   const roundTrip = await page.evaluate(() => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     tool.Export();
     const text = tool.io.value;
     tool.overrides = {};
@@ -334,8 +334,8 @@ try {
   // 出图压到三岔口边上 8.5 m 高斜着看，朝向按真的 look-at 反解（YXZ 下直接写 yaw 会看反，
   // 面板里那条注释就是这么来的）。
   const framed = await page.evaluate(() => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const route = tool.routes.find((r) => r.id === "FrontCommunication" && r.kind === "trench");
     tool.Select(route.key, { fly: false });
     const plan = tool.TrenchPlan();
@@ -355,15 +355,15 @@ try {
     const fx = dx / len, fy = dy / len, fz = dz / len;
     const yaw = Math.atan2(-fx, -fz);
     const pitch = Math.asin(Math.max(-1, Math.min(1, fy)));
-    T.camera.position.set(eyeX, eyeY, eyeZ);
-    T.editor.flycam.yaw = yaw;
-    T.editor.flycam.pitch = pitch;
-    T.camera.rotation.set(pitch, yaw, 0, "YXZ");
+    T.base.camera.position.set(eyeX, eyeY, eyeZ);
+    T.studio.flycam.yaw = yaw;
+    T.studio.flycam.pitch = pitch;
+    T.base.camera.rotation.set(pitch, yaw, 0, "YXZ");
     T.StepFrames(6, 1 / 60, true);
 
     // 「画出来了」不等于「看得见」：叠加层开/关各拍一次，数变了多少像素。
     // 再拍一次「开」当噪声底（TAA 每帧都在动），差值要比噪声底高一个数量级才算数。
-    const source = T.renderer.domElement;
+    const source = T.base.renderer.domElement;
     const canvas = document.createElement("canvas");
     canvas.width = source.width;
     canvas.height = source.height;
@@ -397,7 +397,7 @@ try {
     `${framed.overlayPixels} px（噪声底 ${framed.noise} px，画面 ${framed.total} px）@ ${framed.at.x},${framed.at.z}`);
   await page.screenshot({ path: path.join(shotDir, "TrenchPreview.png") });
   await page.evaluate(() => document.getElementById("edRoot")?.classList.remove("off"));
-  await page.evaluate(() => window.Taierzhuang.StepFrames(2, 1 / 60, true));
+  await page.evaluate(() => window.PcgTool.StepFrames(2, 1 / 60, true));
   await page.screenshot({ path: path.join(shotDir, "TrenchPanel.png") });
   await page.evaluate(() => document.getElementById("edRoot")?.classList.add("off"));
   for (const name of ["TrenchPreview.png", "TrenchPanel.png"]) {
@@ -409,22 +409,22 @@ try {
   // 7) 退出：overlay 摘干净；覆盖按现有纪律留着（建关读的是同一份）
   // -------------------------------------------------------------------------
   const closed = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.active;
+    const T = window.PcgTool;
+    const tool = T.studio.active;
     const group = tool.group;
     const geometries = group.children.filter((c) => c.geometry).length;
-    const geoBefore = T.renderer.info.memory.geometries;
-    T.editor.Close();
+    const geoBefore = T.base.renderer.info.memory.geometries;
+    T.studio.CloseTool();
     T.StepFrames(4, 1 / 60, true);
     const { TrenchPreset } = await import("./Script_TrenchPlan.mjs");
     return {
-      active: T.editor.ActiveId,
+      active: T.studio.ActiveId,
       inScene: !!group.parent,
       children: group.children.length,
       hadGeometries: geometries,
-      geoBefore, geoAfter: T.renderer.info.memory.geometries,
-      byName: !!T.scene.getObjectByName("SplineEditorOverlay"),
-      assets: !!T.scene.getObjectByName("SplineEditorAssets"),
+      geoBefore, geoAfter: T.base.renderer.info.memory.geometries,
+      byName: !!T.base.scene.getObjectByName("SplineEditorOverlay"),
+      assets: !!T.base.scene.getObjectByName("SplineEditorAssets"),
       // 与围墙 SetWallPresetOverride 同一条：退出不清覆盖，
       // 「重建关卡」才是覆盖生效的那一刻 —— 清掉就永远看不到自己调的数进了游戏。
       stillOverridden: TrenchPreset("communication").revetment.spacingM,
@@ -442,8 +442,8 @@ try {
   // 8) 再开 + 「全部还原出厂」：规划层里不许留残渣
   // -------------------------------------------------------------------------
   const reverted = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    const tool = T.editor.Open("splines");
+    const T = window.PcgTool;
+    const tool = T.studio.Open("splines");
     const { TrenchPreset, TrenchRevision, CompileTrenchNetwork } = await import("./Script_TrenchPlan.mjs");
     const { SampleMissionNaturalHeight } = await import("./Data_FirstLevelMissionTerrain.mjs");
     const restored = TrenchPreset("communication").revetment.spacingM;
@@ -454,7 +454,7 @@ try {
     const plan = CompileTrenchNetwork(tool.TrenchNetwork(), { natural: SampleMissionNaturalHeight });
     const segment = plan.segments.find((s) => s.id === "FrontCommunication");
     const trenches = tool.routes.filter((r) => r.kind === "trench");
-    T.editor.Close();
+    T.studio.CloseTool();
     return {
       restored, restoredSeg,
       spacing: preset.revetment.spacingM, bermH: preset.bermH,

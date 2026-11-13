@@ -407,6 +407,8 @@ export const TEXT = Object.freeze({
   "menu.debugTools.playerState.note": "独立窗口：血量失血、压制、体力、后坐散布、弹药动作等隐藏状态",
   "menu.debugTools.ai.label": "敌军 AI",
   "menu.debugTools.ai.note": "画面叠加：行为图、单兵黑板、视野与掩体、调参热改",
+  "menu.debugTools.environment.label": "环境",
+  "menu.debugTools.environment.note": "独立窗口：加载场景环境配置，查看与调整组件、区域和时间轴参数",
   "menu.debugTools.fps.label": "FPS 显示",
   "menu.debugTools.fps.note": "左上角实时帧率",
 

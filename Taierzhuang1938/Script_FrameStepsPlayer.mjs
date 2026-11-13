@@ -289,7 +289,6 @@ export function PlayStepView(ctx, f) {
   ctx.lastLookDeltaYaw = dYaw;
 
   // 第一人称持枪移动检查：替身眼睛抄这一帧的玩家眼睛，Viewmodel 挂在它下面（没开工具 = 空操作）。
-  ctx.editor?.SyncOverlayEye(ctx.camera);
   ctx.profiler.B("viewmodel");
   if (!ctx.player.Alive && ctx.viewmodel.deathHands) {
     ctx.UpdatePlayerDeath();

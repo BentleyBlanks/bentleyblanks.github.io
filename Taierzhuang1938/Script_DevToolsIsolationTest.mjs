@@ -6,11 +6,11 @@
 //      一个开发工具模块都没有 —— 有人绕过 Script_DevTools 直接 import 编辑器时，这里报出是谁拉进来的；
 //      标题菜单包无论剔不剔都不许带编辑器；
 //   3. --browser：真浏览器里跑剔除后的包，开机、设置三页照常可用，菜单里没有「Debug工具」「高级工具」；
-//   4. 已拆进 AdvancedTools/ 的 13 个工具（docs/Data_EditorSuite.md「AdvancedTool ControlCenter 与独立工具宿主」）：
+//   4. 已拆进 AdvancedTools/ 的 15 个工具（docs/Data_EditorSuite.md「AdvancedTool ControlCenter 与独立工具宿主」）：
 //      拆分边界两对（Script_DevToolsSplit / Data_DevToolsSplit）与各自的剔除版导出同一组名字；
 //      游戏目录里的非测试代码除 Script_DevToolsSplit 外不许 import ./AdvancedTools/（方向只许 AdvancedTools → 游戏）；
 //      线上发布构建（--deploy）始终把这一对换成剔除版，发布副本不含 AdvancedTools/、index.html 的 import map 不残留它的条目，
-//      --browser 里跑这一档：菜单（标题菜单设置 → 高级工具 与游戏内高级工具菜单栏）里这 13 项消失、留在游戏里的工具照旧。
+//      --browser 里跑这一档：菜单（标题菜单设置 → 高级工具 与游戏内高级工具菜单栏）里这 15 项消失、留在游戏里的工具照旧。
 //
 // 用法：node Taierzhuang1938/Script_DevToolsIsolationTest.mjs [--browser]
 // 口径见 docs/Data_EditorSuite.md「开发工具隔离与打包剔除」。
@@ -65,14 +65,14 @@ for (const [real, stub] of Object.entries({ ...DEV_TOOL_STUBS, ...SPLIT_TOOL_STU
 {
   const stub = await import("./Data_DevToolsStub.mjs"), real = await import("./Data_DevTools.mjs");
   Check("剔除版声明没有开发工具", stub.DEV_TOOLS_ENABLED === false && stub.DEBUG_TOOL_IDS.length === 0);
-  Check("开发版登记了 Debug工具七项", real.DEV_TOOLS_ENABLED === true && real.DEBUG_TOOL_IDS.length === 7, real.DEBUG_TOOL_IDS.join(","));
+  Check("开发版登记了 Debug工具八项", real.DEV_TOOLS_ENABLED === true && real.DEBUG_TOOL_IDS.length === 8, real.DEBUG_TOOL_IDS.join(","));
 }
 {
   const stub = await import("./Data_DevToolsSplitStub.mjs"), real = await import("./Data_DevToolsSplit.mjs");
   Check("拆分边界：剔除版声明拆出去的工具不在，开发版在", stub.SPLIT_TOOLS_AVAILABLE === false && real.SPLIT_TOOLS_AVAILABLE === true);
   const stubClasses = await import("./Script_DevToolsSplitStub.mjs"), realClasses = await import("./Script_DevToolsSplit.mjs");
   Check("拆分边界：剔除版是空数组", Array.isArray(stubClasses.SPLIT_TOOL_CLASSES) && stubClasses.SPLIT_TOOL_CLASSES.length === 0);
-  Check("拆分边界：开发版 13 个类与 TOOL_INFO 里 split 的条目一一对应",
+  Check("拆分边界：开发版 15 个类与 TOOL_INFO 里 split 的条目一一对应",
     JSON.stringify(realClasses.SPLIT_TOOL_CLASSES.map((Editor) => Editor.id).sort()) === JSON.stringify([...SPLIT_IDS].sort()), SPLIT_IDS.join(","));
 }
 
@@ -139,8 +139,12 @@ Check("发布构建的游戏包换进了 Script_DevToolsSplitStub、不含 Advan
   deploy.gameInputs.filter((file) => file.startsWith("AdvancedTools/")).join(", "));
 Check("发布构建的菜单包换进了 Data_DevToolsSplitStub、不含 AdvancedTools/", deploy.menuInputs.includes("Data_DevToolsSplitStub.mjs")
   && !deploy.menuInputs.includes("Data_DevToolsSplit.mjs") && !deploy.menuInputs.some((file) => file.startsWith("AdvancedTools/")));
-Check("发布构建里留在游戏里的工具仍在（Script_Editor、第一人称持枪移动检查、白盒入口）",
-  ["Script_Editor.mjs", "Script_EditorFirstPersonMotion.mjs", "Script_EditorBlockoutEntry.mjs"].every((file) => deploy.gameInputs.includes(file)));
+Check("发布构建里留在游戏里的工具仍在（Script_Editor、白盒入口）",
+  ["Script_Editor.mjs", "Script_EditorBlockoutEntry.mjs"].every((file) => deploy.gameInputs.includes(file)));
+Check("游戏宿主通过入口调用 PCG 独立工具", !full.gameInputs.some((file) => /Script_Editor(Splines|PropPcg)/.test(file)));
+Check("发布包隔离 PCG 验证界面，保留生产生成器", !deploy.gameInputs.some((file) => /Script_Editor(Splines|PropPcg)/.test(file))
+  && deploy.gameInputs.includes("Script_PropPcg.mjs") && deploy.gameInputs.includes("Script_RoadSpline.mjs"));
+Check("完整包已删除持枪移动观察工具", !full.gameInputs.some((file) => /FirstPersonMotion/.test(file)));
 Check("发布构建比完整包小", deploy.gameInputs.length < full.gameInputs.length, `${full.gameInputs.length} → ${deploy.gameInputs.length} 个模块`);
 {
   // 发布副本：目录整个不在、import map 不残留指向它的条目、范围白名单也不放行
@@ -226,15 +230,15 @@ if (process.argv.includes("--browser")) {
         { waitUntil: "commit", timeout: 60000 });
       await page.waitForFunction(() => window.Tengxian?.state?.ready || document.getElementById("bootStep")?.textContent.startsWith("启动失败："),
         null, { timeout: 240000 });
-      const KEPT = ["environment", "splines", "propPcg", "blockout", "timeline", "fpMotion"];
+      const KEPT = ["blockout", "timeline"];
       if (fixture.name === "Game") {
         await page.click("#bootStart");
         await page.waitForFunction(() => window.Tengxian.state.running, null, { timeout: 20000 });
         const bar = await page.evaluate(() => ({ ids: [...document.querySelectorAll("#edRoot .edMenuItem[data-editor]")].map((item) => item.dataset.editor),
           groups: [...document.querySelectorAll("#edRoot .edMenu[data-menu]")].map((menu) => menu.dataset.menu), editor: !!window.Tengxian.editor }));
-        Check("发布构建：游戏内高级工具菜单栏里这 13 项消失、留在游戏里的 6 项照旧",
+        Check("发布构建：游戏内高级工具菜单栏里这 15 项消失、留在游戏里的 2 项照旧",
           bar.editor && SPLIT_IDS.every((id) => !bar.ids.includes(id)) && KEPT.every((id) => bar.ids.includes(id)), bar.ids.join(","));
-        Check("发布构建：整组拆空的「特效与声音」不再列", !bar.groups.includes("media") && bar.groups.includes("scene"), bar.groups.join(","));
+        Check("发布构建：高级工具只保留关卡组和 Debug工具", bar.groups.join(",") === "level,debug", bar.groups.join(","));
         const opened = await page.evaluate(() => { const result = window.Tengxian.editor.Open("actor"); return { active: window.Tengxian.editor.ActiveId, result: result === null }; });
         Check("发布构建：直接 Open 已拆出的工具 id 不抛错、也不会打开", opened.result && opened.active === null);
         await page.evaluate(() => window.Tengxian.Debug.Pause());
@@ -244,8 +248,8 @@ if (process.argv.includes("--browser")) {
       await page.evaluate(() => window.Tengxian.Debug.MenuAct("settings"));
       await page.click('[data-setting="tools"]');
       const rows = await page.evaluate(() => [...document.querySelectorAll(".mnToolItem")].map((row) => row.dataset.toolId));
-      Check(`发布构建 ${fixture.name}：设置 → 高级工具里这 13 项消失、留在游戏里的 6 项照旧`,
-        SPLIT_IDS.every((id) => !rows.includes(id)) && ["environment", "splines", "propPcg", "blockout", "timeline", "fpMotion"].every((id) => rows.includes(id)), rows.join(","));
+      Check(`发布构建 ${fixture.name}：设置 → 高级工具里这 15 项消失、留在游戏里的 2 项照旧`,
+        SPLIT_IDS.every((id) => !rows.includes(id)) && ["blockout", "timeline"].every((id) => rows.includes(id)), rows.join(","));
       Check(`发布构建 ${fixture.name}：没有页面错误`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await page.close();
     }

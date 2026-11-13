@@ -152,7 +152,7 @@ const afterGear = await page.evaluate(() => {
     blockout: !!document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]'),
     // 设置三页不在高级工具里；Debug工具在菜单栏右侧自己的下拉里（2026-10-22），不混进编辑器条目
     settingsInBar: ["graphics", "sound", "controls"].some((id) => document.querySelector(`#edRoot [data-editor="${id}"]`)),
-    debugAsEditor: ["debugRendering", "profiler", "frameDebugger", "worldInfo", "playerState", "ai"]
+    debugAsEditor: ["debugRendering", "profiler", "frameDebugger", "worldInfo", "playerState", "ai", "environment"]
       .some((id) => document.querySelector(`#edRoot [data-editor="${id}"]`)),
     debugMenu: [...document.querySelectorAll('#edRoot .edMenu[data-menu="debug"] [data-debug-tool]')].map((el) => el.dataset.debugTool),
     debugNextToVolume: document.querySelector('#edRoot .edMenu[data-menu="debug"]')?.parentElement?.nextElementSibling?.classList.contains("edVolume") ?? false,
@@ -161,17 +161,15 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 第一人称持枪移动检查（叠加层，2026-10-23）
-// + 贴图管理 + 场景编辑器（独立窗口，2026-10-31 加）+ 白盒关卡编辑器（整页跳转入口）= 16 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景 / 关卡编排；
-// 出图机位 shotCamera 是不进菜单的测试工具，不计入）
-Check("菜单栏列出全部编辑器入口", afterGear.entries === 16
+// 菜单栏有六组高级工具、右侧 Debug工具，共 17 个高级工具入口。
+Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
   && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
   && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
-Check("Debug工具七项在音量条旁的下拉里，不混进编辑器条目",
+Check("Debug工具八项在音量条旁的下拉里，不混进编辑器条目",
   !afterGear.debugAsEditor && afterGear.debugNextToVolume
-  && afterGear.debugMenu.join(",") === "debugRendering,profiler,frameDebugger,worldInfo,playerState,ai,fps",
+  && afterGear.debugMenu.join(",") === "debugRendering,profiler,frameDebugger,worldInfo,playerState,ai,environment,fps",
   `下拉=${afterGear.debugMenu.join("/")}，挨着音量=${afterGear.debugNextToVolume}`);
 const fpsDefault = await page.evaluate(() => {
   const fps = document.querySelector(".hudFps");
@@ -648,11 +646,17 @@ Check("Debug Rendering：透视（关深度测试）比贴面模式画出更多�
   `透视=${debugShading.xrayDiff.toFixed(4)} 贴面=${debugShading.colliders.diff.toFixed(4)}`);
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
-// 就不再收到 WASD：自由飞行类工具（这里用场景样条PCG）的飞行镜头仍应继续移动。
-await ClickTool("splines");
+// 就不再收到 WASD：自由飞行类工具（这里用出图机位）的飞行镜头仍应继续移动。
+await page.evaluate(() => {
+  const tool = window.Taierzhuang.editor.Open("shotCamera");
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.setAttribute("aria-label", "键盘路由测试滑杆");
+  tool.panel.body.appendChild(slider);
+});
 await Step(4);
 const debugOverlayPersists = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
-Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "splines"
+Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "shotCamera"
   && debugOverlayPersists.debugRendering && debugOverlayPersists.debugView === "normal",
 JSON.stringify(debugOverlayPersists));
 const sliderFound = await page.locator('.edPanel.work input[type="range"]').count();

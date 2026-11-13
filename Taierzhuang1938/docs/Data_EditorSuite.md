@@ -18,18 +18,14 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 开发工具分两块，**都不对玩家开放**，出图模式（`?shot=1`）下整棵 DOM 是 `display:none`：
 
-- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：十二个互斥编辑器 + 第一人称持枪移动检查（叠加层）
-  + 贴图管理、场景编辑器（`SceneEditor.html`，2026-10-31 加，见 [Data_Scene.md](Data_Scene.md) §6）两个独立窗口
-  + 白盒关卡编辑器跳转入口，共 16 项（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景 / 关卡编排），分在顶部菜单栏的「场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产」六个菜单里（表在
-  `Script_Editor.TOOL_MENUS`），菜单栏最右是「返回主菜单」文字按钮（所有页面都有；没有「游戏」菜单）。选中的工具显示在右侧 Inspector。
+- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：共 17 项，按场景、关卡、角色、武器、特效与声音、资产六组排列。15 项经独立工具边界接入，白盒关卡编辑器和 Timeline 使用整页入口。
 - **高级工具音量**（2026-10-20，用户：高级工具页面要有独立的音量调节）：菜单栏右侧（Debug工具下拉与「返回主菜单」之间）一条
   喇叭 + 滑条 + 百分比（`Script_EditorVolume`），点喇叭静音 / 取消，滑条上滚轮一格 5%。存在自己的 localStorage 键
   `tengxian1938_tools_volume_v1`（`{ volume, muted }`），**不碰**游戏「声音」设置那份 `tengxian1938_audio_v1`；第一次用时从
   玩家当前的总音量起步。高级工具开着（或有工具在跑）、或者在白盒关卡编辑器页面里时，`EditorSuite.SyncToolsVolume` 调
   `Script_Audio.SetToolsVolume(音量)` 盖过玩家的总音量（`outputVolume = toolsVolume ?? masterVolume`）；退出高级工具调
   `SetToolsVolume(null)` 还回去。白盒关卡编辑器右上角工具条里也有同一条（同一份存档）。
-- **Debug工具**（菜单 设置 → Debug工具；高级工具菜单栏右侧、音量条左边的「Debug工具」下拉）：六个可叠加的观察层
-  Debug Rendering / Profiler / Frame Debugger / WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。两处入口开关同一份状态
+- **Debug工具**（菜单 设置 → Debug工具；高级工具菜单栏右侧、音量条左边的「Debug工具」下拉）：Debug Rendering / Profiler / Frame Debugger / WorldInfo / 玩家状态 / 敌军 AI / 环境，外加 FPS 显示。两处入口开关同一份状态
   （`EditorSuite.DebugToolStates` / `ToggleDebugTool`，顺序与文案都取 `Data_DevTools.DEBUG_TOOL_IDS` 与
   `Data_Text_Menu` 的 `menu.debugTools.*`）；下拉条目带 `data-debug-tool`，不算编辑器条目（不带 `data-editor`），
   开着的打金方块，弹独立窗口的几项后缀 ↗。独立窗口被浏览器拦下时下拉不会静悄悄地没反应：拦截原因写到画面顶上的提示行，5 秒后收掉
@@ -64,14 +60,16 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 一部分高级工具从游戏里拆到 `Taierzhuang1938/AdvancedTools/`，用本地控制中心和独立宿主页打开；方向只许 **AdvancedTools → 游戏**。
 
-- **范围**：独立网页 4 个整页搬走、旧网址不留跳转壳——场景编辑器 `SceneEditor.html`、遭遇设计 `Tool_LevelFlow.html`、Mixamo 动作预览 `Tool_MixamoAnimationPreview.html`、贴图管理 `TextureManager.html`（连同只给它们用的模块与样式）；摄影棚类 9 个（`assetStandards audio props actor facial squadMarch weapon firstPerson vfx`）源码搬进该目录，连同只被它们用的 `Script_EditorParticleInspector / FallingSoil / FlareField`、`Script_FacialReview`、`Script_PlaceableCatalog`。被留在游戏里的代码导入的模块一律留在原地（如 `Script_MixamoProps`、`Script_TextureImports`），AdvancedTools 里用 `../X.mjs` 引。其余场景类（environment / splines / propPcg / blockout / timeline）、fpMotion、全部 Debug工具与共用的 `Script_EditorStage / Ui / Settings / Volume / Home`、`Script_Editor` 本体不动。
-- **控制中心** `AdvancedTools/ControlCenter.html`（`Script_ControlCenter.mjs`，目录表 `Data_AdvancedTools.mjs` 零依赖）：版式照工具首页，按 `TOOL_MENUS` 六组列 19 张卡片——独立窗口页开各自页面、摄影棚类开 `Tool_Studio.html?tool=<id>`、留在游戏里的标「游戏内」并链到游戏现有入口（blockout / timeline / environment 用入口类静态 `Url()`，其余 `../index.html?editor=tools&tool=<id>`）。Debug工具不列。
+- **范围**：独立网页 4 个整页搬走、旧网址不留跳转壳——场景编辑器 `SceneEditor.html`、遭遇设计 `Tool_LevelFlow.html`、Mixamo 动作预览 `Tool_MixamoAnimationPreview.html`、贴图管理 `TextureManager.html`（连同只给它们用的模块与样式）；摄影棚类 9 个（`assetStandards audio props actor facial squadMarch weapon firstPerson vfx`）源码搬进该目录，连同只被它们用的 `Script_EditorParticleInspector / FallingSoil / FlareField`、`Script_FacialReview`、`Script_PlaceableCatalog`。被留在游戏里的代码导入的模块一律留在原地（如 `Script_MixamoProps`、`Script_TextureImports`），AdvancedTools 里用 `../X.mjs` 引。白盒 / Timeline、全部 Debug工具与共用的 `Script_EditorStage / Ui / Settings / Volume / Home`、`Script_Editor` 本体不动。
+- **控制中心** `AdvancedTools/ControlCenter.html`（`Script_ControlCenter.mjs`，目录表 `Data_AdvancedTools.mjs` 零依赖）：版式照工具首页，按 `TOOL_MENUS` 六组列 17 张卡片——独立窗口页开各自页面、摄影棚类开 `Tool_Studio.html?tool=<id>`、留在游戏里的标「游戏内」并链到游戏现有入口（blockout / timeline 用入口类静态 `Url()`）。Debug工具不列。
 - **独立工具宿主** `AdvancedTools/Tool_Studio.html?tool=<id>`（`Script_ToolStudio.mjs` 外壳 + `Script_ToolStudioRenderBase.mjs` 渲染底座）：不改 `Script_Main`，底座照 Main 的建系统与出画顺序自己装配（画质档与玩家存档同一套，天光 / 地台照工具首页那一关），host 字段同 `EditorSuite.editorHost`，差别只有 `game` 是最小桩、`playerWeaponId` 取 `DEFAULT_PLAYER_WEAPON`。页面 `<base href="../">`，游戏模块里按游戏根写的 `./Model/…` 相对路径照旧可用；外部 PBR 清单照抄 Main 的表（`Data_ToolStudioPbrSets.mjs`，Main 改表要同步）。`?manual=1` 时钟归测试（`window.ToolStudio.StepFrames`）。
 - **搬家后的路径**：独立页面读 `../index.html` 的 import map，键值按 index.html 位置解析成绝对地址再插入（避免同一模块两个实例）；入口类用 `new URL("../", import.meta.url)` 解析 `TOOL_INFO.window.url`（相对 `Taierzhuang1938/` 根）。`index.html` 的 import map 里搬走的模块登记为 `./AdvancedTools/X.mjs`。
-- **游戏内入口暂时保留、行为不变**：两对拆分边界模块（写法同 `Script_DevTools` / `Data_DevTools`）——`Script_DevToolsSplit.mjs` 导出 `SPLIT_TOOL_CLASSES`（13 个工具类，游戏里唯一可以 import `./AdvancedTools/` 的模块）、`Data_DevToolsSplit.mjs` 导出 `SPLIT_TOOLS_AVAILABLE`（零依赖）；`TOOL_INFO` 里 13 项带 `split: true`，`TOOL_MENUS` 按 `!split || SPLIT_TOOLS_AVAILABLE` 过滤；`Script_Editor` 的类表 / 互斥表由本地类加 `SPLIT_TOOL_CLASSES` 组装。
-- **线上剔除**：Pages 发布始终把这两对换成 `*Stub`（`Script_BuildBrowserBundle --deploy` 自动带，`--strip-dev-tools` 全剔路径仍可用），发布副本不含 `AdvancedTools/`（`PUBLISH_EXCLUDE` + `Script_PublishScope.IsPublishedSource`），`Script_PublishPrune.StripAdvancedToolsImports` 摘掉 `index.html` import map 里指向它的条目（排在盖戳之前），`Script_StampImportMaps` 不进该目录。效果：线上菜单 / 设置 → 高级工具里这 13 项消失（整组拆空的「特效与声音」也不列），其余工具照旧。
+- **游戏内入口暂时保留、行为不变**：两对拆分边界模块（写法同 `Script_DevTools` / `Data_DevTools`）——`Script_DevToolsSplit.mjs` 导出 `SPLIT_TOOL_CLASSES`（15 个工具类，游戏里唯一可以 import `./AdvancedTools/` 的模块）、`Data_DevToolsSplit.mjs` 导出 `SPLIT_TOOLS_AVAILABLE`（零依赖）；`TOOL_INFO` 里 15 项带 `split: true`，`TOOL_MENUS` 按 `!split || SPLIT_TOOLS_AVAILABLE` 过滤；`Script_Editor` 的类表 / 互斥表由本地类加 `SPLIT_TOOL_CLASSES` 组装。
+- **线上剔除**：Pages 发布始终把这两对换成 `*Stub`（`Script_BuildBrowserBundle --deploy` 自动带，`--strip-dev-tools` 全剔路径仍可用），发布副本不含 `AdvancedTools/`（`PUBLISH_EXCLUDE` + `Script_PublishScope.IsPublishedSource`），`Script_PublishPrune.StripAdvancedToolsImports` 摘掉 `index.html` import map 里指向它的条目（排在盖戳之前），`Script_StampImportMaps` 不进该目录。效果：线上菜单 / 设置 → 高级工具里这 15 项消失（整组拆空的「特效与声音」也不列），其余工具照旧。
 - **启动器** `AdvancedTools/Script_ControlCenterLaunch.mjs`：8080 起找 `/__preview/ping` 根目录就是本仓库的预览服，没有就后台起 `Script_LocalPreview.mjs --no-open`（端口以输出为准，关窗口即停服），再用默认浏览器开控制中心；`--dry-run` 只打印计划，`--shortcut` 在桌面建「AdvancedTool ControlCenter.lnk」（目标 node、参数本脚本、工作目录仓库根），`--shortcut-dir=<dir>` 改目标目录。
 - **门禁**：`Script_AdvancedToolsTest`（纯 Node：目录表、搬家、入口类地址、卡片、启动器）、`Script_AdvancedToolsBrowserTest`（控制中心、九个工具在独立宿主逐个打开、四个页面新地址）、`Script_ToolStudioParityBrowserTest`（九个工具游戏宿主 vs 独立宿主整页截图平均绝对差 ≤ 2/255，约 20+ 分钟，tier2）、`Script_DevToolsIsolationTest`（拆分边界导出对账、游戏不 import AdvancedTools、发布构建 / 发布副本 / 菜单剔除）。
+
+- **2026-11-13**：样条与撒点验证界面移入 `AdvancedTools/`，入口为 `Tool_Pcg.html?tool=splines|propPcg`。宿主复用工具渲染底座与界面外壳，通过 `TengxianField` / `FirstLevelWhiteboxField`、`AddExternalProps` 装配场地与真实布设。生产生成器和数据仍由游戏共享调用，发布包剔除这两项验证界面。环境转入 Debug工具独立窗口，第一人称持枪移动检查删除。控制中心共 17 项，15 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
 
 ## 精简测试界面
 
@@ -304,38 +302,9 @@ FOV 按正片相同的 `adsFovScale` 收窄。红十字是枪口真实弹道在�
 让带历史限速的肘平面落定。投掷（会真扔出手榴弹）和装填（提交弹药、发声）不进时间轴。
 `Debug.FirstPersonAnimation({ weapon:"Dadao", clip:"action:melee", normalized:0.46 })` 与面板同一条路。
 
-### 第一人称持枪移动检查 `Script_EditorFirstPersonMotion.mjs`（叠加层，2026-10-23）
+### 第一人称持枪移动检查（2026-11-13 删除）
 
-高级工具 → 武器 → 「第一人称持枪移动检查」。用来看第一人称画面里看不到的东西：腿脚怎么迈、胯和上身朝哪、
-枪和双手在世界里实际在哪儿。只读观察，不改任何玩法与手感数据。和上面的「第一人称持枪检查」分工：那个停住玩法、
-把 Viewmodel 搬进摄影棚逐件看手位；这个**玩法照跑**，边走边开枪边看。
-
-- **叠加层**（不进互斥、不暂停玩法、关掉高级工具不收，`keepOnClose`）；只在「武器」菜单登记，不进 Debug工具 列表。
-  停它：菜单里再点一次或面板的 ×。白盒编辑器页（`?editor=blockout`）里同样能用。
-- **画面**：主相机挪到玩家身旁的外部机位，玩家照常 WASD / 鼠标 / 开枪 / 开镜（鼠标转的是玩家视线，不是机位）。
-  七个机位：右侧、正前、左侧、右后上、左前低、脚下、俯视；「跟着视线转」关掉 = 固定世界方向（看原地转身用）；
-  距离倍率 0.4–3×；「避开遮挡」从看的那一点朝机位打射线（含地形），被墙 / 洞顶挡住就收到撞点前面（洞里、沟里要它）。
-- **枪和双手**：Viewmodel 本来挂在主相机下，开着工具时挂到一台「替身眼睛」（`PerspectiveCamera`，每帧在玩家相机与 FOV
-  写完、`Viewmodel.Update` 之前抄一次玩家相机）下，所以从外面看到的就是它跟着玩家眼睛的实际位置，FOV 补偿照旧读 `parent.fov`。
-  三档：真实尺寸（缺省：观察这一帧把 `fovRig` 的窄 FOV 深度压缩压回 1，下一帧开头还原，玩家画面、弹道不受影响）/
-  画面压缩版（玩家眼里那一份几何，从外面看是缩到眼前、深度压扁的）/ 藏起（只看身体腿脚）。
-- **辅助线**（`post.AddDebugOverlay`，不进场景图与预通道）：玩家眼睛的视锥与视线（黄）、碰撞胶囊（青）、
-  地上三根箭头（视线朝向黄、胯朝向橙、移动速度绿）、最近 16 个落脚点（左蓝右红，越旧越暗；空中的脚画一根竖线）。
-  外部机位出画时藏掉 HUD 的屏幕中心准星（`body.edFpMotionObserver`），视锥那根亮黄线才是玩家视线。
-- **读数**：机位、慢放、移动速度与姿态、武器与枪手档位、视线偏航俯仰、上身拧角（原地转身中会标出）、骨盆下沉与两脚着地、
-  近 3 秒步频 / 步长、近 2 秒「着地脚滑动」（读**真实脚骨骼**：着地期间相邻两帧水平挪了多少，> 3 mm 黄、> 10 mm 红）。
-- **热键**（只在工具开着时，都不在游戏键位表里）：`J` 换机位、`K` 慢放（原速 / 0.5× / 0.25× / 0.1×，整个玩法 dt 乘倍率）、
-  `L` 切回第一人称画面（再按回外部）、`[` `]` 拉近 / 拉远。
-- **接线**（`Script_Main` 只经套件碰它）：`editor.SyncOverlayEye(camera)` 在 `viewmodel.Update` 之前；
-  `editor.ApplyOverlayCamera(camera, fresh)` 在白盒预演 / 飞行与炮击测试场相机之后、只在它们都没接管时调（玩法停着的那条分支传
-  `fresh=false`，不重抄替身眼睛）；`editor.ScaleDt(dt)` 乘慢放。有互斥编辑器开着时不接管相机。阴影框留在玩家脚下（机位就在几米内）。
-- **关掉**：Viewmodel 挂回主相机，深度压缩、可见性、准星、慢放全部还原。
-- 闸门 `Script_EditorFirstPersonMotionBrowserTest`（白盒 FirstLevel0105 关键帧 03-1）：热键不占游戏键位；开了玩法照跑、
-  替身眼睛 = 玩家眼睛、主相机离开眼睛且不在地下；真实尺寸那一帧压缩是 1；沟里上坡全速走 2.5 s 读数着地脚滑动 ≤ 1 mm/帧；
-  J / K（0.25× 时同样帧数走约 1/4）/ L；固定机位原地转视角 40° 上身拧角 ≈ 40°；关掉全还原；没有未捕获错误。
-
-它第一次用就查出一处真问题：03-1 沟里从坑底起步上坡时，锁在地上的后脚在胯下 0.8–0.9 m，降胯到底也够不着，IK 把脚往上拽，
-实测 28–47 mm/帧。规划器「够不着就提前迈」原来只看水平距离，现在按三维腿长判（见 [第一人称身体与持枪](Data_FirstPersonEmbodiment.md)「下半身」）。
+按用户要求删除工具、热键、观察机位、慢放和主循环接线。
 
 ### 音效音乐 `Script_EditorAudio.mjs`
 
@@ -352,15 +321,17 @@ FOV 按正片相同的 `adsFovScale` 收窄。红十字是枪口真实弹道在�
 
 环境床与音乐是常驻的，退出编辑器时会还原成进来时那一份。
 
-### 环境 `Script_EditorEnvironment.mjs`（2026-11-02）
+### 环境窗口（2026-11-13）
 
-高级工具 → 场景 → 「环境」（`Script_EditorEnvironmentEntry`，同 Timeline 过场是跳转入口：整页切到白盒编辑器并打开面板，已在白盒编辑器里就只开面板；
-在登记了区域文件的正片关卡里（第一关 `?whitebox=p012`）改开游戏内叠加层 `Script_EditorEnvironmentGame`——同一个面板放左边，「这一拍」是任务步骤，
-不暂停玩法，退出菜单栏后还在；只在高级工具里，Debug工具菜单里没有）。
-白盒编辑器右侧的环境面板：时间条、总览（当前生效 / 区域与覆盖）、区域检查器、预设资源检查器，三处共用一套预设 / 组件 / 参数视图；
-底部昼夜时间轴；场景里画区域框、拖手柄改范围。口径见 [环境系统](Data_Environment.md) §8。
+入口为设置 → Debug工具 → 环境，或高级工具菜单栏里的 Debug工具 → 环境。
+`Script_EditorEnvironmentWindow` 打开独立的 `EnvironmentEditor.html`，窗口内的 `Script_EnvironmentWindow`
+复用 `EnvironmentEditor`、组件参数视图、昼夜时间轴、撤销和带 revision 的存取接口。
+目标列表可加载两个场景与登记的正片关卡配置。目标与宿主当前场景相同时连接同一环境系统，修改参数立即参与游戏出画。
+白盒内部的共用控制器继续处理关键帧时间和外部文件同步。
 
 ### Timeline 过场 `Script_EditorTimeline.mjs`（2026-10-31 重做）
+
+2026-11-13 核对：`Timeline/FirstLevelOpening.timeline.json` 是独立的过场编排源文件，包含 7 段子序列。旧版 01–05 的白盒预演与试玩通过 `OverlayTimelinePreviz` 读取这份原件并共用 `BlockoutPreviz` 播放器。正式第一关仍由 `FirstLevelMissionRuntime` 调用 `FirstLevelOpening` 等导演模块，运行时尚需接入统一的 Timeline 资源播放接口。
 
 **旧版已删**：原来的 Timeline 驱动 `CutsceneDirector` 播 7 场分镜式过场（序章《出川》、第一关关中
 《空地上的三个人》、旧战役五场）。2026-10-31 用户：7 场都过时了，连同播放器、`?preview=` 页、

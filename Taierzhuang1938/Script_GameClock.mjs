@@ -7,7 +7,7 @@
 // `realDt` 一直留着：QTE 的按键窗口、编辑器面板这类东西要走真实时间，不跟着慢。纯逻辑，零 three。
 
 /** 登记顺序（小的先算）。原 Frame 开头五行的顺序：白刃 QTE → 测试场 → 编辑器。 */
-export const CLOCK_ORDER = Object.freeze({ meleeQte: 10, sandbox: 20, editor: 50 });
+export const CLOCK_ORDER = Object.freeze({ meleeQte: 10, sandbox: 20 });
 
 export class GameClock {
   constructor() {

@@ -1,7 +1,7 @@
 // 高级工具拆分（AdvancedTools/）真浏览器门禁。
 //
 // 查：
-//   1. 控制中心 ControlCenter.html：19 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
+//   1. 控制中心 ControlCenter.html：17 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
 //      点一张摄影棚卡片真能开出独立工具宿主；
 //   2. 独立工具宿主 Tool_Studio.html?tool=<id>：九个摄影棚类工具逐个开，工作窗 .edPanel.work 出现、没有 console.error / pageerror、
 //      画布不是一片纯色；菜单栏只列这九个工具、可在页内切换、有「返回控制中心」；无 tool 参数时是空 Inspector；
@@ -73,7 +73,7 @@ try {
   // --- 1. 控制中心 -----------------------------------------------------------------
   if (!only || only.has("center")) {
     const { page, errors } = await OpenPage(`${base}ControlCenter.html`);
-    await page.waitForFunction(() => document.querySelectorAll("[data-home-tool]").length >= 19, null, { timeout: 60000 });
+    await page.waitForFunction(() => document.querySelectorAll("[data-home-tool]").length >= 17, null, { timeout: 60000 });
     const info = await page.evaluate(() => ({
       title: document.title, brand: document.querySelector(".edMenuBrand")?.textContent,
       groups: [...document.querySelectorAll(".edHomeGroup")].map((group) => ({ id: group.dataset.group, label: group.querySelector(".edHomeGroupLabel")?.textContent })),
@@ -85,7 +85,7 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("19 张卡片", info.cards.length === 19, String(info.cards.length));
+    Check("17 张卡片", info.cards.length === 17, String(info.cards.length));
     const card = (id) => info.cards.find((entry) => entry.id === id);
     Check("文案取 TOOL_INFO 的 label / hint", info.cards.every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
     for (const id of WINDOW_TOOL_IDS) {
@@ -150,6 +150,34 @@ try {
       title: document.querySelector("#edInspectorEmpty .edTitle")?.textContent }));
     Check("无 tool 参数：空 Inspector 提示", empty.active === null && empty.visible && empty.title === "未选择工具", JSON.stringify(empty));
     Check("无 tool 参数没有报错", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await page.close();
+  }
+
+  // 独立环境配置窗：目标切换、参数编辑、撤销与版本检查沿用共用面板。
+  if (!only || only.has("environment")) {
+    const { page, errors } = await OpenPage(`${base}../EnvironmentEditor.html`);
+    await page.waitForFunction(() => window.EnvironmentWindow?.ready);
+    const state = await page.evaluate(async () => {
+      const ed = window.EnvironmentWindow.editor;
+      ed.SetTab("preset");
+      const id = ed.SelectedPresetId();
+      const before = JSON.stringify(ed.PresetDoc(id));
+      ed.SetParam(id, "Fog", "density", 0.012);
+      const dirty = ed.dirty.has(`preset:${id}`);
+      const changed = JSON.stringify(ed.PresetDoc(id)) !== before;
+      ed.Undo();
+      const restored = JSON.stringify(ed.PresetDoc(id)) === before;
+      await ed.Reload({ discard: true });
+      return { dirty, changed, restored, writable: ed.status.writable, cards: document.querySelectorAll(".envCard").length };
+    });
+    Check("环境窗口复用组件参数编辑、撤销与本机保存状态", state.dirty && state.changed && state.restored && state.cards > 0 && typeof state.writable === "boolean", JSON.stringify(state));
+    await page.selectOption("#environmentTarget", "level/FirstLevelCampaign");
+    await page.waitForFunction(() => window.EnvironmentWindow.editor.loadedKind === "level" && window.EnvironmentWindow.editor.loadedScene === "FirstLevelCampaign");
+    await page.selectOption("#environmentTarget", "scene/FirstLevel");
+    await page.waitForFunction(() => window.EnvironmentWindow.editor.loadedKind === "scene" && window.EnvironmentWindow.editor.loadedScene === "FirstLevel");
+    Check("环境窗口可加载正片关卡与场景配置", true);
+    Check("环境窗口没有错误", errors.length === 0, errors.join(" | "));
+    if (shots) await page.screenshot({ path: path.join(shotDir, "EnvironmentWindow.png") });
     await page.close();
   }
 

@@ -41,22 +41,23 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
 
 // 2. 玩法时钟
 {
+  Check(!Object.hasOwn(CLOCK_ORDER, "editor"), "持枪移动观察工具的时钟顺序已删除");
   const clock = new GameClock();
   Check(clock.Step(0.016) === 0.016, "没登记缩放器 = 原样");
   const order = [];
-  clock.Add("editor", (dt) => { order.push("editor"); return dt * 0.5; }, CLOCK_ORDER.editor);
+  clock.Add("probe", (dt) => { order.push("probe"); return dt * 0.5; }, 50);
   clock.Add("meleeQte", (dt) => { order.push("meleeQte"); return dt * 0.25; }, CLOCK_ORDER.meleeQte);
   clock.Add("sandbox", (dt) => { order.push("sandbox"); return dt; }, CLOCK_ORDER.sandbox);
   Check(Math.abs(clock.Step(0.016) - 0.016 * 0.25 * 0.5) < 1e-12, "倍率相乘");
-  Check(order.join() === "meleeQte,sandbox,editor", "按 order 先后：白刃 QTE → 测试场 → 编辑器（同原 Frame 开头那五行）");
+  Check(order.join() === "meleeQte,sandbox,probe", "按 order 先后：白刃 QTE → 测试场 → 测试探针（同原 Frame 开头那五行）");
   Check(clock.realDt === 0.016, "真实时间原样留着（QTE 按键窗口用）");
   clock.Add("sandbox", () => 0, CLOCK_ORDER.sandbox);
   Check(clock.Step(0.016) === 0 && clock.State().scalers.length === 3, "同名重登记替换旧的；能暂停");
   clock.Add("sandbox", () => 1 / 60, CLOCK_ORDER.sandbox);
-  Check(Math.abs(clock.Step(0.001) - (1 / 60) * 0.5) < 1e-12, "单步：测试场给固定步长，后面的编辑器照样再乘");
+  Check(Math.abs(clock.Step(0.001) - (1 / 60) * 0.5) < 1e-12, "单步：测试场给固定步长，后面的测试探针照样再乘");
   const remove = clock.Add("tmp", (dt) => dt * 3, 99);
   remove();
-  clock.Remove("sandbox"); clock.Remove("meleeQte"); clock.Remove("editor");
+  clock.Remove("sandbox"); clock.Remove("meleeQte"); clock.Remove("probe");
   Check(clock.Step(0.02) === 0.02 && !clock.Has("tmp"), "撤销后回到原样");
 }
 
