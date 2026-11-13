@@ -308,14 +308,14 @@ const dragRearguardTracks = FLOW_DRAG_REARGUARD.map(plan => ({...plan,track:Keys
   fall:BeatById(plan.fallBeat).start+BeatById(plan.fallBeat).duration*plan.fallFraction}));
 
 function CampActors(actors, time) {
-  if (time < BeatById("04b").start || time > BeatById("05a").start) return;
+  if (time < BeatById("04b").start || time > BeatById("05a").end) return;
   for (const plan of campDefenseTracks) {
     const actor = actors.find(entry => entry.id === plan.id);
     actor.p = Track(plan.track, time);
     const moving = Distance(actor.p, Track(plan.track, time + 0.02)) > 0.001;
     const deployed = time >= BeatById("04b").start + BeatById("04b").duration * plan.readyFraction;
     Object.assign(actor, {pose: moving ? "run" : deployed ? "shoot" : "stand",
-      firing: deployed && !moving, heavy: plan.heavy === true && deployed && !moving,
+      firing: deployed && !moving, heavy: plan.heavy === true && deployed && !moving, coveringEvacuation: true,
       status: moving ? "转移阵位" : deployed ? "前沿阻击" : "准备前出"});
   }
   const loading = FLOW_CAMP_LOADING;
@@ -370,6 +370,14 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
     actors.push(Actor("cart", "老耿的车", "civilian", "cart", cart, "stand",{heading}));
     actors.push(Actor("donkey", "毛驴", "civilian", "donkey", CartOffset(0,2.3), "walk",{heading}));
     actors.push(Actor("geng", "老耿", "civilian", "person", CartOffset(-0.95,1.2), "stand"));
+    if(Number(beat.stage)<8) {
+      const evacuating=time>=BeatById("04d").start;
+      Object.assign(actors.at(-1),{pose:evacuating?"run":"stand",status:evacuating?"趁阻击带车后撤":"等待装运"});
+      for(const [index,member] of FLOW_CAMP_LOADING.members.slice(1).entries()) {
+        actors.push(Actor(member.id,member.name,"civilian","person",CartOffset(index?1.8:-1.8,-1-index*1.8),evacuating?"run":"stand",
+          {status:evacuating?"弹药已装车，随车后撤":"等待搬运"}));
+      }
+    }
     let nier = CartOffset(1,0.6);
     if(beat.id === "08g") nier=SampleRoute([[104.6,379.3],[99,380],[80,382],[80,392]],progress);
     if(beat.stage === "09") nier=offset(-0.8,1.2);
@@ -551,7 +559,9 @@ function Effects(beat, time, progress, actors) {
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
   if ((beat.fire === "tank" || ["03h","05a","05b","05c"].includes(beat.id)) && tank && tank.pose !== "burn") {
-    const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : player.p;
+    const cover=actors.filter(actor=>actor.coveringEvacuation && actor.firing)
+      .reduce((nearest,actor)=>!nearest||Distance(tank.p,actor.p)<Distance(tank.p,nearest.p)?actor:nearest,null);
+    const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : cover?.p ?? player.p;
     effects.push({ kind:"fire", a:tank.p, b:target, side:"enemy", heavy:true, phase:(time*5)%1 });
   }
   if (["crossfire","north"].includes(beat.fire) && beat.stage === "02") {

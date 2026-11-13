@@ -231,8 +231,23 @@ try {
   });
   const groundFormation=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['GroundWest','GroundEast'].includes(actor.groupId)));
   assert.equal(groundFormation.length,8);
-  assert.ok(groundFormation.some(actor=>actor.pose==='run')&&groundFormation.some(actor=>actor.firing),'the camp preview displays advancing infantry and covering fire together');
+  assert.ok(groundFormation.every(actor=>actor.firing&&actor.p[1]<=119.5),'squad fire holds both enemy flanks outside the camp');
   await page.screenshot({path:path.join(out,"GroundInfantryFormation.png")});
+  await page.evaluate(()=>{
+    const layout=LevelFlow.Inspect().viewports;
+    for(const view of layout.views) {view.center=[83,150];view.scale=3.5;view.layers.triggers=false;}
+    LevelFlow.RestoreViewports(layout);
+  });
+  const evacuationStart=FLOW_TIMELINE.find(beat=>beat.id==="04d").start;
+  const withdrawalStart=FLOW_TIMELINE.find(beat=>beat.id==="05a").start;
+  for(const [stamp,name] of [[evacuationStart,"CampEvacuationStart"],[withdrawalStart+12.1794,"CampAnnotatedHolding"],[withdrawalStart+35,"CampEvacuationRearGuard"]]) {
+    await page.evaluate(stamp=>LevelFlow.Seek(stamp),stamp);
+    const evacuation=await page.evaluate(()=>LevelFlow.Inspect());
+    assert.equal(evacuation.actors.filter(actor=>['geng','ammoCarrier1','ammoCarrier2'].includes(actor.id)&&actor.pose==='run').length,3);
+    assert.ok(evacuation.actors.filter(actor=>actor.coveringEvacuation&&actor.firing).length>=2);
+    assert.ok(evacuation.actors.filter(actor=>['GroundWest','GroundEast'].includes(actor.groupId)&&actor.pose!=='dead').every(actor=>actor.p[1]<=119.5));
+    await page.screenshot({path:path.join(out,name+'.png')});
+  }
   await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),campViews);
   await page.evaluate(()=>LevelFlow.Seek(247.137));
   const pressure=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==="Fork");

@@ -79,11 +79,15 @@ export function CreateEncounterDocument(timeline, waves) {
     const group=groups.find(item=>item.id===formation.id);
     group.area.size=[...formation.areaSize];
     group.spawnOffsets=structuredClone(formation.offsets);
+    if(formation.holdUntil) group.holdUntil=structuredClone(formation.holdUntil);
     group.memberPlans=formation.offsets.map((offset,index)=>({
       delay:formation.delays[index],
       route:structuredClone(formation.routes?.[index]
         || (formation.route||group.route).slice(1).map(point=>point.map((value,axis)=>value+offset[axis]))),
     }));
+    if(formation.holdPoint) for(const [index,plan] of group.memberPlans.entries()) {
+      plan.route.unshift(formation.holdPoint.map((value,axis)=>value+formation.offsets[index][axis]));
+    }
   }
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const group=groups.find(entry=>entry.id===reinforcement.id);
@@ -93,7 +97,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-friend-reinforcements-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-camp-cover-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -139,6 +143,9 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.standoffMetres===undefined || Number.isFinite(group.standoffMetres) && group.standoffMetres>=0 && group.standoffMetres<=100, "追击距离无效");
     Require(group.spacingMetres===undefined || Number.isFinite(group.spacingMetres) && group.spacingMetres>=0 && group.spacingMetres<=10, "单兵间距无效");
     Require(group.coverWaitSeconds===undefined || Number.isFinite(group.coverWaitSeconds) && group.coverWaitSeconds>=0 && group.coverWaitSeconds<=60, "掩护停留时长无效");
+    Require(group.holdUntil===undefined || group.behavior==="bounds" && group.memberPlans && group.spawnOffsets
+      && timeline.some(beat=>beat.id===group.holdUntil?.beat) && Number.isFinite(group.holdUntil.fraction)
+      && group.holdUntil.fraction>=0 && group.holdUntil.fraction<=1, "阻击停留时刻无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
@@ -205,7 +212,8 @@ export function CompileEncounters(document, timeline) {
       if(born>=end) break;
       lives.push({born,fall:born+group.lifetime});
     }
-    const compiled={...group,start,end,lives};
+    const holdBeat=beats.get(group.holdUntil?.beat);
+    const compiled={...group,start,end,lives,holdUntilTime:holdBeat?holdBeat.start+holdBeat.duration*group.holdUntil.fraction:null};
     if(group.standoffMetres && !(group.behavior==="bounds" && group.memberPlans)) coverTracks.set(compiled,BuildPursuitTracks(compiled,route));
     else if(group.behavior==="bounds") coverTracks.set(compiled,BuildCoverTracks(compiled,route));
     return compiled;
@@ -305,7 +313,8 @@ function BuildBoundingPairTracks(group,playerRoute) {
         || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]!==state.next || frontReady[otherIndex]);
       const clear = state.next>=state.path.length || !group.standoffMetres
         || SegmentDistance(player,state.path[state.next-1],state.path[state.next])>=group.standoffMetres;
-      if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady && clear) {
+      const held=group.holdUntilTime!==null && time<group.holdUntilTime && state.next>1;
+      if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady && clear && !held) {
         const distance=Math.min(state.distances[state.next],state.distance+group.speed*step);
         const candidate=SampleRoute(state.path,distance/(state.distances.at(-1)||1));
         const spaced=!group.spacingMetres || states.every(other=>other===state
@@ -388,10 +397,13 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
   }
   const enemies=actors.filter((actor)=>actor.side==="enemy"&&actor.pose!=="dead");
   const rearGuards=coreActors.filter(actor=>actor.groupId==="DragRearguard");
+  const campGuards=coreActors.filter(actor=>actor.coveringEvacuation && actor.firing);
   for(const actor of [...actors,...rearGuards].filter((item)=>item.firing)) {
     const casualty=actor.groupId==="Corner" && rearGuards.find(guard=>time>=guard.fall-2 && time<=guard.fall+0.3);
+    const coveringTarget=actor.side==="enemy" && actor.target==="player" && campGuards.reduce((nearest,guard)=>
+      !nearest||Distance(actor.p,guard.p)<Distance(actor.p,nearest.p)?guard:nearest,null);
     const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
-      :actor.target==="ramp"?{p:[100,384]}:casualty||(coreActors.find((item)=>item.id===actor.target)??player);
+      :actor.target==="ramp"?{p:[100,384]}:casualty||coveringTarget||(coreActors.find((item)=>item.id===actor.target)??player);
     if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
   }
   return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),
@@ -431,6 +443,7 @@ function UpgradeGroundFormations(value,defaults) {
     current.area=structuredClone(next.area);
     current.spawnOffsets=structuredClone(next.spawnOffsets);
     current.memberPlans=structuredClone(next.memberPlans);
+    if(next.holdUntil) current.holdUntil=structuredClone(next.holdUntil);
   }
   return UpgradeDragPursuit(value,defaults);
 }
@@ -466,8 +479,21 @@ function UpgradePursuit(value, defaults) {
       }
     }
   }
-  value.revision = defaults.revision;
+  return UpgradeCampCover(value,defaults);
+}
 
+function UpgradeCampCover(value,defaults) {
+  for(const formation of FLOW_GROUND_FORMATIONS.filter(entry=>entry.holdUntil)) {
+    const current=value.groups.find(group=>group.id===formation.id),next=defaults.groups.find(group=>group.id===formation.id);
+    if(!current || !next) continue;
+    const previousPlans=next.memberPlans.map(plan=>({...plan,route:plan.route.slice(1)}));
+    if(JSON.stringify(current.memberPlans)!==JSON.stringify(previousPlans)
+      || JSON.stringify(current.route)!==JSON.stringify(next.route)
+      || JSON.stringify(current.spawnOffsets)!==JSON.stringify(next.spawnOffsets)) continue;
+    current.memberPlans=structuredClone(next.memberPlans);
+    if(current.holdUntil===undefined) current.holdUntil=structuredClone(next.holdUntil);
+  }
+  value.revision=defaults.revision;
   return value;
 }
 
@@ -517,7 +543,7 @@ function UpgradeLegacyEncounterDocument(input,defaults) {
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
-  if(upgraded===input && input.revision!=="2026-11-13-pit-retreat-1") return input;
+  if(upgraded===input && !["2026-11-13-pit-retreat-1","2026-11-14-friend-reinforcements-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const current=value.groups.find(entry=>entry.id===reinforcement.id);
@@ -533,6 +559,5 @@ export function UpgradeEncounterDocument(input,defaults) {
     const trigger=value.triggers.find(entry=>entry.id===current.triggerId);
     if(trigger?.mode==="time" && trigger.delay===0 && trigger.beat===previous.beat) trigger.beat=next.beat;
   }
-  value.revision=defaults.revision;
-  return value;
+  return UpgradeCampCover(value,defaults);
 }

@@ -281,7 +281,7 @@ const previousGroundDraft=structuredClone(defaults);
 previousGroundDraft.revision="2026-11-13-flank-refill-1";
 for(const formation of FLOW_GROUND_FORMATIONS) {
   const group=previousGroundDraft.groups.find(item=>item.id===formation.id);
-  group.area.size=[...formation.previousAreaSize];delete group.spawnOffsets;delete group.memberPlans;
+  group.area.size=[...formation.previousAreaSize];delete group.spawnOffsets;delete group.memberPlans;delete group.holdUntil;
 }
 previousGroundDraft.groups.find(group=>group.id==="GroundWest").speed=3;
 previousGroundDraft.groups.find(group=>group.id==="GroundEast").route=[[125,109],[130,170]];
@@ -636,6 +636,59 @@ for (const id of ["luo","he","liu","yao","geng"]) {
     assert.ok(Distance(before.p,after.p) < 0.03, "camp actors cross beat boundaries continuously");
   }
 }
+const evacuationIds=["geng","ammoCarrier1","ammoCarrier2"];
+const holdRelease=BeatById("05a").start+BeatById("05a").duration*0.8;
+for(let stamp=BeatById("04d").start;stamp<holdRelease;stamp+=0.25) {
+  const frame=EvaluateFlow(stamp),previous=EvaluateFlow(stamp-0.25);
+  const civilians=frame.actors.filter(actor=>evacuationIds.includes(actor.id));
+  assert.equal(civilians.length,3,"all ammunition handlers remain visible after loading");
+  for(const actor of civilians) {
+    assert.ok(Distance(actor.p,previous.actors.find(entry=>entry.id===actor.id).p)<1,"evacuation never teleports");
+    assert.equal(actor.pose,"run","ammunition handlers leave promptly with the cart");
+  }
+  const infantry=frame.actors.filter(actor=>["GroundWest","GroundEast"].includes(actor.groupId)&&actor.pose!=="dead");
+  assert.ok(infantry.every(actor=>actor.p[1]<=119.5),"squad fire pins infantry north of the loading area until evacuation clears");
+  for(const civilian of civilians) for(const enemy of frame.actors.filter(actor=>actor.side==="enemy"&&actor.pose!=="dead")) {
+    assert.ok(Distance(civilian.p,enemy.p)>30,"enemy cannot close on the withdrawing ammunition party");
+  }
+  const guards=frame.actors.filter(actor=>actor.coveringEvacuation&&actor.firing);
+  if(stamp<BeatById("05a").start+BeatById("05a").duration*0.72) {
+    assert.ok(guards.length>=2,"one pair always covers while the other pair falls back");
+    for(const guard of guards) assert.ok(frame.effects.some(effect=>effect.kind==="fire"&&effect.side==="friend"&&Distance(effect.a,guard.p)<0.01));
+    for(const effect of frame.effects.filter(effect=>effect.kind==="fire"&&effect.side==="enemy")) {
+      assert.ok(guards.some(guard=>Distance(effect.b,guard.p)<0.01),"covering squad draws enemy fire away from the evacuation");
+    }
+  }
+}
+const annotatedEvacuationTime=BeatById("05a").start+12.1794;
+const annotatedEvacuation=EvaluateFlow(annotatedEvacuationTime);
+assert.equal(annotatedEvacuation.actors.filter(actor=>actor.coveringEvacuation&&actor.firing).length,2);
+EvaluateFlow(700);EvaluateFlow(0);
+assert.deepEqual(EvaluateFlow(annotatedEvacuationTime),annotatedEvacuation,"annotated evacuation remains seek deterministic");
+const previousCampDraft=structuredClone(defaults);
+previousCampDraft.revision="2026-11-13-pit-retreat-1";
+for(const group of previousCampDraft.groups.filter(group=>group.holdUntil)) {
+  delete group.holdUntil;
+  for(const plan of group.memberPlans) plan.route.shift();
+}
+previousCampDraft.groups.find(group=>group.id==="GroundWest").speed=3;
+previousCampDraft.groups=previousCampDraft.groups.filter(group=>group.id!=="SearchNeighbor");
+const recentCampDraft=structuredClone(previousCampDraft);
+recentCampDraft.revision="2026-11-14-friend-reinforcements-1";
+assert.deepEqual(UpgradeEncounterDocument(recentCampDraft,defaults),UpgradeEncounterDocument(previousCampDraft,defaults),"the latest reinforcement drafts also receive evacuation cover");
+const restoredCamp=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(previousCampDraft),setItem:()=>{}}).value;
+assert.equal(restoredCamp.revision,defaults.revision);
+assert.deepEqual(restoredCamp.groups.find(group=>group.id==="GroundWest").memberPlans,defaults.groups.find(group=>group.id==="GroundWest").memberPlans);
+assert.equal(restoredCamp.groups.find(group=>group.id==="GroundWest").speed,3);
+assert.ok(!restoredCamp.groups.some(group=>group.id==="SearchNeighbor"));
+previousCampDraft.groups.find(group=>group.id==="GroundWest").memberPlans[0].route[0][0]+=2;
+const editedCamp=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(previousCampDraft),setItem:()=>{}}).value;
+assert.deepEqual(editedCamp.groups.find(group=>group.id==="GroundWest").memberPlans,previousCampDraft.groups.find(group=>group.id==="GroundWest").memberPlans,"custom member routes stay authored");
+assert.equal(editedCamp.groups.find(group=>group.id==="GroundWest").holdUntil,undefined);
+for(const holdUntil of [{beat:"missing",fraction:0.5},{beat:"05a",fraction:2}]) {
+  const invalid=structuredClone(defaults);invalid.groups.find(group=>group.id==="GroundWest").holdUntil=holdUntil;
+  assert.throws(()=>ValidateEncounterDocument(invalid,FLOW_TIMELINE));
+}
 // The annotated 03B formation is created in one hidden batch. Movement starts
 // after deployment and joins the approach around the new walls' open ends.
 const spawnWalls=map.objects.filter(object=>["Encounter_NorthSpawnWall","Encounter_EastSpawnWall"].includes(object.id));
@@ -739,7 +792,7 @@ assert.deepEqual(importedBatch.value.groups.find(group=>group.id==="Fork").membe
 const batchDraft=structuredClone(defaults);batchDraft.revision=FLOW_PREVIOUS_BATCH_ENCOUNTER.revision;
 for(const collection of ["groups","triggers"]) batchDraft[collection]=FLOW_PREVIOUS_BATCH_ENCOUNTER[collection].map(previous=>{
   const item={...structuredClone(defaults[collection].find(item=>item.id===previous.id)),...structuredClone(previous)};
-  delete item.spawnOffsets;delete item.deployDelay;delete item.memberPlans;return item;
+  delete item.spawnOffsets;delete item.deployDelay;delete item.memberPlans;delete item.holdUntil;return item;
 });
 batchDraft.groups.find(group=>group.id==="Corner").speed=3;
 batchDraft.groups=batchDraft.groups.filter(group=>group.id!=="SearchNeighbor");
