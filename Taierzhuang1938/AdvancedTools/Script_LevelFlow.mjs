@@ -29,6 +29,7 @@ function SetPlaying(value) {
   playing=value;lastTimestamp=0;
   Element("playFlow").textContent=value?"暂停":"播放";
   Element("playFlow").setAttribute("aria-pressed",String(value));
+  RequestRender();
 }
 function SetMode(value) {
   mode=value;
@@ -146,10 +147,10 @@ function UpdateAnnotations() {
   }
 }
 function RequestRender() {renderPending=true;}
-function Render() {
+function Render(preparedFrame=null) {
   if(!map||!workspace) return;
   renderPending=false;
-  frame=EvaluateFlow(time,project.value);UpdateTimeline();
+  frame=preparedFrame||EvaluateFlow(time,project.value);UpdateTimeline();
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
 }
@@ -275,7 +276,7 @@ function Tick(timestamp) {
     else time+=delta;
     frame=EvaluateFlow(time,project.value);
     if(previousStage!==frame.stage.id) workspace.FrameStage();
-    Render();
+    Render(frame);
   }
   else if(navigated||renderPending) Render();
   lastTimestamp=timestamp;requestAnimationFrame(Tick);

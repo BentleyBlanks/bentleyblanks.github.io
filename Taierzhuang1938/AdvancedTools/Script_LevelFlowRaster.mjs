@@ -1,3 +1,5 @@
+import { EncounterGpuRaster } from './Script_LevelFlowGpuRaster.mjs';
+
 const colors=new Map();
 function Rgb(color) {
   if(!colors.has(color)) colors.set(color,[parseInt(color.slice(1,3),16),parseInt(color.slice(3,5),16),parseInt(color.slice(5,7),16)]);
@@ -8,7 +10,7 @@ function Edge(a,b,x,y) {return (x-a.x)*(b.y-a.y)-(y-a.y)*(b.x-a.x);}
 // World triangles and actor strokes use the same depth test. This avoids
 // average-face sorting and axis-aligned proxy boxes changing visibility.
 export class EncounterRaster {
-  constructor() {this.canvas=document.createElement("canvas");}
+  constructor() {this.canvas=document.createElement("canvas");this.gpu=EncounterGpuRaster();this.gpuVertices=new Float32Array(65536);this.worldVertices=new Float32Array(65536);}
 
   Begin(width,height,perspective,coordinateScale=1) {
     width=Math.max(1,Math.round(width));height=Math.max(1,Math.round(height));
@@ -18,10 +20,31 @@ export class EncounterRaster {
     }
     this.perspective=perspective;this.coordinateScale=coordinateScale;
     this.displayWidth=width/coordinateScale;this.displayHeight=height/coordinateScale;
+    this.gpuLength=0;this.worldLength=0;this.accelerated=!!this.gpu&&!this.gpu.gl.isContextLost();
     this.depth.fill(Infinity);this.triangles=0;this.image.data.fill(0);
   }
 
+  WorldTriangle(points,colors) {
+    if(this.worldLength+18>this.worldVertices.length) {const vertices=new Float32Array(this.worldVertices.length*2);vertices.set(this.worldVertices);this.worldVertices=vertices;}
+    for(let index=0;index<3;index++) {
+      const point=points[index],rgb=colors[index],offset=this.worldLength;
+      this.worldVertices[offset]=point[0];this.worldVertices[offset+1]=point[1];this.worldVertices[offset+2]=point[2];
+      this.worldVertices[offset+3]=rgb[0];this.worldVertices[offset+4]=rgb[1];this.worldVertices[offset+5]=rgb[2];this.worldLength+=6;
+    }
+    this.triangles++;
+  }
+
   Triangle(a,b,c,color) {
+    if(this.accelerated) {
+      if(this.gpuLength+18>this.gpuVertices.length) {const vertices=new Float32Array(this.gpuVertices.length*2);vertices.set(this.gpuVertices);this.gpuVertices=vertices;}
+      const fallback=a.rgb&&b.rgb&&c.rgb?null:Rgb(color);
+      for(const point of [a,b,c]) {
+        const rgb=fallback||point.rgb,offset=this.gpuLength;
+        this.gpuVertices[offset]=point.x;this.gpuVertices[offset+1]=point.y;this.gpuVertices[offset+2]=point.depth;
+        this.gpuVertices[offset+3]=rgb[0];this.gpuVertices[offset+4]=rgb[1];this.gpuVertices[offset+5]=rgb[2];this.gpuLength+=6;
+      }
+      this.triangles++;return;
+    }
     this.triangles++;
     const area=Edge(a,b,c.x,c.y);
     if(Math.abs(area)<0.001) return;
@@ -91,6 +114,25 @@ export class EncounterRaster {
   }
 
   Flush(context,width,height) {
+    if(this.accelerated&&this.gpu.Draw(this)) {
+      context.drawImage(this.gpu.canvas,0,0,this.width,this.height,0,0,width,height);return;
+    }
+    if(this.accelerated) {
+      // Context loss or unsupported targets must still produce this frame.
+      this.accelerated=false;this.gpu=null;this.triangles=0;this.image.data.fill(0);this.depth.fill(Infinity);
+      for(let offset=0;offset<this.worldLength;offset+=18) {
+        const points=[],colors=[];
+        for(let index=offset;index<offset+18;index+=6) {points.push(Array.from(this.worldVertices.subarray(index,index+3)));colors.push(Array.from(this.worldVertices.subarray(index+3,index+6)));}
+        const vertices=this.view.FaceVertices(points,colors);
+        for(const vertex of vertices) {vertex.x*=this.coordinateScale;vertex.y*=this.coordinateScale;}
+        this.Face(vertices,'#000000');
+      }
+      for(let offset=0;offset<this.gpuLength;offset+=18) {
+        const vertices=[];
+        for(let index=offset;index<offset+18;index+=6) vertices.push({x:this.gpuVertices[index],y:this.gpuVertices[index+1],depth:this.gpuVertices[index+2],rgb:Array.from(this.gpuVertices.subarray(index+3,index+6))});
+        this.Triangle(...vertices,'#000000');
+      }
+    }
     this.canvas.getContext("2d").putImageData(this.image,0,0);
     context.drawImage(this.canvas,0,0,width,height);
   }

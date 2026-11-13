@@ -37,6 +37,68 @@ try {
     }
   }
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  const rasterParity=await page.evaluate(async()=>{
+    const {EncounterRaster}=await import('./Script_LevelFlowRaster.mjs');
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const results=[];
+    for(const perspective of [false,true]) {
+      const gpu=new EncounterRaster(),cpu=new EncounterRaster();cpu.gpu=null;
+      const Draw=raster=>{
+        raster.Begin(64,48,perspective);
+        raster.Triangle({x:-10.2,y:-8.7,depth:7,rgb:[190,80,50]}, {x:81.3,y:5.7,depth:15,rgb:[60,190,80]}, {x:13.4,y:68.1,depth:9,rgb:[80,60,200]}, '#000000');
+        raster.Triangle({x:12.3,y:10.7,depth:3},{x:43.7,y:12.4,depth:3},{x:29.1,y:35.2,depth:3},'#abcdef');
+        const canvas=document.createElement('canvas');canvas.width=64;canvas.height=48;
+        const context=canvas.getContext('2d');raster.Flush(context,64,48);
+        return context.getImageData(0,0,64,48).data;
+      };
+      const actual=Draw(gpu),expected=Draw(cpu);
+      let pixels=0,maxColorError=0,maxDepthError=0;
+      // Sample interiors, excluding the different CPU/GPU edge fill rules.
+      for(let y=14;y<25;y++) for(let x=19;x<36;x++) {
+        const index=y*64+x;
+        if(!Number.isFinite(cpu.depth[index])) continue;
+        pixels++;
+        maxDepthError=Math.max(maxDepthError,Math.abs(gpu.depth[index]-cpu.depth[index]));
+        for(let c=0;c<4;c++) maxColorError=Math.max(maxColorError,Math.abs(actual[index*4+c]-expected[index*4+c]));
+      }
+      results.push({accelerated:gpu.accelerated,pixels,maxColorError,maxDepthError});
+      // A failed GPU frame must immediately replay all triangles in software.
+      const failed=new EncounterRaster();failed.gpu={gl:{isContextLost:()=>false},Draw:()=>false};
+      const recovered=Draw(failed);
+      results.push({fallback:!failed.accelerated,same:recovered.every((value,index)=>Math.abs(value-expected[index])<=1)});
+      const view={eye:[0,0,0],right:[1,0,0],up:[0,1,0],forward:[0,0,1],focal:32,scale:4,far:50,width:64,height:48,
+        type:perspective?'scene':'oblique',CameraPoint:point=>point,
+        Vertex:point=>({x:32+point[0]*4,y:48*.57-point[1]*4,depth:point[2]})};
+      view.FaceVertices=(...args)=>FlowPerspectiveView.prototype.FaceVertices.apply(view,args);
+      const world=[[-7,6,0],[8,5,6],[0,-8,80]],colors=[[210,70,40],[40,170,80],[70,60,190]];
+      const WorldDraw=raster=>{
+        raster.Begin(64,48,perspective);raster.view=view;
+        if(raster.accelerated) raster.WorldTriangle(world,colors);
+        else raster.Face(view.FaceVertices(world,colors),'#000000');
+        const canvas=document.createElement('canvas');canvas.width=64;canvas.height=48;
+        raster.Flush(canvas.getContext('2d'),64,48);return canvas.getContext('2d').getImageData(0,0,64,48).data;
+      };
+      const worldExpected=WorldDraw(cpu),worldActual=WorldDraw(gpu);
+      let worldPixels=0,worldColorError=0,worldDepthError=0;
+      for(let y=10;y<37;y++) for(let x=10;x<54;x++) {
+        const i=y*64+x;
+        if(![i-65,i-64,i-63,i-1,i,i+1,i+63,i+64,i+65].every(index=>Number.isFinite(cpu.depth[index]))) continue;
+        worldPixels++;worldDepthError=Math.max(worldDepthError,Math.abs(gpu.depth[i]-cpu.depth[i]));
+        for(let c=0;c<4;c++) worldColorError=Math.max(worldColorError,Math.abs(worldActual[i*4+c]-worldExpected[i*4+c]));
+      }
+      // GPU triangle setup snaps to a subpixel grid. Its near/far-clipped
+      // interpolation error must stay below the editor's 2.5 cm depth bias.
+      results.push({pixels:worldPixels,maxColorError:worldColorError,maxDepthError:worldDepthError,depthTolerance:0.025});
+      failed.gpu={gl:{isContextLost:()=>false},Draw:()=>false};
+      const worldRecovered=WorldDraw(failed);
+      results.push({fallback:!failed.accelerated,same:worldRecovered.every((value,index)=>Math.abs(value-worldExpected[index])<=1)});
+    }
+    return results;
+  });
+  for(const result of rasterParity) {
+    if('fallback' in result) assert.ok(result.fallback&&result.same,'GPU failure replays the complete frame in software');
+    else assert.ok(result.pixels>100&&result.maxColorError<=2&&result.maxDepthError<(result.depthTolerance||0.001),`GPU preserves smooth colors and perspective depth: ${JSON.stringify(result)}`);
+  }
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
@@ -522,6 +584,11 @@ try {
   });
   assert.ok(terrainWork.triangles>0&&terrainWork.triangles<40000,`Scene navigation bounds terrain work by projected detail ${JSON.stringify(terrainWork)}`);
   assert.ok(terrainWork.skyTriangles<1000,"looking at empty sky culls the terrain before projecting its faces");
+  await page.evaluate(()=>{LevelFlow.SetViewType(0,'chase');LevelFlow.SetViewType(1,'eye');LevelFlow.Seek(150);LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>150.2);
+  assert.ok((await page.evaluate(()=>LevelFlow.Inspect().rendering)).every(view=>view.renderScale===1),'playback preserves full terrain resolution');
+  await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  await page.waitForFunction(()=>LevelFlow.Inspect().rendering.every(view=>view.renderScale===1));
   await page.evaluate(()=>{LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
   await page.screenshot({path:path.join(out,'RealTerrainGully.png')});
   await page.evaluate(()=>LevelFlow.JumpBeat('06g'));await page.screenshot({path:path.join(out,'CartLane.png')});

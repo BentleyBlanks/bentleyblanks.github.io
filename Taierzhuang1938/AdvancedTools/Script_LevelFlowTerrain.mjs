@@ -97,6 +97,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     else cells.push(cell);
     cell.minHeight=cell.children?Math.min(...cell.children.map(child=>child.minHeight)):Math.min(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
     cell.maxHeight=cell.children?Math.max(...cell.children.map(child=>child.maxHeight)):Math.max(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
+    cell.center=[cx,(cell.minHeight+cell.maxHeight)/2,cz];
+    cell.radius=Math.hypot(size/Math.SQRT2,(cell.maxHeight-cell.minHeight)/2);
     return cell;
   };
   const radius=6144;
@@ -131,6 +133,14 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return color;
   };
   const faceCache=new WeakMap();
+  // Adjacent triangles and LOD cells share immutable vertices, so each view
+  // can project a ground vertex once per camera frame without changing seams.
+  const vertices=new Map();
+  const VertexAt=(x,z)=>{
+    const key=`${x},${z}`;
+    if(!vertices.has(key)) vertices.set(key,[x,Sample(x,z),z]);
+    return vertices.get(key);
+  };
   const FacesForCell=(cell)=>{
     if(faceCache.has(cell)) return faceCache.get(cell);
     const triangles=[];
@@ -141,10 +151,10 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       ...Between(rows.get(maxZ),x,maxX).reverse().slice(1).map((value)=>[value,maxZ]),
       ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map((value)=>[x,value]),
     ];
-    const center=[x+size/2,Sample(x+size/2,z+size/2),z+size/2];
+    const center=VertexAt(x+size/2,z+size/2);
     for(let index=0;index<outline.length;index++) {
       const a=outline[index],b=outline[(index+1)%outline.length];
-      const points=[center,[a[0],Sample(...a),a[1]],[b[0],Sample(...b),b[1]]];
+      const points=[center,VertexAt(...a),VertexAt(...b)];
       const vertexColors = points.map(point => ColorAt(point[0], point[2]));
       const color = "#" + vertexColors[0].map((channel, axis) =>
         Math.round((channel + vertexColors[1][axis] + vertexColors[2][axis]) / 3).toString(16).padStart(2, "0")).join("");

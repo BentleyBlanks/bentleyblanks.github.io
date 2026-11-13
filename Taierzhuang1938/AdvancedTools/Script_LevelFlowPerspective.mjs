@@ -15,13 +15,22 @@ export class FlowPerspectiveView extends FlowMapView {
     // Camera navigation uses the same pixel density and terrain detail as rest.
     this.renderScale=1;
     this.boxGeometry=new WeakMap();
+    this.terrainProjection=new WeakMap();this.projectionFrame=0;
+    this.groundCache=new Map();this.groundTerrain=mapData.terrain;
   }
   Draw(...args) {
     const start=performance.now();this.frameDrawing=true;
     try {super.Draw(...args);} finally {this.frameDrawing=false;}
     this.drawMs=performance.now()-start;
   }
-  Ground(point) {return this.mapData.terrain.heightAt(point[0],point[1]);}
+  Ground(point) {
+    if(this.groundTerrain!==this.mapData.terrain) {this.groundCache.clear();this.groundTerrain=this.mapData.terrain;}
+    const key=`${point[0]},${point[1]}`;
+    if(this.groundCache.has(key)) return this.groundCache.get(key);
+    const height=this.mapData.terrain.heightAt(point[0],point[1]);
+    if(this.groundCache.size>=4096) this.groundCache.delete(this.groundCache.keys().next().value);
+    this.groundCache.set(key,height);return height;
+  }
   BeforeDraw(frame) {
     this.frame=frame;this.occlusion.clear();
     const rect=this.canvas.getBoundingClientRect();this.width=rect.width;this.height=rect.height;
@@ -164,6 +173,18 @@ export class FlowPerspectiveView extends FlowMapView {
     const renderScale=this.renderScale;
     DrawEncounterSky(context,width,height,this);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
+    this.raster.view=this;
+    const projectionFrame=++this.projectionFrame;
+    const TerrainVertex=(point,rgb)=>{
+      let cached=this.terrainProjection.get(point);
+      if(!cached) {cached={frame:0,vertex:null};this.terrainProjection.set(point,cached);}
+      if(cached.frame!==projectionFrame) {
+        const vertex=this.Vertex(point);
+        vertex.x*=renderScale;vertex.y*=renderScale;vertex.rgb=rgb;
+        cached.vertex=vertex;cached.frame=projectionFrame;
+      }
+      return cached.vertex;
+    };
     const horizontal=width/(2*this.focal),top=height*0.49/this.focal,bottom=height*0.51/this.focal;
     const horizontalNormal=Math.hypot(1,horizontal),topNormal=Math.hypot(1,top),bottomNormal=Math.hypot(1,bottom);
     const SphereInView=(camera,radius)=>{
@@ -179,9 +200,8 @@ export class FlowPerspectiveView extends FlowMapView {
       if(vertices.length>=3) this.raster.Face(vertices,color);
     };
     const Visit=(cell)=>{
-      const heightRange=cell.maxHeight-cell.minHeight;
-      const cx=cell.x+cell.size/2,cz=cell.z+cell.size/2,cy=(cell.minHeight+cell.maxHeight)/2,radius=Math.hypot(cell.size/Math.SQRT2,heightRange/2);
-      const camera=this.CameraPoint([cx,cy,cz]);
+      const heightRange=cell.maxHeight-cell.minHeight,radius=cell.radius;
+      const camera=this.CameraPoint(cell.center);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
       // Corridor color transitions need detail even where the floor is flat.
@@ -192,7 +212,13 @@ export class FlowPerspectiveView extends FlowMapView {
         return;
       }
       for(const triangle of this.mapData.terrain.facesForCell(cell)) {
-        Face(triangle.points,triangle.color,triangle.vertexColors);
+        if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors);continue;}
+        const a=TerrainVertex(triangle.points[0],triangle.vertexColors[0]);
+        const b=TerrainVertex(triangle.points[1],triangle.vertexColors[1]);
+        const c=TerrainVertex(triangle.points[2],triangle.vertexColors[2]);
+        if(!perspective||(a.depth>=0.15&&a.depth<=this.far&&b.depth>=0.15&&b.depth<=this.far&&c.depth>=0.15&&c.depth<=this.far)) {
+          this.raster.Triangle(a,b,c,triangle.color);
+        } else Face(triangle.points,triangle.color,triangle.vertexColors);
       }
     };
     let coverBoxes=[];
@@ -228,9 +254,12 @@ export class FlowPerspectiveView extends FlowMapView {
     const signals=EncounterSignals(frame);
     const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
-    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
+    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
     if(cached) {
-      this.raster.image.data.set(this.staticImage);this.raster.depth.set(this.staticDepth);
+      if(this.raster.accelerated) {
+        this.raster.worldVertices.set(this.staticWorldVertices.subarray(0,this.staticWorldLength));this.raster.worldLength=this.staticWorldLength;
+        this.raster.gpuVertices.set(this.staticGpuVertices.subarray(0,this.staticGpuLength));this.raster.gpuLength=this.staticGpuLength;
+      } else {this.raster.image.data.set(this.staticImage);this.raster.depth.set(this.staticDepth);}
       this.terrainTriangles=this.staticTerrainTriangles;this.raster.triangles=this.staticTriangles;
       coverBoxes=this.staticCoverBoxes;
     } else {
@@ -248,10 +277,19 @@ export class FlowPerspectiveView extends FlowMapView {
       Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover,object);
     }
     if(cacheStatic) {
+      if(this.raster.accelerated) {
+        if(this.staticWorldVertices?.length!==this.raster.worldVertices.length) this.staticWorldVertices=new Float32Array(this.raster.worldVertices.length);
+        if(this.staticGpuVertices?.length!==this.raster.gpuVertices.length) this.staticGpuVertices=new Float32Array(this.raster.gpuVertices.length);
+        this.staticWorldLength=this.raster.worldLength;this.staticGpuLength=this.raster.gpuLength;
+        this.staticWorldVertices.set(this.raster.worldVertices.subarray(0,this.staticWorldLength));
+        this.staticGpuVertices.set(this.raster.gpuVertices.subarray(0,this.staticGpuLength));
+      } else {
       if(this.staticImage?.length!==this.raster.image.data.length) {
         this.staticImage=new Uint8ClampedArray(this.raster.image.data.length);this.staticDepth=new Float32Array(this.raster.depth.length);
       }
       this.staticImage.set(this.raster.image.data);this.staticDepth.set(this.raster.depth);
+      }
+      this.staticAccelerated=this.raster.accelerated;
       this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;
       this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
     }
@@ -385,5 +423,5 @@ export class FlowPerspectiveView extends FlowMapView {
     const vertices=this.FaceVertices([a,b,b]);
     if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],"#c47b34",1.2,{visible:0,hidden:0},0);
   }
-  Diagnostics() {return {renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
+  Diagnostics() {return {backend:this.raster.accelerated?"webgl2":"software",renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
 }
