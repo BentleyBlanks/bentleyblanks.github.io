@@ -175,6 +175,8 @@ export const FLOW_GROUND = {
     ["TrafficFlankBags",21,79.2,3,0.95,0.8,"Sandbag"],
     ["DragWestBerm",20,94,5,0.9,2,"Earth"],
     ["PitPursuitScreen",-6,-13,12,2.8,1.2,"Earth"],
+    ["NorthPursuitSpawnScreen",24,37.5,12,3.2,1.4,"Earth"],
+    ["NorthPursuitSpawnReturn",30,31,1.4,3.2,14.4,"Earth"],
     ["WestPursuitScreen",11.5,75.5,1.4,3.2,12,"Earth"],
     ["WestPursuitReturn",3.5,81.5,17,2.6,1.2,"Earth"],
     ["NorthPursuitBags",14.2,52,2.2,1.05,0.7,"Sandbag"],

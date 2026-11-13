@@ -628,18 +628,40 @@ for (const id of ["luo","he","liu","yao","geng"]) {
 // after deployment and joins the approach around the new walls' open ends.
 const spawnWalls=map.objects.filter(object=>["Encounter_NorthSpawnWall","Encounter_EastSpawnWall"].includes(object.id));
 assert.equal(spawnWalls.length,2);
-function SpawnSightBlocked(from,to) {
+function SpawnSightBlocked(from,to,walls=spawnWalls) {
   const distance=Math.hypot(...to.map((value,axis)=>value-from[axis]));
   const steps=Math.ceil(distance/0.08);
   for(let index=1;index<steps;index++) {
     const point=from.map((value,axis)=>value+(to[axis]-value)*index/steps);
     if(terrain.heightAt(point[0],point[2])>point[1]) return true;
-    for(const wall of spawnWalls) {
+    for(const wall of walls) {
       const [x,,z]=wall.pos,[width,height,depth]=wall.size,base=terrain.heightAt(x,z);
       if(Math.abs(point[0]-x)<width/2&&Math.abs(point[2]-z)<depth/2&&point[1]>base&&point[1]<base+height) return true;
     }
   }
   return false;
+}
+const northSpawnWalls=map.objects.filter(object=>["Encounter_NorthPursuitSpawnScreen","Encounter_NorthPursuitSpawnReturn"].includes(object.id));
+assert.equal(northSpawnWalls.length,2);
+const northPursuit=Group("RearPursuit");
+for(const life of northPursuit.lives) {
+  for(const elapsed of [0,0.25,0.5]) {
+    const frame=EvaluateFlow(life.born+elapsed);
+    const actor=frame.actors.find(actor=>actor.groupId===northPursuit.id&&actor.born===life.born);
+    for(const observer of [frame.player,[21.9,67.1],[25.171,71.957],[30,86],[35,131],[46,65.6]]) {
+      const eye=[observer[0],terrain.heightAt(...observer)+1.65,observer[1]];
+      for(const dx of [-0.25,0,0.25]) for(const height of [0.3,1,1.8]) {
+        assert.ok(SpawnSightBlocked(eye,[actor.p[0]+dx,terrain.heightAt(...actor.p)+height,actor.p[1]],northSpawnWalls),`${actor.id} stays hidden behind the northern earth wall at birth + ${elapsed}s`);
+      }
+    }
+  }
+}
+for(let stamp=northPursuit.start;stamp<northPursuit.end;stamp+=0.1) {
+  for(const actor of EvaluateFlow(stamp).actors.filter(actor=>actor.groupId===northPursuit.id&&actor.pose!=="dead")) {
+    for(const wall of northSpawnWalls) {
+      assert.ok(Math.abs(actor.p[0]-wall.pos[0])>wall.size[0]/2+0.35||Math.abs(actor.p[1]-wall.pos[2])>wall.size[2]/2+0.35,`${actor.id} clears the northern earth wall on the way down`);
+    }
+  }
 }
 for(const id of ["Fork","Corner"]) {
   const group=Group(id),frame=EvaluateFlow(group.start);
