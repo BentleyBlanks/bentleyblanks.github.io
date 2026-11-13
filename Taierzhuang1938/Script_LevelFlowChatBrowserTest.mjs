@@ -41,6 +41,17 @@ try {
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=384`);
   await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent === "本机 Codex CLI");
+  assert.equal(await page.locator("#newCodexChat").isVisible(), false);
+  assert.equal(await page.locator("#toggleCodexSessions").getAttribute("aria-expanded"), "false");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 360);
+  await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
+  const handle = await page.locator("#inspectorResizeHandle").boundingBox();
+  await page.mouse.move(handle.x + 3, handle.y + 150); await page.mouse.down();
+  await page.mouse.move(handle.x - 197, handle.y + 150, { steps: 8 }); await page.mouse.up();
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 560);
+  await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("ArrowRight");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 540);
+  await page.click("#toggleCodexSessions");
   const layout = await page.evaluate(() => {
     const list = document.querySelector(".lfChatSidebar").getBoundingClientRect(), detail = document.querySelector(".lfChatDetail").getBoundingClientRect();
     return { list: list.right, detail: detail.left, right: detail.right, width: innerWidth };
@@ -95,11 +106,16 @@ try {
   assert.equal(calls.length, 3); assert.ok(!calls[2].args.includes("resume"));
   Finish(calls[2], "第二个会话已完成。");
   await page.reload(); await page.waitForFunction(() => window.LevelFlow);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 540);
+  assert.equal(await page.locator("#newCodexChat").isVisible(), false);
+  await page.click("#toggleCodexSessions");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
   await page.locator(".lfChatSession").first().click();
   await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
   assert.equal(await page.locator(".lfChatMessage.assistant .lfChatBubble").textContent(), "第二个会话已完成。");
   await page.setViewportSize({ width: 878, height: 720 });
+  await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 360);
   await page.screenshot({ path: path.join(out, "CodexConversationCompact.png") });
   assert.ok(await page.locator("#sendCodexChat").isVisible());
   assert.deepEqual(errors, []);

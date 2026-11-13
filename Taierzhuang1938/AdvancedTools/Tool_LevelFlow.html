@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113CodexChat">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113ResizableChat">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,7 +25,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261113PitRetreat"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261113ResizableChat"></script>
 </head>
 <body class="lfBody">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -39,11 +39,12 @@
   <main class="lfWorkspace">
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapReadout"></div><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
+      <div id="inspectorResizeHandle" class="lfInspectorResize" role="separator" aria-label="调整右侧栏宽度" aria-orientation="vertical" tabindex="0" title="拖动调整侧栏宽度，方向键微调，Home 恢复默认"></div>
       <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button><button data-tab="edit" title="调整触发区域、生成波次与行动路线">布设</button></div><button id="markScreenshot" title="截取当前所有视口，可标注、复制、导出或附加到会话">截图与标注</button></div>
-      <section id="chatPane" class="lfChatPane" aria-label="Codex 会话">
-        <nav class="lfChatSidebar" aria-label="会话列表"><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
+      <section id="chatPane" class="lfChatPane" aria-label="Codex 会话" data-list-open="false">
+        <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
-          <div class="lfChatHeading"><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div>
+          <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div></div>
           <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"><div class="lfChatEmpty"><h2>向 Codex 提交需求</h2><p>每次发送自动附上当前时间、点位与视口。</p></div></div>
           <div id="codexChatError" class="lfChatError" role="status" hidden></div>
           <form id="codexComposer" class="lfChatComposer">

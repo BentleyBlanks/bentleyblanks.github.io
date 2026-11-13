@@ -68,7 +68,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfBack { margin-left: auto; font-size: 11px; color: #a0a79e; white-space: nowrap; }
 
 /* Fine separators distinguish viewports, the reading pane and editing controls. */
-.lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) clamp(460px, 43vw, 620px); gap: 8px; padding: 8px 10px 0; flex: 1; min-height: 0; }
+.lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) var(--lf-inspector-width, 360px); gap: 8px; padding: 8px 10px 0; flex: 1; min-height: 0; }
 .lfViewport { min-width: 0; min-height: 0; position: relative; overflow: hidden; }
 .lfViewGrid { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 8px; width: 100%; height: 100%; background: var(--lf-bg); }
 .lfViewGrid[data-layout="1"] { grid-template-columns: minmax(0, 1fr); }
@@ -106,7 +106,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfTooltip { position: absolute; max-width: 260px; padding: 8px 12px; border: 1px solid var(--lf-line); border-radius: 2px; background: #141819; color: #d0d6c8; box-shadow: 0 4px 18px #00000040; font-size: 12px; pointer-events: none; z-index: 3; }
 #mapLoading { position: absolute; inset: 0; display: grid; place-items: center; background: #101619f2; color: #bdbda7; border-radius: 3px; }
 
-.lfInspector { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--lf-panel); border: 1px solid var(--lf-line); border-radius: 3px; }
+.lfInspector { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--lf-panel); border: 1px solid var(--lf-line); border-radius: 3px; }
 .lfTabs { display: flex; flex: 1; gap: 0; margin: 0; padding: 0; background: transparent; border-bottom: 1px solid var(--lf-line); height: 43px; }
 .lfTabs button { flex: 1; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; font-size: 13px; letter-spacing: .12em; font-weight: 400; color: #9aa69f; }
 .lfTabs button.selected { background: linear-gradient(0deg,#d7c7970c,transparent); color: #e0cb99; border-bottom-color: var(--lf-accent); }
@@ -200,7 +200,7 @@ textarea { resize: vertical; min-height: 64px; }
   #frameHeading { max-width: 135px; font-size: 11px; padding-right: 9px; }
   .lfHistory { padding-left: 5px; }
   .lfHistory button { font-size: 18px; min-width: 25px; padding: 1px 4px; }
-  .lfWorkspace { grid-template-columns: minmax(0,1fr) 460px; gap: 9px; padding: 10px 10px 0; }
+  .lfWorkspace { grid-template-columns: minmax(0,1fr) var(--lf-inspector-width, 360px); gap: 9px; padding: 10px 10px 0; }
   .lfPane { padding: 17px; }
   .lfViewBar { gap: 3px; padding: 4px 5px; }
   .lfViewBar > span { display: none; }
@@ -210,7 +210,7 @@ textarea { resize: vertical; min-height: 64px; }
   .lfToolbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 6px; }
   .lfHistory { display: none; }
   #frameHeading { max-width: 160px; }
-  .lfWorkspace { grid-template-columns: minmax(240px,1fr) minmax(380px, 55vw); gap: 7px; padding: 7px 7px 0; }
+  .lfWorkspace { grid-template-columns: minmax(240px,1fr) var(--lf-inspector-width, 360px); gap: 7px; padding: 7px 7px 0; }
   .lfPane { padding: 14px; }
   .lfViewGrid { gap: 5px; }
   .lfViewBar { height: 50px; flex-wrap: wrap; }
@@ -241,8 +241,11 @@ textarea { resize: vertical; min-height: 64px; }
 .lfChatSession small { display: block; font-size: 9px; color: #87978b; margin-top: 4px; }
 .lfChatSession.selected { background: #c6af6e12; border-color: #a5915745; color: #e0cd9f; }
 .lfChatDetail { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: #101515; }
-.lfChatHeading { display: flex; flex-direction: column; gap: 2px; padding: 12px 15px; border-bottom: 1px solid #303832; }
-.lfChatHeading strong { font-size: 12px; font-weight: 500; color: #dbe0d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lfChatHeading { display: flex; align-items: center; gap: 9px; padding: 12px 15px; border-bottom: 1px solid #303832; }
+.lfChatHeading > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+#toggleCodexSessions { flex: none; padding: 2px 6px; background: transparent; border-color: transparent; color: #b3bdab; font-size: 16px; }
+#toggleCodexSessions[aria-expanded="true"] { color: #e0cb99; background: #c6af6e12; }
+.lfChatHeading strong { display: block; font-size: 12px; font-weight: 500; color: #dbe0d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #codexConnection { color: #8e9b8f; font-size: 10px; }
 .lfChatMessages { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 12px; scrollbar-width: thin; scrollbar-color: #45544a transparent; }
 .lfChatEmpty { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 10px; color: #89978a; }
@@ -284,3 +287,10 @@ textarea { resize: vertical; min-height: 64px; }
   .lfViewport { min-height: 280px; }
   .lfInspector { min-height: 540px; }
 }
+
+.lfChatPane[data-list-open="false"] { grid-template-columns: minmax(0, 1fr); }
+.lfInspectorResize { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 6; cursor: col-resize; touch-action: none; outline: none; }
+.lfInspectorResize:hover, .lfInspectorResize:focus-visible, .lfResizingInspector .lfInspectorResize { background: #c4ac6755; box-shadow: inset 2px 0 #b49d64; }
+.lfResizingInspector, .lfResizingInspector * { cursor: col-resize !important; user-select: none !important; }
+.lfChatActions span { min-width: 0; overflow: hidden; }
+@media (max-width: 650px) { .lfInspectorResize { display: none; } }

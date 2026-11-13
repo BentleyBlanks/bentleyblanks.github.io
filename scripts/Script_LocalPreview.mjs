@@ -39,6 +39,7 @@ import { fileURLToPath } from "node:url";
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
 import { CreateEncounterCodexHandler } from "./Script_EncounterCodexServer.mjs";
+import { PreviewRuntimeRevision } from "./Script_LocalPreviewRuntime.mjs";
 // 白盒关卡编辑器的「记下当前机位」。配置模块是纯的（node 与浏览器共用），导入时不抛错：
 //   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
 //   POST /__blockout/save   { level, doc, revision } → 写 Taierzhuang1938/Blockout/<Level>.json
@@ -354,6 +355,7 @@ const mounts = new Map(); // absRoot -> { port, server }
 
 function CreateServer(rootDir, context) {
   const handleEncounterCodex = CreateEncounterCodexHandler(rootDir);
+  const runtimeRevision = PreviewRuntimeRevision(rootDir);
   return http.createServer(async (request, response) => {
     const [rawRoute, query] = request.url.split("?");
     let route;
@@ -361,7 +363,7 @@ function CreateServer(rootDir, context) {
 
     if (route === "/__preview/ping") {
       response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      response.end(JSON.stringify({ app: APP_ID, root: rootDir, port: context.port }));
+      response.end(JSON.stringify({ app: APP_ID, root: rootDir, port: context.port, runtimeRevision }));
       return;
     }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
@@ -442,7 +444,10 @@ function CreateServer(rootDir, context) {
 
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
-    if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
+    const relativePath = path.relative(rootDir, filePath);
+    if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) { response.writeHead(403).end(); return; }
+    const privatePath = relativePath.replaceAll("\\", "/").toLowerCase();
+    if (privatePath === "tmp/encountercodex" || privatePath.startsWith("tmp/encountercodex/")) { response.writeHead(403).end(); return; }
     fs.stat(filePath, (error, stat) => {
       if (error) {
         response.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
@@ -957,13 +962,13 @@ async function Main() {
   // 8080 很可能被别人的树占着，无脑复用等于把浏览器指到别人的代码上，
   // 而且看起来一切正常 —— 这种错最难发现。根不一样就往上让一个端口。
   const existing = await ProbeExisting(basePort);
-  if (existing && path.resolve(existing.root) === rootDir) {
+  if (existing && path.resolve(existing.root) === rootDir && existing.runtimeRevision === PreviewRuntimeRevision(rootDir)) {
     console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
     if (shouldOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
     return;
   }
   if (existing) {
-    console.log(`:${basePort} 上是另一棵树（${existing.root}），本次往后让一个端口。`);
+    console.log(`:${basePort} 上已有预览（根：${existing.root}），为当前运行时另选端口。`);
   }
 
   const context = { port: basePort, basePort, host, lanUrls: [] };

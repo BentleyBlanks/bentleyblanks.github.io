@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { PreviewRuntimeRevision } from "../../scripts/Script_LocalPreviewRuntime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(here, "..", "..");
@@ -35,7 +36,8 @@ export async function ServesThisRepo(port, root = REPO_ROOT) {
     const response = await fetch(`http://127.0.0.1:${port}/__preview/ping`, { signal: AbortSignal.timeout(800) });
     if (!response.ok) return false;
     const info = await response.json();
-    return info.app === APP_ID && path.resolve(info.root) === path.resolve(root);
+    return info.app === APP_ID && path.resolve(info.root) === path.resolve(root)
+      && info.runtimeRevision === PreviewRuntimeRevision(root);
   } catch { return false; }
 }
 

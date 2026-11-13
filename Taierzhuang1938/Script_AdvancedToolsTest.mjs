@@ -16,10 +16,13 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import http from "node:http";
+import { once } from "node:events";
+import { PreviewRuntimeRevision } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { TOOL_INFO, TOOL_MENUS } from "./Data_DevTools.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
 import { ControlCenterCards, CONTROL_CENTER_TITLE } from "./AdvancedTools/Script_ControlCenter.mjs";
-import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
+import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const toolsDir = path.join(projectDir, "AdvancedTools");
@@ -130,8 +133,20 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
-  // 没有预览服时真起一份：从一个罕见端口起；端口以服务输出为准
-  const child = spawn(process.execPath, [launcher, "8291", "--no-open"], { cwd: os.tmpdir(), stdio: ["ignore", "pipe", "inherit"], windowsHide: true });
+  let advertisedRevision;
+  const oldPreview = http.createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ app: "BlanksLocalPreview", root: REPO_ROOT, runtimeRevision: advertisedRevision }));
+  });
+  oldPreview.listen(0, "127.0.0.1"); await once(oldPreview, "listening");
+  const oldPort = oldPreview.address().port;
+  Check("同目录的旧服务需要更新", !(await ServesThisRepo(oldPort)));
+  advertisedRevision = PreviewRuntimeRevision(REPO_ROOT);
+  Check("同目录同运行时可以复用", await ServesThisRepo(oldPort));
+  advertisedRevision = "older-runtime";
+  Check("同目录不同运行时需要更新", !(await ServesThisRepo(oldPort)));
+  // Simulate a running pre-chat server at the launcher's preferred port.
+  const child = spawn(process.execPath, [launcher, String(oldPort), "--no-open"], { cwd: os.tmpdir(), stdio: ["ignore", "pipe", "inherit"], windowsHide: true });
   let text = "";
   child.stdout.on("data", (chunk) => { text += chunk; });
   const deadline = Date.now() + 30000;
@@ -143,14 +158,22 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
   try {
     Check("没有服务时启动器起一份预览服并报出控制中心地址", !!port, text.trim().split("\n").at(-2) || text);
     if (port) {
+      Check("启动器为当前版本选取新端口", port !== oldPort);
       const ping = await (await fetch(`http://127.0.0.1:${port}/__preview/ping`)).json();
       Check("新起的服务服的正是本仓库", path.resolve(ping.root) === REPO_ROOT, ping.root);
+      Check("新起的服务具有当前运行时版本", ping.runtimeRevision === PreviewRuntimeRevision(REPO_ROOT));
+      Check("控制中心连接的预览具有 Codex 会话接口", (await fetch(`http://127.0.0.1:${port}/__encounter/codex/sessions`)).ok);
+      Check("静态文件入口保护会话私有目录", (await fetch(`http://127.0.0.1:${port}/tmp/EncounterCodex/`)).status === 403);
+      Check("静态入口限制在当前仓库内", (await fetch(`http://127.0.0.1:${port}/%2e%2e%2f${path.basename(REPO_ROOT)}Leak/Example.txt`)).status === 403);
       const page = await fetch(ControlCenterUrl(port));
       Check("控制中心页能取到", page.ok && /AdvancedTool ControlCenter/.test(await page.text()));
     }
   } finally {
-    child.kill();
+    if (process.platform === "win32") {
+      try { execFileSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true }); } catch { /* Already stopped. */ }
+    } else child.kill();
     await new Promise((resolve) => (child.exitCode !== null ? resolve() : child.once("exit", resolve)));
+    oldPreview.closeAllConnections(); await new Promise(resolve => oldPreview.close(resolve));
   }
 }
 

@@ -55,13 +55,13 @@
 
 ## 截图与本机会话
 
-右栏“会话”页左列显示会话列表，右列显示当前会话的用户需求气泡与 Codex 最终答复。点击“新建会话”编写需求，首次发送时通过本机 `codex exec --json --output-last-message` 创建独立 CLI 会话；在列表选中既有会话后，后续需求通过 `codex exec resume <id>` 继续。CLI 沿用本机登录、模型与权限配置，按仓库 AGENTS.md 在独占 worktree 中修改源码。执行中可以切换其他会话，刷新后可从列表恢复查看。
+右栏默认宽 360 px，左边缘可拖拽调到 280–720 px，宽度保存在当前浏览器源。聚焦分隔条后方向键每次微调 20 px，Home 恢复默认。会话列表默认折叠，点击对话标题旁的菜单按钮展开左列会话列表与“新建会话”，右列显示当前会话的用户需求气泡与 Codex 最终答复。点击“新建会话”编写需求，首次发送时通过本机 `codex exec --json --output-last-message` 创建独立 CLI 会话；在列表选中既有会话后，后续需求通过 `codex exec resume <id>` 继续。CLI 沿用本机登录、模型与权限配置，按仓库 AGENTS.md 在独占 worktree 中修改源码。执行中可以切换其他会话，刷新后可从列表恢复查看。
 
 每次发送自动附上当时的 `Frame.json` 和 `Location.json`，包含拍号、精确秒数、玩家世界坐标、选中对象、当前遭遇草稿与各视口相机。输入框上方可展开定位预览，用户气泡下方可打开对应附件。
 
 “截图与标注”截取当前所有视口并暂停时间轴。支持箭头、框、文字、移动、撤销／重做、复制图片与导出 PNG。“附加到会话”把当前标注图放入输入区，发送前可继续标注或移除。PNG 的 iTXt 键 `EncounterFrame` 保存完整帧数据、原图与标记，可用 `ReadPngFrameMetadata` 或 Pillow 的 `Image.open(path).info['EncounterFrame']` 回读。截图拍摄时的帧另存 `ScreenshotFrame.json`，每次发送的定位按发送时刻重新采集。
 
-本地接口由 `scripts/Script_LocalPreview.mjs` 提供，只接受本机同源请求。使用 `node scripts/Script_LocalPreview.mjs --no-open` 启动，再进入本工具。会话与附件保存在当前检出的忽略目录 `tmp/EncounterCodex/`，CLI 思考、工具调用与进度事件不会进入聊天气泡。服务执行失败时显示错误并保留已提交的需求与附件。
+本地接口由 `scripts/Script_LocalPreview.mjs` 提供，只接受本机同源请求。控制中心启动器按仓库目录和服务端代码指纹复用预览进程，旧进程继续占用端口时会为当前代码另选端口。使用 `node scripts/Script_LocalPreview.mjs --no-open` 启动，再进入本工具。会话与附件保存在当前检出的忽略目录 `tmp/EncounterCodex/`，CLI 思考、工具调用与进度事件不会进入聊天气泡。服务执行失败时显示固定的错误分类并保留已提交的需求与附件。CLI 原始错误输出和事件中的服务商错误文本直接丢弃，旧记录的原始错误字段读取时会归一化。会话私有目录经静态文件入口访问时返回 403，附件通过本机同源接口读取。桥接层调用本机已安装的 CLI 并继承其现有配置与认证；需求和附件会随 CLI 的模型请求发送到所配置的服务商。
 
 ## 维护与验证
 

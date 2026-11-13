@@ -7,7 +7,7 @@ function ContextLabel(context) {
 
 async function Request(route, options) {
   const response = await fetch(`${API}${route}`, options);
-  const result = await response.json().catch(() => ({ error: "请通过本机 LocalPreview 服务打开此工具" }));
+  const result = await response.json().catch(() => ({ error: "本地预览服务需要更新，请重新打开 AdvancedTool ControlCenter" }));
   if (!response.ok) throw new Error(result.error || "本机会话服务不可用");
   return result;
 }
@@ -33,6 +33,15 @@ export class EncounterChat {
     this.loading = false;
     this.sending = false;
     this.selectionVersion = 0;
+    this.BindInspectorResize();
+    Element("toggleCodexSessions").onclick = () => {
+      const button = Element("toggleCodexSessions");
+      const open = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", String(open));
+      button.setAttribute("aria-label", open ? "收起会话列表" : "展开会话列表");
+      Element("codexChatSidebar").hidden = !open;
+      Element("chatPane").dataset.listOpen = String(open);
+    };
     Element("newCodexChat").onclick = () => this.New();
     Element("attachCodexScreenshot").onclick = openScreenshot;
     Element("editCodexImage").onclick = () => this.editScreenshot(this.pendingImage);
@@ -47,6 +56,48 @@ export class EncounterChat {
     // Polling also restores runs after a browser reload. Background sessions remain in the list.
     this.timer = setInterval(() => this.Poll(), 2000);
     window.addEventListener("pagehide", () => clearInterval(this.timer), { once: true });
+  }
+
+  BindInspectorResize() {
+    const handle = Element("inspectorResizeHandle");
+    const workspace = document.querySelector(".lfWorkspace");
+    const inspector = document.querySelector(".lfInspector");
+    const key = "tengxian1938_encounter_sidebar_width_v1";
+    let preferred = 360, drag = null;
+    try { preferred = Number(localStorage.getItem(key)) || preferred; } catch { /* Storage is optional. */ }
+    const SetWidth = (width, persist = false) => {
+      preferred = Math.max(280, Math.min(720, Math.round(width)));
+      const maximum = Math.max(280, Math.min(720, window.innerWidth - 300));
+      const actual = Math.min(preferred, maximum);
+      workspace.style.setProperty("--lf-inspector-width", `${actual}px`);
+      handle.setAttribute("aria-valuemin", "280");
+      handle.setAttribute("aria-valuemax", String(maximum));
+      handle.setAttribute("aria-valuenow", String(actual));
+      if (persist) { try { localStorage.setItem(key, String(preferred)); } catch { /* Keep this window's width. */ } }
+    };
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      drag = { x: event.clientX, width: inspector.getBoundingClientRect().width };
+      handle.setPointerCapture(event.pointerId);
+      document.body.classList.add("lfResizingInspector");
+    });
+    handle.addEventListener("pointermove", event => { if (drag) SetWidth(drag.width + drag.x - event.clientX); });
+    const Finish = () => {
+      if (!drag) return;
+      drag = null; SetWidth(preferred, true);
+      document.body.classList.remove("lfResizingInspector");
+    };
+    handle.addEventListener("pointerup", Finish);
+    handle.addEventListener("pointercancel", Finish);
+    handle.addEventListener("lostpointercapture", Finish);
+    handle.addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      SetWidth(event.key === "Home" ? 360 : inspector.getBoundingClientRect().width + (event.key === "ArrowLeft" ? 20 : -20), true);
+    });
+    window.addEventListener("resize", () => SetWidth(preferred));
+    SetWidth(preferred);
   }
 
   Error(message = "") {

@@ -9,6 +9,13 @@ import { FLOW_TIMELINE } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlow
 const PREFIX = "/__encounter/codex";
 const ID = /^[a-f0-9-]{36}$/;
 const BODY_LIMIT = 32 * 1024 * 1024;
+const CLI_FAILURE = "Codex 执行失败，请在本机 CLI 检查登录和网络后重试";
+const CLI_MISSING = "未找到本机 Codex CLI，请检查安装和 PATH 配置";
+const CLI_START_FAILURE = "本机 Codex CLI 启动失败，请检查本机运行环境";
+const CLI_INTERRUPTED = "本地服务已重启，上次执行已中断。可继续发送需求。";
+const PUBLIC_ERRORS = new Set([CLI_FAILURE, CLI_MISSING, CLI_START_FAILURE, CLI_INTERRUPTED]);
+
+class RequestError extends Error {}
 
 function Send(response, status, value) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -30,20 +37,22 @@ async function ReadTurn(request) {
   const chunks = [];
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > BODY_LIMIT) throw new Error("附件超过 32 MB，请减少截图尺寸");
+    if (size > BODY_LIMIT) throw new RequestError("附件超过 32 MB，请减少截图尺寸");
     chunks.push(chunk);
   }
-  const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  if (typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 20000) throw new Error("请填写需求，最多 20000 字");
-  if (body.sessionId != null && !ID.test(body.sessionId)) throw new Error("会话编号无效");
-  if (body.requestId != null && !ID.test(body.requestId)) throw new Error("请求编号无效");
+  let body;
+  try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  catch { throw new RequestError("请求 JSON 无效"); }
+  if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 20000) throw new RequestError("请填写需求，最多 20000 字");
+  if (body.sessionId != null && !ID.test(body.sessionId)) throw new RequestError("会话编号无效");
+  if (body.requestId != null && !ID.test(body.requestId)) throw new RequestError("请求编号无效");
   const frame = ReadFramePacket(body.frame, FLOW_TIMELINE);
   // Keep the more detailed location attachment, including selection and world-space camera.
-  if (!body.location || typeof body.location !== "object" || JSON.stringify(body.location).length > 256000) throw new Error("定位附件无效");
+  if (!body.location || typeof body.location !== "object" || JSON.stringify(body.location).length > 256000) throw new RequestError("定位附件无效");
   if (body.screenshot) {
-    if (typeof body.screenshot.image !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.screenshot.image)) throw new Error("截图必须为 PNG");
+    if (typeof body.screenshot.image !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.screenshot.image)) throw new RequestError("截图必须为 PNG");
     const png = Buffer.from(body.screenshot.image.split(",")[1], "base64");
-    if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error("截图文件无效");
+    if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new RequestError("截图文件无效");
     ReadFramePacket(body.screenshot.frame, FLOW_TIMELINE);
   }
   return { ...body, frame, prompt: body.prompt.trim() };
@@ -69,11 +78,12 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     fs.renameSync(temporary, SessionPath(session.id));
   }
   function Load(id) {
-    if (!ID.test(id)) throw new Error("会话编号无效");
+    if (!ID.test(id)) throw new RequestError("会话编号无效");
     const session = JSON.parse(fs.readFileSync(SessionPath(id), "utf8"));
+    if (session.error && !PUBLIC_ERRORS.has(session.error)) { session.error = CLI_FAILURE; Save(session); }
     if (session.status === "running" && !active.has(id)) {
       session.status = "failed";
-      session.error = "本地服务已重启，上次执行已中断。可继续发送需求。";
+      session.error = CLI_INTERRUPTED;
       Save(session);
     }
     return session;
@@ -97,11 +107,11 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     Save(session);
     let child;
     try { child = spawnCodex(args, rootDir); }
-    catch (error) { session.status = "failed"; session.error = error.message; Save(session); return; }
+    catch (error) { session.status = "failed"; session.error = error.code === "ENOENT" ? CLI_MISSING : CLI_START_FAILURE; Save(session); return; }
     active.set(session.id, child);
     child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    let buffer = "", diagnostic = "", failure = "";
+    child.stderr.resume();
+    let buffer = "";
     child.stdout.on("data", chunk => {
       buffer += chunk.toString();
       const lines = buffer.split("\n");
@@ -110,11 +120,9 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
         try {
           const event = JSON.parse(line);
           if (event.type === "thread.started") { session.cliSessionId = event.thread_id; Save(session); }
-          if (event.type === "turn.failed" || event.type === "error") failure = String(event.error?.message || event.message || "Codex 执行失败").slice(0, 2000);
         } catch { /* Other CLI events are deliberately discarded. */ }
       }
     });
-    child.stderr.on("data", chunk => { diagnostic = (diagnostic + chunk.toString()).slice(-4000); });
     let finished = false;
     function Finish(code, error) {
       if (finished) return;
@@ -123,7 +131,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       const conclusion = fs.existsSync(output) ? fs.readFileSync(output, "utf8").trim() : "";
       session.status = code === 0 && conclusion ? "completed" : "failed";
       if (conclusion) session.messages.push({ role: "assistant", text: conclusion, createdAt: new Date().toISOString() });
-      if (session.status === "failed") session.error = error?.message || failure || diagnostic.trim() || "Codex 未返回最终结论，请检查本机 CLI 登录后重试";
+      if (session.status === "failed") session.error = error?.code === "ENOENT" ? CLI_MISSING : CLI_FAILURE;
       session.updatedAt = new Date().toISOString();
       Save(session);
     }
@@ -180,7 +188,9 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       Start(next, turn, folder);
       Send(response, 202, next);
     } catch (error) {
-      if (!response.headersSent) Send(response, error.code === "ENOENT" ? 404 : 400, { error: error.message });
+      if (!response.headersSent) Send(response, error.code === "ENOENT" ? 404 : 400, {
+        error: error instanceof RequestError ? error.message : error.code === "ENOENT" ? "会话或附件不存在" : "请求无效或本机会话文件无法读写",
+      });
       else response.end();
     }
   };
