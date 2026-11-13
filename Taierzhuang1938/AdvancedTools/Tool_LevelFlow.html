@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114Workbench">
+  <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114MenuTheme">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,9 +26,9 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261114Workbench"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261114MenuTheme"></script>
 </head>
-<body class="lfBody">
+<body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
     <h1 class="lfSrOnly">Encounter Designer</h1>
     <span id="frameHeading" title="当前阶段与节拍"></span>
@@ -43,7 +44,7 @@
       <section id="chatPane" class="lfChatPane" aria-label="Codex 会话" data-list-open="false">
         <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
-          <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div></div>
+          <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div><button id="interruptCodexChat" type="button" hidden>中断</button></div>
           <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"></div>
           <div id="codexChatError" class="lfChatError" role="status" hidden></div>
           <form id="codexComposer" class="lfChatComposer">

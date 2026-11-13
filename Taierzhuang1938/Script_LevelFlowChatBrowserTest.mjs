@@ -14,12 +14,13 @@ const storage = fs.mkdtempSync(path.join(os.tmpdir(), "EncounterChatBrowser-"));
 const calls = [];
 const handler = CreateEncounterCodexHandler(storage, { spawnCodex(args) {
   const child = new EventEmitter();
+  child.pid = process.pid;
   child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
   child.prompt = ""; child.args = args;
   child.stdin.on("data", chunk => { child.prompt += chunk.toString(); });
   calls.push(child);
   return child;
-} });
+}, stopCodex(child) { child.emit("close", 130); } });
 const server = await ServeProject(root);
 const serveFiles = server.listeners("request")[0];
 server.removeAllListeners("request");
@@ -116,7 +117,17 @@ try {
   await page.click("#newCodexChat"); await page.click("#sendCodexChat");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
   assert.equal(calls.length, 3); assert.ok(!calls[2].args.includes("resume"));
-  Finish(calls[2], "第二个会话已完成。");
+  assert.ok(await page.locator("#interruptCodexChat").isVisible());
+  await page.locator("#codexPrompt").fill("中断时保留的草稿");
+  await page.click("#interruptCodexChat");
+  await page.waitForFunction(() => document.querySelector(".lfChatWaiting")?.textContent === "已中断");
+  assert.ok(await page.locator("#interruptCodexChat").isHidden());
+  assert.equal(await page.locator("#codexPrompt").inputValue(), "中断时保留的草稿");
+  await page.locator("#codexPrompt").fill("中断后继续");
+  await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 2);
+  assert.equal(calls.length, 4);
+  Finish(calls[3], "第二个会话已完成。");
   await page.reload(); await page.waitForFunction(() => window.LevelFlow);
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 570);
   assert.equal(await page.locator("#newCodexChat").isVisible(), false);
@@ -131,7 +142,21 @@ try {
   await page.screenshot({ path: path.join(out, "CodexConversationCompact.png") });
   assert.ok(await page.locator("#sendCodexChat").isVisible());
   assert.deepEqual(errors, []);
-  console.log("ok  Encounter chat browser: resizable layout, screenshot marks, pinned optional location, resume/new CLI sessions, attachment drafts and reload history");
+  const theme = await page.evaluate(() => ({
+    theme: document.body.classList.contains("edThemedSurface"),
+    border: getComputedStyle(document.querySelector(".lfInspector")).borderTopColor,
+    expected: getComputedStyle(document.body).getPropertyValue("--ed-edge").trim(),
+    radius: getComputedStyle(document.querySelector(".lfInspector")).borderTopLeftRadius,
+    panel: getComputedStyle(document.querySelector(".lfInspector")).backgroundImage,
+    titleFont: getComputedStyle(document.querySelector(".lfTabs button")).fontFamily,
+  }));
+  assert.ok(theme.theme);
+  assert.equal(theme.expected, "#c1bdab40");
+  assert.equal(theme.radius, "9px");
+  assert.equal(theme.border, "rgba(193, 189, 171, 0.25)");
+  assert.ok(theme.panel.includes("rgba(8, 9, 7, 0.94)"));
+  assert.ok(theme.titleFont.includes("TzTitleText"));
+  console.log("ok  Encounter chat browser: shared menu theme, rounded layout, screenshot and location drafts, interrupt/continue, resume/new CLI sessions and reload history");
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(storage), path.resolve(os.tmpdir()));

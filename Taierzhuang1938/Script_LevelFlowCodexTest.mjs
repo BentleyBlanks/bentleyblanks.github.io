@@ -6,21 +6,30 @@ import http from "node:http";
 import { EventEmitter, once } from "node:events";
 import { PassThrough } from "node:stream";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { CreateFramePacket } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "EncounterCodexTest-"));
 const children = [];
+const realChildren = [], ready = [];
+const stopped = [];
+let stopFailure = false;
 const handler = CreateEncounterCodexHandler(directory, { spawnCodex(args, root) {
   assert.equal(root, directory);
   const child = new EventEmitter();
+  child.pid = process.pid;
   child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
   child.prompt = "";
   child.stdin.on("data", chunk => { child.prompt += chunk.toString(); });
   child.args = args;
   children.push(child);
   return child;
+}, stopCodex(child) {
+  if (stopFailure) throw new Error("test stop failure");
+  stopped.push(child);
+  (children.includes(child) ? child : children.at(-1)).emit("close", 130);
 } });
 const server = http.createServer(handler);
 server.listen(0, "127.0.0.1"); await once(server, "listening");
@@ -128,8 +137,63 @@ try {
   delete interrupted.runnerPid;
   fs.writeFileSync(interruptedFile, JSON.stringify(interrupted));
   assert.equal((await (await fetch(`${base}/sessions/${plainSession.id}`)).json()).status, "running", "a legacy run with unknown ownership is preserved");
-  console.log("ok  Encounter Codex bridge: same-origin gate, frame/image attachments, final-only replies, resume, concurrent rejection and persisted history");
+  const cancelResponse = await Post({ requestId: randomUUID(), prompt: "需要中断的任务" });
+  const cancelSession = await cancelResponse.json();
+  const interruptUrl = `${base}/sessions/${cancelSession.id}/interrupt`;
+  assert.equal((await fetch(interruptUrl, { method: "POST", headers: { Origin: "https://example.com" } })).status, 403);
+  stopFailure = true;
+  assert.equal((await fetch(interruptUrl, { method: "POST" })).status, 400);
+  assert.equal((await (await fetch(`${base}/sessions/${cancelSession.id}`)).json()).status, "running");
+  stopFailure = false;
+  const canceled = await (await fetch(interruptUrl, { method: "POST" })).json();
+  assert.equal(canceled.status, "interrupted");
+  assert.equal(canceled.error, "");
+  assert.equal(canceled.messages[0].text, "需要中断的任务");
+  assert.equal(stopped.length, 1);
+  await fetch(interruptUrl, { method: "POST" });
+  assert.equal(stopped.length, 1, "repeated interruption is idempotent");
+  const continued = await (await Post({ sessionId: cancelSession.id, requestId: randomUUID(), prompt: "继续处理" })).json();
+  assert.equal(continued.status, "running");
+  Finish(children.at(-1), "继续处理完成。");
+  assert.equal((await (await fetch(`${base}/sessions/${cancelSession.id}`)).json()).status, "completed", "a past interruption does not cancel the next turn");
+  const realHandler = CreateEncounterCodexHandler(directory, { spawnCodex() {
+    const code = "const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(JSON.stringify({pid:child.pid}));process.stdin.resume();setInterval(()=>{},1000);";
+    const child = spawn(process.execPath, ["-e", code], { windowsHide: true, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+    ready.push(new Promise(resolve => child.stdout.once("data", data => resolve(JSON.parse(data.toString()).pid))));
+    realChildren.push(child);
+    return child;
+  } });
+  server.removeAllListeners("request"); server.on("request", realHandler);
+  const realSession = await (await Post({ requestId: randomUUID(), prompt: "test process interruption" })).json();
+  const firstDescendant = await ready[0];
+  const sibling = await (await Post({ requestId: randomUUID(), prompt: "test sibling isolation" })).json();
+  const secondDescendant = await ready[1];
+  const realInterrupt = await fetch(`${base}/sessions/${realSession.id}/interrupt`, { method: "POST" });
+  assert.equal(realInterrupt.status, 202);
+  assert.equal((await (await fetch(`${base}/sessions/${realSession.id}`)).json()).status, "interrupted");
+  assert.throws(() => process.kill(realChildren[0].pid, 0), "the interrupted CLI wrapper has exited");
+  assert.throws(() => process.kill(firstDescendant, 0), "the interrupted CLI descendant has exited");
+  assert.doesNotThrow(() => process.kill(realChildren[1].pid, 0), "another session's wrapper keeps running");
+  assert.doesNotThrow(() => process.kill(secondDescendant, 0), "another session's descendant keeps running");
+  const legacyFile = path.join(directory, "tmp", "EncounterCodex", realSession.id, "Session.json");
+  const legacyCompletion = JSON.parse(fs.readFileSync(legacyFile, "utf8"));
+  legacyCompletion.status = "failed";
+  legacyCompletion.error = "Codex 执行失败，请在本机 CLI 检查登录和网络后重试";
+  delete legacyCompletion.cliPid;
+  fs.writeFileSync(legacyFile, JSON.stringify(legacyCompletion));
+  assert.equal((await (await fetch(`${base}/sessions/${realSession.id}`)).json()).status, "interrupted", "the interruption receipt survives an older owner's completion callback");
+  await fetch(`${base}/sessions/${sibling.id}/interrupt`, { method: "POST" });
+  console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final replies, resume, concurrent rejection, interrupt/retry/continue and isolated CLI process-tree termination");
 } finally {
+  for (const child of realChildren) {
+    if (child.exitCode !== null) continue;
+    try {
+      if (process.platform === "win32") {
+        const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+        await once(killer, "close");
+      } else process.kill(-child.pid, "SIGKILL");
+    } catch { /* The test process may have finished between the exit check and cleanup. */ }
+  }
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
   fs.rmSync(directory, { recursive: true, force: true });

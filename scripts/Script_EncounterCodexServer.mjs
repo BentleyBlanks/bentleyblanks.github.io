@@ -2,7 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { ReadFramePacket } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowDocument.mjs";
 import { FLOW_TIMELINE } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowModel.mjs";
 
@@ -16,6 +17,7 @@ const CLI_INTERRUPTED = "本地服务已重启，上次执行已中断。可继�
 const PUBLIC_ERRORS = new Set([CLI_FAILURE, CLI_MISSING, CLI_START_FAILURE, CLI_INTERRUPTED]);
 
 class RequestError extends Error {}
+const RunFile = promisify(execFile);
 
 function ProcessIsRunning(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -70,14 +72,38 @@ function SpawnCodex(args, rootDir) {
   const npmEntry = path.join(process.env.APPDATA || "", "npm/node_modules/@openai/codex/bin/codex.js");
   const command = fs.existsSync(npmEntry) ? process.execPath : process.platform === "win32" ? "codex.exe" : "codex";
   return spawn(command, fs.existsSync(npmEntry) ? [npmEntry, ...args] : args, {
-    cwd: rootDir, windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
+    cwd: rootDir, windowsHide: true, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"],
   });
 }
 
-export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex } = {}) {
+async function StopCodex(child) {
+  if (!ProcessIsRunning(child.pid)) return;
+  if (process.platform === "win32") {
+    await RunFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 15000 });
+  } else process.kill(-child.pid, "SIGTERM");
+}
+
+async function LegacyCliPid(session) {
+  if (session.cliPid && ProcessIsRunning(session.cliPid)) return session.cliPid;
+  if (process.platform !== "win32") throw new RequestError("旧会话缺少 CLI 进程信息");
+  // Session IDs are validated UUIDs. Return only the matching CLI wrapper's PID.
+  const script = `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -like '*codex.js*' -and $_.CommandLine -like '*exec*' -and $_.CommandLine -like '*${session.id}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+  const { stdout } = await RunFile("powershell.exe", ["-NoProfile", "-Command", script], { windowsHide: true, timeout: 10000 });
+  const pid = Number(stdout.trim());
+  if (!ProcessIsRunning(pid)) throw new RequestError("未找到该会话正在执行的 CLI 进程");
+  return pid;
+}
+
+export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex } = {}) {
   const directory = path.join(rootDir, "tmp", "EncounterCodex");
   const active = new Map();
   const SessionPath = id => path.join(directory, id, "Session.json");
+  const InterruptPath = id => path.join(directory, id, "Interrupt.json");
+  function ReadInterrupt(session) {
+    if (!fs.existsSync(InterruptPath(session.id))) return null;
+    const interruption = JSON.parse(fs.readFileSync(InterruptPath(session.id), "utf8"));
+    return interruption.requestId === session.messages.findLast(message => message.role === "user")?.requestId ? interruption : null;
+  }
   function Save(session) {
     fs.mkdirSync(path.dirname(SessionPath(session.id)), { recursive: true });
     const temporary = `${SessionPath(session.id)}.tmp`;
@@ -88,6 +114,13 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     if (!ID.test(id)) throw new RequestError("会话编号无效");
     const session = JSON.parse(fs.readFileSync(SessionPath(id), "utf8"));
     if (session.error && !PUBLIC_ERRORS.has(session.error)) { session.error = CLI_FAILURE; Save(session); }
+    const interruption = ReadInterrupt(session);
+    if (interruption && !ProcessIsRunning(interruption.cliPid) && session.status !== "interrupted") {
+      session.status = "interrupted";
+      session.error = "";
+      session.updatedAt = interruption.createdAt;
+      Save(session);
+    }
     const ownerAlive = ProcessIsRunning(session.runnerPid);
     if (session.status === "failed" && session.error === CLI_INTERRUPTED && ownerAlive) {
       session.status = "running";
@@ -125,6 +158,8 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     try { child = spawnCodex(args, rootDir); }
     catch (error) { session.status = "failed"; session.error = error.code === "ENOENT" ? CLI_MISSING : CLI_START_FAILURE; Save(session); return; }
     active.set(session.id, child);
+    session.cliPid = child.pid;
+    Save(session);
     child.stdout.setEncoding("utf8");
     child.stderr.resume();
     let buffer = "";
@@ -145,7 +180,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       finished = true;
       active.delete(session.id);
       const conclusion = fs.existsSync(output) ? fs.readFileSync(output, "utf8").trim() : "";
-      session.status = code === 0 && conclusion ? "completed" : "failed";
+      session.status = ReadInterrupt(session) ? "interrupted" : code === 0 && conclusion ? "completed" : "failed";
       if (conclusion) session.messages.push({ role: "assistant", text: conclusion, createdAt: new Date().toISOString() });
       if (session.status === "failed") session.error = error?.code === "ENOENT" ? CLI_MISSING : CLI_FAILURE;
       session.updatedAt = new Date().toISOString();
@@ -168,6 +203,30 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       }
       const sessionRoute = /^\/sessions\/([a-f0-9-]{36})$/.exec(route);
       if (request.method === "GET" && sessionRoute) { Send(response, 200, Load(sessionRoute[1])); return; }
+      const interruptRoute = /^\/sessions\/([a-f0-9-]{36})\/interrupt$/.exec(route);
+      if (request.method === "POST" && interruptRoute) {
+        const session = Load(interruptRoute[1]);
+        if (!["running", "interrupting"].includes(session.status)) { Send(response, 200, session); return; }
+        const pendingInterrupt = ReadInterrupt(session);
+        const child = active.get(session.id) || { pid: pendingInterrupt?.cliPid || await LegacyCliPid(session) };
+        const interruption = { requestId: session.messages.findLast(message => message.role === "user").requestId,
+          cliPid: child.pid, createdAt: new Date().toISOString() };
+        const temporary = `${InterruptPath(session.id)}.tmp`;
+        fs.writeFileSync(temporary, JSON.stringify(interruption));
+        fs.renameSync(temporary, InterruptPath(session.id));
+        session.status = "interrupting";
+        Save(session);
+        try { await stopCodex(child); }
+        catch {
+          if (ProcessIsRunning(child.pid)) {
+            fs.rmSync(InterruptPath(session.id), { force: true });
+            session.status = "running"; Save(session);
+            throw new RequestError("中断未成功，请重试");
+          }
+        }
+        Send(response, 202, Load(session.id));
+        return;
+      }
       const attachment = /^\/attachments\/([a-f0-9-]{36})\/([a-f0-9-]{36})\/(Screenshot\.png|Frame\.json|Location\.json|ScreenshotFrame\.json)$/.exec(route);
       if (request.method === "GET" && attachment) {
         const file = path.join(directory, ...attachment.slice(1));
@@ -185,7 +244,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       if (turn.sessionId && !session) { Send(response, 404, { error: "会话不存在" }); return; }
       if (session?.messages.some(message => message.requestId === turnId)) { Send(response, 202, session); return; }
       const next = session || { id: sessionId, title: turn.prompt.slice(0, 32), messages: [], createdAt: now };
-      if (active.has(next.id) || next.status === "running") { Send(response, 409, { error: "当前会话正在执行，请等待结论" }); return; }
+      if (active.has(next.id) || ["running", "interrupting"].includes(next.status)) { Send(response, 409, { error: "当前会话正在执行，请等待结论" }); return; }
       const folder = path.join(directory, next.id, turnId);
       fs.mkdirSync(folder, { recursive: true });
       if (turn.frame) {

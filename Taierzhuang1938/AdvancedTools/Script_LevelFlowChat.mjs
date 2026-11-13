@@ -33,6 +33,7 @@ export class EncounterChat {
     this.available = false;
     this.loading = false;
     this.sending = false;
+    this.stopping = null;
     this.selectionVersion = 0;
     this.BindInspectorResize();
     Element("toggleCodexSessions").onclick = () => {
@@ -44,6 +45,7 @@ export class EncounterChat {
       Element("chatPane").dataset.listOpen = String(open);
     };
     Element("newCodexChat").onclick = () => this.New();
+    Element("interruptCodexChat").onclick = () => this.Interrupt();
     Element("attachCodexScreenshot").onclick = openScreenshot;
     Element("attachCodexLocation").onclick = () => {
       this.pendingLocation = structuredClone(this.snapshot());
@@ -191,9 +193,14 @@ export class EncounterChat {
   }
 
   UpdateSend() {
-    const busy = this.sending || this.loading || this.current?.status === "running";
+    const running = ["running", "interrupting"].includes(this.current?.status);
+    const stopping = this.stopping === this.current?.id || this.current?.status === "interrupting";
+    const busy = this.sending || this.loading || running || stopping;
     Element("sendCodexChat").disabled = !this.available || busy || !Element("codexPrompt").value.trim();
-    Element("sendCodexChat").textContent = this.sending ? "提交中…" : this.current?.status === "running" ? "执行中…" : "发送";
+    Element("sendCodexChat").textContent = this.sending ? "提交中…" : running ? "执行中…" : "发送";
+    Element("interruptCodexChat").hidden = !running;
+    Element("interruptCodexChat").disabled = stopping;
+    Element("interruptCodexChat").textContent = stopping ? "中断中…" : "中断";
     Element("codexPrompt").readOnly = this.sending;
     for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
   }
@@ -210,7 +217,8 @@ export class EncounterChat {
       button.setAttribute("aria-current", String(session.id === this.current?.id));
       const title = document.createElement("span"), status = document.createElement("small");
       title.textContent = session.title;
-      status.textContent = session.status === "running" ? "正在执行" : session.status === "failed" ? "需要处理" : "已完成";
+      const labels = { running: "正在执行", interrupting: "中断中", interrupted: "已中断", failed: "需要处理", completed: "已完成" };
+      status.textContent = labels[session.status] || "已完成";
       button.append(title, status);
       button.onclick = () => this.Select(session.id);
       list.append(button);
@@ -244,9 +252,10 @@ export class EncounterChat {
       }
       log.append(row);
     }
-    if (this.current?.status === "running") {
+    if (["running", "interrupting", "interrupted"].includes(this.current?.status)) {
       const pending = document.createElement("div"); pending.className = "lfChatWaiting";
-      pending.textContent = "Codex 正在处理…"; log.append(pending);
+      const labels = { running: "Codex 正在处理…", interrupting: "正在中断…", interrupted: "已中断" };
+      pending.textContent = labels[this.current.status]; log.append(pending);
     }
     if (this.current?.error) this.Error(this.current.error);
     this.UpdateSend();
@@ -273,6 +282,20 @@ export class EncounterChat {
       this.Draw();
     } catch (error) { this.Error(error.message); }
     finally { this.sending = false; this.UpdateSend(); }
+  }
+
+  async Interrupt() {
+    const id = this.current?.id;
+    if (!id || this.stopping || !["running", "interrupting"].includes(this.current.status)) return;
+    this.stopping = id;
+    this.Error(); this.UpdateSend();
+    try {
+      const session = await Request(`/sessions/${id}/interrupt`, { method: "POST", signal: AbortSignal.timeout(25000) });
+      this.sessions = this.sessions.map(item => item.id === id ? session : item);
+      if (this.current?.id === id) { this.current = session; this.Draw(); }
+      else this.DrawList();
+    } catch (error) { if (this.current?.id === id) this.Error(error.message); }
+    finally { this.stopping = null; this.UpdateSend(); }
   }
 
   async Poll() {
