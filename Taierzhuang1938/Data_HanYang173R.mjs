@@ -1,8 +1,8 @@
 // Dots 173R author-space metres, +Y up, muzzle -Z. Values are measured in the
 // delivered GLB; weapon operation remains driven by the existing game timeline.
 export const HANYANG_173R = Object.freeze({
-  version: '173R-20261113',
-  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261113',
+  version: '173R-20261113R2',
+  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261113r2',
   sourceSha256: '3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c',
   // SideWoodButton is metal in the source ORM despite its object name.
   wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'],
@@ -16,6 +16,9 @@ export const HANYANG_173R = Object.freeze({
   // 36/31; the Blender overview's wood is 51.
   exposureGain: 2.5,
   textureAnisotropy: 16,
+  // 2026-11-13 R2 reference finish divides the runtime gains into its baked base
+  // maps. These multipliers therefore reconstruct the reference reflectance.
+  // Wood uses repeating longitudinal UVs with a 6 cm, 2048 px PBR tile.
   // 2026-11-03 底色校准（用户看过候选后定：「确实好很多，改了推吧」）。只调材质球上的底色倍率（material.color），
   // 贴图与 GLB 字节不动；`?gunBase=authored` 可切回旧的单一 exposureGain 对照。
   // 依据见 _shots/BaseColorCompare：木头 3.3% 低于实测最暗木材（≈9%）与 COD 二战木托（粗估 ≈9%）；

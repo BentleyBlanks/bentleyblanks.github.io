@@ -55,7 +55,30 @@ for(const index of [57,58,59]){
 }
 const reshaped=new Set(report.mechanismRepair.shapeParts);
 for(const p of report.parts.filter(p=>!p.gameplayAdaptation&&p.part!=='RearBand_ControlledCrown'&&!reshaped.has(p.part)))assert(Math.max(p.gameToSourceMaxM,p.sourceToGameMaxM)<=.0005,p.part);
-assert.equal(report.mechanismRepair.version,D.version);
+assert.equal(report.mechanismRepair.version,'173R-20261113');
+assert.equal(report.materialMatch.version,D.version);
+assert.equal(doc.asset.extras.materialMatch,D.version);
+assert.equal(report.materialMatch.sourceAssets.length,2);
+assert(report.materialMatch.sourceAssets.every(source=>source.tier===1&&/^[0-9a-f]{64}$/.test(source.sha256)));
+for(const name of D.wood){
+ const part=report.parts.find(part=>part.part===name);
+ assert(part.rebake.tiledUv&&part.rebake.tileMeters===.06&&part.rebake.textureSize===2048);
+ const node=doc.nodes.find(node=>node.name===name),primitive=doc.meshes[node.mesh].primitives[0];
+ const material=doc.materials[primitive.material];
+ for(const slot of [material.pbrMetallicRoughness.baseColorTexture,material.pbrMetallicRoughness.metallicRoughnessTexture,material.normalTexture]){
+  const sampler=doc.samplers[doc.textures[slot.index].sampler];
+  assert.equal(sampler.wrapS,10497);assert.equal(sampler.wrapT,10497);
+ }
+ const uv=Read(primitive.attributes.TEXCOORD_0);
+ assert(Math.max(...uv.map(value=>value[0]))-Math.min(...uv.map(value=>value[0]))>1,'stock UVs retain reference detail by repeating along their length');
+ const normalTexture=doc.textures[material.normalTexture.index];
+ const normalImage=doc.images[normalTexture.extensions?.EXT_texture_webp?.source??normalTexture.source];
+ const normalView=doc.bufferViews[normalImage.bufferView];
+ const normalBytes=bin.subarray(normalView.byteOffset||0,(normalView.byteOffset||0)+normalView.byteLength);
+ const dimensions=await sharp(normalBytes).metadata(),stats=await sharp(normalBytes).stats();
+ assert.equal(dimensions.width,2048);assert.equal(dimensions.height,2048);
+ assert(stats.channels[0].stdev>2&&stats.channels[1].stdev>2,'wood fibres retain a two-direction normal response');
+}
 for(const name of Object.keys(report.surfaceRepair.sourceSurfaceErrors)){
  const part=report.parts.find(p=>p.part===name);
  assert(part.rebake.uvCoverage>0,name);
@@ -77,11 +100,12 @@ assert(flagSize.z<.0025,'safety flag has the reference thin-section profile');
 assert.equal(report.parts.find(p=>p.part==='HandleSphere').gameTriangles,2208,'bolt knob silhouette uses the refined surface');
 for(const name of ['RearOuterCover_RoundedSideReturn','HandleSphere','RearSmallCover']){
  const node=doc.nodes.find(n=>n.name===name),primitive=doc.meshes[node.mesh].primitives[0],material=doc.materials[primitive.material];
- const image=doc.images[doc.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index].source],view=doc.bufferViews[image.bufferView];
+ const texture=doc.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
+ const image=doc.images[texture.extensions?.EXT_texture_webp?.source??texture.source],view=doc.bufferViews[image.bufferView];
  const {data,info}=await sharp(bin.subarray(view.byteOffset||0,(view.byteOffset||0)+view.byteLength)).removeAlpha().raw().toBuffer({resolveWithObject:true});
  let sum=0,squared=0;for(let index=1;index<data.length;index+=info.channels){const value=data[index]/255;sum+=value;squared+=value*value;}
  const count=info.width*info.height,mean=sum/count,deviation=Math.sqrt(Math.max(0,squared/count-mean*mean));
- assert(Math.abs(mean-report.mechanismRepair.finishes[name].roughness)<.008&&deviation<.015,`${name}: satin roughness retains fine variation`);
+ assert(mean>.4&&mean<.75&&deviation>.015&&deviation<.2,`${name}: aged steel retains spatially varying roughness`);
 }
 assert.equal(report.parts.find(p=>p.part==='MainWood_ContinuousLowerShoulder').gameTriangles,32211,'use clean wood before the slicing regression');
 assert.equal(report.parts.find(p=>p.part==='UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront').gameTriangles,11893);

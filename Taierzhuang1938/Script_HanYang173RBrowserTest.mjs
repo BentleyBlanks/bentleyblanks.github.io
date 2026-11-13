@@ -32,9 +32,9 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261113');assert.equal(evidence.identity.triangles,64266);
+ assert.equal(evidence.identity.version,'173R-20261113R2');assert.equal(evidence.identity.triangles,64266);
  assert.equal(evidence.identity.worldTriangles,64266);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
- for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert.equal(m.normal,'');assert.equal(m.orm,'');assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
+ for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert(['','srgb-linear'].includes(m.normal));assert(['','srgb-linear'].includes(m.orm));assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
  evidence.lighting=[];
  for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
   const row=await page.evaluate(async mode=>{

@@ -20,7 +20,7 @@ def SmoothNormals(obj):
     mesh.update()
 
 
-def BakeParts(scene, game, sources, parts, out, unwrapNames):
+def BakeParts(scene, game, sources, parts, out, unwrapNames, mapRoles=("BaseColor", "ORM", "Normal")):
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
     scene.cycles.samples = 16
@@ -74,7 +74,7 @@ def BakeParts(scene, game, sources, parts, out, unwrapNames):
         source.hide_render = False
         source.select_set(True)
         bake.margin = 32 if resolution >= 4096 else 16
-        for role in ["BaseColor", "ORM", "Normal"]:
+        for role in mapRoles:
             image = bpy.data.images.new("Repair_" + role, width=resolution, height=resolution, alpha=False, float_buffer=True)
             image.colorspace_settings.name = "sRGB" if role == "BaseColor" else "Non-Color"
             texture.image = image

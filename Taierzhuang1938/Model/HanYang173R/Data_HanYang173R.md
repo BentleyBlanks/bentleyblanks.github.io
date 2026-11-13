@@ -6,10 +6,10 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
 - Game geometry: **64,266 triangles, 44 parts, 132 embedded images**. The 2026-11-13 revision reconstructs nine visible mechanism parts from reference photographs. `Data_GameGeometry.json` records the current hash, per-part geometry comparisons and image payloads.
-- 13 parts retain the delivered PBR payloads with their UVs. The 31 rebaked parts include the clean wooden meshes and sixteen satin steel surfaces. Tangent frames and bake/export UV coverage are checked.
+- All 44 parts receive the R2 reference finish. Three wooden parts share a 2048-pixel repeating PBR tile. Steel keeps its fitted UV atlases. Tangent frames and bake/export UV coverage are checked.
 - The front sight crown, trigger and selected contact parts retain their original geometry. The receiver inlet is relieved by at most 0.152 mm. The handguard band follows timber and barrel profiles. The nine mechanism reconstructions carry explicit reference scope. Other simplified parts keep sampled bidirectional vertex-to-surface errors below 0.5 mm.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
-- GPU publication uses BC7 and the explicit path rules. The three main-stock maps retain 4096 pixels, selected by embedded image indices 57–59. Other images follow their existing 2048-pixel maximum.
+- GPU publication uses BC7 and the explicit path rules. Main-stock images 57–59 permit up to 4096 pixels. R2 uses a 2048-pixel tile over 6 cm, giving 34.13 baked pixels/mm. Other images follow their existing 2048-pixel maximum.
 
 Source packages and source Blender projects remain outside Git:
 
@@ -17,7 +17,27 @@ Source packages and source Blender projects remain outside Git:
 
 `DotsDelivery/` contains the original three packages; all 605 supplied SHA256 entries were verified. `Game60k/Scene_HanYang173RGame60k.blend` is the editable reduced source. Preserve [Dots' material-source statement](Data_DotsMaterialSources.txt); it includes unresolved historical input provenance and does not assert that the whole package is CC0.
 
-## Mechanism and finish revision, 2026-11-13
+## Photo-reference material revision R2, 2026-11-13
+
+The user rejected the preceding smooth finish. R2 matches the two supplied receiver and barrel-band photographs with dark longitudinal timber fibres, fine steel corrosion, oxide mottling and spatially varying worn reflections. Wood uses a 6 cm repeating cylindrical unwrap with planar ends. The steel source repeats every 4 cm before baking into the existing atlases. Metal bump distance is 32 micrometres at strength 0.25. Wood bump distance is 150 micrometres at strength 0.30. Roughness varies with the source texture across each surface.
+
+Both source base-colour images were generated with built-in imagegen, tier 1. Their hashes are recorded in `Data_GameGeometry.json.materialMatch`. The source images, exact prompts, immutable preceding GLB, raw 16-bit normals and packed editable Blender project live in `ReferenceMaterials_20261113/` under the external source directory. Generated texture details and material parameters are creative reconstruction. The reference photographs guide appearance.
+
+The base maps account for the existing runtime colour gains. Browser normals are packed to 8-bit at their baked dimensions. The repository's lossless WebP packer verifies decoded pixel identity and preserves dimensions. Identical wooden texture payloads share buffer views while the 44-part and 132-image structure is retained. Both handguard bands receive fresh aspect-preserving UVs and 2048-pixel bakes. Geometry remains at 64,266 triangles.
+
+```powershell
+node scripts/Script_BlenderMcp.mjs start --task HanYangSurfaceRepair
+node scripts/Script_BlenderMcp.mjs exec --code "import os; os.environ['HANYANG_PROJECT_ROOT']=r'<owned-worktree>/Taierzhuang1938'; os.environ['HANYANG_MATERIAL_PARTS']=''"
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYang173RReferenceMaterials.py --timeout 3600
+python Taierzhuang1938/_import/Script_HanYang173RRebakeAssemble.py <revision>/Model_HanYang173R_Before.glb <revision>/Model_ReferenceBaked.glb <revision>/Bake --report <revision>/Data_RuntimeGeometry.json --material-match <revision>/Data_MaterialMatch.json
+python Taierzhuang1938/_import/Script_HanYang173RPackRuntime.py <revision>/Model_ReferenceBaked.glb Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb <revision>/Data_RuntimeGeometry.json
+node scripts/Script_BlenderMcp.mjs stop
+node scripts/Script_BlenderMcp.mjs status --scan
+```
+
+Before assembly, copy the preceding `Data_GameGeometry.json` to `<revision>/Data_RuntimeGeometry.json`. After packing, copy the updated report to `Model/HanYang173R/Data_GameGeometry.json`.
+
+## Mechanism and preceding finish revision, 2026-11-13
 
 The user rejected the preceding full-surface coarse finish. The visible rear mechanism now uses paired protective cheeks, a stepped round cocking body, a complete circular rear disc and central pin, a thin rounded safety flag and top strip, a round bolt stem, a 48-segment knob, and a beveled rear V-notch. The 2026-11-12 wooden meshes and fitted handguard band provide the surrounding rifle body.
 

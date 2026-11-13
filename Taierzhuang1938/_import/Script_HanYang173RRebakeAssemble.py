@@ -19,9 +19,14 @@ def Acc(doc, binb, i):
     assert not v.get('byteStride') or v['byteStride'] == np.dtype(DT[a['componentType']]).itemsize * w
     return np.frombuffer(binb, dtype=DT[a['componentType']], count=a['count'] * w, offset=v.get('byteOffset', 0) + a.get('byteOffset', 0)).reshape(-1, w).copy()
 
+filledImages = {}
+
 def FillPng(path, hit, bits16=False):
     """命中像素原样；没命中的（零星漏点 + 岛外）取最近命中像素。"""
     import cv2
+    key = (hashlib.sha256(path.read_bytes()).digest(), hashlib.sha256(hit.tobytes()).digest(), bits16)
+    if key in filledImages:
+        return filledImages[key]
     a = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)          # 16 位 PNG 原样读（PIL 会悄悄降成 8 位）
     assert a is not None and a.dtype == (np.uint16 if bits16 else np.uint8), (path, None if a is None else a.dtype)
     a = a[..., ::-1] if a.ndim == 3 else a[..., None]        # BGR → RGB
@@ -31,16 +36,19 @@ def FillPng(path, hit, bits16=False):
     if bits16:
         # 低 6 位是烘焙噪声，PNG 压不动；留 10 位精度（发布时 GPU 压缩只剩 8 位）
         out = (np.minimum(65535, (out.astype(np.uint32) + 32) >> 6 << 6)).astype(np.uint16)
-    ok, enc = cv2.imencode('.png', np.ascontiguousarray(out[..., ::-1]), [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    ok, enc = cv2.imencode('.png', np.ascontiguousarray(out[..., ::-1]), [cv2.IMWRITE_PNG_COMPRESSION, 6])
     assert ok
-    return enc.tobytes()
+    filledImages[key] = enc.tobytes()
+    return filledImages[key]
 
-args = sys.argv[1:]; report_path = None; surface_repair = None; mechanism_repair = None
+args = sys.argv[1:]; report_path = None; surface_repair = None; mechanism_repair = None; material_match = None
 if '--report' in args: k = args.index('--report'); report_path = Path(args[k + 1]); del args[k:k + 2]
 if '--surface-repair' in args:
     k = args.index('--surface-repair'); surface_repair = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
 if '--mechanism-repair' in args:
     k = args.index('--mechanism-repair'); mechanism_repair = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
+if '--material-match' in args:
+    k = args.index('--material-match'); material_match = json.loads(Path(args[k + 1]).read_text(encoding='utf8')); del args[k:k + 2]
 game, out_path, dirs = args[0], args[1], [Path(d) for d in args[2:]]
 doc, binb = ReadGlb(game)
 parts = {}
@@ -71,7 +79,7 @@ def AddAccessor(arr, comp, typ, target, minmax=False):
     if minmax: a['min'] = arr.min(0).astype(float).tolist(); a['max'] = arr.max(0).astype(float).tolist()
     doc['accessors'].append(a); return len(doc['accessors']) - 1
 
-log = []; payloads = {}
+log = []; payloads = {}; imageViews = {}
 for node in doc['nodes']:
     name = node.get('name')
     if name not in parts or 'mesh' not in node: continue
@@ -104,8 +112,12 @@ for node in doc['nodes']:
     # 三张贴图
     mat = doc['materials'][prim['material']]; pbr = mat['pbrMetallicRoughness']
     slots = {'BaseColor': pbr['baseColorTexture']['index'], 'ORM': pbr['metallicRoughnessTexture']['index'], 'Normal': mat['normalTexture']['index']}
+    if rep.get('tiledUv'):
+        doc.setdefault('samplers', []).append({'magFilter': 9729, 'minFilter': 9987, 'wrapS': 10497, 'wrapT': 10497})
+        for texture in slots.values():
+            doc['textures'][texture]['sampler'] = len(doc['samplers']) - 1
     hit = np.asarray(Image.open(d / f'{name}_ORM.png').convert('RGB'))[..., 0] > 128
-    if surface_repair or mechanism_repair:
+    if surface_repair or mechanism_repair or material_match:
         assert float(hit.mean()) >= rep['unwrap']['coverage'] * .8, (name, 'baked coverage disagrees with exported UVs', float(hit.mean()), rep['unwrap']['coverage'])
     for role, ti in slots.items():
         for key in ('texCoord',):
@@ -113,11 +125,14 @@ for node in doc['nodes']:
         img = doc['images'][doc['textures'][ti]['source']]
         src = d / f'{name}_{role}.png'
         data = FillPng(src, hit, bits16=(role == 'Normal'))
-        img['bufferView'] = AddView(data); img['mimeType'] = 'image/png'
+        digest = hashlib.sha256(data).hexdigest()
+        if digest not in imageViews:
+            imageViews[digest] = AddView(data)
+        img['bufferView'] = imageViews[digest]; img['mimeType'] = 'image/png'
         payloads[img['name']] = {'sha256': hashlib.sha256(data).hexdigest(), 'sourceSha256': hashlib.sha256(src.read_bytes()).hexdigest(), 'islandCoverage': round(float(hit.mean()), 4)}
     for t in ([pbr['baseColorTexture'], pbr['metallicRoughnessTexture'], mat['normalTexture']]):
         t.pop('texCoord', None)
-    log.append({'part': name, 'vertices': int(P.shape[0]), 'triangles': int(I.size // 3), 'res': rep['res'], 'pxPerMm': rep['unwrap']['pxPerMm'], 'uvCoverage': rep['unwrap']['coverage'], 'missedFilled': int((~hit).sum())})
+    log.append({'part': name, 'vertices': int(P.shape[0]), 'triangles': int(I.size // 3), 'res': rep['res'], 'pxPerMm': rep['unwrap']['pxPerMm'], 'uvCoverage': rep['unwrap']['coverage'], 'missedFilled': int((~hit).sum()), 'tiledUv': rep.get('tiledUv',False), 'tileMeters': rep.get('tileMeters')})
 
 # 清孤儿 bufferView，重新紧排
 used = sorted({a['bufferView'] for a in doc['accessors'] if 'bufferView' in a} | {im['bufferView'] for im in doc['images']})
@@ -149,7 +164,10 @@ doc['bufferViews'] = fviews
 while len(final) % 4: final.append(0)
 doc['buffers'] = [{'byteLength': len(final)}]
 extras = doc.setdefault('asset', {}).setdefault('extras', {})
-if surface_repair:
+if material_match:
+    extras['materialMatch'] = material_match['version']
+    extras['sourceImagesPreserved'] = False
+elif surface_repair:
     extras['surfaceRepair'] = surface_repair['version']
 elif mechanism_repair:
     extras['mechanismRepair'] = mechanism_repair['version']
@@ -164,11 +182,13 @@ if report_path:
     for part in rep['parts']:
         if part['part'] in byname:
             l = byname[part['part']]; part['gameTriangles'] = l['triangles']
-            part['rebake'] = {'textureSize': l['res'], 'pxPerMm': l['pxPerMm'], 'uvCoverage': l['uvCoverage']}
+            part['rebake'] = {'textureSize': l['res'], 'pxPerMm': l['pxPerMm'], 'uvCoverage': l['uvCoverage'], 'tiledUv': l['tiledUv'], 'tileMeters': l['tileMeters']}
     rep['triangles'] = sum(p['gameTriangles'] for p in rep['parts'])
     for t in rep['texturePayloads']:
         if t['name'] in payloads: t.update(payloads[t['name']]); t['rebake'] = True
-    if mechanism_repair:
+    if material_match:
+        rep['materialMatch'] = material_match
+    elif mechanism_repair:
         rep['mechanismRepair'] = mechanism_repair
         for part in rep['parts']:
             if part['part'] in mechanism_repair['sourceSurfaceErrors']:
