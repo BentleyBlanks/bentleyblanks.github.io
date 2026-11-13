@@ -443,11 +443,21 @@ try {
   assert.ok(approaching.some(actor=>actor.pose==='run'));
   await page.screenshot({path:path.join(out,'OpeningEnemyApproach.png')});
   await page.evaluate(()=>LevelFlow.Seek(85));
-  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.p[1]<LevelFlow.Evaluate(84).actors.find(previous=>previous.id===actor.id).p[1])));
+  const rescueApproach=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')));
+  assert.equal(new Set(rescueApproach.map(actor=>actor.rescueGroup)).size,4);
+  assert.ok(rescueApproach.some(actor=>actor.pose==='walk')&&rescueApproach.some(actor=>actor.pose==='kneel'),'advancing soldiers and observers have independent timing');
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>{
+    const before=LevelFlow.Evaluate(74).actors.find(previous=>previous.id===actor.id);
+    return Math.hypot(actor.p[0]-before.p[0],actor.p[1]-before.p[1])>3;
+  })),'each trio makes progress along its approach between observation halts');
   await page.screenshot({path:path.join(out,'OpeningReturn.png')});
   await page.evaluate(()=>LevelFlow.Seek(107));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.pose==='kneel')));
   await page.screenshot({path:path.join(out,'OpeningSouthBerm.png')});
+  await page.evaluate(()=>LevelFlow.Seek(107.654));
+  const rescueReady=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')));
+  assert.equal(rescueReady.filter(actor=>actor.rescueLane==='branch'&&actor.p[0]<36&&actor.p[1]<68).length,6,'branch relief stops west of the Japanese positions');
+  assert.equal(rescueReady.filter(actor=>actor.rescueLane==='south'&&actor.p[1]>72).length,6,'southern relief spreads behind the berm');
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, causal area/count edits, drag, undo/redo, reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

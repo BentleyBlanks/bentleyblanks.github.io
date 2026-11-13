@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -398,10 +398,37 @@ for (let stamp=24;stamp<BeatById("02b").start;stamp+=0.5) {
 }
 assert.ok(ActorAt("luo",64.5).p[1]<ActorAt("luo",64).p[1],"winter's call reverses retreat toward the branch");
 for (const [index,id] of retreatIds.entries()) {
-  const heard=BeatById("02b").start+index*0.12;
+  const group=FLOW_OPENING_RESCUE.groups.find(entry=>entry.members.includes(index));
+  const heard=BeatById("02b").start+group.responseDelay+group.members.indexOf(index)*FLOW_OPENING_RESCUE.memberResponseInterval;
   assert.ok(ActorAt(id,heard+0.1).p[1]<ActorAt(id,heard).p[1],"each soldier turns after hearing the call");
 }
-for (const id of retreatIds) assert.equal(ActorAt(id,107).pose,"kneel","the whole party gathers on the south berm before throwing grenades");
+const rescueReady = retreatIds.map(id => ActorAt(id,107.654));
+assert.equal(rescueReady.filter(actor => actor.rescueLane === "branch").length,6);
+assert.equal(rescueReady.filter(actor => actor.rescueLane === "south").length,6);
+assert.equal(new Set(rescueReady.map(actor => actor.rescueGroup)).size,4,"each approach has two independent trios");
+for (const actor of rescueReady) {
+  assert.equal(actor.pose,"kneel","both lanes settle into cover before the grenade signal");
+  assert.ok(rescueReady.filter(other => other !== actor).every(other => Distance(actor.p,other.p)>2),"the rescue party retains loose individual cover positions");
+  assert.ok(actor.rescueLane === "branch" ? actor.p[1]<68 : actor.p[1]>72,"one lane follows the branch while the other approaches around its south side");
+}
+let mixedRescueFrames = 0;
+for (let stamp=66;stamp<105;stamp+=0.25) {
+  const actors = retreatIds.map(id => ActorAt(id,stamp));
+  if (actors.some(actor => actor.pose === "walk") && actors.some(actor => actor.pose === "kneel")) mixedRescueFrames++;
+  for (const actor of actors) assert.ok(Distance(actor.p,ActorAt(actor.id,stamp+0.01).p)/0.01<2.8,"rescue approaches stay below a headlong sprint");
+}
+assert.ok(mixedRescueFrames>50,"observation halts and advances are staggered across soldiers");
+for (const id of retreatIds) {
+  let reachedJunction = false, reachedSouthernBend = false, paused = false;
+  for (let stamp=66;stamp<107;stamp+=0.1) {
+    const actor = ActorAt(id,stamp);
+    reachedJunction ||= Distance(actor.p,[23.5,67.2])<1.2;
+    reachedSouthernBend ||= actor.p[0]>34 && actor.p[1]>84;
+    paused ||= actor.pose === "kneel" && Distance(actor.p,ActorAt(id,107).p)>3;
+  }
+  assert.ok(ActorAt(id,107).rescueLane === "branch" ? reachedJunction : reachedSouthernBend,`${id} follows the corresponding user-drawn approach`);
+  assert.ok(paused,`${id} pauses in cover during the approach`);
+}
 assert.ok(ActorAt("luo",112).p[1]<ActorAt("luo",110).p[1],"the party jumps into the trench after the grenade blasts");
 assert.equal(EvaluateFlow(130).actors.filter(actor=>retreatIds.includes(actor.id)&&actor.pose==="dead").length,7);
 const openingIds = [...retreatIds,...gunIds,...Array.from({length:9},(_,index)=>`opening${index}`)];

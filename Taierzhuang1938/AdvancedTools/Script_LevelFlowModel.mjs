@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -137,35 +137,70 @@ function RouteLength(route) {
   return route.slice(1).reduce((total, point, index) => total + Distance(route[index], point), 0);
 }
 
-function OpeningRetreat(time, index) {
+function BuildOpeningRetreat(index) {
+  const group = FLOW_OPENING_RESCUE.groups.find(entry => entry.members.includes(index));
+  const member = group.members.indexOf(index);
   const departure = BeatById("01c").start + index * FLOW_OPENING.departureInterval;
-  const heard = BeatById("02b").start + index * 0.12;
+  const heard = BeatById("02b").start + group.responseDelay + member * FLOW_OPENING_RESCUE.memberResponseInterval;
   const origin = [64 + index % 3 * 0.65, 63.5 + Math.floor(index / 3) * 0.35];
   const route = [origin, ...FLOW_OPENING.retreatRoute];
-  const distance = Math.min(RouteLength(route), Math.max(0, heard - departure) * FLOW_OPENING.retreatSpeed);
-  const turn = SampleRoute(route, distance / RouteLength(route));
-  if (time < heard) return {p: SampleRoute(route, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed / RouteLength(route)),
-    pose: time > departure ? "run" : "stand"};
+  const total = RouteLength(route);
+  const distance = Math.min(total, (heard - departure) * FLOW_OPENING.retreatSpeed);
+  const turn = SampleRoute(route, distance / total);
 
-  // Retrace the actual traversed bends to the rear of the branch, then use
-  // the south berm to approach. No return movement precedes winter's call.
+  // Preserve every traversed traffic-trench bend before the two lanes split.
   let traveled = 0;
   const traversed = [];
   for (let point = 1; point < route.length; point++) {
     traveled += Distance(route[point - 1], route[point]);
-    if (traveled < distance && point >= 6) traversed.push(route[point]);
+    if (traveled < distance && point >= 8) traversed.push(route[point]);
   }
-  const rim = [58 - index * 0.85, 72 + index % 2 * 0.3];
-  const returning = [turn, ...traversed.reverse(), [26,75], [28,72.5], [42,72.5], rim];
-  const ready = BeatById("02e").start;
-  if (time < ready) return {p: SampleRoute(returning, (time - heard) / (ready - heard)), pose: "run"};
-  const landing = [60 - index * 0.65, 65.3 + index % 3 * 0.4];
+  const rim = group.positions[member], landing = group.landings[member];
+  const centerline = [turn, ...traversed.reverse(), ...group.route, rim];
+  const laneOffset = FLOW_OPENING_RESCUE.memberLaneOffsets[member];
+  const returning = centerline.map((point, pointIndex) => {
+    if (pointIndex === 0 || pointIndex === centerline.length - 1) return point;
+    const before = centerline[pointIndex - 1], after = centerline[pointIndex + 1];
+    const length = Distance(before, after);
+    return [point[0] - (after[1] - before[1]) / length * laneOffset,
+      point[1] + (after[0] - before[0]) / length * laneOffset];
+  });
+  const arrival = BeatById("02e").start + group.arrivalOffset + member * FLOW_OPENING_RESCUE.memberArrivalInterval;
+  const halts = returning.map((point, pointIndex) => pointIndex === 0 || pointIndex === returning.length - 1
+    ? 0 : FLOW_OPENING_RESCUE.haltSeconds[(index + pointIndex) % FLOW_OPENING_RESCUE.haltSeconds.length]);
+  const movingSeconds = arrival - heard - halts.reduce((sum, seconds) => sum + seconds, 0);
+  const speed = RouteLength(returning) / movingSeconds;
+  const keys = [[heard, ...turn]], pauses = [];
+  let clock = heard;
+  for (let point = 1; point < returning.length; point++) {
+    clock += Distance(returning[point - 1], returning[point]) / speed;
+    keys.push([clock, ...returning[point]]);
+    if (halts[point] > 0) {
+      pauses.push([clock, clock + halts[point]]);
+      clock += halts[point];
+      keys.push([clock, ...returning[point]]);
+    }
+  }
+  return {departure, heard, route, total, rim, landing, arrival, keys, pauses,
+    rescueLane: group.lane, rescueGroup: group.id};
+}
+
+const openingRetreatPlans = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => BuildOpeningRetreat(index));
+
+function OpeningRetreat(time, index) {
+  const plan = openingRetreatPlans[index];
+  const {departure, heard, route, total, rim, landing, arrival, keys, pauses} = plan;
+  if (time < heard) return {p: SampleRoute(route, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed / total),
+    pose: time > departure ? "walk" : "stand"};
+  const identity = {rescueLane: plan.rescueLane, rescueGroup: plan.rescueGroup};
+  if (time < arrival) return {p: Track(keys, time),
+    pose: pauses.some(([start, end]) => time >= start && time < end) ? "kneel" : "walk", ...identity};
   const jump = BeatById("02f").start + 3 + index * 0.08;
-  if (time < jump) return {p: rim, pose: "kneel"};
-  if (time < BeatById("02f").end) return {p: SampleRoute([rim, landing], (time - jump) / (BeatById("02f").end - jump)), pose: "run"};
+  if (time < jump) return {p: rim, pose: "kneel", ...identity};
+  if (time < BeatById("02f").end) return {p: SampleRoute([rim, landing], (time - jump) / (BeatById("02f").end - jump)), pose: "run", ...identity};
   let pose = "stand";
   if (index >= 3 && time >= BeatById("02h").start) pose = index < 10 ? "dead" : "wounded";
-  return {p: landing, pose};
+  return {p: landing, pose, ...identity};
 }
 
 function OpeningGunTeam(time, index) {

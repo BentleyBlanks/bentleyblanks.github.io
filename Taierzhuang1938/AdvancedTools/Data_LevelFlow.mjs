@@ -23,7 +23,7 @@ export const FLOW_STAGES = [
 
 // User-directed opening blocking. Counts, speeds and routes are preview values.
 export const FLOW_OPENING = {
-  retreatCount: 12, retreatSpeed: 2.5, departureInterval: 0.35,
+  retreatCount: 12, retreatSpeed: 1.8, departureInterval: 0.35,
   retreatRoute: [[63,64.5],[60,65.6],[46,65.6],[30,66.8],[23.5,67.2],[26,75],[30,86],[32.5,101],[35,114],[35,129]],
   gunSpeed: 3, gunInterval: 0.5,
   gunRoute: [[63,64.5],[60,65.6],[46,65.6],[30,66.8],[23.5,67.2],[22,66],[12,44],[13,21],[0,11],[0,0],[0,-7]],
@@ -34,6 +34,33 @@ export const FLOW_OPENING = {
     [[109,39],[104,53],[91,64],[76,70],[64,70],[60,65.6]],
   ],
   enemyPositions: [[54.5,61.4],[57.5,61.2],[59,65],[59.8,64],[56,65],[51,65.3],[45,66],[42,66],[39,66]],
+};
+
+// User-drawn rescue approaches, 2026-11-13. Each lane has two loose trios.
+// Arrival offsets and short observation halts are creative preview blocking.
+export const FLOW_OPENING_RESCUE = {
+  memberArrivalInterval: 0.75,
+  memberResponseInterval: 0.4,
+  memberLaneOffsets: [-0.65,0.1,0.75],
+  haltSeconds: [0.7, 1.2, 1.7],
+  groups: [
+    { id: "SouthLead", lane: "south", members: [0,2,3], responseDelay: 0, arrivalOffset: -2.8,
+      route: [[30,86],[35,85],[41,84.7],[47,81.5],[51,77.5]],
+      positions: [[58,72.4],[55.4,74.5],[52.8,72.8]],
+      landings: [[60,65.3],[57.2,66.5],[54.6,65.5]] },
+    { id: "SouthFollow", lane: "south", members: [4,5,6], responseDelay: 4.5, arrivalOffset: -0.4,
+      route: [[30,86],[35,86.2],[41,85.7],[46,82.5]],
+      positions: [[49.2,74.4],[46.5,76],[44,74.2]],
+      landings: [[52,66.8],[49.5,65.8],[47,67]] },
+    { id: "BranchLead", lane: "branch", members: [1,7,8], responseDelay: 1.8, arrivalOffset: -3.6,
+      route: [[30,86],[26,75],[23.5,67.2],[26,66.9],[29,66.5]],
+      positions: [[35,66.5],[32.6,65.7],[30.2,67.2]],
+      landings: [[45,65.5],[42.5,66.5],[40,65.7]] },
+    { id: "BranchFollow", lane: "branch", members: [9,10,11], responseDelay: 7.5, arrivalOffset: -0.8,
+      route: [[30,86],[26,75],[23.5,67.2],[24,67]],
+      positions: [[27.7,66.5],[25.3,65.7],[23,67.4]],
+      landings: [[37.7,66],[35.3,67],[33,65.7]] },
+  ],
 };
 
 // The three surviving opening actors keep their identities across 02 and 03.
@@ -133,7 +160,7 @@ export const FLOW_BEATS = [
   { id: "02a", stage: "02", duration: 24, title: "被按在沟底", p: [[63,64.5],[61.8,65.6]], pose: "kneel",
     passage: "顺子被拖出洞，按着跪在沟底，冬瓜在左边一步远。玩家只能转头。北沿上一挺机枪朝后沟打。", task: "只能转头", threat: "北沿机枪 → 后沟；西边捷克式对射", gate: "被拖出洞", exit: "翻译开始审问", fire: "crossfire", planning: "九个日军从前一拍起持续进场，按标注分三路从北面、东北面与东面绕来。机枪组登上北沿，其余从门外坡道和东侧沟沿下到支沟，陆续展开。班长一队仍沿后沟撤退。" },
   { id: "02b", stage: "02", duration: 22, title: "冬瓜引开注意，挨刺刀", p: [[61.8,65.6]], pose: "kneel",
-    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，话断成一声呜咽。", task: "看冬瓜和南沿", threat: "近身刺刀；南沿藏着援兵", gate: "审问持续", exit: "丁转向玩家", fire: "crossfire", planning: "冬瓜在炮火中喊骂，撤退途中的班长一队闻声停下、折返，沿来路回到支沟口，再借南沿土垄掩护接近。到喊声开始才回头，随后集结投弹救人。" },
+    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，话断成一声呜咽。", task: "看冬瓜和南沿", threat: "近身刺刀；南沿藏着援兵", gate: "审问持续", exit: "丁转向玩家", fire: "crossfire", planning: "冬瓜喊骂后，班长一队闻声折返，分两路各六人跟进，一路回支沟口转东沿沟接近，一路从南侧拐弯处绕向南沿。每路分两组三人，疏开间隔，错峰停步观察、逐段迂回接近。南沿组投弹后两路接应救人。" },
   { id: "02c", stage: "02", duration: 10, title: "西边的枪停了", p: [[61.8,65.6]], pose: "kneel",
     passage: "西边的捷克式打着打着停了，没有再响。", task: "辨认西面的变化", threat: "西边机枪坑失守", gate: "冬瓜受伤", exit: "只剩后沟枪声", fire: "north" },
   { id: "02d", stage: "02", duration: 9, title: "刀尖对着脸", p: [[61.8,65.6]], pose: "kneel",
