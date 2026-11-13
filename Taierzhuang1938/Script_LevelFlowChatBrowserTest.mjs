@@ -43,14 +43,16 @@ try {
   await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent === "本机 Codex CLI");
   assert.equal(await page.locator("#newCodexChat").isVisible(), false);
   assert.equal(await page.locator("#toggleCodexSessions").getAttribute("aria-expanded"), "false");
-  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 360);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
+  assert.equal(await page.locator("#markScreenshot,.lfChatEmpty").count(), 0);
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   const handle = await page.locator("#inspectorResizeHandle").boundingBox();
   await page.mouse.move(handle.x + 3, handle.y + 150); await page.mouse.down();
   await page.mouse.move(handle.x - 197, handle.y + 150, { steps: 8 }); await page.mouse.up();
-  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 560);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 590);
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("ArrowRight");
-  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 540);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 570);
   await page.click("#toggleCodexSessions");
   const layout = await page.evaluate(() => {
     const list = document.querySelector(".lfChatSidebar").getBoundingClientRect(), detail = document.querySelector(".lfChatDetail").getBoundingClientRect();
@@ -66,8 +68,11 @@ try {
   await page.click("#attachScreenshot");
   await page.waitForFunction(() => !document.querySelector("#codexPendingImage").hidden);
   assert.ok(await page.locator("#codexPendingImage").isVisible());
-  // The image keeps its captured time while the automatic location follows the current frame.
+  // Each attachment preserves the time at which the user added it.
   await page.evaluate(() => LevelFlow.Seek(386));
+  await page.click("#attachCodexLocation");
+  await page.evaluate(() => LevelFlow.Seek(390));
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 386);
   await page.locator("#codexPrompt").fill("调整这个生成区的路线");
   await page.locator("#codexPrompt").press("Control+Enter");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 1);
@@ -81,6 +86,7 @@ try {
   assert.equal(screenshot.context.time, 384); assert.equal(screenshot.screenshot.marks.length, 1);
   assert.ok(await page.locator("#sendCodexChat").isDisabled());
   await page.click("#newCodexChat");
+  await page.click("#attachCodexLocation");
   await page.locator("#codexPrompt").fill("第二个会话的独立草稿");
   await page.locator(".lfChatSession").first().click();
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 1);
@@ -92,6 +98,10 @@ try {
   await page.screenshot({ path: path.join(out, "CodexConversation.png") });
   await page.click("#newCodexChat");
   assert.equal(await page.locator("#codexPrompt").inputValue(), "第二个会话的独立草稿");
+  assert.ok(await page.locator("#codexPendingLocation").isVisible());
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 390);
+  await page.click("#removeCodexLocation");
+  assert.ok(await page.locator("#codexPendingLocation").isHidden());
   await page.locator(".lfChatSession").first().click();
   await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
   await page.evaluate(() => LevelFlow.Seek(400));
@@ -99,6 +109,8 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 2);
   assert.equal(calls.length, 2); assert.equal(calls[1].args[1], "resume");
   assert.ok(!calls[1].args.includes("--image"));
+  const plainDirectory = path.dirname(calls[1].args[calls[1].args.indexOf("--output-last-message") + 1]);
+  assert.equal(fs.existsSync(path.join(plainDirectory, "Frame.json")), false);
   Finish(calls[1], "当前点位已处理。");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.assistant").length === 2);
   await page.click("#newCodexChat"); await page.click("#sendCodexChat");
@@ -106,7 +118,7 @@ try {
   assert.equal(calls.length, 3); assert.ok(!calls[2].args.includes("resume"));
   Finish(calls[2], "第二个会话已完成。");
   await page.reload(); await page.waitForFunction(() => window.LevelFlow);
-  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 540);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 570);
   assert.equal(await page.locator("#newCodexChat").isVisible(), false);
   await page.click("#toggleCodexSessions");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
@@ -115,11 +127,11 @@ try {
   assert.equal(await page.locator(".lfChatMessage.assistant .lfChatBubble").textContent(), "第二个会话已完成。");
   await page.setViewportSize({ width: 878, height: 720 });
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
-  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 360);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   await page.screenshot({ path: path.join(out, "CodexConversationCompact.png") });
   assert.ok(await page.locator("#sendCodexChat").isVisible());
   assert.deepEqual(errors, []);
-  console.log("ok  Encounter chat browser: two columns, bubbles, screenshot marks, fresh coordinates, resume/new CLI sessions, draft switching and reload history");
+  console.log("ok  Encounter chat browser: resizable layout, screenshot marks, pinned optional location, resume/new CLI sessions, attachment drafts and reload history");
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(storage), path.resolve(os.tmpdir()));

@@ -251,7 +251,6 @@ function BindControls() {
   Element("viewportLayout").onchange=(event)=>{workspace.SetLayout(Number(event.target.value));Render();};
   Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
   Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
-  Element("markScreenshot").onclick=OpenAnnotations;
   document.addEventListener("keydown",(event)=>{
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
     if(navigation.Key(event)) return;

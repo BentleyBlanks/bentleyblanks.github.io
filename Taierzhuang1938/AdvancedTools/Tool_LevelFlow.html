@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113ViewportTools">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114Workbench">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,7 +25,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261113ViewportTools"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261114Workbench"></script>
 </head>
 <body class="lfBody">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -39,18 +39,20 @@
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapReadout"></div><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
       <div id="inspectorResizeHandle" class="lfInspectorResize" role="separator" aria-label="调整右侧栏宽度" aria-orientation="vertical" tabindex="0" title="拖动调整侧栏宽度，方向键微调，Home 恢复默认"></div>
-      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div><button id="markScreenshot" title="截取当前所有视口，可标注、复制、导出或附加到会话">截图与标注</button></div>
+      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div></div>
       <section id="chatPane" class="lfChatPane" aria-label="Codex 会话" data-list-open="false">
         <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
           <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div></div>
-          <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"><div class="lfChatEmpty"><h2>向 Codex 提交需求</h2><p>每次发送自动附上当前时间、点位与视口。</p></div></div>
+          <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"></div>
           <div id="codexChatError" class="lfChatError" role="status" hidden></div>
           <form id="codexComposer" class="lfChatComposer">
-            <details class="lfChatContext"><summary id="codexContextSummary">当前定位 · 自动附加</summary><pre id="codexContextDetail"></pre></details>
-            <div id="codexPendingImage" class="lfPendingImage" hidden><button id="editCodexImage" type="button" title="继续标注"><img id="codexImagePreview" alt="待发送的标注截图"><span id="codexImageLabel"></span></button><button id="removeCodexImage" type="button" aria-label="移除截图附件">×</button></div>
+            <div class="lfChatAttachments">
+              <div id="codexPendingLocation" class="lfPendingLocation" hidden><details class="lfChatContext"><summary id="codexContextSummary">定位</summary><pre id="codexContextDetail"></pre></details><button id="removeCodexLocation" type="button" aria-label="移除定位附件">×</button></div>
+              <div id="codexPendingImage" class="lfPendingImage" hidden><button id="editCodexImage" type="button" title="继续标注"><img id="codexImagePreview" alt="截图附件"><span id="codexImageLabel">截图</span></button><button id="removeCodexImage" type="button" aria-label="移除截图附件">×</button></div>
+            </div>
             <label class="lfSrOnly" for="codexPrompt">本次需求</label><textarea id="codexPrompt" rows="3" maxlength="20000" placeholder="描述需要调整的内容…"></textarea>
-            <div class="lfChatActions"><button id="attachCodexScreenshot" type="button">＋ 截图标注</button><span>Ctrl + Enter 发送</span><button id="sendCodexChat" class="sePrimary" type="submit">发送</button></div>
+            <div class="lfChatActions"><button id="attachCodexScreenshot" type="button" title="截取视口并标注">＋ 截图</button><button id="attachCodexLocation" type="button" title="附加当前时间、坐标与视口">＋ 定位</button><button id="sendCodexChat" class="sePrimary" type="submit" title="Ctrl + Enter">发送 ↑</button></div>
           </form>
         </div>
       </section>
@@ -68,7 +70,7 @@
       <div class="lfToolGroup"><button data-mark-tool="arrow" aria-pressed="true">箭头</button><button data-mark-tool="rect" aria-pressed="false">框</button><button data-mark-tool="text" aria-pressed="false">文字</button></div>
       <input id="screenshotText" type="text" maxlength="2000" placeholder="点击截图添加文字" aria-label="标记文字" disabled>
       <div class="lfToolGroup"><button id="undoAnnotation" title="Ctrl+Z">撤销</button><button id="redoAnnotation" title="Ctrl+Shift+Z">重做</button><button id="deleteScreenshotAnnotation">删除选中</button></div>
-      <div class="lfToolGroup lfExport"><button id="copyScreenshot">复制图片</button><button id="exportFrame">导出 PNG</button><button id="attachScreenshot" class="sePrimary">附加到会话</button></div>
+      <div class="lfToolGroup lfExport"><button id="copyScreenshot">复制</button><button id="exportFrame">导出 PNG</button><button id="attachScreenshot" class="sePrimary">添加附件</button></div>
     </div>
     <div id="annotationStage" class="lfAnnotationStage"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas></div>
     <div class="lfAnnotationFooter"><span>拖画箭头或框 · 点击添加文字 · 拖动已有标记可移动</span><output id="annotationStatus" role="status"></output></div>

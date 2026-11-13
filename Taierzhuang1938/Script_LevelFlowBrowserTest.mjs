@@ -337,6 +337,7 @@ try {
   assert.ok(layout.paragraphs>1,'source passage is broken into readable paragraphs');
   async function ReadLocationAttachment() {
     await page.click('[data-tab="chat"]');
+    await page.click('#attachCodexLocation');
     await page.locator('.lfChatContext').evaluate(element=>{element.open=true;element.dispatchEvent(new Event('toggle'));});
     return page.locator('#codexContextDetail').textContent();
   }
@@ -348,13 +349,18 @@ try {
   assert.equal(location.timeline.secondsIntoBeat,384-location.timeline.beatStartSeconds);
   assert.equal(location.viewports.length,2);assert.ok(location.player.x&&Number.isFinite(location.player.y));
   assert.equal(location.coordinates.unit,'metres');
+  await page.evaluate(()=>LevelFlow.Seek(400));
+  assert.equal(JSON.parse(await page.locator('#codexContextDetail').textContent()).timeline.timeSeconds,384,'location attachment stays at its captured time');
+  await page.click('#removeCodexLocation');
+  assert.ok(await page.locator('#codexPendingLocation').isHidden());
+  await page.evaluate(()=>LevelFlow.Seek(384));
   const fireMenu=page.locator('.lfViewPane').first().locator('.lfViewLayers');
   await fireMenu.locator('summary').click();await fireMenu.locator('[data-layer="fire"]').uncheck();
   const layerState=await page.evaluate(()=>LevelFlow.Inspect().viewports.views.map(view=>view.layers));
   assert.equal(layerState[0].fire,false);assert.equal(layerState[1].fire,true,'display settings belong to each viewport');
   await fireMenu.locator('[data-layer="fire"]').check();await fireMenu.locator('summary').click();
   let downloads=0;page.on('download',()=>downloads++);
-  await page.click('#markScreenshot');
+  await page.click('#attachCodexScreenshot');
   await page.click('#copyScreenshot');
   await page.waitForFunction(()=>document.querySelector('#annotationStatus').textContent.includes('已复制标记截图'));
   const clipboard=await page.evaluate(async()=>{
@@ -376,7 +382,7 @@ try {
   assert.ok(clipboard.types.includes('image/png'));assert.equal(clipboard.width,clipboard.expectedWidth);assert.equal(clipboard.height,clipboard.expectedHeight);
   assert.equal(downloads,0,'copy viewport screenshot writes clipboard without downloading');
   await page.click('#closeAnnotations');
-  await page.click('#markScreenshot');
+  await page.click('#attachCodexScreenshot');
   assert.ok(await page.locator('#annotationDialog').isVisible());
   const frozen=await page.evaluate(()=>LevelFlow.Inspect().time);
   async function Draw(kind,a,b,text) {
@@ -408,7 +414,8 @@ try {
   await page.selectOption('#viewportLayout','4');
   await page.evaluate(()=>{LevelFlow.SetViewType(1,'chase');LevelFlow.SetViewType(2,'oblique');LevelFlow.SetViewType(3,'eye');});
   await page.screenshot({path:path.join(out,'FourViewports.png')});
-  await page.click('#markScreenshot');
+  await page.click('[data-tab="chat"]');
+  await page.click('#attachCodexScreenshot');
   const multiDownloadPromise=page.waitForEvent('download');await page.click('#exportFrame');const multiDownload=await multiDownloadPromise;
   const multiPath=path.join(out,'FourViewportFrame.png');await multiDownload.saveAs(multiPath);
   const multiMetadata=ReadPngFrameMetadata(Uint8Array.from(fs.readFileSync(multiPath)).buffer);

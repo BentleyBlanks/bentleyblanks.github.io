@@ -28,6 +28,7 @@ export class EncounterChat {
     this.sessions = [];
     this.current = null;
     this.pendingImage = null;
+    this.pendingLocation = null;
     this.drafts = new Map();
     this.available = false;
     this.loading = false;
@@ -44,6 +45,11 @@ export class EncounterChat {
     };
     Element("newCodexChat").onclick = () => this.New();
     Element("attachCodexScreenshot").onclick = openScreenshot;
+    Element("attachCodexLocation").onclick = () => {
+      this.pendingLocation = structuredClone(this.snapshot());
+      this.RefreshContext();
+    };
+    Element("removeCodexLocation").onclick = () => { this.pendingLocation = null; this.RefreshContext(); };
     Element("editCodexImage").onclick = () => this.editScreenshot(this.pendingImage);
     Element("removeCodexImage").onclick = () => { this.pendingImage = null; this.DrawAttachment(); };
     Element("codexPrompt").addEventListener("input", () => this.UpdateSend());
@@ -63,7 +69,7 @@ export class EncounterChat {
     const workspace = document.querySelector(".lfWorkspace");
     const inspector = document.querySelector(".lfInspector");
     const key = "tengxian1938_encounter_sidebar_width_v1";
-    let preferred = 360, drag = null;
+    let preferred = 390, drag = null;
     try { preferred = Number(localStorage.getItem(key)) || preferred; } catch { /* Storage is optional. */ }
     const SetWidth = (width, persist = false) => {
       preferred = Math.max(280, Math.min(720, Math.round(width)));
@@ -94,7 +100,7 @@ export class EncounterChat {
     handle.addEventListener("keydown", event => {
       if (!["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();
-      SetWidth(event.key === "Home" ? 360 : inspector.getBoundingClientRect().width + (event.key === "ArrowLeft" ? 20 : -20), true);
+      SetWidth(event.key === "Home" ? 390 : inspector.getBoundingClientRect().width + (event.key === "ArrowLeft" ? 20 : -20), true);
     });
     window.addEventListener("resize", () => SetWidth(preferred));
     SetWidth(preferred);
@@ -123,14 +129,16 @@ export class EncounterChat {
   }
 
   SaveDraft() {
-    this.drafts.set(this.current?.id || "new", { prompt: Element("codexPrompt").value, image: this.pendingImage });
+    this.drafts.set(this.current?.id || "new", { prompt: Element("codexPrompt").value, image: this.pendingImage, location: this.pendingLocation });
   }
 
   RestoreDraft() {
     const draft = this.drafts.get(this.current?.id || "new");
     Element("codexPrompt").value = draft?.prompt || "";
     this.pendingImage = draft?.image || null;
+    this.pendingLocation = draft?.location || null;
     this.DrawAttachment();
+    this.RefreshContext();
   }
 
   New() {
@@ -159,10 +167,14 @@ export class EncounterChat {
   }
 
   RefreshContext() {
-    const { frame, location } = this.snapshot();
-    Element("codexContextSummary").textContent = `${ContextLabel(frame.context)} · 自动附加`;
+    Element("codexPendingLocation").hidden = !this.pendingLocation;
+    if (!this.pendingLocation) return;
+    const { frame, location } = this.pendingLocation;
+    Element("codexContextSummary").textContent = `定位 · ${frame.context.time.toFixed(2)} s`;
+    Element("codexContextSummary").title = ContextLabel(frame.context);
     const details = Element("codexContextDetail");
-    if (details.parentElement.open) details.textContent = JSON.stringify(location, null, 2);
+    const content = JSON.stringify(location, null, 2);
+    if (details.textContent !== content) details.textContent = content;
   }
 
   async Attach(editor) {
@@ -174,7 +186,8 @@ export class EncounterChat {
   DrawAttachment() {
     Element("codexPendingImage").hidden = !this.pendingImage;
     Element("codexImagePreview").src = this.pendingImage?.image || "";
-    Element("codexImageLabel").textContent = this.pendingImage ? `标注截图 · ${ContextLabel(this.pendingImage.frame.context)}` : "";
+    Element("codexImageLabel").textContent = "截图";
+    Element("editCodexImage").title = this.pendingImage ? ContextLabel(this.pendingImage.frame.context) : "继续标注";
   }
 
   UpdateSend() {
@@ -182,7 +195,7 @@ export class EncounterChat {
     Element("sendCodexChat").disabled = !this.available || busy || !Element("codexPrompt").value.trim();
     Element("sendCodexChat").textContent = this.sending ? "提交中…" : this.current?.status === "running" ? "执行中…" : "发送";
     Element("codexPrompt").readOnly = this.sending;
-    for (const id of ["attachCodexScreenshot", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
+    for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
   }
 
   DrawList() {
@@ -209,13 +222,6 @@ export class EncounterChat {
     Element("codexChatTitle").textContent = this.current?.title || "新会话";
     const log = Element("codexMessages");
     log.replaceChildren();
-    if (!this.current) {
-      const empty = document.createElement("div"); empty.className = "lfChatEmpty";
-      const title = document.createElement("h2"), hint = document.createElement("p");
-      title.textContent = "向 Codex 提交需求";
-      hint.textContent = "每次发送自动附上当前时间、点位与视口。";
-      empty.append(title, hint); log.append(empty);
-    }
     for (const message of this.current?.messages || []) {
       const row = document.createElement("article"); row.className = `lfChatMessage ${message.role}`;
       const label = document.createElement("span"); label.className = "lfChatAuthor";
@@ -224,14 +230,16 @@ export class EncounterChat {
       row.append(label, bubble);
       if (message.frame) {
         const attachment = document.createElement("a"); attachment.className = "lfChatFrame";
-        attachment.textContent = `定位附件 · ${ContextLabel(message.frame)}`;
+        attachment.textContent = `定位 · ${message.frame.time.toFixed(2)} s`;
+        attachment.title = ContextLabel(message.frame);
         attachment.href = message.locationUrl; attachment.target = "_blank"; attachment.rel = "noopener";
         row.append(attachment);
       }
       if (message.screenshotUrl) {
         const link = document.createElement("a"), image = document.createElement("img");
         link.href = message.screenshotUrl; link.target = "_blank"; link.rel = "noopener"; link.className = "lfChatScreenshot";
-        image.src = message.screenshotUrl; image.alt = `标注截图 · ${ContextLabel(message.screenshotFrame)}`;
+        image.src = message.screenshotUrl; image.alt = "截图";
+        link.title = ContextLabel(message.screenshotFrame);
         link.append(image); row.append(link);
       }
       log.append(row);
@@ -247,7 +255,7 @@ export class EncounterChat {
 
   async Send() {
     if (Element("sendCodexChat").disabled) return;
-    const { frame, location } = this.snapshot();
+    const { frame = null, location = null } = this.pendingLocation || {};
     const body = { sessionId: this.current?.id, prompt: Element("codexPrompt").value, frame, location,
       screenshot: this.pendingImage ? { image: this.pendingImage.image, frame: this.pendingImage.frame } : null };
     const content = JSON.stringify(body);
@@ -260,6 +268,7 @@ export class EncounterChat {
       this.lastSubmission = null;
       this.drafts.delete(body.sessionId || "new");
       Element("codexPrompt").value = ""; this.pendingImage = null; this.DrawAttachment();
+      this.pendingLocation = null; this.RefreshContext();
       this.sessions = [this.current, ...this.sessions.filter(item => item.id !== this.current.id)];
       this.Draw();
     } catch (error) { this.Error(error.message); }

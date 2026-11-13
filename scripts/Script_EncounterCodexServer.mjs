@@ -17,6 +17,12 @@ const PUBLIC_ERRORS = new Set([CLI_FAILURE, CLI_MISSING, CLI_START_FAILURE, CLI_
 
 class RequestError extends Error {}
 
+function ProcessIsRunning(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return error.code === "EPERM"; }
+}
+
 function Send(response, status, value) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   response.end(JSON.stringify(value));
@@ -46,9 +52,10 @@ async function ReadTurn(request) {
   if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 20000) throw new RequestError("请填写需求，最多 20000 字");
   if (body.sessionId != null && !ID.test(body.sessionId)) throw new RequestError("会话编号无效");
   if (body.requestId != null && !ID.test(body.requestId)) throw new RequestError("请求编号无效");
-  const frame = ReadFramePacket(body.frame, FLOW_TIMELINE);
+  const frame = body.frame == null ? null : ReadFramePacket(body.frame, FLOW_TIMELINE);
   // Keep the more detailed location attachment, including selection and world-space camera.
-  if (!body.location || typeof body.location !== "object" || JSON.stringify(body.location).length > 256000) throw new RequestError("定位附件无效");
+  if (frame && (!body.location || typeof body.location !== "object" || Array.isArray(body.location) || JSON.stringify(body.location).length > 256000)) throw new RequestError("定位附件无效");
+  if (!frame && body.location != null) throw new RequestError("定位附件缺少帧信息");
   if (body.screenshot) {
     if (typeof body.screenshot.image !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.screenshot.image)) throw new RequestError("截图必须为 PNG");
     const png = Buffer.from(body.screenshot.image.split(",")[1], "base64");
@@ -81,7 +88,14 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     if (!ID.test(id)) throw new RequestError("会话编号无效");
     const session = JSON.parse(fs.readFileSync(SessionPath(id), "utf8"));
     if (session.error && !PUBLIC_ERRORS.has(session.error)) { session.error = CLI_FAILURE; Save(session); }
-    if (session.status === "running" && !active.has(id)) {
+    const ownerAlive = ProcessIsRunning(session.runnerPid);
+    if (session.status === "failed" && session.error === CLI_INTERRUPTED && ownerAlive) {
+      session.status = "running";
+      session.error = "";
+      Save(session);
+    }
+    // Another preview instance may own this run. Legacy records have no owner PID.
+    if (session.status === "running" && !active.has(id) && session.runnerPid != null && !ownerAlive) {
       session.status = "failed";
       session.error = CLI_INTERRUPTED;
       Save(session);
@@ -97,12 +111,14 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
     args.push("-");
     const prompt = [
       "你正在处理 Encounter Designer 右侧会话提交的需求。遵循仓库 AGENTS.md，代码修改须在本会话独占的 worktree 中进行。",
-      `编辑器检出目录为 ${rootDir}。当前帧、时间、世界坐标、相机与选中对象已自动保存到 ${path.join(folder, "Frame.json")} 和 ${path.join(folder, "Location.json")}，先读取附件。`,
+      `编辑器检出目录为 ${rootDir}。`,
+      turn.frame ? `定位附件保存在 ${path.join(folder, "Frame.json")} 和 ${path.join(folder, "Location.json")}，包含用户附加时的帧、时间、世界坐标、相机与选中对象。先读取附件。` : "",
       turn.screenshot ? `标注截图附在本条消息中，截图当时的帧信息在 ${path.join(folder, "ScreenshotFrame.json")}。` : "",
       "最终答复请用简洁中文给出处理结论、验证结果与尚未完成项。",
       "用户需求", turn.prompt,
     ].filter(Boolean).join("\n\n");
     session.status = "running";
+    session.runnerPid = process.pid;
     session.error = "";
     Save(session);
     let child;
@@ -169,14 +185,17 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex }
       if (turn.sessionId && !session) { Send(response, 404, { error: "会话不存在" }); return; }
       if (session?.messages.some(message => message.requestId === turnId)) { Send(response, 202, session); return; }
       const next = session || { id: sessionId, title: turn.prompt.slice(0, 32), messages: [], createdAt: now };
-      if (active.has(next.id)) { Send(response, 409, { error: "当前会话正在执行，请等待结论" }); return; }
+      if (active.has(next.id) || next.status === "running") { Send(response, 409, { error: "当前会话正在执行，请等待结论" }); return; }
       const folder = path.join(directory, next.id, turnId);
       fs.mkdirSync(folder, { recursive: true });
-      fs.writeFileSync(path.join(folder, "Frame.json"), JSON.stringify(turn.frame, null, 2));
-      fs.writeFileSync(path.join(folder, "Location.json"), JSON.stringify(turn.location, null, 2));
+      if (turn.frame) {
+        fs.writeFileSync(path.join(folder, "Frame.json"), JSON.stringify(turn.frame, null, 2));
+        fs.writeFileSync(path.join(folder, "Location.json"), JSON.stringify(turn.location, null, 2));
+      }
       const attachmentBase = `${PREFIX}/attachments/${next.id}/${turnId}`;
-      const message = { role: "user", requestId: turnId, text: turn.prompt, createdAt: now, frame: turn.frame.context, location: turn.location,
-        frameUrl: `${attachmentBase}/Frame.json`, locationUrl: `${attachmentBase}/Location.json` };
+      const message = { role: "user", requestId: turnId, text: turn.prompt, createdAt: now };
+      if (turn.frame) Object.assign(message, { frame: turn.frame.context, location: turn.location,
+        frameUrl: `${attachmentBase}/Frame.json`, locationUrl: `${attachmentBase}/Location.json` });
       if (turn.screenshot) {
         fs.writeFileSync(path.join(folder, "Screenshot.png"), Buffer.from(turn.screenshot.image.split(",")[1], "base64"));
         fs.writeFileSync(path.join(folder, "ScreenshotFrame.json"), JSON.stringify(turn.screenshot.frame, null, 2));

@@ -12,10 +12,12 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { TOOL_INFO } from "./Data_DevTools.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS } from "./AdvancedTools/Data_AdvancedTools.mjs";
 
@@ -41,6 +43,11 @@ async function Spread(buffer, region) {
 }
 
 const server = await ServeRoot(rootDir, 0);
+const chatStorage = await fs.mkdtemp(path.join(os.tmpdir(), "AdvancedToolsChat-"));
+const handleChat = CreateEncounterCodexHandler(chatStorage);
+const serveFiles = server.listeners("request")[0];
+server.removeAllListeners("request");
+server.on("request", (request, response) => request.url.startsWith("/__encounter/codex/") ? handleChat(request, response) : serveFiles(request, response));
 const port = server.address().port;
 const base = `http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/`;
 const browser = await LaunchBrowser({ extraArgs: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
@@ -159,6 +166,9 @@ try {
     await page.waitForFunction(ready, null, { timeout: 120000 });
     await page.waitForTimeout(1500);
     Check(`${label}：新地址能开、没有报错`, errors.length === 0, errors.slice(0, 3).join(" | "));
+    if (label === "遭遇设计") {
+      Check("遭遇设计会话接口已连接", await page.locator("#codexConnection").textContent() === "本机 Codex CLI");
+    }
     if (label === "场景编辑器") {
       const status = await page.evaluate(async () => { const response = await fetch("/__scene/status", { cache: "no-store" }); return { ok: response.ok, body: await response.json() }; });
       Check("场景编辑器的 /__scene/status 存盘口状态可读", status.ok && typeof status.body.writable === "boolean", JSON.stringify(status.body).slice(0, 120));
@@ -171,6 +181,7 @@ try {
 } finally {
   await browser.close();
   server.close();
+  await fs.rm(chatStorage, { recursive: true, force: true });
 }
 
 console.log(failed ? `${failed} 项未过` : "高级工具拆分（浏览器）：全部通过");
