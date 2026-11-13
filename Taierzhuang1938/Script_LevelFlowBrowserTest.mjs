@@ -36,7 +36,7 @@ try {
       await page.evaluate(()=>new Promise(requestAnimationFrame));
     }
   }
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow);
   const rasterParity=await page.evaluate(async()=>{
     const {EncounterRaster}=await import('./Script_LevelFlowRaster.mjs');
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
@@ -107,7 +107,7 @@ try {
   for(const type of ['scene','plan','battle','oblique','chase','eye']) {
     await page.evaluate(type=>LevelFlow.SetViewType(1,type),type);
     for(const playing of [true,false]) {
-      await page.evaluate(playing=>{LevelFlow.Seek(384);LevelFlow.SetPlaying(playing);},playing);
+      await page.evaluate(playing=>{LevelFlow.Seek(424);LevelFlow.SetPlaying(playing);},playing);
       const box=await page.locator('#flowMap2').boundingBox();
       const x=box.x+box.width/2,y=box.y+24;
       await page.mouse.move(x,y);await page.mouse.down();
@@ -125,9 +125,9 @@ try {
     }
   }
   await page.evaluate(defaults=>LevelFlow.RestoreViewports(defaults),defaults);
-  await page.evaluate(()=>LevelFlow.Seek(600));
+  await page.evaluate(()=>LevelFlow.Seek(640));
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views)).map(view=>view.freeCamera),defaults.views.map(view=>view.freeCamera),'scrubbing preserves both manually controlled Scene cameras');
-  await page.evaluate(()=>LevelFlow.Seek(384));
+  await page.evaluate(()=>LevelFlow.Seek(424));
   await page.evaluate(()=>{
     LevelFlow.SetViewType(0,'oblique');LevelFlow.SetViewType(1,'battle');
     const layout=LevelFlow.Inspect().viewports;
@@ -135,7 +135,7 @@ try {
       view.center=[36.5,66.5];view.scale=15;view.mode='manual';view.freeCamera=null;
       view.yaw=-0.4;view.pitch=0.65;
     }
-    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(116.4);
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(156.4);
   });
   const meleeFrame=await page.evaluate(()=>LevelFlow.Inspect());
   for(const id of ['opening6','opening7','opening8']) {
@@ -147,18 +147,18 @@ try {
   await page.evaluate(()=>{
     const layout=LevelFlow.Inspect().viewports;
     for(const view of layout.views) {view.center=[28,63];view.scale=9;}
-    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(123.9);
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(163.9);
   });
   const fugitives=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==='OpeningSurvivors');
   assert.equal(fugitives.length,3);
   assert.ok(fugitives.every(actor=>actor.pose==='run'&&actor.p[0]<27),'the three fugitives have already cleared the crowd in the reported 02G frame');
   await page.screenshot({path:path.join(out,'OpeningMeleeDisengaged.png')});
-  await page.evaluate(defaults=>{LevelFlow.Seek(145);LevelFlow.Seek(116.4);LevelFlow.RestoreViewports(defaults);LevelFlow.Seek(384);},defaults);
+  await page.evaluate(defaults=>{LevelFlow.Seek(185);LevelFlow.Seek(156.4);LevelFlow.RestoreViewports(defaults);LevelFlow.Seek(424);},defaults);
   const skyPixels=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
     const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain:{heightAt:()=>0,roots:[]}},'scene');
-    view.freeCamera={eye:[0,1.6,0],yaw:0,pitch:0.3};view.Draw(LevelFlow.Evaluate(384),{},null);
+    view.freeCamera={eye:[0,1.6,0],yaw:0,pitch:0.3};view.Draw(LevelFlow.Evaluate(424),{},null);
     const context=canvas.getContext('2d'),pixels=[20,210].map(y=>[...context.getImageData(160,y,1,1).data]);
     canvas.remove();return pixels;
   });
@@ -167,7 +167,7 @@ try {
   await page.evaluate(()=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
   assert.equal(await page.locator("h1").textContent(),"Encounter Designer");
   assert.equal(await page.title(),"Encounter Designer · 血战滕县");
-  await page.evaluate(()=>LevelFlow.Seek(165));
+  await page.evaluate(()=>LevelFlow.Seek(205));
   const junctionBlockers=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>["OpeningSurvivors","ForkRelief"].includes(actor.groupId));
   assert.equal(junctionBlockers.length,5);
   assert.ok(junctionBlockers.every(actor=>actor.pose==="shoot"));
@@ -188,7 +188,7 @@ try {
     await page.screenshot({path:path.join(out,`${name}.png`)});
   }
   await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),returnViews);
-  await page.evaluate(()=>LevelFlow.Seek(455.569));
+  await page.evaluate(()=>LevelFlow.Seek(495.569));
   const camp = await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(camp.actors.filter(actor=>['luo','he','liu','yao'].includes(actor.id)&&actor.firing&&actor.p[1]<148).length,4);
   assert.equal(camp.actors.filter(actor=>['geng','ammoCarrier1','ammoCarrier2'].includes(actor.id)).length,3);
@@ -203,28 +203,28 @@ try {
       view.center=[108,139];view.scale=4.5;view.mode='manual';view.freeCamera=null;
       view.yaw=0;view.pitch=0.65;
     }
-    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(455.569);
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(495.569);
   });
   const groundFormation=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['GroundWest','GroundEast'].includes(actor.groupId)));
   assert.equal(groundFormation.length,8);
   assert.ok(groundFormation.some(actor=>actor.pose==='run')&&groundFormation.some(actor=>actor.firing),'the camp preview displays advancing infantry and covering fire together');
   await page.screenshot({path:path.join(out,"GroundInfantryFormation.png")});
   await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),campViews);
-  await page.evaluate(()=>LevelFlow.Seek(207.137));
+  await page.evaluate(()=>LevelFlow.Seek(247.137));
   const pressure=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==="Fork");
   assert.equal(pressure.length,5);
   assert.equal(new Set(pressure.map(actor=>actor.p.join(","))).size,5);
   assert.equal(pressure.filter(actor=>actor.pose==="run").length,2);
   assert.equal(pressure.filter(actor=>actor.firing).length,3);
   await page.screenshot({path:path.join(out,"EnemyFormation.png")});
-  await page.evaluate(()=>LevelFlow.Seek(398.55));
-  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank").every(actor=>actor.born<390)),"second west-ramp batch waits until all three originals have fallen");
-  await page.evaluate(()=>LevelFlow.Seek(419));
+  await page.evaluate(()=>LevelFlow.Seek(438.55));
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank").every(actor=>actor.born<430)),"second west-ramp batch waits until all three originals have fallen");
+  await page.evaluate(()=>LevelFlow.Seek(459));
   const flankRefill=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank"&&actor.pose!=="dead"));
   assert.equal(flankRefill.length,3);
-  assert.ok(flankRefill.every(actor=>actor.born>398&&actor.p[1]>86),"the complete second batch advances through the marked bend");
+  assert.ok(flankRefill.every(actor=>actor.born>438&&actor.p[1]>86),"the complete second batch advances through the marked bend");
   await page.screenshot({path:path.join(out,"WestRampRefill.png")});
-  await page.evaluate(()=>LevelFlow.Seek(384));
+  await page.evaluate(()=>LevelFlow.Seek(424));
   const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
     const canvas=document.getElementById(id),context=canvas.getContext("2d");
     const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
@@ -263,7 +263,7 @@ try {
   const independentAfter=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
   assert.deepEqual(independentAfter[0],independentBefore[0],"zooming viewport 2 leaves viewport 1 unchanged");
   assert.notEqual(independentAfter[1].scale,independentBefore[1].scale);
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=21.9&z=67.1&zoom=12`);await ReadyPlan();
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424&x=21.9&z=67.1&zoom=12`);await ReadyPlan();
   for(const menu of await page.locator('.lfViewPane:visible .lfViewLayers').all()) {
     await menu.locator('summary').click();
     for(const input of await menu.locator('input').all()) await input.uncheck();
@@ -281,14 +281,14 @@ try {
   });
   assert.ok(junctionPixels.every(pixel=>pixel[0]>170&&pixel[1]>150&&pixel[2]>120),"the branch T-junction has a continuous floor, with no overpainted bank cap");
   await page.screenshot({path:path.join(out,'JunctionConnectivity.png')});
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384`);await ReadyPlan();
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await ReadyPlan();
   for(const beat of FLOW_TIMELINE) {
     await page.evaluate((time)=>window.LevelFlow.Seek(time),beat.start+beat.duration*0.5);
     assert.equal(await page.locator("#beatTitle").textContent(),beat.title);
     assert.equal(await page.locator("#sourcePassage").textContent(),FLOW_SOURCE_EXCERPTS[beat.id],"paragraph formatting retains all script wording");
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight),false);
   }
-  await page.evaluate(()=>window.LevelFlow.Seek(384));
+  await page.evaluate(()=>window.LevelFlow.Seek(424));
   await page.screenshot({path:path.join(out,"Retreat.png")});
   await page.click('.lfViewPane[data-viewport="0"] [data-framing="follow"]');
   const framing=await page.evaluate(()=>{
@@ -329,7 +329,7 @@ try {
   });
   await page.reload();await ReadyPlan();
   assert.equal((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==='Fork').count,8,'existing saved drafts survive the UI change');
-  await page.evaluate(()=>window.LevelFlow.Seek(384));
+  await page.evaluate(()=>window.LevelFlow.Seek(424));
   assert.equal(await page.locator('#exportProject,#importProject,#importFile,#planningSection,[data-tab="notes"]').count(),0);
   const layout=await page.evaluate(()=>({toolbar:document.querySelector('.lfToolbar').getBoundingClientRect().height,
     passage:document.querySelector('#sourcePassage').textContent,paragraphs:document.querySelectorAll('#sourcePassage p').length}));
@@ -345,15 +345,15 @@ try {
   const locationText=await ReadLocationAttachment();
   assert.ok(!locationText.includes('http'),'AI location contains no URL');
   const location=JSON.parse(locationText);
-  assert.equal(location.timeline.timeSeconds,384);
-  assert.equal(location.timeline.secondsIntoBeat,384-location.timeline.beatStartSeconds);
+  assert.equal(location.timeline.timeSeconds,424);
+  assert.equal(location.timeline.secondsIntoBeat,424-location.timeline.beatStartSeconds);
   assert.equal(location.viewports.length,2);assert.ok(location.player.x&&Number.isFinite(location.player.y));
   assert.equal(location.coordinates.unit,'metres');
   await page.evaluate(()=>LevelFlow.Seek(400));
-  assert.equal(JSON.parse(await page.locator('#codexContextDetail').textContent()).timeline.timeSeconds,384,'location attachment stays at its captured time');
+  assert.equal(JSON.parse(await page.locator('#codexContextDetail').textContent()).timeline.timeSeconds,424,'location attachment stays at its captured time');
   await page.click('#removeCodexLocation');
   assert.ok(await page.locator('#codexPendingLocation').isHidden());
-  await page.evaluate(()=>LevelFlow.Seek(384));
+  await page.evaluate(()=>LevelFlow.Seek(424));
   const fireMenu=page.locator('.lfViewPane').first().locator('.lfViewLayers');
   await fireMenu.locator('summary').click();await fireMenu.locator('[data-layer="fire"]').uncheck();
   const layerState=await page.evaluate(()=>LevelFlow.Inspect().viewports.views.map(view=>view.layers));
@@ -405,7 +405,7 @@ try {
   const downloadPromise=page.waitForEvent('download');await page.click('#exportFrame');const download=await downloadPromise;
   const imagePath=path.join(out,'FrameWithMetadata.png');await download.saveAs(imagePath);
   const metadata=ReadPngFrameMetadata(Uint8Array.from(fs.readFileSync(imagePath)).buffer);
-  assert.equal(metadata.context.time,384);assert.equal(metadata.screenshot.marks.length,3);
+  assert.equal(metadata.context.time,424);assert.equal(metadata.screenshot.marks.length,3);
   assert.equal(metadata.screenshot.marks[2].text,'这里加两名追兵');
   assert.equal(metadata.context.mapSource.sha256.length,64);assert.equal(metadata.context.viewports.count,2);
   assert.equal(metadata.document.groups.find(group=>group.id==='Fork').count,8);
@@ -424,24 +424,24 @@ try {
   await page.click('#closeAnnotations');
   await page.evaluate(()=>{LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
   await page.locator('#flowMap').focus();await page.keyboard.press('Space');
-  await page.waitForFunction(()=>window.LevelFlow.Inspect().time>384.2);await page.keyboard.press('Space');
+  await page.waitForFunction(()=>window.LevelFlow.Inspect().time>424.2);await page.keyboard.press('Space');
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).playing,false);
   await page.click('[data-stage="01"]');assert.ok(await page.locator('.lfBeats .cinematic').count()>0);
   await page.click('[data-stage="09"]');await page.click('[data-tab="script"]');await page.screenshot({path:path.join(out,'Village.png')});
   await page.click('[data-stage="05"]');await page.evaluate(()=>window.LevelFlow.JumpBeat('05c'));await page.screenshot({path:path.join(out,'TankApproach.png')});
   await page.setViewportSize({width:1024,height:720});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.setViewportSize({width:1280,height:720});
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=652.25&x=86.50&z=258.85&zoom=12`);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=692.25&x=86.50&z=258.85&zoom=12`);
   await ReadyPlan();
   const groundFrame=await page.evaluate(()=>LevelFlow.Inspect());
-  assert.equal(groundFrame.time,652.25);
+  assert.equal(groundFrame.time,692.25);
   assert.ok(groundFrame.actors.filter(actor=>actor.kind==='tank').every(actor=>actor.p[0]>100));
   await page.screenshot({path:path.join(out,'GroundTank652.png')});
   const roundTrips=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
     const view=new FlowPerspectiveView(document.getElementById('flowMap2'),await LoadEncounterMap(),'oblique');
-    view.center=[100,246];view.scale=10;view.BeforeDraw(LevelFlow.Evaluate(652.25));
+    view.center=[100,246];view.scale=10;view.BeforeDraw(LevelFlow.Evaluate(692.25));
     return [[101,240],[88,238],[96,247]].map(point=>({point,restored:view.ToWorld(view.ToScreen(point))}));
   });
   assert.ok(roundTrips.every(({point,restored})=>Math.hypot(point[0]-restored[0],point[1]-restored[1])<0.1),'elevated ground, trench floor and ramp keep consistent edit coordinates');
@@ -450,12 +450,12 @@ try {
   await page.locator('.lfViewTarget').first().selectOption('tank1');
   await page.screenshot({path:path.join(out,'GroundTankOblique652.png')});
   await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=384&x=73&z=115&zoom=5.5`);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424&x=73&z=115&zoom=5.5`);
   await ReadyPlan();
   const early=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(early.actors.some(actor=>actor.kind==='tank'),'vehicle threat is present during dragging before collection');
   await page.screenshot({path:path.join(out,'EarlyGroundEncounter.png')});
-  await page.evaluate(()=>LevelFlow.Seek(301));
+  await page.evaluate(()=>LevelFlow.Seek(341));
   const alignment=await page.evaluate(()=>{
     const axis=document.querySelector('#timelineAxis').getBoundingClientRect(),range=document.querySelector('#flowSeek').getBoundingClientRect();
     const seconds=LevelFlow.Inspect().time,duration=LevelFlow.Inspect().duration;
@@ -465,12 +465,12 @@ try {
       beats:[...document.querySelectorAll('[data-beat]')].map(element=>({id:element.dataset.beat,x:element.getBoundingClientRect().x,width:element.getBoundingClientRect().width})),axis:{x:axis.x,width:axis.width}};
   });
   assert.ok(Math.abs(alignment.playhead-alignment.expected)<0.1&&Math.abs(alignment.slider-alignment.expected)<0.1,"05:01 slider and playhead use the same global time position");
-  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).x-(alignment.axis.x+alignment.axis.width*beat.start/1870))<0.1,"every beat uses the global time axis");
-  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).width-alignment.axis.width*beat.duration/1870)<0.1,"short beats retain their actual duration width");
-  for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/1870))<0.1,"every stage uses the global time axis");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).x-(alignment.axis.x+alignment.axis.width*beat.start/1910))<0.1,"every beat uses the global time axis");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).width-alignment.axis.width*beat.duration/1910)<0.1,"short beats retain their actual duration width");
+  for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/1910))<0.1,"every stage uses the global time axis");
   await page.screenshot({path:path.join(out,'Timeline301.png')});
 
-  await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
+  await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(424);});
   await page.evaluate(async()=>{
     const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
     const original=FlowMapView.prototype.Draw;
@@ -500,7 +500,7 @@ try {
   assert.equal(await page.locator('#flowMap2').evaluate(canvas=>canvas.toDataURL()),heldNavigation.pixels,'the same camera has identical pixels while held and after release');
   assert.equal(await page.evaluate(()=>inactiveViewDraws),0,'navigating the paused right Scene leaves the unchanged left canvas cached');
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).viewports.views[1],stopped.viewports.views[1],"releasing RMB stops movement while playback is paused");
-  assert.equal(stopped.time,384);assert.equal(stopped.playing,false);
+  assert.equal(stopped.time,424);assert.equal(stopped.playing,false);
   assert.deepEqual(stopped.viewports.views[0],firstView,"Scene navigation leaves the other viewport unchanged");
   await page.mouse.down({button:'middle'});await page.mouse.move(mouseX+65,mouseY+30,{steps:4});
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().rendering[1].renderScale),1,'MMB pan preserves full terrain resolution');
@@ -531,7 +531,7 @@ try {
     const actors=[{id:'visible',kind:'person',side:'friend',pose:'stand',p:[0,3]},
       {id:'hidden',kind:'person',side:'friend',pose:'stand',p:[0,10]},
       {id:'partial',kind:'person',side:'friend',pose:'stand',p:[4.4,10]}];
-    const frame={...LevelFlow.Evaluate(384),actors};view.BeforeDraw(frame);view.DrawBase(canvas.getContext('2d'),640,360,frame);
+    const frame={...LevelFlow.Evaluate(424),actors};view.BeforeDraw(frame);view.DrawBase(canvas.getContext('2d'),640,360,frame);
     const context=canvas.getContext('2d'),pixel=view.Vertex([0,1,10]);
     const background=[...context.getImageData(Math.floor(pixel.x),Math.floor(pixel.y),1,1).data];
     view.DrawActor(context,actors[1],frame);
@@ -591,19 +591,19 @@ try {
   });
   assert.ok(terrainWork.triangles>0&&terrainWork.triangles<40000,`Scene navigation bounds terrain work by projected detail ${JSON.stringify(terrainWork)}`);
   assert.ok(terrainWork.skyTriangles<1000,"looking at empty sky culls the terrain before projecting its faces");
-  await page.evaluate(()=>{LevelFlow.SetViewType(0,'chase');LevelFlow.SetViewType(1,'eye');LevelFlow.Seek(150);LevelFlow.SetPlaying(true);});
-  await page.waitForFunction(()=>LevelFlow.Inspect().time>150.2);
+  await page.evaluate(()=>{LevelFlow.SetViewType(0,'chase');LevelFlow.SetViewType(1,'eye');LevelFlow.Seek(190);LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>190.2);
   assert.ok((await page.evaluate(()=>LevelFlow.Inspect().rendering)).every(view=>view.renderScale===1),'playback preserves full terrain resolution');
   await page.evaluate(()=>LevelFlow.SetPlaying(false));
   await page.waitForFunction(()=>LevelFlow.Inspect().rendering.every(view=>view.renderScale===1));
-  await page.evaluate(()=>{LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(384);});
+  await page.evaluate(()=>{LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(424);});
   await page.screenshot({path:path.join(out,'RealTerrainGully.png')});
   await page.evaluate(()=>LevelFlow.JumpBeat('06g'));await page.screenshot({path:path.join(out,'CartLane.png')});
   await page.evaluate(()=>localStorage.removeItem('tengxian1938_encounter_v2'));
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=227.14&x=45&z=65&zoom=9`);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=267.14&x=45&z=65&zoom=9`);
   await ReadyPlan();
   assert.equal(await page.locator('#planningSection').count(),0);
-  await page.evaluate(()=>LevelFlow.Seek(186.63));
+  await page.evaluate(()=>LevelFlow.Seek(226.63));
   const deployed=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'));
   assert.equal(deployed.length,5);
   assert.equal(new Set(deployed.map(actor=>actor.born)).size,1);
@@ -627,15 +627,15 @@ try {
   assert.ok(hiddenSpawns.every(actor=>actor.visible===0&&actor.hidden>0&&actor.labelOpacity===0),"all five dispersed spawns are fully hidden from the real player camera");
   await page.screenshot({path:path.join(out,'HiddenSpawnEye186.png')});
   await page.evaluate(()=>LevelFlow.SetViewType(0,'oblique'));
-  await page.evaluate(()=>LevelFlow.Seek(227.14));
+  await page.evaluate(()=>LevelFlow.Seek(267.14));
   await page.screenshot({path:path.join(out,'DragDoorPressure.png')});
-  await page.evaluate(()=>LevelFlow.Seek(252));
+  await page.evaluate(()=>LevelFlow.Seek(292));
   const rampEnemy=await page.evaluate(()=>LevelFlow.Inspect().actors.find(actor=>actor.groupId==='Corner'&&actor.pose!=='dead'));
   assert.ok(rampEnemy,'second pressure reaches the door ramp after the first wave');
   await page.screenshot({path:path.join(out,'DragRampPressure.png')});
-  await page.evaluate(()=>LevelFlow.Seek(364.5));
+  await page.evaluate(()=>LevelFlow.Seek(404.5));
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='TrafficFlank').length),0);
-  await page.evaluate(()=>LevelFlow.Seek(369));
+  await page.evaluate(()=>LevelFlow.Seek(409));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.some(actor=>actor.groupId==='TrafficFlank')));
   await page.screenshot({path:path.join(out,'TrafficSecondRampPressure.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=26.14&x=45&z=58&zoom=6`);
@@ -644,24 +644,42 @@ try {
   assert.equal(opening.actors.filter(actor=>actor.id==='yao'||actor.id.startsWith('openingGun')).length,4);
   assert.equal(opening.actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')).length,12);
   await page.screenshot({path:path.join(out,'OpeningDeparture.png')});
-  await page.evaluate(()=>LevelFlow.Seek(40.05));
+  await page.evaluate(()=>LevelFlow.Seek(32.423));
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.side==='enemy').length),0);
+  await page.screenshot({path:path.join(out,'OpeningPackingNoEnemies.png')});
+  const entryTime=await page.evaluate(async()=>{
+    const {OPENING_ENEMY_ENTRY_TIME}=await import('./Script_LevelFlowModel.mjs');
+    return OPENING_ENEMY_ENTRY_TIME;
+  });
+  await page.evaluate(time=>LevelFlow.Seek(time-0.001),entryTime);
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>/^opening\d+$/.test(actor.id)).length),0);
+  await page.evaluate(time=>LevelFlow.Seek(time),entryTime);
+  const entry=await page.evaluate(()=>LevelFlow.Inspect().actors);
+  const withdrawn=entry.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly'));
+  assert.equal(withdrawn.length,12);
+  assert.ok(withdrawn.every(actor=>actor.p[1]>=67.2-0.001));
+  assert.equal(entry.filter(actor=>/^opening\d+$/.test(actor.id)).length,1);
+  await page.screenshot({path:path.join(out,'OpeningTailClearsBend.png')});
+  await page.evaluate(()=>LevelFlow.Seek(32.423));
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.side==='enemy').length),0);
+  await page.evaluate(()=>LevelFlow.Seek(60.05));
   const approaching=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>/^opening\d+$/.test(actor.id)));
   assert.equal(approaching.length,9);
   assert.ok(approaching.some(actor=>actor.pose==='run'));
   await page.screenshot({path:path.join(out,'OpeningEnemyApproach.png')});
-  await page.evaluate(()=>LevelFlow.Seek(85));
+  await page.evaluate(()=>LevelFlow.Seek(105));
   const rescueApproach=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')));
   assert.equal(new Set(rescueApproach.map(actor=>actor.rescueGroup)).size,4);
   assert.ok(rescueApproach.some(actor=>actor.pose==='walk')&&rescueApproach.some(actor=>actor.pose==='kneel'),'advancing soldiers and observers have independent timing');
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>{
-    const before=LevelFlow.Evaluate(74).actors.find(previous=>previous.id===actor.id);
+    const before=LevelFlow.Evaluate(94).actors.find(previous=>previous.id===actor.id);
     return Math.hypot(actor.p[0]-before.p[0],actor.p[1]-before.p[1])>3;
   })),'each trio makes progress along its approach between observation halts');
   await page.screenshot({path:path.join(out,'OpeningReturn.png')});
-  await page.evaluate(()=>LevelFlow.Seek(107));
+  await page.evaluate(()=>LevelFlow.Seek(147));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.id.startsWith('openingAlly')).every(actor=>actor.pose==='kneel')));
   await page.screenshot({path:path.join(out,'OpeningSouthBerm.png')});
-  await page.evaluate(()=>LevelFlow.Seek(107.654));
+  await page.evaluate(()=>LevelFlow.Seek(147.654));
   const rescueReady=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')));
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='branch'&&actor.p[0]<36&&actor.p[1]<68).length,6,'branch relief stops west of the Japanese positions');
   assert.equal(rescueReady.filter(actor=>actor.rescueLane==='south'&&actor.p[1]>72).length,6,'southern relief spreads behind the berm');
@@ -672,19 +690,19 @@ try {
     const layout=LevelFlow.Packet().context.viewports;
     Object.assign(layout.views[0],{mode:'manual',center:[100,426],freeCamera:{eye:[100,13,399],yaw:0,pitch:-0.4},focusDistance:30});
     LevelFlow.RestoreViewports(layout);
-    LevelFlow.Seek(1084);
+    LevelFlow.Seek(1124);
   });
   const villageRunners=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties'));
   assert.equal(villageRunners.length,2);
   assert.ok(villageRunners.every(actor=>actor.pose==='run'));
   await page.screenshot({path:path.join(out,'VillageEscape.png')});
-  await page.evaluate(()=>LevelFlow.Seek(1086.05));
+  await page.evaluate(()=>LevelFlow.Seek(1126.05));
   const villageHit=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(villageHit.actors.find(actor=>actor.id==='villager2').pose,'hit');
-  assert.ok(await page.evaluate(()=>LevelFlow.Evaluate(1086.05).effects.some(effect=>effect.targetId==='villager2'&&effect.phase<0.3)));
+  assert.ok(await page.evaluate(()=>LevelFlow.Evaluate(1126.05).effects.some(effect=>effect.targetId==='villager2'&&effect.phase<0.3)));
   await page.screenshot({path:path.join(out,'VillageMachineGunHit.png')});
-  await page.evaluate(()=>{LevelFlow.Seek(1088.1);LevelFlow.SetPlaying(true);});
-  await page.waitForFunction(()=>LevelFlow.Inspect().time>1089.4);
+  await page.evaluate(()=>{LevelFlow.Seek(1128.1);LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>1129.4);
   await page.evaluate(()=>LevelFlow.SetPlaying(false));
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties').every(actor=>actor.pose==='dead')));
   await page.screenshot({path:path.join(out,'VillageBodies.png')});

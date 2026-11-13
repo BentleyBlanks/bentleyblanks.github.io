@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
+import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, OPENING_ENEMY_ENTRY_TIME, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_PURSUIT } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
@@ -68,11 +68,13 @@ assert.ok(clipped.every(vertex => vertex.depth >= 0.15 && vertex.rgb.length === 
 assert.ok(clipped.some(vertex => Math.abs(vertex.depth - 0.15) < 1e-8 && Math.abs(vertex.rgb[0] - 15) < 1e-8),
   "near-plane clipping interpolates terrain colors with geometry");
 
+const ReferenceTime = seconds => seconds >= 86 ? seconds + BeatById("02c").start - 86
+  : seconds >= 37 ? seconds + BeatById("01e").start - 37 : seconds;
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
-assert.equal(FLOW_DURATION,1870);
+assert.equal(FLOW_DURATION,1910);
 assert.equal(FLOW_TIMELINE.length,68);
 assert.deepEqual(Object.keys(FLOW_SOURCE_EXCERPTS),FLOW_TIMELINE.map((beat)=>beat.id));
-assert.equal(STAGE_TIMELINE[6].end,1060);
+assert.equal(STAGE_TIMELINE[6].end,1100);
 assert.ok(STAGE_TIMELINE.slice(0,7).every((stage)=>stage.status==="定稿"));
 assert.ok(STAGE_TIMELINE.slice(7).every((stage)=>stage.status==="草稿"));
 for(let index=1;index<FLOW_TIMELINE.length;index++) {
@@ -84,7 +86,7 @@ ValidateEncounterDocument(defaults,FLOW_TIMELINE);
 // The fugitives meet the northeastern relief, then hold the branch junction.
 const survivorsAt = (time) => EvaluateFlow(time).actors.filter((actor) => actor.groupId === "OpeningSurvivors");
 for (let slot = 0; slot < 3; slot++) {
-  const contact = 115.8 + slot * 0.25, escape = contact + 1.3;
+  const contact = BeatById("02g").start + 0.8 + slot * 0.25, escape = contact + 1.3;
   const frame = EvaluateFlow(contact + 0.4);
   const enemy = frame.actors.find(actor => actor.id === `opening${slot + 6}`);
   const ally = frame.actors.find(actor => actor.id === enemy.meleePartnerId);
@@ -95,33 +97,33 @@ for (let slot = 0; slot < 3; slot++) {
   assert.equal(EvaluateFlow(escape + 0.01).actors.find(actor => actor.id === enemy.id).pose, "run");
   assert.ok(["dead", "wounded"].includes(EvaluateFlow(escape + 0.01).actors.find(actor => actor.id === ally.id).pose));
 }
-const escapedFrame = EvaluateFlow(123.9);
-assert.equal(survivorsAt(123.9).length, 3, "all three disengage during the player's first shot beat");
-for (const enemy of survivorsAt(123.9)) {
+const escapedFrame = EvaluateFlow(ReferenceTime(123.9));
+assert.equal(survivorsAt(ReferenceTime(123.9)).length, 3, "all three disengage during the player's first shot beat");
+for (const enemy of survivorsAt(ReferenceTime(123.9))) {
   assert.equal(enemy.pose, "run");
   const rearAllies = escapedFrame.actors.filter(actor => ["openingAlly9", "openingAlly10", "openingAlly11"].includes(actor.id));
   assert.ok(rearAllies.every(ally => Distance(enemy.p, ally.p) > 10), "fugitives have cleared the rear melee crowd at the reported frame");
 }
-for (let stamp = 110; stamp < 160; stamp += 0.05) for (const id of ["opening6", "opening7", "opening8", "openingAlly9", "openingAlly10", "openingAlly11"]) {
+for (let stamp = ReferenceTime(110); stamp < ReferenceTime(160); stamp += 0.05) for (const id of ["opening6", "opening7", "opening8", "openingAlly9", "openingAlly10", "openingAlly11"]) {
   const before = EvaluateFlow(stamp).actors.find(actor => actor.id === id);
   const after = EvaluateFlow(stamp + 0.05).actors.find(actor => actor.id === id);
   assert.ok(Distance(before.p, after.p) < 0.26, `${id} approaches, fights and withdraws continuously at ${stamp}`);
 }
-const openingFrames = [111, 115, 116.4, 118, 123.9, 130, 145, 160].map(stamp => EvaluateFlow(stamp));
-for (const stamp of [160, 123.9, 116.4, 145, 111]) EvaluateFlow(stamp);
-assert.deepEqual([111, 115, 116.4, 118, 123.9, 130, 145, 160].map(stamp => EvaluateFlow(stamp)), openingFrames);
-assert.equal(survivorsAt(149.63).length,3);
-assert.deepEqual(survivorsAt(160).map((actor)=>actor.id),survivorsAt(149.63).map((actor)=>actor.id),"the same three survivors persist across the 02/03 boundary");
-const rallyFrame=EvaluateFlow(145);
+const openingFrames = [111, 115, 116.4, 118, 123.9, 130, 145, 160].map(ReferenceTime).map(stamp => EvaluateFlow(stamp));
+for (const stamp of [160, 123.9, 116.4, 145, 111].map(ReferenceTime)) EvaluateFlow(stamp);
+assert.deepEqual([111, 115, 116.4, 118, 123.9, 130, 145, 160].map(ReferenceTime).map(stamp => EvaluateFlow(stamp)), openingFrames);
+assert.equal(survivorsAt(ReferenceTime(149.63)).length,3);
+assert.deepEqual(survivorsAt(ReferenceTime(160)).map((actor)=>actor.id),survivorsAt(ReferenceTime(149.63)).map((actor)=>actor.id),"the same three survivors persist across the 02/03 boundary");
+const rallyFrame=EvaluateFlow(ReferenceTime(145));
 const reliefAtRally=rallyFrame.actors.filter((actor)=>actor.groupId==="ForkRelief");
 assert.equal(reliefAtRally.length,2);
-assert.ok([...survivorsAt(145),...reliefAtRally].every((actor)=>Distance(actor.p,[12,44])<2),"both groups meet at marked point 1");
-const blockingFrame=EvaluateFlow(165);
+assert.ok([...survivorsAt(ReferenceTime(145)),...reliefAtRally].every((actor)=>Distance(actor.p,[12,44])<2),"both groups meet at marked point 1");
+const blockingFrame=EvaluateFlow(ReferenceTime(165));
 const blockers=blockingFrame.actors.filter((actor)=>["OpeningSurvivors","ForkRelief"].includes(actor.groupId));
 assert.equal(blockers.length,5);
 assert.ok(blockers.every((actor)=>actor.pose==="shoot"&&actor.firing&&Distance(actor.p,[23.5,67.1])<4),"five reunited enemies block marked point 2");
 for(const actor of blockers) assert.ok(blockingFrame.effects.some((effect)=>effect.kind==="fire"&&effect.side==="enemy"&&Distance(effect.a,actor.p)<0.01&&Distance(effect.b,blockingFrame.player)<0.01),"each blocker fires toward the squad");
-for(const stamp of [130,145,160]) for(const id of ["opening6","opening7","opening8"]) {
+for(const stamp of [130,145,160].map(ReferenceTime)) for(const id of ["opening6","opening7","opening8"]) {
   const a=EvaluateFlow(stamp-0.001).actors.find((actor)=>actor.id===id);
   const b=EvaluateFlow(stamp+0.001).actors.find((actor)=>actor.id===id);
   assert.ok(a&&b&&Distance(a.p,b.p)<0.02,`${id} moves continuously through ${stamp}`);
@@ -187,7 +189,7 @@ assert.equal(new EncounterDocument(defaults,FLOW_TIMELINE,storage).value.groups[
 const before=JSON.stringify(document.value);
 assert.throws(()=>document.Change((value)=>value.groups[0].count=-2));
 assert.equal(JSON.stringify(document.value),before,"invalid edits leave the draft intact");
-const sample=EvaluateFlow(384),view={center:[32,106],scale:5.5};
+const sample=EvaluateFlow(ReferenceTime(384)),view={center:[32,106],scale:5.5};
 document.Change((value)=>value.annotations.push({id:"TestNote",kind:"arrow",a:[28,100],b:[35,112],text:"在这里补两人",time:384,view}));
 const packet=CreateFramePacket(document.value,sample,view,{width:984,height:492});
 assert.deepEqual(ReadFramePacket(JSON.parse(JSON.stringify(packet)),FLOW_TIMELINE),packet);
@@ -213,9 +215,9 @@ const tankGate=baseline.groups.find((group)=>group.id==="TankEscort");
 assert.ok(tankGate.start>BeatById("03h").start&&tankGate.start<BeatById("04a").start);
 const missedTank=structuredClone(defaults);
 missedTank.triggers.find((trigger)=>trigger.id==="Trigger_TankEscort").area.center=[300,300];
-assert.ok(!EvaluateFlow(652.25,missedTank).actors.some((actor)=>actor.kind==="tank"),"moving the early trigger also controls vehicle arrival");
+assert.ok(!EvaluateFlow(ReferenceTime(652.25),missedTank).actors.some((actor)=>actor.kind==="tank"),"moving the early trigger also controls vehicle arrival");
 const noEscort=structuredClone(defaults);noEscort.groups.find((group)=>group.id==="TankEscort").enabled=false;
-assert.ok(EvaluateFlow(652.25,noEscort).actors.some((actor)=>actor.id==="tank1"),"turning off infantry preserves the triggered vehicle");
+assert.ok(EvaluateFlow(ReferenceTime(652.25),noEscort).actors.some((actor)=>actor.id==="tank1"),"turning off infantry preserves the triggered vehicle");
 let movingTanks=0,waitingTanks=0,grenadeFrames=0,earlyGrenades=0;
 for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
   const frame=EvaluateFlow(time);
@@ -271,9 +273,9 @@ for(let stamp=tankGate.start;stamp<BeatById("06h").end;stamp+=0.25) {
 }
 assert.equal(advancingPairs.size,4,"both pairs on both flanks take turns advancing");
 assert.ok(coveredBounds>100,"alternating cover persists across the ground pursuit");
-const formationFrame=EvaluateFlow(455.569).actors.filter(actor=>groundGroupIds.has(actor.groupId));
-EvaluateFlow(710);EvaluateFlow(384);
-assert.deepEqual(EvaluateFlow(455.569).actors.filter(actor=>groundGroupIds.has(actor.groupId)),formationFrame);
+const formationFrame=EvaluateFlow(ReferenceTime(455.569)).actors.filter(actor=>groundGroupIds.has(actor.groupId));
+EvaluateFlow(ReferenceTime(710));EvaluateFlow(ReferenceTime(384));
+assert.deepEqual(EvaluateFlow(ReferenceTime(455.569)).actors.filter(actor=>groundGroupIds.has(actor.groupId)),formationFrame);
 
 const previousGroundDraft=structuredClone(defaults);
 previousGroundDraft.revision="2026-11-13-flank-refill-1";
@@ -327,7 +329,7 @@ ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
 
 // The gun-pit survivors return continuously with Yaowa and pursuit stays back.
 const returnIds = ["yao","openingGun0","openingGun2","pitRifleman"];
-const returnFrame = EvaluateFlow(312.442);
+const returnFrame = EvaluateFlow(ReferenceTime(312.442));
 assert.equal(returnFrame.actors.filter(actor => actor.groupId === "PitSurvivors" && actor.alive && actor.wounded).length,3);
 assert.equal(returnFrame.actors.filter(actor => actor.groupId === "Rim" && actor.pose !== "dead").length,3);
 for (const stamp of [BeatById("03d").start,BeatById("03f").start,BeatById("03g").start,BeatById("03h").start]) {
@@ -337,7 +339,7 @@ for (const stamp of [BeatById("03d").start,BeatById("03f").start,BeatById("03g")
     assert.ok(before && after && Distance(before.p,after.p)<0.03,`${id} crosses ${stamp} without a position jump`);
   }
 }
-for (let stamp=292;stamp<400;stamp+=0.25) {
+for (let stamp=ReferenceTime(292);stamp<ReferenceTime(400);stamp+=0.25) {
   const frame=EvaluateFlow(stamp);
   const friends=frame.actors.filter(actor => ["player","friend"].includes(actor.side) && actor.pose!=="dead");
   for (const enemy of frame.actors.filter(actor => ["Rim","RearPursuit","TrafficFlank"].includes(actor.groupId) && actor.pose!=="dead")) {
@@ -348,7 +350,7 @@ for (let stamp=292;stamp<400;stamp+=0.25) {
 const plannedPursuit=structuredClone(defaults);
 const plannedRim=plannedPursuit.groups.find(group=>group.id==="Rim");
 plannedRim.memberPlans=[{delay:1,route:plannedRim.route.slice(1)}];
-const plannedFrame=EvaluateFlow(312.442,plannedPursuit);
+const plannedFrame=EvaluateFlow(ReferenceTime(312.442),plannedPursuit);
 assert.ok(plannedFrame.actors.filter(actor=>actor.groupId==="Rim").every(actor=>Distance(actor.p,plannedRim.area.center)>40),"advance behavior supports individual plans with firing distance");
 const previousPursuit=structuredClone(defaults);
 previousPursuit.revision="2026-11-13-ground-formation-1";
@@ -368,7 +370,7 @@ assert.ok(!customPursuit.groups.some(group=>group.id==="RearPursuit"));
 
 // The annotated door approach precedes the ramp chase and fork pursuit.
 const Group=(id)=>baseline.groups.find(group=>group.id===id);
-const chaseFrame=EvaluateFlow(253.908),chase=chaseFrame.actors.filter(actor=>actor.groupId==="Corner");
+const chaseFrame=EvaluateFlow(ReferenceTime(253.908)),chase=chaseFrame.actors.filter(actor=>actor.groupId==="Corner");
 assert.equal(chase.length,6,"the reported 03C frame has six pursuers");
 assert.ok(chase.some(actor=>actor.firing)&&chase.some(actor=>actor.pose==="run"),"covering fire supports the advancing pair");
 for(let stamp=Group("Corner").start;stamp<Group("Corner").lives[0].fall;stamp+=0.1) {
@@ -380,7 +382,7 @@ for(let stamp=Group("Corner").start;stamp<Group("Corner").lives[0].fall;stamp+=0
     for(const other of enemies.slice(index+1)) assert.ok(Distance(enemy.p,other.p)>0.7,"the ramp formation keeps separate bodies");
   }
 }
-const settledChase=EvaluateFlow(280).actors.filter(actor=>actor.groupId==="Corner");
+const settledChase=EvaluateFlow(ReferenceTime(280)).actors.filter(actor=>actor.groupId==="Corner");
 assert.ok(settledChase.every(actor=>actor.firing&&actor.p[0]>=54),"all six settle at their rear firing positions");
 assert.equal(new Set(settledChase.map(actor=>actor.p.join(","))).size,6);
 for(const plan of FLOW_DRAG_REARGUARD) {
@@ -390,8 +392,8 @@ for(const plan of FLOW_DRAG_REARGUARD) {
   assert.ok(living.firing&&living.pose==="shoot","the ordinary rear guard covers the withdrawal before being hit");
   assert.ok(before.effects.some(effect=>effect.kind==="fire"&&effect.side==="enemy"&&Distance(effect.b,living.p)<0.01),"incoming fire reaches the guard at the casualty cue");
   assert.equal(dead.pose,"dead");assert.ok(!dead.firing);
-  assert.deepEqual(EvaluateFlow(410).actors.find(actor=>actor.id===plan.id).p,dead.p,"the fallen guard stays at the casualty location");
-  EvaluateFlow(0);EvaluateFlow(600);
+  assert.deepEqual(EvaluateFlow(ReferenceTime(410)).actors.find(actor=>actor.id===plan.id).p,dead.p,"the fallen guard stays at the casualty location");
+  EvaluateFlow(ReferenceTime(0));EvaluateFlow(ReferenceTime(600));
   assert.deepEqual(EvaluateFlow(fall+0.01).actors.find(actor=>actor.id===plan.id),dead,"rewinding never resurrects a fallen guard after the cue");
 }
 const previousCornerDraft=structuredClone(defaults);
@@ -466,13 +468,13 @@ assert.ok(EvaluateFlow(flankStart+0.01).actors.some(actor=>actor.groupId==="Traf
 const shiftedFlank=structuredClone(defaults);
 shiftedFlank.triggers.find(trigger=>trigger.id==="Trigger_TrafficFlank").area.center=[300,300];
 assert.equal(CompileEncounters(shiftedFlank,FLOW_TIMELINE).groups.find(group=>group.id==="TrafficFlank").start,null);
-assert.ok(!EvaluateFlow(380,shiftedFlank).actors.some(actor=>actor.groupId==="TrafficFlank"),"west-ramp reinforcement depends on reaching point 2");
-assert.ok(!EvaluateFlow(420,shiftedFlank).actors.some(actor=>actor.groupId==="TrafficFlank"),"both batches wait when point 2 is missed");
-assert.equal(EvaluateFlow(227.14).actors[0].pose,"kneel","the box-stack firing pause uses a low protected posture");
+assert.ok(!EvaluateFlow(ReferenceTime(380),shiftedFlank).actors.some(actor=>actor.groupId==="TrafficFlank"),"west-ramp reinforcement depends on reaching point 2");
+assert.ok(!EvaluateFlow(ReferenceTime(420),shiftedFlank).actors.some(actor=>actor.groupId==="TrafficFlank"),"both batches wait when point 2 is missed");
+assert.equal(EvaluateFlow(ReferenceTime(227.14)).actors[0].pose,"kneel","the box-stack firing pause uses a low protected posture");
 const doorCoverIds=new Set(["DugoutDoorBags","DugoutDoorReturn","DugoutInnerCrates","DragFirstShield","DragCornerShield","TrafficFlankBags"].map(id=>`Encounter_${id}`));
 const doorCovers=map.objects.filter(object=>doorCoverIds.has(object.id));
 assert.equal(doorCovers.length,6);
-for(let stamp=160;stamp<400;stamp+=0.25) {
+for(let stamp=ReferenceTime(160);stamp<ReferenceTime(400);stamp+=0.25) {
   for(const actor of EvaluateFlow(stamp).actors.filter(actor=>["player","winter"].includes(actor.id))) {
     for(const cover of doorCovers) {
       const [x,,z]=cover.pos,[width,,depth]=cover.size;
@@ -527,7 +529,7 @@ for(const exit of ["West","East","Left","Right"]) {
 }
 assert.ok(terrain.preAt(-20,70)>(terrain.preAt(-36,70)+terrain.preAt(-4,70))/2+0.5,"the rear ground has a genuine raised mound");
 assert.ok(terrain.preAt(-12,-91)<(terrain.preAt(-23,-91)+terrain.preAt(-1,-91))/2-0.4,"the forward ground has a genuine shell depression");
-const campFrame = EvaluateFlow(455.569);
+const campFrame = EvaluateFlow(ReferenceTime(455.569));
 const campDefenders = campFrame.actors.filter(actor => ["luo","he","liu","yao"].includes(actor.id));
 assert.equal(campDefenders.length,4);
 for (const actor of campDefenders) {
@@ -548,12 +550,12 @@ for (let stamp = BeatById("04a").start; stamp < BeatById("05a").start; stamp += 
     for (const cover of campCover) assert.ok(Math.abs(actor.p[0]-cover.pos[0]) > cover.size[0]/2+0.8 || Math.abs(actor.p[1]-cover.pos[2]) > cover.size[2]/2+0.8, "new parapets preserve casualty and cart clearance");
   }
 }
-for (const stamp of [435,447,455.569,474.999,475,480,489.999,490]) {
-  const snapshot = EvaluateFlow(stamp);EvaluateFlow(0);EvaluateFlow(600);
+for (const stamp of [435,447,455.569,474.999,475,480,489.999,490].map(ReferenceTime)) {
+  const snapshot = EvaluateFlow(stamp);EvaluateFlow(ReferenceTime(0));EvaluateFlow(ReferenceTime(600));
   assert.deepEqual(EvaluateFlow(stamp),snapshot,"camp deployment and loading remain deterministic after seeking");
 }
 for (const id of ["luo","he","liu","yao","geng"]) {
-  for (const boundary of [435,455,475,490]) {
+  for (const boundary of [435,455,475,490].map(ReferenceTime)) {
     const before = EvaluateFlow(boundary-0.001).actors.find(actor => actor.id === id);
     const after = EvaluateFlow(boundary+0.001).actors.find(actor => actor.id === id);
     assert.ok(Distance(before.p,after.p) < 0.03, "camp actors cross beat boundaries continuously");
@@ -597,20 +599,20 @@ for(const id of ["Fork","Corner"]) {
     }
   }
 }
-const markedFrame=EvaluateFlow(186.63).actors.filter(actor=>actor.groupId==="Fork");
+const markedFrame=EvaluateFlow(ReferenceTime(186.63)).actors.filter(actor=>actor.groupId==="Fork");
 assert.equal(markedFrame.length,5);
 assert.ok(markedFrame.every(actor=>actor.pose==="kneel"&&!actor.firing));
 const firstAdvance=EvaluateFlow(Group("Fork").start+10.1).actors.filter(actor=>actor.groupId==="Fork");
 assert.equal(firstAdvance.filter(actor=>actor.pose==="run").length,2);
 assert.equal(firstAdvance.filter(actor=>actor.pose==="kneel").length,3,"advance starts are staggered after the hidden batch");
-const reportedFrame=EvaluateFlow(207.137).actors.filter(actor=>actor.groupId==="Fork");
+const reportedFrame=EvaluateFlow(ReferenceTime(207.137)).actors.filter(actor=>actor.groupId==="Fork");
 assert.equal(reportedFrame.length,5);
 assert.ok(reportedFrame.some(actor=>actor.pose==="run") && reportedFrame.some(actor=>actor.firing),"covering fire continues while other members advance");
 for(const [id,coverId] of [["Fork_0","Encounter_DugoutDoorBags"],["Fork_2","Encounter_DugoutInnerCrates"]]) {
   const actor=reportedFrame.find(actor=>actor.id===id),cover=map.objects.find(object=>object.id===coverId);
   assert.ok(actor.firing && actor.p[1]<cover.pos[2] && Distance(actor.p,[cover.pos[0],cover.pos[2]])<1.5,"two soldiers hold separate cover positions");
 }
-for(let stamp=178;stamp<232;stamp+=0.05) {
+for(let stamp=ReferenceTime(178);stamp<ReferenceTime(232);stamp+=0.05) {
   const actors=EvaluateFlow(stamp).actors.filter(actor=>actor.groupId==="Fork");
   for(let first=0;first<actors.length;first++) for(let second=first+1;second<actors.length;second++) {
     assert.ok(Distance(actors[first].p,actors[second].p)>0.75,`formation remains separated at ${stamp}`);
@@ -619,10 +621,10 @@ for(let stamp=178;stamp<232;stamp+=0.05) {
     assert.ok(Math.abs(actor.p[0]-cover.pos[0])>cover.size[0]/2+0.25 || Math.abs(actor.p[1]-cover.pos[2])>cover.size[2]/2+0.25,`${actor.id} stays outside doorway cover`);
   }
 }
-const settled=EvaluateFlow(225).actors.filter(actor=>actor.groupId==="Fork");
+const settled=EvaluateFlow(ReferenceTime(225)).actors.filter(actor=>actor.groupId==="Fork");
 assert.equal(new Set(settled.map(actor=>actor.p.join(","))).size,5,"five separate endpoints remain after movement ends");
-EvaluateFlow(207.137);EvaluateFlow(186.63);
-assert.deepEqual(EvaluateFlow(225).actors.filter(actor=>actor.groupId==="Fork"),settled,"formation seeking is deterministic");
+EvaluateFlow(ReferenceTime(207.137));EvaluateFlow(ReferenceTime(186.63));
+assert.deepEqual(EvaluateFlow(ReferenceTime(225)).actors.filter(actor=>actor.groupId==="Fork"),settled,"formation seeking is deterministic");
 const oldBatch=structuredClone(defaults);oldBatch.revision="2026-11-13-batch-1";
 const oldFork=oldBatch.groups.find(group=>group.id==="Fork");delete oldFork.memberPlans;oldFork.count=8;
 oldBatch.groups=oldBatch.groups.filter(group=>group.id!=="SearchNeighbor");
@@ -685,14 +687,29 @@ for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) f
 }
 assert.ok([...terrainEdges.values()].every(edge=>edge.count===(edge.boundary?1:2)),"terrain has no open internal edges or coarse/fine T-junction cracks");
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
+assert.ok(OPENING_ENEMY_ENTRY_TIME > 32.423);
+for (let time = 0; time < OPENING_ENEMY_ENTRY_TIME; time += 0.1) {
+  assert.ok(!EvaluateFlow(time).actors.some(actor => /^opening\d+$/.test(actor.id)), "attackers wait until the last retreating soldier clears the bend");
+}
+assert.ok(!EvaluateFlow(32.423).actors.some(actor => actor.side === "enemy"), "the annotated packing frame has no Japanese troops");
+const bend = FLOW_OPENING.retreatRoute[FLOW_OPENING.enemyEntryBendIndex];
+const entryFrame = EvaluateFlow(OPENING_ENEMY_ENTRY_TIME);
+const withdrawing = entryFrame.actors.filter(actor => ["luo", "he", "liu"].includes(actor.id) || /^openingAlly/.test(actor.id));
+assert.equal(withdrawing.length, 12);
+assert.ok(withdrawing.every(actor => actor.p[1] >= bend[1] - 0.001), "all twelve soldiers clear the bend before the first attacker enters");
+assert.ok(Distance(withdrawing.at(-1).p, bend) < 0.001);
+const waiting = EvaluateFlow(BeatById("02b").start - 0.001).actors.filter(actor => ["luo", "he", "liu"].includes(actor.id) || /^openingAlly/.test(actor.id));
+for (const actor of waiting) assert.ok(waiting.filter(other => other !== actor).every(other => Distance(actor.p, other.p) > 1.9), "the delayed call leaves individual waiting places instead of stacking twelve soldiers at the route end");
+assert.equal(entryFrame.actors.filter(actor => /^opening\d+$/.test(actor.id)).length, 1);
+assert.deepEqual(EvaluateFlow(OPENING_ENEMY_ENTRY_TIME - 0.001).actors.filter(actor => /^opening\d+$/.test(actor.id)), []);
 // Opening regression: both friendly parties and all three hostile approaches
 // must remain continuous across beats and arbitrary backward seeks.
-const leaving = EvaluateFlow(26.14);
+const leaving = EvaluateFlow(ReferenceTime(26.14));
 const retreatIds = ["luo", "he", "liu", ...Array.from({length:9}, (_,index)=>`openingAlly${index+3}`)];
 assert.equal(leaving.actors.filter(actor=>retreatIds.includes(actor.id)).length,FLOW_OPENING.retreatCount);
 assert.ok(FLOW_OPENING.retreatCount>3);
 const gunIds = ["yao", "openingGun0", "openingGun1", "openingGun2"];
-for (const id of gunIds.slice(1)) assert.ok(Distance(ActorAt(id,26.14).p,ActorAt("yao",26.14).p)<6,"yao leaves with the messenger and gun crew");
+for (const id of gunIds.slice(1)) assert.ok(Distance(ActorAt(id,ReferenceTime(26.14)).p,ActorAt("yao",ReferenceTime(26.14)).p)<6,"yao leaves with the messenger and gun crew");
 const pathDistance = (point,route) => Math.min(...route.slice(1).map((end,index)=>SegmentDistance(point,route[index],end)));
 for (let stamp=24;stamp<BeatById("02b").start;stamp+=0.5) {
   for (const id of retreatIds) {
@@ -701,13 +718,13 @@ for (let stamp=24;stamp<BeatById("02b").start;stamp+=0.5) {
     assert.ok(actor.p[1]>=ActorAt(id,stamp-0.1).p[1],"the rescue party does not return before winter calls");
   }
 }
-assert.ok(ActorAt("luo",64.5).p[1]<ActorAt("luo",64).p[1],"winter's call reverses retreat toward the branch");
+assert.ok(ActorAt("luo",ReferenceTime(64.5)).p[1]<ActorAt("luo",ReferenceTime(64)).p[1],"winter's call reverses retreat toward the branch");
 for (const [index,id] of retreatIds.entries()) {
   const group=FLOW_OPENING_RESCUE.groups.find(entry=>entry.members.includes(index));
   const heard=BeatById("02b").start+group.responseDelay+group.members.indexOf(index)*FLOW_OPENING_RESCUE.memberResponseInterval;
   assert.ok(ActorAt(id,heard+0.1).p[1]<ActorAt(id,heard).p[1],"each soldier turns after hearing the call");
 }
-const rescueReady = retreatIds.map(id => ActorAt(id,107.654));
+const rescueReady = retreatIds.map(id => ActorAt(id,ReferenceTime(107.654)));
 assert.equal(rescueReady.filter(actor => actor.rescueLane === "branch").length,6);
 assert.equal(rescueReady.filter(actor => actor.rescueLane === "south").length,6);
 assert.equal(new Set(rescueReady.map(actor => actor.rescueGroup)).size,4,"each approach has two independent trios");
@@ -717,7 +734,7 @@ for (const actor of rescueReady) {
   assert.ok(actor.rescueLane === "branch" ? actor.p[1]<68 : actor.p[1]>72,"one lane follows the branch while the other approaches around its south side");
 }
 let mixedRescueFrames = 0;
-for (let stamp=66;stamp<105;stamp+=0.25) {
+for (let stamp=ReferenceTime(66);stamp<ReferenceTime(105);stamp+=0.25) {
   const actors = retreatIds.map(id => ActorAt(id,stamp));
   if (actors.some(actor => actor.pose === "walk") && actors.some(actor => actor.pose === "kneel")) mixedRescueFrames++;
   for (const actor of actors) assert.ok(Distance(actor.p,ActorAt(actor.id,stamp+0.01).p)/0.01<2.8,"rescue approaches stay below a headlong sprint");
@@ -725,36 +742,36 @@ for (let stamp=66;stamp<105;stamp+=0.25) {
 assert.ok(mixedRescueFrames>50,"observation halts and advances are staggered across soldiers");
 for (const id of retreatIds) {
   let reachedJunction = false, reachedSouthernBend = false, paused = false;
-  for (let stamp=66;stamp<107;stamp+=0.1) {
+  for (let stamp=ReferenceTime(66);stamp<ReferenceTime(107);stamp+=0.1) {
     const actor = ActorAt(id,stamp);
     reachedJunction ||= Distance(actor.p,[23.5,67.2])<1.2;
     reachedSouthernBend ||= actor.p[0]>34 && actor.p[1]>84;
-    paused ||= actor.pose === "kneel" && Distance(actor.p,ActorAt(id,107).p)>3;
+    paused ||= actor.pose === "kneel" && Distance(actor.p,ActorAt(id,ReferenceTime(107)).p)>3;
   }
-  assert.ok(ActorAt(id,107).rescueLane === "branch" ? reachedJunction : reachedSouthernBend,`${id} follows the corresponding user-drawn approach`);
+  assert.ok(ActorAt(id,ReferenceTime(107)).rescueLane === "branch" ? reachedJunction : reachedSouthernBend,`${id} follows the corresponding user-drawn approach`);
   assert.ok(paused,`${id} pauses in cover during the approach`);
 }
-assert.ok(ActorAt("luo",112).p[1]<ActorAt("luo",110).p[1],"the party jumps into the trench after the grenade blasts");
-assert.equal(EvaluateFlow(130).actors.filter(actor=>retreatIds.includes(actor.id)&&actor.pose==="dead").length,7);
+assert.ok(ActorAt("luo",ReferenceTime(112)).p[1]<ActorAt("luo",ReferenceTime(110)).p[1],"the party jumps into the trench after the grenade blasts");
+assert.equal(EvaluateFlow(ReferenceTime(130)).actors.filter(actor=>retreatIds.includes(actor.id)&&actor.pose==="dead").length,7);
 const openingIds = [...retreatIds,...gunIds,...Array.from({length:9},(_,index)=>`opening${index}`)];
-for (let stamp=0.1;stamp<161;stamp+=0.1) {
+for (let stamp=ReferenceTime(0.1);stamp<ReferenceTime(161);stamp+=0.1) {
   const before=EvaluateFlow(stamp-0.1),after=EvaluateFlow(stamp);
   for (const id of openingIds) {
     const previous=before.actors.find(actor=>actor.id===id),current=after.actors.find(actor=>actor.id===id);
     if (previous&&current) assert.ok(Distance(previous.p,current.p)<0.41,`${id} moves continuously across opening beats at ${stamp}`);
   }
 }
-const capturing=EvaluateFlow(40.05).actors.filter(actor=>/^opening\d+$/.test(actor.id));
+const capturing=EvaluateFlow(BeatById("02a").start+0.05).actors.filter(actor=>/^opening\d+$/.test(actor.id));
 assert.equal(capturing.length,9);
 assert.ok(capturing.some(actor=>actor.pose==="run"),"the capture beat opens with troops still approaching");
 for (const enemy of capturing) {
   assert.ok(enemy.born<BeatById("02a").start,"capture troops enter from the preceding scene");
   assert.ok(Distance(ActorAt(enemy.id,enemy.born).p,[66.5,64.5])>35,"troops appear on their distant approach routes");
   assert.ok(Distance(ActorAt(enemy.id,enemy.born+1).p,ActorAt(enemy.id,enemy.born).p)>2.9,"each approach visibly advances");
-  assert.ok(Distance(ActorAt(enemy.id,63).p,FLOW_OPENING.enemyPositions[Number(enemy.id.slice(7))])<0.01,"nine attackers reach their authored stations");
+  assert.ok(Distance(ActorAt(enemy.id,BeatById("02b").start-1).p,FLOW_OPENING.enemyPositions[Number(enemy.id.slice(7))])<0.01,"nine attackers reach their authored stations");
 }
-for (const stamp of [17,26.14,39.999,40.05,64,85,107,112,130,160]) {
-  const snapshot=EvaluateFlow(stamp);EvaluateFlow(0);EvaluateFlow(150);
+for (const stamp of [17,26.14,39.999,40.05,64,85,107,112,130,160].map(ReferenceTime)) {
+  const snapshot=EvaluateFlow(stamp);EvaluateFlow(ReferenceTime(0));EvaluateFlow(ReferenceTime(150));
   assert.deepEqual(EvaluateFlow(stamp),snapshot,"opening staging survives rewind without replaying events");
 }
 const lane=L0610_LANE.line.map(point=>[point.x,point.z]);

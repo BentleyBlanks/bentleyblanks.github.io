@@ -178,7 +178,8 @@ function BuildOpeningRetreat(index) {
   const origin = [64 + index % 3 * 0.65, 63.5 + Math.floor(index / 3) * 0.35];
   const route = [origin, ...FLOW_OPENING.retreatRoute];
   const total = RouteLength(route);
-  const distance = Math.min(total, (heard - departure) * FLOW_OPENING.retreatSpeed);
+  const stopDistance = total - index * FLOW_OPENING.retreatSpacing;
+  const distance = Math.min(stopDistance, (heard - departure) * FLOW_OPENING.retreatSpeed);
   const turn = SampleRoute(route, distance / total);
 
   // Preserve every traversed traffic-trench bend before the two lanes split.
@@ -214,11 +215,13 @@ function BuildOpeningRetreat(index) {
       keys.push([clock, ...returning[point]]);
     }
   }
-  return {departure, heard, route, total, rim, landing, arrival, keys, pauses,
+  return {departure, heard, route, total, stopDistance, rim, landing, arrival, keys, pauses,
     rescueLane: group.lane, rescueGroup: group.id};
 }
 
 const openingRetreatPlans = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => BuildOpeningRetreat(index));
+export const OPENING_ENEMY_ENTRY_TIME = Math.max(...openingRetreatPlans.map(plan =>
+  plan.departure + RouteLength(plan.route.slice(0, FLOW_OPENING.enemyEntryBendIndex + 2)) / FLOW_OPENING.retreatSpeed));
 const openingMeleePlans = FLOW_OPENING_RETREAT.meleeAllies.map((ally, slot) => {
   const retreat = FLOW_OPENING_RETREAT;
   const contact = BeatById(retreat.meleeBeat).start + retreat.contactDelay + slot * retreat.memberInterval;
@@ -234,8 +237,10 @@ const openingMeleePlans = FLOW_OPENING_RETREAT.meleeAllies.map((ally, slot) => {
 function OpeningRetreat(time, index) {
   const plan = openingRetreatPlans[index];
   const {departure, heard, route, total, rim, landing, arrival, keys, pauses} = plan;
-  if (time < heard) return {p: SampleRoute(route, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed / total),
-    pose: time > departure ? "walk" : "stand"};
+  if (time < heard) {
+    const distance = Math.min(plan.stopDistance, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed);
+    return {p: SampleRoute(route, distance / total), pose: time > departure && distance < plan.stopDistance ? "walk" : "stand"};
+  }
   const identity = {rescueLane: plan.rescueLane, rescueGroup: plan.rescueGroup};
   if (time < arrival) return {p: Track(keys, time),
     pose: pauses.some(([start, end]) => time >= start && time < end) ? "kneel" : "walk", ...identity};
@@ -478,7 +483,7 @@ function OpeningActors(time) {
   const defeated = time >= BeatById("02g").start;
   return Array.from({ length: 9 }, (_,index) => {
     const route = [...FLOW_OPENING.enemyRoutes[index < 2 ? 0 : index < 6 ? 1 : 2], FLOW_OPENING.enemyPositions[index]];
-    const born = BeatById("01c").start + index * 0.4;
+    const born = OPENING_ENEMY_ENTRY_TIME + index * FLOW_OPENING.enemyInterval;
     const arrival = born + RouteLength(route) / FLOW_OPENING.enemySpeed;
     let p = SampleRoute(route, (time - born) / (arrival - born));
     if (time < born || index < 6 && time >= BeatById(retreat.blockBeat).start) return null;

@@ -113,7 +113,7 @@ export function ValidateEncounterDocument(input, timeline) {
     CheckIdentity(trigger);
     Require(!triggers.has(trigger.id), "触发区编号重复");triggers.add(trigger.id);
     Require(["area","time"].includes(trigger.mode), "触发方式无效");
-    Require(Number.isFinite(trigger.delay) && trigger.delay >= 0 && trigger.delay <= 1870, "触发延迟无效");
+    Require(Number.isFinite(trigger.delay) && trigger.delay >= 0 && trigger.delay <= timeline.at(-1).end, "触发延迟无效");
   }
   const groupIds = new Set();
   for (const group of input.groups) {
