@@ -1,7 +1,7 @@
 """Assemble Er Ya from original Tripo meshes using similarity transforms.
 
 Run through scripts/Script_BlenderMcp.mjs exec --file or start --batch.
-The editable parts retain the source mesh, topology, UVs and custom normals.
+The editable parts preserve their source geometry with a local neck-skin repair.
 The head's white display base uses a visibility override in its assembled copy.
 """
 
@@ -9,11 +9,13 @@ import hashlib
 import json
 import math
 import os
+from collections import defaultdict
 from pathlib import Path
 
 import bpy
 import numpy as np
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 sourceRoot = Path(os.environ.get('ERYA_SOURCE_ROOT',
     r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\25_二丫'))
@@ -89,6 +91,220 @@ def PlacePart(sourceRole, role, scalePixels, orientation, sourceAnchor, targetPi
     return obj
 
 
+def RepairNeckSkin(head, projectRoot):
+    mesh = head.data
+    points = np.array([vertex.co[:] for vertex in mesh.vertices])
+    originalUvs = np.array([item.uv[:] for item in mesh.uv_layers.active.data])
+    originalNormals = np.array([item.vector[:] for item in mesh.corner_normals])
+    mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
+    originalTangents = np.array([item.tangent[:] for item in mesh.loops])
+    originalSigns = np.array([item.bitangent_sign for item in mesh.loops])
+    material = mesh.materials[0]
+    shader = next(node for node in material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED')
+    colorImage = shader.inputs['Base Color'].links[0].from_node.image
+    normalNode = shader.inputs['Normal'].links[0].from_node
+    normalImage = normalNode.inputs['Color'].links[0].from_node.image
+    ormImage = next(node.image for node in material.node_tree.nodes
+                    if node.type == 'TEX_IMAGE' and node.image not in [colorImage, normalImage])
+    imageArrays = {image: np.array(image.pixels[:]).reshape(image.size[1], image.size[0], 4)
+                   for image in [colorImage, normalImage, ormImage]}
+
+    def Unit(value):
+        return value / max(float(np.linalg.norm(value)), 1e-10)
+
+    def Sample(array, uv):
+        height, width = array.shape[:2]
+        x = float(np.clip(uv[0] * width - .5, 0, width - 1))
+        y = float(np.clip(uv[1] * height - .5, 0, height - 1))
+        x0, y0 = int(x), int(y)
+        x1, y1 = min(x0 + 1, width - 1), min(y0 + 1, height - 1)
+        dx, dy = x - x0, y - y0
+        return ((1 - dy) * ((1 - dx) * array[y0, x0] + dx * array[y0, x1])
+                + dy * ((1 - dx) * array[y1, x0] + dx * array[y1, x1]))
+
+    def Weights(point, triangle):
+        a, b = triangle[1] - triangle[0], triangle[2] - triangle[0]
+        p = point - triangle[0]
+        aa, ab, bb = np.dot(a, a), np.dot(a, b), np.dot(b, b)
+        denominator = aa * bb - ab * ab
+        v = (bb * np.dot(p, a) - ab * np.dot(p, b)) / denominator
+        w = (aa * np.dot(p, b) - ab * np.dot(p, a)) / denominator
+        return np.array([1 - v - w, v, w])
+
+    patchFaces = {face.index for face in mesh.polygons
+                  if .005 < face.center.z < .15 and face.center.x > .015
+                  and abs(face.center.y) < .12
+                  and (face.normal.x > .25 or (.055 < face.center.z < .10 and abs(face.normal.z) > .5))}
+    skinFaces = []
+    for face in mesh.polygons:
+        if face.index in patchFaces or face.material_index != 0 or face.center.x < -.10:
+            continue
+        if min(points[index, 2] for index in face.vertices) < .10 or face.center.z > .45:
+            continue
+        samples = [Sample(imageArrays[colorImage], originalUvs[index]) for index in face.loop_indices]
+        if all(color[0] - color[2] > .03 for color in samples):
+            skinFaces.append(face)
+    skinIndices = {face.index for face in skinFaces}
+    skinTree = BVHTree.FromPolygons(points.tolist(), [face.vertices[:] for face in skinFaces])
+    edges = defaultdict(list)
+    for face in mesh.polygons:
+        for edge in face.edge_keys:
+            edges[tuple(sorted(edge))].append(face.index)
+    boundary = [edge for edge, faces in edges.items()
+                if any(index in patchFaces for index in faces) and any(index in skinIndices for index in faces)]
+    assert boundary, 'Original neck skin boundary was not found'
+    starts = np.array([points[a] for a, b in boundary])
+    deltas = np.array([points[b] - points[a] for a, b in boundary])
+    edgeLengths = np.sum(deltas * deltas, axis=1)
+
+    def Reflect(point):
+        amounts = np.clip(np.sum((point - starts) * deltas, axis=1) / edgeLengths, 0, 1)
+        closest = starts + amounts[:, None] * deltas
+        index = int(np.argmin(np.sum((point - closest)**2, axis=1)))
+        return 2 * closest[index] - point
+
+    def SourceSample(point):
+        closest, _, index, _ = skinTree.find_nearest(Reflect(point))
+        face = skinFaces[index]
+        weights = Weights(np.array(closest), points[list(face.vertices)])
+        loops = list(face.loop_indices)
+        uv = weights @ originalUvs[loops]
+        color = Sample(imageArrays[colorImage], uv)
+        for amount in [.1, .25, .5, 1]:
+            if color[0] - color[2] > .025:
+                break
+            weights = weights * (1 - amount) + amount / 3
+            uv = weights @ originalUvs[loops]
+            color = Sample(imageArrays[colorImage], uv)
+        normal = Unit(weights @ originalNormals[loops])
+        tangent = weights @ originalTangents[loops]
+        tangent = Unit(tangent - normal * np.dot(normal, tangent))
+        bitangent = np.cross(normal, tangent) * originalSigns[loops[0]]
+        detail = Sample(imageArrays[normalImage], uv)[:3] * 2 - 1
+        detail[:2] *= normalNode.inputs['Strength'].default_value
+        shadedNormal = Unit(tangent * detail[0] + bitangent * detail[1] + normal * detail[2])
+        return color, Sample(imageArrays[ormImage], uv), normal, shadedNormal
+
+    repairVertices = sorted({index for faceIndex in patchFaces for index in mesh.polygons[faceIndex].vertices})
+    newPoints = points.copy()
+    originalTree = BVHTree.FromPolygons(points.tolist(), [face.vertices[:] for face in mesh.polygons])
+    for index in repairVertices:
+        point = points[index]
+        hit, _, _, _ = originalTree.ray_cast(Vector((1, point[1], .115)), Vector((-1, 0, 0)), 2)
+        assert hit is not None
+        amount = float(np.clip((.115 - point[2]) / .035, 0, 1))
+        weight = amount * amount * (3 - 2 * amount)
+        lowerAmount = float(np.clip((.045 - point[2]) / .04, 0, 1))
+        newPoints[index, 0] += (hit.x - point[0]) * weight - .008 * lowerAmount**2 * (3 - 2 * lowerAmount)
+    smoothNormals = defaultdict(lambda: np.zeros(3))
+    reversedFaces = []
+    for faceIndex in patchFaces:
+        vertices = list(mesh.polygons[faceIndex].vertices)
+        triangle = newPoints[vertices]
+        normal = np.cross(triangle[1] - triangle[0], triangle[2] - triangle[0])
+        if normal[0] < 0:
+            mesh.polygons[faceIndex].flip()
+            normal *= -1
+            reversedFaces.append(faceIndex)
+        for index in vertices:
+            smoothNormals[tuple(np.round(newPoints[index], 6))] += normal
+    uvMin = points[repairVertices][:, [1, 2]].min(0)
+    uvRange = points[repairVertices][:, [1, 2]].max(0) - uvMin
+    size, margin = 256, 8 / 256
+    patchNormals = originalNormals.copy()
+    for faceIndex in patchFaces:
+        face = mesh.polygons[faceIndex]
+        face.use_smooth = True
+        for loop in face.loop_indices:
+            point = points[mesh.loops[loop].vertex_index]
+            uv = margin + (point[[1, 2]] - uvMin) / uvRange * (1 - 2 * margin)
+            mesh.uv_layers.active.data[loop].uv = uv
+            _, _, sourceNormal, _ = SourceSample(point)
+            amount = float(np.clip((point[2] - .08) / .06, 0, 1))
+            amount = amount * amount * (3 - 2 * amount)
+            surfaceNormal = Unit(smoothNormals[tuple(np.round(newPoints[mesh.loops[loop].vertex_index], 6))])
+            patchNormals[loop] = Unit(sourceNormal * amount + surfaceNormal * (1 - amount))
+    mesh.vertices.foreach_set('co', newPoints.ravel())
+    mesh.update()
+    mesh.normals_split_custom_set(patchNormals.tolist())
+    mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
+    targetTangents = np.array([item.tangent[:] for item in mesh.loops])
+    targetSigns = np.array([item.bitangent_sign for item in mesh.loops])
+    targetUvs = np.array([item.uv[:] for item in mesh.uv_layers.active.data])
+    colorMap, ormMap, normalMap = [np.zeros((size, size, 4), dtype=np.float32) for _ in range(3)]
+    valid = np.zeros((size, size), dtype=bool)
+    for faceIndex in patchFaces:
+        face = mesh.polygons[faceIndex]
+        loops, vertices = list(face.loop_indices), list(face.vertices)
+        triangle = targetUvs[loops]
+        minimum = np.maximum(0, np.floor(triangle.min(0) * size).astype(int))
+        maximum = np.minimum(size - 1, np.ceil(triangle.max(0) * size).astype(int))
+        for row in range(minimum[1], maximum[1] + 1):
+            for column in range(minimum[0], maximum[0] + 1):
+                uv = np.array([(column + .5) / size, (row + .5) / size])
+                weights = Weights(uv, triangle)
+                if weights.min() < -1e-5:
+                    continue
+                point = weights @ points[vertices]
+                color, orm, sourceNormal, shadedNormal = SourceSample(point)
+                normal = Unit(weights @ patchNormals[loops])
+                tangent = weights @ targetTangents[loops]
+                tangent = Unit(tangent - normal * np.dot(normal, tangent))
+                bitangent = np.cross(normal, tangent) * targetSigns[loops[0]]
+                axis, cosine = np.cross(sourceNormal, normal), np.dot(sourceNormal, normal)
+                transported = (shadedNormal + np.cross(axis, shadedNormal)
+                    + np.cross(axis, np.cross(axis, shadedNormal)) / max(1 + cosine, 1e-8))
+                detail = Unit(np.array([np.dot(transported, tangent), np.dot(transported, bitangent),
+                                        np.dot(transported, normal)]))
+                colorMap[row, column], ormMap[row, column] = color, orm
+                normalMap[row, column] = (*list(detail * .5 + .5), 1)
+                valid[row, column] = True
+    assert valid.any(), 'Neck skin texture bake was empty'
+    maps = [colorMap, ormMap, normalMap]
+    for _ in range(12):
+        previous = valid.copy()
+        for dy, dx in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            sourceValid = np.roll(previous, (dy, dx), axis=(0, 1))
+            fill = (~valid) & sourceValid
+            for pixels in maps:
+                pixels[fill] = np.roll(pixels, (dy, dx), axis=(0, 1))[fill]
+            valid[fill] = True
+    for pixels in maps:
+        pixels[~valid] = pixels[valid].mean(0)
+        pixels[:, :, 3] = 1
+    bakeRoot = projectRoot / 'TextureBakes' / 'NeckSkinFill'
+    bakeRoot.mkdir(parents=True, exist_ok=True)
+    baked = []
+    for suffix, pixels, sourceImage in [('BaseColor', colorMap, colorImage), ('Orm', ormMap, ormImage),
+                                         ('Normal', normalMap, normalImage)]:
+        image = bpy.data.images.new('Texture_ErYa_NeckSkin_' + suffix, width=size, height=size)
+        image.colorspace_settings.name = sourceImage.colorspace_settings.name
+        image.pixels.foreach_set(pixels.ravel())
+        image.update()
+        image.file_format = 'PNG'
+        image.filepath_raw = str(bakeRoot / (image.name + '.png'))
+        image.save()
+        image.pack()
+        baked.append(image)
+    patchMaterial = material.copy()
+    patchMaterial.name = 'Material_ErYa_NeckSkinFill'
+    replacements = dict(zip([colorImage, ormImage, normalImage], baked))
+    for node in patchMaterial.node_tree.nodes:
+        if node.type == 'TEX_IMAGE' and node.image in replacements:
+            node.image = replacements[node.image]
+        if node.type == 'NORMAL_MAP':
+            node.inputs['Strength'].default_value = 1
+    mesh.materials.append(patchMaterial)
+    for faceIndex in patchFaces:
+        mesh.polygons[faceIndex].material_index = len(mesh.materials) - 1
+    head['NeckSkinPatchFaces'] = sorted(patchFaces)
+    head['NeckSkinPatchVertices'] = repairVertices
+    return {'faces': sorted(patchFaces), 'vertices': repairVertices, 'textureSize': size,
+            'reversedFaces': reversedFaces,
+            'skinBoundaryEdges': len(boundary), 'sourceSkinFaces': len(skinFaces),
+            'maximumLocalVertexShift': float(np.abs(newPoints - points).max())}
+
+
 for role, filename in sourceFiles.items():
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=str(sourceRoot / filename))
@@ -133,6 +349,7 @@ imageWidth, imageHeight = headImage.size[:]
 headColors = np.array(headImage.pixels[:]).reshape(imageHeight, imageWidth, 4)
 headUvs = head.data.uv_layers.active.data
 headBaseFaces = []
+neckSkinFaces = []
 for face in head.data.polygons:
     if face.center.z > .25:
         continue
@@ -141,8 +358,11 @@ for face in head.data.polygons:
     row = min(imageHeight - 1, max(0, int(uv.y * (imageHeight - 1))))
     color = headColors[row, column, :3]
     whiteBase = color.min() > .45 and color.max() - color.min() < .12
+    warmNeckSkin = face.center.z > .18 and color[0] - color[2] > .04
+    if whiteBase and warmNeckSkin:
+        neckSkinFaces.append(face.index)
     belowBase = max(rawHead[index, 2] for index in face.vertices) < .08
-    if whiteBase or belowBase:
+    if (whiteBase and not warmNeckSkin) or belowBase:
         headBaseFaces.append(face.index)
 baseMaterial = headMaterial.copy()
 baseMaterial.name = 'Material_ErYa_DisplayBaseHidden'
@@ -154,6 +374,10 @@ head.data.materials.append(baseMaterial)
 for faceIndex in headBaseFaces:
     head.data.polygons[faceIndex].material_index = len(head.data.materials) - 1
 head['DisplayBaseHiddenFaces'] = len(headBaseFaces)
+head['RetainedNeckSkinFaces'] = neckSkinFaces
+neckSkinRepair = RepairNeckSkin(head, projectRoot)
+head['AssemblyMethod'] = 'Original head with local collar-interior skin repair'
+head['DisplayBaseHiddenFaces'] = sum(face.material_index == 1 for face in head.data.polygons)
 
 rawHand = Coordinates(sources['LeftHand'])
 planeSample = rawHand[rawHand[:, 1] > 0][:, [0, 2]]
@@ -194,8 +418,14 @@ parts = [obj for obj in collections['ErYa_TPose'].objects if obj.type == 'MESH']
 for obj in parts:
     obj.parent = root
     source = sources[obj['SourceRole']]
-    assert np.array_equal(Coordinates(obj), Coordinates(source)), 'Source mesh coordinates changed'
-    assert [loop.vertex_index for loop in obj.data.loops] == [loop.vertex_index for loop in source.data.loops]
+    protected = np.ones(len(obj.data.vertices), dtype=bool)
+    if obj == head:
+        protected[neckSkinRepair['vertices']] = False
+    assert np.array_equal(Coordinates(obj)[protected], Coordinates(source)[protected]), 'Protected source coordinates changed'
+    for face in obj.data.polygons:
+        if obj == head and face.index in neckSkinRepair['faces']:
+            continue
+        assert tuple(face.vertices) == tuple(source.data.polygons[face.index].vertices)
     axes = np.linalg.svd(np.array(obj.matrix_world)[:3, :3], compute_uv=False)
     assert np.ptp(axes) < 1e-6, 'Part transform has nonuniform scale'
 bpy.context.view_layer.update()
@@ -268,10 +498,12 @@ bpy.ops.file.pack_all()
 bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot / 'Scene_ErYa_Assembled.blend'), compress=True)
 bpy.ops.export_scene.gltf(filepath=str(sourceRoot / 'Model_ErYa_Assembled.glb'),
                           export_format='GLB', use_selection=True, export_apply=True)
-report = {'schema': 'tengxian.originalPartsAssembly', 'version': 1,
+report = {'schema': 'tengxian.originalPartsAssembly', 'version': 2,
           'heightMeters': heightMeters, 'metersPerReferencePixel': pixelSize,
           'sourceFiles': sourceFiles, 'placements': placements,
-          'displayBaseHiddenFaces': len(headBaseFaces),
+          'displayBaseHiddenFaces': head['DisplayBaseHiddenFaces'],
+          'neckSkinRepair': neckSkinRepair,
+          'retainedNeckSkinFaces': neckSkinFaces,
           'sourceSha256': {role: hashlib.sha256((sourceRoot / name).read_bytes()).hexdigest()
                            for role, name in sourceFiles.items()},
           'parts': {obj.name: {'sourceRole': obj['SourceRole'],
