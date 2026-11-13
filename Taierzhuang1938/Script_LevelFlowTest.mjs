@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
@@ -211,6 +211,59 @@ for(let time=tankGate.start;time<BeatById("06i").end;time+=0.5) {
 }
 assert.ok(movingTanks>50&&waitingTanks>50,"vehicles visibly alternate advance and infantry-covering halts");
 assert.ok(grenadeFrames>50&&earlyGrenades>0,"enemy grenade attacks recur from the drag segment through the tank battle");
+// Ground pursuit uses separate lanes, with a stationary pair covering each bound.
+const groundGroupIds=new Set(FLOW_GROUND_FORMATIONS.map(formation=>formation.id));
+const advancingPairs=new Set();
+let coveredBounds=0;
+for(let stamp=tankGate.start;stamp<BeatById("06h").end;stamp+=0.25) {
+  const frame=EvaluateFlow(stamp);
+  const activeGroups=new Set(frame.groups.filter(group=>stamp<group.end).map(group=>group.id));
+  const infantry=frame.actors.filter(actor=>groundGroupIds.has(actor.groupId)&&activeGroups.has(actor.groupId)&&actor.pose!=="dead");
+  for(let first=0;first<infantry.length;first++) {
+    const actor=infantry[first];
+    for(let second=first+1;second<infantry.length;second++) {
+      assert.ok(Distance(actor.p,infantry[second].p)>1.5,`${stamp} ${actor.id} keeps clear of ${infantry[second].id}`);
+    }
+    for(const [id,x,z,width,height,depth] of FLOW_GROUND.cover) {
+      assert.ok(Math.abs(actor.p[0]-x)>width/2+0.25 || Math.abs(actor.p[1]-z)>depth/2+0.25,
+        `${stamp} ${actor.id} passes around ${id}`);
+    }
+  }
+  for(const id of ["GroundWest","GroundEast"]) {
+    const members=infantry.filter(actor=>actor.groupId===id);
+    if(members.length!==4) continue;
+    const moving=members.filter(actor=>actor.pose==="run");
+    assert.ok(moving.length<=2,`${id} retains a covering pair`);
+    if(moving.length) {
+      assert.ok(members.some(actor=>actor.firing),`${id} provides fire while advancing`);
+      coveredBounds++;
+      for(const actor of moving) advancingPairs.add(`${id}_${Math.floor(Number(actor.id.split("_").at(-1))/2)}`);
+    }
+  }
+}
+assert.equal(advancingPairs.size,4,"both pairs on both flanks take turns advancing");
+assert.ok(coveredBounds>100,"alternating cover persists across the ground pursuit");
+const formationFrame=EvaluateFlow(455.569).actors.filter(actor=>groundGroupIds.has(actor.groupId));
+EvaluateFlow(710);EvaluateFlow(384);
+assert.deepEqual(EvaluateFlow(455.569).actors.filter(actor=>groundGroupIds.has(actor.groupId)),formationFrame);
+
+const previousGroundDraft=structuredClone(defaults);
+previousGroundDraft.revision="2026-11-13-flank-refill-1";
+for(const formation of FLOW_GROUND_FORMATIONS) {
+  const group=previousGroundDraft.groups.find(item=>item.id===formation.id);
+  group.area.size=[...formation.previousAreaSize];delete group.spawnOffsets;delete group.memberPlans;
+}
+previousGroundDraft.groups.find(group=>group.id==="GroundWest").speed=3;
+previousGroundDraft.groups.find(group=>group.id==="GroundEast").route=[[125,109],[130,170]];
+previousGroundDraft.groups=previousGroundDraft.groups.filter(group=>group.id!=="TankRearScreen");
+const groundDocument=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(previousGroundDraft),setItem:()=>{}});
+assert.deepEqual(groundDocument.value.groups.find(group=>group.id==="GroundWest").memberPlans,defaults.groups.find(group=>group.id==="GroundWest").memberPlans);
+assert.equal(groundDocument.value.groups.find(group=>group.id==="GroundWest").speed,3);
+assert.equal(groundDocument.value.groups.find(group=>group.id==="GroundEast").memberPlans,undefined,"a custom ground route retains its authored movement");
+assert.ok(!groundDocument.value.groups.some(group=>group.id==="TankRearScreen"));
+groundDocument.Replace(previousGroundDraft);
+assert.equal(groundDocument.value.revision,defaults.revision,"imports receive the same ground formation migration");
+ValidateEncounterDocument(groundDocument.value,FLOW_TIMELINE);
 assert.equal(map.ramps.length,12);
 assert.equal(map.objects.filter((object)=>object.planning).length,27);
 for(const ramp of map.ramps) {

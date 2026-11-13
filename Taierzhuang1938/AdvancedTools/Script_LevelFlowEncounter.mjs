@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -72,7 +72,17 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-flank-refill-1",triggers,groups,annotations:[]};
+  for(const formation of FLOW_GROUND_FORMATIONS) {
+    const group=groups.find(item=>item.id===formation.id);
+    group.area.size=[...formation.areaSize];
+    group.spawnOffsets=structuredClone(formation.offsets);
+    group.memberPlans=formation.offsets.map((offset,index)=>({
+      delay:formation.delays[index],
+      route:structuredClone(formation.routes?.[index]
+        || (formation.route||group.route).slice(1).map(point=>point.map((value,axis)=>value+offset[axis]))),
+    }));
+  }
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-ground-formation-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -217,6 +227,7 @@ export function GroupPath(group,index) {
 // Compile each soldier's cover-to-cover movement once, including waits for the
 // retreating front to move. Seeking samples these tracks without replaying AI.
 function BuildCoverTracks(group,playerRoute) {
+  if(group.memberPlans && group.spawnOffsets) return BuildBoundingPairTracks(group,playerRoute);
   return group.lives.map((life,index)=>{
     const path=GroupPath(group,index),distances=[0];
     for(let point=1;point<path.length;point++) distances.push(distances.at(-1)+Distance(path[point-1],path[point]));
@@ -232,6 +243,38 @@ function BuildCoverTracks(group,playerRoute) {
     }
     return track;
   });
+}
+
+function BuildBoundingPairTracks(group,playerRoute) {
+  const states=group.lives.map((life,index)=>{
+    const path=GroupPath(group,index),distances=[0],slot=index%group.maxAlive;
+    for(let point=1;point<path.length;point++) distances.push(distances.at(-1)+Distance(path[point-1],path[point]));
+    return {path,distances,life,team:Math.floor(slot/2)%2,next:1,distance:0,
+      waitUntil:life.born+(group.deployDelay||0)+(group.memberPlans[slot]?.delay||0),track:[[life.born,0]]};
+  });
+  const step=0.25;
+  for(let time=group.start+step;time<=Math.min(group.end,Math.max(...group.lives.map(life=>life.fall)));time+=step) {
+    // Snapshot arrivals before this tick so a pair cannot release the other
+    // midway through the same tick. Each pair waits for covering fire to resume.
+    const arrivals=states.map(state=>state.next);
+    const player=TimedPosition(playerRoute,time);
+    const frontReady=states.map(state=>state.next>=state.path.length
+      || state.distances[state.next]<=RouteProjection(state.path,player)+2);
+    for(const state of states) {
+      if(time<state.life.born || time>state.life.fall) continue;
+      const covering=states.every((other,otherIndex)=>other.team===state.team
+        || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]>=other.path.length
+        || arrivals[otherIndex]>=state.next+(state.team===1?1:0));
+      const pairReady=states.every((other,otherIndex)=>other.team!==state.team
+        || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]!==state.next || frontReady[otherIndex]);
+      if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady) {
+        state.distance=Math.min(state.distances[state.next],state.distance+group.speed*step);
+        if(state.distance>=state.distances[state.next]) {state.next++;state.waitUntil=time+FLOW_GROUND.coverWaitS;}
+      }
+      state.track.push([time,state.distance]);
+    }
+  }
+  return states.map(state=>state.track);
 }
 
 function CoverMovement(group,index,time) {
@@ -257,7 +300,9 @@ function GroupActor(group,index,time,coreActors) {
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
     const progress=RouteProjection(path,tank.p);
-    const limit=Math.max(0,progress-3-(index%group.maxAlive)*1.1);
+    const spacing=group.memberPlans?3.2:1.1;
+    const clearance=group.memberPlans?5:3;
+    const limit=Math.max(0,progress-clearance-slot*spacing);
     if(distance>=limit) movement.moving=tank.moving;
     distance=Math.min(distance,limit);
   }
@@ -327,11 +372,27 @@ function UpgradeFlankReinforcement(value,defaults) {
       current.reinforceAfterClear=next.reinforceAfterClear;
     }
   }
+  return UpgradeGroundFormations(value,defaults);
+}
+
+function UpgradeGroundFormations(value,defaults) {
+  for(const formation of FLOW_GROUND_FORMATIONS) {
+    const current=value.groups.find(group=>group.id===formation.id);
+    const next=defaults.groups.find(group=>group.id===formation.id);
+    if(!current || !next || current.memberPlans || current.spawnOffsets) continue;
+    const previousArea={...next.area,size:formation.previousAreaSize};
+    if(JSON.stringify(current.route)!==JSON.stringify(next.route)
+      || JSON.stringify(current.area)!==JSON.stringify(previousArea)) continue;
+    current.area=structuredClone(next.area);
+    current.spawnOffsets=structuredClone(next.spawnOffsets);
+    current.memberPlans=structuredClone(next.memberPlans);
+  }
   value.revision=defaults.revision;
   return value;
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision==="2026-11-13-flank-refill-1") return UpgradeGroundFormations(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-formation-1") return UpgradeFlankReinforcement(structuredClone(input),defaults);
   // Upgrade the collapsed batch without restoring groups deleted in a draft.
   if(input.revision==="2026-11-13-batch-1") {

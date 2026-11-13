@@ -146,6 +146,28 @@ export const FLOW_GROUND = {
   ],
 };
 
+// Ground pursuit blocking. Separate lanes and staggered depth are authored
+// preview choices. Bounds groups advance in two mutually covering pairs.
+export const FLOW_GROUND_FORMATIONS = [
+  {id:"GroundWest", previousAreaSize:[3,3], areaSize:[10,22],
+    offsets:[[-4.5,-0.5],[-3.3,-3.5],[-4.5,-5.5],[-3.3,-10]], delays:[0,0.8,0,0.8],
+    routes:[
+      [[90.5,155.5],[90.5,191.5],[91.5,217.5],[91.5,232],[90.5,250.5]],
+      [[91.7,152.5],[91.7,188.5],[92.7,214.5],[92.7,229],[91.7,247.5]],
+      [[90.5,150.5],[90.5,186.5],[91.5,212.5],[90.5,226],[90.5,245.5]],
+      [[91.7,146],[91.7,178],[92.3,208],[92.3,227],[97,241]],
+    ]},
+  {id:"GroundEast", previousAreaSize:[3,3], areaSize:[10,22],
+    route:[[125,109],[123,160],[123,176],[118,189],[118,222],[118,253]],
+    offsets:[[4.5,-0.5],[3.3,-3.5],[4.5,-7],[3.3,-10]], delays:[0.5,1.3,0.5,1.3]},
+  {id:"TankEscort", previousAreaSize:[2.4,3], areaSize:[7,34],
+    offsets:[[-1.6,-2],[-1.9,-5.5],[-1.6,-9],[-1.9,-12.5],[-1.6,-16]], delays:[0,0.6,1.2,1.8,2.4]},
+  {id:"TankRearScreen", previousAreaSize:[3,3], areaSize:[7,27],
+    offsets:[[2.2,-2],[2.7,-5.5],[2.2,-9],[2.7,-12.5]], delays:[0.4,1,1.6,2.2]},
+  {id:"TankReinforce", previousAreaSize:[2.4,3], areaSize:[7,34],
+    offsets:[[2.2,-2],[2.7,-5.5],[2.2,-9],[2.7,-12.5],[2.2,-16]], delays:[0,0.6,1.2,1.8,2.4]},
+];
+
 export const FLOW_TANK_TRACKS = {
   tank1: [
     ["03h",0,142,44],["03h",0.5,113,84],["03h",1,110,118],

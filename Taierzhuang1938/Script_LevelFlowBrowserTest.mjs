@@ -91,6 +91,21 @@ try {
   assert.match(await page.locator('#planningNote').textContent(),/老耿.*搬弹药/);
   assert.equal(await page.locator('#sourcePassage').textContent(),FLOW_SOURCE_EXCERPTS['04c']);
   await page.screenshot({path:path.join(out,"CampDefense.png")});
+  const campViews=await page.evaluate(()=>LevelFlow.Inspect().viewports);
+  await page.evaluate(()=>{
+    LevelFlow.SetViewType(0,'oblique');LevelFlow.SetViewType(1,'plan');
+    const layout=LevelFlow.Inspect().viewports;
+    for(const view of layout.views) {
+      view.center=[108,139];view.scale=4.5;view.mode='manual';view.freeCamera=null;
+      view.yaw=0;view.pitch=0.65;
+    }
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(455.569);
+  });
+  const groundFormation=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>['GroundWest','GroundEast'].includes(actor.groupId)));
+  assert.equal(groundFormation.length,8);
+  assert.ok(groundFormation.some(actor=>actor.pose==='run')&&groundFormation.some(actor=>actor.firing),'the camp preview displays advancing infantry and covering fire together');
+  await page.screenshot({path:path.join(out,"GroundInfantryFormation.png")});
+  await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),campViews);
   await page.evaluate(()=>LevelFlow.Seek(207.137));
   const pressure=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==="Fork");
   assert.equal(pressure.length,5);
