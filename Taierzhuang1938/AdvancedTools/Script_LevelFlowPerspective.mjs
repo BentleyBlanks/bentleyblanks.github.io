@@ -65,7 +65,10 @@ export class FlowPerspectiveView extends FlowMapView {
     this.right=Normalize(Cross(this.forward,[0,1,0]));this.up=Cross(this.right,this.forward);
     this.fov=this.type==="eye"?Clamp(105-this.scale*4,36,90):65;
     this.focal=this.width/(2*Math.tan(this.fov*Math.PI/360));
-    const vehicles=frame.actors.filter(actor=>["tank","cart"].includes(actor.kind)).map(actor=>[actor.p,actor.heading,actor.turret,actor.pose]);
+    // Offscreen vehicles must not invalidate both static camera backgrounds on
+    // every timeline tick. Include carried boxes too: they also write depth.
+    this.solidActors=frame.actors.filter(actor=>(["tank","cart"].includes(actor.kind)||actor.carryingAmmo)&&this.SolidInView(actor));
+    const vehicles=this.solidActors.map(actor=>[actor.id,actor.kind,actor.p,actor.heading,actor.turret,actor.pose,!!actor.carryingAmmo]);
     this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.far,this.renderScale,vehicles]);
   }
   Fit(bounds,padding=35) {
@@ -91,6 +94,20 @@ export class FlowPerspectiveView extends FlowMapView {
     return [x*this.right[0]+y*this.right[1]+z*this.right[2],
       x*this.up[0]+y*this.up[1]+z*this.up[2],
       x*this.forward[0]+y*this.forward[1]+z*this.forward[2]];
+  }
+  SphereInView(camera,radius) {
+    if(camera[2]+radius<0.15||camera[2]-radius>this.far) return false;
+    if(this.type!=="oblique"||this.freeCamera) {
+      const horizontal=this.width/(2*this.focal),top=this.height*0.49/this.focal,bottom=this.height*0.51/this.focal;
+      return Math.abs(camera[0])-horizontal*camera[2]<=radius*Math.hypot(1,horizontal)
+        &&camera[1]-top*camera[2]<=radius*Math.hypot(1,top)&&-camera[1]-bottom*camera[2]<=radius*Math.hypot(1,bottom);
+    }
+    const x=this.width/2+camera[0]*this.scale,y=this.height*0.57-camera[1]*this.scale,extent=radius*this.scale;
+    return x+extent>=0&&x-extent<=this.width&&y+extent>=0&&y-extent<=this.height;
+  }
+  SolidInView(actor) {
+    // Conservative radius encloses tracks, cart rails and a rotating barrel.
+    return this.SphereInView(this.CameraPoint([actor.p[0],this.Ground(actor.p)+1,actor.p[1]]),4);
   }
   Vertex(point) {
     const camera=this.CameraPoint(point);
@@ -211,6 +228,9 @@ export class FlowPerspectiveView extends FlowMapView {
         for(const child of cell.children) Visit(child);
         return;
       }
+      if(this.raster.accelerated&&this.mapData.terrain.packedFacesForCell) {
+        this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell));return;
+      }
       for(const triangle of this.mapData.terrain.facesForCell(cell)) {
         if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors);continue;}
         const a=TerrainVertex(triangle.points[0],triangle.vertexColors[0]);
@@ -303,7 +323,7 @@ export class FlowPerspectiveView extends FlowMapView {
       this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
     }
     }
-    for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind))) {
+    for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind)&&this.SolidInView(item))) {
       const [x,z]=actor.p,ground=this.Ground(actor.p),yaw=-(actor.heading||0);
       if(actor.kind==="cart") {
         Box(x,z,1.4,2.5,0.22,"#ad8e65",ground+0.72,yaw);
@@ -320,7 +340,7 @@ export class FlowPerspectiveView extends FlowMapView {
         Box(x+Math.sin(turret)*0.9,z-Math.cos(turret)*0.9,0.13,1.8,0.13,"#696f59",ground+1.28,-turret);
       }
     }
-    for (const actor of frame.actors.filter(item => item.carryingAmmo)) {
+    for (const actor of frame.actors.filter(item => item.carryingAmmo&&this.SolidInView(item))) {
       Box(actor.p[0],actor.p[1]+0.25,0.8,0.5,0.45,"#94774f",this.Ground(actor.p)+0.8,0);
     }
     this.raster.Flush(context,width,height);

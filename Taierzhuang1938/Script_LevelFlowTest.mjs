@@ -592,7 +592,19 @@ for(const exit of ["West","East","Left","Right"]) {
 }
 assert.ok(terrain.preAt(-20,70)>(terrain.preAt(-36,70)+terrain.preAt(-4,70))/2+0.5,"the rear ground has a genuine raised mound");
 assert.ok(terrain.preAt(-12,-91)<(terrain.preAt(-23,-91)+terrain.preAt(-1,-91))/2-0.4,"the forward ground has a genuine shell depression");
+for(const cell of terrain.cells.filter((_,index)=>index%251===0)) {
+  const faces=terrain.facesForCell(cell),packed=terrain.packedFacesForCell(cell);
+  assert.equal(terrain.packedFacesForCell(cell),packed,'both views reuse one immutable packed terrain cell');
+  assert.deepEqual(packed,new Float32Array(faces.flatMap(face=>face.points.flatMap((point,index)=>[...point,...face.vertexColors[index]]))),
+    'packed terrain retains every original vertex and color, including shared LOD edges');
+  const raster={worldVertices:new Float32Array(16),worldLength:0,triangles:0};
+  EncounterRaster.prototype.WorldBatch.call(raster,packed);
+  EncounterRaster.prototype.WorldBatch.call(raster,packed);
+  assert.equal(raster.triangles,faces.length*2);
+  assert.deepEqual(raster.worldVertices.slice(0,raster.worldLength),new Float32Array([...packed,...packed]),'batch growth preserves earlier cells');
+}
 const campFrame = EvaluateFlow(ReferenceTime(455.569));
+
 const campDefenders = campFrame.actors.filter(actor => ["luo","he","liu","yao"].includes(actor.id));
 assert.equal(campDefenders.length,4);
 for (const actor of campDefenders) {

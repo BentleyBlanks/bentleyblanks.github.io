@@ -99,6 +99,30 @@ try {
     if('fallback' in result) assert.ok(result.fallback&&result.same,'GPU failure replays the complete frame in software');
     else assert.ok(result.pixels>100&&result.maxColorError<=2&&result.maxDepthError<(result.depthTolerance||0.001),`GPU preserves smooth colors and perspective depth: ${JSON.stringify(result)}`);
   }
+  const backgroundCache=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320.5px;height:240.5px';document.body.append(canvas);
+    const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain:{heightAt:()=>0,roots:[]},ramps:[]},'scene');
+    view.freeCamera={eye:[0,2,0],yaw:0,pitch:0};
+    const sample=LevelFlow.Evaluate(384),vehicle={id:'CacheCart',kind:'cart',p:[2000,30],heading:0,side:'friend',pose:'walk'};
+    const player={...sample.actors[0],p:[0,10],pose:'stand'};
+    sample.actors=[player,vehicle];sample.effects=[];sample.zone=null;
+    let draws=0;const original=view.DrawBase.bind(view);view.DrawBase=(...args)=>{draws++;original(...args);};
+    const Draw=()=>{sample.time+=0.01;view.Draw(sample,{},null);};
+    Draw();const initial=draws;vehicle.p=[2001,30];Draw();const offscreen=draws;
+    vehicle.p=[0,12];Draw();const enter=draws,visiblePixels=canvas.toDataURL();
+    vehicle.p=[1,12];Draw();const move=draws,movedPixels=canvas.toDataURL();
+    vehicle.p=[2000,30];Draw();const leave=draws,emptyPixels=canvas.toDataURL();
+    player.carryingAmmo=true;Draw();const carrying=draws;player.p=[1,10];Draw();const carriedMove=draws;
+    const background=view.baseCanvas.toDataURL();view.baseKey='';Draw();const stableEdges=background===view.baseCanvas.toDataURL();
+    canvas.remove();return {initial,offscreen,enter,move,leave,carrying,carriedMove,visibleChanged:visiblePixels!==movedPixels,cleared:emptyPixels!==movedPixels,stableEdges};
+  });
+  assert.equal(backgroundCache.initial,1);
+  assert.equal(backgroundCache.offscreen,1,'offscreen motion does not redraw or read back either static background');
+  assert.deepEqual([backgroundCache.enter,backgroundCache.move,backgroundCache.leave,backgroundCache.carrying,backgroundCache.carriedMove],[2,3,4,5,6],
+    'entering, moving, leaving and carried boxes invalidate the current color/depth frame');
+  assert.ok(backgroundCache.visibleChanged&&backgroundCache.cleared,'cached backgrounds neither freeze moving vehicles nor retain their trails');
+  assert.ok(backgroundCache.stableEdges,'fractional CSS dimensions do not accumulate color at the canvas edge');
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);

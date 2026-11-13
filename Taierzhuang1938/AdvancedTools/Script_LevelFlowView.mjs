@@ -333,8 +333,12 @@ export class FlowMapView {
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
     const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey]);
     if(key!==this.baseKey) {
-      this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;
-      const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);this.DrawBase(background,width,height,frame);this.baseKey=key;
+      if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
+      const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
+      // Fractional CSS sizes leave a partially covered last pixel. Clear the
+      // full backing surface without reallocating it, preventing edge trails.
+      background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
+      this.DrawBase(background,width,height,frame);this.baseKey=key;
     }
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;

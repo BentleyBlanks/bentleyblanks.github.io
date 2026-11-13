@@ -150,13 +150,17 @@ export class EncounterViewports {
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.rotate.hidden=!perspective||entry.type==="scene";
       if(entry.mode==="follow") entry.map.Follow(frame);
-      for(const button of entry.pane.querySelectorAll("[data-framing]")) button.setAttribute("aria-pressed",String(button.dataset.framing===entry.mode));
+      for(const button of entry.pane.querySelectorAll("[data-framing]")) {
+        const pressed=String(button.dataset.framing===entry.mode);
+        if(button.getAttribute("aria-pressed")!==pressed) button.setAttribute("aria-pressed",pressed);
+      }
       const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,rect.width,rect.height,window.devicePixelRatio]);
       if(!contentChanged&&drawKey===entry.drawKey) continue;
       entry.map.Draw(frame,entry.layers,selection,annotations,draft);
       entry.drawKey=drawKey;
-      entry.status.textContent=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"镜头自动跟随":entry.mode==="manual"?"手动移动镜头":entry.mode==="all"?"整个关卡":"当前剧情范围"}`;
+      const status=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"镜头自动跟随":entry.mode==="manual"?"手动移动镜头":entry.mode==="all"?"整个关卡":"当前剧情范围"}`;
+      if(entry.status.textContent!==status) entry.status.textContent=status;
     }
     this.document=document;this.annotations=annotations;this.contentKey=contentKey;
   }

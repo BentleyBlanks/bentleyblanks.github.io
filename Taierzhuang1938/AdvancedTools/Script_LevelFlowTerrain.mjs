@@ -133,6 +133,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return color;
   };
   const faceCache=new WeakMap();
+  const packedFaceCache=new WeakMap();
   // Adjacent triangles and LOD cells share immutable vertices, so each view
   // can project a ground vertex once per camera frame without changing seams.
   const vertices=new Map();
@@ -162,7 +163,16 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     faceCache.set(cell,triangles);return triangles;
   };
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,roots,facesForCell:FacesForCell,cells,plan,source:scene.terrain.file,bounds};
+  const PackedFacesForCell=(cell)=>{
+    if(packedFaceCache.has(cell)) return packedFaceCache.get(cell);
+    const faces=FacesForCell(cell),packed=new Float32Array(faces.length*18);
+    let offset=0;
+    for(const face of faces) for(let index=0;index<3;index++) {
+      packed.set(face.points[index],offset);packed.set(face.vertexColors[index],offset+3);offset+=6;
+    }
+    packedFaceCache.set(cell,packed);return packed;
+  };
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,roots,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map) {

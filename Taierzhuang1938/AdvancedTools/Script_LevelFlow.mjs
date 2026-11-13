@@ -125,9 +125,10 @@ function UpdateTimeline() {
     Element("planningNote").hidden=!frame.beat.planning;
     Element("planningNote").textContent=frame.beat.planning?`当前编排 · ${frame.beat.planning}`:"";
     for(const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected",button.dataset.beat===shownBeat);
+    Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
   }
-  Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
-  Element("flowTime").textContent=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
+  const timeText=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
+  if(Element("flowTime").textContent!==timeText) Element("flowTime").textContent=timeText;
   Element("flowSeek").value=String(time);
   Element("timelineAxis").style.setProperty("--progress",`${time/FLOW_DURATION*100}%`);
   Element("flowSeek").setAttribute("aria-valuetext",`${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);

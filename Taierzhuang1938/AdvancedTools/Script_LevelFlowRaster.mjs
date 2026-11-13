@@ -21,7 +21,19 @@ export class EncounterRaster {
     this.perspective=perspective;this.coordinateScale=coordinateScale;
     this.displayWidth=width/coordinateScale;this.displayHeight=height/coordinateScale;
     this.gpuLength=0;this.worldLength=0;this.accelerated=!!this.gpu&&!this.gpu.gl.isContextLost();
-    this.depth.fill(Infinity);this.triangles=0;this.image.data.fill(0);
+    this.triangles=0;
+    // The GPU overwrites every depth pixel; software colors are unused until
+    // fallback. Avoid clearing two full-resolution CPU surfaces per pane.
+    if(!this.accelerated) {this.depth.fill(Infinity);this.image.data.fill(0);}
+  }
+
+  WorldBatch(vertices) {
+    if(this.worldLength+vertices.length>this.worldVertices.length) {
+      let capacity=this.worldVertices.length;
+      while(capacity<this.worldLength+vertices.length) capacity*=2;
+      const grown=new Float32Array(capacity);grown.set(this.worldVertices);this.worldVertices=grown;
+    }
+    this.worldVertices.set(vertices,this.worldLength);this.worldLength+=vertices.length;this.triangles+=vertices.length/18;
   }
 
   WorldTriangle(points,colors) {
