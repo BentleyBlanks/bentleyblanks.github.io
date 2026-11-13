@@ -17,9 +17,9 @@ export class EncounterSceneControls {
     this.wheelViews.clear();this.drag=null;this.keys.clear();this.render();
   }
 
-  Scale(view) {
+  StartNavigation(view) {
     if(!view.type) return;
-    view.navigationActive=true;view.renderScale=view.adaptiveScale;
+    view.navigationActive=true;
   }
 
   Settle(view) {
@@ -47,7 +47,7 @@ export class EncounterSceneControls {
     const view=entry.map;
     const action=!view.type?"planPan":event.button===1?"pan":event.altKey?(event.button===0?"orbit":"dolly"):"look";
     if(view.type&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
-    this.Scale(view);
+    this.StartNavigation(view);
     entry.mode="manual";
     const pivot=[view.center[0],view.Ground?.(view.center)||0,view.center[1]];
     const offset=view.eye?.map((value,index)=>value-pivot[index]);
@@ -59,7 +59,7 @@ export class EncounterSceneControls {
   Move(entry,event) {
     const drag=this.drag;if(!drag||drag.entry!==entry) return false;
     const dx=event.clientX-drag.x,dy=event.clientY-drag.y,view=entry.map;
-    this.Scale(view);
+    this.StartNavigation(view);
     drag.x=event.clientX;drag.y=event.clientY;
     if(drag.action==="planPan") view.center=[view.center[0]-dx/view.scale,view.center[1]-dy/view.scale];
     else if(drag.action==="look") {
@@ -97,7 +97,7 @@ export class EncounterSceneControls {
     if(entry.map.type) this.Dolly(entry,event.deltaY*0.001);
     else {const rect=entry.canvas.getBoundingClientRect();entry.map.Zoom(Math.exp(-event.deltaY*0.001),[event.clientX-rect.left,event.clientY-rect.top]);}
     if(entry.map.type) {
-      this.Scale(entry.map);
+      this.StartNavigation(entry.map);
       this.wheelViews.set(entry.map,performance.now()+FLOW_RENDERING.navigation.wheelSettleMs);
     }
     this.render();

@@ -12,19 +12,14 @@ export class FlowPerspectiveView extends FlowMapView {
     super(canvas,mapData);
     this.type=type;this.yaw=type==="oblique"?-0.45:0;this.pitch=0.67;this.target="player";this.scale=10;
     this.far=1500;this.raster=new EncounterRaster();this.occlusion=new Map();this.freeCamera=null;
-    this.renderScale=1;this.adaptiveScale=FLOW_RENDERING.navigation.initialScale;
+    // Camera navigation uses the same pixel density and terrain detail as rest.
+    this.renderScale=1;
     this.boxGeometry=new WeakMap();
   }
   Draw(...args) {
     const start=performance.now();this.frameDrawing=true;
     try {super.Draw(...args);} finally {this.frameDrawing=false;}
     this.drawMs=performance.now()-start;
-    if(this.navigationActive) {
-      const tuning=FLOW_RENDERING.navigation;
-      if(this.drawMs>tuning.targetMs*1.15) this.adaptiveScale=Math.max(tuning.minScale,this.renderScale*0.9);
-      else if(this.drawMs<tuning.targetMs*0.65) this.adaptiveScale=Math.min(tuning.maxScale,this.renderScale*1.08);
-      this.renderScale=this.adaptiveScale;
-    }
   }
   Ground(point) {return this.mapData.terrain.heightAt(point[0],point[1]);}
   BeforeDraw(frame) {

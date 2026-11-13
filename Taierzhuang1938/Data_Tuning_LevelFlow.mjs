@@ -4,7 +4,7 @@ export const FLOW_RENDERING = {
   terrainCellPixels: 10,
   terrainFlatHeightPixels: 0.5,
   terrainNormalSampleM: 0.5,
-  navigation: {initialScale:0.6, minScale:0.3, maxScale:0.8, targetMs:12, wheelSettleMs:120},
+  navigation: {wheelSettleMs:120},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
 };
 
