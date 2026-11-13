@@ -4,7 +4,7 @@ const Element = (id) => document.getElementById(id);
 const COLOR = "#ed5145";
 
 export class ScreenshotAnnotations {
-  constructor() {
+  constructor(onAttach) {
     this.dialog = Element("annotationDialog");
     this.canvas = Element("annotationCanvas");
     this.stage = Element("annotationStage");
@@ -34,6 +34,12 @@ export class ScreenshotAnnotations {
     Element("screenshotText").addEventListener("blur", () => { this.editingText = false; });
     Element("copyScreenshot").onclick = () => this.Copy();
     Element("exportFrame").onclick = () => this.Export();
+    Element("attachScreenshot").onclick = async () => {
+      const button = Element("attachScreenshot"); button.disabled = true;
+      try { await onAttach(); }
+      catch (error) { Element("annotationStatus").textContent = error.message; }
+      finally { button.disabled = false; }
+    };
     this.canvas.addEventListener("pointerdown", event => this.Begin(event));
     this.canvas.addEventListener("pointermove", event => this.Move(event));
     this.canvas.addEventListener("pointerup", () => this.End());

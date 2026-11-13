@@ -1,0 +1,111 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { fileURLToPath } from "node:url";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { randomUUID } from "node:crypto";
+import { LaunchBrowser, ServeProject } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const storage = fs.mkdtempSync(path.join(os.tmpdir(), "EncounterChatBrowser-"));
+const calls = [];
+const handler = CreateEncounterCodexHandler(storage, { spawnCodex(args) {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+  child.prompt = ""; child.args = args;
+  child.stdin.on("data", chunk => { child.prompt += chunk.toString(); });
+  calls.push(child);
+  return child;
+} });
+const server = await ServeProject(root);
+const serveFiles = server.listeners("request")[0];
+server.removeAllListeners("request");
+server.on("request", (request, response) => request.url.startsWith("/__encounter/codex/") ? handler(request, response) : serveFiles(request, response));
+const browser = await LaunchBrowser();
+const out = path.join(root, "tmp", "EncounterEditor"); fs.mkdirSync(out, { recursive: true });
+function Finish(child, text) {
+  child.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: randomUUID() })}\n`);
+  child.stdout.write(`${JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "HIDDEN_THOUGHT" } })}\n`);
+  fs.writeFileSync(child.args[child.args.indexOf("--output-last-message") + 1], text);
+  child.emit("close", 0);
+}
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  await page.addInitScript(() => {
+    localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
+    localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
+  });
+  const errors = []; page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=384`);
+  await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent === "本机 Codex CLI");
+  const layout = await page.evaluate(() => {
+    const list = document.querySelector(".lfChatSidebar").getBoundingClientRect(), detail = document.querySelector(".lfChatDetail").getBoundingClientRect();
+    return { list: list.right, detail: detail.left, right: detail.right, width: innerWidth };
+  });
+  assert.equal(layout.list, layout.detail); assert.ok(layout.right <= layout.width);
+  await page.evaluate(() => LevelFlow.Select({ type: "group", id: "Fork" }));
+  await page.click('[data-tab="chat"]');
+  await page.click("#attachCodexScreenshot");
+  const canvas = await page.locator("#annotationCanvas").boundingBox();
+  await page.mouse.move(canvas.x + 50, canvas.y + 50); await page.mouse.down();
+  await page.mouse.move(canvas.x + 150, canvas.y + 120); await page.mouse.up();
+  await page.click("#attachScreenshot");
+  await page.waitForFunction(() => !document.querySelector("#codexPendingImage").hidden);
+  assert.ok(await page.locator("#codexPendingImage").isVisible());
+  // The image keeps its captured time while the automatic location follows the current frame.
+  await page.evaluate(() => LevelFlow.Seek(386));
+  await page.locator("#codexPrompt").fill("调整这个生成区的路线");
+  await page.locator("#codexPrompt").press("Control+Enter");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 1);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].args.includes("--image"));
+  const outputDirectory = path.dirname(calls[0].args[calls[0].args.indexOf("--output-last-message") + 1]);
+  const frame = JSON.parse(fs.readFileSync(path.join(outputDirectory, "Frame.json"), "utf8"));
+  const location = JSON.parse(fs.readFileSync(path.join(outputDirectory, "Location.json"), "utf8"));
+  const screenshot = JSON.parse(fs.readFileSync(path.join(outputDirectory, "ScreenshotFrame.json"), "utf8"));
+  assert.equal(frame.context.time, 386); assert.equal(location.selection.id, "Fork");
+  assert.equal(screenshot.context.time, 384); assert.equal(screenshot.screenshot.marks.length, 1);
+  assert.ok(await page.locator("#sendCodexChat").isDisabled());
+  await page.click("#newCodexChat");
+  await page.locator("#codexPrompt").fill("第二个会话的独立草稿");
+  await page.locator(".lfChatSession").first().click();
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 1);
+  Finish(calls[0], "已调整路线，验证通过。");
+  await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
+  assert.equal(await page.locator(".lfChatMessage.assistant .lfChatBubble").textContent(), "已调整路线，验证通过。");
+  assert.ok(!(await page.locator("#codexMessages").textContent()).includes("HIDDEN_THOUGHT"));
+  assert.equal(await page.locator(".lfChatScreenshot img").evaluate(image => image.complete && image.naturalWidth > 0), true);
+  await page.screenshot({ path: path.join(out, "CodexConversation.png") });
+  await page.click("#newCodexChat");
+  assert.equal(await page.locator("#codexPrompt").inputValue(), "第二个会话的独立草稿");
+  await page.locator(".lfChatSession").first().click();
+  await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
+  await page.evaluate(() => LevelFlow.Seek(400));
+  await page.locator("#codexPrompt").fill("继续调整当前点位"); await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 2);
+  assert.equal(calls.length, 2); assert.equal(calls[1].args[1], "resume");
+  assert.ok(!calls[1].args.includes("--image"));
+  Finish(calls[1], "当前点位已处理。");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.assistant").length === 2);
+  await page.click("#newCodexChat"); await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
+  assert.equal(calls.length, 3); assert.ok(!calls[2].args.includes("resume"));
+  Finish(calls[2], "第二个会话已完成。");
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow);
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
+  await page.locator(".lfChatSession").first().click();
+  await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
+  assert.equal(await page.locator(".lfChatMessage.assistant .lfChatBubble").textContent(), "第二个会话已完成。");
+  await page.setViewportSize({ width: 878, height: 720 });
+  await page.screenshot({ path: path.join(out, "CodexConversationCompact.png") });
+  assert.ok(await page.locator("#sendCodexChat").isVisible());
+  assert.deepEqual(errors, []);
+  console.log("ok  Encounter chat browser: two columns, bubbles, screenshot marks, fresh coordinates, resume/new CLI sessions, draft switching and reload history");
+} finally {
+  await browser.close(); await new Promise(resolve => server.close(resolve));
+  assert.equal(path.dirname(storage), path.resolve(os.tmpdir()));
+  fs.rmSync(storage, { recursive: true, force: true });
+}

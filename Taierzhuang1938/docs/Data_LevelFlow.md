@@ -1,6 +1,6 @@
 # 第一关 Encounter Designer
 
-入口为高级工具 → 关卡 → Encounter Designer，独立页面 `Tool_LevelFlow.html`。工作区支持单、双、四视口，底部为共用时间轴，右侧为原文与编辑面板。场景 `cover` 标记、`Whitebox/Cover` 材质与工具布设掩体在各视口使用绿色表面、深色轮廓、浅色条纹与盾牌符号，立体标记遵循地形和物件遮挡。布设在右侧页签编辑，截图标记在独立弹窗中完成。
+入口为高级工具 → 关卡 → Encounter Designer，独立页面 `Tool_LevelFlow.html`。工作区支持单、双、四视口，底部为共用时间轴，右侧包含会话、原文与布设页签。会话页采用左列会话列表、右列气泡对话与输入框的两列布局。场景 `cover` 标记、`Whitebox/Cover` 材质与工具布设掩体在各视口使用绿色表面、深色轮廓、浅色条纹与盾牌符号，立体标记遵循地形和物件遮挡。布设在右侧页签编辑，“截图与标注”统一在独立弹窗中完成截图、箭头／框／文字标记、复制、导出与附加到会话。
 
 ## 空间与剧情来源
 
@@ -53,13 +53,15 @@
 
 空间图支持拖动平移、滚轮缩放、本段、全图、跟随战场。跟随按玩家、近敌、战车与接应点的联合范围取景，保留屏幕边距。空格播放，左右键回溯，Shift 配合左右键跳五秒，方括号换拍。阶段、全部 68 拍、滑块和贯穿播放线使用同一条全程时间轴，宽度按真实持续时间分配。镜头动画段用斜纹标记，当前段在播放栏显示拍号与“镜头动画”，悬停可查看每拍原文标题和起始时间。
 
-## 用标注图沟通
+## 截图与本机会话
 
-暂停在需要的时刻，选择箭头、框或文字并在图上画。右侧可填写文字、删除，标注端点可拖动。标注绑定世界坐标与当前帧，右侧时间书签可返回该帧。
+右栏“会话”页左列显示会话列表，右列显示当前会话的用户需求气泡与 Codex 最终答复。点击“新建会话”编写需求，首次发送时通过本机 `codex exec --json --output-last-message` 创建独立 CLI 会话；在列表选中既有会话后，后续需求通过 `codex exec resume <id>` 继续。CLI 沿用本机登录、模型与权限配置，按仓库 AGENTS.md 在独占 worktree 中修改源码。执行中可以切换其他会话，刷新后可从列表恢复查看。
 
-“导出标注图”生成一张 PNG，图下印有拍号、精确秒数、玩家位置、视图中心与比例；PNG 的 iTXt 键 `EncounterFrame` 还保存完整 JSON，包括世界坐标标注、帧定位、当时的遭遇配置及所有视口的类型、独立取景与跟随对象。直接发送 PNG 原文件即可供 agent 回读。“导入”支持这种 PNG 和工程 JSON，能恢复原帧、视图、布设与标注。“复制定位”可复制文字和时间／坐标链接。
+每次发送自动附上当时的 `Frame.json` 和 `Location.json`，包含拍号、精确秒数、玩家世界坐标、选中对象、当前遭遇草稿与各视口相机。输入框上方可展开定位预览，用户气泡下方可打开对应附件。
 
-Agent 读取用户给的 PNG 时，可用 Pillow 的 `Image.open(path).info['EncounterFrame']`，或调用 `ReadPngFrameMetadata`，再解析 JSON。重新截图或经过图片压缩的文件可能丢掉 iTXt，图下印出的拍号、时间与坐标仍可定位。
+“截图与标注”截取当前所有视口并暂停时间轴。支持箭头、框、文字、移动、撤销／重做、复制图片与导出 PNG。“附加到会话”把当前标注图放入输入区，发送前可继续标注或移除。PNG 的 iTXt 键 `EncounterFrame` 保存完整帧数据、原图与标记，可用 `ReadPngFrameMetadata` 或 Pillow 的 `Image.open(path).info['EncounterFrame']` 回读。截图拍摄时的帧另存 `ScreenshotFrame.json`，每次发送的定位按发送时刻重新采集。
+
+本地接口由 `scripts/Script_LocalPreview.mjs` 提供，只接受本机同源请求。使用 `node scripts/Script_LocalPreview.mjs --no-open` 启动，再进入本工具。会话与附件保存在当前检出的忽略目录 `tmp/EncounterCodex/`，CLI 思考、工具调用与进度事件不会进入聊天气泡。服务执行失败时显示错误并保留已提交的需求与附件。
 
 ## 维护与验证
 
@@ -76,4 +78,4 @@ Agent 读取用户给的 PNG 时，可用 Pillow 的 `Image.open(path).info['Enc
 
 `?t=384&x=32&z=106&zoom=5.5` 可传时间与地图视图，`?stage=03` / `?beat=03h` 可按段或拍定位。`window.LevelFlow.Inspect()`、`Seek(seconds)`、`JumpBeat(id)`、`Packet()` 与界面共用入口。
 
-验证运行 `Script_LevelFlowTest.mjs` 和 `Script_LevelFlowBrowserTest.mjs`。检查连续触发、波次上限、追兵和战车衔接、回溯一致性、地图来源、实际 UI 编辑、撤销、刷新恢复与 PNG 回读。验收图保存在忽略目录 `tmp/EncounterEditor/`。
+验证运行 `Script_LevelFlowTest.mjs`、`Script_LevelFlowBrowserTest.mjs`、`Script_LevelFlowCodexTest.mjs` 与 `Script_LevelFlowChatBrowserTest.mjs`。检查连续触发、波次上限、追兵和战车衔接、回溯一致性、地图来源、实际 UI 编辑、撤销、刷新恢复与 PNG 回读，以及会话两列布局、气泡、截图标注、每次发送的定位附件、新建／续聊、历史恢复、同源访问与最终答复过滤。验收图保存在忽略目录 `tmp/EncounterEditor/`。

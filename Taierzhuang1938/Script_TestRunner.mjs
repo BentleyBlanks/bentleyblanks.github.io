@@ -48,6 +48,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Encounter gates, continuous passage junctions, deterministic waves and annotation data" },
+  LevelFlowCodexTest: { file: "Script_LevelFlowCodexTest.mjs", desc: "Local Codex chat attachments, final replies, history and session resume" },
+  LevelFlowChatBrowserTest: { file: "Script_LevelFlowChatBrowserTest.mjs", timeoutMs: 90000, desc: "Encounter chat columns, bubbles, marked screenshots, automatic context and reload" },
   LevelFlowBrowserTest: { file: "Script_LevelFlowBrowserTest.mjs", timeoutMs: 180000, desc: "Encounter editor 720p, connected T-junction pixels, independent viewports and PNG round-trip" },
   AdvancedToolsTest: { file: "Script_AdvancedToolsTest.mjs", timeoutMs: 180000, desc: "高级工具拆分（纯 Node）：目录表与 TOOL_INFO 对账、搬走的页面、四个入口类的窗口地址、控制中心卡片、启动器 dry-run / .lnk / 真起预览服" },
   AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 19 张卡片与链接、九个摄影棚工具在独立工具宿主里逐个打开、四个搬走的独立页面新地址可用" },
@@ -626,6 +628,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "LevelFlowChatBrowserTest",
   "LevelFlowBrowserTest",
   "AdvancedToolsBrowserTest",
   "ToolStudioParityBrowserTest",  "HairReferenceBrowserTest",
@@ -917,7 +920,7 @@ export const domains = {
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
+  levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -1060,7 +1063,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "levelFlow", pattern: /LevelFlow/ },
+  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex/ },
   { domain: "advancedTools", pattern: /AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},

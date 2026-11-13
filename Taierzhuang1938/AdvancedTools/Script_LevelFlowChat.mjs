@@ -1,0 +1,242 @@
+const Element = id => document.getElementById(id);
+const API = "/__encounter/codex";
+
+function ContextLabel(context) {
+  return `${context.beat.toUpperCase()} · ${context.time.toFixed(2)} s · 玩家 X ${context.player[0].toFixed(1)} / Z ${context.player[1].toFixed(1)}`;
+}
+
+async function Request(route, options) {
+  const response = await fetch(`${API}${route}`, options);
+  const result = await response.json().catch(() => ({ error: "请通过本机 LocalPreview 服务打开此工具" }));
+  if (!response.ok) throw new Error(result.error || "本机会话服务不可用");
+  return result;
+}
+
+function BlobDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("截图读取失败"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export class EncounterChat {
+  constructor({ snapshot, openScreenshot, editScreenshot }) {
+    this.snapshot = snapshot;
+    this.editScreenshot = editScreenshot;
+    this.sessions = [];
+    this.current = null;
+    this.pendingImage = null;
+    this.drafts = new Map();
+    this.available = false;
+    this.loading = false;
+    this.sending = false;
+    this.selectionVersion = 0;
+    Element("newCodexChat").onclick = () => this.New();
+    Element("attachCodexScreenshot").onclick = openScreenshot;
+    Element("editCodexImage").onclick = () => this.editScreenshot(this.pendingImage);
+    Element("removeCodexImage").onclick = () => { this.pendingImage = null; this.DrawAttachment(); };
+    Element("codexPrompt").addEventListener("input", () => this.UpdateSend());
+    Element("codexPrompt").addEventListener("keydown", event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); Element("codexComposer").requestSubmit(); }
+    });
+    Element("codexComposer").onsubmit = event => { event.preventDefault(); this.Send(); };
+    this.Connect();
+    Element("codexContextSummary").parentElement.addEventListener("toggle", () => this.RefreshContext());
+    // Polling also restores runs after a browser reload. Background sessions remain in the list.
+    this.timer = setInterval(() => this.Poll(), 2000);
+    window.addEventListener("pagehide", () => clearInterval(this.timer), { once: true });
+  }
+
+  Error(message = "") {
+    Element("codexChatError").textContent = message;
+    Element("codexChatError").hidden = !message;
+  }
+
+  async Connect() {
+    try {
+      const { sessions } = await Request("/sessions");
+      this.sessions = sessions;
+      this.available = true;
+      if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
+      Element("codexConnection").textContent = "本机 Codex CLI";
+      this.DrawList();
+    } catch (error) {
+      this.available = false;
+      this.connectionError = error.message;
+      Element("codexConnection").textContent = "本机服务未连接";
+      this.Error(error.message);
+    }
+    this.UpdateSend();
+  }
+
+  SaveDraft() {
+    this.drafts.set(this.current?.id || "new", { prompt: Element("codexPrompt").value, image: this.pendingImage });
+  }
+
+  RestoreDraft() {
+    const draft = this.drafts.get(this.current?.id || "new");
+    Element("codexPrompt").value = draft?.prompt || "";
+    this.pendingImage = draft?.image || null;
+    this.DrawAttachment();
+  }
+
+  New() {
+    if (this.sending) return;
+    this.SaveDraft();
+    this.selectionVersion++;
+    this.current = null;
+    this.loading = false;
+    this.RestoreDraft();
+    this.Error(); this.Draw();
+    Element("codexPrompt").focus();
+  }
+
+  async Select(id) {
+    if (this.sending || id === this.current?.id) return;
+    this.SaveDraft();
+    const version = ++this.selectionVersion;
+    this.loading = true; this.UpdateSend();
+    try {
+      const session = await Request(`/sessions/${id}`);
+      if (version !== this.selectionVersion) return;
+      this.current = session;
+      this.RestoreDraft(); this.Error(); this.Draw();
+    } catch (error) { if (version === this.selectionVersion) this.Error(error.message); }
+    finally { if (version === this.selectionVersion) { this.loading = false; this.UpdateSend(); } }
+  }
+
+  RefreshContext() {
+    const { frame, location } = this.snapshot();
+    Element("codexContextSummary").textContent = `${ContextLabel(frame.context)} · 自动附加`;
+    const details = Element("codexContextDetail");
+    if (details.parentElement.open) details.textContent = JSON.stringify(location, null, 2);
+  }
+
+  async Attach(editor) {
+    const image = await BlobDataUrl(await editor.Blob());
+    this.pendingImage = { image, frame: editor.Packet(), capture: editor.capture, marks: structuredClone(editor.marks) };
+    this.DrawAttachment();
+  }
+
+  DrawAttachment() {
+    Element("codexPendingImage").hidden = !this.pendingImage;
+    Element("codexImagePreview").src = this.pendingImage?.image || "";
+    Element("codexImageLabel").textContent = this.pendingImage ? `标注截图 · ${ContextLabel(this.pendingImage.frame.context)}` : "";
+  }
+
+  UpdateSend() {
+    const busy = this.sending || this.loading || this.current?.status === "running";
+    Element("sendCodexChat").disabled = !this.available || busy || !Element("codexPrompt").value.trim();
+    Element("sendCodexChat").textContent = this.sending ? "提交中…" : this.current?.status === "running" ? "执行中…" : "发送";
+    Element("codexPrompt").readOnly = this.sending;
+    for (const id of ["attachCodexScreenshot", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
+  }
+
+  DrawList() {
+    const list = Element("codexSessions");
+    list.replaceChildren();
+    Element("newCodexChat").classList.toggle("selected", !this.current);
+    for (const session of this.sessions) {
+      const button = document.createElement("button");
+      button.className = "lfChatSession";
+      button.title = session.title;
+      button.classList.toggle("selected", session.id === this.current?.id);
+      button.setAttribute("aria-current", String(session.id === this.current?.id));
+      const title = document.createElement("span"), status = document.createElement("small");
+      title.textContent = session.title;
+      status.textContent = session.status === "running" ? "正在执行" : session.status === "failed" ? "需要处理" : "已完成";
+      button.append(title, status);
+      button.onclick = () => this.Select(session.id);
+      list.append(button);
+    }
+  }
+
+  Draw() {
+    this.DrawList();
+    Element("codexChatTitle").textContent = this.current?.title || "新会话";
+    const log = Element("codexMessages");
+    log.replaceChildren();
+    if (!this.current) {
+      const empty = document.createElement("div"); empty.className = "lfChatEmpty";
+      const title = document.createElement("h2"), hint = document.createElement("p");
+      title.textContent = "向 Codex 提交需求";
+      hint.textContent = "每次发送自动附上当前时间、点位与视口。";
+      empty.append(title, hint); log.append(empty);
+    }
+    for (const message of this.current?.messages || []) {
+      const row = document.createElement("article"); row.className = `lfChatMessage ${message.role}`;
+      const label = document.createElement("span"); label.className = "lfChatAuthor";
+      label.textContent = message.role === "user" ? "你" : "Codex";
+      const bubble = document.createElement("div"); bubble.className = "lfChatBubble"; bubble.textContent = message.text;
+      row.append(label, bubble);
+      if (message.frame) {
+        const attachment = document.createElement("a"); attachment.className = "lfChatFrame";
+        attachment.textContent = `定位附件 · ${ContextLabel(message.frame)}`;
+        attachment.href = message.locationUrl; attachment.target = "_blank"; attachment.rel = "noopener";
+        row.append(attachment);
+      }
+      if (message.screenshotUrl) {
+        const link = document.createElement("a"), image = document.createElement("img");
+        link.href = message.screenshotUrl; link.target = "_blank"; link.rel = "noopener"; link.className = "lfChatScreenshot";
+        image.src = message.screenshotUrl; image.alt = `标注截图 · ${ContextLabel(message.screenshotFrame)}`;
+        link.append(image); row.append(link);
+      }
+      log.append(row);
+    }
+    if (this.current?.status === "running") {
+      const pending = document.createElement("div"); pending.className = "lfChatWaiting";
+      pending.textContent = "Codex 正在处理…"; log.append(pending);
+    }
+    if (this.current?.error) this.Error(this.current.error);
+    this.UpdateSend();
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async Send() {
+    if (Element("sendCodexChat").disabled) return;
+    const { frame, location } = this.snapshot();
+    const body = { sessionId: this.current?.id, prompt: Element("codexPrompt").value, frame, location,
+      screenshot: this.pendingImage ? { image: this.pendingImage.image, frame: this.pendingImage.frame } : null };
+    const content = JSON.stringify(body);
+    if (this.lastSubmission?.content !== content) this.lastSubmission = { content, requestId: crypto.randomUUID() };
+    body.requestId = this.lastSubmission.requestId;
+    this.selectionVersion++;
+    this.sending = true; this.Error(); this.UpdateSend();
+    try {
+      this.current = await Request("/turns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      this.lastSubmission = null;
+      this.drafts.delete(body.sessionId || "new");
+      Element("codexPrompt").value = ""; this.pendingImage = null; this.DrawAttachment();
+      this.sessions = [this.current, ...this.sessions.filter(item => item.id !== this.current.id)];
+      this.Draw();
+    } catch (error) { this.Error(error.message); }
+    finally { this.sending = false; this.UpdateSend(); }
+  }
+
+  async Poll() {
+    this.RefreshContext();
+    if (this.polling || this.sending || this.loading) return;
+    this.polling = true;
+    const version = this.selectionVersion;
+    try {
+      const { sessions } = await Request("/sessions");
+      this.available = true;
+      if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
+      Element("codexConnection").textContent = "本机 Codex CLI";
+      if (this.current && !this.sending) {
+        const session = await Request(`/sessions/${this.current.id}`);
+        if (version === this.selectionVersion && !this.sending && JSON.stringify(session) !== JSON.stringify(this.current)) {
+          this.current = session; this.Draw();
+        }
+      }
+      if (version === this.selectionVersion && !this.sending) { this.sessions = sessions; this.DrawList(); }
+    } catch (error) {
+      this.available = false;
+      this.connectionError = error.message;
+      Element("codexConnection").textContent = "本机服务未连接";
+      this.Error(error.message);
+    } finally { this.polling = false; this.UpdateSend(); }
+  }
+}

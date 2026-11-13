@@ -65,10 +65,10 @@ textarea { resize: vertical; min-height: 64px; }
 .lfHistory { padding-left: 8px; border-left: 1px solid var(--lf-line); gap: 2px; }
 .lfHistory button { min-width: 29px; padding: 1px 5px; font-size: 20px; border-color: transparent; background: transparent; }
 .lfExport { margin-left: auto; }
-.lfBack { font-size: 11px; color: #a0a79e; white-space: nowrap; margin-left: 2px; }
+.lfBack { margin-left: auto; font-size: 11px; color: #a0a79e; white-space: nowrap; }
 
 /* Fine separators distinguish viewports, the reading pane and editing controls. */
-.lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) 326px; gap: 8px; padding: 8px 10px 0; flex: 1; min-height: 0; }
+.lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) clamp(460px, 43vw, 620px); gap: 8px; padding: 8px 10px 0; flex: 1; min-height: 0; }
 .lfViewport { min-width: 0; min-height: 0; position: relative; overflow: hidden; }
 .lfViewGrid { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 8px; width: 100%; height: 100%; background: var(--lf-bg); }
 .lfViewGrid[data-layout="1"] { grid-template-columns: minmax(0, 1fr); }
@@ -107,7 +107,7 @@ textarea { resize: vertical; min-height: 64px; }
 #mapLoading { position: absolute; inset: 0; display: grid; place-items: center; background: #101619f2; color: #bdbda7; border-radius: 3px; }
 
 .lfInspector { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--lf-panel); border: 1px solid var(--lf-line); border-radius: 3px; }
-.lfTabs { display: flex; flex: none; gap: 0; margin: 0 16px; padding: 0; background: transparent; border-bottom: 1px solid var(--lf-line); height: 43px; }
+.lfTabs { display: flex; flex: 1; gap: 0; margin: 0; padding: 0; background: transparent; border-bottom: 1px solid var(--lf-line); height: 43px; }
 .lfTabs button { flex: 1; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; font-size: 13px; letter-spacing: .12em; font-weight: 400; color: #9aa69f; }
 .lfTabs button.selected { background: linear-gradient(0deg,#d7c7970c,transparent); color: #e0cb99; border-bottom-color: var(--lf-accent); }
 .lfPane { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #667267 transparent; }
@@ -200,7 +200,7 @@ textarea { resize: vertical; min-height: 64px; }
   #frameHeading { max-width: 135px; font-size: 11px; padding-right: 9px; }
   .lfHistory { padding-left: 5px; }
   .lfHistory button { font-size: 18px; min-width: 25px; padding: 1px 4px; }
-  .lfWorkspace { grid-template-columns: minmax(0,1fr) 285px; gap: 9px; padding: 10px 10px 0; }
+  .lfWorkspace { grid-template-columns: minmax(0,1fr) 460px; gap: 9px; padding: 10px 10px 0; }
   .lfPane { padding: 17px; }
   .lfViewBar { gap: 3px; padding: 4px 5px; }
   .lfViewBar > span { display: none; }
@@ -210,7 +210,7 @@ textarea { resize: vertical; min-height: 64px; }
   .lfToolbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 6px; }
   .lfHistory { display: none; }
   #frameHeading { max-width: 160px; }
-  .lfWorkspace { grid-template-columns: minmax(0,1fr) 240px; gap: 7px; padding: 7px 7px 0; }
+  .lfWorkspace { grid-template-columns: minmax(240px,1fr) minmax(380px, 55vw); gap: 7px; padding: 7px 7px 0; }
   .lfPane { padding: 14px; }
   .lfViewGrid { gap: 5px; }
   .lfViewBar { height: 50px; flex-wrap: wrap; }
@@ -226,4 +226,61 @@ textarea { resize: vertical; min-height: 64px; }
   .lfAnnotationTools button { padding: 4px 7px; }
   #screenshotText { width: 130px; }
   .lfAnnotationFooter > span { display: none; }
+}
+
+/* Two-column conversation navigation and chat, with a fixed composer. */
+.lfInspectorHeader { display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--lf-line); }
+.lfInspectorHeader .lfTabs { border-bottom: 0; }
+#markScreenshot { flex: none; font-size: 11px; padding: 4px 9px; color: #dfc78f; background: #d9be7110; border-color: #a38e594d; }
+.lfChatPane { flex: 1; min-height: 0; display: grid; grid-template-columns: 124px minmax(0, 1fr); }
+.lfChatSidebar { display: flex; flex-direction: column; min-height: 0; padding: 10px 7px; border-right: 1px solid var(--lf-line); background: #111616; }
+#newCodexChat { flex: none; text-align: left; padding: 7px 8px; font-size: 11px; border-color: #6b6243; color: #e0cb99; }
+#codexSessions { flex: 1; overflow-y: auto; margin-top: 10px; scrollbar-width: thin; }
+.lfChatSession { display: block; width: 100%; text-align: left; padding: 9px 8px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; }
+.lfChatSession span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; white-space: normal; }
+.lfChatSession small { display: block; font-size: 9px; color: #87978b; margin-top: 4px; }
+.lfChatSession.selected { background: #c6af6e12; border-color: #a5915745; color: #e0cd9f; }
+.lfChatDetail { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: #101515; }
+.lfChatHeading { display: flex; flex-direction: column; gap: 2px; padding: 12px 15px; border-bottom: 1px solid #303832; }
+.lfChatHeading strong { font-size: 12px; font-weight: 500; color: #dbe0d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#codexConnection { color: #8e9b8f; font-size: 10px; }
+.lfChatMessages { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 12px; scrollbar-width: thin; scrollbar-color: #45544a transparent; }
+.lfChatEmpty { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 10px; color: #89978a; }
+.lfChatEmpty h2 { font-size: 15px; font-weight: 500; color: #c9cdbd; margin: 0 0 10px; }
+.lfChatEmpty p { font-size: 11px; line-height: 1.9; margin: 0; }
+.lfChatMessage { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 20px; }
+.lfChatMessage.user { align-items: flex-end; padding-left: 16px; }
+.lfChatAuthor { font-size: 10px; color: #8e9b8f; padding: 0 3px; }
+.lfChatBubble { border: 1px solid #34413a; border-radius: 3px 12px 12px; padding: 10px 12px; background: #19211e; color: #d6ddd2; font-size: 12px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; user-select: text; }
+.user .lfChatBubble { border-radius: 12px 3px 12px 12px; background: #343324; border-color: #6c6240; color: #e6dec8; }
+.lfChatFrame { font-size: 9px; color: #9ca98e; line-height: 1.8; overflow-wrap: anywhere; border: 1px solid #344139; padding: 4px 7px; border-radius: 4px; background: #15201b; }
+.lfChatScreenshot { display: block; max-width: 100%; }
+.lfChatScreenshot img { display: block; max-width: 100%; max-height: 160px; border: 1px solid #515944; border-radius: 4px; }
+.lfChatWaiting { color: #bbaa7c; font-size: 11px; padding: 5px 2px 12px; }
+.lfChatError { font-size: 11px; line-height: 1.7; color: #d2a197; background: #43292255; padding: 8px 12px; max-height: 100px; overflow-y: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+.lfChatComposer { flex: none; padding: 10px 12px 12px; border-top: 1px solid #303832; }
+.lfChatContext { margin-bottom: 8px; font-size: 9px; color: #a6b299; }
+.lfChatContext summary { cursor: pointer; line-height: 1.8; }
+.lfChatContext pre { max-height: 110px; overflow: auto; font-size: 9px; white-space: pre-wrap; background: #0c1110; padding: 8px; }
+#codexPrompt { display: block; width: 100%; min-height: 66px; max-height: 150px; resize: vertical; border: 1px solid #475044; border-radius: 6px; padding: 9px 10px; background: #151c19; color: #e0e4d7; font-size: 12px; line-height: 1.8; }
+#codexPrompt:focus { outline: 1px solid #ad965b; border-color: #ad965b; }
+#codexPrompt::placeholder { color: #7e8b7e; }
+.lfChatActions { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.lfChatActions button { padding: 5px 8px; font-size: 10px; }
+.lfChatActions span { flex: 1; font-size: 8px; color: #7e8b7e; text-align: right; }
+#sendCodexChat { min-width: 48px; }
+.lfPendingImage { display: flex; gap: 5px; align-items: flex-start; margin-bottom: 8px; }
+.lfPendingImage > button:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px; background: #1a231d; flex: 1; text-align: left; }
+.lfPendingImage img { width: 65px; height: 40px; object-fit: cover; border-radius: 3px; }
+.lfPendingImage span { font-size: 9px; line-height: 1.7; color: #c0c8b2; }
+#removeCodexImage { border: 0; padding: 0 4px; background: transparent; }
+@media (max-width: 1100px) {
+  .lfChatPane { grid-template-columns: 106px minmax(0, 1fr); }
+  .lfChatActions span { display: none; }
+  .lfChatActions #sendCodexChat { margin-left: auto; }
+}
+@media (max-width: 650px) {
+  .lfWorkspace { grid-template-columns: 1fr; overflow-y: auto; }
+  .lfViewport { min-height: 280px; }
+  .lfInspector { min-height: 540px; }
 }

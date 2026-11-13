@@ -252,8 +252,13 @@ try {
     passage:document.querySelector('#sourcePassage').textContent,paragraphs:document.querySelectorAll('#sourcePassage p').length}));
   assert.ok(layout.toolbar<=52,'all navigation fits in one compact row at 720p');
   assert.ok(layout.paragraphs>1,'source passage is broken into readable paragraphs');
-  await page.click('#copyFrame');
-  const locationText=await page.evaluate(()=>navigator.clipboard.readText());
+  async function ReadLocationAttachment() {
+    await page.click('[data-tab="chat"]');
+    await page.locator('.lfChatContext').evaluate(element=>{element.open=true;element.dispatchEvent(new Event('toggle'));});
+    return page.locator('#codexContextDetail').textContent();
+  }
+  assert.equal(await page.locator('#copyFrame,#copyViewports').count(),0);
+  const locationText=await ReadLocationAttachment();
   assert.ok(!locationText.includes('http'),'AI location contains no URL');
   const location=JSON.parse(locationText);
   assert.equal(location.timeline.timeSeconds,384);
@@ -266,23 +271,28 @@ try {
   assert.equal(layerState[0].fire,false);assert.equal(layerState[1].fire,true,'display settings belong to each viewport');
   await fireMenu.locator('[data-layer="fire"]').check();await fireMenu.locator('summary').click();
   let downloads=0;page.on('download',()=>downloads++);
-  await page.click('#copyViewports');
-  await page.waitForFunction(()=>document.querySelector('#flowError').textContent.includes('已复制 2 个视口'));
+  await page.click('#markScreenshot');
+  await page.click('#copyScreenshot');
+  await page.waitForFunction(()=>document.querySelector('#annotationStatus').textContent.includes('已复制标记截图'));
   const clipboard=await page.evaluate(async()=>{
     const [item]=await navigator.clipboard.read(),blob=await item.getType('image/png'),bitmap=await createImageBitmap(blob);
     const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
     const context=canvas.getContext('2d');context.drawImage(bitmap,0,0);
     const grid=document.querySelector('#viewportGrid').getBoundingClientRect();
+    const reference=document.createElement('canvas');reference.width=Math.round(grid.width);reference.height=Math.round(grid.height);
+    const referenceContext=reference.getContext('2d');
     const samples=[...document.querySelectorAll('.lfViewPane:not([hidden]) canvas')].map(source=>{
       const rect=source.getBoundingClientRect(),x=Math.floor(rect.width/2),y=Math.floor(rect.height/2);
-      return {original:[...source.getContext('2d').getImageData(x,y,1,1).data],
+      referenceContext.drawImage(source,rect.x-grid.x,rect.y-grid.y,rect.width,rect.height);
+      return {original:[...referenceContext.getImageData(Math.round(rect.x-grid.x+x),Math.round(rect.y-grid.y+y),1,1).data],
         copied:[...context.getImageData(Math.round(rect.x-grid.x+x),Math.round(rect.y-grid.y+y),1,1).data]};
     });
-    return {types:item.types,width:bitmap.width,height:bitmap.height,samples};
+    return {types:item.types,width:bitmap.width,height:bitmap.height,samples,expectedWidth:Math.round(grid.width),expectedHeight:Math.round(grid.height)};
   });
   for(const sample of clipboard.samples) assert.deepEqual(sample.copied,sample.original,'clipboard image includes pixels from both viewport canvases');
-  assert.ok(clipboard.types.includes('image/png'));assert.ok(clipboard.width>900&&clipboard.height>350);
+  assert.ok(clipboard.types.includes('image/png'));assert.equal(clipboard.width,clipboard.expectedWidth);assert.equal(clipboard.height,clipboard.expectedHeight);
   assert.equal(downloads,0,'copy viewport screenshot writes clipboard without downloading');
+  await page.click('#closeAnnotations');
   await page.click('#markScreenshot');
   assert.ok(await page.locator('#annotationDialog').isVisible());
   const frozen=await page.evaluate(()=>LevelFlow.Inspect().time);
@@ -403,8 +413,7 @@ try {
   const dollied=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);assert.notDeepEqual(dollied.freeCamera.eye,orbited.freeCamera.eye,"Alt RMB dollies");
   await page.mouse.wheel(0,-100);await page.locator('#flowMap2').focus();await page.keyboard.press('f');
   const focused=await page.evaluate(()=>LevelFlow.Inspect());assert.deepEqual(focused.viewports.views[1].center,focused.actors[0].p,"F focuses the player when no object is selected");
-  await page.click('#copyFrame');
-  const cameraLocation=JSON.parse(await page.evaluate(()=>navigator.clipboard.readText()));
+  const cameraLocation=JSON.parse(await ReadLocationAttachment());
   assert.deepEqual(cameraLocation.viewports[1].camera.eye,focused.viewports.views[1].freeCamera.eye.map(value=>Math.round(value*1000)/1000));
   assert.equal(cameraLocation.viewports[1].camera.farMetres,1500);
   await page.screenshot({path:path.join(out,'SceneNavigation.png')});

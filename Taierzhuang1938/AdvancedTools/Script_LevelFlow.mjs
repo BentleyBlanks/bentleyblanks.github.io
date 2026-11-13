@@ -6,16 +6,17 @@ import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
+import { EncounterChat } from "./Script_LevelFlowChat.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation,annotationEditor;
+let canvas,workspace,navigation,annotationEditor,chat;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
 
-let map, time=0, playing=false, mode="select", tab="script", selection=null;
+let map, time=0, playing=false, mode="select", tab="chat", selection=null;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, objectFormKey="", renderPending=false;
 const params=new URLSearchParams(location.search);
@@ -40,7 +41,7 @@ function ShowTab(value) {
     OpenAnnotations();Element("legacyAnnotations").open=true;Element("notesPane").hidden=false;return;
   }
   tab=value;
-  for(const name of ["script","edit"]) Element(`${name}Pane`).hidden=name!==value;
+  for(const name of ["chat","script","edit"]) Element(`${name}Pane`).hidden=name!==value;
   for(const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected",button.dataset.tab===value);
   objectFormKey="";UpdateObjects();UpdateAnnotations();Render();
 }
@@ -263,7 +264,7 @@ function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientR
 function Packet() {
   const rect=canvas.getBoundingClientRect();
   const packet=CreateFramePacket(project.value,frame,map,{width:rect.width,height:rect.height});
-  packet.context.viewports=workspace.Serialize();return packet;
+  packet.context.viewports=workspace.Serialize();packet.context.selection=structuredClone(selection);return packet;
 }
 
 function RestoreView(view,viewport) {
@@ -380,23 +381,6 @@ function BindControls() {
   Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
   Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
   Element("markScreenshot").onclick=OpenAnnotations;
-  Element("copyFrame").onclick=async()=>{
-    Render();
-    const text=CreateLocationText(frame,workspace,selection,project.value);
-    try {await navigator.clipboard.writeText(text);Toast("已复制时间轴、空间坐标和相机定位");}
-    catch(error) {Toast(`复制定位失败 · ${error.message}`);}
-  };
-  Element("copyViewports").onclick=async()=>{
-    const button=Element("copyViewports");button.disabled=true;
-    try {
-      navigation.Clear();Render();const capture=workspace.Capture();
-      if(!navigator.clipboard?.write||!window.ClipboardItem) throw new Error("当前浏览器不支持复制图片");
-      const image=new Promise((resolve,reject)=>capture.toBlob(blob=>blob?resolve(blob):reject(new Error("截图生成失败")),"image/png"));
-      await navigator.clipboard.write([new ClipboardItem({"image/png":image})]);
-      Toast(`已复制 ${workspace.count} 个视口的截图`);
-    } catch(error) {Toast(`复制截图失败 · ${error.message}`);}
-    finally {button.disabled=false;}
-  };
   document.addEventListener("keydown",(event)=>{
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
     if(navigation.Key(event)) return;
@@ -435,7 +419,14 @@ async function Start() {
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
-  annotationEditor=new ScreenshotAnnotations();
+  annotationEditor=new ScreenshotAnnotations(async()=>{
+    await chat.Attach(annotationEditor);annotationEditor.dialog.close();ShowTab("chat");
+  });
+  chat=new EncounterChat({
+    snapshot:()=>({frame:Packet(),location:JSON.parse(CreateLocationText(frame,workspace,selection,project.value))}),
+    openScreenshot:OpenAnnotations,
+    editScreenshot:(image)=>{if(image) annotationEditor.Open(image.capture,image.frame,image.marks);},
+  });
   Element("mapLoading").hidden=true;
   BindControls();
   window.LevelFlow={
@@ -458,6 +449,6 @@ async function Start() {
     }
   }
   if(project.warning) Toast(project.warning,true);
-  UpdateAnnotations();Render();requestAnimationFrame(Tick);
+  UpdateAnnotations();Render();chat.RefreshContext();requestAnimationFrame(Tick);
 }
 Start().catch((error)=>{Element("mapLoading").textContent=error.message;Toast(error.message,true);console.error(error);});

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113DarkWorkspace">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261113CodexChat">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -25,7 +25,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261113DragPursuit"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261113CodexChat"></script>
 </head>
 <body class="lfBody">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -33,16 +33,28 @@
     <span id="frameHeading" title="当前阶段与节拍"></span>
     <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select><button id="fitStage">本段</button><button id="fitAll">全图</button><button id="followPlayer" aria-pressed="false">跟随战场</button></div>
     <div class="lfToolGroup lfHistory"><button id="undoFlow" title="撤销布设修改 · Ctrl+Z" aria-label="撤销布设修改">↶</button><button id="redoFlow" title="重做布设修改 · Ctrl+Shift+Z" aria-label="重做布设修改">↷</button></div>
-    <div class="lfToolGroup lfExport"><button id="copyFrame" class="lfCopyPrimary" title="复制时间轴、世界坐标、相机与选中对象，供 AI 定位">复制定位</button><button id="markScreenshot" class="sePrimary">截图标记</button></div>
-    <button id="copyViewports" title="把当前所有视口合成一张图片并复制到剪贴板">复制视口截图</button>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
   <main class="lfWorkspace">
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapReadout"></div><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
-      <div class="lfTabs"><button data-tab="script" class="selected">原文</button><button data-tab="edit" title="调整触发区域、生成波次与行动路线">布设</button></div>
-      <section id="scriptPane" class="lfPane"><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button><button data-tab="edit" title="调整触发区域、生成波次与行动路线">布设</button></div><button id="markScreenshot" title="截取当前所有视口，可标注、复制、导出或附加到会话">截图与标注</button></div>
+      <section id="chatPane" class="lfChatPane" aria-label="Codex 会话">
+        <nav class="lfChatSidebar" aria-label="会话列表"><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
+        <div class="lfChatDetail">
+          <div class="lfChatHeading"><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div>
+          <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"><div class="lfChatEmpty"><h2>向 Codex 提交需求</h2><p>每次发送自动附上当前时间、点位与视口。</p></div></div>
+          <div id="codexChatError" class="lfChatError" role="status" hidden></div>
+          <form id="codexComposer" class="lfChatComposer">
+            <details class="lfChatContext"><summary id="codexContextSummary">当前定位 · 自动附加</summary><pre id="codexContextDetail"></pre></details>
+            <div id="codexPendingImage" class="lfPendingImage" hidden><button id="editCodexImage" type="button" title="继续标注"><img id="codexImagePreview" alt="待发送的标注截图"><span id="codexImageLabel"></span></button><button id="removeCodexImage" type="button" aria-label="移除截图附件">×</button></div>
+            <label class="lfSrOnly" for="codexPrompt">本次需求</label><textarea id="codexPrompt" rows="3" maxlength="20000" placeholder="描述需要调整的内容…"></textarea>
+            <div class="lfChatActions"><button id="attachCodexScreenshot" type="button">＋ 截图标注</button><span>Ctrl + Enter 发送</span><button id="sendCodexChat" class="sePrimary" type="submit">发送</button></div>
+          </form>
+        </div>
+      </section>
+      <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
       <section id="editPane" class="lfPane" hidden><p class="lfEditIntro">调整触发区域、生成波次与行动路线。修改自动保存到本机草稿，可拖动时间轴查看结果。</p><div class="lfInline"><select id="objectList" aria-label="当前布设"></select><button id="focusObject" title="定位选中的区域">定位</button></div><div class="lfInline"><button id="addTrigger">＋触发区</button><button id="addGroup">＋生成区</button></div><form id="objectForm"></form><div id="objectPreview" class="lfPreviewStatus"></div><div id="objectActions" class="lfInline" hidden><button id="addRoutePoint">加路点</button><button id="deleteObject">删除</button></div></section>
 
     </aside>
@@ -52,12 +64,12 @@
     <div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1870" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
   </footer>
   <dialog id="annotationDialog" class="lfAnnotationDialog" aria-labelledby="annotationTitle">
-    <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图标记</h2><span id="annotationHeading"></span></div><button id="closeAnnotations" aria-label="关闭截图标记">关闭 ×</button></div>
+    <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图与标注</h2><span id="annotationHeading"></span></div><button id="closeAnnotations" aria-label="关闭截图标记">关闭 ×</button></div>
     <div class="lfAnnotationTools">
       <div class="lfToolGroup"><button data-mark-tool="arrow" aria-pressed="true">箭头</button><button data-mark-tool="rect" aria-pressed="false">框</button><button data-mark-tool="text" aria-pressed="false">文字</button></div>
       <input id="screenshotText" type="text" maxlength="2000" placeholder="点击截图添加文字" aria-label="标记文字" disabled>
       <div class="lfToolGroup"><button id="undoAnnotation" title="Ctrl+Z">撤销</button><button id="redoAnnotation" title="Ctrl+Shift+Z">重做</button><button id="deleteScreenshotAnnotation">删除选中</button></div>
-      <div class="lfToolGroup lfExport"><button id="copyScreenshot" class="lfCopyPrimary">复制图片</button><button id="exportFrame" class="sePrimary">导出 PNG</button></div>
+      <div class="lfToolGroup lfExport"><button id="copyScreenshot">复制图片</button><button id="exportFrame">导出 PNG</button><button id="attachScreenshot" class="sePrimary">附加到会话</button></div>
     </div>
     <div id="annotationStage" class="lfAnnotationStage"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas></div>
     <div class="lfAnnotationFooter"><span>拖画箭头或框 · 点击添加文字 · 拖动已有标记可移动</span><output id="annotationStatus" role="status"></output></div>

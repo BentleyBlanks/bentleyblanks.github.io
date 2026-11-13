@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
+import { CreateEncounterCodexHandler } from "./Script_EncounterCodexServer.mjs";
 // 白盒关卡编辑器的「记下当前机位」。配置模块是纯的（node 与浏览器共用），导入时不抛错：
 //   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
 //   POST /__blockout/save   { level, doc, revision } → 写 Taierzhuang1938/Blockout/<Level>.json
@@ -352,6 +353,7 @@ async function ProbeExisting(port) {
 const mounts = new Map(); // absRoot -> { port, server }
 
 function CreateServer(rootDir, context) {
+  const handleEncounterCodex = CreateEncounterCodexHandler(rootDir);
   return http.createServer(async (request, response) => {
     const [rawRoute, query] = request.url.split("?");
     let route;
@@ -362,6 +364,7 @@ function CreateServer(rootDir, context) {
       response.end(JSON.stringify({ app: APP_ID, root: rootDir, port: context.port }));
       return;
     }
+    if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
     if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
     if (route === "/__preview" || route === "/__preview/") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
