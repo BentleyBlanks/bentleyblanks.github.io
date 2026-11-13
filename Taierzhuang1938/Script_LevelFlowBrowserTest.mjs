@@ -42,6 +42,27 @@ try {
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
   assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
   assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
+  for(const type of ['scene','plan','battle','oblique','chase','eye']) {
+    await page.evaluate(type=>LevelFlow.SetViewType(1,type),type);
+    for(const playing of [true,false]) {
+      await page.evaluate(playing=>{LevelFlow.Seek(384);LevelFlow.SetPlaying(playing);},playing);
+      const box=await page.locator('#flowMap2').boundingBox();
+      const x=box.x+box.width/2,y=box.y+24;
+      await page.mouse.move(x,y);await page.mouse.down();
+      assert.equal(await page.evaluate(()=>LevelFlow.Inspect().playing),playing,`${type} mouse press preserves playback`);
+      const start=await page.evaluate(()=>LevelFlow.Inspect().time);
+      await page.mouse.move(x+35,y+20,{steps:4});
+      if(playing) await page.waitForFunction(start=>LevelFlow.Inspect().time>start,start);
+      else assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),start,`${type} drag keeps paused time fixed`);
+      assert.equal(await page.locator('#playFlow').getAttribute('aria-pressed'),String(playing));
+      await page.mouse.up();
+      assert.equal(await page.evaluate(()=>LevelFlow.Inspect().playing),playing,`${type} mouse release preserves playback`);
+      await page.mouse.click(x,y);
+      assert.equal(await page.evaluate(()=>LevelFlow.Inspect().playing),playing,`${type} click preserves playback`);
+      await page.evaluate(()=>LevelFlow.SetPlaying(false));
+    }
+  }
+  await page.evaluate(defaults=>LevelFlow.RestoreViewports(defaults),defaults);
   await page.evaluate(()=>LevelFlow.Seek(600));
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views)).map(view=>view.freeCamera),defaults.views.map(view=>view.freeCamera),'scrubbing preserves both manually controlled Scene cameras');
   await page.evaluate(()=>LevelFlow.Seek(384));

@@ -266,7 +266,6 @@ function BindMap(entry) {
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
     if(mode==="route"&&selection?.type==="group") {Apply((document)=>document.groups.find((item)=>item.id===selection.id).route.push(world));SetMode("select");ShowTab("edit");return;}
     const action=mode!=="select"?"annotate":["areaHandle","routeHandle","annotationHandle"].includes(hit?.type)?"edit":entry.map.type?"select":"pan";
-    if(action!=="pan") SetPlaying(false);
     pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
