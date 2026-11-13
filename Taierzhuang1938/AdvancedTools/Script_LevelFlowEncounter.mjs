@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -85,7 +85,15 @@ export function CreateEncounterDocument(timeline, waves) {
         || (formation.route||group.route).slice(1).map(point=>point.map((value,axis)=>value+offset[axis]))),
     }));
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-pit-retreat-1",triggers,groups,annotations:[]};
+  for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
+    const group=groups.find(entry=>entry.id===reinforcement.id);
+    Object.assign(group,{beat:"03f",area:Area(reinforcement.center,3,3),route:structuredClone(reinforcement.route),
+      interval:0,lifetime:800,speed:3.2,behavior:"advance",
+      deployDelay:Find("03g").start+4+reinforcement.delay-Find("03f").start,
+      note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
+    Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
+  }
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-friend-reinforcements-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -463,7 +471,7 @@ function UpgradePursuit(value, defaults) {
   return value;
 }
 
-export function UpgradeEncounterDocument(input,defaults) {
+function UpgradeLegacyEncounterDocument(input,defaults) {
   if(input.revision==="2026-11-13-drag-pursuit-1") return UpgradePursuit(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-ground-formation-1") return UpgradeDragPursuit(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-flank-refill-1") return UpgradeGroundFormations(structuredClone(input),defaults);
@@ -504,4 +512,27 @@ export function UpgradeEncounterDocument(input,defaults) {
     }
   }
   return UpgradeFlankReinforcement(value,defaults);
+}
+
+export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision===defaults.revision) return input;
+  const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
+  if(upgraded===input && input.revision!=="2026-11-13-pit-retreat-1") return input;
+  const value=structuredClone(upgraded);
+  for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
+    const current=value.groups.find(entry=>entry.id===reinforcement.id);
+    const next=defaults.groups.find(entry=>entry.id===reinforcement.id);
+    const previous=reinforcement.previous;
+    if(!current || !next || current.memberPlans || current.spawnOffsets || current.deployDelay!==undefined
+      || JSON.stringify(current.route)!==JSON.stringify(previous.route)
+      || JSON.stringify(current.area)!==JSON.stringify(previous.area)) continue;
+    for(const [key,entry] of Object.entries(previous)) {
+      if(JSON.stringify(current[key])===JSON.stringify(entry)) current[key]=structuredClone(next[key]);
+    }
+    current.deployDelay=next.deployDelay;
+    const trigger=value.triggers.find(entry=>entry.id===current.triggerId);
+    if(trigger?.mode==="time" && trigger.delay===0 && trigger.beat===previous.beat) trigger.beat=next.beat;
+  }
+  value.revision=defaults.revision;
+  return value;
 }

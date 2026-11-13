@@ -201,6 +201,18 @@ export const FLOW_GROUND = {
 
 // Ground pursuit blocking. Separate lanes and staggered depth are authored
 // preview choices. Bounds groups advance in two mutually covering pairs.
+export const FLOW_FRIEND_REINFORCEMENTS = [
+  {id:"DragGround",center:[48,153],delay:0,
+    route:[[48,153],[42,153],[36,155],[24,144],[20,120],[20,96]],
+    previous:{beat:"03a",area:{shape:"rect",center:[20,96],size:[3,3]},route:[[20,96]],interval:2,lifetime:800,speed:2.2,behavior:"guard",note:"关卡调度布设"}},
+  {id:"CrestWest",center:[51,156],delay:2,
+    route:[[51,156],[48,150],[42,153],[36,155],[29,142],[28.5,129]],
+    previous:{beat:"03g",area:{shape:"rect",center:[27.5,128],size:[3,3]},route:[[27.5,128],[28.5,129]],interval:2,lifetime:160,speed:2.2,behavior:"guard",note:"关卡调度布设"}},
+  {id:"FieldGround",center:[56,154],delay:4,
+    route:[[56,154],[65,153],[72,149],[79,147],[64,132],[54,126],[48,122]],
+    previous:{beat:"03a",area:{shape:"rect",center:[48,122],size:[3,3]},route:[[48,122]],interval:2,lifetime:800,speed:2.2,behavior:"guard",note:"关卡调度布设"}},
+];
+
 export const FLOW_GROUND_FORMATIONS = [
   {id:"GroundWest", previousAreaSize:[3,3], areaSize:[10,22],
     offsets:[[-4.5,-0.5],[-3.3,-3.5],[-4.5,-5.5],[-3.3,-10]], delays:[0,0.8,0,0.8],
@@ -281,7 +293,7 @@ export const FLOW_BEATS = [
   { id: "03f", stage: "03", duration: 24, title: "到支沟口，幺娃扛枪赶来", p: [[30,66.8],[23.5,67.2]], pose: "drag",
     passage: "幺娃从交通沟北头连滚带爬下来，扛着捷克式：「班长！机枪手死在坑头了，后头跟起来了！」", task: "拖到支沟口，准备南拐", threat: "交通沟北头追兵", gate: "单被进入支沟口", exit: "班长接过捷克式", winter: "drag", zone: [23.5,67.2,3], planning: "幺娃带传令兵、机枪副手和一名川军伤兵从机枪坑沿北沟撤回；三人均负伤存活，错开距离跟随。追兵已在后方沿同一来路推进，在北沟沙包后停步射击，保持交战距离。" },
   { id: "03g", stage: "03", duration: 40, title: "班长压北面，玩家打北沿", p: [[23.5,67.2],[25,71]], pose: "shoot",
-    passage: "班长把机枪架在拐角朝北压。追兵从北侧坡道分两波下沟，沿交通沟追到岔口，玩家与班长交替掩护，把冬瓜向南拖。", task: "挡住北坡下沟的第一波，准备南撤", threat: "③ 北侧坡道 → 北沟 → 岔口", gate: "单被准备往南拐", exit: "北坡第一波解除，第二波接上，班长继续压北", planning: "③ 从标记 1 的北侧坡道先来两波，每波三人。第二波在第一波之后接入，迫使玩家从岔口向南撤。", winter: "ground", wave: "Rim", fire: "north" },
+    passage: "班长把机枪架在拐角朝北压。追兵从北侧坡道分两波下沟，沿交通沟追到岔口，玩家与班长交替掩护，把冬瓜向南拖。", task: "挡住北坡下沟的第一波，准备南撤", threat: "③ 北侧坡道 → 北沟 → 岔口", gate: "单被准备往南拐", exit: "北坡第一波解除，第二波接上，班长继续压北", planning: "③ 从标记 1 的北侧坡道先来两波，每波三人。第二波在第一波之后接入，迫使玩家从岔口向南撤。后方集结处的八名援兵听到枪声后分三路赶来：三人沿西侧外沿去拖行段，两人去坡顶西侧，三人经东侧坡道去东侧地面；途中不开火，到位后阻击。", winter: "ground", wave: "Rim", fire: "north" },
   { id: "03h", stage: "03", duration: 44, title: "边打边撤，拖过坡顶", p: [[25,71],[26,76.6],[30,86],[30,86],[32.5,101],[32.5,101],[35,116],[35,131],[35,141.5]], pace: [0,0.1,0.22,0.32,0.5,0.6,0.68,0.86,1], pose: "drag",
     passage: "班长边打边退：「拖！往坡上拖！」翻过坡顶，别的班在沟沿上接应：「这边！快过来！」", task: "翻坡顶，进干沟", threat: "北侧追兵＋东侧地面战车提前露面，坡顶机枪接应", gate: "北沟两波追兵接上", exit: "单被过坡顶，前沿三回结束", planning: "玩家到达标记 2 的拐弯处 X30、Z86 后，西侧追兵从土墙遮蔽的后方进入，绕墙北端经坡道下沟。两批各三人逐段追来，在弯口保留射击距离，玩家借沙包停拖回击后继续向坡顶撤。", winter: "drag", zone: [35,131,4] },
   { id: "04a", stage: "04", duration: 20, title: "下干沟，伤员等担架", p: [[35,141.5],[46,149]], pose: "walk",

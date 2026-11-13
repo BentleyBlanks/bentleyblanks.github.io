@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FLOW_TIMELINE, FLOW_DURATION, STAGE_TIMELINE, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, EvaluateFlow, OPENING_ENEMY_ENTRY_TIME, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
-import { CompileEncounters, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
+import { CompileEncounters, ValidateEncounterDocument, UpgradeEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_PURSUIT } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
-import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD, FLOW_FRIEND_REINFORCEMENTS } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
@@ -493,6 +493,69 @@ assert.deepEqual(updatedDraft.groups.find(group=>group.id==="Fork").route,Group(
 assert.ok(updatedDraft.groups.some(group=>group.id==="TrafficFlank"));
 assert.ok(!updatedDraft.groups.some(group=>group.id==="SearchNeighbor"));
 ValidateEncounterDocument(updatedDraft,FLOW_TIMELINE);
+
+const reinforcementIds=FLOW_FRIEND_REINFORCEMENTS.map(plan=>plan.id);
+const ReinforcementsAt=time=>EvaluateFlow(time).actors.filter(actor=>reinforcementIds.includes(actor.groupId));
+assert.equal(ReinforcementsAt(BeatById("03f").start-0.01).length,0,"reinforcements are not pre-positioned before the call for help");
+assert.equal(ReinforcementsAt(BeatById("03f").start).length,8,"all eight assemble in the rear camp before departure");
+for(const plan of FLOW_FRIEND_REINFORCEMENTS) {
+  const group=defaults.groups.find(entry=>entry.id===plan.id);
+  const departure=BeatById("03f").start+group.deployDelay;
+  const waiting=ReinforcementsAt(departure-0.01).filter(actor=>actor.groupId===plan.id);
+  assert.equal(waiting.length,group.count);
+  for(const actor of waiting) {
+    assert.ok(Distance(actor.p,plan.center)<2,"waiting soldiers remain at the camp");
+    assert.ok(!actor.firing&&actor.pose==="kneel","waiting soldiers do not fire from their future posts");
+  }
+  const moving=ReinforcementsAt(departure+3).filter(actor=>actor.groupId===plan.id);
+  assert.ok(moving.every(actor=>actor.pose==="run"&&!actor.firing&&Distance(actor.p,plan.center)>group.speed*2),"each route visibly runs out from the camp");
+  const length=plan.route.slice(1).reduce((sum,point,index)=>sum+Distance(plan.route[index],point),0);
+  const arrival=departure+length/group.speed;
+  assert.ok(arrival<BeatById("03h").start,"all three blocking positions are occupied before the retreat crosses the crest");
+  for(const actor of ReinforcementsAt(arrival+0.1).filter(actor=>actor.groupId===plan.id)) {
+    assert.ok(Distance(actor.p,plan.route.at(-1))<2&&actor.firing&&actor.pose==="shoot","arrived reinforcements hold their assigned blocking position");
+  }
+  const earlier=ReinforcementsAt(departure+3);
+  ReinforcementsAt(398.287);
+  assert.deepEqual(ReinforcementsAt(departure+3),earlier,"rewinding restores the same reinforcement positions");
+  let previousActors=ReinforcementsAt(departure-0.01).filter(actor=>actor.groupId===plan.id);
+  for(let time=departure+0.24;time<=arrival+0.5;time+=0.25) {
+    const actors=ReinforcementsAt(time).filter(actor=>actor.groupId===plan.id);
+    for(const actor of actors) {
+      const previous=previousActors.find(entry=>entry.id===actor.id);
+      assert.ok(Distance(actor.p,previous.p)<=group.speed*0.25+0.001,"reinforcements walk continuously without teleporting");
+      for(const cover of map.objects.filter(object=>object.id.startsWith("Encounter_")&&object.size?.[1]>=0.8)) {
+        const [x,,z]=cover.pos,[width,,depth]=cover.size;
+        assert.ok(Math.abs(actor.p[0]-x)>=width/2+0.25||Math.abs(actor.p[1]-z)>=depth/2+0.25,"all three reinforcement lanes clear the authored blocking cover");
+      }
+    }
+    previousActors=actors;
+  }
+}
+const oldReinforcements=structuredClone(defaults);
+oldReinforcements.revision="2026-11-13-pit-retreat-1";
+for(const plan of FLOW_FRIEND_REINFORCEMENTS) {
+  Object.assign(oldReinforcements.groups.find(group=>group.id===plan.id),structuredClone(plan.previous));
+  delete oldReinforcements.groups.find(group=>group.id===plan.id).deployDelay;
+  oldReinforcements.triggers.find(trigger=>trigger.id===`Trigger_${plan.id}`).beat=plan.previous.beat;
+}
+const migratedReinforcements=UpgradeEncounterDocument(oldReinforcements,defaults);
+for(const id of reinforcementIds) assert.deepEqual(migratedReinforcements.groups.find(group=>group.id===id),defaults.groups.find(group=>group.id===id),"old unchanged groups receive the full reinforcement choreography");
+assert.deepEqual(UpgradeEncounterDocument(migratedReinforcements,defaults),migratedReinforcements,"migration is idempotent");
+const customizedReinforcements=structuredClone(oldReinforcements);
+customizedReinforcements.groups.find(group=>group.id==="DragGround").route.push([16,90]);
+customizedReinforcements.groups.find(group=>group.id==="FieldGround").count=4;
+customizedReinforcements.groups.find(group=>group.id==="FieldGround").enabled=false;
+customizedReinforcements.groups=customizedReinforcements.groups.filter(group=>group.id!=="CrestWest");
+const preservedReinforcements=UpgradeEncounterDocument(customizedReinforcements,defaults);
+assert.deepEqual(preservedReinforcements.groups.find(group=>group.id==="DragGround"),customizedReinforcements.groups.find(group=>group.id==="DragGround"),"custom routes are never replaced");
+assert.equal(preservedReinforcements.groups.find(group=>group.id==="FieldGround").count,4);
+assert.equal(preservedReinforcements.groups.find(group=>group.id==="FieldGround").enabled,false);
+assert.ok(!preservedReinforcements.groups.some(group=>group.id==="CrestWest"),"deleted groups stay deleted");
+ValidateEncounterDocument(preservedReinforcements,FLOW_TIMELINE);
+const importedReinforcements=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>null,setItem:()=>{}});
+importedReinforcements.Replace(oldReinforcements);
+assert.deepEqual(importedReinforcements.value,migratedReinforcements,"project imports use the same migration as stored drafts");
 
 const invalidViews=structuredClone(packet);invalidViews.context.viewports={count:4,active:0,views:[]};
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
