@@ -272,6 +272,10 @@ export class FlowMapView {
     } else if(actor.heavy) {
       Circle(context,p,4.5,color,"#111c17");Line(context,[[p[0]-6,p[1]+4],[p[0]+6,p[1]+4]],color,2);Line(context,[[p[0],p[1]],[p[0],p[1]-11]],color,3);
     } else Circle(context,p,actor.side==="player"?6:actor.side==="enemy"?4:4.5,color,"#111c17");
+    if (actor.carryingAmmo) {
+      context.fillStyle="#94774f";context.strokeStyle="#493d2b";
+      context.fillRect(p[0]-4,p[1]+3,8,5);context.strokeRect(p[0]-4,p[1]+3,8,5);
+    }
   }
 
   DrawScale(context,width,height) {

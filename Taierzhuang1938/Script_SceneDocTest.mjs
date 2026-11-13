@@ -98,8 +98,12 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
 {
   const { doc: wb, heights: carved, pre, plan } = ReadSceneSync("FirstLevelWhitebox");
   const formal = ReadSceneSync("FirstLevel");
-  Check(plan && plan.segments.length === 28 && wb.trenches.segments.length === 28, `两个场景都带 28 段样条沟（01–05 二十六段 + 11–18 两段）`);
-  Check(JSON.stringify(formal.doc.trenches) .replace(/FirstLevel\.trench/g, "X") === JSON.stringify(wb.trenches).replace(/FirstLevelWhitebox\.trench/g, "X"), "白盒、正式两个场景的壕沟一样");
+  const campIds = ["CampNorthWestDefense", "CampNorthCenterDefense", "CampEastDefense"];
+  Check(plan && plan.segments.length === 31 && wb.trenches.segments.length === 31 && formal.doc.trenches.segments.length === 28,
+    "白盒 31 段样条沟，含集结处新增三条阻击壕；正式场景 28 段");
+  const sharedTrenches = {...wb.trenches, segments: wb.trenches.segments.filter(segment => !campIds.includes(segment.id))};
+  Check(campIds.every(id => wb.trenches.segments.some(segment => segment.id === id)), "集结处北侧两条、东侧一条阻击壕齐全");
+  Check(JSON.stringify(formal.doc.trenches).replace(/FirstLevel\.trench/g, "X") === JSON.stringify(sharedTrenches).replace(/FirstLevelWhitebox\.trench/g, "X"), "白盒与正式场景原有 28 段壕沟逐项一致");
   // 高度图是没挖的；现挖之后沟底在基准面下约一个沟深
   const t = wb.terrain, at = (h, x, z) => h[Math.round((z - t.minZ) / t.cellM) * (t.cols + 1) + Math.round((x - t.minX) / t.cellM)];
   const fm = plan.segments.find((s) => s.id === "FrontMid"), st = fm.stations[Math.floor(fm.stations.length / 2)];
@@ -120,7 +124,7 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(!bv.ok && bv.errors.some((e) => /roots\.chance 超出/.test(e)) && bv.errors.some((e) => /mystery 不认识/.test(e)) && bv.errors.some((e) => /look 要是/.test(e)), `校验报出细节写错：${bv.errors.slice(0, 3).join("；")}`);
   // 每一段只带自己范围里的沟
   const segs = (k) => ReadBlockoutSceneDocSync(k).trenchPlan?.segments.map((s) => s.id) || [];
-  Check(segs("FirstLevel0105").length === 26 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 26 段、11–18 那一块只带村北两段");
+  Check(segs("FirstLevel0105").length === 29 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 29 段、11–18 那一块只带村北两段");
 }
 
 console.log(`场景文件测试全过（${checks} 项）`);

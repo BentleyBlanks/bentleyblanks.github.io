@@ -541,6 +541,30 @@
   ],
   "encounterReviews": [
     {
+      "id": "L1-04C-455569",
+      "date": "2026-11-13",
+      "scope": "User-directed forward squad defense at the dry-gully camp while Old Geng and civilians load ammunition and evacuate Winter. Three shallow fighting trenches and four parapets are creative encounter staging. Positions, personnel and timings are design values.",
+      "files": [
+        "AdvancedTools/Data_LevelFlow.mjs",
+        "AdvancedTools/Script_LevelFlowModel.mjs",
+        "Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",
+        "docs/Data_LevelFlow.md"
+      ],
+      "codexEntry": "HistoryAndCreation / invented / 撤退与反冲",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-13T07:22:58.089Z",
+          "scope": "Camp creative row and dated status updated with forward defense, ammunition loading and fighting trenches."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-13T07:20:56.123Z",
+          "scope": "Existing creative front-line staging bullet updated with camp defense and ammunition loading."
+        }
+      ]
+    },
+    {
       "id": "L1-02I-149625",
       "date": "2026-11-13",
       "scope": "Opening fugitives meet northeastern flanking troops in the north trench, then move south to block the branch junction during casualty evacuation. Creative encounter staging; counts, coordinates and timings are design values.",

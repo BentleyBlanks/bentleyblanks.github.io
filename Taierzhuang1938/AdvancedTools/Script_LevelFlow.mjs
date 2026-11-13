@@ -122,6 +122,8 @@ function UpdateTimeline() {
     Element("timelineMode").hidden=!ENCOUNTER_CINEMATICS.includes(frame.beat.id);Element("timelineMode").textContent=`${frame.beat.id.toUpperCase()} 镜头动画`;
     Element("beatId").textContent=frame.beat.id.toUpperCase();Element("beatTitle").textContent=frame.beat.title;
     Element("stageStatus").textContent=frame.stage.status;FormatSourcePassage(Element("sourcePassage"),FLOW_SOURCE_EXCERPTS[frame.beat.id]);
+    Element("planningNote").hidden=!frame.beat.planning;
+    Element("planningNote").textContent=frame.beat.planning?`当前编排 · ${frame.beat.planning}`:"";
     for(const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected",button.dataset.beat===shownBeat);
   }
   Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;

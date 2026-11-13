@@ -71,6 +71,24 @@ export const FLOW_OPENING_RETREAT = {
   fallFractions: [0.76,0.86,0.96],
 };
 
+// 04B–04D user-directed defense while the camp loads ammunition and casualties.
+// Keys use [beat, fraction, x, z]. The last keys rejoin the 05A marching formation.
+export const FLOW_CAMP_DEFENSE = [
+  { id: "luo", readyFraction: 0.52, keys: [["04b",0,57,150],["04b",0.14,65,153],["04b",0.32,72,149],["04b",0.43,72,137],["04b",0.52,66,129],["04d",0,66,129],["04d",0.35,72,137],["04d",0.65,65,153],["04d",1,56.8,154.3]] },
+  { id: "he", readyFraction: 0.7, keys: [["04b",0,49,152],["04b",0.2,48,150],["04b",0.35,42,153],["04b",0.55,45,140],["04b",0.7,57,127],["04d",0,57,127],["04d",0.35,45,140],["04d",0.65,48,150],["04d",1,59.3,156.8]] },
+  { id: "liu", readyFraction: 0.52, keys: [["04b",0,52,150],["04b",0.18,65,153],["04b",0.4,72,149],["04b",0.52,84,145],["04d",0.15,84,145],["04d",0.45,72,149],["04d",0.7,65,153],["04d",1,57.5,152.8]] },
+  { id: "yao", readyFraction: 0.6, keys: [["04b",0,50,149],["04b",0.2,65,153],["04b",0.42,79,147],["04b",0.6,86.4,143.2],["04d",0.15,86.4,143.2],["04d",0.5,79,147],["04d",0.75,65,153],["04d",1,56.2,157.8]], heavy: true },
+];
+
+export const FLOW_CAMP_LOADING = {
+  startBeat: "04b", finishBeat: "04d", cycleSeconds: 32, memberDelaySeconds: 7, finishSeconds: 8,
+  members: [
+    {id:"geng",name:"老耿",route:[[50,136.8],[47.5,143],[50,149],[54,153.5]],end:[54,154]},
+    {id:"ammoCarrier1",name:"运弹药的老乡",route:[[50.8,136.8],[48.1,143],[50.8,149],[54.5,153.5]],end:[54.8,154]},
+    {id:"ammoCarrier2",name:"运弹药的老乡",route:[[51.6,136.8],[48.7,143],[51.6,149],[55,153.5]],end:[55.6,154]},
+  ],
+};
+
 // Authored encounter staging. Heights are relative to the planning trench floor.
 // These placements and timings are creative blocking for the design tool.
 export const FLOW_GROUND = {
@@ -194,11 +212,11 @@ export const FLOW_BEATS = [
   { id: "04a", stage: "04", duration: 20, title: "下干沟，伤员等担架", p: [[35,141.5],[46,149]], pose: "walk",
     passage: "满地伤号，老乡两人抬一副担架往南送。老耿的驴车停在树下，妮儿站在车边。冬瓜躺在单被上等担架。", task: "跟到集结处", threat: "前沿在坡顶另一边", gate: "过坡顶", exit: "勤务兵叫住顺子" },
   { id: "04b", stage: "04", duration: 35, title: "先抬营长的皮箱", p: [[46,149],[52,151],[55,154]], pose: "carry",
-    passage: "任务字：把箱子抬上车。玩家自己去抬。何有田小声：「日你妈，人还不如箱子。」", task: "把箱子抬上车", threat: "冬瓜仍在地上等", gate: "拾起皮箱", exit: "箱子在车上", prop: "case" },
+    passage: "任务字：把箱子抬上车。玩家自己去抬。何有田小声：「日你妈，人还不如箱子。」", task: "把箱子抬上车", threat: "班长带队前出阻击，冬瓜仍在地上等", gate: "拾起皮箱", exit: "箱子在车上", prop: "case", planning: "班长带何有田、刘文财和幺娃分路进入北侧两处射击壕与东侧折线阻击壕。老耿与两名老乡在后方弹药堆和驴车之间搬运弹药。" },
   { id: "04c", stage: "04", duration: 20, title: "老乡把冬瓜抬上担架", p: [[55,154]], pose: "look",
-    passage: "两个老乡把冬瓜抬上担架。", task: "等后送队起行", threat: "短暂安全", gate: "担架到达", exit: "冬瓜上担架" },
+    passage: "两个老乡把冬瓜抬上担架。", task: "等后送队起行", threat: "北、东两面仍在交火，班长带队阻击掩护装运", gate: "担架到达", exit: "冬瓜上担架", planning: "罗班长、何有田守北侧两处射击壕；刘文财、幺娃守东侧折线壕，压住跟车步兵。老耿等人继续搬弹药，另两名老乡抬冬瓜。壕沿沙包和东向胸墙遮住车道方向的射线，保留后侧撤回干沟的通路。" },
   { id: "04d", stage: "04", duration: 15, title: "三班跟车殿后", p: [[55,154],[58.2,156.8]], pose: "walk",
-    passage: "班长：「听到没得？跟到车屁股，压住后头！」任务字：跟着后送队，压住后头。", task: "跟着后送队，压住后头", threat: "北面将有追兵", gate: "后送命令", exit: "队伍拐进凹路" },
+    passage: "班长：「听到没得？跟到车屁股，压住后头！」任务字：跟着后送队，压住后头。", task: "跟着后送队，压住后头", threat: "前出小队交替撤回，北面与东侧攻势仍在", gate: "后送命令", exit: "队伍拐进凹路", planning: "车和担架先起行，北侧两人先撤、东侧两人多压一阵，再沿各自来路收回车后，接入凹路殿后队形。" },
   { id: "05a", stage: "05", duration: 55, title: "担架、驴车、小队依次行军", p: [[58.2,156.8],[70,158.6],[80,158.6],[83,161],[83,175],[80,199]], pose: "walk",
     passage: "担架在前，老耿的车居中，殿后的班跟在车屁股后头；冬瓜的担架在顺子前头两步。", task: "跟着冬瓜的担架", threat: "两米土壁，路上只有一车宽", gate: "进入凹路", exit: "远处飞机出现" },
   { id: "05b", stage: "05", duration: 18, title: "三架飞机高高向南飞过", p: [[80,199],[84,214]], pose: "look",

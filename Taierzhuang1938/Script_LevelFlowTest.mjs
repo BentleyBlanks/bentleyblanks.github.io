@@ -323,6 +323,38 @@ const invalidViews=structuredClone(packet);invalidViews.context.viewports={count
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
 const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+const campFrame = EvaluateFlow(455.569);
+const campDefenders = campFrame.actors.filter(actor => ["luo","he","liu","yao"].includes(actor.id));
+assert.equal(campDefenders.length,4);
+for (const actor of campDefenders) {
+  assert.ok(actor.p[1] < 148 && actor.firing && actor.pose === "shoot", "04C squad holds the forward trenches");
+  assert.ok(campFrame.effects.some(effect => effect.kind === "fire" && Distance(effect.a,actor.p) < 0.01), "each defender covers the loading party");
+  const trench = map.trenches.find(entry => entry.id === (actor.id === "he" ? "CampNorthWestDefense" : actor.id === "luo" ? "CampNorthCenterDefense" : "CampEastDefense"));
+  assert.ok(Math.min(...trench.points.slice(1).map((end,index) => SegmentDistance(actor.p,trench.points[index],end))) < 0.1, "defenders stand inside their authored trench floor");
+  assert.ok(terrain.heightAt(...actor.p) + 0.5 < terrain.heightAt(actor.p[0],actor.p[1]-4), "the actual scene terrain excavates each fighting position below the forward lip");
+}
+assert.ok(campFrame.actors.some(actor => actor.id === "yao" && actor.heavy));
+assert.equal(campFrame.actors.filter(actor => ["geng","ammoCarrier1","ammoCarrier2"].includes(actor.id)).length,3);
+assert.ok(campFrame.actors.some(actor => actor.carryingAmmo && actor.pose === "carry"));
+assert.equal(campFrame.actors.filter(actor => ["carrier1","carrier2"].includes(actor.id)).length,2);
+const campCover = map.objects.filter(object => /^Camp(North|East).*(Parapet)$/.test(object.id));
+assert.equal(campCover.length,4);
+for (let stamp = BeatById("04a").start; stamp < BeatById("05a").start; stamp += 0.2) {
+  for (const actor of EvaluateFlow(stamp).actors.filter(actor => ["player","winter","cart"].includes(actor.id))) {
+    for (const cover of campCover) assert.ok(Math.abs(actor.p[0]-cover.pos[0]) > cover.size[0]/2+0.8 || Math.abs(actor.p[1]-cover.pos[2]) > cover.size[2]/2+0.8, "new parapets preserve casualty and cart clearance");
+  }
+}
+for (const stamp of [435,447,455.569,474.999,475,480,489.999,490]) {
+  const snapshot = EvaluateFlow(stamp);EvaluateFlow(0);EvaluateFlow(600);
+  assert.deepEqual(EvaluateFlow(stamp),snapshot,"camp deployment and loading remain deterministic after seeking");
+}
+for (const id of ["luo","he","liu","yao","geng"]) {
+  for (const boundary of [435,455,475,490]) {
+    const before = EvaluateFlow(boundary-0.001).actors.find(actor => actor.id === id);
+    const after = EvaluateFlow(boundary+0.001).actors.find(actor => actor.id === id);
+    assert.ok(Distance(before.p,after.p) < 0.03, "camp actors cross beat boundaries continuously");
+  }
+}
 // The annotated 03B formation is created in one hidden batch. Movement starts
 // after deployment and joins the approach around the new walls' open ends.
 const spawnWalls=map.objects.filter(object=>["Encounter_NorthSpawnWall","Encounter_EastSpawnWall"].includes(object.id));

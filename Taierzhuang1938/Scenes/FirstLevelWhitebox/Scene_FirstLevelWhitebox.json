@@ -515,7 +515,10 @@
       {"id":"Branch","preset":"communication","points":[[21.9,67.1],[63,64.5]],"group":"01–05/壕沟/交通沟","note":"L0105_TRENCHES.branch（南沿土垄 = L0105_BRANCH_SOUTH_BERM）","floorW":3.8,"bermSide":"plus","bermH":1,"bermW":2.6,"jitterScale":0.4,"look":"bare","depthAlong":[[-0.01,2],[1.82,2],[1.84,2.4]]},
       {"id":"CrawlSap","preset":"sap","points":[[-3.5,-9],[-8,-14]],"group":"01–05/壕沟/交通沟","note":"L0105_TRENCHES.crawlSap（坑西北角 → 散兵坑）","depth":1,"floorW":1.4,"bankW":0.6,"bermH":0.12,"bermW":0.8,"cornerRadiusM":0,"jitterScale":0.4,"look":"bare"},
       {"id":"VillageNorthWest","preset":"fire","points":[[36,661],[70,654],[92,650]],"group":"11–18/壕沟","note":"L1218_TRENCH.west（村北沿战壕，七二七团二营；沟南边 8–10 m，壕底宽 1、深 1.2、北沿堆土；第四版 2026-11-02）","depthAlong":[[0,1.2],[57,1.2]],"floorW":1,"bankW":0.35,"bermH":0.35,"bermW":0.9,"bermSide":"minus","cornerRadiusM":0,"jitterScale":0,"look":"scrape"},
-      {"id":"VillageNorthEast","preset":"fire","points":[[106,649],[140,647],[180,651],[216,662]],"group":"11–18/壕沟","note":"L1218_TRENCH.east（村北沿战壕，七二七团二营；沟南边 8–10 m，壕底宽 1、深 1.2、北沿堆土；第四版 2026-11-02）","depthAlong":[[0,1.2],[111.5,1.2]],"floorW":1,"bankW":0.35,"bermH":0.35,"bermW":0.9,"bermSide":"minus","cornerRadiusM":0,"jitterScale":0,"look":"scrape"}
+      {"id":"VillageNorthEast","preset":"fire","points":[[106,649],[140,647],[180,651],[216,662]],"group":"11–18/壕沟","note":"L1218_TRENCH.east（村北沿战壕，七二七团二营；沟南边 8–10 m，壕底宽 1、深 1.2、北沿堆土；第四版 2026-11-02）","depthAlong":[[0,1.2],[111.5,1.2]],"floorW":1,"bankW":0.35,"bermH":0.35,"bermW":0.9,"bermSide":"minus","cornerRadiusM":0,"jitterScale":0,"look":"scrape"},
+      {"id":"CampNorthWestDefense","preset":"fire","points":[[53,127],[57,127],[60,129]],"depth":0.7,"floorW":1.5,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.6,"jitterScale":0.1,"look":"scrape","group":"01–05/壕沟/集结处阻击壕","note":"04B–04D 班长带队阻击，掩护老耿等人装运弹药与伤员。按用户标注的创作性布设。"},
+      {"id":"CampNorthCenterDefense","preset":"fire","points":[[63,130],[66,129],[70,128]],"depth":0.7,"floorW":1.5,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.6,"jitterScale":0.1,"look":"scrape","group":"01–05/壕沟/集结处阻击壕","note":"04B–04D 班长带队阻击，掩护老耿等人装运弹药与伤员。按用户标注的创作性布设。"},
+      {"id":"CampEastDefense","preset":"fire","points":[[77,147],[79,145],[84,145],[88,142],[88,139]],"depth":0.7,"floorW":1.7,"bankW":0.65,"bermH":0.18,"bermW":0.7,"bermSide":"both","cornerRadiusM":0.6,"jitterScale":0.1,"look":"scrape","group":"01–05/壕沟/集结处阻击壕","note":"04B–04D 班长带队阻击，掩护老耿等人装运弹药与伤员。按用户标注的创作性布设。"}
     ]
   },
   "markers": [
@@ -5985,6 +5988,10 @@
     {"id":"AmbushRidgeEast_2","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[93.25,null,276.6],"size":[0.7,0.45,2.6],"cover":{"faceX":-1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
     {"id":"AmbushRidgeEast_3","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[95.2,null,283.4],"size":[0.7,0.45,2.6],"cover":{"faceX":-1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
     {"id":"AmbushRidgeWest_1","asset":"Whitebox/Box","material":"Whitebox/EarthDark","pos":[89.53,null,285],"size":[0.7,0.45,2.6],"cover":{"faceX":1,"faceZ":0},"group":"01–07/凹路伏击弯/土埂","meta":{"prop":"Ridge"}},
-    {"id":"WreckTankette","asset":"Whitebox/Box","material":"Whitebox/Metal","pos":[90.6,null,278.6],"size":[5.8,1.7,2.2],"showOn":"L1SunkenRoadBlocked","group":"01–07/凹路伏击弯/残车","meta":{"prop":"Wreck"}}
+    {"id":"WreckTankette","asset":"Whitebox/Box","material":"Whitebox/Metal","pos":[90.6,null,278.6],"size":[5.8,1.7,2.2],"showOn":"L1SunkenRoadBlocked","group":"01–07/凹路伏击弯/残车","meta":{"prop":"Wreck"}},
+    {"id":"CampNorthWestParapet","asset":"Whitebox/Box","material":"Whitebox/Cover","pos":[57,null,125.4],"size":[6.4,0.25,0.8],"cover":{"faceX":0,"faceZ":-1},"group":"01–05/工事/集结处阻击阵地"},
+    {"id":"CampNorthCenterParapet","asset":"Whitebox/Box","material":"Whitebox/Cover","pos":[66,null,127.3],"size":[6.4,0.25,0.8],"cover":{"faceX":0,"faceZ":-1},"group":"01–05/工事/集结处阻击阵地"},
+    {"id":"CampEastNorthParapet","asset":"Whitebox/Box","material":"Whitebox/Cover","pos":[82,null,143.3],"size":[5.6,0.25,0.8],"cover":{"faceX":0,"faceZ":-1},"group":"01–05/工事/集结处阻击阵地"},
+    {"id":"CampEastRoadParapet","asset":"Whitebox/Box","material":"Whitebox/Cover","pos":[89.5,null,141],"size":[0.8,0.35,7],"cover":{"faceX":1,"faceZ":0},"group":"01–05/工事/集结处阻击阵地"}
   ]
 }

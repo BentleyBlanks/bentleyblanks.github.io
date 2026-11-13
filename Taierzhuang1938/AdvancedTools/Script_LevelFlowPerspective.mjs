@@ -266,6 +266,9 @@ export class FlowPerspectiveView extends FlowMapView {
         Box(x+Math.sin(turret)*0.9,z-Math.cos(turret)*0.9,0.13,1.8,0.13,"#696f59",ground+1.28,-turret);
       }
     }
+    for (const actor of frame.actors.filter(item => item.carryingAmmo)) {
+      Box(actor.p[0],actor.p[1]+0.25,0.8,0.5,0.45,"#94774f",this.Ground(actor.p)+0.8,0);
+    }
     this.raster.Flush(context,width,height);
     for (const {bottom, top} of coverBoxes) {
       const Stroke = (a, b, color, lineWidth) => {

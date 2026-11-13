@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -214,6 +214,36 @@ function OpeningGunTeam(time, index) {
 }
 
 let companionTracks = null;
+const campDefenseTracks = FLOW_CAMP_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
+
+function CampActors(actors, time) {
+  if (time < BeatById("04b").start || time > BeatById("05a").start) return;
+  for (const plan of campDefenseTracks) {
+    const actor = actors.find(entry => entry.id === plan.id);
+    actor.p = Track(plan.track, time);
+    const moving = Distance(actor.p, Track(plan.track, time + 0.02)) > 0.001;
+    const deployed = time >= BeatById("04b").start + BeatById("04b").duration * plan.readyFraction;
+    Object.assign(actor, {pose: moving ? "run" : deployed ? "shoot" : "stand",
+      firing: deployed && !moving, heavy: plan.heavy === true && deployed && !moving,
+      status: moving ? "转移阵位" : deployed ? "前沿阻击" : "准备前出"});
+  }
+  const loading = FLOW_CAMP_LOADING;
+  if (time >= BeatById(loading.finishBeat).start) return;
+  const loadingStart = BeatById(loading.startBeat).start;
+  for (const [index, member] of loading.members.entries()) {
+    const {id, name, route} = member;
+    const finishStart = BeatById(loading.finishBeat).start - loading.finishSeconds;
+    const cycle = ((Math.min(time, finishStart) - loadingStart + index * loading.memberDelaySeconds) % loading.cycleSeconds) / loading.cycleSeconds;
+    const carrying = cycle < 0.5;
+    const actor = actors.find(entry => entry.id === id);
+    let p = SampleRoute(route, carrying ? cycle * 2 : (1 - cycle) * 2);
+    if (time >= finishStart) p = SampleRoute([p, actor?.p ?? member.end], (time - finishStart) / loading.finishSeconds);
+    const state = {p, pose: carrying ? "carry" : "walk", carryingAmmo: carrying,
+      status: time >= finishStart ? "装车收尾" : carrying ? "搬弹药到车边" : "返回弹药堆"};
+    if (actor) Object.assign(actor, state);
+    else actors.push(Actor(id, name, "civilian", "person", p, state.pose, state));
+  }
+}
 
 function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").start+BeatById("03h").duration*0.5) {
   const cartState=CartAt(time),cart=cartState.point,heading=cartState.heading;
@@ -270,10 +300,11 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
       { ...first, surface:"ground", turret, disabled }));
     if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, "stand", { ...second, surface:"ground", heading: Math.PI, turret: Math.PI }));
   }
-  if (["06a","06b"].includes(beat.id)) {
+  if (time >= BeatById("04c").start && time < BeatById("06c").start) {
     const down = beat.id === "06b";
-    actors.push(Actor("carrier1", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]-1.7], down ? "dead" : "walk"));
-    actors.push(Actor("carrier2", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]+1.7], down ? "dead" : "walk"));
+    const pose = down ? "dead" : beat.id === "04c" ? "carry" : "walk";
+    actors.push(Actor("carrier1", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]-1.7], pose));
+    actors.push(Actor("carrier2", "抬担架的老乡", "civilian", "person", [winter[0],winter[1]+1.7], pose));
   }
   if (beat.id === "06c") actors.push(Actor("veteran", "抱捆老兵", "friend", "person", SampleRoute([[94,264],[96,263],[101,263],[101,257]], Math.min(1,progress*2)), progress > 0.5 ? "dead" : "run"));
   if(beat.stage === "10") {
@@ -288,6 +319,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
   if(companionTracks) for(const actor of actors) {
     if(companionTracks[actor.id]) actor.p=Track(companionTracks[actor.id],time);
   }
+  CampActors(actors, time);
   if (Number(beat.stage) <= 2) {
     for (const [index, id] of ["luo", "he", "liu"].entries()) Object.assign(actors.find(actor => actor.id === id), OpeningRetreat(time, index));
     Object.assign(actors.find(actor => actor.id === "yao"), OpeningGunTeam(time, 0));
@@ -399,6 +431,10 @@ function Effects(beat, time, progress, actors) {
   if (blockers.length) for (const id of ["luo","liu"]) {
     const defender = actors.find((actor) => actor.id === id);
     effects.push({kind:"fire",a:defender.p,b:blockers[0].p,side:"friend",phase:(time*2.1+defender.p[0])%1});
+  }
+  for (const defender of actors.filter(actor => actor.firing && campDefenseTracks.some(plan => plan.id === actor.id))) {
+    const target = targets.reduce((nearest, enemy) => !nearest || Distance(defender.p, enemy.p) < Distance(defender.p, nearest.p) ? enemy : nearest, null);
+    if (target) effects.push({kind:"fire",a:defender.p,b:target.p,side:"friend",heavy:defender.heavy,phase:(time*3+defender.p[0])%1});
   }
   if (["shoot","retreat"].includes(beat.pose) && targets.length) {
     const target = targets[Math.floor(time/3) % targets.length];

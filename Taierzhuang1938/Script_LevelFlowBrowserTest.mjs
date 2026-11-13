@@ -84,6 +84,13 @@ try {
   assert.equal(junctionBlockers.length,5);
   assert.ok(junctionBlockers.every(actor=>actor.pose==="shoot"));
   await page.screenshot({path:path.join(out,"JunctionBlockade.png")});
+  await page.evaluate(()=>LevelFlow.Seek(455.569));
+  const camp = await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(camp.actors.filter(actor=>['luo','he','liu','yao'].includes(actor.id)&&actor.firing&&actor.p[1]<148).length,4);
+  assert.equal(camp.actors.filter(actor=>['geng','ammoCarrier1','ammoCarrier2'].includes(actor.id)).length,3);
+  assert.match(await page.locator('#planningNote').textContent(),/老耿.*搬弹药/);
+  assert.equal(await page.locator('#sourcePassage').textContent(),FLOW_SOURCE_EXCERPTS['04c']);
+  await page.screenshot({path:path.join(out,"CampDefense.png")});
   await page.evaluate(()=>LevelFlow.Seek(207.137));
   const pressure=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==="Fork");
   assert.equal(pressure.length,5);
