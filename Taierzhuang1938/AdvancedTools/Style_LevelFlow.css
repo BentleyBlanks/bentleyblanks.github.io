@@ -180,7 +180,14 @@ textarea { resize: vertical; min-height: 64px; }
 .lfAnnotationHeader button { padding: 4px 8px; border-color: transparent; font-size: 13px; color: #a5ae9d; }
 .lfAnnotationTools { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #343c34; flex: none; flex-wrap: wrap; }
 .lfAnnotationTools button { padding: 5px 10px; font-size: 14px; }
-#screenshotText { width: 180px; min-width: 100px; padding: 6px 9px; font-size: 14px; }
+.lfTextStyle { gap: 4px; }
+.lfTextStyle select { width: 105px; }
+#screenshotSize { width: 54px; padding: 4px; background: #111916; border: 1px solid #475044; }
+#screenshotColor { width: 30px; height: 28px; padding: 2px; background: transparent; border: 1px solid #475044; cursor: pointer; }
+.lfTextStyle button { min-width: 28px; padding: 4px 7px; }
+.lfTextStyle button[aria-pressed="true"] { background: #a58c3b44; border-color: #bd9d56; color: #ffe2a1; }
+#annotationCanvasWrap { position: relative; flex: none; }
+#screenshotText { position: absolute; margin: 0; padding: 0; border: 0; outline: 1px dashed #ffe4a0; outline-offset: 3px; border-radius: 0; resize: none; overflow: hidden; background: transparent; caret-color: #fff; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; paint-order: stroke fill; }
 .lfAnnotationStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #080d0f; }
 #annotationCanvas { display: block; flex: none; touch-action: none; cursor: crosshair; outline: none; box-shadow: 0 3px 18px #0000004d; }
 #annotationCanvas:focus-visible { outline: 1px solid #a38e59; }
@@ -216,7 +223,6 @@ textarea { resize: vertical; min-height: 64px; }
   .lfAnnotationDialog { width: calc(100vw - 16px); height: calc(100vh - 16px); max-height: calc(100vh - 16px); }
   .lfAnnotationTools { gap: 6px; padding: 8px; }
   .lfAnnotationTools button { padding: 4px 7px; }
-  #screenshotText { width: 130px; }
   .lfAnnotationFooter > span { display: none; }
 }
 
@@ -245,10 +251,48 @@ textarea { resize: vertical; min-height: 64px; }
 .lfChatAuthor { font-size: 12px; color: var(--ed-text-3); padding: 0 3px; }
 .lfChatBubble { border: 1px solid var(--ed-edge); border-radius: 3px 12px 12px; padding: 10px 12px; background: var(--ed-field); color: var(--ed-text); font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; user-select: text; }
 .user .lfChatBubble { border-radius: 12px 3px 12px 12px; background: var(--ed-sel-strong); border-color: #cdb77b66; color: var(--ed-text); }
+.lfChatMessage { min-width: 0; }
+.lfChatMarkdown { min-width: 0; white-space: normal; }
+.lfChatMarkdown > :first-child { margin-top: 0; }
+.lfChatMarkdown > :last-child { margin-bottom: 0; }
+.lfChatMarkdown p { margin: 0 0 12px; }
+.lfChatMarkdown :is(h1, h2, h3, h4, h5, h6) { margin: 20px 0 10px; color: #e5dcc0; font-weight: 700; line-height: 1.5; }
+.lfChatMarkdown h1 { font-size: 21px; }
+.lfChatMarkdown h2 { font-size: 19px; }
+.lfChatMarkdown h3 { font-size: 17px; }
+.lfChatMarkdown :is(h4, h5, h6) { font-size: 15px; }
+.lfChatMarkdown strong { color: #eee2bf; font-weight: 700; }
+.lfChatMarkdown :is(ul, ol) { margin: 8px 0 12px; padding-left: 23px; }
+.lfChatMarkdown li { margin: 5px 0; }
+.lfChatMarkdown li > p { margin: 5px 0; }
+.lfChatMarkdown blockquote { margin: 12px 0; padding: 4px 12px; border-left: 3px solid #a28d56; color: #aebba9; background: #0e161344; }
+.lfChatMarkdown blockquote > :last-child { margin-bottom: 0; }
+.lfChatMarkdown a { color: #dec582; text-decoration: underline; text-underline-offset: 3px; }
+.lfChatMarkdown a:hover { color: #fff0bc; }
+.lfChatMarkdown code { padding: 2px 4px; border-radius: 3px; background: #0b1210; color: #e1c994; font: 13px/1.7 Consolas, "Courier New", monospace; }
+.lfChatMarkdown pre { max-width: 100%; margin: 12px 0; padding: 10px; overflow-x: auto; border: 1px solid #34413a; border-radius: 5px; background: #0d1411; white-space: pre; overflow-wrap: normal; }
+.lfChatMarkdown pre code { padding: 0; background: transparent; color: #c8d6c6; }
+.lfChatMarkdown hr { border: 0; border-top: 1px solid #415045; margin: 18px 0; }
+.lfChatTableScroll { max-width: 100%; margin: 12px 0; overflow-x: auto; scrollbar-width: thin; }
+.lfChatMarkdown table { width: 100%; border-collapse: collapse; font-size: inherit; line-height: 1.7; }
+.lfChatMarkdown :is(th, td) { min-width: 110px; padding: 8px 10px; border: 1px solid #3f4c42; vertical-align: top; text-align: left; }
+.lfChatMarkdown th { background: #273128; color: #e4d3a8; font-weight: 700; }
+.lfChatMarkdown tr:nth-child(even) td { background: #111a1544; }
+.lfChatMarkdown [align="center"] { text-align: center; }
+.lfChatMarkdown [align="right"] { text-align: right; }
+.lfChatMarkdown img { display: block; max-width: 100%; height: auto; border-radius: 4px; }
+.lfChatMarkdown input[type="checkbox"] { margin-right: 6px; accent-color: #c6af6e; }
+.lfChatMarkdown :is(a, pre, .lfChatTableScroll):focus-visible { outline: 1px solid #d9bd77; outline-offset: 2px; }
 .lfChatFrame { font-size: 12px; color: #9ca98e; line-height: 1.8; overflow-wrap: anywhere; border: 1px solid var(--ed-edge); padding: 4px 7px; border-radius: 4px; background: var(--ed-field); }
-.lfChatScreenshot { display: block; max-width: 100%; }
+.lfChatScreenshot { display: block; max-width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.lfChatScreenshot:hover img, .lfChatScreenshot:focus-visible img { border-color: #d9bd77; }
+.lfChatScreenshot[aria-busy="true"] { opacity: .6; cursor: progress; }
 .lfChatScreenshot img { display: block; max-width: 100%; max-height: 160px; border: 1px solid #515944; border-radius: 4px; }
 .lfChatWaiting { color: #bbaa7c; font-size: 13px; padding: 5px 2px 12px; }
+.lfChatWaiting strong { font-weight: 500; }
+.lfChatWaiting p { margin: 6px 0; color: #c9d4c5; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.lfChatWaiting p:empty { display: none; }
+.lfChatWaiting small { color: #87978b; font-size: 9px; }
 .lfChatError { font-size: 13px; line-height: 1.7; color: #d2a197; background: #43292255; padding: 8px 12px; max-height: 100px; overflow-y: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
 /* Attachments and actions sit inside one composer surface. */
 .lfChatComposer { flex: none; margin: 10px 12px 12px; padding: 10px; border: 1px solid var(--ed-edge); border-radius: 10px; background: var(--ed-field); box-shadow: inset 0 2px 6px #00000030, 0 2px 5px #00000020; }

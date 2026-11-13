@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114MenuTheme">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114ChatMarkdown">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -69,12 +69,18 @@
     <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图与标注</h2><span id="annotationHeading"></span></div><button id="closeAnnotations" aria-label="关闭截图标记">关闭 ×</button></div>
     <div class="lfAnnotationTools">
       <div class="lfToolGroup"><button data-mark-tool="arrow" aria-pressed="true">箭头</button><button data-mark-tool="rect" aria-pressed="false">框</button><button data-mark-tool="text" aria-pressed="false">文字</button></div>
-      <input id="screenshotText" type="text" maxlength="2000" placeholder="点击截图添加文字" aria-label="标记文字" disabled>
+      <div class="lfToolGroup lfTextStyle" aria-label="文字样式">
+        <select id="screenshotFont" aria-label="文字字体"><option value="Microsoft YaHei">微软雅黑</option><option value="SimSun">宋体</option><option value="Arial">Arial</option><option value="Consolas">Consolas</option></select>
+        <input id="screenshotSize" type="number" min="8" max="200" value="24" aria-label="文字字号" title="文字字号">
+        <input id="screenshotColor" type="color" value="#ed5145" aria-label="文字颜色" title="文字颜色">
+        <button id="screenshotBold" aria-label="文字加粗" aria-pressed="false" title="加粗"><b>B</b></button><button id="screenshotItalic" aria-label="文字斜体" aria-pressed="false" title="斜体"><i>I</i></button><button id="screenshotUnderline" aria-label="文字下划线" aria-pressed="false" title="下划线"><u>U</u></button>
+        <button id="screenshotOutline" aria-pressed="false">描边</button><button id="screenshotBackground" aria-pressed="false">底色</button>
+      </div>
       <div class="lfToolGroup"><button id="undoAnnotation" title="Ctrl+Z">撤销</button><button id="redoAnnotation" title="Ctrl+Shift+Z">重做</button><button id="deleteScreenshotAnnotation">删除选中</button></div>
       <div class="lfToolGroup lfExport"><button id="copyScreenshot">复制</button><button id="exportFrame">导出 PNG</button><button id="attachScreenshot" class="sePrimary">添加附件</button></div>
     </div>
-    <div id="annotationStage" class="lfAnnotationStage"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas></div>
-    <div class="lfAnnotationFooter"><span>拖画箭头或框 · 点击添加文字 · 拖动已有标记可移动</span><output id="annotationStatus" role="status"></output></div>
+    <div id="annotationStage" class="lfAnnotationStage"><div id="annotationCanvasWrap"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas><textarea id="screenshotText" maxlength="2000" aria-label="标记文字" spellcheck="false" hidden></textarea></div></div>
+    <div class="lfAnnotationFooter"><span>点击输入文字 · 双击重编辑 · 拖动标记移动 · 拖右下角调整文本宽度 · Ctrl+Enter 完成 · Esc 取消编辑</span><output id="annotationStatus" role="status"></output></div>
     <details id="legacyAnnotations" hidden><summary>原有空间标注</summary>
       <section id="notesPane" class="lfPane"><div class="lfNoteHint">标注后导出 PNG 原文件，可保留帧时间、坐标和布设。</div><label class="lfField">文字<textarea id="annotationText" rows="3" placeholder="选中标注后填写"></textarea></label><div class="lfInline"><button id="deleteAnnotation">删除选中</button></div><div id="annotationFrames"></div></section>
     </details>

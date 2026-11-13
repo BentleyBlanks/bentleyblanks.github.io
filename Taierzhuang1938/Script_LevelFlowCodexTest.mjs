@@ -8,6 +8,8 @@ import { PassThrough } from "node:stream";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
+import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunner.mjs";
+import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
 import { CreateFramePacket } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 
@@ -22,6 +24,8 @@ const handler = CreateEncounterCodexHandler(directory, { spawnCodex(args, root) 
   child.pid = process.pid;
   child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
   child.prompt = "";
+  child.steered = [];
+  child.steer = async (prompt, image) => { child.steered.push({ prompt, image }); };
   child.stdin.on("data", chunk => { child.prompt += chunk.toString(); });
   child.args = args;
   children.push(child);
@@ -69,14 +73,23 @@ try {
   fs.writeFileSync(liveFile, JSON.stringify({ ...session, status: "failed", error: "本地服务已重启，上次执行已中断。可继续发送需求。" }));
   assert.equal((await (await fetch(`${base}/sessions/${session.id}`)).json()).status, "running", "a live owner recovers an older preview's incorrect interruption flag");
   server.removeAllListeners("request"); server.on("request", handler);
-  assert.equal((await Post({ ...body, requestId: randomUUID(), sessionId: session.id })).status, 409);
+  const steerBody = { ...body, requestId: randomUUID(), sessionId: session.id, prompt: "执行中补充，保留附件定位" };
+  const [steered, duplicate] = await Promise.all([Post(steerBody), Post(steerBody)]);
+  assert.equal(steered.status, 202); assert.equal(duplicate.status, 202);
+  assert.equal(children.length, 1); assert.equal(first.steered.length, 1);
+  assert.match(first.steered[0].prompt, /执行中补充，保留附件定位/);
+  assert.ok(first.steered[0].image.endsWith("Screenshot.png"));
   const privateReasoning = "private reasoning must stay out of chat";
   first.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: "01a1d446-7900-7781-9cc4-00ad3a768caf" })}\n`);
+  first.stdout.write(`${JSON.stringify({ type: "progress", activity: "正在验证路线", text: "已定位到路线问题，正在修复并验证。", model: "gpt-6.1-sol", effort: "high" })}\n`);
+  const progress = await (await fetch(`${base}/sessions/${session.id}`)).json();
+  assert.equal(progress.progress.text, "已定位到路线问题，正在修复并验证。");
+  assert.equal(progress.model, "gpt-6.1-sol"); assert.equal(progress.effort, "high");
   first.stdout.write(`${JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: privateReasoning } })}\n`);
   Finish(first, "已完成调整，验证通过。");
   session = await (await fetch(`${base}/sessions/${session.id}`)).json();
   assert.equal(session.status, "completed");
-  assert.equal(session.messages[1].text, "已完成调整，验证通过。");
+  assert.equal(session.messages[2].text, "已完成调整，验证通过。");
   assert.ok(!JSON.stringify(session).includes(privateReasoning));
   const attachment = await fetch(`http://127.0.0.1:${server.address().port}${session.messages[0].screenshotUrl}`);
   assert.equal(attachment.headers.get("content-type"), "image/png");
@@ -87,7 +100,7 @@ try {
   assert.equal(children.length, 2);
   assert.deepEqual(children[1].args.slice(0, 3), ["exec", "resume", session.cliSessionId]);
   assert.ok(!children[1].args.includes("--image"));
-  assert.equal(session.messages[2].frame.time, 400);
+  assert.equal(session.messages[3].frame.time, 400);
   const privateDiagnostic = "provider=https://private-provider.invalid/path Authorization=Bearer FAKE_PRIVATE_CREDENTIAL";
   children[1].stderr.write(privateDiagnostic);
   children[1].stdout.write(`${JSON.stringify({ type: "error", message: privateDiagnostic })}\n`);
@@ -98,7 +111,7 @@ try {
   assert.ok(!JSON.stringify(session).includes("FAKE_PRIVATE_CREDENTIAL"));
   const sessionFile = path.join(directory, "tmp", "EncounterCodex", session.id, "Session.json");
   assert.ok(!fs.readFileSync(sessionFile, "utf8").includes("FAKE_PRIVATE_CREDENTIAL"));
-  assert.equal(session.messages.length, 3);
+  assert.equal(session.messages.length, 4);
   const history = await (await fetch(`${base}/sessions`)).json();
   assert.equal(history.sessions.length, 1); assert.equal(history.sessions[0].id, session.id);
   assert.ok(!JSON.stringify(history).includes("messages"));
@@ -108,7 +121,7 @@ try {
   fs.writeFileSync(sessionFile, JSON.stringify(oldSession));
   server.removeAllListeners("request"); server.on("request", restarted);
   const restored = await (await fetch(`${base}/sessions/${session.id}`)).json();
-  assert.equal(restored.messages.length, 3);
+  assert.equal(restored.messages.length, 4);
   assert.ok(!JSON.stringify(restored).includes("private-provider"));
   assert.ok(!fs.readFileSync(sessionFile, "utf8").includes("FAKE_PRIVATE_CREDENTIAL"));
   server.removeAllListeners("request"); server.on("request", handler);
@@ -184,6 +197,20 @@ try {
   assert.equal((await (await fetch(`${base}/sessions/${realSession.id}`)).json()).status, "interrupted", "the interruption receipt survives an older owner's completion callback");
   await fetch(`${base}/sessions/${sibling.id}/interrupt`, { method: "POST" });
   console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final replies, resume, concurrent rejection, interrupt/retry/continue and isolated CLI process-tree termination");
+  server.removeAllListeners("request"); server.on("request", handler);
+  const legacySession = await (await Post({ requestId: randomUUID(), prompt: "旧版执行中的任务" })).json();
+  const legacyChild = children.at(-1);
+  delete legacyChild.steer;
+  legacyChild.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: "legacy-thread" })}\n`);
+  const migrated = await (await Post({ requestId: randomUUID(), sessionId: legacySession.id, steer: true, prompt: "执行中修正方向" })).json();
+  assert.equal(migrated.status, "running"); assert.equal(migrated.messages.length, 2);
+  assert.ok(stopped.includes(legacyChild));
+  assert.deepEqual(children.at(-1).args.slice(0, 3), ["exec", "resume", "legacy-thread"]);
+  assert.match(children.at(-1).prompt, /执行中修正方向/);
+  Finish(children.at(-1), "已按补充要求处理。");
+  await TestAppServerSteering(directory);
+  TestLegacyProgress(directory);
+  console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final-only replies, resume, live steering, idempotent retries and persisted history");
 } finally {
   for (const child of realChildren) {
     if (child.exitCode !== null) continue;
@@ -197,4 +224,79 @@ try {
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
   fs.rmSync(directory, { recursive: true, force: true });
+}
+
+async function TestAppServerSteering(directory) {
+  const requests = [];
+  const server = new EventEmitter();
+  server.stdin = new PassThrough(); server.stdout = new PassThrough(); server.stderr = new PassThrough();
+  server.kill = () => { server.emit("close", 0); };
+  server.stdin.on("finish", () => server.emit("close", 0));
+  const Emit = value => server.stdout.write(`${JSON.stringify(value)}\n`);
+  let turnCount = 0, pendingSteer;
+  server.stdin.on("data", data => {
+    for (const line of data.toString().trim().split("\n")) {
+      const request = JSON.parse(line); requests.push(request);
+      if (request.id == null) continue;
+      setImmediate(() => {
+        if (request.method === "turn/steer" && request.params.input[0].text === "completion race") { pendingSteer = request; return; }
+        let result = {};
+        if (request.method === "thread/start") result = { thread: { id: "thread-test" } };
+        if (request.method === "turn/start") {
+          const turn = { id: `turn-${++turnCount}` };
+          result = { turn };
+          setImmediate(() => Emit({ method: "turn/started", params: { threadId: "thread-test", turn } }));
+        }
+        Emit({ id: request.id, result });
+      });
+    }
+  });
+  const output = path.join(directory, "AppServerConclusion.txt");
+  const child = CreateSteerableCodexChild(["exec", "--output-last-message", output, "--image", "Original.png", "-"], directory, { spawnAppServer: () => server });
+  const errors = []; child.on("error", error => errors.push(error));
+  let visibleOutput = ""; child.stdout.on("data", chunk => { visibleOutput += chunk; });
+  child.stdin.end("original request");
+  await Promise.all([child.steer("live correction", "Revised.png"), child.steer("another correction")]);
+  const starts = requests.filter(request => request.method === "turn/start");
+  assert.equal(starts.length, 1); assert.equal(starts[0].params.input[1].path, "Original.png");
+  assert.equal(starts[0].params.model, "gpt-6.1-sol"); assert.equal(starts[0].params.effort, "high");
+  const steers = requests.filter(request => request.method === "turn/steer");
+  assert.equal(steers.length, 2); assert.equal(steers[0].params.expectedTurnId, "turn-1");
+  assert.equal(steers[0].params.input[1].path, "Revised.png");
+  const raced = child.steer("completion race");
+  while (!pendingSteer) await new Promise(resolve => setImmediate(resolve));
+  Emit({ method: "turn/completed", params: { threadId: "thread-test", turn: { id: "turn-1", status: "completed" } } });
+  Emit({ id: pendingSteer.id, error: { message: "No active turn" } });
+  await raced;
+  assert.equal(turnCount, 2);
+  assert.equal(requests.filter(request => request.method === "thread/start").length, 1);
+  for (const [type, phase, text] of [["reasoning", null, "hidden"], ["agentMessage", "commentary", "progress"], ["agentMessage", "final_answer", "steered result"]]) {
+    Emit({ method: "item/completed", params: { threadId: "thread-test", turnId: "turn-2", item: { id: text, type, phase, text } } });
+  }
+  assert.ok(visibleOutput.includes('"text":"progress"')); assert.ok(!visibleOutput.includes("hidden"));
+  const finished = once(child, "close");
+  Emit({ method: "turn/completed", params: { threadId: "thread-test", turn: { id: "turn-2", status: "completed" } } });
+  assert.deepEqual(await finished, [0]); assert.deepEqual(errors, []);
+  assert.equal(fs.readFileSync(output, "utf8"), "steered result");
+}
+
+function TestLegacyProgress(directory) {
+  const cliSessionId = randomUUID();
+  const day = path.join(directory, "Rollouts", "2026", "11", "14");
+  fs.mkdirSync(day, { recursive: true });
+  const file = path.join(day, `rollout-test-${cliSessionId}.jsonl`);
+  const Event = (type, payload) => `${JSON.stringify({ type, timestamp: "2026-11-13T16:30:00Z", payload })}\n`;
+  fs.writeFileSync(file, Event("turn_context", { model: "legacy-model", effort: "high" })
+    + Event("response_item", { type: "message", role: "assistant", phase: "commentary", content: [{ type: "output_text", text: "已找到问题，正在验证修复。" }] })
+    + Event("response_item", { type: "reasoning", content: [{ text: "hidden reasoning" }] }));
+  const ReadProgress = CreateLegacyProgressReader(path.join(directory, "Rollouts"));
+  const session = { cliSessionId, createdAt: "2026-11-13T16:23:00Z" };
+  assert.equal(ReadProgress(session).progress.text, "已找到问题，正在验证修复。");
+  assert.equal(ReadProgress(session).model, "legacy-model");
+  fs.appendFileSync(file, "x".repeat(300000) + "\n" + Event("response_item", {
+    type: "message", role: "assistant", phase: "commentary", content: [{ type: "output_text", text: "回归检查已完成，正在整理结果。" }],
+  }));
+  const result = ReadProgress(session);
+  assert.equal(result.progress.text, "回归检查已完成，正在整理结果。");
+  assert.ok(!JSON.stringify(result).includes("hidden reasoning"));
 }

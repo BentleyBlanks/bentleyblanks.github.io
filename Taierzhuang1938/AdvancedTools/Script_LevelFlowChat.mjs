@@ -1,5 +1,42 @@
+import { Marked } from "./vendor/marked.mjs";
+import DOMPurify from "./vendor/purify.mjs";
+import { ValidateScreenshot } from "./Script_LevelFlowDocument.mjs";
+
 const Element = id => document.getElementById(id);
 const API = "/__encounter/codex";
+
+const markdown = new Marked({ gfm: true, breaks: true });
+
+function RenderMarkdown(bubble, text) {
+  // Sanitize before attaching any markup, including HTML embedded in a reply.
+  const content = DOMPurify.sanitize(markdown.parse(text), {
+    ALLOWED_TAGS: ["p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "em", "del",
+      "blockquote", "ul", "ol", "li", "pre", "code", "hr", "table", "thead", "tbody", "tr", "th", "td", "a", "img", "input"],
+    ALLOWED_ATTR: ["href", "title", "src", "alt", "start", "align", "type", "checked", "disabled"],
+    ALLOW_DATA_ATTR: false,
+    RETURN_DOM_FRAGMENT: true,
+  });
+  for (const link of content.querySelectorAll("a[href]")) {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
+  for (const input of content.querySelectorAll("input")) {
+    input.type = "checkbox";
+    input.disabled = true;
+  }
+  for (const table of content.querySelectorAll("table")) {
+    const scroller = document.createElement("div");
+    scroller.className = "lfChatTableScroll";
+    scroller.tabIndex = 0;
+    scroller.setAttribute("role", "region");
+    scroller.setAttribute("aria-label", "表格");
+    table.replaceWith(scroller);
+    scroller.append(table);
+  }
+  for (const pre of content.querySelectorAll("pre")) pre.tabIndex = 0;
+  bubble.classList.add("lfChatMarkdown");
+  bubble.replaceChildren(content);
+}
 
 function ContextLabel(context) {
   return `${context.beat.toUpperCase()} · ${context.time.toFixed(2)} s · 玩家 X ${context.player[0].toFixed(1)} / Z ${context.player[1].toFixed(1)}`;
@@ -115,11 +152,12 @@ export class EncounterChat {
 
   async Connect() {
     try {
-      const { sessions } = await Request("/sessions");
+      const { sessions, model, effort } = await Request("/sessions");
+      this.model = model; this.effort = effort;
       this.sessions = sessions;
       this.available = true;
       if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
-      Element("codexConnection").textContent = "本机 Codex CLI";
+      this.DrawConnection();
       this.DrawList();
     } catch (error) {
       this.available = false;
@@ -185,6 +223,33 @@ export class EncounterChat {
     this.DrawAttachment();
   }
 
+  async OpenScreenshot(message, button) {
+    if (this.sending) return;
+    const version = this.selectionVersion;
+    const screenshotVersion = this.screenshotVersion = (this.screenshotVersion || 0) + 1;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    try {
+      const frame = await Request(message.screenshotUrl.slice(API.length).replace(/Screenshot\.png$/, "ScreenshotFrame.json"));
+      const screenshot = frame.screenshot ? ValidateScreenshot(frame.screenshot) : null;
+      const image = new Image();
+      image.src = screenshot?.image || message.screenshotUrl;
+      await image.decode();
+      if (version !== this.selectionVersion || screenshotVersion !== this.screenshotVersion || this.sending) return;
+      const capture = document.createElement("canvas");
+      capture.width = image.naturalWidth;
+      capture.height = image.naturalHeight;
+      capture.getContext("2d").drawImage(image, 0, 0);
+      this.Error();
+      this.editScreenshot({ capture, frame, marks: screenshot?.marks || [] });
+    } catch (error) {
+      if (version === this.selectionVersion && screenshotVersion === this.screenshotVersion) this.Error(`截图打开失败 · ${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+  }
+
   DrawAttachment() {
     Element("codexPendingImage").hidden = !this.pendingImage;
     Element("codexImagePreview").src = this.pendingImage?.image || "";
@@ -195,11 +260,11 @@ export class EncounterChat {
   UpdateSend() {
     const running = ["running", "interrupting"].includes(this.current?.status);
     const stopping = this.stopping === this.current?.id || this.current?.status === "interrupting";
-    const busy = this.sending || this.loading || running || stopping;
+    const busy = this.sending || this.loading || stopping;
     Element("sendCodexChat").disabled = !this.available || busy || !Element("codexPrompt").value.trim();
-    Element("sendCodexChat").textContent = this.sending ? "提交中…" : running ? "执行中…" : "发送";
+    Element("sendCodexChat").textContent = this.sending ? "提交中…" : running ? "补充要求" : "发送";
     Element("interruptCodexChat").hidden = !running;
-    Element("interruptCodexChat").disabled = stopping;
+    Element("interruptCodexChat").disabled = stopping || this.sending;
     Element("interruptCodexChat").textContent = stopping ? "中断中…" : "中断";
     Element("codexPrompt").readOnly = this.sending;
     for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
@@ -218,15 +283,33 @@ export class EncounterChat {
       const title = document.createElement("span"), status = document.createElement("small");
       title.textContent = session.title;
       const labels = { running: "正在执行", interrupting: "中断中", interrupted: "已中断", failed: "需要处理", completed: "已完成" };
-      status.textContent = labels[session.status] || "已完成";
+      status.textContent = session.status === "running" ? session.progress?.activity || "正在启动" : labels[session.status] || "已完成";
+      status.title = session.progress?.text || status.textContent;
       button.append(title, status);
       button.onclick = () => this.Select(session.id);
       list.append(button);
     }
   }
 
+  DrawConnection() {
+    const model = this.current ? this.current.model || "旧会话沿用原配置" : this.model;
+    const effort = this.current ? this.current.effort : this.effort;
+    Element("codexConnection").textContent = ["本机 Codex CLI", model, effort].filter(Boolean).join(" · ");
+  }
+
+  DrawProgress() {
+    const pending = Element("codexProgress");
+    if (!pending || this.current?.status !== "running") return;
+    const progress = this.current.progress;
+    const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(progress?.updatedAt || this.current.updatedAt)) / 1000));
+    pending.querySelector("strong").textContent = progress?.activity || (this.current.model ? "正在连接本机 Codex" : "旧版 CLI 正在执行");
+    pending.querySelector("p").textContent = progress?.text || "";
+    pending.querySelector("small").textContent = Number.isFinite(seconds) ? `最后更新 ${seconds} 秒前` : "等待进度同步";
+  }
+
   Draw() {
     this.DrawList();
+    this.DrawConnection();
     Element("codexChatTitle").textContent = this.current?.title || "新会话";
     const log = Element("codexMessages");
     log.replaceChildren();
@@ -234,7 +317,9 @@ export class EncounterChat {
       const row = document.createElement("article"); row.className = `lfChatMessage ${message.role}`;
       const label = document.createElement("span"); label.className = "lfChatAuthor";
       label.textContent = message.role === "user" ? "你" : "Codex";
-      const bubble = document.createElement("div"); bubble.className = "lfChatBubble"; bubble.textContent = message.text;
+      const bubble = document.createElement("div"); bubble.className = "lfChatBubble";
+      if (message.role === "assistant") RenderMarkdown(bubble, message.text);
+      else bubble.textContent = message.text;
       row.append(label, bubble);
       if (message.frame) {
         const attachment = document.createElement("a"); attachment.className = "lfChatFrame";
@@ -244,18 +329,26 @@ export class EncounterChat {
         row.append(attachment);
       }
       if (message.screenshotUrl) {
-        const link = document.createElement("a"), image = document.createElement("img");
-        link.href = message.screenshotUrl; link.target = "_blank"; link.rel = "noopener"; link.className = "lfChatScreenshot";
-        image.src = message.screenshotUrl; image.alt = "截图";
-        link.title = ContextLabel(message.screenshotFrame);
+        const link = document.createElement("button"), image = document.createElement("img");
+        link.type = "button"; link.className = "lfChatScreenshot";
+        link.title = "打开截图并继续标注";
+        link.setAttribute("aria-label", `编辑标注截图 · ${ContextLabel(message.screenshotFrame)}`);
+        link.onclick = () => this.OpenScreenshot(message, link);
+        image.src = message.screenshotUrl; image.alt = `标注截图 · ${ContextLabel(message.screenshotFrame)}`;
         link.append(image); row.append(link);
       }
       log.append(row);
     }
     if (["running", "interrupting", "interrupted"].includes(this.current?.status)) {
       const pending = document.createElement("div"); pending.className = "lfChatWaiting";
-      const labels = { running: "Codex 正在处理…", interrupting: "正在中断…", interrupted: "已中断" };
-      pending.textContent = labels[this.current.status]; log.append(pending);
+      if (this.current.status === "running") {
+        pending.id = "codexProgress"; pending.setAttribute("role", "status");
+        pending.append(document.createElement("strong"), document.createElement("p"), document.createElement("small"));
+        log.append(pending); this.DrawProgress();
+      } else {
+        pending.textContent = this.current.status === "interrupting" ? "正在中断…" : "已中断";
+        log.append(pending);
+      }
     }
     if (this.current?.error) this.Error(this.current.error);
     this.UpdateSend();
@@ -265,7 +358,7 @@ export class EncounterChat {
   async Send() {
     if (Element("sendCodexChat").disabled) return;
     const { frame = null, location = null } = this.pendingLocation || {};
-    const body = { sessionId: this.current?.id, prompt: Element("codexPrompt").value, frame, location,
+    const body = { sessionId: this.current?.id, steer: this.current?.status === "running", prompt: Element("codexPrompt").value, frame, location,
       screenshot: this.pendingImage ? { image: this.pendingImage.image, frame: this.pendingImage.frame } : null };
     const content = JSON.stringify(body);
     if (this.lastSubmission?.content !== content) this.lastSubmission = { content, requestId: crypto.randomUUID() };
@@ -300,14 +393,16 @@ export class EncounterChat {
 
   async Poll() {
     this.RefreshContext();
+    this.DrawProgress();
     if (this.polling || this.sending || this.loading) return;
     this.polling = true;
     const version = this.selectionVersion;
     try {
-      const { sessions } = await Request("/sessions");
+      const { sessions, model, effort } = await Request("/sessions");
+      this.model = model; this.effort = effort;
       this.available = true;
       if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
-      Element("codexConnection").textContent = "本机 Codex CLI";
+      this.DrawConnection();
       if (this.current && !this.sending) {
         const session = await Request(`/sessions/${this.current.id}`);
         if (version === this.selectionVersion && !this.sending && JSON.stringify(session) !== JSON.stringify(this.current)) {

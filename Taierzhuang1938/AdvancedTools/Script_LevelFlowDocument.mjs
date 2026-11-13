@@ -27,7 +27,12 @@ export function ValidateScreenshot(value) {
     || typeof value.image !== "string" || !value.image.startsWith("data:image/png;base64,")
     || !Array.isArray(value.marks) || value.marks.length > 2000
     || !value.marks.every(mark => mark && ["arrow", "rect", "text"].includes(mark.kind) && Point(mark.a) && Point(mark.b)
-      && typeof mark.text === "string" && mark.text.length <= 2000)) throw new Error("截图标记数据无效");
+      && typeof mark.text === "string" && mark.text.length <= 2000
+      && (mark.fontSize === undefined || Number.isFinite(mark.fontSize) && mark.fontSize >= 8 && mark.fontSize <= 200)
+      && (mark.width === undefined || Number.isFinite(mark.width) && mark.width >= 16 && mark.width <= 16384)
+      && (mark.color === undefined || /^#[a-f0-9]{6}$/i.test(mark.color))
+      && (mark.fontFamily === undefined || ["Microsoft YaHei", "SimSun", "Arial", "Consolas"].includes(mark.fontFamily))
+      && ["bold", "italic", "underline", "outline", "background"].every(key => mark[key] === undefined || typeof mark[key] === "boolean"))) throw new Error("截图标记数据无效");
   return structuredClone(value);
 }
 

@@ -2,8 +2,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { spawn, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { CreateSteerableCodexChild, ENCOUNTER_CODEX_MODEL, ENCOUNTER_CODEX_EFFORT } from "./Script_EncounterCodexRunner.mjs";
+import { CreateLegacyProgressReader } from "./Script_EncounterCodexProgress.mjs";
 import { ReadFramePacket } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowDocument.mjs";
 import { FLOW_TIMELINE } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowModel.mjs";
 
@@ -68,15 +70,11 @@ async function ReadTurn(request) {
 }
 
 function SpawnCodex(args, rootDir) {
-  // Use the installed npm entry when present, avoiding .cmd quoting and shell execution.
-  const npmEntry = path.join(process.env.APPDATA || "", "npm/node_modules/@openai/codex/bin/codex.js");
-  const command = fs.existsSync(npmEntry) ? process.execPath : process.platform === "win32" ? "codex.exe" : "codex";
-  return spawn(command, fs.existsSync(npmEntry) ? [npmEntry, ...args] : args, {
-    cwd: rootDir, windowsHide: true, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"],
-  });
+  return CreateSteerableCodexChild(args, rootDir);
 }
 
 async function StopCodex(child) {
+  if (child.interrupt) { await child.interrupt(); return; }
   if (!ProcessIsRunning(child.pid)) return;
   if (process.platform === "win32") {
     await RunFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 15000 });
@@ -97,6 +95,8 @@ async function LegacyCliPid(session) {
 export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex } = {}) {
   const directory = path.join(rootDir, "tmp", "EncounterCodex");
   const active = new Map();
+  const submissions = new Map();
+  const ReadLegacyProgress = CreateLegacyProgressReader();
   const SessionPath = id => path.join(directory, id, "Session.json");
   const InterruptPath = id => path.join(directory, id, "Interrupt.json");
   function ReadInterrupt(session) {
@@ -133,7 +133,19 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       session.error = CLI_INTERRUPTED;
       Save(session);
     }
+    if (session.status === "running" && !active.has(id) && !session.progress) Object.assign(session, ReadLegacyProgress(session));
     return session;
+  }
+  function Prompt(turn, folder) {
+    return [
+      "你正在处理 Encounter Designer 右侧会话提交的需求。遵循仓库 AGENTS.md，代码修改须在本会话独占的 worktree 中进行。",
+      `编辑器检出目录为 ${rootDir}。`,
+      turn.frame ? `定位附件保存在 ${path.join(folder, "Frame.json")} 和 ${path.join(folder, "Location.json")}，包含用户附加时的帧、时间、世界坐标、相机与选中对象。先读取附件。` : "",
+      turn.screenshot ? `标注截图附在本条消息中，截图当时的帧信息在 ${path.join(folder, "ScreenshotFrame.json")}。` : "",
+      "最终答复请用简洁中文给出处理结论、验证结果与尚未完成项。",
+      "执行过程中用简洁中文同步公开的进度说明，说明已发现的问题、正在进行的修改或验证。",
+      "用户需求", turn.prompt,
+    ].filter(Boolean).join("\n\n");
   }
   function Start(session, turn, folder) {
     const output = path.join(folder, "Conclusion.txt");
@@ -142,22 +154,17 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
     args.push("--json", "--output-last-message", output);
     if (turn.screenshot) args.push("--image", path.join(folder, "Screenshot.png"));
     args.push("-");
-    const prompt = [
-      "你正在处理 Encounter Designer 右侧会话提交的需求。遵循仓库 AGENTS.md，代码修改须在本会话独占的 worktree 中进行。",
-      `编辑器检出目录为 ${rootDir}。`,
-      turn.frame ? `定位附件保存在 ${path.join(folder, "Frame.json")} 和 ${path.join(folder, "Location.json")}，包含用户附加时的帧、时间、世界坐标、相机与选中对象。先读取附件。` : "",
-      turn.screenshot ? `标注截图附在本条消息中，截图当时的帧信息在 ${path.join(folder, "ScreenshotFrame.json")}。` : "",
-      "最终答复请用简洁中文给出处理结论、验证结果与尚未完成项。",
-      "用户需求", turn.prompt,
-    ].filter(Boolean).join("\n\n");
+    const prompt = Prompt(turn, folder);
     session.status = "running";
+    session.model = ENCOUNTER_CODEX_MODEL; session.effort = ENCOUNTER_CODEX_EFFORT;
+    session.progress = { activity: "正在启动本机 Codex", text: "", updatedAt: new Date().toISOString() };
     session.runnerPid = process.pid;
     session.error = "";
     Save(session);
     let child;
     try { child = spawnCodex(args, rootDir); }
     catch (error) { session.status = "failed"; session.error = error.code === "ENOENT" ? CLI_MISSING : CLI_START_FAILURE; Save(session); return; }
-    active.set(session.id, child);
+    active.set(session.id, { child, session });
     session.cliPid = child.pid;
     Save(session);
     child.stdout.setEncoding("utf8");
@@ -171,6 +178,14 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
         try {
           const event = JSON.parse(line);
           if (event.type === "thread.started") { session.cliSessionId = event.thread_id; Save(session); }
+          if (event.type === "progress") {
+            if (typeof event.text === "string") session.progress.text = event.text.slice(-4000);
+            if (typeof event.activity === "string") session.progress.activity = event.activity.slice(0, 200);
+            if (typeof event.model === "string") session.model = event.model;
+            if (typeof event.effort === "string") session.effort = event.effort;
+            session.progress.updatedAt = new Date().toISOString();
+            Save(session);
+          }
         } catch { /* Other CLI events are deliberately discarded. */ }
       }
     });
@@ -192,38 +207,57 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
     child.stdin.end(prompt);
   }
 
+  async function InterruptSession(session) {
+    const pendingInterrupt = ReadInterrupt(session);
+    const child = active.get(session.id)?.child || { pid: pendingInterrupt?.cliPid || await LegacyCliPid(session) };
+    const interruption = { requestId: session.messages.findLast(message => message.role === "user").requestId,
+      cliPid: child.pid, createdAt: new Date().toISOString() };
+    const temporary = `${InterruptPath(session.id)}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(interruption));
+    fs.renameSync(temporary, InterruptPath(session.id));
+    session.status = "interrupting";
+    Save(session);
+    try { await stopCodex(child); }
+    catch {
+      if (ProcessIsRunning(child.pid)) {
+        fs.rmSync(InterruptPath(session.id), { force: true });
+        session.status = "running"; Save(session);
+        throw new RequestError("中断未成功，请重试");
+      }
+    }
+    return interruption;
+  }
+
+  async function MigrateLegacyRun(session) {
+    if (!session.cliSessionId) throw new RequestError("旧会话正在启动，取得会话编号后即可补充要求");
+    await InterruptSession(session);
+    // Let the old preview's close callback persist any last conclusion before
+    // resuming its transcript. The receipt also survives older owner versions.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const saved = JSON.parse(fs.readFileSync(SessionPath(session.id), "utf8"));
+      if (!["running", "interrupting"].includes(saved.status)) return;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new RequestError("旧连接正在收尾，请重试补充要求");
+  }
+
   return async function Handle(request, response) {
     if (!LocalRequest(request)) { Send(response, 403, { error: "仅支持本机同源页面" }); return; }
     const route = new URL(request.url, "http://localhost").pathname.slice(PREFIX.length);
     try {
       if (request.method === "GET" && route === "/sessions") {
         const sessions = fs.existsSync(directory) ? fs.readdirSync(directory).filter(id => ID.test(id)).map(Load) : [];
-        Send(response, 200, { sessions: sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(({ id, title, status, updatedAt }) => ({ id, title, status, updatedAt })) });
+        Send(response, 200, { model: ENCOUNTER_CODEX_MODEL, effort: ENCOUNTER_CODEX_EFFORT,
+          sessions: sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(({ id, title, status, updatedAt, progress, model, effort }) => ({ id, title, status, updatedAt, progress, model, effort })) });
         return;
       }
       const sessionRoute = /^\/sessions\/([a-f0-9-]{36})$/.exec(route);
       if (request.method === "GET" && sessionRoute) { Send(response, 200, Load(sessionRoute[1])); return; }
       const interruptRoute = /^\/sessions\/([a-f0-9-]{36})\/interrupt$/.exec(route);
       if (request.method === "POST" && interruptRoute) {
-        const session = Load(interruptRoute[1]);
+        const session = active.get(interruptRoute[1])?.session || Load(interruptRoute[1]);
         if (!["running", "interrupting"].includes(session.status)) { Send(response, 200, session); return; }
-        const pendingInterrupt = ReadInterrupt(session);
-        const child = active.get(session.id) || { pid: pendingInterrupt?.cliPid || await LegacyCliPid(session) };
-        const interruption = { requestId: session.messages.findLast(message => message.role === "user").requestId,
-          cliPid: child.pid, createdAt: new Date().toISOString() };
-        const temporary = `${InterruptPath(session.id)}.tmp`;
-        fs.writeFileSync(temporary, JSON.stringify(interruption));
-        fs.renameSync(temporary, InterruptPath(session.id));
-        session.status = "interrupting";
-        Save(session);
-        try { await stopCodex(child); }
-        catch {
-          if (ProcessIsRunning(child.pid)) {
-            fs.rmSync(InterruptPath(session.id), { force: true });
-            session.status = "running"; Save(session);
-            throw new RequestError("中断未成功，请重试");
-          }
-        }
+        await InterruptSession(session);
         Send(response, 202, Load(session.id));
         return;
       }
@@ -240,11 +274,21 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       const now = new Date().toISOString();
       const turnId = turn.requestId || randomUUID();
       const sessionId = turn.sessionId || turnId;
-      const session = fs.existsSync(SessionPath(sessionId)) ? Load(sessionId) : null;
+      let running = active.get(sessionId);
+      const session = running?.session || (fs.existsSync(SessionPath(sessionId)) ? Load(sessionId) : null);
       if (turn.sessionId && !session) { Send(response, 404, { error: "会话不存在" }); return; }
+      const submissionKey = `${sessionId}/${turnId}`;
+      if (submissions.has(submissionKey)) await submissions.get(submissionKey);
       if (session?.messages.some(message => message.requestId === turnId)) { Send(response, 202, session); return; }
-      const next = session || { id: sessionId, title: turn.prompt.slice(0, 32), messages: [], createdAt: now };
-      if (active.has(next.id) || ["running", "interrupting"].includes(next.status)) { Send(response, 409, { error: "当前会话正在执行，请等待结论" }); return; }
+      let next = session || { id: sessionId, title: turn.prompt.slice(0, 32), messages: [], createdAt: now };
+      if (turn.steer === true && next.status === "running" && !running?.child.steer) {
+        await MigrateLegacyRun(next);
+        running = active.get(sessionId);
+        next = running?.session || Load(sessionId);
+        if (next.messages.some(item => item.requestId === turnId)) { Send(response, 202, next); return; }
+      }
+      if (running && !running.child.steer) { Send(response, 409, { error: "当前执行使用旧版连接，请完成后重试" }); return; }
+      if (!running && ["running", "interrupting"].includes(next.status)) { Send(response, 409, { error: "会话由另一个预览服务执行，请在原页面补充要求，或中断后继续" }); return; }
       const folder = path.join(directory, next.id, turnId);
       fs.mkdirSync(folder, { recursive: true });
       if (turn.frame) {
@@ -263,7 +307,17 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       }
       next.messages.push(message);
       next.updatedAt = now;
-      Start(next, turn, folder);
+      if (running) {
+        Save(next);
+        const submission = running.child.steer(Prompt(turn, folder), turn.screenshot ? path.join(folder, "Screenshot.png") : null);
+        submissions.set(submissionKey, submission);
+        try { await submission; }
+        catch {
+          next.messages = next.messages.filter(item => item !== message);
+          Save(next);
+          throw new RequestError("补充要求发送失败，请重试");
+        } finally { submissions.delete(submissionKey); }
+      } else Start(next, turn, folder);
       Send(response, 202, next);
     } catch (error) {
       if (!response.headersSent) Send(response, error.code === "ENOENT" ? 404 : 400, {

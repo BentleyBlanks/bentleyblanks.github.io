@@ -414,14 +414,14 @@ try {
     const rect=await page.locator('#annotationCanvas').boundingBox();
     await page.mouse.move(rect.x+rect.width*a[0],rect.y+rect.height*a[1]);await page.mouse.down();
     await page.mouse.move(rect.x+rect.width*b[0],rect.y+rect.height*b[1],{steps:8});await page.mouse.up();
-    if(text) {await page.locator('#screenshotText').fill(text);await page.locator('#screenshotText').press('Tab');}
+    if(text) {await page.locator('#screenshotText').fill(text);await page.locator('#screenshotText').press('Control+Enter');}
   }
   await Draw('arrow',[0.1,0.2],[0.3,0.4]);
   await Draw('rect',[0.6,0.2],[0.85,0.6]);
   await Draw('text',[0.3,0.75],[0.3,0.75],'这里加两名追兵');
   assert.ok((await page.locator('#annotationStatus').textContent()).includes('3 处'));
-  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('3 处'));
   await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('2 处'));
+  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('1 处'));
   await page.click('#redoAnnotation');await page.click('#redoAnnotation');
   await page.click('#copyScreenshot');await page.waitForFunction(()=>document.querySelector('#annotationStatus').textContent.includes('已复制标记截图'));
   assert.equal(downloads,0,'annotated image copies without downloading');
