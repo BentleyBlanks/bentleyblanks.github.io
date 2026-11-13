@@ -269,11 +269,20 @@ export class FlowPerspectiveView extends FlowMapView {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
       if(Math.max(w,d)<0.4) continue;
-      const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y-h/2:this.Ground([x,z]);
+      const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y:this.Ground([x,z]);
       const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
       if(!SphereInView(camera,radius)) continue;
       if(perspective&&Math.max(w,h,d)*this.focal*renderScale/Math.max(1,camera[2])<0.7) continue;
       const cover=IsEncounterCover(object);
+      if (object.meta?.obstacle === "barbedWire") {
+        const yaw=(object.yawDeg||0)*Math.PI/180;
+        for (const height of [0.25,0.55,0.85]) Box(x,z,w,0.055,0.045,"#5d685a",base+height,yaw);
+        for (let offset=-w/2+0.6;offset<w/2;offset+=1.3) {
+          const bx=x+Math.cos(yaw)*offset,bz=z-Math.sin(yaw)*offset;
+          Box(bx,bz,0.65,d,0.06,"#68705d",base+0.55,yaw+0.65);
+        }
+        continue;
+      }
       Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover,object);
     }
     if(cacheStatic) {

@@ -33,9 +33,11 @@ import {
   L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadStart, RushStation, ScarpZ, LineLength,
   L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_FIELD_TREES, L0105_BACKDROP_LONE_TREES, L0105_BACKDROP_PATHS, L0105_FIELD_PAINT, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP_ROAD, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS, L0105_HEIGHTS,
-  L0105_OLD_POSITION, L0105_WOODS, L0105_SOUTH_TREES, L0105_POST_ROAD_SOUTH, L0105_FIELD_LANES, L0105_BACKDROP_POST_ROAD,
+  L0105_OLD_POSITION, L0105_WOODS, L0105_SOUTH_TREES, L0105_POST_ROAD_SOUTH, L0105_FIELD_LANES, L0105_BACKDROP_POST_ROAD, BundZ,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { ReadBlockoutSceneDocSync } from "./Script_SceneNode.mjs";
+import { SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
+import fs from "node:fs";
 
 // 2026-10-31：场景生成器退休，场景以 Scenes/FirstLevelWhitebox 为准（三段合一，docs/Data_Scene.md）；
 // 下面的设计约束改查场景按 FirstLevel0105 的范围取出来的那一块——在场景编辑器里改坏了，这里会报。
@@ -332,7 +334,13 @@ assert.ok(!all.some((x) => /foxhole|FoxHole|猫耳/i.test(x.id)), "不要猫耳�
 const pn = PitNorthChecks(sample);
 for (const g of pn.graves) assert.ok(g.h >= 0.95 && g.h <= 1.35 && Math.abs(g.h - g.want) <= 0.1, `坟 ${g.id} 高 ${g.h}（要 ${g.want}，1.0–1.3）`);
 assert.equal(pn.graves.length, 7, "两座孤坟 + 坟地五座");
-assert.ok(pn.bunds.length >= 60 && pn.bundMin >= 0.25 && pn.bundMax <= 0.36, `田埂高 ${pn.bundMin}…${pn.bundMax}（要约 0.3）`);
+const currentScene = JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",import.meta.url)));
+const forwardSaps = currentScene.trenches.segments.filter(segment => /^(ForwardObservation|EastListening)/.test(segment.id));
+const uncutBunds = pn.bunds.filter(bund => {
+  const shape = PN.bunds.find(entry => entry.id === bund.id), z = BundZ(shape,bund.x);
+  return forwardSaps.every(segment => segment.points.slice(1).every((end,index) => SegmentDistance([bund.x,z],segment.points[index],end)>6));
+});
+assert.ok(uncutBunds.length >= 60 && uncutBunds.every(bund => bund.h >= 0.25 && bund.h <= 0.36), "前哨支沟开口以外的田埂保持约 0.3 m 高");
 assert.ok(pn.ditchDepthMin >= 1.2 && pn.ditchDepthMax <= 1.75, `干沙沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}（自然地面往下 1.4 + 沟沿翻土）`);
 {
   // 断面（2026-10-24 北沙河小支沟的样子）：沟底宽 5–6（离最深处 10 cm 内）；沟沿（翻土顶）到沟底 ≥ 1.2

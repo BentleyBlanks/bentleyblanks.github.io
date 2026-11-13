@@ -180,6 +180,20 @@ export class FlowMapView {
       }
       context.restore();
     }
+    if (map.terrain) {
+      const step = Math.max(0.5, 2 / scale), bounds = this.Bounds();
+      const minX = Math.max(map.terrain.bounds.minX, bounds[0]), maxX = Math.min(map.terrain.bounds.maxX, bounds[1]);
+      const minZ = Math.max(map.terrain.bounds.minZ, bounds[2]), maxZ = Math.min(map.terrain.bounds.maxZ, bounds[3]);
+      for (let z = minZ; z < maxZ; z += step) for (let x = minX; x < maxX; x += step) {
+        const sample = map.terrain.preAt;
+        const slope = (sample(x-step,z)-sample(x+step,z))*0.7 + (sample(x,z-step)-sample(x,z+step))*0.45;
+        const opacity = Math.min(0.28, Math.abs(slope) / step * 0.45);
+        if (opacity < 0.015) continue;
+        const point = Screen([x,z]);
+        context.fillStyle = slope > 0 ? `rgba(255,250,218,${opacity})` : `rgba(80,69,45,${opacity})`;
+        context.fillRect(point[0],point[1],step*scale+0.5,step*scale+0.5);
+      }
+    }
     for(const path of map.footpaths) Line(context,path.map(Screen),"#a38e6455",Math.max(0.7,scale*0.35),[3,4]);
     // Paint the whole bank network first, then the whole walking surface.
     // Drawing each complete segment in turn used to seal T-junctions again.
@@ -199,6 +213,17 @@ export class FlowMapView {
       if(point[0]+radius<0||point[1]+radius<0||point[0]-radius>width||point[1]-radius>height) continue;
       if(object.material==="Whitebox/Foliage") {
         Circle(context,point,Math.max(1.1,Math.min(w,d)*scale*0.5),"#7d986252","#74875144");continue;
+      }
+      if (object.meta?.obstacle === "barbedWire") {
+        context.save();context.translate(...point);context.rotate(-(object.yawDeg||0)*Math.PI/180);
+        const half = w*scale/2, reach = Math.max(2,d*scale/2);
+        Line(context,[[-half,-reach],[half,-reach]],"#5c6354",1);
+        Line(context,[[-half,reach],[half,reach]],"#5c6354",1);
+        for (let offset=-half;offset<half;offset+=Math.max(5,scale*1.3)) {
+          Line(context,[[offset-2,-reach],[offset+2,reach]],"#535c4c",1);
+          Line(context,[[offset-2,reach],[offset+2,-reach]],"#535c4c",1);
+        }
+        context.restore();continue;
       }
       if(scale<4&&Math.max(w,d)<1.5) continue;
       context.save();context.translate(...point);context.rotate(-(object.yawDeg||0)*Math.PI/180);

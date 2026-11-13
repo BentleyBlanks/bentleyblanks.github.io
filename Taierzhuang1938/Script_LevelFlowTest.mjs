@@ -496,6 +496,37 @@ const invalidViews=structuredClone(packet);invalidViews.context.viewports={count
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
 const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+const defenseWire=map.objects.filter(object=>object.meta?.obstacle==="barbedWire");
+assert.ok(defenseWire.length>40,"two staggered obstacle belts are visible in the encounter map");
+for(const gap of [[-36,-65],[67,-65]]) assert.ok(defenseWire.every(object=>Math.hypot(object.pos[0]-gap[0],object.pos[2]-gap[1])>6),"forward saps retain deliberate obstacle gaps");
+assert.ok(map.labels.some(label=>label.name==="前哨观察哨")&&map.labels.some(label=>label.name==="前哨监听哨"));
+assert.ok(!scene.trenches.segments.some(segment=>segment.id==="RearAmmoSap")&&!map.labels.some(label=>label.name.includes("弹药支线")),"the removed ammunition branch stays absent");
+for(const exit of ["West","East","Left","Right"]) {
+  const steps=map.objects.filter(object=>object.meta?.fortification==="counterattackStep"&&object.meta.exit===exit).sort((a,b)=>a.meta.level-b.meta.level);
+  assert.equal(steps.length,5,"each dispersed counterattack exit has five physical earth steps");
+  for(let index=1;index<steps.length;index++) {
+    const rise=steps[index].pos[1]-steps[index-1].pos[1];
+    assert.ok(rise>0.27&&rise<0.4,"the loaded infantry ascent uses climbable risers");
+  }
+  for(const step of steps) assert.ok(step.pos[1]+step.size[1]>terrain.heightAt(step.pos[0],step.pos[2])+0.1,"step treads remain above the excavated ground");
+  const start=scene.trenches.segments.find(segment=>segment.id===`Counterattack${exit}Access`).points[0];
+  assert.ok(EncounterFloorConnections(start,map).length>=2,"each exit is connected to the firing trench");
+  const access=scene.trenches.segments.find(segment=>segment.id===`Counterattack${exit}Access`);
+  for(let index=1;index<access.points.length;index++) {
+    const a=access.points[index-1],b=access.points[index];
+    for(let fraction=0;fraction<=1;fraction+=0.05) {
+      const point=[a[0]+(b[0]-a[0])*fraction,a[1]+(b[1]-a[1])*fraction];
+      for(const wall of scene.objects.filter(object=>(object.group||"").includes("空气墙"))) {
+        const yaw=(wall.yawDeg||0)*Math.PI/180,dx=point[0]-wall.pos[0],dz=point[1]-wall.pos[2];
+        const localX=dx*Math.cos(yaw)-dz*Math.sin(yaw),localZ=dx*Math.sin(yaw)+dz*Math.cos(yaw);
+        assert.ok(Math.abs(localX)>wall.size[0]/2+0.3||Math.abs(localZ)>wall.size[2]/2+0.3,"the counterattack connection stays clear of old invisible walls");
+      }
+    }
+  }
+  assert.ok(map.objects.some(object=>object.id===`Defense_Counterattack${exit}Turf`),"the exit has a concealing turf lip");
+}
+assert.ok(terrain.preAt(-20,70)>(terrain.preAt(-36,70)+terrain.preAt(-4,70))/2+0.5,"the rear ground has a genuine raised mound");
+assert.ok(terrain.preAt(-12,-91)<(terrain.preAt(-23,-91)+terrain.preAt(-1,-91))/2-0.4,"the forward ground has a genuine shell depression");
 const campFrame = EvaluateFlow(455.569);
 const campDefenders = campFrame.actors.filter(actor => ["luo","he","liu","yao"].includes(actor.id));
 assert.equal(campDefenders.length,4);

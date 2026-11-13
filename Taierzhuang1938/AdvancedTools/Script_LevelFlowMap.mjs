@@ -109,6 +109,8 @@ export function BuildEncounterMap(scene) {
     ["街坊家",74,456], ["本家院",84,482], ["石碾",113.2,465.7], ["关帝庙",84.5,425],
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
+  labels.push(...(scene.markers || []).filter(marker => marker.id.startsWith("LmDefense"))
+    .map(marker => ({name:marker.name,p:[marker.x,marker.z]})));
   return {
     bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => paint.poly && paint.poly.some((point) => point.z < 558)),

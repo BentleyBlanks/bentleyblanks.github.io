@@ -526,7 +526,7 @@ try {
   const depth=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);canvas.width=640;canvas.height=360;
-    const data={objects:[{id:'Wall',pos:[0,1.5,5],size:[4,3,1],material:'Whitebox/Plaster'}],farObjects:[],terrain:{heightAt:()=>0,roots:[],source:'Flat regression scene'}};
+    const data={objects:[{id:'Wall',pos:[0,0,5],size:[4,3,1],material:'Whitebox/Plaster'}],farObjects:[],terrain:{heightAt:()=>0,roots:[],source:'Flat regression scene'}};
     const view=new FlowPerspectiveView(canvas,data,'scene');view.freeCamera={eye:[0,1.6,0],yaw:0,pitch:0};
     const actors=[{id:'visible',kind:'person',side:'friend',pose:'stand',p:[0,3]},
       {id:'hidden',kind:'person',side:'friend',pose:'stand',p:[0,10]},
@@ -546,14 +546,14 @@ try {
     result.eyePixelsUnchanged=eyeBackground.every((value,index)=>value===eyeForeground[index]);
     result.eyeLabelOpacity=view.ActorLabelOpacity(actors[1]);
     view.type='scene';
-    data.objects=[{id:'FarBuilding',pos:[0,1.6,1100],size:[50,50,20],material:'Whitebox/Plaster'}];
+    data.objects=[{id:'FarBuilding',pos:[0,-23.4,1100],size:[50,50,20],material:'Whitebox/Plaster'}];
     view.DrawBase(context,640,360,frame);result.farDepth=view.raster.depth[176*640+320];
     data.objects[0].pos[2]=1600;view.DrawBase(context,640,360,frame);result.beyondFarVisible=Number.isFinite(view.raster.depth[176*640+320]);
     const overview=new FlowPerspectiveView(canvas,data,'oblique');overview.center=[0,0];overview.scale=0.5;
-    data.objects=[-400,400].map(z=>({id:`Overview${z}`,pos:[0,5,z],size:[80,10,80],material:'Whitebox/Plaster'}));
+    data.objects=[-400,400].map(z=>({id:`Overview${z}`,pos:[0,0,z],size:[80,10,80],material:'Whitebox/Plaster'}));
     overview.BeforeDraw(frame);overview.DrawBase(context,640,360,frame);
     result.overviewDepths=[-400,400].map(z=>{const point=overview.Vertex([0,5,z]);return overview.raster.depth[Math.round(point.y)*640+Math.round(point.x)];});
-    data.objects=[{id:'BoxInterior',pos:[0,1.5,0],size:[4,3,2],material:'Whitebox/Plaster'}];
+    data.objects=[{id:'BoxInterior',pos:[0,0,0],size:[4,3,2],material:'Whitebox/Plaster'}];
     result.boxDepths=[];
     for(const [eye,yaw,pitch,point] of [
       [[0,1,0],0,0,[0,1,1]],
