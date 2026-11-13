@@ -172,12 +172,12 @@ export class EncounterViewports {
   Capture() {
     const rect=this.element.getBoundingClientRect(),ratio=Math.min(2,window.devicePixelRatio||1),output=document.createElement("canvas");
     output.width=Math.round(rect.width*ratio);output.height=Math.round(rect.height*ratio);
-    const context=output.getContext("2d");context.fillStyle="#11160f";context.fillRect(0,0,output.width,output.height);
+    const context=output.getContext("2d");context.fillStyle=getComputedStyle(this.element).backgroundColor;context.fillRect(0,0,output.width,output.height);
     context.scale(ratio,ratio);context.font="12px Microsoft YaHei, sans-serif";
     for(const entry of this.Visible()) {
       const pane=entry.pane.getBoundingClientRect(),canvas=entry.canvas.getBoundingClientRect();
-      context.fillStyle="#192017";context.fillRect(pane.x-rect.x,pane.y-rect.y,pane.width,pane.height);
-      context.fillStyle="#dfcfab";context.fillText(`视口 ${entry.index+1} · ${ENCOUNTER_VIEW_TYPES[entry.type]}`,pane.x-rect.x+10,pane.y-rect.y+20);
+      context.fillStyle=getComputedStyle(entry.bar).backgroundColor;context.fillRect(pane.x-rect.x,pane.y-rect.y,pane.width,pane.height);
+      context.fillStyle=getComputedStyle(entry.bar).color;context.fillText(`视口 ${entry.index+1} · ${ENCOUNTER_VIEW_TYPES[entry.type]}`,pane.x-rect.x+10,pane.y-rect.y+20);
       context.drawImage(entry.canvas,canvas.x-rect.x,canvas.y-rect.y,canvas.width,canvas.height);
     }
     return output;

@@ -98,6 +98,10 @@ function PopulateTimeline() {
     button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
     Element("timelineBeats").append(button);
   }
+  for(const stamp of [0,300,600,900,1200,1500,FLOW_DURATION]) {
+    const label=document.createElement("span");label.textContent=FormatFlowTime(stamp);
+    label.style.left=`${stamp/FLOW_DURATION*100}%`;Element("timelineRuler").append(label);
+  }
   const beats=Element("timelineBeats");
   new ResizeObserver(()=>{
     for(const button of beats.children) button.classList.toggle("lfShortBeat",button.getBoundingClientRect().width<25);

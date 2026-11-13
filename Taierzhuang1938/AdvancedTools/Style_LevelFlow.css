@@ -1,120 +1,229 @@
-/* Encounter workbench inherits the game's olive, ivory, gold and square controls. */
-.lfBody { font:13px/1.6 system-ui,"Microsoft YaHei",sans-serif; }
-a { color:var(--se-gold-text); text-decoration:none; }a:hover { text-decoration:underline; }
-.lfToolbar {display:flex;align-items:center;gap:10px;min-height:48px;padding:7px 12px;flex:none;background:var(--se-panel);border-bottom:1px solid var(--se-rule);}
-.lfSrOnly {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
-#frameHeading {font-size:12px;color:var(--se-gold-text);white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;padding-right:10px;border-right:1px solid var(--se-edge);}
-.lfToolGroup {display:flex;align-items:center;gap:4px;}
-.lfToolbar button {font-size:12px;padding:5px 9px;white-space:nowrap;}
-.lfExport {margin-left:auto;}
-.lfToolbar .lfHistory {margin-left:2px;}
-.lfCopyPrimary {background:#d9bb7b;color:#15170f;border-color:#e6cb91;font-weight:650;}
-.lfCopyPrimary:hover:not(:disabled) {background:#edce8e;color:#11150d;border-color:#f2dbac;}
-.lfBack {font-size:11px;white-space:nowrap;padding-left:4px;}
-button.selected,button[aria-pressed=true] { color:var(--se-gold-text); border-color:#d0ae6c; background:#d6b96f19; }
-.lfWorkspace { display:grid; grid-template-columns:minmax(0,1fr) 316px; flex:1; min-height:0; }
-.lfViewport { position:relative; min-width:0; overflow:hidden; background:#30372a; }
-#flowMap { display:block; width:100%; height:100%; touch-action:none; cursor:grab; }#flowMap[data-mode=arrow],#flowMap[data-mode=rect],#flowMap[data-mode=text],#flowMap[data-mode=route] { cursor:crosshair; }#flowMap:active { cursor:grabbing; }
-.lfInspector { min-height:0; display:flex; flex-direction:column; background:var(--se-panel-r); border-left:1px solid var(--se-rule); }
-.lfTabs { display:flex; flex:none; height:36px; border-bottom:1px solid var(--se-edge); }.lfTabs button { flex:1; border:0; border-bottom:2px solid transparent; background:transparent; }.lfTabs button.selected { border-bottom-color:var(--se-gold); background:#d5ba7e0c; }
-.lfPane { overflow-y:auto; padding:16px 16px 20px; min-height:0; flex:1; }
-.lfSourceHeading { display:flex; justify-content:space-between; color:var(--se-muted); font-size:10px; }.lfSourceHeading span:first-child { color:var(--se-gold-text); }
-.lfPane h2 { font:19px/1.55 var(--se-serif); letter-spacing:.03em; margin:9px 0 17px; color:#efeada; }
-#sourcePassage {font-size:14px;line-height:1.9;color:#dddccf;overflow-wrap:anywhere;}#sourcePassage p {margin:0 0 15px;}#sourcePassage .lfDialogue {border-left:2px solid #c8ae6c70;padding-left:11px;color:#f0e5cb;}#sourceLink { display:inline-block; margin-top:22px; font-size:11px; }
-.lfInline { display:flex; gap:6px; margin-bottom:10px; align-items:center; }.lfInline select { min-width:0; flex:1; }.lfInline button { padding:3px 7px; font-size:11px; }
-.lfField { display:flex; flex-direction:column; gap:4px; color:var(--se-muted); font-size:11px; margin:10px 0; }.lfField input,.lfField select { width:100%; min-width:0; padding:4px 7px; border:1px solid var(--se-edge); background:var(--se-field); font-size:12px; }.lfField textarea { font:12px/1.6 ui-monospace,Consolas,monospace; min-height:55px; }
-.lfFieldGrid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }.lfFieldGrid .lfField { margin:5px 0; }
-.lfPreviewStatus { margin:13px 0; padding:10px; color:#c1d5cf; font-size:12px; background:#739e9212; border-left:2px solid #88b1a8; white-space:pre-line; }
-.lfNoteHint { font-size:12px; line-height:1.8; color:var(--se-muted); margin-bottom:14px; }
-.lfFrameBookmark { display:block; width:100%; text-align:left; background:transparent; border:0; border-bottom:1px solid var(--se-edge); padding:10px 2px; color:#cccab9; font-size:12px; }
-.lfFrameBookmark.selected { color:var(--se-gold-text); }
-#mapReadout { position:absolute; top:9px; left:12px; color:#dedcc4; background:#192018da; padding:3px 7px; font:11px/1.5 ui-monospace,Consolas,monospace; pointer-events:none; }
-.lfMapLegend { position:absolute; bottom:12px; left:130px; display:flex; gap:7px; align-items:center; padding:4px 8px; background:#192018df; color:#c4c9b8; font-size:10px; pointer-events:none; }
-.lfMapLegend i { display:inline-block; width:6px; height:6px; border-radius:50%; margin-left:4px; }.lfMapLegend .player {background:#f1d18a;}.lfMapLegend .friend {background:#87c4c0;}.lfMapLegend .enemy {background:#f3957b;}.lfMapLegend .trigger {width:10px;height:10px;border:1px dashed #7bc6dd;margin-left:5px;}.lfMapLegend .spawn {color:#f3957b; margin-left:5px;}
-.lfTooltip { position:absolute; background:#111b15ee; border:1px solid #c0bc9b88; color:#e0dece; padding:6px 10px; max-width:260px; pointer-events:none; font-size:12px; z-index:3; }
-#mapLoading {position:absolute; inset:0; display:grid; place-items:center; background:#22291fee; color:var(--se-gold-text);}
-.lfTimeline {flex:none;padding:8px 14px 10px;border-top:1px solid var(--se-rule);background:#10130f;}
-.lfTransport {display:flex;align-items:center;gap:12px;height:32px;margin-bottom:10px;}
-.lfPlayback {display:flex;align-items:center;gap:3px;}
-.lfPlayback button {height:28px;min-width:32px;padding:2px 8px;font-size:13px;border-color:transparent;background:transparent;}
-.lfPlayback #playFlow {min-width:54px;border-color:#d0ae6b80;background:#c3a7641a;}
-.lfTransport output {font:12px ui-monospace,Consolas,monospace;color:#ead3a0;white-space:nowrap;font-variant-numeric:tabular-nums;}
-.lfTransport select {padding:3px 6px;font-size:11px;border-color:#b4b79d40;}
-.lfTransport .lfLoop {display:flex;align-items:center;gap:5px;font-size:11px;color:var(--se-muted);white-space:nowrap;cursor:pointer;}
-.lfLoop input {appearance:none;width:23px;height:13px;border:1px solid #737b63;border-radius:8px;background:#272e24;margin:0;position:relative;cursor:pointer;}
-.lfLoop input::after {content:"";position:absolute;width:7px;height:7px;top:2px;left:2px;background:#9da78f;border-radius:50%;}
-.lfLoop input:checked {background:#8d7438;border-color:#d4b575;}.lfLoop input:checked::after {left:12px;background:#f5e6c0;}
-.lfLoop input:focus-visible {outline:2px solid var(--se-gold);outline-offset:3px;}
-#timelineMode {font-size:11px;color:#b7abc0;white-space:nowrap;}
-.lfTimeAxis {position:relative;margin:0 7px;--progress:0%;}
-.lfStages,.lfBeats {position:relative;height:25px;}
-.lfStages button,.lfBeats button {position:absolute;top:0;height:100%;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;border:0;border-right:2px solid #10130f;padding:3px 5px;}
-.lfStages button {border-bottom:2px solid transparent;font-size:11px;background:#242b21;color:#adb5a3;text-align:left;}
-.lfStages button.selected {border-bottom-color:var(--se-gold);background:#4b452f;color:#f3e5bd;}
-.lfStages button.draft {color:#b7abc0;}
-#flowSeek {display:block;appearance:none;-webkit-appearance:none;width:calc(100% + 14px);height:14px;margin:3px -7px;background:transparent;cursor:ew-resize;position:relative;z-index:2;}
-#flowSeek::-webkit-slider-runnable-track {height:2px;background:linear-gradient(to right,#ceb575 var(--progress),#414b39 var(--progress));border:0;}
-#flowSeek::-webkit-slider-thumb {appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border:3px solid #e6cf98;border-radius:50%;background:#766036;box-shadow:0 0 0 2px #10130f;}
-#flowSeek::-moz-range-track {height:2px;background:#414b39;border:0;}
-#flowSeek::-moz-range-thumb {box-sizing:border-box;width:14px;height:14px;border:3px solid #e6cf98;border-radius:50%;background:#766036;}
-.lfBeats {height:19px;}
-.lfBeats button {padding:1px 0;font:9px ui-monospace,Consolas,monospace;background:#1b231b;color:#94a38d;text-overflow:clip;}
-.lfBeats button.cinematic {background:#302c36;color:#bcb0c5;}
-.lfBeats button.selected {box-shadow:inset 0 -2px #e0c181;color:#f3e6c5;background:#383b29;}
-.lfBeats button.lfShortBeat {font-size:0;}
-.lfBeats button.lfShortBeat:hover {background:#6d6342;}
-.lfPlayhead {position:absolute;left:var(--progress);top:0;bottom:0;width:1px;background:#d7bd7b90;pointer-events:none;z-index:1;}
-#flowError { position:fixed; left:12px; bottom:153px; max-width:600px; padding:9px 14px; border:1px solid #c3ac7b; background:#24281fef; color:#f1dfbb; z-index:10; font-size:12px; }
-@media(max-width:1150px) {.lfToolbar {gap:6px;padding:6px 8px;}#frameHeading {max-width:130px;font-size:11px;}.lfToolbar button {font-size:11px;padding:5px 6px;}.lfHistory button {font-size:10px;}.lfWorkspace {grid-template-columns:minmax(0,1fr) 280px;}.lfBack {font-size:10px;}}
-@media(max-width:850px) {.lfToolbar {flex-wrap:wrap;}#frameHeading {max-width:150px;}.lfHistory {display:none;}.lfWorkspace {grid-template-columns:minmax(0,1fr) 240px;}.lfPane {padding:12px;}#sourcePassage {font-size:13px;}.lfMapLegend {display:none;}.lfTransport {gap:8px;}.lfStages button {font-size:9px;}}
-/* All panes share the same frame and keep their own navigation. */
+/* Encounter Designer has its own neutral, light editing workspace. */
+:root {
+  color-scheme: light;
+  font: 13px/1.6 Inter, "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --lf-bg: #edf0f4;
+  --lf-panel: #ffffff;
+  --lf-line: #dce2e9;
+  --lf-text: #283448;
+  --lf-muted: #738097;
+  --lf-accent: #3569d6;
+  --lf-accent-soft: #edf3ff;
+}
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+body { margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--lf-bg); color: var(--lf-text); }
+[hidden] { display: none !important; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button, select {
+  border: 1px solid var(--lf-line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 5px 10px;
+  cursor: pointer;
+  line-height: 1.5;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+button { white-space: nowrap; }
+button:hover:not(:disabled), select:hover { background: #f5f7fb; border-color: #b9c7de; color: #1d50b4; }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #8bacf3;
+  outline-offset: 2px;
+}
+button.selected, button[aria-pressed="true"], .sePrimary {
+  color: #2c5fbd;
+  background: var(--lf-accent-soft);
+  border-color: #b9cefa;
+}
+.lfCopyPrimary { background: var(--lf-accent); border-color: var(--lf-accent); color: #fff; font-weight: 600; box-shadow: 0 2px 4px #2858b71a; }
+.lfCopyPrimary:hover:not(:disabled) { background: #285bc3; border-color: #285bc3; color: #fff; }
+a { color: #4268ad; text-decoration: none; }
+a:hover { color: #214c9e; text-decoration: underline; }
+input[type="text"], input[type="number"], textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--lf-line);
+  border-radius: 6px;
+  background: #fff;
+}
+input:disabled { color: #9aa5b6; background: #f5f7fa; }
+input[type="checkbox"] { accent-color: var(--lf-accent); width: 14px; height: 14px; margin: 0; }
+textarea { resize: vertical; min-height: 64px; }
+.lfSrOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-#viewportLayout {font-size:12px;padding:3px 6px;}
-.lfViewGrid {display:grid;grid-template-columns:1.35fr 1fr;grid-template-rows:minmax(0,1fr);gap:6px;padding:6px;height:100%;width:100%;box-sizing:border-box;background:#10150e;}
-.lfViewGrid[data-layout="1"] {grid-template-columns:minmax(0,1fr);}
-.lfViewGrid[data-layout="4"] {grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);}
-.lfViewPane {display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;border:1px solid #b6b09655;overflow:hidden;background:#e7e2d2;}
-.lfViewPane.active {border-color:#d9bd7c;}
-.lfViewBar {flex:none;display:flex;align-items:center;gap:6px;height:31px;padding:2px 7px;background:#151b12;color:#aeb69f;box-sizing:border-box;}
-.lfViewPane.active .lfViewBar {background:#25291b;color:#dfca95;}
-.lfViewBar>span {font-size:10px;white-space:nowrap;}
-.lfViewBar select {font-size:11px;padding:2px 3px;min-width:0;max-width:116px;background:#0d130b;border-color:#a9aa8760;}
-.lfViewBar select:first-of-type {flex:1;}
-.lfViewBar .lfViewTarget {width:60px;}
-.lfViewBar button {font-size:10px;padding:1px 4px;}
-#viewportGrid canvas {display:block;flex:1;width:100%;height:0;min-height:0;touch-action:none;cursor:grab;outline:none;}
-#viewportGrid canvas[data-mode=arrow],#viewportGrid canvas[data-mode=rect],#viewportGrid canvas[data-mode=text],#viewportGrid canvas[data-mode=route] {cursor:crosshair;}
-.lfViewStatus {position:absolute;right:7px;bottom:7px;color:#3e574e;background:#faf6e9d9;padding:2px 5px;font-size:10px;pointer-events:none;}
-#mapReadout {top:auto;bottom:35px;left:18px;color:#403e30;background:#fff8e8dd;}
-.lfMapLegend {color:#454c3c;background:#faf6e8e8;left:120px;bottom:12px;}
-.lfMapLegend .player {background:#ac7a16;}.lfMapLegend .friend {background:#276d82;}.lfMapLegend .enemy {background:#ac4031;}.lfMapLegend .trigger {border-color:#277b9a;}.lfMapLegend .spawn {color:#ac4031;}
-@media(max-width:1100px) {.lfViewBar {gap:3px;padding:2px 4px;}.lfViewBar>span {display:none;}}
-@media(max-width:800px) {.lfViewGrid {gap:3px;padding:3px;}.lfViewBar {flex-wrap:wrap;height:50px;}.lfViewBar select {max-width:90px;}.lfViewTarget {max-width:52px;}}
+/* The toolbar keeps current context and frequent actions on a single row. */
+.lfToolbar { display: flex; align-items: center; flex: none; gap: 12px; height: 52px; padding: 9px 14px; border-bottom: 1px solid var(--lf-line); background: #fff; }
+#frameHeading { color: #44546f; font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; padding-right: 14px; border-right: 1px solid var(--lf-line); }
+.lfToolGroup { display: flex; align-items: center; gap: 5px; }
+.lfToolbar button, .lfToolbar select { font-size: 12px; height: 32px; }
+.lfViewTools { gap: 3px; }
+.lfViewTools button { border-color: transparent; background: transparent; padding: 5px 8px; }
+.lfViewTools button[aria-pressed="true"] { border-color: #c5d7fa; background: var(--lf-accent-soft); }
+#viewportLayout { padding: 4px 6px; margin-right: 3px; background: #f5f7fa; }
+.lfHistory { padding-left: 8px; border-left: 1px solid var(--lf-line); gap: 2px; }
+.lfHistory button { min-width: 29px; padding: 1px 5px; font-size: 20px; border-color: transparent; background: transparent; }
+.lfExport { margin-left: auto; }
+.lfBack { font-size: 11px; color: #66768e; white-space: nowrap; margin-left: 2px; }
 
-.lfMapLegend .cover {width:11px;height:13px;background:#244633;clip-path:polygon(0 0,100% 0,100% 55%,85% 78%,50% 100%,15% 78%,0 55%);margin-left:5px;}
+/* White cards sit beside the neutral map canvas. */
+.lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) 326px; gap: 12px; padding: 12px 12px 0; flex: 1; min-height: 0; }
+.lfViewport { min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+.lfViewGrid { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 8px; width: 100%; height: 100%; background: var(--lf-bg); }
+.lfViewGrid[data-layout="1"] { grid-template-columns: minmax(0, 1fr); }
+.lfViewGrid[data-layout="4"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.lfViewPane { display: flex; flex-direction: column; position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #e7e2d2; border: 1px solid #d4dce5; border-radius: 9px; }
+.lfViewPane.active { border-color: #7c9ee1; box-shadow: 0 0 0 1px #7c9ee126; }
+.lfViewBar { flex: none; display: flex; align-items: center; gap: 5px; height: 35px; padding: 4px 8px; background: #fbfcfe; color: #6b7b92; border-bottom: 1px solid #dfe5ed; }
+.lfViewPane.active .lfViewBar { background: #f1f5fd; color: #45639a; }
+.lfViewBar > span { white-space: nowrap; font-size: 10px; font-weight: 600; }
+.lfViewBar select { min-width: 0; max-width: 135px; font-size: 11px; padding: 2px 5px; height: 25px; background: transparent; border-color: transparent; }
+.lfViewBar select:first-of-type { flex: 1; font-weight: 600; color: #344860; }
+.lfViewBar select:hover { background: #fff; border-color: #ccd7e8; }
+.lfViewBar .lfViewTarget { width: 57px; }
+.lfViewBar button { padding: 2px 5px; height: 25px; font-size: 10px; background: transparent; border-color: transparent; color: #6d7d93; }
+#viewportGrid canvas { flex: 1; display: block; width: 100%; height: 0; min-height: 0; outline: none; touch-action: none; cursor: grab; }
+#viewportGrid canvas[data-mode="arrow"], #viewportGrid canvas[data-mode="rect"], #viewportGrid canvas[data-mode="text"], #viewportGrid canvas[data-mode="route"] { cursor: crosshair; }
+#viewportGrid canvas:focus-visible { outline: 2px solid #6e96e3; outline-offset: -2px; }
+.lfViewStatus { position: absolute; right: 9px; bottom: 10px; padding: 3px 8px; border-radius: 5px; font-size: 10px; color: #5d6c7b; background: #ffffffed; box-shadow: 0 1px 5px #26344812; pointer-events: none; }
+.lfViewLayers { position: relative; flex: none; font-size: 11px; }
+.lfViewLayers summary { list-style: none; padding: 3px 6px; border: 1px solid transparent; border-radius: 5px; cursor: pointer; white-space: nowrap; color: #6a7b94; }
+.lfViewLayers summary::after { content: "⌄"; margin-left: 5px; }
+.lfViewLayers[open] summary { background: #fff; color: #315eaf; border-color: #ccd8ed; }
+.lfViewLayers > div { position: absolute; right: 0; top: calc(100% + 7px); width: 132px; padding: 6px; border: 1px solid var(--lf-line); border-radius: 8px; background: #fff; box-shadow: 0 8px 28px #23334824; z-index: 5; }
+.lfViewLayers label { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 5px; color: #43526a; cursor: pointer; }
+.lfViewLayers label:hover { background: #f1f5fb; }
+#mapReadout { position: absolute; bottom: 43px; left: 14px; padding: 3px 8px; border-radius: 5px; background: #ffffffeb; color: #586778; font: 10px/1.6 "IBM Plex Mono", Consolas, monospace; pointer-events: none; box-shadow: 0 1px 5px #26344812; }
+.lfMapLegend { position: absolute; bottom: 13px; left: 14px; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 5px; color: #5f6c78; background: #fffffff0; font-size: 10px; pointer-events: none; }
+.lfMapLegend i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 3px; }
+.lfMapLegend .player { background: #ac7a16; }
+.lfMapLegend .friend { background: #276d82; }
+.lfMapLegend .enemy { background: #ac4031; }
+.lfMapLegend .trigger { width: 10px; height: 10px; border: 1px dashed #277b9a; margin-left: 5px; }
+.lfMapLegend .spawn { color: #ac4031; }
+.lfMapLegend .cover { width: 10px; height: 12px; background: #244633; margin-left: 5px; clip-path: polygon(0 0,100% 0,100% 55%,85% 78%,50% 100%,15% 78%,0 55%); }
+.lfTooltip { position: absolute; max-width: 260px; padding: 8px 12px; border: 1px solid var(--lf-line); border-radius: 7px; background: #fff; color: #40516b; box-shadow: 0 4px 18px #2634481f; font-size: 12px; pointer-events: none; z-index: 3; }
+#mapLoading { position: absolute; inset: 0; display: grid; place-items: center; background: #e9edf3f2; color: #637793; border-radius: 9px; }
 
-.lfViewLayers {position:relative;flex:none;font-size:11px;}
-.lfViewLayers summary {list-style:none;cursor:pointer;padding:1px 5px;border:1px solid #a9aa8760;white-space:nowrap;}
-.lfViewLayers summary::after {content:"⌄";margin-left:4px;color:#aab397;}
-.lfViewLayers[open] summary {border-color:var(--se-gold);color:var(--se-gold-text);}
-.lfViewLayers>div {position:absolute;right:0;top:calc(100% + 5px);width:110px;padding:8px;background:#161c13;box-shadow:0 8px 24px #0008;border:1px solid #777b61;z-index:5;}
-.lfViewLayers label {display:flex;align-items:center;gap:7px;padding:4px;cursor:pointer;color:#e0dfce;}
-.lfAnnotationDialog {width:calc(100vw - 40px);height:calc(100vh - 40px);max-height:calc(100vh - 40px);padding:0;border:1px solid #92967a;background:#11170f;color:var(--se-text);box-shadow:0 24px 100px #000a;}
-.lfAnnotationDialog[open] {display:flex;flex-direction:column;}
-.lfAnnotationDialog::backdrop {background:#030603bf;backdrop-filter:blur(3px);}
-.lfAnnotationHeader {display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--se-edge);flex:none;}
-.lfAnnotationHeader>div {display:flex;align-items:baseline;gap:18px;min-width:0;}
-.lfAnnotationHeader h2 {margin:0;font:18px var(--se-serif);white-space:nowrap;color:#efdeb4;}
-#annotationHeading {font-size:12px;color:#aeb79f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.lfAnnotationHeader button {padding:3px 8px;font-size:12px;}
-.lfAnnotationTools {display:flex;align-items:center;gap:12px;padding:10px 16px;flex:none;flex-wrap:wrap;border-bottom:1px solid #a9aa8730;}
-.lfAnnotationTools button {font-size:12px;padding:4px 10px;}
-#screenshotText {width:180px;min-width:100px;font-size:12px;}
-.lfAnnotationStage {flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#090d08;}
-#annotationCanvas {display:block;flex:none;touch-action:none;cursor:crosshair;outline:none;box-shadow:0 4px 22px #0006;}
-#annotationCanvas:focus-visible {outline:1px solid #b8ab7a;}
-.lfAnnotationFooter {display:flex;justify-content:space-between;gap:16px;padding:9px 16px;font-size:11px;color:#9ca98f;flex:none;}
-#annotationStatus {color:#e3cd9a;}
-#legacyAnnotations {padding:4px 16px;max-height:180px;overflow:auto;}
-#legacyAnnotations .lfPane {padding:8px 0;}
-@media(max-width:850px) {.lfAnnotationDialog {width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);}.lfAnnotationTools {gap:6px;padding:8px;}.lfAnnotationTools button {padding:4px 7px;}#screenshotText {width:130px;}.lfAnnotationFooter>span {display:none;}}
+.lfInspector { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: #fff; border: 1px solid var(--lf-line); border-radius: 9px; }
+.lfTabs { display: flex; flex: none; gap: 3px; margin: 8px 10px 0; padding: 3px; background: #f0f3f7; border-radius: 7px; height: 35px; }
+.lfTabs button { flex: 1; padding: 3px 10px; border: 0; border-radius: 5px; background: transparent; font-size: 12px; font-weight: 500; color: #768398; }
+.lfTabs button.selected { background: #fff; color: #385d9f; box-shadow: 0 1px 4px #283c5a14; }
+.lfPane { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #cfd7e3 transparent; }
+.lfSourceHeading { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #91a0b2; }
+.lfSourceHeading span:first-child { color: #5079c8; font-weight: 650; letter-spacing: .04em; }
+.lfPane h2 { margin: 9px 0 23px; font-size: 17px; line-height: 1.65; font-weight: 650; color: #24354f; letter-spacing: 0; }
+#sourcePassage { font-size: 14px; line-height: 1.9; color: #526078; overflow-wrap: anywhere; }
+#sourcePassage p { margin: 0 0 17px; }
+#sourcePassage .lfDialogue { padding: 9px 11px; background: #f3f6fc; border-left: 2px solid #8ea9de; border-radius: 0 6px 6px 0; color: #385782; }
+#sourceLink { display: inline-block; font-size: 11px; margin-top: 10px; padding-top: 12px; border-top: 1px solid #edf0f5; color: #7c90b0; }
+.lfEditIntro { margin: 0 0 20px; font-size: 12px; line-height: 1.85; color: #6c7c92; }
+.lfInline { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+.lfInline select { flex: 1; min-width: 0; }
+.lfInline button { padding: 5px 8px; font-size: 11px; }
+.lfField { display: flex; flex-direction: column; gap: 5px; color: #697b94; font-size: 11px; margin: 14px 0; }
+.lfField input, .lfField select { width: 100%; min-width: 0; font-size: 12px; color: #374b69; }
+.lfField textarea { font: 12px/1.7 "IBM Plex Mono", Consolas, monospace; }
+.lfFieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.lfFieldGrid .lfField { margin: 7px 0; }
+#objectForm details { margin-top: 18px; padding-top: 13px; border-top: 1px solid #edf0f5; }
+#objectForm summary { color: #526c94; font-size: 12px; cursor: pointer; }
+.lfPreviewStatus { padding: 11px 12px; border: 1px solid #dce9e4; border-radius: 7px; background: #f4f9f7; color: #62877a; font-size: 11px; line-height: 1.8; white-space: pre-line; margin: 17px 0 10px; }
+#deleteObject { color: #b76767; margin-left: auto; }
+.lfNoteHint { color: var(--lf-muted); font-size: 12px; margin-bottom: 12px; }
+.lfFrameBookmark { display: block; width: 100%; text-align: left; padding: 10px 4px; border: 0; border-bottom: 1px solid #edf0f5; border-radius: 0; color: #697c99; }
+
+/* Stage blocks, real-duration beats and minute ticks share one global axis. */
+.lfTimeline { flex: none; margin: 12px; padding: 8px 14px 10px; background: #fff; border: 1px solid var(--lf-line); border-radius: 9px; }
+.lfTransport { display: flex; align-items: center; gap: 12px; height: 30px; margin-bottom: 6px; }
+.lfPlayback { display: flex; align-items: center; gap: 4px; }
+.lfPlayback button { height: 28px; min-width: 29px; padding: 2px 7px; border-color: transparent; background: transparent; color: #7c8da6; font-size: 12px; }
+.lfPlayback #playFlow { min-width: 56px; font-size: 12px; font-weight: 600; color: #fff; background: #3c6ed5; border-color: #3c6ed5; }
+.lfPlayback #playFlow:hover { background: #2d5dbf; }
+.lfTransport output { padding: 0 11px; color: #536b8a; border-left: 1px solid var(--lf-line); font: 12px "IBM Plex Mono", Consolas, monospace; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lfTransport select { padding: 2px 6px; font-size: 11px; background: #f7f9fc; }
+.lfLoop { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; color: #6c7c92; cursor: pointer; }
+.lfLoop input { appearance: none; position: relative; width: 25px; height: 14px; margin: 0; border: 0; border-radius: 8px; background: #d7dee8; cursor: pointer; }
+.lfLoop input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; background: #fff; border-radius: 50%; box-shadow: 0 1px 2px #31446726; transition: transform .12s; }
+.lfLoop input:checked { background: #6b8edc; }
+.lfLoop input:checked::after { transform: translateX(11px); }
+#timelineMode { font-size: 11px; color: #9a87b5; white-space: nowrap; }
+.lfTimeAxis { position: relative; margin: 0 7px; --progress: 0%; }
+.lfRuler { position: relative; height: 20px; color: #8493a9; font: 10px "IBM Plex Mono", Consolas, monospace; }
+.lfRuler span { position: absolute; top: 3px; transform: translateX(-50%); }
+.lfRuler span:first-child { transform: none; }
+.lfRuler span:last-child { transform: translateX(-100%); }
+.lfStages, .lfBeats { position: relative; height: 25px; }
+.lfStages button, .lfBeats button { position: absolute; top: 0; height: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box; border: 0; border-right: 2px solid #fff; border-radius: 4px; padding: 3px 5px; }
+.lfStages button { text-align: left; font-size: 10px; color: #718198; background: #eef2f7; }
+.lfStages button:hover { background: #e2eaf8; color: #4265a4; }
+.lfStages button.selected { background: #dce8fd; color: #305dba; box-shadow: inset 0 -2px #7298e7; }
+.lfStages button.draft { color: #9582af; background: #f1eef7; }
+#flowSeek { display: block; appearance: none; width: calc(100% + 14px); height: 14px; margin: 3px -7px; background: transparent; cursor: ew-resize; position: relative; z-index: 2; padding: 0; }
+#flowSeek::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right,#8eaceb var(--progress),#e1e6ef var(--progress)); border: 0; }
+#flowSeek::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; margin-top: -6px; border: 3px solid #fff; border-radius: 50%; background: #628bdd; box-shadow: 0 0 0 1px #91ace5, 0 1px 4px #2c59b333; }
+#flowSeek::-moz-range-track { height: 2px; background: #e1e6ef; border: 0; }
+#flowSeek::-moz-range-thumb { box-sizing: border-box; width: 14px; height: 14px; border: 3px solid #fff; border-radius: 50%; background: #628bdd; box-shadow: 0 0 0 1px #91ace5; }
+.lfBeats { height: 18px; }
+.lfBeats button { padding: 1px 0; border-right-width: 1px; border-radius: 2px; background: #f0f3f7; color: #a0acbd; font: 9px "IBM Plex Mono", Consolas, monospace; text-overflow: clip; }
+.lfBeats button.cinematic { background: #eeebf5; color: #a18cba; }
+.lfBeats button.selected { color: #4168af; background: #dce8fd; box-shadow: inset 0 -2px #6e94df; }
+.lfBeats button.lfShortBeat { font-size: 0; }
+.lfBeats button:hover { background: #dce7fb; }
+.lfPlayhead { position: absolute; left: var(--progress); top: 18px; bottom: 0; width: 1px; background: #769ae2a6; pointer-events: none; z-index: 1; }
+#flowError { position: fixed; left: 26px; bottom: 164px; max-width: min(600px,calc(100vw - 52px)); padding: 10px 15px; border: 1px solid #cfddf3; border-radius: 8px; background: #fff; color: #446391; box-shadow: 0 6px 24px #263e6624; z-index: 10; font-size: 12px; }
+
+/* The annotation dialog uses the same controls and an image-focused stage. */
+.lfAnnotationDialog { width: calc(100vw - 40px); height: calc(100vh - 40px); max-height: calc(100vh - 40px); padding: 0; border: 1px solid #d2dce9; border-radius: 12px; background: #fff; color: var(--lf-text); box-shadow: 0 24px 100px #18273d40; }
+.lfAnnotationDialog[open] { display: flex; flex-direction: column; }
+.lfAnnotationDialog::backdrop { background: #27354b66; backdrop-filter: blur(4px); }
+.lfAnnotationHeader { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e6ebf2; flex: none; }
+.lfAnnotationHeader > div { display: flex; align-items: baseline; gap: 18px; min-width: 0; }
+.lfAnnotationHeader h2 { margin: 0; color: #304766; font-size: 16px; font-weight: 600; white-space: nowrap; }
+#annotationHeading { color: #92a0b3; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lfAnnotationHeader button { padding: 4px 8px; border-color: transparent; font-size: 11px; color: #93a0b1; }
+.lfAnnotationTools { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #e6ebf2; flex: none; flex-wrap: wrap; }
+.lfAnnotationTools button { padding: 5px 10px; font-size: 12px; }
+#screenshotText { width: 180px; min-width: 100px; padding: 6px 9px; font-size: 12px; }
+.lfAnnotationStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #e9edf3; }
+#annotationCanvas { display: block; flex: none; touch-action: none; cursor: crosshair; outline: none; box-shadow: 0 3px 18px #27394e1a; }
+#annotationCanvas:focus-visible { outline: 1px solid #8daae1; }
+.lfAnnotationFooter { display: flex; justify-content: space-between; gap: 16px; padding: 10px 18px; font-size: 11px; color: #94a1b4; flex: none; }
+#annotationStatus { color: #5577ae; }
+#legacyAnnotations { padding: 5px 18px; max-height: 180px; overflow: auto; }
+#legacyAnnotations .lfPane { padding: 8px 0; }
+
+@media (max-width: 1150px) {
+  .lfToolbar { gap: 7px; padding: 9px 10px; }
+  .lfToolbar button { font-size: 11px; padding: 5px 7px; }
+  #frameHeading { max-width: 135px; font-size: 11px; padding-right: 9px; }
+  .lfHistory { padding-left: 5px; }
+  .lfHistory button { font-size: 18px; min-width: 25px; padding: 1px 4px; }
+  .lfWorkspace { grid-template-columns: minmax(0,1fr) 285px; gap: 9px; padding: 10px 10px 0; }
+  .lfPane { padding: 17px; }
+  .lfViewBar { gap: 3px; padding: 4px 5px; }
+  .lfViewBar > span { display: none; }
+  .lfBack { font-size: 10px; }
+}
+@media (max-width: 850px) {
+  .lfToolbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 6px; }
+  .lfHistory { display: none; }
+  #frameHeading { max-width: 160px; }
+  .lfWorkspace { grid-template-columns: minmax(0,1fr) 240px; gap: 7px; padding: 7px 7px 0; }
+  .lfPane { padding: 14px; }
+  .lfViewGrid { gap: 5px; }
+  .lfViewBar { height: 50px; flex-wrap: wrap; }
+  .lfViewBar select { max-width: 105px; }
+  .lfMapLegend { display: none; }
+  #mapReadout { bottom: 12px; }
+  .lfTimeline { margin: 7px; padding: 7px 10px 9px; }
+  .lfTransport { gap: 7px; }
+  .lfTransport output { padding: 0 6px; }
+  .lfStages button { font-size: 9px; }
+  .lfAnnotationDialog { width: calc(100vw - 16px); height: calc(100vh - 16px); max-height: calc(100vh - 16px); }
+  .lfAnnotationTools { gap: 6px; padding: 8px; }
+  .lfAnnotationTools button { padding: 4px 7px; }
+  #screenshotText { width: 130px; }
+  .lfAnnotationFooter > span { display: none; }
+}
