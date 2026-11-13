@@ -15,7 +15,7 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 sourceRoot = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
-projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerReferenceFit_V3_20261113'))
+projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerCapWearFit_V4_20261113'))
 exportRoot = Path(os.environ.get('MESSENGER_OUTPUT_DIR', str(sourceRoot)))
 reviewRoot = projectRoot / 'Review'
 reviewRoot.mkdir(parents=True, exist_ok=True)
@@ -23,7 +23,7 @@ exportRoot.mkdir(parents=True, exist_ok=True)
 exportEnabled = os.environ.get('MESSENGER_REVIEW_ONLY') != '1'
 bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True)
 scene = bpy.context.scene
-scene['BlenderMcpTask'] = 'SichuanMessengerReferenceFit_V3_20261113'
+scene['BlenderMcpTask'] = 'SichuanMessengerCapWearFit_V4_20261113'
 scene.unit_settings.system = 'METRIC'
 sourcesCollection = bpy.data.collections.new('OriginalSources')
 assembly = bpy.data.collections.new('OriginalPartsAssembly')
@@ -61,7 +61,7 @@ def Part(role, name, placement):
 
 sources, sourceReport, partRoles = {}, {}, {}
 # Fingerprints are captured directly after import and checked through export.
-# Protected head/hand parts reference the imported mesh datablocks.
+# Visible parts reference the imported mesh datablocks.
 for role in ['Body', 'HeadBald', 'LeftHand', 'LeftFoot', 'FieldCap']:
     path = sourceRoot / f'Model_SichuanMessenger_{role}_Source.glb'
     before = set(bpy.data.objects)
@@ -151,45 +151,54 @@ handPlacement = Matrix.Translation(Vector(targetWrist-wristCenter*handScale)) @ 
 hand = Part('LeftHand', 'Hand_L', handPlacement)
 Part('LeftHand', 'Hand_R', mirror @ handPlacement)
 
-# Fit the cap's circumference, depth and fabric crown independently. The front
-# band and two buttons remain below the crown edit, with equal Y/Z scale.
-sourceCap = WorldPoints(sources['FieldCap'])
+# Seat the complete original crown with the rear band lowered above the ears.
+# Equal Y/Z scale preserves the proportions of the two front buttons.
 capScales = (0.260,0.220,0.220)
-capPitch = 3.0
-capX,capZ = 0.028,1.604
+capPitch = -10.0
+capX,capZ = 0.034,1.585
 capPlacement = Matrix.Translation((capX,0,capZ)) @ Matrix.Rotation(math.radians(capPitch),4,'Y') @ Matrix.Diagonal((*capScales,1.0))
 cap = Part('FieldCap','FieldCap',capPlacement)
-cap.data = sources['FieldCap'].data.copy()
-cap.data.name = 'Mesh_ReferenceFit_FieldCap'
-crownStart,crownScale = 0.43,0.50
-fittedCap = sourceCap.copy()
-fittedCap[:,2] = np.where(sourceCap[:,2] > crownStart,crownStart+(sourceCap[:,2]-crownStart)*crownScale,sourceCap[:,2])
-sourceInverse = sources['FieldCap'].matrix_world.inverted()
-for vertex,point in zip(cap.data.vertices,fittedCap):
-    vertex.co = sourceInverse @ Vector(point)
-cap.data.update()
-sourceLinear = np.array(sources['FieldCap'].matrix_world.to_3x3())
-capNormals = np.array([normal.vector[:] for normal in sources['FieldCap'].data.corner_normals]) @ np.linalg.inv(sourceLinear)
-capLoopIndices = np.array([loop.vertex_index for loop in cap.data.loops])
-capNormals[:,2] /= np.where(sourceCap[capLoopIndices,2] > crownStart,crownScale,1.0)
-capNormals = capNormals @ sourceLinear
-capNormals /= np.linalg.norm(capNormals,axis=1,keepdims=True)
-cap.data.normals_split_custom_set(capNormals)
 
-report = {'assemblyMode':'OriginalHeadHandsWithReferenceFittedCap','version':3,'sources':sourceReport,'parts':{},
+headPoints = WorldPoints(head)
+capPoints = WorldPoints(cap)
+capBvh = BVHTree.FromPolygons([Vector(point) for point in capPoints],[tuple(face.vertices) for face in cap.data.polygons])
+headNormals = np.array([vertex.normal[:] for vertex in head.data.vertices]) @ np.linalg.inv(np.array(head.matrix_world.to_3x3()))
+headCenters = np.array([headPoints[list(face.vertices)].mean(0) for face in head.data.polygons])
+headCenterNormals = np.array([face.normal[:] for face in head.data.polygons]) @ np.linalg.inv(np.array(head.matrix_world.to_3x3()))
+scalpPoints = np.vstack([headPoints,headCenters])
+scalpNormals = np.vstack([headNormals,headCenterNormals])
+scalpNormals /= np.linalg.norm(scalpNormals,axis=1,keepdims=True).clip(1e-8)
+scalpSource = np.vstack([sourceHead,headFaceCenters])
+inCapSource = np.array([(sources['FieldCap'].matrix_world @ (cap.matrix_world.inverted() @ Vector(point)))[:] for point in scalpPoints])
+scalpSelection = np.where((scalpSource[:,2]>.80)&(inCapSource[:,2]>.25))[0]
+scalpClearances = []
+uncoveredScalp = []
+for index in scalpSelection:
+    normal = Vector(scalpNormals[index])
+    location,hitNormal,face,distance = capBvh.ray_cast(Vector(scalpPoints[index])+normal*1e-5,normal,.15)
+    if location is None:
+        uncoveredScalp.append(int(index))
+    else:
+        scalpClearances.append(float(distance))
+assert not uncoveredScalp, f'Scalp exposed through cap: {uncoveredScalp}'
+capWearReport = {'scalpVertexAndFaceCenterTests':len(scalpSelection),'uncoveredScalpSamples':uncoveredScalp,
+                 'outwardClothClearanceMeters':{'minimum':min(scalpClearances),'median':float(np.median(scalpClearances)),'maximum':max(scalpClearances)},
+                 'inspectionViews':['Front','LeftSide','Back','HeadThreeQuarter','UnderBrim','CapTop']}
+(projectRoot/'Data_CapWearCoverage_V4.json').write_text(json.dumps(capWearReport,indent=2),encoding='utf-8')
+
+report = {'assemblyMode':'OriginalPartsWithSeatedCap','version':4,'sources':sourceReport,'parts':{},
           'headRigidFit':{'uniformScale':float(headScale),'translationX':float(headX),'translationZ':float(headZ),
                           'finalShoulderExposureMeters':float(headFinalExposure)},
-          'capReferenceFit':{'axisScales':capScales,'pitchDegrees':capPitch,'translation':[capX,0,capZ],
-                             'crownStartSourceZ':crownStart,'crownScale':crownScale,
-                             'editRegion':'Fabric crown above the front band and buttons'},
+          'capWearFit':{'axisScales':capScales,'pitchDegrees':capPitch,'translation':[capX,0,capZ],
+                         'meshMode':'CompleteOriginalCrown','coverage':capWearReport},
           'references':{name:hashlib.sha256((sourceRoot/f'Image_TPose{name}_2K.png').read_bytes()).hexdigest() for name in ['Front','LeftSide','Back']}}
 for obj in assembly.objects:
     role = partRoles[obj.name]
     meshUnmodified = MeshFingerprint(obj.data) == sourceReport[role]['meshSha256']
     relative = obj.matrix_world @ sources[role].matrix_world.inverted()
     scales = np.linalg.svd(np.array(relative.to_3x3()),compute_uv=False)
+    assert obj.data is sources[role].data and meshUnmodified
     if role != 'FieldCap':
-        assert obj.data is sources[role].data and meshUnmodified
         assert scales.max()-scales.min() < 1e-6
     report['parts'][obj.name] = {'sourceRole':role,'meshSha256':MeshFingerprint(obj.data),'meshUnmodified':meshUnmodified,'axisScaleMagnitudes':scales.tolist(),'modifiers':len(obj.modifiers)}
     assert len(obj.modifiers)==0
@@ -231,6 +240,9 @@ views = [('Front',wholeCenter,Vector((4,0,0)),640*pixelSize),
          ('HeadFront',headCenter,Vector((4,0,0)),0.48),
          ('HeadSide',headCenter,Vector((0,4,0)),0.48),
          ('HeadBack',headCenter,Vector((-4,0,0)),0.48),
+         ('HeadThreeQuarter',Vector((.015,0,1.563)),Vector((4,3,1)),0.40),
+         ('UnderBrim',Vector((.015,0,1.563)),Vector((4,1,-.7)),0.40),
+         ('CapTop',Vector((.015,0,1.563)),Vector((0,0,4)),0.40),
          ('HandTop',handCenter,Vector((0,0,4)),0.36)]
 previewNames = set(os.environ['MESSENGER_PREVIEW_VIEWS'].split(',')) if os.environ.get('MESSENGER_PREVIEW_VIEWS') else None
 for name,center,direction,span in views:
@@ -270,7 +282,7 @@ for screen in bpy.data.screens:
 for role in sources:
     assert MeshFingerprint(sources[role].data)==sourceReport[role]['meshSha256']
 bpy.ops.file.pack_all()
-bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot/'Scene_SichuanMessengerReferenceFit_V3.blend'),compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot/'Scene_SichuanMessengerCapWearFit_V4.blend'),compress=True)
 (projectRoot/'Data_OriginalMeshVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 
 
@@ -330,4 +342,4 @@ if exportEnabled:
     bpy.ops.export_scene.fbx(filepath=str(exportRoot/'Model_SichuanMessenger_Assembled.fbx'),use_selection=True,path_mode='COPY',embed_textures=True,add_leaf_bones=False)
     for role in sources:
         assert MeshFingerprint(sources[role].data)==sourceReport[role]['meshSha256']
-print(json.dumps({'sources':sourceReport,'parts':report['parts'],'capReferenceFit':report['capReferenceFit'],'heightMeters':report['heightMeters']}))
+print(json.dumps({'sources':sourceReport,'parts':report['parts'],'capWearFit':report['capWearFit'],'heightMeters':report['heightMeters']}))
