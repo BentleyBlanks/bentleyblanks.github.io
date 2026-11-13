@@ -8,6 +8,7 @@ import os
 import math
 import json
 import hashlib
+import runpy
 from pathlib import Path
 import bpy
 import numpy as np
@@ -15,7 +16,7 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 sourceRoot = Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\角色\Tripo\33_川军传令兵')
-projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerCapWearFit_V4_20261113'))
+projectRoot = Path(os.environ.get('MESSENGER_PROJECT_DIR', r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\SichuanMessengerRearCapFix_V5_20261114'))
 exportRoot = Path(os.environ.get('MESSENGER_OUTPUT_DIR', str(sourceRoot)))
 reviewRoot = projectRoot / 'Review'
 reviewRoot.mkdir(parents=True, exist_ok=True)
@@ -23,7 +24,7 @@ exportRoot.mkdir(parents=True, exist_ok=True)
 exportEnabled = os.environ.get('MESSENGER_REVIEW_ONLY') != '1'
 bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True)
 scene = bpy.context.scene
-scene['BlenderMcpTask'] = 'SichuanMessengerCapWearFit_V4_20261113'
+scene['BlenderMcpTask'] = 'SichuanMessengerRearCapFix_V5_20261114'
 scene.unit_settings.system = 'METRIC'
 sourcesCollection = bpy.data.collections.new('OriginalSources')
 assembly = bpy.data.collections.new('OriginalPartsAssembly')
@@ -61,7 +62,7 @@ def Part(role, name, placement):
 
 sources, sourceReport, partRoles = {}, {}, {}
 # Fingerprints are captured directly after import and checked through export.
-# Visible parts reference the imported mesh datablocks.
+# Protected head and hand parts reference the imported mesh datablocks.
 for role in ['Body', 'HeadBald', 'LeftHand', 'LeftFoot', 'FieldCap']:
     path = sourceRoot / f'Model_SichuanMessenger_{role}_Source.glb'
     before = set(bpy.data.objects)
@@ -158,6 +159,10 @@ capPitch = -10.0
 capX,capZ = 0.034,1.585
 capPlacement = Matrix.Translation((capX,0,capZ)) @ Matrix.Rotation(math.radians(capPitch),4,'Y') @ Matrix.Diagonal((*capScales,1.0))
 cap = Part('FieldCap','FieldCap',capPlacement)
+helperPath = Path(globals().get('__file__','Taierzhuang1938/_import/Script_AssembleSichuanMessenger.py')).with_name('Script_SichuanMessengerReferenceFit.py')
+helpers = runpy.run_path(str(helperPath))
+rearHemFit = helpers['FitCapRearHem'](cap,head,WorldPoints(sources['FieldCap']))
+(projectRoot/'Data_RearHemFit_V5.json').write_text(json.dumps(rearHemFit,indent=2),encoding='utf-8')
 
 headPoints = WorldPoints(head)
 capPoints = WorldPoints(cap)
@@ -184,21 +189,21 @@ assert not uncoveredScalp, f'Scalp exposed through cap: {uncoveredScalp}'
 capWearReport = {'scalpVertexAndFaceCenterTests':len(scalpSelection),'uncoveredScalpSamples':uncoveredScalp,
                  'outwardClothClearanceMeters':{'minimum':min(scalpClearances),'median':float(np.median(scalpClearances)),'maximum':max(scalpClearances)},
                  'inspectionViews':['Front','LeftSide','Back','HeadThreeQuarter','UnderBrim','CapTop']}
-(projectRoot/'Data_CapWearCoverage_V4.json').write_text(json.dumps(capWearReport,indent=2),encoding='utf-8')
+(projectRoot/'Data_CapWearCoverage_V5.json').write_text(json.dumps(capWearReport,indent=2),encoding='utf-8')
 
-report = {'assemblyMode':'OriginalPartsWithSeatedCap','version':4,'sources':sourceReport,'parts':{},
+report = {'assemblyMode':'OriginalPartsWithLocalRearCapRepair','version':5,'sources':sourceReport,'parts':{},
           'headRigidFit':{'uniformScale':float(headScale),'translationX':float(headX),'translationZ':float(headZ),
                           'finalShoulderExposureMeters':float(headFinalExposure)},
           'capWearFit':{'axisScales':capScales,'pitchDegrees':capPitch,'translation':[capX,0,capZ],
-                         'meshMode':'CompleteOriginalCrown','coverage':capWearReport},
+                         'meshMode':'OriginalCrownWithLocalRearHemFit','coverage':capWearReport,'rearHemFit':rearHemFit},
           'references':{name:hashlib.sha256((sourceRoot/f'Image_TPose{name}_2K.png').read_bytes()).hexdigest() for name in ['Front','LeftSide','Back']}}
 for obj in assembly.objects:
     role = partRoles[obj.name]
     meshUnmodified = MeshFingerprint(obj.data) == sourceReport[role]['meshSha256']
     relative = obj.matrix_world @ sources[role].matrix_world.inverted()
     scales = np.linalg.svd(np.array(relative.to_3x3()),compute_uv=False)
-    assert obj.data is sources[role].data and meshUnmodified
     if role != 'FieldCap':
+        assert obj.data is sources[role].data and meshUnmodified
         assert scales.max()-scales.min() < 1e-6
     report['parts'][obj.name] = {'sourceRole':role,'meshSha256':MeshFingerprint(obj.data),'meshUnmodified':meshUnmodified,'axisScaleMagnitudes':scales.tolist(),'modifiers':len(obj.modifiers)}
     assert len(obj.modifiers)==0
@@ -243,6 +248,8 @@ views = [('Front',wholeCenter,Vector((4,0,0)),640*pixelSize),
          ('HeadThreeQuarter',Vector((.015,0,1.563)),Vector((4,3,1)),0.40),
          ('UnderBrim',Vector((.015,0,1.563)),Vector((4,1,-.7)),0.40),
          ('CapTop',Vector((.015,0,1.563)),Vector((0,0,4)),0.40),
+         ('RearLeft',Vector((-.055,0,1.603)),Vector((-3,3,.1)),0.22),
+         ('RearRight',Vector((-.055,0,1.603)),Vector((-3,-3,.1)),0.22),
          ('HandTop',handCenter,Vector((0,0,4)),0.36)]
 previewNames = set(os.environ['MESSENGER_PREVIEW_VIEWS'].split(',')) if os.environ.get('MESSENGER_PREVIEW_VIEWS') else None
 for name,center,direction,span in views:
@@ -282,7 +289,7 @@ for screen in bpy.data.screens:
 for role in sources:
     assert MeshFingerprint(sources[role].data)==sourceReport[role]['meshSha256']
 bpy.ops.file.pack_all()
-bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot/'Scene_SichuanMessengerCapWearFit_V4.blend'),compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(projectRoot/'Scene_SichuanMessengerRearCapFix_V5.blend'),compress=True)
 (projectRoot/'Data_OriginalMeshVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 
 

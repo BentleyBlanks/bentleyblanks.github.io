@@ -84,6 +84,58 @@ def ApplyGarmentFit(obj, originalWorld, fittedWorld, weights):
             'unaffectedSurfaceShiftMeters': 0.0}
 
 
+def FitCapRearHem(cap, head, sourcePoints):
+    from mathutils.bvhtree import BVHTree
+
+    original = np.array([(cap.matrix_world @ vertex.co)[:] for vertex in cap.data.vertices])
+    headPoints = [(head.matrix_world @ vertex.co) for vertex in head.data.vertices]
+    headTree = BVHTree.FromPolygons(headPoints, [tuple(face.vertices) for face in head.data.polygons])
+    rearFaces = []
+    for face in cap.data.polygons:
+        points = sourcePoints[list(face.vertices)]
+        center = points.mean(0)
+        normal = np.cross(points[1]-points[0], points[2]-points[0])
+        normal /= max(np.linalg.norm(normal), 1e-9)
+        if center[0] < -0.18 and 0.075 < center[2] < 0.26 and normal[0] < -0.20:
+            rearFaces.append(tuple(face.vertices))
+    assert rearFaces
+    _, mapping = np.unique(np.round(original, 6), axis=0, return_inverse=True)
+    fitted = original.copy()
+    selected = {int(mapping[index]) for face in rearFaces for index in face}
+    groups = {index: np.where(mapping == index)[0] for index in selected}
+    samples = np.array([[1/3, 1/3, 1/3], [.5, .5, 0], [.5, 0, .5], [0, .5, .5]])
+
+    def Clearance(point):
+        nearest, normal, face, distance = headTree.find_nearest(Vector(point))
+        return (Vector(point)-nearest).dot(normal), np.array(normal[:])
+
+    beforeDistances = [Clearance(point)[0] for face in rearFaces for point in samples @ original[list(face[:3])]]
+    for iteration in range(6):
+        for indices in groups.values():
+            signed, normal = Clearance(fitted[indices[0]])
+            if signed < 0.004:
+                fitted[indices] += normal*(0.004-signed)
+        for face in rearFaces:
+            triangle = np.array(face[:3])
+            checks = [Clearance(point) for point in samples @ fitted[triangle]]
+            signed, normal = min(checks, key=lambda item: item[0])
+            if signed < 0.002:
+                for group in {int(mapping[index]) for index in face}:
+                    fitted[groups[group]] += normal*(0.004-signed)
+    finalDistances = [Clearance(point)[0] for face in rearFaces for point in samples @ fitted[list(face[:3])]]
+    assert min(finalDistances) >= 0.0015
+    weights = (np.linalg.norm(fitted-original, axis=1) > 1e-7).astype(float)
+    cap.data = cap.data.copy()
+    cap.data.name = 'Mesh_SichuanMessenger_RearHemFit'
+    result = ApplyGarmentFit(cap, original, fitted, weights)
+    result.update({'rearFaces':len(rearFaces),'rearFaceAndEdgeSamples':len(finalDistances),
+                   'rearFaceVertexIndices':[list(face) for face in rearFaces],
+                   'minimumRearClearanceBeforeMeters':float(min(beforeDistances)),
+                   'minimumRearClearanceMeters':float(min(finalDistances)),
+                   'sourceSelection':'Rear-facing lower hem, source X < -0.18 and 0.075 < Z < 0.26'})
+    return result
+
+
 def FitSleeveCuffs(body, leftHand, rightHand):
     original = np.array([(body.matrix_world @ vertex.co)[:] for vertex in body.data.vertices])
     fitted = original.copy()
