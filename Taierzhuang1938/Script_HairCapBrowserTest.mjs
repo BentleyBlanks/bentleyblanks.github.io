@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
+import { HAIR_LOD } from './Data_Tuning_Hair.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const server = process.env.HAIR_PREVIEW ? null : await ServeRoot(root, 0);
@@ -56,10 +57,26 @@ try {
     assert.ok(skinFraction < ceiling, `${view} cap seam exposes too much bald skin (${skinFraction.toFixed(3)} >= ${ceiling})`);
     if (view === 'right') {
       const earRegion = [325, 345, 82, 122], earSkinFraction = SkinFraction(data, info, earRegion);
-      measurements.push({ view: 'rightEar', skinFraction: earSkinFraction, floor: .82, region: earRegion });
-      assert.ok(earSkinFraction > .82, `right ear is covered by hair (${earSkinFraction.toFixed(3)} <= .82)`);
+      measurements.push({ view: 'rightEar', skinFraction: earSkinFraction, floor: .88, region: earRegion });
+      assert.ok(earSkinFraction > .88, `right ear is covered by hair (${earSkinFraction.toFixed(3)} <= .88)`);
     }
   }
+  const lodLayers = await page.evaluate(() => {
+    const groom = window.__preview.hair, camera = window.__preview.camera, renderer = window.__preview.renderer;
+    const Sample = lod => {
+      groom.SetLod(lod); groom.Update(1, camera, renderer);
+      return { cards: groom.meshes.cards.visible, shell: groom.meshes.shell.visible,
+        cardAlpha: groom.meshes.cards.userData.hairUniforms.uAlphaScale.value,
+        baseAlpha: groom.cardBaseAlpha, shellFade: groom.meshes.shell.userData.hairUniforms.uFade.value };
+    };
+    return { cards: Sample('cards'), strands: Sample('strands'), shell: Sample('shell'), none: Sample('none') };
+  });
+  assert.equal(lodLayers.cards.cards, true);
+  assert.equal(lodLayers.cards.shell, true, 'short game cards need the fitted shell underneath');
+  assert.ok(Math.abs(lodLayers.cards.cardAlpha / lodLayers.cards.baseAlpha - HAIR_LOD.shortCardUnderlayAlpha) < 1e-6);
+  assert.equal(lodLayers.strands.shell, false, 'close strands must not show the shell');
+  assert.equal(lodLayers.shell.shell, true);
+  assert.equal(lodLayers.none.shell, false);
   assert.deepEqual(errors, []);
   assert.deepEqual(failedRequests, []);
   fs.writeFileSync(path.join(output, 'Data_HairCapReview.json'), `${JSON.stringify({ measurements, errors, failedRequests }, null, 2)}\n`);

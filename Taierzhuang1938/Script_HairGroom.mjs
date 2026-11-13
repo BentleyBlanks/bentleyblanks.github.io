@@ -222,6 +222,7 @@ export class HairGroom {
     this.screenPx = 0; this.strandFraction = 1;
     this.stats = { lod: 'none', strandsDrawn: 0, screenPx: 0 };
     const h = asset.hair;
+    this.shortGameUnderlay = !!asset.header.model && (h?.family === 'Short' || h?.family === 'Medium');
     if (h) {
       const sg = new THREE.InstancedBufferGeometry();
       for (const [name, attr] of Object.entries(h.strandAttributes)) if (name === 'index') sg.setIndex(attr); else sg.setAttribute(name, attr);
@@ -233,6 +234,7 @@ export class HairGroom {
       this.meshes.strands = this.Mesh(sg, strand, 'Strands');
       if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density, referenceAtlases.get(atlas)), 'Cards');
       if (h.shellGeometry) this.meshes.shell = this.Mesh(h.shellGeometry, MakeShellMaterials(h, this.shared, lightRig), 'Shell');
+      this.cardBaseAlpha = this.meshes.cards?.userData.hairUniforms.uAlphaScale.value;
       if (h.braidGeometry) {
         const braidLook = { ...h, render: { ...h.render, color: h.header.braid.color, roughness: .55, specular: .25, scatter: .25 } };
         this.meshes.braid = this.Mesh(h.braidGeometry, MakeShellMaterials(braidLook, this.shared, lightRig, this.braidSkin?.uniforms), 'Braid');
@@ -361,14 +363,18 @@ export class HairGroom {
     }
     this.fade = Math.min(1, this.fade + (HAIR_LOD.fadeSeconds > 0 ? dt / HAIR_LOD.fadeSeconds : 1));
     if (this.fade >= 1) this.previous = null;
+    const cardWeight = (this.current === 'cards' ? this.fade : 0) + (this.previous === 'cards' ? 1 - this.fade : 0);
+    const shellWeight = (this.current === 'shell' ? this.fade : 0) + (this.previous === 'shell' ? 1 - this.fade : 0);
     for (const lod of ['strands', 'cards', 'shell']) {
       const mesh = this.meshes[lod];
       if (!mesh) continue;
-      const on = lod === this.current || lod === this.previous;
-      mesh.visible = on && lod !== 'none';
-      const f = lod === this.current ? this.fade : 1 - this.fade;
+      const f = lod === 'shell' && this.shortGameUnderlay ? Math.min(1, cardWeight + shellWeight)
+        : lod === this.current ? this.fade : lod === this.previous ? 1 - this.fade : 0;
+      mesh.visible = f > 0.001;
       if (mesh.userData.hairUniforms.uFade) mesh.userData.hairUniforms.uFade.value = f;
     }
+    if (this.meshes.cards) this.meshes.cards.userData.hairUniforms.uAlphaScale.value = this.cardBaseAlpha *
+      (this.shortGameUnderlay ? HAIR_LOD.shortCardUnderlayAlpha : 1);
     if (this.meshes.braid) this.meshes.braid.visible = this.showHair && this.current !== 'none';
     // 头皮染色：发丝 / 发片档才要（头发壳自己盖住头皮）；淡入淡出跟着这两档
     if (this.meshes.scalp) {

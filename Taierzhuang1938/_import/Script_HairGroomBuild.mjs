@@ -1530,9 +1530,14 @@ async function BuildGroom(entry, tiles) {
       ...MeshSections('hairScalp', h.scalp, { uv: !!reference, dataScale: [1, 0.05, 1] }),
       ...(braid ? MeshSections('hairBraid', braid, { dataScale: [1, 0.05], skinning: !!braidSkin }) : {}),
     });
+    const measuredEar = frame.earMask || { marks: frame.m.ear, front: frame.earFront, back: frame.earBack };
     header.hair = {
       style: entry.hair, name: style.name, family: style.family, guides: G, points: K, strands: S,
       ...(entry.hairRootFit ? { rootFit: entry.hairRootFit } : {}),
+      ...(game ? { earCut: { centerX: frame.centerX, centerZ: frame.zc,
+        front: measuredEar.front, back: measuredEar.back,
+        yMin: measuredEar.marks.yMin, yMax: measuredEar.marks.yMax,
+        halfWidth: measuredEar.marks.halfWidth } } : {}),
       bounds: { min: h.bmin, max: h.bmax }, density: { res: h.vn, voxel: h.vox, min: h.bmin, extinctionMax: h.extMax, encoding: 'sqrt' },
       cards: { count: h.cards.idx.length / 6 / (K - 1 || 1), triangles: h.cards.idx.length / 3 },
       shell: { kind: style.shell.kind, triangles: h.shell.idx.length / 3, opacity: style.shell.opacity, ...(h.shell.rootCapTriangles ? {rootCapTriangles: h.shell.rootCapTriangles} : {}) },

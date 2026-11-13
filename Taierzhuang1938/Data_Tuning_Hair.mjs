@@ -1,6 +1,6 @@
 // 头发 / 胡子的手感数值（docs/Data_HairSystem.md §4–§6）。纯数据、零 import。
 // 造型（长短、密度、发色、梳向）在 Hair/Data_HairStyles.json；这里只有着色与远近切档。
-export const HAIR_ASSET_VERSION = '20261113ear-braid';
+export const HAIR_ASSET_VERSION = '20261113ear-clearance';
 
 export const HAIR_SHADING = Object.freeze({
   // 黑色素 → 底色（UE GetHairColorFromMelanin + ColorFromAbsorption）的吸收倍率，1 = UE 原口径：
@@ -39,6 +39,7 @@ export const HAIR_LOD = Object.freeze({
   fadeSeconds: 0.25,        // 切档时两档交叉淡入淡出（哈希丢弃，没有半透明排序问题）
   beardCardsMinPx: 18,      // 胡子发片画到多小
   stubbleMinPx: 10,
+  shortCardUnderlayAlpha: 0.4, // 游戏短发/中短发：发片降低覆盖率，由贴头壳填平耳后和后颈间隙
 });
 
 export const HAIR_QUALITY = Object.freeze({ low: 'shell', medium: 'cards', high: 'strands', ultra: 'strands' });

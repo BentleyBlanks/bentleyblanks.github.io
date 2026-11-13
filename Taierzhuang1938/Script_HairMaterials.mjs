@@ -378,9 +378,29 @@ vec2 ReferenceHairDetail(vec3 p) {
 }
 `;
 
+// Fade fibres over the measured ear surface, including tips grown from nearby
+// scalp roots. The same factor is used by colour and prepass coverage.
+const GLSL_EAR_CUT = /* glsl */`
+uniform float uEarCutEnabled;
+uniform vec4 uEarCutAnglesY;
+uniform vec3 uEarCutCenterWidth;
+float HairEarKeep(vec3 p) {
+  if (uEarCutEnabled < 0.5) return 1.0;
+  float side = abs(p.x - uEarCutCenterWidth.x);
+  float phi = degrees(atan(side + 0.000001, -(p.z - uEarCutCenterWidth.y)));
+  float azimuth = smoothstep(uEarCutAnglesY.x - 8.0, uEarCutAnglesY.x + 1.0, phi)
+    * (1.0 - smoothstep(uEarCutAnglesY.y - 2.0, uEarCutAnglesY.y + 8.0, phi));
+  float height = smoothstep(uEarCutAnglesY.z - 0.01, uEarCutAnglesY.z + 0.003, p.y)
+    * (1.0 - smoothstep(uEarCutAnglesY.w - 0.003, uEarCutAnglesY.w + 0.012, p.y));
+  float outer = smoothstep(uEarCutCenterWidth.z * 0.58, uEarCutCenterWidth.z * 0.82, side);
+  return 1.0 - azimuth * height * outer;
+}
+`;
+
 const STRAND_FRAGMENT = (reference) => /* glsl */`
 ${FRAGMENT_HEAD}
 ${reference ? GLSL_REFERENCE_COLOUR : ''}
+${GLSL_EAR_CUT}
 uniform float uFrame;
 uniform float uFade;
 uniform float uMelanin;
@@ -398,7 +418,7 @@ layout(location = 0) out vec4 fragColor;
 void main() {
   ${reference ? 'vec2 photo = ReferenceHairDetail(vLocalPos);' : ''}
   float h = HairCoverageHash(gl_FragCoord.xy, uFrame, vSeed);
-  if (h > vCoverage * uFade) discard;
+  if (h > vCoverage * uFade * HairEarKeep(vLocalPos)) discard;
   vec3 T = normalize(vTangent);
   vec3 V = normalize(-vViewPos);
   float gray = step(vSeed, uGray);
@@ -412,15 +432,17 @@ void main() {
 const STRAND_PREPASS_FRAGMENT = /* glsl */`
 precision highp float;
 ${GLSL_HASH}
+${GLSL_EAR_CUT}
 uniform float uFrame;
 uniform float uFade;
 in vec3 vTangent;
 in vec3 vViewPos;
+in vec3 vLocalPos;
 in float vCoverage;
 in float vSeed;
 ${PREPASS_FRAGMENT}
 void main() {
-  if (HairCoverageHash(gl_FragCoord.xy, uFrame, vSeed) > vCoverage * uFade) discard;
+  if (HairCoverageHash(gl_FragCoord.xy, uFrame, vSeed) > vCoverage * uFade * HairEarKeep(vLocalPos)) discard;
   vec3 T = normalize(vTangent), V = normalize(-vViewPos);
   HairPrepassOutput(normalize(V - T * dot(V, T)), -vViewPos.z);
 }
@@ -477,6 +499,7 @@ void main() {
 const CARD_FRAGMENT = (reference) => /* glsl */`
 ${FRAGMENT_HEAD}
 ${reference ? GLSL_REFERENCE_COLOUR : ''}
+${GLSL_EAR_CUT}
 uniform sampler2D uAtlas;
 uniform float uFrame;
 uniform float uFade;
@@ -496,7 +519,7 @@ void main() {
   ${reference ? 'vec2 photo = ReferenceHairDetail(vLocalPos);' : ''}
   vec4 t = texture(uAtlas, vUv);
   float h = HairCoverageHash(gl_FragCoord.xy, uFrame, t.b + vData.y);
-  if (h > t.r * uAlphaScale * uFade) discard;
+  if (h > t.r * uAlphaScale * uFade * HairEarKeep(vLocalPos)) discard;
   vec3 N = normalize(vNormalV);
   vec3 T = normalize(vTangent);
   // 每根发丝在发片平面里偏一点，免得一片的高光是一整条
@@ -515,18 +538,20 @@ void main() {
 const CARD_PREPASS_FRAGMENT = /* glsl */`
 precision highp float;
 ${GLSL_HASH}
+${GLSL_EAR_CUT}
 uniform sampler2D uAtlas;
 uniform float uFrame;
 uniform float uFade;
 uniform float uAlphaScale;
 in vec3 vTangent;
 in vec3 vViewPos;
+in vec3 vLocalPos;
 in vec2 vUv;
 in vec3 vData;
 ${PREPASS_FRAGMENT}
 void main() {
   vec4 t = texture(uAtlas, vUv);
-  if (HairCoverageHash(gl_FragCoord.xy, uFrame, t.b + vData.y) > t.r * uAlphaScale * uFade) discard;
+  if (HairCoverageHash(gl_FragCoord.xy, uFrame, t.b + vData.y) > t.r * uAlphaScale * uFade * HairEarKeep(vLocalPos)) discard;
   vec3 T = normalize(vTangent), V = normalize(-vViewPos);
   HairPrepassOutput(normalize(V - T * dot(V, T)), -vViewPos.z);
 }
@@ -547,6 +572,7 @@ float HairStreaks(vec3 p, vec3 t, float freq) {
 const SHELL_FRAGMENT = /* glsl */`
 ${FRAGMENT_HEAD}
 ${GLSL_STREAKS}
+${GLSL_EAR_CUT}
 uniform float uFrame;
 uniform float uFade;
 uniform float uMelanin;
@@ -566,7 +592,7 @@ layout(location = 0) out vec4 fragColor;
 void main() {
   vec3 Tl = normalize(vTangentL);
   float st = HairStreaks(vLocalPos, Tl, uStreakFreq);
-  float coverage = clamp(vData.x * uOpacity * (0.75 + st * 0.5), 0.0, 1.0);
+  float coverage = clamp(vData.x * uOpacity * (0.75 + st * 0.5), 0.0, 1.0) * HairEarKeep(vLocalPos);
   float h = HairCoverageHash(gl_FragCoord.xy, uFrame, 0.37);
   if (h > coverage * uFade) discard;
   vec3 T = normalize(vTangent + normalize(vNormalV) * (st - 0.5) * 0.25);
@@ -581,6 +607,7 @@ const SHELL_PREPASS_FRAGMENT = /* glsl */`
 precision highp float;
 ${GLSL_HASH}
 ${GLSL_STREAKS}
+${GLSL_EAR_CUT}
 uniform float uFrame;
 uniform float uFade;
 uniform float uOpacity;
@@ -595,7 +622,7 @@ ${PREPASS_FRAGMENT}
 void main() {
   vec3 Tl = normalize(vTangentL);
   float st = HairStreaks(vLocalPos, Tl, uStreakFreq);
-  float coverage = clamp(vData.x * uOpacity * (0.75 + st * 0.5), 0.0, 1.0);
+  float coverage = clamp(vData.x * uOpacity * (0.75 + st * 0.5), 0.0, 1.0) * HairEarKeep(vLocalPos);
   if (HairCoverageHash(gl_FragCoord.xy, uFrame, 0.37) > coverage * uFade) discard;
   HairPrepassOutput(normalize(vNormalV), -vViewPos.z);
 }
@@ -714,6 +741,7 @@ ${reference ? '#include <lights_pars_begin>\n' + SUN_SHADOW_GLSL : ''}
 ${GLSL_OUTPUT}
 ${GLSL_MELANIN}
 ${GLSL_STREAKS}
+${GLSL_EAR_CUT}
 ${reference ? GLSL_REFERENCE_FRONT : ''}
 uniform float uMelanin;
 uniform float uRedness;
@@ -728,6 +756,7 @@ void main() {
   float st = HairStreaks(vLocalPos, normalize(vTangentL), 900.0);
   float alpha = clamp(pow(vData.x, 0.8) * uStrength * (0.8 + 0.35 * st), 0.0, 0.92) * uFade;
   ${reference ? 'float referenceBlend = vData.z * ReferenceFrontWeight(vLocalPos); alpha = mix(alpha, texture(uReferenceMask, vUv).g * uFade, referenceBlend);' : ''}
+  alpha *= HairEarKeep(vLocalPos);
   if (alpha < 0.004) discard;
   vec3 base = HairMelaninColor(uMelanin, uRedness);
   vec3 color = base * 0.6 + 0.003;
@@ -789,6 +818,12 @@ function PrepassMaterial(vertexShader, fragmentShader, uniforms, side = THREE.Do
 function ColorUniforms(color) {
   return { uMelanin: { value: color.melanin }, uRedness: { value: color.redness }, uGray: { value: color.gray ?? 0 } };
 }
+function EarCutUniforms(part) {
+  const ear = part.header?.earCut;
+  return { uEarCutEnabled: { value: ear ? 1 : 0 },
+    uEarCutAnglesY: { value: new THREE.Vector4(ear?.front ?? 0, ear?.back ?? 0, ear?.yMin ?? 0, ear?.yMax ?? 0) },
+    uEarCutCenterWidth: { value: new THREE.Vector3(ear?.centerX ?? 0, ear?.centerZ ?? 0, ear?.halfWidth ?? 0) } };
+}
 function ReferenceFrontUniforms(center) {
   return {
     uReferenceCenter: {value: new THREE.Vector2().fromArray(center)},
@@ -822,6 +857,7 @@ export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = nul
     uWidthScale: { value: 1 }, uClump: { value: r.clump }, uFrizz: { value: r.frizz }, uCurl: { value: new THREE.Vector2(r.curl[0], r.curl[1]) },
     uHairLength: { value: r.length }, uFade: { value: 1 },
     uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter },
+    ...EarCutUniforms(hair),
   };
   if (reference) Object.assign(own, ReferenceColourUniforms(hair.referenceScalp, referenceAtlas, r.color.melanin));
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density) };
@@ -833,7 +869,7 @@ export function MakeCardMaterials(part, atlas, shared, lightRig, density, refere
   const r = part.render;
   const reference = !!part.referenceScalp?.projection;
   const own = { uAtlas: { value: atlas }, uFade: { value: 1 }, uAlphaScale: { value: HAIR_SHADING.cardAlphaScale * (part.render.cardAlphaScale ?? (part.stubble?.perVertexLength ? HAIR_SHADING.referenceBeardAlphaScale : 1)) },
-    uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter } };
+    uRoughness: { value: r.roughness }, uSpecular: { value: r.specular }, uScatter: { value: r.scatter }, ...EarCutUniforms(part) };
   if (reference) Object.assign(own, ReferenceColourUniforms(part.referenceScalp, referenceAtlas, r.color.melanin));
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(density), ...(skinBeard || {}) };
   const main = LitMaterial(MESH_VERTEX(false, !!skinBeard), CARD_FRAGMENT(reference), uniforms, { lightRig });
@@ -843,7 +879,8 @@ export function MakeCardMaterials(part, atlas, shared, lightRig, density, refere
 export function MakeShellMaterials(hair, shared, lightRig, skinBones = null) {
   const r = hair.render;
   const own = { uFade: { value: 1 }, uOpacity: { value: hair.shellOpacity }, uStreakFreq: { value: HAIR_SHADING.shellStreakFrequency },
-    uRoughness: { value: Math.min(0.9, r.roughness + 0.12) }, uSpecular: { value: r.specular * 0.7 }, uScatter: { value: r.scatter } };
+    uRoughness: { value: Math.min(0.9, r.roughness + 0.12) }, uSpecular: { value: r.specular * 0.7 }, uScatter: { value: r.scatter },
+    ...EarCutUniforms(hair) };
   const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density), ...(skinBones || {}) };
   const main = LitMaterial(MESH_VERTEX(false, !!skinBones), SHELL_FRAGMENT, uniforms, { lightRig, side: THREE.FrontSide });
   const prepass = PrepassMaterial(MESH_VERTEX(true, !!skinBones), SHELL_PREPASS_FRAGMENT, { ...shared, ...own, ...(skinBones || {}) }, THREE.FrontSide);
@@ -883,7 +920,7 @@ export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightR
 
 export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = null) {
   const own = { uMelanin: { value: hair.render.color.melanin }, uRedness: { value: hair.render.color.redness },
-    uStrength: { value: hair.scalpTint }, uFade: { value: 1 } };
+    uStrength: { value: hair.scalpTint }, uFade: { value: 1 }, ...EarCutUniforms(hair) };
   if (hair.referenceScalp) {
     if (!referenceAtlas) throw new Error('Missing character reference scalp atlas');
     own.uReferenceMask = {value: referenceAtlas};

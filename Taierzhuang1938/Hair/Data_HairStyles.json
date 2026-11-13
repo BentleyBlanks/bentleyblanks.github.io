@@ -1042,7 +1042,8 @@
    "hair": "Crew",
    "beard": "BoxedShort",
    "hairRootFit": "hatSeam",
-   "hairOverrides": { "hairline": { "backEarDrop": 0.85, "earMaskHalfWidth": 0.90 } },
+   "hairOverrides": { "hairline": { "backEarDrop": 0.85, "earMaskHalfWidth": 0.90 },
+     "cards": { "spacing": 0.009, "width": 0.011, "layers": 3, "tile": "Short" } },
    "label": "罗班长（游戏挂接）：短寸头 + 下颌薄短须",
    "referenceLook": "Luo"
   },

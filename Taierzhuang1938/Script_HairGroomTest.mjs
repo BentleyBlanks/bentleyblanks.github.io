@@ -141,6 +141,13 @@ for (const g of manifest.grooms) {
   if (header.hair) {
     const H = header.hair, K = H.points, G = H.guides, S = H.strands;
     Check((H.rootFit || null) === (entry.hairRootFit || null), `${g.id}：帽缘拟合配方与烘焙资产一致`);
+    if (header.model) {
+      const ear = H.earCut, measured = heads[entry.head].ear;
+      Check(!!ear && ear.yMin === measured.yMin && ear.yMax === measured.yMax
+        && ear.halfWidth === measured.halfWidth && ear.front < ear.back
+        && [ear.centerX, ear.centerZ, ear.front, ear.back].every(Number.isFinite),
+      `${g.id}：运行时耳廓裁剪基于本人头模量尺`);
+    } else Check(!H.earCut, `${g.id}：展示样本不施加游戏耳廓裁剪`);
     const guides = sec('hairGuides');
     Check(guides && guides.length === G * K * 4, `${g.id}：导向发丝 ${G} × ${K} 点`);
     let finite = true; for (const v of guides) if (!Number.isFinite(v)) { finite = false; break; }
