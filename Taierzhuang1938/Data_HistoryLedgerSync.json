@@ -548,6 +548,30 @@
   ],
   "encounterReviews": [
     {
+      "id": "L1-03C-253908",
+      "date": "2026-11-13",
+      "scope": "User-directed six-person pursuit with alternating cover and standoff firing positions, plus two ordinary NRA rear guards killed while covering casualty evacuation. Creative preview blocking. Counts, positions and cue times are design values.",
+      "files": [
+        "AdvancedTools/Data_LevelFlow.mjs",
+        "AdvancedTools/Script_LevelFlowEncounter.mjs",
+        "AdvancedTools/Script_LevelFlowModel.mjs",
+        "docs/Data_LevelFlow.md"
+      ],
+      "codexEntry": "HistoryAndCreation / invented / 撤退与反冲",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-13T09:57:23.133Z",
+          "scope": "Casualty evacuation creative row and dated status now include cover-based pursuit and rear-guard losses."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-13T09:57:24.603Z",
+          "scope": "Existing creative front-line staging bullet includes the same pursuit and rear-guard losses."
+        }
+      ]
+    },
+    {
       "id": "L1-04C-455569",
       "date": "2026-11-13",
       "scope": "User-directed forward squad defense at the dry-gully camp while Old Geng and civilians load ammunition and evacuate Winter. Three shallow fighting trenches and four parapets are creative encounter staging. Positions, personnel and timings are design values.",

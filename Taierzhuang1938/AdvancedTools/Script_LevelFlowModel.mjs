@@ -1,4 +1,4 @@
-import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING } from "./Data_LevelFlow.mjs";
+import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD } from "./Data_LevelFlow.mjs";
 
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
@@ -233,6 +233,8 @@ function OpeningGunTeam(time, index) {
 
 let companionTracks = null;
 const campDefenseTracks = FLOW_CAMP_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
+const dragRearguardTracks = FLOW_DRAG_REARGUARD.map(plan => ({...plan,track:Keys(plan.keys),
+  fall:BeatById(plan.fallBeat).start+BeatById(plan.fallBeat).duration*plan.fallFraction}));
 
 function CampActors(actors, time) {
   if (time < BeatById("04b").start || time > BeatById("05a").start) return;
@@ -338,6 +340,15 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("03h").star
     if(companionTracks[actor.id]) actor.p=Track(companionTracks[actor.id],time);
   }
   CampActors(actors, time);
+  if(time>=BeatById("03a").start && time<BeatById("04a").end) {
+    for(const plan of dragRearguardTracks) {
+      const p=Track(plan.track,Math.min(time,plan.fall));
+      const dead=time>=plan.fall;
+      const moving=!dead && Distance(p,Track(plan.track,time+0.02))>0.001;
+      actors.push(Actor(plan.id,plan.name,"friend","person",p,dead?"dead":moving?"run":"shoot",
+        {groupId:"DragRearguard",target:"enemy",fall:plan.fall,firing:!dead&&!moving,status:dead?"掩护撤退时牺牲":moving?"交替撤退":"殿后掩护"}));
+    }
+  }
   if (Number(beat.stage) <= 2) {
     for (const [index, id] of ["luo", "he", "liu"].entries()) Object.assign(actors.find(actor => actor.id === id), OpeningRetreat(time, index));
     Object.assign(actors.find(actor => actor.id === "yao"), OpeningGunTeam(time, 0));

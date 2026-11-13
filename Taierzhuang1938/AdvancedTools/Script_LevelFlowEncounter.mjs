@@ -1,5 +1,5 @@
-import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./Data_LevelFlow.mjs";
-import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
+import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER } from "./Data_LevelFlow.mjs";
+import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -26,9 +26,12 @@ export function CreateEncounterDocument(timeline, waves) {
       ...(wave.memberPlans ? {memberPlans: structuredClone(wave.memberPlans)} : {}),
       ...(wave.deployDelay ? {deployDelay: wave.deployDelay} : {}),
       ...(wave.reinforceAfterClear ? {reinforceAfterClear: true} : {}),
+      ...(wave.standoffMetres ? {standoffMetres:wave.standoffMetres} : {}),
+      ...(wave.spacingMetres ? {spacingMetres:wave.spacingMetres} : {}),
+      ...(wave.coverWaitSeconds !== undefined ? {coverWaitSeconds:wave.coverWaitSeconds} : {}),
       count: wave.count, interval: wave.interval, maxAlive: wave.maxAlive ?? (wave.cyclic ? 5 : wave.count),
       lifetime: wave.lifetime ?? (wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval)), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
-      behavior: wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance",
+      behavior: wave.behavior || (wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance"),
       note: wave.repeat,
     };
   });
@@ -82,7 +85,7 @@ export function CreateEncounterDocument(timeline, waves) {
         || (formation.route||group.route).slice(1).map(point=>point.map((value,axis)=>value+offset[axis]))),
     }));
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-ground-formation-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-drag-pursuit-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -125,6 +128,9 @@ export function ValidateEncounterDocument(input, timeline) {
       && group.memberPlans.every(plan=>plan && Number.isFinite(plan.delay) && plan.delay>=0 && plan.delay<=60
         && Array.isArray(plan.route) && plan.route.length>0 && plan.route.length<=100 && plan.route.every(CheckPoint)), "单兵推进计划无效");
     Require(group.deployDelay===undefined || Number.isFinite(group.deployDelay) && group.deployDelay>=0 && group.deployDelay<=60, "隐蔽集结时长无效");
+    Require(group.standoffMetres===undefined || Number.isFinite(group.standoffMetres) && group.standoffMetres>=0 && group.standoffMetres<=100, "追击距离无效");
+    Require(group.spacingMetres===undefined || Number.isFinite(group.spacingMetres) && group.spacingMetres>=0 && group.spacingMetres<=10, "单兵间距无效");
+    Require(group.coverWaitSeconds===undefined || Number.isFinite(group.coverWaitSeconds) && group.coverWaitSeconds>=0 && group.coverWaitSeconds<=60, "掩护停留时长无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
@@ -249,7 +255,7 @@ function BuildBoundingPairTracks(group,playerRoute) {
   const states=group.lives.map((life,index)=>{
     const path=GroupPath(group,index),distances=[0],slot=index%group.maxAlive;
     for(let point=1;point<path.length;point++) distances.push(distances.at(-1)+Distance(path[point-1],path[point]));
-    return {path,distances,life,team:Math.floor(slot/2)%2,next:1,distance:0,
+    return {path,distances,life,index,team:Math.floor(slot/2)%2,next:1,distance:0,
       waitUntil:life.born+(group.deployDelay||0)+(group.memberPlans[slot]?.delay||0),track:[[life.born,0]]};
   });
   const step=0.25;
@@ -259,17 +265,28 @@ function BuildBoundingPairTracks(group,playerRoute) {
     const arrivals=states.map(state=>state.next);
     const player=TimedPosition(playerRoute,time);
     const frontReady=states.map(state=>state.next>=state.path.length
+      || group.standoffMetres && SegmentDistance(player,state.path[state.next-1],state.path[state.next])>=group.standoffMetres
       || state.distances[state.next]<=RouteProjection(state.path,player)+2);
     for(const state of states) {
       if(time<state.life.born || time>state.life.fall) continue;
       const covering=states.every((other,otherIndex)=>other.team===state.team
+        // Rear pairs follow the preceding cover team. Waiting for a later
+        // pair would lock both teams when that pair queues at the narrow ramp.
+        || group.spacingMetres && other.index>state.index
         || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]>=other.path.length
         || arrivals[otherIndex]>=state.next+(state.team===1?1:0));
       const pairReady=states.every((other,otherIndex)=>other.team!==state.team
         || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]!==state.next || frontReady[otherIndex]);
-      if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady) {
-        state.distance=Math.min(state.distances[state.next],state.distance+group.speed*step);
-        if(state.distance>=state.distances[state.next]) {state.next++;state.waitUntil=time+FLOW_GROUND.coverWaitS;}
+      const clear = state.next>=state.path.length || !group.standoffMetres
+        || SegmentDistance(player,state.path[state.next-1],state.path[state.next])>=group.standoffMetres;
+      if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady && clear) {
+        const distance=Math.min(state.distances[state.next],state.distance+group.speed*step);
+        const candidate=SampleRoute(state.path,distance/(state.distances.at(-1)||1));
+        const spaced=!group.spacingMetres || states.every(other=>other===state
+          || time<other.life.born || time>=other.life.fall
+          || Distance(candidate,SampleRoute(other.path,other.distance/(other.distances.at(-1)||1)))>=group.spacingMetres);
+        if(spaced) state.distance=distance;
+        if(state.distance>=state.distances[state.next]) {state.next++;state.waitUntil=time+(group.coverWaitSeconds??FLOW_GROUND.coverWaitS);}
       }
       state.track.push([time,state.distance]);
     }
@@ -344,9 +361,11 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
     }
   }
   const enemies=actors.filter((actor)=>actor.side==="enemy"&&actor.pose!=="dead");
-  for(const actor of actors.filter((item)=>item.firing)) {
+  const rearGuards=coreActors.filter(actor=>actor.groupId==="DragRearguard");
+  for(const actor of [...actors,...rearGuards].filter((item)=>item.firing)) {
+    const casualty=actor.groupId==="Corner" && rearGuards.find(guard=>time>=guard.fall-2 && time<=guard.fall+0.3);
     const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
-      :actor.target==="ramp"?{p:[100,384]}:coreActors.find((item)=>item.id===actor.target)??player;
+      :actor.target==="ramp"?{p:[100,384]}:casualty||(coreActors.find((item)=>item.id===actor.target)??player);
     if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
   }
   return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),
@@ -387,11 +406,32 @@ function UpgradeGroundFormations(value,defaults) {
     current.spawnOffsets=structuredClone(next.spawnOffsets);
     current.memberPlans=structuredClone(next.memberPlans);
   }
+  return UpgradeDragPursuit(value,defaults);
+}
+
+function UpgradeDragPursuit(value,defaults) {
+  const current=value.groups.find(group=>group.id==="Corner");
+  const next=defaults.groups.find(group=>group.id==="Corner");
+  if(current && next) {
+    const routeEdited=JSON.stringify(current.route)!==JSON.stringify(FLOW_PREVIOUS_CORNER.route)
+      && JSON.stringify(current.route)!==JSON.stringify(next.route);
+    for(const [key,previous] of Object.entries(FLOW_PREVIOUS_CORNER)) {
+      if(routeEdited && key==="behavior") continue;
+      if(JSON.stringify(current[key])===JSON.stringify(previous)) current[key]=structuredClone(next[key]);
+    }
+    if(!routeEdited && !current.memberPlans) {
+      current.memberPlans=structuredClone(next.memberPlans);
+      current.standoffMetres=next.standoffMetres;
+      current.spacingMetres=next.spacingMetres;
+      current.coverWaitSeconds=next.coverWaitSeconds;
+    }
+  }
   value.revision=defaults.revision;
   return value;
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision==="2026-11-13-ground-formation-1") return UpgradeDragPursuit(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-flank-refill-1") return UpgradeGroundFormations(structuredClone(input),defaults);
   if(input.revision==="2026-11-13-formation-1") return UpgradeFlankReinforcement(structuredClone(input),defaults);
   // Upgrade the collapsed batch without restoring groups deleted in a draft.

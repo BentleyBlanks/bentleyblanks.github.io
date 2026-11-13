@@ -7,6 +7,7 @@ import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeom
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
+import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
@@ -292,7 +293,7 @@ groundDocument.Replace(previousGroundDraft);
 assert.equal(groundDocument.value.revision,defaults.revision,"imports receive the same ground formation migration");
 ValidateEncounterDocument(groundDocument.value,FLOW_TIMELINE);
 assert.equal(map.ramps.length,12);
-assert.equal(map.objects.filter((object)=>object.planning).length,27);
+assert.equal(map.objects.filter((object)=>object.planning).length,29);
 for(const ramp of map.ramps) {
   assert.equal(EncounterHeightAt(ramp.points[0],map),0,`${ramp.id} joins trench floor`);
   assert.ok(Math.abs(EncounterHeightAt(ramp.points.at(-1),map)-FLOW_GROUND.height)<1e-6,`${ramp.id} reaches surface`);
@@ -326,6 +327,50 @@ ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
 
 // The annotated door approach precedes the ramp chase and fork pursuit.
 const Group=(id)=>baseline.groups.find(group=>group.id===id);
+const chaseFrame=EvaluateFlow(253.908),chase=chaseFrame.actors.filter(actor=>actor.groupId==="Corner");
+assert.equal(chase.length,6,"the reported 03C frame has six pursuers");
+assert.ok(chase.some(actor=>actor.firing)&&chase.some(actor=>actor.pose==="run"),"covering fire supports the advancing pair");
+for(let stamp=Group("Corner").start;stamp<Group("Corner").lives[0].fall;stamp+=0.1) {
+  const frame=EvaluateFlow(stamp),enemies=frame.actors.filter(actor=>actor.groupId==="Corner");
+  for(const [index,enemy] of enemies.entries()) {
+    for(const friend of frame.actors.filter(actor=>actor.side==="friend"&&actor.pose!=="dead")) {
+      assert.ok(Distance(enemy.p,friend.p)>10,"pursuers retain firing distance from the evacuation and covering soldiers");
+    }
+    for(const other of enemies.slice(index+1)) assert.ok(Distance(enemy.p,other.p)>0.7,"the ramp formation keeps separate bodies");
+  }
+}
+const settledChase=EvaluateFlow(280).actors.filter(actor=>actor.groupId==="Corner");
+assert.ok(settledChase.every(actor=>actor.firing&&actor.p[0]>=54),"all six settle at their rear firing positions");
+assert.equal(new Set(settledChase.map(actor=>actor.p.join(","))).size,6);
+for(const plan of FLOW_DRAG_REARGUARD) {
+  const fall=BeatById(plan.fallBeat).start+BeatById(plan.fallBeat).duration*plan.fallFraction;
+  const before=EvaluateFlow(fall-0.01),after=EvaluateFlow(fall+0.01);
+  const living=before.actors.find(actor=>actor.id===plan.id),dead=after.actors.find(actor=>actor.id===plan.id);
+  assert.ok(living.firing&&living.pose==="shoot","the ordinary rear guard covers the withdrawal before being hit");
+  assert.ok(before.effects.some(effect=>effect.kind==="fire"&&effect.side==="enemy"&&Distance(effect.b,living.p)<0.01),"incoming fire reaches the guard at the casualty cue");
+  assert.equal(dead.pose,"dead");assert.ok(!dead.firing);
+  assert.deepEqual(EvaluateFlow(410).actors.find(actor=>actor.id===plan.id).p,dead.p,"the fallen guard stays at the casualty location");
+  EvaluateFlow(0);EvaluateFlow(600);
+  assert.deepEqual(EvaluateFlow(fall+0.01).actors.find(actor=>actor.id===plan.id),dead,"rewinding never resurrects a fallen guard after the cue");
+}
+const previousCornerDraft=structuredClone(defaults);
+previousCornerDraft.revision="2026-11-13-ground-formation-1";
+const previousCorner=previousCornerDraft.groups.find(group=>group.id==="Corner");
+Object.assign(previousCorner,structuredClone(FLOW_PREVIOUS_CORNER));
+for(const field of ["memberPlans","standoffMetres","spacingMetres","coverWaitSeconds"]) delete previousCorner[field];
+const UpgradeCorner=value=>new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(value),setItem:()=>{}}).value;
+assert.deepEqual(UpgradeCorner(previousCornerDraft).groups.find(group=>group.id==="Corner"),defaults.groups.find(group=>group.id==="Corner"),"existing two-person drafts receive all six pursuit plans");
+const importedCorner=new EncounterDocument(defaults,FLOW_TIMELINE,null);importedCorner.Replace(previousCornerDraft);
+assert.deepEqual(importedCorner.value,UpgradeCorner(previousCornerDraft),"saved drafts and imported projects share the upgrade");
+previousCorner.count=9;previousCorner.speed=1.7;previousCorner.enabled=false;
+const customCorner=UpgradeCorner(previousCornerDraft).groups.find(group=>group.id==="Corner");
+assert.equal(customCorner.count,9);assert.equal(customCorner.speed,1.7);assert.equal(customCorner.enabled,false);
+previousCorner.route=[[77,58],[80,80]];
+const authoredCorner=UpgradeCorner(previousCornerDraft).groups.find(group=>group.id==="Corner");
+assert.deepEqual(authoredCorner.route,previousCorner.route);
+assert.equal(authoredCorner.behavior,"advance");assert.equal(authoredCorner.memberPlans,undefined);
+previousCornerDraft.groups=previousCornerDraft.groups.filter(group=>group.id!=="Corner");
+assert.ok(!UpgradeCorner(previousCornerDraft).groups.some(group=>group.id==="Corner"),"deleted pursuit groups stay deleted");
 assert.ok(Group("Fork").start<Group("Corner").start&&Group("Corner").start<Group("Rim").start);
 assert.ok(Group("Fork").route.every(point=>point[1]<63),"first pressure approaches the doorway on the northern surface");
 for(const id of ["Corner","Rim","RearPursuit","TrafficFlank"]) {
