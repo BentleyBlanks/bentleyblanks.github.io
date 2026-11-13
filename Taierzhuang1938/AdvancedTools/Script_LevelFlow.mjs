@@ -183,6 +183,7 @@ function UpdateObjects() {
     Field(form,"行为","behavior",current.behavior,Object.entries(ENCOUNTER_BEHAVIORS));
     const numbers=document.createElement("div");numbers.className="lfFieldGrid";form.append(numbers);
     for(const [label,path] of [["总人数","count"],["同时在场","maxAlive"],["补充间隔 s","interval"],["存续时长 s","lifetime"]]) Field(numbers,label,path,current[path]);
+    Field(form,"整批消灭后补充","reinforceAfterClear",current.reinforceAfterClear||false);
     Field(geometry,"移动速度 m/s","speed",current.speed);
     Field(geometry,"隐蔽集结 s","deployDelay",current.deployDelay||0);
     Field(form,"跟随战车","tankId",current.tankId||"",[["","头车（默认）"],["tank1","头车"],["tank2","后车"]]);

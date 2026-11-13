@@ -1,4 +1,4 @@
-import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER } from "./Data_LevelFlow.mjs";
+import { FLOW_GROUND, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -25,8 +25,9 @@ export function CreateEncounterDocument(timeline, waves) {
       ...(wave.spawnOffsets ? {spawnOffsets: structuredClone(wave.spawnOffsets)} : {}),
       ...(wave.memberPlans ? {memberPlans: structuredClone(wave.memberPlans)} : {}),
       ...(wave.deployDelay ? {deployDelay: wave.deployDelay} : {}),
-      count: wave.count, interval: wave.interval, maxAlive: wave.cyclic ? 5 : wave.count,
-      lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
+      ...(wave.reinforceAfterClear ? {reinforceAfterClear: true} : {}),
+      count: wave.count, interval: wave.interval, maxAlive: wave.maxAlive ?? (wave.cyclic ? 5 : wave.count),
+      lifetime: wave.lifetime ?? (wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval)), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
       behavior: wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance",
       note: wave.repeat,
     };
@@ -71,7 +72,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-formation-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-flank-refill-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -119,6 +120,7 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
     Require(Number.isInteger(group.count) && group.count>=0 && group.count<=100, "数量须在 0–100 内");
     Require(Number.isInteger(group.maxAlive) && group.maxAlive>=1 && group.maxAlive<=40, "同时在场须在 1–40 内");
+    Require(group.reinforceAfterClear===undefined || typeof group.reinforceAfterClear==="boolean", "整批消灭后补充开关无效");
     Require(Number.isFinite(group.interval) && group.interval>=0 && group.interval<=300, "补充间隔无效");
     Require(Number.isFinite(group.lifetime) && group.lifetime>=2 && group.lifetime<=2000, "存续时长无效");
     Require(Number.isFinite(group.speed) && group.speed>=0.1 && group.speed<=8, "移动速度无效");
@@ -172,7 +174,10 @@ export function CompileEncounters(document, timeline) {
     const lives=[];
     if(start!==null && group.enabled) for(let index=0;index<group.count;index++) {
       const slot=lives[index-group.maxAlive];
-      const born=Math.max(start+index*group.interval,slot?.fall??start);
+      const batchSlot=index%group.maxAlive;
+      const previousBatch=group.reinforceAfterClear ? lives[index-batchSlot-1] : null;
+      const ready=previousBatch ? previousBatch.fall+batchSlot*group.interval : slot?.fall??start;
+      const born=Math.max(start+index*group.interval,ready);
       if(born>=end) break;
       lives.push({born,fall:born+group.lifetime});
     }
@@ -304,7 +309,30 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
       live:group.lives.filter((life)=>time>=life.born&&time<Math.min(life.fall,group.end)).length}))};
 }
 
+function UpgradeFlankReinforcement(value,defaults) {
+  const changes=[
+    ["groups","TrafficFlank",FLOW_PREVIOUS_FLANK.group],
+    ["triggers","Trigger_TrafficFlank",FLOW_PREVIOUS_FLANK.trigger],
+  ];
+  for(const [collection,id,previous] of changes) {
+    const current=value[collection].find(item=>item.id===id);
+    const next=defaults[collection].find(item=>item.id===id);
+    if(!current || !next) continue;
+    for(const [key,entry] of Object.entries(previous)) {
+      if(JSON.stringify(current[key])===JSON.stringify(entry)) {
+        current[key]=structuredClone(next[key]);
+      }
+    }
+    if(collection==="groups" && current.reinforceAfterClear===undefined) {
+      current.reinforceAfterClear=next.reinforceAfterClear;
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
+}
+
 export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision==="2026-11-13-formation-1") return UpgradeFlankReinforcement(structuredClone(input),defaults);
   // Upgrade the collapsed batch without restoring groups deleted in a draft.
   if(input.revision==="2026-11-13-batch-1") {
     const value=structuredClone(input);
@@ -314,8 +342,7 @@ export function UpgradeEncounterDocument(input,defaults) {
       current.memberPlans=structuredClone(next.memberPlans);
       if(current.note==="第一回五人按标注叉位在北侧土垄后整批生成，经南端绕出压住洞口") current.note=next.note;
     }
-    value.revision=defaults.revision;
-    return value;
+    return UpgradeFlankReinforcement(value,defaults);
   }
   const oldRevision=input.revision===FLOW_PREVIOUS_ENCOUNTER.revision;
   // Junction drafts already know ForkRelief, so deleting it stays respected.
@@ -341,6 +368,5 @@ export function UpgradeEncounterDocument(input,defaults) {
       }
     }
   }
-  value.revision=defaults.revision;
-  return value;
+  return UpgradeFlankReinforcement(value,defaults);
 }

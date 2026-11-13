@@ -297,7 +297,7 @@ export const FLOW_WAVES = [
     ], route: [[75,44],[72,51.5],[69,51],[62,57.5],[54,60.5]], label: "① 北侧地面门口压制", interval: 0, lastFall: 54, target: "player", repeat: "第一回五人分散集结，两人到洞口沙包与箱垛后掩护，三人错峰经坡道下沟前压，各守独立位置" },
   { id: "Corner", beat: "03c", until: "03e", count: 2, source: [77,58], areaSize: [6,6], spawnOffsets: [[0,-1.5],[2,1.5]], route: [[77,58],[75,52],[69,52],[62,55.5],[61,60.5],[60,65.6],[50,65.6],[38,66],[33,66.8]], label: "② 门外坡道下沟追兵", interval: 0, lastFall: 58, speed: 2.1, target: "player", repeat: "第二回两人在东侧断墙后整批生成，经门外坡道下沟，投弹后追到拐角" },
   { id: "Rim", beat: "03g", count: 3, source: [20,33], route: [[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[25,72]], label: "③ 北坡下沟第一波", interval: 1.8, lastFall: 30, speed: 2.3, target: "player", repeat: "标记 1 北坡第一波三人，沿交通沟压到岔口" },
-  { id: "TrafficFlank", beat: "03h", count: 3, source: [5,74], route: [[5,74],[14,77],[20,76.8],[26,76.6],[28,81]], label: "西坡增援（到2再触发）", interval: 2, lastFall: 34, speed: 2.4, grenadeInterval: 10, target: "player", trigger: {area:{shape:"rect",center:[30,86],size:[4,4]}}, repeat: "玩家进入标记 2 拐弯处才从西坡下沟一波三人" },
+  { id: "TrafficFlank", beat: "03h", until: "04a", count: 6, maxAlive: 3, reinforceAfterClear: true, source: [5,74], route: [[5,74],[14,77],[20,76.8],[26,76.6],[28,81],[30,86],[32.5,101],[34,117]], label: "西坡增援（到2再触发）", interval: 2, lifetime: 30, speed: 2.4, grenadeInterval: 10, target: "player", trigger: {area:{shape:"rect",center:[30,86],size:[4,4]}}, repeat: "玩家到标记 2 后从西坡下沟三人，首批全部倒下再补三人，沿交通沟追向坡顶" },
   { id: "TankEscort", beat: "03h", until: "06e", count: 5, source: [113,72], route: [[113,72],[110,114],[108,150],[106,182],[103,212],[101,240],[101,269]], label: "头车护卫", interval: 2.2, lastFall: 195, target: "player", repeat: "头车四至五人，演示取五人" },
   { id: "TankReinforce", beat: "06g", count: 5, source: [103,222], route: [[103,222],[101,238],[101,253],[101,269]], label: "第二车护卫", interval: 3, lastFall: 70, target: "player", repeat: "第一捆后增援一拨五人，清完才放第二捆" },
   { id: "YardTransfer", beat: "09e", count: 5, source: [74,459], route: [[74,459],[68.8,459],[66.5,467.5],[66.5,468.75],[99,468.75],[106.5,465],[106.5,460]], label: "搜院组转援", interval: 1.2, lastFall: 80, target: "front", transfer: true, repeat: "原有六人中五人转去路口，门房留一人" },
@@ -305,6 +305,12 @@ export const FLOW_WAVES = [
   { id: "EastStreet", beat: "10b", until: "10e", count: 15, source: [232,465], route: [[232,465],[207,458],[178,461],[166,461],[147,461],[133,465]], label: "东街援兵", interval: 10, lastFall: 172, target: "player", cyclic: true, repeat: "提议每 30 秒补三人；同时前排最多五人；12 副担架过完、哨响即停" },
   { id: "NorthYard", beat: "10d", count: 3, source: [166,449], route: [[166,449],[146,449],[128,450],[123,457]], label: "北院包抄", interval: 2.5, lastFall: 39, target: "player", repeat: "一次三人，先有砸门声，再从西北破门" },
 ];
+
+// West-ramp defaults before the user-requested second batch.
+export const FLOW_PREVIOUS_FLANK = {
+  group: {count:3,maxAlive:3,endBeat:"03h",route:[[5,74],[14,77],[20,76.8],[26,76.6],[28,81]],note:"玩家进入标记 2 拐弯处才从西坡下沟一波三人"},
+  trigger: {endBeat:"03h"},
+};
 
 // Baseline for a field-wise upgrade of existing v2 browser drafts.
 export const FLOW_PREVIOUS_ENCOUNTER = {

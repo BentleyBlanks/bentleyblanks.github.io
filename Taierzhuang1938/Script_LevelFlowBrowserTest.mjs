@@ -91,6 +91,13 @@ try {
   assert.equal(pressure.filter(actor=>actor.pose==="run").length,2);
   assert.equal(pressure.filter(actor=>actor.firing).length,3);
   await page.screenshot({path:path.join(out,"EnemyFormation.png")});
+  await page.evaluate(()=>LevelFlow.Seek(398.55));
+  assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank").every(actor=>actor.born<390)),"second west-ramp batch waits until all three originals have fallen");
+  await page.evaluate(()=>LevelFlow.Seek(419));
+  const flankRefill=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank"&&actor.pose!=="dead"));
+  assert.equal(flankRefill.length,3);
+  assert.ok(flankRefill.every(actor=>actor.born>398&&actor.p[1]>86),"the complete second batch advances through the marked bend");
+  await page.screenshot({path:path.join(out,"WestRampRefill.png")});
   await page.evaluate(()=>LevelFlow.Seek(384));
   const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
     const canvas=document.getElementById(id),context=canvas.getContext("2d");
