@@ -178,7 +178,7 @@ export const FLOW_BEATS = [
   { id: "03a", stage: "03", duration: 18, title: "顺子和何有田揪被角", p: [[61,64.6],[46,65.6]], pose: "drag",
     passage: "顺子和何有田揪被角拖冬瓜，班长在前带路，刘文财殿后看岔口。按住键拖，松开键举枪。", task: "把冬瓜拖到坡顶", threat: "会合后的日军从西侧路口阻击", gate: "按住拖拽", exit: "单被进入箱垛后", zone: [46,65.6,3], winter: "drag", planning: "五名日军已由北沟抵达路口，朝东侧支沟阻击。班长与刘文财交替压住路口，掩护顺子和何有田拖冬瓜。" },
   { id: "03b", stage: "03", duration: 55, title: "第一回，箱垛后松手射击", p: [[46,65.6]], pose: "shoot",
-    passage: "第一拨日军从北侧地面压到防炮洞门口，朝沟内射击。玩家把被子拽到箱垛后头，利用门口沙包与折墙逐段退开，松手回身打。", task: "借箱垛压住北侧门口来的五个", threat: "① 北侧地面 → 防炮洞门外 → 沟内", gate: "冬瓜进箱垛后", exit: "五个追兵解除，接着拖", zone: [46,65.6,3], wave: "Fork", winter: "ground", fire: "player", cover: true, planning: "① 北侧五人在叉位整批生成，隐蔽集结 10 秒后从土垄南端绕出；东侧两人在断墙后整批生成，再绕北端下沟。门外沙包、折墙和箱垛继续掩护玩家。" },
+    passage: "第一拨日军从北侧地面压到防炮洞门口，朝沟内射击。玩家把被子拽到箱垛后头，利用门口沙包与折墙逐段退开，松手回身打。", task: "借箱垛压住北侧门口来的五个", threat: "① 北侧地面 → 防炮洞门外 → 沟内", gate: "冬瓜进箱垛后", exit: "五个追兵解除，接着拖", zone: [46,65.6,3], wave: "Fork", winter: "ground", fire: "player", cover: true, planning: "① 北侧五人在叉位整批生成，集结后两人分别到沙包与箱垛后掩护，三人错峰从坡道下沟前压；东侧两人在断墙后整批生成，再绕北端下沟。门外沙包、折墙和箱垛继续掩护玩家。" },
   { id: "03c", stage: "03", duration: 22, title: "再拖，接近支沟拐角", p: [[46,65.6],[30,66.8]], pose: "drag",
     passage: "第一拨被压住后，东侧来敌绕到门外坡道，下沟沿支沟追赶。玩家把冬瓜拖到下一处拐角掩体。", task: "拖到拐角掩体", threat: "② 东侧地面 → 门外坡道 → 支沟追击", planning: "② 第一拨之后，东侧来敌沿门外坡道下沟。玩家向西拖到拐角，利用第二处沙包遮住追击火线。", gate: "第一拨解除", exit: "手榴弹滚到单被旁", winter: "drag", zone: [30,66.8,3] },
   { id: "03d", stage: "03", duration: 12, title: "捡起脚边手榴弹，甩回去", p: [[30,66.8]], pose: "throw",
@@ -287,7 +287,14 @@ export const FLOW_BEATS = [
 
 export const FLOW_WAVES = [
   { id: "ForkRelief", beat: "02g", until: "03b", count: 2, source: [67,30], route: [[67,30],[40,28],[17,36],[14.5,40],[12,44],[21.9,67.1],[23,67.1]], label: "绕后日军路口阻击", interval: 0, lastFall: 116, speed: 2.2, target: "player", trigger: {mode:"time",delay:2}, repeat: "东北绕行两人经北坡下沟，与三名逃兵在标记 1 会合，再南下标记 2 路口阻击" },
-  { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[-10.6,-5],[5.5,3.8],[-8.4,1.8]], route: [[75,44],[72,51.5],[69,51],[62,57.5],[54,60.5]], label: "① 北侧地面门口压制", interval: 0, lastFall: 54, target: "player", repeat: "第一回五人按标注叉位在北侧土垄后整批生成，经南端绕出压住洞口" },
+  { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[-10.6,-5],[5.5,3.8],[-8.4,1.8]],
+    memberPlans: [
+      {delay:0, route:[[72,51.5],[69,51],[62,57.5],[59,62.8]]},
+      {delay:2, route:[[74,51.5],[70,53.5],[62,59.5],[60.8,64.7],[60,65.0],[58.8,64.9]]},
+      {delay:0, route:[[64.4,47.8],[62,53],[55,60],[53.5,62.8]]},
+      {delay:9, route:[[75,51.5],[70,51.5],[63,60.5],[61,66],[57.7,65.6],[55.5,64.9]]},
+      {delay:13, route:[[66.6,51.5],[62,55.5],[61,60.5],[60.8,65.8],[60,66],[51.5,66]]},
+    ], route: [[75,44],[72,51.5],[69,51],[62,57.5],[54,60.5]], label: "① 北侧地面门口压制", interval: 0, lastFall: 54, target: "player", repeat: "第一回五人分散集结，两人到洞口沙包与箱垛后掩护，三人错峰经坡道下沟前压，各守独立位置" },
   { id: "Corner", beat: "03c", until: "03e", count: 2, source: [77,58], areaSize: [6,6], spawnOffsets: [[0,-1.5],[2,1.5]], route: [[77,58],[75,52],[69,52],[62,55.5],[61,60.5],[60,65.6],[50,65.6],[38,66],[33,66.8]], label: "② 门外坡道下沟追兵", interval: 0, lastFall: 58, speed: 2.1, target: "player", repeat: "第二回两人在东侧断墙后整批生成，经门外坡道下沟，投弹后追到拐角" },
   { id: "Rim", beat: "03g", count: 3, source: [20,33], route: [[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[25,72]], label: "③ 北坡下沟第一波", interval: 1.8, lastFall: 30, speed: 2.3, target: "player", repeat: "标记 1 北坡第一波三人，沿交通沟压到岔口" },
   { id: "TrafficFlank", beat: "03h", count: 3, source: [5,74], route: [[5,74],[14,77],[20,76.8],[26,76.6],[28,81]], label: "西坡增援（到2再触发）", interval: 2, lastFall: 34, speed: 2.4, grenadeInterval: 10, target: "player", trigger: {area:{shape:"rect",center:[30,86],size:[4,4]}}, repeat: "玩家进入标记 2 拐弯处才从西坡下沟一波三人" },

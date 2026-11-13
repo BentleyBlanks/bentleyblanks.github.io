@@ -1,3 +1,4 @@
+import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 
@@ -326,8 +327,15 @@ export class FlowMapView {
       this.DrawArea(context,group.area,color,selected?group.label:"",selected,{type:"group",id:group.id,text:`${group.label} · 已出 ${group.spawned}/${group.count} · 在场 ${group.live}`});
       const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#fcf4e4",color);
       if(layers.routes||selected) {
-        const route=[group.area.center,...group.route.slice(1)];Line(context,route.map(Screen),color+"77",selected?2:1,[5,4]);
-        if(route.length>1) Arrow(context,Screen(route.at(-2)),Screen(route.at(-1)),color+"99",1);
+        for(let index=0;index<(group.memberPlans?.length||0);index++) {
+          const path=GroupPath(group,index);Line(context,path.map(Screen),color+"99",selected?2:1,[5,4]);
+          if(path.length>1) Arrow(context,Screen(path.at(-2)),Screen(path.at(-1)),color+"bb",1);
+        }
+        const route=[group.area.center,...group.route.slice(1)];
+        if(!group.memberPlans || group.memberPlans.length<Math.min(group.count,group.maxAlive) || selected) {
+          Line(context,route.map(Screen),color+"77",selected?2:1,[5,4]);
+          if(route.length>1) Arrow(context,Screen(route.at(-2)),Screen(route.at(-1)),color+"99",1);
+        }
         if(selected) for(let index=1;index<route.length;index++) {
           const screen=Screen(route[index]);Circle(context,screen,4,color,"#f6f0df");this.hits.push({type:"routeHandle",id:group.id,index,screen,radius:9});
         }

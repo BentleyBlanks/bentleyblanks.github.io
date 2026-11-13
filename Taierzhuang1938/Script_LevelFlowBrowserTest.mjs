@@ -84,6 +84,13 @@ try {
   assert.equal(junctionBlockers.length,5);
   assert.ok(junctionBlockers.every(actor=>actor.pose==="shoot"));
   await page.screenshot({path:path.join(out,"JunctionBlockade.png")});
+  await page.evaluate(()=>LevelFlow.Seek(207.137));
+  const pressure=(await page.evaluate(()=>LevelFlow.Inspect())).actors.filter(actor=>actor.groupId==="Fork");
+  assert.equal(pressure.length,5);
+  assert.equal(new Set(pressure.map(actor=>actor.p.join(","))).size,5);
+  assert.equal(pressure.filter(actor=>actor.pose==="run").length,2);
+  assert.equal(pressure.filter(actor=>actor.firing).length,3);
+  await page.screenshot({path:path.join(out,"EnemyFormation.png")});
   await page.evaluate(()=>LevelFlow.Seek(384));
   const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
     const canvas=document.getElementById(id),context=canvas.getContext("2d");
@@ -158,6 +165,14 @@ try {
   assert.ok(framing.every(({p,width,height})=>p[0]>20&&p[1]>20&&p[0]<width-20&&p[1]<height-20),"follow keeps the player, threats and defenders inside the viewport");
   await page.click("#fitStage");
   await page.click('[data-tab="edit"]');await page.selectOption("#objectList","group:Fork");
+  await page.locator('#objectForm details').evaluate(element=>element.open=true);
+  const memberPlans=await page.locator('[name="memberPlans"]').inputValue();
+  const editedPlans=JSON.parse(memberPlans);editedPlans[3].delay=10;
+  await page.locator('[name="memberPlans"]').fill(JSON.stringify(editedPlans));
+  await page.locator('[name="memberPlans"]').press("Tab");
+  assert.equal((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").memberPlans[3].delay,10);
+  await page.click("#undoFlow");
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").memberPlans,JSON.parse(memberPlans));
   await page.locator('[name="count"]').fill("8");await page.locator('[name="count"]').press("Tab");
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,8);
   await page.click("#undoFlow");assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).document.groups.find(group=>group.id==="Fork").count,5);
@@ -424,7 +439,9 @@ try {
   await page.locator('#objectForm summary').click();
   assert.equal(await page.locator('[name="spawnOffsets"]').inputValue(),"2.3, -9.9\n10.3, -3.5\n-10.6, -5\n5.5, 3.8\n-8.4, 1.8");
   await page.locator('[name="deployDelay"]').fill('0');await page.locator('[name="deployDelay"]').press('Tab');
-  assert.ok((await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'))).every(actor=>actor.pose==='run'));
+  const released=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='Fork'));
+  assert.equal(released.filter(actor=>actor.pose==='run').length,3);
+  assert.equal(released.filter(actor=>actor.pose==='kneel').length,2,'individual delays remain after clearing the shared deployment delay');
   await page.click('#undoFlow');await page.click('[data-tab="script"]');
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   await page.screenshot({path:path.join(out,'HiddenSpawnBatch186.png')});

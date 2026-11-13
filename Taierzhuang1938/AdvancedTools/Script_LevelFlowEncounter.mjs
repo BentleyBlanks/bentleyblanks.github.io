@@ -23,6 +23,7 @@ export function CreateEncounterDocument(timeline, waves) {
       side: "enemy", target: wave.target === "winter" ? "winter" : "player",
       area: Area(wave.source,...(wave.areaSize || [2.4,3])), route: structuredClone(wave.route),
       ...(wave.spawnOffsets ? {spawnOffsets: structuredClone(wave.spawnOffsets)} : {}),
+      ...(wave.memberPlans ? {memberPlans: structuredClone(wave.memberPlans)} : {}),
       ...(wave.deployDelay ? {deployDelay: wave.deployDelay} : {}),
       count: wave.count, interval: wave.interval, maxAlive: wave.cyclic ? 5 : wave.count,
       lifetime: wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
@@ -70,7 +71,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
   Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
   Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-batch-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-13-formation-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -109,6 +110,9 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(typeof group.enabled === "boolean" && Object.hasOwn(ENCOUNTER_BEHAVIORS,group.behavior), "行为配置无效");
     Require(Array.isArray(group.route) && group.route.length>0 && group.route.length<=100 && group.route.every(CheckPoint), "推进路线无效");
     Require(group.spawnOffsets===undefined || Array.isArray(group.spawnOffsets) && group.spawnOffsets.length>0 && group.spawnOffsets.length<=40 && group.spawnOffsets.every(CheckPoint), "分散生成点无效");
+    Require(group.memberPlans===undefined || Array.isArray(group.memberPlans) && group.memberPlans.length>0 && group.memberPlans.length<=40
+      && group.memberPlans.every(plan=>plan && Number.isFinite(plan.delay) && plan.delay>=0 && plan.delay<=60
+        && Array.isArray(plan.route) && plan.route.length>0 && plan.route.length<=100 && plan.route.every(CheckPoint)), "单兵推进计划无效");
     Require(group.deployDelay===undefined || Number.isFinite(group.deployDelay) && group.deployDelay>=0 && group.deployDelay<=60, "隐蔽集结时长无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
@@ -198,10 +202,11 @@ function TimedPosition(route,time) {
   return SampleRoute([a.slice(1),b.slice(1)],(time-a[0])/(b[0]-a[0]));
 }
 
-function GroupPath(group,index) {
-  const offset=group.spawnOffsets?.[index%group.maxAlive];
+export function GroupPath(group,index) {
+  const slot=index%group.maxAlive;
+  const offset=group.spawnOffsets?.[slot];
   const origin=offset?group.area.center.map((value,axis)=>value+offset[axis]):group.area.center;
-  return [origin,...group.route.slice(1)];
+  return [origin,...(group.memberPlans?.[slot]?.route || group.route.slice(1))];
 }
 
 // Compile each soldier's cover-to-cover movement once, including waits for the
@@ -211,7 +216,7 @@ function BuildCoverTracks(group,playerRoute) {
     const path=GroupPath(group,index),distances=[0];
     for(let point=1;point<path.length;point++) distances.push(distances.at(-1)+Distance(path[point-1],path[point]));
     const track=[[life.born,0]],step=0.25;
-    let distance=0,next=1,waitUntil=life.born+(group.deployDelay||0);
+    let distance=0,next=1,waitUntil=life.born+(group.deployDelay||0)+(group.memberPlans?.[index%group.maxAlive]?.delay||0);
     for(let time=life.born+step;time<=Math.min(life.fall,group.end);time+=step) {
       const front=RouteProjection(path,TimedPosition(playerRoute,time));
       if(next<path.length&&time>=waitUntil&&distances[next]<=front+2) {
@@ -235,9 +240,9 @@ function CoverMovement(group,index,time) {
 
 function GroupActor(group,index,time,coreActors) {
   const life=group.lives[index];
-  const readyAt=life.born+(group.deployDelay||0);
-  const age=Math.max(0,Math.min(time,life.fall)-readyAt);
   const slot=index%group.maxAlive,offset=group.spawnOffsets?.[slot];
+  const readyAt=life.born+(group.deployDelay||0)+(group.memberPlans?.[slot]?.delay||0);
+  const age=Math.max(0,Math.min(time,life.fall)-readyAt);
   const path=GroupPath(group,index);
   const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
   const total=lengths.reduce((sum,length)=>sum+length,0);
@@ -300,6 +305,18 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  // Upgrade the collapsed batch without restoring groups deleted in a draft.
+  if(input.revision==="2026-11-13-batch-1") {
+    const value=structuredClone(input);
+    const current=value.groups.find(group=>group.id==="Fork");
+    const next=defaults.groups.find(group=>group.id==="Fork");
+    if(current && JSON.stringify(current.route)===JSON.stringify(next.route) && current.memberPlans===undefined) {
+      current.memberPlans=structuredClone(next.memberPlans);
+      if(current.note==="第一回五人按标注叉位在北侧土垄后整批生成，经南端绕出压住洞口") current.note=next.note;
+    }
+    value.revision=defaults.revision;
+    return value;
+  }
   const oldRevision=input.revision===FLOW_PREVIOUS_ENCOUNTER.revision;
   // Junction drafts already know ForkRelief, so deleting it stays respected.
   const baseline=input.revision==="2026-11-13-junction-1" ? {
@@ -317,7 +334,9 @@ export function UpgradeEncounterDocument(input,defaults) {
       const previous=previousEntry?{...FLOW_PREVIOUS_BATCH_ENCOUNTER[collection].find(item=>item.id===next.id),...(oldRevision?FLOW_PREVIOUS_DRAG_ENCOUNTER[collection].find(item=>item.id===next.id):{}),...previousEntry}:null;
       if(!current&&!previous) value[collection].push(structuredClone(next));
       if(!current||!previous) continue;
+      const routeEdited=Object.hasOwn(previous,"route") && JSON.stringify(current.route)!==JSON.stringify(previous.route);
       for(const [key,entry] of Object.entries(next)) {
+        if(key==="memberPlans" && routeEdited) continue;
         if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
       }
     }

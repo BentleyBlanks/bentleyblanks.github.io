@@ -1,7 +1,7 @@
 import { FLOW_SOURCE } from "./Data_LevelFlow.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
 import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATION, FLOW_TIMELINE, FormatFlowTime, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
-import { ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
+import { GroupPath, ENCOUNTER_BEHAVIORS, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
 import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
@@ -67,7 +67,10 @@ function StageBounds() {
   const points=frame.stage.beats.flatMap((beat)=>beat.p);
   if(Number(frame.stage.id)<=2) points.push([0,-10],[76,82]);
   if(frame.stage.id==="05") points.push([88,112],[92,98]);
-  for(const group of frame.groups.filter((item)=>item.beat.slice(0,2)===frame.stage.id)) points.push(group.area.center,...group.route);
+  for(const group of frame.groups.filter((item)=>item.beat.slice(0,2)===frame.stage.id)) {
+    points.push(group.area.center,...group.route);
+    for(let index=0;index<(group.memberPlans?.length||0);index++) points.push(...GroupPath(group,index));
+  }
   const xs=points.map((point)=>point[0]),zs=points.map((point)=>point[1]);
   return [Math.min(...xs)-14,Math.max(...xs)+14,Math.min(...zs)-14,Math.max(...zs)+14];
 }
@@ -192,7 +195,20 @@ function UpdateObjects() {
       const points=document.createElement("textarea");points.name="spawnOffsets";points.value=current.spawnOffsets.map(point=>point.join(", ")).join("\n");wrapper.append(points);geometry.append(wrapper);
       points.addEventListener("change",()=>Apply(document=>{document.groups.find(item=>item.id===current.id).spawnOffsets=points.value.trim().split(/\n/).filter(Boolean).map(line=>line.split(/[,，\s]+/).map(Number));}));
     }
-    const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("路线 X, Z · 地图上可拖路点"));
+    if(current.memberPlans) {
+      const wrapper=document.createElement("label");
+      wrapper.className="lfField";
+      wrapper.append(document.createTextNode("单兵推进计划 JSON · delay 追加等待秒数，route 世界坐标路点"));
+      const plans=document.createElement("textarea");
+      plans.name="memberPlans";
+      plans.value=JSON.stringify(current.memberPlans,null,2);
+      wrapper.append(plans);
+      geometry.append(wrapper);
+      plans.addEventListener("change",()=>Apply(value=>{
+        value.groups.find(item=>item.id===current.id).memberPlans=JSON.parse(plans.value);
+      }));
+    }
+    const wrapper=document.createElement("label");wrapper.className="lfField";wrapper.append(document.createTextNode("共用路线 X, Z · 未配置单兵计划时使用"));
     const route=document.createElement("textarea");route.name="route";route.value=current.route.map((point)=>point.join(", ")).join("\n");wrapper.append(route);geometry.append(wrapper);
     route.addEventListener("change",()=>Apply((document)=>{
       const points=route.value.trim().split(/\n/).filter(Boolean).map((line)=>line.split(/[,，\s]+/).map(Number));

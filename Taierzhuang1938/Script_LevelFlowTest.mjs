@@ -125,7 +125,7 @@ assert.equal(CompileEncounters(moved,FLOW_TIMELINE).groups.find((group)=>group.i
 assert.equal(EvaluateFlow(BeatById("03b").start+20,moved).actors.filter((actor)=>actor.groupId==="Fork").length,0,"moving trigger off the route suppresses its wave");
 const configured=structuredClone(defaults),group=configured.groups.find((item)=>item.id==="Fork");
 group.count=12;group.maxAlive=2;group.interval=0;group.lifetime=8;group.behavior="suppress";group.area.center=[15,52];
-delete group.spawnOffsets;group.area.size=[2.4,3];
+delete group.spawnOffsets;delete group.memberPlans;group.area.size=[2.4,3];
 for(let time=BeatById("03b").start;time<BeatById("03b").end;time+=0.25) {
   const actors=EvaluateFlow(time,configured).actors.filter((actor)=>actor.groupId==="Fork"&&actor.pose!=="dead");
   assert.ok(actors.length<=2,"replacement respects maxAlive");
@@ -333,11 +333,47 @@ for(const id of ["Fork","Corner"]) {
 const markedFrame=EvaluateFlow(186.63).actors.filter(actor=>actor.groupId==="Fork");
 assert.equal(markedFrame.length,5);
 assert.ok(markedFrame.every(actor=>actor.pose==="kneel"&&!actor.firing));
-assert.ok(EvaluateFlow(Group("Fork").start+10.1).actors.filter(actor=>actor.groupId==="Fork").every(actor=>actor.pose==="run"));
+const firstAdvance=EvaluateFlow(Group("Fork").start+10.1).actors.filter(actor=>actor.groupId==="Fork");
+assert.equal(firstAdvance.filter(actor=>actor.pose==="run").length,2);
+assert.equal(firstAdvance.filter(actor=>actor.pose==="kneel").length,3,"advance starts are staggered after the hidden batch");
+const reportedFrame=EvaluateFlow(207.137).actors.filter(actor=>actor.groupId==="Fork");
+assert.equal(reportedFrame.length,5);
+assert.ok(reportedFrame.some(actor=>actor.pose==="run") && reportedFrame.some(actor=>actor.firing),"covering fire continues while other members advance");
+for(const [id,coverId] of [["Fork_0","Encounter_DugoutDoorBags"],["Fork_2","Encounter_DugoutInnerCrates"]]) {
+  const actor=reportedFrame.find(actor=>actor.id===id),cover=map.objects.find(object=>object.id===coverId);
+  assert.ok(actor.firing && actor.p[1]<cover.pos[2] && Distance(actor.p,[cover.pos[0],cover.pos[2]])<1.5,"two soldiers hold separate cover positions");
+}
+for(let stamp=178;stamp<232;stamp+=0.05) {
+  const actors=EvaluateFlow(stamp).actors.filter(actor=>actor.groupId==="Fork");
+  for(let first=0;first<actors.length;first++) for(let second=first+1;second<actors.length;second++) {
+    assert.ok(Distance(actors[first].p,actors[second].p)>0.75,`formation remains separated at ${stamp}`);
+  }
+  for(const actor of actors) for(const cover of doorCovers) {
+    assert.ok(Math.abs(actor.p[0]-cover.pos[0])>cover.size[0]/2+0.25 || Math.abs(actor.p[1]-cover.pos[2])>cover.size[2]/2+0.25,`${actor.id} stays outside doorway cover`);
+  }
+}
+const settled=EvaluateFlow(225).actors.filter(actor=>actor.groupId==="Fork");
+assert.equal(new Set(settled.map(actor=>actor.p.join(","))).size,5,"five separate endpoints remain after movement ends");
+EvaluateFlow(207.137);EvaluateFlow(186.63);
+assert.deepEqual(EvaluateFlow(225).actors.filter(actor=>actor.groupId==="Fork"),settled,"formation seeking is deterministic");
+const oldBatch=structuredClone(defaults);oldBatch.revision="2026-11-13-batch-1";
+const oldFork=oldBatch.groups.find(group=>group.id==="Fork");delete oldFork.memberPlans;oldFork.count=8;
+oldBatch.groups=oldBatch.groups.filter(group=>group.id!=="SearchNeighbor");
+const upgradedBatch=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(oldBatch),setItem:()=>{}}).value;
+assert.deepEqual(upgradedBatch.groups.find(group=>group.id==="Fork").memberPlans,Group("Fork").memberPlans);
+assert.equal(upgradedBatch.groups.find(group=>group.id==="Fork").count,8);
+assert.ok(!upgradedBatch.groups.some(group=>group.id==="SearchNeighbor"));
+oldFork.route=[[75,44],[80,50]];
+const customBatch=new EncounterDocument(defaults,FLOW_TIMELINE,{getItem:()=>JSON.stringify(oldBatch),setItem:()=>{}}).value;
+assert.equal(customBatch.groups.find(group=>group.id==="Fork").memberPlans,undefined,"a custom route keeps its authored movement");
+oldFork.route=structuredClone(Group("Fork").route);
+const importedBatch=new EncounterDocument(defaults,FLOW_TIMELINE,null);importedBatch.Replace(oldBatch);
+assert.deepEqual(importedBatch.value.groups.find(group=>group.id==="Fork").memberPlans,Group("Fork").memberPlans);
+
 const batchDraft=structuredClone(defaults);batchDraft.revision=FLOW_PREVIOUS_BATCH_ENCOUNTER.revision;
 for(const collection of ["groups","triggers"]) batchDraft[collection]=FLOW_PREVIOUS_BATCH_ENCOUNTER[collection].map(previous=>{
   const item={...structuredClone(defaults[collection].find(item=>item.id===previous.id)),...structuredClone(previous)};
-  delete item.spawnOffsets;delete item.deployDelay;return item;
+  delete item.spawnOffsets;delete item.deployDelay;delete item.memberPlans;return item;
 });
 batchDraft.groups.find(group=>group.id==="Corner").speed=3;
 batchDraft.groups=batchDraft.groups.filter(group=>group.id!=="SearchNeighbor");
@@ -355,6 +391,8 @@ const shifted=EvaluateFlow(Group("Fork").start,batchDocument.value).actors.find(
 assert.equal(shifted.p[0],markedFrame[0].p[0]+3,"editing the region translates every authored spawn point");
 assert.throws(()=>batchDocument.Change(value=>value.groups[0].spawnOffsets=[[NaN,1]]));
 assert.throws(()=>batchDocument.Change(value=>value.groups[0].deployDelay=-1));
+assert.throws(()=>batchDocument.Change(value=>value.groups[0].memberPlans=[{delay:-1,route:[[1,2]]}]));
+assert.throws(()=>batchDocument.Change(value=>value.groups[0].memberPlans=[{delay:0,route:[[NaN,2]]}]));
 for(const rampId of ["DugoutPressureRamp","NorthPursuitRamp","TrafficFlankRamp"]) {
   const ramp=map.ramps.find(ramp=>ramp.id===rampId),bottom=terrain.heightAt(...ramp.points[0]),top=terrain.heightAt(...ramp.points.at(-1));
   assert.ok(top>bottom+1,`${rampId} connects real ground to the trench floor`);
