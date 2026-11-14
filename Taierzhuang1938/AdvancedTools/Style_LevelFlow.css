@@ -229,17 +229,30 @@ textarea { resize: vertical; min-height: 64px; }
 /* Two-column conversation navigation and chat, with a fixed composer. */
 .lfInspectorHeader { display: flex; align-items: center; padding: 4px 12px 0; background: transparent; border-bottom: 1px solid var(--lf-line); }
 .lfInspectorHeader .lfTabs { border-bottom: 0; }
-.lfChatPane { flex: 1; min-height: 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); }
-.lfChatSidebar { display: flex; flex-direction: column; min-height: 0; padding: 10px 7px; border-right: 1px solid var(--lf-line); background: var(--ed-field); }
+.lfChatPane { flex: 1; min-height: 0; display: grid; grid-template-columns: clamp(140px, 42%, 200px) minmax(0, 1fr); }
+.lfChatSidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 10px 7px; border-right: 1px solid var(--lf-line); background: var(--ed-field); }
 #newCodexChat { flex: none; text-align: left; padding: 7px 8px; font-size: 13px; border-color: #6b6243; color: #e0cb99; }
 #toggleDeletedCodexChats { flex: none; margin-top: 7px; padding: 5px 8px; text-align: left; font-size: 12px; }
-#codexSessions { flex: 1; overflow-y: auto; margin-top: 10px; scrollbar-width: thin; }
-.lfChatSessionRow { margin-bottom: 6px; border-bottom: 1px solid var(--ed-rule-2); }
-.lfChatSessionAction { display: block; margin: 0 4px 6px auto; padding: 3px 7px; font-size: 12px; }
-.lfChatSession { display: block; width: 100%; text-align: left; padding: 9px 8px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; }
-.lfChatSession span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; white-space: normal; }
-.lfChatSession small { display: block; font-size: 12px; color: #87978b; margin-top: 4px; }
-.lfChatSession.selected { background: #c6af6e12; border-color: #a5915745; color: #e0cd9f; }
+#codexSessions { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 2px; scrollbar-width: thin; }
+.lfChatSessionRow { --session-color: #aaa99e; margin-bottom: 9px; overflow: hidden; border: 1px solid var(--ed-edge); border-left: 3px solid var(--session-color); border-radius: 9px; background: #ffffff04; }
+.lfChatSessionRow[data-state="running"] { --session-color: #9bd6ad; }
+.lfChatSessionRow[data-state="preparing"] { --session-color: #a9c8ed; }
+.lfChatSessionRow[data-state="paused"], .lfChatSessionRow[data-state="interrupting"] { --session-color: #e1c17e; }
+.lfChatSessionRow[data-state="failed"] { --session-color: #e7a39b; }
+.lfChatSessionRow[data-state="completed"] { --session-color: #b3b9ae; }
+.lfChatSessionRow:hover { background: #ffffff08; }
+.lfChatSessionRow.selected { border-color: #a5915780; border-left-color: var(--session-color); background: #c6af6e12; box-shadow: inset 0 0 0 1px #c6af6e18; }
+.lfChatSession { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; width: 100%; text-align: left; padding: 10px 9px 8px; background: transparent; border: 0; border-radius: 6px; box-shadow: none; }
+.lfChatSession.selected { color: #e0cd9f; }
+.lfChatSessionTitle { display: -webkit-box; max-width: 100%; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; white-space: normal; }
+.lfChatSessionStatus { display: inline-flex; align-items: center; gap: 5px; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--session-color) 35%, transparent); border-radius: 5px; color: var(--session-color); background: color-mix(in srgb, var(--session-color) 9%, transparent); font-size: 11px; font-weight: 500; line-height: 1.8; white-space: nowrap; }
+.lfChatSessionStatus::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.lfChatSessionActivity { display: -webkit-box; max-width: 100%; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; font-weight: 400; line-height: 1.65; color: var(--ed-text-3); overflow-wrap: anywhere; white-space: normal; }
+.lfChatSessionFooter { display: flex; align-items: center; justify-content: space-between; gap: 3px; padding: 0 7px 7px 9px; }
+.lfChatSessionFooter time { min-width: 0; font-size: 10px; line-height: 1.6; color: var(--ed-text-3); font-variant-numeric: tabular-nums; }
+.lfChatSessionAction { flex: none; margin-left: auto; padding: 2px 4px; font-size: 11px; color: var(--ed-text-3); border-color: transparent; background: transparent; box-shadow: none; }
+.lfChatSessionAction:hover:not(:disabled) { color: var(--ed-text-hi); border-color: var(--ed-edge); }
+.lfChatSession:focus-visible, .lfChatSessionAction:focus-visible { outline: 2px solid var(--ed-gold); outline-offset: -2px; }
 .lfChatDetail { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; background: transparent; }
 .lfChatHeading { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--ed-rule-2); background: transparent; }
 .lfChatHeading > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
@@ -334,9 +347,6 @@ textarea { resize: vertical; min-height: 64px; }
 .lfUnitRow button { flex: none; border: 0; padding: 0 4px; background: transparent; box-shadow: none; }
 .lfUnitSelectionActions { margin-top: 8px; justify-content: space-between; }
 .lfChatDetail:has(.lfUnitSelection:not([hidden])) #codexPrompt { height: 64px; min-height: 64px; }
-@media (max-width: 1100px) {
-  .lfChatPane { grid-template-columns: 132px minmax(0, 1fr); }
-}
 @media (max-width: 650px) {
   .lfWorkspace { grid-template-columns: 1fr; overflow-y: auto; }
   .lfViewport { min-height: 280px; }

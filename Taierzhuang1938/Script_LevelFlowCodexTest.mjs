@@ -66,6 +66,7 @@ try {
   const response = await Post(body); assert.equal(response.status, 202);
   let session = await response.json();
   assert.equal(session.status, "running");
+  assert.equal(session.progress.phase, "preparing");
   assert.equal(session.messages[0].frame.time, 384);
   assert.equal(children.length, 1);
   const retried = await (await Post(body)).json();
@@ -101,6 +102,7 @@ try {
   first.stdout.write(`${JSON.stringify({ type: "progress", activity: "正在验证路线", text: "已定位到路线问题，正在修复并验证。", model: "gpt-6.1-sol", effort: "high" })}\n`);
   const progress = await (await fetch(`${base}/sessions/${session.id}`)).json();
   assert.equal(progress.progress.text, "已定位到路线问题，正在修复并验证。");
+  assert.equal(progress.progress.phase, "running", "older runner activity events leave preparation");
   assert.equal(progress.model, "gpt-6.1-sol"); assert.equal(progress.effort, "high");
   const sessionUrl = `${base}/sessions/${session.id}`;
   const beforeDelete = fs.readFileSync(liveFile, "utf8");
@@ -346,6 +348,8 @@ async function TestAppServerSteering(directory) {
   let visibleOutput = ""; child.stdout.on("data", chunk => { visibleOutput += chunk; });
   child.stdin.end("original request");
   await Promise.all([child.steer("live correction", "Revised.png"), child.steer("another correction")]);
+  assert.deepEqual(visibleOutput.trim().split("\n").map(line => JSON.parse(line)).filter(event => event.phase).map(event => event.phase),
+    ["preparing", "running"], "the runner reports preparation before the turn starts");
   const starts = requests.filter(request => request.method === "turn/start");
   assert.equal(starts.length, 1); assert.equal(starts[0].params.input[1].path, "Original.png");
   assert.equal(starts[0].params.model, "gpt-6.1-sol"); assert.equal(starts[0].params.effort, "high");

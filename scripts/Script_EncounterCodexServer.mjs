@@ -184,7 +184,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
     const prompt = Prompt(turn, folder);
     session.status = "running";
     session.model = ENCOUNTER_CODEX_MODEL; session.effort = ENCOUNTER_CODEX_EFFORT;
-    session.progress = { activity: "正在启动本机 Codex", text: "", updatedAt: new Date().toISOString() };
+    session.progress = { phase: "preparing", activity: "正在启动本机 Codex", text: "", updatedAt: new Date().toISOString() };
     session.runnerPid = process.pid;
     session.error = "";
     Save(session);
@@ -207,7 +207,10 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
           if (event.type === "thread.started") { session.cliSessionId = event.thread_id; Save(session); }
           if (event.type === "progress") {
             if (typeof event.text === "string") session.progress.text = event.text.slice(-4000);
-            if (typeof event.activity === "string") session.progress.activity = event.activity.slice(0, 200);
+            if (typeof event.activity === "string") {
+              session.progress.activity = event.activity.slice(0, 200);
+              session.progress.phase = event.phase === "preparing" ? "preparing" : "running";
+            }
             if (typeof event.model === "string") session.model = event.model;
             if (typeof event.effort === "string") session.effort = event.effort;
             session.progress.updatedAt = new Date().toISOString();

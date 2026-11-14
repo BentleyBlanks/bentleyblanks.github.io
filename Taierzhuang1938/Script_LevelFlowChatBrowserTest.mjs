@@ -224,8 +224,11 @@ try {
   assert.equal(frame.context.time, 386); assert.equal(location.selection.id, "Fork");
   assert.equal(screenshot.context.time, 384); assert.equal(screenshot.screenshot.marks.length, 1);
   assert.ok(await page.locator("#sendCodexChat").isDisabled());
+  assert.equal(await page.locator(".lfChatSessionStatus").innerText(), "准备中");
   calls[0].stdout.write(`${JSON.stringify({ type: "progress", activity: "正在验证路线", text: "已定位到生成区过近的问题，正在调整敌军推进路线。" })}\n`);
   await page.waitForFunction(() => document.querySelector("#codexProgress p")?.textContent.includes("已定位到生成区"));
+  assert.equal(await page.locator(".lfChatSessionStatus").innerText(), "进行中");
+  assert.equal(await page.locator(".lfChatSessionActivity").innerText(), "正在验证路线");
   assert.equal(await page.locator("#codexProgress strong").innerText(), "正在验证路线");
   assert.match(await page.locator("#codexProgress small").innerText(), /最后更新/);
   const progressBubble = await page.locator("#codexProgress").evaluate(bubble => {
@@ -255,6 +258,7 @@ try {
   assert.equal(await page.locator("#codexPendingUnits").isVisible(), false);
   Finish(calls[0], markdownReply);
   await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
+  assert.equal(await page.locator(".lfChatSessionStatus").innerText(), "已完成");
   const reply = page.locator(".lfChatMessage.assistant .lfChatBubble");
   assert.equal(await reply.locator("h3").first().innerText(), "这里建议怎么改");
   assert.equal(await reply.locator("tbody tr").count(), 3);
@@ -381,7 +385,8 @@ try {
   assert.ok(await page.locator("#codexProgress").isVisible());
   await page.locator("#codexPrompt").fill("中断时保留的草稿");
   await page.click("#interruptCodexChat");
-  await page.waitForFunction(() => document.querySelector(".lfChatWaiting")?.textContent === "已中断");
+  await page.waitForFunction(() => document.querySelector(".lfChatWaiting")?.textContent === "已暂停，发送需求可继续");
+  assert.equal(await page.locator(".lfChatSession.selected .lfChatSessionStatus").innerText(), "已暂停");
   assert.ok(await page.locator("#interruptCodexChat").isHidden());
   assert.equal(await page.locator("#codexPrompt").inputValue(), "中断时保留的草稿");
   await page.locator("#codexPrompt").fill("中断后继续");
@@ -451,6 +456,46 @@ try {
   assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Frame.json"))).context.time, 410);
   assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Location.json"))).timeline.timeSeconds, 410);
   Finish(calls[5], "新建默认定位已收到。");
+  // Exercise mixed states and long activity text through the list API and normal page startup.
+  const fixtures = [
+    { title: "调整沟外集结区的推进路线", status: "running", progress: { phase: "running", activity: "正在执行本地命令" } },
+    { title: "核对敌军露面前的遮挡", status: "interrupted" },
+    { title: "读取定位，准备新的会话", status: "running", progress: { phase: "preparing", activity: "正在启动本机 Codex" } },
+    { title: "修正担架队的停留位置", status: "completed" },
+    { title: "验证当前视口和路线", status: "failed" },
+    { title: "停止本轮执行", status: "interrupting" },
+    { title: "旧版会话继续处理", status: "running", progress: { activity: "正在调用工具并检查很长的文件路径和本地执行结果" } },
+    { title: "待同步的历史会话", status: "unrecognized" },
+  ].map(session => ({ id: randomUUID(), updatedAt: "2026-11-14T02:24:00Z", ...session }));
+  await page.route("**/__encounter/codex/sessions", route => route.fulfill({ json: {
+    model: "gpt-6.1-sol", effort: "high", sessions: fixtures, deletedSessions: [],
+  } }));
+  await page.reload();
+  await page.waitForFunction(() => window.LevelFlow && document.querySelectorAll(".lfChatSessionRow").length === 8);
+  await page.click("#toggleCodexSessions");
+  assert.deepEqual(await page.locator(".lfChatSessionStatus").allTextContents(),
+    ["进行中", "已暂停", "准备中", "已完成", "需要处理", "暂停中", "进行中", "状态未知"]);
+  assert.equal(await page.locator(".lfChatSessionFooter time").count(), 8);
+  for (const width of [280, 390, 720]) {
+    await page.evaluate(width => document.querySelector(".lfWorkspace").style.setProperty("--lf-inspector-width", `${width}px`), width);
+    const cards = await page.locator(".lfChatSessionRow").evaluateAll(rows => rows.map(row => ({
+      rounded: parseFloat(getComputedStyle(row).borderRadius) > 0,
+      fits: row.scrollWidth <= row.clientWidth + 1,
+      badgeFits: row.querySelector(".lfChatSessionStatus").getBoundingClientRect().right <= row.getBoundingClientRect().right,
+      actionInside: row.contains(row.querySelector(".lfChatSessionAction")),
+    })));
+    assert.ok(cards.every(card => card.rounded && card.fits && card.badgeFits && card.actionInside), `cards fit ${width}px inspector`);
+  }
+  await page.evaluate(() => document.querySelector(".lfWorkspace").style.setProperty("--lf-inspector-width", "570px"));
+  await page.screenshot({ path: path.join(out, "CodexSessionCards.png") });
+  await page.locator(".lfChatSessionRow").nth(4).scrollIntoViewIfNeeded();
+  await page.locator(".lfChatSessionRow").nth(4).locator(".lfChatSessionAction").focus();
+  const scrollTop = await page.locator("#codexSessions").evaluate(list => list.scrollTop);
+  await page.evaluate(() => { window.cardBeforePoll = document.querySelector(".lfChatSessionRow"); });
+  await page.waitForFunction(() => window.cardBeforePoll !== document.querySelector(".lfChatSessionRow"));
+  assert.equal(await page.locator("#codexSessions").evaluate(list => list.scrollTop), scrollTop, "polling preserves the card list scroll position");
+  assert.equal(await page.locator(".lfChatSessionRow").nth(4).locator(".lfChatSessionAction").evaluate(button => button === document.activeElement), true);
+  await page.screenshot({ path: path.join(out, "CodexSessionCardsMoreStates.png") });
   assert.deepEqual(errors, []);
   console.log("ok  Safe Markdown, editable attachments, live steering/progress, and Encounter chat browser: shared menu theme, rounded layout, screenshot and location drafts, interrupt/continue, resume/new CLI sessions and reload history");
 } finally {

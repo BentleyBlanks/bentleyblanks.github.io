@@ -43,6 +43,22 @@ function ContextLabel(context) {
   return `${context.beat.toUpperCase()} · ${context.time.toFixed(2)} s · 玩家 X ${context.player[0].toFixed(1)} / Z ${context.player[1].toFixed(1)}`;
 }
 
+function SessionState(session) {
+  if (session.status === "running") {
+    const preparing = session.progress?.phase === "preparing"
+      || ["正在启动本机 Codex", "已连接，正在提交需求"].includes(session.progress?.activity);
+    return { state: preparing ? "preparing" : "running", label: preparing ? "准备中" : "进行中",
+      detail: session.progress?.activity || "正在处理需求" };
+  }
+  const states = {
+    interrupting: { state: "interrupting", label: "暂停中", detail: "正在停止当前执行" },
+    interrupted: { state: "paused", label: "已暂停", detail: "发送需求可继续" },
+    failed: { state: "failed", label: "需要处理", detail: "执行未完成，可重试" },
+    completed: { state: "completed", label: "已完成", detail: "" },
+  };
+  return states[session.status] || { state: "unknown", label: "状态未知", detail: "等待状态同步" };
+}
+
 async function Request(route, options) {
   const response = await fetch(`${API}${route}`, options);
   const result = await response.json().catch(() => ({ error: "本地预览服务需要更新，请重新打开 AdvancedTool ControlCenter" }));
@@ -374,7 +390,7 @@ export class EncounterChat {
     Element("sendCodexChat").textContent = this.sending ? "提交中…" : running ? "补充要求" : "发送";
     Element("interruptCodexChat").hidden = !running;
     Element("interruptCodexChat").disabled = stopping || this.sending;
-    Element("interruptCodexChat").textContent = stopping ? "中断中…" : "中断";
+    Element("interruptCodexChat").textContent = stopping ? "暂停中…" : "暂停";
     Element("codexPrompt").readOnly = this.sending || deleted || !!this.managing;
     for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage",
       "attachCodexUnits", "removeCodexUnits", "selectSingleUnit", "selectMultipleUnits"]) Element(id).disabled = this.sending || deleted || !!this.managing;
@@ -384,33 +400,58 @@ export class EncounterChat {
 
   DrawList() {
     const list = Element("codexSessions");
+    const scrollTop = list.scrollTop;
+    const focused = document.activeElement;
+    const focusedId = focused?.closest(".lfChatSessionRow")?.dataset.sessionId;
+    let restoreFocus;
     list.replaceChildren();
     Element("newCodexChat").classList.toggle("selected", !this.current);
     Element("toggleDeletedCodexChats").textContent = this.showDeleted ? "返回会话" : `已删除 (${this.deletedSessions.length})`;
     Element("toggleDeletedCodexChats").setAttribute("aria-pressed", String(this.showDeleted));
     for (const session of this.showDeleted ? this.deletedSessions : this.sessions) {
+      const { state, label, detail } = SessionState(session);
+      const selected = session.id === this.current?.id;
       const row = document.createElement("div"); row.className = "lfChatSessionRow";
+      row.dataset.sessionId = session.id;
+      row.dataset.state = state;
+      row.classList.toggle("selected", selected);
       const button = document.createElement("button");
       button.className = "lfChatSession";
       button.disabled = this.sending || !!this.managing;
       button.title = session.title;
-      button.classList.toggle("selected", session.id === this.current?.id);
-      button.setAttribute("aria-current", String(session.id === this.current?.id));
-      const title = document.createElement("span"), status = document.createElement("small");
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-current", String(selected));
+      const title = document.createElement("span"), status = document.createElement("span"), activity = document.createElement("small");
+      title.className = "lfChatSessionTitle";
       title.textContent = session.title;
-      const labels = { running: "正在执行", interrupting: "中断中", interrupted: "已中断", failed: "需要处理", completed: "已完成" };
-      status.textContent = session.status === "running" ? session.progress?.activity || labels.running : labels[session.status] || "已完成";
-      status.title = session.progress?.text || status.textContent;
-      button.append(title, status);
+      status.className = "lfChatSessionStatus";
+      status.textContent = label;
+      activity.className = "lfChatSessionActivity";
+      activity.textContent = detail;
+      activity.hidden = !detail;
+      activity.title = session.progress?.text || detail;
+      button.append(status, title, activity);
       button.onclick = () => this.Select(session.id);
+      const footer = document.createElement("div"); footer.className = "lfChatSessionFooter";
+      const updatedAt = session.status === "running" ? session.progress?.updatedAt || session.updatedAt : session.updatedAt;
+      const date = new Date(updatedAt);
+      if (Number.isFinite(date.getTime())) {
+        const time = document.createElement("time"); time.dateTime = date.toISOString();
+        time.textContent = date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+        time.title = `最后更新 ${date.toLocaleString("zh-CN")}`;
+        footer.append(time);
+      }
       const action = document.createElement("button"); action.type = "button"; action.className = "lfChatSessionAction";
       action.textContent = this.showDeleted ? "还原" : "删除";
       action.setAttribute("aria-label", `${action.textContent}会话 · ${session.title}`);
       action.title = this.showDeleted ? "还原到会话列表" : "移入已删除列表，保留本机 Codex 记录";
       action.disabled = this.sending || !!this.managing;
       action.onclick = () => this.SetDeleted(session.id, !session.deletedAt);
-      row.append(button, action); list.append(row);
+      footer.append(action); row.append(button, footer); list.append(row);
+      if (session.id === focusedId) restoreFocus = focused.classList.contains("lfChatSessionAction") ? action : button;
     }
+    list.scrollTop = scrollTop;
+    restoreFocus?.focus({ preventScroll: true });
   }
 
   DrawConnection() {
@@ -480,7 +521,7 @@ export class EncounterChat {
         pending.append(document.createElement("strong"), document.createElement("p"), document.createElement("small"));
         row.append(label, pending); log.append(row); this.DrawProgress();
       } else {
-        pending.textContent = this.current.status === "interrupting" ? "正在中断…" : "已中断";
+        pending.textContent = this.current.status === "interrupting" ? "暂停中…" : "已暂停，发送需求可继续";
         log.append(pending);
       }
     }

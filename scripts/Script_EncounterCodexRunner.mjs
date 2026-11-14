@@ -111,7 +111,7 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
       if (event.method === "turn/started") {
         turnId = params.turn.id; completed = null; startedTurns.add(turnId);
         startWaiters.get(turnId)?.resolve(); startWaiters.delete(turnId);
-        Progress({ activity: "正在处理需求" });
+        Progress({ phase: "running", activity: "正在处理需求" });
       }
       if (event.method === "item/started") {
         if (params.item.type === "agentMessage" && params.item.phase === "commentary") commentary.set(params.item.id, "");
@@ -143,7 +143,7 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
         cwd: rootDir, model: ENCOUNTER_CODEX_MODEL, config: { model_reasoning_effort: ENCOUNTER_CODEX_EFFORT }, ...(resume ? { threadId: args[2] } : {}),
       });
       threadId = result.thread.id;
-      Progress({ activity: "已连接，正在提交需求", model: result.model || ENCOUNTER_CODEX_MODEL, effort: result.reasoningEffort || ENCOUNTER_CODEX_EFFORT });
+      Progress({ phase: "preparing", activity: "已连接，正在提交需求", model: result.model || ENCOUNTER_CODEX_MODEL, effort: result.reasoningEffort || ENCOUNTER_CODEX_EFFORT });
       child.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: threadId })}\n`);
       const imageIndex = args.indexOf("--image");
       await StartTurn(Input(prompt, imageIndex >= 0 ? args[imageIndex + 1] : null));
