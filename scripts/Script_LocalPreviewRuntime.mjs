@@ -15,9 +15,10 @@ export function PreviewRuntimeRevision(root) {
 
 // Keep live children shared across route upgrades so refreshing the editor's
 // JavaScript cannot leave its new controls talking to an old bridge.
-export function CreateReloadableEncounterCodexHandler(root) {
+export function CreateReloadableEncounterCodexHandler(root, { state = {} } = {}) {
   const file = path.join(root, "scripts", "Script_EncounterCodexServer.mjs");
-  const state = { active: new Map(), submissions: new Map() };
+  state.active ||= new Map();
+  state.submissions ||= new Map();
   let revision;
   let loading;
   return async function Handle(request, response) {

@@ -292,7 +292,8 @@ async function TestRouteReload(directory) {
     `);
   }
   WriteVersion(1);
-  const preview = http.createServer(CreateReloadableEncounterCodexHandler(root));
+  const state = { active: new Map([["live child", "retained"]]), submissions: new Map() };
+  const preview = http.createServer(CreateReloadableEncounterCodexHandler(root, { state }));
   preview.listen(0, "127.0.0.1"); await once(preview, "listening");
   const url = `http://127.0.0.1:${preview.address().port}/__encounter/codex/sessions/${randomUUID()}`;
   try {
@@ -307,6 +308,8 @@ async function TestRouteReload(directory) {
     assert.equal((await fetch(url)).status, 503, "an incomplete source update returns a retryable error");
     WriteVersion(3);
     assert.deepEqual(await (await fetch(url)).json(), { version: 3, loads: 3, pending: "live request" }, "a repaired update recovers on the same port with its state intact");
+    assert.equal(state.active.get("live child"), "retained", "an existing preview can hand its live children into the reloadable bridge");
+    assert.equal(state.submissions.get("pending"), "live request");
   } finally {
     preview.closeAllConnections(); await new Promise(resolve => preview.close(resolve));
   }
