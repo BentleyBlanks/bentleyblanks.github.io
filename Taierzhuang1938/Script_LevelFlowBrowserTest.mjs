@@ -145,6 +145,13 @@ try {
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
+  const viewMenus=await page.locator('.lfViewBar > select:first-of-type').evaluateAll(selects=>selects.map(select=>
+    [...select.children].map(group=>({label:group.label,options:[...group.children].map(option=>[option.value,option.textContent])}))));
+  assert.equal(viewMenus.length,4);
+  for(const menu of viewMenus) assert.deepEqual(menu,[
+    {label:'2D',options:[['battle','战斗局部']]},
+    {label:'3D',options:[['scene','Scene 自由视角'],['chase','跟拍'],['eye','玩家视线']]},
+  ],'every viewport exposes only the four requested views under 2D and 3D');
   assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
   assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
   for(const type of ['plan','battle','oblique','chase','eye']) {
@@ -153,6 +160,8 @@ try {
       const layout=LevelFlow.Inspect().viewports;layout.views[1].mode='follow';
       LevelFlow.RestoreViewports(layout);
     },type);
+    assert.equal(await page.locator('.lfViewPane[data-viewport="1"] .lfViewBar > select').first().inputValue(),
+      ({plan:'battle',oblique:'scene'})[type]||type,'legacy projections retain a visible compatible menu selection');
     const initial=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
     const box=await page.locator('#flowMap2').boundingBox();
     await page.mouse.move(box.x+box.width/2,box.y+box.height/2);

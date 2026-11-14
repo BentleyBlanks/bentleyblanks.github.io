@@ -5,6 +5,9 @@ import { ValidateViewportLayout } from "./Script_LevelFlowDocument.mjs";
 import { FLOW_DEFAULT_VIEWS } from "../Data_Tuning_LevelFlow.mjs";
 
 export const ENCOUNTER_VIEW_TYPES={plan:"空间总览",battle:"战斗局部",oblique:"立体俯视",scene:"Scene 自由视角",chase:"跟拍",eye:"玩家视线"};
+const ENCOUNTER_VIEW_GROUPS={"2D":["battle"],"3D":["scene","chase","eye"]};
+// Archived frame packets and framing controls still use the legacy projections.
+const LEGACY_VIEW_SELECTIONS={plan:"battle",oblique:"scene"};
 
 export class EncounterViewports {
   constructor(element,mapData,{activate,change,bounds,bind}) {
@@ -15,8 +18,14 @@ export class EncounterViewports {
       const bar=document.createElement("div");bar.className="lfViewBar";
       const title=document.createElement("span");title.textContent=`视口 ${index+1}`;bar.append(title);
       const select=document.createElement("select");select.setAttribute("aria-label",`视口 ${index+1} 视角`);
-      for(const [value,label] of Object.entries(ENCOUNTER_VIEW_TYPES)) {const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);}
-      select.value=type;bar.append(select);
+      for(const [label,types] of Object.entries(ENCOUNTER_VIEW_GROUPS)) {
+        const group=document.createElement("optgroup");group.label=label;
+        for(const value of types) {
+          const option=document.createElement("option");option.value=value;option.textContent=ENCOUNTER_VIEW_TYPES[value];group.append(option);
+        }
+        select.append(group);
+      }
+      select.value=LEGACY_VIEW_SELECTIONS[type]||type;bar.append(select);
       const target=document.createElement("select");target.className="lfViewTarget";target.setAttribute("aria-label",`视口 ${index+1} 跟随对象`);
       for(const [value,label] of [["player","顺子"],["winter","冬瓜"],["luo","班长"],["tank1","头车"]]) {const option=document.createElement("option");option.value=value;option.textContent=label;target.append(option);}
       bar.append(target);
@@ -111,7 +120,7 @@ export class EncounterViewports {
     if(!Object.hasOwn(ENCOUNTER_VIEW_TYPES,type)) return;
     const entry=this.entries[index],old=entry.map;
     entry.defaultCamera=false;entry.drawKey=null;
-    entry.type=type;entry.select.value=type;entry.map=this.MakeView(entry.canvas,type);
+    entry.type=type;entry.select.value=LEGACY_VIEW_SELECTIONS[type]||type;entry.map=this.MakeView(entry.canvas,type);
     entry.map.center=[...old.center];entry.map.scale=old.scale;
     entry.mode=type==="plan"?"stage":type==="scene"?"manual":"follow";
     if(type==="scene") {
