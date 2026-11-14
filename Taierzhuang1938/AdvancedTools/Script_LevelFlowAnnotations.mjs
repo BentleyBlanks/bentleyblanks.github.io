@@ -13,16 +13,9 @@ export class ScreenshotAnnotations {
     this.selected = -1;
     this.undo = [];
     this.redo = [];
-    this.textStyle = { fontFamily: "Microsoft YaHei", fontSize: 24, color: COLOR, bold: false, italic: false, underline: false, outline: false, background: false };
-    for (const [id, key] of [["screenshotFont", "fontFamily"], ["screenshotSize", "fontSize"], ["screenshotColor", "color"]]) {
-      Element(id).addEventListener("change", event => {
-        const value = key === "fontSize" ? Math.max(8, Math.min(200, Number(event.target.value) || 24)) : event.target.value;
-        this.ChangeTextStyle(key, value);
-      });
-    }
-    for (const key of ["bold", "italic", "underline", "outline", "background"]) {
-      Element(`screenshot${key[0].toUpperCase()}${key.slice(1)}`).onclick = () => this.ChangeTextStyle(key, !this.textStyle[key]);
-    }
+    this.textStyle = { color: COLOR, outline: true };
+    Element("screenshotColor").addEventListener("change", event => this.ChangeTextStyle("color", event.target.value));
+    Element("screenshotOutline").onclick = () => this.ChangeTextStyle("outline", !this.textStyle.outline);
     for (const button of this.dialog.querySelectorAll("[data-mark-tool]")) button.onclick = () => this.SetTool(button.dataset.markTool);
     Element("closeAnnotations").onclick = () => this.dialog.close();
     Element("undoAnnotation").onclick = () => this.History(this.undo, this.redo);
@@ -54,7 +47,7 @@ export class ScreenshotAnnotations {
     Element("attachScreenshot").onclick = async () => {
       const button = Element("attachScreenshot"); button.disabled = true;
       try { await onAttach(); }
-      catch (error) { Element("annotationStatus").textContent = error.message; }
+      catch (error) { this.ShowStatus(error.message); }
       finally { button.disabled = false; }
     };
     this.canvas.addEventListener("pointerdown", event => this.Begin(event));
@@ -82,6 +75,7 @@ export class ScreenshotAnnotations {
     this.CommitText();
     this.Cancel();
     this.capture = capture;
+    Element("annotationStatus").hidden = true;
     this.packet = structuredClone(packet);
     delete this.packet.screenshot;
     this.marks = structuredClone(marks);
@@ -106,8 +100,8 @@ export class ScreenshotAnnotations {
   SetTool(tool) {
     this.CommitText();
     this.tool = tool;
-    for (const button of this.dialog.querySelectorAll("[data-mark-tool]")) button.setAttribute("aria-pressed", String(button.dataset.markTool === tool));
-    this.canvas.dataset.tool = tool;
+    this.selected = -1;
+    this.Draw();
   }
 
   Save() {
@@ -143,7 +137,7 @@ export class ScreenshotAnnotations {
       const layout = this.TextLayout(context, selected);
       const corner = [selected.a[0] + layout.width, selected.a[1] + layout.height];
       if (Math.abs(point[0] - corner[0]) < tolerance && Math.abs(point[1] - corner[1]) < tolerance) {
-        this.drag = { start: point, before: structuredClone(this.marks), existing: true, resize: true };
+        this.drag = { start: point, before: structuredClone(this.marks), existing: true, resize: layout };
         return;
       }
     }
@@ -153,48 +147,64 @@ export class ScreenshotAnnotations {
         return point[0] >= mark.a[0] - tolerance && point[0] <= mark.a[0] + layout.width + tolerance
           && point[1] >= mark.a[1] - tolerance && point[1] <= mark.a[1] + layout.height + tolerance;
       }
+      if (mark.kind === "brush") return mark.points.some((pointB, index) =>
+        index > 0 && this.SegmentDistance(point, mark.points[index - 1], pointB) < tolerance);
       const [ax, ay] = mark.a, [bx, by] = mark.b;
       if (mark.kind === "rect") return point[0] >= Math.min(ax, bx) - tolerance && point[0] <= Math.max(ax, bx) + tolerance
         && point[1] >= Math.min(ay, by) - tolerance && point[1] <= Math.max(ay, by) + tolerance
         && Math.min(Math.abs(point[0] - ax), Math.abs(point[0] - bx), Math.abs(point[1] - ay), Math.abs(point[1] - by)) < tolerance;
-      const length = (bx - ax) ** 2 + (by - ay) ** 2;
-      const fraction = length ? Math.max(0, Math.min(1, ((point[0] - ax) * (bx - ax) + (point[1] - ay) * (by - ay)) / length)) : 0;
-      return Math.hypot(point[0] - ax - fraction * (bx - ax), point[1] - ay - fraction * (by - ay)) < tolerance;
+      return this.SegmentDistance(point, mark.a, mark.b) < tolerance;
     });
     this.drag = { start: point, before: structuredClone(this.marks), existing: hit >= 0 };
     this.selected = hit;
     if (hit < 0) {
       this.selected = this.marks.length;
       this.marks.push({ kind: this.tool, a: point, b: [...point], text: "" });
+      if (this.tool === "brush") this.marks[this.selected].points = [[...point]];
       if (this.tool === "text") {
-        Object.assign(this.marks[this.selected], this.textStyle, { width: Math.max(40, Math.min(400, this.canvas.width - point[0] - 8)) });
+        Object.assign(this.marks[this.selected], this.textStyle, { fontSize: 24, bold: false, background: false, width: Math.max(40, Math.min(400, this.canvas.width - point[0] - 8)) });
         const before = this.drag.before;
         this.drag = null;
         this.EditText(before);
         return;
       }
     }
-    this.SyncTextStyle();
+    this.tool = this.marks[this.selected].kind;
     this.Draw();
+  }
+
+  SegmentDistance(point, a, b) {
+    const length = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2;
+    const fraction = length ? Math.max(0, Math.min(1, ((point[0] - a[0]) * (b[0] - a[0]) + (point[1] - a[1]) * (b[1] - a[1])) / length)) : 0;
+    return Math.hypot(point[0] - a[0] - fraction * (b[0] - a[0]), point[1] - a[1] - fraction * (b[1] - a[1]));
   }
 
   Move(event) {
     if (!this.drag) return;
     const point = this.Point(event), mark = this.marks[this.selected];
     if (this.drag.resize) {
-      mark.width = Math.max(40, Math.min(this.canvas.width - mark.a[0], point[0] - mark.a[0]));
+      const { width, height, size } = this.drag.resize;
+      const projection = ((point[0] - mark.a[0]) * width + (point[1] - mark.a[1]) * height) / (width * width + height * height);
+      const scale = Math.max(8 / size, Math.min(projection, 16384 / size, (this.canvas.width - mark.a[0]) / width, (this.canvas.height - mark.a[1]) / height));
+      mark.width = Math.max(16, width * scale);
+      mark.fontSize = size * scale;
     } else if (this.drag.existing) {
       const original = this.drag.before[this.selected], delta = point.map((value, index) => value - this.drag.start[index]);
       mark.a = original.a.map((value, index) => value + delta[index]);
       mark.b = original.b.map((value, index) => value + delta[index]);
-    } else mark.b = point;
+      if (mark.kind === "brush") mark.points = original.points.map(entry => entry.map((value, index) => value + delta[index]));
+    } else {
+      mark.b = point;
+      if (mark.kind === "brush" && mark.points.length < 10000) mark.points.push([...point]);
+    }
     this.Draw();
   }
 
   End() {
     if (!this.drag) return;
     const mark = this.marks[this.selected], before = this.drag.before;
-    if (!this.drag.existing && mark.kind !== "text" && Math.hypot(mark.a[0] - mark.b[0], mark.a[1] - mark.b[1]) < 4) {
+    const extent = mark.kind === "brush" ? Math.max(...mark.points.map(point => Math.hypot(point[0] - mark.a[0], point[1] - mark.a[1]))) : Math.hypot(mark.a[0] - mark.b[0], mark.a[1] - mark.b[1]);
+    if (!this.drag.existing && mark.kind !== "text" && extent < 4) {
       this.Cancel(); return;
     }
     if (JSON.stringify(before) !== JSON.stringify(this.marks)) {
@@ -220,7 +230,7 @@ export class ScreenshotAnnotations {
     for (const paragraph of mark.text.split("\n")) {
       let line = "";
       for (const character of paragraph) {
-        if (line && context.measureText(line + character).width > width) { lines.push(line); line = ""; }
+        if (line && context.measureText(line + character).width > width + 0.01) { lines.push(line); line = ""; }
         line += character;
       }
       lines.push(line);
@@ -230,17 +240,12 @@ export class ScreenshotAnnotations {
 
   SyncTextStyle() {
     const mark = this.marks[this.selected];
-    if (mark?.kind === "text") {
-      this.textStyle = { fontSize: mark.fontSize || this.FontSize(), fontFamily: mark.fontFamily || "Microsoft YaHei",
-        color: mark.color || COLOR, bold: mark.bold ?? true, italic: !!mark.italic, underline: !!mark.underline,
-        outline: !!mark.outline, background: mark.background ?? true };
-    }
-    Element("screenshotFont").value = this.textStyle.fontFamily;
-    Element("screenshotSize").value = this.textStyle.fontSize;
+    if (mark?.kind === "text") this.textStyle = { color: mark.color || COLOR, outline: !!mark.outline };
+    Element("screenshotTextStyle").hidden = this.tool !== "text";
     Element("screenshotColor").value = this.textStyle.color;
-    for (const key of ["bold", "italic", "underline", "outline", "background"]) {
-      Element(`screenshot${key[0].toUpperCase()}${key.slice(1)}`).setAttribute("aria-pressed", String(this.textStyle[key]));
-    }
+    Element("screenshotOutline").setAttribute("aria-pressed", String(this.textStyle.outline));
+    for (const button of this.dialog.querySelectorAll("[data-mark-tool]")) button.setAttribute("aria-pressed", String(button.dataset.markTool === this.tool));
+    this.canvas.dataset.tool = this.tool;
   }
 
   ChangeTextStyle(key, value) {
@@ -300,7 +305,13 @@ export class ScreenshotAnnotations {
       context.save();
       context.strokeStyle = COLOR; context.fillStyle = COLOR;
       context.shadowColor = "#fff9"; context.shadowBlur = 2;
-      if (mark.kind === "rect") context.strokeRect(ax, ay, bx - ax, by - ay);
+      if (mark.kind === "brush") {
+        context.lineCap = "round";
+        context.beginPath();
+        context.moveTo(...mark.points[0]);
+        for (const point of mark.points.slice(1)) context.lineTo(...point);
+        context.stroke();
+      } else if (mark.kind === "rect") context.strokeRect(ax, ay, bx - ax, by - ay);
       else if (mark.kind === "text") {
         const layout = this.TextLayout(context, mark);
         context.shadowBlur = 0;
@@ -345,8 +356,8 @@ export class ScreenshotAnnotations {
     Element("undoAnnotation").disabled = !this.undo.length;
     Element("redoAnnotation").disabled = !this.redo.length;
     Element("deleteScreenshotAnnotation").disabled = this.selected < 0;
+    this.SyncTextStyle();
     this.PositionTextEditor();
-    Element("annotationStatus").textContent = `${this.marks.length} 处标记 · ${this.canvas.width} × ${this.canvas.height}`;
   }
 
   Packet() {
@@ -366,13 +377,21 @@ export class ScreenshotAnnotations {
     return new Blob([AddPngFrameMetadata(await blob.arrayBuffer(), packet)], { type: "image/png" });
   }
 
+  ShowStatus(message) {
+    const output = Element("annotationStatus");
+    output.textContent = message;
+    output.hidden = false;
+    clearTimeout(this.statusTimer);
+    this.statusTimer = setTimeout(() => { output.hidden = true; }, 4000);
+  }
+
   async Copy() {
     const button = Element("copyScreenshot"); button.disabled = true;
     try {
       if (!navigator.clipboard?.write || !window.ClipboardItem) throw new Error("当前浏览器不支持复制图片，请使用导出 PNG");
       await navigator.clipboard.write([new ClipboardItem({ "image/png": this.Blob() })]);
-      Element("annotationStatus").textContent = "已复制标记截图";
-    } catch (error) { Element("annotationStatus").textContent = `复制失败 · ${error.message}`; }
+      this.ShowStatus("已复制标记截图");
+    } catch (error) { this.ShowStatus(`复制失败 · ${error.message}`); }
     finally { button.disabled = false; }
   }
 
@@ -380,8 +399,8 @@ export class ScreenshotAnnotations {
     const button = Element("exportFrame"); button.disabled = true;
     try {
       DownloadBlob(await this.Blob(), `${this.packet.frameId}.png`);
-      Element("annotationStatus").textContent = "已导出标记 PNG";
-    } catch (error) { Element("annotationStatus").textContent = error.message; }
+      this.ShowStatus("已导出标记 PNG");
+    } catch (error) { this.ShowStatus(error.message); }
     finally { button.disabled = false; }
   }
 }

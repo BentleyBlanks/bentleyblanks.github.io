@@ -179,20 +179,19 @@ textarea { resize: vertical; min-height: 64px; }
 #annotationHeading { color: #99a492; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lfAnnotationHeader button { padding: 4px 8px; border-color: transparent; font-size: 13px; color: #a5ae9d; }
 .lfAnnotationTools { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #343c34; flex: none; flex-wrap: wrap; }
-.lfAnnotationTools button { padding: 5px 10px; font-size: 14px; }
+.lfAnnotationTools button, .lfAnnotationHeader button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 6px; }
+.lfAnnotationTools svg, .lfAnnotationHeader button svg { width: 21px; height: 21px; flex: none; }
+.lfAnnotationTools .lfToolGroup + .lfToolGroup { border-left: 1px solid #343c34; padding-left: 12px; }
+.lfAnnotationTools [hidden] { display: none; }
 .lfTextStyle { gap: 4px; }
-.lfTextStyle select { width: 105px; }
-#screenshotSize { width: 54px; padding: 4px; background: #111916; border: 1px solid #475044; }
-#screenshotColor { width: 30px; height: 28px; padding: 2px; background: transparent; border: 1px solid #475044; cursor: pointer; }
-.lfTextStyle button { min-width: 28px; padding: 4px 7px; }
-.lfTextStyle button[aria-pressed="true"] { background: #a58c3b44; border-color: #bd9d56; color: #ffe2a1; }
+#screenshotColor { width: 30px; height: 30px; padding: 2px; background: transparent; border: 1px solid #475044; border-radius: 4px; cursor: pointer; }
+.lfAnnotationTools button[aria-pressed="true"] { background: #a58c3b44; border-color: #bd9d56; color: #ffe2a1; }
 #annotationCanvasWrap { position: relative; flex: none; }
 #screenshotText { position: absolute; margin: 0; padding: 0; border: 0; outline: 1px dashed #ffe4a0; outline-offset: 3px; border-radius: 0; resize: none; overflow: hidden; background: transparent; caret-color: #fff; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; paint-order: stroke fill; }
 .lfAnnotationStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #080d0f; }
 #annotationCanvas { display: block; flex: none; touch-action: none; cursor: crosshair; outline: none; box-shadow: 0 3px 18px #0000004d; }
 #annotationCanvas:focus-visible { outline: 1px solid #a38e59; }
-.lfAnnotationFooter { display: flex; justify-content: space-between; gap: 16px; padding: 10px 18px; font-size: 13px; color: #9ca794; flex: none; }
-#annotationStatus { color: #d0c193; }
+#annotationStatus { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 40px); padding: 8px 14px; border: 1px solid #475044; border-radius: 6px; background: #111916ee; color: #d0c193; font-size: 13px; }
 #legacyAnnotations { padding: 5px 18px; max-height: 180px; overflow: auto; }
 #legacyAnnotations .lfPane { padding: 8px 0; }
 
@@ -223,7 +222,7 @@ textarea { resize: vertical; min-height: 64px; }
   .lfAnnotationDialog { width: calc(100vw - 16px); height: calc(100vh - 16px); max-height: calc(100vh - 16px); }
   .lfAnnotationTools { gap: 6px; padding: 8px; }
   .lfAnnotationTools button { padding: 4px 7px; }
-  .lfAnnotationFooter > span { display: none; }
+  .lfAnnotationTools .lfToolGroup + .lfToolGroup { padding-left: 6px; }
 }
 
 /* Two-column conversation navigation and chat, with a fixed composer. */

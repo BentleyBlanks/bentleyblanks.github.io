@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114SessionCards">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261115AnnotationTools">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -73,21 +73,18 @@
     <div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1910" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
   </footer>
   <dialog id="annotationDialog" class="lfAnnotationDialog" aria-labelledby="annotationTitle">
-    <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图与标注</h2><span id="annotationHeading"></span></div><button id="closeAnnotations" aria-label="关闭截图标记">关闭 ×</button></div>
-    <div class="lfAnnotationTools">
-      <div class="lfToolGroup"><button data-mark-tool="arrow" aria-pressed="true">箭头</button><button data-mark-tool="rect" aria-pressed="false">框</button><button data-mark-tool="text" aria-pressed="false">文字</button></div>
-      <div class="lfToolGroup lfTextStyle" aria-label="文字样式">
-        <select id="screenshotFont" aria-label="文字字体"><option value="Microsoft YaHei">微软雅黑</option><option value="SimSun">宋体</option><option value="Arial">Arial</option><option value="Consolas">Consolas</option></select>
-        <input id="screenshotSize" type="number" min="8" max="200" value="24" aria-label="文字字号" title="文字字号">
+    <div class="lfAnnotationHeader"><div><h2 id="annotationTitle">截图与标注</h2><span id="annotationHeading"></span></div><button type="button" id="closeAnnotations" aria-label="关闭截图标记" title="关闭截图标记"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="lfAnnotationTools" role="toolbar" aria-label="截图标注">
+      <div class="lfToolGroup"><button type="button" data-mark-tool="arrow" aria-pressed="true" aria-label="箭头" title="箭头"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5M7 5h12v12"/></svg></button><button type="button" data-mark-tool="rect" aria-pressed="false" aria-label="矩形" title="矩形"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/></svg></button><button type="button" data-mark-tool="text" aria-pressed="false" aria-label="文字" title="文字"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6V4h16v2M12 4v16M8 20h8"/></svg></button><button type="button" data-mark-tool="brush" aria-pressed="false" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m14 5 3-3 5 5-3 3-8 8-5-5 8-8ZM6 13c-5 0-1 6-5 8 7 1 9-2 8-5M14 5l5 5"/></svg></button></div>
+      <div id="screenshotTextStyle" class="lfToolGroup lfTextStyle" role="group" aria-label="文字样式" hidden>
         <input id="screenshotColor" type="color" value="#ed5145" aria-label="文字颜色" title="文字颜色">
-        <button id="screenshotBold" aria-label="文字加粗" aria-pressed="false" title="加粗"><b>B</b></button><button id="screenshotItalic" aria-label="文字斜体" aria-pressed="false" title="斜体"><i>I</i></button><button id="screenshotUnderline" aria-label="文字下划线" aria-pressed="false" title="下划线"><u>U</u></button>
-        <button id="screenshotOutline" aria-pressed="false">描边</button><button id="screenshotBackground" aria-pressed="false">底色</button>
+        <button type="button" id="screenshotOutline" aria-pressed="true" aria-label="白色文字描边" title="白色文字描边"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 20 7-16 7 16M8 14h8" stroke-width="4" stroke="#fff"/><path d="m5 20 7-16 7 16M8 14h8" stroke="#ed5145"/></svg></button>
       </div>
-      <div class="lfToolGroup"><button id="undoAnnotation" title="Ctrl+Z">撤销</button><button id="redoAnnotation" title="Ctrl+Shift+Z">重做</button><button id="deleteScreenshotAnnotation">删除选中</button></div>
-      <div class="lfToolGroup lfExport"><button id="copyScreenshot">复制</button><button id="exportFrame">导出 PNG</button><button id="attachScreenshot" class="sePrimary">添加附件</button></div>
+      <div class="lfToolGroup"><button type="button" id="undoAnnotation" aria-label="撤销（Ctrl+Z）" title="撤销（Ctrl+Z）"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/></svg></button><button type="button" id="redoAnnotation" aria-label="重做（Ctrl+Shift+Z）" title="重做（Ctrl+Shift+Z）"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m16 4 5 5-5 5M21 9H10a6 6 0 0 0 0 12"/></svg></button><button type="button" id="deleteScreenshotAnnotation" aria-label="删除选中" title="删除选中"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg></button></div>
+      <div class="lfToolGroup lfExport"><button type="button" id="copyScreenshot" aria-label="复制图片" title="复制图片"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="13" rx="1"/><path d="M16 8V3H3v13h5"/></svg></button><button type="button" id="exportFrame" aria-label="导出 PNG" title="导出 PNG"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6"/></svg></button><button type="button" id="attachScreenshot" class="sePrimary" aria-label="添加附件" title="添加附件"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 6"/></svg></button></div>
     </div>
     <div id="annotationStage" class="lfAnnotationStage"><div id="annotationCanvasWrap"><canvas id="annotationCanvas" tabindex="0" aria-label="截图标记画布"></canvas><textarea id="screenshotText" maxlength="2000" aria-label="标记文字" spellcheck="false" hidden></textarea></div></div>
-    <div class="lfAnnotationFooter"><span>点击输入文字 · 双击重编辑 · 拖动标记移动 · 拖右下角调整文本宽度 · Ctrl+Enter 完成 · Esc 取消编辑</span><output id="annotationStatus" role="status"></output></div>
+    <output id="annotationStatus" role="status" hidden></output>
     <details id="legacyAnnotations" hidden><summary>原有空间标注</summary>
       <section id="notesPane" class="lfPane"><div class="lfNoteHint">标注后导出 PNG 原文件，可保留帧时间、坐标和布设。</div><label class="lfField">文字<textarea id="annotationText" rows="3" placeholder="选中标注后填写"></textarea></label><div class="lfInline"><button id="deleteAnnotation">删除选中</button></div><div id="annotationFrames"></div></section>
     </details>

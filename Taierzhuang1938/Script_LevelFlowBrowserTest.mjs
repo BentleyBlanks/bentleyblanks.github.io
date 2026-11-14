@@ -533,9 +533,10 @@ try {
   await Draw('arrow',[0.1,0.2],[0.3,0.4]);
   await Draw('rect',[0.6,0.2],[0.85,0.6]);
   await Draw('text',[0.3,0.75],[0.3,0.75],'这里加两名追兵');
-  assert.ok((await page.locator('#annotationStatus').textContent()).includes('3 处'));
-  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('2 处'));
-  await page.click('#undoAnnotation');assert.ok((await page.locator('#annotationStatus').textContent()).includes('1 处'));
+  assert.equal(await page.locator('#annotationStatus').isVisible(), false);
+  assert.equal(await page.locator('#screenshotTextStyle').isVisible(), true);
+  await page.click('#undoAnnotation');assert.equal(await page.locator('#undoAnnotation').isEnabled(), true);
+  await page.click('#undoAnnotation');assert.equal(await page.locator('#redoAnnotation').isEnabled(), true);
   await page.click('#redoAnnotation');await page.click('#redoAnnotation');
   await page.click('#copyScreenshot');await page.waitForFunction(()=>document.querySelector('#annotationStatus').textContent.includes('已复制标记截图'));
   assert.equal(downloads,0,'annotated image copies without downloading');

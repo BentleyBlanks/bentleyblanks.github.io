@@ -1207,6 +1207,11 @@ for(let stamp=BeatById("10d").start;stamp<BeatById("10f").end;stamp+=0.5) {
 
 const screenshot={version:1,width:1280,height:720,image:"data:image/png;base64,AA==",marks:[{kind:"arrow",a:[2,3],b:[40,50],text:""}]};
 assert.deepEqual(ValidateScreenshot(screenshot),screenshot);
+const brushScreenshot = { ...screenshot, marks: [{ kind: "brush", a: [2, 3], b: [2, 3], points: [[2, 3], [20, 50], [2, 3]], text: "" }] };
+assert.deepEqual(ValidateScreenshot(brushScreenshot), brushScreenshot);
+assert.throws(() => ValidateScreenshot({ ...brushScreenshot, marks: [{ ...brushScreenshot.marks[0], points: [[2, 3], [NaN, 0]] }] }));
+assert.throws(() => ValidateScreenshot({ ...brushScreenshot, marks: [{ ...brushScreenshot.marks[0], points: [] }] }));
+assert.deepEqual(ValidateScreenshot({ ...screenshot, marks: [{ kind: "text", a: [2, 3], b: [2, 3], text: "large", fontSize: 300 }] }).marks[0].fontSize, 300);
 assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"world",a:[2,3],b:[4,5],text:""}]}));
 assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"text",a:[NaN,3],b:[4,5],text:"x"}]}));
 assert.throws(()=>ValidateScreenshot({...screenshot,width:0}));
