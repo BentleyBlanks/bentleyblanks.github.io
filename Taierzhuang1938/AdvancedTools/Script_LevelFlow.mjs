@@ -6,7 +6,7 @@ import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
-import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114SessionRecovery";
+import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114ReplyBubbles";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 

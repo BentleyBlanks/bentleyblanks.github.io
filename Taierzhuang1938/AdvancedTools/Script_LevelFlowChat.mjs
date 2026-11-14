@@ -63,6 +63,9 @@ export class EncounterChat {
     this.snapshot = snapshot;
     this.editScreenshot = editScreenshot;
     this.sessions = [];
+    this.deletedSessions = [];
+    this.showDeleted = false;
+    this.managing = null;
     this.current = null;
     this.pendingImage = null;
     this.pendingLocation = null;
@@ -82,6 +85,7 @@ export class EncounterChat {
       Element("chatPane").dataset.listOpen = String(open);
     };
     Element("newCodexChat").onclick = () => this.New();
+    Element("toggleDeletedCodexChats").onclick = () => { this.showDeleted = !this.showDeleted; this.DrawList(); };
     Element("interruptCodexChat").onclick = () => this.Interrupt();
     Element("attachCodexScreenshot").onclick = openScreenshot;
     Element("attachCodexLocation").onclick = () => {
@@ -152,9 +156,10 @@ export class EncounterChat {
 
   async Connect() {
     try {
-      const { sessions, model, effort } = await Request("/sessions");
+      const { sessions, deletedSessions = [], model, effort } = await Request("/sessions");
       this.model = model; this.effort = effort;
       this.sessions = sessions;
+      this.deletedSessions = deletedSessions;
       this.available = true;
       if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
       this.DrawConnection();
@@ -182,7 +187,8 @@ export class EncounterChat {
   }
 
   New() {
-    if (this.sending) return;
+    if (this.sending || this.managing) return;
+    this.showDeleted = false;
     this.SaveDraft();
     this.selectionVersion++;
     this.current = null;
@@ -193,7 +199,7 @@ export class EncounterChat {
   }
 
   async Select(id) {
-    if (this.sending || id === this.current?.id) return;
+    if (this.sending || this.managing || id === this.current?.id) return;
     this.SaveDraft();
     const version = ++this.selectionVersion;
     this.loading = true; this.UpdateSend();
@@ -204,6 +210,26 @@ export class EncounterChat {
       this.RestoreDraft(); this.Error(); this.Draw();
     } catch (error) { if (version === this.selectionVersion) this.Error(error.message); }
     finally { if (version === this.selectionVersion) { this.loading = false; this.UpdateSend(); } }
+  }
+
+  async SetDeleted(id, deleted) {
+    if (this.sending || this.managing) return;
+    this.SaveDraft();
+    this.selectionVersion++;
+    this.loading = false;
+    this.managing = id;
+    this.Error(); this.UpdateSend(); this.DrawList();
+    try {
+      const session = await Request(`/sessions/${id}${deleted ? "" : "/restore"}`, { method: deleted ? "DELETE" : "POST" });
+      if (this.current?.id === id) {
+        this.current = deleted ? null : session;
+        this.RestoreDraft();
+      }
+      if (!deleted) this.showDeleted = false;
+      await this.Connect();
+      this.Draw();
+    } catch (error) { this.Error(error.message); }
+    finally { this.managing = null; this.UpdateSend(); this.DrawList(); }
   }
 
   RefreshContext() {
@@ -260,23 +286,29 @@ export class EncounterChat {
   UpdateSend() {
     const running = ["running", "interrupting"].includes(this.current?.status);
     const stopping = this.stopping === this.current?.id || this.current?.status === "interrupting";
-    const busy = this.sending || this.loading || stopping;
-    Element("sendCodexChat").disabled = !this.available || busy || !Element("codexPrompt").value.trim();
+    const busy = this.sending || this.loading || stopping || !!this.managing;
+    const deleted = !!this.current?.deletedAt;
+    Element("sendCodexChat").disabled = !this.available || busy || deleted || !Element("codexPrompt").value.trim();
     Element("sendCodexChat").textContent = this.sending ? "提交中…" : running ? "补充要求" : "发送";
     Element("interruptCodexChat").hidden = !running;
     Element("interruptCodexChat").disabled = stopping || this.sending;
     Element("interruptCodexChat").textContent = stopping ? "中断中…" : "中断";
-    Element("codexPrompt").readOnly = this.sending;
-    for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage", "newCodexChat"]) Element(id).disabled = this.sending;
+    Element("codexPrompt").readOnly = this.sending || deleted || !!this.managing;
+    for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage"]) Element(id).disabled = this.sending || deleted || !!this.managing;
+    Element("newCodexChat").disabled = this.sending || !!this.managing;
   }
 
   DrawList() {
     const list = Element("codexSessions");
     list.replaceChildren();
     Element("newCodexChat").classList.toggle("selected", !this.current);
-    for (const session of this.sessions) {
+    Element("toggleDeletedCodexChats").textContent = this.showDeleted ? "返回会话" : `已删除 (${this.deletedSessions.length})`;
+    Element("toggleDeletedCodexChats").setAttribute("aria-pressed", String(this.showDeleted));
+    for (const session of this.showDeleted ? this.deletedSessions : this.sessions) {
+      const row = document.createElement("div"); row.className = "lfChatSessionRow";
       const button = document.createElement("button");
       button.className = "lfChatSession";
+      button.disabled = this.sending || !!this.managing;
       button.title = session.title;
       button.classList.toggle("selected", session.id === this.current?.id);
       button.setAttribute("aria-current", String(session.id === this.current?.id));
@@ -287,7 +319,13 @@ export class EncounterChat {
       status.title = session.progress?.text || status.textContent;
       button.append(title, status);
       button.onclick = () => this.Select(session.id);
-      list.append(button);
+      const action = document.createElement("button"); action.type = "button"; action.className = "lfChatSessionAction";
+      action.textContent = this.showDeleted ? "还原" : "删除";
+      action.setAttribute("aria-label", `${action.textContent}会话 · ${session.title}`);
+      action.title = this.showDeleted ? "还原到会话列表" : "移入已删除列表，保留本机 Codex 记录";
+      action.disabled = this.sending || !!this.managing;
+      action.onclick = () => this.SetDeleted(session.id, !session.deletedAt);
+      row.append(button, action); list.append(row);
     }
   }
 
@@ -342,9 +380,13 @@ export class EncounterChat {
     if (["running", "interrupting", "interrupted"].includes(this.current?.status)) {
       const pending = document.createElement("div"); pending.className = "lfChatWaiting";
       if (this.current.status === "running") {
+        const row = document.createElement("article"); row.className = "lfChatMessage";
+        const label = document.createElement("span"); label.className = "lfChatAuthor";
+        label.textContent = "Codex";
+        pending.classList.add("lfChatBubble");
         pending.id = "codexProgress"; pending.setAttribute("role", "status");
         pending.append(document.createElement("strong"), document.createElement("p"), document.createElement("small"));
-        log.append(pending); this.DrawProgress();
+        row.append(label, pending); log.append(row); this.DrawProgress();
       } else {
         pending.textContent = this.current.status === "interrupting" ? "正在中断…" : "已中断";
         log.append(pending);
@@ -394,11 +436,11 @@ export class EncounterChat {
   async Poll() {
     this.RefreshContext();
     this.DrawProgress();
-    if (this.polling || this.sending || this.loading) return;
+    if (this.polling || this.sending || this.loading || this.managing) return;
     this.polling = true;
     const version = this.selectionVersion;
     try {
-      const { sessions, model, effort } = await Request("/sessions");
+      const { sessions, deletedSessions = [], model, effort } = await Request("/sessions");
       this.model = model; this.effort = effort;
       this.available = true;
       if (this.connectionError) { this.connectionError = ""; this.Error(this.current?.error || ""); }
@@ -409,7 +451,7 @@ export class EncounterChat {
           this.current = session; this.Draw();
         }
       }
-      if (version === this.selectionVersion && !this.sending) { this.sessions = sessions; this.DrawList(); }
+      if (version === this.selectionVersion && !this.sending) { this.sessions = sessions; this.deletedSessions = deletedSessions; this.DrawList(); }
     } catch (error) {
       this.available = false;
       this.connectionError = error.message;

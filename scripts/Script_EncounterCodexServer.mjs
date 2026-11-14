@@ -98,6 +98,12 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
   const submissions = new Map();
   const SessionPath = id => path.join(directory, id, "Session.json");
   const InterruptPath = id => path.join(directory, id, "Interrupt.json");
+  const DeletedPath = id => path.join(directory, id, "Deleted.json");
+  // Keep list visibility separate from live runner writes and the CLI transcript.
+  function WithVisibility(session) {
+    const deletedAt = fs.existsSync(DeletedPath(session.id)) ? JSON.parse(fs.readFileSync(DeletedPath(session.id), "utf8")).deletedAt : null;
+    return { ...session, deletedAt };
+  }
   function ReadInterrupt(session) {
     if (!fs.existsSync(InterruptPath(session.id))) return null;
     const interruption = JSON.parse(fs.readFileSync(InterruptPath(session.id), "utf8"));
@@ -261,12 +267,29 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
     try {
       if (request.method === "GET" && route === "/sessions") {
         const sessions = fs.existsSync(directory) ? fs.readdirSync(directory).filter(id => ID.test(id)).map(Load) : [];
+        const summaries = sessions.map(WithVisibility).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .map(({ id, title, status, updatedAt, progress, model, effort, deletedAt }) => ({ id, title, status, updatedAt, progress, model, effort, deletedAt }));
         Send(response, 200, { model: ENCOUNTER_CODEX_MODEL, effort: ENCOUNTER_CODEX_EFFORT,
-          sessions: sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(({ id, title, status, updatedAt, progress, model, effort }) => ({ id, title, status, updatedAt, progress, model, effort })) });
+          sessions: summaries.filter(session => !session.deletedAt), deletedSessions: summaries.filter(session => session.deletedAt) });
         return;
       }
       const sessionRoute = /^\/sessions\/([a-f0-9-]{36})$/.exec(route);
-      if (request.method === "GET" && sessionRoute) { Send(response, 200, Load(sessionRoute[1])); return; }
+      if (request.method === "GET" && sessionRoute) { Send(response, 200, WithVisibility(Load(sessionRoute[1]))); return; }
+      const restoreRoute = /^\/sessions\/([a-f0-9-]{36})\/restore$/.exec(route);
+      if ((request.method === "DELETE" && sessionRoute) || (request.method === "POST" && restoreRoute)) {
+        const session = Load((sessionRoute || restoreRoute)[1]);
+        const file = DeletedPath(session.id);
+        if (restoreRoute) fs.rmSync(file, { force: true });
+        else if (!fs.existsSync(file)) {
+          const temporary = `${file}.${randomUUID()}.tmp`;
+          try {
+            fs.writeFileSync(temporary, JSON.stringify({ deletedAt: new Date().toISOString() }));
+            fs.renameSync(temporary, file);
+          } finally { fs.rmSync(temporary, { force: true }); }
+        }
+        Send(response, 200, WithVisibility(session));
+        return;
+      }
       const interruptRoute = /^\/sessions\/([a-f0-9-]{36})\/interrupt$/.exec(route);
       if (request.method === "POST" && interruptRoute) {
         const session = active.get(interruptRoute[1])?.session || Load(interruptRoute[1]);
@@ -288,6 +311,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       const now = new Date().toISOString();
       const turnId = turn.requestId || randomUUID();
       const sessionId = turn.sessionId || turnId;
+      if (fs.existsSync(DeletedPath(sessionId))) { Send(response, 409, { error: "会话已删除，请先在已删除列表中还原" }); return; }
       let running = active.get(sessionId);
       const session = running?.session || (fs.existsSync(SessionPath(sessionId)) ? Load(sessionId) : null);
       if (turn.sessionId && !session) { Send(response, 404, { error: "会话不存在" }); return; }

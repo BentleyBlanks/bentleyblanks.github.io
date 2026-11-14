@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114ChatMarkdown">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114ReplyBubbles">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,7 +26,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261114SceneNames"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261114ReplyBubbles"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -42,7 +42,7 @@
       <div id="inspectorResizeHandle" class="lfInspectorResize" role="separator" aria-label="调整右侧栏宽度" aria-orientation="vertical" tabindex="0" title="拖动调整侧栏宽度，方向键微调，Home 恢复默认"></div>
       <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div></div>
       <section id="chatPane" class="lfChatPane" aria-label="Codex 会话" data-list-open="false">
-        <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><div id="codexSessions"></div></nav>
+        <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><button id="toggleDeletedCodexChats" type="button" aria-pressed="false">已删除</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
           <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div><button id="interruptCodexChat" type="button" hidden>中断</button></div>
           <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"></div>

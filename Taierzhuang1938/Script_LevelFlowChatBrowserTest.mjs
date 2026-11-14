@@ -127,6 +127,14 @@ try {
   await page.waitForFunction(() => document.querySelector("#codexProgress p")?.textContent.includes("已定位到生成区"));
   assert.equal(await page.locator("#codexProgress strong").innerText(), "正在验证路线");
   assert.match(await page.locator("#codexProgress small").innerText(), /最后更新/);
+  const progressBubble = await page.locator("#codexProgress").evaluate(bubble => {
+    const style = getComputedStyle(bubble);
+    return { author: bubble.parentElement.querySelector(".lfChatAuthor")?.textContent,
+      bubble: bubble.classList.contains("lfChatBubble"), border: style.borderTopWidth,
+      radius: style.borderTopRightRadius, padding: style.paddingLeft,
+      fits: bubble.scrollWidth <= bubble.clientWidth + 1 };
+  });
+  assert.deepEqual(progressBubble, { author: "Codex", bubble: true, border: "1px", radius: "12px", padding: "12px", fits: true });
   await page.screenshot({ path: path.join(out, "CodexLiveProgress.png") });
   await page.locator("#codexPrompt").fill("执行中补充，按最新定位调整");
   assert.equal(await page.locator("#sendCodexChat").innerText(), "补充要求");
@@ -248,6 +256,18 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
   assert.equal(calls.length, 3); assert.ok(!calls[2].args.includes("resume"));
   assert.ok(await page.locator("#interruptCodexChat").isVisible());
+  await page.locator(".lfChatSession.selected").locator("..").locator(".lfChatSessionAction").click();
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 1 && document.querySelector("#codexChatTitle").textContent === "新会话");
+  assert.equal(calls.length, 3, "deleting does not start or stop a CLI run");
+  await page.click("#toggleDeletedCodexChats");
+  await page.locator(".lfChatSession").click();
+  await page.waitForFunction(() => document.querySelector("#codexProgress") && document.querySelector("#codexPrompt").readOnly);
+  assert.ok(await page.locator("#sendCodexChat").isDisabled());
+  await page.screenshot({ path: path.join(out, "CodexDeletedSessions.png") });
+  await page.locator(".lfChatSessionAction").click();
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2 && !document.querySelector("#codexPrompt").readOnly);
+  assert.equal(await page.locator("#toggleDeletedCodexChats").getAttribute("aria-pressed"), "false");
+  assert.ok(await page.locator("#codexProgress").isVisible());
   await page.locator("#codexPrompt").fill("中断时保留的草稿");
   await page.click("#interruptCodexChat");
   await page.waitForFunction(() => document.querySelector(".lfChatWaiting")?.textContent === "已中断");
@@ -270,6 +290,19 @@ try {
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   await page.screenshot({ path: path.join(out, "CodexConversationCompact.png") });
+  await page.locator(".lfChatSession.selected").locator("..").locator(".lfChatSessionAction").click();
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 1);
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow);
+  await page.click("#toggleCodexSessions");
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 1);
+  await page.click("#toggleDeletedCodexChats");
+  await page.locator(".lfChatSession").click();
+  await page.waitForFunction(() => document.querySelector(".lfChatMessage.assistant"));
+  assert.equal(await page.locator(".lfChatMessage.assistant .lfChatBubble").innerText(), "第二个会话已完成。");
+  await page.locator(".lfChatSessionAction").click();
+  await page.waitForFunction(() => document.querySelectorAll(".lfChatSession").length === 2);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.screenshot({ path: path.join(out, "CodexRestoredSession.png") });
   assert.ok(await page.locator("#sendCodexChat").isVisible());
   assert.deepEqual(errors, []);
   const theme = await page.evaluate(() => ({
