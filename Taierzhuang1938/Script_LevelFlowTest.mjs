@@ -1046,6 +1046,26 @@ for(const [x,z] of [[21.9,67.1],[25,67.1],[33,100],[35,100],[40,100],[55,150],[8
   assert.equal(terrain.heightAt(x,z),expected,`real game terrain sampler at ${x},${z}`);
 }
 assert.ok(terrain.heightAt(33,100)<terrain.heightAt(40,100)-1,"the gully is carved into actual ground");
+for(const markerId of ["LmAssemblyEntry","LmAssemblyWestEntry","LmAssemblyRoadBridge","LmAssemblySouthExit","LmAssemblyEastBay"]) {
+  const marker=scene.markers.find(entry=>entry.id===markerId);
+  assert.ok(marker&&map.labels.some(label=>label.name===marker.name&&label.p[0]===marker.x&&label.p[1]===marker.z),`${markerId} explains the assembly circulation on the map`);
+}
+let uniformTerrainCells=0,varyingTerrainCells=0;
+const CheckTerrainColorRange=(cell)=>{
+  const range=terrain.colorRangeForCell(cell);
+  assert.ok(Number.isFinite(range)&&range>=0&&range<=255);
+  if(cell.children) for(const child of cell.children) {
+    CheckTerrainColorRange(child);
+    assert.ok(range+1e-8>=terrain.colorRangeForCell(child),"coarse color bounds retain every finer transition");
+  } else if(cell.near&&cell.size===1) {
+    const colors=terrain.facesForCell(cell).flatMap(face=>face.vertexColors);
+    const expected=Math.max(...[0,1,2].map(axis=>Math.max(...colors.map(color=>color[axis]))-Math.min(...colors.map(color=>color[axis]))));
+    assert.ok(Math.abs(range-expected)<1e-8,"trench cell bounds include floor and bank shading");
+    if(range<=1) uniformTerrainCells++;else varyingTerrainCells++;
+  }
+};
+for(const root of terrain.roots) CheckTerrainColorRange(root);
+assert.ok(uniformTerrainCells>0&&varyingTerrainCells>0,"only uniform trench cells can skip color-driven refinement");
 // A shared edge must consist of identical segments on both sides, including
 // 1 m trench cells meeting the coarse surrounding terrain.
 const terrainEdges=new Map();

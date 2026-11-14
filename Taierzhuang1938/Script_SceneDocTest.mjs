@@ -15,6 +15,7 @@ import {
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { BLOCKOUT_LEVELS, HeightGridSampler, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { PROJECT_DIR, ReadSceneSync, ReadBlockoutSceneDocSync, SceneFilePath } from "./Script_SceneNode.mjs";
+import { GridSampler } from "./Script_SceneTrenches.mjs";
 
 let checks = 0;
 const Check = (ok, what) => { assert.ok(ok, what); checks++; };
@@ -119,8 +120,42 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   const formal = ReadSceneSync("FirstLevel");
   const campIds = ["CampNorthWestDefense", "CampNorthCenterDefense", "CampEastDefense"];
   const ambushIds = ["AmbushNorthDefense", "AmbushRearDefense", "AmbushWestGun"];
-  Check(plan && plan.segments.length === 49 && wb.trenches.segments.length === 49 && formal.doc.trenches.segments.length === 28,
-    "白盒 49 段样条沟，含前哨、翼侧折返、救护支沟与四处逆袭踏步；正式场景 28 段");
+  Check(plan && plan.segments.length === 50 && wb.trenches.segments.length === 50 && formal.doc.trenches.segments.length === 28,
+    "白盒 50 段样条沟，含集结处西侧联络沟；正式场景 28 段");
+  const assemblyLink = plan.segments.find(segment => segment.id === "AssemblyWestLink");
+  const sampleAssembly = GridSampler(wb.terrain, carved);
+  Check(assemblyLink && assemblyLink.nominal.floorW >= 3.8, "西邻班到集结处保留担架双向通行宽度");
+  const assemblyObstacles = wb.objects.filter(object => object.solid !== false && object.pos && object.size);
+  for (const station of assemblyLink.stations) {
+    for (const offset of [-0.95, 0, 0.95]) {
+      const x = station.x + station.nx * offset, z = station.z + station.nz * offset;
+      const floor = sampleAssembly(x, z);
+      const expected = -1 + 0.76 * Math.max(0, 1 - station.s / 14);
+      Check(Math.abs(floor - expected) < 0.15, `联络沟全宽连续下到集结处：${station.s.toFixed(1)} m / ${offset} m`);
+      for (const object of assemblyObstacles) {
+        const bottom = object.pos[1] ?? sampleAssembly(object.pos[0], object.pos[2]);
+        if (bottom >= floor + 1.85 || bottom + object.size[1] <= floor + 0.1) continue;
+        const angle = (object.yawDeg || 0) * Math.PI / 180;
+        const dx = x - object.pos[0], dz = z - object.pos[2];
+        const localX = dx * Math.cos(angle) - dz * Math.sin(angle);
+        const localZ = dx * Math.sin(angle) + dz * Math.cos(angle);
+        Check(Math.hypot(Math.max(0, Math.abs(localX) - object.size[0] / 2), Math.max(0, Math.abs(localZ) - object.size[2] / 2)) > 0.35,
+          `联络沟不被旧空气墙或工事堵住：${station.s.toFixed(1)} m / ${object.id}`);
+      }
+    }
+  }
+  const assemblyBridge = wb.objects.find(object => object.id === "AssemblyWestRoadBridge");
+  Check(assemblyBridge.pos[1] - sampleAssembly(assemblyBridge.pos[0], assemblyBridge.pos[2]) > 2,
+    "田路桥下站立净空大于 2 m");
+  for (const side of [-1, 1]) {
+    const angle = assemblyBridge.yawDeg * Math.PI / 180;
+    const x = assemblyBridge.pos[0] + Math.sin(angle) * assemblyBridge.size[2] / 2 * side;
+    const z = assemblyBridge.pos[2] + Math.cos(angle) * assemblyBridge.size[2] / 2 * side;
+    Check(Math.abs(sampleAssembly(x, z) - assemblyBridge.pos[1] - assemblyBridge.size[1]) < 0.35,
+      "田路桥两端落在实地，车道无断口");
+  }
+  Check(["LmAssemblyEntry", "LmAssemblyWestEntry", "LmAssemblySouthExit", "LmAssemblyEastBay"].every(id => wb.markers.some(marker => marker.id === id)),
+    "本班入口、西邻班入口、南侧装运出口、东侧封闭待命湾职责明确");
   Check(campIds.every(id => wb.trenches.segments.some(segment => segment.id === id)), "集结处北侧两条、东侧一条阻击壕齐全");
   Check(formal.doc.trenches.segments.every(segment => wb.trenches.segments.some(entry => entry.id === segment.id)), "白盒保留原有 28 段壕沟身份");
   Check(formal.doc.trenches.segments.filter(segment => /^11/.test(segment.group || "")).every(segment =>
@@ -146,7 +181,7 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(!bv.ok && bv.errors.some((e) => /roots\.chance 超出/.test(e)) && bv.errors.some((e) => /mystery 不认识/.test(e)) && bv.errors.some((e) => /look 要是/.test(e)), `校验报出细节写错：${bv.errors.slice(0, 3).join("；")}`);
   // 每一段只带自己范围里的沟
   const segs = (k) => ReadBlockoutSceneDocSync(k).trenchPlan?.segments.map((s) => s.id) || [];
-  Check(segs("FirstLevel0105").length === 44 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 44 段、11–18 那一块只带村北两段");
+  Check(segs("FirstLevel0105").length === 45 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 45 段、11–18 那一块只带村北两段");
 }
 
 console.log(`场景文件测试全过（${checks} 项）`);

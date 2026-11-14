@@ -132,6 +132,22 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     colorCache.set(key, color);
     return color;
   };
+  const colorBoundsCache=new WeakMap();
+  const ColorBoundsForCell=(cell)=>{
+    if(colorBoundsCache.has(cell)) return colorBoundsCache.get(cell);
+    const samples=cell.children?cell.children.flatMap(ColorBoundsForCell):[
+      ColorAt(cell.x,cell.z),ColorAt(cell.x+cell.size,cell.z),
+      ColorAt(cell.x,cell.z+cell.size),ColorAt(cell.x+cell.size,cell.z+cell.size),
+      ColorAt(cell.x+cell.size/2,cell.z+cell.size/2),
+    ];
+    const bounds=[0,1,2].map(axis=>Math.min(...samples.map(color=>color[axis])));
+    const maxima=[0,1,2].map(axis=>Math.max(...samples.map(color=>color[axis])));
+    const result=[bounds,maxima];colorBoundsCache.set(cell,result);return result;
+  };
+  const ColorRangeForCell=(cell)=>{
+    const [minimum,maximum]=ColorBoundsForCell(cell);
+    return Math.max(...maximum.map((channel,axis)=>channel-minimum[axis]));
+  };
   const faceCache=new WeakMap();
   const packedFaceCache=new WeakMap();
   // Adjacent triangles and LOD cells share immutable vertices, so each view
@@ -172,7 +188,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     packedFaceCache.set(cell,packed);return packed;
   };
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,roots,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map) {

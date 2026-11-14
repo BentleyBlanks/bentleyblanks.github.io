@@ -253,7 +253,8 @@ export class FlowPerspectiveView extends FlowMapView {
       // Corridor color transitions need detail even where the floor is flat.
       // Shared edge vertices keep both height and shading continuous across LODs.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
-        &&(cell.near||heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels)) {
+        &&(heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
+          ||cell.near&&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
         for(const child of cell.children) Visit(child);
         return;
       }

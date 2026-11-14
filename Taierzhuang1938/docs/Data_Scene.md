@@ -221,6 +221,12 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
   高级工具里的「场景样条PCG」壕沟档，仍然只改现行第一关那份网络（`Data_FirstLevelMissionTrenches`）。
 - **门禁**：
   - `Script_TrenchPlanTest`：细节的三层取值，`depthAlong` / `datumAlong` / 塌方 / 不堆土区；
-  - `Script_SceneDocTest`：两个场景 28 段、挖前挖后、套餐解析、校验报错、按段取的段数；
+  - `Script_SceneDocTest`：白盒 50 段 / 正式场景 28 段、挖前挖后、套餐解析、校验报错、按段取的段数；
   - `Script_SceneEditModelTest`：壕沟编辑与撤销；
   - `Script_SceneFormalBrowserTest`：白盒带网络但不画细节；正式场景画土面细节；编辑器拖点重挖、撤销、换套餐摆构件。
+
+### 集结处沟网（2026-11-15）
+
+白盒 `AssemblyWestLink` 从西邻班 `Traffic2` 的末段接入干沟西口，净沟底宽 3.8 m；沿沟基准面让沟底由约 −0.24 m 缓降到 −1 m，不修改高度图。只拆除新通道穿过的旧 `KeepIn_*` 空气墙，不改其他边界。田路由 `AssemblyWestRoadBridge` 跨过联络沟，桥下站立净空超过 2 m，桥两端接原路面，人员不必爬出壕沟横穿车道。
+
+集结处按用途分开：北口接本班交通沟，西口接西邻班，中央保留人员集结和伤员转运，南口通凹路负责伤员、弹药装运，东侧宽湾为封闭待命区而非另一个出口。原剧情坐标、南侧路线与正式场景保持不变。Encounter Designer 的 2D 与 3D 共用场景联络沟和入口地标；`Script_SceneDocTest` 检查全程沟底、通行宽度、旧墙障碍、桥下净空和桥头落地。
