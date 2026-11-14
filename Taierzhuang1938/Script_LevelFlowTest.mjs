@@ -69,6 +69,36 @@ assert.ok(clipped.every(vertex => vertex.depth >= 0.15 && vertex.rgb.length === 
 assert.ok(clipped.some(vertex => Math.abs(vertex.depth - 0.15) < 1e-8 && Math.abs(vertex.rgb[0] - 15) < 1e-8),
   "near-plane clipping interpolates terrain colors with geometry");
 
+const lineView=Object.assign(Object.create(FlowPerspectiveView.prototype),{
+  type:"scene",freeCamera:{},width:640,height:360,focal:320,far:100,
+  Ground:()=>0,CameraPoint:point=>[point[0],point[1]-10,point[2]],
+});
+const visibleRoute=[[-2,10],[0,20],[3,30]];
+assert.deepEqual(lineView.ProjectPath(visibleRoute),[visibleRoute.map(point=>lineView.ToScreen(point))],
+  "visible route vertices retain their projection and continuous dashes");
+for(const route of [
+  [[-2,-10],[2,10]], [[2,10],[-2,-10]],
+  [[-2,10],[0,-10],[2,10]], [[-2,10],[2,150]],
+]) {
+  const paths=lineView.ProjectPath(route);
+  assert.ok(paths.length>0,"partially visible routes retain their clipped portion");
+  assert.ok(paths.flat().every(point=>point.every(Number.isFinite)&&point[1]>=360*0.49),
+    "ground routes crossing camera planes never connect to the hidden-point sentinel in the sky");
+}
+assert.equal(lineView.ProjectPath([[-2,10],[0,-10],[2,10]]).length,2,
+  "hidden portions split polylines instead of bridging unrelated visible endpoints");
+assert.deepEqual(lineView.ProjectPath([[-2,-10],[2,-20]]),[]);
+assert.deepEqual(lineView.ProjectPath([[-2,110],[2,120]]),[]);
+let arrowFills=0;
+const lineContext={beginPath(){},moveTo(){},lineTo(){},setLineDash(){},stroke(){},closePath(){},fill(){arrowFills++;}};
+lineView.DrawArrow(lineContext,[-2,10],[2,150],"#ac4031");
+assert.equal(arrowFills,0,"clipped route endpoints do not acquire artificial arrowheads at the camera plane");
+lineView.DrawArrow(lineContext,[-2,-10],[2,10],"#ac4031");
+assert.equal(arrowFills,1,"visible route destinations keep their direction arrow");
+lineView.CameraPoint=point=>point;
+lineView.DrawArrow(lineContext,[0,10],[0,150],"#ac4031");
+assert.equal(arrowFills,1,"a far-clipped destination stays hidden even when it projects onto the same pixel");
+
 const ReferenceTime = seconds => seconds >= 86 ? seconds + BeatById("02c").start - 86
   : seconds >= 37 ? seconds + BeatById("01e").start - 37 : seconds;
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;

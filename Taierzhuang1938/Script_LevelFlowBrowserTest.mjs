@@ -608,6 +608,42 @@ try {
   assert.equal(cameraLocation.viewports[1].camera.farMetres,1500);
   await page.screenshot({path:path.join(out,'SceneNavigation.png')});
 
+  const routeClipping=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);
+    const context=canvas.getContext('2d'),map=await LoadEncounterMap(),frame=LevelFlow.Evaluate(227);
+    const layers={routes:true,spawns:true,triggers:true,fire:true,names:true};
+    let points=[],ghostStrokes=0;
+    const beginPath=context.beginPath.bind(context),stroke=context.stroke.bind(context);
+    context.beginPath=()=>{points=[];beginPath();};
+    for(const method of ['moveTo','lineTo']) {
+      const original=context[method].bind(context);
+      context[method]=(x,y)=>{points.push([x,y]);original(x,y);};
+    }
+    context.stroke=()=>{
+      if(points.some(point=>point.includes(-100000))&&points.some(point=>point.every(value=>Math.abs(value)<90000))) ghostStrokes++;
+      stroke();
+    };
+    const legacy=new FlowPerspectiveView(canvas,map,'scene');
+    legacy.freeCamera={eye:[85,30,135],yaw:-2.6,pitch:-0.2};
+    legacy.ProjectPath=points=>[points.map(point=>legacy.ToScreen(point))];
+    legacy.Draw(frame,layers,null);
+    const legacyGhostStrokes=ghostStrokes;
+    const results=[];
+    for(const type of ['scene','eye','chase','oblique']) for(const pitch of [-0.2,-0.4,-0.7]) {
+      const view=new FlowPerspectiveView(canvas,map,type);
+      view.freeCamera={eye:[85,30,135],yaw:-2.6,pitch};
+      ghostStrokes=0;
+      view.Draw(frame,layers,null);
+      results.push({type,pitch,ghostStrokes});
+    }
+    canvas.remove();return {legacyGhostStrokes,views:results};
+  });
+  assert.ok(routeClipping.legacyGhostStrokes>0,'elevated 03B camera reproduces the original erroneous connections');
+  assert.ok(routeClipping.views.every(result=>result.ghostStrokes===0),
+    `world routes and arrows never connect hidden-point sentinels to visible geometry: ${JSON.stringify(routeClipping)}`);
+
   const depth=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);canvas.width=640;canvas.height=360;

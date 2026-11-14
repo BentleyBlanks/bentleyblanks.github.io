@@ -118,8 +118,24 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     return {x:this.width/2+camera[0]*this.focal/camera[2],y:this.height*0.49-camera[1]*this.focal/camera[2],depth:camera[2]};
   }
-  Project(point) {const vertex=this.Vertex(point);return vertex.depth<0.15?[-100000,-100000]:[vertex.x,vertex.y];}
+  Project(point) {const vertex=this.Vertex(point);return vertex.depth<0.15||vertex.depth>this.far?[-100000,-100000]:[vertex.x,vertex.y];}
   ToScreen(point) {return this.Project([point[0],this.Ground(point),point[1]]);}
+  ProjectPath(points) {
+    const paths=[];
+    let path=null;
+    for(let index=1;index<points.length;index++) {
+      const a=points[index-1],b=points[index];
+      // Use the same near/far clipping as terrain, actors and fire strokes.
+      // Hidden-point screen sentinels must never become polyline endpoints.
+      const start=[a[0],this.Ground(a),a[1]],end=[b[0],this.Ground(b),b[1]];
+      const vertices=this.FaceVertices([start,end,end]);
+      if(vertices.length<2) {path=null;continue;}
+      const first=[vertices[0].x,vertices[0].y],last=[vertices[1].x,vertices[1].y];
+      if(path&&Distance(path.at(-1),first)<1e-6) path.push(last);
+      else {path=[first,last];paths.push(path);}
+    }
+    return paths;
+  }
   ToWorld(point) {
     const rasterScale=this.raster.coordinateScale||1;
     const depth=this.raster.depth?.[Math.round(point[1]*rasterScale)*this.raster.width+Math.round(point[0]*rasterScale)];

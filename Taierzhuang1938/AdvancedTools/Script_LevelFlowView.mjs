@@ -124,6 +124,20 @@ export class FlowMapView {
     this.baseCanvas=document.createElement("canvas");this.baseKey="";
   }
 
+  ProjectPath(points) {return [points.map(point=>this.ToScreen(point))];}
+
+  DrawPath(context,points,color,width=1,dash=[]) {
+    for(const path of this.ProjectPath(points)) Line(context,path,color,width,dash);
+  }
+
+  DrawArrow(context,a,b,color,width=2) {
+    const end=this.ToScreen(b);
+    for(const path of this.ProjectPath([a,b])) {
+      if(Distance(path.at(-1),end)<1e-6) Arrow(context,path[0],path.at(-1),color,width);
+      else Line(context,path,color,width);
+    }
+  }
+
   Fit(bounds,padding=54) {
     const {width,height}=this.canvas.getBoundingClientRect();
     this.center=[(bounds[0]+bounds[1])/2,(bounds[2]+bounds[3])/2];
@@ -343,8 +357,8 @@ export class FlowMapView {
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
-      Line(context,frame.stage.beats.flatMap((beat)=>beat.p).map(Screen),"#9c731b9c",2,[6,5]);
-      if(Number(frame.stage.id)>=3&&Number(frame.stage.id)<=6) Line(context,FLOW_GROUND.road.map(Screen),"#ad453499",2,[7,5]);
+      this.DrawPath(context,frame.stage.beats.flatMap((beat)=>beat.p),"#9c731b9c",2,[6,5]);
+      if(Number(frame.stage.id)>=3&&Number(frame.stage.id)<=6) this.DrawPath(context,FLOW_GROUND.road,"#ad453499",2,[7,5]);
     }
     if(layers.triggers) for(const trigger of frame.triggers.filter(relevant)) {
       const selected=selection?.type==="trigger"&&selection.id===trigger.id;
@@ -356,13 +370,13 @@ export class FlowMapView {
       const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#fcf4e4",color);
       if(layers.routes||selected) {
         for(let index=0;index<(group.memberPlans?.length||0);index++) {
-          const path=GroupPath(group,index);Line(context,path.map(Screen),color+"99",selected?2:1,[5,4]);
-          if(path.length>1) Arrow(context,Screen(path.at(-2)),Screen(path.at(-1)),color+"bb",1);
+          const path=GroupPath(group,index);this.DrawPath(context,path,color+"99",selected?2:1,[5,4]);
+          if(path.length>1) this.DrawArrow(context,path.at(-2),path.at(-1),color+"bb",1);
         }
         const route=[group.area.center,...group.route.slice(1)];
         if(!group.memberPlans || group.memberPlans.length<Math.min(group.count,group.maxAlive) || selected) {
-          Line(context,route.map(Screen),color+"77",selected?2:1,[5,4]);
-          if(route.length>1) Arrow(context,Screen(route.at(-2)),Screen(route.at(-1)),color+"99",1);
+          this.DrawPath(context,route,color+"77",selected?2:1,[5,4]);
+          if(route.length>1) this.DrawArrow(context,route.at(-2),route.at(-1),color+"99",1);
         }
 
       }
@@ -375,9 +389,9 @@ export class FlowMapView {
       if(effect.phase<0.25) {Line(context,[[Lerp(a[0],b[0],effect.phase*3),Lerp(a[1],b[1],effect.phase*3)],b],color,1.5);Circle(context,a,2.5,"#edb445");}
     }
     const winter=frame.actors.find((actor)=>actor.id==="winter"),he=frame.actors.find((actor)=>actor.id==="he");
-    if(frame.actors[0].pose==="drag") Line(context,[Screen(frame.player),Screen(winter.p),Screen(he.p)],"#776740",1.5);
+    if(frame.actors[0].pose==="drag") this.DrawPath(context,[frame.player,winter.p,he.p],"#776740",1.5);
     if(layers.routes) for(const ramp of this.mapData.ramps) {
-      Arrow(context,Screen(ramp.points[0]),Screen(ramp.points.at(-1)),"#687a50",1.5);
+      this.DrawArrow(context,ramp.points[0],ramp.points.at(-1),"#687a50",1.5);
     }
     const labelBoxes=[];
     for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
@@ -401,19 +415,19 @@ export class FlowMapView {
     }
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
-      if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;Line(context,[Screen(effect.a),Screen(effect.b)],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
+      if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;this.DrawPath(context,[effect.a,effect.b],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
       if(effect.kind==="plane") {const p=Screen(effect.p);Line(context,[[p[0]-8,p[1]],[p[0]+8,p[1]]],"#d2d7c5",2);Line(context,[[p[0],p[1]-5],[p[0],p[1]+7]],"#d2d7c5",2);}
       if(effect.kind==="column"||effect.kind==="runner") Circle(context,Screen(effect.p),3,"#f3957b");
     }
     for(const annotation of [...annotations,...(draft?[draft]:[])]) {
       if(Math.abs(annotation.time-frame.time)>0.06) continue;
       const a=Screen(annotation.a),b=Screen(annotation.b),color="#8d5d11";
-      if(annotation.kind==="arrow") Arrow(context,a,b,color,2.5);
+      if(annotation.kind==="arrow") this.DrawArrow(context,annotation.a,annotation.b,color,2.5);
       if(annotation.kind==="rect") {
-        const corners=[annotation.a,[annotation.b[0],annotation.a[1]],annotation.b,[annotation.a[0],annotation.b[1]],annotation.a].map(Screen);
-        Line(context,corners,color,2);
+        const corners=[annotation.a,[annotation.b[0],annotation.a[1]],annotation.b,[annotation.a[0],annotation.b[1]],annotation.a];
+        this.DrawPath(context,corners,color,2);
       }
-      if(annotation.text) AnnotationText(context,annotation.text,b,width,height);
+      if(annotation.text&&(b[0]!==-100000||b[1]!==-100000)) AnnotationText(context,annotation.text,b,width,height);
       Circle(context,a,3,"#8d5d11");this.hits.push({type:"annotation",id:annotation.id,screen:a,radius:10,text:annotation.text||annotation.kind});
       if(selection?.type==="annotation"&&selection.id===annotation.id) for(const [handle,screen] of [["a",a],["b",b]]) {
         context.fillStyle="#8d5d11";context.fillRect(screen[0]-4,screen[1]-4,8,8);
