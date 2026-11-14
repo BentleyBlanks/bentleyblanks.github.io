@@ -77,7 +77,7 @@
 
 右栏默认宽 390 px，左边缘可拖拽调到 280–720 px，宽度保存在当前浏览器源。聚焦分隔条后方向键每次微调 20 px，Home 恢复默认。会话列表默认折叠，点击对话标题旁的菜单按钮展开左列会话列表与“新建会话”，右列显示当前会话的用户需求气泡与 Codex 最终答复。点击“新建会话”编写需求，首次发送时通过本机 `codex exec --json --output-last-message` 创建独立 CLI 会话。在列表选中既有会话后，后续需求通过 `codex exec resume <id>` 继续。CLI 沿用本机登录、模型与权限配置，按仓库 AGENTS.md 在独占 worktree 中修改源码。执行中可以切换其他会话，刷新后可从列表恢复查看。
 
-输入区的“＋ 定位”附加点击时刻的 `Frame.json` 和 `Location.json`，包含拍号、精确秒数、玩家世界坐标、选中对象、当前遭遇草稿与各视口相机。附件显示在输入框内，可展开查看或移除。移动时间轴后保留附加时的状态，切换会话时随该会话草稿恢复。用户气泡下方可打开对应附件。文字需求可直接发送，定位由用户选择附加。
+新会话默认附加新建时刻的定位，首次打开页面时按 URL 指定的时间与视口完成定位后附加。输入区的“＋ 定位”可重新附加点击时刻的 `Frame.json` 和 `Location.json`，包含拍号、精确秒数、玩家世界坐标、选中对象、当前遭遇草稿与各视口相机。附件显示在输入框内，可展开查看或移除。移动时间轴后保留附加时的状态，切换会话时随该会话草稿恢复。用户气泡下方可打开对应附件。定位可在发送前移除，已移除定位的草稿在切换会话后继续保留该选择。
 
 执行中的公开回复显示在 Codex 气泡里，包含当前执行状态、回复文字与更新时间。会话列表的“删除”将条目移入“已删除”，其中可以查看历史并点击“还原”恢复续聊。删除状态独立保存在会话目录的 `Deleted.json`，会话正文、附件与本机 Codex 转录完整保留，正在执行的任务继续运行。接口为 `DELETE /__encounter/codex/sessions/<id>` 与 `POST /__encounter/codex/sessions/<id>/restore`，均执行本机同源校验，支持重复请求。列表接口分别返回 `sessions` 与 `deletedSessions`。已删除会话须还原后才能发送新需求。
 
@@ -113,4 +113,4 @@
 
 `?t=384&x=32&z=106&zoom=5.5` 可传时间与地图视图，`?stage=03` / `?beat=03h` 可按段或拍定位。`window.LevelFlow.Inspect()`、`Seek(seconds)`、`JumpBeat(id)`、`Packet()` 与界面共用入口。
 
-验证运行 `Script_LevelFlowTest.mjs`、`Script_LevelFlowBrowserTest.mjs`、`Script_LevelFlowCodexTest.mjs` 与 `Script_LevelFlowChatBrowserTest.mjs`。检查连续触发、波次上限、追兵和战车衔接、回溯一致性、地图来源、逐视口镜头控制、区域点选、旧草稿恢复与 PNG 回读，以及会话两列布局、气泡、截图标注、可选定位附件的时间锁定与草稿恢复、新建／续聊、历史恢复、同源访问与最终答复过滤。验收图保存在忽略目录 `tmp/EncounterEditor/`。
+验证运行 `Script_LevelFlowTest.mjs`、`Script_LevelFlowBrowserTest.mjs`、`Script_LevelFlowCodexTest.mjs` 与 `Script_LevelFlowChatBrowserTest.mjs`。检查连续触发、波次上限、追兵和战车衔接、回溯一致性、地图来源、逐视口镜头控制、区域点选、旧草稿恢复与 PNG 回读，以及会话两列布局、气泡、截图标注、默认定位附件的自动附加、时间锁定、手动移除与草稿恢复、新建／续聊、历史恢复、同源访问与最终答复过滤。验收图保存在忽略目录 `tmp/EncounterEditor/`。

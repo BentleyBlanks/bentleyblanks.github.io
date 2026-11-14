@@ -81,7 +81,8 @@ try {
   assert.equal(await page.locator("#toggleCodexSessions").getAttribute("aria-expanded"), "false");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   assert.equal(await page.locator("#markScreenshot,.lfChatEmpty").count(), 0);
-  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), true);
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 384);
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   // Use real canvas clicks in both viewports. Units keep their own frozen snapshot.
   await page.evaluate(() => { LevelFlow.SetViewType(0, "plan"); LevelFlow.SetViewType(1, "plan"); LevelFlow.Seek(221); });
@@ -200,9 +201,10 @@ try {
   assert.equal(calls.length, 1); assert.equal(calls[0].steered.length, 1);
   assert.match(calls[0].steered[0].prompt, /执行中补充/);
   await page.click("#newCodexChat");
+  assert.ok(await page.locator("#codexPendingLocation").isVisible());
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 390);
   await page.evaluate(() => LevelFlow.Select({ type: "actor", id: "player" }));
   await page.click("#attachSelectedUnits");
-  await page.click("#attachCodexLocation");
   await page.locator("#codexPrompt").fill("第二个会话的独立草稿");
   await page.locator(".lfChatSession").first().click();
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.user").length === 2);
@@ -312,6 +314,7 @@ try {
   Finish(calls[1], "当前点位已处理。");
   await page.waitForFunction(() => document.querySelectorAll(".lfChatMessage.assistant").length === 2);
   await page.click("#newCodexChat");
+  assert.ok(await page.locator("#codexPendingLocation").isHidden(), "restoring a draft preserves an explicitly removed location");
   assert.equal(await page.locator("#codexPendingUnits").isVisible(), true);
   await page.click("#removeCodexUnits");
   assert.equal(await page.locator("#codexPendingUnits").isVisible(), false);
@@ -384,6 +387,27 @@ try {
   assert.equal(theme.border, "rgba(193, 189, 171, 0.25)");
   assert.ok(theme.panel.includes("rgba(8, 9, 7, 0.94)"));
   assert.ok(theme.titleFont.includes("TzTitleText"));
+  // Initial URL positioning and later new chats both attach frozen location packets by default.
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent.includes("gpt-6.1-sol"));
+  await page.locator("#codexPrompt").fill("默认定位的新会话"); await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelector("#codexProgress"));
+  assert.equal(calls.length, 5);
+  const defaultDirectory = path.dirname(calls[4].args[calls[4].args.indexOf("--output-last-message") + 1]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(defaultDirectory, "Frame.json"))).context.time, 384);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(defaultDirectory, "Location.json"))).timeline.timeSeconds, 384);
+  Finish(calls[4], "默认定位已收到。");
+  await page.evaluate(() => LevelFlow.Seek(410));
+  await page.click("#toggleCodexSessions"); await page.click("#newCodexChat");
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 410);
+  await page.evaluate(() => LevelFlow.Seek(420));
+  await page.locator("#codexPrompt").fill("新建会话的默认定位"); await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelector("#codexProgress"));
+  assert.equal(calls.length, 6);
+  const nextDirectory = path.dirname(calls[5].args[calls[5].args.indexOf("--output-last-message") + 1]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Frame.json"))).context.time, 410);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Location.json"))).timeline.timeSeconds, 410);
+  Finish(calls[5], "新建默认定位已收到。");
+  assert.deepEqual(errors, []);
   console.log("ok  Safe Markdown, editable attachments, live steering/progress, and Encounter chat browser: shared menu theme, rounded layout, screenshot and location drafts, interrupt/continue, resume/new CLI sessions and reload history");
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve));

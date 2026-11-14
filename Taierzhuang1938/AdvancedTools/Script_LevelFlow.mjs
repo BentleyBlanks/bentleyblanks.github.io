@@ -6,7 +6,7 @@ import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
-import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114UnitAttachments";
+import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114DefaultChatLocation";
 import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
@@ -348,6 +348,6 @@ async function Start() {
     }
   }
   if(project.warning) Toast(project.warning,true);
-  UpdateAnnotations();Render();chat.RefreshContext();requestAnimationFrame(Tick);
+  UpdateAnnotations();Render();chat.RestoreDraft();requestAnimationFrame(Tick);
 }
 Start().catch((error)=>{Element("mapLoading").textContent=error.message;Toast(error.message,true);console.error(error);});

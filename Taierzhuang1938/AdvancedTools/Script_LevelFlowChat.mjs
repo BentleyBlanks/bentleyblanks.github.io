@@ -216,6 +216,7 @@ export class EncounterChat {
     Element("codexPrompt").value = draft?.prompt || "";
     this.pendingImage = draft?.image || null;
     this.pendingLocation = draft?.location || null;
+    if (!draft && !this.current) this.pendingLocation = structuredClone(this.snapshot());
     this.pendingUnits = draft?.units || null;
     this.DrawAttachment();
     this.DrawUnitsAttachment();
