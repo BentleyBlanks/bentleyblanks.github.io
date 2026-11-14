@@ -99,7 +99,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-bend-ambush-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-opening-defense-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -568,8 +568,28 @@ function UpgradeLegacyEncounterDocument(input,defaults) {
   return UpgradeFlankReinforcement(value,defaults);
 }
 
+function UpgradeOpeningDefense(input,defaults) {
+  const value=structuredClone(input),current=value.groups.find(group=>group.id==="Fork");
+  const next=defaults.groups.find(group=>group.id==="Fork");
+  const previousOffsets=[[2.3,-9.9],[10.3,-3.5],[-10.6,-5],[5.5,3.8],[-8.4,1.8]];
+  if(current && next && JSON.stringify(current.route)===JSON.stringify(next.route)
+    && JSON.stringify(current.area)===JSON.stringify(next.area)
+    && JSON.stringify(current.spawnOffsets)===JSON.stringify(previousOffsets)) {
+    const previousPlans=structuredClone(next.memberPlans);
+    previousPlans[2].route=[[64.4,47.8],[62,53],[55,60],[53.5,62.8]];
+    previousPlans[4].route=[[66.6,51.5],[62,55.5],[61,60.5],[60.8,65.8],[60,66],[51.5,66]];
+    if(JSON.stringify(current.memberPlans)===JSON.stringify(previousPlans)) {
+      current.spawnOffsets=structuredClone(next.spawnOffsets);
+      current.memberPlans=structuredClone(next.memberPlans);
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
+}
+
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-14-bend-ambush-1") return UpgradeOpeningDefense(input,defaults);
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
   if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,"2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
@@ -587,5 +607,5 @@ export function UpgradeEncounterDocument(input,defaults) {
     const trigger=value.triggers.find(entry=>entry.id===current.triggerId);
     if(trigger?.mode==="time" && trigger.delay===0 && trigger.beat===previous.beat) trigger.beat=next.beat;
   }
-  return UpgradeAmbush(UpgradeCampCover(value,defaults),defaults);
+  return UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults);
 }

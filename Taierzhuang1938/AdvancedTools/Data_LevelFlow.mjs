@@ -94,6 +94,11 @@ export const FLOW_OPENING_RETREAT = {
   fallFractions: [0.76,0.86,0.96],
 };
 
+export const FLOW_OPENING_DEFENSE = {
+  delay: 3, memberInterval: 0.25, speed: 3.4,
+  positions: [[39,65.5],[41.4,66.7],[43.8,65.5],[37,66.7],[34.6,65.6],[32.2,67],[29.8,65.7],[27.4,66.5],[25,65.7]],
+};
+
 // Return from the gun pit is shared by Yaowa and three surviving wounded men.
 // Counts, timing and spacing are user-directed creative preview blocking.
 export const FLOW_YAOWA_RETURN = {
@@ -418,13 +423,13 @@ export const FLOW_BEATS = [
 
 export const FLOW_WAVES = [
   { id: "ForkRelief", beat: "02g", until: "03b", count: 2, source: [67,30], route: [[67,30],[40,28],[17,36],[14.5,40],[12,44],[21.9,67.1],[23,67.1]], label: "绕后日军路口阻击", interval: 0, lastFall: 116, speed: 2.2, target: "player", trigger: {mode:"time",delay:2}, repeat: "东北绕行两人经北坡下沟，与三名逃兵在标记 1 会合，再南下标记 2 路口阻击" },
-  { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[-10.6,-5],[5.5,3.8],[-8.4,1.8]],
+  { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[1.2,-5],[5.5,3.8],[2.4,1.8]],
     memberPlans: [
       {delay:0, route:[[72,51.5],[69,51],[62,57.5],[59,62.8]]},
       {delay:2, route:[[74,51.5],[70,53.5],[62,59.5],[60.8,64.7],[60,65.0],[58.8,64.9]]},
-      {delay:0, route:[[64.4,47.8],[62,53],[55,60],[53.5,62.8]]},
+      {delay:0, route:[[74,49.5],[69,51.5],[62,53],[55,60],[53.5,62.8]]},
       {delay:9, route:[[75,51.5],[70,51.5],[63,60.5],[61,66],[57.7,65.6],[55.5,64.9]]},
-      {delay:13, route:[[66.6,51.5],[62,55.5],[61,60.5],[60.8,65.8],[60,66],[51.5,66]]},
+      {delay:13, route:[[74.8,52.5],[69.8,52.5],[62,55.5],[61,60.5],[60.8,65.8],[60,66],[51.5,66]]},
     ], route: [[75,44],[72,51.5],[69,51],[62,57.5],[54,60.5]], label: "① 北侧地面门口压制", interval: 0, lastFall: 54, target: "player", repeat: "第一回五人分散集结，两人到洞口沙包与箱垛后掩护，三人错峰经坡道下沟前压，各守独立位置" },
   { id: "Corner", beat: "03c", until: "03e", count: 6, source: [77,58], areaSize: [8,8],
     spawnOffsets: [[0,-2.5],[2,-1],[0,1],[2,2.5],[4,-2.5],[4,1.5]],

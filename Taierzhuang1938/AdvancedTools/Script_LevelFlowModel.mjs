@@ -3,8 +3,7 @@ import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLO
 import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
-import { FLOW_VILLAGE_CASUALTIES } from "./Data_LevelFlow.mjs";
-import { FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
+import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -274,6 +273,24 @@ function OpeningRetreat(time, index) {
     if (time < melee.contact) return {p: SampleRoute([landing, melee.allyPosition],
       (time - BeatById("02g").start) / (melee.contact - BeatById("02g").start)), pose: "run", ...extra};
     return {p: melee.allyPosition, pose: time < melee.escape ? "melee" : index < 10 ? "dead" : "wounded", ...extra};
+  }
+  if (index < FLOW_OPENING_DEFENSE.positions.length) {
+    const defense = FLOW_OPENING_DEFENSE;
+    const departure = BeatById("02g").start + defense.delay + index * defense.memberInterval;
+    const position = defense.positions[index];
+    const arrival = departure + Distance(landing, position) / defense.speed;
+    if (time >= departure && time < BeatById("02h").start) return {
+      p: SampleRoute([landing, position], (time - departure) / (arrival - departure)),
+      pose: time < arrival ? "run" : "shoot", firing: time >= arrival,
+      groupId: "OpeningDefense", status: time < arrival ? "追出支沟" : "沟口阻击", ...identity,
+    };
+    if (time >= BeatById("02h").start) {
+      if (index >= 3) return {p: position, pose: "dead", ...identity};
+      const returning = BeatById("02h").start;
+      const returned = returning + Distance(position, landing) / defense.speed;
+      return {p: SampleRoute([position, landing], (time - returning) / (returned - returning)),
+        pose: time < returned ? "run" : "stand", status: "停止追击，回救冬瓜", ...identity};
+    }
   }
   let pose = "stand";
   if (index >= 3 && time >= BeatById("02h").start) pose = index < 10 ? "dead" : "wounded";
@@ -605,8 +622,8 @@ function OpeningActors(time) {
       const fall = end.start+end.duration*retreat.fallFractions[index-6];
       const dead = time >= fall;
       const moving = time < rally.start ? time < melee.arrival : approaching;
-      return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : moving ? "run" : approaching ? "kneel" : "shoot",
-        {groupId:"OpeningSurvivors",firing:!dead&&!approaching,fall,born,arrival});
+      return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : moving ? "run" : "shoot",
+        {groupId:"OpeningSurvivors",firing:!dead&&!moving,fall,born,arrival});
     }
     const firing = index === 0 && !defeated && time >= arrival && time >= OPENING_GUNFIRE_TIME && time < BeatById("02e").start;
     const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : firing ? "shoot" : index < 2 ? "kneel" : "stand";
@@ -638,7 +655,16 @@ function Effects(beat, time, progress, actors) {
   }
   const targets = actors.filter((actor) => actor.side === "enemy" && actor.pose !== "dead" && actor.kind !== "tank" && actor.pose !== "run");
   const blockers = actors.filter((actor) => actor.groupId === "OpeningSurvivors" && actor.firing);
-  for (const actor of blockers) effects.push({kind:"fire",a:actor.p,b:player.p,side:"enemy",phase:(time*2.3+actor.p[1])%1});
+  const forwardDefenders = actors.filter(actor => actor.groupId === "OpeningDefense" && actor.pose !== "dead");
+  for (const actor of blockers) {
+    const target = forwardDefenders.reduce((nearest, defender) => !nearest || Distance(actor.p, defender.p) < Distance(actor.p, nearest.p) ? defender : nearest, null);
+    effects.push({kind:"fire",a:actor.p,b:target?.p ?? player.p,side:"enemy",phase:(time*2.3+actor.p[1])%1});
+  }
+  for (const defender of forwardDefenders.filter(actor => actor.firing)) {
+    const target = actors.filter(actor => ["OpeningSurvivors","ForkRelief"].includes(actor.groupId) && actor.pose !== "dead")
+      .reduce((nearest, enemy) => !nearest || Distance(defender.p, enemy.p) < Distance(defender.p, nearest.p) ? enemy : nearest, null);
+    if (target) effects.push({kind:"fire",a:defender.p,b:target.p,side:"friend",phase:(time*2.1+defender.p[0])%1});
+  }
   if (blockers.length) for (const id of ["luo","liu"]) {
     const defender = actors.find((actor) => actor.id === id);
     if (defender.pose === "walk") continue;

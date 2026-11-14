@@ -98,6 +98,28 @@ for (let slot = 0; slot < 3; slot++) {
   assert.ok(["dead", "wounded"].includes(EvaluateFlow(escape + 0.01).actors.find(actor => actor.id === ally.id).pose));
 }
 const escapedFrame = EvaluateFlow(ReferenceTime(123.9));
+const pursuitFrame = EvaluateFlow(161.2626);
+for (let index=3;index<9;index++) {
+  const actor=pursuitFrame.actors.find(actor=>actor.id==='openingAlly'+index);
+  const before=EvaluateFlow(BeatById('02g').start).actors.find(entry=>entry.id===actor.id);
+  assert.equal(actor.pose,'run','ordinary Sichuan infantry pursue instead of standing at their landings');
+  assert.ok(actor.p[0]<before.p[0]-3,'the marked soldiers advance west toward the mouth');
+}
+const defenseFrame=EvaluateFlow(BeatById('02g').end-1);
+assert.ok(defenseFrame.effects.some(effect=>effect.side==='enemy'&&defenseFrame.actors.some(actor=>actor.groupId==='OpeningDefense'&&Distance(effect.b,actor.p)<0.01)),
+  'retreating enemies turn and fire at the forward defense rather than ignoring it');
+const defenseLeader=defenseFrame.actors.find(actor=>actor.id==='luo');
+for(const actor of defenseFrame.actors.filter(actor=>actor.groupId==='OpeningDefense')) {
+  assert.ok(actor.firing&&actor.pose==='shoot','the pursuit settles into a firing line');
+  assert.ok(Distance(actor.p,defenseLeader.p)<16,'the mouth defenders stay near their squad leader');
+  assert.ok(Distance(actor.p,[23.5,67.2])<21,'the line stays near the trench mouth');
+  assert.ok(defenseFrame.effects.some(effect=>effect.side==='friend'&&Distance(effect.a,actor.p)<0.01),'each defender has actual outgoing fire');
+}
+for(let stamp=155;stamp<186;stamp+=0.1) for(const id of ['luo','he','liu','openingAlly3','openingAlly4','openingAlly5','openingAlly6','openingAlly7','openingAlly8']) {
+  const before=EvaluateFlow(stamp).actors.find(actor=>actor.id===id);
+  const after=EvaluateFlow(stamp+0.1).actors.find(actor=>actor.id===id);
+  assert.ok(Distance(before.p,after.p)<0.35,'pursuit, hold, casualties and return never teleport');
+}
 assert.equal(survivorsAt(ReferenceTime(123.9)).length, 3, "all three disengage during the player's first shot beat");
 for (const enemy of survivorsAt(ReferenceTime(123.9))) {
   assert.equal(enemy.pose, "run");
@@ -142,6 +164,25 @@ ValidateEncounterDocument(junctionUpgrade,FLOW_TIMELINE);
 const junctionDocument=new EncounterDocument(defaults,FLOW_TIMELINE,null);
 junctionDocument.Replace(junctionDraft);
 assert.deepEqual(junctionDocument.value,junctionUpgrade,"old imported projects receive the same junction reinforcement upgrade");
+const exposedDraft=structuredClone(defaults);
+exposedDraft.revision='2026-11-14-bend-ambush-1';
+const exposedFork=exposedDraft.groups.find(group=>group.id==='Fork');
+exposedFork.spawnOffsets=[[2.3,-9.9],[10.3,-3.5],[-10.6,-5],[5.5,3.8],[-8.4,1.8]];
+exposedFork.memberPlans[2].route=[[64.4,47.8],[62,53],[55,60],[53.5,62.8]];
+exposedFork.memberPlans[4].route=[[66.6,51.5],[62,55.5],[61,60.5],[60.8,65.8],[60,66],[51.5,66]];
+exposedFork.count=8;
+const hiddenDraft=UpgradeEncounterDocument(exposedDraft,defaults);
+const hiddenFork=hiddenDraft.groups.find(group=>group.id==='Fork');
+assert.deepEqual(hiddenFork.spawnOffsets,defaults.groups.find(group=>group.id==='Fork').spawnOffsets);
+assert.deepEqual(hiddenFork.memberPlans,defaults.groups.find(group=>group.id==='Fork').memberPlans);
+assert.equal(hiddenFork.count,8,'upgrading the two exposed spawns preserves edited counts');
+const customExposedDraft=structuredClone(exposedDraft);
+customExposedDraft.groups.find(group=>group.id==='Fork').memberPlans[2].route=[[80,35],[80,50]];
+assert.deepEqual(UpgradeEncounterDocument(customExposedDraft,defaults).groups.find(group=>group.id==='Fork').memberPlans,
+  customExposedDraft.groups.find(group=>group.id==='Fork').memberPlans,'authored single-soldier routes remain untouched');
+const deletedExposedDraft=structuredClone(exposedDraft);
+deletedExposedDraft.groups=deletedExposedDraft.groups.filter(group=>group.id!=='Fork');
+assert.ok(!UpgradeEncounterDocument(deletedExposedDraft,defaults).groups.some(group=>group.id==='Fork'),'a deleted reinforcement group stays deleted');
 const rectangle={shape:"rect",center:[0,0],size:[2,2]},circle={...rectangle,shape:"circle"};
 assert.equal(EnterArea([-4,0],[4,0],rectangle),0.375);
 assert.equal(EnterArea([-4,0],[4,0],circle),0.375);
@@ -769,6 +810,13 @@ for(const id of ["Fork","Corner"]) {
   assert.ok(!EvaluateFlow(group.start-0.001).actors.some(actor=>actor.groupId===id));
   const eye=[frame.player[0],terrain.heightAt(...frame.player)+1.65,frame.player[1]];
   const actors=frame.actors.filter(actor=>actor.groupId===id);
+  if(id==='Fork') for(const actor of actors) {
+    assert.ok(actor.p[0]>71.5,'all five reinforcements start on the far side of the north earth wall');
+    for(const observer of [[25,65.7],[39,65.5],[46,65.6],[61.8,65.6]]) {
+      const forwardEye=[observer[0],terrain.heightAt(...observer)+1.65,observer[1]];
+      assert.ok(SpawnSightBlocked(forwardEye,[actor.p[0],terrain.heightAt(...actor.p)+1.8,actor.p[1]]),'reinforcements are hidden from both the player and the forward defense');
+    }
+  }
   assert.equal(new Set(actors.map(actor=>actor.p.join(","))).size,group.count);
   for(const [index,actor] of actors.entries()) {
     assert.deepEqual(actor.p,group.area.center.map((value,axis)=>value+group.spawnOffsets[index][axis]));

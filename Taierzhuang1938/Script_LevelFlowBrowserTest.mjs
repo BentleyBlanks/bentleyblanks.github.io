@@ -695,7 +695,7 @@ try {
   assert.equal(new Set(deployed.map(actor=>actor.p.join(','))).size,5);
   assert.ok(deployed.every(actor=>actor.pose==='kneel'&&!actor.firing));
   const forkDocument=(await page.evaluate(()=>LevelFlow.Inspect().document)).groups.find(group=>group.id==='Fork');
-  assert.equal(forkDocument.spawnOffsets.map(point=>point.join(', ')).join('\n'),"2.3, -9.9\n10.3, -3.5\n-10.6, -5\n5.5, 3.8\n-8.4, 1.8");
+  assert.equal(forkDocument.spawnOffsets.map(point=>point.join(', ')).join('\n'),"2.3, -9.9\n10.3, -3.5\n1.2, -5\n5.5, 3.8\n2.4, 1.8");
   await page.click('[data-tab="script"]');
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   await page.screenshot({path:path.join(out,'HiddenSpawnBatch186.png')});
