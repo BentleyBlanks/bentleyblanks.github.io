@@ -86,14 +86,14 @@ export class EncounterSceneControls {
 
   Dolly(entry,amount) {
     const view=entry.map;
-    if(entry.mode==="follow") {
+    if(entry.mode==="follow"&&view.type!=="scene") {
       const scale=Clamp(view.scale*Math.exp(-amount),0.15,40);
       view.followZoom=Clamp((view.followZoom??1)*scale/view.scale,0.001,1000);
       view.scale=scale;
       return;
     }
     if(!view.type||view.type==="oblique") {view.scale=Clamp(view.scale*Math.exp(-amount),0.15,40);return;}
-    this.Free(entry);
+    if(entry.mode!=="follow") this.Free(entry);
     const distance=Math.max(1,view.focusDistance||20),step=distance*(1-Math.exp(Clamp(amount,-1,1)));
     view.freeCamera.eye=view.freeCamera.eye.map((value,index)=>value+view.forward[index]*step);
     view.focusDistance=Clamp(distance-step,1,1000);

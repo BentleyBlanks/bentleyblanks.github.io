@@ -60,7 +60,7 @@ export class EncounterViewports {
       this.entries.push(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
       select.onchange=()=>this.SetType(index,select.value);
-      target.onchange=()=>{entry.map.target=target.value;entry.mode="follow";this.callbacks.change();};
+      target.onchange=()=>{entry.map.target=target.value;entry.map.followAnchor=null;entry.mode="follow";this.callbacks.change();};
       fit.onclick=()=>{
         if(entry.type==="scene") {entry.defaultCamera=true;entry.mode="manual";}
         else {entry.mode=entry.type==="plan"?"stage":"follow";entry.map.followZoom=1;this.Frame(entry);}
@@ -142,8 +142,10 @@ export class EncounterViewports {
     const entry=this.entries[index];
     if(mode==="follow"&&entry.mode==="follow") entry.mode="manual";
     else {
-      if(entry.type==="scene"||mode!=="follow"&&["eye","chase"].includes(entry.type)) this.SetType(index,"oblique");
-      entry.mode=mode;if(mode==="follow") entry.map.followZoom=1;this.Frame(entry);
+      if(mode!=="follow"&&["scene","eye","chase"].includes(entry.type)) this.SetType(index,"oblique");
+      entry.mode=mode;
+      if(mode==="follow") {entry.map.followZoom=1;entry.map.followAnchor=null;}
+      this.Frame(entry);
     }
     this.Activate(index);
   }
@@ -192,7 +194,8 @@ export class EncounterViewports {
       const rect=entry.canvas.getBoundingClientRect();
       return {type:entry.type,mode:entry.mode,layers:{...entry.layers},center:[...entry.map.center],scale:entry.map.scale,followZoom:entry.map.followZoom??1,
         yaw:entry.map.yaw||0,pitch:entry.map.pitch||0.67,target:entry.map.target||"player",viewport:{width:rect.width,height:rect.height},
-        ...(entry.map.type?{far:entry.map.far,freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20}:{})};
+        ...(entry.map.type?{far:entry.map.far,freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20,
+          followAnchor:entry.map.followAnchor?[...entry.map.followAnchor]:null}:{})};
     })};
   }
 
@@ -210,6 +213,7 @@ export class EncounterViewports {
       }
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
       entry.map.followZoom=saved.followZoom??1;
+      entry.map.followAnchor=saved.followAnchor?[...saved.followAnchor]:null;
       if(entry.map.type) {entry.map.far=saved.far||1500;entry.map.freeCamera=saved.freeCamera?structuredClone(saved.freeCamera):entry.map.freeCamera;entry.map.focusDistance=saved.focusDistance||20;}
       const ratio=saved.viewport?Math.min(rect.width/saved.viewport.width,rect.height/saved.viewport.height):1;
       entry.map.scale=Clamp(saved.scale*ratio,0.15,40);

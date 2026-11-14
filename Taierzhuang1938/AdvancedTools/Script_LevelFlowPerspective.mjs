@@ -86,7 +86,16 @@ export class FlowPerspectiveView extends FlowMapView {
     this.scale=Clamp(Math.min((width/2-padding)/extentX,(height*0.43-padding)/extentY),0.15,12);
   }
   Follow(frame) {
-    this.freeCamera=null;const actor=frame.actors.find(item=>item.id===this.target)||frame.actors[0];this.center=[...actor.p];
+    const actor=frame.actors.find(item=>item.id===this.target)||frame.actors[0];
+    if(this.type==="scene") {
+      const anchor=[actor.p[0],this.Ground(actor.p)+(actor.elevation||0),actor.p[1]];
+      if(this.freeCamera&&this.followAnchor) {
+        this.freeCamera.eye=this.freeCamera.eye.map((value,axis)=>value+(anchor[axis]-this.followAnchor[axis]));
+      }
+      this.followAnchor=anchor;this.center=[...actor.p];
+      return;
+    }
+    this.freeCamera=null;this.center=[...actor.p];
     if(this.type==="oblique") this.scale=Clamp(Math.min(this.canvas.clientWidth,this.canvas.clientHeight)/35,3,12);
     else this.scale=this.type==="eye"?8:10;
     this.scale=Clamp(this.scale*(this.followZoom??1),0.15,40);
@@ -203,7 +212,7 @@ export class FlowPerspectiveView extends FlowMapView {
     return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2],
       ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
-  DrawBase(context,width,height,frame) {
+  DrawBase(context,width,height,frame,layers={}) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     const renderScale=this.renderScale;
     DrawEncounterSky(context,width,height,this);
@@ -386,6 +395,7 @@ export class FlowPerspectiveView extends FlowMapView {
         DrawCoverSymbol(context, [vertex.x, vertex.y]);
       }
     }
+    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
   }
   SpeechAnchor(actor) {
     const head = this.Vertex([actor.p[0], this.Ground(actor.p) + (actor.elevation || 0) + SpeechHeadHeight(actor), actor.p[1]]);

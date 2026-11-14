@@ -10,6 +10,7 @@ export function ValidateViewportLayout(layout) {
       &&Array.isArray(view.center)&&view.center.length===2&&view.center.every((value)=>Number.isFinite(value)&&Math.abs(value)<=10000)
       &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=80&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)
       &&(view.followZoom===undefined||Number.isFinite(view.followZoom)&&view.followZoom>=0.001&&view.followZoom<=1000)
+      &&(view.followAnchor==null||Array.isArray(view.followAnchor)&&view.followAnchor.length===3&&view.followAnchor.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000))
       &&["player","winter","luo","tank1"].includes(view.target)
       &&(view.far===undefined||Number.isFinite(view.far)&&view.far>=100&&view.far<=10000)
       &&(view.focusDistance===undefined||Number.isFinite(view.focusDistance)&&view.focusDistance>0&&view.focusDistance<=10000)

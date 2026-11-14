@@ -142,6 +142,26 @@ try {
   assert.deepEqual(landmarkLabels.off,[],'turning scene names off invalidates the background and omits its text');
   assert.deepEqual(landmarkLabels.on,landmarkLabels.initial);
   assert.ok(landmarkLabels.changed&&landmarkLabels.restored&&landmarkLabels.legacy,'scene labels toggle without moving the camera and older settings keep labels visible');
+  const perspectiveLandmarks=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);
+    const map={objects:[],farObjects:[],terrain:{heightAt:()=>0,roots:[]},labels:[
+      {name:'关帝庙',p:[-6,8]},{name:'土地庙',p:[6,8]},{name:'背后地标',p:[0,-80]},{name:'远裁剪外',p:[0,2000]},
+    ]};
+    const view=new FlowPerspectiveView(canvas,map,'scene');view.scale=0.15;view.freeCamera={eye:[0,15,-20],yaw:0,pitch:-0.45};
+    const source=LevelFlow.Evaluate(424);
+    const frame={...source,actors:source.actors.map(actor=>({...actor,p:[10000,10000]})),effects:[],triggers:[],groups:[]};
+    const context=view.baseCanvas.getContext('2d'),fillText=context.fillText.bind(context);
+    let drawn=[];context.fillText=(text,...args)=>{drawn.push(text);fillText(text,...args);};
+    view.Draw(frame,{landmarks:true},null);const shown=canvas.toDataURL(),initial=[...drawn];
+    drawn=[];view.Draw(frame,{landmarks:false},null);const hidden=canvas.toDataURL(),off=[...drawn];
+    drawn=[];view.Draw(frame,{landmarks:true},null);const restored=canvas.toDataURL(),on=[...drawn];
+    canvas.remove();return {initial,off,on,changed:shown!==hidden,restored:shown===restored};
+  });
+  assert.deepEqual(perspectiveLandmarks.initial,['关帝庙','土地庙'],'3D projects the same landmark names and clips labels behind the camera and beyond the far plane');
+  assert.deepEqual(perspectiveLandmarks.off,[]);
+  assert.deepEqual(perspectiveLandmarks.on,perspectiveLandmarks.initial);
+  assert.ok(perspectiveLandmarks.changed&&perspectiveLandmarks.restored,'3D scene names toggle and invalidate the background cache');
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
@@ -154,6 +174,41 @@ try {
   ],'every viewport exposes only the four requested views under 2D and 3D');
   assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
   assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
+  const sceneBefore=await page.evaluate(()=>LevelFlow.Inspect());
+  const followButton=page.locator('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
+  await followButton.click();
+  const sceneFollowing=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(sceneFollowing.viewports.views[1].type,'scene','enabling follow preserves the perspective Scene camera');
+  assert.equal(sceneFollowing.viewports.views[1].mode,'follow');
+  assert.deepEqual(sceneFollowing.viewports.views[1].freeCamera,sceneBefore.viewports.views[1].freeCamera,'enabling follow preserves position and orientation');
+  assert.deepEqual(sceneFollowing.rendering[1].aim,sceneBefore.rendering[1].aim,'enabling follow preserves perspective projection');
+  const followingSceneBox=await page.locator('#flowMap2').boundingBox();
+  await page.mouse.move(followingSceneBox.x+followingSceneBox.width/2,followingSceneBox.y+followingSceneBox.height/2);
+  await page.keyboard.down('Alt');await page.mouse.down({button:'right'});
+  await page.mouse.move(followingSceneBox.x+followingSceneBox.width/2+12,followingSceneBox.y+followingSceneBox.height/2+8,{steps:3});
+  await page.mouse.up({button:'right'});await page.keyboard.up('Alt');
+  await page.mouse.wheel(0,-80);
+  const sceneZoomed=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+  assert.equal(sceneZoomed.mode,'follow');assert.equal(sceneZoomed.type,'scene');
+  assert.notEqual(sceneZoomed.focusDistance,sceneFollowing.viewports.views[1].focusDistance,'perspective zoom moves the following camera');
+  await page.evaluate(()=>{LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>424.1);
+  await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.Seek(640);});
+  const sceneMoved=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+  assert.notDeepEqual(sceneMoved.followAnchor,sceneZoomed.followAnchor);
+  for(let axis=0;axis<3;axis++) assert.ok(Math.abs((sceneMoved.freeCamera.eye[axis]-sceneZoomed.freeCamera.eye[axis])
+    -(sceneMoved.followAnchor[axis]-sceneZoomed.followAnchor[axis]))<1e-9,'camera and subject translate together in all three axes');
+  assert.equal(sceneMoved.freeCamera.yaw,sceneZoomed.freeCamera.yaw);assert.equal(sceneMoved.freeCamera.pitch,sceneZoomed.freeCamera.pitch);
+  assert.equal(sceneMoved.focusDistance,sceneZoomed.focusDistance);
+  await page.evaluate(()=>LevelFlow.RestoreViewports(LevelFlow.Inspect().viewports));
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).freeCamera,sceneMoved.freeCamera,'restoring a following Scene preserves its camera');
+  await page.evaluate(()=>LevelFlow.Seek(424));
+  const sceneRewound=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+  for(let axis=0;axis<3;axis++) assert.ok(Math.abs(sceneRewound.freeCamera.eye[axis]-sceneZoomed.freeCamera.eye[axis])<1e-9,'rewinding restores the following camera offset');
+  await followButton.click();
+  await page.evaluate(()=>LevelFlow.Seek(640));
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).freeCamera,sceneRewound.freeCamera,'stopping follow holds the perspective camera in place');
+  await page.evaluate(defaults=>{LevelFlow.Seek(424);LevelFlow.RestoreViewports(defaults);},defaults);
   for(const type of ['plan','battle','oblique','chase','eye']) {
     await page.evaluate(type=>{
       LevelFlow.SetPlaying(false);LevelFlow.Seek(424);LevelFlow.SetViewType(1,type);

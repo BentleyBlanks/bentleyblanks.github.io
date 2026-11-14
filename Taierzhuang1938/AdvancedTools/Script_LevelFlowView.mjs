@@ -283,11 +283,17 @@ export class FlowMapView {
       Line(context,[[point[0]-4,point[1]+4],[point[0]+4,point[1]-4]],"#a7503f",1.5);
       if(layers.landmarks!==false) Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
     }
+    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
+  }
+
+  DrawLandmarks(context,width,height) {
     const occupied=[];
-    if(layers.landmarks!==false) for(const landmark of map.labels) {
-      const point=Screen(landmark.p);
+    for(const landmark of this.mapData.labels||[]) {
+      const point=this.ToScreen(landmark.p);
       if(point[0]<12||point[0]>width-45||point[1]<24||point[1]>height-24) continue;
-      if(scale<0.8&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
+      const [x,z]=landmark.p;
+      const labelScale=this.type?Math.max(Distance(point,this.ToScreen([x+1,z])),Distance(point,this.ToScreen([x,z+1]))):this.scale;
+      if(labelScale<0.8&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
       const labelWidth=landmark.name.length*12;
       const position=[Clamp(point[0]+8,8,width-labelWidth-8),point[1]-15];
       const box=[position[0],position[1]-8,labelWidth,16];
