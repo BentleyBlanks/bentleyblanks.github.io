@@ -13,3 +13,11 @@ export const FLOW_DEFAULT_VIEWS = [
   {type:"scene", distance:48, yaw:-2.6, pitch:-0.72, lookHeight:0.8},
   {type:"scene", distance:6, yaw:-1.5707963267948966, pitch:-0.06, lookHeight:1.6},
 ];
+
+// Screen-space comic speech HUD, anchored above the sampled actor's head.
+export const FLOW_SPEECH_HUD = {
+  fontSize:15, lineHeight:21, maxWidth:280, padding:12, margin:8,
+  tailHeight:16, headGap:8, cornerRadius:14, nameHeight:19,
+  fill:"#fff8e8", ink:"#302b24", outline:"#494034", nameColor:"#756246",
+  headHeight:{person:1.85, child:1.25, quilt:0.65, kneel:1.2, crouch:1.2, drag:1.25, down:0.65},
+};

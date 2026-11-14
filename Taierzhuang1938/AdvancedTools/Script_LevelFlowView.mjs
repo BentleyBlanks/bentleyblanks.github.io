@@ -1,6 +1,7 @@
 import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
+import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
@@ -339,6 +340,11 @@ export class FlowMapView {
 
   }
 
+  SpeechAnchor(actor) {
+    const point = this.ToScreen(actor.p);
+    return [point[0], point[1] - 10];
+  }
+
   Draw(frame,layers,selection,annotations=[],draft=null) {
     this.BeforeDraw?.(frame);
     const rect=this.canvas.getBoundingClientRect(),ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
@@ -419,6 +425,7 @@ export class FlowMapView {
       if(effect.kind==="plane") {const p=Screen(effect.p);Line(context,[[p[0]-8,p[1]],[p[0]+8,p[1]]],"#d2d7c5",2);Line(context,[[p[0],p[1]-5],[p[0],p[1]+7]],"#d2d7c5",2);}
       if(effect.kind==="column"||effect.kind==="runner") Circle(context,Screen(effect.p),3,"#f3957b");
     }
+    this.speechBubbles = DrawFlowDialogue(context, this, frame, width, height);
     for(const annotation of [...annotations,...(draft?[draft]:[])]) {
       if(Math.abs(annotation.time-frame.time)>0.06) continue;
       const a=Screen(annotation.a),b=Screen(annotation.b),color="#8d5d11";

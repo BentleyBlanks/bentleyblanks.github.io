@@ -927,6 +927,48 @@ try {
   const marching=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(marching.actors.filter(actor=>actor.kind==='tank').length,2);
   assert.equal(marching.actors.filter(actor=>['TankEscort','TankRearScreen'].includes(actor.groupId)).length,9);
+  // Authored dialogue is a world-anchored HUD in both the map and game views.
+  await page.evaluate(()=>{
+    LevelFlow.SetLayout(2);
+    LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'chase');
+    LevelFlow.Seek(1064);
+  });
+  let speech = await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(speech.dialogue[0].actorId,'he');
+  assert.ok(speech.speechBubbles[0].length>0,'map renders the speaking actor bubble');
+  assert.ok(speech.speechBubbles[1].length>0,'chase view renders a billboard bubble');
+  for(const bubbles of speech.speechBubbles) for(const bubble of bubbles) {
+    assert.equal(bubble.text,speech.dialogue[0].text);
+    assert.ok(bubble.lines.length>=1);
+    assert.ok(bubble.box.every(Number.isFinite)&&bubble.anchor.every(Number.isFinite));
+  }
+  await page.screenshot({path:path.join(out,'DialogueBubbles.png')});
+  const before = speech.speechBubbles[0][0].anchor;
+  await page.evaluate(()=>LevelFlow.Seek(1068));
+  speech=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.notDeepEqual(speech.speechBubbles[0][0].anchor,before,'speech follows the moving speaker');
+  await page.evaluate(()=>LevelFlow.Seek(1064));
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect())).speechBubbles[0][0].anchor,before,'rewind restores the same anchor');
+  await page.evaluate(()=>LevelFlow.Seek(1069));
+  assert.ok((await page.evaluate(()=>LevelFlow.Inspect())).speechBubbles.every(bubbles=>bubbles.length===0),'expired speech clears all canvases');
+  const speechClipping=await page.evaluate(async()=>{
+    const {DrawFlowDialogue}=await import('./Script_LevelFlowDialogue.mjs');
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.width=220;canvas.height=220;
+    const context=canvas.getContext('2d'),actor={id:'speaker',p:[0,10],kind:'person',pose:'stand'};
+    const frame={actors:[actor],dialogue:[{actorId:actor.id,name:'Speaker',text:'A long sentence that should wrap inside a narrow viewport.'}]};
+    const view={SpeechAnchor:()=>[8,80],ActorLabelOpacity:()=>1};
+    const bubble=DrawFlowDialogue(context,view,frame,220,220)[0];
+    const hidden=DrawFlowDialogue(context,{...view,ActorLabelOpacity:()=>0},frame,220,220).length;
+    const self=DrawFlowDialogue(context,{...view,VisibleActor:()=>false},frame,220,220).length;
+    const behind=FlowPerspectiveView.prototype.SpeechAnchor.call({Ground:()=>0,Vertex:()=>({x:50,y:50,depth:-1}),far:1500},actor);
+    return {bubble,hidden,self,behind};
+  });
+  assert.ok(speechClipping.bubble.lines.length>1,'long speech wraps');
+  assert.ok(speechClipping.bubble.box[0]>=8&&speechClipping.bubble.box[0]+speechClipping.bubble.box[2]<=212,'bubble stays within a narrow viewport');
+  assert.equal(speechClipping.hidden,0,'occluded eye-view speakers have no speech HUD');
+  assert.equal(speechClipping.self,0,'first-person speaker has no floating self bubble');
+  assert.equal(speechClipping.behind,null,'speakers behind the camera have no anchor');
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

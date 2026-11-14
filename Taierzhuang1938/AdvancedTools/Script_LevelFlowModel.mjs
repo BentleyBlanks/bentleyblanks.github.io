@@ -4,6 +4,7 @@ import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_Le
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
+import { SampleFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -758,7 +759,8 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const nearest = actors.filter((actor)=>actor.side === "enemy" && actor.pose !== "dead")
     .reduce((value,actor)=>Math.min(value,Distance(player,actor.p)),Infinity);
   const stretchersPassed=beat.stage === "10" ? Clamp(Math.floor((time-BeatById("10a").start-32)/13.5)+1,0,12) : null;
-  return {time,beat,stage,progress,player,actors,effects,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed};
+  const dialogue = SampleFlowDialogue(beat, time, actors);
+  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed};
 }
 
 export function FormatFlowTime(time) {

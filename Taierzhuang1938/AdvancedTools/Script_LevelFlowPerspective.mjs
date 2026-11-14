@@ -3,6 +3,7 @@ import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
+import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
 function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
@@ -384,6 +385,10 @@ export class FlowPerspectiveView extends FlowMapView {
         DrawCoverSymbol(context, [vertex.x, vertex.y]);
       }
     }
+  }
+  SpeechAnchor(actor) {
+    const head = this.Vertex([actor.p[0], this.Ground(actor.p) + (actor.elevation || 0) + SpeechHeadHeight(actor), actor.p[1]]);
+    return head.depth > 0.15 && head.depth < this.far ? [head.x, head.y] : null;
   }
   VisibleActor(actor) {return !(this.type==="eye"&&!this.freeCamera&&actor.id===this.target);}
   DrawArea(context,area,color,label,selection,hit) {

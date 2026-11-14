@@ -14,6 +14,32 @@ import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
+
+// Every authored speech binds a current quoted line to a living, sampled actor.
+for (const [id, cues] of Object.entries(FLOW_DIALOGUE)) {
+  const beat = BeatById(id);
+  assert.ok(beat, `speech beat ${id} exists`);
+  const quotes = [...beat.passage.matchAll(/[「“]([^」”]+)[」”]/gu)];
+  for (const [index, cue] of cues.entries()) {
+    assert.ok(quotes[cue.quote], `${id} cue ${index} references current dialogue`);
+    assert.ok(cue.at >= 0 && cue.duration > 0 && cue.at + cue.duration <= beat.duration);
+    const time = beat.start + cue.at, frame = EvaluateFlow(time);
+    const speech = frame.dialogue.find(entry => entry.id === `${id}_${index}`);
+    assert.ok(speech, `${id} cue ${index} resolves a living speaker`);
+    assert.equal(speech.text, cue.text || quotes[cue.quote][1]);
+    assert.ok(frame.actors.some(actor => actor.id === speech.actorId));
+    assert.ok(!EvaluateFlow(speech.end).dialogue.some(entry => entry.id === speech.id), 'speech expires at its end');
+    EvaluateFlow(FLOW_DURATION);
+    assert.deepEqual(EvaluateFlow(time).dialogue, frame.dialogue, 'rewinding restores exact dialogue');
+    assert.deepEqual(SampleFlowDialogue(beat,time,[]),[], 'missing speakers produce no floating speech');
+    assert.deepEqual(SampleFlowDialogue(beat,time,frame.actors.map(actor=>({...actor,pose:"dead"}))),[], 'dead speakers stay silent');
+  }
+}
+for (const id of ["01a", "01d", "09j", "10c"]) {
+  assert.deepEqual(EvaluateFlow(BeatById(id).start + 1).dialogue, [], 'stage directions and sound effects stay out of speech');
+}
 
 // Compare incremental depth interpolation against the original barycentric
 // equation, including either winding and triangles crossing the viewport.

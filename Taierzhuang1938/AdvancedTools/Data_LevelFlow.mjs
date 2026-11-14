@@ -427,6 +427,37 @@ export const FLOW_BEATS = [
     passage: "幺娃和刘文财一边一个架起他跑。班长：“往那棵大槐树跑！过了槐树就是村口！”", task: "等人跟上，撤到南口后送队", threat: "落炮向后方滚进", gate: "过翻墙院出口", exit: "全队到南口，接 11", fx: "artillery", zone: [117,545,4] },
 ];
 
+// Speech references quoted lines in the current beat passage, in reading order.
+// Offsets/durations are preview blocking in seconds, independent of voice audio.
+// Sound effects in quotes deliberately have no speech cue.
+export const FLOW_DIALOGUE = {
+  "01b": [{actor:"openingGun0", quote:0, at:1, duration:8}],
+  "01e": [{actor:"winter", quote:0, at:0, duration:2.5}],
+  "02e": [{actor:"opening2", name:"日军甲", quote:0, at:0, duration:2, text:"停火。"}],
+  "02h": [{actor:"liu", quote:0, at:1, duration:5}],
+  "02i": [{actor:"luo", quote:0, at:1, duration:9}],
+  "03d": [{actor:"he", quote:0, at:0, duration:3}],
+  "03f": [{actor:"yao", quote:0, at:12, duration:9}],
+  "03h": [{actor:"luo", quote:0, at:1, duration:5}, {group:"FieldGround", quote:1, at:34, duration:5}],
+  "04b": [{actor:"he", quote:0, at:3, duration:6}],
+  "04d": [{actor:"luo", quote:0, at:0, duration:7}],
+  "05b": [{actor:"yao", quote:0, at:1, duration:3}, {actor:"luo", quote:1, at:4, duration:5}],
+  "05c": [{actor:"he", quote:0, at:1, duration:5}, {actor:"luo", quote:1, at:6, duration:4}],
+  "06e": [{actor:"luo", quote:0, at:1, duration:6}],
+  "07a": [{actor:"luo", quote:0, at:1, duration:3}, {actor:"yao", quote:1, at:4, duration:2},
+    {actor:"he", quote:2, at:6, duration:2}, {actor:"liu", quote:3, at:8, duration:2}, {actor:"player", quote:4, at:10, duration:2}],
+  "07b": [{actor:"he", quote:0, at:1, duration:8}, {actor:"winter", quote:1, at:10, duration:5}],
+  "07c": [{actor:"luo", quote:0, at:3, duration:4}],
+  "08b": [{actor:"luo", quote:0, at:1, duration:7}, {actor:"geng", quote:1, at:9, duration:9}],
+  "08d": [{actor:"yao", quote:0, at:2, duration:5}],
+  "08e": [{actor:"luo", quote:0, at:1, duration:14}],
+  "08g": [{actor:"geng", quote:0, at:3, duration:5}],
+  "10a": [{actor:"luo", quote:0, at:1, duration:6}],
+  "10d": [{actor:"luo", quote:0, at:4, duration:3}],
+  "10i": [{actor:"luo", quote:0, at:1, duration:4}],
+  "10j": [{actor:"luo", quote:0, at:1, duration:7}],
+};
+
 export const FLOW_WAVES = [
   { id: "ForkRelief", beat: "02g", until: "03b", count: 2, source: [67,30], route: [[67,30],[40,28],[17,36],[14.5,40],[12,44],[21.9,67.1],[23,67.1]], label: "绕后日军路口阻击", interval: 0, lastFall: 116, speed: 2.2, target: "player", trigger: {mode:"time",delay:2}, repeat: "东北绕行两人经北坡下沟，与三名逃兵在标记 1 会合，再南下标记 2 路口阻击" },
   { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[1.2,-5],[5.5,3.8],[2.4,1.8]],
