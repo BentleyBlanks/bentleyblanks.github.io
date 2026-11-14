@@ -381,7 +381,7 @@ export class FlowMapView {
     }
     const labelBoxes=[];
     for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
-      const p=this.ActorScreen?this.ActorScreen(actor):Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&selection.id===actor.id;
+      const p=this.ActorScreen?this.ActorScreen(actor):Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&(selection.ids||[selection.id]).includes(actor.id);
       if(this.ActorInView?!this.ActorInView(actor):p[0]<-20||p[0]>width+20||p[1]<-20||p[1]>height+20) continue;
       if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
       this.DrawActor(context,actor,frame);

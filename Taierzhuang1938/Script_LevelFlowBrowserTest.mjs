@@ -396,7 +396,7 @@ try {
   async function ReadLocationAttachment() {
     await page.click('[data-tab="chat"]');
     await page.click('#attachCodexLocation');
-    await page.locator('.lfChatContext').evaluate(element=>{element.open=true;element.dispatchEvent(new Event('toggle'));});
+    await page.locator('#codexPendingLocation .lfChatContext').evaluate(element=>{element.open=true;element.dispatchEvent(new Event('toggle'));});
     return page.locator('#codexContextDetail').textContent();
   }
   assert.equal(await page.locator('#copyFrame,#copyViewports').count(),0);

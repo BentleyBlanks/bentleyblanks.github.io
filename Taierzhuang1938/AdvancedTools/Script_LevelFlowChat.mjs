@@ -1,6 +1,7 @@
 import { Marked } from "./vendor/marked.mjs";
 import DOMPurify from "./vendor/purify.mjs";
 import { ValidateScreenshot } from "./Script_LevelFlowDocument.mjs";
+import { ReadUnitsAttachment, UnitsLabel } from "./Script_LevelFlowUnits.mjs";
 
 const Element = id => document.getElementById(id);
 const API = "/__encounter/codex";
@@ -58,8 +59,27 @@ function BlobDataUrl(blob) {
   });
 }
 
+function DrawUnitList(element, units, remove = null, disabled = false) {
+  element.replaceChildren();
+  const sides = { player: "玩家", friend: "我方", enemy: "日军", civilian: "平民" };
+  const poses = { dead: "阵亡", burn: "燃烧", run: "跑动", walk: "行进", shoot: "射击", kneel: "低姿态", melee: "近战", drag: "拖行", down: "倒地", stand: "站立", idle: "待机" };
+  for (const unit of units) {
+    const row = document.createElement("div"); row.className = "lfUnitRow"; row.dataset.unitId = unit.id;
+    const content = document.createElement("div"), name = document.createElement("strong"), info = document.createElement("small");
+    name.textContent = `${unit.name} · ${sides[unit.side] || unit.side}`;
+    info.textContent = `${unit.id} · ${unit.status || poses[unit.pose] || unit.pose} · X ${unit.position.x.toFixed(1)} / Y ${unit.position.y.toFixed(1)} / Z ${unit.position.z.toFixed(1)}${unit.groupId ? ` · ${unit.group?.label || unit.groupId}` : ""}`;
+    content.append(name, info); row.append(content);
+    if (remove) {
+      const button = document.createElement("button"); button.type = "button"; button.textContent = "×";
+      button.setAttribute("aria-label", `取消选择 ${unit.name}`); button.disabled = disabled;
+      button.onclick = () => remove(unit.id); row.append(button);
+    }
+    element.append(row);
+  }
+}
+
 export class EncounterChat {
-  constructor({ snapshot, openScreenshot, editScreenshot }) {
+  constructor({ snapshot, openScreenshot, editScreenshot, openUnits, setUnitMode, removeUnit, clearUnits }) {
     this.snapshot = snapshot;
     this.editScreenshot = editScreenshot;
     this.sessions = [];
@@ -69,6 +89,8 @@ export class EncounterChat {
     this.current = null;
     this.pendingImage = null;
     this.pendingLocation = null;
+    this.pendingUnits = null;
+    this.unitActions = { openUnits, setUnitMode, removeUnit, clearUnits };
     this.drafts = new Map();
     this.available = false;
     this.loading = false;
@@ -92,6 +114,18 @@ export class EncounterChat {
       this.pendingLocation = structuredClone(this.snapshot());
       this.RefreshContext();
     };
+    Element("attachCodexUnits").onclick = () => this.OpenUnits();
+    Element("selectSingleUnit").onclick = () => setUnitMode(false);
+    Element("selectMultipleUnits").onclick = () => setUnitMode(true);
+    Element("clearSelectedUnits").onclick = clearUnits;
+    Element("closeUnitSelection").onclick = () => { Element("unitSelection").hidden = true; };
+    Element("attachSelectedUnits").onclick = () => {
+      try {
+        this.pendingUnits = ReadUnitsAttachment(this.selectedUnits);
+        this.DrawUnitsAttachment(); Element("unitSelection").hidden = true;
+      } catch (error) { this.Error(error.message); }
+    };
+    Element("removeCodexUnits").onclick = () => { this.pendingUnits = null; this.DrawUnitsAttachment(); };
     Element("removeCodexLocation").onclick = () => { this.pendingLocation = null; this.RefreshContext(); };
     Element("editCodexImage").onclick = () => this.editScreenshot(this.pendingImage);
     Element("removeCodexImage").onclick = () => { this.pendingImage = null; this.DrawAttachment(); };
@@ -174,7 +208,7 @@ export class EncounterChat {
   }
 
   SaveDraft() {
-    this.drafts.set(this.current?.id || "new", { prompt: Element("codexPrompt").value, image: this.pendingImage, location: this.pendingLocation });
+    this.drafts.set(this.current?.id || "new", { prompt: Element("codexPrompt").value, image: this.pendingImage, location: this.pendingLocation, units: this.pendingUnits });
   }
 
   RestoreDraft() {
@@ -182,7 +216,9 @@ export class EncounterChat {
     Element("codexPrompt").value = draft?.prompt || "";
     this.pendingImage = draft?.image || null;
     this.pendingLocation = draft?.location || null;
+    this.pendingUnits = draft?.units || null;
     this.DrawAttachment();
+    this.DrawUnitsAttachment();
     this.RefreshContext();
   }
 
@@ -243,6 +279,37 @@ export class EncounterChat {
     if (details.textContent !== content) details.textContent = content;
   }
 
+  OpenUnits() {
+    if (this.sending || this.current?.deletedAt || this.managing) return;
+    for (const details of Element("codexComposer").querySelectorAll("details")) details.open = false;
+    Element("unitSelection").hidden = false;
+    this.unitActions.openUnits();
+  }
+
+  UpdateUnits(attachment, multiple) {
+    const disabled = this.sending || !!this.current?.deletedAt || !!this.managing;
+    const key = JSON.stringify([attachment, multiple, disabled]);
+    if (key === this.unitSelectionKey) return;
+    this.unitSelectionKey = key;
+    this.selectedUnits = attachment;
+    Element("unitSelectionCount").textContent = attachment.units.length ? `已选 ${attachment.units.length} 个单位` : "选择单位";
+    Element("unitSelectionHint").textContent = multiple ? "多选模式 · 点击单位增减选择。" : "点击画面中的单位，Ctrl / Shift + 点击可增减选择。";
+    Element("unitSelectionHint").hidden = attachment.units.length > 0;
+    Element("selectSingleUnit").setAttribute("aria-pressed", String(!multiple));
+    Element("selectMultipleUnits").setAttribute("aria-pressed", String(multiple));
+    DrawUnitList(Element("selectedUnits"), attachment.units, this.unitActions.removeUnit, disabled);
+    Element("attachSelectedUnits").disabled = disabled || !attachment.units.length;
+    Element("clearSelectedUnits").disabled = disabled || !attachment.units.length;
+    Element("attachSelectedUnits").textContent = attachment.units.length ? `附加 ${attachment.units.length} 个单位` : "附加单位";
+  }
+
+  DrawUnitsAttachment() {
+    Element("codexPendingUnits").hidden = !this.pendingUnits;
+    Element("codexUnitsSummary").textContent = this.pendingUnits ? UnitsLabel(this.pendingUnits) : "单位";
+    DrawUnitList(Element("codexUnitsList"), this.pendingUnits?.units || []);
+    Element("codexUnitsDetail").textContent = this.pendingUnits ? JSON.stringify(this.pendingUnits, null, 2) : "";
+  }
+
   async Attach(editor) {
     const image = await BlobDataUrl(await editor.Blob());
     this.pendingImage = { image, frame: editor.Packet(), capture: editor.capture, marks: structuredClone(editor.marks) };
@@ -294,8 +361,10 @@ export class EncounterChat {
     Element("interruptCodexChat").disabled = stopping || this.sending;
     Element("interruptCodexChat").textContent = stopping ? "中断中…" : "中断";
     Element("codexPrompt").readOnly = this.sending || deleted || !!this.managing;
-    for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage"]) Element(id).disabled = this.sending || deleted || !!this.managing;
+    for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage",
+      "attachCodexUnits", "removeCodexUnits", "selectSingleUnit", "selectMultipleUnits"]) Element(id).disabled = this.sending || deleted || !!this.managing;
     Element("newCodexChat").disabled = this.sending || !!this.managing;
+    if (this.selectedUnits) this.UpdateUnits(this.selectedUnits, Element("selectMultipleUnits").getAttribute("aria-pressed") === "true");
   }
 
   DrawList() {
@@ -359,6 +428,14 @@ export class EncounterChat {
       if (message.role === "assistant") RenderMarkdown(bubble, message.text);
       else bubble.textContent = message.text;
       row.append(label, bubble);
+      if (message.units) {
+        const details = document.createElement("details"); details.className = "lfChatContext lfChatFrame";
+        const summary = document.createElement("summary"), list = document.createElement("div"), link = document.createElement("a");
+        summary.textContent = UnitsLabel(message.units); list.className = "lfSelectedUnits";
+        DrawUnitList(list, message.units.units);
+        link.textContent = "打开单位信息 JSON"; link.href = message.unitsUrl; link.target = "_blank"; link.rel = "noopener";
+        details.append(summary, list, link); row.append(details);
+      }
       if (message.frame) {
         const attachment = document.createElement("a"); attachment.className = "lfChatFrame";
         attachment.textContent = `定位 · ${message.frame.time.toFixed(2)} s`;
@@ -400,7 +477,7 @@ export class EncounterChat {
   async Send() {
     if (Element("sendCodexChat").disabled) return;
     const { frame = null, location = null } = this.pendingLocation || {};
-    const body = { sessionId: this.current?.id, steer: this.current?.status === "running", prompt: Element("codexPrompt").value, frame, location,
+    const body = { sessionId: this.current?.id, steer: this.current?.status === "running", prompt: Element("codexPrompt").value, frame, location, units: this.pendingUnits,
       screenshot: this.pendingImage ? { image: this.pendingImage.image, frame: this.pendingImage.frame } : null };
     const content = JSON.stringify(body);
     if (this.lastSubmission?.content !== content) this.lastSubmission = { content, requestId: crypto.randomUUID() };
@@ -413,6 +490,7 @@ export class EncounterChat {
       this.drafts.delete(body.sessionId || "new");
       Element("codexPrompt").value = ""; this.pendingImage = null; this.DrawAttachment();
       this.pendingLocation = null; this.RefreshContext();
+      this.pendingUnits = null; this.DrawUnitsAttachment();
       this.sessions = [this.current, ...this.sessions.filter(item => item.id !== this.current.id)];
       this.Draw();
     } catch (error) { this.Error(error.message); }

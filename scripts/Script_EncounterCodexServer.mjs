@@ -8,6 +8,7 @@ import { CreateSteerableCodexChild, ENCOUNTER_CODEX_MODEL, ENCOUNTER_CODEX_EFFOR
 import { CreateLegacyProgressReader } from "./Script_EncounterCodexProgress.mjs";
 import { ReadFramePacket } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowDocument.mjs";
 import { FLOW_TIMELINE } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowModel.mjs";
+import { ReadUnitsAttachment } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowUnits.mjs";
 
 const PREFIX = "/__encounter/codex";
 const ID = /^[a-f0-9-]{36}$/;
@@ -60,13 +61,18 @@ async function ReadTurn(request) {
   // Keep the more detailed location attachment, including selection and world-space camera.
   if (frame && (!body.location || typeof body.location !== "object" || Array.isArray(body.location) || JSON.stringify(body.location).length > 256000)) throw new RequestError("定位附件无效");
   if (!frame && body.location != null) throw new RequestError("定位附件缺少帧信息");
+  let units = null;
+  if (body.units != null) {
+    try { units = ReadUnitsAttachment(body.units); }
+    catch { throw new RequestError("单位附件无效"); }
+  }
   if (body.screenshot) {
     if (typeof body.screenshot.image !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.screenshot.image)) throw new RequestError("截图必须为 PNG");
     const png = Buffer.from(body.screenshot.image.split(",")[1], "base64");
     if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new RequestError("截图文件无效");
     ReadFramePacket(body.screenshot.frame, FLOW_TIMELINE);
   }
-  return { ...body, frame, prompt: body.prompt.trim() };
+  return { ...body, frame, units, prompt: body.prompt.trim() };
 }
 
 function SpawnCodex(args, rootDir) {
@@ -161,6 +167,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       "你正在处理 Encounter Designer 右侧会话提交的需求。遵循仓库 AGENTS.md，代码修改须在本会话独占的 worktree 中进行。",
       `编辑器检出目录为 ${rootDir}。`,
       turn.frame ? `定位附件保存在 ${path.join(folder, "Frame.json")} 和 ${path.join(folder, "Location.json")}，包含用户附加时的帧、时间、世界坐标、相机与选中对象。先读取附件。` : "",
+      turn.units ? `单位附件保存在 ${path.join(folder, "Units.json")}，包含用户明确选中的 ${turn.units.units.length} 个单位及附加时的剧情时间、稳定编号、阵营、世界坐标、状态和生成组配置。先读取附件，按编号定位这些单位。` : "",
       turn.screenshot ? `标注截图附在本条消息中，截图当时的帧信息在 ${path.join(folder, "ScreenshotFrame.json")}。` : "",
       "最终答复请用简洁中文给出处理结论、验证结果与尚未完成项。",
       "执行过程中用简洁中文同步公开的进度说明，说明已发现的问题、正在进行的修改或验证。",
@@ -298,7 +305,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
         Send(response, 202, Load(session.id));
         return;
       }
-      const attachment = /^\/attachments\/([a-f0-9-]{36})\/([a-f0-9-]{36})\/(Screenshot\.png|Frame\.json|Location\.json|ScreenshotFrame\.json)$/.exec(route);
+      const attachment = /^\/attachments\/([a-f0-9-]{36})\/([a-f0-9-]{36})\/(Screenshot\.png|Frame\.json|Location\.json|Units\.json|ScreenshotFrame\.json)$/.exec(route);
       if (request.method === "GET" && attachment) {
         const file = path.join(directory, ...attachment.slice(1));
         const content = fs.readFileSync(file);
@@ -335,6 +342,10 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       }
       const attachmentBase = `${PREFIX}/attachments/${next.id}/${turnId}`;
       const message = { role: "user", requestId: turnId, text: turn.prompt, createdAt: now };
+      if (turn.units) {
+        fs.writeFileSync(path.join(folder, "Units.json"), JSON.stringify(turn.units, null, 2));
+        message.units = turn.units; message.unitsUrl = `${attachmentBase}/Units.json`;
+      }
       if (turn.frame) Object.assign(message, { frame: turn.frame.context, location: turn.location,
         frameUrl: `${attachmentBase}/Frame.json`, locationUrl: `${attachmentBase}/Location.json` });
       if (turn.screenshot) {

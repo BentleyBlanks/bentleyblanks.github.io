@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114ReplyBubbles">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261114UnitAttachments">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,7 +26,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261114ReplyBubbles"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261114UnitAttachments"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -47,13 +47,20 @@
           <div class="lfChatHeading"><button id="toggleCodexSessions" aria-label="展开会话列表" aria-controls="codexChatSidebar" aria-expanded="false" title="展开或收起会话列表">☰</button><div><strong id="codexChatTitle">新会话</strong><span id="codexConnection" role="status">连接本机 CLI…</span></div><button id="interruptCodexChat" type="button" hidden>中断</button></div>
           <div id="codexMessages" class="lfChatMessages" role="log" aria-label="对话内容" aria-live="polite"></div>
           <div id="codexChatError" class="lfChatError" role="status" hidden></div>
+          <section id="unitSelection" class="lfUnitSelection" aria-label="选择单位" hidden>
+            <div class="lfUnitSelectionHeader"><strong id="unitSelectionCount">选择单位</strong><div role="group" aria-label="单位选择方式"><button id="selectSingleUnit" type="button" aria-pressed="true">单选</button><button id="selectMultipleUnits" type="button" aria-pressed="false">多选</button></div><button id="closeUnitSelection" type="button" aria-label="收起单位选择">×</button></div>
+            <p id="unitSelectionHint">点击画面中的单位，Ctrl / Shift + 点击可增减选择。</p>
+            <div id="selectedUnits" class="lfSelectedUnits"></div>
+            <div class="lfUnitSelectionActions"><button id="clearSelectedUnits" type="button">清空选择</button><button id="attachSelectedUnits" type="button" class="sePrimary" disabled>附加单位</button></div>
+          </section>
           <form id="codexComposer" class="lfChatComposer">
             <div class="lfChatAttachments">
+              <div id="codexPendingUnits" class="lfPendingUnits" hidden><details class="lfChatContext"><summary id="codexUnitsSummary">单位</summary><div id="codexUnitsList" class="lfSelectedUnits"></div><pre id="codexUnitsDetail"></pre></details><button id="removeCodexUnits" type="button" aria-label="移除单位附件">×</button></div>
               <div id="codexPendingLocation" class="lfPendingLocation" hidden><details class="lfChatContext"><summary id="codexContextSummary">定位</summary><pre id="codexContextDetail"></pre></details><button id="removeCodexLocation" type="button" aria-label="移除定位附件">×</button></div>
               <div id="codexPendingImage" class="lfPendingImage" hidden><button id="editCodexImage" type="button" title="继续标注"><img id="codexImagePreview" alt="截图附件"><span id="codexImageLabel">截图</span></button><button id="removeCodexImage" type="button" aria-label="移除截图附件">×</button></div>
             </div>
             <label class="lfSrOnly" for="codexPrompt">本次需求</label><textarea id="codexPrompt" rows="3" maxlength="20000" placeholder="描述需要调整的内容…"></textarea>
-            <div class="lfChatActions"><button id="attachCodexScreenshot" type="button" title="截取视口并标注">＋ 截图</button><button id="attachCodexLocation" type="button" title="附加当前时间、坐标与视口">＋ 定位</button><button id="sendCodexChat" class="sePrimary" type="submit" title="Ctrl + Enter">发送 ↑</button></div>
+            <div class="lfChatActions"><button id="attachCodexScreenshot" type="button" title="截取视口并标注">＋ 截图</button><button id="attachCodexLocation" type="button" title="附加当前时间、坐标与视口">＋ 定位</button><button id="attachCodexUnits" type="button" title="选择画面中的单位并附加信息">＋ 单位</button><button id="sendCodexChat" class="sePrimary" type="submit" title="Ctrl + Enter">发送 ↑</button></div>
           </form>
         </div>
       </section>

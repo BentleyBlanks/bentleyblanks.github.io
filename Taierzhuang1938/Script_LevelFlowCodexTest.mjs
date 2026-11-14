@@ -12,6 +12,7 @@ import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunne
 import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
 import { CreateFramePacket } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow } from "./AdvancedTools/Script_LevelFlowModel.mjs";
+import { CreateUnitsAttachment } from "./AdvancedTools/Script_LevelFlowUnits.mjs";
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "EncounterCodexTest-"));
 const children = [];
@@ -40,7 +41,8 @@ server.listen(0, "127.0.0.1"); await once(server, "listening");
 const base = `http://127.0.0.1:${server.address().port}/__encounter/codex`;
 const snapshot = CreateFramePacket(DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow(384), { center: [20, 30], scale: 2 }, { width: 640, height: 360 });
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aM1sAAAAASUVORK5CYII=";
-const body = { requestId: randomUUID(), prompt: "调整所选区域", frame: snapshot, location: { timeline: { timeSeconds: 384 }, selection: { id: "Fork" } }, screenshot: { image: png, frame: snapshot } };
+const unitSnapshot = CreateUnitsAttachment(EvaluateFlow(221), { mapData: { source: { scene: "FirstLevelWhitebox" }, terrain: { heightAt: () => 2 } } }, ["player", "Fork_0"], DEFAULT_ENCOUNTER_DOCUMENT);
+const body = { requestId: randomUUID(), prompt: "调整所选区域", frame: snapshot, units: unitSnapshot, location: { timeline: { timeSeconds: 384 }, selection: { id: "Fork" } }, screenshot: { image: png, frame: snapshot } };
 async function Post(value, headers = {}) {
   return fetch(`${base}/turns`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(value) });
 }
@@ -54,6 +56,10 @@ try {
   assert.equal((await Post({ ...body, screenshot: { image: "invalid" } })).status, 400);
   assert.equal((await Post({ ...body, frame: {} })).status, 400);
   assert.equal((await Post({ ...body, prompt: "" })).status, 400);
+  for (const units of [{}, { ...unitSnapshot, units: [] }, { ...unitSnapshot, units: [unitSnapshot.units[0], unitSnapshot.units[0]] },
+    { ...unitSnapshot, units: [{ ...unitSnapshot.units[0], position: { x: null, y: 0, z: 0 } }] }]) {
+    assert.equal((await Post({ ...body, units })).status, 400);
+  }
   assert.equal(children.length, 0);
   const response = await Post(body); assert.equal(response.status, 202);
   let session = await response.json();
@@ -65,6 +71,11 @@ try {
   const first = children[0];
   assert.ok(first.args.includes("--image"));
   assert.ok(first.prompt.includes("Frame.json") && first.prompt.includes("Location.json"));
+  assert.match(first.prompt, /Units.json/);
+  assert.deepEqual(session.messages[0].units, unitSnapshot);
+  const unitsResponse = await fetch(`http://127.0.0.1:${server.address().port}${session.messages[0].unitsUrl}`);
+  assert.equal(unitsResponse.status, 200);
+  assert.deepEqual(await unitsResponse.json(), unitSnapshot);
   const concurrentReader = CreateEncounterCodexHandler(directory);
   server.removeAllListeners("request"); server.on("request", concurrentReader);
   assert.equal((await (await fetch(`${base}/sessions/${session.id}`)).json()).status, "running", "another preview keeps a live owner's run active");
@@ -78,6 +89,7 @@ try {
   assert.equal(steered.status, 202); assert.equal(duplicate.status, 202);
   assert.equal(children.length, 1); assert.equal(first.steered.length, 1);
   assert.match(first.steered[0].prompt, /执行中补充，保留附件定位/);
+  assert.match(first.steered[0].prompt, /Units.json/);
   assert.ok(first.steered[0].image.endsWith("Screenshot.png"));
   const privateReasoning = "private reasoning must stay out of chat";
   first.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: "01a1d446-7900-7781-9cc4-00ad3a768caf" })}\n`);
@@ -145,6 +157,7 @@ try {
   fs.writeFileSync(sessionFile, JSON.stringify(oldSession));
   server.removeAllListeners("request"); server.on("request", restarted);
   const restored = await (await fetch(`${base}/sessions/${session.id}`)).json();
+  assert.deepEqual(restored.messages[0].units, unitSnapshot);
   assert.equal(restored.messages.length, 4);
   assert.ok(!JSON.stringify(restored).includes("private-provider"));
   assert.ok(!fs.readFileSync(sessionFile, "utf8").includes("FAKE_PRIVATE_CREDENTIAL"));
@@ -166,6 +179,11 @@ try {
   assert.equal(imageSession.messages[0].screenshotFrame.time, 384);
   assert.ok(children.at(-1).prompt.includes("ScreenshotFrame.json"));
   Finish(children.at(-1), "已查看截图。");
+  const unitsOnly = await (await Post({ ...plainBody, requestId: randomUUID(), units: unitSnapshot })).json();
+  assert.equal(unitsOnly.messages[0].frame, undefined);
+  assert.deepEqual(unitsOnly.messages[0].units, unitSnapshot);
+  assert.match(children.at(-1).prompt, /Units.json/);
+  Finish(children.at(-1), "已查看单位。");
   const interruptedFile = path.join(directory, "tmp", "EncounterCodex", plainSession.id, "Session.json");
   const interrupted = JSON.parse(fs.readFileSync(interruptedFile, "utf8"));
   interrupted.status = "running"; interrupted.runnerPid = 2147483647;

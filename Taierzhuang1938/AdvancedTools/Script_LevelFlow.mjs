@@ -6,7 +6,8 @@ import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
-import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114ReplyBubbles";
+import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114UnitAttachments";
+import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 
@@ -17,6 +18,7 @@ try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
 
 let map, time=0, playing=false, mode="select", selection=null;
+let selectedUnitIds=[], multipleUnits=false;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, renderPending=false;
 const params=new URLSearchParams(location.search);
@@ -58,10 +60,26 @@ function SelectedObject() {
   return selection?.type==="trigger"?project.value.triggers.find((item)=>item.id===selection.id)
     :selection?.type==="group"?project.value.groups.find((item)=>item.id===selection.id):null;
 }
-function Select(value) {
-  selection=value;
+function Select(value, { additive=false }={}) {
+  if(value?.type==="actor") {
+    if(!frame.actors.some(actor=>actor.id===value.id)||chat?.sending) return;
+    SetPlaying(false);
+    selectedUnitIds=additive||multipleUnits
+      ?selectedUnitIds.includes(value.id)?selectedUnitIds.filter(id=>id!==value.id):[...selectedUnitIds,value.id]
+      :[value.id];
+    selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
+    chat?.OpenUnits();ShowTab("chat");
+  } else {selection=value;selectedUnitIds=[];}
   if(value?.type==="group"||value?.type==="trigger") {SetMode("select");}
   if(value?.type==="annotation") {ShowTab("notes");Element("annotationText").value=project.value.annotations.find((item)=>item.id===value.id)?.text||"";}
+  Render();
+}
+function SetUnitSelectionMode(multiple) {
+  multipleUnits=multiple;
+  if(!multiple&&selectedUnitIds.length>1) {
+    selectedUnitIds=[selectedUnitIds.at(-1)];
+    selection={type:"actor",id:selectedUnitIds[0],ids:[...selectedUnitIds]};
+  }
   Render();
 }
 function StageBounds() {
@@ -78,7 +96,7 @@ function StageBounds() {
 function Seek(value,{fit=false}={}) {
   const previousStage=frame.stage.id;
   time=Clamp(Number(value)||0,0,FLOW_DURATION);frame=EvaluateFlow(time,project.value);
-  if(previousStage!==frame.stage.id) {selection=null;}
+  if(previousStage!==frame.stage.id) {selection=null;selectedUnitIds=[];}
   if(map&&(fit||previousStage!==frame.stage.id)) workspace.FrameStage();
   draft=null;Render();
 }
@@ -152,13 +170,17 @@ function Render(preparedFrame=null) {
   if(!map||!workspace) return;
   renderPending=false;
   frame=preparedFrame||EvaluateFlow(time,project.value);UpdateTimeline();
+  selectedUnitIds=selectedUnitIds.filter(id=>frame.actors.some(actor=>actor.id===id));
+  if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
+  chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
   Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
   return view.hits.filter((item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1])<=item.radius)
-    .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0))[0];
+    .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0)
+      ||Math.hypot(a.screen[0]-point[0],a.screen[1]-point[1])-Math.hypot(b.screen[0]-point[0],b.screen[1]-point[1]))[0];
 }
 function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
 function Packet() {
@@ -176,7 +198,7 @@ function RestoreView(view,viewport) {
 
 function BindMap(entry) {
   const surface=entry.canvas;
-  surface.title="右键旋转 · 右键 + WASD 飞行 · Q/E 升降 · Shift 加速 · 中键平移 · Alt + 左键环绕 · Alt + 右键缩放 · F 聚焦";
+  surface.title="点击单位单选 · Ctrl / Shift + 点击多选 · 右键旋转 · 右键 + WASD 飞行 · Q/E 升降 · 中键平移 · Alt + 左键环绕 · F 聚焦";
   surface.addEventListener("contextmenu",event=>event.preventDefault());
   surface.addEventListener("pointerdown",(event)=>{
     if(navigation.Begin(entry,event)) return;
@@ -185,7 +207,7 @@ function BindMap(entry) {
     surface.focus();surface.setPointerCapture(event.pointerId);
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
     const action=mode!=="select"?"annotate":hit?.type==="annotationHandle"?"edit":entry.map.type?"select":"pan";
-    pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey};
+    pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey,additive:event.ctrlKey||event.metaKey||event.shiftKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
       draft={id:`Note_${Date.now()}`,kind:mode,time:Math.round(time*100)/100,a:world,b:[...world],text:"",view:{center:[...map.center],scale:map.scale},viewport:{width:rect.width,height:rect.height},viewports:workspace.Serialize()};
@@ -227,8 +249,10 @@ function BindMap(entry) {
       const annotation=draft;draft=null;Apply((document)=>document.annotations.push(annotation));Select({type:"annotation",id:annotation.id});
       if(annotation.kind==="text") {Element("annotationText").focus();Element("annotationText").select();}
     }
-    if(["pan","select"].includes(action)&&!pointer.moved&&pointer.hit) {
-      const hit=pointer.hit;Select({type:hit.type,id:hit.id});
+    if(["pan","select"].includes(action)&&!pointer.moved) {
+      const hit=pointer.hit;
+      if(hit) Select({type:hit.type,id:hit.id},{additive:pointer.additive});
+      else if(!pointer.additive&&!multipleUnits) Select(null);
     }
     pointer=null;draft=null;Render();
   });
@@ -297,6 +321,10 @@ async function Start() {
     snapshot:()=>({frame:Packet(),location:JSON.parse(CreateLocationText(frame,workspace,selection,project.value))}),
     openScreenshot:OpenAnnotations,
     editScreenshot:(image)=>{if(image) annotationEditor.Open(image.capture,image.frame,image.marks);},
+    openUnits:()=>{SetPlaying(false);ShowTab("chat");},
+    setUnitMode:SetUnitSelectionMode,
+    removeUnit:id=>Select({type:"actor",id},{additive:true}),
+    clearUnits:()=>Select(null),
   });
   Element("mapLoading").hidden=true;
   BindControls();
