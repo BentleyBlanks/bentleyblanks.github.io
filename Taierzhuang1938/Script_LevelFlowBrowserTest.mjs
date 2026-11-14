@@ -123,6 +123,39 @@ try {
     'entering, moving, leaving and carried boxes invalidate the current color/depth frame');
   assert.ok(backgroundCache.visibleChanged&&backgroundCache.cleared,'cached backgrounds neither freeze moving vehicles nor retain their trails');
   assert.ok(backgroundCache.stableEdges,'fractional CSS dimensions do not accumulate color at the canvas edge');
+  const mapTerrainCache=await page.evaluate(async()=>{
+    const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
+    const {FLOW_RENDERING}=await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320.5px;height:240.5px';document.body.append(canvas);
+    const context=canvas.getContext('2d');canvas.width=641;canvas.height=481;context.scale(2,2);
+    let samples=0,layoutReads=0;
+    const height=(x,z)=>{samples++;return Math.sin(x*.13)+Math.cos(z*.1);};
+    const map={terrain:{bounds:{minX:-1000,maxX:1000,minZ:-1000,maxZ:1000},preAt:height}};
+    const view=new FlowMapView(canvas,map);
+    const rect=canvas.getBoundingClientRect.bind(canvas);
+    canvas.getBoundingClientRect=()=>{layoutReads++;return rect();};
+    const Draw=()=>{context.clearRect(0,0,320.5,240.5);view.DrawTerrain(context,320.5,240.5);return canvas.toDataURL();};
+    const results=[];
+    for(const scale of [.5,2.4,6,15]) {
+      view.scale=scale;view.center=[40,60];Draw();const before=samples;
+      Draw();const reused=samples===before;
+      view.center=[40+1/scale,60+1/scale];const moved=Draw(),afterMove=samples;
+      view.terrainTiles.clear();const rebuilt=Draw();
+      results.push({reused,panSamples:afterMove-before,equal:moved===rebuilt});
+    }
+    view.scale=2.4;Draw();const beforeZoom=samples;
+    view.scale=3;Draw();const zoomed=samples>beforeZoom,beforeReplace=samples;
+    map.terrain={...map.terrain,preAt:(x,z)=>height(x,z)*2};Draw();const replaced=samples>beforeReplace;
+    for(let index=0;index<140;index++) {view.center=[-900+index*13,0];Draw();}
+    const bounded=view.terrainTiles.size<=FLOW_RENDERING.mapTerrain.maxTiles;
+    view.center=[40,60];const returned=Draw();view.terrainTiles.clear();const rebuilt=Draw();
+    canvas.remove();return {results,zoomed,replaced,bounded,returned:returned===rebuilt,layoutReads};
+  });
+  assert.ok(mapTerrainCache.results.every(result=>result.reused&&result.equal&&result.panSamples===0),
+    '2D pan reuses world-aligned terrain tiles and matches a fresh draw at every tested zoom');
+  assert.ok(mapTerrainCache.zoomed&&mapTerrainCache.replaced&&mapTerrainCache.bounded&&mapTerrainCache.returned,
+    'terrain tiles rebuild for zoom and source changes, stay bounded, and recover after eviction');
+  assert.equal(mapTerrainCache.layoutReads,0,'terrain sampling never reads layout per cell');
   const landmarkLabels=await page.evaluate(async()=>{
     const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
@@ -419,6 +452,26 @@ try {
   assert.equal(await page.locator("[data-stage]").count(),10);
   assert.ok((await page.evaluate(()=>window.LevelFlow.Inspect())).mapObjects>1000);
   assert.equal(await page.locator('.lfViewPane:visible').count(),2);
+  const dualPanes=await page.locator('.lfViewPane:visible').evaluateAll(panes=>panes.map(pane=>{
+    const {x,y,width,height}=pane.getBoundingClientRect();return {x,y,width,height};
+  }));
+  assert.ok(Math.abs(dualPanes[0].width-dualPanes[1].width)<1&&dualPanes[0].y===dualPanes[1].y,
+    'two viewports divide the workspace into equal left and right columns');
+  await page.selectOption('#viewportLayout','3');
+  assert.equal(await page.locator('.lfViewPane:visible').count(),3);
+  const triple=await page.evaluate(()=>LevelFlow.Inspect().viewports);
+  assert.equal(triple.count,3);assert.equal(triple.views.length,3);
+  const triplePanes=await page.locator('.lfViewPane:visible').evaluateAll(panes=>panes.map(pane=>{
+    const {x,y,width,height}=pane.getBoundingClientRect();return {x,y,width,height};
+  }));
+  assert.ok(triplePanes[0].height>triplePanes[1].height*1.9&&triplePanes[1].x===triplePanes[2].x
+    &&triplePanes[0].x<triplePanes[1].x&&triplePanes[1].y<triplePanes[2].y
+    &&Math.abs(triplePanes[0].width-triplePanes[1].width)<1,
+    'three viewports provide one full-height left pane and two stacked right panes');
+  await page.evaluate(triple=>{LevelFlow.SetLayout(4);LevelFlow.RestoreViewports(triple);},triple);
+  assert.equal((await page.evaluate(()=>LevelFlow.Packet().context.viewports)).count,3,'frame packets retain the three-viewport layout');
+  await page.screenshot({path:path.join(out,'ThreeViewports.png')});
+  await page.selectOption('#viewportLayout','2');
   await page.evaluate(()=>LevelFlow.SetViewType(1,'scene'));
   const hoverPicks=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');

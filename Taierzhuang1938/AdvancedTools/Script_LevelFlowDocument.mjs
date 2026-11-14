@@ -5,7 +5,7 @@ export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
 
 export function ValidateViewportLayout(layout) {
   const types=["plan","battle","oblique","scene","chase","eye"],modes=["stage","all","manual","follow"];
-  const valid=layout&&[1,2,4].includes(layout.count)&&Number.isInteger(layout.active)&&layout.active>=0&&layout.active<layout.count
+  const valid=layout&&[1,2,3,4].includes(layout.count)&&Number.isInteger(layout.active)&&layout.active>=0&&layout.active<layout.count
     &&Array.isArray(layout.views)&&layout.views.length===layout.count&&layout.views.every((view)=>types.includes(view.type)&&modes.includes(view.mode)
       &&Array.isArray(view.center)&&view.center.length===2&&view.center.every((value)=>Number.isFinite(value)&&Math.abs(value)<=10000)
       &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=80&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)

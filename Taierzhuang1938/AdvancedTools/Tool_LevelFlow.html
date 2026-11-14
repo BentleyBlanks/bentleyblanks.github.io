@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261115UnitHover">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261115ThreeViewports">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,13 +26,13 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261115StreetDefense2"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261115PanPerformance"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
     <h1 class="lfSrOnly">Encounter Designer</h1>
     <span id="frameHeading" title="当前阶段与节拍"></span>
-    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="4">四视口</option></select></div>
+    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1">单视口</option><option value="2" selected>双视口</option><option value="3">三视口</option><option value="4">四视口</option></select></div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>

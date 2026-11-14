@@ -2,6 +2,7 @@ import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
+import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
@@ -123,6 +124,7 @@ export class FlowMapView {
   constructor(canvas,mapData) {
     this.canvas=canvas;this.mapData=mapData;this.center=[52,76];this.scale=5;this.hits=[];this.hoveredActorId=null;
     this.baseCanvas=document.createElement("canvas");this.baseKey="";
+    this.terrainTiles=new Map();
   }
 
   ProjectPath(points) {return [points.map(point=>this.ToScreen(point))];}
@@ -170,8 +172,58 @@ export class FlowMapView {
     return [a[0],b[0],a[1],b[1]];
   }
 
+  DrawTerrain(context,width,height) {
+    const terrain=this.mapData.terrain;
+    if(!terrain) return;
+    const scale=this.scale,ratio=Math.min(2,window.devicePixelRatio||1);
+    const key=`${scale},${ratio}`;
+    if(this.tileTerrain!==terrain||this.terrainTileKey!==key) {
+      this.terrainTiles.clear();this.tileTerrain=terrain;this.terrainTileKey=key;
+    }
+    const step=Math.max(0.5,2/scale),cells=Math.max(1,Math.floor(FLOW_RENDERING.mapTerrain.tilePixels/(step*scale)));
+    const tileMetres=cells*step,tilePixels=tileMetres*scale,bounds=terrain.bounds;
+    const left=(bounds.minX-this.center[0])*scale+width/2,top=(bounds.minZ-this.center[1])*scale+height/2;
+    const minX=Math.max(0,Math.floor(-left/tilePixels)),minZ=Math.max(0,Math.floor(-top/tilePixels));
+    const maxX=Math.min(Math.ceil((bounds.maxX-bounds.minX)/tileMetres),Math.ceil((width-left)/tilePixels));
+    const maxZ=Math.min(Math.ceil((bounds.maxZ-bounds.minZ)/tileMetres),Math.ceil((height-top)/tilePixels));
+    context.save();context.beginPath();
+    context.rect(left,top,(bounds.maxX-bounds.minX)*scale,(bounds.maxZ-bounds.minZ)*scale);context.clip();
+    for(let row=minZ;row<maxZ;row++) for(let column=minX;column<maxX;column++) {
+      const tileKey=`${column},${row}`;
+      let tile=this.terrainTiles.get(tileKey);
+      if(!tile) {
+        tile=document.createElement("canvas");tile.width=tile.height=Math.ceil(tilePixels*ratio);
+        const paint=tile.getContext("2d");paint.scale(ratio,ratio);
+        const originX=bounds.minX+column*tileMetres,originZ=bounds.minZ+row*tileMetres,sample=terrain.preAt;
+        // Include the previous cell's half-pixel overlap at tile boundaries.
+        // Samples stay fixed in world space as the camera pans.
+        for(let z=-1;z<cells;z++) for(let x=-1;x<cells;x++) {
+          const worldX=originX+x*step,worldZ=originZ+z*step;
+          if(worldX<bounds.minX||worldX>=bounds.maxX||worldZ<bounds.minZ||worldZ>=bounds.maxZ) continue;
+          const slope=(sample(worldX-step,worldZ)-sample(worldX+step,worldZ))*0.7
+            +(sample(worldX,worldZ-step)-sample(worldX,worldZ+step))*0.45;
+          const opacity=Math.min(0.28,Math.abs(slope)/step*0.45);
+          if(opacity<0.015) continue;
+          paint.fillStyle=slope>0?`rgba(255,250,218,${opacity})`:`rgba(80,69,45,${opacity})`;
+          paint.fillRect(x*step*scale,z*step*scale,step*scale+0.5,step*scale+0.5);
+        }
+      }
+      // Refresh insertion order so long pans retain the most recent tiles.
+      this.terrainTiles.delete(tileKey);this.terrainTiles.set(tileKey,tile);
+      context.drawImage(tile,0,0,tilePixels*ratio,tilePixels*ratio,left+column*tilePixels,top+row*tilePixels,tilePixels,tilePixels);
+    }
+    // Keep the visible set even on wide single-view layouts. Evict after the
+    // draw so new edge tiles cannot evict visible tiles still awaiting reuse.
+    const budget=Math.max(FLOW_RENDERING.mapTerrain.maxTiles,Math.max(0,maxX-minX)*Math.max(0,maxZ-minZ));
+    while(this.terrainTiles.size>budget) this.terrainTiles.delete(this.terrainTiles.keys().next().value);
+    context.restore();
+  }
+
   DrawBase(context,width,height,frame,layers={}) {
-    const map=this.mapData,Screen=(point)=>this.ToScreen(point),scale=this.scale;
+    const map=this.mapData,scale=this.scale;
+    // The planar projection shares one viewport size for the entire background.
+    // Reading layout for every terrain cell and scene object stalls navigation.
+    const Screen=(point)=>[(point[0]-this.center[0])*scale+width/2,(point[1]-this.center[1])*scale+height/2];
     context.fillStyle="#e7e2d2";context.fillRect(0,0,width,height);
     for(const paint of map.paint) {
       const points=paint.poly.map((point)=>Screen([point.x,point.z]));
@@ -196,20 +248,7 @@ export class FlowMapView {
       }
       context.restore();
     }
-    if (map.terrain) {
-      const step = Math.max(0.5, 2 / scale), bounds = this.Bounds();
-      const minX = Math.max(map.terrain.bounds.minX, bounds[0]), maxX = Math.min(map.terrain.bounds.maxX, bounds[1]);
-      const minZ = Math.max(map.terrain.bounds.minZ, bounds[2]), maxZ = Math.min(map.terrain.bounds.maxZ, bounds[3]);
-      for (let z = minZ; z < maxZ; z += step) for (let x = minX; x < maxX; x += step) {
-        const sample = map.terrain.preAt;
-        const slope = (sample(x-step,z)-sample(x+step,z))*0.7 + (sample(x,z-step)-sample(x,z+step))*0.45;
-        const opacity = Math.min(0.28, Math.abs(slope) / step * 0.45);
-        if (opacity < 0.015) continue;
-        const point = Screen([x,z]);
-        context.fillStyle = slope > 0 ? `rgba(255,250,218,${opacity})` : `rgba(80,69,45,${opacity})`;
-        context.fillRect(point[0],point[1],step*scale+0.5,step*scale+0.5);
-      }
-    }
+    this.DrawTerrain(context,width,height);
     for(const path of map.footpaths) Line(context,path.map(Screen),"#a38e6455",Math.max(0.7,scale*0.35),[3,4]);
     // Paint the whole bank network first, then the whole walking surface.
     // Drawing each complete segment in turn used to seal T-junctions again.

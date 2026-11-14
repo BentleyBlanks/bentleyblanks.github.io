@@ -5,6 +5,7 @@ export const FLOW_RENDERING = {
   terrainFlatHeightPixels: 0.5,
   terrainNormalSampleM: 0.5,
   navigation: {wheelSettleMs:120},
+  mapTerrain: {tilePixels:128,maxTiles:96},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
 };
 

@@ -102,7 +102,7 @@ export class EncounterViewports {
   }
 
   SetLayout(count) {
-    this.count=[1,2,4].includes(Number(count))?Number(count):2;
+    this.count=[1,2,3,4].includes(Number(count))?Number(count):2;
     this.element.dataset.layout=String(this.count);
     for(const entry of this.entries) entry.pane.hidden=entry.index>=this.count;
     if(this.activeIndex>=this.count) this.activeIndex=0;
