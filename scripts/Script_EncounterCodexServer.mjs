@@ -98,10 +98,10 @@ async function LegacyCliPid(session) {
   return pid;
 }
 
-export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex, readLegacyProgress = CreateLegacyProgressReader() } = {}) {
+export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex, readLegacyProgress = CreateLegacyProgressReader(), state = {} } = {}) {
   const directory = path.join(rootDir, "tmp", "EncounterCodex");
-  const active = new Map();
-  const submissions = new Map();
+  const active = state.active ||= new Map();
+  const submissions = state.submissions ||= new Map();
   const SessionPath = id => path.join(directory, id, "Session.json");
   const InterruptPath = id => path.join(directory, id, "Interrupt.json");
   const DeletedPath = id => path.join(directory, id, "Deleted.json");

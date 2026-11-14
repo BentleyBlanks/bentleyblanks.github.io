@@ -38,8 +38,7 @@ import { fileURLToPath } from "node:url";
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
-import { CreateEncounterCodexHandler } from "./Script_EncounterCodexServer.mjs";
-import { PreviewRuntimeRevision } from "./Script_LocalPreviewRuntime.mjs";
+import { CreateReloadableEncounterCodexHandler, PreviewRuntimeRevision } from "./Script_LocalPreviewRuntime.mjs";
 // 白盒关卡编辑器的「记下当前机位」。配置模块是纯的（node 与浏览器共用），导入时不抛错：
 //   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
 //   POST /__blockout/save   { level, doc, revision } → 写 Taierzhuang1938/Blockout/<Level>.json
@@ -354,7 +353,7 @@ async function ProbeExisting(port) {
 const mounts = new Map(); // absRoot -> { port, server }
 
 function CreateServer(rootDir, context) {
-  const handleEncounterCodex = CreateEncounterCodexHandler(rootDir);
+  const handleEncounterCodex = CreateReloadableEncounterCodexHandler(rootDir);
   const runtimeRevision = PreviewRuntimeRevision(rootDir);
   return http.createServer(async (request, response) => {
     const [rawRoute, query] = request.url.split("?");

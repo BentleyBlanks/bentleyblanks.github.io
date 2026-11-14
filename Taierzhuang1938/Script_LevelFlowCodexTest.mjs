@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunner.mjs";
 import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
+import { CreateReloadableEncounterCodexHandler } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { CreateFramePacket } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CreateUnitsAttachment } from "./AdvancedTools/Script_LevelFlowUnits.mjs";
@@ -19,7 +20,8 @@ const children = [];
 const realChildren = [], ready = [];
 const stopped = [];
 let stopFailure = false;
-const handler = CreateEncounterCodexHandler(directory, { spawnCodex(args, root) {
+const state = {};
+const handler = CreateEncounterCodexHandler(directory, { state, spawnCodex(args, root) {
   assert.equal(root, directory);
   const child = new EventEmitter();
   child.pid = process.pid;
@@ -83,7 +85,7 @@ try {
   const liveFile = path.join(directory, "tmp", "EncounterCodex", session.id, "Session.json");
   fs.writeFileSync(liveFile, JSON.stringify({ ...session, status: "failed", error: "本地服务已重启，上次执行已中断。可继续发送需求。" }));
   assert.equal((await (await fetch(`${base}/sessions/${session.id}`)).json()).status, "running", "a live owner recovers an older preview's incorrect interruption flag");
-  server.removeAllListeners("request"); server.on("request", handler);
+  server.removeAllListeners("request"); server.on("request", CreateEncounterCodexHandler(directory, { state }));
   const steerBody = { ...body, requestId: randomUUID(), sessionId: session.id, prompt: "执行中补充，保留附件定位" };
   const [steered, duplicate] = await Promise.all([Post(steerBody), Post(steerBody)]);
   assert.equal(steered.status, 202); assert.equal(duplicate.status, 202);
@@ -91,6 +93,9 @@ try {
   assert.match(first.steered[0].prompt, /执行中补充，保留附件定位/);
   assert.match(first.steered[0].prompt, /Units.json/);
   assert.ok(first.steered[0].image.endsWith("Screenshot.png"));
+  assert.equal((await Post(steerBody)).status, 202, "route upgrades keep the active child and request deduplication state");
+  assert.equal(children.length, 1);
+  server.removeAllListeners("request"); server.on("request", handler);
   const privateReasoning = "private reasoning must stay out of chat";
   first.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: "01a1d446-7900-7781-9cc4-00ad3a768caf" })}\n`);
   first.stdout.write(`${JSON.stringify({ type: "progress", activity: "正在验证路线", text: "已定位到路线问题，正在修复并验证。", model: "gpt-6.1-sol", effort: "high" })}\n`);
@@ -253,6 +258,7 @@ try {
   await TestAppServerSteering(directory);
   TestLegacyProgress(directory);
   await TestLegacyRecovery(directory, server, base);
+  await TestRouteReload(directory);
   console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final-only replies, resume, live steering, idempotent retries and persisted history");
 } finally {
   for (const child of realChildren) {
@@ -267,6 +273,43 @@ try {
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
   fs.rmSync(directory, { recursive: true, force: true });
+}
+
+async function TestRouteReload(directory) {
+  const root = path.join(directory, "ReloadablePreview");
+  const file = path.join(root, "scripts", "Script_EncounterCodexServer.mjs");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  function WriteVersion(version) {
+    fs.writeFileSync(file, `
+      export function CreateEncounterCodexHandler(root, { state }) {
+        state.active.set("loads", (state.active.get("loads") || 0) + 1);
+        return (request, response) => {
+          if (request.method === "POST") state.submissions.set("pending", "live request");
+          response.writeHead(${version === 1 ? 404 : 200}, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ version: ${version}, loads: state.active.get("loads"), pending: state.submissions.get("pending") }));
+        };
+      }
+    `);
+  }
+  WriteVersion(1);
+  const preview = http.createServer(CreateReloadableEncounterCodexHandler(root));
+  preview.listen(0, "127.0.0.1"); await once(preview, "listening");
+  const url = `http://127.0.0.1:${preview.address().port}/__encounter/codex/sessions/${randomUUID()}`;
+  try {
+    assert.equal((await fetch(url, { method: "POST" })).status, 404);
+    WriteVersion(2);
+    const responses = await Promise.all([fetch(url, { method: "DELETE" }), fetch(url, { method: "DELETE" })]);
+    for (const response of responses) {
+      assert.equal(response.status, 200, "a new deletion route loads on the existing preview port");
+      assert.deepEqual(await response.json(), { version: 2, loads: 2, pending: "live request" }, "concurrent requests share one upgrade and retain live state");
+    }
+    fs.writeFileSync(file, "export function {");
+    assert.equal((await fetch(url)).status, 503, "an incomplete source update returns a retryable error");
+    WriteVersion(3);
+    assert.deepEqual(await (await fetch(url)).json(), { version: 3, loads: 3, pending: "live request" }, "a repaired update recovers on the same port with its state intact");
+  } finally {
+    preview.closeAllConnections(); await new Promise(resolve => preview.close(resolve));
+  }
 }
 
 async function TestAppServerSteering(directory) {
