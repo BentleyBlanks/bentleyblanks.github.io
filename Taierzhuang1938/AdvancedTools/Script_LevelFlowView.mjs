@@ -154,7 +154,7 @@ export class FlowMapView {
     return [a[0],b[0],a[1],b[1]];
   }
 
-  DrawBase(context,width,height,frame) {
+  DrawBase(context,width,height,frame,layers={}) {
     const map=this.mapData,Screen=(point)=>this.ToScreen(point),scale=this.scale;
     context.fillStyle="#e7e2d2";context.fillRect(0,0,width,height);
     for(const paint of map.paint) {
@@ -265,10 +265,10 @@ export class FlowMapView {
       if(point[0]<10||point[0]>width-35||point[1]<20||point[1]>height-20) continue;
       Line(context,[[point[0]-4,point[1]-4],[point[0]+4,point[1]+4]],"#a7503f",1.5);
       Line(context,[[point[0]-4,point[1]+4],[point[0]+4,point[1]-4]],"#a7503f",1.5);
-      Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
+      if(layers.landmarks!==false) Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
     }
     const occupied=[];
-    for(const landmark of map.labels) {
+    if(layers.landmarks!==false) for(const landmark of map.labels) {
       const point=Screen(landmark.p);
       if(point[0]<12||point[0]>width-45||point[1]<24||point[1]>height-24) continue;
       if(scale<0.8&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
@@ -331,14 +331,14 @@ export class FlowMapView {
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
-    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey]);
+    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false]);
     if(key!==this.baseKey) {
       if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
       // Fractional CSS sizes leave a partially covered last pixel. Clear the
       // full backing surface without reallocating it, preventing edge trails.
       background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
-      this.DrawBase(background,width,height,frame);this.baseKey=key;
+      this.DrawBase(background,width,height,frame,layers);this.baseKey=key;
     }
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;

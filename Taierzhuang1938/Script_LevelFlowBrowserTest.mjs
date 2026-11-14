@@ -123,6 +123,25 @@ try {
     'entering, moving, leaving and carried boxes invalidate the current color/depth frame');
   assert.ok(backgroundCache.visibleChanged&&backgroundCache.cleared,'cached backgrounds neither freeze moving vehicles nor retain their trails');
   assert.ok(backgroundCache.stableEdges,'fractional CSS dimensions do not accumulate color at the canvas edge');
+  const landmarkLabels=await page.evaluate(async()=>{
+    const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const map={paint:[],fieldZones:[],fields:[],footpaths:[],trenches:[],floors:[],river:[],objects:[],markers:[],ramps:[],
+      roads:[{points:[[-4,0],[4,0]],width:1,caps:['from']}],labels:[{name:'测试掩体',p:[0,0]}]};
+    const view=new FlowMapView(canvas,map);view.center=[0,0];view.scale=5;
+    const frame={...LevelFlow.Evaluate(384),actors:[{id:'player',pose:'stand',p:[10000,10000],side:'player'}],effects:[],triggers:[],groups:[]};
+    const background=view.baseCanvas.getContext('2d'),fillText=background.fillText.bind(background);
+    let labels=[];background.fillText=(text,...args)=>{labels.push(text);fillText(text,...args);};
+    view.Draw(frame,{landmarks:true},null);const shown=canvas.toDataURL(),initial=[...labels];
+    labels=[];view.Draw(frame,{landmarks:false},null);const hidden=canvas.toDataURL(),off=[...labels];
+    labels=[];view.Draw(frame,{landmarks:true},null);const restored=canvas.toDataURL(),on=[...labels];
+    view.Draw(frame,{},null);const legacy=canvas.toDataURL();
+    canvas.remove();return {initial,off,on,changed:shown!==hidden,restored:shown===restored,legacy:shown===legacy};
+  });
+  assert.deepEqual(landmarkLabels.initial,['死巷','测试掩体']);
+  assert.deepEqual(landmarkLabels.off,[],'turning scene names off invalidates the background and omits its text');
+  assert.deepEqual(landmarkLabels.on,landmarkLabels.initial);
+  assert.ok(landmarkLabels.changed&&landmarkLabels.restored&&landmarkLabels.legacy,'scene labels toggle without moving the camera and older settings keep labels visible');
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
@@ -397,7 +416,21 @@ try {
   await fireMenu.locator('summary').click();await fireMenu.locator('[data-layer="fire"]').uncheck();
   const layerState=await page.evaluate(()=>LevelFlow.Inspect().viewports.views.map(view=>view.layers));
   assert.equal(layerState[0].fire,false);assert.equal(layerState[1].fire,true,'display settings belong to each viewport');
-  await fireMenu.locator('[data-layer="fire"]').check();await fireMenu.locator('summary').click();
+  await fireMenu.locator('[data-layer="fire"]').check();
+  await fireMenu.locator('[data-layer="landmarks"]').uncheck();
+  const hiddenLandmarks=await page.evaluate(()=>LevelFlow.Packet().context.viewports);
+  assert.equal(hiddenLandmarks.views[0].layers.landmarks,false);
+  assert.equal(hiddenLandmarks.views[1].layers.landmarks,true,'scene names belong to each viewport');
+  assert.equal(hiddenLandmarks.views[0].layers.names,true,'scene names leave the character-name setting independent');
+  await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),hiddenLandmarks);
+  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),false,'saved frame layouts restore the scene-name setting');
+  const invalidLandmarks=structuredClone(hiddenLandmarks);invalidLandmarks.views[0].layers.landmarks='off';
+  assert.equal(await page.evaluate(layout=>{try{LevelFlow.RestoreViewports(layout);return false;}catch{return true;}},invalidLandmarks),true);
+  const legacyLandmarks=structuredClone(hiddenLandmarks);
+  for(const view of legacyLandmarks.views) delete view.layers.landmarks;
+  await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),legacyLandmarks);
+  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),true,'older layouts default to visible scene names');
+  await fireMenu.locator('summary').click();
   let downloads=0;page.on('download',()=>downloads++);
   await page.click('#attachCodexScreenshot');
   await page.click('#copyScreenshot');

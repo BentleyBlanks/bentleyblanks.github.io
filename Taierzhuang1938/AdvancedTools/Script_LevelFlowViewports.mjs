@@ -25,8 +25,8 @@ export class EncounterViewports {
       const layerMenu=document.createElement("details");layerMenu.className="lfViewLayers";
       const layerSummary=document.createElement("summary");layerSummary.textContent="显示";layerMenu.append(layerSummary);
       const layerOptions=document.createElement("div");layerMenu.append(layerOptions);bar.append(layerMenu);
-      const layers={fire:true,triggers:true,spawns:true,routes:true,names:true};
-      for(const [key,label] of [["fire","火力"],["triggers","触发"],["spawns","生成"],["routes","路线"],["names","人名"]]) {
+      const layers={fire:true,triggers:true,spawns:true,routes:true,names:true,landmarks:true};
+      for(const [key,label] of [["fire","火力"],["triggers","触发"],["spawns","生成"],["routes","路线"],["names","人名"],["landmarks","场景名称"]]) {
         const wrapper=document.createElement("label"),input=document.createElement("input");
         input.type="checkbox";input.checked=true;input.dataset.layer=key;input.setAttribute("aria-label",`视口 ${index+1} ${label}`);
         input.onchange=()=>{layers[key]=input.checked;this.callbacks.change();};
@@ -183,6 +183,7 @@ export class EncounterViewports {
       const entry=this.entries[index],rect=entry.canvas.getBoundingClientRect();
       if(saved.layers) {
         Object.assign(entry.layers,saved.layers);
+        entry.layers.landmarks=saved.layers.landmarks??true;
         for(const input of entry.layerMenu.querySelectorAll("input")) input.checked=entry.layers[input.dataset.layer];
       }
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
