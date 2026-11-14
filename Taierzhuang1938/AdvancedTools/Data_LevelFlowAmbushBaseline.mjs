@@ -319,3 +319,257 @@ export const FLOW_PREVIOUS_TANK_APPROACH = {
     }
   ]
 };
+
+export const FLOW_PREVIOUS_STREET_DEFENSE = {
+  "revision": "2026-11-14-double-tank-destruction-1",
+  "groups": [
+    {
+      "id": "EastStreet",
+      "label": "东街援兵",
+      "beat": "10b",
+      "endBeat": "10e",
+      "triggerId": "Trigger_EastStreet",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          232,
+          465
+        ],
+        "size": [
+          2.4,
+          3
+        ]
+      },
+      "route": [
+        [
+          232,
+          465
+        ],
+        [
+          207,
+          458
+        ],
+        [
+          178,
+          461
+        ],
+        [
+          166,
+          461
+        ],
+        [
+          147,
+          461
+        ],
+        [
+          133,
+          465
+        ]
+      ],
+      "count": 15,
+      "interval": 10,
+      "maxAlive": 5,
+      "lifetime": 44,
+      "speed": 2.5,
+      "grenadeInterval": 0,
+      "behavior": "bounds",
+      "note": "提议每 30 秒补三人；同时前排最多五人；12 副担架过完、哨响即停"
+    },
+    {
+      "id": "NorthYard",
+      "label": "北院包抄",
+      "beat": "10d",
+      "endBeat": "10d",
+      "triggerId": "Trigger_NorthYard",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          166,
+          449
+        ],
+        "size": [
+          2.4,
+          3
+        ]
+      },
+      "route": [
+        [
+          166,
+          449
+        ],
+        [
+          146,
+          449
+        ],
+        [
+          128,
+          450
+        ],
+        [
+          123,
+          457
+        ]
+      ],
+      "count": 3,
+      "interval": 2.5,
+      "maxAlive": 3,
+      "lifetime": 34,
+      "speed": 2.5,
+      "grenadeInterval": 0,
+      "behavior": "advance",
+      "note": "一次三人，先有砸门声，再从西北破门"
+    },
+    {
+      "id": "TempleGun",
+      "label": "土地庙机枪",
+      "beat": "10c",
+      "endBeat": "10e",
+      "triggerId": "Trigger_TempleGun",
+      "enabled": true,
+      "side": "enemy",
+      "target": "player",
+      "area": {
+        "shape": "rect",
+        "center": [
+          181,
+          480
+        ],
+        "size": [
+          3,
+          3
+        ]
+      },
+      "route": [
+        [
+          181,
+          480
+        ]
+      ],
+      "count": 2,
+      "interval": 2,
+      "maxAlive": 2,
+      "lifetime": 140,
+      "speed": 2.2,
+      "behavior": "suppress",
+      "note": "关卡调度布设"
+    },
+    {
+      "id": "MortarTeam",
+      "label": "场院掷弹筒",
+      "beat": "10c",
+      "endBeat": "10e",
+      "triggerId": "Trigger_MortarTeam",
+      "enabled": true,
+      "side": "enemy",
+      "target": "none",
+      "area": {
+        "shape": "rect",
+        "center": [
+          199,
+          449
+        ],
+        "size": [
+          3,
+          3
+        ]
+      },
+      "route": [
+        [
+          199,
+          449
+        ]
+      ],
+      "count": 2,
+      "interval": 2,
+      "maxAlive": 2,
+      "lifetime": 140,
+      "speed": 2.2,
+      "behavior": "guard",
+      "note": "关卡调度布设"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "Trigger_EastStreet",
+      "label": "东街援兵",
+      "beat": "10b",
+      "endBeat": "10e",
+      "mode": "area",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          114,
+          465
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "id": "Trigger_NorthYard",
+      "label": "北院包抄",
+      "beat": "10d",
+      "endBeat": "10d",
+      "mode": "area",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          112,
+          467
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "id": "Trigger_TempleGun",
+      "label": "土地庙机枪",
+      "beat": "10c",
+      "endBeat": "10e",
+      "mode": "time",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          114,
+          465
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "id": "Trigger_MortarTeam",
+      "label": "场院掷弹筒",
+      "beat": "10c",
+      "endBeat": "10e",
+      "mode": "time",
+      "delay": 0,
+      "area": {
+        "shape": "rect",
+        "center": [
+          114,
+          465
+        ],
+        "size": [
+          6,
+          6
+        ]
+      }
+    }
+  ]
+};

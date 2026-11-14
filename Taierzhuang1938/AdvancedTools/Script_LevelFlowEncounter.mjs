@@ -1,6 +1,8 @@
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
-import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
+import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
+import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -123,7 +125,14 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-15-village-engagement-1",triggers,groups,annotations:[]};
+  for(const staging of FLOW_STREET_DEFENSE.groups) {
+    const group=groups.find(entry=>entry.id===staging.id);
+    Object.assign(group,structuredClone(staging));
+    Object.assign(triggers.find(entry=>entry.id===group.triggerId),{
+      beat:group.beat,endBeat:group.endBeat,mode:"time",delay:0,
+    });
+  }
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-15-street-defense-2",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -164,11 +173,18 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.spawnOffsets===undefined || Array.isArray(group.spawnOffsets) && group.spawnOffsets.length>0 && group.spawnOffsets.length<=40 && group.spawnOffsets.every(CheckPoint), "分散生成点无效");
     Require(group.memberPlans===undefined || Array.isArray(group.memberPlans) && group.memberPlans.length>0 && group.memberPlans.length<=40
       && group.memberPlans.every(plan=>plan && Number.isFinite(plan.delay) && plan.delay>=0 && plan.delay<=60
+        && (plan.lifetime===undefined || Number.isFinite(plan.lifetime) && plan.lifetime>=2 && plan.lifetime<=2000)
         && Array.isArray(plan.route) && plan.route.length>0 && plan.route.length<=100 && plan.route.every(CheckPoint)), "单兵推进计划无效");
     Require(group.deployDelay===undefined || Number.isFinite(group.deployDelay) && group.deployDelay>=0 && group.deployDelay<=60, "隐蔽集结时长无效");
     Require(group.standoffMetres===undefined || Number.isFinite(group.standoffMetres) && group.standoffMetres>=0 && group.standoffMetres<=100, "追击距离无效");
     Require(group.spacingMetres===undefined || Number.isFinite(group.spacingMetres) && group.spacingMetres>=0 && group.spacingMetres<=10, "单兵间距无效");
     Require(group.coverWaitSeconds===undefined || Number.isFinite(group.coverWaitSeconds) && group.coverWaitSeconds>=0 && group.coverWaitSeconds<=60, "掩护停留时长无效");
+    Require(group.firingArea===undefined || CheckArea(group.firingArea), "射击区域无效");
+    Require(group.withdrawAlongRoute===undefined || typeof group.withdrawAlongRoute==="boolean", "沿原路撤离开关无效");
+    Require(group.fireCycle===undefined || group.fireCycle && Number.isFinite(group.fireCycle.seconds)
+      && group.fireCycle.seconds>=1 && group.fireCycle.seconds<=120 && Number.isFinite(group.fireCycle.active)
+      && group.fireCycle.active>0 && group.fireCycle.active<=group.fireCycle.seconds
+      && Number.isFinite(group.fireCycle.offset) && group.fireCycle.offset>=0, "射击与换弹节奏无效");
     if(group.suppressedBy!==undefined) {
       Require(group.side==="enemy" && Array.isArray(group.suppressedBy) && group.suppressedBy.length>0
         && group.suppressedBy.every(id=>typeof id==="string" && id.length>0 && !input.groups.some(defender=>defender.id===id && defender.side!=="friend")), "阻击方须引用友军组");
@@ -242,7 +258,7 @@ export function CompileEncounters(document, timeline) {
       const ready=previousBatch ? previousBatch.fall+batchSlot*group.interval : slot?.fall??start;
       const born=Math.max(start+index*group.interval,ready);
       if(born>=end) break;
-      lives.push({born,fall:born+group.lifetime});
+      lives.push({born,fall:born+(group.memberPlans?.[batchSlot]?.lifetime ?? group.lifetime)});
     }
     const holdBeat=beats.get(group.holdUntil?.beat);
     const compiled={...group,start,end,lives,engageAt:group.engageOn?beats.get(group.engageOn).start:-Infinity,holdUntilTime:holdBeat?holdBeat.start+holdBeat.duration*group.holdUntil.fraction:null};
@@ -392,14 +408,17 @@ function CoverMovement(group,index,time) {
 
 function GroupActor(group,index,time,coreActors) {
   const life=group.lives[index];
+  const survivesWithdrawal=group.withdrawAlongRoute && life.fall>=group.end;
+  const dead=!survivesWithdrawal && time>=life.fall;
   const slot=index%group.maxAlive,offset=group.spawnOffsets?.[slot];
   const readyAt=life.born+(group.deployDelay||0)+(group.memberPlans?.[slot]?.delay||0);
-  const age=Math.max(0,Math.min(time,life.fall)-readyAt);
+  const sampleTime=group.withdrawAlongRoute?Math.min(time,group.end):time;
+  const age=Math.max(0,Math.min(sampleTime,life.fall)-readyAt);
   const path=GroupPath(group,index);
   const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
   const total=lengths.reduce((sum,length)=>sum+length,0);
   const stationary=["suppress","guard"].includes(group.behavior);
-  const movement=group.standoffMetres||group.behavior==="bounds"?CoverMovement(group,index,Math.min(time,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
+  const movement=group.standoffMetres||group.behavior==="bounds"?CoverMovement(group,index,Math.min(sampleTime,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
   let distance=stationary?0:Math.min(total,movement.distance);
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
@@ -410,6 +429,7 @@ function GroupActor(group,index,time,coreActors) {
     if(distance>=limit) movement.moving=tank.moving;
     distance=Math.min(distance,limit);
   }
+  if(group.withdrawAlongRoute && time>=group.end && !dead) distance=Math.max(0,distance-(time-group.end)*group.speed);
   let position=SampleRoute(path,total?distance/total:0);
   const slots=Math.min(group.count,group.maxAlive);
   const columns=Math.ceil(Math.sqrt(slots)),rows=Math.ceil(slots/columns);
@@ -417,22 +437,29 @@ function GroupActor(group,index,time,coreActors) {
     ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
     : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
   position=[position[0]+spread[0],position[1]+spread[1]];
-  let pose=time>=life.fall?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
+  let pose=dead?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
   if(time<group.engageAt && pose==="shoot") pose="kneel";
+  if(group.withdrawAlongRoute && time>=group.end && !dead) pose="run";
+  const inFiringArea=!group.firingArea || InsideArea(position,group.firingArea);
+  const firingWindow=!group.fireCycle || (time-life.born+group.fireCycle.offset+slot*0.7)%group.fireCycle.seconds<group.fireCycle.active;
+  const firing=time<group.end && group.behavior!=="withdraw" && group.target!=="none" && pose==="shoot" && inFiringArea && firingWindow;
+  if(pose==="shoot" && !firing && group.fireCycle) pose="kneel";
   return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
-    heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing:time<group.end&&group.behavior!=="withdraw"&&group.target!=="none"&&pose==="shoot"};
+    ...(group.withdrawAlongRoute ? {withdrawn:time>=group.end && !dead && distance<=0} : {}),
+    heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing};
 }
 
 export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors) {
   const actors=[],effects=[];
   const player=coreActors.find((actor)=>actor.id==="player");
   for(const group of plan.groups) {
-    if(group.start===null||!group.enabled||time<group.start||time>group.end+8) continue;
+    if(group.start===null||!group.enabled||time<group.start||!group.withdrawAlongRoute&&time>group.end+8) continue;
     for(let index=0;index<group.lives.length;index++) {
       const life=group.lives[index];
-      if(time<life.born||time>life.fall+8) continue;
-      actors.push(GroupActor(group,index,time,coreActors));
+      if(time<life.born||time>life.fall+8 && !(group.withdrawAlongRoute && life.fall>=group.end)) continue;
+      const actor=GroupActor(group,index,time,coreActors);
+      if(!actor.withdrawn) actors.push(actor);
       if(group.side!=="enemy"||!group.grenadeInterval||group.target==="none") continue;
       const interval=group.grenadeInterval,first=life.born+5+index*1.7;
       const launch=first+Math.floor((time-first)/interval)*interval,age=time-launch;
@@ -458,7 +485,7 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
       !nearest||Distance(actor.p,guard.p)<Distance(actor.p,nearest.p)?guard:nearest,null);
     const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
       :actor.target==="ramp"?{p:[100,384]}:casualty||coveringTarget||(coreActors.find((item)=>item.id===actor.target)??player);
-    if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
+    if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,sourceId:actor.id,targetId:target.id,groupId:actor.groupId,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
   }
   return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),
     groups:plan.groups.map((group)=>({...group,spawned:group.lives.filter((life)=>time>=life.born).length,
@@ -639,7 +666,7 @@ function UpgradeOpeningDefense(input,defaults) {
   return value;
 }
 
-export function UpgradeEncounterDocument(input,defaults) {
+function UpgradeExistingEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
   if(input.revision==="2026-11-14-double-tank-destruction-1") return UpgradeVillageEngagement(structuredClone(input),defaults);
   if(input.revision==="2026-11-14-tank-approach-1") return UpgradeTankDestruction(structuredClone(input),defaults);
@@ -668,6 +695,25 @@ export function UpgradeEncounterDocument(input,defaults) {
     }
   }
   return UpgradeTankDestruction(UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults),defaults);
+}
+
+export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision===defaults.revision) return input;
+  const upgraded=UpgradeExistingEncounterDocument(input,defaults);
+  if(upgraded===input && !["2026-11-15-village-engagement-1","2026-11-15-street-defense-1"].includes(input.revision)) return input;
+  const value=structuredClone(upgraded);
+  for(const collection of ["groups","triggers"]) for(const previous of FLOW_PREVIOUS_STREET_DEFENSE[collection]) {
+    const current=value[collection].find(entry=>entry.id===previous.id);
+    const next=defaults[collection].find(entry=>entry.id===previous.id);
+    if(!current || !next) continue;
+    const spatialKeys=collection==="groups"?["area","route","memberPlans","spawnOffsets"]:["area"];
+    const spatialEdited=spatialKeys.some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]));
+    for(const [key,entry] of Object.entries(next)) {
+      if(spatialEdited && [...spatialKeys,"behavior","firingArea"].includes(key)) continue;
+      if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
+    }
+  }
+  return UpgradeVillageEngagement(value,defaults);
 }
 
 function UpgradeTankDestruction(value,defaults) {

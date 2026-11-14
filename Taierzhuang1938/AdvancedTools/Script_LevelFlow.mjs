@@ -175,7 +175,9 @@ function Render(preparedFrame=null) {
   if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
   chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
-  Element("mapReadout").textContent=`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`;
+  Element("mapReadout").textContent=frame.stretchersPassed===null
+    ?`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`
+    :`${frame.defenseWarning || frame.beat.task} · 担架 ${frame.stretchersPassed}/12`;
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
@@ -359,7 +361,7 @@ async function Start() {
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
     SetViewType:(index,type)=>workspace.SetType(index,type),

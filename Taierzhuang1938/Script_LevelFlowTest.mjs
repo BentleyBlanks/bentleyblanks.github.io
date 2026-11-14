@@ -16,6 +16,8 @@ import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel061
 import { FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
+import { FLOW_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlow.mjs";
+import { FLOW_PREVIOUS_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 
 const transferEnd = BeatById("09e").end;
 const transferArrival = EvaluateFlow(transferEnd).actors.filter(actor => actor.groupId === "YardTransfer");
@@ -1266,6 +1268,110 @@ for(let stamp=BeatById("10d").start;stamp<BeatById("10f").end;stamp+=0.5) {
   assert.equal(winter.parentId,"cart");assert.equal(winter.elevation,1.05);assert.equal(winter.heading,cart.heading);assert.ok(Distance(winter.p,cart.p)<0.2);
 }
 
+
+// The street sample keeps one legible defense task while covered pairs close
+// the distance. All checks sample the same public entry point as the editor.
+const streetIds=FLOW_STREET_DEFENSE.groups.map(group=>group.id);
+const streetStart=BeatById("10b").start,streetEnd=BeatById("10f").start;
+const streetWalls=map.objects.filter(object=>object.pos[0]>90 && object.pos[0]<220 && object.pos[2]>430 && object.pos[2]<495
+  && object.size[1]>=1.5 && (!Number.isFinite(object.pos[1]) || object.pos[1]<1.5)
+  && !object.hideOn && !object.showOn);
+const streetOccluders=streetWalls.map(wall=>{
+  const [x,,z]=wall.pos,[width,height,depth]=wall.size,base=terrain.heightAt(x,z);
+  return {min:[x-width/2,base,z-depth/2],max:[x+width/2,base+height,z+depth/2]};
+});
+function StreetSightBlocked(from,to) {
+  return streetOccluders.some(box=>{
+    let enter=0,exit=1;
+    for(let axis=0;axis<3;axis++) {
+      const delta=to[axis]-from[axis];
+      if(Math.abs(delta)<1e-8) {
+        if(from[axis]<box.min[axis] || from[axis]>box.max[axis]) return false;
+      } else {
+        const first=(box.min[axis]-from[axis])/delta,last=(box.max[axis]-from[axis])/delta;
+        enter=Math.max(enter,Math.min(first,last));
+        exit=Math.min(exit,Math.max(first,last));
+      }
+      if(enter>exit) return false;
+    }
+    return exit>0 && enter<1;
+  });
+}
+const streetActors=stamp=>EvaluateFlow(stamp).actors.filter(actor=>streetIds.includes(actor.groupId));
+let boundingFrames=0,enemyFireFrames=0,northFireFrames=0;
+for(let stamp=streetStart;stamp<streetEnd;stamp+=0.5) {
+  const frame=EvaluateFlow(stamp),enemies=streetActors(stamp),east=enemies.filter(actor=>actor.groupId==="EastStreet" && actor.pose!=="dead");
+  assert.ok(east.length<=4,"east-street live budget stays at four");
+  if(east.some(actor=>actor.pose==="run") && east.some(actor=>actor.firing)) boundingFrames++;
+  if(frame.effects.some(effect=>effect.kind==="fire" && effect.side==="enemy" && streetIds.includes(effect.groupId))) enemyFireFrames++;
+  if(frame.effects.some(effect=>effect.kind==="fire" && effect.groupId==="NorthYard")) northFireFrames++;
+  const stretchers=frame.actors.filter(actor=>actor.id.startsWith("stretcher"));
+  for(const actor of [...enemies.filter(actor=>actor.pose!=="dead"),...frame.actors.filter(actor=>actor.defenseSector),...stretchers]) {
+    assert.ok(!streetWalls.some(wall=>Math.abs(actor.p[0]-wall.pos[0])<wall.size[0]/2+0.16
+      && Math.abs(actor.p[1]-wall.pos[2])<wall.size[2]/2+0.16),`${actor.id} clears real walls and buildings at ${stamp}`);
+  }
+  for(let index=0;index<frame.stretchersPassed;index++) {
+    assert.ok(frame.actors.find(actor=>actor.id===`stretcher${index}`).p[1]>=472,"counted stretchers have cleared the alley mouth with their full length");
+  }
+  for(const shot of frame.effects.filter(effect=>effect.kind==="fire" && effect.sourceId)) {
+    const shooter=frame.actors.find(actor=>actor.id===shot.sourceId);
+    if(!shooter.defenseSector && !streetIds.includes(shooter.groupId)) continue;
+    const ground=terrain.heightAt(...shot.a);
+    assert.ok(!StreetSightBlocked([shot.a[0],ground+1.4,shot.a[1]],
+      [shot.b[0],terrain.heightAt(...shot.b)+1.4,shot.b[1]]),`${shot.sourceId} fires through an open sightline at ${stamp}: ${JSON.stringify([shot.a,shot.b,shot.targetId])}`);
+  }
+}
+assert.ok(boundingFrames>8 && enemyFireFrames>50 && northFireFrames>0,"advancing pairs receive covering fire and the warned flank reaches the pocket");
+for(const group of defaults.groups.filter(group=>streetIds.includes(group.id))) {
+  const compiled=CompileEncounters(defaults,FLOW_TIMELINE).groups.find(entry=>entry.id===group.id);
+  for(const [index,life] of compiled.lives.entries()) for(const elapsed of [0,0.5]) {
+    const frame=EvaluateFlow(life.born+elapsed);
+    const actor=frame.actors.find(actor=>actor.id===`${group.id}_${index}`);
+    if(!actor) continue;
+    for(const eye of [frame.player,[114,465],[111,466.5],[105.5,464],[108.5,466]]) for(const height of [0.25,1,1.8]) for(const offset of [-0.25,0,0.25]) {
+      assert.ok(StreetSightBlocked([eye[0],terrain.heightAt(...eye)+1.6,eye[1]],
+        [actor.p[0]+offset,terrain.heightAt(...actor.p)+height,actor.p[1]]),`${actor.id} spawns behind real cover`);
+    }
+  }
+}
+const warningStart=BeatById("10d").start;
+assert.ok(EvaluateFlow(warningStart).defenseWarning);
+assert.equal(EvaluateFlow(warningStart+12).defenseWarning,null);
+assert.ok(streetActors(warningStart+11.5).filter(actor=>actor.groupId==="NorthYard").every(actor=>actor.pose==="kneel"),"flank waits for the full warning");
+assert.deepEqual(["10b","10c","10d","10e","10f"].map(id=>EvaluateFlow(BeatById(id).start).stretchersPassed),[0,4,8,8,12]);
+assert.equal(EvaluateFlow(BeatById("10e").end-0.01).stretchersPassed,12);
+assert.equal(EvaluateFlow(streetEnd+1).effects.filter(effect=>effect.kind==="fire").length,0,"the withdrawal whistle ends all gunfire");
+assert.ok(streetActors(streetEnd+8.5).some(actor=>actor.groupId==="TempleGun" && actor.pose==="run"),"survivors keep retreating until they reach concealed origins");
+for(let stamp=streetEnd;stamp<streetEnd+45;stamp+=0.5) for(const actor of streetActors(stamp)) {
+  assert.ok(actor.pose==="run" || actor.pose==="dead");
+  assert.ok(!streetWalls.some(wall=>Math.abs(actor.p[0]-wall.pos[0])<wall.size[0]/2+0.16
+    && Math.abs(actor.p[1]-wall.pos[2])<wall.size[2]/2+0.16),`${actor.id} retraces the open route when withdrawing`);
+}
+assert.ok(!streetActors(FLOW_DURATION).some(actor=>actor.pose!=="dead"),"all surviving attackers have returned behind cover by the end");
+const streetSnapshot=EvaluateFlow(warningStart+38);
+EvaluateFlow(0);EvaluateFlow(FLOW_DURATION);
+assert.deepEqual(EvaluateFlow(warningStart+38),streetSnapshot,"street warning, targets and stretcher batches rewind identically");
+const oldStreet=structuredClone(defaults);
+oldStreet.revision=FLOW_PREVIOUS_STREET_DEFENSE.revision;
+for(const collection of ["groups","triggers"]) for(const previous of FLOW_PREVIOUS_STREET_DEFENSE[collection]) {
+  oldStreet[collection][oldStreet[collection].findIndex(entry=>entry.id===previous.id)]=structuredClone(previous);
+}
+assert.deepEqual(UpgradeEncounterDocument(oldStreet,defaults),defaults,"existing saved street layouts receive the sample");
+oldStreet.groups.find(group=>group.id==="EastStreet").count=9;
+oldStreet.groups.find(group=>group.id==="NorthYard").route[1][0]-=2;
+oldStreet.groups=oldStreet.groups.filter(group=>group.id!=="TempleGun");
+const customStreet=UpgradeEncounterDocument(oldStreet,defaults);
+assert.equal(customStreet.groups.find(group=>group.id==="EastStreet").count,9);
+assert.deepEqual(customStreet.groups.find(group=>group.id==="NorthYard").route,oldStreet.groups.find(group=>group.id==="NorthYard").route);
+assert.equal(customStreet.groups.find(group=>group.id==="NorthYard").memberPlans,undefined,"custom routes retain their path representation");
+assert.ok(!customStreet.groups.some(group=>group.id==="TempleGun"),"deleted groups stay deleted");
+ValidateEncounterDocument(customStreet,FLOW_TIMELINE);
+const earlyStreetDraft=structuredClone(defaults);
+earlyStreetDraft.revision="2026-11-15-street-defense-1";
+for(const group of earlyStreetDraft.groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) delete group.engageOn;
+assert.deepEqual(UpgradeEncounterDocument(earlyStreetDraft,defaults),defaults,"early street drafts also receive the village engagement signal");
+const futureStreetDraft={...earlyStreetDraft,revision:"future-layout-version"};
+assert.equal(UpgradeEncounterDocument(futureStreetDraft,defaults),futureStreetDraft,"unknown future documents retain their revision and authored fields");
 
 const screenshot={version:1,width:1280,height:720,image:"data:image/png;base64,AA==",marks:[{kind:"arrow",a:[2,3],b:[40,50],text:""}]};
 assert.deepEqual(ValidateScreenshot(screenshot),screenshot);

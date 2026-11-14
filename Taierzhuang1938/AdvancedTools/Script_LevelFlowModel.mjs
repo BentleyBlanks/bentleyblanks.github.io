@@ -1,10 +1,11 @@
 import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD, FLOW_YAOWA_RETURN, FLOW_AMBUSH_DEFENSE } from "./Data_LevelFlow.mjs";
 
-import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
+import { Clamp, Lerp, Distance, InsideArea, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
+import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -35,6 +36,50 @@ function Track(points, time) {
 // spawn events or mutates state, so backward seeks produce the same frame.
 function Keys(entries) {
   return entries.map(([id, fraction, x, z]) => [BeatById(id).start + BeatById(id).duration * fraction, x, z]);
+}
+
+const streetDefenderTracks=FLOW_STREET_DEFENSE.defenders.map(plan=>({...plan,track:Keys(plan.keys)}));
+const stretcherCrossings=FLOW_STREET_DEFENSE.stretcherBatches.flatMap(batch=>
+  Array.from({length:4},(_,index)=>BeatById(batch.beat).start+batch.delay+index*batch.interval));
+const streetWarningStart=BeatById(FLOW_STREET_DEFENSE.warning.beat).start+FLOW_STREET_DEFENSE.warning.delay;
+
+function StreetDefenseActors(actors,beat,time) {
+  if(beat.stage!=="10" || time>=BeatById("10f").end) return;
+  const start=BeatById("10b").start;
+  for(const plan of streetDefenderTracks) {
+    const actor=actors.find(entry=>entry.id===plan.id);
+    actor.p=Track(plan.track,time);
+    const moving=Distance(actor.p,Track(plan.track,time+0.02))>0.001;
+    const reload=(time-start+plan.offset)%FLOW_STREET_DEFENSE.reloadCycleSeconds
+      >=FLOW_STREET_DEFENSE.reloadCycleSeconds-FLOW_STREET_DEFENSE.reloadSeconds;
+    const firing=time>=start && time<BeatById("10f").start && !moving && !reload;
+    Object.assign(actor,{pose:moving?"run":firing?"shoot":"kneel",firing,defenseSector:plan.sector,
+      coveringEvacuation:firing,status:FLOW_STREET_DEFENSE.statuses[moving?"moving":reload?"reload":plan.sector==="NorthYard"?"north":"east"]});
+  }
+  const player=actors.find(actor=>actor.id==="player");
+  if(time<start) return;
+  const moving=Distance(player.p,SampleBeatRoute(beat,Clamp((time+0.02-beat.start)/beat.duration,0,1)))>0.001;
+  const reload=(time-start)%FLOW_STREET_DEFENSE.reloadCycleSeconds
+    >=FLOW_STREET_DEFENSE.reloadCycleSeconds-FLOW_STREET_DEFENSE.reloadSeconds;
+  const firing=time<BeatById("10f").start && !moving && !reload;
+  Object.assign(player,{pose:moving?"run":firing?"shoot":"kneel",firing,
+    defenseSector:beat.id==="10d"?"NorthYard":"EastStreet",
+    status:FLOW_STREET_DEFENSE.statuses[moving?"moving":reload?"reload":beat.id==="10d"?"north":"east"]});
+}
+
+function StreetDefenseFire(actors,time) {
+  const effects=[];
+  for(const defender of actors.filter(actor=>actor.defenseSector && actor.firing)) {
+    const sector=FLOW_STREET_DEFENSE.sectors[defender.defenseSector];
+    const candidates=actors.filter(enemy=>enemy.side==="enemy" && enemy.pose!=="dead"
+      && sector.groups.includes(enemy.groupId) && InsideArea(enemy.p,sector.area));
+    const target=candidates.reduce((nearest,enemy)=>!nearest || Distance(defender.p,enemy.p)<Distance(defender.p,nearest.p)?enemy:nearest,null);
+    if(!target) continue;
+    defender.heading=Math.atan2(target.p[0]-defender.p[0],-(target.p[1]-defender.p[1]));
+    effects.push({kind:"fire",a:defender.p,b:target.p,side:defender.side,sourceId:defender.id,targetId:target.id,
+      heavy:defender.id==="player",phase:(time*3.2+defender.p[0])%1});
+  }
+  return effects;
 }
 
 const winterKeys = Keys([
@@ -536,9 +581,10 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
   if (beat.id === "06c") actors.push(Actor("veteran", "抱捆老兵", "friend", "person", SampleRoute([[94,264],[96,263],[101,263],[101,257]], Math.min(1,progress*2)), progress > 0.5 ? "dead" : "run"));
   if(beat.stage === "10") {
     for(let index=0;index<12;index++) {
-      const cross=BeatById("10a").start+32+index*13.5;
-      const p=Track([[cross-110,115,380],[cross-95,100,383],[cross-12,100,458],
-        [cross,111,465],[cross+16,109,493],[cross+30,113.25,505],[cross+55,117,527],[cross+80,117,552]],time);
+      const cross=stretcherCrossings[index];
+      const p=Track([[cross-130,115,380],[cross-115,100,383],[cross-42,100,456-index%4*2.8],
+        [cross-22,100,456-index%4*2.8],[cross-14,100,461],[cross-8,104,465],[cross-2,109,469],[cross,109,472],
+        [cross+16,109,493],[cross+30,113.25,505],[cross+55,117,527],[cross+80,117,552]],time);
       actors.push(Actor(`stretcher${index}`,`担架 ${index+1}`,"civilian","quilt",p,"wounded"));
     }
     if(beat.id >= "10h") actors.push(Actor("platoon","负伤排长","friend","person",offset(-1,-3),"drag"));
@@ -579,6 +625,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
   WoundedEvacuation(actors, time);
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
   EvacuationActors(actors,time);
+  StreetDefenseActors(actors,beat,time);
   return actors;
 }
 
@@ -694,11 +741,11 @@ function Effects(beat, time, progress, actors) {
     if (defender.pose === "walk") continue;
     effects.push({kind:"fire",a:defender.p,b:blockers[0].p,side:"friend",phase:(time*2.1+defender.p[0])%1});
   }
-  for (const defender of actors.filter(actor => actor.firing && campDefenseTracks.some(plan => plan.id === actor.id))) {
+  for (const defender of actors.filter(actor => actor.firing && !actor.defenseSector && campDefenseTracks.some(plan => plan.id === actor.id))) {
     const target = targets.reduce((nearest, enemy) => !nearest || Distance(defender.p, enemy.p) < Distance(defender.p, nearest.p) ? enemy : nearest, null);
     if (target) effects.push({kind:"fire",a:defender.p,b:target.p,side:"friend",heavy:defender.heavy,phase:(time*3+defender.p[0])%1});
   }
-  if (["shoot","retreat"].includes(player.pose) && targets.length) {
+  if (["shoot","retreat"].includes(player.pose) && targets.length && !player.defenseSector) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
@@ -726,8 +773,9 @@ function Effects(beat, time, progress, actors) {
   if(beat.fx === "mortar") {
     const cycle=Math.floor((time-beat.start)/12),phase=((time-beat.start)%12)/3;
     const landing=[[127,467],[120,466],[113,474],[113,465]][Math.min(cycle,3)];
-    if(phase<=1) effects.push({kind:"grenade",a:[199,449],b:landing,phase});
-    else if(phase<1.7) effects.push({kind:"blast",p:landing,age:(phase-1)*2});
+    const mortar=actors.find(actor=>actor.groupId==="MortarTeam" && actor.pose!=="dead");
+    if(phase<=1 && mortar) effects.push({kind:"grenade",a:mortar.p,b:landing,phase});
+    else if(mortar && phase>1 && phase<1.7) effects.push({kind:"blast",p:landing,age:(phase-1)*2});
   }
   if(beat.fx === "artillery") {
     const age=(time-beat.start)%5;
@@ -771,7 +819,7 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
       Object.assign(actor,{firing,pose:firing?"shoot":"kneel",status:firing?id==="yao"?"班长开火后，从坡道接战":"从东院发起战斗":"隐蔽待命，不暴露友军位置"});
     }
   }
-  const effects = [...Effects(beat,time,progress,actors), ...encounter.effects];
+  const effects = [...Effects(beat,time,progress,actors), ...encounter.effects, ...StreetDefenseFire(actors,time)];
   if(villageEngaged) {
     for(const id of ["luo","he","yao"]) {
       const actor=actors.find(entry=>entry.id===id);
@@ -793,9 +841,11 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
 
   const nearest = actors.filter((actor)=>actor.side === "enemy" && actor.pose !== "dead")
     .reduce((value,actor)=>Math.min(value,Distance(player,actor.p)),Infinity);
-  const stretchersPassed=beat.stage === "10" ? Clamp(Math.floor((time-BeatById("10a").start-32)/13.5)+1,0,12) : null;
+  const stretchersPassed=beat.stage === "10" ? stretcherCrossings.filter(cross=>time>=cross).length : null;
+  const defenseWarning=time>=streetWarningStart && time<streetWarningStart+FLOW_STREET_DEFENSE.warning.seconds
+    ?FLOW_STREET_DEFENSE.warning.text:null;
   const dialogue = SampleFlowDialogue(beat, time, actors);
-  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed};
+  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed,defenseWarning};
 }
 
 export function FormatFlowTime(time) {
