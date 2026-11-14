@@ -49,6 +49,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 export const testDefs = {
   LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Encounter gates, continuous passage junctions, deterministic waves and annotation data" },
   LevelFlowAmbushTest: { file: "Script_LevelFlowAmbushTest.mjs", desc: "Infantry-first pursuit, evacuated civilians, named ambush trenches, bomb approaches and draft migration" },
+  LevelFlowFrontDefenseTest: { file: "Script_LevelFlowFrontDefenseTest.mjs", desc: "Covered pursuit, surviving friendly suppression, player forward defense and draft migration" },
   LevelFlowCodexTest: { file: "Script_LevelFlowCodexTest.mjs", desc: "Local Codex chat attachments, final replies, history and session resume" },
   LevelFlowChatBrowserTest: { file: "Script_LevelFlowChatBrowserTest.mjs", timeoutMs: 90000, desc: "Encounter chat columns, bubbles, marked screenshots, automatic context and reload" },
   LevelFlowBrowserTest: { file: "Script_LevelFlowBrowserTest.mjs", timeoutMs: 180000, desc: "Encounter editor 720p, connected T-junction pixels, independent viewports and PNG round-trip" },
@@ -920,7 +921,7 @@ export const domains = {
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowAmbushTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
+  levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},

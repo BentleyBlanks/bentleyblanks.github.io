@@ -1,6 +1,6 @@
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -30,6 +30,7 @@ export function CreateEncounterDocument(timeline, waves) {
       ...(wave.standoffMetres ? {standoffMetres:wave.standoffMetres} : {}),
       ...(wave.spacingMetres ? {spacingMetres:wave.spacingMetres} : {}),
       ...(wave.coverWaitSeconds !== undefined ? {coverWaitSeconds:wave.coverWaitSeconds} : {}),
+      ...(wave.suppressedBy ? {suppressedBy:[...wave.suppressedBy],suppressionStop:[...wave.suppressionStop]} : {}),
       count: wave.count, interval: wave.interval, maxAlive: wave.maxAlive ?? (wave.cyclic ? 5 : wave.count),
       lifetime: wave.lifetime ?? (wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval)), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
       behavior: wave.behavior || (wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance"),
@@ -41,8 +42,9 @@ export function CreateEncounterDocument(timeline, waves) {
     triggers.push({id:triggerId,label,beat,endBeat,mode:"time",delay:0,area:Area(Find(beat).p[0],6)});
     groups.push({id,label,beat,endBeat,triggerId,enabled:true,side,target,area:Area(center,3,3),route,count,interval:2,maxAlive:count,lifetime,speed:2.2,behavior,note:"关卡调度布设"});
   };
-  Add("RearPursuit","③ 北坡下沟第二波","03g","03h",[20,33],[[20,33],[17,36],[14.5,40],[12,44],[21.9,67.1],[26,76.6],[30,86],[32.5,101],[34,117]],3,"enemy","advance","player",54);
+  Add("RearPursuit","③ 北坡下沟第二波","03g","03h",[20,33],[[20,33],[17,36],[14.5,40],[12,44],[9.5,50],[9.5,57],[13.5,58],[21.9,67.1],[25.5,79],[25.5,83.8],[29,83.8],[29,89],[30,91],[32.5,101],[34,117]],3,"enemy","advance","player",54);
   const pursuit=groups.at(-1);pursuit.interval=2.5;pursuit.maxAlive=3;triggers.at(-1).delay=36;pursuit.standoffMetres=16;pursuit.grenadeInterval=11;pursuit.behavior="bounds";
+  Object.assign(pursuit,{suppressedBy:["DragGround","CrestWest","CampWestGun"],suppressionStop:[25.5,83.8],note:"北侧第二波绕过北沟工事；我军仍在阻击时守弯口沙包，不沿我军火线自杀式前进"});
   const escort=groups.find((group)=>group.id==="TankEscort");
   Object.assign(escort,{lifetime:182,speed:2.2,tankId:"tank1",grenadeInterval:12});
   Object.assign(triggers.find((trigger)=>trigger.id===escort.triggerId),{area:Area([86,225],8,8)});
@@ -99,7 +101,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-opening-defense-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-front-defense-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -145,6 +147,11 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.standoffMetres===undefined || Number.isFinite(group.standoffMetres) && group.standoffMetres>=0 && group.standoffMetres<=100, "追击距离无效");
     Require(group.spacingMetres===undefined || Number.isFinite(group.spacingMetres) && group.spacingMetres>=0 && group.spacingMetres<=10, "单兵间距无效");
     Require(group.coverWaitSeconds===undefined || Number.isFinite(group.coverWaitSeconds) && group.coverWaitSeconds>=0 && group.coverWaitSeconds<=60, "掩护停留时长无效");
+    if(group.suppressedBy!==undefined) {
+      Require(group.side==="enemy" && Array.isArray(group.suppressedBy) && group.suppressedBy.length>0
+        && group.suppressedBy.every(id=>typeof id==="string" && id.length>0 && !input.groups.some(defender=>defender.id===id && defender.side!=="friend")), "阻击方须引用友军组");
+      Require(CheckPoint(group.suppressionStop) && !group.memberPlans, "受阻停步点须为有效世界坐标，使用共用路线");
+    }
     Require(group.holdUntil===undefined || group.behavior==="bounds" && group.memberPlans && group.spawnOffsets
       && timeline.some(beat=>beat.id===group.holdUntil?.beat) && Number.isFinite(group.holdUntil.fraction)
       && group.holdUntil.fraction>=0 && group.holdUntil.fraction<=1, "阻击停留时刻无效");
@@ -216,10 +223,12 @@ export function CompileEncounters(document, timeline) {
     }
     const holdBeat=beats.get(group.holdUntil?.beat);
     const compiled={...group,start,end,lives,holdUntilTime:holdBeat?holdBeat.start+holdBeat.duration*group.holdUntil.fraction:null};
-    if(group.standoffMetres && !(group.behavior==="bounds" && group.memberPlans)) coverTracks.set(compiled,BuildPursuitTracks(compiled,route));
-    else if(group.behavior==="bounds") coverTracks.set(compiled,BuildCoverTracks(compiled,route));
     return compiled;
   });
+  for(const group of groups) {
+    if(group.standoffMetres && !(group.behavior==="bounds" && group.memberPlans)) coverTracks.set(group,BuildPursuitTracks(group,route,groups));
+    else if(group.behavior==="bounds") coverTracks.set(group,BuildCoverTracks(group,route));
+  }
   return {triggers,groups};
 }
 
@@ -251,7 +260,7 @@ export function GroupPath(group,index) {
 
 // Compile each soldier's cover-to-cover movement once, including waits for the
 // retreating front to move. Seeking samples these tracks without replaying AI.
-function BuildPursuitTracks(group, playerRoute) {
+function BuildPursuitTracks(group, playerRoute, groups) {
   return group.lives.map((life, index) => {
     const path = GroupPath(group, index);
     const total = path.slice(1).reduce((sum, point, entry) => sum + Distance(path[entry], point), 0);
@@ -259,7 +268,13 @@ function BuildPursuitTracks(group, playerRoute) {
     let distance = 0;
     const ready = life.born + (group.deployDelay || 0) + (group.memberPlans?.[index % group.maxAlive]?.delay || 0);
     for (let time = life.born + 0.25; time <= Math.min(life.fall, group.end); time += 0.25) {
-      const next = Math.min(total, distance + group.speed * 0.25);
+      const suppressed=group.suppressedBy?.some(id=>{
+        const defender=groups.find(entry=>entry.id===id);
+        return defender?.enabled && defender.start!==null && time<defender.end && defender.lives.some((life,index)=>
+          time>=life.born && time<life.fall && GroupActor(defender,index,time,[]).firing);
+      });
+      const stop=suppressed?RouteProjection(path,group.suppressionStop):total;
+      const next = Math.max(distance,Math.min(stop, distance + group.speed * 0.25));
       const candidate = SampleRoute(path, total ? next / total : 0);
       if (time >= ready && Distance(candidate, TimedPosition(playerRoute, time)) >= group.standoffMetres + Math.hypot(...group.area.size) / 2) distance = next;
       track.push([time, distance]);
@@ -402,7 +417,9 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
   const campGuards=coreActors.filter(actor=>actor.coveringEvacuation && actor.firing);
   for(const actor of [...actors,...rearGuards].filter((item)=>item.firing)) {
     const casualty=actor.groupId==="Corner" && rearGuards.find(guard=>time>=guard.fall-2 && time<=guard.fall+0.3);
-    const coveringTarget=actor.side==="enemy" && actor.target==="player" && campGuards.reduce((nearest,guard)=>
+    const suppression=plan.groups.find(group=>group.id===actor.groupId)?.suppressedBy;
+    const blockingGuards=suppression?actors.filter(guard=>guard.side==="friend" && guard.firing && suppression.includes(guard.groupId)):[];
+    const coveringTarget=actor.side==="enemy" && actor.target==="player" && [...campGuards,...blockingGuards].reduce((nearest,guard)=>
       !nearest||Distance(actor.p,guard.p)<Distance(actor.p,nearest.p)?guard:nearest,null);
     const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
       :actor.target==="ramp"?{p:[100,384]}:casualty||coveringTarget||(coreActors.find((item)=>item.id===actor.target)??player);
@@ -589,9 +606,8 @@ function UpgradeOpeningDefense(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
-  if(input.revision==="2026-11-14-bend-ambush-1") return UpgradeOpeningDefense(input,defaults);
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
-  if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,"2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
+  if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,FLOW_PREVIOUS_FRONT_DEFENSE.revision,"2026-11-14-opening-defense-1","2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const current=value.groups.find(entry=>entry.id===reinforcement.id);
@@ -606,6 +622,13 @@ export function UpgradeEncounterDocument(input,defaults) {
     current.deployDelay=next.deployDelay;
     const trigger=value.triggers.find(entry=>entry.id===current.triggerId);
     if(trigger?.mode==="time" && trigger.delay===0 && trigger.beat===previous.beat) trigger.beat=next.beat;
+  }
+  for(const previous of FLOW_PREVIOUS_FRONT_DEFENSE.groups) {
+    const current=value.groups.find(group=>group.id===previous.id),next=defaults.groups.find(group=>group.id===previous.id);
+    if(!current || !next || current.memberPlans || JSON.stringify(current.route)!==JSON.stringify(previous.route)) continue;
+    for(const [key,entry] of Object.entries(next)) {
+      if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
+    }
   }
   return UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults);
 }

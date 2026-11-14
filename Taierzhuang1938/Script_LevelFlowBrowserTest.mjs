@@ -293,7 +293,7 @@ try {
   await page.evaluate(()=>LevelFlow.Seek(459));
   const flankRefill=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==="TrafficFlank"&&actor.pose!=="dead"));
   assert.equal(flankRefill.length,3);
-  assert.ok(flankRefill.every(actor=>actor.born>438&&actor.p[1]>86),"the complete second batch advances through the marked bend");
+  assert.ok(flankRefill.every(actor=>actor.born>438&&actor.p[1]<85&&actor.firing),"the complete second batch holds behind cover while friendly blocking fire survives");
   await page.screenshot({path:path.join(out,"WestRampRefill.png")});
   await page.evaluate(()=>LevelFlow.Seek(424));
   const coverPixels=await page.evaluate(()=>["flowMap","flowMap2"].map(id=>{
@@ -841,6 +841,21 @@ try {
   await page.evaluate(time=>LevelFlow.Seek(time),FLOW_TIMELINE.find(beat=>beat.id==='06h').start+35);
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.find(actor=>actor.id==='tank1').disabled),true);
   await page.screenshot({path:path.join(out,'AmbushFrontApproach06H.png')});
+  for(const [stamp,centerX,centerZ,zoom,name] of [[383.35,24.55,57.44,10,'NorthPursuitCovered03G'],[433.301,36.39,106.45,6,'PursuitStoppedByDefense03H'],[504.217,68.97,127.76,6,'ShunziForwardDefense04C']]) {
+    await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${stamp}&x=${centerX}&z=${centerZ}&zoom=${zoom}`);
+    await page.waitForFunction(()=>window.LevelFlow);
+    await page.evaluate(({centerX,centerZ,zoom})=>{
+      LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'battle');
+      const layout=LevelFlow.Inspect().viewports;
+      Object.assign(layout.views[0],{mode:'manual',center:[centerX,centerZ],scale:zoom});
+      LevelFlow.RestoreViewports(layout);
+    },{centerX,centerZ,zoom});
+    const frame=await page.evaluate(()=>LevelFlow.Inspect());
+    if(stamp===383.35) assert.ok(frame.actors.filter(actor=>actor.groupId==='Rim').every(actor=>actor.p[1]<55&&actor.firing));
+    if(stamp===433.301) assert.ok(frame.actors.filter(actor=>['RearPursuit','TrafficFlank'].includes(actor.groupId)).every(actor=>actor.p[1]<85&&actor.firing));
+    if(stamp===504.217) assert.ok(frame.actors.find(actor=>actor.id==='player').firing&&frame.actors.find(actor=>actor.id==='player').p[1]<130);
+    await page.screenshot({path:path.join(out,name+'.png')});
+  }
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

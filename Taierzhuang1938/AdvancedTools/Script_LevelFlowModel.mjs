@@ -447,6 +447,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").star
   const aboard=time>=BeatById("06d").start;
   const winter=aboard?CartOffset(0,-0.1):time>=BeatById("06c").start?SampleRoute(winterLoadingRoute,loadingProgress):Track(winterKeys,time);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.cover?"kneel":beat.pose)];
+  if(beat.id==="04c") Object.assign(actors[0],{pose:progress<0.4?"run":"shoot",firing:progress>=0.4,status:progress<0.4?"前出射击壕":"前沿阻击"});
   const winterPose = time < OPENING_FRIENDLY_CRY_TIME ? "kneel" : "wounded";
   actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose,
     aboard?{parentId:"cart",elevation:1.05,heading}:loadingProgress>0?{elevation:1.05*Clamp((loadingProgress-0.85)/0.15,0,1),heading}
@@ -674,7 +675,7 @@ function Effects(beat, time, progress, actors) {
     const target = targets.reduce((nearest, enemy) => !nearest || Distance(defender.p, enemy.p) < Distance(defender.p, nearest.p) ? enemy : nearest, null);
     if (target) effects.push({kind:"fire",a:defender.p,b:target.p,side:"friend",heavy:defender.heavy,phase:(time*3+defender.p[0])%1});
   }
-  if (["shoot","retreat"].includes(beat.pose) && targets.length) {
+  if (["shoot","retreat"].includes(player.pose) && targets.length) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }

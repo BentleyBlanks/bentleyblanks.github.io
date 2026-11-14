@@ -516,7 +516,9 @@ assert.ok(secondBatch.every(life=>life.born<flank.end),"03H-to-04A transition al
 for(let stamp=flank.start;stamp<flank.end;stamp+=0.25) {
   assert.ok(EvaluateFlow(stamp).actors.filter(actor=>actor.groupId==="TrafficFlank"&&actor.pose!=="dead").length<=3);
 }
-assert.ok(EvaluateFlow(secondBatch[2].born+16).actors.some(actor=>actor.groupId==="TrafficFlank"&&actor.born>=secondBatch[0].born&&actor.p[1]>86&&actor.pose!=="dead"),"the second batch reaches the marked bend and continues south");
+const heldSecondBatch=EvaluateFlow(secondBatch[2].born+16).actors.filter(actor=>actor.groupId==="TrafficFlank"&&actor.born>=secondBatch[0].born&&actor.pose!=="dead");
+assert.equal(heldSecondBatch.length,3);
+assert.ok(heldSecondBatch.every(actor=>actor.p[1]<=84.8&&actor.firing),"the second batch holds behind bend cover while the friendly blocking line survives");
 const oldFlankDraft=structuredClone(defaults);
 oldFlankDraft.revision="2026-11-13-formation-1";
 Object.assign(oldFlankDraft.groups.find(group=>group.id==="TrafficFlank"),FLOW_PREVIOUS_FLANK.group);
