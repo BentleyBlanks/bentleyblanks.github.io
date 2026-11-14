@@ -1219,6 +1219,44 @@ assert.deepEqual(EvaluateFlow(villageStart + 26.4), villageSnapshot, "rewinding 
 const oldVillageDocument = new EncounterDocument(defaults, FLOW_TIMELINE, {getItem:()=>JSON.stringify(previousDraft), setItem:()=>{}}).value;
 assert.deepEqual(EvaluateFlow(BeatById("08c").start, oldVillageDocument).actors.filter(actor => actor.groupId === "VillageCasualties"),
   VillageActors(BeatById("08c").start), "saved encounter drafts also receive the missing screenplay actors");
+const villageBattleStart=BeatById("09e").start;
+const priorVillageDraft=structuredClone(defaults);
+priorVillageDraft.revision="2026-11-14-double-tank-destruction-1";
+for(const group of priorVillageDraft.groups) delete group.engageOn;
+priorVillageDraft.groups.find(group=>group.id==="VillageGun").count=2;
+priorVillageDraft.groups=priorVillageDraft.groups.filter(group=>group.id!=="VillageRifles");
+const migratedVillageDraft=UpgradeEncounterDocument(priorVillageDraft,defaults);
+assert.equal(migratedVillageDraft.revision,defaults.revision);
+assert.equal(migratedVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn,"09e");
+assert.equal(migratedVillageDraft.groups.find(group=>group.id==="VillageGun").count,2);
+assert.ok(!migratedVillageDraft.groups.some(group=>group.id==="VillageRifles"));
+assert.ok(!priorVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn,"migration does not mutate the attachment");
+const customVillageDraft=structuredClone(priorVillageDraft);
+customVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn="09f";
+assert.equal(UpgradeEncounterDocument(customVillageDraft,defaults).groups.find(group=>group.id==="VillageGun").engageOn,"09f");
+const invalidVillageDraft=structuredClone(defaults);
+invalidVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn="missing";
+assert.throws(()=>ValidateEncounterDocument(invalidVillageDraft,FLOW_TIMELINE),/接战拍号/);
+for(const document of [defaults,migratedVillageDraft]) {
+  for(let time=villageStart;time<villageBattleStart;time+=2) {
+    const frame=EvaluateFlow(time,document);
+    const shots=frame.effects.filter(effect=>effect.kind==="fire");
+    assert.ok(shots.every(effect=>effect.targetId?.startsWith("villager")),"before the leader opens fire, only civilian-targeted bursts are allowed");
+    assert.ok(frame.actors.filter(actor=>["luo","he","yao"].includes(actor.id)).every(actor=>!actor.firing),"frontline allies remain concealed");
+  }
+  const before=EvaluateFlow(villageBattleStart-0.001,document);
+  assert.ok(before.actors.some(actor=>actor.groupId==="SearchYard"));
+  assert.ok(!before.actors.some(actor=>actor.groupId==="YardTransfer"));
+  const first=EvaluateFlow(villageBattleStart,document);
+  assert.ok(first.effects.some(effect=>effect.sourceId==="luo"),"leader initiates the battle");
+  assert.ok(!first.actors.find(actor=>actor.id==="yao").firing,"yaowa waits for the leader's gunfire");
+  assert.ok(first.actors.some(actor=>actor.groupId==="YardTransfer"&&actor.pose==="run"),"search party responds in the battle beat");
+  const joined=EvaluateFlow(villageBattleStart+1.5,document);
+  assert.ok(joined.effects.some(effect=>effect.sourceId==="yao"),"yaowa joins after the signal");
+  assert.ok(joined.actors.some(actor=>actor.groupId==="VillageGun"&&actor.firing));
+  EvaluateFlow(BeatById("10a").start,document);
+  assert.deepEqual(EvaluateFlow(villageBattleStart+1.5,document),joined,"rewinding restores the same engagement order");
+}
 const boardedWinter=ActorAt("winter",BeatById("06d").start),boardingWinter=ActorAt("winter",BeatById("06d").start-0.001);
 assert.equal(boardedWinter.parentId,"cart","06D opens with winter already on the cart, matching its source passage");
 assert.ok(Distance(boardedWinter.p,boardingWinter.p)<0.01&&Math.abs(boardedWinter.elevation-boardingWinter.elevation)<0.01,"boarding has a continuous position and lift");

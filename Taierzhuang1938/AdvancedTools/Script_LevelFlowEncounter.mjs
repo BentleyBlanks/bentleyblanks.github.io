@@ -73,6 +73,7 @@ export function CreateEncounterDocument(timeline, waves) {
   Add("CrestEast","坡顶东侧接应","03g","04a",[43,129],[[43,129],[43,129]],2,"friend","guard","enemy",160);
   Add("VillageGun","北屋枪眼机枪组","08a","09i",[100,471.5],[[100,471.5]],3,"enemy","suppress","ramp",700);
   Add("VillageRifles","北屋与墙角守军","08a","09i",[104,471],[[104,471]],4,"enemy","guard","ramp",700);
+  for(const group of groups.filter(entry=>["VillageGun","VillageRifles"].includes(entry.id))) group.engageOn="09e";
   Add("SearchYard","街坊家搜人组","09a","09d",[74,459],[[74,459]],4,"enemy","guard","none",300);
   Add("SearchNeighbor","隔壁搜人组","09a","09d",[61,448],[[61,448]],2,"enemy","guard","none",300);
   Add("GateGuard","门房守卫","09e","09f",[73,465.5],[[73,465.5]],1,"enemy","guard","none",40);
@@ -122,7 +123,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-double-tank-destruction-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-15-village-engagement-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -176,6 +177,7 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.holdUntil===undefined || group.behavior==="bounds" && group.memberPlans && group.spawnOffsets
       && timeline.some(beat=>beat.id===group.holdUntil?.beat) && Number.isFinite(group.holdUntil.fraction)
       && group.holdUntil.fraction>=0 && group.holdUntil.fraction<=1, "阻击停留时刻无效");
+    Require(group.engageOn===undefined||timeline.some(beat=>beat.id===group.engageOn),"接战拍号无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
@@ -243,7 +245,7 @@ export function CompileEncounters(document, timeline) {
       lives.push({born,fall:born+group.lifetime});
     }
     const holdBeat=beats.get(group.holdUntil?.beat);
-    const compiled={...group,start,end,lives,holdUntilTime:holdBeat?holdBeat.start+holdBeat.duration*group.holdUntil.fraction:null};
+    const compiled={...group,start,end,lives,engageAt:group.engageOn?beats.get(group.engageOn).start:-Infinity,holdUntilTime:holdBeat?holdBeat.start+holdBeat.duration*group.holdUntil.fraction:null};
     return compiled;
   });
   for(const group of groups) {
@@ -415,7 +417,8 @@ function GroupActor(group,index,time,coreActors) {
     ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
     : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
   position=[position[0]+spread[0],position[1]+spread[1]];
-  const pose=time>=life.fall?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
+  let pose=time>=life.fall?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
+  if(time<group.engageAt && pose==="shoot") pose="kneel";
   return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
     heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing:time<group.end&&group.behavior!=="withdraw"&&group.target!=="none"&&pose==="shoot"};
@@ -638,6 +641,7 @@ function UpgradeOpeningDefense(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-14-double-tank-destruction-1") return UpgradeVillageEngagement(structuredClone(input),defaults);
   if(input.revision==="2026-11-14-tank-approach-1") return UpgradeTankDestruction(structuredClone(input),defaults);
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
   if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,FLOW_PREVIOUS_FRONT_DEFENSE.revision,"2026-11-14-front-defense-1","2026-11-14-opening-defense-1","2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
@@ -674,6 +678,14 @@ function UpgradeTankDestruction(value,defaults) {
     if(id==="Arrival_06h" && JSON.stringify(current.area)===JSON.stringify({shape:"circle",center:[101,281],size:[6,6]})) {
       current.area=structuredClone(next.area);
     }
+  }
+  return UpgradeVillageEngagement(value,defaults);
+}
+
+function UpgradeVillageEngagement(value,defaults) {
+  for(const id of ["VillageGun","VillageRifles"]) {
+    const group=value.groups.find(entry=>entry.id===id);
+    if(group && group.engageOn===undefined) group.engageOn=defaults.groups.find(entry=>entry.id===id).engageOn;
   }
   value.revision=defaults.revision;
   return value;

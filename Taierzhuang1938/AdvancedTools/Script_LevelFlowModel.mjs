@@ -165,8 +165,9 @@ function VillageGunfire(time, actors, effects) {
   const staging = FLOW_VILLAGE_CASUALTIES;
   const victim = actors.find(actor => actor.groupId === "VillageCasualties"
     && time >= actor.fall - staging.burstLeadSeconds && time <= actor.fall + staging.fallSeconds);
-  const gunner = actors.find(actor => actor.groupId === staging.gunGroup && actor.firing);
+  const gunner = actors.find(actor => actor.groupId === staging.gunGroup && actor.pose !== "dead");
   if (!victim || !gunner) return;
+  Object.assign(gunner,{pose:"shoot",firing:true,status:"向逃上主街的村民射击，尚未发现路沟友军"});
   // The existing gunner turns from the ramp to the escaping civilian.
   const shot = effects.find(effect => effect.kind === "fire" && Distance(effect.a, gunner.p) < 0.01);
   const burst = {kind: "fire", a: gunner.p, b: victim.p, side: gunner.side, heavy: true,
@@ -762,7 +763,23 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
     return CoreActors(sampleBeat,sampleTime,SampleBeatRoute(sampleBeat,sampleProgress),sampleProgress,tankStart);
   });
   actors.push(...OpeningActors(time), ...encounter.actors);
+  const villageEngaged=time>=BeatById("09e").start && time<BeatById("09j").end;
+  if(time>=BeatById("08a").start && time<BeatById("09j").end) {
+    for(const id of ["luo","he","yao"]) {
+      const actor=actors.find(entry=>entry.id===id);
+      const firing=villageEngaged && (id!=="yao" || time>=BeatById("09e").start+1.5);
+      Object.assign(actor,{firing,pose:firing?"shoot":"kneel",status:firing?id==="yao"?"班长开火后，从坡道接战":"从东院发起战斗":"隐蔽待命，不暴露友军位置"});
+    }
+  }
   const effects = [...Effects(beat,time,progress,actors), ...encounter.effects];
+  if(villageEngaged) {
+    for(const id of ["luo","he","yao"]) {
+      const actor=actors.find(entry=>entry.id===id);
+      const target=actors.find(entry=>entry.groupId===(id==="yao"?"VillageGun":"VillageRifles") && entry.pose!=="dead")
+        || actors.find(entry=>["VillageGun","VillageRifles"].includes(entry.groupId) && entry.pose!=="dead");
+      if(actor.firing && target) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:id==="yao",phase:(time*3.2+actor.p[0])%1,sourceId:actor.id,targetId:target.id});
+    }
+  }
   VillageGunfire(time, actors, effects);
   if (beat.id === "03h") {
     actors[0].pose = (progress >= 0.22 && progress < 0.32) || (progress >= 0.5 && progress < 0.6) ? "shoot" : "drag";
