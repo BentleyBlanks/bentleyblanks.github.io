@@ -86,6 +86,16 @@ try {
   assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 384);
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   // Use real canvas clicks in both viewports. Units keep their own frozen snapshot.
+  await page.evaluate(async () => {
+    const { FlowMapView } = await import("./Script_LevelFlowView.mjs");
+    window.unitHoverViews = {};
+    window.unitHoverDraw = FlowMapView.prototype.Draw;
+    FlowMapView.prototype.Draw = function (...args) {
+      const result = window.unitHoverDraw.apply(this, args);
+      window.unitHoverViews[this.canvas.id] = this;
+      return result;
+    };
+  });
   await page.evaluate(() => { LevelFlow.SetViewType(0, "plan"); LevelFlow.SetViewType(1, "plan"); LevelFlow.Seek(221); });
   async function ClickUnit(id, index = 0, modifier = null) {
     const point = await page.evaluate(({ id, index }) => {
@@ -99,6 +109,59 @@ try {
     if (modifier) await page.keyboard.up(modifier);
   }
   const SelectedIds = () => page.locator("#selectedUnits .lfUnitRow").evaluateAll(rows => rows.map(row => row.dataset.unitId));
+  assert.equal(await page.locator("#viewportGrid canvas[title]").count(), 0);
+  const unitHoverPoint = await page.evaluate(() => {
+    const hit = unitHoverViews.flowMap.hits.find(hit => hit.type === "actor" && hit.id === "liu");
+    const rect = document.querySelector("#flowMap").getBoundingClientRect();
+    return { x: rect.x + hit.screen[0], y: rect.y + hit.screen[1], label: hit.labelBounds.map((value, index) => value + (index === 0 ? rect.x : index === 1 ? rect.y : 0)) };
+  });
+  const hoverBefore = await page.locator("#flowMap").evaluate(canvas => canvas.toDataURL());
+  const otherBefore = await page.locator("#flowMap2").evaluate(canvas => canvas.toDataURL());
+  await page.mouse.move(unitHoverPoint.x, unitHoverPoint.y);
+  await page.waitForFunction(() => unitHoverViews.flowMap.hoveredActorId === "liu");
+  assert.equal(await page.locator("#flowMap").evaluate(canvas => getComputedStyle(canvas).cursor), "pointer");
+  assert.equal(await page.locator("#mapTooltip").isVisible(), false);
+  assert.notEqual(await page.locator("#flowMap").evaluate(canvas => canvas.toDataURL()), hoverBefore, "hover highlights the unit HUD");
+  assert.equal(await page.locator("#flowMap2").evaluate(canvas => canvas.toDataURL()), otherBefore, "hover only updates its own viewport");
+  assert.deepEqual(await SelectedIds(), [], "hover leaves selection untouched");
+  await page.screenshot({ path: path.join(out, "UnitHover.png") });
+  const label = unitHoverPoint.label;
+  await page.mouse.move(label[0] + 5, label[1] + label[3] / 2);
+  assert.equal(await page.locator("#flowMap").getAttribute("data-unit-hover"), "liu");
+  await page.mouse.click(label[0] + 5, label[1] + label[3] / 2);
+  assert.deepEqual(await SelectedIds(), ["liu"], "unit nameplates are clickable");
+  await page.mouse.move(10, 10);
+  await page.waitForFunction(() => unitHoverViews.flowMap.hoveredActorId === null);
+  assert.equal(await page.locator("#flowMap").getAttribute("data-unit-hover"), null);
+  await page.evaluate(() => LevelFlow.Select(null));
+  await page.evaluate(() => { LevelFlow.SetViewType(1, "scene"); LevelFlow.Seek(221.01); });
+  const sceneHoverPoint = await page.evaluate(() => {
+    const view = unitHoverViews.flowMap2;
+    const rect = view.canvas.getBoundingClientRect();
+    const hit = view.hits.find(candidate => {
+      const [x, y] = candidate.screen;
+      const inside = x > 20 && x < rect.width - 20 && y > 70 && y < rect.height - 70;
+      const overlap = view.hits.some(other => {
+        const box = other.labelBounds;
+        const marker = Math.hypot(other.screen[0] - x, other.screen[1] - y) < other.radius;
+        const nameplate = box && x >= box[0] && x <= box[0] + box[2] && y >= box[1] && y <= box[1] + box[3];
+        return other !== candidate && other.type === "actor" && (marker || nameplate);
+      });
+      return candidate.type === "actor" && inside && !overlap;
+    });
+    return { id: hit.id, x: rect.x + hit.screen[0], y: rect.y + hit.screen[1] };
+  });
+  await page.mouse.move(sceneHoverPoint.x, sceneHoverPoint.y);
+  await page.waitForFunction(id => unitHoverViews.flowMap2.hoveredActorId === id, sceneHoverPoint.id);
+  assert.equal(await page.locator("#mapTooltip").isVisible(), false);
+  await page.screenshot({ path: path.join(out, "UnitHoverScene.png") });
+  await page.mouse.move(10, 10);
+  await page.evaluate(async () => {
+    const { FlowMapView } = await import("./Script_LevelFlowView.mjs");
+    FlowMapView.prototype.Draw = window.unitHoverDraw;
+    delete window.unitHoverViews; delete window.unitHoverDraw;
+    LevelFlow.SetViewType(1, "plan"); LevelFlow.Seek(221);
+  });
   await page.evaluate(() => LevelFlow.SetPlaying(true));
   await ClickUnit("Fork_0");
   assert.equal(await page.evaluate(() => LevelFlow.Inspect().playing), false);

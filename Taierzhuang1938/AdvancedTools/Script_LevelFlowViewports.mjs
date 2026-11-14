@@ -179,7 +179,7 @@ export class EncounterViewports {
         if(button.getAttribute("aria-pressed")!==pressed) button.setAttribute("aria-pressed",pressed);
       }
       const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
-      const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,rect.width,rect.height,window.devicePixelRatio]);
+      const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
       if(!contentChanged&&drawKey===entry.drawKey) continue;
       entry.map.Draw(frame,entry.layers,selection,annotations,draft);
       entry.drawKey=drawKey;

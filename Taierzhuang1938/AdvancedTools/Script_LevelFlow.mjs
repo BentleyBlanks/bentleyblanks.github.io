@@ -179,10 +179,19 @@ function Render(preparedFrame=null) {
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
-  return view.hits.filter((item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1])<=item.radius)
+  const InLabel=(item)=>{
+    const box=item.labelBounds;
+    return !!box&&point[0]>=box[0]&&point[0]<=box[0]+box[2]&&point[1]>=box[1]&&point[1]<=box[1]+box[3];
+  };
+  // Keep precise marker clicks reliable where nameplates overlap dense units.
+  const DistanceTo=(item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1]);
+  return view.hits.filter((item)=>InLabel(item)||DistanceTo(item)<=item.radius)
     .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0)
-      ||Math.hypot(a.screen[0]-point[0],a.screen[1]-point[1])-Math.hypot(b.screen[0]-point[0],b.screen[1]-point[1]))[0];
+      ||Number(DistanceTo(b)<=3)-Number(DistanceTo(a)<=3)
+      ||Number(InLabel(b))-Number(InLabel(a))
+      ||DistanceTo(a)-DistanceTo(b))[0];
 }
+
 function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
 function Packet() {
   const rect=canvas.getBoundingClientRect();
@@ -199,9 +208,17 @@ function RestoreView(view,viewport) {
 
 function BindMap(entry) {
   const surface=entry.canvas;
-  surface.title="点击单位单选 · Ctrl / Shift + 点击多选 · 右键旋转 · 右键 + WASD 飞行 · Q/E 升降 · 中键平移 · Alt + 左键环绕 · F 聚焦";
+  const HoverUnit=(hit=null)=>{
+    const id=mode==="select"&&hit?.type==="actor"?hit.id:null;
+    if(id) surface.dataset.unitHover=id;
+    else delete surface.dataset.unitHover;
+    if(entry.map.hoveredActorId===id) return;
+    entry.map.hoveredActorId=id;
+    RequestRender();
+  };
   surface.addEventListener("contextmenu",event=>event.preventDefault());
   surface.addEventListener("pointerdown",(event)=>{
+    HoverUnit();Element("mapTooltip").hidden=true;
     if(navigation.Begin(entry,event)) return;
     if(event.button!==0) return;
     workspace.Activate(entry.index);
@@ -238,7 +255,8 @@ function BindMap(entry) {
       }
       Element("mapTooltip").hidden=true;RequestRender();return;
     }
-    const hit=Hit(screen,entry.map),tip=Element("mapTooltip");tip.hidden=!hit?.text;
+    const hit=Hit(screen,entry.map),tip=Element("mapTooltip");
+    HoverUnit(hit);tip.hidden=!hit?.text;
     if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
   });
   surface.addEventListener("pointerup",()=>{
@@ -257,10 +275,11 @@ function BindMap(entry) {
     }
     pointer=null;draft=null;Render();
   });
-  surface.addEventListener("pointercancel",()=>{navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
+  surface.addEventListener("pointercancel",()=>{HoverUnit();navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
   surface.addEventListener("lostpointercapture",()=>navigation.End(entry));
-  surface.addEventListener("wheel",event=>navigation.Wheel(entry,event),{passive:false});
-  surface.addEventListener("pointerleave",()=>{Element("mapTooltip").hidden=true;});
+  surface.addEventListener("wheel",event=>{HoverUnit();Element("mapTooltip").hidden=true;navigation.Wheel(entry,event);},{passive:false});
+  surface.addEventListener("pointerleave",()=>{HoverUnit();Element("mapTooltip").hidden=true;});
+  surface.addEventListener("blur",()=>HoverUnit());
 }
 
 function OpenAnnotations() {

@@ -121,7 +121,7 @@ function AnnotationText(context,text,anchor,width,height) {
 
 export class FlowMapView {
   constructor(canvas,mapData) {
-    this.canvas=canvas;this.mapData=mapData;this.center=[52,76];this.scale=5;this.hits=[];
+    this.canvas=canvas;this.mapData=mapData;this.center=[52,76];this.scale=5;this.hits=[];this.hoveredActorId=null;
     this.baseCanvas=document.createElement("canvas");this.baseKey="";
   }
 
@@ -413,15 +413,33 @@ export class FlowMapView {
       if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
       this.DrawActor(context,actor,frame);
       context.save();context.globalAlpha=this.ActorLabelOpacity?this.ActorLabelOpacity(actor):1;
+      const hovered=this.hoveredActorId===actor.id;
+      if(hovered) {
+        context.beginPath();
+        for(const [x,y] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+          context.moveTo(p[0]+x*8,p[1]+y*16);
+          context.lineTo(p[0]+x*13,p[1]+y*16);
+          context.lineTo(p[0]+x*13,p[1]+y*11);
+        }
+        context.lineWidth=4;context.strokeStyle="#fff9";context.stroke();
+        context.lineWidth=2;context.strokeStyle=color;context.stroke();
+      }
       if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
-      this.hits.push({type:"actor",id:actor.id,screen:p,radius:9,text:`${actor.name} · X ${actor.p[0].toFixed(1)}  Z ${actor.p[1].toFixed(1)}${actor.status?` · ${actor.status}`:""}`});
-      if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected)) {
+      const hit={type:"actor",id:actor.id,screen:p,radius:9};
+      this.hits.push(hit);
+      if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected||hovered)) {
         const text=actor.status?`${actor.name} · ${actor.status}`:actor.name,labelWidth=text.length*12+8;
         for(const offset of [[11,-10],[11,13],[-labelWidth-10,-10],[-labelWidth-10,13],[11,-28],[11,30]]) {
           const box=[p[0]+offset[0],p[1]+offset[1]-8,labelWidth,16];
           if(box[0]<3||box[0]+box[2]>width-3||box[1]<3||box[1]+16>height-3) continue;
           if(labelBoxes.some((other)=>box[0]<other[0]+other[2]&&box[0]+box[2]>other[0]&&box[1]<other[1]+other[3]&&box[1]+box[3]>other[1])) continue;
-          labelBoxes.push(box);Label(context,text,box[0],box[1]+8,color,12,true);break;
+          labelBoxes.push(box);Label(context,text,box[0],box[1]+8,color,12,true);
+          hit.labelBounds=[box[0]-4,box[1]-1,context.measureText(text).width+8,18];
+          if(hovered) {
+            context.lineWidth=1.5;context.strokeStyle=color;
+            context.strokeRect(...hit.labelBounds);
+          }
+          break;
         }
       }
       context.restore();

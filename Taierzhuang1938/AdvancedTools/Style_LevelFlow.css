@@ -86,6 +86,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfViewBar .lfViewTarget { width: 66px; }
 .lfViewBar button { padding: 2px 5px; height: 29px; font-size: 12px; background: transparent; border-color: transparent; color: var(--ed-text-3); }
 #viewportGrid canvas { flex: 1; display: block; width: 100%; height: 0; min-height: 0; outline: none; touch-action: none; cursor: grab; }
+#viewportGrid canvas[data-unit-hover] { cursor: pointer; }
 #viewportGrid canvas[data-mode="arrow"], #viewportGrid canvas[data-mode="rect"], #viewportGrid canvas[data-mode="text"], #viewportGrid canvas[data-mode="route"] { cursor: crosshair; }
 #viewportGrid canvas:focus-visible { outline: 2px solid #bba36b; outline-offset: -2px; }
 .lfViewStatus { position: absolute; right: 9px; bottom: 10px; padding: 3px 8px; border-radius: 2px; font-size: 12px; color: #bdc5b9; background: #101716e8; box-shadow: 0 1px 5px #00000026; pointer-events: none; }
