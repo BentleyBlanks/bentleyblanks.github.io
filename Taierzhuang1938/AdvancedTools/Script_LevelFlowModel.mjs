@@ -124,16 +124,18 @@ function TankTrack(keys,time) {
   const end=keys.findIndex((key)=>key[0]>time);
   if(end<=0) return Track(keys,time);
   const a=keys[end-1],b=keys[end],duration=b[0]-a[0],age=time-a[0];
-  return SampleRoute([a.slice(1),b.slice(1)],MarchTime(age)/MarchTime(duration));
+  const bends=FLOW_GROUND.road.filter(point=>point[1]>Math.min(a[2],b[2]) && point[1]<Math.max(a[2],b[2]));
+  if(b[2]<a[2]) bends.reverse();
+  return SampleRoute([a.slice(1),...bends,b.slice(1)],MarchTime(age)/MarchTime(duration));
 }
 
 function TankState(keys,time) {
   const position=TankTrack(keys,time),next=TankTrack(keys,time+0.02);
   const moving=Distance(position,next)>0.001;
-  // A stationary track retains the direction of its current leg.
-  const end=keys.findIndex((key)=>key[0]>time);
-  const a=keys[Math.max(0,end-1)],b=keys[end<0?keys.length-1:end];
-  const heading=Distance(a.slice(1),b.slice(1))>0.01?Math.atan2(b[1]-a[1],-(b[2]-a[2])):Math.PI;
+  // Follow road bends, retaining the last travel direction during a cover halt.
+  const previous=TankTrack(keys,time-FLOW_GROUND.tankWaitS-0.02);
+  const direction=moving?[next[0]-position[0],next[1]-position[1]]:[position[0]-previous[0],position[1]-previous[1]];
+  const heading=Math.hypot(...direction)>0.001?Math.atan2(direction[0],-direction[1]):Math.PI;
   return {p:position,moving,heading,status:moving?"地面推进":"停驶掩护，等待步兵"};
 }
 
@@ -440,7 +442,7 @@ function EvacuationActors(actors,time,cart) {
     [finish,...LaneAtZ(317)],[BeatById("06i").end,...Offset(final,1,0.6)]],time);
 }
 
-function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").start) {
+function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").start) {
   const cartState=CartAt(time),cart=cartState.point,heading=cartState.heading;
   const CartOffset=(side,forward)=>[cart[0]+Math.cos(heading)*side+Math.sin(heading)*forward,cart[1]+Math.sin(heading)*side-Math.cos(heading)*forward];
   const loadingProgress=Clamp((time-BeatById("06c").start)/BeatById("06c").duration,0,1);
@@ -493,17 +495,19 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").star
   }
   if (time >= tankStart) {
     const burned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
-    const tankTime=time-tankStart+BeatById("06a").start;
+    const tankTime=time-tankStart+BeatById("05a").start;
     const first=TankState(tankKeys,tankTime),second=TankState(secondTankKeys,tankTime);
     const disabled=time>=BeatById("06g").start;
     if(disabled) {first.moving=false;first.status=burned?"焚毁":"履带损毁";}
     if(time>=BeatById("06i").start) second.status="倒车撤离";
     const tankPosition=first.p;
     const turretTarget=["06g","06h"].includes(beat.id)?yao:player;
-    const turret=Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.15;
+    const turret=time<BeatById("06a").start?first.heading
+      :Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.15;
     actors.push(Actor("tank1", "九四式 · 头车", "enemy", "tank", tankPosition, burned ? "burn" : "stand",
       { ...first, surface:"ground", turret, disabled }));
-    if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, "stand", { ...second, surface:"ground", heading: Math.PI, turret: Math.PI }));
+    const secondHeading=time>=BeatById("06i").start?Math.PI:second.heading;
+    if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, "stand", { ...second, surface:"ground", heading:secondHeading, turret:secondHeading }));
   }
   if (time >= BeatById("04c").start && time < BeatById("06c").start) {
     const down = beat.id === "06b";
@@ -679,7 +683,7 @@ function Effects(beat, time, progress, actors) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
-  if ((beat.fire === "tank" || ["03h","05a","05b","05c"].includes(beat.id)) && tank && tank.pose !== "burn") {
+  if (beat.stage === "06" && tank && tank.pose !== "burn") {
     const cover=actors.filter(actor=>actor.coveringEvacuation && actor.firing)
       .reduce((nearest,actor)=>!nearest||Distance(tank.p,actor.p)<Distance(tank.p,nearest.p)?actor:nearest,null);
     const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : cover?.p ?? player.p;

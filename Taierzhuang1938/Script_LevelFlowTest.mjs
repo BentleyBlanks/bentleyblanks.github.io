@@ -13,6 +13,7 @@ import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 
 // Compare incremental depth interpolation against the original barycentric
 // equation, including either winding and triangles crossing the viewport.
@@ -210,9 +211,51 @@ for(let time=BeatById("03h").start;time<BeatById("03h").end-6;time+=1) {
 assert.equal(EvaluateFlow(BeatById("03h").start+12).actors[0].pose,"shoot");
 const tankBefore=EvaluateFlow(BeatById("06a").start-0.001).actors.find((actor)=>actor.id==="tank1");
 const tankAfter=EvaluateFlow(BeatById("06a").start+0.001).actors.find((actor)=>actor.id==="tank1");
-assert.equal(tankBefore,undefined,"the infantry hold precedes the vehicle pursuit");
-assert.ok(tankAfter,"the first tank arrives at 06A, not during the camp hold");
-assert.ok(!EvaluateFlow(BeatById("05b").start).actors.some((actor)=>actor.kind==="tank"));
+assert.ok(tankBefore && tankAfter,"the tank is already approaching before the pursuit begins");
+assert.ok(Distance(tankBefore.p,tankAfter.p)<0.01,"06A continues the same tank without a spawn or teleport");
+assert.ok(EvaluateFlow(BeatById("05b").start).actors.some((actor)=>actor.kind==="tank"));
+for(const stamp of [540,550,560,585,603.84]) {
+  const frame=EvaluateFlow(stamp),next=EvaluateFlow(stamp+0.02);
+  for(const tank of frame.actors.filter(actor=>actor.kind==="tank" && actor.moving)) {
+    const after=next.actors.find(actor=>actor.id===tank.id),length=Distance(tank.p,after.p);
+    const alignment=((after.p[0]-tank.p[0])*Math.sin(tank.heading)-(after.p[1]-tank.p[1])*Math.cos(tank.heading))/length;
+    assert.ok(alignment>0.999,`${tank.id} turns with the road instead of sliding sideways`);
+  }
+}
+const convoyIds=["tank1","tank2",...Array.from({length:5},(_,index)=>`TankEscort_${index}`),...Array.from({length:4},(_,index)=>`TankRearScreen_${index}`)];
+for(const boundary of ["05b","05c","06a"]) {
+  const stamp=BeatById(boundary).start;
+  for(const id of convoyIds) {
+    const before=EvaluateFlow(stamp-0.001).actors.find(actor=>actor.id===id);
+    const after=EvaluateFlow(stamp+0.001).actors.find(actor=>actor.id===id);
+    assert.ok(before && after && Distance(before.p,after.p)<0.02,`${id} stays continuous across ${boundary}`);
+  }
+}
+for(let stamp=BeatById("05a").start;stamp<BeatById("06a").end;stamp+=0.1) {
+  const frame=EvaluateFlow(stamp),next=EvaluateFlow(stamp+0.1);
+  for(const id of convoyIds) {
+    const actor=frame.actors.find(actor=>actor.id===id),after=next.actors.find(actor=>actor.id===id);
+    assert.ok(Distance(actor.p,after.p)<0.5,`${id} approaches at a bounded speed without corner jumps`);
+  }
+  if(stamp<BeatById("06a").start) assert.ok(!frame.effects.some(effect=>effect.kind==="fire" && frame.actors.some(actor=>actor.kind==="tank" && Distance(actor.p,effect.a)<0.01)),"distant convoy does not fire before the pursuit");
+}
+const approachDraft=structuredClone(defaults);
+approachDraft.revision="2026-11-14-opening-defense-1";
+for(const collection of ["groups","triggers"]) for(const previous of FLOW_PREVIOUS_TANK_APPROACH[collection]) {
+  approachDraft[collection][approachDraft[collection].findIndex(entry=>entry.id===previous.id)]=structuredClone(previous);
+}
+assert.deepEqual(UpgradeEncounterDocument(approachDraft,defaults),defaults,"saved 06A-spawn drafts receive the complete marching approach");
+assert.deepEqual(UpgradeEncounterDocument({...approachDraft,revision:"2026-11-14-front-defense-1"},defaults),defaults,"front-defense drafts also receive the marching approach");
+const editedApproach=structuredClone(approachDraft);
+editedApproach.groups.find(group=>group.id==="TankEscort").route=[[105,187],[115,240]];
+editedApproach.groups.find(group=>group.id==="TankEscort").count=7;
+editedApproach.groups=editedApproach.groups.filter(group=>group.id!=="TankRearScreen");
+editedApproach.triggers.find(trigger=>trigger.id==="Trigger_TankEscort").area.center=[300,300];
+const upgradedApproach=UpgradeEncounterDocument(editedApproach,defaults);
+assert.deepEqual(upgradedApproach.groups.find(group=>group.id==="TankEscort").route,[[105,187],[115,240]]);
+assert.equal(upgradedApproach.groups.find(group=>group.id==="TankEscort").count,7);
+assert.ok(!upgradedApproach.groups.some(group=>group.id==="TankRearScreen"));
+assert.deepEqual(upgradedApproach.triggers.find(trigger=>trigger.id==="Trigger_TankEscort").area.center,[300,300]);
 for(let time=0;time<=FLOW_DURATION;time+=0.5) {
   const frame=EvaluateFlow(time);
   for(const actor of frame.actors) assert.ok(actor.p.every(Number.isFinite),`${time} ${actor.id}`);
@@ -254,7 +297,7 @@ for(const point of [[0,-4],[0,0],[21.9,67.1],[63,64.5],[35,144.5],[56,152],[58.2
 for(const id of ["SW","ES","SE_N","SE","NE","NE_S"]) assert.ok(map.roads.some((road)=>road.id===id),`${id} curved alley is present`);
 // Ground-level pursuit starts before the casualty collection point.
 const tankGate=baseline.groups.find((group)=>group.id==="TankEscort");
-assert.equal(tankGate.start,BeatById("06a").start);
+assert.equal(tankGate.start,BeatById("05a").start);
 const missedTank=structuredClone(defaults);
 missedTank.triggers.find((trigger)=>trigger.id==="Trigger_TankEscort").area.center=[300,300];
 assert.ok(!EvaluateFlow(ReferenceTime(652.25),missedTank).actors.some((actor)=>actor.kind==="tank"),"moving the early trigger also controls vehicle arrival");
@@ -363,7 +406,7 @@ oldDraft.groups=oldDraft.groups.filter((group)=>group.id!=="SearchNeighbor");
 const oldStorage={getItem:()=>JSON.stringify(oldDraft),setItem:()=>{}};
 const upgraded=new EncounterDocument(defaults,FLOW_TIMELINE,oldStorage).value;
 const upgradedEscort=upgraded.groups.find((group)=>group.id==="TankEscort");
-assert.equal(upgradedEscort.count,9);assert.equal(upgradedEscort.beat,"06a");
+assert.equal(upgradedEscort.count,9);assert.equal(upgradedEscort.beat,"05a");
 assert.deepEqual(upgradedEscort.route,defaults.groups.find((group)=>group.id==="TankEscort").route);
 assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
 assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
@@ -781,6 +824,23 @@ function SpawnSightBlocked(from,to,walls=spawnWalls) {
     }
   }
   return false;
+}
+const convoyScreen=map.objects.filter(object=>object.id==="Encounter_TankApproachScreen");
+assert.equal(convoyScreen.length,1);
+for(const elapsed of [0,0.25,0.5,1]) {
+  const frame=EvaluateFlow(BeatById("05a").start+elapsed);
+  for(const id of convoyIds) {
+    const actor=frame.actors.find(actor=>actor.id===id);
+    for(const observer of [frame.player,[35,141.5],[46,149],[55,154],[79,147]]) {
+      const eye=[observer[0],terrain.heightAt(...observer)+1.65,observer[1]];
+      for(const dx of actor.kind==="tank"?[-0.95,0,0.95]:[-0.25,0,0.25]) {
+        for(const dz of actor.kind==="tank"?[-1.55,0,1.55]:[0]) {
+          const point=[actor.p[0]+dx,actor.p[1]+dz];
+          assert.ok(SpawnSightBlocked(eye,[point[0],terrain.heightAt(...actor.p)+1.8,point[1]],convoyScreen),`${id} is fully concealed at creation + ${elapsed}s`);
+        }
+      }
+    }
+  }
 }
 const northSpawnWalls=map.objects.filter(object=>["Encounter_NorthPursuitSpawnScreen","Encounter_NorthPursuitSpawnReturn"].includes(object.id));
 assert.equal(northSpawnWalls.length,2);

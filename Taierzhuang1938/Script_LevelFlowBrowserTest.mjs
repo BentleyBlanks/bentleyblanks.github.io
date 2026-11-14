@@ -827,7 +827,9 @@ try {
   await page.waitForFunction(()=>window.LevelFlow);
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   const departure=await page.evaluate(()=>LevelFlow.Inspect());
-  assert.ok(!departure.actors.some(actor=>actor.kind==='tank'||['LaneGround','BendGround'].includes(actor.groupId)));
+  assert.ok(!departure.actors.some(actor=>['LaneGround','BendGround'].includes(actor.groupId)));
+  assert.equal(departure.actors.filter(actor=>actor.kind==='tank').length,2);
+  assert.ok(departure.actors.filter(actor=>actor.kind==='tank').every(actor=>actor.p[1]<departure.actors.find(actor=>actor.id==='player').p[1]-40));
   assert.ok(departure.actors.find(actor=>actor.id==='geng').p[1]>240);
   await page.screenshot({path:path.join(out,'AmbushEvacuation05B.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${FLOW_TIMELINE.find(beat=>beat.id==='06e').start+15.0142}&x=96&z=286&zoom=7`);
@@ -856,6 +858,39 @@ try {
     if(stamp===504.217) assert.ok(frame.actors.find(actor=>actor.id==='player').firing&&frame.actors.find(actor=>actor.id==='player').p[1]<130);
     await page.screenshot({path:path.join(out,name+'.png')});
   }
+  const convoyVisibility=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const map=await LoadEncounterMap(),results=[];
+    for(const time of [530,603.84]) {
+      const frame=LevelFlow.Evaluate(time),tank=frame.actors.find(actor=>actor.id==='tank1');
+      frame.effects=[];frame.zone=null;
+      const bearing=Math.atan2(tank.p[0]-frame.player[0],tank.p[1]-frame.player[1]),images=[];
+      for(const include of [true,false]) {
+        const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:1280px;height:720px';document.body.append(canvas);
+        const view=new FlowPerspectiveView(canvas,map,'eye');
+        view.BeforeDraw(frame);view.yaw=bearing-Math.atan2(view.forward[0],view.forward[2]);
+        const actors=frame.actors.filter(actor=>include || actor.kind!=='tank' && !['TankEscort','TankRearScreen'].includes(actor.groupId));
+        view.Draw({...frame,actors},{names:false,fire:false,spawns:false,triggers:false,routes:false,landmarks:false},null);
+        images.push(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data);
+        canvas.remove();
+      }
+      let changed=0;
+      for(let index=0;index<images[0].length;index+=4) {
+        if([0,1,2].some(channel=>images[0][index+channel]!==images[1][index+channel])) changed++;
+      }
+      results.push(changed);
+    }
+    return results;
+  });
+  assert.equal(convoyVisibility[0],0,'convoy creation is completely concealed in the player view');
+  assert.ok(convoyVisibility[1]>0,'the marching convoy emerges into view before 06A');
+  await page.evaluate(()=>{LevelFlow.Seek(619.5);LevelFlow.SetPlaying(true);});
+  await page.waitForFunction(()=>LevelFlow.Inspect().time>621.5);
+  await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  const marching=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(marching.actors.filter(actor=>actor.kind==='tank').length,2);
+  assert.equal(marching.actors.filter(actor=>['TankEscort','TankRearScreen'].includes(actor.groupId)).length,9);
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

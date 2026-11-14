@@ -1,6 +1,6 @@
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH } from "./Data_LevelFlowAmbushBaseline.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -93,6 +93,27 @@ export function CreateEncounterDocument(timeline, waves) {
       plan.route.unshift(formation.holdPoint.map((value,axis)=>value+formation.offsets[index][axis]));
     }
   }
+  // Stage the convoy behind the northern berm before the player hears it.
+  // Both escort squads are already marching when the tanks enter pursuit.
+  const approachLead=Find("06a").start-Find("05a").start;
+  for(const [id,center] of [["TankEscort",[137,53]],["TankRearScreen",[152,26]]]) {
+    const group=groups.find(entry=>entry.id===id);
+    const approach=FLOW_GROUND.road.filter(point=>point[1]>=44 && point[1]<=186);
+    if(id==="TankEscort") approach.shift();
+    group.beat="05a";
+    group.area.center=center;
+    group.route=[center,...approach,...group.route.slice(1)];
+    group.memberPlans=group.spawnOffsets.map((offset,index)=>({
+      delay:0,
+      route:[...approach.map(point=>[point[0]+offset[0],point[1]]),...group.memberPlans[index].route.filter(point=>point[1]>186)],
+    }));
+    group.interval=0;
+    group.lifetime+=approachLead;
+    group.note="05A 在北侧土垄后随车出发，绕垄上车道，05C 车声靠近，06A 连续追入";
+  }
+  Object.assign(triggers.find(trigger=>trigger.id===escort.triggerId),{
+    beat:"05a",area:Area(Find("05a").p[0],8,8),
+  });
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const group=groups.find(entry=>entry.id===reinforcement.id);
     Object.assign(group,{beat:"03f",area:Area(reinforcement.center,3,3),route:structuredClone(reinforcement.route),
@@ -101,7 +122,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-front-defense-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-tank-approach-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -244,6 +265,18 @@ function RouteProjection(path,point) {
   return progress;
 }
 
+function EscortRouteProgress(path,point) {
+  // The authored convoy advances south. Use its longitudinal position so
+  // closest-point projection cannot jump across the inside of a road bend.
+  if(path.some((entry,index)=>index>0 && entry[1]<=path[index-1][1])) return RouteProjection(path,point);
+  let distance=0;
+  for(let index=1;index<path.length;index++) {
+    const a=path[index-1],b=path[index];
+    distance+=Distance(a,b)*Clamp((point[1]-a[1])/(b[1]-a[1]),0,1);
+  }
+  return distance;
+}
+
 function TimedPosition(route,time) {
   const end=route.findIndex((point)=>point[0]>=time);
   if(end<=0) return route[end<0?route.length-1:0].slice(1);
@@ -368,7 +401,7 @@ function GroupActor(group,index,time,coreActors) {
   let distance=stationary?0:Math.min(total,movement.distance);
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
-    const progress=RouteProjection(path,tank.p);
+    const progress=EscortRouteProgress(path,[tank.p[0]+(offset?.[0]||0),tank.p[1]]);
     const spacing=group.memberPlans?3.2:1.1;
     const clearance=group.memberPlans?5:3;
     const limit=Math.max(0,progress-clearance-slot*spacing);
@@ -607,7 +640,7 @@ function UpgradeOpeningDefense(input,defaults) {
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
-  if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,FLOW_PREVIOUS_FRONT_DEFENSE.revision,"2026-11-14-opening-defense-1","2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
+  if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,FLOW_PREVIOUS_FRONT_DEFENSE.revision,"2026-11-14-front-defense-1","2026-11-14-opening-defense-1","2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
   for(const reinforcement of FLOW_FRIEND_REINFORCEMENTS) {
     const current=value.groups.find(entry=>entry.id===reinforcement.id);
@@ -630,5 +663,21 @@ export function UpgradeEncounterDocument(input,defaults) {
       if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
     }
   }
-  return UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults);
+  return UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults);
+}
+
+function UpgradeTankApproach(value,defaults) {
+  for(const collection of ["groups","triggers"]) for(const previous of FLOW_PREVIOUS_TANK_APPROACH[collection]) {
+    const current=value[collection].find(entry=>entry.id===previous.id);
+    const next=defaults[collection].find(entry=>entry.id===previous.id);
+    if(!current || !next) continue;
+    const spatialKeys=collection==="groups"?["area","route","memberPlans","spawnOffsets"]:["area"];
+    const edited=spatialKeys.some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]));
+    for(const [key,entry] of Object.entries(next)) {
+      if(edited && spatialKeys.includes(key)) continue;
+      if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
 }

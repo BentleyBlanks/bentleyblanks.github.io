@@ -7,7 +7,7 @@ import { FLOW_GROUND } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleBeatRoute, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
-for(let time=BeatById("04b").start;time<BeatById("06a").start;time+=0.5) {
+for(let time=BeatById("04b").start;time<BeatById("05a").start;time+=0.5) {
   const frame=EvaluateFlow(time);
   assert.ok(!frame.actors.some(actor=>actor.kind==="tank"||["TankEscort","TankRearScreen"].includes(actor.groupId)),"no vehicles or vehicle escorts before the infantry hold ends");
   assert.ok(!frame.actors.some(actor=>["LaneGround","BendGround"].includes(actor.groupId)),"no unexplained roadside relief soldiers");
@@ -60,14 +60,14 @@ previous.groups.find(group=>group.id==="TankEscort").count=9;
 previous.groups=previous.groups.filter(group=>group.id!=="TankRearScreen");
 const migrated=UpgradeEncounterDocument(previous,defaults);
 ValidateEncounterDocument(migrated,FLOW_TIMELINE);
-assert.equal(migrated.groups.find(group=>group.id==="TankEscort").beat,"06a");
+assert.equal(migrated.groups.find(group=>group.id==="TankEscort").beat,"05a");
 assert.equal(migrated.groups.find(group=>group.id==="TankEscort").count,9);
 assert.equal(migrated.groups.find(group=>group.id==="LaneGround").enabled,false);
 assert.ok(!migrated.groups.some(group=>group.id==="TankRearScreen"),"deleted groups stay deleted");
 const edited=structuredClone(previous);edited.groups.find(group=>group.id==="TankEscort").route=[[105,187],[115,240]];
 assert.deepEqual(UpgradeEncounterDocument(edited,defaults).groups.find(group=>group.id==="TankEscort").route,[[105,187],[115,240]]);
 const recent=structuredClone(previous);recent.revision="2026-11-14-camp-cover-1";
-assert.equal(UpgradeEncounterDocument(recent,defaults).groups.find(group=>group.id==="TankEscort").beat,"06a");
+assert.equal(UpgradeEncounterDocument(recent,defaults).groups.find(group=>group.id==="TankEscort").beat,"05a");
 const saved=EvaluateFlow(focus.time,migrated);EvaluateFlow(0,migrated);EvaluateFlow(925,migrated);
 assert.deepEqual(EvaluateFlow(focus.time,migrated),saved,"upgraded drafts remain deterministic after seeking");
 console.log("ok  Bend ambush: infantry-first staging, separated evacuation, named firing trenches, clear bomb approaches, continuity and draft migration");
