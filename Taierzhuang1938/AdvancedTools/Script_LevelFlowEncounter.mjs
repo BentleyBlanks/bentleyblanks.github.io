@@ -122,7 +122,7 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-tank-approach-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-14-double-tank-destruction-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -639,6 +639,7 @@ function UpgradeOpeningDefense(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-14-tank-approach-1") return UpgradeTankDestruction(structuredClone(input),defaults);
   const upgraded=UpgradeLegacyEncounterDocument(input,defaults);
   if(upgraded===input && ![FLOW_PREVIOUS_AMBUSH.revision,FLOW_PREVIOUS_FRONT_DEFENSE.revision,"2026-11-14-front-defense-1","2026-11-14-opening-defense-1","2026-11-14-friend-reinforcements-1","2026-11-14-camp-cover-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
@@ -663,7 +664,20 @@ export function UpgradeEncounterDocument(input,defaults) {
       if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
     }
   }
-  return UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults);
+  return UpgradeTankDestruction(UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults),defaults);
+}
+
+function UpgradeTankDestruction(value,defaults) {
+  for(const [id,label] of [["Arrival_06f","捡第一捆，追到后轮放下"],["Arrival_06h","老耿递第二捆，摸到车头"]]) {
+    const current=value.triggers.find(trigger=>trigger.id===id),next=defaults.triggers.find(trigger=>trigger.id===id);
+    if(!current || !next) continue;
+    if(current.label===label) current.label=next.label;
+    if(id==="Arrival_06h" && JSON.stringify(current.area)===JSON.stringify({shape:"circle",center:[101,281],size:[6,6]})) {
+      current.area=structuredClone(next.area);
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
 }
 
 function UpgradeTankApproach(value,defaults) {

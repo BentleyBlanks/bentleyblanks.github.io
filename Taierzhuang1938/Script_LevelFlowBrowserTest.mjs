@@ -918,11 +918,17 @@ try {
   const ambush=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(ambush.actors.filter(actor=>actor.kind==='tank').length,2);
   assert.equal(ambush.actors.filter(actor=>['luo','he','liu','yao'].includes(actor.id)&&actor.firing).length,4);
-  assert.ok(ambush.actors.find(actor=>actor.id==='geng').p[1]>=310);
+  assert.ok(ambush.actors.filter(actor=>['nier','ammoCarrier1','ammoCarrier2'].includes(actor.id)).every(actor=>actor.p[1]>=345&&actor.pose==='kneel'));
+  assert.ok(Math.hypot(...ambush.actors.find(actor=>actor.id==='geng').p.map((value,index)=>value-ambush.actors.find(actor=>actor.id==='cart').p[index]))<3);
   await page.screenshot({path:path.join(out,'AmbushCrossfire06E.png')});
   await page.evaluate(time=>LevelFlow.Seek(time),FLOW_TIMELINE.find(beat=>beat.id==='06h').start+35);
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.find(actor=>actor.id==='tank1').disabled),true);
   await page.screenshot({path:path.join(out,'AmbushFrontApproach06H.png')});
+  await page.evaluate(time=>LevelFlow.Seek(time),FLOW_TIMELINE.find(beat=>beat.id==='06i').start+1.8142);
+  const destroyed=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(destroyed.actors.filter(actor=>actor.kind==='tank'&&actor.pose==='burn'&&actor.disabled&&!actor.moving).length,2);
+  assert.ok(destroyed.actors.every(actor=>!actor.status?.includes('倒车')));
+  await page.screenshot({path:path.join(out,'BothTanksDestroyed06I.png')});
   for(const [stamp,centerX,centerZ,zoom,name] of [[383.35,24.55,57.44,10,'NorthPursuitCovered03G'],[433.301,36.39,106.45,6,'PursuitStoppedByDefense03H'],[504.217,68.97,127.76,6,'ShunziForwardDefense04C']]) {
     await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${stamp}&x=${centerX}&z=${centerZ}&zoom=${zoom}`);
     await page.waitForFunction(()=>window.LevelFlow);

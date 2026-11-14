@@ -422,25 +422,35 @@ function AmbushActors(actors,time) {
   }
 }
 
-function EvacuationActors(actors,time,cart) {
-  if(time<BeatById("06a").start||time>=BeatById("07a").start) return;
+function EvacuationActors(actors,time) {
+  if(time<BeatById("06a").start||time>=BeatById("07c").end) return;
   const start=BeatById("06a").start,returnStart=BeatById("06h").start,finish=BeatById("06h").end;
   const shelter=LaneAtZ(314),geng=actors.find(actor=>actor.id==="geng"),nier=actors.find(actor=>actor.id==="nier");
-  const finalTime=BeatById("06i").end,initial=CartAt(start),final=CartAt(finalTime);
+  const finalTime=BeatById("07c").end,initial=CartAt(start),final=CartAt(finalTime);
   const Offset=(state,side,forward)=>[state.point[0]+Math.cos(state.heading)*side+Math.sin(state.heading)*forward,
     state.point[1]+Math.sin(state.heading)*side-Math.cos(state.heading)*forward];
+  const Withdraw=(actor,origin,destination,delay)=>{
+    const route=[origin,LaneAtZ(origin[1]),...L0610_LANE.line.filter(point=>point.z>origin[1]&&point.z<destination[1]).map(point=>[point.x,point.z]),LaneAtZ(destination[1]),destination];
+    const length=RouteLength(route),distance=Math.max(0,time-start-delay)*1.15;
+    Object.assign(actor,{p:SampleRoute(route,distance/length),pose:distance<length?"walk":"kneel",firing:false,
+      status:distance<length?"沿凹路南撤，先去后方沟弯":"已到后方沟弯，隐蔽等后送车"});
+  };
   for(const [index,id] of ["ammoCarrier1","ammoCarrier2"].entries()) {
-    const actor=actors.find(entry=>entry.id===id),shelter=LaneAtZ(310+index*3);
-    actor.p=Track([[start,...CartFollower(start,index?1.8:-1.8,-1-index*1.8)],
-      [start+30,...shelter],[finish,...shelter],[finalTime,...CartFollower(finalTime,index?1.8:-1.8,-1-index*1.8)]],time);
-    actor.status="先过南弯，远离阻击阵地";
+    Withdraw(actors.find(entry=>entry.id===id),CartFollower(start,index?1.8:-1.8,-1-index*1.8),
+      CartFollower(finalTime,index?1.8:-1.8,-1-index*1.8),index*2);
   }
-  geng.p=Track([[start,...CartFollower(start,-0.95,1.2)],[start+30,...shelter],
-    [returnStart,...shelter],[returnStart+18,96,289],[finish,96,289],
-    [finalTime,...CartFollower(finalTime,-0.95,1.2)]],time);
-  geng.status=time<returnStart?"南弯后照应老乡":"回车边递第二捆";
-  nier.p=Track([[start,...Offset(initial,1,0.6)],[start+32,...LaneAtZ(317)],
-    [finish,...LaneAtZ(317)],[BeatById("06i").end,...Offset(final,1,0.6)]],time);
+  Withdraw(nier,Offset(initial,1,0.6),Offset(final,1,0.6),4);
+  if(time>=finish) {
+    Object.assign(geng,{p:CartFollower(time,-0.95,1.2),pose:"walk",status:"照看冬瓜，随车南撤"});
+    return;
+  }
+  const returnToCart=BeatById("06b").start,cartSide=CartFollower(returnToCart+30,-0.95,1.2);
+  const keys=[[start,...CartFollower(start,-0.95,1.2)],[start+30,...shelter],
+    [returnToCart,...shelter],[returnToCart+30,...cartSide],[returnStart,...cartSide],
+    [returnStart+6,96,289],[returnStart+18,96,289],[finish,...CartFollower(finish,-0.95,1.2)]];
+  geng.p=Track(keys,time);
+  geng.pose=Distance(geng.p,Track(keys,time+0.02))>0.001?"walk":"kneel";
+  geng.status=time<returnToCart?"护送老乡过南弯":time<returnToCart+30?"折回照看冬瓜和驴车":time<returnStart?"照看冬瓜，垫轮备弹":"从车箱递第二捆";
 }
 
 function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").start) {
@@ -482,10 +492,13 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
     if(Number(beat.stage)<8) {
       const evacuating=time>=BeatById("04d").start;
       Object.assign(actors.at(-1),{pose:evacuating?"run":"stand",status:evacuating?"趁阻击带车后撤":"等待装运"});
-      for(const [index,member] of FLOW_CAMP_LOADING.members.slice(1).entries()) {
-        actors.push(Actor(member.id,member.name,"civilian","person",CartFollower(time,index?1.8:-1.8,-1-index*1.8),evacuating?"run":"stand",
-          {status:evacuating?"弹药已装车，随车后撤":"等待搬运"}));
-      }
+    }
+    for(const [index,member] of FLOW_CAMP_LOADING.members.slice(1).entries()) {
+      const position=CartFollower(time,index?1.8:-1.8,-1-index*1.8);
+      const moving=Distance(position,CartFollower(time+0.02,index?1.8:-1.8,-1-index*1.8))>0.001;
+      const departing=time>=BeatById("04d").start&&time<BeatById("06a").start;
+      actors.push(Actor(member.id,member.name,"civilian","person",position,moving||departing?"run":"kneel",
+        {status:moving?"弹药已装车，随车后撤":"车旁隐蔽照看弹药"}));
     }
     let nier = CartOffset(1,0.6);
     if(beat.id === "08g") nier=SampleRoute([[104.6,379.3],[99,380],[80,382],[80,392]],progress);
@@ -495,20 +508,23 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
     actors.push(Actor("nier", "妮儿", "civilian", "child", nier, "stand"));
   }
   if (time >= tankStart) {
-    const burned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
+    const firstBurned = time >= BeatById("06f").start + BeatById("06f").duration * 0.8;
+    const secondBurned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
     const tankTime=time-tankStart+BeatById("05a").start;
     const first=TankState(tankKeys,tankTime),second=TankState(secondTankKeys,tankTime);
-    const disabled=time>=BeatById("06g").start;
-    if(disabled) {first.moving=false;first.status=burned?"焚毁":"履带损毁";}
-    if(time>=BeatById("06i").start) second.status="倒车撤离";
+    if(firstBurned) Object.assign(first,{moving:false,status:"第一捆命中，焚毁"});
+    if(secondBurned) Object.assign(second,{moving:false,status:"第二捆命中，焚毁"});
     const tankPosition=first.p;
     const turretTarget=["06g","06h"].includes(beat.id)?yao:player;
     const turret=time<BeatById("06a").start?first.heading
       :Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.15;
-    actors.push(Actor("tank1", "九四式 · 头车", "enemy", "tank", tankPosition, burned ? "burn" : "stand",
-      { ...first, surface:"ground", turret, disabled }));
-    const secondHeading=time>=BeatById("06i").start?Math.PI:second.heading;
-    if (time < BeatById("07a").start) actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, "stand", { ...second, surface:"ground", heading:secondHeading, turret:secondHeading }));
+    actors.push(Actor("tank1", "九四式 · 头车", "enemy", "tank", tankPosition, firstBurned ? "burn" : "stand",
+      { ...first, surface:"ground", turret:firstBurned?first.heading:turret, disabled:firstBurned }));
+    const secondTarget=actors.find(actor=>actor.id==="yao").p;
+    const secondTurret=!secondBurned&&["06g","06h"].includes(beat.id)
+      ?Math.atan2(secondTarget[0]-second.p[0],-(secondTarget[1]-second.p[1])):second.heading;
+    actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, secondBurned?"burn":"stand",
+      { ...second, surface:"ground", turret:secondTurret, disabled:secondBurned }));
   }
   if (time >= BeatById("04c").start && time < BeatById("06c").start) {
     const down = beat.id === "06b";
@@ -561,7 +577,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
   ReturnFromPit(actors, time);
   WoundedEvacuation(actors, time);
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
-  EvacuationActors(actors,time,cart);
+  EvacuationActors(actors,time);
   return actors;
 }
 
@@ -657,7 +673,8 @@ function Effects(beat, time, progress, actors) {
   }
   if (["trackBlast","engineBlast","collapse"].includes(beat.fx)) {
     const age = time - (beat.start + beat.duration * 0.8);
-    if (age >= 0 && age < 5) effects.push({ kind: "blast", p: tank?.p ?? player.p, age });
+    const target=actors.find(actor=>actor.id===beat.blastTarget)??tank;
+    if (age >= 0 && age < 5) effects.push({ kind: "blast", p: target?.p ?? player.p, age });
   }
   const targets = actors.filter((actor) => actor.side === "enemy" && actor.pose !== "dead" && actor.kind !== "tank" && actor.pose !== "run");
   const blockers = actors.filter((actor) => actor.groupId === "OpeningSurvivors" && actor.firing);
@@ -684,7 +701,7 @@ function Effects(beat, time, progress, actors) {
     const target = targets[Math.floor(time/3) % targets.length];
     effects.push({ kind: "fire", a:player.p, b:target.p, side:"player", phase:(time*1.2)%1 });
   }
-  if (beat.stage === "06" && tank && tank.pose !== "burn") {
+  for(const tank of actors.filter(actor=>beat.stage==="06"&&actor.kind==="tank"&&actor.pose!=="burn")) {
     const cover=actors.filter(actor=>actor.coveringEvacuation && actor.firing)
       .reduce((nearest,actor)=>!nearest||Distance(tank.p,actor.p)<Distance(tank.p,nearest.p)?actor:nearest,null);
     const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : cover?.p ?? player.p;
@@ -700,7 +717,8 @@ function Effects(beat, time, progress, actors) {
     if (gunner?.firing && beat.fire === "crossfire" && westGun && westGun.pose !== "run") effects.push({kind:"fire",a:westGun.p,b:gunner.p,side:"friend",phase:(time*3)%1,heavy:true});
   }
   if (beat.id === "03g") effects.push({kind:"fire",a:[22,69.5],b:[12,44],side:"friend",phase:(time*5)%1,heavy:true});
-  if (["06g","06h"].includes(beat.id)&&tank) effects.push({kind:"fire",a:actors.find(actor=>actor.id==="yao").p,b:tank.p,side:"friend",phase:(time*5)%1});
+  const rearTank=actors.find(actor=>actor.id==="tank2"&&actor.pose!=="burn");
+  if (["06g","06h"].includes(beat.id)&&rearTank) effects.push({kind:"fire",a:actors.find(actor=>actor.id==="yao").p,b:rearTank.p,side:"friend",phase:(time*5)%1});
   if (beat.fx === "planes") {
     for (let index=0;index<3;index++) effects.push({kind:"plane",p:[105+(index-1)*9,180+progress*150-index*6],height:35});
   }
