@@ -415,11 +415,10 @@ function GroupActor(group,index,time,coreActors) {
     ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
     : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
   position=[position[0]+spread[0],position[1]+spread[1]];
-  let pose=time>=life.fall?"dead":time<readyAt?"kneel":group.behavior==="withdraw"||movement.moving?"run":"shoot";
-  if(time>=group.end&&pose!=="dead") {position=SampleRoute([position,group.area.center],(time-group.end)*group.speed/(Distance(position,group.area.center)||1));pose="run";}
+  const pose=time>=life.fall?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
   return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
-    heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing:group.behavior!=="withdraw"&&group.target!=="none"&&pose==="shoot"};
+    heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing:time<group.end&&group.behavior!=="withdraw"&&group.target!=="none"&&pose==="shoot"};
 }
 
 export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors) {

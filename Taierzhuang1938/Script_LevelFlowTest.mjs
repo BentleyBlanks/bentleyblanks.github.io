@@ -17,6 +17,30 @@ import { FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbus
 import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
 
+const transferEnd = BeatById("09e").end;
+const transferArrival = EvaluateFlow(transferEnd).actors.filter(actor => actor.groupId === "YardTransfer");
+assert.equal(transferArrival.length, 5, "all five search soldiers reach the forward junction");
+for (const offset of [0.01, 2, 4.4106, 7.99, 8]) {
+  const frame = EvaluateFlow(transferEnd + offset);
+  const soldiers = frame.actors.filter(actor => actor.groupId === "YardTransfer");
+  assert.equal(soldiers.length, 5, "transfer remains visible during the existing cleanup window");
+  for (const soldier of soldiers) {
+    assert.deepEqual(soldier.p, transferArrival.find(actor => actor.id === soldier.id).p, "beat transition never sends transfers back to their spawn");
+    assert.equal(soldier.pose, "stand", "arrived transfers do not run in place");
+    assert.equal(soldier.firing, false, "transfers do not acquire an invented combat or alarm response");
+  }
+  EvaluateFlow(0);
+  assert.deepEqual(EvaluateFlow(transferEnd + offset), frame, "transfer staging is deterministic after rewind");
+}
+assert.ok(!EvaluateFlow(transferEnd + 8.01).actors.some(actor => actor.groupId === "YardTransfer"), "existing group cleanup timing remains unchanged");
+const continuingTransfer = structuredClone(DEFAULT_ENCOUNTER_DOCUMENT);
+const shortTransfer = continuingTransfer.groups.find(group => group.id === "YardTransfer");
+shortTransfer.speed = 0.5;
+const transferBeforeEnd = EvaluateFlow(transferEnd, continuingTransfer).actors.find(actor => actor.groupId === "YardTransfer");
+const transferAfterEnd = EvaluateFlow(transferEnd + 4, continuingTransfer).actors.find(actor => actor.id === transferBeforeEnd.id);
+assert.ok(transferAfterEnd.p[0] > transferBeforeEnd.p[0], "unfinished transfers continue east along their authored lane after the beat ends");
+assert.equal(transferAfterEnd.pose, "run");
+
 // Every authored speech binds a current quoted line to a living, sampled actor.
 for (const [id, cues] of Object.entries(FLOW_DIALOGUE)) {
   const beat = BeatById(id);

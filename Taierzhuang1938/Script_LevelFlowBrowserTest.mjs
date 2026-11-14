@@ -1029,6 +1029,22 @@ try {
   assert.equal(speechClipping.hidden,0,'occluded eye-view speakers have no speech HUD');
   assert.equal(speechClipping.self,0,'first-person speaker has no floating self bubble');
   assert.equal(speechClipping.behind,null,'speakers behind the camera have no anchor');
+  await page.goto(base+'AdvancedTools/Tool_LevelFlow.html?t=1485&x=96&z=460&zoom=9');
+  await ReadyPlan();
+  const transferArrival=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
+  assert.equal(transferArrival.length,5);
+  for(const offset of [2,4.4106,7.99]) {
+    await page.evaluate(time=>LevelFlow.Seek(time),1485+offset);
+    const transfers=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
+    assert.equal(transfers.length,5);
+    for(const actor of transfers) {
+      assert.deepEqual(actor.p,transferArrival.find(entry=>entry.id===actor.id).p,'09F keeps transferred soldiers at the junction, not back at spawn');
+      assert.equal(actor.pose,'stand');
+      assert.equal(actor.firing,false);
+    }
+  }
+  await page.evaluate(()=>LevelFlow.Seek(1489.4106));
+  await page.screenshot({path:path.join(out,'Screenshot_YardTransferHold.png')});
   // fastForward delivers a single delayed animation frame, reproducing a
   // slow renderer without depending on the test machine's GPU or frame rate.
   await page.clock.install();
