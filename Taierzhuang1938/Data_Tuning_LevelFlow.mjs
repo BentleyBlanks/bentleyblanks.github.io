@@ -7,6 +7,12 @@ export const FLOW_RENDERING = {
   navigation: {wheelSettleMs:120},
   mapTerrain: {tilePixels:128,maxTiles:96},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
+  lighting: {
+    ambient:0.48, direct:0.52,
+    shadowMapSize:2048, shadowMinRadiusM:32, shadowMaxRadiusM:800,
+    shadowDepthM:2048, shadowBiasM:0.12, shadowStrength:0.95,
+    aoRadiusM:1.6, aoStrength:2.4, aoMaxPixels:36, aoMinLight:0.52,
+  },
 };
 
 // Screenshot reference supplied by the user on 2026-11-13.

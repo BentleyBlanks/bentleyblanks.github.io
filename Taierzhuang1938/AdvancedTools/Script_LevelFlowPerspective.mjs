@@ -4,6 +4,7 @@ import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
+import { EncounterBoxGeometry, EncounterShadowGeometry, ShadeEncounterFace } from "./Script_LevelFlowLighting.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
 function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
@@ -18,6 +19,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.boxGeometry=new WeakMap();
     this.terrainProjection=new WeakMap();this.projectionFrame=0;
     this.groundCache=new Map();this.groundTerrain=mapData.terrain;
+    this.lighting=FLOW_RENDERING.lighting;
   }
   Draw(...args) {
     const start=performance.now();this.frameDrawing=true;
@@ -272,33 +274,41 @@ export class FlowPerspectiveView extends FlowMapView {
     const Box=(x,z,w,d,h,color,y,yaw=0,cover=false,owner=null)=>{
       let geometry=owner&&this.boxGeometry.get(owner);
       if(!geometry||geometry.x!==x||geometry.z!==z||geometry.w!==w||geometry.d!==d||geometry.h!==h||geometry.y!==y||geometry.yaw!==yaw) {
-        const cosine=Math.cos(yaw),sine=Math.sin(yaw);
-        const Point=(dx,dy,dz)=>[x+dx*cosine+dz*sine,y+dy,z-dx*sine+dz*cosine];
-        const bottom=[Point(-w/2,0,-d/2),Point(w/2,0,-d/2),Point(w/2,0,d/2),Point(-w/2,0,d/2)];
-        const top=bottom.map(point=>[point[0],point[1]+h,point[2]]);
-        geometry={x,z,w,d,h,y,yaw,cosine,sine,bottom,top,points:[...bottom,...top],faces:[[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7],[4,5,6,7]]};
+        geometry=EncounterBoxGeometry(x,y,z,w,h,d,yaw);
         if(owner) this.boxGeometry.set(owner,geometry);
       }
       const {cosine,sine,bottom,top}=geometry,projected=new Array(8);
-      const BoxFace=(indices,faceColor)=>{
+      const BoxFace=(faceIndex,faceColor)=>{
+        const indices=geometry.faces[faceIndex];
+        const rgb=this.lighting?ShadeEncounterFace(faceColor,geometry.normals[faceIndex]):[1,3,5].map(index=>parseInt(faceColor.slice(index,index+2),16));
+        if(this.raster.accelerated) {
+          for(const triangle of [[0,1,2],[0,2,3]]) this.raster.WorldTriangle(triangle.map(index=>geometry.points[indices[index]]),[rgb,rgb,rgb]);
+          return;
+        }
         const vertices=indices.map(index=>{
           if(!projected[index]) {
             const vertex=this.Vertex(geometry.points[index]);
             vertex.x*=renderScale;vertex.y*=renderScale;projected[index]=vertex;
           }
-          return projected[index];
+          return {...projected[index],rgb};
         });
-        if(perspective&&vertices.some(vertex=>vertex.depth<0.15||vertex.depth>this.far)) Face(indices.map(index=>geometry.points[index]),faceColor);
+        if(perspective&&vertices.some(vertex=>vertex.depth<0.15||vertex.depth>this.far)) Face(indices.map(index=>geometry.points[index]),faceColor,indices.map(()=>rgb));
         else this.raster.Face(vertices,faceColor);
       };
       const dx=this.eye[0]-x,dz=this.eye[2]-z,localX=dx*cosine-dz*sine,localZ=dx*sine+dz*cosine;
       const outside=this.eye[1]>=y&&(this.eye[1]>=y+h||Math.abs(localX)>w/2||Math.abs(localZ)>d/2);
       const visibleSides=[localZ<-d/2,localX>w/2,localZ>d/2,localX<-w/2];
-      for(let index=0;index<4;index++) if(!outside||visibleSides[index]) BoxFace(geometry.faces[index],color);
-      if(!outside||this.eye[1]>=y+h) BoxFace(geometry.faces[4],cover?FLOW_COVER_COLORS.top:color);
+      for(let index=0;index<4;index++) if(!outside||visibleSides[index]) BoxFace(index,color);
+      if(!outside||this.eye[1]>=y+h) BoxFace(4,cover?FLOW_COVER_COLORS.top:color);
       if(cover) coverBoxes.push({bottom,top});
     };
     const signals=EncounterSignals(frame);
+    const shadowKey=JSON.stringify([...signals]);
+    if(this.shadowKey!==shadowKey||this.shadowObjects!==this.mapData.objects||this.shadowFarObjects!==this.mapData.farObjects) {
+      this.shadowVertices=EncounterShadowGeometry([...this.mapData.objects,...this.mapData.farObjects],signals,point=>this.Ground(point));
+      this.shadowKey=shadowKey;this.shadowObjects=this.mapData.objects;this.shadowFarObjects=this.mapData.farObjects;
+    }
+    this.raster.shadowVertices=this.shadowVertices;
     const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
     const cached=cacheStatic&&staticKey===this.staticKey&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;

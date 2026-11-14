@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
-import {LaunchBrowser,ServeProject} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import {ServeRoot} from "./Script_DevServer.mjs";
 import {FLOW_TIMELINE} from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import {FLOW_SOURCE_EXCERPTS} from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import {ReadPngFrameMetadata} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),out=path.join(root,"tmp","EncounterEditor");
 fs.mkdirSync(out,{recursive:true});
-const server=await ServeProject(root),base=`http://127.0.0.1:${server.address().port}/Taierzhuang1938/`;
+const server=await ServeRoot(root),base=`http://127.0.0.1:${server.address().port}/Taierzhuang1938/`;
 const browser=await LaunchBrowser();
 try {
   const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
@@ -99,6 +100,48 @@ try {
     if('fallback' in result) assert.ok(result.fallback&&result.same,'GPU failure replays the complete frame in software');
     else assert.ok(result.pixels>100&&result.maxColorError<=2&&result.maxDepthError<(result.depthTolerance||0.001),`GPU preserves smooth colors and perspective depth: ${JSON.stringify(result)}`);
   }
+  const lighting=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {FLOW_RENDERING}=await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const objects=[
+      {id:'Floor',pos:[0,-0.1,0],size:[20,0.1,20],material:'Whitebox/Plaster'},
+      {id:'Wall',pos:[0,0,0],size:[5,3,0.4],material:'Whitebox/Plaster'},
+      {id:'Wing',pos:[-2.5,0,2],size:[0.4,3,4],material:'Whitebox/Plaster'},
+    ];
+    const view=new FlowPerspectiveView(canvas,{objects,farObjects:[],terrain:{heightAt:()=>0,roots:[]},ramps:[]},'scene');
+    view.freeCamera={eye:[6,6,8],yaw:Math.atan2(-6,-8),pitch:Math.atan2(-5,10)};
+    const frame={...LevelFlow.Evaluate(1355),actors:[],effects:[]};
+    canvas.width=320;canvas.height=240;
+    const Draw=settings=>{
+      view.lighting=settings;view.BeforeDraw(frame);const context=canvas.getContext('2d');view.DrawBase(context,320,240,frame);
+      return {pixels:context.getImageData(0,0,320,240).data,depth:[...view.raster.depth]};
+    };
+    const direct=Draw({...FLOW_RENDERING.lighting,shadowStrength:0,aoStrength:0});
+    const shadow=Draw({...FLOW_RENDERING.lighting,aoStrength:0});
+    const ambient=Draw({...FLOW_RENDERING.lighting,shadowStrength:0});
+    const CountDarker=(a,b)=>{
+      let count=0,depthError=0;
+      for(let i=0;i<a.depth.length;i++) {
+        if(Number.isFinite(a.depth[i])) {
+          depthError=Math.max(depthError,Math.abs(a.depth[i]-b.depth[i]));
+          if(a.pixels[i*4]-b.pixels[i*4]>12) count++;
+        }
+      }
+      return {count,depthError};
+    };
+    // All four panes share this context. Returning to another target size and
+    // camera must preserve the same shadow/AO color and interaction depth.
+    const repeated=Draw({...FLOW_RENDERING.lighting,aoStrength:0});
+    const result={backend:view.raster.accelerated,shadow:CountDarker(direct,shadow),ao:CountDarker(direct,ambient),repeat:CountDarker(shadow,repeated),maxRepeatError:shadow.pixels.reduce((max,value,index)=>Math.max(max,Math.abs(value-repeated.pixels[index])),0)};
+    canvas.remove();return result;
+  });
+  assert.ok(lighting.backend,'lighting regression exercises WebGL');
+  assert.ok(lighting.shadow.count>100,`wall casts a visible ground shadow: ${JSON.stringify(lighting)}`);
+  assert.ok(lighting.ao.count>25,`wall/floor junction receives ambient occlusion: ${JSON.stringify(lighting)}`);
+  assert.equal(lighting.shadow.depthError,0,'shadows preserve picking and actor depth');
+  assert.equal(lighting.ao.depthError,0,'AO preserves picking and actor depth');
+  assert.ok(lighting.maxRepeatError<=1,`repeated lighting is deterministic: ${JSON.stringify(lighting)}`);
   const backgroundCache=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320.5px;height:240.5px';document.body.append(canvas);

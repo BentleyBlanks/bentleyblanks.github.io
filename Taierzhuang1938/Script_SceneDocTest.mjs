@@ -27,6 +27,25 @@ Check(heights.length === (scene.terrain.cols + 1) * (scene.terrain.rows + 1), "�
 Check(scene.objects.every(o => SCENE_ASSETS[o.asset]) && scene.objects.every(o => o.material === undefined || SCENE_MATERIALS[o.material]), "资产 / 材质编号都在目录里");
 Check(Object.values(SCENE_MATERIALS).every(m => WhiteboxMaterialFor(m.semantic) && SCENE_MATERIALS[WhiteboxMaterialFor(m.semantic)] === m), "语义 ↔ 白盒材质一一对应");
 Check(fs.readFileSync(SceneFilePath("FirstLevelWhitebox"), "utf8").indexOf("\r") < 0, "场景 JSON 是 LF");
+// Route-side houses must have real empty apertures. A dark rectangle on a
+// solid facade would still block both observation and player movement.
+const rooms=scene.objects.filter(object=>object.meta?.hollow&&object.meta.openings);
+Check(rooms.length>=35,"玩家沿途房屋有空心结构与门窗记录");
+for(const room of rooms) {
+  const {openings,floorY}=room.meta;
+  Check(openings.some(opening=>opening.kind==="door"&&opening.width>=1&&opening.topH>=2),`${room.id} 有可通行的房门`);
+  Check(openings.some(opening=>opening.kind==="window"&&opening.width>=0.7&&opening.sillH<=1.2),`${room.id} 有可观察的窗洞`);
+  for(const opening of openings) for(const fraction of [0.15,0.5,0.85]) {
+    const point=[opening.center[0],floorY+opening.sillH+(opening.topH-opening.sillH)*fraction,opening.center[2]];
+    const blocked=scene.objects.some(object=>{
+      if(object.solid===false||!object.size||!Number.isFinite(object.pos[1])) return false;
+      const [x,y,z]=object.pos,[w,h,d]=object.size,yaw=(object.yawDeg||0)*Math.PI/180;
+      const dx=point[0]-x,dz=point[2]-z;
+      return point[1]>y+0.01&&point[1]<y+h-0.01&&Math.abs(dx*Math.cos(yaw)-dz*Math.sin(yaw))<w/2-0.01&&Math.abs(dx*Math.sin(yaw)+dz*Math.cos(yaw))<d/2-0.01;
+    });
+    Check(!blocked,`${opening.id} 的门窗开口为空`);
+  }
+}
 // 两个场景（2026-11-01）：剧情事件都有中文名；物件都分了层级（段落 / 类别……），没有只差大小写的两个文件夹
 for (const id of ["FirstLevelWhitebox", "FirstLevel"]) {
   const objects = ReadSceneSync(id).doc.objects;

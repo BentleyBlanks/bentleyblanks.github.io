@@ -1,6 +1,7 @@
-// One offscreen context for all preview panes. Only triangle filling moves to
-// the GPU; the editor keeps its CPU depth buffer for picking and actor strokes.
-// No game renderer, scene assets or terrain sampling rules are changed here.
+import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+
+// One offscreen context for all panes. Depth readback remains unfiltered for
+// picking and actor strokes. Lighting only changes the displayed color.
 let shared;
 let unavailable=false;
 
@@ -41,6 +42,7 @@ class GpuRaster {
       uniform vec4 projection;
       out vec3 rgb;
       out float distanceToCamera;
+      out vec3 worldPosition;
       void main() {
         vec3 point=position;
         vec4 clip=vec4(0.0);
@@ -58,15 +60,49 @@ class GpuRaster {
         gl_Position=world?clip:vec4((point.xy/size*2.0-1.0)*w,0.0,w);
         rgb=color/255.0;
         distanceToCamera=point.z;
+        vec2 screen=position.xy/size;
+        float cameraScale=perspective?position.z:1.0;
+        vec2 cameraXY=vec2((screen.x-0.5)*size.x,(projection.y-screen.y)*size.y)/projection.x*cameraScale;
+        worldPosition=world?position:eye+right*cameraXY.x+up*cameraXY.y+forward*position.z;
       }`);
     const fragment=Shader(gl.FRAGMENT_SHADER,`#version 300 es
       precision highp float;
       in vec3 rgb;
       in float distanceToCamera;
+      in vec3 worldPosition;
+      uniform bool lit;
+      uniform sampler2D shadowMap;
+      uniform vec3 shadowCenter;
+      uniform vec3 shadowRight;
+      uniform vec3 shadowUp;
+      uniform vec3 sun;
+      uniform vec3 eye;
+      uniform vec2 lightBalance;
+      uniform vec4 shadowSettings;
       layout(location=0) out vec4 pixel;
       layout(location=1) out float distancePixel;
       void main() {
-        pixel=vec4(rgb,1.0);
+        float visibility=1.0;
+        if(lit) {
+          vec3 relative=worldPosition-shadowCenter;
+          vec3 shadow=vec3(dot(relative,shadowRight)/shadowSettings.x,dot(relative,shadowUp)/shadowSettings.x,-dot(relative,sun)/shadowSettings.y)*0.5+0.5;
+          vec3 normal=normalize(cross(dFdx(worldPosition),dFdy(worldPosition)));
+          if(dot(normal,eye-worldPosition)<0.0) normal=-normal;
+          float cosine=abs(dot(normal,sun));
+          float slope=sqrt(max(0.0,1.0-cosine*cosine))/max(0.1,cosine);
+          vec2 texel=1.0/vec2(textureSize(shadowMap,0));
+          float bias=shadowSettings.z+slope*texel.x*shadowSettings.x/shadowSettings.y*1.5;
+          if(all(greaterThan(shadow,vec3(0.0)))&&all(lessThan(shadow,vec3(1.0)))) {
+            float blocked=0.0;
+            for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) {
+              float depth=texture(shadowMap,shadow.xy+vec2(x,y)*texel).r;
+              blocked+=shadow.z-bias>depth?1.0:0.0;
+            }
+            float direct=lightBalance.y*max(dot(normal,sun),0.0);
+            visibility-=shadowSettings.w*blocked/9.0*direct/(lightBalance.x+direct);
+          }
+        }
+        pixel=vec4(rgb*visibility,1.0);
         distancePixel=distanceToCamera;
         gl_FragDepth=distanceToCamera/16384.0;
       }`);
@@ -79,6 +115,86 @@ class GpuRaster {
     this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     for(let index=0;index<2;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,24,index*12);}
     this.targets=new Map();
+    const Program=(vertexSource,fragmentSource)=>{
+      const program=gl.createProgram(),v=Shader(gl.VERTEX_SHADER,vertexSource),f=Shader(gl.FRAGMENT_SHADER,fragmentSource);
+      gl.attachShader(program,v);gl.attachShader(program,f);gl.linkProgram(program);gl.deleteShader(v);gl.deleteShader(f);
+      if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+      return program;
+    };
+    this.lightingUniforms=Object.fromEntries(['lit','shadowMap','shadowCenter','shadowRight','shadowUp','sun','shadowSettings','lightBalance'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
+    this.shadowProgram=Program(`#version 300 es
+      precision highp float;
+      layout(location=0) in vec3 position;
+      uniform vec3 shadowCenter,shadowRight,shadowUp,sun;
+      uniform vec4 shadowSettings;
+      void main() {
+        vec3 p=position-shadowCenter;
+        gl_Position=vec4(dot(p,shadowRight)/shadowSettings.x,dot(p,shadowUp)/shadowSettings.x,-dot(p,sun)/shadowSettings.y,1.0);
+      }`, `#version 300 es
+      precision highp float;
+      void main() {}`);
+    this.shadowUniforms=Object.fromEntries(['shadowCenter','shadowRight','shadowUp','sun','shadowSettings'].map(name=>[name,gl.getUniformLocation(this.shadowProgram,name)]));
+    this.aoProgram=Program(`#version 300 es
+      void main() {
+        vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);
+        gl_Position=vec4(p*2.0-1.0,0.0,1.0);
+      }`, `#version 300 es
+      precision highp float;
+      uniform sampler2D sceneColor,sceneDepth;
+      uniform vec2 size;
+      uniform vec4 projection,aoSettings;
+      uniform float minLight;
+      uniform bool perspective;
+      out vec4 pixel;
+      vec3 Position(vec2 p) {
+        ivec2 at=clamp(ivec2(p),ivec2(0),ivec2(size)-1);
+        float z=min(texelFetch(sceneDepth,at,0).r,projection.w);
+        vec2 xy=vec2(p.x-size.x*0.5,size.y*projection.y-p.y)/projection.x;
+        return vec3(xy*(perspective?z:1.0),z);
+      }
+      void main() {
+        ivec2 at=ivec2(gl_FragCoord.xy);
+        pixel=texelFetch(sceneColor,at,0);
+        if(pixel.a==0.0) return;
+        vec2 p=gl_FragCoord.xy;
+        vec3 center=Position(p);
+        vec3 left=center-Position(p-vec2(1,0)),right=Position(p+vec2(1,0))-center;
+        vec3 top=center-Position(p-vec2(0,1)),bottom=Position(p+vec2(0,1))-center;
+        vec3 dx=abs(left.z)<abs(right.z)?left:right,dy=abs(top.z)<abs(bottom.z)?top:bottom;
+        vec3 normal=normalize(cross(dx,dy));
+        if(dot(normal,center)>0.0) normal=-normal;
+        float radius=clamp(aoSettings.x*projection.x/(perspective?max(center.z,0.15):1.0),2.0,aoSettings.z);
+        float occlusion=0.0;
+        for(int direction=0;direction<8;direction++) {
+          float angle=float(direction)*0.785398163;
+          vec2 ray=vec2(cos(angle),sin(angle));
+          for(int step=1;step<=2;step++) {
+            vec2 sampleAt=p+ray*radius*(float(step)*0.45);
+            if(any(lessThan(sampleAt,vec2(0.5)))||any(greaterThanEqual(sampleAt,size-0.5))) continue;
+            if(texelFetch(sceneColor,ivec2(sampleAt),0).a==0.0) continue;
+            vec3 delta=Position(sampleAt)-center;
+            float distance=length(delta);
+            if(distance<0.015||distance>aoSettings.x) continue;
+            float horizon=max(0.0,dot(normal,delta/distance)-0.08);
+            occlusion+=horizon*(1.0-distance/aoSettings.x);
+          }
+        }
+        pixel.rgb*=max(minLight,1.0-occlusion*aoSettings.y/16.0);
+      }`);
+    this.aoUniforms=Object.fromEntries(['sceneColor','sceneDepth','size','projection','aoSettings','minLight','perspective'].map(name=>[name,gl.getUniformLocation(this.aoProgram,name)]));
+    this.shadowBuffer=gl.createBuffer();this.shadowVao=gl.createVertexArray();
+    gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
+    gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,12,0);
+    this.fullscreenVao=gl.createVertexArray();
+    const settings=FLOW_RENDERING.lighting;
+    this.shadowTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,settings.shadowMapSize,settings.shadowMapSize,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+    this.shadowFramebuffer=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,this.shadowTexture,0);
+    gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete shadow framebuffer');
   }
 
   Resize(width,height) {
@@ -86,16 +202,16 @@ class GpuRaster {
     if(this.canvas.width<width||this.canvas.height<height) {this.canvas.width=Math.max(width,this.canvas.width);this.canvas.height=Math.max(height,this.canvas.height);}
     if(this.targets.has(key)) {
       const target=this.targets.get(key);this.targets.delete(key);this.targets.set(key,target);
-      this.framebuffer=target.framebuffer;return;
+      this.target=target;this.framebuffer=target.framebuffer;return;
     }
     // Reuse the different sizes of the four panes instead of reallocating GPU
     // attachments when switching from the left pane to the right pane.
     while(this.targets.size>=4) {
       const [oldKey,target]=this.targets.entries().next().value;
-      gl.deleteFramebuffer(target.framebuffer);gl.deleteTexture(target.color);gl.deleteTexture(target.distance);gl.deleteRenderbuffer(target.depth);this.targets.delete(oldKey);
+      gl.deleteFramebuffer(target.framebuffer);gl.deleteFramebuffer(target.shadedFramebuffer);gl.deleteTexture(target.shadedColor);gl.deleteTexture(target.color);gl.deleteTexture(target.distance);gl.deleteRenderbuffer(target.depth);this.targets.delete(oldKey);
     }
     const target={framebuffer:gl.createFramebuffer(),color:gl.createTexture(),distance:gl.createTexture(),depth:gl.createRenderbuffer()};
-    this.targets.set(key,target);this.framebuffer=target.framebuffer;
+    this.targets.set(key,target);this.target=target;this.framebuffer=target.framebuffer;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
     for(const [texture,attachment,format,type,internal] of [
       [target.color,gl.COLOR_ATTACHMENT0,gl.RGBA,gl.UNSIGNED_BYTE,gl.RGBA8],
@@ -110,16 +226,75 @@ class GpuRaster {
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,target.depth);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete raster framebuffer');
+    target.shadedFramebuffer=gl.createFramebuffer();target.shadedColor=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,target.shadedColor);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,target.shadedFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target.shadedColor,0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete AO framebuffer');
+  }
+
+  DrawShadows(raster) {
+    const gl=this.gl,view=raster.view,settings=view.lighting;
+    const sun=FLOW_RENDERING.sky.sunDirection.map(value=>value/Math.hypot(...FLOW_RENDERING.sky.sunDirection));
+    const horizontal=Math.hypot(sun[0],sun[2]),right=[sun[2]/horizontal,0,-sun[0]/horizontal];
+    const up=[sun[1]*right[2],sun[2]*right[0]-sun[0]*right[2],-sun[1]*right[0]];
+    const orthographic=!raster.perspective;
+    const distance=Math.min(180,Math.max(20,(view.eye[1]-view.Ground([view.eye[0],view.eye[2]]))/Math.max(0.15,-view.forward[1])));
+    const center=orthographic?view.aim:view.eye.map((value,axis)=>value+view.forward[axis]*distance);
+    const radius=Math.min(settings.shadowMaxRadiusM,Math.max(settings.shadowMinRadiusM,orthographic?Math.max(view.width,view.height)/view.scale*0.65:distance*1.5));
+    const values={shadowCenter:center,shadowRight:right,shadowUp:up,sun,shadowSettings:[radius,settings.shadowDepthM,settings.shadowBiasM/settings.shadowDepthM/2,settings.shadowStrength]};
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);gl.viewport(0,0,settings.shadowMapSize,settings.shadowMapSize);
+    gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);
+    gl.clearBufferfv(gl.DEPTH,0,new Float32Array([1]));gl.useProgram(this.shadowProgram);
+    for(const [name,value] of Object.entries(values)) {
+      if(value.length===4) gl.uniform4fv(this.shadowUniforms[name],value);else gl.uniform3fv(this.shadowUniforms[name],value);
+    }
+    gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER,raster.shadowVertices,gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.shadowVertices.length/3);
+    // Visible terrain, vehicles and carried objects also cast shadows.
+    gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/6);
+    return values;
+  }
+
+  DrawAmbientOcclusion(raster) {
+    const gl=this.gl,view=raster.view,settings=view.lighting;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.shadedFramebuffer);gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(this.aoProgram);gl.bindVertexArray(this.fullscreenVao);
+    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance]]) {
+      gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoUniforms[name],unit);
+    }
+    gl.uniform2f(this.aoUniforms.size,raster.width,raster.height);
+    gl.uniform4f(this.aoUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
+    gl.uniform4f(this.aoUniforms.aoSettings,settings.aoRadiusM,settings.aoStrength,settings.aoMaxPixels,0);
+    gl.uniform1f(this.aoUniforms.minLight,settings.aoMinLight);gl.uniform1i(this.aoUniforms.perspective,raster.perspective?1:0);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.target.shadedFramebuffer);
   }
 
   Draw(raster) {
     const gl=this.gl;if(gl.isContextLost()) return false;
     try {this.Resize(raster.width,raster.height);} catch {unavailable=true;return false;}
+    const lighting=raster.view?.lighting&&raster.shadowVertices;
+    const shadowValues=lighting?this.DrawShadows(raster):null;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.viewport(0,0,raster.width,raster.height);
     gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);
     gl.clearBufferfv(gl.COLOR,0,new Float32Array(4));gl.clearBufferfv(gl.COLOR,1,new Float32Array([Infinity,0,0,0]));
     gl.clearBufferfv(gl.DEPTH,0,new Float32Array([1]));
     gl.useProgram(this.program);gl.uniform2f(this.size,raster.width,raster.height);gl.uniform1i(this.perspective,raster.perspective?1:0);
+    gl.uniform1i(this.lightingUniforms.lit,lighting?1:0);
+    if(lighting) {
+      gl.uniform2f(this.lightingUniforms.lightBalance,raster.view.lighting.ambient,raster.view.lighting.direct);
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.lightingUniforms.shadowMap,0);
+      for(const [name,value] of Object.entries(shadowValues)) {
+        if(value.length===4) gl.uniform4fv(this.lightingUniforms[name],value);else gl.uniform3fv(this.lightingUniforms[name],value);
+      }
+    }
     gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     if(raster.worldLength) {
       const view=raster.view;
@@ -134,6 +309,7 @@ class GpuRaster {
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
     gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depth);
     // Keep color on the GPU. Only depth is read back for editor interactions.
+    if(lighting) this.DrawAmbientOcclusion(raster);
     gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
     gl.blitFramebuffer(0,0,raster.width,raster.height,0,this.canvas.height,raster.width,this.canvas.height-raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);
     return !gl.isContextLost()&&gl.getError()===gl.NO_ERROR;

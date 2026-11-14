@@ -33,7 +33,7 @@ const J = (v) => JSON.stringify(v);
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 // The static test server does not implement editor status endpoints; keep this review read-only.
 for (const route of ["**/__blockout/status", "**/__scene/status", "**/__environment/status"]) {
   await page.route(route, request => request.fulfill({ json: { writable: false } }));
@@ -164,7 +164,7 @@ try {
 
   // 4) 场景编辑器：两个场景
   console.log("--- scene editor");
-  const editor = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const editor = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   editor.on("pageerror", (error) => errors.push(`SCENEEDITOR PAGEERROR ${String(error).slice(0, 300)}`));
   await editor.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevel`, { waitUntil: "load", timeout: 120000 });
   await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0 && document.querySelectorAll("#seAssets code").length > 0, null, { timeout: 120000 });
