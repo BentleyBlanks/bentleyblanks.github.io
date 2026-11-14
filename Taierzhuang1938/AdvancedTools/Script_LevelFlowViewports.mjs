@@ -60,16 +60,7 @@ export class EncounterViewports {
       rotate.onclick=()=>{entry.map.yaw=(entry.map.yaw||0)+Math.PI/4;this.callbacks.change();};
       this.callbacks.bind(entry);
     }
-    this.observer=new ResizeObserver(()=>{
-      for(const entry of this.Visible()) {
-        const rect=entry.canvas.getBoundingClientRect();
-        if(rect.width<1||rect.height<1) continue;
-        if(entry.size&&entry.mode==="manual") entry.map.scale*=Math.min(rect.width/entry.size.width,rect.height/entry.size.height);
-        else this.Frame(entry);
-        entry.size={width:rect.width,height:rect.height};
-      }
-      this.callbacks.change();
-    });
+    this.observer=new ResizeObserver(()=>this.Resize());
     for(const entry of this.entries) this.observer.observe(entry.canvas);
     this.SetLayout(2);
   }
@@ -79,6 +70,27 @@ export class EncounterViewports {
   }
   get active() {return this.entries[this.activeIndex];}
   Visible() {return this.entries.slice(0,this.count);}
+
+  SetResizing(resizing) {
+    // CSS stretches the existing canvas bitmap while the sidebar follows the pointer.
+    // Rebuild terrain projection and raster buffers once at the final dimensions.
+    this.resizing=resizing;
+    if(!resizing) this.Resize(true);
+  }
+
+  Resize(force=false) {
+    if(this.resizing) return;
+    let changed=false;
+    for(const entry of this.Visible()) {
+      const rect=entry.canvas.getBoundingClientRect();
+      if(rect.width<1||rect.height<1||entry.size?.width===rect.width&&entry.size?.height===rect.height) continue;
+      if(entry.size&&entry.mode==="manual") entry.map.scale*=Math.min(rect.width/entry.size.width,rect.height/entry.size.height);
+      else this.Frame(entry);
+      entry.size={width:rect.width,height:rect.height};
+      changed=true;
+    }
+    if(changed||force) this.callbacks.change();
+  }
 
   SetLayout(count) {
     this.count=[1,2,4].includes(Number(count))?Number(count):2;
@@ -143,6 +155,7 @@ export class EncounterViewports {
   }
 
   Draw(frame,layers,selection,annotations,draft,document=null) {
+    if(this.resizing) return;
     const contentKey=JSON.stringify([frame.time,frame.beat.id,layers,selection,draft]);
     const contentChanged=document===null||document!==this.document||annotations!==this.annotations||contentKey!==this.contentKey;
     for(const entry of this.Visible()) {

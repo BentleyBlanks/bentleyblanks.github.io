@@ -6,7 +6,7 @@ import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
 import { ScreenshotAnnotations } from "./Script_LevelFlowAnnotations.mjs";
-import { EncounterChat } from "./Script_LevelFlowChat.mjs?v=20261114DefaultChatLocation";
+import { EncounterChat } from "./Script_LevelFlowChat.mjs";
 import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
@@ -325,6 +325,7 @@ async function Start() {
     setUnitMode:SetUnitSelectionMode,
     removeUnit:id=>Select({type:"actor",id},{additive:true}),
     clearUnits:()=>Select(null),
+    resizeViewports:resizing=>workspace.SetResizing(resizing),
   });
   Element("mapLoading").hidden=true;
   BindControls();

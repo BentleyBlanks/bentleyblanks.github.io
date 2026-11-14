@@ -79,7 +79,7 @@ function DrawUnitList(element, units, remove = null, disabled = false) {
 }
 
 export class EncounterChat {
-  constructor({ snapshot, openScreenshot, editScreenshot, openUnits, setUnitMode, removeUnit, clearUnits }) {
+  constructor({ snapshot, openScreenshot, editScreenshot, openUnits, setUnitMode, removeUnit, clearUnits, resizeViewports = () => {} }) {
     this.snapshot = snapshot;
     this.editScreenshot = editScreenshot;
     this.sessions = [];
@@ -97,7 +97,7 @@ export class EncounterChat {
     this.sending = false;
     this.stopping = null;
     this.selectionVersion = 0;
-    this.BindInspectorResize();
+    this.BindInspectorResize(resizeViewports);
     Element("toggleCodexSessions").onclick = () => {
       const button = Element("toggleCodexSessions");
       const open = button.getAttribute("aria-expanded") !== "true";
@@ -141,12 +141,12 @@ export class EncounterChat {
     window.addEventListener("pagehide", () => clearInterval(this.timer), { once: true });
   }
 
-  BindInspectorResize() {
+  BindInspectorResize(resizeViewports) {
     const handle = Element("inspectorResizeHandle");
     const workspace = document.querySelector(".lfWorkspace");
     const inspector = document.querySelector(".lfInspector");
     const key = "tengxian1938_encounter_sidebar_width_v1";
-    let preferred = 390, drag = null;
+    let preferred = 390, drag = null, resizeFrame = 0;
     try { preferred = Number(localStorage.getItem(key)) || preferred; } catch { /* Storage is optional. */ }
     const SetWidth = (width, persist = false) => {
       preferred = Math.max(280, Math.min(720, Math.round(width)));
@@ -159,21 +159,35 @@ export class EncounterChat {
       if (persist) { try { localStorage.setItem(key, String(preferred)); } catch { /* Keep this window's width. */ } }
     };
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || drag) return;
       event.preventDefault();
-      drag = { x: event.clientX, width: inspector.getBoundingClientRect().width };
+      const width = inspector.getBoundingClientRect().width;
+      drag = { x: event.clientX, width, nextWidth: width, pointerId: event.pointerId };
       handle.setPointerCapture(event.pointerId);
       document.body.classList.add("lfResizingInspector");
+      resizeViewports(true);
     });
-    handle.addEventListener("pointermove", event => { if (drag) SetWidth(drag.width + drag.x - event.clientX); });
-    const Finish = () => {
-      if (!drag) return;
-      drag = null; SetWidth(preferred, true);
+    handle.addEventListener("pointermove", event => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      drag.nextWidth = drag.width + drag.x - event.clientX;
+      if (!resizeFrame) resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        SetWidth(drag.nextWidth);
+      });
+    });
+    const Finish = event => {
+      if (!drag || event.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
+      cancelAnimationFrame(resizeFrame); resizeFrame = 0;
+      const { nextWidth, pointerId } = drag;
+      drag = null; SetWidth(nextWidth, true);
       document.body.classList.remove("lfResizingInspector");
+      if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
+      resizeViewports(false);
     };
     handle.addEventListener("pointerup", Finish);
     handle.addEventListener("pointercancel", Finish);
     handle.addEventListener("lostpointercapture", Finish);
+    window.addEventListener("blur", Finish);
     handle.addEventListener("keydown", event => {
       if (!["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();

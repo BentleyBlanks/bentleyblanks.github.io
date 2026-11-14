@@ -136,10 +136,54 @@ try {
   assert.deepEqual(await SelectedIds(), []);
   assert.equal(await page.locator("#attachSelectedUnits").isDisabled(), true);
   await page.click("#closeUnitSelection");
+  await page.evaluate(async () => {
+    const { FlowPerspectiveView } = await import("./Script_LevelFlowPerspective.mjs");
+    const original = FlowPerspectiveView.prototype.Draw;
+    window.inspectorResizeProbe = { draws: 0, bitmapWidth: document.querySelector("#flowMap").width,
+      cameras: LevelFlow.Inspect().viewports.views.map(view => view.freeCamera),
+      restore: () => { FlowPerspectiveView.prototype.Draw = original; } };
+    FlowPerspectiveView.prototype.Draw = function (...args) {
+      inspectorResizeProbe.draws++;
+      return original.apply(this, args);
+    };
+    document.querySelector("#inspectorResizeHandle").addEventListener("pointerdown", event => {
+      inspectorResizeProbe.pointerId = event.pointerId;
+    });
+  });
   const handle = await page.locator("#inspectorResizeHandle").boundingBox();
   await page.mouse.move(handle.x + 3, handle.y + 150); await page.mouse.down();
-  await page.mouse.move(handle.x - 197, handle.y + 150, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(handle.x - 197, handle.y + 150, { steps: 30 });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 590);
+  assert.equal(await page.evaluate(() => inspectorResizeProbe.draws), 0, "drag reuses the existing viewport bitmap");
+  assert.equal(await page.locator("#flowMap").evaluate(canvas => canvas.width), await page.evaluate(() => inspectorResizeProbe.bitmapWidth));
+  await page.mouse.up();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  assert.equal(await page.evaluate(() => inspectorResizeProbe.draws), 2, "each visible viewport redraws once on release");
+  assert.deepEqual(await page.evaluate(() => LevelFlow.Inspect().viewports.views.map(view => view.freeCamera)),
+    await page.evaluate(() => inspectorResizeProbe.cameras));
+  assert.equal(await page.locator("#flowMap").evaluate(canvas => canvas.width === Math.round(canvas.getBoundingClientRect().width)), true);
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 590);
+  // Losing capture, cancelling a pointer and window blur flush the last queued move.
+  for (const finish of ["pointercancel", "lostpointercapture", "blur"]) {
+    const currentHandle = await page.locator("#inspectorResizeHandle").boundingBox();
+    const expectedWidth = (await page.locator(".lfInspector").boundingBox()).width + 10;
+    await page.mouse.move(currentHandle.x + 3, currentHandle.y + 150); await page.mouse.down();
+    await page.evaluate(({ x, finish }) => {
+      const handle = document.querySelector("#inspectorResizeHandle");
+      handle.dispatchEvent(new PointerEvent("pointermove", { pointerId: inspectorResizeProbe.pointerId, clientX: x - 10 }));
+      if (finish === "blur") window.dispatchEvent(new Event("blur"));
+      else if (finish === "lostpointercapture") handle.releasePointerCapture(inspectorResizeProbe.pointerId);
+      else handle.dispatchEvent(new PointerEvent(finish, { pointerId: inspectorResizeProbe.pointerId }));
+    }, { x: currentHandle.x + 3, finish });
+    await page.mouse.up();
+    await page.waitForFunction(() => !document.body.classList.contains("lfResizingInspector"));
+    assert.equal((await page.locator(".lfInspector").boundingBox()).width, expectedWidth);
+    assert.equal(await page.evaluate(() => localStorage.getItem("tengxian1938_encounter_sidebar_width_v1")), String(expectedWidth));
+  }
+  await page.evaluate(() => inspectorResizeProbe.restore());
+  await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
+  for (let step = 0; step < 10; step++) await page.keyboard.press("ArrowLeft");
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("ArrowRight");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 570);
   await page.click("#toggleCodexSessions");
