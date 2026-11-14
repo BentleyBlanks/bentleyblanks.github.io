@@ -1,9 +1,15 @@
 // Encounter preview terrain budgets, measured with a 640 × 640 Scene viewport
 // on 2026-11-13. Small cells refine height detail, and flat cells stop early.
 export const FLOW_RENDERING = {
-  terrainCellPixels: 10,
+  terrainCellPixels: 24,
+  terrainPaintCellPixels: 32,
   terrainFlatHeightPixels: 0.5,
   terrainNormalSampleM: 0.5,
+  terrainSceneCellM: 8,
+  terrainHeightErrorM: 0.18,
+  terrainBackdropCellM: 32,
+  backdropPaint: {maxPx:2048, minTexelM:2},
+  tree: {minHeightM:2.5, crownWidthRatio:0.27, crownMaxM:3, crownBaseRatio:0.45, trunkMaxM:0.5},
   navigation: {wheelSettleMs:120},
   mapTerrain: {tilePixels:128,maxTiles:96},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
@@ -14,6 +20,8 @@ export const FLOW_RENDERING = {
     aoRadiusM:1.6, aoStrength:2.4, aoMaxPixels:36, aoMinLight:0.52,
   },
 };
+
+export const FLOW_FIELD_COLORS = {wheat:"#b6bf88", plowed:"#b59c7a", fallow:"#b6b197"};
 
 // Screenshot reference supplied by the user on 2026-11-13.
 export const FLOW_DEFAULT_VIEWS = [

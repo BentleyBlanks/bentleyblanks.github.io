@@ -62,6 +62,14 @@ function FrontPaperFields() {
 export function BuildEncounterMap(scene) {
   const objects = scene.objects.filter((object) => object.pos && object.pos[2] < 558
     && object.layer !== "backdrop" && !/空气墙|^11–18|^远景/.test(object.group || ""));
+  const farObjects = scene.objects.filter(object => object.pos && !objects.includes(object)
+    && !String(object.group || "").includes("空气墙")).map(object => {
+    if (object.size) return object;
+    const params = object.params || {}, height = params.h || 1;
+    const tree = object.asset === "Backdrop/Tree";
+    return { ...object, size: [params.w || params.rx * 2 || height * 0.18, height, params.d || params.rz * 2 || height * 0.18],
+      ...(tree ? {material:"Whitebox/Foliage"} : {}) };
+  });
   const ramps=structuredClone(FLOW_GROUND.ramps);
   const roads = [
     {id:"TankGroundRoad",points:FLOW_GROUND.road,width:5},
@@ -112,8 +120,8 @@ export function BuildEncounterMap(scene) {
   labels.push(...(scene.markers || []).filter(marker => /^LmDefense|^LmAssembly/.test(marker.id))
     .map(marker => ({name:marker.name,p:[marker.x,marker.z]})));
   return {
-    bounds: [-160, 320, -480, 558], objects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
-    paint: scene.paint.filter((paint) => paint.poly && paint.poly.some((point) => point.z < 558)),
+    bounds: [-160, 320, -480, 558], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
+    paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < 558)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),
     river: village.L0610_RIVER.line.map(Point),
@@ -134,6 +142,5 @@ export async function LoadEncounterMap() {
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(map)));
   map.source={scene:"Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
   map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map);
-  map.farObjects=scene.objects.filter((object)=>object.pos&&!map.objects.includes(object)&&!String(object.group||"").includes("空气墙"));
   return map;
 }

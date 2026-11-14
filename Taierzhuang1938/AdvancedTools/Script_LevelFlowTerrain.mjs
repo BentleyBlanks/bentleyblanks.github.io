@@ -1,7 +1,8 @@
 import { DecodeSceneHeights } from "../Script_SceneDoc.mjs";
 import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_SceneTrenches.mjs";
-import { Clamp, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
+import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
+import { BuildGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
 
 function LowerBound(values,target) {
   let low=0,high=values.length;
@@ -14,6 +15,40 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   const datum=scene.trenches?.datum&&datumBytes?DecodeTrenchDatum(scene.trenches.datum,datumBytes):[];
   const plan=CompileSceneTrenches(scene.trenches,{datum,pre:preAt});
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
+  const groundPaint = BuildGroundPaint(scene.paint, bounds);
+  const backdropPaint = RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
+  const fieldColors = Object.fromEntries(Object.entries(FLOW_FIELD_COLORS).map(([kind, hex]) =>
+    [kind, [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255)]));
+  const fields = (map.fields || []).map(field => ({...field,
+    cosine:Math.cos(field.angleDeg * Math.PI / 180), sine:Math.sin(field.angleDeg * Math.PI / 180),
+    polygon:map.fieldZones.find(zone => zone.id === field.zone).poly}));
+  const routePaint = BuildGroundPaint([
+    ...(map.roads || []).map(road => ({line:road.points.map(([x,z]) => ({x,z})), halfW:road.width / 2, feather:0.8, color:"#d8c8a7"})),
+    ...(map.footpaths || []).map(points => ({line:points.map(([x,z]) => ({x,z})), halfW:0.35, feather:0.5, color:"#c4b792"})),
+    ...(map.floors || []).map(floor => ({poly:floor.points.map(([x,z]) => ({x,z})), feather:0.5, color:"#d8c8a7"})),
+  ], bounds);
+  const SurfaceColorAt = (x, z) => {
+    const color = [198 / 255, 207 / 255, 169 / 255];
+    if (backdropPaint) {
+      const { minX, minZ, texelM, width, height, data } = backdropPaint;
+      const column = Math.floor((x - minX) / texelM), row = Math.floor((z - minZ) / texelM);
+      if (column >= 0 && column < width && row >= 0 && row < height) {
+        const offset = (row * width + column) * 4, alpha = data[offset + 3] / 255;
+        for (let axis = 0; axis < 3; axis++) color[axis] += (data[offset + axis] / 255 - color[axis]) * alpha;
+      }
+    }
+    for (const field of fields) {
+      const dx = x - field.x, dz = z - field.z;
+      const u = dx * field.cosine - dz * field.sine, v = dx * field.sine + dz * field.cosine;
+      if (Math.abs(u) > field.w / 2 || Math.abs(v) > field.d / 2 || !InsidePolygon([x,z], field.polygon)) continue;
+      const strip = field.strips.find(strip => u >= strip.from && u < strip.to) || field.strips.at(-1);
+      color.splice(0, 3, ...fieldColors[strip.kind]);
+      break;
+    }
+    groundPaint?.Blend(x, z, color);
+    routePaint?.Blend(x, z, color);
+    return color.map(channel => channel * 255);
+  };
   const SceneHeightAt=(x,z)=>{
     const edgeX=Clamp(x,bounds.minX,bounds.maxX),edgeZ=Clamp(z,bounds.minZ,bounds.maxZ);
     const distance=Math.hypot(x-edgeX,z-edgeZ);
@@ -82,6 +117,23 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return sampleCache.get(key);
   };
   const cells=[];
+  const NeedsReliefDetail = (x, z, size) => {
+    const grid = scene.terrain;
+    const firstColumn = Math.max(0, Math.ceil((x - grid.minX) / grid.cellM));
+    const lastColumn = Math.min(grid.cols, Math.floor((x + size - grid.minX) / grid.cellM));
+    const firstRow = Math.max(0, Math.ceil((z - grid.minZ) / grid.cellM));
+    const lastRow = Math.min(grid.rows, Math.floor((z + size - grid.minZ) / grid.cellM));
+    const a = preAt(x,z), b = preAt(x+size,z), c = preAt(x,z+size), d = preAt(x+size,z+size);
+    for (let row = firstRow; row <= lastRow; row++) {
+      const v = (grid.minZ + row * grid.cellM - z) / size;
+      for (let column = firstColumn; column <= lastColumn; column++) {
+        const u = (grid.minX + column * grid.cellM - x) / size;
+        const expected = (a + (b-a) * u) * (1-v) + (c + (d-c) * u) * v;
+        if (Math.abs(pre[row * (grid.cols + 1) + column] - expected) > FLOW_RENDERING.terrainHeightErrorM) return true;
+      }
+    }
+    return false;
+  };
   const Refine=(x,z,size)=>{
     const half=size/2,cx=x+half,cz=z+half;
     const near=interest.some((segment)=>{
@@ -91,12 +143,43 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     });
     const inScene=x+size>=bounds.minX&&x<=bounds.maxX&&z+size>=bounds.minZ&&z<=bounds.maxZ;
     const center=Sample(cx,cz),average=(Sample(x,z)+Sample(x+size,z)+Sample(x,z+size)+Sample(x+size,z+size))/4;
-    const split=size>1&&near||size>16&&inScene||size>2&&Math.abs(center-average)>0.18;
-    const cell={x,z,size,near};
+    const painted = inScene || !!backdropPaint && x + size >= backdropPaint.minX && z + size >= backdropPaint.minZ
+      && x <= backdropPaint.minX + backdropPaint.width * backdropPaint.texelM
+      && z <= backdropPaint.minZ + backdropPaint.height * backdropPaint.texelM;
+    // Sample the original relief throughout the scene, including features away
+    // from the trench network that a coarse cell's center can miss entirely.
+    const split = size > 1 && near || size > FLOW_RENDERING.terrainSceneCellM && inScene
+      || size > FLOW_RENDERING.terrainBackdropCellM && painted || size > 2 && Math.abs(center-average) > 0.18
+      || size > 1 && size <= FLOW_RENDERING.terrainSceneCellM && inScene && NeedsReliefDetail(x,z,size);
+    const cell={x,z,size,near,painted};
     if(split) cell.children=[Refine(x,z,half),Refine(cx,z,half),Refine(cx,cz,half),Refine(x,cz,half)];
     else cells.push(cell);
     cell.minHeight=cell.children?Math.min(...cell.children.map(child=>child.minHeight)):Math.min(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
     cell.maxHeight=cell.children?Math.max(...cell.children.map(child=>child.maxHeight)):Math.max(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
+    cell.heightError = 0;
+    if (cell.children) {
+      const corners = [Sample(x,z), Sample(x+size,z), Sample(x+size,z+size), Sample(x,z+size)];
+      const CoarseHeightAt = (px, pz) => {
+        const dx = (px-cx)/half, dz = (pz-cz)/half, extent = Math.max(Math.abs(dx),Math.abs(dz));
+        if (extent === 0) return center;
+        let from, to, progress;
+        if (Math.abs(dx) >= Math.abs(dz)) {
+          [from,to] = dx < 0 ? [corners[0],corners[3]] : [corners[1],corners[2]];
+          progress = (dz/extent+1)/2;
+        } else {
+          [from,to] = dz < 0 ? [corners[0],corners[1]] : [corners[3],corners[2]];
+          progress = (dx/extent+1)/2;
+        }
+        return center + (from + (to-from)*progress - center)*extent;
+      };
+      for (const child of cell.children) {
+        const points = [[child.x,child.z], [child.x+child.size,child.z],
+          [child.x+child.size,child.z+child.size], [child.x,child.z+child.size],
+          [child.x+child.size/2,child.z+child.size/2]];
+        const deviation = Math.max(...points.map(([px,pz]) => Math.abs(Sample(px,pz)-CoarseHeightAt(px,pz))));
+        cell.heightError = Math.max(cell.heightError,child.heightError+deviation);
+      }
+    }
     cell.center=[cx,(cell.minHeight+cell.maxHeight)/2,cz];
     cell.radius=Math.hypot(size/Math.SQRT2,(cell.maxHeight-cell.minHeight)/2);
     return cell;
@@ -126,8 +209,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     const step = FLOW_RENDERING.terrainNormalSampleM;
     const normal = [Sample(x - step, z) - Sample(x + step, z), 2 * step, Sample(x, z - step) - Sample(x, z + step)];
-    const light = 0.84 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) / Math.hypot(...normal) * 0.16;
-    const color = [198, 207, 169].map((channel, axis) =>
+    const light = 0.7 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) / Math.hypot(...normal) * 0.3;
+    const color = SurfaceColorAt(x, z).map((channel, axis) =>
       Clamp((channel + ([184, 164, 128][axis] - channel) * soilMix) * light, 0, 255));
     colorCache.set(key, color);
     return color;
@@ -188,7 +271,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     packedFaceCache.set(cell,packed);return packed;
   };
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map) {

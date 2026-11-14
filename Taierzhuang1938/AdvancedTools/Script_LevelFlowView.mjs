@@ -2,10 +2,9 @@ import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
-import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_FIELD_COLORS, FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
-const fieldColors={wheat:"#d5ddbc",plowed:"#dfd0b8",fallow:"#e1dcc9"};
 export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
 
 export const FLOW_COVER_COLORS = {
@@ -225,21 +224,16 @@ export class FlowMapView {
     // Reading layout for every terrain cell and scene object stalls navigation.
     const Screen=(point)=>[(point[0]-this.center[0])*scale+width/2,(point[1]-this.center[1])*scale+height/2];
     context.fillStyle="#e7e2d2";context.fillRect(0,0,width,height);
-    for(const paint of map.paint) {
-      const points=paint.poly.map((point)=>Screen([point.x,point.z]));
-      if(points.every((point)=>point[1]<0)||points.every((point)=>point[1]>height)) continue;
-      context.globalAlpha=0.15;Polygon(context,points,"#aeb48c");context.globalAlpha=1;
-    }
     for(const zone of map.fieldZones) {
       context.save();context.beginPath();
       zone.poly.map(Screen).forEach((point,index)=>index?context.lineTo(...point):context.moveTo(...point));
       context.closePath();context.clip();
       for(const field of map.fields.filter((item)=>item.zone===zone.id)) {
         const center=Screen([field.x,field.z]);
-        context.save();context.translate(...center);context.rotate(field.angleDeg*Math.PI/180);
+        context.save();context.translate(...center);context.rotate(-field.angleDeg*Math.PI/180);
         context.globalAlpha=0.48;
         for(const strip of field.strips) {
-          context.fillStyle=fieldColors[strip.kind];
+          context.fillStyle=FLOW_FIELD_COLORS[strip.kind];
           context.fillRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);
           context.strokeStyle="#91876d44";context.lineWidth=0.6;
           context.strokeRect(strip.from*scale,-field.d*scale/2,(strip.to-strip.from)*scale,field.d*scale);
@@ -247,6 +241,14 @@ export class FlowMapView {
         context.restore();
       }
       context.restore();
+    }
+    for (const paint of map.paint) {
+      const points = (paint.poly || paint.line).map(point => Screen([point.x,point.z]));
+      if (points.every(point => point[1] < 0) || points.every(point => point[1] > height)) continue;
+      context.globalAlpha = (paint.strength ?? 1) * 0.65;
+      if (paint.poly) Polygon(context, points, paint.color);
+      else SmoothLine(context, points, paint.color, paint.halfW * 2 * scale);
+      context.globalAlpha = 1;
     }
     this.DrawTerrain(context,width,height);
     for(const path of map.footpaths) Line(context,path.map(Screen),"#a38e6455",Math.max(0.7,scale*0.35),[3,4]);
@@ -267,7 +269,8 @@ export class FlowMapView {
       const radius=Math.max(w,d)*scale;
       if(point[0]+radius<0||point[1]+radius<0||point[0]-radius>width||point[1]-radius>height) continue;
       if(object.material==="Whitebox/Foliage") {
-        Circle(context,point,Math.max(1.1,Math.min(w,d)*scale*0.5),"#7d986252","#74875144");continue;
+        const crown = h >= FLOW_RENDERING.tree.minHeightM ? Math.min(FLOW_RENDERING.tree.crownMaxM,h*FLOW_RENDERING.tree.crownWidthRatio) : 0;
+        Circle(context,point,Math.max(1.1,Math.max(Math.min(w,d),crown)*scale*0.5),"#7d986252","#74875144");continue;
       }
       if (object.meta?.obstacle === "barbedWire") {
         context.save();context.translate(...point);context.rotate(-(object.yawDeg||0)*Math.PI/180);

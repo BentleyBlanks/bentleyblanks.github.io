@@ -250,11 +250,12 @@ export class FlowPerspectiveView extends FlowMapView {
       const camera=this.CameraPoint(cell.center);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
-      // Corridor color transitions need detail even where the floor is flat.
-      // Shared edge vertices keep both height and shading continuous across LODs.
+      // Preserve projected relief error, while planar slopes can stay coarse.
+      // Surface colors use a separate projected cell-size threshold.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
-        &&(heightRange*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
-          ||cell.near&&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
+        &&((cell.heightError??heightRange)*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
+          ||(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
+            &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
         for(const child of cell.children) Visit(child);
         return;
       }
@@ -326,12 +327,20 @@ export class FlowPerspectiveView extends FlowMapView {
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
-      if(Math.max(w,d)<0.4) continue;
+      if(Math.max(w,h,d)<0.4) continue;
       const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y:this.Ground([x,z]);
       const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
       if(!SphereInView(camera,radius)) continue;
       if(perspective&&Math.max(w,h,d)*this.focal*renderScale/Math.max(1,camera[2])<0.7) continue;
       const cover=IsEncounterCover(object);
+      if (object.material === "Whitebox/Foliage" && h >= FLOW_RENDERING.tree.minHeightM) {
+        const tree = FLOW_RENDERING.tree, yaw = (object.yawDeg || 0) * Math.PI / 180;
+        const crown = Math.min(tree.crownMaxM, h * tree.crownWidthRatio);
+        Box(x,z,Math.min(w,tree.trunkMaxM),Math.min(d,tree.trunkMaxM),h,"#8b795f",base,yaw);
+        Box(x,z,Math.max(w,crown),Math.max(d,crown),h*(1-tree.crownBaseRatio),
+          FLOW_MATERIAL_COLORS["Whitebox/Foliage"],base+h*tree.crownBaseRatio,yaw);
+        continue;
+      }
       if (object.meta?.obstacle === "barbedWire") {
         const yaw=(object.yawDeg||0)*Math.PI/180;
         for (const height of [0.25,0.55,0.85]) Box(x,z,w,0.055,0.045,"#5d685a",base+height,yaw);
@@ -341,7 +350,7 @@ export class FlowPerspectiveView extends FlowMapView {
         }
         continue;
       }
-      Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base,(object.yawDeg||0)*Math.PI/180,cover,object);
+      Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:object.params?.color||FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base+(object.params?.lift||0),(object.yawDeg||0)*Math.PI/180,cover,object);
     }
     if(cacheStatic) {
       if(this.raster.accelerated) {

@@ -25,10 +25,16 @@ export function EncounterShadowGeometry(objects,signals,ground) {
   for(const object of objects) {
     if(!VisibleEncounterObject(object,signals)||object.material==="Whitebox/Water"||object.meta?.obstacle==="barbedWire") continue;
     const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
-    if(h<0.15||Math.max(w,d)<0.4) continue;
-    const base=object.planning?ground([x,z]):Number.isFinite(y)?y:ground([x,z]);
-    const box=EncounterBoxGeometry(x,base,z,w,h,d,(object.yawDeg||0)*Math.PI/180);
-    for(const [a,b,c,d] of box.faces) for(const index of [a,b,c,a,c,d]) vertices.push(...box.points[index]);
+    if(h<0.15||Math.max(w,h,d)<0.4) continue;
+    const base=(object.planning?ground([x,z]):Number.isFinite(y)?y:ground([x,z]))+(object.params?.lift||0);
+    const yaw=(object.yawDeg||0)*Math.PI/180,tree=FLOW_RENDERING.tree;
+    const boxes=[];
+    if(object.material==="Whitebox/Foliage"&&h>=tree.minHeightM) {
+      const crown=Math.min(tree.crownMaxM,h*tree.crownWidthRatio);
+      boxes.push(EncounterBoxGeometry(x,base,z,Math.min(w,tree.trunkMaxM),h,Math.min(d,tree.trunkMaxM),yaw));
+      boxes.push(EncounterBoxGeometry(x,base+h*tree.crownBaseRatio,z,Math.max(w,crown),h*(1-tree.crownBaseRatio),Math.max(d,crown),yaw));
+    } else boxes.push(EncounterBoxGeometry(x,base,z,w,h,d,yaw));
+    for(const box of boxes) for(const [a,b,c,d] of box.faces) for(const index of [a,b,c,a,c,d]) vertices.push(...box.points[index]);
   }
   return new Float32Array(vertices);
 }

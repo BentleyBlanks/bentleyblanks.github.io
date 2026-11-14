@@ -18,6 +18,7 @@ import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
+import { EncodeSceneHeights } from "./Script_SceneDoc.mjs";
 
 const transferEnd = BeatById("09e").end;
 const transferArrival = EvaluateFlow(transferEnd).actors.filter(actor => actor.groupId === "YardTransfer");
@@ -762,6 +763,32 @@ const invalidViews=structuredClone(packet);invalidViews.context.viewports={count
 assert.throws(()=>ReadFramePacket(invalidViews,FLOW_TIMELINE),"invalid viewport data is rejected before importing the document");
 const ReadSceneBytes=(name)=>{const bytes=fs.readFileSync(new URL(`./Scenes/FirstLevelWhitebox/${name}`,import.meta.url));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
 const terrain=BuildEncounterTerrain(scene,ReadSceneBytes(scene.terrain.file),ReadSceneBytes(scene.trenches.datum.file),map);
+for (const source of scene.objects.filter(object => object.asset === "Backdrop/Tree")) {
+  const tree = map.farObjects.find(object => object.id === source.id);
+  assert.deepEqual(tree.pos, source.pos, "abstract trees retain their authored location and grounding");
+  assert.equal(tree.size[1], source.params.h, "backdrop trees retain their original height");
+  assert.equal(tree.material, "Whitebox/Foliage");
+}
+const reliefGrid = {file:"Relief.height.bin", encoding:"int16-cm-le", minX:0, minZ:0, cellM:0.5, cols:32, rows:32};
+const reliefHeights = new Float32Array(33 * 33);
+reliefHeights[2 * 33 + 6] = 1.4;
+reliefHeights[14 * 33 + 18] = -1.4;
+const relief = BuildEncounterTerrain({terrain:reliefGrid, bounds:{minX:0,maxX:16,minZ:0,maxZ:16},
+  paint:[{color:"#123456",feather:0.1,poly:[{x:0,z:0},{x:1,z:0},{x:1,z:1},{x:0,z:1}]}]},
+  EncodeSceneHeights(reliefHeights), null, {trenches:[],
+    fieldZones:[{id:"Test",poly:[[0,0],[16,0],[16,16],[0,16]]}],
+    fields:[{zone:"Test",x:8,z:8,w:16,d:16,angleDeg:0,
+      strips:[{from:-8,to:-2,kind:"plowed"},{from:-2,to:2,kind:"wheat"},{from:2,to:8,kind:"fallow"}]}]});
+assert.deepEqual(relief.surfaceColorAt(2,2).map(Math.round), [181,156,122], "field strips retain plowed soil");
+assert.deepEqual(relief.surfaceColorAt(8,2).map(Math.round), [182,191,136], "wheat fields reach the 3D terrain surface");
+assert.deepEqual(relief.surfaceColorAt(14,2).map(Math.round), [182,177,151], "the adjacent fallow strip stays distinct");
+assert.deepEqual(relief.surfaceColorAt(0.5,0.5).map(Math.round), [18,52,86], "authored scene paint overrides the field fallback");
+for (const [x,z,height] of [[3,1,1.4],[9,7,-1.4]]) {
+  const cell = relief.cells.find(cell => x >= cell.x && x < cell.x + cell.size && z >= cell.z && z < cell.z + cell.size);
+  assert.ok(cell.size <= 1, "off-center relief refines even when the coarse cell corners and center are flat");
+  assert.ok(relief.facesForCell(cell).some(face => face.points.some(point => point[0] === x && point[2] === z && Math.abs(point[1] - height) < 0.01)),
+    "the drawn terrain contains the source mound and depression vertices");
+}
 const defenseWire=map.objects.filter(object=>object.meta?.obstacle==="barbedWire");
 assert.ok(defenseWire.length>40,"two staggered obstacle belts are visible in the encounter map");
 for(const gap of [[-36,-65],[67,-65]]) assert.ok(defenseWire.every(object=>Math.hypot(object.pos[0]-gap[0],object.pos[2]-gap[1])>6),"forward saps retain deliberate obstacle gaps");
