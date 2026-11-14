@@ -283,7 +283,7 @@ export class EncounterChat {
       const title = document.createElement("span"), status = document.createElement("small");
       title.textContent = session.title;
       const labels = { running: "正在执行", interrupting: "中断中", interrupted: "已中断", failed: "需要处理", completed: "已完成" };
-      status.textContent = session.status === "running" ? session.progress?.activity || "正在启动" : labels[session.status] || "已完成";
+      status.textContent = session.status === "running" ? session.progress?.activity || labels.running : labels[session.status] || "已完成";
       status.title = session.progress?.text || status.textContent;
       button.append(title, status);
       button.onclick = () => this.Select(session.id);

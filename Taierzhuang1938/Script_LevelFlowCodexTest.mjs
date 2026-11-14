@@ -210,6 +210,7 @@ try {
   Finish(children.at(-1), "已按补充要求处理。");
   await TestAppServerSteering(directory);
   TestLegacyProgress(directory);
+  await TestLegacyRecovery(directory, server, base);
   console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final-only replies, resume, live steering, idempotent retries and persisted history");
 } finally {
   for (const child of realChildren) {
@@ -299,4 +300,44 @@ function TestLegacyProgress(directory) {
   const result = ReadProgress(session);
   assert.equal(result.progress.text, "回归检查已完成，正在整理结果。");
   assert.ok(!JSON.stringify(result).includes("hidden reasoning"));
+  fs.appendFileSync(file, Event("event_msg", { type: "task_complete", last_agent_message: "旧任务已完成。" }));
+  assert.equal(ReadProgress(session).completion.text, "旧任务已完成。");
+  assert.equal(ReadProgress({ ...session, messages: [{ role: "user", createdAt: "2026-11-14T01:00:00Z" }] }).completion, undefined, "a resumed request never inherits the previous turn's completion");
+  fs.appendFileSync(file, Event("event_msg", { type: "task_started" }));
+  assert.equal(ReadProgress(session).completion, undefined, "a newer running turn clears an older completion");
+}
+
+async function TestLegacyRecovery(directory, server, base) {
+  const id = randomUUID(), cliSessionId = randomUUID();
+  const sessionFile = path.join(directory, "tmp", "EncounterCodex", id, "Session.json");
+  fs.mkdirSync(path.dirname(sessionFile), { recursive: true });
+  const session = { id, cliSessionId, title: "旧进程残留", status: "running", runnerPid: process.pid,
+    createdAt: "2026-11-14T01:00:00Z", updatedAt: "2026-11-14T01:00:00Z",
+    messages: [{ role: "user", text: "原始需求", createdAt: "2026-11-14T01:00:00Z" }] };
+  fs.writeFileSync(sessionFile, JSON.stringify(session));
+  const rollout = path.join(directory, "Rollouts", "2026", "11", "14", `rollout-recovery-${cliSessionId}.jsonl`);
+  const Event = (timestamp, type, payload) => `${JSON.stringify({ timestamp, type, payload })}\n`;
+  fs.writeFileSync(rollout, Event("2026-11-14T01:01:00Z", "response_item", {
+    type: "message", role: "assistant", phase: "commentary", content: [{ type: "output_text", text: "正在核对修复。" }],
+  }));
+  const reader = CreateLegacyProgressReader(path.join(directory, "Rollouts"));
+  server.removeAllListeners("request"); server.on("request", CreateEncounterCodexHandler(directory, { readLegacyProgress: reader }));
+  const Read = async () => (await fetch(`${base}/sessions/${id}`)).json();
+  assert.equal((await Read()).progress.text, "正在核对修复。");
+  fs.appendFileSync(rollout, Event("2026-11-14T01:02:00Z", "response_item", {
+    type: "message", role: "assistant", phase: "commentary", content: [{ type: "output_text", text: "验证结束。" }],
+  }));
+  assert.equal((await Read()).progress.text, "验证结束。", "legacy progress keeps updating across polls");
+  fs.appendFileSync(rollout, Event("2026-11-14T01:03:00Z", "event_msg", { type: "task_complete", last_agent_message: "修复已交付。" }));
+  const recovered = await Read();
+  assert.equal(recovered.status, "completed", "task completion is recovered even while the old owner is alive");
+  assert.equal(recovered.messages.at(-1).text, "修复已交付。");
+  assert.equal(recovered.updatedAt, "2026-11-14T01:03:00Z");
+  assert.equal((await Read()).messages.length, 2, "repeated polling never duplicates the final reply");
+  assert.equal(JSON.parse(fs.readFileSync(sessionFile)).status, "completed");
+  assert.equal((await (await fetch(`${base}/sessions`)).json()).sessions.find(item => item.id === id).status, "completed");
+  fs.writeFileSync(sessionFile, JSON.stringify({ ...session, status: "failed", error: "Codex 执行失败，请在本机 CLI 检查登录和网络后重试" }));
+  assert.equal((await Read()).status, "completed", "a late legacy process exit cannot overwrite recorded success");
+  fs.writeFileSync(sessionFile, JSON.stringify({ ...session, messages: [...recovered.messages, { role: "user", text: "继续修改", createdAt: "2026-11-14T02:00:00Z" }] }));
+  assert.equal((await Read()).status, "running", "a new request stays active until its own completion");
 }

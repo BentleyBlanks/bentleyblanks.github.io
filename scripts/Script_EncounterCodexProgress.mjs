@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// Older exec-based previews discard public progress events. Read only the
-// matching rollout's bounded tail so those runs can still report commentary.
+// Older exec-based previews can remain alive after task_complete. Read only
+// public progress and completion from the matching rollout's bounded tail.
 export function CreateLegacyProgressReader(sessionsRoot = path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "sessions")) {
   const cache = new Map();
   return function ReadProgress(session) {
@@ -24,16 +24,22 @@ export function CreateLegacyProgressReader(sessionsRoot = path.join(process.env.
       }
       if (!entry?.file) return null;
       const stat = fs.statSync(entry.file);
-      if (entry.mtime === stat.mtimeMs && entry.size === stat.size) return entry.result;
+      const turnStartedAt = session.messages?.findLast(message => message.role === "user")?.createdAt || session.createdAt;
+      if (entry.mtime === stat.mtimeMs && entry.size === stat.size && entry.turnStartedAt === turnStartedAt) return entry.result;
       const bytes = Buffer.alloc(Math.min(stat.size, 256 * 1024));
       const descriptor = fs.openSync(entry.file, "r");
       try { fs.readSync(descriptor, bytes, 0, bytes.length, stat.size - bytes.length); }
       finally { fs.closeSync(descriptor); }
-      const result = { ...entry.result };
+      const result = entry.turnStartedAt === turnStartedAt ? { ...entry.result } : {};
       for (const line of bytes.toString("utf8").split("\n")) {
         let event;
         try { event = JSON.parse(line); } catch { continue; }
         const item = event.payload;
+        if (Date.parse(event.timestamp) < Date.parse(turnStartedAt)) continue;
+        if (event.type === "event_msg" && item?.type === "task_started") delete result.completion;
+        if (event.type === "event_msg" && item?.type === "task_complete" && typeof item.last_agent_message === "string" && item.last_agent_message.trim()) {
+          result.completion = { text: item.last_agent_message.trim(), updatedAt: event.timestamp };
+        }
         if (event.type === "turn_context") {
           if (typeof item?.model === "string") result.model = item.model;
           if (typeof item?.effort === "string") result.effort = item.effort;
@@ -43,7 +49,7 @@ export function CreateLegacyProgressReader(sessionsRoot = path.join(process.env.
           if (text) result.progress = { activity: "旧版 CLI 正在执行", text: text.slice(-4000), updatedAt: event.timestamp };
         }
       }
-      Object.assign(entry, { mtime: stat.mtimeMs, size: stat.size, result });
+      Object.assign(entry, { mtime: stat.mtimeMs, size: stat.size, turnStartedAt, result });
       return result;
     } catch { return null; }
   };

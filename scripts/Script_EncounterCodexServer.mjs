@@ -92,11 +92,10 @@ async function LegacyCliPid(session) {
   return pid;
 }
 
-export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex } = {}) {
+export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex, readLegacyProgress = CreateLegacyProgressReader() } = {}) {
   const directory = path.join(rootDir, "tmp", "EncounterCodex");
   const active = new Map();
   const submissions = new Map();
-  const ReadLegacyProgress = CreateLegacyProgressReader();
   const SessionPath = id => path.join(directory, id, "Session.json");
   const InterruptPath = id => path.join(directory, id, "Interrupt.json");
   function ReadInterrupt(session) {
@@ -133,7 +132,22 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       session.error = CLI_INTERRUPTED;
       Save(session);
     }
-    if (session.status === "running" && !active.has(id) && !session.progress) Object.assign(session, ReadLegacyProgress(session));
+    if (["running", "failed"].includes(session.status) && !active.has(id) && !interruption) {
+      const legacy = readLegacyProgress(session);
+      if (legacy?.model) session.model = legacy.model;
+      if (legacy?.effort) session.effort = legacy.effort;
+      if (legacy?.progress && (!session.progress || Date.parse(legacy.progress.updatedAt) > Date.parse(session.progress.updatedAt))) session.progress = legacy.progress;
+      if (legacy?.completion) {
+        const { text, updatedAt } = legacy.completion;
+        if (session.messages.at(-1)?.role !== "assistant" || session.messages.at(-1).text !== text) {
+          session.messages.push({ role: "assistant", text, createdAt: updatedAt });
+        }
+        session.status = "completed";
+        session.error = "";
+        session.updatedAt = updatedAt;
+        Save(session);
+      }
+    }
     return session;
   }
   function Prompt(turn, folder) {
