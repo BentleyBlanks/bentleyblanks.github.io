@@ -111,6 +111,15 @@ export const FLOW_YAOWA_RETURN = {
   ],
 };
 
+export const FLOW_WOUNDED_EVACUATION = {
+  startBeat: "03a", exitBeat: "05b", speed: 0.85, departureInterval: 2,
+  members: [10,11],
+  route: [[30,66.8],[23.5,67.2],[26,76.6],[30,86],[32.5,101],[35,116],[35,131],[35,141.5],[42,146]],
+  evacuationKeys: [["04d",0,42,146],["04d",1,58,161],["05a",1,80,210]],
+  leaderKeys: [["03a",1,46,65.6],["03b",0.25,30,66.8],["03b",0.4,23.5,67.2],
+    ["03b",0.6,25,74],["03g",0.8,25,74],["03h",0,22,69.5]],
+};
+
 // 04B–04D user-directed defense while the camp loads ammunition and casualties.
 // Keys use [beat, fraction, x, z]. The last keys rejoin after the 05A rear guard.
 export const FLOW_CAMP_DEFENSE = [

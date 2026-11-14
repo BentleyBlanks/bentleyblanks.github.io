@@ -4,6 +4,7 @@ import { Clamp, Lerp, Distance, SampleRoute, SampleBeatRoute } from "./Script_Le
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_VILLAGE_CASUALTIES } from "./Data_LevelFlow.mjs";
+import { FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -323,6 +324,40 @@ function ReturnFromPit(actors, time) {
 }
 
 let companionTracks = null;
+function WoundedEvacuation(actors, time) {
+  const plan = FLOW_WOUNDED_EVACUATION;
+  const start = BeatById(plan.startBeat).start;
+  if (time < start || time >= BeatById(plan.exitBeat).start) return;
+  for (const [memberIndex, index] of plan.members.entries()) {
+    const id = `openingAlly${index}`;
+    let actor = actors.find(entry => entry.id === id);
+    if (!actor) {
+      actor = Actor(id, `川军 ${index - 2}`, "friend", "person", []);
+      actors.push(actor);
+    }
+    const origin = OpeningRetreat(start, index).p;
+    const route = [origin, ...plan.route.map(point => [point[0] + memberIndex * 0.6, point[1]])];
+    const departure = start + memberIndex * plan.departureInterval;
+    const length = RouteLength(route), arrival = departure + length / plan.speed;
+    const evacuation = Keys(plan.evacuationKeys).map(([stamp,x,z]) => [stamp,x + memberIndex * 0.6,z]);
+    const Position = stamp => stamp < arrival
+      ? SampleRoute(route, Clamp((stamp - departure) * plan.speed / length, 0, 1))
+      : Track([[arrival,...route.at(-1)],...evacuation], stamp);
+    const p = Position(time), moving = Distance(p, Position(time + 0.02)) > 0.001;
+    Object.assign(actor, {name:`川军 ${index - 2}（负伤）`, p, pose:moving ? "walk" : "wounded", alive:true, wounded:true, firing:false,
+      groupId:"WalkingWounded", status:moving ? "轻伤先撤，沿沟去后送点" : time < departure ? "等前一名伤员起行" : "后送点待转运"});
+    delete actor.meleePartnerId;
+    delete actor.heading;
+  }
+  if (time < BeatById("03h").start) {
+    const leader = actors.find(actor => actor.id === "luo");
+    const keys = [[start,...OpeningRetreat(start,0).p],...Keys(plan.leaderKeys)];
+    leader.p = Track(keys,time);
+    const moving = Distance(leader.p,Track(keys,time+0.02)) > 0.001;
+    Object.assign(leader,{pose:moving ? "walk" : "shoot", firing:!moving,
+      status:moving ? "前导伤员，转移到南侧掩护位" : "守住南撤通路，掩护冬瓜和后续伤员"});
+  }
+}
 const campDefenseTracks = FLOW_CAMP_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
 const ambushDefenseTracks = FLOW_AMBUSH_DEFENSE.map(plan => ({...plan, track: Keys(plan.keys)}));
 const dragRearguardTracks = FLOW_DRAG_REARGUARD.map(plan => ({...plan,track:Keys(plan.keys),
@@ -501,6 +536,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").star
     }
   }
   ReturnFromPit(actors, time);
+  WoundedEvacuation(actors, time);
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
   EvacuationActors(actors,time,cart);
   return actors;
@@ -605,6 +641,7 @@ function Effects(beat, time, progress, actors) {
   for (const actor of blockers) effects.push({kind:"fire",a:actor.p,b:player.p,side:"enemy",phase:(time*2.3+actor.p[1])%1});
   if (blockers.length) for (const id of ["luo","liu"]) {
     const defender = actors.find((actor) => actor.id === id);
+    if (defender.pose === "walk") continue;
     effects.push({kind:"fire",a:defender.p,b:blockers[0].p,side:"friend",phase:(time*2.1+defender.p[0])%1});
   }
   for (const defender of actors.filter(actor => actor.firing && campDefenseTracks.some(plan => plan.id === actor.id))) {

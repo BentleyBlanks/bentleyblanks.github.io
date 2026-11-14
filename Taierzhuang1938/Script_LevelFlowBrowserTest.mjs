@@ -217,6 +217,19 @@ try {
   await page.screenshot({path:path.join(out,"JunctionBlockade.png")});
   const returnViews=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   await page.evaluate(()=>{
+    LevelFlow.SetViewType(0,"battle");LevelFlow.SetViewType(1,"battle");
+    const layout=LevelFlow.Inspect().viewports;
+    layout.views[0].mode="manual";layout.views[0].center=[43,67];layout.views[0].scale=10;
+    layout.views[1].mode="manual";layout.views[1].center=[33,116];layout.views[1].scale=6;
+    LevelFlow.RestoreViewports(layout);LevelFlow.Seek(298.6793);
+  });
+  const woundedEvacuation=await page.evaluate(()=>LevelFlow.Inspect());
+  const walkingWounded=woundedEvacuation.actors.filter(actor=>actor.groupId==="WalkingWounded");
+  assert.equal(walkingWounded.length,2);
+  assert.ok(walkingWounded.every(actor=>actor.wounded&&actor.alive&&!actor.firing&&actor.p[1]>110));
+  assert.ok(woundedEvacuation.actors.find(actor=>actor.id==="luo").p[1]>=73);
+  await page.screenshot({path:path.join(out,"WalkingWoundedEvacuation.png")});
+  await page.evaluate(()=>{
     LevelFlow.SetViewType(0,"oblique");LevelFlow.SetViewType(1,"battle");
     const layout=LevelFlow.Inspect().viewports;
     for(const view of layout.views) {view.mode="manual";view.center=[18,66];view.scale=4;view.layers.triggers=false;}

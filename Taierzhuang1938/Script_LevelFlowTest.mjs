@@ -328,6 +328,38 @@ assert.ok(upgraded.groups.some((group)=>group.id==="CampEastGun"));
 assert.ok(!upgraded.groups.some((group)=>group.id==="SearchNeighbor"),"a user-deleted group stays deleted during upgrade");
 ValidateEncounterDocument(upgraded,FLOW_TIMELINE);
 
+const walkingWoundedIds = ["openingAlly10","openingAlly11"];
+const evacuationStart = BeatById("03a").start;
+for (let stamp = evacuationStart; stamp < BeatById("05b").start - 0.1; stamp += 0.25) {
+  const frame = EvaluateFlow(stamp), next = EvaluateFlow(stamp + 0.02);
+  for (const id of walkingWoundedIds) {
+    const actor = frame.actors.find(entry => entry.id === id);
+    assert.ok(actor?.alive && actor.wounded && !actor.firing, `${id} remains a living noncombatant during evacuation`);
+    assert.ok(!actor.meleePartnerId && actor.pose !== "shoot", `${id} no longer fights a former melee partner`);
+    assert.ok(Distance(actor.p,next.actors.find(entry => entry.id === id).p) < 0.06, `${id} walks continuously without teleporting`);
+  }
+}
+const woundedFeedbackFrame = EvaluateFlow(298.6793);
+assert.equal(woundedFeedbackFrame.beat.id,"03d");
+for (const id of walkingWoundedIds) {
+  const actor = woundedFeedbackFrame.actors.find(entry => entry.id === id);
+  assert.ok(actor.p[1] > 110, `${id} has already left the exposed branch before the annotated grenade`);
+  const before = EvaluateFlow(evacuationStart-0.001).actors.find(entry => entry.id === id);
+  const after = EvaluateFlow(evacuationStart+0.001).actors.find(entry => entry.id === id);
+  assert.ok(Distance(before.p,after.p) < 0.01, `${id} starts from the actual wounded position`);
+}
+const evacuationLeader = woundedFeedbackFrame.actors.find(actor => actor.id === "luo");
+assert.ok(evacuationLeader.p[1] >= 73 && evacuationLeader.firing,"leader guards the southward escape instead of waiting beside the blanket");
+assert.equal(woundedFeedbackFrame.actors.find(actor => actor.id === "liu").pose,"shoot");
+assert.equal(woundedFeedbackFrame.actors.find(actor => actor.id === "he").wounded,undefined,"blanket carrier stays with the immobile casualty");
+for (const boundary of ["03a","03h"]) {
+  const stamp = BeatById(boundary).start;
+  assert.ok(Distance(EvaluateFlow(stamp-0.001).actors.find(actor => actor.id === "luo").p,
+    EvaluateFlow(stamp+0.001).actors.find(actor => actor.id === "luo").p) < 0.03,"leader joins both ends of the evacuation cover continuously");
+}
+EvaluateFlow(BeatById("05a").end);
+assert.deepEqual(EvaluateFlow(298.6793),woundedFeedbackFrame,"wounded evacuation remains deterministic after seeking backwards");
+
 // The gun-pit survivors return continuously with Yaowa and pursuit stays back.
 const returnIds = ["yao","openingGun0","openingGun2","pitRifleman"];
 const returnFrame = EvaluateFlow(ReferenceTime(312.442));
