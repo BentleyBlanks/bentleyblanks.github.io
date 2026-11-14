@@ -150,6 +150,7 @@ export class FlowMapView {
     for(const group of frame.groups) if(group.start!==null&&frame.time>=group.start-8&&frame.time<group.end&&Distance(group.area.center,frame.player)<130) points.push(group.area.center);
     const xs=points.map((point)=>point[0]),zs=points.map((point)=>point[1]);
     this.Fit([Math.min(...xs)-14,Math.max(...xs)+14,Math.min(...zs)-14,Math.max(...zs)+14],62);
+    this.scale=Clamp(this.scale*(this.followZoom??1),0.15,40);
   }
 
   ToScreen(point) {

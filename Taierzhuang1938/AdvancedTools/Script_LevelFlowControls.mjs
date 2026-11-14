@@ -45,10 +45,11 @@ export class EncounterSceneControls {
     if(event.button!==1&&event.button!==2&&!(event.button===0&&event.altKey)) return false;
     event.preventDefault();this.workspace.Activate(entry.index);entry.canvas.focus();entry.canvas.setPointerCapture(event.pointerId);
     const view=entry.map;
-    const action=!view.type?"planPan":event.button===1?"pan":event.altKey?(event.button===0?"orbit":"dolly"):"look";
-    if(view.type&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
+    const action=event.altKey&&event.button===2?"dolly":!view.type?"planPan":event.button===1?"pan":event.altKey?"orbit":"look";
+    const followingZoom=entry.mode==="follow"&&action==="dolly";
+    if(view.type&&!followingZoom&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
     this.StartNavigation(view);
-    entry.mode="manual";
+    if(!followingZoom) entry.mode="manual";
     const pivot=[view.center[0],view.Ground?.(view.center)||0,view.center[1]];
     const offset=view.eye?.map((value,index)=>value-pivot[index]);
     this.drag={entry,action,x:event.clientX,y:event.clientY,pivot,distance:offset?Math.max(2,Math.hypot(...offset)):20};
@@ -85,7 +86,13 @@ export class EncounterSceneControls {
 
   Dolly(entry,amount) {
     const view=entry.map;
-    if(view.type==="oblique") {view.scale=Clamp(view.scale*Math.exp(-amount),0.15,40);return;}
+    if(entry.mode==="follow") {
+      const scale=Clamp(view.scale*Math.exp(-amount),0.15,40);
+      view.followZoom=Clamp((view.followZoom??1)*scale/view.scale,0.001,1000);
+      view.scale=scale;
+      return;
+    }
+    if(!view.type||view.type==="oblique") {view.scale=Clamp(view.scale*Math.exp(-amount),0.15,40);return;}
     this.Free(entry);
     const distance=Math.max(1,view.focusDistance||20),step=distance*(1-Math.exp(Clamp(amount,-1,1)));
     view.freeCamera.eye=view.freeCamera.eye.map((value,index)=>value+view.forward[index]*step);
@@ -93,8 +100,9 @@ export class EncounterSceneControls {
   }
 
   Wheel(entry,event) {
-    event.preventDefault();this.workspace.Activate(entry.index);entry.mode="manual";
-    if(entry.map.type) this.Dolly(entry,event.deltaY*0.001);
+    event.preventDefault();this.workspace.Activate(entry.index);
+    if(entry.mode!=="follow") entry.mode="manual";
+    if(entry.map.type||entry.mode==="follow") this.Dolly(entry,event.deltaY*0.001);
     else {const rect=entry.canvas.getBoundingClientRect();entry.map.Zoom(Math.exp(-event.deltaY*0.001),[event.clientX-rect.left,event.clientY-rect.top]);}
     if(entry.map.type) {
       this.StartNavigation(entry.map);

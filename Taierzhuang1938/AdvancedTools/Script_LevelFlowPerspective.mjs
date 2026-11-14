@@ -89,6 +89,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.freeCamera=null;const actor=frame.actors.find(item=>item.id===this.target)||frame.actors[0];this.center=[...actor.p];
     if(this.type==="oblique") this.scale=Clamp(Math.min(this.canvas.clientWidth,this.canvas.clientHeight)/35,3,12);
     else this.scale=this.type==="eye"?8:10;
+    this.scale=Clamp(this.scale*(this.followZoom??1),0.15,40);
   }
   CameraPoint(point) {
     const x=point[0]-this.eye[0],y=point[1]-this.eye[1],z=point[2]-this.eye[2];

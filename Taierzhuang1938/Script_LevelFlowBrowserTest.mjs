@@ -147,6 +147,50 @@ try {
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
   assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
   assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
+  for(const type of ['plan','battle','oblique','chase','eye']) {
+    await page.evaluate(type=>{
+      LevelFlow.SetPlaying(false);LevelFlow.Seek(424);LevelFlow.SetViewType(1,type);
+      const layout=LevelFlow.Inspect().viewports;layout.views[1].mode='follow';
+      LevelFlow.RestoreViewports(layout);
+    },type);
+    const initial=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
+    const box=await page.locator('#flowMap2').boundingBox();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+    await page.keyboard.down('Alt');await page.mouse.down({button:'right'});
+    assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'follow',`${type} zoom press preserves follow`);
+    await page.mouse.move(box.x+box.width/2+15,box.y+box.height/2+10,{steps:3});
+    await page.mouse.up({button:'right'});await page.keyboard.up('Alt');
+    const dragged=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
+    assert.equal(dragged[1].type,type);assert.equal(dragged[1].mode,'follow');
+    assert.ok(dragged[1].scale<initial[1].scale,`${type} Alt RMB changes the following zoom`);
+    assert.deepEqual(dragged[0],initial[0],`${type} zoom leaves the other viewport unchanged`);
+    await page.mouse.wheel(0,-180);
+    const zoomed=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+    assert.equal(zoomed.mode,'follow');assert.equal(zoomed.type,type);
+    assert.ok(zoomed.scale>dragged[1].scale,`${type} wheel changes the following zoom`);
+    await page.evaluate(()=>LevelFlow.Seek(424));
+    assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).scale,zoomed.scale,`${type} redraw retains zoom`);
+    await page.evaluate(()=>{LevelFlow.SetPlaying(true);});
+    await page.waitForFunction(()=>LevelFlow.Inspect().time>424.1);
+    await page.mouse.wheel(0,80);
+    await page.evaluate(()=>LevelFlow.SetPlaying(false));
+    const playingZoom=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+    assert.equal(playingZoom.mode,'follow');assert.equal(playingZoom.type,type);
+    assert.ok(playingZoom.followZoom<zoomed.followZoom,`${type} zoom works during playback`);
+    await page.evaluate(()=>LevelFlow.Seek(640));
+    const moved=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
+    assert.notDeepEqual(moved.center,zoomed.center,`${type} camera keeps following the moving subject`);
+    assert.equal(moved.followZoom,playingZoom.followZoom,`${type} seeking retains the zoom adjustment`);
+    await page.evaluate(()=>LevelFlow.RestoreViewports(LevelFlow.Inspect().viewports));
+    assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).followZoom,playingZoom.followZoom,`${type} viewport round-trip retains zoom`);
+    await page.locator('.lfViewPane[data-viewport="1"] [data-framing="follow"]').click();
+    assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'manual',`${type} follow can still be stopped explicitly`);
+  }
+  await page.evaluate(defaults=>{
+    for(const view of defaults.views) delete view.followZoom;
+    LevelFlow.RestoreViewports(defaults);
+  },defaults);
+  assert.ok((await page.evaluate(()=>LevelFlow.Inspect().viewports.views)).every(view=>view.followZoom===1),'older viewport layouts default to unmodified zoom');
   for(const type of ['scene','plan','battle','oblique','chase','eye']) {
     await page.evaluate(type=>LevelFlow.SetViewType(1,type),type);
     for(const playing of [true,false]) {
