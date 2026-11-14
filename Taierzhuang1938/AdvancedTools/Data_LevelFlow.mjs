@@ -57,6 +57,8 @@ export const FLOW_OPENING = {
 // User-drawn rescue approaches, 2026-11-13. Each lane has two loose trios.
 // Arrival offsets and short observation halts are creative preview blocking.
 export const FLOW_OPENING_RESCUE = {
+  gunfire: {beat: "02a", delay: 18},
+  friendlyCry: {beat: "02b", delay: 20},
   memberArrivalInterval: 0.75,
   memberResponseInterval: 0.4,
   memberLaneOffsets: [-0.65,0.1,0.75],
@@ -278,9 +280,9 @@ export const FLOW_BEATS = [
   { id: "01e", stage: "01", duration: 3, title: "洞口塌下", p: [[66.5,64.5],[63,64.5]], pose: "down",
     passage: "冬瓜：「趴下——！」洞口塌了。黑场。", task: "趴下", threat: "塌洞冲击", gate: "收拾背包完成", exit: "黑场接被俘", fx: "collapse" },
   { id: "02a", stage: "02", duration: 24, title: "被按在沟底", p: [[63,64.5],[61.8,65.6]], pose: "kneel",
-    passage: "顺子被拖出洞，按着跪在沟底，冬瓜在左边一步远。玩家只能转头。北沿上一挺机枪朝后沟打。", task: "只能转头", threat: "北沿机枪 → 后沟；西边捷克式对射", gate: "被拖出洞", exit: "翻译开始审问", fire: "crossfire", planning: "九个日军从前一拍起持续进场，按标注分三路从北面、东北面与东面绕来。机枪组登上北沿，其余从门外坡道和东侧沟沿下到支沟，陆续展开。班长一队仍沿后沟撤退。" },
+    passage: "顺子被拖出洞，按着跪在沟底，冬瓜在左边一步远。玩家只能转头。日军先静默包抄，北沿机枪架好后仍不开火；随后才朝后沟打，枪声引来班长等人。", task: "只能转头", threat: "先静默包抄，后北沿机枪开火；西边捷克式还击", gate: "被拖出洞", exit: "枪声引来班长等人，翻译开始审问", fire: "crossfire", planning: "九个日军从前一拍起分三路从北面、东北面与东面绕到后方，尽量不开枪。机枪组登上北沿，其余经门外坡道和东侧沟沿下到支沟。02A 第18秒北沿机枪才开火，西边捷克式随后还击；班长一队听见枪声才分路折返，此时尚不知道沟里有自己人。" },
   { id: "02b", stage: "02", duration: 42, title: "冬瓜引开注意，挨刺刀", p: [[61.8,65.6]], pose: "kneel",
-    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，话断成一声呜咽。", task: "看冬瓜和南沿", threat: "近身刺刀；南沿藏着援兵", gate: "审问持续", exit: "丁转向玩家", fire: "crossfire", planning: "冬瓜喊骂后，班长一队闻声折返，分两路各六人跟进，一路回支沟口转东沿沟接近，一路从南侧拐弯处绕向南沿。每路分两组三人，疏开间隔，错峰停步观察、逐段迂回接近。南沿组投弹后两路接应救人。" },
+    passage: "冬瓜扯起嗓子骂，把鬼子的眼睛拉回自己身上。新兵丁第一刀扎偏。第二刀捅进去，冬瓜惨叫。已经循枪声接近的班长等人这才知道沟里有自己人，没有直接手榴弹开路。", task: "看冬瓜和南沿", threat: "近身刺刀；援兵辨出自己人，暂缓投弹", gate: "审问持续，冬瓜受刺惨叫", exit: "丁转向玩家", fire: "crossfire", planning: "班长一队已被北沿机枪声引来，并非被喊骂召回。02B 第20秒冬瓜受刺惨叫，援兵确认沟里有自己人，收住直接向沟内投弹的打算。两路各六人、每路两组三人继续疏开接近；到南沿观察清楚后，02F 只向北沿机枪阵位投弹，再跳沟救人。" },
   { id: "02c", stage: "02", duration: 10, title: "西边的枪停了", p: [[61.8,65.6]], pose: "kneel",
     passage: "西边的捷克式打着打着停了，没有再响。", task: "辨认西面的变化", threat: "西边机枪坑失守", gate: "冬瓜受伤", exit: "只剩后沟枪声", fire: "north" },
   { id: "02d", stage: "02", duration: 9, title: "刀尖对着脸", p: [[61.8,65.6]], pose: "kneel",

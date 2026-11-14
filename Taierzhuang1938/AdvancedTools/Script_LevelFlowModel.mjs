@@ -177,15 +177,28 @@ function RouteLength(route) {
   return route.slice(1).reduce((total, point, index) => total + Distance(route[index], point), 0);
 }
 
-function BuildOpeningRetreat(index) {
-  const group = FLOW_OPENING_RESCUE.groups.find(entry => entry.members.includes(index));
-  const member = group.members.indexOf(index);
+function OpeningWithdrawal(index) {
   const departure = BeatById("01c").start + index * FLOW_OPENING.departureInterval;
-  const heard = BeatById("02b").start + group.responseDelay + member * FLOW_OPENING_RESCUE.memberResponseInterval;
   const origin = [64 + index % 3 * 0.65, 63.5 + Math.floor(index / 3) * 0.35];
   const route = [origin, ...FLOW_OPENING.retreatRoute];
   const total = RouteLength(route);
   const stopDistance = total - index * FLOW_OPENING.retreatSpacing;
+  return {departure, route, total, stopDistance};
+}
+
+const openingWithdrawals = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => OpeningWithdrawal(index));
+export const OPENING_ENEMY_ENTRY_TIME = Math.max(...openingWithdrawals.map(plan =>
+  plan.departure + RouteLength(plan.route.slice(0, FLOW_OPENING.enemyEntryBendIndex + 2)) / FLOW_OPENING.retreatSpeed));
+export const OPENING_GUNFIRE_TIME = Math.max(
+  BeatById(FLOW_OPENING_RESCUE.gunfire.beat).start + FLOW_OPENING_RESCUE.gunfire.delay,
+  OPENING_ENEMY_ENTRY_TIME + RouteLength([...FLOW_OPENING.enemyRoutes[0], FLOW_OPENING.enemyPositions[0]]) / FLOW_OPENING.enemySpeed);
+export const OPENING_FRIENDLY_CRY_TIME = BeatById(FLOW_OPENING_RESCUE.friendlyCry.beat).start + FLOW_OPENING_RESCUE.friendlyCry.delay;
+
+function BuildOpeningRetreat(index) {
+  const group = FLOW_OPENING_RESCUE.groups.find(entry => entry.members.includes(index));
+  const member = group.members.indexOf(index);
+  const {departure, route, total, stopDistance} = openingWithdrawals[index];
+  const heard = OPENING_GUNFIRE_TIME + group.responseDelay + member * FLOW_OPENING_RESCUE.memberResponseInterval;
   const distance = Math.min(stopDistance, (heard - departure) * FLOW_OPENING.retreatSpeed);
   const turn = SampleRoute(route, distance / total);
 
@@ -227,8 +240,6 @@ function BuildOpeningRetreat(index) {
 }
 
 const openingRetreatPlans = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => BuildOpeningRetreat(index));
-export const OPENING_ENEMY_ENTRY_TIME = Math.max(...openingRetreatPlans.map(plan =>
-  plan.departure + RouteLength(plan.route.slice(0, FLOW_OPENING.enemyEntryBendIndex + 2)) / FLOW_OPENING.retreatSpeed));
 const openingMeleePlans = FLOW_OPENING_RETREAT.meleeAllies.map((ally, slot) => {
   const retreat = FLOW_OPENING_RETREAT;
   const contact = BeatById(retreat.meleeBeat).start + retreat.contactDelay + slot * retreat.memberInterval;
@@ -249,6 +260,8 @@ function OpeningRetreat(time, index) {
     return {p: SampleRoute(route, distance / total), pose: time > departure && distance < plan.stopDistance ? "walk" : "stand"};
   }
   const identity = {rescueLane: plan.rescueLane, rescueGroup: plan.rescueGroup};
+  if (index === 0 && time < BeatById("02f").start) identity.status = time < OPENING_FRIENDLY_CRY_TIME
+    ? "循枪声接近，准备投弹" : "沟里有自己人，暂缓投弹";
   if (time < arrival) return {p: Track(keys, time),
     pose: pauses.some(([start, end]) => time >= start && time < end) ? "kneel" : "walk", ...identity};
   const jump = BeatById("02f").start + 3 + index * 0.08;
@@ -382,9 +395,10 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("06a").star
   const aboard=time>=BeatById("06d").start;
   const winter=aboard?CartOffset(0,-0.1):time>=BeatById("06c").start?SampleRoute(winterLoadingRoute,loadingProgress):Track(winterKeys,time);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.cover?"kneel":beat.pose)];
-  const winterPose = time < BeatById("02b").start ? "kneel" : "wounded";
+  const winterPose = time < OPENING_FRIENDLY_CRY_TIME ? "kneel" : "wounded";
   actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose,
-    aboard?{parentId:"cart",elevation:1.05,heading}:loadingProgress>0?{elevation:1.05*Clamp((loadingProgress-0.85)/0.15,0,1),heading}:{}));
+    aboard?{parentId:"cart",elevation:1.05,heading}:loadingProgress>0?{elevation:1.05*Clamp((loadingProgress-0.85)/0.15,0,1),heading}
+      :time >= OPENING_FRIENDLY_CRY_TIME && beat.id === "02b" ? {status:"受刺惨叫"} : {}));
   const atCamp = beat.stage === "04", village = Number(beat.stage) >= 8;
   const offset = (x, z) => [player[0] + x, player[1] + z];
   let luo = offset(-1.4, -2.5), he = offset(1.1, 0), liu = offset(-0.7, -4), yao = offset(-2, 1);
@@ -558,8 +572,10 @@ function OpeningActors(time) {
       return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : moving ? "run" : approaching ? "kneel" : "shoot",
         {groupId:"OpeningSurvivors",firing:!dead&&!approaching,fall,born,arrival});
     }
-    const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : "stand";
-    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {born,arrival});
+    const firing = index === 0 && !defeated && time >= arrival && time >= OPENING_GUNFIRE_TIME && time < BeatById("02e").start;
+    const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : firing ? "shoot" : index < 2 ? "kneel" : "stand";
+    const status = index === 0 && !defeated ? time < arrival ? "静默包抄" : firing ? "向后沟开火" : time < OPENING_GUNFIRE_TIME ? "静默架枪" : "停火" : undefined;
+    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {born,arrival,firing,status});
   }).filter(Boolean);
 }
 
@@ -608,12 +624,11 @@ function Effects(beat, time, progress, actors) {
   if (["crossfire","north"].includes(beat.fire) && beat.stage === "02") {
     const gunner = actors.find(actor => actor.id === "opening0");
     const leader = actors.find(actor => actor.id === "luo");
-    if (time >= gunner.arrival) {
+    if (gunner?.firing) {
       effects.push({kind:"fire",a:gunner.p,b:leader.p,side:"enemy",phase:(time*6)%1,heavy:true});
-      if (time < BeatById("02b").start) effects.push({kind:"fire",a:leader.p,b:gunner.p,side:"friend",phase:(time*3)%1});
     }
     const westGun = actors.find(actor => actor.id === "openingGun1");
-    if (beat.fire === "crossfire" && westGun.pose !== "run") effects.push({kind:"fire",a:westGun.p,b:gunner.p,side:"friend",phase:(time*3)%1,heavy:true});
+    if (gunner?.firing && beat.fire === "crossfire" && westGun && westGun.pose !== "run") effects.push({kind:"fire",a:westGun.p,b:gunner.p,side:"friend",phase:(time*3)%1,heavy:true});
   }
   if (beat.id === "03g") effects.push({kind:"fire",a:[22,69.5],b:[12,44],side:"friend",phase:(time*5)%1,heavy:true});
   if (["06g","06h"].includes(beat.id)&&tank) effects.push({kind:"fire",a:actors.find(actor=>actor.id==="yao").p,b:tank.p,side:"friend",phase:(time*5)%1});
