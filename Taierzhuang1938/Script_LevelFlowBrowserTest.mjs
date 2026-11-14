@@ -1029,6 +1029,54 @@ try {
   assert.equal(speechClipping.hidden,0,'occluded eye-view speakers have no speech HUD');
   assert.equal(speechClipping.self,0,'first-person speaker has no floating self bubble');
   assert.equal(speechClipping.behind,null,'speakers behind the camera have no anchor');
+  // fastForward delivers a single delayed animation frame, reproducing a
+  // slow renderer without depending on the test machine's GPU or frame rate.
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now()+1000));
+  for(const speed of [0.5,1,2,4,8,16]) {
+    await page.evaluate(speed=>{
+      LevelFlow.SetPlaying(false);LevelFlow.Seek(22);
+      document.getElementById('loopStage').checked=false;
+      document.getElementById('flowSpeed').value=String(speed);
+      LevelFlow.SetPlaying(true);
+    },speed);
+    await page.clock.fastForward(250);
+    const state=await page.evaluate(()=>LevelFlow.Inspect());
+    assert.ok(Math.abs(state.time-(22+0.25*speed))<0.001,`${speed}x preserves a 250 ms frame's elapsed time`);
+    await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  }
+  await page.evaluate(()=>{
+    LevelFlow.Seek(22);document.getElementById('flowSpeed').value='1';LevelFlow.SetPlaying(true);
+  });
+  const beforeSlowFrame=await page.evaluate(()=>LevelFlow.Inspect());
+  await page.clock.fastForward(5000);
+  const afterSlowFrame=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.ok(Math.abs(afterSlowFrame.time-beforeSlowFrame.time-5)<0.001,'1x advances five seconds after a five-second render stall');
+  const beforeSoldier=beforeSlowFrame.actors.find(actor=>actor.id==='openingAlly3');
+  const afterSoldier=afterSlowFrame.actors.find(actor=>actor.id==='openingAlly3');
+  const {FLOW_OPENING}=await import('./AdvancedTools/Data_LevelFlow.mjs');
+  assert.ok(Math.abs(Math.hypot(afterSoldier.p[0]-beforeSoldier.p[0],afterSoldier.p[1]-beforeSoldier.p[1])/5-FLOW_OPENING.retreatSpeed)<0.01,
+    'a soldier covers the configured metres per real second even during a render stall');
+  await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  await page.clock.fastForward(3000);
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),afterSlowFrame.time,'paused wall time does not advance the plan');
+  await page.evaluate(()=>{LevelFlow.SetPlaying(true);LevelFlow.Seek(30);});
+  await page.clock.fastForward(500);
+  assert.ok(Math.abs(await page.evaluate(()=>LevelFlow.Inspect().time)-30.5)<0.001,'seeking during playback rebases elapsed time');
+  const firstStageEnd=FLOW_TIMELINE.find(beat=>beat.id==='02a').start;
+  await page.evaluate(end=>{
+    LevelFlow.Seek(end-0.2);document.getElementById('loopStage').checked=true;
+  },firstStageEnd);
+  await page.clock.fastForward((firstStageEnd*2+2)*1000);
+  assert.ok(Math.abs(await page.evaluate(()=>LevelFlow.Inspect().time)-1.8)<0.001,'looping preserves overshoot across multiple complete stage loops');
+  await page.evaluate(()=>{
+    document.getElementById('loopStage').checked=false;
+    LevelFlow.Seek(LevelFlow.Inspect().duration-0.2);
+  });
+  await page.clock.fastForward(1000);
+  const ended=await page.evaluate(()=>LevelFlow.Inspect());
+  assert.equal(ended.time,ended.duration);
+  assert.equal(ended.playing,false,'delayed final frame stops at the end of the plan');
   assert.deepEqual(errors,[]);
   console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

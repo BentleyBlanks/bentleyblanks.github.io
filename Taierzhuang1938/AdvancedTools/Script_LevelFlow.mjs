@@ -28,7 +28,7 @@ function Toast(message,persistent=false) {
   if(!persistent) toastTimer=setTimeout(()=>{Element("flowError").hidden=true;},5000);
 }
 function SetPlaying(value) {
-  playing=value;lastTimestamp=0;
+  playing=value;lastTimestamp=performance.now();
   Element("playFlow").textContent=value?"暂停":"播放";
   Element("playFlow").setAttribute("aria-pressed",String(value));
   RequestRender();
@@ -95,6 +95,7 @@ function StageBounds() {
 }
 function Seek(value,{fit=false}={}) {
   const previousStage=frame.stage.id;
+  lastTimestamp=performance.now();
   time=Clamp(Number(value)||0,0,FLOW_DURATION);frame=EvaluateFlow(time,project.value);
   if(previousStage!==frame.stage.id) {selection=null;selectedUnitIds=[];}
   if(map&&(fit||previousStage!==frame.stage.id)) workspace.FrameStage();
@@ -292,12 +293,19 @@ function BindControls() {
   });
 }
 function Tick(timestamp) {
-  const navigated=!Element("annotationDialog").open&&navigation.Tick(lastTimestamp?Math.min(0.1,(timestamp-lastTimestamp)/1000):0);
+  const elapsed=lastTimestamp?Math.max(0,(timestamp-lastTimestamp)/1000):0;
+  const navigated=!Element("annotationDialog").open&&navigation.Tick(Math.min(0.1,elapsed));
   if(playing&&lastTimestamp) {
-    const previousStage=frame.stage.id,delta=Math.min(0.1,(timestamp-lastTimestamp)/1000)*Number(Element("flowSpeed").value);
+    // Frames sample an absolute-time plan. Dropping elapsed time on a slow
+    // render makes 1x playback (and every actor's metres/second) run too slowly.
+    const previousStage=frame.stage.id,delta=elapsed*Number(Element("flowSpeed").value);
     const end=Element("loopStage").checked?frame.stage.end:FLOW_DURATION;
-    if(time+delta>=end) {if(Element("loopStage").checked) time=frame.stage.start;else {time=FLOW_DURATION;SetPlaying(false);}}
-    else time+=delta;
+    if(time+delta>=end) {
+      if(Element("loopStage").checked) {
+        const duration=end-frame.stage.start;
+        time=frame.stage.start+(time+delta-frame.stage.start)%duration;
+      } else {time=FLOW_DURATION;SetPlaying(false);}
+    } else time+=delta;
     frame=EvaluateFlow(time,project.value);
     if(previousStage!==frame.stage.id) workspace.FrameStage();
     Render(frame);
