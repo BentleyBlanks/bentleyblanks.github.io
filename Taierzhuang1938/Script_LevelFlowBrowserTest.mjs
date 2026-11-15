@@ -247,6 +247,37 @@ try {
   assert.deepEqual(landmarkLabels.off,[],'turning scene names off invalidates the background and omits its text');
   assert.deepEqual(landmarkLabels.on,landmarkLabels.initial);
   assert.ok(landmarkLabels.changed&&landmarkLabels.restored&&landmarkLabels.legacy,'scene labels toggle without moving the camera and older settings keep labels visible');
+  const restoredMapObjects=await page.evaluate(async()=>{
+    const {BuildEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
+    const scene=await (await fetch('../Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json')).json();
+    const map=BuildEncounterMap(scene),canvas=document.createElement('canvas');
+    canvas.width=320;canvas.height=240;
+    canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const view=new FlowMapView(canvas,map),context=canvas.getContext('2d');
+    view.center=[70,525];view.scale=8;
+    const frame=LevelFlow.Evaluate(530),objects=map.objects;
+    const Draw=()=>{
+      view.DrawBase(context,320,240,frame,{landmarks:false});
+      return context.getImageData(0,0,320,240).data;
+    };
+    map.objects=objects.filter(object=>!/^11–18/.test(object.group||''));
+    const before=Draw();map.objects=objects;const after=Draw();
+    let changedPixels=0;
+    for(let index=0;index<before.length;index+=4) {
+      if(before[index]!==after[index]||before[index+1]!==after[index+1]||before[index+2]!==after[index+2]) changedPixels++;
+    }
+    const names=[];context.fillText=text=>names.push(text);
+    for(const id of ['LmGengGrove','LmWell_GardenNW','LmThreshing1','LmOuterPond','LmShop']) {
+      const label=map.labels.find(entry=>entry.id===id);
+      view.mapData={...map,labels:[label]};view.center=[...label.p];view.scale=5;
+      view.DrawLandmarks(context,320,240);
+    }
+    canvas.remove();return {changedPixels,names};
+  });
+  assert.ok(restoredMapObjects.changedPixels>100,'southern courtyard walls and props appear through the normal 2D background renderer');
+  assert.deepEqual(restoredMapObjects.names,['耿家林','浇地井（西北菜园）','场院（北）','取土坑（庄东北）','杂货铺'],
+    'original grove, well, threshing ground, pond and shop labels reach the canvas');
   const perspectiveLandmarks=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:640px;height:360px';document.body.append(canvas);

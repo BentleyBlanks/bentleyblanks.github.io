@@ -380,6 +380,20 @@ assert.deepEqual(ReadPngFrameMetadata(png.buffer),packet,"single PNG preserves t
 assert.throws(()=>ReadPngFrameMetadata(tinyPng.buffer));
 const scene=JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",import.meta.url),"utf8"));
 const map=BuildEncounterMap(scene);
+const sceneMapObjects = scene.objects.filter(object => object.pos && object.pos[2] < 558
+  && object.layer !== "backdrop" && !/空气墙|^远景/.test(object.group || ""));
+for (const object of sceneMapObjects) {
+  assert.ok(map.objects.includes(object), `${object.id} remains on the 2D map regardless of its chapter group`);
+  assert.ok(!map.farObjects.some(entry => entry.id === object.id), "3D draws restored map objects once");
+}
+assert.ok(map.objects.some(object => object.id === "Wall_SW2c_Sa"), "the village's southern courtyard walls reach the 2D map");
+const sceneMapMarkers = scene.markers.filter(marker => marker.z < 558);
+assert.equal(map.labels.filter(label => label.id).length, sceneMapMarkers.length, "all scene markers in the active map are loaded");
+for (const marker of sceneMapMarkers) {
+  const label = map.labels.find(label => label.id === marker.id);
+  assert.deepEqual(label, {...marker,p:[marker.x,marker.z]}, "landmarks retain authored names, location, kind, extent and notes");
+}
+assert.equal(map.labels.filter(label => label.name === "防炮洞").length, 1, "scene names take precedence over duplicate fallback labels");
 assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="WaterVat_T2")),"cover metadata marks ordinary prop materials");
 assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="Encounter_DragWestBerm")),"authored planning berms receive cover markings");
 assert.ok(IsEncounterCover({material:"Whitebox/Cover"}));

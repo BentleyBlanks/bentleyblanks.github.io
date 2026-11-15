@@ -61,7 +61,7 @@ function FrontPaperFields() {
 
 export function BuildEncounterMap(scene) {
   const objects = scene.objects.filter((object) => object.pos && object.pos[2] < 558
-    && object.layer !== "backdrop" && !/空气墙|^11–18|^远景/.test(object.group || ""));
+    && object.layer !== "backdrop" && !/空气墙|^远景/.test(object.group || ""));
   const farObjects = scene.objects.filter(object => object.pos && !objects.includes(object)
     && !String(object.group || "").includes("空气墙")).map(object => {
     if (object.size) return object;
@@ -107,7 +107,9 @@ export function BuildEncounterMap(scene) {
   for(const [id,x,z,w,h,d,material] of FLOW_GROUND.cover) objects.push({
     id:`Encounter_${id}`,pos:[x,0,z],size:[w,h,d],material:`Whitebox/${material}`,group:"遭遇设计/地面工事",planning:true,
   });
-  const labels = [
+  const labels = (scene.markers || []).filter(marker => marker.z < 558)
+    .map(marker => ({...marker, p:[marker.x,marker.z]}));
+  const supplementalLabels = [
     ["门外下沟坡道",63,55.5], ["1 北侧坡道",18,35], ["2 西侧坡道",15,78], ["2 拐弯触发点",30,86],
     ["东侧地面车道",109,174], ["地面车道收窄口",101,280], ["集结处机枪阵地",72,139],
     ["旧阵地（已弃）",0,-203], ["旧警戒阵地",-22,-440], ["西邻班后撤沟",-48,90],
@@ -117,8 +119,7 @@ export function BuildEncounterMap(scene) {
     ["街坊家",74,456], ["本家院",84,482], ["石碾",113.2,465.7], ["关帝庙",84.5,425],
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
-  labels.push(...(scene.markers || []).filter(marker => /^LmDefense|^LmAssembly/.test(marker.id))
-    .map(marker => ({name:marker.name,p:[marker.x,marker.z]})));
+  labels.push(...supplementalLabels.filter(label => !labels.some(marker => marker.name === label.name)));
   return {
     bounds: [-160, 320, -480, 558], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
     paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < 558)),
