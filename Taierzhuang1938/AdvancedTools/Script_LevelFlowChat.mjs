@@ -143,6 +143,7 @@ export class EncounterChat {
     };
     Element("removeCodexUnits").onclick = () => { this.pendingUnits = null; this.DrawUnitsAttachment(); };
     Element("removeCodexLocation").onclick = () => { this.pendingLocation = null; this.RefreshContext(); };
+    Element("copyCodexLocation").onclick = () => this.CopyLocation();
     Element("editCodexImage").onclick = () => this.editScreenshot(this.pendingImage);
     Element("removeCodexImage").onclick = () => { this.pendingImage = null; this.DrawAttachment(); };
     Element("codexPrompt").addEventListener("input", () => this.UpdateSend());
@@ -313,7 +314,26 @@ export class EncounterChat {
     Element("codexContextSummary").title = ContextLabel(frame.context);
     const details = Element("codexContextDetail");
     const content = JSON.stringify(location, null, 2);
-    if (details.textContent !== content) details.textContent = content;
+    if (details.textContent !== content) {
+      details.textContent = content;
+      Element("copyCodexLocation").textContent = "复制";
+    }
+  }
+
+  async CopyLocation() {
+    const location = this.pendingLocation?.location;
+    if (!location) return;
+    const button = Element("copyCodexLocation");
+    button.disabled = true;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("当前浏览器不支持复制文本");
+      await navigator.clipboard.writeText(JSON.stringify(location, null, 2));
+      if (this.pendingLocation?.location === location) button.textContent = "已复制";
+    } catch (error) {
+      this.Error(`复制定位失败 · ${error.message}`);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   OpenUnits() {

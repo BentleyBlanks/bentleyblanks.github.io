@@ -71,6 +71,7 @@ function Finish(child, text) {
 }
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.addInitScript(() => {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));
@@ -85,6 +86,36 @@ try {
   assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
   assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
   assert.equal(await page.locator("#codexContextDetail").textContent(), "");
+  await page.click("#attachCodexLocation");
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), true);
+  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 384);
+  const locationToCopy = await page.locator("#codexContextDetail").textContent();
+  await page.click("#copyCodexLocation");
+  await page.waitForFunction(() => document.getElementById("copyCodexLocation").textContent === "已复制");
+  assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n"), locationToCopy, "copies the complete attached location JSON");
+  assert.equal(await page.locator("#codexPendingLocation details").evaluate(details => details.open), false, "copying leaves the attachment collapsed");
+  await page.evaluate(() => LevelFlow.Seek(390));
+  await page.click("#codexContextSummary");
+  await page.click("#copyCodexLocation");
+  assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n"), locationToCopy, "copies the frozen attachment after seeking");
+  assert.equal(await page.locator("#codexPendingLocation details").evaluate(details => details.open), true);
+  await page.click("#attachCodexLocation");
+  assert.equal(await page.locator("#copyCodexLocation").textContent(), "复制", "a new location resets copy feedback");
+  await page.evaluate(() => {
+    window.originalLocationCopy = navigator.clipboard.writeText;
+    navigator.clipboard.writeText = async () => { throw new Error("测试剪贴板拒绝"); };
+  });
+  await page.click("#copyCodexLocation");
+  await page.waitForFunction(() => document.getElementById("codexChatError").textContent.includes("复制定位失败"));
+  assert.equal(await page.locator("#copyCodexLocation").isEnabled(), true, "clipboard failure allows retry");
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = originalLocationCopy; delete window.originalLocationCopy;
+    document.getElementById("codexChatError").textContent = ""; document.getElementById("codexChatError").hidden = true;
+    LevelFlow.Seek(384);
+  });
+  await page.click("#attachCodexLocation");
+  await page.click("#codexContextSummary");
+  await page.click("#removeCodexLocation");
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   // Use real canvas clicks in both viewports. Units keep their own frozen snapshot.
   await page.selectOption('#viewportLayout','2');

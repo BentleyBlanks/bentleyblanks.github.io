@@ -359,6 +359,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfPendingLocation, .lfPendingImage, .lfPendingUnits { display: flex; align-items: flex-start; gap: 6px; border: 1px solid var(--ed-rule-2); border-radius: 6px; padding: 6px; background: var(--ed-sel); min-width: 0; }
 .lfChatContext { flex: 1; min-width: 0; color: var(--ed-text-2); font-size: 13px; }
 .lfChatContext summary { cursor: pointer; line-height: 1.8; }
+#copyCodexLocation { flex: none; min-width: 52px; padding: 2px 6px; font-size: 12px; line-height: 20px; }
 .lfChatContext pre { max-height: 110px; overflow: auto; font: 12px/1.7 var(--ui-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--ed-black); padding: 8px; margin: 8px 0 0; border-radius: 4px; }
 #codexPrompt { display: block; width: 100%; min-height: 82px; max-height: 160px; resize: vertical; border: 0; border-radius: 0; padding: 4px 3px 10px; background: transparent; box-shadow: none; color: var(--ed-text-hi); font-size: 15px; line-height: 1.7; }
 #codexPrompt:focus { outline: none; }
