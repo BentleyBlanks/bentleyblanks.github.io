@@ -82,8 +82,9 @@ try {
   assert.equal(await page.locator("#toggleCodexSessions").getAttribute("aria-expanded"), "false");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   assert.equal(await page.locator("#markScreenshot,.lfChatEmpty").count(), 0);
-  assert.equal(await page.locator("#codexPendingLocation").isVisible(), true);
-  assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 384);
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
+  assert.equal(await page.locator("#codexContextDetail").textContent(), "");
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   // Use real canvas clicks in both viewports. Units keep their own frozen snapshot.
   await page.selectOption('#viewportLayout','2');
@@ -313,6 +314,9 @@ try {
   assert.equal(calls.length, 1); assert.equal(calls[0].steered.length, 1);
   assert.match(calls[0].steered[0].prompt, /执行中补充/);
   await page.click("#newCodexChat");
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
+  await page.click("#attachCodexLocation");
   assert.ok(await page.locator("#codexPendingLocation").isVisible());
   assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 390);
   await page.evaluate(() => LevelFlow.Select({ type: "actor", id: "player" }));
@@ -554,26 +558,54 @@ try {
   assert.equal(theme.border, "rgba(193, 189, 171, 0.25)");
   assert.ok(theme.panel.includes("rgba(8, 9, 7, 0.94)"));
   assert.ok(theme.titleFont.includes("TzTitleText"));
-  // Initial URL positioning and later new chats both attach frozen location packets by default.
+  // New chats send location only after an explicit attachment action.
   await page.reload(); await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent.includes("gpt-6.1-sol"));
-  await page.locator("#codexPrompt").fill("默认定位的新会话"); await page.click("#sendCodexChat");
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
+  await page.locator("#codexPrompt").fill("没有附加定位的新会话"); await page.click("#sendCodexChat");
   await page.waitForFunction(() => document.querySelector("#codexProgress"));
   assert.equal(calls.length, 5);
   const defaultDirectory = path.dirname(calls[4].args[calls[4].args.indexOf("--output-last-message") + 1]);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(defaultDirectory, "Frame.json"))).context.time, 384);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(defaultDirectory, "Location.json"))).timeline.timeSeconds, 384);
-  Finish(calls[4], "默认定位已收到。");
+  assert.equal(fs.existsSync(path.join(defaultDirectory, "Frame.json")), false);
+  assert.equal(fs.existsSync(path.join(defaultDirectory, "Location.json")), false);
+  assert.equal(await page.locator(".lfChatMessage.user a.lfChatFrame").count(), 0);
+  Finish(calls[4], "已收到需求。");
   await page.evaluate(() => LevelFlow.Seek(410));
   await page.click("#toggleCodexSessions"); await page.click("#newCodexChat");
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
+  assert.equal(await page.locator("#codexContextDetail").textContent(), "");
+  await page.click("#attachCodexLocation");
   assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 410);
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "↻ 更新定位");
   await page.evaluate(() => LevelFlow.Seek(420));
-  await page.locator("#codexPrompt").fill("新建会话的默认定位"); await page.click("#sendCodexChat");
+  assert.match(await page.locator("#codexContextSummary").textContent(), /410\.00 s/);
+  await page.locator("#codexPrompt").fill("手动附加定位的新会话"); await page.click("#sendCodexChat");
   await page.waitForFunction(() => document.querySelector("#codexProgress"));
   assert.equal(calls.length, 6);
   const nextDirectory = path.dirname(calls[5].args[calls[5].args.indexOf("--output-last-message") + 1]);
   assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Frame.json"))).context.time, 410);
   assert.equal(JSON.parse(fs.readFileSync(path.join(nextDirectory, "Location.json"))).timeline.timeSeconds, 410);
-  Finish(calls[5], "新建默认定位已收到。");
+  assert.equal(await page.locator("#codexContextDetail").textContent(), "");
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
+  Finish(calls[5], "手动定位已收到。");
+  await page.click("#newCodexChat");
+  await page.evaluate(() => LevelFlow.Seek(0));
+  assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
+  await page.click("#attachCodexLocation");
+  assert.match(await page.locator("#codexContextSummary").textContent(), /0\.00 s/);
+  await page.click("#removeCodexLocation");
+  assert.equal(await page.locator("#codexContextSummary").textContent(), "定位");
+  assert.equal(await page.locator("#codexContextSummary").getAttribute("title"), null);
+  assert.equal(await page.locator("#codexContextDetail").textContent(), "");
+  assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
+  await page.click("#attachCodexLocation");
+  await page.locator("#codexPrompt").fill("手动附加零秒定位"); await page.click("#sendCodexChat");
+  await page.waitForFunction(() => document.querySelector("#codexProgress"));
+  assert.equal(calls.length, 7);
+  const zeroDirectory = path.dirname(calls[6].args[calls[6].args.indexOf("--output-last-message") + 1]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(zeroDirectory, "Frame.json"))).context.time, 0);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(zeroDirectory, "Location.json"))).timeline.timeSeconds, 0);
+  assert.equal(await page.locator(".lfChatMessage.user a.lfChatFrame").innerText(), "定位 · 0.00 s");
+  Finish(calls[6], "零秒定位已收到。");
   // Exercise mixed states and long activity text through the list API and normal page startup.
   const fixtures = [
     { title: "调整沟外集结区的推进路线", status: "running", progress: { phase: "running", activity: "正在执行本地命令" } },

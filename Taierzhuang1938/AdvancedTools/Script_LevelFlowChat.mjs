@@ -246,7 +246,6 @@ export class EncounterChat {
     Element("codexPrompt").value = draft?.prompt || "";
     this.pendingImage = draft?.image || null;
     this.pendingLocation = draft?.location || null;
-    if (!draft && !this.current) this.pendingLocation = structuredClone(this.snapshot());
     this.pendingUnits = draft?.units || null;
     this.DrawAttachment();
     this.DrawUnitsAttachment();
@@ -301,7 +300,14 @@ export class EncounterChat {
 
   RefreshContext() {
     Element("codexPendingLocation").hidden = !this.pendingLocation;
-    if (!this.pendingLocation) return;
+    Element("attachCodexLocation").textContent = this.pendingLocation ? "↻ 更新定位" : "＋ 未附加定位";
+    if (!this.pendingLocation) {
+      const summary = Element("codexContextSummary");
+      summary.textContent = "定位"; summary.removeAttribute("title");
+      summary.parentElement.open = false;
+      Element("codexContextDetail").textContent = "";
+      return;
+    }
     const { frame, location } = this.pendingLocation;
     Element("codexContextSummary").textContent = `定位 · ${frame.context.time.toFixed(2)} s`;
     Element("codexContextSummary").title = ContextLabel(frame.context);
