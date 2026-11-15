@@ -253,13 +253,12 @@ if (badFoley.length || !sampleOnlyOk) {
 
 // Timeline 静音快进之后，目标时刻仍在说的那一句必须从**对应采样点**接回来，
 // 不能从头播、也不能没声（编辑器审片全靠这条）。
-// 2026-08-29：取样键从旧序章的 `prologue_young_dispatch_01` 换成新序章的
-// `ch0_shunzi_02`（3.36 s，镜 2 顺子读家信那一句）—— 旧序章那 11 条 prologue_* 行
-// 已经从 Data_Voice 的总表里退役了，拿它取样只会量到「voiceBank 里没有这条」。
+// 序章过场及 ch0_shunzi_02 已在 2026-10-31 删除；使用仍在声库内的
+// ch1_luo_05（3.06 s），保留真实采样偏移与剩余时长检查。
 // 挑长的那一句是有理由的：偏移 0.5 s 之后还得剩下够长的一段才量得出差别。
 const voiceSeek = await page.evaluate(() => {
   const a = window.Taierzhuang.audio;
-  const key = "ch0_shunzi_02";
+  const key = "ch1_luo_05";
   const entry = a.voiceBank.get(key);
   if (!entry) return null;
   const name = `voice.${key}`;
@@ -271,11 +270,11 @@ const voiceSeek = await page.evaluate(() => {
   return out;
 });
 if (!voiceSeek || voiceSeek.duration === undefined) {
-  Fail(`序章章节台词无法做采样跳转：${JSON.stringify(voiceSeek)}（ch0_shunzi_02 没进 voiceBank？）`);
+  Fail(`章节台词无法做采样跳转：${JSON.stringify(voiceSeek)}（ch1_luo_05 没进 voiceBank？）`);
 } else if (Math.abs(voiceSeek.offset - 0.5) > 0.001
     || Math.abs(voiceSeek.duration - (voiceSeek.full - 0.5)) > 0.05) {
   Fail(`人声采样偏移不对：${JSON.stringify(voiceSeek)}`);
-} else Ok("序章章节台词可从 Timeline 目标采样点起播（ch0_shunzi_02）");
+} else Ok("章节台词可从 Timeline 目标采样点起播（ch1_luo_05）");
 
 // 军号是「一个音 + playbackRate 排动机」，基频量错了整段跑调 ——
 // 495.5 Hz 是 Last Post 那个持续音的实测值（G 号的 B4）。

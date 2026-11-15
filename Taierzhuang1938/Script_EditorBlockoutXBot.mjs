@@ -275,7 +275,8 @@ const XBOT_TORSO_FIT = Object.freeze({
 
 /** 整套 X Bot 资源（一份）+ 每个人一份的 XBotSkin。 */
 export class XBotSkins {
-  constructor({ base = XBOT.base } = {}) {
+  constructor({ base = XBOT.base, characterKeys = null } = {}) {
+    this.characterKeys=characterKeys;
     this.base = base;
     this.loader = new GLTFLoader();
     this.ready = false;
@@ -317,7 +318,8 @@ export class XBotSkins {
     this.source.traverse(o => { if (o.isBone) this.restBones.set(o.name, o); });
     // 每种人物一套（模型、头高、身体胶囊、初始骨头）；X Bot 之外的按阵营表读，读不到不影响 X Bot
     this.kits = new Map([["xbot", { key: "xbot", def: XBOT_CHARACTERS.xbot, source: this.source, headY: this.headY, bodyVolumes: this.bodyVolumes, restBones: this.restBones }]]);
-    await Promise.all([this._CalibrateRifle(), ...[...new Set([...Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys), ...Object.values(XBOT_CAST_CHARACTERS)])].map(key => this._LoadKit(key))]);
+    const keys=this.characterKeys||[...new Set([...Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys), ...Object.values(XBOT_CAST_CHARACTERS)])];
+    await Promise.all([this._CalibrateRifle(), ...keys.map(key => this._LoadKit(key))]);
     this.ready = true;
   }
 

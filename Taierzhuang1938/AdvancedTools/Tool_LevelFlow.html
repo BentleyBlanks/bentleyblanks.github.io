@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261115CameraMenu">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261115PlayRuntimeV2">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,7 +26,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261115TempleArrival"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261115PlayRuntimeV2"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -37,7 +37,7 @@
       <button type="button" data-navigation-tool="hand" aria-label="手形工具" aria-pressed="false" title="手形工具（Q）· 左键拖拽平移场景"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-5.5V4a1.5 1.5 0 0 1 3 0v7m0-5a1.5 1.5 0 0 1 3 0v6m0-3a1.5 1.5 0 0 1 3 0v6.5a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.7-2.3l-3.9-5a1.6 1.6 0 0 1 2.4-2.1L8 14"/></svg></button>
       <button type="button" data-navigation-tool="select" aria-label="选择工具" aria-pressed="true" title="选择工具（W）· 左键点选单位与区域"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M5 2.5 20 13l-7.1 1.1-3.7 7.4Z"/></svg></button>
     </div>
-    <div class="lfToolGroup lfPlayTools"><button id="playGame" title="Play · 从所选关键帧开始" aria-label="Play" aria-pressed="false">▶</button><select id="playGameStart" aria-label="Play 开始位置"><option value="current">当前关键帧</option><option value="beginning">从头开始</option></select></div>
+    <div class="lfToolGroup lfPlayTools"><button id="playGame" title="播放" aria-label="Play" aria-pressed="false">▶</button><button id="pauseGame" title="暂停" aria-label="暂停 Play" aria-pressed="false" disabled>Ⅱ</button><button id="stopGame" title="停止" aria-label="停止 Play" disabled>■</button><select id="playGameStart" aria-label="Play 开始位置"><option value="current">当前关键帧</option><option value="beginning">从首个战斗段开始</option></select></div>
     <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1" selected>单视口</option><option value="2">双视口</option><option value="3">三视口</option><option value="4">四视口</option></select></div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
@@ -70,7 +70,7 @@
           </form>
         </div>
       </section>
-      <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <section id="scriptPane" class="lfPane" hidden><div id="playStatus" class="lfPlayStatus" hidden role="status"><strong id="playStatusTitle"></strong><p id="playStatusTask"></p><p id="playStatusHint"></p></div><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
 
     </aside>
   </main>

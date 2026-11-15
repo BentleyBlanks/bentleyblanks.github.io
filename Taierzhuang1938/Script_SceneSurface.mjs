@@ -23,7 +23,7 @@ export function SceneSurfaceSampler(surface, groundAt) {
     }
     return height;
   };
-  return (x,z) => {
+  const Sample=(x,z) => {
     let height=Pocket(x,z), nearest=Infinity;
     for(const r of ramps) {
       for(const segment of r.segments) {
@@ -40,4 +40,9 @@ export function SceneSurfaceSampler(surface, groundAt) {
     }
     return height;
   };
+  Sample.regions=[
+    ...pockets.map(p=>{const [minX,maxX,minZ,maxZ]=p.box,f=p.featherM??1.5;return {minX:minX-f,maxX:maxX+f,minZ:minZ-f,maxZ:maxZ+f};}),
+    ...ramps.flatMap(r=>r.segments),
+  ];
+  return Sample;
 }

@@ -328,7 +328,7 @@ function Box(group, material, w, h, d, x, y, z) {
 }
 
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false }) {
+  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false, characterKeys = null }) {
     this.formalOnly=formalOnly;
     this.scene = scene;
     this.actorFactory = actorFactory;
@@ -353,7 +353,7 @@ export class BlockoutPuppets {
     this.actorCount = 0;
     this.missingClips = new Set();
     // X Bot（文件头 2026-11-01）：资源异步读，读完之前照旧是士兵模型，读完那一帧给每个人挂上
-    this.xbot = BLOCKOUT_PUPPETS.xbot ? new XBotSkins() : null;
+    this.xbot = BLOCKOUT_PUPPETS.xbot ? new XBotSkins({characterKeys}) : null;
     this.xbot?.Load();
   }
 
@@ -1462,11 +1462,14 @@ export class BlockoutPuppets {
     return out;
   }
 
-  Dispose() {
+  Clear() {
     for (const puppet of this.puppets.values()) this._Destroy(puppet);
-    this.xbot?.DisposeHair();
     this.puppets.clear();
     this.plan = null;
+  }
+  Dispose() {
+    this.Clear();
+    this.xbot?.DisposeHair();
     this.root.removeFromParent();
     for (const material of Object.values(this.materials)) material.dispose();
     this.stretcherMaterial?.dispose();

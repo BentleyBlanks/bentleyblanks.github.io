@@ -11,3 +11,4 @@
 .encounterHint {
   pointer-events: none;
 }
+.encounterGame .hudObjective,.encounterGame .hudHint,.encounterGame .hudActions,.encounterGame .hudBrief,.encounterGame .hudTitle{display:none!important}

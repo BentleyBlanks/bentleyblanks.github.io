@@ -4891,6 +4891,13 @@ export class AudioEngine {
     return !!this.ctx && this.ctx.state === "running" && !this.disposed;
   }
 
+  ResetSession() {
+    this.Music(null,{fadeOut:0});this.StopAmbience(0);this.ResetDeafen();
+    for(const id of this.timers)clearTimeout(id);this.timers.clear();
+    for(const voice of Array.from(this.pendingVoices))this.FreeVoice(voice);
+    this.pendingVoices.clear();this.activeVoices.clear();this.occCache.clear();
+    this.SetPaused(true);this.pausedState={ambience:null,music:null};
+  }
   Dispose() {
     this.disposed = true;
     this.ResetDeafen();

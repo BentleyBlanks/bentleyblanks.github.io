@@ -7,7 +7,13 @@
 .lfPlayHost{position:absolute;inset:0;z-index:35;background:#0b0f12}
 .lfPlayHost iframe{display:block;width:100%;height:100%;border:0}
 .lfPlayLoading{position:absolute;inset:0;display:grid;place-items:center;background:#141b24;color:#e5dfce;font:15px system-ui;pointer-events:none}
-.lfPlayingGame .lfTimeline,.lfPlayingGame .lfInspector{opacity:.55}
+.lfPlayingGame .lfTimeline{opacity:.75}
+.lfPlayTools #pauseGame,.lfPlayTools #stopGame{width:36px;height:30px;padding:4px;line-height:1}
+#pauseGame[aria-pressed=true]{background:#8b743b;color:#fff}
+.lfPlayTools button:disabled{opacity:.4;cursor:default}
+.lfPlayTools #playGame[aria-pressed=true]{opacity:1}
+.lfPlayStatus{border-left:3px solid #a8bd7b;background:#20281d;padding:12px 14px;margin-bottom:14px}
+.lfPlayStatus p{margin:6px 0}.lfPlayStatus #playStatusHint{color:#dec78e}
 :root {
   color-scheme: dark;
   font: 15px/1.6 var(--ui-font);

@@ -10,6 +10,11 @@ export function EncounterSceneSignals(frame) {
 export function EncounterStartBeat(time=0) {
   return FLOW_TIMELINE.find(b=>time<b.end)||FLOW_TIMELINE.at(-1);
 }
+export function EncounterCanPlay(time) {
+  const beat=EncounterStartBeat(time);
+  return beat.start>=BeatById(CONFIG.firstPlayableBeat).start&&!ENCOUNTER_CINEMATICS.includes(beat.id)&&!!CONFIG.gates[beat.id];
+}
+export function EncounterFirstPlayable(){return BeatById(CONFIG.firstPlayableBeat);}
 export function EncounterPlayerYaw(beat) {
   const from=beat.p[0],to=beat.p.find(p=>Distance(p,from)>.1);
   return to?Math.atan2(from[0]-to[0],from[1]-to[1]):Math.PI/2;
@@ -36,11 +41,14 @@ export function EncounterActorSpec(actor,carrier=null) {
 export class EncounterPlayPlan {
   constructor(document=DEFAULT_ENCOUNTER_DOCUMENT,time=0) {
     this.document=ValidateEncounterDocument(structuredClone(document),FLOW_TIMELINE);
-    this.startBeat=EncounterStartBeat(time);
+    this.startBeat=time===0?EncounterFirstPlayable():EncounterStartBeat(time);
+    if(!EncounterCanPlay(this.startBeat.start))throw new Error("镜头动画段暂不支持 Play");
     this.time=this.startBeat.start;this.elapsed=0;this.beatIndex=FLOW_TIMELINE.indexOf(this.startBeat);
+    this.startIndex=this.beatIndex;this.enteredAt=new Map([[this.startBeat.id,0]]);
+    this.beatOrder=new Map(FLOW_TIMELINE.map((beat,index)=>[beat.id,index]));
     this.compiled=CompileEncounters(this.document,FLOW_TIMELINE);
     this.dead=new Set();this.spawned=new Set();this.triggers=new Map();this.groups=new Map();
-    this.interacted=new Set();this.completed=false;this.waiting=null;
+    this.interacted=new Set();this.completed=false;this.waiting=null;this.beatElapsed=0;this.facts=new Set();this.killed=new Set();this.phaseKills=new Set();this.completedBeats=[];this.entryPosition=[...this.startBeat.p[0]];
     const snapshot=EvaluateFlow(this.time,this.document);
     for(const actor of snapshot.actors) if(actor.pose==="dead") this.dead.add(actor.id);
     for(const trigger of this.compiled.triggers) if(trigger.firedAt!==null&&trigger.firedAt<=this.time) this.triggers.set(trigger.id,trigger.firedAt);
@@ -51,42 +59,75 @@ export class EncounterPlayPlan {
       for(let i=0;i<expired;i++) this.dead.add(group.id+"_"+i);
       for(let i=0;i<prior;i++) this.spawned.add(group.id+"_"+i);
     }
-    this.initial=snapshot.actors.filter(a=>!this.dead.has(a.id));
+    // A selected combat keyframe starts its required encounter fresh. Preview
+    // lifetime estimates are not evidence that its required targets were killed.
+    const required=new Set([...(this.gate.clear||[]),...(this.gate.kills?.groups||[])]);
+    for(const id of required){
+      const group=this.groups.get(id);if(group)group.count=0;
+      for(const dead of this.dead)if(dead.startsWith(id+"_"))this.dead.delete(dead);
+      const spec=this.compiled.groups.find(g=>g.id===id),trigger=this.compiled.triggers.find(t=>t.id===spec?.triggerId);
+      if(spec?.enabled&&trigger&&this.beatOrder.get(trigger.endBeat)<this.startIndex)this.triggers.set(trigger.id,0);
+    }
+    for(const id of this.gate.kill||[])this.dead.delete(id);
+    if(this.startBeat.id>="06g")this.facts.add("tank1Destroyed");
+    if(this.startBeat.id>="06i")this.facts.add("tank2Destroyed");
+    this.initial=snapshot.actors.filter(a=>!required.has(a.groupId)&&!this.dead.has(a.id)).map(a=>(this.gate.kill||[]).includes(a.id)?{...a,pose:"shoot",firing:true}:a);
   }
   get beat(){return FLOW_TIMELINE[this.beatIndex];}
-  Frame(){return EvaluateFlow(Math.min(this.time,this.beat.end-0.001),this.document);}
-  Kill(id){this.dead.add(id);}
-  Interact(){this.interacted.add(this.beat.id);if(CONFIG.interactionBeats.includes(this.beat.id))this.time=this.beat.end;}
-  Step(dt,player,aliveIds,conditions={}) {
+  get gate(){return CONFIG.gates[this.beat.id];}
+  Frame(){
+    const frame=EvaluateFlow(Math.min(this.time,this.beat.end-0.001),this.document);
+    for(const a of frame.actors){
+      if((this.gate.kill||[]).includes(a.id)&&!this.dead.has(a.id)){a.pose="shoot";a.firing=true;}
+      if(a.kind==="tank")a.pose=this.facts.has(a.id+"Destroyed")?"burn":"stand";
+    }
+    return frame;
+  }
+  Kill(id){if(!this.dead.has(id)){this.killed.add(id);this.phaseKills.add(id);}this.dead.add(id);}
+  Interact(){this.interacted.add(this.beat.id);}
+  Area(){const trigger=this.gate.target!=="end"&&this.compiled.triggers.find(t=>t.id==="Arrival_"+this.beat.id);return trigger?.area||{shape:"circle",center:this.beat.p.at(-1),size:[(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)*2,(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)*2]};}
+  CanInteract(player){return !!this.gate.action&&InsideArea(player,this.Area())&&!this.interacted.has(this.beat.id);}
+  Step(dt,player,aliveIds,events={}) {
     if(this.completed)return;
     this.elapsed+=dt;
-    this.time=Math.min(this.beat.end,this.time+dt);
+    this.beatElapsed+=dt;this.time=Math.min(this.beat.end-.001,this.beat.start+this.beatElapsed);
     for(const trigger of this.compiled.triggers) {
-      if(this.triggers.has(trigger.id)||this.time<trigger.start||this.time>trigger.end) continue;
+      if(this.triggers.has(trigger.id)||this.beatIndex<this.beatOrder.get(trigger.beat)||this.beatIndex>this.beatOrder.get(trigger.endBeat))continue;
+      const entered=this.enteredAt.get(trigger.beat)??(this.beatOrder.get(trigger.beat)<this.startIndex?BeatById(trigger.beat).start-this.startBeat.start:null);
+      if(entered===null||this.elapsed-entered<trigger.delay)continue;
       if(trigger.mode==="time"||InsideArea(player,trigger.area)) this.triggers.set(trigger.id,this.elapsed);
     }
-    const endpoint=this.beat.p.at(-1), cinematic=ENCOUNTER_CINEMATICS.includes(this.beat.id);
-    const arrivalGate=CONFIG.arrivalGates?.[this.beat.id];
-    const reached=Distance(player,endpoint)<=(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM);
-    const arrivalReady=arrivalGate==="reach"||conditions[arrivalGate];
-    if(arrivalGate&&reached&&arrivalReady)this.time=this.beat.end;
-    const needed=CONFIG.clearGroups[this.beat.id]||[];
-    this.waiting=this.time<this.beat.end?null:!cinematic&&Distance(player,endpoint)>(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)?"reach":
-      arrivalGate&&!arrivalReady?"event":
-      needed.some(id=>{
+    for(const fact of events.facts||[])this.facts.add(fact);
+    const gate=this.gate,waiting=[];
+    if(gate.area&&(!InsideArea(player,this.Area())||Distance(player,this.entryPosition)<.1))waiting.push("reach");
+    if(gate.retreat&&Distance(player,this.beat.p.at(-1))>CONFIG.reachM)waiting.push("retreat");
+    if((gate.kill||[]).some(id=>!this.killed.has(id)))waiting.push("combat");
+    if((gate.clear||[]).some(id=>{
         const group=this.compiled.groups.find(g=>g.id===id);
-        return group?.enabled&&(this.groups.get(id).count<group.count||[...aliveIds].some(actor=>actor.startsWith(id+"_")));
-      })?"combat":
-      CONFIG.interactionBeats.includes(this.beat.id)&&!this.interacted.has(this.beat.id)?"interact":null;
-    if(this.time>=this.beat.end&&!this.waiting) {
-      if(this.beatIndex===FLOW_TIMELINE.length-1){this.completed=true;return;}
-      this.beatIndex++;this.time=this.beat.start;
+        return group?.enabled&&(this.groups.get(id).count<group.count||Array.from({length:group.count},(_,i)=>id+"_"+i).some(actor=>!this.dead.has(actor)));
+      }))waiting.push("combat");
+    if(gate.kills){
+      const available=this.compiled.groups.filter(g=>g.enabled&&gate.kills.groups.includes(g.id)).reduce((sum,g)=>sum+g.count,0);
+      if([...this.killed].filter(id=>gate.kills.groups.some(group=>id.startsWith(group+"_"))).length<Math.min(gate.kills.count,available))waiting.push("combat");
+    }
+    if(gate.action&&!this.interacted.has(this.beat.id))waiting.push("interact");
+    if(gate.fact&&!this.facts.has(gate.fact))waiting.push("event");
+    if(gate.event&&!events[gate.event])waiting.push("event");
+    if(gate.escort&&(events.escorted||0)<gate.escort)waiting.push("escort");
+    if((gate.departed||[]).some(id=>!events.departed?.includes(id)))waiting.push("departure");
+    this.conditions=[...new Set(waiting)];this.waiting=this.conditions[0]||null;
+    if(!this.waiting) {
+      this.completedBeats.push(this.beat.id);
+      let next=this.beatIndex+1;while(next<FLOW_TIMELINE.length&&!EncounterCanPlay(FLOW_TIMELINE[next].start))next++;
+      if(next===FLOW_TIMELINE.length){this.completed=true;return;}
+      for(let index=this.beatIndex+1;index<=next;index++)this.enteredAt.set(FLOW_TIMELINE[index].id,this.elapsed);
+      this.beatIndex=next;this.time=this.beat.start;this.beatElapsed=0;this.phaseKills.clear();this.entryPosition=[...player];
     }
   }
   Spawns(aliveIds) {
     const result=[];
     for(const group of this.compiled.groups) {
-      if(!group.enabled||!this.triggers.has(group.triggerId)||this.time>group.end)continue;
+      if(!group.enabled||!this.triggers.has(group.triggerId)||(this.time>group.end&&![...(this.gate.clear||[]),...(this.gate.kills?.groups||[])].includes(group.id)))continue;
       const state=this.groups.get(group.id),live=[...aliveIds].filter(id=>id.startsWith(group.id+"_")).length;
       if(state.count>=group.count||live>=group.maxAlive||group.reinforceAfterClear&&state.count>=group.maxAlive&&live>0)continue;
       if(this.elapsed-state.lastSpawn<group.interval)continue;
@@ -101,5 +142,5 @@ export class EncounterPlayPlan {
     const group=this.groups.get(actor.groupId);
     if(group){group.count++;group.lastSpawn=this.elapsed;}
   }
-  State(){return {scene:CONFIG.scene,beat:this.beat.id,startBeat:this.startBeat.id,time:this.time,elapsed:this.elapsed,waiting:this.waiting,completed:this.completed,dead:[...this.dead],triggers:[...this.triggers.keys()]};}
+  State(){return {scene:CONFIG.scene,beat:this.beat.id,startBeat:this.startBeat.id,time:this.time,timelineTime:this.beat.start,elapsed:this.elapsed,waiting:this.waiting,conditions:this.conditions||[],completed:this.completed,completedBeats:[...this.completedBeats],dead:[...this.dead],triggers:[...this.triggers.keys()]};}
 }

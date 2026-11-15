@@ -37,7 +37,7 @@
 
 ## 跨系统契约
 
-- **Encounter Play 独立场景（2026-11-15）**：Encounter Designer 与工具栏 Play 共用 `Scenes/FirstLevelEncounter/`，旧 `FirstLevelWhitebox` 和 `FirstLevel` 保留独立。新场景内的 `Data_LevelFlow*` 是编排源，`Data_Play` 是试玩规则与选曲。Play 从当前关键帧或从头开始，默认单视口、最多双视口；停止不回写运行结果。接线与验收见 [Encounter Play](docs/Data_EncounterPlay.md)。
+- **Encounter Play 独立场景（2026-11-15）**：Encounter Designer 与工具栏 Play 共用 `Scenes/FirstLevelEncounter/`，旧 `FirstLevelWhitebox` 和 `FirstLevel` 保留独立。新场景内的 `Data_LevelFlow*` 是编排源，`Data_Play.gates` 是事件过关条件，不能用时间代替。镜头动画段禁用 Play；从头从首个战斗关键帧开始。工具栏播放／暂停／停止，提示放右侧原文，默认单视口、最多双视口；停止不回写运行结果并短时复用已加载资源。接线与验收见 [Encounter Play](docs/Data_EncounterPlay.md)。
 
 - **高级工具拆分（2026-11-12）**：场景编辑器、遭遇设计、Mixamo 动作预览、贴图管理与九个摄影棚类编辑器在 `AdvancedTools/`（本地控制中心 `ControlCenter.html`、独立宿主 `Tool_Studio.html`），口径见 [编辑器套件](docs/Data_EditorSuite.md)「AdvancedTool ControlCenter 与独立工具宿主」。**方向规则：游戏目录的非测试代码不 import `./AdvancedTools/`，唯一例外 `Script_DevToolsSplit.mjs`**；线上发布恒换成 `*Split*Stub`、不含该目录；守门 `Script_DevToolsIsolationTest` + `Script_AdvancedToolsTest`。
 

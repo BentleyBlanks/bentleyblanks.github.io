@@ -22,7 +22,7 @@
 // （抢指针锁、藏枪模、给手榴弹、换枪补给），以及主文件的工具箱 ctx（靶场与白刃实验场的运行时整块读写主文件状态时用）。
 
 import { SANDBOX_RANGES } from "./Data_SandboxRanges.mjs";
-import { ENCOUNTER_PLAY_PHASE, EncounterPlay } from "./Script_EncounterPlaySplit.mjs";
+import { ENCOUNTER_PLAY_PHASE, ENCOUNTER_PLAY_STARTUP, EncounterPlay } from "./Script_EncounterPlaySplit.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { RANGE_PHASE } from "./Data_Range.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
@@ -79,17 +79,18 @@ function FireRangeOptions(h) {
 
 const PLUGINS = {
   encounterPlay: {
-    phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField,
+    phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) {
       const runtime=new EncounterPlay(h);
       return Instance(runtime,{
         debugName:"EncounterPlay",updateSlot:"beforeAi",holdsRespawn:true,
-        ScaleDt:dt=>runtime.ready&&!runtime.failed&&!runtime.plan.completed?dt:0,
+        ScaleDt:dt=>runtime.active&&runtime.ready&&!runtime.paused&&!runtime.failed&&!runtime.plan.completed?dt:0,
         CapturesInput:()=>runtime.CapturesInput(),
         OnKey:detail=>runtime.OnKey(detail),
-        OnPlayerDown:()=>{runtime.failed=true;runtime.RenderHud();return true;},
+        OnPlayerDown:()=>{runtime.failed=true;runtime.RenderHud();runtime.Send("state",{state:runtime.State()});return true;},
         ViewportSize:()=>runtime.view.Size(),
         AfterRender:(dt,options)=>runtime.AfterRender(dt,options),
+        Warmup:onStep=>runtime.Warmup(onStep),
       });
     },
   },

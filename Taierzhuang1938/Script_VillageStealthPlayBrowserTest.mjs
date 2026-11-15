@@ -64,7 +64,7 @@ try {
   const concealed=await page.evaluate(()=>{Tengxian.StepFrames(1800,1/60,false);return Tengxian.Debug.EncounterPlay.State();});
   assert.ok(!concealed.failed&&!concealed.stealth.alarm,"waiting in the authored cover stays safe for the full search");
   assert.equal(concealed.actors.filter(actor=>actor.group==="TempleSearch"&&actor.alive).length,2);
-  assert.match(await page.locator(".encounterPlayHud").innerText(),/禁止开火/);
+  assert.match(await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State().hints.task),/禁止开火/);
   const fired=await page.evaluate(()=>{
     const g=Tengxian;g.player.yaw=0;g.player.pitch=0;g.StepFrames(4,1/60,false);
     const ammo=g.state.ammo;g.Debug.Fire();g.StepFrames(2,1/60,false);
@@ -74,8 +74,8 @@ try {
   assert.equal(fired.state.stealth.reason,"shot");
   state=await page.evaluate(()=>{Tengxian.StepFrames(156,1/60,false);Tengxian.StepFrames(1,0,true);return Tengxian.Debug.EncounterPlay.State();});
   assert.ok(state.failed);
-  assert.match(await page.locator(".encounterPlayHud").innerText(),/后送通道被封锁/);
-  assert.match(await page.locator(".encounterHint").innerText(),/R/);
+  assert.match(await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State().hints.task),/后送通道被封锁/);
+  assert.match(await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State().hints.hint),/R/);
   await page.screenshot({path:path.join(out,"Scene_ActualTempleFailure.png"),timeout:120000});
   console.log("ok real pull, input release and gunshot failure");
   await page.evaluate(()=>Tengxian.Debug.Key("KeyR"));
@@ -119,6 +119,8 @@ try {
   let game=page.frames().find(frame=>frame.url().includes("encounterPlay=1"));
   await game.evaluate(()=>{Tengxian.player.yaw=0;Tengxian.player.pitch=0;Tengxian.StepFrames(4,1/60,false);Tengxian.Debug.Fire();});
   await page.waitForFunction(()=>document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian?.Debug.EncounterPlay.State().failed,null,{timeout:30000});
+  await page.waitForFunction(()=>document.querySelector("#playStatusTask")?.textContent.includes("后送通道被封锁"));
+  assert.equal(await game.locator(".encounterPlayHud").count(),0,"failure hints stay in the editor source pane");
   await game.evaluate(()=>Tengxian.Debug.Key("KeyR"));
   await page.waitForFunction(()=>{
     const game=document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian;
@@ -127,7 +129,7 @@ try {
   },null,{timeout:420000});
   assert.equal((await Playing()).stealth.alarm,false);
   await page.screenshot({path:path.join(out,"Scene_EditorPlayRetry.png"),timeout:120000});
-  await page.locator("#playGame").click();
+  await page.locator("#stopGame").click();
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),editor.time);
   assert.equal(await page.evaluate(()=>JSON.stringify(LevelFlow.Inspect().document)),editor.document);
   console.log("ok editor Play retries automatically and Stop restores the untouched authoring snapshot");

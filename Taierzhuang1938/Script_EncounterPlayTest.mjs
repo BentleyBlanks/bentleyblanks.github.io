@@ -1,16 +1,50 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {EncounterPlayPlan,EncounterStartBeat,EncounterActorSpec,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
 import {FLOW_TIMELINE,DEFAULT_ENCOUNTER_DOCUMENT,BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import {FIRST_LEVEL_MUSIC_CUES} from "./Data_FirstLevelMissionMusic.mjs";
 import {WEAPONS} from "./Data_Weapons.mjs";
 import {ValidateScene} from "./Script_SceneDoc.mjs";
 import {SceneSurfaceSampler} from "./Script_SceneSurface.mjs";
+import {PrepareSceneTerrain,GridSampler} from "./Script_SceneTrenches.mjs";
 import {EncounterDocument,ENCOUNTER_STORAGE_KEY} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
+import {ENCOUNTER_CINEMATICS} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 for(const beat of FLOW_TIMELINE) {
+  if(beat.start>=EncounterFirstPlayable().start&&!ENCOUNTER_CINEMATICS.includes(beat.id))assert.ok(C.gates[beat.id],"Missing gameplay gate: "+beat.id);
+  if(!EncounterCanPlay(beat.start)){assert.throws(()=>new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+.01));continue;}
   const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+beat.duration/2);
   assert.equal(plan.time,beat.start);assert.equal(plan.beat.id,beat.id);
+  plan.Step(beat.duration*10,[500,500],new Set(plan.initial.map(a=>a.id)));
+  assert.equal(plan.beat.id,beat.id,beat.id+": elapsed time alone never advances a stage");
+  assert.equal(plan.State().timelineTime,beat.start);
   assert.ok(EncounterActorSpec({id:"unit",kind:"person",side:"enemy",p:[0,0]}).weapon in WEAPONS);
+}
+assert.equal(new EncounterPlayPlan().beat.id,"02g");
+assert.equal(EncounterFirstPlayable().id,"02g");
+{
+ const doc=structuredClone(DEFAULT_ENCOUNTER_DOCUMENT),beat=BeatById("03b");
+ const trigger=doc.triggers.find(t=>t.id==="Trigger_Fork");trigger.mode="time";trigger.delay=beat.duration+5;
+ const plan=new EncounterPlayPlan(doc,beat.start);
+ plan.Step(beat.duration,[0,0],new Set());assert.ok(!plan.triggers.has(trigger.id));
+ plan.Step(6,[0,0],new Set());assert.ok(plan.triggers.has(trigger.id),"A held stage still runs its real spawn timer");
+ assert.equal(plan.beat.id,"03b");
+}
+for(const beat of FLOW_TIMELINE.filter(b=>EncounterCanPlay(b.start))){
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start),gate=plan.gate;
+ for(const id of gate.kill||[]){assert.ok(plan.initial.some(a=>a.id===id));plan.Kill(id);}
+ for(const id of gate.clear||[]){
+   const group=plan.compiled.groups.find(g=>g.id===id);assert.ok(group,"Unknown clear target "+id);
+   plan.groups.get(id).count=group.count;for(let i=0;i<group.count;i++)plan.Kill(id+"_"+i);
+ }
+ if(gate.kills)for(const id of gate.kills.groups){const group=plan.compiled.groups.find(g=>g.id===id);assert.ok(group);for(let i=0;i<group.count;i++)plan.Kill(id+"_"+i);}
+ if(gate.action)plan.Interact();
+ const point=gate.retreat?beat.p.at(-1):plan.Area().center;
+ plan.Step(0,point,new Set(),{facts:gate.fact?[gate.fact]:[],escorted:gate.escort||0,departed:gate.departed||[],[gate.event]:true});
+ assert.ok(plan.completed||plan.beat.id!==beat.id,"Declared completion conditions must be satisfiable: "+beat.id);
+}
+{
+ const p=new EncounterPlayPlan();p.Step(999,p.beat.p[0],new Set(["opening4"]));assert.equal(p.beat.id,"02g");
+ p.Kill("opening4");p.Step(0,p.beat.p[0],new Set());assert.equal(p.beat.id,"02h");
 }
 for(const cue of Object.values(C.music))assert.ok(FIRST_LEVEL_MUSIC_CUES[cue],cue);
 assert.ok(WEAPONS[C.startWeapon]);
@@ -42,11 +76,21 @@ const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
   plan.Step(50,[0,0],new Set([first.id]));
   assert.ok(!plan.Spawns(new Set([first.id])).some(a=>a.groupId==="Fork"),"Living soldier blocks replacement beyond preview expiry");
   plan.Kill(first.id);const second=plan.Spawns(new Set()).find(a=>a.groupId==="Fork");assert.ok(second);assert.notEqual(second.id,first.id);
+  plan.Spawned(second);plan.Step(500,[0,0],new Set());assert.equal(plan.beat.id,"03b","Disappearing without death is not a kill");
+  plan.Kill(second.id);plan.Step(0,[0,0],new Set());assert.equal(plan.beat.id,"03c","Recorded kills advance immediately");
 }
 {
-  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("01d").start);
-  plan.Step(31,plan.beat.p[0],new Set());assert.equal(plan.waiting,"interact");
-  plan.Interact();plan.Step(0,plan.beat.p[0],new Set());assert.equal(plan.beat.id,"01e");
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("02i").start);
+  plan.Step(999,plan.beat.p[0],new Set());assert.equal(plan.waiting,"interact");
+  plan.Interact();plan.Step(0,plan.beat.p[0],new Set());assert.equal(plan.beat.id,"03a");
+  const goal=plan.Area().center;plan.Step(0,goal,new Set());assert.equal(plan.beat.id,"03b","Actual area arrival advances without waiting for the authored duration");
+}
+{
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start);
+ plan.Interact();plan.Step(999,plan.beat.p[0],new Set());assert.equal(plan.beat.id,"03d","Throwing alone cannot substitute for detonation");
+ plan.Step(0,plan.beat.p[0],new Set(),{facts:["grenadeReturned"]});assert.equal(plan.beat.id,"03e");
+ const skip=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("08e").start);
+ skip.Step(0,skip.Area().center,new Set());assert.equal(skip.beat.id,"08g","Camera animation 08F is never played");
 }
 assert.equal(JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT),original,"Play does not mutate authoring data");
 {
@@ -77,4 +121,13 @@ assert.ok(scene.objects.some(o=>o.meta?.planning&&o.solid),"Authored encounter c
 assert.ok(scene.surface.ramps.length>0&&scene.surface.pockets.length>0);
 const surface=SceneSurfaceSampler({pockets:[],ramps:[{points:[[0,0],[0,10]],width:2,from:0,to:2}]},()=>3);
 assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0,10),2);assert.equal(surface(20,5),3);
+{
+ const terrain={minX:-30,minZ:-30,cols:120,rows:120,cellM:.5};
+ const pre=Float32Array.from({length:121*121},(_,i)=>Math.sin(i*.02)*.1+3);
+ const patches={pockets:[{box:[2,4,2,4],height:1,featherM:1.5}],ramps:[{points:[[0,0],[0,10]],width:2,from:0,to:2}]};
+ const sample=SceneSurfaceSampler(patches,GridSampler(terrain,pre)),reference=new Float32Array(pre);
+ for(let z=0;z<=120;z++)for(let x=0;x<=120;x++)reference[z*121+x]=sample(-30+x*.5,-30+z*.5);
+ const actual=PrepareSceneTerrain({terrain,surface:patches},pre).heights;
+ assert.deepEqual(actual,reference,"Bounded surface work preserves every height sample");
+}
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music and independent scene");

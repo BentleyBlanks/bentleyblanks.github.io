@@ -9,13 +9,19 @@ import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
 import { LoadToolsVolume, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
+import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
+import { XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { PrepareWoundVariants } from "./Script_CharacterWounds.mjs";
+import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
+import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
+import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 const UI=CONFIG.ui;
 export class EncounterPlay {
   constructor(host) {
-    this.host=host;this.entries=new Map();this.failed=false;this.ready=false;this.disposed=false;
-    this.orderClock=0;this.lastBeat=null;this.music=null;this.lastStateSent=0;this.smoke=new Map();
+    this.host=host;this.hostId=crypto.randomUUID();this.entries=new Map();this.failed=false;this.ready=false;this.disposed=false;this.active=true;this.paused=false;this.starting=false;this.initialized=false;
+    this.orderClock=0;this.lastBeat=null;this.music=null;this.lastStateSent=0;this.smoke=new Map();this.pendingActions=new Map();this.retiredMaterials=new DeferredMaterialDispose();this.warmedSignatures=new Set();
     let payload=null;
     try {payload=JSON.parse(sessionStorage.getItem(PAYLOAD_KEY)||"null");}catch{}
     this.plan=new EncounterPlayPlan(payload?.document||DEFAULT_ENCOUNTER_DOCUMENT,payload?.time||0);
@@ -25,23 +31,20 @@ export class EncounterPlay {
     this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
     this.token=payload?.token||"standalone";
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,
-      groundAt:(x,z)=>host.battlefield.GroundHeight(x,z),formalOnly:true});
+      groundAt:(x,z)=>host.battlefield.GroundHeight(x,z),formalOnly:true,
+      characterKeys:[...new Set([...Object.values(CONFIG.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
     this.view=new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
     this.BuildUi();
     this.api={State:()=>this.State(),SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
-      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:()=>this.RetryStealth(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
-    this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);this.status.textContent=UI.loadFailed;console.error(error);this.Send("error",{message:String(error.message||error)});});
+      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:()=>this.RetryStealth(),Begin:p=>this.Begin(p),Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
+    this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);console.error(error);this.Send("error",{message:String(error.message||error)});});
   }
   BuildUi() {
     document.body.classList.add("encounterGame");
-    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261115TemplePlay",import.meta.url).href;document.head.append(this.style);
-    this.panel=document.createElement("section");this.panel.className="encounterPlayHud";
-    this.title=document.createElement("strong");this.status=document.createElement("div");
+    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261115PlayRuntimeV2",import.meta.url).href;document.head.append(this.style);
     this.dialogue=document.createElement("div");this.dialogue.className="encounterDialogue";
-    this.hint=document.createElement("div");this.hint.className="encounterHint";
-    this.stop=document.createElement("button");this.stop.textContent=UI.stop;this.stop.onclick=()=>this.RequestStop();
-    this.panel.append(this.title,this.status,this.stop);document.body.append(this.panel,this.dialogue,this.hint);
+    document.body.append(this.dialogue);
     this.onMessage=e=>{
       if(e.source!==window.parent||e.origin!==location.origin||e.data?.token!==this.token)return;
       if(e.data.type==="encounter-play-layout")this.view.SetLayout(e.data.count);
@@ -55,6 +58,7 @@ export class EncounterPlay {
     await this.puppets.xbot.Load();
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
+    for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
     const frame=EvaluateFlow(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
@@ -67,9 +71,92 @@ export class EncounterPlay {
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
     this.stealth.Reset();
-    this.ready=true;this.Update(0);this.Send("ready");
+    this.initialized=true;this.ready=true;this.Update(0);
+    this.puppets.Settle(40,.05,this.host.player.position);this.SetPlayerPuppetVisible(false);
+    this.Send("ready");
+  }
+  async Begin(payload) {
+    if(this.disposed)throw new Error("Play host disposed");
+    if(this.active||this.ready||this.entries.size||this.pendingActions.size)this.Suspend();
+    else this.view.SetLayout(1);
+    this.starting=true;this.active=true;this.token=payload.token;
+    const token=this.token;
+    this.plan=new EncounterPlayPlan(payload.document,payload.time);
+    this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
+    this.checkpointInventory=payload.checkpointInventory||null;this.checkpointTime=null;this.alarmAnnounced=false;
+    this.failed=false;this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
+    this.host.ctx.RespawnPlayer(true);
+    this.host.state.deathTimer=0;this.host.state.playerShots=0;this.host.state.lastShot=null;
+    this.host.hud.HideDeathCard?.();this.host.viewmodel.ResetDeath?.();
+    this.readyPromise=this.Load();await this.readyPromise;
+    if(!this.active||this.token!==token)return false;
+    await this.Warmup(this.onWarmStep);
+    if(!this.active||this.token!==token)return false;
+    this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
+    this.starting=false;this.host.ctx.menu?.Close();this.host.state.menu=false;this.host.state.running=true;
+    this.host.audio.SetPaused(false);this.host.audio.ctx?.resume().catch(()=>{});
+    this.host.ctx.RenderScene(0);this.Send("state",{state:this.State()});return true;
+  }
+  Pause(on=!this.paused) {
+    if(!this.active||!this.ready||this.starting)return false;
+    this.paused=!!on;this.host.state.running=!this.paused;
+    this.host.audio.SetPaused(this.paused);
+    if(this.paused){this.host.ctx.ReleasePointerLock();this.host.audio.ctx?.suspend();}
+    else{this.host.ctx.menu?.Close();this.host.state.menu=false;this.host.audio.ctx?.resume();}
+    this.Send("state",{state:this.State()});return this.paused;
+  }
+  Suspend() {
+    this.active=false;this.paused=false;this.ready=false;this.host.state.running=false;
+    this.host.ctx.ReleasePointerLock();this.host.audio.ResetSession();this.host.audio.ctx?.suspend();
+    this.retiredMaterials.Collect(()=>{
+      this.host.ctx.gore?.ReleaseAll();this.host.ctx.meleeCombat?.Reset();
+      this.host.combat.ClearProjectiles();this.host.interact.Clear();this.host.interact.ClearGroundWeapons();this.host.ctx.ClearLooseGuns();
+      for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
+      this.entries.clear();this.host.ai.tactics.Reset();
+      for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);this.smoke.clear();this.pendingActions.clear();
+      this.puppets.Clear();this.host.vfx.ClearParticles();this.host.battlefield.deformation?.Reset();
+    });
+    this.view.SetLayout(1);this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
+    this.dialogue.replaceChildren();this.dialogue.hidden=true;this.stealth.Reset();
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
+  async Warmup(onStep) {
+    this.onWarmStep=onStep;
+    await this.readyPromise;
+    if(!this.ready)throw new Error(this.error||"Encounter assets not ready");
+    const {host}=this,start=performance.now(),wasWarming=host.state.warming;
+    const signature=JSON.stringify([this.plan.startBeat.id,host.ctx.graphics,
+      [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
+      this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
+    const retained=this.warmedSignatures.has(signature);
+    const group=new THREE.Group();group.name="EncounterWarmExtras";
+    AddGoreWarmProxies(group,[...this.entries.values()].map(e=>e.soldier.actor));
+    if(host.viewmodel.CreateActionDebrisWarmProxy)group.add(host.viewmodel.CreateActionDebrisWarmProxy());
+    host.scene.add(group);host.state.warming=true;
+    const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch};
+    try {
+      host.ai.PrepareCrowd(["nra","ija"]);
+      if(retained)host.ctx.CompileAsRendered(host.scene);
+      else await host.ctx.WarmupShaders(host.scene,onStep,null,options);
+      const restore=PrepareWoundVariants(host.scene);
+      try{if(retained)host.ctx.CompileAsRendered(host.scene);else await host.ctx.WarmupShaders(host.scene,onStep,null,options);}finally{restore();}
+      if(retained)host.ctx.RenderScene(0);
+    } catch(error) {
+      this.error=String(error.stack||error);this.ready=false;this.Send("error",{message:String(error.message||error)});throw error;
+    } finally {
+      group.removeFromParent();
+      for(const child of group.children)if(child.isMesh&&child.name.startsWith("GoreWarm_Part_"))child.geometry.dispose();
+      host.state.warming=wasWarming;
+    }
+    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length};
+    this.warmedSignatures.add(signature);this.FlushRetired();
+  }
+  FlushRetired() {
+    const host=this.host;
+    const inUse=new Set(),visit=o=>{for(const m of [o.material,o.customDepthMaterial,o.customDistanceMaterial].flat())if(m)inUse.add(m);};
+    host.scene.traverse(visit);for(const kit of this.puppets.xbot.kits.values())kit.source.traverse(visit);
+    this.retiredMaterials.Flush(inUse);
+  }
   VisibleSpawn(actor) {
     const {camera,battlefield}=this.host;
     camera.updateMatrixWorld();
@@ -89,8 +176,10 @@ export class EncounterPlay {
     if(this.entries.has(actor.id)||this.plan.dead.has(actor.id))return false;
     if(!initial&&actor.side==="enemy"&&this.VisibleSpawn(actor))return false;
     const spec=EncounterActorSpec(actor),group=actor.group||this.plan.compiled.groups.find(g=>g.id===actor.groupId);
+    let hash=2166136261;for(const c of actor.id)hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
+    const variants=CHARACTER_RANDOM_VARIANTS_BY_KIND[spec.side];
     const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,
-      navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),...SpeakingCastOptions(spec.castId)});
+      navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),modelVariant:variants[hash%variants.length],...SpeakingCastOptions(spec.castId)});
     if(!soldier)return false;
     const skin=spec.castId||spec.side==="ija"?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
     if(skin)this.host.ai.view.SetSkin(soldier,skin);
@@ -111,7 +200,7 @@ export class EncounterPlay {
     const prior=initial?Math.max(0,this.plan.time-(group?.lives[index]?.born??this.plan.time)):0;
     const waitUntil=group?.id==="TempleSearch"?(this.templeEnteredAt??Infinity)+(member?.delay||0)
       :this.plan.elapsed+Math.max(0,deployment-prior);
-    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,
+    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,engaged:!!actor.firing||["shoot","melee"].includes(actor.pose),
       routeWaits:member?.waitSeconds||[],waitedIndex:-1,waitUntil});
     if(!initial)this.plan.Spawned(actor);
     return true;
@@ -138,8 +227,8 @@ export class EncounterPlay {
       if(this.plan.elapsed<entry.waitUntil&&!this.stealth.state?.alarm)target=[soldier.position.x,soldier.position.z];
     }
     moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
-    let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:
-      !!current?.firing||current?.pose==="shoot"||current?.pose==="melee";
+    entry.engaged ||= !!current?.firing||current?.pose==="shoot"||current?.pose==="melee";
+    let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:entry.engaged;
     if(this.stealth.state?.alarm && entry.spec.side==="ija")combat=true;
     if(group?.suppressedBy?.some(id=>[...this.entries.values()].some(e=>e.actor.groupId===id&&e.soldier.alive&&e.soldier.targetVisible))) {
       if(group.suppressionStop)target=group.suppressionStop;
@@ -161,11 +250,11 @@ export class EncounterPlay {
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7)});
   }
   Update(dt) {
-    if(!this.ready||this.disposed)return;
+    if(!this.active||this.paused||!this.ready||this.disposed)return;
     if(this.failed){this.RenderHud();return;}
     const {player,state}=this.host;
     for(const [id,entry] of this.entries)if(!entry.soldier.alive)this.plan.Kill(id);
-    if(!player.Alive){this.failed=true;this.host.audio.Music(null,{fadeOut:0.2});this.RenderHud();return;}
+    if(!player.Alive){const changed=!this.failed;this.failed=true;this.host.audio.Music(null,{fadeOut:0.2});this.RenderHud();if(changed)this.Send("state",{state:this.State()});return;}
     const alive=this.AliveIds();
     const before=this.plan.Frame();
     const stealth=this.stealth.Update(before,dt,this.entries);
@@ -185,7 +274,14 @@ export class EncounterPlay {
       this.host.ai.NoteStimulus("gunshot",player.position,{side:"nra",isPlayer:true,ref:player,loudnessM:30});
     }
     const previousBeat=this.plan.beat.id;
-    if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{partyArrived:this.PartyAtEndpoint()});
+    const departed=[];
+    for(const group of this.plan.compiled.groups){
+      const entries=[...this.entries.values()].filter(e=>e.actor.groupId===group.id);
+      if(this.plan.groups.get(group.id).count>=group.count&&entries.every(e=>!e.soldier.alive||e.route&&e.routeIndex===e.route.length-1&&Math.hypot(e.soldier.position.x-e.route.at(-1)[0],e.soldier.position.z-e.route.at(-1)[1])<CONFIG.routeReachM))departed.push(group.id);
+    }
+    const escorted=[...this.puppets.puppets.values()].filter(p=>/^stretcher\d+$/.test(p.id)&&p.z>=CONFIG.escortExitZ).length;
+    const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
+    if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
     const frame=this.plan.Frame();
     if(previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
       this.templeEnteredAt=this.plan.elapsed;
@@ -208,10 +304,6 @@ export class EncounterPlay {
         Object.assign(actor,{p:source.p,pose:source.pose,heading:source.heading,status:source.status});
       }
     }
-    if(previousBeat!==this.plan.beat.id&&ENCOUNTER_CINEMATICS.includes(this.plan.beat.id)) {
-      const p=this.plan.beat.p[0];player.position.set(p[0],this.host.battlefield.GroundHeight(...p),p[1]);
-      player.body?.Teleport(player.position.x,player.position.y,player.position.z);
-    }
     const signals=EncounterSceneSignals(frame);signals.add("Stage0105Done");
     const signalKey=[...signals].join(",");
     if(this.signalKey!==signalKey){
@@ -223,7 +315,7 @@ export class EncounterPlay {
     for(const actor of this.plan.Spawns(alive))this.Spawn(actor);
     this.orderClock-=dt;
     if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=CONFIG.orderEveryS;}
-    const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)).map(a=>{
+    const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)&&!this.plan.groups.has(a.groupId)).map(a=>{
       const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId));
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
       if(a.kind==="litter")spec.kind="litter";
@@ -264,9 +356,23 @@ export class EncounterPlay {
     });
   }
   Interact() {
-    if(!this.ready||this.failed||this.plan.completed)return false;
-    const end=this.plan.beat.p.at(-1),p=this.host.player.position;
-    if(Math.hypot(p.x-end[0],p.z-end[1])>CONFIG.reachM)return false;
+    if(!this.active||this.paused||!this.ready||this.failed||this.plan.completed)return false;
+    const p=this.host.player.position;
+    if(!this.plan.CanInteract([p.x,p.z]))return false;
+    const action=this.plan.gate.action;
+    if(action==="returnGrenade"){
+      const projectile=this.host.combat.Throw("Grenade",.6,this.host.player.EyePosition,this.host.camera.getWorldDirection(new THREE.Vector3()),0);
+      if(!projectile)return false;this.pendingActions.set("grenadeReturned",projectile);
+    }
+    if(action==="plantFirst"||action==="plantSecond"){
+      if(this.host.state.bundles<=0)return false;
+      const id=action==="plantFirst"?"tank1":"tank2",tank=this.plan.Frame().actors.find(a=>a.id===id);
+      if(!tank)return false;
+      const pos=new THREE.Vector3(tank.p[0],this.host.battlefield.GroundHeight(...tank.p)+.2,tank.p[1]);
+      const projectile=this.host.combat.Throw("GrenadeBundle",0,pos,new THREE.Vector3(0,-1,0),0,{handRelease:true});
+      if(!projectile)return false;this.host.state.bundles--;this.pendingActions.set(id+"Destroyed",projectile);
+    }
+    if(action==="bandageWinter"){if(this.host.player.bandages<=0)return false;this.host.player.bandages--;}
     this.plan.Interact();
     return true;
   }
@@ -280,24 +386,25 @@ export class EncounterPlay {
       }
       return true;
     }
-    if(detail.code==="KeyF"&&detail.down!==false&&CONFIG.interactionBeats.includes(this.plan.beat.id))return this.Interact();
+    if(detail.code==="KeyF"&&detail.down!==false&&this.plan.gate.action)return this.Interact();
   }
   RenderHud(frame=this.plan.Frame()) {
     const currentTask=frame.beat.id==="09b"&&this.stealth.exitStartedElapsed!==null?UI.templeExit:this.plan.beat.task;
     const task=this.stealth.state?.active?`${currentTask} · ${UI.stealthNoFire}`:currentTask;
     const title=this.plan.beat.id.toUpperCase()+" · "+this.plan.beat.title;
-    const status=this.failed && this.stealth.state?.active ? this.stealth.state.failure
+    const status=this.failed && this.stealth.state?.active ? (this.stealth.state.failure||UI.dead)
       : this.failed?UI.dead:this.stealth.state?.alarm?UI.stealthAlarm:this.stealth.state?.suspicion>0?UI.stealthSuspicion:this.plan.completed?UI.complete:task;
-    const p=this.host.player.position,end=this.plan.beat.p.at(-1),distance=Math.hypot(p.x-end[0],p.z-end[1]);
-    const hint=this.failed && this.stealth.state?.active ? UI.stealthRetry : this.failed?UI.retry:this.stealth.state?.locked?UI.stealthPull:
-      frame.beat.id==="09b"&&distance<=CONFIG.reachM&&!this.PartyAtEndpoint()?UI.waitParty:
-      this.stealth.state?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?UI.stealthWait:this.plan.completed?UI.stop:
-      CONFIG.interactionBeats.includes(this.plan.beat.id)&&distance<CONFIG.reachM?UI.interact:
-      this.plan.waiting==="combat"?UI.clear:distance>CONFIG.reachM?UI.reach+" "+distance.toFixed(0)+" m":"";
+    const p=this.host.player.position,end=this.plan.gate.retreat&&this.plan.interacted.has(this.plan.beat.id)?this.plan.beat.p.at(-1):this.plan.Area().center,distance=Math.hypot(p.x-end[0],p.z-end[1]);
+    const hint=this.failed&&this.stealth.state?.active?UI.stealthRetry:this.stealth.state?.locked?UI.stealthPull:frame.beat.id==="09b"&&distance<=CONFIG.reachM&&!this.PartyAtEndpoint()?UI.waitParty:this.stealth.state?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?UI.stealthWait:this.failed?UI.retry:this.plan.completed?UI.stop:
+      this.plan.CanInteract([p.x,p.z])?UI.interact:
+      this.plan.waiting==="combat"?UI.clear:this.plan.waiting==="event"?UI.event:this.plan.waiting==="escort"?UI.escort:this.plan.waiting==="departure"?UI.departure:distance>CONFIG.reachM?UI.reach+" "+distance.toFixed(0)+" m":"";
     const dialogue=frame.dialogue.filter(line=>!this.plan.dead.has(line.actorId));
-    const key=JSON.stringify([title,status,hint,dialogue]);
+    const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
+    const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
+    const help=[hint,actions,notice].filter(Boolean).join(" · ");
+    const key=JSON.stringify([title,status,help,dialogue]);
     if(key===this.hudKey)return;this.hudKey=key;
-    this.title.textContent=title;this.status.textContent=status;this.hint.textContent=hint;
+    this.hudInfo={title,task:status,hint:help};
     this.dialogue.replaceChildren();
     for(const line of dialogue) {
       const row=document.createElement("p");row.textContent=line.name+"："+line.text;this.dialogue.append(row);
@@ -307,13 +414,13 @@ export class EncounterPlay {
   AfterRender(dt,options){this.view.Render(dt,options,()=>this.SetPlayerPuppetVisible(true),()=>this.SetPlayerPuppetVisible(false));}
   RequestStop(){if(window.parent!==window)this.Send("stop");else history.back();}
   Send(kind,extra={}){if(window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
-  Actors(){return [...this.entries].map(([id,e])=>({id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor.characterRig?.modelId,group:e.actor.groupId||null}));}
+  Actors(){return [...this.entries].map(([id,e])=>({id,soldierId:e.soldier.id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor?.characterRig?.modelId,group:e.actor.groupId||null}));}
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
-  State(){return {...this.plan.State(),ready:this.ready,error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors()};}
+  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors()};}
   CapturesInput() {
-    return !this.ready || this.failed || this.stealth.CapturesInput()
+    return !this.active || this.paused || this.starting || !this.ready || this.failed || this.stealth.CapturesInput()
       || VillageStealthAt(this.plan.time,FLOW_TIMELINE).locked
       || this.view.count===2&&this.view.focused;
   }
@@ -330,13 +437,14 @@ export class EncounterPlay {
     if(saved.wounds)player.wounds=structuredClone(saved.wounds);
   }
   RetryStealth() {
-    if(!this.failed || !this.stealth.state?.active)return false;
+    if(!this.active || this.paused || !this.failed || !this.stealth.state?.active)return false;
     const plan=new EncounterPlayPlan(this.plan.document,this.stealth.state.checkpoint);
     const {player,state,combat,battlefield,vfx,ctx}=this.host;
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     this.entries.clear();
     this.puppets.SyncFrame([],0);
     combat.ClearProjectiles();
+    this.pendingActions.clear();
     battlefield.deformation?.Reset();
     vfx.ClearParticles();
     vfx.ClearGroundImpacts();
@@ -357,6 +465,7 @@ export class EncounterPlay {
     ctx.viewmodel.root.visible=true;
     this.stealth.Reset();
     for(const actor of plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
+    this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
     this.Update(0);
     return true;
   }
@@ -366,7 +475,8 @@ export class EncounterPlay {
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);
     this.entries.clear();this.puppets.Dispose();window.removeEventListener("message",this.onMessage);
-    for(const node of [this.panel,this.dialogue,this.hint,this.style])node.remove();
+    this.retiredMaterials.Flush();
+    for(const node of [this.dialogue,this.style])node.remove();
     document.body.classList.remove("encounterGame");
   }
 }

@@ -220,7 +220,11 @@ export function PrepareSceneTerrain(doc, pre, datumBytes = null) {
     const sample=SceneSurfaceSampler(doc.surface,GridSampler(doc.terrain,heights));
     const {cols,rows,minX,minZ,cellM}=doc.terrain;
     const patched=new Float32Array(heights);
-    for(let z=0;z<=rows;z++) for(let x=0;x<=cols;x++) patched[z*(cols+1)+x]=sample(minX+x*cellM,minZ+z*cellM);
+    for(const region of sample.regions) {
+      const x0=Math.max(0,Math.floor((region.minX-minX)/cellM)),x1=Math.min(cols,Math.ceil((region.maxX-minX)/cellM));
+      const z0=Math.max(0,Math.floor((region.minZ-minZ)/cellM)),z1=Math.min(rows,Math.ceil((region.maxZ-minZ)/cellM));
+      for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)patched[z*(cols+1)+x]=sample(minX+x*cellM,minZ+z*cellM);
+    }
     heights=patched;
   }
   return { heights, pre, plan, datum };

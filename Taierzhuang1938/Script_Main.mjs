@@ -998,12 +998,15 @@ const ctx = {
   AirColumnEnteredRoad,
   ApplyDebugOptions,
   ApplyGraphics,
+  WarmupShaders,
+  CompileAsRendered,
   SuspendScreenSpaceForProbe,
   BlockoutInputCaptured,
   BuildGroundWeaponView,
   CallMortar,
   ClearAiDebugOverlay,
   ClearFirearmRequests,
+  ClearLooseGuns,
   CountOpenDirections,
   DoMelee,
   EndBattle,
@@ -1528,7 +1531,7 @@ async function Boot() {
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep(T("boot.step.physics"), BOOT.progress.physics);
-  await Promise.all([InitPhysics(), SANDBOX_STARTUP ? null : PrepareCraterDebris(library)]);
+  await Promise.all([InitPhysics(), SANDBOX_STARTUP && !SANDBOX_STARTUP.craterDebris ? null : PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
@@ -1566,7 +1569,7 @@ async function Boot() {
   // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
-  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP });
+  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false });
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
@@ -3874,8 +3877,9 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   // 人物材质预热（见 WarmActorShaders 的抬头）：加载画面还盖着，在这里把全阵营
   // 每个模型号的 program 先编出来，换人 / 某个模型号第一次进画面就不再冻那一两秒。
   try {
-    await WarmActorShaders(phase,
-      (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)));
+    const onWarmStep=(label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress));
+    if(sandbox?.Warmup) await sandbox.Warmup(onWarmStep);
+    else await WarmActorShaders(phase,onWarmStep);
   } catch (error) {
     console.warn("[Main] 人物材质预热失败（退回用到时现编）", error);
   }
@@ -4032,7 +4036,7 @@ function SelectShaderRepresentatives(objects, seen) {
  * @param {THREE.Object3D|null} root 要预热的子树
  * @param {(label: string, progress: number) => void|null} onStep 进度回调（null = 不报）
  */
-async function WarmupShaders(root, onStep = null, shouldStop = null) {
+async function WarmupShaders(root, onStep = null, shouldStop = null, options = {}) {
   if (!root) return 0;
   // 挑代表按材质认「热没热」：视模网格上还挂着源材质（多半已被人物编过）就会被跳过，
   // 自阴影那份克隆一直没人交。先换成出画那一份再挑（CompileAsRendered ③）。
@@ -4095,7 +4099,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
     const submitList = picks.concat(outsidePicks);
     // Keep the driver queue short enough that grabbing the paper can stop the
     // next batch before dozens of pending shader compiles saturate the GPU.
-    const SUBMIT = 4;
+    const SUBMIT = options.submitBatch || 4;
     for (let i = 0; i < submitList.length; i += SUBMIT) {
       const proxy = new THREE.Group();
       // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的

@@ -152,6 +152,7 @@ function PopulateTimeline() {
   Element("flowSeek").max=String(FLOW_DURATION);Element("sourceLink").href=FLOW_SOURCE.url;
 }
 function UpdateTimeline() {
+  gamePlay?.SetCursorTime(time);
   if(shownStage!==frame.stage.id) {
     shownStage=frame.stage.id;
     for(const button of document.querySelectorAll("[data-stage]")) button.classList.toggle("selected",button.dataset.stage===shownStage);
@@ -376,7 +377,15 @@ async function Start() {
   gamePlay=new LevelFlowPlay({
     snapshot:()=>({time,document:structuredClone(project.value),viewports:workspace.Serialize(),selection:structuredClone(selection)}),
     pause:()=>{SetPlaying(false);navigation.Clear();},
-    restore:saved=>{selection=saved.selection;Seek(saved.time);workspace.Restore(saved.viewports);Render();},
+    restore:saved=>{Element("playStatus").hidden=true;selection=saved.selection;Seek(saved.time);workspace.Restore(saved.viewports);Render();},
+    showSource:()=>ShowTab("script"),
+    onState:state=>{
+      time=state.timelineTime;frame=EvaluateFlow(time,project.value);UpdateTimeline();
+      Element("playStatus").hidden=false;
+      Element("playStatusTitle").textContent=(state.paused?"已暂停 · ":"")+(state.hints?.title||"");
+      Element("playStatusTask").textContent=state.hints?.task||"";
+      Element("playStatusHint").textContent=state.hints?.hint||"";
+    },
     toast:Toast,
   });
   annotationEditor=new ScreenshotAnnotations(async()=>{
@@ -396,7 +405,7 @@ async function Start() {
   BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
-    Play:{Start:mode=>gamePlay.Start(mode),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
+    Play:{Start:mode=>gamePlay.Start(mode),Pause:on=>gamePlay.Pause(on),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
     Evaluate:(value)=>EvaluateFlow(value,project.value),
     Stealth:()=>structuredClone(frame.stealth),
     Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
