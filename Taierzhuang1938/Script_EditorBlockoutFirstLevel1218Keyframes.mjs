@@ -846,7 +846,7 @@ function Keyframes() {
       N("Bearer2", AY(30.2, 33.0), { face: blanket127 }),
       ...CartWoundedInYard(),
       C("Nier", nier127, { face: girl }),
-      C("Girl", girl, { face: nier127 }),
+      C("Girl", girl, { face: nier127, body: "rig", castId: "erya" }),
       N("LiuWencai", AY(29.6, 29.0), { face: blanket127 }),
       ...AidPeople({ doctor: false }),
     ],

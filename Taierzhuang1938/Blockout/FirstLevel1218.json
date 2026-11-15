@@ -3912,7 +3912,8 @@
           "kind": "child",
           "name": "女娃",
           "role": "girl",
-          "body": "procedural",
+          "body": "rig",
+          "castId": "erya",
           "x": 97,
           "z": 830.1,
           "yawDeg": -52.7

@@ -72,6 +72,10 @@ assert.equal(XBOT_CAST_CHARACTERS.taniHisao, "taniHisao", "谷寿夫使用已登
 assert.equal(XBOT_CAST_CHARACTERS.liuwencai, "liuWencai", "刘文财使用已登记的专属外观");
 assert.equal(XBotLook({ faction: "nra", castId: "liuwencai", unitId: "Companion" }).key, "liuwencai");
 assert.equal(XBotLook({ faction: "nra", unitId: "LiuWencai" }).key, "liuwencai");
+assert.equal(XBOT_CAST_CHARACTERS.erya, "erya", "二丫使用 Dirty 专属外观");
+assert.equal(XBotLook({ faction: "civ", castId: "erya" }).key, "erya");
+assert.equal(XBotLook({ faction: "civ", unitId: "ErYa" }).key, "erya");
+assert.equal(XBotLook({ faction: "civ", unitId: "Girl" }).key, "erya");
 assert.equal(XBOT_CAST_CHARACTERS.interpreter, "interpreter", "翻译使用V6专属外观");
 assert.equal(XBotLook({ faction: "nra", castId: "interpreter" }).key, "interpreter");
 assert.equal(XBotLook({ faction: "nra", unitId: "Interpreter" }).key, "interpreter");
@@ -225,7 +229,7 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro", "Interpreter", "TianSao"]) {
+for (const character of ["Yaowa", "OldGeng", "Nier", "ErYa", "AzumaShiro", "Interpreter", "TianSao"]) {
   const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
   for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
     assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,

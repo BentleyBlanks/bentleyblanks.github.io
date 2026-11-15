@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "built": "2026-11-15",
+  "script": "_import/Script_BuildErYa.mjs",
+  "source": {
+    "file": "Model_ErYa_Atlas_Bones.glb",
+    "bytes": 110908648,
+    "sha256": "3f8b80e2b32d0915649816022ed2e37370cbf89f293855e4b17775d32abade24",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_ErYa.glb",
+    "bytes": 9296228,
+    "sha256": "03f62db644a2251776635d32e980357ceaca49adda4003863517fefa23167bfd"
+  },
+  "scale": 1.3,
+  "crownM": 1.3,
+  "triangles": 43142,
+  "vertices": 36755,
+  "sourceVertices": 36755,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandIndex4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4",
+    "RightToe_End"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.065
+    ],
+    "vertices": 4321,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.6525,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.6258,
+  "headY": 1.1197,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 32697204,
+      "bytes": 3429522
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 15468852,
+      "bytes": 1001730
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 17041523,
+      "bytes": 2411286
+    }
+  ],
+  "input": {
+    "file": "Model_ErYa_DirtyAssembled_Bones.glb",
+    "sha256": "492d90a07afc4fec40d0970fe0ac8090a2fc24aebb6409907f23b1144f58bf93",
+    "meshes": 6,
+    "joints": 54,
+    "materials": 4
+  },
+  "atlas": {
+    "size": 4096,
+    "gutter": 4,
+    "materialOrder": [
+      "Material_ErYaDirty_Body_0",
+      "Material_ErYaDirty_LeftFoot_0",
+      "Material_ErYaDirty_LeftHand_0",
+      "Material_ErYaDirty_HeadBald_0"
+    ],
+    "originalGeometryPreserved": true
+  },
+  "headSkinRepair": {
+    "neckBlendStartM": 1.045,
+    "rigidFaceStartM": 1.095,
+    "vertices": 7354
+  },
+  "endBoneFits": [
+    {
+      "name": "HeadTop_End",
+      "position": [
+        0.002539098330627541,
+        1.295,
+        0.02285159454380004
+      ]
+    },
+    {
+      "name": "RightHandIndex4",
+      "position": [
+        -0.6302355473604045,
+        0.9643085922836724,
+        0.0638088495971469
+      ]
+    },
+    {
+      "name": "RightHandMiddle4",
+      "position": [
+        -0.6361446137807131,
+        0.9669131836210362,
+        0.02015260016646516
+      ]
+    },
+    {
+      "name": "RightHandRing4",
+      "position": [
+        -0.6172185478091902,
+        0.9671324424975012,
+        -0.012170338643817918
+      ]
+    },
+    {
+      "name": "RightHandPinky4",
+      "position": [
+        -0.581654553347667,
+        0.9701351010511491,
+        -0.04205868456718931
+      ]
+    },
+    {
+      "name": "LeftHandThumb4",
+      "position": [
+        0.5687290291846111,
+        0.9697881362069026,
+        0.09984073003719182
+      ]
+    },
+    {
+      "name": "LeftHandIndex4",
+      "position": [
+        0.6288568625948203,
+        0.9633789029038958,
+        0.049443885265204914
+      ]
+    },
+    {
+      "name": "LeftHandMiddle4",
+      "position": [
+        0.6373484593008759,
+        0.9639763563247997,
+        0.004792260299782015
+      ]
+    },
+    {
+      "name": "LeftHandRing4",
+      "position": [
+        0.6195301551450717,
+        0.965090232879959,
+        -0.03112876359178262
+      ]
+    },
+    {
+      "name": "LeftHandPinky4",
+      "position": [
+        0.5795423893900888,
+        0.9701453749005844,
+        -0.05368912436371683
+      ]
+    },
+    {
+      "name": "RightToe_End",
+      "position": [
+        -0.07819394823130334,
+        -0.007921681057501111,
+        0.1336291395238781
+      ]
+    }
+  ],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  },
+  "reconstructionScope": [
+    "二丫的光头、脏旧棉衣、补丁裤与布鞋采用用户提供的 Dirty 绑骨版，属于角色创作外观。",
+    "图集、骨架转换、局部权重和动作接触适配属于游戏表现。"
+  ],
+  "historicalReferences": [],
+  "integration": {
+    "castId": "erya",
+    "unitIds": [
+      "ErYa",
+      "Girl"
+    ],
+    "level": "FirstLevel1218",
+    "keyframe": "12-7"
+  }
+}

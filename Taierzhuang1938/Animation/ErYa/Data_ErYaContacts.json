@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeNierContacts.mjs",
+  "character": "erya",
+  "model": {
+    "file": "Model/Character/Model_ErYa.glb",
+    "sha256": "03f62db644a2251776635d32e980357ceaca49adda4003863517fefa23167bfd"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_UnarmedRunForward_V1.glb",
+        "sha256": "6b3225ab28cb44178b3da2ecb12a7c0e2d764c95905cae54fd71c68455e91c02"
+      },
+      "output": {
+        "file": "Animation/ErYa/Animation_ErYa_UnarmedRunForward_V1.glb",
+        "sha256": "ef9f301e6f49960502023ecbea8c5010d4eebd7dae10e1a8451a7dc2e3ae0b14"
+      },
+      "frames": 51,
+      "duration": 0.8333333134651184,
+      "minBefore": -0.015273841388862359,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.017273841388862357
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_KneelingIdle_V1.glb",
+        "sha256": "3b0ecd6e08d23b84805e1f7bb5340b1f0898aa942c3afdc39bf2804db5cfce4b"
+      },
+      "output": {
+        "file": "Animation/ErYa/Animation_ErYa_KneelingIdle_V1.glb",
+        "sha256": "d2457a0786499fdacd14b140780ab068c18056362c4ef4a553f03bd85a1d0adc"
+      },
+      "frames": 259,
+      "duration": 4.300000190734863,
+      "minBefore": -0.03265718090472494,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.034657180904724944
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_CrouchWalking_V1.glb",
+        "sha256": "046e80b4c43917b1a14c24ec1e96c8e078bb49f5d55b428765c70df459dd7b02"
+      },
+      "output": {
+        "file": "Animation/ErYa/Animation_ErYa_CrouchWalking_V1.glb",
+        "sha256": "bcb3808feac056d76c493c1da81a188495d06eaf3af35aa335ab9eee6e2202cb"
+      },
+      "frames": 73,
+      "duration": 1.2000000476837158,
+      "minBefore": -0.022836839534219194,
+      "minAfter": 0.0019999999999999983,
+      "maxLiftM": 0.024836839534219196
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_KneelingInspecting_V1.glb",
+        "sha256": "6dbac4e8ca127d90fadd54c6cf263a07b2b12a5e56a38f886172e11594629142"
+      },
+      "output": {
+        "file": "Animation/ErYa/Animation_ErYa_KneelingInspecting_V1.glb",
+        "sha256": "c5b1b28bc0b9823d038fccb7d228ba10f306eacc2c402413bf9d4a51e119c1ca"
+      },
+      "frames": 299,
+      "duration": 4.9666666984558105,
+      "minBefore": -0.011500264357419568,
+      "minAfter": 0.002,
+      "maxLiftM": 0.013500264357419568
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/ErYa/Animation_ErYa_SittingIdle_V2.glb",
+        "sha256": "00678112a6cd3825291e8b7cacbedf96dfd2c40a73da079a23fcb9aaba659b2f"
+      },
+      "frames": 655,
+      "duration": 10.899999618530273,
+      "minBefore": -0.06056162374411991,
+      "minAfter": 0.001999999999999995,
+      "maxLiftM": 0.06256162374411992
+    }
+  ]
+}

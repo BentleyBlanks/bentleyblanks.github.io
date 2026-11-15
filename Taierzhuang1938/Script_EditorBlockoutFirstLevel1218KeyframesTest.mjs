@@ -2,7 +2,7 @@
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutFirstLevel1218KeyframesTest.mjs
 // 查：生成两次除 generatedAt 外逐字相同、过 ValidateBlockout 且无警告、摆位 / 走位问题为零（读场景取出来的那一块连实心块、高差、深水一起查）、
 // 33 帧（11-1…18-8）齐全、名字按契约、信号按拍起（含 ChargesSet 18-3）、所有人脚下在地面上（高度场或 ≤ 1 m 的块顶：板桥门板、门槛；铁路桥 / 官道桥桥面是 standOn）、身子不进实心块；
-// 百姓一律程序化身体、只有 14-4…14-6 妮儿、14-6 / 15-1 / 17-1 老耿、15-3 妮儿是骨骼身体；七二七团的人名字里带「二营」「三营」；
+// 二丫及已指定动作的妮儿、老耿使用骨骼身体；七二七团的人名字里带「二营」「三营」；
 // 冬瓜 11-1…12-6 在车上的担架上、12-7…17-3 躺在自己那床单被上、17 起盖着脸不动、18 起留在厢房里；车只到 14-2（12-7 起停在门前空地；14-3 起翻在门前，黑子倒地到 18-2，18-3 起不摆）；
 // 台词照契约第三节原字；没有第三版删掉的旧戏；13 没有装甲车、是步兵 + 两挺机枪 + 掷弹筒；几条关键视线；走位走板桥、走南街、走门、上下路基走土坡；桥面上的人站在枕木顶。
 
@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { ValidateBlockout, NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
+import { XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { IsBlanketLitter } from "./Script_EditorBlockoutPuppets.mjs";
 import { BuildFirstLevel1218Config, StreetRoute, LoadSceneLayout, StandSampler, FirstLevel1218Issues, OnRailBridge, CART_LINE } from "./Script_EditorBlockoutFirstLevel1218Keyframes.mjs";
 import { BlockSight, SolidBlocks, BlockCenterY, SightBlock } from "./Script_EditorBlockoutFirstLevel1218Scene.mjs";
@@ -47,7 +48,8 @@ for (const kf of a.keyframes) {
   assert.ok(!/掩护|清理|护送/.test(kf.next?.text || ""), `${kf.id} next 用了禁词：${kf.next?.text}`);
   assert.ok(kf.what.length <= 80, `${kf.id} what 太长`);
   assert.ok(kf.how.length >= 3 && kf.notes.length > 0, `${kf.id} how / notes 要写`);
-  for (const u of kf.units) if (u.castId) assert.ok(Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, u.castId), `${kf.id} ${u.id} 的 castId ${u.castId} 不在定妆表里`);
+  for (const u of kf.units) if (u.castId) assert.ok(Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, u.castId)
+    || Object.hasOwn(XBOT_CAST_CHARACTERS, u.castId), `${kf.id} ${u.id} 的 castId ${u.castId} 要登记到定妆或角色外观表`);
 }
 const identity = new Map();
 for (const kf of a.keyframes) for (const u of kf.units) {
@@ -99,14 +101,16 @@ for (const id of IDS) {
   assert.ok(!hit, `${id} 还有第三版的旧戏 / 不要的词：${hit?.[0]}`);
 }
 
-// --- 身体：百姓一律程序化；只有拖被子 / 跪 / 蹲着画驴那几帧是骨骼身体 ---
-const RIG = new Set(["14-4/Nier", "14-5/Nier", "14-6/Nier", "14-6/Geng", "15-1/Geng", "15-3/Nier", "17-1/Geng"]);
+// --- 身体：二丫与指定动作角色的骨骼身体清单 ---
+const RIG = new Set(["12-7/Girl", "14-4/Nier", "14-5/Nier", "14-6/Nier", "14-6/Geng", "15-1/Geng", "15-3/Nier", "17-1/Geng"]);
 for (const kf of a.keyframes) for (const u of kf.units) {
   if (u.side !== "civ" || !["civilian", "child"].includes(u.kind)) { assert.ok(!u.body, `${kf.id} ${u.id} 不是百姓不该有 body`); continue; }
   assert.equal(u.body, RIG.has(`${kf.id}/${u.id}`) ? "rig" : "procedural", `${kf.id} ${u.id} 的身体`);
 }
 for (const id of IDS) { assert.ok(Unit(id, "Geng")?.kind === "civilian", `${id} 老耿要在`); assert.ok(Unit(id, "Nier")?.kind === "child", `${id} 妮儿要在`); }
-for (const [id, uid] of [["12-5", "ElderCarrier"], ["12-7", "Girl"], ["14-2", "StreetWoman"], ["15-3", "BurnedMother"], ["18-2", "GirlMother"], ["18-3", "Wader2"], ["18-8", "Refugee1"]]) assert.ok(Unit(id, uid)?.side === "civ" && Unit(id, uid).body === "procedural", `${id} ${uid} 程序化身体`);
+for (const [id, uid] of [["12-5", "ElderCarrier"], ["14-2", "StreetWoman"], ["15-3", "BurnedMother"], ["18-2", "GirlMother"], ["18-3", "Wader2"], ["18-8", "Refugee1"]]) assert.ok(Unit(id, uid)?.side === "civ" && Unit(id, uid).body === "procedural", `${id} ${uid} 程序化身体`);
+assert.equal(Unit("12-7", "Girl").body, "rig", "救护所洞口女娃使用二丫的骨骼身体");
+assert.equal(Unit("12-7", "Girl").castId, "erya", "救护所女娃绑定二丫脏旧外观");
 for (const uid of ["Sentry", "Captain"]) assert.ok(Unit("12-3", uid)?.side === "nra" && /二营/.test(Unit("12-3", uid).name), `12-3 ${uid} 是二营的（名字带「二营」）`);
 assert.equal(Unit("12-3", "Captain").castId, "frontOfficer", "二营连长的定妆 frontOfficer");
 assert.ok(Unit("12-7", "Doctor")?.name === "军医" && Unit("12-7", "Doctor").weapon === null && Unit("12-7", "Doctor").stance === "crouch" && DistXZ(Unit("12-7", "Doctor"), A.wallRootDonggua) < 0.8, "12-7 军医空手、蹲在冬瓜身边处理");

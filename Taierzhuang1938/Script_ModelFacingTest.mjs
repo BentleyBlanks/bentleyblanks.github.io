@@ -773,6 +773,18 @@ Check(nierSoles.length > 100 && nierFront > Math.abs(nierBack) + .02,
 Check(nierFacing.sourceForward === "+Z" && nierFacing.actorForward === "-Z",
   "妮儿沿用X Bot源+Z至角色-Z的共用桥接");
 
+const eryaFile = path.join(projectDir, "Model/Character/Model_ErYa.glb");
+const erya = LoadGlb(eryaFile);
+const eryaMesh = erya.json.nodes.find(node => node.mesh === 0);
+const eryaSoles = RiggedGlbPoints(eryaFile, eryaMesh.name).filter(point => point[1] < .06);
+const eryaFront = Math.max(...eryaSoles.map(point => point[2]));
+const eryaBack = Math.min(...eryaSoles.map(point => point[2]));
+const eryaFacing = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_ErYa.json"))).facing;
+Check(eryaSoles.length > 100 && eryaFront > Math.abs(eryaBack) + .02,
+  "二丫布鞋的实际鞋尖顶点云朝源+Z", JSON.stringify({ front: eryaFront, back: eryaBack }));
+Check(eryaFacing.sourceForward === "+Z" && eryaFacing.actorForward === "-Z",
+  "二丫使用共用源+Z至角色-Z桥接");
+
 // Hair lab busts are converted external heads too. Measure their actual nose
 // prominence relative to the brow, including Nier's differently oriented source.
 const hairHeads = JSON.parse(fs.readFileSync(path.join(projectDir, 'Hair/Heads/Data_HairHeads.json'), 'utf8')).heads;

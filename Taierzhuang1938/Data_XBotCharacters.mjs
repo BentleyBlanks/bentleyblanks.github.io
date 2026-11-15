@@ -70,6 +70,16 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_KneelingInspecting_V1.glb": "./Animation/Nier/Animation_Nier_KneelingInspecting_V1.glb",
       "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/Nier/Animation_Nier_SittingIdle_V2.glb",
     }) }),
+  // 二丫 Dirty：用户下载的六部件绑骨版，恢复原 1.30 米尺寸并合并为游戏图集。
+  erya: Object.freeze({ name: "二丫", file: "./Model/Character/Model_ErYa.glb", hipsScale: 0.6258, heightM: 1.30, ownMaterial: true,
+    report: "./Model/Character/Data_ErYa.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_UnarmedRunForward_V1.glb": "./Animation/ErYa/Animation_ErYa_UnarmedRunForward_V1.glb",
+      "Animation_Mixamo_KneelingIdle_V1.glb": "./Animation/ErYa/Animation_ErYa_KneelingIdle_V1.glb",
+      "Animation_Mixamo_CrouchWalking_V1.glb": "./Animation/ErYa/Animation_ErYa_CrouchWalking_V1.glb",
+      "Animation_Mixamo_KneelingInspecting_V1.glb": "./Animation/ErYa/Animation_ErYa_KneelingInspecting_V1.glb",
+      "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/ErYa/Animation_ErYa_SittingIdle_V2.glb",
+    }) }),
   // 翻译 V6：用户下载的绑骨件保留剃净源头与修复后的手腕比例；游戏里按三视图挂凌乱短发、保持净面。
   interpreter: Object.freeze({ name: "翻译", file: "./Model/Character/Model_Interpreter.glb", hipsScale: 1.0036, heightM: 1.9343339204788208, ownMaterial: true,
     report: "./Model/Character/Data_Interpreter.json", groom: "./Hair/Grooms/Groom_Game_Interpreter.bin",
@@ -106,4 +116,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier", interpreter: "interpreter", tiansao: "tianSao" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier", erya: "erya", interpreter: "interpreter", tiansao: "tianSao" });

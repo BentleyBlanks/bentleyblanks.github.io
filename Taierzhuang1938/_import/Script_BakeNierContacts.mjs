@@ -1,4 +1,5 @@
-// Fit Nier's kneeling, crouched walking and seated poses to the floor through Hips.
+// Fit child kneeling, crouched walking and seated poses through Hips.
+// Defaults preserve Nier. Er Ya uses: node Script_BakeNierContacts.mjs erya ErYa
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
@@ -9,9 +10,10 @@ import { LoadGlb, SerializeGlb } from "./Script_LugouGlbPose.mjs";
 import { ClipForCharacter } from "../Script_XBotCharacters.mjs";
 
 const project = path.resolve(import.meta.dirname, "..");
-const modelFile = path.join(project, "Model/Character/Model_Nier.glb");
-const modelReport = JSON.parse(fs.readFileSync(path.join(project, "Model/Character/Data_Nier.json")));
-const outputDir = path.join(project, "Animation/Nier");
+const character = process.argv[2] || "nier", modelName = process.argv[3] || "Nier";
+const modelFile = path.join(project, `Model/Character/Model_${modelName}.glb`);
+const modelReport = JSON.parse(fs.readFileSync(path.join(project, `Model/Character/Data_${modelName}.json`)));
+const outputDir = path.join(project, "Animation", modelName);
 const Hash = file => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 async function ReadSkeleton(file) {
   const glb = LoadGlb(file), doc = structuredClone(glb.json);
@@ -26,11 +28,14 @@ const mesh = scene.getObjectByProperty("isSkinnedMesh", true);
 const hips = scene.getObjectByName("Hips");
 const point = new THREE.Vector3();
 const report = {
-  schema: 1, script: "_import/Script_BakeNierContacts.mjs", character: "nier",
-  model: { file: "Model/Character/Model_Nier.glb", sha256: Hash(modelFile) }, clips: [],
+  schema: 1, script: "_import/Script_BakeNierContacts.mjs", character,
+  model: { file: `Model/Character/Model_${modelName}.glb`, sha256: Hash(modelFile) }, clips: [],
 };
 fs.mkdirSync(outputDir, { recursive: true });
-for (const name of ["KneelingIdle_V1", "CrouchWalking_V1", "KneelingInspecting_V1", "SittingIdle_V2"]) {
+const requestedClips = process.argv.slice(4);
+const clipNames = requestedClips.length ? requestedClips
+  : ["KneelingIdle_V1", "CrouchWalking_V1", "KneelingInspecting_V1", "SittingIdle_V2"];
+for (const name of clipNames) {
   const sourceFile = path.join(project, `Animation/Mixamo/Animation_Mixamo_${name}.glb`);
   const source = LoadGlb(sourceFile), animation = (await ReadSkeleton(sourceFile)).animations[0];
   const clip = ClipForCharacter(animation, modelReport);
@@ -81,7 +86,7 @@ for (const name of ["KneelingIdle_V1", "CrouchWalking_V1", "KneelingInspecting_V
   };
   doc.buffers[0].byteLength = byteLength;
   doc.asset.generator = "Script_BakeNierContacts.mjs";
-  const outputFile = path.join(outputDir, `Animation_Nier_${name}.glb`);
+  const outputFile = path.join(outputDir, `Animation_${modelName}_${name}.glb`);
   fs.writeFileSync(outputFile, SerializeGlb(doc, Buffer.concat(chunks)));
   report.clips.push({
     source: { file: path.relative(project, sourceFile).replaceAll("\\", "/"), sha256: Hash(sourceFile) },
@@ -89,5 +94,5 @@ for (const name of ["KneelingIdle_V1", "CrouchWalking_V1", "KneelingInspecting_V
     frames: times.length, duration: clip.duration, minBefore, minAfter, maxLiftM,
   });
 }
-fs.writeFileSync(path.join(outputDir, "Data_NierContacts.json"), `${JSON.stringify(report, null, 2)}\n`);
+fs.writeFileSync(path.join(outputDir, `Data_${modelName}Contacts.json`), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
