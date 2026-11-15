@@ -827,12 +827,12 @@ try {
   assert.equal((await page.evaluate(()=>window.LevelFlow.Inspect())).playing,false);
   await page.click('[data-stage="01"]');assert.ok(await page.locator('.lfBeats .cinematic').count()>0);
   await page.click('[data-stage="09"]');await page.click('[data-tab="script"]');await page.screenshot({path:path.join(out,'Village.png')});
-  await page.evaluate(()=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'scene');LevelFlow.Seek(1397.577);});
+  await page.evaluate(time=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'scene');LevelFlow.Seek(time);},FLOW_TIMELINE.find(beat=>beat.id==='09c').start+2.577);
   const hiddenVillage=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(hiddenVillage.beat,'09c');
   assert.equal(hiddenVillage.effects.filter(effect=>effect.kind==='fire').length,0,'attached 09C frame no longer shows premature crossfire');
   await page.screenshot({path:path.join(out,'VillageBeforeSignal.png')});
-  const villageSignal=FLOW_TIMELINE.find(beat=>beat.id==='09e').start;
+  const villageSignal=FLOW_TIMELINE.find(beat=>beat.id==='09j').start;
   await page.evaluate(time=>LevelFlow.Seek(time),villageSignal);
   const leaderSignal=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(leaderSignal.effects.some(effect=>effect.sourceId==='luo'));
@@ -840,7 +840,7 @@ try {
   await page.evaluate(time=>LevelFlow.Seek(time+2),villageSignal);
   const villageResponse=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(villageResponse.effects.some(effect=>effect.sourceId==='yao'));
-  assert.ok(villageResponse.actors.some(actor=>actor.groupId==='YardTransfer'&&actor.pose==='run'));
+  assert.ok((await page.evaluate(time=>LevelFlow.Evaluate(time),FLOW_TIMELINE.find(beat=>beat.id==='09e').start+2)).actors.some(actor=>actor.groupId==='YardTransfer'&&actor.pose==='run'));
   await page.screenshot({path:path.join(out,'VillageAfterSignal.png')});
   await page.click('[data-stage="05"]');await page.evaluate(()=>window.LevelFlow.JumpBeat('05c'));await page.screenshot({path:path.join(out,'TankApproach.png')});
   await page.setViewportSize({width:1024,height:720});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -879,9 +879,9 @@ try {
       beats:[...document.querySelectorAll('[data-beat]')].map(element=>({id:element.dataset.beat,x:element.getBoundingClientRect().x,width:element.getBoundingClientRect().width})),axis:{x:axis.x,width:axis.width}};
   });
   assert.ok(Math.abs(alignment.playhead-alignment.expected)<0.1&&Math.abs(alignment.slider-alignment.expected)<0.1,"05:01 slider and playhead use the same global time position");
-  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).x-(alignment.axis.x+alignment.axis.width*beat.start/1910))<0.1,"every beat uses the global time axis");
-  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).width-alignment.axis.width*beat.duration/1910)<0.1,"short beats retain their actual duration width");
-  for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/1910))<0.1,"every stage uses the global time axis");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).x-(alignment.axis.x+alignment.axis.width*beat.start/FLOW_TIMELINE.at(-1).end))<0.1,"every beat uses the global time axis");
+  for(const beat of FLOW_TIMELINE) assert.ok(Math.abs(alignment.beats.find(item=>item.id===beat.id).width-alignment.axis.width*beat.duration/FLOW_TIMELINE.at(-1).end)<0.1,"short beats retain their actual duration width");
+  for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/FLOW_TIMELINE.at(-1).end))<0.1,"every stage uses the global time axis");
   await page.screenshot({path:path.join(out,'Timeline301.png')});
 
   await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(424);});
@@ -1304,12 +1304,13 @@ try {
   assert.equal(speechClipping.hidden,0,'occluded eye-view speakers have no speech HUD');
   assert.equal(speechClipping.self,0,'first-person speaker has no floating self bubble');
   assert.equal(speechClipping.behind,null,'speakers behind the camera have no anchor');
-  await page.goto(base+'AdvancedTools/Tool_LevelFlow.html?t=1485&x=96&z=460&zoom=9');
+  const transferEnd=FLOW_TIMELINE.find(beat=>beat.id==='09e').end;
+  await page.goto(base+`AdvancedTools/Tool_LevelFlow.html?t=${transferEnd}&x=96&z=460&zoom=9`);
   await ReadyPlan();
   const transferArrival=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
   assert.equal(transferArrival.length,5);
   for(const offset of [2,4.4106,7.99]) {
-    await page.evaluate(time=>LevelFlow.Seek(time),1485+offset);
+    await page.evaluate(time=>LevelFlow.Seek(time),transferEnd+offset);
     const transfers=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
     assert.equal(transfers.length,5);
     for(const actor of transfers) {
@@ -1318,7 +1319,7 @@ try {
       assert.equal(actor.firing,false);
     }
   }
-  await page.evaluate(()=>LevelFlow.Seek(1489.4106));
+  await page.evaluate(time=>LevelFlow.Seek(time+4.4106),transferEnd);
   await page.screenshot({path:path.join(out,'Screenshot_YardTransferHold.png')});
   // fastForward delivers a single delayed animation frame, reproducing a
   // slow renderer without depending on the test machine's GPU or frame rate.

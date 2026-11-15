@@ -63,7 +63,7 @@ for (const [id, cues] of Object.entries(FLOW_DIALOGUE)) {
   assert.ok(beat, `speech beat ${id} exists`);
   const quotes = [...beat.passage.matchAll(/[「“]([^」”]+)[」”]/gu)];
   for (const [index, cue] of cues.entries()) {
-    assert.ok(quotes[cue.quote], `${id} cue ${index} references current dialogue`);
+    assert.ok(cue.text || quotes[cue.quote], `${id} cue ${index} references current dialogue`);
     assert.ok(cue.at >= 0 && cue.duration > 0 && cue.at + cue.duration <= beat.duration);
     const time = beat.start + cue.at, frame = EvaluateFlow(time);
     const speech = frame.dialogue.find(entry => entry.id === `${id}_${index}`);
@@ -168,7 +168,7 @@ assert.equal(arrowFills,1,"a far-clipped destination stays hidden even when it p
 const ReferenceTime = seconds => seconds >= 86 ? seconds + BeatById("02c").start - 86
   : seconds >= 37 ? seconds + BeatById("01e").start - 37 : seconds;
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
-assert.equal(FLOW_DURATION,1910);
+assert.equal(FLOW_DURATION,1959);
 assert.equal(FLOW_TIMELINE.length,68);
 assert.deepEqual(Object.keys(FLOW_SOURCE_EXCERPTS),FLOW_TIMELINE.map((beat)=>beat.id));
 assert.equal(STAGE_TIMELINE[6].end,1100);
@@ -1295,7 +1295,7 @@ assert.deepEqual(EvaluateFlow(villageStart + 26.4), villageSnapshot, "rewinding 
 const oldVillageDocument = new EncounterDocument(defaults, FLOW_TIMELINE, {getItem:()=>JSON.stringify(previousDraft), setItem:()=>{}}).value;
 assert.deepEqual(EvaluateFlow(BeatById("08c").start, oldVillageDocument).actors.filter(actor => actor.groupId === "VillageCasualties"),
   VillageActors(BeatById("08c").start), "saved encounter drafts also receive the missing screenplay actors");
-const villageBattleStart=BeatById("09e").start;
+const villageBattleStart=BeatById("09j").start;
 const priorVillageDraft=structuredClone(defaults);
 priorVillageDraft.revision="2026-11-14-double-tank-destruction-1";
 for(const group of priorVillageDraft.groups) delete group.engageOn;
@@ -1303,7 +1303,7 @@ priorVillageDraft.groups.find(group=>group.id==="VillageGun").count=2;
 priorVillageDraft.groups=priorVillageDraft.groups.filter(group=>group.id!=="VillageRifles");
 const migratedVillageDraft=UpgradeEncounterDocument(priorVillageDraft,defaults);
 assert.equal(migratedVillageDraft.revision,defaults.revision);
-assert.equal(migratedVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn,"09e");
+assert.equal(migratedVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn,"09j");
 assert.equal(migratedVillageDraft.groups.find(group=>group.id==="VillageGun").count,2);
 assert.ok(!migratedVillageDraft.groups.some(group=>group.id==="VillageRifles"));
 assert.ok(!priorVillageDraft.groups.find(group=>group.id==="VillageGun").engageOn,"migration does not mutate the attachment");
@@ -1320,16 +1320,16 @@ for(const document of [defaults,migratedVillageDraft]) {
     assert.ok(shots.every(effect=>effect.targetId?.startsWith("villager")),"before the leader opens fire, only civilian-targeted bursts are allowed");
     assert.ok(frame.actors.filter(actor=>["luo","he","yao"].includes(actor.id)).every(actor=>!actor.firing),"frontline allies remain concealed");
   }
-  const before=EvaluateFlow(villageBattleStart-0.001,document);
+  const before=EvaluateFlow(BeatById("09e").start-0.001,document);
   assert.ok(before.actors.some(actor=>actor.groupId==="SearchYard"));
   assert.ok(!before.actors.some(actor=>actor.groupId==="YardTransfer"));
   const first=EvaluateFlow(villageBattleStart,document);
   assert.ok(first.effects.some(effect=>effect.sourceId==="luo"),"leader initiates the battle");
   assert.ok(!first.actors.find(actor=>actor.id==="yao").firing,"yaowa waits for the leader's gunfire");
-  assert.ok(first.actors.some(actor=>actor.groupId==="YardTransfer"&&actor.pose==="run"),"search party responds in the battle beat");
+  assert.ok(EvaluateFlow(BeatById("09e").start+1,document).actors.some(actor=>actor.groupId==="YardTransfer"&&actor.pose==="run"),"search party responds to the enemy recall whistle before the coordinated attack");
   const joined=EvaluateFlow(villageBattleStart+1.5,document);
   assert.ok(joined.effects.some(effect=>effect.sourceId==="yao"),"yaowa joins after the signal");
-  assert.ok(joined.actors.some(actor=>actor.groupId==="VillageGun"&&actor.firing));
+  assert.ok(joined.actors.some(actor=>actor.groupId==="GengHouse"&&actor.firing),"north-house guards return fire during the coordinated attack");
   EvaluateFlow(BeatById("10a").start,document);
   assert.deepEqual(EvaluateFlow(villageBattleStart+1.5,document),joined,"rewinding restores the same engagement order");
 }

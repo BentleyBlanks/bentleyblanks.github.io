@@ -176,7 +176,7 @@ function Render(preparedFrame=null) {
   if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
   chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
-  Element("mapReadout").textContent=frame.stretchersPassed===null
+  Element("mapReadout").textContent=frame.stealth.active ? (frame.stealth.pulling ? "文财拉低身体 · 1.8秒后还操作" : frame.stealth.objective) : frame.stretchersPassed===null
     ?`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`
     :`${frame.defenseWarning || frame.beat.task} · 担架 ${frame.stretchersPassed}/12`;
 }
@@ -363,6 +363,7 @@ async function Start() {
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
     Evaluate:(value)=>EvaluateFlow(value,project.value),
+    Stealth:()=>structuredClone(frame.stealth),
     Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},

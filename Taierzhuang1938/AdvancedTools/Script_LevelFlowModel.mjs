@@ -6,6 +6,7 @@ import { L0610_LANE, L0610_SOUTH_LANE } from "../Data_EditorBlockoutFirstLevel06
 import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
+import { StageVillageActors, VillageStealthAt } from "./Script_LevelFlowVillage.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -141,13 +142,21 @@ const cartDistanceKeys=cartKeys.map(([time,x,z])=>{
   previousCartDistance=best.distance;return [time,best.distance,0];
 });
 
+function CartClock(time) {
+  const release = BeatById("10a");
+  if (time >= release.start && time < release.end) return release.start + Math.max(0,time-release.start-5)*release.duration/(release.duration-5);
+  return time;
+}
+
 function CartAt(time) {
+  time = CartClock(time);
   const distance=Track(cartDistanceKeys,time)[0],total=cartLengths.at(-1);
   const point=SampleRoute(cartRoute,distance/total);
   const before=SampleRoute(cartRoute,(distance-0.6)/total),after=SampleRoute(cartRoute,(distance+0.6)/total);
   return {point,heading:Math.atan2(after[0]-before[0],-(after[1]-before[1]))};
 }
 function CartFollower(time,side,forward) {
+  time = CartClock(time);
   const distance=Track(cartDistanceKeys,time)[0]+forward,total=cartLengths.at(-1);
   const point=SampleRoute(cartRoute,distance/total);
   const before=SampleRoute(cartRoute,(distance-6)/total),after=SampleRoute(cartRoute,(distance+6)/total);
@@ -626,6 +635,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
   if(aboard&&actors.some(actor=>actor.id==="nier")&&(time>=BeatById("10d").end||Number(beat.stage)<8)) actors.find(actor=>actor.id==="nier").p=CartOffset(1,0.6);
   EvacuationActors(actors,time);
   StreetDefenseActors(actors,beat,time);
+  StageVillageActors(actors,time,FLOW_TIMELINE,stretcherCrossings);
   return actors;
 }
 
@@ -811,11 +821,11 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
     return CoreActors(sampleBeat,sampleTime,SampleBeatRoute(sampleBeat,sampleProgress),sampleProgress,tankStart);
   });
   actors.push(...OpeningActors(time), ...encounter.actors);
-  const villageEngaged=time>=BeatById("09e").start && time<BeatById("09j").end;
+  const villageEngaged=time>=BeatById("09j").start && time<BeatById("09j").end;
   if(time>=BeatById("08a").start && time<BeatById("09j").end) {
     for(const id of ["luo","he","yao"]) {
       const actor=actors.find(entry=>entry.id===id);
-      const firing=villageEngaged && (id!=="yao" || time>=BeatById("09e").start+1.5);
+      const firing=villageEngaged && (id!=="yao" || time>=BeatById("09j").start+1.5);
       Object.assign(actor,{firing,pose:firing?"shoot":"kneel",status:firing?id==="yao"?"班长开火后，从坡道接战":"从东院发起战斗":"隐蔽待命，不暴露友军位置"});
     }
   }
@@ -845,7 +855,8 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const defenseWarning=time>=streetWarningStart && time<streetWarningStart+FLOW_STREET_DEFENSE.warning.seconds
     ?FLOW_STREET_DEFENSE.warning.text:null;
   const dialogue = SampleFlowDialogue(beat, time, actors);
-  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed,defenseWarning};
+  const stealth = VillageStealthAt(time,FLOW_TIMELINE);
+  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed,defenseWarning,stealth};
 }
 
 export function FormatFlowTime(time) {

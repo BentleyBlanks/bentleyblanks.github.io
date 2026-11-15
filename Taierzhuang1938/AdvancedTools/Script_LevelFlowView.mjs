@@ -346,6 +346,8 @@ export class FlowMapView {
 
   DrawActor(context,actor,frame) {
     const p=this.ToScreen(actor.p),color=FLOW_COLORS[actor.side];
+    if(actor.tetherTo) Line(context,[p,this.ToScreen(actor.tetherTo)],"#75613e",1.5);
+    if(actor.id==="liu" && frame.stealth?.pulling) this.DrawPath(context,[actor.p,frame.player],"#75613e",2.5);
     if(actor.pose==="dead") {Line(context,[[p[0]-3,p[1]-3],[p[0]+3,p[1]+3]],color+"66",1.3);Line(context,[[p[0]-3,p[1]+3],[p[0]+3,p[1]-3]],color+"66",1.3);}
     else if(actor.kind==="tank"||actor.kind==="cart") {
       context.save();context.translate(...p);context.rotate(actor.heading||0);context.fillStyle=actor.pose==="burn"?"#74432c":"#6c7258";context.strokeStyle=color;context.lineWidth=1.4;

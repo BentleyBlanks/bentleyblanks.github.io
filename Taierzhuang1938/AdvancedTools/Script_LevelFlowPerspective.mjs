@@ -54,10 +54,11 @@ export class FlowPerspectiveView extends FlowMapView {
       let heading=Math.hypot(...direction)>0.01?Math.atan2(direction[0],direction[1]):-Math.PI/2;
       const shot=frame.effects.find(effect=>effect.kind==="fire"&&Distance(effect.a,actor.p)<0.1);
       if(shot) heading=Math.atan2(shot.b[0]-actor.p[0],shot.b[1]-actor.p[1]);
+      if(actor.lookAt) heading=Math.atan2(actor.lookAt[0]-actor.p[0],actor.lookAt[1]-actor.p[1]);
       const yaw=this.yaw+heading,base=this.Ground(actor.p)+(actor.elevation||0);
       if(this.type==="eye") {
-        const height=actor.kind==="quilt"?0.55:actor.pose==="drag"?0.95:1.6;
-        this.eye=[actor.p[0],base+height,actor.p[1]];this.aim=[actor.p[0]+Math.sin(yaw)*20,base+1.25,actor.p[1]+Math.cos(yaw)*20];
+        const height=actor.eyeHeight ?? (actor.kind==="quilt"?0.55:["drag","kneel","crouch"].includes(actor.pose)?0.95:1.6);
+        this.eye=[actor.p[0],base+height,actor.p[1]];this.aim=[actor.p[0]+Math.sin(yaw)*20,base+height-0.15,actor.p[1]+Math.cos(yaw)*20];
       } else {
         const distance=Clamp(125/this.scale,FLOW_ZOOM.minChaseDistanceM,120);
         this.eye=[this.center[0]-Math.sin(yaw+0.55)*distance,this.centerHeight+distance*0.52,this.center[1]-Math.cos(yaw+0.55)*distance];
@@ -475,6 +476,7 @@ export class FlowPerspectiveView extends FlowMapView {
       for(const side of [-0.2,0.2]) for(const end of [-0.4,0.4]) Segment(Point(side,0.7,end),Point(side,0,end),2);
       Segment(Point(0,0.8,0.5),Point(0,1.25,0.8),4);
       for(const side of [-0.1,0.1]) Segment(Point(side,1.2,0.8),Point(side,1.5,0.75),2);
+      if(actor.tetherTo) Segment(Point(0,1.1,0.8),[actor.tetherTo[0],this.Ground(actor.tetherTo)+0.7,actor.tetherTo[1]],1);
       return;
     }
     if(actor.fallProgress !== undefined) {
@@ -507,6 +509,10 @@ export class FlowPerspectiveView extends FlowMapView {
         [hand[0]+forward[0]*0.45,hand[1],hand[2]+forward[1]*0.45],2);
     } else {
       Segment([x,base+height*0.65*crouch,z],[x-0.4,base+height*0.47*crouch,z+0.15],2);Segment([x,base+height*0.65*crouch,z],[x+0.4,base+height*0.47*crouch,z+0.15],2);
+    }
+    if(actor.id==="liu" && frame.stealth?.pulling) {
+      const player=frame.actors.find(item=>item.id==="player");
+      Segment([x,base+1.1,z],[player.p[0]+0.15,this.Ground(player.p)+frame.stealth.eyeHeight-0.25,player.p[1]+0.3],3);
     }
     const head=this.Vertex([x,base+height*0.94*crouch,z]),neck=this.Vertex([x,base+height*0.8*crouch,z]);
     if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);

@@ -599,11 +599,23 @@
       "id": "L1-02I-149625",
       "date": "2026-11-13",
       "scope": "Opening fugitives meet northeastern flanking troops in the north trench, then move south to block the branch junction during casualty evacuation. Creative encounter staging; counts, coordinates and timings are design values.",
-      "files": ["AdvancedTools/Data_LevelFlow.mjs", "AdvancedTools/Script_LevelFlowModel.mjs", "docs/Data_LevelFlow.md"],
+      "files": [
+        "AdvancedTools/Data_LevelFlow.mjs",
+        "AdvancedTools/Script_LevelFlowModel.mjs",
+        "docs/Data_LevelFlow.md"
+      ],
       "codexEntry": "HistoryAndCreation / invented / 撤退与反冲",
       "notionSnapshots": [
-        {"id": "3fd60335331c8194aa82f0b238084d34", "lastEdited": "2026-11-12T18:36:37.885Z", "scope": "Existing counterattack creative row and dated status enhanced with the fugitives joining flanking troops and blocking casualty evacuation."},
-        {"id": "3fd60335331c818fa24deadb6d72ca70", "lastEdited": "2026-11-12T18:37:39.209Z", "scope": "Existing creative front-line staging bullet enhanced with the same junction blockade."}
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-12T18:36:37.885Z",
+          "scope": "Existing counterattack creative row and dated status enhanced with the fugitives joining flanking troops and blocking casualty evacuation."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-12T18:37:39.209Z",
+          "scope": "Existing creative front-line staging bullet enhanced with the same junction blockade."
+        }
       ]
     }
   ],
@@ -678,6 +690,27 @@
     {
       "url": "https://www.marxists.org/chinese/reference-books/shanghaidezaochen/1-03.htm",
       "reason": "周而复长篇小说《上海的早晨》，只能挂在「创作」条目下说明是文学作品"
+    }
+  ],
+  "stagingReviews": [
+    {
+      "id": "VillageTempleStealth20261115",
+      "date": "2026-11-15",
+      "scope": "This review covers only the user-approved cart tethering, dispersed stretcher shelter, temple passage, patrol blocking, short crouch pull and stealth failure design. Preserve global review cursors and unrelated sources.",
+      "classification": "invented",
+      "runtime": "AdvancedTools/Data_LevelFlow.mjs and AdvancedTools/Script_LevelFlowVillage.mjs",
+      "scene": "Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json; matching changed objects in Scenes/FirstLevel/Scene_FirstLevel.json",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-15T07:42:00.441Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-15T07:42:12.558Z"
+        }
+      ],
+      "decision": "Events, local placement, timing, movement and no-fire/retry rules are creative staging. No new historical source or classification upgrade. The existing general temple/school comparison remains separate."
     }
   ]
 }

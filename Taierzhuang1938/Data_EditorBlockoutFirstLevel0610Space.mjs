@@ -961,7 +961,7 @@ export const L0610_ROUTE = F({
   ]),
   // 泛洪测试允许到的地方：路沿线的胡同 + L4（东头到路口）+ 这几个院子 / 空地
   allowedLanes: F(["alleyNorth", "alleyA2", "alleyA3", "alleyA4", "alleyA5", "l4", "l4WestStub", "alleyEastStub", "alleyWestStub", "passage", "passageEnd"]),
-  allowedYards: F(["NAE", "WM1", "JIEFANG", "BENJIA", "GW", "GENG"]),   // GENG 只在 SideGateOpen 之后才到得了
+  allowedYards: F(["NAE", "WM1", "WM2", "WA1", "JIEFANG", "BENJIA", "GW", "GENG"]),   // GENG 只在 SideGateOpen 之后才到得了
 });
 
 // ---------------------------------------------------------------------------

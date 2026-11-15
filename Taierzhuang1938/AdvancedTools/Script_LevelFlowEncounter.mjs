@@ -3,6 +3,7 @@ import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_P
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH } from "./Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
+import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
@@ -133,7 +134,13 @@ export function CreateEncounterDocument(timeline, waves) {
       beat:group.beat,endBeat:group.endBeat,mode:"time",delay:0,
     });
   }
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-15-street-defense-2",triggers,groups,annotations:[]};
+  const patrol = structuredClone(FLOW_VILLAGE_STEALTH.patrol);
+  patrol.triggerId = "Trigger_TempleSearch";
+  groups.push(patrol);
+  triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
+    mode:"time",delay:0,area:structuredClone(patrol.area)});
+  for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevel",revision:"2026-11-15-temple-stealth-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -175,7 +182,9 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.memberPlans===undefined || Array.isArray(group.memberPlans) && group.memberPlans.length>0 && group.memberPlans.length<=40
       && group.memberPlans.every(plan=>plan && Number.isFinite(plan.delay) && plan.delay>=0 && plan.delay<=60
         && (plan.lifetime===undefined || Number.isFinite(plan.lifetime) && plan.lifetime>=2 && plan.lifetime<=2000)
-        && Array.isArray(plan.route) && plan.route.length>0 && plan.route.length<=100 && plan.route.every(CheckPoint)), "单兵推进计划无效");
+        && Array.isArray(plan.route) && plan.route.length>0 && plan.route.length<=100 && plan.route.every(CheckPoint)
+        && (plan.waitSeconds===undefined || Array.isArray(plan.waitSeconds) && plan.waitSeconds.length===plan.route.length+1
+          && plan.waitSeconds.every(seconds=>Number.isFinite(seconds)&&seconds>=0&&seconds<=60))), "单兵推进计划无效");
     Require(group.deployDelay===undefined || Number.isFinite(group.deployDelay) && group.deployDelay>=0 && group.deployDelay<=60, "隐蔽集结时长无效");
     Require(group.standoffMetres===undefined || Number.isFinite(group.standoffMetres) && group.standoffMetres>=0 && group.standoffMetres<=100, "追击距离无效");
     Require(group.spacingMetres===undefined || Number.isFinite(group.spacingMetres) && group.spacingMetres>=0 && group.spacingMetres<=10, "单兵间距无效");
@@ -407,6 +416,21 @@ function CoverMovement(group,index,time) {
   return {distance:Lerp(a[1],b[1],(time-a[0])/(b[0]-a[0])),moving:b[1]>a[1]};
 }
 
+function WaitingRouteMovement(path, waits, age, speed) {
+  let elapsed = age;
+  let distance = 0;
+  for (let index = 0; index < path.length; index++) {
+    if (elapsed < waits[index]) return {distance,moving:false};
+    elapsed -= waits[index];
+    if (index === path.length - 1) return {distance,moving:false};
+    const length = Distance(path[index],path[index+1]);
+    if (elapsed < length/speed) return {distance:distance+elapsed*speed,moving:true};
+    elapsed -= length/speed;
+    distance += length;
+  }
+  return {distance,moving:false};
+}
+
 function GroupActor(group,index,time,coreActors) {
   const life=group.lives[index];
   const survivesWithdrawal=group.withdrawAlongRoute && life.fall>=group.end;
@@ -419,7 +443,9 @@ function GroupActor(group,index,time,coreActors) {
   const lengths=path.slice(1).map((point,index)=>Distance(path[index],point));
   const total=lengths.reduce((sum,length)=>sum+length,0);
   const stationary=["suppress","guard"].includes(group.behavior);
-  const movement=group.standoffMetres||group.behavior==="bounds"?CoverMovement(group,index,Math.min(sampleTime,life.fall)):{distance:age*group.speed,moving:!stationary&&age*group.speed<total};
+  const waits = group.memberPlans?.[slot]?.waitSeconds;
+  const movement=group.standoffMetres||group.behavior==="bounds"?CoverMovement(group,index,Math.min(sampleTime,life.fall))
+    : waits ? WaitingRouteMovement(path,waits,age,group.speed) : {distance:age*group.speed,moving:!stationary&&age*group.speed<total};
   let distance=stationary?0:Math.min(total,movement.distance);
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
@@ -700,8 +726,13 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  const prior = structuredClone(defaults);
+  prior.revision = "2026-11-15-street-defense-2";
+  prior.groups = prior.groups.filter(group=>group.id!=="TempleSearch");
+  prior.triggers = prior.triggers.filter(trigger=>trigger.id!=="Trigger_TempleSearch");
+  const currentRevision = input.revision === prior.revision;
   const upgraded=UpgradeExistingEncounterDocument(input,defaults);
-  if(upgraded===input && !["2026-11-15-village-engagement-1","2026-11-15-street-defense-1"].includes(input.revision)) return input;
+  if(upgraded===input && !currentRevision && !["2026-11-15-village-engagement-1","2026-11-15-street-defense-1"].includes(input.revision)) return input;
   const value=structuredClone(upgraded);
   for(const collection of ["groups","triggers"]) for(const previous of FLOW_PREVIOUS_STREET_DEFENSE[collection]) {
     const current=value[collection].find(entry=>entry.id===previous.id);
@@ -713,6 +744,13 @@ export function UpgradeEncounterDocument(input,defaults) {
       if(spatialEdited && [...spatialKeys,"behavior","firingArea"].includes(key)) continue;
       if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(entry);
     }
+  }
+  for (const collection of ["groups","triggers"]) {
+    const id = collection === "groups" ? "TempleSearch" : "Trigger_TempleSearch";
+    if (!value[collection].some(entry=>entry.id===id)) value[collection].push(structuredClone(defaults[collection].find(entry=>entry.id===id)));
+  }
+  for (const group of value.groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) {
+    if (group.engageOn === "09e") group.engageOn = "09j";
   }
   return UpgradeVillageEngagement(value,defaults);
 }
