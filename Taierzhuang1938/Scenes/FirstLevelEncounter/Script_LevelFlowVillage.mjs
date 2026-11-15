@@ -122,6 +122,10 @@ export function StageVillageActors(actors, time, timeline, crossings) {
       Sample(time,end*1.4),
       waiting ? "kneel" : "carry", { groupId: "VillageEvacuation", status: waiting ? "守在伤员旁" : "抬架" }));
   }
+  StageVillageCompanions(actors,time,timeline);
+}
+
+export function StageVillageCompanions(actors,time,timeline) {
   const stealth = VillageStealthAt(time, timeline);
   const beat = timeline.find(entry => time < entry.end) || timeline.at(-1);
   if (stealth.active) {
@@ -132,9 +136,10 @@ export function StageVillageActors(actors, time, timeline, crossings) {
     const nier = actors.find(actor => actor.id === "nier");
     if (beat.id === "09a" || beat.id === "09b") {
       const progress = Clamp((time - beat.start) / beat.duration, 0, 1);
+      const lagScale=beat.id==="09b"?Clamp((1-progress)*2,0,1):1;
       // Follow the same bends, not a constant world offset through the walls.
-      liu.p = SampleBeatRoute(beat, Clamp(progress + (beat.id==="09a"?1.3:-1.3) / beat.duration, 0, 1));
-      nier.p = SampleBeatRoute(beat, Clamp(progress - 2.6 / beat.duration, 0, 1));
+      liu.p = SampleBeatRoute(beat, Clamp(progress + (beat.id==="09a"?1.3:-1.3*lagScale) / beat.duration, 0, 1));
+      nier.p = SampleBeatRoute(beat, Clamp(progress - 2.6*lagScale / beat.duration, 0, 1));
       liu.pose = nier.pose = "kneel";
       if (beat.id==="09a" && progress>=0.9) {
         const approach=Clamp((progress-0.9)/0.1,0,1);

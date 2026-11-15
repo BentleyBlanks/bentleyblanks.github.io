@@ -27,6 +27,7 @@ export const FLOW_VILLAGE_STEALTH = {
     route: [[94.5,433.5],[92,433.5],[88,435],[84.5,429.5],[88,435],[92,433.5],[94.5,433.5]],
     count: 2, maxAlive: 2, interval: 0, lifetime: 1000, speed: 2.2,
     behavior: "withdraw", deployDelay: 60, spawnOffsets: [[0,0],[1,0.6]],
+    afterRouteLookAt: [96.75,442.5],
     memberPlans: [
       {delay:4,route:[[92,433.5],[88,435],[84.5,429.5],[88,435],[92,433.5],[94.5,433.5]],waitSeconds:[0,0,0,4,0,0,0]},
       {delay:7,route:[[92,434.1],[89.8,435],[89.8,431],[92,435],[95.5,434.1]],waitSeconds:[0,0,0,5,0,0]}

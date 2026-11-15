@@ -12,10 +12,34 @@ export class VillageStealthPlay {
     this.state=null;
     this.pull=null;
     this.observerId=null;
+    this.exitStartedElapsed=null;
     this.shots=this.host.state.playerShots;
     this.grenades=this.host.state.grenades+this.host.state.bundles;
   }
   CapturesInput() { return !!(this.state?.locked || this.state?.alarm); }
+  CompanionFrameTime(frame,entries,elapsed) {
+    if(frame.beat.id==="09a") {
+      const points=frame.beat.p,player=this.host.player.position;
+      let length=0,nearest=Infinity,distance=0;
+      for(let index=1;index<points.length;index++) {
+        const a=points[index-1],b=points[index],dx=b[0]-a[0],dz=b[1]-a[1];
+        const squared=dx*dx+dz*dz,segment=Math.sqrt(squared);
+        const t=squared?Math.max(0,Math.min(1,((player.x-a[0])*dx+(player.z-a[1])*dz)/squared)):0;
+        const error=Math.hypot(a[0]+t*dx-player.x,a[1]+t*dz-player.z);
+        if(error<nearest){nearest=error;distance=length+segment*t;}
+        length+=segment;
+      }
+      const progress=Math.min(1,(distance+0.5)/Math.max(0.001,length));
+      return Math.min(frame.beat.end-0.001,frame.beat.start+frame.beat.duration*progress);
+    }
+    if(frame.beat.id!==PLAN.pullBeat||frame.stealth.pulling)return null;
+    const guards=[...entries.values()].filter(entry=>entry.actor.groupId===PLAN.patrol.id&&entry.soldier.alive);
+    const cleared=guards.every(entry=>!entry.route || entry.routeIndex===entry.route.length-1
+      &&Math.hypot(entry.soldier.position.x-entry.route.at(-1)[0],entry.soldier.position.z-entry.route.at(-1)[1])<1.5);
+    if(cleared&&this.exitStartedElapsed===null)this.exitStartedElapsed=elapsed;
+    if(this.exitStartedElapsed===null)return frame.beat.start+PLAN.pullSeconds;
+    return Math.min(frame.beat.end-0.001,frame.beat.start+PLAN.patrolClearSeconds+elapsed-this.exitStartedElapsed);
+  }
   Detected(entries) {
     const {player,battlefield}=this.host;
     this.observerId=null;

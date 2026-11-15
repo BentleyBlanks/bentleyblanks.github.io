@@ -57,7 +57,7 @@ export class EncounterPlayPlan {
   Frame(){return EvaluateFlow(Math.min(this.time,this.beat.end-0.001),this.document);}
   Kill(id){this.dead.add(id);}
   Interact(){this.interacted.add(this.beat.id);if(CONFIG.interactionBeats.includes(this.beat.id))this.time=this.beat.end;}
-  Step(dt,player,aliveIds) {
+  Step(dt,player,aliveIds,conditions={}) {
     if(this.completed)return;
     this.elapsed+=dt;
     this.time=Math.min(this.beat.end,this.time+dt);
@@ -66,8 +66,13 @@ export class EncounterPlayPlan {
       if(trigger.mode==="time"||InsideArea(player,trigger.area)) this.triggers.set(trigger.id,this.elapsed);
     }
     const endpoint=this.beat.p.at(-1), cinematic=ENCOUNTER_CINEMATICS.includes(this.beat.id);
+    const arrivalGate=CONFIG.arrivalGates?.[this.beat.id];
+    const reached=Distance(player,endpoint)<=(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM);
+    const arrivalReady=arrivalGate==="reach"||conditions[arrivalGate];
+    if(arrivalGate&&reached&&arrivalReady)this.time=this.beat.end;
     const needed=CONFIG.clearGroups[this.beat.id]||[];
     this.waiting=this.time<this.beat.end?null:!cinematic&&Distance(player,endpoint)>(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)?"reach":
+      arrivalGate&&!arrivalReady?"event":
       needed.some(id=>{
         const group=this.compiled.groups.find(g=>g.id===id);
         return group?.enabled&&(this.groups.get(id).count<group.count||[...aliveIds].some(actor=>actor.startsWith(id+"_")));

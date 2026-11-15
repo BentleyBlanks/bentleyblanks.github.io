@@ -73,7 +73,8 @@ for(let time=BeatById("09b").start+PLAN.patrolClearSeconds;time<BeatById("09b").
   for(const guard of frame.actors.filter(actor=>actor.groupId===PLAN.patrol.id)) {
     for(const id of ["player","liu","nier"]) {
       const actor=frame.actors.find(entry=>entry.id===id),dx=actor.p[0]-guard.p[0],dz=actor.p[1]-guard.p[1],distance=Math.hypot(dx,dz);
-      if(distance>PLAN.detectionRangeM || -dz/distance<Math.cos(PLAN.detectionHalfAngleDeg*Math.PI/180))continue;
+      const heading=guard.heading||0;
+      if(distance>PLAN.detectionRangeM || (Math.sin(heading)*dx-Math.cos(heading)*dz)/distance<Math.cos(PLAN.detectionHalfAngleDeg*Math.PI/180))continue;
       assert.ok(Blocked([guard.p[0],terrain.heightAt(...guard.p)+PLAN.enemyEyeM,guard.p[1]],
         [actor.p[0],terrain.heightAt(...actor.p)+(id==="nier"?0.85:1.6),actor.p[1]]),`${id} exits behind the returned sentries at ${time}`);
     }

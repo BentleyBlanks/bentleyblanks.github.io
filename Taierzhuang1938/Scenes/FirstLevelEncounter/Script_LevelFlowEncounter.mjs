@@ -140,7 +140,7 @@ export function CreateEncounterDocument(timeline, waves) {
   triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
     mode:"time",delay:0,area:structuredClone(patrol.area)});
   for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-15-temple-stealth-2",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-15-temple-stealth-3",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -178,6 +178,7 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(["friend","enemy"].includes(group.side) && ["player","winter","enemy","ramp","none"].includes(group.target), "阵营或目标无效");
     Require(typeof group.enabled === "boolean" && Object.hasOwn(ENCOUNTER_BEHAVIORS,group.behavior), "行为配置无效");
     Require(Array.isArray(group.route) && group.route.length>0 && group.route.length<=100 && group.route.every(CheckPoint), "推进路线无效");
+    Require(group.afterRouteLookAt===undefined || CheckPoint(group.afterRouteLookAt),"路线结束朝向无效");
     Require(group.spawnOffsets===undefined || Array.isArray(group.spawnOffsets) && group.spawnOffsets.length>0 && group.spawnOffsets.length<=40 && group.spawnOffsets.every(CheckPoint), "分散生成点无效");
     Require(group.memberPlans===undefined || Array.isArray(group.memberPlans) && group.memberPlans.length>0 && group.memberPlans.length<=40
       && group.memberPlans.every(plan=>plan && Number.isFinite(plan.delay) && plan.delay>=0 && plan.delay<=60
@@ -471,7 +472,9 @@ function GroupActor(group,index,time,coreActors) {
   const firingWindow=!group.fireCycle || (time-life.born+group.fireCycle.offset+slot*0.7)%group.fireCycle.seconds<group.fireCycle.active;
   const firing=time<group.end && group.behavior!=="withdraw" && group.target!=="none" && pose==="shoot" && inFiringArea && firingWindow;
   if(pose==="shoot" && !firing && group.fireCycle) pose="kneel";
-  return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,
+  const heading=group.afterRouteLookAt&&!movement.moving&&distance>=total-0.001
+    ?Math.atan2(group.afterRouteLookAt[0]-position[0],-(group.afterRouteLookAt[1]-position[1])):undefined;
+  return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,heading,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
     ...(group.withdrawAlongRoute ? {withdrawn:time>=group.end && !dead && distance<=0} : {}),
     heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing};
@@ -726,7 +729,7 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
-  if(input.revision==="2026-11-15-temple-stealth-1")return UpgradeTempleCover(structuredClone(input),defaults);
+  if(["2026-11-15-temple-stealth-1","2026-11-15-temple-stealth-2"].includes(input.revision))return UpgradeTempleCover(structuredClone(input),defaults);
   const prior = structuredClone(defaults);
   prior.revision = "2026-11-15-street-defense-2";
   prior.groups = prior.groups.filter(group=>group.id!=="TempleSearch");
@@ -757,6 +760,8 @@ export function UpgradeEncounterDocument(input,defaults) {
 }
 
 function UpgradeTempleCover(value,defaults) {
+  const patrol=value.groups.find(group=>group.id==="TempleSearch");
+  if(patrol&&patrol.afterRouteLookAt===undefined)patrol.afterRouteLookAt=structuredClone(defaults.groups.find(group=>group.id==="TempleSearch").afterRouteLookAt);
   const current=value.triggers.find(trigger=>trigger.id==="Arrival_09b");
   const next=defaults.triggers.find(trigger=>trigger.id==="Arrival_09b");
   const previousAreas=[

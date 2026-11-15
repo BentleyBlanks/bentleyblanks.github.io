@@ -50,6 +50,15 @@ const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
 }
 assert.equal(JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT),original,"Play does not mutate authoring data");
 {
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09a").start);
+  plan.Step(0,plan.beat.p.at(-1),new Set());
+  assert.equal(plan.beat.id,"09b","temple entry uses actual arrival without waiting for the preview duration");
+  plan.Step(1000,plan.beat.p.at(-1),new Set(),{partyArrived:false});
+  assert.equal(plan.waiting,"event");
+  plan.Step(0,plan.beat.p.at(-1),new Set(),{partyArrived:true});
+  assert.equal(plan.beat.id,"09c","exit waits for actual companion arrival");
+}
+{
  const old=structuredClone(DEFAULT_ENCOUNTER_DOCUMENT);old.groups[0].count=4;
  const values=new Map([["tengxian1938_encounter_v2",JSON.stringify(old)]]);
  const storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};

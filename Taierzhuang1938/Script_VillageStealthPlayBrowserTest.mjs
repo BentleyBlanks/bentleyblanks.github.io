@@ -22,6 +22,27 @@ async function Ready() {
   if(await boot.isVisible())await boot.click({timeout:180000});
   await page.waitForFunction(()=>Tengxian.state.running,null,{timeout:180000});
 }
+async function Walk(points,nextBeat) {
+  return page.evaluate(({points,nextBeat})=>{
+    const g=Tengxian;
+    if(g.player.stance!=="crouch")g.Debug.Key("KeyC");
+    let frames=0;
+    outer:for(const point of points) {
+      g.Debug.Key("KeyW",true);
+      for(let step=0;step<900;step++) {
+        if(Math.hypot(g.player.position.x-point[0],g.player.position.z-point[1])<.18)break;
+        g.player.yaw=Math.atan2(g.player.position.x-point[0],g.player.position.z-point[1]);
+        g.StepFrames(1,1/60,false);frames++;
+        const state=g.Debug.EncounterPlay.State();
+        if(state.failed)throw Error("walk failed "+JSON.stringify(state.stealth));
+        if(state.beat===nextBeat){g.Debug.Key("KeyW",false);break outer;}
+        if(step===899)throw Error("walk stalled "+JSON.stringify({point,p:g.player.position.toArray()}));
+      }
+      g.Debug.Key("KeyW",false);
+    }
+    return {state:g.Debug.EncounterPlay.State(),position:g.player.position.toArray(),frames};
+  },{points,nextBeat});
+}
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/index.html?encounterPlay=1&manual=1`);
   await Ready();console.log("ok temple Play loaded");
@@ -70,6 +91,22 @@ try {
   assert.ok((await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State())).failed);
   await page.evaluate(()=>Tengxian.Debug.Key("KeyR"));
   assert.equal(await page.evaluate(()=>Tengxian.combat.projectiles.length),0,"retry clears live grenades");
+  const approach=await Walk(BeatById("09a").p.slice(1),"09b");
+  assert.equal(approach.state.beat,"09b","walking the route triggers the temple pull on arrival");
+  assert.ok(approach.state.elapsed<BeatById("09a").duration,"entry does not wait for the preview clock");
+  const search=await page.evaluate(()=>{
+    Tengxian.StepFrames(1800,1/60,false);
+    return Tengxian.Debug.EncounterPlay.State();
+  });
+  assert.ok(!search.failed,"the search stays safe after a real approach");
+  const exitBeat=BeatById("09b");
+  const coverIndex=exitBeat.p.findLastIndex(point=>point[0]===80&&point[1]===426.7);
+  const exited=await Walk(exitBeat.p.slice(coverIndex+1),"09c");
+  if(exited.state.beat!=="09c") {
+    await page.evaluate(()=>Tengxian.StepFrames(1800,1/60,false));
+    assert.equal(await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State().beat),"09c");
+  }
+  console.log("ok continuous alley walk, physical patrol, safe exit and companion arrival through 09C");
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?beat=09b`);
   await page.waitForFunction(()=>window.LevelFlow);
   const editor=await page.evaluate(()=>({time:LevelFlow.Inspect().time,document:JSON.stringify(LevelFlow.Inspect().document)}));
@@ -95,7 +132,7 @@ try {
   assert.equal(await page.evaluate(()=>JSON.stringify(LevelFlow.Inspect().document)),editor.document);
   console.log("ok editor Play retries automatically and Stop restores the untouched authoring snapshot");
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(out,"Data_Result.json"),JSON.stringify({pulled,released,fired,state,retried,grenade,errors},null,2));
+  await fs.writeFile(path.join(out,"Data_Result.json"),JSON.stringify({pulled,released,fired,state,retried,grenade,approach,search,exited,errors},null,2));
   console.log("ok real grenade failure, checkpoint ammo restoration and clean 720p Play");
 } catch(error) {
   console.log(JSON.stringify(await page.evaluate(()=>({boot:document.querySelector("#boot")?.innerText,
