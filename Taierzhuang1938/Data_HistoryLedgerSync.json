@@ -711,6 +711,29 @@
         }
       ],
       "decision": "Events, local placement, timing, movement and no-fire/retry rules are creative staging. No new historical source or classification upgrade. The existing general temple/school comparison remains separate."
+    },
+    {
+      "id": "EncounterOutline20261115",
+      "date": "2026-11-15",
+      "scope": "Current saved encounter stages 01-10, mapped to outline 01-12 without renumbering. Preserve global review cursors and unrelated historical claims.",
+      "classification": "invented",
+      "repoCommit": "4767f94f7f3358ba1e8e6630d2d5a88163a88169",
+      "runtime": "Scenes/FirstLevelEncounter/Data_LevelFlow.mjs; Script_LevelFlowModel.mjs; Script_LevelFlowVillage.mjs",
+      "notionSnapshots": [
+        {
+          "id": "3f960335331c81d8bd65e07e7288f7d2",
+          "lastEdited": "2026-11-15T09:29:20.255Z"
+        },
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-15T09:29:58.077Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-15T09:29:59.105Z"
+        }
+      ],
+      "decision": "Updated only the story outline and the matching creative ledger. Script and beat sheet remain unsynchronized; authored blocking is not proof of completed gameplay."
     }
   ]
 }
