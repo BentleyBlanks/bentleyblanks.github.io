@@ -1012,7 +1012,7 @@ export class AiDirector {
   }
 
   /** Scene director orders use the existing movement/combat components. */
-  DirectActor(s, { x, z, yaw, stance=0, combat=true, moving=false, speed=2.6 } = {}) {
+  DirectActor(s, { x, z, yaw, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7 } = {}) {
     if (!s?.alive) return;
     s.goal.set(x, this.ctx.battlefield.GroundHeight(x,z), z);
     s.order=moving?"advance":"hold";
@@ -1021,7 +1021,7 @@ export class AiDirector {
     s.scriptedNoncombatant=!combat;
     s.p012Guided=moving;
     s.scriptMoveSpeedMps=moving?speed:undefined;
-    s.scriptArrivalRadius=0.7;
+    s.scriptArrivalRadius=arrivalRadius;
     if(Number.isFinite(yaw)&&!moving&&!s.target) s.yaw=yaw;
     this.SetStance(s,stance,0.3,true);
   }
@@ -1059,8 +1059,9 @@ export class AiDirector {
     if (w) { x = Clamp(x, w.minX, w.maxX); z = Clamp(z, w.minZ, w.maxZ); }
     // 走不到的口袋里不许生人：三个占领点的圆心在封闭院落里，守军撒进去之后
     // 攻方永远够不着，双方隔着一堵墙站到天亮（见 NavGrid.InMain 的账）。
+    // 作者摆定的场景路线可能穿过粗导航网格未连通的窄门，下面仍检查实际物理净空。
     const nav = this.ctx.nav;
-    if (nav && !nav.InMain(x, z)) {
+    if (nav && options.navPlacement !== "authored" && !nav.InMain(x, z)) {
       nav.SnapToMain(x, z, this.navOut);
       x = this.navOut.x; z = this.navOut.z;
     }

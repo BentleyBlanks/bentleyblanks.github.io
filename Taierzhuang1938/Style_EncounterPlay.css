@@ -7,3 +7,7 @@
 .encounterDual #view,.encounterDual #hud{width:50%!important}.encounterDual .encounterPlayHud{max-width:calc(50% - 52px)}.encounterDual .encounterDialogue{left:3%;width:44%}.encounterDual .encounterHint{width:50%}
 .encounterPrimary{position:fixed;left:0;top:0;width:50%;height:100%;pointer-events:none;z-index:1}.encounterDual #view{opacity:0}
 .encounterObserver button,.encounterObserver select{background:#303740;color:#e6e8ea;border:1px solid #65707a;border-radius:3px;font:12px system-ui;padding:2px 7px}
+.encounterDialogue,
+.encounterHint {
+  pointer-events: none;
+}

@@ -11,12 +11,14 @@ export function VillageStealthAt(time, timeline) {
   const age = time - pull.start;
   const active = time >= Beat(PLAN.fromBeat).start && time < Beat(PLAN.attackBeat).start;
   const pulling = active && age >= 0 && age < PLAN.pullSeconds - 1e-7;
+  const pullProgress=Clamp((age-PLAN.pullLeadSeconds)/(PLAN.pullSeconds-PLAN.pullLeadSeconds),0,1);
   return {
     active, pulling, locked: pulling, allowAim: !pulling,
+    pullProgress,
     objective: active ? PLAN.objective : null,
     checkpoint: time < Beat(PLAN.checkpointBeat).start ? Beat(PLAN.fromBeat).start : Beat(PLAN.checkpointBeat).start,
     failure: PLAN.failure,
-    eyeHeight: pulling ? Lerp(1.6, 0.95, Clamp(age / PLAN.pullSeconds, 0, 1)) : 0.95,
+    eyeHeight: pulling ? Lerp(1.6, 0.95, pullProgress) : 0.95,
     handVisible: pulling,
     patrolCleared: age >= PLAN.patrolClearSeconds,
   };
@@ -136,8 +138,10 @@ export function StageVillageActors(actors, time, timeline, crossings) {
       liu.pose = nier.pose = "kneel";
       if (beat.id==="09a" && progress>=0.9) {
         const approach=Clamp((progress-0.9)/0.1,0,1);
-        liu.p=SampleRoute([[76.5,423.8],[76.7,424.8],[82.15,424.8],[82.15,425.3]],approach);
-        nier.p=SampleRoute([[76.7,423.8],[76.7,424.8],[80.5,424.8],[80.5,423.3]],approach);
+        const liuStart=SampleBeatRoute(beat,0.9+1.3/beat.duration);
+        const nierStart=SampleBeatRoute(beat,0.9-2.6/beat.duration);
+        liu.p=SampleRoute([liuStart,[80,424.8],[80,426],PLAN.liuCover],approach);
+        nier.p=SampleRoute([nierStart,[76.7,423.8],[76.7,424.8],[79.8,424.8],PLAN.nierCover],approach);
         if(progress>=0.97) {
           player.eyeHeight=Lerp(0.95,1.6,(progress-0.97)/0.03);
           player.pose="stand";
@@ -145,18 +149,20 @@ export function StageVillageActors(actors, time, timeline, crossings) {
       }
       if (beat.id===PLAN.pullBeat && time>=beat.start+PLAN.patrolClearSeconds) {
         const departure=Clamp((time-beat.start-PLAN.patrolClearSeconds)/3,0,1);
-        liu.p=SampleRoute([[82.15,425.3],[82.15,424.8],liu.p],departure);
-        nier.p=nier.p.map((value,axis)=>Lerp([80.5,423.3][axis],value,departure));
+        liu.p=SampleRoute([PLAN.liuCover,PLAN.playerCover,[PLAN.playerCover[0],liu.p[1]],liu.p],departure);
+        nier.p=SampleRoute([PLAN.nierCover,PLAN.playerCover,[PLAN.playerCover[0],nier.p[1]],nier.p],departure);
       }
     }
     if (beat.id === PLAN.pullBeat && time < beat.start + PLAN.patrolClearSeconds) {
-      liu.p = [82.15,425.3];
+      liu.p = [...PLAN.liuCover];
       liu.pose = stealth.pulling ? "carry" : "kneel";
       liu.status = stealth.pulling ? "伸手拉顺子蹲下" : "盯住殿门，等搜巷兵走远";
-      nier.p = [80.5,423.3];
+      nier.p = [...PLAN.nierCover];
       nier.pose = "kneel";
       nier.status = "看文财手势，缩在墙后";
-      player.lookAt = [84.5,429.5];
+      player.lookAt = [...PLAN.lookAt];
+      const facing=stealth.pulling?player.p:PLAN.lookAt;
+      liu.heading=Math.atan2(facing[0]-liu.p[0],-(facing[1]-liu.p[1]));
     }
   }
 }

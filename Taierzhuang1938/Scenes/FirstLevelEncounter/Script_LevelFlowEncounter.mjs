@@ -140,7 +140,7 @@ export function CreateEncounterDocument(timeline, waves) {
   triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
     mode:"time",delay:0,area:structuredClone(patrol.area)});
   for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-15-temple-stealth-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-15-temple-stealth-2",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -726,6 +726,7 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-15-temple-stealth-1")return UpgradeTempleCover(structuredClone(input),defaults);
   const prior = structuredClone(defaults);
   prior.revision = "2026-11-15-street-defense-2";
   prior.groups = prior.groups.filter(group=>group.id!=="TempleSearch");
@@ -752,7 +753,22 @@ export function UpgradeEncounterDocument(input,defaults) {
   for (const group of value.groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) {
     if (group.engageOn === "09e") group.engageOn = "09j";
   }
-  return UpgradeVillageEngagement(value,defaults);
+  return UpgradeTempleCover(UpgradeVillageEngagement(value,defaults),defaults);
+}
+
+function UpgradeTempleCover(value,defaults) {
+  const current=value.triggers.find(trigger=>trigger.id==="Arrival_09b");
+  const next=defaults.triggers.find(trigger=>trigger.id==="Arrival_09b");
+  const previousAreas=[
+    {shape:"circle",center:[76,430],size:[6,6]},
+    {shape:"circle",center:[80.3,424.8],size:[2.4,2.4]}
+  ];
+  if(current && next && previousAreas.some(area=>JSON.stringify(area)===JSON.stringify(current.area))) {
+    current.area=structuredClone(next.area);
+    if(current.label==="蹲在窗台底下挪过" || current.label==="蹲在窗台下挪过")current.label=next.label;
+  }
+  value.revision=defaults.revision;
+  return value;
 }
 
 function UpgradeTankDestruction(value,defaults) {

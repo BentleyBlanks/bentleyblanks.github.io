@@ -85,7 +85,7 @@ const PLUGINS = {
       return Instance(runtime,{
         debugName:"EncounterPlay",updateSlot:"beforeAi",holdsRespawn:true,
         ScaleDt:dt=>runtime.ready&&!runtime.failed&&!runtime.plan.completed?dt:0,
-        CapturesInput:()=>!runtime.ready||runtime.view.count===2&&runtime.view.focused,
+        CapturesInput:()=>runtime.CapturesInput(),
         OnKey:detail=>runtime.OnKey(detail),
         OnPlayerDown:()=>{runtime.failed=true;runtime.RenderHud();return true;},
         ViewportSize:()=>runtime.view.Size(),

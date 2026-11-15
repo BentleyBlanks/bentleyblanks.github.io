@@ -67,7 +67,7 @@ export class EncounterPlayPlan {
     }
     const endpoint=this.beat.p.at(-1), cinematic=ENCOUNTER_CINEMATICS.includes(this.beat.id);
     const needed=CONFIG.clearGroups[this.beat.id]||[];
-    this.waiting=this.time<this.beat.end?null:!cinematic&&Distance(player,endpoint)>CONFIG.reachM?"reach":
+    this.waiting=this.time<this.beat.end?null:!cinematic&&Distance(player,endpoint)>(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)?"reach":
       needed.some(id=>{
         const group=this.compiled.groups.find(g=>g.id===id);
         return group?.enabled&&(this.groups.get(id).count<group.count||[...aliveIds].some(actor=>actor.startsWith(id+"_")));

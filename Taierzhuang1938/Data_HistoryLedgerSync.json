@@ -698,8 +698,8 @@
       "date": "2026-11-15",
       "scope": "This review covers only the user-approved cart tethering, dispersed stretcher shelter, temple passage, patrol blocking, short crouch pull and stealth failure design. Preserve global review cursors and unrelated sources.",
       "classification": "invented",
-      "runtime": "AdvancedTools/Data_LevelFlow.mjs and AdvancedTools/Script_LevelFlowVillage.mjs",
-      "scene": "Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json; matching changed objects in Scenes/FirstLevel/Scene_FirstLevel.json",
+      "runtime": "Scenes/FirstLevelEncounter/Data_LevelFlow.mjs; Scenes/FirstLevelEncounter/Script_LevelFlowVillage.mjs; Script_VillageStealthPlay.mjs",
+      "scene": "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json; original matching temple openings were delivered in FirstLevelWhitebox and FirstLevel",
       "notionSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
@@ -710,7 +710,8 @@
           "lastEdited": "2026-11-15T07:42:12.558Z"
         }
       ],
-      "decision": "Events, local placement, timing, movement and no-fire/retry rules are creative staging. No new historical source or classification upgrade. The existing general temple/school comparison remains separate."
+      "decision": "Events, local placement, timing, movement and no-fire/retry rules are creative staging. No new historical source or classification upgrade. The existing general temple/school comparison remains separate.",
+      "playIntegration": "Actual firearm and throw counters, scene-occluded enemy sight, 1.8-second player control, alarm, in-session checkpoint reconstruction and inventory restoration implement the same creative design."
     },
     {
       "id": "EncounterOutline20261115",
