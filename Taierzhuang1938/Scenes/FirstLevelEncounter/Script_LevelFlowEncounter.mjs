@@ -1,7 +1,7 @@
 import { FLOW_ZOOM } from "../../Data_Tuning_LevelFlow.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER } from "./Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
@@ -140,7 +140,7 @@ export function CreateEncounterDocument(timeline, waves) {
   triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
     mode:"time",delay:0,area:structuredClone(patrol.area)});
   for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-15-temple-stealth-3",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-16-camp-cover-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -728,6 +728,25 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if(input.revision===defaults.revision) return input;
+  const upgraded=input.revision===FLOW_PREVIOUS_CAMP_COVER.revision
+    ? structuredClone(input) : UpgradeTempleEncounterDocument(input,defaults);
+  if(upgraded===input) return input;
+  for(const previous of FLOW_PREVIOUS_CAMP_COVER.groups) {
+    const current=upgraded.groups.find(group=>group.id===previous.id);
+    const next=defaults.groups.find(group=>group.id===previous.id);
+    if(!current || !next || ["area","route","spawnOffsets"].some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]))) continue;
+    for(const [index,plan] of (current.memberPlans||[]).entries()) {
+      if(JSON.stringify(plan.route)===JSON.stringify(previous.memberPlans[index]?.route)) {
+        plan.route=structuredClone(next.memberPlans[index].route);
+      }
+    }
+  }
+  upgraded.revision=defaults.revision;
+  return upgraded;
+}
+
+function UpgradeTempleEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
   if(["2026-11-15-temple-stealth-1","2026-11-15-temple-stealth-2"].includes(input.revision))return UpgradeTempleCover(structuredClone(input),defaults);
   const prior = structuredClone(defaults);

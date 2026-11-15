@@ -13,7 +13,7 @@ import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
-import { FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlow.mjs";
@@ -915,6 +915,69 @@ for(let stamp=BeatById("04d").start;stamp<holdRelease;stamp+=0.25) {
     }
   }
 }
+// The 05A camp defenders occupy the protected side of the actual scene cover.
+const encounterSceneRoot=new URL("./Scenes/FirstLevelEncounter/",import.meta.url);
+const encounterScene=JSON.parse(fs.readFileSync(new URL("Scene_FirstLevelEncounter.json",encounterSceneRoot)));
+const encounterMap=BuildEncounterMap(encounterScene);
+const ReadEncounterBytes=name=>{
+  const bytes=fs.readFileSync(new URL(name,encounterSceneRoot));
+  return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
+};
+const encounterTerrain=BuildEncounterTerrain(encounterScene,ReadEncounterBytes(encounterScene.terrain.file),ReadEncounterBytes(encounterScene.trenches.datum.file),encounterMap);
+const campCoverIds={GroundWest:"Encounter_FieldWestBerm",GroundEast:"Encounter_FieldEastWall"};
+for(const stamp of [530.113,BeatById("04a").start+20,holdRelease-0.3]) {
+  const frame=EvaluateFlow(stamp);
+  for(const [groupId,coverId] of Object.entries(campCoverIds)) {
+    const cover=encounterScene.objects.find(object=>object.id===coverId);
+    const members=frame.actors.filter(actor=>actor.groupId===groupId);
+    assert.equal(members.length,4,"both camp flanks retain four defenders");
+    const [x,base,z]=cover.pos,[width,height,depth]=cover.size;
+    const area={shape:"rect",center:[x,z],size:[width,depth]};
+    for(const actor of members) {
+      assert.ok(actor.p[0]>x+width/2+0.34 && actor.p[0]<x+width/2+1,"camp defenders occupy the protected side with body clearance");
+      for(const observer of [frame.player,...frame.actors.filter(friend=>friend.coveringEvacuation).map(friend=>friend.p)]) {
+        const fraction=EnterArea(actor.p,observer,area);
+        assert.notEqual(fraction,null,actor.id+" has cover between it and the camp firing line");
+        const torso=encounterTerrain.heightAt(...actor.p)+0.8;
+        const eye=encounterTerrain.heightAt(...observer)+1.6;
+        const hitHeight=torso+(eye-torso)*fraction;
+        assert.ok(hitHeight>base && hitHeight<base+height,actor.id+" lower torso is shielded by the real cover volume");
+      }
+    }
+  }
+}
+for(let stamp=BeatById("03h").start;stamp<BeatById("05a").end;stamp+=0.1) {
+  for(const actor of EvaluateFlow(stamp).actors.filter(actor=>Object.hasOwn(campCoverIds,actor.groupId))) {
+    const cover=encounterScene.objects.find(object=>object.id===campCoverIds[actor.groupId]);
+    assert.ok(Math.abs(actor.p[0]-cover.pos[0])>cover.size[0]/2+0.34 || Math.abs(actor.p[1]-cover.pos[2])>cover.size[2]/2+0.34,actor.id+" enters and leaves camp cover without clipping it");
+  }
+}
+const oldCampCover=structuredClone(defaults);
+oldCampCover.revision=FLOW_PREVIOUS_CAMP_COVER.revision;
+for(const previous of FLOW_PREVIOUS_CAMP_COVER.groups) Object.assign(oldCampCover.groups.find(group=>group.id===previous.id),structuredClone(previous));
+const upgradedCampCover=UpgradeEncounterDocument(oldCampCover,defaults);
+for(const id of Object.keys(campCoverIds)) assert.deepEqual(upgradedCampCover.groups.find(group=>group.id===id).memberPlans,defaults.groups.find(group=>group.id===id).memberPlans);
+const editedCampCover=structuredClone(oldCampCover);
+const editedWest=editedCampCover.groups.find(group=>group.id==="GroundWest");
+editedWest.memberPlans[0].route[0][0]+=2;
+editedWest.memberPlans[1].delay+=1;
+editedWest.count=3;editedWest.enabled=false;
+const editedEast=editedCampCover.groups.find(group=>group.id==="GroundEast");
+editedEast.area.center[0]+=2;
+const preservedCampCover=UpgradeEncounterDocument(editedCampCover,defaults);
+const preservedWest=preservedCampCover.groups.find(group=>group.id==="GroundWest");
+assert.deepEqual(preservedWest.memberPlans[0],editedWest.memberPlans[0],"custom member route is preserved");
+assert.equal(preservedWest.memberPlans[1].delay,editedWest.memberPlans[1].delay,"custom delay is preserved while its default route upgrades");
+assert.deepEqual(preservedWest.memberPlans[1].route,defaults.groups.find(group=>group.id==="GroundWest").memberPlans[1].route);
+assert.equal(preservedWest.count,3);assert.equal(preservedWest.enabled,false);
+assert.deepEqual(preservedCampCover.groups.find(group=>group.id==="GroundEast"),editedEast,"custom spawn area preserves the corresponding routes");
+const deletedCampCover=structuredClone(oldCampCover);
+deletedCampCover.groups=deletedCampCover.groups.filter(group=>group.id!=="GroundWest");
+assert.ok(!UpgradeEncounterDocument(deletedCampCover,defaults).groups.some(group=>group.id==="GroundWest"));
+assert.equal(UpgradeEncounterDocument(defaults,defaults),defaults);
+const futureCampCover={...oldCampCover,revision:"future-camp-layout"};
+assert.equal(UpgradeEncounterDocument(futureCampCover,defaults),futureCampCover);
+
 const annotatedEvacuationTime=BeatById("05a").start+12.1794;
 const annotatedEvacuation=EvaluateFlow(annotatedEvacuationTime);
 assert.equal(annotatedEvacuation.actors.filter(actor=>actor.coveringEvacuation&&actor.firing).length,2);
