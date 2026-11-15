@@ -740,7 +740,7 @@ Check(yaowaReport.facing.sourceForward === "+Z" && yaowaReport.facing.actorForwa
   "幺娃沿用X Bot源+Z至角色-Z的共用桥接");
 Check(Math.abs(Math.max(...yaowaCloud.map(point => point[1])) - 1.615) < .0001,
   "幺娃保留V6的1.615米帽顶高度");
-for (const [id, name] of [["LiuWencai", "刘文财"], ["Interpreter", "翻译"]]) {
+for (const [id, name] of [["LiuWencai", "刘文财"], ["Interpreter", "翻译"], ["TianSao", "田嫂"]]) {
   const file = path.join(projectDir, `Model/Character/Model_${id}.glb`);
   const model = LoadGlb(file), doc = model.json;
   const mesh = doc.nodes.find(node => node.mesh === 0);

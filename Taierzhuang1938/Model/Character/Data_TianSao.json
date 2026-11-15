@@ -1,0 +1,148 @@
+{
+  "schema": 1,
+  "built": "2026-11-15",
+  "script": "_import/Script_BuildTianSao.mjs",
+  "source": {
+    "file": "Model_TianSao_V7_Bones.glb",
+    "bytes": 37558560,
+    "sha256": "1fe5ea0e45c524d0c650e275406e01c5d230fcf782f33c7fe4bb0843c9f56d13",
+    "heightM": 1
+  },
+  "output": {
+    "file": "Model/Character/Model_TianSao.glb",
+    "bytes": 7792172,
+    "sha256": "7dfa0e9fd28a16fa4be47db8e35b527270dbe8879cd0aecc678cad3143fdd053"
+  },
+  "scale": 1.65,
+  "crownM": 1.65,
+  "triangles": 38256,
+  "vertices": 31649,
+  "sourceVertices": 31649,
+  "bones": 65,
+  "addedEndBones": [
+    "HeadTop_End",
+    "RightHandThumb4",
+    "RightHandIndex4",
+    "RightHandMiddle4",
+    "RightHandRing4",
+    "RightHandPinky4",
+    "LeftHandThumb4",
+    "LeftHandMiddle4",
+    "LeftHandRing4",
+    "LeftHandPinky4"
+  ],
+  "rigidHead": {
+    "aboveHeadJointM": [
+      0.015,
+      0.09
+    ],
+    "vertices": 2966,
+    "otherInfluenceVertices": 0
+  },
+  "hipsY": 0.8862,
+  "xbotHipsY": 1.0427,
+  "hipsScale": 0.8499,
+  "headY": 1.4792,
+  "xbotHeadY": 1.5993,
+  "images": [
+    {
+      "index": 0,
+      "role": "baseColor",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 18844794,
+      "bytes": 2929014
+    },
+    {
+      "index": 1,
+      "role": "metallicRoughness",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 6482383,
+      "bytes": 720330
+    },
+    {
+      "index": 2,
+      "role": "normal",
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 9972947,
+      "bytes": 2013170
+    }
+  ],
+  "faceSkin": {
+    "blendStartM": 1.403160326031203,
+    "rigidStartM": 1.4366686323244855,
+    "repairedVertices": 3904,
+    "faceVertices": 4339,
+    "minimumFaceHeadWeightBefore": 0.08627451211214066,
+    "minimumFaceHeadWeightAfter": 1
+  },
+  "preparation": {
+    "source": {
+      "file": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\角色\\Tripo\\24_田嫂\\Model_TianSao_TripoReady_V6_Bones.glb",
+      "sha256": "33ed0056aecc4f75273489f542174f622f53b8f67a9a3f08581ce92a8efb0166"
+    },
+    "approvedAssembly": {
+      "file": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\角色\\Tripo\\24_田嫂\\Model_TianSao_TripoReady_V7.glb",
+      "sha256": "4ae78253c87f22e1d3a833e1d713ef9aeb6d31bd4ebef1a81c7d38824a8c740a"
+    },
+    "protectedVertices": 29319,
+    "skinWeightsUnchanged": true,
+    "restoredGeometry": "V7 shoes",
+    "reversedTriangles": 2356,
+    "sideReports": [
+      {
+        "side": "Left",
+        "vertices": 1165,
+        "maximumInputError": 0.0000475258992014003,
+        "maximumUvError": 0.00016762378684816935,
+        "soleReflection": {
+          "samples": 266,
+          "maximumError": 1.6129478329844088e-8
+        }
+      },
+      {
+        "side": "Right",
+        "vertices": 1165,
+        "maximumInputError": 0.00004776204787683505,
+        "maximumUvError": 0.00016762378684816935,
+        "soleReflection": {
+          "samples": 266,
+          "maximumError": 2.020913531726694e-8
+        }
+      }
+    ],
+    "fittedJoints": [
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:LeftToe_End",
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase",
+      "mixamorig:RightToe_End"
+    ],
+    "alignment": {
+      "scale": 1.9696432523270417,
+      "shift": [
+        -0.00400019607946007,
+        0.00001759932855893709,
+        0.033737502758218935
+      ]
+    }
+  },
+  "stature": {
+    "heightM": 1.65,
+    "basis": "Adult female game-scale default; uniform scaling of the approved assembly"
+  },
+  "headAppearance": "Bald",
+  "reconstructionScope": [
+    "田嫂的光头、脸型、深色棉衣、绑腿和布鞋采用用户确认的模型外观，属于本作创作。",
+    "V7 左右鞋修正、衣内连接、蒙皮适配和共用骨架转换属于建模与游戏表现。"
+  ],
+  "historicalReferences": [],
+  "facing": {
+    "sourceForward": "+Z",
+    "actorForward": "-Z",
+    "evidence": "Script_ModelFacingTest.mjs"
+  }
+}

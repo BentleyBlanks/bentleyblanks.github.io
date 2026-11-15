@@ -77,6 +77,14 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Derived/Animation_XBot_InterpreterFlee.glb": "./Animation/Interpreter/Animation_Interpreter_Flee.glb",
       "Derived/Animation_XBot_InterpreterShotStagger.glb": "./Animation/Interpreter/Animation_Interpreter_ShotStagger.glb",
     }) }),
+  // 田嫂：用户的 V6 绑骨件合入 V7 左右鞋修正，按成年女性 1.65 米等比转换，采用光头外观。
+  tianSao: Object.freeze({ name: "田嫂", file: "./Model/Character/Model_TianSao.glb", hipsScale: 0.8499, heightM: 1.65, ownMaterial: true,
+    report: "./Model/Character/Data_TianSao.json",
+    clipOverrides: Object.freeze({
+      "Animation_Mixamo_NeutralIdle_V1.glb": "./Animation/TianSao/Animation_TianSao_NeutralIdle_V1.glb",
+      "Animation_Mixamo_LookingAround_V2.glb": "./Animation/TianSao/Animation_TianSao_LookingAround_V2.glb",
+      "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/TianSao/Animation_TianSao_SittingIdle_V2.glb",
+    }) }),
   // 日军士兵A：Tripo 部件合并（角色\Tripo\10_日军士兵A，V7：下巴带、去掉帽檐下挂环），用户在 Tripo 绑的骨；hipsScale 同 Model/Character/Data_JapaneseSoldierA.json
   ijaA: Object.freeze({ name: "日军士兵A", file: "./Model/Character/Model_JapaneseSoldierA.glb", hipsScale: 0.9396, ownMaterial: true,
     report: "./Model/Character/Data_JapaneseSoldierA.json", groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin" }),
@@ -98,4 +106,4 @@ export const XBOT_CHARACTERS = Object.freeze({
 export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
-export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier", interpreter: "interpreter" });
+export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier", interpreter: "interpreter", tiansao: "tianSao" });

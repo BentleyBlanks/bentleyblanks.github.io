@@ -48,7 +48,7 @@ function Worlds(doc) {
   return { parent, world };
 }
 const Float = (glb, i) => {
-  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { SCALAR: 1, VEC3: 3, VEC4: 4, MAT4: 16 }[a.type];
+  const a = glb.doc.accessors[i], v = glb.doc.bufferViews[a.bufferView], w = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[a.type];
   const offset = (v.byteOffset || 0) + (a.byteOffset || 0);
   const out = new Float32Array(a.count * w); new Uint8Array(out.buffer).set(glb.bin.subarray(offset, offset + out.byteLength)); return out;
 };
@@ -77,6 +77,16 @@ assert.equal(XBotLook({ faction: "nra", castId: "interpreter" }).key, "interpret
 assert.equal(XBotLook({ faction: "nra", unitId: "Interpreter" }).key, "interpreter");
 assert.ok(!Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys).includes("interpreter"), "翻译由命名角色映射选择");
 assert.equal(XBOT_CHARACTERS.interpreter.groom, "./Hair/Grooms/Groom_Game_Interpreter.bin", "翻译使用参考短发，脸部保持净面");
+assert.equal(XBOT_CAST_CHARACTERS.tiansao, "tianSao", "田嫂使用专属绑骨外观");
+assert.equal(XBotLook({ faction: "civilian", castId: "tiansao" }).key, "tiansao");
+assert.equal(XBotLook({ faction: "civilian", unitId: "TianSao" }).key, "tiansao");
+assert.equal(XBOT_CHARACTERS.tianSao.heightM, 1.65);
+assert.equal(XBOT_CHARACTERS.tianSao.groom, undefined, "田嫂采用用户确认的光头外观");
+const tianSaoReport = JSON.parse(fs.readFileSync(path.join(here, XBOT_CHARACTERS.tianSao.report), "utf8"));
+assert.equal(tianSaoReport.preparation.restoredGeometry, "V7 shoes");
+assert.equal(tianSaoReport.preparation.skinWeightsUnchanged, true);
+assert.equal(tianSaoReport.preparation.fittedJoints.length, 6);
+assert.ok(tianSaoReport.preparation.sideReports.every(side => side.maximumInputError < .0003 && side.soleReflection.maximumError < 1e-5));
 assert.ok(!FactionCharacterKeys("ija").includes("taniHisao"), "谷寿夫按命名角色选择");
 assert.equal(XBotLook({ faction: "ija", castId: "taniHisao", unitId: "Officer" }).key, "taniHisao");
 assert.equal(XBotLook({ faction: "ija", unitId: "TaniHisao" }).key, "taniHisao");
@@ -177,6 +187,21 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
     rigidHeadVertices++;
   }
   assert.ok(rigidHeadVertices > 0, `${key}: upper head and cap weights were checked`);
+  if (key === "tianSao") {
+    const uv = Float(glb, prim.attributes.TEXCOORD_0);
+    let faceVertices = 0;
+    for (let index = 0; index < positions.length / 3; index++) {
+      point.fromArray(positions, index * 3).applyMatrix4(M);
+      if (uv[index * 2] <= .5 || uv[index * 2 + 1] <= .5 || point.y < report.faceSkin.rigidStartM + 1e-5) continue;
+      let headWeight = 0;
+      for (let slot = 0; slot < 4; slot++) {
+        if (glb.bin[jointOffset + index * 4 + slot] === headIndex) headWeight += W4[index * 4 + slot];
+      }
+      assert.ok(headWeight > .99999, `田嫂下颌与脸部顶点 ${index} 跟随 Head`);
+      faceVertices++;
+    }
+    assert.ok(faceVertices > 2000);
+  }
   for (const [original, replacement] of Object.entries(def.clipOverrides || {})) {
     assert.ok(fs.existsSync(path.join(here,"Animation/Mixamo",original)), `${key}: 专用动作保留原件`);
     const source = ReadGlb(path.join(here, "Animation/Mixamo", original));
@@ -200,7 +225,7 @@ for (const character of ["JapaneseSoldierYi", "JapaneseSoldierC"]) {
     `${character}: 接触烘焙对应实际模型与源动作`);
 }
 
-for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro", "Interpreter"]) {
+for (const character of ["Yaowa", "OldGeng", "Nier", "AzumaShiro", "Interpreter", "TianSao"]) {
   const contacts = JSON.parse(fs.readFileSync(path.join(here, `Animation/${character}/Data_${character}Contacts.json`), "utf8"));
   for (const item of [contacts.model, ...contacts.clips.flatMap(clip => [clip.source, clip.output])]) {
     assert.equal(createHash("sha256").update(fs.readFileSync(path.join(here, item.file))).digest("hex"), item.sha256,

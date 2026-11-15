@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "script": "_import/Script_BakeTianSaoContacts.mjs",
+  "character": "tianSao",
+  "model": {
+    "file": "Model/Character/Model_TianSao.glb",
+    "sha256": "7dfa0e9fd28a16fa4be47db8e35b527270dbe8879cd0aecc678cad3143fdd053"
+  },
+  "clips": [
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_NeutralIdle_V1.glb",
+        "sha256": "5b9497802b6f932fe1383aa0d758d4d9114ea2f492fe662a23c4bcca28987251"
+      },
+      "output": {
+        "file": "Animation/TianSao/Animation_TianSao_NeutralIdle_V1.glb",
+        "sha256": "da747238711d17d78456610a904ebeeb4e029d2bc52b7d182fff0d30954f28b1"
+      },
+      "frames": 529,
+      "duration": 8.800000190734863,
+      "minBefore": -0.0047134741770478855,
+      "minAfter": 0.002,
+      "maxLiftM": 0.0067134741770478856
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_LookingAround_V2.glb",
+        "sha256": "14d1a890ee29793ce04ae2ad90d503d55544cd23b0d0a5e4367c7218ed1413e9"
+      },
+      "output": {
+        "file": "Animation/TianSao/Animation_TianSao_LookingAround_V2.glb",
+        "sha256": "358ddb1b8c977dad85ad25294c2398a2176383c389d0e6b134923c23f9ebd708"
+      },
+      "frames": 383,
+      "duration": 6.366666793823242,
+      "minBefore": -0.007586296039191158,
+      "minAfter": 0.001999999999999999,
+      "maxLiftM": 0.009586296039191158
+    },
+    {
+      "source": {
+        "file": "Animation/Mixamo/Animation_Mixamo_SittingIdle_V2.glb",
+        "sha256": "b46f8b6173af242142fe3cbf1cd64a0550e042e93a19506662b84e1cb4c67e21"
+      },
+      "output": {
+        "file": "Animation/TianSao/Animation_TianSao_SittingIdle_V2.glb",
+        "sha256": "fa676435def66e291592d21b2b0d05e962251745360c5ea563320fd1b362c4e0"
+      },
+      "frames": 655,
+      "duration": 10.899999618530273,
+      "minBefore": -0.04236453293912857,
+      "minAfter": 0.0020000000000000018,
+      "maxLiftM": 0.04436453293912857
+    }
+  ]
+}
