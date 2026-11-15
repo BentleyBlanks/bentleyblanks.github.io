@@ -98,6 +98,8 @@ textarea { resize: vertical; min-height: 64px; }
 .lfViewBar button { padding: 2px 5px; height: 29px; font-size: 12px; background: transparent; border-color: transparent; color: var(--ed-text-3); }
 #viewportGrid canvas { flex: 1; display: block; width: 100%; height: 0; min-height: 0; outline: none; touch-action: none; cursor: grab; }
 #viewportGrid canvas[data-unit-hover] { cursor: pointer; }
+#viewportGrid canvas[data-navigation-tool="hand"] { cursor: grab; }
+#viewportGrid canvas[data-navigation-action="pan"], #viewportGrid canvas[data-navigation-action="planPan"] { cursor: grabbing; }
 #viewportGrid canvas[data-mode="arrow"], #viewportGrid canvas[data-mode="rect"], #viewportGrid canvas[data-mode="text"], #viewportGrid canvas[data-mode="route"] { cursor: crosshair; }
 #viewportGrid canvas:focus-visible { outline: 2px solid #bba36b; outline-offset: -2px; }
 .lfViewGizmo { position: absolute; right: 12px; top: 52px; width: 96px; height: 96px; border-radius: 50%; background: #111812b8; border: 1px solid #d7decd29; box-shadow: 0 2px 10px #0003; touch-action: none; cursor: grab; user-select: none; z-index: 2; }

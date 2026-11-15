@@ -12,7 +12,13 @@ export class EncounterSceneControls {
   }
 
   Clear() {
-    if(this.drag) this.Settle(this.drag.entry.map);
+    const drag=this.drag;
+    this.drag=null;
+    if(drag) {
+      this.Settle(drag.entry.map);
+      delete drag.surface.dataset.navigationAction;
+      if(drag.surface.hasPointerCapture(drag.pointerId)) drag.surface.releasePointerCapture(drag.pointerId);
+    }
     for(const view of this.wheelViews.keys()) this.Settle(view);
     this.wheelViews.clear();this.drag=null;this.keys.clear();this.render();
   }
@@ -41,18 +47,21 @@ export class EncounterSceneControls {
     return view;
   }
 
-  Begin(entry,event,{surface=entry.canvas,forceOrbit=false}={}) {
-    if(!forceOrbit&&event.button!==1&&event.button!==2&&!(event.button===0&&event.altKey)) return false;
+  Begin(entry,event,{surface=entry.canvas,forceOrbit=false,forcePan=false}={}) {
+    const handPan=forcePan&&event.button===0&&!event.altKey;
+    if(!forceOrbit&&!handPan&&event.button!==1&&event.button!==2&&!(event.button===0&&event.altKey)) return false;
+    if(this.drag) this.Clear();
     event.preventDefault();this.workspace.Activate(entry.index);surface.focus();surface.setPointerCapture(event.pointerId);
     const view=entry.map;
-    const action=forceOrbit?"orbit":event.altKey&&event.button===2?"dolly":!view.type?"planPan":event.button===1?"pan":event.altKey?"orbit":"look";
+    const action=forceOrbit?"orbit":event.altKey&&event.button===2?"dolly":!view.type?"planPan":event.button===1||handPan?"pan":event.altKey?"orbit":"look";
     const followingZoom=entry.mode==="follow"&&action==="dolly";
     if(view.type&&!followingZoom&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
     this.StartNavigation(view);
     if(!followingZoom) entry.mode="manual";
     const pivot=[view.center[0],view.Ground?.(view.center)||0,view.center[1]];
     const offset=view.eye?.map((value,index)=>value-pivot[index]);
-    this.drag={entry,action,x:event.clientX,y:event.clientY,pivot,distance:offset?Math.max(2,Math.hypot(...offset)):20};
+    this.drag={entry,action,surface,pointerId:event.pointerId,x:event.clientX,y:event.clientY,pivot,distance:offset?Math.max(2,Math.hypot(...offset)):20};
+    surface.dataset.navigationAction=action;
     if(event.shiftKey) this.keys.add("ShiftLeft");
     return true;
   }

@@ -937,6 +937,58 @@ try {
   assert.equal(cameraLocation.viewports[1].camera.farMetres,1500);
   await page.screenshot({path:path.join(out,'SceneNavigation.png')});
 
+  const handButton=page.getByRole('button',{name:'手形工具',exact:true});
+  const selectButton=page.getByRole('button',{name:'选择工具',exact:true});
+  await handButton.click();
+  assert.equal(await handButton.getAttribute('aria-pressed'),'true');
+  assert.equal(await selectButton.getAttribute('aria-pressed'),'false');
+  const beforeHand=await page.evaluate(()=>LevelFlow.Packet());
+  await page.mouse.move(mouseX,mouseY);await page.mouse.down();
+  assert.equal(await page.locator('#flowMap2').evaluate(canvas=>getComputedStyle(canvas).cursor),'grabbing');
+  await page.mouse.move(mouseX+48,mouseY+24,{steps:4});await page.mouse.up();
+  const afterHand=await page.evaluate(()=>LevelFlow.Packet());
+  assert.notDeepEqual(afterHand.context.viewports.views[1].freeCamera.eye,beforeHand.context.viewports.views[1].freeCamera.eye,'hand tool pans a 3D scene with LMB');
+  assert.equal(afterHand.context.viewports.views[1].freeCamera.yaw,beforeHand.context.viewports.views[1].freeCamera.yaw,'hand pan preserves yaw');
+  assert.equal(afterHand.context.viewports.views[1].freeCamera.pitch,beforeHand.context.viewports.views[1].freeCamera.pitch,'hand pan preserves pitch');
+  assert.deepEqual(afterHand.context.viewports.views[0],beforeHand.context.viewports.views[0],'hand tool only moves the pressed viewport');
+  assert.deepEqual(afterHand.context.selection,beforeHand.context.selection,'hand dragging preserves selection');
+  assert.equal(await page.locator('#flowMap2').evaluate(canvas=>getComputedStyle(canvas).cursor),'grab');
+  assert.equal(await page.locator('#flowMap2').getAttribute('data-navigation-action'),null,'release clears navigation capture');
+  await page.screenshot({path:path.join(out,'SceneHandTool.png')});
+  // A simple hand click over a unit must keep the current selection.
+  await page.evaluate(()=>LevelFlow.Select({type:'actor',id:'winter'}));
+  await handButton.click();
+  const handSelection=await page.evaluate(()=>LevelFlow.Packet().context.selection);
+  const playerPoint=await page.evaluate(()=>LevelFlow.ToScreen(LevelFlow.Inspect().actors[0].p,1));
+  await page.mouse.click(sceneBox.x+playerPoint[0],sceneBox.y+playerPoint[1]);
+  assert.deepEqual(await page.evaluate(()=>LevelFlow.Packet().context.selection),handSelection,'hand click over a unit preserves selection');
+  await page.locator('#flowMap2').focus();await page.keyboard.press('w');
+  assert.equal(await selectButton.getAttribute('aria-pressed'),'true','W returns to selection');
+  await page.keyboard.press('q');
+  assert.equal(await handButton.getAttribute('aria-pressed'),'true','Q selects the hand tool');
+  await page.locator('#codexPrompt').fill('');await page.locator('#codexPrompt').press('w');
+  assert.equal(await handButton.getAttribute('aria-pressed'),'true','typing W in the composer keeps the hand tool');
+  await page.locator('#codexPrompt').fill('');
+  await page.getByRole('button',{name:'＋ 单位',exact:true}).click();
+  assert.equal(await selectButton.getAttribute('aria-pressed'),'true','unit attachment returns to selection');
+  await page.evaluate(()=>LevelFlow.Select(null));
+  await handButton.click();
+  await page.mouse.move(mouseX,mouseY);await page.mouse.down();await page.keyboard.press('Escape');await page.mouse.up();
+  assert.equal(await selectButton.getAttribute('aria-pressed'),'true','Escape cancels a hand drag and selects');
+  assert.equal(await page.locator('#flowMap2').getAttribute('data-navigation-action'),null);
+  await handButton.click();
+  await page.mouse.move(mouseX,mouseY);await page.mouse.down();await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.mouse.up();
+  assert.equal(await page.locator('#flowMap2').getAttribute('data-navigation-action'),null,'blur clears a hand drag');
+  const planBox=await page.locator('#flowMap').boundingBox();
+  await page.evaluate(()=>LevelFlow.SetViewType(0,'plan'));
+  const planBefore=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0]);
+  await page.mouse.move(planBox.x+planBox.width/2,planBox.y+planBox.height/2);await page.mouse.down();
+  await page.mouse.move(planBox.x+planBox.width/2+30,planBox.y+planBox.height/2+20);await page.mouse.up();
+  assert.notDeepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0])).center,planBefore.center,'hand tool pans 2D');
+  // Restore the existing navigation fixture for later checks.
+  await selectButton.click();
+  await page.evaluate(layout=>{LevelFlow.RestoreViewports(layout);LevelFlow.ActivateView(1);},focused.viewports);
+
   const routeClipping=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');

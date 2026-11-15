@@ -20,6 +20,7 @@ try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
 
 let map, time=0, playing=false, mode="select", selection=null;
+let navigationTool="select";
 let selectedUnitIds=[], multipleUnits=false;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, renderPending=false;
@@ -40,6 +41,23 @@ function SetMode(value) {
   for(const entry of workspace.Visible()) entry.canvas.dataset.mode=value;
   for(const button of document.querySelectorAll("[data-mode]")) button.classList.toggle("selected",button.dataset.mode===value);
   if(value!=="select") SetPlaying(false);
+}
+function SetNavigationTool(value) {
+  navigation.Clear();
+  if(pointer?.action==="edit") project.value=pointer.original;
+  pointer=null;draft=null;
+  navigationTool=value;
+  SetMode("select");
+  for(const entry of workspace.entries) {
+    entry.canvas.dataset.navigationTool=value;
+    delete entry.canvas.dataset.unitHover;
+    entry.map.hoveredActorId=null;
+  }
+  for(const button of document.querySelectorAll("button[data-navigation-tool]")) {
+    button.setAttribute("aria-pressed",String(button.dataset.navigationTool===value));
+  }
+  Element("mapTooltip").hidden=true;
+  RequestRender();
 }
 function ShowTab(value) {
   if(value==="notes") {
@@ -213,7 +231,7 @@ function RestoreView(view,viewport) {
 function BindMap(entry) {
   const surface=entry.canvas;
   const HoverUnit=(hit=null)=>{
-    const id=mode==="select"&&hit?.type==="actor"?hit.id:null;
+    const id=navigationTool==="select"&&mode==="select"&&hit?.type==="actor"?hit.id:null;
     if(id) surface.dataset.unitHover=id;
     else delete surface.dataset.unitHover;
     if(entry.map.hoveredActorId===id) return;
@@ -223,7 +241,7 @@ function BindMap(entry) {
   surface.addEventListener("contextmenu",event=>event.preventDefault());
   surface.addEventListener("pointerdown",(event)=>{
     HoverUnit();Element("mapTooltip").hidden=true;
-    if(navigation.Begin(entry,event)) return;
+    if(navigation.Begin(entry,event,{forcePan:navigationTool==="hand"&&mode==="select"})) return;
     if(event.button!==0) return;
     workspace.Activate(entry.index);
     surface.focus();surface.setPointerCapture(event.pointerId);
@@ -260,6 +278,7 @@ function BindMap(entry) {
       Element("mapTooltip").hidden=true;RequestRender();return;
     }
     const hit=Hit(screen,entry.map),tip=Element("mapTooltip");
+    if(navigationTool==="hand") {HoverUnit();tip.hidden=true;return;}
     HoverUnit(hit);tip.hidden=!hit?.text;
     if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
   });
@@ -292,6 +311,9 @@ function OpenAnnotations() {
 }
 
 function BindControls() {
+  for(const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick=()=>{
+    SetNavigationTool(button.dataset.navigationTool);workspace.active.canvas.focus();
+  };
   for(const button of document.querySelectorAll("[data-tab]")) button.onclick=()=>ShowTab(button.dataset.tab);
   for(const button of document.querySelectorAll("[data-mode]")) button.onclick=()=>SetMode(button.dataset.mode);
   Element("playFlow").onclick=()=>{if(time>=FLOW_DURATION) Seek(0);SetMode("select");SetPlaying(!playing);};
@@ -304,6 +326,9 @@ function BindControls() {
     if(gamePlay?.active)return;
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
     if(navigation.Key(event)) return;
+    if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&["KeyQ","KeyW"].includes(event.code)) {
+      event.preventDefault();SetNavigationTool(event.code==="KeyQ"?"hand":"select");return;
+    }
     if(event.code==="KeyF") {
       event.preventDefault();const object=SelectedObject(),actor=frame.actors.find(item=>selection?.type==="actor"&&item.id===selection.id);
       const note=project.value.annotations.find(item=>selection?.type==="annotation"&&item.id===selection.id);
@@ -313,7 +338,7 @@ function BindControls() {
     if(event.code==="Space") {event.preventDefault();SetMode("select");SetPlaying(!playing);}
     if(event.key==="ArrowLeft"||event.key==="ArrowRight") {event.preventDefault();Seek(time+(event.key==="ArrowRight"?1:-1)*(event.shiftKey?5:1));}
     if(event.key==="[") StepBeat(-1);if(event.key==="]") StepBeat(1);
-    if(event.key==="Escape") {navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;SetMode("select");draft=null;pointer=null;Render();}
+    if(event.key==="Escape") {SetNavigationTool("select");Render();}
   });
 }
 function Tick(timestamp) {
@@ -343,7 +368,7 @@ async function Start() {
   PopulateTimeline();
   const mapData=await LoadEncounterMap();
   workspace=new EncounterViewports(Element("viewportGrid"),mapData,{
-    activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;},
+    activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;canvas.dataset.navigationTool=navigationTool;},
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
@@ -361,7 +386,7 @@ async function Start() {
     snapshot:()=>({frame:Packet(),location:JSON.parse(CreateLocationText(frame,workspace,selection,project.value))}),
     openScreenshot:OpenAnnotations,
     editScreenshot:(image)=>{if(image) annotationEditor.Open(image.capture,image.frame,image.marks);},
-    openUnits:()=>{SetPlaying(false);ShowTab("chat");},
+    openUnits:()=>{SetNavigationTool("select");SetPlaying(false);ShowTab("chat");},
     setUnitMode:SetUnitSelectionMode,
     removeUnit:id=>Select({type:"actor",id},{additive:true}),
     clearUnits:()=>Select(null),
