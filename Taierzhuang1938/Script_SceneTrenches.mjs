@@ -13,6 +13,7 @@
 import { CompileTrenchNetwork, TRENCH_PRESETS } from "./Script_TrenchPlan.mjs";
 import { TRENCH_EARTH_PROFILE } from "./Data_TrenchAppearance.mjs";
 import { TrenchDetailIssues, TRENCH_LOOKS, TRENCH_LOOK_KEYS } from "./Data_TrenchDetails.mjs";
+import { SceneSurfaceSampler } from "./Script_SceneSurface.mjs";
 
 export const SCENE_TRENCH_DATUM_ENCODING = "int16-cm-le";
 /** 场景里写的 earthProfile 名 → 断面档（缺省 compact = 照片 01/14 的压实手挖土）。 */
@@ -210,11 +211,19 @@ export function CarveSceneHeights(terrain, pre, plan, { natural = null, region =
 /** 读好的场景 → { heights（挖好的）, pre（没挖的）, plan, datum }。没有壕沟时 heights === pre。 */
 export function PrepareSceneTerrain(doc, pre, datumBytes = null) {
   const trenches = doc.trenches;
-  if (!trenches?.segments?.length) return { heights: pre, pre, plan: null, datum: [] };
-  const datum = trenches.datum && datumBytes ? DecodeTrenchDatum(trenches.datum, datumBytes) : [];
+  if (!trenches?.segments?.length && !doc.surface) return { heights: pre, pre, plan: null, datum: [] };
+  const datum = trenches?.datum && datumBytes ? DecodeTrenchDatum(trenches.datum, datumBytes) : [];
   const preSampler = GridSampler(doc.terrain, pre);
-  const plan = CompileSceneTrenches(trenches, { datum, pre: preSampler });
-  return { heights: CarveSceneHeights(doc.terrain, pre, plan), pre, plan, datum };
+  const plan = trenches?.segments?.length ? CompileSceneTrenches(trenches, { datum, pre: preSampler }) : null;
+  let heights = plan ? CarveSceneHeights(doc.terrain, pre, plan) : pre;
+  if (doc.surface) {
+    const sample=SceneSurfaceSampler(doc.surface,GridSampler(doc.terrain,heights));
+    const {cols,rows,minX,minZ,cellM}=doc.terrain;
+    const patched=new Float32Array(heights);
+    for(let z=0;z<=rows;z++) for(let x=0;x<=cols;x++) patched[z*(cols+1)+x]=sample(minX+x*cellM,minZ+z*cellM);
+    heights=patched;
+  }
+  return { heights, pre, plan, datum };
 }
 
 /** 俯视图 / 地面涂色用的沟中线（控制点折线）。 */

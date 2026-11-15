@@ -11,9 +11,10 @@ import { EncounterChat } from "./Script_LevelFlowChat.mjs";
 import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
+import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation,annotationEditor,chat;
+let canvas,workspace,navigation,annotationEditor,chat,gamePlay;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
@@ -296,10 +297,11 @@ function BindControls() {
   Element("playFlow").onclick=()=>{if(time>=FLOW_DURATION) Seek(0);SetMode("select");SetPlaying(!playing);};
   Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
   Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
-  Element("viewportLayout").onchange=(event)=>{workspace.SetLayout(Number(event.target.value));Render();};
+  Element("viewportLayout").onchange=(event)=>{const count=Number(event.target.value);if(gamePlay?.SetLayout(count))return;workspace.SetLayout(count);Render();};
   Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
   Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
   document.addEventListener("keydown",(event)=>{
+    if(gamePlay?.active)return;
     if(event.target.matches("input,select,textarea,button,a,summary")) return;
     if(navigation.Key(event)) return;
     if(event.code==="KeyF") {
@@ -315,6 +317,7 @@ function BindControls() {
   });
 }
 function Tick(timestamp) {
+  if(gamePlay?.active){lastTimestamp=timestamp;requestAnimationFrame(Tick);return;}
   const elapsed=lastTimestamp?Math.max(0,(timestamp-lastTimestamp)/1000):0;
   const navigated=!Element("annotationDialog").open&&navigation.Tick(Math.min(0.1,elapsed));
   if(playing&&lastTimestamp) {
@@ -345,6 +348,12 @@ async function Start() {
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
   for(const entry of workspace.entries) navigation.BindGizmo(entry);
+  gamePlay=new LevelFlowPlay({
+    snapshot:()=>({time,document:structuredClone(project.value),viewports:workspace.Serialize(),selection:structuredClone(selection)}),
+    pause:()=>{SetPlaying(false);navigation.Clear();},
+    restore:saved=>{selection=saved.selection;Seek(saved.time);workspace.Restore(saved.viewports);Render();},
+    toast:Toast,
+  });
   annotationEditor=new ScreenshotAnnotations(async()=>{
     await chat.Attach(annotationEditor);annotationEditor.dialog.close();ShowTab("chat");
   });
@@ -362,6 +371,7 @@ async function Start() {
   BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
+    Play:{Start:mode=>gamePlay.Start(mode),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
     Evaluate:(value)=>EvaluateFlow(value,project.value),
     Stealth:()=>structuredClone(frame.stealth),
     Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),

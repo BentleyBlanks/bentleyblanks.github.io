@@ -998,6 +998,7 @@ const ctx = {
   AirColumnEnteredRoad,
   ApplyDebugOptions,
   ApplyGraphics,
+  SuspendScreenSpaceForProbe,
   BlockoutInputCaptured,
   BuildGroundWeaponView,
   CallMortar,
@@ -8564,7 +8565,7 @@ function RenderSceneContent(dt) {
   const openingLens = missionRuntime?.Perception().lens || null;
   hud.SetLens(openingLens);
   profiler.B("post");
-  post.Render(scene, camera, ApplyBlastStunToPost(ApplyLensToPost({
+  const framePostOptions = ApplyBlastStunToPost(ApplyLensToPost({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
@@ -8624,7 +8625,9 @@ function RenderSceneContent(dt) {
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
-  }, openingLens), stun));
+  }, openingLens), stun);
+  post.Render(scene, camera, framePostOptions);
+  sandbox?.AfterRender?.(dt, framePostOptions);
   profiler.E("post");
   // 第一人称本地反射图：排在主画面之后（阴影图本帧已烘过、骨头还没再动），拍的是下一帧给枪映的那张。
   if (firstPersonReflection?.enabled) {
@@ -8928,16 +8931,17 @@ function ApplyGraphics() {
   // 把玩家自己调低的那个数抬上去 —— 所以下限取两者的小者。
   const scale = autoScale >= 1 ? manualScale
     : Math.max(manualScale * autoScale, Math.min(manualScale, AUTO_QUALITY.floor));
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const viewportSize=sandbox?.ViewportSize?.()||{width:window.innerWidth,height:window.innerHeight};
+  camera.aspect = viewportSize.width / viewportSize.height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  const width = Math.round(window.innerWidth * scale), height = Math.round(window.innerHeight * scale);
+  renderer.setSize(viewportSize.width, viewportSize.height, false);
+  const width = Math.round(viewportSize.width * scale), height = Math.round(viewportSize.height * scale);
   // 两组尺寸：内部（renderScale 缩过的）与输出（画布满分辨率）。TAAU 开着时
   // TAA 把画面解算到后者，composite 与末趟都在满分辨率上跑；关着时两者由
   // SetSize 内部拉平，行为与 TAAU 落地之前一致。
   if (post.width !== width || post.height !== height
-    || post.outputWidth !== window.innerWidth || post.outputHeight !== window.innerHeight) {
-    post.SetSize(width, height, window.innerWidth, window.innerHeight);
+    || post.outputWidth !== viewportSize.width || post.outputHeight !== viewportSize.height) {
+    post.SetSize(width, height, viewportSize.width, viewportSize.height);
   }
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。

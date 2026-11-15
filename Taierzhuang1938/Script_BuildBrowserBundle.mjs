@@ -15,12 +15,13 @@ export const DEV_TOOL_STUBS = Object.freeze({
 // Tools already moved into AdvancedTools/ (Script_DevToolsSplit / Data_DevToolsSplit) are never published:
 // the Pages build always swaps this pair for its stubs and the staging copy has no AdvancedTools/ directory.
 export const SPLIT_TOOL_STUBS = Object.freeze({
+  './Script_EncounterPlaySplit.mjs': './Script_EncounterPlaySplitStub.mjs',
   './Script_DevToolsSplit.mjs': './Script_DevToolsSplitStub.mjs',
   './Data_DevToolsSplit.mjs': './Data_DevToolsSplitStub.mjs',
 });
 function StripDevToolsPlugin(projectDir, stubs) {
   return {name: 'strip-dev-tools', setup(builder) {
-    builder.onResolve({filter: /^\.\/(?:Script|Data)_DevTools(?:Split)?\.mjs$/}, args => (stubs[args.path] ? {path: path.join(projectDir, stubs[args.path])} : undefined));
+    builder.onResolve({filter: /^\.\/(?:(?:Script|Data)_DevTools(?:Split)?|Script_EncounterPlaySplit)\.mjs$/}, args => (stubs[args.path] ? {path: path.join(projectDir, stubs[args.path])} : undefined));
   }};
 }
 export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath(import.meta.url)), {stripDevTools = false, stripSplitTools = false} = {}) {

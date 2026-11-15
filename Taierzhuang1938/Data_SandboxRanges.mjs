@@ -30,6 +30,7 @@ const RANGE = (spec) => Object.freeze({
 });
 
 export const SANDBOX_RANGES = Object.freeze([
+  RANGE({ id: "encounterPlay", externalProps: false, trimProps: false }),
   RANGE({ id: "movement", bootLabel: "boot.start.movementRange", externalProps: false, trimProps: false }),
   RANGE({ id: "weapons", bootLabel: "boot.start.weaponRange", targetDetail: false, steadyView: true }),
   RANGE({ id: "range", pinsPhase: false }),

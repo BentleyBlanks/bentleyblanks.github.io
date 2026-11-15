@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  EncounterPlayTest: {file:"Script_EncounterPlayTest.mjs",desc:"Independent scene, keyframe starts, real arrival and survival, reinforcement slots and immutable drafts"},
+  EncounterPlayBrowserTest: {file:"Script_EncounterPlayBrowserTest.mjs",timeoutMs:900000,desc:"Play and Stop, real game controls, formal cast, single/dual camera world and editor restoration"},
   LevelFlowTest: { file: "Script_LevelFlowTest.mjs", desc: "Encounter gates, continuous passage junctions, deterministic waves and annotation data" },
   LevelFlowVillageTest: { file: "Script_LevelFlowVillageTest.mjs", desc: "Temple passage, concealed patrol and wounded, cart release, stealth failure and retry rules" },
   LevelFlowAmbushTest: { file: "Script_LevelFlowAmbushTest.mjs", desc: "Infantry-first pursuit, evacuated civilians, named ambush trenches, bomb approaches and draft migration" },
@@ -632,6 +634,7 @@ export const testDefs = {
 export const browserTests = new Set([
   "LevelFlowChatBrowserTest",
   "LevelFlowBrowserTest",
+  "EncounterPlayBrowserTest",
   "AdvancedToolsBrowserTest",
   "ToolStudioParityBrowserTest",  "HairReferenceBrowserTest",
   "HairRangeBrowserTest",
@@ -765,6 +768,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "EncounterPlayTest",
   "HairGroomTest",
   "TimelineTest",
   "FlareSurfaceTest",
@@ -922,7 +926,7 @@ export const domains = {
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  levelFlow: { label: "第一关抽象调度预演", tests: ["LevelFlowTest", "LevelFlowVillageTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
+  levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -1065,7 +1069,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex/ },
+  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|FirstLevelEncounter|SceneSurface/ },
   { domain: "advancedTools", pattern: /AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},

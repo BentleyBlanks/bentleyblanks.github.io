@@ -328,7 +328,8 @@ function Box(group, material, w, h, d, x, y, z) {
 }
 
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt, library = null }) {
+  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false }) {
+    this.formalOnly=formalOnly;
     this.scene = scene;
     this.actorFactory = actorFactory;
     this.library = library;
@@ -588,6 +589,19 @@ export class BlockoutPuppets {
   // 关键帧
 
   /** 直接到位（后退、跨多个、切关、首次载入）。 */
+  /** A runtime director supplies continuous poses while this class owns animation. */
+  SyncFrame(units, dt, cameraPosition = null) {
+    this.plan=null;
+    this._Sync(units,cameraPosition);
+    for(const unit of units) {
+      const puppet=this.puppets.get(unit.id);
+      const distance=Math.hypot(unit.x-puppet.x,unit.z-puppet.z);
+      Object.assign(puppet,{x:unit.x,z:unit.z,yawDeg:unit.yawDeg,stance:unit.stance,
+        moving:distance>0.001,speedMps:dt>0?distance/dt:0,visible:true,down:unit.state==="down"});
+    }
+    this.Update(dt,cameraPosition);
+  }
+
   Apply(units, cameraPosition = null) {
     this.plan = null;
     this.planTime = 0;
@@ -780,6 +794,7 @@ export class BlockoutPuppets {
    */
   _SyncXBot(puppet, human, { drive, state, mps, aim, carryRole, throwing, clipState, lieAlong, lieClip, seat, distance, cameraPosition }, step) {
     if (!this.xbot?.ready) return;
+    if(this.formalOnly&&!human.castId&&human.faction!=="ija")return;
     // 配色：有名字的角色各一种（castId，或顺子 / 老耿 / 妮儿这类按单位 id）；抬担架的、普通人按阵营素色
     if (!human.skin && human.body === "rig") human.skin = this.xbot.Attach(human.actor, { faction: human.faction,
       castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null, seed: `${puppet.unit.id}:${human.slot}` });

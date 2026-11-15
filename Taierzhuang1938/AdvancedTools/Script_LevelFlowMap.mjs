@@ -70,7 +70,7 @@ export function BuildEncounterMap(scene) {
     return { ...object, size: [params.w || params.rx * 2 || height * 0.18, height, params.d || params.rz * 2 || height * 0.18],
       ...(tree ? {material:"Whitebox/Foliage"} : {}) };
   });
-  const ramps=structuredClone(FLOW_GROUND.ramps);
+  const ramps=structuredClone(scene.surface?.ramps||FLOW_GROUND.ramps);
   const roads = [
     {id:"TankGroundRoad",points:FLOW_GROUND.road,width:5},
     ...ramps,
@@ -94,7 +94,7 @@ export function BuildEncounterMap(scene) {
   trenches.push({id:"PlatoonEntry",points:[[12.695652,28],[17,28]],width:1.2});
   const Rectangle=(name,box,trench=false)=>({name,trench,points:[[box.minX,box.minZ],[box.maxX,box.minZ],[box.maxX,box.maxZ],[box.minX,box.maxZ]]});
   const floors=[
-    ...FLOW_GROUND.pockets.map(({name,box:[minX,maxX,minZ,maxZ]})=>Rectangle(name,{minX,maxX,minZ,maxZ})),
+    ...(scene.surface?.pockets||FLOW_GROUND.pockets).map(({name,box:[minX,maxX,minZ,maxZ]})=>Rectangle(name,{minX,maxX,minZ,maxZ})),
     Rectangle("丁字路口",village.L0610_STREETS.square.box),
     Rectangle("路口东北角",village.L0610_STREETS.pocket.box),
     Rectangle("老耿家院子",village.L0610_GENG.compound),
@@ -104,7 +104,7 @@ export function BuildEncounterMap(scene) {
   for(const place of [front.L0105_PLACES.pit,front.L0105_PLACES.dugout,front.L0105_PLACES.platoonShelter]) {
     floors.push(Rectangle(place.name,{minX:place.x-place.w/2,maxX:place.x+place.w/2,minZ:place.z-place.d/2,maxZ:place.z+place.d/2},true));
   }
-  for(const [id,x,z,w,h,d,material] of FLOW_GROUND.cover) objects.push({
+  for(const [id,x,z,w,h,d,material] of scene.surface?[]:FLOW_GROUND.cover) objects.push({
     id:`Encounter_${id}`,pos:[x,0,z],size:[w,h,d],material:`Whitebox/${material}`,group:"遭遇设计/地面工事",planning:true,
   });
   const labels = (scene.markers || []).filter(marker => marker.z < 558)
@@ -121,7 +121,7 @@ export function BuildEncounterMap(scene) {
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   labels.push(...supplementalLabels.filter(label => !labels.some(marker => marker.name === label.name)));
   return {
-    bounds: [-160, 320, -480, 558], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:FLOW_GROUND.pockets,
+    bounds: [-160, 320, -480, 558], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:scene.surface?.pockets||FLOW_GROUND.pockets,
     paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < 558)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),
@@ -136,12 +136,12 @@ export function BuildEncounterMap(scene) {
 }
 
 export async function LoadEncounterMap() {
-  const sceneUrl=new URL("../Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json", import.meta.url);
+  const sceneUrl=new URL("../Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json", import.meta.url);
   const response = await fetch(sceneUrl, {cache:"no-store"});
   if (!response.ok) throw new Error(`空间底图读取失败 ${response.status}`);
   const scene=await response.json(),map=BuildEncounterMap(scene);
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(map)));
-  map.source={scene:"Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
+  map.source={scene:"Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
   map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map);
   return map;
 }

@@ -2,6 +2,7 @@ import { DecodeSceneHeights } from "../Script_SceneDoc.mjs";
 import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_SceneTrenches.mjs";
 import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
+import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
 import { BuildGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
 
 function LowerBound(values,target) {
@@ -84,7 +85,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     for(let index=1;index<ramp.points.length;index++) lengths.push(lengths.at(-1)+Math.hypot(ramp.points[index][0]-ramp.points[index-1][0],ramp.points[index][1]-ramp.points[index-1][1]));
     return {...ramp,lengths,from:PocketsAt(...ramp.points[0]),to:PocketsAt(...ramp.points.at(-1))};
   });
-  const HeightAt=(x,z)=>{
+  const LegacyHeightAt=(x,z)=>{
     let height=PocketsAt(x,z),nearest=Infinity;
     for(const ramp of ramps) for(let index=1;index<ramp.points.length;index++) {
       const a=ramp.points[index-1],b=ramp.points[index],length=ramp.lengths[index]-ramp.lengths[index-1];
@@ -98,6 +99,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     return height;
   };
+  const HeightAt=scene.surface?SceneSurfaceSampler(scene.surface,SceneHeightAt):LegacyHeightAt;
   const interest=[];
   for(const corridor of [...map.trenches,...ramps,...(map.planningPockets||[]).map(pocket=>{
     const [minX,maxX,minZ,maxZ]=pocket.box;return {width:3,points:[[minX,minZ],[maxX,minZ],[maxX,maxZ],[minX,maxZ],[minX,minZ]]};

@@ -1011,6 +1011,21 @@ export class AiDirector {
     return point;
   }
 
+  /** Scene director orders use the existing movement/combat components. */
+  DirectActor(s, { x, z, yaw, stance=0, combat=true, moving=false, speed=2.6 } = {}) {
+    if (!s?.alive) return;
+    s.goal.set(x, this.ctx.battlefield.GroundHeight(x,z), z);
+    s.order=moving?"advance":"hold";
+    s.holdZone=moving?null:{x,z,radius:1.5};
+    s.scriptDefensive=!moving&&combat;
+    s.scriptedNoncombatant=!combat;
+    s.p012Guided=moving;
+    s.scriptMoveSpeedMps=moving?speed:undefined;
+    s.scriptArrivalRadius=0.7;
+    if(Number.isFinite(yaw)&&!moving&&!s.target) s.yaw=yaw;
+    this.SetStance(s,stance,0.3,true);
+  }
+
   Spawn(side, x, z, options = {}) {
     if (this.aliveCount >= this.maxAlive) return null;
     // 兵种原型（Data_SoldierArchetypes）：写了 archetype 就先套上它的默认武器 / 外观 / 开关。

@@ -1,7 +1,7 @@
 import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { ValidateEncounterDocument, UpgradeEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 
-export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_v2";
+export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_FirstLevelEncounter_v1";
 export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
 
 export function ValidateViewportLayout(layout) {
@@ -55,17 +55,22 @@ export class EncounterDocument {
     this.value=structuredClone(defaults);
     this.undo=[];this.redo=[];this.warning="";
     try {
-      const saved=storage?.getItem(ENCOUNTER_STORAGE_KEY);
+      // Copy the existing arrangement once; never write the old scene's draft.
+      const own=storage?.getItem(ENCOUNTER_STORAGE_KEY);
+      const saved=own||storage?.getItem("tengxian1938_encounter_v2");
       if(saved) {
         const original=ValidateSavedDocument(JSON.parse(saved),timeline);
         this.value=ValidateSavedDocument(UpgradeEncounterDocument(original,defaults),timeline);
+        this.value.id=defaults.id;
         if(this.value.revision!==original.revision) {this.Save();this.warning=this.warning||"已更新地面遭遇布设，保留草稿中自行修改的字段";}
+        else if(!own)this.Save();
       }
     } catch(error) { this.warning=`草稿未载入 · ${error.message}`; }
   }
 
   Replace(value) {
     const validated=ValidateSavedDocument(UpgradeEncounterDocument(value,this.defaults),this.timeline);
+    validated.id=this.defaults.id;
     this.undo.push(this.value);
     if(this.undo.length>40) this.undo.shift();
     this.redo=[];this.value=validated;this.Save();
@@ -97,7 +102,7 @@ export function CreateFramePacket(document,frame,view,viewport) {
   return {
     schema:FRAME_SCHEMA,
     frameId:`L1-${frame.beat.id.toUpperCase()}-${Math.round(frame.time*1000)}`,
-    context:{level:"FirstLevel",stage:frame.stage.id,beat:frame.beat.id,title:frame.beat.title,time:frame.time,
+    context:{level:"FirstLevel",scene:"FirstLevelEncounter",stage:frame.stage.id,beat:frame.beat.id,title:frame.beat.title,time:frame.time,
       player:[...frame.player],view:{center:[...view.center],scale:view.scale},viewport,
       bounds:view.Bounds?view.Bounds():[view.center[0]-viewport.width/(2*view.scale),view.center[0]+viewport.width/(2*view.scale),view.center[1]-viewport.height/(2*view.scale),view.center[1]+viewport.height/(2*view.scale)],
       projection:view.type||"plan",camera:view.eye?{eye:[...view.eye],aim:[...view.aim]}:null,

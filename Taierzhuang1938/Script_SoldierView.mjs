@@ -18,13 +18,24 @@ const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_DETAIL.boundRadi
 
 export class SoldierView {
   /** @param {object} director 它服务的 AiDirector（读 soldiers / time / ctx，远景层挂在 director.crowd）。 */
-  constructor(director) { this.ai = director; }
+  constructor(director) { this.ai = director; this.observerCameras=[]; this.skins=new Map(); }
+
+  SetObserverCameras(cameras) { this.observerCameras=cameras; }
+  SetSkin(s,skin) { if(skin)this.skins.set(s,skin);else this.skins.delete(s); }
+  SyncSkin(s,dt,state) {
+    this.skins.get(s)?.Sync({
+      mps:Number.isFinite(state.moveSpeedMps)?state.moveSpeedMps:(state.moveSpeed||0)*3.6,
+      stance:state.prone>0.5?"prone":state.crouch>0.5?"crouch":"stand",
+      aim:state.aim>0.5,melee:state.meleeCombat||null,down:!!state.dead||!!s.actor.ragdollState,firing:!!state.firing,
+      throwSeconds:s.actor.characterRig?.currentId==="GrenadeThrow"?s.actor.characterRig.currentAction?.time:null,
+    },dt);
+  }
 
   /** 出生：人物摆到出生点并挂进场景。 */
   Attach(s) { s.actor.root.position.copy(s.position); this.ai.ctx.scene.add(s.actor.root); }
 
   /** 移除：人物摘下场景并回收。 */
-  Detach(s) { this.ai.ctx.scene.remove(s.actor.root); s.actor.Dispose(); }
+  Detach(s) { this.skins.get(s)?.Dispose(); this.skins.delete(s); this.ai.ctx.scene.remove(s.actor.root); s.actor.Dispose(); }
 
   /** 每帧：人物跟上 AI 的位置与朝向。 */
   Place(s) { s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw; }
@@ -57,14 +68,14 @@ export class SoldierView {
   Animate(s, dt, options) {
     const profiler = this.ai.ctx.profiler;
     // 剖析器关着（正式玩家路径）就是一次布尔检查 + 直调，连 try/finally 都不进。
-    if (!profiler || !profiler.on) { s.actor.Update(dt, options); return; }
+    if (!profiler || !profiler.on) { s.actor.Update(dt, options); this.SyncSkin(s,dt,options); return; }
     profiler.B("ai/act/anim");
-    try { s.actor.Update(dt, options); }
+    try { s.actor.Update(dt, options); this.SyncSkin(s,dt,options); }
     finally { profiler.E("ai/act/anim"); }
   }
 
   /** 尸体的倒地 / 下垂姿势（不进 ai/act/anim 子桶：它归 ai/corpse，见 AiDirector.Update 的尸体循环）。 */
-  AnimateCorpse(s, dt, options) { s.actor.Update(dt, options); }
+  AnimateCorpse(s, dt, options) { s.actor.Update(dt, options); this.SyncSkin(s,dt,options); }
 
   /**
    * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；
@@ -80,20 +91,24 @@ export class SoldierView {
     camera.updateWorldMatrix(true, false);
     _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
     _cullFrustum.setFromProjectionMatrix(_cullMatrix);
+    const observers=this.observerCameras.map(view=>{
+      view.updateWorldMatrix(true,false);
+      return {camera:view,frustum:new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().copy(view.matrixWorld).invert().premultiply(view.projectionMatrix))};
+    });
     const crowd = this.Crowd();
     if (crowd) crowd.Begin();
     for (const s of this.ai.soldiers) {
       if (!s.actor) continue;
       // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
       _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
-      if (!_cullFrustum.intersectsSphere(_cullSphere)) {
+      if (!_cullFrustum.intersectsSphere(_cullSphere) && !observers.some(view=>view.frustum.intersectsSphere(_cullSphere))) {
         this.ai._SetDetailedAttached(s.actor, false);
         s.actor.SetCrowdHitboxes?.(null);
         s.actor.allowFootIk = false;
         s.renderLod = "culled";
         continue;
       }
-      const distanceSq = s.position.distanceToSquared(camera.position);
+      const distanceSq = Math.min(s.position.distanceToSquared(camera.position),...observers.map(view=>s.position.distanceToSquared(view.camera.position)));
       s.actor.renderDistanceSq = distanceSq;
       s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2 || s.stance === 2 || s.proneBlend > .45;
       s.actor.SetShadowEnabled(distanceSq <= ACTOR_DETAIL.shadowM ** 2);

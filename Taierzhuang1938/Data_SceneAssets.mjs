@@ -15,6 +15,7 @@ export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "FirstLevelWhitebox", title: "第一关 · 白盒", style: "whitebox", note: "白盒编辑器的编辑与预演跑这个" }),
   Object.freeze({ id: "FirstLevel", title: "第一关 · 正式", style: "formal",
     note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，道具换外部模型、地面换分层地表，体块仍是白盒网格，之后单独打磨" }),
+  Object.freeze({ id: "FirstLevelEncounter", title: "第一关 · Encounter Play", style: "whitebox", note: "独立遭遇场景；编排和 Play 共用，原场景保持独立" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */

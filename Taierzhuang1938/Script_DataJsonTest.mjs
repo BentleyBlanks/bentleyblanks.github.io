@@ -43,7 +43,11 @@ export function JsonProblem(value, at = "", seen = new Set()) {
   return null;
 }
 
-const files = fs.readdirSync(here).filter((f) => /^Data_.*\.mjs$/.test(f)).sort();
+const files = [
+  ...fs.readdirSync(here).filter((f) => /^Data_.*\.mjs$/.test(f)),
+  ...fs.readdirSync(path.join(here,"Scenes"),{recursive:true}).map(f=>String(f).replaceAll("\\","/"))
+    .filter(f=>/(?:^|\/)Data_[^/]+\.mjs$/.test(f)).map(f=>"Scenes/"+f),
+].sort();
 const dirty = [];
 for (const file of files) {
   const mod = await import(pathToFileURL(path.join(here, file)).href);

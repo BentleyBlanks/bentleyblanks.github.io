@@ -1,0 +1,9 @@
+.encounterGame .encounterPlayHud{position:fixed;top:14px;left:18px;z-index:30;padding:12px 16px;color:#eee;background:#15191de0;border-left:3px solid #ddb973;border-radius:4px;max-width:calc(100% - 52px);font:14px/1.6 system-ui}
+.encounterPlayHud strong{display:block}.encounterPlayHud button{margin-top:6px;color:#ddd;border:1px solid #6e747a;background:#20262c;padding:3px 12px;cursor:pointer}
+.encounterDialogue{position:fixed;left:10%;bottom:12%;width:80%;box-sizing:border-box;padding:12px 20px;background:#101419e8;border:1px solid #70767b;border-radius:6px;color:#fff;z-index:25;font:17px/1.7 system-ui}.encounterDialogue p{margin:3px 0}
+.encounterHint{position:fixed;top:63%;left:0;width:100%;text-align:center;color:#fff;z-index:26;text-shadow:0 2px 3px #000;font:15px system-ui}
+.encounterObserver{position:fixed;left:50%;top:0;width:50%;height:100%;z-index:20;background:#111;border-left:2px solid #636b74;box-sizing:border-box}
+.encounterObserver[hidden]{display:none}.encounterObserver>div{height:30px;background:#252b32;display:flex;gap:6px;padding:3px 8px;box-sizing:border-box}.encounterObserver canvas{width:100%;height:calc(100% - 30px);display:block}
+.encounterDual #view,.encounterDual #hud{width:50%!important}.encounterDual .encounterPlayHud{max-width:calc(50% - 52px)}.encounterDual .encounterDialogue{left:3%;width:44%}.encounterDual .encounterHint{width:50%}
+.encounterPrimary{position:fixed;left:0;top:0;width:50%;height:100%;pointer-events:none;z-index:1}.encounterDual #view{opacity:0}
+.encounterObserver button,.encounterObserver select{background:#303740;color:#e6e8ea;border:1px solid #65707a;border-radius:3px;font:12px system-ui;padding:2px 7px}

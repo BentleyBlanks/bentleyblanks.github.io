@@ -1,0 +1,82 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
+import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import {ServeRoot} from "./Script_DevServer.mjs";
+import {BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+const out=path.join(root,"tmp/EncounterPlay");await fs.mkdir(out,{recursive:true});
+const server=await ServeRoot(root,0),browser=await LaunchBrowser();
+const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1});
+const errors=[];page.on("pageerror",e=>errors.push(e.message));
+await page.addInitScript(()=>{
+ localStorage.setItem("tengxian1938_audio_v1",JSON.stringify({master:0}));
+ localStorage.setItem("tengxian1938_tools_volume_v1",JSON.stringify({volume:0,muted:true}));
+});
+const State=()=>page.evaluate(()=>document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian?.Debug.EncounterPlay?.State());
+async function Ready(){
+ await page.waitForFunction(()=>{const g=document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian;return g?.state.running&&g.Debug.EncounterPlay?.State().ready;},null,{timeout:420000});
+ return page.frames().find(f=>f.url().includes("encounterPlay=1"));
+}
+try{
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=222`);
+ await page.waitForFunction(()=>window.LevelFlow);
+ await page.evaluate(()=>LevelFlow.SetLayout(3));
+ const before=await page.evaluate(()=>({time:LevelFlow.Inspect().time,document:JSON.stringify(LevelFlow.Inspect().document),viewports:LevelFlow.Inspect().viewports}));
+ await page.locator("#playGame").click();let frame=await Ready();console.log("ok  current keyframe loaded");
+ let state=await State();
+ assert.equal(state.startBeat,"03b");assert.equal(state.layout,1);assert.equal(state.scene,"FirstLevelEncounter");
+ assert.ok(state.actors.some(a=>a.model==="luo"));assert.ok(state.actors.some(a=>/^ija/.test(a.model)));
+ assert.equal(await page.locator('#viewportLayout option[value="3"]').isDisabled(),true);
+ const audio=await frame.evaluate(()=>({cue:Tengxian.audio.musicCue,context:!!Tengxian.audio.ctx}));
+ assert.equal(audio.cue,"firstLevelSapTrench");assert.ok(audio.context);
+ await frame.waitForFunction(()=>Tengxian.audio.musicBuffers.has(Tengxian.audio.musicCue),null,{timeout:60000});
+ const ammo=await frame.evaluate(()=>{
+   const g=Tengxian,before=g.state.ammo;g.Debug.Fire();return {before,after:g.state.ammo};
+ });
+ assert.ok(ammo.after<ammo.before,"Play uses the real firearm and ammunition");
+ const kill=await frame.evaluate(()=>{
+   const g=Tengxian,actor=g.Debug.EncounterPlay.State().actors.find(a=>a.group==="ForkRelief");
+   const soldier=g.ai.soldiers.find(s=>s.alive&&Math.hypot(s.position.x-actor.position[0],s.position.z-actor.position[2])<.2);
+   soldier.Kill();g.StepFrames(3,1/60,false);
+   return {id:actor.id,dead:g.Debug.EncounterPlay.State().dead.includes(actor.id)};
+ });
+ assert.ok(kill.dead,"Real soldier death is retained by the encounter");
+ await page.screenshot({path:path.join(out,"PlaySingle.png"),timeout:120000});
+ await page.selectOption("#viewportLayout","2");
+ await frame.waitForFunction(()=>Tengxian.Debug.EncounterPlay.State().layout===2);
+ await page.screenshot({path:path.join(out,"PlayDual.png"),timeout:120000});
+ state=await State();assert.equal(state.layout,2);
+ assert.ok(state.view.camera.every(Number.isFinite));
+ assert.ok(state.dead.includes(kill.id),"Changing cameras cannot recreate a dead actor");
+ await frame.evaluate(()=>Tengxian.Debug.Key("KeyO"));
+ const observeBefore=await State();
+ await frame.locator(".encounterObserver canvas").focus();await page.keyboard.down("w");
+ await frame.evaluate(()=>Tengxian.StepFrames(12,1/60,false));await page.keyboard.up("w");
+ const observeAfter=await State();
+ assert.ok(observeAfter.view.camera.some((n,i)=>Math.abs(n-observeBefore.view.camera[i])>.2),"Observer flies independently");
+ assert.equal(await frame.evaluate(()=>Tengxian.input.forward),0,"Observer navigation does not move the player");
+ await frame.evaluate(()=>Tengxian.Debug.Key("KeyO"));
+ await page.locator("#playGame").click();
+ const restored=await page.evaluate(()=>({time:LevelFlow.Inspect().time,document:JSON.stringify(LevelFlow.Inspect().document),count:LevelFlow.Inspect().viewports.count,play:LevelFlow.Play.State().active}));
+ assert.equal(restored.time,before.time);assert.equal(restored.document,before.document);assert.equal(restored.count,3);assert.equal(restored.play,false);
+ console.log("ok  real gun/death, two views, immutable draft and editor restoration");
+ await page.selectOption("#playGameStart","beginning");await page.locator("#playGame").click();frame=await Ready();
+ state=await State();assert.equal(state.startBeat,"01a");assert.equal(state.layout,1);
+ await frame.waitForFunction(()=>Tengxian.Debug.EncounterPlay.State().beat==="01b",null,{timeout:90000});
+ await frame.waitForFunction(()=>!document.querySelector(".encounterDialogue").hidden,null,{timeout:30000});
+ await page.screenshot({path:path.join(out,"PlayDialogue.png"),timeout:120000});
+ await page.locator("#playGame").click();assert.equal(await page.locator(".lfPlayHost").count(),0);
+ await page.evaluate(time=>LevelFlow.Seek(time),BeatById("06g").start+1);
+ await page.selectOption("#playGameStart","current");await page.locator("#playGame").click();frame=await Ready();
+ await frame.waitForFunction(()=>Tengxian.Debug.EncounterPlay.Presentation().some(p=>p.kind==="animal"&&p.model),null,{timeout:60000});
+ const cast=await frame.evaluate(()=>Tengxian.Debug.EncounterPlay.Presentation());
+ assert.ok(cast.some(p=>p.id==="nier"&&p.kind==="child"&&p.humans.includes("nier")));
+ assert.ok(cast.some(p=>p.kind==="cart"&&p.model));
+ await page.selectOption("#viewportLayout","2");
+ await page.screenshot({path:path.join(out,"PlayVehicles.png"),timeout:120000});
+ await page.locator("#playGame").click();
+ assert.deepEqual(errors,[]);
+ console.log("ok  beginning start, text dialogue, civilian/child/vehicle models and clean Stop; 720p captures in tmp/EncounterPlay");
+}finally{await browser.close();await new Promise(r=>server.close(r));}

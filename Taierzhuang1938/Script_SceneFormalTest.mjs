@@ -24,7 +24,8 @@ let count = 0;
 function Check(ok, label) { assert.ok(ok, label); count++; }
 
 // 1) 清单
-Check(SCENE_LIST.length === 2 && SCENE_IDS.includes("FirstLevelWhitebox") && SCENE_IDS.includes("FirstLevel"), "场景清单：第一关白盒 + 第一关正式");
+Check(SCENE_LIST.length === 3 && ["FirstLevelWhitebox","FirstLevel","FirstLevelEncounter"].every(id=>SCENE_IDS.includes(id)), "场景清单：保留白盒与正式场景，另有独立 Encounter 场景");
+Check(SceneStyle("FirstLevelEncounter")==="whitebox","独立 Encounter 场景保持白盒材质");
 Check(SceneStyle("FirstLevelWhitebox") === "whitebox" && SceneStyle("FirstLevel") === "formal", "两个场景的样子：whitebox / formal");
 const path = SceneFilePath("FirstLevel");
 const text = fs.readFileSync(path, "utf8");

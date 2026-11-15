@@ -13,6 +13,7 @@
 const RULE = (match, role, by, note) => Object.freeze({ match, role, by: Object.freeze(by), note });
 
 export const DATA_SOURCE_RULES = Object.freeze([
+  RULE("Scenes/FirstLevelEncounter/Data_*.mjs", "source", [], "Independent encounter choreography and cast source"),
   RULE("Data_PublishPathRules.json", "source", ["Script_StrictTextureRules.mjs"], "全发布范围图片规则：路径、明确格式、正数最大边长；包含模型内嵌图，不允许自动跳过"),
   // --- 关卡内容 ---------------------------------------------------------------------------------------------
   RULE("Scenes/*/Environment_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],
@@ -71,7 +72,7 @@ export const DATA_RETIRED = Object.freeze([
 
 /** 门禁扫哪些文件：数据模块、JSON（这些目录与根目录），不扫第三方、导入工作区、取证输出。 */
 export const DATA_SCAN = Object.freeze({
-  include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
+  include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
     "Audio/**/*.json", "Font/*.json", "Volume/*.json", "Hair/**/*.json", "Model/**/*.json", "_blender/**/*.json", "docs/*.json"]),
   exclude: Object.freeze(["vendor/**", "node_modules/**", "_import/**", "_shots/**", "tmp/**"]),
 });
