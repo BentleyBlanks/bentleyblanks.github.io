@@ -19,6 +19,7 @@ export function ValidateViewportLayout(layout) {
         &&Number.isFinite(view.freeCamera.yaw)&&Number.isFinite(view.freeCamera.pitch)&&Math.abs(view.freeCamera.pitch)<Math.PI/2)
       &&(view.layers===undefined||view.layers&&["fire","triggers","spawns","routes","names"].every(key=>typeof view.layers[key]==="boolean"))
       &&(view.layers?.landmarks===undefined||typeof view.layers.landmarks==="boolean")
+      &&(view.layers?.hud===undefined||typeof view.layers.hud==="boolean")
       &&Number.isFinite(view.viewport?.width)&&view.viewport.width>0&&Number.isFinite(view.viewport?.height)&&view.viewport.height>0);
   if(!valid) throw new Error("多视口定位数据无效");
   return structuredClone(layout);

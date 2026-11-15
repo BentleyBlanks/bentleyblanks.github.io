@@ -124,7 +124,6 @@ textarea { resize: vertical; min-height: 64px; }
 .lfViewGizmo .lfGizmoTip:active:not(:disabled) { transform: translate(-50%,-50%); background: var(--axis-color); }
 .lfGizmoCenter { position: absolute; left: 41px; top: 41px; width: 14px; height: 14px; border: 1px solid #f9f5e3b3; border-radius: 3px; background: #a5ac9c; transform: rotate(45deg); z-index: 100; pointer-events: none; }
 .lfGizmoDragging, .lfGizmoDragging .lfGizmoTip { cursor: grabbing; }
-.lfViewStatus { position: absolute; right: 9px; bottom: 10px; padding: 3px 8px; border-radius: 2px; font-size: 12px; color: #bdc5b9; background: #101716e8; box-shadow: 0 1px 5px #00000026; pointer-events: none; }
 .lfViewLayers, .lfViewCamera { position: relative; flex: none; font-size: 13px; }
 .lfViewLayers summary, .lfViewCamera summary { list-style: none; padding: 3px 6px; border: 1px solid transparent; border-radius: 2px; cursor: pointer; white-space: nowrap; color: #b5beb2; }
 .lfViewLayers summary::after, .lfViewCamera summary::after { content: "⌄"; margin-left: 5px; }
@@ -136,8 +135,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfViewCamera > div > button:first-child { margin-bottom: 4px; border-bottom: 1px solid var(--ed-edge); border-radius: 0; padding-bottom: 10px; }
 .lfViewLayers label { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 2px; color: #c4cbc0; cursor: pointer; }
 .lfViewLayers label:hover { background: #292e27; }
-#mapReadout { position: absolute; bottom: 43px; left: 14px; padding: 3px 8px; border-radius: 2px; background: #101716e8; color: #c6cdbf; font: 12px/1.6 "IBM Plex Mono", Consolas, monospace; pointer-events: none; box-shadow: 0 1px 5px #00000026; }
-.lfMapLegend { position: absolute; bottom: 13px; left: 14px; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 2px; color: #bdc5b6; background: #101716ed; font-size: 12px; pointer-events: none; }
+.lfMapLegend { position: absolute; bottom: 13px; left: 14px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; max-width: calc(100% - 56px); padding: 4px 8px; border-radius: 2px; color: #bdc5b6; background: #101716ed; font-size: 12px; pointer-events: none; }
 .lfMapLegend i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 3px; }
 .lfMapLegend .player { background: #ac7a16; }
 .lfMapLegend .friend { background: #276d82; }
@@ -253,8 +251,7 @@ textarea { resize: vertical; min-height: 64px; }
   .lfViewGrid { gap: 5px; }
   .lfViewBar { height: 50px; flex-wrap: wrap; }
   .lfViewBar select { max-width: 105px; }
-  .lfMapLegend { display: none; }
-  #mapReadout { bottom: 12px; }
+
   .lfTimeline { margin: 7px; padding: 7px 10px 9px; }
   .lfTransport { gap: 7px; }
   .lfTransport output { padding: 0 6px; }

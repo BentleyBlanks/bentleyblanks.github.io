@@ -37,10 +37,10 @@ export class EncounterViewports {
       const layerMenu=document.createElement("details");layerMenu.className="lfViewLayers";
       const layerSummary=document.createElement("summary");layerSummary.textContent="显示";layerMenu.append(layerSummary);
       const layerOptions=document.createElement("div");layerMenu.append(layerOptions);bar.append(layerMenu);
-      const layers={fire:true,triggers:true,spawns:true,routes:true,names:true,landmarks:true};
-      for(const [key,label] of [["fire","火力"],["triggers","触发"],["spawns","生成"],["routes","路线"],["names","人名"],["landmarks","场景名称"]]) {
+      const layers={fire:true,triggers:true,spawns:true,routes:true,names:true,landmarks:true,hud:false};
+      for(const [key,label] of [["fire","火力"],["triggers","触发"],["spawns","生成"],["routes","路线"],["names","人名"],["landmarks","场景名称"],["hud","地图 HUD"]]) {
         const wrapper=document.createElement("label"),input=document.createElement("input");
-        input.type="checkbox";input.checked=true;input.dataset.layer=key;input.setAttribute("aria-label",`视口 ${index+1} ${label}`);
+        input.type="checkbox";input.checked=layers[key];input.dataset.layer=key;input.setAttribute("aria-label",`视口 ${index+1} ${label}`);
         input.onchange=()=>{layers[key]=input.checked;this.callbacks.change();};
         wrapper.append(input,document.createTextNode(label));layerOptions.append(wrapper);
       }
@@ -60,7 +60,7 @@ export class EncounterViewports {
       }
       const canvas=document.createElement("canvas");canvas.id=index===0?"flowMap":`flowMap${index+1}`;canvas.tabIndex=0;
       canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
-      const status=document.createElement("div");status.className="lfViewStatus";
+      const legend=document.getElementById("viewportLegend").content.firstElementChild.cloneNode(true);legend.hidden=true;
       for(const [mode,label,description] of [
         ["stage","当前剧情范围","缩放到当前剧情段落的活动范围，只调整这个视口"],
         ["all","整个关卡","缩放到整个关卡的范围，只调整这个视口"],
@@ -70,8 +70,8 @@ export class EncounterViewports {
         button.dataset.framing=mode;button.setAttribute("aria-pressed","false");
         button.onclick=()=>{this.SetFraming(index,mode);cameraMenu.open=false;cameraSummary.focus();};cameraOptions.append(button);
       }
-      pane.append(bar,canvas,status);element.append(pane);
-      const entry={index,pane,bar,canvas,select,target,status,type,layers,layerMenu,cameraMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
+      pane.append(bar,canvas,legend);element.append(pane);
+      const entry={index,pane,bar,canvas,select,target,legend,type,layers,layerMenu,cameraMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
       this.entries.push(entry);
       this.CreateGizmo(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
@@ -228,6 +228,7 @@ export class EncounterViewports {
       if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.gizmo.hidden=!perspective;
+      entry.legend.hidden=!entry.layers.hud;
       if(entry.mode==="follow") entry.map.Follow(frame);
       for(const button of entry.pane.querySelectorAll("[data-framing]")) {
         const pressed=String(button.dataset.framing===entry.mode);
@@ -242,8 +243,6 @@ export class EncounterViewports {
       entry.map.Draw(frame,entry.layers,selection,annotations,draft);
       this.DrawGizmo(entry);
       entry.drawKey=drawKey;
-      const status=`${frame.beat.id.toUpperCase()}  ·  ${entry.mode==="follow"?"镜头自动跟随":entry.mode==="manual"?"手动移动镜头":entry.mode==="all"?"整个关卡":"当前剧情范围"}`;
-      if(entry.status.textContent!==status) entry.status.textContent=status;
     }
     this.document=document;this.annotations=annotations;this.contentKey=contentKey;
   }
@@ -268,8 +267,9 @@ export class EncounterViewports {
       if(saved.layers) {
         Object.assign(entry.layers,saved.layers);
         entry.layers.landmarks=saved.layers.landmarks??true;
-        for(const input of entry.layerMenu.querySelectorAll("input")) input.checked=entry.layers[input.dataset.layer];
       }
+      entry.layers.hud=saved.layers?.hud??false;
+      for(const input of entry.layerMenu.querySelectorAll("input")) input.checked=entry.layers[input.dataset.layer];
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
       entry.map.followZoom=saved.followZoom??1;
       entry.map.followAnchor=saved.followAnchor?[...saved.followAnchor]:null;

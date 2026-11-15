@@ -44,8 +44,7 @@ function SetMode(value) {
 }
 function SetNavigationTool(value) {
   navigation.Clear();
-  if(pointer?.action==="edit") project.value=pointer.original;
-  pointer=null;draft=null;
+  CancelPointer();
   navigationTool=value;
   SetMode("select");
   for(const entry of workspace.entries) {
@@ -196,9 +195,6 @@ function Render(preparedFrame=null) {
   if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
   chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
   workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
-  Element("mapReadout").textContent=frame.stealth.active ? (frame.stealth.pulling ? "文财拉低身体 · 1.8秒后还操作" : frame.stealth.objective) : frame.stretchersPassed===null
-    ?`${frame.beat.id.toUpperCase()}  ${FormatFlowTime(time)}  ·  玩家 X ${frame.player[0].toFixed(1)}  Z ${frame.player[1].toFixed(1)}`
-    :`${frame.defenseWarning || frame.beat.task} · 担架 ${frame.stretchersPassed}/12`;
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
@@ -229,6 +225,11 @@ function RestoreView(view,viewport) {
   map.scale=Clamp(view.scale*ratio,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);workspace.active.mode="manual";
 }
 
+function CancelPointer() {
+  if(pointer?.action==="edit") project.value=pointer.original;
+  pointer=null;draft=null;
+}
+
 function BindMap(entry) {
   const surface=entry.canvas;
   const HoverUnit=(hit=null)=>{
@@ -242,13 +243,14 @@ function BindMap(entry) {
   surface.addEventListener("contextmenu",event=>event.preventDefault());
   surface.addEventListener("pointerdown",(event)=>{
     HoverUnit();Element("mapTooltip").hidden=true;
+    if(navigation.TouchBegin(entry,event)) {CancelPointer();RequestRender();return;}
     if(navigation.Begin(entry,event,{forcePan:navigationTool==="hand"&&mode==="select"})) return;
     if(event.button!==0) return;
     workspace.Activate(entry.index);
     surface.focus();surface.setPointerCapture(event.pointerId);
     const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
     const action=mode!=="select"?"annotate":hit?.type==="annotationHandle"?"edit":entry.map.type?"select":"pan";
-    pointer={screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey,additive:event.ctrlKey||event.metaKey||event.shiftKey};
+    pointer={pointerId:event.pointerId,screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey,additive:event.ctrlKey||event.metaKey||event.shiftKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
       draft={id:`Note_${Date.now()}`,kind:mode,time:Math.round(time*100)/100,a:world,b:[...world],text:"",view:{center:[...map.center],scale:map.scale},viewport:{width:rect.width,height:rect.height},viewports:workspace.Serialize()};
@@ -256,7 +258,9 @@ function BindMap(entry) {
     }
   });
   surface.addEventListener("pointermove",(event)=>{
+    if(navigation.TouchMove(entry,event)) return;
     if(navigation.Move(entry,event)) return;
+    if(pointer&&pointer.pointerId!==event.pointerId) return;
     const screen=LocalPoint(event,surface);
     if(pointer&&pointer.viewport===entry.index) {
       const dx=screen[0]-pointer.screen[0],dy=screen[1]-pointer.screen[1];if(Math.hypot(dx,dy)>3) pointer.moved=true;
@@ -283,9 +287,10 @@ function BindMap(entry) {
     HoverUnit(hit);tip.hidden=!hit?.text;
     if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
   });
-  surface.addEventListener("pointerup",()=>{
+  surface.addEventListener("pointerup",event=>{
+    if(navigation.TouchEnd(entry,event)) return;
     if(navigation.End(entry)) return;
-    if(!pointer||pointer.viewport!==entry.index) return;
+    if(!pointer||pointer.viewport!==entry.index||pointer.pointerId!==event.pointerId) return;
     const action=pointer.action;
     if(action==="edit") {const candidate=project.value;project.value=pointer.original;try {project.Replace(candidate);Changed();} catch(error) {Toast(error.message);}}
     if(action==="annotate"&&draft&&(pointer.moved||draft.kind==="text")) {
@@ -299,8 +304,11 @@ function BindMap(entry) {
     }
     pointer=null;draft=null;Render();
   });
-  surface.addEventListener("pointercancel",()=>{HoverUnit();navigation.Clear();if(pointer?.action==="edit") project.value=pointer.original;pointer=null;draft=null;Render();});
-  surface.addEventListener("lostpointercapture",()=>navigation.End(entry));
+  surface.addEventListener("pointercancel",()=>{HoverUnit();navigation.Clear();CancelPointer();Render();});
+  surface.addEventListener("lostpointercapture",event=>{
+    if(navigation.TouchLost(event)||pointer?.pointerId===event.pointerId) {CancelPointer();RequestRender();}
+    navigation.End(entry);
+  });
   surface.addEventListener("wheel",event=>{HoverUnit();Element("mapTooltip").hidden=true;navigation.Wheel(entry,event);},{passive:false});
   surface.addEventListener("pointerleave",()=>{HoverUnit();Element("mapTooltip").hidden=true;});
   surface.addEventListener("blur",()=>HoverUnit());
@@ -312,6 +320,7 @@ function OpenAnnotations() {
 }
 
 function BindControls() {
+  window.addEventListener("blur",()=>{CancelPointer();RequestRender();});
   for(const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick=()=>{
     SetNavigationTool(button.dataset.navigationTool);workspace.active.canvas.focus();
   };

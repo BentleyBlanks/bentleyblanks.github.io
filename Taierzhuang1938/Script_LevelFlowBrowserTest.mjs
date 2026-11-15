@@ -975,6 +975,7 @@ try {
   assert.notDeepEqual(afterHand.context.viewports.views[1].freeCamera.eye,beforeHand.context.viewports.views[1].freeCamera.eye,'hand tool pans a 3D scene with LMB');
   assert.equal(afterHand.context.viewports.views[1].freeCamera.yaw,beforeHand.context.viewports.views[1].freeCamera.yaw,'hand pan preserves yaw');
   assert.equal(afterHand.context.viewports.views[1].freeCamera.pitch,beforeHand.context.viewports.views[1].freeCamera.pitch,'hand pan preserves pitch');
+  assert.equal(afterHand.context.viewports.views[1].freeCamera.eye[1],beforeHand.context.viewports.views[1].freeCamera.eye[1],'LMB hand pan stays on the XZ plane');
   assert.deepEqual(afterHand.context.viewports.views[0],beforeHand.context.viewports.views[0],'hand tool only moves the pressed viewport');
   assert.deepEqual(afterHand.context.selection,beforeHand.context.selection,'hand dragging preserves selection');
   assert.equal(await page.locator('#flowMap2').evaluate(canvas=>getComputedStyle(canvas).cursor),'grab');

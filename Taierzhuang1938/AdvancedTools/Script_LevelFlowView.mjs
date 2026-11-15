@@ -510,7 +510,10 @@ export class FlowMapView {
         this.hits.push({type:"annotationHandle",id:annotation.id,handle,screen,radius:9});
       }
     }
-    this.DrawScale(context,width,height);
-    this.DrawCompass(context,width,height);
+    if(layers.hud) {
+      const legendHeight=this.canvas.parentElement?.querySelector(".lfMapLegend")?.offsetHeight||0;
+      this.DrawScale(context,width,height-legendHeight);
+      this.DrawCompass(context,width,height);
+    }
   }
 }
