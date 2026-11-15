@@ -11,6 +11,7 @@ import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexSer
 import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunner.mjs";
 import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
 import { CreateReloadableEncounterCodexHandler } from "../scripts/Script_LocalPreviewRuntime.mjs";
+import { LoadPreviewModules } from "../scripts/Script_PreviewModules.mjs";
 import { CreateFramePacket } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { CreateUnitsAttachment } from "./AdvancedTools/Script_LevelFlowUnits.mjs";
@@ -43,7 +44,12 @@ server.listen(0, "127.0.0.1"); await once(server, "listening");
 const base = `http://127.0.0.1:${server.address().port}/__encounter/codex`;
 const snapshot = CreateFramePacket(DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow(384), { center: [20, 30], scale: 2 }, { width: 640, height: 360 });
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aM1sAAAAASUVORK5CYII=";
-const unitSnapshot = CreateUnitsAttachment(EvaluateFlow(221), { mapData: { source: { scene: "FirstLevelWhitebox" }, terrain: { heightAt: () => 2 } } }, ["player", "Fork_0"], DEFAULT_ENCOUNTER_DOCUMENT);
+snapshot.context.viewports = { count: 1, active: 0, views: [{ type: "chase", mode: "follow", center: [20, 30],
+  scale: 2, followZoom: 0.419, yaw: 0, pitch: 0.67, target: "player", viewport: { width: 640, height: 360 } }] };
+snapshot.screenshot = { version: 1, width: 640, height: 360, image: png,
+  marks: [{ kind: "brush", a: [10, 20], b: [30, 40], points: [[10, 20], [30, 40]], text: "" }] };
+// Match the JSON payload sent over HTTP, including omitted optional fields.
+const unitSnapshot = JSON.parse(JSON.stringify(CreateUnitsAttachment(EvaluateFlow(221), { mapData: { source: { scene: "FirstLevelWhitebox" }, terrain: { heightAt: () => 2 } } }, ["player", "Fork_0"], DEFAULT_ENCOUNTER_DOCUMENT)));
 const body = { requestId: randomUUID(), prompt: "调整所选区域", frame: snapshot, units: unitSnapshot, location: { timeline: { timeSeconds: 384 }, selection: { id: "Fork" } }, screenshot: { image: png, frame: snapshot } };
 async function Post(value, headers = {}) {
   return fetch(`${base}/turns`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(value) });
@@ -56,7 +62,12 @@ function Finish(child, text, code = 0) {
 try {
   assert.equal((await Post(body, { Origin: "https://example.com" })).status, 403);
   assert.equal((await Post({ ...body, screenshot: { image: "invalid" } })).status, 400);
-  assert.equal((await Post({ ...body, frame: {} })).status, 400);
+  const invalidFrame = await Post({ ...body, frame: {} });
+  assert.equal(invalidFrame.status, 400);
+  assert.match((await invalidFrame.json()).error, /定位附件无效.*文件中没有可回放的帧定位/);
+  const invalidScreenshotFrame = await Post({ ...body, screenshot: { image: png, frame: {} } });
+  assert.equal(invalidScreenshotFrame.status, 400);
+  assert.match((await invalidScreenshotFrame.json()).error, /截图定位无效.*文件中没有可回放的帧定位/);
   assert.equal((await Post({ ...body, prompt: "" })).status, 400);
   for (const units of [{}, { ...unitSnapshot, units: [] }, { ...unitSnapshot, units: [unitSnapshot.units[0], unitSnapshot.units[0]] },
     { ...unitSnapshot, units: [{ ...unitSnapshot.units[0], position: { x: null, y: 0, z: 0 } }] }]) {
@@ -261,6 +272,7 @@ try {
   TestLegacyProgress(directory);
   await TestLegacyRecovery(directory, server, base);
   await TestRouteReload(directory);
+  await TestValidationReload(directory);
   console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final-only replies, resume, live steering, idempotent retries and persisted history");
 } finally {
   for (const child of realChildren) {
@@ -275,6 +287,27 @@ try {
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
   fs.rmSync(directory, { recursive: true, force: true });
+}
+
+async function TestValidationReload(directory) {
+  const root = path.join(directory, "ValidationReload");
+  fs.mkdirSync(root, { recursive: true });
+  const entry = path.join(root, "Reader.mjs"), dependency = path.join(root, "Validator.mjs");
+  const tuning = path.join(root, "Limits.mjs");
+  fs.writeFileSync(entry, 'export { Validate } from "./Validator.mjs";');
+  fs.writeFileSync(dependency, 'import { limit } from "./Limits.mjs"; export function Validate() { return limit; }');
+  fs.writeFileSync(tuning, "export const limit = 1;");
+  const [original] = await LoadPreviewModules([entry]);
+  assert.equal(original.Validate(), 1);
+  fs.writeFileSync(tuning, "export const limit = 320;");
+  const [updated] = await LoadPreviewModules([entry]);
+  assert.equal(updated.Validate(), 320, "a transitive dependency refreshes without restarting the preview");
+  assert.equal(original.Validate(), 1, "existing readers retain their coherent revision");
+  assert.equal((await LoadPreviewModules([entry]))[0], updated, "unchanged sources reuse the loaded modules");
+  fs.writeFileSync(tuning, "export const limit = ;");
+  await assert.rejects(LoadPreviewModules([entry]), SyntaxError);
+  fs.writeFileSync(tuning, "export const limit = 640;");
+  assert.equal((await LoadPreviewModules([entry]))[0].Validate(), 640, "a repaired dependency loads on the next request");
 }
 
 async function TestRouteReload(directory) {

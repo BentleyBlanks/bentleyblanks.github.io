@@ -4,11 +4,13 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { CreateSteerableCodexChild, ENCOUNTER_CODEX_MODEL, ENCOUNTER_CODEX_EFFORT } from "./Script_EncounterCodexRunner.mjs";
 import { CreateLegacyProgressReader } from "./Script_EncounterCodexProgress.mjs";
-import { ReadFramePacket } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowDocument.mjs";
-import { FLOW_TIMELINE } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowModel.mjs";
-import { ReadUnitsAttachment } from "../Taierzhuang1938/AdvancedTools/Script_LevelFlowUnits.mjs";
+import { LoadPreviewModules } from "./Script_PreviewModules.mjs";
+
+const VALIDATION_FILES = ["Document", "Model", "Units"].map(name =>
+  fileURLToPath(new URL(`../Taierzhuang1938/AdvancedTools/Script_LevelFlow${name}.mjs`, import.meta.url)));
 
 const PREFIX = "/__encounter/codex";
 const ID = /^[a-f0-9-]{36}$/;
@@ -57,7 +59,12 @@ async function ReadTurn(request) {
   if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 20000) throw new RequestError("请填写需求，最多 20000 字");
   if (body.sessionId != null && !ID.test(body.sessionId)) throw new RequestError("会话编号无效");
   if (body.requestId != null && !ID.test(body.requestId)) throw new RequestError("请求编号无效");
-  const frame = body.frame == null ? null : ReadFramePacket(body.frame, FLOW_TIMELINE);
+  const [{ ReadFramePacket }, { FLOW_TIMELINE }, { ReadUnitsAttachment }] = await LoadPreviewModules(VALIDATION_FILES);
+  function ReadFrame(value, label) {
+    try { return ReadFramePacket(value, FLOW_TIMELINE); }
+    catch (error) { throw new RequestError(`${label}无效 · ${error.message}`); }
+  }
+  const frame = body.frame == null ? null : ReadFrame(body.frame, "定位附件");
   // Keep the more detailed location attachment, including selection and world-space camera.
   if (frame && (!body.location || typeof body.location !== "object" || Array.isArray(body.location) || JSON.stringify(body.location).length > 256000)) throw new RequestError("定位附件无效");
   if (!frame && body.location != null) throw new RequestError("定位附件缺少帧信息");
@@ -70,7 +77,7 @@ async function ReadTurn(request) {
     if (typeof body.screenshot.image !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.screenshot.image)) throw new RequestError("截图必须为 PNG");
     const png = Buffer.from(body.screenshot.image.split(",")[1], "base64");
     if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new RequestError("截图文件无效");
-    ReadFramePacket(body.screenshot.frame, FLOW_TIMELINE);
+    ReadFrame(body.screenshot.frame, "截图定位");
   }
   return { ...body, frame, units, prompt: body.prompt.trim() };
 }
