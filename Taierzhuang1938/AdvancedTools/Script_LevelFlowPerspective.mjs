@@ -1,7 +1,7 @@
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
-import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
 import { EncounterBoxGeometry, EncounterShadowGeometry, ShadeEncounterFace } from "./Script_LevelFlowLighting.mjs";
@@ -59,14 +59,14 @@ export class FlowPerspectiveView extends FlowMapView {
         const height=actor.kind==="quilt"?0.55:actor.pose==="drag"?0.95:1.6;
         this.eye=[actor.p[0],base+height,actor.p[1]];this.aim=[actor.p[0]+Math.sin(yaw)*20,base+1.25,actor.p[1]+Math.cos(yaw)*20];
       } else {
-        const distance=Clamp(125/this.scale,8,120);
+        const distance=Clamp(125/this.scale,FLOW_ZOOM.minChaseDistanceM,120);
         this.eye=[this.center[0]-Math.sin(yaw+0.55)*distance,this.centerHeight+distance*0.52,this.center[1]-Math.cos(yaw+0.55)*distance];
         this.aim=[this.center[0],this.centerHeight+0.8,this.center[1]];
       }
     }
     this.forward=Normalize(this.aim.map((value,index)=>value-this.eye[index]));
     this.right=Normalize(Cross(this.forward,[0,1,0]));this.up=Cross(this.right,this.forward);
-    this.fov=this.type==="eye"?Clamp(105-this.scale*4,36,90):65;
+    this.fov=this.type==="eye"?Clamp(105-this.scale*4,FLOW_ZOOM.minEyeFovDeg,90):65;
     this.focal=this.width/(2*Math.tan(this.fov*Math.PI/360));
     // Offscreen vehicles must not invalidate both static camera backgrounds on
     // every timeline tick. Include carried boxes too: they also write depth.
@@ -100,7 +100,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.freeCamera=null;this.center=[...actor.p];
     if(this.type==="oblique") this.scale=Clamp(Math.min(this.canvas.clientWidth,this.canvas.clientHeight)/35,3,12);
     else this.scale=this.type==="eye"?8:10;
-    this.scale=Clamp(this.scale*(this.followZoom??1),0.15,40);
+    this.scale=Clamp(this.scale*(this.followZoom??1),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);
   }
   CameraPoint(point) {
     const x=point[0]-this.eye[0],y=point[1]-this.eye[1],z=point[2]-this.eye[2];

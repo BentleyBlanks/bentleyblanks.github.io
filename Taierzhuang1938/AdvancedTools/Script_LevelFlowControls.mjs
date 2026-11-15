@@ -1,5 +1,5 @@
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 
 // Navigation belongs to the viewport that received the mouse press. Playback
 // and other viewports remain independent while the scene camera is moving.
@@ -41,11 +41,11 @@ export class EncounterSceneControls {
     return view;
   }
 
-  Begin(entry,event) {
-    if(event.button!==1&&event.button!==2&&!(event.button===0&&event.altKey)) return false;
-    event.preventDefault();this.workspace.Activate(entry.index);entry.canvas.focus();entry.canvas.setPointerCapture(event.pointerId);
+  Begin(entry,event,{surface=entry.canvas,forceOrbit=false}={}) {
+    if(!forceOrbit&&event.button!==1&&event.button!==2&&!(event.button===0&&event.altKey)) return false;
+    event.preventDefault();this.workspace.Activate(entry.index);surface.focus();surface.setPointerCapture(event.pointerId);
     const view=entry.map;
-    const action=event.altKey&&event.button===2?"dolly":!view.type?"planPan":event.button===1?"pan":event.altKey?"orbit":"look";
+    const action=forceOrbit?"orbit":event.altKey&&event.button===2?"dolly":!view.type?"planPan":event.button===1?"pan":event.altKey?"orbit":"look";
     const followingZoom=entry.mode==="follow"&&action==="dolly";
     if(view.type&&!followingZoom&&!(view.type==="oblique"&&action!=="look")) this.Free(entry);
     this.StartNavigation(view);
@@ -55,6 +55,55 @@ export class EncounterSceneControls {
     this.drag={entry,action,x:event.clientX,y:event.clientY,pivot,distance:offset?Math.max(2,Math.hypot(...offset)):20};
     if(event.shiftKey) this.keys.add("ShiftLeft");
     return true;
+  }
+
+  BindGizmo(entry) {
+    const surface=entry.gizmo;
+    let press=null;
+    surface.addEventListener("pointerdown",event=>{
+      if(event.button!==0) return;
+      event.stopPropagation();
+      press={pointerId:event.pointerId,x:event.clientX,y:event.clientY,axis:event.target.closest("[data-gizmo-axis]")?.dataset.gizmoAxis,moved:false};
+      this.Begin(entry,event,{surface,forceOrbit:true});
+      surface.classList.add("lfGizmoDragging");
+    });
+    surface.addEventListener("pointermove",event=>{
+      if(!press) return;
+      press.moved ||= Math.hypot(event.clientX-press.x,event.clientY-press.y)>3;
+      this.Move(entry,event);
+    });
+    const Finish=(accept)=>{
+      const released=press;press=null;
+      surface.classList.remove("lfGizmoDragging");
+      if(released&&surface.hasPointerCapture(released.pointerId)) surface.releasePointerCapture(released.pointerId);
+      this.End(entry);
+      if(accept&&released&&!released.moved&&released.axis) this.SnapAxis(entry,released.axis);
+    };
+    surface.addEventListener("pointerup",()=>Finish(true));
+    surface.addEventListener("pointercancel",()=>Finish(false));
+    surface.addEventListener("lostpointercapture",()=>Finish(false));
+    window.addEventListener("blur",()=>Finish(false));
+    surface.addEventListener("keydown",event=>{
+      if(event.key!=="Escape") return;
+      event.preventDefault();event.stopPropagation();Finish(false);
+    });
+    surface.addEventListener("click",event=>{
+      const axis=event.target.closest("[data-gizmo-axis]")?.dataset.gizmoAxis;
+      if(event.detail===0&&axis) this.SnapAxis(entry,axis);
+    });
+    surface.addEventListener("wheel",event=>this.Wheel(entry,event),{passive:false});
+  }
+
+  SnapAxis(entry,axis) {
+    const view=this.Free(entry),direction=[0,0,0];
+    direction["XYZ".indexOf(axis[1])]=axis[0]==="+"?1:-1;
+    const yaw=Math.atan2(-direction[0],-direction[2]);
+    const pitch=Clamp(Math.asin(-direction[1]),-1.54,1.54);
+    const forward=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
+    const target=[view.center[0],view.Ground(view.center)+0.8,view.center[1]];
+    const distance=Math.max(1,view.focusDistance||20);
+    view.freeCamera={eye:target.map((value,index)=>value-forward[index]*distance),yaw,pitch};
+    view.focusDistance=distance;this.render();
   }
 
   Move(entry,event) {
@@ -87,12 +136,12 @@ export class EncounterSceneControls {
   Dolly(entry,amount) {
     const view=entry.map;
     if(entry.mode==="follow"&&view.type!=="scene") {
-      const scale=Clamp(view.scale*Math.exp(-amount),0.15,40);
+      const scale=Clamp(view.scale*Math.exp(-amount),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);
       view.followZoom=Clamp((view.followZoom??1)*scale/view.scale,0.001,1000);
       view.scale=scale;
       return;
     }
-    if(!view.type||view.type==="oblique") {view.scale=Clamp(view.scale*Math.exp(-amount),0.15,40);return;}
+    if(!view.type||view.type==="oblique") {view.scale=Clamp(view.scale*Math.exp(-amount),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);return;}
     if(entry.mode!=="follow") this.Free(entry);
     const distance=Math.max(1,view.focusDistance||20),step=distance*(1-Math.exp(Clamp(amount,-1,1)));
     view.freeCamera.eye=view.freeCamera.eye.map((value,index)=>value+view.forward[index]*step);

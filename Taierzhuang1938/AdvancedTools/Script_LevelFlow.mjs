@@ -1,3 +1,4 @@
+import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { FLOW_SOURCE } from "./Data_LevelFlow.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
 import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATION, FLOW_TIMELINE, FormatFlowTime, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
@@ -205,7 +206,7 @@ function RestoreView(view,viewport) {
   map.center=[...view.center];
   const rect=canvas.getBoundingClientRect();
   const ratio=viewport?Math.min(rect.width/viewport.width,rect.height/viewport.height):1;
-  map.scale=Clamp(view.scale*ratio,0.15,40);workspace.active.mode="manual";
+  map.scale=Clamp(view.scale*ratio,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);workspace.active.mode="manual";
 }
 
 function BindMap(entry) {
@@ -343,6 +344,7 @@ async function Start() {
     change:()=>Render(),bounds:StageBounds,bind:BindMap,
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
+  for(const entry of workspace.entries) navigation.BindGizmo(entry);
   annotationEditor=new ScreenshotAnnotations(async()=>{
     await chat.Attach(annotationEditor);annotationEditor.dialog.close();ShowTab("chat");
   });
@@ -371,7 +373,7 @@ async function Start() {
   const stage=STAGE_TIMELINE.find((item)=>item.id===params.get("stage")?.padStart(2,"0"));
   if(params.has("beat")) JumpBeat(params.get("beat"));else Seek(params.has("t")?Number(params.get("t")):stage?.start||0,{fit:true});
   if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {
-    map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),0.15,40);workspace.active.mode="manual";
+    map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);workspace.active.mode="manual";
     if(map.type==="scene") {
       const distance=Clamp(map.focal/map.scale,4,map.far/2),target=[map.center[0],map.Ground(map.center)+0.8,map.center[1]];
       map.freeCamera.eye=target.map((value,axis)=>value-map.forward[axis]*distance);map.focusDistance=distance;

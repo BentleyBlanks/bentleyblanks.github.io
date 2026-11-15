@@ -1,3 +1,4 @@
+import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { ValidateEncounterDocument, UpgradeEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 
 export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_v2";
@@ -8,7 +9,7 @@ export function ValidateViewportLayout(layout) {
   const valid=layout&&[1,2,3,4].includes(layout.count)&&Number.isInteger(layout.active)&&layout.active>=0&&layout.active<layout.count
     &&Array.isArray(layout.views)&&layout.views.length===layout.count&&layout.views.every((view)=>types.includes(view.type)&&modes.includes(view.mode)
       &&Array.isArray(view.center)&&view.center.length===2&&view.center.every((value)=>Number.isFinite(value)&&Math.abs(value)<=10000)
-      &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=80&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)
+      &&Number.isFinite(view.scale)&&view.scale>=0.1&&view.scale<=FLOW_ZOOM.maxScale&&Number.isFinite(view.yaw)&&Number.isFinite(view.pitch)
       &&(view.followZoom===undefined||Number.isFinite(view.followZoom)&&view.followZoom>=0.001&&view.followZoom<=1000)
       &&(view.followAnchor==null||Array.isArray(view.followAnchor)&&view.followAnchor.length===3&&view.followAnchor.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000))
       &&["player","winter","luo","tank1"].includes(view.target)
@@ -112,7 +113,7 @@ export function ReadFramePacket(value,timeline) {
   const Point=(point)=>Array.isArray(point)&&point.length===2&&point.every((number)=>Number.isFinite(number)&&Math.abs(number)<=10000);
   if(!Number.isFinite(context?.time)||context.time<0||context.time>timeline.at(-1).end
     || !Point(context.player)||!Point(context.view?.center)||!Number.isFinite(context.view.scale)
-    ||context.view.scale<0.1||context.view.scale>80
+    ||context.view.scale<0.1||context.view.scale>FLOW_ZOOM.maxScale
     ||!Number.isFinite(context.viewport?.width)||!Number.isFinite(context.viewport?.height)
     ||context.viewport.width<=0||context.viewport.height<=0) throw new Error("帧定位坐标或时间无效");
   if(context.viewports) ValidateViewportLayout(context.viewports);

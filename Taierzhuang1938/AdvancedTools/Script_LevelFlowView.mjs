@@ -2,7 +2,7 @@ import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
-import { FLOW_FIELD_COLORS, FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
@@ -151,7 +151,7 @@ export class FlowMapView {
     for(const group of frame.groups) if(group.start!==null&&frame.time>=group.start-8&&frame.time<group.end&&Distance(group.area.center,frame.player)<130) points.push(group.area.center);
     const xs=points.map((point)=>point[0]),zs=points.map((point)=>point[1]);
     this.Fit([Math.min(...xs)-14,Math.max(...xs)+14,Math.min(...zs)-14,Math.max(...zs)+14],62);
-    this.scale=Clamp(this.scale*(this.followZoom??1),0.15,40);
+    this.scale=Clamp(this.scale*(this.followZoom??1),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);
   }
 
   ToScreen(point) {
@@ -163,7 +163,7 @@ export class FlowMapView {
     return [(point[0]-width/2)/this.scale+this.center[0],(point[1]-height/2)/this.scale+this.center[1]];
   }
   Zoom(factor,point) {
-    const previous=this.ToWorld(point);this.scale=Clamp(this.scale*factor,0.15,40);const current=this.ToWorld(point);
+    const previous=this.ToWorld(point);this.scale=Clamp(this.scale*factor,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);const current=this.ToWorld(point);
     this.center=this.center.map((value,index)=>value+previous[index]-current[index]);
   }
   Bounds() {

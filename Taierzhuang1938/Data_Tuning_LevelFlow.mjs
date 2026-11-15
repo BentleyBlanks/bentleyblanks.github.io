@@ -37,3 +37,9 @@ export const FLOW_SPEECH_HUD = {
   fill:"#fff8e8", ink:"#302b24", outline:"#494034", nameColor:"#756246",
   headHeight:{person:1.85, child:1.25, quilt:0.65, kneel:1.2, crouch:1.2, drag:1.25, down:0.65},
 };
+
+// Detail inspection requested on 2026-11-15, with the full overview still available.
+export const FLOW_ZOOM = {
+  minScale:0.15, maxScale:320,
+  minChaseDistanceM:1.5, minEyeFovDeg:12,
+};

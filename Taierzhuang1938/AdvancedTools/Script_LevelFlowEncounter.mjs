@@ -1,3 +1,4 @@
+import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH } from "./Data_LevelFlowAmbushBaseline.mjs";
@@ -211,7 +212,7 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(Number.isFinite(annotation.time) && annotation.time>=0 && annotation.time<=timeline.at(-1).end,"标注时间无效");
     Require(CheckPoint(annotation.a) && CheckPoint(annotation.b),"标注坐标无效");
     Require(typeof annotation.text==="string" && annotation.text.length<=500,"标注文字过长");
-    if(annotation.view) Require(CheckPoint(annotation.view.center)&&Number.isFinite(annotation.view.scale)&&annotation.view.scale>=0.1&&annotation.view.scale<=80,"标注视图无效");
+    if(annotation.view) Require(CheckPoint(annotation.view.center)&&Number.isFinite(annotation.view.scale)&&annotation.view.scale>=0.1&&annotation.view.scale<=FLOW_ZOOM.maxScale,"标注视图无效");
   }
   return structuredClone(input);
 }

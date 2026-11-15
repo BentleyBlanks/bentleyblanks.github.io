@@ -91,6 +91,17 @@ textarea { resize: vertical; min-height: 64px; }
 #viewportGrid canvas[data-unit-hover] { cursor: pointer; }
 #viewportGrid canvas[data-mode="arrow"], #viewportGrid canvas[data-mode="rect"], #viewportGrid canvas[data-mode="text"], #viewportGrid canvas[data-mode="route"] { cursor: crosshair; }
 #viewportGrid canvas:focus-visible { outline: 2px solid #bba36b; outline-offset: -2px; }
+.lfViewGizmo { position: absolute; right: 12px; top: 52px; width: 96px; height: 96px; border-radius: 50%; background: #111812b8; border: 1px solid #d7decd29; box-shadow: 0 2px 10px #0003; touch-action: none; cursor: grab; user-select: none; z-index: 2; }
+.lfViewGizmo[hidden] { display: none; }
+.lfViewGizmo:focus-visible { outline: 2px solid #d9c080; outline-offset: 2px; }
+.lfGizmoArm { position: absolute; inset: 0; pointer-events: none; }
+.lfGizmoLine { position: absolute; left: 48px; top: 47px; height: 2px; background: var(--axis-color); transform-origin: 0 50%; }
+.lfViewGizmo .lfGizmoTip { position: absolute; display: grid; place-items: center; width: 21px; height: 21px; min-width: 0; padding: 0; border: 1px solid #fff8; border-radius: 50%; background: var(--axis-color); color: #101710; font: 700 12px/1 system-ui, sans-serif; transform: translate(-50%,-50%); box-shadow: 0 1px 3px #0005; pointer-events: auto; cursor: grab; }
+.lfViewGizmo .lfGizmoNegative { width: 11px; height: 11px; border-color: var(--axis-color); background: #172018; }
+.lfViewGizmo .lfGizmoTip:hover { background: var(--axis-color); color: #101710; box-shadow: 0 0 0 3px #fff5; }
+.lfViewGizmo .lfGizmoTip:active:not(:disabled) { transform: translate(-50%,-50%); background: var(--axis-color); }
+.lfGizmoCenter { position: absolute; left: 41px; top: 41px; width: 14px; height: 14px; border: 1px solid #f9f5e3b3; border-radius: 3px; background: #a5ac9c; transform: rotate(45deg); z-index: 100; pointer-events: none; }
+.lfGizmoDragging, .lfGizmoDragging .lfGizmoTip { cursor: grabbing; }
 .lfViewStatus { position: absolute; right: 9px; bottom: 10px; padding: 3px 8px; border-radius: 2px; font-size: 12px; color: #bdc5b9; background: #101716e8; box-shadow: 0 1px 5px #00000026; pointer-events: none; }
 .lfViewLayers { position: relative; flex: none; font-size: 13px; }
 .lfViewLayers summary { list-style: none; padding: 3px 6px; border: 1px solid transparent; border-radius: 2px; cursor: pointer; white-space: nowrap; color: #b5beb2; }
