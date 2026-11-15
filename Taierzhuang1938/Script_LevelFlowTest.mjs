@@ -19,6 +19,19 @@ import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs
 import { FLOW_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { EncodeSceneHeights } from "./Script_SceneDoc.mjs";
+import { EncounterShadowGeometry } from "./AdvancedTools/Script_LevelFlowLighting.mjs";
+import { FLOW_RENDERING } from "./Data_Tuning_LevelFlow.mjs";
+
+const roofShadow=EncounterShadowGeometry([
+  {material:"Whitebox/Roof",pos:[0,3.3,0],size:[10,0.2,10]},
+  {material:"Whitebox/Plaster",pos:[0,0,0],size:[5,3.5,10]},
+],new Set(),()=>0);
+const roofHeights=Array.from(roofShadow.slice(0,90)).filter((value,index)=>index%3===1);
+const wallHeights=Array.from(roofShadow.slice(90)).filter((value,index)=>index%3===1);
+assert.ok(Math.abs(Math.max(...roofHeights)-(3.5+FLOW_RENDERING.roofSurfaceSeparationM))<1e-6,"roof shadows use the same separated cap as the visible geometry");
+assert.ok(Math.abs(roofShadow[0])-5>FLOW_RENDERING.roofSurfaceSeparationM*0.99,"roof shadows include the separated fascia footprint");
+assert.ok(Math.abs(Math.min(...roofHeights)-3.3)<1e-6,"separating the cap preserves the roof underside");
+assert.equal(Math.max(...wallHeights),3.5,"wall tops keep their authored height");
 
 const transferEnd = BeatById("09e").end;
 const transferArrival = EvaluateFlow(transferEnd).actors.filter(actor => actor.groupId === "YardTransfer");

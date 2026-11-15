@@ -8,6 +8,7 @@ export const FLOW_RENDERING = {
   terrainSceneCellM: 8,
   terrainHeightErrorM: 0.18,
   terrainBackdropCellM: 32,
+  roofSurfaceSeparationM: 0.005,
   backdropPaint: {maxPx:2048, minTexelM:2},
   tree: {minHeightM:2.5, crownWidthRatio:0.27, crownMaxM:3, crownBaseRatio:0.45, trunkMaxM:0.5},
   navigation: {wheelSettleMs:120},

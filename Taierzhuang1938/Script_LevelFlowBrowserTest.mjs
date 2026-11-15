@@ -38,6 +38,35 @@ try {
     }
   }
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow);
+  const roofDepth=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const roof={id:'Roof',material:'Whitebox/Roof',pos:[0,2.5,0],size:[10,1,10],params:{color:'#ff0000'}};
+    const wall={id:'Lintel',material:'Whitebox/Plaster',pos:[0,0,0],size:[5,3.5,10],params:{color:'#0000ff'}};
+    const source=LevelFlow.Evaluate(424),frame={...source,actors:source.actors.map(actor=>({...actor,p:[10000,10000]})),effects:[],triggers:[],groups:[]};
+    const results=[];
+    for(const software of [false,true]) for(const reverse of [false,true]) {
+      const view=new FlowPerspectiveView(canvas,{objects:reverse?[wall,roof]:[roof,wall],farObjects:[],labels:[],terrain:{heightAt:()=>0,roots:[]}},'scene');
+      view.lighting=null;if(software) view.raster.gpu=null;
+      for(const yaw of [-0.6,0.4]) for(const pitch of [-0.08,-0.35,-0.8]) {
+        const forward=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
+        view.freeCamera={eye:forward.map((value,axis)=>(axis===1?3.5:0)-value*30),yaw,pitch};
+        view.Draw(frame,{names:false,landmarks:false},null);
+        const context=canvas.getContext('2d');let wrong=0;
+        for(const x of [-0.6,0,0.6]) for(const z of [-0.6,0,0.6]) {
+          const point=view.Project([x,3.5,z]),pixel=context.getImageData(Math.round(point[0]),Math.round(point[1]),1,1).data;
+          if(pixel[0]<200||pixel[2]>20) wrong++;
+        }
+        for(const x of [-0.6,0,0.6]) {
+          const point=view.Project([x,3,-5]),pixel=context.getImageData(Math.round(point[0]),Math.round(point[1]),1,1).data;
+          if(pixel[0]<200||pixel[2]>20) wrong++;
+        }
+        results.push({software,reverse,yaw,pitch,wrong});
+      }
+    }
+    canvas.remove();return results;
+  });
+  assert.ok(roofDepth.every(result=>result.wrong===0),`roof caps stay above coplanar wall tops for GPU/software, either draw order and shallow/steep cameras: ${JSON.stringify(roofDepth.filter(result=>result.wrong))}`);
   const rasterParity=await page.evaluate(async()=>{
     const {EncounterRaster}=await import('./Script_LevelFlowRaster.mjs');
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');

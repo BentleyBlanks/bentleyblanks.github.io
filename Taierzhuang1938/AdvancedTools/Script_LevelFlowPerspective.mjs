@@ -274,6 +274,9 @@ export class FlowPerspectiveView extends FlowMapView {
     };
     let coverBoxes=[];
     const Box=(x,z,w,d,h,color,y,yaw=0,cover=false,owner=null)=>{
+      // Roof tops and fascia share authored planes with lintels and wall piers.
+      const separation=owner?.material==="Whitebox/Roof"?FLOW_RENDERING.roofSurfaceSeparationM:0;
+      w+=separation*2;d+=separation*2;h+=separation;
       let geometry=owner&&this.boxGeometry.get(owner);
       if(!geometry||geometry.x!==x||geometry.z!==z||geometry.w!==w||geometry.d!==d||geometry.h!==h||geometry.y!==y||geometry.yaw!==yaw) {
         geometry=EncounterBoxGeometry(x,y,z,w,h,d,yaw);

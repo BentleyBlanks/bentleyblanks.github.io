@@ -33,7 +33,10 @@ export function EncounterShadowGeometry(objects,signals,ground) {
       const crown=Math.min(tree.crownMaxM,h*tree.crownWidthRatio);
       boxes.push(EncounterBoxGeometry(x,base,z,Math.min(w,tree.trunkMaxM),h,Math.min(d,tree.trunkMaxM),yaw));
       boxes.push(EncounterBoxGeometry(x,base+h*tree.crownBaseRatio,z,Math.max(w,crown),h*(1-tree.crownBaseRatio),Math.max(d,crown),yaw));
-    } else boxes.push(EncounterBoxGeometry(x,base,z,w,h,d,yaw));
+    } else {
+      const separation=object.material==="Whitebox/Roof"?FLOW_RENDERING.roofSurfaceSeparationM:0;
+      boxes.push(EncounterBoxGeometry(x,base,z,w+separation*2,h+separation,d+separation*2,yaw));
+    }
     for(const box of boxes) for(const [a,b,c,d] of box.faces) for(const index of [a,b,c,a,c,d]) vertices.push(...box.points[index]);
   }
   return new Float32Array(vertices);
