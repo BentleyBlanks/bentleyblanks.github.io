@@ -86,13 +86,22 @@ export class EncounterPlay {
     const skin=spec.castId||spec.side==="ija"?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
     if(skin)this.host.ai.view.SetSkin(soldier,skin);
     const index=Number(actor.id.slice((actor.groupId||"").length+1))||0;
-    const route=actor.route|| (group?GroupPath(group,index):null);
+    const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
     let routeIndex=0;
     if(route&&initial) {
       let nearest=Infinity;
-      for(let i=0;i<route.length;i++){const d=Math.hypot(route[i][0]-spec.x,route[i][1]-spec.z);if(d<nearest){nearest=d;routeIndex=i;}}
+      for(let i=1;i<route.length;i++){
+        const a=route[i-1],b=route[i],dx=b[0]-a[0],dz=b[1]-a[1],length=dx*dx+dz*dz;
+        const t=length?Math.max(0,Math.min(1,((spec.x-a[0])*dx+(spec.z-a[1])*dz)/length)):0;
+        const d=Math.hypot(a[0]+t*dx-spec.x,a[1]+t*dz-spec.z);
+        if(d<nearest){nearest=d;routeIndex=t<.001?i-1:i;}
+      }
     }
-    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex});
+    const member=group?.memberPlans?.[index%(group?.maxAlive||1)];
+    const deployment=(group?.deployDelay||0)+(member?.delay||0);
+    const prior=initial?Math.max(0,this.plan.time-(group?.lives[index]?.born??this.plan.time)):0;
+    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,
+      routeWaits:member?.waitSeconds||[],waitedIndex:-1,waitUntil:this.plan.elapsed+Math.max(0,deployment-prior)});
     if(!initial)this.plan.Spawned(actor);
     return true;
   }
@@ -101,10 +110,16 @@ export class EncounterPlay {
     const {soldier,group,route}=entry;
     if(!soldier.alive)return;
     const current=frame.actors.find(a=>a.id===entry.actor.id);
-    let target=current?.p||[soldier.position.x,soldier.position.z],moving=false;
+    let target=group&&!route?[entry.spec.x,entry.spec.z]:current?.p||[soldier.position.x,soldier.position.z],moving=false;
     if(route) {
-      while(entry.routeIndex<route.length-1&&Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<CONFIG.routeReachM)entry.routeIndex++;
+      const arrived=Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<CONFIG.routeReachM;
+      if(arrived&&entry.waitedIndex!==entry.routeIndex){
+        entry.waitedIndex=entry.routeIndex;
+        entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||0));
+      }
+      if(arrived&&this.plan.elapsed>=entry.waitUntil&&entry.routeIndex<route.length-1)entry.routeIndex++;
       target=route[entry.routeIndex];
+      if(this.plan.elapsed<entry.waitUntil)target=[soldier.position.x,soldier.position.z];
     }
     moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>CONFIG.routeReachM;
     let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:
@@ -141,7 +156,7 @@ export class EncounterPlay {
     this.orderClock-=dt;
     if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=CONFIG.orderEveryS;}
     const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)).map(a=>{
-      const spec=EncounterActorSpec(a);
+      const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId));
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
       if(a.kind==="litter")spec.kind="litter";
       return spec;
@@ -168,6 +183,7 @@ export class EncounterPlay {
     if(id==="player")return this.host.player.position;
     const entry=this.entries.get(id);if(entry)return entry.soldier.position;
     const puppet=this.puppets.puppets.get(id);
+    if(puppet?.humans[0])return puppet.humans[0].actor.root.getWorldPosition(new THREE.Vector3());
     return puppet?new THREE.Vector3(puppet.x,this.host.battlefield.GroundHeight(puppet.x,puppet.z),puppet.z):null;
   }
   Interact() {

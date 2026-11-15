@@ -14,15 +14,20 @@ export function EncounterPlayerYaw(beat) {
   const from=beat.p[0],to=beat.p.find(p=>Distance(p,from)>.1);
   return to?Math.atan2(from[0]-to[0],from[1]-to[1]):Math.PI/2;
 }
-export function EncounterActorSpec(actor) {
+export function EncounterActorSpec(actor,carrier=null) {
   const civilian=actor.side==="civilian", castId=CONFIG.casts[actor.id]||null;
   const next={id:actor.id,name:actor.name,castId,side:actor.side==="enemy"?"ija":civilian?"civ":"nra",
-    x:actor.p[0],z:actor.p[1],yawDeg:(actor.heading||0)*180/Math.PI,
+    x:actor.p[0],z:actor.p[1],yawDeg:-(actor.heading||0)*180/Math.PI,
     stance:["prone","wounded","dead","down"].includes(actor.pose)?"prone":["kneel","crouch"].includes(actor.pose)?"crouch":"stand",
     state:["dead","wounded","down"].includes(actor.pose)?"down":"alive",aim:!!actor.firing||actor.pose==="shoot",
     kind:actor.kind==="tank"?"tank":actor.kind==="cart"?"cart":actor.kind==="donkey"?"animal":actor.kind==="child"?"child":actor.kind==="quilt"?"soldier":civilian?"civilian":"soldier",
     weapon:civilian||actor.id==="winter"?null:actor.side==="enemy"?(actor.heavy?"Type11":"Type38"):(actor.heavy?"Zb26":"HanYang"),
     shape:"tankette",...(actor.kind==="cart"?{animal:false}:{})};
+  if(actor.parentId&&carrier) {
+    const yaw=-(carrier.heading||0),c=Math.cos(yaw),s=Math.sin(yaw),dx=actor.p[0]-carrier.p[0],dz=actor.p[1]-carrier.p[1];
+    next.ride={on:carrier.id,x:c*dx-s*dz,z:s*dx+c*dz,y:actor.elevation||0,yawDeg:next.yawDeg-yaw*180/Math.PI};
+    if(next.state==="down")next.lie="along";
+  }
   return next;
 }
 

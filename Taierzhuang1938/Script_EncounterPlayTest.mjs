@@ -17,6 +17,12 @@ assert.ok(WEAPONS[C.startWeapon]);
 assert.equal(EncounterActorSpec({id:"donkey",kind:"donkey",side:"civilian",pose:"walk",p:[0,0]}).kind,"animal");
 assert.equal(EncounterActorSpec({id:"nier",kind:"child",side:"civilian",pose:"kneel",p:[0,0]}).kind,"child");
 assert.equal(EncounterActorSpec({id:"nier",kind:"child",side:"civilian",pose:"kneel",p:[0,0]}).stance,"crouch");
+{
+ const carrier={id:"cart",kind:"cart",side:"civilian",p:[10,20],heading:Math.PI/2};
+ const actor={id:"winter",kind:"quilt",side:"friend",pose:"wounded",parentId:"cart",elevation:1.05,p:[10,20.5],heading:Math.PI/2};
+ assert.equal(EncounterActorSpec(carrier).yawDeg,-90,"Vehicle models face their direction of travel");
+ const spec=EncounterActorSpec(actor,carrier);assert.equal(spec.ride.on,"cart");assert.equal(spec.ride.y,1.05);assert.equal(spec.lie,"along");
+}
 const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
 {
   const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03c").start);
