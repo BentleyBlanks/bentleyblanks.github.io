@@ -86,6 +86,7 @@ try {
   assert.equal(JSON.parse(await page.locator("#codexContextDetail").textContent()).timeline.timeSeconds, 384);
   await page.screenshot({ path: path.join(out, "CodexSidebarNarrow.png") });
   // Use real canvas clicks in both viewports. Units keep their own frozen snapshot.
+  await page.selectOption('#viewportLayout','2');
   await page.evaluate(async () => {
     const { FlowMapView } = await import("./Script_LevelFlowView.mjs");
     window.unitHoverViews = {};

@@ -12,7 +12,7 @@ const LEGACY_VIEW_SELECTIONS={plan:"battle",oblique:"scene"};
 export class EncounterViewports {
   constructor(element,mapData,{activate,change,bounds,bind}) {
     this.element=element;this.mapData=mapData;this.callbacks={activate,change,bounds,bind};
-    this.count=2;this.entries=[];this.activeIndex=0;
+    this.count=1;this.entries=[];this.activeIndex=0;
     for(const [index,type] of [...FLOW_DEFAULT_VIEWS.map(view=>view.type),"battle","eye"].entries()) {
       const pane=document.createElement("section");pane.className="lfViewPane";pane.dataset.viewport=String(index);
       const bar=document.createElement("div");bar.className="lfViewBar";
@@ -29,7 +29,11 @@ export class EncounterViewports {
       const target=document.createElement("select");target.className="lfViewTarget";target.setAttribute("aria-label",`视口 ${index+1} 跟随对象`);
       for(const [value,label] of [["player","顺子"],["winter","冬瓜"],["luo","班长"],["tank1","头车"]]) {const option=document.createElement("option");option.value=value;option.textContent=label;target.append(option);}
       bar.append(target);
-      const fit=document.createElement("button");fit.textContent="重置镜头";fit.title=`恢复视口 ${index+1} 的默认镜头位置`;bar.append(fit);
+      const cameraMenu=document.createElement("details");cameraMenu.className="lfViewCamera";
+      const cameraSummary=document.createElement("summary");cameraSummary.textContent="镜头";cameraSummary.title="镜头取景";
+      cameraSummary.setAttribute("aria-label",`视口 ${index+1} 镜头`);
+      const cameraOptions=document.createElement("div");cameraMenu.append(cameraSummary,cameraOptions);bar.append(cameraMenu);
+      const fit=document.createElement("button");fit.textContent="重置镜头";fit.title=`恢复视口 ${index+1} 的默认镜头位置`;cameraOptions.append(fit);
       const layerMenu=document.createElement("details");layerMenu.className="lfViewLayers";
       const layerSummary=document.createElement("summary");layerSummary.textContent="显示";layerMenu.append(layerSummary);
       const layerOptions=document.createElement("div");layerMenu.append(layerOptions);bar.append(layerMenu);
@@ -40,11 +44,23 @@ export class EncounterViewports {
         input.onchange=()=>{layers[key]=input.checked;this.callbacks.change();};
         wrapper.append(input,document.createTextNode(label));layerOptions.append(wrapper);
       }
-      layerMenu.addEventListener("toggle",()=>{if(layerMenu.open) for(const other of this.entries) if(other.index!==index) other.layerMenu.open=false;});
+      for(const menu of [cameraMenu,layerMenu]) {
+        menu.addEventListener("toggle",()=>{
+          if(!menu.open) return;
+          for(const other of this.entries) {
+            for(const otherMenu of [other.cameraMenu,other.layerMenu]) {
+              if(otherMenu!==menu) otherMenu.open=false;
+            }
+          }
+        });
+        menu.addEventListener("keydown",event=>{
+          if(event.key!=="Escape") return;
+          event.preventDefault();event.stopPropagation();menu.open=false;menu.querySelector("summary").focus();
+        });
+      }
       const canvas=document.createElement("canvas");canvas.id=index===0?"flowMap":`flowMap${index+1}`;canvas.tabIndex=0;
       canvas.setAttribute("aria-label",`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`);
       const status=document.createElement("div");status.className="lfViewStatus";
-      const framing=document.createElement("div");framing.className="lfViewFraming";framing.setAttribute("aria-label",`视口 ${index+1} 镜头范围`);
       for(const [mode,label,description] of [
         ["stage","当前剧情范围","缩放到当前剧情段落的活动范围，只调整这个视口"],
         ["all","整个关卡","缩放到整个关卡的范围，只调整这个视口"],
@@ -52,10 +68,10 @@ export class EncounterViewports {
       ]) {
         const button=document.createElement("button");button.textContent=label;button.title=description;
         button.dataset.framing=mode;button.setAttribute("aria-pressed","false");
-        button.onclick=()=>this.SetFraming(index,mode);framing.append(button);
+        button.onclick=()=>{this.SetFraming(index,mode);cameraMenu.open=false;cameraSummary.focus();};cameraOptions.append(button);
       }
-      pane.append(bar,canvas,framing,status);element.append(pane);
-      const entry={index,pane,bar,canvas,select,target,status,type,layers,layerMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
+      pane.append(bar,canvas,status);element.append(pane);
+      const entry={index,pane,bar,canvas,select,target,status,type,layers,layerMenu,cameraMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
       this.entries.push(entry);
       this.CreateGizmo(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
@@ -64,13 +80,17 @@ export class EncounterViewports {
       fit.onclick=()=>{
         if(entry.type==="scene") {entry.defaultCamera=true;entry.mode="manual";}
         else {entry.mode=entry.type==="plan"?"stage":"follow";entry.map.followZoom=1;this.Frame(entry);}
-        this.callbacks.change();
+        this.callbacks.change();cameraMenu.open=false;cameraSummary.focus();
       };
       this.callbacks.bind(entry);
     }
     this.observer=new ResizeObserver(()=>this.Resize());
     for(const entry of this.entries) this.observer.observe(entry.canvas);
-    this.SetLayout(2);
+    document.addEventListener("pointerdown",event=>{
+      if(event.target.closest(".lfViewCamera, .lfViewLayers")) return;
+      for(const entry of this.entries) {entry.cameraMenu.open=false;entry.layerMenu.open=false;}
+    });
+    this.SetLayout(1);
   }
 
   CreateGizmo(entry) {
@@ -137,7 +157,7 @@ export class EncounterViewports {
   }
 
   SetLayout(count) {
-    this.count=[1,2,3,4].includes(Number(count))?Number(count):2;
+    this.count=[1,2,3,4].includes(Number(count))?Number(count):1;
     this.element.dataset.layout=String(this.count);
     for(const entry of this.entries) entry.pane.hidden=entry.index>=this.count;
     if(this.activeIndex>=this.count) this.activeIndex=0;
@@ -211,7 +231,10 @@ export class EncounterViewports {
       if(entry.mode==="follow") entry.map.Follow(frame);
       for(const button of entry.pane.querySelectorAll("[data-framing]")) {
         const pressed=String(button.dataset.framing===entry.mode);
-        if(button.getAttribute("aria-pressed")!==pressed) button.setAttribute("aria-pressed",pressed);
+        if(button.getAttribute("aria-pressed")!==pressed) {
+          button.setAttribute("aria-pressed",pressed);
+          if(button.dataset.framing==="follow") button.textContent=entry.mode==="follow"?"停止跟随":"自动跟随";
+        }
       }
       const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);

@@ -22,7 +22,7 @@ try {
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
   async function ReadyPlan() {
     await page.waitForFunction(()=>window.LevelFlow);
-    await page.evaluate(()=>{LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
+    await page.evaluate(()=>{LevelFlow.SetLayout(2);LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
     const framing=await page.evaluate(()=>{
       const params=new URLSearchParams(location.search);
       return ['x','z','zoom'].every(key=>params.has(key))?['x','z','zoom'].map(key=>Number(params.get(key))):null;
@@ -36,6 +36,12 @@ try {
       await page.mouse.wheel(0,-Math.log(framing[2]/scale)*1000);
       await page.evaluate(()=>new Promise(requestAnimationFrame));
     }
+  }
+  async function FrameViewport(index,mode) {
+    const menu=page.locator(`.lfViewPane[data-viewport="${index}"] .lfViewCamera`);
+    await menu.locator('summary').click();
+    await menu.locator(`[data-framing="${mode}"]`).click();
+    assert.equal(await menu.getAttribute('open'),null,'camera action closes its menu');
   }
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow);
   const roofDepth=await page.evaluate(async()=>{
@@ -298,6 +304,26 @@ try {
   assert.deepEqual(perspectiveLandmarks.off,[]);
   assert.deepEqual(perspectiveLandmarks.on,perspectiveLandmarks.initial);
   assert.ok(perspectiveLandmarks.changed&&perspectiveLandmarks.restored,'3D scene names toggle and invalidate the background cache');
+  const initialLayout=await page.evaluate(()=>LevelFlow.Inspect().viewports);
+  assert.equal(initialLayout.count,1,'the editor opens with a single viewport');
+  assert.deepEqual(initialLayout.views.map(view=>view.type),['scene']);
+  assert.equal(await page.locator('#viewportLayout').inputValue(),'1');
+  assert.equal(await page.locator('.lfViewPane:visible').count(),1);
+  assert.equal(await page.locator('.lfViewFraming').count(),0,'framing actions share the top-bar camera menu');
+  const cameraMenu=page.locator('.lfViewPane[data-viewport="0"] .lfViewCamera');
+  await cameraMenu.locator('summary').click();
+  assert.deepEqual(await cameraMenu.locator('button').allTextContents(),['重置镜头','当前剧情范围','整个关卡','自动跟随']);
+  await page.screenshot({path:path.join(out,'CameraMenuSingle.png')});
+  await page.keyboard.press('Escape');assert.equal(await cameraMenu.getAttribute('open'),null);
+  await cameraMenu.locator('summary').click();await page.locator('#frameHeading').click();
+  assert.equal(await cameraMenu.getAttribute('open'),null,'outside click closes the camera menu');
+  await FrameViewport(0,'follow');
+  await cameraMenu.locator('summary').click();
+  assert.equal(await cameraMenu.locator('[data-framing="follow"]').textContent(),'停止跟随');
+  await cameraMenu.getByRole('button',{name:'重置镜头',exact:true}).click();
+  assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0])).mode,'manual');
+  assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0])).freeCamera,initialLayout.views[0].freeCamera,'reset restores the default Scene camera');
+  await page.selectOption('#viewportLayout','2');
   const defaults=await page.evaluate(()=>LevelFlow.Inspect().viewports);
   assert.equal(defaults.count,2);
   assert.deepEqual(defaults.views.map(view=>view.type),['scene','scene']);
@@ -360,8 +386,7 @@ try {
   assert.ok(defaults.views.every(view=>view.mode==='manual'&&view.freeCamera));
   assert.ok(defaults.views[0].freeCamera.pitch<-0.5&&defaults.views[1].focusDistance<defaults.views[0].focusDistance/2,'the default pair provides an aerial and a near-ground Scene camera');
   const sceneBefore=await page.evaluate(()=>LevelFlow.Inspect());
-  const followButton=page.locator('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
-  await followButton.click();
+  await FrameViewport(1,'follow');
   const sceneFollowing=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(sceneFollowing.viewports.views[1].type,'scene','enabling follow preserves the perspective Scene camera');
   assert.equal(sceneFollowing.viewports.views[1].mode,'follow');
@@ -390,7 +415,7 @@ try {
   await page.evaluate(()=>LevelFlow.Seek(424));
   const sceneRewound=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1]);
   for(let axis=0;axis<3;axis++) assert.ok(Math.abs(sceneRewound.freeCamera.eye[axis]-sceneZoomed.freeCamera.eye[axis])<1e-9,'rewinding restores the following camera offset');
-  await followButton.click();
+  await FrameViewport(1,'follow');
   await page.evaluate(()=>LevelFlow.Seek(640));
   assert.deepEqual((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).freeCamera,sceneRewound.freeCamera,'stopping follow holds the perspective camera in place');
   await page.evaluate(defaults=>{LevelFlow.Seek(424);LevelFlow.RestoreViewports(defaults);},defaults);
@@ -432,7 +457,7 @@ try {
     assert.equal(moved.followZoom,playingZoom.followZoom,`${type} seeking retains the zoom adjustment`);
     await page.evaluate(()=>LevelFlow.RestoreViewports(LevelFlow.Inspect().viewports));
     assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).followZoom,playingZoom.followZoom,`${type} viewport round-trip retains zoom`);
-    await page.locator('.lfViewPane[data-viewport="1"] [data-framing="follow"]').click();
+    await FrameViewport(1,'follow');
     assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'manual',`${type} follow can still be stopped explicitly`);
   }
   await page.evaluate(defaults=>{
@@ -674,16 +699,16 @@ try {
   }
   await page.evaluate(()=>window.LevelFlow.Seek(424));
   await page.screenshot({path:path.join(out,"Retreat.png")});
-  await page.click('.lfViewPane[data-viewport="0"] [data-framing="follow"]');
+  await FrameViewport(0,'follow');
   const framing=await page.evaluate(()=>{
     const state=window.LevelFlow.Inspect(),canvas=document.getElementById('flowMap');
     return state.actors.filter(actor=>actor.pose!=="dead"&&Math.hypot(actor.p[0]-state.actors[0].p[0],actor.p[1]-state.actors[0].p[1])<115).map(actor=>({name:actor.name,p:window.LevelFlow.ToScreen(actor.p),width:canvas.clientWidth,height:canvas.clientHeight}));
   });
   assert.ok(framing.every(({p,width,height})=>p[0]>20&&p[1]>20&&p[0]<width-20&&p[1]<height-20),"follow keeps the player, threats and defenders inside the viewport");
-  await page.click('.lfViewPane[data-viewport="0"] [data-framing="stage"]');
+  await FrameViewport(0,'stage');
   assert.equal(await page.locator('[data-tab="edit"],#editPane,#objectList,#objectForm,#undoFlow,#redoFlow').count(),0);
   const firstBefore=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[0]);
-  await page.click('.lfViewPane[data-viewport="1"] [data-framing="all"]');
+  await FrameViewport(1,'all');
   const framedViews=await page.evaluate(()=>LevelFlow.Inspect().viewports.views);
   assert.equal(framedViews[1].mode,'all');assert.deepEqual(framedViews[0],firstBefore,'viewport controls only reframe their own viewport');
   const fullMap=await page.evaluate(async()=>{
@@ -692,9 +717,9 @@ try {
     return {width:canvas.clientWidth,height:canvas.clientHeight,corners:[[bounds[0],bounds[2]],[bounds[1],bounds[2]],[bounds[1],bounds[3]],[bounds[0],bounds[3]]].map(point=>LevelFlow.ToScreen(point,1))};
   });
   assert.ok(fullMap.corners.every(point=>point[0]>=20&&point[0]<=fullMap.width-20&&point[1]>=20&&point[1]<=fullMap.height-20),'the entire level fits inside the overview viewport');
-  await page.click('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
+  await FrameViewport(1,'follow');
   assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'follow');
-  await page.click('.lfViewPane[data-viewport="1"] [data-framing="follow"]');
+  await FrameViewport(1,'follow');
   assert.equal((await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1])).mode,'manual');
   await page.click('[data-tab="chat"]');
   await page.evaluate(()=>LevelFlow.Select({type:'group',id:'RearPursuit'}));

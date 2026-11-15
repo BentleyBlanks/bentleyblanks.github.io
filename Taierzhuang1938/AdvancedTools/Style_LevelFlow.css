@@ -119,11 +119,15 @@ textarea { resize: vertical; min-height: 64px; }
 .lfGizmoCenter { position: absolute; left: 41px; top: 41px; width: 14px; height: 14px; border: 1px solid #f9f5e3b3; border-radius: 3px; background: #a5ac9c; transform: rotate(45deg); z-index: 100; pointer-events: none; }
 .lfGizmoDragging, .lfGizmoDragging .lfGizmoTip { cursor: grabbing; }
 .lfViewStatus { position: absolute; right: 9px; bottom: 10px; padding: 3px 8px; border-radius: 2px; font-size: 12px; color: #bdc5b9; background: #101716e8; box-shadow: 0 1px 5px #00000026; pointer-events: none; }
-.lfViewLayers { position: relative; flex: none; font-size: 13px; }
-.lfViewLayers summary { list-style: none; padding: 3px 6px; border: 1px solid transparent; border-radius: 2px; cursor: pointer; white-space: nowrap; color: #b5beb2; }
-.lfViewLayers summary::after { content: "⌄"; margin-left: 5px; }
-.lfViewLayers[open] summary { background: var(--ed-black); color: #e1c58b; border-color: #a18c565c; }
-.lfViewLayers > div { position: absolute; right: 0; top: calc(100% + 7px); width: 132px; padding: 6px; border: 1px solid var(--lf-line); border-radius: 8px; background: var(--ed-black); box-shadow: 0 8px 28px #00000055; z-index: 5; }
+.lfViewLayers, .lfViewCamera { position: relative; flex: none; font-size: 13px; }
+.lfViewLayers summary, .lfViewCamera summary { list-style: none; padding: 3px 6px; border: 1px solid transparent; border-radius: 2px; cursor: pointer; white-space: nowrap; color: #b5beb2; }
+.lfViewLayers summary::after, .lfViewCamera summary::after { content: "⌄"; margin-left: 5px; }
+.lfViewLayers[open] summary, .lfViewCamera[open] summary { background: var(--ed-black); color: #e1c58b; border-color: #a18c565c; }
+.lfViewLayers > div, .lfViewCamera > div { position: absolute; right: 0; top: calc(100% + 7px); width: 132px; padding: 6px; border: 1px solid var(--lf-line); border-radius: 8px; background: var(--ed-black); box-shadow: 0 8px 28px #00000055; z-index: 5; }
+.lfViewCamera > div { width: 160px; }
+.lfViewCamera > div > button { display: block; width: 100%; height: auto; padding: 7px 9px; text-align: left; font-size: 13px; color: var(--ed-text-2); }
+.lfViewCamera > div > button:hover, .lfViewCamera > div > button[aria-pressed="true"] { color: var(--ed-gold-text); background: var(--ed-sel-strong); }
+.lfViewCamera > div > button:first-child { margin-bottom: 4px; border-bottom: 1px solid var(--ed-edge); border-radius: 0; padding-bottom: 10px; }
 .lfViewLayers label { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 2px; color: #c4cbc0; cursor: pointer; }
 .lfViewLayers label:hover { background: #292e27; }
 #mapReadout { position: absolute; bottom: 43px; left: 14px; padding: 3px 8px; border-radius: 2px; background: #101716e8; color: #c6cdbf; font: 12px/1.6 "IBM Plex Mono", Consolas, monospace; pointer-events: none; box-shadow: 0 1px 5px #00000026; }
@@ -387,14 +391,6 @@ textarea { resize: vertical; min-height: 64px; }
 .lfInspectorResize:hover, .lfInspectorResize:focus-visible, .lfResizingInspector .lfInspectorResize { background: #c4ac6755; box-shadow: inset 2px 0 #b49d64; }
 .lfResizingInspector, .lfResizingInspector * { cursor: col-resize !important; user-select: none !important; }
 @media (max-width: 650px) { .lfInspectorResize { display: none; } }
-
-.lfViewFraming { position: absolute; top: 48px; left: 8px; display: flex; flex-wrap: wrap; max-width: calc(100% - 16px); gap: 3px; z-index: 2; padding: 3px; background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 6px; box-shadow: inset 0 1px var(--ed-rule-2), 0 2px 6px #00000040; }
-.lfViewFraming button { letter-spacing: .04em; padding: 4px 6px; font-size: 13px; line-height: 1.5; color: var(--ed-text-2); background: transparent; border-color: transparent; box-shadow: none; }
-.lfViewFraming button[aria-pressed="true"] { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
-@media (max-width: 850px) {
-  .lfViewFraming { top: 58px; left: 5px; gap: 0; padding: 2px; }
-  .lfViewFraming button { padding: 3px; font-size: 12px; }
-}
 
 #interruptCodexChat { flex: none; border-color: #b28d5966; color: var(--ed-gold-text); font-size: 13px; padding: 4px 10px; }
 #interruptCodexChat:hover:not(:disabled) { border-color: var(--ed-gold); background: var(--ed-sel); }
