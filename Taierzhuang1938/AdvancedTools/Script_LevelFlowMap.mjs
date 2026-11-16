@@ -145,14 +145,14 @@ export function BuildEncounterMap(scene) {
   };
 }
 
-export async function LoadEncounterMap() {
+export async function LoadEncounterMap(options) {
   const sceneUrl=new URL("../Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json", import.meta.url);
   const response = await fetch(sceneUrl, {cache:"no-store"});
   if (!response.ok) throw new Error(`空间底图读取失败 ${response.status}`);
   const scene=await response.json(),map=BuildEncounterMap(scene);
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(map)));
   map.source={scene:"Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
-  map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map);
+  map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map,options);
   map.terrain.surfaceMaps();
   return map;
 }

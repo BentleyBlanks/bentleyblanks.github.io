@@ -374,6 +374,12 @@ export function BuildGroundPaint(items, bounds = null, { cellM: startCellM = BLO
       }
     }
   }
+  return HydrateGroundPaint({ cellM, minX, minZ, cols, rows, C, A });
+}
+
+export function HydrateGroundPaint(raster) {
+  if(!raster) return null;
+  const {cellM,minX,minZ,cols,rows,C,A}=raster;
   const Blend = (x, z, rgb) => {
     const gx = (x - minX) / cellM, gz = (z - minZ) / cellM;
     if (!(gx >= 0 && gz >= 0 && gx <= cols - 1 && gz <= rows - 1)) return 0;
@@ -390,7 +396,7 @@ export function BuildGroundPaint(items, bounds = null, { cellM: startCellM = BLO
     }
     return a;
   };
-  return { cellM, minX, minZ, cols, rows, C, A, Blend };
+  return {...raster,Blend};
 }
 
 /**

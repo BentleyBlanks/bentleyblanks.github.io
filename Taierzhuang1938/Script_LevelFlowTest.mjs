@@ -800,12 +800,27 @@ const reliefGrid = {file:"Relief.height.bin", encoding:"int16-cm-le", minX:0, mi
 const reliefHeights = new Float32Array(33 * 33);
 reliefHeights[2 * 33 + 6] = 1.4;
 reliefHeights[14 * 33 + 18] = -1.4;
-const relief = BuildEncounterTerrain({terrain:reliefGrid, bounds:{minX:0,maxX:16,minZ:0,maxZ:16},
-  paint:[{color:"#123456",feather:0.1,poly:[{x:0,z:0},{x:1,z:0},{x:1,z:1},{x:0,z:1}]}]},
-  EncodeSceneHeights(reliefHeights), null, {trenches:[],
+const reliefScene={terrain:reliefGrid, bounds:{minX:0,maxX:16,minZ:0,maxZ:16},
+  paint:[{color:"#123456",feather:0.1,poly:[{x:0,z:0},{x:1,z:0},{x:1,z:1},{x:0,z:1}]}]};
+const reliefMap={trenches:[],
     fieldZones:[{id:"Test",poly:[[0,0],[16,0],[16,16],[0,16]]}],
     fields:[{zone:"Test",x:8,z:8,w:16,d:16,angleDeg:0,
-      strips:[{from:-8,to:-2,kind:"plowed"},{from:-2,to:2,kind:"wheat"},{from:2,to:8,kind:"fallow"}]}]});
+      strips:[{from:-8,to:-2,kind:"plowed"},{from:-2,to:2,kind:"wheat"},{from:2,to:8,kind:"fallow"}]}]};
+const reliefBytes=EncodeSceneHeights(reliefHeights);
+const relief=BuildEncounterTerrain(reliefScene,reliefBytes,null,reliefMap);
+const snapshot=structuredClone(relief.prepareSnapshot());
+const restoredRelief=BuildEncounterTerrain(reliefScene,reliefBytes,null,reliefMap,snapshot);
+assert.equal(restoredRelief.leafCount,relief.cells.length,'worker snapshots preserve every relief leaf');
+for(let index=0;index<120;index++) {
+  const x=index*7.31%16,z=index*13.7%16;
+  assert.equal(restoredRelief.heightAt(x,z),relief.heightAt(x,z),'hydration preserves terrain and collision samples');
+  assert.deepEqual(restoredRelief.surfaceColorAt(x,z),relief.surfaceColorAt(x,z),'hydrated paint uses the original bilinear sampler');
+}
+for(let index=0;index<relief.cells.length;index+=17) {
+  assert.deepEqual(restoredRelief.cells[index].center,relief.cells[index].center);
+  assert.deepEqual(restoredRelief.packedFacesForCell(restoredRelief.cells[index],true),relief.packedFacesForCell(relief.cells[index],true),
+    'restored and worker-prewarmed cells retain identical packed geometry');
+}
 assert.deepEqual(relief.surfaceColorAt(2,2).map(Math.round), [181,156,122], "field strips retain plowed soil");
 assert.deepEqual(relief.surfaceColorAt(8,2).map(Math.round), [182,191,136], "wheat fields reach the 3D terrain surface");
 assert.deepEqual(relief.surfaceColorAt(14,2).map(Math.round), [182,177,151], "the adjacent fallow strip stays distinct");
@@ -1316,6 +1331,17 @@ const SelectTerrain=(cell)=>{
 };
 terrain.roots.filter(cell=>[-256,0].includes(cell.x)&&cell.z===0).forEach(SelectTerrain);
 const selectedBoundaries=terrain.boundariesForCells(selectedTerrain),selectedEdges=new Map();
+let incrementalBoundaries={};
+const BoundaryValues=lines=>[...lines].map(([key,values])=>[key,[...values]]).sort(([a],[b])=>a-b);
+for(const selection of [selectedTerrain,selectedTerrain.slice(0,-7),selectedTerrain.slice(3),[],selectedTerrain]) {
+  incrementalBoundaries=terrain.boundariesForCells(selection,incrementalBoundaries);
+  const fresh=terrain.boundariesForCells(selection);
+  assert.deepEqual(BoundaryValues(incrementalBoundaries.rows),BoundaryValues(fresh.rows),'incremental LOD rows match a full rebuild after additions and removals');
+  assert.deepEqual(BoundaryValues(incrementalBoundaries.columns),BoundaryValues(fresh.columns),'incremental LOD columns preserve exact shared corners');
+  for(const cell of selection.filter((_,index)=>index%97===0)) assert.deepEqual(
+    terrain.packedFacesForCell(cell,true,incrementalBoundaries),terrain.packedFacesForCell(cell,true,fresh),
+    'incremental seam meshes retain identical native geometry');
+}
 let selectedFaces=0,fullBoundaryFaces=0;
 for(const cell of selectedTerrain) {
   const faces=terrain.facesForCell(cell,selectedBoundaries);

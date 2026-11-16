@@ -3,7 +3,7 @@ import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_
 import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
 import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
-import { BuildGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
+import { BuildGroundPaint, HydrateGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
 
 function LowerBound(values,target) {
   let low=0,high=values.length;
@@ -11,15 +11,15 @@ function LowerBound(values,target) {
   return low;
 }
 
-export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
+export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=null) {
   const pre=DecodeSceneHeights(heightBytes,scene.terrain),preAt=GridSampler(scene.terrain,pre);
   const datum=scene.trenches?.datum&&datumBytes?DecodeTrenchDatum(scene.trenches.datum,datumBytes):[];
   const plan=CompileSceneTrenches(scene.trenches,{datum,pre:preAt});
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
   const paintSettings={cellM:FLOW_RENDERING.terrainSurface.texelM,maxCells:FLOW_RENDERING.terrainSurface.maxPixels};
-  const groundPaint = BuildGroundPaint(scene.paint, bounds, paintSettings);
-  const backdropPaint = RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
-  const localBackdropPaint = RasterizeBackdropPaint(scene.backdrop, {
+  const groundPaint = prepared?HydrateGroundPaint(prepared.groundPaint):BuildGroundPaint(scene.paint, bounds, paintSettings);
+  const backdropPaint = prepared?prepared.backdropPaint:RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
+  const localBackdropPaint = prepared?prepared.localBackdropPaint:RasterizeBackdropPaint(scene.backdrop, {
     maxPx:FLOW_RENDERING.terrainSurface.maxTexturePx, minTexelM:FLOW_RENDERING.terrainSurface.texelM,
     padM:FLOW_RENDERING.terrainSurface.paddingM, bounds,
   });
@@ -28,7 +28,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   const fields = (map.fields || []).map(field => ({...field,
     cosine:Math.cos(field.angleDeg * Math.PI / 180), sine:Math.sin(field.angleDeg * Math.PI / 180),
     polygon:map.fieldZones.find(zone => zone.id === field.zone).poly}));
-  const routePaint = BuildGroundPaint([
+  const routePaint = prepared?HydrateGroundPaint(prepared.routePaint):BuildGroundPaint([
     ...(map.roads || []).map(road => ({line:road.points.map(([x,z]) => ({x,z})), halfW:road.width / 2, feather:0.8, color:"#d8c8a7"})),
     ...(map.footpaths || []).map(points => ({line:points.map(([x,z]) => ({x,z})), halfW:0.35, feather:0.5, color:"#c4b792"})),
     ...(map.floors || []).map(floor => ({poly:floor.points.map(([x,z]) => ({x,z})), feather:0.5, color:"#d8c8a7"})),
@@ -212,34 +212,87 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return cell;
   };
   const radius=6144;
-  const roots=[];
-  for(let z=-radius;z<radius;z+=256) for(let x=-radius;x<radius;x+=256) roots.push(Refine(x,z,256));
-  const BoundariesForCells = (selected) => {
-    const rows=new Map(),columns=new Map();
-    for(const cell of selected) for(const [x,z] of [[cell.x,cell.z],[cell.x+cell.size,cell.z],
-      [cell.x+cell.size,cell.z+cell.size],[cell.x,cell.z+cell.size]]) {
-      if(!rows.has(z)) rows.set(z,new Set()); rows.get(z).add(x);
-      if(!columns.has(x)) columns.set(x,new Set()); columns.get(x).add(z);
+  const restoredNodes=new Map();
+  const RestoreNode=(index)=>{
+    if(restoredNodes.has(index)) return restoredNodes.get(index);
+    const data=prepared.nodes,offset=index*15;
+    const [x,z,size,minHeight,maxHeight,heightError,near,painted,firstChild]=data.subarray(offset,offset+9);
+    const corners=Array.from(data.subarray(offset+9,offset+13)),centerHeight=data[offset+13];
+    const cell={x,z,size,minHeight,maxHeight,heightError,corners,centerHeight,near:!!near,painted:!!painted,nodeIndex:index,
+      center:[x+size/2,(minHeight+maxHeight)/2,z+size/2],radius:Math.hypot(size/Math.SQRT2,(maxHeight-minHeight)/2)};
+    if(data[offset+14]>=0) cell.exactHeightError=data[offset+14];
+    restoredNodes.set(index,cell);
+    if(firstChild>=0) Object.defineProperty(cell,"children",{configurable:true,get(){
+      const children=[0,1,2,3].map(child=>RestoreNode(firstChild+child));
+      Object.defineProperty(cell,"children",{value:children});return children;
+    }});
+    return cell;
+  };
+  const roots=prepared?Array.from({length:prepared.rootCount},(_,index)=>RestoreNode(index)):[];
+  if(!prepared) for(let z=-radius;z<radius;z+=256) for(let x=-radius;x<radius;x+=256) roots.push(Refine(x,z,256));
+  const BoundariesForCells=(selected,state=null)=>{
+    if(state) {
+      if(!state.selected) Object.assign(state,{selected:new Set(),rowCounts:new Map(),columnCounts:new Map(),rows:new Map(),columns:new Map()});
+      const dirtyRows=new Set(),dirtyColumns=new Set(),next=new Set(selected);
+      const UpdateLine=(lines,dirty,key,value,delta)=>{
+        let counts=lines.get(key);
+        if(!counts) {counts=new Map();lines.set(key,counts);}
+        const count=(counts.get(value)||0)+delta;
+        if(count) counts.set(value,count);else counts.delete(value);
+        if(!counts.size) lines.delete(key);
+        dirty.add(key);
+      };
+      const UpdateCell=(cell,delta)=>{
+        for(const [x,z] of [[cell.x,cell.z],[cell.x+cell.size,cell.z],
+          [cell.x+cell.size,cell.z+cell.size],[cell.x,cell.z+cell.size]]) {
+          UpdateLine(state.rowCounts,dirtyRows,z,x,delta);UpdateLine(state.columnCounts,dirtyColumns,x,z,delta);
+        }
+      };
+      for(const cell of state.selected) if(!next.has(cell)) UpdateCell(cell,-1);
+      for(const cell of next) if(!state.selected.has(cell)) UpdateCell(cell,1);
+      for(const [lines,counts,dirty] of [[state.rows,state.rowCounts,dirtyRows],[state.columns,state.columnCounts,dirtyColumns]]) {
+        for(const key of dirty) {
+          const values=counts.get(key);
+          if(values) lines.set(key,Float64Array.from(values.keys()).sort());else lines.delete(key);
+        }
+      }
+      state.selected=next;return state;
     }
-    for(const [key,values] of rows) rows.set(key,[...values].sort((a,b)=>a-b));
-    for(const [key,values] of columns) columns.set(key,[...values].sort((a,b)=>a-b));
+    const rows=new Map(),columns=new Map();
+    const Register=(x,z)=>{
+      let row=rows.get(z);if(!row) {row=new Set();rows.set(z,row);}row.add(x);
+      let column=columns.get(x);if(!column) {column=new Set();columns.set(x,column);}column.add(z);
+    };
+    for(const cell of selected) {
+      Register(cell.x,cell.z);Register(cell.x+cell.size,cell.z);
+      Register(cell.x+cell.size,cell.z+cell.size);Register(cell.x,cell.z+cell.size);
+    }
+    for(const lines of [rows,columns]) for(const [key,values] of lines) lines.set(key,Float64Array.from(values).sort());
     return {rows,columns};
   };
-  const fullBoundaries=BoundariesForCells(cells);
+  const RestoreLines=lines=>new Map(Array.from(lines.keys,(key,index)=>[key,lines.values.subarray(lines.offsets[index],lines.offsets[index+1])]));
+  const fullBoundaries=prepared?{rows:RestoreLines(prepared.rows),columns:RestoreLines(prepared.columns)}:BoundariesForCells(cells);
   const Between=(values,from,to)=>values.slice(LowerBound(values,from),LowerBound(values,to+1e-8));
   const OutlineForCell = ({x,z,size},{rows,columns}=fullBoundaries) => {
     const maxX=x+size,maxZ=z+size;
     return [
-      ...Between(rows.get(z),x,maxX).map(value=>[value,z]),
-      ...Between(columns.get(maxX),z,maxZ).slice(1).map(value=>[maxX,value]),
-      ...Between(rows.get(maxZ),x,maxX).reverse().slice(1).map(value=>[value,maxZ]),
-      ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map(value=>[x,value]),
+      ...Array.from(Between(rows.get(z),x,maxX),value=>[value,z]),
+      ...Array.from(Between(columns.get(maxX),z,maxZ).slice(1),value=>[maxX,value]),
+      ...Array.from(Between(rows.get(maxZ),x,maxX).reverse().slice(1),value=>[value,maxZ]),
+      ...Array.from(Between(columns.get(x),z,maxZ).reverse().slice(1,-1),value=>[x,value]),
     ];
   };
   const heightErrorCache = new WeakMap();
+  const preparedErrors=new Map(prepared?Array.from(prepared.errorIds,(id,index)=>[id,index]):[]);
   const HeightErrorForCell = (cell,limit=Infinity) => {
+    if(cell.exactHeightError!==undefined) return cell.exactHeightError;
     if (!cell.children) return 0;
-    if (!heightErrorCache.has(cell)) heightErrorCache.set(cell,{error:0,pending:[...cell.children]});
+    if (!heightErrorCache.has(cell)) {
+      const index=preparedErrors.get(cell.nodeIndex);
+      const state=index===undefined?{error:0,pending:[...cell.children]}:{error:prepared.errorValues[index],
+        pending:Array.from(prepared.errorPending.subarray(prepared.errorOffsets[index],prepared.errorOffsets[index+1]),RestoreNode)};
+      heightErrorCache.set(cell,state);
+    }
     const state=heightErrorCache.get(cell);
     if (!state.pending.length || state.error>limit) return state.error;
     const {x,z,size} = cell, half = size / 2, cx = x + half, cz = z + half;
@@ -265,12 +318,18 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       Check(child.x+child.size,child.z+child.size,child.corners[2]); Check(child.x,child.z+child.size,child.corners[3]);
       Check(child.x+child.size/2,child.z+child.size/2,child.centerHeight);
     }
+    if(!state.pending.length) cell.exactHeightError=state.error;
     return state.error;
   };
   const normalCache = new Map();
+  const preparedNormals=new Map(prepared?prepared.normalKeys.map((key,index)=>[key,index]):[]);
   const NormalAt = (x, z) => {
     const key = `${x},${z}`;
     if (!normalCache.has(key)) {
+      const cached=preparedNormals.get(key);
+      if(cached!==undefined) {
+        const normal=Array.from(prepared.normalValues.subarray(cached*3,cached*3+3));normalCache.set(key,normal);return normal;
+      }
       const step = FLOW_RENDERING.terrainNormalSampleM;
       const normal = [Sample(x - step, z) - Sample(x + step, z), 2 * step,
         Sample(x, z - step) - Sample(x, z + step)];
@@ -303,7 +362,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   };
   // Bake color independently of relief tessellation. Pixel centers correspond
   // to world grid samples, so adjacent LOD cells use exactly the same paint.
-  let surfaceMaps;
+  let surfaceMaps=prepared?.surfaceMaps;
   const SurfaceMaps = () => {
     if (surfaceMaps) return surfaceMaps;
     const settings = FLOW_RENDERING.terrainSurface;
@@ -355,6 +414,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return Math.max(...maximum.map((channel,axis)=>channel-minimum[axis]));
   };
   const faceCache=new WeakMap();
+  const preparedMeshes=new Map(prepared?Array.from(prepared.packedIds,(id,index)=>[id,index]):[]);
   // Adjacent triangles and LOD cells share immutable vertices, so each view
   // can project a ground vertex once per camera frame without changing seams.
   const vertices=new Map();
@@ -365,11 +425,44 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   };
   const surfaceColor=[198,207,169];
   const MeshForCell=(cell,boundaries=fullBoundaries,textured=false)=>{
+    let cached=faceCache.get(cell);
+    if(!cached) {cached={variants:new Map(),textured:null,shaded:null};faceCache.set(cell,cached);}
+    const previous=textured?cached.textured:cached.shaded;
+    if(previous&&previous.segments[0].line===boundaries.rows.get(cell.z)
+      &&previous.segments[1].line===boundaries.columns.get(cell.x+cell.size)
+      &&previous.segments[2].line===boundaries.rows.get(cell.z+cell.size)
+      &&previous.segments[3].line===boundaries.columns.get(cell.x)) return previous.record;
+    const edges=[boundaries.rows.get(cell.z),boundaries.columns.get(cell.x+cell.size),
+      boundaries.rows.get(cell.z+cell.size),boundaries.columns.get(cell.x)];
+    if(previous) {
+      let unchanged=true;
+      for(let side=0;side<4;side++) {
+        const old=previous.segments[side],line=edges[side];
+        if(old.line===line) continue;
+        const from=side%2?cell.z:cell.x,start=LowerBound(line,from),end=LowerBound(line,from+cell.size+1e-8);
+        if(end-start!==old.end-old.start) {unchanged=false;break;}
+        for(let index=0;index<end-start;index++) if(line[start+index]!==old.line[old.start+index]) {unchanged=false;break;}
+        if(!unchanged) break;
+        old.line=line;old.start=start;old.end=end;
+      }
+      if(unchanged) return previous.record;
+    }
+    const segments=edges.map((line,side)=>{
+      const from=side%2?cell.z:cell.x;
+      return {line,start:LowerBound(line,from),end:LowerBound(line,from+cell.size+1e-8)};
+    });
     const outline=OutlineForCell(cell,boundaries);
     const key=(textured?"T:":"S:")+outline.flat().join(",");
-    if(!faceCache.has(cell)) faceCache.set(cell,new Map());
-    const variants=faceCache.get(cell);
-    if(variants.has(key)) return variants.get(key);
+    const variants=cached.variants;
+    if(variants.has(key)) {
+      const record=variants.get(key);
+      cached[textured?"textured":"shaded"]={segments,record};return record;
+    }
+    const preparedIndex=preparedMeshes.get(cell.nodeIndex);
+    if(textured&&outline.length===4&&preparedIndex!==undefined) {
+      const packed=prepared.packedVertices.subarray(prepared.packedOffsets[preparedIndex],prepared.packedOffsets[preparedIndex+1]);
+      const record={faces:null,packed};variants.set(key,record);cached.textured={segments,record};return record;
+    }
     const triangles=[];
     const {x,z,size}=cell,maxX=x+size,maxZ=z+size;
     const center=VertexAt(x+size/2,z+size/2);
@@ -401,7 +494,14 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
         break;
       }
     }
-    for(const points of pointSets) {
+    let packed=null;
+    if(textured) {
+      packed=new Float32Array(pointSets.length*27);
+      let offset=0;
+      for(const points of pointSets) for(const point of points) {
+        packed.set(point,offset);packed.set(surfaceColor,offset+3);packed.set(NormalAt(point[0],point[2]),offset+6);offset+=9;
+      }
+    } else for(const points of pointSets) {
       const vertexColors = points.map(point => textured?surfaceColor:ColorAt(point[0], point[2]));
       const vertexNormals = points.map(point => NormalAt(point[0], point[2]));
       const color = "#" + vertexColors[0].map((channel, axis) =>
@@ -409,8 +509,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       triangles.push({points,color,vertexColors,vertexNormals,minX:x,maxX,minZ:z,maxZ});
     }
     if(variants.size>=4) variants.delete(variants.keys().next().value);
-    const record={faces:triangles,packed:null};
+    const record={faces:triangles,packed};
     variants.set(key,record);
+    cached[textured?"textured":"shaded"]={segments,record};
     return record;
   };
   const PackedFacesForCell=(cell,textured=false,boundaries=fullBoundaries)=>{
@@ -427,15 +528,67 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     record.packed=packed;
     return packed;
   };
+  const PrepareSnapshot=(focus=[0,0])=>{
+    if(prepared) return prepared;
+    const all=[...roots],rootCount=roots.length,childIndices=[],indices=new WeakMap();
+    for(let index=0;index<all.length;index++) {
+      const cell=all[index];indices.set(cell,index);
+      if(cell.children) {childIndices.push(all.length);all.push(...cell.children);} else childIndices.push(-1);
+    }
+    const settings=FLOW_RENDERING.terrainBuild;
+    const candidates=all.filter(cell=>cell.size>=2&&Math.abs(cell.center[0]-focus[0])<=settings.prewarmRadiusM
+      &&Math.abs(cell.center[2]-focus[1])<=settings.prewarmRadiusM);
+    candidates.sort((a,b)=>b.size-a.size||Math.hypot(a.center[0]-focus[0],a.center[2]-focus[1])-Math.hypot(b.center[0]-focus[0],b.center[2]-focus[1]));
+    let bytes=0;
+    const packs=[],packedIds=[],packedOffsets=[0];
+    for(const cell of candidates) {
+      const packed=PackedFacesForCell(cell,true,BoundariesForCells([cell]));
+      if(bytes+packed.byteLength>settings.prewarmBytes) break;
+      packs.push(packed);packedIds.push(indices.get(cell));bytes+=packed.byteLength;packedOffsets.push(bytes/4);
+      HeightErrorForCell(cell,FLOW_RENDERING.terrainDetailHeightErrorM);
+    }
+    const packedVertices=new Float32Array(bytes/4);
+    packs.forEach((packed,index)=>packedVertices.set(packed,packedOffsets[index]));
+    const nodes=new Float64Array(all.length*15);
+    for(const [index,cell] of all.entries()) nodes.set([cell.x,cell.z,cell.size,cell.minHeight,cell.maxHeight,cell.heightError,
+      Number(cell.near),Number(cell.painted),childIndices[index],...cell.corners,cell.centerHeight,cell.exactHeightError??-1],index*15);
+    const SerializeLines=lines=>{
+      const keys=new Float64Array(lines.size),offsets=new Uint32Array(lines.size+1);
+      const values=new Float64Array([...lines.values()].reduce((count,row)=>count+row.length,0));
+      let index=0,offset=0;
+      for(const [key,row] of lines) {keys[index]=key;offsets[index++]=offset;values.set(row,offset);offset+=row.length;}
+      offsets[index]=offset;return {keys,offsets,values};
+    };
+    const Raster=raster=>{if(!raster) return null;const {Blend,...data}=raster;return data;};
+    const normalKeys=[...normalCache.keys()],normalValues=new Float64Array(normalKeys.length*3);
+    normalKeys.forEach((key,index)=>normalValues.set(normalCache.get(key),index*3));
+    const errorIds=[],errorValues=[],errorOffsets=[0],errorPending=[];
+    for(const cell of all) {
+      const state=heightErrorCache.get(cell);
+      if(!state) continue;
+      errorIds.push(indices.get(cell));errorValues.push(state.error);
+      for(const child of state.pending) errorPending.push(indices.get(child));
+      errorOffsets.push(errorPending.length);
+    }
+    return {format:2,rootCount,nodes,leafIds:new Uint32Array(cells.map(cell=>indices.get(cell))),
+      rows:SerializeLines(fullBoundaries.rows),columns:SerializeLines(fullBoundaries.columns),
+      groundPaint:Raster(groundPaint),routePaint:Raster(routePaint),backdropPaint,localBackdropPaint,surfaceMaps:SurfaceMaps(),normalKeys,normalValues,
+      errorIds:new Uint32Array(errorIds),errorValues:new Float64Array(errorValues),errorOffsets:new Uint32Array(errorOffsets),errorPending:new Uint32Array(errorPending),
+      packedIds:new Uint32Array(packedIds),packedOffsets:new Uint32Array(packedOffsets),packedVertices};
+  };
+  let restoredCells;
   return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,
     heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,colorRangeForCell:ColorRangeForCell,
-    facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
+    facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,prepareSnapshot:PrepareSnapshot,
+    get cells(){return prepared?(restoredCells||=(Array.from(prepared.leafIds,RestoreNode))):cells;},
+    leafCount:prepared?prepared.leafIds.length:cells.length,plan,source:scene.terrain.file,bounds};
 }
 
-export async function LoadEncounterTerrain(scene,sceneUrl,map) {
+export async function LoadEncounterTerrain(scene,sceneUrl,map,options) {
   const urls=[new URL(scene.terrain.file,sceneUrl),...(scene.trenches?.datum?.file?[new URL(scene.trenches.datum.file,sceneUrl)]:[])];
   const responses=await Promise.all(urls.map((url)=>fetch(url,{cache:"no-store"})));
   for(const response of responses) if(!response.ok) throw new Error(`场景地形读取失败 ${response.status}`);
   const bytes=await Promise.all(responses.map((response)=>response.arrayBuffer()));
-  return BuildEncounterTerrain(scene,bytes[0],bytes[1]||null,map);
+  const {PrepareEncounterTerrain}=await import("./Script_LevelFlowTerrainLoader.mjs");
+  return PrepareEncounterTerrain(scene,bytes,map,options);
 }

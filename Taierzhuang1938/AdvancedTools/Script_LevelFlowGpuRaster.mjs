@@ -165,6 +165,7 @@ class GpuRaster {
     this.lightingUniforms=Object.fromEntries(['lit','shadowMap','shadowCenter','shadowRight','shadowUp','sun','shadowSettings','lightBalance'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.surfaceUniforms=Object.fromEntries(['terrainSurface','groundColor','distantColor','groundBounds','distantBounds'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.surfaceTextures=new Map();
+    this.residentOwners=new Map();
     this.shadowProgram=Program(`#version 300 es
       precision highp float;
       layout(location=0) in vec3 position;
@@ -274,6 +275,18 @@ class GpuRaster {
         pixel.rgb=mix(pixel.rgb,hazeColor,haze);
       }`);
     this.aoResolveUniforms=Object.fromEntries(['sceneColor','sceneDepth','aoMap','size','farDepth','hazeSettings','hazeColor'].map(name=>[name,gl.getUniformLocation(this.aoResolveProgram,name)]));
+    this.depthSampleProgram=Program(fullscreenVertex,`#version 300 es
+      precision highp float;
+      precision highp int;
+      uniform sampler2D sceneDepth;
+      uniform highp usampler2D sampleIndices;
+      uniform uint sourceWidth;
+      out float pixel;
+      void main() {
+        uint index=texelFetch(sampleIndices,ivec2(gl_FragCoord.xy),0).r;
+        pixel=texelFetch(sceneDepth,ivec2(index%sourceWidth,index/sourceWidth),0).r;
+      }`);
+    this.depthSampleUniforms=Object.fromEntries(['sceneDepth','sampleIndices','sourceWidth'].map(name=>[name,gl.getUniformLocation(this.depthSampleProgram,name)]));
     this.shadowBuffer=gl.createBuffer();this.shadowVao=gl.createVertexArray();
     gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,12,0);
@@ -380,6 +393,140 @@ class GpuRaster {
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete AO factor framebuffer');
   }
 
+  PrepareResidentGeometry(raster) {
+    if(!raster.resident||!raster.worldBatches.length) return null;
+    const gl=this.gl,settings=FLOW_RENDERING.residentGeometry,owner=raster.view.mapData;
+    let arena=this.residentOwners.get(owner);
+    const previous=raster.residentIndexRecord;
+    if(previous&&previous.arena===arena&&previous.batches===raster.worldBatches) return previous;
+    let needed=0,total=0;
+    for(const vertices of raster.worldBatches) {
+      total+=vertices.byteLength;
+      if(!arena?.entries.has(vertices)) needed+=vertices.byteLength;
+    }
+    if(total>settings.maxBytes) {raster.MaterializeWorldBatches();return null;}
+    if(arena&&arena.used+needed>settings.maxBytes) {
+      gl.deleteBuffer(arena.buffer);gl.deleteVertexArray(arena.vao);
+      this.residentOwners.delete(owner);arena=null;needed=total;
+    }
+    if(!arena) {
+      while(this.residentOwners.size>=settings.owners) {
+        const [oldOwner,old]=this.residentOwners.entries().next().value;
+        gl.deleteBuffer(old.buffer);gl.deleteVertexArray(old.vao);this.residentOwners.delete(oldOwner);
+      }
+      arena={entries:new WeakMap(),buffer:gl.createBuffer(),vao:gl.createVertexArray(),
+        used:0,capacity:settings.initialBytes,indices:new Uint32Array(0)};
+      while(arena.capacity<needed) arena.capacity*=2;
+      gl.bindBuffer(gl.ARRAY_BUFFER,arena.buffer);gl.bufferData(gl.ARRAY_BUFFER,arena.capacity,gl.STATIC_DRAW);
+      this.residentOwners.set(owner,arena);
+    }
+    if(arena.used+needed>arena.capacity) {
+      let capacity=arena.capacity;
+      while(capacity<arena.used+needed) capacity*=2;
+      const buffer=gl.createBuffer();gl.bindBuffer(gl.COPY_WRITE_BUFFER,buffer);gl.bufferData(gl.COPY_WRITE_BUFFER,capacity,gl.STATIC_DRAW);
+      gl.bindBuffer(gl.COPY_READ_BUFFER,arena.buffer);gl.copyBufferSubData(gl.COPY_READ_BUFFER,gl.COPY_WRITE_BUFFER,0,0,arena.used);
+      gl.deleteBuffer(arena.buffer);arena.buffer=buffer;arena.capacity=capacity;
+    }
+    gl.bindVertexArray(arena.vao);gl.bindBuffer(gl.ARRAY_BUFFER,arena.buffer);
+    for(let index=0;index<3;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,36,index*12);}
+    const count=total/36;
+    if(arena.indices.length<count) arena.indices=new Uint32Array(2**Math.ceil(Math.log2(count)));
+    const uploadStart=arena.used,additions=needed?new Float32Array(needed/4):null;
+    let offset=0;
+    for(const vertices of raster.worldBatches) {
+      let indices=arena.entries.get(vertices);
+      if(!indices) {
+        const first=arena.used/36,length=vertices.length/9;
+        indices=new Uint32Array(length);
+        for(let index=0;index<length;index++) indices[index]=first+index;
+        additions.set(vertices,(arena.used-uploadStart)/4);
+        arena.used+=vertices.byteLength;arena.entries.set(vertices,indices);
+      }
+      arena.indices.set(indices,offset);offset+=indices.length;
+    }
+    if(additions) gl.bufferSubData(gl.ARRAY_BUFFER,uploadStart,additions.subarray(0,(arena.used-uploadStart)/4));
+    const indexBuffer=previous?.indexBuffer||gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arena.indices.subarray(0,count),gl.STREAM_DRAW);
+    const record={arena,indexBuffer,count,batches:raster.worldBatches};
+    raster.residentIndexRecord=record;
+    return record;
+  }
+
+  DrawResidentGeometry() {
+    if(!this.residentWorld) return;
+    this.gl.bindVertexArray(this.residentWorld.arena.vao);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER,this.residentWorld.indexBuffer);
+    this.gl.drawElements(this.gl.TRIANGLES,this.residentWorld.count,this.gl.UNSIGNED_INT,0);
+  }
+
+  SaveDepthSnapshot(raster) {
+    const gl=this.gl;
+    let snapshot=raster.depthSnapshot;
+    if(!snapshot||snapshot.gl!==gl||snapshot.width!==raster.width||snapshot.height!==raster.height) {
+      if(snapshot?.gl===gl) {gl.deleteTexture(snapshot.texture);gl.deleteFramebuffer(snapshot.framebuffer);}
+      snapshot={gl,width:raster.width,height:raster.height,texture:gl.createTexture(),framebuffer:gl.createFramebuffer()};
+      gl.bindTexture(gl.TEXTURE_2D,snapshot.texture);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,raster.width,raster.height,0,gl.RED,gl.FLOAT,null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,snapshot.framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,snapshot.texture,0);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+      raster.depthSnapshot=snapshot;
+    }
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.framebuffer);gl.readBuffer(gl.COLOR_ATTACHMENT1);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,snapshot.framebuffer);
+    gl.blitFramebuffer(0,0,raster.width,raster.height,0,0,raster.width,raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
+  }
+
+  ReadFullDepth(raster) {
+    const gl=this.gl;
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,raster.depthSnapshot.framebuffer);gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);
+  }
+
+  ReadDepthSamples(raster) {
+    if(!raster.depthSampleCount) return;
+    const gl=this.gl,width=FLOW_RENDERING.depthReadback.sampleWidth;
+    const rows=Math.ceil(raster.depthSampleCount/width);
+    if(rows>gl.getParameter(gl.MAX_TEXTURE_SIZE)) {
+      this.ReadFullDepth(raster);raster.fullDepthReady=true;raster.depthSampleCount=0;return;
+    }
+    if(!this.depthSamples||this.depthSamples.height<rows) {
+      if(this.depthSamples) {
+        gl.deleteTexture(this.depthSamples.indices);gl.deleteTexture(this.depthSamples.values);gl.deleteFramebuffer(this.depthSamples.framebuffer);
+      }
+      const height=2**Math.ceil(Math.log2(Math.max(1,rows)));
+      const samples={height,indices:gl.createTexture(),values:gl.createTexture(),framebuffer:gl.createFramebuffer(),
+        keys:new Uint32Array(width*height),depth:new Float32Array(width*height)};
+      gl.activeTexture(gl.TEXTURE1);
+      for(const [texture,internal,format,type] of [[samples.indices,gl.R32UI,gl.RED_INTEGER,gl.UNSIGNED_INT],[samples.values,gl.R32F,gl.RED,gl.FLOAT]]) {
+        gl.bindTexture(gl.TEXTURE_2D,texture);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D,0,internal,width,height,0,format,type,null);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER,samples.framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,samples.values,0);gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+      this.depthSamples=samples;
+    }
+    const samples=this.depthSamples;
+    samples.keys.set(raster.depthSampleKeys.subarray(0,raster.depthSampleCount));
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,samples.indices);
+    gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,width,rows,gl.RED_INTEGER,gl.UNSIGNED_INT,samples.keys.subarray(0,width*rows));
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,raster.depthSnapshot.texture);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,samples.framebuffer);gl.viewport(0,0,width,rows);gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(this.depthSampleProgram);gl.bindVertexArray(this.fullscreenVao);
+    gl.uniform1i(this.depthSampleUniforms.sceneDepth,0);gl.uniform1i(this.depthSampleUniforms.sampleIndices,1);
+    gl.uniform1ui(this.depthSampleUniforms.sourceWidth,raster.width);
+    gl.drawArrays(gl.TRIANGLES,0,3);gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.readPixels(0,0,width,rows,gl.RED,gl.FLOAT,samples.depth.subarray(0,width*rows));
+    for(let index=0;index<raster.depthSampleCount;index++) raster.depthData[raster.depthSampleKeys[index]]=samples.depth[index];
+    for(let index=0;index<raster.depthTiles.length;index++) if(raster.depthTiles[index]===1) raster.depthTiles[index]=2;
+    raster.depthSampleCount=0;
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
+  }
+
   DrawShadows(raster) {
     const gl=this.gl,view=raster.view,settings=view.lighting;
     const sun=FLOW_RENDERING.sky.sunDirection.map(value=>value/Math.hypot(...FLOW_RENDERING.sky.sunDirection));
@@ -403,10 +550,16 @@ class GpuRaster {
       if(value.length===4) gl.uniform4fv(this.shadowUniforms[name],value);else gl.uniform3fv(this.shadowUniforms[name],value);
     }
     gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER,raster.shadowVertices,gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.shadowVertices.length/3);
+    if(this.uploadedShadowVertices!==raster.shadowVertices) {
+      gl.bufferData(gl.ARRAY_BUFFER,raster.shadowVertices,gl.STATIC_DRAW);this.uploadedShadowVertices=raster.shadowVertices;
+    }
+    gl.drawArrays(gl.TRIANGLES,0,raster.shadowVertices.length/3);
     // Visible terrain, vehicles and carried objects also cast shadows.
-    gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
+    this.DrawResidentGeometry();
+    if(raster.worldLength) {
+      gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
+    }
     return values;
   }
 
@@ -446,6 +599,7 @@ class GpuRaster {
   Draw(raster) {
     const gl=this.gl;if(gl.isContextLost()) return false;
     try {this.Resize(raster.width,raster.height);} catch {unavailable=true;return false;}
+    this.residentWorld=this.PrepareResidentGeometry(raster);
     const lighting=raster.view?.lighting&&raster.shadowVertices;
     const shadowValues=lighting?this.DrawShadows(raster):null;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.viewport(0,0,raster.width,raster.height);
@@ -455,6 +609,10 @@ class GpuRaster {
     gl.clearBufferfv(gl.DEPTH,0,new Float32Array([1]));
     gl.useProgram(this.program);gl.uniform2f(this.size,raster.width,raster.height);gl.uniform1i(this.perspective,raster.perspective?1:0);
     gl.uniform1i(this.lightingUniforms.lit,lighting?1:0);
+    const balance=raster.view?.lighting||FLOW_RENDERING.lighting;
+    gl.uniform2f(this.lightingUniforms.lightBalance,balance.ambient,balance.direct);
+    const sun=FLOW_RENDERING.sky.sunDirection,sunLength=Math.hypot(...sun);
+    gl.uniform3fv(this.lightingUniforms.sun,sun.map(value=>value/sunLength));
     if(lighting) {
       gl.uniform2f(this.lightingUniforms.lightBalance,raster.view.lighting.ambient,raster.view.lighting.direct);
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.lightingUniforms.shadowMap,0);
@@ -469,7 +627,9 @@ class GpuRaster {
       for(const name of ['eye','right','up','forward']) gl.uniform3fv(this.cameraUniforms[name],view[name]);
       gl.uniform4f(this.cameraUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
     }
+    gl.uniform1i(this.world,1);this.DrawResidentGeometry();
     if(raster.worldLength) {
+      gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
       gl.uniform1i(this.world,1);
       if(!lighting) gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);
       gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
@@ -478,7 +638,12 @@ class GpuRaster {
     gl.bindVertexArray(this.screenVao);
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
-    gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depth);
+    if(raster.sparseDepth) {
+      this.SaveDepthSnapshot(raster);this.ReadDepthSamples(raster);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
+    } else {
+      gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);
+    }
     // Keep color on the GPU. Only depth is read back for editor interactions.
     if(lighting) this.DrawAmbientOcclusion(raster);
     gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);

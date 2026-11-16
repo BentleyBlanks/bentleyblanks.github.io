@@ -376,7 +376,7 @@ function Tick(timestamp) {
 
 async function Start() {
   PopulateTimeline();
-  const mapData=await LoadEncounterMap();
+  const mapData=await LoadEncounterMap({focus:frame.player});
   workspace=new EncounterViewports(Element("viewportGrid"),mapData,{
     activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;canvas.dataset.navigationTool=navigationTool;},
     change:()=>Render(),bounds:StageBounds,bind:BindMap,

@@ -400,9 +400,10 @@ export class FlowMapView {
     return [point[0], point[1] - 10];
   }
 
-  Draw(frame,layers,selection,annotations=[],draft=null) {
-    this.BeforeDraw?.(frame);
-    const rect=this.canvas.getBoundingClientRect(),ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
+  Draw(frame,layers,selection,annotations=[],draft=null,viewport=null) {
+    const rect=viewport||this.canvas.getBoundingClientRect();
+    this.BeforeDraw?.(frame,rect);
+    const ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
@@ -415,6 +416,7 @@ export class FlowMapView {
       background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
       this.DrawBase(background,width,height,frame,layers);this.baseKey=key;
     }
+    this.BeforeOverlays?.(frame,layers);
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {

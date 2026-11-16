@@ -1,6 +1,19 @@
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 import { VisibleEncounterObject } from "./Script_LevelFlowView.mjs";
 
+const shadowGeometries=new WeakMap();
+
+export function CachedEncounterShadows(map,signals,ground) {
+  const key=JSON.stringify([...signals]);
+  let cached=shadowGeometries.get(map);
+  if(!cached||cached.key!==key||cached.objects!==map.objects||cached.farObjects!==map.farObjects||cached.terrain!==map.terrain) {
+    cached={key,objects:map.objects,farObjects:map.farObjects,terrain:map.terrain,
+      vertices:EncounterShadowGeometry([...map.objects,...map.farObjects],signals,ground)};
+    shadowGeometries.set(map,cached);
+  }
+  return cached.vertices;
+}
+
 export function EncounterBoxGeometry(x,y,z,w,h,d,yaw=0) {
   const cosine=Math.cos(yaw),sine=Math.sin(yaw);
   const Point=(dx,dy,dz)=>[x+dx*cosine+dz*sine,y+dy,z-dx*sine+dz*cosine];

@@ -1,4 +1,5 @@
 import { EncounterGpuRaster } from './Script_LevelFlowGpuRaster.mjs';
+import { FLOW_RENDERING } from '../Data_Tuning_LevelFlow.mjs';
 
 const colors=new Map();
 function Rgb(color) {
@@ -12,28 +13,87 @@ function Edge(a,b,x,y) {return (x-a.x)*(b.y-a.y)-(y-a.y)*(b.x-a.x);}
 export class EncounterRaster {
   constructor() {this.canvas=document.createElement("canvas");this.gpu=EncounterGpuRaster();this.gpuVertices=new Float32Array(65536);this.worldVertices=new Float32Array(65536);}
 
+  get depth() {
+    if(this.sparseDepth&&!this.fullDepthReady&&this.depthSnapshot&&this.gpu) {
+      this.gpu.ReadFullDepth(this);this.fullDepthReady=true;
+    }
+    return this.depthData;
+  }
+
   Begin(width,height,perspective,coordinateScale=1) {
     width=Math.max(1,Math.round(width));height=Math.max(1,Math.round(height));
     if(this.width!==width||this.height!==height) {
       this.width=width;this.height=height;this.canvas.width=width;this.canvas.height=height;
-      this.image=new ImageData(width,height);this.depth=new Float32Array(width*height);
+      this.image=new ImageData(width,height);this.depthData=new Float32Array(width*height);
+      const tile=FLOW_RENDERING.depthReadback.tilePixels;
+      this.depthColumns=Math.ceil(width/tile);this.depthTiles=new Uint8Array(this.depthColumns*Math.ceil(height/tile));
     }
     this.perspective=perspective;this.coordinateScale=coordinateScale;
     this.displayWidth=width/coordinateScale;this.displayHeight=height/coordinateScale;
     this.gpuLength=0;this.worldLength=0;this.accelerated=!!this.gpu&&!this.gpu.gl.isContextLost();
+    this.resident=false;this.worldBatches=[];
     this.triangles=0;
+    this.sparseDepth=false;this.fullDepthReady=true;this.depthSampleCount=0;
+    this.depthTiles.fill(0);
     // The GPU overwrites every depth pixel; software colors are unused until
     // fallback. Avoid clearing two full-resolution CPU surfaces per pane.
     if(!this.accelerated) {this.depth.fill(Infinity);this.image.data.fill(0);}
   }
 
+  CollectDepthSamples(draw) {
+    if(!this.accelerated) return;
+    if(!this.sparseDepth) this.fullDepthReady=false;
+    this.sparseDepth=true;this.collectingDepth=true;
+    try {draw();} finally {this.collectingDepth=false;}
+  }
+
+  RequestDepthTile(x,y) {
+    const tile=FLOW_RENDERING.depthReadback.tilePixels;
+    const column=Math.floor(x/tile),row=Math.floor(y/tile),key=row*this.depthColumns+column;
+    if(this.depthTiles[key]) return;
+    this.depthTiles[key]=1;
+    const count=this.depthSampleCount+tile*tile;
+    if(!this.depthSampleKeys||this.depthSampleKeys.length<count) {
+      const grown=new Uint32Array(Math.max(count,(this.depthSampleKeys?.length||1024)*2));
+      if(this.depthSampleKeys) grown.set(this.depthSampleKeys);this.depthSampleKeys=grown;
+    }
+    for(let py=row*tile;py<Math.min(this.height,(row+1)*tile);py++) {
+      for(let px=column*tile;px<Math.min(this.width,(column+1)*tile);px++) this.depthSampleKeys[this.depthSampleCount++]=py*this.width+px;
+    }
+  }
+
+  DepthAt(x,y) {
+    if(!this.depthData||!Number.isFinite(x)||!Number.isFinite(y)) return Infinity;
+    if(x<0||y<0||x>=this.width||y>=this.height) return Infinity;
+    if(this.sparseDepth&&!this.fullDepthReady) {
+      const tile=FLOW_RENDERING.depthReadback.tilePixels;
+      const key=Math.floor(y/tile)*this.depthColumns+Math.floor(x/tile);
+      if(this.depthTiles[key]!==2) {
+        this.RequestDepthTile(x,y);
+        if(!this.collectingDepth&&this.depthSnapshot) this.gpu.ReadDepthSamples(this);
+      }
+    }
+    return this.depthData[y*this.width+x];
+  }
+
   WorldBatch(vertices) {
+    if(this.resident) {this.worldBatches.push(vertices);this.triangles+=vertices.length/27;return;}
     if(this.worldLength+vertices.length>this.worldVertices.length) {
       let capacity=this.worldVertices.length;
       while(capacity<this.worldLength+vertices.length) capacity*=2;
       const grown=new Float32Array(capacity);grown.set(this.worldVertices);this.worldVertices=grown;
     }
     this.worldVertices.set(vertices,this.worldLength);this.worldLength+=vertices.length;this.triangles+=vertices.length/27;
+  }
+
+  MaterializeWorldBatches() {
+    if(!this.worldBatches.length) return;
+    const length=this.worldBatches.reduce((sum,vertices)=>sum+vertices.length,this.worldLength);
+    const vertices=new Float32Array(length);
+    let offset=0;
+    for(const batch of this.worldBatches) {vertices.set(batch,offset);offset+=batch.length;}
+    vertices.set(this.worldVertices.subarray(0,this.worldLength),offset);
+    this.worldVertices=vertices;this.worldLength=length;this.worldBatches=[];this.resident=false;
   }
 
   WorldTriangle(points,colors,normals=null) {
@@ -135,8 +195,9 @@ export class EncounterRaster {
       context.drawImage(this.gpu.canvas,0,0,this.width,this.height,0,0,width,height);return;
     }
     if(this.accelerated) {
+      this.MaterializeWorldBatches();
       // Context loss or unsupported targets must still produce this frame.
-      this.accelerated=false;this.gpu=null;this.triangles=0;this.image.data.fill(0);this.depth.fill(Infinity);
+      this.accelerated=false;this.gpu=null;this.sparseDepth=false;this.triangles=0;this.image.data.fill(0);this.depth.fill(Infinity);
       for(let offset=0;offset<this.worldLength;offset+=27) {
         const points=[],colors=[];
         for(let index=offset;index<offset+27;index+=9) {
@@ -162,7 +223,8 @@ export class EncounterRaster {
   Occluded(vertex) {
     const x=Math.round(vertex.x*this.coordinateScale),y=Math.round(vertex.y*this.coordinateScale);
     if(x<0||y<0||x>=this.width||y>=this.height) return false;
-    return vertex.depth>this.depth[y*this.width+x]+0.025;
+    if(this.collectingDepth) {this.RequestDepthTile(x,y);return false;}
+    return vertex.depth>this.DepthAt(x,y)+0.025;
   }
 
   Stroke(context,a,b,color,width,stats,hiddenAlpha=0.2) {
@@ -177,7 +239,7 @@ export class EncounterRaster {
     const length=Math.hypot(dx,dy)*(to-from),steps=Math.max(1,Math.ceil(length/1.5));
     let previous=null,hidden=null,lastPoint=null;
     const Paint=(end)=>{
-      if(!previous) return;
+      if(!previous||this.collectingDepth) return;
       context.save();context.globalAlpha=hidden?hiddenAlpha:1;context.strokeStyle=color;context.lineWidth=width;context.lineCap="round";
       context.beginPath();context.moveTo(previous.x,previous.y);context.lineTo(end.x,end.y);context.stroke();context.restore();
     };
@@ -196,14 +258,16 @@ export class EncounterRaster {
   }
 
   Head(context,point,radius,color,stats,hiddenAlpha=0.2) {
-    const size=Math.ceil(radius*2+2),image=new ImageData(size,size),rgb=Rgb(color);
+    const size=Math.ceil(radius*2+2),image=this.collectingDepth?null:new ImageData(size,size),rgb=Rgb(color);
     const left=Math.floor(point.x-radius-1),top=Math.floor(point.y-radius-1);
     for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
       const dx=left+x+0.5-point.x,dy=top+y+0.5-point.y;
       if(dx*dx+dy*dy>radius*radius) continue;
       const hidden=this.Occluded({x:left+x,y:top+y,depth:point.depth});stats[hidden?"hidden":"visible"]++;
+      if(!image) continue;
       const offset=(y*size+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?Math.round(hiddenAlpha*255):255;
     }
+    if(!image) return;
     const marker=this.marker||(this.marker=document.createElement("canvas"));marker.width=size;marker.height=size;
     marker.getContext("2d").putImageData(image,0,0);context.drawImage(marker,left,top);
   }
@@ -212,7 +276,7 @@ export class EncounterRaster {
     const left=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.x)))),top=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.y))));
     const right=Math.min(this.displayWidth,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.displayHeight,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
     if(right<=left||bottom<=top) return;
-    const width=right-left,height=bottom-top,image=new ImageData(width,height),rgb=Rgb(color);
+    const width=right-left,height=bottom-top,image=this.collectingDepth?null:new ImageData(width,height),rgb=Rgb(color);
     for(let triangle=1;triangle<vertices.length-1;triangle++) {
       const a=vertices[0],b=vertices[triangle],c=vertices[triangle+1],area=Edge(a,b,c.x,c.y);
       if(Math.abs(area)<0.001) continue;
@@ -221,9 +285,11 @@ export class EncounterRaster {
         if(first<0||second<0||third<0) continue;
         const depth=this.perspective?1/(first/a.depth+second/b.depth+third/c.depth):first*a.depth+second*b.depth+third*c.depth;
         const hidden=this.Occluded({x:left+x,y:top+y,depth});stats[hidden?"hidden":"visible"]++;
+        if(!image) continue;
         const offset=(y*width+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?Math.round(hiddenAlpha*255):255;
       }
     }
+    if(!image) return;
     const marker=this.overlay||(this.overlay=document.createElement("canvas"));marker.width=width;marker.height=height;
     marker.getContext("2d").putImageData(image,0,0);context.drawImage(marker,left,top);
   }

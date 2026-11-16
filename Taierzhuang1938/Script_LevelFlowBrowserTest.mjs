@@ -18,6 +18,10 @@ try {
   await page.addInitScript(()=>{
     localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
     localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
+    window.encounterLoadPulse={ticks:0,maxGap:0,last:performance.now()};
+    window.encounterLoadTimer=setInterval(()=>{
+      const now=performance.now();encounterLoadPulse.ticks++;encounterLoadPulse.maxGap=Math.max(encounterLoadPulse.maxGap,now-encounterLoadPulse.last);encounterLoadPulse.last=now;
+    },50);
   });
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
   async function ReadyPlan() {
@@ -44,6 +48,16 @@ try {
     assert.equal(await menu.getAttribute('open'),null,'camera action closes its menu');
   }
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow);
+  const terrainLoading=await page.evaluate(async()=>{
+    clearInterval(encounterLoadTimer);
+    const pulse={...encounterLoadPulse};
+    const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
+    const map=await LoadEncounterMap();
+    return {pulse,build:map.terrain.buildInfo,leaves:map.terrain.leafCount};
+  });
+  assert.ok(terrainLoading.pulse.ticks>20&&terrainLoading.pulse.maxGap<2500,'first-load terrain work yields the browser main thread');
+  assert.equal(terrainLoading.build.source,'cache','a second load restores the content-keyed prepared terrain');
+  assert.ok(terrainLoading.leaves>100000&&terrainLoading.build.cached,'cached data restores the full terrain hierarchy');
   const roofDepth=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
@@ -214,6 +228,45 @@ try {
   assert.deepEqual(terrainTexture.first,terrainTexture.alternate,'changing the terrain diagonal preserves painted surface pixels');
   assert.ok(terrainTexture.software&&terrainTexture.fallback[0][0]>terrainTexture.fallback[0][2]
     &&terrainTexture.fallback[1][2]>terrainTexture.fallback[1][0],'GPU failure restores authored terrain colors in the same frame');
+  const sampledDepth=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';document.body.append(canvas);
+    const objects=[{id:'Floor',material:'Whitebox/Plaster',pos:[0,-0.1,0],size:[30,0.1,30]},
+      {id:'Wall',material:'Whitebox/Plaster',pos:[0,0,0],size:[5,3,0.4]}];
+    const map={objects,farObjects:[],terrain:{heightAt:()=>0,roots:[]}};
+    const view=new FlowPerspectiveView(canvas,map,'scene');view.freeCamera={eye:[0,2,-6],yaw:0,pitch:-0.1};
+    const source=LevelFlow.Evaluate(424),template=source.actors[0];
+    const frame={...source,actors:[{...template,id:'Visible',pose:'stand',p:[-2,-2]},{...template,id:'Hidden',pose:'stand',p:[0,3]},
+      {...template,id:'Partial',pose:'stand',p:[2.5,3]}],effects:[],dialogue:[]};
+    const layers={names:false,landmarks:false};
+    const Draw=()=>{view.baseKey='';view.Draw(frame,layers,null);return canvas.getContext('2d').getImageData(0,0,320,240).data;};
+    const sparse=Draw(),stats=view.Diagnostics().actors;
+    const samples=view.raster.depthTiles.reduce((count,value)=>count+(value===2?64:0),0);
+    const other=document.createElement('canvas');other.style.cssText=canvas.style.cssText;document.body.append(other);
+    const second=new FlowPerspectiveView(other,map,'scene');second.freeCamera={eye:[6,7,-9],yaw:-0.4,pitch:-0.5};second.Draw(frame,layers,null);
+    const preserved=[...view.raster.depth],picked=view.ToWorld([160,180]);
+    const collect=view.raster.CollectDepthSamples.bind(view.raster);
+    view.raster.CollectDepthSamples=()=>{};
+    const full=Draw(),fullDepth=[...view.raster.depth];
+    const maxError=full.reduce((maximum,value,index)=>Math.max(maximum,Math.abs(value-sparse[index])),0);
+    const sameDepth=fullDepth.every((value,index)=>value===preserved[index]);
+    view.raster.CollectDepthSamples=collect;
+    view.baseKey='';view.Draw(frame,layers,null);
+    const moving=[];
+    for(let index=0;index<4;index++) {
+      frame.time+=0.1;frame.actors[0].p[0]+=0.4;
+      view.Draw(frame,layers,null);const cached=canvas.getContext('2d').getImageData(0,0,320,240).data;
+      view.raster.CollectDepthSamples=()=>{};const expected=Draw();view.raster.CollectDepthSamples=collect;
+      moving.push(expected.reduce((maximum,value,pixel)=>Math.max(maximum,Math.abs(value-cached[pixel])),0));
+      view.baseKey='';view.Draw(frame,layers,null);
+    }
+    canvas.remove();other.remove();return {maxError,sameDepth,picked,samples,stats,moving};
+  });
+  assert.ok(sampledDepth.samples>0&&sampledDepth.samples<320*240/2,'occlusion reads a bounded set of exact native-depth tiles');
+  assert.ok(sampledDepth.maxError<=1&&sampledDepth.sameDepth,'sampled and full depth preserve pixels and the complete lazy depth snapshot across panes');
+  assert.ok(sampledDepth.stats.find(actor=>actor.id==='Hidden').hidden>0&&sampledDepth.stats.find(actor=>actor.id==='Visible').visible>0);
+  assert.ok(sampledDepth.picked.every(Number.isFinite)&&sampledDepth.moving.every(error=>error<=1),
+    'picking and moving actors retain correct depth while the static background is cached');
   const bankLighting = await page.evaluate(async () => {
     const {FlowPerspectiveView} = await import('./Script_LevelFlowPerspective.mjs');
     const {FLOW_RENDERING} = await import('../Data_Tuning_LevelFlow.mjs');

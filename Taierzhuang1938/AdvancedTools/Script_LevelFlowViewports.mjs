@@ -224,7 +224,8 @@ export class EncounterViewports {
     if(this.resizing) return;
     const contentKey=JSON.stringify([frame.time,frame.beat.id,layers,selection,draft]);
     const contentChanged=document===null||document!==this.document||annotations!==this.annotations||contentKey!==this.contentKey;
-    for(const entry of this.Visible()) {
+    const viewports=this.Visible().map(entry=>({entry,rect:entry.canvas.getBoundingClientRect()}));
+    for(const {entry,rect} of viewports) {
       if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.gizmo.hidden=!perspective;
@@ -237,10 +238,10 @@ export class EncounterViewports {
           if(button.dataset.framing==="follow") button.textContent=entry.mode==="follow"?"停止跟随":"自动跟随";
         }
       }
-      const rect=entry.canvas.getBoundingClientRect(),view=entry.map;
+      const view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
       if(!contentChanged&&drawKey===entry.drawKey) continue;
-      entry.map.Draw(frame,entry.layers,selection,annotations,draft);
+      entry.map.Draw(frame,entry.layers,selection,annotations,draft,rect);
       this.DrawGizmo(entry);
       entry.drawKey=drawKey;
     }
