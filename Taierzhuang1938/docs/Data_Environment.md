@@ -136,6 +136,7 @@ Taierzhuang1938/Environment/Level_<Id>.json      格式同场景的区域文件�
 角色光照（第二轮加进两份预设，`Script_EnvPresetSeed` 同步改）：白天两路 0（画面不变）；黄昏补光 0、暖色轮廓光 0.35（`#ffb072`，收边 3，太阳低、人物背光时边上一圈暖色）；晚上冷色补光 0.12 + 轮廓光 0.3（都是 `#9fb4e8`，收边 2.6，夜里人脸不至于糊成一团黑）。中间时段对数插（0 那头按线性）。
 
 - `Environment/EnvPreset_FirstLevelWhitebox.json` ← `Scenes/FirstLevelWhitebox/Environment_FirstLevelWhitebox.json` 的兜底区域；`Environment/EnvPreset_FirstLevel.json` ← `Scenes/FirstLevel/Environment_FirstLevel.json`。两份预设一开始一样，之后各自打磨（白盒是体块灰面，正式场景有正式地表与道具）。
+- 2026-11-16 `FirstLevelEncounter`（Encounter Play 场景）在兜底区域之外加了 `BeishaheDusk`：box、完全覆盖、从官道中段 z820 盖到南界 z1440、x 全宽，过渡 20 s，引用 `EnvPreset_FirstLevelEncounterDusk`（以 17:30 为底、11-16 再压过太阳亮度、雾和泛光防过曝的常量预设：太阳高度角 8°、方位角 276°，不随钟点变；暖色雾与大气、黄昏角色轮廓光）。太阳方向是 `Sun` 组件的参数（方位角 0° = 南、90° = 东），固定它只需写常量，不动全局时钟。遭遇编辑器立体视口另有同款黄昏天光（`FLOW_DUSK`，见 [Encounter Designer](Data_LevelFlow.md) 2026-11-16 条）。
 - 中间时段：4→12 点是拂晓（夜 → 白天），12→18 点是下午（太阳从正午往西走、渐暖），18→22 点是暮色（黄昏 → 夜）。亮度类参数按对数插，过渡中间不会比两头亮。
 - 编排怎么用：某一拍要黄昏就在那一拍写时间（§8.6：关键帧的 `time`、预演 / Timeline 的 `time` 事件、正片关卡的 `stages`），手上试看用 `Debug.Lighting.SetLook("dusk")` 或 `SetHour(18)`；局部（屋里、地道口）要不一样，加一个盒子区域引用另一份只含几种组件的预设，优先级高于 0。
 - 第一关 11–18（`FirstLevel1218`）按剧本写了三拍：`16-1` 傍晚 `{hour: 17}`、`18-3` 黄昏 `{look: "dusk"}`（太阳落到铁路那头）、`18-8` 晚上 `{look: "night"}`（「1938年3月14日 夜」）；其余沿用，`12-1` 之前没写 = 区域文件默认 12:00。01–05、06–10 一拍没写（白天）。

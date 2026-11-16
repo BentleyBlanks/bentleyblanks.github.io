@@ -7,14 +7,17 @@
     "paused": true
   },
   "volumes": [
+    {"id": "Fallback", "name": "兜底（全场）", "shape": "global", "priority": 0, "blendS": 0, "mode": "full", "preset": "FirstLevelEncounter"},
     {
-      "id": "Fallback",
-      "name": "兜底（全场）",
-      "shape": "global",
-      "priority": 0,
-      "blendS": 0,
+      "id": "BeishaheDusk",
+      "name": "北沙河黄昏（官道中段 z820 起到南界）",
+      "shape": "box",
+      "center": [80, 0, 1130],
+      "size": [520, 400, 620],
+      "priority": 10,
+      "blendS": 20,
       "mode": "full",
-      "preset": "FirstLevelEncounter"
+      "preset": "FirstLevelEncounterDusk"
     }
   ]
 }

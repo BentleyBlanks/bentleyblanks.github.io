@@ -21,8 +21,9 @@ import {
   VolumeContains, SCENE_ENV_FILE_RE, ENV_PRESET_FILE_RE, EnvPresetRepoPath, SceneEnvRepoPath,
 } from "./Script_EnvPreset.mjs";
 import { EnvironmentSystem, OffValues, EvaluatePreset } from "./Script_EnvSystem.mjs";
-import { SKY_PRESETS } from "./Script_Sky.mjs";
+import { SKY_PRESETS, SunDirectionFrom } from "./Script_Sky.mjs";
 import { SCENE_LIST } from "./Data_SceneAssets.mjs";
+import { SceneRepoPath } from "./Script_SceneDoc.mjs";
 import { TimeSpecErrors, BeatTime, LevelEnvRepoPath, LEVEL_ENV_FILE_RE, ZoneFileUrl } from "./Script_EnvPreset.mjs";
 import { ENV_LEVELS } from "./Data_EnvLevels.mjs";
 import { EnvTargetForPhase } from "./Script_EnvLoader.mjs";
@@ -244,6 +245,48 @@ for (const sceneId of ["FirstLevelWhitebox", "FirstLevel"]) {
   const afternoon = at(15);
   Check(afternoon.sunElevation < day.sunElevation && afternoon.sunElevation > dusk.sunElevation, `${sceneId} 下午 3 点太阳在正午与黄昏之间`);
   Check(WrapHour(25) === 1, "时钟回绕");
+}
+
+// --- 7b. FirstLevelEncounter：兜底 + 北沙河黄昏区域（官道中段 z820 到南界） ------------------------------------------
+{
+  const sceneFile = path.join(repo, SceneEnvRepoPath("FirstLevelEncounter"));
+  const text = fs.readFileSync(sceneFile, "utf8");
+  const doc = JSON.parse(text);
+  Check(text === FormatEnvJson(doc), "FirstLevelEncounter 区域文件按统一写法");
+  const presets = new Map();
+  for (const id of new Set(doc.volumes.map((v) => v.preset))) {
+    const presetText = fs.readFileSync(path.join(repo, EnvPresetRepoPath(id)), "utf8");
+    const preset = JSON.parse(presetText);
+    const check = ValidateEnvPreset(preset);
+    Check(check.ok, `${id} 预设合规：${check.errors.join("；")}`);
+    if (id === "FirstLevelEncounterDusk") Check(presetText === FormatEnvJson(preset), `${id} 预设按统一写法`);
+    presets.set(id, preset);
+  }
+  const check = ValidateSceneEnv(doc, { presetIds: new Set(presets.keys()) });
+  Check(check.ok && !check.warnings.length, `FirstLevelEncounter 区域文件合规：${check.errors.concat(check.warnings).join("；")}`);
+  const fallback = doc.volumes.find((v) => v.shape === "global"), dusk = doc.volumes.find((v) => v.id === "BeishaheDusk");
+  Check(fallback.preset === "FirstLevelEncounter" && fallback.mode === "full" && fallback.priority === 0, "FirstLevelEncounter 兜底仍是白天预设");
+  Check(dusk && dusk.shape === "box" && dusk.mode === "full" && dusk.priority > fallback.priority && dusk.blendS === 20 && dusk.preset === "FirstLevelEncounterDusk", "北沙河黄昏区域：box、完全覆盖、优先级高于兜底、过渡 20 s");
+  const scene = JSON.parse(fs.readFileSync(path.join(repo, SceneRepoPath("FirstLevelEncounter")), "utf8"));
+  const inside = (x, z) => VolumeContains(dusk, { x, y: 1, z });
+  Check(!inside(100, 819) && inside(100, 821) && inside(-159, scene.bounds.maxZ - 1) && inside(319, scene.bounds.maxZ - 1) && inside(100, 1300), "黄昏区域从 z820 盖到场景南界、x 盖满全宽");
+  Check(!inside(100, 560) && !inside(100, 700), "耿家庄与官道北段仍是白天");
+  const duskPreset = presets.get("FirstLevelEncounterDusk");
+  const sameAt = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  Check([0, 9, 12, 18, 22].every((h) => sameAt(EvaluatePreset(duskPreset, h), EvaluatePreset(duskPreset, 17.5))), "黄昏预设不随钟点变（全是常量）");
+  const values = EvaluatePreset(duskPreset, 12);
+  Check(values.Sun.elevation >= 6 && values.Sun.elevation <= 10, `太阳还在地平线上 6–10°（${values.Sun.elevation}）`);
+  const toSun = SunDirectionFrom(values.Sun.elevation, values.Sun.azimuth);
+  Check(toSun.x < -0.95 && toSun.z > 0 && toSun.z < 0.2 && toSun.y > 0.1, `太阳在西（−X、铁路桥一侧）略偏南（+Z）：${toSun.x.toFixed(3)}, ${toSun.y.toFixed(3)}, ${toSun.z.toFixed(3)}`);
+  Check(values.CharacterLight.rim > 0.3, "黄昏开角色轮廓光");
+  const daySun = EvaluatePreset(presets.get("FirstLevelEncounter"), 12).Sun;
+  Check(daySun.elevation > 40, "兜底白天太阳不变");
+  const sys = new EnvironmentSystem();
+  sys.SetScene("FirstLevelEncounter", doc, presets);
+  const north = sys.Update(0, { x: 100, y: 1, z: 700 }).preset;
+  sys.Update(0, { x: 100, y: 1, z: 1200 });
+  const south = sys.Update(40, { x: 100, y: 1, z: 1200 }).preset;
+  Check(Math.abs(south.sunElevation - values.Sun.elevation) < 0.01 && north.sunElevation > 40, `走进黄昏区域后过渡完成就是黄昏预设（${north.sunElevation} → ${south.sunElevation}）`);
 }
 
 // --- 8. 角色光照组件 ------------------------------------------------------------------------------------------

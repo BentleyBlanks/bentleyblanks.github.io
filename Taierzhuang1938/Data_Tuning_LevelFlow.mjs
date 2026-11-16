@@ -32,6 +32,14 @@ export const FLOW_RENDERING = {
   },
 };
 
+// Beishahe dusk for the 3D viewports: the sky, sun direction (toward the sun: due west, a little south, 8 degrees
+// up) and light balance blend with the camera focus z between fromZ and toZ. 2D maps always use the day sky.
+export const FLOW_DUSK = {
+  fromZ: 820, toZ: 960, steps: 32,
+  sky: {zenith:"#3f4c6e", horizon:"#e9965a", below:"#6d5b58", sun:"#ffb272", sunDirection:[-0.985,0.139,0.104]},
+  lighting: {ambient:0.4, direct:0.6},
+};
+
 export const FLOW_FIELD_COLORS = {wheat:"#b6bf88", plowed:"#b59c7a", fallow:"#b6b197"};
 
 // Screenshot reference supplied by the user on 2026-11-13.
@@ -50,6 +58,6 @@ export const FLOW_SPEECH_HUD = {
 
 // Detail inspection requested on 2026-11-15, with the full overview still available.
 export const FLOW_ZOOM = {
-  minScale:0.15, maxScale:320,
+  minScale:0.08, maxScale:320,
   minChaseDistanceM:1.5, minEyeFovDeg:12,
 };

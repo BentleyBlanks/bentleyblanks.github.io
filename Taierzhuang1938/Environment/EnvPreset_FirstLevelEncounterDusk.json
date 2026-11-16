@@ -1,0 +1,113 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "FirstLevelEncounterDusk",
+  "title": "第一关遭遇 · 北沙河夕照（17:30 基础，太阳 8°、正西略偏南；压亮度与雾，防过曝）",
+  "looks": [
+    {"id": "dusk", "label": "黄昏", "hour": 17.5}
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {"elevation": 8, "azimuth": 276, "color": "#ffb275", "intensity": 2.6, "discColor": [1, 0.5485, 0.2728], "discIntensity": 40, "discSize": 0}
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {"probe": 0.3414, "color": "#657487", "intensity": 0.12}
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {"intensity": 0.9598}
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {
+        "zenith": [0.08, 0.12, 0.26],
+        "horizon": [1.7, 0.85, 0.38],
+        "ground": [0.4561, 0.3777, 0.2989],
+        "glow": 1.2,
+        "glowSpread": 17.8426,
+        "smoke": 0.5098,
+        "smokeColor": [1.5382, 1.0494, 0.7044],
+        "smokeHeight": 0.1702,
+        "stars": 0
+      }
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {
+        "shapeScale": 3.2,
+        "shapeLow": 0.3,
+        "shapeHigh": 0.68,
+        "shapeCover": 0.252,
+        "structure": 0.7539,
+        "coverage": 0.522,
+        "scale": 1.1,
+        "softness": 0.549,
+        "warp": 0.35,
+        "underside": 0.451,
+        "gap": 1.5961,
+        "silver": 0.5951,
+        "shade": [0.6176, 0.4412, 0.3337]
+      }
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": 1.2,
+        "mieG": 0.7804,
+        "rayleigh": 1.9666,
+        "ozone": 1.3921,
+        "groundAlbedo": 0.5431,
+        "sunIrradiance": 18,
+        "skyTint": [1.1876, 0.8543, 0.8079],
+        "skyFloor": [0.1779, 0.1779, 0.1778],
+        "artGlow": 0.2,
+        "sunDiskT": 1,
+        "belowVeil": 0,
+        "aerialBlend": 0.5,
+        "aerialGain": 0.4343
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": 0.004,
+        "falloff": 17.5509,
+        "max": 0.55,
+        "skyColor": [0.8539, 0.5608, 0.3437],
+        "groundColor": [0.4009, 0.3021, 0.2424],
+        "sunGain": 0.25,
+        "desat": 0.3953,
+        "flatten": 0.0986
+      }
+    },
+    "CharacterLight": {
+      "enabled": true,
+      "params": {"fill": 0, "fillColor": "#ffffff", "rim": 0.35, "rimColor": "#ffb072", "rimPower": 3}
+    },
+    "WeaponLight": {
+      "enabled": true,
+      "params": {"fill": 0.5, "spec": 0.22, "color": "#ffe2c4", "ambient": 0.5, "sun": 0.6}
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "exposure": 0.56,
+        "profile": "dusk",
+        "saturation": 0.9788,
+        "contrast": 1.0804,
+        "contrastCurve": "linear",
+        "lift": [0.0059, 0.0039, 0.0118],
+        "gain": [1.02, 1, 0.965],
+        "shadowTint": [0.8565, 0.9751, 1.1682],
+        "highlightTint": [1.105, 1.015, 0.88],
+        "splitShadow": 0.9862,
+        "splitHighlight": 0.9852,
+        "bloom": 0.15,
+        "bloomThreshold": 1.18,
+        "godStrength": 0.15,
+        "lensFlare": 0.3
+      }
+    }
+  }
+}

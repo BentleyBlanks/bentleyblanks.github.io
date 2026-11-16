@@ -4,6 +4,7 @@ import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
+import { ApplyEncounterSky } from "./Script_LevelFlowSkyBlend.mjs";
 import { EncounterBoxGeometry, CachedEncounterShadows, ShadeEncounterFace } from "./Script_LevelFlowLighting.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
@@ -27,7 +28,7 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   Draw(...args) {
     const start=performance.now();this.frameDrawing=true;
-    try {super.Draw(...args);} finally {this.frameDrawing=false;}
+    try {super.Draw(...args);} finally {this.frameDrawing=false;ApplyEncounterSky(null);}
     this.drawMs=performance.now()-start;
   }
   Ground(point) {
@@ -82,6 +83,7 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   Fit(bounds,padding=35) {
     this.freeCamera=null;super.Fit(bounds,padding);
+    if(this.type==="oblique") this.far=Math.max(this.far,Math.ceil(Math.hypot(bounds[1]-bounds[0],bounds[3]-bounds[2])*1.1/100)*100);
     const {width,height}=this.canvas.getBoundingClientRect(),ground=this.Ground(this.center);
     const corners=[[bounds[0],bounds[2]],[bounds[1],bounds[2]],[bounds[1],bounds[3]],[bounds[0],bounds[3]]];
     const projected=corners.map(point=>{
@@ -226,6 +228,7 @@ export class FlowPerspectiveView extends FlowMapView {
   DrawBase(context,width,height,frame,layers={}) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     const renderScale=this.renderScale;
+    ApplyEncounterSky(this.aim[2]);
     DrawEncounterSky(context,width,height,this);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     this.raster.view=this;
@@ -310,9 +313,9 @@ export class FlowPerspectiveView extends FlowMapView {
       const BoxFace=(faceIndex,faceColor)=>{
         const indices=geometry.faces[faceIndex];
         let shaded=geometry.shading[faceIndex];
-        if(!shaded||shaded.color!==faceColor||shaded.lit!==!!this.lighting) {
+        if(!shaded||shaded.color!==faceColor||shaded.lit!==!!this.lighting||shaded.sky!==FLOW_RENDERING.skyBlend) {
           const rgb=this.lighting?ShadeEncounterFace(faceColor,geometry.normals[faceIndex]):[1,3,5].map(index=>parseInt(faceColor.slice(index,index+2),16));
-          shaded={color:faceColor,lit:!!this.lighting,rgb};geometry.shading[faceIndex]=shaded;
+          shaded={color:faceColor,lit:!!this.lighting,sky:FLOW_RENDERING.skyBlend,rgb};geometry.shading[faceIndex]=shaded;
         }
         const rgb=shaded.rgb;
         if(this.raster.accelerated) {
@@ -354,7 +357,7 @@ export class FlowPerspectiveView extends FlowMapView {
       this.shadowTerrain=this.mapData.terrain;
     }
     this.raster.shadowVertices=this.shadowVertices;
-    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,texturedTerrain,[...signals]]);
+    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,texturedTerrain,FLOW_RENDERING.skyBlend,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
     const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
     if(cached) {

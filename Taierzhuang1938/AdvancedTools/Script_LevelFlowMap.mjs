@@ -5,8 +5,8 @@ import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { LoadEncounterTerrain } from "./Script_LevelFlowTerrain.mjs";
 
 const Point = (point) => Array.isArray(point) ? point.slice(0, 2) : [point.x, point.z];
-// The 2D map runs from the front line to the Beishahe village mouth (anti-tank ditch, wire and the first row of courtyards).
-export const ENCOUNTER_MAP_MAX_Z = 700;
+// The 2D map runs from the front line to the scene's south edge: Gengjiazhuang, the long official road, Beishahe village, the river and the rail bridge.
+export const ENCOUNTER_MAP_MAX_Z = 1440;
 // South of Gengjiazhuang the module data ends; roads and the anti-tank ditch there come from the scene ways.
 const GENGJIAZHUANG_SOUTH_Z = 558;
 

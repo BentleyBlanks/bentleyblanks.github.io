@@ -966,7 +966,7 @@ assert.ok(encounterMap.trenches.some(trench=>trench.id==="VillageNorthEast"),"th
 assert.ok(encounterMap.labels.some(label=>label.id==="LmMgDitchWest")&&encounterMap.objects.some(object=>object.id==="BshMgEastFront"),"ditch-end guns are mapped");
 assert.ok(encounterMap.objects.filter(object=>object.meta?.obstacle==="barbedWire"&&/^BshWire_/.test(object.id)).length>=20,"village-mouth wire uses solid frontline spans");
 for(const x of [60,120,150]) {
-  const line=encounterScene.ways.trenches.find(points=>points[0].x===40&&points[0].z===650);
+  const line=encounterScene.ways.trenches.find(points=>points[0].x===40&&points[0].z===1010);
   const index=line.findIndex(point=>point.x>=x),a=line[index-1],b=line[index],centre=a.z+(b.z-a.z)*(x-a.x)/(b.x-a.x);
   const lip=encounterTerrain.heightAt(x,centre-2.6),floor=encounterTerrain.heightAt(x,centre),bank=encounterTerrain.heightAt(x,centre+3);
   assert.ok(lip-floor>2.3,"the ditch is deeper than a man");

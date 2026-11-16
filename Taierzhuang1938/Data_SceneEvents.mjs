@@ -28,6 +28,7 @@ export const SCENE_EVENTS = Object.freeze({
   GuandaoBridgeBlown: Object.freeze({ label: "官道桥炸了", from: "13-2", note: "二营炸的木桥：中间几跨没了、断木砸进河床" }),
   DugoutBombed: Object.freeze({ label: "院里的洞挨了炸弹", from: "14-2", note: "南街那家院里：弹坑 + 碎砖 + 塌了的洞顶" }),
   CartOverturned: Object.freeze({ label: "车翻了", from: "14-3" }),
+  AidCartBurned: Object.freeze({ label: "救护所的车烧了", from: "14-3", note: "FirstLevelEncounter：救护所院门口翻倒、烧着的车和车轮；12 时车是好的，默认不显示" }),
   RaidAftermath: Object.freeze({ label: "空袭过后", from: "15-1", note: "街上、门前、路头上一排排盖着席子的人、几处碎砖堆" }),
   GirlHoleCovered: Object.freeze({ label: "藏人的洞口盖上了", from: "18-2" }),
   ChargesSet: Object.freeze({ label: "炸药装好了", from: "18-3" }),

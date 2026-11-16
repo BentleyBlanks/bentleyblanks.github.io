@@ -143,7 +143,7 @@ export class FlowMapView {
   Fit(bounds,padding=54) {
     const {width,height}=this.canvas.getBoundingClientRect();
     this.center=[(bounds[0]+bounds[1])/2,(bounds[2]+bounds[3])/2];
-    this.scale=Clamp(Math.min((width-padding*2)/Math.max(10,bounds[1]-bounds[0]),(height-padding*2)/Math.max(10,bounds[3]-bounds[2])),0.15,32);
+    this.scale=Clamp(Math.min((width-padding*2)/Math.max(10,bounds[1]-bounds[0]),(height-padding*2)/Math.max(10,bounds[3]-bounds[2])),FLOW_ZOOM.minScale,32);
   }
 
   Follow(frame) {

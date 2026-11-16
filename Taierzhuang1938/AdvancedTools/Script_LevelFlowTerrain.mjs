@@ -384,9 +384,25 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     surfaceMaps = {scene:{minX:bounds.minX, minZ:bounds.minZ, texelM, width, height, data}, backdrop:backdropPaint};
     return surfaceMaps;
   };
-  const colorCache = new Map();
-  const sun=FLOW_RENDERING.sky.sunDirection, sunLength=Math.hypot(...sun);
+  // One colour cache per light setting, so viewports with different skies (day and dusk) keep their own colours.
+  const colorCaches = new Map();
+  let activeCache = null, activeSun = null, activeAmbient = NaN, activeDirect = NaN;
+  const SyncLight = () => {
+    const sun=FLOW_RENDERING.sky.sunDirection;
+    const {ambient, direct}=FLOW_RENDERING.lighting;
+    if (!activeCache || sun!==activeSun || ambient!==activeAmbient || direct!==activeDirect) {
+      const currentLight=`${sun}|${ambient}|${direct}`;
+      activeCache=colorCaches.get(currentLight);
+      if (!activeCache) {
+        if (colorCaches.size>=6) colorCaches.delete(colorCaches.keys().next().value);
+        activeCache=new Map();colorCaches.set(currentLight,activeCache);
+      }
+      activeSun=sun;activeAmbient=ambient;activeDirect=direct;
+    }
+    return activeCache;
+  };
   const ColorAt = (x, z) => {
+    const colorCache=SyncLight(), sun=activeSun, sunLength=Math.hypot(...sun);
     const key = `${x},${z}`;
     if (colorCache.has(key)) return colorCache.get(key);
     const soilMix = SoilMixAt(x, z);
@@ -398,8 +414,11 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     colorCache.set(key, color);
     return color;
   };
-  const colorBoundsCache=new WeakMap();
+  const colorBoundsCaches=new WeakMap();
   const ColorBoundsForCell=(cell)=>{
+    const lightCache=SyncLight();
+    let colorBoundsCache=colorBoundsCaches.get(lightCache);
+    if(!colorBoundsCache) {colorBoundsCache=new WeakMap();colorBoundsCaches.set(lightCache,colorBoundsCache);}
     if(colorBoundsCache.has(cell)) return colorBoundsCache.get(cell);
     const samples=cell.children?cell.children.flatMap(ColorBoundsForCell):[
       ...OutlineForCell(cell).map(point=>ColorAt(...point)),

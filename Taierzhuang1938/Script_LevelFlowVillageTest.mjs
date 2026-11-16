@@ -6,6 +6,9 @@ import { VillageStealthAt, VillageStealthRules } from "./AdvancedTools/Script_Le
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { UpgradeEncounterDocument, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
+import { FLOW_RENDERING, FLOW_DUSK } from "./Data_Tuning_LevelFlow.mjs";
+import { ApplyEncounterSky, EncounterDuskBlend } from "./AdvancedTools/Script_LevelFlowSkyBlend.mjs";
+import { SCENE_EVENTS } from "./Data_SceneEvents.mjs";
 
 const scene = JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",import.meta.url)));
 const map = BuildEncounterMap(scene);
@@ -145,4 +148,90 @@ firstTemple.groups=firstTemple.groups.filter(group=>group.id!==PLAN.patrol.id);
 const customTemple=UpgradeEncounterDocument(firstTemple,DEFAULT_ENCOUNTER_DOCUMENT);
 assert.deepEqual(customTemple.triggers.find(trigger=>trigger.id==="Arrival_09b").area.center,[80,425]);
 assert.ok(!customTemple.groups.some(group=>group.id===PLAN.patrol.id),"cover migration preserves custom areas and deleted groups");
+// --- Beishahe moved 360 m south: long official road, village layout, road ditch, dusk sky ---------------------------------
+{
+  const marker=id=>scene.markers.find(item=>item.id===id);
+  const object=id=>scene.objects.find(item=>item.id===id);
+  const solidsIn=(minX,maxX,minZ,maxZ)=>walls.filter(wall=>{
+    const turned=Math.abs(Math.sin((wall.yawDeg||0)*Math.PI/180))>1e-3;
+    const reachX=turned?Math.hypot(wall.size[0],wall.size[2])/2:wall.size[0]/2,reachZ=turned?reachX:wall.size[2]/2;
+    return (wall.pos[1]===null||wall.pos[1]>=-0.5)&&Math.max(wall.size[0],wall.size[2])>=0.6&&wall.size[1]>=0.5
+      &&wall.pos[0]+reachX>minX&&wall.pos[0]-reachX<maxX&&wall.pos[2]+reachZ>minZ&&wall.pos[2]-reachZ<maxZ;
+  });
+  assert.equal(scene.bounds.maxZ,1440,"scene runs to z1440");
+  assert.equal(scene.terrain.rows,(1440+480)/0.5,"height map rows follow the new south edge");
+  assert.equal(scene.trenches.datum.patches[1].minZ,1001,"village-mouth trench datum moved with the ditch");
+  assert.ok(marker("LmPlank").z===1001&&marker("LmAtDitch").z>1000&&marker("LmVillage").z>1100,"village landmarks moved south by 360 m");
+  assert.equal(marker("LmHechaTail").z,579,"Gengjiazhuang's ditch tail stays where the river-fork taper left it");
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+  const line=(first,last)=>scene.ways.roads.find(road=>Math.hypot(road[0].x-first[0],road[0].z-first[1])<0.01&&Math.hypot(road.at(-1).x-last[0],road.at(-1).z-last[1])<0.01);
+  const dirt=line([117,545],[92,700]),post=line([-160,610],[92,700]),official=line([92,700],[99,997]);
+  assert.ok(dirt&&post&&official,"dirt road and north-west road meet at junction J(92,700); the official road runs on to the plank bridge");
+  for(const road of [dirt,post,official]) for(let i=1;i<road.length;i++) assert.ok(dist(road[i-1],road[i])<=75&&road[i].z>=road[i-1].z-0.01,"roads run south with gentle bends");
+  assert.ok(official.at(-1).z-official[0].z>=290,"the official road is about 300 m long");
+  assert.ok(marker("LmJunction").x===92&&marker("LmJunction").z===700&&marker("LmPostRoad_1218").z===672,"junction and north-west road labels moved");
+  assert.ok(["LmLoneGrave","LmRoadBarrow","LmRoadShrine","LmNorthGrave"].every(id=>marker(id)),"roadside grave, barrow, shrine and the 13 grave are labelled");
+  assert.ok(scene.objects.filter(item=>/^LoneCypress_/.test(item.id)).length>=4&&scene.objects.filter(item=>/^RoadTree_/.test(item.id)).length>=6,"cypress grove and a few scattered bare trees");
+  for(const seam of [590,950]) for(let x=-150;x<=300;x+=5) {
+    if(x>-105&&x<-55) continue;
+    for(let z=seam-3;z<seam+3;z+=0.5) assert.ok(Math.abs(terrain.heightAt(x,z+0.5)-terrain.heightAt(x,z))<0.12,`no step or cliff at the z${seam} seam (x${x}, z${z})`);
+  }
+  assert.ok(terrain.heightAt(-80,700)>2.4&&terrain.heightAt(-80,940)>2.4,"railway embankment runs through the new fields");
+  assert.ok(terrain.heightAt(-80,640)<1,"the north-west road crosses the railway at a level crossing");
+  const poles=scene.objects.filter(item=>item.meta?.pole&&item.meta?.telegraph).map(item=>item.pos[2]).sort((a,b)=>a-b);
+  assert.equal(poles[0],580,"telegraph poles start at z580");
+  const gaps=poles.slice(1).map((z,index)=>z-poles[index]);
+  assert.ok(gaps.every(gap=>gap===35||gap===105)&&gaps.filter(gap=>gap===105).length===1,"telegraph poles stay 35 m apart; the only longer gap is the river span at the rail bridge");
+  assert.ok(scene.paint.some(item=>item.id==="RailNorth"&&item.line.at(-1).z===1278),"bare railway bed paint runs up to the north");
+  const church=marker("LmChurch"),gate=marker("LmChurchGate");
+  assert.ok(church.x>marker("LmRoadWall").x&&church.x<marker("LmLoneYard").x-7.5&&church.z<marker("LmRoadWall").z&&church.z>marker("LmLoneYard").z-10,"church sits between the road wall and the lone yard, north of the road");
+  assert.ok(gate.z>church.z+9&&Math.abs(gate.x-church.x)<0.01,"church gate opens in the south wall facing the road");
+  assert.ok(church.w>=22&&church.d>=20&&object("Church_Hall")&&object("Church_Tower")&&scene.objects.filter(item=>/^Church_Wall/.test(item.id)).length>=5,"church keeps the original body inside a 22 m yard");
+  assert.ok(scene.objects.every(item=>!/^Church_/.test(item.id)||Math.abs(item.pos[0]-church.x)<14&&Math.abs(item.pos[2]-church.z)<14),"no church parts remain at the old village centre");
+  assert.ok(marker("LmThreshing")&&scene.objects.filter(item=>/^ThreshStack_\d$/.test(item.id)).length===2&&object("ThreshRoller")&&marker("LmWell_1"),"the old church site is a threshing floor with straw stacks and the well kept");
+  const clear=(minX,maxX,minZ,maxZ)=>solidsIn(minX,maxX,minZ,maxZ).map(item=>item.id);
+  assert.deepEqual(clear(92,106,1156,1174),[],"aid yard has an 18 x 14 m clear floor for straw beds");
+  assert.deepEqual(clear(116.4,126.4,1158,1166),[],"the gate yard has a 10 x 8 m clear space for the donkey cart");
+  assert.ok(scene.objects.filter(item=>/^AidStraw_/.test(item.id)).length>=16,"straw beds for about thirty wounded");
+  assert.ok(object("AidPot")&&Math.abs(object("AidPot").pos[0]-116)<4,"a cauldron stands by the east wall");
+  assert.ok(object("AidXiangThreshold")?.meta?.threshold,"the side room door has a threshold");
+  const gateGap=object("AidWallE_2").pos[2]-object("AidWallE_2").size[2]/2-(object("AidWallE_1").pos[2]+object("AidWallE_1").size[2]/2);
+  assert.ok(gateGap>=3&&marker("LmAidGate").x===116,"the east gate is wide enough for people carrying stretchers");
+  assert.ok(marker("LmAidHoleA")&&marker("LmAidHoleB"),"two holes in the aid yard");
+  const tianHole=marker("LmTianHole");
+  for(const from of [{x:99,z:1166},marker("LmAidGate")]) { const range=dist(from,tianHole); assert.ok(range>=15&&range<=25,`aid yard to Tian's hole is 15–25 m (${range.toFixed(1)})`); }
+  const coverBetween=scene.objects.filter(item=>item.cover&&item.pos[2]>1180&&item.pos[2]<1195&&item.pos[0]>90&&item.pos[0]<110);
+  assert.ok(coverBetween.length>=4&&object("TianRoller")&&object("TianDoorStack"),"wall roots, roller and door boards give cover on the way to Tian's yard");
+  assert.ok(object("AidWallS_Collapsed").size[1]<=0.7,"half of the aid yard's south wall is down");
+  assert.ok(!scene.objects.some(item=>/Girl/.test(item.id+item.group))&&!scene.markers.some(item=>/Girl/.test(item.id)),"nothing is still named for the girl's house");
+  assert.ok(marker("LmTianYard")&&object("TianHole_Roof")&&object("TianHouse1"),"Tian Sao's house and hole exist under the new name");
+  const matHole=marker("LmMatHole"),wallStub=object("MatHomeWallE_Stub");
+  assert.ok(marker("LmMatHome")&&matHole.z>marker("LmTianYard").z+15&&Math.abs(matHole.x-marker("LmTianYard").x)<20,"the mat-hole house lies directly south of Tian's yard");
+  assert.ok(wallStub.size[1]<=0.7&&wallStub.pos[0]>matHole.x+5,"its east wall facing the exit path has collapsed");
+  const eye=[121,terrain.heightAt(121,matHole.z)+1.6,matHole.z],target=[matHole.x,0.4,matHole.z];
+  assert.ok(!Blocked(eye,target),"the mat over the hole is visible from the exit path across the collapsed wall");
+  assert.ok(terrain.heightAt(matHole.x,matHole.z)<-1.5&&terrain.heightAt(tianHole.x,tianHole.z)<-1.5&&terrain.heightAt(97,1192.9)>0,"holes are dug at the new places and the old one is filled");
+  for(const id of ["OverturnedCart","OverturnedCartWheel"]) assert.equal(object(id).showOn,"AidCartBurned",`${id} appears only after the aid-station cart burns`);
+  assert.ok(SCENE_EVENTS.AidCartBurned.label==="救护所的车烧了"&&SCENE_EVENTS.GuandaoBridgeBlown.label==="官道桥炸了");
+  assert.ok(scene.objects.filter(item=>item.hideOn==="GuandaoBridgeBlown").length>=3&&scene.objects.filter(item=>item.showOn==="GuandaoBridgeBlown").length>=3,"the Guandao bridge has whole and broken states");
+  assert.equal(scene.objects.filter(item=>/^VillageLight_(AidGateN|AidGateS|AidYard|ChurchGateW|ChurchGateE|TianGate|MatHome)$/.test(item.id)).length,7,"lanterns at the aid station, church gate and village doors");
+  const ditch=scene.trenches.segments.find(item=>item.id==="RoadDitchNorthBank");
+  assert.ok(ditch&&ditch.look==="scrape"&&ditch.collapses.length>=2&&ditch.depthAlong.every(([,depth])=>Math.abs(depth-0.7)<0.01),"0.7 m scrape ditch with two entrances");
+  assert.ok(Math.abs(ditch.points[0][0]-116)<3&&ditch.points[0][1]>1210&&ditch.points.at(-1)[0]<-55,"the ditch runs from the exit path to the bridge bank");
+  let ditched=0;
+  for(let i=1;i<ditch.points.length-1;i++) {
+    const [x,z]=ditch.points[i];
+    if(Math.max(terrain.heightAt(x,z-3.4),terrain.heightAt(x,z+3.4))-terrain.heightAt(x,z)>0.45) ditched++;
+  }
+  assert.ok(ditched>=ditch.points.length-3,"the dug ditch is about 0.7 m deep along the road");
+  const daySun=[...FLOW_RENDERING.sky.sunDirection],dayAmbient=FLOW_RENDERING.lighting.ambient;
+  assert.equal(EncounterDuskBlend(800),0);assert.equal(EncounterDuskBlend(960),1);assert.equal(EncounterDuskBlend(NaN),0);
+  const middle=EncounterDuskBlend((FLOW_DUSK.fromZ+FLOW_DUSK.toZ)/2);assert.ok(middle>0.3&&middle<0.7,"mid-band focus is half way between day and dusk");
+  ApplyEncounterSky(1100);
+  assert.ok(FLOW_RENDERING.sky.sunDirection[0]<-0.9&&FLOW_RENDERING.sky.sunDirection[1]>0.1&&FLOW_RENDERING.sky.sunDirection[2]>0&&FLOW_RENDERING.sky.horizon===FLOW_DUSK.sky.horizon&&FLOW_RENDERING.lighting.direct===FLOW_DUSK.lighting.direct,"far south: dusk sky, the sun low in the west, dusk light balance");
+  ApplyEncounterSky(890);
+  assert.ok(FLOW_RENDERING.skyBlend>0&&FLOW_RENDERING.skyBlend<1&&FLOW_RENDERING.sky.horizon!==FLOW_DUSK.sky.horizon,"the transition band blends the sky");
+  ApplyEncounterSky(300);
+  assert.deepEqual(FLOW_RENDERING.sky.sunDirection,daySun);assert.equal(FLOW_RENDERING.lighting.ambient,dayAmbient);assert.equal(FLOW_RENDERING.skyBlend,0,"north of the band the day sky is restored exactly");
+}
 console.log("ok Temple approach, walls, concealed patrol/shelters, cart handoff, stealth rules and draft migration");
