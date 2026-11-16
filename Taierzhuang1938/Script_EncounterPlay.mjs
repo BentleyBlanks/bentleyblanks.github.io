@@ -11,10 +11,12 @@ import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
 import { LoadToolsVolume, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
-import { PrepareWoundVariants } from "./Script_CharacterWounds.mjs";
+import { PrepareWoundMaterials } from "./Script_CharacterWounds.mjs";
 import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { XBOT_DEATHS } from "./Data_BlockoutXBotClips.mjs";
+import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 const UI=CONFIG.ui;
@@ -55,9 +57,12 @@ export class EncounterPlay {
   async Load() {
     const phase=this.host.ctx.PHASE_TABLE[this.host.state.phaseIndex];
     if(phase.blockout?.sceneError)throw new Error(phase.blockout.sceneError);
-    await this.puppets.xbot.Load();
+    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
+    const deaths=await Promise.allSettled(Object.values(XBOT_DEATHS).map(entry=>this.puppets.xbot.Clip(entry.file)));
+    for(const result of deaths)if(result.status==="rejected")console.warn("[EncounterPlay] Death clip warmup failed; retaining mirrored poses",result.reason);
+    if(this.disposed||!this.active)return;
     for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
     const frame=EvaluateFlow(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
@@ -129,24 +134,60 @@ export class EncounterPlay {
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
+    const excluded=new Set([...this.entries.values()].flatMap(entry=>entry.skin?.hidden||[]));
+    const post=host.post;
+    const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
+    const hiddenHair=[];
     const group=new THREE.Group();group.name="EncounterWarmExtras";
     AddGoreWarmProxies(group,[...this.entries.values()].map(e=>e.soldier.actor));
     if(host.viewmodel.CreateActionDebrisWarmProxy)group.add(host.viewmodel.CreateActionDebrisWarmProxy());
     host.scene.add(group);host.state.warming=true;
-    const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch};
+    const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch,
+      drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded};
     try {
+      if(dimensions){
+        const height=Math.min(post.height,ENCOUNTER_PLAY_STARTUP.warmupHeight);
+        const width=Math.max(1,Math.round(height*post.width/post.height));
+        post.SetSize(width,height,Math.round(width*post.outputWidth/post.width),Math.round(height*post.outputHeight/post.height));
+      }
+      host.scene.traverse(mesh=>{if(mesh.userData.hairGroom&&!mesh.visible){hiddenHair.push(mesh);mesh.visible=true;}});
       host.ai.PrepareCrowd(["nra","ija"]);
+      if(!retained)PrepareWoundMaterials(host.scene);
       if(retained)host.ctx.CompileAsRendered(host.scene);
       else await host.ctx.WarmupShaders(host.scene,onStep,null,options);
-      const restore=PrepareWoundVariants(host.scene);
-      try{if(retained)host.ctx.CompileAsRendered(host.scene);else await host.ctx.WarmupShaders(host.scene,onStep,null,options);}finally{restore();}
       if(retained)host.ctx.RenderScene(0);
     } catch(error) {
       this.error=String(error.stack||error);this.ready=false;this.Send("error",{message:String(error.message||error)});throw error;
     } finally {
       group.removeFromParent();
+      for(const mesh of hiddenHair)mesh.visible=false;
       for(const child of group.children)if(child.isMesh&&child.name.startsWith("GoreWarm_Part_"))child.geometry.dispose();
+      if(dimensions){
+        const size=host.renderer.getDrawingBufferSize(new THREE.Vector2());
+        post.SetSize(Math.round(size.x*dimensions[0]/dimensions[2]),Math.round(size.y*dimensions[1]/dimensions[3]),size.x,size.y);
+        post.NotifyCameraCut();
+      }
       host.state.warming=wasWarming;
+    }
+    if(!retained){
+      await post.dofPass.Warmup();
+      const blood=host.vfx.bloodEffects,eye=host.player.EyePosition.clone();
+      const direction=host.camera.getWorldDirection(new THREE.Vector3());
+      const spot=eye.addScaledVector(direction,2);
+      host.vfx.Blood(spot,direction,1);
+      blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
+      await host.vfx.particles.Ready();
+      const ready=host.state.ready;
+      const warming=host.state.warming;
+      try{
+        host.state.ready=true;host.state.warming=false;
+        for(let i=0;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++){
+          host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);host.renderer.getContext().finish();
+        }
+      }finally{
+        host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
+        post.NotifyCameraCut();
+      }
     }
     host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length};
     this.warmedSignatures.add(signature);this.FlushRetired();

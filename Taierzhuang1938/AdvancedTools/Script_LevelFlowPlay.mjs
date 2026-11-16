@@ -132,8 +132,8 @@ export class LevelFlowPlay {
   Stop() {
     if(!this.active)return;
     this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
-    const api=this.frame?.contentWindow.Tengxian?.Debug.EncounterPlay;
-    if(api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.cacheTimer=setTimeout(()=>this.DropHost(),ENCOUNTER_PLAY_STARTUP.idleCacheMs);}
+    const game=this.frame?.contentWindow.Tengxian,api=game?.Debug.EncounterPlay;
+    if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.cacheTimer=setTimeout(()=>this.DropHost(),ENCOUNTER_PLAY_STARTUP.idleCacheMs);}
     else this.DropHost();
     sessionStorage.removeItem("tengxian1938_encounter_play_session_v1");
     for(const option of this.layout.options)option.hidden=option.disabled=false;

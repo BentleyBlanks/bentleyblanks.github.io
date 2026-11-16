@@ -15,6 +15,17 @@ try {
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?gore=1&shot=1&manual=1&quality=high&scale=small`,{waitUntil:'load',timeout:180000});
  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&Taierzhuang.state.running&&Taierzhuang.Debug.GoreRange,null,{timeout:180000});
  console.log('READY');
+ const preparation=await page.evaluate(async()=>{
+  const {PrepareWoundMaterials}=await import('./Script_CharacterWounds.mjs');
+  const T=Taierzhuang,materials=[];
+  T.scene.traverse(mesh=>{if(mesh.isSkinnedMesh)materials.push([mesh,mesh.material]);});
+  PrepareWoundMaterials(T.scene);T.StepFrames(2,1/60,true);
+  const programs=T.renderer.info.programs.length;
+  PrepareWoundMaterials(T.scene);T.StepFrames(2,1/60,true);
+  return {sameMaterials:materials.every(([mesh,material])=>mesh.material===material),programs,after:T.renderer.info.programs.length};
+ });
+ assert.ok(preparation.sameMaterials,'Prepared healthy materials retain identity and disposal ownership');
+ assert.equal(preparation.after,preparation.programs,'Preparing sources repeatedly is idempotent');
  await page.evaluate(()=>{Taierzhuang.Debug.GoreRange.Reset();Taierzhuang.StepFrames(20,1/60,true);const s=Taierzhuang.ai.soldiers[0];Taierzhuang.ai.Spawn("nra",s.position.x-4,s.position.z,{dummy:true,unarmed:true});Taierzhuang.StepFrames(10,1/60,true);});
  const inventory=await page.evaluate(()=>Taierzhuang.ai.soldiers.map(s=>({id:s.id,side:s.side,model:s.actor?.modelId})));
  console.log('CAST',JSON.stringify(inventory.slice(0,10)));

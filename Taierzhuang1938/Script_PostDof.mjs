@@ -392,6 +392,23 @@ export class DofPass {
     return this.active;
   }
 
+  // ADS and death activate this pass after loading. Link its four programs and
+  // allocate the actual targets before either first-use frame can block.
+  async Warmup() {
+    if (!this.target || this.warmedTarget === this.target) return;
+    await Promise.all([
+      [this.matDown, this.half], [this.matGather, this.gather],
+      [this.matFill, this.fill], [this.material, this.target],
+    ].map(([material, target]) => this.pipeline.blitter.Compile(material, target)));
+    const P = this.pipeline, savedTarget = P.renderer.getRenderTarget();
+    try {
+      this.Render({sceneColor:P.targets.hdr, normalDepthTexture:P.targets.normalDepth?.texture, blitter:P.blitter});
+      this.warmedTarget = this.target;
+    } finally {
+      P.renderer.setRenderTarget(savedTarget);
+    }
+  }
+
   Render(ctx) {
     // 1) 降采样 + CoC
     const UD = this.uniformsDown;

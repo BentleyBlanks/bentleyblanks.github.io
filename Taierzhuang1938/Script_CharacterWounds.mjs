@@ -7,6 +7,8 @@ import { BLOOD_WOUND as C } from "./Data_Tuning_Blood.mjs";
 const posed = new THREE.Vector3(), rest = new THREE.Vector3();
 const origin = new THREE.Vector3(), basis = new THREE.Vector3();
 const classification = new WeakMap();
+const activeVertices = new WeakMap();
+const woundPatchKey = `cloth-wound-2-${C.slots}`;
 const raycaster=new THREE.Raycaster(), triangle=new THREE.Triangle(), barycentric=new THREE.Vector3();
 function Region(name) {
   const limb = LimbForBone(name);
@@ -37,8 +39,26 @@ function Regions(mesh) {
   classification.set(geometry,result);
   return result;
 }
+function ActiveVertices(geometry) {
+  const index = geometry.index, version = index?.version;
+  const count = geometry.attributes.position.count;
+  let record = activeVertices.get(geometry);
+  if (!record || record.index !== index || record.version !== version || record.count !== count) {
+    const ids = index ? [...new Set(index.array)] : Array.from({length:count},(_,i)=>i);
+    record = {index,version,count,ids};
+    activeVertices.set(geometry,record);
+  }
+  return record.ids;
+}
+function PrepareWoundGeometry(mesh) {
+  mesh.geometry.setAttribute("woundRestPosition",mesh.geometry.attributes.position);
+  if (mesh.isSkinnedMesh) {
+    Regions(mesh);
+    ActiveVertices(mesh.geometry);
+  }
+}
 function WoundPatch(uniforms) {
-  return MakePatch({key:`cloth-wound-2-${C.slots}`, uniforms:u=>Object.assign(u,uniforms),
+  return MakePatch({key:woundPatchKey, uniforms:u=>Object.assign(u,uniforms),
     vertex:[["#include <common>","attribute vec3 woundRestPosition; varying vec3 vWoundRest;"],
       ["#include <begin_vertex>","vWoundRest = woundRestPosition;"]],
     fragment:[["#include <common>",`
@@ -90,7 +110,7 @@ function WoundMaterial(source,uniforms) {
 export function PaintBakedWounds(mesh,uniforms=WoundUniforms()) {
   mesh.geometry.setAttribute("woundRestPosition",mesh.geometry.attributes.position);
   const patch=WoundPatch(uniforms);
-  for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material])ApplyPatches(m,[...(PatchesOf(m)||[]),patch]);
+  for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material])ApplyPatches(m,WithPatch(m,patch));
   return uniforms;
 }
 export function CreateWoundUniforms(){return WoundUniforms();}
@@ -101,7 +121,7 @@ export function PrepareWoundVariants(root) {
   const swapped=[];
   root?.traverse(mesh=>{
     if(!mesh.isSkinnedMesh && !mesh.name?.startsWith("GoreWarm_Part_"))return;
-    mesh.geometry.setAttribute("woundRestPosition",mesh.geometry.attributes.position);
+    PrepareWoundGeometry(mesh);
     const source=mesh.material;
     const Warm=original=>{
       let material=warmMaterials.get(original);
@@ -115,6 +135,21 @@ export function PrepareWoundVariants(root) {
     swapped.push([mesh,source]);
   });
   return ()=>{for(const [mesh,source] of swapped)mesh.material=source;};
+}
+
+// A zero-wound source draws the healthy appearance and shares its program with
+// private injury clones. Material identity and disposal ownership stay intact.
+export function PrepareWoundMaterials(root) {
+  root.traverse(mesh => {
+    if (!mesh.isSkinnedMesh && !mesh.name?.startsWith("GoreWarm_Part_")) return;
+    PrepareWoundGeometry(mesh);
+    for (const material of [mesh.material].flat()) {
+      if (!material) continue;
+      if (PatchesOf(material)?.some(existing => existing.key === woundPatchKey)) continue;
+      const patch = WoundPatch(WoundUniforms());
+      ApplyPatches(material,WithPatch(material,patch));
+    }
+  });
 }
 
 // Bind-space masks deform with the existing skin, preserving lighting, normals and motion vectors.
@@ -145,11 +180,11 @@ export class CharacterWounds {
     let selected=null, best=Infinity, cloth=null, clothDistance=Infinity;
     for(const mesh of meshes) {
       mesh.skeleton.update();
-      const regions=Regions(mesh), active=mesh.geometry.index;
+      const regions=Regions(mesh);
       const isCloth=(Array.isArray(mesh.material)?mesh.material:[mesh.material])
         .some(m=>m.userData.externalMaterialClass==="cloth" || !!m.userData.nraUniformPalette);
       // Respect severed geometry: removed vertices must never win nearest-surface selection.
-      const ids=[...(active ? new Set(active.array) : regions.keys())].filter(i=>Matches(regions[i],part,shapeId));
+      const ids=ActiveVertices(mesh.geometry).filter(i=>Matches(regions[i],part,shapeId));
       const stride=Math.max(1,Math.ceil(ids.length/C.maxSurfaceSamples));
       for(let sample=0;sample<ids.length;sample+=stride) {
         const i=ids[sample];

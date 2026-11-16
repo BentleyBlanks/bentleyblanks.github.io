@@ -131,6 +131,21 @@ export class Blitter {
     this.renderer.setRenderTarget(target ?? null);
     this.renderer.render(this.scene, QUAD_CAMERA);
   }
+
+  // Compile against the same target as Blit, including MRT/output colour space.
+  // compileAsync submits synchronously, so other materials can join the driver queue.
+  Compile(material, target) {
+    const savedTarget = this.renderer.getRenderTarget();
+    const savedMaterial = this.mesh.material;
+    try {
+      this.mesh.material = material;
+      this.renderer.setRenderTarget(target ?? null);
+      return this.renderer.compileAsync(this.scene, QUAD_CAMERA);
+    } finally {
+      this.mesh.material = savedMaterial;
+      this.renderer.setRenderTarget(savedTarget);
+    }
+  }
 }
 
 /**

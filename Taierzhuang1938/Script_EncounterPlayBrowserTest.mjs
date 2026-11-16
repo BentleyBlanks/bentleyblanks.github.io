@@ -18,6 +18,43 @@ await page.addInitScript(()=>{
  localStorage.setItem("tengxian1938_tools_volume_v1",JSON.stringify({volume:0,muted:true}));
 });
 const State=()=>page.evaluate(()=>document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian?.Debug.EncounterPlay?.State());
+async function FirstUse(frame,kill=false){
+ return frame.evaluate(async kill=>{
+  const {WEAPONS}=await import('./Data_Weapons.mjs');
+  const g=Tengxian,known=new Set(g.renderer.info.programs.map(p=>p.cacheKey));
+  const frames=[];
+  const warming=g.state.warming;
+  let target=null,actionMs=0;
+  g.state.warming=true;
+  try{
+   if(kill){
+    const actor=g.Debug.EncounterPlay.State().actors.find(a=>a.group==="Fork"&&a.alive);
+    target=g.ai.soldiers.find(s=>s.id===actor.soldierId);
+    const direction=g.camera.getWorldDirection(g.player.position.clone()),weaponId=g.viewmodel.weaponId;
+    const shape=target.actor.GetBoneHitboxes().find(hit=>hit.id==="upperTorso");
+    const point=shape.start.clone().lerp(shape.end,.5);
+    target.health=1;
+    const at=performance.now();
+    target.TakeHit(WEAPONS[weaponId].damage,"torso",direction,{kind:"bullet",weaponId,shapeId:shape.id,point});
+    g.vfx.Blood(point,direction,1);
+    actionMs=performance.now()-at;
+   }else g.Debug.Mouse(2,true);
+   // One complete gameplay frame per display tick avoids an artificial GPU
+   // command backlog from submitting ninety frames in one JavaScript task.
+   for(let i=0;i<(kill?90:24);i++){
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    const at=performance.now();g.StepFrames(1,1/60,true);frames.push(performance.now()-at);
+   }
+  }finally{
+   g.state.warming=warming;
+   if(!kill)g.Debug.Mouse(2,false);
+  }
+  const ads=g.player.ads;
+  return {actionMs,firstFrameMs:frames[0],maxMs:Math.max(...frames),ads,dead:target?!target.alive:null,wounds:target?.actor.woundBlood?.count,
+   late:g.renderer.info.programs.filter(p=>!known.has(p.cacheKey)).map(p=>p.name||p.cacheKey),
+   renderSize:[g.post.width,g.post.height,g.post.outputWidth,g.post.outputHeight],quality:g.graphics.profile};
+ },kill);
+}
 async function Ready(){
  await page.waitForFunction(()=>{const g=document.querySelector(".lfPlayHost iframe")?.contentWindow.Tengxian;return g?.state.running&&g.Debug.EncounterPlay?.State().ready;},null,{timeout:180000});
  await page.locator(".lfPlayLoading").waitFor({state:"hidden",timeout:30000});
@@ -34,6 +71,10 @@ try{
  let state=await State();const hostId=state.hostId;
  assert.equal(state.startBeat,"03b");assert.equal(state.layout,1);
  await frame.evaluate(()=>Tengxian.player.SetDebugOptions({invincible:true}));
+ const firstAim=await FirstUse(frame);
+ assert.ok(firstAim.ads>.9,"The first ADS uses real held mouse input");
+ assert.deepEqual(firstAim.late,[],"First ADS must reuse linked programs");
+ assert.ok(firstAim.renderSize[1]>144&&firstAim.renderSize[3]>144,"Full render dimensions are restored before Play");
  assert.ok(state.actors.some(a=>a.model==="luo"));
  assert.ok(await page.locator("#scriptPane").isVisible());assert.ok(await page.locator("#playStatus").isVisible());
  assert.equal(await frame.locator(".encounterPlayHud").count(),0);
@@ -43,6 +84,10 @@ try{
  await frame.waitForFunction(()=>Tengxian.audio.musicBuffers.has(Tengxian.audio.musicCue),null,{timeout:60000});
  const ammo=await frame.evaluate(()=>{const g=Tengxian,before=g.state.ammo;g.Debug.Fire();return {before,after:g.state.ammo};});
  assert.ok(ammo.after<ammo.before);
+ const firstKill=await FirstUse(frame,true);
+ assert.ok(firstKill.dead&&firstKill.wounds>0,"First lethal bullet retains wounds and the real death chain");
+ assert.deepEqual(firstKill.late,[],"First lethal hit, blood and corpse frames must reuse linked programs");
+ await fs.writeFile(path.join(out,"Data_FirstUse.json"),JSON.stringify({coldMs,firstAim,firstKill},null,2));
  await frame.evaluate(()=>Tengxian.Debug.Throw("Grenade",.2));
  await page.locator("#pauseGame").click();
  await frame.waitForFunction(()=>Tengxian.audio.ctx.state==="suspended");
@@ -92,6 +137,7 @@ try{
  state=await State();assert.equal(state.hostId,hostId);assert.equal(state.startBeat,"03b");assert.ok(!state.dead.some(id=>id.startsWith("Fork_")));
  assert.equal(await frame.evaluate(()=>Tengxian.state.ammo),ammo.before);
  assert.deepEqual(await frame.evaluate(()=>({health:Tengxian.player.health,grenades:Tengxian.state.grenades,bundles:Tengxian.state.bundles})),{health:100,grenades:3,bundles:2});
+ console.log(JSON.stringify({coldMs,warmMs,warm:await frame.evaluate(()=>Tengxian.state.actorShaderWarm)}));
  assert.ok(warmMs<coldMs*.6&&warmMs<12000,"Repeated Play reuses its warmed host");
  await page.locator("#stopGame").click();
  await page.evaluate(time=>LevelFlow.Seek(time),BeatById("05b").start);
@@ -169,8 +215,8 @@ try{
  await page.selectOption("#playGameStart","current");await page.evaluate(time=>LevelFlow.Seek(time),BeatById("08f").start);
  assert.ok(await page.locator("#playGame").isDisabled());assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,hostId,errors,checkpoint,restoredSlots,
-   checks:"camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop; death retry by keyboard and toolbar; outer R; continued movement; current-beat checkpoint; melee and stored ammo restoration; cinematic checkpoint skipped"},null,2));
+ await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,firstAim,firstKill,hostId,errors,checkpoint,restoredSlots,
+   checks:"camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop; death retry by keyboard and toolbar; outer R; continued movement; current-beat checkpoint; melee and stored ammo restoration; cinematic checkpoint skipped; first ADS and lethal hit reuse linked programs at full resolution"},null,2));
  console.log("ok  Play controls, death retry, current checkpoint inventory, event-driven timeline, skipped cinematics and state reset; first "+(coldMs/1000).toFixed(2)+" s, repeat "+(warmMs/1000).toFixed(2)+" s");
 }catch(error){
  console.log(JSON.stringify(await page.evaluate(()=>({status:document.getElementById("playStatus")?.textContent,loading:document.querySelector(".lfPlayLoading")?.textContent,state:window.LevelFlow?.Play.State()})).catch(()=>null)));

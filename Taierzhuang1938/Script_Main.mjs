@@ -4039,6 +4039,9 @@ function SelectShaderRepresentatives(objects, seen) {
  */
 async function WarmupShaders(root, onStep = null, shouldStop = null, options = {}) {
   if (!root) return 0;
+  const warmDof = post.dofPass.Warmup().catch(error => {
+    console.warn("[Main] DoF shader warmup failed", error);
+  });
   // 挑代表按材质认「热没热」：视模网格上还挂着源材质（多半已被人物编过）就会被跳过，
   // 自阴影那份克隆一直没人交。先换成出画那一份再挑（CompileAsRendered ③）。
   firstPersonSelfShadow?.SyncForCompile();
@@ -4046,12 +4049,12 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
   root.traverse((object) => {
     if (object.isMesh || object.isPoints || object.isLine || object.isSprite) meshes.push(object);
   });
-  if (!meshes.length) return 0;
+  if (!meshes.length) { await warmDof; return 0; }
 
   // 代表网格：同一个 program 只画一次。三千六百件收敛到三百来个代表。
   const seen = new Set();
-  const picks = SelectShaderRepresentatives(meshes, seen);
-  if (!picks.length) return 0;
+  const picks = SelectShaderRepresentatives(meshes.filter(object => !options.excluded?.has(object)), seen);
+  if (!picks.length) { await warmDof; return 0; }
 
   // 藏起来用的是**层**不是 visible：visible 是层级的（父物体一藏，整棵子树连同
   // 想画的那件一起没了），layers 是逐物体的 —— projectObject 照样往下走。
@@ -4136,6 +4139,8 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
       }
     }
 
+    await warmDof;
+
     // --- 二、场上原有材质的重编 ---------------------------------------------
     // 过场一开场就换天光（Play 里 applySky 排在建布景之前），场上那座城的材质整批
     // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下。它的 program 已经
@@ -4167,7 +4172,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
     // 一批画多少件按上一批的结果收放：建出了新 program 的收到一件（一个 program
     // 三五百毫秒，几件挤进同一帧就是好几秒的冻结），纯命中缓存的一路翻倍放开
     // （那种一批只要几毫秒，逐件跑三百趟纯属白等）。
-    let chunk = 2;
+    let chunk = options.drawBatch || 2;
     let done = 0;
     while (done < picks.length) {
       const batch = picks.slice(done, done + chunk);
@@ -4188,8 +4193,10 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
         batch[k].frustumCulled = culled[k];
       }
       done += batch.length;
-      if (born) chunk = 1;
-      else if (cost < 30) chunk = Math.min(32, chunk * 2);
+      if (!options.drawBatch) {
+        if (born) chunk = 1;
+        else if (cost < 30) chunk = Math.min(32, chunk * 2);
+      }
       onStep?.(T("boot.step.warmMaterials", { done, total: picks.length }),
         BootProgress(BOOT.warm.warmMaterials, done / picks.length));
       if (!await Yield()) return picks.length;
@@ -4199,7 +4206,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
     // 上面只画了代表件，另外三千多件的顶点/索引缓冲一次都还没传上去 —— 全堆在
     // 第一帧就是一秒半的卡顿。缓冲上传比编译便宜得多，按大批累加放出来即可；
     // 最后一批放完场上就是完整的一套，正好当收尾的兜底帧。
-    const REVEAL = 256;
+    const REVEAL = options.revealBatch || 256;
     for (let i = 0; i < meshes.length; i += REVEAL) {
       for (const object of meshes.slice(i, i + REVEAL)) object.layers.mask = masks.get(object);
       RenderScene(0);
