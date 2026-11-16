@@ -68,10 +68,15 @@ try {
     const rotated=await State();
     if(type!=="battle") {
       const current=rotated.viewports.views[0],prior=panned.viewports.views[0];
-      Near(current.freeCamera?.yaw??current.yaw,(prior.freeCamera?.yaw??prior.yaw)-angle,`${type} twist rotates yaw`);
+      Near(current.freeCamera?.yaw??current.yaw,(prior.freeCamera?.yaw??prior.yaw)+angle,`${type} clockwise twist follows the fingers`);
       Near(current.freeCamera?.pitch??current.pitch,prior.freeCamera?.pitch??prior.pitch,`${type} twist preserves pitch`);
     }
-    await Touch("touchEnd",[[2,x+30+32*Math.cos(angle),y+18+32*Math.sin(angle)]]);
+    await Touch("touchMove",[[1,x+30-32*Math.cos(-angle),y+18-32*Math.sin(-angle)],[2,x+30+32*Math.cos(-angle),y+18+32*Math.sin(-angle)]]);
+    if(type!=="battle") {
+      const current=(await State()).viewports.views[0],prior=panned.viewports.views[0];
+      Near(current.freeCamera?.yaw??current.yaw,(prior.freeCamera?.yaw??prior.yaw)-angle,`${type} counterclockwise twist follows the fingers`);
+    }
+    await Touch("touchEnd",[[2,x+30+32*Math.cos(-angle),y+18+32*Math.sin(-angle)]]);
     const released=await State();
     await Touch("touchMove",[[2,x+80,y+60]]);
     assert.deepEqual((await State()).viewports.views[0],released.viewports.views[0],"remaining finger cannot become a stray drag");

@@ -96,7 +96,7 @@ export class EncounterSceneControls {
       view.scale=Clamp(gesture.scale*ratio,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);
       view.center=[gesture.anchor[0]-(measure.x-rect.width/2)/view.scale,gesture.anchor[1]-(measure.y-rect.height/2)/view.scale];
     } else {
-      const yaw=gesture.yaw-gesture.rotation,pitch=gesture.pitch,orthographic=view.type==="oblique";
+      const yaw=gesture.yaw+gesture.rotation,pitch=gesture.pitch,orthographic=view.type==="oblique";
       const forward=orthographic?[-Math.sin(yaw)*Math.cos(pitch),-Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)]
         :[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
       const right=orthographic?[Math.cos(yaw),0,-Math.sin(yaw)]:[-Math.cos(yaw),0,Math.sin(yaw)];
