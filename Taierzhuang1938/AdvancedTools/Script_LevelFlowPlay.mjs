@@ -11,6 +11,12 @@ export class LevelFlowPlay {
     this.button.onclick=()=>this.active?this.Pause(false):this.Start(this.menu.value);
     this.pauseButton.onclick=()=>this.Pause(!this.paused);this.stopButton.onclick=()=>this.Stop();
     this.menu.onchange=()=>this.UpdateControls();
+    // Keyboard events do not cross iframe boundaries. Keep an escape route
+    // when a toolbar/sidebar control owns focus while the game is running.
+    document.addEventListener("keydown",event=>{
+      if(event.key!=="Escape"||event.repeat||!this.active||!this.state?.ready||this.launching)return;
+      event.preventDefault();this.Pause(!this.paused);
+    });
     window.addEventListener("message",e=>{
       if(!this.active||e.source!==this.frame?.contentWindow||e.origin!==location.origin||e.data?.token!==this.token)return;
       if(e.data.type==="encounter-play-ready")this.StartHost();
@@ -96,7 +102,9 @@ export class LevelFlowPlay {
   Pause(on) {
     if(!this.active||!this.state?.ready)return false;
     this.paused=this.frame.contentWindow.Tengxian.Debug.EncounterPlay.Pause(on);
-    this.state=this.frame.contentWindow.Tengxian.Debug.EncounterPlay.State();this.onState?.(this.state);this.UpdateControls();return this.paused;
+    this.state=this.frame.contentWindow.Tengxian.Debug.EncounterPlay.State();this.onState?.(this.state);this.UpdateControls();
+    if(!this.paused)this.frame.focus();
+    return this.paused;
   }
   LoadError(message){
     clearInterval(this.timer);clearTimeout(this.deadline);this.launching=false;
@@ -107,7 +115,9 @@ export class LevelFlowPlay {
   SetLayout(count) {
     if(!this.active)return false;
     count=count===2?2:1;this.layout.value=String(count);
-    this.frame?.contentWindow.postMessage({type:"encounter-play-layout",token:this.token,count},location.origin);return true;
+    this.frame?.contentWindow.postMessage({type:"encounter-play-layout",token:this.token,count},location.origin);
+    if(!this.paused&&this.state?.ready)this.frame?.focus();
+    return true;
   }
   Stop() {
     if(!this.active)return;
