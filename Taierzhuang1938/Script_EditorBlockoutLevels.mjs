@@ -449,6 +449,7 @@ export const BLOCKOUT_BACKDROP_TEXTURE = Object.freeze({ maxPx: 4096, minTexelM:
  * 把 backdrop.paint（按顺序：poly / line 同场景 paint，rects = 轴对齐田块，实边）画成一张 RGBA 图（sRGB 字节），纯 JS、零 three。
  * 每个像素存「预乘」累积色 C 与覆盖度 A（同 BuildGroundPaint），最后写出 rgb = C / A、a = A；没涂到的像素 rgb = ground.color、a = 0
  * （mipmap 平均时不会混进黑边）。图外框一圈像素一定是 a = 0（钳边采样出去就是没涂）。
+ * options.bounds 可限定烘焙范围，供局部高精度涂色复用同一套形状与叠色。
  * → null（没有可画的项）或 { minX, minZ, texelM, width, height, data: Uint8Array, painted 被涂到的像素数 }。
  */
 export function RasterizeBackdropPaint(backdrop, options = {}) {
@@ -461,6 +462,10 @@ export function RasterizeBackdropPaint(backdrop, options = {}) {
     if (item.rects) { for (const r of item.rects) Grow(r[0], r[1], r[2], r[3]); continue; }
     const pad = (item.line ? item.halfW : 0) + (Number.isFinite(item.feather) ? item.feather : BLOCKOUT_PAINT.feather);
     for (const p of item.poly || item.line) Grow(p.x - pad, p.z - pad, p.x + pad, p.z + pad);
+  }
+  if (options.bounds) {
+    minX = Math.max(minX, options.bounds.minX); maxX = Math.min(maxX, options.bounds.maxX);
+    minZ = Math.max(minZ, options.bounds.minZ); maxZ = Math.min(maxZ, options.bounds.maxZ);
   }
   if (!(maxX > minX && maxZ > minZ)) return null;
   minX -= T.padM; minZ -= T.padM; maxX += T.padM; maxZ += T.padM;

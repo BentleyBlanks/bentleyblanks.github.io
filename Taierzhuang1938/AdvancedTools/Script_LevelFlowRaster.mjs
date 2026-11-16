@@ -139,7 +139,12 @@ export class EncounterRaster {
       this.accelerated=false;this.gpu=null;this.triangles=0;this.image.data.fill(0);this.depth.fill(Infinity);
       for(let offset=0;offset<this.worldLength;offset+=27) {
         const points=[],colors=[];
-        for(let index=offset;index<offset+27;index+=9) {points.push(Array.from(this.worldVertices.subarray(index,index+3)));colors.push(Array.from(this.worldVertices.subarray(index+3,index+6)));}
+        for(let index=offset;index<offset+27;index+=9) {
+          const point=Array.from(this.worldVertices.subarray(index,index+3));
+          points.push(point);
+          const terrain=this.terrainSurface&&Math.hypot(...this.worldVertices.subarray(index+6,index+9))>0.1;
+          colors.push(terrain?this.view.mapData.terrain.colorAt(point[0],point[2]):Array.from(this.worldVertices.subarray(index+3,index+6)));
+        }
         const vertices=this.view.FaceVertices(points,colors);
         for(const vertex of vertices) {vertex.x*=this.coordinateScale;vertex.y*=this.coordinateScale;}
         this.Face(vertices,'#000000');

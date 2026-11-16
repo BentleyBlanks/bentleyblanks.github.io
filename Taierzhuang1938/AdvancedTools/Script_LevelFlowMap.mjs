@@ -153,5 +153,6 @@ export async function LoadEncounterMap() {
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(map)));
   map.source={scene:"Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",sha256:[...new Uint8Array(digest)].map((byte)=>byte.toString(16).padStart(2,"0")).join("")};
   map.terrain=await LoadEncounterTerrain(scene,sceneUrl,map);
+  map.terrain.surfaceMaps();
   return map;
 }

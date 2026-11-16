@@ -85,6 +85,9 @@ class GpuRaster {
       uniform vec3 right,up,forward;
       uniform vec2 lightBalance;
       uniform vec4 shadowSettings;
+      uniform bool terrainSurface;
+      uniform sampler2D groundColor,distantColor;
+      uniform vec4 groundBounds,distantBounds;
       layout(location=0) out vec4 pixel;
       layout(location=1) out float distancePixel;
       layout(location=2) out vec4 normalPixel;
@@ -121,7 +124,22 @@ class GpuRaster {
             visibility-=shadowSettings.w*(1.0-lit/9.0)*direct/(lightBalance.x+direct);
           }
         }
-        pixel=vec4(rgb*visibility,1.0);
+        vec3 surface=rgb;
+        if(terrainSurface&&dot(worldNormal,worldNormal)>0.01) {
+          surface=vec3(198.0,207.0,169.0)/255.0;
+          vec2 distantUv=(worldPosition.xz-distantBounds.xy)/distantBounds.zw;
+          if(all(greaterThanEqual(distantUv,vec2(0.0)))&&all(lessThanEqual(distantUv,vec2(1.0)))) {
+            vec4 paint=texture(distantColor,distantUv);
+            surface=mix(surface,paint.rgb,paint.a);
+          }
+          vec2 groundSize=vec2(textureSize(groundColor,0));
+          vec2 groundUv=(worldPosition.xz-groundBounds.xy)/groundBounds.zw;
+          if(all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)))) {
+            surface=texture(groundColor,(groundUv*(groundSize-1.0)+0.5)/groundSize).rgb;
+          }
+          surface*=0.7+dot(normalize(worldNormal),vec3(-0.35,0.88,0.3))*0.3;
+        }
+        pixel=vec4(surface*visibility,1.0);
         distancePixel=distanceToCamera;
         gl_FragDepth=distanceToCamera/16384.0;
       }`);
@@ -144,6 +162,8 @@ class GpuRaster {
       return program;
     };
     this.lightingUniforms=Object.fromEntries(['lit','shadowMap','shadowCenter','shadowRight','shadowUp','sun','shadowSettings','lightBalance'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
+    this.surfaceUniforms=Object.fromEntries(['terrainSurface','groundColor','distantColor','groundBounds','distantBounds'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
+    this.surfaceTextures=new Map();
     this.shadowProgram=Program(`#version 300 es
       precision highp float;
       layout(location=0) in vec3 position;
@@ -170,7 +190,7 @@ class GpuRaster {
     this.aoProgram=Program(fullscreenVertex, `#version 300 es
       precision highp float;
       uniform sampler2D sceneColor,sceneDepth,sceneNormal;
-      uniform vec2 size;
+      uniform vec2 size,aoSize;
       uniform vec4 projection,aoSettings;
       uniform vec2 terrainAo;
       uniform float minLight;
@@ -184,11 +204,12 @@ class GpuRaster {
         return vec3(xy*(perspective?z:1.0),z);
       }
       void main() {
-        ivec2 at=ivec2(gl_FragCoord.xy);
+        vec2 p=gl_FragCoord.xy*size/aoSize;
+        ivec2 at=clamp(ivec2(p),ivec2(0),ivec2(size)-1);
         pixel=vec4(1.0);
         if(texelFetch(sceneColor,at,0).a==0.0) return;
-        vec2 p=gl_FragCoord.xy;
-        int phase=bayer[(at.x&3)+((at.y&3)<<2)];
+        ivec2 phaseAt=ivec2(gl_FragCoord.xy);
+        int phase=bayer[(phaseAt.x&3)+((phaseAt.y&3)<<2)];
         float turn=float(phase)/16.0*0.785398163;
         float jitter=float((phase*7)&15)/16.0;
         vec3 center=Position(p);
@@ -220,12 +241,13 @@ class GpuRaster {
         }
         pixel=vec4(vec3(max(minLight,1.0-occlusion*aoSettings.y*mix(1.0,terrainAo.x,surfaceNormal.w)/32.0)),1.0);
       }`);
-    this.aoUniforms=Object.fromEntries(['sceneColor','sceneDepth','sceneNormal','size','projection','aoSettings','terrainAo','minLight','perspective'].map(name=>[name,gl.getUniformLocation(this.aoProgram,name)]));
+    this.aoUniforms=Object.fromEntries(['sceneColor','sceneDepth','sceneNormal','size','aoSize','projection','aoSettings','terrainAo','minLight','perspective'].map(name=>[name,gl.getUniformLocation(this.aoProgram,name)]));
     this.aoResolveProgram=Program(fullscreenVertex, `#version 300 es
       precision highp float;
       uniform sampler2D sceneColor,sceneDepth,aoMap;
       uniform vec2 size;
       uniform float farDepth;
+      uniform vec3 hazeSettings,hazeColor;
       out vec4 pixel;
       void main() {
         ivec2 at=ivec2(gl_FragCoord.xy);
@@ -236,15 +258,21 @@ class GpuRaster {
         // across a wall edge are far away in depth and drop out, so the
         // shadow does not bleed onto the other surface.
         float tolerance=0.03*z+0.12,sum=0.0,total=0.0;
+        ivec2 aoSize=textureSize(aoMap,0);
+        vec2 aoScale=vec2(aoSize)/size;
+        ivec2 aoAt=ivec2(gl_FragCoord.xy*aoScale);
         for(int y=-2;y<2;y++) for(int x=-2;x<2;x++) {
-          ivec2 q=clamp(at+ivec2(x,y),ivec2(0),ivec2(size)-1);
-          if(texelFetch(sceneColor,q,0).a==0.0) continue;
-          float weight=max(0.0,1.0-abs(min(texelFetch(sceneDepth,q,0).r,farDepth)-z)/tolerance);
+          ivec2 q=clamp(aoAt+ivec2(x,y),ivec2(0),aoSize-1);
+          ivec2 sceneAt=clamp(ivec2((vec2(q)+0.5)/aoScale),ivec2(0),ivec2(size)-1);
+          if(texelFetch(sceneColor,sceneAt,0).a==0.0) continue;
+          float weight=max(0.0,1.0-abs(min(texelFetch(sceneDepth,sceneAt,0).r,farDepth)-z)/tolerance);
           sum+=weight*texelFetch(aoMap,q,0).r;total+=weight;
         }
-        pixel.rgb*=total>0.0?sum/total:texelFetch(aoMap,at,0).r;
+        pixel.rgb*=total>0.0?sum/total:1.0;
+        float haze=smoothstep(hazeSettings.x,hazeSettings.y,z)*hazeSettings.z;
+        pixel.rgb=mix(pixel.rgb,hazeColor,haze);
       }`);
-    this.aoResolveUniforms=Object.fromEntries(['sceneColor','sceneDepth','aoMap','size','farDepth'].map(name=>[name,gl.getUniformLocation(this.aoResolveProgram,name)]));
+    this.aoResolveUniforms=Object.fromEntries(['sceneColor','sceneDepth','aoMap','size','farDepth','hazeSettings','hazeColor'].map(name=>[name,gl.getUniformLocation(this.aoResolveProgram,name)]));
     this.shadowBuffer=gl.createBuffer();this.shadowVao=gl.createVertexArray();
     gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,12,0);
@@ -260,6 +288,45 @@ class GpuRaster {
     gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,this.shadowTexture,0);
     gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete shadow framebuffer');
+  }
+
+  BindTerrainSurface(surface) {
+    const gl=this.gl,uniforms=this.surfaceUniforms;
+    gl.uniform1i(uniforms.terrainSurface,surface?1:0);
+    gl.uniform1i(uniforms.groundColor,1);gl.uniform1i(uniforms.distantColor,2);
+    if(!surface) return;
+    if(!this.surfaceTextures.has(surface)) {
+      gl.activeTexture(gl.TEXTURE1);
+      // The shared context serves every pane. Reuse the same pair of maps,
+      // and release replaced scene maps when the editor changes terrain.
+      while(this.surfaceTextures.size>=2) {
+        const [oldSource,textures]=this.surfaceTextures.entries().next().value;
+        for(const texture of textures) gl.deleteTexture(texture);
+        this.surfaceTextures.delete(oldSource);
+      }
+      const anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');
+      const textures=[surface.scene,surface.backdrop].map(map=>{
+        const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,map?.width||1,map?.height||1,0,gl.RGBA,gl.UNSIGNED_BYTE,map?.data||new Uint8Array(4));
+        gl.generateMipmap(gl.TEXTURE_2D);
+        if(anisotropy) gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,
+          Math.min(FLOW_RENDERING.terrainSurface.anisotropy,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+        return texture;
+      });
+      this.surfaceTextures.set(surface,textures);
+    }
+    const textures=this.surfaceTextures.get(surface);
+    for(const [index,map] of [surface.scene,surface.backdrop].entries()) {
+      gl.activeTexture(gl.TEXTURE1+index);gl.bindTexture(gl.TEXTURE_2D,textures[index]);
+      gl.uniform1i(index?uniforms.distantColor:uniforms.groundColor,1+index);
+      const extent=map?[map.minX,map.minZ,(map.width-(index?0:1))*map.texelM,(map.height-(index?0:1))*map.texelM]:[0,0,1,1];
+      gl.uniform4fv(index?uniforms.distantBounds:uniforms.groundBounds,extent);
+    }
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   Resize(width,height) {
@@ -303,7 +370,9 @@ class GpuRaster {
     target.aoFramebuffer=gl.createFramebuffer();target.aoTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,target.aoTexture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    target.aoWidth=Math.max(1,Math.ceil(width*FLOW_RENDERING.lighting.aoRenderScale));
+    target.aoHeight=Math.max(1,Math.ceil(height*FLOW_RENDERING.lighting.aoRenderScale));
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,target.aoWidth,target.aoHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
     gl.bindFramebuffer(gl.FRAMEBUFFER,target.aoFramebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target.aoTexture,0);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
@@ -343,11 +412,13 @@ class GpuRaster {
   DrawAmbientOcclusion(raster) {
     const gl=this.gl,view=raster.view,settings=view.lighting;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.aoFramebuffer);gl.disable(gl.DEPTH_TEST);
+    gl.viewport(0,0,this.target.aoWidth,this.target.aoHeight);
     gl.useProgram(this.aoProgram);gl.bindVertexArray(this.fullscreenVao);
     for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance],[2,'sceneNormal',this.target.normal]]) {
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoUniforms[name],unit);
     }
     gl.uniform2f(this.aoUniforms.size,raster.width,raster.height);
+    gl.uniform2f(this.aoUniforms.aoSize,this.target.aoWidth,this.target.aoHeight);
     gl.uniform4f(this.aoUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
     gl.uniform4f(this.aoUniforms.aoSettings,settings.aoRadiusM,settings.aoStrength,settings.aoMaxPixels,0);
     gl.uniform2f(this.aoUniforms.terrainAo,settings.aoTerrainScale??FLOW_RENDERING.lighting.aoTerrainScale,
@@ -356,11 +427,15 @@ class GpuRaster {
     gl.drawArrays(gl.TRIANGLES,0,3);
     // Resolve: average the dithered factors and apply them to the lit color.
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.shadedFramebuffer);
+    gl.viewport(0,0,raster.width,raster.height);
     gl.useProgram(this.aoResolveProgram);
     for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance],[2,'aoMap',this.target.aoTexture]]) {
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoResolveUniforms[name],unit);
     }
     gl.uniform2f(this.aoResolveUniforms.size,raster.width,raster.height);gl.uniform1f(this.aoResolveUniforms.farDepth,view.far);
+    const haze=FLOW_RENDERING.haze;
+    gl.uniform3f(this.aoResolveUniforms.hazeSettings,haze.startM,haze.endM,haze.strength);
+    gl.uniform3fv(this.aoResolveUniforms.hazeColor,[1,3,5].map(offset=>parseInt(FLOW_RENDERING.sky.horizon.slice(offset,offset+2),16)/255));
     gl.drawArrays(gl.TRIANGLES,0,3);
     gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,null);
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
@@ -386,6 +461,7 @@ class GpuRaster {
         if(value.length===4) gl.uniform4fv(this.lightingUniforms[name],value);else gl.uniform3fv(this.lightingUniforms[name],value);
       }
     }
+    this.BindTerrainSurface(raster.terrainSurface);
     gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     if(raster.view) {
       const view=raster.view;
@@ -394,7 +470,7 @@ class GpuRaster {
     }
     if(raster.worldLength) {
       gl.uniform1i(this.world,1);
-      gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);
+      if(!lighting) gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);
       gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
     }
     gl.uniform1i(this.world,0);

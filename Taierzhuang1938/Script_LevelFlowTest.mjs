@@ -810,6 +810,16 @@ assert.deepEqual(relief.surfaceColorAt(2,2).map(Math.round), [181,156,122], "fie
 assert.deepEqual(relief.surfaceColorAt(8,2).map(Math.round), [182,191,136], "wheat fields reach the 3D terrain surface");
 assert.deepEqual(relief.surfaceColorAt(14,2).map(Math.round), [182,177,151], "the adjacent fallow strip stays distinct");
 assert.deepEqual(relief.surfaceColorAt(0.5,0.5).map(Math.round), [18,52,86], "authored scene paint overrides the field fallback");
+const reliefSurface=relief.surfaceMaps();
+assert.equal(relief.surfaceMaps(),reliefSurface,'all panes reuse the baked terrain surface');
+assert.equal(reliefSurface.backdrop,null,'scenes without backdrop paint retain the plain-ground fallback');
+for(const [x,z] of [[0.5,0.5],[2,2],[8,2],[14,2]]) {
+  const texture=reliefSurface.scene;
+  const offset=((z-texture.minZ)/texture.texelM*texture.width+(x-texture.minX)/texture.texelM)*4;
+  assert.deepEqual([...texture.data.slice(offset,offset+3)],relief.surfaceColorAt(x,z).map(Math.round),
+    'terrain texel centers preserve authored paint and field colors at world coordinates');
+  assert.equal(texture.data[offset+3],255);
+}
 for (const [x,z,height] of [[3,1,1.4],[9,7,-1.4]]) {
   const cell = relief.cells.find(cell => x >= cell.x && x < cell.x + cell.size && z >= cell.z && z < cell.z + cell.size);
   assert.ok(cell.size <= 1, "off-center relief refines even when the coarse cell corners and center are flat");
@@ -852,6 +862,15 @@ for(const cell of terrain.cells.filter((_,index)=>index%251===0)) {
   assert.equal(terrain.packedFacesForCell(cell),packed,'both views reuse one immutable packed terrain cell');
   assert.deepEqual(packed,new Float32Array(faces.flatMap(face=>face.points.flatMap((point,index)=>[...point,...face.vertexColors[index],...face.vertexNormals[index]]))),
     'packed terrain retains every vertex, color and smooth normal, including shared LOD edges');
+  const textured=terrain.packedFacesForCell(cell,true);
+  assert.equal(terrain.packedFacesForCell(cell,true),textured,'textured cells are packed once for all cameras');
+  assert.ok(textured.length<=packed.length,'flat boundary runs reduce GPU geometry');
+  for(let offset=0;offset<textured.length;offset+=9) {
+    assert.ok(Math.abs(textured[offset+1]-terrain.heightAt(textured[offset],textured[offset+2]))<1e-5,
+      'textured terrain retains source heights');
+    assert.ok(Math.abs(Math.hypot(...textured.subarray(offset+6,offset+9))-1)<1e-6,
+      'textured terrain retains normalized smooth normals');
+  }
   const raster={worldVertices:new Float32Array(16),worldLength:0,triangles:0};
   EncounterRaster.prototype.WorldBatch.call(raster,packed);
   EncounterRaster.prototype.WorldBatch.call(raster,packed);

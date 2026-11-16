@@ -19,6 +19,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.boxGeometry=new WeakMap();
     this.terrainProjection=new WeakMap();this.projectionFrame=0;
     this.groundCache=new Map();this.groundTerrain=mapData.terrain;
+    this.objectBases=new WeakMap();
     this.lighting=FLOW_RENDERING.lighting;
   }
   Draw(...args) {
@@ -27,7 +28,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.drawMs=performance.now()-start;
   }
   Ground(point) {
-    if(this.groundTerrain!==this.mapData.terrain) {this.groundCache.clear();this.groundTerrain=this.mapData.terrain;}
+    if(this.groundTerrain!==this.mapData.terrain) {this.groundCache.clear();this.groundTerrain=this.mapData.terrain;this.baseKey="";}
     const key=`${point[0]},${point[1]}`;
     if(this.groundCache.has(key)) return this.groundCache.get(key);
     const height=this.mapData.terrain.heightAt(point[0],point[1]);
@@ -221,6 +222,8 @@ export class FlowPerspectiveView extends FlowMapView {
     DrawEncounterSky(context,width,height,this);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     this.raster.view=this;
+    this.raster.terrainSurface=this.raster.accelerated?this.mapData.terrain.surfaceMaps?.():null;
+    const texturedTerrain=!!this.raster.terrainSurface;
     const projectionFrame=++this.projectionFrame;
     const TerrainVertex=(point,rgb)=>{
       let cached=this.terrainProjection.get(point);
@@ -255,13 +258,13 @@ export class FlowPerspectiveView extends FlowMapView {
       // Surface colors use a separate projected cell-size threshold.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
         &&((cell.heightError??heightRange)*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
-          ||cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
+          ||!texturedTerrain&&cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
             &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
         for(const child of cell.children) Visit(child);
         return;
       }
       if(this.raster.accelerated&&this.mapData.terrain.packedFacesForCell) {
-        this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell));return;
+        this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell,texturedTerrain));return;
       }
       for(const triangle of this.mapData.terrain.facesForCell(cell)) {
         if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors,triangle.vertexNormals);continue;}
@@ -310,14 +313,15 @@ export class FlowPerspectiveView extends FlowMapView {
     };
     const signals=EncounterSignals(frame);
     const shadowKey=JSON.stringify([...signals]);
-    if(this.shadowKey!==shadowKey||this.shadowObjects!==this.mapData.objects||this.shadowFarObjects!==this.mapData.farObjects) {
+    if(this.shadowKey!==shadowKey||this.shadowTerrain!==this.mapData.terrain||this.shadowObjects!==this.mapData.objects||this.shadowFarObjects!==this.mapData.farObjects) {
       this.shadowVertices=EncounterShadowGeometry([...this.mapData.objects,...this.mapData.farObjects],signals,point=>this.Ground(point));
       this.shadowKey=shadowKey;this.shadowObjects=this.mapData.objects;this.shadowFarObjects=this.mapData.farObjects;
+      this.shadowTerrain=this.mapData.terrain;
     }
     this.raster.shadowVertices=this.shadowVertices;
-    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,[...signals]]);
+    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,texturedTerrain,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
-    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
+    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
     if(cached) {
       if(this.raster.accelerated) {
         this.raster.worldVertices.set(this.staticWorldVertices.subarray(0,this.staticWorldLength));this.raster.worldLength=this.staticWorldLength;
@@ -332,7 +336,13 @@ export class FlowPerspectiveView extends FlowMapView {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
       if(Math.max(w,h,d)<0.4) continue;
-      const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y:this.Ground([x,z]);
+      let anchor=this.objectBases.get(object);
+      if(!anchor||anchor.terrain!==this.mapData.terrain||anchor.x!==x||anchor.y!==y||anchor.z!==z||anchor.planning!==object.planning) {
+        const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y:this.Ground([x,z]);
+        anchor={terrain:this.mapData.terrain,x,y,z,planning:object.planning,base};
+        this.objectBases.set(object,anchor);
+      }
+      const base=anchor.base;
       const camera=this.CameraPoint([x,base+h/2,z]),radius=Math.hypot(w,h,d)/2;
       if(!SphereInView(camera,radius)) continue;
       if(perspective&&Math.max(w,h,d)*this.focal*renderScale/Math.max(1,camera[2])<0.7) continue;
@@ -370,6 +380,7 @@ export class FlowPerspectiveView extends FlowMapView {
       this.staticImage.set(this.raster.image.data);this.staticDepth.set(this.raster.depth);
       }
       this.staticAccelerated=this.raster.accelerated;
+      this.staticTerrain=this.mapData.terrain;
       this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;
       this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
     }

@@ -177,6 +177,43 @@ try {
   assert.equal(lighting.shadow.depthError,0,'shadows preserve picking and actor depth');
   assert.equal(lighting.ao.depthError,0,'AO preserves picking and actor depth');
   assert.ok(lighting.maxRepeatError<=1,`repeated lighting is deterministic: ${JSON.stringify(lighting)}`);
+  const terrainTexture=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {FLOW_RENDERING}=await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:321px;height:241px';
+    document.body.append(canvas);canvas.width=321;canvas.height=241;
+    const data=new Uint8Array(5*5*4);
+    for(let row=0;row<5;row++) for(let column=0;column<5;column++) data.set(column<2?[220,20,20,255]:[20,20,220,255],(row*5+column)*4);
+    const surface={scene:{minX:-2,minZ:0,texelM:1,width:5,height:5,data},backdrop:null};
+    const points=[[-2,0,0],[2,0,0],[2,0,4],[-2,0,4]];
+    let diagonal=false;
+    const terrain={heightAt:()=>0,colorAt:x=>x<0?[220,20,20]:[20,20,220],surfaceMaps:()=>surface,
+      roots:[{center:[0,0,2],radius:3,size:4,minHeight:0,maxHeight:0}],
+      packedFacesForCell:()=>new Float32Array((diagonal?[[0,1,3],[1,2,3]]:[[0,1,2],[0,2,3]])
+        .flatMap(face=>face.flatMap(index=>[...points[index],20,220,20,0,1,0])))};
+    const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain},'scene');
+    view.freeCamera={eye:[0,3,-3],yaw:0,pitch:-0.55};
+    view.lighting={...FLOW_RENDERING.lighting,shadowStrength:0,aoStrength:0};
+    const frame={...LevelFlow.Evaluate(0),actors:[],effects:[]};
+    const Draw=()=>{
+      view.BeforeDraw(frame);const context=canvas.getContext('2d');context.clearRect(0,0,321,241);
+      view.DrawBase(context,321,241,frame);
+      return [[-1,0,2],[1,0,2]].map(point=>{
+        const pixel=view.Project(point);return [...context.getImageData(Math.round(pixel[0]),Math.round(pixel[1]),1,1).data];
+      });
+    };
+    const first=Draw(),target=view.raster.gpu.target;
+    diagonal=true;const alternate=Draw();
+    view.raster.gpu={gl:{isContextLost:()=>false},Draw:()=>false};
+    const fallback=Draw(),software=!view.raster.accelerated;
+    canvas.remove();return {first,alternate,fallback,software,aoSize:[target.aoWidth,target.aoHeight]};
+  });
+  assert.deepEqual(terrainTexture.aoSize,[161,121],'AO uses a bounded half-resolution target for odd-sized native viewports');
+  assert.ok(terrainTexture.first[0][0]>terrainTexture.first[0][2]*4&&terrainTexture.first[1][2]>terrainTexture.first[1][0]*4,
+    'world-space terrain textures override triangle vertex colors');
+  assert.deepEqual(terrainTexture.first,terrainTexture.alternate,'changing the terrain diagonal preserves painted surface pixels');
+  assert.ok(terrainTexture.software&&terrainTexture.fallback[0][0]>terrainTexture.fallback[0][2]
+    &&terrainTexture.fallback[1][2]>terrainTexture.fallback[1][0],'GPU failure restores authored terrain colors in the same frame');
   const bankLighting = await page.evaluate(async () => {
     const {FlowPerspectiveView} = await import('./Script_LevelFlowPerspective.mjs');
     const {FLOW_RENDERING} = await import('../Data_Tuning_LevelFlow.mjs');

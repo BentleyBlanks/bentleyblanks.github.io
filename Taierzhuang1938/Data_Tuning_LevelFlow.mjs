@@ -13,6 +13,8 @@ export const FLOW_RENDERING = {
   terrainBackdropCellM: 32,
   roofSurfaceSeparationM: 0.005,
   backdropPaint: {maxPx:2048, minTexelM:2},
+  terrainSurface: {texelM:0.5, maxPixels:4000000, maxTexturePx:4096, paddingM:2, anisotropy:8},
+  haze: {startM:300, endM:1800, strength:0.82},
   tree: {minHeightM:2.5, crownWidthRatio:0.27, crownMaxM:3, crownBaseRatio:0.45, trunkMaxM:0.5},
   navigation: {wheelSettleMs:120},
   mapTerrain: {tilePixels:128,maxTiles:96},
@@ -23,6 +25,7 @@ export const FLOW_RENDERING = {
     shadowDepthM:2048, shadowBiasM:0.12, shadowStrength:0.95,
     aoRadiusM:1.6, aoStrength:2.4, aoMaxPixels:36, aoMinLight:0.52,
     aoTerrainScale:0.4, aoTerrainBias:0.16,
+    aoRenderScale:0.5,
   },
 };
 

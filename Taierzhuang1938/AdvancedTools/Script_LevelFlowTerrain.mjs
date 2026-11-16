@@ -16,8 +16,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   const datum=scene.trenches?.datum&&datumBytes?DecodeTrenchDatum(scene.trenches.datum,datumBytes):[];
   const plan=CompileSceneTrenches(scene.trenches,{datum,pre:preAt});
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
-  const groundPaint = BuildGroundPaint(scene.paint, bounds);
+  const paintSettings={cellM:FLOW_RENDERING.terrainSurface.texelM,maxCells:FLOW_RENDERING.terrainSurface.maxPixels};
+  const groundPaint = BuildGroundPaint(scene.paint, bounds, paintSettings);
   const backdropPaint = RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
+  const localBackdropPaint = RasterizeBackdropPaint(scene.backdrop, {
+    maxPx:FLOW_RENDERING.terrainSurface.maxTexturePx, minTexelM:FLOW_RENDERING.terrainSurface.texelM,
+    padM:FLOW_RENDERING.terrainSurface.paddingM, bounds,
+  });
   const fieldColors = Object.fromEntries(Object.entries(FLOW_FIELD_COLORS).map(([kind, hex]) =>
     [kind, [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255)]));
   const fields = (map.fields || []).map(field => ({...field,
@@ -27,15 +32,25 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     ...(map.roads || []).map(road => ({line:road.points.map(([x,z]) => ({x,z})), halfW:road.width / 2, feather:0.8, color:"#d8c8a7"})),
     ...(map.footpaths || []).map(points => ({line:points.map(([x,z]) => ({x,z})), halfW:0.35, feather:0.5, color:"#c4b792"})),
     ...(map.floors || []).map(floor => ({poly:floor.points.map(([x,z]) => ({x,z})), feather:0.5, color:"#d8c8a7"})),
-  ], bounds);
+  ], bounds, paintSettings);
   const SurfaceColorAt = (x, z) => {
     const color = [198 / 255, 207 / 255, 169 / 255];
-    if (backdropPaint) {
-      const { minX, minZ, texelM, width, height, data } = backdropPaint;
-      const column = Math.floor((x - minX) / texelM), row = Math.floor((z - minZ) / texelM);
-      if (column >= 0 && column < width && row >= 0 && row < height) {
-        const offset = (row * width + column) * 4, alpha = data[offset + 3] / 255;
-        for (let axis = 0; axis < 3; axis++) color[axis] += (data[offset + axis] / 255 - color[axis]) * alpha;
+    const paint = localBackdropPaint && x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ
+      ? localBackdropPaint : backdropPaint;
+    if (paint) {
+      const { minX, minZ, texelM, width, height, data } = paint;
+      const gx = (x - minX) / texelM - 0.5, gz = (z - minZ) / texelM - 0.5;
+      const column = Math.floor(gx), row = Math.floor(gz);
+      if (column >= 0 && column < width - 1 && row >= 0 && row < height - 1) {
+        const u = gx - column, v = gz - row;
+        let alpha = 0;
+        const premultiplied = [0, 0, 0];
+        for (const [dx, dz, weight] of [[0,0,(1-u)*(1-v)],[1,0,u*(1-v)],[0,1,(1-u)*v],[1,1,u*v]]) {
+          const offset = ((row + dz) * width + column + dx) * 4, coverage = data[offset + 3] / 255 * weight;
+          alpha += coverage;
+          for (let axis = 0; axis < 3; axis++) premultiplied[axis] += data[offset + axis] / 255 * coverage;
+        }
+        for (let axis = 0; axis < 3; axis++) color[axis] = color[axis] * (1 - alpha) + premultiplied[axis];
       }
     }
     for (const field of fields) {
@@ -229,17 +244,57 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     return normalCache.get(key);
   };
+  const soilCellM = 16, soilBuckets = new Map();
+  for (const segment of interest) {
+    const [minX, maxX, minZ, maxZ] = segment.colorBounds;
+    for (let row = Math.floor(minZ / soilCellM); row <= Math.floor(maxZ / soilCellM); row++) {
+      for (let column = Math.floor(minX / soilCellM); column <= Math.floor(maxX / soilCellM); column++) {
+        const key = `${column},${row}`;
+        if (!soilBuckets.has(key)) soilBuckets.set(key, []);
+        soilBuckets.get(key).push(segment);
+      }
+    }
+  }
+  const SoilMixAt = (x, z) => {
+    let mix = 0;
+    const point = [x, z];
+    const segments = soilBuckets.get(`${Math.floor(x / soilCellM)},${Math.floor(z / soilCellM)}`) || [];
+    for (const segment of segments) {
+      const [minX, maxX, minZ, maxZ] = segment.colorBounds;
+      if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+      mix = Math.max(mix, Clamp((segment.reach + 1 - SegmentDistance(point, segment.a, segment.b)) / 3, 0, 1));
+    }
+    return mix;
+  };
+  // Bake color independently of relief tessellation. Pixel centers correspond
+  // to world grid samples, so adjacent LOD cells use exactly the same paint.
+  let surfaceMaps;
+  const SurfaceMaps = () => {
+    if (surfaceMaps) return surfaceMaps;
+    const settings = FLOW_RENDERING.terrainSurface;
+    let texelM = settings.texelM;
+    while (Math.ceil((bounds.maxX - bounds.minX) / texelM) + 1 > settings.maxTexturePx
+      || Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1 > settings.maxTexturePx
+      || (Math.ceil((bounds.maxX - bounds.minX) / texelM) + 1)
+        * (Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1) > settings.maxPixels) texelM *= 2;
+    const width = Math.ceil((bounds.maxX - bounds.minX) / texelM) + 1;
+    const height = Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1;
+    const data = new Uint8Array(width * height * 4);
+    for (let row = 0; row < height; row++) for (let column = 0; column < width; column++) {
+      const x = bounds.minX + column * texelM, z = bounds.minZ + row * texelM;
+      const color = SurfaceColorAt(x, z), soilMix = SoilMixAt(x, z);
+      const offset = (row * width + column) * 4;
+      for (let axis = 0; axis < 3; axis++) data[offset + axis] = Math.round(color[axis] + ([184, 164, 128][axis] - color[axis]) * soilMix);
+      data[offset + 3] = 255;
+    }
+    surfaceMaps = {scene:{minX:bounds.minX, minZ:bounds.minZ, texelM, width, height, data}, backdrop:backdropPaint};
+    return surfaceMaps;
+  };
   const colorCache = new Map();
   const ColorAt = (x, z) => {
     const key = `${x},${z}`;
     if (colorCache.has(key)) return colorCache.get(key);
-    let soilMix = 0;
-    const point = [x, z];
-    for (const segment of interest) {
-      const [minX, maxX, minZ, maxZ] = segment.colorBounds;
-      if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
-      soilMix = Math.max(soilMix, Clamp((segment.reach + 1 - SegmentDistance(point, segment.a, segment.b)) / 3, 0, 1));
-    }
+    const soilMix = SoilMixAt(x, z);
     const normal = NormalAt(x, z);
     const light = 0.7 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) * 0.3;
     const color = SurfaceColorAt(x, z).map((channel, axis) =>
@@ -264,6 +319,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   };
   const faceCache=new WeakMap();
   const packedFaceCache=new WeakMap();
+  const packedSurfaceCache=new WeakMap();
   // Adjacent triangles and LOD cells share immutable vertices, so each view
   // can project a ground vertex once per camera frame without changing seams.
   const vertices=new Map();
@@ -289,7 +345,37 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     faceCache.set(cell,triangles);return triangles;
   };
-  const PackedFacesForCell=(cell)=>{
+  const PackedFacesForCell=(cell, textured=false)=>{
+    if (textured) {
+      if (packedSurfaceCache.has(cell)) return packedSurfaceCache.get(cell);
+      // Fine neighbours add many boundary points to an otherwise flat cell.
+      // Keep relief and normal changes, while joining exactly collinear runs.
+      const boundary = OutlineForCell(cell).map(point => VertexAt(...point));
+      const outline = boundary.filter((point, index) => {
+        const previous = boundary[(index + boundary.length - 1) % boundary.length];
+        const next = boundary[(index + 1) % boundary.length];
+        if (previous[0] !== next[0] && previous[2] !== next[2]) return true;
+        const length = Math.hypot(next[0] - previous[0], next[2] - previous[2]);
+        const progress = Math.hypot(point[0] - previous[0], point[2] - previous[2]) / length;
+        if (Math.abs(point[1] - previous[1] - (next[1] - previous[1]) * progress) > 1e-6) return true;
+        const normal = NormalAt(point[0], point[2]);
+        const before = NormalAt(previous[0], previous[2]), after = NormalAt(next[0], next[2]);
+        return normal.some((value, axis) => Math.abs(value - before[axis] - (after[axis] - before[axis]) * progress) > 1e-5);
+      });
+      const center = VertexAt(cell.x + cell.size / 2, cell.z + cell.size / 2);
+      const packed = new Float32Array(outline.length * 27);
+      let offset = 0;
+      for (let index = 0; index < outline.length; index++) {
+        for (const point of [center, outline[index], outline[(index + 1) % outline.length]]) {
+          packed.set(point, offset);
+          packed.set([198, 207, 169], offset + 3);
+          packed.set(NormalAt(point[0], point[2]), offset + 6);
+          offset += 9;
+        }
+      }
+      packedSurfaceCache.set(cell, packed);
+      return packed;
+    }
     if(packedFaceCache.has(cell)) return packedFaceCache.get(cell);
     const faces=FacesForCell(cell),packed=new Float32Array(faces.length*27);
     let offset=0;
@@ -301,7 +387,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     }
     packedFaceCache.set(cell,packed);return packed;
   };
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map) {
