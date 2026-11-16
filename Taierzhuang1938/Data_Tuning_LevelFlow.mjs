@@ -19,7 +19,7 @@ export const FLOW_RENDERING = {
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
   lighting: {
     ambient:0.48, direct:0.52,
-    shadowMapSize:2048, shadowMinRadiusM:32, shadowMaxRadiusM:800,
+    shadowMapSize:4096, shadowMinRadiusM:32, shadowMaxRadiusM:800,
     shadowDepthM:2048, shadowBiasM:0.12, shadowStrength:0.95,
     aoRadiusM:1.6, aoStrength:2.4, aoMaxPixels:36, aoMinLight:0.52,
     aoTerrainScale:0.4, aoTerrainBias:0.16,

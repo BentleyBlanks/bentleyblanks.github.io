@@ -2,6 +2,7 @@ import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
 // One offscreen context for all panes. Depth readback remains unfiltered for
 // picking and actor strokes. Lighting only changes the displayed color.
+const Dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 let shared;
 let unavailable=false;
 
@@ -75,7 +76,7 @@ class GpuRaster {
       in vec3 worldPosition;
       in vec3 worldNormal;
       uniform bool lit;
-      uniform sampler2D shadowMap;
+      uniform highp sampler2DShadow shadowMap;
       uniform vec3 shadowCenter;
       uniform vec3 shadowRight;
       uniform vec3 shadowUp;
@@ -109,14 +110,15 @@ class GpuRaster {
           vec2 texel=1.0/vec2(textureSize(shadowMap,0));
           float bias=shadowSettings.z+slope*texel.x*shadowSettings.x/shadowSettings.y*1.5;
           if(all(greaterThan(shadow,vec3(0.0)))&&all(lessThan(shadow,vec3(1.0)))) {
-            float blocked=0.0;
+            // Each tap is a hardware bilinear depth comparison, so the 3x3 kernel
+            // blends 16 texels with smooth weights instead of nine hard steps.
+            float lit=0.0;
             for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) {
               vec2 offset=vec2(x,y)*texel;
-              float depth=texture(shadowMap,shadow.xy+offset).r;
-              blocked+=shadow.z+dot(depthGradient,offset)-bias>depth?1.0:0.0;
+              lit+=texture(shadowMap,vec3(shadow.xy+offset,clamp(shadow.z+dot(depthGradient,offset)-bias,0.0,1.0)));
             }
             float direct=lightBalance.y*max(dot(shadingNormal,sun),0.0);
-            visibility-=shadowSettings.w*blocked/9.0*direct/(lightBalance.x+direct);
+            visibility-=shadowSettings.w*(1.0-lit/9.0)*direct/(lightBalance.x+direct);
           }
         }
         pixel=vec4(rgb*visibility,1.0);
@@ -249,9 +251,11 @@ class GpuRaster {
     this.fullscreenVao=gl.createVertexArray();
     const settings=FLOW_RENDERING.lighting;
     this.shadowTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    this.shadowSize=Math.min(settings.shadowMapSize,gl.getParameter(gl.MAX_TEXTURE_SIZE));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,settings.shadowMapSize,settings.shadowMapSize,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_MODE,gl.COMPARE_REF_TO_TEXTURE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_FUNC,gl.LEQUAL);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,this.shadowSize,this.shadowSize,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
     this.shadowFramebuffer=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,this.shadowTexture,0);
     gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
@@ -313,11 +317,16 @@ class GpuRaster {
     const up=[sun[1]*right[2],sun[2]*right[0]-sun[0]*right[2],-sun[1]*right[0]];
     const orthographic=!raster.perspective;
     const distance=Math.min(180,Math.max(20,(view.eye[1]-view.Ground([view.eye[0],view.eye[2]]))/Math.max(0.15,-view.forward[1])));
-    const center=orthographic?view.aim:view.eye.map((value,axis)=>value+view.forward[axis]*distance);
-    const radius=Math.min(settings.shadowMaxRadiusM,Math.max(settings.shadowMinRadiusM,orthographic?Math.max(view.width,view.height)/view.scale*0.65:distance*1.5));
+    const center=orthographic?[...view.aim]:view.eye.map((value,axis)=>value+view.forward[axis]*distance);
+    // Radius steps up in 20% increments and the center snaps to whole texels, so
+    // shadow edges stay put while the camera moves instead of crawling.
+    const wanted=Math.min(settings.shadowMaxRadiusM,Math.max(settings.shadowMinRadiusM,orthographic?Math.max(view.width,view.height)/view.scale*0.65:distance*1.5));
+    const radius=Math.min(settings.shadowMaxRadiusM,Math.max(settings.shadowMinRadiusM,1.2**Math.ceil(Math.log(wanted)/Math.log(1.2))));
+    const texelSize=radius*2/this.shadowSize,snapRight=Math.round(Dot(center,right)/texelSize)*texelSize-Dot(center,right),snapUp=Math.round(Dot(center,up)/texelSize)*texelSize-Dot(center,up);
+    for(let axis=0;axis<3;axis++) center[axis]+=right[axis]*snapRight+up[axis]*snapUp;
     const values={shadowCenter:center,shadowRight:right,shadowUp:up,sun,shadowSettings:[radius,settings.shadowDepthM,settings.shadowBiasM/settings.shadowDepthM/2,settings.shadowStrength]};
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);gl.viewport(0,0,settings.shadowMapSize,settings.shadowMapSize);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);gl.viewport(0,0,this.shadowSize,this.shadowSize);
     gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);
     gl.clearBufferfv(gl.DEPTH,0,new Float32Array([1]));gl.useProgram(this.shadowProgram);
     for(const [name,value] of Object.entries(values)) {
