@@ -107,6 +107,16 @@ for (const z of [215, 260, 300, 400, 450, 500, 540]) {
   Near(sample(-6, 296), TR.floorY, 0.1, "西来小沟是挖下去的沟");
   assert.ok(sample(-6, 296 - 3) > TR.floorY + 0.9 && sample(-6, 296 + 3) > TR.floorY + 0.9, "西来小沟两边是岸");
   assert.ok(a.blocks.some((x) => /^TributaryWater_/.test(x.id) && x.semantic === "water" && x.solid === false), "西来小沟里有水");
+  // 沟头（2026-11-17）：中线往北接长到 z 172，一路渐浅到平地；不是一刀切掉的沟口
+  const headLine = [[34.8, 172], [33.4, 184], [30, 196], [25, 208]];
+  Near(sample(34.8, 172), H.plain, 0.3, "沟头 z172 已经是平地"); assert.ok(sample(33.4, 184) > -0.9 && sample(33.4, 184) < H.plain, "沟头 z184 是浅洼");
+  assert.ok(sample(30, 196) <= -1.4 && sample(25, 208) <= -2.4, "沟头 z196 起够深、z208 接近满深");
+  let prevHead = sample(25, 208);
+  for (let k = 1; k < headLine.length; k++) for (let i = 1; i <= 24; i++) {
+    const [ax, az] = headLine[headLine.length - k], [bx, bz] = headLine[headLine.length - k - 1], x = ax + (bx - ax) * i / 24, z = az + (bz - az) * i / 24, v = sample(x, z);
+    assert.ok(v >= prevHead - 0.03 && v - prevHead <= 0.3, `沟头 z${z.toFixed(0)} 要一路渐浅（${prevHead.toFixed(2)} → ${v.toFixed(2)}）`); prevHead = v;
+  }
+  assert.ok(a.blocks.some((x) => x.id === "RiverWater_1_00" && x.semantic === "water" && x.solid === false), "沟头那一截有水块");
   // 凸岸泥滩：弯的内侧是缓坡到 −1.4 的烂泥（比村里地面低 0.8 以上，走不了）
   for (const b of RV.bends) { const r = RiverAtZ(b.z); const mx = b.x + b.side * (r.halfW + 2.0); assert.ok(sample(mx, b.z) <= RV.mud.y + 0.1 && sample(mx, b.z) >= RIVER_FLOOR_Y + 0.5, `z${b.z} 凸岸泥滩 ${sample(mx, b.z).toFixed(2)}`); }
 }

@@ -280,6 +280,12 @@ for (const [x, z, what] of [[-104, 700, "x −104 的旧路基"], [-10, 975, "�
 }
 Near(sample(34.5, 560), HECHA_FLOOR_Y, 0.05, "河汊子直段接着 0610");
 assert.ok(sample(34.5, HECHA_END.endZ + 1) > H.plain - 0.3, "河汊子在沟尾收住");
+{
+  // 沟尾（2026-11-17）：z 561 起 22 m 渐浅，不是一刀切；水块一路接到浅滩
+  let prev = sample(34.5, 561);
+  for (let z = 562; z <= 584; z++) { const v = sample(34.5, z); assert.ok(v >= prev - 0.03 && v - prev <= 0.35, `沟尾 z${z} 要一路渐浅（${prev.toFixed(2)} → ${v.toFixed(2)}）`); prev = v; }
+  assert.ok(["HechaTailWater", "HechaTailWater_2", "HechaTailWater_3"].every((id) => all.some((x) => x.id === id && x.semantic === "water" && x.solid === false)), "沟尾的水块分三截收窄");
+}
 assert.ok(!a.paint.some((p) => /^Road_(FieldPath|GateStreet|WestExit|NorthLane|GateSquare|MidLane|WestStreet)$/.test(p.id) || p.id === "NorthGateYard"), "第三版的路与北门的涂色不该还在");
 for (const x of south) assert.ok(x.x >= B.minX && x.x <= B.maxX && x.z <= B.maxZ, `${x.id} 在场地外 (${x.x},${x.z})`);
 
