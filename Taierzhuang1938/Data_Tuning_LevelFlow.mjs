@@ -1,10 +1,13 @@
 // Encounter preview terrain budgets, measured with a 640 × 640 Scene viewport
 // on 2026-11-13. Small cells refine height detail, and flat cells stop early.
+// Curved banks refine to 25 cm for close views and share height-field normals.
 export const FLOW_RENDERING = {
-  terrainCellPixels: 24,
+  terrainCellPixels: 40,
   terrainPaintCellPixels: 32,
   terrainFlatHeightPixels: 0.5,
   terrainNormalSampleM: 0.5,
+  terrainDetailCellM: 0.25,
+  terrainDetailHeightErrorM: 0.025,
   terrainSceneCellM: 8,
   terrainHeightErrorM: 0.18,
   terrainBackdropCellM: 32,
@@ -19,6 +22,7 @@ export const FLOW_RENDERING = {
     shadowMapSize:2048, shadowMinRadiusM:32, shadowMaxRadiusM:800,
     shadowDepthM:2048, shadowBiasM:0.12, shadowStrength:0.95,
     aoRadiusM:1.6, aoStrength:2.4, aoMaxPixels:36, aoMinLight:0.52,
+    aoTerrainScale:0.4, aoTerrainBias:0.16,
   },
 };
 

@@ -32,6 +32,7 @@ class GpuRaster {
       precision highp float;
       layout(location=0) in vec3 position;
       layout(location=1) in vec3 color;
+      layout(location=2) in vec3 normal;
       uniform vec2 size;
       uniform bool perspective;
       uniform bool world;
@@ -43,6 +44,7 @@ class GpuRaster {
       out vec3 rgb;
       out float distanceToCamera;
       out vec3 worldPosition;
+      out vec3 worldNormal;
       void main() {
         vec3 point=position;
         vec4 clip=vec4(0.0);
@@ -64,12 +66,14 @@ class GpuRaster {
         float cameraScale=perspective?position.z:1.0;
         vec2 cameraXY=vec2((screen.x-0.5)*size.x,(projection.y-screen.y)*size.y)/projection.x*cameraScale;
         worldPosition=world?position:eye+right*cameraXY.x+up*cameraXY.y+forward*position.z;
+        worldNormal=world?normal:vec3(0.0);
       }`);
     const fragment=Shader(gl.FRAGMENT_SHADER,`#version 300 es
       precision highp float;
       in vec3 rgb;
       in float distanceToCamera;
       in vec3 worldPosition;
+      in vec3 worldNormal;
       uniform bool lit;
       uniform sampler2D shadowMap;
       uniform vec3 shadowCenter;
@@ -77,17 +81,29 @@ class GpuRaster {
       uniform vec3 shadowUp;
       uniform vec3 sun;
       uniform vec3 eye;
+      uniform vec3 right,up,forward;
       uniform vec2 lightBalance;
       uniform vec4 shadowSettings;
       layout(location=0) out vec4 pixel;
       layout(location=1) out float distancePixel;
+      layout(location=2) out vec4 normalPixel;
       void main() {
         float visibility=1.0;
+        normalPixel=vec4(0.0);
         if(lit) {
-          vec3 relative=worldPosition-shadowCenter;
-          vec3 shadow=vec3(dot(relative,shadowRight)/shadowSettings.x,dot(relative,shadowUp)/shadowSettings.x,-dot(relative,sun)/shadowSettings.y)*0.5+0.5;
           vec3 normal=normalize(cross(dFdx(worldPosition),dFdy(worldPosition)));
           if(dot(normal,eye-worldPosition)<0.0) normal=-normal;
+          bool smoothTerrain=dot(worldNormal,worldNormal)>0.01;
+          vec3 shadingNormal=smoothTerrain?normalize(worldNormal):normal;
+          normalPixel=vec4(dot(shadingNormal,right),dot(shadingNormal,up),dot(shadingNormal,forward),smoothTerrain?1.0:0.0);
+          // Offset smooth receivers away from their own tessellated surface.
+          float normalBias=smoothTerrain?shadowSettings.z*shadowSettings.y*2.0:0.0;
+          vec3 relative=worldPosition+shadingNormal*normalBias-shadowCenter;
+          vec3 shadow=vec3(dot(relative,shadowRight)/shadowSettings.x,dot(relative,shadowUp)/shadowSettings.x,-dot(relative,sun)/shadowSettings.y)*0.5+0.5;
+          vec3 shadowDx=dFdx(shadow),shadowDy=dFdy(shadow);
+          float determinant=shadowDx.x*shadowDy.y-shadowDx.y*shadowDy.x;
+          vec2 depthGradient=abs(determinant)>1e-10
+            ?vec2(shadowDy.y*shadowDx.z-shadowDx.y*shadowDy.z,shadowDx.x*shadowDy.z-shadowDy.x*shadowDx.z)/determinant:vec2(0.0);
           float cosine=abs(dot(normal,sun));
           float slope=sqrt(max(0.0,1.0-cosine*cosine))/max(0.1,cosine);
           vec2 texel=1.0/vec2(textureSize(shadowMap,0));
@@ -95,10 +111,11 @@ class GpuRaster {
           if(all(greaterThan(shadow,vec3(0.0)))&&all(lessThan(shadow,vec3(1.0)))) {
             float blocked=0.0;
             for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) {
-              float depth=texture(shadowMap,shadow.xy+vec2(x,y)*texel).r;
-              blocked+=shadow.z-bias>depth?1.0:0.0;
+              vec2 offset=vec2(x,y)*texel;
+              float depth=texture(shadowMap,shadow.xy+offset).r;
+              blocked+=shadow.z+dot(depthGradient,offset)-bias>depth?1.0:0.0;
             }
-            float direct=lightBalance.y*max(dot(normal,sun),0.0);
+            float direct=lightBalance.y*max(dot(shadingNormal,sun),0.0);
             visibility-=shadowSettings.w*blocked/9.0*direct/(lightBalance.x+direct);
           }
         }
@@ -113,6 +130,9 @@ class GpuRaster {
     this.world=gl.getUniformLocation(this.program,'world');
     this.cameraUniforms=Object.fromEntries(['eye','right','up','forward','projection'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+    for(let index=0;index<3;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,36,index*12);}
+    this.screenVao=gl.createVertexArray();gl.bindVertexArray(this.screenVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     for(let index=0;index<2;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,24,index*12);}
     this.targets=new Map();
     const Program=(vertexSource,fragmentSource)=>{
@@ -140,9 +160,10 @@ class GpuRaster {
         gl_Position=vec4(p*2.0-1.0,0.0,1.0);
       }`, `#version 300 es
       precision highp float;
-      uniform sampler2D sceneColor,sceneDepth;
+      uniform sampler2D sceneColor,sceneDepth,sceneNormal;
       uniform vec2 size;
       uniform vec4 projection,aoSettings;
+      uniform vec2 terrainAo;
       uniform float minLight;
       uniform bool perspective;
       out vec4 pixel;
@@ -158,11 +179,16 @@ class GpuRaster {
         if(pixel.a==0.0) return;
         vec2 p=gl_FragCoord.xy;
         vec3 center=Position(p);
+        // Terrain supplies interpolated height-field normals. A depth derivative
+        // would expose every fan triangle again along the bank and its foot.
+        vec4 surfaceNormal=texelFetch(sceneNormal,at,0);
+        vec3 normal=normalize(surfaceNormal.xyz);
+        float horizonBias=mix(0.08,terrainAo.y,surfaceNormal.w);
         vec3 left=center-Position(p-vec2(1,0)),right=Position(p+vec2(1,0))-center;
         vec3 top=center-Position(p-vec2(0,1)),bottom=Position(p+vec2(0,1))-center;
         vec3 dx=abs(left.z)<abs(right.z)?left:right,dy=abs(top.z)<abs(bottom.z)?top:bottom;
-        vec3 normal=normalize(cross(dx,dy));
-        if(dot(normal,center)>0.0) normal=-normal;
+        vec3 geometricNormal=normalize(cross(dx,dy));
+        if(dot(geometricNormal,center)>0.0) geometricNormal=-geometricNormal;
         float radius=clamp(aoSettings.x*projection.x/(perspective?max(center.z,0.15):1.0),2.0,aoSettings.z);
         float occlusion=0.0;
         for(int direction=0;direction<8;direction++) {
@@ -175,13 +201,13 @@ class GpuRaster {
             vec3 delta=Position(sampleAt)-center;
             float distance=length(delta);
             if(distance<0.015||distance>aoSettings.x) continue;
-            float horizon=max(0.0,dot(normal,delta/distance)-0.08);
+            float horizon=max(0.0,min(dot(normal,delta/distance),dot(geometricNormal,delta/distance))-horizonBias);
             occlusion+=horizon*(1.0-distance/aoSettings.x);
           }
         }
-        pixel.rgb*=max(minLight,1.0-occlusion*aoSettings.y/16.0);
+        pixel.rgb*=max(minLight,1.0-occlusion*aoSettings.y*mix(1.0,terrainAo.x,surfaceNormal.w)/16.0);
       }`);
-    this.aoUniforms=Object.fromEntries(['sceneColor','sceneDepth','size','projection','aoSettings','minLight','perspective'].map(name=>[name,gl.getUniformLocation(this.aoProgram,name)]));
+    this.aoUniforms=Object.fromEntries(['sceneColor','sceneDepth','sceneNormal','size','projection','aoSettings','terrainAo','minLight','perspective'].map(name=>[name,gl.getUniformLocation(this.aoProgram,name)]));
     this.shadowBuffer=gl.createBuffer();this.shadowVao=gl.createVertexArray();
     gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,12,0);
@@ -208,14 +234,15 @@ class GpuRaster {
     // attachments when switching from the left pane to the right pane.
     while(this.targets.size>=4) {
       const [oldKey,target]=this.targets.entries().next().value;
-      gl.deleteFramebuffer(target.framebuffer);gl.deleteFramebuffer(target.shadedFramebuffer);gl.deleteTexture(target.shadedColor);gl.deleteTexture(target.color);gl.deleteTexture(target.distance);gl.deleteRenderbuffer(target.depth);this.targets.delete(oldKey);
+      gl.deleteFramebuffer(target.framebuffer);gl.deleteFramebuffer(target.shadedFramebuffer);gl.deleteTexture(target.shadedColor);gl.deleteTexture(target.color);gl.deleteTexture(target.distance);gl.deleteTexture(target.normal);gl.deleteRenderbuffer(target.depth);this.targets.delete(oldKey);
     }
-    const target={framebuffer:gl.createFramebuffer(),color:gl.createTexture(),distance:gl.createTexture(),depth:gl.createRenderbuffer()};
+    const target={framebuffer:gl.createFramebuffer(),color:gl.createTexture(),distance:gl.createTexture(),normal:gl.createTexture(),depth:gl.createRenderbuffer()};
     this.targets.set(key,target);this.target=target;this.framebuffer=target.framebuffer;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
     for(const [texture,attachment,format,type,internal] of [
       [target.color,gl.COLOR_ATTACHMENT0,gl.RGBA,gl.UNSIGNED_BYTE,gl.RGBA8],
       [target.distance,gl.COLOR_ATTACHMENT1,gl.RED,gl.FLOAT,gl.R32F],
+      [target.normal,gl.COLOR_ATTACHMENT2,gl.RGBA,gl.HALF_FLOAT,gl.RGBA16F],
     ]) {
       gl.bindTexture(gl.TEXTURE_2D,texture);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
@@ -224,7 +251,7 @@ class GpuRaster {
     }
     gl.bindRenderbuffer(gl.RENDERBUFFER,target.depth);gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT32F,width,height);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,target.depth);
-    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1,gl.COLOR_ATTACHMENT2]);
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete raster framebuffer');
     target.shadedFramebuffer=gl.createFramebuffer();target.shadedColor=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,target.shadedColor);
@@ -257,7 +284,7 @@ class GpuRaster {
     gl.bufferData(gl.ARRAY_BUFFER,raster.shadowVertices,gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.shadowVertices.length/3);
     // Visible terrain, vehicles and carried objects also cast shadows.
     gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/6);
+    gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
     return values;
   }
 
@@ -265,14 +292,17 @@ class GpuRaster {
     const gl=this.gl,view=raster.view,settings=view.lighting;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.shadedFramebuffer);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.aoProgram);gl.bindVertexArray(this.fullscreenVao);
-    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance]]) {
+    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance],[2,'sceneNormal',this.target.normal]]) {
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoUniforms[name],unit);
     }
     gl.uniform2f(this.aoUniforms.size,raster.width,raster.height);
     gl.uniform4f(this.aoUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
     gl.uniform4f(this.aoUniforms.aoSettings,settings.aoRadiusM,settings.aoStrength,settings.aoMaxPixels,0);
+    gl.uniform2f(this.aoUniforms.terrainAo,settings.aoTerrainScale??FLOW_RENDERING.lighting.aoTerrainScale,
+      settings.aoTerrainBias??FLOW_RENDERING.lighting.aoTerrainBias);
     gl.uniform1f(this.aoUniforms.minLight,settings.aoMinLight);gl.uniform1i(this.aoUniforms.perspective,raster.perspective?1:0);
     gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,null);
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.target.shadedFramebuffer);
   }
@@ -285,6 +315,7 @@ class GpuRaster {
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.viewport(0,0,raster.width,raster.height);
     gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);
     gl.clearBufferfv(gl.COLOR,0,new Float32Array(4));gl.clearBufferfv(gl.COLOR,1,new Float32Array([Infinity,0,0,0]));
+    gl.clearBufferfv(gl.COLOR,2,new Float32Array(4));
     gl.clearBufferfv(gl.DEPTH,0,new Float32Array([1]));
     gl.useProgram(this.program);gl.uniform2f(this.size,raster.width,raster.height);gl.uniform1i(this.perspective,raster.perspective?1:0);
     gl.uniform1i(this.lightingUniforms.lit,lighting?1:0);
@@ -296,15 +327,18 @@ class GpuRaster {
       }
     }
     gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
-    if(raster.worldLength) {
+    if(raster.view) {
       const view=raster.view;
       for(const name of ['eye','right','up','forward']) gl.uniform3fv(this.cameraUniforms[name],view[name]);
       gl.uniform4f(this.cameraUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
+    }
+    if(raster.worldLength) {
       gl.uniform1i(this.world,1);
       gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);
-      gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/6);
+      gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
     }
     gl.uniform1i(this.world,0);
+    gl.bindVertexArray(this.screenVao);
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
     gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depth);

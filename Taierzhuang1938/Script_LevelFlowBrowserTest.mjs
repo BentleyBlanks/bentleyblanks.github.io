@@ -109,7 +109,7 @@ try {
       const world=[[-7,6,0],[8,5,6],[0,-8,80]],colors=[[210,70,40],[40,170,80],[70,60,190]];
       const WorldDraw=raster=>{
         raster.Begin(64,48,perspective);raster.view=view;
-        if(raster.accelerated) raster.WorldTriangle(world,colors);
+        if(raster.accelerated) raster.WorldTriangle(world,colors,[[0,1,0],[0.2,0.98,0],[0,0.98,0.2]]);
         else raster.Face(view.FaceVertices(world,colors),'#000000');
         const canvas=document.createElement('canvas');canvas.width=64;canvas.height=48;
         raster.Flush(canvas.getContext('2d'),64,48);return canvas.getContext('2d').getImageData(0,0,64,48).data;
@@ -177,6 +177,60 @@ try {
   assert.equal(lighting.shadow.depthError,0,'shadows preserve picking and actor depth');
   assert.equal(lighting.ao.depthError,0,'AO preserves picking and actor depth');
   assert.ok(lighting.maxRepeatError<=1,`repeated lighting is deterministic: ${JSON.stringify(lighting)}`);
+  const bankLighting = await page.evaluate(async () => {
+    const {FlowPerspectiveView} = await import('./Script_LevelFlowPerspective.mjs');
+    const {FLOW_RENDERING} = await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;left:-2000px;width:320px;height:240px';
+    document.body.append(canvas); canvas.width = 320; canvas.height = 240;
+    const HeightAt = (x, z) => {
+      const t = Math.max(0, Math.min(1, (Math.abs(x - z * 0.14) - 2) / 1.5));
+      return -2 + 2 * t * t * (3 - 2 * t);
+    };
+    const NormalAt = ([x, , z]) => {
+      const normal = [HeightAt(x - 0.5, z) - HeightAt(x + 0.5, z), 1,
+        HeightAt(x, z - 0.5) - HeightAt(x, z + 0.5)];
+      return normal.map(value => value / Math.hypot(...normal));
+    };
+    const view = new FlowPerspectiveView(canvas, {objects:[], farObjects:[], terrain:{heightAt:HeightAt, roots:[]}}, 'scene');
+    view.freeCamera = {eye:[0, 1, -6], yaw:0, pitch:-0.12};
+    view.BeforeDraw(LevelFlow.Evaluate(424));
+    const faces = [];
+    for (let z = -10; z < 20; z += 0.5) for (let x = -7; x < 7; x += 0.5) {
+      const center = [x + 0.25, HeightAt(x + 0.25, z + 0.25), z + 0.25];
+      const outline = [[x,z], [x+0.5,z], [x+0.5,z+0.5], [x,z+0.5]]
+        .map(([px,pz]) => [px,HeightAt(px,pz),pz]);
+      for (let index = 0; index < 4; index++) faces.push([center,outline[index],outline[(index+1)%4]]);
+    }
+    const Draw = (smooth, lit) => {
+      view.lighting = {...FLOW_RENDERING.lighting, shadowStrength:0, aoStrength:lit?FLOW_RENDERING.lighting.aoStrength:0};
+      view.raster.Begin(320,240,true); view.raster.view = view;
+      view.raster.shadowVertices = new Float32Array(0);
+      for (const points of faces) view.raster.WorldTriangle(points, [[184,164,128],[184,164,128],[184,164,128]], smooth?points.map(NormalAt):null);
+      const context = canvas.getContext('2d');
+      context.clearRect(0,0,320,240); view.raster.Flush(context,320,240);
+      return {pixels:context.getImageData(0,0,320,240).data,depth:[...view.raster.depth]};
+    };
+    const direct = Draw(true,false), flat = Draw(false,true), smooth = Draw(true,true);
+    let samples = 0, flatDarkness = 0, smoothDarkness = 0, depthError = 0;
+    for (let z = 0; z <= 12; z += 0.5) for (const side of [-1,1]) for (const offset of [2.2,2.6,3,3.4]) {
+      const x = z * 0.14 + side * offset, point = view.Project([x,HeightAt(x,z),z]);
+      const px = Math.round(point[0]), py = Math.round(point[1]);
+      if (px < 1 || py < 1 || px >= 319 || py >= 239) continue;
+      const index = py * 320 + px;
+      if (!Number.isFinite(direct.depth[index])) continue;
+      samples++;
+      flatDarkness += Math.max(0,direct.pixels[index*4]-flat.pixels[index*4]);
+      smoothDarkness += Math.max(0,direct.pixels[index*4]-smooth.pixels[index*4]);
+      depthError = Math.max(depthError, Math.abs(flat.depth[index]-smooth.depth[index]));
+    }
+    const result = {accelerated:view.raster.accelerated,samples,flatDarkness,smoothDarkness,depthError};
+    canvas.remove(); return result;
+  });
+  assert.ok(bankLighting.accelerated && bankLighting.samples > 50, `bank lighting samples the GPU surface: ${JSON.stringify(bankLighting)}`);
+  assert.ok(bankLighting.flatDarkness > 100 && bankLighting.smoothDarkness < bankLighting.flatDarkness * 0.6,
+    `smooth terrain lighting suppresses repeated dark fan ridges: ${JSON.stringify(bankLighting)}`);
+  assert.equal(bankLighting.depthError,0,'smooth bank lighting preserves picking and occlusion depth');
   const backgroundCache=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320.5px;height:240.5px';document.body.append(canvas);

@@ -850,8 +850,8 @@ assert.ok(terrain.preAt(-12,-91)<(terrain.preAt(-23,-91)+terrain.preAt(-1,-91))/
 for(const cell of terrain.cells.filter((_,index)=>index%251===0)) {
   const faces=terrain.facesForCell(cell),packed=terrain.packedFacesForCell(cell);
   assert.equal(terrain.packedFacesForCell(cell),packed,'both views reuse one immutable packed terrain cell');
-  assert.deepEqual(packed,new Float32Array(faces.flatMap(face=>face.points.flatMap((point,index)=>[...point,...face.vertexColors[index]]))),
-    'packed terrain retains every original vertex and color, including shared LOD edges');
+  assert.deepEqual(packed,new Float32Array(faces.flatMap(face=>face.points.flatMap((point,index)=>[...point,...face.vertexColors[index],...face.vertexNormals[index]]))),
+    'packed terrain retains every vertex, color and smooth normal, including shared LOD edges');
   const raster={worldVertices:new Float32Array(16),worldLength:0,triangles:0};
   EncounterRaster.prototype.WorldBatch.call(raster,packed);
   EncounterRaster.prototype.WorldBatch.call(raster,packed);
@@ -1187,7 +1187,7 @@ const CheckTerrainColorRange=(cell)=>{
   if(cell.children) for(const child of cell.children) {
     CheckTerrainColorRange(child);
     assert.ok(range+1e-8>=terrain.colorRangeForCell(child),"coarse color bounds retain every finer transition");
-  } else if(cell.near&&cell.size===1) {
+  } else if(cell.near&&cell.size<=1) {
     const colors=terrain.facesForCell(cell).flatMap(face=>face.vertexColors);
     const expected=Math.max(...[0,1,2].map(axis=>Math.max(...colors.map(color=>color[axis]))-Math.min(...colors.map(color=>color[axis]))));
     assert.ok(Math.abs(range-expected)<1e-8,"trench cell bounds include floor and bank shading");
@@ -1197,20 +1197,29 @@ const CheckTerrainColorRange=(cell)=>{
 for(const root of terrain.roots) CheckTerrainColorRange(root);
 assert.ok(uniformTerrainCells>0&&varyingTerrainCells>0,"only uniform trench cells can skip color-driven refinement");
 // A shared edge must consist of identical segments on both sides, including
-// 1 m trench cells meeting the coarse surrounding terrain.
+// Sub-metre trench cells meeting the coarse surrounding terrain.
 const terrainEdges=new Map();
 const terrainColors = new Map();
+let refinedBanks = 0;
 for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) for(let index=0;index<3;index++) {
   const a=face.points[index],b=face.points[(index+1)%3];
   const vertexKey = a.join(","), color = face.vertexColors[index];
   assert.ok(color.length === 3 && color.every(channel => Number.isFinite(channel) && channel >= 0 && channel <= 255));
-  if (terrainColors.has(vertexKey)) assert.deepEqual(color, terrainColors.get(vertexKey), "shared terrain vertices have identical shading across cells");
-  terrainColors.set(vertexKey, color);
+  const normal = face.vertexNormals[index];
+  assert.ok(normal[1] > 0 && Math.abs(Math.hypot(...normal) - 1) < 1e-10, "terrain lighting uses unit height-field normals");
+  if (terrainColors.has(vertexKey)) {
+    const shared = terrainColors.get(vertexKey);
+    assert.deepEqual(color, shared.color, "shared terrain vertices have identical shading across cells");
+    assert.deepEqual(normal, shared.normal, "smooth normals agree across cell and LOD boundaries");
+  }
+  terrainColors.set(vertexKey, {color, normal});
+  if (cell.size === FLOW_RENDERING.terrainDetailCellM && Math.abs(normal[0]) + Math.abs(normal[2]) > 0.2) refinedBanks++;
   const vertices=[a.join(","),b.join(",")].sort(),key=vertices.join("|");
   const boundary=Math.abs(a[0])===6144&&a[0]===b[0]||Math.abs(a[2])===6144&&a[2]===b[2];
   const edge=terrainEdges.get(key)||{count:0,boundary};edge.count++;terrainEdges.set(key,edge);
 }
 assert.ok([...terrainEdges.values()].every(edge=>edge.count===(edge.boundary?1:2)),"terrain has no open internal edges or coarse/fine T-junction cracks");
+assert.ok(refinedBanks > 100, "curved banks retain sub-metre geometry for close inspection");
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
 assert.equal(OPENING_GUNFIRE_TIME, 78);
 assert.equal(OPENING_FRIENDLY_CRY_TIME, 104);

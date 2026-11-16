@@ -33,15 +33,20 @@ export class EncounterRaster {
       while(capacity<this.worldLength+vertices.length) capacity*=2;
       const grown=new Float32Array(capacity);grown.set(this.worldVertices);this.worldVertices=grown;
     }
-    this.worldVertices.set(vertices,this.worldLength);this.worldLength+=vertices.length;this.triangles+=vertices.length/18;
+    this.worldVertices.set(vertices,this.worldLength);this.worldLength+=vertices.length;this.triangles+=vertices.length/27;
   }
 
-  WorldTriangle(points,colors) {
-    if(this.worldLength+18>this.worldVertices.length) {const vertices=new Float32Array(this.worldVertices.length*2);vertices.set(this.worldVertices);this.worldVertices=vertices;}
+  WorldTriangle(points,colors,normals=null) {
+    if(this.worldLength+27>this.worldVertices.length) {const vertices=new Float32Array(this.worldVertices.length*2);vertices.set(this.worldVertices);this.worldVertices=vertices;}
     for(let index=0;index<3;index++) {
-      const point=points[index],rgb=colors[index],offset=this.worldLength;
+      const point=points[index],rgb=colors[index],normal=normals?.[index],offset=this.worldLength;
       this.worldVertices[offset]=point[0];this.worldVertices[offset+1]=point[1];this.worldVertices[offset+2]=point[2];
-      this.worldVertices[offset+3]=rgb[0];this.worldVertices[offset+4]=rgb[1];this.worldVertices[offset+5]=rgb[2];this.worldLength+=6;
+      this.worldVertices[offset+3]=rgb[0];this.worldVertices[offset+4]=rgb[1];this.worldVertices[offset+5]=rgb[2];
+      // World vertices carry XYZ, RGB and a smooth normal. Zero selects the face normal.
+      this.worldVertices[offset+6]=normal?.[0]??0;
+      this.worldVertices[offset+7]=normal?.[1]??0;
+      this.worldVertices[offset+8]=normal?.[2]??0;
+      this.worldLength+=9;
     }
     this.triangles++;
   }
@@ -132,9 +137,9 @@ export class EncounterRaster {
     if(this.accelerated) {
       // Context loss or unsupported targets must still produce this frame.
       this.accelerated=false;this.gpu=null;this.triangles=0;this.image.data.fill(0);this.depth.fill(Infinity);
-      for(let offset=0;offset<this.worldLength;offset+=18) {
+      for(let offset=0;offset<this.worldLength;offset+=27) {
         const points=[],colors=[];
-        for(let index=offset;index<offset+18;index+=6) {points.push(Array.from(this.worldVertices.subarray(index,index+3)));colors.push(Array.from(this.worldVertices.subarray(index+3,index+6)));}
+        for(let index=offset;index<offset+27;index+=9) {points.push(Array.from(this.worldVertices.subarray(index,index+3)));colors.push(Array.from(this.worldVertices.subarray(index+3,index+6)));}
         const vertices=this.view.FaceVertices(points,colors);
         for(const vertex of vertices) {vertex.x*=this.coordinateScale;vertex.y*=this.coordinateScale;}
         this.Face(vertices,'#000000');

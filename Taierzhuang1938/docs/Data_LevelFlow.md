@@ -148,7 +148,7 @@
 - `Script_LevelFlowModel.mjs` 按绝对时间采样人物、战车、触发状态与火力。
 - `Script_LevelFlowDocument.mjs` 管理草稿、撤销和 PNG／JSON 帧包。
 - `Script_LevelFlowView.mjs` 绘制连通的空间图与对象选择。
-- `Script_LevelFlowTerrain.mjs` 复用实际地形与壕沟采样，构建共享边界的地面网格。顶点按世界坐标计算土色与平滑法线，沟沿的平坦区域也保留颜色过渡所需细分。
+- `Script_LevelFlowTerrain.mjs` 复用实际地形与壕沟采样，构建共享边界的地面网格。弯曲沟岸按高度误差细分至 0.25 米；顶点按世界坐标共享土色与平滑法线，沟沿的平坦区域也保留颜色过渡所需细分。GPU 的投影明暗与环境遮蔽读取同一组平滑法线，地表使用较柔和的遮蔽强度与法线偏移，减少三角扇产生的重复深色棱边。点选和遮挡继续读取原始几何深度。
 - `Script_LevelFlowRaster.mjs` 提供三角形深度缓冲、透视正确的顶点颜色插值和遮挡半透绘制。
 - `Script_LevelFlowGpuRaster.mjs` 提供共享 GPU 光栅和地形投影；浏览器回归对比软硬件颜色、深度、近远面裁剪与失败回退。
 - `Script_LevelFlowPerspective.mjs` 绘制立体视口，`Script_LevelFlowViewports.mjs` 管理视口布局与合成导出，`Script_LevelFlowControls.mjs` 管理 Scene 导航。

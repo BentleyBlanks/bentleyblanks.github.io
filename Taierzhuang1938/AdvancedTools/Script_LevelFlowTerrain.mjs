@@ -144,7 +144,17 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       return SegmentDistance([cx,cz],segment.a,segment.b)<size*0.71+segment.reach;
     });
     const inScene=x+size>=bounds.minX&&x<=bounds.maxX&&z+size>=bounds.minZ&&z<=bounds.maxZ;
-    const center=Sample(cx,cz),average=(Sample(x,z)+Sample(x+size,z)+Sample(x,z+size)+Sample(x+size,z+size))/4;
+    const center=Sample(cx,cz);
+    const corners=[Sample(x,z),Sample(x+size,z),Sample(x+size,z+size),Sample(x,z+size)];
+    const average=corners.reduce((sum,height)=>sum+height,0)/4;
+    // A metre-wide fan cuts across a curved bank and leaves alternating ridges.
+    // Check its edge midpoints and twist before adding sub-metre slope detail.
+    const slopeDetail=size>FLOW_RENDERING.terrainDetailCellM&&size<=1&&(near||inScene)
+      &&Math.max(Math.abs(center-average),Math.abs(corners[0]-corners[1]+corners[2]-corners[3])/4,
+        Math.abs(Sample(cx,z)-(corners[0]+corners[1])/2),
+        Math.abs(Sample(x+size,cz)-(corners[1]+corners[2])/2),
+        Math.abs(Sample(cx,z+size)-(corners[2]+corners[3])/2),
+        Math.abs(Sample(x,cz)-(corners[3]+corners[0])/2))>FLOW_RENDERING.terrainDetailHeightErrorM;
     const painted = inScene || !!backdropPaint && x + size >= backdropPaint.minX && z + size >= backdropPaint.minZ
       && x <= backdropPaint.minX + backdropPaint.width * backdropPaint.texelM
       && z <= backdropPaint.minZ + backdropPaint.height * backdropPaint.texelM;
@@ -152,7 +162,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     // from the trench network that a coarse cell's center can miss entirely.
     const split = size > 1 && near || size > FLOW_RENDERING.terrainSceneCellM && inScene
       || size > FLOW_RENDERING.terrainBackdropCellM && painted || size > 2 && Math.abs(center-average) > 0.18
-      || size > 1 && size <= FLOW_RENDERING.terrainSceneCellM && inScene && NeedsReliefDetail(x,z,size);
+      || size > 1 && size <= FLOW_RENDERING.terrainSceneCellM && inScene && NeedsReliefDetail(x,z,size)
+      || slopeDetail;
     const cell={x,z,size,near,painted};
     if(split) cell.children=[Refine(x,z,half),Refine(cx,z,half),Refine(cx,cz,half),Refine(x,cz,half)];
     else cells.push(cell);
@@ -160,7 +171,6 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     cell.maxHeight=cell.children?Math.max(...cell.children.map(child=>child.maxHeight)):Math.max(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
     cell.heightError = 0;
     if (cell.children) {
-      const corners = [Sample(x,z), Sample(x+size,z), Sample(x+size,z+size), Sample(x,z+size)];
       const CoarseHeightAt = (px, pz) => {
         const dx = (px-cx)/half, dz = (pz-cz)/half, extent = Math.max(Math.abs(dx),Math.abs(dz));
         if (extent === 0) return center;
@@ -198,6 +208,27 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   for(const [key,values] of rows) rows.set(key,[...values].sort((a,b)=>a-b));
   for(const [key,values] of columns) columns.set(key,[...values].sort((a,b)=>a-b));
   const Between=(values,from,to)=>values.slice(LowerBound(values,from),LowerBound(values,to+1e-8));
+  const OutlineForCell = ({x,z,size}) => {
+    const maxX=x+size,maxZ=z+size;
+    return [
+      ...Between(rows.get(z),x,maxX).map(value=>[value,z]),
+      ...Between(columns.get(maxX),z,maxZ).slice(1).map(value=>[maxX,value]),
+      ...Between(rows.get(maxZ),x,maxX).reverse().slice(1).map(value=>[value,maxZ]),
+      ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map(value=>[x,value]),
+    ];
+  };
+  const normalCache = new Map();
+  const NormalAt = (x, z) => {
+    const key = `${x},${z}`;
+    if (!normalCache.has(key)) {
+      const step = FLOW_RENDERING.terrainNormalSampleM;
+      const normal = [Sample(x - step, z) - Sample(x + step, z), 2 * step,
+        Sample(x, z - step) - Sample(x, z + step)];
+      const length = Math.hypot(...normal);
+      normalCache.set(key, normal.map(value => value / length));
+    }
+    return normalCache.get(key);
+  };
   const colorCache = new Map();
   const ColorAt = (x, z) => {
     const key = `${x},${z}`;
@@ -209,9 +240,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
       soilMix = Math.max(soilMix, Clamp((segment.reach + 1 - SegmentDistance(point, segment.a, segment.b)) / 3, 0, 1));
     }
-    const step = FLOW_RENDERING.terrainNormalSampleM;
-    const normal = [Sample(x - step, z) - Sample(x + step, z), 2 * step, Sample(x, z - step) - Sample(x, z + step)];
-    const light = 0.7 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) / Math.hypot(...normal) * 0.3;
+    const normal = NormalAt(x, z);
+    const light = 0.7 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) * 0.3;
     const color = SurfaceColorAt(x, z).map((channel, axis) =>
       Clamp((channel + ([184, 164, 128][axis] - channel) * soilMix) * light, 0, 255));
     colorCache.set(key, color);
@@ -221,8 +251,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   const ColorBoundsForCell=(cell)=>{
     if(colorBoundsCache.has(cell)) return colorBoundsCache.get(cell);
     const samples=cell.children?cell.children.flatMap(ColorBoundsForCell):[
-      ColorAt(cell.x,cell.z),ColorAt(cell.x+cell.size,cell.z),
-      ColorAt(cell.x,cell.z+cell.size),ColorAt(cell.x+cell.size,cell.z+cell.size),
+      ...OutlineForCell(cell).map(point=>ColorAt(...point)),
       ColorAt(cell.x+cell.size/2,cell.z+cell.size/2),
     ];
     const bounds=[0,1,2].map(axis=>Math.min(...samples.map(color=>color[axis])));
@@ -247,29 +276,28 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     if(faceCache.has(cell)) return faceCache.get(cell);
     const triangles=[];
     const {x,z,size}=cell,maxX=x+size,maxZ=z+size;
-    const outline=[
-      ...Between(rows.get(z),x,maxX).map((value)=>[value,z]),
-      ...Between(columns.get(maxX),z,maxZ).slice(1).map((value)=>[maxX,value]),
-      ...Between(rows.get(maxZ),x,maxX).reverse().slice(1).map((value)=>[value,maxZ]),
-      ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map((value)=>[x,value]),
-    ];
+    const outline=OutlineForCell(cell);
     const center=VertexAt(x+size/2,z+size/2);
     for(let index=0;index<outline.length;index++) {
       const a=outline[index],b=outline[(index+1)%outline.length];
       const points=[center,VertexAt(...a),VertexAt(...b)];
       const vertexColors = points.map(point => ColorAt(point[0], point[2]));
+      const vertexNormals = points.map(point => NormalAt(point[0], point[2]));
       const color = "#" + vertexColors[0].map((channel, axis) =>
         Math.round((channel + vertexColors[1][axis] + vertexColors[2][axis]) / 3).toString(16).padStart(2, "0")).join("");
-      triangles.push({points,color,vertexColors,minX:x,maxX,minZ:z,maxZ});
+      triangles.push({points,color,vertexColors,vertexNormals,minX:x,maxX,minZ:z,maxZ});
     }
     faceCache.set(cell,triangles);return triangles;
   };
   const PackedFacesForCell=(cell)=>{
     if(packedFaceCache.has(cell)) return packedFaceCache.get(cell);
-    const faces=FacesForCell(cell),packed=new Float32Array(faces.length*18);
+    const faces=FacesForCell(cell),packed=new Float32Array(faces.length*27);
     let offset=0;
     for(const face of faces) for(let index=0;index<3;index++) {
-      packed.set(face.points[index],offset);packed.set(face.vertexColors[index],offset+3);offset+=6;
+      packed.set(face.points[index],offset);
+      packed.set(face.vertexColors[index],offset+3);
+      packed.set(face.vertexNormals[index],offset+6);
+      offset+=9;
     }
     packedFaceCache.set(cell,packed);return packed;
   };

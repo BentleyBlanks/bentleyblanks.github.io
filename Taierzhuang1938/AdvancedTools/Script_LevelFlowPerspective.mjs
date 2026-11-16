@@ -255,7 +255,7 @@ export class FlowPerspectiveView extends FlowMapView {
       // Surface colors use a separate projected cell-size threshold.
       if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
         &&((cell.heightError??heightRange)*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
-          ||(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
+          ||cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
             &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
         for(const child of cell.children) Visit(child);
         return;
@@ -264,7 +264,7 @@ export class FlowPerspectiveView extends FlowMapView {
         this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell));return;
       }
       for(const triangle of this.mapData.terrain.facesForCell(cell)) {
-        if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors);continue;}
+        if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors,triangle.vertexNormals);continue;}
         const a=TerrainVertex(triangle.points[0],triangle.vertexColors[0]);
         const b=TerrainVertex(triangle.points[1],triangle.vertexColors[1]);
         const c=TerrainVertex(triangle.points[2],triangle.vertexColors[2]);
