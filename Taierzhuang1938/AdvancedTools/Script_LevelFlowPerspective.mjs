@@ -249,24 +249,32 @@ export class FlowPerspectiveView extends FlowMapView {
       if(renderScale!==1) for(const vertex of vertices) {vertex.x*=renderScale;vertex.y*=renderScale;}
       if(vertices.length>=3) this.raster.Face(vertices,color);
     };
+    const terrainCells=[];
     const Visit=(cell)=>{
       const heightRange=cell.maxHeight-cell.minHeight,radius=cell.radius;
       const camera=this.CameraPoint(cell.center);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
+      let heightError=cell.heightError??heightRange;
+      if(heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels&&this.mapData.terrain.heightErrorForCell) {
+        heightError=this.mapData.terrain.heightErrorForCell(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale);
+      }
       // Preserve projected relief error, while planar slopes can stay coarse.
       // Surface colors use a separate projected cell-size threshold.
-      if(cell.children&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
-        &&((cell.heightError??heightRange)*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
-          ||!texturedTerrain&&cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
+      if(cell.children&&(heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
+        ||!texturedTerrain&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
+          &&cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
             &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
         for(const child of cell.children) Visit(child);
         return;
       }
+      terrainCells.push(cell);
+    };
+    const DrawTerrainCell=(cell,boundaries)=>{
       if(this.raster.accelerated&&this.mapData.terrain.packedFacesForCell) {
-        this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell,texturedTerrain));return;
+        this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell,texturedTerrain,boundaries));return;
       }
-      for(const triangle of this.mapData.terrain.facesForCell(cell)) {
+      for(const triangle of this.mapData.terrain.facesForCell(cell,boundaries)) {
         if(this.raster.accelerated) {this.raster.WorldTriangle(triangle.points,triangle.vertexColors,triangle.vertexNormals);continue;}
         const a=TerrainVertex(triangle.points[0],triangle.vertexColors[0]);
         const b=TerrainVertex(triangle.points[1],triangle.vertexColors[1]);
@@ -331,6 +339,8 @@ export class FlowPerspectiveView extends FlowMapView {
       coverBoxes=this.staticCoverBoxes;
     } else {
     for(const root of this.mapData.terrain.roots) Visit(root);
+    const terrainBoundaries=this.mapData.terrain.boundariesForCells?.(terrainCells);
+    for(const cell of terrainCells) DrawTerrainCell(cell,terrainBoundaries);
     this.terrainTriangles=this.raster.triangles;
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;

@@ -810,6 +810,8 @@ assert.deepEqual(relief.surfaceColorAt(2,2).map(Math.round), [181,156,122], "fie
 assert.deepEqual(relief.surfaceColorAt(8,2).map(Math.round), [182,191,136], "wheat fields reach the 3D terrain surface");
 assert.deepEqual(relief.surfaceColorAt(14,2).map(Math.round), [182,177,151], "the adjacent fallow strip stays distinct");
 assert.deepEqual(relief.surfaceColorAt(0.5,0.5).map(Math.round), [18,52,86], "authored scene paint overrides the field fallback");
+assert.ok(relief.colorAt(3.5,1)[0]>relief.colorAt(2.5,1)[0]+30,
+  "equal soil on the sun-facing mound slope is brighter than its backlit slope");
 const reliefSurface=relief.surfaceMaps();
 assert.equal(relief.surfaceMaps(),reliefSurface,'all panes reuse the baked terrain surface');
 assert.equal(reliefSurface.backdrop,null,'scenes without backdrop paint retain the plain-ground fallback');
@@ -1239,6 +1241,36 @@ for(const cell of terrain.cells) for(const face of terrain.facesForCell(cell)) f
 }
 assert.ok([...terrainEdges.values()].every(edge=>edge.count===(edge.boundary?1:2)),"terrain has no open internal edges or coarse/fine T-junction cracks");
 assert.ok(refinedBanks > 100, "curved banks retain sub-metre geometry for close inspection");
+const selectedTerrain=[];
+const SelectTerrain=(cell)=>{
+  if(cell.children&&cell.size>(cell.x<0?4:8)) cell.children.forEach(SelectTerrain);
+  else selectedTerrain.push(cell);
+};
+terrain.roots.filter(cell=>[-256,0].includes(cell.x)&&cell.z===0).forEach(SelectTerrain);
+const selectedBoundaries=terrain.boundariesForCells(selectedTerrain),selectedEdges=new Map();
+let selectedFaces=0,fullBoundaryFaces=0;
+for(const cell of selectedTerrain) {
+  const faces=terrain.facesForCell(cell,selectedBoundaries);
+  selectedFaces+=faces.length;fullBoundaryFaces+=terrain.facesForCell(cell).length;
+  assert.equal(terrain.packedFacesForCell(cell,false,selectedBoundaries),terrain.packedFacesForCell(cell,false,selectedBoundaries),
+    "unchanged LOD boundaries reuse their packed mesh");
+  for(const face of faces) for(let index=0;index<3;index++) {
+    const a=face.points[index],b=face.points[(index+1)%3];
+    const key=[a.join(","),b.join(",")].sort().join("|");
+    const outside=a[0]===b[0]&&[-256,256].includes(a[0])||a[2]===b[2]&&[0,256].includes(a[2]);
+    const edge=selectedEdges.get(key)||{count:0,outside};edge.count++;selectedEdges.set(key,edge);
+  }
+}
+assert.ok([...selectedEdges.values()].every(edge=>edge.count===(edge.outside?1:2)),
+  "mixed 4 m and 8 m LOD cells share complete edges without cracks");
+assert.ok(selectedFaces<fullBoundaryFaces,"active LOD boundaries omit unused fine-grid edge vertices");
+const flatTerrain=terrain.roots.find(cell=>cell.x===5888&&cell.z===5888);
+assert.equal(terrain.facesForCell(flatTerrain).length,2,"an exactly planar, uniformly shaded cell uses two triangles");
+let bankCell=terrain.roots.find(cell=>32>=cell.x&&32<cell.x+cell.size&&88>=cell.z&&88<cell.z+cell.size);
+while(bankCell.children&&bankCell.size>8) bankCell=bankCell.children.find(cell=>32>=cell.x&&32<cell.x+cell.size&&88>=cell.z&&88<cell.z+cell.size);
+const partialBankError=terrain.heightErrorForCell(bankCell,0),completeBankError=terrain.heightErrorForCell(bankCell);
+assert.ok(completeBankError>=partialBankError&&completeBankError<=bankCell.heightError+1e-8,
+  "threshold queries resume to the measured source error without accumulating LOD deviations");
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
 assert.equal(OPENING_GUNFIRE_TIME, 78);
 assert.equal(OPENING_FRIENDLY_CRY_TIME, 104);

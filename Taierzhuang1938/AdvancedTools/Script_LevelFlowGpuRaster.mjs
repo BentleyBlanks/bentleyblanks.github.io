@@ -137,7 +137,8 @@ class GpuRaster {
           if(all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)))) {
             surface=texture(groundColor,(groundUv*(groundSize-1.0)+0.5)/groundSize).rgb;
           }
-          surface*=0.7+dot(normalize(worldNormal),vec3(-0.35,0.88,0.3))*0.3;
+          float diffuse=max(0.0,dot(normalize(worldNormal),sun));
+          surface*=lightBalance.x+lightBalance.y*diffuse;
         }
         pixel=vec4(surface*visibility,1.0);
         distancePixel=distanceToCamera;

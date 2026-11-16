@@ -268,6 +268,30 @@ try {
   assert.ok(bankLighting.flatDarkness > 100 && bankLighting.smoothDarkness < bankLighting.flatDarkness * 0.6,
     `smooth terrain lighting suppresses repeated dark fan ridges: ${JSON.stringify(bankLighting)}`);
   assert.equal(bankLighting.depthError,0,'smooth bank lighting preserves picking and occlusion depth');
+  const terrainSun=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {FLOW_RENDERING}=await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';
+    canvas.width=320;canvas.height=240;document.body.append(canvas);
+    const texture={minX:-20,minZ:-20,texelM:40,width:2,height:2,data:new Uint8Array(Array(4).fill([180,160,120,255]).flat())};
+    const normal=FLOW_RENDERING.sky.sunDirection.map(value=>value/Math.hypot(...FLOW_RENDERING.sky.sunDirection));
+    const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain:{heightAt:()=>0,roots:[],
+      surfaceMaps:()=>({scene:texture,backdrop:null})}},'scene');
+    view.freeCamera={eye:[0,3,-3],yaw:0,pitch:-0.55};
+    view.lighting={...FLOW_RENDERING.lighting,shadowStrength:0,aoStrength:0};
+    const frame=LevelFlow.Evaluate(0),points=[[-10,0,-10],[10,0,-10],[10,0,10],[-10,0,10]];
+    const Draw=(direction)=>{
+      view.BeforeDraw(frame);view.raster.Begin(320,240,true);view.raster.view=view;
+      view.raster.terrainSurface=view.mapData.terrain.surfaceMaps();view.raster.shadowVertices=new Float32Array(0);
+      for(const face of [[0,1,2],[0,2,3]]) view.raster.WorldTriangle(face.map(index=>points[index]),
+        [[180,160,120],[180,160,120],[180,160,120]],Array(3).fill(direction));
+      const context=canvas.getContext('2d');view.raster.Flush(context,320,240);
+      const at=view.Project([0,0,2]);return context.getImageData(Math.round(at[0]),Math.round(at[1]),1,1).data[0];
+    };
+    const facing=Draw(normal),back=Draw(normal.map(value=>-value));canvas.remove();return {facing,back};
+  });
+  assert.ok(terrainSun.facing>terrainSun.back+60&&terrainSun.back>60,
+    `terrain uses the real sun direction with ambient light on its backlit side: ${JSON.stringify(terrainSun)}`);
   const backgroundCache=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320.5px;height:240.5px';document.body.append(canvas);
@@ -1195,6 +1219,25 @@ try {
   assert.ok(depth.farDepth>1000&&depth.farDepth<1500&&!depth.beyondFarVisible,"the 1500 m far plane renders distant geometry and clips beyond its range");
   assert.ok(depth.overviewDepths.every(value=>Number.isFinite(value)&&value>0&&value<1500),"zoomed-out oblique view retains geometry 400 m on both sides of the center");
   assert.ok(depth.boxDepths.every((value,index)=>Math.abs(value-[1,5,3,6][index])<0.1),'box face culling preserves interior walls, open-bottom undersides, tops and exterior walls');
+  const distantLod=await page.evaluate(async()=>{
+    const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+    const {FLOW_RENDERING}=await import('../Data_Tuning_LevelFlow.mjs');
+    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:320px;height:240px';
+    canvas.width=320;canvas.height=240;document.body.append(canvas);
+    const root={x:-8,z:20,size:16,center:[0,-1,28],radius:12,minHeight:-2,maxHeight:0,heightError:3};
+    root.children=[[-8,20],[0,20],[0,28],[-8,28]].map(([x,z])=>({x,z,size:8,center:[x+4,-1,z+4],radius:6,
+      minHeight:-2,maxHeight:0,heightError:0}));
+    const selected=[];
+    const view=new FlowPerspectiveView(canvas,{objects:[],farObjects:[],terrain:{heightAt:()=>-2,roots:[root],
+      facesForCell:cell=>{selected.push(cell.size);return [{points:[[cell.x,-2,cell.z],[cell.x+cell.size,-2,cell.z],
+        [cell.x,-2,cell.z+cell.size]],color:'#b8a480',vertexColors:[[184,164,128],[184,164,128],[184,164,128]]}];}}},'scene');
+    view.freeCamera={eye:[0,20,-110],yaw:0,pitch:-0.1};view.lighting=null;
+    const frame=LevelFlow.Evaluate(0);view.BeforeDraw(frame);view.DrawBase(canvas.getContext('2d'),320,240,frame);
+    const projectedSize=root.size*view.focal/(view.CameraPoint(root.center)[2]-root.radius);
+    canvas.remove();return {selected,projectedSize,paintThreshold:FLOW_RENDERING.terrainCellPixels};
+  });
+  assert.ok(distantLod.projectedSize<distantLod.paintThreshold&&distantLod.selected.length===4
+    &&distantLod.selected.every(size=>size===8),`distant relief refines below the paint-size threshold: ${JSON.stringify(distantLod)}`);
   const terrainWork=await page.evaluate(async()=>{
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
@@ -1402,15 +1445,26 @@ try {
     const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
     const map=await LoadEncounterMap(),results=[];
+    let creationVisible=0,creationDepthError=0;
     for(const time of [530,603.84]) {
       const frame=LevelFlow.Evaluate(time),tank=frame.actors.find(actor=>actor.id==='tank1');
       frame.effects=[];frame.zone=null;
-      const bearing=Math.atan2(tank.p[0]-frame.player[0],tank.p[1]-frame.player[1]),images=[];
+      const bearing=Math.atan2(tank.p[0]-frame.player[0],tank.p[1]-frame.player[1]),images=[],depths=[];
       for(const include of [true,false]) {
         const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:1280px;height:720px';document.body.append(canvas);
         const view=new FlowPerspectiveView(canvas,map,'eye');
         view.BeforeDraw(frame);view.yaw=bearing-Math.atan2(view.forward[0],view.forward[2]);
         const actors=frame.actors.filter(actor=>include || actor.kind!=='tank' && !['TankEscort','TankRearScreen'].includes(actor.groupId));
+        view.Draw({...frame,actors},{names:false,fire:false,spawns:false,triggers:false,routes:false,landmarks:false},null);
+        if(time===530) {
+          depths.push(view.raster.depth.slice());
+          if(include) creationVisible=view.Diagnostics().actors.filter(actor=>/tank|TankEscort|TankRearScreen/.test(actor.id))
+            .reduce((sum,actor)=>sum+actor.visible,0);
+        }
+        // Keep strict first-frame visibility/depth checks. Warm the GPU once
+        // before exact RGB comparison, which otherwise catches one-unit AO
+        // rounding differences on unrelated ground during cold uploads.
+        view.baseKey='';
         view.Draw({...frame,actors},{names:false,fire:false,spawns:false,triggers:false,routes:false,landmarks:false},null);
         images.push(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data);
         canvas.remove();
@@ -1420,11 +1474,16 @@ try {
         if([0,1,2].some(channel=>images[0][index+channel]!==images[1][index+channel])) changed++;
       }
       results.push(changed);
+      if(time===530) for(let index=0;index<depths[0].length;index++) {
+        if(depths[0][index]!==depths[1][index]) creationDepthError=Math.max(creationDepthError,Math.abs(depths[0][index]-depths[1][index]));
+      }
     }
-    return results;
+    return {changes:results,creationVisible,creationDepthError};
   });
-  assert.equal(convoyVisibility[0],0,'convoy creation is completely concealed in the player view');
-  assert.ok(convoyVisibility[1]>0,'the marching convoy emerges into view before 06A');
+  assert.equal(convoyVisibility.creationVisible,0,'convoy strokes are hidden on their first rendered frame');
+  assert.equal(convoyVisibility.creationDepthError,0,'hidden convoy boxes do not alter first-frame depth');
+  assert.equal(convoyVisibility.changes[0],0,'convoy creation is completely concealed in the player view');
+  assert.ok(convoyVisibility.changes[1]>0,'the marching convoy emerges into view before 06A');
   await page.evaluate(()=>{LevelFlow.Seek(619.5);LevelFlow.SetPlaying(true);});
   await page.waitForFunction(()=>LevelFlow.Inspect().time>621.5);
   await page.evaluate(()=>LevelFlow.SetPlaying(false));

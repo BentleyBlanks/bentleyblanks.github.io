@@ -179,7 +179,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       || size > FLOW_RENDERING.terrainBackdropCellM && painted || size > 2 && Math.abs(center-average) > 0.18
       || size > 1 && size <= FLOW_RENDERING.terrainSceneCellM && inScene && NeedsReliefDetail(x,z,size)
       || slopeDetail;
-    const cell={x,z,size,near,painted};
+    const cell={x,z,size,near,painted,corners,centerHeight:center};
     if(split) cell.children=[Refine(x,z,half),Refine(cx,z,half),Refine(cx,cz,half),Refine(x,cz,half)];
     else cells.push(cell);
     cell.minHeight=cell.children?Math.min(...cell.children.map(child=>child.minHeight)):Math.min(center,Sample(x,z),Sample(x+size,z),Sample(x,z+size),Sample(x+size,z+size));
@@ -214,16 +214,20 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
   const radius=6144;
   const roots=[];
   for(let z=-radius;z<radius;z+=256) for(let x=-radius;x<radius;x+=256) roots.push(Refine(x,z,256));
-  const rows=new Map(),columns=new Map();
-  const Register=(x,z)=>{
-    if(!rows.has(z)) rows.set(z,new Set());rows.get(z).add(x);
-    if(!columns.has(x)) columns.set(x,new Set());columns.get(x).add(z);
+  const BoundariesForCells = (selected) => {
+    const rows=new Map(),columns=new Map();
+    for(const cell of selected) for(const [x,z] of [[cell.x,cell.z],[cell.x+cell.size,cell.z],
+      [cell.x+cell.size,cell.z+cell.size],[cell.x,cell.z+cell.size]]) {
+      if(!rows.has(z)) rows.set(z,new Set()); rows.get(z).add(x);
+      if(!columns.has(x)) columns.set(x,new Set()); columns.get(x).add(z);
+    }
+    for(const [key,values] of rows) rows.set(key,[...values].sort((a,b)=>a-b));
+    for(const [key,values] of columns) columns.set(key,[...values].sort((a,b)=>a-b));
+    return {rows,columns};
   };
-  for(const cell of cells) for(const [x,z] of [[cell.x,cell.z],[cell.x+cell.size,cell.z],[cell.x+cell.size,cell.z+cell.size],[cell.x,cell.z+cell.size]]) Register(x,z);
-  for(const [key,values] of rows) rows.set(key,[...values].sort((a,b)=>a-b));
-  for(const [key,values] of columns) columns.set(key,[...values].sort((a,b)=>a-b));
+  const fullBoundaries=BoundariesForCells(cells);
   const Between=(values,from,to)=>values.slice(LowerBound(values,from),LowerBound(values,to+1e-8));
-  const OutlineForCell = ({x,z,size}) => {
+  const OutlineForCell = ({x,z,size},{rows,columns}=fullBoundaries) => {
     const maxX=x+size,maxZ=z+size;
     return [
       ...Between(rows.get(z),x,maxX).map(value=>[value,z]),
@@ -231,6 +235,37 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       ...Between(rows.get(maxZ),x,maxX).reverse().slice(1).map(value=>[value,maxZ]),
       ...Between(columns.get(x),z,maxZ).reverse().slice(1,-1).map(value=>[x,value]),
     ];
+  };
+  const heightErrorCache = new WeakMap();
+  const HeightErrorForCell = (cell,limit=Infinity) => {
+    if (!cell.children) return 0;
+    if (!heightErrorCache.has(cell)) heightErrorCache.set(cell,{error:0,pending:[...cell.children]});
+    const state=heightErrorCache.get(cell);
+    if (!state.pending.length || state.error>limit) return state.error;
+    const {x,z,size} = cell, half = size / 2, cx = x + half, cz = z + half;
+    const center = cell.centerHeight, corners = cell.corners;
+    const CoarseHeightAt = (px,pz) => {
+      const dx = (px-cx)/half, dz = (pz-cz)/half, extent = Math.max(Math.abs(dx),Math.abs(dz));
+      if (extent === 0) return center;
+      const vertical = Math.abs(dx) >= Math.abs(dz);
+      const [from,to] = vertical ? (dx < 0 ? [corners[0],corners[3]] : [corners[1],corners[2]])
+        : (dz < 0 ? [corners[0],corners[1]] : [corners[3],corners[2]]);
+      const progress = ((vertical ? dz : dx)/extent+1)/2;
+      const outer = from + (to-from)*progress;
+      return center + (outer-center)*extent;
+    };
+    // Measure the corner fan against its finest source samples.
+    // Summing errors between successive LODs overestimates this deviation.
+    // Retain unfinished work so a later closer camera can resume the query.
+    const Check = (px,pz,height) => { state.error = Math.max(state.error,Math.abs(height-CoarseHeightAt(px,pz))); };
+    while (state.pending.length && state.error<=limit) {
+      const child = state.pending.pop();
+      if (child.children) { state.pending.push(...child.children); continue; }
+      Check(child.x,child.z,child.corners[0]); Check(child.x+child.size,child.z,child.corners[1]);
+      Check(child.x+child.size,child.z+child.size,child.corners[2]); Check(child.x,child.z+child.size,child.corners[3]);
+      Check(child.x+child.size/2,child.z+child.size/2,child.centerHeight);
+    }
+    return state.error;
   };
   const normalCache = new Map();
   const NormalAt = (x, z) => {
@@ -291,12 +326,14 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return surfaceMaps;
   };
   const colorCache = new Map();
+  const sun=FLOW_RENDERING.sky.sunDirection, sunLength=Math.hypot(...sun);
   const ColorAt = (x, z) => {
     const key = `${x},${z}`;
     if (colorCache.has(key)) return colorCache.get(key);
     const soilMix = SoilMixAt(x, z);
     const normal = NormalAt(x, z);
-    const light = 0.7 + (-normal[0] * 0.35 + normal[1] * 0.88 + normal[2] * 0.3) * 0.3;
+    const diffuse=Math.max(0,normal.reduce((sum,value,axis)=>sum+value*sun[axis]/sunLength,0));
+    const light=FLOW_RENDERING.lighting.ambient+FLOW_RENDERING.lighting.direct*diffuse;
     const color = SurfaceColorAt(x, z).map((channel, axis) =>
       Clamp((channel + ([184, 164, 128][axis] - channel) * soilMix) * light, 0, 255));
     colorCache.set(key, color);
@@ -318,8 +355,6 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     return Math.max(...maximum.map((channel,axis)=>channel-minimum[axis]));
   };
   const faceCache=new WeakMap();
-  const packedFaceCache=new WeakMap();
-  const packedSurfaceCache=new WeakMap();
   // Adjacent triangles and LOD cells share immutable vertices, so each view
   // can project a ground vertex once per camera frame without changing seams.
   const vertices=new Map();
@@ -328,56 +363,60 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
     if(!vertices.has(key)) vertices.set(key,[x,Sample(x,z),z]);
     return vertices.get(key);
   };
-  const FacesForCell=(cell)=>{
-    if(faceCache.has(cell)) return faceCache.get(cell);
+  const surfaceColor=[198,207,169];
+  const MeshForCell=(cell,boundaries=fullBoundaries,textured=false)=>{
+    const outline=OutlineForCell(cell,boundaries);
+    const key=(textured?"T:":"S:")+outline.flat().join(",");
+    if(!faceCache.has(cell)) faceCache.set(cell,new Map());
+    const variants=faceCache.get(cell);
+    if(variants.has(key)) return variants.get(key);
     const triangles=[];
     const {x,z,size}=cell,maxX=x+size,maxZ=z+size;
-    const outline=OutlineForCell(cell);
     const center=VertexAt(x+size/2,z+size/2);
-    for(let index=0;index<outline.length;index++) {
-      const a=outline[index],b=outline[(index+1)%outline.length];
-      const points=[center,VertexAt(...a),VertexAt(...b)];
-      const vertexColors = points.map(point => ColorAt(point[0], point[2]));
+    const boundary=outline.map(point=>VertexAt(...point));
+    // Texture sampling carries paint detail independently. Preserve the
+    // existing exact height/normal test when removing collinear edge points.
+    const rim=textured?boundary.filter((point,index)=>{
+      const previous=boundary[(index+boundary.length-1)%boundary.length];
+      const next=boundary[(index+1)%boundary.length];
+      if(previous[0]!==next[0]&&previous[2]!==next[2]) return true;
+      const length=Math.hypot(next[0]-previous[0],next[2]-previous[2]);
+      const progress=Math.hypot(point[0]-previous[0],point[2]-previous[2])/length;
+      if(Math.abs(point[1]-previous[1]-(next[1]-previous[1])*progress)>1e-6) return true;
+      const normal=NormalAt(point[0],point[2]),before=NormalAt(previous[0],previous[2]),after=NormalAt(next[0],next[2]);
+      return normal.some((value,axis)=>Math.abs(value-before[axis]-(after[axis]-before[axis])*progress)>1e-5);
+    }):boundary;
+    let pointSets=rim.map((point,index)=>[center,point,rim[(index+1)%rim.length]]);
+    // Merge a fan across an exact diagonal when height, color and normals
+    // interpolate identically. Flat floors and slopes then need two faces.
+    if(rim.length===4) {
+      const centerValues=[center[1],...(textured?surfaceColor:ColorAt(center[0],center[2])),...NormalAt(center[0],center[2])];
+      for(const [from,to] of [[0,2],[1,3]]) {
+        const a=rim[from],b=rim[to];
+        const first=[a[1],...(textured?surfaceColor:ColorAt(a[0],a[2])),...NormalAt(a[0],a[2])];
+        const second=[b[1],...(textured?surfaceColor:ColorAt(b[0],b[2])),...NormalAt(b[0],b[2])];
+        if(!centerValues.every((value,index)=>Math.abs(value-(first[index]+second[index])/2)<1e-7)) continue;
+        pointSets=from===0?[[rim[0],rim[1],rim[2]],[rim[0],rim[2],rim[3]]]
+          :[[rim[0],rim[1],rim[3]],[rim[1],rim[2],rim[3]]];
+        break;
+      }
+    }
+    for(const points of pointSets) {
+      const vertexColors = points.map(point => textured?surfaceColor:ColorAt(point[0], point[2]));
       const vertexNormals = points.map(point => NormalAt(point[0], point[2]));
       const color = "#" + vertexColors[0].map((channel, axis) =>
         Math.round((channel + vertexColors[1][axis] + vertexColors[2][axis]) / 3).toString(16).padStart(2, "0")).join("");
       triangles.push({points,color,vertexColors,vertexNormals,minX:x,maxX,minZ:z,maxZ});
     }
-    faceCache.set(cell,triangles);return triangles;
+    if(variants.size>=4) variants.delete(variants.keys().next().value);
+    const record={faces:triangles,packed:null};
+    variants.set(key,record);
+    return record;
   };
-  const PackedFacesForCell=(cell, textured=false)=>{
-    if (textured) {
-      if (packedSurfaceCache.has(cell)) return packedSurfaceCache.get(cell);
-      // Fine neighbours add many boundary points to an otherwise flat cell.
-      // Keep relief and normal changes, while joining exactly collinear runs.
-      const boundary = OutlineForCell(cell).map(point => VertexAt(...point));
-      const outline = boundary.filter((point, index) => {
-        const previous = boundary[(index + boundary.length - 1) % boundary.length];
-        const next = boundary[(index + 1) % boundary.length];
-        if (previous[0] !== next[0] && previous[2] !== next[2]) return true;
-        const length = Math.hypot(next[0] - previous[0], next[2] - previous[2]);
-        const progress = Math.hypot(point[0] - previous[0], point[2] - previous[2]) / length;
-        if (Math.abs(point[1] - previous[1] - (next[1] - previous[1]) * progress) > 1e-6) return true;
-        const normal = NormalAt(point[0], point[2]);
-        const before = NormalAt(previous[0], previous[2]), after = NormalAt(next[0], next[2]);
-        return normal.some((value, axis) => Math.abs(value - before[axis] - (after[axis] - before[axis]) * progress) > 1e-5);
-      });
-      const center = VertexAt(cell.x + cell.size / 2, cell.z + cell.size / 2);
-      const packed = new Float32Array(outline.length * 27);
-      let offset = 0;
-      for (let index = 0; index < outline.length; index++) {
-        for (const point of [center, outline[index], outline[(index + 1) % outline.length]]) {
-          packed.set(point, offset);
-          packed.set([198, 207, 169], offset + 3);
-          packed.set(NormalAt(point[0], point[2]), offset + 6);
-          offset += 9;
-        }
-      }
-      packedSurfaceCache.set(cell, packed);
-      return packed;
-    }
-    if(packedFaceCache.has(cell)) return packedFaceCache.get(cell);
-    const faces=FacesForCell(cell),packed=new Float32Array(faces.length*27);
+  const PackedFacesForCell=(cell,textured=false,boundaries=fullBoundaries)=>{
+    const record=MeshForCell(cell,boundaries,textured);
+    if(record.packed) return record.packed;
+    const faces=record.faces,packed=new Float32Array(faces.length*27);
     let offset=0;
     for(const face of faces) for(let index=0;index<3;index++) {
       packed.set(face.points[index],offset);
@@ -385,9 +424,12 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map) {
       packed.set(face.vertexNormals[index],offset+6);
       offset+=9;
     }
-    packedFaceCache.set(cell,packed);return packed;
+    record.packed=packed;
+    return packed;
   };
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,colorRangeForCell:ColorRangeForCell,facesForCell:FacesForCell,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,
+    heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,colorRangeForCell:ColorRangeForCell,
+    facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,cells,plan,source:scene.terrain.file,bounds};
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map) {
