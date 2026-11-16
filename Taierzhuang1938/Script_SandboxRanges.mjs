@@ -87,7 +87,7 @@ const PLUGINS = {
         ScaleDt:dt=>runtime.active&&runtime.ready&&!runtime.paused&&!runtime.failed&&!runtime.plan.completed?dt:0,
         CapturesInput:()=>runtime.CapturesInput(),
         OnKey:detail=>runtime.OnKey(detail),
-        OnPlayerDown:()=>{runtime.failed=true;runtime.RenderHud();runtime.Send("state",{state:runtime.State()});return true;},
+        OnPlayerDown:()=>runtime.Fail(),
         ViewportSize:()=>runtime.view.Size(),
         AfterRender:(dt,options)=>runtime.AfterRender(dt,options),
         Warmup:onStep=>runtime.Warmup(onStep),

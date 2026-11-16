@@ -1033,6 +1033,7 @@ const ctx = {
   RenderScene,
   RequestPointerLock,
   RespawnPlayer,
+  ActivateSlot,
   SeedSoldiers,
   ShowPauseMenu,
   SlotWeaponId,

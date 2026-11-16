@@ -5,9 +5,11 @@ import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
+import {EncounterPlayPlan} from "./Script_EncounterPlayPlan.mjs";
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const out=path.join(root,"tmp/EncounterPlay");await fs.mkdir(out,{recursive:true});
-const server=await ServeRoot(root,0),browser=await LaunchBrowser();
+const server=process.env.ENCOUNTER_TEST_BASE?null:await ServeRoot(root,0),browser=await LaunchBrowser();
+const base=process.env.ENCOUNTER_TEST_BASE||"http://127.0.0.1:"+server.address().port;
 const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1});
 const errors=[];page.on("pageerror",e=>errors.push(e.message));
 page.on("console",message=>{if(message.type()==="error"&&/THREE\.WebGL|Shader Error|INVALID_OPERATION/.test(message.text()))errors.push(message.text());});
@@ -22,7 +24,7 @@ async function Ready(){
  return page.frames().find(f=>f.url().includes("encounterPlay=1"));
 }
 try{
- await page.goto("http://127.0.0.1:"+server.address().port+"/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=0");
+ await page.goto(base+"/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=0");
  await page.waitForFunction(()=>window.LevelFlow);
  assert.ok(await page.locator("#playGame").isDisabled(),"Opening movie cannot be played");
  assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
@@ -92,6 +94,72 @@ try{
  assert.deepEqual(await frame.evaluate(()=>({health:Tengxian.player.health,grenades:Tengxian.state.grenades,bundles:Tengxian.state.bundles})),{health:100,grenades:3,bundles:2});
  assert.ok(warmMs<coldMs*.6&&warmMs<12000,"Repeated Play reuses its warmed host");
  await page.locator("#stopGame").click();
+ await page.evaluate(time=>LevelFlow.Seek(time),BeatById("05b").start);
+ await page.locator("#playGame").click();frame=await Ready();
+ const checkpoint=await frame.evaluate(()=>({ammo:Tengxian.state.ammo,clips:Tengxian.state.clips,grenades:Tengxian.state.grenades,
+   health:Tengxian.player.health,actors:Tengxian.Debug.EncounterPlay.State().actors.map(actor=>actor.id).sort()}));
+ const KillPlayer=()=>frame.evaluate(()=>{
+   const g=Tengxian;
+   g.Debug.Throw("Grenade",30);
+   g.state.ammo=0;g.player.health=1;g.player.spawnGrace=0;g.player.SetDebugOptions({invincible:false});
+   g.player.TakeHit(1000,"head",null,{bullet:true});g.StepFrames(2,1/60,false);
+   return {alive:g.player.Alive,state:g.Debug.EncounterPlay.State()};
+ });
+ const death=await KillPlayer();assert.equal(death.alive,false);assert.ok(death.state.failed);
+ await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
+ assert.ok(await page.locator("#playGame").isEnabled(),"Death exposes a toolbar retry");
+ assert.match(await page.locator("#playStatus").textContent(),/R.*重来/);
+ await page.screenshot({path:path.join(out,"PlayDeathRetry.png"),timeout:120000});
+ await frame.locator("body").focus();await page.keyboard.press("r");
+ await frame.waitForFunction(()=>Tengxian.player.Alive&&!Tengxian.Debug.EncounterPlay.State().failed);
+ const RetryState=()=>frame.evaluate(()=>({ammo:Tengxian.state.ammo,clips:Tengxian.state.clips,grenades:Tengxian.state.grenades,
+   health:Tengxian.player.health,actors:Tengxian.Debug.EncounterPlay.State().actors.map(actor=>actor.id).sort()}));
+ assert.deepEqual(await RetryState(),checkpoint,"Keyboard retry restores the current checkpoint and supplies");
+ assert.equal((await State()).hostId,hostId);assert.equal((await State()).startBeat,"05b");
+ assert.equal(await frame.evaluate(()=>Tengxian.combat.projectiles.length),0);
+ assert.equal(await frame.evaluate(()=>Tengxian.viewmodel.deathHands),null);
+ const MoveAfterRetry=async()=>{
+   const before=await frame.evaluate(()=>Tengxian.player.position.toArray());
+   await frame.locator("body").focus();await page.keyboard.down("w");
+   await frame.evaluate(()=>Tengxian.StepFrames(24,1/60,false));await page.keyboard.up("w");
+   const after=await frame.evaluate(()=>Tengxian.player.position.toArray());
+   assert.ok(Math.hypot(after[0]-before[0],after[2]-before[2])>.2,"Movement resumes after death retry");
+ };
+ await MoveAfterRetry();
+ await KillPlayer();await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
+ await page.locator("#playGame").click();
+ await frame.waitForFunction(()=>Tengxian.player.Alive&&!Tengxian.Debug.EncounterPlay.State().failed);
+ assert.deepEqual(await RetryState(),checkpoint,"Toolbar retry restores the same checkpoint");
+ await MoveAfterRetry();
+ await KillPlayer();await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
+ await page.locator("#playGame").focus();await page.keyboard.press("r");
+ await frame.waitForFunction(()=>Tengxian.player.Alive&&!Tengxian.Debug.EncounterPlay.State().failed);
+ assert.deepEqual(await RetryState(),checkpoint,"R also retries when the outer toolbar owns focus");
+ await page.screenshot({path:path.join(out,"PlayDeathRecovered.png"),timeout:120000});
+ const nextArea=new EncounterPlayPlan(JSON.parse(before.document),BeatById("05b").start).Area().center;
+ await frame.evaluate(point=>{
+   const g=Tengxian;g.state.ammo=3;g.Debug.Key(g.Debug.SlotKey("melee"));
+   g.player.position.set(point[0],g.battlefield.GroundHeight(...point),point[1]);
+   g.player.body.Teleport(...g.player.position.toArray());g.StepFrames(3,1/60,false);
+ },nextArea);
+ assert.equal((await State()).beat,"05c","Actual arrival advances to the next checkpoint");
+ assert.equal(await frame.evaluate(()=>Tengxian.state.activeSlot),"melee");
+ await KillPlayer();await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
+ await page.locator("#playGame").click();
+ await frame.waitForFunction(()=>Tengxian.player.Alive&&!Tengxian.Debug.EncounterPlay.State().failed);
+ assert.equal((await State()).startBeat,"05c","Retry uses the current beat after continuous progression");
+ const restoredSlots=await frame.evaluate(()=>Tengxian.Debug.Slots());
+ assert.equal(restoredSlots.active,"melee");assert.equal(restoredSlots.weapon,"Dadao");
+ assert.equal(restoredSlots.viewmodel,"Dadao");assert.equal(restoredSlots.mags.primary.ammo,3);
+ await page.locator("#stopGame").click();
+ assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),BeatById("05b").start);
+ await page.evaluate(time=>LevelFlow.Seek(time),BeatById("08g").start);
+ await page.locator("#playGame").click();frame=await Ready();
+ await KillPlayer();await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
+ await frame.locator("body").focus();await page.keyboard.press("r");
+ await frame.waitForFunction(()=>Tengxian.player.Alive&&!Tengxian.Debug.EncounterPlay.State().failed);
+ assert.equal((await State()).startBeat,"08g","Retry skips the nonplayable 08F cinematic checkpoint");
+ await page.locator("#stopGame").click();
  await page.evaluate(()=>LevelFlow.Seek(0));assert.ok(await page.locator("#playGame").isDisabled());
  await page.selectOption("#playGameStart","beginning");await page.locator("#playGame").click();frame=await Ready();
  state=await State();assert.equal(state.startBeat,"02g");assert.ok(!state.dead.includes("opening4"));
@@ -101,9 +169,10 @@ try{
  await page.selectOption("#playGameStart","current");await page.evaluate(time=>LevelFlow.Seek(time),BeatById("08f").start);
  assert.ok(await page.locator("#playGame").isDisabled());assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,hostId,errors,checks:"camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop"},null,2));
- console.log("ok  Play controls, event-driven timeline, skipped cinematics, sidebar hints and state reset; first "+(coldMs/1000).toFixed(2)+" s, repeat "+(warmMs/1000).toFixed(2)+" s");
+ await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,hostId,errors,checkpoint,restoredSlots,
+   checks:"camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop; death retry by keyboard and toolbar; outer R; continued movement; current-beat checkpoint; melee and stored ammo restoration; cinematic checkpoint skipped"},null,2));
+ console.log("ok  Play controls, death retry, current checkpoint inventory, event-driven timeline, skipped cinematics and state reset; first "+(coldMs/1000).toFixed(2)+" s, repeat "+(warmMs/1000).toFixed(2)+" s");
 }catch(error){
  console.log(JSON.stringify(await page.evaluate(()=>({status:document.getElementById("playStatus")?.textContent,loading:document.querySelector(".lfPlayLoading")?.textContent,state:window.LevelFlow?.Play.State()})).catch(()=>null)));
  throw error;
-}finally{await browser.close();await new Promise(r=>server.close(r));}
+}finally{await browser.close();if(server)await new Promise(r=>server.close(r));}

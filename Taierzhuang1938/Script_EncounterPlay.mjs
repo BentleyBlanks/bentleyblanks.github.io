@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EncounterPlayPlan, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+import { EncounterPlayPlan, EncounterCanPlay, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
 import { EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, FLOW_TIMELINE } from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import { VillageStealthRules, VillageStealthAt, StageVillageCompanions } from "./Scenes/FirstLevelEncounter/Script_LevelFlowVillage.mjs";
 import { SampleBeatRoute } from "./Scenes/FirstLevelEncounter/Script_LevelFlowGeometry.mjs";
@@ -37,7 +37,7 @@ export class EncounterPlay {
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
     this.BuildUi();
     this.api={State:()=>this.State(),SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
-      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:()=>this.RetryStealth(),Begin:p=>this.Begin(p),Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
+      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:()=>this.Retry(),Begin:p=>this.Begin(p),Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
     this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);console.error(error);this.Send("error",{message:String(error.message||error)});});
   }
   BuildUi() {
@@ -66,7 +66,7 @@ export class EncounterPlay {
     this.host.state.clips=CONFIG.inventory.spareClips;
     if(this.host.state.mags.primary)this.host.state.mags.primary.clips=CONFIG.inventory.spareClips;
     this.host.state.grenades=CONFIG.inventory.grenades;this.host.state.bundles=CONFIG.inventory.bundles;
-    this.RestoreStealthInventory();
+    this.RestoreCheckpointInventory();
     this.host.player.SetDebugOptions({invincible:false,infiniteStamina:false});
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
@@ -254,20 +254,13 @@ export class EncounterPlay {
     if(this.failed){this.RenderHud();return;}
     const {player,state}=this.host;
     for(const [id,entry] of this.entries)if(!entry.soldier.alive)this.plan.Kill(id);
-    if(!player.Alive){const changed=!this.failed;this.failed=true;this.host.audio.Music(null,{fadeOut:0.2});this.RenderHud();if(changed)this.Send("state",{state:this.State()});return;}
+    if(!player.Alive){this.Fail();return;}
     const alive=this.AliveIds();
     const before=this.plan.Frame();
     const stealth=this.stealth.Update(before,dt,this.entries);
-    if(stealth.active && this.checkpointTime!==stealth.checkpoint) {
-      this.checkpointTime=stealth.checkpoint;
-      if(!this.checkpointInventory || before.beat.id==="09a") this.checkpointInventory={weapon:this.host.Weapon(),
-        ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,health:player.health,
-        bleeding:player.bleeding,bandages:player.bandages,stamina:player.stamina,wounds:structuredClone(player.wounds)};
-    }
+    this.SaveCheckpoint();
     if(stealth.failed) {
-      this.failed=true;
-      this.host.audio.Music(null,{fadeOut:0.2});
-      this.RenderHud(before);this.Send("state",{state:this.State()});return;
+      this.Fail();return;
     }
     if(stealth.alarm && !this.alarmAnnounced) {
       this.alarmAnnounced=true;
@@ -283,6 +276,7 @@ export class EncounterPlay {
     const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
     if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
     const frame=this.plan.Frame();
+    this.SaveCheckpoint();
     if(previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
       this.templeEnteredAt=this.plan.elapsed;
       for(const entry of this.entries.values())if(entry.actor.groupId==="TempleSearch") {
@@ -377,7 +371,7 @@ export class EncounterPlay {
     return true;
   }
   OnKey(detail) {
-    if(detail.code==="KeyR" && detail.down && !detail.repeat && this.failed && this.stealth.state?.active)return this.RetryStealth();
+    if(detail.code==="KeyR" && detail.down && !detail.repeat && this.failed)return this.Retry();
     if(this.stealth.CapturesInput() && detail.down && !["Escape","KeyO"].includes(detail.code))return true;
     if(detail.code==="KeyO"&&this.view.count===2) {
       if(detail.down&&!detail.repeat) {
@@ -401,7 +395,7 @@ export class EncounterPlay {
     const dialogue=frame.dialogue.filter(line=>!this.plan.dead.has(line.actorId));
     const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
     const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
-    const help=[hint,actions,notice].filter(Boolean).join(" · ");
+    const help=(this.failed?[hint]:[hint,actions,notice]).filter(Boolean).join(" · ");
     const key=JSON.stringify([title,status,help,dialogue]);
     if(key===this.hudKey)return;this.hudKey=key;
     this.hudInfo={title,task:status,hint:help};
@@ -424,24 +418,58 @@ export class EncounterPlay {
       || VillageStealthAt(this.plan.time,FLOW_TIMELINE).locked
       || this.view.count===2&&this.view.focused;
   }
-  RestoreStealthInventory() {
+  Fail() {
+    this.failed=true;
+    this.host.audio.Music(null,{fadeOut:0.2});
+    this.RenderHud();this.Send("state",{state:this.State()});
+    return true;
+  }
+  SaveCheckpoint() {
+    const stealth=VillageStealthAt(this.plan.time,FLOW_TIMELINE);
+    const desiredTime=stealth.active?stealth.checkpoint:this.plan.beat.start;
+    if(this.checkpointTime===desiredTime)return;
+    // The approach checkpoint can reference a skipped cinematic (08F).
+    const time=FLOW_TIMELINE.find(beat=>beat.start>=desiredTime&&EncounterCanPlay(beat.start)).start;
+    if(this.checkpointTime===time)return;
+    const preserveInventory=this.checkpointTime===null&&stealth.active&&this.checkpointInventory;
+    this.checkpointTime=time;
+    // Entering the temple keeps the supplies saved at its approach checkpoint.
+    if(preserveInventory)return;
+    const {state,player}=this.host;
+    const mags=structuredClone(state.mags);
+    if(mags[state.activeSlot])Object.assign(mags[state.activeSlot],{ammo:state.ammo,clips:state.clips});
+    this.checkpointInventory={weapon:this.host.Weapon(),activeSlot:state.activeSlot,lastGunSlot:state.lastGunSlot,
+      slots:{...state.slots},mags,weaponVariants:{...state.weaponVariants},bayonets:{...state.bayonets},
+      bayonetFixed:state.bayonetFixed,fireMode:state.fireMode,
+      ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,health:player.health,
+      bleeding:player.bleeding,bandages:player.bandages,stamina:player.stamina,wounds:structuredClone(player.wounds)};
+  }
+  RestoreCheckpointInventory() {
     const saved=this.checkpointInventory;
     if(!saved)return;
     const {state,player}=this.host;
-    if(saved.weapon && this.host.Weapon()!==saved.weapon)this.host.Pickup(saved.weapon);
+    if(saved.slots) {
+      for(const key of ["slots","mags","weaponVariants","bayonets"])state[key]=structuredClone(saved[key]);
+      this.host.ctx.ActivateSlot(saved.activeSlot);
+      Object.assign(state,{lastGunSlot:saved.lastGunSlot,bayonetFixed:saved.bayonetFixed,fireMode:saved.fireMode});
+    } else if(saved.weapon && this.host.Weapon()!==saved.weapon)this.host.Pickup(saved.weapon);
     Object.assign(state,{ammo:saved.ammo,clips:saved.clips,grenades:saved.grenades,bundles:saved.bundles});
-    if(state.mags.primary)Object.assign(state.mags.primary,{ammo:saved.ammo,clips:saved.clips});
+    if(state.mags[state.activeSlot])Object.assign(state.mags[state.activeSlot],{ammo:saved.ammo,clips:saved.clips});
     for(const key of ["health","bleeding","bandages","stamina"]) {
       if(saved[key]!==undefined)player[key]=saved[key];
     }
     if(saved.wounds)player.wounds=structuredClone(saved.wounds);
   }
-  RetryStealth() {
-    if(!this.active || this.paused || !this.failed || !this.stealth.state?.active)return false;
-    const plan=new EncounterPlayPlan(this.plan.document,this.stealth.state.checkpoint);
+  Retry() {
+    if(!this.active || !this.ready || this.starting || this.disposed || !this.failed)return false;
+    const plan=new EncounterPlayPlan(this.plan.document,this.checkpointTime??this.plan.beat.start);
     const {player,state,combat,battlefield,vfx,ctx}=this.host;
+    this.host.audio.ResetSession();
+    ctx.gore?.ReleaseAll();ctx.meleeCombat?.Reset();
+    this.host.interact.Clear();this.host.interact.ClearGroundWeapons();ctx.ClearLooseGuns();
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     this.entries.clear();
+    this.host.ai.tactics.Reset();
     this.puppets.SyncFrame([],0);
     combat.ClearProjectiles();
     this.pendingActions.clear();
@@ -451,22 +479,27 @@ export class EncounterPlay {
     for(const source of this.smoke.values())vfx.RemoveSmokeSource(source);
     this.smoke.clear();
     Object.assign(this,{
-      plan,failed:false,alarmAnnounced:false,checkpointTime:null,templeEnteredAt:null,
+      plan,failed:false,paused:false,alarmAnnounced:false,templeEnteredAt:plan.beat.id==="09b"?0:null,
       orderClock:0,lastBeat:null,lastStateSent:-1,hudKey:null,signalKey:null,music:null
     });
+    ctx.RespawnPlayer(true);
     const p=plan.Frame().player;
     player.Spawn(...p,EncounterPlayerYaw(plan.beat));
-    this.RestoreStealthInventory();
-    Object.assign(state,{playerAliveLast:true,pendingRespawn:false,deathTimer:0,cooking:null,cook:0});
+    this.RestoreCheckpointInventory();
+    Object.assign(state,{playerAliveLast:true,pendingRespawn:false,deathTimer:0,cooking:null,cook:0,playerShots:0,lastShot:null,menu:false,running:true});
     ctx.ClearFirearmRequests();
     ctx.router.SetSuppressed(true);
     ctx.router.SetSuppressed(false);
-    ctx.viewmodel.Equip(this.host.Weapon(),state.weaponVariants.primary||0,{instant:true});
+    ctx.menu?.Close();this.host.hud.HideDeathCard?.();ctx.viewmodel.ResetDeath?.();
+    ctx.viewmodel.Equip(this.host.Weapon(),state.weaponVariants[state.activeSlot]||0,{instant:true});
+    ctx.SyncBayonet();
     ctx.viewmodel.root.visible=true;
     this.stealth.Reset();
     for(const actor of plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
     this.Update(0);
+    this.host.audio.SetPaused(false);this.host.audio.ctx?.resume().catch(()=>{});
+    this.Send("state",{state:this.State()});
     return true;
   }
   Dispose() {

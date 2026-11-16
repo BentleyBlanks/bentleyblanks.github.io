@@ -8,14 +8,15 @@ export class LevelFlowPlay {
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
-    this.button.onclick=()=>this.active?this.Pause(false):this.Start(this.menu.value);
+    this.button.onclick=()=>this.active?(this.state?.failed?this.Retry():this.Pause(false)):this.Start(this.menu.value);
     this.pauseButton.onclick=()=>this.Pause(!this.paused);this.stopButton.onclick=()=>this.Stop();
     this.menu.onchange=()=>this.UpdateControls();
     // Keyboard events do not cross iframe boundaries. Keep an escape route
     // when a toolbar/sidebar control owns focus while the game is running.
     document.addEventListener("keydown",event=>{
-      if(event.key!=="Escape"||event.repeat||!this.active||!this.state?.ready||this.launching)return;
-      event.preventDefault();this.Pause(!this.paused);
+      if(event.repeat||!this.active||!this.state?.ready||this.launching)return;
+      if(event.code==="KeyR"&&this.state.failed){event.preventDefault();this.Retry();}
+      if(event.key==="Escape"){event.preventDefault();this.Pause(!this.paused);}
     });
     window.addEventListener("message",e=>{
       if(!this.active||e.source!==this.frame?.contentWindow||e.origin!==location.origin||e.data?.token!==this.token)return;
@@ -29,8 +30,9 @@ export class LevelFlowPlay {
   SetCursorTime(time){this.cursorTime=time;this.UpdateControls();}
   UpdateControls() {
     const allowed=this.menu.value==="beginning"||EncounterCanPlay(this.cursorTime);
-    this.button.disabled=this.active?!this.paused:!allowed;
-    this.button.title=!allowed&&!this.active?"镜头动画段暂不支持 Play":this.paused?"继续 Play":"播放";
+    this.button.disabled=this.active?!this.paused&&!this.state?.failed:!allowed;
+    this.button.title=!allowed&&!this.active?"镜头动画段暂不支持 Play":this.state?.failed?"从检查点重新开始":this.paused?"继续 Play":"播放";
+    this.button.setAttribute("aria-label",this.state?.failed?"重新开始 Play":"Play");
     this.button.setAttribute("aria-pressed",String(this.active&&!this.paused));
     this.pauseButton.disabled=!this.active||!this.state?.ready||this.launching;
     this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
@@ -105,6 +107,14 @@ export class LevelFlowPlay {
     this.state=this.frame.contentWindow.Tengxian.Debug.EncounterPlay.State();this.onState?.(this.state);this.UpdateControls();
     if(!this.paused)this.frame.focus();
     return this.paused;
+  }
+  Retry() {
+    if(!this.active||!this.state?.failed||!this.state.ready)return false;
+    const api=this.frame.contentWindow.Tengxian.Debug.EncounterPlay;
+    if(!api.Retry())return false;
+    this.state=api.State();this.paused=!!this.state.paused;
+    this.onState?.(this.state);this.UpdateControls();this.frame.focus();
+    return true;
   }
   LoadError(message){
     clearInterval(this.timer);clearTimeout(this.deadline);this.launching=false;
