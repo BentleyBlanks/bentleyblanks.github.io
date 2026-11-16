@@ -1,7 +1,7 @@
 import { FLOW_ZOOM } from "../../Data_Tuning_LevelFlow.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED } from "./Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
@@ -140,7 +140,7 @@ export function CreateEncounterDocument(timeline, waves) {
   triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
     mode:"time",delay:0,area:structuredClone(patrol.area)});
   for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-16-camp-cover-1",triggers,groups,annotations:[]};
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-17-camp-scatter-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -729,6 +729,7 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision===FLOW_PREVIOUS_CAMP_ALIGNED.revision) return UpgradeCampScatter(structuredClone(input),defaults);
   const upgraded=input.revision===FLOW_PREVIOUS_CAMP_COVER.revision
     ? structuredClone(input) : UpgradeTempleEncounterDocument(input,defaults);
   if(upgraded===input) return input;
@@ -742,8 +743,24 @@ export function UpgradeEncounterDocument(input,defaults) {
       }
     }
   }
-  upgraded.revision=defaults.revision;
-  return upgraded;
+  return UpgradeCampScatter(upgraded,defaults);
+}
+
+// Untouched aligned-wall routes move to the scattered roadside cover. Edited
+// routes, delays, counts, switches and deleted groups stay as authored.
+function UpgradeCampScatter(value,defaults) {
+  for(const previous of FLOW_PREVIOUS_CAMP_ALIGNED.groups) {
+    const current=value.groups.find(group=>group.id===previous.id);
+    const next=defaults.groups.find(group=>group.id===previous.id);
+    if(!current || !next || ["area","route","spawnOffsets"].some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]))) continue;
+    for(const [index,plan] of (current.memberPlans||[]).entries()) {
+      if(JSON.stringify(plan.route)===JSON.stringify(previous.memberPlans[index]?.route)) {
+        plan.route=structuredClone(next.memberPlans[index].route);
+      }
+    }
+  }
+  value.revision=defaults.revision;
+  return value;
 }
 
 function UpgradeTempleEncounterDocument(input,defaults) {

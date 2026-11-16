@@ -13,7 +13,7 @@ import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
-import { FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED, FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleFlowDialogue } from "./AdvancedTools/Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./AdvancedTools/Data_LevelFlow.mjs";
@@ -958,39 +958,91 @@ for(const x of [60,120,150]) {
   assert.ok(bank-lip>0.6,"spoil is heaped on the village (south) lip");
   assert.ok(encounterTerrain.heightAt(x,centre+1.2)<floor+0.3&&encounterTerrain.heightAt(x,centre-1.4)>floor+0.5,"north wall slopes while the south wall stays sheer");
 }
-const campCoverIds={GroundWest:"Encounter_FieldWestBerm",GroundEast:"Encounter_FieldEastWall"};
-for(const stamp of [530.113,BeatById("04a").start+20,holdRelease-0.3]) {
+// 2026-11-17: the eight camp defenders hold behind separate roadside blocks
+// of different sizes and materials instead of one straight wall per flank.
+const campCoverIds={
+  GroundWest_0:["RoadWestRubble"],GroundWest_1:["RoadWestCratesSouth","RoadWestCratesWest"],
+  GroundWest_2:["RoadWestMound"],GroundWest_3:["RoadWestBags","RoadWestBagsEnd"],
+  GroundEast_0:["RoadEastCratesSouth","RoadEastCratesWest"],GroundEast_1:["RoadEastWall","RoadEastWallFoot"],
+  GroundEast_2:["RoadEastBerm","RoadEastBermEnd"],GroundEast_3:["RoadEastBagsWest","RoadEastBagsFoot"],
+};
+const campCoverObjects=Object.fromEntries(Object.entries(campCoverIds).map(([actorId,ids])=>[actorId,ids.map(id=>{
+  const object=encounterScene.objects.find(entry=>entry.id===`Encounter_${id}`);
+  assert.ok(object,id+" exists in the encounter scene");
+  assert.equal(object.solid,true);assert.ok(object.cover,id+" is tagged as cover");
+  return object;
+})]));
+assert.ok(!encounterScene.objects.some(object=>["Encounter_FieldWestBerm","Encounter_FieldEastWall"].includes(object.id)),"the two straight camp walls are gone");
+assert.equal(new Set(Object.values(campCoverObjects).flat().map(object=>object.id)).size,14,"every roadside block is distinct");
+assert.ok(new Set(Object.values(campCoverObjects).flat().map(object=>object.material)).size>=4,"roadside cover mixes earth, sandbag, timber and rubble");
+function HitsCover(from,to,object) {
+  const [x,base,z]=object.pos,[width,height,depth]=object.size;
+  const fraction=EnterArea(from,to,{shape:"rect",center:[x,z],size:[width,depth]});
+  if(fraction===null) return false;
+  const torso=encounterTerrain.heightAt(...from)+0.8,eye=encounterTerrain.heightAt(...to)+1.6;
+  const hitHeight=torso+(eye-torso)*fraction;
+  return hitHeight>base && hitHeight<base+height;
+}
+for(const stamp of [530.113,BeatById("04a").start+20,BeatById("04b").start+10,BeatById("04d").start+5,holdRelease-0.3]) {
   const frame=EvaluateFlow(stamp);
-  for(const [groupId,coverId] of Object.entries(campCoverIds)) {
-    const cover=encounterScene.objects.find(object=>object.id===coverId);
-    const members=frame.actors.filter(actor=>actor.groupId===groupId);
-    assert.equal(members.length,4,"both camp flanks retain four defenders");
-    const [x,base,z]=cover.pos,[width,height,depth]=cover.size;
-    const area={shape:"rect",center:[x,z],size:[width,depth]};
-    for(const actor of members) {
-      assert.ok(actor.p[0]>x+width/2+0.34 && actor.p[0]<x+width/2+1,"camp defenders occupy the protected side with body clearance");
-      for(const observer of [frame.player,...frame.actors.filter(friend=>friend.coveringEvacuation).map(friend=>friend.p)]) {
-        const fraction=EnterArea(actor.p,observer,area);
-        assert.notEqual(fraction,null,actor.id+" has cover between it and the camp firing line");
-        const torso=encounterTerrain.heightAt(...actor.p)+0.8;
-        const eye=encounterTerrain.heightAt(...observer)+1.6;
-        const hitHeight=torso+(eye-torso)*fraction;
-        assert.ok(hitHeight>base && hitHeight<base+height,actor.id+" lower torso is shielded by the real cover volume");
-      }
+  const holds=[];
+  for(const [actorId,objects] of Object.entries(campCoverObjects)) {
+    const actor=frame.actors.find(entry=>entry.id===actorId);
+    assert.ok(actor && actor.pose!=="dead",actorId+" holds at "+stamp);
+    holds.push(actor.p);
+    assert.ok(actor.p[1]<=119.5,"camp defenders stay north of the loading area");
+    assert.ok(objects.some(object=>{
+      const [x,,z]=object.pos,[width,,depth]=object.size;
+      return Math.abs(actor.p[0]-x)<width/2+1.8 && Math.abs(actor.p[1]-z)<depth/2+1.8;
+    }),actorId+" stands next to its own cover");
+    for(const observer of [frame.player,...frame.actors.filter(friend=>friend.coveringEvacuation).map(friend=>friend.p)]) {
+      assert.ok(objects.some(object=>HitsCover(actor.p,observer,object)),actorId+" lower torso is shielded by its own real cover volume");
+    }
+  }
+  for(const flank of ["GroundWest","GroundEast"]) {
+    const spots=holds.filter((_,index)=>Object.keys(campCoverIds)[index].startsWith(flank));
+    const spread=axis=>Math.max(...spots.map(point=>point[axis]))-Math.min(...spots.map(point=>point[axis]));
+    assert.equal(spots.length,4);
+    assert.ok(spread(0)>=8 && spread(1)>=6,flank+" defenders are scattered in both depth and width");
+    for(const [index,a] of spots.entries()) for(const b of spots.slice(index+1)) assert.ok(Distance(a,b)>=4,flank+" defenders do not bunch up in a line");
+  }
+}
+const campCoverShapes=Object.values(campCoverObjects).flat();
+for(let stamp=BeatById("03h").start;stamp<BeatById("05a").end;stamp+=0.1) {
+  for(const actor of EvaluateFlow(stamp).actors.filter(actor=>Object.hasOwn(campCoverIds,actor.id))) {
+    for(const cover of campCoverShapes) {
+      assert.ok(Math.abs(actor.p[0]-cover.pos[0])>cover.size[0]/2+0.3 || Math.abs(actor.p[1]-cover.pos[2])>cover.size[2]/2+0.3,actor.id+" enters and leaves camp cover without clipping "+cover.id);
     }
   }
 }
-for(let stamp=BeatById("03h").start;stamp<BeatById("05a").end;stamp+=0.1) {
-  for(const actor of EvaluateFlow(stamp).actors.filter(actor=>Object.hasOwn(campCoverIds,actor.groupId))) {
-    const cover=encounterScene.objects.find(object=>object.id===campCoverIds[actor.groupId]);
-    assert.ok(Math.abs(actor.p[0]-cover.pos[0])>cover.size[0]/2+0.34 || Math.abs(actor.p[1]-cover.pos[2])>cover.size[2]/2+0.34,actor.id+" enters and leaves camp cover without clipping it");
+// Spawn and approach stay hidden: no defender is in view of the player before it reaches its block.
+for(let stamp=BeatById("03h").start;stamp<BeatById("04a").start+6;stamp+=0.5) {
+  const frame=EvaluateFlow(stamp);
+  const eye=[frame.player[0],encounterTerrain.heightAt(...frame.player)+1.65,frame.player[1]];
+  for(const actor of frame.actors.filter(actor=>Object.hasOwn(campCoverIds,actor.id))) {
+    for(const height of [0.3,0.8,1.7]) {
+      const target=[actor.p[0],encounterTerrain.heightAt(...actor.p)+height,actor.p[1]];
+      assert.ok(SightBlockedByTerrain(eye,target,campCoverShapes),actor.id+" is not in the player's view while spawning and walking in at "+stamp);
+    }
   }
+}
+function SightBlockedByTerrain(from,to,objects) {
+  const distance=Math.hypot(...to.map((value,axis)=>value-from[axis])),steps=Math.ceil(distance/0.1);
+  for(let index=1;index<steps;index++) {
+    const point=from.map((value,axis)=>value+(to[axis]-value)*index/steps);
+    if(encounterTerrain.heightAt(point[0],point[2])>point[1]) return true;
+    for(const object of objects) {
+      const [x,base,z]=object.pos,[width,height,depth]=object.size;
+      if(Math.abs(point[0]-x)<width/2&&Math.abs(point[2]-z)<depth/2&&point[1]>encounterTerrain.heightAt(x,z)&&point[1]<encounterTerrain.heightAt(x,z)+height) return true;
+    }
+  }
+  return false;
 }
 const oldCampCover=structuredClone(defaults);
 oldCampCover.revision=FLOW_PREVIOUS_CAMP_COVER.revision;
 for(const previous of FLOW_PREVIOUS_CAMP_COVER.groups) Object.assign(oldCampCover.groups.find(group=>group.id===previous.id),structuredClone(previous));
 const upgradedCampCover=UpgradeEncounterDocument(oldCampCover,defaults);
-for(const id of Object.keys(campCoverIds)) assert.deepEqual(upgradedCampCover.groups.find(group=>group.id===id).memberPlans,defaults.groups.find(group=>group.id===id).memberPlans);
+for(const id of ["GroundWest","GroundEast"]) assert.deepEqual(upgradedCampCover.groups.find(group=>group.id===id).memberPlans,defaults.groups.find(group=>group.id===id).memberPlans);
 const editedCampCover=structuredClone(oldCampCover);
 const editedWest=editedCampCover.groups.find(group=>group.id==="GroundWest");
 editedWest.memberPlans[0].route[0][0]+=2;
@@ -1008,6 +1060,22 @@ assert.deepEqual(preservedCampCover.groups.find(group=>group.id==="GroundEast"),
 const deletedCampCover=structuredClone(oldCampCover);
 deletedCampCover.groups=deletedCampCover.groups.filter(group=>group.id!=="GroundWest");
 assert.ok(!UpgradeEncounterDocument(deletedCampCover,defaults).groups.some(group=>group.id==="GroundWest"));
+// Drafts saved with the straight-wall camp upgrade to the scattered cover; edits are kept.
+const alignedCamp=structuredClone(defaults);
+alignedCamp.revision=FLOW_PREVIOUS_CAMP_ALIGNED.revision;
+for(const previous of FLOW_PREVIOUS_CAMP_ALIGNED.groups) Object.assign(alignedCamp.groups.find(group=>group.id===previous.id),structuredClone(previous));
+const scatteredCamp=UpgradeEncounterDocument(alignedCamp,defaults);
+assert.equal(scatteredCamp.revision,defaults.revision);
+for(const id of ["GroundWest","GroundEast"]) assert.deepEqual(scatteredCamp.groups.find(group=>group.id===id).memberPlans,defaults.groups.find(group=>group.id===id).memberPlans);
+const editedAligned=structuredClone(alignedCamp);
+const editedAlignedWest=editedAligned.groups.find(group=>group.id==="GroundWest");
+editedAlignedWest.memberPlans[2].route[0][0]+=1.5;editedAlignedWest.count=3;
+editedAligned.groups=editedAligned.groups.filter(group=>group.id!=="GroundEast");
+const preservedAligned=UpgradeEncounterDocument(editedAligned,defaults);
+assert.deepEqual(preservedAligned.groups.find(group=>group.id==="GroundWest").memberPlans[2],editedAlignedWest.memberPlans[2],"a hand-moved hold point survives");
+assert.deepEqual(preservedAligned.groups.find(group=>group.id==="GroundWest").memberPlans[0],defaults.groups.find(group=>group.id==="GroundWest").memberPlans[0]);
+assert.equal(preservedAligned.groups.find(group=>group.id==="GroundWest").count,3);
+assert.ok(!preservedAligned.groups.some(group=>group.id==="GroundEast"),"a deleted flank stays deleted");
 assert.equal(UpgradeEncounterDocument(defaults,defaults),defaults);
 const futureCampCover={...oldCampCover,revision:"future-camp-layout"};
 assert.equal(UpgradeEncounterDocument(futureCampCover,defaults),futureCampCover);
