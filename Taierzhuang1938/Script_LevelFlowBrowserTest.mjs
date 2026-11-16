@@ -336,18 +336,20 @@ try {
       view.terrainTiles.clear();const rebuilt=Draw();
       results.push({reused,panSamples:afterMove-before,equal:moved===rebuilt});
     }
-    view.scale=2.4;Draw();const beforeZoom=samples;
+    view.scale=2.4;Draw();const beforeSame=samples;
+    view.scale=2.6;Draw();const sameLevel=samples===beforeSame,beforeZoom=samples;
     view.scale=3;Draw();const zoomed=samples>beforeZoom,beforeReplace=samples;
     map.terrain={...map.terrain,preAt:(x,z)=>height(x,z)*2};Draw();const replaced=samples>beforeReplace;
     for(let index=0;index<140;index++) {view.center=[-900+index*13,0];Draw();}
     const bounded=view.terrainTiles.size<=FLOW_RENDERING.mapTerrain.maxTiles;
     view.center=[40,60];const returned=Draw();view.terrainTiles.clear();const rebuilt=Draw();
-    canvas.remove();return {results,zoomed,replaced,bounded,returned:returned===rebuilt,layoutReads};
+    canvas.remove();return {results,sameLevel,zoomed,replaced,bounded,returned:returned===rebuilt,layoutReads};
   });
   assert.ok(mapTerrainCache.results.every(result=>result.reused&&result.equal&&result.panSamples===0),
     '2D pan reuses world-aligned terrain tiles and matches a fresh draw at every tested zoom');
+  assert.ok(mapTerrainCache.sameLevel,'zooming within one terrain level only rescales the cached tiles');
   assert.ok(mapTerrainCache.zoomed&&mapTerrainCache.replaced&&mapTerrainCache.bounded&&mapTerrainCache.returned,
-    'terrain tiles rebuild for zoom and source changes, stay bounded, and recover after eviction');
+    'terrain tiles rebuild for level and source changes, stay bounded, and recover after eviction');
   assert.equal(mapTerrainCache.layoutReads,0,'terrain sampling never reads layout per cell');
   const landmarkLabels=await page.evaluate(async()=>{
     const {FlowMapView}=await import('./Script_LevelFlowView.mjs');

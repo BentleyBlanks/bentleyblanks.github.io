@@ -17,7 +17,7 @@ export const FLOW_RENDERING = {
   haze: {startM:300, endM:1800, strength:0.82},
   tree: {minHeightM:2.5, crownWidthRatio:0.27, crownMaxM:3, crownBaseRatio:0.45, trunkMaxM:0.5},
   navigation: {wheelSettleMs:120},
-  mapTerrain: {tilePixels:128,maxTiles:96},
+  mapTerrain: {tileCells:128,maxTiles:96,minStepM:0.5,maxLevel:7},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
   lighting: {
     ambient:0.48, direct:0.52,

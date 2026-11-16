@@ -174,42 +174,46 @@ export class FlowMapView {
   DrawTerrain(context,width,height) {
     const terrain=this.mapData.terrain;
     if(!terrain) return;
-    const scale=this.scale,ratio=Math.min(2,window.devicePixelRatio||1);
-    const key=`${scale},${ratio}`;
-    if(this.tileTerrain!==terrain||this.terrainTileKey!==key) {
-      this.terrainTiles.clear();this.tileTerrain=terrain;this.terrainTileKey=key;
-    }
-    const step=Math.max(0.5,2/scale),cells=Math.max(1,Math.floor(FLOW_RENDERING.mapTerrain.tilePixels/(step*scale)));
-    const tileMetres=cells*step,tilePixels=tileMetres*scale,bounds=terrain.bounds;
+    const scale=this.scale,{tileCells:cells,minStepM,maxLevel}=FLOW_RENDERING.mapTerrain;
+    // Shading is sampled on a fixed world grid per power-of-two level and only
+    // stretched to the current zoom, so continuous zoom or follow framing
+    // never invalidates the tiles. Crossing a level boundary builds new tiles.
+    const level=Clamp(Math.round(Math.log2(Math.max(minStepM,2/scale)/minStepM)),0,maxLevel);
+    if(this.tileTerrain!==terrain) {this.terrainTiles.clear();this.tileTerrain=terrain;}
+    const step=minStepM*2**level,tileMetres=cells*step,tilePixels=tileMetres*scale,bounds=terrain.bounds;
     const left=(bounds.minX-this.center[0])*scale+width/2,top=(bounds.minZ-this.center[1])*scale+height/2;
     const minX=Math.max(0,Math.floor(-left/tilePixels)),minZ=Math.max(0,Math.floor(-top/tilePixels));
     const maxX=Math.min(Math.ceil((bounds.maxX-bounds.minX)/tileMetres),Math.ceil((width-left)/tilePixels));
     const maxZ=Math.min(Math.ceil((bounds.maxZ-bounds.minZ)/tileMetres),Math.ceil((height-top)/tilePixels));
     context.save();context.beginPath();
     context.rect(left,top,(bounds.maxX-bounds.minX)*scale,(bounds.maxZ-bounds.minZ)*scale);context.clip();
+    context.imageSmoothingEnabled=true;context.imageSmoothingQuality="low";
+    const size=cells+2;
     for(let row=minZ;row<maxZ;row++) for(let column=minX;column<maxX;column++) {
-      const tileKey=`${column},${row}`;
+      const tileKey=`${level}:${column},${row}`;
       let tile=this.terrainTiles.get(tileKey);
       if(!tile) {
-        tile=document.createElement("canvas");tile.width=tile.height=Math.ceil(tilePixels*ratio);
-        const paint=tile.getContext("2d");paint.scale(ratio,ratio);
-        const originX=bounds.minX+column*tileMetres,originZ=bounds.minZ+row*tileMetres,sample=terrain.preAt;
-        // Include the previous cell's half-pixel overlap at tile boundaries.
-        // Samples stay fixed in world space as the camera pans.
-        for(let z=-1;z<cells;z++) for(let x=-1;x<cells;x++) {
-          const worldX=originX+x*step,worldZ=originZ+z*step;
+        tile=document.createElement("canvas");tile.width=tile.height=size;
+        const image=new ImageData(size,size),data=image.data,originX=bounds.minX+column*tileMetres,originZ=bounds.minZ+row*tileMetres,sample=terrain.preAt;
+        // One cell of border on every side comes from the neighbouring tiles'
+        // samples, so smoothed edges blend instead of fading to transparent.
+        for(let z=-1;z<=cells;z++) for(let x=-1;x<=cells;x++) {
+          const worldX=originX+(x+0.5)*step,worldZ=originZ+(z+0.5)*step;
           if(worldX<bounds.minX||worldX>=bounds.maxX||worldZ<bounds.minZ||worldZ>=bounds.maxZ) continue;
           const slope=(sample(worldX-step,worldZ)-sample(worldX+step,worldZ))*0.7
             +(sample(worldX,worldZ-step)-sample(worldX,worldZ+step))*0.45;
           const opacity=Math.min(0.28,Math.abs(slope)/step*0.45);
           if(opacity<0.015) continue;
-          paint.fillStyle=slope>0?`rgba(255,250,218,${opacity})`:`rgba(80,69,45,${opacity})`;
-          paint.fillRect(x*step*scale,z*step*scale,step*scale+0.5,step*scale+0.5);
+          const offset=((z+1)*size+x+1)*4;
+          if(slope>0) {data[offset]=255;data[offset+1]=250;data[offset+2]=218;}
+          else {data[offset]=80;data[offset+1]=69;data[offset+2]=45;}
+          data[offset+3]=Math.round(opacity*255);
         }
+        tile.getContext("2d").putImageData(image,0,0);
       }
       // Refresh insertion order so long pans retain the most recent tiles.
       this.terrainTiles.delete(tileKey);this.terrainTiles.set(tileKey,tile);
-      context.drawImage(tile,0,0,tilePixels*ratio,tilePixels*ratio,left+column*tilePixels,top+row*tilePixels,tilePixels,tilePixels);
+      context.drawImage(tile,1,1,cells,cells,left+column*tilePixels,top+row*tilePixels,tilePixels,tilePixels);
     }
     // Keep the visible set even on wide single-view layouts. Evict after the
     // draw so new edge tiles cannot evict visible tiles still awaiting reuse.
