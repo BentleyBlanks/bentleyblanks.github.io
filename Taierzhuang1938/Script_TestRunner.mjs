@@ -470,6 +470,7 @@ export const testDefs = {
   EditorBlockoutFirstLevel0105KeepInBrowserTest: { file: "Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs", timeoutMs: 900000, desc: "01–05 白盒玩家出不了沟（2026-10-21）：剧本通路在沟里且离空气墙够远、19 处低处 × 8 个方向跳 + 翻每帧都在沟里、射击台翻不过胸墙、顺沟走得到、手榴弹飞出沟、NPC 照常翻出沟" },
   RifleSlingClothBrowserTest: { file: "Script_RifleSlingClothBrowserTest.mjs", timeoutMs: 600000, desc: "背枪枪带布料模拟（2026-11-04）白盒实机：FirstLevel0105 02-7 国军（X Bot / 何有田）日军（日兵甲）的原带子都换成模拟的、身体取看得见那层、两头钉住、胸前贴身、拉长有上限、每根每帧耗时；关掉退回原带子；预演 03-1 走动不出 NaN" },
   EditorBlockoutBlanketClothBrowserTest: { file: "Script_EditorBlockoutBlanketClothBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器单被布料模拟（2026-10-21）实机：FirstLevel0105 关键帧平铺、02-3 揪起被角、02-4 拖到半路两角钉在两个拖的人手上 / 尾巴贴地 / 冬瓜身下压着布 / 拉长有上限、从不同时刻 Seek 结果一致、松手落平、连续播每帧耗时与不对折" },
+  FirstPersonSelfShadowTest: { file: "Script_FirstPersonSelfShadowTest.mjs", timeoutMs: 120000, desc: "第一人称阴影 GPU 深度往返、斜面无痤疮与真实接触阴影" },
   FirstPersonLightingBrowserTest: { file: "Script_FirstPersonLightingBrowserTest.mjs", timeoutMs: 600000, desc: "第一人称取光（2026-11-02 背光枪发黑）：太阳在眼睛处取（沟里≈1、防炮洞里≈0）、本地反射图拍好并只换到视模材质、背光同镜头新做法比改之前亮、关反射还原 envMap、GL 无错" },
   EditorBlockoutFlyBrowserTest: { file: "Script_EditorBlockoutFlyBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器飞行观察（2026-10-21）实机：O 键 / 按钮进出、WASD 沿视线 + E/Q 升降 + Shift 加速的位移、滚轮调速、鼠标转相机、玩家原地且不吃游戏输入、小地图 / 全关总图的相机标记、复制位置与重现链接带相机位姿、退出后相机回到玩家视角、预演与切关的互斥" },
   EditorBlockoutTouchBrowserTest: { file: "Script_EditorBlockoutTouchBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器手机验收触屏层（2026-10-23）实机：手机自动开、竖 / 横屏控件在屏内不重叠、卡片收起展开、拖动转视角、摇杆走路 / 冲刺 / 双指并用、飞行摇杆与升降加速、预演按钮、总图双指缩放 / 双击全图 / 手指点选、图层面板、桌面不开" },
@@ -742,6 +743,7 @@ export const browserTests = new Set([
   "DraftCartEditorTest",
   "MotionVectorContractTest", "FpsRifleViewTest", "Type38_511BrowserTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ShunziCharacterBrowserTest", "DongguaCharacterBrowserTest", "TaniHisaoCharacterBrowserTest", "AzumaShiroCharacterBrowserTest", "NierCharacterBrowserTest", "ErYaCharacterBrowserTest", "YaowaCharacterBrowserTest", "OldGengCharacterBrowserTest", "LiuWencaiCharacterBrowserTest", "InterpreterCharacterBrowserTest", "TianSaoCharacterBrowserTest",
   "BrowserBundleTest",
+  "FirstPersonSelfShadowTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
   'FirstLevelP012AnimationTest',
@@ -922,6 +924,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  firstPersonSelfShadow: { label: "第一人称自阴影", tests: ["FirstPersonSelfShadowTest", "FirstPersonLightingBrowserTest", "SamplerBudgetTest"] },
   hair: { label: "头发胡子测试场与角色头骨挂接", tests: ["HairGroomTest", "HairReferenceBrowserTest", "HairRangeBrowserTest", "HairCapBrowserTest", "NierBraidBrowserTest", "MixamoGroomBrowserTest", "BeardSkinBrowserTest", "SandboxRangesTest", "XBotCharactersTest", "ModuleGraphTest", "TextTest", "DataSourcesTest", "DataJsonTest", "MotionVectorContractTest"] },
   flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareShadowInstancesTest','FlareShadowInstancesBrowserTest','FlareRenderBudgetBrowserTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
@@ -1103,6 +1106,7 @@ const changedDomainRules = [
   {domain:"render",pattern:/Script_FirstPersonShadow\.mjs$/},
   // 第一人称取光：眼睛处取阳光（自阴影补丁）+ 本地反射图，改了要跑它的浏览器闸门
   {domain:"render",pattern:/FirstPersonReflectionProbe|FirstPersonLighting/},
+  {domain:"firstPersonSelfShadow",pattern:/FirstPersonSelfShadow|FirstPersonLighting|Script_Tuning_GameGraphics/},
   { domain: "nakajimaKi4", pattern: /NakajimaKi4/ },
   { domain: "kawasakiType88", pattern: /KawasakiType88/ },
   { domain: "editor", pattern: /(?:Data_ToolsHome|Script_ToolsHomeField)\.mjs/ },

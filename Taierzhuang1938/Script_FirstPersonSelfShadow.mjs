@@ -7,7 +7,7 @@
 // 本系统因此走一条隔离路径：
 //   1) 第一人称不透明 PBR 网格独占 FIRST_PERSON_SHADOW_LAYER；主相机同时看 0/29 层；
 //   2) 用正交相机 + MeshDepthMaterial 只画 29 层的 RGBA packed depth；
-//   3) 只在 Viewmodel 自己的材质克隆里注入 3×3 PCF，压低直射漫反射 / 镜面反射。
+//   3) 视模材质使用接收面/法线偏置、双线性 PCF 与接触硬化 PCSS。
 // 世界不采这张图，Viewmodel 也仍保持 castShadow=false，所以两张阴影图绝不串线。
 //
 // 【2026-11-02 太阳改在眼睛处取】视模也不再逐像素采世界阴影图（用户：背向太阳时枪这么黑）。
@@ -72,6 +72,8 @@ const SHADOW_BIAS_MATRIX = new THREE.Matrix4().set(
 );
 
 const SHADOW_FRAGMENT_GLSL = /* glsl */`
+// Some material variants include <packing> after <common>.
+float unpackRGBAToDepth(const in vec4 v);
 uniform sampler2D uFirstPersonShadowMap;
 uniform vec2 uFirstPersonShadowTexel;
 uniform float uFirstPersonShadowEnabled;
@@ -81,6 +83,7 @@ uniform float uFirstPersonShadowSoft;        // 1 = 软化路径：双线性 Poi
 uniform float uFirstPersonShadowRadius;      // 软化滤波半径（texel）
 uniform float uFirstPersonShadowSoftBias;    // 软化路径的常数偏置；斜率交给平面偏置，所以比硬路径小
 uniform float uFirstPersonShadowPlaneClamp;  // 平面偏置的梯度钳制：掠射角下导数会爆，不钳就是几十厘米的漏光
+uniform vec4 uFirstPersonShadowPcss;         // depth span, angular radius / texel metres, search texels, minimum filter texels
 uniform float uFirstPersonEyeSun;            // 1 = 太阳可见度取眼睛处那一个数（下一行），0 = 照旧逐像素采世界阴影图
 uniform float uFirstPersonSunVisibility;     // 眼睛与真实握枪位置朝太阳的射线平均（CPU 每帧算、平滑过）
 uniform vec4 uWeaponLight;                   // 武器补光：x 漫反射倍数, y 高光倍数, z 柔和衰减 wrap, w 高光粗糙度下限
@@ -99,32 +102,30 @@ const vec2 FIRST_PERSON_POISSON[12] = vec2[12](
   vec2( 0.507,  0.064), vec2( 0.896,  0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598)
 );
 
-const vec4 FIRST_PERSON_DEPTH_UNPACK = vec4(
-  1.0 / (256.0 * 256.0 * 256.0),
-  1.0 / (256.0 * 256.0),
-  1.0 / 256.0,
-  1.0
-);
-
 float FirstPersonPackedDepth(vec2 uv) {
-  return dot(texture2D(uFirstPersonShadowMap, uv), FIRST_PERSON_DEPTH_UNPACK);
+  // MeshDepthMaterial uses the current three packing chunk. Reuse its inverse:
+  // r185 stores the most significant byte in R, while the retired decoder read A.
+  return unpackRGBAToDepth(texture2D(uFirstPersonShadowMap, uv));
 }
 
-float FirstPersonCompare(vec2 uv, float receiver) {
-  return step(receiver, FirstPersonPackedDepth(uv));
+float FirstPersonCompare(vec2 uv, vec3 receiver, vec2 planeGrad, float bias) {
+  float depth = receiver.z + dot(planeGrad, uv - receiver.xy) - bias;
+  return step(depth, FirstPersonPackedDepth(uv));
 }
 
 // 双线性 PCF：**先比较再插值**。插值深度再比较会在遮挡边缘算出一个不存在的中间深度，
 // 边缘反而更脏；比较结果按小数权重混合才是硬件 PCF 的那种平滑。
-float FirstPersonBilinearCompare(vec2 uv, float receiver) {
+float FirstPersonBilinearCompare(vec2 uv, vec3 receiver, vec2 planeGrad, float bias) {
   vec2 texel = uFirstPersonShadowTexel;
   vec2 grid = uv / texel - 0.5;
   vec2 f = fract(grid);
   vec2 base = (floor(grid) + 0.5) * texel;
-  float a = FirstPersonCompare(base, receiver);
-  float b = FirstPersonCompare(base + vec2(texel.x, 0.0), receiver);
-  float c = FirstPersonCompare(base + vec2(0.0, texel.y), receiver);
-  float d = FirstPersonCompare(base + texel, receiver);
+  // Each of the four *actual texel centres* needs its own receiver-plane depth.
+  // Correcting only the Poisson offset still leaves acne inside a bilinear tap.
+  float a = FirstPersonCompare(base, receiver, planeGrad, bias);
+  float b = FirstPersonCompare(base + vec2(texel.x, 0.0), receiver, planeGrad, bias);
+  float c = FirstPersonCompare(base + vec2(0.0, texel.y), receiver, planeGrad, bias);
+  float d = FirstPersonCompare(base + texel, receiver, planeGrad, bias);
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
@@ -137,18 +138,6 @@ float FirstPersonSelfShadow() {
   if (projected.x <= 0.0 || projected.x >= 1.0
       || projected.y <= 0.0 || projected.y >= 1.0
       || projected.z <= 0.0 || projected.z >= 1.0) return 1.0;
-  if (uFirstPersonShadowSoft < 0.5) {
-    // 硬路径（出厂默认）：3×3 step PCF，原样保留。
-    float receiver = projected.z - uFirstPersonShadowBias;
-    float lit = 0.0;
-    for (int y = -1; y <= 1; y += 1) {
-      for (int x = -1; x <= 1; x += 1) {
-        vec2 uv = projected.xy + vec2(float(x), float(y)) * uFirstPersonShadowTexel;
-        lit += FirstPersonCompare(uv, receiver);
-      }
-    }
-    return mix(1.0, lit / 9.0, uFirstPersonShadowStrength);
-  }
   // receiver-plane depth bias（Isidoro 2006）：用接收面在阴影图空间的深度梯度，
   // 给每个 tap 各自的参考深度，这样倾斜的手背不靠一个大常数偏置也不长 acne。
   float det = dpdx.x * dpdy.y - dpdx.y * dpdy.x;
@@ -157,12 +146,35 @@ float FirstPersonSelfShadow() {
     planeGrad = vec2(dpdy.y * dpdx.z - dpdx.y * dpdy.z, dpdx.x * dpdy.z - dpdy.x * dpdx.z) / det;
     planeGrad = clamp(planeGrad, vec2(-uFirstPersonShadowPlaneClamp), vec2(uFirstPersonShadowPlaneClamp));
   }
-  vec2 scale = uFirstPersonShadowTexel * uFirstPersonShadowRadius;
+  if (uFirstPersonShadowSoft < 0.5) {
+    float lit = 0.0;
+    for (int y = -1; y <= 1; y += 1) {
+      for (int x = -1; x <= 1; x += 1) {
+        vec2 uv = projected.xy + vec2(float(x), float(y)) * uFirstPersonShadowTexel;
+        lit += FirstPersonBilinearCompare(uv, projected, planeGrad, uFirstPersonShadowBias);
+      }
+    }
+    return mix(1.0, lit / 9.0, uFirstPersonShadowStrength);
+  }
+  // Directional-light PCSS: separation × source angular radius. Stable samples
+  // preserve contact detail without introducing frame-varying noise on the hands.
+  float blockerGap = 0.0;
+  float blockers = 0.0;
+  for (int i = 0; i < 8; i += 1) {
+    vec2 offset = FIRST_PERSON_POISSON[i] * uFirstPersonShadowTexel * uFirstPersonShadowPcss.z;
+    float gap = projected.z + dot(planeGrad, offset) - FirstPersonPackedDepth(projected.xy + offset);
+    if (gap > uFirstPersonShadowSoftBias) {
+      blockerGap += gap;
+      blockers += 1.0;
+    }
+  }
+  float separation = blockerGap / max(blockers, 1.0) * uFirstPersonShadowPcss.x;
+  float radius = clamp(separation * uFirstPersonShadowPcss.y, uFirstPersonShadowPcss.w, uFirstPersonShadowRadius);
+  vec2 scale = uFirstPersonShadowTexel * radius;
   float lit = 0.0;
   for (int i = 0; i < 12; i += 1) {
     vec2 offset = FIRST_PERSON_POISSON[i] * scale;
-    float receiver = projected.z + dot(planeGrad, offset) - uFirstPersonShadowSoftBias;
-    lit += FirstPersonBilinearCompare(projected.xy + offset, receiver);
+    lit += FirstPersonBilinearCompare(projected.xy + offset, projected, planeGrad, uFirstPersonShadowSoftBias);
   }
   return mix(1.0, lit / 12.0, uFirstPersonShadowStrength);
 }
@@ -222,28 +234,29 @@ function CloneOwnedMaterial(material) {
 export class FirstPersonSelfShadow {
   /**
    * @param {object} [options]
-   * @param {number} [options.size=1024]        硬路径（出厂）的阴影图边长
+   * @param {number} [options.size=1024]        基础过滤路径的阴影图边长
    * @param {number} [options.extent=1.35]      正交相机半幅面（米）
-   * @param {boolean} [options.soft=false]      软化路径：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。
-   *                                            出厂关；画质面板「自阴影软化」热切（SetSoft）。
+   * @param {boolean} [options.soft=false]      软化路径：2048 图 + 接触硬化 PCSS。
+   *                                            画质装配按数据表选默认值，设置面板可热切。
    * @param {number} [options.softSize=2048]    软化路径的阴影图边长
    * @param {number} [options.softRadius=0.006] 软化滤波半径（米）；按当前 texel 换算成 uniform
    * @param {boolean} [options.eyeSun=true]     太阳可见度在眼睛处取（见文件头 2026-11-02 一段）
    * @param {(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number) => boolean} [options.sunBlocked]
    *                                            朝太阳的一条射线被挡住没有（Script_Main 接物理世界）；没有就当照得到
    */
-  constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35, soft = false, softSize = 2048, softRadius = 0.006,
+  constructor(renderer, scene, camera, root, { size = 1024, extent = FIRST_PERSON_LIGHTING.shadow.extent,
+    soft = false, softSize = FIRST_PERSON_LIGHTING.shadow.softSize, softRadius = FIRST_PERSON_LIGHTING.shadow.maxRadiusM,
     eyeSun = true, sunBlocked = null } = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
     this.root = root;
     this.hardSize = Math.max(256, Math.min(2048, Math.round(size) || 1024));
-    this.softSize = Math.max(512, Math.min(4096, Math.round(softSize) || 2048));
-    this.softRadius = Math.max(0.001, Number(softRadius) || 0.006);
+    this.softSize = Math.max(512, Math.min(4096, Math.round(softSize) || FIRST_PERSON_LIGHTING.shadow.softSize));
+    this.softRadius = Math.max(0.001, Number(softRadius) || FIRST_PERSON_LIGHTING.shadow.maxRadiusM);
     this.soft = !!soft;
     this.size = this.soft ? this.softSize : this.hardSize;
-    this.extent = Math.max(0.8, Number(extent) || 1.35);
+    this.extent = Math.max(0.8, Number(extent) || FIRST_PERSON_LIGHTING.shadow.extent);
     this.enabled = false;
     this.renderedFrames = 0;
 
@@ -251,16 +264,19 @@ export class FirstPersonSelfShadow {
       map: { value: null },
       texel: { value: new THREE.Vector2(1 / this.size, 1 / this.size) },
       enabled: { value: 0 },
-      bias: { value: 0.0018 },
-      strength: { value: 0.78 },
+      bias: { value: 0 },
+      strength: { value: FIRST_PERSON_LIGHTING.shadow.strength },
       matrix: { value: new THREE.Matrix4() },
       // 软化路径。soft 是 uniform 而不是 define：切换不重编译整棵视模材质。
       soft: { value: this.soft ? 1 : 0 },
       radius: { value: 1 },
       // 常数偏置只兜住 packed depth 的量化误差；斜率由 receiver-plane 偏置接管
-      softBias: { value: 0.0006 },
+      softBias: { value: 0 },
       // 梯度钳在 1.0：5 texel 的 tap 在 2048 图上最多带 ~1.5 cm 的平面偏置
-      planeClamp: { value: 1.0 },
+      planeClamp: { value: FIRST_PERSON_LIGHTING.shadow.planeClamp },
+      pcss: { value: new THREE.Vector4() },
+      normalBias: { value: 0 },
+      sunDirection: { value: new THREE.Vector3(0, 1, 0) },
       // 眼睛处的太阳可见度。eyeSun 也是 uniform 不是 define：面板热切不重编译。
       eyeSun: { value: 0 },
       sunVisibility: { value: 1 },
@@ -303,6 +319,11 @@ export class FirstPersonSelfShadow {
     this.shadowCamera = new THREE.OrthographicCamera(-e, e, e, -e, 0.02, 6.0);
     this.shadowCamera.layers.set(FIRST_PERSON_SHADOW_LAYER);
     this.shadowCamera.matrixWorldAutoUpdate = true;
+    const depthSpan = this.shadowCamera.far - this.shadowCamera.near;
+    this.uniforms.bias.value = FIRST_PERSON_LIGHTING.shadow.hardBiasM / depthSpan;
+    this.uniforms.softBias.value = FIRST_PERSON_LIGHTING.shadow.softBiasM / depthSpan;
+    this.uniforms.pcss.value.x = depthSpan;
+    this._UpdateRadius();
     this.camera.layers.enable(FIRST_PERSON_SHADOW_LAYER);
 
     this.ownedBySource = new WeakMap();
@@ -345,6 +366,11 @@ export class FirstPersonSelfShadow {
   _UpdateRadius() {
     const texelMeters = (2 * this.extent) / this.size;
     this.uniforms.radius.value = this.softRadius / texelMeters;
+    const S = FIRST_PERSON_LIGHTING.shadow;
+    this.uniforms.pcss.value.y = S.lightAngularRadius / texelMeters;
+    this.uniforms.pcss.value.z = S.blockerSearchM / texelMeters;
+    this.uniforms.pcss.value.w = Math.min(S.minRadiusTexels, this.uniforms.radius.value);
+    this.uniforms.normalBias.value = S.normalBiasTexels * texelMeters;
   }
 
   /**
@@ -393,6 +419,9 @@ export class FirstPersonSelfShadow {
       shader.uniforms.uFirstPersonShadowRadius = uniforms.radius;
       shader.uniforms.uFirstPersonShadowSoftBias = uniforms.softBias;
       shader.uniforms.uFirstPersonShadowPlaneClamp = uniforms.planeClamp;
+      shader.uniforms.uFirstPersonShadowPcss = uniforms.pcss;
+      shader.uniforms.uFirstPersonShadowNormalBias = uniforms.normalBias;
+      shader.uniforms.uFirstPersonShadowSunDirection = uniforms.sunDirection;
       shader.uniforms.uFirstPersonEyeSun = uniforms.eyeSun;
       shader.uniforms.uFirstPersonSunVisibility = uniforms.sunVisibility;
       shader.uniforms.uWeaponLight = uniforms.weaponLight;
@@ -412,6 +441,8 @@ export class FirstPersonSelfShadow {
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", `#include <common>
         uniform mat4 uFirstPersonShadowMatrix;
+        uniform float uFirstPersonShadowNormalBias;
+        uniform vec3 uFirstPersonShadowSunDirection;
         varying vec4 vFirstPersonShadowCoord;`)
         .replace("#include <project_vertex>", `#include <project_vertex>
         {
@@ -422,10 +453,20 @@ export class FirstPersonSelfShadow {
           #ifdef USE_INSTANCING
             firstPersonShadowWorld = instanceMatrix * firstPersonShadowWorld;
           #endif
-          vFirstPersonShadowCoord = uFirstPersonShadowMatrix * modelMatrix * firstPersonShadowWorld;
+          firstPersonShadowWorld = modelMatrix * firstPersonShadowWorld;
+          // Slope-scaled normal offset follows the map's world texel footprint.
+          // This prevents curved high-poly surfaces from shadowing their own ribs.
+          vec3 firstPersonNormal = inverseTransformDirection(transformedNormal, viewMatrix);
+          float firstPersonNdl = dot(firstPersonNormal, uFirstPersonShadowSunDirection);
+          float firstPersonSlope = sqrt(max(0.0, 1.0 - firstPersonNdl * firstPersonNdl));
+          firstPersonNormal *= firstPersonNdl < 0.0 ? -1.0 : 1.0;
+          firstPersonShadowWorld.xyz += firstPersonNormal * (uFirstPersonShadowNormalBias * firstPersonSlope);
+          vFirstPersonShadowCoord = uFirstPersonShadowMatrix * firstPersonShadowWorld;
         }`);
+      const packing = shader.fragmentShader.includes("#include <packing>") ? "" : "#include <packing>";
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>
+${packing}
 ${SHADOW_FRAGMENT_GLSL}`)
         .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
 ${WEAPON_LIGHT_GLSL}`)
@@ -437,7 +478,7 @@ ${WEAPON_LIGHT_GLSL}`)
         }`);
     };
     material.customProgramCacheKey = function FirstPersonShadowCacheKey() {
-      return `${previousKey.call(this)}|firstPersonSelfShadow4`;
+      return `${previousKey.call(this)}|firstPersonSelfShadow5`;
     };
     material.userData.firstPersonSelfShadow = true;
     // **不要在这里动 allowOverride**。预通道归属由 Script_Post.MarkForegroundPrepass
@@ -555,6 +596,7 @@ ${WEAPON_LIGHT_GLSL}`)
     this._sunDirection.copy(sunDirection || { x: 0.45, y: 0.75, z: 0.35 });
     if (this._sunDirection.lengthSq() < 1e-6) this._sunDirection.set(0.45, 0.75, 0.35);
     this._sunDirection.normalize();
+    this.uniforms.sunDirection.value.copy(this._sunDirection);
     this.shadowCamera.position.copy(this._center).addScaledVector(this._sunDirection, 2.8);
     this.shadowCamera.up.set(0, 1, 0);
     if (Math.abs(this._sunDirection.y) > 0.98) this.shadowCamera.up.set(0, 0, 1);

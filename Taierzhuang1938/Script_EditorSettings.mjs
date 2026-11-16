@@ -26,6 +26,7 @@ import { T } from "./Script_Text.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
+import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -579,7 +580,7 @@ export class GraphicsSettings {
     this.host.game?.autoQuality?.Reset(0);
     gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
-    gfx.firstPersonSelfShadowSoft = false;
+    gfx.firstPersonSelfShadowSoft = FIRST_PERSON_LIGHTING.shadow.softDefaultByProfile[gfx.profile] ?? true;
     gfx.firstPersonEyeSun = true;
     gfx.firstPersonReflection = true;
     gfx.firstPersonWeaponLight = true;

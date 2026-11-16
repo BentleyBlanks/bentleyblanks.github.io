@@ -13,6 +13,23 @@
 // 两项都只作用在第一人称自阴影那份视模材质上（Script_FirstPersonSelfShadow 的克隆），
 // 世界材质一个字不动。画质面板可分别关掉，关掉就是改之前的样子（参考版）。
 export const FIRST_PERSON_LIGHTING = Object.freeze({
+  shadow: Object.freeze({
+    // Dedicated viewmodel map. Keep the projection stable while arms animate.
+    extent: 1.35,
+    softSize: 2048,
+    softDefaultByProfile: Object.freeze({ low: false, medium: true, high: true, ultra: true }),
+    strength: 0.78,
+    // Metres, converted using the actual orthographic depth span.
+    hardBiasM: 0.001,
+    softBiasM: 0.0004,
+    normalBiasTexels: 1.5,
+    planeClamp: 1,
+    maxRadiusM: 0.006,
+    blockerSearchM: 0.012,
+    // Broaden the sun for the overcast art direction. PCSS keeps contacts sharp.
+    lightAngularRadius: 0.035,
+    minRadiusTexels: 0.85,
+  }),
   sun: Object.freeze({
     // 取样点：相机局部坐标（米，-Z 朝前、+Y 朝上、+X 朝右），按**真实尺寸**的握枪位置，
     // 不是视模压缩后的位置。眼睛一个、枪身中段一个、枪口一带一个，平均成 0…1。

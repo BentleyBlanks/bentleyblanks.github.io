@@ -874,6 +874,7 @@ const firstPersonShadowSoft = await page.evaluate(() => {
   const button = Btn();
   if (!button || !T.firstPersonSelfShadow) return { found: false };
   const before = T.firstPersonSelfShadow.Status();
+  if (before.soft) Btn().click();
   const gl = T.firstPersonSelfShadow.renderer.getContext();
   gl.getError();
   button.click();
@@ -898,7 +899,7 @@ const firstPersonShadowSoft = await page.evaluate(() => {
   return { found: true, before, soft, hard, depth, glError, bright, pixels: probe.width * probe.height, saved: saved?.firstPersonSelfShadowSoft };
 });
 Check("画质面板：自阴影软化可热切（2048 靶 / 软化分支）并落盘，关回 1024 硬路径",
-  firstPersonShadowSoft.found && firstPersonShadowSoft.before.soft === false
+  firstPersonShadowSoft.found && firstPersonShadowSoft.before.soft === true
   && firstPersonShadowSoft.soft.soft === true && firstPersonShadowSoft.soft.size === 2048
   && firstPersonShadowSoft.soft.radiusTexels > 2 && firstPersonShadowSoft.soft.enabled
   && firstPersonShadowSoft.depth.size === 2048 && firstPersonShadowSoft.depth.nonClear > 256

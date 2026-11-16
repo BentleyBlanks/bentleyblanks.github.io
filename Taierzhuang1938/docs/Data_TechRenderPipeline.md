@@ -2382,6 +2382,18 @@ node Taierzhuang1938/Script_BootTest.mjs      # 七关各一帧，含 8.10 M 三
 
 ### 6.12 第一人称自阴影（独立视模靶）
 
+#### 2026-11-16 深度解码修复与接触硬化
+
+当前第一人称阴影采用独立视模阴影图，medium / high / ultra 默认使用 2048 图与接触硬化 PCSS，low 沿用较低分辨率。保存过的软化开关继续由玩家设置控制。所有形状、偏置与默认值集中在 `Data_Tuning_FirstPersonLighting.shadow`。
+
+本轮实际查到深度协议错误。`MeshDepthMaterial` 使用本仓 Three r185 的 `packDepthToRGBA`，最高有效字节位于 R。原来的手写逆变换按 A 为最高有效字节读取，造成木托条纹与大片误遮挡。当前通过同一 `packing` chunk 的 `unpackRGBAToDepth` 解码，GPU 门禁覆盖八组深度往返，以及平面、斜面和真实遮挡体。
+
+过滤采用固定 Poisson 样本与双线性比较。每个实际 texel 中心单独应用 receiver-plane 深度修正，法线偏置随图的世界空间 texel 尺寸缩放，并按入射角衰减。软化路径搜索遮挡体，按遮挡体与接收面的距离估计方向光半影，接触处保留清晰轮廓，远处逐渐变软。静态机位重复绘制的结果逐像素一致。
+
+方法参考 [NVIDIA PCSS](https://developer.download.nvidia.com/shaderlibrary/docs/shadow_PCSS.pdf) 的遮挡体搜索、半影估计和 PCF 过滤，以及 [GPU Gems 3 第 8 章](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-8-summed-area-variance-shadow-maps) 对斜面偏置与过滤的讨论。当前实现保留浏览器前向管线与独立视模隔离路径。
+
+回归 `Script_FirstPersonSelfShadowTest.mjs` 检查 GPU 深度往返、未遮挡斜面、真实接触阴影、半影随距离增大和静态稳定性。`Script_FirstPersonLightingBrowserTest.mjs`、`Script_SamplerBudgetTest.mjs` 与 `Script_EditorTest.mjs` 覆盖游戏取光、材质采样预算和设置开关。以下 09-05 取证与默认值为历史记录。
+
 正式实现位于 `Script_FirstPersonSelfShadow.mjs`。第一人称枪械为了伪造窄 FOV 与守住近裁面，
 在相机下经过非等比深度压缩；若直接设 `castShadow=true`，这棵假几何会进入战场太阳阴影图，
 在墙上投出被放大的黑块。因此视模继续禁止向世界投影，另用只看第一人称层的正交相机画

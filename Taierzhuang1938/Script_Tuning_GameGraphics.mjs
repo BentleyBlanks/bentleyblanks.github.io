@@ -2,6 +2,7 @@
 
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { CAMERA } from "./Data_Tuning_Main.mjs";
+import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
 export function CreateGameGraphics({profile, preset, taaEnabled = !!preset.taa, gi = false, gore = true}) {
 return {
@@ -16,9 +17,8 @@ return {
   shadowSize: 0,          // 0 = 用出厂档位（级联之后这是**每一级**的图边长）
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
   firstPersonSelfShadow: true,
-  // 自阴影软化：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。出厂关（2026-09-05），
-  // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
-  firstPersonSelfShadowSoft: false,
+  // Contact-hardening viewmodel shadows, with the lower-cost path for low.
+  firstPersonSelfShadowSoft: FIRST_PERSON_LIGHTING.shadow.softDefaultByProfile[profile] ?? true,
   // 第一人称取光（2026-11-02，背光枪发黑；Data_Tuning_FirstPersonLighting）。都只作用在自阴影那份视模材质上，
   // 关掉就是改之前的样子：眼睛处取阳光 = 视模不再逐像素采世界阴影图；本地反射 = 跟着玩家拍的反射图。
   firstPersonEyeSun: true,
