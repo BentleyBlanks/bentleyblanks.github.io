@@ -5,7 +5,7 @@ import { CompileEncounters, ValidateEncounterDocument, UpgradeEncounterDocument 
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_PURSUIT } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
-import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt } from "./AdvancedTools/Script_LevelFlowMap.mjs";
+import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt, ENCOUNTER_MAP_MAX_Z } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD, FLOW_FRIEND_REINFORCEMENTS } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
@@ -380,14 +380,14 @@ assert.deepEqual(ReadPngFrameMetadata(png.buffer),packet,"single PNG preserves t
 assert.throws(()=>ReadPngFrameMetadata(tinyPng.buffer));
 const scene=JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelWhitebox/Scene_FirstLevelWhitebox.json",import.meta.url),"utf8"));
 const map=BuildEncounterMap(scene);
-const sceneMapObjects = scene.objects.filter(object => object.pos && object.pos[2] < 558
+const sceneMapObjects = scene.objects.filter(object => object.pos && object.pos[2] < ENCOUNTER_MAP_MAX_Z
   && object.layer !== "backdrop" && !/空气墙|^远景/.test(object.group || ""));
 for (const object of sceneMapObjects) {
   assert.ok(map.objects.includes(object), `${object.id} remains on the 2D map regardless of its chapter group`);
   assert.ok(!map.farObjects.some(entry => entry.id === object.id), "3D draws restored map objects once");
 }
 assert.ok(map.objects.some(object => object.id === "Wall_SW2c_Sa"), "the village's southern courtyard walls reach the 2D map");
-const sceneMapMarkers = scene.markers.filter(marker => marker.z < 558);
+const sceneMapMarkers = scene.markers.filter(marker => marker.z < ENCOUNTER_MAP_MAX_Z);
 assert.equal(map.labels.filter(label => label.id).length, sceneMapMarkers.length, "all scene markers in the active map are loaded");
 for (const marker of sceneMapMarkers) {
   const label = map.labels.find(label => label.id === marker.id);
@@ -924,6 +924,19 @@ const ReadEncounterBytes=name=>{
   return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
 };
 const encounterTerrain=BuildEncounterTerrain(encounterScene,ReadEncounterBytes(encounterScene.terrain.file),ReadEncounterBytes(encounterScene.trenches.datum.file),encounterMap);
+// The Beishahe village mouth reaches the 2D map with the 2026-11-15 anti-tank ditch section.
+assert.ok(encounterMap.trenches.some(trench=>trench.id==="BeishaheAtDitch"),"the Beishahe anti-tank ditch is drawn on the 2D map");
+assert.ok(encounterMap.trenches.some(trench=>trench.id==="VillageNorthEast"),"the 727th Regiment fire trench reaches the 2D map");
+assert.ok(encounterMap.labels.some(label=>label.id==="LmMgDitchWest")&&encounterMap.objects.some(object=>object.id==="BshMgEastFront"),"ditch-end guns are mapped");
+assert.ok(encounterMap.objects.filter(object=>object.meta?.obstacle==="barbedWire"&&/^BshWire_/.test(object.id)).length>=20,"village-mouth wire uses solid frontline spans");
+for(const x of [60,120,150]) {
+  const line=encounterScene.ways.trenches.find(points=>points[0].x===40&&points[0].z===650);
+  const index=line.findIndex(point=>point.x>=x),a=line[index-1],b=line[index],centre=a.z+(b.z-a.z)*(x-a.x)/(b.x-a.x);
+  const lip=encounterTerrain.heightAt(x,centre-2.6),floor=encounterTerrain.heightAt(x,centre),bank=encounterTerrain.heightAt(x,centre+3);
+  assert.ok(lip-floor>2.3,"the ditch is deeper than a man");
+  assert.ok(bank-lip>0.6,"spoil is heaped on the village (south) lip");
+  assert.ok(encounterTerrain.heightAt(x,centre+1.2)<floor+0.3&&encounterTerrain.heightAt(x,centre-1.4)>floor+0.5,"north wall slopes while the south wall stays sheer");
+}
 const campCoverIds={GroundWest:"Encounter_FieldWestBerm",GroundEast:"Encounter_FieldEastWall"};
 for(const stamp of [530.113,BeatById("04a").start+20,holdRelease-0.3]) {
   const frame=EvaluateFlow(stamp);

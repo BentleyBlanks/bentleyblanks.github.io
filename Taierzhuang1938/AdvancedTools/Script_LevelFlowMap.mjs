@@ -5,6 +5,10 @@ import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { LoadEncounterTerrain } from "./Script_LevelFlowTerrain.mjs";
 
 const Point = (point) => Array.isArray(point) ? point.slice(0, 2) : [point.x, point.z];
+// The 2D map runs from the front line to the Beishahe village mouth (anti-tank ditch, wire and the first row of courtyards).
+export const ENCOUNTER_MAP_MAX_Z = 700;
+// South of Gengjiazhuang the module data ends; roads and the anti-tank ditch there come from the scene ways.
+const GENGJIAZHUANG_SOUTH_Z = 558;
 
 export function EncounterFloorConnections(point,map,ignore=null) {
   const connections=[];
@@ -60,7 +64,7 @@ function FrontPaperFields() {
 }
 
 export function BuildEncounterMap(scene) {
-  const objects = scene.objects.filter((object) => object.pos && object.pos[2] < 558
+  const objects = scene.objects.filter((object) => object.pos && object.pos[2] < ENCOUNTER_MAP_MAX_Z
     && object.layer !== "backdrop" && !/空气墙|^远景/.test(object.group || ""));
   const farObjects = scene.objects.filter(object => object.pos && !objects.includes(object)
     && !String(object.group || "").includes("空气墙")).map(object => {
@@ -84,8 +88,14 @@ export function BuildEncounterMap(scene) {
     {id:"VillageEntryRamp",points:[[100,380],[100,385]],width:village.L0610_DITCH.rampHalfW*2},
     {id:"VillageAlleyRamp",points:[[80,380],[80,384]],width:2},
   ];
-  const trenches = scene.trenches.segments.filter((segment) => !/^11–18/.test(segment.group || ""))
+  const InMap = (line) => line.some((point) => Point(point)[1] < ENCOUNTER_MAP_MAX_Z);
+  const Beyond = (line) => line.every((point) => Point(point)[1] >= GENGJIAZHUANG_SOUTH_Z);
+  roads.push(...(scene.ways?.roads || []).filter((line) => Beyond(line.slice(1)) && InMap(line))
+    .map((line, index) => ({ id: `BeishaheRoad${index}`, points: line.map(Point), width: 5 })));
+  const trenches = scene.trenches.segments.filter((segment) => InMap(segment.points))
     .map((segment) => ({ id: segment.id, points: segment.points.map(Point), width: segment.floorW || 3.8 }));
+  for (const line of (scene.ways?.trenches || []).filter((line) => Beyond(line) && InMap(line)))
+    trenches.push({ id: "BeishaheAtDitch", points: line.map(Point), width: 4 });
   trenches.push({ id: "Gully", points: front.L0105_GULLY.line.map(Point), width: 8 });
   trenches.push({ id: "GullyBranch", points: front.L0105_GULLY.branch.map(Point), width: 6 });
   trenches.push({ id: "SunkenLane", points: village.L0610_LANE.line.map(Point), width: 5.5 });
@@ -107,7 +117,7 @@ export function BuildEncounterMap(scene) {
   for(const [id,x,z,w,h,d,material] of scene.surface?[]:FLOW_GROUND.cover) objects.push({
     id:`Encounter_${id}`,pos:[x,0,z],size:[w,h,d],material:`Whitebox/${material}`,group:"遭遇设计/地面工事",planning:true,
   });
-  const labels = (scene.markers || []).filter(marker => marker.z < 558)
+  const labels = (scene.markers || []).filter(marker => marker.z < ENCOUNTER_MAP_MAX_Z)
     .map(marker => ({...marker, p:[marker.x,marker.z]}));
   const supplementalLabels = [
     ["门外下沟坡道",63,55.5], ["1 北侧坡道",18,35], ["2 西侧坡道",15,78], ["2 拐弯触发点",30,86],
@@ -121,8 +131,8 @@ export function BuildEncounterMap(scene) {
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   labels.push(...supplementalLabels.filter(label => !labels.some(marker => marker.name === label.name)));
   return {
-    bounds: [-160, 320, -480, 558], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:scene.surface?.pockets||FLOW_GROUND.pockets,
-    paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < 558)),
+    bounds: [-160, 320, -480, ENCOUNTER_MAP_MAX_Z], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:scene.surface?.pockets||FLOW_GROUND.pockets,
+    paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < ENCOUNTER_MAP_MAX_Z)),
     fields: [...FrontPaperFields(),...village.L0610_FIELDS], fieldZones: [{id:"FrontPaper",poly:[[-160,-12],[330,-12],[330,206],[-160,206]]},...village.L0610_FIELD_ZONES],
     footpaths: [...front.L0105_FIELD_LANES, ...village.L0610_FOOTPATHS.map((path) => path.line)].map((line) => line.map(Point)),
     river: village.L0610_RIVER.line.map(Point),
