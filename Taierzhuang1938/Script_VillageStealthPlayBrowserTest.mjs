@@ -91,7 +91,21 @@ try {
   assert.ok((await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State())).failed);
   await page.evaluate(()=>Tengxian.Debug.Key("KeyR"));
   assert.equal(await page.evaluate(()=>Tengxian.combat.projectiles.length),0,"retry clears live grenades");
-  const approach=await Walk(BeatById("09a").p.slice(1),"09b");
+  const approachPoints=BeatById("09a").p;
+  const forkIndex=approachPoints.findIndex(point=>point[0]===71&&point[1]===423.8);
+  assert.ok(forkIndex>0);
+  await Walk(approachPoints.slice(1,forkIndex+1),"09b");
+  const blockedShortcut=await page.evaluate(()=>{
+    const game=Tengxian;game.player.yaw=Math.PI/2;
+    game.Debug.Key("KeyW",true);game.StepFrames(240,1/60,false);game.Debug.Key("KeyW",false);
+    game.StepFrames(1,0,true);
+    return {position:game.player.position.toArray(),state:game.Debug.EncounterPlay.State()};
+  });
+  assert.ok(blockedShortcut.position[0]>68&&blockedShortcut.position[0]<70,"real collision stops the annotated shortcut at the visible collapse");
+  assert.equal(blockedShortcut.state.beat,"09a");
+  assert.ok(!blockedShortcut.state.failed,"checking the blocked fork does not trigger a stealth failure");
+  await page.screenshot({path:path.join(out,"Scene_BlockedTempleShortcut.png"),timeout:120000});
+  const approach=await Walk(approachPoints.slice(forkIndex),"09b");
   assert.equal(approach.state.beat,"09b","walking the route triggers the temple pull on arrival");
   assert.ok(approach.state.elapsed<BeatById("09a").duration,"entry does not wait for the preview clock");
   const search=await page.evaluate(()=>{

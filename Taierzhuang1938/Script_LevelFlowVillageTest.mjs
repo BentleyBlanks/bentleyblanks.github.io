@@ -32,6 +32,14 @@ function Blocked(from,to) {
   return false;
 }
 const Actor=(time,id)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
+const shortcutDebris=walls.filter(wall=>wall.id.startsWith("TempleShortcutRubble"));
+assert.ok(shortcutDebris.length>=3,"the annotated right-hand shortcut has visible physical collapse debris");
+for(let z=421.75;z<=424.25;z+=0.1) for(const height of [0.55,1.6,2.2]) {
+  const point=[67,terrain.heightAt(67,z)+height,z];
+  assert.ok(shortcutDebris.some(wall=>Inside(point,wall,0.19)),"collapse seals the full alley width, including standing/jumping clearance");
+}
+assert.ok(shortcutDebris.every(wall=>wall.noClimb && !wall.hideOn && !wall.showOn),"the shortcut is blocked by persistent non-climbable scene geometry, not an invisible or timed wall");
+assert.ok(scene.markers.some(mark=>mark.id==="LmTempleShortcutCollapse"),"the editor explains why the temple detour is necessary");
 for(const beat of [BeatById("09a"),BeatById("09b")]) for(let time=beat.start;time<beat.end;time+=0.25) {
   const frame=EvaluateFlow(time);
   for(const actor of frame.actors.filter(actor=>["player","liu","nier"].includes(actor.id) || actor.groupId===PLAN.patrol.id)) {
