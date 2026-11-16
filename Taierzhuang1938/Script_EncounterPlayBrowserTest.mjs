@@ -51,6 +51,7 @@ async function FirstUse(frame,kill=false){
   }
   const ads=g.player.ads;
   return {actionMs,firstFrameMs:frames[0],maxMs:Math.max(...frames),ads,dead:target?!target.alive:null,wounds:target?.actor.woundBlood?.count,
+   prewarmedBloodDrops:g.state.actorShaderWarm.bloodDrops,
    late:g.renderer.info.programs.filter(p=>!known.has(p.cacheKey)).map(p=>p.name||p.cacheKey),
    renderSize:[g.post.width,g.post.height,g.post.outputWidth,g.post.outputHeight],quality:g.graphics.profile};
  },kill);
@@ -73,6 +74,7 @@ try{
  await frame.evaluate(()=>Tengxian.player.SetDebugOptions({invincible:true}));
  const firstAim=await FirstUse(frame);
  assert.ok(firstAim.ads>.9,"The first ADS uses real held mouse input");
+ assert.ok(firstAim.prewarmedBloodDrops>0,"Blood warmup must emit actual particles from the active player camera");
  assert.deepEqual(firstAim.late,[],"First ADS must reuse linked programs");
  assert.ok(firstAim.renderSize[1]>144&&firstAim.renderSize[3]>144,"Full render dimensions are restored before Play");
  assert.ok(state.actors.some(a=>a.model==="luo"));
@@ -142,6 +144,9 @@ try{
  await page.locator("#stopGame").click();
  await page.evaluate(time=>LevelFlow.Seek(time),BeatById("05b").start);
  await page.locator("#playGame").click();frame=await Ready();
+ const distantWarm=await frame.evaluate(()=>({distance:Math.hypot(Tengxian.player.position.x,Tengxian.player.position.z),warm:Tengxian.state.actorShaderWarm}));
+ assert.ok(distantWarm.distance>100&&distantWarm.warm.bloodDrops>0,"A distant checkpoint warms blood from its own camera position");
+ await page.screenshot({path:path.join(out,"PlayMarchStart.png"),timeout:120000});
  const checkpoint=await frame.evaluate(()=>({ammo:Tengxian.state.ammo,clips:Tengxian.state.clips,grenades:Tengxian.state.grenades,
    health:Tengxian.player.health,actors:Tengxian.Debug.EncounterPlay.State().actors.map(actor=>actor.id).sort()}));
  const KillPlayer=()=>frame.evaluate(()=>{
@@ -215,7 +220,7 @@ try{
  await page.selectOption("#playGameStart","current");await page.evaluate(time=>LevelFlow.Seek(time),BeatById("08f").start);
  assert.ok(await page.locator("#playGame").isDisabled());assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,firstAim,firstKill,hostId,errors,checkpoint,restoredSlots,
+ await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,firstAim,firstKill,distantWarm,hostId,errors,checkpoint,restoredSlots,
    checks:"camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop; death retry by keyboard and toolbar; outer R; continued movement; current-beat checkpoint; melee and stored ammo restoration; cinematic checkpoint skipped; first ADS and lethal hit reuse linked programs at full resolution"},null,2));
  console.log("ok  Play controls, death retry, current checkpoint inventory, event-driven timeline, skipped cinematics and state reset; first "+(coldMs/1000).toFixed(2)+" s, repeat "+(warmMs/1000).toFixed(2)+" s");
 }catch(error){

@@ -134,6 +134,7 @@ export class EncounterPlay {
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
+    let bloodDrops=0;
     const excluded=new Set([...this.entries.values()].flatMap(entry=>entry.skin?.hidden||[]));
     const post=host.post;
     const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
@@ -171,25 +172,33 @@ export class EncounterPlay {
     }
     if(!retained){
       await post.dofPass.Warmup();
-      const blood=host.vfx.bloodEffects,eye=host.player.EyePosition.clone();
-      const direction=host.camera.getWorldDirection(new THREE.Vector3());
-      const spot=eye.addScaledVector(direction,2);
-      host.vfx.Blood(spot,direction,1);
-      blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
       await host.vfx.particles.Ready();
+      const blood=host.vfx.bloodEffects;
       const ready=host.state.ready;
       const warming=host.state.warming;
+      const DrawWarmFrame=()=>{
+        host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);
+        host.renderer.getContext().finish();
+      };
       try{
         host.state.ready=true;host.state.warming=false;
-        for(let i=0;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++){
-          host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);host.renderer.getContext().finish();
-        }
+        // Update the actual camera and blood distance-culling eye first.
+        DrawWarmFrame();
+        blood.Update(0,host.vfx.time,host.camera);
+        const direction=host.player.ViewDirection(new THREE.Vector3());
+        const spot=host.player.EyePosition.clone().addScaledVector(direction,2);
+        const existingDrops=blood.activeDrops.length;
+        host.vfx.Blood(spot,direction,1);
+        bloodDrops=blood.activeDrops.length-existingDrops;
+        spot.y=host.battlefield.GroundHeight(spot.x,spot.z);
+        blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
+        for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++)DrawWarmFrame();
       }finally{
         host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
         post.NotifyCameraCut();
       }
     }
-    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length};
+    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops};
     this.warmedSignatures.add(signature);this.FlushRetired();
   }
   FlushRetired() {
