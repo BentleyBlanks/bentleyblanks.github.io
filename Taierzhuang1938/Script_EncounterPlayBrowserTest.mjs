@@ -136,6 +136,15 @@ try{
  assert.ok(firstKill.dead&&firstKill.wounds>0,"First lethal bullet retains wounds and the real death chain");
  assert.deepEqual(firstKill.late,[],"First lethal hit, blood and corpse frames must reuse linked programs");
  await fs.writeFile(path.join(out,"Data_FirstUse.json"),JSON.stringify({coldMs,firstAim,firstKill},null,2));
+ await page.locator("#toggleTimeline").click();
+ assert.equal(await page.locator("#flowTimeline").isVisible(),false,"Timeline can be hidden during Play");
+ await page.locator("#toggleTimeline").click();
+ assert.equal(await page.locator("#flowTimeline").isVisible(),true,"The toolbar can restore the inert Play timeline");
+ await page.locator("#toggleTimeline").click();
+ // Returning from the toolbar uses the normal game click to reacquire its fake lock.
+ await frame.locator("canvas").first().click();
+ const resizedAim=await FirstUse(frame);
+ assert.ok(resizedAim.ads>.9,"Aiming still works after resizing the running Play viewport");
  await frame.evaluate(()=>Tengxian.Debug.Throw("Grenade",.2));
  await page.locator("#pauseGame").click();
  await frame.waitForFunction(()=>Tengxian.audio.ctx.state==="suspended");
@@ -174,6 +183,8 @@ try{
  for(let i=0;i<20&&!(await State()).completedBeats.includes("03d");i++)await frame.evaluate(()=>Tengxian.StepFrames(30,1/60,false));
  assert.ok((await State()).completedBeats.includes("03d"),"Real grenade detonation satisfies the event gate");
  await page.locator("#stopGame").click();
+ assert.equal(await page.locator("#flowTimeline").isVisible(),false,"Stopping Play keeps the chosen timeline visibility");
+ await page.locator("#toggleTimeline").click();
  assert.equal(await page.locator(".lfPlayHost").count(),0);
  const dormant=await page.evaluate(()=>{const g=document.querySelector(".lfPlayCache iframe").contentWindow.Tengxian;return {running:g.state.running,soldiers:g.ai.soldiers.length,projectiles:g.combat.projectiles.length,elapsed:g.state.elapsed,frames:g.renderer.info.render.frame};});
  await page.waitForTimeout(400);

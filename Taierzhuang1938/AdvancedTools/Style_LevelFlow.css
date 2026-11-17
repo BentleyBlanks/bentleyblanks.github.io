@@ -86,6 +86,9 @@ textarea { resize: vertical; min-height: 64px; }
 .lfNavigationTools button[aria-pressed="false"]:hover { background: var(--ed-sel); color: var(--ed-text-hi); }
 .lfNavigationTools svg { display: block; width: 20px; height: 20px; pointer-events: none; }
 #viewportLayout { padding: 4px 6px; margin-right: 3px; background: var(--ed-field); }
+.lfTimelineToggle { display: flex; align-items: center; gap: 6px; }
+.lfTimelineToggle svg { width: 16px; height: 16px; }
+.lfTimelineToggle[aria-expanded="false"] svg { transform: rotate(180deg); }
 .lfExport { margin-left: auto; }
 .lfBack { margin-left: auto; font-size: 13px; color: var(--ed-text-3); white-space: nowrap; }
 

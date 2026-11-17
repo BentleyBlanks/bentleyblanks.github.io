@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261117SidebarCollapse">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261117TimelineCollapse">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -38,7 +38,7 @@
       <button type="button" data-navigation-tool="select" aria-label="选择工具" aria-pressed="true" title="选择工具（W）· 左键点选单位与区域"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M5 2.5 20 13l-7.1 1.1-3.7 7.4Z"/></svg></button>
     </div>
     <div class="lfToolGroup lfPlayTools"><button id="playGame" title="播放" aria-label="Play" aria-pressed="false">▶</button><button id="pauseGame" title="暂停" aria-label="暂停 Play" aria-pressed="false" disabled>Ⅱ</button><button id="stopGame" title="停止" aria-label="停止 Play" disabled>■</button><select id="playGameStart" aria-label="Play 开始位置"><option value="current">当前关键帧</option><option value="beginning">从首个战斗段开始</option></select></div>
-    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1" selected>单视口</option><option value="2">双视口</option><option value="3">三视口</option><option value="4">四视口</option></select></div>
+    <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1" selected>单视口</option><option value="2">双视口</option><option value="3">三视口</option><option value="4">四视口</option></select><button id="toggleTimeline" class="lfTimelineToggle selected" type="button" aria-label="隐藏 Timeline" aria-controls="flowTimeline" aria-expanded="true" title="隐藏 Timeline"><span>Timeline</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 9 7 7 7-7"/></svg></button></div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
@@ -75,7 +75,7 @@
 
     </aside>
   </main>
-  <footer class="lfTimeline">
+  <footer id="flowTimeline" class="lfTimeline">
     <div class="lfTransport"><div class="lfPlayback"><button id="previousBeat" title="上一拍" aria-label="上一拍">⏮</button><button id="playFlow" class="sePrimary" aria-pressed="false">播放</button><button id="nextBeat" title="下一拍" aria-label="下一拍">⏭</button></div><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label class="lfLoop"><input id="loopStage" type="checkbox"><span>循环本段</span></label></div>
     <div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1910" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
   </footer>

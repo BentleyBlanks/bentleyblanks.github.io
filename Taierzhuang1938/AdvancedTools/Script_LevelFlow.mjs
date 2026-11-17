@@ -25,7 +25,9 @@ let selectedUnitIds=[], multipleUnits=false;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, renderPending=false;
 let inspectorCollapsed=false, inspectorTab="chat";
+let timelineCollapsed=false;
 const INSPECTOR_COLLAPSED_KEY="tengxian1938_encounter_sidebar_collapsed_v1";
+const TIMELINE_COLLAPSED_KEY="tengxian1938_encounter_timeline_collapsed_v1";
 const params=new URLSearchParams(location.search);
 
 function Toast(message,persistent=false) {
@@ -69,6 +71,22 @@ function SetInspectorCollapsed(collapsed,persist=true) {
   Element("inspectorResizeHandle").hidden=collapsed;
   for(const name of ["chat","script"]) Element(`${name}Pane`).hidden=collapsed||name!==inspectorTab;
   if(persist) {try {storage?.setItem(INSPECTOR_COLLAPSED_KEY,String(collapsed));} catch { /* Keep this window's layout. */ }}
+  RequestRender();
+}
+function SetTimelineCollapsed(collapsed,persist=true) {
+  timelineCollapsed=collapsed;
+  Element("flowTimeline").hidden=collapsed;
+  const button=Element("toggleTimeline");
+  const label=collapsed?"显示 Timeline":"隐藏 Timeline";
+  button.setAttribute("aria-expanded",String(!collapsed));
+  button.setAttribute("aria-label",label);
+  button.title=label;
+  button.classList.toggle("selected",!collapsed);
+  if(persist) {
+    try {storage?.setItem(TIMELINE_COLLAPSED_KEY,String(collapsed));}
+    catch { /* Keep this window's layout. */ }
+  }
+  if(gamePlay?.active&&!gamePlay.paused&&gamePlay.state?.ready) gamePlay.frame?.focus();
   RequestRender();
 }
 function ShowTab(value) {
@@ -335,9 +353,14 @@ function OpenAnnotations() {
 function BindControls() {
   window.addEventListener("blur",()=>{CancelPointer();RequestRender();});
   Element("toggleInspector").onclick=()=>SetInspectorCollapsed(!inspectorCollapsed);
-  let collapsed=false;
-  try {collapsed=storage?.getItem(INSPECTOR_COLLAPSED_KEY)==="true";} catch { /* Storage is optional. */ }
+  Element("toggleTimeline").onclick=()=>SetTimelineCollapsed(!timelineCollapsed);
+  let collapsed=false,timelineHidden=false;
+  try {
+    collapsed=storage?.getItem(INSPECTOR_COLLAPSED_KEY)==="true";
+    timelineHidden=storage?.getItem(TIMELINE_COLLAPSED_KEY)==="true";
+  } catch { /* Storage is optional. */ }
   SetInspectorCollapsed(collapsed,false);
+  SetTimelineCollapsed(timelineHidden,false);
   for(const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick=()=>{
     SetNavigationTool(button.dataset.navigationTool);workspace.active.canvas.focus();
   };

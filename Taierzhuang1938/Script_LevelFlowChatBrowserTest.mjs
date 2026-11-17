@@ -129,6 +129,35 @@ try {
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   await page.screenshot({ path: path.join(out, "InspectorExpanded.png") });
+  const timelineViewport = await page.locator("#flowMap").boundingBox();
+  await page.selectOption("#flowSpeed", "2"); await page.locator("#loopStage").check();
+  await page.click("#toggleTimeline");
+  assert.equal(await page.locator("#flowTimeline").isVisible(), false);
+  assert.equal(await page.locator("#toggleTimeline").getAttribute("aria-expanded"), "false");
+  assert.ok((await page.locator("#flowMap").boundingBox()).height > timelineViewport.height + 120, "hiding the whole timeline frees viewport height");
+  await page.locator("#flowMap").focus(); await page.keyboard.press("Space");
+  await page.waitForFunction(() => LevelFlow.Inspect().time > 384);
+  await page.keyboard.press("Space");
+  assert.equal(await page.evaluate(() => LevelFlow.Inspect().playing), false, "keyboard playback works while the timeline is hidden");
+  const hiddenTime = await page.evaluate(() => LevelFlow.Inspect().time);
+  await page.locator("#toggleTimeline").focus(); await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#flowTimeline").isVisible(), true);
+  assert.equal(await page.locator("#flowSpeed").inputValue(), "2");
+  assert.equal(await page.locator("#loopStage").isChecked(), true);
+  assert.equal(await page.evaluate(() => LevelFlow.Inspect().time), hiddenTime, "showing the timeline keeps its current playback position");
+  await page.click("#toggleInspector"); await page.click("#toggleTimeline");
+  await page.screenshot({ path: path.join(out, "TimelineAndInspectorHidden.png") });
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow);
+  assert.equal(await page.locator("#flowTimeline").isVisible(), false, "reload restores the timeline visibility");
+  assert.equal(await page.locator("#toggleTimeline").isVisible(), true, "the toolbar always provides a way to show the timeline");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 48);
+  await page.click("#toggleTimeline");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 48, "timeline and inspector visibility are independent");
+  await page.click("#toggleInspector");
+  await page.selectOption("#flowSpeed", "1"); await page.locator("#loopStage").uncheck();
+  await page.evaluate(() => LevelFlow.Seek(384));
+  assert.equal(await page.locator("#toggleTimeline").getAttribute("aria-expanded"), "true");
+  await page.screenshot({ path: path.join(out, "TimelineRestored.png") });
   assert.equal(await page.locator("#markScreenshot,.lfChatEmpty").count(), 0);
   assert.equal(await page.locator("#codexPendingLocation").isVisible(), false);
   assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
@@ -313,6 +342,8 @@ try {
     const currentHandle = await page.locator("#inspectorResizeHandle").boundingBox();
     const expectedWidth = (await page.locator(".lfInspector").boundingBox()).width + 10;
     await page.mouse.move(currentHandle.x + 3, currentHandle.y + 150); await page.mouse.down();
+    // A real move establishes pending pointer capture before releasing it below.
+    await page.mouse.move(currentHandle.x + 2, currentHandle.y + 150);
     await page.evaluate(({ x, finish }) => {
       const handle = document.querySelector("#inspectorResizeHandle");
       handle.dispatchEvent(new PointerEvent("pointermove", { pointerId: inspectorResizeProbe.pointerId, clientX: x - 10 }));
