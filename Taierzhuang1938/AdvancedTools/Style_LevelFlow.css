@@ -86,9 +86,6 @@ textarea { resize: vertical; min-height: 64px; }
 .lfNavigationTools button[aria-pressed="false"]:hover { background: var(--ed-sel); color: var(--ed-text-hi); }
 .lfNavigationTools svg { display: block; width: 20px; height: 20px; pointer-events: none; }
 #viewportLayout { padding: 4px 6px; margin-right: 3px; background: var(--ed-field); }
-.lfTimelineToggle { display: flex; align-items: center; gap: 6px; }
-.lfTimelineToggle svg { width: 16px; height: 16px; }
-.lfTimelineToggle[aria-expanded="false"] svg { transform: rotate(180deg); }
 .lfExport { margin-left: auto; }
 .lfBack { margin-left: auto; font-size: 13px; color: var(--ed-text-3); white-space: nowrap; }
 
@@ -171,8 +168,15 @@ textarea { resize: vertical; min-height: 64px; }
 .lfFrameBookmark { display: block; width: 100%; text-align: left; padding: 10px 4px; border: 0; border-bottom: 1px solid #303832; border-radius: 0; color: #b9c1b1; }
 
 /* Stage blocks, real-duration beats and minute ticks share one global axis. */
-.lfTimeline { flex: none; margin: 12px; padding: 10px 14px 12px; background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 9px; box-shadow: 0 12px 30px #00000055; }
-.lfTransport { display: flex; align-items: center; gap: 12px; height: 34px; margin-bottom: 6px; }
+.lfTimeline { position: relative; flex: none; margin: 12px; padding: 10px 14px 12px; background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 9px; box-shadow: 0 12px 30px #00000055; }
+.lfTimelineToggle { position: absolute; top: 10px; right: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 28px; height: 28px; padding: 4px; }
+.lfTimelineToggle svg { flex: none; width: 18px; height: 18px; }
+.lfTimelineToggle span { display: none; }
+.lfTimelineToggle[aria-expanded="false"] svg { transform: rotate(180deg); }
+.lfTimeline[data-collapsed="true"] { padding: 4px 10px; }
+.lfTimeline[data-collapsed="true"] .lfTimelineToggle { position: static; width: auto; margin-left: auto; padding: 4px 8px; }
+.lfTimeline[data-collapsed="true"] .lfTimelineToggle span { display: inline; }
+.lfTransport { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-height: 34px; padding-right: 40px; margin-bottom: 6px; }
 .lfPlayback { display: flex; align-items: center; gap: 4px; padding: 2px; border: 1px solid #00000055; border-radius: 7px; background: var(--ed-field); }
 .lfPlayback button { height: 28px; min-width: 29px; padding: 2px 7px; border-color: transparent; background: transparent; color: var(--ed-text-3); font-size: 14px; }
 .lfPlayback #playFlow { min-width: 56px; font-size: 14px; font-weight: 600; color: var(--ed-gold-text); background: var(--ed-sel-strong); border-color: #cdb77b88; }

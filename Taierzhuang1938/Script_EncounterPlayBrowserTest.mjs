@@ -139,9 +139,9 @@ try{
  await page.locator("#toggleTimeline").click();
  assert.equal(await page.locator("#flowTimeline").isVisible(),false,"Timeline can be hidden during Play");
  await page.locator("#toggleTimeline").click();
- assert.equal(await page.locator("#flowTimeline").isVisible(),true,"The toolbar can restore the inert Play timeline");
+ assert.equal(await page.locator("#flowTimeline").isVisible(),true,"The timeline window can restore its inert Play content");
  await page.locator("#toggleTimeline").click();
- // Returning from the toolbar uses the normal game click to reacquire its fake lock.
+ // Returning from the timeline window uses the normal game click to reacquire its fake lock.
  await frame.locator("canvas").first().click();
  const resizedAim=await FirstUse(frame);
  assert.ok(resizedAim.ads>.9,"Aiming still works after resizing the running Play viewport");

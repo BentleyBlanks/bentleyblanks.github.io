@@ -62,7 +62,7 @@ export class LevelFlowPlay {
     this.deadline=setTimeout(()=>{if(this.active&&generation===this.generation){this.Stop();this.toast("Play 加载超时，已停止；可以重新尝试。",true);}},ENCOUNTER_PLAY_STARTUP.maxLoadMs);
     for(const option of this.layout.options)option.hidden=option.disabled=Number(option.value)>2;
     this.layout.value="1";document.body.classList.add("lfPlayingGame");
-    document.querySelector("#chatPane").inert=true;document.querySelector(".lfTimeline").inert=true;
+    document.querySelector("#chatPane").inert=true;document.querySelector("#flowTimeline").inert=true;
     this.showSource?.();this.UpdateControls();
     this.Launch(payload,generation).catch(error=>{
       if(!this.active||generation!==this.generation)return;
@@ -138,7 +138,7 @@ export class LevelFlowPlay {
     sessionStorage.removeItem("tengxian1938_encounter_play_session_v1");
     for(const option of this.layout.options)option.hidden=option.disabled=false;
     document.body.classList.remove("lfPlayingGame");
-    document.querySelector("#chatPane").inert=false;document.querySelector(".lfTimeline").inert=false;
+    document.querySelector("#chatPane").inert=false;document.querySelector("#flowTimeline").inert=false;
     this.restore(this.saved);this.layout.value=String(this.saved.viewports.count);this.saved=null;this.state=null;this.UpdateControls();this.button.focus();
   }
   DropHost(){

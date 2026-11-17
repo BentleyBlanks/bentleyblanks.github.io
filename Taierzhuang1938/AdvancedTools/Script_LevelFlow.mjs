@@ -76,12 +76,12 @@ function SetInspectorCollapsed(collapsed,persist=true) {
 function SetTimelineCollapsed(collapsed,persist=true) {
   timelineCollapsed=collapsed;
   Element("flowTimeline").hidden=collapsed;
+  Element("flowTimeline").parentElement.dataset.collapsed=String(collapsed);
   const button=Element("toggleTimeline");
-  const label=collapsed?"显示 Timeline":"隐藏 Timeline";
+  const label=collapsed?"展开 Timeline":"收起 Timeline";
   button.setAttribute("aria-expanded",String(!collapsed));
   button.setAttribute("aria-label",label);
   button.title=label;
-  button.classList.toggle("selected",!collapsed);
   if(persist) {
     try {storage?.setItem(TIMELINE_COLLAPSED_KEY,String(collapsed));}
     catch { /* Keep this window's layout. */ }

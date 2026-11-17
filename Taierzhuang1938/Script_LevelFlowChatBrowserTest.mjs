@@ -129,6 +129,8 @@ try {
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
   await page.screenshot({ path: path.join(out, "InspectorExpanded.png") });
+  assert.equal(await page.locator(".lfToolbar #toggleTimeline").count(), 0);
+  assert.equal(await page.locator(".lfTimeline #toggleTimeline").count(), 1, "the toggle belongs to the timeline window");
   const timelineViewport = await page.locator("#flowMap").boundingBox();
   await page.selectOption("#flowSpeed", "2"); await page.locator("#loopStage").check();
   await page.click("#toggleTimeline");
@@ -149,7 +151,7 @@ try {
   await page.screenshot({ path: path.join(out, "TimelineAndInspectorHidden.png") });
   await page.reload(); await page.waitForFunction(() => window.LevelFlow);
   assert.equal(await page.locator("#flowTimeline").isVisible(), false, "reload restores the timeline visibility");
-  assert.equal(await page.locator("#toggleTimeline").isVisible(), true, "the toolbar always provides a way to show the timeline");
+  assert.equal(await page.locator("#toggleTimeline").isVisible(), true, "the folded timeline keeps its own restore button");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 48);
   await page.click("#toggleTimeline");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 48, "timeline and inspector visibility are independent");
