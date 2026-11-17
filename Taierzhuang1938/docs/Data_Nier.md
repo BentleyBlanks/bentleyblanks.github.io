@@ -1,12 +1,14 @@
-# 妮儿 V11 游戏接入
+# 妮儿 Dirty V4 游戏接入
 
-采用用户下载的 `Nier_Merged_V11_Bones.glb`，源文件 SHA-256 为 `3fb890c5bb826034d37a01538468ec10c653c246fcf42a92f7b61ede9dd77ce9`。输入包含54根参与蒙皮的 Mixamo 关节，Tripo 将模型最大尺寸归一化到1米附近。
+采用用户在 `08_妮儿/Dirty` 下载的 `Model_NierDirty_Merged_V4_Bones.glb`，源文件 SHA-256 为 `0a1f7cdd844c8c78d38f807b183a244727ff3b2ebbbbc000e906e7c0b9c121fb`。输入包含55根 Mixamo 关节，Tripo 将模型高度归一化到1米。输入的三张4K PNG与已验收静态V4逐字节一致，`KHR_materials_specular` 的0.5高光系数也完整保留。
 
-`_import/Script_BuildNier.mjs` 复用共用转换器，恢复拼接件的1.288729米高度，生成65骨运行时骨架。骨名、层级和初始朝向对齐 X Bot，关节位置使用妮儿自身比例。动作转换去掉 Hips 以外的位移轨，Hips 位移按0.6397缩放。
+`_import/Script_BuildNier.mjs` 复用共用转换器，恢复拼接件的1.288729米高度，生成65骨运行时骨架。骨名、层级和初始朝向对齐 X Bot，关节位置使用妮儿自身比例。动作转换去掉 Hips 以外的位移轨，Hips 位移按0.6542缩放。
 
-头顶和手指的无权重末端骨按自身轮廓重新定位。头顶末端从约1.3465米移到1.2837米，落在头部表面内侧。脸部所在连通网格在1.08米以上收为 Head 权重，1.04至1.08米之间平滑过渡，修正自动权重中的颈部和肩部泄漏。
+头顶和手指的无权重末端骨按自身轮廓重新定位。头顶末端定位到1.2837米，落在头部表面内侧。脸部所在连通网格在1.08米以上收为 Head 权重，1.04至1.08米之间平滑过渡，修正自动权重中的颈部和肩部泄漏。
 
-运行时资产为 `Model/Character/Model_Nier.glb`，约7.23 MB、36,611三角面、单网格、单材质，三张贴图均为4K WebP。输入输出哈希、末端骨位置和权重修复数值写在 `Model/Character/Data_Nier.json`。
+运行时资产为 `Model/Character/Model_Nier.glb`，约8.89 MB、39,790三角面、单网格、单材质，三张贴图均为4K WebP。输入输出哈希、末端骨位置和权重修复数值写在 `Model/Character/Data_Nier.json`。
+
+V4材质通过标准物理材质加载，颜色、粗糙度与微表面法线均为4K WebP，金属度为0、粗糙度贴图系数为1、高光系数为0.5。现有游戏发型按新头模重新烘焙，头部匹配误差约1.18毫米，发型跟随Head骨。
 
 ## 加载与尺寸
 
@@ -26,19 +28,22 @@
 
 `NierCharacterBrowserTest` 逐帧检查八组现有动作，共264帧，覆盖空手待机、环顾、行走、跑步、跪姿、蹲行、跪地检查和坐姿。独立转动头骨至正负45度检查下颌刚性，并验证第六段实际妮儿的模型、身高和世界缩放。截图、资源错误和数值只留本地 `tmp/Nier/`。
 
-接触检查发现蹲行最低点约下陷5.0厘米，跪地检查约3.0厘米，坐姿约7.0厘米。`_import/Script_BakeNierContacts.mjs` 以每秒60帧采样实际蒙皮最低点，通过Hips竖向位移校正跪姿、蹲行、跪地检查和坐姿，生成妮儿专用动作覆盖。其他关节角度和肢体长度沿用原动作。模型与动作输入输出哈希记录在 `Animation/Nier/Data_NierContacts.json`。
+接触检查发现蹲行最低点约下陷3.4厘米，跪地检查约-0.0厘米，坐姿约6.3厘米。`_import/Script_BakeNierContacts.mjs` 以每秒60帧采样实际蒙皮最低点，通过Hips竖向位移校正跪姿、蹲行、跪地检查和坐姿，生成妮儿专用动作覆盖。其他关节角度和肢体长度沿用原动作。模型与动作输入输出哈希记录在 `Animation/Nier/Data_NierContacts.json`。
 
 浏览器验收直接采样最终覆盖动作，检查最低点下陷小于1厘米。动态图及场景的原生步速另按世界尺寸与自身胯高比校验。
 
-正式场景试玩从06-2切入06-3，实际读取 `Scenes/FirstLevel/Scene_FirstLevel.json`。妮儿保持1.288729米Actor身高和模型世界缩放1，资源与脚本错误均为零。待机和环顾的最低点仍有约5–6毫米下陷，四条校正动作的最低点约高于平面2毫米。
+正式场景试玩从06-2切入06-3，实际读取 `Scenes/FirstLevel/Scene_FirstLevel.json`。妮儿保持1.288729米Actor身高和模型世界缩放1，资源与脚本错误均为零。待机和环顾的最低点下陷小于5毫米，四条校正动作的最低点约高于平面2毫米。
 
 运动矢量、全部画质档采样器预算、发布资源及其浏览器核验、打包入口和独立菜单检查通过。合入同期人物与预览工具更新后，共用骨架、朝向、模块图、文字字体、数据来源、资产规范、史实台账和测试登记检查再次通过。静态测试服务为环境编辑器与白盒编辑器提供只读状态响应，保留实际模型、动作与场景资源加载及错误断言。
+
+正常遭遇试玩已检查04a模型加载及08g离车后的真实显示，`NierEncounterBrowserTest` 验证实际妮儿为33,374顶点、39,790三角面、65骨，身高1.288729米、世界缩放1、物理材质高光0.5，并核对粗糙度、法线贴图及高画质着色程序链接。
 
 ## 重建
 
 ~~~powershell
 node Taierzhuang1938/_import/Script_BuildNier.mjs
-node Taierzhuang1938/Script_TestRunner.mjs --only=XBotCharactersTest,NierCharacterBrowserTest,ModelFacingTest --fail-fast
+node Taierzhuang1938/_import/Script_HairGroomBuild.mjs Game_Nier
+node Taierzhuang1938/Script_TestRunner.mjs --only=XBotCharactersTest,NierCharacterBrowserTest,NierEncounterBrowserTest,ModelFacingTest,HairGroomTest --fail-fast
 ~~~
 
 输入放在其他位置时，把完整 GLB 路径作为重建命令的第一个参数。

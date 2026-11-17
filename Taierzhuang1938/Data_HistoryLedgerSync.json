@@ -544,6 +544,26 @@
           "scope": "Added one Azuma Shiro creative-appearance bullet."
         }
       ]
+    },
+    {
+      "asset": "NierDirtyV4",
+      "date": "2026-11-17",
+      "scope": "Only the user-provided Nier Dirty V4 appearance, skeleton and PBR update. Existing Nier creative-appearance wording covers this asset.",
+      "runtimeAsset": "Model/Character/Data_Nier.json",
+      "assetContract": "docs/Data_Nier.md",
+      "decision": "Weathering, skin, cloth, shoes, material response, proportions, skinning and contacts are creative game presentation. No new historical claim or classification change.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-17T07:58:09.431Z",
+          "scope": "Read the existing Nier appearance row only."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-17T07:58:10.570Z",
+          "scope": "Read the existing Nier creative-appearance bullet only."
+        }
+      ]
     }
   ],
   "encounterReviews": [

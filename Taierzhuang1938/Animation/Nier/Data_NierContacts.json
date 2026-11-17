@@ -4,7 +4,7 @@
   "character": "nier",
   "model": {
     "file": "Model/Character/Model_Nier.glb",
-    "sha256": "3be8ad2c367a314998109e8f0cddec652f1bba90c00ff2678fd45276cd9ed70e"
+    "sha256": "d5947eae49624bc4e822f81f3dd6ff82cebfbefa2d92cbcc15d68d0bad58f5a6"
   },
   "clips": [
     {
@@ -14,13 +14,13 @@
       },
       "output": {
         "file": "Animation/Nier/Animation_Nier_KneelingIdle_V1.glb",
-        "sha256": "8b3726fdce34ed2620711032c345745da3837049d93496b1f429e96129b349f6"
+        "sha256": "c8f238608b49d41fb53d865b777b5e58f12991e45ac6fa7a3f654da2f1f58ed4"
       },
       "frames": 259,
       "duration": 4.300000190734863,
-      "minBefore": -0.014548616359464287,
+      "minBefore": -0.018127034094805542,
       "minAfter": 0.0019999999999999983,
-      "maxLiftM": 0.016548616359464287
+      "maxLiftM": 0.02012703409480554
     },
     {
       "source": {
@@ -29,13 +29,13 @@
       },
       "output": {
         "file": "Animation/Nier/Animation_Nier_CrouchWalking_V1.glb",
-        "sha256": "5b77e9d07b2cc508d6662305335750aa7f3b5d20bdd9244b7fe20325b38e9c58"
+        "sha256": "74ed85563edcc306fd1821a79f1500366b93cbd562962f13dbb5a0ba832fc3e8"
       },
       "frames": 73,
       "duration": 1.2000000476837158,
-      "minBefore": -0.05177954748824773,
+      "minBefore": -0.0343671368997834,
       "minAfter": 0.0019999999999999983,
-      "maxLiftM": 0.05377954748824773
+      "maxLiftM": 0.0363671368997834
     },
     {
       "source": {
@@ -44,13 +44,13 @@
       },
       "output": {
         "file": "Animation/Nier/Animation_Nier_KneelingInspecting_V1.glb",
-        "sha256": "05221bb0ddf91f9c15976e3199eecd64b78bd1999ef159eb68fc900ec3586536"
+        "sha256": "440124b6f380af6940c205a9d1a100c243ee042de21efdc60f093478fc4ccf0c"
       },
       "frames": 299,
       "duration": 4.9666666984558105,
-      "minBefore": -0.031402812894264207,
-      "minAfter": 0.0019999999999999983,
-      "maxLiftM": 0.03340281289426421
+      "minBefore": 0.0001682215362804315,
+      "minAfter": 0.002,
+      "maxLiftM": 0.0018317784637195684
     },
     {
       "source": {
@@ -59,13 +59,13 @@
       },
       "output": {
         "file": "Animation/Nier/Animation_Nier_SittingIdle_V2.glb",
-        "sha256": "e9d79f43a5e24f695de142ef6c1564f1fd1d98f81f693c69fb89315ce0befcd6"
+        "sha256": "5d685e7afde359ec429671546fe36661683ac3bf86819e8d696a45cec9b6161c"
       },
       "frames": 655,
       "duration": 10.899999618530273,
-      "minBefore": -0.06978575050663074,
+      "minBefore": -0.06330713993572443,
       "minAfter": 0.0020000000000000018,
-      "maxLiftM": 0.07178575050663075
+      "maxLiftM": 0.06530713993572443
     }
   ]
 }

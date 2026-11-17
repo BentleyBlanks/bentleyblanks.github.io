@@ -62,7 +62,7 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_Dying_V3.glb": "./Animation/LiuWencai/Animation_LiuWencai_Dying.glb",
       "Animation_Mixamo_IdleCrouchingAiming_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
     }) }),
-  nier: Object.freeze({ name: "妮儿", file: "./Model/Character/Model_Nier.glb", hipsScale: 0.6397, heightM: 1.2887294292449951, ownMaterial: true,
+  nier: Object.freeze({ name: "妮儿", file: "./Model/Character/Model_Nier.glb", hipsScale: 0.6542, heightM: 1.2887294292449951, ownMaterial: true,
     report: "./Model/Character/Data_Nier.json", groom: "./Hair/Grooms/Groom_Game_Nier.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_KneelingIdle_V1.glb": "./Animation/Nier/Animation_Nier_KneelingIdle_V1.glb",

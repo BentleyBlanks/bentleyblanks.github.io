@@ -62,10 +62,18 @@ try {
     document.querySelector("#edRoot").style.display = "none";
     document.querySelector("#follow").checked = false;
     return { material: mesh.material.name, bones: mesh.skeleton.bones.length, faceVertices: face.length,
+      physicalMaterial: mesh.material.isMeshPhysicalMaterial, specularIntensity: mesh.material.specularIntensity,
+      roughness: mesh.material.roughness, metalness: mesh.material.metalness,
+      roughnessMap: !!mesh.material.roughnessMap, normalMap: !!mesh.material.normalMap,
       restHeightM: bounds.max.y - bounds.min.y, bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() } };
   });
   assert.match(info.material, /Nier/);
   assert.equal(info.bones, 65);
+  assert.equal(info.physicalMaterial, true, "V4 specular material reaches the actual preview");
+  assert.equal(info.specularIntensity, .5, "V4 reduced specular factor is preserved");
+  assert.equal(info.roughness, 1);
+  assert.equal(info.metalness, 0);
+  assert.ok(info.roughnessMap && info.normalMap, "V4 roughness and micro-normal maps are loaded");
   assert.ok(info.faceVertices > 3000);
   assert.ok(Math.abs(info.restHeightM - XBOT_CHARACTERS.nier.heightM) < .0002);
   for (const file of clips) {

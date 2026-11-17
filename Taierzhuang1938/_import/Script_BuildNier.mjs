@@ -1,4 +1,4 @@
-// Convert the user-provided Nier V11 skin to the shared runtime skeleton.
+// Convert the user-provided weathered Nier V4 skin to the shared runtime skeleton.
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -8,14 +8,14 @@ import { LoadGlb, ReadAccessor, ReadAccessorInt, SerializeGlb } from "./Script_L
 
 const project = path.resolve(import.meta.dirname, "..");
 const source = path.resolve(process.argv[2] || process.env.NIER_SOURCE ||
-  "C:/Users/Bentl/OneDrive/Sync/饮河/FPS/角色/Tripo/08_妮儿/Nier_Merged_V11_Bones.glb");
+  "C:/Users/Bentl/OneDrive/Sync/饮河/FPS/角色/Tripo/08_妮儿/Dirty/Model_NierDirty_Merged_V4_Bones.glb");
 const bytes = fs.readFileSync(source);
 const document = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
 if (document.skins?.length !== 1 || document.materials?.length !== 1) {
   throw new Error("Nier input requires one complete skin and one material");
 }
 
-// Restore the height of the assembled V11 before Tripo normalized its export.
+// Restore the accepted assembly height before Tripo normalized its export.
 const crownM = 1.2887294292449951;
 const result = spawnSync(process.execPath, [
   path.join(import.meta.dirname, "Script_BuildXBotRigCharacter.mjs"), source,
@@ -28,6 +28,8 @@ if (result.status !== 0) throw new Error(`Nier conversion failed (${result.statu
 const outputFile = path.join(project, "Model/Character/Model_Nier.glb");
 const glb = LoadGlb(outputFile);
 const doc = glb.json, skin = doc.skins[0], primitive = doc.meshes[0].primitives[0];
+// Keep the V4 specular factor active in loaders that use extensionsUsed.
+doc.extensionsUsed = [...new Set([...(doc.extensionsUsed || []), ...Object.keys(doc.materials[0].extensions || {})])];
 const positions = ReadAccessor(glb, primitive.attributes.POSITION).data;
 const indices = ReadAccessorInt(glb, primitive.indices).data;
 const joints = ReadAccessorInt(glb, primitive.attributes.JOINTS_0).data;
@@ -175,8 +177,16 @@ report.input = {
   file: path.basename(source), sha256: createHash("sha256").update(bytes).digest("hex"),
   skins: document.skins.length, joints: document.skins[0].joints.length,
 };
+report.appearanceVersion = "Nier Dirty V4";
+report.material = {
+  name: doc.materials[0].name,
+  specularFactor: doc.materials[0].extensions?.KHR_materials_specular?.specularFactor ?? 1,
+  metallicFactor: doc.materials[0].pbrMetallicRoughness.metallicFactor ?? 1,
+  roughnessMap: doc.materials[0].pbrMetallicRoughness.metallicRoughnessTexture?.index,
+  normalMap: doc.materials[0].normalTexture?.index,
+};
 report.reconstructionScope = [
-  "妮儿的脸型、旧棉衣、补丁裤和布鞋来自用户确认的合并件，属于本作创作外观。",
+  "妮儿的脸型、脏旧棉衣、补丁裤和布鞋来自用户确认的 Dirty V4 合并件，属于本作创作外观。",
   "人物骨架、蒙皮与动作适配属于游戏表现。",
 ];
 report.historicalReferences = [];

@@ -813,11 +813,11 @@
    "label": "妮儿（游戏挂接）",
    "model": "Model/Character/Model_Nier.glb",
    "file": "Grooms/Groom_Game_Nier.bin",
-   "bytes": 4473388,
+   "bytes": 1919916,
    "strands": 60000,
-   "guides": 2077,
-   "cardTriangles": 81702,
-   "shellTriangles": 20940
+   "guides": 617,
+   "cardTriangles": 25092,
+   "shellTriangles": 13126
   },
   {
    "id": "Game_TaniHisao",
