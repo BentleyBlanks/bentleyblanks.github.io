@@ -52,8 +52,8 @@ export const XBOT_CHARACTERS = Object.freeze({
       "Animation_Mixamo_Dying_V3.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_Dying_V3.glb",
       "Animation_Mixamo_SittingIdle_V2.glb": "./Animation/AzumaShiro/Animation_AzumaShiro_SittingIdle_V2.glb",
     }) }),
-  // 刘文财 V9：用户下载的 Mixamo 绑骨件，转换为共用骨架。
-  liuWencai: Object.freeze({ name: "刘文财", file: "./Model/Character/Model_LiuWencai.glb", hipsScale: 0.9153, ownMaterial: true,
+  // 刘文财 Dirty V1：战损拼接版的用户绑骨件，转换为共用骨架。
+  liuWencai: Object.freeze({ name: "刘文财", file: "./Model/Character/Model_LiuWencai.glb", hipsScale: 0.9495, heightM: 1.83, ownMaterial: true,
     report: "./Model/Character/Data_LiuWencai.json", groom: "./Hair/Grooms/Groom_Game_LiuWencai.bin",
     clipOverrides: Object.freeze({
       "Animation_Mixamo_Crawling_V1.glb": "./Animation/LiuWencai/Animation_LiuWencai_Crawling.glb",

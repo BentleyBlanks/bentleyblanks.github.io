@@ -7,6 +7,8 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
+const expectedModel = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "Model/Character/Data_LiuWencai.json"), "utf8"));
+assert.equal(expectedModel.appearanceVersion, "Dirty V1");
 const custom = process.argv.find(arg => arg.startsWith("--url="))?.slice(6);
 const server = custom ? null : await ServeRoot(root, 0);
 const origin = custom || `http://127.0.0.1:${server.address().port}`;
@@ -105,10 +107,19 @@ try {
     window.__liuWencai = { mesh, head, rigid };
     document.querySelector("#edRoot").style.display = "none";
     document.querySelector("#follow").checked = false;
-    return { material: mesh.material.name, bones: mesh.skeleton.bones.length, vertices: weights.count, rigidHeadVertices: rigid.length };
+    return { material: mesh.material.name, bones: mesh.skeleton.bones.length, vertices: weights.count,
+      triangles: mesh.geometry.index.count / 3, rigidHeadVertices: rigid.length,
+      groom: { id: P.hair?.asset.id, modelSha256: P.hair?.asset.header.modelSha256,
+        beard: !!P.hair?.asset.beard, parent: P.hair?.root.parent?.name } };
   });
   assert.match(info.material, /LiuWencai/);
   assert.equal(info.bones, 65);
+  assert.equal(info.vertices, expectedModel.vertices, "the rendered mesh is the current Dirty model");
+  assert.equal(info.triangles, expectedModel.triangles);
+  assert.equal(info.groom.id, "Game_LiuWencai");
+  assert.equal(info.groom.modelSha256, expectedModel.output.sha256);
+  assert.equal(info.groom.parent, "Head");
+  assert.equal(info.groom.beard, false, "the adopted Dirty appearance has a clean-shaven face");
   // The native skin blends the lower face into Neck. The shared static test
   // verifies that every upper-head vertex has full Head influence.
   assert.ok(info.rigidHeadVertices > 1000);

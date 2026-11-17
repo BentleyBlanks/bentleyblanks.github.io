@@ -12,7 +12,8 @@ import { XBOT_CHARACTERS } from "../Data_XBotCharacters.mjs";
 const project = path.resolve(import.meta.dirname, "..");
 const modelFile = path.join(project, "Model/Character/Model_LiuWencai.glb");
 const outputDir = path.join(project, "Animation/LiuWencai");
-const character = XBOT_CHARACTERS.liuWencai;
+const modelReport = JSON.parse(fs.readFileSync(path.join(project, "Model/Character/Data_LiuWencai.json"), "utf8"));
+const character = { ...XBOT_CHARACTERS.liuWencai, hipsScale: modelReport.hipsScale };
 const floor = 0.002;
 const policies = [
   { id: "Crawling", file: "Animation_Mixamo_Crawling_V1.glb", feet: true, hands: true, kneeFloor: .075 },

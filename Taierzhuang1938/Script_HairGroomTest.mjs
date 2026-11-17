@@ -120,7 +120,8 @@ for (const g of manifest.grooms) {
         const axis = index % 2, unit = value / 65535;
         return unit >= tile[axis] - .0001 && unit <= tile[axis] + tile[axis + 2] + .0001;
       }), `${g.id}：UV 始终在本人的图集区域内`);
-    } else Check(!header.beard && look.beard.enabled === false, `${g.id}：净面参考不生成胡须或胡茬`);
+    } else Check(!header.beard && (look.beard.enabled === false || entry.model && entry.beard === null),
+      `${g.id}：净面参考或显式游戏净面配置不生成胡须或胡茬`);
     const scalpUv = sec('hairScalpUv'), scalpPos = sec('hairScalpPos');
     Check(header.hair?.referenceScalp?.look === entry.referenceLook && header.hair?.referenceScalp?.atlasSha256 === referenceMasks.atlasSha256,
       `${g.id}：额前发根使用本人的参考覆盖图`);

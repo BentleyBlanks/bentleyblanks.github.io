@@ -1,23 +1,23 @@
 {
   "schema": 1,
-  "built": "2026-11-07",
+  "built": "2026-11-17",
   "script": "_import/Script_BuildLiuWencai.mjs",
   "source": {
-    "file": "LiuWencai_Merged_V9_Bones.glb",
-    "bytes": 36224272,
-    "sha256": "86f476ef313014dc10d6f0375c3ec40103a5b931aec7909a3d4a99d5bceae2cf",
-    "heightM": 0.9972
+    "file": "Model_LiuWencaiDirty_Merged_V1_Bones.glb",
+    "bytes": 42158836,
+    "sha256": "8de49c79ae1115a1a934509ca95f7d8d8b7102a319dede04370dc8ec115bfe15",
+    "heightM": 1
   },
   "output": {
     "file": "Model/Character/Model_LiuWencai.glb",
-    "bytes": 8986472,
-    "sha256": "01fe7034fce12e90c9d981a196737ab2e38a008ce970463e3ac74095b109f024"
+    "bytes": 10600376,
+    "sha256": "7c3c8468e826a24c5c2fcd8bebe804952aadbc97988692d467fa96806c5e68e5"
   },
-  "scale": 1.835228,
-  "crownM": 1.8300752639770508,
-  "triangles": 47400,
-  "vertices": 40434,
-  "sourceVertices": 40434,
+  "scale": 1.83,
+  "crownM": 1.83,
+  "triangles": 52863,
+  "vertices": 45692,
+  "sourceVertices": 45692,
   "bones": 65,
   "addedEndBones": [
     "HeadTop_End",
@@ -27,7 +27,6 @@
     "RightHandRing4",
     "RightHandPinky4",
     "LeftHandThumb4",
-    "LeftHandIndex4",
     "LeftHandMiddle4",
     "LeftHandRing4",
     "LeftHandPinky4"
@@ -37,13 +36,13 @@
       0.015,
       0.075
     ],
-    "vertices": 5358,
+    "vertices": 5726,
     "otherInfluenceVertices": 0
   },
-  "hipsY": 0.9545,
+  "hipsY": 0.9901,
   "xbotHipsY": 1.0427,
-  "hipsScale": 0.9153,
-  "headY": 1.6068,
+  "hipsScale": 0.9495,
+  "headY": 1.6191,
   "xbotHeadY": 1.5993,
   "images": [
     {
@@ -51,35 +50,45 @@
       "role": "baseColor",
       "width": 4096,
       "height": 4096,
-      "sourceBytes": 14802957,
-      "bytes": 2637908
+      "sourceBytes": 16712778,
+      "bytes": 2941672
     },
     {
       "index": 1,
       "role": "metallicRoughness",
       "width": 4096,
       "height": 4096,
-      "sourceBytes": 5158700,
-      "bytes": 1541032
+      "sourceBytes": 7117030,
+      "bytes": 1961888
     },
     {
       "index": 2,
       "role": "normal",
       "width": 4096,
       "height": 4096,
-      "sourceBytes": 13402113,
-      "bytes": 2111286
+      "sourceBytes": 15108224,
+      "bytes": 2661612
     }
   ],
-  "input": {
-    "file": "LiuWencai_Merged_V9_Bones.glb",
-    "sha256": "86f476ef313014dc10d6f0375c3ec40103a5b931aec7909a3d4a99d5bceae2cf",
-    "skins": 1,
-    "joints": 54
+  "headSkinRepair": {
+    "headVertices": 8791,
+    "changedVertices": 5117,
+    "faceVertices": 6671,
+    "neckBlendStartM": 1.53,
+    "rigidFaceStartM": 1.585,
+    "minFaceHeadWeightBefore": 0.12941177189350128,
+    "maxFacePullBeforeAt45DegM": 0.04268807000935931
   },
+  "input": {
+    "file": "Model_LiuWencaiDirty_Merged_V1_Bones.glb",
+    "sha256": "8de49c79ae1115a1a934509ca95f7d8d8b7102a319dede04370dc8ec115bfe15",
+    "skins": 1,
+    "joints": 55
+  },
+  "appearanceVersion": "Dirty V1",
   "reconstructionScope": [
     "刘文财的脸型、灰色旧军服、软军帽、绑腿和草鞋按角色参考图设计，属于本作创作外观。",
-    "V9 帽沿贴合修复、原始小臂轮廓恢复、骨架转换与动作适配属于建模及游戏表现。"
+    "干燥烟灰、泥尘、衣物破损、帽沿贴合、身体比例、骨架和动作适配属于本作创作与游戏表现。"
   ],
   "historicalReferences": [],
   "facing": {

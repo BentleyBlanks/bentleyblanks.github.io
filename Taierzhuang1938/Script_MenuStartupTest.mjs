@@ -6,6 +6,8 @@ import {BuildBrowserBundle} from './Script_BuildBrowserBundle.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {SANDBOX_RANGE_KEYS} from './Data_SandboxRanges.mjs';
+// Encounter Play uses the director's launch controls and shares startup routing.
+const visibleSandboxKeys = SANDBOX_RANGE_KEYS.filter(key => key !== 'encounterPlay');
 
 for (const query of ['', 'quality=high', 'menuPreview=3&menuPreviewUi=0', 'audio=0']) assert.ok(IsMenuStartup(new URLSearchParams(query)), query);
 for (const query of ['whitebox=p012', ...SANDBOX_RANGE_KEYS.map(key => `${key}=1`), 'shot=1', 'phase=0', 'poseTest=1', 'editor=vfx', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);
@@ -137,7 +139,7 @@ async function CheckMenuResponse(page, deployed) {
   assert.ok(response.copyShift < 1, 'outgoing text retains its layout during the crossfade');
   await page.waitForFunction(() => !document.querySelector('.mnBriefLeaving'));
   await page.getByRole('button', {name: '测试场景', exact: true}).click();
-  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), SANDBOX_RANGE_KEYS.length);
+  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), visibleSandboxKeys.length);
   const hairEntry = page.getByRole('button', {name: /头发胡子测试场/});
   await hairEntry.scrollIntoViewIfNeeded();
   await hairEntry.hover();
@@ -151,7 +153,7 @@ async function CheckMenuResponse(page, deployed) {
     finally { m.host.PlaySandbox = play; }
     return keys;
   });
-  assert.deepEqual(routes, SANDBOX_RANGE_KEYS, 'every registered test scene has a working visible menu route');
+  assert.deepEqual(routes, visibleSandboxKeys, 'every selectable test scene has a working visible menu route');
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.mnChapterLevel:visible').count(), 6);
   for (const viewport of [{width:390,height:844}, {width:844,height:390}]) {

@@ -757,7 +757,7 @@
    "id": "Game_LiuWencai",
    "head": "LiuWencai",
    "hair": "Crew",
-   "beard": "StubbleLight",
+   "beard": null,
    "reference": {
     "look": "LiuWencai",
     "source": "06_刘文财/HairReference_20261107/Ref_LiuWencai_HeadHair_1K_V1.png",
@@ -769,11 +769,11 @@
    "label": "刘文财（游戏挂接）",
    "model": "Model/Character/Model_LiuWencai.glb",
    "file": "Grooms/Groom_Game_LiuWencai.bin",
-   "bytes": 960872,
-   "strands": 46000,
-   "guides": 578,
-   "cardTriangles": 4734,
-   "shellTriangles": 438
+   "bytes": 543792,
+   "strands": 28576,
+   "guides": 179,
+   "cardTriangles": 1770,
+   "shellTriangles": 187
   },
   {
    "id": "Game_OldGeng",

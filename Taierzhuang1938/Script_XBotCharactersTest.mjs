@@ -191,6 +191,22 @@ for (const [key, def] of Object.entries(XBOT_CHARACTERS)) {
     rigidHeadVertices++;
   }
   assert.ok(rigidHeadVertices > 0, `${key}: upper head and cap weights were checked`);
+  if (key === "liuWencai") {
+    let checkedFaceVertices = 0;
+    for (let index = 0; index < positions.length / 3; index++) {
+      point.fromArray(positions, index * 3).applyMatrix4(M);
+      if (point.y < report.headSkinRepair.rigidFaceStartM || point.y > 1.70 || Math.abs(point.x) > .09 || point.z < .025) continue;
+      let headWeight = 0;
+      for (let slot = 0; slot < 4; slot++) {
+        const offset = jointOffset + (index * 4 + slot) * jointBytes;
+        const joint = jointBytes === 1 ? glb.bin[offset] : glb.bin.readUInt16LE(offset);
+        if (joint === headIndex) headWeight += W4[index * 4 + slot];
+      }
+      assert.ok(headWeight > .99999, `刘文财下颌和脸部顶点 ${index} 随 Head 刚性转动`);
+      checkedFaceVertices++;
+    }
+    assert.ok(checkedFaceVertices > 1000);
+  }
   if (key === "tianSao") {
     const uv = Float(glb, prim.attributes.TEXCOORD_0);
     let faceVertices = 0;

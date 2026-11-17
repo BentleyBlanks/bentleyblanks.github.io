@@ -4,7 +4,7 @@
   "character": "liuWencai",
   "model": {
     "file": "Model/Character/Model_LiuWencai.glb",
-    "sha256": "01fe7034fce12e90c9d981a196737ab2e38a008ce970463e3ac74095b109f024"
+    "sha256": "7c3c8468e826a24c5c2fcd8bebe804952aadbc97988692d467fa96806c5e68e5"
   },
   "results": [
     {
@@ -15,11 +15,11 @@
       },
       "output": {
         "file": "Animation/LiuWencai/Animation_LiuWencai_Crawling.glb",
-        "sha256": "8599ab2f217c93302199da4740ae6e3b557ad2669f384973f02ab46f09ce135a"
+        "sha256": "2c1eca131d9954facad493b6402e018a562c938f1fcd0e625b37294a989cff2b"
       },
       "frames": 57,
-      "minSkinnedY": -0.0007025900587375863,
-      "maxPelvisLiftM": 0.12379699287861023,
+      "minSkinnedY": -0.0011899572027088275,
+      "maxPelvisLiftM": 0.13670396628610704,
       "maxBodyBoneLengthErrorM": 0
     },
     {
@@ -30,11 +30,11 @@
       },
       "output": {
         "file": "Animation/LiuWencai/Animation_LiuWencai_ProneFiringRifle.glb",
-        "sha256": "02f5998980f9478de8518d5488538673001d9344c0c0682fdbc36f7cde753a12"
+        "sha256": "03ff14e59bf19247ab7ac589e5fa7d29b3647a0eabce864c25001d226cbf1158"
       },
       "frames": 16,
-      "minSkinnedY": 0.002000002287690816,
-      "maxPelvisLiftM": 0.07851285608648938,
+      "minSkinnedY": 0.001698947162896707,
+      "maxPelvisLiftM": 0.0754153709600922,
       "maxBodyBoneLengthErrorM": 0
     },
     {
@@ -45,11 +45,11 @@
       },
       "output": {
         "file": "Animation/LiuWencai/Animation_LiuWencai_SittingIdle.glb",
-        "sha256": "0d8e9bae9dd41641bbd4aa424deab84cfa63ca91ac37b3fa31fb6888c3b8936a"
+        "sha256": "5e9c36c9a550dc791ddffad6f0dc3c9744a50bd1455f9330a5e439d0e2fa3808"
       },
       "frames": 328,
-      "minSkinnedY": 0.00043711983864848185,
-      "maxPelvisLiftM": 0.06985901764055308,
+      "minSkinnedY": 0.0008507896809422146,
+      "maxPelvisLiftM": 0.07646058503024968,
       "maxBodyBoneLengthErrorM": 0
     },
     {
@@ -60,11 +60,11 @@
       },
       "output": {
         "file": "Animation/LiuWencai/Animation_LiuWencai_Dying.glb",
-        "sha256": "7e03bf71a48170a9ba49fe4007fde7ccfd95ab89322c427acdd14338b88d0922"
+        "sha256": "e6835fd13a549ce09ca176a1d8b4026919f337273e03654496e3cfac3f08ef1a"
       },
       "frames": 137,
-      "minSkinnedY": 0.0020000000000001132,
-      "maxPelvisLiftM": 0.10960317571657162,
+      "minSkinnedY": 0.002000000088010731,
+      "maxPelvisLiftM": 0.09707694788612425,
       "maxBodyBoneLengthErrorM": 0
     },
     {
@@ -75,11 +75,11 @@
       },
       "output": {
         "file": "Animation/LiuWencai/Animation_LiuWencai_CrouchingAiming.glb",
-        "sha256": "25ab3ec85e3e3c3e1303be157d35974fd84da79b3decc9c3335a29da2786ecd6"
+        "sha256": "a673badb53acd606bb367dc1f91fd657a75441256eea08cf8fb9fd1224061681"
       },
       "frames": 66,
-      "minSkinnedY": 0.002000000742385272,
-      "maxPelvisLiftM": 0.02551781576825908,
+      "minSkinnedY": 0.0020000005778803595,
+      "maxPelvisLiftM": 0.0314922814521896,
       "maxBodyBoneLengthErrorM": 0
     }
   ]
