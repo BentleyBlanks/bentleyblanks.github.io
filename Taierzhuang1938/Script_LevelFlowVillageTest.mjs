@@ -9,6 +9,8 @@ import { UpgradeEncounterDocument, ValidateEncounterDocument } from "./AdvancedT
 import { FLOW_RENDERING, FLOW_DUSK } from "./Data_Tuning_LevelFlow.mjs";
 import { ApplyEncounterSky, EncounterDuskBlend } from "./AdvancedTools/Script_LevelFlowSkyBlend.mjs";
 import { SCENE_EVENTS } from "./Data_SceneEvents.mjs";
+import { BlockoutDocFromScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
+import { LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 
 const scene = JSON.parse(fs.readFileSync(new URL("./Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",import.meta.url)));
 const map = BuildEncounterMap(scene);
@@ -258,7 +260,13 @@ assert.ok(!customTemple.groups.some(group=>group.id===PLAN.patrol.id),"cover mig
     }
   }
   const shelters=scene.objects.filter(object=>object.meta?.shelter);
-  assert.equal(shelters.length,43,"authored shelter rooms plus the village households");
+  assert.deepEqual(shelters.map(object=>object.meta.holeRoof).sort(),["AidHoleA","AidHoleB","BombedHole","MatHole","TianHole"],
+    "only the five individually authored story shelters remain");
+  assert.ok(!scene.objects.some(object=>object.id.startsWith("VillageShelter_")));
+  assert.ok(!scene.markers.some(marker=>marker.id.startsWith("LmVillageShelter_")));
+  for(const [x,z] of [[67.9,1036.5],[138,1040],[188,1151]]) {
+    assert.ok(terrain.heightAt(x,z)>-.35,"ordinary courtyards have a connected, restored ground surface");
+  }
   for(const roof of shelters) {
     const {x,z,w,d,yaw,floorY,run}=roof.meta.shelter,a=yaw*Math.PI/180;
     assert.ok(Math.abs(terrain.heightAt(x,z)-floorY)<.08,`${roof.id} has a genuinely excavated floor`);
@@ -289,5 +297,27 @@ assert.ok(!customTemple.groups.some(group=>group.id===PLAN.patrol.id),"cover mig
   assert.ok(EvaluateFlow(BeatById('16c').end-.1).signals.includes('MatHomeCovered'),'the fifth-draft event really closes the mat');
   assert.ok(!EvaluateFlow(BeatById('16c').start).signals.includes('MatHomeCovered'),'seeking before the action reopens the entrance');
   assert.equal(map.labels.filter(label=>label.detail).length>300,true,'close-view aperture labels use the authored openings');
+}
+{
+  const water=scene.objects.find(object=>object.id==="SandRiverSurface");
+  const rows=water.meta.waterRibbon;
+  const widths=rows.map(([,north,south])=>south-north);
+  const surfaceY=water.pos[1]+water.size[1];
+  assert.ok(Math.min(...widths)<2 && Math.max(...widths)>4 && Math.max(...widths)<6,"low water changes width along exposed sand");
+  assert.ok(!scene.objects.some(object=>object.id.startsWith("SandRiverWater_")),"the shallow strip replaces overlapping water boxes");
+  const checkRows=rows.filter(([x])=>x>-152&&x<312);
+  for(const [x,north,south] of checkRows) {
+    const mid=(north+south)/2;
+    const depth=surfaceY-terrain.heightAt(x,mid);
+    assert.ok(depth>.045&&depth<.5,`sand river center is wet and shallow at x=${x}, depth=${depth}`);
+    assert.ok(terrain.heightAt(x,north-4)>surfaceY&&terrain.heightAt(x,south+4)>surfaceY,`sand banks are exposed at x=${x}`);
+  }
+  const doc=BlockoutDocFromScene(scene,DecodeSceneHeights(ReadBytes(scene.terrain.file),scene.terrain),{
+    level:"FirstLevel",region:{minX:-100,maxX:260,minZ:1180,maxZ:1360},
+  });
+  const layout=LayoutFromSceneDoc(doc);
+  const inPlay=layout.blocks.find(object=>object.id===water.id);
+  assert.deepEqual(inPlay.waterRibbon,rows,"Play receives the same connected cross-sections as the editor");
+  assert.ok(inPlay.solid===false&&inPlay.semantic==="water");
 }
 console.log("ok Temple approach, walls, concealed patrol/shelters, cart handoff, stealth rules and draft migration");

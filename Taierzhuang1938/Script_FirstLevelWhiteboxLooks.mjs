@@ -395,3 +395,30 @@ export function BuildWhiteboxWater(blocks, scene, { preset = "muddyRiver", name 
   geometry.computeBoundingSphere();
   return CreateWaterSurface({ geometry, scene, preset, name });
 }
+
+/** Bake authored cross-sections into one connected, horizontal shallow-water surface. */
+export function BuildRibbonWater(block, scene) {
+  const positions=[], normals=[], uvs=[], indices=[];
+  const across=4, surfaceY=block.y+block.h/2;
+  for(const [x,north,south] of block.waterRibbon) {
+    for(let column=0;column<=across;column++) {
+      const z=north+(south-north)*column/across;
+      positions.push(x,surfaceY,z);
+      normals.push(0,1,0);
+      uvs.push(x,z);
+    }
+  }
+  for(let row=1;row<block.waterRibbon.length;row++) {
+    for(let column=0;column<across;column++) {
+      const a=(row-1)*(across+1)+column, b=a+across+1;
+      indices.push(a,a+1,b,b,a+1,b+1);
+    }
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
+  geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+  return CreateWaterSurface({geometry,scene,preset:"muddyRiver",flow:[-1,.2],name:block.id});
+}

@@ -270,6 +270,7 @@ function GroundedBlock(block, groundAt) {
     ...(block.propModel ? { propModel: block.propModel } : {}),
     ...(block.propTile ? { propTile: [...block.propTile] } : {}),
     ...(block.sceneTree ? { sceneTree: true } : {}),
+    ...(block.semantic === "water" && block.waterRibbon ? { waterRibbon: block.waterRibbon } : {}),
   };
 }
 

@@ -32,6 +32,8 @@ try {
    ["WallSlogan",[119,2.6,1065.4],[125.29,1.7,1061.27]],
    ["MatEntrance",[111,2.4,1211.5],[105.5,-.3,1210.5]],
    ["Church",[63,4,1230],[63,2.5,1218.5]],
+   ["SandRiverReach",[126,31,1325],[63,-2,1270]],
+   ["SandRiverBridge",[-48,9,1320],[-81,-1,1296]],
  ]) {
    await Camera(eye,target);await page.evaluate(()=>new Promise(requestAnimationFrame));
    await page.screenshot({path:path.join(out,`Verified_${name}.png`)});

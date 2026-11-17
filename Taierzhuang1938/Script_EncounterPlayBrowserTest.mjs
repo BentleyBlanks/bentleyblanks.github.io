@@ -372,6 +372,15 @@ try{
      assert.ok(Math.abs(lighting.output.sunElevation-8)<0.01&&lighting.state.components.Sun.transition===1,"the local dusk is settled before Play becomes ready");
    } else assert.ok(lighting.state.clock.hour>21&&lighting.output.profile==="firstLevelNight","bridge demolition has reached night lighting");
    assert.ok(start.actors.some(actor=>actor.id==="luo"),"southern scene uses the real cast");
+   if(beat==="18f") {
+     const river=await frame.evaluate(()=>{
+       const mesh=Tengxian.scene.getObjectByName("SandRiverSurface");
+       const position=mesh?.geometry.getAttribute("position");
+       return {visible:mesh?.visible,vertices:position?.count,triangles:mesh?.geometry.index?.count/3};
+     });
+     assert.ok(river.visible && river.vertices>1000 && river.triangles>1000,
+       "the railway bridge view in Play has one connected shallow-water mesh");
+   }
    if(beat==="12b") {
      const cast=await frame.evaluate(()=>Tengxian.Debug.EncounterPlay.Presentation());
      assert.ok(cast.find(actor=>actor.id==="erya").humans.includes("erya"),"Er Ya uses her approved model");

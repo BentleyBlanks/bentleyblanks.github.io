@@ -32,7 +32,7 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
-import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
+import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater, BuildRibbonWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { WHITEBOX_RAILWAY_LOOKS, PlanRoofShells } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing, AddScenePropModels } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
@@ -398,6 +398,11 @@ export class FirstLevelWhiteboxField {
     const terrainAt = (x, z) => this.TerrainHeight(x, z);
     for (const block of this.layout.blocks) {
       if(block.dynamic || block.treeModel)continue;
+      if(block.waterRibbon) {
+        this.waterMesh=BuildRibbonWater(block,this.scene);
+        this.meshes.push(this.waterMesh);
+        continue;
+      }
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       if(airWallSink&&block.tag==="airWall")airWallSink.Add("AirWallDebug",PlaceGeometry(MakeBox(block.w,block.h,block.d,1,block.id),
@@ -451,8 +456,11 @@ export class FirstLevelWhiteboxField {
       this.stats.roofShells = shells.length;
       // 名字沿用 StaticWhiteBoxes：Script_FirstLevelFrontBreakables 按这个名字找静态合批塌顶点。
       this.meshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, "FirstLevelWhitebox_StaticWhiteBoxes"));
-      this.waterMesh = BuildWhiteboxWater(waterBlocks, this.scene);
-      if (this.waterMesh) this.meshes.push(this.waterMesh);
+      const waterMesh=BuildWhiteboxWater(waterBlocks,this.scene);
+      if(waterMesh) {
+        this.waterMesh=waterMesh;
+        this.meshes.push(waterMesh);
+      }
       this.stats.looks = { ...this.looks.stats.looks };
       this.stats.lookFallbackSets = this.looks.stats.fallbackSets.slice();
       this.stats.waterBlocks = waterBlocks.length;

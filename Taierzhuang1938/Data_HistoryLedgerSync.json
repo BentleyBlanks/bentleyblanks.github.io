@@ -568,6 +568,29 @@
   ],
   "encounterReviews": [
     {
+      "id": "BeishaheVillageAndRiver20261118",
+      "date": "2026-11-18",
+      "scope": "Scoped check of the northern bank village, diagonal post road, railway to the west, German church, domestic refuges, shared wells and early spring water. Ren Shigan's interviews and the local memorial record document refuge in some homes. They do not establish the number or position of the shelters. County records support the seasonal low-water design, with no identified water-level observation for March 1938.",
+      "files": [
+        "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",
+        "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
+        "docs/Data_LevelFlow.md"
+      ],
+      "codexEntry": "HistoryAndCreation / 北沙河村里的人、往南的路",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-17T23:27:06.692Z",
+          "scope": "Qualified domestic shelter coverage and recorded the evidence limits for wells and early spring water."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-17T23:33:32.411Z",
+          "scope": "Corrected household shelter coverage. Listed the shared wells and representation of low water as design choices."
+        }
+      ]
+    },
+    {
       "id": "L1-03C-253908",
       "date": "2026-11-13",
       "scope": "User-directed six-person pursuit with alternating cover and standoff firing positions, plus two ordinary NRA rear guards killed while covering casualty evacuation. Creative preview blocking. Counts, positions and cue times are design values.",

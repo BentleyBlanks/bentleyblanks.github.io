@@ -68,6 +68,15 @@ function ObjectIssues(obj, at, errors, ids) {
   if (obj.group !== undefined && !(typeof obj.group === "string" && obj.group.length <= SCENE_LIMITS.groupMax)) errors.push(`${at}.group 要是至多 ${SCENE_LIMITS.groupMax} 字的字符串`);
   if (obj.params !== undefined && !IsObject(obj.params)) errors.push(`${at}.params 要是对象`);
   if (obj.meta !== undefined && !IsObject(obj.meta)) errors.push(`${at}.meta 要是对象`);
+  if (obj.meta?.waterRibbon !== undefined) {
+    const rows = obj.meta.waterRibbon;
+    const validRows = Array.isArray(rows) && rows.length >= 2 && rows.length <= 4096
+      && rows.every((row, i) => Array.isArray(row) && row.length === 3 && row.every(Finite)
+        && row[1] < row[2] && (i === 0 || row[0] > rows[i - 1][0]));
+    if (obj.material !== "Whitebox/Water" || obj.solid !== false || !Finite(obj.pos?.[1]) || !validRows) {
+      errors.push(`${at}.meta.waterRibbon 需要非实体水面、明确底高及按 X 递增的 [x, 北岸z, 南岸z]`);
+    }
+  }
   for (const k of Object.keys(obj)) if (!SCENE_OBJECT_KEYS.includes(k)) errors.push(`${at} 不认识的字段 ${k}（放进 meta）`);
 }
 

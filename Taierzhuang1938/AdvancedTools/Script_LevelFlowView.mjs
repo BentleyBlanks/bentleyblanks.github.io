@@ -268,7 +268,8 @@ export class FlowMapView {
     SmoothLine(context,map.river.map(Screen),"#a6c5cf",6*scale);
     const signals=EncounterSignals(frame);
     for(const object of map.objects) {
-      if(!VisibleEncounterObject(object,signals)||/Lintel/.test(object.id)) continue;
+      // The ground paint already contains this surface's exact footprint.
+      if(object.meta?.waterRibbon||!VisibleEncounterObject(object,signals)||/Lintel/.test(object.id)) continue;
       const [x,,z]=object.pos,[w,h,d]=object.size||[1,1,1],point=Screen([x,z]);
       const radius=Math.max(w,d)*scale;
       if(point[0]+radius<0||point[1]+radius<0||point[0]-radius>width||point[1]-radius>height) continue;

@@ -380,6 +380,22 @@ export class FlowPerspectiveView extends FlowMapView {
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
+      const ribbon=object.meta?.waterRibbon;
+      if(ribbon) {
+        const surfaceY=y+h;
+        const rgb=this.lighting?ShadeEncounterFace("#819291",[0,1,0]):[129,146,145];
+        for(let i=1;i<ribbon.length;i++) {
+          const [x0,north0,south0]=ribbon[i-1], [x1,north1,south1]=ribbon[i];
+          const centerZ=(north0+south0+north1+south1)/4;
+          const radius=Math.hypot(x1-x0,Math.max(south0,south1)-Math.min(north0,north1))/2;
+          if(!SphereInView(this.CameraPoint([(x0+x1)/2,surfaceY,centerZ]),radius)) continue;
+          const points=[[x0,surfaceY,north0],[x0,surfaceY,south0],[x1,surfaceY,south1],[x1,surfaceY,north1]];
+          if(this.raster.accelerated) {
+            for(const triangle of [[0,1,2],[0,2,3]]) this.raster.WorldTriangle(triangle.map(index=>points[index]),[rgb,rgb,rgb]);
+          } else Face(points,"#819291",[rgb,rgb,rgb,rgb]);
+        }
+        continue;
+      }
       if(Math.max(w,h,d)<0.4&&!object.meta?.detail) continue;
       let anchor=this.objectBases.get(object);
       if(!anchor||anchor.terrain!==this.mapData.terrain||anchor.x!==x||anchor.y!==y||anchor.z!==z||anchor.planning!==object.planning) {
