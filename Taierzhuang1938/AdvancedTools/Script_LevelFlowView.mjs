@@ -2,7 +2,7 @@ import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
-import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
@@ -37,7 +37,7 @@ export function DrawCoverSymbol(context, point) {
 }
 
 export function EncounterSignals(frame) {
-  const signals=new Set();
+  const signals=new Set(frame.signals||[]);
   if(frame.time>=40) signals.add("DugoutCollapsed");
   if(frame.beat.id>="04c") signals.add("L1TrunkLoaded");
   if(frame.beat.id>="05a") signals.add("CartDeparted");
@@ -407,7 +407,8 @@ export class FlowMapView {
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
-    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false]);
+    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false,
+      frame.signals,Math.round((frame.nightBlend||0)*FLOW_DUSK.steps)]);
     if(key!==this.baseKey) {
       if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
@@ -497,7 +498,10 @@ export class FlowMapView {
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
       if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;this.DrawPath(context,[effect.a,effect.b],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
-      if(effect.kind==="plane") {const p=Screen(effect.p);Line(context,[[p[0]-8,p[1]],[p[0]+8,p[1]]],"#d2d7c5",2);Line(context,[[p[0],p[1]-5],[p[0],p[1]+7]],"#d2d7c5",2);}
+      if(effect.kind==="plane") {
+        const p=this.EffectScreen?this.EffectScreen(effect):Screen(effect.p);
+        if(p) {Line(context,[[p[0]-8,p[1]],[p[0]+8,p[1]]],"#d2d7c5",2);Line(context,[[p[0],p[1]-5],[p[0],p[1]+7]],"#d2d7c5",2);}
+      }
       if(effect.kind==="column"||effect.kind==="runner") Circle(context,Screen(effect.p),3,"#f3957b");
     }
     this.speechBubbles = DrawFlowDialogue(context, this, frame, width, height);

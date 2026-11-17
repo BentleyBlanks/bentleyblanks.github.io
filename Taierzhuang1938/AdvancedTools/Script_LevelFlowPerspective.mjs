@@ -61,7 +61,7 @@ export class FlowPerspectiveView extends FlowMapView {
       const shot=frame.effects.find(effect=>effect.kind==="fire"&&Distance(effect.a,actor.p)<0.1);
       if(shot) heading=Math.atan2(shot.b[0]-actor.p[0],shot.b[1]-actor.p[1]);
       if(actor.lookAt) heading=Math.atan2(actor.lookAt[0]-actor.p[0],actor.lookAt[1]-actor.p[1]);
-      const yaw=this.yaw+heading,base=this.Ground(actor.p)+(actor.elevation||0);
+      const yaw=this.yaw+heading,base=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0);
       if(this.type==="eye") {
         const height=actor.eyeHeight ?? (actor.kind==="quilt"?0.55:["drag","kneel","crouch"].includes(actor.pose)?0.95:1.6);
         this.eye=[actor.p[0],base+height,actor.p[1]];this.aim=[actor.p[0]+Math.sin(yaw)*20,base+height-0.15,actor.p[1]+Math.cos(yaw)*20];
@@ -98,7 +98,7 @@ export class FlowPerspectiveView extends FlowMapView {
   Follow(frame) {
     const actor=frame.actors.find(item=>item.id===this.target)||frame.actors[0];
     if(this.type==="scene") {
-      const anchor=[actor.p[0],this.Ground(actor.p)+(actor.elevation||0),actor.p[1]];
+      const anchor=[actor.p[0],(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),actor.p[1]];
       if(this.freeCamera&&this.followAnchor) {
         this.freeCamera.eye=this.freeCamera.eye.map((value,axis)=>value+(anchor[axis]-this.followAnchor[axis]));
       }
@@ -228,7 +228,7 @@ export class FlowPerspectiveView extends FlowMapView {
   DrawBase(context,width,height,frame,layers={}) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     const renderScale=this.renderScale;
-    ApplyEncounterSky(this.aim[2]);
+    ApplyEncounterSky(this.aim[2],this.frame.nightBlend||0);
     DrawEncounterSky(context,width,height,this);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     this.raster.view=this;
@@ -503,10 +503,14 @@ export class FlowPerspectiveView extends FlowMapView {
     }
   }
   SpeechAnchor(actor) {
-    const head = this.Vertex([actor.p[0], this.Ground(actor.p) + (actor.elevation || 0) + SpeechHeadHeight(actor), actor.p[1]]);
+    const head = this.Vertex([actor.p[0], (actor.surfaceY ?? this.Ground(actor.p)) + (actor.elevation || 0) + SpeechHeadHeight(actor), actor.p[1]]);
     return head.depth > 0.15 && head.depth < this.far ? [head.x, head.y] : null;
   }
   VisibleActor(actor) {return !(this.type==="eye"&&!this.freeCamera&&actor.id===this.target);}
+  EffectScreen(effect) {
+    const point=this.Vertex([effect.p[0],this.Ground(effect.p)+(effect.elevation||0),effect.p[1]]);
+    return point.depth>0.15&&point.depth<this.far?[point.x,point.y]:null;
+  }
   DrawArea(context,area,color,label,selection,hit) {
     const [x,z]=area.center,[w,d]=area.size;
     const corners=area.shape==="circle"?Array.from({length:48},(_,index)=>[x+Math.cos(index/48*Math.PI*2)*w/2,z+Math.sin(index/48*Math.PI*2)*w/2])
@@ -523,10 +527,10 @@ export class FlowPerspectiveView extends FlowMapView {
     if(label) Label(context,label,p[0]+10,p[1]-10,color,11,true);
 
   }
-  LabelVertex(actor) {return this.Vertex([actor.p[0],this.Ground(actor.p)+(actor.elevation||0)+(actor.kind==="tank"?1.8:actor.kind==="cart"?1.45:0.65),actor.p[1]]);}
+  LabelVertex(actor) {return this.Vertex([actor.p[0],(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0)+(actor.kind==="tank"?1.8:actor.kind==="cart"?1.45:0.65),actor.p[1]]);}
   ActorScreen(actor) {const vertex=this.LabelVertex(actor);return vertex.depth<0.15?[-100000,-100000]:[vertex.x,vertex.y];}
   ActorInView(actor) {
-    const ground=this.Ground(actor.p)+(actor.elevation||0),points=[this.Vertex([actor.p[0],ground,actor.p[1]]),this.Vertex([actor.p[0],ground+1.8,actor.p[1]])];
+    const ground=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),points=[this.Vertex([actor.p[0],ground,actor.p[1]]),this.Vertex([actor.p[0],ground+1.8,actor.p[1]])];
     return points.some(point=>point.depth>0.15&&point.depth<this.far&&point.x>-25&&point.x<this.width+25&&point.y>-100&&point.y<this.height+100);
   }
   ActorLabelOpacity(actor) {
@@ -538,7 +542,7 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   OrderActors(actors) {return [...actors].sort((a,b)=>Distance(b.p,this.center)-Distance(a.p,this.center));}
   DrawActor(context,actor,frame) {
-    const [x,z]=actor.p,base=this.Ground(actor.p)+(actor.elevation||0),color=FLOW_COLORS[actor.side],stats={visible:0,hidden:0};
+    const [x,z]=actor.p,base=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),color=FLOW_COLORS[actor.side],stats={visible:0,hidden:0};
     const hiddenAlpha=this.type==="eye"&&!this.freeCamera?0:0.2;
     this.occlusion.set(actor.id,stats);
     const Segment=(a,b,width=2)=>{

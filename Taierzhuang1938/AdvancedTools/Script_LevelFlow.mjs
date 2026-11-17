@@ -12,9 +12,10 @@ import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs?v=20261116DeathRetry";
+import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation,annotationEditor,chat,gamePlay;
+let canvas,workspace,navigation,annotationEditor,chat,gamePlay,timeline;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
@@ -171,14 +172,9 @@ function PopulateTimeline() {
     button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
     Element("timelineBeats").append(button);
   }
-  for(const stamp of [0,300,600,900,1200,1500,FLOW_DURATION]) {
-    const label=document.createElement("span");label.textContent=FormatFlowTime(stamp);
-    label.style.left=`${stamp/FLOW_DURATION*100}%`;Element("timelineRuler").append(label);
-  }
-  const beats=Element("timelineBeats");
-  new ResizeObserver(()=>{
-    for(const button of beats.children) button.classList.toggle("lfShortBeat",button.getBoundingClientRect().width<25);
-  }).observe(beats);
+  timeline=new EncounterTimeline({viewport:Element("timelineScroll"),axis:Element("timelineAxis"),
+    ruler:Element("timelineRuler"),fitButton:Element("timelineFit"),scaleOutput:Element("timelineScale"),
+    duration:FLOW_DURATION,formatTime:FormatFlowTime});
   Element("flowSeek").max=String(FLOW_DURATION);Element("sourceLink").href=FLOW_SOURCE.url;
 }
 function UpdateTimeline() {
@@ -200,7 +196,7 @@ function UpdateTimeline() {
   const timeText=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
   if(Element("flowTime").textContent!==timeText) Element("flowTime").textContent=timeText;
   Element("flowSeek").value=String(time);
-  Element("timelineAxis").style.setProperty("--progress",`${time/FLOW_DURATION*100}%`);
+  timeline.SetTime(time);
   Element("flowSeek").setAttribute("aria-valuetext",`${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);
 }
 function UpdateAnnotations() {
@@ -454,6 +450,7 @@ async function Start() {
   BindControls();
   window.LevelFlow={
     Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
+    Timeline:()=>timeline.Inspect(),
     Play:{Start:mode=>gamePlay.Start(mode),Pause:on=>gamePlay.Pause(on),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
     Evaluate:(value)=>EvaluateFlow(value,project.value),
     Stealth:()=>structuredClone(frame.stealth),

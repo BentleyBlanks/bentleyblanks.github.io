@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261117TimelineWindow">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261117EncounterTimeline">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,7 +26,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261117TerrainSurface"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261117EncounterTimeline"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -77,8 +77,8 @@
   </main>
   <footer class="lfTimeline" data-collapsed="false">
     <div id="flowTimeline" class="lfTimelineContent">
-    <div class="lfTransport"><div class="lfPlayback"><button id="previousBeat" title="上一拍" aria-label="上一拍">⏮</button><button id="playFlow" class="sePrimary" aria-pressed="false">播放</button><button id="nextBeat" title="下一拍" aria-label="下一拍">⏭</button></div><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label class="lfLoop"><input id="loopStage" type="checkbox"><span>循环本段</span></label></div>
-    <div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="1910" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div>
+    <div class="lfTransport"><div class="lfPlayback"><button id="previousBeat" title="上一拍" aria-label="上一拍">⏮</button><button id="playFlow" class="sePrimary" aria-pressed="false">播放</button><button id="nextBeat" title="下一拍" aria-label="下一拍">⏭</button></div><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label class="lfLoop"><input id="loopStage" type="checkbox"><span>循环本段</span></label><div class="lfTimelineZoom"><output id="timelineScale" aria-label="时间轴缩放"></output><button id="timelineFit" type="button" aria-pressed="false" title="自适应显示全程">全程</button></div></div>
+    <div id="timelineScroll" class="lfTimelineScroll" tabindex="0" aria-label="剧情时间轴，滚轮缩放，Shift加滚轮横移"><div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="3249" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div></div>
     </div>
     <button id="toggleTimeline" class="lfTimelineToggle" type="button" aria-label="收起 Timeline" aria-controls="flowTimeline" aria-expanded="true" title="收起 Timeline"><span>Timeline</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 9 7 7 7-7"/></svg></button>
   </footer>

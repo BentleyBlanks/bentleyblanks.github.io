@@ -1,4 +1,5 @@
 // Play configuration belongs to this scene. Existing campaign data is untouched.
+import { BEISHAHE_PLAY_GATES, BEISHAHE_GUIDANCE } from "./Data_LevelFlowBeishahe.mjs";
 export const ENCOUNTER_PLAY = {
   scene:"FirstLevelEncounter", schema:"tengxian-encounter-play/1",
   ui:{"stop":"■ 停止 Play","loadFailed":"Play 加载失败","dead":"顺子阵亡","complete":"本段试玩完成","retry":"R · 从当前关键帧重来，也可点击 ▶","interact":"F · 完成当前交互","clear":"清除当前目标","reach":"前往目标","stealthAlarm":"日军正在示警，后送通道暴露","stealthRetry":"R · 从检查点重来，也可点击 ▶","stealthSuspicion":"有人往这边看，缩回掩体","stealthPull":"低头，贴住侧墙","stealthWait":"保持隐蔽，等搜查兵走远","stealthNoFire":"禁止开火、投弹","event":"等待交互结果","escort":"掩护担架通过","departure":"等待敌军离开","templeExit":"跟着文财和妮儿出庙，接回西巷","waitParty":"等文财和妮儿跟上"},
@@ -8,6 +9,7 @@ export const ENCOUNTER_PLAY = {
   // satisfied; these lines introduce no new story events or voice recordings.
   dialogue:{occlusionSlackM:0.12},
   guidance:{
+    ...BEISHAHE_GUIDANCE,
     "02g":{actor:"liu",text:"顺儿，捡枪！班长背后那个，打！"},
     "02h":{actor:"luo",text:"莫追那几个龟儿子！先找冬瓜！"},
     "02i":{actor:"luo",text:"把冬瓜伤口勒住，拿被子来，准备拖！"},
@@ -67,7 +69,9 @@ export const ENCOUNTER_PLAY = {
   inventory:{spareClips:12,grenades:3,bundles:2},
   escortExitZ:490,
   firstPlayableBeat:"02g",
+  environment:{dayHour:12,duskHour:17.5,nightHour:22,steps:32,duskBeat:"11c"},
   gates:{
+    ...BEISHAHE_PLAY_GATES,
     "02g":{kill:["opening4"]},"02h":{action:"findWinter"},"02i":{action:"bandageWinter"},
     "03a":{area:true},"03b":{clear:["Fork"]},"03c":{area:true},"03d":{action:"returnGrenade",fact:"grenadeReturned"},
     "03e":{clear:["Corner"]},"03f":{area:true},"03g":{clear:["Rim"]},"03h":{area:true},
@@ -84,7 +88,7 @@ export const ENCOUNTER_PLAY = {
     "10b":{escort:4,kills:{groups:["EastStreet"],count:2}},"10c":{area:true,escort:8},"10d":{clear:["NorthYard"]},"10e":{escort:12,clear:["EastStreet"]},
     "10f":{action:"confirmWithdrawal"},"10h":{area:true},"10i":{area:true,target:"end"},"10j":{area:true},
   },
-  casts:{player:"shunzi",winter:"comrade",luo:"luo",he:"heyoutian",liu:"liuwencai",yao:"yaowa",geng:"geng",nier:"nier",interpreter:"interpreter"},
-  signals:[{time:40,id:"DugoutCollapsed"},{beat:"04c",id:"L1TrunkLoaded"},{beat:"05a",id:"CartDeparted"},{beat:"06e",id:"L1TrunkTossed"},{beat:"06i",id:"L1SunkenRoadBlocked"},{beat:"09i",id:"SideGateOpen"},{beat:"10a",id:"MgSilenced"},{beat:"10a",id:"EastGateBurst"},{beat:"10d",id:"NorthYardGatesBroken"},{beat:"10g",id:"BarrageHit"},{beat:"10i",id:"LaneWallCollapse"}],
-  music:{"01":"firstLevelShellShock","02":"firstLevelTrenchPulse","03":"firstLevelSapTrench","04":"firstLevelFrontLine","05":"firstLevelIronSiege","06":"firstLevelIronSiege","07":"firstLevelDusk","08":"firstLevelWitness","09":"firstLevelCloseQuartersPressure","10":"firstLevelOpenTheWay"},
+  casts:{player:"shunzi",winter:"comrade",luo:"luo",he:"heyoutian",liu:"liuwencai",yao:"yaowa",geng:"geng",nier:"nier",erya:"erya",tian:"tiansao",interpreter:"interpreter"},
+  signals:[{beat:"13e",id:"PlankBridgeRemoved"},{beat:"13f",id:"GuandaoBridgeBlown"},{beat:"14c",id:"AidCartBurned"},{beat:"14c",id:"RaidAftermath"},{beat:"16d",id:"MatHomeCovered"},{beat:"18a",id:"ChargesSet"},{time:40,id:"DugoutCollapsed"},{beat:"04c",id:"L1TrunkLoaded"},{beat:"05a",id:"CartDeparted"},{beat:"06e",id:"L1TrunkTossed"},{beat:"06i",id:"L1SunkenRoadBlocked"},{beat:"09i",id:"SideGateOpen"},{beat:"10a",id:"MgSilenced"},{beat:"10a",id:"EastGateBurst"},{beat:"10d",id:"NorthYardGatesBroken"},{beat:"10g",id:"BarrageHit"},{beat:"10i",id:"LaneWallCollapse"}],
+  music:{"01":"firstLevelShellShock","02":"firstLevelTrenchPulse","03":"firstLevelSapTrench","04":"firstLevelFrontLine","05":"firstLevelIronSiege","06":"firstLevelIronSiege","07":"firstLevelDusk","08":"firstLevelWitness","09":"firstLevelCloseQuartersPressure","10":"firstLevelOpenTheWay","11":"firstLevelDusk","12":"firstLevelDusk","13":"firstLevelIronSiege","14":"firstLevelIronSiege","15":"firstLevelDusk","16":"firstLevelDusk","17":"firstLevelSapTrench","18":"firstLevelOpenTheWay"},
 };

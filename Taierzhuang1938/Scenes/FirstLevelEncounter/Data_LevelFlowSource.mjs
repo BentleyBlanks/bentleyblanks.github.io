@@ -1,3 +1,4 @@
+import { BEISHAHE_EXCERPTS } from "./Data_LevelFlowBeishaheSource.mjs";
 // Paragraph excerpts from the Notion script, read 2026-11-12.
 // 08C–08G and 09E incorporate the user's local encounter correction on 2026-11-15.
 // See FLOW_SOURCE for page URL and revision. Markup has been removed.
@@ -69,5 +70,6 @@ export const FLOW_SOURCE_EXCERPTS = {
   "10g": "第一发炮落在石碾边上。顺子被掀出去好几步，枪从手里飞出去；耳朵里只剩一声长鸣，眼前一阵白一阵黑，什么都听不清。",
   "10h": "大家往胡同口跑。幺娃把机枪的枪栓卸下来，路过院门扔进门里的水缸。何有田胳膊上缠着布，蹲在院门框边往门缝里卡手榴弹，只有几秒钟：“滚！表挡事！”",
   "10i": "前头一发砸塌一段院墙，横在胡同里把路堵死了。班长：“过不去！翻墙！”他先踩着墙根那垛柴爬上墙头，翻进旁边的院子，回身把人一个个拽上去；大家穿过院子，从那家院门出来，接上胡同。",
-  "10j": "班长：“往那棵大槐树跑！过了槐树就是村口！”"
+  "10j": "班长：“往那棵大槐树跑！过了槐树就是村口！”",
+  ...BEISHAHE_EXCERPTS,
 };

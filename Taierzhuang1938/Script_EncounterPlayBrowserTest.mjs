@@ -328,8 +328,38 @@ try{
  await page.locator("#stopGame").click();
  await page.selectOption("#playGameStart","current");await page.evaluate(time=>LevelFlow.Seek(time),BeatById("08f").start);
  assert.ok(await page.locator("#playGame").isDisabled());assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
+ const southernStarts=[];
+ for(const beat of ["11f","12b","13d","18f"]) {
+   await page.evaluate(beat=>LevelFlow.JumpBeat(beat),beat);
+   assert.ok(await page.locator("#playGame").isEnabled(),beat+" has a playable keyframe");
+   await page.locator("#playGame").click();frame=await Ready();
+   const start=await State();assert.equal(start.startBeat,beat);
+   const position=await frame.evaluate(()=>Tengxian.player.position.toArray());
+   assert.ok(position[2]>1000,"the full southern scene loads beyond the former z560 boundary");
+   const lighting=await frame.evaluate(()=>({state:Tengxian.Debug.Lighting.State(),output:Tengxian.Debug.Lighting.Output()}));
+   if(beat!=="18f") {
+     assert.equal(lighting.state.clock.hour,17.5,"southern keyframes start at dusk");
+     assert.ok(Math.abs(lighting.output.sunElevation-8)<0.01&&lighting.state.components.Sun.transition===1,"the local dusk is settled before Play becomes ready");
+   } else assert.ok(lighting.state.clock.hour>21&&lighting.output.profile==="firstLevelNight","bridge demolition has reached night lighting");
+   assert.ok(start.actors.some(actor=>actor.id==="luo"),"southern scene uses the real cast");
+   if(beat==="12b") {
+     const cast=await frame.evaluate(()=>Tengxian.Debug.EncounterPlay.Presentation());
+     assert.ok(cast.find(actor=>actor.id==="erya").humans.includes("erya"),"Er Ya uses her approved model");
+     assert.ok(cast.find(actor=>actor.id==="tian").humans.includes("tianSao"),"Tian Sao uses her approved model");
+   }
+   southernStarts.push({beat,position,ready:start.ready});
+   if(beat==="13d"||beat==="18f") {
+     await frame.evaluate(()=>{Tengxian.player.SetDebugOptions({invincible:true});Tengxian.Debug.Key("KeyF");Tengxian.StepFrames(3,1/60,false);});
+     const after=await State();
+     assert.ok(after.signals.includes(beat==="13d"?"PlankBridgeRemoved":"BridgeBlown"),beat+" interaction changes the actual scene event");
+     if(beat==="18f") assert.equal(after.completed,true);
+   }
+   await page.screenshot({path:path.join(out,"PlayBeishahe"+beat.toUpperCase()+".png"),timeout:120000});
+   await page.locator("#stopGame").click();
+   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().beat),beat,"Stop restores the southern editing keyframe");
+ }
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,firstAim,firstKill,distantWarm,hostId,errors,checkpoint,restoredSlots,
+ await fs.writeFile(path.join(out,"Data_PlayAcceptance.json"),JSON.stringify({coldMs,warmMs,firstAim,firstKill,distantWarm,hostId,errors,checkpoint,restoredSlots,southernStarts,
    checks:"saved debug options on first Play, cached restart and death retry; camera sections disabled; live event gates; stepped timeline; sidebar hints; pause/resume; clean cached stop; death retry by keyboard and toolbar; outer R; continued movement; current-beat checkpoint; melee and stored ammo restoration; cinematic checkpoint skipped; first ADS and lethal hit reuse linked programs at full resolution"},null,2));
  console.log("ok  Saved debug options, Play controls, death retry, current checkpoint inventory, event-driven timeline, skipped cinematics and state reset; first "+(coldMs/1000).toFixed(2)+" s, repeat "+(warmMs/1000).toFixed(2)+" s");
 }catch(error){

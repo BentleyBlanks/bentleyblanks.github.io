@@ -41,7 +41,9 @@ export class LevelFlowPlay {
   async SceneStamp() {
     const paths=["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.trench.bin","Scenes/FirstLevelEncounter/Environment_FirstLevelEncounter.json",
-      "Environment/EnvPreset_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Data_Play.mjs"];
+      "Environment/EnvPreset_FirstLevelEncounter.json","Environment/EnvPreset_FirstLevelEncounterDusk.json",
+      "Scenes/FirstLevelEncounter/Data_Play.mjs","Scenes/FirstLevelEncounter/Data_LevelFlow.mjs",
+      "Scenes/FirstLevelEncounter/Data_LevelFlowBeishahe.mjs","Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs"];
     return (await Promise.all(paths.map(async path=>{
       const response=await fetch(new URL("../"+path,import.meta.url),{cache:"no-store"});
       if(!response.ok)throw new Error("场景读取失败："+response.status);

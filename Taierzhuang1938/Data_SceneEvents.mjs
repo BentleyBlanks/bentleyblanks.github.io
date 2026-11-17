@@ -26,6 +26,9 @@ export const SCENE_EVENTS = Object.freeze({
   L1SunkenRoadBlocked: Object.freeze({ label: "凹路被残车堵死", from: "06-8", note: "最高的弯下面第一辆九四式横在路底" }),
   // 11–18 第四版（2026-11-02）：FamilyHidden（钻洞的那一家）删了
   GuandaoBridgeBlown: Object.freeze({ label: "官道桥炸了", from: "13-2", note: "二营炸的木桥：中间几跨没了、断木砸进河床" }),
+  PlankBridgeRemoved: Object.freeze({ label: "沟口门板桥撤了", from: "13D" }),
+  NierDrawing: Object.freeze({ label: "妮儿画黑子，摆弹壳", from: "15B" }),
+  MatHomeCovered: Object.freeze({ label: "南邻院把席子拉上", from: "16C" }),
   DugoutBombed: Object.freeze({ label: "院里的洞挨了炸弹", from: "14-2", note: "南街那家院里：弹坑 + 碎砖 + 塌了的洞顶" }),
   CartOverturned: Object.freeze({ label: "车翻了", from: "14-3" }),
   AidCartBurned: Object.freeze({ label: "救护所的车烧了", from: "14-3", note: "FirstLevelEncounter：救护所院门口翻倒、烧着的车和车轮；12 时车是好的，默认不显示" }),

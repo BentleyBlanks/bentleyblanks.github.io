@@ -1,8 +1,8 @@
 {
   "schema": "tengxian-history-ledger-sync-v1",
   "about": "史实与创作对照的同步记号。Script_HistoryLedgerAudit.mjs 读它决定从哪里开始看改动、--check 读它拦已否决的链接；skill tengxian-fact-fiction-sync 核对完用 --mark-reviewed 写回。",
-  "reviewedAt": "2026-11-16T14:26:03.572Z",
-  "repoCommit": "6d964ed9559740906d879c8287033f4f57b2ca27",
+  "reviewedAt": "2026-11-17T09:59:47.016Z",
+  "repoCommit": "9cce1761ab97e25208af5badf05b5b35a49802e1",
   "assetReviews": [
     {
       "asset": "BeishaheBridge",
@@ -630,13 +630,13 @@
       "id": "3fd60335331c818fa24deadb6d72ca70",
       "title": "史实与创作",
       "role": "ledgerParent",
-      "lastEdited": "2026-11-11T18:01:47.010Z"
+      "lastEdited": "2026-11-17T07:58:10.570Z"
     },
     {
       "id": "3fd60335331c8194aa82f0b238084d34",
       "title": "史实与创作对照表",
       "role": "ledgerTable",
-      "lastEdited": "2026-11-16T14:07:00.000Z"
+      "lastEdited": "2026-11-17T07:58:09.431Z"
     },
     {
       "id": "3c360335331c81be876fcf4cb0928e1b",
@@ -661,7 +661,7 @@
       "id": "3fb60335331c81faa38dfe84c25d29f0",
       "title": "第一关｜往南的路 · 剧本",
       "role": "source",
-      "lastEdited": "2026-11-16T14:12:00.000Z"
+      "lastEdited": "2026-11-16T18:34:10.895Z"
     },
     {
       "id": "3fc60335331c814f8be8e23d43500eb5",

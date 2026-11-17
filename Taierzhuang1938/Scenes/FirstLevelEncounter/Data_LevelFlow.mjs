@@ -1,9 +1,10 @@
 // Narrative source is the 2026-11-11 Notion script. Coordinates reuse the
 // FirstLevelWhitebox space drawings. Timing, cover offsets and wave intervals
 // describe this planning preview and have not been validated by gameplay.
+import { BEISHAHE_STAGES, BEISHAHE_BEATS, BEISHAHE_DIALOGUE, BEISHAHE_WAVES } from "./Data_LevelFlowBeishahe.mjs";
 export const FLOW_SOURCE = {
   url: "https://app.notion.com/p/3fb60335331c81faa38dfe84c25d29f0",
-  revision: "2026-11-11",
+  revision: "01–07 2026-11-11；11–18 第五版 2026-11-16",
   coordinateSource: "FirstLevelEncounter (forked from FirstLevelWhitebox / L1Map0107 / L0610Space)",
   notice: "调度预演 · 点位与时刻为演示值",
 };
@@ -121,6 +122,7 @@ export const FLOW_STAGES = [
   { id: "08", title: "村口", status: "草稿", bounds: [52, 155, 360, 484] },
   { id: "09", title: "摸进老耿家", status: "草稿", bounds: [60, 130, 395, 496] },
   { id: "10", title: "守路口，撤出庄子", status: "草稿", bounds: [87, 245, 430, 555] },
+  ...BEISHAHE_STAGES,
 ];
 
 // User-directed opening blocking. Counts, speeds and routes are preview values.
@@ -526,12 +528,14 @@ export const FLOW_BEATS = [
     passage: "班长：“过不去！翻墙！”他先踩着墙根那垛柴爬上墙头，翻进旁边的院子，回身把人一个个拽上去。", task: "翻进旁院，从院门接回胡同", threat: "前方塌墙封路；后方落炮", gate: "炮击造成塌墙", exit: "全队穿过旁院接回路线", fx: "artillery", zone: [106,506,3] },
   { id: "10j", stage: "10", duration: 25, title: "架起排长，过槐树到村南口", p: [[113.25,519],[113.25,521],[117,521],[117,545],[117,552]], pose: "run",
     passage: "幺娃和刘文财一边一个架起他跑。班长：“往那棵大槐树跑！过了槐树就是村口！”", task: "等人跟上，撤到南口后送队", threat: "落炮向后方滚进", gate: "过翻墙院出口", exit: "全队到南口，接 11", fx: "artillery", zone: [117,545,4] },
+  ...BEISHAHE_BEATS,
 ];
 
 // Speech references quoted lines in the current beat passage, in reading order.
 // Offsets/durations are preview blocking in seconds, independent of voice audio.
 // Sound effects in quotes deliberately have no speech cue.
 export const FLOW_DIALOGUE = {
+  ...BEISHAHE_DIALOGUE,
   "01b": [{actor:"openingGun0", quote:0, at:1, duration:8}],
   "01e": [{actor:"winter", quote:0, at:0, duration:2.5}],
   "02e": [{actor:"opening2", name:"日军甲", quote:0, at:0, duration:2, text:"停火。"}],
@@ -561,6 +565,7 @@ export const FLOW_DIALOGUE = {
 };
 
 export const FLOW_WAVES = [
+  ...BEISHAHE_WAVES,
   { id: "ForkRelief", beat: "02g", until: "03b", count: 2, source: [67,30], route: [[67,30],[40,28],[17,36],[14.5,40],[12,44],[21.9,67.1],[23,67.1]], label: "绕后日军路口阻击", interval: 0, lastFall: 116, speed: 2.2, target: "player", trigger: {mode:"time",delay:2}, repeat: "东北绕行两人经北坡下沟，与三名逃兵在标记 1 会合，再南下标记 2 路口阻击" },
   { id: "Fork", beat: "03b", count: 5, source: [75,44], areaSize: [24,24], deployDelay: 10, spawnOffsets: [[2.3,-9.9],[10.3,-3.5],[1.2,-5],[5.5,3.8],[2.4,1.8]],
     memberPlans: [

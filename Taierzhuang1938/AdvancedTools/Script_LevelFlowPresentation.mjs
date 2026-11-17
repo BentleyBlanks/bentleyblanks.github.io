@@ -37,7 +37,7 @@ function RoundValues(value) {
 
 export function CreateLocationText(frame, workspace, selection, document) {
   const Ground = (point) => workspace.mapData.terrain.heightAt(...point);
-  const Position = (point, elevation = 0) => ({ x: point[0], y: Ground(point) + elevation, z: point[1] });
+  const Position = (point, elevation = 0, surfaceY = null) => ({ x: point[0], y: (surfaceY ?? Ground(point)) + elevation, z: point[1] });
   const selectedObject = selection?.type === "group" ? document.groups.find(item => item.id === selection.id)
     : selection?.type === "trigger" ? document.triggers.find(item => item.id === selection.id) : null;
   const actor = frame.actors.find(item => selection?.type === "actor" && item.id === selection.id);
@@ -78,7 +78,7 @@ export function CreateLocationText(frame, workspace, selection, document) {
     location.selection.spawnPositions = selectedObject.spawnOffsets.map(offset => Position(offset.map((value, index) => value + selectedObject.area.center[index])));
     location.selection.deployDelaySeconds = selectedObject.deployDelay;
   }
-  if (actor) location.selection = { type: "actor", id: actor.id, name: actor.name, position: Position(actor.p, actor.elevation || 0), heading: actor.heading, pose: actor.pose };
+  if (actor) location.selection = { type: "actor", id: actor.id, name: actor.name, position: Position(actor.p, actor.elevation || 0, actor.surfaceY), heading: actor.heading, pose: actor.pose };
   if (note) location.selection = { type: "annotation", id: note.id, timeSeconds: note.time, a: Position(note.a), b: Position(note.b), text: note.text };
   return JSON.stringify(RoundValues(location), null, 2);
 }

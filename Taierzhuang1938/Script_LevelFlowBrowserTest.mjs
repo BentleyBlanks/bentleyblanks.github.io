@@ -25,7 +25,7 @@ try {
   });
   const errors=[];page.on("pageerror",error=>errors.push(error.message));
   async function ReadyPlan() {
-    await page.waitForFunction(()=>window.LevelFlow);
+    await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
     await page.evaluate(()=>{LevelFlow.SetLayout(2);LevelFlow.SetViewType(0,'plan');LevelFlow.SetViewType(1,'oblique');LevelFlow.ActivateView(0);});
     const framing=await page.evaluate(()=>{
       const params=new URLSearchParams(location.search);
@@ -47,7 +47,7 @@ try {
     await menu.locator(`[data-framing="${mode}"]`).click();
     assert.equal(await menu.getAttribute('open'),null,'camera action closes its menu');
   }
-  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow);
+  await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=424`);await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
   const terrainLoading=await page.evaluate(async()=>{
     clearInterval(encounterLoadTimer);
     const pulse={...encounterLoadPulse};
@@ -796,7 +796,7 @@ try {
   assert.ok(coverPixels.every(count=>count>10),"plan and oblique views show dark green cover outlines and shields");
   assert.equal(await page.locator("#flowCamera").count(),0);
   assert.equal(await page.locator("#stageList").count(),0);
-  assert.equal(await page.locator("[data-stage]").count(),10);
+  assert.equal(await page.locator("[data-stage]").count(),18);
   assert.ok((await page.evaluate(()=>window.LevelFlow.Inspect())).mapObjects>1000);
   assert.equal(await page.locator('.lfViewPane:visible').count(),2);
   const dualPanes=await page.locator('.lfViewPane:visible').evaluateAll(panes=>panes.map(pane=>{
@@ -1079,6 +1079,27 @@ try {
   for(const stage of alignment.stages) assert.ok(Math.abs(stage.x-(alignment.axis.x+alignment.axis.width*FLOW_TIMELINE.find(beat=>beat.stage===stage.id).start/FLOW_TIMELINE.at(-1).end))<0.1,"every stage uses the global time axis");
   await page.screenshot({path:path.join(out,'Timeline301.png')});
 
+  const timelineViewport=await page.locator('#timelineScroll').boundingBox();
+  await page.mouse.move(timelineViewport.x+timelineViewport.width/2,timelineViewport.y+35);
+  const timelineBefore=await page.evaluate(()=>LevelFlow.Timeline());
+  const anchoredTime=(timelineBefore.scrollLeft+timelineBefore.viewportWidth/2)/timelineBefore.width;
+  await page.mouse.wheel(0,-400);
+  await page.waitForFunction(width=>LevelFlow.Timeline().width>width,timelineBefore.width);
+  const timelineZoomed=await page.evaluate(()=>LevelFlow.Timeline());
+  assert.ok(Math.abs((timelineZoomed.scrollLeft+timelineZoomed.viewportWidth/2)/timelineZoomed.width-anchoredTime)<0.002,'wheel zoom keeps the time under the pointer fixed');
+  const cursorBeforePan=await page.evaluate(()=>LevelFlow.Inspect().time);
+  await page.keyboard.down('Shift');await page.mouse.wheel(0,200);await page.keyboard.up('Shift');
+  await page.waitForFunction(left=>LevelFlow.Timeline().scrollLeft>left,timelineZoomed.scrollLeft);
+  assert.equal(await page.evaluate(()=>LevelFlow.Inspect().time),cursorBeforePan,'horizontal navigation never changes the story cursor');
+  await page.evaluate(()=>LevelFlow.JumpBeat('18f'));
+  assert.ok(await page.evaluate(()=>{
+    const head=document.querySelector('.lfPlayhead').getBoundingClientRect(),clip=document.querySelector('#timelineScroll').getBoundingClientRect();
+    return head.x>=clip.x&&head.x<=clip.right;
+  }),'jumping to a later beat reveals its playhead');
+  await page.click('#timelineFit');
+  assert.ok(await page.evaluate(()=>document.querySelector('#timelineScroll').scrollWidth<=document.querySelector('#timelineScroll').clientWidth+1),'fit shows the whole story without overflow');
+  await page.screenshot({path:path.join(out,'TimelineFullStory.png')});
+
   await page.evaluate(()=>{LevelFlow.SetPlaying(false);LevelFlow.SetLayout(2);LevelFlow.SetViewType(1,'oblique');LevelFlow.Seek(424);});
   await page.evaluate(async()=>{
     const {FlowMapView}=await import('./Script_LevelFlowView.mjs');
@@ -1356,7 +1377,7 @@ try {
   assert.ok(await page.evaluate(()=>LevelFlow.Inspect().actors.some(actor=>actor.groupId==='TrafficFlank')));
   await page.screenshot({path:path.join(out,'TrafficSecondRampPressure.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=26.14&x=45&z=58&zoom=6`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
   const opening=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(opening.actors.filter(actor=>actor.id==='yao'||actor.id.startsWith('openingGun')).length,4);
   assert.equal(opening.actors.filter(actor=>['luo','he','liu'].includes(actor.id)||actor.id.startsWith('openingAlly')).length,12);
@@ -1456,7 +1477,7 @@ try {
   assert.equal(await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='VillageCasualties'&&actor.pose==='dead').length),2);
   await page.screenshot({path:path.join(out,'VillageBodies08C.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${FLOW_TIMELINE.find(beat=>beat.id==='05b').start+5.8964}&x=91&z=251&zoom=4`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   const departure=await page.evaluate(()=>LevelFlow.Inspect());
   assert.ok(!departure.actors.some(actor=>['LaneGround','BendGround'].includes(actor.groupId)));
@@ -1465,7 +1486,7 @@ try {
   assert.ok(departure.actors.find(actor=>actor.id==='geng').p[1]>240);
   await page.screenshot({path:path.join(out,'AmbushEvacuation05B.png')});
   await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${FLOW_TIMELINE.find(beat=>beat.id==='06e').start+15.0142}&x=96&z=286&zoom=7`);
-  await page.waitForFunction(()=>window.LevelFlow);
+  await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
   await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'oblique');});
   const ambush=await page.evaluate(()=>LevelFlow.Inspect());
   assert.equal(ambush.actors.filter(actor=>actor.kind==='tank').length,2);
@@ -1483,7 +1504,7 @@ try {
   await page.screenshot({path:path.join(out,'BothTanksDestroyed06I.png')});
   for(const [stamp,centerX,centerZ,zoom,name] of [[383.35,24.55,57.44,10,'NorthPursuitCovered03G'],[433.301,36.39,106.45,6,'PursuitStoppedByDefense03H'],[504.217,68.97,127.76,6,'ShunziForwardDefense04C']]) {
     await page.goto(`${base}AdvancedTools/Tool_LevelFlow.html?t=${stamp}&x=${centerX}&z=${centerZ}&zoom=${zoom}`);
-    await page.waitForFunction(()=>window.LevelFlow);
+    await page.waitForFunction(()=>window.LevelFlow, {}, {timeout:180000});
     await page.evaluate(({centerX,centerZ,zoom})=>{
       LevelFlow.SetLayout(1);LevelFlow.SetViewType(0,'battle');
       const layout=LevelFlow.Inspect().viewports;
@@ -1653,5 +1674,5 @@ try {
   assert.equal(ended.time,ended.duration);
   assert.equal(ended.playing,false,'delayed final frame stops at the end of the plan');
   assert.deepEqual(errors,[]);
-  console.log('ok  Encounter editor browser: 68 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
+  console.log('ok  Encounter editor browser: 112 beats, 720p layout, safe following, per-viewport camera controls, removed setup panel, region selection, legacy draft reload, arrow/box/text, clipboard screenshots, compact toolbar, readable source, per-viewport layers, PNG export and playback');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -273,7 +273,9 @@ for (const sceneId of ["FirstLevelWhitebox", "FirstLevel"]) {
   Check(!inside(100, 560) && !inside(100, 700), "耿家庄与官道北段仍是白天");
   const duskPreset = presets.get("FirstLevelEncounterDusk");
   const sameAt = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  Check([0, 9, 12, 18, 22].every((h) => sameAt(EvaluatePreset(duskPreset, h), EvaluatePreset(duskPreset, 17.5))), "黄昏预设不随钟点变（全是常量）");
+  Check([12,15,17.5].every((h) => sameAt(EvaluatePreset(duskPreset,h),EvaluatePreset(duskPreset,17.5))),"12:00至17:30沿用已确认的夕照");
+  const nightValues=EvaluatePreset(duskPreset,22);
+  Check(nightValues.Sun.intensity<EvaluatePreset(duskPreset,17.5).Sun.intensity,"赶桥至夜行的天光逐渐转暗");
   const values = EvaluatePreset(duskPreset, 12);
   Check(values.Sun.elevation >= 6 && values.Sun.elevation <= 10, `太阳还在地平线上 6–10°（${values.Sun.elevation}）`);
   const toSun = SunDirectionFrom(values.Sun.elevation, values.Sun.azimuth);
@@ -287,6 +289,11 @@ for (const sceneId of ["FirstLevelWhitebox", "FirstLevel"]) {
   sys.Update(0, { x: 100, y: 1, z: 1200 });
   const south = sys.Update(40, { x: 100, y: 1, z: 1200 }).preset;
   Check(Math.abs(south.sunElevation - values.Sun.elevation) < 0.01 && north.sunElevation > 40, `走进黄昏区域后过渡完成就是黄昏预设（${north.sunElevation} → ${south.sunElevation}）`);
+  sys.SnapAt({x:0,y:1.6,z:0});
+  const snapped=sys.SnapAt({x:100,y:1.6,z:1165});
+  Check(Math.abs(snapped.preset.sunElevation-values.Sun.elevation)<0.01&&Object.values(snapped.components).every(component=>component.transition===1),"关键帧开局立即采用所在地的黄昏环境");
+  sys.SetHour(22);
+  Check(sys.SnapAt({x:100,y:1.6,z:1328}).preset.profile==="firstLevelNight","赶桥之后接现有第一关夜景");
 }
 
 // --- 8. 角色光照组件 ------------------------------------------------------------------------------------------

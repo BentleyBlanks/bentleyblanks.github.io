@@ -189,7 +189,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfLoop input:checked { background: var(--ed-gold-fill); }
 .lfLoop input:checked::after { transform: translateX(11px); }
 #timelineMode { font-size: 13px; color: #b0a2b7; white-space: nowrap; }
-.lfTimeAxis { position: relative; margin: 0 7px; --progress: 0%; }
+.lfTimeAxis { position: relative; margin: 0; --progress: 0%; }
 .lfRuler { position: relative; height: 24px; color: var(--ed-text-4); font: 12px var(--ui-mono); }
 .lfRuler span { position: absolute; top: 3px; transform: translateX(-50%); }
 .lfRuler span:first-child { transform: none; }
@@ -424,3 +424,9 @@ textarea { resize: vertical; min-height: 64px; }
 
 #interruptCodexChat { flex: none; border-color: #b28d5966; color: var(--ed-gold-text); font-size: 13px; padding: 4px 10px; }
 #interruptCodexChat:hover:not(:disabled) { border-color: var(--ed-gold); background: var(--ed-sel); }
+
+.lfTimelineScroll { overflow-x: auto; overflow-y: hidden; padding: 0 7px 8px; scrollbar-color: #87774f #111817; scrollbar-width: auto; overscroll-behavior-x: contain; }
+.lfTimelineZoom { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.lfTimelineZoom output { padding: 0; border: 0; min-width: 38px; font-size: 12px; color: var(--ed-text-3); }
+.lfTimelineZoom button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+.lfTimelineScroll:focus-visible { outline: 1px solid var(--ed-gold); outline-offset: 3px; }

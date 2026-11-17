@@ -4,8 +4,8 @@ import { InsideArea } from "./Scenes/FirstLevelEncounter/Script_LevelFlowGeometr
 import { ENCOUNTER_PLAY as CONFIG } from "./Scenes/FirstLevelEncounter/Data_Play.mjs";
 
 export { CONFIG as ENCOUNTER_PLAY_CONFIG };
-export function EncounterSceneSignals(frame) {
-  return new Set(CONFIG.signals.filter(s=>s.beat?frame.beat.id>=s.beat:frame.time>=s.time).map(s=>s.id));
+export function EncounterSceneSignals(frame, facts=[]) {
+  return new Set([...CONFIG.signals.filter(s=>s.beat?frame.beat.id>=s.beat:frame.time>=s.time).map(s=>s.id),...facts]);
 }
 export function EncounterStartBeat(time=0) {
   return FLOW_TIMELINE.find(b=>time<b.end)||FLOW_TIMELINE.at(-1);
@@ -16,7 +16,7 @@ export function EncounterCanPlay(time) {
 }
 export function EncounterFirstPlayable(){return BeatById(CONFIG.firstPlayableBeat);}
 export function EncounterPlayerYaw(beat) {
-  const from=beat.p[0],to=beat.p.find(p=>Distance(p,from)>.1);
+  const from=beat.p[0],to=beat.lookAt||beat.p.find(p=>Distance(p,from)>.1);
   return to?Math.atan2(from[0]-to[0],from[1]-to[1]):Math.PI/2;
 }
 export function EncounterActorSpec(actor,carrier=null) {
@@ -84,7 +84,7 @@ export class EncounterPlayPlan {
     return frame;
   }
   Kill(id){if(!this.dead.has(id)){this.killed.add(id);this.phaseKills.add(id);}this.dead.add(id);}
-  Interact(){this.interacted.add(this.beat.id);}
+  Interact(){this.interacted.add(this.beat.id);for(const signal of this.gate.signals||[])this.facts.add(signal);}
   Area(){const trigger=this.gate.target!=="end"&&this.compiled.triggers.find(t=>t.id==="Arrival_"+this.beat.id);return trigger?.area||{shape:"circle",center:this.beat.p.at(-1),size:[(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)*2,(CONFIG.reachByBeat?.[this.beat.id]??CONFIG.reachM)*2]};}
   CanInteract(player){return !!this.gate.action&&InsideArea(player,this.Area())&&!this.interacted.has(this.beat.id);}
   Step(dt,player,aliveIds,events={}) {

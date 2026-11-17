@@ -17,6 +17,7 @@ import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { XBOT_DEATHS } from "./Data_BlockoutXBotClips.mjs";
+import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
@@ -34,7 +35,7 @@ export class EncounterPlay {
     this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
     this.token=payload?.token||"standalone";
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,
-      groundAt:(x,z)=>host.battlefield.GroundHeight(x,z),formalOnly:true,
+      groundAt:(x,z)=>BeishaheSurfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,
       characterKeys:[...new Set([...Object.values(CONFIG.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
     this.view=new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
@@ -70,6 +71,7 @@ export class EncounterPlay {
     const frame=EvaluateFlow(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
+    this.SyncEnvironment(frame,true);
     if(this.host.Weapon()!==CONFIG.startWeapon)this.host.Pickup(CONFIG.startWeapon);
     this.host.state.clips=CONFIG.inventory.spareClips;
     if(this.host.state.mags.primary)this.host.state.mags.primary.clips=CONFIG.inventory.spareClips;
@@ -114,6 +116,7 @@ export class EncounterPlay {
     this.Send("state",{state:this.State()});return this.paused;
   }
   Suspend() {
+    if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
     this.active=false;this.paused=false;this.ready=false;this.host.state.running=false;
     this.host.ctx.ReleasePointerLock();this.host.audio.ResetSession();this.host.audio.ctx?.suspend();
     this.retiredMaterials.Collect(()=>{
@@ -128,6 +131,19 @@ export class EncounterPlay {
     this.speech.Clear();this.stealth.Reset();
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
+  SyncEnvironment(frame,snap=false) {
+    const {env,envBridge}=this.host.ctx;
+    if(!env?.active)return;
+    const config=CONFIG.environment;
+    const night=Math.round((frame.nightBlend||0)*config.steps)/config.steps;
+    const hour=frame.beat.id<config.duskBeat?config.dayHour:config.duskHour+(config.nightHour-config.duskHour)*night;
+    if(snap||this.environmentHour!==hour) {env.SetHour(hour);this.environmentHour=hour;}
+    if(snap) {
+      this.previousEnvironmentObserverMode=env.observerMode;
+      env.observerMode="player";
+      envBridge.Apply(env.SnapAt(this.host.player.position),{force:true});
+    }
+  }
   async Warmup(onStep) {
     this.onWarmStep=onStep;
     await this.readyPromise;
@@ -329,6 +345,7 @@ export class EncounterPlay {
     const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
     if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
     const frame=this.plan.Frame();
+    this.SyncEnvironment(frame);
     this.SaveCheckpoint();
     if(previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
       this.templeEnteredAt=this.plan.elapsed;
@@ -351,7 +368,8 @@ export class EncounterPlay {
         Object.assign(actor,{p:source.p,pose:source.pose,heading:source.heading,status:source.status});
       }
     }
-    const signals=EncounterSceneSignals(frame);signals.add("Stage0105Done");
+    const signals=EncounterSceneSignals(frame,this.plan.facts);signals.add("Stage0105Done");
+    this.sceneSignals=[...signals];
     const signalKey=[...signals].join(",");
     if(this.signalKey!==signalKey){
       this.signalKey=signalKey;
@@ -465,7 +483,7 @@ export class EncounterPlay {
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
-  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors()};}
+  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.failed || this.stealth.CapturesInput()
       || VillageStealthAt(this.plan.time,FLOW_TIMELINE).locked

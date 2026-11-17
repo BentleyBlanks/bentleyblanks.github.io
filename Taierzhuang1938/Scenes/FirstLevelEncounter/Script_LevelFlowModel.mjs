@@ -7,6 +7,7 @@ import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION 
 import { SampleFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { StageVillageActors, VillageStealthAt } from "./Script_LevelFlowVillage.mjs";
+import { BeishaheActors, BeishaheEffects, BeishaheSignals, ApplyBeishaheSurfaces } from "./Script_LevelFlowBeishahe.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -509,6 +510,7 @@ function EvacuationActors(actors,time) {
 }
 
 function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").start) {
+  if(Number(beat.stage)>=11) return BeishaheActors(beat,time,player,progress,FLOW_TIMELINE);
   const cartState=CartAt(time),cart=cartState.point,heading=cartState.heading;
   const CartOffset=(side,forward)=>[cart[0]+Math.cos(heading)*side+Math.sin(heading)*forward,cart[1]+Math.sin(heading)*side-Math.cos(heading)*forward];
   const loadingProgress=Clamp((time-BeatById("06c").start)/BeatById("06c").duration,0,1);
@@ -814,13 +816,14 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const tankTrigger=compiledDocuments.get(document).triggers.find((trigger)=>trigger.id==="Trigger_TankEscort");
   const tankStart=tankTrigger?.firedAt??Infinity;
   const actors = CoreActors(beat,time,player,progress,tankStart);
-  actors.push(...VillageCasualties(time));
+  if(Number(beat.stage)<11) actors.push(...VillageCasualties(time));
   const encounter = SampleEncounters(compiledDocuments.get(document), time, actors, (sampleTime)=>{
     const sampleBeat=FLOW_TIMELINE.find((entry)=>sampleTime<entry.end)??FLOW_TIMELINE.at(-1);
     const sampleProgress=Clamp((sampleTime-sampleBeat.start)/sampleBeat.duration,0,1);
     return CoreActors(sampleBeat,sampleTime,SampleBeatRoute(sampleBeat,sampleProgress),sampleProgress,tankStart);
   });
   actors.push(...OpeningActors(time), ...encounter.actors);
+  if(Number(beat.stage)>=11) ApplyBeishaheSurfaces(actors,time,FLOW_TIMELINE);
   const villageEngaged=time>=BeatById("09j").start && time<BeatById("09j").end;
   if(time>=BeatById("08a").start && time<BeatById("09j").end) {
     for(const id of ["luo","he","yao"]) {
@@ -829,7 +832,8 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
       Object.assign(actor,{firing,pose:firing?"shoot":"kneel",status:firing?id==="yao"?"班长开火后，从坡道接战":"从东院发起战斗":"隐蔽待命，不暴露友军位置"});
     }
   }
-  const effects = [...Effects(beat,time,progress,actors), ...encounter.effects, ...StreetDefenseFire(actors,time)];
+  const effects = [...(Number(beat.stage)<11?Effects(beat,time,progress,actors):[]),
+    ...encounter.effects, ...StreetDefenseFire(actors,time), ...BeishaheEffects(beat,time,progress,actors,FLOW_TIMELINE)];
   if(villageEngaged) {
     for(const id of ["luo","he","yao"]) {
       const actor=actors.find(entry=>entry.id===id);
@@ -838,7 +842,7 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
       if(actor.firing && target) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,heavy:id==="yao",phase:(time*3.2+actor.p[0])%1,sourceId:actor.id,targetId:target.id});
     }
   }
-  VillageGunfire(time, actors, effects);
+  if(Number(beat.stage)<11) VillageGunfire(time, actors, effects);
   if (beat.id === "03h") {
     actors[0].pose = (progress >= 0.22 && progress < 0.32) || (progress >= 0.5 && progress < 0.6) ? "shoot" : "drag";
     const pursuer = encounter.actors.find(actor => actor.wave === "RearPursuit" && actor.pose !== "dead");
@@ -856,7 +860,9 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
     ?FLOW_STREET_DEFENSE.warning.text:null;
   const dialogue = SampleFlowDialogue(beat, time, actors);
   const stealth = VillageStealthAt(time,FLOW_TIMELINE);
-  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed,defenseWarning,stealth};
+  const signals=BeishaheSignals(time,FLOW_TIMELINE);
+  const nightBlend=time<BeatById("17a").start?0:Clamp((time-BeatById("17a").start)/(BeatById("18g").start-BeatById("17a").start),0,1);
+  return {time,beat,stage,progress,player,actors,effects,dialogue,spawns:encounter.groups,groups:encounter.groups,triggers:encounter.triggers,zone,nearest,stretchersPassed,defenseWarning,stealth,signals,nightBlend};
 }
 
 export function FormatFlowTime(time) {

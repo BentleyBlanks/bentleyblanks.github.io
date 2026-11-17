@@ -40,6 +40,12 @@ export const FLOW_DUSK = {
   lighting: {ambient:0.4, direct:0.6},
 };
 
+// The final bridge sequence darkens toward the night march.
+export const FLOW_NIGHT = {
+  sky:{zenith:"#111b31",horizon:"#444457",below:"#252c3b",sun:"#887f75",sunDirection:[-0.995,-0.06,0.08]},
+  lighting:{ambient:0.34,direct:0.1},
+};
+
 export const FLOW_FIELD_COLORS = {wheat:"#b6bf88", plowed:"#b59c7a", fallow:"#b6b197"};
 
 // Screenshot reference supplied by the user on 2026-11-13.

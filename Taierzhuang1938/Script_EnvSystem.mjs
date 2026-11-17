@@ -338,6 +338,13 @@ export class EnvironmentSystem {
     return this.output;
   }
 
+  /** Starting at an authored keyframe resolves its local environment immediately. */
+  SnapAt(observer) {
+    this.snapNext = true;
+    this.dirty = true;
+    return this.Update(0, observer);
+  }
+
   /** 此刻实际在用的某个组件参数（编辑器「添加组件时以当前表现为初值」用）。 */
   CurrentValues(type) { return CloneValue(this.states.get(type)?.display || null); }
 

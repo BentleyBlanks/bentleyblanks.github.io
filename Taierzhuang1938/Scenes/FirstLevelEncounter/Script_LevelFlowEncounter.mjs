@@ -10,7 +10,7 @@ export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
   advance: "沿路线推进", suppress: "定点压制", bounds: "掩体间跃进", flank: "绕侧包抄", escort: "跟车推进", withdraw: "撤离", guard: "驻守掩护",
 };
-export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","02d","02e","02f","08f","09d","10g"];
+export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","02d","02e","02f","08f","09d","10g","11c","18g"];
 const Area = (center, width = 5, depth = width) => ({ shape: "rect", center: [...center], size: [width, depth] });
 
 export function CreateEncounterDocument(timeline, waves) {
@@ -25,7 +25,7 @@ export function CreateEncounterDocument(timeline, waves) {
     triggers.push({id:triggerId,label:wave.label,beat:beat.id,endBeat:end.id,mode:"area",delay:0,area:Area(beat.p[0],6),...structuredClone(wave.trigger||{})});
     return {
       id: wave.id, label: wave.label, beat: beat.id, endBeat: end.id, triggerId, enabled: true,
-      side: "enemy", target: wave.target === "winter" ? "winter" : "player",
+      side: "enemy", target: ["winter","none"].includes(wave.target) ? wave.target : "player",
       area: Area(wave.source,...(wave.areaSize || [2.4,3])), route: structuredClone(wave.route),
       ...(wave.spawnOffsets ? {spawnOffsets: structuredClone(wave.spawnOffsets)} : {}),
       ...(wave.memberPlans ? {memberPlans: structuredClone(wave.memberPlans)} : {}),
@@ -140,7 +140,8 @@ export function CreateEncounterDocument(timeline, waves) {
   triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
     mode:"time",delay:0,area:structuredClone(patrol.area)});
   for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-17-camp-scatter-1",triggers,groups,annotations:[]};
+  for(const group of groups) if(["BeishaheGunWest","BeishaheGunEast","RailBridgeGun"].includes(group.id)) group.weapon="machineGun";
+  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-17-beishahe-story-1",triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -728,7 +729,23 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  const value=UpgradePriorBeishaheDocument(input,defaults);
+  if(input.revision===defaults.revision) return value;
+  if(value===input) return input;
+  const upgraded=structuredClone(value);
+  const addedGroups=defaults.groups.filter(group=>Number(group.beat.slice(0,2))>=11);
+  for(const group of addedGroups) if(!upgraded.groups.some(entry=>entry.id===group.id)) upgraded.groups.push(structuredClone(group));
+  const triggerIds=new Set(addedGroups.map(group=>group.triggerId));
+  for(const trigger of defaults.triggers.filter(entry=>triggerIds.has(entry.id))) {
+    if(!upgraded.triggers.some(entry=>entry.id===trigger.id)) upgraded.triggers.push(structuredClone(trigger));
+  }
+  upgraded.revision=defaults.revision;
+  return upgraded;
+}
+
+function UpgradePriorBeishaheDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-17-camp-scatter-1") return structuredClone(input);
   if(input.revision===FLOW_PREVIOUS_CAMP_ALIGNED.revision) return UpgradeCampScatter(structuredClone(input),defaults);
   const upgraded=input.revision===FLOW_PREVIOUS_CAMP_COVER.revision
     ? structuredClone(input) : UpgradeTempleEncounterDocument(input,defaults);

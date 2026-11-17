@@ -102,6 +102,8 @@ assert.ok(WEAPONS[C.startWeapon]);
 assert.equal(EncounterActorSpec({id:"donkey",kind:"donkey",side:"civilian",pose:"walk",p:[0,0]}).kind,"animal");
 assert.equal(EncounterActorSpec({id:"nier",kind:"child",side:"civilian",pose:"kneel",p:[0,0]}).kind,"child");
 assert.equal(EncounterActorSpec({id:"nier",kind:"child",side:"civilian",pose:"kneel",p:[0,0]}).stance,"crouch");
+assert.equal(EncounterActorSpec({id:"erya",kind:"child",side:"civilian",pose:"kneel",p:[0,0]}).castId,"erya");
+assert.equal(EncounterActorSpec({id:"tian",kind:"person",side:"civilian",pose:"kneel",p:[0,0]}).castId,"tiansao");
 {
  const carrier={id:"cart",kind:"cart",side:"civilian",p:[10,20],heading:Math.PI/2};
  const actor={id:"winter",kind:"quilt",side:"friend",pose:"wounded",parentId:"cart",elevation:1.05,p:[10,20.5],heading:Math.PI/2};

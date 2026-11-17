@@ -168,8 +168,10 @@ assert.equal(arrowFills,1,"a far-clipped destination stays hidden even when it p
 const ReferenceTime = seconds => seconds >= 86 ? seconds + BeatById("02c").start - 86
   : seconds >= 37 ? seconds + BeatById("01e").start - 37 : seconds;
 const defaults=DEFAULT_ENCOUNTER_DOCUMENT;
-assert.equal(FLOW_DURATION,1959);
-assert.equal(FLOW_TIMELINE.length,68);
+assert.equal(BeatById("10j").end,1959);
+assert.equal(FLOW_DURATION,3249);
+assert.equal(FLOW_TIMELINE.length,112);
+assert.equal(STAGE_TIMELINE.length,18);
 assert.deepEqual(Object.keys(FLOW_SOURCE_EXCERPTS),FLOW_TIMELINE.map((beat)=>beat.id));
 assert.equal(STAGE_TIMELINE[6].end,1100);
 assert.ok(STAGE_TIMELINE.slice(0,7).every((stage)=>stage.status==="定稿"));
@@ -1687,4 +1689,66 @@ assert.deepEqual(ValidateScreenshot({ ...screenshot, marks: [{ kind: "text", a: 
 assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"world",a:[2,3],b:[4,5],text:""}]}));
 assert.throws(()=>ValidateScreenshot({...screenshot,marks:[{kind:"text",a:[NaN,3],b:[4,5],text:"x"}]}));
 assert.throws(()=>ValidateScreenshot({...screenshot,width:0}));
+
+// The fifth draft continues from the public editor model through every stage.
+const beishaheBeats=FLOW_TIMELINE.filter(beat=>Number(beat.stage)>=11);
+assert.equal(beishaheBeats.length,44);
+for(const beat of beishaheBeats) for(const fraction of [0,0.25,0.5,0.75,0.999]) {
+  const stamp=beat.start+beat.duration*fraction,frame=EvaluateFlow(stamp);
+  assert.ok(frame.actors.some(actor=>actor.id==="winter"&&actor.pose==="wounded"),`${beat.id} keeps winter alive`);
+  EvaluateFlow(0);EvaluateFlow(FLOW_DURATION);
+  assert.deepEqual(EvaluateFlow(stamp),frame,`${beat.id} rewinds deterministically`);
+}
+for(const signal of ["PlankBridgeRemoved","GuandaoBridgeBlown","AidCartBurned","NierDrawing","MatHomeCovered","BridgeBlown"]) {
+  assert.ok(EvaluateFlow(FLOW_DURATION).signals.includes(signal));
+  assert.ok(!EvaluateFlow(BeatById("11a").start).signals.includes(signal));
+}
+assert.equal(ActorAt("winter",BeatById("12f").start).parentId,"cart");
+assert.ok(!EvaluateFlow(BeatById("14c").start).actors.some(actor=>actor.id==="cart"),"the burned cart no longer renders an intact duplicate");
+assert.equal(ActorAt("medic",BeatById("15a").start).pose,"dead");
+assert.ok(EvaluateFlow(BeatById("14a").start+7).effects.some(effect=>effect.kind==="plane"));
+assert.ok(EvaluateFlow(BeatById("18f").start+13).signals.includes("BridgeBlown"));
+assert.equal(EvaluateFlow(BeatById("18g").start).nightBlend,1);
+for(const id of ["17b","17d"]) assert.equal(ActorAt("winter",BeatById(id).start).carried,false);
+const bridgeFrame=EvaluateFlow(BeatById("18a").start+22);
+assert.equal(bridgeFrame.actors.find(actor=>actor.id==="player").surfaceY,2.545,"crossing actors stand on the sleepers above the riverbed");
+
+const southernWalls=encounterScene.objects.filter(object=>object.pos[2]>900 && object.asset==="Whitebox/Box"
+  && object.size[1]>1.3 && object.solid!==false && (!Number.isFinite(object.pos[1])||object.pos[1]<1)
+  && !/Roof|Foliage/.test(object.material) && !/Lintel|LightPost/.test(object.id));
+for(const beat of beishaheBeats) for(let stamp=beat.start;stamp<beat.end;stamp+=0.5) {
+  const frame=EvaluateFlow(stamp),player=frame.actors[0],point=player.p;
+  const feet=player.surfaceY??encounterTerrain.heightAt(...point);
+  for(const wall of southernWalls) {
+    if(wall.hideOn&&frame.signals.includes(wall.hideOn)||wall.showOn&&!frame.signals.includes(wall.showOn)) continue;
+    const bottom=wall.pos[1]??encounterTerrain.heightAt(wall.pos[0],wall.pos[2]);
+    if(feet>=bottom+wall.size[1]-0.05) continue;
+    const yaw=(wall.yawDeg||0)*Math.PI/180,dx=point[0]-wall.pos[0],dz=point[1]-wall.pos[2];
+    const x=dx*Math.cos(yaw)-dz*Math.sin(yaw),z=dx*Math.sin(yaw)+dz*Math.cos(yaw);
+    assert.ok(Math.abs(x)>=wall.size[0]/2+0.2 || Math.abs(z)>=wall.size[2]/2+0.2,`${beat.id} clears ${wall.id} at ${stamp}`);
+  }
+}
+const southScreens=encounterScene.objects.filter(object=>object.id.startsWith("Encounter_Beishahe"));
+const firstRoadFrame=EvaluateFlow(BeatById("11a").start),thirdTank=firstRoadFrame.actors.find(actor=>actor.id==="tank3");
+const roadEye=[firstRoadFrame.player[0],encounterTerrain.heightAt(...firstRoadFrame.player)+1.6,firstRoadFrame.player[1]];
+for(const dx of [-0.9,0,0.9]) assert.ok(SightBlockedByTerrain(roadEye,[thirdTank.p[0]+dx,encounterTerrain.heightAt(...thirdTank.p)+1.8,thirdTank.p[1]],southScreens),"the third tank is concealed before the convoy advances");
+const southernGroups=CompileEncounters(defaults,FLOW_TIMELINE).groups.filter(group=>Number(group.beat.slice(0,2))>=11);
+for(const group of southernGroups) for(const [index,life] of group.lives.entries()) {
+  const frame=EvaluateFlow(life.born+0.001),enemy=frame.actors.find(actor=>actor.id===`${group.id}_${index}`);
+  if(!enemy) continue;
+  const eye=[frame.player[0],encounterTerrain.heightAt(...frame.player)+1.6,frame.player[1]];
+  for(const [dx,height] of [[-0.3,1.6],[0,1.8],[0.3,1.6],[0,0.4]]) {
+    assert.ok(SightBlockedByTerrain(eye,[enemy.p[0]+dx,encounterTerrain.heightAt(...enemy.p)+height,enemy.p[1]],southScreens),`${enemy.id} is concealed on creation`);
+  }
+}
+const beforeBeishahe=structuredClone(defaults);
+beforeBeishahe.revision="2026-11-17-camp-scatter-1";
+beforeBeishahe.groups=beforeBeishahe.groups.filter(group=>Number(group.beat.slice(0,2))<11&&group.id!=="GroundEast");
+beforeBeishahe.groups.find(group=>group.id==="GroundWest").count=3;
+beforeBeishahe.triggers=beforeBeishahe.triggers.filter(trigger=>Number(trigger.beat.slice(0,2))<11);
+const migratedBeishahe=UpgradeEncounterDocument(beforeBeishahe,defaults);
+assert.equal(migratedBeishahe.groups.find(group=>group.id==="GroundWest").count,3);
+assert.ok(!migratedBeishahe.groups.some(group=>group.id==="GroundEast"));
+assert.equal(migratedBeishahe.groups.filter(group=>Number(group.beat.slice(0,2))>=11).length,9);
+assert.deepEqual(UpgradeEncounterDocument(migratedBeishahe,defaults),migratedBeishahe,"repeat loads preserve new edits and deletions");
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

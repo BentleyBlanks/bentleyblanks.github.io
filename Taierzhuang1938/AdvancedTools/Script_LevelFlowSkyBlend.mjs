@@ -1,4 +1,4 @@
-import { FLOW_RENDERING, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_RENDERING, FLOW_DUSK, FLOW_NIGHT } from "../Data_Tuning_LevelFlow.mjs";
 
 const day = {
   sky: {...FLOW_RENDERING.sky, sunDirection: [...FLOW_RENDERING.sky.sunDirection]},
@@ -25,12 +25,19 @@ export function EncounterDuskBlend(focusZ) {
 }
 
 /** Writes the blended sky and light balance into FLOW_RENDERING (shared by the software and WebGL rasters). */
-export function ApplyEncounterSky(focusZ) {
+export function ApplyEncounterSky(focusZ, night = 0) {
   const blend = EncounterDuskBlend(focusZ), sky = FLOW_RENDERING.sky, lighting = FLOW_RENDERING.lighting;
   for (const key of ["zenith", "horizon", "below", "sun"]) sky[key] = blend ? MixHex(day.sky[key], FLOW_DUSK.sky[key], blend) : day.sky[key];
   sky.sunDirection = blend ? MixDirection(day.sky.sunDirection, FLOW_DUSK.sky.sunDirection, blend) : [...day.sky.sunDirection];
   lighting.ambient = day.lighting.ambient + (FLOW_DUSK.lighting.ambient - day.lighting.ambient) * blend;
   lighting.direct = day.lighting.direct + (FLOW_DUSK.lighting.direct - day.lighting.direct) * blend;
-  FLOW_RENDERING.skyBlend = blend;
+  const nightBlend = Math.round(Math.max(0,Math.min(1,night)) * FLOW_DUSK.steps) / FLOW_DUSK.steps;
+  if(nightBlend>0) {
+    for (const key of ["zenith","horizon","below","sun"]) sky[key] = MixHex(sky[key],FLOW_NIGHT.sky[key],nightBlend);
+    sky.sunDirection = MixDirection(sky.sunDirection,FLOW_NIGHT.sky.sunDirection,nightBlend);
+    lighting.ambient += (FLOW_NIGHT.lighting.ambient - lighting.ambient) * nightBlend;
+    lighting.direct += (FLOW_NIGHT.lighting.direct - lighting.direct) * nightBlend;
+  }
+  FLOW_RENDERING.skyBlend = blend + nightBlend * (FLOW_DUSK.steps+1);
   return blend;
 }
