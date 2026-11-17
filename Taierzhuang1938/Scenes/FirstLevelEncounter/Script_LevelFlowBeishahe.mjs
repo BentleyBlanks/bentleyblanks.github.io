@@ -24,6 +24,20 @@ function PlayerAt(time, timeline) {
   return SampleBeatRoute(beat, Clamp((time - beat.start) / beat.duration, 0, 1));
 }
 
+function BehindPlayer(beat, progress, metres, timeline) {
+  let remaining=metres;
+  const beatIndex=timeline.indexOf(beat);
+  for(let index=beatIndex;index>=0;index--) {
+    const route=timeline[index].p;
+    const length=route.slice(1).reduce((total,point,slot)=>total+Distance(route[slot],point),0);
+    const travelled=length*(index===beatIndex?progress:1);
+    if(length>0&&travelled>=remaining) return SampleRoute(route,(travelled-remaining)/length);
+    remaining-=travelled;
+    if(timeline[index].id==="16c") return [...route[0]];
+  }
+  return [...beat.p[0]];
+}
+
 const leaderKeys = [
   ["11e",0,99,995],["11e",0.3,99,1005],["11e",0.7,105,1008],["11e",1,118,1008],
   ["14a",0,118,1008],["14a",0.15,105,1008],["14a",0.3,102.7,1016],
@@ -86,8 +100,11 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
     winterExtra = {};
   }
   if (time >= At("16c")) {
-    winter = [player[0],player[1] + 1.5];
-    winterExtra = {carried:true,elevation:0.75,status:"顺子与文财抬行，仍然活着"};
+    const stopped=["17b","17d"].includes(beat.id);
+    winter = BehindPlayer(beat,stopped?0:progress,1.5,timeline);
+    const front=stopped?beat.p[0]:player,rear=BehindPlayer(beat,stopped?0:progress,2.9,timeline);
+    const heading=Math.atan2(front[0]-rear[0],-(front[1]-rear[1]));
+    winterExtra = {carried:true,elevation:0.75,heading,status:"顺子与文财抬行，仍然活着"};
     if (["17b","17d"].includes(beat.id)) Object.assign(winterExtra,{carried:false,elevation:0,status:"放下担架，等火力被压住"});
     if (time >= At("18a",1) && time < At("18g")) {winter = [-90,1331];winterExtra = {status:"冬瓜在南堤后，活着等待回城"};}
   }
@@ -110,7 +127,7 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
     actors.push(Actor(id,name,"friend","person",p,stuck ? "down" : firing ? "shoot" : "stand",
       {heavy:id === "yao",firing,status:stuck ? "脚卡枕木缝，班长回头拽" : firing ? "殿后掩护" : "随队行动"}));
   }
-  const liu = carrying ? [winter[0],winter[1] + 1.4]
+  const liu = carrying || ["17b","17d"].includes(beat.id) ? BehindPlayer(beat,carrying?progress:0,2.9,timeline)
     : time >= At("12a") && time < At("12f") ? [player[0] + 0.8,player[1] + 1]
     : beat.stage === "15" || ["16a","16b"].includes(beat.id) ? [101,1190.4]
     : time >= At("18b") && time < At("18g") ? [-88.5,1328] : Follow(1.5);

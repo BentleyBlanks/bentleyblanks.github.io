@@ -28,6 +28,7 @@ export function EncounterActorSpec(actor,carrier=null) {
     kind:actor.kind==="tank"?"tank":actor.kind==="cart"?"cart":actor.kind==="donkey"?"animal":actor.kind==="child"?"child":actor.kind==="quilt"?"soldier":civilian?"civilian":"soldier",
     weapon:civilian||actor.id==="winter"?null:actor.side==="enemy"?(actor.heavy?"Type11":"Type38"):(actor.heavy?"Zb26":"HanYang"),
     shape:"tankette",...(actor.kind==="cart"?{animal:false}:{})};
+  if(actor.kind==="quilt"&&actor.carried)next.lie="along";
   if(actor.parentId&&carrier) {
     const yaw=-(carrier.heading||0),c=Math.cos(yaw),s=Math.sin(yaw),dx=actor.p[0]-carrier.p[0],dz=actor.p[1]-carrier.p[1];
     next.ride={on:carrier.id,x:c*dx-s*dz,z:s*dx+c*dz,y:actor.elevation||0,yawDeg:next.yawDeg-yaw*180/Math.PI};

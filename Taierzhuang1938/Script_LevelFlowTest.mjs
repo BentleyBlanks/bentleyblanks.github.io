@@ -1717,15 +1717,27 @@ const southernWalls=encounterScene.objects.filter(object=>object.pos[2]>900 && o
   && object.size[1]>1.3 && object.solid!==false && (!Number.isFinite(object.pos[1])||object.pos[1]<1)
   && !/Roof|Foliage/.test(object.material) && !/Lintel|LightPost/.test(object.id));
 for(const beat of beishaheBeats) for(let stamp=beat.start;stamp<beat.end;stamp+=0.5) {
-  const frame=EvaluateFlow(stamp),player=frame.actors[0],point=player.p;
-  const feet=player.surfaceY??encounterTerrain.heightAt(...point);
-  for(const wall of southernWalls) {
-    if(wall.hideOn&&frame.signals.includes(wall.hideOn)||wall.showOn&&!frame.signals.includes(wall.showOn)) continue;
-    const bottom=wall.pos[1]??encounterTerrain.heightAt(wall.pos[0],wall.pos[2]);
-    if(feet>=bottom+wall.size[1]-0.05) continue;
-    const yaw=(wall.yawDeg||0)*Math.PI/180,dx=point[0]-wall.pos[0],dz=point[1]-wall.pos[2];
-    const x=dx*Math.cos(yaw)-dz*Math.sin(yaw),z=dx*Math.sin(yaw)+dz*Math.cos(yaw);
-    assert.ok(Math.abs(x)>=wall.size[0]/2+0.2 || Math.abs(z)>=wall.size[2]/2+0.2,`${beat.id} clears ${wall.id} at ${stamp}`);
+  const frame=EvaluateFlow(stamp);
+  const walkers=frame.actors.filter(actor=>actor.id==="player"||actor.carried
+    ||actor.id==="winter"&&["17b","17d"].includes(beat.id)
+    ||actor.id==="liu"&&["16c","16d","17a","17b","17c","17d","17e","18a","18g"].includes(beat.id));
+  for(const actor of walkers) {
+    const heading=actor.heading||0;
+    const corners=actor.kind==="quilt"?[[-0.4,-0.9],[0.4,-0.9],[0.4,0.9],[-0.4,0.9]]:[[0,0]];
+    const feet=(actor.surfaceY??encounterTerrain.heightAt(...actor.p))+(actor.elevation||0);
+    for(const [cornerX,cornerZ] of corners) {
+      const point=[actor.p[0]+cornerX*Math.cos(heading)-cornerZ*Math.sin(heading),
+        actor.p[1]+cornerX*Math.sin(heading)+cornerZ*Math.cos(heading)];
+      for(const wall of southernWalls) {
+        if(wall.hideOn&&frame.signals.includes(wall.hideOn)||wall.showOn&&!frame.signals.includes(wall.showOn)) continue;
+        const bottom=wall.pos[1]??encounterTerrain.heightAt(wall.pos[0],wall.pos[2]);
+        if(feet>=bottom+wall.size[1]-0.05) continue;
+        const yaw=(wall.yawDeg||0)*Math.PI/180,deltaX=point[0]-wall.pos[0],deltaZ=point[1]-wall.pos[2];
+        const x=deltaX*Math.cos(yaw)-deltaZ*Math.sin(yaw),z=deltaX*Math.sin(yaw)+deltaZ*Math.cos(yaw);
+        assert.ok(Math.abs(x)>=wall.size[0]/2+0.2 || Math.abs(z)>=wall.size[2]/2+0.2,
+          `${beat.id} ${actor.id} clears ${wall.id} at ${stamp}`);
+      }
+    }
   }
 }
 const southScreens=encounterScene.objects.filter(object=>object.id.startsWith("Encounter_Beishahe"));
