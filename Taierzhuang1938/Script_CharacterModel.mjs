@@ -1404,8 +1404,12 @@ export class LugouCharacterRig {
     let floor = Infinity;
     for (const { mesh, vertices } of this.infantryGroundProbes) {
       mesh.skeleton.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
+      // A crossfade samples thousands of leg vertices against one fixed pose.
+      // Reuse the exact Float64 bone products, as the death-grounding path does,
+      // instead of multiplying the same bone/inverse for every vertex influence.
+      const read = SkinnedVertexReader(mesh);
       for (const index of vertices) {
-        mesh.getVertexPosition(index, point).applyMatrix4(transform);
+        read(index, point).applyMatrix4(transform);
         floor = Math.min(floor, point.y);
       }
     }

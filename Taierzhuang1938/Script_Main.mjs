@@ -1553,7 +1553,8 @@ async function Boot() {
   actorFactory = new ActorFactory(library, { quality: QUALITY });
   // 人物合批：全场人物的分件按「几何 × 材质」收成 InstancedMesh，
   // 一帧 1408 个人物 draw call 收到几十个。逐像素等价，账见 Script_ActorBatch.mjs。
-  actorBatch = new ActorBatcher(scene);
+  actorBatch = new ActorBatcher(scene, renderer);
+  if(post.prepassPass)post.prepassPass.actorBatch=actorBatch;
   actorFactory.SetBatcher(actorBatch);
   /**
    * 脚部 IK 的探地口。**走取值器读 physics/battlefield，不能捕获当前那一份** ——

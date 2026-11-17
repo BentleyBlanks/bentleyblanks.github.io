@@ -35,7 +35,7 @@ export class EncounterPlay {
     this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
     this.token=payload?.token||"standalone";
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,
-      groundAt:(x,z)=>BeishaheSurfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,
+      groundAt:(x,z)=>BeishaheSurfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
       characterKeys:[...new Set([...Object.values(CONFIG.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
     this.view=new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
@@ -81,8 +81,8 @@ export class EncounterPlay {
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
     this.stealth.Reset();
-    this.initialized=true;this.ready=true;this.Update(0);
-    this.puppets.Settle(40,.05,this.host.player.position);this.SetPlayerPuppetVisible(false);
+    this.initialized=true;this.ready=true;this.preparingPuppets=true;this.Update(0);
+    this.puppets.Settle(40,.05,this.host.player.position);this.preparingPuppets=false;this.SetPlayerPuppetVisible(false);
     this.Send("ready");
   }
   async Begin(payload) {
@@ -148,12 +148,13 @@ export class EncounterPlay {
     this.onWarmStep=onStep;
     await this.readyPromise;
     if(!this.ready)throw new Error(this.error||"Encounter assets not ready");
+    await Promise.all([...this.puppets.puppets.values()].flatMap(p=>p.humans.map(h=>h.towel?.Ready?.()).filter(Boolean)));
     const {host}=this,start=performance.now(),wasWarming=host.state.warming;
     const signature=JSON.stringify([this.plan.startBeat.id,host.ctx.graphics,
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
-    let bloodDrops=0;
+    let bloodDrops=0,prepassBatchPrimed=0,shadowBatchPrimed=0;
     const excluded=new Set([...this.entries.values()].flatMap(entry=>entry.skin?.hidden||[]));
     const post=host.post;
     const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
@@ -203,6 +204,12 @@ export class EncounterPlay {
         host.state.ready=true;host.state.warming=false;
         // Update the actual camera and blood distance-culling eye first.
         DrawWarmFrame();
+        // Encounter's dedicated warmup bypasses WarmLevel's static-batch Prime.
+        // Otherwise the 30-frame settling threshold allocates/uploads the entire
+        // terrain batch during the first fight (about 270 MB on this scene).
+        // The following warm draws and finish complete it behind the loading UI.
+        shadowBatchPrimed=host.ctx.shadowCasterBatch?.Prime()||0;
+        prepassBatchPrimed=host.ctx.prepassStaticBatch?.Prime()||0;
         blood.Update(0,host.vfx.time,host.camera);
         const direction=host.player.ViewDirection(new THREE.Vector3());
         const spot=host.player.EyePosition.clone().addScaledVector(direction,2);
@@ -217,7 +224,7 @@ export class EncounterPlay {
         post.NotifyCameraCut();
       }
     }
-    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops};
+    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops,prepassBatchPrimed,shadowBatchPrimed};
     this.warmedSignatures.add(signature);this.FlushRetired();
   }
   FlushRetired() {
@@ -387,7 +394,8 @@ export class EncounterPlay {
       return spec;
     });
     units.push({...EncounterActorSpec({id:"player",name:"",side:"player",kind:"person",p:[player.position.x,player.position.z],pose:"stand"}),
-      yawDeg:player.yaw*180/Math.PI,stance:player.stance,state:"alive",weapon:state.activeSlot==="melee"?"Dadao":this.host.Weapon()});
+      yawDeg:player.yaw*180/Math.PI,stance:player.stance,state:"alive",visible:this.view.count===2||this.preparingPuppets===true,
+      weapon:state.activeSlot==="melee"?"Dadao":this.host.Weapon()});
     this.puppets.SyncFrame(units,dt,this.view.count===2?null:player.position);
     this.playerPuppet=this.puppets.puppets.get("player");
     this.SetPlayerPuppetVisible(false);
@@ -403,7 +411,11 @@ export class EncounterPlay {
       this.lastStateSent=this.plan.elapsed;this.lastBeat=this.plan.beat.id;this.Send("state",{state:this.State()});
     }
   }
-  SetPlayerPuppetVisible(visible){for(const human of this.playerPuppet?.humans||[])human.actor.root.visible=visible;}
+  SetPlayerPuppetVisible(visible){for(const human of this.playerPuppet?.humans||[]){
+    // This proxy is revealed only inside the observer draw, after the main
+    // camera's batch collection. Keep its attachments on their ordinary Mesh path.
+    this.host.ctx.actorBatch?.Remove(human.actor);human.actor.root.visible=visible;
+  }}
   Position(id) {
     if(id==="player")return this.host.player.position;
     const entry=this.entries.get(id);if(entry)return entry.soldier.position;

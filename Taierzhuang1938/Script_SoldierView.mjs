@@ -67,6 +67,7 @@ export class SoldierView {
    */
   Animate(s, dt, options) {
     const profiler = this.ai.ctx.profiler;
+    if(this.skins.has(s))options={...options,riggedPoseOnly:true};
     // 剖析器关着（正式玩家路径）就是一次布尔检查 + 直调，连 try/finally 都不进。
     if (!profiler || !profiler.on) { s.actor.Update(dt, options); this.SyncSkin(s,dt,options); return; }
     profiler.B("ai/act/anim");

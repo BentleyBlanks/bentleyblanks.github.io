@@ -115,19 +115,32 @@ function Approach(value, target, dt, tau) { return value + (target - value) * (1
 
 /** 骨头在世界空间里再转 q（左乘），换回本地写进去。 */
 function RotateBoneWorld(bone, q) {
-  const parentQ = bone.parent.getWorldQuaternion(new THREE.Quaternion()), world = bone.getWorldQuaternion(new THREE.Quaternion());
+  const parentQ = FreshQuaternion(bone.parent), world = FreshQuaternion(bone);
   bone.quaternion.copy(parentQ.invert().multiply(q.multiply(world)));
   bone.updateWorldMatrix(false, true);
 }
 
 function SetBoneWorldQuaternion(bone, world) {
-  bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+  bone.quaternion.copy(FreshQuaternion(bone.parent).invert().multiply(world));
   bone.updateWorldMatrix(false, true);
 }
 
 function Palm(hand, middle, out) {
   hand.getWorldPosition(out);
   return middle ? out.lerp(middle.getWorldPosition(_p2), 0.55) : out;
+}
+
+// Sync has refreshed both skeletons before attachment/IK solving. Reading their
+// matrices avoids repeatedly recomposing the same ancestor chain for every palm,
+// elbow and quaternion. IK writes still refresh the affected subtree immediately.
+const _freshPosition=new THREE.Vector3(),_freshScale=new THREE.Vector3();
+function FreshQuaternion(bone) {
+  const result=new THREE.Quaternion();bone.matrixWorld.decompose(_freshPosition,result,_freshScale);return result;
+}
+function FreshPosition(bone) {return new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);}
+function FreshPalm(hand,middle,out) {
+  out.setFromMatrixPosition(hand.matrixWorld);
+  return middle?out.lerp(_freshPosition.setFromMatrixPosition(middle.matrixWorld),.55):out;
 }
 
 /**
@@ -601,6 +614,7 @@ export class XBotSkin {
    */
   Sync(intent, dt) {
     const rig = this.rig, actor = this.actor;
+    this.sourceMatricesReady = false;
     this.frame += 1;
     const visible = actor.root.visible !== false && rig.root.visible !== false;
     this.container.visible = visible;
@@ -610,7 +624,9 @@ export class XBotSkin {
     this.container.position.copy(rig.root.position);
     this.container.quaternion.copy(rig.root.quaternion);
     this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
-    this.container.updateMatrixWorld(true);
+    // Placement only needs the container transform. Bone descendants are
+    // refreshed after the new pose/blend, before IK and rendering read them.
+    this.container.updateWorldMatrix(true, false);
     // 台阶：地面高度在人物根（容器的上两层）上，按世界高度平滑，再把差值折回容器的本地 y
     // 按原始高度这一帧变了多少判断是台阶还是瞬移（顺着一级级的坡往下走，平滑出来的高度会越落越后，不能拿它比）
     const worldY = this.container.matrixWorld.elements[13], rawStep = worldY - this.rawY;
@@ -620,7 +636,7 @@ export class XBotSkin {
     if (Math.abs(this.stepY - worldY) > 1e-5) {
       this.container.parent.matrixWorld.decompose(_p, _q, _s);
       this.container.position.y += (this.stepY - worldY) / (_s.y || 1);
-      this.container.updateMatrixWorld(true);
+      this.container.updateWorldMatrix(true, false);
     }
     if (intent.shadow !== undefined && !!intent.shadow !== this.shadow) {
       this.shadow = !!intent.shadow;
@@ -641,7 +657,7 @@ export class XBotSkin {
         if (this.container.parent !== root) root.add(this.container);
       }
       this.holdLocal.decompose(this.container.position, this.container.quaternion, this.container.scale);
-      this.container.updateMatrixWorld(true);
+      this.container.updateWorldMatrix(true, false);
       this.stepY = this.rawY = this.container.matrixWorld.elements[13];
     } else {
       this.holdLocal = null;
@@ -651,7 +667,7 @@ export class XBotSkin {
         this.container.position.copy(rig.root.position);
         this.container.quaternion.copy(rig.root.quaternion);
         this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
-        this.container.updateMatrixWorld(true);
+        this.container.updateWorldMatrix(true, false);
       }
     }
     if (pick.mode === "hold") this._Hold();
@@ -873,6 +889,7 @@ export class XBotSkin {
     this.baseValid = false;
     const rig = this.rig;
     rig.root.updateMatrixWorld(true);
+    this.sourceMatricesReady = true;
     _inv.copy(rig.root.matrixWorld).invert();
     rig.root.matrixWorld.decompose(_p, _q, _s);
     const rootQinv = _q.clone().invert();
@@ -898,7 +915,8 @@ export class XBotSkin {
    */
   _Reanchor(pick, dt = 0) {
     if (this.frame - this.attachScan > 30 || this.attachWeapon !== this.actor.weaponGroup) this._ScanAttachments();
-    this.rig.root.updateMatrixWorld(true);
+    if (!this.sourceMatricesReady) this.rig.root.updateMatrixWorld(true);
+    this.sourceMatricesReady = false;
     for (const a of this.attachments) {
       const object = a.object;
       object.updateMatrix();
@@ -1252,8 +1270,7 @@ export class XBotSkin {
     // 取证：握着枪的手（IK 之后）掌心离它该握的那一点多远
     const n = { R: "Right", L: "Left" };
     this.contact = Object.fromEntries(["R", "L"].map(side => [side, target[side] && this['ik' + side] > 0.5
-      ? +Palm(this.H(n[side] + "Hand"), this.H(n[side] + "HandMiddle1"), new THREE.Vector3()).distanceTo(target[side]).toFixed(3) : null]));
-    this.container.updateMatrixWorld(true);
+      ? +FreshPalm(this.H(n[side] + "Hand"), this.H(n[side] + "HandMiddle1"), new THREE.Vector3()).distanceTo(target[side]).toFixed(3) : null]));
     // 枪的本地矩阵 = 挂点世界矩阵⁻¹ × 目标（整矩阵乘，不拆缩放：枪在挂点里有自己的缩放抵消身高缩放）
     this._WeaponVisualOrigin();
     w.matrix.copy(_inv.copy(w.parent.matrixWorld).invert().multiply(W));
@@ -1349,9 +1366,9 @@ export class XBotSkin {
    */
   _Reachable(side, grip, front) {
     const n = side === "R" ? "Right" : "Left";
-    const A = this.H(n + "Arm").getWorldPosition(new THREE.Vector3()), B = this.H(n + "ForeArm").getWorldPosition(new THREE.Vector3());
-    const hand = this.H(n + "Hand"), Cw = hand.getWorldPosition(new THREE.Vector3());
-    const reach = (A.distanceTo(B) + B.distanceTo(Cw)) * 0.97 + Palm(hand, this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(Cw);
+    const A = FreshPosition(this.H(n + "Arm")), B = FreshPosition(this.H(n + "ForeArm"));
+    const hand = this.H(n + "Hand"), Cw = FreshPosition(hand);
+    const reach = (A.distanceTo(B) + B.distanceTo(Cw)) * 0.97 + FreshPalm(hand, this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(Cw);
     for (let t = 1; t >= 0.45; t -= 0.05) { const p = grip.clone().lerp(front, t); if (p.distanceTo(A) <= reach) return p; }
     return grip.clone().lerp(front, 0.45);
   }
@@ -1393,14 +1410,14 @@ export class XBotSkin {
     if (!hand) return null;
     const key = "srcMiddle" + side;
     if (this[key] === undefined) this[key] = this.rig.root.getObjectByName("Bip001_" + side + "_Finger2") || null;
-    return Palm(hand, this[key], new THREE.Vector3());
+    return FreshPalm(hand, this[key], new THREE.Vector3());
   }
 
   /** 这只手要不要去握点：掌心离握点 ≤ near 全拉，≥ far 不拉，中间渐变（按 X Bot 原尺寸的米算）。 */
   _GripWeight(side, target) {
     const n = side === "R" ? "Right" : "Left";
     const scale = this.container.matrixWorld.getMaxScaleOnAxis() || 1;
-    const d = Palm(this.H(n + "Hand"), this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(target) / scale;
+    const d = FreshPalm(this.H(n + "Hand"), this.H(n + "HandMiddle1"), new THREE.Vector3()).distanceTo(target) / scale;
     const { near, far } = XBOT_GRIP;
     return d <= near ? 1 : d >= far ? 0 : 1 - (d - near) / (far - near);
   }
@@ -1410,20 +1427,19 @@ export class XBotSkin {
     const n = side === "R" ? "Right" : "Left";
     const upper = this.H(n + "Arm"), fore = this.H(n + "ForeArm"), hand = this.H(n + "Hand"), middle = this.H(n + "HandMiddle1");
     if (!upper || !fore || !hand) return;
-    upper.updateWorldMatrix(true, true);
-    const handQ = hand.getWorldQuaternion(new THREE.Quaternion());
-    const A = upper.getWorldPosition(new THREE.Vector3()), B = fore.getWorldPosition(new THREE.Vector3()), Cw = hand.getWorldPosition(new THREE.Vector3());
-    const palmOff = Palm(hand, middle, new THREE.Vector3()).sub(Cw);
+    const handQ = FreshQuaternion(hand);
+    const A = FreshPosition(upper), B = FreshPosition(fore), Cw = FreshPosition(hand);
+    const palmOff = FreshPalm(hand, middle, new THREE.Vector3()).sub(Cw);
     const target = Cw.clone().lerp(targetPalm.clone().sub(palmOff), weight);
     const lab = A.distanceTo(B), lbc = B.distanceTo(Cw);
     const lat = THREE.MathUtils.clamp(A.distanceTo(target), Math.abs(lab - lbc) + 1e-4, lab + lbc - 1e-4);
     const ba = A.clone().sub(B), bc = Cw.clone().sub(B);
     let axis = ba.clone().cross(bc);
-    if (axis.lengthSq() < 1e-10) axis = new THREE.Vector3(0, 1, 0).applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion())).cross(ba);
+    if (axis.lengthSq() < 1e-10) axis = new THREE.Vector3(0, 1, 0).applyQuaternion(FreshQuaternion(upper)).cross(ba);
     axis.normalize();
     const cur = ba.angleTo(bc), des = Math.acos(THREE.MathUtils.clamp((lab * lab + lbc * lbc - lat * lat) / (2 * lab * lbc), -1, 1));
     RotateBoneWorld(fore, new THREE.Quaternion().setFromAxisAngle(axis, des - cur));
-    const C2 = hand.getWorldPosition(new THREE.Vector3());
+    const C2 = FreshPosition(hand);
     const ac = C2.sub(A).normalize(), at = target.clone().sub(A).normalize();
     RotateBoneWorld(upper, new THREE.Quaternion().setFromUnitVectors(ac, at));
     SetBoneWorldQuaternion(hand, handQ);

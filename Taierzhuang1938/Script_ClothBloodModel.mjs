@@ -20,10 +20,17 @@ export class ClothBloodModel {
       const broad=Math.sin(x*0.53+Math.sin(y*0.37))*Math.sin(y*0.65+Math.sin(x*0.29));
       return 0.64+0.40*broad+0.12*Math.sin(y*2.13+x*0.19);
     });
+    this.conductivityRight=new Float64Array(this.n);this.conductivityDown=new Float64Array(this.n);
+    for(let y=0;y<this.ny;y++)for(let x=0;x<this.nx;x++){
+      const i=y*this.nx+x;
+      if(x+1<this.nx)this.conductivityRight[i]=this.conductivity[i]+this.conductivity[i+1];
+      if(y+1<this.ny)this.conductivityDown[i]=this.conductivity[i]+this.conductivity[i+this.nx];
+    }
   }
   ResetState() {
     this.params={...this.initialParams}; this.layers=Array.from({length:2},()=>({mobile:new Float64Array(this.n),bound:new Float64Array(this.n),wet:new Float64Array(this.n)}));
     this.delta=new Float64Array(this.n); this.tick=0; this.timeS=0; this.pendingS=0; this.cursor=0; this.feed=null; this.injectedMl=0; this.revision++;
+    this.transportDelta ||= Array.from({length:4},()=>new Float64Array(this.n));
   }
   Record(type,data={}) {
     // Editing a historical frame creates a branch; simply replaying preserves future events.
@@ -80,6 +87,34 @@ export class ClothBloodModel {
     }
     for(let i=0;i<this.n;i++)field[i]+=this.delta[i];
   }
+  /** The four transported fields share the same grid and coefficients. Visit
+   * each edge once, preserving each field's original Float64 operation order. */
+  DiffuseLayers(dt) {
+    const d=this.fabric.diffusionM2S*this.params.diffusion;if(d<=0)return;
+    const nx=this.nx,ny=this.ny,n=this.n;
+    const kx=d*dt/(this.width/nx)**2*S.fiberAnisotropy,ky=d*dt/(this.length/ny)**2/S.fiberAnisotropy;
+    const fm=this.layers[0].mobile,fw=this.layers[0].wet,bm=this.layers[1].mobile,bw=this.layers[1].wet;
+    const [dm,dw,db,ds]=this.transportDelta,right=this.conductivityRight,down=this.conductivityDown;
+    dm.fill(0);dw.fill(0);db.fill(0);ds.fill(0);
+    for(let y=0;y<ny;y++)for(let x=0;x<nx;x++) {
+      const i=y*nx+x,fmi=fm[i],fwi=fw[i],bmi=bm[i],bwi=bw[i];
+      if(x+1<nx) {
+        const j=i+1,c=right[i];
+        let flux=(fm[j]-fmi)*kx*c*.5;dm[i]+=flux;dm[j]-=flux;
+        flux=(fw[j]-fwi)*kx*c*.5;dw[i]+=flux;dw[j]-=flux;
+        flux=(bm[j]-bmi)*kx*c*.5;db[i]+=flux;db[j]-=flux;
+        flux=(bw[j]-bwi)*kx*c*.5;ds[i]+=flux;ds[j]-=flux;
+      }
+      if(y+1<ny) {
+        const j=i+nx,c=down[i];
+        let flux=(fm[j]-fmi)*ky*c*.5;dm[i]+=flux;dm[j]-=flux;
+        flux=(fw[j]-fwi)*ky*c*.5;dw[i]+=flux;dw[j]-=flux;
+        flux=(bm[j]-bmi)*ky*c*.5;db[i]+=flux;db[j]-=flux;
+        flux=(bw[j]-bwi)*ky*c*.5;ds[i]+=flux;ds[j]-=flux;
+      }
+    }
+    for(let i=0;i<n;i++){fm[i]+=dm[i];fw[i]+=dw[i];bm[i]+=db[i];bw[i]+=ds[i];}
+  }
   Integrate(dt) {
     if(!this.injectedMl&&!this.feed)return;
     if(this.feed)this.Deposit(this.feed,(this.feed.rateMlS??this.params.feedMlS)*dt,this.params.ageS);
@@ -89,13 +124,14 @@ export class ClothBloodModel {
     const step=dt/substeps, capture=1-Math.exp(-step/this.fabric.bindS), dry=Math.exp(-step/(this.params.drySeconds*this.fabric.dryingScale));
     const front=this.layers[0],back=this.layers[1];
     for(let sub=0;sub<substeps;sub++) {
-      for(const layer of this.layers) { this.Diffuse(layer.mobile,step); this.Diffuse(layer.wet,step); }
+      this.DiffuseLayers(step);
       for(let i=0;i<this.n;i++) {
         const saturation=Math.min(1,Math.sqrt(Math.max(front.mobile[i],back.mobile[i])/this.fabric.capacityMlM2));
         const exchange=(1-Math.exp(-2*step*this.params.permeation*saturation/this.fabric.penetrateS))*0.5;
         const pigmentFlux=(front.mobile[i]-back.mobile[i])*exchange, wetFlux=(front.wet[i]-back.wet[i])*exchange;
         front.mobile[i]-=pigmentFlux;back.mobile[i]+=pigmentFlux;front.wet[i]-=wetFlux;back.wet[i]+=wetFlux;
-        for(const layer of this.layers) { const retained=layer.mobile[i]*capture; layer.mobile[i]-=retained; layer.bound[i]+=retained; layer.wet[i]*=dry; }
+        const frontRetained=front.mobile[i]*capture;front.mobile[i]-=frontRetained;front.bound[i]+=frontRetained;front.wet[i]*=dry;
+        const backRetained=back.mobile[i]*capture;back.mobile[i]-=backRetained;back.bound[i]+=backRetained;back.wet[i]*=dry;
       }
     }
     this.revision++;

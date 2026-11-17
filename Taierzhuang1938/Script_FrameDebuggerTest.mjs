@@ -292,7 +292,9 @@ try {
     const editorReleased = await game.evaluate(() => {
       const d = Tengxian.FrameDebugger;
       Tengxian.StepFrames(2); d.RequestCapture(); Tengxian.StepFrames(1);
-      const frozen = d.frozen; Tengxian.editor.Open('graphics');
+      // Graphics settings moved out of the editor suite. Use its supported
+      // fixed-camera editor so this still exercises a real mutually exclusive tool.
+      const frozen = d.frozen; Tengxian.editor.Open('shotCamera');
       const released = d.state === 'idle' && d._copies.length === 0;
       Tengxian.editor.Close(); Tengxian.editor.CloseOverlay('frameDebugger');
       return frozen && released;

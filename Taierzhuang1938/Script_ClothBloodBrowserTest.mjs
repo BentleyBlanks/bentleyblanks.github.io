@@ -151,7 +151,8 @@ try {
     await page.evaluate(() => { const api = window.Taierzhuang.Debug.ClothRange; api.Set('wind', 0); api.Action('hang'); api.Pause(true); api.BloodSource({ u: .5, v: .5, side: 1 }); });
     await Set('amountMl', 24); await Set('drySeconds', 600); await Action('inject'); await Advance(30);
     const state = Blood(await State()); const render = await RenderEvidence();
-    assert.equal(render.graphics.profile, 'high'); assert.equal(render.graphics.whitebox, false);
+    assert.equal(render.graphics.profile, 'high');
+    assert.equal(Object.hasOwn(render.graphics,'whitebox'),false,'The retired whitebox quality flag must remain absent');
     assert.ok(render.records.length > 0 && render.records.some(row => row.map)
       && render.records.every(row => !row.transparent && !row.wireframe && row.skin),
     `${id}: actual normal textured opaque skinned cloth surfaces rendered (untextured binding is allowed): ${JSON.stringify(render.records)}`);

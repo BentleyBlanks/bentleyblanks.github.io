@@ -269,6 +269,7 @@ export const testDefs = {
   BlanketClothTest: { file: "Script_BlanketClothTest.mjs", desc: "单被布料模拟（2026-10-21，纯 Node）：真 GLB 的 18×12 骨格 / 角骨 / 静止朝向、挪转后重铺写回骨头蒙皮不变形、卷成圆筒时顶点离轴 = 半径且法线跟着转、平铺不动 / 落下落平、两角钉手拖人不对折不出 NaN、交叠不弹飞、实心块不当地面、台阶渐进抬、逐位确定、每帧耗时" },
   ClothRangeTest: { file: "Script_ClothRangeTest.mjs", desc: "独立布料测试场：旧被子字节保护、预设与参数边界、真实风压/面密度、三件GLB骨格/厚度/蒙皮/材质" },
   ClothBloodTest: { file: "Script_ClothBloodTest.mjs", desc: "Cloth absorption: conservation, two-sided transport, drying, multi-source capacity and deterministic replay" },
+  ClothBloodAsyncTest: { file: "Script_ClothBloodAsyncTest.mjs", timeoutMs:180000, desc: "Runtime cloth worker: exact Float64 state, texture bytes, ordered cap, fallback and disposal in source and bundled builds" },
   ClothBloodBrowserTest: { file: "Script_ClothBloodBrowserTest.mjs", timeoutMs: 600000, desc: "Cloth blood in the real lab: normal materials, front/back, fiber attachment, controls, replay and sampler budget" },
   ClothRangeBrowserTest: { file: "Script_ClothRangeBrowserTest.mjs", timeoutMs: 600000, desc: "布料测试场实机：三样品、参数隔离、暂停/步进/动作/阵风、骨骼历史、高画质截图" },
   AssetStandardsTest: { file: "Script_AssetStandardsTest.mjs", desc: "源/实际面数、枪械 30k、战车 80k、三件翻倍特例与编辑器清单一致性（纯 Node）" },
@@ -781,6 +782,7 @@ export const browserTests = new Set([
   "BattleReactionRangeBrowserTest",
   "ClothRangeBrowserTest",
   "ClothBloodBrowserTest",
+  "ClothBloodAsyncTest",
 ]);
 
 export const tier0Fast = [
@@ -941,7 +943,7 @@ export const domains = {
   japaneseSoldierC: { label: "日军士兵C模型与动作", tests: ["XBotCharactersTest", "JapaneseSoldierCBrowserTest"] },
   rifleSling: { label: "背枪枪带布料模拟", tests: ["RifleSlingClothTest", "RifleSlingClothBrowserTest", "MotionVectorContractTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
-  clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
+  clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothBloodAsyncTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterPlayBrowserTest", "EncounterInputBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
@@ -1206,7 +1208,7 @@ const changedDomainRules = [
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
   // 换关延后释放旧材质（DeferredMaterialDisposeTest 是它的纯 Node 门禁，跳段不重编靠 WhiteboxShaderWarmTest 一类的预热门）。
-  { domain: "render", pattern: /Script_DeferredMaterialDispose|Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_ShadowBatchWarm|Script_InstanceFrustumScope|Script_StaticInstanceCulling|Script_ShadowInstanceCulling|Script_FlareShadowInstances|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
+  { domain: "render", pattern: /Script_ActorDepthBatch|Script_DeferredMaterialDispose|Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_ShadowBatchWarm|Script_InstanceFrustumScope|Script_StaticInstanceCulling|Script_ShadowInstanceCulling|Script_FlareShadowInstances|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},

@@ -28,20 +28,14 @@
 //     加一个 `size*size`（= 整整 size 行），列不变、行 +size，落在下半张。
 //     显存与上传：一具 50 骨的骨骼 three 原本按 16×16 RGBA32F 算（4 KB），翻倍成
 //     16×32（8 KB）。本关 69 名士兵满编 ≈ 0.55 MB/帧上传（原来 0.28 MB）。
-//   · **静态几何 / InstancedMesh / BatchedMesh：只有相机速度**（把实例矩阵当不变）。
-//     2026-09 复量：本关 161 只 InstancedMesh / 2467 个实例，再挂一份上一帧
-//     instanceMatrix 只要 0.151 MB —— 显存不是拦路石，「覆盖材质全场只有一份」才是
-//     （自定义属性的 define 是材质级不是对象级，缺属性的那只会静默塌到原点）。
-//     详见 docs/Data_TechRenderPipeline.md §17.10。
-//     `Script_ActorBatch` 与布设流送每帧改写 `instanceMatrix`，所以**远景人群与
-//     会动的布设件在 RT1 里是「静止物体」**。要修得给每只 InstancedMesh 再挂一份
-//     上一帧 `instanceMatrix` 属性（显存翻倍 + 每帧多一次上传），本阶段不做。
+//   · **ActorBatch 刚性挂件**：instancePreviousMatrix 存每个原对象的前帧矩阵，
+//     压紧可见实例时历史跟对象走；隐藏重现用当前矩阵。覆盖材质逐 draw 绑定有效位，
+//     无此属性的静态 InstancedMesh / BatchedMesh 仍走相机速度，不读缺失属性。
 //   · **普通刚体 Mesh 默认记录上一帧世界矩阵**，包括骨骼附件、异步新建道具。
 //     由覆盖材质的 onBeforeRender 统一绑定，不要求调用方逐件打标、不占对象钩子。
 //     只有矩阵实际变化时上传上一帧矩阵；静态物体仍走相机速度的快速路径。
 //     蒙皮同时记录 modelMatrix * bindMatrixInverse；有效性按实际绘制历史判断。
-//     InstancedMesh / BatchedMesh 的逐实例形变仍不在此契约内，近景移动交互件用
-//     身份稳定的普通 Mesh（如车厢背包、弹药）；不能把组矩阵当成逐实例历史。
+//     未实现前帧属性的动态实例仍不满足近景契约；不能把组矩阵当成逐实例历史。
 //
 // ## HZB
 // 预通道之后按 max-reduce 建一条线性视深金字塔（RGBA16F，四个通道同值）：
@@ -202,6 +196,7 @@ function MakeNormalDepthMaterial({ velocity = false, shared = null } = {}) {
     uniforms.uPrevModelMatrix = { value: new THREE.Matrix4() };
     uniforms.uPrevModelValid = { value: 0 };
     uniforms.uPrevSkinValid = { value: 0 };
+    uniforms.uPrevInstanceValid = { value: 0 };
     uniforms.uVelocityValid = { value: 0 };
     uniforms.uVelocityClamp = { value: VELOCITY.clampUv };
   }
@@ -217,6 +212,12 @@ function MakeNormalDepthMaterial({ velocity = false, shared = null } = {}) {
           #endif
           vec4 worldNow = modelMatrix * worldLocal;
           vec4 worldPrev = worldNow;
+          #ifdef USE_INSTANCING
+            if (uPrevInstanceValid > 0.5) {
+              worldPrev = (uPrevModelValid > 0.5 ? uPrevModelMatrix : modelMatrix)
+                * instancePreviousMatrix * vec4(transformed, 1.0);
+            }
+          #endif
           #ifdef USE_SKINNING
           if (uPrevSkinValid > 0.5) {
             // 上一帧骨矩阵在同一张 boneTexture 的下半张（见文件头「逐物体速度」）。
@@ -237,7 +238,7 @@ function MakeNormalDepthMaterial({ velocity = false, shared = null } = {}) {
             if (uPrevModelValid > 0.5) worldPrev = uPrevModelMatrix * prevSkinned;
           }
           #else
-            if (uPrevModelValid > 0.5) worldPrev = uPrevModelMatrix * worldLocal;
+            if (uPrevModelValid > 0.5 && uPrevInstanceValid < 0.5) worldPrev = uPrevModelMatrix * worldLocal;
           #endif
           vCurClip = uViewProjection * worldNow;
           vPrevClip = uPrevViewProjection * worldPrev;
@@ -260,6 +261,10 @@ function MakeNormalDepthMaterial({ velocity = false, shared = null } = {}) {
       uniform mat4 uPrevModelMatrix;
       uniform float uPrevModelValid;
       uniform float uPrevSkinValid;
+      uniform float uPrevInstanceValid;
+      #ifdef USE_INSTANCING
+        attribute mat4 instancePreviousMatrix;
+      #endif
       varying vec4 vCurClip;
       varying vec4 vPrevClip;
       #ifdef USE_SKINNING
@@ -764,8 +769,9 @@ export class PrepassPass {
   // Keep history per pass, outside userData (cloning must not clone live history).
   _BindObjectVelocity(object) {
     const U = this.material.uniforms;
-    let valid = 0, skinValid = 0;
-    if (object.isMesh && !object.isInstancedMesh && !object.isBatchedMesh
+    let valid = 0, skinValid = 0, instanceValid = 0;
+    const movingInstances = object.isInstancedMesh && object.geometry.attributes.instancePreviousMatrix?.isInstancedBufferAttribute;
+    if (object.isMesh && (!object.isInstancedMesh || (movingInstances && object.count > 0)) && !object.isBatchedMesh
         && !this._foregroundObjects.has(object)) {
       const skinned = !!object.isSkinnedMesh;
       const matrix = skinned
@@ -778,6 +784,10 @@ export class PrepassPass {
         this._objectHistory.set(object, history);
       }
       const consecutive = history.frame === this._velocityFrame - 1;
+      // A capture or preview can render the same instance buffer twice. Its
+      // producer's previous matrices then describe the earlier update, not the
+      // previous draw: unchanged buffers have camera-only motion on the replay.
+      instanceValid = movingInstances && consecutive && history.instanceVersion !== object.instanceMatrix.version ? 1 : 0;
       skinValid = skinned && consecutive && VELOCITY.skinnedPrev && this._upgraded.has(object.skeleton)
         && history.skeleton === object.skeleton && history.bind.equals(object.bindMatrix) ? 1 : 0;
       if (consecutive && (!skinned || skinValid) && !history.matrix.equals(matrix)) {
@@ -791,9 +801,10 @@ export class PrepassPass {
     }
     // Restore defaults before other draws too. Upload only changed transforms
     // and validity transitions, not the full uniforms for every static wall.
-    if (valid || U.uPrevModelValid.value !== valid || U.uPrevSkinValid.value !== skinValid) this.material.uniformsNeedUpdate = true;
+    if (valid || U.uPrevModelValid.value !== valid || U.uPrevSkinValid.value !== skinValid || U.uPrevInstanceValid.value !== instanceValid) this.material.uniformsNeedUpdate = true;
     U.uPrevModelValid.value = valid;
     U.uPrevSkinValid.value = skinValid;
+    U.uPrevInstanceValid.value = instanceValid;
   }
 
   /**
@@ -892,6 +903,7 @@ export class PrepassPass {
         history.bind.copy(object.bindMatrix);
         history.skeleton = object.skeleton;
       } else history.matrix.copy(object.matrixWorld);
+      if(object.isInstancedMesh)history.instanceVersion=object.instanceMatrix.version;
       history.frame = this._velocityFrame;
     }
     this._objectsDrawn.length = 0;
@@ -956,9 +968,11 @@ export class PrepassPass {
       staticBatch.BeginPrepass(this._NoteStatic);
     }
     this._BeginOwnPrepass(ctx);
+    this.actorBatch?.BeginDepthPass();
     try {
       this.variants.Run(renderer, () => renderer.render(scene, camera));
     } finally {
+      this.actorBatch?.EndDepthPass();
       this._EndOwnPrepass();
       staticBatch?.EndPrepass();
       renderer.setOpaqueSort(null);

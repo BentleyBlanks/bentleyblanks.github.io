@@ -2328,6 +2328,18 @@ export class Actor {
       this.pronePhase = (this.pronePhase + dt * (0.42 + moveSpeed * 1.9)) % 1;
     }
 
+    // The external formal skin, sockets and hitboxes use the imported rig.
+    // Its ordinary locomotion does not consume the detached procedural body.
+    // Keep special authoring/carry/melee poses and rigs without death clips on
+    // the complete compatibility path; all shared clocks above still advance.
+    if (s.riggedPoseOnly && this.characterRig?.deathClipById?.size
+        && !(throwing || melee || kneel || reach || binoculars || sit || warmHands || watchOut
+          || repairShoe || cleanRifle || sleep || checkAmmo || prepare || s.meleeCombat
+          || s.carryRole || s.woundedWalk || talking)) {
+      this._FinishRiggedPose(dt,s);
+      return;
+    }
+
     // --- 站姿高度：蹲就是把胯压下去，膝盖弯多少交给腿 IK 自己算 ------------
     // dying 也走这一条（不是事后再减 hips.position.y）：这个高度是在腿 IK **之前**
     // 定的，IK 会把踝钉回地面；事后减的话整条腿跟着胯一起下去，人直接陷进土里
@@ -2712,15 +2724,16 @@ export class Actor {
     // 正常帧的可见骨架由导入动作完整驱动；程序化 body 只在 Ragdoll 的提前返回
     // 分支里保留，用作整个人绕胯倒地的根运动，避免与蒙皮动作叠两遍。
     if (this.characterRig) {
-      this.body.position.set(0, d.hipY, 0);
-      this.body.rotation.set(0, 0, 0);
-      this.characterRig.proneContact?.Apply(s);
-      if (this.characterRig.proneContact?.active) this._UpdateRiggedWeaponMount();
-      // Stationary prone aiming is the last arm layer: terrain fitting must
-      // not rotate the live barrel away from the requested yaw/pitch.
-      this._ApplyRiggedAim(s);
-      if (this.characterRig.hitReaction?.active) this._ApplyHitReaction(dt, s);
+      this._FinishRiggedPose(dt,s);
     }
+  }
+
+  _FinishRiggedPose(dt,state) {
+    this.body.position.set(0,this.dims.hipY,0);this.body.rotation.set(0,0,0);
+    this.characterRig.proneContact?.Apply(state);
+    if(this.characterRig.proneContact?.active)this._UpdateRiggedWeaponMount();
+    this._ApplyRiggedAim(state);
+    if(this.characterRig.hitReaction?.active)this._ApplyHitReaction(dt,state);
   }
 
   /** Aim the arms and rifle without folding the animated torso into the knees. */

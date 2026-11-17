@@ -166,8 +166,45 @@ try {
     staticBatch.evictions=pass.staticBatch.stats.evictions;
     samples.push({label:'static batch member starts moving',expectedBody:8,expectedAttachment:null,...moved});
     pass.staticBatch.Dispose();pass.staticBatch=null;batchMesh.geometry.dispose();batchMesh.material.dispose();
+    // Two real ActorBatch entries share a draw but retain different previous
+    // transforms. Visibility compaction must never assign one actor's history to another.
+    const {ActorBatcher}=await import('./Script_ActorBatch.mjs');
+    const movingScene=new T.Scene(),movingCamera=new T.OrthographicCamera(-2,2,1.5,-1.5,.01,100);
+    movingCamera.position.z=2;
+    const movingGeometry=new T.PlaneGeometry(.3,.3),movingMaterial=new T.MeshBasicMaterial();
+    movingMaterial.name='HanYang173R_ContractFixture';
+    const batcher=new ActorBatcher(movingScene,renderer);
+    const actors=[0,.65].map(y=>{
+      const root=new T.Group(),bone=new T.Bone(),mesh=new T.Mesh(movingGeometry,movingMaterial);
+      root.position.y=y;bone.add(mesh);root.add(bone);movingScene.add(root);
+      const actor={root,bone,mesh,usingRiggedCharacter:true,partsRevision:0};batcher.Add(actor);return actor;
+    });
+    let movingPrev=new T.Matrix4(),movingFrame=0;
+    const MovingDraw=(label,body,attachment,cut=false)=>{
+      movingScene.updateMatrixWorld(true);movingCamera.updateMatrixWorld(true);batcher.Update(movingCamera);
+      const vp=new T.Matrix4().multiplyMatrices(movingCamera.projectionMatrix,movingCamera.matrixWorldInverse);
+      pass.Render({renderer,scene:movingScene,camera:movingCamera,viewProjection:vp,prevViewProjection:movingPrev,hasPrev:movingFrame++>0&&!cut});
+      const result=Read();movingPrev.copy(vp);
+      samples.push({label:'moving instances: '+label,expectedBody:body,expectedAttachment:attachment,...result});
+    };
+    MovingDraw('first frame',0,0);
+    actors[0].bone.position.x+=.1;actors[1].bone.position.x-=.1;MovingDraw('opposite bone motion',8,-8);
+    actors[1].mesh.castShadow=true;
+    actors[0].bone.position.x+=.1;actors[1].bone.position.x-=.1;MovingDraw('shadow membership reorder',8,-8);
+    movingCamera.position.x+=.05;MovingDraw('camera only',-4,-4);
+    actors[0].root.visible=false;actors[1].bone.position.x+=.1;MovingDraw('compacted survivor',null,8);
+    actors[0].root.visible=true;actors[0].bone.position.x+=.5;MovingDraw('reappearance',0,0);
+    actors[0].bone.position.x+=.1;actors[1].bone.position.x+=.1;MovingDraw('resumed motion',8,8);
+    actors[0].bone.position.x+=.1;MovingDraw('camera cut',0,0,true);
+    batcher.SetEnabled(false);MovingDraw('unbatched first draw',0,0);
+    actors[0].bone.position.x+=.1;actors[1].bone.position.x-=.1;MovingDraw('unbatched motion',8,-8);
+    batcher.SetEnabled(true);MovingDraw('reenabled batch',0,0);
+    actors[0].bone.position.x+=.1;actors[1].bone.position.x+=.1;MovingDraw('motion before repeated draw',8,8);
+    pass.Render({renderer,scene:movingScene,camera:movingCamera,viewProjection:movingPrev,prevViewProjection:movingPrev,hasPrev:true});
+    samples.push({label:'moving instances: repeated draw without an update',expectedBody:0,expectedAttachment:0,...Read()});
+    const movingBatch={...batcher.stats};batcher.Clear();movingGeometry.dispose();movingMaterial.dispose();
     pass.Dispose();copy.dispose();target.dispose();quad.geometry.dispose();
-    return {samples,cutout,staticBatch,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
+    return {samples,cutout,staticBatch,movingBatch,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
   });
   await page.screenshot({path:path.join(output,'Scene_ContractFixture.png')});
   await fs.writeFile(path.join(output,'Data_Result.json'),JSON.stringify({result,errors,skinWarnings},null,2));
@@ -186,6 +223,7 @@ try {
   assert.ok(result.cutout.opaque>6000);
   assert.ok(Math.abs(result.cutout.masked/result.cutout.opaque-.5)<.02,'alpha holes omit both normal/depth and velocity');
   assert.ok(result.staticBatch.members===1&&result.staticBatch.evictions===1,`static batch joined then evicted the moving member: ${JSON.stringify(result.staticBatch)}`);
+  assert.equal(result.movingBatch.instances,2);assert.equal(result.movingBatch.batches,1);
   assert.equal(skinWarnings.length,2,'each unsupported skeleton emits one diagnostic, never a silent fallback or per-frame spam');
   console.log(`PASS MotionVector contract: ${result.samples.length} GPU scenarios; attached/detached skins, new bone attachments, history lifecycle, foreground inheritance, exclusions, callbacks`);
 } finally {await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

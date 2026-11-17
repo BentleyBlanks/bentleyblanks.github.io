@@ -11,6 +11,34 @@ import { MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBotLook, XBotSkin } from "./Script_EditorBlockoutXBot.mjs";
 
 const here = import.meta.dirname;
+// Reference IK deliberately uses three's refreshing world getters. The runtime
+// path reads the frame's fresh matrices; every affected descendant must still
+// match without a test-side update masking a missing propagation.
+function ReferenceArm(upper,fore,hand,middle,targetPalm,weight) {
+  const Palm=()=>hand.getWorldPosition(new THREE.Vector3()).lerp(middle.getWorldPosition(new THREE.Vector3()),.55);
+  const Rotate=(bone,q)=>{const parent=bone.parent.getWorldQuaternion(new THREE.Quaternion()),world=bone.getWorldQuaternion(new THREE.Quaternion());bone.quaternion.copy(parent.invert().multiply(q.multiply(world)));bone.updateWorldMatrix(false,true);};
+  upper.updateWorldMatrix(true,true);
+  const handQ=hand.getWorldQuaternion(new THREE.Quaternion());
+  const a=upper.getWorldPosition(new THREE.Vector3()),b=fore.getWorldPosition(new THREE.Vector3()),c=hand.getWorldPosition(new THREE.Vector3());
+  const target=c.clone().lerp(targetPalm.clone().sub(Palm().sub(c)),weight),ab=a.distanceTo(b),bc=c.distanceTo(b);
+  const reach=THREE.MathUtils.clamp(a.distanceTo(target),Math.abs(ab-bc)+1e-4,ab+bc-1e-4),ba=a.clone().sub(b),cb=c.clone().sub(b);
+  let axis=ba.clone().cross(cb);if(axis.lengthSq()<1e-10)axis=new THREE.Vector3(0,1,0).applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion())).cross(ba);
+  const desired=Math.acos(THREE.MathUtils.clamp((ab*ab+bc*bc-reach*reach)/(2*ab*bc),-1,1));
+  Rotate(fore,new THREE.Quaternion().setFromAxisAngle(axis.normalize(),desired-ba.angleTo(cb)));
+  Rotate(upper,new THREE.Quaternion().setFromUnitVectors(hand.getWorldPosition(new THREE.Vector3()).sub(a).normalize(),target.clone().sub(a).normalize()));
+  hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(handQ));hand.updateWorldMatrix(false,true);
+}
+for(let sample=0;sample<100;sample++) {
+  const root=new THREE.Group(),upper=new THREE.Bone(),fore=new THREE.Bone(),hand=new THREE.Bone(),middle=new THREE.Bone();
+  root.position.set(sample*.03,-.7,2);root.rotation.set(.12,sample*.17,-.08);root.scale.setScalar(.8+sample*.003);
+  root.add(upper);upper.add(fore);fore.add(hand);hand.add(middle);
+  upper.position.set(.15,1.2,0);upper.rotation.set(.2,sample*.01,.3);fore.position.set(.29,.02,0);fore.rotation.z=-.4-sample*.005;hand.position.x=.27;middle.position.x=.06;
+  root.updateMatrixWorld(true);const copy=root.clone(true);copy.updateMatrixWorld(true);
+  const u=copy.children[0],f=u.children[0],h=f.children[0],m=h.children[0],target=new THREE.Vector3(.4+sample*.015,1.2,1.8),weight=(sample%10)/9;
+  ReferenceArm(upper,fore,hand,middle,target,weight);
+  XBotSkin.prototype._SolveArm.call({H:name=>({RightArm:u,RightForeArm:f,RightHand:h,RightHandMiddle1:m})[name]},'R',target,weight);
+  for(const [expected,actual] of [[upper,u],[fore,f],[hand,h],[middle,m]])assert.ok(expected.matrixWorld.elements.every((v,i)=>Math.abs(v-actual.matrixWorld.elements[i])<1e-10),'IK preserves the full descendant world transform');
+}
 const fitSettings=XBOT_CHARACTERS.ijaYi.weaponVisualOriginFit;
 const testMuzzle=new THREE.Vector3(0,.035,-1.006);
 const testOffset=MeasureWeaponVisualOrigin([new THREE.Vector3(-.01,.175,-1),new THREE.Vector3(.01,.195,-1),new THREE.Vector3(0,-.4,-.4)],testMuzzle,fitSettings);

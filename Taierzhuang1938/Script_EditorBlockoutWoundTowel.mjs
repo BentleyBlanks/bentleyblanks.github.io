@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { CreateClothSampleMaterials } from "./Script_ClothSampleMaterials.mjs";
 import { ClothBlood } from "./Script_ClothBlood.mjs";
+import { AsyncClothBlood } from "./Script_ClothBloodAsync.mjs";
 
 export const BLOCKOUT_WOUND_TOWEL = Object.freeze({
   /** 叠好的毛巾：宽（顺两肩）、长（顺脊柱）、厚，米；边缘收薄到厚度的 edgeThin 倍；面上褶的起伏。 */
@@ -58,7 +59,7 @@ const _p = new THREE.Vector3(), _c = new THREE.Vector3(), _l = new THREE.Vector3
 const _up = new THREE.Vector3(), _right = new THREE.Vector3(), _fwd = new THREE.Vector3(), _m = new THREE.Matrix4();
 
 /** 一条毛巾。→ { mesh, blood, Pose(rig) → bool, Advance(dt), Probe(), Dispose() } */
-export function CreateWoundTowel() {
+export function CreateWoundTowel({asyncBlood=false}={}) {
   const mesh = new THREE.Mesh(TowelGeometry(), TowelMaterial());
   mesh.name = "BlockoutWoundTowel";
   mesh.castShadow = true; mesh.receiveShadow = true;
@@ -71,12 +72,17 @@ export function CreateWoundTowel() {
     blood.Advance(W.soakS);
     blood.StartFeed({ u: 0.5, v: 0.5, side: -1, rateMlS: W.feedMlS });
   } catch (error) { console.warn("[BlockoutWoundTowel] cloth blood failed; plain towel", error); blood = null; }
+  const asynchronous=asyncBlood&&blood?new AsyncClothBlood(blood,W.capMl):null;
   return {
     mesh, blood,
+    Ready:()=>asynchronous?.ready||Promise.resolve(true),
     /** 摆到倒地的人肚子正面：骨盆→胸口当「上」、两肩当「右」，正面 = 上 × 右。骨头缺了 → false（藏起来）。 */
     Pose(rig) {
       const b = rig?.bones;
       if (!b?.pelvis || !b.chest || !b.upperArmL || !b.upperArmR) return false;
+      // Only these four bone paths feed the towel basis. Refreshing the entire
+      // puppet scene here repeats every other character's already solved pose.
+      for(const bone of [b.pelvis,b.chest,b.upperArmL,b.upperArmR])bone.updateWorldMatrix(true,false);
       _p.setFromMatrixPosition(b.pelvis.matrixWorld); _c.setFromMatrixPosition(b.chest.matrixWorld);
       _l.setFromMatrixPosition(b.upperArmL.matrixWorld); _r.setFromMatrixPosition(b.upperArmR.matrixWorld);
       _up.subVectors(_c, _p);
@@ -95,6 +101,7 @@ export function CreateWoundTowel() {
     },
     Advance(dt) {
       if (!blood || !(dt > 0)) return;
+      if(asynchronous){asynchronous.Advance(dt);return;}
       if (blood.feed && blood.injectedMl >= W.capMl) blood.StopFeed();
       blood.Advance(dt);
     },
@@ -102,6 +109,6 @@ export function CreateWoundTowel() {
       const s = blood?.State();
       return s ? { injectedMl: +s.injectedMl.toFixed(1), frontM2: +s.front.areaM2.toFixed(4), backM2: +s.back.areaM2.toFixed(4), feeding: s.feeding } : { blood: false };
     },
-    Dispose() { blood?.Dispose(); mesh.removeFromParent(); sourceGeometry.dispose(); },
+    Dispose() { asynchronous?.Dispose(); blood?.Dispose(); mesh.removeFromParent(); sourceGeometry.dispose(); },
   };
 }

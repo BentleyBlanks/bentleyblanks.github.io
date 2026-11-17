@@ -328,8 +328,10 @@ function Box(group, material, w, h, d, x, y, z) {
 }
 
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false, characterKeys = null }) {
+  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false, characterKeys = null, asyncBlood = false, riggedPoseOnly = false }) {
     this.formalOnly=formalOnly;
+    this.asyncBlood=asyncBlood;
+    this.riggedPoseOnly=riggedPoseOnly;
     this.scene = scene;
     this.actorFactory = actorFactory;
     this.library = library;
@@ -597,7 +599,7 @@ export class BlockoutPuppets {
       const puppet=this.puppets.get(unit.id);
       const distance=Math.hypot(unit.x-puppet.x,unit.z-puppet.z);
       Object.assign(puppet,{x:unit.x,z:unit.z,yawDeg:unit.yawDeg,stance:unit.stance,
-        moving:distance>0.001,speedMps:dt>0?distance/dt:0,visible:true,down:unit.state==="down"});
+        moving:distance>0.001,speedMps:dt>0?distance/dt:0,visible:unit.visible!==false,down:unit.state==="down"});
     }
     this.Update(dt,cameraPosition);
   }
@@ -673,6 +675,20 @@ export class BlockoutPuppets {
       puppet.moving = !!drive.moving; puppet.speedMps = drive.speedMps || 0; puppet.visible = drive.visible !== false;
       puppet.down = drive.state === "down";
     }
+    // Observer-only proxies are prewarmed at loading, but have no pose consumers
+    // in a single view. Reset the visible-skin blend so reappearance snaps to the
+    // current pose; do not accumulate an offscreen animation timestep.
+    if (!puppet.visible && !force) {
+      if (puppet.body) puppet.body.visible=false;
+      for (const human of puppet.humans) {
+        human.actor.root.visible=false;human.animDt=0;
+        human.skin?.Sync({},0);
+        // Three still updates invisible descendants. Keep the prewarmed proxy,
+        // but detach it until an observer actually needs its pose again.
+        if(human.actor.root.parent){human.hiddenParent=human.actor.root.parent;human.actor.root.removeFromParent();}
+      }
+      return;
+    }
     // 2026-10-21 不倒地了，人却还是倒着的（预演键把倒地的人扶起来）：重造（_Revive），这一帧就站起来（照造人时那样强推一步）
     if (!puppet.down && puppet.humans.some(h => h.actor.ragdollState)) { this._Revive(puppet); force = true; }
     // 2026-10-20 挂到车上（ride）：位姿 = 车当前位姿 ∘ 本地偏移，不贴地、不走路；位置键不管用
@@ -699,6 +715,7 @@ export class BlockoutPuppets {
     const distance = cameraPosition ? Math.hypot(puppet.x - cameraPosition.x, puppet.z - cameraPosition.z) : 0;
     for (const human of puppet.humans) {
       const actor = human.actor;
+      if(human.hiddenParent){human.hiddenParent.add(actor.root);human.hiddenParent=null;}
       let x = puppet.x, z = puppet.z;
       if (unit.kind === "litter") {
         const offset = BLOCKOUT_PUPPETS.litter.d / 2 + BLOCKOUT_PUPPETS.litter.bearerGapM;
@@ -741,6 +758,7 @@ export class BlockoutPuppets {
       // 看着是站着的）：蹲 / 卧的人也当戒备，落到原生 KneelHold / CrouchIdle（骨盆 0.36–0.45 m）。
       human.soldier.missionCombatAlert = aim || (!carryRole && puppet.stance !== "stand");
       const state = {
+        riggedPoseOnly:this.riggedPoseOnly&&!!human.skin,
         moveSpeed: mps / 3.6, moveSpeedMps: mps, locomotionTracked: true, elapsed: this.elapsed,
         aim: aim && !carryRole && !throwing ? 1 : 0,
         crouch: !carryRole && puppet.stance === "crouch" ? 1 : 0,
@@ -1050,13 +1068,13 @@ export class BlockoutPuppets {
       for (const human of puppet.humans) {
         if (!want) { if (human.towel) { human.towel.Dispose(); human.towel = null; } continue; }
         if (!human.towel) {
-          try { human.towel = CreateWoundTowel(); this.root.add(human.towel.mesh); }
+          try { human.towel = CreateWoundTowel({asyncBlood:this.asyncBlood}); this.root.add(human.towel.mesh); }
           catch (error) { console.warn("[BlockoutPuppets] wound towel failed", error); human.towel = false; }
         }
         if (!human.towel) continue;
         const actor = human.actor;
         let shown = puppet.visible && actor.root.visible;
-        if (shown) { actor.root.updateMatrixWorld(true); this.root.updateMatrixWorld(); shown = human.towel.Pose(actor.characterRig); }
+        if (shown) { this.root.updateWorldMatrix(true,false); shown = human.towel.Pose(actor.characterRig); }
         human.towel.mesh.visible = shown;
         if (shown) human.towel.Advance(dt);
       }

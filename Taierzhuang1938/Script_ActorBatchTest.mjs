@@ -24,15 +24,9 @@
 //   `renderer.shadowMap.needsUpdate = true` 只是让 three 进一次阴影循环、逐灯全部跳过，
 //   既不改状态也不产生差异（`ScheduleShadowUpdate` 接管之后它就是历史遗留了）。
 //
-// 【本关的合批断言可能是空的】`Script_ActorBatch` 按设计整人跳过蒙皮 GLB
-//   （见该模块文件头），唯一不带 GLB 骨骼的人物是 `Actor.isChild`（百姓的
-//   childBoy / childGirl，只在 P012 开场人流的名册里）。2026-09-08 实测：
-//   phase=1/2/3/4/5/6 与 ?whitebox=p012（推到 1200 帧）的在册人物**全是蒙皮 GLB**
-//   （程序化 0），所以 `stats.instances` 恒为 0，开关合批连一个网格都不挪，
-//   `draw` 与画面天然相等 —— 也就是说这几关跑的是一次「配置跟自己比」。
-//   这个事实必须在输出里说出来，不能让它安静地绿着：逐关末尾会标注、
-//   全轮结束还会再汇总一次。要把这半条断言填实，得先让程序化人物真的上场
-//   （挑一个孩子在场的时机，或者由测试自己造几个），那是另一件事。
+// 2026-11-17：蒙皮人物上的汉阳造/三八式刚性挂件也参与合批；--encounter 使用
+// 03B 实际场景，必须有有效实例，并额外读取两把真实武器的 RT1，验证 8 px 位移。
+// 没有适用挂件的旧切片仍明确报告空断言。
 //
 // 【与 Script_PropInstancingTest 是同一份 Draw/Compare/预热】那道门是外部布设的
 //   同款 A/B。两边的 Draw()、Compare()、WARM_DRAWS 与判据必须保持一致，改一处就
@@ -48,7 +42,8 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
-const PHASES = (process.env.PHASES || "1,2,5").split(",");
+const encounter = process.argv.includes('--encounter');
+const PHASES = encounter ? ['encounter'] : (process.env.PHASES || "1,2,5").split(",");
 /**
  * 每一侧读回缓冲之前空跑多少趟，把时域链推到不动点。空跑不读 readPixels，
  * 一趟只有一次 Render。
@@ -96,7 +91,12 @@ const errors = [];
 let batchedPhases = 0;
 
 for (const phase of PHASES) {
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await page.addInitScript(encounter => {
+    localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
+    localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));
+    if(encounter) sessionStorage.setItem('tengxian1938_encounter_play_session_v1',JSON.stringify({time:222}));
+  },encounter);
   page.on("pageerror", (error) => errors.push(`p${phase} PAGEERROR ${String(error).slice(0, 200)}`));
   page.on("console", (message) => {
     if (message.type() !== "error") return;
@@ -104,12 +104,12 @@ for (const phase of PHASES) {
     if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
     errors.push(`p${phase} CONSOLE ${message.text().slice(0, 200)}`);
   });
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&${encounter?'encounterPlay=1&quality=high':`phase=${phase}`}`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 300000 });
+  await page.waitForFunction(() => window.Taierzhuang?.state.ready, null, { timeout: 300000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(200));
 
-  const result = await page.evaluate((warmDraws) => {
+  const result = await page.evaluate(async ({warmDraws, encounter}) => {
     const T = window.Taierzhuang;
     // 冻住玩法：rAF 那条主循环还在跑，不冻的话两次读到的不是同一帧世界。
     T.state.running = false;
@@ -126,6 +126,9 @@ for (const phase of PHASES) {
       T.scene.updateMatrixWorld();
       T.actorBatch.Update(T.camera);
       T.renderer.shadowMap.needsUpdate = true;
+      // The encounter regression must compare freshly baked shadows on both
+      // sides, including the mixed caster/non-caster instance subset.
+      if(encounter) T.scene.traverse(object=>{if(object.isLight&&object.shadow)object.shadow.needsUpdate=true;});
       T.renderer.info.autoReset = false;
       T.renderer.info.reset();
       T.post.Render(T.scene, T.camera, {
@@ -164,17 +167,75 @@ for (const phase of PHASES) {
     T.actorBatch.SetEnabled(true);
     const noiseOn = Compare(on.pixels, onAgain.pixels);
     const noiseOff = Compare(off.pixels, offAgain.pixels);
+    const velocity=[];
+    if(encounter) {
+      const THREE=await import('three');
+      const {PrepassPass}=await import('./Script_PostPrepass.mjs');
+      for(const weapon of ['HanYang','Type38']) {
+        const asset=weapon==='HanYang'?T.actorFactory.hanYang173R:T.actorFactory.type38;
+        const scene=new THREE.Scene(),root=new THREE.Group();root.rotation.y=Math.PI/2;scene.add(root);
+        const source=T.actorFactory.WeaponGeometry(weapon);
+        for(const [key,geometry] of source.geometries){
+          const mesh=new THREE.Mesh(geometry,asset.materials.get(key));root.add(mesh);
+        }
+        const actor={root,usingRiggedCharacter:true,partsRevision:0};
+        const batcher=new T.actorBatch.constructor(scene,T.renderer);batcher.Add(actor);
+        const camera=new THREE.OrthographicCamera(-2,2,1.5,-1.5,.01,100);camera.position.z=3;camera.updateMatrixWorld(true);
+        const vp=new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse),runs=[];
+        for(const enabled of [false,true]) {
+          batcher.SetEnabled(enabled);
+          const pass=new PrepassPass({preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:THREE.HalfFloatType,targets:{}});pass.actorBatch=batcher;pass.Resize(320,240);
+          for(let i=0;i<2;i++){
+            root.position.x=i*.1;scene.updateMatrixWorld(true);batcher.Update(camera);
+            pass.Render({renderer:T.renderer,scene,camera,viewProjection:vp,prevViewProjection:vp,hasPrev:i>0});
+          }
+          const depth=new Uint16Array(320*240*4),motion=new Uint16Array(320*240*2);
+          T.renderer.readRenderTargetPixels(pass.target,0,0,320,240,depth);
+          T.renderer.readRenderTargetPixels(pass.target,0,0,320,240,motion,undefined,1);
+          const values=[];
+          for(let i=0;i<320*240;i++)if(depth[i*4+3])values.push(THREE.DataUtils.fromHalfFloat(motion[i*2])*320);
+          runs.push({enabled,pixels:values.length,min:Math.min(...values),max:Math.max(...values),depthGroups:[...batcher.depthBatch.groups.values()].filter(g=>g.valid).length});pass.Dispose();
+        }
+        velocity.push({weapon,runs});batcher.Clear();
+      }
+      T.actorBatch.EnableShadowScope(T.renderer);
+    }
+    const poseParity=[];
+    if(encounter){
+      const unique=new Map(T.ai.soldiers.filter(s=>s.actor.characterRig&&!s.actor.ragdollState).map(s=>[s.actor.modelId,s.actor]));
+      for(const actor of unique.values())for(const [label,patch] of [['idle',{}],['walk',{moveSpeed:.5,moveSpeedMps:1.8}],['aim',{aim:1,lookYaw:.2,lookPitch:-.1}],['crouch',{crouch:1,aim:.8}],['prone',{prone:1,aim:1}],['reach',{reach:1}],['talk',{talking:1}]]){
+        const state={grounded:true,elapsed:123,...patch},parent=actor.root.parent,visible=actor.root.visible;
+        if(!parent)T.scene.add(actor.root);actor.root.visible=true;
+        const Capture=()=>{const shapes=actor.GetBoneHitboxes().flatMap(s=>[...s.start.toArray(),...s.end.toArray()]);actor.root.updateMatrixWorld(true);actor.characterRig.root.traverse(o=>{if(o.isBone||o.isSkinnedMesh)shapes.push(...o.matrixWorld.elements);});if(actor.weaponGroup)shapes.push(...actor.weaponGroup.matrixWorld.elements);return shapes;};
+        for(let i=0;i<20;i++)actor.Update(1/60,state);
+        for(let i=0;i<4;i++)actor.Update(0,{...state,riggedPoseOnly:false});const reference=Capture();
+        for(let i=0;i<4;i++)actor.Update(0,{...state,riggedPoseOnly:true});const fast=Capture();
+        poseParity.push({model:actor.modelId,label,maxError:Math.max(...reference.map((n,i)=>Math.abs(n-fast[i])))});
+        actor.root.visible=visible;if(!parent)actor.root.removeFromParent();
+      }
+    }
     return {
+      velocity,poseParity,
       calls: { on: on.calls, off: off.calls },
       stats: { ...T.actorBatch.stats },
       // 噪声底取两侧的大者：任何一侧没压平，A/B 的结论都不作数。
       noise: noiseOn.pct >= noiseOff.pct ? noiseOn : noiseOff,
       diff: Compare(onAgain.pixels, offAgain.pixels),
     };
-  }, WARM_DRAWS);
+  }, {warmDraws:WARM_DRAWS,encounter});
   await page.close();
 
   const { calls, stats, noise, diff } = result;
+  if(encounter){
+    console.log(`native pose and hitbox parity: ${result.poseParity.length} cases, max ${Math.max(...result.poseParity.map(p=>p.maxError))}`);
+    if(result.poseParity.length<7||result.poseParity.some(p=>p.maxError>1e-6))failures.push('Native pose fast path changed bones, weapon or hitboxes: '+JSON.stringify(result.poseParity.filter(p=>p.maxError>1e-6)));
+  }
+  if(encounter && stats.instances === 0) failures.push('Encounter fixture must batch real weapon attachments');
+  for(const {weapon,runs} of result.velocity){
+    console.log(`real ${weapon} velocity: ${JSON.stringify(runs)}`);
+    if(runs.some(run=>run.pixels<100||Math.abs(run.min-8)>.08||Math.abs(run.max-8)>.08)
+      || Math.abs(runs[0].pixels-runs[1].pixels)>2||runs[1].depthGroups<1)failures.push(`${weapon}: merged depth must preserve actual 8 px motion and raster coverage`);
+  }
   const tolerance = Math.max(MAX_DIFF_PCT, noise.pct * NOISE_FACTOR);
   const label = `phase=${phase} draw ${calls.off} -> ${calls.on}`
     + ` | 实例 ${stats.instances}（${stats.actors} 人 / ${stats.batches} 批）`

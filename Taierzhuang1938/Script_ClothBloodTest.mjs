@@ -27,6 +27,16 @@ function Healthy(model, label) {
 
 const evidence = {};
 {
+ class ScalarTransport extends ClothBloodModel {DiffuseLayers(dt){for(const layer of this.layers){this.Diffuse(layer.mobile,dt);this.Diffuse(layer.wet,dt);}}}
+ for(const options of [{width:.2,length:.25,profile:'towel'},{profile:'thin'},{profile:'quilt',params:{diffusion:4,permeation:3}}]){
+  const scalar=new ScalarTransport(options),fused=new ClothBloodModel(options);
+  for(const model of [scalar,fused]){model.Inject({amountMl:30,side:-1});model.StartFeed({rateMlS:.1});model.Advance(3);}
+  for(let side=0;side<2;side++)for(const field of ['mobile','bound','wet'])assert.deepEqual(fused.layers[side][field],scalar.layers[side][field]);
+  assert.deepEqual(fused.TextureData(),scalar.TextureData());
+  Check(true,`Fused grid transport is Float64-exact: ${options.profile}`);
+ }
+}
+{
   const model = new ClothBloodModel({ width: 1.4, length: 1.9, profile: 'thin' });
   Check(Mass(model.State()) === 0 && Wet(model.State()) === 0, 'New cloth starts clean');
   model.Inject({ u: .5, v: .5, side: 1, amountMl: 12 });

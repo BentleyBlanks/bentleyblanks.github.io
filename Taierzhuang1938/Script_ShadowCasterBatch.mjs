@@ -83,6 +83,7 @@ function FacingCulled(bounds, light, perspective, side) {
 
 /** 这只对象的形状能不能进合批（不看它此刻动不动）。 */
 function Batchable(object) {
+  if ((object.layers.mask & 1) === 0) return false;
   if (!object.isMesh || object.isSkinnedMesh || object.isInstancedMesh || object.isBatchedMesh) return false;
   if (object.children.length) return false;   // 烘焙时要整只藏起来：只收叶子
   if (object.userData?.shadowCasterBatch || object.userData?.noShadowBatch) return false;
@@ -165,7 +166,7 @@ export class ShadowCasterBatch {
     let budgetLeft = true;
     for (const rec of this.records.values()) {
       const object = rec.object;
-      const inScene = this._InScene(object);
+      const inScene = this._InScene(object) && (object.layers.mask & 1) !== 0;
       if (rec.state === MEMBER) {
         if (!inScene || !object.castShadow || object.children.length || this._Changed(rec)) {
           this._Evict(rec);

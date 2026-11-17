@@ -10,6 +10,7 @@
 // 用法：node Taierzhuang1938/Script_ShadowCasterBatchTest.mjs
 
 import * as THREE from "three";
+import { ActorBatcher, RigidWeaponMatrix } from "./Script_ActorBatch.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
 
 let failed = 0;
@@ -20,6 +21,24 @@ const Check = (label, ok, detail = "") => {
 
 const TUNING = { enabled: true, settleFrames: 5, cooldownFrames: 10, rescanFrames: 3, joinBudgetMs: 1e9,
   minInstanceCapacity: 4, minVertexCapacity: 64 };
+
+{
+  let error=0;
+  for(let i=0;i<200;i++){
+    const position=new THREE.Vector3(Math.sin(i)*90,Math.cos(i*.7)*3,i*.1),q=new THREE.Quaternion().setFromEuler(new THREE.Euler(i*.01,i*.03,i*.02));
+    const parent=new THREE.Matrix4().compose(position,q,new THREE.Vector3(i%2?-1:1,1.7,.6));
+    const right=i%3?new THREE.Matrix4().makeTranslation(i*.01,-i*.02,i*.03):new THREE.Matrix4().compose(position,q,new THREE.Vector3(.8,1,1.2));
+    const expected=new THREE.Matrix4().multiplyMatrices(parent,right),actual=new RigidWeaponMatrix().multiplyMatrices(parent,right);
+    const aliasLeft=new RigidWeaponMatrix().copy(parent);aliasLeft.multiplyMatrices(aliasLeft,right);
+    const aliasRight=new RigidWeaponMatrix().copy(right);aliasRight.multiplyMatrices(parent,aliasRight);
+    for(let j=0;j<16;j++)error=Math.max(error,Math.abs(actual.elements[j]-expected.elements[j]),Math.abs(aliasLeft.elements[j]-expected.elements[j]),Math.abs(aliasRight.elements[j]-expected.elements[j]));
+    for(const rotation of [new THREE.Quaternion(),q]){
+      const a=new RigidWeaponMatrix().compose(position,rotation,new THREE.Vector3(1,1,1)),b=new THREE.Matrix4().compose(position,rotation,new THREE.Vector3(1,1,1));
+      for(let j=0;j<16;j++)error=Math.max(error,Math.abs(a.elements[j]-b.elements[j]));
+    }
+  }
+  Check('刚性武器矩阵与通用 Matrix4 等价（镜像、缩放、旋转及左右别名）',error<1e-12,`error=${error}`);
+}
 
 const scene = new THREE.Scene();
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -40,6 +59,7 @@ const parent = Mesh("parent", 12); parent.add(new THREE.Mesh(boxGeometry, plain)
 const cutout = Mesh("cutout", 15, { material: new THREE.MeshStandardMaterial({ alphaTest: .5, map: new THREE.Texture() }) });
 const mirrored = Mesh("mirrored", 18); mirrored.scale.x = -1;
 const noShadow = Mesh("noShadow", 21); noShadow.castShadow = false;
+const batchSource = Mesh("batchSource", 24); batchSource.layers.set(30);
 const skinned = new THREE.SkinnedMesh(boxGeometry, plain); skinned.castShadow = true; scene.add(skinned);
 
 const batch = new ShadowCasterBatch(scene, { tuning: TUNING, cloneDepthMaterial: (m) => { const c = m.clone(); c.name = m.name + "_clone"; return c; } });
@@ -108,6 +128,7 @@ Evicted("wallA", () => { wallA.visible = false; });
 wallA.visible = true;
 Evicted("trench", () => { trench.geometry.attributes.position.needsUpdate = true; });
 Check("全部踢空后组不再上场", batch.live.length === 0);
+Check("人物实例化的源网格不重复烘影", !batch.records.has(batchSource));
 
 // 5. 冷却后重新收；castShadow 被关、长子节点、摘出场景
 for (let i = 0; i < 20; i += 1) Frame();
@@ -121,6 +142,8 @@ Check("摘出场景的登记被删", !batch.records.has(trench));
 scene.add(trench);
 for (let i = 0; i < 20; i += 1) Frame();
 Check("挂回来重新收", members().includes("trench"));
+Evicted("trench", () => { trench.layers.set(30); });
+trench.layers.set(0);
 Check("镜像件永不收", !members().includes("mirrored"));
 
 // 6. 关掉全部还原
@@ -327,5 +350,79 @@ batch.SetEnabled(true);
   primed.Dispose(); geometry.dispose(); flat.dispose(); fakeDepth.dispose();
 }
 
+{
+  const world=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),geometry=new THREE.BoxGeometry();
+  const material=new THREE.MeshStandardMaterial();material.name='HanYang173R_ShadowFixture';
+  let throwDraw=false,observed=null,activeBatch;
+  const fakeRenderer={shadowMap:{render(){
+    const group=[...activeBatch.groups.values()][0];
+    observed={main:group.meshes.plain.visible,shadow:group.meshes.cast.visible,count:group.meshes.cast.count};
+    if(throwDraw)throw new Error('ActorShadowScopeOracle');
+  }}};
+  activeBatch=new ActorBatcher(world,fakeRenderer);
+  const actors=[true,false].map((castShadow,i)=>{
+    const root=new THREE.Group(),mesh=new THREE.Mesh(geometry,material);mesh.castShadow=castShadow;
+    root.position.x=i;root.add(mesh);world.add(root);const actor={root,partsRevision:0,usingRiggedCharacter:true};activeBatch.Add(actor);return actor;
+  });
+  world.updateMatrixWorld(true);camera.updateMatrixWorld(true);activeBatch.Update(camera);
+  const group=[...activeBatch.groups.values()][0],main=group.meshes.plain,shadow=group.meshes.cast;
+  Check('人物主画面合并不同投影状态，阴影代理平时隐藏',main.count===2&&main.visible&&!main.castShadow&&shadow.count===1&&!shadow.visible);
+  fakeRenderer.shadowMap.render();
+  Check('阴影只画投影子集，画完恢复主画面',!observed.main&&observed.shadow&&observed.count===1&&main.visible&&!shadow.visible);
+  throwDraw=true;let threw=false;try{fakeRenderer.shadowMap.render();}catch(error){threw=error.message==='ActorShadowScopeOracle';}
+  Check('阴影异常也恢复实例可见性',threw&&main.visible&&!shadow.visible);
+  const wrapper=fakeRenderer.shadowMap.render;activeBatch.Clear();activeBatch=new ActorBatcher(world,fakeRenderer);
+  Check('换关复用同一个阴影包装，不积累旧人物层',wrapper===fakeRenderer.shadowMap.render&&actors.every(a=>a.root.children[0].layers.mask===1));
+  activeBatch.Clear();geometry.dispose();material.dispose();
+}
+{
+  const world=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),a=new THREE.BoxGeometry(),b=a.clone().translate(2,0,0);
+  const material=new THREE.MeshStandardMaterial();material.name='HanYang173R_RigidDepthFixture';
+  let batch,seen;
+  const renderer={shadowMap:{render(){const group=[...batch.depthBatch.groups.values()][0];seen={normal:group.normal.visible,shadow:group.shadow.visible,count:group.shadow.count};}}};
+  batch=new ActorBatcher(world,renderer);
+  const actors=[true,false].map(cast=>{const root=new THREE.Group();for(const geometry of [a,b]){const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=cast;root.add(mesh);}world.add(root);const actor={root,partsRevision:0,usingRiggedCharacter:true};batch.Add(actor);return actor;});
+  const Step=()=>{world.updateMatrixWorld(true);camera.updateMatrixWorld(true);batch.Update(camera);};Step();
+  const group=[...batch.depthBatch.groups.values()][0];
+  Check('刚性零件合成同一深度实例，保留所有三角',group.valid&&group.normal.count===2&&group.shadow.count===1&&group.geometry.index.count===a.index.count+b.index.count);
+  batch.BeginDepthPass();
+  Check('预通道只开整把武器代理，颜色批次临时隐藏',group.normal.visible&&group.parts.every(p=>!p.meshes.plain.visible));
+  renderer.shadowMap.render();
+  Check('预通道内烘影只画投影子集，返回后仍为预通道',!seen.normal&&seen.shadow&&seen.count===1&&group.normal.visible);
+  batch.EndDepthPass();Check('预通道结束完整恢复颜色批次',!group.normal.visible&&!group.shadow.visible&&group.parts.every(p=>p.meshes.plain.visible));
+  actors[0].root.children[0].visible=false;Step();
+  Check('单个零件被藏时退回逐材质绘制，不丢其他部分',!group.valid&&group.normal.count===0&&group.parts[0].meshes.plain.count===1&&group.parts[1].meshes.plain.count===2);
+  actors[0].root.children[0].visible=true;Step();Check('完整刚体恢复时重新使用深度代理',group.valid);
+  const ownerRoot=new THREE.Group(),weapon=new THREE.Group(),limb=new THREE.Group();world.add(ownerRoot,limb);ownerRoot.add(weapon);
+  for(const geometry of [a,b])weapon.add(new THREE.Mesh(geometry,material));
+  const detachedActor={root:ownerRoot,partsRevision:0,usingRiggedCharacter:true};batch.Add(detachedActor);Step();
+  limb.attach(weapon);ownerRoot.visible=false;detachedActor.goreWeaponHold={mount:ownerRoot};Step();
+  Check('断肢携枪脱离人物树后，身体剔除不吞掉仍在场的枪',batch.records.get(detachedActor).entries.every(e=>e.drawnFrame===batch.frame));
+  a.attributes.position.needsUpdate=true;Step();Check('源几何变化立即回退，不能继续画旧合并几何',!group.valid);
+  let sourceDisposed=0;a.addEventListener('dispose',()=>sourceDisposed++);batch.Clear();
+  Check('清理深度代理不释放原始武器几何',sourceDisposed===0&&world.children.every(o=>!o.name.startsWith('ActorDepthBatch_')));
+  a.dispose();b.dispose();material.dispose();
+}
+{
+  const world=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),root=new THREE.Group(),geometry=new THREE.BoxGeometry();
+  const material=new THREE.MeshStandardMaterial();material.name='HanYang173R_SourceScope';
+  for(let i=0;i<2;i++)root.add(new THREE.Mesh(geometry,material));world.add(root);
+  let observed=true,throwRender=false;
+  const renderer={render(){observed=root.visible;if(throwRender)throw new Error('SourceScopeOracle');},shadowMap:{render(){}}};
+  let batch=new ActorBatcher(world,renderer);const actor={root,partsRevision:0,usingRiggedCharacter:true};batch.Add(actor);
+  const Step=()=>{world.updateMatrixWorld(true);camera.updateMatrixWorld(true);batch.Update(camera);};Step();
+  renderer.render(world);Check('提交期间跳过完整源子树，返回后可见性不变',!observed&&root.visible&&batch.stats.sourceMeshes===2);
+  renderer.render(new THREE.Scene());Check('其他场景的渲染不隐藏原世界源件',observed&&root.visible);
+  throwRender=true;let caught=false;try{renderer.render(world);}catch(error){caught=error.message==='SourceScopeOracle';}
+  Check('提交异常完整恢复源父节点',caught&&root.visible);throwRender=false;
+  const extra=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial());root.add(extra);Step();renderer.render(world);
+  Check('新增未合批零件时保留父子树遍历',observed);
+  root.remove(extra);Step();renderer.render(world);Check('完整覆盖恢复后重新省去遍历',!observed&&root.visible);
+  root.children[0].geometry=geometry.clone();Step();renderer.render(world);Check('源几何变化的回退网格不被父层隐藏',observed);
+  root.children[0].geometry.dispose();root.children[0].geometry=geometry;Step();batch.Remove(actor);renderer.render(world);
+  Check('移除人物立即还原原生遍历，无需等下一帧',observed&&root.children.every(mesh=>mesh.layers.mask===1));
+  const wrapped=renderer.render;batch.Clear();batch=new ActorBatcher(world,renderer);Check('换关复用渲染包装，不叠加旧源子树',renderer.render===wrapped);
+  batch.Clear();geometry.dispose();material.dispose();extra.material.dispose();
+}
 console.log(failed ? `FAIL ${failed} 项` : "PASS ShadowCasterBatch：只收稳定叶子、烘焙那一刻换人并原样还原、变化当帧踢出、不改成员属性、关掉全还原、预热复用克隆、进关一次收满");
 process.exit(failed ? 1 : 0);

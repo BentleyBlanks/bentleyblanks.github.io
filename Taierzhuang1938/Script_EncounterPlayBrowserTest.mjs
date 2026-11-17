@@ -64,6 +64,12 @@ async function FirstUse(frame,kill=false){
   const {WEAPONS}=await import('./Data_Weapons.mjs');
   const g=Tengxian,known=new Set(g.renderer.info.programs.map(p=>p.cacheKey));
   const frames=[];
+  const gl=g.renderer.getContext(),bufferData=gl.bufferData,largeUploads=[];
+  gl.bufferData=function(...args){
+    const bytes=typeof args[1]==="number"?args[1]:(args[1]?.byteLength||0);
+    if(bytes>=16*1024*1024)largeUploads.push(bytes);
+    return bufferData.apply(this,args);
+  };
   const warming=g.state.warming;
   let target=null,actionMs=0;
   g.state.warming=true;
@@ -87,11 +93,14 @@ async function FirstUse(frame,kill=false){
     const at=performance.now();g.StepFrames(1,1/60,true);frames.push(performance.now()-at);
    }
   }finally{
+   gl.bufferData=bufferData;
    g.state.warming=warming;
    if(!kill)g.Debug.Mouse(2,false);
   }
   const ads=g.player.ads;
-  return {actionMs,firstFrameMs:frames[0],maxMs:Math.max(...frames),ads,dead:target?!target.alive:null,wounds:target?.actor.woundBlood?.count,
+  return {actionMs,firstFrameMs:frames[0],maxMs:Math.max(...frames),ads,dead:target?!target.alive:null,wounds:target?.actor.woundBlood?.count,largeUploads,
+   prepassBatchPrimed:g.state.actorShaderWarm.prepassBatchPrimed,
+   prepassBatchMembers:g.prepassStaticBatch.stats.members,
    prewarmedBloodDrops:g.state.actorShaderWarm.bloodDrops,
    late:g.renderer.info.programs.filter(p=>!known.has(p.cacheKey)).map(p=>p.name||p.cacheKey),
    renderSize:[g.post.width,g.post.height,g.post.outputWidth,g.post.outputHeight],quality:g.graphics.profile};
@@ -150,10 +159,24 @@ try{
  const coldAt=performance.now();await page.locator("#playGame").click();let frame=await Ready();const coldMs=performance.now()-coldAt;
  let state=await State();const hostId=state.hostId;
  assert.equal(state.startBeat,"03b");assert.equal(state.layout,1);
+ await frame.evaluate(async()=>{
+  const {BlockoutPuppets}=await import('./Script_EditorBlockoutPuppets.mjs');
+  const previous=BlockoutPuppets.prototype._Pose;
+  BlockoutPuppets.prototype._Pose=function(puppet,...args){if(puppet.unit.id==='player')window.observerProxy=puppet;return previous.call(this,puppet,...args);};
+  try{Tengxian.StepFrames(1,1/60,false);}finally{BlockoutPuppets.prototype._Pose=previous;}
+ });
+ const singleProxy=await frame.evaluate(()=>{
+  const actor=observerProxy.humans[0].actor,previous=actor.Update;let calls=0;
+  actor.Update=function(...args){calls++;return previous.apply(this,args);};
+  try{Tengxian.StepFrames(8,1/60,false);return {calls,attached:!!actor.root.parent};}finally{actor.Update=previous;}
+ });
+ assert.deepEqual(singleProxy,{calls:0,attached:false},'Single view retains its prewarmed observer proxy without animation or scene traversal');
  const firstAim=await FirstUse(frame);
  assert.ok(firstAim.ads>.9,"The first ADS uses real held mouse input");
  assert.ok(firstAim.prewarmedBloodDrops>0,"Blood warmup must emit actual particles from the active player camera");
  assert.deepEqual(firstAim.late,[],"First ADS must reuse linked programs");
+ assert.ok(firstAim.prepassBatchMembers>0,"Static terrain batches are populated before controls are released");
+ assert.deepEqual(firstAim.largeUploads,[],"First ADS must not allocate large terrain vertex/index buffers");
  assert.ok(firstAim.renderSize[1]>144&&firstAim.renderSize[3]>144,"Full render dimensions are restored before Play");
  await CheckDebugOptions(frame,true);
  await frame.evaluate(keys=>{
@@ -174,6 +197,7 @@ try{
  const firstKill=await FirstUse(frame,true);
  assert.ok(firstKill.dead&&firstKill.wounds>0,"First lethal bullet retains wounds and the real death chain");
  assert.deepEqual(firstKill.late,[],"First lethal hit, blood and corpse frames must reuse linked programs");
+ assert.deepEqual(firstKill.largeUploads,[],"The settling frames after the first kill must not upload cold terrain buffers");
  await fs.writeFile(path.join(out,"Data_FirstUse.json"),JSON.stringify({coldMs,firstAim,firstKill},null,2));
  await page.locator("#toggleTimeline").click();
  assert.equal(await page.locator("#flowTimeline").isVisible(),false,"Timeline can be hidden during Play");
@@ -210,6 +234,12 @@ try{
  await page.waitForFunction(t=>Number(document.getElementById("flowSeek").value)===t,BeatById("03c").start);
  assert.equal((await State()).beat,"03c");
  await page.selectOption("#viewportLayout","2");await frame.waitForFunction(()=>Tengxian.Debug.EncounterPlay.State().layout===2);
+ const dualProxy=await frame.evaluate(()=>{
+  const actor=observerProxy.humans[0].actor,previous=actor.Update;let calls=0;
+  actor.Update=function(...args){calls++;return previous.apply(this,args);};
+  try{Tengxian.StepFrames(8,1/60,false);return {calls,attached:!!actor.root.parent,position:actor.root.position.distanceTo(Tengxian.player.position)};}finally{actor.Update=previous;}
+ });
+ assert.ok(dualProxy.calls>0&&dualProxy.attached&&dualProxy.position<.1,'Dual view restores and updates the same player proxy at the current position');
  await page.screenshot({path:path.join(out,"PlayDual.png"),timeout:120000});
  await frame.evaluate(()=>Tengxian.Debug.Key("KeyO"));
  const eyeBefore=(await State()).view.camera;
