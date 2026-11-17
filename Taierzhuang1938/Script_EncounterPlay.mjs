@@ -8,6 +8,7 @@ import { GroupPath, ENCOUNTER_CINEMATICS } from "./Scenes/FirstLevelEncounter/Sc
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
+import { EncounterPlayDialogue, EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { LoadToolsVolume, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -44,9 +45,11 @@ export class EncounterPlay {
   }
   BuildUi() {
     document.body.classList.add("encounterGame");
-    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261115PlayRuntimeV2",import.meta.url).href;document.head.append(this.style);
-    this.dialogue=document.createElement("div");this.dialogue.className="encounterDialogue";
-    document.body.append(this.dialogue);
+    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261117SpeechBillboards",import.meta.url).href;document.head.append(this.style);
+    this.speech=new EncounterPlayDialogue(this.host,this.view,id=>{
+      const position=this.Position(id),soldier=this.entries.get(id)?.soldier;
+      return position?{position,pose:soldier?.stance}:null;
+    });
     this.onMessage=e=>{
       if(e.source!==window.parent||e.origin!==location.origin||e.data?.token!==this.token)return;
       if(e.data.type==="encounter-play-layout")this.view.SetLayout(e.data.count);
@@ -122,7 +125,7 @@ export class EncounterPlay {
       this.puppets.Clear();this.host.vfx.ClearParticles();this.host.battlefield.deformation?.Reset();
     });
     this.view.SetLayout(1);this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
-    this.dialogue.replaceChildren();this.dialogue.hidden=true;this.stealth.Reset();
+    this.speech.Clear();this.stealth.Reset();
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
   async Warmup(onStep) {
@@ -442,27 +445,27 @@ export class EncounterPlay {
     const hint=this.failed&&this.stealth.state?.active?UI.stealthRetry:this.stealth.state?.locked?UI.stealthPull:frame.beat.id==="09b"&&distance<=CONFIG.reachM&&!this.PartyAtEndpoint()?UI.waitParty:this.stealth.state?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?UI.stealthWait:this.failed?UI.retry:this.plan.completed?UI.stop:
       this.plan.CanInteract([p.x,p.z])?UI.interact:
       this.plan.waiting==="combat"?UI.clear:this.plan.waiting==="event"?UI.event:this.plan.waiting==="escort"?UI.escort:this.plan.waiting==="departure"?UI.departure:distance>CONFIG.reachM?UI.reach+" "+distance.toFixed(0)+" m":"";
-    const dialogue=frame.dialogue.filter(line=>!this.plan.dead.has(line.actorId));
+    const dialogue=EncounterDialogueLines(this.plan,frame,{failed:this.failed,exit:this.stealth.exitStartedElapsed!==null,
+      interact:this.plan.CanInteract([p.x,p.z])});
+    this.speech.Set(frame,dialogue);
     const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
     const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
     const help=(this.failed?[hint]:[hint,actions,notice]).filter(Boolean).join(" · ");
     const key=JSON.stringify([title,status,help,dialogue]);
     if(key===this.hudKey)return;this.hudKey=key;
     this.hudInfo={title,task:status,hint:help};
-    this.dialogue.replaceChildren();
-    for(const line of dialogue) {
-      const row=document.createElement("p");row.textContent=line.name+"："+line.text;this.dialogue.append(row);
-    }
-    this.dialogue.hidden=!this.dialogue.childElementCount;
   }
-  AfterRender(dt,options){this.view.Render(dt,options,()=>this.SetPlayerPuppetVisible(true),()=>this.SetPlayerPuppetVisible(false));}
+  AfterRender(dt,options){
+    this.view.Render(dt,options,()=>this.SetPlayerPuppetVisible(true),()=>this.SetPlayerPuppetVisible(false));
+    this.speech.Render();
+  }
   RequestStop(){if(window.parent!==window)this.Send("stop");else history.back();}
   Send(kind,extra={}){if(window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
   Actors(){return [...this.entries].map(([id,e])=>({id,soldierId:e.soldier.id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor?.characterRig?.modelId,group:e.actor.groupId||null}));}
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
-  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors()};}
+  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors()};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.failed || this.stealth.CapturesInput()
       || VillageStealthAt(this.plan.time,FLOW_TIMELINE).locked
@@ -560,7 +563,7 @@ export class EncounterPlay {
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);
     this.entries.clear();this.puppets.Dispose();window.removeEventListener("message",this.onMessage);
     this.retiredMaterials.Flush();
-    for(const node of [this.dialogue,this.style])node.remove();
+    this.speech.Dispose();this.style.remove();
     document.body.classList.remove("encounterGame");
   }
 }

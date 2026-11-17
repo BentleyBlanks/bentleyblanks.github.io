@@ -10,6 +10,42 @@ import {PrepareSceneTerrain,GridSampler} from "./Script_SceneTrenches.mjs";
 import {EncounterDocument,ENCOUNTER_STORAGE_KEY} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import {ENCOUNTER_CINEMATICS} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 import {DebugOptions, DEBUG_OPTION_KEYS} from "./Script_DebugOptions.mjs";
+import {EncounterDialogueLines,EncounterSpeechAnchor} from "./Script_EncounterPlayDialogue.mjs";
+import {Vector3,PerspectiveCamera} from "./vendor/three/build/three.module.js";
+for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start);
+ assert.ok(C.guidance[beat.id]?.text,"A playable gate needs a text order: "+beat.id);
+ const first=EncounterDialogueLines(plan,plan.Frame()).find(line=>line.order);
+ assert.ok(first?.actorId,"A text order has a present speaker: "+beat.id);
+ plan.Step(beat.duration*10,[500,500],new Set(plan.initial.map(actor=>actor.id)));
+ assert.ok(EncounterDialogueLines(plan,plan.Frame()).some(line=>line.order),"Waiting never expires the current direction: "+beat.id);
+}
+{
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start);
+ const before=EncounterDialogueLines(plan,plan.Frame(),{interact:true});
+ assert.ok(before.some(line=>line.order&&line.text.includes(C.ui.interact)),"Available interaction is readable even during authored speech");
+ plan.Interact();
+ const after=EncounterDialogueLines(plan,plan.Frame());
+ assert.ok(after.some(line=>line.text===C.guidance["03d"].afterAction));
+ assert.ok(!after.some(line=>!line.order&&line.actorId==="he"),"A completed action cannot leave its old command over the new one");
+ plan.Kill("he");
+ const dead=EncounterDialogueLines(plan,plan.Frame());
+ assert.ok(dead.every(line=>line.actorId!=="he"));
+ assert.equal(dead.find(line=>line.order).text,plan.beat.task,"Missing speakers fall back to the existing task without impersonation");
+ assert.deepEqual(EncounterDialogueLines(plan,plan.Frame(),{failed:true}),[]);
+ plan.completed=true;assert.deepEqual(EncounterDialogueLines(plan,plan.Frame()),[]);
+}
+{
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09b").start);
+ assert.ok(EncounterDialogueLines(plan,plan.Frame(),{exit:true}).some(line=>line.text===C.guidance["09b"].exit),"The real patrol exit switches wait to leave");
+ const camera=new PerspectiveCamera(60,16/9,.1,1500);camera.position.set(0,1.6,0);camera.updateMatrixWorld();
+ const actor={kind:"person",pose:"stand"},clear={Raycast:()=>null};
+ const front=EncounterSpeechAnchor(new Vector3(0,0,-10),actor,camera,1280,720,clear);
+ assert.ok(front?.every(Number.isFinite));
+ assert.notDeepEqual(EncounterSpeechAnchor(new Vector3(1,0,-10),actor,camera,1280,720,clear),front,"Speech follows the live head position");
+ for(const point of [new Vector3(0,0,10),new Vector3(1000,0,-10)])assert.equal(EncounterSpeechAnchor(point,actor,camera,1280,720,clear),null);
+ assert.equal(EncounterSpeechAnchor(new Vector3(0,0,-10),actor,camera,1280,720,{Raycast:()=>({t:2})}),null,"A real wall hides the bubble so the subtitle can take over");
+}
 {
  const values=new Map();
  const storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};

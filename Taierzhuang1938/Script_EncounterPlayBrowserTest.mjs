@@ -102,6 +102,43 @@ async function Ready(){
  await page.locator(".lfPlayLoading").waitFor({state:"hidden",timeout:30000});
  return page.frames().find(f=>f.url().includes("encounterPlay=1"));
 }
+async function CheckSpeech(frame){
+ const result=await frame.evaluate(()=>{
+  const g=Tengxian,api=g.Debug.EncounterPlay,player=g.player;
+  const saved={position:player.position.toArray(),yaw:player.yaw,pitch:player.pitch,warming:g.state.warming};
+  window.speechTestSaved=saved;g.state.warming=true;
+  const info=api.State().actors.find(actor=>actor.id==="luo"),soldier=g.ai.soldiers.find(s=>s.id===info.soldierId);
+  let found=null;
+  for(const [dx,dz] of [[-4,0],[4,0],[0,4],[0,-4]]){
+   const p=soldier.position;
+   player.position.set(p.x+dx,g.battlefield.GroundHeight(p.x+dx,p.z+dz),p.z+dz);
+   player.body.Teleport(...player.position.toArray());player.velocity.set(0,0,0);
+   player.yaw=Math.atan2(dx,dz);player.pitch=0;player.aimYaw=0;player.aimPitch=0;
+   g.StepFrames(1,0,true);
+   found=api.State().dialogue.bubbles[0]?.find(line=>line.actorId==="luo");
+   if(found)break;
+  }
+  return {found,state:api.State().dialogue,size:[innerWidth,innerHeight]};
+ });
+ assert.ok(result.found,"An unobstructed live leader renders a head-anchored Play bubble: "+JSON.stringify(result));
+ for(const value of result.found.anchor)assert.ok(Number.isFinite(value));
+ assert.ok(result.found.box[0]>=0&&result.found.box[0]+result.found.box[2]<=result.size[0]);
+ await page.screenshot({path:path.join(out,"PlayDialogueBillboard.png"),timeout:120000});
+ try{
+  await frame.evaluate(()=>{Tengxian.player.yaw+=Math.PI;Tengxian.StepFrames(1,0,true);});
+  assert.ok(await frame.locator(".encounterDialogue").isVisible(),"Off-screen leaders fall back to a readable subtitle");
+  assert.match(await frame.locator(".encounterDialogue").textContent(),/北侧门口/);
+  assert.ok(!(await State()).dialogue.bubbles[0]?.some(line=>line.actorId==="luo"),"A speaker behind the camera has no false billboard");
+  await page.screenshot({path:path.join(out,"PlayDialogueFallback.png"),timeout:120000});
+ }finally{
+  await frame.evaluate(()=>{
+   const g=Tengxian,saved=window.speechTestSaved;
+   g.player.position.fromArray(saved.position);g.player.body.Teleport(...saved.position);
+   g.player.yaw=saved.yaw;g.player.pitch=saved.pitch;g.StepFrames(1,0,true);g.state.warming=saved.warming;
+   delete window.speechTestSaved;
+  });
+ }
+}
 try{
  await SavedDebugOptions(true);
  await page.goto(base+"/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=0");
@@ -129,6 +166,8 @@ try{
  assert.equal(await frame.locator(".encounterHint").count(),0);
  assert.equal(await frame.locator(".hudObjective").isVisible(),false);
  assert.equal(await frame.locator(".hudHint").isVisible(),false);
+ assert.ok(state.dialogue.lines.some(line=>line.order&&/北侧门口/.test(line.text)),"The current gate has a persistent text direction without voice audio");
+ await CheckSpeech(frame);
  await frame.waitForFunction(()=>Tengxian.audio.musicBuffers.has(Tengxian.audio.musicCue),null,{timeout:60000});
  const ammo=await frame.evaluate(()=>{const g=Tengxian,before=g.state.ammo;g.Debug.Fire();return {before,after:g.state.ammo};});
  assert.ok(ammo.after<ammo.before);
@@ -178,8 +217,11 @@ try{
  assert.ok((await State()).view.camera.some((n,i)=>Math.abs(n-eyeBefore[i])>.2));
  await frame.evaluate(()=>{Tengxian.Debug.Key("KeyO");const g=Tengxian;g.player.position.set(30,g.battlefield.GroundHeight(30,66.8),66.8);g.player.body.Teleport(...g.player.position.toArray());g.StepFrames(3,1/60,false);});
  assert.equal((await State()).beat,"03d","Entering the area advances the stage");
+ assert.ok((await State()).dialogue.lines.some(line=>line.order&&/脚边有雷/.test(line.text)));
  await frame.evaluate(()=>Tengxian.Debug.Key("KeyF"));
  assert.equal((await State()).beat,"03d","The throw must actually finish");
+ await frame.evaluate(()=>Tengxian.StepFrames(1,1/60,true));
+ assert.ok((await State()).dialogue.lines.some(line=>line.order&&/等它炸/.test(line.text)),"The real throw updates the instruction while waiting for its explosion");
  for(let i=0;i<20&&!(await State()).completedBeats.includes("03d");i++)await frame.evaluate(()=>Tengxian.StepFrames(30,1/60,false));
  assert.ok((await State()).completedBeats.includes("03d"),"Real grenade detonation satisfies the event gate");
  await page.locator("#stopGame").click();
@@ -187,6 +229,7 @@ try{
  await page.locator("#toggleTimeline").click();
  assert.equal(await page.locator(".lfPlayHost").count(),0);
  const dormant=await page.evaluate(()=>{const g=document.querySelector(".lfPlayCache iframe").contentWindow.Tengxian;return {running:g.state.running,soldiers:g.ai.soldiers.length,projectiles:g.combat.projectiles.length,elapsed:g.state.elapsed,frames:g.renderer.info.render.frame};});
+ assert.deepEqual(await page.evaluate(()=>document.querySelector(".lfPlayCache iframe").contentWindow.Tengxian.Debug.EncounterPlay.State().dialogue.lines),[],"Stop clears the previous dialogue before caching the host");
  await page.waitForTimeout(400);
  const dormantAgain=await page.evaluate(()=>{const g=document.querySelector(".lfPlayCache iframe").contentWindow.Tengxian;return {running:g.state.running,soldiers:g.ai.soldiers.length,projectiles:g.combat.projectiles.length,elapsed:g.state.elapsed,frames:g.renderer.info.render.frame};});
  assert.deepEqual(dormantAgain,dormant);assert.equal(dormant.soldiers,0);assert.equal(dormant.projectiles,0);assert.equal(dormant.running,false);
@@ -219,6 +262,7 @@ try{
    return {alive:g.player.Alive,state:g.Debug.EncounterPlay.State()};
  });
  const death=await KillPlayer();assert.equal(death.alive,false);assert.ok(death.state.failed);
+ assert.deepEqual(death.state.dialogue.lines,[],"Death clears the live instruction");
  await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
  assert.ok(await page.locator("#playGame").isEnabled(),"Death exposes a toolbar retry");
  assert.match(await page.locator("#playStatus").textContent(),/R.*重来/);
