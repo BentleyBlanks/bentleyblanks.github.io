@@ -1244,8 +1244,8 @@ function EnsureDebugInventory() {
   }
 }
 
-function ApplyDebugOptions() {
-  const options = debugOptions.Get();
+function ApplyDebugOptions({ reload = false } = {}) {
+  const options = reload ? debugOptions.Reload() : debugOptions.Get();
   // 爆炸 / 断肢 / 炮击扬尘 / 人物反应 / 布料测试场里玩家一律无敌（登记表的 invincible）：
   // 炸点就在人身边，被自己按的那一下炸死只会把换人的着色器预热和一张阵亡卡塞进取证里。
   if (SANDBOX_RANGE?.invincible) options.invincible = true;

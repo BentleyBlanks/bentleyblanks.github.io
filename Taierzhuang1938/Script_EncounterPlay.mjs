@@ -72,7 +72,7 @@ export class EncounterPlay {
     if(this.host.state.mags.primary)this.host.state.mags.primary.clips=CONFIG.inventory.spareClips;
     this.host.state.grenades=CONFIG.inventory.grenades;this.host.state.bundles=CONFIG.inventory.bundles;
     this.RestoreCheckpointInventory();
-    this.host.player.SetDebugOptions({invincible:false,infiniteStamina:false});
+    this.host.ctx.ApplyDebugOptions({reload:true});
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
     this.stealth.Reset();
@@ -536,6 +536,7 @@ export class EncounterPlay {
     const p=plan.Frame().player;
     player.Spawn(...p,EncounterPlayerYaw(plan.beat));
     this.RestoreCheckpointInventory();
+    ctx.ApplyDebugOptions({reload:true});
     Object.assign(state,{playerAliveLast:true,pendingRespawn:false,deathTimer:0,cooking:null,cook:0,playerShots:0,lastShot:null,menu:false,running:true});
     ctx.ClearFirearmRequests();
     ctx.router.SetSuppressed(true);

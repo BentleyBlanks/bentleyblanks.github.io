@@ -28,16 +28,22 @@ export class DebugOptions {
     this.values = this.Read();
   }
 
-  Read() {
+  Read(fallback = null) {
     try {
-      const raw = this.storage?.getItem?.(STORE_KEY);
+      if (!this.storage?.getItem) return NormalizeDebugOptions(fallback);
+      const raw = this.storage.getItem(STORE_KEY);
       return NormalizeDebugOptions(raw ? JSON.parse(raw) : null);
     } catch (error) {
-      return NormalizeDebugOptions();
+      return NormalizeDebugOptions(fallback);
     }
   }
 
   Get() { return { ...this.values }; }
+
+  Reload() {
+    this.values = this.Read(this.values);
+    return this.Get();
+  }
 
   Enabled(key) { return this.values[key] === true; }
 

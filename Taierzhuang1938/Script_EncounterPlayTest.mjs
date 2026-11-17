@@ -9,6 +9,21 @@ import {SceneSurfaceSampler} from "./Script_SceneSurface.mjs";
 import {PrepareSceneTerrain,GridSampler} from "./Script_SceneTrenches.mjs";
 import {EncounterDocument,ENCOUNTER_STORAGE_KEY} from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import {ENCOUNTER_CINEMATICS} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
+import {DebugOptions, DEBUG_OPTION_KEYS} from "./Script_DebugOptions.mjs";
+{
+ const values=new Map();
+ const storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
+ const menu=new DebugOptions(storage),host=new DebugOptions(storage);
+ for(const key of DEBUG_OPTION_KEYS)menu.Set(key,true);
+ assert.ok(DEBUG_OPTION_KEYS.every(key=>host.Reload()[key]),"A retained Play host reloads every menu option");
+ menu.Reset();
+ assert.ok(DEBUG_OPTION_KEYS.every(key=>!host.Reload()[key]),"Removed preferences disable every retained option");
+ for(const storage of [null,{getItem(){throw new Error("Storage unavailable");},setItem(){throw new Error("Storage unavailable");}}]) {
+  const options=new DebugOptions(storage);
+  for(const key of DEBUG_OPTION_KEYS)options.Set(key,true);
+  assert.ok(DEBUG_OPTION_KEYS.every(key=>options.Reload()[key]),"Unavailable storage retains in-session options on retry");
+ }
+}
 for(const beat of FLOW_TIMELINE) {
   if(beat.start>=EncounterFirstPlayable().start&&!ENCOUNTER_CINEMATICS.includes(beat.id))assert.ok(C.gates[beat.id],"Missing gameplay gate: "+beat.id);
   if(!EncounterCanPlay(beat.start)){assert.throws(()=>new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+.01));continue;}
