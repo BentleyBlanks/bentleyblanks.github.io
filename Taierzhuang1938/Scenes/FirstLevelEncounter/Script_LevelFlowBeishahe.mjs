@@ -96,7 +96,7 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
   }
   if (burned) {winter = [122.3,1169];winterExtra = {};}
   if (time >= At("14c")) {
-    winter = beat.id === "14c" ? SampleRoute([[122.3,1169],[121,1172.5],[121,1194],[108,1194],[100,1189.6]],Clamp((progress-0.16)/0.84,0,1)) : [100,1189.6];
+    winter = beat.id === "14c" ? SampleRoute([[122.3,1169],[121,1172.5],[121,1194],[108,1194],[108,1189.6],[100,1189.6]],Clamp((progress-0.16)/0.84,0,1)) : [100,1189.6];
     winterExtra = {};
   }
   if (time >= At("16c")) {
@@ -133,7 +133,7 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
     : time >= At("18b") && time < At("18g") ? [-88.5,1328] : Follow(1.5);
   actors.push(Actor("liu","刘文财","friend","person",liu,carrying ? "carry" : beat.cover ? "shoot" : "walk",{firing:beat.cover === true}));
 
-  const shelterRoute = [[122,1169],[121,1172.5],[121,1194],[108,1194],[100,1189.6]];
+  const shelterRoute = [[122,1169],[121,1172.5],[121,1194],[108,1194],[108,1189.6],[100,1189.6]];
   for (const [index,id,name,kind] of [[0,"geng","老耿","person"],[1,"nier","妮儿","child"]]) {
     let p = time < At("12a") ? Follow(index ? 1 : 2) : [122 + index,1171 + index];
     if (beat.id === "11e" && id === "nier") p = [cart[0],cart[1] + 2.4];
@@ -146,7 +146,7 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
 
   if (time >= At("12a")) {
     let tian = time < At("14b") ? [113,1169.6]
-      : SampleRoute([[113,1169.6],[114,1172.5],[121,1172.5],[121,1194],[108,1194],[101,1189.6]],Clamp((time-At("14b"))/(At("14c",1)-At("14b")),0,1));
+      : SampleRoute([[113,1169.6],[114,1172.5],[121,1172.5],[121,1194],[108,1194],[108,1189.6],[101,1189.6]],Clamp((time-At("14b"))/(At("14c",1)-At("14b")),0,1));
     if (time >= At("16c")) tian = Follow(5);
     if (time >= At("18a",1) && time < At("18g")) tian = [-94,1332];
     actors.push(Actor("tian","田嫂","civilian","person",tian,beat.stage === "15" ? "kneel" : "stand"));
@@ -158,7 +158,7 @@ export function BeishaheActors(beat, time, player, progress, timeline) {
       {elevation:time >= At("16c") ? 0.8 : 0}));
     const medicDead = time >= At("14e",0.55);
     let medic = time < At("12c") ? [102,1165] : [103,1169];
-    if (beat.id === "14c") medic = [player[0] + 0.6,player[1] + 1];
+    if (beat.id === "14c") medic = PlayerAt(Math.max(At("14c"),time-.7),timeline);
     if (time >= At("14c",1)) medic = beat.id === "14d" && progress<0.5 ? [...player] : [103,1169];
     actors.push(Actor("medic","军医","friend","person",medic,medicDead ? "dead" : "kneel",{status:medicDead ? "在院心施救时被扫倒" : "给伤号止血"}));
     actors.push(Actor("orderly","后送卫生兵","friend","person",[104,1167],"kneel"));

@@ -208,7 +208,8 @@ assert.ok(!customTemple.groups.some(group=>group.id===PLAN.patrol.id),"cover mig
   const matHole=marker("LmMatHole"),wallStub=object("MatHomeWallE_Stub");
   assert.ok(marker("LmMatHome")&&matHole.z>marker("LmTianYard").z+15&&Math.abs(matHole.x-marker("LmTianYard").x)<20,"the mat-hole house lies directly south of Tian's yard");
   assert.ok(wallStub.size[1]<=0.7&&wallStub.pos[0]>matHole.x+5,"its east wall facing the exit path has collapsed");
-  const eye=[121,terrain.heightAt(121,matHole.z)+1.6,matHole.z],target=[matHole.x,0.4,matHole.z];
+  const matRoll=object("MatHole_MatRoll");
+  const eye=[121,terrain.heightAt(121,matHole.z)+1.6,matHole.z],target=[matRoll.pos[0],matRoll.pos[1]+.08,matRoll.pos[2]];
   assert.ok(!Blocked(eye,target),"the mat over the hole is visible from the exit path across the collapsed wall");
   assert.ok(terrain.heightAt(matHole.x,matHole.z)<-1.5&&terrain.heightAt(tianHole.x,tianHole.z)<-1.5&&terrain.heightAt(97,1192.9)>0,"holes are dug at the new places and the old one is filled");
   for(const id of ["OverturnedCart","OverturnedCartWheel"]) assert.equal(object(id).showOn,"AidCartBurned",`${id} appears only after the aid-station cart burns`);
@@ -233,5 +234,60 @@ assert.ok(!customTemple.groups.some(group=>group.id===PLAN.patrol.id),"cover mig
   assert.ok(FLOW_RENDERING.skyBlend>0&&FLOW_RENDERING.skyBlend<1&&FLOW_RENDERING.sky.horizon!==FLOW_DUSK.sky.horizon,"the transition band blends the sky");
   ApplyEncounterSky(300);
   assert.deepEqual(FLOW_RENDERING.sky.sunDirection,daySun);assert.equal(FLOW_RENDERING.lighting.ambient,dayAmbient);assert.equal(FLOW_RENDERING.skyBlend,0,"north of the band the day sky is restored exactly");
+}
+// Beishahe detail acceptance: test the empty space a person actually uses, not
+// merely whether a named box exists in the document.
+{
+  const rooms=scene.objects.filter(object=>object.meta?.room?.center);
+  assert.equal(rooms.length,70,"all village, aid-station, church and roadside house masses have interiors");
+  for(const room of rooms) {
+    const {center,floorY,size}=room.meta.room;
+    const ownWalls=scene.objects.filter(object=>object.meta?.roomId===room.id);
+    for(const height of [.4,1.5])assert.ok(!ownWalls.some(wall=>Inside([center[0],floorY+height,center[1]],wall)),`${room.id} has clear interior volume`);
+    assert.ok(size[1]>=2.7);
+    const roof=scene.objects.find(object=>object.id===room.meta.room.roofId);
+    assert.ok(roof&&Math.abs(roof.pos[1]-(floorY+size[1]))<.03,`${room.id} roof meets the walls without a floating daylight gap`);
+    const apertures=room.meta.openings;
+    assert.ok(apertures.some(opening=>opening.kind==="door"),`${room.id} has an actual entrance`);
+    for(const opening of apertures) {
+      const yaw=opening.yawDeg*Math.PI/180;
+      for(const offset of [-.25,0,.25]) {
+        const point=[opening.p[0]+Math.sin(yaw)*offset,opening.y+opening.h/2,opening.p[1]+Math.cos(yaw)*offset];
+        assert.ok(!ownWalls.some(wall=>Inside(point,wall)),`${opening.id} remains open through the wall thickness`);
+      }
+    }
+  }
+  const shelters=scene.objects.filter(object=>object.meta?.shelter);
+  assert.equal(shelters.length,43,"authored shelter rooms plus the village households");
+  for(const roof of shelters) {
+    const {x,z,w,d,yaw,floorY,run}=roof.meta.shelter,a=yaw*Math.PI/180;
+    assert.ok(Math.abs(terrain.heightAt(x,z)-floorY)<.08,`${roof.id} has a genuinely excavated floor`);
+    assert.ok(roof.pos[1]-floorY>=2,`${roof.id} has usable headroom`);
+    const ownWalls=walls.filter(object=>object.id.startsWith(roof.meta.holeRoof+'_'));
+    let previous=null;
+    for(let distance=0;distance<=d/2+run;distance+=.15) {
+      const point=[x+Math.sin(a)*distance,z+Math.cos(a)*distance],ground=terrain.heightAt(...point);
+      if(previous!==null)assert.ok(Math.abs(ground-previous)<.4,`${roof.id} entrance slope has no impassable step`);
+      previous=ground;
+      assert.ok(!ownWalls.some(wall=>Inside([point[0],ground+1.6,point[1]],wall)),`${roof.id} entrance has head clearance`);
+    }
+    assert.ok(w>=2.2);
+  }
+  // The rescue, return and departure all pass through the east mouth. Cutting a
+  // room must not leave the old straight-line actor path crossing its sidewall.
+  for(const beatId of ['14c','14d','14e','16c']) {
+    const beat=BeatById(beatId);
+    for(let time=beat.start;time<beat.end;time+=.2) {
+      const player=Actor(time,'player'),[x,z]=player.p;
+      if(Math.hypot(x-100,z-1189.6)>8)continue;
+      assert.ok(!walls.filter(wall=>wall.id.startsWith('TianHole_')).some(wall=>Inside([x,terrain.heightAt(x,z)+1.3,z],wall)),`${beatId} uses the real shelter entrance at ${time}`);
+    }
+  }
+  assert.equal(scene.markers.find(marker=>marker.id==='LmTianHole').name,'田嫂家的避机洞');
+  assert.ok(scene.markers.filter(marker=>marker.kind==='hole'&&marker.z>1000).length>=5,'each main shelter has an entrance annotation');
+  assert.equal(scene.objects.find(object=>object.id==='Encounter_MatHomeSheet').showOn,'MatHomeCovered');
+  assert.ok(EvaluateFlow(BeatById('16c').end-.1).signals.includes('MatHomeCovered'),'the fifth-draft event really closes the mat');
+  assert.ok(!EvaluateFlow(BeatById('16c').start).signals.includes('MatHomeCovered'),'seeking before the action reopens the entrance');
+  assert.equal(map.labels.filter(label=>label.detail).length>300,true,'close-view aperture labels use the authored openings');
 }
 console.log("ok Temple approach, walls, concealed patrol/shelters, cart handoff, stealth rules and draft migration");

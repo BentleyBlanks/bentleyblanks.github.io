@@ -334,17 +334,42 @@ export class FlowMapView {
 
   DrawLandmarks(context,width,height) {
     const occupied=[];
-    for(const landmark of this.mapData.labels||[]) {
-      const point=this.ToScreen(landmark.p);
+    const Priority=landmark=>landmark.detail?0:landmark.kind==="area"?6:landmark.kind==="hole"?5:landmark.kind==="pit"?4:2;
+    const labels=[...(this.mapData.labels||[])].sort((a,b)=>Priority(b)-Priority(a));
+    this.visibleLandmarks=[];
+    for(const landmark of labels) {
+      if(this.eye) {
+        const range=Math.hypot(landmark.p[0]-this.eye[0],landmark.p[1]-this.eye[2]);
+        const height=Math.max(0,this.eye[1]-this.Ground([this.eye[0],this.eye[2]]));
+        if(range>(landmark.detail?32:Math.max(85,height*4)))continue;
+      }
+      const anchor=this.LandmarkAnchor?.(landmark);
+      if(anchor&&(anchor.depth<0.15||anchor.depth>this.far))continue;
+      const point=anchor?[anchor.x,anchor.y]:this.ToScreen(landmark.p);
       if(point[0]<12||point[0]>width-45||point[1]<24||point[1]>height-24) continue;
       const [x,z]=landmark.p;
-      const labelScale=this.type?Math.max(Distance(point,this.ToScreen([x+1,z])),Distance(point,this.ToScreen([x,z+1]))):this.scale;
-      if(labelScale<0.8&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
+      const groundPoint=this.ToScreen(landmark.p);
+      const labelScale=this.type?Math.max(Distance(groundPoint,this.ToScreen([x+1,z])),Distance(groundPoint,this.ToScreen([x,z+1]))):this.scale;
+      if(landmark.detail&&labelScale<9)continue;
+      if(landmark.kind==="pit"&&landmark.w<5&&labelScale<4)continue;
+      if(labelScale<0.8&&landmark.kind!=="area"&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
+      const hidden=anchor&&this.raster.Occluded(anchor);
+      if(hidden&&(this.type==="eye"||landmark.detail))continue;
       const labelWidth=landmark.name.length*12;
-      const position=[Clamp(point[0]+8,8,width-labelWidth-8),point[1]-15];
-      const box=[position[0],position[1]-8,labelWidth,16];
-      if(occupied.some((other)=>box[0]<other[0]+other[2]&&box[0]+box[2]>other[0]&&box[1]<other[1]+other[3]&&box[1]+box[3]>other[1])) continue;
-      occupied.push(box);Label(context,landmark.name,...position,"#62543d",12,true);
+      let position,box;
+      for(const offset of [-15,7,-37,29]) {
+        const candidate=[Clamp(point[0]+8,8,width-labelWidth-8),point[1]+offset],rect=[candidate[0],candidate[1]-9,labelWidth+8,18];
+        if(rect[1]<8||rect[1]+18>height-8||occupied.some(other=>rect[0]<other[0]+other[2]&&rect[0]+rect[2]>other[0]&&rect[1]<other[1]+other[3]&&rect[1]+rect[3]>other[1]))continue;
+        position=candidate;box=rect;break;
+      }
+      if(!position)continue;
+      occupied.push(box);
+      if(!context||this.raster?.collectingDepth)continue;
+      this.visibleLandmarks.push({id:landmark.id,name:landmark.name,hidden:!!hidden});
+      context.save();context.globalAlpha=hidden?.35:1;
+      const color=['pit','hole'].includes(landmark.kind)?"#285d68":"#62543d";
+      Circle(context,point,3,color);Line(context,[point,[position[0]-4,position[1]]],color,.8);
+      Label(context,landmark.name,...position,color,12,true);context.restore();
     }
   }
 

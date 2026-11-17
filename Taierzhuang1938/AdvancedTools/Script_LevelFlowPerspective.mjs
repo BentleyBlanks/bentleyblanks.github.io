@@ -347,6 +347,9 @@ export class FlowPerspectiveView extends FlowMapView {
       const visibleSides=[localZ<-d/2,localX>w/2,localZ>d/2,localX<-w/2];
       for(let index=0;index<4;index++) if(!outside||visibleSides[index]) BoxFace(index,color);
       if(!outside||this.eye[1]>=y+h) BoxFace(4,cover?FLOW_COVER_COLORS.top:color);
+      if(this.eye[1]<y&&(owner?.meta?.holeRoof||owner?.material==="Whitebox/Roof")) {
+        Face([...bottom].reverse(),color,Array(4).fill(this.lighting?ShadeEncounterFace(color,[0,-1,0]):[1,3,5].map(index=>parseInt(color.slice(index,index+2),16))));
+      }
       if(cover) coverBoxes.push({bottom,top});
     };
     const signals=EncounterSignals(frame);
@@ -377,7 +380,7 @@ export class FlowPerspectiveView extends FlowMapView {
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
-      if(Math.max(w,h,d)<0.4) continue;
+      if(Math.max(w,h,d)<0.4&&!object.meta?.detail) continue;
       let anchor=this.objectBases.get(object);
       if(!anchor||anchor.terrain!==this.mapData.terrain||anchor.x!==x||anchor.y!==y||anchor.z!==z||anchor.planning!==object.planning) {
         const base=object.planning?this.Ground([x,z]):Number.isFinite(y)?y:this.Ground([x,z]);
@@ -452,6 +455,7 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     this.PrepareDepth(frame,layers,coverBoxes);
     this.raster.Flush(context,width,height);
+    this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
     if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
   }
@@ -465,9 +469,38 @@ export class FlowPerspectiveView extends FlowMapView {
         this.raster.Occluded(this.LabelVertex(actor));
       }
       if(layers.fire) for(const effect of frame.effects) if(effect.kind==="fire") this.DrawFire(null,effect,frame);
+      if(layers.landmarks!==false)this.DrawLandmarks(null,this.width,this.height);
+      this.DrawWallWriting(null,frame);
     });
     this.occlusion.clear();
     this.depthPreparedPass=this.depthPass;
+  }
+
+  LandmarkAnchor(landmark) {
+    const ground=this.Ground(landmark.p);
+    const y=Math.max(ground+.65,Number.isFinite(landmark.y)?landmark.y:ground);
+    return this.Vertex([landmark.p[0],y,landmark.p[1]]);
+  }
+
+  DrawWallWriting(context,frame) {
+    const signals=EncounterSignals(frame);
+    for(const object of this.mapData.objects) {
+      const text=object.meta?.slogan;if(!text||!VisibleEncounterObject(object,signals))continue;
+      const [x,y,z]=object.pos,[w,h,d]=object.size,yaw=(object.yawDeg||0)*Math.PI/180;
+      if(Math.hypot(x-this.eye[0],z-this.eye[2])>70)continue;
+      const c=Math.cos(yaw),s=Math.sin(yaw),side=((this.eye[0]-x)*s+(this.eye[2]-z)*c)>=0?1:-1;
+      const Point=(u,v)=>[x+u*c+side*(d/2+.035)*s,y+v,z-u*s+side*(d/2+.035)*c];
+      const chars=[...text],step=Math.min(w/(chars.length+.5),h*.88),start=-(chars.length-1)*step/2;
+      for(const [index,char] of chars.entries()) {
+        const u=(start+index*step)*side,center=this.Vertex(Point(u,h*.5));
+        if(center.depth<.15||center.depth>this.far)continue;
+        const hidden=this.raster.Occluded(center);if(!context||this.raster.collectingDepth||hidden)continue;
+        const left=this.Vertex(Point(u-side*step*.44,h*.88)),right=this.Vertex(Point(u+side*step*.44,h*.88)),bottom=this.Vertex(Point(u-side*step*.44,h*.12));
+        if([left,right,bottom].some(p=>p.depth<.15))continue;
+        context.save();context.transform(right.x-left.x,right.y-left.y,bottom.x-left.x,bottom.y-left.y,left.x,left.y);
+        context.font='bold 1px "Microsoft YaHei",sans-serif';context.textAlign='center';context.textBaseline='middle';context.fillStyle='#32291e';context.fillText(char,.5,.54,1);context.restore();
+      }
+    }
   }
 
   BeforeOverlays(frame,layers) {

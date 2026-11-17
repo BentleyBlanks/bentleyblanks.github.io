@@ -130,6 +130,11 @@ export function BuildEncounterMap(scene) {
     ["土地庙",181,481], ["土炮楼",229.5,390.5], ["村南口",117,545], ["河汊子",38,407],
   ].map(([name,x,z]) => ({name,p:[x,z]}));
   labels.push(...supplementalLabels.filter(label => !labels.some(marker => marker.name === label.name)));
+  // Apertures come from the same cut walls that Play collides with. Close views
+  // show their names; overview labels stay reserved for places and shelter mouths.
+  const openings=objects.flatMap(object=>object.meta?.openings||[]).filter(opening=>Array.isArray(opening.p));
+  labels.push(...openings.filter(opening=>!labels.some(label=>label.kind===opening.kind&&Math.hypot(label.p[0]-opening.p[0],label.p[1]-opening.p[1])<1))
+    .map(opening=>({...opening,y:opening.y+opening.h/2,name:opening.kind==="door"?"屋门":"窗洞",detail:true})));
   return {
     bounds: [-160, 320, -480, ENCOUNTER_MAP_MAX_Z], objects, farObjects, roads, trenches, labels, floors, ramps, planningPockets:scene.surface?.pockets||FLOW_GROUND.pockets,
     paint: scene.paint.filter(paint => (paint.poly || paint.line)?.some(point => point.z < ENCOUNTER_MAP_MAX_Z)),
@@ -138,6 +143,7 @@ export function BuildEncounterMap(scene) {
     river: village.L0610_RIVER.line.map(Point),
     groves: village.L0610_GROVES, wells: village.L0610_WELLS,
     markers: [
+      ...openings.map(opening=>({...opening,name:opening.kind==="door"?"屋门":"窗洞"})),
       {name:"狗洞",p:[92,473],kind:"opening"}, {name:"便门",p:[92,484.6],kind:"opening"},
       {name:"院门",p:[108,483.5],kind:"opening"}, {name:"枪眼",p:[100,470],kind:"window"},
       ...Object.values(village.L0610_ALLEY_WINDOWS).map((window) => ({name:window.id,p:[window.x,window.z],kind:"window"})),
