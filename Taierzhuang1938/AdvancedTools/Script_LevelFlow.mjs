@@ -24,6 +24,8 @@ let navigationTool="select";
 let selectedUnitIds=[], multipleUnits=false;
 let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
 let toastTimer=0, renderPending=false;
+let inspectorCollapsed=false, inspectorTab="chat";
+const INSPECTOR_COLLAPSED_KEY="tengxian1938_encounter_sidebar_collapsed_v1";
 const params=new URLSearchParams(location.search);
 
 function Toast(message,persistent=false) {
@@ -58,11 +60,22 @@ function SetNavigationTool(value) {
   Element("mapTooltip").hidden=true;
   RequestRender();
 }
+function SetInspectorCollapsed(collapsed,persist=true) {
+  inspectorCollapsed=collapsed;
+  document.querySelector(".lfWorkspace").dataset.inspectorCollapsed=String(collapsed);
+  const button=Element("toggleInspector"),label=collapsed?"展开右侧栏":"收起右侧栏";
+  button.setAttribute("aria-expanded",String(!collapsed));
+  button.setAttribute("aria-label",label);button.title=label;
+  Element("inspectorResizeHandle").hidden=collapsed;
+  for(const name of ["chat","script"]) Element(`${name}Pane`).hidden=collapsed||name!==inspectorTab;
+  if(persist) {try {storage?.setItem(INSPECTOR_COLLAPSED_KEY,String(collapsed));} catch { /* Keep this window's layout. */ }}
+  RequestRender();
+}
 function ShowTab(value) {
   if(value==="notes") {
     OpenAnnotations();Element("legacyAnnotations").open=true;Element("notesPane").hidden=false;return;
   }
-  for(const name of ["chat","script"]) Element(`${name}Pane`).hidden=name!==value;
+  inspectorTab=value;SetInspectorCollapsed(false);
   for(const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected",button.dataset.tab===value);
   UpdateAnnotations();Render();
 }
@@ -321,6 +334,10 @@ function OpenAnnotations() {
 
 function BindControls() {
   window.addEventListener("blur",()=>{CancelPointer();RequestRender();});
+  Element("toggleInspector").onclick=()=>SetInspectorCollapsed(!inspectorCollapsed);
+  let collapsed=false;
+  try {collapsed=storage?.getItem(INSPECTOR_COLLAPSED_KEY)==="true";} catch { /* Storage is optional. */ }
+  SetInspectorCollapsed(collapsed,false);
   for(const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick=()=>{
     SetNavigationTool(button.dataset.navigationTool);workspace.active.canvas.focus();
   };

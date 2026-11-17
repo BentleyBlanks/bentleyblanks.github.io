@@ -265,6 +265,8 @@ textarea { resize: vertical; min-height: 64px; }
 /* Two-column conversation navigation and chat, with a fixed composer. */
 .lfInspectorHeader { display: flex; align-items: center; padding: 4px 12px 0; background: transparent; border-bottom: 1px solid var(--lf-line); }
 .lfInspectorHeader .lfTabs { border-bottom: 0; }
+.lfInspectorToggle { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin-left: 8px; padding: 4px; }
+.lfInspectorToggle svg { width: 18px; height: 18px; }
 .lfChatPane { flex: 1; min-height: 0; display: grid; grid-template-columns: clamp(140px, 42%, 200px) minmax(0, 1fr); }
 .lfChatSidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 10px 7px; border-right: 1px solid var(--lf-line); background: var(--ed-field); }
 #newCodexChat { flex: none; text-align: left; padding: 7px 8px; font-size: 13px; border-color: #6b6243; color: #e0cb99; }
@@ -395,6 +397,23 @@ textarea { resize: vertical; min-height: 64px; }
 .lfInspectorResize:hover, .lfInspectorResize:focus-visible, .lfResizingInspector .lfInspectorResize { background: #c4ac6755; box-shadow: inset 2px 0 #b49d64; }
 .lfResizingInspector, .lfResizingInspector * { cursor: col-resize !important; user-select: none !important; }
 @media (max-width: 650px) { .lfInspectorResize { display: none; } }
+
+.lfWorkspace[data-inspector-collapsed="true"] { grid-template-columns: minmax(0, 1fr) 48px; }
+.lfWorkspace[data-inspector-collapsed="true"] .lfInspectorHeader { flex-direction: column; padding: 8px 4px; gap: 10px; border-bottom: 0; }
+.lfWorkspace[data-inspector-collapsed="true"] .lfInspectorToggle { order: -1; margin: 0; }
+.lfWorkspace[data-inspector-collapsed="true"] .lfInspectorToggle svg { transform: rotate(180deg); }
+.lfWorkspace[data-inspector-collapsed="true"] .lfTabs { flex-direction: column; flex: none; height: auto; gap: 6px; }
+.lfWorkspace[data-inspector-collapsed="true"] .lfTabs button { flex: none; writing-mode: vertical-rl; text-orientation: upright; padding: 12px 8px; border-bottom: 0; border-right: 2px solid transparent; border-radius: 4px; }
+.lfWorkspace[data-inspector-collapsed="true"] .lfTabs button.selected { border-right-color: var(--ed-gold); }
+@media (max-width: 650px) {
+  .lfWorkspace[data-inspector-collapsed="true"] { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 1fr) auto; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfInspector { min-height: 0; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfInspectorHeader { flex-direction: row; padding: 4px 12px; gap: 0; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfInspectorToggle { order: 0; margin-left: 8px; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfTabs { flex-direction: row; flex: 1; height: 43px; gap: 0; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfTabs button { flex: 1; writing-mode: horizontal-tb; padding: 6px 10px; border-right: 0; border-bottom: 2px solid transparent; border-radius: 0; }
+  .lfWorkspace[data-inspector-collapsed="true"] .lfTabs button.selected { border-bottom-color: var(--ed-gold); }
+}
 
 #interruptCodexChat { flex: none; border-color: #b28d5966; color: var(--ed-gold-text); font-size: 13px; padding: 4px 10px; }
 #interruptCodexChat:hover:not(:disabled) { border-color: var(--ed-gold); background: var(--ed-sel); }
