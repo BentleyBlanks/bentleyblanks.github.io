@@ -518,26 +518,26 @@ vec4 GrainHash(vec2 cell) {
 }
 
 // 一格的颗粒：.w 是亮度噪声，.xyz 是各通道的彩色噪声；均匀分布拉成单位方差（σ = 1）。
-vec3 GrainCell(vec2 cell) {
+vec3 GrainCell(vec2 cell, float chroma) {
   vec4 n = (GrainHash(cell + vec2(uGrainSeed * 17.0, uGrainSeed * 29.0)) - 0.5) * 3.4641016;
-  // 亮度噪声与色度噪声独立，方差各占 (1-c) 与 c：每个通道仍是单位方差。
-  return sqrt(1.0 - uGrainChroma) * n.w + sqrt(uGrainChroma) * n.xyz;
+  // 亮度噪声与色度噪声独立，方差各占 (1-c) 与 c：每个通道仍是单位方差。chroma = 0 即纯亮度噪声。
+  return sqrt(1.0 - chroma) * n.w + sqrt(chroma) * n.xyz;
 }
 
 // 单位方差的颗粒场（σ = 1，每个通道）。
-//   · uGrainMode < 0.5 或颗粒格 ≤ 1 像素：逐像素一格、纯亮度噪声（low 档的便宜路径，一次 hash）。
+//   · uGrainMode < 0.5（low 档的便宜路径）：最近格、纯亮度噪声（一次 hash）。
+//   · 颗粒格 ≤ 1 像素（出厂 1080p 就是这条）：逐像素一格、带彩色颗粒、不插值（最细的颗粒，一次 hash）。
 //   · 否则：四格平滑插值（smoothstep 权重），**再除以权重平方和的平方根**——插值会压低方差，
 //     不归一的话「颗粒大小」滑杆会同时改强度。彩色比例按 sqrt 分配，亮度与色度噪声各占 (1-c)、c 的方差。
 vec3 FilmGrainField(vec2 fragCoord) {
-  if (uGrainMode < 0.5 || uGrainPx <= 1.001) {
-    return vec3(GrainCell(floor(fragCoord / max(uGrainPx, 1.0))).x);
-  }
+  if (uGrainMode < 0.5) return vec3(GrainCell(floor(fragCoord / max(uGrainPx, 1.0)), 0.0).x);
+  if (uGrainPx <= 1.001) return GrainCell(floor(fragCoord), uGrainChroma);
   vec2 p = fragCoord / uGrainPx - 0.5;
   vec2 i = floor(p);
   vec2 f = fract(p);
   vec2 w = f * f * (3.0 - 2.0 * f);
-  vec3 a = GrainCell(i), b = GrainCell(i + vec2(1.0, 0.0));
-  vec3 c = GrainCell(i + vec2(0.0, 1.0)), d = GrainCell(i + vec2(1.0, 1.0));
+  vec3 a = GrainCell(i, uGrainChroma), b = GrainCell(i + vec2(1.0, 0.0), uGrainChroma);
+  vec3 c = GrainCell(i + vec2(0.0, 1.0), uGrainChroma), d = GrainCell(i + vec2(1.0, 1.0), uGrainChroma);
   vec3 n = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
   vec2 q = (1.0 - w) * (1.0 - w) + w * w;      // 每轴 Σ weight²
   return n * inversesqrt(max(q.x * q.y, 1e-4));
