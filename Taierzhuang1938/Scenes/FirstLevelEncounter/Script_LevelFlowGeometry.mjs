@@ -38,15 +38,26 @@ export function InsideArea(point, area) {
   return Math.abs(dx) <= area.size[0] / 2 + 1e-7 && Math.abs(dz) <= area.size[1] / 2 + 1e-7;
 }
 
+function PacedSegment(pace, progress) {
+  const time = Clamp(progress, 0, 1);
+  for (let index = 1; index < pace.length; index++) {
+    if (time > pace[index]) continue;
+    const fraction = (time - pace[index - 1]) / (pace[index] - pace[index - 1]);
+    return [index - 1, index, fraction];
+  }
+  return [pace.length - 1, pace.length - 1, 0];
+}
+
 export function SampleBeatRoute(beat, progress) {
   if (!beat.pace) return SampleRoute(beat.p, progress);
-  const time = Clamp(progress, 0, 1);
-  for (let index = 1; index < beat.pace.length; index++) {
-    if (time > beat.pace[index]) continue;
-    const fraction = (time - beat.pace[index - 1]) / (beat.pace[index] - beat.pace[index - 1]);
-    return beat.p[index - 1].map((value, axis) => Lerp(value, beat.p[index][axis], fraction));
-  }
-  return [...beat.p.at(-1)];
+  const [from, to, fraction] = PacedSegment(beat.pace, progress);
+  return beat.p[from].map((value, axis) => Lerp(value, beat.p[to][axis], fraction));
+}
+
+export function SampleBeatElevation(beat, progress) {
+  if (!beat.elevations) return 0;
+  const [from, to, fraction] = PacedSegment(beat.pace, progress);
+  return Lerp(beat.elevations[from], beat.elevations[to], fraction);
 }
 
 export function EnterArea(a, b, area) {

@@ -1634,7 +1634,7 @@ for(const group of defaults.groups.filter(group=>streetIds.includes(group.id))) 
     const frame=EvaluateFlow(life.born+elapsed);
     const actor=frame.actors.find(actor=>actor.id===`${group.id}_${index}`);
     if(!actor) continue;
-    for(const eye of [frame.player,[114,465],[111,466.5],[105.5,464],[108.5,466]]) for(const height of [0.25,1,1.8]) for(const offset of [-0.25,0,0.25]) {
+    for(const eye of [frame.player,...["10b","10c","10d","10e"].map(id=>BeatById(id).p.at(-1))]) for(const height of [0.25,1,1.8]) for(const offset of [-0.25,0,0.25]) {
       assert.ok(StreetSightBlocked([eye[0],terrain.heightAt(...eye)+1.6,eye[1]],
         [actor.p[0]+offset,terrain.heightAt(...actor.p)+height,actor.p[1]]),`${actor.id} spawns behind real cover`);
     }

@@ -1,6 +1,6 @@
 import { FLOW_BEATS, FLOW_STAGES, FLOW_WAVES, FLOW_GROUND, FLOW_TANK_TRACKS, FLOW_OPENING, FLOW_OPENING_RETREAT, FLOW_OPENING_RESCUE, FLOW_CAMP_DEFENSE, FLOW_CAMP_LOADING, FLOW_DRAG_REARGUARD, FLOW_YAOWA_RETURN, FLOW_AMBUSH_DEFENSE } from "./Data_LevelFlow.mjs";
 
-import { Clamp, Lerp, Distance, InsideArea, SampleRoute, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
+import { Clamp, Lerp, Distance, InsideArea, SampleRoute, SampleBeatRoute, SampleBeatElevation } from "./Script_LevelFlowGeometry.mjs";
 import { CreateEncounterDocument, CompileEncounters, SampleEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "../../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_VILLAGE_CASUALTIES, FLOW_OPENING_DEFENSE, FLOW_WOUNDED_EVACUATION } from "./Data_LevelFlow.mjs";
@@ -517,6 +517,7 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
   const aboard=time>=BeatById("06d").start;
   const winter=aboard?CartOffset(0,-0.1):time>=BeatById("06c").start?SampleRoute(winterLoadingRoute,loadingProgress):Track(winterKeys,time);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.cover?"kneel":beat.pose)];
+  if (beat.elevations) actors[0].elevation = SampleBeatElevation(beat, progress);
   if(beat.id==="04c") Object.assign(actors[0],{pose:progress<0.4?"run":"shoot",firing:progress>=0.4,status:progress<0.4?"前出射击壕":"前沿阻击"});
   const winterPose = time < OPENING_FRIENDLY_CRY_TIME ? "kneel" : "wounded";
   actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, winterPose,

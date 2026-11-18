@@ -5,6 +5,8 @@ import { FLOW_VILLAGE_STEALTH as PLAN } from "./AdvancedTools/Data_LevelFlow.mjs
 import { VillageStealthAt, VillageStealthRules } from "./AdvancedTools/Script_LevelFlowVillage.mjs";
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
+import { EncounterSignals, VisibleEncounterObject } from "./AdvancedTools/Script_LevelFlowView.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 import { UpgradeEncounterDocument, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
 import { FLOW_RENDERING, FLOW_DUSK } from "./Data_Tuning_LevelFlow.mjs";
 import { ApplyEncounterSky, EncounterDuskBlend } from "./AdvancedTools/Script_LevelFlowSkyBlend.mjs";
@@ -18,12 +20,12 @@ const ReadBytes = file => fs.readFileSync(new URL(`./Scenes/FirstLevelEncounter/
 const terrain = BuildEncounterTerrain(scene,ReadBytes(scene.terrain.file),ReadBytes(scene.trenches.datum.file),map);
 const walls = map.objects.filter(object=>object.pos && object.size && object.solid!==false && !object.hideOn && !object.showOn);
 const wallBounds=walls.map(object=>({object,radius:Math.hypot(object.size[0],object.size[2])/2}));
-function Inside(point, object, padding = 0) {
+function Inside(point, object, padding = 0, height = 0) {
   const dx=point[0]-object.pos[0], dz=point[2]-object.pos[2], yaw=(object.yawDeg||0)*Math.PI/180;
   const x=dx*Math.cos(yaw)-dz*Math.sin(yaw), z=dx*Math.sin(yaw)+dz*Math.cos(yaw);
   const base=object.pos[1] ?? terrain.heightAt(object.pos[0],object.pos[2]);
   return Math.abs(x)<object.size[0]/2+padding && Math.abs(z)<object.size[2]/2+padding
-    && point[1]>base && point[1]<base+object.size[1];
+    && point[1]+height>base && point[1]<base+object.size[1];
 }
 function Blocked(from,to) {
   const distance=Math.hypot(...to.map((value,axis)=>value-from[axis]));
@@ -37,6 +39,36 @@ function Blocked(from,to) {
   return false;
 }
 const Actor=(time,id)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
+
+const streetBeats=FLOW_TIMELINE.filter(beat=>beat.stage==="10");
+const streetSolids=wallBounds.filter(({object,radius})=>object.pos[0]+radius>=96 && object.pos[0]-radius<=120
+  && object.pos[2]+radius>=462 && object.pos[2]-radius<=553).map(({object})=>object);
+streetSolids.push(...map.objects.filter(object=>object.solid!==false && object.pos && object.size
+  && (object.hideOn || object.showOn)));
+const standingHeight=STANCE.stand.eye+0.16;
+let climbedWall=false, exitedSideGate=false;
+for(const beat of streetBeats) {
+  const index=FLOW_TIMELINE.indexOf(beat);
+  assert.deepEqual(FLOW_TIMELINE[index-1].p.at(-1),beat.p[0],`${beat.id} joins incoming player route`);
+  assert.deepEqual(beat.p.at(-1),FLOW_TIMELINE[index+1].p[0],`${beat.id} joins outgoing player route`);
+  const steps=Math.ceil(beat.duration/0.08);
+  for(let step=0;step<=steps;step++) {
+    const time=beat.start+Math.min(beat.duration*step/steps,beat.duration-1e-6);
+    const frame=EvaluateFlow(time);
+    const player=frame.actors.find(actor=>actor.id==="player");
+    const [x,z]=player.p, ground=terrain.heightAt(x,z), feet=ground+(player.elevation??0);
+    const signals=EncounterSignals(frame);
+    const hits=streetSolids.filter(object=>VisibleEncounterObject(object,signals)
+      && Inside([x,feet+0.02,z],object,STANCE.stand.radius,standingHeight-0.02));
+    assert.deepEqual(hits.map(object=>object.id),[],`${beat.id} player clears scene solids at (${x.toFixed(2)}, ${z.toFixed(2)})`);
+    if(beat.id==="10i"&&Math.abs(x-114.5)<0.05) {
+      if(Math.abs(z-501.3)<0.05 && feet>ground+2.2) climbedWall=true;
+      if(Math.abs(z-518)<0.05 && feet===ground) exitedSideGate=true;
+    }
+  }
+}
+assert.ok(climbedWall,"10I goes up and over the east wall on the firewood route");
+assert.ok(exitedSideGate,"10I returns through the side gate on the ground");
 const shortcutDebris=walls.filter(wall=>wall.id.startsWith("TempleShortcutRubble"));
 assert.ok(shortcutDebris.length>=3,"the annotated right-hand shortcut has visible physical collapse debris");
 for(let z=421.75;z<=424.25;z+=0.1) for(const height of [0.55,1.6,2.2]) {

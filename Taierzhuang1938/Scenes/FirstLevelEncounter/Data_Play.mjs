@@ -57,7 +57,7 @@ export const ENCOUNTER_PLAY = {
     "09j":{actor:"liu",text:"到后头了，打！先放倒机枪手，再清北屋！"},
     "10a":{actor:"luo",text:"调过来！到石碾后头朝东打，担架过胡同！"},
     "10b":{actor:"luo",text:"守住东街！先掩护前头四副担架过口！"},
-    "10c":{actor:"luo",text:"炮在找石碾！绕南侧换位，接下一批担架！"},
+    "10c":{actor:"luo",text:"炮在找石碾！沿碾西边往南换位，接下一批担架！"},
     "10d":{actor:"luo",text:"左手院子！到路口西侧，封住北院门！"},
     "10e":{actor:"luo",text:"守住南巷出口！最后几副担架还没过完！"},
     "10f":{actor:"luo",text:"听哨子！看清鬼子是不是往东撤了！"},
