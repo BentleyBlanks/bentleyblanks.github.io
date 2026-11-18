@@ -11,7 +11,7 @@ import { EncounterChat } from "./Script_LevelFlowChat.mjs";
 import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
-import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs?v=20261116DeathRetry";
+import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs?v=20261119DebugTools";
 import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
 
 const Element = (id) => document.getElementById(id);

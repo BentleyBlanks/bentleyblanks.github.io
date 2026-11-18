@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261118BeishaheDetail">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261119DebugTools">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -26,7 +26,7 @@
       document.currentScript.after(map);
     })();
   </script>
-  <script type="module" src="./Script_LevelFlow.mjs?v=20261118StreetPlayerRoute"></script>
+  <script type="module" src="./Script_LevelFlow.mjs?v=20261119DebugTools"></script>
 </head>
 <body class="lfBody edThemedSurface">
   <header class="lfToolbar" aria-label="遭遇设计工具栏">
@@ -39,6 +39,10 @@
     </div>
     <div class="lfToolGroup lfPlayTools"><button id="playGame" title="播放" aria-label="Play" aria-pressed="false">▶</button><button id="pauseGame" title="暂停" aria-label="暂停 Play" aria-pressed="false" disabled>Ⅱ</button><button id="stopGame" title="停止" aria-label="停止 Play" disabled>■</button><select id="playGameStart" aria-label="Play 开始位置"><option value="current">当前关键帧</option><option value="beginning">从首个战斗段开始</option></select></div>
     <div class="lfToolGroup lfViewTools"><select id="viewportLayout" aria-label="视口布局"><option value="1" selected>单视口</option><option value="2">双视口</option><option value="3">三视口</option><option value="4">四视口</option></select></div>
+    <div class="lfToolGroup lfDebugTools" role="group" aria-label="Debug 工具">
+      <button type="button" data-debug-tool="profiler" aria-label="Profiler" title="Profiler · 请先启动 Play" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6m-3 0v3m5.5 1.5 1.5-1.5M11 9v4m1 7.4A7.3 7.3 0 1 1 18.3 12"/><circle cx="17.5" cy="16.5" r="3.2"/><path d="m19.8 18.8 2.2 2.2"/></svg></button>
+      <button type="button" data-debug-tool="frameDebugger" aria-label="Frame Debugger" title="Frame Debugger · 请先启动 Play" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M15.5 8.5v7"/><path fill="currentColor" stroke="none" d="M8 8.5v7l5.5-3.5z"/></svg></button>
+    </div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>

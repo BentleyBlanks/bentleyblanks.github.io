@@ -8,6 +8,8 @@ export class LevelFlowPlay {
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
+    this.debugButtons=[...document.querySelectorAll(".lfDebugTools [data-debug-tool]")];
+    for(const button of this.debugButtons)button.onclick=()=>this.OpenDebugTool(button);
     this.button.onclick=()=>this.active?(this.state?.failed?this.Retry():this.Pause(false)):this.Start(this.menu.value);
     this.pauseButton.onclick=()=>this.Pause(!this.paused);this.stopButton.onclick=()=>this.Stop();
     this.menu.onchange=()=>this.UpdateControls();
@@ -37,6 +39,25 @@ export class LevelFlowPlay {
     this.pauseButton.disabled=!this.active||!this.state?.ready||this.launching;
     this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
     this.stopButton.disabled=!this.active;this.menu.disabled=this.active;
+    const canDebug=!!this.DebugEditor();
+    for(const button of this.debugButtons){
+      const label=button.getAttribute("aria-label");
+      button.disabled=!canDebug;
+      button.title=canDebug?label:`${label} · ${this.active?"等待 Play 就绪":"请先启动 Play"}`;
+    }
+  }
+  DebugEditor(){return this.active&&this.state?.ready&&!this.launching?this.frame?.contentWindow.Tengxian?.editor:null;}
+  OpenDebugTool(button){
+    const editor=this.DebugEditor();if(!editor)return;
+    const id=button.dataset.debugTool,overlay=editor.overlays.get(id);
+    if(overlay?.win&&!overlay.win.closed){overlay.win.focus();return;}
+    if(overlay)editor.CloseOverlay(id);
+    editor.overlayError="";
+    if(!editor.ToggleOverlay(id))this.toast(editor.overlayError||`${button.getAttribute("aria-label")} 打不开。`,true);
+  }
+  CloseDebugTools(){
+    const editor=this.frame?.contentWindow.Tengxian?.editor;
+    for(const button of this.debugButtons)editor?.CloseOverlay(button.dataset.debugTool);
   }
   async SceneStamp() {
     const paths=["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
@@ -134,6 +155,7 @@ export class LevelFlowPlay {
   Stop() {
     if(!this.active)return;
     this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
+    this.CloseDebugTools();
     const game=this.frame?.contentWindow.Tengxian,api=game?.Debug.EncounterPlay;
     if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.cacheTimer=setTimeout(()=>this.DropHost(),ENCOUNTER_PLAY_STARTUP.idleCacheMs);}
     else this.DropHost();
@@ -145,6 +167,7 @@ export class LevelFlowPlay {
   }
   DropHost(){
     clearTimeout(this.cacheTimer);
+    this.CloseDebugTools();
     try{this.frame?.contentWindow.Tengxian?.Debug?.EncounterPlay?.Dispose?.();}catch{}
     if(this.frame)this.frame.src="about:blank";this.host?.remove();this.frame=null;this.host=null;
   }
