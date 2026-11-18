@@ -141,7 +141,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
-import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
+import { LENS_FLARE, FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
@@ -8607,7 +8607,9 @@ function RenderSceneContent(dt) {
     skyPreset: skyName,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
-    grain: ((skyName === "night" || skyName === "firstLevelNight") ? 0.020 : 0.014) * graphics.grain,
+    // 胶片颗粒：出厂强度按时段取（Data_Tuning_Camera.FILM_GRAIN），乘面板「颗粒」倍率；大小是面板「颗粒大小」倍率。
+    grain: ((skyName === "night" || skyName === "firstLevelNight") ? FILM_GRAIN.nightStrength : FILM_GRAIN.strength) * graphics.grain,
+    grainSize: graphics.grainSize,
     // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
     fade: player?.Alive ? missionRuntime?.Perception().blackout || 0 : 0,
     eyeClosure: player?.Alive ? Math.max(missionRuntime?.Perception().eyeClosure || 0, BlastEyeClosure()) : 0,

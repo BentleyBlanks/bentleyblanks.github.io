@@ -133,6 +133,10 @@
  *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
  *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
  *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
+ *   filmGrain     全屏胶片颗粒的算法档（0 = 单格亮度噪声，一次 hash；1 = 平滑插值的颗粒格 + 彩色颗粒）。
+ *                 **不是开关**：颗粒开不开、多强、多粗由面板「颗粒 / 颗粒大小」倍率定（0 = 关，关时整段不执行），
+ *                 数值口径在 `Data_Tuning_Camera.FILM_GRAIN`。low 走便宜路径，其余三档走完整路径
+ *                 （完整路径每像素 4 次 hash，合成 pass 里是零头，low 档仍留着最便宜的一条）。
  *   stunTrail     近爆眩晕的拖影（Script_PostStunTrail：composite 之后的帧反馈，两张输出分辨率 HalfFloat 靶懒建；
  *                 还要 options.stunTrail > 0 且没开 reduced-motion 才真跑，平时不占显存与时间）
  * @typedef {Record<string, boolean|number>} QualityPreset
@@ -215,6 +219,7 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: false,
     materialTexture: 256,
     stunTrail: true,
+    filmGrain: 0,
   },
   medium: {
     ...RESERVED_OFF,
@@ -235,6 +240,7 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
     stunTrail: true,
+    filmGrain: 1,
     // 2026-09-08 分档定稿复核：**保持 0.75**。试过 0.70，但这一轮的实测说明
     // 3394×1348 下整帧根本不是像素受限（见 docs §17.2 的分档表：四档的下界都压在
     // 同一个 ~11.4 ms 上，而 CPU 提交是 12–16 ms），压内部分辨率买不到时间、
@@ -264,6 +270,7 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
     stunTrail: true,
+    filmGrain: 1,
     // 0.8 是实测背书的（省 24.2% GPU，见上面 renderScale 那一条），不是拍的
     taaUpscale: true, renderScale: 0.8,
     motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
@@ -288,6 +295,7 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 1024,
     stunTrail: true,
+    filmGrain: 1,
     // ultra 是「内部 = 输出」，TAA 退回纯抗锯齿（TAAU 的上采样部分不生效，
     // 因为两组尺寸相等）。留 taaUpscale: true 是为了玩家手动下调分辨率时它照样接上。
     taaUpscale: true, renderScale: 1.0,

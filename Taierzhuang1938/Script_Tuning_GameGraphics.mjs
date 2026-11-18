@@ -2,6 +2,7 @@
 
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { CAMERA } from "./Data_Tuning_Main.mjs";
+import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
 export function CreateGameGraphics({profile, preset, taaEnabled = !!preset.taa, gi = false, gore = true}) {
@@ -26,6 +27,8 @@ return {
   // 武器补光（环境系统 WeaponLight 组件给强度）：关掉 = 强度归零，对照用
   firstPersonWeaponLight: true,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 全屏胶片颗粒的粗细倍率（强度是上面的 grain）。范围与出厂值在 Data_Tuning_Camera.FILM_GRAIN.sizeRange。
+  grainSize: FILM_GRAIN.sizeRange.value,
   // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
   // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
   ssr: !!preset.ssr, ssrStrength: 1,

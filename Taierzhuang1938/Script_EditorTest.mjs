@@ -828,6 +828,49 @@ Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
   && taaToggle.on.settled === true && taaToggle.saved === true,
   `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
 
+// 胶片颗粒：面板里的「颗粒」（强度倍率）与「颗粒大小」都是真滑杆，拖动要落到 graphics、存档和合成 uniform 上。
+// 同样按标签找控件、派发真实 input 事件，而不是直接改 gfx 字段（面板没接回调时后者一样是绿的）。
+const grainSliders = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const SliderOf = (label) => {
+    const row = Array.from(document.querySelectorAll(".edPanel.work .gfxRow"))
+      .find((r) => (r.dataset.gfxName || "") === label);
+    return row ? row.querySelector('input[type="range"]') : null;
+  };
+  const Drag = (input, value) => {
+    input.value = String(value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    T.StepFrames(3);
+  };
+  const strengthInput = SliderOf("颗粒"), sizeInput = SliderOf("颗粒大小");
+  if (!strengthInput || !sizeInput) return { found: false, strength: !!strengthInput, size: !!sizeInput };
+  const U = T.post.uniformsComposite;
+  const out = { found: true, bootGrain: T.graphics.grain, bootSize: T.graphics.grainSize, bootPx: U.uGrainPx.value, bootStrength: U.uGrain.value,
+    range: { min: Number(sizeInput.min), max: Number(sizeInput.max) } };
+  Drag(sizeInput, 2);
+  out.size2 = { gfx: T.graphics.grainSize, px: U.uGrainPx.value };
+  Drag(strengthInput, 0);
+  out.strength0 = { gfx: T.graphics.grain, uniform: U.uGrain.value };
+  Drag(strengthInput, 2);
+  out.strength2 = { gfx: T.graphics.grain, uniform: U.uGrain.value };
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  out.saved = saved ? { grain: saved.grain, grainSize: saved.grainSize } : null;
+  Drag(sizeInput, out.bootSize); Drag(strengthInput, out.bootGrain);   // 还原，不影响后面的取证
+  out.restored = { grain: T.graphics.grain, size: T.graphics.grainSize };
+  return out;
+});
+Check("画质面板：「颗粒」「颗粒大小」是真滑杆，拖动改到 graphics / 合成 uniform / 存档",
+  grainSliders.found
+  && grainSliders.size2.gfx === 2 && grainSliders.size2.px > grainSliders.bootPx
+  && grainSliders.strength0.gfx === 0 && grainSliders.strength0.uniform === 0
+  && grainSliders.strength2.gfx === 2 && Math.abs(grainSliders.strength2.uniform - 2 * grainSliders.bootStrength) < 1e-6 * 100
+  && grainSliders.saved?.grain === 2 && grainSliders.saved?.grainSize === 2
+  && grainSliders.restored.grain === grainSliders.bootGrain && grainSliders.restored.size === grainSliders.bootSize,
+  grainSliders.found
+    ? `大小 ×2：px ${grainSliders.bootPx.toFixed(2)} → ${grainSliders.size2.px.toFixed(2)}；强度 0 → uGrain=${grainSliders.strength0.uniform}，×2 → uGrain=${grainSliders.strength2.uniform.toFixed(4)}（出厂 ${grainSliders.bootStrength.toFixed(4)}）；落盘 ${JSON.stringify(grainSliders.saved)}`
+    : `面板上找不到颗粒滑杆（颗粒=${grainSliders.strength} 颗粒大小=${grainSliders.size}）`);
+
 // 第一人称自阴影：同样点真实按钮，并读回独立深度靶。只验 DOM/布尔位会放过
 // 「开关在、材质也注入了，但深度 pass 一直是清屏白色」这一类静默坏法。
 const firstPersonShadowToggle = await page.evaluate(() => {

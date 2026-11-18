@@ -27,6 +27,7 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
+import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -71,6 +72,10 @@ export function GraphicsDetailControls(post) {
       { key: "microShadowStrength", label: "微阴影", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
       { key: "horizonStrength", label: "地平线遮蔽", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
       { key: "skinStrength", label: "皮肤散射", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+    ],
+    // 全屏胶片颗粒的粗细（强度是「后处理强度」里的「颗粒」倍率）。范围与出厂值在 Data_Tuning_Camera.FILM_GRAIN。
+    grain: [
+      { key: "grainSize", label: "颗粒大小", ...FILM_GRAIN.sizeRange, prefix: "×", digits: 2 },
     ],
   };
 }
@@ -507,7 +512,12 @@ export class GraphicsSettings {
     Multiplier(post.box, "泛光", "bloom", "", true);
     Multiplier(post.box, "体积光", "god", "", true);
     Multiplier(post.box, "运动模糊", "motionBlur", "", true);
-    Multiplier(post.box, "颗粒", "grain", "", true);
+    Multiplier(post.box, "颗粒", "grain",
+      "全屏胶片颗粒的强度：中间调最明显，纯黑与高光处渐隐，颗粒按每秒 24 次换花样。拖到 0 完全关闭（不执行、不改画面明暗）。", true);
+    Details(post.box, "grain", {
+      grainSize: "颗粒格的粗细，按 1080p 高度等比缩放，4K 与 1080p 看起来一样粗。改粗细不改强度。"
+        + (preset.filmGrain ? "" : "当前画质档走最便宜的颗粒（逐像素亮度噪声），粗细只在 1× 以上才有区别。"),
+    });
     Multiplier(post.box, "暗角", "vignette", "", true);
     post.Done();
 
@@ -591,7 +601,7 @@ export class GraphicsSettings {
     // 读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null），不是 preset 那一位：
     // 后者已经被 ApplyGraphics 按当前开关改写过，拿它当出厂值等于恢复了个寂寞。
     gfx.volumetrics = !!this.host.post?.volumetricsPass?.grid;
-    gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
+    gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;   // 颗粒大小由下面的 NormalizeGraphicsDetails(reset) 复位
     gfx.gi = false; gfx.giStrength = 1;
     // SSR 的出厂值跟画质档走（medium 及以上开），和 TAA 同一个先例：
     // 在 low 档按「恢复出厂」应该回到关，而不是给它开一个建不出靶的开关。
