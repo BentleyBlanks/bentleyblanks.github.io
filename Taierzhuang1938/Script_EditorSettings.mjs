@@ -515,7 +515,7 @@ export class GraphicsSettings {
     Multiplier(post.box, "颗粒", "grain",
       "全屏胶片颗粒的强度：中间调最明显，纯黑与高光处渐隐，颗粒按每秒 24 次换花样。拖到 0 完全关闭（不执行、不改画面明暗）。", true);
     Details(post.box, "grain", {
-      grainSize: "颗粒格的粗细，×1 = 最细（1080p 下逐像素），往上越粗越柔；按 1080p 高度等比缩放，4K 与 1080p 看起来一样粗。改粗细不改强度。"
+      grainSize: "颗粒格的粗细，×1 = 出厂最细（略柔的小团），往上越粗；按 1080p 高度等比缩放，4K 与 1080p 看起来一样粗。改粗细不改强度。"
         + (preset.filmGrain ? "" : "当前画质档走最便宜的颗粒（只有亮度噪声、格间不插值、没有彩色），粗细是整格放大。"),
     });
     Multiplier(post.box, "暗角", "vignette", "", true);

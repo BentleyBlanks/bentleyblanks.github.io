@@ -91,12 +91,13 @@ try {
     const ldr = post.targets.ldr;
     const pixelCount = ldr.width * ldr.height;
     const textures = new Map();
-    const Render = (hdr, { grain = 0, px = 1, mode = 1, seed = 0, chroma = cfg.grain.chroma, exposure = 1 } = {}) => {
+    const Render = (hdr, { grain = 0, px = 1, mode = 1, seed = 0, seedNext = seed + 1, blend = 0, chroma = cfg.grain.chroma, exposure = 1 } = {}) => {
       if (!textures.has(hdr)) textures.set(hdr, MakePixel(hdr));
       U.uHdr.value = textures.get(hdr);
       U.uExposure.value = exposure;
       U.uGrain.value = grain; U.uGrainPx.value = px; U.uGrainMode.value = mode;
-      U.uGrainSeed.value = seed; U.uGrainChroma.value = chroma;
+      U.uGrainSeed.value = seed; U.uGrainSeedNext.value = seedNext; U.uGrainBlend.value = blend;
+      U.uGrainChroma.value = chroma;
       U.uGrainResponse.value.set(cfg.grain.response.floor, cfg.grain.response.blackFade);
       post._Blit(post.matComposite, ldr);
       const bytes = new Uint8Array(pixelCount * 4);
@@ -148,10 +149,13 @@ try {
     out.lag1 = { px1: LagX(dSmall, ldr.width), px125: LagX(dG, ldr.width), px3: LagX(dBig, ldr.width) };
     out.stdBig = Std(dBig);
     out.stdSmall = Std(dSmall);
-    // 种子换花样
+    // 种子换花样；过渡中途（blend=0.5）强度不掉，且不等于两端任一张
     const gSeed = Render(midValue, { grain: strength, px: 1.25, seed: 1 });
     out.seedCorr = Corr(dG, Dev(gSeed, base, 1));
     out.seedDiffers = !Same(g1, gSeed);
+    const gBlend = Render(midValue, { grain: strength, px: 1.25, seed: 0, seedNext: 1, blend: 0.5 });
+    out.blendDiffers = !Same(g1, gBlend) && !Same(gSeed, gBlend);
+    out.stdBlend = Std(Dev(gBlend, base, 1));
     // 通道相关：完整路径 ≈ 1 − chroma；便宜路径 = 纯亮度噪声
     out.rgCorrFull = Corr(Dev(g1, base, 0), Dev(g1, base, 1));
     const gCheap = Render(midValue, { grain: strength, px: 1.25, mode: 0, seed: 0 });
@@ -226,16 +230,19 @@ try {
     out.pxDefault = U.uGrainPx.value;
     out.expectedDefault = Math.max(1, cfg.grain.sizePx * cfg.grain.sizeRange.value * outputHeight / 1080);
 
-    // 种子按时钟走：dt 累积到 1/rateHz 才换，不是每帧都换
-    const seeds = [];
+    // 种子按时钟走：rateHz 次/秒，相邻种子平滑过渡；不是每帧硬切
+    const seeds = [], blends = [];
     const t0 = pass.grainClock;
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 24; i++) {
       post.Render(P.scene, P.camera, { ...base, grain: 0.05, dt: 1 / 60 });
       seeds.push(U.uGrainSeed.value);
+      blends.push(U.uGrainBlend.value);
     }
     out.seeds = seeds;
+    out.blends = blends;
     out.clockAdvance = pass.grainClock - t0;
     out.seedRange = cfg.grain.seedCount;
+    out.rateHz = cfg.grain.rateHz;
     // 画质档位：直接换 preset 位再渲染一帧
     const saved = post.preset.filmGrain;
     post.preset.filmGrain = 0; post.Render(P.scene, P.camera, { ...base, grain: 0.05, dt: 0 }); out.modeLow = U.uGrainMode.value;
@@ -300,6 +307,8 @@ assert.ok(shader.lag1.px1 < 0.1 && shader.lag1.px1 > -0.1, `逐像素路径相�
 assert.ok(shader.lag1.px125 > shader.lag1.px1 + 0.1, `默认格子比逐像素更成团（${shader.lag1.px125.toFixed(2)}）`);
 assert.ok(shader.lag1.px3 > 0.6 && shader.lag1.px3 > shader.lag1.px125 + 0.15, `格子越大越相关（3 px：${shader.lag1.px3.toFixed(2)}）`);
 assert.ok(shader.seedDiffers && Math.abs(shader.seedCorr) < 0.1, `换种子是另一张花样（相关 ${shader.seedCorr.toFixed(3)}）`);
+assert.ok(shader.blendDiffers, "相邻种子 blend=0.5 时不等于两端任一张");
+near(shader.stdBlend, shader.expectedStd, 0.15, "过渡中途（blend=0.5）强度不掉");
 assert.ok(shader.rgCorrCheap > 0.95, `便宜路径是纯亮度噪声（RG 相关 ${shader.rgCorrCheap.toFixed(3)}）`);
 const expectedRg = 1 - FILM_GRAIN.chroma;
 assert.ok(Math.abs(shader.rgCorrFull - expectedRg) < 0.12, `完整路径有彩色颗粒（RG 相关 ${shader.rgCorrFull.toFixed(3)} ≈ ${expectedRg}）`);
@@ -328,12 +337,15 @@ assert.ok(Math.abs(wiring.pxClampHigh - wiring.expectedClampHigh) < 1e-6, "倍�
 assert.ok(Math.abs(wiring.pxDefault - wiring.expectedDefault) < 1e-6, "没给倍率 = 出厂值");
 assert.equal(wiring.mode, wiring.presetFilmGrain ? 1 : 0, "算法位取自当前画质档的 preset.filmGrain");
 assert.equal(wiring.modeLow, 0); assert.equal(wiring.modeFull, 1);
-assert.ok(Math.abs(wiring.clockAdvance - 12 / 60) < 1e-9, "颗粒时钟按 dt 累积");
+assert.ok(Math.abs(wiring.clockAdvance - 24 / 60) < 1e-9, "颗粒时钟按 dt 累积");
 const distinctSeeds = new Set(wiring.seeds).size;
-assert.ok(distinctSeeds >= 4 && distinctSeeds <= 6,
-  `按 ${FILM_GRAIN.rateHz} Hz 换花样：12 帧 @60 fps 约换 ${(12 * FILM_GRAIN.rateHz / 60)} 次，实际 ${distinctSeeds} 种种子（${wiring.seeds.join(",")}）`);
+const expectedAdvances = 24 * FILM_GRAIN.rateHz / 60;
+assert.ok(distinctSeeds >= Math.max(2, Math.floor(expectedAdvances)) && distinctSeeds <= Math.ceil(expectedAdvances) + 1,
+  `按 ${FILM_GRAIN.rateHz} Hz 换花样：24 帧 @60 fps 约换 ${expectedAdvances} 次，实际 ${distinctSeeds} 种种子（${wiring.seeds.join(",")}）`);
 assert.ok(wiring.seeds.every((s, i) => i === 0 || s >= wiring.seeds[i - 1] || s < 4), "种子随时间单调推进（只在回绕处下降）");
 assert.ok(wiring.seeds.every((s) => Number.isInteger(s) && s >= 0 && s < wiring.seedRange), "种子是 [0, seedCount) 的整数");
+assert.ok(wiring.blends.every((b) => b >= 0 && b < 1), "blend 落在 [0, 1)");
+assert.ok(wiring.blends.some((b, i) => i > 0 && Math.abs(b - wiring.blends[i - 1]) > 0.01), "blend 在种子持有期内持续推进（不是每帧硬切）");
 
 // 3. 设置层
 assert.ok(settings, "设置层有结果");

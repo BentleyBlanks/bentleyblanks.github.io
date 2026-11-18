@@ -156,6 +156,8 @@ uniform float uSplitHighlight;
 uniform float uVignette;
 uniform float uGrain;          // 胶片颗粒：sRGB 域标准差（0–1）；0 = 关
 uniform float uGrainSeed;      // 当前花样的种子（整数，0..seedCount-1）
+uniform float uGrainSeedNext;  // 下一张花样的种子（与 uGrainSeed 平滑过渡）
+uniform float uGrainBlend;     // 0 = 只用当前种子，1 = 只用下一张；过渡中途按权重平方和归一
 uniform float uGrainPx;        // 颗粒格边长（目标像素）；≤ 1 = 逐像素
 uniform float uGrainMode;      // 0 = 单格亮度噪声（low 档），1 = 平滑插值 + 彩色颗粒
 uniform float uGrainChroma;    // 彩色颗粒比例（0–1）
@@ -518,29 +520,39 @@ vec4 GrainHash(vec2 cell) {
 }
 
 // 一格的颗粒：.w 是亮度噪声，.xyz 是各通道的彩色噪声；均匀分布拉成单位方差（σ = 1）。
-vec3 GrainCell(vec2 cell, float chroma) {
-  vec4 n = (GrainHash(cell + vec2(uGrainSeed * 17.0, uGrainSeed * 29.0)) - 0.5) * 3.4641016;
+vec3 GrainCell(vec2 cell, float seed, float chroma) {
+  vec4 n = (GrainHash(cell + vec2(seed * 17.0, seed * 29.0)) - 0.5) * 3.4641016;
   // 亮度噪声与色度噪声独立，方差各占 (1-c) 与 c：每个通道仍是单位方差。chroma = 0 即纯亮度噪声。
   return sqrt(1.0 - chroma) * n.w + sqrt(chroma) * n.xyz;
 }
 
-// 单位方差的颗粒场（σ = 1，每个通道）。
+// 某一张种子的单位方差颗粒场。
 //   · uGrainMode < 0.5（low 档的便宜路径）：最近格、纯亮度噪声（一次 hash）。
-//   · 颗粒格 ≤ 1 像素（出厂 1080p 就是这条）：逐像素一格、带彩色颗粒、不插值（最细的颗粒，一次 hash）。
+//   · 颗粒格 ≤ 1 像素：逐像素一格、带彩色颗粒、不插值。
 //   · 否则：四格平滑插值（smoothstep 权重），**再除以权重平方和的平方根**——插值会压低方差，
-//     不归一的话「颗粒大小」滑杆会同时改强度。彩色比例按 sqrt 分配，亮度与色度噪声各占 (1-c)、c 的方差。
-vec3 FilmGrainField(vec2 fragCoord) {
-  if (uGrainMode < 0.5) return vec3(GrainCell(floor(fragCoord / max(uGrainPx, 1.0)), 0.0).x);
-  if (uGrainPx <= 1.001) return GrainCell(floor(fragCoord), uGrainChroma);
+//     不归一的话「颗粒大小」滑杆会同时改强度。
+vec3 FilmGrainFieldAt(vec2 fragCoord, float seed) {
+  if (uGrainMode < 0.5) return vec3(GrainCell(floor(fragCoord / max(uGrainPx, 1.0)), seed, 0.0).x);
+  if (uGrainPx <= 1.001) return GrainCell(floor(fragCoord), seed, uGrainChroma);
   vec2 p = fragCoord / uGrainPx - 0.5;
   vec2 i = floor(p);
   vec2 f = fract(p);
   vec2 w = f * f * (3.0 - 2.0 * f);
-  vec3 a = GrainCell(i, uGrainChroma), b = GrainCell(i + vec2(1.0, 0.0), uGrainChroma);
-  vec3 c = GrainCell(i + vec2(0.0, 1.0), uGrainChroma), d = GrainCell(i + vec2(1.0, 1.0), uGrainChroma);
+  vec3 a = GrainCell(i, seed, uGrainChroma), b = GrainCell(i + vec2(1.0, 0.0), seed, uGrainChroma);
+  vec3 c = GrainCell(i + vec2(0.0, 1.0), seed, uGrainChroma), d = GrainCell(i + vec2(1.0, 1.0), seed, uGrainChroma);
   vec3 n = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
-  vec2 q = (1.0 - w) * (1.0 - w) + w * w;      // 每轴 Σ weight²
+  vec2 q = (1.0 - w) * (1.0 - w) + w * w;
   return n * inversesqrt(max(q.x * q.y, 1e-4));
+}
+
+// 相邻两张种子平滑过渡；mix 会压方差，除以 √((1−t)²+t²) 让过渡中途强度不掉。
+vec3 FilmGrainField(vec2 fragCoord) {
+  float t = clamp(uGrainBlend, 0.0, 1.0);
+  if (t <= 0.001) return FilmGrainFieldAt(fragCoord, uGrainSeed);
+  if (t >= 0.999) return FilmGrainFieldAt(fragCoord, uGrainSeedNext);
+  vec3 a = FilmGrainFieldAt(fragCoord, uGrainSeed);
+  vec3 b = FilmGrainFieldAt(fragCoord, uGrainSeedNext);
+  return mix(a, b, t) * inversesqrt(max((1.0 - t) * (1.0 - t) + t * t, 1e-4));
 }
 
 vec3 ApplyFilmGrain(vec3 color) {
@@ -699,7 +711,8 @@ export class CompositePass {
       uExposure: { value: 1.0 }, uExposureTex: { value: this.whitePixel },
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
       uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uChromaKeep: { value: 0 }, uGrain: { value: FILM_GRAIN.strength },
-      uGrainSeed: { value: 0 }, uGrainPx: { value: FILM_GRAIN.sizePx }, uGrainMode: { value: 1 },
+      uGrainSeed: { value: 0 }, uGrainSeedNext: { value: 1 }, uGrainBlend: { value: 0 },
+      uGrainPx: { value: FILM_GRAIN.sizePx }, uGrainMode: { value: 1 },
       uGrainChroma: { value: FILM_GRAIN.chroma },
       uGrainResponse: { value: new THREE.Vector2(FILM_GRAIN.response.floor, FILM_GRAIN.response.blackFade) },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
@@ -832,7 +845,7 @@ export class CompositePass {
     U.uChromaKeep.value = Math.max(0, Math.min(1, options.chromaKeep || 0));
     // 胶片颗粒：强度 = 调用方给的最终值（出厂值 × 面板倍率）；格子大小按**本 pass 实际输出的像素高度**
     // 等比缩放（TAAU 时内部与输出分辨率不同，gl_FragCoord 走的是输出靶），4K 与 1080p 粗细一致。
-    // 换花样按时钟走（FILM_GRAIN.rateHz），没有 dt 的取证页退回按帧数当 60 fps，同一帧序列结果恒定。
+    // 换花样按时钟走（FILM_GRAIN.rateHz），相邻种子用 uGrainBlend 平滑过渡；没有 dt 的取证页退回按 60 fps。
     U.uGrain.value = Math.max(0, options.grain ?? FILM_GRAIN.strength);
     const grainSize = Math.min(FILM_GRAIN.sizeRange.max, Math.max(FILM_GRAIN.sizeRange.min,
       Number.isFinite(options.grainSize) ? options.grainSize : FILM_GRAIN.sizeRange.value));
@@ -840,7 +853,11 @@ export class CompositePass {
     U.uGrainMode.value = ctx.preset.filmGrain ? 1 : 0;
     if (Number.isFinite(options.dt)) this.grainClock += Math.max(0, options.dt);
     else this.grainClock = ctx.frame / 60;
-    U.uGrainSeed.value = Math.floor(this.grainClock * FILM_GRAIN.rateHz) % FILM_GRAIN.seedCount;
+    const grainPhase = this.grainClock * FILM_GRAIN.rateHz;
+    const grainSeed = Math.floor(grainPhase) % FILM_GRAIN.seedCount;
+    U.uGrainSeed.value = grainSeed;
+    U.uGrainSeedNext.value = (grainSeed + 1) % FILM_GRAIN.seedCount;
+    U.uGrainBlend.value = grainPhase - Math.floor(grainPhase);
     U.uSaturation.value = options.saturation ?? 0.94;
     U.uContrast.value = options.contrast ?? 1.06;
     // 分离调色 + lift/gain。Script_Main / Script_Probe 的调用点只透传 `preset.fog`，
