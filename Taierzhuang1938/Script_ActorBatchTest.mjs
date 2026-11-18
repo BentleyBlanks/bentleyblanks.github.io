@@ -142,7 +142,7 @@ for (const phase of PHASES) {
       const pixels = new Uint8Array(width * height * 4);
       T.renderer.setRenderTarget(null);
       gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      return { calls, pixels };
+      return { calls, pixels, skipped:T.actorBatch.stats.cameraTrianglesSkipped };
     };
     /** 空跑到时域链的不动点。不读回缓冲，一趟只有一次 Render。 */
     const Warm = () => { for (let i = 0; i < warmDraws; i += 1) Draw(false); };
@@ -167,6 +167,23 @@ for (const phase of PHASES) {
     T.actorBatch.SetEnabled(true);
     const noiseOn = Compare(on.pixels, onAgain.pixels);
     const noiseOff = Compare(off.pixels, offAgain.pixels);
+    const subsetProbe=encounter?await (async()=>{
+      const THREE=await import('three'),scope=T.actorBatch.cameraSubset;
+      const geometry=new THREE.BoxGeometry(1,1,1,12,12,12),mesh=new THREE.InstancedMesh(geometry,new THREE.MeshBasicMaterial(),3);
+      const prev=new THREE.InstancedBufferAttribute(new Float32Array(48),16);geometry.setAttribute('instancePreviousMatrix',prev);
+      for(const [i,x] of [20,0,21].entries()){
+        mesh.setMatrixAt(i,new THREE.Matrix4().makeTranslation(x,0,-5));prev.array[i*16+12]=x-0.125;
+      }
+      const shadow=mesh.clone();shadow.visible=false;const group={valid:true,normal:mesh,shadow};
+      const fixture={depthBatch:{groups:new Map([[1,group]])},stats:{cameraTrianglesSkipped:0}};
+      const camera=new THREE.PerspectiveCamera(50,1,.1,30);
+      const Read=()=>[mesh.count,...Array.from({length:mesh.count},(_,i)=>[mesh.instanceMatrix.array[i*16+12],prev.array[i*16+12]]),shadow.count];
+      const before=Read();let nested;
+      const center=scope.Draw(fixture,camera,()=>{nested=scope.Draw(fixture,new THREE.OrthographicCamera(),Read);return Read();});camera.position.x=20;
+      let right;try{scope.Draw(fixture,camera,()=>{right=Read();throw 'test scope cleanup';});}catch(e){if(e!=='test scope cleanup')throw e;}
+      const after=Read();shadow.dispose();mesh.dispose();geometry.dispose();mesh.material.dispose();
+      return {before,center,right,after,nested};
+    })():null;
     const velocity=[];
     if(encounter) {
       const THREE=await import('three');
@@ -215,7 +232,7 @@ for (const phase of PHASES) {
       }
     }
     return {
-      velocity,poseParity,
+      velocity,poseParity,subsetProbe,skipped:on.skipped,
       calls: { on: on.calls, off: off.calls },
       stats: { ...T.actorBatch.stats },
       // 噪声底取两侧的大者：任何一侧没压平，A/B 的结论都不作数。
@@ -227,6 +244,11 @@ for (const phase of PHASES) {
 
   const { calls, stats, noise, diff } = result;
   if(encounter){
+    console.log(`camera subset: ${result.skipped} triangles outside the encounter camera skipped across colour/normal passes`);
+    if(!(result.skipped>0))failures.push('Encounter must skip real offscreen geometry');
+    const p=result.subsetProbe;
+    if(JSON.stringify(p.before)!==JSON.stringify(p.nested)||JSON.stringify(p.before)!==JSON.stringify(p.after)||JSON.stringify(p.center)!==JSON.stringify([1,[0,-.125],3])
+      ||JSON.stringify(p.right)!==JSON.stringify([2,[20,19.875],[21,20.875],3]))failures.push('Camera subsets must preserve owners, motion history, full shadows, and restore after exceptions: '+JSON.stringify(p));
     console.log(`native pose and hitbox parity: ${result.poseParity.length} cases, max ${Math.max(...result.poseParity.map(p=>p.maxError))}`);
     if(result.poseParity.length<7||result.poseParity.some(p=>p.maxError>1e-6))failures.push('Native pose fast path changed bones, weapon or hitboxes: '+JSON.stringify(result.poseParity.filter(p=>p.maxError>1e-6)));
   }

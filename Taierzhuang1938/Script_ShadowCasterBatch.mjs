@@ -36,6 +36,7 @@
 // 回归口：Script_ShadowCasterBatchTest（纯 Node）；实机看 shadow 段 draw 与逐像素阴影图。
 // ===========================================================================
 
+import { TrackBatchUploads } from "./Script_BatchUploadRanges.mjs";
 import * as THREE from "three";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { STATIC_CASTER_BATCH } from "./Data_Tuning_Shadows.mjs";
@@ -594,6 +595,7 @@ export class ShadowCasterBatch {
       }
     }
     const ids = prepared.parts.map((part) => mesh.addGeometry(part));
+    TrackBatchUploads(group);
     const entry = { id: ids[0], ids, refs: 0, prepared, version: prepared.version, source };
     group.geometries.set(source, entry);
     return entry;

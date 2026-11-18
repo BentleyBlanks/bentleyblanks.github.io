@@ -391,7 +391,21 @@ export class Hud {
     this.el.missionArea.setAttribute("aria-live", "polite");
     this.el.missionArea.setAttribute("aria-hidden", "true");
     this.missionAreaSeconds = null;
-    this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
+    // Bake the farthest-corner vignette once at HUD creation. The compositor
+    // stretches this small bitmap and only changes its opacity during play.
+    const mask = this.el.suppress = mk("hudSuppress", this.root, "canvas");
+    mask.setAttribute("aria-hidden", "true");
+    const size = 256, half = size / 2;
+    mask.width = mask.height = size;
+    const ink = mask.getContext("2d");
+    if (ink) {
+      const vignette = ink.createRadialGradient(half, half, 0, half, half, half * Math.SQRT2);
+      vignette.addColorStop(0.34, "rgba(6,6,8,0)");
+      vignette.addColorStop(0.72, "rgba(6,6,8,0.55)");
+      vignette.addColorStop(1, "rgba(4,4,6,0.9)");
+      ink.fillStyle = vignette;
+      ink.fillRect(0, 0, size, size);
+    }
     this.el.damage = mk("hudDamage");
     this.el.meleeKillBlood = mk("hudMeleeKillBlood");
     this.el.meleeKillBlood.setAttribute("aria-hidden", "true");
@@ -951,49 +965,37 @@ export class Hud {
     svg.setAttribute("class", "hudHitDirs");
     svg.setAttribute("viewBox", "-100 -100 200 200");
     svg.setAttribute("aria-hidden", "true");
-    const defs = document.createElementNS(NS, "defs");
+    // Rasterize the two fixed indicators once. Live SVG blur/gradients used to
+    // compile several Skia programs together on the very first near miss.
     const edge = HITDIR.radius * Math.sin(HITDIR.spanDeg * Math.PI / 360);
-    const Gradient = (id, stops) => {
-      const grad = document.createElementNS(NS, "linearGradient");
-      grad.setAttribute("id", id);
-      grad.setAttribute("gradientUnits", "userSpaceOnUse");
-      grad.setAttribute("x1", (-edge).toFixed(2)); grad.setAttribute("x2", edge.toFixed(2));
-      grad.setAttribute("y1", "0"); grad.setAttribute("y2", "0");
-      for (const [offset, color, alpha] of stops) {
-        const stop = document.createElementNS(NS, "stop");
-        stop.setAttribute("offset", offset);
-        stop.setAttribute("stop-color", color);
-        stop.setAttribute("stop-opacity", alpha);
-        grad.appendChild(stop);
-      }
-      defs.appendChild(grad);
+    const pad = Math.ceil(HITDIR.glowBlur * 4 + HITDIR.halfWidth);
+    const x = -Math.ceil(edge)-pad, y = -Math.ceil(HITDIR.radius+HITDIR.tipHeight+HITDIR.halfWidth)-pad;
+    const w = -2*x, h = Math.ceil(-HITDIR.radius*Math.cos(HITDIR.spanDeg*Math.PI/360))+pad-y;
+    const path = new Path2D(HitDirArcPath(HITDIR)), scale = 8;
+    const Bake = near => {
+      const canvas = document.createElement("canvas"); canvas.width=w*scale; canvas.height=h*scale;
+      const c=canvas.getContext("2d", {willReadFrequently:true});
+      c.setTransform(scale,0,0,scale,-x*scale,-y*scale);
+      const gradient=c.createLinearGradient(-edge,0,edge,0), shade=c.createLinearGradient(-edge,0,edge,0);
+      const colors=near?["rgba(255,255,255,0)","rgba(242,238,230,.65)","white"]
+        :["rgba(122,11,22,0)","rgba(168,28,38,.7)","rgb(227,38,48)"];
+      [0,.2,.5,.8,1].forEach((t,i)=>gradient.addColorStop(t,colors[Math.min(i,4-i)]));
+      shade.addColorStop(0,"transparent");shade.addColorStop(.5,"black");shade.addColorStop(1,"transparent");
+      c.filter=`blur(${HITDIR.glowBlur*scale}px)`;c.globalAlpha=near ? .45 : .4;c.fillStyle=near?shade:gradient;c.fill(path);
+      c.filter="none";c.globalAlpha=1;c.fillStyle=gradient;c.fill(path);
+      return canvas.toDataURL();
     };
-    Gradient("hudHitFillHit", [[0, "#7a0b16", 0], [0.2, "#a81c26", 0.7], [0.5, "#e32630", 1], [0.8, "#a81c26", 0.7], [1, "#7a0b16", 0]]);
-    Gradient("hudHitFillNear", [[0, "#ffffff", 0], [0.2, "#f2eee6", 0.65], [0.5, "#ffffff", 1], [0.8, "#f2eee6", 0.65], [1, "#ffffff", 0]]);
-    Gradient("hudHitShade", [[0, "#000000", 0], [0.5, "#000000", 1], [1, "#000000", 0]]);
-    const blur = document.createElementNS(NS, "filter");
-    blur.setAttribute("id", "hudHitGlowBlur");
-    blur.setAttribute("x", "-50%"); blur.setAttribute("y", "-50%");
-    blur.setAttribute("width", "200%"); blur.setAttribute("height", "200%");
-    const gaussian = document.createElementNS(NS, "feGaussianBlur");
-    gaussian.setAttribute("stdDeviation", HITDIR.glowBlur);
-    blur.appendChild(gaussian);
-    defs.appendChild(blur);
-    svg.appendChild(defs);
-    const d = HitDirArcPath(HITDIR);
+    const hitImage=Bake(false), nearImage=Bake(true);
     this.hitDirNodes = [];
     for (let i = 0; i < HIT_FEEDBACK.markMax; i += 1) {
       const node = document.createElementNS(NS, "g");
       node.setAttribute("class", "hudHitDir");
       node.style.opacity = "0";
-      const glow = document.createElementNS(NS, "path");
-      glow.setAttribute("class", "hudHitGlow");
-      glow.setAttribute("d", d);
-      glow.setAttribute("filter", "url(#hudHitGlowBlur)");
-      const arc = document.createElementNS(NS, "path");
-      arc.setAttribute("class", "hudHitArc");
-      arc.setAttribute("d", d);
-      node.append(glow, arc);
+      for(const [kind,href] of [["hit",hitImage],["near",nearImage]]){
+        const image=document.createElementNS(NS,"image");image.setAttribute("class",`hudArcImage ${kind}`);
+        for(const [key,v] of Object.entries({x,y,width:w,height:h,href}))image.setAttribute(key,v);
+        node.appendChild(image);
+      }
       svg.appendChild(node);
       this.hitDirNodes.push(node);
     }

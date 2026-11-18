@@ -16,7 +16,7 @@ import { SetShadowOnly } from "./Script_ShadowSkip.mjs";
 
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _delta = new THREE.Quaternion();
 const _va = new THREE.Vector3(), _vb = new THREE.Vector3();
-const _s = new THREE.Vector3();
+const _unit = new THREE.Vector3(1, 1, 1), _unscaled = new THREE.Matrix4(), _inverse = new THREE.Matrix4();
 const ARM_BONES = /_(L|R)_(Clavicle|UpperArm|Forearm|Hand|Finger\d+)$/;
 
 function RotateBoneWorld(bone, delta) {
@@ -82,7 +82,10 @@ export class FirstPersonShadow {
     this.root.scale.setScalar(have > 0.5 ? want / have : 1);
     this.gun = new THREE.Group();
     this.gun.name = "FirstPersonShadowGun";
-    this.gunSource = null;
+    this.equippedRig = null;
+    this.sources = [];
+    this.handPositions = [new THREE.Vector3(), new THREE.Vector3()];
+    this.hands = [null, null];
     this.gunMeshes = [];
     this.active = false;
   }
@@ -131,49 +134,57 @@ export class FirstPersonShadow {
     for (const mesh of this.meshes) if (mesh.isSkinnedMesh) mesh.skeleton.update();
   }
 
-  /** fovRig 的深度压缩临时压回 1，读双手与枪网格的世界位姿，再还原。→ [左手, 右手] 世界坐标（缺的为 null） */
+  // Convert current world matrices to the uncompressed FOV space once. The
+  // viewmodel (including attached skin bind matrices) stays in its render pose.
   _TrueSizeGunAndHands(viewmodel) {
     const rig = viewmodel?.fovRig, mount = viewmodel?.weaponMount;
-    if (!rig || !mount || !viewmodel.root.visible) { this.gun.visible = false; return null; }
-    const saved = _s.copy(rig.scale);
-    rig.scale.set(1, 1, 1);
+    if (!rig || !mount || !viewmodel.root.visible) {
+      for (const clone of this.gunMeshes) clone.visible = false;
+      return null;
+    }
+    viewmodel.root.updateWorldMatrix(true, false);
     viewmodel.root.updateMatrixWorld(true);
+    _unscaled.compose(rig.position, rig.quaternion, _unit);
+    if (rig.parent) _unscaled.premultiply(rig.parent.matrixWorld);
+    _unscaled.multiply(_inverse.copy(rig.matrixWorld).invert());
+    if (this.equippedRig !== viewmodel.rig) {
+      this.gun.clear(); this.gunMeshes.length = 0; this.equippedRig = viewmodel.rig;
+    }
     this._SyncGun(mount);
-    const arms = viewmodel.riggedArms?.bones;
-    const out = [arms?.l?.hand, arms?.r?.hand].map((bone) => (bone ? bone.getWorldPosition(new THREE.Vector3()) : null));
-    rig.scale.copy(saved);
-    viewmodel.root.updateMatrixWorld(true);
-    return out;
+    const bones = viewmodel.riggedArms?.bones;
+    for (let i = 0; i < 2; i++) {
+      const bone = i === 0 ? bones?.l?.hand : bones?.r?.hand;
+      this.hands[i] = bone ? this.handPositions[i].setFromMatrixPosition(bone.matrixWorld).applyMatrix4(_unscaled) : null;
+    }
+    return this.hands;
   }
 
-  /** 枪的影子：换枪时按 weaponMount 下的不透明网格重建克隆（几何共用），每帧抄世界矩阵。 */
+  // A round or clip becoming visible should not recreate the whole shadow gun.
+  // Reuse slots for visible rigid meshes, bounded by this weapon's peak demand.
   _SyncGun(mount) {
-    const sources = [];
-    mount.traverse((node) => {
+    const sources = this.sources;
+    sources.length = 0;
+    for (const child of mount.children) child.traverseVisible(node => {
       if (!node.isMesh || node.isSkinnedMesh || !node.geometry) return;
-      let shown = true; for (let o = node; o && o !== mount; o = o.parent) if (!o.visible) { shown = false; break; }
-      const materials = Array.isArray(node.material) ? node.material : [node.material];
-      if (!shown || materials.some((m) => m?.transparent || m?.depthWrite === false)) return;
+      const material = node.material;
+      if (Array.isArray(material) ? material.some(m => m?.transparent || m?.depthWrite === false)
+        : material?.transparent || material?.depthWrite === false) return;
       sources.push(node);
     });
-    const key = sources.map((n) => n.geometry.uuid).join("|");
-    if (key !== this.gunSource) {
-      for (const clone of this.gunMeshes) this.gun.remove(clone);
-      this.gunMeshes = sources.map((src) => {
-        const clone = new THREE.Mesh(src.geometry, src.material);
-        clone.matrixAutoUpdate = false;
-        clone.castShadow = true; clone.receiveShadow = false; clone.frustumCulled = false;
-        clone.userData.skipNormalDepth = true;
-        this.gun.add(clone);
-        return clone;
-      });
-      this.gunSource = key;
-    }
-    this.gun.visible = true;
     for (let i = 0; i < sources.length; i++) {
-      this.gunMeshes[i].matrix.copy(sources[i].matrixWorld);
-      this.gunMeshes[i].matrixWorld.copy(sources[i].matrixWorld);
+      const src = sources[i];
+      let clone = this.gunMeshes[i];
+      if (!clone) {
+        clone = new THREE.Mesh(src.geometry, src.material);
+        clone.matrixAutoUpdate = false; clone.castShadow = true; clone.frustumCulled = false;
+        clone.userData.skipNormalDepth = true;
+        this.gun.add(clone); this.gunMeshes.push(clone);
+      }
+      clone.visible = true; clone.geometry = src.geometry; clone.material = src.material;
+      clone.matrix.multiplyMatrices(_unscaled, src.matrixWorld);
+      clone.matrixWorld.copy(clone.matrix);
     }
+    for (let i = sources.length; i < this.gunMeshes.length; i++) this.gunMeshes[i].visible = false;
   }
 
   /** 两节骨骼 IK：中间关节先弯到够得着的角度，再整条对准目标，最后绕根→目标的轴把中间关节转向 pole。 */

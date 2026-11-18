@@ -34,6 +34,72 @@ import * as THREE from "three";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { ActorDepthBatcher } from "./Script_ActorDepthBatch.mjs";
 
+// Only the colour and normal draws use this subset. Shadow draws have their
+// own full caster buffers. Test the actual render camera (including TAA jitter),
+// keep the source order and move previous transforms with current transforms.
+class CameraInstanceSubset {
+  constructor(){this.records=new WeakMap();this.saved=[];this.clip=new THREE.Matrix4();this.frustum=new THREE.Frustum();this.matrix=new THREE.Matrix4();this.box=new THREE.Box3();}
+  Draw(batch,camera,draw){
+    if(this.active){
+      // A probe/secondary camera may render recursively from a draw callback.
+      if(this.suspended)return draw();
+      this.suspended=true;
+      try{for(const r of this.saved)this.Restore(r);return draw();}
+      finally{for(const r of this.saved)this.Compact(r);this.suspended=false;}
+    }
+    if(!camera?.isPerspectiveCamera||camera.isArrayCamera)return draw();
+    this.active=true;
+    try{
+      if(!camera.parent&&camera.matrixWorldAutoUpdate)camera.updateMatrixWorld();
+      this.clip.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+      this.frustum.setFromProjectionMatrix(this.clip,camera.coordinateSystem,camera.reversedDepth);
+      for(const g of batch.depthBatch.groups.values())if(g.valid){
+        if(g.normal?.visible)this.Apply(g.normal,batch);
+        else for(const part of g.parts){const m=part.meshes.plain;if(m?.visible)this.Apply(m,batch);}
+      }
+      return draw();
+    }finally{
+      for(const r of this.saved)this.Restore(r);
+      this.saved.length=0;this.active=false;
+    }
+  }
+  Restore({mesh,count,first,end,current,previous}){
+    const a=mesh.instanceMatrix,b=mesh.geometry.attributes.instancePreviousMatrix;
+    if(end>first){a.array.set(current.subarray(first*16,end*16),first*16);b.array.set(previous.subarray(first*16,end*16),first*16);a.needsUpdate=true;b.needsUpdate=true;}
+    mesh.count=count;
+  }
+  Compact({mesh,first,end,indices}){
+    const a=mesh.instanceMatrix,b=mesh.geometry.attributes.instancePreviousMatrix;
+    for(let j=first;j<end;j++){
+      const i=indices[j];a.array.copyWithin(j*16,i*16,i*16+16);b.array.copyWithin(j*16,i*16,i*16+16);
+    }
+    if(end>first){a.needsUpdate=true;b.needsUpdate=true;}
+    mesh.count=end;
+  }
+  Apply(mesh,batch){
+    const count=mesh.count,g=mesh.geometry,triangles=(g.index?.count??g.attributes.position.count)/3;
+    if(!count||triangles*count<2048)return;
+    if(!g.boundingBox)g.computeBoundingBox();
+    if(!g.boundingBox||g.boundingBox.isEmpty())return;
+    const current=mesh.instanceMatrix,previous=g.attributes.instancePreviousMatrix;
+    let r=this.records.get(mesh);
+    if(!r){r={mesh,indices:new Uint32Array(current.count),current:new Float32Array(current.array.length),previous:new Float32Array(previous.array.length)};this.records.set(mesh,r);}
+    let n=0,first=count;
+    for(let i=0;i<count;i++){
+      this.matrix.fromArray(current.array,i*16).premultiply(mesh.matrixWorld);
+      this.box.copy(g.boundingBox).applyMatrix4(this.matrix);
+      if(this.frustum.intersectsBox(this.box))r.indices[n++]=i;else if(first===count)first=i;
+    }
+    if(n===count)return;
+    batch.stats.cameraTrianglesSkipped+=(count-n)*triangles;
+    r.count=count;r.first=first;r.end=n;this.saved.push(r);
+    if(n>first){
+      r.current.set(current.array.subarray(first*16,n*16),first*16);r.previous.set(previous.array.subarray(first*16,n*16),first*16);
+    }
+    this.Compact(r);
+  }
+}
+
 /** 原网格挪去的图层：相机与灯的 layers 掩码都只有第 0 位，挪过去就等于不提交。 */
 const BATCH_LAYER = 30;
 /** 人物包围球半径（米）。人高 1.8 m，倒地/挥枪时分件最远也在根节点 1.5 m 内。 */
@@ -95,6 +161,7 @@ export class ActorBatcher {
     this.ancestry=new WeakMap();
     this.sourceRoots=[];
     this.depthBatch = new ActorDepthBatcher(scene);
+    this.cameraSubset = new CameraInstanceSubset();
     this.shadowScope = false;
     if (renderer) this.EnableShadowScope(renderer);
   }
@@ -116,7 +183,11 @@ export class ActorBatcher {
         // hidden just for submission; animation and all gameplay reads see the
         // original visibility before and after this synchronous render scope.
         if(batch.enabled&&scene===batch.scene)for(const root of batch.sourceRoots){saved.push(root,root.visible);root.visible=false;}
-        try{return render.call(this,scene,...args);}
+        try{
+          if(batch.enabled&&batch.shadowScope&&scene===batch.scene&&!this.xr?.isPresenting)
+            return batch.cameraSubset.Draw(batch,args[0],()=>render.call(this,scene,...args));
+          return render.call(this,scene,...args);
+        }
         finally{for(let i=0;i<saved.length;i+=2)saved[i].visible=saved[i+1];}
       };
     }
@@ -201,6 +272,7 @@ export class ActorBatcher {
   Update(camera) {
     if (!this.enabled) return;
     this.frame += 1;
+    this.stats.cameraTrianglesSkipped=0;
     this.sourceRoots.length=0;
     this.depthBatch.BeginFrame();
     for (const group of this.groups.values()) { group.count.cast = 0; group.count.plain = 0;group.changed=GeometryChanged(group); }

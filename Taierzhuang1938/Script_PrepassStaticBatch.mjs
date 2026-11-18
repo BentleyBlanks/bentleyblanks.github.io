@@ -24,6 +24,7 @@
 // 回归口：Script_PrepassStaticBatchTest（纯 Node）。
 // ===========================================================================
 
+import { TrackBatchUploads } from "./Script_BatchUploadRanges.mjs";
 import * as THREE from "three";
 import { PREPASS_STATIC_BATCH } from "./Data_Tuning_Graphics.mjs";
 
@@ -431,6 +432,7 @@ export class PrepassStaticBatch {
       }
     }
     const id = mesh.addGeometry(geometry);
+    TrackBatchUploads(group);
     geometry.dispose();
     const entry = { id, refs: 0, version, source };
     group.geometries.set(source, entry);

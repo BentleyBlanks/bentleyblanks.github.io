@@ -30,6 +30,7 @@ export class FpsSkeletalAnimation {
     this.other=new THREE.Quaternion();this.matrix=new THREE.Matrix4();
     this.unit=new THREE.Vector3(1,1,1);
     this.boneMap=new Map();
+    this.bindings=null;
     this.cameraScaleRig=null;
     if(viewmodel.fovRig?.parent===viewmodel.root){
       this.cameraScaleRig=new THREE.Group();this.cameraScaleRig.name='FpsReloadCameraScale';
@@ -79,17 +80,26 @@ export class FpsSkeletalAnimation {
       ...Object.fromEntries(Object.entries(vm.rig?.parts||{}).map(([key,obj])=>['part_'+key,obj]))};
   }
 
+  Bindings(asset) {
+    const vm=this.vm;
+    if(this.bindings?.asset!==asset||this.bindings.rig!==vm.rig||this.bindings.arms!==vm.riggedArms){
+      this.bindings={asset,rig:vm.rig,arms:vm.riggedArms,bones:asset.bones.map(name=>this.boneMap.get(Normalize(name))),objects:this.Controls()};
+    }
+    return this.bindings;
+  }
+
   Apply(name,time,{weight=1,controls=null,visible=false,preserveParts=false}={}) {
     const clip=this.Clip(name),asset=this.assets?.[this.vm.weaponId];
     if(!clip||!asset)return false;
-    for(let i=0;i<asset.bones.length;i++){
-      const bone=this.boneMap.get(Normalize(asset.bones[i]));if(!bone)continue;
+    const {bones,objects}=this.Bindings(asset);
+    for(let i=0;i<bones.length;i++){
+      const bone=bones[i];if(!bone)continue;
       this.Sample(clip.bones[i],clip,time);
       if(weight===1){bone.position.copy(this.position);bone.quaternion.copy(this.quaternion);}
       else {bone.position.lerp(this.position,weight);bone.quaternion.slerp(this.quaternion,weight);}
     }
-    const objects=this.Controls();
-    for(const [key,values] of Object.entries(clip.controls)){
+    for(const key in clip.controls){
+      const values=clip.controls[key];
       if(controls&&!controls.includes(key))continue;
       if(preserveParts&&key.startsWith('part_'))continue;
       const obj=objects[key];if(!obj)continue;
@@ -152,14 +162,15 @@ export class FpsSkeletalAnimation {
     this.SetCameraScale(s.view?.cameraScale??1);
     const elapsed=a.t*a.duration,weight=s.blendInS>0?Math.min(1,elapsed/s.blendInS):1;
     // Cross-fade from the pose the reload started in (held aim, open-bolt idle) to the clip.
-    const objects=this.Controls(),asset=this.assets[vm.weaponId];
-    const targets=[...asset.bones.map(name=>this.boneMap.get(Normalize(name))),...s.controls.map(key=>objects[key])].filter(Boolean);
-    s.from??=targets.map(o=>({o,p:o.position.clone(),q:o.quaternion.clone()}));
+    if(weight<1&&!s.from){
+      const {bones,objects}=this.Bindings(this.assets[vm.weaponId]);
+      s.from=[...bones,...s.controls.map(key=>objects[key])].filter(Boolean).map(o=>({o,p:o.position.clone(),q:o.quaternion.clone()}));
+    }
     this.Apply(s.clip,s.startS+elapsed,{controls:s.controls,visible:true});
     if(weight<1){
       const w=weight*weight*(3-2*weight);
-      for(const {o,p,q} of s.from){o.position.lerpVectors(p,o.position,w);o.quaternion.copy(q.clone().slerp(o.quaternion,w));}
-    }
+      for(const {o,p,q} of s.from){o.position.lerpVectors(p,o.position,w);o.quaternion.slerpQuaternions(q,this.other.copy(o.quaternion),w);}
+    }else s.from=null;
     if(!(a.packetRounds>0))for(const key of s.usedPacket)vm[key].visible=false;
     for(const side of ['r','l'])vm.riggedArms.operationPose[side]=vm.riggedArms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
     this.UpdateMatrices();

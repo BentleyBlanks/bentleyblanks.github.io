@@ -29,10 +29,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* 压制：径向暗角 + 轻微去色。ER2 的压制表现就是这个。 */
 .hudSuppress {
-  position: absolute; inset: 0; opacity: 0;
-  transition: opacity 0.18s linear;
-  background: radial-gradient(ellipse at center,
-    rgba(0,0,0,0) 34%, rgba(6,6,8,0.55) 72%, rgba(4,4,6,0.9) 100%);
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0;
+  will-change: opacity; transition: opacity 0.18s linear;
 }
 /* Imagegen 血污只覆盖周边，中央保持清楚。父层接伤害/血量，子层独立搏动。 */
 .hudDamage {
@@ -114,10 +112,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transform: translate(-50%, -50%);
   pointer-events: none; overflow: visible; z-index: 6;
 }
-.hudHitArc { fill: url(#hudHitFillHit); }
-.hudHitGlow { fill: url(#hudHitFillHit); opacity: 0.4; }
-.hudHitDir.near .hudHitArc { fill: url(#hudHitFillNear); }
-.hudHitDir.near .hudHitGlow { fill: url(#hudHitShade); opacity: 0.45; }
+.hudArcImage.near, .hudHitDir.near .hudArcImage.hit { display: none; }
+.hudHitDir.near .hudArcImage.near { display: inline; }
 @media (prefers-reduced-motion: reduce) {
   .hudDamage.low::before { animation: none; opacity: 1; }
   .hudMeleeKillBlood { transform: none !important; }
