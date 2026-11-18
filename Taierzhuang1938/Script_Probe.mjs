@@ -8,6 +8,7 @@ import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
+import { FilmGrainStrengthFor } from "./Data_Tuning_Camera.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
 import { SSIL } from "./Data_Tuning_Gtao.mjs";
 import { MakeBox, MakeSandbag, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
@@ -363,7 +364,8 @@ function Frame(dt) {
     godStrength: preset.godStrength,
     saturation: preset.saturation,
     contrast: preset.contrast,
-    grain: 0.014,
+    grain: FilmGrainStrengthFor(presetName),
+    dt,
     vignette: 0.42,
     fade: 0,
   });

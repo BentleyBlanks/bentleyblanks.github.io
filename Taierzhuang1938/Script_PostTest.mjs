@@ -94,7 +94,6 @@ try {
     U.uGodStrength.value = 0;
     U.uVignette.value = 0;
     U.uAberration.value = 0;
-    U.uGrain.value = 0;
     U.uSaturation.value = 1;
     U.uContrast.value = 1.10;
     U.uLift.value.set(0, 0, 0);
@@ -122,7 +121,7 @@ try {
     }
     const stripes=new THREE.DataTexture(pixels,64,64,THREE.RGBAFormat);
     stripes.colorSpace=THREE.NoColorSpace;stripes.needsUpdate=true;
-    U.uHdr.value=stripes;U.uGrain.value=0;U.uDither.value=0;
+    U.uHdr.value=stripes;U.uDither.value=0;
     const Read=()=>{post._Blit(post.matComposite,post.targets.ldr);
       const bytes=new Uint8Array(ldrDark.width*ldrDark.height*4);
       P.renderer.readRenderTargetPixels(ldrDark,0,0,ldrDark.width,ldrDark.height,bytes);return bytes;};

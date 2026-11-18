@@ -589,7 +589,7 @@ export const testDefs = {
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
   FilmGrainTest: { file: "Script_FilmGrainTest.mjs",
-    desc: "全屏胶片颗粒：强度 = 标准差、不改平均亮度、黑位不被抬、大小改相关长度不改强度、种子换花样、low 档便宜路径、关掉逐比特不变" },
+    desc: "最终送屏胶片颗粒：细粒与乳剂团、色度、色调响应、锐化与分辨率独立、换片连续、滑杆存档和零强度" },
   AutoQualityTest: { file: "Script_AutoQualityTest.mjs",
     desc: "自动降档（纯 Node）：阶梯映射 / 持续 2 s 才降 / 降后锁 30 s / 升档要 8 s / 死区不抖" },
   ClusteredLightsTest: { file: "Script_ClusteredLightsTest.mjs", timeoutMs: 20 * 60 * 1000,

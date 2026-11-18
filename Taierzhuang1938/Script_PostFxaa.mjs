@@ -30,6 +30,7 @@ import * as THREE from "three";
 import { MakeFullscreenMaterial, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { GLSL_COC, ApplyCocUniforms } from "./Script_PostDof.mjs";
 import { CAS, DOF } from "./Data_Tuning_TemporalDof.mjs";
+import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
 
 const FRAG_FXAA = /* glsl */`
 uniform sampler2D uSource;
@@ -38,8 +39,66 @@ uniform float uSharpen;   // CAS sharpness，0–1
 uniform float uFxaa;      // TAA 开着时置 0：几何锯齿已在时域上解决，FXAA 只会再糊一层
 uniform float uCasPeakLow;
 uniform float uCasPeakHigh;
+uniform float uGrain;          // 胶片颗粒：sRGB 域标准差（0–1）；0 = 关
+uniform float uGrainSeed;      // 当前花样的种子（整数，0..seedCount-1）
+uniform float uGrainSeedNext;  // 下一张花样的种子（与 uGrainSeed 平滑过渡）
+uniform float uGrainBlend;     // 0 = 只用当前种子，1 = 只用下一张；过渡中途按权重平方和归一
+uniform float uGrainPx;
+uniform float uGrainMode;
+uniform float uGrainChroma;    // 彩色颗粒比例（0–1）
+uniform vec2 uGrainResponse;
 varying vec2 vUv;
 ${GLSL_COMMON}
+
+vec2 GrainDeposit(ivec2 site, uint seed) {
+  uint bits = uint(site.x) * 0x9e3779b1u + uint(site.y) * 0x85ebca77u + seed * 0xc2b2ae3du;
+  bits ^= bits >> 16u; bits *= 0x7feb352du;
+  bits ^= bits >> 15u; bits *= 0x846ca68bu; bits ^= bits >> 16u;
+  uvec4 bytes = (uvec4(bits) >> uvec4(0, 8, 16, 24)) & 255u;
+  vec4 noise = (vec4(bytes) - 127.5) / 256.0;
+  return vec2(dot(noise.xyz, vec3(2.0)), noise.w * 3.464102);
+}
+
+vec2 GrainLayer(vec2 position, uint seed) {
+  vec2 lattice = vec2(position.x - position.y * .57735027, position.y * 1.15470054);
+  ivec2 base = ivec2(floor(lattice));
+  vec2 local = fract(lattice);
+  int corner = int(step(1.0, local.x + local.y));
+  vec3 dx = local.x - vec3(float(corner), 1.0, 0.0);
+  vec3 dy = local.y - vec3(float(corner), 0.0, 1.0);
+  vec3 weights = max(vec3(.75) - (dx*dx + dx*dy + dy*dy), 0.0);
+  weights = normalize(weights * weights);
+  return weights.x * GrainDeposit(base + ivec2(corner), seed)
+       + weights.y * GrainDeposit(base + ivec2(1, 0), seed)
+       + weights.z * GrainDeposit(base + ivec2(0, 1), seed);
+}
+
+vec3 FilmGrainFieldAt(vec2 fragCoord, float seed) {
+  vec2 plate = fragCoord / uGrainPx;
+  vec2 offset = fract(seed * vec2(.618034, .414214)) * 23.0;
+  float silver = GrainLayer(mat2(.8, .6, -.6, .8) * plate + offset, uint(seed)).x;
+  if (uGrainMode < .5) return vec3(silver);
+  vec2 clouds = GrainLayer(mat2(.28, -.96, .96, .28) * plate * .43 - offset, uint(seed) + 7919u);
+  float density = .925 * silver + .38 * clouds.x;
+  return vec3(density) + uGrainChroma * clouds.y * vec3(.95, -.18, -.98);
+}
+
+// 相邻两张种子平滑过渡；mix 会压方差，除以 √((1−t)²+t²) 让过渡中途强度不掉。
+vec3 FilmGrainField(vec2 fragCoord) {
+  float t = clamp(uGrainBlend, 0.0, 1.0);
+  if (t <= 0.001) return FilmGrainFieldAt(fragCoord, uGrainSeed);
+  if (t >= 0.999) return FilmGrainFieldAt(fragCoord, uGrainSeedNext);
+  vec3 a = FilmGrainFieldAt(fragCoord, uGrainSeed);
+  vec3 b = FilmGrainFieldAt(fragCoord, uGrainSeedNext);
+  return mix(a, b, t) * inversesqrt(max((1.0 - t) * (1.0 - t) + t * t, 1e-4));
+}
+
+vec3 ApplyFilmGrain(vec3 color) {
+  float y = Luma(color);
+  float response = smoothstep(0.0, uGrainResponse.x, y) * (1.0 - smoothstep(uGrainResponse.y, 1.0, y));
+  vec3 amplitude = min(vec3(uGrain * response), .2 * min(color, 1.0 - color));
+  return clamp(color + FilmGrainField(gl_FragCoord.xy) * amplitude, 0.0, 1.0);
+}
 
 void main() {
   // CAS 的 3×3 取名沿用 AMD 原版：
@@ -91,6 +150,7 @@ void main() {
     vec3 w = amp * peak;
     result = clamp((b * w + d * w + f * w + h * w + e) / (1.0 + 4.0 * w), 0.0, 1.0);
   }
+  if (uGrain > 0.0) result = ApplyFilmGrain(result);
   gl_FragColor = vec4(result, 1.0);
 }
 `;
@@ -160,11 +220,17 @@ export const TEMPORAL_DEBUG_VIEWS = ["velocityTile", "dofCoc", "taaWeight"];
 export class FxaaPass {
   constructor(pipeline) {
     this.name = "fxaa";
+    this.grainClock = 0;
     this.pipeline = pipeline;
     this.uniforms = {
       uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
       uSharpen: { value: pipeline.preset.sharpen }, uFxaa: { value: 1 },
       uCasPeakLow: { value: CAS.peakLow }, uCasPeakHigh: { value: CAS.peakHigh },
+      uGrain: { value: 0 },
+      uGrainSeed: { value: 0 }, uGrainSeedNext: { value: 1 }, uGrainBlend: { value: 0 },
+      uGrainPx: { value: FILM_GRAIN.sizePx }, uGrainMode: { value: 1 },
+      uGrainChroma: { value: FILM_GRAIN.chroma },
+      uGrainResponse: { value: new THREE.Vector2(FILM_GRAIN.response.toeEnd, FILM_GRAIN.response.shoulderStart) },
     };
     this.material = MakeFullscreenMaterial(FRAG_FXAA, this.uniforms);
 
@@ -204,6 +270,22 @@ export class FxaaPass {
     this.uniforms.uTexel.value.set(1 / source.width, 1 / source.height);
     this.uniforms.uSharpen.value = ctx.options.sharpen ?? P.sharpenStrength;
     this.uniforms.uFxaa.value = ctx.taaActive ? 0 : 1;
+    const { options } = ctx;
+    const U = this.uniforms;
+    U.uGrain.value = Math.max(0, options.grain ?? FILM_GRAIN.strength);
+    const grainSize = Math.min(FILM_GRAIN.sizeRange.max, Math.max(FILM_GRAIN.sizeRange.min,
+      Number.isFinite(options.grainSize) ? options.grainSize : FILM_GRAIN.sizeRange.value));
+    U.uGrainPx.value = Math.max(1, FILM_GRAIN.sizePx * grainSize * P.renderer.domElement.height / 1080);
+    U.uGrainMode.value = ctx.preset.filmGrain ? 1 : 0;
+    if (Number.isFinite(options.dt)) this.grainClock += Math.max(0, options.dt);
+    else this.grainClock = ctx.frame / 60;
+    const grainPhase = this.grainClock * FILM_GRAIN.rateHz;
+    const grainSeed = Math.floor(grainPhase) % FILM_GRAIN.seedCount;
+    U.uGrainSeed.value = grainSeed;
+    U.uGrainSeedNext.value = (grainSeed + 1) % FILM_GRAIN.seedCount;
+    const angle = (grainPhase - Math.floor(grainPhase)) * Math.PI / 2;
+    const nextWeight = Math.sin(angle);
+    U.uGrainBlend.value = nextWeight / (Math.cos(angle) + nextWeight);
     ctx.blitter.Blit(this.material, null);
   }
 

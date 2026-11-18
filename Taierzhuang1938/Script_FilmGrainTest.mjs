@@ -1,4 +1,4 @@
-// 全屏胶片颗粒回归（Composite 的 LensEffects 段，口径见 Data_Tuning_Camera.FILM_GRAIN）。
+// 全屏胶片颗粒回归（CAS 后最终送屏；口径见 Data_Tuning_Camera.FILM_GRAIN）。
 //
 // 三层（第三层是设置：出厂值 / 越界钳制 / 存档回灌 / 旧存档兼容）：
 //   1. 着色器层——受控 HDR 平色直接喂 Composite（同 Script_PostTest 的做法），回读 8 位输出量：
@@ -7,7 +7,7 @@
 //      · 不改平均亮度（零均值）：中间调均值与无颗粒基线相差 < 0.8 级；
 //      · 黑位不被抬（response 在纯黑处为 0）、高光处明显更弱；
 //      · 「颗粒大小」改相关长度、不改强度（格子越大相邻像素越相关，标准差不变）；
-//      · 种子换花样；low 档便宜路径是纯亮度噪声（通道完全相关），完整路径有彩色颗粒（相关系数 ≈ 1 − chroma）。
+//      · 花样确定且平滑换片；横竖相关长度接近，完整档有额外的乳剂团与弱色度。
 //   2. 接线层——走真实 post.Render(options)：强度、大小倍率、画质档位、按时钟换种子都从 options / preset 落到 uniform，
 //      大小按输出靶高度等比缩放；`filmGrain` 在四档画质档里都有值。
 //
@@ -89,19 +89,23 @@ try {
     U.uConcussion.value.set(0, 0, 0, 0); U.uEyeClosure.value = 0; U.uCheekCut.value.set(0, 0, 0);
 
     const ldr = post.targets.ldr;
+    const display = ldr.clone();
+    const final = post.uniformsFxaa;
+    final.uSource.value = ldr.texture;
+    final.uSharpen.value = 0; final.uFxaa.value = 0;
     const pixelCount = ldr.width * ldr.height;
     const textures = new Map();
     const Render = (hdr, { grain = 0, px = 1, mode = 1, seed = 0, seedNext = seed + 1, blend = 0, chroma = cfg.grain.chroma, exposure = 1 } = {}) => {
       if (!textures.has(hdr)) textures.set(hdr, MakePixel(hdr));
       U.uHdr.value = textures.get(hdr);
       U.uExposure.value = exposure;
-      U.uGrain.value = grain; U.uGrainPx.value = px; U.uGrainMode.value = mode;
-      U.uGrainSeed.value = seed; U.uGrainSeedNext.value = seedNext; U.uGrainBlend.value = blend;
-      U.uGrainChroma.value = chroma;
-      U.uGrainResponse.value.set(cfg.grain.response.floor, cfg.grain.response.blackFade);
+      final.uGrain.value = grain; final.uGrainPx.value = px; final.uGrainMode.value = mode;
+      final.uGrainSeed.value = seed; final.uGrainSeedNext.value = seedNext; final.uGrainBlend.value = blend;
+      final.uGrainChroma.value = chroma;
       post._Blit(post.matComposite, ldr);
+      post._Blit(post.matFxaa, display);
       const bytes = new Uint8Array(pixelCount * 4);
-      P.renderer.readRenderTargetPixels(ldr, 0, 0, ldr.width, ldr.height, bytes);
+      P.renderer.readRenderTargetPixels(display, 0, 0, display.width, display.height, bytes);
       return bytes;
     };
     const Channel = (bytes, c) => { const out = new Float64Array(pixelCount); for (let i = 0; i < pixelCount; i++) out[i] = bytes[i * 4 + c]; return out; };
@@ -110,12 +114,18 @@ try {
     // 相对基线的偏差场
     const Dev = (bytes, base, c) => { const a = Channel(bytes, c), b = Channel(base, c); const d = new Float64Array(pixelCount); for (let i = 0; i < pixelCount; i++) d[i] = a[i] - b[i]; return d; };
     const Corr = (a, b) => { const ma = Mean(a), mb = Mean(b); let sab = 0, saa = 0, sbb = 0; for (let i = 0; i < a.length; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; } return sab / Math.sqrt(saa * sbb || 1); };
-    const LagX = (a, w) => { const x = [], y = []; for (let r = 0; r < pixelCount / w; r++) for (let c = 0; c + 1 < w; c++) { x.push(a[r * w + c]); y.push(a[r * w + c + 1]); } return Corr(x, y); };
+    const Lag = (field, width, dx, dy) => {
+      const source = [], neighbor = [];
+      for (let row = 0; row + dy < field.length / width; row++) for (let col = 0; col + dx < width; col++) {
+        const index = row * width + col;
+        source.push(field[index]); neighbor.push(field[index + dy * width + dx]);
+      }
+      return Corr(source, neighbor);
+    };
     const Same = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
     const Luma01 = (bytes) => (0.2126 * bytes[0] + 0.7152 * bytes[1] + 0.0722 * bytes[2]) / 255;
     const Smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-    const Response = (y) => (cfg.grain.response.floor + (1 - cfg.grain.response.floor) * 4 * y * (1 - y))
-      * Smooth(0, cfg.grain.response.blackFade, y);
+    const Response = (value) => Smooth(0, cfg.grain.response.toeEnd, value) * (1 - Smooth(cfg.grain.response.shoulderStart, 1, value));
 
     // 挑一个基线落在中间调（编码亮度 0.3–0.7）的 HDR 平色
     let midValue = null;
@@ -143,10 +153,12 @@ try {
     out.std125 = Std(dG);
     out.meanShift = Math.abs(Mean(Channel(g1, 1)) - Mean(Channel(base, 1)));
     // 大小：相关长度变、强度不变
-    const gSmall = Render(midValue, { grain: strength, px: 1, seed: 0 });      // ≤ 1 px：逐像素路径
+    const gSmall = Render(midValue, { grain: strength, px: 1, seed: 0 });
     const gBig = Render(midValue, { grain: strength, px: 3, seed: 0 });
     const dSmall = Dev(gSmall, base, 1), dBig = Dev(gBig, base, 1);
-    out.lag1 = { px1: LagX(dSmall, ldr.width), px125: LagX(dG, ldr.width), px3: LagX(dBig, ldr.width) };
+    out.lag1 = { px1: Lag(dSmall, ldr.width, 1, 0), px125: Lag(dG, ldr.width, 1, 0), px3: Lag(dBig, ldr.width, 1, 0) };
+    out.verticalLag = Lag(dBig, ldr.width, 0, 1);
+    out.plateTail = Lag(dBig, ldr.width, 3, 0);
     out.stdBig = Std(dBig);
     out.stdSmall = Std(dSmall);
     // 种子换花样；过渡中途（blend=0.5）强度不掉，且不等于两端任一张
@@ -156,11 +168,34 @@ try {
     const gBlend = Render(midValue, { grain: strength, px: 1.25, seed: 0, seedNext: 1, blend: 0.5 });
     out.blendDiffers = !Same(g1, gBlend) && !Same(gSeed, gBlend);
     out.stdBlend = Std(Dev(gBlend, base, 1));
-    // 通道相关：完整路径 ≈ 1 − chroma；便宜路径 = 纯亮度噪声
+    // 通道相关：完整档保留弱色度，便宜路径仅有亮度细粒。
     out.rgCorrFull = Corr(Dev(g1, base, 0), Dev(g1, base, 1));
     const gCheap = Render(midValue, { grain: strength, px: 1.25, mode: 0, seed: 0 });
     out.rgCorrCheap = Corr(Dev(gCheap, base, 0), Dev(gCheap, base, 1));
     out.stdCheap = Std(Dev(gCheap, base, 1));
+    const savedSharpen = final.uSharpen.value, savedFxaa = final.uFxaa.value;
+    const flat = MakePixel(110);
+    final.uSource.value = flat; final.uGrainMode.value = 1;
+    const ReadFinal = () => {
+      post._Blit(post.matFxaa, display);
+      const pixels = new Uint8Array(pixelCount * 4);
+      P.renderer.readRenderTargetPixels(display, 0, 0, display.width, display.height, pixels);
+      return pixels;
+    };
+    const unsharpened = ReadFinal();
+    final.uSharpen.value = 1; final.uFxaa.value = 1;
+    const sharpened = ReadFinal();
+    out.aaMaxDelta = sharpened.reduce((worst, value, index) => Math.max(worst, Math.abs(value - unsharpened[index])), 0);
+    out.aaCorrelation = Corr(Channel(sharpened, 1), Channel(unsharpened, 1));
+    final.uSource.value = ldr.texture; flat.dispose();
+    final.uSharpen.value = savedSharpen; final.uFxaa.value = savedFxaa;
+    const monoBig = Dev(Render(midValue, { grain: strength, px: 3, mode: 0 }), base, 1);
+    out.monoTail = Lag(monoBig, ldr.width, 3, 0);
+    out.maxPlateJump = Math.max(...[0, .125, .25, .375, .5, .625, .75, .875].map((blend) => {
+      const plate = (phase) => Dev(Render(midValue, { grain: strength, px: 1.25, blend: phase }), base, 1);
+      const first = plate(blend), second = plate(blend + .125);
+      return Std(first.map((value, index) => second[index] - value)) / out.std125;
+    }));
     // 管线的黑位（曝光 0 → 场景光全无，只剩分级 LUT 的 lift / 暗部着色，实测约 [8,5,25]，不是 0，设计如此）：
     // 颗粒压到很弱，4 倍强度下均值也不被零均值噪声的截断抬亮。
     const blackBase = Render(255, { exposure: 0 });
@@ -194,23 +229,23 @@ try {
       out.darkMeanShift = Mean(Channel(darkGrain, 1)) - Mean(Channel(darkBase, 1));
     }
     for (const t of textures.values()) t.dispose();
-    black.dispose();
+    black.dispose(); display.dispose();
     out.glError = P.renderer.getContext().getError();
     return out;
   }, config);
 
   // ---- 2. 接线层：真实 post.Render(options) ----
-  // 视口放大到 720p：180 高时 sizePx × 倍率 × h/1080 都 < 1，会被钳成 1，缩放断言就是空转。
+  // 视口放大到 720p，另用半尺寸输入验证颗粒依然跟随画布。
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.waitForFunction(() => window.Probe.post.targets.ldr.height >= 720, null, { timeout: 60000 });
   wiring = await page.evaluate(async (cfg) => {
     const P = window.Probe;
     const post = P.post;
-    const U = post.uniformsComposite;
-    const pass = post.compositePass;
+    const U = post.uniformsFxaa;
+    const pass = post.fxaaPass;
     const base = { taa: false, motionBlur: 0, vignette: 0, autoExposure: false, exposure: 1, fog: { density: 0 } };
     const out = { tiers: cfg.filmGrainTiers, presetFilmGrain: post.preset.filmGrain };
-    const outputHeight = post.targets.ldr.height;
+    const outputHeight = P.renderer.domElement.height;
 
     post.Render(P.scene, P.camera, { ...base, grain: 0.05, grainSize: 2, dt: 0 });
     out.outputHeight = outputHeight;
@@ -248,6 +283,10 @@ try {
     post.preset.filmGrain = 0; post.Render(P.scene, P.camera, { ...base, grain: 0.05, dt: 0 }); out.modeLow = U.uGrainMode.value;
     post.preset.filmGrain = 1; post.Render(P.scene, P.camera, { ...base, grain: 0.05, dt: 0 }); out.modeFull = U.uGrainMode.value;
     post.preset.filmGrain = saved;
+    post.SetSize(640, 360);
+    post.Render(P.scene, P.camera, { ...base, grain: 0.05, grainSize: 2, dt: 0 });
+    out.halfSourceHeight = post.targets.ldr.height;
+    out.halfSourcePx = U.uGrainPx.value;
     out.glError = P.renderer.getContext().getError();
     return out;
   }, config);
@@ -293,6 +332,7 @@ console.log("接线层", JSON.stringify(wiring));
 
 // 1. 着色器层
 assert.equal(shader.glError, 0, "着色器编过、无 GL 错误");
+assert.ok(shader.aaMaxDelta <= 1 && shader.aaCorrelation > .999, "平色开启 AA/CAS 只允许一次 8 位舍入，不得改变颗粒形状");
 assert.ok(shader.offIdentical, "uGrain = 0 时输出逐比特等于无颗粒（与格子大小、种子无关）");
 assert.ok(shader.sameSeedIdentical, "同一花样重复渲染逐比特相同（确定性）");
 assert.ok(shader.onChangesPixels && shader.std125 > 1, `打开颗粒确实改了像素（标准差 ${shader.std125.toFixed(2)} 级）`);
@@ -303,15 +343,17 @@ near(shader.stdBig, shader.expectedStd, 0.15, "大格子（3 px）强度不变")
 near(shader.stdSmall, shader.expectedStd, 0.15, "逐像素路径强度不变");
 near(shader.stdCheap, shader.expectedStd, 0.15, "便宜路径强度不变");
 assert.ok(shader.meanShift < 0.8, `不改中间调平均亮度（偏移 ${shader.meanShift.toFixed(2)} 级）`);
-assert.ok(shader.lag1.px1 < 0.1 && shader.lag1.px1 > -0.1, `逐像素路径相邻像素不相关（${shader.lag1.px1.toFixed(2)}）`);
+assert.ok(shader.lag1.px1 > .1 && shader.lag1.px1 < .3, "1 px 细粒不退回白噪声，也不糊成片");
+assert.ok(Math.abs(shader.lag1.px3 - shader.verticalLag) < .05, "横竖相关长度一致，没有轴向条纹");
+assert.ok(shader.plateTail > shader.monoTail + .035, "双层乳剂比单层银盐多出可测的粗粒团");
+assert.ok(shader.maxPlateJump < .32, "过渡中的任意八分之一周期均无硬闪");
 assert.ok(shader.lag1.px125 > shader.lag1.px1 + 0.1, `默认格子比逐像素更成团（${shader.lag1.px125.toFixed(2)}）`);
 assert.ok(shader.lag1.px3 > 0.6 && shader.lag1.px3 > shader.lag1.px125 + 0.15, `格子越大越相关（3 px：${shader.lag1.px3.toFixed(2)}）`);
 assert.ok(shader.seedDiffers && Math.abs(shader.seedCorr) < 0.1, `换种子是另一张花样（相关 ${shader.seedCorr.toFixed(3)}）`);
 assert.ok(shader.blendDiffers, "相邻种子 blend=0.5 时不等于两端任一张");
 near(shader.stdBlend, shader.expectedStd, 0.15, "过渡中途（blend=0.5）强度不掉");
 assert.ok(shader.rgCorrCheap > 0.95, `便宜路径是纯亮度噪声（RG 相关 ${shader.rgCorrCheap.toFixed(3)}）`);
-const expectedRg = 1 - FILM_GRAIN.chroma;
-assert.ok(Math.abs(shader.rgCorrFull - expectedRg) < 0.12, `完整路径有彩色颗粒（RG 相关 ${shader.rgCorrFull.toFixed(3)} ≈ ${expectedRg}）`);
+assert.ok(shader.rgCorrFull > .95 && shader.rgCorrFull < shader.rgCorrCheap - .002, "完整档以亮度为主，只有很弱的色度变化");
 assert.ok(shader.blackLuma < 0.06, `曝光 0 取到管线黑位（${JSON.stringify(shader.blackBase)}，luma ${shader.blackLuma.toFixed(3)}）`);
 assert.ok(shader.blackStd < shader.std125 * 0.4,
   `黑位处颗粒很弱（${shader.blackStd.toFixed(2)} < ${(shader.std125 * 0.4).toFixed(2)}，中间调 ${shader.std125.toFixed(2)}）`);
@@ -336,6 +378,7 @@ assert.ok(Math.abs(wiring.px - wiring.expectedPx) < 1e-6, `颗粒格大小 = 数
 assert.ok(Math.abs(wiring.pxClampHigh - wiring.expectedClampHigh) < 1e-6, "倍率越界被钳到滑杆上限");
 assert.ok(Math.abs(wiring.pxDefault - wiring.expectedDefault) < 1e-6, "没给倍率 = 出厂值");
 assert.equal(wiring.mode, wiring.presetFilmGrain ? 1 : 0, "算法位取自当前画质档的 preset.filmGrain");
+assert.ok(wiring.halfSourceHeight < wiring.outputHeight && wiring.halfSourcePx === wiring.px, "内部渲染降到半分辨率不改变屏幕颗粒大小");
 assert.equal(wiring.modeLow, 0); assert.equal(wiring.modeFull, 1);
 assert.ok(Math.abs(wiring.clockAdvance - 24 / 60) < 1e-9, "颗粒时钟按 dt 累积");
 const distinctSeeds = new Set(wiring.seeds).size;

@@ -828,7 +828,7 @@ Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
   && taaToggle.on.settled === true && taaToggle.saved === true,
   `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
 
-// 胶片颗粒：面板里的「颗粒」（强度倍率）与「颗粒大小」都是真滑杆，拖动要落到 graphics、存档和合成 uniform 上。
+// 胶片颗粒：面板里的「颗粒」（强度倍率）与「颗粒大小」都是真滑杆，拖动要落到 graphics、存档和送屏 uniform 上。
 // 同样按标签找控件、派发真实 input 事件，而不是直接改 gfx 字段（面板没接回调时后者一样是绿的）。
 const grainSliders = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -844,7 +844,7 @@ const grainSliders = await page.evaluate(() => {
   };
   const strengthInput = SliderOf("颗粒"), sizeInput = SliderOf("颗粒大小");
   if (!strengthInput || !sizeInput) return { found: false, strength: !!strengthInput, size: !!sizeInput };
-  const U = T.post.uniformsComposite;
+  const U = T.post.uniformsFxaa;
   const out = { found: true, bootGrain: T.graphics.grain, bootSize: T.graphics.grainSize, bootPx: U.uGrainPx.value, bootStrength: U.uGrain.value,
     range: { min: Number(sizeInput.min), max: Number(sizeInput.max) } };
   Drag(sizeInput, 2);
@@ -860,7 +860,7 @@ const grainSliders = await page.evaluate(() => {
   out.restored = { grain: T.graphics.grain, size: T.graphics.grainSize };
   return out;
 });
-Check("画质面板：「颗粒」「颗粒大小」是真滑杆，拖动改到 graphics / 合成 uniform / 存档",
+Check("画质面板：「颗粒」「颗粒大小」是真滑杆，拖动改到 graphics / 送屏 uniform / 存档",
   grainSliders.found
   && grainSliders.size2.gfx === 2 && grainSliders.size2.px > grainSliders.bootPx
   && grainSliders.strength0.gfx === 0 && grainSliders.strength0.uniform === 0

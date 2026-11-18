@@ -23,6 +23,7 @@ import { FirstPersonReflectionProbe } from "../Script_FirstPersonReflectionProbe
 import { StepRifleSlings } from "../Script_RifleSlingCloth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "../Script_Gi.mjs";
 import { PostPipeline } from "../Script_Post.mjs";
+import { FilmGrainStrengthFor } from "../Data_Tuning_Camera.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "../Script_PostGtao.mjs";
 import { SSIL } from "../Data_Tuning_Gtao.mjs";
 import { MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs } from "../Script_MaterialShading.mjs";
@@ -384,7 +385,8 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
       godStrength: (graphics.godEnabled && !post.preset.volumetrics) ? preset.godStrength * graphics.god : 0,
       saturation: preset.saturation,
       contrast: preset.contrast,
-      grain: ((skyName === "night" || skyName === "firstLevelNight") ? 0.020 : 0.014) * graphics.grain,
+      grain: FilmGrainStrengthFor(skyName) * graphics.grain,
+      grainSize: graphics.grainSize,
       fade: 0, eyeClosure: 0,
       vignette: 0.42 * graphics.vignette,
       damage: 0, hitDisorientation: 0,
