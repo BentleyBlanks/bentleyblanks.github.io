@@ -11,11 +11,12 @@ import { EncounterChat } from "./Script_LevelFlowChat.mjs";
 import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
-import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs?v=20261119DebugTools";
+import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs";
+import { LevelFlowDebug } from "./Script_LevelFlowDebug.mjs";
 import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation,annotationEditor,chat,gamePlay,timeline;
+let canvas,workspace,navigation,annotationEditor,chat,gamePlay,timeline,previewDebug;
 let storage;
 try { storage=window.localStorage; } catch { storage=null; }
 const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
@@ -214,14 +215,26 @@ function UpdateAnnotations() {
   }
 }
 function RequestRender() {renderPending=true;}
-function Render(preparedFrame=null) {
+function Render(tick=null) {
   if(!map||!workspace) return;
   renderPending=false;
-  frame=preparedFrame||EvaluateFlow(time,project.value);UpdateTimeline();
-  selectedUnitIds=selectedUnitIds.filter(id=>frame.actors.some(actor=>actor.id===id));
-  if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
-  chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
-  workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value);
+  const debug=!gamePlay?.active&&(previewDebug?.profiler?.recording||previewDebug?.capture.state==="armed")?previewDebug:null;
+  let failure=null;
+  debug?.BeginFrame(tick?.time??performance.now(),tick);
+  try {
+    debug?.BeginCpu("encounterTimeline");
+    const previousStage=frame.stage.id;
+    frame=EvaluateFlow(time,project.value);
+    if(tick?.advancing&&previousStage!==frame.stage.id) workspace.FrameStage();
+    debug?.SetStage(frame.stage.id);
+    UpdateTimeline();
+    selectedUnitIds=selectedUnitIds.filter(id=>frame.actors.some(actor=>actor.id===id));
+    if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
+    chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
+    debug?.EndCpu("encounterTimeline");
+    workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value,debug);
+  } catch(error) {failure=error;throw error;}
+  finally {debug?.EndFrame(failure);}
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
@@ -390,11 +403,12 @@ function BindControls() {
 function Tick(timestamp) {
   if(gamePlay?.active){lastTimestamp=timestamp;requestAnimationFrame(Tick);return;}
   const elapsed=lastTimestamp?Math.max(0,(timestamp-lastTimestamp)/1000):0;
+  previewDebug.Update(Math.min(elapsed,1));
   const navigated=!Element("annotationDialog").open&&navigation.Tick(Math.min(0.1,elapsed));
   if(playing&&lastTimestamp) {
     // Frames sample an absolute-time plan. Dropping elapsed time on a slow
     // render makes 1x playback (and every actor's metres/second) run too slowly.
-    const previousStage=frame.stage.id,delta=elapsed*Number(Element("flowSpeed").value);
+    const delta=elapsed*Number(Element("flowSpeed").value);
     const end=Element("loopStage").checked?frame.stage.end:FLOW_DURATION;
     if(time+delta>=end) {
       if(Element("loopStage").checked) {
@@ -402,11 +416,9 @@ function Tick(timestamp) {
         time=frame.stage.start+(time+delta-frame.stage.start)%duration;
       } else {time=FLOW_DURATION;SetPlaying(false);}
     } else time+=delta;
-    frame=EvaluateFlow(time,project.value);
-    if(previousStage!==frame.stage.id) workspace.FrameStage();
-    Render(frame);
+    Render({time:timestamp,previous:lastTimestamp,advancing:true});
   }
-  else if(navigated||renderPending) Render();
+  else if(navigated||renderPending) Render({time:timestamp,previous:lastTimestamp});
   lastTimestamp=timestamp;requestAnimationFrame(Tick);
 }
 
@@ -419,6 +431,7 @@ async function Start() {
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
   for(const entry of workspace.entries) navigation.BindGizmo(entry);
+  previewDebug=new LevelFlowDebug({requestRender:RequestRender,renderFrame:()=>Render(),toast:Toast,visible:()=>workspace.Visible()});
   gamePlay=new LevelFlowPlay({
     snapshot:()=>({time,document:structuredClone(project.value),viewports:workspace.Serialize(),selection:structuredClone(selection)}),
     pause:()=>{SetPlaying(false);navigation.Clear();},
@@ -432,6 +445,7 @@ async function Start() {
       Element("playStatusHint").textContent=state.hints?.hint||"";
     },
     toast:Toast,
+    previewDebug,
   });
   annotationEditor=new ScreenshotAnnotations(async()=>{
     await chat.Attach(annotationEditor);annotationEditor.dialog.close();ShowTab("chat");

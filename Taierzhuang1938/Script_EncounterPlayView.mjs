@@ -77,6 +77,7 @@ export class EncounterPlayView {
   State(){return {count:this.count,mode:this.mode,target:this.target,camera:this.camera.position.toArray(),direction:this.camera.getWorldDirection(new THREE.Vector3()).toArray(),calls:this.renderer?.info.render.calls,triangles:this.renderer?.info.render.triangles};}
   Render(dt,options,before,after) {
     if(this.count!==2)return;
+    this.host.ctx.frameDebugger?.SetViewport("视口 2 · 观察视角");
     if(!this.renderer) {
       this.renderer=this.host.renderer;
       this.post=new PostPipeline(this.renderer,{width:640,height:720,quality:this.host.ctx.graphicsProfileApi?.State?.()?.id||"high"});

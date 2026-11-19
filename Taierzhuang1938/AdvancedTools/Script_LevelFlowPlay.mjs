@@ -3,8 +3,8 @@ import {ENCOUNTER_PLAY_STARTUP} from "../Data_Tuning_EncounterPlayStartup.mjs";
 
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
-  constructor({snapshot,restore,pause,toast,onState,showSource}) {
-    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource});
+  constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug}) {
+    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,previewDebug});
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
@@ -39,15 +39,17 @@ export class LevelFlowPlay {
     this.pauseButton.disabled=!this.active||!this.state?.ready||this.launching;
     this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
     this.stopButton.disabled=!this.active;this.menu.disabled=this.active;
-    const canDebug=!!this.DebugEditor();
+    const canDebug=!this.active||!!this.DebugEditor();
     for(const button of this.debugButtons){
       const label=button.getAttribute("aria-label");
-      button.disabled=!canDebug;
-      button.title=canDebug?label:`${label} · ${this.active?"等待 Play 就绪":"请先启动 Play"}`;
+      const disabled=!canDebug,labelText=`${label} · ${!this.active?"编辑器预览":disabled?"等待 Play 就绪":"当前 Play"}`;
+      if(button.disabled!==disabled) button.disabled=disabled;
+      if(button.title!==labelText) button.title=labelText;
     }
   }
   DebugEditor(){return this.active&&this.state?.ready&&!this.launching?this.frame?.contentWindow.Tengxian?.editor:null;}
   OpenDebugTool(button){
+    if(!this.active){return this.previewDebug.Open(button.dataset.debugTool);}
     const editor=this.DebugEditor();if(!editor)return;
     const id=button.dataset.debugTool,overlay=editor.overlays.get(id);
     if(overlay?.win&&!overlay.win.closed){overlay.win.focus();return;}
@@ -81,6 +83,7 @@ export class LevelFlowPlay {
     const payload={token:this.token,time,document:this.saved.document};
     try{sessionStorage.setItem("tengxian1938_encounter_play_session_v1",JSON.stringify(payload));}
     catch(error){this.toast("Play 开局数据保存失败："+error.message,true);this.saved=null;return false;}
+    this.previewDebug.CloseAll();
     this.active=true;this.startedAt=performance.now();this.startTime=time;const generation=++this.generation;
     this.deadline=setTimeout(()=>{if(this.active&&generation===this.generation){this.Stop();this.toast("Play 加载超时，已停止；可以重新尝试。",true);}},ENCOUNTER_PLAY_STARTUP.maxLoadMs);
     for(const option of this.layout.options)option.hidden=option.disabled=Number(option.value)>2;

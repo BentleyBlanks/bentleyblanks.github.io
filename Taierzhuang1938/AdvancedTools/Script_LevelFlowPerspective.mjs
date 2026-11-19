@@ -26,9 +26,11 @@ export class FlowPerspectiveView extends FlowMapView {
     this.objectBases=geometry.bases;
     this.lighting=FLOW_RENDERING.lighting;
   }
-  Draw(...args) {
+  Draw(frame,layers,selection,annotations,draft,viewport,trace=null) {
     const start=performance.now();this.frameDrawing=true;
-    try {super.Draw(...args);} finally {this.frameDrawing=false;ApplyEncounterSky(null);}
+    this.raster.debugTrace=trace;
+    try {super.Draw(frame,layers,selection,annotations,draft,viewport,trace);}
+    finally {this.raster.debugTrace=null;this.frameDrawing=false;ApplyEncounterSky(null);}
     this.drawMs=performance.now()-start;
   }
   Ground(point) {
@@ -225,11 +227,13 @@ export class FlowPerspectiveView extends FlowMapView {
     return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2],
       ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
-  DrawBase(context,width,height,frame,layers={}) {
+  DrawBase(context,width,height,frame,layers={},trace=null) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     const renderScale=this.renderScale;
+    const skyStart=trace?.capturing?performance.now():0;
     ApplyEncounterSky(this.aim[2],this.frame.nightBlend||0);
     DrawEncounterSky(context,width,height,this);
+    if(trace?.capturing) trace.Canvas("绘制天空",this.baseCanvas,skyStart);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     this.raster.view=this;
     this.raster.resident=this.raster.accelerated;
@@ -471,9 +475,11 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     this.PrepareDepth(frame,layers,coverBoxes);
     this.raster.Flush(context,width,height);
+    const markersStart=trace?.capturing?performance.now():0;
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
     if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
+    if(trace?.capturing) trace.Canvas("绘制地标与掩体标记",this.baseCanvas,markersStart);
   }
 
   PrepareDepth(frame,layers,coverBoxes=[]) {

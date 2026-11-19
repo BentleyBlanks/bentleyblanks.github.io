@@ -220,8 +220,14 @@ export class EncounterViewports {
     entry.defaultCamera=false;
   }
 
-  Draw(frame,layers,selection,annotations,draft,document=null) {
-    if(this.resizing) return;
+  Draw(frame,layers,selection,annotations,draft,document=null,debug=null) {
+    if(this.resizing&&!debug?.forceDraw) return;
+    debug?.BeginViewports();
+    try {this.DrawVisible(frame,layers,selection,annotations,draft,document,debug);}
+    finally {debug?.EndViewports();}
+  }
+
+  DrawVisible(frame,layers,selection,annotations,draft,document,debug) {
     const contentKey=JSON.stringify([frame.time,frame.beat.id,layers,selection,draft]);
     const contentChanged=document===null||document!==this.document||annotations!==this.annotations||contentKey!==this.contentKey;
     const viewports=this.Visible().map(entry=>({entry,rect:entry.canvas.getBoundingClientRect()}));
@@ -240,8 +246,10 @@ export class EncounterViewports {
       }
       const view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
-      if(!contentChanged&&drawKey===entry.drawKey) continue;
-      entry.map.Draw(frame,entry.layers,selection,annotations,draft,rect);
+      if(!debug?.forceDraw&&!contentChanged&&drawKey===entry.drawKey) continue;
+      const trace=debug?.BeginViewport(entry,`视口 ${entry.index+1} · ${ENCOUNTER_VIEW_TYPES[entry.type]}`);
+      try {view.Draw(frame,entry.layers,selection,annotations,draft,rect,trace);}
+      finally {trace?.End();}
       this.DrawGizmo(entry);
       entry.drawKey=drawKey;
     }

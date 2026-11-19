@@ -8391,7 +8391,7 @@ if (!Object.getOwnPropertyDescriptor(THREE.BatchedMesh.prototype, "colorTexture"
  */
 function RenderScene(dt) {
   if (frameDebugger.frozen) return;
-  const capturing = frameDebugger.BeginRender();
+  const capturing = frameDebugger.BeginRender(SANDBOX_RANGE?.id === "encounterPlay" ? "视口 1 · 玩家视角" : null);
   let failure = null;
   try { RenderSceneContent(dt); }
   catch (error) { failure = error; throw error; }
@@ -8643,6 +8643,7 @@ function RenderSceneContent(dt) {
   }, openingLens), stun);
   post.Render(scene, camera, framePostOptions);
   sandbox?.AfterRender?.(dt, framePostOptions);
+  if (SANDBOX_RANGE?.id === "encounterPlay") frameDebugger.SetViewport();
   profiler.E("post");
   // 第一人称本地反射图：排在主画面之后（阴影图本帧已烘过、骨头还没再动），拍的是下一帧给枪映的那张。
   if (firstPersonReflection?.enabled) {

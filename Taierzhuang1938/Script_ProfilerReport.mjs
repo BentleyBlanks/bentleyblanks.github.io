@@ -17,6 +17,8 @@
 
 /** CPU 桶的中文说明。没登记的 key 照原样显示（表是数据驱动的，不靠这张表决定显示什么）。 */
 export const CPU_LABELS = {
+  encounterViewport: "编辑器视口",
+  encounterTimeline: "编辑器时间轴与界面",
   post: "渲染提交（整条链）",
   ai: "AI",
   "ai/think": "决策（Think，每帧六分之一的人）",
@@ -115,7 +117,7 @@ export const BOTTLENECK_LABELS = { game: "CPU · 逻辑", draw: "CPU · 渲染�
 
 /** 帧状态的中文（与 Script_Profiler.FRAME_STATES 同表；这里再写一份免得显示层去 import 内核）。 */
 export const STATE_LABELS = {
-  play: "游戏中", cutscene: "过场", menu: "菜单", paused: "暂停", editor: "编辑器接管",
+  play: "游戏中", cutscene: "过场", menu: "菜单", paused: "暂停", editor: "编辑器接管", editorPreview: "编辑器预览",
   loading: "加载/预热", failure: "失败画面", hidden: "页面在后台",
 };
 
@@ -136,7 +138,7 @@ export function CpuBag(summary) {
   const bag = Object.create(null);
   for (const key in summary.cpu || {}) bag[key] = summary.cpu[key];
   for (const key in summary.gpuCpu || {}) {
-    if (bag[key]) continue;
+    if (bag[key]||key==="encounterViewport"||key.startsWith("encounterViewport/")) continue;
     bag[`post/${key}`] = summary.gpuCpu[key];
   }
   return bag;
@@ -358,7 +360,7 @@ export function GroupDraws(draws, field) {
     let group = groups.get(key);
     if (!group) { group = { key, draws: 0, materials: new Set(), matSwitches: 0, tris: 0, instances: 0, us: 0, passes: new Set() }; groups.set(key, group); }
     group.draws += 1;
-    group.materials.add(draw.materialId);
+    if (draw.materialId != null) group.materials.add(draw.materialId);
     if (draw.matSwitch) group.matSwitches += 1;
     group.tris += draw.tris || 0;
     group.instances += draw.instances || 0;

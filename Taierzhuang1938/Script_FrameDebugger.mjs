@@ -93,7 +93,7 @@ export class FrameDebugger {
     object[key] = wrapper;
     this._hooks.push(() => { if (object[key] !== wrapper) return; if (own) object[key] = original; else delete object[key]; });
   }
-  BeginRender() {
+  BeginRender(viewport = null) {
     if (this.state !== 'armed') return false;
     const gl = this.gl;
     this.state = 'capturing'; this._overhead = 0; this._bytes = 0; this._start = performance.now();
@@ -175,6 +175,7 @@ export class FrameDebugger {
       // are independent, so initial program uniform values are saved separately.
       this.renderer.resetState();
       this._start = performance.now(); this._startOverhead = this._overhead;
+      if (viewport) this.SetViewport(viewport);
       return true;
     } catch (error) { this.Abort(error); return false; }
   }
@@ -196,6 +197,11 @@ export class FrameDebugger {
     // Idle / Prepare that submitted nothing is not worth a tree node.
     if (row.transient && row.last < row.first && row.id === this._passes.length - 1) { this._passes.pop(); this._owners.delete(row.id); return; }
     delete row.transient;
+  }
+  SetViewport(name = null) {
+    if (this.state !== 'capturing') return;
+    if (this._stack.at(-1)?.viewport) this.Pop();
+    if (name) { this.Push(name); this._stack.at(-1).viewport = true; }
   }
   _Budget(bytes) {
     this._bytes += bytes;

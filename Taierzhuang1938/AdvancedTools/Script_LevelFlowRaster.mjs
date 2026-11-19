@@ -191,9 +191,14 @@ export class EncounterRaster {
   }
 
   Flush(context,width,height) {
+    const trace=this.debugTrace?.capturing?this.debugTrace:null;
     if(this.accelerated&&this.gpu.Draw(this)) {
-      context.drawImage(this.gpu.canvas,0,0,this.width,this.height,0,0,width,height);return;
+      const started=trace?performance.now():0;
+      context.drawImage(this.gpu.canvas,0,0,this.width,this.height,0,0,width,height);
+      trace?.Canvas("合成 WebGL2 场景",context.canvas,started);
+      return;
     }
+    const started=trace?performance.now():0;
     if(this.accelerated) {
       this.MaterializeWorldBatches();
       // Context loss or unsupported targets must still produce this frame.
@@ -218,6 +223,7 @@ export class EncounterRaster {
     }
     this.canvas.getContext("2d").putImageData(this.image,0,0);
     context.drawImage(this.canvas,0,0,width,height);
+    trace?.Canvas("合成软件光栅场景",context.canvas,started);
   }
 
   Occluded(vertex) {
