@@ -244,17 +244,11 @@ function Render(tick=null) {
 }
 function Hit(point,view=map) {
   const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
-  const InLabel=(item)=>{
-    const box=item.labelBounds;
-    return !!box&&point[0]>=box[0]&&point[0]<=box[0]+box[2]&&point[1]>=box[1]&&point[1]<=box[1]+box[3];
-  };
-  // Keep precise marker clicks reliable where nameplates overlap dense units.
-  const DistanceTo=(item)=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1]);
-  return view.hits.filter((item)=>InLabel(item)||DistanceTo(item)<=item.radius)
-    .sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0)
-      ||Number(DistanceTo(b)<=3)-Number(DistanceTo(a)<=3)
-      ||Number(InLabel(b))-Number(InLabel(a))
-      ||DistanceTo(a)-DistanceTo(b))[0];
+  const DistanceTo=item=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1]);
+  const candidates=view.hits.filter(item=>(item.type!=="actor"||!view.PickActor)&&DistanceTo(item)<=item.radius);
+  const body=view.PickActor?.(point);
+  if(body) candidates.push(body);
+  return candidates.sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0)||DistanceTo(a)-DistanceTo(b))[0];
 }
 
 function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
@@ -294,8 +288,9 @@ function BindMap(entry) {
     if(event.button!==0) return;
     workspace.Activate(entry.index);
     surface.focus();surface.setPointerCapture(event.pointerId);
-    const screen=LocalPoint(event),world=map.ToWorld(screen),hit=Hit(screen);
+    const screen=LocalPoint(event),hit=Hit(screen);
     const action=mode!=="select"?"annotate":hit?.type==="annotationHandle"?"edit":entry.map.type?"select":"pan";
+    const world=action==="annotate"||action==="pan"?map.ToWorld(screen):null;
     pointer={pointerId:event.pointerId,screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey,additive:event.ctrlKey||event.metaKey||event.shiftKey};
     if(action==="annotate") {
       const rect=canvas.getBoundingClientRect();
@@ -474,7 +469,7 @@ async function Start() {
     Play:{Start:mode=>gamePlay.Start(mode),Pause:on=>gamePlay.Pause(on),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
     Evaluate:(value)=>EvaluateFlow(value,project.value),
     Stealth:()=>structuredClone(frame.stealth),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,terrainBuild:mapData.terrain.buildInfo,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
+    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.InspectSpeech?.()||entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,terrainBuild:mapData.terrain.buildInfo,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
     ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
     SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
     SetViewType:(index,type)=>workspace.SetType(index,type),

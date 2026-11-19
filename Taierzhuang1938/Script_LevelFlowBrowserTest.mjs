@@ -244,33 +244,71 @@ try {
       {...template,id:'Partial',pose:'stand',p:[2.5,3]}],effects:[],dialogue:[]};
     const layers={names:false,landmarks:false};
     const Draw=()=>{view.baseKey='';view.Draw(frame,layers,null);return canvas.getContext('2d').getImageData(0,0,320,240).data;};
-    const sparse=Draw(),stats=view.Diagnostics().actors;
-    const samples=view.raster.depthTiles.reduce((count,value)=>count+(value===2?64:0),0);
+    const gl=view.raster.gpu?.gl,read=gl?.readPixels;
+    let reads=0;
+    if(gl) gl.readPixels=function(...args){reads++;return read.apply(this,args);};
+    const sparse=Draw(),renderReads=reads,stats=view.Diagnostics().actors;
     const other=document.createElement('canvas');other.style.cssText=canvas.style.cssText;document.body.append(other);
     const second=new FlowPerspectiveView(other,map,'scene');second.freeCamera={eye:[6,7,-9],yaw:-0.4,pitch:-0.5};second.Draw(frame,layers,null);
     const preserved=[...view.raster.depth],picked=view.ToWorld([160,180]);
-    const collect=view.raster.CollectDepthSamples.bind(view.raster);
-    view.raster.CollectDepthSamples=()=>{};
     const full=Draw(),fullDepth=[...view.raster.depth];
     const maxError=full.reduce((maximum,value,index)=>Math.max(maximum,Math.abs(value-sparse[index])),0);
     const sameDepth=fullDepth.every((value,index)=>value===preserved[index]);
-    view.raster.CollectDepthSamples=collect;
     view.baseKey='';view.Draw(frame,layers,null);
     const moving=[];
+    const beforeMoving=reads;
     for(let index=0;index<4;index++) {
       frame.time+=0.1;frame.actors[0].p[0]+=0.4;
       view.Draw(frame,layers,null);const cached=canvas.getContext('2d').getImageData(0,0,320,240).data;
-      view.raster.CollectDepthSamples=()=>{};const expected=Draw();view.raster.CollectDepthSamples=collect;
+      const expected=Draw();
       moving.push(expected.reduce((maximum,value,pixel)=>Math.max(maximum,Math.abs(value-cached[pixel])),0));
       view.baseKey='';view.Draw(frame,layers,null);
     }
-    canvas.remove();other.remove();return {maxError,sameDepth,picked,samples,stats,moving};
+    const movingReads=reads-beforeMoving;
+    if(gl) gl.readPixels=read;
+    canvas.remove();other.remove();return {maxError,sameDepth,picked,renderReads,movingReads,stats,moving};
   });
-  assert.ok(sampledDepth.samples>0&&sampledDepth.samples<320*240/2,'occlusion reads a bounded set of exact native-depth tiles');
+  assert.equal(sampledDepth.renderReads,0,'scene depth stays on the GPU when drawing the world and labels');
+  assert.equal(sampledDepth.movingReads,0,'moving actors and reused backgrounds do not read WebGL depth');
   assert.ok(sampledDepth.maxError<=1&&sampledDepth.sameDepth,'sampled and full depth preserve pixels and the complete lazy depth snapshot across panes');
   assert.ok(sampledDepth.stats.find(actor=>actor.id==='Hidden').hidden>0&&sampledDepth.stats.find(actor=>actor.id==='Visible').visible>0);
   assert.ok(sampledDepth.picked.every(Number.isFinite)&&sampledDepth.moving.every(error=>error<=1),
     'picking and moving actors retain correct depth while the static background is cached');
+  const bodyOverlay=await page.evaluate(async()=>{
+   const {FlowPerspectiveView}=await import('./Script_LevelFlowPerspective.mjs');
+   const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;left:-2000px;width:480px;height:320px';document.body.append(canvas);
+   const wall={id:'wall',pos:[0,0,5],size:[4,3,1],material:'Whitebox/Plaster'};
+   const map={objects:[wall],farObjects:[],labels:[],terrain:{heightAt:()=>0,roots:[]}};
+   const view=new FlowPerspectiveView(canvas,map,'eye');view.lighting=null;
+   const src=LevelFlow.Evaluate(0);
+   const player={id:'player',kind:'person',side:'player',name:'相机',pose:'stand',p:[0,0],lookAt:[0,4],eyeHeight:1.6};
+   const make=(id,x,z)=>({id,kind:'person',side:'friend',pose:'stand',name:id,p:[x,z]});
+   const far=make('FAR',0,10),near=make('NEAR',0,3),partial=make('EDGE',4.4,10);
+   const gl=view.raster.gpu?.gl,orig=gl?.readPixels;let reads=0;if(gl) gl.readPixels=function(...a){reads++;return orig.apply(this,a)};
+   const render=(actors,dialogue=[])=>{view.baseKey='';view.Draw({...src,actors:[player,...actors],dialogue,effects:[],groups:[],triggers:[]},{names:true,landmarks:true},null);
+    return canvas.getContext('2d').getImageData(0,0,480,320).data};
+   const difference=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.max(...[0,1,2].map(c=>Math.abs(a[i+c]-b[i+c])))>2)n++;return n};
+   const empty=render([]),hidden=render([far],[{actorId:'FAR',text:'不应显示',name:'FAR'}]),edge=render([partial]),front=render([near],[{actorId:'NEAR',text:'可见对白',name:'NEAR'}]);
+   render([near,far]);const p=view.Vertex([0,1,3]),p2=view.Vertex([0,1.50,3]);const nearest=view.PickActor([p.x,p.y])?.id,chest=view.PickActor([p2.x,p2.y])?.id;
+   render([far,near]);const reordered=view.PickActor([p.x,p.y])?.id;
+   const hit=view.hits.find(h=>h.id==='NEAR'),off=hit.labelBounds&&view.PickActor([hit.labelBounds[0]+hit.labelBounds[2]-1,hit.labelBounds[1]+4])?.id;
+    const labelPixel=[hit.labelBounds[0]+hit.labelBounds[2]-1,hit.labelBounds[1]+4];
+    const depth=3.2,dx=(labelPixel[0]-view.width/2)/view.focal,dy=(view.height*.49-labelPixel[1])/view.focal;
+    const world=view.eye.map((v,i)=>v+depth*(view.forward[i]+dx*view.right[i]+dy*view.up[i]));
+    const underLabel=make("BODY",world[0],world[2]);underLabel.surfaceY=world[1]-.8;
+    render([near,underLabel]);const overlap=view.PickActor(labelPixel)?.id;
+    if(gl) gl.readPixels=orig;
+    canvas.remove();
+    return {overlap,hidden:difference(empty,hidden),partial:difference(empty,edge),visible:difference(empty,front),
+      nearest,chest,reordered,off:off??null,reads};
+  });
+  assert.equal(bodyOverlay.hidden,0,"a wall hides both the actor and its GPU name and speech in eye view");
+  assert.ok(bodyOverlay.partial>0&&bodyOverlay.visible>bodyOverlay.partial,"exposed limbs and foreground labels remain visible");
+  assert.deepEqual([bodyOverlay.nearest,bodyOverlay.chest,bodyOverlay.reordered],["NEAR","NEAR","NEAR"],
+    "the ray hits the closest body or head independently of actor order");
+  assert.equal(bodyOverlay.overlap,"BODY","a label over another body does not intercept its ray");
+  assert.equal(bodyOverlay.off,null,"a ray into nameplate pixels outside the body misses");
+  assert.equal(bodyOverlay.reads,0,"looking, moving actors, dialogue and body picking never read GPU depth");
   const bankLighting = await page.evaluate(async () => {
     const {FlowPerspectiveView} = await import('./Script_LevelFlowPerspective.mjs');
     const {FLOW_RENDERING} = await import('../Data_Tuning_LevelFlow.mjs');
@@ -469,9 +507,15 @@ try {
     const frame={...source,actors:source.actors.map(actor=>({...actor,p:[10000,10000]})),effects:[],triggers:[],groups:[]};
     const context=view.baseCanvas.getContext('2d'),fillText=context.fillText.bind(context);
     let drawn=[];context.fillText=(text,...args)=>{drawn.push(text);fillText(text,...args);};
+    const overlay=view.raster.gpu?.overlay,billboard=overlay?.Billboard;
+    if(overlay) overlay.Billboard=function(key,...args) {
+      if(key[0]==="label") drawn.push(key[1]);
+      return billboard.call(this,key,...args);
+    };
     view.Draw(frame,{landmarks:true},null);const shown=canvas.toDataURL(),initial=[...drawn];
     drawn=[];view.Draw(frame,{landmarks:false},null);const hidden=canvas.toDataURL(),off=[...drawn];
     drawn=[];view.Draw(frame,{landmarks:true},null);const restored=canvas.toDataURL(),on=[...drawn];
+    if(overlay) overlay.Billboard=billboard;
     canvas.remove();return {initial,off,on,changed:shown!==hidden,restored:shown===restored};
   });
   assert.deepEqual(perspectiveLandmarks.initial,['关帝庙','土地庙'],'3D projects the same landmark names and clips labels behind the camera and beyond the far plane');

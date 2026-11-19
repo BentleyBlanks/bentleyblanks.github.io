@@ -58,8 +58,9 @@ export class LevelFlowFrameCapture {
     }
     const draw=triangles!==null;
     const indexed=api==="drawElements",count=draw?args[indexed?1:2]:0;
-    const part=indexed?{count,offsetBytes:args[3],instances:1}:{count,first:args[1],instances:1};
-    const drawInfo=draw?{topology:EnumName(gl,args[0]),indexed,batch:false,subDraws:1,submissions:1,elements:count,
+    const instances=api==="drawArraysInstanced"?args[3]:1;
+    const part=indexed?{count,offsetBytes:args[3],instances:1}:{count,first:args[1],instances};
+    const drawInfo=draw?{topology:EnumName(gl,args[0]),indexed,batch:false,subDraws:1,submissions:1,elements:count*instances,
       indexType:indexed?EnumName(gl,args[2]):null,parts:[part]}:null;
     const kind=draw?"Draw Procedural":api==="blitFramebuffer"?"Blit":"Clear";
     const label=kind==="Clear"?`${api} · ${args[0]===gl.DEPTH?"Depth":`Color ${args[1]}`}`:api;

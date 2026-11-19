@@ -94,7 +94,14 @@ export function Arrow(context,a,b,color,width=2) {
   Polygon(context,[b,[b[0]-Math.cos(angle-0.45)*size,b[1]-Math.sin(angle-0.45)*size],[b[0]-Math.cos(angle+0.45)*size,b[1]-Math.sin(angle+0.45)*size]],color);
 }
 export function Label(context,text,x,y,color="#494b3d",size=12,background=false) {
-  context.font=`${size}px system-ui, Microsoft YaHei, sans-serif`;context.textAlign="left";context.textBaseline="middle";
+  context.font=`${size}px system-ui, Microsoft YaHei, sans-serif`;
+  if(context.DepthOverlay) {
+    const overlay=context.DepthOverlay,w=Math.ceil(context.measureText(text).width)+12,h=size+10;
+    overlay.Billboard(["label",text,color,size,background],x-6,y-h/2,w,h,
+      ctx=>Label(ctx,text,6,h/2,color,size,background),overlay.anchor,overlay.actorSlot);
+    return;
+  }
+  context.textAlign="left";context.textBaseline="middle";
   if(background) {context.fillStyle="#faf5e8ee";context.fillRect(x-4,y-size/2-3,context.measureText(text).width+8,size+6);}
   context.lineWidth=3;context.strokeStyle="#f1eddfcc";context.strokeText(text,x,y);context.fillStyle=color;context.fillText(text,x,y);
 }
@@ -337,7 +344,7 @@ export class FlowMapView {
     const occupied=[];
     const Priority=landmark=>landmark.detail?0:landmark.kind==="area"?6:landmark.kind==="hole"?5:landmark.kind==="pit"?4:2;
     const labels=[...(this.mapData.labels||[])].sort((a,b)=>Priority(b)-Priority(a));
-    this.visibleLandmarks=[];
+    const displayed=[];this.visibleLandmarks=displayed;
     for(const landmark of labels) {
       if(this.eye) {
         const range=Math.hypot(landmark.p[0]-this.eye[0],landmark.p[1]-this.eye[2]);
@@ -354,7 +361,8 @@ export class FlowMapView {
       if(landmark.detail&&labelScale<9)continue;
       if(landmark.kind==="pit"&&landmark.w<5&&labelScale<4)continue;
       if(labelScale<0.8&&landmark.kind!=="area"&&!['防炮洞','干沟集结处','耿家庄','村南口'].includes(landmark.name)&&!landmark.name.startsWith("旧")) continue;
-      const hidden=anchor&&this.raster.Occluded(anchor);
+      const overlay=context?.DepthOverlay;
+      const hidden=!overlay&&anchor&&this.raster.Occluded(anchor);
       if(hidden&&(this.type==="eye"||landmark.detail))continue;
       const labelWidth=landmark.name.length*12;
       let position,box;
@@ -366,11 +374,17 @@ export class FlowMapView {
       if(!position)continue;
       occupied.push(box);
       if(!context||this.raster?.collectingDepth)continue;
-      this.visibleLandmarks.push({id:landmark.id,name:landmark.name,hidden:!!hidden});
+      displayed.push({id:landmark.id,name:landmark.name,hidden:!!hidden});
+      if(overlay) this.landmarkAnchors.push({anchor,hide:this.type==="eye"||landmark.detail});
       context.save();context.globalAlpha=hidden?.35:1;
       const color=['pit','hole'].includes(landmark.kind)?"#285d68":"#62543d";
-      Circle(context,point,3,color);Line(context,[point,[position[0]-4,position[1]]],color,.8);
+      if(overlay) {
+        overlay.anchor=[anchor.x,anchor.y,anchor.depth,this.type==="eye"||landmark.detail?0:.35];
+        overlay.Disk(anchor,3,color,1,overlay.anchor);
+        overlay.Line(anchor,{x:position[0]-4,y:position[1],depth:anchor.depth},color,.8,1,overlay.anchor);
+      } else {Circle(context,point,3,color);Line(context,[point,[position[0]-4,position[1]]],color,.8);}
       Label(context,landmark.name,...position,color,12,true);context.restore();
+      if(overlay) overlay.anchor=undefined;
     }
   }
 
@@ -450,12 +464,13 @@ export class FlowMapView {
       cpu?.End();
       if(trace?.capturing&&!this.raster) trace.Canvas("绘制 2D 底图",this.baseCanvas,started);
     }
-    this.BeforeOverlays?.(frame,layers);
+
     let started=trace?.capturing?performance.now():0;
     cpu?.Begin("合成底图");
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
     cpu?.End();
     if(trace?.capturing) {trace.Canvas("合成视口底图",this.canvas,started);started=performance.now();}
+    this.BeginOverlay?.(context);
     cpu?.Begin("路线与区域");
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
@@ -502,23 +517,35 @@ export class FlowMapView {
       const p=this.ActorScreen?this.ActorScreen(actor):Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&(selection.ids||[selection.id]).includes(actor.id);
       if(this.ActorInView?!this.ActorInView(actor):p[0]<-20||p[0]>width+20||p[1]<-20||p[1]>height+20) continue;
       if(this.VisibleActor&&!this.VisibleActor(actor)) continue;
+      const overlay=context.DepthOverlay,hovered=this.hoveredActorId===actor.id;
+      const showName=layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected||hovered);
+      if(overlay&&(showName||hovered||selected||frame.dialogue?.some(line=>line.actorId===actor.id))) overlay.TrackActor(actor.id);
       this.DrawActor(context,actor,frame);
-      context.save();context.globalAlpha=this.ActorLabelOpacity?this.ActorLabelOpacity(actor):1;
-      const hovered=this.hoveredActorId===actor.id;
-      if(hovered) {
-        context.beginPath();
-        for(const [x,y] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
-          context.moveTo(p[0]+x*8,p[1]+y*16);
-          context.lineTo(p[0]+x*13,p[1]+y*16);
-          context.lineTo(p[0]+x*13,p[1]+y*11);
-        }
-        context.lineWidth=4;context.strokeStyle="#fff9";context.stroke();
-        context.lineWidth=2;context.strokeStyle=color;context.stroke();
+      if(overlay) {
+        overlay.probeActor=-1;
+        const v=this.LabelVertex(actor);
+        overlay.anchor=[v.x,v.y,v.depth,this.type==="eye"&&!this.freeCamera?0:.22];
+        overlay.actorSlot=overlay.actorSlots.get(actor.id);
       }
-      if(selected) Circle(context,p,12,"#e7d49a12","#e8d19a");
+      context.save();context.globalAlpha=!overlay&&this.ActorLabelOpacity?this.ActorLabelOpacity(actor):1;
+      const Highlight=(ctx,x,y)=>{
+        if(hovered) {
+          ctx.beginPath();
+          for(const [dx,dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+            ctx.moveTo(x+dx*8,y+dy*16);ctx.lineTo(x+dx*13,y+dy*16);ctx.lineTo(x+dx*13,y+dy*11);
+          }
+          ctx.lineWidth=4;ctx.strokeStyle="#fff9";ctx.stroke();ctx.lineWidth=2;ctx.strokeStyle=color;ctx.stroke();
+        }
+        if(selected) Circle(ctx,[x,y],12,"#e7d49a12","#e8d19a");
+      };
+      if(hovered||selected) {
+        if(overlay) overlay.Billboard(["unitHighlight",color,hovered,selected],p[0]-16,p[1]-19,32,38,
+          ctx=>Highlight(ctx,16,19),overlay.anchor,overlay.actorSlot);
+        else Highlight(context,...p);
+      }
       const hit={type:"actor",id:actor.id,screen:p,radius:9};
       this.hits.push(hit);
-      if(layers.names&&actor.pose!=="dead"&&(!actor.groupId||selected||hovered)) {
+      if(showName) {
         const text=actor.status?`${actor.name} · ${actor.status}`:actor.name,labelWidth=text.length*12+8;
         for(const offset of [[11,-10],[11,13],[-labelWidth-10,-10],[-labelWidth-10,13],[11,-28],[11,30]]) {
           const box=[p[0]+offset[0],p[1]+offset[1]-8,labelWidth,16];
@@ -528,13 +555,20 @@ export class FlowMapView {
           hit.labelBounds=[box[0]-4,box[1]-1,context.measureText(text).width+8,18];
           if(hovered) {
             context.lineWidth=1.5;context.strokeStyle=color;
-            context.strokeRect(...hit.labelBounds);
+            if(overlay) {
+              const [x,y,w,h]=hit.labelBounds;
+              overlay.Billboard(["nameFrame",color],x-1,y-1,w+2,h+2,ctx=>{
+                ctx.lineWidth=1.5;ctx.strokeStyle=color;ctx.strokeRect(1,1,w,h);
+              },overlay.anchor,overlay.actorSlot);
+            } else context.strokeRect(...hit.labelBounds);
           }
           break;
         }
       }
       context.restore();
+      if(overlay) {overlay.anchor=undefined;overlay.actorSlot=-1;}
     }
+    this.EndOverlay?.(context);
     cpu?.End();
     cpu?.Begin("特效与标注");
     for(const effect of frame.effects) {
@@ -546,7 +580,9 @@ export class FlowMapView {
       }
       if(effect.kind==="column"||effect.kind==="runner") Circle(context,Screen(effect.p),3,"#f3957b");
     }
-    this.speechBubbles = DrawFlowDialogue(context, this, frame, width, height);
+    this.BeginOverlay?.(context,true);
+    const overlay=context.DepthOverlay;
+    this.speechBubbles = DrawFlowDialogue(context,this,frame,width,height,overlay?.Speech.bind(overlay));
     for(const annotation of [...annotations,...(draft?[draft]:[])]) {
       if(Math.abs(annotation.time-frame.time)>0.06) continue;
       const a=Screen(annotation.a),b=Screen(annotation.b),color="#8d5d11";
@@ -568,6 +604,7 @@ export class FlowMapView {
       this.DrawCompass(context,width,height);
     }
     cpu?.End();
+    this.EndOverlay?.(context);
     if(trace?.capturing) trace.Canvas("场景叠层与视口输出",this.canvas,started);
   }
 }

@@ -103,8 +103,10 @@ try {
     assert.ok(frames.some(frame=>frame.calls>0&&frame.triangles>0&&frame.gpuCalls?.["encounterViewport/视口 2"]>0),
       "The actual editor GL draw calls and triangles reach the Profiler");
     assert.ok(frames.slice(1).every(frame=>!frame.gpuCalls?.["encounterViewport/视口 1"]),"Canvas 2D is not counted as WebGL after changing the view types");
-    assert.ok(frames.some(frame=>Object.keys(frame.cpu).some(key=>key.includes("/WebGL2/")&&key.endsWith("/gl.readPixels"))),
-      "The WebGL readback has its own CPU scope");
+    assert.ok(frames.some(frame=>Object.keys(frame.gpuCalls||{}).some(key=>key.endsWith("/GPU 文字与标记"))),
+      "The Profiler reports actual GPU overlay draws");
+    assert.ok(frames.every(frame=>!Object.keys(frame.cpu).some(key=>key.endsWith("/gl.readPixels"))),
+      "Ordinary recorded draws never synchronously read back scene depth");
   } else {
     assert.ok(frames.every(frame=>frame.calls===0&&!frame.gpu),"Software rendering does not invent GPU measurements");
     assert.ok(frames.some(frame=>frame.cpu[`${parentKey}/软件光栅输出`]>0),"Software raster output is measured");

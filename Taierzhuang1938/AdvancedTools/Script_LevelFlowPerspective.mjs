@@ -1,3 +1,4 @@
+import { PickEncounterBody } from "./Script_LevelFlowPicking.mjs";
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
@@ -50,6 +51,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.groundCache.set(key,height);return height;
   }
   BeforeDraw(frame,viewport=null) {
+    if(this.raster.accelerated&&(!this.raster.gpu||this.raster.gpu.gl.isContextLost())) this.baseKey="";
     this.depthPass=(this.depthPass||0)+1;
     this.frame=frame;this.occlusion.clear();
     const rect=viewport||this.canvas.getBoundingClientRect();this.width=rect.width;this.height=rect.height;
@@ -509,33 +511,41 @@ export class FlowPerspectiveView extends FlowMapView {
       Box(actor.p[0],actor.p[1]+0.25,0.8,0.5,0.45,"#94774f",this.Ground(actor.p)+0.8,0);
     }
     cpu?.End();
-    this.PrepareDepth(frame,layers,coverBoxes,true);
+    this.raster.sparseDepth=this.raster.accelerated;
+    this.raster.fullDepthReady=!this.raster.sparseDepth;
     this.raster.Flush(context,width,height);
     const markersStart=trace?.capturing?performance.now():0;
     cpu?.Begin("地标与掩体标记");
+    this.BeginOverlay(context);
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
-    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
+    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);else this.visibleLandmarks=[];
+    this.EndOverlay(context);
     cpu?.End();
     if(trace?.capturing) trace.Canvas("绘制地标与掩体标记",this.baseCanvas,markersStart);
   }
 
-  PrepareDepth(frame,layers,coverBoxes=[],afterSceneSubmit=false) {
-    this.raster.CollectDepthSamples(()=>{
-      this.DrawCoverBoxes(null,coverBoxes);
-      for(const actor of frame.actors) {
-        if(!this.ActorInView(actor)||!this.VisibleActor(actor)) continue;
-        this.DrawActor(null,actor,frame);
-        this.raster.Occluded(this.LabelVertex(actor));
-      }
-      if(layers.fire) for(const effect of frame.effects) if(effect.kind==="fire") this.DrawFire(null,effect,frame);
-      if(layers.landmarks!==false)this.DrawLandmarks(null,this.width,this.height);
-      this.DrawWallWriting(null,frame);
-      this.occlusion.clear();
-    },afterSceneSubmit);
-    this.depthPreparedPass=this.depthPass;
+  BeginOverlay(context,reuseVisibility=false) {
+    if(!this.raster.accelerated||!this.raster.depthSnapshot) return;
+    context.DepthOverlay=this.raster.gpu.overlay.Begin(this.raster,context,reuseVisibility);
   }
-
+  EndOverlay(context) {
+    if(!context.DepthOverlay) return;
+    try {context.DepthOverlay.Flush();} finally {delete context.DepthOverlay;}
+  }
+  set visibleLandmarks(rows) {this.landmarkRows=rows;this.landmarkAnchors=[];}
+  get visibleLandmarks() {
+    const probes=this.landmarkAnchors;
+    if(probes?.length&&this.raster.sparseDepth) {
+      this.raster.CollectDepthSamples(()=>{for(const {anchor} of probes) this.raster.Occluded(anchor);});
+      this.raster.gpu.ReadDepthSamples(this.raster);
+      this.landmarkRows=this.landmarkRows.filter((row,i)=>{
+        row.hidden=this.raster.Occluded(probes[i].anchor);return !(row.hidden&&probes[i].hide);
+      });
+      this.landmarkAnchors=[];
+    }
+    return this.landmarkRows||[];
+  }
   LandmarkAnchor(landmark) {
     const ground=this.Ground(landmark.p);
     const y=Math.max(ground+.65,Number.isFinite(landmark.y)?landmark.y:ground);
@@ -554,23 +564,23 @@ export class FlowPerspectiveView extends FlowMapView {
       for(const [index,char] of chars.entries()) {
         const u=(start+index*step)*side,center=this.Vertex(Point(u,h*.5));
         if(center.depth<this.near||center.depth>this.far)continue;
-        const hidden=this.raster.Occluded(center);if(!context||this.raster.collectingDepth||hidden)continue;
+        const hidden=!context?.DepthOverlay&&this.raster.Occluded(center);if(!context||this.raster.collectingDepth||hidden)continue;
         const left=this.Vertex(Point(u-side*step*.44,h*.88)),right=this.Vertex(Point(u+side*step*.44,h*.88)),bottom=this.Vertex(Point(u-side*step*.44,h*.12));
         if([left,right,bottom].some(p=>p.depth<this.near||p.depth>this.far))continue;
+        if(context.DepthOverlay) {
+          const corners=[[left.x,left.y],[right.x,right.y],[right.x+bottom.x-left.x,right.y+bottom.y-left.y],[bottom.x,bottom.y]];
+          const span=Math.max(Math.hypot(right.x-left.x,right.y-left.y),Math.hypot(bottom.x-left.x,bottom.y-left.y));
+          const size=2**Math.ceil(Math.log2(Clamp(span,16,512)));
+          context.DepthOverlay.Sprite(["writing",char],size,size,ctx=>{
+            ctx.font=`bold ${size}px "Microsoft YaHei",sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillStyle="#32291e";ctx.fillText(char,size/2,size*.54,size);
+          },corners,[center.x,center.y,center.depth,0]);
+          continue;
+        }
         context.save();context.transform(right.x-left.x,right.y-left.y,bottom.x-left.x,bottom.y-left.y,left.x,left.y);
         context.font='bold 1px "Microsoft YaHei",sans-serif';context.textAlign='center';context.textBaseline='middle';context.fillStyle='#32291e';context.fillText(char,.5,.54,1);context.restore();
       }
     }
-  }
-
-  BeforeOverlays(frame,layers) {
-    if(!this.raster.accelerated||!this.raster.sparseDepth) return;
-    const cpu=this.raster.debugTrace?.cpu;
-    cpu?.Begin("更新遮挡");
-    try {
-      if(this.depthPreparedPass!==this.depthPass) this.PrepareDepth(frame,layers);
-      this.raster.gpu.ReadDepthSamples(this.raster);
-    } finally {cpu?.End();}
   }
 
   DrawCoverBoxes(context,coverBoxes) {
@@ -594,8 +604,10 @@ export class FlowPerspectiveView extends FlowMapView {
       const vertex = this.Vertex(center);
       const corners = top.map(point => this.Vertex(point));
       const span = Math.max(...corners.map(point => point.x)) - Math.min(...corners.map(point => point.x));
-      if (vertex.depth >= this.near && vertex.depth <= this.far && !this.raster.Occluded(vertex) && span >= 8 && !this.raster.collectingDepth) {
-        DrawCoverSymbol(context, [vertex.x, vertex.y]);
+      if (vertex.depth >= this.near && vertex.depth <= this.far && span >= 8 && (context?.DepthOverlay||!this.raster.Occluded(vertex)) && !this.raster.collectingDepth) {
+        if(context?.DepthOverlay) context.DepthOverlay.Billboard("cover",vertex.x-7,vertex.y-7,14,16,
+          ctx=>DrawCoverSymbol(ctx,[7,7]),[vertex.x,vertex.y,vertex.depth,0]);
+        else DrawCoverSymbol(context, [vertex.x, vertex.y]);
       }
     }
   }
@@ -625,6 +637,17 @@ export class FlowPerspectiveView extends FlowMapView {
 
   }
   LabelVertex(actor) {return this.Vertex([actor.p[0],(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0)+(actor.kind==="tank"?1.8:actor.kind==="cart"?1.45:0.65),actor.p[1]]);}
+  PickActor(point) {
+    if(!this.frame) return null;
+    const ortho=this.type==="oblique"&&!this.freeCamera;
+    const scale=ortho?this.scale:this.focal;
+    const x=(point[0]-this.width/2)/scale,y=(this.height*(ortho ? .57 : .49)-point[1])/scale;
+    const offset=this.right.map((v,i)=>v*x+this.up[i]*y);
+    const origin=ortho?this.eye.map((v,i)=>v+offset[i]):this.eye;
+    const direction=ortho?this.forward:Normalize(this.forward.map((v,i)=>v+offset[i]));
+    const actor=PickEncounterBody(this,origin,direction);
+    return actor?{type:"actor",id:actor.id,screen:this.ActorScreen(actor)}:null;
+  }
   ActorScreen(actor) {const vertex=this.LabelVertex(actor);return vertex.depth<this.near||vertex.depth>this.far?[-100000,-100000]:[vertex.x,vertex.y];}
   ActorInView(actor) {
     const ground=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),points=[this.Vertex([actor.p[0],ground,actor.p[1]]),this.Vertex([actor.p[0],ground+1.8,actor.p[1]])];
@@ -641,7 +664,7 @@ export class FlowPerspectiveView extends FlowMapView {
   DrawActor(context,actor,frame) {
     const [x,z]=actor.p,base=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),color=FLOW_COLORS[actor.side],stats={visible:0,hidden:0};
     const hiddenAlpha=this.type==="eye"&&!this.freeCamera?0:0.2;
-    this.occlusion.set(actor.id,stats);
+    if(!context?.DepthOverlay) this.occlusion.set(actor.id,stats);
     const Segment=(a,b,width=2)=>{
       const vertices=this.FaceVertices([a,b,b]);
       if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],color,width,stats,hiddenAlpha);
@@ -707,5 +730,28 @@ export class FlowPerspectiveView extends FlowMapView {
     const vertices=this.FaceVertices([a,b,b]);
     if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],"#c47b34",1.2,{visible:0,hidden:0},0);
   }
-  Diagnostics() {return {backend:this.raster.accelerated?"webgl2":"software",renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
+  InspectOcclusion() {
+    // Detailed fragment counts are an explicit inspection operation. Playback,
+    // camera movement, hover and selection consume GPU visibility directly.
+    if(this.raster.sparseDepth&&this.diagnosticPass!==this.depthPass&&this.frameDrawing!==true) {
+      const actors=this.frame.actors.filter(actor=>this.ActorInView(actor)&&this.VisibleActor(actor));
+      this.raster.CollectDepthSamples(()=>{
+        for(const actor of actors) {this.DrawActor(null,actor,this.frame);this.raster.Occluded(this.LabelVertex(actor));}
+      });
+      this.raster.gpu.ReadDepthSamples(this.raster);
+      this.occlusion.clear();for(const actor of actors) this.DrawActor(null,actor,this.frame);
+      this.diagnosticPass=this.depthPass;
+    }
+  }
+  InspectSpeech() {
+    if(!this.speechBubbles?.length||!this.raster.sparseDepth) return this.speechBubbles||[];
+    this.InspectOcclusion();
+    return this.speechBubbles.flatMap(bubble=>{
+      const actor=this.frame.actors.find(a=>a.id===bubble.actorId),opacity=this.ActorLabelOpacity(actor);
+      return opacity>0?[{...bubble,opacity}]:[];
+    });
+  }
+  Diagnostics() {
+    this.InspectOcclusion();
+    return {backend:this.raster.accelerated?"webgl2":"software",renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
 }

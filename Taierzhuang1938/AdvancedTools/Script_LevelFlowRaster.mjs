@@ -33,18 +33,17 @@ export class EncounterRaster {
     this.gpuLength=0;this.worldLength=0;this.accelerated=!!this.gpu&&!this.gpu.gl.isContextLost();
     this.resident=false;this.worldBatches=[];
     this.triangles=0;
-    this.sparseDepth=false;this.fullDepthReady=true;this.depthSampleCount=0;this.pendingDepthDraw=null;
+    this.sparseDepth=false;this.fullDepthReady=true;this.depthSampleCount=0;
     this.depthTiles.fill(0);
     // The GPU overwrites every depth pixel; software colors are unused until
     // fallback. Avoid clearing two full-resolution CPU surfaces per pane.
     if(!this.accelerated) {this.depth.fill(Infinity);this.image.data.fill(0);}
   }
 
-  CollectDepthSamples(draw,afterSceneSubmit=false) {
+  CollectDepthSamples(draw) {
     if(!this.accelerated) return;
     if(!this.sparseDepth) this.fullDepthReady=false;
     this.sparseDepth=true;
-    if(afterSceneSubmit) {this.pendingDepthDraw=draw;return;}
     this.collectingDepth=true;
     try {draw();} finally {this.collectingDepth=false;}
   }
@@ -241,6 +240,7 @@ export class EncounterRaster {
   }
 
   Stroke(context,a,b,color,width,stats,hiddenAlpha=0.2) {
+    if(context?.DepthOverlay) return context.DepthOverlay.Line(a,b,color,width,hiddenAlpha);
     const dx=b.x-a.x,dy=b.y-a.y;
     let from=0,to=1;
     for(const [origin,delta,limit] of [[a.x,dx,this.displayWidth],[a.y,dy,this.displayHeight]]) {
@@ -252,7 +252,7 @@ export class EncounterRaster {
     const length=Math.hypot(dx,dy)*(to-from),steps=Math.max(1,Math.ceil(length/1.5));
     let previous=null,hidden=null,lastPoint=null;
     const Paint=(end)=>{
-      if(!previous||this.collectingDepth) return;
+      if(!previous||!context||this.collectingDepth) return;
       context.save();context.globalAlpha=hidden?hiddenAlpha:1;context.strokeStyle=color;context.lineWidth=width;context.lineCap="round";
       context.beginPath();context.moveTo(previous.x,previous.y);context.lineTo(end.x,end.y);context.stroke();context.restore();
     };
@@ -271,7 +271,8 @@ export class EncounterRaster {
   }
 
   Head(context,point,radius,color,stats,hiddenAlpha=0.2) {
-    const size=Math.ceil(radius*2+2),image=this.collectingDepth?null:new ImageData(size,size),rgb=Rgb(color);
+    if(context?.DepthOverlay) return context.DepthOverlay.Disk(point,radius,color,hiddenAlpha);
+    const size=Math.ceil(radius*2+2),image=!context||this.collectingDepth?null:new ImageData(size,size),rgb=Rgb(color);
     const left=Math.floor(point.x-radius-1),top=Math.floor(point.y-radius-1);
     for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
       const dx=left+x+0.5-point.x,dy=top+y+0.5-point.y;
@@ -286,10 +287,11 @@ export class EncounterRaster {
   }
 
   OverlayFace(context,vertices,color,stats,hiddenAlpha=0.2) {
+    if(context?.DepthOverlay) return context.DepthOverlay.Face(vertices,color,hiddenAlpha);
     const left=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.x)))),top=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.y))));
     const right=Math.min(this.displayWidth,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.displayHeight,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
     if(right<=left||bottom<=top) return;
-    const width=right-left,height=bottom-top,image=this.collectingDepth?null:new ImageData(width,height),rgb=Rgb(color);
+    const width=right-left,height=bottom-top,image=!context||this.collectingDepth?null:new ImageData(width,height),rgb=Rgb(color);
     for(let triangle=1;triangle<vertices.length-1;triangle++) {
       const a=vertices[0],b=vertices[triangle],c=vertices[triangle+1],area=Edge(a,b,c.x,c.y);
       if(Math.abs(area)<0.001) continue;

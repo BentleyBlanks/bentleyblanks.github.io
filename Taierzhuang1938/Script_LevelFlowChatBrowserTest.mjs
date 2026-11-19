@@ -237,10 +237,10 @@ try {
   assert.deepEqual(await SelectedIds(), [], "hover leaves selection untouched");
   await page.screenshot({ path: path.join(out, "UnitHover.png") });
   const label = unitHoverPoint.label;
-  await page.mouse.move(label[0] + 5, label[1] + label[3] / 2);
-  assert.equal(await page.locator("#flowMap").getAttribute("data-unit-hover"), "liu");
-  await page.mouse.click(label[0] + 5, label[1] + label[3] / 2);
-  assert.deepEqual(await SelectedIds(), ["liu"], "unit nameplates are clickable");
+  await page.mouse.move(label[0] + label[2] - 2, label[1] + label[3] / 2);
+  assert.notEqual(await page.locator("#flowMap").getAttribute("data-unit-hover"), "liu");
+  await page.mouse.click(label[0] + label[2] - 2, label[1] + label[3] / 2);
+  assert.ok(!(await SelectedIds()).includes("liu"), "a nameplate alone cannot select its actor");
   await page.mouse.move(10, 10);
   await page.waitForFunction(() => unitHoverViews.flowMap.hoveredActorId === null);
   assert.equal(await page.locator("#flowMap").getAttribute("data-unit-hover"), null);
@@ -258,7 +258,7 @@ try {
         const nameplate = box && x >= box[0] && x <= box[0] + box[2] && y >= box[1] && y <= box[1] + box[3];
         return other !== candidate && other.type === "actor" && (marker || nameplate);
       });
-      return candidate.type === "actor" && inside && !overlap;
+      return candidate.type === "actor" && inside && !overlap && view.PickActor(candidate.screen)?.id===candidate.id;
     });
     return { id: hit.id, x: rect.x + hit.screen[0], y: rect.y + hit.screen[1] };
   });

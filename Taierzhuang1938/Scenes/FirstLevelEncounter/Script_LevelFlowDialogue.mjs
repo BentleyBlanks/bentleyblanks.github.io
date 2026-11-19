@@ -34,14 +34,14 @@ function WrapSpeech(context, text, maxWidth) {
 
 // Drawing into each viewport's canvas keeps captures and PNG exports identical
 // to playback. Font size stays in CSS pixels as the world camera moves.
-export function DrawFlowDialogue(context, view, frame, width, height) {
+export function DrawFlowDialogue(context, view, frame, width, height, drawBillboard=null) {
   const bubbles = [];
   for (const speech of frame.dialogue || []) {
     const actor = frame.actors.find(entry => entry.id === speech.actorId);
     if (!actor || view.VisibleActor && !view.VisibleActor(actor)) continue;
     const anchor = view.SpeechAnchor(actor);
     if (!anchor || anchor[0] < 0 || anchor[0] > width || anchor[1] < 0 || anchor[1] > height) continue;
-    const opacity = view.ActorLabelOpacity ? view.ActorLabelOpacity(actor) : 1;
+    const opacity = !drawBillboard&&view.ActorLabelOpacity ? view.ActorLabelOpacity(actor) : 1;
     if (opacity <= 0) continue;
     context.save();
     context.globalAlpha = opacity;
@@ -60,30 +60,39 @@ export function DrawFlowDialogue(context, view, frame, width, height) {
     const tailAtBottom = top + boxHeight / 2 < anchor[1];
     const edgeY = tailAtBottom ? top + boxHeight : top;
     const tailX = Clamp(anchor[0], left + HUD.cornerRadius + 6, left + boxWidth - HUD.cornerRadius - 6);
-    context.fillStyle = HUD.fill;
-    context.strokeStyle = HUD.outline;
-    context.lineWidth = 2;
-    context.beginPath();
-    context.roundRect(left, top, boxWidth, boxHeight, HUD.cornerRadius);
-    context.fill();
-    context.stroke();
-    context.beginPath();
-    context.moveTo(tailX - 7, edgeY);
-    context.lineTo(anchor[0], anchor[1] - HUD.headGap);
-    context.lineTo(tailX + 7, edgeY);
-    context.fill();
-    context.stroke();
-    context.strokeStyle = HUD.fill;
-    context.beginPath();
-    context.moveTo(tailX - 6, edgeY);
-    context.lineTo(tailX + 6, edgeY);
-    context.stroke();
-    context.fillStyle = HUD.nameColor;
-    context.font = "12px sans-serif";
-    context.fillText(speech.name, left + HUD.padding, top + HUD.padding);
-    context.fillStyle = HUD.ink;
-    context.font = `${HUD.fontSize}px sans-serif`;
-    lines.forEach((line, index) => context.fillText(line, left + HUD.padding, top + HUD.padding + HUD.nameHeight + index * HUD.lineHeight));
+    const PaintBody=(ctx,x,y)=>{
+      ctx.textAlign="left";ctx.textBaseline="top";
+      ctx.fillStyle = HUD.fill;
+      ctx.strokeStyle = HUD.outline;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, boxWidth, boxHeight, HUD.cornerRadius);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = HUD.nameColor;
+      ctx.font = "12px sans-serif";
+      ctx.fillText(speech.name, x + HUD.padding, y + HUD.padding);
+      ctx.fillStyle = HUD.ink;
+      ctx.font = `${HUD.fontSize}px sans-serif`;
+      lines.forEach((line, index) => ctx.fillText(line, x + HUD.padding, y + HUD.padding + HUD.nameHeight + index * HUD.lineHeight));
+    };
+    if(drawBillboard) {
+      drawBillboard(actor,speech,lines,[left,top,boxWidth,boxHeight],PaintBody,
+        {x:tailX,edgeY,tipX:anchor[0],tipY:anchor[1]-HUD.headGap,fill:HUD.fill,outline:HUD.outline});
+    } else {
+      PaintBody(context,left,top);context.fillStyle=HUD.fill;context.strokeStyle=HUD.outline;context.lineWidth=2;
+      context.beginPath();
+      context.moveTo(tailX - 7, edgeY);
+      context.lineTo(anchor[0], anchor[1] - HUD.headGap);
+      context.lineTo(tailX + 7, edgeY);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = HUD.fill;
+      context.beginPath();
+      context.moveTo(tailX - 6, edgeY);
+      context.lineTo(tailX + 6, edgeY);
+      context.stroke();
+    }
     context.restore();
     bubbles.push({...speech, anchor, box:[left, top, boxWidth, boxHeight], opacity, lines});
   }

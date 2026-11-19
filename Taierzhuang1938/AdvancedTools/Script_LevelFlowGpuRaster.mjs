@@ -1,7 +1,8 @@
+import { EncounterGpuOverlay } from "./Script_LevelFlowGpuOverlay.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 
-// One offscreen context for all panes. Depth readback remains unfiltered for
-// picking and actor strokes. Lighting only changes the displayed color.
+// One offscreen context for all panes. Each pane retains its native linear
+// depth for GPU overlays and on-demand surface picking.
 const Dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 let shared;
 let unavailable=false;
@@ -166,6 +167,7 @@ class GpuRaster {
     this.surfaceUniforms=Object.fromEntries(['terrainSurface','groundColor','distantColor','groundBounds','distantBounds'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.surfaceTextures=new Map();
     this.residentOwners=new Map();
+    this.overlay=new EncounterGpuOverlay(gl,Program);
     this.shadowProgram=Program(`#version 300 es
       precision highp float;
       layout(location=0) in vec3 position;
@@ -636,10 +638,10 @@ class GpuRaster {
     this.trace=trace;
     trace.cpu?.Begin("WebGL2");
     try {
-      for(const api of ["drawArrays","drawElements",...(trace.capturing?["clearBufferfv","blitFramebuffer"]:[])]) {
+      for(const api of ["drawArrays","drawElements","drawArraysInstanced",...(trace.capturing?["clearBufferfv","blitFramebuffer"]:[])]) {
         const original=gl[api],own=Object.hasOwn(gl,api);
         gl[api]=(...args)=>{
-          const triangles=api==="drawElements"?args[1]/3:api==="drawArrays"?args[2]/3:null;
+          const triangles=api==="drawElements"?args[1]/3:api==="drawArrays"?args[2]/3:api==="drawArraysInstanced"?(args[0]===gl.TRIANGLES?args[2]*args[3]/3:0):null;
           const query=trace.BeginGl(gl),timed=trace.capturing||trace.captureDraws;
           const start=timed?performance.now():0;
           try {return original.apply(gl,args);}
@@ -718,20 +720,7 @@ class GpuRaster {
     gl.bindVertexArray(this.screenVao);
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
-    if(raster.sparseDepth) {
-      this.Phase(null);
-      // Let the GPU render shadows and scene depth while the CPU projects the
-      // current frame's markers and collects the pixels they actually need.
-      if(raster.pendingDepthDraw) {
-        cpu?.Begin("遮挡采样坐标");
-        try {
-          gl.flush();
-          raster.CollectDepthSamples(raster.pendingDepthDraw);raster.pendingDepthDraw=null;
-        } finally {cpu?.End();}
-      }
-      this.ReadDepthSamples(raster);
-      gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
-    } else {
+    if(!raster.sparseDepth) {
       this.Phase("深度回读");
       gl.readBuffer(gl.COLOR_ATTACHMENT1);this.ReadDepthPixels(raster.width,raster.height,raster.depthData);
     }
