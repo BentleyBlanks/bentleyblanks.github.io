@@ -14,6 +14,9 @@ const server=await ServeRoot(root),base=`http://127.0.0.1:${server.address().por
 const browser=await LaunchBrowser();
 try {
   const page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
+  // Exercise the portable Worker and IndexedDB path even on a developer machine
+  // with a prebuilt disk Library. EncounterLibraryBrowserTest covers disk hits.
+  await page.route("**/Library/Terrain/*.bin.gz",route=>route.fulfill({status:404,body:""}));
   await page.context().grantPermissions(['clipboard-read','clipboard-write']);
   await page.addInitScript(()=>{
     localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));
@@ -52,7 +55,8 @@ try {
     clearInterval(encounterLoadTimer);
     const pulse={...encounterLoadPulse};
     const {LoadEncounterMap}=await import('./Script_LevelFlowMap.mjs');
-    const map=await LoadEncounterMap();
+    const {EvaluateFlow}=await import('./Script_LevelFlowModel.mjs');
+    const map=await LoadEncounterMap({focus:EvaluateFlow(0).player});
     return {pulse,build:map.terrain.buildInfo,leaves:map.terrain.leafCount};
   });
   assert.ok(terrainLoading.pulse.ticks>20&&terrainLoading.pulse.maxGap<2500,'first-load terrain work yields the browser main thread');
@@ -1609,6 +1613,9 @@ try {
   assert.equal(speechClipping.self,0,'first-person speaker has no floating self bubble');
   assert.equal(speechClipping.behind,null,'speakers behind the camera have no anchor');
   const transferEnd=FLOW_TIMELINE.find(beat=>beat.id==='09e').end;
+  // Install before the new document schedules its RAF loop. A native callback
+  // already queued before installation cannot be driven by fastForward().
+  await page.clock.install();
   await page.goto(base+`AdvancedTools/Tool_LevelFlow.html?t=${transferEnd}&x=96&z=460&zoom=9`);
   await ReadyPlan();
   const transferArrival=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
@@ -1627,7 +1634,6 @@ try {
   await page.screenshot({path:path.join(out,'Screenshot_YardTransferHold.png')});
   // fastForward delivers a single delayed animation frame, reproducing a
   // slow renderer without depending on the test machine's GPU or frame rate.
-  await page.clock.install();
   await page.clock.pauseAt(new Date(Date.now()+1000));
   for(const speed of [0.5,1,2,4,8,16]) {
     await page.evaluate(speed=>{

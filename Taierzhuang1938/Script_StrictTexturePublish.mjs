@@ -41,7 +41,7 @@ export function ModelView(doc,buffers,index){
   if(!buffer||start<0||view.byteLength<0||start+view.byteLength>buffer.length)throw Error('Invalid model buffer view');
   return buffer.subarray(start,start+view.byteLength);
 }
-function Pack(doc,chunks){
+export function Pack(doc,chunks){
   let offset=0;const parts=[];
   for(const [index,bytes]of chunks.entries()){
     Object.assign(doc.bufferViews[index],{buffer:0,byteOffset:offset,byteLength:bytes.length});

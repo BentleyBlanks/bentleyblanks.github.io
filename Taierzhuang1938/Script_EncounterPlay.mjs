@@ -19,6 +19,8 @@ import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs
 import { XBOT_DEATHS } from "./Data_BlockoutXBotClips.mjs";
 import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
+import { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";
+import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 const UI=CONFIG.ui;
@@ -73,7 +75,7 @@ export class EncounterPlay {
     this.checkpointTime=null;
     this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
     this.token=payload?.token||"standalone";
-    this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,
+    this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,loadCast:LoadEncounterCast,
       groundAt:(x,z)=>BeishaheSurfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
       characterKeys:[...new Set([...Object.values(CONFIG.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
     this.view=new EncounterPlayView(host);
@@ -100,6 +102,8 @@ export class EncounterPlay {
   async Load() {
     const phase=this.host.ctx.PHASE_TABLE[this.host.state.phaseIndex];
     if(phase.blockout?.sceneError)throw new Error(phase.blockout.sceneError);
+    // Launch independent driver work while character kits are still loading.
+    this.passProgramsSubmitted=this.initialized?0:SubmitEncounterPrograms(this.host);
     await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
@@ -195,7 +199,7 @@ export class EncounterPlay {
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
-    let bloodDrops=0,prepassBatchPrimed=0,shadowBatchPrimed=0;
+    let bloodDrops=0,prepassBatchPrimed=0,shadowBatchPrimed=0,actorProgramsSubmitted=0,firstBatch=null;
     const excluded=new Set([...this.entries.values()].flatMap(entry=>entry.skin?.hidden||[]));
     const post=host.post;
     const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
@@ -208,7 +212,8 @@ export class EncounterPlay {
     group.add(debris);
     host.scene.add(group);host.state.warming=true;
     const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch,
-      drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded};
+      drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded,
+      onFirstDraw:(ms,programs)=>{firstBatch={ms,programs};}};
     try {
       if(dimensions){
         const height=Math.min(post.height,ENCOUNTER_PLAY_STARTUP.warmupHeight);
@@ -223,6 +228,7 @@ export class EncounterPlay {
         // compile here also submits unused variants of the hidden actor rigs.
         host.ctx.RenderScene(0);
       } else {
+        actorProgramsSubmitted=SubmitEncounterActorPrograms(host);
         await host.ctx.WarmupShaders(host.scene,onStep,null,options);
         host.viewmodel.DrawActionWarmup(()=>host.ctx.RenderScene(0));
       }
@@ -269,7 +275,7 @@ export class EncounterPlay {
       host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
       post.NotifyCameraCut();
     }
-    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops,prepassBatchPrimed,shadowBatchPrimed};
+    host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops,prepassBatchPrimed,shadowBatchPrimed,passProgramsSubmitted:this.passProgramsSubmitted,actorProgramsSubmitted,firstBatch};
     this.warmedSignatures.add(signature);this.FlushRetired();
   }
   FlushRetired() {

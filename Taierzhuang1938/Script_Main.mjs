@@ -4189,6 +4189,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
       RenderScene(0);
       const cost = performance.now() - started;
       const born = renderer.info.programs.length - had;
+      if(done===0)options.onFirstDraw?.(cost,born);
       for (let k = 0; k < batch.length; k += 1) {
         batch[k].layers.set(HIDDEN_LAYER);
         batch[k].frustumCulled = culled[k];

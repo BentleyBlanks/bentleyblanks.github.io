@@ -328,7 +328,7 @@ function Box(group, material, w, h, d, x, y, z) {
 }
 
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false, characterKeys = null, asyncBlood = false, riggedPoseOnly = false }) {
+  constructor({ scene, actorFactory, groundAt, library = null, formalOnly = false, characterKeys = null, loadCast = null, asyncBlood = false, riggedPoseOnly = false }) {
     this.formalOnly=formalOnly;
     this.asyncBlood=asyncBlood;
     this.riggedPoseOnly=riggedPoseOnly;
@@ -355,7 +355,7 @@ export class BlockoutPuppets {
     this.actorCount = 0;
     this.missingClips = new Set();
     // X Bot（文件头 2026-11-01）：资源异步读，读完之前照旧是士兵模型，读完那一帧给每个人挂上
-    this.xbot = BLOCKOUT_PUPPETS.xbot ? new XBotSkins({characterKeys}) : null;
+    this.xbot = BLOCKOUT_PUPPETS.xbot ? new XBotSkins({characterKeys,loadCast}) : null;
     this.xbot?.Load();
   }
 

@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
+import { PrepareEncounterLibraryRequest } from "./Script_EncounterLibraryServer.mjs";
 import { CreateReloadableEncounterCodexHandler, PreviewRuntimeRevision } from "./Script_LocalPreviewRuntime.mjs";
 // 白盒关卡编辑器的「记下当前机位」。配置模块是纯的（node 与浏览器共用），导入时不抛错：
 //   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
@@ -355,6 +356,7 @@ const mounts = new Map(); // absRoot -> { port, server }
 function CreateServer(rootDir, context) {
   const handleEncounterCodex = CreateReloadableEncounterCodexHandler(rootDir);
   const runtimeRevision = PreviewRuntimeRevision(rootDir);
+  const libraryRequest = path.resolve(rootDir) === DEFAULT_ROOT ? PrepareEncounterLibraryRequest(rootDir) : null;
   return http.createServer(async (request, response) => {
     const [rawRoute, query] = request.url.split("?");
     let route;
@@ -447,6 +449,14 @@ function CreateServer(rootDir, context) {
     if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) { response.writeHead(403).end(); return; }
     const privatePath = relativePath.replaceAll("\\", "/").toLowerCase();
     if (privatePath === "tmp/encountercodex" || privatePath.startsWith("tmp/encountercodex/")) { response.writeHead(403).end(); return; }
+    if (libraryRequest && route.startsWith("/Taierzhuang1938/AdvancedTools/")) {
+      try {
+        if (await libraryRequest(route,filePath)) response.setHeader("X-Encounter-Library","validated");
+      } catch(error) {
+        console.warn("[Encounter Library]",error.message);
+        response.writeHead(503,{"Cache-Control":"no-store"}).end();return;
+      }
+    }
     fs.stat(filePath, (error, stat) => {
       if (error) {
         response.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });

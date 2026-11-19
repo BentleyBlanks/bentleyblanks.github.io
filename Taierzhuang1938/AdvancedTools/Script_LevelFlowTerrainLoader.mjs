@@ -1,39 +1,40 @@
 import {BuildEncounterTerrain} from "./Script_LevelFlowTerrain.mjs";
 import {ReadTerrainCache} from "./Script_LevelFlowTerrainCache.mjs";
 
-async function SourceIdentity(root) {
-  const sources=new Map();
-  const Read=async url=>{
-    if(sources.has(url.href)) return;
-    sources.set(url.href,"");
-    const response=await fetch(url,{cache:"no-store"});
-    if(!response.ok) throw new Error(`Terrain source ${response.status}`);
-    const source=await response.text();sources.set(url.href,source);
-    const references=[...source.matchAll(/\b(?:import|export)\s+(?:[^;]*?\s+from\s*)?["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']/g)]
-      .map(match=>match[1]||match[2]).filter(reference=>reference.startsWith("."));
-    await Promise.all(references.map(reference=>Read(new URL(reference,url))));
-  };
-  await Read(root);
-  return JSON.stringify([...sources].sort(([a],[b])=>a.localeCompare(b)));
-}
+import {TerrainLibraryKey} from "./Script_LevelFlowTerrainKey.mjs";
+import {UnpackTerrainSnapshot} from "./Script_TerrainSnapshot.mjs";
 
-async function CacheKey(scene,bytes,map,workerUrl) {
-  const encoder=new TextEncoder();
-  const inputs=[encoder.encode(await SourceIdentity(workerUrl)),encoder.encode(JSON.stringify([scene,map])),...bytes];
-  const hashes=await Promise.all(inputs.map(input=>crypto.subtle.digest("SHA-256",input)));
-  return hashes.map(hash=>[...new Uint8Array(hash)].map(value=>value.toString(16).padStart(2,"0")).join("")).join("-");
+async function ReadDiskTerrain(key) {
+  if(typeof DecompressionStream==="undefined")return null;
+  const url=new URL("./Library/Terrain/"+key+".bin.gz",import.meta.url);
+  const response=await fetch(url,{cache:"no-store"});
+  if(!response.ok)return null;
+  const stream=response.body.pipeThrough(new DecompressionStream("gzip"));
+  return UnpackTerrainSnapshot(await new Response(stream).arrayBuffer());
 }
 
 export async function PrepareEncounterTerrain(scene,bytes,map,{focus=[0,0]}={}) {
   const started=performance.now(),workerUrl=new URL("./Script_LevelFlowTerrainWorker.mjs",import.meta.url);
   let key=null,prepared=null,source="worker",buildMs=0,cached=false;
-  if(typeof Worker!=="undefined") {
-    try {key=await CacheKey(scene,bytes,map,workerUrl);prepared=await ReadTerrainCache(key);} catch(error) {
-      console.warn("[EncounterTerrain] Cache unavailable",error.message);
-    }
-    if(prepared?.format===2) {source="cache";cached=true;}
+  try {
+    key=await TerrainLibraryKey(scene,bytes,map,focus,async url=>{
+      const response=await fetch(url,{cache:"no-store"});
+      if(!response.ok)throw Error("Terrain source "+response.status);
+      return response.text();
+    });
+  } catch(error) {console.warn("[EncounterTerrain] Cannot identify terrain inputs",error.message);}
+  if(key) {
+    try {prepared=await ReadTerrainCache(key);} catch(error) {console.warn("[EncounterTerrain] Browser cache unavailable",error.message);}
+    if(prepared?.format===2)source="cache";
     else {
-      prepared=null;
+      try {prepared=await ReadDiskTerrain(key);} catch(error) {console.warn("[EncounterTerrain] Disk cache unavailable",error.message);}
+      if(prepared?.format===2)source="library";
+    }
+    cached=prepared?.format===2;
+  }
+  if(!cached) {
+    prepared=null;
+    if(typeof Worker!=="undefined") {
       try {
         const result=await new Promise((resolve,reject)=>{
           const worker=new Worker(workerUrl,{type:"module"});

@@ -18,5 +18,6 @@ export const ENCOUNTER_PLAY_STARTUP = {
   settleFrames:4,
   settleDt:1/60,
   idleCacheMs:120000,
+  editorIdleCacheMs:600000,
   maxLoadMs:120000,
 };

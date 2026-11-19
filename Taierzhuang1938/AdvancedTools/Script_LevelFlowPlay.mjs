@@ -1,5 +1,6 @@
 import {EncounterCanPlay,EncounterFirstPlayable} from "../Script_EncounterPlayPlan.mjs";
 import {ENCOUNTER_PLAY_STARTUP} from "../Data_Tuning_EncounterPlayStartup.mjs";
+import {ReadCastLibrary} from "./Script_EncounterCastLibrary.mjs";
 
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
@@ -10,6 +11,12 @@ export class LevelFlowPlay {
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
     this.button.onclick=()=>this.active?(this.state?.failed?this.Retry():this.Pause(false)):this.Start(this.menu.value);
     this.pauseButton.onclick=()=>this.Pause(!this.paused);this.stopButton.onclick=()=>this.Stop();
+    this.releaseButton=document.getElementById("releasePlayCache");
+    this.releaseButton.onclick=()=>{if(!this.active){this.DropHost();this.UpdateControls();}};
+    const activity=()=>{if(!this.active&&this.frame)this.ScheduleRelease();};
+    for(const event of ["pointerdown","keydown","input","wheel","visibilitychange"])
+      document.addEventListener(event,activity,{capture:true,passive:true});
+    document.addEventListener("freeze",()=>{if(!this.active){this.DropHost();this.UpdateControls();}});
     this.menu.onchange=()=>this.UpdateControls();
     // Keyboard events do not cross iframe boundaries. Keep an escape route
     // when a toolbar/sidebar control owns focus while the game is running.
@@ -37,6 +44,7 @@ export class LevelFlowPlay {
     this.pauseButton.disabled=!this.active||!this.state?.ready||this.launching;
     this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
     this.stopButton.disabled=!this.active;this.menu.disabled=this.active;
+    this.releaseButton.hidden=this.active||!this.frame;
   }
   async SceneStamp() {
     const paths=["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
@@ -44,12 +52,14 @@ export class LevelFlowPlay {
       "Environment/EnvPreset_FirstLevelEncounter.json","Environment/EnvPreset_FirstLevelEncounterDusk.json",
       "Scenes/FirstLevelEncounter/Data_Play.mjs","Scenes/FirstLevelEncounter/Data_LevelFlow.mjs",
       "Scenes/FirstLevelEncounter/Data_LevelFlowBeishahe.mjs","Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs"];
-    return (await Promise.all(paths.map(async path=>{
+    const hashes=paths.map(async path=>{
       const response=await fetch(new URL("../"+path,import.meta.url),{cache:"no-store"});
       if(!response.ok)throw new Error("场景读取失败："+response.status);
       const hash=await crypto.subtle.digest("SHA-256",await response.arrayBuffer());
       return [...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,"0")).join("");
-    }))).join(":");
+    });
+    hashes.push(ReadCastLibrary().then(library=>JSON.stringify(library?.data.models||null)).catch(()=>"null"));
+    return (await Promise.all(hashes)).join(":");
   }
   Start(mode="current") {
     if(this.active)return false;
@@ -76,7 +86,7 @@ export class LevelFlowPlay {
     const stamp=await this.SceneStamp();
     if(!this.active||generation!==this.generation)return;
     const api=this.frame?.contentWindow.Tengxian?.Debug.EncounterPlay;
-    if(api?.State().initialized&&!api.State().error&&stamp===this.cachedStamp) {
+    if(api?.State().initialized&&!api.State().error&&!this.frame.contentWindow.Tengxian.renderer.getContext().isContextLost()&&stamp===this.cachedStamp) {
       this.host.className="lfPlayHost";this.host.hidden=false;this.loading.hidden=false;this.loading.textContent="正在重置试玩…";
       await api.Begin(payload);
       if(!this.active||generation!==this.generation)return;
@@ -86,6 +96,13 @@ export class LevelFlowPlay {
     this.host=document.createElement("div");this.host.className="lfPlayHost";
     this.loading=document.createElement("div");this.loading.className="lfPlayLoading";this.loading.textContent="正在载入战斗场景…";
     this.frame=document.createElement("iframe");this.frame.title="Encounter Play";this.frame.allow="autoplay; fullscreen";this.frame.src="../index.html?encounterPlay=1";
+    const frame=this.frame;
+    frame.addEventListener("load",()=>{
+      if(this.frame!==frame)return;
+      frame.contentDocument.addEventListener("webglcontextlost",()=>{
+        if(!this.active&&this.frame===frame){this.DropHost();this.UpdateControls();}
+      },true);
+    },{once:true});
     this.host.append(this.frame,this.loading);document.querySelector(".lfViewport").append(this.host);
     this.launching=false;this.timer=setInterval(()=>this.StartHost(),100);
   }
@@ -135,13 +152,18 @@ export class LevelFlowPlay {
     if(!this.active)return;
     this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
     const game=this.frame?.contentWindow.Tengxian,api=game?.Debug.EncounterPlay;
-    if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.cacheTimer=setTimeout(()=>this.DropHost(),ENCOUNTER_PLAY_STARTUP.idleCacheMs);}
+    if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.ScheduleRelease();}
     else this.DropHost();
     sessionStorage.removeItem("tengxian1938_encounter_play_session_v1");
     for(const option of this.layout.options)option.hidden=option.disabled=false;
     document.body.classList.remove("lfPlayingGame");
     document.querySelector("#chatPane").inert=false;document.querySelector("#flowTimeline").inert=false;
     this.restore(this.saved);this.layout.value=String(this.saved.viewports.count);this.saved=null;this.state=null;this.UpdateControls();this.button.focus();
+  }
+  ScheduleRelease(){
+    clearTimeout(this.cacheTimer);
+    const idle=document.hidden?ENCOUNTER_PLAY_STARTUP.idleCacheMs:ENCOUNTER_PLAY_STARTUP.editorIdleCacheMs;
+    this.cacheTimer=setTimeout(()=>{if(!this.active){this.DropHost();this.UpdateControls();}},idle);
   }
   DropHost(){
     clearTimeout(this.cacheTimer);

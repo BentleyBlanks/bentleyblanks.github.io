@@ -288,7 +288,8 @@ const XBOT_TORSO_FIT = Object.freeze({
 
 /** 整套 X Bot 资源（一份）+ 每个人一份的 XBotSkin。 */
 export class XBotSkins {
-  constructor({ base = XBOT.base, characterKeys = null } = {}) {
+  constructor({ base = XBOT.base, characterKeys = null, loadCast = null } = {}) {
+    this.loadCast = loadCast;
     this.characterKeys=characterKeys;
     this.base = base;
     this.loader = new GLTFLoader();
@@ -339,7 +340,7 @@ export class XBotSkins {
   async _LoadKit(key) {
     const def = XBOT_CHARACTERS[key];
     try {
-      const gltf = await this.loader.loadAsync(def.file);
+      const gltf = await (this.loadCast && def.ownMaterial ? this.loadCast(this.loader,def.file) : this.loader.loadAsync(def.file));
       const source = gltf.scene, mesh = FirstSkinnedMesh(source);
       const { rest } = SkinRest(source, mesh);
       const restBones = new Map();
