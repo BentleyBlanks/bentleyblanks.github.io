@@ -1,13 +1,43 @@
 import * as THREE from 'three';
 
+function CapturedGeometry({ data, batches, stride, colorScale = 255 }) {
+  const sources = batches || [data];
+  const count = sources.reduce((sum, vertices) => sum + vertices.length / stride, 0);
+  const position = new Float32Array(count * 3), color = stride >= 6 ? new Float32Array(count * 3) : null;
+  const geometry = new THREE.BufferGeometry();
+  let offset = 0;
+  for (const vertices of sources) {
+    for (let i = 0; i < vertices.length; i += stride, offset += 3) {
+      for (let axis = 0; axis < 3; axis++) {
+        position[offset + axis] = vertices[i + axis];
+        if (color) color[offset + axis] = vertices[i + axis + 3] / colorScale;
+      }
+    }
+  }
+  geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  if (color) geometry.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  geometry.computeVertexNormals();
+  if (stride === 9) {
+    const normal = geometry.attributes.normal;
+    offset = 0;
+    for (const vertices of sources) {
+      for (let i = 0; i < vertices.length; i += stride, offset++) {
+        const x = vertices[i + 6], y = vertices[i + 7], z = vertices[i + 8];
+        if (x || y || z) normal.setXYZ(offset, x, y, z);
+      }
+    }
+  }
+  return geometry;
+}
+
 // Separate context: inspecting geometry cannot modify the captured frame.
 export class FrameDebugMesh {
   constructor(canvas) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(1); this.renderer.setSize(720, 440, false);
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x171c24);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x455066, 2));
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x191b15);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x515644, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 3); sun.position.set(3, 5, 4); this.scene.add(sun);
     this.camera = new THREE.PerspectiveCamera(40, 720 / 440, 0.01, 10000);
     this.yaw = 0.5; this.pitch = 0.2; this.distance = 4; this.center = new THREE.Vector3();
@@ -25,9 +55,11 @@ export class FrameDebugMesh {
   }
   SetEvent(event, mode = 'shaded', wireframe = false, morph = 1) {
     this.Clear();
-    const ref = event?._object; if (!ref?.geometry?.attributes.position) return;
+    const captured = event?._geometry;
+    const ref = captured ? { geometry: CapturedGeometry(captured), object: {}, material: { vertexColors: captured.stride >= 6 } } : event?._object;
+    if (!ref?.geometry?.attributes.position) return;
     this.ref = ref;
-    const geometry = ref.geometry.clone(); this.geometry = geometry;
+    const geometry = captured ? ref.geometry : ref.geometry.clone(); this.geometry = geometry;
     const position = geometry.attributes.position;
     // Bake the displayed pose, including skin and morph targets, into the preview.
     const corrective = ref.object._fpsGripCorrectiveData;
@@ -94,7 +126,7 @@ export class FrameDebugMesh {
       const uv = geometry.attributes.uv;
       if (!uv) throw new Error('This draw has no UV attribute');
       for (let i = 0; i < position.count; i++) position.setXYZ(i, uv.getX(i), uv.getY(i), 0);
-      material = new THREE.MeshBasicMaterial({ color: 0x71bdff, wireframe: true, side: THREE.DoubleSide });
+      material = new THREE.MeshBasicMaterial({ color: 0xedca83, wireframe: true, side: THREE.DoubleSide });
     } else if (mode === 'normals') material = new THREE.MeshNormalMaterial({ wireframe, side: THREE.DoubleSide });
     else if (mode === 'tangents') {
       const tangent = geometry.attributes.tangent; if (!tangent) throw new Error('This draw has no tangent attribute');

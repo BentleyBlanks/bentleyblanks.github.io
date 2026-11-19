@@ -1,5 +1,6 @@
 import { EncounterGpuRaster } from "./Script_LevelFlowGpuRaster.mjs";
 import { LevelFlowFrameCapture } from "./Script_LevelFlowFrameCapture.mjs";
+import { ENCOUNTER_VIEW_TYPES } from "./Script_LevelFlowViewports.mjs";
 
 const TOOLS={
   profiler:{label:"Profiler",features:"width=1360,height=980,menubar=no,toolbar=no"},
@@ -47,7 +48,9 @@ export class LevelFlowDebug {
       } else {
         const {FrameDebuggerEditor}=await import("../Script_EditorFrameDebugger.mjs");
         if(this.windows.get(id)!==slot||popup.closed) return;
-        slot.panel=new FrameDebuggerEditor({preview:true,game:{FrameDebugger:this.capture},CloseFrameDebugger:()=>this.Close(id)},popup);
+        slot.panel=new FrameDebuggerEditor({preview:true,game:{FrameDebugger:this.capture},
+          CaptureTargets:()=>this.visible().map(({index,type})=>[index,`视口 ${index+1} · ${ENCOUNTER_VIEW_TYPES[type]}`]),
+          CloseFrameDebugger:()=>this.Close(id)},popup);
         slot.panel.Enter();
       }
     } catch(error) {
@@ -106,7 +109,7 @@ export class LevelFlowDebug {
 
   BeginViewport(entry,name) {
     const domain=`encounterViewport/视口 ${entry.index+1}`;
-    const capture=this.capture.state==="capturing"?this.capture:null;
+    const capture=this.capture.state==="capturing"&&(this.capture.requestedViewport===null||this.capture.requestedViewport===entry.index)?this.capture:null;
     const profiler=this.profileFrame,stats=this.renderStats;
     const passStart=capture?performance.now():0,overhead=capture?.overhead||0;
     const scopes=profiler?[domain]:null;
@@ -128,14 +131,14 @@ export class LevelFlowDebug {
       BeginGpu:phase=>profiler?.GpuPush(`${domain}/${phase}`),
       EndGpu:()=>profiler?.GpuPop(),
       BeginGl:gl=>capture?.BeginGpu(gl),
-      Gl:(gl,phase,api,args,triangles,cpuMs,query)=>{
+      Gl:(gl,phase,api,args,triangles,cpuMs,query,gpu,raster)=>{
         if(profiler&&triangles!==null) {
           stats.calls++;stats.triangles+=triangles;
           if(profiler.capturingDraws) profiler.RecordRawDraw(api,triangles,cpuMs);
         }
         if(capture) {
           const start=performance.now();
-          capture.GlEvent(gl,phase,api,args,triangles,cpuMs,query);
+          capture.GlEvent(gl,phase,api,args,triangles,cpuMs,query,gpu,raster);
           capture.overhead+=performance.now()-start;
         }
       },

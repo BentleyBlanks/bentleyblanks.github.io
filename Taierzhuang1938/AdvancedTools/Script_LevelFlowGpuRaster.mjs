@@ -631,21 +631,97 @@ class GpuRaster {
     return this.Trace(raster,this.DrawContent);
   }
 
+  DebugGeometry(raster,vao,first,count) {
+    if(vao===this.residentWorld?.arena.vao)
+      return {name:"场景静态几何",batches:this.residentWorld.batches,stride:9};
+    if(vao===this.shadowVao)
+      return {name:"阴影投射几何",data:raster.shadowVertices,stride:3,immutable:true};
+    if(vao===this.vao)
+      return {name:"动态世界几何",data:raster.worldVertices.subarray(0,raster.worldLength),stride:9};
+    if(vao===this.screenVao)
+      return {name:"屏幕空间几何",data:raster.gpuVertices.subarray(0,raster.gpuLength),stride:6};
+    if(vao===this.overlay.layout.vao) {
+      const stride=this.overlay.layout.stride;
+      return {name:"文字与标记批次",data:this.overlay.vertices.subarray(first*stride,(first+count)*stride),stride,colorScale:1};
+    }
+    return null;
+  }
+
+  DebugTargetName(framebuffer) {
+    if(!framebuffer) return "视口 Backbuffer";
+    if(framebuffer===this.shadowFramebuffer) return "阴影贴图";
+    if(framebuffer===this.target?.framebuffer) return "场景 G-Buffer";
+    if(framebuffer===this.target?.aoFramebuffer) return "环境遮蔽";
+    if(framebuffer===this.target?.shadedFramebuffer) return "场景合成";
+    if(framebuffer===this.depthSamples?.framebuffer) return "深度采样";
+    if(framebuffer===this.overlay.flagFbo) return "人物可见性";
+    return "WebGL2 Render Target";
+  }
+
+  DebugProgramName(program) {
+    if(program===this.program) return "Encounter Scene";
+    if(program===this.shadowProgram) return "Encounter Shadow";
+    if(program===this.aoProgram) return "Encounter AO";
+    if(program===this.aoResolveProgram) return "Encounter AO Resolve";
+    if(program===this.depthSampleProgram) return "Encounter Depth Samples";
+    if(program===this.overlay.program) return "Encounter Overlay";
+    if(program===this.overlay.probeProgram) return "Encounter Visibility";
+    return "WebGL2 Program";
+  }
+
+  DebugTextureInfo(raster,texture) {
+    const {width,height}=raster,target=this.target;
+    if(texture===this.shadowTexture)
+      return {name:"阴影贴图",format:"DEPTH_COMPONENT24",width:this.shadowSize,height:this.shadowSize,scalar:true,flipY:false};
+    const scene=[
+      [target.color,"场景颜色","RGBA8"],
+      [target.attachedDistance,"线性距离","R32F",true],
+      [target.normal,"场景法线","RGBA16F"],
+    ].find(([handle])=>handle===texture);
+    if(scene) return {name:scene[1],format:scene[2],width,height,scalar:scene[3],flipY:false};
+    if(texture===target.aoTexture)
+      return {name:"环境遮蔽",format:"RGBA8",width:target.aoWidth,height:target.aoHeight,flipY:false};
+    if(texture===this.depthSamples?.indices)
+      return {name:"采样坐标",format:"R32UI",width:FLOW_RENDERING.depthReadback.sampleWidth,height:this.depthSamples.height};
+    if(texture===raster.depthSnapshot?.texture)
+      return {name:"视口线性距离",format:"R32F",width:raster.depthSnapshot.width,height:raster.depthSnapshot.height,scalar:true,flipY:false};
+    if(texture===this.overlay.flags)
+      return {name:"人物可见性",format:"RGBA8",width:this.overlay.flagWidth,height:1};
+    if(texture===this.overlay.blank)
+      return {name:"叠层空白纹理",format:"RGBA8",width:1,height:1};
+    if(this.overlay.pages.some(page=>page.texture===texture))
+      return {name:"叠层文字图集",format:"RGBA8",width:this.overlay.atlasSize,height:this.overlay.atlasSize,flipY:false};
+    const surface=raster.terrainSurface,terrain=surface?this.surfaceTextures.get(surface):null;
+    const slot=terrain?.indexOf(texture);
+    if(slot>=0) {
+      const map=slot?surface.backdrop:surface.scene;
+      return {name:slot?"远景地表":"场景地表",format:"RGBA8",width:map?.width||1,height:map?.height||1,flipY:false};
+    }
+    return null;
+  }
+
   Trace(raster,method) {
     const trace=raster.debugTrace;
     if(!trace||this.trace===trace) return method.call(this,raster);
     const gl=this.gl,restore=[];
+    let inspecting=false;
     this.trace=trace;
     trace.cpu?.Begin("WebGL2");
     try {
       for(const api of ["drawArrays","drawElements","drawArraysInstanced",...(trace.capturing?["clearBufferfv","blitFramebuffer"]:[])]) {
         const original=gl[api],own=Object.hasOwn(gl,api);
         gl[api]=(...args)=>{
+          if(inspecting) return original.apply(gl,args);
           const triangles=api==="drawElements"?args[1]/3:api==="drawArrays"?args[2]/3:api==="drawArraysInstanced"?(args[0]===gl.TRIANGLES?args[2]*args[3]/3:0):null;
           const query=trace.BeginGl(gl),timed=trace.capturing||trace.captureDraws;
           const start=timed?performance.now():0;
           try {return original.apply(gl,args);}
-          finally {trace.Gl(gl,this.phase,api,args,triangles,timed?performance.now()-start:0,query);}
+          finally {
+            const elapsed=timed?performance.now()-start:0;
+            inspecting=true;
+            try {trace.Gl(gl,this.phase,api,args,triangles,elapsed,query,this,raster);}
+            finally {inspecting=false;}
+          }
         };
         restore.push(()=>{if(own) gl[api]=original;else delete gl[api];});
       }

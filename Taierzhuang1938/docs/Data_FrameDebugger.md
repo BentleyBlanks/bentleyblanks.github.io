@@ -1,7 +1,13 @@
 # Frame Debugger
 
 入口：暂停菜单（Esc）→ **设置 → Debug工具 → Frame Debugger**。独立窗口可放在另一块屏幕。
-点击「启用 / 捕获当前帧」捕获一次完整的 RenderScene（含 GI、第一人称阴影和 PostPipeline），随后冻结模拟、镜头和任务时钟；「禁用 / 继续」、关闭窗口、视口改变或 context lost 会释放捕获。当前暂停/音频状态会恢复，原有 Profiler 录制在捕获期间暂停，结束后续录。
+点击「捕获当前帧」捕获一次完整的 RenderScene（含 GI、第一人称阴影和 PostPipeline），随后冻结模拟、镜头和任务时钟。「继续运行」、关闭窗口、视口改变或 context lost 会释放捕获。当前暂停与音频状态会恢复，原有 Profiler 录制在捕获期间暂停，结束后续录。
+
+## Encounter Designer 编辑器视口
+
+- 「Frame Debugger」可在未进入 Play 时打开。可捕获全部可见视口或单个视口。事件树按视口、渲染阶段和真实提交顺序组织。点击分组查看末尾输出，点击单条绘制、清除或 Blit 查看该命令提交后的附件。编辑器时间轴可以继续操作，已捕获的内容保留到清除或重拍。
+- 编辑器捕获包含阴影、主场景 MRT、AO、人物可见性、GPU 文字与标记和 Canvas2D 合成。场景静态几何合并成一个真实索引 DC，详情显示该调用包含的几何块数量。网格支持着色、线框、法线和有数据时的顶点色。属性区显示实际 GLSL、uniform、采样纹理和顶点布局。纯 Canvas2D 视口按渲染层捕获。
+- 输出附件的快照最长边为 512 像素，采样纹理为 256，Canvas2D 为 960。浮点和深度快照使用源精度读回，可在冻结后调整通道、Levels 和曝光。快照内存上限为 192 MiB，达到上限的附件在界面标出。GPU ms ≈ 为逐命令异步查询之和，查询区间不含快照读回及命令之间的工作。
 
 ## 使用
 
@@ -13,8 +19,8 @@
 - 右侧顶部是事件标题、所属 Pass 面包屑（可点）、目标与 GPU/CPU/三角形/实例/Shader/Batch 摘要。下面按 Unity 事件信息分组折叠（展开状态跨事件保留）：
   - **Details**：Event（API 调用按枚举名还原）、Draw（拓扑、索引、图元、实例、子绘制表）、Mesh / Object（显示名及其来源、层级路径可复制、几何/材质/Shader/相机、渲染队列、材质开关、阴影）、Clear 值、Render Target 附件表、Render State（Unity 写法：Blend / BlendOp / ColorMask / ZTest / ZWrite / Cull / Offset / Stencil / Viewport / Scissor…）。
   - **Keywords**：材质 defines 与编译后 `#define`（标出只在 V / F 一个阶段出现的）。
-  - **Properties**：Textures（缩略图、单元、GLSL 采样器类型、纹理名、尺寸、three 格式/类型/色彩空间、资产链接）、Ints / Floats / Vectors / Matrices 表格，数组可展开，矩阵按行列排；可按名字筛选。
-  - **Buffers**：顶点属性、索引缓冲、uniform blocks。**Shader**：带行号的实际编译源码，可复制。**Raw JSON**：此事件的原始数据。
+  - **Textures**：缩略图、单元、GLSL 采样器类型、纹理名、尺寸、格式与适用的资产链接。**Ints / Floats / Vectors / Matrices** 独立折叠，数组可展开，矩阵按行列排。
+  - **Buffers**：顶点属性与索引信息。**Constant Buffers**：uniform blocks。**Shader**：带行号的实际编译源码，可复制。**Raw JSON**：此事件的原始数据。
 
 ### 事件命名与分组
 

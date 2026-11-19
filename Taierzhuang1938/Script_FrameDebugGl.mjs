@@ -221,10 +221,16 @@ export function CopyAttachment(gl, source, attachment, asTexture = false) {
 export function ReadOutput(gl, source, attachment, options = {}) {
   const restore = SaveGlState(gl);
   let input = null;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, source);
+  const readBuffer = gl.getParameter(gl.READ_BUFFER);
   try {
     input = CopyAttachment(gl, source, attachment, true);
     return DrawPreview(gl, input.texture, attachment.width, attachment.height, attachment.depth, options);
-  } finally { input?.Dispose(); restore(); }
+  } finally {
+    input?.Dispose();
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, source); gl.readBuffer(readBuffer);
+    restore();
+  }
 }
 
 // Reads a texture exactly as the selected draw sees it (after replay). Only
@@ -246,35 +252,41 @@ export function ReadTexture(gl, texture, { sourceWidth, sourceHeight, depth = fa
   }
 }
 
-function DrawPreview(gl, input, sourceWidth, sourceHeight, depth, { channel = 'rgba', black = 0, white = 1, exposure = 0, width = 960 } = {}) {
+function DrawPreview(gl, input, sourceWidth, sourceHeight, depth, {
+  channel = 'rgba', black = 0, white = 1, exposure = 0, width = 960, raw = false, flipY = true,
+  region = [0, 0, sourceWidth, sourceHeight],
+} = {}) {
   const resources = [];
   try {
-    const w = Math.max(1, Math.min(width, sourceWidth)), h = Math.max(1, Math.round(sourceHeight * w / sourceWidth));
+    const [x, y, regionWidth, regionHeight] = region;
+    const w = Math.max(1, Math.min(width, regionWidth)), h = Math.max(1, Math.round(regionHeight * w / regionWidth));
     const target = gl.createFramebuffer(), texture = gl.createTexture();
     resources.push(() => { gl.deleteFramebuffer(target); gl.deleteTexture(texture); });
-    gl.bindTexture(gl.TEXTURE_2D, texture); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h);
+    gl.bindTexture(gl.TEXTURE_2D, texture); gl.texStorage2D(gl.TEXTURE_2D, 1, raw ? gl.RGBA32F : gl.RGBA8, w, h);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
     const vertex = gl.createShader(gl.VERTEX_SHADER), fragment = gl.createShader(gl.FRAGMENT_SHADER), program = gl.createProgram();
     resources.push(() => { gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment); });
     gl.shaderSource(vertex, '#version 300 es\nout vec2 uv;void main(){uv=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(uv*2.-1.,0.,1.);}');
-    gl.shaderSource(fragment, `#version 300 es\nprecision highp float;uniform sampler2D tex;uniform vec3 levels;uniform int channel;in vec2 uv;out vec4 color;void main(){vec4 v=texture(tex,uv);v.rgb*=exp2(levels.z);v=(v-levels.x)/max(0.000001,levels.y-levels.x);if(channel>0){float c=channel==1?v.r:channel==2?v.g:channel==3?v.b:v.a;color=vec4(vec3(c),1.);}else{color=vec4(v.rgb,channel==0?1.:v.a);}}`);
+    gl.shaderSource(fragment, `#version 300 es\nprecision highp float;uniform sampler2D tex;uniform vec4 region;uniform vec3 levels;uniform int channel;in vec2 uv;out vec4 color;void main(){vec4 v=texture(tex,region.xy+uv*region.zw);if(channel==-2){color=v;return;}v.rgb*=exp2(levels.z);v=(v-levels.x)/max(0.000001,levels.y-levels.x);if(channel>0){float c=channel==1?v.r:channel==2?v.g:channel==3?v.b:v.a;color=vec4(vec3(c),1.);}else{color=vec4(v.rgb,channel==0?1.:v.a);}}`);
     for (const shader of [vertex, fragment]) { gl.compileShader(shader); gl.attachShader(program, shader); }
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
     const vao = gl.createVertexArray(); resources.push(() => gl.deleteVertexArray(vao)); gl.bindVertexArray(vao);
     gl.useProgram(program); gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.bindTexture(gl.TEXTURE_2D, input);
     gl.uniform1i(gl.getUniformLocation(program, 'tex'), 0);
+    gl.uniform4f(gl.getUniformLocation(program, 'region'), x/sourceWidth, y/sourceHeight, regionWidth/sourceWidth, regionHeight/sourceHeight);
     gl.uniform3f(gl.getUniformLocation(program, 'levels'), black, white, exposure);
-    gl.uniform1i(gl.getUniformLocation(program, 'channel'), depth ? 1 : ({ rgba: -1, rgb: 0, r: 1, g: 2, b: 3, a: 4 })[channel] ?? 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'channel'), raw ? -2 : depth ? 1 : ({ rgba: -1, rgb: 0, r: 1, g: 2, b: 3, a: 4 })[channel] ?? 0);
     for (const flag of [gl.DEPTH_TEST, gl.STENCIL_TEST, gl.CULL_FACE, gl.BLEND, gl.SCISSOR_TEST, gl.RASTERIZER_DISCARD]) gl.disable(flag);
     gl.colorMask(true, true, true, true); gl.viewport(0, 0, w, h);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    const pixels = new Uint8Array(w * h * 4);
+    const pixels = raw ? new Float32Array(w * h * 4) : new Uint8ClampedArray(w * h * 4);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
     gl.pixelStorei(gl.PACK_ROW_LENGTH, 0); gl.pixelStorei(gl.PACK_SKIP_PIXELS, 0); gl.pixelStorei(gl.PACK_SKIP_ROWS, 0);
-    gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    const flipped = new Uint8ClampedArray(pixels.length);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.readPixels(0, 0, w, h, gl.RGBA, raw ? gl.FLOAT : gl.UNSIGNED_BYTE, raw ? pixels : new Uint8Array(pixels.buffer));
+    if (!flipY) return { width: w, height: h, pixels };
+    const flipped = new pixels.constructor(pixels.length);
     for (let y = 0; y < h; y++) flipped.set(pixels.subarray(y * w * 4, (y + 1) * w * 4), (h - y - 1) * w * 4);
     return { width: w, height: h, pixels: flipped };
   } finally { resources.reverse().forEach(Dispose => Dispose()); }

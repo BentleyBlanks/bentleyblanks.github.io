@@ -133,23 +133,30 @@ try {
   const [report]=await Promise.all([debuggerWindow.waitForEvent("download"),debuggerWindow.getByRole("button",{name:"导出报告"}).click()]);
   const saved=JSON.parse(await fs.readFile(await report.path(),"utf8"));
   let first=0;
-  for(const pass of saved.passes) {
+  const viewports=saved.passes.filter(pass=>pass.parent===null);
+  for(const pass of viewports) {
     assert.equal(pass.first,first);
     assert.equal(pass.parent,null);
     assert.ok(pass.last>=pass.first);
     const events=saved.events.slice(pass.first,pass.last+1);
-    assert.ok(events.every((event,offset)=>event.pass===pass.id&&event.index===pass.first+offset));
+    assert.ok(events.every((event,offset)=>saved.passes[event.pass].parent===pass.id&&event.index===pass.first+offset));
     assert.equal(events.at(-1).label,"场景叠层与视口输出");
     first=pass.last+1;
   }
   assert.equal(first,saved.events.length);
   assert.equal(saved.events[0].label,"绘制 2D 底图");
-  assert.ok(!saved.events.some(event=>(event.pass===0||event.pass===3)&&event.draw));
+  assert.ok(!saved.events.some(event=>[1,4].includes(saved.passes[saved.passes[event.pass].parent].viewport)&&event.draw));
   if(supportsWebGl) {
-    const gpu=saved.events.filter(event=>event.pass===1);
+    const gpu=saved.events.filter(event=>saved.passes[event.pass].parent===viewports[1].id);
     assert.ok(gpu.some(event=>event.api==="drawElements"&&event.phase==="主场景"&&event.drawInfo.elements>0));
     assert.ok(gpu.some(event=>event.api==="clearBufferfv"&&event.phase==="阴影"));
     assert.ok(gpu.some(event=>event.api==="blitFramebuffer"&&event.phase==="输出到视口"));
+    const visibility=gpu.find(event=>event.api==="drawArraysInstanced"&&event.phase==="人物可见性");
+    assert.ok(visibility?.drawInfo.topology==="POINTS"&&visibility.drawInfo.parts[0].instances>0&&visibility.attachments[0].previewSize,
+      "Instanced point probes expose their own visibility attachment");
+    assert.ok(gpu.some(event=>event.draw&&event.phase==="GPU 文字与标记"&&event.attachments[0].previewSize),
+      "The editor overlay backbuffer exposes each real draw");
+    assert.ok(!gpu.some(event=>event.label==="合成软件光栅场景"),"Capturing GL state does not force the software renderer");
   } else {
     assert.ok(saved.events.every(event=>event.kind==="Canvas2D"));
     assert.ok(saved.events.some(event=>event.label==="合成软件光栅场景"));
@@ -162,10 +169,40 @@ try {
   assert.ok(await debuggerWindow.locator("#output").evaluate(canvas=>canvas.width>1&&canvas.height>1),"Each viewport exposes its own captured output");
   await debuggerWindow.getByRole("button",{name:"展开全部"}).click();
   if(supportsWebGl) {
-    const firstDraw=saved.events.find(event=>event.draw);
-    await debuggerWindow.locator(`[data-event="${firstDraw.index}"]`).click();
-    assert.match(await debuggerWindow.locator("#previewError").textContent(),/没有图像快照/);
-    assert.ok(await debuggerWindow.locator("#png").isDisabled(),"A pure GL command must not show another event's pixels");
+    const inScene=event=>saved.passes[event.pass].parent===viewports[2].id&&event.phase==="主场景";
+    const draw=saved.events.find(event=>inScene(event)&&event.api==="drawElements");
+    const clear=saved.events.find(event=>inScene(event)&&event.label==="Color 0");
+    assert.equal(draw.drawInfo.geometryBatches>0,true);
+    assert.ok(draw.uniforms.length>0&&draw.buffers.length>0&&saved.programs[draw.programId].sources.length===2);
+    assert.ok(draw.attachments.every(attachment=>attachment.previewSize&&!attachment.previewError));
+    const select=event=>debuggerWindow.locator(`[data-event="${event.index}"]`).click();
+    const image=()=>debuggerWindow.locator("#output").evaluate(canvas=>canvas.toDataURL());
+    await select(clear);
+    const cleared=await image();
+    await select(draw);
+    const drawn=await image();
+    assert.notEqual(drawn,cleared,"The indexed draw changes the color attachment");
+    assert.equal(await debuggerWindow.locator("#previewError").textContent(),"");
+    assert.ok(await debuggerWindow.locator("#png").isEnabled());
+    await debuggerWindow.getByRole("button",{name:"R",exact:true}).click();
+    assert.notEqual(await image(),drawn,"Color-channel controls transform the same captured attachment");
+    await debuggerWindow.getByRole("button",{name:"RGBA",exact:true}).click();
+    await debuggerWindow.getByLabel("渲染目标附件").selectOption(String(draw.attachments.findIndex(attachment=>attachment.depth)));
+    assert.notEqual(await image(),drawn,"The captured depth attachment can be inspected independently");
+    await debuggerWindow.getByLabel("渲染目标附件").selectOption("0");
+    await debuggerWindow.getByRole("button",{name:"网格",exact:true}).click();
+    assert.ok(await debuggerWindow.locator("#mesh").isVisible());
+    assert.equal(await debuggerWindow.locator("#previewError").textContent(),"");
+    await debuggerWindow.getByRole("button",{name:"输出",exact:true}).click();
+    assert.equal(await image(),drawn,"Returning to a captured event retains its pixels");
+    await debuggerWindow.locator("#properties summary").filter({hasText:"Textures"}).click();
+    const texture=debuggerWindow.locator("#properties .thumbButton").first();
+    await texture.click();
+    assert.equal(await debuggerWindow.getByRole("button",{name:"纹理",exact:true}).getAttribute("aria-pressed"),"true");
+    assert.equal(await debuggerWindow.locator("#previewError").textContent(),"");
+    await debuggerWindow.getByRole("button",{name:"输出",exact:true}).click();
+    await debuggerWindow.setViewportSize({width:1280,height:720});
+    await debuggerWindow.screenshot({path:path.join(output,"EditorFrameDebuggerDraw.png")});
   }
   await groups.nth(0).click();
   await debuggerWindow.getByRole("button",{name:"折叠全部"}).click();
@@ -173,13 +210,19 @@ try {
   await debuggerWindow.setViewportSize({width:1280,height:720});
   await debuggerWindow.screenshot({path:path.join(output,`EditorFrameDebugger${suffix}.png`)});
 
-  const timeBefore=await page.evaluate(()=>{LevelFlow.SetLayout(1);LevelFlow.SetPlaying(true);return LevelFlow.Inspect().time;});
+  const timeBefore=await page.evaluate(()=>{LevelFlow.SetPlaying(true);return LevelFlow.Inspect().time;});
   await page.waitForFunction(previous=>LevelFlow.Inspect().time>previous+0.25,timeBefore,{timeout:30000});
   assert.match(await status.textContent(),/4 个视口/,"The capture remains frozen while the editor keeps moving");
   await page.evaluate(()=>LevelFlow.SetPlaying(false));
+  await debuggerWindow.getByLabel("捕获目标").selectOption("2");
+  await capture.click();
+  assert.deepEqual(await groups.allTextContents(),["视口 3 · 立体俯视"],"A capture can target one pane while four remain visible");
+  await page.evaluate(()=>LevelFlow.SetLayout(1));
+  await debuggerWindow.getByLabel("捕获目标").selectOption({index:0});
   await capture.click();
   await debuggerWindow.waitForFunction(()=>document.querySelector("#statusText").textContent.includes("1 个视口"));
   assert.equal(await groups.count(),1);
+  assert.match((await groups.allTextContents())[0],/^视口 1/);
   await debuggerWindow.getByRole("button",{name:/清除捕获/}).click();
   assert.equal(await groups.count(),0,"Clearing releases the capture without touching the editor");
   await Promise.all([profiler.waitForEvent("close"),debuggerWindow.waitForEvent("close"),page.close()]);

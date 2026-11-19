@@ -283,7 +283,7 @@ try {
     await popup.screenshot({ path: path.join(output, 'FrameDebugger_Game.png'), fullPage: true });
     const firstDraw = await game.evaluate(() => Tengxian.FrameDebugger._events.find(event => event.draw)?.index);
     await popup.locator('#index').fill(String(firstDraw + 1)); await popup.locator('#index').press('Enter');
-    await popup.locator('#view').selectOption('mesh');
+    await popup.getByRole('button', { name: '网格', exact: true }).click();
     await popup.screenshot({ path: path.join(output, 'FrameDebugger_Mesh.png'), fullPage: true });
     assert.equal(await popup.locator('#previewError').textContent(), '');
     await popup.locator('#resume').click();
