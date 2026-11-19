@@ -119,6 +119,7 @@ try {
 
   const [debuggerWindow]=await Promise.all([context.waitForEvent("page"),debuggerButton.click()]);
   await debuggerWindow.getByRole("heading",{name:"Frame Debugger"}).waitFor();
+  await debuggerWindow.setViewportSize({width:1280,height:720});
   await debuggerButton.click();
   const debugWindows=await Promise.all(context.pages().filter(window=>window.url()==="about:blank").map(window=>window.title()));
   assert.equal(debugWindows.filter(title=>title.includes("Frame Debugger")).length,1,"Reopening focuses the existing Frame Debugger");
@@ -195,14 +196,40 @@ try {
     assert.equal(await debuggerWindow.locator("#previewError").textContent(),"");
     await debuggerWindow.getByRole("button",{name:"输出",exact:true}).click();
     assert.equal(await image(),drawn,"Returning to a captured event retains its pixels");
+    const previewHeight=await debuggerWindow.locator("#preview").evaluate(stage=>stage.offsetHeight);
+    const grip=debuggerWindow.getByRole("button",{name:"调整预览高度"});
+    await grip.press("ArrowUp");
+    assert.equal(await debuggerWindow.locator("#preview").evaluate(stage=>stage.offsetHeight),previewHeight-16);
+    assert.equal(await image(),drawn,"The resize control keeps the current draw selected");
+    await grip.press("ArrowDown");
+    await debuggerWindow.getByText("色阶",{exact:true}).click();
+    await debuggerWindow.getByLabel("曝光 EV").fill("1");
+    await debuggerWindow.getByLabel("曝光 EV").press("Tab");
+    assert.notEqual(await image(),drawn,"Exposure remains available from the compact adjustment controls");
+    await debuggerWindow.getByLabel("曝光 EV").fill("0");
+    await debuggerWindow.getByLabel("曝光 EV").press("Tab");
+    assert.equal(await image(),drawn);
+    await debuggerWindow.getByRole("button",{name:"Shader 属性",exact:true}).click();
     await debuggerWindow.locator("#properties summary").filter({hasText:"Textures"}).click();
     const texture=debuggerWindow.locator("#properties .thumbButton").first();
     await texture.click();
     assert.equal(await debuggerWindow.getByRole("button",{name:"纹理",exact:true}).getAttribute("aria-pressed"),"true");
     assert.equal(await debuggerWindow.locator("#previewError").textContent(),"");
+    await debuggerWindow.waitForFunction(()=>{
+      const thumb=document.querySelector("#properties .thumbButton canvas");
+      return thumb&&thumb.width!==300;
+    });
+    await debuggerWindow.getByRole("button",{name:"折叠全部"}).click();
+    await debuggerWindow.screenshot({path:path.join(output,"EditorFrameDebuggerShader.png")});
     await debuggerWindow.getByRole("button",{name:"输出",exact:true}).click();
-    await debuggerWindow.setViewportSize({width:1280,height:720});
+    await debuggerWindow.getByRole("button",{name:"原始数据",exact:true}).click();
+    assert.match(await debuggerWindow.locator("#properties pre").textContent(),/drawElements/);
+    await debuggerWindow.getByRole("button",{name:"详情",exact:true}).click();
     await debuggerWindow.screenshot({path:path.join(output,"EditorFrameDebuggerDraw.png")});
+    await debuggerWindow.setViewportSize({width:960,height:720});
+    assert.ok(await debuggerWindow.locator("#properties").evaluate(panel=>panel.clientHeight>=96),"Details stay reachable in a narrower window");
+    assert.ok(await debuggerWindow.getByRole("button",{name:"保存 PNG"}).evaluate(button=>button.getBoundingClientRect().right<=innerWidth));
+    await debuggerWindow.setViewportSize({width:1280,height:720});
   }
   await groups.nth(0).click();
   await debuggerWindow.getByRole("button",{name:"折叠全部"}).click();

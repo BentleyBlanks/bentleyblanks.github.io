@@ -13,10 +13,10 @@
 
 - 左侧按真实提交顺序列 Pass 与事件，包含普通 DC、实例化、multi-draw 合批、Clear、Blit、mipmap；每一行都显示 DC 数与 CPU/GPU 毫秒，GPU 列底色按占比画热度条。父 Pass 包含子 Pass，不能把父子行再次相加。行首色块标类型：D 普通网格、I 实例化、B 合批、F 全屏、P 无源对象的原始绘制、C Clear、⇢ Blit、M/T mip 与拷贝。
 - 滑条、事件编号、上一条/下一条、←/→ 或 ↑/↓（Shift 十条）、Home/End 可定位事件。单击 Pass / 分组 = 看该组最后一个事件的画面（Unity 同款），并在右侧列该组统计与最耗 GPU 的 DC；▸ 或双击展开折叠，展开状态按路径记住，重新捕获仍保留。搜索对象/材质/Shader/Pass/`#编号`，或按耗时排序，排序不会改变回放顺序。左栏宽度可拖分隔条调整。
-- Output 回放到选中事件，显示当时的渲染目标；支持 MRT 颜色附件、Depth、RGBA/RGB/R/G/B/A、黑白 Levels、曝光、适应/原尺寸、PNG 保存，鼠标悬停显示源像素坐标与显示值（经 Levels 后的 8 位值，不是 HDR 原值）。默认同步到游戏画面，可取消「同步游戏画面」独立查看。
+- 「输出」显示选中事件的渲染目标，支持 MRT 颜色附件、Depth、RGBA/RGB/R/G/B/A、适应/原尺寸和 PNG 保存。「色阶」中可调黑场、白场与曝光。鼠标悬停显示源像素坐标与调整后的显示值。预览底栏可拖动调整高度，属性区独立滚动。游戏内默认同步到主画面，可在窗口底栏关闭同步。
 - Mesh 支持基础光照 PBR 预览、线框、UV 棋盘、UV 展开、顶点色、法线、切线、当前 blendshape 强度、鼠标旋转/缩放。没有对应顶点属性的模式禁用。蒙皮烘成当前姿态用于独立预览，不修改角色骨骼；场景相关 AO/SSR/簇光 Shader 的真实源码/参数在属性区，网格预览使用独立基础光照。
-- Texture：Properties 里每个 2D 采样器都有缩略图，点它在预览区看**该 DC 读到的内容**（回放到此事件后读纹理；Levels/通道同样生效）。Cube/Array/3D/整数采样器不出图。换选事件回到 Output。
-- 右侧顶部是事件标题、所属 Pass 面包屑（可点）、目标与 GPU/CPU/三角形/实例/Shader/Batch 摘要。下面按 Unity 事件信息分组折叠（展开状态跨事件保留）：
+- 「Shader 属性 → Textures」中的 2D 纹理缩略图可打开该 DC 的采样内容，色阶与通道同样生效。Cube、Array、3D 与整数采样器只显示属性。换选事件回到「输出」。
+- 右侧顶部显示事件、Pass 路径、渲染目标与 CPU、GPU 和图元摘要。预览下方有「详情」「Shader 属性」「原始数据」，Shader 分组的展开状态跨事件保留：
   - **Details**：Event（API 调用按枚举名还原）、Draw（拓扑、索引、图元、实例、子绘制表）、Mesh / Object（显示名及其来源、层级路径可复制、几何/材质/Shader/相机、渲染队列、材质开关、阴影）、Clear 值、Render Target 附件表、Render State（Unity 写法：Blend / BlendOp / ColorMask / ZTest / ZWrite / Cull / Offset / Stencil / Viewport / Scissor…）。
   - **Keywords**：材质 defines 与编译后 `#define`（标出只在 V / F 一个阶段出现的）。
   - **Textures**：缩略图、单元、GLSL 采样器类型、纹理名、尺寸、格式与适用的资产链接。**Ints / Floats / Vectors / Matrices** 独立折叠，数组可展开，矩阵按行列排。

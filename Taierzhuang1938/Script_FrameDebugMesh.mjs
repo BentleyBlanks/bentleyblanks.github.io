@@ -36,8 +36,8 @@ export class FrameDebugMesh {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(1); this.renderer.setSize(720, 440, false);
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x191b15);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x515644, 2));
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x111318);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x555e6e, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 3); sun.position.set(3, 5, 4); this.scene.add(sun);
     this.camera = new THREE.PerspectiveCamera(40, 720 / 440, 0.01, 10000);
     this.yaw = 0.5; this.pitch = 0.2; this.distance = 4; this.center = new THREE.Vector3();

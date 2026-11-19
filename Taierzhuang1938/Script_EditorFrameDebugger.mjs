@@ -3,90 +3,559 @@ import { FrameDebugMesh } from './Script_FrameDebugMesh.mjs';
 import { EnumName, Primitives, RenderStateRows, ApiCall } from './Script_FrameDebugGl.mjs';
 
 const CSS = `
-:root{color-scheme:dark}
-body.edThemedSurface{--bg:#10110e;--panel:#161811;--panel2:#1c1e17;--line:var(--ed-rule-2,#393b31);--line2:var(--ed-edge,#57594b);
---text:var(--ed-text,#deddd2);--muted:var(--ed-text-3,#aaa99b);--dim:var(--ed-text-4,#989b8b);--accent:var(--ed-gold,#edca83);
---sel:linear-gradient(90deg,#3b3220,#27261a);--selLine:var(--accent);--hover:#25271e;--pass:var(--ed-text-hi,#eeeee7);
---heat:237,202,131;--good:#a7ba91;--warn:#edca83;--err:#ef9a8a;
---mono:'Cascadia Mono','JetBrains Mono',Consolas,monospace}
-*{box-sizing:border-box}[hidden]{display:none!important}
-html,body{height:100%}body.edThemedSurface{margin:0;background:var(--bg);color:var(--text);font:12px/1.45 var(--ui-font,system-ui);display:flex;flex-direction:column;overflow:hidden}
-button,input,select{font:inherit;color:inherit;background:var(--ed-field,#10110e);border:1px solid var(--line2);border-radius:4px;padding:4px 8px;min-height:27px}
-button{cursor:pointer;white-space:nowrap}button:hover:not(:disabled){background:var(--hover);border-color:var(--accent);color:var(--accent)}button:disabled{opacity:.42;cursor:default}
-button.primary{background:var(--sel);border-color:#977d49;color:var(--accent);font-weight:700}button.primary:hover:not(:disabled){background:#433924}
-input[type=checkbox]{min-height:0;margin:0;accent-color:var(--accent)}label{display:inline-flex;align-items:center;gap:5px}
-input[type=number]{width:62px}input[type=search]{width:100%}input:focus,select:focus,button:focus-visible{outline:1px solid var(--accent);outline-offset:0}
-a{color:var(--accent)}small,.muted{color:var(--muted)}.mono{font-family:var(--mono)}.spacer{flex:1}
-header{display:flex;align-items:center;gap:10px;min-height:43px;padding:6px 12px;background:linear-gradient(180deg,#10110e,#090a08);border-bottom:1px solid var(--ed-rule,var(--line))}
-h1{font-size:16px;margin:0;letter-spacing:.25px;color:var(--pass);font-family:var(--ed-serif,var(--ui-font,system-ui));white-space:nowrap}
-.source{padding-left:10px;border-left:1px solid var(--line);color:var(--muted);white-space:nowrap}
-.stats{display:flex;gap:0;flex-wrap:wrap;justify-content:flex-end}.stat{display:flex;align-items:baseline;gap:6px;padding:1px 9px;border-left:1px solid var(--line)}
-.stat:first-child{border:0}.stat b{font:600 12px var(--mono);color:var(--pass)}.stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
-.stat.timing b{color:var(--accent)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);display:inline-block;margin-right:7px;flex:none}.dot.frozen,.dot.armed{background:var(--accent)}.dot.error{background:var(--err)}
-.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.bar{padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
-.bar input[type=range]{flex:1;min-width:80px;padding:0;border:0;accent-color:var(--accent)}.sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
-#status{padding:3px 12px;color:var(--muted);background:#0c0d0a;border-top:1px solid var(--line);display:flex;align-items:center;min-height:24px}
-main{flex:1;min-height:0;display:grid;grid-template-columns:var(--aside,clamp(330px,31vw,475px)) 5px minmax(0,1fr)}
-aside{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
-.asideHead{padding:8px 8px 0;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line);background:var(--panel)}
-.asideHead .toolbar button{padding:3px 6px;font-size:11px}
-.legend,.row{display:grid;grid-template-columns:minmax(0,1fr) 30px 53px 57px;align-items:center}
-.legend{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:4px 0 5px}.legend span{text-align:right;padding-right:6px}.legend span:first-child{text-align:left;padding-left:8px}
-#splitter{cursor:col-resize;background:var(--line)}#splitter:hover,#splitter.drag{background:var(--accent)}
-#events{flex:1;overflow:auto;padding:2px 0 20px;font-size:11.5px}
-.row{min-height:24px;cursor:default;border-left:2px solid transparent;user-select:none}.row:hover{background:var(--hover)}
-.row>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.row>.num{text-align:right;padding-right:6px;font:11px var(--mono);color:var(--text)}
-.row .name{display:flex;align-items:center;gap:5px;padding-left:calc(4px + var(--depth,0) * 14px)}
-.row .label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row .sub{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 0;min-width:0}
-.row.pass{font-weight:600;color:var(--pass)}.row.pass .label{flex:0 1 auto}
-.row.pass.inside{background:var(--panel2)}.row.on{background:var(--sel)!important;border-left-color:var(--selLine);color:var(--accent)}.row.on .sub{color:var(--muted)}
-.caret{width:14px;height:14px;min-height:0;padding:0;border:0;background:none;color:var(--muted);font-size:9px;line-height:14px;flex:none}.caret:hover:not(:disabled){background:none;color:#fff}
-.icon{flex:none;width:16px;height:14px;border-radius:2px;font:700 9px/14px var(--mono);text-align:center;color:var(--muted);background:#d8d4c313}
-.icon.draw,.icon.inst,.icon.batch,.icon.proc{color:#c2ccaa}.icon.full,.icon.blit,.icon.copy{color:var(--accent)}
-.icon.group{background:none;color:var(--accent);font-size:9px}.icon.group.synthetic{color:var(--muted)}
-.idx{color:var(--dim);font:10.5px var(--mono);flex:none;min-width:28px;text-align:right}
-.gpu{background:linear-gradient(90deg,rgba(var(--heat),.38) var(--p,0%),transparent var(--p,0%))}
-.node.closed>.kids{display:none}.empty{padding:14px;color:var(--muted)}
-.right{display:flex;flex-direction:column;min-height:0;overflow:auto;background:var(--bg)}.right>*{flex-shrink:0}
-.eventHead{padding:8px 12px 6px;border-bottom:1px solid var(--line);background:var(--panel)}
-.titleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}h2{font-size:15px;margin:0;color:var(--pass);font-weight:600;overflow-wrap:anywhere}
-.crumbs{color:var(--muted);font-size:11px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}.crumbs button{min-height:0;padding:0 2px;border:0;background:none;color:var(--muted)}.crumbs button:hover:not(:disabled){text-decoration:underline;background:none}
-.summaryLine{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;margin-top:4px}.chips{display:flex;gap:7px 14px;flex-wrap:wrap}.chip{display:inline-flex;gap:5px;align-items:baseline;font-size:11px;white-space:nowrap}.chip b{font:600 11px var(--mono);color:var(--pass)}.chip.hot b{color:var(--accent)}
-.previewBar{padding:5px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
-.previewBar input[type=number]{width:48px}#attachment{max-width:185px;min-width:70px}
-.seg{display:inline-flex}.seg button{border-radius:0;margin-left:-1px;min-width:25px;padding:3px 6px}.seg button:first-child{border-radius:4px 0 0 4px;margin-left:0}.seg button:last-child{border-radius:0 4px 4px 0}.seg button.on{background:var(--sel);color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
-.preview{position:relative;container-type:size;height:clamp(200px,38vh,560px);min-height:140px;resize:vertical;background:repeating-conic-gradient(#20221b 0% 25%,#191b15 0% 50%) 0/16px 16px;border-bottom:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center}
-.preview canvas{max-width:100%;max-height:100%;image-rendering:auto}.preview.zoom{overflow:auto;display:block}.preview.zoom canvas{max-width:none;max-height:none;image-rendering:pixelated}
-#output{width:min(100cqw,calc(100cqh * var(--image-aspect,1)));height:auto}.preview.zoom #output{width:auto}
-#mesh{display:none;touch-action:none;cursor:grab;width:100%;height:100%;object-fit:contain}
-.previewInfo{position:absolute;left:8px;bottom:6px;right:8px;display:flex;gap:10px;pointer-events:none;font:11px var(--mono);color:var(--text);text-shadow:0 1px 2px #000}.previewInfo .tag{background:#080907d9;padding:2px 6px;border-radius:3px}
-.error{color:var(--err);padding:0 16px}.error:not(:empty){padding:6px 16px}
-#properties{padding:0 0 8px}
-details.fold{border-bottom:1px solid var(--line);background:var(--panel)}details.fold>summary{cursor:pointer;padding:6px 12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;list-style:none;user-select:none}
-details.fold>summary:hover{background:var(--hover)}
-details.fold>summary::before{content:'▸';color:var(--muted);font-size:10px;width:10px}details.fold[open]>summary::before{content:'▾'}details.fold>summary::-webkit-details-marker{display:none}
-details.fold>summary .count{font:10.5px var(--mono);color:var(--muted);font-weight:400}details.fold>summary .tools{margin-left:auto;display:flex;gap:6px;font-weight:400}
-.foldBody{padding:4px 10px 10px;border-top:1px solid var(--line);background:var(--bg);overflow:auto}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:7px;padding-top:5px}
-.card{border:1px solid var(--line);border-radius:3px;background:var(--panel);min-width:0;overflow:auto}.card h3{margin:0;padding:4px 8px;font-size:11px;letter-spacing:.35px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);background:var(--panel2)}
-dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);margin:0;padding:5px 9px;column-gap:14px;row-gap:3px}dl.kv dt{color:var(--muted);white-space:nowrap}dl.kv dd{margin:0;font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere;min-width:0}
-.off{color:var(--dim)}.on-val{color:var(--good)}.hint{color:var(--dim);font-family:system-ui,sans-serif;font-size:11px;margin-left:6px}
-table{width:100%;border-collapse:collapse;font:11px/1.45 var(--mono)}th{position:sticky;top:0;text-align:left;color:var(--muted);font:600 10.5px var(--ui-font,system-ui);text-transform:uppercase;letter-spacing:.3px;background:var(--panel2);padding:4px 7px;border-bottom:1px solid var(--line2)}
-td{padding:3px 7px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}tr:hover td{background:var(--hover)}td.k{color:var(--text);white-space:nowrap}td.t{color:var(--dim);white-space:nowrap}
-h4{margin:6px 0 4px;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;display:flex;gap:6px;align-items:baseline}h4 .count{color:var(--dim);font-weight:400}
-.thumbButton{padding:0;border:0;cursor:zoom-in}.thumb{width:44px;height:44px;border:1px solid var(--line2);background:repeating-conic-gradient(var(--panel2) 0% 25%,var(--panel) 0% 50%) 0/8px 8px;display:block;object-fit:contain}.thumb.none{display:flex;align-items:center;justify-content:center;color:var(--dim)}
-.swatch{display:inline-block;width:11px;height:11px;border:1px solid #0008;border-radius:2px;vertical-align:-1px;margin-right:5px}
-.matrix{display:grid;gap:0 10px;font:11px var(--mono)}.matrix span{text-align:right}
-.keywords{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0}.kw{font:11px var(--mono);padding:1px 6px;border-radius:3px;background:var(--panel2);border:1px solid var(--line2);color:var(--text)}.kw i{font-style:normal;color:var(--muted)}.kw.v{border-color:#61744b}.kw.f{border-color:#806b47}
-.code{display:grid;grid-template-columns:max-content minmax(0,1fr);font:11px/1.5 var(--mono);max-height:520px;overflow:auto;background:#0d0e0a;border:1px solid var(--line);border-radius:4px}
-.code .ln{color:var(--dim);text-align:right;padding:0 8px;user-select:none;border-right:1px solid var(--line);white-space:pre}.code .src{white-space:pre;padding:0 10px;color:var(--text)}
-.code .pp{color:var(--accent)}.code .cm{color:var(--muted)}
-.filter{width:220px;min-height:22px;padding:2px 7px}
-pre.json{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.5 var(--mono);margin:0;max-height:480px;overflow:auto}
-.fold.emptyFold>summary{color:var(--dim);cursor:default}.fold.emptyFold>summary:hover{background:none}
-@media(max-width:900px){main{grid-template-columns:var(--aside,290px) 5px minmax(0,1fr)}.stats .stat.memory,.source{display:none}}
-@media(max-width:650px){main{grid-template-columns:minmax(180px,40%) 4px minmax(0,1fr)}.legend,.row{grid-template-columns:minmax(0,1fr) 48px}.row>.num:nth-child(2),.row>.num:nth-child(3),.legend>span:nth-child(2),.legend>span:nth-child(3){display:none}}`;
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body.edThemedSurface {
+  --surface: #191c22;
+  --surface-raised: #22262e;
+  --surface-hover: #292e37;
+  --stage: #111318;
+  --line: #363b45;
+  --line-soft: #2c313a;
+  --edge: #454c57;
+  --text: #edf0f4;
+  --muted: #b8bfc9;
+  --dim: #929caa;
+  --accent: var(--ed-gold, #edca83);
+  --selection: #373022;
+  --good: #a9c49a;
+  --error: #ffada0;
+  --mono: "Cascadia Mono", Consolas, monospace;
+  --font: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  font: 14px/1.45 var(--font);
+  scrollbar-color: #525966 transparent;
+  scrollbar-width: thin;
+}
+button, select, input { font: inherit; color: inherit; }
+button, select, input[type="search"], input[type="number"] {
+  min-height: 32px;
+  padding: 4px 9px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--surface-raised);
+}
+button, select { cursor: pointer; }
+button { white-space: nowrap; }
+button:hover:not(:disabled), select:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--dim);
+}
+button:disabled, select:disabled { color: var(--dim); opacity: .64; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="checkbox"], input[type="range"] { accent-color: var(--accent); }
+input[type="checkbox"] { margin: 0; }
+input[type="number"] { min-width: 0; font-variant-numeric: tabular-nums; }
+label { display: inline-flex; align-items: center; gap: 6px; }
+a { color: var(--accent); }
+small, .muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+.spacer { flex: 1; }
+.toolbar { display: flex; align-items: center; gap: 7px; }
+.masthead {
+  min-height: 61px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 16px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 13px; min-width: 0; }
+h1 { margin: 0; font-size: 21px; font-weight: 650; line-height: 1.2; letter-spacing: .1px; white-space: nowrap; }
+.source { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.stats { display: flex; align-items: center; flex-shrink: 0; }
+.stat { display: grid; gap: 1px; padding: 0 15px; border-left: 1px solid var(--line); }
+.stat:last-child { padding-right: 0; }
+.stat span { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.stat b { color: var(--text); font: 600 16px/1.22 var(--mono); white-space: nowrap; }
+.stat.timing b { color: var(--accent); }
+.bar {
+  min-height: 47px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.captureTools, .steps { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.captureTools { flex: none; padding-right: 11px; border-right: 1px solid var(--line); }
+.steps { flex: 1; }
+#target { max-width: 187px; }
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #241d13;
+  font-weight: 700;
+}
+button.primary:hover:not(:disabled) { background: #ffe1a9; border-color: #ffe1a9; }
+.step {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  padding: 0;
+}
+.step::before, .caret::before, .adjustSummary::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+}
+#previous::before { transform: rotate(135deg); }
+#next::before { transform: rotate(-45deg); }
+#scrubber {
+  appearance: none;
+  flex: 1;
+  min-width: 40px;
+  height: 26px;
+  margin: 0 3px;
+  background: transparent;
+  cursor: pointer;
+}
+#scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--accent) var(--position, 0%), #474e59 var(--position, 0%));
+}
+#scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--stage);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+#scrubber:disabled { cursor: default; opacity: .5; }
+#index { width: 59px; }
+#index::-webkit-inner-spin-button { appearance: none; }
+#count { min-width: 34px; white-space: nowrap; font: 12px var(--mono); }
+#save { margin-left: 6px; }
+main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, var(--aside, clamp(350px, 31vw, 490px))) 5px minmax(0, 1fr);
+}
+aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  container: tree-pane / inline-size;
+}
+.asideHead { flex: none; padding: 10px 12px 0; background: var(--surface); }
+.treeTools { gap: 5px; }
+.treeTools h2 { flex: 1; min-width: max-content; margin: 0; font-size: 14px; font-weight: 650; }
+.treeTools button, .treeTools select { min-height: 28px; padding: 3px 6px; font-size: 12px; }
+.searchBox { display: flex; position: relative; margin: 8px 0 6px; }
+.searchBox::before, .searchBox::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 11px;
+  pointer-events: none;
+}
+.searchBox::before { width: 8px; height: 8px; border: 1.5px solid var(--dim); border-radius: 50%; }
+.searchBox::after { top: 20px; left: 20px; width: 5px; height: 1.5px; background: var(--dim); transform: rotate(45deg); }
+#search {
+  width: 100%;
+  padding-left: 32px;
+  background: var(--stage);
+  font-size: 13px;
+}
+#search::placeholder { color: var(--dim); }
+.legend, .row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 37px 60px 69px;
+  align-items: center;
+}
+.legend {
+  flex: none;
+  min-height: 28px;
+  color: var(--dim);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 11.5px;
+}
+.legend span { padding-right: 9px; text-align: right; white-space: nowrap; }
+.legend span:first-child { padding-left: 12px; text-align: left; }
+#splitter { position: relative; z-index: 1; cursor: col-resize; background: var(--stage); touch-action: none; }
+#splitter:hover, #splitter.drag { background: var(--accent); }
+#events { flex: 1; min-height: 0; overflow: auto; padding-bottom: 10px; scrollbar-gutter: stable; }
+.legend { scrollbar-gutter: stable; overflow: hidden; }
+.row {
+  min-height: 28px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.row:hover, .row:focus-visible { background: var(--surface-hover); }
+.row:focus-visible { outline-offset: -2px; }
+.row .name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: calc(6px + min(var(--depth, 0), 7) * 10px);
+}
+.row .label, .row .sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .label { font-size: 13.5px; }
+.row .sub { flex: 0 1 auto; color: var(--dim); font-size: 12px; }
+.row .num { padding-right: 9px; text-align: right; white-space: nowrap; color: var(--muted); font: 12.5px/1.3 var(--mono); }
+.row .idx { flex: 0 0 auto; min-width: 24px; color: var(--dim); text-align: right; font: 11.5px var(--mono); }
+.row.pass { min-height: 30px; font-weight: 650; background: #20242b; border-top: 1px solid var(--line-soft); }
+.row.pass.viewport { min-height: 32px; background: var(--surface-raised); }
+.row.pass.inside { background: #292e36; }
+.row.pass:hover { background: var(--surface-hover); }
+.row.on, .row.pass.on { border-left-color: var(--accent); background: var(--selection); }
+.row.on .label, .row.on .idx { color: var(--accent); }
+.row .gpu {
+  position: relative;
+  color: var(--text);
+}
+.gpu::after {
+  content: "";
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 9px;
+  width: calc((100% - 13px) * var(--share, 0));
+  height: 1.5px;
+  border-radius: 1px;
+  background: #a78b56;
+}
+.caret {
+  display: grid;
+  place-items: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 21px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.caret::before { transform: rotate(45deg) translate(-1px, -1px); }
+.closed > .row .caret::before { transform: rotate(-45deg); }
+.icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 20px;
+  height: 17px;
+  border-radius: 4px;
+  background: #303641;
+  color: #d0d7e0;
+  font: 600 10px/1 var(--mono);
+}
+.icon.draw, .icon.inst, .icon.batch, .icon.proc { background: #293d39; color: #b5dbc9; }
+.icon.full, .icon.blit, .icon.copy { background: #393245; color: #dbc9ec; }
+.node.closed > .kids { display: none; }
+.empty { padding: 14px; color: var(--muted); }
+.right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  container: inspector / inline-size;
+}
+.eventHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 14px;
+  flex: none;
+  padding: 9px 14px;
+  background: var(--surface);
+}
+.eventIdentity { min-width: 0; }
+.titleRow { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+#eventId { color: var(--accent); font: 600 12px var(--mono); white-space: nowrap; }
+.titleRow h2 { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; font-weight: 650; }
+.crumbs { display: flex; align-items: center; min-width: 0; gap: 5px; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.crumbs span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumbs button {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.crumbs button:hover:not(:disabled) { background: none; color: var(--text); text-decoration: underline; }
+.chips { display: flex; align-items: center; gap: 11px; white-space: nowrap; }
+.chip { display: grid; gap: 1px; align-items: baseline; border-left: 1px solid var(--line); padding-left: 10px; font-size: 11.5px; }
+.chip b { color: var(--text); font: 600 13px var(--mono); }
+.chip.hot b { color: var(--accent); }
+.previewBar {
+  flex-wrap: wrap;
+  flex: none;
+  min-height: 39px;
+  padding: 3px 12px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--line-soft);
+}
+.previewBar button, .previewBar select { min-height: 29px; padding: 3px 8px; font-size: 12px; }
+#attachment { width: clamp(118px, 20cqw, 205px); }
+.tabs { display: flex; flex: none; align-items: stretch; align-self: stretch; gap: 2px; }
+.tabs button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 11px;
+  border-radius: 4px;
+}
+.tabs button.on { color: var(--accent); background: #332d23; }
+.tabs button:hover:not(:disabled) { color: var(--text); }
+.seg { display: inline-flex; flex: none; border: 1px solid var(--edge); border-radius: 5px; padding: 2px; gap: 1px; }
+.seg button { min-height: 23px; min-width: 23px; padding: 1px 5px; border: 0; border-radius: 3px; background: transparent; color: var(--muted); font-size: 11.5px; }
+.seg button.on { color: var(--accent); background: var(--selection); }
+.adjustments { position: relative; z-index: 4; }
+.adjustSummary, .adjustFields {
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--surface-raised);
+}
+.adjustSummary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 29px;
+  padding: 3px 8px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.adjustSummary::-webkit-details-marker { display: none; }
+.adjustSummary::after { transform: rotate(45deg) translateY(-1px); }
+.adjustments[open] .adjustSummary { color: var(--accent); }
+.adjustFields {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 5px);
+  padding: 9px 10px;
+  display: grid;
+  gap: 7px;
+  box-shadow: 0 7px 20px #0008;
+}
+.adjustFields label { justify-content: space-between; min-width: 143px; color: var(--muted); font-size: 13px; }
+.adjustFields input { width: 77px; background: var(--stage); }
+.appActions { gap: 7px; color: var(--muted); font-size: 12px; }
+.appActions button, .copyAction { min-height: 24px; padding: 2px 6px; font-size: 12px; }
+dd .copyAction { margin-left: 6px; }
+h4 .copyAction { margin-left: auto; }
+#meshControls { min-height: 35px; color: var(--muted); font-size: 13px; }
+.preview {
+  position: relative;
+  flex: none;
+  container-type: size;
+  height: clamp(150px, 31vh, 530px);
+  min-height: 100px;
+  max-height: max(150px, calc(100vh - 340px));
+  padding: 9px 12px;
+  background: var(--stage);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+#output {
+  width: min(100cqw, calc(100cqh * var(--image-aspect, 1)));
+  height: auto;
+  background: repeating-conic-gradient(#232833 0% 25%, #1a1f28 0% 50%) 0 / 16px 16px;
+}
+#output.emptyImage { visibility: hidden; }
+.preview.zoom { overflow: auto; display: block; }
+.preview.zoom #output { width: auto; image-rendering: pixelated; }
+#mesh { display: none; touch-action: none; cursor: grab; max-width: 100%; max-height: 100%; object-fit: contain; }
+.previewInfo {
+  min-height: 26px;
+  flex: none;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #181b21;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font: 11.5px/1.35 var(--mono);
+}
+.tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#previewGrip {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  min-height: 17px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  cursor: row-resize;
+  touch-action: none;
+}
+#previewGrip::before {
+  content: "";
+  width: 14px;
+  height: 4px;
+  border-block: 1px solid var(--dim);
+}
+#previewError { flex: none; color: var(--error); padding: 4px 12px; background: var(--stage); }
+#previewError:empty { display: none; }
+.inspector {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.propertyTabs {
+  align-self: auto;
+  flex: none;
+  min-height: 37px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.propertyTabs button {
+  border: 0;
+  border-radius: 0;
+  padding-inline: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.propertyTabs button.on { background: transparent; box-shadow: inset 0 -2px var(--accent); }
+#properties { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+details.fold { border-bottom: 1px solid var(--line-soft); }
+details.fold > summary {
+  min-height: 33px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 14px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  list-style: none;
+  user-select: none;
+  cursor: pointer;
+}
+details.fold > summary:focus-visible { outline-offset: -2px; }
+details.fold > summary::before { content: '›'; font-size: 16px; color: var(--muted); }
+details.fold[open] > summary::before { transform: rotate(90deg); }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary:hover { background: var(--surface-hover); }
+details.fold > summary .count { color: var(--dim); font: 12px var(--mono); }
+details.fold > summary .tools { margin-left: auto; display: flex; gap: 6px; font-weight: 400; }
+.fold.emptyFold > summary { color: var(--dim); cursor: default; }
+.fold.emptyFold > summary:hover { background: none; }
+.foldBody { padding: 3px 14px 10px; overflow: auto; }
+.detailContent { padding: 10px 14px 16px; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+.card { min-width: 0; }
+.card h3 {
+  margin: 0;
+  padding: 3px 0 5px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+dl.kv { display: grid; grid-template-columns: minmax(91px, max-content) minmax(0, 1fr); gap: 0 10px; margin: 0; }
+dl.kv dt, dl.kv dd { min-width: 0; margin: 0; padding-block: 4px; border-bottom: 1px solid var(--line-soft); }
+dl.kv dt { color: var(--muted); font-size: 12.5px; }
+dl.kv dd { overflow-wrap: anywhere; color: var(--text); font: 12.5px/1.5 var(--mono); }
+.off { color: var(--dim); }
+.on-val { color: var(--good); }
+.hint { color: var(--muted); font: 12px var(--font); margin-left: 6px; }
+table { width: 100%; border-collapse: collapse; font: 12px/1.5 var(--mono); }
+th { text-align: left; color: var(--muted); font: 600 12px var(--font); padding: 5px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); vertical-align: top; overflow-wrap: anywhere; }
+tr:hover td { background: var(--surface-raised); }
+td.k, td.t { white-space: nowrap; }
+td.t { color: var(--dim); }
+h4 { margin: 6px 0 4px; font-size: 13px; color: var(--text); display: flex; gap: 7px; }
+h4 .count { color: var(--dim); font-weight: 400; }
+.thumbButton { padding: 0; border: 0; cursor: zoom-in; }
+.thumb { width: 44px; height: 44px; border: 1px solid var(--edge); background: var(--stage); display: block; object-fit: contain; }
+.thumb.none { display: grid; place-items: center; color: var(--muted); }
+.swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #0008; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+.matrix { display: grid; gap: 0 10px; font: 12px var(--mono); }
+.matrix span { text-align: right; }
+.keywords { display: flex; flex-wrap: wrap; gap: 5px; padding: 5px 0; }
+.kw { padding: 2px 5px; border: 1px solid var(--edge); border-radius: 3px; background: var(--surface-raised); font: 12px var(--mono); }
+.kw i { font-style: normal; color: var(--muted); }
+.kw.v { border-color: #59776d; }
+.kw.f { border-color: #806a97; }
+.code {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  max-height: 540px;
+  overflow: auto;
+  background: var(--stage);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: 12px/1.55 var(--mono);
+}
+.code .ln { color: var(--dim); text-align: right; padding: 0 8px; user-select: none; border-right: 1px solid var(--line); white-space: pre; }
+.code .src { white-space: pre; padding: 0 10px; }
+.code .pp { color: var(--accent); }
+.code .cm { color: var(--muted); }
+.filter { width: 164px; min-height: 23px !important; padding: 2px 6px !important; font-size: 12px; }
+pre.json { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.55 var(--mono); margin: 0; }
+#status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 27px;
+  padding: 3px 13px;
+  background: #171a20;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+.dot.frozen, .dot.armed { background: var(--accent); }
+.dot.error { background: var(--error); }
+@container tree-pane (max-width: 365px) {
+  .legend, .row { grid-template-columns: minmax(0, 1fr) 32px 53px 61px; }
+  .row .name { gap: 4px; padding-left: calc(5px + min(var(--depth, 0), 6) * 8px); }
+  .row .sub { display: none; }
+}
+@container tree-pane (max-width: 310px) {
+  .legend, .row { grid-template-columns: minmax(0, 1fr) 32px 62px; }
+  .legend > :nth-child(3), .row > :nth-child(3) { display: none; }
+}
+@container inspector (max-width: 590px) {
+  .eventHead { gap: 6px 9px; }
+  .chips { gap: 5px; }
+  .chip { padding-left: 5px; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 920px) {
+  main { grid-template-columns: minmax(0, var(--aside, 320px)) 5px minmax(0, 1fr); }
+  .stat { padding-inline: 8px; }
+  .stat.memory { display: none; }
+}
+@media (max-width: 720px) {
+  main { grid-template-columns: 43% 4px minmax(0, 1fr); }
+  .bar { flex-wrap: wrap; }
+  .captureTools { padding-right: 0; border-right: 0; }
+  .steps { flex: 1 1 100%; }
+  .source { display: none; }
+}
+`;
 
 const Ms = value => value == null ? '—' : value < 0.001 ? '<.001' : value.toFixed(3);
 const Count = value => value == null ? '—' : Number(value).toLocaleString('en-US');
@@ -124,7 +593,7 @@ export class FrameDebuggerEditor {
   constructor(host, popup = null) {
     this.host = host; this.debugger = host.game.FrameDebugger; this.win = popup; this.mesh = null; this.lastRevision = -1; this.captureId = null;
     this.treeKey = ''; this.filter = ''; this.sort = 'order'; this.channel = 'rgba'; this.open = new Set(); this.folds = new Map();
-    this.selectedPass = null; this.textureView = null; this.view = 'output';
+    this.selectedPass = null; this.textureView = null; this.view = 'output'; this.propertyView = 'details';
   }
   Enter() {
     this.win ??= window.open('', this.debugger.windowName, 'width=1440,height=980,menubar=no,toolbar=no');
@@ -136,27 +605,88 @@ export class FrameDebuggerEditor {
       const theme = doc.createElement('link'); theme.rel = 'stylesheet'; theme.href = source.href; doc.head.append(theme);
     }
     const style = doc.createElement('style'); style.textContent = CSS; doc.head.append(style);
-    doc.body.innerHTML = `<header><h1>Frame Debugger</h1><span class="source">台儿庄 1938</span><span class="spacer"></span><div id="stats" class="stats"></div></header>
-      <div class="toolbar bar"><button id="capture" class="primary" aria-label="捕获当前帧">捕获当前帧</button><button id="resume">继续运行</button>
-        <select id="target" aria-label="捕获目标"><option>当前游戏</option></select><span class="sep"></span>
-        <button id="previous" title="上一事件 (←，Shift ×10)">◀</button><input id="scrubber" aria-label="渲染事件" type="range" min="0" max="0" value="0"><button id="next" title="下一事件 (→，Shift ×10)">▶</button>
-        <input id="index" aria-label="事件编号" type="number" min="1" value="1"><span id="count" class="muted">/ 0</span><span class="sep"></span><button id="save">导出报告</button></div>
-      <main><aside><div class="asideHead"><input id="search" type="search" aria-label="搜索渲染事件" placeholder="搜索事件" title="Pass、对象、材质、Shader、#编号">
-        <div class="toolbar"><select id="sort" aria-label="排序"><option value="order">事件顺序</option><option value="gpu">GPU 最耗时</option><option value="cpu">CPU 最耗时</option></select>
-        <button id="expand" title="展开全部">展开全部</button><button id="collapse" title="折叠全部">折叠全部</button><span class="spacer"></span><small id="treeInfo"></small></div>
-        <div class="legend"><span>事件层级</span><span>DC</span><span>CPU ms</span><span id="gpuColumn">GPU ms</span></div></div><div id="events" role="tree"></div></aside>
-      <div id="splitter" title="拖动调整宽度"></div>
-      <section id="right" class="right"><div class="eventHead"><div class="titleRow"><h2 id="selected">尚未捕获</h2><span class="spacer"></span>
-          <label><input id="syncView" type="checkbox" checked> 同步游戏画面</label><button id="locate" title="在控制台定位源对象">定位对象</button></div>
-        <div class="summaryLine"><div id="crumbs" class="crumbs"></div><div id="chips" class="chips"></div></div></div>
-      <div class="toolbar previewBar"><span id="viewModes" class="seg" role="group" aria-label="预览模式"></span>
-        <select id="attachment" aria-label="渲染目标附件"></select><span id="channel" class="seg" role="group" aria-label="颜色通道"></span>
-        <label>Levels <input id="black" type="number" value="0" step=".01" title="黑场" aria-label="黑场"> – <input id="white" type="number" value="1" step=".01" title="白场" aria-label="白场"></label><label>EV <input id="exposure" type="number" value="0" step=".5" aria-label="曝光"></label>
-        <span class="spacer"></span><button id="zoom" title="适应窗口 / 快照像素">1:1</button><button id="png">保存 PNG</button></div>
-      <div id="meshControls" class="toolbar previewBar" hidden><select id="meshMode" aria-label="网格模式"><option value="shaded">着色</option><option value="uvChecker">UV 棋盘</option><option value="uvLayout">UV 展开</option><option value="vertexColor">顶点色</option><option value="normals">法线</option><option value="tangents">切线</option><option value="blendshapes">形变</option></select><label><input id="wireframe" type="checkbox"> 线框</label><label>形变 <input id="morph" type="range" min="0" max="1" step=".01" value="1"></label></div>
-      <div id="preview" class="preview"><canvas id="output"></canvas><canvas id="mesh"></canvas><div class="previewInfo"><span id="previewLabel" class="tag" hidden></span><span class="spacer"></span><span id="pixel" class="tag" hidden></span></div></div>
-      <div id="previewError" class="error"></div><div id="properties"></div>
-      </section></main><footer id="status" role="status"><span id="stateDot" class="dot"></span><span id="statusText"></span></footer>`;
+    doc.body.innerHTML = `
+      <header class="masthead">
+        <div class="brand"><h1>Frame Debugger</h1><span class="source">台儿庄 1938</span></div>
+        <div id="stats" class="stats"></div>
+      </header>
+      <div class="toolbar bar">
+        <div class="captureTools">
+          <select id="target" aria-label="捕获目标"><option>当前游戏</option></select>
+          <button id="capture" class="primary" aria-label="捕获当前帧">捕获当前帧</button>
+          <button id="resume">继续运行</button>
+        </div>
+        <div class="steps">
+          <button id="previous" class="step" aria-label="上一事件" title="上一事件 (←，Shift ×10)"></button>
+          <input id="scrubber" aria-label="渲染事件" type="range" min="0" max="0" value="0">
+          <button id="next" class="step" aria-label="下一事件" title="下一事件 (→，Shift ×10)"></button>
+          <input id="index" aria-label="事件编号" type="number" min="1" value="1"><span id="count" class="muted">/ 0</span>
+        </div>
+        <button id="save">导出报告</button>
+      </div>
+      <main>
+        <aside>
+          <div class="asideHead">
+            <div class="toolbar treeTools">
+              <h2 id="treeHeading">渲染事件</h2>
+              <select id="sort" aria-label="排序"><option value="order">事件顺序</option><option value="gpu">GPU 降序</option><option value="cpu">CPU 降序</option></select>
+              <button id="expand" aria-label="展开全部" title="展开全部">展开</button>
+              <button id="collapse" aria-label="折叠全部" title="折叠全部">折叠</button>
+            </div>
+            <div class="searchBox"><input id="search" type="search" aria-label="搜索渲染事件" placeholder="搜索事件、Pass 或 Shader" title="Pass、对象、材质、Shader、#编号"></div>
+          </div>
+          <div class="legend"><span id="treeInfo">名称</span><span>DC</span><span>CPU ms</span><span id="gpuColumn">GPU ms</span></div>
+          <div id="events" role="tree" aria-labelledby="treeHeading"></div>
+        </aside>
+        <div id="splitter" title="拖动调整宽度"></div>
+        <section id="right" class="right" aria-label="事件检查">
+          <div class="eventHead">
+            <div class="eventIdentity">
+              <div class="titleRow"><span id="eventId" hidden></span><h2 id="selected">尚未捕获</h2></div>
+              <div id="crumbs" class="crumbs"></div>
+            </div>
+            <div id="chips" class="chips"></div>
+          </div>
+          <div class="toolbar previewBar">
+            <span id="viewModes" class="tabs" role="group" aria-label="预览模式"></span>
+            <select id="attachment" aria-label="渲染目标附件"></select>
+            <span id="channel" class="seg" role="group" aria-label="颜色通道"></span>
+            <details id="adjustments" class="adjustments" hidden>
+              <summary class="adjustSummary">色阶</summary>
+              <div class="adjustFields">
+                <label>黑场<input id="black" type="number" value="0" step=".01"></label>
+                <label>白场<input id="white" type="number" value="1" step=".01"></label>
+                <label>曝光 EV<input id="exposure" type="number" value="0" step=".5"></label>
+              </div>
+            </details>
+            <span class="spacer"></span>
+            <button id="zoom" title="适应窗口 / 快照像素" aria-pressed="false">适应</button>
+            <button id="png">保存 PNG</button>
+          </div>
+          <div id="meshControls" class="toolbar previewBar" hidden>
+            <select id="meshMode" aria-label="网格模式"><option value="shaded">着色</option><option value="uvChecker">UV 棋盘</option><option value="uvLayout">UV 展开</option><option value="vertexColor">顶点色</option><option value="normals">法线</option><option value="tangents">切线</option><option value="blendshapes">形变</option></select>
+            <label><input id="wireframe" type="checkbox"> 线框</label>
+            <label>形变 <input id="morph" type="range" min="0" max="1" step=".01" value="1"></label>
+          </div>
+          <div id="preview" class="preview"><canvas id="output" class="emptyImage"></canvas><canvas id="mesh"></canvas></div>
+          <div class="previewInfo">
+            <span id="previewLabel" class="tag" hidden></span><span class="spacer"></span><span id="pixel" class="tag" hidden></span>
+            <button id="previewGrip" aria-label="调整预览高度" title="拖动调整预览高度，也可用方向键"></button>
+          </div>
+          <div id="previewError" role="status"></div>
+          <section class="inspector" aria-label="事件属性">
+            <div class="toolbar tabs propertyTabs" id="propertyTabs" role="group" aria-label="属性视图"></div>
+            <div id="properties" tabindex="0"></div>
+          </section>
+        </section>
+      </main>
+      <footer id="status" role="status">
+        <span id="stateDot" class="dot"></span><span id="statusText"></span><span class="spacer"></span>
+        <div id="appActions" class="toolbar appActions">
+          <label><input id="syncView" type="checkbox" checked> 同步游戏画面</label>
+          <button id="locate" title="在控制台定位源对象">定位对象</button>
+        </div>
+      </footer>`;
     this.ui = Object.fromEntries([...doc.querySelectorAll('[id]')].map(el => [el.id, el]));
     const ui = this.ui;
     if (this.host.preview) {
@@ -165,8 +695,7 @@ export class FrameDebuggerEditor {
       ui.target.options[0].textContent = '可见编辑器视口';
       ui.gpuColumn.textContent = 'GPU ms ≈'; ui.gpuColumn.title = '逐命令 GPU 查询';
       ui.resume.textContent = '清除捕获';
-      ui.syncView.closest('label').hidden = true; ui.syncView.checked = false;
-      ui.locate.hidden = true;
+      ui.appActions.hidden = true; ui.syncView.checked = false;
     }
     for (const [value, label] of [['output', '输出'], ['mesh', '网格'], ['texture', '纹理']]) {
       const button = this.El('button', label); button.dataset.value = value;
@@ -177,6 +706,11 @@ export class FrameDebuggerEditor {
       const button = this.El('button', text); button.dataset.value = value;
       button.onclick = () => { this.channel = value; this.DrawPreview(); };
       ui.channel.append(button);
+    }
+    for (const [value, text] of [['details', '详情'], ['shader', 'Shader 属性'], ['raw', '原始数据']]) {
+      const button = this.El('button', text); button.dataset.value = value;
+      button.onclick = () => this.ShowProperties(value);
+      ui.propertyTabs.append(button);
     }
     ui.capture.onclick = () => {
       if (this.host.preview) this.debugger.RequestCapture(ui.target.selectedIndex > 0 ? Number(ui.target.value) : null);
@@ -190,13 +724,32 @@ export class FrameDebuggerEditor {
     ui.index.onchange = () => this.Select(Number(ui.index.value) - 1);
     ui.search.oninput = () => { this.filter = ui.search.value.trim().toLowerCase(); this.BuildTree(); };
     ui.sort.onchange = () => { this.sort = ui.sort.value; this.BuildTree(); };
-    ui.expand.onclick = () => { for (const pass of this.debugger.capture?.passes || []) this.open.add(pass.path); this.BuildTree(); };
-    ui.collapse.onclick = () => { this.open.clear(); this.BuildTree(); };
+    ui.expand.onclick = () => { for (const pass of this.debugger.capture?.passes || []) this.open.add(pass.path); this.BuildTree(true); };
+    ui.collapse.onclick = () => { this.open.clear(); this.BuildTree(true); };
     ui.events.onclick = event => this.TreeClick(event);
     ui.events.ondblclick = event => { const node = event.target.closest('.row.pass')?.parentElement; if (node) this.Toggle(node); };
     for (const id of ['attachment', 'black', 'white', 'exposure', 'meshMode', 'wireframe', 'morph']) ui[id].onchange = () => this.DrawPreview();
     ui.syncView.onchange = () => { if (!ui.syncView.checked) this.debugger.Present(); else this.DrawPreview(); };
-    ui.zoom.onclick = () => { ui.zoom.textContent = ui.preview.classList.toggle('zoom') ? '适应' : '1:1'; };
+    ui.zoom.onclick = () => {
+      const actualSize = ui.preview.classList.toggle('zoom');
+      ui.zoom.textContent = actualSize ? '1:1' : '适应';
+      ui.zoom.setAttribute('aria-pressed', actualSize);
+    };
+    const ResizePreview = height => { ui.preview.style.height = `${Math.max(100, height)}px`; };
+    ui.previewGrip.onpointerdown = event => {
+      const start = event.clientY, height = ui.preview.offsetHeight;
+      ui.previewGrip.setPointerCapture(event.pointerId);
+      ui.previewGrip.onpointermove = move => ResizePreview(height + move.clientY - start);
+    };
+    ui.previewGrip.onlostpointercapture = () => { ui.previewGrip.onpointermove = null; };
+    ui.previewGrip.onkeydown = event => {
+      if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      ResizePreview(ui.preview.offsetHeight + (event.key === 'ArrowDown' ? 16 : -16));
+      event.preventDefault(); event.stopPropagation();
+    };
+    doc.addEventListener('pointerdown', event => {
+      if (!ui.adjustments.contains(event.target)) ui.adjustments.open = false;
+    });
     ui.save.onclick = () => this.Download(new Blob([JSON.stringify(this.debugger.Inspect(), null, 2)], { type: 'application/json' }), `FrameCapture_${this.debugger.capture?.id || 0}.json`);
     ui.png.onclick = () => (this.view === 'mesh' ? ui.mesh : ui.output).toBlob(blob => { if (blob) this.Download(blob, `FrameCapture_Event${this.debugger.selected + 1}.png`); });
     ui.locate.onclick = () => this.Locate();
@@ -206,10 +759,13 @@ export class FrameDebuggerEditor {
     if (!this.host.preview) ui.output.title = '单击查看像素历史';
     ui.splitter.onpointerdown = event => {
       ui.splitter.setPointerCapture(event.pointerId); ui.splitter.classList.add('drag');
-      ui.splitter.onpointermove = move => doc.body.style.setProperty('--aside', `${Math.max(240, Math.min(this.win.innerWidth - 420, move.clientX))}px`);
-      ui.splitter.onpointerup = () => { ui.splitter.onpointermove = null; ui.splitter.classList.remove('drag'); };
+      ui.splitter.onpointermove = move => doc.body.style.setProperty('--aside', `${Math.max(255, Math.min(this.win.innerWidth - 335, move.clientX))}px`);
+      ui.splitter.onlostpointercapture = () => { ui.splitter.onpointermove = null; ui.splitter.classList.remove('drag'); };
     };
     doc.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && ui.adjustments.open) { ui.adjustments.open = false; event.preventDefault(); return; }
+      if (event.ctrlKey && event.key.toLowerCase() === 'f') { ui.search.focus(); event.preventDefault(); return; }
+      if (event.key !== 'Escape' && event.target.closest('#properties')) return;
       if (/INPUT|SELECT|TEXTAREA/.test(event.target.tagName) && event.target.type !== 'range') return;
       const delta = event.shiftKey ? 10 : 1;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') this.Select(this.debugger.selected - delta);
@@ -217,7 +773,6 @@ export class FrameDebuggerEditor {
       else if (event.key === 'Home') this.Select(0);
       else if (event.key === 'End') this.Select(this.debugger._events.length - 1);
       else if (event.key === 'Escape') { this.debugger.Resume(); this.Update(); }
-      else if (event.key === 'f' && event.ctrlKey) ui.search.focus();
       else return;
       event.preventDefault();
     });
@@ -252,12 +807,14 @@ export class FrameDebuggerEditor {
     if (!capture || !ready) {
       ui.statusText.textContent = this.debugger.error || (ui.capture.disabled ? '正在捕获…' : '就绪');
       if (!capture) {
-        ui.events.replaceChildren(this.El('div', '尚未捕获', 'empty'));
-        ui.properties.replaceChildren(); ui.selected.textContent = '尚未捕获'; ui.crumbs.replaceChildren(); ui.chips.replaceChildren(); ui.stats.replaceChildren();
-        ui.treeInfo.textContent = ''; ui.previewLabel.hidden = ui.pixel.hidden = true; ui.previewError.textContent = '';
+        ui.events.replaceChildren();
+        this.propertyEvent = null; this.propertyBuilders = null; this.ShowProperties('details');
+        ui.selected.textContent = '尚未捕获'; ui.selected.removeAttribute('title'); ui.eventId.hidden = true;
+        ui.crumbs.replaceChildren(); ui.chips.replaceChildren(); ui.stats.replaceChildren();
+        ui.treeInfo.textContent = '名称'; ui.previewLabel.hidden = ui.pixel.hidden = true; ui.previewError.textContent = '';
         ui.attachment.replaceChildren(); ui.attachment.disabled = ui.zoom.disabled = true; ui.count.textContent = '/ 0';
-        ui.scrubber.max = ui.scrubber.value = '0'; ui.index.value = '1'; ui.meshControls.hidden = true;
-        ui.mesh.style.display = 'none'; ui.output.style.display = ''; ui.output.width = ui.output.height = 1;
+        ui.scrubber.max = ui.scrubber.value = '0'; ui.scrubber.style.setProperty('--position', '0%'); ui.index.value = '1'; ui.meshControls.hidden = true;
+        ui.mesh.style.display = 'none'; ui.output.style.display = ''; ui.output.width = ui.output.height = 1; ui.output.classList.add('emptyImage');
         this.view = 'output'; this.textureView = null;
         this.mesh?.Clear(); this.UpdatePreviewModes(null);
       }
@@ -299,9 +856,10 @@ export class FrameDebuggerEditor {
     const [iconClass, glyph] = ICONS[event.kind] || ['draw', '?'];
     const name = this.El('span', '', 'name'), icon = this.El('span', glyph, `icon ${iconClass}`); icon.title = event.kind;
     const d = event.details;
-    name.append(this.El('span', '', 'caret'), icon, this.El('span', String(event.index + 1), 'idx'), this.El('span', event.label || event.kind, 'label'),
-      this.El('span', flat ? event.path : d?.material || (this.host.preview ? '' : event.target), 'sub'));
-    const gpu = this.El('span', Ms(event.gpuMs), 'num gpu'); gpu.style.setProperty('--p', `${Math.min(100, (event.gpuMs || 0) / this.maxEventGpu * 100)}%`);
+    name.append(this.El('span', String(event.index + 1), 'idx'), icon, this.El('span', event.label || event.kind, 'label'));
+    const secondary = flat ? event.path : d?.material;
+    if (secondary && secondary !== event.label) name.append(this.El('span', secondary, 'sub'));
+    const gpu = this.El('span', Ms(event.gpuMs), 'num gpu'); gpu.style.setProperty('--share', Math.min(1, (event.gpuMs || 0) / this.maxEventGpu));
     row.append(name, this.El('span', event.draw ? '1' : '', 'num'), this.El('span', Ms(event.cpuMs), 'num'), gpu);
     row.title = `#${event.index + 1} ${event.kind} ${event.label}\n${event.path} → ${event.target}${d ? `\n${d.path}\n材质 ${d.material} · ${event.shaderName || d.shader}` : ''}`;
     if (event.index === this.debugger.selected && this.selectedPass == null) row.classList.add('on');
@@ -309,21 +867,21 @@ export class FrameDebuggerEditor {
   }
   PassNode(pass, depth, filtered) {
     const node = this.El('div', '', 'node'); node.dataset.pass = pass.id; node.dataset.path = pass.path;
-    const row = this.El('div', '', 'row pass'); row.style.setProperty('--depth', depth);
-    const name = this.El('span', '', 'name'), caret = this.El('button', '▾', 'caret'); caret.tabIndex = -1; caret.dataset.toggle = '1';
-    const icon = this.El('span', '◆', `icon group${pass.synthetic ? ' synthetic' : ''}`);
-    icon.title = pass.viewport ? '视口' : pass.synthetic ? '捕获器归并的分组' : '游戏 Pass';
-    name.append(caret, icon, this.El('span', pass.name, 'label'));
+    const row = this.El('div', '', `row pass${pass.viewport ? ' viewport' : ''}`); row.style.setProperty('--depth', depth);
+    const name = this.El('span', '', 'name'), caret = this.El('button', '', 'caret'); caret.tabIndex = -1; caret.dataset.toggle = '1';
+    const expanded = filtered || this.open.has(pass.path);
+    caret.setAttribute('aria-label', expanded ? '折叠' : '展开'); caret.setAttribute('aria-expanded', expanded);
+    name.append(caret, this.El('span', pass.name, 'label'));
     const total = this.debugger.capture.gpuMs, gpu = this.El('span', Ms(pass.gpuMs), 'num gpu');
-    gpu.style.setProperty('--p', `${total ? Math.min(100, (pass.gpuMs || 0) / total * 100) : 0}%`);
+    gpu.style.setProperty('--share', total ? Math.min(1, (pass.gpuMs || 0) / total) : 0);
     row.append(name, this.El('span', Count(pass.draws), 'num'), this.El('span', Ms(pass.cpuMs), 'num'), gpu);
     row.title = `${pass.path}\n事件 #${pass.first + 1} – #${pass.last + 1} · ${pass.draws} DC${total && pass.gpuMs != null ? ` · 占 GPU 帧 ${(pass.gpuMs / total * 100).toFixed(1)}%` : ''}\n单击：看此组结束时的画面 · 双击 / ▾：展开折叠`;
-    if (!filtered && !this.open.has(pass.path)) { node.classList.add('closed'); caret.textContent = '▸'; }
+    node.classList.toggle('closed', !expanded);
     if (this.selectedPass === pass.id) row.classList.add('on');
     const kids = this.El('div', '', 'kids'); node.append(row, kids);
     return node;
   }
-  BuildTree() {
+  BuildTree(keepSelectionInView = false) {
     const capture = this.debugger.capture; if (!capture || !this.debugger.frozen) return;
     const root = this.ui.events, scroll = root.scrollTop, fragment = this.doc.createDocumentFragment();
     this.maxEventGpu = Math.max(1e-6, ...capture.events.map(event => event.gpuMs || 0));
@@ -359,12 +917,14 @@ export class FrameDebuggerEditor {
     }
     root.replaceChildren(fragment);
     if (!shown && !root.childElementCount) root.append(this.El('div', '没有匹配的事件', 'empty'));
-    this.ui.treeInfo.textContent = this.filter ? `${shown} 项匹配` : '';
+    this.ui.treeInfo.textContent = this.filter ? `${shown} 项匹配` : '名称';
     root.scrollTop = scroll;
-    this.MarkSelection(false);
+    this.MarkSelection(keepSelectionInView);
   }
   Toggle(node, open = node.classList.contains('closed')) {
-    node.classList.toggle('closed', !open); node.querySelector(':scope>.row .caret').textContent = open ? '▾' : '▸';
+    node.classList.toggle('closed', !open);
+    const caret = node.querySelector(':scope>.row .caret');
+    caret.setAttribute('aria-label', open ? '折叠' : '展开'); caret.setAttribute('aria-expanded', open);
     if (open) this.open.add(node.dataset.path); else this.open.delete(node.dataset.path);
   }
   TreeClick(event) {
@@ -399,12 +959,14 @@ export class FrameDebuggerEditor {
     const event = this.debugger._events[this.debugger.selected]; if (!event) return;
     const ui = this.ui;
     ui.scrubber.max = this.debugger._events.length - 1; ui.scrubber.value = event.index;
+    ui.scrubber.style.setProperty('--position', `${event.index / Math.max(1, Number(ui.scrubber.max)) * 100}%`);
     ui.index.max = this.debugger._events.length; ui.index.value = event.index + 1; ui.count.textContent = `/ ${this.debugger._events.length}`;
     ui.previous.disabled = event.index === 0; ui.next.disabled = event.index === this.debugger._events.length - 1;
     const previous = ui.attachment.selectedOptions[0]?.dataset.name;
     ui.attachment.replaceChildren();
     event._target.attachments.forEach((attachment, i) => {
-      const option = this.El('option', `${attachment.name} · ${EnumName(this.debugger.gl, attachment.format)} · ${attachment.width}×${attachment.height}`);
+      const option = this.El('option', attachment.name);
+      option.title = `${EnumName(this.debugger.gl, attachment.format)} · ${attachment.width} × ${attachment.height}`;
       option.value = i; option.dataset.name = attachment.name; option.disabled = attachment.stencil; ui.attachment.append(option);
     });
     const matching = event._target.attachments.findIndex(attachment => attachment.name === previous && !attachment.stencil);
@@ -424,7 +986,9 @@ export class FrameDebuggerEditor {
   Header(event) {
     if (!event) return;
     const ui = this.ui, capture = this.debugger.capture, pass = this.selectedPass != null ? capture.passes[this.selectedPass] : null;
-    ui.selected.textContent = pass ? pass.name : `#${event.index + 1} · ${event.draw ? event.label : `${event.kind} ${event.label}`}`.trim();
+    ui.eventId.hidden = !!pass; ui.eventId.textContent = `#${event.index + 1}`;
+    ui.selected.textContent = pass?.name ?? (event.draw ? event.label : `${event.kind} ${event.label}`.trim());
+    ui.selected.title = ui.selected.textContent;
     ui.crumbs.replaceChildren();
     const chain = [];
     for (let id = pass ? pass.parent : event.pass; id != null; id = capture.passes[id].parent) chain.unshift(capture.passes[id]);
@@ -433,29 +997,21 @@ export class FrameDebuggerEditor {
       const button = this.El('button', row.name); button.title = `选中 ${row.path}（跳到其最后一个事件）`; button.onclick = () => this.Select(row.last, row.id); ui.crumbs.append(button);
     });
     if (chain.length) ui.crumbs.append(this.El('span', '→'));
-    ui.crumbs.append(this.El('span', event.target));
+    const targetName = this.El('span', event.target); targetName.title = event.target; ui.crumbs.append(targetName);
     const Chip = (label, value, hot = false) => { const chip = this.El('span', '', `chip${hot ? ' hot' : ''}`); chip.append(this.El('span', label, 'muted'), this.El('b', value)); return chip; };
     const target = pass || event, share = capture.gpuMs && target.gpuMs != null ? target.gpuMs / capture.gpuMs : 0;
-    ui.chips.replaceChildren(Chip(this.host.preview ? 'GPU ≈' : 'GPU', `${Ms(target.gpuMs)} ms${share ? ` · ${(share * 100).toFixed(1)}%` : ''}`, share > 0.05), Chip('CPU', `${Ms(target.cpuMs)} ms`));
-    if (pass) ui.chips.append(Chip('DC', Count(pass.draws)), Chip('事件', `#${pass.first + 1} – #${pass.last + 1}`));
-    else {
-      const info = event.drawInfo;
-      if (info) {
-        ui.chips.append(Chip(info.topology === 'TRIANGLES' ? 'Triangles' : 'Primitives', Count(Primitives(info))));
-        const instances = info.parts.reduce((sum, part) => sum + part.instances, 0);
-        if (instances > info.parts.length) ui.chips.append(Chip('Instances', Count(instances)));
-        if (info.batch) ui.chips.append(Chip('Sub-draws', Count(info.subDraws)));
-      }
-      if (event.shaderName || event.details?.shader) ui.chips.append(Chip('Shader', event.shaderName || event.details.shader));
-      if (event.batchCause) ui.chips.append(Chip('Batch', event.batchCause));
-    }
+    const gpu = Chip(this.host.preview ? 'GPU ms ≈' : 'GPU ms', Ms(target.gpuMs), true);
+    if (share) gpu.title = `占帧 GPU 耗时 ${(share * 100).toFixed(1)}%`;
+    ui.chips.replaceChildren(Chip('CPU ms', Ms(target.cpuMs)), gpu);
+    if (pass) ui.chips.prepend(Chip('DC', Count(pass.draws)));
+    else if (event.drawInfo) ui.chips.prepend(Chip(event.drawInfo.topology === 'TRIANGLES' ? '三角形' : '图元', Count(Primitives(event.drawInfo))));
   }
   Locate() {
     const event = this.debugger._events[this.debugger.selected], ref = event?._object;
     if (!ref) { this.ui.previewError.textContent = '此事件没有 three.js 源对象（Clear / Blit / 原始 GL 调用）。'; return; }
     console.info('[Frame Debugger] Captured source object', ref.object, ref.geometry, ref.material);
     this.debugger.selection = { object: ref.object, geometry: ref.geometry, material: ref.material };
-    this.ui.previewError.textContent = `源对象：${event.details.path} · 已存入 Tengxian.FrameDebugger.selection，可在游戏窗口控制台检查。`;
+    this.ui.previewError.textContent = '已在游戏控制台定位对象';
   }
   // ---------------------------------------------------------------- preview
   UpdatePreviewModes(event) {
@@ -475,8 +1031,9 @@ export class FrameDebuggerEditor {
       button.disabled = !canAdjust || scalar;
       button.classList.toggle('on', active); button.setAttribute('aria-pressed', active);
     }
-    ui.channel.hidden = ui.black.closest('label').hidden = ui.exposure.closest('label').hidden = view === 'mesh' && !!event;
-    ui.black.disabled = ui.white.disabled = ui.exposure.disabled = !canAdjust;
+    ui.channel.hidden = !canAdjust || !!scalar;
+    ui.adjustments.hidden = !canAdjust;
+    if (!canAdjust) ui.adjustments.open = false;
     ui.attachment.hidden = !output && !!event; ui.attachment.disabled = !attachment;
     ui.zoom.disabled = !canAdjust;
     ui.locate.disabled = !event?._object;
@@ -488,9 +1045,10 @@ export class FrameDebuggerEditor {
     const index = this.debugger.selected, event = this.debugger._events[index];
     const view = this.view, isMesh = view === 'mesh';
     this.UpdatePreviewModes(event);
-    ui.output.width = ui.output.height = 1; ui.png.disabled = true; this.previewSource = null;
+    ui.output.width = ui.output.height = 1; ui.output.classList.add('emptyImage'); ui.png.disabled = true; this.previewSource = null;
     ui.pixel.hidden = ui.previewLabel.hidden = true;
     ui.output.style.display = isMesh ? 'none' : ''; ui.mesh.style.display = isMesh ? 'block' : 'none'; ui.meshControls.hidden = !isMesh;
+    ui.preview.classList.toggle('zoom', !isMesh && ui.zoom.getAttribute('aria-pressed') === 'true');
     ui.wireframe.disabled = ui.meshMode.value === 'uvLayout';
     ui.morph.closest('label').hidden = ui.meshMode.value !== 'blendshapes';
     const options = { channel: this.channel, black: Number(ui.black.value), white: Number(ui.white.value), exposure: Number(ui.exposure.value) };
@@ -517,6 +1075,7 @@ export class FrameDebuggerEditor {
         ui.previewLabel.hidden = false; ui.png.disabled = false;
       } else if (shown) {
         ui.output.width = shown.width; ui.output.height = shown.height;
+        ui.output.classList.remove('emptyImage');
         ui.output.style.setProperty('--image-aspect', shown.width / shown.height);
         const context = ui.output.getContext('2d', { willReadFrequently: true }), data = context.createImageData(shown.width, shown.height); data.data.set(shown.pixels); context.putImageData(data, 0, 0);
         ui.png.disabled = false;
@@ -535,8 +1094,8 @@ export class FrameDebuggerEditor {
     const event = this.debugger._events[this.debugger.selected];
     try { this.pixelHistory = this.debugger.PixelHistory(at[0], at[1], { event: event.index, attachment: Number(this.ui.attachment.value) || 0 }); }
     catch (error) { this.ui.previewError.textContent = String(error.message || error); return; }
-    this.folds.set('pixel', true); this.Properties(event); this.lastRevision = this.debugger.revision;
-    this.ui.properties.scrollIntoView({ block: 'start' });
+    this.folds.set('pixel', true); this.propertyView = 'details'; this.Properties(event); this.lastRevision = this.debugger.revision;
+    this.ui.properties.scrollTop = 0;
   }
   PixelHistoryFold(root) {
     const history = this.pixelHistory, Value = value => { const span = this.El('span'); span.append(this.Swatch(value), this.El('span', `(${value.map(Num).join(', ')})`)); return span; };
@@ -553,7 +1112,6 @@ export class FrameDebuggerEditor {
           const link = this.El('a', `${item.kind} ${item.label}`); link.href = '#'; link.onclick = click => { click.preventDefault(); this.Select(item.index); };
           return [String(item.index + 1), link, item.path, Value(item.value), item.changed ? '改写' : '未变'];
         }));
-        content.append(this.El('div', '原始值是附件里的真实数据（HDR 不截断，深度 0–1，sRGB 靶为线性）；与 Tengxian.FrameDebug.PixelHistory 同一份。', 'muted'));
       };
       box.onchange = () => { this.pixelHistoryAll = box.checked; Draw(); };
       Draw();
@@ -571,7 +1129,7 @@ export class FrameDebuggerEditor {
     const event = this.debugger._events[this.debugger.selected], texture = event.textures[binding];
     this.textureView = { binding, index: event.index, uniform: texture.uniform, arrayIndex: texture.arrayIndex };
     this.view = 'texture';
-    this.DrawPreview(); this.ui.preview.scrollIntoView({ block: 'nearest' });
+    this.DrawPreview();
   }
   // ---------------------------------------------------------------- properties
   Fold(root, key, title, count, Build, open = false) {
@@ -647,14 +1205,36 @@ export class FrameDebuggerEditor {
   }
   Plain(value) { return value instanceof this.win.Node ? value.textContent : value; }
   Properties(event) {
-    const root = this.ui.properties; root.replaceChildren();
-    const d = event.details, capture = this.debugger.capture, gl = this.debugger.gl, pass = this.selectedPass != null ? capture.passes[this.selectedPass] : null;
-    const program = capture.programs[event.programId];
+    const scrollTop = this.propertyEvent === event ? this.ui.properties.scrollTop : 0;
+    this.propertyEvent = event;
+    this.propertyBuilders = {
+      details: root => this.DetailProperties(root, event),
+      shader: event.draw ? root => this.ShaderProperties(root, event) : null,
+      raw: root => this.RawJson(root, event),
+    };
+    this.ShowProperties(this.propertyView);
+    this.ui.properties.scrollTop = scrollTop;
+  }
+  ShowProperties(view) {
+    const ui = this.ui, builders = this.propertyBuilders;
+    this.propertyView = builders?.[view] ? view : 'details';
+    for (const button of ui.propertyTabs.children) {
+      const value = button.dataset.value, active = value === this.propertyView;
+      button.disabled = !builders?.[value];
+      button.classList.toggle('on', active); button.setAttribute('aria-pressed', active);
+    }
+    ui.properties.replaceChildren();
+    builders?.[this.propertyView]?.(ui.properties);
+    ui.properties.scrollTop = 0;
+  }
+  DetailProperties(root, event) {
+    const d = event.details, capture = this.debugger.capture, gl = this.debugger.gl;
+    const pass = this.selectedPass != null ? capture.passes[this.selectedPass] : null;
     if (this.pixelHistory) this.PixelHistoryFold(root);
     if (pass) this.Fold(root, 'group', '分组统计', null, body => {
       const cards = this.El('div', '', 'cards'); body.append(cards);
-      this.Card(cards, 'Group', [['路径', pass.path], ['类型', pass.viewport ? '视口' : pass.synthetic ? `捕获器归并（${pass.synthetic}）` : '游戏 Pass'], ['事件', `#${pass.first + 1} – #${pass.last + 1}`],
-        ['Draw calls', Count(pass.draws)], ['CPU', `${Ms(pass.cpuMs)} ms`], ['GPU', `${Ms(pass.gpuMs)} ms`], [this.host.preview ? '渲染事件' : 'GL 命令', `${Count(pass.commandEnd - pass.commandStart)}`]]);
+      this.Card(cards, '分组', [['路径', pass.path], ['类型', pass.viewport ? '视口' : pass.synthetic ?? 'Pass'], ['事件', `#${pass.first + 1} – #${pass.last + 1}`],
+        ['Draw Calls', Count(pass.draws)], ['CPU', `${Ms(pass.cpuMs)} ms`], ['GPU', `${Ms(pass.gpuMs)} ms`], [this.host.preview ? '渲染事件' : 'GL 命令', Count(pass.commandEnd - pass.commandStart)]]);
       const top = capture.events.slice(pass.first, pass.last + 1).filter(item => item.draw && item.gpuMs != null).sort((a, b) => b.gpuMs - a.gpuMs).slice(0, 8);
       if (top.length) {
         const card = this.El('div', '', 'card'); card.append(this.El('h3', '最耗 GPU 的 DC'));
@@ -662,52 +1242,52 @@ export class FrameDebuggerEditor {
         cards.append(card);
       }
     });
-    this.Fold(root, 'details', 'Details', null, body => {
-      const cards = this.El('div', '', 'cards'); body.append(cards);
-      this.Card(cards, 'Event', [['事件', `#${event.index + 1} / ${capture.events.length}`], ['类型', event.kind], ['API', ApiCall(this.debugger.gl, event)],
-        ['Pass', event.path], ['CPU', `${Ms(event.cpuMs)} ms`, event.draw && event.cpuMs !== event.cpuSubmitMs ? `GL 提交 ${Ms(event.cpuSubmitMs)} ms` : ''],
-        [this.host.preview ? 'GPU ≈' : 'GPU', `${Ms(event.gpuMs)} ms`],
-        ['Batch cause', event.batchCause ?? undefined]]);
-      if (event.drawInfo) {
-        const info = event.drawInfo, primitives = Primitives(info);
-        this.Card(cards, 'Draw', [['Topology', info.topology], ['Indexed', info.indexed ? `Yes · ${info.indexType}` : 'No'], ['Elements', Count(info.elements)],
-          ['Primitives', Count(Math.round(primitives))], ['Instances', Count(info.parts.reduce((sum, part) => sum + part.instances, 0))], ['Sub-draws', info.batch ? Count(info.subDraws) : undefined],
-          ['合并几何块', info.geometryBatches ? Count(info.geometryBatches) : undefined],
-          ['Vertices (buffer)', d ? Count(d.vertices) : undefined], ['Indices (buffer)', d?.indices ? Count(d.indices) : undefined],
-          ['Draw range', d ? `${d.drawRange.start}, ${d.drawRange.count === Infinity ? '∞' : d.drawRange.count}` : undefined],
-          ['Group', d?.group ? `start ${d.group.start} · count ${d.group.count} · material ${d.group.materialIndex}` : undefined]]);
-        if (info.parts.length > 1) {
-          const card = this.El('div', '', 'card'); card.append(this.El('h3', `Sub-draws (${info.parts.length})`));
-          this.Table(card, ['#', info.indexed ? 'Offset bytes' : 'First', 'Count', 'Instances'], info.parts.slice(0, 256).map((part, i) => [String(i), Count(info.indexed ? part.offsetBytes : part.first), Count(part.count), Count(part.instances)]));
-          cards.append(card);
-        }
+    const cards = this.El('div', '', 'cards detailContent'); root.append(cards);
+    this.Card(cards, '事件', [['类型', event.kind], ['API', ApiCall(gl, event)],
+      ['Pass', event.path], ['CPU', `${Ms(event.cpuMs)} ms`, event.draw && event.cpuMs !== event.cpuSubmitMs ? `GL 提交 ${Ms(event.cpuSubmitMs)} ms` : ''],
+      [this.host.preview ? 'GPU ≈' : 'GPU', `${Ms(event.gpuMs)} ms`],
+      ['Batch cause', event.batchCause ?? undefined]]);
+    if (event.drawInfo) {
+      const info = event.drawInfo, primitives = Primitives(info);
+      this.Card(cards, '绘制', [['拓扑', info.topology], ['索引类型', info.indexed ? info.indexType : '—'], ['元素', Count(info.elements)],
+        ['图元', Count(Math.round(primitives))], ['实例', Count(info.parts.reduce((sum, part) => sum + part.instances, 0))], ['子绘制', info.batch ? Count(info.subDraws) : undefined],
+        ['合并几何块', info.geometryBatches ? Count(info.geometryBatches) : undefined],
+        ['Vertices (buffer)', d ? Count(d.vertices) : undefined], ['Indices (buffer)', d?.indices ? Count(d.indices) : undefined],
+        ['Draw range', d ? `${d.drawRange.start}, ${d.drawRange.count === Infinity ? '∞' : d.drawRange.count}` : undefined],
+        ['Group', d?.group ? `start ${d.group.start} · count ${d.group.count} · material ${d.group.materialIndex}` : undefined]]);
+      if (info.parts.length > 1) {
+        const card = this.El('div', '', 'card'); card.append(this.El('h3', `Sub-draws (${info.parts.length})`));
+        this.Table(card, ['#', info.indexed ? 'Offset bytes' : 'First', 'Count', 'Instances'], info.parts.slice(0, 256).map((part, i) => [String(i), Count(info.indexed ? part.offsetBytes : part.first), Count(part.count), Count(part.instances)]));
+        cards.append(card);
       }
-      if (d) {
-        const path = this.El('span'); path.append(this.El('span', d.path));
-        const copy = this.El('button', '复制'); copy.style.cssText = 'min-height:0;padding:0 6px;margin-left:6px;font-size:10.5px'; copy.onclick = () => this.win.navigator.clipboard?.writeText(d.path); path.append(copy);
-        const flags = d.materialFlags;
-        this.Card(cards, 'Mesh / Object', [['显示名', d.name, `来自 ${d.nameSource}`], ['Object', `${d.object} · ${d.objectType} #${d.objectId}`], ['层级路径', path],
-          ['Geometry', `${d.geometry} · ${d.geometryType} #${d.geometryId}`], ['Material', `${d.material} · ${d.shader} #${d.materialId}`],
-          ['Shader', event.shaderName || d.shader, event.shaderName ? 'SHADER_NAME' : 'material.type'], ['Camera', d.camera], ['渲染队列', `${d.phase} · renderOrder ${d.renderOrder}`],
-          ['Material flags', flags ? `${flags.transparent ? 'Transparent' : 'Opaque'} · ${flags.side} · Blending ${THREE_NAMES.blending.get(flags.blending) ?? flags.blending} · depthTest ${flags.depthTest ? 'On' : 'Off'} · depthWrite ${flags.depthWrite ? 'On' : 'Off'}${flags.alphaTest ? ` · alphaTest ${Num(flags.alphaTest)}` : ''}${flags.opacity !== 1 ? ` · opacity ${Num(flags.opacity)}` : ''}` : undefined],
-          ['Shadows', `cast ${d.castShadow ? 'On' : 'Off'} · receive ${d.receiveShadow ? 'On' : 'Off'} · frustumCulled ${d.frustumCulled ? 'On' : 'Off'}`],
-          ['Instances (object)', d.instances > 1 ? Count(d.instances) : undefined], ['Source', d.source ?? undefined]]);
-      } else if (event.draw && (event._geometry || event.shaderName)) {
-        this.Card(cards, 'Mesh / Shader', [['网格', event._geometry?.name], ['Shader', event.shaderName ?? undefined]]);
-      }
-      if (event.api === 'clearBufferfv' && this.host.preview) {
-        this.Card(cards, 'Clear', [['附件', event.label], ['值', event.args[2].map(Num).join(', ')]]);
-      } else if (event.kind === 'Clear' && event.state) {
-        const s = event.state, color = this.El('span'); color.append(this.Swatch(s.COLOR_CLEAR_VALUE), this.El('span', `(${s.COLOR_CLEAR_VALUE.map(Num).join(', ')})`));
-        this.Card(cards, 'Clear', [['Buffers', event.label.replace(/[()]/g, '')], ['Color', color], ['Depth', Num(s.DEPTH_CLEAR_VALUE)], ['Stencil', String(s.STENCIL_CLEAR_VALUE)]]);
-      }
-      const target = event._target, card = this.Card(cards, 'Render Target', [['RenderTarget', target.name], ['Size', `${target.width} × ${target.height}`],
-        ['Initial action', target.initialAction ?? undefined]]);
-      this.Table(card, ['Attachment', 'Format', 'Size', 'MSAA', 'Level/Face/Layer'], target.attachments.map(attachment => [attachment.name, String(EnumName(gl, attachment.format)),
-        `${attachment.width}×${attachment.height}`, attachment.samples ? `×${attachment.samples}` : 'Off', `${attachment.level || 0} / ${attachment.face ? EnumName(gl, attachment.face) : 0} / ${attachment.layer || 0}`]));
-      if (event.state) this.Card(cards, 'Render State', RenderStateRows(event.state, Num));
-    }, true);
-    if (!event.draw) { this.RawJson(root, event); return; }
+    }
+    if (d) {
+      const path = this.El('span'); path.append(this.El('span', d.path));
+      const copy = this.El('button', '复制', 'copyAction'); copy.onclick = () => this.win.navigator.clipboard?.writeText(d.path); path.append(copy);
+      const flags = d.materialFlags;
+      this.Card(cards, '网格与对象', [['显示名', d.name, `来自 ${d.nameSource}`], ['Object', `${d.object} · ${d.objectType} #${d.objectId}`], ['层级路径', path],
+        ['Geometry', `${d.geometry} · ${d.geometryType} #${d.geometryId}`], ['Material', `${d.material} · ${d.shader} #${d.materialId}`],
+        ['Shader', event.shaderName || d.shader, event.shaderName ? 'SHADER_NAME' : 'material.type'], ['Camera', d.camera], ['渲染队列', `${d.phase} · renderOrder ${d.renderOrder}`],
+        ['Material flags', flags ? `${flags.transparent ? 'Transparent' : 'Opaque'} · ${flags.side} · Blending ${THREE_NAMES.blending.get(flags.blending) ?? flags.blending} · depthTest ${flags.depthTest ? 'On' : 'Off'} · depthWrite ${flags.depthWrite ? 'On' : 'Off'}${flags.alphaTest ? ` · alphaTest ${Num(flags.alphaTest)}` : ''}${flags.opacity !== 1 ? ` · opacity ${Num(flags.opacity)}` : ''}` : undefined],
+        ['Shadows', `cast ${d.castShadow ? 'On' : 'Off'} · receive ${d.receiveShadow ? 'On' : 'Off'} · frustumCulled ${d.frustumCulled ? 'On' : 'Off'}`],
+        ['Instances (object)', d.instances > 1 ? Count(d.instances) : undefined], ['Source', d.source ?? undefined]]);
+    } else if (event.draw && (event._geometry || event.shaderName)) {
+      this.Card(cards, '网格与程序', [['网格', event._geometry?.name], ['Shader', event.shaderName ?? undefined]]);
+    }
+    if (event.api === 'clearBufferfv' && this.host.preview) {
+      this.Card(cards, 'Clear', [['附件', event.label], ['值', event.args[2].map(Num).join(', ')]]);
+    } else if (event.kind === 'Clear' && event.state) {
+      const s = event.state, color = this.El('span'); color.append(this.Swatch(s.COLOR_CLEAR_VALUE), this.El('span', `(${s.COLOR_CLEAR_VALUE.map(Num).join(', ')})`));
+      this.Card(cards, 'Clear', [['Buffers', event.label.replace(/[()]/g, '')], ['Color', color], ['Depth', Num(s.DEPTH_CLEAR_VALUE)], ['Stencil', String(s.STENCIL_CLEAR_VALUE)]]);
+    }
+    const target = event._target, card = this.Card(cards, '渲染目标', [['名称', target.name], ['尺寸', `${target.width} × ${target.height}`],
+      ['Initial action', target.initialAction ?? undefined]]);
+    this.Table(card, ['Attachment', 'Format', 'Size', 'MSAA', 'Level/Face/Layer'], target.attachments.map(attachment => [attachment.name, String(EnumName(gl, attachment.format)),
+      `${attachment.width}×${attachment.height}`, attachment.samples ? `×${attachment.samples}` : 'Off', `${attachment.level || 0} / ${attachment.face ? EnumName(gl, attachment.face) : 0} / ${attachment.layer || 0}`]));
+    if (event.state) this.Card(cards, '渲染状态', RenderStateRows(event.state, Num));
+  }
+  ShaderProperties(root, event) {
+    const d = event.details, program = this.debugger.capture.programs[event.programId];
     const defines = new Map();
     for (const source of program?.sources || []) for (const match of source.source?.matchAll(/^\s*#define\s+(\w+)(?:[ \t]+(.+))?$/gm) || []) {
       const entry = defines.get(match[1]) || { value: (match[2] || '').trim(), stages: new Set() }; entry.stages.add(source.stage[0]); defines.set(match[1], entry);
@@ -743,14 +1323,13 @@ export class FrameDebuggerEditor {
     const blocks = event.blocks || [];
     this.Fold(root, 'constantBuffers', 'Constant Buffers', blocks.length, body =>
       this.Table(body, ['Block', 'Binding', 'Bytes'], blocks.map(block => [block.name, String(block.binding), Count(block.bytes)])));
-    this.Fold(root, 'shader', 'Shader', program?.sources.length ?? 0, body => {
+    this.Fold(root, 'shader', 'GLSL 源码', program?.sources.length ?? 0, body => {
       for (const source of program?.sources || []) {
         const lines = (source.source || '').split('\n'), header = this.El('h4', `${source.stage} shader`);
-        const copy = this.El('button', '复制'); copy.style.cssText = 'min-height:0;padding:0 6px;font-size:10.5px;margin-left:auto'; copy.onclick = () => this.win.navigator.clipboard?.writeText(source.source || ''); header.append(copy);
+        const copy = this.El('button', '复制', 'copyAction'); copy.onclick = () => this.win.navigator.clipboard?.writeText(source.source || ''); header.append(copy);
         body.append(header, this.Code(lines));
       }
     });
-    this.RawJson(root, event);
   }
   Keyword(name, value, stage) {
     const chip = this.El('span', name, `kw${stage === 'V' ? ' v' : stage === 'F' ? ' f' : ''}`);
@@ -822,10 +1401,8 @@ export class FrameDebuggerEditor {
     box.append(numbers, source); return box;
   }
   RawJson(root, event) {
-    this.Fold(root, 'raw', 'Raw JSON', null, body => {
-      const { _target, _object, _geometry, _textureHandles, textures, uniforms, ...rest } = event;
-      body.append(this.El('pre', JSON.stringify({ ...rest, uniforms: uniforms.length, textures: textures?.map(({ _handle, ...texture }) => texture) }, null, 2), 'json'));
-    });
+    const { _target, _object, _geometry, _textureHandles, textures, uniforms, ...rest } = event;
+    root.append(this.El('pre', JSON.stringify({ ...rest, uniforms: uniforms.length, textures: textures?.map(({ _handle, ...texture }) => texture) }, null, 2), 'json detailContent'));
   }
   Download(blob, name) {
     const url = URL.createObjectURL(blob), link = this.El('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
