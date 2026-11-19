@@ -2,6 +2,7 @@
 // on 2026-11-13. Small cells refine height detail, and flat cells stop early.
 // Curved banks refine to 25 cm for close views and share height-field normals.
 export const FLOW_RENDERING = {
+  terrainPatchSizeM: 8,
   terrainCellPixels: 40,
   terrainPaintCellPixels: 32,
   terrainFlatHeightPixels: 2,

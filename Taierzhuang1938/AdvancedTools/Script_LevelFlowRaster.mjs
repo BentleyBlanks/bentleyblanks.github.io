@@ -33,17 +33,19 @@ export class EncounterRaster {
     this.gpuLength=0;this.worldLength=0;this.accelerated=!!this.gpu&&!this.gpu.gl.isContextLost();
     this.resident=false;this.worldBatches=[];
     this.triangles=0;
-    this.sparseDepth=false;this.fullDepthReady=true;this.depthSampleCount=0;
+    this.sparseDepth=false;this.fullDepthReady=true;this.depthSampleCount=0;this.pendingDepthDraw=null;
     this.depthTiles.fill(0);
     // The GPU overwrites every depth pixel; software colors are unused until
     // fallback. Avoid clearing two full-resolution CPU surfaces per pane.
     if(!this.accelerated) {this.depth.fill(Infinity);this.image.data.fill(0);}
   }
 
-  CollectDepthSamples(draw) {
+  CollectDepthSamples(draw,afterSceneSubmit=false) {
     if(!this.accelerated) return;
     if(!this.sparseDepth) this.fullDepthReady=false;
-    this.sparseDepth=true;this.collectingDepth=true;
+    this.sparseDepth=true;
+    if(afterSceneSubmit) {this.pendingDepthDraw=draw;return;}
+    this.collectingDepth=true;
     try {draw();} finally {this.collectingDepth=false;}
   }
 

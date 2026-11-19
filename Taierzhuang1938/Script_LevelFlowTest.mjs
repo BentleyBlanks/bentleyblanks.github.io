@@ -1367,6 +1367,36 @@ while(bankCell.children&&bankCell.size>8) bankCell=bankCell.children.find(cell=>
 const partialBankError=terrain.heightErrorForCell(bankCell,0),completeBankError=terrain.heightErrorForCell(bankCell);
 assert.ok(completeBankError>=partialBankError&&completeBankError<=bankCell.heightError+1e-8,
   "threshold queries resume to the measured source error without accumulating LOD deviations");
+// A differently tessellated neighbour must meet the cached bank mesh at the
+// same heights, including fine samples between the coarse cell's two corners.
+const bankPatch=terrain.selectTerrainPatch(bankCell,0.01);
+assert.ok(bankPatch.perimeter?.length>0);
+assert.equal(terrain.selectTerrainPatch(bankCell,0.01001),bankPatch,"nearby camera depths reuse the resident bank mesh");
+const edgeX=bankCell.x+bankCell.size,edgeZ=bankCell.z;
+const ContainsEdge=cell=>edgeX>=cell.x&&edgeX<cell.x+cell.size&&edgeZ>=cell.z&&edgeZ<cell.z+cell.size;
+let neighbour=terrain.roots.find(ContainsEdge);
+while(neighbour.children&&neighbour.size>bankCell.size) neighbour=neighbour.children.find(ContainsEdge);
+const seam=terrain.boundariesForCells([bankPatch,neighbour]);
+const neighbourMesh=terrain.packedFacesForCell(neighbour,true,seam);
+const bankMesh=terrain.packedTerrainPatch(bankPatch,seam);
+assert.equal(terrain.packedTerrainPatch(bankPatch,seam),bankMesh,"unchanged edges reuse packed vertices");
+function BankEdge(mesh) {
+  const heights=new Map();
+  for(let i=0;i<mesh.length;i+=9) if(mesh[i]===edgeX) heights.set(mesh[i+2],mesh[i+1]);
+  return [...heights].sort((a,b)=>a[0]-b[0]);
+}
+const bankEdge=BankEdge(bankMesh),neighbourEdge=BankEdge(neighbourMesh);
+assert.ok(bankEdge.length>=2&&neighbourEdge.length>=2);
+for(const [source,other] of [[bankEdge,neighbourEdge],[neighbourEdge,bankEdge]]) {
+  for(const [z,y] of source) {
+    if(z<edgeZ||z>edgeZ+bankCell.size) continue;
+    const index=other.findIndex(point=>point[0]>=z);
+    assert.ok(index>=0);
+    const [endZ,endY]=other[index],[startZ,startY]=other[Math.max(0,index-1)];
+    const height=endZ===z?endY:startY+(endY-startY)*(z-startZ)/(endZ-startZ);
+    assert.ok(Math.abs(y-height)<0.00001,"mixed detail levels retain the same bank edge");
+  }
+}
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
 assert.equal(OPENING_GUNFIRE_TIME, 78);
 assert.equal(OPENING_FRIENDLY_CRY_TIME, 104);

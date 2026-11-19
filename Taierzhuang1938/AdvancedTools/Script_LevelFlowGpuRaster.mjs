@@ -293,7 +293,8 @@ class GpuRaster {
     this.fullscreenVao=gl.createVertexArray();
     const settings=FLOW_RENDERING.lighting;
     this.shadowTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);
-    this.shadowSize=Math.min(settings.shadowMapSize,gl.getParameter(gl.MAX_TEXTURE_SIZE));
+    this.maxTextureSize=gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    this.shadowSize=Math.min(settings.shadowMapSize,this.maxTextureSize);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_MODE,gl.COMPARE_REF_TO_TEXTURE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_FUNC,gl.LEQUAL);
@@ -460,7 +461,19 @@ class GpuRaster {
     this.gl.drawElements(this.gl.TRIANGLES,this.residentWorld.count,this.gl.UNSIGNED_INT,0);
   }
 
-  SaveDepthSnapshot(raster) {
+  BindSceneTarget(raster) {
+    const gl=this.gl,target=this.target;
+    // Draw distance directly into this pane's picking texture. Other panes of
+    // the same size reuse the color targets but keep their own last depth.
+    const distance=raster.sparseDepth?this.DepthSnapshot(raster).texture:target.distance;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,target.framebuffer);
+    if(target.attachedDistance!==distance) {
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,distance,0);
+      target.attachedDistance=distance;
+    }
+  }
+
+  DepthSnapshot(raster) {
     const gl=this.gl;
     let snapshot=raster.depthSnapshot;
     if(!snapshot||snapshot.gl!==gl||snapshot.width!==raster.width||snapshot.height!==raster.height) {
@@ -471,13 +484,10 @@ class GpuRaster {
       gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,raster.width,raster.height,0,gl.RED,gl.FLOAT,null);
       gl.bindFramebuffer(gl.FRAMEBUFFER,snapshot.framebuffer);
       gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,snapshot.texture,0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);gl.bindTexture(gl.TEXTURE_2D,null);
       raster.depthSnapshot=snapshot;
     }
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.framebuffer);gl.readBuffer(gl.COLOR_ATTACHMENT1);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,snapshot.framebuffer);
-    gl.blitFramebuffer(0,0,raster.width,raster.height,0,0,raster.width,raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
+    return snapshot;
   }
 
   ReadFullDepth(raster) {
@@ -490,7 +500,7 @@ class GpuRaster {
     if(!raster.depthSampleCount) return;
     const gl=this.gl,width=FLOW_RENDERING.depthReadback.sampleWidth;
     const rows=Math.ceil(raster.depthSampleCount/width);
-    if(rows>gl.getParameter(gl.MAX_TEXTURE_SIZE)) {
+    if(rows>this.maxTextureSize) {
       this.ReadFullDepth(raster);raster.fullDepthReady=true;raster.depthSampleCount=0;return;
     }
     if(!this.depthSamples||this.depthSamples.height<rows) {
@@ -568,7 +578,7 @@ class GpuRaster {
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.aoFramebuffer);gl.disable(gl.DEPTH_TEST);
     gl.viewport(0,0,this.target.aoWidth,this.target.aoHeight);
     gl.useProgram(this.aoProgram);gl.bindVertexArray(this.fullscreenVao);
-    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance],[2,'sceneNormal',this.target.normal]]) {
+    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.attachedDistance],[2,'sceneNormal',this.target.normal]]) {
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoUniforms[name],unit);
     }
     gl.uniform2f(this.aoUniforms.size,raster.width,raster.height);
@@ -583,7 +593,7 @@ class GpuRaster {
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.shadedFramebuffer);
     gl.viewport(0,0,raster.width,raster.height);
     gl.useProgram(this.aoResolveProgram);
-    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.distance],[2,'aoMap',this.target.aoTexture]]) {
+    for(const [unit,name,texture] of [[0,'sceneColor',this.target.color],[1,'sceneDepth',this.target.attachedDistance],[2,'aoMap',this.target.aoTexture]]) {
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(this.aoResolveUniforms[name],unit);
     }
     gl.uniform2f(this.aoResolveUniforms.size,raster.width,raster.height);gl.uniform1f(this.aoResolveUniforms.farDepth,view.far);
@@ -602,7 +612,7 @@ class GpuRaster {
     this.residentWorld=this.PrepareResidentGeometry(raster);
     const lighting=raster.view?.lighting&&raster.shadowVertices;
     const shadowValues=lighting?this.DrawShadows(raster):null;
-    gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.viewport(0,0,raster.width,raster.height);
+    this.BindSceneTarget(raster);gl.viewport(0,0,raster.width,raster.height);
     gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);
     gl.clearBufferfv(gl.COLOR,0,new Float32Array(4));gl.clearBufferfv(gl.COLOR,1,new Float32Array([Infinity,0,0,0]));
     gl.clearBufferfv(gl.COLOR,2,new Float32Array(4));
@@ -639,7 +649,13 @@ class GpuRaster {
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
     if(raster.sparseDepth) {
-      this.SaveDepthSnapshot(raster);this.ReadDepthSamples(raster);
+      // Let the GPU render shadows and scene depth while the CPU projects the
+      // current frame's markers and collects the pixels they actually need.
+      if(raster.pendingDepthDraw) {
+        gl.flush();
+        raster.CollectDepthSamples(raster.pendingDepthDraw);raster.pendingDepthDraw=null;
+      }
+      this.ReadDepthSamples(raster);
       gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
     } else {
       gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);

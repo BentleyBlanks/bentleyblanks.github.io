@@ -262,11 +262,18 @@ export class FlowPerspectiveView extends FlowMapView {
     };
     const terrainCells=[];
     const terrainCamera=[0,0,0],objectPoint=[0,0,0],objectCamera=[0,0,0];
+    const terrain=this.mapData.terrain;
+    const usePatches=texturedTerrain&&!!terrain.selectTerrainPatch;
     const Visit=(cell)=>{
       const heightRange=cell.maxHeight-cell.minHeight,radius=cell.radius;
       const camera=this.CameraPoint(cell.center,terrainCamera);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
+      // Only batch fully visible patches. Keep culling individual cells at the frustum edge.
+      if(usePatches&&cell.size<=FLOW_RENDERING.terrainPatchSizeM&&SphereInView(camera,-radius)) {
+        terrainCells.push(terrain.selectTerrainPatch(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale));
+        return;
+      }
       let heightError=cell.heightError??heightRange;
       if(heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels&&this.mapData.terrain.heightErrorForCell) {
         heightError=this.mapData.terrain.heightErrorForCell(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale);
@@ -373,9 +380,11 @@ export class FlowPerspectiveView extends FlowMapView {
       coverBoxes=this.staticCoverBoxes;
     } else {
     for(const root of this.mapData.terrain.roots) Visit(root);
-    const terrainBoundaries=this.mapData.terrain.boundariesForCells?.(terrainCells,this.terrainBoundaries||{});
-    this.terrainBoundaries=terrainBoundaries;
-    for(const cell of terrainCells) DrawTerrainCell(cell,terrainBoundaries);
+    this.terrainBoundaries=terrain.boundariesForCells?.(terrainCells,this.terrainBoundaries||{});
+    for(const cell of terrainCells) {
+      if(cell.perimeter) this.raster.WorldBatch(terrain.packedTerrainPatch(cell,this.terrainBoundaries));
+      else DrawTerrainCell(cell,this.terrainBoundaries);
+    }
     this.terrainTriangles=this.raster.triangles;
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
@@ -469,14 +478,14 @@ export class FlowPerspectiveView extends FlowMapView {
     for (const actor of frame.actors.filter(item => item.carryingAmmo&&this.SolidInView(item))) {
       Box(actor.p[0],actor.p[1]+0.25,0.8,0.5,0.45,"#94774f",this.Ground(actor.p)+0.8,0);
     }
-    this.PrepareDepth(frame,layers,coverBoxes);
+    this.PrepareDepth(frame,layers,coverBoxes,true);
     this.raster.Flush(context,width,height);
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
     if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
   }
 
-  PrepareDepth(frame,layers,coverBoxes=[]) {
+  PrepareDepth(frame,layers,coverBoxes=[],afterSceneSubmit=false) {
     this.raster.CollectDepthSamples(()=>{
       this.DrawCoverBoxes(null,coverBoxes);
       for(const actor of frame.actors) {
@@ -487,8 +496,8 @@ export class FlowPerspectiveView extends FlowMapView {
       if(layers.fire) for(const effect of frame.effects) if(effect.kind==="fire") this.DrawFire(null,effect,frame);
       if(layers.landmarks!==false)this.DrawLandmarks(null,this.width,this.height);
       this.DrawWallWriting(null,frame);
-    });
-    this.occlusion.clear();
+      this.occlusion.clear();
+    },afterSceneSubmit);
     this.depthPreparedPass=this.depthPass;
   }
 

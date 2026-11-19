@@ -230,6 +230,14 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   };
   const roots=prepared?Array.from({length:prepared.rootCount},(_,index)=>RestoreNode(index)):[];
   if(!prepared) for(let z=-radius;z<radius;z+=256) for(let x=-radius;x<radius;x+=256) roots.push(Refine(x,z,256));
+  const VisitBoundaryPoints=(cell,visit,delta)=>{
+    if(cell.perimeter) {
+      for(const [x,z] of cell.perimeter) visit(x,z,delta);
+      return;
+    }
+    const {x,z,size}=cell;
+    visit(x,z,delta);visit(x+size,z,delta);visit(x+size,z+size,delta);visit(x,z+size,delta);
+  };
   const BoundariesForCells=(selected,state=null)=>{
     if(state) {
       if(!state.selected) Object.assign(state,{selected:new Set(),rowCounts:new Map(),columnCounts:new Map(),rows:new Map(),columns:new Map()});
@@ -237,23 +245,23 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const UpdateLine=(lines,dirty,key,value,delta)=>{
         let counts=lines.get(key);
         if(!counts) {counts=new Map();lines.set(key,counts);}
-        const count=(counts.get(value)||0)+delta;
+        const before=counts.get(value)||0,count=before+delta;
         if(count) counts.set(value,count);else counts.delete(value);
         if(!counts.size) lines.delete(key);
-        dirty.add(key);
+        if(!before||!count) dirty.add(key);
       };
-      const UpdateCell=(cell,delta)=>{
-        for(const [x,z] of [[cell.x,cell.z],[cell.x+cell.size,cell.z],
-          [cell.x+cell.size,cell.z+cell.size],[cell.x,cell.z+cell.size]]) {
-          UpdateLine(state.rowCounts,dirtyRows,z,x,delta);UpdateLine(state.columnCounts,dirtyColumns,x,z,delta);
-        }
+      const UpdatePoint=(x,z,delta)=>{
+        UpdateLine(state.rowCounts,dirtyRows,z,x,delta);UpdateLine(state.columnCounts,dirtyColumns,x,z,delta);
       };
-      for(const cell of state.selected) if(!next.has(cell)) UpdateCell(cell,-1);
-      for(const cell of next) if(!state.selected.has(cell)) UpdateCell(cell,1);
+      for(const cell of state.selected) if(!next.has(cell)) VisitBoundaryPoints(cell,UpdatePoint,-1);
+      for(const cell of next) if(!state.selected.has(cell)) VisitBoundaryPoints(cell,UpdatePoint,1);
       for(const [lines,counts,dirty] of [[state.rows,state.rowCounts,dirtyRows],[state.columns,state.columnCounts,dirtyColumns]]) {
         for(const key of dirty) {
           const values=counts.get(key);
-          if(values) lines.set(key,Float64Array.from(values.keys()).sort());else lines.delete(key);
+          if(!values) {lines.delete(key);continue;}
+          const previous=lines.get(key);
+          if(previous?.length===values.size&&previous.every(value=>values.has(value))) continue;
+          lines.set(key,Float64Array.from(values.keys()).sort());
         }
       }
       state.selected=next;return state;
@@ -263,10 +271,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       let row=rows.get(z);if(!row) {row=new Set();rows.set(z,row);}row.add(x);
       let column=columns.get(x);if(!column) {column=new Set();columns.set(x,column);}column.add(z);
     };
-    for(const cell of selected) {
-      Register(cell.x,cell.z);Register(cell.x+cell.size,cell.z);
-      Register(cell.x+cell.size,cell.z+cell.size);Register(cell.x,cell.z+cell.size);
-    }
+    for(const cell of selected) VisitBoundaryPoints(cell,Register);
     for(const lines of [rows,columns]) for(const [key,values] of lines) lines.set(key,Float64Array.from(values).sort());
     return {rows,columns};
   };
@@ -547,6 +552,61 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     record.packed=packed;
     return packed;
   };
+  // Cache the selection within a small patch. Publish only its perimeter to
+  // neighbouring patches; interior vertices never participate in their seams.
+  const patchCache=new WeakMap();
+  const SelectTerrainPatch=(root,heightLimit)=>{
+    if(!root.children||root.heightError<=heightLimit||HeightErrorForCell(root,heightLimit)<=heightLimit) return root;
+    const band=Math.floor(Math.log2(heightLimit)*4);
+    let variants=patchCache.get(root);
+    if(!variants) {variants=new Map();patchCache.set(root,variants);}
+    if(variants.has(band)) return variants.get(band);
+    // Round toward finer geometry using the nearest depth of the whole patch.
+    const limit=2**(band/4),cells=[];
+    const Select=cell=>{
+      if(cell.children&&cell.heightError>limit&&HeightErrorForCell(cell,limit)>limit) {
+        for(const child of cell.children) Select(child);
+      } else cells.push(cell);
+    };
+    Select(root);
+    const boundaries=BoundariesForCells(cells),{x,z,size}=root;
+    const perimeter=[];
+    for(const edgeZ of [z,z+size]) {
+      for(const edgeX of boundaries.rows.get(edgeZ)) perimeter.push([edgeX,edgeZ]);
+    }
+    for(const edgeX of [x,x+size]) {
+      for(const edgeZ of boundaries.columns.get(edgeX)) if(edgeZ!==z&&edgeZ!==z+size) perimeter.push([edgeX,edgeZ]);
+    }
+    const patch={x,z,size,cells,boundaries,perimeter,edgeLines:[],packed:null};
+    if(variants.size>=3) variants.delete(variants.keys().next().value);
+    variants.set(band,patch);
+    return patch;
+  };
+  const PackedTerrainPatch=(patch,visible)=>{
+    const {x,z,size,boundaries}=patch;
+    let rebuild=!patch.packed;
+    // Match the visible neighbour's actual edge. A change elsewhere on the
+    // same grid line must not invalidate this patch's resident vertex buffer.
+    for(let side=0;side<4;side++) {
+      const horizontal=side<2,axis=horizontal?"rows":"columns";
+      const at=(horizontal?z:x)+(side%2)*size,from=horizontal?x:z;
+      const line=visible[axis].get(at);
+      if(patch.edgeLines[side]===line) continue;
+      patch.edgeLines[side]=line;
+      const current=boundaries[axis].get(at);
+      const first=LowerBound(line,from),last=LowerBound(line,from+size+1e-8);
+      if(current.length===last-first&&current.every((v,i)=>v===line[first+i])) continue;
+      boundaries[axis].set(at,line.slice(first,last));
+      rebuild=true;
+    }
+    if(rebuild) {
+      const meshes=patch.cells.map(cell=>PackedFacesForCell(cell,true,boundaries));
+      patch.packed=new Float32Array(meshes.reduce((sum,mesh)=>sum+mesh.length,0));
+      let offset=0;
+      for(const mesh of meshes) {patch.packed.set(mesh,offset);offset+=mesh.length;}
+    }
+    return patch.packed;
+  };
   const PrepareSnapshot=(focus=[0,0])=>{
     if(prepared) return prepared;
     const all=[...roots],rootCount=roots.length,childIndices=[],indices=new WeakMap();
@@ -598,6 +658,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   let restoredCells;
   return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,
     heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,colorRangeForCell:ColorRangeForCell,
+    selectTerrainPatch:SelectTerrainPatch,packedTerrainPatch:PackedTerrainPatch,
     facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,prepareSnapshot:PrepareSnapshot,
     get cells(){return prepared?(restoredCells||=(Array.from(prepared.leafIds,RestoreNode))):cells;},
     leafCount:prepared?prepared.leafIds.length:cells.length,plan,source:scene.terrain.file,bounds};
