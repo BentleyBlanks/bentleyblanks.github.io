@@ -204,6 +204,7 @@ aside {
 .row:focus-visible { outline-offset: -2px; }
 .row .name {
   min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -211,7 +212,7 @@ aside {
 }
 .row .label, .row .sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .label { font-size: 13.5px; }
-.row .sub { flex: 0 1 auto; color: var(--dim); font-size: 12px; }
+.row .sub { flex: 1 1 0; color: var(--dim); font-size: 12px; }
 .row .num { padding-right: 9px; text-align: right; white-space: nowrap; color: var(--muted); font: 12.5px/1.3 var(--mono); }
 .row .idx { flex: 0 0 auto; min-width: 24px; color: var(--dim); text-align: right; font: 11.5px var(--mono); }
 .row.pass { min-height: 30px; font-weight: 650; background: #20242b; border-top: 1px solid var(--line-soft); }
