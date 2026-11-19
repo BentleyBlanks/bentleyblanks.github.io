@@ -448,9 +448,34 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     return vertices.get(key);
   };
   const surfaceColor=[198,207,169];
+  // The common four-corner case already has every height in its quadtree
+  // node. Build its native fan directly, including the exact diagonal merge.
+  const QuadMesh=cell=>{
+    const index=preparedMeshes.get(cell.nodeIndex);
+    if(index!==undefined) return {faces:null,packed:prepared.packedVertices.subarray(prepared.packedOffsets[index],prepared.packedOffsets[index+1])};
+    const {x,z,size,corners,centerHeight}=cell;
+    const points=[[x,corners[0],z],[x+size,corners[1],z],[x+size,corners[2],z+size],
+      [x,corners[3],z+size],[x+size/2,centerHeight,z+size/2]];
+    const normals=points.map(([px,,pz])=>NormalAt(px,pz));
+    let indices=[4,0,1,4,1,2,4,2,3,4,3,0];
+    for(const from of [0,1]) {
+      const to=from+2;
+      if(Math.abs(centerHeight-(corners[from]+corners[to])/2)>=1e-7) continue;
+      if(!normals[4].every((value,axis)=>Math.abs(value-(normals[from][axis]+normals[to][axis])/2)<1e-7)) continue;
+      indices=from===0?[0,1,2,0,2,3]:[0,1,3,1,2,3];break;
+    }
+    const packed=new Float32Array(indices.length*9);
+    for(let i=0;i<indices.length;i++) {
+      const vertex=indices[i],at=i*9;
+      packed.set(points[vertex],at);packed.set(surfaceColor,at+3);packed.set(normals[vertex],at+6);
+    }
+    return {faces:null,packed};
+  };
   const MeshForCell=(cell,boundaries=fullBoundaries,textured=false)=>{
     let cached=faceCache.get(cell);
     if(!cached) {cached={variants:new Map(),textured:null,shaded:null};faceCache.set(cell,cached);}
+    // The finest source grid has no possible intermediate edge vertices.
+    if(textured&&cell.size===FLOW_RENDERING.terrainDetailCellM) return cached.quad??=QuadMesh(cell);
     const previous=textured?cached.textured:cached.shaded;
     if(previous&&previous.segments[0].line===boundaries.rows.get(cell.z)
       &&previous.segments[1].line===boundaries.columns.get(cell.x+cell.size)
@@ -475,17 +500,16 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const from=side%2?cell.z:cell.x;
       return {line,start:LowerBound(line,from),end:LowerBound(line,from+cell.size+1e-8)};
     });
+    if(textured&&segments.every(segment=>segment.end-segment.start===2)) {
+      const record=cached.quad??=QuadMesh(cell);
+      cached.textured={segments,record};return record;
+    }
     const outline=OutlineForCell(cell,boundaries);
     const key=(textured?"T:":"S:")+outline.flat().join(",");
     const variants=cached.variants;
     if(variants.has(key)) {
       const record=variants.get(key);
       cached[textured?"textured":"shaded"]={segments,record};return record;
-    }
-    const preparedIndex=preparedMeshes.get(cell.nodeIndex);
-    if(textured&&outline.length===4&&preparedIndex!==undefined) {
-      const packed=prepared.packedVertices.subarray(prepared.packedOffsets[preparedIndex],prepared.packedOffsets[preparedIndex+1]);
-      const record={faces:null,packed};variants.set(key,record);cached.textured={segments,record};return record;
     }
     const triangles=[];
     const {x,z,size}=cell,maxX=x+size,maxZ=z+size;

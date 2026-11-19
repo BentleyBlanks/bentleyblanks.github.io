@@ -1397,6 +1397,14 @@ for(const [source,other] of [[bankEdge,neighbourEdge],[neighbourEdge,bankEdge]])
     assert.ok(Math.abs(y-height)<0.00001,"mixed detail levels retain the same bank edge");
   }
 }
+const curvedLeaf=terrain.cells.find(cell=>cell.size===FLOW_RENDERING.terrainDetailCellM&&
+  [0,1].every(i=>Math.abs(cell.centerHeight-(cell.corners[i]+cell.corners[i+2])/2)>0.001));
+assert.ok(curvedLeaf);
+const leafEdges=terrain.boundariesForCells([curvedLeaf]);
+const referenceVertices=terrain.facesForCell(curvedLeaf,leafEdges).flatMap(face=>
+  face.points.flatMap((point,i)=>[...point,198,207,169,...face.vertexNormals[i]]));
+assert.deepEqual(terrain.packedFacesForCell(curvedLeaf,true,leafEdges),new Float32Array(referenceVertices),
+  "direct quad packing retains native positions, triangle winding and smooth normals");
 const ActorAt=(id,time)=>EvaluateFlow(time).actors.find(actor=>actor.id===id);
 assert.equal(OPENING_GUNFIRE_TIME, 78);
 assert.equal(OPENING_FRIENDLY_CRY_TIME, 104);
