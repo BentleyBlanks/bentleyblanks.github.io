@@ -19,7 +19,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { FrameProfiler, RECORDING_FORMAT, IsLiveFrame, IsActiveFrame, SummarizeFrames, EstimateVsyncMs } from "./Script_Profiler.mjs";
-import { CpuRows, FormatSnapshot, FormatFrameTimeline, DecodeSamples } from "./Script_ProfilerReport.mjs";
+import { CpuRows, FormatSnapshot, FormatFrameTimeline, DecodeSamples, FrameHotspot } from "./Script_ProfilerReport.mjs";
 import { FoldTrace } from "./Script_ProfilerSampler.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +28,26 @@ const Check = (name, ok, detail = "") => {
   if (!ok) failed += 1;
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` (${detail})` : ""}`);
 };
+
+const viewport = "encounterViewport/视口 1";
+const legacyPreview = { id: 25, state: "editorPreview", cpuMs: 204, other: 1,
+  cpu: { encounterViewport: 203, [viewport]: 203 },
+  gpuCpu: { [`${viewport}/深度采样`]: 180 }, gpuTotal: 6.5 };
+const legacyHotspot = FrameHotspot(legacyPreview);
+Check("旧预览录制可定位已有的 GL 提交耗时",
+  legacyHotspot.thread === "CPU" && legacyHotspot.scope === `${viewport}/深度采样` && legacyHotspot.durationMs === 180);
+const preview = { ...legacyPreview, preview: { timeSeconds: 3 },
+  cpu: { ...legacyPreview.cpu, [`${viewport}/3D 底图`]: 200, [`${viewport}/3D 底图/gl.readPixels`]: 170 } };
+const previewHotspot = FrameHotspot(preview);
+Check("卡点使用独占 CPU 耗时，GPU 提交不叠加进新插桩",
+  previewHotspot.scope === `${viewport}/3D 底图/gl.readPixels` && previewHotspot.durationMs === 170);
+const previewRows = CpuRows(SummarizeFrames([preview]));
+Check("新预览 CPU 表保留插桩层级与自身耗时",
+  previewRows.some(row => row.key === `${viewport}/3D 底图|self` && row.self === 30)
+  && !previewRows.some(row => row.key === `${viewport}/深度采样`));
+const gpuHotspot = FrameHotspot({ ...preview, gpuTotal: 230, gpu: { main: 220, "main/opaque": 210 } });
+Check("GPU 更慢时显示 GPU 最热分段",
+  gpuHotspot.thread === "GPU" && gpuHotspot.scope === "main/opaque" && gpuHotspot.durationMs === 210);
 
 function FakeRenderer() {
   const info = {

@@ -843,6 +843,8 @@ export class FrameProfiler {
       loafAvailable: this.source ? this.source.loafAvailable : !!this._loafObserver,
       historyMax: this.historyMax,
       names: this.names.slice(),
+      sampleFields: ["nameId", "depth", "startMs", "durationMs"],
+      gpuSegmentFields: ["nameId", "startMs", "submitMs", "draws", "triangles"],
       // 第四版：计数器名表（与每帧 ctr 下标对齐）、环境、忙闲基准
       counters: this.source ? (this.source.counters || []) : this.CounterMeta(),
       environment: this.source ? (this.source.environment || null) : this.Environment(),
@@ -1296,7 +1298,7 @@ export class FrameProfiler {
     this._sampleCount += 1;
   }
 
-  EndFrame() {
+  EndFrame({ preview } = {}) {
     if (!this.recording) return;
     const cpuMs = performance.now() - this._frameStart;
     // GC / 分配速率（Chrome 系；别的浏览器 performance.memory 不存在，两项恒 0）
@@ -1367,6 +1369,7 @@ export class FrameProfiler {
       gap: this._gap,     // 暂停后的第一帧：间隔是暂停时长，不进帧率统计
       state: this._state,
       stage: this._stage,
+      ...(preview ? { preview } : {}),
       busy: this.busy > 0 ? Math.round(this.busy * 1000) / 1000 : null,
       pressure: this.pressure,
       rsMat: Pack(this.rsMat),

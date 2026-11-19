@@ -236,16 +236,21 @@ export class FlowPerspectiveView extends FlowMapView {
       ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
   DrawBase(context,width,height,frame,layers={},trace=null) {
+    const cpu=trace?.cpu;
     const perspective=this.type!=="oblique"||!!this.freeCamera;
     const renderScale=this.renderScale,near=this.near,far=this.far;
     const skyStart=trace?.capturing?performance.now():0;
+    cpu?.Begin("天空");
     ApplyEncounterSky(this.aim[2],this.frame.nightBlend||0);
     DrawEncounterSky(context,width,height,this);
+    cpu?.End();
     if(trace?.capturing) trace.Canvas("绘制天空",this.baseCanvas,skyStart);
+    cpu?.Begin("光栅准备");
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
     this.raster.view=this;
     this.raster.resident=this.raster.accelerated;
     this.raster.terrainSurface=this.raster.accelerated?this.mapData.terrain.surfaceMaps?.():null;
+    cpu?.End();
     const texturedTerrain=!!this.raster.terrainSurface;
     const projectionFrame=++this.projectionFrame;
     const TerrainVertex=(point,rgb)=>{
@@ -374,15 +379,18 @@ export class FlowPerspectiveView extends FlowMapView {
     const signals=EncounterSignals(frame);
     const shadowKey=JSON.stringify([...signals]);
     if(this.shadowKey!==shadowKey||this.shadowTerrain!==this.mapData.terrain||this.shadowObjects!==this.mapData.objects||this.shadowFarObjects!==this.mapData.farObjects) {
+      cpu?.Begin("阴影几何");
       this.shadowVertices=CachedEncounterShadows(this.mapData,signals,point=>this.Ground(point));
       this.shadowKey=shadowKey;this.shadowObjects=this.mapData.objects;this.shadowFarObjects=this.mapData.farObjects;
       this.shadowTerrain=this.mapData.terrain;
+      cpu?.End();
     }
     this.raster.shadowVertices=this.shadowVertices;
     const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.fov,near,far,renderScale,texturedTerrain,FLOW_RENDERING.skyBlend,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
     const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
     if(cached) {
+      cpu?.Begin("恢复静态缓存");
       if(this.raster.accelerated) {
         this.raster.worldBatches=this.staticWorldBatches;
         this.raster.worldVertices.set(this.staticWorldVertices.subarray(0,this.staticWorldLength));this.raster.worldLength=this.staticWorldLength;
@@ -390,14 +398,20 @@ export class FlowPerspectiveView extends FlowMapView {
       } else {this.raster.image.data.set(this.staticImage);this.raster.depth.set(this.staticDepth);}
       this.terrainTriangles=this.staticTerrainTriangles;this.raster.triangles=this.staticTriangles;
       coverBoxes=this.staticCoverBoxes;
+      cpu?.End();
     } else {
+    cpu?.Begin("地形选块与接缝");
     for(const root of this.mapData.terrain.roots) Visit(root);
     this.terrainBoundaries=terrain.boundariesForCells?.(terrainCells,this.terrainBoundaries||{});
+    cpu?.End();
+    cpu?.Begin("地形几何");
     for(const cell of terrainCells) {
       if(cell.perimeter) this.raster.WorldBatch(terrain.packedTerrainPatch(cell,this.terrainBoundaries));
       else DrawTerrainCell(cell,this.terrainBoundaries);
     }
     this.terrainTriangles=this.raster.triangles;
+    cpu?.End();
+    cpu?.Begin("静态物件");
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
@@ -449,7 +463,9 @@ export class FlowPerspectiveView extends FlowMapView {
       }
       Box(x,z,w,d,h,cover?FLOW_COVER_COLORS.side:object.params?.color||FLOW_MATERIAL_COLORS[object.material]||"#b8a786",base+(object.params?.lift||0),(object.yawDeg||0)*Math.PI/180,cover,object);
     }
+    cpu?.End();
     if(cacheStatic) {
+      cpu?.Begin("写入静态缓存");
       if(this.raster.accelerated) {
         this.staticWorldBatches=[...this.raster.worldBatches];
         this.raster.worldBatches=this.staticWorldBatches;
@@ -468,8 +484,10 @@ export class FlowPerspectiveView extends FlowMapView {
       this.staticTerrain=this.mapData.terrain;
       this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;
       this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
+      cpu?.End();
     }
     }
+    cpu?.Begin("动态几何");
     for(const actor of frame.actors.filter(item=>["tank","cart"].includes(item.kind)&&this.SolidInView(item))) {
       const [x,z]=actor.p,ground=this.Ground(actor.p),yaw=-(actor.heading||0);
       if(actor.kind==="cart") {
@@ -490,12 +508,15 @@ export class FlowPerspectiveView extends FlowMapView {
     for (const actor of frame.actors.filter(item => item.carryingAmmo&&this.SolidInView(item))) {
       Box(actor.p[0],actor.p[1]+0.25,0.8,0.5,0.45,"#94774f",this.Ground(actor.p)+0.8,0);
     }
+    cpu?.End();
     this.PrepareDepth(frame,layers,coverBoxes,true);
     this.raster.Flush(context,width,height);
     const markersStart=trace?.capturing?performance.now():0;
+    cpu?.Begin("地标与掩体标记");
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
     if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
+    cpu?.End();
     if(trace?.capturing) trace.Canvas("绘制地标与掩体标记",this.baseCanvas,markersStart);
   }
 
@@ -544,8 +565,12 @@ export class FlowPerspectiveView extends FlowMapView {
 
   BeforeOverlays(frame,layers) {
     if(!this.raster.accelerated||!this.raster.sparseDepth) return;
-    if(this.depthPreparedPass!==this.depthPass) this.PrepareDepth(frame,layers);
-    this.raster.gpu.ReadDepthSamples(this.raster);
+    const cpu=this.raster.debugTrace?.cpu;
+    cpu?.Begin("更新遮挡");
+    try {
+      if(this.depthPreparedPass!==this.depthPass) this.PrepareDepth(frame,layers);
+      this.raster.gpu.ReadDepthSamples(this.raster);
+    } finally {cpu?.End();}
   }
 
   DrawCoverBoxes(context,coverBoxes) {

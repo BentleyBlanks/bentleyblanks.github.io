@@ -11,6 +11,7 @@ await fs.mkdir(output,{recursive:true});
 const server=process.env.ENCOUNTER_TEST_BASE?null:await ServeRoot(root);
 const base=process.env.ENCOUNTER_TEST_BASE||`http://127.0.0.1:${server.address().port}`;
 const canvasOnly=process.argv.includes("--canvas-only");
+const suffix=canvasOnly?"CanvasOnly":"";
 const browser=await LaunchBrowser({extraArgs:canvasOnly?["--disable-webgl"]:[]});
 try {
   const context=await browser.newContext({viewport:{width:1280,height:720},deviceScaleFactor:1,acceptDownloads:true});
@@ -31,6 +32,7 @@ try {
 
   const [profiler]=await Promise.all([context.waitForEvent("page"),profilerButton.click()]);
   await profiler.locator("body.uiProfiler").waitFor();
+  await profiler.setViewportSize({width:1280,height:720});
   assert.match(await profiler.title(),/编辑器预览/);
   await profilerButton.click();assert.equal(context.pages().length,2,"Reopening focuses the existing Profiler");
   await profiler.getByRole("button",{name:"录制中",exact:true}).click();
@@ -40,25 +42,78 @@ try {
     LevelFlow.SetViewType(2,"oblique");LevelFlow.SetViewType(3,"battle");
     LevelFlow.Seek(424);
   });
+  await profiler.getByRole("button",{name:"清空",exact:true}).click();
   await profiler.getByRole("button",{name:/继续录制/}).click();
-  await page.evaluate(()=>LevelFlow.SetPlaying(true));
+  await profiler.getByRole("button",{name:"函数采样",exact:true}).click();
+  const startSampling=profiler.getByRole("button",{name:"开始采样",exact:true});
+  const sampling=await startSampling.count()===1;
+  if(sampling) await startSampling.click();
+  await page.evaluate(()=>{
+    const layout=LevelFlow.Inspect().viewports;
+    layout.views[1].fov=56;
+    LevelFlow.RestoreViewports(layout);
+    LevelFlow.SetPlaying(true);
+  });
   await page.waitForFunction(()=>LevelFlow.Inspect().time>424.5,null,{timeout:30000});
   await page.evaluate(()=>LevelFlow.SetPlaying(false));
-  const [download]=await Promise.all([profiler.waitForEvent("download"),profiler.getByRole("button",{name:"保存录制",exact:true}).click()]);
+  if(sampling) {
+    const stopSampling=profiler.getByRole("button",{name:"停止采样",exact:true});
+    if(await stopSampling.isVisible()) await stopSampling.click();
+    await profiler.getByText(/\d+ 样本 ·/).waitFor();
+  }
+  await profiler.getByRole("button",{name:"录制中",exact:true}).click();
+  const hotspot=profiler.getByRole("button",{name:/^卡点/});
+  await hotspot.click();
+  const hotFrame=Number((await profiler.locator("#viewLabel").textContent()).slice(1));
+  await profiler.getByRole("button",{name:"CPU",exact:true}).click();
+  const [download]=await Promise.all([profiler.waitForEvent("download"),profiler.getByRole("button",{name:"导出 JSON",exact:true}).click()]);
+  const recordingPath=path.join(output,`ProfilerRecording${suffix}.json`);
+  await download.saveAs(recordingPath);
   const recording=JSON.parse(await fs.readFile(await download.path(),"utf8"));
   const frames=recording.frames;
+  assert.deepEqual(recording.selection,{first:hotFrame,last:hotFrame});
+  assert.equal(recording.hotspot.frameId,hotFrame);
+  assert.ok(recording.hotspot.scope&&recording.hotspot.durationMs>0);
+  assert.deepEqual(recording.sampleFields,["nameId","depth","startMs","durationMs"]);
+  if(sampling) {
+    assert.ok(recording.samplerTrace?.trace.samples.length>0,"JSON includes the original browser samples");
+    assert.ok(recording.sampler.samples>0);
+  }
   assert.equal(recording.environment.source,"Encounter Designer");
   assert.ok(frames.some(frame=>frame.state==="editorPreview"&&frame.cpu.encounterTimeline>0&&frame.cpu["encounterViewport/视口 1"]>0),
     "Profiler records real preview time before Play");
+  assert.ok(frames.some(frame=>frame.preview?.viewports.length===4&&frame.preview.viewports[0].backend==="canvas2d"),
+    "Each recorded render identifies its timeline position and viewport configuration");
+  assert.ok(frames.some(frame=>frame.cpu["encounterTimeline/EvaluateFlow"]>0&&frame.cpu["encounterViewport/视口 1/人物与姓名"]>0),
+    "Timeline and Canvas 2D costs are measured inside their parents");
+  const detailFrame=frames.find(frame=>frame.cpu["encounterViewport/视口 2/3D 底图/地形几何"]>0);
+  assert.ok(detailFrame,"The 3D viewport measures terrain generation");
+  const parentKey="encounterViewport/视口 2/3D 底图";
+  const terrainKey=`${parentKey}/地形几何`;
+  const samples=[];
+  for(let i=0;i<detailFrame.samples.length;i+=recording.sampleFields.length) {
+    const [nameId,depth,start,duration]=detailFrame.samples.slice(i,i+recording.sampleFields.length);
+    samples.push({key:recording.names[nameId],depth,start,end:start+duration});
+  }
+  const terrain=samples.find(sample=>sample.key===terrainKey),parent=samples.find(sample=>sample.key===parentKey);
+  assert.ok(terrain&&parent&&terrain.depth===parent.depth+1&&terrain.start>=parent.start&&terrain.end<=parent.end+0.002);
   const supportsWebGl=await page.evaluate(()=>LevelFlow.Inspect().rendering.some(item=>item?.backend==="webgl2"));
   if(canvasOnly) assert.equal(supportsWebGl,false);
   if(supportsWebGl) {
     assert.ok(frames.some(frame=>frame.calls>0&&frame.triangles>0&&frame.gpuCalls?.["encounterViewport/视口 2"]>0),
       "The actual editor GL draw calls and triangles reach the Profiler");
     assert.ok(frames.slice(1).every(frame=>!frame.gpuCalls?.["encounterViewport/视口 1"]),"Canvas 2D is not counted as WebGL after changing the view types");
+    assert.ok(frames.some(frame=>Object.keys(frame.cpu).some(key=>key.includes("/WebGL2/")&&key.endsWith("/gl.readPixels"))),
+      "The WebGL readback has its own CPU scope");
   } else {
     assert.ok(frames.every(frame=>frame.calls===0&&!frame.gpu),"Software rendering does not invent GPU measurements");
+    assert.ok(frames.some(frame=>frame.cpu[`${parentKey}/软件光栅输出`]>0),"Software raster output is measured");
   }
+  assert.doesNotMatch(await profiler.locator("body").innerText(),/仅记录实际更新|忙闲探针|双击回到最新|父行已含子行|玩法照跑/);
+  await profiler.screenshot({path:path.join(output,`EditorProfiler${suffix}.png`)});
+  await profiler.locator('input[type="file"]').setInputFiles(recordingPath);
+  await profiler.getByText("回放",{exact:true}).waitFor();
+  assert.equal(await profiler.locator("#viewLabel").textContent(),`#${hotFrame}`);
 
   const [debuggerWindow]=await Promise.all([context.waitForEvent("page"),debuggerButton.click()]);
   await debuggerWindow.getByRole("heading",{name:"Frame Debugger"}).waitFor();
@@ -112,7 +167,6 @@ try {
   }
   await groups.nth(0).click();
   await debuggerWindow.getByRole("button",{name:"折叠全部"}).click();
-  const suffix=canvasOnly?"CanvasOnly":"";
   await page.screenshot({path:path.join(output,`EditorDebugToolbar${suffix}.png`)});
   await debuggerWindow.setViewportSize({width:1280,height:720});
   await debuggerWindow.screenshot({path:path.join(output,`EditorFrameDebugger${suffix}.png`)});
@@ -128,7 +182,7 @@ try {
   assert.equal(await groups.count(),0,"Clearing releases the capture without touching the editor");
   await Promise.all([profiler.waitForEvent("close"),debuggerWindow.waitForEvent("close"),page.close()]);
   assert.deepEqual(errors,[]);
-  console.log(`ok  Editor Profiler and Frame Debugger: actual draws, ordered viewports, single-view recapture and popup cleanup (${supportsWebGl?"WebGL2":"software"})`);
+  console.log(`ok  Editor Profiler and Frame Debugger: nested CPU, JSON replay, ordered viewports and popup cleanup (${supportsWebGl?"WebGL2":"software"}, ${frames.length} frames, peak #${hotFrame}, JS samples ${recording.sampler?.samples??0})`);
 } finally {
   await browser.close();
   if(server) await new Promise(resolve=>server.close(resolve));

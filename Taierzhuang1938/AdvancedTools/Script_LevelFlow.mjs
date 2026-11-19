@@ -224,13 +224,19 @@ function Render(tick=null) {
   try {
     debug?.BeginCpu("encounterTimeline");
     const previousStage=frame.stage.id;
+    debug?.BeginCpu("encounterTimeline/EvaluateFlow");
     frame=EvaluateFlow(time,project.value);
+    debug?.EndCpu("encounterTimeline/EvaluateFlow");
+    debug?.BeginCpu("encounterTimeline/UpdateTimeline");
     if(tick?.advancing&&previousStage!==frame.stage.id) workspace.FrameStage();
-    debug?.SetStage(frame.stage.id);
     UpdateTimeline();
+    debug?.EndCpu("encounterTimeline/UpdateTimeline");
+    debug?.SetFrameContext(frame);
+    debug?.BeginCpu("encounterTimeline/UpdateUnits");
     selectedUnitIds=selectedUnitIds.filter(id=>frame.actors.some(actor=>actor.id===id));
     if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
     chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
+    debug?.EndCpu("encounterTimeline/UpdateUnits");
     debug?.EndCpu("encounterTimeline");
     workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value,debug);
   } catch(error) {failure=error;throw error;}

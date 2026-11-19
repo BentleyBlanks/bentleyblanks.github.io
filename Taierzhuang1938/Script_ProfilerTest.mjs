@@ -200,7 +200,8 @@ try {
     Check("汇总有渲染统计", !!liveSummary.render && Object.keys(liveSummary.render.matSw).length > 0);
     for (const tab of ["render", "counters", "events", "draws", "sampler", "census", "export", "gpu", "cpu"]) panel.SetTab(tab);
     Check("页签全部能切、最后停在计时页", panel.tab === "cpu" && panel.ui.pages.get("cpu").classList.contains("on"));
-    Check("读数条写出结论", panel.ui.cards.verdict.v.textContent.length > 1, panel.ui.cards.verdict.v.textContent);
+    Check("卡点显示帧号、插桩和耗时", !panel.ui.hotspot.hidden && /^卡点 #\d+$/.test(panel.ui.hotFrame.textContent)
+      && /^(CPU|GPU) ›/.test(panel.ui.hotPath.textContent) && panel.ui.hotMs.textContent.endsWith(" ms"));
     panel.TogglePause();
     Check("录制键暂停：钩子还在、不再记录", T.profiler.on && !T.profiler.recording
       && proto.updateMatrixWorld.name === "ProfiledUpdateMatrixWorld");
@@ -210,7 +211,7 @@ try {
     const pick = T.profiler.history[Math.max(1, pausedLength - 10)];
     panel.SelectFrame(pick.id);
     Check("选中一帧：CPU 表切到单帧列", panel.ui.cpuTable.classList.contains("single")
-      && panel.ui.cpuTitle.textContent.includes(`#${pick.id}`), panel.ui.cpuTitle.textContent);
+      && panel.ui.viewLabel.textContent === `#${pick.id}`, panel.ui.viewLabel.textContent);
     Check("选中一帧：时间轴出现", panel.ui.timeline.style.display === "block" && !!panel.tl.layout);
     const PaintedPixels = (canvas) => {
       const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;

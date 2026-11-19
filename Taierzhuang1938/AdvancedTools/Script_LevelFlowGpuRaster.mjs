@@ -498,7 +498,14 @@ class GpuRaster {
     this.Phase("深度回读");
     const gl=this.gl;
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER,raster.depthSnapshot.framebuffer);gl.readBuffer(gl.COLOR_ATTACHMENT0);
-    gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);
+    this.ReadDepthPixels(raster.width,raster.height,raster.depthData);
+  }
+
+  ReadDepthPixels(width,height,data) {
+    const gl=this.gl,cpu=this.trace?.cpu;
+    cpu?.Begin("gl.readPixels");
+    try {gl.readPixels(0,0,width,height,gl.RED,gl.FLOAT,data);}
+    finally {cpu?.End();}
   }
 
   ReadDepthSamples(raster) {
@@ -540,7 +547,7 @@ class GpuRaster {
     gl.uniform1i(this.depthSampleUniforms.sceneDepth,0);gl.uniform1i(this.depthSampleUniforms.sampleIndices,1);
     gl.uniform1ui(this.depthSampleUniforms.sourceWidth,raster.width);
     gl.drawArrays(gl.TRIANGLES,0,3);gl.readBuffer(gl.COLOR_ATTACHMENT0);
-    gl.readPixels(0,0,width,rows,gl.RED,gl.FLOAT,samples.depth.subarray(0,width*rows));
+    this.ReadDepthPixels(width,rows,samples.depth.subarray(0,width*rows));
     for(let index=0;index<raster.depthSampleCount;index++) raster.depthData[raster.depthSampleKeys[index]]=samples.depth[index];
     for(let index=0;index<raster.depthTiles.length;index++) if(raster.depthTiles[index]===1) raster.depthTiles[index]=2;
     raster.depthSampleCount=0;
@@ -627,6 +634,7 @@ class GpuRaster {
     if(!trace||this.trace===trace) return method.call(this,raster);
     const gl=this.gl,restore=[];
     this.trace=trace;
+    trace.cpu?.Begin("WebGL2");
     try {
       for(const api of ["drawArrays","drawElements",...(trace.capturing?["clearBufferfv","blitFramebuffer"]:[])]) {
         const original=gl[api],own=Object.hasOwn(gl,api);
@@ -643,19 +651,28 @@ class GpuRaster {
     } finally {
       this.Phase(null);this.trace=null;
       for(const undo of restore.reverse()) undo();
+      trace.cpu?.End();
     }
   }
 
   Phase(name) {
     if(!this.trace||name===this.phase) return;
-    if(this.phase) this.trace.EndGpu();
+    if(this.phase) {
+      this.trace.cpu?.End();
+      this.trace.EndGpu();
+    }
     this.phase=name;
-    if(name) this.trace.BeginGpu(name);
+    if(name) {
+      this.trace.BeginGpu(name);
+      this.trace.cpu?.Begin(name);
+    }
   }
 
   DrawContent(raster) {
     const gl=this.gl;if(gl.isContextLost()) return false;
+    this.trace?.cpu?.Begin("帧缓冲准备");
     try {this.Resize(raster.width,raster.height);} catch {unavailable=true;return false;}
+    finally {this.trace?.cpu?.End();}
     this.Phase("几何准备");
     this.residentWorld=this.PrepareResidentGeometry(raster);
     const lighting=raster.view?.lighting&&raster.shadowVertices;
@@ -680,7 +697,10 @@ class GpuRaster {
         if(value.length===4) gl.uniform4fv(this.lightingUniforms[name],value);else gl.uniform3fv(this.lightingUniforms[name],value);
       }
     }
-    this.BindTerrainSurface(raster.terrainSurface);
+    const cpu=this.trace?.cpu;
+    cpu?.Begin("地表贴图");
+    try {this.BindTerrainSurface(raster.terrainSurface);}
+    finally {cpu?.End();}
     gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     if(raster.view) {
       const view=raster.view;
@@ -698,18 +718,22 @@ class GpuRaster {
     gl.bindVertexArray(this.screenVao);
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
-    this.Phase("深度回读");
     if(raster.sparseDepth) {
+      this.Phase(null);
       // Let the GPU render shadows and scene depth while the CPU projects the
       // current frame's markers and collects the pixels they actually need.
       if(raster.pendingDepthDraw) {
-        gl.flush();
-        raster.CollectDepthSamples(raster.pendingDepthDraw);raster.pendingDepthDraw=null;
+        cpu?.Begin("遮挡采样坐标");
+        try {
+          gl.flush();
+          raster.CollectDepthSamples(raster.pendingDepthDraw);raster.pendingDepthDraw=null;
+        } finally {cpu?.End();}
       }
       this.ReadDepthSamples(raster);
       gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
     } else {
-      gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);
+      this.Phase("深度回读");
+      gl.readBuffer(gl.COLOR_ATTACHMENT1);this.ReadDepthPixels(raster.width,raster.height,raster.depthData);
     }
     // Keep color on the GPU. Only depth is read back for editor interactions.
     if(lighting) this.DrawAmbientOcclusion(raster);

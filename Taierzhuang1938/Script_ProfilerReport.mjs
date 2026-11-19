@@ -18,15 +18,18 @@
 /** CPU 桶的中文说明。没登记的 key 照原样显示（表是数据驱动的，不靠这张表决定显示什么）。 */
 export const CPU_LABELS = {
   encounterViewport: "编辑器视口",
-  encounterTimeline: "编辑器时间轴与界面",
-  post: "渲染提交（整条链）",
+  encounterTimeline: "时间轴与界面",
+  "encounterTimeline/EvaluateFlow": "剧情求值",
+  "encounterTimeline/UpdateTimeline": "时间轴与控件",
+  "encounterTimeline/UpdateUnits": "单位选区",
+  post: "渲染提交",
   ai: "AI",
-  "ai/think": "决策（Think，每帧六分之一的人）",
-  "ai/act": "执行（Act：移动、贴地、开火）",
+  "ai/think": "决策",
+  "ai/act": "执行",
   "ai/act/anim": "人物动画与蒙皮解算",
-  "ai/corpse": "尸体（倒地收尾与刚体同步）",
+  "ai/corpse": "尸体",
   "ai/cull": "可见性剔除",
-  "ai/front": "战线重算（每秒一次）",
+  "ai/front": "战线重算",
   "ai/grenade": "在飞手榴弹的威胁扫描",
   "ai/nav": "寻路帧预算复位",
   physics: "物理（Rapier）",
@@ -36,8 +39,8 @@ export const CPU_LABELS = {
   combat: "战斗结算/破坏",
   actorBatch: "人物合批",
   matrix: "场景矩阵（updateMatrixWorld）",
-  frameSetup: "出画前接线（雾/水面/听者/簇表）",
-  shadowBatch: "阴影静态合批（逐帧对账）",
+  frameSetup: "帧准备",
+  shadowBatch: "阴影静态合批",
   slingCloth: "背枪枪带布料模拟",
   firstPersonShadow: "视模自阴影",
   firstPersonProbe: "视模本地反射图",
@@ -48,7 +51,7 @@ export const CPU_LABELS = {
   "story/mission/train": "军列推进",
   "story/mission/voice": "对白、音乐与战场声",
   "story/mission/spawns": "遭遇放置",
-  "story/mission/director": "调度（小队/战线/战术/空袭/担架）",
+  "story/mission/director": "调度",
   "story/mission/other": "其余任务判定",
   "story/p012": "白盒流程",
   "story/objectives": "目标推进",
@@ -59,9 +62,9 @@ export const CPU_LABELS = {
   spawn: "补兵",
   streamer: "道具流送",
   input: "输入",
-  overlay: "编辑器叠加层（含本面板）",
-  other: "其他（未标记）",
-  browser: "浏览器侧（布局/绘制/合成/等 vsync）",
+  overlay: "编辑器叠加层",
+  other: "未标记",
+  browser: "浏览器侧",
 };
 
 /**
@@ -138,10 +141,26 @@ export function CpuBag(summary) {
   const bag = Object.create(null);
   for (const key in summary.cpu || {}) bag[key] = summary.cpu[key];
   for (const key in summary.gpuCpu || {}) {
-    if (bag[key]||key==="encounterViewport"||key.startsWith("encounterViewport/")) continue;
+    if (bag[key] || RootOf(key) === "encounterViewport") continue;
     bag[`post/${key}`] = summary.gpuCpu[key];
   }
+  AddPreviewSubmitScopes(bag, summary.gpuCpu);
   return bag;
+}
+
+// 旧预览录制只有视口 B/E 和独立的 GL 提交计时。
+function AddPreviewSubmitScopes(bag, gpuCpu) {
+  const measured = new Set();
+  const ViewportOf = (key) => key.split("/", 2).join("/");
+  for (const key in bag) {
+    const viewport = ViewportOf(key);
+    if (key !== viewport) measured.add(viewport);
+  }
+  for (const key in gpuCpu || {}) {
+    if (!key.startsWith("encounterViewport/")) continue;
+    const viewport = ViewportOf(key);
+    if (key !== viewport && bag[viewport] && !measured.has(viewport)) bag[key] = gpuCpu[key];
+  }
 }
 
 /**
@@ -184,9 +203,9 @@ export function TreeRows(bag, { keys = null } = {}) {
 
 /** 行的显示名：根 key 查中文表，子 key 只显示最后一段（前缀已经由缩进表达）。 */
 export function CpuLabel(row) {
-  if (row.selfRow) return "自身（父 − 子之和）";
+  if (row.selfRow) return "自身";
   const known = CPU_LABELS[row.key];
-  if (known) return row.depth ? `${Tail(row.key)} · ${known}` : known;
+  if (known) return known;
   return row.depth ? Tail(row.key) : row.key;
 }
 
@@ -231,7 +250,7 @@ export function GpuRows(summary) {
   const tris = summary.gpuTris || {};
   return rows.map((row) => ({
     ...row,
-    label: row.selfRow ? "自身（父 − 子之和）" : (row.depth ? Tail(row.key) : row.key),
+    label: row.selfRow ? "自身" : (row.depth ? Tail(row.key) : row.key),
     note: GPU_NOTES[row.key] || "",
     cpuMs: row.selfRow ? null : (cpu[row.key] ? cpu[row.key].avg : null),
     calls: row.selfRow ? null : (calls[row.key] ? calls[row.key].avg : null),
@@ -266,6 +285,36 @@ export function Bottleneck(summary) {
     browser: summary.browser ? summary.browser.avg : null,
     main: summary.cpuTotal.avg,
   };
+}
+
+/** 用同帧的 CPU / GPU 读数寻找独占耗时最大的插桩。 */
+export function FrameHotspot(record) {
+  if (!record) return null;
+  const cpuMs = record.cpuMs || 0;
+  const gpuMs = record.gpuTotal || 0;
+  if (!(cpuMs > 0 || gpuMs > 0)) return null;
+  const gpu = gpuMs > cpuMs;
+  const bag = { ...(gpu ? record.gpu : record.cpu) };
+  if (!gpu && !record.preview && record.state === "editorPreview") AddPreviewSubmitScopes(bag, record.gpuCpu);
+  const entries = Object.entries(bag);
+  const childMs = new Map();
+  for (const [key, ms] of entries) {
+    const cut = key.lastIndexOf("/");
+    if (cut < 0) continue;
+    const parent = key.slice(0, cut);
+    childMs.set(parent, (childMs.get(parent) || 0) + ms);
+  }
+  let scope = null;
+  let durationMs = gpu ? 0 : (record.other || 0);
+  if (durationMs > 0) scope = "other";
+  for (const [key, ms] of entries) {
+    const selfMs = ms - (childMs.get(key) || 0);
+    if (selfMs > durationMs) {
+      durationMs = selfMs;
+      scope = key;
+    }
+  }
+  return { frameId: record.id, thread: gpu ? "GPU" : "CPU", scope, durationMs: durationMs || (gpu ? gpuMs : cpuMs) };
 }
 
 export function UnitLine(summary) {

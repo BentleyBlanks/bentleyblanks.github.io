@@ -427,6 +427,8 @@ export class FlowMapView {
   }
 
   Draw(frame,layers,selection,annotations=[],draft=null,viewport=null,trace=null) {
+    const cpu=trace?.cpu;
+    cpu?.Begin("画布准备");
     const rect=viewport||this.canvas.getBoundingClientRect();
     this.BeforeDraw?.(frame,rect);
     const ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
@@ -435,7 +437,9 @@ export class FlowMapView {
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
     const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false,
       frame.signals,Math.round((frame.nightBlend||0)*FLOW_DUSK.steps)]);
+    cpu?.End();
     if(trace?.redrawBase||key!==this.baseKey) {
+      cpu?.Begin(this.raster?"3D 底图":"2D 底图");
       const started=trace?.capturing?performance.now():0;
       if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
@@ -443,12 +447,16 @@ export class FlowMapView {
       // full backing surface without reallocating it, preventing edge trails.
       background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
       this.DrawBase(background,width,height,frame,layers,trace);this.baseKey=key;
+      cpu?.End();
       if(trace?.capturing&&!this.raster) trace.Canvas("绘制 2D 底图",this.baseCanvas,started);
     }
     this.BeforeOverlays?.(frame,layers);
     let started=trace?.capturing?performance.now():0;
+    cpu?.Begin("合成底图");
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
+    cpu?.End();
     if(trace?.capturing) {trace.Canvas("合成视口底图",this.canvas,started);started=performance.now();}
+    cpu?.Begin("路线与区域");
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
       this.DrawPath(context,frame.stage.beats.flatMap((beat)=>beat.p),"#9c731b9c",2,[6,5]);
@@ -487,6 +495,8 @@ export class FlowMapView {
     if(layers.routes) for(const ramp of this.mapData.ramps) {
       this.DrawArrow(context,ramp.points[0],ramp.points.at(-1),"#687a50",1.5);
     }
+    cpu?.End();
+    cpu?.Begin("人物与姓名");
     const labelBoxes=[];
     for(const actor of this.OrderActors?.(frame.actors)||frame.actors) {
       const p=this.ActorScreen?this.ActorScreen(actor):Screen(actor.p),color=FLOW_COLORS[actor.side],selected=selection?.type==="actor"&&(selection.ids||[selection.id]).includes(actor.id);
@@ -525,6 +535,8 @@ export class FlowMapView {
       }
       context.restore();
     }
+    cpu?.End();
+    cpu?.Begin("特效与标注");
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
       if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;this.DrawPath(context,[effect.a,effect.b],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
@@ -555,6 +567,7 @@ export class FlowMapView {
       this.DrawScale(context,width,height-legendHeight);
       this.DrawCompass(context,width,height);
     }
+    cpu?.End();
     if(trace?.capturing) trace.Canvas("场景叠层与视口输出",this.canvas,started);
   }
 }

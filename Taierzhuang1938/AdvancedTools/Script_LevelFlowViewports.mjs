@@ -285,10 +285,13 @@ export class EncounterViewports {
   }
 
   DrawVisible(frame,layers,selection,annotations,draft,document,debug) {
+    debug?.BeginCpu("encounterViewport/布局");
     const contentKey=JSON.stringify([frame.time,frame.beat.id,layers,selection,draft]);
     const contentChanged=document===null||document!==this.document||annotations!==this.annotations||contentKey!==this.contentKey;
     const viewports=this.Visible().map(entry=>({entry,rect:entry.canvas.getBoundingClientRect()}));
+    debug?.EndCpu("encounterViewport/布局");
     for(const {entry,rect} of viewports) {
+      debug?.BeginCpu("encounterViewport/视口状态");
       if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.gizmo.hidden=!perspective;
@@ -304,6 +307,7 @@ export class EncounterViewports {
       }
       const view=entry.map;
       const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.fov,view.near,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
+      debug?.EndCpu("encounterViewport/视口状态");
       if(!debug?.forceDraw&&!contentChanged&&drawKey===entry.drawKey) continue;
       const trace=debug?.BeginViewport(entry,`视口 ${entry.index+1} · ${ENCOUNTER_VIEW_TYPES[entry.type]}`);
       try {view.Draw(frame,entry.layers,selection,annotations,draft,rect,trace);}

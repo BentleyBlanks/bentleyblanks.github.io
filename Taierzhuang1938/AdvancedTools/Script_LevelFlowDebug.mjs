@@ -80,6 +80,7 @@ export class LevelFlowDebug {
     if(this.profileFrame) {
       this.profileFrame.BeginFrame(time,!!tick&&tick.previous===this.lastRender);
     }
+    this.preview=null;
     this.lastRender=this.profileFrame&&tick?time:null;
     this.forceDraw=capturing||!!(this.profileFrame&&this.fullDraw);
     if(this.profileFrame) this.fullDraw=false;
@@ -87,7 +88,11 @@ export class LevelFlowDebug {
 
   BeginCpu(name) {this.profileFrame?.B(name);}
   EndCpu(name) {this.profileFrame?.E(name);}
-  SetStage(stage) {this.profileFrame?.SetFrameContext("editorPreview",stage);}
+  SetFrameContext(frame) {
+    if(!this.profileFrame) return;
+    this.profileFrame.SetFrameContext("editorPreview",frame.stage.id);
+    this.preview={timeSeconds:frame.time,beat:frame.beat.id,viewports:[]};
+  }
 
   BeginViewports() {
     this.BeginCpu("encounterViewport");
@@ -104,9 +109,18 @@ export class LevelFlowDebug {
     const capture=this.capture.state==="capturing"?this.capture:null;
     const profiler=this.profileFrame,stats=this.renderStats;
     const passStart=capture?performance.now():0,overhead=capture?.overhead||0;
-    this.BeginCpu(domain);
+    const scopes=profiler?[domain]:null;
+    const cpu=profiler?{
+      Begin:label=>{
+        const path=`${scopes.at(-1)}/${label}`;
+        scopes.push(path);profiler.B(path);
+      },
+      End:()=>profiler.E(scopes.pop()),
+    }:null;
+    profiler?.B(domain);
     capture?.BeginViewport(name,entry.index,entry.type,entry.canvas);
     return {
+      cpu,
       capturing:!!capture,
       captureDraws:!!profiler?.capturingDraws,
       redrawBase:this.forceDraw,
@@ -126,14 +140,19 @@ export class LevelFlowDebug {
         }
       },
       End:()=>{
-        this.EndCpu(domain);
+        if(profiler) {
+          while(scopes.length) cpu.End();
+          this.preview?.viewports.push({index:entry.index+1,type:entry.type,
+            backend:entry.map.raster?(entry.map.raster.accelerated?"webgl2":"software"):"canvas2d",
+            width:entry.canvas.width,height:entry.canvas.height});
+        }
         capture?.EndViewport(Math.max(0,performance.now()-passStart-(capture.overhead-overhead)));
       },
     };
   }
 
   EndFrame(error) {
-    this.profileFrame?.EndFrame();
+    this.profileFrame?.EndFrame(this.preview?{preview:this.preview}:undefined);
     this.profileFrame=null;
     if(this.capture.state==="capturing") this.capture.Finish(error);
   }
