@@ -9,7 +9,7 @@ let unavailable=false;
 
 export function EncounterGpuRaster() {
   if(unavailable) return null;
-  if(shared&&!shared.gl.isContextLost()) return shared;
+  if(shared&&!shared.resourceFailed&&!shared.gl.isContextLost()) return shared;
   try {
     shared=new GpuRaster();
     return shared;
@@ -151,10 +151,11 @@ class GpuRaster {
     this.size=gl.getUniformLocation(this.program,'size');this.perspective=gl.getUniformLocation(this.program,'perspective');
     this.world=gl.getUniformLocation(this.program,'world');
     this.cameraUniforms=Object.fromEntries(['eye','right','up','forward','projection'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
+    this.streamCapacities=new WeakMap();this.validateResources=true;
     this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     for(let index=0;index<3;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,36,index*12);}
     this.screenVao=gl.createVertexArray();gl.bindVertexArray(this.screenVao);
-    gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+    this.screenBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.screenBuffer);
     for(let index=0;index<2;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,24,index*12);}
     this.targets=new Map();
     const Program=(vertexSource,fragmentSource)=>{
@@ -313,6 +314,7 @@ class GpuRaster {
     gl.uniform1i(uniforms.groundColor,1);gl.uniform1i(uniforms.distantColor,2);
     if(!surface) return;
     if(!this.surfaceTextures.has(surface)) {
+      this.validateResources=true;
       gl.activeTexture(gl.TEXTURE1);
       // The shared context serves every pane. Reuse the same pair of maps,
       // and release replaced scene maps when the editor changes terrain.
@@ -359,6 +361,7 @@ class GpuRaster {
       const [oldKey,target]=this.targets.entries().next().value;
       gl.deleteFramebuffer(target.framebuffer);gl.deleteFramebuffer(target.shadedFramebuffer);gl.deleteTexture(target.shadedColor);gl.deleteFramebuffer(target.aoFramebuffer);gl.deleteTexture(target.aoTexture);gl.deleteTexture(target.color);gl.deleteTexture(target.distance);gl.deleteTexture(target.normal);gl.deleteRenderbuffer(target.depth);this.targets.delete(oldKey);
     }
+    this.validateResources=true;
     const target={framebuffer:gl.createFramebuffer(),color:gl.createTexture(),distance:gl.createTexture(),normal:gl.createTexture(),depth:gl.createRenderbuffer()};
     this.targets.set(key,target);this.target=target;this.framebuffer=target.framebuffer;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
@@ -400,30 +403,39 @@ class GpuRaster {
     if(!raster.resident||!raster.worldBatches.length) return null;
     const gl=this.gl,settings=FLOW_RENDERING.residentGeometry,owner=raster.view.mapData;
     let arena=this.residentOwners.get(owner);
+    const pool=owner.terrain?.nativePool,reserved=(pool?.capacity||0)*36;
+    if(arena&&arena.pool!==pool) {
+      gl.deleteBuffer(arena.buffer);gl.deleteVertexArray(arena.vao);this.residentOwners.delete(owner);arena=null;
+    }
     const previous=raster.residentIndexRecord;
-    if(previous&&previous.arena===arena&&previous.batches===raster.worldBatches) return previous;
-    let needed=0,total=0;
+    if(previous&&previous.arena===arena&&previous.generation===arena.generation&&previous.batches===raster.worldBatches) return previous;
+    let needed=0,total=0,count=0;
     for(const vertices of raster.worldBatches) {
+      if(vertices instanceof Uint32Array) {count+=vertices.length;continue;}
+      count+=vertices.length/9;
       total+=vertices.byteLength;
       if(!arena?.entries.has(vertices)) needed+=vertices.byteLength;
     }
-    if(total>settings.maxBytes) {raster.MaterializeWorldBatches();return null;}
+    if(total+reserved>settings.maxBytes||(pool&&pool.count>pool.capacity)) {raster.MaterializeWorldBatches();return null;}
     if(arena&&arena.used+needed>settings.maxBytes) {
-      gl.deleteBuffer(arena.buffer);gl.deleteVertexArray(arena.vao);
-      this.residentOwners.delete(owner);arena=null;needed=total;
+      // Recycle the existing high-water allocation. Index buffers in other panes
+      // must be rebuilt before they refer to these offsets again.
+      arena.generation++;arena.used=reserved;arena.entries=new WeakMap();needed=total;
     }
     if(!arena) {
+      this.validateResources=true;
       while(this.residentOwners.size>=settings.owners) {
         const [oldOwner,old]=this.residentOwners.entries().next().value;
         gl.deleteBuffer(old.buffer);gl.deleteVertexArray(old.vao);this.residentOwners.delete(oldOwner);
       }
       arena={entries:new WeakMap(),buffer:gl.createBuffer(),vao:gl.createVertexArray(),
-        used:0,capacity:settings.initialBytes,indices:new Uint32Array(0)};
-      while(arena.capacity<needed) arena.capacity*=2;
+        generation:0,used:reserved,pool,uploaded:0,capacity:settings.initialBytes,indices:new Uint32Array(0)};
+      while(arena.capacity<reserved+needed) arena.capacity*=2;
       gl.bindBuffer(gl.ARRAY_BUFFER,arena.buffer);gl.bufferData(gl.ARRAY_BUFFER,arena.capacity,gl.STATIC_DRAW);
       this.residentOwners.set(owner,arena);
     }
     if(arena.used+needed>arena.capacity) {
+      this.validateResources=true;
       let capacity=arena.capacity;
       while(capacity<arena.used+needed) capacity*=2;
       const buffer=gl.createBuffer();gl.bindBuffer(gl.COPY_WRITE_BUFFER,buffer);gl.bufferData(gl.COPY_WRITE_BUFFER,capacity,gl.STATIC_DRAW);
@@ -432,11 +444,18 @@ class GpuRaster {
     }
     gl.bindVertexArray(arena.vao);gl.bindBuffer(gl.ARRAY_BUFFER,arena.buffer);
     for(let index=0;index<3;index++) {gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,3,gl.FLOAT,false,36,index*12);}
-    const count=total/36;
+    if(pool&&arena.uploaded<pool.count) {
+      const first=arena.uploaded*9;
+      gl.bufferSubData(gl.ARRAY_BUFFER,first*4,pool.data,first,pool.count*9-first);
+      arena.uploaded=pool.count;
+    }
     if(arena.indices.length<count) arena.indices=new Uint32Array(2**Math.ceil(Math.log2(count)));
     const uploadStart=arena.used,additions=needed?new Float32Array(needed/4):null;
     let offset=0;
     for(const vertices of raster.worldBatches) {
+      if(vertices instanceof Uint32Array) {
+        arena.indices.set(vertices,offset);offset+=vertices.length;continue;
+      }
       let indices=arena.entries.get(vertices);
       if(!indices) {
         const first=arena.used/36,length=vertices.length/9;
@@ -449,11 +468,33 @@ class GpuRaster {
     }
     if(additions) gl.bufferSubData(gl.ARRAY_BUFFER,uploadStart,additions.subarray(0,(arena.used-uploadStart)/4));
     const indexBuffer=previous?.indexBuffer||gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arena.indices.subarray(0,count),gl.STREAM_DRAW);
-    const record={arena,indexBuffer,count,batches:raster.worldBatches};
+    this.UploadStream(gl.ELEMENT_ARRAY_BUFFER,indexBuffer,arena.indices,count,Math.min(4*1024*1024,reserved/8));
+    const record={arena,generation:arena.generation,indexBuffer,count,batches:raster.worldBatches};
     raster.residentIndexRecord=record;
     return record;
+  }
+
+  UploadStream(target,buffer,source,count,minimum=65536) {
+    if(!count) return;
+    const gl=this.gl,bytes=count*source.BYTES_PER_ELEMENT;
+    gl.bindBuffer(target,buffer);
+    if((this.streamCapacities.get(buffer)||0)<bytes) {
+      const capacity=2**Math.ceil(Math.log2(Math.max(bytes,minimum)));
+      gl.bufferData(target,capacity,gl.DYNAMIC_DRAW);
+      this.streamCapacities.set(buffer,capacity);this.validateResources=true;
+    }
+    gl.bufferSubData(target,0,source,0,count);
+  }
+
+  ResourcesReady() {
+    if(this.validateResources) {
+      this.validateResources=false;
+      const cpu=this.trace?.cpu;
+      cpu?.Begin("gl.getError");
+      try {this.resourceFailed=this.gl.getError()!==this.gl.NO_ERROR;}
+      finally {cpu?.End();}
+    }
+    return !this.resourceFailed&&!this.gl.isContextLost();
   }
 
   DrawResidentGeometry() {
@@ -480,6 +521,7 @@ class GpuRaster {
     let snapshot=raster.depthSnapshot;
     if(!snapshot||snapshot.gl!==gl||snapshot.width!==raster.width||snapshot.height!==raster.height) {
       if(snapshot?.gl===gl) {gl.deleteTexture(snapshot.texture);gl.deleteFramebuffer(snapshot.framebuffer);}
+      this.validateResources=true;
       snapshot={gl,width:raster.width,height:raster.height,texture:gl.createTexture(),framebuffer:gl.createFramebuffer()};
       gl.bindTexture(gl.TEXTURE_2D,snapshot.texture);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
@@ -578,16 +620,12 @@ class GpuRaster {
     for(const [name,value] of Object.entries(values)) {
       if(value.length===4) gl.uniform4fv(this.shadowUniforms[name],value);else gl.uniform3fv(this.shadowUniforms[name],value);
     }
-    gl.bindVertexArray(this.shadowVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);
-    if(this.uploadedShadowVertices!==raster.shadowVertices) {
-      gl.bufferData(gl.ARRAY_BUFFER,raster.shadowVertices,gl.STATIC_DRAW);this.uploadedShadowVertices=raster.shadowVertices;
-    }
+    gl.bindVertexArray(this.shadowVao);
     gl.drawArrays(gl.TRIANGLES,0,raster.shadowVertices.length/3);
     // Visible terrain, vehicles and carried objects also cast shadows.
     this.DrawResidentGeometry();
     if(raster.worldLength) {
-      gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
-      gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
+      gl.bindVertexArray(this.vao);gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
     }
     return values;
   }
@@ -633,7 +671,7 @@ class GpuRaster {
 
   DebugGeometry(raster,vao,first,count) {
     if(vao===this.residentWorld?.arena.vao)
-      return {name:"场景静态几何",batches:this.residentWorld.batches,stride:9};
+      return {name:"场景静态几何",batches:this.residentWorld.batches.map(batch=>batch instanceof Uint32Array?raster.view.mapData.terrain.expandNative(batch):batch),stride:9};
     if(vao===this.shadowVao)
       return {name:"阴影投射几何",data:raster.shadowVertices,stride:3,immutable:true};
     if(vao===this.vao)
@@ -747,17 +785,32 @@ class GpuRaster {
   }
 
   DrawContent(raster) {
-    const gl=this.gl;if(gl.isContextLost()) return false;
+    const gl=this.gl;if(this.resourceFailed||gl.isContextLost()) return false;
     this.trace?.cpu?.Begin("帧缓冲准备");
     try {this.Resize(raster.width,raster.height);} catch {unavailable=true;return false;}
     finally {this.trace?.cpu?.End();}
     this.Phase("几何准备");
-    this.residentWorld=this.PrepareResidentGeometry(raster);
+    const cpuTrace=this.trace?.cpu;
+    cpuTrace?.Begin("常驻顶点与索引");
+    try {this.residentWorld=this.PrepareResidentGeometry(raster);} finally {cpuTrace?.End();}
+    cpuTrace?.Begin("视口目标和动态缓冲");
     const lighting=raster.view?.lighting&&raster.shadowVertices;
+    this.BindSceneTarget(raster);
+    this.UploadStream(gl.ARRAY_BUFFER,this.buffer,raster.worldVertices,raster.worldLength);
+    this.UploadStream(gl.ARRAY_BUFFER,this.screenBuffer,raster.gpuVertices,raster.gpuLength);
+    if(lighting&&this.uploadedShadowVertices!==raster.shadowVertices) {
+      this.UploadStream(gl.ARRAY_BUFFER,this.shadowBuffer,raster.shadowVertices,raster.shadowVertices.length);
+      this.uploadedShadowVertices=raster.shadowVertices;
+    }
+    cpuTrace?.End();
+    // Resource growth can fail. Validate it before queueing the expensive shadow
+    // and scene passes; an unchanged frame needs no synchronous driver query.
+    this.Phase(null);
+    if(!this.ResourcesReady()) return false;
     if(lighting) this.Phase("阴影");
     const shadowValues=lighting?this.DrawShadows(raster):null;
     this.Phase("主场景");
-    this.BindSceneTarget(raster);gl.viewport(0,0,raster.width,raster.height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.viewport(0,0,raster.width,raster.height);
     gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);
     gl.clearBufferfv(gl.COLOR,0,new Float32Array(4));gl.clearBufferfv(gl.COLOR,1,new Float32Array([Infinity,0,0,0]));
     gl.clearBufferfv(gl.COLOR,2,new Float32Array(4));
@@ -768,9 +821,10 @@ class GpuRaster {
     gl.uniform2f(this.lightingUniforms.lightBalance,balance.ambient,balance.direct);
     const sun=FLOW_RENDERING.sky.sunDirection,sunLength=Math.hypot(...sun);
     gl.uniform3fv(this.lightingUniforms.sun,sun.map(value=>value/sunLength));
+    // WebGL validates the shadow sampler even when the lighting branch is off.
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.lightingUniforms.shadowMap,0);
     if(lighting) {
       gl.uniform2f(this.lightingUniforms.lightBalance,raster.view.lighting.ambient,raster.view.lighting.direct);
-      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.lightingUniforms.shadowMap,0);
       for(const [name,value] of Object.entries(shadowValues)) {
         if(value.length===4) gl.uniform4fv(this.lightingUniforms[name],value);else gl.uniform3fv(this.lightingUniforms[name],value);
       }
@@ -789,13 +843,12 @@ class GpuRaster {
     if(raster.worldLength) {
       gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
       gl.uniform1i(this.world,1);
-      if(!lighting) gl.bufferData(gl.ARRAY_BUFFER,raster.worldVertices.subarray(0,raster.worldLength),gl.STREAM_DRAW);
       gl.drawArrays(gl.TRIANGLES,0,raster.worldLength/9);
     }
-    gl.uniform1i(this.world,0);
-    gl.bindVertexArray(this.screenVao);
-    gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
-    gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
+    if(raster.gpuLength) {
+      gl.uniform1i(this.world,0);gl.bindVertexArray(this.screenVao);
+      gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
+    }
     if(!raster.sparseDepth) {
       this.Phase("深度回读");
       gl.readBuffer(gl.COLOR_ATTACHMENT1);this.ReadDepthPixels(raster.width,raster.height,raster.depthData);
@@ -804,7 +857,11 @@ class GpuRaster {
     if(lighting) this.DrawAmbientOcclusion(raster);
     this.Phase("输出到视口");
     gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
-    gl.blitFramebuffer(0,0,raster.width,raster.height,0,this.canvas.height,raster.width,this.canvas.height-raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);
-    return !gl.isContextLost()&&gl.getError()===gl.NO_ERROR;
+    cpuTrace?.Begin("gl.blitFramebuffer");
+    try {gl.blitFramebuffer(0,0,raster.width,raster.height,0,this.canvas.height,raster.width,this.canvas.height-raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);}
+    finally {cpuTrace?.End();}
+    this.Phase(null);
+    if(this.trace?.capturing) this.validateResources=true;
+    return this.ResourcesReady();
   }
 }

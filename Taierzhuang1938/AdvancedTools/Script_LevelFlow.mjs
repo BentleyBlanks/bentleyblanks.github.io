@@ -404,8 +404,12 @@ function BindControls() {
 function Tick(timestamp) {
   if(gamePlay?.active){lastTimestamp=timestamp;requestAnimationFrame(Tick);return;}
   const elapsed=lastTimestamp?Math.max(0,(timestamp-lastTimestamp)/1000):0;
+  const measuring=!!previewDebug.profiler?.recording;
+  const beforeUpdate=measuring?performance.now():0;
   previewDebug.Update(Math.min(elapsed,1));
+  const beforeNavigation=measuring?performance.now():0;
   const navigated=!Element("annotationDialog").open&&navigation.Tick(Math.min(0.1,elapsed));
+  const beforeRender=measuring?{debugUpdateMs:beforeNavigation-beforeUpdate,navigationMs:performance.now()-beforeNavigation}:null;
   if(playing&&lastTimestamp) {
     // Frames sample an absolute-time plan. Dropping elapsed time on a slow
     // render makes 1x playback (and every actor's metres/second) run too slowly.
@@ -417,9 +421,9 @@ function Tick(timestamp) {
         time=frame.stage.start+(time+delta-frame.stage.start)%duration;
       } else {time=FLOW_DURATION;SetPlaying(false);}
     } else time+=delta;
-    Render({time:timestamp,previous:lastTimestamp,advancing:true});
+    Render({time:timestamp,previous:lastTimestamp,advancing:true,beforeRender});
   }
-  else if(navigated||renderPending) Render({time:timestamp,previous:lastTimestamp});
+  else if(navigated||renderPending) Render({time:timestamp,previous:lastTimestamp,beforeRender});
   lastTimestamp=timestamp;requestAnimationFrame(Tick);
 }
 

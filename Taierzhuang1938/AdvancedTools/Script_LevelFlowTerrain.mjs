@@ -127,11 +127,34 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       ]});
     }
   }
+  // Native mesh positions and normal probes lie on an eighth-metre grid.
+  // Numeric keys avoid allocating coordinate strings on each cold camera turn.
+  const GridKey=(x,z)=>{
+    const ix=x*8,iz=z*8;
+    return Number.isInteger(ix)&&Number.isInteger(iz)&&Math.abs(ix)<65536&&Math.abs(iz)<65536
+      ?ix*131072+iz:`${x},${z}`;
+  };
+  const radius=6144,rootSize=256,rootColumns=2*radius/rootSize;
+  const PreparedHeight=(x,z)=>{
+    if(!prepared||x< -radius||z< -radius||x>=radius||z>=radius) return undefined;
+    const data=prepared.nodes;
+    let node=Math.floor((z+radius)/rootSize)*rootColumns+Math.floor((x+radius)/rootSize);
+    while(node>=0) {
+      const at=node*15,left=data[at],top=data[at+1],half=data[at+2]/2;
+      const dx=x-left,dz=z-top;
+      if(dx===half&&dz===half) return data[at+13];
+      if((dx===0||dx===half*2)&&(dz===0||dz===half*2)) return data[at+9+(dz===0?(dx===0?0:1):(dx===0?3:2))];
+      const first=data[at+8];
+      if(first<0) return undefined;
+      node=first+(dz<half?(dx<half?0:1):(dx<half?3:2));
+    }
+  };
   const sampleCache=new Map();
   const Sample=(x,z)=>{
-    const key=`${x},${z}`;
-    if(!sampleCache.has(key)) sampleCache.set(key,HeightAt(x,z));
-    return sampleCache.get(key);
+    const key=GridKey(x,z),cached=sampleCache.get(key);
+    if(cached!==undefined) return cached;
+    const value=PreparedHeight(x,z)??HeightAt(x,z);
+    sampleCache.set(key,value);return value;
   };
   const cells=[];
   const NeedsReliefDetail = (x, z, size) => {
@@ -211,13 +234,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     cell.radius=Math.hypot(size/Math.SQRT2,(cell.maxHeight-cell.minHeight)/2);
     return cell;
   };
-  const radius=6144;
   const restoredNodes=new Map();
   const RestoreNode=(index)=>{
     if(restoredNodes.has(index)) return restoredNodes.get(index);
     const data=prepared.nodes,offset=index*15;
-    const [x,z,size,minHeight,maxHeight,heightError,near,painted,firstChild]=data.subarray(offset,offset+9);
-    const corners=Array.from(data.subarray(offset+9,offset+13)),centerHeight=data[offset+13];
+    const x=data[offset],z=data[offset+1],size=data[offset+2],minHeight=data[offset+3],maxHeight=data[offset+4];
+    const heightError=data[offset+5],near=data[offset+6],painted=data[offset+7],firstChild=data[offset+8];
+    const corners=[data[offset+9],data[offset+10],data[offset+11],data[offset+12]],centerHeight=data[offset+13];
     const cell={x,z,size,minHeight,maxHeight,heightError,corners,centerHeight,near:!!near,painted:!!painted,nodeIndex:index,
       center:[x+size/2,(minHeight+maxHeight)/2,z+size/2],radius:Math.hypot(size/Math.SQRT2,(maxHeight-minHeight)/2)};
     if(data[offset+14]>=0) cell.exactHeightError=data[offset+14];
@@ -277,6 +300,60 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   };
   const RestoreLines=lines=>new Map(Array.from(lines.keys,(key,index)=>[key,lines.values.subarray(lines.offsets[index],lines.offsets[index+1])]));
   const fullBoundaries=prepared?{rows:RestoreLines(prepared.rows),columns:RestoreLines(prepared.columns)}:BoundariesForCells(cells);
+  // All LOD corners lie on the baked grid. Give each coordinate a stable bit
+  // in both its row and its column; each pane owns just its active bitsets.
+  let edgeGrid;
+  const cellBits=new WeakMap();
+  const VisibleBoundariesForCells=(selected,state={})=>{
+    if(!edgeGrid) {
+      const lines=[],rows=new Map(),columns=new Map();
+      let words=0;
+      for(const [source,index] of [[fullBoundaries.rows,rows],[fullBoundaries.columns,columns]]) {
+        for(const [at,values] of source) {
+          const length=Math.ceil(values.length/32);
+          const line={at,values,first:words,end:words+length,row:index===rows};
+          index.set(at,line);lines.push(line);words+=length;
+        }
+      }
+      edgeGrid={rows,columns,lines,words};
+    }
+    if(state.grid!==edgeGrid||state.selected) {
+      state={grid:edgeGrid,rows:new Map(),columns:new Map(),active:new Uint32Array(edgeGrid.words),next:new Uint32Array(edgeGrid.words)};
+    }
+    const {active,next}=state;
+    next.fill(0);
+    for(const cell of selected) {
+      let bits=cellBits.get(cell);
+      if(!bits) {
+        bits=new Uint32Array((cell.perimeter?.length??4)*2);
+        let at=0;
+        VisitBoundaryPoints(cell,(x,z)=>{
+          const row=edgeGrid.rows.get(z),column=edgeGrid.columns.get(x);
+          bits[at++]=row.first*32+LowerBound(row.values,x);
+          bits[at++]=column.first*32+LowerBound(column.values,z);
+        });
+        cellBits.set(cell,bits);
+      }
+      for(let i=0;i<bits.length;i++) {const bit=bits[i];next[bit>>>5]|=1<<(bit&31);}
+    }
+    for(const line of edgeGrid.lines) {
+      let word=line.first;
+      while(word<line.end&&active[word]===next[word]) word++;
+      if(word===line.end) continue;
+      const points=[];
+      for(word=line.first;word<line.end;word++) {
+        let mask=next[word];
+        while(mask) {
+          const bit=31-Math.clz32(mask&-mask);
+          points.push(line.values[(word-line.first)*32+bit]);mask&=mask-1;
+        }
+      }
+      const target=line.row?state.rows:state.columns;
+      if(points.length) target.set(line.at,points);else target.delete(line.at);
+    }
+    state.active=next;state.next=active;
+    return state;
+  };
   const Between=(values,from,to)=>values.slice(LowerBound(values,from),LowerBound(values,to+1e-8));
   const OutlineForCell = ({x,z,size},{rows,columns}=fullBoundaries) => {
     const maxX=x+size,maxZ=z+size;
@@ -327,9 +404,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     return state.error;
   };
   const normalCache = new Map();
-  const preparedNormals=new Map(prepared?prepared.normalKeys.map((key,index)=>[key,index]):[]);
+  const preparedNormals=new Map();
+  if(prepared) prepared.normalKeys.forEach((key,index)=>{
+    // Older snapshot files stored coordinates as strings.
+    preparedNormals.set(typeof key==="number"?key:GridKey(...key.split(",").map(Number)),index);
+  });
   const NormalAt = (x, z) => {
-    const key = `${x},${z}`;
+    const key = GridKey(x,z);
     if (!normalCache.has(key)) {
       const cached=preparedNormals.get(key);
       if(cached!==undefined) {
@@ -443,33 +524,86 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   // can project a ground vertex once per camera frame without changing seams.
   const vertices=new Map();
   const VertexAt=(x,z)=>{
-    const key=`${x},${z}`;
+    const key=GridKey(x,z);
     if(!vertices.has(key)) vertices.set(key,[x,Sample(x,z),z]);
     return vertices.get(key);
   };
   const surfaceColor=[198,207,169];
   // The common four-corner case already has every height in its quadtree
   // node. Build its native fan directly, including the exact diagonal merge.
-  const QuadMesh=cell=>{
-    const index=preparedMeshes.get(cell.nodeIndex);
-    if(index!==undefined) return {faces:null,packed:prepared.packedVertices.subarray(prepared.packedOffsets[index],prepared.packedOffsets[index+1])};
-    const {x,z,size,corners,centerHeight}=cell;
-    const points=[[x,corners[0],z],[x+size,corners[1],z],[x+size,corners[2],z+size],
-      [x,corners[3],z+size],[x+size/2,centerHeight,z+size/2]];
-    const normals=points.map(([px,,pz])=>NormalAt(px,pz));
-    let indices=[4,0,1,4,1,2,4,2,3,4,3,0];
+  // Textured LODs share world-grid positions and normals. Retain each vertex
+  // once, and change only triangle indices when a camera or neighbour changes.
+  const cornerCount=[...fullBoundaries.rows.values()].reduce((sum,line)=>sum+line.length,0);
+  const nodeCount=prepared?prepared.nodes.length/15:(4*cells.length-roots.length)/3;
+  const bakedCount=prepared?.nativeHeights?.length||0;
+  const nativePool={capacity:cornerCount+nodeCount,data:new Float32Array(Math.max(9216,bakedCount*9)),count:bakedCount};
+  const nativeIds=new Map();
+  for(let i=0;i<bakedCount;i++) {
+    const n=prepared.nativeNormalIds[i],key=prepared.normalKeys[n],at=i*9,data=nativePool.data;
+    if(typeof key==="number") {
+      const ix=Math.round(key/131072);
+      data[at]=ix/8;data[at+2]=(key-ix*131072)/8;
+    } else {
+      const [x,z]=key.split(",").map(Number);data[at]=x;data[at+2]=z;
+    }
+    data[at+1]=prepared.nativeHeights[i];
+    data.set(surfaceColor,at+3);
+    data[at+6]=prepared.normalValues[n*3];data[at+7]=prepared.normalValues[n*3+1];data[at+8]=prepared.normalValues[n*3+2];
+    nativeIds.set(key,i);
+  }
+  const NativeVertex=(x,y,z,normal)=>{
+    const key=GridKey(x,z),known=nativeIds.get(key);
+    if(known!==undefined) return known;
+    const index=nativePool.count++,at=index*9;
+    if(at+9>nativePool.data.length) {
+      const grown=new Float32Array(Math.max(9216,at+9,nativePool.data.length*2));grown.set(nativePool.data);nativePool.data=grown;
+    }
+    const data=nativePool.data;
+    data[at]=x;data[at+1]=y;data[at+2]=z;data.set(surfaceColor,at+3);data.set(normal??NormalAt(x,z),at+6);
+    nativeIds.set(key,index);return index;
+  };
+  const ExpandNative=indices=>{
+    const out=new Float32Array(indices.length*9),data=nativePool.data;
+    for(let i=0;i<indices.length;i++) {
+      const at=indices[i]*9;
+      for(let c=0;c<9;c++) out[i*9+c]=data[at+c];
+    }
+    return out;
+  };
+  const quadIndices=[[4,0,1,4,1,2,4,2,3,4,3,0],[0,1,2,0,2,3],[0,1,3,1,2,3]];
+  const QuadNormals=cell=>{
+    const {x,z,size}=cell;
+    return [NormalAt(x,z),NormalAt(x+size,z),NormalAt(x+size,z+size),NormalAt(x,z+size),NormalAt(x+size/2,z+size/2)];
+  };
+  const QuadTopology=(cell,normals)=>{
     for(const from of [0,1]) {
       const to=from+2;
-      if(Math.abs(centerHeight-(corners[from]+corners[to])/2)>=1e-7) continue;
-      if(!normals[4].every((value,axis)=>Math.abs(value-(normals[from][axis]+normals[to][axis])/2)<1e-7)) continue;
-      indices=from===0?[0,1,2,0,2,3]:[0,1,3,1,2,3];break;
+      if(Math.abs(cell.centerHeight-(cell.corners[from]+cell.corners[to])/2)>=1e-7) continue;
+      if(normals[4].every((value,axis)=>Math.abs(value-(normals[from][axis]+normals[to][axis])/2)<1e-7)) return from+1;
     }
-    const packed=new Float32Array(indices.length*9);
-    for(let i=0;i<indices.length;i++) {
-      const vertex=indices[i],at=i*9;
-      packed.set(points[vertex],at);packed.set(surfaceColor,at+3);packed.set(normals[vertex],at+6);
+    return 0;
+  };
+  const QuadIds=(cell,normals)=>{
+    const {x,z,size,corners,centerHeight}=cell;
+    return [NativeVertex(x,corners[0],z,normals[0]),NativeVertex(x+size,corners[1],z,normals[1]),
+      NativeVertex(x+size,corners[2],z+size,normals[2]),NativeVertex(x,corners[3],z+size,normals[3]),
+      NativeVertex(x+size/2,centerHeight,z+size/2,normals[4])];
+  };
+  const QuadMesh=cell=>{
+    const index=preparedMeshes.get(cell.nodeIndex);
+    if(index!==undefined&&prepared.packedVertices) {
+      const packed=prepared.packedVertices.subarray(prepared.packedOffsets[index],prepared.packedOffsets[index+1]);
+      const indices=new Uint32Array(packed.length/9);
+      for(let i=0;i<indices.length;i++) {
+        const at=i*9;indices[i]=NativeVertex(packed[at],packed[at+1],packed[at+2],packed.subarray(at+6,at+9));
+      }
+      return {faces:null,packed,indices};
     }
-    return {faces:null,packed};
+    const baked=index!==undefined&&prepared.quadVertexIds;
+    const normals=baked?null:QuadNormals(cell);
+    const vertices=baked?prepared.quadVertexIds.subarray(index*5,index*5+5):QuadIds(cell,normals);
+    const order=quadIndices[baked?prepared.quadTopology[index]:QuadTopology(cell,normals)];
+    return {faces:null,indices:Uint32Array.from(order,i=>vertices[i])};
   };
   const MeshForCell=(cell,boundaries=fullBoundaries,textured=false)=>{
     let cached=faceCache.get(cell);
@@ -542,13 +676,11 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         break;
       }
     }
-    let packed=null;
+    let meshIndices=null;
     if(textured) {
-      packed=new Float32Array(pointSets.length*27);
+      meshIndices=new Uint32Array(pointSets.length*3);
       let offset=0;
-      for(const points of pointSets) for(const point of points) {
-        packed.set(point,offset);packed.set(surfaceColor,offset+3);packed.set(NormalAt(point[0],point[2]),offset+6);offset+=9;
-      }
+      for(const points of pointSets) for(const point of points) meshIndices[offset++]=NativeVertex(...point);
     } else for(const points of pointSets) {
       const vertexColors = points.map(point => textured?surfaceColor:ColorAt(point[0], point[2]));
       const vertexNormals = points.map(point => NormalAt(point[0], point[2]));
@@ -557,7 +689,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       triangles.push({points,color,vertexColors,vertexNormals,minX:x,maxX,minZ:z,maxZ});
     }
     if(variants.size>=4) variants.delete(variants.keys().next().value);
-    const record={faces:triangles,packed};
+    const record={faces:triangles,indices:meshIndices};
     variants.set(key,record);
     cached[textured?"textured":"shaded"]={segments,record};
     return record;
@@ -565,6 +697,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   const PackedFacesForCell=(cell,textured=false,boundaries=fullBoundaries)=>{
     const record=MeshForCell(cell,boundaries,textured);
     if(record.packed) return record.packed;
+    if(record.indices) return record.packed=ExpandNative(record.indices);
     const faces=record.faces,packed=new Float32Array(faces.length*27);
     let offset=0;
     for(const face of faces) for(let index=0;index<3;index++) {
@@ -606,9 +739,10 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     variants.set(band,patch);
     return patch;
   };
-  const PackedTerrainPatch=(patch,visible)=>{
+  const IndicesForCell=(cell,boundaries)=>MeshForCell(cell,boundaries,true).indices;
+  const IndexedTerrainPatch=(patch,visible)=>{
     const {x,z,size,boundaries}=patch;
-    let rebuild=!patch.packed;
+    let rebuild=!patch.indices;
     // Match the visible neighbour's actual edge. A change elsewhere on the
     // same grid line must not invalidate this patch's resident vertex buffer.
     for(let side=0;side<4;side++) {
@@ -624,12 +758,16 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       rebuild=true;
     }
     if(rebuild) {
-      const meshes=patch.cells.map(cell=>PackedFacesForCell(cell,true,boundaries));
-      patch.packed=new Float32Array(meshes.reduce((sum,mesh)=>sum+mesh.length,0));
+      const meshes=patch.cells.map(cell=>IndicesForCell(cell,boundaries));
+      patch.indices=new Uint32Array(meshes.reduce((sum,mesh)=>sum+mesh.length,0));patch.packed=null;
       let offset=0;
-      for(const mesh of meshes) {patch.packed.set(mesh,offset);offset+=mesh.length;}
+      for(const mesh of meshes) {patch.indices.set(mesh,offset);offset+=mesh.length;}
     }
-    return patch.packed;
+    return patch.indices;
+  };
+  const PackedTerrainPatch=(patch,visible)=>{
+    const indices=IndexedTerrainPatch(patch,visible);
+    return patch.packed??=ExpandNative(indices);
   };
   const PrepareSnapshot=(focus=[0,0])=>{
     if(prepared) return prepared;
@@ -639,19 +777,22 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       if(cell.children) {childIndices.push(all.length);all.push(...cell.children);} else childIndices.push(-1);
     }
     const settings=FLOW_RENDERING.terrainBuild;
-    const candidates=all.filter(cell=>cell.size>=2&&Math.abs(cell.center[0]-focus[0])<=settings.prewarmRadiusM
+    // Store topology and five shared normal references instead of repeating
+    // position, colour and normal for each triangle corner. Spend the existing
+    // prewarm budget near the start camera, including the fine trench cells.
+    const candidates=all.filter(cell=>Math.abs(cell.center[0]-focus[0])<=settings.prewarmRadiusM
       &&Math.abs(cell.center[2]-focus[1])<=settings.prewarmRadiusM);
-    candidates.sort((a,b)=>b.size-a.size||Math.hypot(a.center[0]-focus[0],a.center[2]-focus[1])-Math.hypot(b.center[0]-focus[0],b.center[2]-focus[1]));
-    let bytes=0;
-    const packs=[],packedIds=[],packedOffsets=[0];
+    const distance2=cell=>(cell.center[0]-focus[0])**2+(cell.center[2]-focus[1])**2;
+    candidates.sort((a,b)=>distance2(a)-distance2(b)||b.size-a.size);
+    const packedIds=[],quadVertexIds=[],quadTopology=[];
     for(const cell of candidates) {
-      const packed=PackedFacesForCell(cell,true,BoundariesForCells([cell]));
-      if(bytes+packed.byteLength>settings.prewarmBytes) break;
-      packs.push(packed);packedIds.push(indices.get(cell));bytes+=packed.byteLength;packedOffsets.push(bytes/4);
-      HeightErrorForCell(cell,FLOW_RENDERING.terrainDetailHeightErrorM);
+      // Each node needs five vertex ids and its topology. Shared positions,
+      // colours and normals occupy nine floats per distinct source vertex.
+      if((packedIds.length+1)*25+(nativePool.count+5)*40>settings.prewarmBytes) break;
+      const normals=QuadNormals(cell);
+      quadVertexIds.push(...QuadIds(cell,normals));packedIds.push(indices.get(cell));
+      quadTopology.push(QuadTopology(cell,normals));HeightErrorForCell(cell,FLOW_RENDERING.terrainDetailHeightErrorM);
     }
-    const packedVertices=new Float32Array(bytes/4);
-    packs.forEach((packed,index)=>packedVertices.set(packed,packedOffsets[index]));
     const nodes=new Float64Array(all.length*15);
     for(const [index,cell] of all.entries()) nodes.set([cell.x,cell.z,cell.size,cell.minHeight,cell.maxHeight,cell.heightError,
       Number(cell.near),Number(cell.painted),childIndices[index],...cell.corners,cell.centerHeight,cell.exactHeightError??-1],index*15);
@@ -663,8 +804,15 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       offsets[index]=offset;return {keys,offsets,values};
     };
     const Raster=raster=>{if(!raster) return null;const {Blend,...data}=raster;return data;};
-    const normalKeys=[...normalCache.keys()],normalValues=new Float64Array(normalKeys.length*3);
-    normalKeys.forEach((key,index)=>normalValues.set(normalCache.get(key),index*3));
+    const keys=[...normalCache.keys()];
+    const normalKeys=keys.every(key=>typeof key==="number")?Float64Array.from(keys):keys;
+    const normalValues=new Float64Array(keys.length*3);
+    const nativeHeights=new Float32Array(nativePool.count),nativeNormalIds=new Uint32Array(nativePool.count);
+    normalKeys.forEach((key,index)=>{
+      normalValues.set(normalCache.get(key),index*3);
+      const vertex=nativeIds.get(key);
+      if(vertex!==undefined) {nativeHeights[vertex]=nativePool.data[vertex*9+1];nativeNormalIds[vertex]=index;}
+    });
     const errorIds=[],errorValues=[],errorOffsets=[0],errorPending=[];
     for(const cell of all) {
       const state=heightErrorCache.get(cell);
@@ -677,12 +825,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       rows:SerializeLines(fullBoundaries.rows),columns:SerializeLines(fullBoundaries.columns),
       groundPaint:Raster(groundPaint),routePaint:Raster(routePaint),backdropPaint,localBackdropPaint,surfaceMaps:SurfaceMaps(),normalKeys,normalValues,
       errorIds:new Uint32Array(errorIds),errorValues:new Float64Array(errorValues),errorOffsets:new Uint32Array(errorOffsets),errorPending:new Uint32Array(errorPending),
-      packedIds:new Uint32Array(packedIds),packedOffsets:new Uint32Array(packedOffsets),packedVertices};
+      packedIds:new Uint32Array(packedIds),quadVertexIds:new Uint32Array(quadVertexIds),nativeHeights,nativeNormalIds,quadTopology:new Uint8Array(quadTopology)};
   };
   let restoredCells;
   return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,
-    heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,colorRangeForCell:ColorRangeForCell,
+    heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,visibleBoundariesForCells:VisibleBoundariesForCells,colorRangeForCell:ColorRangeForCell,
     selectTerrainPatch:SelectTerrainPatch,packedTerrainPatch:PackedTerrainPatch,
+    nativePool,indicesForCell:IndicesForCell,indexedTerrainPatch:IndexedTerrainPatch,expandNative:ExpandNative,
     facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,prepareSnapshot:PrepareSnapshot,
     get cells(){return prepared?(restoredCells||=(Array.from(prepared.leafIds,RestoreNode))):cells;},
     leafCount:prepared?prepared.leafIds.length:cells.length,plan,source:scene.terrain.file,bounds};

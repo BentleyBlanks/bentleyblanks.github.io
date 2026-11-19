@@ -318,7 +318,11 @@ export class EncounterGpuOverlay {
     gl.disable(gl.BLEND);gl.disable(gl.SCISSOR_TEST);
     for(const unit of [2,1,0]) {gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,null);}
     const sx=raster.view.width/width,sy=raster.view.height/height;
-    this.context.drawImage(gpu.canvas,left,top,right-left,bottom-top,left*sx,top*sy,(right-left)*sx,(bottom-top)*sy);
+    gpu.Phase(null);
+    const cpu=gpu.trace?.cpu;
+    cpu?.Begin("叠层合成到画布");
+    try {this.context.drawImage(gpu.canvas,left,top,right-left,bottom-top,left*sx,top*sy,(right-left)*sx,(bottom-top)*sy);}
+    finally {cpu?.End();}
     while(this.pages.length>2) {
       const page=this.pages.shift();for(const key of page.keys) this.sprites.delete(key);gl.deleteTexture(page.texture);
     }

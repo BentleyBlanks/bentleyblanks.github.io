@@ -82,6 +82,11 @@ export class LevelFlowDebug {
     this.profileFrame=!capturing&&this.capture.capture?.gpuStatus!=="pending"&&this.profiler?.recording?this.profiler:null;
     if(this.profileFrame) {
       this.profileFrame.BeginFrame(time,!!tick&&tick.previous===this.lastRender);
+      const start=performance.now();
+      const previous=this.profileFrame.history.at(-1);
+      this.redrawIntervalMs=previous?start-previous.t0:null;
+      this.outsideRenderBeforeMs=previous?Math.max(0,start-previous.t0-previous.cpuMs):null;
+      this.beforeRender=tick?.beforeRender??null;
     }
     this.preview=null;
     this.lastRender=this.profileFrame&&tick?time:null;
@@ -94,7 +99,7 @@ export class LevelFlowDebug {
   SetFrameContext(frame) {
     if(!this.profileFrame) return;
     this.profileFrame.SetFrameContext("editorPreview",frame.stage.id);
-    this.preview={timeSeconds:frame.time,beat:frame.beat.id,viewports:[]};
+    this.preview={timeSeconds:frame.time,beat:frame.beat.id,redrawIntervalMs:this.redrawIntervalMs,outsideRenderBeforeMs:this.outsideRenderBeforeMs,beforeRender:this.beforeRender,viewports:[]};
   }
 
   BeginViewports() {
@@ -147,7 +152,10 @@ export class LevelFlowDebug {
           while(scopes.length) cpu.End();
           this.preview?.viewports.push({index:entry.index+1,type:entry.type,
             backend:entry.map.raster?(entry.map.raster.accelerated?"webgl2":"software"):"canvas2d",
-            width:entry.canvas.width,height:entry.canvas.height});
+            width:entry.canvas.width,height:entry.canvas.height,
+            camera:entry.map.eye?{eye:[...entry.map.eye],forward:[...entry.map.forward],up:[...entry.map.up],
+              perspective:entry.map.raster.perspective,scale:entry.map.scale,fov:entry.map.fov,near:entry.map.near,far:entry.map.far,
+              navigating:!!entry.map.navigationActive}:null});
         }
         capture?.EndViewport(Math.max(0,performance.now()-passStart-(capture.overhead-overhead)));
       },

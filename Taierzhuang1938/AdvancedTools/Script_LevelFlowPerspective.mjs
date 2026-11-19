@@ -309,6 +309,7 @@ export class FlowPerspectiveView extends FlowMapView {
       terrainCells.push(cell);
     };
     const DrawTerrainCell=(cell,boundaries)=>{
+      if(usePatches&&terrain.indicesForCell) {this.raster.WorldBatch(terrain.indicesForCell(cell,boundaries));return;}
       if(this.raster.accelerated&&this.mapData.terrain.packedFacesForCell) {
         this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell,texturedTerrain,boundaries));return;
       }
@@ -403,12 +404,15 @@ export class FlowPerspectiveView extends FlowMapView {
       cpu?.End();
     } else {
     cpu?.Begin("地形选块与接缝");
-    for(const root of this.mapData.terrain.roots) Visit(root);
-    this.terrainBoundaries=terrain.boundariesForCells?.(terrainCells,this.terrainBoundaries||{});
-    cpu?.End();
+    cpu?.Begin("视锥和细节筛选");
+    for(const root of terrain.roots) Visit(root);
+    cpu?.End();cpu?.Begin("共享边界");
+    const selectBoundaries=usePatches&&terrain.visibleBoundariesForCells||terrain.boundariesForCells;
+    this.terrainBoundaries=selectBoundaries?.(terrainCells,this.terrainBoundaries||{});
+    cpu?.End();cpu?.End();
     cpu?.Begin("地形几何");
     for(const cell of terrainCells) {
-      if(cell.perimeter) this.raster.WorldBatch(terrain.packedTerrainPatch(cell,this.terrainBoundaries));
+      if(cell.perimeter) this.raster.WorldBatch((terrain.indexedTerrainPatch||terrain.packedTerrainPatch)(cell,this.terrainBoundaries));
       else DrawTerrainCell(cell,this.terrainBoundaries);
     }
     this.terrainTriangles=this.raster.triangles;

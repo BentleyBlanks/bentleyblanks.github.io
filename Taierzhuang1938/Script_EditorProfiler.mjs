@@ -1224,7 +1224,7 @@ export class ProfilerEditor {
         ui.legend.appendChild(label);
       };
       for (const root of order) Swatch(ColorOf(root), CPU_LABELS[root] || root);
-      Swatch(BROWSER_COLOR, "浏览器侧");
+      Swatch(BROWSER_COLOR, "帧间余量估算");
       Swatch(GPU_LINE, "GPU");
       Swatch(BUDGET_COLOR, "预算");
       if (this._plotCounter >= 0) Swatch("#9fd3c7", this._CounterLabel(this._plotCounter));
@@ -1416,7 +1416,13 @@ export class ProfilerEditor {
     const state = FrameStateOf(row);
     lines.push(`#${row.id} · ${IsLiveFrame(row) ? `${F(row.interval)} ms` : "间隔 —"}`
       + ` · ${STATE_LABELS[state] || state}${row.stage ? ` · ${row.stage}` : ""}`);
-    lines.push(`主线程 ${F(row.cpuMs)} ｜ GPU ${F(row.gpuTotal)} ｜ 浏览器侧 ${IsLiveFrame(row) ? F(Math.max(0, row.interval - row.cpuMs)) : "—"}`);
+    lines.push(`主线程 ${F(row.cpuMs)} ｜ GPU ${F(row.gpuTotal)} ｜ 帧间余量 ${IsLiveFrame(row) ? F(row.preview?.outsideRenderBeforeMs ?? Math.max(0, row.interval - row.cpuMs)) : "—"}`);
+    if(row.preview) {
+      if(row.preview.redrawIntervalMs!=null) lines.push(`两次重绘间隔 ${F(row.preview.redrawIntervalMs)} ms（含按需等待）`);
+      if(row.preview.beforeRender) lines.push(`本次 rAF 绘制前：调试工具 ${F(row.preview.beforeRender.debugUpdateMs)} ms，导航 ${F(row.preview.beforeRender.navigationMs)} ms`);
+      const status={pending:"查询中",disjoint:"计时失效",expired:"查询过期",contextLost:"上下文丢失",unavailable:"无计时器",incomplete:"计时不完整",noSegments:"无分段"};
+      lines.push(`GPU 为已计时的 WebGL 分段合计，不含浏览器最终合成${status[row.gpuTiming]?" · "+status[row.gpuTiming]:""}`);
+    }
     const roots = Object.entries(row.cpu).filter(([key]) => key.indexOf("/") < 0)
       .sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([key, value]) => `${CPU_LABELS[key] || key} ${value.toFixed(2)}`);
@@ -1516,7 +1522,7 @@ export class ProfilerEditor {
       ctx.fillRect(cpuEnd, RULER, x1 - cpuEnd, H - RULER);
       ctx.fillStyle = "#56584f";
       ctx.font = "10px sans-serif";
-      if (x1 - cpuEnd > 70) ctx.fillText("浏览器侧", cpuEnd + 6, gpuY - 2);
+      if (x1 - cpuEnd > 70) ctx.fillText("间隔余量估算", cpuEnd + 6, gpuY - 2);
     }
     ctx.fillStyle = "#8a8b80";
     ctx.fillRect(Math.round(cpuEnd), RULER, 1, H - RULER);
@@ -1884,7 +1890,7 @@ export class ProfilerEditor {
       return row;
     };
     TotalRow(ui.cpuTable, ui.cpuRows, "__total", "主线程合计", summary.cpuTotal, 8);
-    TotalRow(ui.cpuTable, ui.cpuRows, "__browser", CPU_LABELS.browser, summary.browser, 8, "帧间隔减去主线程耗时。");
+    TotalRow(ui.cpuTable, ui.cpuRows, "__browser", CPU_LABELS.browser, summary.browser, 8, "编辑器取上次 CPU 绘制结束到本次开始的间隔，含输入、调度及等待。旧记录按帧间隔减 CPU 耗时估算。");
     this._Sweep(ui.cpuRows);
 
     // --- GPU 表 ---

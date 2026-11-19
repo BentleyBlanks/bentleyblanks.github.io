@@ -484,7 +484,7 @@ export function SummarizeFrames(allRows, {
     cpuAlloc: BucketStats("cpuAlloc"),
     other: Percentiles(rows.map((row) => row.other)),
     // 整帧减主线程：样式 / 布局 / 绘制 / 合成 / 等 vsync 全在这一段里。
-    browser: Percentiles(live.map((row) => Math.max(0, row.interval - row.cpuMs))),
+    browser: Percentiles(live.map((row) => row.preview?.outsideRenderBeforeMs ?? Math.max(0, row.interval - row.cpuMs))),
     gpu,
     gpuFrames: gpuRows.length,
     gpuTotal: Percentiles(gpuRows.map((row) => row.gpuTotal || 0)),
@@ -566,6 +566,7 @@ export class FrameProfiler {
     this._sampleCount = 0;
     this._gpuSegBuf = new Float64Array(GPU_SEG_STRIDE * 64);
     this._gpuSegCount = 0;
+    this._gpuTiming = "noSegments";
     this._gap = false;             // 下一条记录是暂停后的接缝帧
 
     this.cpu = Object.create(null);       // 本帧各桶累计（ms）
@@ -1241,6 +1242,7 @@ export class FrameProfiler {
     this._cpuStack.length = 0;
     this._sampleCount = 0;
     this._gpuSegCount = 0;
+    this._gpuTiming = "noSegments";
     this._frameStart = performance.now();
     if (this._info) this._info.reset();
   }
@@ -1386,6 +1388,7 @@ export class FrameProfiler {
       cpuAlloc: Pack(this.cpuAlloc),
       other: Math.max(0, cpuMs - bucketSum),
       gpu: null,          // _Poll 过几帧补上
+      gpuTiming: this._gpuTiming,
       gpuTotal: null,
       gpuCpu: Pack(this.gpuCpu),
       gpuCalls: Pack(this.gpuCalls),
@@ -1445,11 +1448,20 @@ export class FrameProfiler {
     if (!this._gpuActive) return;
     this._EndSeg();
     this._gpuActive = false;
+    if (this._gpuSegCount && this._segs.length !== this._gpuSegCount) {
+      // A missing timer is not a zero-duration pass; partial sums would
+      // understate this frame's GPU time. CPU submissions and draws remain valid.
+      this._gpuTiming = this._ext ? "incomplete" : "unavailable";
+      for (const seg of this._segs) this._gl.deleteQuery(seg.query);
+      this._segs.length = 0;
+      return;
+    }
     if (this._segs.length) {
+      this._gpuTiming = "pending";
       this._pending.push({ id: this.frameId, segs: this._segs.slice(), slots: this._gpuSegCount });
       this._segs.length = 0;
       // 结果迟迟不来（disjoint、上下文丢失）就丢最老的，别把查询对象攒成山
-      while (this._pending.length > 8) this._DropPending(this._pending.shift());
+      while (this._pending.length > 8) this._DropPending(this._pending.shift(), "expired");
     }
   }
 
@@ -1511,7 +1523,11 @@ export class FrameProfiler {
     return this._gpuSegCount - 1;
   }
 
-  _DropPending(entry) {
+  _DropPending(entry, reason) {
+    if (reason) {
+      const index = this.IndexOfId(entry.id);
+      if (index >= 0) this.history[index].gpuTiming = reason;
+    }
     for (const seg of entry.segs) this._gl.deleteQuery(seg.query);
   }
 
@@ -1519,8 +1535,9 @@ export class FrameProfiler {
     if (!this._ext || this._pending.length === 0) return;
     const gl = this._gl;
     // disjoint（降频、切上下文）期间的计时不可信，整批扔掉。读这个参数本身会清标志。
-    if (gl.getParameter(this._ext.GPU_DISJOINT_EXT)) {
-      for (const entry of this._pending) this._DropPending(entry);
+    if (gl.isContextLost() || gl.getParameter(this._ext.GPU_DISJOINT_EXT)) {
+      const reason = gl.isContextLost() ? "contextLost" : "disjoint";
+      for (const entry of this._pending) this._DropPending(entry, reason);
       this._pending.length = 0;
       return;
     }
@@ -1551,6 +1568,7 @@ export class FrameProfiler {
     if (index < 0) return;   // 记录已被环形淘汰（或暂停在帧中间、这一帧没入账）
     const record = this.history[index];
     record.gpu = sums;
+    record.gpuTiming = "ready";
     record.gpuTotal = total;
     record.gpuSegMs = perSeg;
     this.revision += 1;

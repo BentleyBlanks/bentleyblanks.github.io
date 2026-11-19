@@ -78,7 +78,7 @@ export class EncounterRaster {
   }
 
   WorldBatch(vertices) {
-    if(this.resident) {this.worldBatches.push(vertices);this.triangles+=vertices.length/27;return;}
+    if(this.resident) {this.worldBatches.push(vertices);this.triangles+=vertices.length/(vertices instanceof Uint32Array?3:27);return;}
     if(this.worldLength+vertices.length>this.worldVertices.length) {
       let capacity=this.worldVertices.length;
       while(capacity<this.worldLength+vertices.length) capacity*=2;
@@ -89,10 +89,11 @@ export class EncounterRaster {
 
   MaterializeWorldBatches() {
     if(!this.worldBatches.length) return;
-    const length=this.worldBatches.reduce((sum,vertices)=>sum+vertices.length,this.worldLength);
+    const batches=this.worldBatches.map(batch=>batch instanceof Uint32Array?this.view.mapData.terrain.expandNative(batch):batch);
+    const length=batches.reduce((sum,vertices)=>sum+vertices.length,this.worldLength);
     const vertices=new Float32Array(length);
     let offset=0;
-    for(const batch of this.worldBatches) {vertices.set(batch,offset);offset+=batch.length;}
+    for(const batch of batches) {vertices.set(batch,offset);offset+=batch.length;}
     vertices.set(this.worldVertices.subarray(0,this.worldLength),offset);
     this.worldVertices=vertices;this.worldLength=length;this.worldBatches=[];this.resident=false;
   }

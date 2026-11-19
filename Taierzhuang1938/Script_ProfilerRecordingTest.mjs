@@ -29,6 +29,27 @@ const Check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` (${detail})` : ""}`);
 };
 
+// Incomplete GPU query coverage must never appear as a fast/zero GPU pass.
+{
+  const r=FakeRenderer(),timer={TIME_ELAPSED_EXT:1,GPU_DISJOINT_EXT:2};
+  let allocated=0,deleted=0,disjoint=false,allowAll=false;
+  r.getContext=()=>({getExtension:()=>timer,isContextLost:()=>false,beginQuery(){},endQuery(){},
+    createQuery:()=>++allocated===1||allowAll?{}:null,deleteQuery(){deleted++;},getParameter:()=>disjoint});
+  const measured=new FrameProfiler(r);
+  measured.Enable();
+  const MakeFrame=()=>{
+    measured.BeginFrame();measured.GpuFrameStart(true);
+    for(const name of ["scene","overlay"]) {measured.GpuPush(name);measured.GpuPop();}
+    measured.GpuFrameEnd();measured.EndFrame();return measured.history.at(-1);
+  };
+  const partial=MakeFrame();
+  Check("部分 GPU 查询分配失败时保留提交记录并标为未完整计时",
+    partial.gpuTiming==="incomplete"&&partial.gpuTotal===null&&partial.gpuSegs.length===10&&deleted===1);
+  allowAll=true;
+  const interrupted=MakeFrame();disjoint=true;measured.PollGpu();
+  Check("GPU 时钟失效保留原因与空耗时",interrupted.gpuTiming==="disjoint"&&interrupted.gpuTotal===null&&deleted===3);
+  measured.Disable();
+}
 const viewport = "encounterViewport/视口 1";
 const legacyPreview = { id: 25, state: "editorPreview", cpuMs: 204, other: 1,
   cpu: { encounterViewport: 203, [viewport]: 203 },

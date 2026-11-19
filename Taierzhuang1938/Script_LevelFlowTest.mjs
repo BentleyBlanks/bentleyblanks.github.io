@@ -1353,6 +1353,13 @@ for(const selection of [selectedTerrain,selectedTerrain.slice(0,-7),selectedTerr
     terrain.packedFacesForCell(cell,true,incrementalBoundaries),terrain.packedFacesForCell(cell,true,fresh),
     'incremental seam meshes retain identical native geometry');
 }
+let indexedEdges={};
+for(const selection of [selectedTerrain,selectedTerrain.slice(3),[],selectedTerrain]) {
+  indexedEdges=terrain.visibleBoundariesForCells(selection,indexedEdges);
+  const reference=terrain.boundariesForCells(selection);
+  assert.deepEqual(BoundaryValues(indexedEdges.rows),BoundaryValues(reference.rows),"indexed visible rows match a full reconstruction");
+  assert.deepEqual(BoundaryValues(indexedEdges.columns),BoundaryValues(reference.columns),"indexed visible columns preserve every shared source corner");
+}
 let selectedFaces=0,fullBoundaryFaces=0;
 for(const cell of selectedTerrain) {
   const faces=terrain.facesForCell(cell,selectedBoundaries);

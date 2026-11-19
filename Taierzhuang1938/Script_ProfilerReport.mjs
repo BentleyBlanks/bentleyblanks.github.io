@@ -64,7 +64,7 @@ export const CPU_LABELS = {
   input: "输入",
   overlay: "编辑器叠加层",
   other: "未标记",
-  browser: "浏览器侧",
+  browser: "帧间余量",
 };
 
 /**
@@ -322,7 +322,7 @@ export function UnitLine(summary) {
   if (!b) return "—";
   const head = b.key ? `卡在 ${b.label}（${b.votes[b.key]}/${b.frames} 帧）` : "没有可判定的帧";
   return `${head} ｜ 逻辑 ${F(b.game)} ｜ 渲染提交 ${F(b.draw)} ｜ GPU ${b.gpu == null ? "—" : F(b.gpu)}`
-    + ` ｜ 浏览器侧 ${b.browser == null ? "—" : F(b.browser)} ｜ 剖析面板自身 ${F(b.overlay)} ms`;
+    + ` ｜ 帧间余量 ${b.browser == null ? "—" : F(b.browser)} ｜ 剖析面板自身 ${F(b.overlay)} ms`;
 }
 
 export function HitchLine(summary) {
