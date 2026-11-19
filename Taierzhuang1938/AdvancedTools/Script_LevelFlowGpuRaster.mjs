@@ -225,7 +225,7 @@ class GpuRaster {
         vec3 dx=abs(left.z)<abs(right.z)?left:right,dy=abs(top.z)<abs(bottom.z)?top:bottom;
         vec3 geometricNormal=normalize(cross(dx,dy));
         if(dot(geometricNormal,center)>0.0) geometricNormal=-geometricNormal;
-        float radius=clamp(aoSettings.x*projection.x/(perspective?max(center.z,0.15):1.0),2.0,aoSettings.z);
+        float radius=clamp(aoSettings.x*projection.x/(perspective?max(center.z,projection.z):1.0),2.0,aoSettings.z);
         float occlusion=0.0;
         for(int direction=0;direction<8;direction++) {
           float angle=float(direction)*0.785398163+turn;
@@ -583,7 +583,7 @@ class GpuRaster {
     }
     gl.uniform2f(this.aoUniforms.size,raster.width,raster.height);
     gl.uniform2f(this.aoUniforms.aoSize,this.target.aoWidth,this.target.aoHeight);
-    gl.uniform4f(this.aoUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
+    gl.uniform4f(this.aoUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,view.near,view.far);
     gl.uniform4f(this.aoUniforms.aoSettings,settings.aoRadiusM,settings.aoStrength,settings.aoMaxPixels,0);
     gl.uniform2f(this.aoUniforms.terrainAo,settings.aoTerrainScale??FLOW_RENDERING.lighting.aoTerrainScale,
       settings.aoTerrainBias??FLOW_RENDERING.lighting.aoTerrainBias);
@@ -635,7 +635,7 @@ class GpuRaster {
     if(raster.view) {
       const view=raster.view;
       for(const name of ['eye','right','up','forward']) gl.uniform3fv(this.cameraUniforms[name],view[name]);
-      gl.uniform4f(this.cameraUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,0.15,view.far);
+      gl.uniform4f(this.cameraUniforms.projection,(raster.perspective?view.focal:view.scale)*raster.coordinateScale,raster.perspective?0.49:0.57,view.near,view.far);
     }
     gl.uniform1i(this.world,1);this.DrawResidentGeometry();
     if(raster.worldLength) {

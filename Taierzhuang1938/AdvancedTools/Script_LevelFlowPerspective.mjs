@@ -1,7 +1,7 @@
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
-import { FLOW_RENDERING, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_RENDERING, FLOW_SCENE_CAMERA, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
 import { ApplyEncounterSky } from "./Script_LevelFlowSkyBlend.mjs";
@@ -12,10 +12,11 @@ function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a
 const sceneGeometry=new WeakMap();
 
 export class FlowPerspectiveView extends FlowMapView {
-  constructor(canvas,mapData,type="oblique") {
+  constructor(canvas,mapData,type="oblique",sceneCamera={...FLOW_SCENE_CAMERA}) {
     super(canvas,mapData);
     this.type=type;this.yaw=type==="oblique"?-0.45:0;this.pitch=0.67;this.target="player";this.scale=10;
-    this.far=1500;this.raster=new EncounterRaster();this.occlusion=new Map();this.freeCamera=null;
+    this.sceneCamera=sceneCamera;this.viewFar=FLOW_SCENE_CAMERA.far;
+    this.raster=new EncounterRaster();this.occlusion=new Map();this.freeCamera=null;
     // Camera navigation uses the same pixel density and terrain detail as rest.
     this.renderScale=1;
     let geometry=sceneGeometry.get(mapData);
@@ -26,6 +27,13 @@ export class FlowPerspectiveView extends FlowMapView {
     this.objectBases=geometry.bases;
     this.lighting=FLOW_RENDERING.lighting;
   }
+  get near() {return this.type==="scene"?this.sceneCamera.near:FLOW_SCENE_CAMERA.near;}
+  get far() {return this.type==="scene"?this.sceneCamera.far:this.viewFar;}
+  get fov() {
+    if(this.type==="eye") return Clamp(105-this.scale*4,FLOW_ZOOM.minEyeFovDeg,90);
+    return this.type==="scene"?this.sceneCamera.fov:FLOW_SCENE_CAMERA.fov;
+  }
+
   Draw(...args) {
     const start=performance.now();this.frameDrawing=true;
     try {super.Draw(...args);} finally {this.frameDrawing=false;ApplyEncounterSky(null);}
@@ -73,17 +81,16 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     this.forward=Normalize(this.aim.map((value,index)=>value-this.eye[index]));
     this.right=Normalize(Cross(this.forward,[0,1,0]));this.up=Cross(this.right,this.forward);
-    this.fov=this.type==="eye"?Clamp(105-this.scale*4,FLOW_ZOOM.minEyeFovDeg,90):65;
     this.focal=this.width/(2*Math.tan(this.fov*Math.PI/360));
     // Offscreen vehicles must not invalidate both static camera backgrounds on
     // every timeline tick. Include carried boxes too: they also write depth.
     this.solidActors=frame.actors.filter(actor=>(["tank","cart"].includes(actor.kind)||actor.carryingAmmo)&&this.SolidInView(actor));
     const vehicles=this.solidActors.map(actor=>[actor.id,actor.kind,actor.p,actor.heading,actor.turret,actor.pose,!!actor.carryingAmmo]);
-    this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.far,this.renderScale,vehicles]);
+    this.cameraKey=JSON.stringify([this.type,this.yaw,this.pitch,this.eye,this.aim,this.fov,this.near,this.far,this.renderScale,vehicles]);
   }
   Fit(bounds,padding=35) {
     this.freeCamera=null;super.Fit(bounds,padding);
-    if(this.type==="oblique") this.far=Math.max(this.far,Math.ceil(Math.hypot(bounds[1]-bounds[0],bounds[3]-bounds[2])*1.1/100)*100);
+    if(this.type==="oblique") this.viewFar=Math.max(this.far,Math.ceil(Math.hypot(bounds[1]-bounds[0],bounds[3]-bounds[2])*1.1/100)*100);
     const {width,height}=this.canvas.getBoundingClientRect(),ground=this.Ground(this.center);
     const corners=[[bounds[0],bounds[2]],[bounds[1],bounds[2]],[bounds[1],bounds[3]],[bounds[0],bounds[3]]];
     const projected=corners.map(point=>{
@@ -119,7 +126,7 @@ export class FlowPerspectiveView extends FlowMapView {
     return result;
   }
   SphereInView(camera,radius) {
-    if(camera[2]+radius<0.15||camera[2]-radius>this.far) return false;
+    if(camera[2]+radius<this.near||camera[2]-radius>this.far) return false;
     if(this.type!=="oblique"||this.freeCamera) {
       const horizontal=this.width/(2*this.focal),top=this.height*0.49/this.focal,bottom=this.height*0.51/this.focal;
       return Math.abs(camera[0])-horizontal*camera[2]<=radius*Math.hypot(1,horizontal)
@@ -141,7 +148,7 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     return {x:this.width/2+camera[0]*this.focal/camera[2],y:this.height*0.49-camera[1]*this.focal/camera[2],depth:camera[2]};
   }
-  Project(point) {const vertex=this.Vertex(point);return vertex.depth<0.15||vertex.depth>this.far?[-100000,-100000]:[vertex.x,vertex.y];}
+  Project(point) {const vertex=this.Vertex(point);return vertex.depth<this.near||vertex.depth>this.far?[-100000,-100000]:[vertex.x,vertex.y];}
   ToScreen(point) {return this.Project([point[0],this.Ground(point),point[1]]);}
   ProjectPath(points) {
     const paths=[];
@@ -173,9 +180,11 @@ export class FlowPerspectiveView extends FlowMapView {
     const orthographic=this.type==="oblique"&&!this.freeCamera;
     const x=(point[0]-this.width/2)/(orthographic?this.scale:this.focal),y=-(point[1]-this.height*(orthographic?0.57:0.49))/(orthographic?this.scale:this.focal);
     const origin=orthographic?this.eye.map((value,index)=>value+this.right[index]*x+this.up[index]*y):this.eye;
-    const direction=orthographic?this.forward:Normalize(this.forward.map((value,index)=>value+this.right[index]*x+this.up[index]*y));
-    let previous=0;
-    for(let distance=0;distance<=this.far;distance+=distance<100?0.25:1) {
+    // The ray advances in camera-space depth, matching the render clip planes.
+    const direction=orthographic?this.forward:this.forward.map((value,index)=>value+this.right[index]*x+this.up[index]*y);
+    const near=this.near,far=this.far;
+    let previous=near;
+    for(let distance=near;;distance=Math.min(far,distance+(distance<100?0.25:1))) {
       const world=origin.map((value,index)=>value+direction[index]*distance);
       if(world[1]<=this.Ground([world[0],world[2]])) {
         let low=previous,high=distance;
@@ -185,6 +194,7 @@ export class FlowPerspectiveView extends FlowMapView {
         }
         return [origin[0]+direction[0]*high,origin[2]+direction[2]*high];
       }
+      if(distance===far) break;
       previous=distance;
     }
     return [...this.center];
@@ -193,7 +203,7 @@ export class FlowPerspectiveView extends FlowMapView {
   NorthDirection() {return [-this.right[2],this.forward[2]];}
   DrawScale(context,width,height) {Label(context,`远裁剪 ${this.far} m`,18,height-31,"#655e4b",10);}
   FaceVertices(points, vertexColors = null) {
-    const orthographic=this.type==="oblique"&&!this.freeCamera;
+    const orthographic=this.type==="oblique"&&!this.freeCamera,near=this.near,far=this.far;
     const projected=points.map((point,index)=>{
       let vertex;
       if(orthographic) vertex=this.Vertex(point);
@@ -204,13 +214,12 @@ export class FlowPerspectiveView extends FlowMapView {
       if (vertexColors) vertex.rgb = vertexColors[index];
       return vertex;
     });
-    if(orthographic||projected.every(vertex=>vertex.depth>=0.15&&vertex.depth<=this.far)) return projected;
+    if(orthographic||projected.every(vertex=>vertex.depth>=near&&vertex.depth<=far)) return projected;
     let polygon=points.map((point, index) => {
       const camera = this.CameraPoint(point);
       return vertexColors ? [...camera, ...vertexColors[index]] : camera;
     });
-    if(polygon.some(point=>point[2]<0.15||point[2]>this.far)) {
-    for(const [edge,sign] of [[0.15,1],[this.far,-1]]) {
+    for(const [edge,sign] of [[near,1],[far,-1]]) {
       if(polygon.every(point=>(point[2]-edge)*sign>=0)) continue;
       if(polygon.every(point=>(point[2]-edge)*sign<0)) return [];
       const clipped=[];
@@ -221,13 +230,12 @@ export class FlowPerspectiveView extends FlowMapView {
       }
       polygon=clipped;if(polygon.length<3) return [];
     }
-    }
     return polygon.map(point=>({x:this.width/2+point[0]*this.focal/point[2],y:this.height*0.49-point[1]*this.focal/point[2],depth:point[2],
       ...(vertexColors ? {rgb:point.slice(3)} : {})}));
   }
   DrawBase(context,width,height,frame,layers={}) {
     const perspective=this.type!=="oblique"||!!this.freeCamera;
-    const renderScale=this.renderScale;
+    const renderScale=this.renderScale,near=this.near,far=this.far;
     ApplyEncounterSky(this.aim[2],this.frame.nightBlend||0);
     DrawEncounterSky(context,width,height,this);
     this.raster.Begin(width*renderScale,height*renderScale,perspective,renderScale);
@@ -249,7 +257,7 @@ export class FlowPerspectiveView extends FlowMapView {
     const horizontal=width/(2*this.focal),top=height*0.49/this.focal,bottom=height*0.51/this.focal;
     const horizontalNormal=Math.hypot(1,horizontal),topNormal=Math.hypot(1,top),bottomNormal=Math.hypot(1,bottom);
     const SphereInView=(camera,radius)=>{
-      if(camera[2]+radius<0.15||camera[2]-radius>this.far) return false;
+      if(camera[2]+radius<near||camera[2]-radius>far) return false;
       if(perspective) return Math.abs(camera[0])-horizontal*camera[2]<=radius*horizontalNormal
         &&camera[1]-top*camera[2]<=radius*topNormal&&-camera[1]-bottom*camera[2]<=radius*bottomNormal;
       const x=width/2+camera[0]*this.scale,y=height*0.57-camera[1]*this.scale,extent=radius*this.scale;
@@ -268,7 +276,7 @@ export class FlowPerspectiveView extends FlowMapView {
       const heightRange=cell.maxHeight-cell.minHeight,radius=cell.radius;
       const camera=this.CameraPoint(cell.center,terrainCamera);
       if(!SphereInView(camera,radius)) return;
-      const projectionScale=(perspective?this.focal/Math.max(0.15,camera[2]-radius):this.scale)*renderScale;
+      const projectionScale=(perspective?this.focal/Math.max(near,camera[2]-radius):this.scale)*renderScale;
       // Only batch fully visible patches. Keep culling individual cells at the frustum edge.
       if(usePatches&&cell.size<=FLOW_RENDERING.terrainPatchSizeM&&SphereInView(camera,-radius)) {
         terrainCells.push(terrain.selectTerrainPatch(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale));
@@ -298,7 +306,7 @@ export class FlowPerspectiveView extends FlowMapView {
         const a=TerrainVertex(triangle.points[0],triangle.vertexColors[0]);
         const b=TerrainVertex(triangle.points[1],triangle.vertexColors[1]);
         const c=TerrainVertex(triangle.points[2],triangle.vertexColors[2]);
-        if(!perspective||(a.depth>=0.15&&a.depth<=this.far&&b.depth>=0.15&&b.depth<=this.far&&c.depth>=0.15&&c.depth<=this.far)) {
+        if(!perspective||(a.depth>=near&&a.depth<=far&&b.depth>=near&&b.depth<=far&&c.depth>=near&&c.depth<=far)) {
           this.raster.Triangle(a,b,c,triangle.color);
         } else Face(triangle.points,triangle.color,triangle.vertexColors);
       }
@@ -346,7 +354,7 @@ export class FlowPerspectiveView extends FlowMapView {
           }
           return {...projected[index],rgb};
         });
-        if(perspective&&vertices.some(vertex=>vertex.depth<0.15||vertex.depth>this.far)) Face(indices.map(index=>geometry.points[index]),faceColor,indices.map(()=>rgb));
+        if(perspective&&vertices.some(vertex=>vertex.depth<near||vertex.depth>far)) Face(indices.map(index=>geometry.points[index]),faceColor,indices.map(()=>rgb));
         else this.raster.Face(vertices,faceColor);
       };
       const dx=this.eye[0]-x,dz=this.eye[2]-z,localX=dx*cosine-dz*sine,localZ=dx*sine+dz*cosine;
@@ -367,7 +375,7 @@ export class FlowPerspectiveView extends FlowMapView {
       this.shadowTerrain=this.mapData.terrain;
     }
     this.raster.shadowVertices=this.shadowVertices;
-    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.far,renderScale,texturedTerrain,FLOW_RENDERING.skyBlend,[...signals]]);
+    const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.fov,near,far,renderScale,texturedTerrain,FLOW_RENDERING.skyBlend,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
     const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
     if(cached) {
@@ -518,10 +526,10 @@ export class FlowPerspectiveView extends FlowMapView {
       const chars=[...text],step=Math.min(w/(chars.length+.5),h*.88),start=-(chars.length-1)*step/2;
       for(const [index,char] of chars.entries()) {
         const u=(start+index*step)*side,center=this.Vertex(Point(u,h*.5));
-        if(center.depth<.15||center.depth>this.far)continue;
+        if(center.depth<this.near||center.depth>this.far)continue;
         const hidden=this.raster.Occluded(center);if(!context||this.raster.collectingDepth||hidden)continue;
         const left=this.Vertex(Point(u-side*step*.44,h*.88)),right=this.Vertex(Point(u+side*step*.44,h*.88)),bottom=this.Vertex(Point(u-side*step*.44,h*.12));
-        if([left,right,bottom].some(p=>p.depth<.15))continue;
+        if([left,right,bottom].some(p=>p.depth<this.near||p.depth>this.far))continue;
         context.save();context.transform(right.x-left.x,right.y-left.y,bottom.x-left.x,bottom.y-left.y,left.x,left.y);
         context.font='bold 1px "Microsoft YaHei",sans-serif';context.textAlign='center';context.textBaseline='middle';context.fillStyle='#32291e';context.fillText(char,.5,.54,1);context.restore();
       }
@@ -555,19 +563,19 @@ export class FlowPerspectiveView extends FlowMapView {
       const vertex = this.Vertex(center);
       const corners = top.map(point => this.Vertex(point));
       const span = Math.max(...corners.map(point => point.x)) - Math.min(...corners.map(point => point.x));
-      if (vertex.depth > 0.15 && vertex.depth < this.far && !this.raster.Occluded(vertex) && span >= 8 && !this.raster.collectingDepth) {
+      if (vertex.depth >= this.near && vertex.depth <= this.far && !this.raster.Occluded(vertex) && span >= 8 && !this.raster.collectingDepth) {
         DrawCoverSymbol(context, [vertex.x, vertex.y]);
       }
     }
   }
   SpeechAnchor(actor) {
     const head = this.Vertex([actor.p[0], (actor.surfaceY ?? this.Ground(actor.p)) + (actor.elevation || 0) + SpeechHeadHeight(actor), actor.p[1]]);
-    return head.depth > 0.15 && head.depth < this.far ? [head.x, head.y] : null;
+    return head.depth >= this.near && head.depth <= this.far ? [head.x, head.y] : null;
   }
   VisibleActor(actor) {return !(this.type==="eye"&&!this.freeCamera&&actor.id===this.target);}
   EffectScreen(effect) {
     const point=this.Vertex([effect.p[0],this.Ground(effect.p)+(effect.elevation||0),effect.p[1]]);
-    return point.depth>0.15&&point.depth<this.far?[point.x,point.y]:null;
+    return point.depth>=this.near&&point.depth<=this.far?[point.x,point.y]:null;
   }
   DrawArea(context,area,color,label,selection,hit) {
     const [x,z]=area.center,[w,d]=area.size;
@@ -586,10 +594,10 @@ export class FlowPerspectiveView extends FlowMapView {
 
   }
   LabelVertex(actor) {return this.Vertex([actor.p[0],(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0)+(actor.kind==="tank"?1.8:actor.kind==="cart"?1.45:0.65),actor.p[1]]);}
-  ActorScreen(actor) {const vertex=this.LabelVertex(actor);return vertex.depth<0.15?[-100000,-100000]:[vertex.x,vertex.y];}
+  ActorScreen(actor) {const vertex=this.LabelVertex(actor);return vertex.depth<this.near||vertex.depth>this.far?[-100000,-100000]:[vertex.x,vertex.y];}
   ActorInView(actor) {
     const ground=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),points=[this.Vertex([actor.p[0],ground,actor.p[1]]),this.Vertex([actor.p[0],ground+1.8,actor.p[1]])];
-    return points.some(point=>point.depth>0.15&&point.depth<this.far&&point.x>-25&&point.x<this.width+25&&point.y>-100&&point.y<this.height+100);
+    return points.some(point=>point.depth>=this.near&&point.depth<=this.far&&point.x>-25&&point.x<this.width+25&&point.y>-100&&point.y<this.height+100);
   }
   ActorLabelOpacity(actor) {
     const stats=this.occlusion.get(actor.id);
@@ -631,7 +639,7 @@ export class FlowPerspectiveView extends FlowMapView {
         Segment(Point(0,1.05),Point(side*0.4,0.75),2);
       }
       const head=this.Vertex(Point(0,1.55)),neck=this.Vertex(Point(0,1.3));
-      if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
+      if(head.depth>=this.near&&head.depth<=this.far) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
       return;
     }
     if(actor.pose==="dead") {Segment([x-0.5,base+0.1,z],[x+0.5,base+0.1,z]);return;}
@@ -658,7 +666,7 @@ export class FlowPerspectiveView extends FlowMapView {
       Segment([x,base+1.1,z],[player.p[0]+0.15,this.Ground(player.p)+frame.stealth.eyeHeight-0.25,player.p[1]+0.3],3);
     }
     const head=this.Vertex([x,base+height*0.94*crouch,z]),neck=this.Vertex([x,base+height*0.8*crouch,z]);
-    if(head.depth>0.15) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
+    if(head.depth>=this.near&&head.depth<=this.far) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
   }
   DrawFire(context,effect,frame) {
     if(effect.phase>=0.3) return;

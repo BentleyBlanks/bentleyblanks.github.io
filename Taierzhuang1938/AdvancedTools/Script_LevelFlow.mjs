@@ -415,7 +415,7 @@ async function Start() {
   const mapData=await LoadEncounterMap({focus:frame.player});
   workspace=new EncounterViewports(Element("viewportGrid"),mapData,{
     activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;canvas.dataset.navigationTool=navigationTool;},
-    change:()=>Render(),bounds:StageBounds,bind:BindMap,
+    change:()=>Render(),bounds:StageBounds,bind:BindMap,storage,
   });
   navigation=new EncounterSceneControls(workspace,RequestRender);
   for(const entry of workspace.entries) navigation.BindGizmo(entry);

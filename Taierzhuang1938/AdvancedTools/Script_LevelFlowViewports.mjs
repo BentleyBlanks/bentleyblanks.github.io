@@ -1,18 +1,19 @@
 import { FlowMapView } from "./Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./Script_LevelFlowPerspective.mjs";
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
-import { ValidateViewportLayout } from "./Script_LevelFlowDocument.mjs";
-import { FLOW_DEFAULT_VIEWS, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
+import { ReadSceneCamera, ValidateViewportLayout } from "./Script_LevelFlowDocument.mjs";
+import { FLOW_DEFAULT_VIEWS, FLOW_SCENE_CAMERA, FLOW_SCENE_CAMERA_LIMITS, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 
 export const ENCOUNTER_VIEW_TYPES={plan:"空间总览",battle:"战斗局部",oblique:"立体俯视",scene:"Scene 自由视角",chase:"跟拍",eye:"玩家视线"};
 const ENCOUNTER_VIEW_GROUPS={"2D":["battle"],"3D":["scene","chase","eye"]};
 // Archived frame packets and framing controls still use the legacy projections.
 const LEGACY_VIEW_SELECTIONS={plan:"battle",oblique:"scene"};
+const SCENE_CAMERA_STORAGE_PREFIX="tengxian1938_encounter_scene_camera_v1_";
 
 export class EncounterViewports {
-  constructor(element,mapData,{activate,change,bounds,bind}) {
+  constructor(element,mapData,{activate,change,bounds,bind,storage}) {
     this.element=element;this.mapData=mapData;this.callbacks={activate,change,bounds,bind};
-    this.count=1;this.entries=[];this.activeIndex=0;
+    this.count=1;this.entries=[];this.activeIndex=0;this.storage=storage;
     for(const [index,type] of [...FLOW_DEFAULT_VIEWS.map(view=>view.type),"battle","eye"].entries()) {
       const pane=document.createElement("section");pane.className="lfViewPane";pane.dataset.viewport=String(index);
       const bar=document.createElement("div");bar.className="lfViewBar";
@@ -30,7 +31,7 @@ export class EncounterViewports {
       for(const [value,label] of [["player","顺子"],["winter","冬瓜"],["luo","班长"],["tank1","头车"]]) {const option=document.createElement("option");option.value=value;option.textContent=label;target.append(option);}
       bar.append(target);
       const cameraMenu=document.createElement("details");cameraMenu.className="lfViewCamera";
-      const cameraSummary=document.createElement("summary");cameraSummary.textContent="镜头";cameraSummary.title="镜头取景";
+      const cameraSummary=document.createElement("summary");cameraSummary.textContent="镜头";cameraSummary.title="镜头取景与相机设置";
       cameraSummary.setAttribute("aria-label",`视口 ${index+1} 镜头`);
       const cameraOptions=document.createElement("div");cameraMenu.append(cameraSummary,cameraOptions);bar.append(cameraMenu);
       const fit=document.createElement("button");fit.textContent="重置镜头";fit.title=`恢复视口 ${index+1} 的默认镜头位置`;cameraOptions.append(fit);
@@ -71,8 +72,15 @@ export class EncounterViewports {
         button.onclick=()=>{this.SetFraming(index,mode);cameraMenu.open=false;cameraSummary.focus();};cameraOptions.append(button);
       }
       pane.append(bar,canvas,legend);element.append(pane);
-      const entry={index,pane,bar,canvas,select,target,legend,type,layers,layerMenu,cameraMenu,mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type),size:null,defaultCamera:index<2};
+      const sceneCamera={...FLOW_SCENE_CAMERA};
+      try {
+        const saved=storage?.getItem(SCENE_CAMERA_STORAGE_PREFIX+index);
+        if(saved) Object.assign(sceneCamera,ReadSceneCamera(JSON.parse(saved)));
+      } catch { /* Camera settings still work without browser storage. */ }
+      const entry={index,pane,bar,canvas,select,target,legend,type,layers,layerMenu,cameraMenu,sceneCamera,
+        mode:type==="scene"?"manual":"follow",map:this.MakeView(canvas,type,sceneCamera),size:null,defaultCamera:index<2};
       this.entries.push(entry);
+      this.CreateCameraSettings(entry,cameraOptions);
       this.CreateGizmo(entry);
       pane.addEventListener("pointerdown",()=>this.Activate(index),{capture:true});
       select.onchange=()=>this.SetType(index,select.value);
@@ -91,6 +99,55 @@ export class EncounterViewports {
       for(const entry of this.entries) {entry.cameraMenu.open=false;entry.layerMenu.open=false;}
     });
     this.SetLayout(1);
+  }
+
+  CreateCameraSettings(entry,container) {
+    const fields=document.createElement("fieldset"),legend=document.createElement("legend");
+    fields.className="lfSceneCameraSettings";
+    legend.textContent="Scene 相机设置";
+    fields.append(legend);
+    const inputs={};
+    const status=document.createElement("output");status.hidden=true;
+    for(const [key,label,unit] of [["fov","水平 FOV","°"],["near","近裁剪","m"],["far","远裁剪","m"],["speed","移动速度","m/s"]]) {
+      const row=document.createElement("label"),name=document.createElement("span"),input=document.createElement("input");
+      const [min,max]=FLOW_SCENE_CAMERA_LIMITS[key];
+      name.textContent=label;
+      input.type="number";input.name=key;input.min=min;input.max=max;input.step="any";input.required=true;
+      input.setAttribute("aria-label",`视口 ${entry.index+1} ${label}（${unit}）`);
+      if(key==="speed") input.title="按住右键配合 WASD / Q / E 飞行，Shift 加速";
+      inputs[key]=input;
+      input.addEventListener("change",()=>{
+        const settings=ReadSceneCamera({...entry.sceneCamera,[key]:input.valueAsNumber});
+        if(!settings) {
+          input.setAttribute("aria-invalid","true");
+          status.textContent=input.validity.valid?"远裁剪须比近裁剪至少大 0.01 m。":`请输入 ${min}–${max} ${unit}。`;
+          status.hidden=false;
+          return;
+        }
+        this.SaveCameraSettings(entry,settings);
+      });
+      row.append(name,input,document.createTextNode(unit));fields.append(row);
+    }
+    const reset=document.createElement("button");reset.type="button";reset.textContent="恢复默认参数";
+    reset.addEventListener("click",()=>this.SaveCameraSettings(entry,FLOW_SCENE_CAMERA));
+    fields.append(status,reset);container.append(fields);
+    entry.cameraSettings=fields;
+    entry.syncCameraSettings=()=>{
+      for(const [key,input] of Object.entries(inputs)) {
+        input.value=entry.sceneCamera[key];input.removeAttribute("aria-invalid");
+      }
+      status.hidden=true;
+    };
+    entry.cameraMenu.addEventListener("toggle",()=>{if(entry.cameraMenu.open) entry.syncCameraSettings();});
+    entry.syncCameraSettings();
+  }
+
+  SaveCameraSettings(entry,settings) {
+    Object.assign(entry.sceneCamera,settings);
+    entry.syncCameraSettings();
+    try {this.storage?.setItem(SCENE_CAMERA_STORAGE_PREFIX+entry.index,JSON.stringify(settings));}
+    catch { /* Keep the settings available in this session. */ }
+    this.callbacks.change();
   }
 
   CreateGizmo(entry) {
@@ -129,8 +186,8 @@ export class EncounterViewports {
     }
   }
 
-  MakeView(canvas,type) {
-    return ["plan","battle"].includes(type)?new FlowMapView(canvas,this.mapData):new FlowPerspectiveView(canvas,this.mapData,type);
+  MakeView(canvas,type,sceneCamera) {
+    return ["plan","battle"].includes(type)?new FlowMapView(canvas,this.mapData):new FlowPerspectiveView(canvas,this.mapData,type,sceneCamera);
   }
   get active() {return this.entries[this.activeIndex];}
   Visible() {return this.entries.slice(0,this.count);}
@@ -175,7 +232,7 @@ export class EncounterViewports {
     if(!Object.hasOwn(ENCOUNTER_VIEW_TYPES,type)) return;
     const entry=this.entries[index],old=entry.map;
     entry.defaultCamera=false;entry.drawKey=null;
-    entry.type=type;entry.select.value=LEGACY_VIEW_SELECTIONS[type]||type;entry.map=this.MakeView(entry.canvas,type);
+    entry.type=type;entry.select.value=LEGACY_VIEW_SELECTIONS[type]||type;entry.map=this.MakeView(entry.canvas,type,entry.sceneCamera);
     entry.map.center=[...old.center];entry.map.scale=old.scale;
     entry.mode=type==="plan"?"stage":type==="scene"?"manual":"follow";
     if(type==="scene") {
@@ -229,6 +286,7 @@ export class EncounterViewports {
       if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
       entry.target.hidden=!perspective||entry.type==="scene";entry.gizmo.hidden=!perspective;
+      entry.cameraSettings.hidden=entry.type!=="scene";
       entry.legend.hidden=!entry.layers.hud;
       if(entry.mode==="follow") entry.map.Follow(frame);
       for(const button of entry.pane.querySelectorAll("[data-framing]")) {
@@ -239,7 +297,7 @@ export class EncounterViewports {
         }
       }
       const view=entry.map;
-      const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
+      const drawKey=JSON.stringify([entry.type,entry.mode,entry.layers,view.center,view.scale,view.freeCamera,view.yaw,view.pitch,view.fov,view.near,view.far,view.target,view.renderScale,view.hoveredActorId,rect.width,rect.height,window.devicePixelRatio]);
       if(!contentChanged&&drawKey===entry.drawKey) continue;
       entry.map.Draw(frame,entry.layers,selection,annotations,draft,rect);
       this.DrawGizmo(entry);
@@ -253,7 +311,8 @@ export class EncounterViewports {
       const rect=entry.canvas.getBoundingClientRect();
       return {type:entry.type,mode:entry.mode,layers:{...entry.layers},center:[...entry.map.center],scale:entry.map.scale,followZoom:entry.map.followZoom??1,
         yaw:entry.map.yaw||0,pitch:entry.map.pitch||0.67,target:entry.map.target||"player",viewport:{width:rect.width,height:rect.height},
-        ...(entry.map.type?{far:entry.map.far,freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20,
+        ...(entry.type==="scene"?entry.sceneCamera:entry.map.type?{far:entry.map.far}:{}),
+        ...(entry.map.type?{freeCamera:entry.map.freeCamera?structuredClone(entry.map.freeCamera):null,focusDistance:entry.map.focusDistance||20,
           followAnchor:entry.map.followAnchor?[...entry.map.followAnchor]:null}:{})};
     })};
   }
@@ -274,7 +333,14 @@ export class EncounterViewports {
       entry.mode=saved.mode;entry.map.center=[...saved.center];entry.map.yaw=saved.yaw;entry.map.pitch=saved.pitch;entry.map.target=saved.target;
       entry.map.followZoom=saved.followZoom??1;
       entry.map.followAnchor=saved.followAnchor?[...saved.followAnchor]:null;
-      if(entry.map.type) {entry.map.far=saved.far||1500;entry.map.freeCamera=saved.freeCamera?structuredClone(saved.freeCamera):entry.map.freeCamera;entry.map.focusDistance=saved.focusDistance||20;}
+      if(entry.type==="scene") {
+        Object.assign(entry.sceneCamera,ReadSceneCamera(saved));entry.syncCameraSettings();
+      }
+      if(entry.map.type) {
+        if(entry.type!=="scene") entry.map.viewFar=saved.far??FLOW_SCENE_CAMERA.far;
+        entry.map.freeCamera=saved.freeCamera?structuredClone(saved.freeCamera):entry.map.freeCamera;
+        entry.map.focusDistance=saved.focusDistance||20;
+      }
       const ratio=saved.viewport?Math.min(rect.width/saved.viewport.width,rect.height/saved.viewport.height):1;
       entry.map.scale=Clamp(saved.scale*ratio,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);
       entry.size={width:rect.width,height:rect.height};

@@ -12,6 +12,7 @@ import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.m
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
 import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
+import { EncounterSceneControls } from "./AdvancedTools/Script_LevelFlowControls.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED, FLOW_PREVIOUS_TANK_APPROACH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_DIALOGUE } from "./AdvancedTools/Data_LevelFlow.mjs";
@@ -129,14 +130,22 @@ for (const perspective of [false, true]) {
   }
 }
 const clipped = FlowPerspectiveView.prototype.FaceVertices.call({
-  type:"scene", freeCamera:{}, width:64, height:64, focal:32, far:1500, CameraPoint:point => point,
+  type:"scene", freeCamera:{}, width:64, height:64, focal:32, near:0.25, far:1500, CameraPoint:point => point,
 }, [[0,0,0], [1,0,1], [0,1,1]], [[0,0,0], [100,100,100], [200,200,200]]);
-assert.ok(clipped.every(vertex => vertex.depth >= 0.15 && vertex.rgb.length === 3));
-assert.ok(clipped.some(vertex => Math.abs(vertex.depth - 0.15) < 1e-8 && Math.abs(vertex.rgb[0] - 15) < 1e-8),
+assert.ok(clipped.every(vertex => vertex.depth >= 0.25 && vertex.rgb.length === 3));
+assert.ok(clipped.some(vertex => Math.abs(vertex.depth - 0.25) < 1e-8 && Math.abs(vertex.rgb[0] - 25) < 1e-8),
   "near-plane clipping interpolates terrain colors with geometry");
 
+const flyView={sceneCamera:{speed:24},freeCamera:{eye:[0,0,0],yaw:0,pitch:0}};
+const flyControls={drag:{action:"look",entry:{map:flyView}},keys:new Set(["KeyW"]),wheelViews:new Map()};
+EncounterSceneControls.prototype.Tick.call(flyControls,0.25);
+assert.deepEqual(flyView.freeCamera.eye,[0,0,6],"right-button fly movement uses the configured metres per second");
+flyControls.keys.add("ShiftLeft");
+EncounterSceneControls.prototype.Tick.call(flyControls,0.25);
+assert.deepEqual(flyView.freeCamera.eye,[0,0,30],"Shift multiplies the configured speed by four");
+
 const lineView=Object.assign(Object.create(FlowPerspectiveView.prototype),{
-  type:"scene",freeCamera:{},width:640,height:360,focal:320,far:100,
+  type:"scene",freeCamera:{},width:640,height:360,focal:320,sceneCamera:{near:0.5,far:100},
   Ground:()=>0,CameraPoint:point=>[point[0],point[1]-10,point[2]],
 });
 const visibleRoute=[[-2,10],[0,20],[3,30]];

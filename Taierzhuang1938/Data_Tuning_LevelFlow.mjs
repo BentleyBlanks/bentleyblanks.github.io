@@ -68,3 +68,8 @@ export const FLOW_ZOOM = {
   minScale:0.08, maxScale:320,
   minChaseDistanceM:1.5, minEyeFovDeg:12,
 };
+
+export const FLOW_SCENE_CAMERA = {fov:65, near:0.15, far:1500, speed:12};
+export const FLOW_SCENE_CAMERA_LIMITS = {
+  fov:[10,150], near:[0.01,1000], far:[0.02,10000], speed:[0.1,120],
+};

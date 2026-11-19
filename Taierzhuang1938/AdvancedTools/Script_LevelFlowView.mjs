@@ -345,7 +345,7 @@ export class FlowMapView {
         if(range>(landmark.detail?32:Math.max(85,height*4)))continue;
       }
       const anchor=this.LandmarkAnchor?.(landmark);
-      if(anchor&&(anchor.depth<0.15||anchor.depth>this.far))continue;
+      if(anchor&&(anchor.depth<this.near||anchor.depth>this.far))continue;
       const point=anchor?[anchor.x,anchor.y]:this.ToScreen(landmark.p);
       if(point[0]<12||point[0]>width-45||point[1]<24||point[1]>height-24) continue;
       const [x,z]=landmark.p;

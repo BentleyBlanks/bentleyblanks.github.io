@@ -294,7 +294,7 @@ export class EncounterSceneControls {
     const forward=Number(this.keys.has("KeyW"))-Number(this.keys.has("KeyS"));
     const right=Number(this.keys.has("KeyD"))-Number(this.keys.has("KeyA"));
     const vertical=Number(this.keys.has("KeyE"))-Number(this.keys.has("KeyQ"));
-    const speed=12*(this.keys.has("ShiftLeft")||this.keys.has("ShiftRight")?4:1)*delta/Math.max(1,Math.hypot(forward,right,vertical));
+    const speed=view.sceneCamera.speed*(this.keys.has("ShiftLeft")||this.keys.has("ShiftRight")?4:1)*delta/Math.max(1,Math.hypot(forward,right,vertical));
     const movement=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*forward-Math.cos(camera.yaw)*right,
       Math.sin(camera.pitch)*forward+vertical,Math.cos(camera.yaw)*Math.cos(camera.pitch)*forward+Math.sin(camera.yaw)*right];
     camera.eye=camera.eye.map((value,index)=>value+movement[index]*speed);

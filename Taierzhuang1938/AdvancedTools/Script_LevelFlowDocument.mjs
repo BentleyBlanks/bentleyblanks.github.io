@@ -1,8 +1,20 @@
-import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_SCENE_CAMERA, FLOW_SCENE_CAMERA_LIMITS, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { ValidateEncounterDocument, UpgradeEncounterDocument } from "./Script_LevelFlowEncounter.mjs";
 
 export const ENCOUNTER_STORAGE_KEY = "tengxian1938_encounter_FirstLevelEncounter_v1";
 export const FRAME_SCHEMA = "tengxian-encounter-frame/2";
+
+export function ReadSceneCamera(source) {
+  const settings={...FLOW_SCENE_CAMERA};
+  for(const [key,[min,max]] of Object.entries(FLOW_SCENE_CAMERA_LIMITS)) {
+    const value=source?.[key];
+    if(value===undefined) continue;
+    if(!Number.isFinite(value)||value<min||value>max) return null;
+    settings[key]=value;
+  }
+  // Keep the planes separated when passed to the GPU as 32-bit floats.
+  return settings.far-settings.near>=0.01-1e-9?settings:null;
+}
 
 export function ValidateViewportLayout(layout) {
   const types=["plan","battle","oblique","scene","chase","eye"],modes=["stage","all","manual","follow"];
@@ -13,7 +25,7 @@ export function ValidateViewportLayout(layout) {
       &&(view.followZoom===undefined||Number.isFinite(view.followZoom)&&view.followZoom>=0.001&&view.followZoom<=1000)
       &&(view.followAnchor==null||Array.isArray(view.followAnchor)&&view.followAnchor.length===3&&view.followAnchor.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000))
       &&["player","winter","luo","tank1"].includes(view.target)
-      &&(view.far===undefined||Number.isFinite(view.far)&&view.far>=100&&view.far<=10000)
+      &&(view.type==="scene"?ReadSceneCamera(view):view.far===undefined||Number.isFinite(view.far)&&view.far>=100&&view.far<=10000)
       &&(view.focusDistance===undefined||Number.isFinite(view.focusDistance)&&view.focusDistance>0&&view.focusDistance<=10000)
       &&(view.freeCamera==null||Array.isArray(view.freeCamera.eye)&&view.freeCamera.eye.length===3&&view.freeCamera.eye.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000)
         &&Number.isFinite(view.freeCamera.yaw)&&Number.isFinite(view.freeCamera.pitch)&&Math.abs(view.freeCamera.pitch)<Math.PI/2)

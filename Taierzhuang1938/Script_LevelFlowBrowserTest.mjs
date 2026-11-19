@@ -120,7 +120,7 @@ try {
       const failed=new EncounterRaster();failed.gpu={gl:{isContextLost:()=>false},Draw:()=>false};
       const recovered=Draw(failed);
       results.push({fallback:!failed.accelerated,same:recovered.every((value,index)=>Math.abs(value-expected[index])<=1)});
-      const view={eye:[0,0,0],right:[1,0,0],up:[0,1,0],forward:[0,0,1],focal:32,scale:4,far:50,width:64,height:48,
+      const view={eye:[0,0,0],right:[1,0,0],up:[0,1,0],forward:[0,0,1],focal:32,scale:4,near:perspective?0.65:0.15,far:50,width:64,height:48,
         type:perspective?'scene':'oblique',CameraPoint:point=>point,
         Vertex:point=>({x:32+point[0]*4,y:48*.57-point[1]*4,depth:point[2]})};
       view.FaceVertices=(...args)=>FlowPerspectiveView.prototype.FaceVertices.apply(view,args);
@@ -486,7 +486,39 @@ try {
   assert.equal(await page.locator('.lfViewFraming').count(),0,'framing actions share the top-bar camera menu');
   const cameraMenu=page.locator('.lfViewPane[data-viewport="0"] .lfViewCamera');
   await cameraMenu.locator('summary').click();
-  assert.deepEqual(await cameraMenu.locator('button').allTextContents(),['重置镜头','当前剧情范围','整个关卡','自动跟随']);
+  assert.deepEqual(await cameraMenu.locator('button').allTextContents(),['重置镜头','当前剧情范围','整个关卡','自动跟随','恢复默认参数']);
+  const ReadCameraSettings=()=>page.evaluate(()=> {
+    const {fov,near,far,speed}=LevelFlow.Packet().context.viewports.views[0];
+    return {fov,near,far,speed};
+  });
+  const defaultSettings={fov:65,near:0.15,far:1500,speed:12};
+  assert.deepEqual(await ReadCameraSettings(),defaultSettings);
+  const SetCameraSetting=async(key,value)=>{
+    const input=cameraMenu.locator(`input[name="${key}"]`);
+    await input.fill(String(value));await input.press('Enter');
+  };
+  const testPoint=[initialLayout.views[0].center[0]+8,initialLayout.views[0].center[1]];
+  const originalScreen=await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint);
+  await SetCameraSetting('fov',42);
+  const tighterScreen=await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint);
+  const screenCenter=initialLayout.views[0].viewport.width/2;
+  assert.ok(Math.abs(tighterScreen[0]-screenCenter)>Math.abs(originalScreen[0]-screenCenter),'FOV reprojects a paused viewport');
+  await SetCameraSetting('far',20);
+  assert.deepEqual(await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint),[-100000,-100000],'editor far plane clips projection');
+  await SetCameraSetting('far',120);
+  await SetCameraSetting('near',90);
+  assert.deepEqual(await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint),[-100000,-100000],'editor near plane clips projection');
+  await SetCameraSetting('near',120);
+  assert.equal(await cameraMenu.locator('input[name="near"]').getAttribute('aria-invalid'),'true');
+  assert.equal((await ReadCameraSettings()).near,90,'invalid clip planes keep the last valid projection');
+  await SetCameraSetting('near',0.35);
+  await SetCameraSetting('speed',24);
+  const tunedSettings={fov:42,near:0.35,far:120,speed:24};
+  assert.deepEqual(await ReadCameraSettings(),tunedSettings);
+  await page.evaluate(()=>LevelFlow.RestoreViewports(LevelFlow.Packet().context.viewports));
+  assert.deepEqual(await ReadCameraSettings(),tunedSettings,'frame restore retains Scene settings');
+  await cameraMenu.getByRole('button',{name:'恢复默认参数'}).click();
+  assert.deepEqual(await ReadCameraSettings(),defaultSettings);
   await page.screenshot({path:path.join(out,'CameraMenuSingle.png')});
   await page.keyboard.press('Escape');assert.equal(await cameraMenu.getAttribute('open'),null);
   await cameraMenu.locator('summary').click();await page.locator('#frameHeading').click();
@@ -1604,7 +1636,7 @@ try {
     const bubble=DrawFlowDialogue(context,view,frame,220,220)[0];
     const hidden=DrawFlowDialogue(context,{...view,ActorLabelOpacity:()=>0},frame,220,220).length;
     const self=DrawFlowDialogue(context,{...view,VisibleActor:()=>false},frame,220,220).length;
-    const behind=FlowPerspectiveView.prototype.SpeechAnchor.call({Ground:()=>0,Vertex:()=>({x:50,y:50,depth:-1}),far:1500},actor);
+    const behind=FlowPerspectiveView.prototype.SpeechAnchor.call({Ground:()=>0,Vertex:()=>({x:50,y:50,depth:-1}),near:0.15,far:1500},actor);
     return {bubble,hidden,self,behind};
   });
   assert.ok(speechClipping.bubble.lines.length>1,'long speech wraps');
