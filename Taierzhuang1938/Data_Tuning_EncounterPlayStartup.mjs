@@ -12,6 +12,9 @@ export const ENCOUNTER_PLAY_STARTUP = {
   meshRevealBatch:2048,
   // Warm draws need the real formats and quality, while pixel count can stay small.
   warmupHeight:144,
+  // Local GLBs contain the authoring images. Ship-size the encounter cast
+  // before its first upload, matching Model/Character in Data_PublishPathRules.
+  castTextureMaxSize:2048,
   settleFrames:4,
   settleDt:1/60,
   idleCacheMs:120000,

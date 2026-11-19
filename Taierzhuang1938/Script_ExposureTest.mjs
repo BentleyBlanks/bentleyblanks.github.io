@@ -130,7 +130,6 @@ async function ProbeSection(page) {
       U.uGodStrength.value = 0;
       U.uVignette.value = 0;
       U.uAberration.value = 0;
-      U.uGrain.value = 0;
       U.uSaturation.value = 1;
       U.uContrast.value = 1;
       U.uLift.value.set(0, 0, 0);

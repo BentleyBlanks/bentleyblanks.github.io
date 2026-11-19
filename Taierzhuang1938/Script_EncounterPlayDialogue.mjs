@@ -1,3 +1,4 @@
+import { FLOW_SPEECH_HUD } from "./Data_Tuning_LevelFlow.mjs";
 import { ENCOUNTER_PLAY as CONFIG } from "./Scenes/FirstLevelEncounter/Data_Play.mjs";
 import { DrawFlowDialogue, SpeechHeadHeight } from "./Scenes/FirstLevelEncounter/Script_LevelFlowDialogue.mjs";
 
@@ -47,17 +48,22 @@ export class EncounterPlayDialogue {
   Set(frame,lines) {this.frame=frame;this.lines=lines;}
   Render() {
     const frame=this.frame;
-    this.bubbles=[];
+    const previous=this.bubbles;this.bubbles=[];
     for(const [index,canvas] of this.canvases.entries()) {
       const source=index===0?this.host.canvas:this.view.canvas;
       const active=!!frame&&this.lines.length>0&&(index===0||this.view.count===2);
       canvas.hidden=!active;
-      if(!active)continue;
+      if(!active){
+        // Clear once on hide; a later line must not reveal old speech pixels.
+        if(previous[index]?.length)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
+        continue;
+      }
       const rect=source.getBoundingClientRect(),width=Math.max(1,Math.round(rect.width)),height=Math.max(1,Math.round(rect.height));
       canvas.style.left=rect.left+"px";canvas.style.top=rect.top+"px";
       canvas.style.width=width+"px";canvas.style.height=height+"px";
-      if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
-      const context=canvas.getContext("2d");context.clearRect(0,0,width,height);
+      const resized=canvas.width!==width||canvas.height!==height;
+      if(resized){canvas.width=width;canvas.height=height;}
+      const context=canvas.getContext("2d");
       const camera=index===0?this.host.camera:this.view.camera;
       const anchors=new Map();
       for(const line of this.lines){
@@ -70,6 +76,12 @@ export class EncounterPlayDialogue {
       // Narrative speech gets its speaker's bubble; the persistent order stays
       // readable below instead of drawing a second box on the same head.
       const speaking=new Set(this.lines.filter(line=>!line.order).map(line=>line.actorId));
+      // The GPU also draws this transparent overlay. Invalidating all its tiles
+      // for one speech bubble costs a full-screen raster even with an idle HUD.
+      if(!resized)for(const {box:[x,y,w,h],anchor:[ax,ay]} of previous[index]||[]){
+        const left=Math.floor(Math.min(x,ax))-12,top=Math.floor(Math.min(y,ay-FLOW_SPEECH_HUD.headGap))-12;
+        context.clearRect(left,top,Math.ceil(Math.max(x+w,ax))-left+12,Math.ceil(Math.max(y+h,ay-FLOW_SPEECH_HUD.headGap))-top+12);
+      }
       const bubbles=DrawFlowDialogue(context,{SpeechAnchor:actor=>anchors.get(actor.id)},
         {...frame,dialogue:this.lines.filter(line=>!line.order||!speaking.has(line.actorId))},width,height);
       this.bubbles[index]=bubbles;

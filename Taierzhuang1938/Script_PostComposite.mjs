@@ -52,7 +52,7 @@ import { VOLUMETRIC_SAMPLE_GLSL, BindVolumetricUniforms } from "./Script_PostVol
 // 2026-09 相机曝光轮（子系统 B6a）：tonemap 曲线、3D LUT、相机数值表。
 import { TONEMAP_GLSL } from "./Script_PostExposure.mjs";
 import { LUT_GLSL, GradeLutCache, GradeFromUniforms } from "./Script_PostGrade.mjs";
-import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS, FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
+import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS } from "./Data_Tuning_Camera.mjs";
 
 // ## 2026-09 相机曝光轮：四段换了实现，接口与默认值一个都没动
 //   · SEGMENT exposure —— `uExposureTex` 的**生产者接上了**（Script_PostExposure
@@ -61,7 +61,7 @@ import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS, FILM_GRAIN } fro
 //   · SEGMENT color-grade —— 改成查 3D LUT（`uLut` / `uLutAmount`）。
 //     `uLutAmount = 0` 时走原来那套算式，逐比特不变；LUT 是**同一套数学**
 //     在 JS 里烘出来的（Script_PostGrade），两条路差 ≤ 1/255。
-//   · SEGMENT lens —— 受伤/暗角/颗粒/黑场原样保留（光晕不在这一段：
+//   · SEGMENT lens —— 受伤/暗角/黑场；颗粒在最终送屏（光晕不在这一段：
 //     它必须在 tonemap 之前，见 SEGMENT exposure 的抬头）。
 //   · SEGMENT encode —— 多一位 `uDither`（三角分布抖动，出厂 0）。
 // **关掉 autoExposure / lut / lensFlare 三位之后，这一 pass 逐比特等于重构前。**
@@ -154,14 +154,6 @@ uniform float uSplitHighlight;
 
 // --- SEGMENT lens -----------------------------------------------------------
 uniform float uVignette;
-uniform float uGrain;          // 胶片颗粒：sRGB 域标准差（0–1）；0 = 关
-uniform float uGrainSeed;      // 当前花样的种子（整数，0..seedCount-1）
-uniform float uGrainSeedNext;  // 下一张花样的种子（与 uGrainSeed 平滑过渡）
-uniform float uGrainBlend;     // 0 = 只用当前种子，1 = 只用下一张；过渡中途按权重平方和归一
-uniform float uGrainPx;        // 颗粒格边长（目标像素）；≤ 1 = 逐像素
-uniform float uGrainMode;      // 0 = 单格亮度噪声（low 档），1 = 平滑插值 + 彩色颗粒
-uniform float uGrainChroma;    // 彩色颗粒比例（0–1）
-uniform vec2 uGrainResponse;   // x = 高光残留比例，y = 黑位压到 0 的宽度
 uniform float uHitDisorientation;
 uniform vec2 uHitOffset;
 uniform float uHitGhostMix;
@@ -506,63 +498,11 @@ vec3 ColorGrade(vec3 color, out float gradedLuma) {
 }
 
 // ===========================================================================
-// SEGMENT lens —— 受伤反馈 / 暗角 / 颗粒 / 黑场
+// SEGMENT lens —— 受伤反馈 / 暗角 / 黑场
 //
 // （色差的通道偏移在 MotionBlur 那一趟里做，见那一段的抬头。）
 // 镜头光晕、镜头脏污接在这里：都属于「镜头上发生的事」，在调色之后、编码之前。
 // ===========================================================================
-
-// 胶片颗粒的格点噪声：一格四个独立的 [0,1) 值（Hoskins hash44）。
-vec4 GrainHash(vec2 cell) {
-  vec4 p = fract(vec4(cell.xyxy) * vec4(.1031, .1030, .0973, .1099));
-  p += dot(p, p.wzxy + 33.33);
-  return fract((p.xxyz + p.yzzw) * p.zywx);
-}
-
-// 一格的颗粒：.w 是亮度噪声，.xyz 是各通道的彩色噪声；均匀分布拉成单位方差（σ = 1）。
-vec3 GrainCell(vec2 cell, float seed, float chroma) {
-  vec4 n = (GrainHash(cell + vec2(seed * 17.0, seed * 29.0)) - 0.5) * 3.4641016;
-  // 亮度噪声与色度噪声独立，方差各占 (1-c) 与 c：每个通道仍是单位方差。chroma = 0 即纯亮度噪声。
-  return sqrt(1.0 - chroma) * n.w + sqrt(chroma) * n.xyz;
-}
-
-// 某一张种子的单位方差颗粒场。
-//   · uGrainMode < 0.5（low 档的便宜路径）：最近格、纯亮度噪声（一次 hash）。
-//   · 颗粒格 ≤ 1 像素：逐像素一格、带彩色颗粒、不插值。
-//   · 否则：四格平滑插值（smoothstep 权重），**再除以权重平方和的平方根**——插值会压低方差，
-//     不归一的话「颗粒大小」滑杆会同时改强度。
-vec3 FilmGrainFieldAt(vec2 fragCoord, float seed) {
-  if (uGrainMode < 0.5) return vec3(GrainCell(floor(fragCoord / max(uGrainPx, 1.0)), seed, 0.0).x);
-  if (uGrainPx <= 1.001) return GrainCell(floor(fragCoord), seed, uGrainChroma);
-  vec2 p = fragCoord / uGrainPx - 0.5;
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 w = f * f * (3.0 - 2.0 * f);
-  vec3 a = GrainCell(i, seed, uGrainChroma), b = GrainCell(i + vec2(1.0, 0.0), seed, uGrainChroma);
-  vec3 c = GrainCell(i + vec2(0.0, 1.0), seed, uGrainChroma), d = GrainCell(i + vec2(1.0, 1.0), seed, uGrainChroma);
-  vec3 n = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
-  vec2 q = (1.0 - w) * (1.0 - w) + w * w;
-  return n * inversesqrt(max(q.x * q.y, 1e-4));
-}
-
-// 相邻两张种子平滑过渡；mix 会压方差，除以 √((1−t)²+t²) 让过渡中途强度不掉。
-vec3 FilmGrainField(vec2 fragCoord) {
-  float t = clamp(uGrainBlend, 0.0, 1.0);
-  if (t <= 0.001) return FilmGrainFieldAt(fragCoord, uGrainSeed);
-  if (t >= 0.999) return FilmGrainFieldAt(fragCoord, uGrainSeedNext);
-  vec3 a = FilmGrainFieldAt(fragCoord, uGrainSeed);
-  vec3 b = FilmGrainFieldAt(fragCoord, uGrainSeedNext);
-  return mix(a, b, t) * inversesqrt(max((1.0 - t) * (1.0 - t) + t * t, 1e-4));
-}
-
-vec3 ApplyFilmGrain(vec3 color) {
-  vec3 s = clamp(LinearToSrgb(max(color, vec3(0.0))), 0.0, 1.0);
-  float y = Luma(s);
-  float bell = uGrainResponse.x + (1.0 - uGrainResponse.x) * 4.0 * y * (1.0 - y);
-  float response = bell * smoothstep(0.0, max(uGrainResponse.y, 1e-4), y);
-  s += FilmGrainField(gl_FragCoord.xy) * (uGrain * response);
-  return SrgbToLinear(clamp(s, 0.0, 1.0));
-}
 
 vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
   if(uConcussion.x>0.0){
@@ -626,10 +566,6 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱
   float vig = 1.0 - uVignette * smoothstep(0.02, 0.50, r2);
   color *= vig;
-
-  // 胶片颗粒（sRGB 域、有颗粒尺寸、按亮度分响应、按时钟换花样；口径见 Data_Tuning_Camera.FILM_GRAIN）。
-  // uGrain = 0 时整段不执行，输出逐比特等于没有颗粒。
-  if (uGrain > 0.0) color = ApplyFilmGrain(color);
 
   // 眼皮、透光、火光残影（Script_EyelidMask.EyeView）；都没有时就是原样。
   return EyeView(color, uv, uEyeClosure, uLidGlow) * (1.0 - uFade);
@@ -701,7 +637,6 @@ export class CompositePass {
   constructor(pipeline) {
     this.name = "composite";
     this.hitTime = 0;
-    this.grainClock = 0;   // 胶片颗粒换花样的时钟（秒）
     this.reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
     this.pipeline = pipeline;
     this.whitePixel = MakeWhitePixel();
@@ -710,11 +645,7 @@ export class CompositePass {
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
       uExposure: { value: 1.0 }, uExposureTex: { value: this.whitePixel },
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
-      uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uChromaKeep: { value: 0 }, uGrain: { value: FILM_GRAIN.strength },
-      uGrainSeed: { value: 0 }, uGrainSeedNext: { value: 1 }, uGrainBlend: { value: 0 },
-      uGrainPx: { value: FILM_GRAIN.sizePx }, uGrainMode: { value: 1 },
-      uGrainChroma: { value: FILM_GRAIN.chroma },
-      uGrainResponse: { value: new THREE.Vector2(FILM_GRAIN.response.floor, FILM_GRAIN.response.blackFade) },
+      uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uChromaKeep: { value: 0 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
       uContrastCurve: { value: 0 },
       uLift: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.lift) },
@@ -843,21 +774,6 @@ export class CompositePass {
     U.uVignette.value = options.vignette ?? 0.42;
     U.uAberration.value = options.aberration ?? 0.0022;
     U.uChromaKeep.value = Math.max(0, Math.min(1, options.chromaKeep || 0));
-    // 胶片颗粒：强度 = 调用方给的最终值（出厂值 × 面板倍率）；格子大小按**本 pass 实际输出的像素高度**
-    // 等比缩放（TAAU 时内部与输出分辨率不同，gl_FragCoord 走的是输出靶），4K 与 1080p 粗细一致。
-    // 换花样按时钟走（FILM_GRAIN.rateHz），相邻种子用 uGrainBlend 平滑过渡；没有 dt 的取证页退回按 60 fps。
-    U.uGrain.value = Math.max(0, options.grain ?? FILM_GRAIN.strength);
-    const grainSize = Math.min(FILM_GRAIN.sizeRange.max, Math.max(FILM_GRAIN.sizeRange.min,
-      Number.isFinite(options.grainSize) ? options.grainSize : FILM_GRAIN.sizeRange.value));
-    U.uGrainPx.value = Math.max(1, FILM_GRAIN.sizePx * grainSize * (this.target?.height ?? 1080) / 1080);
-    U.uGrainMode.value = ctx.preset.filmGrain ? 1 : 0;
-    if (Number.isFinite(options.dt)) this.grainClock += Math.max(0, options.dt);
-    else this.grainClock = ctx.frame / 60;
-    const grainPhase = this.grainClock * FILM_GRAIN.rateHz;
-    const grainSeed = Math.floor(grainPhase) % FILM_GRAIN.seedCount;
-    U.uGrainSeed.value = grainSeed;
-    U.uGrainSeedNext.value = (grainSeed + 1) % FILM_GRAIN.seedCount;
-    U.uGrainBlend.value = grainPhase - Math.floor(grainPhase);
     U.uSaturation.value = options.saturation ?? 0.94;
     U.uContrast.value = options.contrast ?? 1.06;
     // 分离调色 + lift/gain。Script_Main / Script_Probe 的调用点只透传 `preset.fog`，

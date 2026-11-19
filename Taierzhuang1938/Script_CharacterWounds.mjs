@@ -45,10 +45,62 @@ function ActiveVertices(geometry) {
   let record = activeVertices.get(geometry);
   if (!record || record.index !== index || record.version !== version || record.count !== count) {
     const ids = index ? [...new Set(index.array)] : Array.from({length:count},(_,i)=>i);
-    record = {index,version,count,ids};
+    record = {index,version,count,ids,parts:new Map()};
     activeVertices.set(geometry,record);
   }
-  return record.ids;
+  return record;
+}
+// Cache only topology across hits. Rest-space triangles may be shared between
+// actors, but their skinned vertices are valid for one mesh in one pose only.
+function PartVertices(mesh,part,shapeId) {
+  const topology=ActiveVertices(mesh.geometry),key=shapeId && !/Torso/.test(shapeId)?'s:'+shapeId:'p:'+part;
+  let subset=topology.parts.get(key);
+  if(!subset){
+    const regions=Regions(mesh),flags=new Uint8Array(topology.count);
+    const ids=topology.ids.filter(i=>{
+      if(!Matches(regions[i],part,shapeId))return false;
+      flags[i]=1;return true;
+    });
+    subset={ids,flags};topology.parts.set(key,subset);
+  }
+  return subset;
+}
+const localRay=new THREE.Ray(),inverseWorld=new THREE.Matrix4(),hitPoint=new THREE.Vector3();
+let poseBuffer=new Float64Array(0),poseTags=new Uint32Array(0),poseId=0;
+function ReadPose(mesh,index,out) {
+  if(poseTags[index]===poseId)return out.fromArray(poseBuffer,index*3);
+  mesh.getVertexPosition(index,out).toArray(poseBuffer,index*3);poseTags[index]=poseId;return out;
+}
+// Same ray, sides, draw ranges and deformed triangle intersection as Mesh.raycast.
+// Reject unrelated triangles before skinning; adjacent faces share posed vertices.
+function PartSurface(mesh,flags,target) {
+  if(!raycaster.layers.test(mesh.layers))return null;
+  const geometry=mesh.geometry,index=geometry.index,vertexCount=geometry.attributes.position.count;
+  if(vertexCount>poseTags.length){poseBuffer=new Float64Array(vertexCount*3);poseTags=new Uint32Array(vertexCount);}
+  if(++poseId>0xffffffff){poseTags.fill(0);poseId=1;}
+  localRay.copy(raycaster.ray).applyMatrix4(inverseWorld.copy(mesh.matrixWorld).invert());
+  let best=null,score=Infinity,nearest=Infinity;
+  const count=index?.count??vertexCount,draw=geometry.drawRange;
+  function Visit(start,end,material){
+    if(!material)return;
+    const side=material.side;
+    for(let j=Math.max(draw.start,start),stop=Math.min(count,draw.start+draw.count,end);j<stop;j+=3){
+      const a=index?index.getX(j):j,b=index?index.getX(j+1):j+1,c=index?index.getX(j+2):j+2;
+      if(!(flags[a]||flags[b]||flags[c]))continue;
+      const A=ReadPose(mesh,a,triangle.a),B=ReadPose(mesh,b,triangle.b),C=ReadPose(mesh,c,triangle.c);
+      if(!localRay.intersectTriangle(side===THREE.BackSide?C:A,B,side===THREE.BackSide?A:C,side!==THREE.DoubleSide,hitPoint))continue;
+      hitPoint.applyMatrix4(mesh.matrixWorld);
+      const d=raycaster.ray.origin.distanceTo(hitPoint);
+      if(d<raycaster.near||d>raycaster.far)continue;
+      const value=target?hitPoint.distanceToSquared(target):d;
+      if(value<score||(value===score&&d<nearest)){
+        score=value;nearest=d;best={object:mesh,face:{a,b,c},point:hitPoint.clone(),score};
+      }
+    }
+  }
+  if(Array.isArray(mesh.material))for(const group of geometry.groups)Visit(group.start,group.start+group.count,mesh.material[group.materialIndex]);
+  else Visit(0,count,mesh.material);
+  return best;
 }
 function PrepareWoundGeometry(mesh) {
   mesh.geometry.setAttribute("woundRestPosition",mesh.geometry.attributes.position);
@@ -180,11 +232,10 @@ export class CharacterWounds {
     let selected=null, best=Infinity, cloth=null, clothDistance=Infinity;
     for(const mesh of meshes) {
       mesh.skeleton.update();
-      const regions=Regions(mesh);
       const isCloth=(Array.isArray(mesh.material)?mesh.material:[mesh.material])
         .some(m=>m.userData.externalMaterialClass==="cloth" || !!m.userData.nraUniformPalette);
       // Respect severed geometry: removed vertices must never win nearest-surface selection.
-      const ids=ActiveVertices(mesh.geometry).filter(i=>Matches(regions[i],part,shapeId));
+      const {ids}=PartVertices(mesh,part,shapeId);
       const stride=Math.max(1,Math.ceil(ids.length/C.maxSurfaceSamples));
       for(let sample=0;sample<ids.length;sample+=stride) {
         const i=ids[sample];
@@ -207,19 +258,10 @@ export class CharacterWounds {
       // The subdivided first-person hand has >76k vertices. Keep injury work bounded;
       // its nearest-surface sample is enough, while the outer cloth remains ray-exact.
       if(candidate.geometry.attributes.position.count>C.maxRayVertices)continue;
-      // The ray early-out needs the posed sphere, but culling keeps the rig's shared
-      // pose-independent one (Script_CharacterModel.ShareSkinnedCullSphere): put it back.
-      const cullSphere=candidate.boundingSphere;
-      candidate.boundingSphere=null;
-      candidate.computeBoundingSphere();
-      const hits=raycaster.intersectObject(candidate,false);
-      if(cullSphere)candidate.boundingSphere=cullSphere;
-      const regions=Regions(candidate);
-      for(const hit of hits) {
-        if(!hit.face || ![hit.face.a,hit.face.b,hit.face.c].some(i=>Matches(regions[i],part,shapeId)))continue;
-        const distance=point ? hit.point.distanceToSquared(target) : hit.distance;
-        if(distance<surfaceDistance) {surface=hit;surfaceDistance=distance;}
-      }
+      const {ids,flags}=PartVertices(candidate,part,shapeId);
+      if(!ids.length)continue;
+      const hit=PartSurface(candidate,flags,point?target:null);
+      if(hit&&hit.score<surfaceDistance){surface=hit;surfaceDistance=hit.score;}
     }
     if(surface)selected={mesh:surface.object,index:surface.face.a};
     if(!selected)return false;

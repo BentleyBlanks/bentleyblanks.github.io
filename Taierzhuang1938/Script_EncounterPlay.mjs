@@ -22,9 +22,48 @@ import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 const UI=CONFIG.ui;
+
+// All instances of a cast member share the loaded kit. Resize its source once,
+// before spawning anyone, including maps used by more than one material slot.
+async function PrepareCastTextures(kits) {
+  const sources=new Set(),limit=ENCOUNTER_PLAY_STARTUP.castTextureMaxSize;
+  for(const kit of kits.values())kit.source.traverse(object=>{
+    if(!object.isMesh)return;
+    for(const material of [object.material].flat())for(const texture of Object.values(material)) {
+      if(!texture?.isTexture)continue;
+      const image=texture.source.data;
+      if(image instanceof HTMLImageElement || (typeof ImageBitmap!=="undefined" && image instanceof ImageBitmap)) sources.add(texture.source);
+    }
+  });
+  for(const source of sources) {
+    const image=source.data,longest=Math.max(image.width,image.height);
+    if(longest<=limit)continue;
+    const width=Math.max(1,Math.round(image.width*limit/longest));
+    const height=Math.max(1,Math.round(image.height*limit/longest));
+    if(typeof createImageBitmap==="function") {
+      source.data=await createImageBitmap(image,{resizeWidth:width,resizeHeight:height,resizeQuality:"high",
+        premultiplyAlpha:"none",colorSpaceConversion:"none"});
+    } else {
+      const canvas=document.createElement("canvas");
+      canvas.width=width;canvas.height=height;
+      const context=canvas.getContext("2d");
+      context.imageSmoothingQuality="high";context.drawImage(image,0,0,width,height);
+      source.data=canvas;
+    }
+    source.needsUpdate=true;
+  }
+}
+
 export class EncounterPlay {
   constructor(host) {
     this.host=host;this.hostId=crypto.randomUUID();this.entries=new Map();this.failed=false;this.ready=false;this.disposed=false;this.active=true;this.paused=false;this.starting=false;this.initialized=false;
+    // These terrain tiles are already individual spatial batches. Copying the
+    // entire 1.9 km field into two more buffers competes with combat draws for
+    // resident memory. Both passes can draw the same indexed tiles as color.
+    for(const mesh of host.battlefield.meshes)if(mesh.userData.deformableTerrain) {
+      mesh.userData.noPrepassBatch=true;
+      mesh.userData.noShadowBatch=true;
+    }
     this.orderClock=0;this.lastBeat=null;this.music=null;this.lastStateSent=0;this.smoke=new Map();this.pendingActions=new Map();this.retiredMaterials=new DeferredMaterialDispose();this.warmedSignatures=new Set();
     let payload=null;
     try {payload=JSON.parse(sessionStorage.getItem(PAYLOAD_KEY)||"null");}catch{}
@@ -64,6 +103,8 @@ export class EncounterPlay {
     await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
+    this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits);
+    await this.castTexturesReady;
     const deaths=await Promise.allSettled(Object.values(XBOT_DEATHS).map(entry=>this.puppets.xbot.Clip(entry.file)));
     for(const result of deaths)if(result.status==="rejected")console.warn("[EncounterPlay] Death clip warmup failed; retaining mirrored poses",result.reason);
     if(this.disposed||!this.active)return;
@@ -150,7 +191,7 @@ export class EncounterPlay {
     if(!this.ready)throw new Error(this.error||"Encounter assets not ready");
     await Promise.all([...this.puppets.puppets.values()].flatMap(p=>p.humans.map(h=>h.towel?.Ready?.()).filter(Boolean)));
     const {host}=this,start=performance.now(),wasWarming=host.state.warming;
-    const signature=JSON.stringify([this.plan.startBeat.id,host.ctx.graphics,
+    const signature=JSON.stringify([this.plan.startBeat.id,host.ctx.graphics,host.viewmodel.weaponId,
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
@@ -161,7 +202,10 @@ export class EncounterPlay {
     const hiddenHair=[];
     const group=new THREE.Group();group.name="EncounterWarmExtras";
     AddGoreWarmProxies(group,[...this.entries.values()].map(e=>e.soldier.actor));
-    if(host.viewmodel.CreateActionDebrisWarmProxy)group.add(host.viewmodel.CreateActionDebrisWarmProxy());
+    const debris=host.viewmodel.CreateActionDebrisWarmProxy();
+    debris.position.copy(host.player.EyePosition);
+    for(const mesh of debris.children)mesh.frustumCulled=false;
+    group.add(debris);
     host.scene.add(group);host.state.warming=true;
     const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch,
       drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded};
@@ -173,10 +217,15 @@ export class EncounterPlay {
       }
       host.scene.traverse(mesh=>{if(mesh.userData.hairGroom&&!mesh.visible){hiddenHair.push(mesh);mesh.visible=true;}});
       host.ai.PrepareCrowd(["nra","ija"]);
-      if(!retained)PrepareWoundMaterials(host.scene);
-      if(retained)host.ctx.CompileAsRendered(host.scene);
-      else await host.ctx.WarmupShaders(host.scene,onStep,null,options);
-      if(retained)host.ctx.RenderScene(0);
+      PrepareWoundMaterials(host.scene);
+      if(retained) {
+        // These programs and action buffers already exist. A whole-scene
+        // compile here also submits unused variants of the hidden actor rigs.
+        host.ctx.RenderScene(0);
+      } else {
+        await host.ctx.WarmupShaders(host.scene,onStep,null,options);
+        host.viewmodel.DrawActionWarmup(()=>host.ctx.RenderScene(0));
+      }
     } catch(error) {
       this.error=String(error.stack||error);this.ready=false;this.Send("error",{message:String(error.message||error)});throw error;
     } finally {
@@ -190,39 +239,35 @@ export class EncounterPlay {
       }
       host.state.warming=wasWarming;
     }
-    if(!retained){
-      await post.dofPass.Warmup();
-      await host.vfx.particles.Ready();
-      const blood=host.vfx.bloodEffects;
-      const ready=host.state.ready;
-      const warming=host.state.warming;
-      const DrawWarmFrame=()=>{
-        host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);
-        host.renderer.getContext().finish();
-      };
-      try{
-        host.state.ready=true;host.state.warming=false;
-        // Update the actual camera and blood distance-culling eye first.
-        DrawWarmFrame();
-        // Encounter's dedicated warmup bypasses WarmLevel's static-batch Prime.
-        // Otherwise the 30-frame settling threshold allocates/uploads the entire
-        // terrain batch during the first fight (about 270 MB on this scene).
-        // The following warm draws and finish complete it behind the loading UI.
-        shadowBatchPrimed=host.ctx.shadowCasterBatch?.Prime()||0;
-        prepassBatchPrimed=host.ctx.prepassStaticBatch?.Prime()||0;
-        blood.Update(0,host.vfx.time,host.camera);
-        const direction=host.player.ViewDirection(new THREE.Vector3());
-        const spot=host.player.EyePosition.clone().addScaledVector(direction,2);
-        const existingDrops=blood.activeDrops.length;
-        host.vfx.Blood(spot,direction,1);
-        bloodDrops=blood.activeDrops.length-existingDrops;
-        spot.y=host.battlefield.GroundHeight(spot.x,spot.z);
-        blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
-        for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++)DrawWarmFrame();
-      }finally{
-        host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
-        post.NotifyCameraCut();
-      }
+    await post.dofPass.Warmup();
+    await host.vfx.particles.Ready();
+    const blood=host.vfx.bloodEffects;
+    const ready=host.state.ready;
+    const warming=host.state.warming;
+    const DrawWarmFrame=()=>{
+      host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);
+      host.renderer.getContext().finish();
+    };
+    try{
+      host.state.ready=true;host.state.warming=false;
+      // Update the actual camera and blood distance-culling eye first.
+      DrawWarmFrame();
+      // Restart reconstructs actors and their batch membership even when the
+      // programs are retained. Draw their actual passes before releasing input.
+      shadowBatchPrimed=host.ctx.shadowCasterBatch?.Prime()||0;
+      prepassBatchPrimed=host.ctx.prepassStaticBatch?.Prime()||0;
+      blood.Update(0,host.vfx.time,host.camera);
+      const direction=host.player.ViewDirection(new THREE.Vector3());
+      const spot=host.player.EyePosition.clone().addScaledVector(direction,2);
+      const existingDrops=blood.activeDrops.length;
+      host.vfx.Blood(spot,direction,1);
+      bloodDrops=blood.activeDrops.length-existingDrops;
+      spot.y=host.battlefield.GroundHeight(spot.x,spot.z);
+      blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
+      for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++)DrawWarmFrame();
+    }finally{
+      host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
+      post.NotifyCameraCut();
     }
     host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops,prepassBatchPrimed,shadowBatchPrimed};
     this.warmedSignatures.add(signature);this.FlushRetired();

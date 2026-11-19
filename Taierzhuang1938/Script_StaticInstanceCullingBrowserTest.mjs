@@ -48,6 +48,18 @@ try{
   camera.position.x=25;camera.lookAt(25,2,0);Case('differentSubset');
   camera.position.set(0,5,12);camera.lookAt(0,2,0);Place(2,2);source.instanceMatrix.needsUpdate=true;source.computeBoundingSphere();other.boundingSphere.copy(source.boundingSphere);Case('streamUpdate');
   const alpha=new T.DataTexture(new Uint8Array([255,255,255,255,255,255,255,0,255,255,255,0,255,255,255,255]),2,2);alpha.needsUpdate=true;alpha.magFilter=T.NearestFilter;alpha.minFilter=T.NearestFilter;mat.map=alpha;mat.alphaTest=.5;mat.needsUpdate=true;source.customDepthMaterial.needsUpdate=true;Case('cutout');
+  // A tiny late addition must not re-send a batch's first full upload.
+  const {TrackBatchUploads}=await import('./Script_BatchUploadRanges.mjs');
+  const batch=new T.BatchedMesh(8,512,2048,new T.MeshBasicMaterial()),batchScene=new T.Scene();
+  const box=new T.BoxGeometry(),group={mesh:batch};batch.frustumCulled=false;batchScene.add(batch);
+  const Add=()=>{const id=batch.addGeometry(box);TrackBatchUploads(group);batch.addInstance(id);};
+  Add();r.render(batchScene,camera);
+  const glContext=r.getContext(),originalUpload=glContext.bufferSubData,uploads=[];
+  glContext.bufferSubData=function(target,offset,array,srcOffset,length){uploads.push([offset,length]);return originalUpload.apply(this,arguments);};
+  try{Add();r.render(batchScene,camera);}finally{glContext.bufferSubData=originalUpload;}
+  const expected=[box.index,...Object.values(box.attributes)].map(a=>[a.array.length*(a===box.index?batch.geometry.index.array.BYTES_PER_ELEMENT:a.array.BYTES_PER_ELEMENT),a.array.length]);
+  if(!expected.every(([offset,count])=>uploads.some(([o,n])=>o===offset&&n===count))||uploads.some(([o])=>o===0))throw Error('Unexpected late geometry upload: '+JSON.stringify(uploads));
+  batch.dispose();batch.material.dispose();box.dispose();
   const gl=r.getContext().getError();scope.Dispose();prepass.Dispose();r.dispose();return {cases,sortRegressionWitness,shadowSources,gl};
  });
  await fs.mkdir(path.join(root,'tmp/StaticInstanceCulling'),{recursive:true});await fs.writeFile(path.join(root,'tmp/StaticInstanceCulling/Data_Report.json'),JSON.stringify({report,errors},null,2));

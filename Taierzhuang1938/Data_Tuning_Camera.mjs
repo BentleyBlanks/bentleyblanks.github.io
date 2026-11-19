@@ -328,55 +328,20 @@ export const LENS_FLARE = {
 /** 输出编码。dither = 三角分布抖动的幅度（1/255 的倍数）；0 = 关（出厂）。 */
 export const OUTPUT = { dither: 0.0 };
 
-/**
- * 全屏胶片颗粒（`Script_PostComposite` 的 LensEffects 段，tonemap / 分级之后、sRGB 编码之前）。
- *
- * 2026-11-18 由「线性空间 ±0.007 的 1 像素白噪声」（折到 sRGB 只有 ~1/255，肉眼看不见）改成真正可见的颗粒：
- *   · **在 sRGB 编码域叠加**：同一个 strength 在暗部和中间调的观感一致，
- *     线性域叠加会让暗部的颗粒比亮部强几倍。
- *   · **有颗粒尺寸**：一个颗粒格 `sizePx` 像素（按 1080p 高度等比缩放，4K 与 1080p 的粗细一样），
- *     格间用平滑权重插值并按权重平方和归一，所以改尺寸不改强度，也不会出方块。
- *   · **按亮度分响应**：中间调最明显，暗部与高光渐隐；纯黑附近压到 0，
- *     免得零均值噪声被 0 截断后把暗部整体抬亮（用户对画面明暗极敏感，见 Data_Tuning_Graphics 的 CAMERA_OFF 注释）。
- *   · **按时钟换花样**：`rateHz` 次/秒换种子，相邻种子之间用 `uGrainBlend` 平滑插值（并除以权重平方和的平方根，
- *     过渡中途强度不掉）；不是每个渲染帧硬切一张噪点图。
- *   · 带一点彩色颗粒（`chroma`）：0 = 纯亮度噪声，1 = 三通道各自独立。
- *
- * 玩家调节：画质 → 后处理强度「颗粒」（倍率乘在 strength 上，0 = 关，关时这一段一条指令都不执行，
- * 输出逐比特等于没有颗粒）与「颗粒大小」（倍率乘在 sizePx 上，`sizeRange` 是滑杆范围）。
- * 画质档的开关位在 `Data_Tuning_Graphics` 的 `filmGrain`（0 = 单格亮度噪声，1 = 平滑插值 + 彩色颗粒）。
- */
 export const FILM_GRAIN = {
-  /**
-   * sRGB 编码值上的颗粒标准差（0–1）。0.011 ≈ 2.8/255；面板「颗粒」拉到 ×2 约 5.6/255。
-   * 2026-11-18 第三轮（用户：「变换频率太快，更稀碎更柔和，对标 COD14」）：0.014 → 0.011。
-   */
-  strength: 0.011,
-  /** 夜战关（night / firstLevelNight）的出厂强度：暗场景里同样的颗粒读起来更淡，略抬一点。 */
-  nightStrength: 0.014,
-  /**
-   * 1080p 高度下一个颗粒格的边长（像素）。**≤ 1 时就是逐像素颗粒**（不插值、带彩色）。
-   * 出厂 1.35：格间平滑插值，读起来稀碎柔和（COD 系那一层「有质感但不扎眼」的颗粒）。
-   * 面板「颗粒大小」×1 = 这一档；往上更粗，往下不能低于 ×1（再细没有意义）。
-   */
-  sizePx: 1.35,
-  /** 画质面板「颗粒大小」滑杆的倍率范围与出厂值。最小 ×1 = 出厂最细；往上拉越粗。 */
+  strength: 0.014,
+  nightStrength: 0.016,
+  sizePx: 1.60,
   sizeRange: { min: 1, max: 3, step: 0.05, value: 1 },
-  /** 彩色颗粒的比例（0–1）。0.15：几乎是亮度颗粒，只留一点胶片色度。 */
-  chroma: 0.15,
-  /**
-   * 每秒换几次花样。2026-11-18 第三轮：24 → 8（约每 125 ms 换一次，中间平滑过渡）。
-   * COD14 系不是电影 24 格硬切；硬切会读成「噪点在闪」。
-   */
+  chroma: 0.12,
   rateHz: 8,
-  /** 轮换的种子数（越小越容易看出周期；越大 hash 精度越差，256 在 4K 上仍够用）。 */
-  seedCount: 256,
-  /**
-   * 亮度响应：`floor + (1 - floor) · 4y(1-y)`（y = 编码后亮度），再乘 `smoothstep(0, blackFade, y)`。
-   * floor 是高光处残留的比例；blackFade 是压到 0 的那一小段黑位。
-   */
-  response: { floor: 0.12, blackFade: 0.07 },
+  seedCount: 4096,
+  response: { toeEnd: 0.34, shoulderStart: 0.49 },
 };
+
+export function FilmGrainStrengthFor(profile) {
+  return profile === "night" || profile === "firstLevelNight" ? FILM_GRAIN.nightStrength : FILM_GRAIN.strength;
+}
 
 export default {
   AUTO_EXPOSURE, SKY_EXPOSURE, SkyExposureFor, TONEMAP, TONEMAP_MODES, LUT, GRADE_DEFAULTS, BLOOM,

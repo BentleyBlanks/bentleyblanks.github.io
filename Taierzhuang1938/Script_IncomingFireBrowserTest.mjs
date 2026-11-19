@@ -49,21 +49,26 @@ try {
   }
   // The incoming-fire arc must stay concentric with the sight at every bearing (the old
   // generated texture's arc centre was off the image centre, so rotation swept it across aim).
-  const arcShape = await page.evaluate(() => {
-    const path = document.querySelector(".hudHitArc"), len = path.getTotalLength();
-    const radii = [], angles = [];
-    for (let i = 0; i < 400; i++) {
-      const p = path.getPointAtLength(len * i / 400);
-      radii.push(Math.hypot(p.x, p.y)); angles.push(Math.atan2(p.x, -p.y) * 180 / Math.PI);
-    }
-    return {paths:document.querySelector(".hudHitDir").querySelectorAll("path").length,
-      minR:Math.min(...radii),maxR:Math.max(...radii),minDeg:Math.min(...angles),maxDeg:Math.max(...angles)};
+  const arcShape = await page.evaluate(async () => {
+    const sprites={};
+    for(const el of document.querySelectorAll(".hudHitDir:first-child image")) {
+      const img=new Image(); img.src=el.getAttribute("href"); await img.decode();
+      const c=document.createElement("canvas");c.width=img.width;c.height=img.height;
+      const ctx=c.getContext("2d");ctx.drawImage(img,0,0);const data=ctx.getImageData(0,0,c.width,c.height).data;
+      const box=["x","y","width","height"].map(k=>+el.getAttribute(k));let minR=100,maxR=0,minDeg=180,maxDeg=-180,bright=0;
+      for(let i=0;i<data.length;i+=4){if(data[i+3]<128)continue;
+        const x=box[0]+((i/4%c.width)+.5)*box[2]/c.width, y=box[1]+(Math.floor(i/4/c.width)+.5)*box[3]/c.height;
+        const r=Math.hypot(x,y),a=Math.atan2(x,-y)*180/Math.PI;minR=Math.min(minR,r);maxR=Math.max(maxR,r);minDeg=Math.min(minDeg,a);maxDeg=Math.max(maxDeg,a);
+        if(el.classList.contains("hit")?data[i]>data[i+1]*3:data[i+1]>210)bright++;
+      }
+      sprites[el.classList.contains("hit")?"hit":"near"]={minR,maxR,minDeg,maxDeg,bright};
+    }return sprites;
   });
-  assert.equal(arcShape.paths,2,"one glow and one arc per bearing");
-  assert.ok(arcShape.minR >= HITDIR.radius - HITDIR.halfWidth - .05, "arc inner edge stays on the sight-centred ring");
-  assert.ok(arcShape.maxR <= HITDIR.radius + HITDIR.halfWidth + HITDIR.tipHeight + .05, "only the central tip rises outward");
-  assert.ok(Math.abs(arcShape.maxDeg + arcShape.minDeg) < .5 && arcShape.maxDeg <= HITDIR.spanDeg/2 + .05,
-    "arc is symmetric about 12 o'clock and bounded by its span");
+  for(const kind of ["hit","near"]){const arc=arcShape[kind];assert.ok(arc?.bright>1000,`${kind} has the correct bright ink`);
+    assert.ok(arc.minR>=HITDIR.radius-HITDIR.halfWidth-.35&&arc.minR<HITDIR.radius,"arc inner edge stays on the sight-centred ring");
+    assert.ok(arc.maxR<=HITDIR.radius+HITDIR.halfWidth+HITDIR.tipHeight+.35&&arc.maxR>HITDIR.radius+HITDIR.tipHeight-.5,"central tip points outwards");
+    assert.ok(Math.abs(arc.maxDeg+arc.minDeg)<.5&&arc.maxDeg<=HITDIR.spanDeg/2+.05&&arc.maxDeg>15,"arc is symmetric about twelve o'clock");
+  }
   await page.evaluate(async () => {
     const T = window.Tengxian;
     await T.Debug.FirstLevelJump(4);
@@ -85,14 +90,14 @@ try {
   });
   const near = await page.evaluate(() => {
     const T = window.Tengxian, el = document.querySelector(".hudHitDir.near");
-    const arc = el?.querySelector(".hudHitArc");
+    const arc = el && [...el.querySelectorAll("image")].find(i=>getComputedStyle(i).display!=="none");
     return {hp:T.player.health,flash:T.player.hitFlash,kind:T.player.hitMarks[0]?.kind,
       angle:el?.getAttribute("transform"),opacity:el && +getComputedStyle(el).opacity,
-      fill:arc && getComputedStyle(arc).fill};
+      fill:arc?.getAttribute("class")};
   });
   assert.equal(near.hp,100); assert.equal(near.flash,0); assert.equal(near.kind,"near");
   assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7);
-  assert.ok(near.fill.includes("hudHitFillNear"),"non-damaging incoming fire draws the white arc");
+  assert.ok(near.fill.includes("near"),"non-damaging incoming fire draws the white arc");
   await page.screenshot({path:path.join(output,"NearRight.png")});
   const hit = await page.evaluate(() => {
     const T = window.Tengxian, p = T.player;
@@ -103,11 +108,11 @@ try {
     const el = document.querySelector(".hudHitDir.hit");
     return {hp:p.health,flash:p.hitFlash,marks:p.hitMarks.map(m=>({...m})),
       opacity:+getComputedStyle(el).opacity,
-      fill:getComputedStyle(el.querySelector(".hudHitArc")).fill};
+      fill:[...el.querySelectorAll("image")].find(i=>getComputedStyle(i).display!=="none")?.getAttribute("class")};
   });
   assert.ok(hit.hp<100 && hit.flash>.5); assert.equal(hit.marks.length,1);
   assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8);
-  assert.ok(hit.fill.includes("hudHitFillHit"),"geometric hits draw the blood-red arc");
+  assert.ok(hit.fill.includes("hit"),"geometric hits draw the blood-red arc");
   await page.waitForTimeout(150); // Let the existing damage-vignette CSS transition settle.
   await page.screenshot({path:path.join(output,"HitRight.png")});
   // Debug invincibility protects health but must not turn a geometric hit into a white near miss.
@@ -119,16 +124,16 @@ try {
     const before = p.hitMarks[0]?.kind;
     p.TakeHit(24,"torso",null,{bullet:true,from});
     T.hud.SetHurt({health:p.health,flash:p.hitFlash,marks:p.hitMarks,yaw:p.yaw});
-    const el = document.querySelector(".hudHitDir.hit"), arc = el?.querySelector(".hudHitArc");
+    const el = document.querySelector(".hudHitDir.hit"), arc = el && [...el.querySelectorAll("image")].find(i=>getComputedStyle(i).display!=="none");
     return {before,hp:p.health,bleeding:p.bleeding,flash:p.hitFlash,disorientation:p.HitDisorientation,
       events:p.hitEvents.length,marks:p.hitMarks.map(m=>m.kind),className:el?.getAttribute("class"),
-      opacity:el && +getComputedStyle(el).opacity,fill:arc && getComputedStyle(arc).fill};
+      opacity:el && +getComputedStyle(el).opacity,fill:arc?.getAttribute("class")};
   });
   const {opacity:invincibleOpacity,fill:invincibleFill,...invincibleState}=invincibleHit;
   assert.deepEqual(invincibleState,{before:"near",hp:100,bleeding:0,flash:0,disorientation:0,
     events:0,marks:["hit"],className:"hudHitDir hit"});
   assert.ok(invincibleOpacity>.8,"invincible geometric hit remains visible");
-  assert.ok(invincibleFill.includes("hudHitFillHit"),
+  assert.ok(invincibleFill.includes("hit"),
     "invincible geometric hit keeps the blood-red arc instead of the white near-miss fill");
   await page.waitForTimeout(150);
   await page.screenshot({path:path.join(output,"InvincibleHitRight.png")});

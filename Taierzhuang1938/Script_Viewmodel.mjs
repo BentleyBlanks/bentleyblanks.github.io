@@ -2056,6 +2056,34 @@ export class Viewmodel {
     return group;
   }
 
+  /** Exercise the held meshes on their real color, depth and self-shadow paths.
+   * No gameplay steps: do not advance animation, emit sound or touch inventory. */
+  DrawActionWarmup(draw) {
+    const kind = this.weapon?.reloadKind;
+    const props = kind === "enBloc" ? [this.packetProp, this.usedPacketProp]
+      : kind === "stripper" ? [this.clipProp] : [];
+    const shown = [this.flash, ...props, ...props.map(prop => prop.userData.rounds)];
+    const visibility = shown.map(object => object.visible);
+    const rounds = props.at(-1)?.userData.rounds;
+    const originals = rounds?.children.map(mesh => mesh.geometry);
+    try {
+      for (const object of shown) object.visible = true;
+      draw();
+      if (rounds) {
+        const profile = props.at(-1).userData.profile;
+        for (let count = 1; count < 5; count++) {
+          const partial = this._ReloadRoundGeometry(profile, count);
+          rounds.children[0].geometry = partial.cases;
+          rounds.children[1].geometry = partial.bullets;
+          draw();
+        }
+      }
+    } finally {
+      if (rounds) rounds.children.forEach((mesh, index) => { mesh.geometry = originals[index]; });
+      shown.forEach((object, index) => { object.visible = visibility[index]; });
+    }
+  }
+
   // -------------------------------------------------------------------------
   // 装备
   // -------------------------------------------------------------------------
