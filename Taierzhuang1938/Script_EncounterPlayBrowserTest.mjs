@@ -151,12 +151,19 @@ async function CheckSpeech(frame){
 try{
  await SavedDebugOptions(true);
  await page.goto(base+"/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=0");
- await page.waitForFunction(()=>window.LevelFlow);
+ await page.waitForFunction(()=>window.LevelFlow,null,{timeout:180000});
+ const profilerButton=page.getByRole("button",{name:"Profiler",exact:true});
+ const frameDebuggerButton=page.getByRole("button",{name:"Frame Debugger",exact:true});
+ assert.ok(await profilerButton.isEnabled()&&await frameDebuggerButton.isEnabled(),"Debug tools can target the editor before Play");
+ const [previewDebuggerWindow]=await Promise.all([context.waitForEvent("page",{timeout:15000}),frameDebuggerButton.click()]);
+ await previewDebuggerWindow.getByRole("heading",{name:"Frame Debugger"}).waitFor();
  assert.ok(await page.locator("#playGame").isDisabled(),"Opening movie cannot be played");
  assert.equal(await page.evaluate(()=>LevelFlow.Play.Start("current")),false);
  await page.evaluate(()=>{LevelFlow.Seek(222);LevelFlow.SetLayout(3);});
  const before=await page.evaluate(()=>({time:LevelFlow.Inspect().time,document:JSON.stringify(LevelFlow.Inspect().document),viewports:LevelFlow.Inspect().viewports}));
- const coldAt=performance.now();await page.locator("#playGame").click();let frame=await Ready();const coldMs=performance.now()-coldAt;
+ const coldAt=performance.now();
+ await Promise.all([previewDebuggerWindow.waitForEvent("close",{timeout:15000}),page.locator("#playGame").click()]);
+ let frame=await Ready();const coldMs=performance.now()-coldAt;
  let state=await State();const hostId=state.hostId;
  assert.equal(state.startBeat,"03b");assert.equal(state.layout,1);
  await frame.evaluate(async()=>{
@@ -254,7 +261,24 @@ try{
  assert.ok((await State()).dialogue.lines.some(line=>line.order&&/等它炸/.test(line.text)),"The real throw updates the instruction while waiting for its explosion");
  for(let i=0;i<20&&!(await State()).completedBeats.includes("03d");i++)await frame.evaluate(()=>Tengxian.StepFrames(30,1/60,false));
  assert.ok((await State()).completedBeats.includes("03d"),"Real grenade detonation satisfies the event gate");
- await page.locator("#stopGame").click();
+ await page.locator("#pauseGame").click();
+ const [profilerWindow]=await Promise.all([context.waitForEvent("page",{timeout:15000}),profilerButton.click()]);
+ await profilerWindow.locator("body.uiProfiler").waitFor();
+ const [frameDebuggerWindow]=await Promise.all([context.waitForEvent("page",{timeout:15000}),frameDebuggerButton.click()]);
+ await frameDebuggerWindow.getByRole("heading",{name:"Frame Debugger"}).waitFor();
+ assert.ok(await frame.evaluate(()=>Tengxian.editor.overlays.get("frameDebugger")?.debugger===Tengxian.FrameDebugger),"Frame Debugger targets this Play renderer");
+ await frameDebuggerWindow.locator("#capture").click();
+ await frameDebuggerWindow.waitForFunction(()=>Array.from(document.querySelectorAll("#events > .node > .row .label")).filter(node=>node.textContent.startsWith("视口 ")).length===2,null,{timeout:60000});
+ assert.deepEqual(await frame.evaluate(()=>Tengxian.FrameDebugger.capture.passes.filter(pass=>pass.viewport).map(pass=>pass.name)),["视口 1 · 玩家视角","视口 2 · 观察视角"]);
+ await frameDebuggerWindow.locator("#resume").click();
+ assert.deepEqual(await frame.evaluate(()=>Tengxian.Debug.DebugTools().filter(tool=>tool.on&&["profiler","frameDebugger"].includes(tool.id)).map(tool=>tool.id).sort()),["frameDebugger","profiler"]);
+ const openPageCount=context.pages().length;
+ await profilerButton.click();
+ assert.equal(context.pages().length,openPageCount,"Repeated click focuses the existing tool window");
+ assert.ok(!profilerWindow.isClosed(),"Repeated click keeps the existing Profiler window open");
+ await page.screenshot({path:path.join(out,"PlayDebugToolbar.png"),timeout:120000});
+ await Promise.all([profilerWindow.waitForEvent("close",{timeout:15000}),frameDebuggerWindow.waitForEvent("close",{timeout:15000}),page.locator("#stopGame").click()]);
+ assert.ok(await profilerButton.isEnabled()&&await frameDebuggerButton.isEnabled(),"Stop closes Play debug windows and restores the editor launchers");
  assert.equal(await page.locator("#flowTimeline").isVisible(),false,"Stopping Play keeps the chosen timeline visibility");
  await page.locator("#toggleTimeline").click();
  assert.equal(await page.locator(".lfPlayHost").count(),0);

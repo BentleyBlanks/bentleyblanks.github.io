@@ -268,9 +268,9 @@ export class ProfilerEditor {
   // 停它：面板里再点一次开关，或直接关它的独立窗口（Update 会跟着自我关闭）。
   static keepOnClose = true;
 
-  constructor(host) {
+  constructor(host, popup = null) {
     this.host = host;
-    this.win = null;
+    this.win = popup;
     this.doc = null;
     this.ui = null;          // 独立窗口里的节点引用
     this._frame = 0;
@@ -330,12 +330,12 @@ export class ProfilerEditor {
   // -------------------------------------------------------------------------
 
   OpenWindow() {
-    let win = null;
+    let win = this.win;
     try {
-      win = window.open("", "tzProfiler",
+      win ??= window.open("", "tzProfiler",
         "width=1360,height=1080,menubar=no,toolbar=no,location=no");
     } catch (error) { win = null; }
-    if (!win) { this.win = null; return; }
+    if (!win || win.closed) { this.win = null; return; }
     this.win = win;
     const doc = win.document;
     this.doc = doc;
@@ -375,7 +375,9 @@ export class ProfilerEditor {
     // --- 抬头 ---
     const top = El("div", "top");
     const titles = El("div");
-    titles.appendChild(El("div", "eyebrow", "PROFILER · 台儿庄：血战滕县"));
+    const source = this.host.preview ? "Encounter Designer 编辑器预览" : "台儿庄：血战滕县";
+    titles.appendChild(El("div", "eyebrow", `PROFILER · ${source}`));
+    if (this.host.preview) doc.title = `${source} · Profiler`;
     titles.appendChild(El("h1", "", "性能剖析"));
     top.appendChild(titles);
     const badges = El("div", "badges");
@@ -416,8 +418,8 @@ export class ProfilerEditor {
     const bufferLabel = El("span", "muted", "");
     toolbar.appendChild(bufferLabel);
     Sep(toolbar);
-    const activeBtn = Button(toolbar, "只看游戏帧",
-      "开着：汇总只算「游戏中 + 过场」帧，暂停/菜单/加载帧在帧图上灰底、不进统计（那份 20 fps 录制前 495 帧都是暂停空转）",
+    const activeBtn = Button(toolbar, this.host.preview ? "只看预览帧" : "只看游戏帧",
+      this.host.preview ? "开着：汇总只看编辑器预览帧" : "开着：汇总只算「游戏中 + 过场」帧，暂停/菜单/加载帧在帧图上灰底、不进统计（那份 20 fps 录制前 495 帧都是暂停空转）",
       () => this.SetActiveOnly(!this.host.profiler?.activeOnly), "btn switch");
     const target = El("select", "btn");
     target.title = "预算线与「超预算」按这个帧率算；「按屏幕」= 从帧间隔估出来的刷新率";
@@ -428,6 +430,7 @@ export class ProfilerEditor {
     }
     target.addEventListener("change", () => { if (this.ui) this.SetTargetFps(Number(target.value)); });
     toolbar.appendChild(target);
+    if (this.host.preview) toolbar.appendChild(El("span", "muted", "仅记录实际更新；静止视口不重复绘制"));
     const topActions = El("div", "topActions");
     Button(topActions, "保存录制", "整条缓冲存成 JSON（命令行 --print=<文件> --frame=<帧号> 也能读）",
       () => this.SaveRecording(), "act");
@@ -889,6 +892,7 @@ export class ProfilerEditor {
     if (!profiler || !profiler.on) return;
     if (!profiler.recording) { this._SetStatus("先继续录制再抓（暂停时没有新帧）"); return; }
     profiler.RequestDrawCapture();
+    this.host.RequestDrawFrame?.();
     this._drawPending = true;
     this.ui.drawStatus.textContent = "等下一帧…";
     if (this.tab !== "draws") this.SetTab("draws");
@@ -2302,7 +2306,7 @@ export class ProfilerEditor {
       return;
     }
     const draws = record.draws;
-    const materials = new Set(draws.map((draw) => draw.materialId)).size;
+    const materials = new Set(draws.filter((draw) => draw.materialId != null).map((draw) => draw.materialId)).size;
     const switches = draws.filter((draw) => draw.matSwitch).length;
     ui.drawStatus.textContent = `第 #${record.id} 帧 · ${draws.length} 个 draw · ${materials} 种材质 · 换材质 ${switches} 次`;
     ui.tabButtons.get("draws").count.textContent = String(draws.length);

@@ -491,6 +491,11 @@ class GpuRaster {
   }
 
   ReadFullDepth(raster) {
+    return this.Trace(raster,this.ReadFullDepthContent);
+  }
+
+  ReadFullDepthContent(raster) {
+    this.Phase("深度回读");
     const gl=this.gl;
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER,raster.depthSnapshot.framebuffer);gl.readBuffer(gl.COLOR_ATTACHMENT0);
     gl.readPixels(0,0,raster.width,raster.height,gl.RED,gl.FLOAT,raster.depthData);
@@ -498,6 +503,11 @@ class GpuRaster {
 
   ReadDepthSamples(raster) {
     if(!raster.depthSampleCount) return;
+    return this.Trace(raster,this.ReadDepthSamplesContent);
+  }
+
+  ReadDepthSamplesContent(raster) {
+    this.Phase("深度采样");
     const gl=this.gl,width=FLOW_RENDERING.depthReadback.sampleWidth;
     const rows=Math.ceil(raster.depthSampleCount/width);
     if(rows>this.maxTextureSize) {
@@ -574,6 +584,7 @@ class GpuRaster {
   }
 
   DrawAmbientOcclusion(raster) {
+    this.Phase("环境遮蔽");
     const gl=this.gl,view=raster.view,settings=view.lighting;
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.aoFramebuffer);gl.disable(gl.DEPTH_TEST);
     gl.viewport(0,0,this.target.aoWidth,this.target.aoHeight);
@@ -590,6 +601,7 @@ class GpuRaster {
     gl.uniform1f(this.aoUniforms.minLight,settings.aoMinLight);gl.uniform1i(this.aoUniforms.perspective,raster.perspective?1:0);
     gl.drawArrays(gl.TRIANGLES,0,3);
     // Resolve: average the dithered factors and apply them to the lit color.
+    this.Phase("遮蔽合成与远雾");
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.target.shadedFramebuffer);
     gl.viewport(0,0,raster.width,raster.height);
     gl.useProgram(this.aoResolveProgram);
@@ -607,11 +619,49 @@ class GpuRaster {
   }
 
   Draw(raster) {
+    return this.Trace(raster,this.DrawContent);
+  }
+
+  Trace(raster,method) {
+    const trace=raster.debugTrace;
+    if(!trace||this.trace===trace) return method.call(this,raster);
+    const gl=this.gl,restore=[];
+    this.trace=trace;
+    try {
+      for(const api of ["drawArrays","drawElements",...(trace.capturing?["clearBufferfv","blitFramebuffer"]:[])]) {
+        const original=gl[api],own=Object.hasOwn(gl,api);
+        gl[api]=(...args)=>{
+          const triangles=api==="drawElements"?args[1]/3:api==="drawArrays"?args[2]/3:null;
+          const query=trace.BeginGl(gl),timed=trace.capturing||trace.captureDraws;
+          const start=timed?performance.now():0;
+          try {return original.apply(gl,args);}
+          finally {trace.Gl(gl,this.phase,api,args,triangles,timed?performance.now()-start:0,query);}
+        };
+        restore.push(()=>{if(own) gl[api]=original;else delete gl[api];});
+      }
+      return method.call(this,raster);
+    } finally {
+      this.Phase(null);this.trace=null;
+      for(const undo of restore.reverse()) undo();
+    }
+  }
+
+  Phase(name) {
+    if(!this.trace||name===this.phase) return;
+    if(this.phase) this.trace.EndGpu();
+    this.phase=name;
+    if(name) this.trace.BeginGpu(name);
+  }
+
+  DrawContent(raster) {
     const gl=this.gl;if(gl.isContextLost()) return false;
     try {this.Resize(raster.width,raster.height);} catch {unavailable=true;return false;}
+    this.Phase("几何准备");
     this.residentWorld=this.PrepareResidentGeometry(raster);
     const lighting=raster.view?.lighting&&raster.shadowVertices;
+    if(lighting) this.Phase("阴影");
     const shadowValues=lighting?this.DrawShadows(raster):null;
+    this.Phase("主场景");
     this.BindSceneTarget(raster);gl.viewport(0,0,raster.width,raster.height);
     gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);
     gl.clearBufferfv(gl.COLOR,0,new Float32Array(4));gl.clearBufferfv(gl.COLOR,1,new Float32Array([Infinity,0,0,0]));
@@ -648,6 +698,7 @@ class GpuRaster {
     gl.bindVertexArray(this.screenVao);
     gl.bufferData(gl.ARRAY_BUFFER,raster.gpuVertices.subarray(0,raster.gpuLength),gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES,0,raster.gpuLength/6);
+    this.Phase("深度回读");
     if(raster.sparseDepth) {
       // Let the GPU render shadows and scene depth while the CPU projects the
       // current frame's markers and collects the pixels they actually need.
@@ -662,6 +713,7 @@ class GpuRaster {
     }
     // Keep color on the GPU. Only depth is read back for editor interactions.
     if(lighting) this.DrawAmbientOcclusion(raster);
+    this.Phase("输出到视口");
     gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
     gl.blitFramebuffer(0,0,raster.width,raster.height,0,this.canvas.height,raster.width,this.canvas.height-raster.height,gl.COLOR_BUFFER_BIT,gl.NEAREST);
     return !gl.isContextLost()&&gl.getError()===gl.NO_ERROR;

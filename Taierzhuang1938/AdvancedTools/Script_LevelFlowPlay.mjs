@@ -4,11 +4,13 @@ import {ReadCastLibrary} from "./Script_EncounterCastLibrary.mjs";
 
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
-  constructor({snapshot,restore,pause,toast,onState,showSource}) {
-    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource});
+  constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug}) {
+    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,previewDebug});
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
+    this.debugButtons=[...document.querySelectorAll(".lfDebugTools [data-debug-tool]")];
+    for(const button of this.debugButtons)button.onclick=()=>this.OpenDebugTool(button);
     this.button.onclick=()=>this.active?(this.state?.failed?this.Retry():this.Pause(false)):this.Start(this.menu.value);
     this.pauseButton.onclick=()=>this.Pause(!this.paused);this.stopButton.onclick=()=>this.Stop();
     this.releaseButton=document.getElementById("releasePlayCache");
@@ -45,6 +47,27 @@ export class LevelFlowPlay {
     this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
     this.stopButton.disabled=!this.active;this.menu.disabled=this.active;
     this.releaseButton.hidden=this.active||!this.frame;
+    const canDebug=!this.active||!!this.DebugEditor();
+    for(const button of this.debugButtons){
+      const label=button.getAttribute("aria-label");
+      const disabled=!canDebug,labelText=`${label} · ${!this.active?"编辑器预览":disabled?"等待 Play 就绪":"当前 Play"}`;
+      if(button.disabled!==disabled) button.disabled=disabled;
+      if(button.title!==labelText) button.title=labelText;
+    }
+  }
+  DebugEditor(){return this.active&&this.state?.ready&&!this.launching?this.frame?.contentWindow.Tengxian?.editor:null;}
+  OpenDebugTool(button){
+    if(!this.active){return this.previewDebug.Open(button.dataset.debugTool);}
+    const editor=this.DebugEditor();if(!editor)return;
+    const id=button.dataset.debugTool,overlay=editor.overlays.get(id);
+    if(overlay?.win&&!overlay.win.closed){overlay.win.focus();return;}
+    if(overlay)editor.CloseOverlay(id);
+    editor.overlayError="";
+    if(!editor.ToggleOverlay(id))this.toast(editor.overlayError||`${button.getAttribute("aria-label")} 打不开。`,true);
+  }
+  CloseDebugTools(){
+    const editor=this.frame?.contentWindow.Tengxian?.editor;
+    for(const button of this.debugButtons)editor?.CloseOverlay(button.dataset.debugTool);
   }
   async SceneStamp() {
     const paths=["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
@@ -70,6 +93,7 @@ export class LevelFlowPlay {
     const payload={token:this.token,time,document:this.saved.document};
     try{sessionStorage.setItem("tengxian1938_encounter_play_session_v1",JSON.stringify(payload));}
     catch(error){this.toast("Play 开局数据保存失败："+error.message,true);this.saved=null;return false;}
+    this.previewDebug.CloseAll();
     this.active=true;this.startedAt=performance.now();this.startTime=time;const generation=++this.generation;
     this.deadline=setTimeout(()=>{if(this.active&&generation===this.generation){this.Stop();this.toast("Play 加载超时，已停止；可以重新尝试。",true);}},ENCOUNTER_PLAY_STARTUP.maxLoadMs);
     for(const option of this.layout.options)option.hidden=option.disabled=Number(option.value)>2;
@@ -151,6 +175,7 @@ export class LevelFlowPlay {
   Stop() {
     if(!this.active)return;
     this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
+    this.CloseDebugTools();
     const game=this.frame?.contentWindow.Tengxian,api=game?.Debug.EncounterPlay;
     if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.ScheduleRelease();}
     else this.DropHost();
@@ -167,6 +192,7 @@ export class LevelFlowPlay {
   }
   DropHost(){
     clearTimeout(this.cacheTimer);
+    this.CloseDebugTools();
     try{this.frame?.contentWindow.Tengxian?.Debug?.EncounterPlay?.Dispose?.();}catch{}
     if(this.frame)this.frame.src="about:blank";this.host?.remove();this.frame=null;this.host=null;
   }

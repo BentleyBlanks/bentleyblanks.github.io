@@ -71,7 +71,7 @@ export function SaveGlState(gl) {
 
 const ENUMS = new WeakMap();
 export function EnumName(gl, value) {
-  if (value === null) return null;
+  if (typeof value !== 'number') return value;
   if (!ENUMS.has(gl)) {
     const names = new Map();
     for (let p = gl; p; p = Object.getPrototypeOf(p)) {

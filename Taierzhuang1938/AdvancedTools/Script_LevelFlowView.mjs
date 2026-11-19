@@ -426,7 +426,7 @@ export class FlowMapView {
     return [point[0], point[1] - 10];
   }
 
-  Draw(frame,layers,selection,annotations=[],draft=null,viewport=null) {
+  Draw(frame,layers,selection,annotations=[],draft=null,viewport=null,trace=null) {
     const rect=viewport||this.canvas.getBoundingClientRect();
     this.BeforeDraw?.(frame,rect);
     const ratio=Math.min(2,window.devicePixelRatio||1),width=rect.width,height=rect.height;
@@ -435,16 +435,20 @@ export class FlowMapView {
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
     const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false,
       frame.signals,Math.round((frame.nightBlend||0)*FLOW_DUSK.steps)]);
-    if(key!==this.baseKey) {
+    if(trace?.redrawBase||key!==this.baseKey) {
+      const started=trace?.capturing?performance.now():0;
       if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
       // Fractional CSS sizes leave a partially covered last pixel. Clear the
       // full backing surface without reallocating it, preventing edge trails.
       background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
-      this.DrawBase(background,width,height,frame,layers);this.baseKey=key;
+      this.DrawBase(background,width,height,frame,layers,trace);this.baseKey=key;
+      if(trace?.capturing&&!this.raster) trace.Canvas("绘制 2D 底图",this.baseCanvas,started);
     }
     this.BeforeOverlays?.(frame,layers);
+    let started=trace?.capturing?performance.now():0;
     context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
+    if(trace?.capturing) {trace.Canvas("合成视口底图",this.canvas,started);started=performance.now();}
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
     if(layers.routes) {
       this.DrawPath(context,frame.stage.beats.flatMap((beat)=>beat.p),"#9c731b9c",2,[6,5]);
@@ -551,5 +555,6 @@ export class FlowMapView {
       this.DrawScale(context,width,height-legendHeight);
       this.DrawCompass(context,width,height);
     }
+    if(trace?.capturing) trace.Canvas("场景叠层与视口输出",this.canvas,started);
   }
 }

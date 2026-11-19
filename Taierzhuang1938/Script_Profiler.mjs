@@ -96,18 +96,19 @@ export const FRAME_STATES = {
   menu: "菜单",
   paused: "暂停",
   editor: "编辑器接管",
+  editorPreview: "编辑器预览",
   loading: "加载/预热",
   failure: "失败画面",
   hidden: "页面在后台",
 };
-const ACTIVE_STATES = new Set(["play", "cutscene"]);
+const ACTIVE_STATES = new Set(["play", "cutscene", "editorPreview"]);
 
 /**
  * 算「渲染提交」（UE stat unit 的 Draw）的 CPU 桶：RenderScene 里打的那几个。
  * 其余根桶（AI、物理、剧情、玩家……）都是「逻辑」（Game）。`overlay` 是剖析面板自己，
  * 单列，不算进任何一边。
  */
-export const RENDER_BUCKETS = ["post", "matrix", "shadowBatch", "actorBatch", "frameSetup", "firstPersonShadow", "firstPersonProbe", "gi"];
+export const RENDER_BUCKETS = ["post", "matrix", "shadowBatch", "actorBatch", "frameSetup", "firstPersonShadow", "firstPersonProbe", "gi", "encounterViewport"];
 const RENDER_BUCKET_SET = new Set(RENDER_BUCKETS);
 
 /** 卡顿三档的下限（ms）：≥50 轻、≥100 中、≥250 重。 */
@@ -691,6 +692,15 @@ export class FrameProfiler {
     return true;
   }
 
+  get capturingDraws() { return this._capturing; }
+
+  RecordRawDraw(api, triangles, ms) {
+    if (!this._capturing || this._drawList.length >= 4000) return;
+    const pass = this._segName || "WebGL2";
+    this._drawList.push({pass, object: api, top: pass.split("/").slice(0, 2).join("/"), material: "—", materialType: "WebGL2",
+      materialId: null, kind: "raw", tris: triangles, instances: 1, us: Math.round(ms * 1000), matSwitch: false, flip: false});
+  }
+
   // -------------------------------------------------------------------------
   // 开关
   // -------------------------------------------------------------------------
@@ -699,8 +709,8 @@ export class FrameProfiler {
     if (this.on || !this.renderer) return;
     this.on = true;
     this.recording = true;
-    this._gl = this.renderer.getContext();
-    this._ext = this._gl.getExtension("EXT_disjoint_timer_query_webgl2");
+    this._gl = this.renderer?.getContext();
+    this._ext = this._gl?.getExtension("EXT_disjoint_timer_query_webgl2");
     this.timerAvailable = !!this._ext;
     this.Clear();
     this.frameId = 0;
@@ -923,7 +933,7 @@ export class FrameProfiler {
    *     （`meter.triangles += …`），逐盏调用只会分几次累，总数不变。
    */
   _WrapShadow() {
-    const shadowMap = this.renderer.shadowMap;
+    const shadowMap = this.renderer?.shadowMap;
     if (!shadowMap || this._shadowOrig) return;
     const original = shadowMap.render;
     this._shadowOrig = original;
@@ -1195,13 +1205,13 @@ export class FrameProfiler {
   // CPU 标记（装配层调）
   // -------------------------------------------------------------------------
 
-  BeginFrame(now = performance.now()) {
+  BeginFrame(now = performance.now(), contiguous = true) {
     if (!this.on) return;
     // 暂停时 GPU 查询也照收：暂停前最后几帧的 GPU 数要落到它们自己的记录上。
-    this._Poll();
+    this.PollGpu();
     if (!this.recording) return;
     this.frameId += 1;
-    this.interval = this._lastRaf ? now - this._lastRaf : 0;
+    this.interval = contiguous && this._lastRaf ? now - this._lastRaf : 0;
     this._lastRaf = now;
     for (const key in this.cpu) this.cpu[key] = 0;
     for (const key in this.cpuCalls) this.cpuCalls[key] = 0;
@@ -1402,9 +1412,10 @@ export class FrameProfiler {
   // GPU 分段（RenderScene 与 Post.Render 调）
   // -------------------------------------------------------------------------
 
-  GpuFrameStart() {
+  GpuFrameStart(scoped = false) {
     if (!this.recording || this._gpuActive) return;
     this._gpuActive = true;
+    this._gpuScoped = scoped;
     this._stack.length = 0;
     this._segs.length = 0;
     for (const key in this.gpuCpu) this.gpuCpu[key] = 0;
@@ -1440,6 +1451,7 @@ export class FrameProfiler {
   }
 
   _StartSeg() {
+    if (this._gpuScoped && !this._stack.length) return;
     this._segName = this._stack.length ? this._stack[this._stack.length - 1] : "misc";
     this._segCpuStart = performance.now();
     // 每一趟 renderer.render 开头 three 都把「当前材质」清掉，所以每段的第一个 draw 必然换材质
@@ -1453,7 +1465,9 @@ export class FrameProfiler {
     }
     if (!this._ext) return;
     const gl = this._gl;
+    if (gl.isContextLost()) return;
     const query = this._pool.pop() || gl.createQuery();
+    if (!query) return;
     gl.beginQuery(this._ext.TIME_ELAPSED_EXT, query);
     this._segQuery = query;
   }
@@ -1498,7 +1512,7 @@ export class FrameProfiler {
     for (const seg of entry.segs) this._gl.deleteQuery(seg.query);
   }
 
-  _Poll() {
+  PollGpu() {
     if (!this._ext || this._pending.length === 0) return;
     const gl = this._gl;
     // disjoint（降频、切上下文）期间的计时不可信，整批扔掉。读这个参数本身会清标志。

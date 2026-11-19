@@ -105,20 +105,20 @@ for (const [key, value] of Object.entries(THREE)) {
   else if (/Blending$/.test(key) && value <= 6) THREE_NAMES.blending.set(value, key.replace(/Blending$/, ''));
 }
 const ICONS = { 'Draw Mesh': ['draw', 'D'], 'Draw Mesh Instanced': ['inst', 'I'], 'Draw Batched': ['batch', 'B'], 'Draw Fullscreen': ['full', 'F'],
-  'Draw Procedural': ['proc', 'P'], Clear: ['clear', 'C'], Blit: ['blit', '⇢'], 'Generate Mips': ['copy', 'M'], 'Copy Texture': ['copy', 'T'] };
+  'Draw Procedural': ['proc', 'P'], Canvas2D: ['full', '2D'], Clear: ['clear', 'C'], Blit: ['blit', '⇢'], 'Generate Mips': ['copy', 'M'], 'Copy Texture': ['copy', 'T'] };
 
 export class FrameDebuggerEditor {
   static id = 'frameDebugger';
   static label = 'Frame Debugger';
   static hint = '独立窗口：冻结一帧、逐 DC / Pass 回放、CPU / GPU 耗时、渲染靶 / 网格 / Shader 检查';
   static keepOnClose = true;
-  constructor(host) {
-    this.host = host; this.debugger = host.game.FrameDebugger; this.win = null; this.mesh = null; this.lastRevision = -1; this.captureId = null;
+  constructor(host, popup = null) {
+    this.host = host; this.debugger = host.game.FrameDebugger; this.win = popup; this.mesh = null; this.lastRevision = -1; this.captureId = null;
     this.treeKey = ''; this.filter = ''; this.sort = 'order'; this.channel = 'rgba'; this.open = new Set(); this.folds = new Map();
     this.selectedPass = null; this.textureView = null; this.propertyFilter = '';
   }
   Enter() {
-    this.win = window.open('', this.debugger.windowName, 'width=1440,height=980,menubar=no,toolbar=no');
+    this.win ??= window.open('', this.debugger.windowName, 'width=1440,height=980,menubar=no,toolbar=no');
     if (!this.win) throw new Error('Frame Debugger 独立窗口被浏览器拦截，请允许弹窗后重试');
     const doc = this.win.document; this.doc = doc;
     doc.open(); doc.write('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>台儿庄 · Frame Debugger</title></head><body></body></html>'); doc.close();
@@ -147,6 +147,16 @@ export class FrameDebuggerEditor {
       <footer class="note">GPU 来自当前冻结帧的一次完整命令回放，查询异步返回；— 表示未返回或不可用。CPU 为捕获时提交（含绘制准备），已扣除检查开销。Pass / 分组的 GPU 包含状态设置、上传与子事件；父行包含子行，勿重复相加。灰色 ◆ 分组（Render / Draw*Objects / Unscoped）由捕获器按提交顺序归并，不是游戏里的 Pass。缓存与查询插桩会影响耗时，趋势请用 Profiler。Unity SRP Batcher、Compute/Geometry/Tessellation、memoryless / load-store 不是本游戏 WebGL2 管线功能，不伪造数据。</footer></section></main>`;
     this.ui = Object.fromEntries([...doc.querySelectorAll('[id]')].map(el => [el.id, el]));
     const ui = this.ui;
+    if (this.host.preview) {
+      doc.title = 'Encounter Designer 编辑器预览 · Frame Debugger';
+      doc.querySelector('.pill').textContent = 'Encounter Designer · 编辑器预览';
+      ui.target.options[0].textContent = '所有可见编辑器视口';
+      ui.capture.textContent = '● 捕获当前帧'; ui.resume.textContent = '■ 清除捕获';
+      ui.syncView.closest('label').hidden = true; ui.syncView.checked = false;
+      ui.locate.hidden = true; ui.view.hidden = true;
+      ui.channel.hidden = true; ui.black.closest('label').hidden = ui.exposure.closest('label').hidden = true;
+      doc.querySelector('footer').textContent = '按视口编号与实际提交顺序记录。WebGL 列出逐条绘制、清除与拷贝，Canvas2D 按渲染层记录。可见输出保存实际绘制时的快照；中间 GPU 命令只显示详情，不回放。GPU 耗时是捕获时的异步查询；未提供读数显示为 —。';
+    }
     for (const [value, text] of [['rgba', 'RGBA'], ['rgb', 'RGB'], ['r', 'R'], ['g', 'G'], ['b', 'B'], ['a', 'A']]) {
       const button = this.El('button', text); button.dataset.value = value; button.classList.toggle('on', value === this.channel);
       button.onclick = () => { this.channel = value; ui.channel.querySelectorAll('button').forEach(el => el.classList.toggle('on', el === button)); this.DrawPreview(); };
@@ -174,7 +184,7 @@ export class FrameDebuggerEditor {
     ui.output.onmousemove = event => this.Pixel(event);
     ui.output.onmouseleave = () => { ui.pixel.hidden = true; };
     ui.output.onclick = event => this.PixelHistoryAt(event);
-    ui.output.title = '单击像素：像素历史（哪些事件写过它、写后的原始值）';
+    if (!this.host.preview) ui.output.title = '单击像素：像素历史（哪些事件写过它、写后的原始值）';
     ui.splitter.onpointerdown = event => {
       ui.splitter.setPointerCapture(event.pointerId); ui.splitter.classList.add('drag');
       ui.splitter.onpointermove = move => doc.body.style.setProperty('--aside', `${Math.max(240, Math.min(this.win.innerWidth - 420, move.clientX))}px`);
@@ -203,10 +213,12 @@ export class FrameDebuggerEditor {
     if (this.lastRevision === this.debugger.revision) return;
     this.lastRevision = this.debugger.revision;
     const capture = this.debugger.capture, ui = this.ui, ready = this.debugger.frozen;
-    for (const id of ['resume', 'save', 'previous', 'next', 'scrubber', 'index', 'png', 'locate']) ui[id].disabled = !ready;
+    for (const id of ['save', 'previous', 'next', 'scrubber', 'index', 'png', 'locate']) ui[id].disabled = !ready;
+    ui.resume.disabled = !ready && this.debugger.state !== 'armed';
     ui.stateDot.className = `dot ${ready ? 'frozen' : this.debugger.state === 'armed' || this.debugger.state === 'capturing' ? 'armed' : this.debugger.state === 'error' ? 'error' : 'live'}`;
     if (!capture || !ready) {
-      ui.statusText.textContent = this.debugger.error || (this.debugger.state === 'armed' ? '等待下一次渲染提交…' : '游戏运行中 · 点击「启用 / 捕获当前帧」冻结下一帧');
+      ui.statusText.textContent = this.debugger.error || (this.debugger.state === 'armed' ? '等待下一次渲染提交…'
+        : this.host.preview ? '点击「捕获当前帧」保存所有可见视口的本次提交' : '游戏运行中 · 点击「启用 / 捕获当前帧」冻结下一帧');
       if (!capture) {
         ui.events.replaceChildren(this.El('div', '尚未捕获。捕获后这里按提交顺序列出 Pass 与每个渲染事件。', 'empty'));
         ui.properties.replaceChildren(); ui.selected.textContent = '尚未捕获'; ui.kindTag.hidden = true; ui.crumbs.replaceChildren(); ui.chips.replaceChildren(); ui.stats.replaceChildren();
@@ -217,14 +229,20 @@ export class FrameDebuggerEditor {
     }
     const statuses = { ready: '已返回', pending: '等待 GPU', unavailable: '扩展不可用', disjoint: 'GPU 时钟失效', timeout: '查询超时' };
     const draws = capture.events.filter(event => event.draw).length;
-    ui.statusText.textContent = `帧 #${capture.id} 已冻结 · ${capture.capturedAt.slice(11, 19)} · ${capture.width}×${capture.height} · ${Count(capture.commandCount)} 条 GL 命令 · GPU 计时${statuses[capture.gpuStatus]}`;
+    const target = this.host.preview ? `${capture.passes.length} 个视口 · ${Count(capture.commandCount)} 个渲染事件`
+      : `${capture.width}×${capture.height} · ${Count(capture.commandCount)} 条 GL 命令`;
+    ui.statusText.textContent = `帧 #${capture.id} ${this.host.preview ? '已捕获' : '已冻结'} · ${capture.capturedAt.slice(11, 19)} · ${target} · GPU 计时${statuses[capture.gpuStatus]}`;
     ui.stats.replaceChildren(this.Stat('Draw calls', Count(draws)), this.Stat('Events', Count(capture.events.length)),
-      this.Stat('Passes', Count(capture.passes.filter(pass => !pass.synthetic).length)), this.Stat('CPU ms', Ms(capture.cpuMs)),
+      this.Stat(this.host.preview ? '视口' : 'Passes', Count(capture.passes.filter(pass => !pass.synthetic).length)), this.Stat('CPU ms', Ms(capture.cpuMs)),
       this.Stat('GPU ms', Ms(capture.gpuMs), statuses[capture.gpuStatus]), this.Stat('Backup', `${(capture.bytes / 1048576).toFixed(1)} MiB`));
     const key = `${capture.id}:${capture.gpuStatus}`;
     if (key !== this.treeKey) {
       this.treeKey = key; this.BuildTree();
-      if (this.captureId !== capture.id) { this.captureId = capture.id; this.selectedPass = null; this.textureView = null; this.pixelHistory = null; this.Select(capture.events.length - 1); }
+      if (this.captureId !== capture.id) {
+        this.captureId = capture.id; this.selectedPass = null; this.textureView = null; this.pixelHistory = null;
+        const firstView = this.host.preview ? capture.passes[0] : null;
+        this.Select(firstView?.last ?? capture.events.length - 1, firstView?.id ?? null);
+      }
       else { const event = this.debugger._events[this.debugger.selected]; this.Header(event); if (event) this.Properties(event); }
     }
   }
@@ -232,7 +250,7 @@ export class FrameDebuggerEditor {
   Match(event) {
     if (!this.filter) return true;
     const d = event.details || {};
-    return `#${event.index + 1} ${event.kind} ${event.label} ${event.path} ${event.target} ${d.material || ''} ${d.shader || ''} ${event.shaderName || ''} ${d.geometry || ''} ${d.path || ''}`.toLowerCase().includes(this.filter);
+    return `#${event.index + 1} ${event.kind} ${event.label} ${event.path} ${event.target} ${event.phase || ''} ${d.material || ''} ${d.shader || ''} ${event.shaderName || ''} ${d.geometry || ''} ${d.path || ''}`.toLowerCase().includes(this.filter);
   }
   EventRow(event, depth, flat = false) {
     const row = this.El('div', '', 'row ev'); row.dataset.event = event.index; row.style.setProperty('--depth', depth);
@@ -240,7 +258,7 @@ export class FrameDebuggerEditor {
     const name = this.El('span', '', 'name'), icon = this.El('span', glyph, `icon ${iconClass}`); icon.title = event.kind;
     const d = event.details;
     name.append(this.El('span', '', 'caret'), icon, this.El('span', String(event.index + 1), 'idx'), this.El('span', event.draw ? event.label : `${event.kind} ${event.label}`.trim(), 'label'),
-      this.El('span', flat ? event.path : d ? d.material : event.target, 'sub'));
+      this.El('span', flat ? event.path : d ? d.material : event.phase || event.target, 'sub'));
     const gpu = this.El('span', Ms(event.gpuMs), 'num gpu'); gpu.style.setProperty('--p', `${Math.min(100, (event.gpuMs || 0) / this.maxEventGpu * 100)}%`);
     row.append(name, this.El('span', event.draw ? '1' : '', 'num'), this.El('span', Ms(event.cpuMs), 'num'), gpu);
     row.title = `#${event.index + 1} ${event.kind} ${event.label}\n${event.path} → ${event.target}${d ? `\n${d.path}\n材质 ${d.material} · ${event.shaderName || d.shader}` : ''}`;
@@ -251,7 +269,8 @@ export class FrameDebuggerEditor {
     const node = this.El('div', '', 'node'); node.dataset.pass = pass.id; node.dataset.path = pass.path;
     const row = this.El('div', '', 'row pass'); row.style.setProperty('--depth', depth);
     const name = this.El('span', '', 'name'), caret = this.El('button', '▾', 'caret'); caret.tabIndex = -1; caret.dataset.toggle = '1';
-    const icon = this.El('span', '◆', `icon group${pass.synthetic ? ' synthetic' : ''}`); icon.title = pass.synthetic ? '捕获器归并的分组' : '游戏 Pass';
+    const icon = this.El('span', '◆', `icon group${pass.synthetic ? ' synthetic' : ''}`);
+    icon.title = pass.viewport ? '视口' : pass.synthetic ? '捕获器归并的分组' : '游戏 Pass';
     name.append(caret, icon, this.El('span', pass.name, 'label'));
     const total = this.debugger.capture.gpuMs, gpu = this.El('span', Ms(pass.gpuMs), 'num gpu');
     gpu.style.setProperty('--p', `${total ? Math.min(100, (pass.gpuMs || 0) / total * 100) : 0}%`);
@@ -267,7 +286,7 @@ export class FrameDebuggerEditor {
     const root = this.ui.events, scroll = root.scrollTop, fragment = this.doc.createDocumentFragment();
     this.maxEventGpu = Math.max(1e-6, ...capture.events.map(event => event.gpuMs || 0));
     let shown = 0;
-    if (this.sort !== 'order') {
+    if (this.sort !== 'order' && !capture.passes.some(pass => pass.viewport)) {
       const key = `${this.sort}Ms`;
       for (const event of [...capture.events].filter(event => this.Match(event)).sort((a, b) => (b[key] ?? -1) - (a[key] ?? -1))) { fragment.append(this.EventRow(event, 0, true)); shown++; }
     } else {
@@ -280,14 +299,17 @@ export class FrameDebuggerEditor {
         const value = !this.filter || pass.name.toLowerCase().includes(this.filter) || (children.get(`e${pass.id}`) || []).some(item => this.Match(item.event)) || (children.get(pass.id) || []).some(item => Has(item.pass));
         Visible.set(pass.id, value); return value;
       };
-      const Add = (parentId, container, depth, forced) => {
-        const items = [...(children.get(parentId) || []), ...(children.get(`e${parentId}`) || [])].sort((a, b) => a.at - b.at || (a.pass ? -1 : 1));
+      const Add = (parentId, container, depth, forced, viewport = false) => {
+        const sortKey = viewport && this.sort !== 'order' ? `${this.sort}Ms` : null;
+        const items = [...(children.get(parentId) || []), ...(children.get(`e${parentId}`) || [])].sort((left, right) =>
+          (sortKey ? ((right.pass || right.event)[sortKey] ?? -1) - ((left.pass || left.event)[sortKey] ?? -1) : 0)
+          || left.at - right.at || (left.pass ? -1 : 1));
         for (const item of items) {
           if (item.pass) {
             const passMatch = this.filter && item.pass.name.toLowerCase().includes(this.filter);
             if (!forced && !Has(item.pass)) continue;
             const node = this.PassNode(item.pass, depth, !!this.filter); container.append(node);
-            Add(item.pass.id, node.lastChild, depth + 1, forced || passMatch);
+            Add(item.pass.id, node.lastChild, depth + 1, forced || passMatch, viewport || !!item.pass.viewport);
           } else if (forced || this.Match(item.event)) { container.append(this.EventRow(item.event, depth)); shown++; }
         }
       };
@@ -317,7 +339,7 @@ export class FrameDebuggerEditor {
     root.querySelectorAll('.row.on,.row.inside').forEach(el => el.classList.remove('on', 'inside'));
     let row = this.selectedPass != null ? root.querySelector(`.node[data-pass="${this.selectedPass}"]>.row`) : root.querySelector(`[data-event="${index}"]`);
     const event = this.debugger._events[index];
-    if (this.sort === 'order' && event) {
+    if ((this.sort === 'order' || this.debugger.capture.passes.some(pass => pass.viewport)) && event) {
       // Open the chain down to the selection (Unity keeps the selected event visible).
       const chain = [];
       for (let id = this.selectedPass != null ? this.debugger.capture.passes[this.selectedPass].parent : event.pass; id != null; id = this.debugger.capture.passes[id].parent) chain.push(id);
@@ -398,9 +420,15 @@ export class FrameDebuggerEditor {
     if (!this.debugger.frozen) return;
     const ui = this.ui; ui.previewError.textContent = '';
     const index = this.debugger.selected, event = this.debugger._events[index];
+    if (this.host.preview && !event?._target.attachments.length) {
+      ui.output.width = ui.output.height = 1; ui.png.disabled = true; this.previewSource = null;
+      ui.pixel.hidden = ui.previewLabel.hidden = true; ui.attachment.disabled = true;
+      ui.previewError.textContent = '此事件没有图像快照。选择带输出的合成事件，或点视口分组查看最终画面。';
+      return;
+    }
     const view = ui.view.value, isMesh = view === 'mesh';
     ui.output.style.display = isMesh ? 'none' : ''; ui.mesh.style.display = isMesh ? 'block' : 'none'; ui.meshControls.hidden = !isMesh;
-    ui.attachment.disabled = view !== 'output';
+    ui.attachment.disabled = view !== 'output'; ui.png.disabled = false;
     const options = { channel: this.channel, black: Number(ui.black.value), white: Number(ui.white.value), exposure: Number(ui.exposure.value) };
     try {
       const attachment = event?._target.attachments[Number(ui.attachment.value)];
@@ -432,7 +460,7 @@ export class FrameDebuggerEditor {
   }
   // Same call agents use (Tengxian.FrameDebug.PixelHistory); shown at the top of the properties.
   PixelHistoryAt(mouse) {
-    const at = this.ui.view.value === 'output' && this.SourcePixel(mouse); if (!at) return;
+    const at = !this.host.preview && this.ui.view.value === 'output' && this.SourcePixel(mouse); if (!at) return;
     const event = this.debugger._events[this.debugger.selected];
     try { this.pixelHistory = this.debugger.PixelHistory(at[0], at[1], { event: event.index, attachment: Number(this.ui.attachment.value) || 0 }); }
     catch (error) { this.ui.previewError.textContent = String(error.message || error); return; }
@@ -549,8 +577,8 @@ export class FrameDebuggerEditor {
     if (this.pixelHistory) this.PixelHistoryFold(root);
     if (pass) this.Fold(root, 'group', `分组 · ${pass.name}`, null, body => {
       const cards = this.El('div', '', 'cards'); body.append(cards);
-      this.Card(cards, 'Group', [['路径', pass.path], ['类型', pass.synthetic ? `捕获器归并（${pass.synthetic}）` : '游戏 Pass'], ['事件', `#${pass.first + 1} – #${pass.last + 1}`],
-        ['Draw calls', Count(pass.draws)], ['CPU', `${Ms(pass.cpuMs)} ms`], ['GPU', `${Ms(pass.gpuMs)} ms`], ['GL 命令', `${Count(pass.commandEnd - pass.commandStart)}`]]);
+      this.Card(cards, 'Group', [['路径', pass.path], ['类型', pass.viewport ? '视口' : pass.synthetic ? `捕获器归并（${pass.synthetic}）` : '游戏 Pass'], ['事件', `#${pass.first + 1} – #${pass.last + 1}`],
+        ['Draw calls', Count(pass.draws)], ['CPU', `${Ms(pass.cpuMs)} ms`], ['GPU', `${Ms(pass.gpuMs)} ms`], [this.host.preview ? '渲染事件' : 'GL 命令', `${Count(pass.commandEnd - pass.commandStart)}`]]);
       const top = capture.events.slice(pass.first, pass.last + 1).filter(item => item.draw).sort((a, b) => (b.gpuMs ?? -1) - (a.gpuMs ?? -1)).slice(0, 8);
       if (top.length) {
         const card = this.El('div', '', 'card'); card.append(this.El('h3', '最耗 GPU 的 DC'));
@@ -562,6 +590,7 @@ export class FrameDebuggerEditor {
     this.Fold(root, 'details', 'Details', null, body => {
       const cards = this.El('div', '', 'cards'); body.append(cards);
       this.Card(cards, 'Event', [['事件', `#${event.index + 1} / ${capture.events.length}`], ['类型', event.kind], ['API', ApiCall(this.debugger.gl, event)],
+        ['阶段', event.phase ?? undefined],
         ['Pass', event.path], ['CPU', `${Ms(event.cpuMs)} ms`, event.draw ? `GL 调用本身 ${Ms(event.cpuSubmitMs)} ms` : ''], ['GPU', `${Ms(event.gpuMs)} ms`],
         ['Batch cause', event.batchCause ?? undefined]]);
       if (event.drawInfo) {
@@ -588,7 +617,7 @@ export class FrameDebuggerEditor {
           ['Shadows', `cast ${d.castShadow ? 'On' : 'Off'} · receive ${d.receiveShadow ? 'On' : 'Off'} · frustumCulled ${d.frustumCulled ? 'On' : 'Off'}`],
           ['Instances (object)', d.instances > 1 ? Count(d.instances) : undefined], ['Source', d.source ?? undefined]]);
       } else if (event.draw) this.Card(cards, 'Mesh / Object', [['源对象', '无', '原始 GL 调用，没有经过 three.js renderBufferDirect'], ['Shader', event.shaderName ?? undefined]]);
-      if (event.kind === 'Clear') {
+      if (event.kind === 'Clear' && event.state) {
         const s = event.state, color = this.El('span'); color.append(this.Swatch(s.COLOR_CLEAR_VALUE), this.El('span', `(${s.COLOR_CLEAR_VALUE.map(Num).join(', ')})`));
         this.Card(cards, 'Clear', [['Buffers', event.label.replace(/[()]/g, '')], ['Color', color], ['Depth', Num(s.DEPTH_CLEAR_VALUE)], ['Stencil', String(s.STENCIL_CLEAR_VALUE)]]);
       }
@@ -596,7 +625,7 @@ export class FrameDebuggerEditor {
         ['Initial action', target.initialAction ?? undefined]]);
       this.Table(card, ['Attachment', 'Format', 'Size', 'MSAA', 'Level/Face/Layer'], target.attachments.map(attachment => [attachment.name, String(EnumName(gl, attachment.format)),
         `${attachment.width}×${attachment.height}`, attachment.samples ? `×${attachment.samples}` : 'Off', `${attachment.level || 0} / ${attachment.face ? EnumName(gl, attachment.face) : 0} / ${attachment.layer || 0}`]));
-      this.Card(cards, 'Render State', RenderStateRows(event.state, Num));
+      if (event.state) this.Card(cards, 'Render State', RenderStateRows(event.state, Num));
     }, true);
     if (!event.draw) { this.RawJson(root, event); return; }
     const defines = new Map();
