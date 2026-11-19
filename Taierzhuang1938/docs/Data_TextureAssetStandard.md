@@ -77,6 +77,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=<起点提交> --profile=qu
 
 ## 3. 格式与尺寸
 
+场景、角色和特效贴图的最长边遵循[全仓贴图尺寸上限](../../AGENTS.md#贴图尺寸上限)。下列资产预算和 `Data_PublishPathRules.json` 中的发布路径可以规定更小的尺寸。
+
 ### 3.1 格式
 
 - 游戏贴图一律 **WebP**。取舍：

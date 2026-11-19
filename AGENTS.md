@@ -70,6 +70,18 @@
 - 引擎回调、公共接口、第三方文件、工具约定名称（如 index.html、AGENTS.md、package.json）保留要求的拼写；Git 分支按上文命名。不做无关批量重命名。
 - 提交标题：`<AgentName> <Project>: short change summary`，例如 `Codex GravityTank: correct roulette weights`。不用 Conventional Commit 前缀或句末句号；跨项目基础设施用 `Repository`，游戏变化优先写主要项目。
 
+## 贴图尺寸上限
+
+各项目按用途验收运行时贴图，以每张成品的最长边（宽、高中的较大值）计。模型内嵌贴图同样适用，图集按整张图计算。
+
+| 贴图用途 | 最长边上限 |
+| --- | --- |
+| 场景贴图 | 4K（4096 像素） |
+| 角色贴图 | 4K（4096 像素） |
+| 特效贴图 | 2K（2048 像素） |
+
+项目对具体资产或发布路径设有更低上限时，验收取两者中的较小值。
+
 ## Blender 源工程
 
 - 后续所有 Blender 原始工程统一存放在 `C:\Users\Bentl\OneDrive\AI\Models\Blender`，按项目与资产建立子目录；`.blend` 及自动备份均留在该目录，不放进 github.io 仓库。仓库保留游戏所需的 GLB、贴图、重建脚本与资产说明。
