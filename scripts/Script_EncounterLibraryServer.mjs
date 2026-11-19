@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {execFile} from "node:child_process";
+import {WatchEncounterImports} from "./Script_EncounterImportWatch.mjs";
 import {promisify} from "node:util";
 
 const Run=promisify(execFile);
@@ -15,7 +16,7 @@ export function PrepareEncounterLibraryRequest(root) {
   const project=path.join(root,"Taierzhuang1938"),tools=path.join(project,"AdvancedTools");
   const script=path.join(tools,"Script_EncounterLibrary.mjs"),index=path.join(tools,"Library/Data_Cast.json");
   const jobs=new Map(),terrainChecks=new Map();
-  let castRevision;
+  let castRevision,closeWatch;
   function Import(type) {
     if(!jobs.has(type)){
       const job=Run(process.execPath,[script,type],{cwd:root,windowsHide:true});
@@ -37,7 +38,7 @@ export function PrepareEncounterLibraryRequest(root) {
     }
     return (await Promise.all(files.map(Stamp))).join("|");
   }
-  return async (route,file)=>{
+  async function Handle(route,file){
     if(route==="/Taierzhuang1938/AdvancedTools/Library/Data_Cast.json"){
       let revision=await CastStamp().catch(()=>null);
       for(let attempt=0;(!revision||revision!==castRevision)&&attempt<3;attempt++) {
@@ -60,6 +61,14 @@ export function PrepareEncounterLibraryRequest(root) {
       return true;
     }
     if(route==="/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html"){
+      if(!closeWatch){
+        try {
+          closeWatch=WatchEncounterImports(project,async type=>{
+            await jobs.get(type)?.catch(()=>{});
+            await Import(type);
+          });
+        } catch(error) {console.warn("[Encounter Library]",error.message);}
+      }
       // Begin missing imports while the browser reads the editor and scene.
       for(const [type,asset] of [["cast",index],["terrain",path.join(tools,"Library/Terrain")]]){
         try {await fs.access(asset);} catch {
@@ -68,5 +77,7 @@ export function PrepareEncounterLibraryRequest(root) {
       }
     }
     return false;
-  };
+  }
+  Handle.close=()=>closeWatch?.();
+  return Handle;
 }

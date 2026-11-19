@@ -1,8 +1,9 @@
 // Local derived data. Only content-addressed products and the last complete
 // manifest live in Library/. Running the importer twice is safe across processes.
 import fs from "node:fs/promises";
-import {createWriteStream,createReadStream,watch} from "node:fs";
+import {createWriteStream,createReadStream} from "node:fs";
 import {fork} from "node:child_process";
+import {WatchEncounterImports} from "../../scripts/Script_EncounterImportWatch.mjs";
 import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {createHash,randomUUID} from "node:crypto";
@@ -108,46 +109,23 @@ async function BuildTerrain() {
 
 // Optional companion for ordinary static file servers. Start watching first so
 // edits made during an import are picked up in a fresh process after it finishes.
-function WatchLibrary() {
-  const pending=new Set(["cast","terrain"]);
-  let active=false,timer;
-  async function Drain() {
-    if(active)return;
-    active=true;
-    try {
-      while(pending.size) {
-        const type=pending.size===2?"all":[...pending][0];
-        pending.clear();
-        const child=fork(fileURLToPath(import.meta.url),[type],{stdio:["ignore","inherit","inherit","ipc"],windowsHide:true});
-        await new Promise((resolve,reject)=>{child.once("error",reject);child.once("exit",code=>{
-          if(code!==0)console.error("Encounter Library import failed:",code);
-          resolve();
-        });});
-      }
-    } catch(error) {console.error(error.message);}
-    finally {active=false;}
-  }
-  for(const dir of ["Model/Character","Scenes/FirstLevelEncounter","AdvancedTools","."]) {
-    watch(path.join(project,dir),(_event,file)=>{
-      if(!file)return;
-      if(dir==="Model/Character"&&file.endsWith(".glb"))pending.add("cast");
-      if(dir==="Scenes/FirstLevelEncounter"&&/\.(?:bin|json|mjs)$/.test(file))pending.add("terrain");
-      if((dir==="."||dir==="AdvancedTools")&&file.endsWith(".mjs")){
-        pending.add("terrain");
-        if(["Script_EncounterLibrary.mjs","Script_StrictTexturePublish.mjs","Script_PublishAssetPaths.mjs",
-          "Data_XBotCharacters.mjs","Data_Tuning_EncounterPlayStartup.mjs"].includes(file))pending.add("cast");
-      }
-      if(pending.size){clearTimeout(timer);timer=setTimeout(Drain,350);}
-    });
-  }
+async function WatchLibrary() {
+  const run=type=>new Promise((resolve,reject)=>{
+    const child=fork(fileURLToPath(import.meta.url),[type],{stdio:["ignore","inherit","inherit","ipc"],windowsHide:true});
+    child.once("error",reject);
+    child.once("exit",code=>code===0?resolve():reject(Error("Import failed: "+code)));
+  });
+  // Queue startup and edit-triggered imports in the same order.
+  let ready=run("all");
+  WatchEncounterImports(project,type=>{ready=ready.catch(()=>{}).then(()=>run(type));return ready;});
   console.log("Watching encounter imports in",library);
-  void Drain();
+  await ready;
 }
 
 if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url) {
   const type=process.argv[2]||"all";
   if(!["all","cast","terrain","watch"].includes(type))throw Error("Usage: node Script_EncounterLibrary.mjs [all|cast|terrain|watch]");
-  if(type==="watch")WatchLibrary();
+  if(type==="watch")await WatchLibrary();
   else {
     if(type!=="terrain")await BuildCast();
     if(type!=="cast")await BuildTerrain();

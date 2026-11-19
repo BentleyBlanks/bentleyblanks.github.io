@@ -357,7 +357,7 @@ function CreateServer(rootDir, context) {
   const handleEncounterCodex = CreateReloadableEncounterCodexHandler(rootDir);
   const runtimeRevision = PreviewRuntimeRevision(rootDir);
   const libraryRequest = path.resolve(rootDir) === DEFAULT_ROOT ? PrepareEncounterLibraryRequest(rootDir) : null;
-  return http.createServer(async (request, response) => {
+  const server=http.createServer(async (request, response) => {
     const [rawRoute, query] = request.url.split("?");
     let route;
     try { route = decodeURIComponent(rawRoute); } catch { route = rawRoute; }
@@ -478,6 +478,8 @@ function CreateServer(rootDir, context) {
       SendFile(request, response, filePath, stat);
     });
   });
+  server.on("close",()=>libraryRequest?.close());
+  return server;
 }
 
 // -------------------------------------------------- 调参表保存（只在本地）
