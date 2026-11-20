@@ -162,15 +162,15 @@ try {
     await B(() => window.Tengxian.Debug.Blockout.Fly(false));
   }
 
-  // 4) 场景编辑器：两个场景
+  // 4) 场景编辑器：场景切换入口与正式场景资产
   console.log("--- scene editor");
   const editor = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   editor.on("pageerror", (error) => errors.push(`SCENEEDITOR PAGEERROR ${String(error).slice(0, 300)}`));
   await editor.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevel`, { waitUntil: "load", timeout: 120000 });
-  await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0 && document.querySelectorAll("#seAssets code").length > 0, null, { timeout: 120000 });
+  await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0 && document.querySelector("#seAssets [data-prefab]"), null, { timeout: 120000 });
   const se = await editor.evaluate(() => {
     const options = [...document.querySelectorAll("#seScene option")].map((o) => [o.value, o.textContent]);
-    const assets = [...document.querySelectorAll("#seAssets code")].map((c) => c.textContent);
+    const assets = [...document.querySelectorAll("#seAssets [data-prefab]")].map((tile) => tile.dataset.prefab);
     const state = window.SceneEditor.State();
     const pixels = window.SceneEditor.PixelStats?.();
     return { options, assets, objects: state.objects ?? state.count, style: state.style, pixels };
@@ -185,7 +185,7 @@ try {
       comps: [...document.querySelectorAll("#seInspector .seCompTitle")].map((n) => n.textContent) };
   });
   Check("场景编辑器里正式场景的地面是分层地表（同试玩），不是白盒的高度色带", terrainOk && look.terrainLook === "layers", J({ terrainOk, look: look.terrainLook }));
-  Check("层级是一层层文件夹（段落 / 类别 / 院子），检视按组件分节", look.depths >= 4 && ["位置", "外观", "碰撞", "剧情事件"].every((c) => look.comps.includes(c)), J(look));
+  Check("层级是一层层文件夹（段落 / 类别 / 院子），检视按组件分卡", look.depths >= 4 && ["变换", "外观", "碰撞", "剧情事件"].every((c) => look.comps.includes(c)), J(look));
   // 壕沟：层级里有、选中能拖点重挖、细节开关会改构件、撤销回去
   const tr = await editor.evaluate(async () => {
     const A = window.SceneEditor;
@@ -207,7 +207,7 @@ try {
   Check("场景编辑器：拖控制点按样条重挖（新位置挖下去、旧位置填回）、撤销回原样", tr.h1 < tr.h0 - 1.2 && tr.at1 > tr.at0 + 1.2 && Math.abs(tr.back - tr.h0) < 0.01 && !tr.dirty,
     J({ h0: tr.h0, h1: tr.h1, at0: tr.at0, at1: tr.at1, back: tr.back, dirty: tr.dirty }));
   Check("场景编辑器：套餐换成「新挖完好」，护壁、踏板摆出来", tr.d1 > tr.d0 + 10, J({ before: tr.d0, fresh: tr.d1 }));
-  Check("场景编辑器下拉里有两个场景：第一关 · 白盒、第一关 · 正式", se.options.length === 2 && se.options.some(([v]) => v === "FirstLevelWhitebox") && se.options.some(([v]) => v === "FirstLevel"), J(se.options));
+  Check("场景编辑器下拉包含白盒、正式和 Encounter Play", ["FirstLevelWhitebox", "FirstLevel", "FirstLevelEncounter"].every((id) => se.options.some(([v]) => v === id)), J(se.options));
   Check("正式场景的资产页列白盒体块、道具与树", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
   await editor.screenshot({ path: path.join(shotDir, "SceneEditor_Formal.png") });
   await editor.close();

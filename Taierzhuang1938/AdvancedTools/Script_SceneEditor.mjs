@@ -38,6 +38,9 @@ export const SCENE_EDITOR = Object.freeze({
   dragPx: 4,
 });
 const E = SCENE_EDITOR;
+const PREFAB_DRAG_TYPE = "application/x-tengxian-scene-prefab";
+const TRENCH_PREFAB = "Trench/Spline";
+const PREFAB_CATEGORIES = [["box", "构件"], ["prop", "道具"], ["tree", "植被"], ["backdrop", "远景"]];
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
 
@@ -72,6 +75,12 @@ class SceneEditorApp {
     if (!SCENE_IDS.includes(this.sceneId)) this.sceneId = SCENE_IDS[0];
     // whitebox = 白盒场景（白盒体块）；formal = 正式场景（白盒体块 + 道具、树）—— 决定资产页列哪些
     this.style = SceneStyle(this.sceneId);
+    this.prefabs = new Map([
+      ["Whitebox/Box", SCENE_ASSETS["Whitebox/Box"]],
+      [TRENCH_PREFAB, { label: "样条壕沟", kind: "trench" }],
+      ...SceneAssetsFor(this.style).filter(([id]) => id !== "Whitebox/Box"),
+    ]);
+    this.selectedPrefab = "Whitebox/Box";
     this.model = null;
     this.writable = false;
     this.revision = null;
@@ -129,6 +138,11 @@ class SceneEditorApp {
     };
     this.edges = new THREE.EdgesGeometry(this.geometry.box);
     this.edgeMaterial = new THREE.LineBasicMaterial({ color: 0xedca83, depthTest: false, transparent: true, opacity: 0.95 });
+    this.prefabGhost = new THREE.Mesh(this.geometry.box, new THREE.MeshBasicMaterial({
+      color: 0xedca83, transparent: true, opacity: 0.55, depthWrite: false,
+    }));
+    this.prefabGhost.visible = false;
+    this.scene.add(this.prefabGhost);
     new ResizeObserver(() => this.Resize()).observe(canvas.parentElement);
     this.Resize();
   }
@@ -388,12 +402,11 @@ class SceneEditorApp {
     this.LookAt(center, Math.max(14, size * 1.1), Math.min(-25, this.cam.pitch / DEG));
   }
 
-  /** 新建一段壕沟：画面中间、顺着视线方向 16 m。 */
-  AddTrenchHere({ preset = "communication", look = "", group = "" } = {}) {
-    const at = this.ScreenCenterGround();
-    const dir = new THREE.Vector3(-Math.sin(this.cam.yaw), 0, -Math.cos(this.cam.yaw));
-    const a = [at.x - dir.x * 8, at.z - dir.z * 8], b = [at.x + dir.x * 8, at.z + dir.z * 8];
-    this.model.AddTrench({ preset, points: [a, b], group: group || undefined, look: look || undefined });
+  /** 新建一段顺着视线方向的壕沟。 */
+  AddTrenchHere({ preset = "communication", look = "", group = "" } = {}, at = this.ScreenCenterGround()) {
+    const dx = -Math.sin(this.cam.yaw) * 8, dz = -Math.cos(this.cam.yaw) * 8;
+    const points = [[at.x - dx, at.z - dz], [at.x + dx, at.z + dz]];
+    this.model.AddTrench({ preset, points, group: group || undefined, look: look || undefined });
     this.AfterEdit(null);
     this.SelectTrench(this.model.trench);
   }
@@ -838,6 +851,10 @@ class SceneEditorApp {
     c.addEventListener("pointermove", (e) => this.PointerMove(e));
     c.addEventListener("pointerup", (e) => this.PointerUp(e));
     c.addEventListener("wheel", (e) => this.Wheel(e), { passive: false });
+    c.addEventListener("dragover", (e) => this.PrefabDragOver(e));
+    c.addEventListener("dragleave", () => this.ShowPrefabDrop());
+    c.addEventListener("drop", (e) => this.PrefabDrop(e));
+    window.addEventListener("dragend", () => this.EndPrefabDrag());
     window.addEventListener("keydown", (e) => this.KeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
@@ -859,6 +876,12 @@ class SceneEditorApp {
       this.LoadScene().catch((error) => this.Fail(error));
     });
     $("seSearch").addEventListener("input", () => this.RenderTree());
+    $("sePrefabSearch").addEventListener("input", () => this.RenderAssets());
+    $("sePlacePrefab").addEventListener("click", () => {
+      if (!this.model || !this.selectedPrefab) return;
+      const rect = c.getBoundingClientRect();
+      this.PlacePrefab(this.selectedPrefab, this.PrefabGroundAt(this.selectedPrefab, rect.x + rect.width / 2, rect.y + rect.height / 2));
+    });
     $("seTabTree").addEventListener("click", () => this.Tab("tree"));
     $("seTabAssets").addEventListener("click", () => this.Tab("assets"));
     $("seShowBackdrop").addEventListener("change", (e) => { this.show.backdrop = e.target.checked; this.RebuildObjects(); });
@@ -872,8 +895,10 @@ class SceneEditorApp {
   }
 
   Tab(which) {
-    $("seTabTree").classList.toggle("selected", which === "tree");
-    $("seTabAssets").classList.toggle("selected", which === "assets");
+    for (const [id, tab] of [["seTabTree", "tree"], ["seTabAssets", "assets"]]) {
+      $(id).classList.toggle("selected", which === tab);
+      $(id).setAttribute("aria-pressed", String(which === tab));
+    }
     $("sePaneTree").hidden = which !== "tree";
     $("sePaneAssets").hidden = which !== "assets";
   }
@@ -1133,14 +1158,17 @@ class SceneEditorApp {
     return this.PickGround(raycaster.ray, 2000) || this.cam.pos.clone().addScaledVector(this.Forward(), 20);
   }
 
-  AddAsset(assetId, { material, size, group }) {
-    const at = this.ScreenCenterGround();
+  AssetOptions(assetId, at, { material, size, group } = {}) {
     const asset = SCENE_ASSETS[assetId];
-    this.model.Add(assetId, {
-      pos: [at.x, null, at.z], material, size, group: group || undefined,
+    return {
+      pos: [at.x, null, at.z], material, size: size || asset.size || [1, 1, 1], group: group || undefined,
       ...(asset.layer ? { layer: asset.layer } : {}),
       ...(asset.sized ? {} : { params: assetId === "Backdrop/Tree" ? { h: 10 } : { h: 4, w: 4, d: 4, rx: 4, color: "#8a8370" } }),
-    });
+    };
+  }
+
+  AddAsset(assetId, opts, at = this.ScreenCenterGround()) {
+    this.model.Add(assetId, this.AssetOptions(assetId, at, opts));
     this.AfterEdit(null, { structural: true });
     this.SelectIds([...this.model.selection]);
   }
@@ -1305,83 +1333,144 @@ ${seg.note}` : ""}`;
 
   RenderAssets() {
     const box = $("seAssets");
-    box.textContent = "";
-    // 样条壕沟（docs/Data_Scene.md §9）：放下一段两点的沟，再拖点、改参数
-    {
-      const card = El("div", "seAsset");
-      card.append(El("h3", "", "样条壕沟"), El("code", "", "trenches.segments"),
-        El("p", "", "按样条现挖地面；护壁、踏板、土崖、土团、草根这些细节每段单独开关、调参数（选中后在检视里改）。"));
-      const prow = El("div", "seRow"); prow.append(El("span", "", "沟型"));
-      const preset = El("select");
-      for (const [key, p] of Object.entries(TRENCH_PRESETS)) preset.append(new Option(`${p.label}（${key}）`, key));
-      prow.append(preset); card.append(prow);
-      const lrow = El("div", "seRow"); lrow.append(El("span", "", "套餐"));
-      const look = El("select");
-      look.append(new Option("（缺省）", ""));
-      for (const [key, l] of Object.entries(TRENCH_LOOKS)) look.append(new Option(`${l.label}（${key}）`, key));
-      lrow.append(look); card.append(lrow);
-      const grow = El("div", "seRow"); grow.append(El("span", "", "分组"));
-      const group = El("input"); group.type = "text"; group.placeholder = "不写 = 壕沟";
-      grow.append(group); card.append(grow);
-      const add = El("button", "sePrimary", "放到画面中间");
-      add.addEventListener("click", () => this.AddTrenchHere({ preset: preset.value, look: look.value, group: group.value.trim() }));
-      const row = El("div", "seButtons"); row.append(add); card.append(row);
-      box.append(card);
-    }
-    // 白盒场景列白盒体块 + 远景；正式场景列体块、道具、树 + 远景（Data_SceneAssets.SceneAssetsFor）
-    for (const [id, asset] of SceneAssetsFor(this.style)) {
-      const card = El("div", "seAsset");
-      card.append(El("h3", "", asset.label), El("code", "", id), El("p", "", asset.note || ""));
-      let material = null;
-      const size = [];
-      if (asset.kind === "box") {
-        const row = El("div", "seRow"); row.append(El("span", "", "材质"));
-        material = El("select");
-        for (const [mid, m] of Object.entries(SCENE_MATERIALS)) material.append(new Option(`${m.label}（${mid.replace(/^Whitebox\//, "")}）`, mid));
-        row.append(material); card.append(row);
+    const query = $("sePrefabSearch").value.trim().toLowerCase();
+    box.replaceChildren();
+    for (const [category, label] of PREFAB_CATEGORIES) {
+      const grid = El("div", "sePrefabGrid");
+      for (const [id, prefab] of this.prefabs) {
+        const folder = prefab.layer || (prefab.kind === "trench" ? "box" : prefab.kind);
+        if (folder !== category || !`${prefab.label} ${id} ${label}`.toLowerCase().includes(query)) continue;
+        const tile = El("button", "sePrefab");
+        tile.dataset.prefab = id;
+        tile.title = `${prefab.label} · ${id}`;
+        tile.draggable = true;
+        const icon = El("span", `sePrefabIcon ${prefab.kind}`);
+        icon.setAttribute("aria-hidden", "true");
+        tile.append(icon, El("span", "sePrefabName", prefab.label));
+        tile.addEventListener("click", () => this.SelectPrefab(id));
+        tile.addEventListener("dragstart", (e) => {
+          this.SelectPrefab(id);
+          this.draggedPrefab = id;
+          e.dataTransfer.effectAllowed = "copy";
+          e.dataTransfer.setData(PREFAB_DRAG_TYPE, id);
+        });
+        grid.append(tile);
       }
-      if (asset.sized) {
-        const srow = El("div", "seRow"); srow.append(El("span", "", "尺寸 宽高深"));
-        const triple = El("div", "seTriple");
-        for (let i = 0; i < 3; i++) { const input = El("input"); input.type = "number"; input.step = "0.1"; input.min = "0.02"; input.value = String(asset.size?.[i] ?? 1); size.push(input); triple.append(input); }
-        srow.append(triple); card.append(srow);
+      if (grid.childElementCount) {
+        const group = El("section", "sePrefabGroup");
+        group.append(El("h3", "", label), grid);
+        box.append(group);
       }
-      const grow = El("div", "seRow"); grow.append(El("span", "", "分组"));
-      const group = El("input"); group.type = "text"; group.placeholder = "不写 = 跟选中的那个同组";
-      grow.append(group); card.append(grow);
-      const add = El("button", "sePrimary", "放到画面中间");
-      add.addEventListener("click", () => {
-        const sel = this.model.Selected()[0];
-        this.AddAsset(id, { material: material?.value, size: size.length ? size.map(i => Math.max(0.02, Number(i.value) || 1)) : undefined, group: group.value.trim() || sel?.group });
-      });
-      const row = El("div", "seButtons"); row.append(add); card.append(row);
-      box.append(card);
     }
+    if (!box.childElementCount) box.append(El("p", "seMuted seEmpty", "没有匹配的 Prefab。"));
+    this.SelectPrefab(this.selectedPrefab);
   }
 
-  // ------------------------------------------------------------------ 检视（Unity Inspector 的排法）
-  //
-  // 顶上一块是物件本身（看得见、名字、资产、分组），下面一节一节是「组件」：位置、外观、碰撞、剧情事件、参数。
-  // 每节一个可折叠的标题条（折叠状态记在本机），左列名字右列控件；X / Y / Z 的小字按住左右拖能直接调数（像 Unity）。
+  SelectPrefab(id) {
+    this.selectedPrefab = null;
+    for (const tile of $("seAssets").querySelectorAll("[data-prefab]")) {
+      const selected = tile.dataset.prefab === id;
+      tile.setAttribute("aria-pressed", String(selected));
+      if (selected) this.selectedPrefab = id;
+    }
+    $("sePlacePrefab").disabled = !this.model || !this.selectedPrefab;
+  }
+
+  PrefabGroundAt(id, x, y) {
+    const point = this.PickGround(this.Ray(x, y).ray);
+    const backdrop = this.prefabs.get(id)?.layer === "backdrop";
+    return point && (backdrop || Inside(this.model.doc.bounds, point.x, point.z)) ? point : null;
+  }
+
+  PlacePrefab(id, point) {
+    if (!point) { this.Toast("请把 Prefab 放到视图中的地面上"); return; }
+    if (id === TRENCH_PREFAB) {
+      this.AddTrenchHere({}, point);
+    } else {
+      if (this.prefabs.get(id).layer === "backdrop" && !this.show.backdrop) {
+        this.show.backdrop = true;
+        $("seShowBackdrop").checked = true;
+      }
+      this.AddAsset(id, { group: this.model.Selected()[0]?.group }, point);
+    }
+    this.canvas.focus();
+  }
+
+  PrefabDragOver(e) {
+    const id = this.draggedPrefab;
+    if (!this.model || !id || !e.dataTransfer.types.includes(PREFAB_DRAG_TYPE)) return;
+    const point = this.PrefabGroundAt(id, e.clientX, e.clientY);
+    if (point) e.preventDefault();
+    e.dataTransfer.dropEffect = point ? "copy" : "none";
+    this.ShowPrefabDrop(id, point);
+  }
+
+  PrefabDrop(e) {
+    if (!this.model || !this.draggedPrefab || !e.dataTransfer.types.includes(PREFAB_DRAG_TYPE)) return;
+    e.preventDefault();
+    const id = e.dataTransfer.getData(PREFAB_DRAG_TYPE);
+    const allowed = id === this.draggedPrefab;
+    this.EndPrefabDrag();
+    if (allowed) this.PlacePrefab(id, this.PrefabGroundAt(id, e.clientX, e.clientY));
+  }
+
+  EndPrefabDrag() {
+    this.draggedPrefab = null;
+    this.ShowPrefabDrop();
+  }
+
+  ShowPrefabDrop(id, point) {
+    const label = $("sePrefabDrop");
+    label.hidden = !id;
+    this.prefabGhost.visible = !!point;
+    if (!id) return;
+    label.textContent = point ? `放置 · ${this.prefabs.get(id).label}` : "移到可放置的地面";
+    label.classList.toggle("ready", !!point);
+    if (!point) return;
+    const shape = id === TRENCH_PREFAB
+      ? { kind: "box", c: [point.x, point.y + 0.15, point.z], half: [0.35, 0.15, 8], yaw: this.cam.yaw }
+      : this.Shape({ asset: id, ...this.AssetOptions(id, point) });
+    this.prefabGhost.geometry = this.geometry[shape.kind];
+    this.prefabGhost.position.set(...shape.c);
+    this.prefabGhost.rotation.y = shape.yaw;
+    this.prefabGhost.scale.set(...shape.half.map((half) => half * 2));
+  }
+
+  // ------------------------------------------------------------------ 检视卡片
 
   /** 检视用的控件工厂：都在 change（或拖完）时才写进撤销记录。 */
   InspectorKit(box, ids, err) {
     const kit = {};
     kit.Section = (key, title, { headerToggle = null, defaultOpen = true } = {}) => {
-      const open = this.folds.has(key) ? this.folds.get(key) : defaultOpen;
-      const section = El("section", `seComp${open ? " open" : ""}`);
+      const section = El("section", "seComp");
       const head = El("div", "seCompHead");
-      const twisty = El("i", "seTwisty", open ? "▾" : "▸");
-      head.append(twisty);
+      const disclosure = El("button", "seCompDisclosure");
+      const twisty = El("i", "seTwisty");
+      twisty.setAttribute("aria-hidden", "true");
+      disclosure.append(twisty, El("span", "seCompTitle", title));
+      head.append(disclosure);
       if (headerToggle) {
         const input = El("input"); input.type = "checkbox"; input.checked = headerToggle.checked; input.title = headerToggle.title || "";
-        input.addEventListener("click", (e) => e.stopPropagation());
+        input.setAttribute("aria-label", headerToggle.title || title);
         input.addEventListener("change", () => headerToggle.onChange(input.checked));
         head.append(input);
       }
-      head.append(El("span", "seCompTitle", title));
-      head.addEventListener("click", () => { this.folds.set(key, !open); this.SaveFolds(); this.RenderInspector(); });
       const body = El("div", "seCompBody");
+      body.id = `seComponent-${key}`;
+      disclosure.setAttribute("aria-controls", body.id);
+      const SetOpen = (open) => {
+        body.hidden = !open;
+        disclosure.setAttribute("aria-expanded", String(open));
+        section.classList.toggle("open", open);
+        twisty.textContent = open ? "▾" : "▸";
+      };
+      SetOpen(this.folds.get(key) ?? defaultOpen);
+      disclosure.addEventListener("click", () => {
+        const open = body.hidden;
+        SetOpen(open);
+        this.folds.set(key, open);
+        this.SaveFolds();
+      });
       section.append(head, body);
       box.append(section);
       return body;
@@ -1389,6 +1478,7 @@ ${seg.note}` : ""}`;
     kit.Row = (body, label, ...controls) => {
       const row = El("div", "seProp");
       const name = El("label", "seLabel", label);
+      name.title = label;
       const value = El("div", "seValue");
       value.append(...controls);
       row.append(name, value);
@@ -1402,23 +1492,29 @@ ${seg.note}` : ""}`;
       return input;
     };
     /** X / Y / Z 三格：axis 字按住左右拖调数（每像素 step），松手才记一步撤销。 */
-    kit.Vec = (values, onChange, { step = 0.05, disabled = [false, false, false], placeholders = ["", "", ""], axes = ["X", "Y", "Z"] } = {}) => {
+    kit.Vec = (values, onChange, { step = 0.05, precision = null, disabled = [false, false, false], placeholders = ["", "", ""], axes = ["X", "Y", "Z"] } = {}) => {
       const wrap = El("div", "seVec");
       values.forEach((v, i) => {
         const cell = El("div", "seAxis");
         const tag = El("span", `seAxisTag a${i}`, axes[i]);
-        const input = kit.Num(v, (nv) => onChange(i, nv), { step, disabled: disabled[i], placeholder: placeholders[i] });
+        const displayed = precision !== null && Number.isFinite(v) ? Number(v.toFixed(precision)) : v;
+        const input = kit.Num(displayed, (nv) => onChange(i, nv), { step, disabled: disabled[i], placeholder: placeholders[i] });
+        input.setAttribute("aria-label", axes[i]);
+        if (displayed !== v) input.title = String(v);
         if (!disabled[i]) {
           tag.title = "按住左右拖调数";
           tag.addEventListener("pointerdown", (e) => {
             e.preventDefault();
             tag.setPointerCapture(e.pointerId);
-            const x0 = e.clientX, v0 = Number(input.value) || 0;
-            const Move = (m) => { input.value = String(Number((v0 + Math.round((m.clientX - x0)) * step * (m.shiftKey ? 10 : 1)).toFixed(3))); };
+            const x0 = e.clientX, v0 = Number.isFinite(v) ? v : 0, start = input.value;
+            let delta = 0;
+            const Move = (m) => {
+              delta = Math.round(m.clientX - x0) * step * (m.shiftKey ? 10 : 1);
+              input.value = delta ? String(Number((v0 + delta).toFixed(3))) : start;
+            };
             const Up = () => {
               tag.removeEventListener("pointermove", Move); tag.removeEventListener("pointerup", Up);
-              const nv = Number(input.value);
-              if (Number.isFinite(nv) && nv !== v0) onChange(i, nv);
+              if (delta) onChange(i, Number(input.value));
             };
             tag.addEventListener("pointermove", Move); tag.addEventListener("pointerup", Up);
           });
@@ -1483,47 +1579,49 @@ ${seg.note}` : ""}`;
     box.textContent = "";
     if (this.model.trench) { this.RenderTrenchInspector(box, this.model.FindTrench(this.model.trench)); return; }
     const list = this.model.Selected();
-    if (!list.length) { box.append(El("p", "seMuted seEmpty", "在画面或层级里点一个物件或一段壕沟（Ctrl 点多选、Shift 点加选、双击文件夹选中整组；点在沟里选那段沟）。")); return; }
+    if (!list.length) { box.append(El("p", "seMuted seEmpty", "在视图或层级中选中物件。")); return; }
     if (list.length > 1) { this.RenderMulti(box, list); return; }
     const obj = list[0], asset = SCENE_ASSETS[obj.asset] || {}, ids = [obj.id];
     const err = El("div", "seError");
     const k = this.InspectorKit(box, ids, err);
     const backdrop = obj.layer === "backdrop";
 
-    // 物件本身：看得见 + 名字 / 资产 / 分组（Unity 的 GameObject 头）
+    // 实例卡：可见性、名称、来源和分组
+    const objectCard = El("section", "seObjectCard");
     const head = El("div", "seObjHead");
     const visible = El("input"); visible.type = "checkbox"; visible.checked = obj.visual !== false; visible.title = "看得见（不勾 = 只要碰撞不画，比如空气墙）";
+    visible.setAttribute("aria-label", "可见");
     visible.disabled = backdrop;
     visible.addEventListener("change", () => k.Set("visual", visible.checked ? undefined : false, "改看得见", true));
     const name = k.Text(obj.id, (v) => { try { this.model.Rename(obj.id, v); this.AfterEdit(null); } catch (error) { err.textContent = error.message; name.classList.add("bad"); } });
     name.classList.add("seObjName");
+    name.setAttribute("aria-label", "物件名称");
     const line = El("div", "seObjLine"); line.append(visible, name);
     head.append(line, err);
-    box.append(head);
     const meta = El("div", "seObjMeta");
-    k.Row(meta, "资产", El("span", "seId", `${asset.label || obj.asset}`), El("code", "", obj.asset));
+    const source = El("span", "seId seSource", asset.label || obj.asset);
+    source.title = [obj.asset, asset.note].filter(Boolean).join(" · ");
+    k.Row(meta, "Prefab", source);
     k.Row(meta, "分组", k.GroupInput(obj.group, (v) => k.Set("group", v || undefined, "改分组", true)));
-    box.append(meta);
+    objectCard.append(head, meta);
+    box.append(objectCard);
 
-    // 位置（Transform）
-    const t = k.Section("transform", "位置");
+    const t = k.Section("transform", "变换");
     const grounded = obj.pos[1] === null;
     const SetPos = (i, v) => { const p = [...obj.pos]; p[i] = v; k.Set("pos", p, "改位置"); };
-    k.Row(t, "位置", k.Vec(obj.pos, SetPos, { disabled: [false, grounded, false], placeholders: ["", grounded ? Fixed(this.GroundY(obj)) : "", ""] }));
+    k.Row(t, "位置", k.Vec(obj.pos, SetPos, { precision: 2, disabled: [false, grounded, false], placeholders: ["", grounded ? Fixed(this.GroundY(obj)) : "", ""] }));
     k.Row(t, "", k.Check(" 落地（Y 跟着地形走）", grounded, (on) => { this.model.SetGrounded(ids, on, (o) => this.GroundY(o)); this.AfterEdit(ids); }));
     k.Row(t, "朝向", k.Vec([obj.yawDeg || 0], (i, v) => k.Set("yawDeg", v, "改朝向"), { step: 1, axes: ["Y°"], disabled: [false], placeholders: [""] }));
     if (asset.sized) {
       const SetSize = (i, v) => { const s = [...obj.size]; s[i] = Math.max(0.02, v); k.Set("size", s, "改尺寸"); };
-      k.Row(t, "尺寸 m", k.Vec(obj.size, SetSize, { step: 0.05, axes: ["宽", "高", "深"] }));
+      k.Row(t, "尺寸 m", k.Vec(obj.size, SetSize, { precision: 2, axes: ["宽", "高", "深"] }));
     }
 
     // 外观
-    const look = k.Section("look", "外观");
-    k.Row(look, "资产", El("span", "seId", asset.label || obj.asset));
     if (asset.kind === "box" || obj.material) {
+      const look = k.Section("look", "外观");
       k.Row(look, "材质", k.Select(k.MaterialOptions(), obj.material, (v) => k.Set("material", v, "改材质", true)));
     }
-    if (asset.note) look.append(El("p", "seNote", asset.note));
 
     if (!backdrop) {
       // 碰撞（标题条上的勾 = 挡人）
@@ -1539,7 +1637,7 @@ ${seg.note}` : ""}`;
     }
 
     // 剧情事件
-    const ev = k.Section("events", "剧情事件");
+    const ev = k.Section("events", "剧情事件", { defaultOpen: !!(obj.showOn || obj.hideOn) });
     k.Row(ev, "出现于", k.Select(k.EventOptions(obj.showOn), obj.showOn || "", (v) => k.Set("showOn", v || undefined, "改出现事件", true)));
     k.Row(ev, "消失于", k.Select(k.EventOptions(obj.hideOn), obj.hideOn || "", (v) => k.Set("hideOn", v || undefined, "改消失事件", true)));
     ev.append(El("p", "seNote", "这件事发生之前 / 之后它在不在。哪一刻发生由白盒编辑器那一关的关键帧决定；画面上方「剧情事件」可以勾上预览。"));
@@ -1577,17 +1675,18 @@ ${seg.note}` : ""}`;
     const Edit = (fn) => { fn(); this.AfterEdit(null); };
     const SetField = (key, value, label) => Edit(() => this.model.SetTrenchField(id, key, value, label));
 
+    const objectCard = El("section", "seObjectCard");
     const head = El("div", "seObjHead");
     const name = k.Text(id, (v) => { try { this.model.RenameTrench(id, v); this.AfterEdit(null); } catch (error) { err.textContent = error.message; name.classList.add("bad"); } });
     name.classList.add("seObjName");
     const line = El("div", "seObjLine"); line.append(El("i", "seIcon trench", "〰"), name);
     head.append(line, err);
-    box.append(head);
     const meta = El("div", "seObjMeta");
     k.Row(meta, "类型", El("span", "seId", "样条壕沟"), El("code", "", `${seg.points.length} 个控制点 · ${compiled ? compiled.path.length.toFixed(1) : "—"} m`));
     k.Row(meta, "分组", k.GroupInput(seg.group, (v) => SetField("group", v || undefined, "改壕沟分组")));
     k.Row(meta, "备注", k.Text(seg.note, (v) => SetField("note", v || undefined, "改壕沟备注"), "这段沟是干什么的"));
-    box.append(meta);
+    objectCard.append(head, meta);
+    box.append(objectCard);
 
     // 走向
     const path = k.Section("trench.path", "走向");
@@ -1704,15 +1803,16 @@ ${seg.note}` : ""}`;
   RenderMulti(box, list) {
     const ids = list.map(o => o.id);
     const k = this.InspectorKit(box, ids, El("div"));
+    const objectCard = El("section", "seObjectCard");
     const head = El("div", "seObjHead");
     head.append(El("div", "seObjTitle", `选中 ${list.length} 个`), El("p", "seMuted", ids.slice(0, 8).join("、") + (ids.length > 8 ? " ……" : "")));
-    box.append(head);
     const meta = El("div", "seObjMeta");
     const group = k.GroupInput("", (v) => { this.model.SetField(ids, "group", v || undefined, "改分组"); this.AfterEdit(null); });
     group.placeholder = "一起挪到这个分组";
     k.Row(meta, "分组", group);
-    box.append(meta);
-    const t = k.Section("transform", "位置");
+    objectCard.append(head, meta);
+    box.append(objectCard);
+    const t = k.Section("transform", "变换");
     const row = El("div", "seButtons");
     const on = El("button", "", "都落地"); on.addEventListener("click", () => { this.model.SetGrounded(ids, true); this.AfterEdit(ids); });
     const off = El("button", "", "都取消落地"); off.addEventListener("click", () => { this.model.SetGrounded(ids, false, (o) => this.GroundY(o)); this.AfterEdit(ids); });
@@ -1723,7 +1823,7 @@ ${seg.note}` : ""}`;
       const look = k.Section("look", "外观");
       k.Row(look, "材质", k.Select([["", "（不改）"], ...k.MaterialOptions()], "", (v) => { if (v) { this.model.SetField(boxes, "material", v, "改材质"); this.AfterEdit(null, { structural: true }); } }));
     }
-    const ev = k.Section("events", "剧情事件");
+    const ev = k.Section("events", "剧情事件", { defaultOpen: list.some((o) => o.showOn || o.hideOn) });
     k.Row(ev, "出现于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "showOn", v || undefined, "改出现事件"); this.AfterEdit(null, { structural: true }); } }));
     k.Row(ev, "消失于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "hideOn", v || undefined, "改消失事件"); this.AfterEdit(null, { structural: true }); } }));
     this.InspectorButtons(box);
@@ -1789,7 +1889,7 @@ ${seg.note}` : ""}`;
   }
 
   async Poll() {
-    if (!this.model || this.drag || this.polling) return;
+    if (!this.model || this.drag || this.draggedPrefab || this.polling) return;
     this.polling = true;
     try {
       let changed = false;

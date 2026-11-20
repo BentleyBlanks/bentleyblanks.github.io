@@ -4,7 +4,7 @@
 //   1. 开起来：物件数 = 场景文件、按材质分批、地形画出来了（数像素：不是满屏天空色、颜色够多）、没有报错；
 //   2. 选中 + 拖 X 箭头：那个物件 x 变了、只记一步撤销、标成没保存；Ctrl+Z 回原位；
 //   3. 在画面里点另一个物件：选中换成它；拖金圈转、Esc 取消拖动不留改动；
-//   4. 从资产加一个、删掉、撤销回来；改信号：随信号消失的块藏起来；
+//   4. 搜索 Prefab、拖放到地面、检视卡收展、壕沟放置、撤销；改信号：随信号消失的块藏起来；
 //   5. 保存：发出去的场景过校验、带读盘时的版本号；200 后标成已保存；409 挂横幅；
 //   6. 外面改了场景文件（status 报新版本号）：没改动时 2 s 内自动重读出新位置。
 
@@ -36,7 +36,7 @@ const diskRevision = crypto.createHash("sha1").update(sceneBytes).digest("hex");
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
-const context = await browser.newContext({ viewport: { width: 1500, height: 920 } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 300)}`));
@@ -118,7 +118,72 @@ try {
   const yaw1 = await E(() => window.SceneEditor.Find(window.SceneEditor.State().selected[0]).yawDeg || 0);
   Check("拖金圈中途 Esc：不留改动", yaw1 === yaw0 && (await E(() => window.SceneEditor.State().undo)) === 0, `${yaw0} → ${yaw1}`);
 
-  // 4. 加、删、撤销；信号
+  // 4. 从资产面板拖放；检查落点、Inspector 与撤销行为。
+  await page.locator("#seTabAssets").click();
+  const search = page.locator("#sePrefabSearch");
+  const boxTile = page.locator('[data-prefab="Whitebox/Box"]');
+  await search.fill("Whitebox/Box");
+  Check("按资产编号搜索 Prefab", await page.locator("[data-prefab]").count() === 1 && await boxTile.isVisible());
+  const canvas = page.locator("#seCanvas");
+  const view = await canvas.boundingBox();
+  const drop = { x: Math.round(view.width * 0.7), y: Math.round(view.height * 0.7) };
+  const tile = await boxTile.boundingBox();
+  await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(view.x + drop.x, view.y + drop.y, { steps: 6 });
+  await page.mouse.move(view.x + drop.x + 1, view.y + drop.y);
+  await page.locator("#sePrefabDrop.ready").waitFor({ state: "visible" });
+  Check("拖动预览不提前生成物件", (await E(() => window.SceneEditor.State())).objects === state.objects);
+  await page.mouse.up();
+  const placed = await E(() => {
+    const editor = window.SceneEditor;
+    const current = editor.State();
+    return { ...current, object: editor.Find(current.selected[0]), pivot: editor.ProjectGizmo("origin") };
+  });
+  Check("拖到非中心位置：生成且选中一个落地实例", placed.objects === state.objects + 1 && placed.selected.length === 1
+    && placed.object?.asset === "Whitebox/Box" && placed.object.pos[1] === null && placed.undo === 1
+    && Math.hypot(placed.pivot.x - view.x - drop.x, placed.pivot.y - view.y - drop.y) < 8, JSON.stringify(placed.object?.pos));
+  Check("放置后清除落点预览", await page.locator("#sePrefabDrop").isHidden());
+  const transform = page.getByRole("button", { name: "变换", exact: true });
+  await transform.press("Space");
+  Check("键盘折叠变换卡，焦点留在卡头", await page.locator("#seComponent-transform").isHidden()
+    && await transform.getAttribute("aria-expanded") === "false"
+    && await transform.evaluate((button) => button === document.activeElement));
+  await transform.press("Space");
+  const collider = page.locator('[id="seComponent-collider"]');
+  await page.getByRole("checkbox", { name: /^挡人/ }).uncheck();
+  Check("卡头勾选编辑碰撞，卡片保持展开", await collider.isVisible()
+    && (await E((id) => window.SceneEditor.Find(id), placed.selected[0]))?.solid === false);
+  await page.locator("#seUndo").click();
+  await search.clear();
+  await Shot("04_PrefabInspector");
+  await page.locator("#seUndo").click();
+  Check("撤销拖放恢复物件数量、选中实例被移除", (await E(() => window.SceneEditor.State())).objects === state.objects
+    && !(await E((id) => window.SceneEditor.Find(id), placed.selected[0])));
+  await page.locator("#seRedo").click();
+  Check("重做拖放恢复同一实例", !!(await E((id) => window.SceneEditor.Find(id), placed.selected[0])));
+  await page.locator("#seUndo").click();
+
+  const trenchTile = page.locator('[data-prefab="Trench/Spline"]');
+  await trenchTile.dragTo(canvas, { targetPosition: { x: drop.x - 55, y: drop.y + 24 } });
+  const trench = await E(() => {
+    const editor = window.SceneEditor;
+    const current = editor.State();
+    return { current, segment: editor.Trench(current.trench) };
+  });
+  Check("拖放样条壕沟：生成两点、选中沟并打开对应检视", trench.current.trenches === state.trenches + 1
+    && trench.segment?.points.length === 2 && await page.getByRole("button", { name: "走向", exact: true }).isVisible());
+  await page.locator("#seUndo").click();
+  await boxTile.dragTo(page.locator(".seRight h2"));
+  Check("拖到检视面板外部取消：场景无改动", await page.locator("#sePrefabDrop").isHidden()
+    && !(await E(() => window.SceneEditor.State())).dirty);
+  await boxTile.click();
+  await page.locator("#sePlacePrefab").click();
+  Check("资产区放到中心可直接放置所选预制件", (await E(() => window.SceneEditor.State())).objects === state.objects + 1);
+  await page.locator("#seUndo").click();
+  await page.locator("#seTabTree").click();
+
+  // API 入口仍可带初始材质、尺寸；删、撤销；信号。
   const added = await E(() => window.SceneEditor.Add("Whitebox/Box", { material: "Whitebox/Cover", size: [2, 1, 1] }));
   Check("从资产加一个白盒体块：选中它、在场景里", !!added && !!(await E((id) => window.SceneEditor.Find(id), added)), added);
   await page.keyboard.press("Delete");

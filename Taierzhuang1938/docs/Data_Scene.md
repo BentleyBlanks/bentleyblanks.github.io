@@ -104,7 +104,9 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 - **页面**：`SceneEditor.html` 开机先同步读 `index.html` 里的 import map 插进来（线上发布的 index.html 也保留它），模块版本永远跟游戏同一套戳，不另抄。主程序 `Script_SceneEditor.mjs`，数据层 `Script_SceneEditModel.mjs`（纯，带撤销），样式 `Style_SceneEditor.css`（同设置页口径）。
 - **画法**：白盒场景的地形按高度色带 + 地面涂色 + 米格线（`Script_WhiteboxGrid`，与游戏白盒同一段着色）；正式场景的地形同试玩那份分层地表（MissionPlain 四层贴图，权重 `BuildSceneGroundSurface`，读不到贴图就退回色带并在状态栏说）；网格太密时按步长抽稀（不超过约 90 万个顶点）；白盒体块按材质分批实例化、颜色取 `look.semanticColors` 与第一关语义色表；远景层画成盒子 / 椭球 / 锥（可关）；`visual: false` 的空气墙勾「空气墙」才画（半透明红）。画面上方「剧情事件」里勾上的当已经发生（随它消失的藏、随它出现的显示），每个事件显示中文名与第一次发生的关键帧。段落按钮跳到三段各自的场地。
-- **操作**：右键按住转视角、WASD 移动、Q/E 降升、Shift 加速、滚轮前后、中键平移；左键点选（Ctrl 多选、Shift 加选，层级里同样），拖红绿蓝箭头沿 X/Y/Z 挪、拖金圈绕竖轴转、按住已选中的物件直接在水平面上拖；Ctrl 吸附 0.5 m / 15°；F 看选中、Del 删除、Ctrl+D 复制、Ctrl+Z / Ctrl+Y 撤销重做、Esc 取消拖动。落地的物件被竖着挪就不再落地。**层级**（2026-11-01）：按 `group` 路径一层层文件夹，单击展开 / 收起（记在本机），双击选中文件夹里全部，把物件拖到文件夹上 = 挪进那个分组；物件行前的小图标分体块（语义色）/ 道具 ◆ / 树 ♣ / 空气墙 ▢，跟剧情事件走的带 ⚑；画面里点选会展开到它、滚到它。**检视**（2026-11-01，Unity Inspector 的排法）：物件头（看得见勾选、名字、资产、分组），下面一节一节可折叠的组件——位置（X / Y / Z 的小字按住左右拖能调数，Shift 十倍）、外观（材质）、碰撞（标题条上的勾 = 挡人；空气墙 / 不能翻 / 能站上去）、剧情事件（出现于 / 消失于，下拉是中文名）、参数 / 附加数据（JSON，默认收起）。资产页从目录加物件，放在画面中心看到的地面上。
+- **操作**：右键按住转视角、WASD 移动、Q/E 降升、Shift 加速、滚轮前后、中键平移；左键点选（Ctrl 多选、Shift 加选，层级里同样），拖红绿蓝箭头沿 X/Y/Z 挪、拖金圈绕竖轴转、按住已选中的物件直接在水平面上拖；Ctrl 吸附 0.5 m / 15°；F 看选中、Del 删除、Ctrl+D 复制、Ctrl+Z / Ctrl+Y 撤销重做、Esc 取消拖动。落地的物件被竖着挪就不再落地。**层级**（2026-11-01）：按 `group` 路径一层层文件夹，单击展开 / 收起（记在本机），双击选中文件夹里全部，把物件拖到文件夹上 = 挪进那个分组；物件行前的小图标分体块（语义色）/ 道具 ◆ / 树 ♣ / 空气墙 ▢，跟剧情事件走的带 ⚑；画面里点选会展开到它、滚到它。
+- **检视**：实例卡显示可见性、名称、Prefab 来源和分组。组件独立成卡，可展开或收起，折叠状态记在本机。变换卡保留 X / Y / Z 拖拽调值（Shift 十倍），外观卡提供材质，碰撞卡头勾选控制挡人。剧情事件、参数和附加数据按需展开。
+- **资产**：按构件、道具、植被和远景浏览 Prefab，可按名称、编号或类别搜索。拖到视图地面时先看放置预览，松手创建默认实例并选中，可一步撤销。也可选中资产后点「放到中心」。放置后的材质、尺寸、分组与壕沟套餐在检视里调整。视口右下角的「操作键」可展开快捷键。
 - **存盘**：本机预览（`node scripts/Script_LocalPreview.mjs`）下 `POST /__scene/save { scene, doc, revision }` 直接写回场景文件；闸同 `/__blockout/save`（本机 Host、同源、JSON、版本号 = 读场景时原始字节的 sha1，对不上 409 + 当前版本号），过 `ValidateScene` 才按 `FormatSceneJson` 原子写；`GET /__scene/status` 报能不能写与版本号。线上（Pages）没有这个口，「保存」退化成下载，换掉 `Scenes/` 里那份再提交。高度图 v1 不开放写。
 - **同步**：每 2 s 查一次版本号。外面（人 / agent / 别的窗口）改了场景文件：这边没改动就自动重读（相机、选中保留）；有没保存的改动就挂横幅，让人选重新读取还是先不管。存盘遇到 409 同样挂横幅，可下载自己的版本。
 - **接白盒编辑器**：「在白盒编辑器里看」按画面中心的地面点找它落在哪一段，打开 `index.html?editor=blockout&level=<那一段>&pose=x,z,朝向,0,stand`。白盒编辑器每 2 s 也会发现场景文件变了、整片重建。
@@ -118,7 +120,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
     - 表现套餐；
     - 每一项细节：标题条上的勾 = 开关，展开改参数，灰字是缺省值，● = 段上改过；
     - 沿沟深度 / 基准面抬降 / 塌方（JSON）。
-  - **新建**：资产页「样条壕沟」放一段两点的新沟。
+  - **新建**：从资产页拖入「样条壕沟」，沿当前视线方向生成一段两点的新沟。
   - **预览**：构件（护壁、踏板、射击位、杂物）照游戏那份摆成半透明盒子；土崖、土团、草根这些土面细节只在游戏里画。
 - **给 agent / 测试**：`window.SceneEditor`（`State()`、`Select(ids)`、`MoveBy(dx, dy, dz)`、`RotateBy(deg)`、`SetField(key, value)`、`Add(asset, opts)`、`Duplicate()`、`Delete()`、`Undo()`、`Redo()`、`Save()`、`Reload()`、`Doc()`、`PixelStats()`、`Signals(list)`、`Show({ backdrop, hidden })`、`TerrainReady()`、`Tree()`、`Open(paths)`；壕沟：`Trench(id)`、`SelectTrench(id, point)`、`MoveTrenchPoint(id, i, x, z)`、`SetTrenchField(id, key, value)`、`SetTrenchDetail(id, key, value)`、`AddTrench(opts)`、`HeightAt(x, z)`（挖好的 / 没挖的）、`ProjectTrenchPoint(id, i)`）。
 - 门禁：`Script_SceneEditModelTest`（纯 node：移动 / 转 / 改字段 / 加删复制改名 / 撤销顺序 / 存盘判定，真场景改一圈撤到底逐字相同）、`Script_SceneSaveTest`（真起本地预览：写成什么样、409 与各种拒绝都不落盘）、`Script_SceneEditorBrowserTest`（真浏览器：数像素证明画出来了、拖箭头、点选、Esc 取消、加删撤销、信号、保存 / 409、外部改动自动重读；存盘口在页面里拦截，不写仓库文件）。
