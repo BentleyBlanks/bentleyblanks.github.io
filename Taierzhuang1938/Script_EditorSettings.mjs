@@ -513,10 +513,10 @@ export class GraphicsSettings {
     Multiplier(post.box, "体积光", "god", "", true);
     Multiplier(post.box, "运动模糊", "motionBlur", "", true);
     Multiplier(post.box, "颗粒", "grain",
-      "胶片颗粒在墙面、肤色等中间调最清楚，深阴影和高光保持干净。拖到 0 可完全关闭。", true);
+      "35mm 电影银盐颗粒：阴影与中间调最细腻饱满，极黑与亮空保持干净。拖到 0 可完全关闭。", true);
     Details(post.box, "grain", {
-      grainSize: "×1 是细颗粒，调大可看见更粗的颗粒，不会同时加重强度。"
-        + (preset.filmGrain ? "当前档位保留少量较大的乳剂团和很淡的色彩变化。" : "低画质只保留单层亮度颗粒。"),
+      grainSize: "×1 是 35mm 细银盐颗粒，调大可模拟更粗的 16mm 胶片质感，不会同时加重强度。"
+        + (preset.filmGrain ? "当前档位启用双角无平铺采样与细腻的三层染料色度。" : "低画质使用单层银盐亮度颗粒。"),
     });
     Multiplier(post.box, "暗角", "vignette", "", true);
     post.Done();

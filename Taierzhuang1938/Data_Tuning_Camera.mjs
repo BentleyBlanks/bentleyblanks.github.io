@@ -328,15 +328,27 @@ export const LENS_FLARE = {
 /** 输出编码。dither = 三角分布抖动的幅度（1/255 的倍数）；0 = 关（出厂）。 */
 export const OUTPUT = { dither: 0.0 };
 
+/**
+ * 全屏胶片颗粒（COD 系 35mm 电影感口径，在 Script_PostFxaa 最终送屏、CAS 锐化之后施加）。
+ *
+ * 与旧版单纯形低频云团颗粒的区别：
+ *   · 启动时离线合成一张 256×256 无缝高通银盐乳剂纹理（零网络资产、约 256 KB 显存），
+ *     用微光学 MTF（σ≈0.30）滤除像素锯齿，再用高通（−96% 低频）彻底去掉 4–12 px 糊状脏斑；
+ *   · 完整档用两次无理角旋转采样（1.0× 与 0.85× 微尺差）消除周期平铺与双线性格感，
+ *     R/G/B 独立三层零亮度染料云在暗部自动退回纯银盐亮度颗粒，避免暗部彩色噪点；
+ *   · 亮度响应（response）：极黑趾部（< 0.015）归零不抬黑位，阴影到中间调（0.18–0.36）
+ *     最饱满（贴合 35mm 负片与 COD 战役质感），亮部与天空肩部柔顺退净，不脏脸不脏天；
+ *   · 时域以 16 Hz 球面等方差平滑轮换（避开 8 Hz 肉眼最敏感的慢蠕动频段，也无 24 Hz 硬切闪烁）。
+ */
 export const FILM_GRAIN = {
-  strength: 0.014,
-  nightStrength: 0.016,
-  sizePx: 1.60,
+  strength: 0.013,
+  nightStrength: 0.015,
+  sizePx: 1.12,
   sizeRange: { min: 1, max: 3, step: 0.05, value: 1 },
-  chroma: 0.12,
-  rateHz: 8,
+  chroma: 0.10,
+  rateHz: 16,
   seedCount: 4096,
-  response: { toeEnd: 0.34, shoulderStart: 0.49 },
+  response: { toeEnd: 0.18, shoulderStart: 0.36 },
 };
 
 export function FilmGrainStrengthFor(profile) {

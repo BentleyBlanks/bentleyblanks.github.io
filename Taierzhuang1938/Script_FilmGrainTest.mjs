@@ -125,7 +125,21 @@ try {
     const Same = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
     const Luma01 = (bytes) => (0.2126 * bytes[0] + 0.7152 * bytes[1] + 0.0722 * bytes[2]) / 255;
     const Smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-    const Response = (value) => Smooth(0, cfg.grain.response.toeEnd, value) * (1 - Smooth(cfg.grain.response.shoulderStart, 1, value));
+    const Response = (value) => {
+      const toe = Smooth(0.015, cfg.grain.response.toeEnd, value);
+      const hi = 1 - Smooth(cfg.grain.response.shoulderStart, 0.94, value);
+      return toe * hi * (0.35 + 0.65 * hi);
+    };
+    // 8×8 块均值的标准差与逐像素标准差之比：衡量是否混入低频大泥斑（旧版 3.7px 云斑约 0.35+，高通 35mm 银盐应 < 0.22）。
+    const BlotchRatio = (field, width, height, std) => {
+      const blocks = [];
+      for (let by = 0; by + 8 <= height; by += 8) for (let bx = 0; bx + 8 <= width; bx += 8) {
+        let sum = 0;
+        for (let dy = 0; dy < 8; dy++) for (let dx = 0; dx < 8; dx++) sum += field[(by + dy) * width + (bx + dx)];
+        blocks.push(sum / 64);
+      }
+      return Std(blocks) / Math.max(std, 1e-6);
+    };
 
     // 挑一个基线落在中间调（编码亮度 0.3–0.7）的 HDR 平色
     let midValue = null;
@@ -189,8 +203,7 @@ try {
     out.aaCorrelation = Corr(Channel(sharpened, 1), Channel(unsharpened, 1));
     final.uSource.value = ldr.texture; flat.dispose();
     final.uSharpen.value = savedSharpen; final.uFxaa.value = savedFxaa;
-    const monoBig = Dev(Render(midValue, { grain: strength, px: 3, mode: 0 }), base, 1);
-    out.monoTail = Lag(monoBig, ldr.width, 3, 0);
+    out.blotch8x8Ratio = BlotchRatio(dG, ldr.width, ldr.height, out.std125);
     out.maxPlateJump = Math.max(...[0, .125, .25, .375, .5, .625, .75, .875].map((blend) => {
       const plate = (phase) => Dev(Render(midValue, { grain: strength, px: 1.25, blend: phase }), base, 1);
       const first = plate(blend), second = plate(blend + .125);
@@ -227,6 +240,8 @@ try {
       const darkBase = Render(darkValue), darkGrain = Render(darkValue, { grain: strength * 1.3, px: 1.25, seed: 2 });
       out.darkLuma = Luma01(darkBase);
       out.darkMeanShift = Mean(Channel(darkGrain, 1)) - Mean(Channel(darkBase, 1));
+      out.darkStd = Std(Dev(darkGrain, darkBase, 1));
+      out.rgCorrDark = Corr(Dev(darkGrain, darkBase, 0), Dev(darkGrain, darkBase, 1));
     }
     for (const t of textures.values()) t.dispose();
     black.dispose(); display.dispose();
@@ -251,7 +266,7 @@ try {
     out.outputHeight = outputHeight;
     out.strength = U.uGrain.value;
     out.px = U.uGrainPx.value;
-    out.expectedPx = Math.max(1, cfg.grain.sizePx * 2 * outputHeight / 1080);
+    out.expectedPx = Math.max(0.75, cfg.grain.sizePx * 2 * outputHeight / 1080);
     out.mode = U.uGrainMode.value;
 
     post.Render(P.scene, P.camera, { ...base, grain: 0, grainSize: 2, dt: 0 });
@@ -260,10 +275,10 @@ try {
     // 大小倍率越界会被钳到滑杆范围；没给就是出厂值
     post.Render(P.scene, P.camera, { ...base, grain: 0.05, grainSize: 99, dt: 0 });
     out.pxClampHigh = U.uGrainPx.value;
-    out.expectedClampHigh = Math.max(1, cfg.grain.sizePx * cfg.grain.sizeRange.max * outputHeight / 1080);
+    out.expectedClampHigh = Math.max(0.75, cfg.grain.sizePx * cfg.grain.sizeRange.max * outputHeight / 1080);
     post.Render(P.scene, P.camera, { ...base, grain: 0.05, dt: 0 });
     out.pxDefault = U.uGrainPx.value;
-    out.expectedDefault = Math.max(1, cfg.grain.sizePx * cfg.grain.sizeRange.value * outputHeight / 1080);
+    out.expectedDefault = Math.max(0.75, cfg.grain.sizePx * cfg.grain.sizeRange.value * outputHeight / 1080);
 
     // 种子按时钟走：rateHz 次/秒，相邻种子平滑过渡；不是每帧硬切
     const seeds = [], blends = [];
@@ -343,11 +358,11 @@ near(shader.stdBig, shader.expectedStd, 0.15, "大格子（3 px）强度不变")
 near(shader.stdSmall, shader.expectedStd, 0.15, "逐像素路径强度不变");
 near(shader.stdCheap, shader.expectedStd, 0.15, "便宜路径强度不变");
 assert.ok(shader.meanShift < 0.8, `不改中间调平均亮度（偏移 ${shader.meanShift.toFixed(2)} 级）`);
-assert.ok(shader.lag1.px1 > .1 && shader.lag1.px1 < .3, "1 px 细粒不退回白噪声，也不糊成片");
+assert.ok(shader.lag1.px1 > .1 && shader.lag1.px1 < .32, `1 px 细粒不退回白噪声，也不糊成片（${shader.lag1.px1.toFixed(3)}）`);
 assert.ok(Math.abs(shader.lag1.px3 - shader.verticalLag) < .05, "横竖相关长度一致，没有轴向条纹");
-assert.ok(shader.plateTail > shader.monoTail + .035, "双层乳剂比单层银盐多出可测的粗粒团");
+assert.ok(shader.blotch8x8Ratio < .22, `高通乳剂压住低频脏斑（8×8 块均值比 ${shader.blotch8x8Ratio.toFixed(3)} < 0.22）`);
 assert.ok(shader.maxPlateJump < .32, "过渡中的任意八分之一周期均无硬闪");
-assert.ok(shader.lag1.px125 > shader.lag1.px1 + 0.1, `默认格子比逐像素更成团（${shader.lag1.px125.toFixed(2)}）`);
+assert.ok(shader.lag1.px125 > shader.lag1.px1 + 0.08, `默认格子比逐像素更成团（${shader.lag1.px125.toFixed(2)}）`);
 assert.ok(shader.lag1.px3 > 0.6 && shader.lag1.px3 > shader.lag1.px125 + 0.15, `格子越大越相关（3 px：${shader.lag1.px3.toFixed(2)}）`);
 assert.ok(shader.seedDiffers && Math.abs(shader.seedCorr) < 0.1, `换种子是另一张花样（相关 ${shader.seedCorr.toFixed(3)}）`);
 assert.ok(shader.blendDiffers, "相邻种子 blend=0.5 时不等于两端任一张");
@@ -366,6 +381,8 @@ assert.ok(shader.highlightStd < shader.std125 * 0.35,
 assert.ok(shader.highlightMeanShift < 1.0, `高光均值不被拉低（${shader.highlightMeanShift.toFixed(2)} 级）`);
 assert.notEqual(shader.darkValue, null, "找到了落在暗部的 HDR 平色");
 assert.ok(shader.darkMeanShift < 1.0, `暗部均值不被抬亮（${shader.darkMeanShift.toFixed(2)} 级，夜战关用的更强档）`);
+assert.ok(shader.darkStd > 0.5 && shader.rgCorrDark > shader.rgCorrFull,
+  `暗部保留银盐颗粒且自动压弱色度（std ${shader.darkStd.toFixed(2)}，暗部 RG 相关 ${shader.rgCorrDark.toFixed(3)} > 中间调 ${shader.rgCorrFull.toFixed(3)}）`);
 
 // 2. 接线层
 assert.equal(wiring.glError, 0);

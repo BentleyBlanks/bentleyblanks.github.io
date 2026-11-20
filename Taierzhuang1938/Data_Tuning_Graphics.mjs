@@ -133,7 +133,7 @@
  *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
  *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
  *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
- *   filmGrain     颗粒算法档，非开关。low = 单层亮度细粒；其余档 = 细粒叠加少量较大的乳剂团与弱色度。
+ *   filmGrain     颗粒算法档，非开关。low = 单采样高通银盐亮度细粒；其余档 = 双无理角旋转采样（无平铺）+ 三层弱色度染料乳剂。
  *                 全档沿用后处理强度 grain（0 = 关）与粒径倍率 grainSize。
  *   stunTrail     近爆眩晕的拖影（Script_PostStunTrail：composite 之后的帧反馈，两张输出分辨率 HalfFloat 靶懒建；
  *                 还要 options.stunTrail > 0 且没开 reduced-motion 才真跑，平时不占显存与时间）

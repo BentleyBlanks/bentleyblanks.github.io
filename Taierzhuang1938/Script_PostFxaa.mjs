@@ -32,16 +32,162 @@ import { GLSL_COC, ApplyCocUniforms } from "./Script_PostDof.mjs";
 import { CAS, DOF } from "./Data_Tuning_TemporalDof.mjs";
 import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
 
+const GRAIN_TEX_SIZE = 256;
+const GRAIN_TEX_RANGE = 5.0; // ±5.0 映射到 [0, 255]，覆盖 >99.98% 高斯尾部且量化步长 < 0.13 级 sRGB
+
+/**
+ * 离线合成一张 256×256 无缝周期 35mm 银盐乳剂纹理（零网络资产、约 256 KB 显存）。
+ *
+ * 通道布局（NoColorSpace 线性数据，127.5/255 为零均值中心）：
+ *   · A    主银盐亮度乳剂（σ_mtf = 0.30，配合硬件双线性呈细腻微晶，高通 −96% 去除 4–12 px 低频泥斑）；
+ *   · RGB  独立三层彩色染料云（R 0.40 / G 0.36 / B 0.44，模拟胶片蓝敏黄染料层略柔的物理特征，同样高通去脏斑）。
+ *
+ * 每通道按「旋转随机相位下的硬件双线性期望方差」精确归一，所以无论 uGrainPx 调多粗、
+ * 怎么旋转，送屏标准差始终等于 uGrain × 亮度响应，不随颗粒大小滑杆漂移。
+ */
+function BuildFilmGrainTexture(size = GRAIN_TEX_SIZE) {
+  const count = size * size;
+  const mask = size - 1;
+  let state = 0x19380317;
+  const Rand01 = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const Gauss = () => Math.sqrt(-2 * Math.log(Math.max(Rand01(), 1e-7))) * Math.cos(6.283185307179586 * Rand01());
+
+  const GaussBlur = (src, sigma) => {
+    const r = Math.max(1, Math.ceil(sigma * 3));
+    const k = new Float32Array(r + 1);
+    let sum = 1;
+    k[0] = 1;
+    for (let d = 1; d <= r; d++) {
+      k[d] = Math.exp(-0.5 * (d / sigma) ** 2);
+      sum += 2 * k[d];
+    }
+    for (let d = 0; d <= r; d++) k[d] /= sum;
+    const tmp = new Float32Array(count);
+    const dst = new Float32Array(count);
+    for (let y = 0; y < size; y++) {
+      const row = y * size;
+      for (let x = 0; x < size; x++) {
+        let acc = src[row + x] * k[0];
+        for (let d = 1; d <= r; d++) acc += (src[row + ((x - d) & mask)] + src[row + ((x + d) & mask)]) * k[d];
+        tmp[row + x] = acc;
+      }
+    }
+    for (let y = 0; y < size; y++) {
+      const row = y * size;
+      for (let x = 0; x < size; x++) {
+        let acc = tmp[row + x] * k[0];
+        for (let d = 1; d <= r; d++) acc += (tmp[((y - d) & mask) * size + x] + tmp[((y + d) & mask) * size + x]) * k[d];
+        dst[row + x] = acc;
+      }
+    }
+    return dst;
+  };
+
+  // 三遍周期滑窗盒滤波（radius=2 → 等效 σ≈2.45），用来抽离并压制 4–12 px 糊状低频云斑。
+  const BoxBlurLow = (src, radius = 2, passes = 3) => {
+    const inv = 1 / (radius * 2 + 1);
+    const cur = new Float32Array(src);
+    const tmp = new Float32Array(count);
+    for (let p = 0; p < passes; p++) {
+      for (let y = 0; y < size; y++) {
+        const row = y * size;
+        let sum = 0;
+        for (let d = -radius; d <= radius; d++) sum += cur[row + (d & mask)];
+        for (let x = 0; x < size; x++) {
+          tmp[row + x] = sum * inv;
+          sum += cur[row + ((x + radius + 1) & mask)] - cur[row + ((x - radius) & mask)];
+        }
+      }
+      for (let x = 0; x < size; x++) {
+        let sum = 0;
+        for (let d = -radius; d <= radius; d++) sum += tmp[(d & mask) * size + x];
+        for (let y = 0; y < size; y++) {
+          cur[y * size + x] = sum * inv;
+          sum += tmp[((y + radius + 1) & mask) * size + x] - tmp[((y - radius) & mask) * size + x];
+        }
+      }
+    }
+    return cur;
+  };
+
+  const MakeLayer = (sigmaMtf, hpWeight) => {
+    const white = new Float32Array(count);
+    for (let i = 0; i < count; i++) white[i] = Gauss();
+    const fine = GaussBlur(white, sigmaMtf);
+    const low = BoxBlurLow(fine, 2, 3);
+    const out = new Float32Array(count);
+    let mean = 0;
+    for (let i = 0; i < count; i++) {
+      const v = fine[i] - hpWeight * low[i];
+      out[i] = v;
+      mean += v;
+    }
+    mean /= count;
+    for (let i = 0; i < count; i++) out[i] -= mean;
+    // 解析积分：随机相位 (fx,fy)∈[0,1)² 下双线性插值的期望方差 = (4·v0 + 4·v1 + vd) / 9。
+    let v0 = 0, v1 = 0, vd = 0;
+    for (let y = 0; y < size; y++) {
+      const row = y * size;
+      const nextRow = ((y + 1) & mask) * size;
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 1) & mask;
+        const a = out[row + x], b = out[row + nx], c = out[nextRow + x], d = out[nextRow + nx];
+        v0 += a * a;
+        v1 += a * b + a * c;
+        vd += a * d + b * c;
+      }
+    }
+    v0 /= count;
+    v1 /= (2 * count);
+    vd /= (2 * count);
+    const invStd = 1 / Math.sqrt(Math.max((4 * v0 + 4 * v1 + vd) / 9, 1e-8));
+    for (let i = 0; i < count; i++) out[i] *= invStd;
+    return out;
+  };
+
+  const r = MakeLayer(0.40, 0.96);
+  const g = MakeLayer(0.36, 0.96);
+  const b = MakeLayer(0.44, 0.96);
+  const a = MakeLayer(0.30, 0.96);
+  const bytes = new Uint8Array(count * 4);
+  const scale = 127.5 / GRAIN_TEX_RANGE;
+  const Pack = (v) => Math.max(0, Math.min(255, Math.round(127.5 + v * scale)));
+  for (let i = 0; i < count; i++) {
+    const o = i * 4;
+    bytes[o] = Pack(r[i]);
+    bytes[o + 1] = Pack(g[i]);
+    bytes[o + 2] = Pack(b[i]);
+    bytes[o + 3] = Pack(a[i]);
+  }
+  const texture = new THREE.DataTexture(bytes, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.flipY = false;
+  texture.unpackAlignment = 1;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const FRAG_FXAA = /* glsl */`
 uniform sampler2D uSource;
+uniform sampler2D uGrainTex;
 uniform vec2 uTexel;
 uniform float uSharpen;   // CAS sharpness，0–1
 uniform float uFxaa;      // TAA 开着时置 0：几何锯齿已在时域上解决，FXAA 只会再糊一层
 uniform float uCasPeakLow;
 uniform float uCasPeakHigh;
 uniform float uGrain;          // 胶片颗粒：sRGB 域标准差（0–1）；0 = 关
-uniform float uGrainSeed;      // 当前花样的种子（整数，0..seedCount-1）
-uniform float uGrainSeedNext;  // 下一张花样的种子（与 uGrainSeed 平滑过渡）
+uniform float uGrainSeed;      // 当前底片的种子（整数，0..seedCount-1）
+uniform float uGrainSeedNext;  // 下一张底片的种子（与 uGrainSeed 平滑过渡）
 uniform float uGrainBlend;     // 0 = 只用当前种子，1 = 只用下一张；过渡中途按权重平方和归一
 uniform float uGrainPx;
 uniform float uGrainMode;
@@ -50,54 +196,64 @@ uniform vec2 uGrainResponse;
 varying vec2 vUv;
 ${GLSL_COMMON}
 
-vec2 GrainDeposit(ivec2 site, uint seed) {
-  uint bits = uint(site.x) * 0x9e3779b1u + uint(site.y) * 0x85ebca77u + seed * 0xc2b2ae3du;
-  bits ^= bits >> 16u; bits *= 0x7feb352du;
-  bits ^= bits >> 15u; bits *= 0x846ca68bu; bits ^= bits >> 16u;
-  uvec4 bytes = (uvec4(bits) >> uvec4(0, 8, 16, 24)) & 255u;
-  vec4 noise = (vec4(bytes) - 127.5) / 256.0;
-  return vec2(dot(noise.xyz, vec3(2.0)), noise.w * 3.464102);
+const float GRAIN_INV_TEX = ${(1 / GRAIN_TEX_SIZE).toFixed(8)};
+const float GRAIN_DECODE = ${(GRAIN_TEX_RANGE * 2).toFixed(4)};
+
+mat2 GrainRot(float angle) {
+  float c = cos(angle), s = sin(angle);
+  return mat2(c, -s, s, c);
 }
 
-vec2 GrainLayer(vec2 position, uint seed) {
-  vec2 lattice = vec2(position.x - position.y * .57735027, position.y * 1.15470054);
-  ivec2 base = ivec2(floor(lattice));
-  vec2 local = fract(lattice);
-  int corner = int(step(1.0, local.x + local.y));
-  vec3 dx = local.x - vec3(float(corner), 1.0, 0.0);
-  vec3 dy = local.y - vec3(float(corner), 0.0, 1.0);
-  vec3 weights = max(vec3(.75) - (dx*dx + dx*dy + dy*dy), 0.0);
-  weights = normalize(weights * weights);
-  return weights.x * GrainDeposit(base + ivec2(corner), seed)
-       + weights.y * GrainDeposit(base + ivec2(1, 0), seed)
-       + weights.z * GrainDeposit(base + ivec2(0, 1), seed);
+vec4 SampleGrainPlate(vec2 coord, float angle, vec2 offset) {
+  vec2 uv = (GrainRot(angle) * coord) * GRAIN_INV_TEX + offset;
+  return (texture2D(uGrainTex, uv) - vec4(127.5 / 255.0)) * GRAIN_DECODE;
 }
 
-vec3 FilmGrainFieldAt(vec2 fragCoord, float seed) {
-  vec2 plate = fragCoord / uGrainPx;
-  vec2 offset = fract(seed * vec2(.618034, .414214)) * 23.0;
-  float silver = GrainLayer(mat2(.8, .6, -.6, .8) * plate + offset, uint(seed)).x;
-  if (uGrainMode < .5) return vec3(silver);
-  vec2 clouds = GrainLayer(mat2(.28, -.96, .96, .28) * plate * .43 - offset, uint(seed) + 7919u);
-  float density = .925 * silver + .38 * clouds.x;
-  return vec3(density) + uGrainChroma * clouds.y * vec3(.95, -.18, -.98);
+vec3 FilmGrainFieldAt(vec2 fragCoord, float seed, float chromaWeight) {
+  vec2 plate = (fragCoord - vec2(512.0)) / uGrainPx;
+  float angleA = 0.37 + fract(seed * 0.381966011) * 6.28318531;
+  vec2 offsetA = fract(seed * vec2(0.75487767, 0.56984029) + vec2(0.13, 0.29));
+  vec4 tapA = SampleGrainPlate(plate, angleA, offsetA);
+  if (uGrainMode < 0.5) return vec3(tapA.a);
+
+  // 第二层无理角旋转 + 0.85x 微尺差：彻底打破 256px 周期性与轴向双线性格感，
+  // 同时模拟真实银盐乳剂微小的晶体尺度起伏，而不引入任何低频大糊斑。
+  float angleB = angleA + 1.17809725;
+  vec2 offsetB = fract(seed * vec2(0.61803399, 0.38196601) + vec2(0.47, 0.83));
+  vec4 tapB = SampleGrainPlate(plate * 0.85, angleB, offsetB);
+  vec4 emul = 0.78 * tapA + 0.62578 * tapB;
+
+  float silver = emul.a;
+  // 真实三层 RGB 染料云中剥离纯零亮度色度，保证不漂移均值且无 1D 橙蓝脏斑。
+  vec3 dye = emul.rgb - vec3(Luma(emul.rgb));
+  float c = clamp(chromaWeight, 0.0, 0.5);
+  return vec3(silver * sqrt(max(1.0 - c * c, 0.0))) + dye * c;
 }
 
-// 相邻两张种子平滑过渡；mix 会压方差，除以 √((1−t)²+t²) 让过渡中途强度不掉。
-vec3 FilmGrainField(vec2 fragCoord) {
+// 相邻两张底片平滑过渡；mix 会压方差，除以 √((1−t)²+t²) 让过渡中途强度不掉。
+vec3 FilmGrainField(vec2 fragCoord, float chromaWeight) {
   float t = clamp(uGrainBlend, 0.0, 1.0);
-  if (t <= 0.001) return FilmGrainFieldAt(fragCoord, uGrainSeed);
-  if (t >= 0.999) return FilmGrainFieldAt(fragCoord, uGrainSeedNext);
-  vec3 a = FilmGrainFieldAt(fragCoord, uGrainSeed);
-  vec3 b = FilmGrainFieldAt(fragCoord, uGrainSeedNext);
+  if (t <= 0.001) return FilmGrainFieldAt(fragCoord, uGrainSeed, chromaWeight);
+  if (t >= 0.999) return FilmGrainFieldAt(fragCoord, uGrainSeedNext, chromaWeight);
+  vec3 a = FilmGrainFieldAt(fragCoord, uGrainSeed, chromaWeight);
+  vec3 b = FilmGrainFieldAt(fragCoord, uGrainSeedNext, chromaWeight);
   return mix(a, b, t) * inversesqrt(max((1.0 - t) * (1.0 - t) + t * t, 1e-4));
+}
+
+float FilmGrainResponse(float y) {
+  // 极黑趾部（< 0.015）归零保护黑位，阴影到中间调最饱满，高光/天空沿摄影肩部柔顺退净。
+  float toe = smoothstep(0.015, uGrainResponse.x, y);
+  float hi = 1.0 - smoothstep(uGrainResponse.y, 0.94, y);
+  return toe * hi * (0.35 + 0.65 * hi);
 }
 
 vec3 ApplyFilmGrain(vec3 color) {
   float y = Luma(color);
-  float response = smoothstep(0.0, uGrainResponse.x, y) * (1.0 - smoothstep(uGrainResponse.y, 1.0, y));
-  vec3 amplitude = min(vec3(uGrain * response), .2 * min(color, 1.0 - color));
-  return clamp(color + FilmGrainField(gl_FragCoord.xy) * amplitude, 0.0, 1.0);
+  float response = FilmGrainResponse(y);
+  // 暗部自动退回纯银盐亮度颗粒（真实胶片与 COD 暗部不出彩色数字噪点）。
+  float chromaWeight = uGrainChroma * smoothstep(0.08, 0.28, y);
+  vec3 amplitude = min(vec3(uGrain * response), 0.28 * min(color, 1.0 - color));
+  return clamp(color + FilmGrainField(gl_FragCoord.xy, chromaWeight) * amplitude, 0.0, 1.0);
 }
 
 void main() {
@@ -222,8 +378,10 @@ export class FxaaPass {
     this.name = "fxaa";
     this.grainClock = 0;
     this.pipeline = pipeline;
+    this.grainTexture = BuildFilmGrainTexture();
     this.uniforms = {
-      uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
+      uSource: { value: null }, uGrainTex: { value: this.grainTexture },
+      uTexel: { value: new THREE.Vector2() },
       uSharpen: { value: pipeline.preset.sharpen }, uFxaa: { value: 1 },
       uCasPeakLow: { value: CAS.peakLow }, uCasPeakHigh: { value: CAS.peakHigh },
       uGrain: { value: 0 },
@@ -275,7 +433,7 @@ export class FxaaPass {
     U.uGrain.value = Math.max(0, options.grain ?? FILM_GRAIN.strength);
     const grainSize = Math.min(FILM_GRAIN.sizeRange.max, Math.max(FILM_GRAIN.sizeRange.min,
       Number.isFinite(options.grainSize) ? options.grainSize : FILM_GRAIN.sizeRange.value));
-    U.uGrainPx.value = Math.max(1, FILM_GRAIN.sizePx * grainSize * P.renderer.domElement.height / 1080);
+    U.uGrainPx.value = Math.max(0.75, FILM_GRAIN.sizePx * grainSize * P.renderer.domElement.height / 1080);
     U.uGrainMode.value = ctx.preset.filmGrain ? 1 : 0;
     if (Number.isFinite(options.dt)) this.grainClock += Math.max(0, options.dt);
     else this.grainClock = ctx.frame / 60;
@@ -338,5 +496,6 @@ export class FxaaPass {
   Dispose() {
     this.material.dispose();
     this.materialDebug.dispose();
+    this.grainTexture?.dispose();
   }
 }
