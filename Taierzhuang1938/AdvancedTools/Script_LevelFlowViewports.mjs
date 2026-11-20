@@ -108,13 +108,13 @@ export class EncounterViewports {
     fields.append(legend);
     const inputs={};
     const status=document.createElement("output");status.hidden=true;
-    for(const [key,label,unit] of [["fov","水平 FOV","°"],["near","近裁剪","m"],["far","远裁剪","m"],["speed","移动速度","m/s"]]) {
+    for(const [key,label,unit] of [["verticalFov","垂直 FOV","°"],["near","近裁剪","m"],["far","远裁剪","m"],["speed","移动速度","m/s"]]) {
       const row=document.createElement("label"),name=document.createElement("span"),input=document.createElement("input");
       const [min,max]=FLOW_SCENE_CAMERA_LIMITS[key];
       name.textContent=label;
       input.type="number";input.name=key;input.min=min;input.max=max;input.step="any";input.required=true;
       input.setAttribute("aria-label",`视口 ${entry.index+1} ${label}（${unit}）`);
-      if(key==="speed") input.title="按住右键配合 WASD / Q / E 飞行，Shift 加速";
+      if(key==="speed") input.title="按住右键配合 WASD / Q / E 飞行，Shift 加速，滚轮实时调速";
       inputs[key]=input;
       input.addEventListener("change",()=>{
         const settings=ReadSceneCamera({...entry.sceneCamera,[key]:input.valueAsNumber});
@@ -148,6 +148,16 @@ export class EncounterViewports {
     try {this.storage?.setItem(SCENE_CAMERA_STORAGE_PREFIX+entry.index,JSON.stringify(settings));}
     catch { /* Keep the settings available in this session. */ }
     this.callbacks.change();
+  }
+
+  AdjustFlySpeed(entry,factor) {
+    const [min,max]=FLOW_SCENE_CAMERA_LIMITS.speed;
+    const speed=Math.min(max,Math.max(min,entry.sceneCamera.speed*factor));
+    this.SaveCameraSettings(entry,{...entry.sceneCamera,speed});
+    const toast=entry.speedToast??=Object.assign(document.createElement("output"),{className:"lfSpeedToast"});
+    toast.textContent=`飞行速度 ${speed.toFixed(speed<10?2:1)} m/s`;toast.hidden=false;
+    entry.pane.append(toast);
+    clearTimeout(entry.speedToastTimer);entry.speedToastTimer=setTimeout(()=>{toast.hidden=true;},900);
   }
 
   CreateGizmo(entry) {

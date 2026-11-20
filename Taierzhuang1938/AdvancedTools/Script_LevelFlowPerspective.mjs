@@ -2,7 +2,7 @@ import { PickEncounterBody } from "./Script_LevelFlowPicking.mjs";
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
-import { FLOW_RENDERING, FLOW_SCENE_CAMERA, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
+import { FLOW_RENDERING, FLOW_SCENE_CAMERA, FLOW_VIEW_HORIZONTAL_FOV_DEG, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
 import { ApplyEncounterSky } from "./Script_LevelFlowSkyBlend.mjs";
@@ -30,9 +30,14 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   get near() {return this.type==="scene"?this.sceneCamera.near:FLOW_SCENE_CAMERA.near;}
   get far() {return this.type==="scene"?this.sceneCamera.far:this.viewFar;}
+  get verticalFov() {
+    if(this.type==="scene") return this.sceneCamera.verticalFov;
+    return 2*Math.atan(Math.tan(this.fov*Math.PI/360)/(this.width/this.height||16/9))*180/Math.PI;
+  }
   get fov() {
     if(this.type==="eye") return Clamp(105-this.scale*4,FLOW_ZOOM.minEyeFovDeg,90);
-    return this.type==="scene"?this.sceneCamera.fov:FLOW_SCENE_CAMERA.fov;
+    if(this.type==="scene") return 2*Math.atan(Math.tan(this.sceneCamera.verticalFov*Math.PI/360)*(this.width/this.height||16/9))*180/Math.PI;
+    return FLOW_VIEW_HORIZONTAL_FOV_DEG;
   }
 
   Draw(frame,layers,selection,annotations,draft,viewport,trace=null) {
@@ -85,7 +90,7 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     this.forward=Normalize(this.aim.map((value,index)=>value-this.eye[index]));
     this.right=Normalize(Cross(this.forward,[0,1,0]));this.up=Cross(this.right,this.forward);
-    this.focal=this.width/(2*Math.tan(this.fov*Math.PI/360));
+    this.focal=this.type==="scene"?this.height/(2*Math.tan(this.sceneCamera.verticalFov*Math.PI/360)):this.width/(2*Math.tan(this.fov*Math.PI/360));
     // Offscreen vehicles must not invalidate both static camera backgrounds on
     // every timeline tick. Include carried boxes too: they also write depth.
     this.solidActors=frame.actors.filter(actor=>(["tank","cart"].includes(actor.kind)||actor.carryingAmmo)&&this.SolidInView(actor));

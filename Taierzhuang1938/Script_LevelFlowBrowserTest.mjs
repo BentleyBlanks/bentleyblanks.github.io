@@ -532,10 +532,10 @@ try {
   await cameraMenu.locator('summary').click();
   assert.deepEqual(await cameraMenu.locator('button').allTextContents(),['重置镜头','当前剧情范围','整个关卡','自动跟随','恢复默认参数']);
   const ReadCameraSettings=()=>page.evaluate(()=> {
-    const {fov,near,far,speed}=LevelFlow.Packet().context.viewports.views[0];
-    return {fov,near,far,speed};
+    const {verticalFov,near,far,speed}=LevelFlow.Packet().context.viewports.views[0];
+    return {verticalFov,near,far,speed};
   });
-  const defaultSettings={fov:65,near:0.15,far:1500,speed:12};
+  const defaultSettings={verticalFov:60,near:0.15,far:1500,speed:12};
   assert.deepEqual(await ReadCameraSettings(),defaultSettings);
   const SetCameraSetting=async(key,value)=>{
     const input=cameraMenu.locator(`input[name="${key}"]`);
@@ -543,7 +543,7 @@ try {
   };
   const testPoint=[initialLayout.views[0].center[0]+8,initialLayout.views[0].center[1]];
   const originalScreen=await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint);
-  await SetCameraSetting('fov',42);
+  await SetCameraSetting('verticalFov',42);
   const tighterScreen=await page.evaluate(point=>LevelFlow.ToScreen(point),testPoint);
   const screenCenter=initialLayout.views[0].viewport.width/2;
   assert.ok(Math.abs(tighterScreen[0]-screenCenter)>Math.abs(originalScreen[0]-screenCenter),'FOV reprojects a paused viewport');
@@ -557,7 +557,7 @@ try {
   assert.equal((await ReadCameraSettings()).near,90,'invalid clip planes keep the last valid projection');
   await SetCameraSetting('near',0.35);
   await SetCameraSetting('speed',24);
-  const tunedSettings={fov:42,near:0.35,far:120,speed:24};
+  const tunedSettings={verticalFov:42,near:0.35,far:120,speed:24};
   assert.deepEqual(await ReadCameraSettings(),tunedSettings);
   await page.evaluate(()=>LevelFlow.RestoreViewports(LevelFlow.Packet().context.viewports));
   assert.deepEqual(await ReadCameraSettings(),tunedSettings,'frame restore retains Scene settings');
@@ -1199,6 +1199,14 @@ try {
   const beforeUp=await page.evaluate(()=>LevelFlow.Inspect().viewports.views[1].freeCamera.eye[1]);
   await page.waitForFunction((height)=>LevelFlow.Inspect().viewports.views[1].freeCamera.eye[1]>height+0.3,beforeUp);
   await page.keyboard.up('e');
+  const ReadFly=()=>page.evaluate(()=>({speed:LevelFlow.Packet().context.viewports.views[1].speed,eye:LevelFlow.Inspect().viewports.views[1].freeCamera.eye}));
+  const flyBase=await ReadFly();
+  await page.mouse.wheel(0,-100);
+  await page.waitForFunction(speed=>LevelFlow.Packet().context.viewports.views[1].speed>speed*1.15,flyBase.speed);
+  assert.deepEqual((await ReadFly()).eye,flyBase.eye,'wheel while flying changes speed instead of dollying');
+  assert.equal(await page.locator('.lfViewPane[data-viewport="1"] .lfSpeedToast:visible').count(),1,'speed change is shown on the viewport');
+  await page.mouse.wheel(0,100);
+  await page.waitForFunction(speed=>Math.abs(LevelFlow.Packet().context.viewports.views[1].speed-speed)<1e-6,flyBase.speed);
   await page.evaluate(()=>new Promise(requestAnimationFrame));
   const heldNavigation=await page.evaluate(()=>({rendering:LevelFlow.Inspect().rendering[1],pixels:document.getElementById('flowMap2').toDataURL()}));
   assert.equal(heldNavigation.rendering.renderScale,1,'flying preserves full terrain resolution');

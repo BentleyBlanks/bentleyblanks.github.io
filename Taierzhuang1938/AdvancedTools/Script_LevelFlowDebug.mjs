@@ -154,7 +154,7 @@ export class LevelFlowDebug {
             backend:entry.map.raster?(entry.map.raster.accelerated?"webgl2":"software"):"canvas2d",
             width:entry.canvas.width,height:entry.canvas.height,
             camera:entry.map.eye?{eye:[...entry.map.eye],forward:[...entry.map.forward],up:[...entry.map.up],
-              perspective:entry.map.raster.perspective,scale:entry.map.scale,fov:entry.map.fov,near:entry.map.near,far:entry.map.far,
+              perspective:entry.map.raster.perspective,scale:entry.map.scale,fov:entry.map.fov,verticalFov:entry.map.verticalFov,near:entry.map.near,far:entry.map.far,
               navigating:!!entry.map.navigationActive}:null});
         }
         capture?.EndViewport(Math.max(0,performance.now()-passStart-(capture.overhead-overhead)));

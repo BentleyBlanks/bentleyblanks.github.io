@@ -50,7 +50,7 @@ try {
   if(sampling) await startSampling.click();
   await page.evaluate(()=>{
     const layout=LevelFlow.Inspect().viewports;
-    layout.views[1].fov=56;
+    layout.views[1].verticalFov=56;
     LevelFlow.RestoreViewports(layout);
     LevelFlow.SetPlaying(true);
   });

@@ -269,6 +269,9 @@ export class EncounterSceneControls {
 
   Wheel(entry,event) {
     event.preventDefault();this.workspace.Activate(entry.index);
+    if(this.drag?.action==="look"&&this.drag.entry===entry) {
+      this.workspace.AdjustFlySpeed(entry,Math.exp(-Clamp(event.deltaY,-300,300)*0.002));return;
+    }
     if(entry.mode!=="follow") entry.mode="manual";
     if(entry.map.type||entry.mode==="follow") this.Dolly(entry,event.deltaY*0.001);
     else {const rect=entry.canvas.getBoundingClientRect();entry.map.Zoom(Math.exp(-event.deltaY*0.001),[event.clientX-rect.left,event.clientY-rect.top]);}

@@ -63,7 +63,7 @@ export function CreateLocationText(frame, workspace, selection, document) {
       if (view.eye) result.camera = { projection: orthographic ? "orthographic" : "perspective",
         eye: [...view.eye], aim: [...view.aim], forward: [...view.forward],
         yaw: Math.atan2(view.forward[0], view.forward[2]), pitch: Math.asin(view.forward[1]),
-        ...(!orthographic ? { horizontalFovDegrees: view.fov } : {}), nearMetres: view.near, farMetres: view.far,
+        ...(!orthographic ? { horizontalFovDegrees: view.fov, verticalFovDegrees: view.verticalFov } : {}), nearMetres: view.near, farMetres: view.far,
         ...(entry.type==="scene" ? { speedMetresPerSecond: view.sceneCamera.speed } : {}) };
       else {
         const [minX, maxX, minZ, maxZ] = view.Bounds();
