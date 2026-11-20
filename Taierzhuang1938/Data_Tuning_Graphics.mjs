@@ -164,9 +164,9 @@ const RESERVED_OFF = {
  * 三位**全部关掉时，合成输出逐比特等于 2026-09 帧图重构后的版本** ——
  * 这是本轮的硬约束（用户对画面明暗极敏感，历史事故「画面为什么这么黑」）。
  */
-const CAMERA_OFF = { autoExposure: false, lensFlare: false, lut: true };
-const CAMERA_ON = { autoExposure: true, lensFlare: false, lut: true };
-const CAMERA_FULL = { autoExposure: true, lensFlare: true, lut: true };
+const CAMERA_OFF = { autoExposure: false, lensFlare: false, lut: true, localTonemap: false, filmOptics: false };
+const CAMERA_ON = { autoExposure: true, lensFlare: false, lut: true, localTonemap: true, filmOptics: true };
+const CAMERA_FULL = { autoExposure: true, lensFlare: true, lut: true, localTonemap: true, filmOptics: true };
 
 export const QUALITY_PRESETS = {
   // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），

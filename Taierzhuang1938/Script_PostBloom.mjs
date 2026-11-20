@@ -26,9 +26,13 @@ const FRAG_BRIGHT = /* glsl */`
 uniform sampler2D uSource;
 uniform sampler2D uNormalDepth;
 uniform sampler2D uExposureTex;
+uniform sampler2D uFogScatter;
+uniform float uFogSource;
+uniform float uFogMax;
 uniform float uThreshold;
 uniform float uKnee;
 uniform float uClamp;
+uniform float uVeiling;
 uniform float uPackSky;
 uniform vec4 uFlareClampSource[${FLARE_GLARE.slots}]; // uv, linear view depth, physical radius
 uniform vec2 uFlareClampProjScale;
@@ -57,6 +61,12 @@ bool FlareClampRegion(vec2 uv){
 }
 void main() {
   vec3 c = texture2D(uSource, vUv).rgb;
+  // 2026-11-20：亮部提取前先接入体积雾散射，让亮雾光柱与雾中强光源自然参与泛光与镜头宽尾辉光。
+  if (uFogSource > 0.5) {
+    vec4 vol = texture2D(uFogScatter, vUv);
+    float fog = clamp(1.0 - vol.a, 0.0, uFogMax);
+    c = c * (1.0 - fog) + vol.rgb;
+  }
   // 增益 1.0（自动曝光关着 = 纯白 1×1）时下面三行精确等于旧版
   float invGain = 1.0 / max(texture2D(uExposureTex, vec2(0.5)).r, 1e-4);
   float threshold = uThreshold * invGain;
@@ -73,6 +83,13 @@ void main() {
   float soft = clamp(br - threshold + knee, 0.0, 2.0 * knee);
   soft = soft * soft / (4.0 * knee + 1e-4);
   float contrib = max(soft, br - threshold) / max(br, 1e-4);
+  // 极克制的宽尾镜头漫反射辉光（Veiling Glare）：仅高于 0.78× 阈值的强光/太阳带入微量柔散射，
+  // 暗部、常规中灰与薄雾天际线保持零污染，不发奶白。
+  if (uVeiling > 0.0) {
+    float veilStart = threshold * 0.78;
+    float veiling = max(br - veilStart, 0.0) / max(br, 1e-4) * uVeiling;
+    contrib = max(contrib, veiling);
+  }
   // 太阳拖影开时借 alpha 带一张低分辨率天空遮挡图。这一趟本来就在读 HDR，
   // 顺手多读一次深度，可以让后面的径向模糊每步从“亮部+全分辨率深度”
   // 两次随机访存变成只读这一张图。关拖影时统一写 1，动态分支不读深度。
@@ -137,6 +154,7 @@ uniform sampler2D uSource;   // 更小一级
 uniform sampler2D uPrevious; // 同级已有内容
 uniform vec2 uTexel;
 uniform float uRadius;
+uniform float uUpGain;
 varying vec2 vUv;
 void main() {
   vec2 o = uTexel * uRadius;
@@ -149,7 +167,7 @@ void main() {
   s += texture2D(uSource, vUv + vec2(-o.x, -o.y)).rgb * 1.0;
   s += texture2D(uSource, vUv + vec2( 0.0, -o.y)).rgb * 2.0;
   s += texture2D(uSource, vUv + vec2( o.x, -o.y)).rgb * 1.0;
-  gl_FragColor = vec4(texture2D(uPrevious, vUv).rgb + s / 16.0, 1.0);
+  gl_FragColor = vec4(texture2D(uPrevious, vUv).rgb + (s / 16.0) * uUpGain, 1.0);
 }
 `;
 
@@ -188,10 +206,18 @@ export class BloomPass {
   constructor(pipeline) {
     this.name = "bloom";
     this.pipeline = pipeline;
+    this.dummyFogPixel = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
+    this.dummyFogPixel.colorSpace = THREE.NoColorSpace;
+    this.dummyFogPixel.minFilter = THREE.NearestFilter;
+    this.dummyFogPixel.magFilter = THREE.NearestFilter;
+    this.dummyFogPixel.generateMipmaps = false;
+    this.dummyFogPixel.needsUpdate = true;
     this.uniformsBright = {
       uSource: { value: null }, uNormalDepth: { value: null },
       uExposureTex: { value: null },
+      uFogScatter: { value: this.dummyFogPixel }, uFogSource: { value: 0 }, uFogMax: { value: 0.94 },
       uThreshold: { value: 1.18 }, uKnee: { value: 0.55 }, uClamp: { value: 40 },
+      uVeiling: { value: BLOOM.veilingScatter ?? 0 },
       uPackSky: { value: 0 },
       uFlareClampSource: { value: Array.from({length:FLARE_GLARE.slots},()=>new THREE.Vector4()) },
       uFlareClampProjScale: { value: new THREE.Vector2(1,1) },
@@ -204,11 +230,12 @@ export class BloomPass {
       uKaris: { value: 0 },
     };
     this.matDown = MakeFullscreenMaterial(FRAG_DOWNSAMPLE, this.uniformsDown);
-    /** Karis 平均（出厂关，见 FRAG_DOWNSAMPLE 抬头）。画质面板可热切。 */
+    /** Karis 平均（出厂按 BLOOM.karis 开启，见 Data_Tuning_Camera.BLOOM）。画质面板可热切。 */
     this.karis = !!BLOOM.karis;
     this.uniformsUp = {
       uSource: { value: null }, uPrevious: { value: null },
       uTexel: { value: new THREE.Vector2() }, uRadius: { value: 1.0 },
+      uUpGain: { value: 1.0 },
     };
     this.matUp = MakeFullscreenMaterial(FRAG_UPSAMPLE, this.uniformsUp);
     this.bright = null;
@@ -277,6 +304,12 @@ export class BloomPass {
     this.uniformsBright.uNormalDepth.value = ctx.normalDepthTexture;
     // 阈值跟随曝光：自动曝光关着时这张是纯白 1×1，除出来精确等于旧版
     this.uniformsBright.uExposureTex.value = this.pipeline.ExposureTexture;
+    const compU = this.pipeline.compositePass?.uniforms;
+    const fogReady = !!(BLOOM.fogAware && compU && compU.uFogSource.value > 0.5 && compU.uFogScatter.value);
+    this.uniformsBright.uFogSource.value = fogReady ? 1 : 0;
+    this.uniformsBright.uFogScatter.value = fogReady ? compU.uFogScatter.value : this.dummyFogPixel;
+    this.uniformsBright.uFogMax.value = ctx.options.fog?.max ?? 0.94;
+    this.uniformsBright.uVeiling.value = ctx.preset.bloomLevels >= 6 ? (BLOOM.veilingScatter ?? 0) : 0;
     this.uniformsBright.uPackSky.value = ctx.godActive ? 1 : 0;
     this.uniformsBright.uThreshold.value = ctx.options.bloomThreshold ?? 1.18;
     ctx.blitter.Blit(this.matBright, this.bright);
@@ -293,7 +326,8 @@ export class BloomPass {
       source = dst;
     }
     this.uniformsDown.uKaris.value = 0;
-    // 从最小一级往回叠：每一级 = 本级降采样结果 + 上一级(更小)的 tent 放大
+    // 从最小一级往回叠：深层金字塔略提宽尾辉光权重（wideTailGain），近层保持 1.0 不糊核心。
+    const tailGain = levels >= 6 ? (BLOOM.wideTailGain ?? 1.0) : 1.0;
     let carried = this.mips[(levels - 1) * 2];
     for (let i = levels - 2; i >= 0; i -= 1) {
       const same = this.mips[i * 2];
@@ -301,6 +335,8 @@ export class BloomPass {
       this.uniformsUp.uSource.value = carried.texture;
       this.uniformsUp.uPrevious.value = same.texture;
       this.uniformsUp.uTexel.value.set(1 / dst.width, 1 / dst.height);
+      const depthT = levels > 2 ? i / (levels - 2) : 0;
+      this.uniformsUp.uUpGain.value = 1 + (tailGain - 1) * depthT;
       ctx.blitter.Blit(this.matUp, dst);
       carried = dst;
     }
@@ -310,6 +346,7 @@ export class BloomPass {
     if (this.bright) this.bright.dispose();
     for (const rt of this.mips) rt.dispose();
     this.mips = [];
+    this.dummyFogPixel.dispose();
     this.matBright.dispose();
     this.matDown.dispose();
     this.matUp.dispose();

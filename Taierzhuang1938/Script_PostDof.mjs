@@ -130,18 +130,27 @@ void main() {
   // 双线性放大回输出后就是前景轮廓外一圈芝麻点，还逐帧闪。
   // 本靶上的采集半径最多 maxCocPx × ¼ ≈ 7 像素，48 个点间距 < 2 像素、源又是
   // 双线性取样，固定盘看不出条纹或「同一朵花」。
+  vec2 lensAxis = (vUv - 0.5) * vec2(max(uTexel.y / max(uTexel.x, 1e-6), 0.5), 1.0);
+  const float BLADES = ${(DOF.apertureBlades ?? 7).toFixed(1)};
+  const float BLADE_SECTOR = 6.2831853 / BLADES;
+  const float BLADE_FLAT = ${(1 - (DOF.apertureCurvature ?? 0.42)).toFixed(4)};
+  const float CATEYE = ${(DOF.catEyeVignette ?? 0.34).toFixed(4)};
   for (int i = 0; i < ${samples}; i++) {
     float fi = float(i);
     float rf = sqrt((fi + 0.5) / float(${samples}));
     float angle = fi * 2.39996323;
-    vec2 dir = vec2(cos(angle), sin(angle)) * rf;
+    // 7 片复古电影光圈叶片整形 + 镜筒边缘猫眼渐晕（中心完整对称，四角自然呈椭圆猫眼散景）
+    float sector = mod(angle + BLADE_SECTOR * 0.5, BLADE_SECTOR) - BLADE_SECTOR * 0.5;
+    float polyScale = cos(BLADE_SECTOR * 0.5) / max(cos(sector), 0.35);
+    vec2 dir = vec2(cos(angle), sin(angle)) * (rf * mix(1.0, polyScale, BLADE_FLAT));
+    float catEyeMask = 1.0 - smoothstep(0.78, 1.15, length(dir + lensAxis * (CATEYE * 1.45)));
 
     // 远场：只有 CoC 够大、能覆盖到中心的**远景**样本才算数（scatter-as-gather）
     if (farRadius > 0.5) {
       vec2 offset = dir * farRadius;
       vec4 s = texture2D(uSource, vUv + offset * uTexel);
       float cocS = max(s.a, 0.0) * uCocScale;
-      float w = clamp(cocS - length(offset) + 1.0, 0.0, 1.0);
+      float w = clamp(cocS - length(offset) + 1.0, 0.0, 1.0) * (0.25 + 0.75 * catEyeMask);
       farSum += s.rgb * w;
       farWeight += w;
     }

@@ -237,20 +237,22 @@ export const GRADE_DEFAULTS = Object.freeze({
 });
 
 /**
- * 泛光的物理化口径。
+ * 泛光的物理化口径（COD14 / MW2019 宽尾辉光 + 雾后光学泛光）。
  *
- * threshold/knee/clamp 仍是 HDR 域的数，但运行时**除以自动曝光增益**：
- * gain = 1（自动曝光关着，绑纯白 1×1）时与今天逐比特相同；自动曝光把暗处
- * 提亮 2 倍时阈值同步降到 0.59，于是「显示上一样亮的东西泛光一样多」——
- * 这就是物理化的全部意思，不需要改任何一张时段预设。
- *
- *   karis   第一级降采样用 Karis 平均（1/(1+luma) 加权）压萤火虫。
- *           **出厂关**：它会改变每一张画面（这正是它的用途），
- *           而本轮的验收要求「自动曝光关掉时逐比特等于改动前」。
- *           想开就在画质面板里翻，或把这一位改 true。
- *   exposureTracking  上面那条阈值跟随。恒开（gain=1 时是恒等式）。
+ * threshold/knee/clamp 仍是 HDR 域的数，运行时除以自动曝光增益；
+ * 2026-11-20 升级：
+ *   · karis 默认开启：第一级降采样用 Karis 平均（1/(1+luma)）压制金属/水面/高光萤火虫；
+ *   · fogAware：亮部提取前先混入体积雾散射，合成时「先雾再泛光」，让强光与亮空自然向前景边缘溢光（Light Wrap）；
+ *   · veilingScatter / wideTailGain：在深层金字塔叠加极克制的宽尾镜头漫反射辉光（Veiling Glare），
+ *     不抬暗部、不糊中灰，仅让强光源与亮空带出柔和空气感。
  */
-export const BLOOM = { karis: false, exposureTracking: true };
+export const BLOOM = {
+  karis: true,
+  exposureTracking: true,
+  fogAware: true,
+  veilingScatter: 0.008,
+  wideTailGain: 1.0,
+};
 
 /**
  * 镜头光晕（Chapman 2013,《Pseudo Lens Flare》）+ 镜头脏污。
@@ -325,8 +327,55 @@ export const LENS_FLARE = {
   dirt: { strength: 0.45, thresholdLow: 0.55, thresholdHigh: 1.60, size: 256, seed: 20260907 },
 };
 
-/** 输出编码。dither = 三角分布抖动的幅度（1/255 的倍数）；0 = 关（出厂）。 */
-export const OUTPUT = { dither: 0.0 };
+/**
+ * 局部色调映射（Local Tone Mapping，对标 COD MW2019 / TLOU2）与暗视觉 Purkinje 偏移。
+ * 复用 ExposurePass 的 160×90 对数亮度图经可分离宽模糊产出 80×45 局部适应亮度：
+ *   · 均匀平场下 localLog === globalLog → 精确恒等 1.0（不干扰中灰曝光标定）；
+ *   · 室内/掩蔽部看室外高反差画面时，同步轻抬局部暗部、轻压局部过曝，兼顾两头细节；
+ *   · Purkinje 仅作用于极暗线性区（< 0.032），夜战暗影呈真实视杆细胞冷银蓝微偏，白天零影响。
+ */
+export const LOCAL_TONEMAP = {
+  enabled: true,
+  shadowLift: 0.24,
+  highlightCompress: 0.20,
+  maxLiftEv: 0.55,
+  maxCompressEv: 0.48,
+  purkinje: 0.22,
+  nightPurkinje: 0.36,
+};
+
+/**
+ * 电影印片调色风格（烘焙进 64³ 3D LUT，运行时零额外像素开销）。
+ *   standard   原版基准分级（逐比特兼容旧预设与曝光校验）
+ *   cod14      COD:WWII / 1938 战地胶片（青灰暗部、暖土黄中亮、压抑荧光绿、质感克制）
+ *   bleach     《拯救大兵瑞恩》漂白旁路（高微对比、冷橄榄与钢灰低饱和纪录片观感）
+ *   kodak2383  Kodak 2383 经典电影印片（深青影、暖琥珀高光、饱满银盐密度）
+ */
+export const FILM_LOOK_MODES = ["standard", "cod14", "bleach", "kodak2383"];
+export const FILM_LOOK = { default: "cod14" };
+
+/**
+ * 镜头光学质感与战争动态扰动（零额外全屏渲染靶，合入 CompositePass）：
+ *   spectralCa       5 谱段径向光谱色散（消除单次 R/B 偏移的硬红青边）
+ *   halation         35mm 负片红橙底基光渗强度（仅在强逆光/火光/亮窗边缘渗入暗侧）
+ *   halationThreshold 泛光触发光渗的亮度门槛
+ *   shockwaveGain    爆炸冲击波屏幕折射环幅度倍率（由 Combat.BlastFeedback 自动触发）
+ *   heatHaze         燃烧/强火源上方的热浪空气折射幅度
+ *   blastDustDecayS  近爆扬土附着镜头玻璃的淡出时间常数（秒）
+ *   blastDustBoost   近爆瞬态镜头灰尘对脏污层的额外增益
+ */
+export const FILM_OPTICS = {
+  spectralCa: true,
+  halation: 0.14,
+  halationThreshold: 0.50,
+  shockwaveGain: 1.0,
+  heatHaze: 0.65,
+  blastDustDecayS: 6.5,
+  blastDustBoost: 0.85,
+};
+
+/** 输出编码。dither = 空间蓝噪声/IGN 三角分布抖动幅度（1/255 的倍数）；0.75 彻底消除 8-bit 色带且静止帧零抖动。 */
+export const OUTPUT = { dither: 0.75 };
 
 /**
  * 全屏胶片颗粒（COD 系 35mm 电影感口径，在 Script_PostFxaa 最终送屏、CAS 锐化之后施加）。
@@ -357,5 +406,5 @@ export function FilmGrainStrengthFor(profile) {
 
 export default {
   AUTO_EXPOSURE, SKY_EXPOSURE, SkyExposureFor, TONEMAP, TONEMAP_MODES, LUT, GRADE_DEFAULTS, BLOOM,
-  LENS_FLARE, OUTPUT, FILM_GRAIN,
+  LENS_FLARE, LOCAL_TONEMAP, FILM_LOOK, FILM_LOOK_MODES, FILM_OPTICS, OUTPUT, FILM_GRAIN,
 };

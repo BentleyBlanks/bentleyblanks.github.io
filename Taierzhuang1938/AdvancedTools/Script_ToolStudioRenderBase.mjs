@@ -23,7 +23,7 @@ import { FirstPersonReflectionProbe } from "../Script_FirstPersonReflectionProbe
 import { StepRifleSlings } from "../Script_RifleSlingCloth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "../Script_Gi.mjs";
 import { PostPipeline } from "../Script_Post.mjs";
-import { FilmGrainStrengthFor } from "../Data_Tuning_Camera.mjs";
+import { FilmGrainStrengthFor, FILM_LOOK, OUTPUT } from "../Data_Tuning_Camera.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "../Script_PostGtao.mjs";
 import { SSIL } from "../Data_Tuning_Gtao.mjs";
 import { MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs } from "../Script_MaterialShading.mjs";
@@ -256,11 +256,14 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     lights.SetNearShadowBakeAllowed(true);
     post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false && graphics.shadows !== false;
     post.SetAutoExposure(graphics.autoExposure !== false);
+    post.SetLocalTonemap(graphics.localTonemap !== false);
     post.SetLutEnabled(graphics.lut !== false);
+    post.SetFilmLook(graphics.filmLook || FILM_LOOK.default);
+    post.SetFilmOptics(graphics.filmOptics !== false);
     post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
     post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
     post.bloomPass.karis = graphics.bloomKaris === true;
-    post.uniformsComposite.uDither.value = graphics.dither ?? 0;
+    post.uniformsComposite.uDither.value = graphics.dither ?? OUTPUT.dither;
     post.SetTonemap(graphics.tonemap || "aces");
     giUniforms.normalBias.value = graphics.giNormalBias;
     giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;

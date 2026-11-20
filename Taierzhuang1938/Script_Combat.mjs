@@ -738,6 +738,17 @@ export class CombatSystem {
       // at：爆点（火光残影要把火球投到屏幕上，Player._FlashOnScreen）。
       shaken.BlastReaction?.(exposure, { ...bearing, at: position });
       earExposure = { left: exposure.tinnitusLeft, right: exposure.tinnitusRight };
+      // 镜头光学动态：爆炸冲击波空气折射环 + 近爆扬尘附着（距离与墙体遮挡衰减）。
+      if (this.host.post) {
+        const shockRange = Math.max(18, radius * 4.5);
+        const shockFalloff = Math.max(0, 1 - eyeDist / shockRange);
+        const shockStrength = shockFalloff * (blastOccluded ? 0.35 : 1.0) * Math.min(1.5, Math.max(0.65, radius / 7));
+        if (shockStrength > 0.04) this.host.post.TriggerShockwave?.(from, radius, shockStrength);
+        const dustRange = Math.max(12, radius * 2.6);
+        const dustFalloff = Math.max(0, 1 - eyeDist / dustRange);
+        const dustStrength = dustFalloff * dustFalloff * (blastOccluded ? 0.25 : 0.95);
+        if (dustStrength > 0.04) this.host.post.AddBlastDust?.(dustStrength);
+      }
     }
     // 距离分档、落屑与按威力/距离/遮挡分级的耳鸣，
     // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。

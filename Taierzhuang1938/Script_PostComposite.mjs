@@ -51,8 +51,8 @@ import { AERIAL_PERSPECTIVE_GLSL, BindAtmosphereUniforms } from "./Script_Atmosp
 import { VOLUMETRIC_SAMPLE_GLSL, BindVolumetricUniforms } from "./Script_PostVolumetrics.mjs";
 // 2026-09 相机曝光轮（子系统 B6a）：tonemap 曲线、3D LUT、相机数值表。
 import { TONEMAP_GLSL } from "./Script_PostExposure.mjs";
-import { LUT_GLSL, GradeLutCache, GradeFromUniforms } from "./Script_PostGrade.mjs";
-import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS } from "./Data_Tuning_Camera.mjs";
+import { LUT_GLSL, FILM_LOOK_GLSL, FilmLookIndex, GradeLutCache, GradeFromUniforms } from "./Script_PostGrade.mjs";
+import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS, LOCAL_TONEMAP, FILM_OPTICS } from "./Data_Tuning_Camera.mjs";
 
 // ## 2026-09 相机曝光轮：四段换了实现，接口与默认值一个都没动
 //   · SEGMENT exposure —— `uExposureTex` 的**生产者接上了**（Script_PostExposure
@@ -125,21 +125,35 @@ uniform float uExposure;
 // 自动曝光的接线点：1×1 靶，出厂是纯白（乘出来精确等于 1.0）。
 // 生产者 = Script_PostExposure 的直方图自动曝光；关着时仍绑那张纯白。
 uniform sampler2D uExposureTex;
+// 局部色调映射（Local Tone Mapping，80×45 宽模糊对数亮度）+ 暗视觉 Purkinje 偏移。
+uniform sampler2D uLocalLum;
+uniform vec4 uLocalTonemap;     // x = shadowLift, y = highlightCompress, z = maxLiftEv, w = maxCompressEv
+uniform float uPurkinje;        // 极暗线性区视杆细胞冷银蓝偏移强度
 // 色调映射曲线：0 = ACES Hill（默认），1 = AgX。
 uniform float uTonemap;
-// 镜头进光（**tonemap 之前**）：光晕靶 + 镜头脏污图。
+// 镜头进光（**tonemap 之前**）：光晕靶 + 镜头脏污图 + 近爆瞬态镜头灰尘 + 35mm 胶片光渗。
 uniform sampler2D uFlare;
 uniform float uFlareStrength;
 uniform sampler2D uDirt;
 uniform float uDirtStrength;
 uniform float uDirtLow;
 uniform float uDirtHigh;
+uniform float uBlastDust;       // 近爆扬土动态镜头附着（0–1，随时间淡出）
+uniform float uHalation;        // 35mm 胶片暖红橙底基光渗强度
+uniform float uHalationThreshold;
+uniform float uSpectralCa;      // 1 = 5 谱段径向光谱色散；0 = 旧版单次 R/B 偏移
+// 爆炸冲击波 & 燃烧热浪空气折射（最多各 4 源，w = 0 跳过）
+uniform vec4 uShockwaves[4];    // xy = 屏内 uv，z = 环半径，w = 扭曲强度
+uniform vec4 uHeatSources[4];   // xy = 屏内 uv，z = 影响半径，w = 热浪强度
+uniform float uRefractionTime;
+uniform float uAspect;
 
 // --- SEGMENT color-grade ----------------------------------------------------
 uniform float uSaturation;
 uniform float uContrast;
 // 0 = 围绕 sRGB 0.5 的线性拉伸（出厂，其余预设逐比特不变）；1 = 幂形 S 曲线（两端渐近，不硬裁）
 uniform float uContrastCurve;
+uniform float uFilmLook;        // 0 = standard, 1 = cod14, 2 = bleach, 3 = kodak2383
 uniform vec3 uLift;
 uniform vec3 uGain;
 // 分离调色（split toning）：**这是「整体偏单色土黄」的最后一道闸门**。
@@ -195,8 +209,9 @@ vec3 SrgbToLinear(vec3 color) {
              step(0.04045, color));
 }
 
-// 3D LUT 查表（**要排在 LinearToSrgb / SrgbToLinear 之后**：索引域是 sRGB）
+// 3D LUT 查表 + 电影印片风格（**要排在 LinearToSrgb / SrgbToLinear 之后**：索引域是 sRGB）
 ${LUT_GLSL}
+${FILM_LOOK_GLSL}
 
 vec3 ViewPos(vec2 uv, float depth) {
   vec2 ndc = uv * 2.0 - 1.0;
@@ -222,11 +237,64 @@ float SideDaze(vec2 uv) {
   float s = uSideDaze.x > 0.0 ? 1.0 - uv.x : uv.x;
   return uSideDaze.y * smoothstep(.38, 1.0, s);
 }
+// 爆炸冲击波环形折射 + 火源上方热浪空气扰动（零额外全屏靶，无源时整段零开销跳过）
+vec2 DistortSceneUv(vec2 uv) {
+  vec2 delta = vec2(0.0);
+  float asp = max(uAspect, 0.5);
+  for (int i = 0; i < 4; i++) {
+    vec4 sw = uShockwaves[i];
+    if (sw.w > 0.0001) {
+      vec2 rel = (uv - sw.xy) * vec2(asp, 1.0);
+      float dist = length(rel);
+      float band = abs(dist - sw.z);
+      float ringWidth = 0.055 + sw.z * 0.14;
+      if (band < ringWidth && dist > 1e-4) {
+        float env = cos((band / ringWidth) * 1.5707963);
+        env = env * env;
+        float wave = sin((dist - sw.z) / max(ringWidth, 1e-3) * 3.1415926);
+        vec2 dir = rel / dist;
+        delta += vec2(dir.x / asp, dir.y) * (wave * env * sw.w);
+      }
+    }
+    vec4 hs = uHeatSources[i];
+    if (hs.w > 0.0001) {
+      // 热浪主要在火源正上方上升扩散
+      vec2 rel = (uv - hs.xy) * vec2(asp, 1.0);
+      float rise = smoothstep(-hs.z * 0.25, hs.z * 0.4, rel.y) * (1.0 - smoothstep(hs.z * 0.4, hs.z * 2.2, rel.y));
+      float horiz = 1.0 - smoothstep(0.0, hs.z * (0.75 + max(rel.y, 0.0) * 1.1), abs(rel.x));
+      float mask = rise * horiz;
+      if (mask > 0.001) {
+        float phase = uv.y * 55.0 - uRefractionTime * 9.5 + uv.x * 19.0;
+        vec2 shimmer = vec2(sin(phase) + 0.5 * cos(phase * 1.7 + 1.3), cos(phase * 1.3) * 0.45);
+        delta += shimmer * (mask * hs.w);
+      }
+    }
+  }
+  return clamp(uv + delta, vec2(0.001), vec2(0.999));
+}
+
+vec3 SampleSpectralCa(vec2 uv, vec2 centered, float ca) {
+  vec3 c0 = texture2D(uHdr, uv).rgb;
+  if (ca <= 0.0001) return c0;
+  if (uSpectralCa < 0.5) {
+    return vec3(texture2D(uHdr, clamp(uv + centered * ca, 0.0, 1.0)).r, c0.g,
+      texture2D(uHdr, clamp(uv - centered * ca, 0.0, 1.0)).b);
+  }
+  // 5 谱段径向连续色散（权重逐通道精确归一到 (1, 1, 1)，杜绝单次偏移的红青硬边）
+  vec2 stepUv = centered * ca;
+  vec3 sR = texture2D(uHdr, clamp(uv + stepUv, 0.0, 1.0)).rgb;
+  vec3 sO = texture2D(uHdr, clamp(uv + stepUv * 0.5, 0.0, 1.0)).rgb;
+  vec3 sC = texture2D(uHdr, clamp(uv - stepUv * 0.5, 0.0, 1.0)).rgb;
+  vec3 sB = texture2D(uHdr, clamp(uv - stepUv, 0.0, 1.0)).rgb;
+  float r = sR.r * 0.55 + sO.r * 0.35 + c0.r * 0.10;
+  float g = sO.g * 0.22 + c0.g * 0.56 + sC.g * 0.22;
+  float b = c0.b * 0.10 + sC.b * 0.35 + sB.b * 0.55;
+  return vec3(r, g, b);
+}
+
 vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   float ca = uAberration * r2;
-  vec3 clear=texture2D(uHdr,uv).rgb;
-  if(ca>0.0001)clear=vec3(texture2D(uHdr,uv+centered*ca).r,clear.g,
-    texture2D(uHdr,uv-centered*ca).b);
+  vec3 clear = SampleSpectralCa(uv, centered, ca);
   // Concussion is an optical response, independent of velocity/TAA history.
   // A compact Gaussian footprint keeps silhouettes continuous; the centre
   // resolves earlier than the periphery. No extra pass, target or sampler.
@@ -415,27 +483,65 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
 //      两条曲线的 GLSL 都在 Script_PostExposure.TONEMAP_GLSL，JS 里还有一份
 //      镜像用于求解中灰补偿与验收。
 // ===========================================================================
-vec3 LensLight(vec3 color) {
+vec3 LensLight(vec3 color, vec2 uv, float r2) {
   // 光晕：亮部图的鬼影/光环/太阳星芒（Script_PostLensFlare），关着时绑 1×1 全黑
   if (uFlareStrength > 0.0) {
-    color += texture2D(uFlare, vUv).rgb * uFlareStrength;
+    color += texture2D(uFlare, uv).rgb * uFlareStrength;
   }
-  // 镜头脏污：**只乘在泛光的高亮处**。main() 已经加过 bloom×uBloomStrength，
-  // 所以这里补的是等价的那一项 —— bloom·strength·dirt·门槛，
-  // 与 docs §5 的 bloom *= (1 + dirt·strength·smoothstep(...)) 完全等价。
-  // 那道 smoothstep 是「有强光才脏」与「整屏永远糊一层灰」的分界线。
-  if (uDirtStrength > 0.0) {
-    vec3 bloomTexel = texture2D(uBloom, vUv).rgb * uBloomStrength;
-    float dirt = texture2D(uDirt, vUv).r;
-    color += bloomTexel * dirt * uDirtStrength
-      * smoothstep(uDirtLow, uDirtHigh, Luma(bloomTexel));
+  // 镜头脏污 + 近爆动态扬尘附着：静态脏污只吃泛光高亮，近爆灰尘额外在屏幕边缘被亮空/火光打亮并随时间淡出。
+  float dirtTotal = uDirtStrength + uBlastDust * 0.55;
+  if (dirtTotal > 0.0) {
+    vec3 bloomTexel = texture2D(uBloom, uv).rgb * uBloomStrength;
+    float dirt = texture2D(uDirt, uv).r;
+    float lowGate = max(0.10, uDirtLow * (1.0 - uBlastDust * 0.55));
+    color += bloomTexel * dirt * dirtTotal
+      * smoothstep(lowGate, uDirtHigh, Luma(bloomTexel));
+    if (uBlastDust > 0.001) {
+      float edgeDust = smoothstep(0.08, 0.45, r2) * dirt * uBlastDust;
+      // 仅在画面有光处显出微尘（纯黑不发光）
+      float sceneLight = smoothstep(0.04, 0.65, Luma(color));
+      color = mix(color, color * 0.88 + vec3(0.14, 0.12, 0.095) * sceneLight, edgeDust * 0.28);
+    }
+  }
+  // 35mm 胶片红橙底基光渗（Halation）：强逆光/火光/亮窗边缘渗入暗侧，去数码硬边。
+  if (uHalation > 0.001 && uBloomStrength > 0.001) {
+    vec3 bloomHalo = texture2D(uBloom, uv).rgb * uBloomStrength;
+    float haloExcess = max(Luma(bloomHalo) - uHalationThreshold, 0.0);
+    if (haloExcess > 0.0) {
+      float darkBorder = 1.0 - smoothstep(0.45, 1.65, Luma(color));
+      color += vec3(1.0, 0.25, 0.06) * (haloExcess * uHalation * (0.28 + 0.72 * darkBorder));
+    }
   }
   return color;
 }
 
-vec3 ApplyExposureTonemap(vec3 color) {
-  color = LensLight(color);
-  color *= uExposure * texture2D(uExposureTex, vec2(0.5)).r;
+vec3 ApplyExposureTonemap(vec3 color, vec2 uv, float r2) {
+  color = LensLight(color, uv, r2);
+  vec4 expState = texture2D(uExposureTex, vec2(0.5));
+  float globalGain = uExposure * expState.r;
+  color *= globalGain;
+  // 局部色调映射（Local Tone Mapping，对标 COD MW2019 / TLOU2）：
+  // 均匀平场下 localLog === globalLog → 精确恒等 1.0；室内看室外等高反差下兼顾暗部与亮窗细节。
+  if (uLocalTonemap.x > 0.0 || uLocalTonemap.y > 0.0) {
+    vec2 localSample = texture2D(uLocalLum, uv).rg;
+    float localLog = localSample.x;
+    float relLog = clamp(localLog - localSample.y, -3.0, 3.0);
+    float pixelLog = log2(max(Luma(color), 1e-4)) - log2(max(globalGain, 1e-4));
+    float edgeGuard = exp(-0.18 * (pixelLog - localLog) * (pixelLog - localLog));
+    float evShift = relLog < 0.0
+      ? min(-relLog * uLocalTonemap.x, uLocalTonemap.z)
+      : -min(relLog * uLocalTonemap.y, uLocalTonemap.w);
+    float darkGuard = smoothstep(0.002, 0.025, Luma(color));
+    color *= exp2(evShift * (0.45 + 0.55 * edgeGuard) * darkGuard);
+  }
+  // 暗视觉 Purkinje 偏移：仅极暗线性区（< 0.032）偏向视杆细胞冷银蓝，白天与中灰（0.18）精确为 0。
+  if (uPurkinje > 0.001) {
+    float yExp = Luma(color);
+    float scotopicMask = (1.0 - smoothstep(0.0015, 0.032, yExp)) * smoothstep(0.0002, 0.004, yExp);
+    float rodY = dot(color, vec3(0.06, 0.62, 0.32));
+    vec3 scotopicCol = vec3(rodY) * vec3(0.84, 0.95, 1.16);
+    color = mix(color, scotopicCol, scotopicMask * uPurkinje);
+  }
   return ApplyTonemap(color, uTonemap);
 }
 
@@ -483,6 +589,7 @@ vec3 GradeMath(vec3 color) {
   } else {
     perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
   }
+  perceptual = ApplyFilmLook(perceptual, uFilmLook);
   return SrgbToLinear(perceptual);
 }
 
@@ -585,17 +692,17 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
 vec4 EncodeOutput(vec3 color) {
   vec3 encoded = LinearToSrgb(color);
   if (uDither > 0.0) {
-    // 两个独立均匀噪声相减 = 三角分布（TPDF）：比单个均匀噪声更不容易
-    // 在梯度上留下可见的"纹路"。种子随帧走，静止画面上也不会钉死一张噪点图。
-    float n1 = Hash12(gl_FragCoord.xy + uFrame * 17.31);
-    float n2 = Hash12(gl_FragCoord.xy + uFrame * 17.31 + 91.7);
-    encoded += (n1 - n2) * uDither / 255.0;
+    // 2026-11-20：空间蓝噪声/交错梯度三角抖动（COD:AW Jimenez IGN-TPDF，纯空间相位）：
+    // 彻底消除 8-bit 天空/雾/暗角色带（关掉胶片颗粒也零色带），且静止帧逐像素恒定零抖动。
+    float ignA = Ign(gl_FragCoord.xy);
+    float ignB = Ign(gl_FragCoord.xy + vec2(5.588238, 13.719471));
+    encoded = clamp(encoded + (ignA - ignB) * (uDither / 255.0), 0.0, 1.0);
   }
   return vec4(encoded, 1.0);
 }
 
 void main() {
-  vec2 uv = vUv;
+  vec2 uv = DistortSceneUv(vUv);
   vec2 centered = uv - 0.5;
   float r2 = dot(centered, centered);
   vec4 nd = texture2D(uNormalDepth, uv);
@@ -610,13 +717,15 @@ void main() {
     color = mix(color, ghost, uHitGhostMix * uHitDisorientation);
   }
   color = DepthOfField(color, uv, nd);
+  // 2026-11-20 物理光学顺序：先完成场景雾/体积散射，再叠加泛光与太阳拖影，
+  // 避免远处强光泛光圈被雾按深度轮廓硬切，并让亮雾/亮空自然向前景边缘溢光（Light Wrap）。
+  color = ApplyFog(color, uv, nd);
   color += texture2D(uBloom, uv).rgb * uBloomStrength;
   color += texture2D(uGod, uv).rgb * uGodStrength;
-  color = ApplyFog(color, uv, nd);
-  color = ApplyExposureTonemap(color);
+  color = ApplyExposureTonemap(color, uv, r2);
   float gradedLuma;
   color = ColorGrade(color, gradedLuma);
-  color = LensEffects(color, uv, r2, gradedLuma);
+  color = LensEffects(color, vUv, r2, gradedLuma);
   gl_FragColor = EncodeOutput(color);
 }
 `;
@@ -644,10 +753,13 @@ export class CompositePass {
       uHdr: { value: null }, uBloom: { value: null }, uGod: { value: null },
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
       uExposure: { value: 1.0 }, uExposureTex: { value: this.whitePixel },
+      uLocalLum: { value: this.whitePixel },
+      uLocalTonemap: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uPurkinje: { value: 0 },
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
       uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uChromaKeep: { value: 0 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
-      uContrastCurve: { value: 0 },
+      uContrastCurve: { value: 0 }, uFilmLook: { value: 0 },
       uLift: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.lift) },
       uGain: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.gain) },
       uMotionScale: { value: 0.6 }, uInvProjection: { value: new THREE.Matrix4() },
@@ -691,6 +803,14 @@ export class CompositePass {
       uDirt: { value: null }, uDirtStrength: { value: 0 },
       uDirtLow: { value: LENS_FLARE.dirt.thresholdLow },
       uDirtHigh: { value: LENS_FLARE.dirt.thresholdHigh },
+      uBlastDust: { value: 0 },
+      uHalation: { value: 0 },
+      uHalationThreshold: { value: FILM_OPTICS.halationThreshold },
+      uSpectralCa: { value: 0 },
+      uShockwaves: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
+      uHeatSources: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
+      uRefractionTime: { value: 0 },
+      uAspect: { value: 16 / 9 },
       uDither: { value: OUTPUT.dither },
     };
     // 大气透视的接线点。出厂绑中性占位（散射 0 / 透过率 1 / blend 0 = 恒等），
@@ -713,8 +833,40 @@ export class CompositePass {
     this.lutCache = new GradeLutCache(LUT_TUNING.size, LUT_TUNING.maxCache);
     this.lutAmount = LUT_TUNING.amount;
     this._lutTexture = null;
-    this._gradeSig = new Float64Array(16).fill(NaN);   // NaN 保证第一帧一定判「变了」
-    this._gradeNext = new Float64Array(16);
+    this._gradeSig = new Float64Array(17).fill(NaN);   // NaN 保证第一帧一定判「变了」
+    this._gradeNext = new Float64Array(17);
+    this.shockwaves = [];
+    this.blastDust = 0;
+    this.refractionTime = 0;
+    this._tmpProj = new THREE.Vector3();
+    this._tmpView = new THREE.Vector3();
+  }
+
+  /** 触发一圈从世界坐标向外扩散的爆炸冲击波空气折射环（最多 4 圈并发）。 */
+  TriggerShockwave(worldPos, radius = 8, intensity = 1) {
+    if (!worldPos) return;
+    const clamped = Math.max(0, Math.min(2, Number(intensity) || 0));
+    if (!(clamped > 0.01)) return;
+    const pos = worldPos.isVector3 ? worldPos.clone() : new THREE.Vector3(worldPos.x ?? 0, worldPos.y ?? 0, worldPos.z ?? 0);
+    if (this.shockwaves.length >= 4) this.shockwaves.shift();
+    this.shockwaves.push({
+      position: pos,
+      age: 0,
+      duration: 0.42 + Math.min(0.28, (Number(radius) || 8) * 0.015),
+      intensity: clamped,
+    });
+  }
+
+  /** 近爆瞬态镜头扬尘附着脉冲（随时间指数淡出）。 */
+  AddBlastDust(amount = 0.7) {
+    const add = Math.max(0, Math.min(1, Number(amount) || 0));
+    if (add > 0) this.blastDust = Math.min(1, Math.max(this.blastDust, add) + add * 0.25);
+  }
+
+  /** 复位动态冲击波与镜头灰尘（换关 / 重开时调）。 */
+  ResetDynamicOptics() {
+    this.shockwaves.length = 0;
+    this.blastDust = 0;
   }
 
   /** 外部 LUT（.cube 重采样后的条带纹理）；传 null 恢复内部烘焙。 */
@@ -742,6 +894,7 @@ export class CompositePass {
     next[13] = U.uSplitHighlight.value;
     next[14] = U.uContrast.value;
     next[15] = U.uContrastCurve.value;
+    next[16] = U.uFilmLook.value;
     const sig = this._gradeSig;
     for (let i = 0; i < next.length; i += 1) {
       if (sig[i] !== next[i]) { sig.set(next); return true; }
@@ -858,15 +1011,99 @@ export class CompositePass {
 
     // --- SEGMENT exposure / color-grade / encode 的本帧接线 -----------------
     // 曝光增益：自动曝光在跑就是它那张 1×1，没跑就是纯白（乘出来精确 1.0）。
+    const dt = Math.max(0, Math.min(0.1, options.dt ?? 0));
+    this.refractionTime += dt;
+    // 空间后处理区域（Post Volume）混合覆盖
+    const vol = options.postVolume ?? this.pipeline.postVolume ?? null;
+    if (vol) {
+      if (Number.isFinite(vol.exposureMul)) U.uExposure.value *= vol.exposureMul;
+      if (Number.isFinite(vol.bloomMul)) U.uBloomStrength.value *= vol.bloomMul;
+      if (Number.isFinite(vol.vignetteAdd)) U.uVignette.value = Math.max(0, U.uVignette.value + vol.vignetteAdd);
+      if (Number.isFinite(vol.satMul)) U.uSaturation.value *= vol.satMul;
+    }
     U.uExposureTex.value = this.pipeline.ExposureTexture;
+    // 局部色调映射与暗视觉 Purkinje 偏移
+    const expPass = this.pipeline.exposurePass;
+    const localOn = !!(this.pipeline.localTonemapEnabled && expPass?.localLumActive);
+    U.uLocalLum.value = localOn ? expPass.LocalLumTexture : this.whitePixel;
+    if (localOn) {
+      U.uLocalTonemap.value.set(
+        LOCAL_TONEMAP.shadowLift, LOCAL_TONEMAP.highlightCompress,
+        LOCAL_TONEMAP.maxLiftEv, LOCAL_TONEMAP.maxCompressEv,
+      );
+    } else {
+      U.uLocalTonemap.value.set(0, 0, 0, 0);
+    }
+    const isNight = options.skyPreset === "night" || options.skyPreset === "firstLevelNight";
+    U.uPurkinje.value = (this.pipeline.localTonemapEnabled && ctx.preset.localTonemap !== false)
+      ? (isNight ? LOCAL_TONEMAP.nightPurkinje : LOCAL_TONEMAP.purkinje) : 0;
+
     U.uTonemap.value = this.pipeline.tonemapMode === "agx" ? 1 : 0;
-    // 镜头进光。pass 关着时 Texture 是 1×1 全黑且强度为 0，两道保险。
+    U.uFilmLook.value = FilmLookIndex(this.pipeline.filmLookMode);
+
+    // 镜头进光 + 35mm 光渗 + 5 谱段色散 + 近爆动态灰尘 + 冲击波/热浪折射
+    const opticsOn = this.pipeline.filmOpticsEnabled !== false && ctx.preset.filmOptics !== false;
+    U.uSpectralCa.value = opticsOn && FILM_OPTICS.spectralCa ? 1 : 0;
+    U.uHalation.value = opticsOn ? FILM_OPTICS.halation * (vol?.halationMul ?? 1) : 0;
+    U.uHalationThreshold.value = FILM_OPTICS.halationThreshold;
+    // 折射相位由 ctx.frame 决定论驱动（与颗粒/TAA 同源），保证 StepFrames 复现时逐比特一致。
+    U.uRefractionTime.value = ctx.frame / 60;
+    U.uAspect.value = ctx.outputWidth / Math.max(1, ctx.outputHeight);
+
+    const reduced = !!this.reducedMotion?.matches;
+    if (dt > 0 && this.blastDust > 0) {
+      this.blastDust *= Math.exp(-dt / Math.max(0.5, FILM_OPTICS.blastDustDecayS));
+      if (this.blastDust < 0.005) this.blastDust = 0;
+    }
+    U.uBlastDust.value = opticsOn ? this.blastDust * FILM_OPTICS.blastDustBoost : 0;
+
+    // 爆炸冲击波环更新与投影
+    for (let i = 0; i < 4; i += 1) U.uShockwaves.value[i].set(0, 0, 0, 0);
+    if (opticsOn && !reduced && this.shockwaves.length > 0 && ctx.camera) {
+      let slot = 0;
+      for (let i = this.shockwaves.length - 1; i >= 0; i -= 1) {
+        const sw = this.shockwaves[i];
+        sw.age += dt;
+        if (sw.age >= sw.duration) { this.shockwaves.splice(i, 1); continue; }
+        if (slot >= 4) continue;
+        this._tmpView.copy(sw.position).applyMatrix4(ctx.view);
+        if (-this._tmpView.z <= 0.1) continue;
+        this._tmpProj.copy(sw.position).project(ctx.camera);
+        const sx = this._tmpProj.x * 0.5 + 0.5;
+        const sy = this._tmpProj.y * 0.5 + 0.5;
+        if (sx < -0.5 || sx > 1.5 || sy < -0.5 || sy > 1.5) continue;
+        const p = sw.age / sw.duration;
+        const distScale = Math.min(1.4, 14 / Math.max(3, -this._tmpView.z));
+        const ringR = (0.04 + p * 0.72) * Math.max(0.5, distScale);
+        const amp = (1 - p) * (1 - p) * 0.024 * sw.intensity * distScale * FILM_OPTICS.shockwaveGain;
+        U.uShockwaves.value[slot++].set(sx, sy, ringR, Math.min(0.042, amp));
+      }
+    }
+
+    // 火源上方热浪空气折射（复用 LensFlare 追踪的燃烧火源，零额外扫描）
     const flare = this.pipeline.lensFlarePass;
+    for (let i = 0; i < 4; i += 1) U.uHeatSources.value[i].set(0, 0, 0, 0);
+    if (opticsOn && !reduced && FILM_OPTICS.heatHaze > 0 && flare?.source?.fireSources && ctx.camera) {
+      let slot = 0;
+      for (const source of flare.source.fireSources.values()) {
+        if (slot >= 4) break;
+        if (!source || source.emitterVisible === false || !(source.currentIntensity > 0.6)) continue;
+        this._tmpView.copy(source.position).applyMatrix4(ctx.view);
+        const z = -this._tmpView.z;
+        if (z <= 0.4 || z > 42) continue;
+        this._tmpProj.copy(source.position).project(ctx.camera);
+        if (Math.max(Math.abs(this._tmpProj.x), Math.abs(this._tmpProj.y)) > 1.15) continue;
+        const screenR = Math.min(0.28, Math.max(0.03, (1.4 / z) * ctx.projScale.y * 0.5));
+        const amp = Math.min(0.0038, 0.0022 * FILM_OPTICS.heatHaze * Math.min(1.5, source.currentIntensity / 6) * Math.min(1, 16 / z));
+        U.uHeatSources.value[slot++].set(this._tmpProj.x * 0.5 + 0.5, this._tmpProj.y * 0.5 + 0.5, screenR, amp);
+      }
+    }
+
     U.uFlare.value = flare.Texture;
     U.uFlareStrength.value = flare.active ? flare.strength : 0;
     U.uDirtStrength.value = flare.active ? flare.dirtStrength : 0;
-    if (U.uDirtStrength.value > 0) U.uDirt.value = flare.DirtTexture;
-    // 3D LUT：参数变了才重烘（换时段），其余帧只是取同一张纹理。
+    if (U.uDirtStrength.value > 0 || U.uBlastDust.value > 0) U.uDirt.value = flare.DirtTexture;
+    // 3D LUT：参数变了才重烘（换时段或切换胶片风格），其余帧只是取同一张纹理。
     if (this.pipeline.lutEnabled) {
       if (this._GradeChanged(U) || !this._lutTexture) {
         this._lutTexture = this.lutCache.Get(GradeFromUniforms(U));

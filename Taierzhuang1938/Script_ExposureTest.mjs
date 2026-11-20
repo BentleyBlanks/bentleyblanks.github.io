@@ -143,6 +143,16 @@ async function ProbeSection(page) {
       U.uNearDofStrength.value = 0;
       U.uFogDensity.value = 0;
       U.uFogSource.value = 0;
+      U.uLocalTonemap.value.set(0, 0, 0, 0);
+      U.uPurkinje.value = 0;
+      U.uFilmLook.value = 0;
+      U.uHalation.value = 0;
+      U.uSpectralCa.value = 0;
+      U.uBlastDust.value = 0;
+      for (let i = 0; i < 4; i += 1) {
+        U.uShockwaves.value[i].set(0, 0, 0, 0);
+        U.uHeatSources.value[i].set(0, 0, 0, 0);
+      }
       return black;
     };
     /** 直接驱动曝光 pass：绕过帧图，用受控的 sceneColor 推 N 帧。 */

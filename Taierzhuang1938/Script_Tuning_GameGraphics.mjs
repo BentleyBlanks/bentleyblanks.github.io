@@ -2,7 +2,7 @@
 
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { CAMERA } from "./Data_Tuning_Main.mjs";
-import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
+import { BLOOM, FILM_GRAIN, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
 export function CreateGameGraphics({profile, preset, taaEnabled = !!preset.taa, gi = false, gore = true}) {
@@ -48,12 +48,18 @@ return {
   lensFlare: 1, lensDirt: 1,
   // 色调映射曲线："aces"（默认）/ "agx"
   tonemap: "aces",
+  // 局部色调映射（80×45 空间平滑对数亮度自适应）与暗视觉 Purkinje 偏移
+  localTonemap: preset.localTonemap !== false,
   // 3D LUT 分级（关掉退回等价的着色器算式，画面差 ≤ 1/255）
   lut: preset.lut !== false,
-  // 泛光第一级的 Karis 平均（压萤火虫）。出厂关：它会改变每一张画面。
-  bloomKaris: false,
-  // 输出抖动（1/255 的倍数）。出厂 0，同上。
-  dither: 0,
+  // 电影胶片调色风格："standard" / "cod14"（默认）/ "bleach" / "kodak2383"
+  filmLook: FILM_LOOK.default,
+  // 镜头光学与战场动态（5 谱段色散、35mm 光渗、爆炸冲击波折射、火源热浪、近爆扬尘）
+  filmOptics: preset.filmOptics !== false,
+  // 泛光第一级的 Karis 平均（压萤火虫）。出厂按 Data_Tuning_Camera.BLOOM.karis 开启。
+  bloomKaris: !!BLOOM.karis,
+  // 空间蓝噪声 / IGN 三角分布输出抖动（1/255 的倍数）。出厂 0.75，压掉 8-bit 暗部/天空色带且静止帧零抖动。
+  dither: OUTPUT.dither,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
   // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。

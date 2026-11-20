@@ -27,7 +27,7 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
-import { FILM_GRAIN } from "./Data_Tuning_Camera.mjs";
+import { BLOOM, FILM_GRAIN, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -528,7 +528,21 @@ export class GraphicsSettings {
       gfx.autoExposure = on;
       this.Apply();
     });
+    Switch(camera.box, "局部色调映射", gfx.localTonemap !== false, (on) => {
+      gfx.localTonemap = on;
+      this.Apply();
+    }, "在战壕暗处看亮外景时自动保住高光与暗部层次，夜间开启暗视觉冷偏移。");
     Switch(camera.box, "3D LUT 分级", gfx.lut !== false, (on) => { gfx.lut = on; this.Apply(); });
+    Choice(camera.box, "胶片调色风格", [
+      { value: "standard", label: "标准" },
+      { value: "cod14", label: "COD14 战地" },
+      { value: "bleach", label: "漂白旁路" },
+      { value: "kodak2383", label: "Kodak 2383" },
+    ], gfx.filmLook || FILM_LOOK.default, (v) => { gfx.filmLook = String(v); this.Apply(); });
+    Switch(camera.box, "镜头光学与扰动", gfx.filmOptics !== false, (on) => {
+      gfx.filmOptics = on;
+      this.Apply();
+    }, "5 谱段光谱色散、35mm 红橙光渗、爆炸冲击波折射、火源热浪与近爆镜面扬尘。");
     Switch(camera.box, "泛光 Karis 平均", gfx.bloomKaris === true, (on) => {
       gfx.bloomKaris = on;
       this.Apply();
@@ -549,10 +563,10 @@ export class GraphicsSettings {
       onInput: (v) => { gfx.lensDirt = v; this.Apply(); },
     });
     Range(camera.box, {
-      label: "输出抖动", min: 0, max: 2, step: 0.1, value: gfx.dither ?? 0,
-      format: (v) => (v <= 0 ? "关" : `${v.toFixed(1)} / 255`),
+      label: "输出抖动", min: 0, max: 2, step: 0.05, value: gfx.dither ?? OUTPUT.dither,
+      format: (v) => (v <= 0 ? "关" : `${v.toFixed(2)} / 255`),
       onInput: (v) => { gfx.dither = v; this.Apply(); },
-    });
+    }, "空间三角分布蓝噪声抖动：消除暗部与天空 8-bit 色带，静止帧零闪动。");
     camera.Done();
 
     // ↑↓ 在各行的主控件之间移动（滑杆的 ↑↓ 本来会改值，同声音页：改成换行，←→ 才调值）。
@@ -627,9 +641,12 @@ export class GraphicsSettings {
     gfx.exposureCompensation = 0;
     gfx.lensFlare = 1; gfx.lensDirt = 1;
     gfx.tonemap = "aces";
-    gfx.bloomKaris = false;
-    gfx.dither = 0;
+    gfx.filmLook = FILM_LOOK.default;
+    gfx.bloomKaris = !!BLOOM.karis;
+    gfx.dither = OUTPUT.dither;
     gfx.autoExposure = this.host.post ? this.host.post.preset.autoExposure !== false : true;
+    gfx.localTonemap = this.host.post ? this.host.post.preset.localTonemap !== false : true;
+    gfx.filmOptics = this.host.post ? this.host.post.preset.filmOptics !== false : true;
     gfx.lut = this.host.post ? this.host.post.preset.lut !== false : true;
     // 内容项：断肢出厂开（Data_Tuning_Gore.ENABLED）。`?gore=0` 那条硬覆盖在
     // ApplyGraphics 里，这里照常写 true —— 恢复出厂不是绕过参数的后门。

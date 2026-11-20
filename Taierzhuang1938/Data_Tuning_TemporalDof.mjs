@@ -65,6 +65,10 @@ export const TAAU = {
   flareResponsiveDelta:.006,
   flareResponsiveSlots:5,
   flareSourceRadiusM:.7,
+  // 2026-11-20 抗鬼影增强：遮挡变化速度梯度拒绝 + 自发光/枪口焰/火花自动反应掩码（Reactive Mask）
+  disocclusionPx: 12,
+  disocclusionWeight: 0.42,
+  reactiveSpikeWeight: 0.72,
 };
 
 /**
@@ -131,6 +135,10 @@ export const DOF = {
   viewmodelSharpRadius: 0.04,
   viewmodelBlurRadius: 0.20,
   viewmodelCocScale: 1.4,
+  // 2026-11-20 光学散景细节：7 片复古电影光圈叶片 + 边缘猫眼渐晕（Cat's-Eye）
+  apertureBlades: 7,
+  apertureCurvature: 0.42,
+  catEyeVignette: 0.34,
 };
 
 /**

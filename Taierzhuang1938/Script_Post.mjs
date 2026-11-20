@@ -95,7 +95,8 @@ import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { ExposurePass } from "./Script_PostExposure.mjs";
 import { LensFlarePass } from "./Script_PostLensFlare.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
-import { LutCheckView } from "./Script_PostGrade.mjs";
+import { LutCheckView, LoadCubeLut } from "./Script_PostGrade.mjs";
+import { FILM_LOOK, FILM_LOOK_MODES } from "./Data_Tuning_Camera.mjs";
 import { FxaaPass } from "./Script_PostFxaa.mjs";
 import { StunTrailPass } from "./Script_PostStunTrail.mjs";
 import { DebugPass, InjectDepthPull, SHADING_MODES, WIRE_BACKGROUND_PURE } from "./Script_PostDebug.mjs";
@@ -206,6 +207,10 @@ export class PostPipeline {
     // 先例 —— 直接改 preset 的话「恢复出厂」就找不回档位默认值了。
     this.autoExposureEnabled = !!this.preset.autoExposure;
     this.lutEnabled = !!this.preset.lut;
+    this.localTonemapEnabled = this.preset.localTonemap !== false;
+    this.filmLookMode = FILM_LOOK.default;
+    this.filmOpticsEnabled = this.preset.filmOptics !== false;
+    this.postVolume = null;
     this.taaJitterScale = 1;
     this.sharpenStrength = this.preset.sharpen;
     this.taaFlip = false;
@@ -539,6 +544,59 @@ export class PostPipeline {
   SetLutEnabled(on) {
     this.lutEnabled = !!on;
     return this.lutEnabled;
+  }
+
+  /** 局部色调映射与暗视觉 Purkinje 偏移热切（画质面板）。 */
+  SetLocalTonemap(on) {
+    this.localTonemapEnabled = !!on;
+    return this.localTonemapEnabled;
+  }
+
+  /** 电影胶片调色风格：`"standard"` / `"cod14"` / `"bleach"` / `"kodak2383"`。 */
+  SetFilmLook(mode) {
+    this.filmLookMode = FILM_LOOK_MODES.includes(mode) ? mode : FILM_LOOK.default;
+    return this.filmLookMode;
+  }
+
+  GetFilmLook() { return this.filmLookMode; }
+
+  /** 镜头光学与战场动态（5 谱段色散、35mm 光渗、爆炸冲击波折射、火源热浪、近爆扬尘）热切。 */
+  SetFilmOptics(on) {
+    this.filmOpticsEnabled = !!on;
+    return this.filmOpticsEnabled;
+  }
+
+  /** 空间后处理区域（Post Volume）混合覆盖；传 null 清除。 */
+  SetPostVolume(volume) {
+    this.postVolume = volume || null;
+    return this.postVolume;
+  }
+
+  /** 绑定外部 3D LUT 条带纹理（或传 null 恢复内部烘焙）。 */
+  SetExternalLut(texture) {
+    this.compositePass.SetExternalLut(texture);
+  }
+
+  /** 加载 Adobe / DaVinci `.cube` 3D LUT 并接入管线分级。 */
+  async LoadCubeLut(url, options = {}) {
+    const texture = await LoadCubeLut(url, options);
+    this.compositePass.SetExternalLut(texture);
+    return texture;
+  }
+
+  /** 触发爆炸冲击波空气折射环（世界坐标、半径、强度 0–2）。 */
+  TriggerShockwave(worldPos, radius = 8, intensity = 1) {
+    this.compositePass.TriggerShockwave(worldPos, radius, intensity);
+  }
+
+  /** 触发近爆镜头扬尘附着脉冲（强度 0–1）。 */
+  AddBlastDust(amount = 0.7) {
+    this.compositePass.AddBlastDust(amount);
+  }
+
+  /** 清空动态冲击波与镜头扬尘（换关 / 重开）。 */
+  ResetDynamicOptics() {
+    this.compositePass.ResetDynamicOptics();
   }
 
   /**

@@ -31,7 +31,59 @@
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
-import { LUT } from "./Data_Tuning_Camera.mjs";
+import { LUT, FILM_LOOK_MODES } from "./Data_Tuning_Camera.mjs";
+
+export function FilmLookIndex(name) {
+  const i = FILM_LOOK_MODES.indexOf(name);
+  return i >= 0 ? i : 0;
+}
+
+/**
+ * 电影印片调色风格（GLSL 版，与下方 ApplyFilmLookJs 逐项同式，工作在感知 sRGB 域）。
+ * mode: 0 = standard（恒等）, 1 = cod14（1938 战地胶片）, 2 = bleach（漂白旁路）, 3 = kodak2383（经典电影印片）
+ */
+export const FILM_LOOK_GLSL = /* glsl */`
+vec3 ApplyFilmLook(vec3 srgb, float mode) {
+  if (mode < 0.5) return srgb;
+  vec3 c = clamp(srgb, 0.0, 1.0);
+  float y = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  if (mode < 1.5) {
+    // COD14 / 1938 战地胶片：克制的冷灰蓝阴影 + 暖土黄中亮 + 压制数码荧光绿 + 柔顺 S 密度
+    float greenExcess = max(c.g - max(c.r, c.b), 0.0);
+    c.r += greenExcess * 0.14;
+    c.g -= greenExcess * 0.12;
+    c.b -= greenExcess * 0.04;
+    float sh = 1.0 - smoothstep(0.04, 0.45, y);
+    float hi = smoothstep(0.42, 0.92, y);
+    c = clamp(c + sh * vec3(-0.008, 0.002, 0.014) + hi * vec3(0.016, 0.006, -0.018), 0.0, 1.0);
+    // 柔顺微对比 S 曲线（保护黑位与亮部细节，不裁切）
+    vec3 sCurve = c * c * (3.0 - 2.0 * c);
+    c = mix(c, sCurve, 0.14);
+    float y2 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    return clamp(mix(vec3(y2), c, 0.93), 0.0, 1.0);
+  }
+  if (mode < 2.5) {
+    // 漂白旁路（Saving Private Ryan 风格）：高银盐微对比 + 压低饱和 + 冷橄榄钢灰质感
+    vec3 silver = vec3(y * y * (3.0 - 2.0 * y));
+    c = mix(c, silver, 0.34);
+    float sh = 1.0 - smoothstep(0.05, 0.50, y);
+    c = clamp(c + sh * vec3(-0.010, 0.004, 0.010), 0.0, 1.0);
+    vec3 sCurve = c * c * (3.0 - 2.0 * c);
+    return clamp(mix(c, sCurve, 0.24), 0.0, 1.0);
+  }
+  // Kodak 2383 电影印片：深青影 + 暖琥珀高光 + 胶片印刷密度
+  float greenExcess = max(c.g - max(c.r, c.b), 0.0);
+  c.r += greenExcess * 0.10;
+  c.g -= greenExcess * 0.08;
+  float sh = 1.0 - smoothstep(0.03, 0.48, y);
+  float hi = smoothstep(0.38, 0.94, y);
+  c = clamp(c + sh * vec3(-0.018, 0.006, 0.024) + hi * vec3(0.026, 0.010, -0.026), 0.0, 1.0);
+  vec3 sCurve = c * c * (3.0 - 2.0 * c);
+  c = mix(c, sCurve, 0.20);
+  float y2 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  return clamp(mix(vec3(y2), c, 1.04), 0.0, 1.0);
+}
+`;
 
 // ===========================================================================
 // GLSL 侧
@@ -80,6 +132,52 @@ export function SrgbToLinearJs(x) {
 }
 
 function Clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
+function SmoothstepJs(e0, e1, x) {
+  const t = Clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+}
+
+/** FILM_LOOK_GLSL 的逐行 JS 镜像（确保 3D LUT 与数学路径差 ≤ 1/255）。 */
+export function ApplyFilmLookJs(cr, cg, cb, mode = 0) {
+  if (!(mode >= 0.5)) return [cr, cg, cb];
+  let r = Clamp01(cr), g = Clamp01(cg), b = Clamp01(cb);
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const Mix = (a, t, k) => a + (t - a) * k;
+  const SCurve = (v) => v * v * (3 - 2 * v);
+  if (mode < 1.5) {
+    const ge = Math.max(g - Math.max(r, b), 0);
+    r += ge * 0.14; g -= ge * 0.12; b -= ge * 0.04;
+    const sh = 1 - SmoothstepJs(0.04, 0.45, y);
+    const hi = SmoothstepJs(0.42, 0.92, y);
+    r = Clamp01(r + sh * -0.008 + hi * 0.016);
+    g = Clamp01(g + sh * 0.002 + hi * 0.006);
+    b = Clamp01(b + sh * 0.014 + hi * -0.018);
+    r = Mix(r, SCurve(r), 0.14);
+    g = Mix(g, SCurve(g), 0.14);
+    b = Mix(b, SCurve(b), 0.14);
+    const y2 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return [Clamp01(Mix(y2, r, 0.93)), Clamp01(Mix(y2, g, 0.93)), Clamp01(Mix(y2, b, 0.93))];
+  }
+  if (mode < 2.5) {
+    const silver = SCurve(y);
+    r = Mix(r, silver, 0.34); g = Mix(g, silver, 0.34); b = Mix(b, silver, 0.34);
+    const sh = 1 - SmoothstepJs(0.05, 0.50, y);
+    r = Clamp01(r + sh * -0.010); g = Clamp01(g + sh * 0.004); b = Clamp01(b + sh * 0.010);
+    return [Clamp01(Mix(r, SCurve(r), 0.24)), Clamp01(Mix(g, SCurve(g), 0.24)), Clamp01(Mix(b, SCurve(b), 0.24))];
+  }
+  const ge = Math.max(g - Math.max(r, b), 0);
+  r += ge * 0.10; g -= ge * 0.08;
+  const sh = 1 - SmoothstepJs(0.03, 0.48, y);
+  const hi = SmoothstepJs(0.38, 0.94, y);
+  r = Clamp01(r + sh * -0.018 + hi * 0.026);
+  g = Clamp01(g + sh * 0.006 + hi * 0.010);
+  b = Clamp01(b + sh * 0.024 + hi * -0.026);
+  r = Mix(r, SCurve(r), 0.20);
+  g = Mix(g, SCurve(g), 0.20);
+  b = Mix(b, SCurve(b), 0.20);
+  const y2 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return [Clamp01(Mix(y2, r, 1.04)), Clamp01(Mix(y2, g, 1.04)), Clamp01(Mix(y2, b, 1.04))];
+}
 
 /**
  * `ColorGrade` 的**饱和之前**那一段，JS 版。
@@ -87,7 +185,7 @@ function Clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
  * 改一边必须改另一边，`Script_ExposureTest` 的一致性断言就压在这上面。
  *
  * @param {number[]} rgb 线性
- * @param {object} grade { lift, gain, shadowTint, highlightTint, splitShadow, splitHighlight, contrast }
+ * @param {object} grade { lift, gain, shadowTint, highlightTint, splitShadow, splitHighlight, contrast, filmLook? }
  * @returns {number[]} 线性
  */
 export function GradeMathJs(rgb, grade) {
@@ -108,9 +206,10 @@ export function GradeMathJs(rgb, grade) {
   const Curve = (v) => (soft
     ? (v < 0.5 ? 0.5 * Math.pow(Math.max(v * 2, 0), contrast) : 1 - 0.5 * Math.pow(Math.max((1 - v) * 2, 0), contrast))
     : Clamp01((v - 0.5) * contrast + 0.5));
-  const cr = Curve(LinearToSrgbJs(r));
-  const cg = Curve(LinearToSrgbJs(g));
-  const cb = Curve(LinearToSrgbJs(b));
+  let cr = Curve(LinearToSrgbJs(r));
+  let cg = Curve(LinearToSrgbJs(g));
+  let cb = Curve(LinearToSrgbJs(b));
+  [cr, cg, cb] = ApplyFilmLookJs(cr, cg, cb, grade.filmLook ?? 0);
   return [SrgbToLinearJs(cr), SrgbToLinearJs(cg), SrgbToLinearJs(cb)];
 }
 
@@ -125,6 +224,7 @@ export function GradeFromUniforms(U) {
     splitHighlight: U.uSplitHighlight.value,
     contrast: U.uContrast.value,
     contrastCurve: U.uContrastCurve ? U.uContrastCurve.value : 0,
+    filmLook: U.uFilmLook ? U.uFilmLook.value : 0,
   };
 }
 
@@ -135,9 +235,117 @@ export function GradeKey(grade) {
     grade.lift.map(N).join(","), grade.gain.map(N).join(","),
     grade.shadowTint.map(N).join(","), grade.highlightTint.map(N).join(","),
     N(grade.splitShadow), N(grade.splitHighlight), N(grade.contrast),
-    // 旧键逐字不变（contrastCurve = 0 时不追加），其余预设的缓存命中不受影响
+    // 旧键逐字不变（contrastCurve / filmLook = 0 时不追加），其余预设的缓存命中不受影响
     ...(grade.contrastCurve ? [`c${grade.contrastCurve}`] : []),
+    ...(grade.filmLook ? [`f${grade.filmLook}`] : []),
   ].join("|");
+}
+
+/**
+ * 解析标准 Adobe / DaVinci Resolve `.cube` 3D LUT 文本。
+ * 支持 TITLE、LUT_3D_SIZE、DOMAIN_MIN、DOMAIN_MAX 与 R-fastest 顺序 RGB 浮点表。
+ */
+export function ParseCubeLut(text) {
+  let title = "";
+  let size = 0;
+  let domainMin = [0, 0, 0];
+  let domainMax = [1, 1, 1];
+  const values = [];
+  for (const rawLine of String(text || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line.startsWith("TITLE")) { title = line.slice(5).trim().replace(/^"|"$/g, ""); continue; }
+    if (line.startsWith("LUT_3D_SIZE")) { size = parseInt(line.split(/\s+/)[1], 10) || 0; continue; }
+    if (line.startsWith("DOMAIN_MIN")) { domainMin = line.split(/\s+/).slice(1, 4).map(Number); continue; }
+    if (line.startsWith("DOMAIN_MAX")) { domainMax = line.split(/\s+/).slice(1, 4).map(Number); continue; }
+    if (/^[A-Za-z_]/.test(line)) continue;
+    const parts = line.split(/\s+/);
+    if (parts.length >= 3) {
+      const r = Number(parts[0]), g = Number(parts[1]), b = Number(parts[2]);
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) values.push(r, g, b);
+    }
+  }
+  if (size < 2 || size > 128) throw new Error(`Invalid LUT_3D_SIZE: ${size}`);
+  if (values.length < size * size * size * 3) {
+    throw new Error(`Incomplete .cube table: got ${values.length / 3}, expected ${size ** 3}`);
+  }
+  return { title, size, domainMin, domainMax, data: new Float32Array(values.slice(0, size * size * size * 3)) };
+}
+
+/**
+ * 把任意尺寸 `.cube` 重采样成引擎统一的 64³（4096×64）sRGB 索引条带纹理（严格遵守四条纹理铁律）。
+ * @param {{size:number,domainMin:number[],domainMax:number[],data:Float32Array}} cube
+ * @param {{targetSize?:number,inputSpace?:"srgb"|"linear",outputSpace?:"srgb"|"linear"}} [options]
+ */
+export function BakeCubeLutTexture(cube, { targetSize = LUT.size, inputSpace = "srgb", outputSpace = "srgb" } = {}) {
+  const N = cube.size;
+  const src = cube.data;
+  const [minR, minG, minB] = cube.domainMin || [0, 0, 0];
+  const [maxR, maxG, maxB] = cube.domainMax || [1, 1, 1];
+  const spanR = Math.max(maxR - minR, 1e-6), spanG = Math.max(maxG - minG, 1e-6), spanB = Math.max(maxB - minB, 1e-6);
+  const At = (ri, gi, bi, c) => src[((bi * N + gi) * N + ri) * 3 + c];
+  const Trilinear = (rVal, gVal, bVal) => {
+    const rx = Clamp01((rVal - minR) / spanR) * (N - 1);
+    const gx = Clamp01((gVal - minG) / spanG) * (N - 1);
+    const bx = Clamp01((bVal - minB) / spanB) * (N - 1);
+    const r0 = Math.floor(rx), r1 = Math.min(r0 + 1, N - 1), fr = rx - r0;
+    const g0 = Math.floor(gx), g1 = Math.min(g0 + 1, N - 1), fg = gx - g0;
+    const b0 = Math.floor(bx), b1 = Math.min(b0 + 1, N - 1), fb = bx - b0;
+    const out = [0, 0, 0];
+    for (let c = 0; c < 3; c += 1) {
+      const c00 = At(r0, g0, b0, c) * (1 - fr) + At(r1, g0, b0, c) * fr;
+      const c10 = At(r0, g1, b0, c) * (1 - fr) + At(r1, g1, b0, c) * fr;
+      const c01 = At(r0, g0, b1, c) * (1 - fr) + At(r1, g0, b1, c) * fr;
+      const c11 = At(r0, g1, b1, c) * (1 - fr) + At(r1, g1, b1, c) * fr;
+      const c0 = c00 * (1 - fg) + c10 * fg;
+      const c1 = c01 * (1 - fg) + c11 * fg;
+      out[c] = c0 * (1 - fb) + c1 * fb;
+    }
+    return out;
+  };
+  const width = targetSize * targetSize;
+  const height = targetSize;
+  const outBytes = new Uint8Array(width * height * 4);
+  const inv = 1 / (targetSize - 1);
+  for (let bi = 0; bi < targetSize; bi += 1) {
+    const bSrgb = bi * inv;
+    const bIn = inputSpace === "linear" ? SrgbToLinearJs(bSrgb) : bSrgb;
+    for (let gi = 0; gi < targetSize; gi += 1) {
+      const gSrgb = gi * inv;
+      const gIn = inputSpace === "linear" ? SrgbToLinearJs(gSrgb) : gSrgb;
+      for (let ri = 0; ri < targetSize; ri += 1) {
+        const rSrgb = ri * inv;
+        const rIn = inputSpace === "linear" ? SrgbToLinearJs(rSrgb) : rSrgb;
+        const rgb = Trilinear(rIn, gIn, bIn);
+        const rOut = outputSpace === "linear" ? LinearToSrgbJs(Clamp01(rgb[0])) : Clamp01(rgb[0]);
+        const gOut = outputSpace === "linear" ? LinearToSrgbJs(Clamp01(rgb[1])) : Clamp01(rgb[1]);
+        const bOut = outputSpace === "linear" ? LinearToSrgbJs(Clamp01(rgb[2])) : Clamp01(rgb[2]);
+        const idx = (gi * width + bi * targetSize + ri) * 4;
+        outBytes[idx] = Math.round(rOut * 255);
+        outBytes[idx + 1] = Math.round(gOut * 255);
+        outBytes[idx + 2] = Math.round(bOut * 255);
+        outBytes[idx + 3] = 255;
+      }
+    }
+  }
+  const texture = new THREE.DataTexture(outBytes, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.flipY = false;
+  texture.unpackAlignment = 1;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/** 从 URL 拉取并烘焙 `.cube` 3D LUT（供工具与运行期外部调色接入）。 */
+export async function LoadCubeLut(url, options = {}) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch .cube LUT (${res.status}): ${url}`);
+  return BakeCubeLutTexture(ParseCubeLut(await res.text()), options);
 }
 
 /**

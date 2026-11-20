@@ -453,6 +453,35 @@ void main() {
 }
 `;
 
+// --- 局部色调映射：80×45 可分离宽模糊对数亮度（复用 160×90 lumTarget，零额外主场景采样）----
+const FRAG_LOCAL_LUM = /* glsl */`
+uniform sampler2D uSource;
+uniform vec2 uStep;
+varying vec2 vUv;
+void main() {
+  // 9-tap 可分离宽高斯（步幅 2 纹素，覆盖约 18% 屏宽），平滑提取局部环境光照水平。
+  float acc = texture2D(uSource, vUv).r * 0.1758;
+  acc += (texture2D(uSource, clamp(vUv + uStep * 1.0, vec2(0.001), vec2(0.999))).r
+        + texture2D(uSource, clamp(vUv - uStep * 1.0, vec2(0.001), vec2(0.999))).r) * 0.1583;
+  acc += (texture2D(uSource, clamp(vUv + uStep * 2.0, vec2(0.001), vec2(0.999))).r
+        + texture2D(uSource, clamp(vUv - uStep * 2.0, vec2(0.001), vec2(0.999))).r) * 0.1194;
+  acc += (texture2D(uSource, clamp(vUv + uStep * 3.0, vec2(0.001), vec2(0.999))).r
+        + texture2D(uSource, clamp(vUv - uStep * 3.0, vec2(0.001), vec2(0.999))).r) * 0.0754;
+  acc += (texture2D(uSource, clamp(vUv + uStep * 4.0, vec2(0.001), vec2(0.999))).r
+        + texture2D(uSource, clamp(vUv - uStep * 4.0, vec2(0.001), vec2(0.999))).r) * 0.0590;
+  // 纵向 pass 顺手对横向已宽模糊的图做 3×3 全帧均值，写入 .g 作为与自动曝光完全解耦的基准对数亮度。
+  float frameAvg = acc;
+  if (uStep.y > 0.0) {
+    float s = 0.0;
+    s += texture2D(uSource, vec2(0.17, 0.20)).r + texture2D(uSource, vec2(0.50, 0.20)).r + texture2D(uSource, vec2(0.83, 0.20)).r;
+    s += texture2D(uSource, vec2(0.17, 0.50)).r + texture2D(uSource, vec2(0.50, 0.50)).r + texture2D(uSource, vec2(0.83, 0.50)).r;
+    s += texture2D(uSource, vec2(0.17, 0.80)).r + texture2D(uSource, vec2(0.50, 0.80)).r + texture2D(uSource, vec2(0.83, 0.80)).r;
+    frameAvg = s * (1.0 / 9.0);
+  }
+  gl_FragColor = vec4(acc, frameAvg, acc, 1.0);
+}
+`;
+
 /** 自动曝光关着时绑的 1×1 纯白：`.r` 精确等于 1.0，一个比特都不改。 */
 export function MakeWhitePixel() {
   const texture = new THREE.DataTexture(
@@ -494,6 +523,20 @@ export class ExposurePass {
     const NEAREST = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
     this.lumTarget = MakeRenderTarget(A.lumWidth, A.lumHeight,
       { type: THREE.HalfFloatType, ...NEAREST });
+    // 局部色调映射：80×45 线性滤波半浮点靶（约 56 KB 显存），存放空间平滑后的 log2 场景亮度。
+    const localW = Math.max(8, A.lumWidth >> 1);
+    const localH = Math.max(8, A.lumHeight >> 1);
+    this.localLumH = MakeRenderTarget(localW, localH,
+      { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    this.localLumV = MakeRenderTarget(localW, localH,
+      { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    this.localLumActive = false;
+    this.localLumWanted = false;
+    this.uniformsLocalLum = {
+      uSource: { value: this.lumTarget.texture },
+      uStep: { value: new THREE.Vector2(1 / localW, 0) },
+    };
+    this.matLocalLum = MakeFullscreenMaterial(FRAG_LOCAL_LUM, this.uniformsLocalLum);
     this.histTarget = MakeRenderTarget(A.bins, A.rows,
       { type: THREE.HalfFloatType, ...NEAREST });
     this.binsTarget = MakeRenderTarget(A.bins, 1,
@@ -623,6 +666,11 @@ export class ExposurePass {
     return this.active ? this.stateTargets[this.flip].texture : this.whitePixel;
   }
 
+  /** 局部色调映射的平滑对数亮度图；未启用时返回纯白（同时 Composite 侧强度为 0）。 */
+  get LocalLumTexture() {
+    return this.localLumActive ? this.localLumV.texture : this.whitePixel;
+  }
+
   /** 直方图、亮度图与状态（调试视图 / 断言用）。 */
   get HistogramTexture() { return this.binsTarget.texture; }
   get LuminanceTexture() { return this.lumTarget.texture; }
@@ -647,10 +695,24 @@ export class ExposurePass {
     this.RequestReset();
   }
 
-  Enabled(ctx) {
+  _WantAuto() {
     // 半浮点靶不可用时整条链没有意义（8 位靶存不下 log 亮度，加法混合也会饱和）
-    void ctx;
-    return this.pipeline.autoExposureEnabled && this.pipeline.hdrCapable;
+    return !!(this.pipeline.autoExposureEnabled && this.pipeline.hdrCapable);
+  }
+
+  _WantLocal(ctx) {
+    return !!(this.pipeline.localTonemapEnabled && this.pipeline.hdrCapable
+      && ctx?.preset?.localTonemap !== false && this.pipeline.shadingMode !== "wireframe");
+  }
+
+  Enabled(ctx) {
+    return this._WantAuto() || this._WantLocal(ctx);
+  }
+
+  Idle() {
+    this.active = false;
+    this.localLumActive = false;
+    this.localLumWanted = false;
   }
 
   Resize() {
@@ -671,7 +733,9 @@ export class ExposurePass {
     this.transientStart=flareLit&&!(this.transientWeight>0);
     this.transientWeight=flareLit?1:(this.transientWeight||0)*Math.exp(-Math.max(0,ctx.options.dt??1/60)/FLARE_EXPOSURE.recoveryS);
     if(this.transientWeight<FLARE_EXPOSURE.cutoff)this.transientWeight=0;
-    this.active = this.Enabled(ctx);
+    this.active = this._WantAuto();
+    this.localLumWanted = this._WantLocal(ctx);
+    this.localLumActive = false;
     if (!this.active) {
       // 关着时保持复位待命：一打开就吸附，不从几分钟前的旧状态爬过来
       this.snapFrames = AUTO_EXPOSURE.snapFrames;
@@ -700,53 +764,68 @@ export class ExposurePass {
       1 / ctx.sceneColor.width, 1 / ctx.sceneColor.height);
     ctx.blitter.Blit(this.matLum, this.lumTarget);
 
-    // --- 2) 点图元直方图 -------------------------------------------------
-    // 显式清屏而不是靠 autoClear：这一趟的清屏色必须是 0，
-    // 而主场景那一趟刚把清屏色设成黑（或线框底灰）。
-    const prevAutoClear = renderer.autoClear;
-    const prevAlpha = renderer.getClearAlpha();
-    renderer.getClearColor(this._clearColor);
-    renderer.setRenderTarget(this.histTarget);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear(true, false, false);
-    renderer.autoClear = false;
-    renderer.render(this.pointScene, QUAD_CAMERA);
-    renderer.autoClear = prevAutoClear;
-    renderer.setClearColor(this._clearColor, prevAlpha);
+    if (this.active) {
+      // --- 2) 点图元直方图 -------------------------------------------------
+      // 显式清屏而不是靠 autoClear：这一趟的清屏色必须是 0，
+      // 而主场景那一趟刚把清屏色设成黑（或线框底灰）。
+      const prevAutoClear = renderer.autoClear;
+      const prevAlpha = renderer.getClearAlpha();
+      renderer.getClearColor(this._clearColor);
+      renderer.setRenderTarget(this.histTarget);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, false, false);
+      renderer.autoClear = false;
+      renderer.render(this.pointScene, QUAD_CAMERA);
+      renderer.autoClear = prevAutoClear;
+      renderer.setClearColor(this._clearColor, prevAlpha);
 
-    // --- 3) 列归约 → 归一化频度 -----------------------------------------
-    ctx.blitter.Blit(this.matRows, this.binsTarget);
+      // --- 3) 列归约 → 归一化频度 -----------------------------------------
+      ctx.blitter.Blit(this.matRows, this.binsTarget);
 
-    // --- 4) 1×1 状态（百分位 → EV → 适应 → 增益）------------------------
-    const U = this.uniformsState;
-    const hasCalibration = Number.isFinite(this.anchor.logLum);
-    if (this.mode === "absolute") {
-      U.uEvAnchor.value = AbsoluteAnchorEv(ctx.options.exposure ?? 1, this.tonemap);
-      U.uNeutral.value = 0;
-    } else if (hasCalibration) {
-      U.uEvAnchor.value = this.anchor.logLum + EV_LOG_OFFSET;
-      U.uNeutral.value = 0;
-    } else {
-      // 没有标定数据（未登记的时段预设、探针页）：只测量不作用。
-      // 增益恒 1，画面与关掉自动曝光完全一致；EV 读数照常，标定工具就靠它。
-      U.uEvAnchor.value = 0;
-      U.uNeutral.value = 1;
+      // --- 4) 1×1 状态（百分位 → EV → 适应 → 增益）------------------------
+      const U = this.uniformsState;
+      const hasCalibration = Number.isFinite(this.anchor.logLum);
+      if (this.mode === "absolute") {
+        U.uEvAnchor.value = AbsoluteAnchorEv(ctx.options.exposure ?? 1, this.tonemap);
+        U.uNeutral.value = 0;
+      } else if (hasCalibration) {
+        U.uEvAnchor.value = this.anchor.logLum + EV_LOG_OFFSET;
+        U.uNeutral.value = 0;
+      } else {
+        // 没有标定数据（未登记的时段预设、探针页）：只测量不作用。
+        // 增益恒 1，画面与关掉自动曝光完全一致；EV 读数照常，标定工具就靠它。
+        U.uEvAnchor.value = 0;
+        U.uNeutral.value = 1;
+      }
+      U.uEvBias.value = (this.anchor.evBias ?? 0) + this.userBiasEv;
+      U.uEvUp.value = this.anchor.evUp ?? 1.5;
+      U.uEvDown.value = this.anchor.evDown ?? 1.5;
+      U.uTransientWeight.value = !hasCalibration&&this.mode!=="absolute" ? (this.transientWeight||0) : 0;
+      U.uTransientStart.value = U.uTransientWeight.value>0&&this.transientStart ? 1 : 0;
+      if(U.uTransientWeight.value>0){
+        U.uEvAnchor.value=AbsoluteAnchorEv(ctx.options.exposure??1,this.tonemap);
+        U.uEvUp.value=0;U.uEvDown.value=FLARE_EXPOSURE.maxDarkEv;
+      }
+      U.uDt.value = Math.min(0.25, Math.max(1 / 240, ctx.options.dt ?? 1 / 60));
+      U.uSnap.value = this.snapFrames > 0 ? 1 : 0;
+      U.uPrevious.value = this.stateTargets[this.flip].texture;
+      this.flip ^= 1;
+      ctx.blitter.Blit(this.matState, this.stateTargets[this.flip]);
+      if (this.snapFrames > 0) this.snapFrames -= 1;
     }
-    U.uEvBias.value = (this.anchor.evBias ?? 0) + this.userBiasEv;
-    U.uEvUp.value = this.anchor.evUp ?? 1.5;
-    U.uEvDown.value = this.anchor.evDown ?? 1.5;
-    U.uTransientWeight.value = !hasCalibration&&this.mode!=="absolute" ? (this.transientWeight||0) : 0;
-    U.uTransientStart.value = U.uTransientWeight.value>0&&this.transientStart ? 1 : 0;
-    if(U.uTransientWeight.value>0){
-      U.uEvAnchor.value=AbsoluteAnchorEv(ctx.options.exposure??1,this.tonemap);
-      U.uEvUp.value=0;U.uEvDown.value=FLARE_EXPOSURE.maxDarkEv;
+
+    // --- 5) 局部色调映射：可分离宽模糊提取 80×45 局部对数亮度 ----------------
+    // 与自动曝光完全解耦：autoExposure 开关往返不影响局部适应图。
+    const wantLocal = !!this.localLumWanted;
+    this.localLumActive = wantLocal;
+    if (wantLocal) {
+      this.uniformsLocalLum.uSource.value = this.lumTarget.texture;
+      this.uniformsLocalLum.uStep.value.set(2 / this.localLumH.width, 0);
+      ctx.blitter.Blit(this.matLocalLum, this.localLumH);
+      this.uniformsLocalLum.uSource.value = this.localLumH.texture;
+      this.uniformsLocalLum.uStep.value.set(0, 2 / this.localLumV.height);
+      ctx.blitter.Blit(this.matLocalLum, this.localLumV);
     }
-    U.uDt.value = Math.min(0.25, Math.max(1 / 240, ctx.options.dt ?? 1 / 60));
-    U.uSnap.value = this.snapFrames > 0 ? 1 : 0;
-    U.uPrevious.value = this.stateTargets[this.flip].texture;
-    this.flip ^= 1;
-    ctx.blitter.Blit(this.matState, this.stateTargets[this.flip]);
-    if (this.snapFrames > 0) this.snapFrames -= 1;
   }
 
   /**
@@ -776,10 +855,13 @@ export class ExposurePass {
 
   Dispose() {
     this.lumTarget.dispose();
+    this.localLumH.dispose();
+    this.localLumV.dispose();
     this.histTarget.dispose();
     this.binsTarget.dispose();
     for (const target of this.stateTargets) target.dispose();
     this.matLum.dispose();
+    this.matLocalLum.dispose();
     this.matHistogram.dispose();
     this.matRows.dispose();
     this.matState.dispose();

@@ -141,7 +141,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
-import { LENS_FLARE, FilmGrainStrengthFor } from "./Data_Tuning_Camera.mjs";
+import { LENS_FLARE, FilmGrainStrengthFor, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
@@ -2013,7 +2013,7 @@ async function Boot() {
   };
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, grenadeAsset,
-    audioWiring,
+    audioWiring, post,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
@@ -2956,6 +2956,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     vfx?.SetGroundImpactDust?.(false); vfx?.SetGroundSampler?.(null);
     // 通用开关（phase.blastReaction）：近爆身体反应与耳朵模型同理，离开本关先关，进关再按新一关的开关打开。
     player?.SetBlastReaction?.(false); audio?.SetEarModel?.("legacy");
+    post?.ResetDynamicOptics?.();
     aircraft?.SetPhase(phase);
     ClearExternalProps();
     if(phase.whitebox?.p012)ClearTrimProps(scene);
@@ -9005,11 +9006,14 @@ function ApplyGraphics() {
   // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
   // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。
   post.SetAutoExposure(graphics.autoExposure !== false);
+  post.SetLocalTonemap(graphics.localTonemap !== false);
   post.SetLutEnabled(graphics.lut !== false);
+  post.SetFilmLook(graphics.filmLook || FILM_LOOK.default);
+  post.SetFilmOptics(graphics.filmOptics !== false);
   post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
   post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
   post.bloomPass.karis = graphics.bloomKaris === true;
-  post.uniformsComposite.uDither.value = graphics.dither ?? 0;
+  post.uniformsComposite.uDither.value = graphics.dither ?? OUTPUT.dither;
   post.SetTonemap(graphics.tonemap || "aces");
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;

@@ -238,10 +238,25 @@ void main() {
   float velocityPx = length(velocity * uHistoryResolution);
   float w = mix(stillWeight, uFastMotionWeight,
                 clamp(velocityPx / max(uFastMotionPx, 1.0), 0.0, 1.0));
+  // ②b 遮挡变化拒绝（Disocclusion）：前景运动轮廓与背后新露出像素速度差大时抬高当前帧权重，消掉人物/车辆拖影
+  float disocclusion = 0.0;
+  if (uUseVelocityBuffer > 0.5) {
+    vec2 centerVel = texture2D(uVelocity, vUv).xy;
+    float velJumpPx = length((velocity - centerVel) * uHistoryResolution);
+    disocclusion = smoothstep(2.0, ${(TAAU.disocclusionPx ?? 12).toFixed(1)}, velJumpPx) * smoothstep(0.15, 0.75, clipAmount);
+    w = max(w, disocclusion * ${(TAAU.disocclusionWeight ?? 0.42).toFixed(3)});
+  }
+  // ②c 自动特效反应掩码（Reactive Mask）：枪口焰、曳光弹、爆炸火星等高频自发光突变绕过重历史，保持利落不拖糊；
+  // 静止画面中 curLuma ≈ histLuma → reactive 恒 0，完全不削弱抗锯齿收敛。
+  float curHdrLuma = Luma(TonemapUnweight(YcocgToRgb(filtered)));
+  float histHdrLuma = Luma(TonemapUnweight(YcocgToRgb(history)));
+  float vfxSpike = max(curHdrLuma - max(histHdrLuma * 2.2, 0.9), 0.0);
+  float reactive = smoothstep(0.35, 2.2, vfxSpike) * smoothstep(0.12, 0.65, clipAmount);
+  w = max(w, reactive * ${(TAAU.reactiveSpikeWeight ?? 0.72).toFixed(3)});
   // ③ responsive（UE ResponsiveAA）：第一人称手/枪几乎只用当前帧。
   //    预通道给它们写的是常数前景标签深度，速度恒 0 —— 世界在它们背后滑过时
   //    历史会把瞄具边缘拖出一条虚影，正是 FPS 手感的红线。
-  float responsive = 0.0;
+  float responsive = max(reactive, disocclusion * 0.5);
   if (uForegroundDepth > 0.0 && abs(centerDepth - uForegroundDepth) < uForegroundEps) {
     responsive = 1.0;
     w = max(w, uResponsiveWeight);
