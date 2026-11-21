@@ -35,6 +35,8 @@ export const TOOL_INFO = Object.freeze({
   facial: { label: "人物面部", hint: "配套对白、口型与表情近景检查", split: true },
   mixamoPreview: { label: "Mixamo 动作预览", hint: "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，角色默认带已配置的头发胡子及项目道具", split: true,
     window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
+  motionCompare: { label: "动作衔接对比", hint: "打开独立窗口：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
+    window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare", features: "popup,width=1600,height=1000" } },
   weapon: { label: "枪械", hint: "台架 + 数据卡", split: true },
   firstPerson: { label: "第一人称持枪检查", hint: "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差、准心校准", split: true },
   vfx: { label: "特效预览", hint: "查看火焰、烟雾、爆炸、命中、枪口焰与曳光", split: true },
@@ -49,7 +51,7 @@ export const TOOL_INFO = Object.freeze({
 const TOOL_MENU_DEFS = [
   { id: "scene", label: "场景", items: ["sceneEditor", "splines", "propPcg"] },
   { id: "level", label: "关卡", items: ["blockout", "timeline", "levelFlow", "squadMarch"] },
-  { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview"] },
+  { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson"] },
   { id: "media", label: "特效与声音", items: ["vfx", "audio"] },
   { id: "assets", label: "资产", items: ["props", "assetStandards", "textures"] },

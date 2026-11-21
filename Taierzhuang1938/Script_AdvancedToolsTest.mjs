@@ -37,18 +37,18 @@ const Same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].s
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);
 const splitIds = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
-Check("split 条目共 15 项", splitIds.length === 15, splitIds.join(","));
+Check("split 条目共 16 项", splitIds.length === 16, splitIds.join(","));
 Check("独立窗口 + 摄影棚 = split 的全部", Same([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS], splitIds));
 Check("独立窗口 = split 且带 window 的条目", Same(WINDOW_TOOL_IDS, splitIds.filter((id) => TOOL_INFO[id].window)));
 Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, menuIds.filter((id) => !TOOL_INFO[id].split)));
-Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 17);
+Check("菜单 18 项且三类互不重叠", menuIds.length === 18 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 18);
 
 // --- 2. 搬家 ---------------------------------------------------------------------
-const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "TextureManager.html", "Tool_Studio.html", "ControlCenter.html"];
+const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "TextureManager.html", "Tool_Studio.html", "ControlCenter.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
-Check("旧位置不留跳转壳", pages.slice(0, 4).every((page) => !fs.existsSync(path.join(projectDir, page))));
-Check("九个摄影棚编辑器与四个入口类都在 AdvancedTools/", ["Actor", "Facial", "SquadMarch", "Weapon", "FirstPerson", "Vfx", "Audio", "PropLibrary", "AssetStandards",
-  "SceneEntry", "LevelFlow", "MixamoPreview", "Textures"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
+Check("旧位置不留跳转壳", pages.slice(0, 5).every((page) => !fs.existsSync(path.join(projectDir, page))));
+Check("九个摄影棚编辑器与五个入口类都在 AdvancedTools/", ["Actor", "Facial", "SquadMarch", "Weapon", "FirstPerson", "Vfx", "Audio", "PropLibrary", "AssetStandards",
+  "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "Textures"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
 
 Check("PCG 验证界面迁入独立工具目录", ["Splines", "PropPcg"].every((id) => fs.existsSync(path.join(toolsDir, `Script_Editor${id}.mjs`)) && !fs.existsSync(path.join(projectDir, `Script_Editor${id}.mjs`))));
@@ -62,6 +62,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["sceneEditor", "Script_EditorSceneEntry.mjs", "SceneEditorEntry", "SceneEditor.html"],
     ["levelFlow", "Script_EditorLevelFlow.mjs", "LevelFlowEntry", "Tool_LevelFlow.html"],
     ["mixamoPreview", "Script_EditorMixamoPreview.mjs", "MixamoPreviewEditor", "Tool_MixamoAnimationPreview.html"],
+    ["motionCompare", "Script_EditorMotionCompare.mjs", "MotionCompareEditor", "Tool_MotionCompare.html"],
     ["textures", "Script_EditorTextures.mjs", "TextureEditor", "TextureManager.html"],
     ["splines", "Script_EditorPcgEntry.mjs", "SplineEntry", "Tool_Pcg.html"],
     ["propPcg", "Script_EditorPcgEntry.mjs", "PropPcgEntry", "Tool_Pcg.html"],
@@ -83,7 +84,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   const page = "http://127.0.0.1:9/Taierzhuang1938/AdvancedTools/ControlCenter.html";
   const cards = ControlCenterCards(page);
   Check("标题是 AdvancedTool ControlCenter", CONTROL_CENTER_TITLE === "AdvancedTool ControlCenter");
-  Check("卡片 17 张、六组、顺序同 TOOL_MENUS", cards.length === 17 && new Set(cards.map((card) => card.group)).size === 6
+  Check("卡片 18 张、六组、顺序同 TOOL_MENUS", cards.length === 18 && new Set(cards.map((card) => card.group)).size === 6
     && JSON.stringify(cards.map((card) => card.id)) === JSON.stringify(menuIds));
   Check("文案取 TOOL_INFO 的 label / hint", cards.every((card) => card.label === TOOL_INFO[card.id].label && card.hint === TOOL_INFO[card.id].hint));
   for (const id of WINDOW_TOOL_IDS) {

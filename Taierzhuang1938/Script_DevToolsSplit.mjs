@@ -12,6 +12,7 @@ import { SquadMarchEditor } from "./AdvancedTools/Script_EditorSquadMarch.mjs";
 import { ActorEditor } from "./AdvancedTools/Script_EditorActor.mjs";
 import { FacialEditor } from "./AdvancedTools/Script_EditorFacial.mjs";
 import { MixamoPreviewEditor } from "./AdvancedTools/Script_EditorMixamoPreview.mjs";
+import { MotionCompareEditor } from "./AdvancedTools/Script_EditorMotionCompare.mjs";
 import { WeaponEditor } from "./AdvancedTools/Script_EditorWeapon.mjs";
 import { FirstPersonEditor } from "./AdvancedTools/Script_EditorFirstPerson.mjs";
 import { VfxEditor } from "./AdvancedTools/Script_EditorVfx.mjs";
@@ -22,6 +23,6 @@ import { TextureEditor } from "./AdvancedTools/Script_EditorTextures.mjs";
 
 /** 已拆出去的工具类（id 与 Data_DevTools.TOOL_INFO 里 split: true 的条目一一对应）。剔除版是空数组。 */
 export const SPLIT_TOOL_CLASSES = Object.freeze([
-  SplineEntry, PropPcgEntry, SceneEditorEntry, LevelFlowEntry, SquadMarchEditor, ActorEditor, FacialEditor, MixamoPreviewEditor,
+  SplineEntry, PropPcgEntry, SceneEditorEntry, LevelFlowEntry, SquadMarchEditor, ActorEditor, FacialEditor, MixamoPreviewEditor, MotionCompareEditor,
   WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, PropLibraryEditor, AssetStandardsEditor, TextureEditor,
 ]);

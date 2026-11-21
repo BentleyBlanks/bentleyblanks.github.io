@@ -70,6 +70,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **门禁**：`Script_AdvancedToolsTest`（纯 Node：目录表、搬家、入口类地址、卡片、启动器）、`Script_AdvancedToolsBrowserTest`（控制中心、九个工具在独立宿主逐个打开、四个页面新地址）、`Script_ToolStudioParityBrowserTest`（九个工具游戏宿主 vs 独立宿主整页截图平均绝对差 ≤ 2/255，约 20+ 分钟，tier2）、`Script_DevToolsIsolationTest`（拆分边界导出对账、游戏不 import AdvancedTools、发布构建 / 发布副本 / 菜单剔除）。
 
 - **2026-11-13**：样条与撒点验证界面移入 `AdvancedTools/`，入口为 `Tool_Pcg.html?tool=splines|propPcg`。宿主复用工具渲染底座与界面外壳，通过 `TengxianField` / `FirstLevelWhiteboxField`、`AddExternalProps` 装配场地与真实布设。生产生成器和数据仍由游戏共享调用，发布包剔除这两项验证界面。环境转入 Debug工具独立窗口，第一人称持枪移动检查删除。控制中心共 17 项，15 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
+- **2026-11-21**：新增独立窗口工具「动作衔接对比」（`motionCompare`，入口 `AdvancedTools/Tool_MotionCompare.html` + `Script_MotionCompare.mjs` + `Script_EditorMotionCompare.mjs`），归入「角色」分组；左右同步分屏实机对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / BlenderMCP 9 帧 Aim Offset / 开火叠加 / 第一人称双腿防穿插 / WASD 沙盒）。控制中心共 18 项，16 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
 
 ## 精简测试界面
 

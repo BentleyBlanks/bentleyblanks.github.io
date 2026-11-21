@@ -73,7 +73,7 @@ try {
   // --- 1. 控制中心 -----------------------------------------------------------------
   if (!only || only.has("center")) {
     const { page, errors } = await OpenPage(`${base}ControlCenter.html`);
-    await page.waitForFunction(() => document.querySelectorAll("[data-home-tool]").length >= 17, null, { timeout: 60000 });
+    await page.waitForFunction(() => document.querySelectorAll("[data-home-tool]").length >= 18, null, { timeout: 60000 });
     const info = await page.evaluate(() => ({
       title: document.title, brand: document.querySelector(".edMenuBrand")?.textContent,
       groups: [...document.querySelectorAll(".edHomeGroup")].map((group) => ({ id: group.dataset.group, label: group.querySelector(".edHomeGroupLabel")?.textContent })),
@@ -85,7 +85,7 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("17 张卡片", info.cards.length === 17, String(info.cards.length));
+    Check("18 张卡片", info.cards.length === 18, String(info.cards.length));
     const card = (id) => info.cards.find((entry) => entry.id === id);
     Check("文案取 TOOL_INFO 的 label / hint", info.cards.every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
     for (const id of WINDOW_TOOL_IDS) {
@@ -186,6 +186,7 @@ try {
     ["场景编辑器", "SceneEditor.html?scene=FirstLevelWhitebox", () => window.SceneEditor && document.getElementById("seCanvas")],
     ["遭遇设计", "Tool_LevelFlow.html?t=384", () => window.LevelFlow && document.getElementById("flowMap")],
     ["Mixamo 动作预览", "Tool_MixamoAnimationPreview.html?who=oldGeng", () => window.__preview?.action && document.getElementById("who")?.value === "oldGeng"],
+    ["动作衔接对比", "Tool_MotionCompare.html", () => window.MotionCompare?.ready && window.MotionCompare.state().aimOffsetLoaded],
     ["贴图管理", "TextureManager.html", () => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas")],
   ];
   for (const [label, rel, ready] of windows) {
