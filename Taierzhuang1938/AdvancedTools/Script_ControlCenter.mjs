@@ -2,8 +2,8 @@
 //
 // 版式照游戏内的工具首页 Script_EditorHome（World at War 主题：卡片网格、按 Data_DevTools.TOOL_MENUS 分六组）。
 // 三种卡片：
-//   · 独立窗口页（场景编辑器 / 遭遇设计 / Mixamo 动作预览 / 贴图管理）：打开各自的页面，窗口参数取 TOOL_INFO.window；
-//   · 摄影棚类九个工具：打开独立工具宿主 Tool_Studio.html?tool=<id>；
+//   · 独立窗口页：打开各自的页面，窗口参数取 TOOL_INFO.window；
+//   · 摄影棚类工具：打开独立工具宿主 Tool_Studio.html?tool=<id>；
 //   · 留在游戏里的工具（标「游戏内」）：链到游戏现有入口——白盒 / Timeline / 环境用各自入口类的 Url()（与游戏内入口完全一致），
 //     其余走 ../index.html?editor=tools&tool=<id>（需要选关卡的工具，游戏的工具首页会先弹「载入哪一关」）。
 // Debug工具不列。文案取 TOOL_INFO 的 label / hint。

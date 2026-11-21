@@ -30,30 +30,24 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, dev
 const problems = [];
 page.on("pageerror", (error) => problems.push(String(error)));
 try {
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?quality=low&scale=small&phase=0&menu=0`,
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_WeaponInspection.html`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
-  await page.evaluate(() => { const T = window.Taierzhuang; T.StepFrames(10); T.Debug.OpenEditor("weapon"); T.StepFrames(5); });
+  await page.waitForFunction(() => window.WeaponInspection !== undefined, null, { timeout: 60000 });
 
   const icons = {};
   for (const id of IDS) {
     const shot = await page.evaluate(async ({ id, metersPerPx, fill }) => {
-      const T = window.Taierzhuang;
-      const THREE = await import("./vendor/three/build/three.module.js");
-      const editor = T.editor.active;
-      editor.spin = false;
-      editor.SetMode("bench");
-      editor.SetWeapon(id, 0);
-      T.StepFrames(2);
-      if (!editor.benchGroup) return null;
+      const THREE = await import("three");
+      const model = await window.WeaponInspection.Select(id);
+      if (!model) return null;
 
       // 只要枪本体：挂点小方块（MeshBasicMaterial）与藏着的台架刺刀不进剪影。
       const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const scene = new THREE.Scene();
       scene.matrixWorldAutoUpdate = false;
       const parts = [];
-      editor.benchGroup.updateWorldMatrix(true, true);
-      editor.benchGroup.traverseVisible((child) => {
+      model.body.updateWorldMatrix(true, true);
+      model.body.traverseVisible((child) => {
         if (!child.isMesh || child.material?.isMeshBasicMaterial) return;
         if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
         parts.push({ geometry: child.geometry, matrix: child.matrixWorld.clone() });

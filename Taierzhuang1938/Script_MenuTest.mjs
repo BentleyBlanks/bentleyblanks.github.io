@@ -518,11 +518,11 @@ async function CheckInterface() {
   await page.locator('[data-setting="tools"]').click();
   await page.locator('[data-action="openTools"]').click();
   await page.waitForFunction(() => window.Taierzhuang?.editor?.panelOpen, null, {timeout: 240000});
-  // 高级工具是菜单栏 + Inspector：先点「武器」菜单，再点下拉里的「枪械」
+  // 「第一人称持枪检查」仍在高级工具的 Inspector 中。
   await page.locator('#edRoot .edMenu[data-menu="weapon"] > .edMenuTitle').click();
-  await page.locator('[data-editor="weapon"]').click();
+  await page.locator('[data-editor="firstPerson"]').click();
   await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
-  await Shot("Weapon");
+  await Shot("FirstPerson");
   Check('编辑器工作窗关闭按钮可聚焦',await page.locator('#edRoot .edPanel.work .edX').evaluate(el=>el.tagName==='BUTTON'&&!!el.getAttribute('aria-label')));
   const popupPromise=page.waitForEvent('popup');
   // Profiler 属于 设置 → Debug工具；这里走那一页背后的同一个开关
@@ -539,7 +539,7 @@ async function CheckInterface() {
       return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,bodyOverflow:body.scrollWidth>body.clientWidth+1};
     });
     Check(name+'工具窗边界与内容可达',fits.left>=0&&fits.right<=width&&fits.top>=0&&fits.bottom<=height&&!fits.bodyOverflow,JSON.stringify(fits));
-    await Shot('Weapon'+name);
+    await Shot('FirstPerson'+name);
   }
   // 标题菜单进来的是工具首页：退出 = 整页回独立标题菜单
   Check('标题菜单进高级工具不建关卡',await page.evaluate(()=>window.Taierzhuang.editor.host.game.PHASES.map(p=>p.id).join()==='ToolsHome'));

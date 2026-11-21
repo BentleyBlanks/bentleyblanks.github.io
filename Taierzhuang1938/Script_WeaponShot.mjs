@@ -53,26 +53,24 @@ fs.mkdirSync(outDir, { recursive: true });
 
 // 台架把枪绕 Y 转了 90°，所以**枪管轴 = 世界 X、枪口在 -X**；
 // 相机 yaw=π（站在 -Z）时枪口朝屏幕右。下面所有机位都按这个约定写。
-const PI = Math.PI;
 const WEAPONS = [
-  { id: "ZhongZheng", len: 1.11 },
-  { id: "HanYang", len: 1.25 },
-  { id: "Type38", len: 1.276 },
-  { id: "Zb26", len: 1.165 },
+  { id: "ZhongZheng" },
+  { id: "HanYang" },
+  { id: "Type38" },
+  { id: "Zb26" },
   // 外购九毫米。**这一支曾经漏在名单外**，于是它在加载画面上碎成一堆尖片、
   // 枪口挂点长在握把底下，谁都没看见 —— 名单漏一把，等于那把枪没人验收。
-  { id: "ServicePistol", len: 0.222, closeAt: -0.02 },
-  { id: "Grenade", len: 0.22, upright: true },
-  // 集束不是普通木柄弹的缩放版；单列出图，保证七枚与捆扎绳的剪影有人验收。
-  { id: "GrenadeBundle", len: 0.26, upright: true },
-  { id: "Dadao", len: 0.90, upright: true },
+  { id: "ServicePistol", closeAt: -0.02 },
+  { id: "Grenade" },
+  { id: "GrenadeBundle" },
+  { id: "Dadao" },
   // 带三脚架的架设重机枪必须进入固定台架出图，避免被手持枪姿态托到半空。
-  { id: "Type92Hmg", len: 1.156, upright: true },
+  { id: "Type92Hmg" },
   // 用户提供的卢沟桥合集。识别未定的组件也进入固定台架出图，防止“加进表里但
   // 从来没人看过”再发生；它们不进入第一人称玩法时仍可在这里逐件验收贴图。
-  { id: "OfficerSwordSet", len: 1.000 },
-  { id: "MediumMortar", len: 1.444, upright: true },
-  { id: "Type11", len: 1.100 },
+  { id: "OfficerSwordSet" },
+  { id: "MediumMortar" },
+  { id: "Type11" },
 ];
 
 const VIEWPORT = { width: 1280, height: 720 };
@@ -92,98 +90,115 @@ page.on("console", (message) => {
   problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
 });
 
-// menu=0：跳过主菜单直接进关。菜单是一整层盖在 canvas 上的 DOM，
-// 出图要的是台架那一帧，不是菜单的运镜。
 try {
-await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "weapons=1&shot=1&manual=1" : "phase=0"}&menu=0`,
-  { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
-await page.evaluate(() => window.Taierzhuang.StepFrames(30));
-await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("weapon"));
-await page.evaluate(() => window.Taierzhuang.StepFrames(10));
+if (firstPerson || reloadSheet) {
+  await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "weapons=1&shot=1&manual=1" : "phase=0"}&menu=0&audio=0`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+  await page.addStyleTag({ content: ".edPanel, .edGear, .edMenuBar, .edFpsMountHud, .edFpsLegend, .edCross, #hud, .hud { display: none !important; }" });
+} else {
+  await page.goto(`${baseUrl}/Taierzhuang1938/AdvancedTools/Tool_WeaponInspection.html`, { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.WeaponInspection !== undefined, null, { timeout: 60000 });
+  await page.addStyleTag({ content: `
+    .tool-header, .catalog, .details, .view-bar, .bench-footer { display: none !important; }
+    .workspace { display: block; height: 100dvh; min-height: 0; padding: 0; }
+    .bench { height: 100%; border: 0; }
+  ` });
+}
 
-// 面板与 HUD 挡住展台就白拍了。出图期间整个 DOM 层收掉，只留 canvas。
-await page.addStyleTag({ content: ".edPanel, .edGear, .edMenuBar, .edFpsMountHud, .edFpsLegend, .edCross, #hud, .hud { display: none !important; }" });
+const Sheet = async (entry) => page.evaluate(async ({ w, flatMode, debug }) => {
+  const THREE = await import("three");
+  const { scene: stage, Select } = window.WeaponInspection;
+  const model = await Select(w.id, w.variant || 0);
+  if (!model) throw new Error(`检查台没有载入模型：${w.id}`);
+  stage.Resize();
 
-const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
-  const T = window.Taierzhuang;
-  const THREE = await import("./vendor/three/build/three.module.js");
-  const editor = T.editor.ActiveId === "weapon" ? T.editor.active : T.editor.Open("weapon");
-  editor.spin = false;
-  editor.SetWeapon(w.id, w.variant || 0);
-  T.StepFrames(2);
-
-  // 纯色对照：把台架上每块网格的材质换成同色系的无贴图 PBR。
-  // 换的是 mesh.material 引用，不动材质库里的那一份（那是全场共用的）。
-  //
-  // 认桶靠**引用相等**，不是 material.name —— MaterialLibrary 出的材质根本没设
-  // name（设 name 的只有 Script_Actor 里那组一次性的 SentinelMaterials）。
-  // 照着 name 分桶的话每一块都落进 else 分支，整支枪会被刷成同一种材质，
-  // 对照图看起来"和有贴图的一模一样"，得出的结论是反的。
-  if (flatMode && editor.benchGroup) {
-    // 页面已经加载过 three，上面的 import 拿到的是同一个模块实例（不是第二份库）
-    const plain = {
-      steel: new THREE.MeshStandardMaterial({ color: 0x3B3E42, roughness: 0.55, metalness: 0.85 }),
-      blade: new THREE.MeshStandardMaterial({ color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
-      grip: new THREE.MeshStandardMaterial({ color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
-      wood: new THREE.MeshStandardMaterial({ color: 0x6A472B, roughness: 0.8, metalness: 0 }),
-      accessory: new THREE.MeshStandardMaterial({ color: 0x7A6A52, roughness: 0.95, metalness: 0 }),
-      red: new THREE.MeshStandardMaterial({ color: 0x9E2B22, roughness: 0.92, metalness: 0 }),
-    };
-    const byRef = new Map();
-    for (const key of Object.keys(plain)) {
-      if (editor.materials && editor.materials[key]) byRef.set(editor.materials[key], plain[key]);
+  // 给取证网格临时换材质引用，材质库继续持有原材质。
+  const palette = {
+    steel: [0x3b3e42, .55, .85], blade: [0x929aa2, .34, .95], grip: [0x8f7c61, .78, 0],
+    wood: [0x6a472b, .8, 0], accessory: [0x7a6a52, .95, 0], red: [0x9e2b22, .92, 0],
+  };
+  const bucket = new Map(Object.entries(stage.materials).map(([key, material]) => [material, key]));
+  const replacements = new Map();
+  const temporary = [];
+  const Diagnostic = (material) => {
+    const { side, normalMap, normalScale } = material;
+    if (debug === "normal") return new THREE.MeshNormalMaterial({ side, normalMap, normalScale, toneMapped: false });
+    if (debug === "baseColor") return new THREE.MeshBasicMaterial({ side, color: material.color, map: material.map, toneMapped: false });
+    const roughness = debug === "roughness";
+    const factor = roughness ? material.roughness : material.metalness;
+    const map = roughness || material.userData.ormUniforms?.metalness ? material.roughnessMap : material.metalnessMap;
+    const preview = new THREE.MeshBasicMaterial({ side, color: new THREE.Color().setScalar(factor), map, toneMapped: false });
+    if (map) {
+      const channel = roughness ? "g" : "b";
+      preview.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>",
+          `diffuseColor.rgb *= texture2D(map, vMapUv).${channel};`);
+      };
+      preview.customProgramCacheKey = () => debug;
     }
-    editor.benchGroup.traverse((child) => {
-      if (!child.isMesh || !child.material || child.material.isMeshBasicMaterial) return;
-      child.material = byRef.get(child.material) || plain.steel;
+    return preview;
+  };
+  if (flatMode || debug !== "final") {
+    model.body.traverseVisible((mesh) => {
+      if (!mesh.isMesh) return;
+      let material = mesh.material;
+      replacements.set(mesh, material);
+      if (flatMode) {
+        const key = mesh.userData.weaponSurface || bucket.get(material);
+        const [color, roughness, metalness] = palette[key] || palette.steel;
+        material = new THREE.MeshStandardMaterial({ color, roughness, metalness, side: material.side });
+        temporary.push(material);
+      }
+      if (debug !== "final") {
+        material = Diagnostic(material);
+        temporary.push(material);
+      }
+      mesh.material = material;
     });
   }
 
-  const src = document.getElementById("view");
+  const src = stage.canvas;
   const cw = 640, ch = 360;
   const sheet = document.createElement("canvas");
-  sheet.width = cw * 2; sheet.height = ch * 2;
+  sheet.width = cw * 2;
+  sheet.height = ch * 2;
   const ctx = sheet.getContext("2d");
-  // 不再猜“平举 1.1 m / 竖放半个枪长”：架设武器现在按真实包围盒落地，刀具
-  // 也可能在 ActorGeometry 中转过轴。直接从最终台架组取中心与跨度，截图才能
-  // 与编辑器所见严格一致，不会把高射炮或三脚架的上半截裁掉。
-  const bounds = new THREE.Box3().setFromObject(editor.benchGroup);
-  const center = bounds.getCenter(new THREE.Vector3());
-  const span = bounds.getSize(new THREE.Vector3());
-  const centerY = center.y;
-  const wide = Math.max(0.75, w.len * 1.8, span.x * 2.0, span.y * 2.0);
   const views = [
-    { name: "正侧", yaw: Math.PI, pitch: 0.05, dist: wide, tx: 0, ty: centerY },
-    { name: "俯视", yaw: Math.PI, pitch: 1.20, dist: wide, tx: 0, ty: centerY },
-    { name: "四分之三", yaw: Math.PI + 0.85, pitch: 0.32, dist: wide * 0.9, tx: 0, ty: centerY },
-    {
-      name: "机匣特写", yaw: Math.PI + 0.45, pitch: 0.20,
-      dist: Math.max(0.26, Math.min(wide * 0.65, Math.max(span.x, span.y, span.z) * 0.65)),
-      tx: w.closeAt != null ? w.closeAt : center.x,
-      ty: centerY + span.y * 0.18,
-    },
+    { name: "正侧", yaw: Math.PI, pitch: .05 },
+    { name: "俯视", yaw: Math.PI, pitch: 1.20 },
+    { name: "四分之三", yaw: Math.PI + .85, pitch: .32 },
+    { name: "机匣特写", yaw: Math.PI + .45, pitch: .20, detail: true },
   ];
-  for (let i = 0; i < views.length; i += 1) {
-    const v = views[i];
-    const orbit = editor.studio.orbit;
-    orbit.yaw = v.yaw; orbit.pitch = v.pitch; orbit.dist = v.dist;
-    orbit.target.set(v.tx, v.ty, 0);
-    editor.studio.ApplyCamera();
-    T.StepFrames(2);
-    const x = (i % 2) * cw, y = Math.floor(i / 2) * ch;
-    ctx.drawImage(src, 0, 0, src.width, src.height, x, y, cw, ch);
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(x + 6, y + 6, 96, 24);
-    ctx.fillStyle = "#fff";
-    ctx.font = "15px sans-serif";
-    ctx.fillText(v.name, x + 14, y + 23);
+  ctx.fillStyle = "#d5dddf";
+  ctx.fillRect(0, 0, sheet.width, sheet.height);
+  try {
+    for (const [i, view] of views.entries()) {
+      stage.SetView(view.yaw, view.pitch);
+      if (view.detail) {
+        stage.zoom = 2.35;
+        stage.center.x += w.closeAt ?? 0;
+        stage.center.y += model.size.y * .18;
+      }
+      stage.Draw();
+      const x = (i % 2) * cw, y = Math.floor(i / 2) * ch;
+      ctx.drawImage(src, 0, 0, src.width, src.height, x, y, cw, ch);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(x + 6, y + 6, 96, 24);
+      ctx.fillStyle = "#fff";
+      ctx.font = "15px sans-serif";
+      ctx.fillText(view.name, x + 14, y + 23);
+    }
+  } finally {
+    for (const [mesh, original] of replacements) mesh.material = original;
+    for (const material of temporary) material.dispose();
   }
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.strokeRect(cw, 0, 0.5, ch * 2);
   ctx.strokeRect(0, ch, cw * 2, 0.5);
   return sheet.toDataURL("image/png");
-}, { w: entry, flatMode: flat });
+}, { w: entry, flatMode: flat, debug: debugView });
 
 /** 第一人称四格：腰射 / 开镜 / 开火那一帧 / 拉栓中。 */
 const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
@@ -285,7 +300,7 @@ if (reloadSheet) list = list.filter(entry => weaponDefinitions[entry.id]?.ammo &
 // 手枪暂时停用：台架上照样出模型图，第一人称持握和换弹图不出。
 if (firstPerson || reloadSheet) list = list.filter(entry => !WeaponShelved(entry.id));
 for (const entry of list) {
-  await page.evaluate(({ view, materialMode }) => {
+  if (firstPerson || reloadSheet) await page.evaluate(({ view, materialMode }) => {
     const T = window.Taierzhuang;
     if (T.library?.gi) T.library.gi.debugView.value = materialMode;
     T.post.SetDebugView(view, T.gi, !!T.library?.gi);

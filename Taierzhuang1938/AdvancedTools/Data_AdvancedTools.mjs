@@ -1,18 +1,18 @@
 // AdvancedTool ControlCenter 的目录表：纯值、零依赖（不 import 任何模块，node 测试与控制中心页都能直接读）。
 //
 // 分三类：
-//   · studio：八个摄影棚类工具，跑在独立工具宿主 Tool_Studio.html?tool=<id> 里；
-//   · window：七个独立窗口工具（页面地址与窗口参数在 Data_DevTools.TOOL_INFO.window）；
+//   · studio：共享独立工具宿主 Tool_Studio.html?tool=<id>；
+//   · window：独立窗口（页面地址与窗口参数在 Data_DevTools.TOOL_INFO.window）；
 //   · game：留在游戏里的工具（白盒关卡与 Timeline），控制中心只列一张「游戏内」卡片链到游戏现有入口。
 // Debug工具不列。Tool_FirstLevelSpaceMap.html、Probe.html 不在这里。
 //
 // 路径口径：下面的地址都以 AdvancedTools/ 目录里的页面为基准（`./` = AdvancedTools/，`../` = Taierzhuang1938/）。
 
 export const STUDIO_TOOL_IDS = Object.freeze([
-  "assetStandards", "audio", "props", "actor", "facial", "weapon", "firstPerson", "vfx",
+  "assetStandards", "audio", "props", "actor", "facial", "firstPerson", "vfx",
 ]);
 
-export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "textures", "splines", "propPcg"]);
+export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "weapon", "textures", "splines", "propPcg"]);
 
 export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
 

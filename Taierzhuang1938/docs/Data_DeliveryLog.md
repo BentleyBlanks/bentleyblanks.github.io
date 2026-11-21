@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **独立枪械检查台（2026-11-22）**。ControlCenter 开独立窗口，模型列表、大视口和只读信息并列。中性灯光、比例尺、三向观察和附件叠层用于检查模型。旧地址及台架出图脚本接到新页面。[枪械检查台](Data_EditorSuite.md#枪械检查台)
+
 - **Profiler 逐帧导出（2026-11-20）**。主界面保留帧图、卡点和数据表，点击卡点定位到具体插桩。Encounter Designer 记录地形、场景叠层、WebGL 提交和 `gl.readPixels` 等 CPU 子项。JSON 保存逐实例样本、所选帧、预览视口和已完成的函数采样。验收入口为 `Script_LevelFlowDebugBrowserTest` 和 `Script_ProfilerRecordingTest`。[Profiler](Data_EditorSuite.md#profiler-script_editorprofilermjs叠加层独立窗口)
 
 - **全屏胶片颗粒（2026-11-18）**：画质 → 后处理强度新增「颗粒大小」，原「颗粒」倍率改为真正可见的胶片颗粒的强度。旧颗粒是线性空间的 1 像素白噪声（折到 sRGB 约 1/255，看不见）；新颗粒在 sRGB 域叠加、有颗粒尺寸、按亮度分响应（黑位与高光渐隐，平均亮度不变）、按 24 Hz 换花样、带少量彩色。出厂强度 0.011（夜战关 0.014；第三轮用户反馈「变换频率太快、更稀碎更柔和，对标 COD14」：换花样 24→8 Hz 且相邻种子平滑过渡、颗粒格 1.0→1.35、彩色 0.2→0.15），「颗粒」拖到 0 整段跳过、逐比特等于没有颗粒。画质档新增算法位 `filmGrain`（low 便宜路径）。数值在 `Data_Tuning_Camera.FILM_GRAIN`，口径见[渲染管线 §14](Data_TechRenderPipeline.md)，门禁 `Script_FilmGrainTest`。已有存档里的「颗粒」倍率沿用（旧键 `grain`），新键 `grainSize` 缺项时取出厂值。

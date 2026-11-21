@@ -1,7 +1,7 @@
 // 高级工具拆分（AdvancedTools/）纯 Node 门禁。
 //
 // 查：
-//   1. 目录表 Data_AdvancedTools 与 Data_DevTools 对得上：split 的 15 项 = 独立窗口 7 + 摄影棚 8，其余 2 项留游戏里；
+//   1. 目录表 Data_AdvancedTools 与 Data_DevTools 对账，分别检查独立窗口、摄影棚、游戏内入口；
 //   2. 搬走的页面都在 AdvancedTools/，旧位置不留跳转壳；
 //   3. 独立窗口入口类解析出的仍是 AdvancedTools/<页面>；
 //   4. 控制中心卡片：17 张、六组、地址与「游戏内」标注都对；
@@ -44,12 +44,14 @@ Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, m
 Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 17);
 
 // --- 2. 搬家 ---------------------------------------------------------------------
-const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "TextureManager.html", "Tool_Studio.html", "ControlCenter.html"];
+const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html",
+  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_Studio.html", "ControlCenter.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
 Check("旧位置不留跳转壳", pages.slice(0, 5).every((page) => !fs.existsSync(path.join(projectDir, page))));
-Check("八个摄影棚编辑器与五个入口类都在 AdvancedTools/", ["Actor", "Facial", "Weapon", "FirstPerson", "Vfx", "Audio", "PropLibrary", "AssetStandards",
-  "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "Textures"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
+Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "Vfx", "Audio", "PropLibrary", "AssetStandards",
+  "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
+Check("旧枪械工作窗已移除", !fs.existsSync(path.join(toolsDir, "Script_EditorWeapon.mjs")));
 
 Check("PCG 验证界面迁入独立工具目录", ["Splines", "PropPcg"].every((id) => fs.existsSync(path.join(toolsDir, `Script_Editor${id}.mjs`)) && !fs.existsSync(path.join(projectDir, `Script_Editor${id}.mjs`))));
 Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPersonMotion.mjs", "Script_EditorFirstPersonMotionBrowserTest.mjs"].every((file) => !fs.existsSync(path.join(projectDir, file))));
@@ -63,6 +65,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["levelFlow", "Script_EditorLevelFlow.mjs", "LevelFlowEntry", "Tool_LevelFlow.html"],
     ["mixamoPreview", "Script_EditorMixamoPreview.mjs", "MixamoPreviewEditor", "Tool_MixamoAnimationPreview.html"],
     ["motionCompare", "Script_EditorMotionCompare.mjs", "MotionCompareEditor", "Tool_MotionCompare.html"],
+    ["weapon", "Script_EditorWeaponEntry.mjs", "WeaponInspectionEntry", "Tool_WeaponInspection.html"],
     ["textures", "Script_EditorTextures.mjs", "TextureEditor", "TextureManager.html"],
     ["splines", "Script_EditorPcgEntry.mjs", "SplineEntry", "Tool_Pcg.html"],
     ["propPcg", "Script_EditorPcgEntry.mjs", "PropPcgEntry", "Tool_Pcg.html"],

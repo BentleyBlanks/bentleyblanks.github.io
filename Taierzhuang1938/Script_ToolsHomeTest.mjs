@@ -1,6 +1,6 @@
 // 高级工具首页（?editor=tools 不带关卡，Data_ToolsHome / Script_EditorHome）的浏览器回归：
 //   1. 不建任何关卡：PHASES 只有 ToolsHome 那一片，工具首页显示、空 Inspector 不显示；
-//   2. 摄影棚类工具（枪械）在首页上直接开，Esc 回首页；
+//   2. 摄影棚类工具在首页上直接开，Esc 回首页，枪械检查台打开独立窗口；
 //   3. 场景类工具弹「载入哪一关」，选一关后整页换到 ?phase=N&editor=tools&tool=<id>；
 //   4. 首页上 Esc 回独立标题菜单（URL 去掉 editor）。
 // 用法：node Taierzhuang1938/Script_ToolsHomeTest.mjs   截图在 _shots/ToolsHome/
@@ -36,15 +36,22 @@ try {
 
     if (name === "Desktop") {
       // 摄影棚工具直接开；Esc 回首页
-      await page.click('#edRoot .edHomeTool[data-home-tool="weapon"]');
+      await page.click('#edRoot .edHomeTool[data-home-tool="firstPerson"]');
       await page.waitForSelector("#edRoot .edPanel.work");
-      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), "weapon");
+      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), "firstPerson");
       assert.equal(await page.locator("#edRoot .edHome").isHidden(), true);
       await page.evaluate(() => window.Tengxian.StepFrames?.(5));
-      await page.screenshot({ path: path.join(out, "WeaponFromHome.png") });
+      await page.screenshot({ path: path.join(out, "FirstPersonFromHome.png") });
       await page.keyboard.press("Escape");
       assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null);
       assert.equal(await page.locator("#edRoot .edHome").isVisible(), true, "Esc 先回首页");
+
+      const weaponReady = page.waitForEvent("popup");
+      await page.click('#edRoot .edHomeTool[data-home-tool="weapon"]');
+      const weapon = await weaponReady;
+      await weapon.waitForURL(`${base}AdvancedTools/Tool_WeaponInspection.html`);
+      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null, "游戏宿主未打开枪械工作窗");
+      await weapon.close();
 
       // PCG 卡片打开独立验证宿主。
       const popupReady = page.waitForEvent("popup");

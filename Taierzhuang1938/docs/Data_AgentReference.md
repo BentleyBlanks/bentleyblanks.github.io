@@ -19,7 +19,7 @@
 ```powershell
 node Taierzhuang1938/Script_ShotTest.mjs                        # 正片固定镜头（--probe / --only=名字）
 node Taierzhuang1938/Script_DressingShot.mjs --phase=5 --x=...  # 布设自验：任意机位拍当前城
-node Taierzhuang1938/Script_WeaponShot.mjs                      # 枪械台架四宫格（近距离穿模只有它拍得出）
+node Taierzhuang1938/Script_WeaponShot.mjs                      # 从独立枪械检查台生成四宫格
 node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图；姿态图 Script_ActorPoseShot.mjs
 ```
 

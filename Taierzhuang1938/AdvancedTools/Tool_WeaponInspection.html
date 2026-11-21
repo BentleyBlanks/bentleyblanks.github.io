@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../">
+  <title>枪械检查台 · 血战滕县</title>
+  <link rel="icon" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs"></script>
+</head>
+<body>
+  <header class="tool-header">
+    <div class="tool-title">
+      <span class="viewfinder" aria-hidden="true"></span>
+      <h1>枪械检查台</h1>
+      <span class="readonly">只读</span>
+    </div>
+    <a id="controlCenter" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel catalog" aria-labelledby="catalogTitle">
+      <header class="panel-header">
+        <h2 id="catalogTitle">模型列表</h2>
+        <output id="catalogCount" for="modelSearch"></output>
+      </header>
+      <div class="search">
+        <input id="modelSearch" type="search" aria-label="搜索模型名称或编号" placeholder="搜索名称或编号" autocomplete="off">
+      </div>
+      <div id="modelList" class="model-list"></div>
+    </aside>
+
+    <section class="panel bench" aria-label="模型视口">
+      <div class="view-bar">
+        <div class="view-presets" role="group" aria-label="观察方向">
+          <button type="button" data-view="side" aria-pressed="false">正侧</button>
+          <button type="button" data-view="angle" aria-pressed="true">斜视</button>
+          <button type="button" data-view="top" aria-pressed="false">俯视</button>
+        </div>
+        <div class="view-zoom" role="group" aria-label="视口缩放">
+          <button type="button" data-zoom="out" aria-label="缩小">−</button>
+          <button type="button" data-zoom="in" aria-label="放大">+</button>
+          <button type="button" id="fitView">适配</button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <canvas id="view" tabindex="0" aria-label="三维模型，方向键旋转，Shift 加方向键平移，正负号缩放" aria-describedby="viewHint"></canvas>
+        <span class="mount mount-muzzle" id="muzzleLabel" hidden>枪口</span>
+        <span class="mount mount-grip" id="gripLabel" hidden>前握</span>
+        <div class="scale" id="viewScale" hidden><span id="scaleValue"></span></div>
+        <div class="stage-status" id="stageStatus">
+          <span id="loadMessage" role="status">正在载入模型…</span>
+          <button type="button" id="retryLoad" hidden>重试</button>
+        </div>
+      </div>
+
+      <footer class="bench-footer">
+        <div class="overlays" role="group" aria-label="预览叠层">
+          <button type="button" id="gridToggle" aria-pressed="true">网格</button>
+          <button type="button" id="mountToggle" aria-pressed="false">挂点</button>
+          <button type="button" id="bayonetToggle" aria-pressed="false" hidden>刺刀预览</button>
+        </div>
+        <span id="viewHint">左键旋转 · 右键平移 · 滚轮缩放</span>
+      </footer>
+    </section>
+
+    <aside class="panel details" aria-labelledby="detailsTitle">
+      <header class="panel-header"><h2 id="detailsTitle">模型信息</h2></header>
+      <div class="model-heading">
+        <h3 id="modelName"></h3>
+        <p id="modelFullName"></p>
+        <code id="modelId"></code>
+      </div>
+      <dl class="facts">
+        <div><dt>类别</dt><dd id="modelKind"></dd></div>
+        <div><dt>阵营</dt><dd id="modelSide"></dd></div>
+        <div class="file"><dt>模型文件</dt><dd id="modelFile"></dd></div>
+        <div><dt>三角面</dt><dd id="modelTriangles"></dd></div>
+      </dl>
+      <div class="bounds">
+        <h3>模型尺寸 <small>mm</small></h3>
+        <dl class="facts">
+          <div><dt>横向</dt><dd id="sizeX">—</dd></div>
+          <div><dt>竖向</dt><dd id="sizeY">—</dd></div>
+          <div><dt>纵深</dt><dd id="sizeZ">—</dd></div>
+        </dl>
+      </div>
+      <p class="resource-note" id="resourceNote" role="status" hidden></p>
+    </aside>
+  </main>
+</body>
+</html>

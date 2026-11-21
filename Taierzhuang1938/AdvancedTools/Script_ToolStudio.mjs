@@ -13,7 +13,6 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
@@ -23,7 +22,7 @@ import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
 
 /** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页，不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
+  ActorEditor, FacialEditor, FirstPersonEditor, VfxEditor, AudioEditor,
   PropLibraryEditor, AssetStandardsEditor,
 ]);
 
@@ -412,6 +411,10 @@ function StepFrame(base, studio, dt) {
 
 async function Main() {
   const params = new URLSearchParams(location.search);
+  if (params.get("tool") === "weapon") {
+    location.replace(new URL(TOOL_INFO.weapon.window.url, document.baseURI));
+    return;
+  }
   const bootEl = document.getElementById("tsBoot");
   const stepEl = document.getElementById("tsBootStep");
   const barEl = document.getElementById("tsBootBar");

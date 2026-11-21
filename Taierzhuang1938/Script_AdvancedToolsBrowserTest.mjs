@@ -3,10 +3,9 @@
 // 查：
 //   1. 控制中心 ControlCenter.html：17 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
 //      点一张摄影棚卡片真能开出独立工具宿主；
-//   2. 独立工具宿主 Tool_Studio.html?tool=<id>：八个摄影棚类工具逐个开，工作窗 .edPanel.work 出现、没有 console.error / pageerror、
+//   2. 独立工具宿主 Tool_Studio.html?tool=<id>：摄影棚工具逐个开，工作窗 .edPanel.work 出现、没有 console.error / pageerror、
 //      画布不是一片纯色；菜单栏只列摄影棚类工具、可在页内切换、有「返回控制中心」；无 tool 参数时是空 Inspector；
-//   3. 四个搬走的独立页面（场景编辑器 / 遭遇设计 / Mixamo 动作预览 / 贴图管理）在新地址能开、没有报错，
-//      场景编辑器的 /__scene/status 存盘口状态照旧可读（走本机预览服时 writable 为布尔值）。
+//   3. 独立页面在新地址可用，枪械检查台覆盖独立开窗、真实模型和只读交互。
 //
 // 用法：node Taierzhuang1938/Script_AdvancedToolsBrowserTest.mjs [--only=actor,vfx] [--no-shots]
 
@@ -19,6 +18,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { TOOL_INFO } from "./Data_DevTools.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS } from "./AdvancedTools/Data_AdvancedTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
@@ -130,13 +130,13 @@ try {
     Check(`${id}：画布不是一片纯色`, spread > 12, `spread=${spread.toFixed(1)}`);
     Check(`${id}：没有 console.error / pageerror`, errors.length === 0, errors.slice(0, 3).join(" | "));
     if (id === STUDIO_TOOL_IDS[0]) {
-      Check("菜单栏只列八个摄影棚工具、有「返回控制中心」", [...probe.entries].sort().join(",") === [...STUDIO_TOOL_IDS].sort().join(",") && probe.back === "返回控制中心", probe.entries.join(","));
+      Check("菜单栏只列摄影棚工具、有「返回控制中心」", [...probe.entries].sort().join(",") === [...STUDIO_TOOL_IDS].sort().join(",") && probe.back === "返回控制中心", probe.entries.join(","));
       // 页内切换：一次只开一个
-      await page.evaluate(() => window.ToolStudio.Open("weapon"));
+      await page.evaluate(() => window.ToolStudio.Open("vfx"));
       await page.waitForTimeout(800);
       const switched = await page.evaluate(() => ({ active: window.ToolStudio.activeId, work: document.querySelectorAll(".edPanel.work").length,
         on: [...document.querySelectorAll(".edMenuItem.on")].map((item) => item.dataset.editor) }));
-      Check("页内切换工具：一次只开一个", switched.active === "weapon" && switched.on.join() === "weapon" && switched.work === 1, JSON.stringify(switched));
+      Check("页内切换工具：一次只开一个", switched.active === "vfx" && switched.on.join() === "vfx" && switched.work === 1, JSON.stringify(switched));
       await page.keyboard.press("Escape");
       const closed = await page.evaluate(() => ({ active: window.ToolStudio.activeId, work: document.querySelectorAll(".edPanel.work").length, empty: !document.getElementById("edInspectorEmpty")?.hidden }));
       Check("Esc 关掉当前工具回到空 Inspector", closed.active === null && closed.work === 0 && closed.empty, JSON.stringify(closed));
@@ -181,7 +181,140 @@ try {
     await page.close();
   }
 
-  // --- 3. 四个搬走的独立页面 ---------------------------------------------------------------
+  // --- 3. 独立页面 ----------------------------------------------------------------------
+  if (!only || only.has("weapon")) {
+    const { page: center, errors } = await OpenPage(`${base}ControlCenter.html`, { viewport: { width: 1440, height: 900 } });
+    const requests = [];
+    center.context().on("request", (request) => requests.push({ url: request.url(), method: request.method() }));
+    const link = center.locator('[data-home-tool="weapon"]');
+    const [page] = await Promise.all([center.waitForEvent("popup"), link.click()]);
+    page.on("pageerror", (error) => errors.push(String(error)));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    const WaitModel = (id) => page.waitForFunction((key) => document.querySelector("#view").dataset.state === "ready"
+      && window.WeaponInspection?.selected === key, id, { timeout: 60000 });
+    const Inspect = async (id) => {
+      await page.locator(`[data-model="${id}"]`).click();
+      await WaitModel(id);
+    };
+    await WaitModel("ZhongZheng");
+    const independent = await page.evaluate(() => ({
+      name: window.name, opener: window.opener?.location.pathname, models: document.querySelectorAll("[data-model]").length,
+      standalone: !window.ToolStudio && !window.Tengxian && !document.querySelector(".edMenuBar, .edPanel"),
+      noWrites: !document.querySelector("form, input:not([type=search]), [contenteditable]"),
+    }));
+    Check("控制中心启动有独立窗口名的只读枪械检查台",
+      page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
+      && independent.opener?.endsWith("/ControlCenter.html") && independent.standalone && independent.noWrites
+      && independent.models === Object.keys(WEAPONS).length, JSON.stringify(independent));
+    const pixels = await page.evaluate(() => {
+      const stage = window.WeaponInspection.scene;
+      stage.Draw();
+      const copy = document.createElement("canvas");
+      copy.width = stage.canvas.width;
+      copy.height = stage.canvas.height;
+      const ctx = copy.getContext("2d");
+      ctx.drawImage(stage.canvas, 0, 0);
+      const data = ctx.getImageData(0, 0, copy.width, copy.height).data;
+      let minX = copy.width, maxX = 0, count = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 245) continue;
+        const x = ((i - 3) / 4) % copy.width;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        count += 1;
+      }
+      return { count, left: minX / copy.width, right: maxX / copy.width,
+        triangles: stage.model.triangles, quiet: stage.model.blade?.visible === false };
+    });
+    Check("中正式真实模型在视口内居中且占主要宽度",
+      pixels.count > 2500 && pixels.left > .03 && pixels.right < .97 && pixels.right - pixels.left > .60
+      && pixels.triangles === 6703 && pixels.quiet, JSON.stringify(pixels));
+    if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
+
+    await page.locator('[data-view="top"]').click();
+    Check("俯视按钮实际切换相机", await page.evaluate(() => window.WeaponInspection.scene.pitch > 1.56));
+    await page.locator('[data-view="side"]').click();
+    const canvas = page.locator("#view");
+    const rect = await canvas.boundingBox();
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(rect.x + rect.width / 2 + 65, rect.y + rect.height / 2 + 25, { steps: 4 });
+    await page.mouse.up();
+    await page.mouse.wheel(0, -230);
+    await page.waitForFunction(() => window.WeaponInspection.scene.zoom > 1);
+    Check("拖动、滚轮和适配改变实际相机",
+      await page.evaluate(() => window.WeaponInspection.scene.yaw !== 0
+        && !document.querySelector('[data-view][aria-pressed="true"]')));
+    const beforePan = await page.evaluate(() => window.WeaponInspection.scene.center.toArray());
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(rect.x + rect.width / 2 + 103, rect.y + rect.height / 2 + 25, { steps: 3 });
+    await page.mouse.up({ button: "right" });
+    Check("右键拖动平移检视中心", await page.evaluate((before) => window.WeaponInspection.scene.center.toArray()
+      .some((value, index) => Math.abs(value - before[index]) > .01), beforePan));
+    await page.locator("#fitView").click();
+    Check("适配复位倍率", await page.evaluate(() => window.WeaponInspection.scene.zoom === 1));
+    await page.locator("#gridToggle").click();
+    await page.locator("#mountToggle").click();
+    await page.waitForFunction(() => !document.querySelector("#muzzleLabel").hidden && !document.querySelector("#gripLabel").hidden);
+    await page.locator("#bayonetToggle").click();
+    Check("网格、挂点、刺刀只切换预览状态", await page.evaluate(() => {
+      const stage = window.WeaponInspection.scene;
+      return !stage.grid.visible && stage.model.blade.visible && !document.querySelector("#muzzleLabel").hidden;
+    }));
+
+    const search = page.locator("#modelSearch");
+    await search.fill("zb26");
+    Check("可按编号搜索，过滤仅影响模型列表", await page.locator("[data-model]").count() === 1
+      && await page.locator("[data-model]").getAttribute("data-model") === "Zb26");
+    await Inspect("Zb26");
+    Check("换模型后同步数据、隐藏不可用的刺刀预览", await page.locator("#modelName").textContent() === "捷克式"
+      && await page.locator("#bayonetToggle").isHidden() && await page.locator("#bayonetToggle").getAttribute("aria-pressed") === "false");
+    await search.fill("no-such-model");
+    Check("搜索无结果有反馈且保留当前模型", await page.locator(".search-empty").isVisible() && await page.locator("#modelName").textContent() === "捷克式");
+    await search.clear();
+
+    const assets = await page.evaluate(async (ids) => {
+      const tool = window.WeaponInspection;
+      const { Box3 } = await import("three");
+      const details = {};
+      for (const id of ids) {
+        const model = await tool.Select(id);
+        if (!model) { details[id] = null; continue; }
+        model.group.updateMatrixWorld(true);
+        details[id] = {
+          minY: new Box3().setFromObject(model.body, true).min.y,
+          pitch: model.pose.rotation.x, span: model.size.toArray(), turret: !!model.nodes?.get("turret"), triangles: model.triangles,
+          file: model.file,
+        };
+      }
+      return details;
+    }, Object.keys(WEAPONS));
+    Check("所有模型条目都能绘制", Object.values(assets).every((model) => model?.triangles > 0),
+      Object.entries(assets).filter(([, model]) => !model?.triangles).map(([id]) => id).join(","));
+    const { Type92Hmg, MediumMortar, OfficerSwordSet, Type89Tank, HanYang, Type38 } = assets;
+    Check("架设武器按各自姿态落地，军刀横放，车辆保留炮塔，GLB 使用原模型",
+      [Type92Hmg, MediumMortar, Type89Tank].every((model) => Math.abs(model?.minY) < .005)
+      && Math.abs(Type92Hmg.pitch) < .001 && MediumMortar.pitch > 1 && MediumMortar.pitch < 1.15
+      && MediumMortar.span[1] > MediumMortar.span[0] * .9 && OfficerSwordSet?.span[0] > OfficerSwordSet?.span[1] * 5
+      && Type89Tank.turret && /173R.*\.glb$/.test(HanYang?.file) && /511.*\.glb$/.test(Type38?.file));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await Inspect("ZhongZheng");
+    if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionMobile.png") });
+    Check("窄窗口视口和控制可达、没有横向溢出", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
+      && document.querySelector("#view").clientWidth > 280 && document.querySelector("#view").clientHeight > 220));
+    Check("枪械检查台只读资源，不启动游戏与摄影棚", requests.length > 0
+      && requests.every(({ url, method }) => method === "GET" && !/Script_(Main|ToolStudioRenderBase)\.mjs|\/__scene\//.test(url)));
+    Check("枪械窗口没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await Promise.all([page.waitForEvent("close"), page.locator("#controlCenter").click()]);
+    Check("窗口内的控制中心入口返回原窗口", !center.isClosed() && center.url() === `${base}ControlCenter.html`);
+    await center.close();
+
+    const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=weapon`, { waitUntil: "commit" });
+    await legacy.waitForURL(`${base}Tool_WeaponInspection.html`);
+    Check("旧摄影棚链接直达枪械检查台", true);
+    await legacy.close();
+  }
+
   const windows = [
     ["场景编辑器", "SceneEditor.html?scene=FirstLevelWhitebox", () => window.SceneEditor && document.getElementById("seCanvas")],
     ["遭遇设计", "Tool_LevelFlow.html?t=384", () => window.LevelFlow && document.getElementById("flowMap")],
