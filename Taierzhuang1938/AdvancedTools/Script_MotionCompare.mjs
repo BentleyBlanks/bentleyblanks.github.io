@@ -1,12 +1,12 @@
 // 动作衔接对比工具（Tool_MotionCompare.html，2026-11-21）。
 //
 // 左右同步分屏实机对照 3C 动作系统优化前后（左：优化前旧方案；右：新 3C 体系 + BlenderMCP 9 帧精修 Aim Offset）：
-//   01 · 持枪横移与斜向跑动     — 2D Blend Space 相位同步 + Orientation Warping vs 单向播片硬漂
+//   01 · 持枪横移与斜向跑动     — 2D Blend Space 相位对齐（Sync Marker）+ 权重阻尼 + Orientation Warping vs 单向硬漂
 //   02 · 静止持枪原地转身       — Turn-in-Place（±44° 死区锁脚 + 迈步转身 + Hips 偏航剥离）vs 脚底抹油原地自转
 //   03 · 9 向精修 Aim Offset   — BlenderMCP 9 帧（Mesh-Space 脊柱 + Local-Space 锁骨/双臂贴腮）vs 无/纯数学脊柱
 //   04 · 跑动与横移中开火       — 上半身 Masked Additive 后坐（双腿 0° 透明）vs 切站立开火 0.35 s 冻腿滑冰
 //   05 · 综合实战机动           — 掩体警戒 → 扫视 → 迈步转向 → 斜前突击 → 跑动点射 → 停步蹲姿瞄准
-//   06 · 第一人称侧向双腿防穿插 — 真 FirstPersonGait 求解器对照（旧 11.8 cm 穿插 vs 新 15.6 cm 净距 + 0 mm 滑步）
+//   06 · 第一人称侧向双腿防穿插 — 真 FirstPersonGait 求解器对照（旧 11.8 cm 穿插 vs 新 15.5 cm 净距 + 0 mm 滑步）
 //   07 · 自由操控沙盒           — WASD 移动 + Shift 疾跑 + Q/E 转向 + C 蹲站 + F 点射 + 9 宫格瞄准
 
 import * as THREE from "three";
@@ -14,6 +14,7 @@ import { clone as CloneSkinned } from "../vendor/three/examples/jsm/utils/Skelet
 import { ManagedGLTFLoader as GLTFLoader } from "../Script_ModelImports.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { LoadModel } from "../Script_MeshLoad.mjs";
+import { LoadHanYang173R, HanYang173RBaseGain, InstantiateHanYang173R } from "../Script_HanYang173R.mjs";
 import { AimAt } from "../Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS } from "../Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "../Script_XBotCharacters.mjs";
@@ -31,7 +32,18 @@ const BASE = "./Animation/Mixamo/";
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
 
-const CHAR_KEYS = ["ijaJia", "xbot", "heYouTian", "oldGeng", "ijaYi", "ijaBing"].filter((k) => XBOT_CHARACTERS[k]);
+// 全部线上已配置角色（保留优先展示顺序：主角团 → 友军/百姓 → 日军 → X Bot）
+const PREFERRED_CHAR_ORDER = [
+  "heYoutian", "luo", "shunzi", "donggua", "yaowa", "oldGeng", "liuWencai",
+  "ijaJia", "ijaA", "ijaYi", "ijaC", "taniHisao", "azumaShiro",
+  "interpreter", "tianSao", "nier", "erya", "xbot",
+];
+const CHAR_KEYS = [
+  ...PREFERRED_CHAR_ORDER.filter((k) => XBOT_CHARACTERS[k]),
+  ...Object.keys(XBOT_CHARACTERS).filter((k) => !PREFERRED_CHAR_ORDER.includes(k)),
+];
+
+const RIFLE_LABELS = { HanYang: "汉阳造", Type38: "三八式", ZhongZheng: "中正式" };
 
 const XBOT_SPINE_CHAIN = [
   ["Spine", "spine"], ["Spine1", "spine1"], ["Spine2", "spine2"], ["Neck", "neck"], ["Head", "head"],
@@ -91,85 +103,85 @@ const SCENARIOS = [
     index: "01",
     name: "持枪横移与斜向跑动",
     tag: "2D 混合 + 扭曲",
-    hint: "枪口锁定前方靶标，身体斜前/纯侧/斜后连续换向机动",
+    hint: "枪口锁定前方靶标，身体斜前/纯侧/斜后平滑换向机动",
     defaultCam: "front34",
-    captionTitle: "对比要点：脚方向与移动方向是否贴合 · 下盘扭曲与上身反补",
-    captionDesc: "左（旧）：只能硬播单条前走/前跑动作横向硬漂，看地面网格就能看出双脚斜着滑步。右（新）：2D Blend Space 四向相位同步 + Orientation Warping 顺势扭胯 ±45° + 上身 9 帧 Aim Offset 反补锁靶。",
-    checklist: "观察步骤：注意地面移动网格与脚底的相对方向；也可切「俯视步法」机位，对比青色下盘箭头如何随绿色速度箭头顺势扭转，而黄色枪口箭头纹丝不动。",
+    captionTitle: "脚方向与移动方向贴合 · 下盘扭曲与上身反补",
+    captionDesc: "左（旧）：只能硬播单条前跑横向硬漂。右（新）：四向按左脚摆峰相位对齐 + 权重平滑阻尼 + 下盘扭胯 ±45° + 上身 9 帧精修反补锁靶。",
+    checklist: "观察要点：结合地面砖纹与位移轨迹点，可切「俯视步法」看青色下盘箭头如何顺着绿色速度方向扭转、黄色枪口方向纹丝不动。",
   },
   {
     id: "turnInPlace",
     index: "02",
     name: "静止持枪原地转身",
     tag: "Turn-in-Place",
-    hint: "目标先在 ±35° 死区内微移，再大角度甩到 ±85° 观察脚步衔接",
+    hint: "目标先在 ±35° 死区内微移，再大角度甩到 ±88° 观察迈步衔接",
     defaultCam: "front34",
-    captionTitle: "对比要点：±44° 死区双脚是否纹丝不动 · 超阈值是否真实迈步换脚",
-    captionDesc: "左（旧）：目标每动 1° 整个人就像立在电动转盘上的木偶脚底打转。右（新）：±44° 内双脚钉死、只转腰肩头与步枪；超过 44° 触发 Turn90Left/Right 迈步转身并剥离 Hips 偏航角无跳变收敛。",
-    checklist: "观察步骤：把慢放切到 0.5x，紧盯双脚和地面网格——左侧一直在地上蹭着转圈，右侧死区内纹丝不动，越过 44° 后清晰迈出左右步把下盘带正。",
+    captionTitle: "±44° 死区双脚锁死 · 超阈值迈步换脚转身",
+    captionDesc: "左（旧）：目标微动即整个人像电动转盘原地蹭脚自转。右（新）：±44° 内双脚纹丝不动仅转上身；超 44° 触发 Turn90 迈步转身并剥离 Hips 偏航收敛。",
+    checklist: "观察要点：切 0.5x 慢放盯住靴底与地面砖缝——左侧全程原地打滑，右侧死区内钉死、过 44° 后清晰迈步把下盘带正。",
   },
   {
     id: "aimOffset9",
     index: "03",
     name: "9 向精修 Aim Offset 对照",
     tag: "Blender 9 帧",
-    hint: "自动循环九宫格瞄准，也可点击右侧九宫格或切换「左侧=纯数学脊柱」细品差异",
+    hint: "自动循环九宫格瞄准，也可切换「左侧=纯数学脊柱」细品锁骨与贴腮差异",
     defaultCam: "front34",
-    captionTitle: "对比要点：右撇子探肩/耸肩/贴腮手肘雕刻 · 双脚 0° 零漂移",
-    captionDesc: "左（旧）：无脊柱偏移时枪口根本跟不上靶；切为「纯数学 5 节脊柱」时双肩与肘部仍僵硬死板。右（新）：BlenderMCP 烘焙的 9 帧资产在右瞄时左肩自然前探、抬枪时双锁骨上提、下瞄时抬头保准星。",
-    checklist: "建议玩法：在右侧把「左侧 Aim」切到「纯数学 5 节脊柱」，再点九宫格的「→ 正右」和「↑ 正上」，一眼看出 Blender 9 帧在锁骨、肘部和贴腮上的肉眼级提升。",
+    captionTitle: "右撇子探肩 / 耸肩 / 贴腮手肘雕刻 · 双脚 0° 零漂移",
+    captionDesc: "左（旧）：无偏移时脱靶；切「纯数学 5 节脊柱」时双肩与肘部仍僵硬。右（新）：BlenderMCP 9 帧资产右瞄左肩前探、抬枪锁骨上提、下瞄抬头保准星。",
+    checklist: "推荐对比：把「左侧 Aim」切到「纯数学 5 节脊柱」，点上方九宫格的「→ 正右」「↗ 右上」，直观对比肩肘与贴腮差异。",
   },
   {
     id: "moveAndFire",
     index: "04",
     name: "跑动与横移中开火",
     tag: "Additive 开火",
-    hint: "斜向冲刺时每 0.8 秒点射一次，重点看开火瞬间双腿是否被冻住滑步",
+    hint: "斜向冲刺时每 0.85 秒点射一次，重点看开火瞬间双腿是否被冻住滑步",
     defaultCam: "side",
-    captionTitle: "对比要点：开火后坐是否打断下半身步态（冻腿滑冰 vs 0° 透明叠加）",
-    captionDesc: "左（旧）：每开一枪强制切进站立 FiringRifle 持续 0.35 秒，双腿瞬间急刹冻住，在移动网格上滑出一大截！右（新）：离线提纯上半身 Additive 差值 + 阻尼后坐，双腿步态 100% 不断。",
-    checklist: "观察步骤：已默认切到正侧面机位，盯住开火提示亮起的 0.35 秒——左侧双腿僵硬卡住跟着地面打滑，右侧下盘照常大步迈进、只有肩胸和枪向上弹跳回肩。",
+    captionTitle: "开火后坐不打断下半身步态（冻腿滑冰 vs 0° 透明叠加）",
+    captionDesc: "左（旧）：每次开火强切站立开火 0.35 秒，双腿瞬间急刹冻住向前打滑。右（新）：上半身 Additive 后坐叠加 + 阻尼回肩，双腿步态 100% 连贯。",
+    checklist: "观察要点：正侧面机位盯住枪口闪光后的 0.35 秒——左侧双腿僵直打滑，右侧照常大步跨进、仅肩胸和枪弹跳回肩。",
   },
   {
     id: "combatSequence",
     index: "05",
     name: "综合实战机动衔接",
     tag: "全链路串联",
-    hint: "12 秒完整战斗循环：警戒扫视 → 迈步转向 → 斜前突击 → 跑动点射 → 蹲姿急停瞄准",
+    hint: "12 秒战斗循环：警戒扫视 → 迈步转身 → 斜前突击 → 跑动点射 → 蹲姿急停瞄准",
     defaultCam: "front34",
-    captionTitle: "对比要点：多状态高频切换时的连续流畅度与持枪稳定性",
-    captionDesc: "左（旧）：站→转→跑→开火→蹲每一步都有生硬断层、脚底滑移和枪口脱靶。右（新）：五大模块协同工作，从头到尾像同一名受过训练的士兵一气呵成。",
-    checklist: "观察步骤：直接完整看一遍 12 秒循环，再切 0.5x 慢放看「斜向突击→开火→急停蹲瞄」那三段交界处。",
+    captionTitle: "多状态高频切换连续流畅度与持枪稳定性",
+    captionDesc: "左（旧）：站→转→跑→开火→蹲每步衔接生硬断层、脚底滑移。右（新）：五大模块协同工作，停步不抖枪，全程自然连贯。",
+    checklist: "观察要点：先 1.0x 看完整 12 秒，再切 0.5x 细看「斜前突击→移动开火→急停下蹲瞄准」三段交界处。",
   },
   {
     id: "fpStrafeLegs",
     index: "06",
-    name: "第一人称侧向走路双腿防穿插",
+    name: "第一人称侧向双腿防穿插",
     tag: "FP 腿距求解",
-    hint: "真实 FirstPersonGait 求解器对照：旧参数 11.8 cm 穿插 vs 新参数 15.6 cm 净距",
+    hint: "真实 FirstPersonGait 求解器对照：旧参数 11.7 cm 穿插 vs 新参数 15.5 cm 净距",
     defaultCam: "fpDown",
-    captionTitle: "对比要点：低头侧向横移时双腿 3D 轴线最小净距与支撑脚 0 滑移",
-    captionDesc: "左（旧参数）：骨盆扭曲仅 40° 且无横移步宽与外摆弧，侧移时双腿交错处最小净距跌到 ~11.8 cm（标红警告），低头看脚肉眼可见穿插。右（新参数）：扭曲 54° + 步宽 7.5 cm + 外摆弧 5.5 cm，全程保持 ≥ 15.5 cm 净距且着地 0 mm 滑步。",
-    checklist: "观察步骤：注意两腿之间那条实时连线（红 = 过近穿插风险，绿 = 安全净距）；可切换「3/4 前视」或「低头看脚」机位，从玩家本人视角直接验收。",
+    captionTitle: "低头侧向横移双腿 3D 轴线净距与着地 0 mm 滑移",
+    captionDesc: "左（旧参数）：扭曲 40° 且无步宽/外摆弧，交错时净距跌至 ~11.7 cm 标红穿插。右（新参数）：扭曲 54° + 步宽 7.5 cm + 外摆弧 5.5 cm，保持 ≥ 15.5 cm 且 0 mm 滑步。",
+    checklist: "观察要点：看两腿间那根实时测距标尺（红 = 穿插风险，绿 = 安全净距），可切「3/4 前视」与「低头看脚」双角度复核。",
   },
   {
     id: "sandbox",
     index: "07",
     name: "自由操控沙盒",
-    tag: "WASD + F 实操",
+    tag: "WASD + F",
     hint: "键盘 WASD 任意走位、Shift 疾跑、Q/E 转向、C 蹲站、F 开火，左右同步响应",
     defaultCam: "front34",
-    captionTitle: "自由操控模式：同一份玩家输入同时驱动左右两个角色",
-    captionDesc: "按 W/A/S/D 横移或斜跑、Shift 加速、Q/E 旋转朝向、C 切换站蹲、F 点射，也可勾选右侧「手动锁定瞄准角」拖滑杆，亲自用最刁钻的操作测试衔接破绽。",
-    checklist: "推荐连招：按住 W+D 斜前跑同时连按 F 点射，再松开方向键按住 Q 缓慢旋转，对比两边脚底、骨盆与枪口表现。",
+    captionTitle: "自由操控：同一份输入同步驱动左右两套动作系统",
+    captionDesc: "支持随意启停、斜跑点射、原地缓转与手动九宫格瞄准，可直接检验启停瞬间的步枪与脚步衔接。",
+    checklist: "推荐连招：按住 W+D 斜前跑同时连按 F 点射 → 突然松手急停检查步枪是否稳如磐石 → 原地按 Q/E 缓转检验 44° 死区迈步。",
   },
 ];
 
 // ---------- Shared Scratch Math ----------
 const _up = new THREE.Vector3(0, 1, 0);
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
-const _p2 = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _s2 = new THREE.Vector3();
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q2 = new THREE.Quaternion();
+const _v1 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _yawQ = new THREE.Quaternion(), _aimQ = new THREE.Quaternion(), _aimQ2 = new THREE.Quaternion();
 const _aimRight = new THREE.Vector3(), _aimFwd = new THREE.Vector3();
 const _aoTop = new THREE.Quaternion(), _aoBot = new THREE.Quaternion();
@@ -181,7 +193,6 @@ function Approach(cur, target, dt, tau) {
   if (tau <= 1e-4) return target;
   return cur + (target - cur) * (1 - Math.exp(-Math.max(dt, 0) / tau));
 }
-
 function FreshPosition(o, out = new THREE.Vector3()) {
   o.updateWorldMatrix(true, false);
   return out.setFromMatrixPosition(o.matrixWorld);
@@ -244,24 +255,17 @@ function SampleScalarCurve(curve, t) {
   const f = span > 1e-6 ? (t - times[lo]) / span : 0;
   return values[lo] + (values[hi] - values[lo]) * f;
 }
-
-/** 两条 3D 线段最近点与距离（用于场景 06 精确测量左右腿三维轴线净距）。 */
 function ClosestPointsSegments(p1, q1, p2, q2) {
   const d1 = q1.clone().sub(p1), d2 = q2.clone().sub(p2), r = p1.clone().sub(p2);
   const a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r);
   let s = 0, t = 0;
-  if (a <= 1e-10 && e <= 1e-10) {
-    return { dist: p1.distanceTo(p2), a: p1.clone(), b: p2.clone() };
-  }
-  if (a <= 1e-10) {
-    t = Clamp(f / e, 0, 1);
-  } else {
+  if (a <= 1e-10 && e <= 1e-10) return { dist: p1.distanceTo(p2), a: p1.clone(), b: p2.clone() };
+  if (a <= 1e-10) t = Clamp(f / e, 0, 1);
+  else {
     const c = d1.dot(r);
-    if (e <= 1e-10) {
-      s = Clamp(-c / a, 0, 1);
-    } else {
-      const b = d1.dot(d2);
-      const denom = a * e - b * b;
+    if (e <= 1e-10) s = Clamp(-c / a, 0, 1);
+    else {
+      const b = d1.dot(d2), denom = a * e - b * b;
       s = denom !== 0 ? Clamp((b * f - c * e) / denom, 0, 1) : 0;
       t = (b * s + f) / e;
       if (t < 0) { t = 0; s = Clamp(-c / a, 0, 1); }
@@ -273,9 +277,65 @@ function ClosestPointsSegments(p1, q1, p2, q2) {
   return { dist: c1.distanceTo(c2), a: c1, b: c2 };
 }
 
+// ---------- Seamless Anti-Aliased Tiled Ground Texture (Zero Flashing Center Cross!) ----------
+function CreateTiledFloorTexture(renderer) {
+  const size = 512;
+  const cv = document.createElement("canvas");
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext("2d");
+  const half = size / 2;
+
+  // 2×2 subtle matte checker (represents 2m × 2m world area -> 1m per tile!)
+  ctx.fillStyle = "#2b2c2a";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#31322f";
+  ctx.fillRect(0, 0, half, half);
+  ctx.fillRect(half, half, half, half);
+
+  // Subtle 0.25m sub-grid hairlines
+  ctx.strokeStyle = "rgba(214, 217, 209, 0.045)";
+  ctx.lineWidth = 1;
+  const step = size / 8;
+  for (let i = 1; i < 8; i++) {
+    if (i === 4) continue;
+    const p = Math.round(i * step) + 0.5;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
+  }
+
+  // Crisp 1.0m primary tile seams
+  ctx.strokeStyle = "rgba(214, 217, 209, 0.14)";
+  ctx.lineWidth = 2;
+  for (const p of [0, half]) {
+    ctx.beginPath(); ctx.moveTo(p + 1, 0); ctx.lineTo(p + 1, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p + 1); ctx.lineTo(size, p + 1); ctx.stroke();
+  }
+
+  // Muted corner registration ticks on every 1m intersection (steady visual velocity reference, zero flicker!)
+  ctx.strokeStyle = "rgba(212, 184, 114, 0.28)";
+  ctx.lineWidth = 2;
+  const tick = 10;
+  for (const x of [0, half]) {
+    for (const y of [0, half]) {
+      ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x + tick, y + 1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 1, y); ctx.lineTo(x + 1, y + tick); ctx.stroke();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(30, 30); // 60m plane / 2m per repeat = exact 1.0m tiles!
+  tex.anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  tex.needsUpdate = true;
+  return tex;
+}
+
 // ---------- Asset Manager (Shared across Old & New Rigs) ----------
 class CompareAssetBank {
   constructor(renderer) {
+    this.renderer = renderer;
     this.loader = new GLTFLoader();
     SetTextureImportRenderer(renderer);
     this.xbotSource = null;
@@ -284,6 +344,7 @@ class CompareAssetBank {
     this.rifleOffset = null;
     this.aimOffsetGrid = null;
     this.rawClips = new Map();
+    this.overrideClips = new Map();
     this.charClips = new Map();
     this.additiveFireCache = new Map();
     this.turnYawCache = new Map();
@@ -295,7 +356,7 @@ class CompareAssetBank {
   }
 
   async Init(onProgress) {
-    onProgress(15, "读取 Mixamo 动作清单与 X Bot 基准骨架…");
+    onProgress(15, "读取 Mixamo 动作清单与基准骨架…");
     const [xbotGltf, libJson] = await Promise.all([
       this.loader.loadAsync(BASE + "Model_MixamoXBot.glb"),
       fetch(BASE + "Data_MixamoLibrary.json").then((r) => r.json()),
@@ -307,7 +368,7 @@ class CompareAssetBank {
     this.rootParent = new THREE.Matrix4().copy(this.xbotSource.matrixWorld).invert().multiply(hips.parent.matrixWorld);
     this.hipsParentInv = this.rootParent.clone().invert();
 
-    onProgress(40, "预载全部四向步态、转身、开火与 9 帧精修 Aim Offset…");
+    onProgress(40, "预载四向步态、原地转身、开火与 9 帧精修 Aim Offset…");
     const requiredClips = new Set([
       XBOT_NATIVE.standIdleRifleAim.file,
       XBOT_NATIVE.standWalkRifle.file,
@@ -326,7 +387,7 @@ class CompareAssetBank {
       ...[...requiredClips].map((f) => this.LoadRawClip(f)),
       this._LoadAimOffsetGrid(),
     ]);
-    onProgress(70, "标定步枪握持基准与开火/转身曲线…");
+    onProgress(70, "标定步枪握持基准与循环接缝闭合…");
     this._CalibrateRifle();
   }
 
@@ -338,6 +399,7 @@ class CompareAssetBank {
     const entry = this.library.get(file);
     const loop = entry?.loop ?? false;
     if (!entry?.inPlace) this._FixRoot(clip, !loop);
+    if (loop) this._CloseLoopSeam(clip);
     this.rawClips.set(file, clip);
     return clip;
   }
@@ -357,10 +419,46 @@ class CompareAssetBank {
     }
   }
 
+  /** 对循环片段末两帧向首帧做平滑闭合，消除 RifleRun_V1 等 Mixamo 原始片段回绕瞬间的局部抽搐。 */
+  _CloseLoopSeam(clip) {
+    const q0 = new THREE.Quaternion(), qn = new THREE.Quaternion(), qi = new THREE.Quaternion();
+    for (const tr of clip.tracks) {
+      if (!tr.name.endsWith(".quaternion")) continue;
+      const n = tr.times.length;
+      if (n < 6) continue;
+      const v = tr.values;
+      q0.set(v[0], v[1], v[2], v[3]).normalize();
+      qn.set(v[(n - 1) * 4], v[(n - 1) * 4 + 1], v[(n - 1) * 4 + 2], v[(n - 1) * 4 + 3]).normalize();
+      if (q0.dot(qn) < 0) qn.set(-qn.x, -qn.y, -qn.z, -qn.w);
+      if (q0.angleTo(qn) < 0.015) continue;
+      v[(n - 1) * 4] = q0.x; v[(n - 1) * 4 + 1] = q0.y; v[(n - 1) * 4 + 2] = q0.z; v[(n - 1) * 4 + 3] = q0.w;
+      const prevOff = (n - 2) * 4;
+      qi.set(v[prevOff], v[prevOff + 1], v[prevOff + 2], v[prevOff + 3]).normalize();
+      if (qi.dot(q0) < 0) qi.set(-qi.x, -qi.y, -qi.z, -qi.w);
+      qi.slerp(q0, 0.5).normalize();
+      v[prevOff] = qi.x; v[prevOff + 1] = qi.y; v[prevOff + 2] = qi.z; v[prevOff + 3] = qi.w;
+    }
+  }
+
+  async PreloadCharacterOverrides(charKey) {
+    const def = XBOT_CHARACTERS[charKey];
+    if (!def?.clipOverrides) return;
+    await Promise.all(Object.entries(def.clipOverrides).map(async ([file, url]) => {
+      const k = `${charKey}|${file}`;
+      if (this.overrideClips.has(k)) return;
+      try {
+        const g = await this.loader.loadAsync(url);
+        if (g.animations?.[0]) this.overrideClips.set(k, g.animations[0]);
+      } catch {
+        // Fallback silently to shared Mixamo clip
+      }
+    }));
+  }
+
   GetClipFor(charKey, file) {
     const key = `${charKey}|${file}`;
     if (this.charClips.has(key)) return this.charClips.get(key);
-    const raw = this.rawClips.get(file);
+    const raw = this.overrideClips.get(key) || this.rawClips.get(file);
     if (!raw) return null;
     const def = XBOT_CHARACTERS[charKey] || XBOT_CHARACTERS.xbot;
     const adapted = ClipForCharacter(raw, def);
@@ -538,14 +636,38 @@ class CompareAssetBank {
   }
 
   async LoadRifle(id) {
-    if (!this.rifles.has(id)) {
-      this.rifles.set(id, LoadModel(`./Model/Model_${id}.tzm.json`, { materials: RIFLE_MATERIALS }).then((built) => {
-        if (!built) return null;
-        built.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-        return built;
-      }));
+    if (this.rifles.has(id)) return this.rifles.get(id);
+    if (id === "HanYang") {
+      const p = LoadHanYang173R().then((asset) => {
+        const aniso = Math.min(16, this.renderer.capabilities.getMaxAnisotropy());
+        asset.gltf.scene.traverse((mesh) => {
+          if (!mesh.isMesh) return;
+          const mat = mesh.material;
+          mat.color.fromArray(HanYang173RBaseGain(mesh.name));
+          for (const slot of ["map", "normalMap", "roughnessMap", "metalnessMap"]) {
+            if (mat[slot]) { mat[slot].anisotropy = aniso; mat[slot].needsUpdate = true; }
+          }
+          asset.materials.set(`HanYang173R_${mesh.name}`, mat);
+        });
+        const inst = InstantiateHanYang173R(asset);
+        return {
+          root: inst.root,
+          mounts: {
+            gripL: inst.nodes.get("gripL"),
+            muzzle: inst.nodes.get("muzzle"),
+          },
+        };
+      });
+      this.rifles.set(id, p);
+      return p;
     }
-    return this.rifles.get(id);
+    const p = LoadModel(`./Model/Model_${id}.tzm.json`, { materials: RIFLE_MATERIALS }).then((built) => {
+      if (!built) return null;
+      built.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      return built;
+    });
+    this.rifles.set(id, p);
+    return p;
   }
 }
 
@@ -566,10 +688,10 @@ class CharacterCompareUnit {
     this.baseValid = false;
     this.hair = null;
     this.rifleObj = null;
-    this.rifleGripL = new THREE.Vector3(0, -0.012, -0.443);
-    this.rifleMuzzle = new THREE.Vector3(0, 0.035, -0.95);
+    this.rifleGripL = new THREE.Vector3(0, -0.012, -0.418);
+    this.rifleMuzzle = new THREE.Vector3(0, 0.038, -0.995);
     this.muzzleFlash = null;
-    this.charKey = "ijaJia";
+    this.charKey = "heYoutian";
     this.hipsScale = 1;
 
     // 3C & legacy state
@@ -578,6 +700,7 @@ class CharacterCompareUnit {
     this.locoPhase = 0;
     this.pelvisWarp = 0;
     this.blendActions = new Map();
+    this.blendWeights = new Map();
     this.activeAction = null;
     this.activeFile = null;
     this.activeClock = 0;
@@ -585,16 +708,15 @@ class CharacterCompareUnit {
     this.oldFireHold = 0;
     this.lastFireSeq = 0;
     this.flashAge = Infinity;
-    this.oldAimBaseline = "none"; // "none" | "procedural"
+    this.oldAimBaseline = "none";
 
-    // Smooth cross-fade state (matching XBotSkin._BeginBlend)
-    this.shownQ = [];
-    this.shownHips = new THREE.Vector3();
-    this.shownValid = false;
+    // Pre-overlay pose capture for clean, jitter-free state cross-fading (NO double AimOffset / NO T-pose flash!)
+    this.preOverlayQ = [];
+    this.preOverlayHips = new THREE.Vector3();
+    this.preOverlayValid = false;
     this.pickKey = null;
     this.blend = null;
 
-    // Live telemetry
     this.telemetry = {
       stateLabel: "待机",
       pelvisWarpDeg: 0,
@@ -611,9 +733,9 @@ class CharacterCompareUnit {
     // Visual diagnostic overlays (arrows + aim ray + target post)
     this.visGroup = new THREE.Group();
     this.scene.add(this.visGroup);
-    this.arrowAim = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.06, 0), 0.95, 0xdfbd68, 0.18, 0.12);
-    this.arrowHips = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.04, 0), 0.78, 0x67c5d8, 0.16, 0.10);
-    this.arrowVel = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.08, 0), 0.85, 0x7fd486, 0.16, 0.11);
+    this.arrowAim = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.05, 0), 0.92, 0xdfbd68, 0.16, 0.11);
+    this.arrowHips = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.035, 0), 0.76, 0x67c5d8, 0.14, 0.09);
+    this.arrowVel = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.065, 0), 0.85, 0x7fd486, 0.15, 0.10);
     this.visGroup.add(this.arrowAim, this.arrowHips, this.arrowVel);
 
     // Aim target marker & muzzle ray
@@ -622,13 +744,13 @@ class CharacterCompareUnit {
     const ringGeo = new THREE.RingGeometry(0.11, 0.15, 24);
     const ringMat = new THREE.MeshBasicMaterial({ color: mode === "new" ? 0xdfbd68 : 0xd6604a, side: THREE.DoubleSide });
     this.targetRing = new THREE.Mesh(ringGeo, ringMat);
-    const coreGeo = new THREE.SphereGeometry(0.045, 12, 10);
+    const coreGeo = new THREE.SphereGeometry(0.042, 12, 10);
     const coreMat = new THREE.MeshBasicMaterial({ color: mode === "new" ? 0xf5df9c : 0xef8a75 });
     this.targetCore = new THREE.Mesh(coreGeo, coreMat);
     this.targetMarker = new THREE.Group();
     this.targetMarker.add(this.targetRing, this.targetCore);
     const rayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -2)]);
-    const rayMat = new THREE.LineBasicMaterial({ color: mode === "new" ? 0xdfbd68 : 0xd6604a, transparent: true, opacity: 0.75 });
+    const rayMat = new THREE.LineBasicMaterial({ color: mode === "new" ? 0xdfbd68 : 0xd6604a, transparent: true, opacity: 0.7 });
     this.muzzleRay = new THREE.Line(rayGeo, rayMat);
     this.targetGroup.add(this.targetMarker, this.muzzleRay);
   }
@@ -642,6 +764,7 @@ class CharacterCompareUnit {
     const [src, groomPack] = await Promise.all([
       this.bank.LoadCharacterSource(charKey),
       this.bank.LoadGroom(def),
+      this.bank.PreloadCharacterOverrides(charKey),
     ]);
     if (this.model) {
       this.mixer?.stopAllAction();
@@ -652,7 +775,6 @@ class CharacterCompareUnit {
     this.hair = null;
 
     this.model = CloneSkinned(src);
-    // Mixamo 模型面朝 +Z，游戏世界逻辑 yaw=0 面朝 -Z，故模型绕 Y 转 π 与游戏坐标系对齐
     this.model.rotation.y = Math.PI;
     this.model.traverse((o) => {
       if (o.isMesh) {
@@ -671,9 +793,9 @@ class CharacterCompareUnit {
       }
     });
     this.base = this.boneList.map(() => new THREE.Quaternion());
-    this.shownQ = this.boneList.map(() => new THREE.Quaternion());
+    this.preOverlayQ = this.boneList.map(() => new THREE.Quaternion());
     this.baseValid = false;
-    this.shownValid = false;
+    this.preOverlayValid = false;
     this.blend = null;
     this.pickKey = null;
 
@@ -684,6 +806,7 @@ class CharacterCompareUnit {
 
     this.mixer = new THREE.AnimationMixer(this.model);
     this.blendActions.clear();
+    this.blendWeights.clear();
     this.activeAction = null;
     this.activeFile = null;
   }
@@ -694,10 +817,9 @@ class CharacterCompareUnit {
     if (!built) return;
     this.rifleObj = built.root.clone(true);
     this.scene.add(this.rifleObj);
-    this.rifleGripL.copy(built.mounts?.gripL?.position || new THREE.Vector3(0, -0.012, -0.443));
-    this.rifleMuzzle.copy(built.mounts?.muzzle?.position || new THREE.Vector3(0, 0.035, -0.95));
+    this.rifleGripL.copy(built.mounts?.gripL?.position || new THREE.Vector3(0, -0.012, -0.418));
+    this.rifleMuzzle.copy(built.mounts?.muzzle?.position || new THREE.Vector3(0, 0.038, -0.995));
 
-    // Subtle muzzle flash star mesh for crisp fire cue
     const flashGeo = new THREE.SphereGeometry(0.055, 8, 6);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.92 });
     this.muzzleFlash = new THREE.Mesh(flashGeo, flashMat);
@@ -715,10 +837,11 @@ class CharacterCompareUnit {
     this.oldFireHold = 0;
     this.flashAge = Infinity;
     this.lastFireSeq = 0;
-    this.shownValid = false;
+    this.preOverlayValid = false;
     this.blend = null;
     this.pickKey = null;
     this.activeClock = 0;
+    this.blendWeights.clear();
   }
 
   SetVisible(v) {
@@ -758,21 +881,21 @@ class CharacterCompareUnit {
     if (this.mode === "old") this._UpdateOld(yaw, vx, vz, mps, stance, lookYaw, lookPitch, dt);
     else this._UpdateNew(yaw, vx, vz, mps, stance, lookYaw, lookPitch, dt);
 
-    // Place rifle + 2-Bone Left Arm IK
+    // Mount rifle + 2-Bone Left Arm IK cleanly AFTER single-pass Aim Offset & Recoil
     this._PlaceRifleAndIk();
-
-    // Remember final shown pose for smooth state cross-fade
-    for (let i = 0; i < this.boneList.length; i++) this.shownQ[i].copy(this.boneList[i].quaternion);
-    const hips = this.H("Hips");
-    if (hips) this.shownHips.copy(hips.position);
-    this.shownValid = true;
 
     // Update 3D diagnostic overlays
     this._UpdateVisuals(yaw, vx, vz, mps, lookYaw, lookPitch, visOpts);
   }
 
+  _CapturePreOverlay() {
+    for (let i = 0; i < this.boneList.length; i++) this.preOverlayQ[i].copy(this.boneList[i].quaternion);
+    const hips = this.H("Hips");
+    if (hips) this.preOverlayHips.copy(hips.position);
+    this.preOverlayValid = true;
+  }
+
   _UpdateOld(yaw, vx, vz, mps, stance, lookYaw, lookPitch, dt) {
-    // 旧方案：整个人直接硬转到 yaw，无下盘扭曲、无原地转身、无四向混合、开火强制切站立开火 0.35s 冻腿
     this.container.position.set(0, 0, 0);
     this.container.rotation.set(0, yaw, 0);
     this.container.updateMatrixWorld(true);
@@ -780,7 +903,7 @@ class CharacterCompareUnit {
     let file, label, rate = 1, loop = true, isFireLock = false;
     if (this.oldFireHold > 0) {
       file = stance === "crouch" ? XBOT_NATIVE.fireCrouch.file : XBOT_NATIVE.fireStand.file;
-      label = mps > 0.15 ? "开火锁腿滑步！" : "站立开火";
+      label = mps > 0.15 ? "开火锁腿滑步" : "站立开火";
       loop = false;
       isFireLock = mps > 0.15;
     } else if (mps < 0.08) {
@@ -801,15 +924,14 @@ class CharacterCompareUnit {
     }
 
     const key = "old:" + file + (this.oldFireHold > 0 ? ":fire" : "");
-    const changed = this.shownValid && key !== this.pickKey;
-    if (changed) this._BeginBlend(0.16);
+    if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.18);
     this.pickKey = key;
 
     this._PlaySingleClip(file, dt, rate, loop, this.oldFireHold > 0 ? 0.35 - this.oldFireHold : null);
     this._ApplyBlend(dt);
+    this._CapturePreOverlay();
     this.container.updateMatrixWorld(true);
 
-    // 可选对比基线：纯数学 5 节脊柱（用于专门对比 BlenderMCP 9 帧精修 vs 纯数学）
     let aimMode = "无（僵直）";
     if (this.oldAimBaseline === "procedural" && (Math.abs(lookYaw) > 1e-3 || Math.abs(lookPitch) > 1e-3)) {
       this._ApplyProceduralSpineAim(yaw, lookYaw, lookPitch, stance, 1);
@@ -841,18 +963,16 @@ class CharacterCompareUnit {
     this.container.updateMatrixWorld(true);
 
     let key = "", label = "";
-    let turnFile = null, turnTime = 0;
     if (tip.turning && tip.turnClipKey && XBOT_TURN_IN_PLACE[tip.turnClipKey]) {
       const entry = XBOT_TURN_IN_PLACE[tip.turnClipKey];
-      turnFile = entry.file;
+      const turnFile = entry.file;
       const clip = this.bank.GetClipFor(this.charKey, turnFile);
-      turnTime = tip.turnProgress * (clip?.duration || 0.7);
+      const turnTime = tip.turnProgress * (clip?.duration || 0.7);
       key = "tip:" + turnFile;
       label = tip.turnDir > 0 ? "原地左迈步转身" : "原地右迈步转身";
-      if (this.shownValid && key !== this.pickKey) this._BeginBlend(0.14);
+      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.14);
       this.pickKey = key;
       this._PlaySingleClip(turnFile, dt, 1, false, turnTime);
-      // Root Yaw Extraction：抵消片段自带的 Hips 转向
       const hips = this.H("Hips");
       const curve = hips ? this.bank.TurnYawCurve(turnFile) : null;
       if (curve) {
@@ -875,22 +995,23 @@ class CharacterCompareUnit {
       label = entries.length > 1
         ? `2D 混合 (${dirZh[entries[0].dir]}${Math.round(entries[0].weight * 100)}/${dirZh[entries[1].dir]}${Math.round(entries[1].weight * 100)})`
         : `2D 步态 (${dirZh[entries[0]?.dir || "forward"]})`;
-      if (this.shownValid && key !== this.pickKey) this._BeginBlend(0.18);
+      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.18);
       this.pickKey = key;
       this._PlayBlendSpace(entries, mps, dt);
     } else {
       const file = stance === "crouch" ? XBOT_NATIVE.crouchIdleRifleAim.file : XBOT_NATIVE.standIdleRifleAim.file;
       key = "idle:" + file;
       label = Math.abs(tip.visualYawOffset) > 0.03 ? "死区锁脚 + 腰肩瞄准" : "持枪瞄准待机";
-      if (this.shownValid && key !== this.pickKey) this._BeginBlend(0.18);
+      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.20);
       this.pickKey = key;
       this._PlaySingleClip(file, dt, 1, true, null);
     }
 
     this._ApplyBlend(dt);
+    // 严格在 AimOffset / 开火叠加 / 左手 IK 之前保存纯净底层姿态，停步过渡绝不重复叠 AimOffset！
+    this._CapturePreOverlay();
     this.container.updateMatrixWorld(true);
 
-    // 9 帧 BlenderMCP 精修 Aim Offset（Mesh-Space 脊柱 + Local-Space 锁骨/双臂）
     const residualYaw = WrapAngle(lookYaw - lowerYawOff);
     let aimMode = "基准 (0°)";
     if (Math.abs(residualYaw) > 1e-3 || Math.abs(lookPitch) > 1e-3) {
@@ -903,7 +1024,6 @@ class CharacterCompareUnit {
       }
     }
 
-    // 上半身 Masked Additive 开火后坐（双腿与 Hips 严格 0° 透明）
     const rec = EvaluateAdditiveFireRecoil(this.addFireAge);
     if (rec.active) {
       const fireFile = stance === "crouch" ? XBOT_NATIVE.fireCrouch.file : XBOT_NATIVE.fireStand.file;
@@ -945,7 +1065,10 @@ class CharacterCompareUnit {
     if (!clip) return;
     if (this.activeFile !== file || this.blendActions.size > 0) {
       this.mixer.stopAllAction();
+      // 关键：清除 Three.js PropertyMixer 残留累积缓冲，杜绝从 blend2d 切回 idle 时闪一帧 T-Pose / 原点！
+      this.mixer.uncacheRoot(this.model);
       this.blendActions.clear();
+      this.blendWeights.clear();
       this.activeFile = file;
       this.activeAction = this.mixer.clipAction(clip);
       this.activeAction.reset();
@@ -956,6 +1079,7 @@ class CharacterCompareUnit {
       this.activeAction.setEffectiveWeight(1);
       this.activeAction.play();
       this.activeClock = 0;
+      this.baseValid = false;
     } else if (this.baseValid) {
       for (let i = 0; i < this.boneList.length; i++) this.boneList[i].quaternion.copy(this.base[i]);
       this.H("Hips")?.position.copy(this.baseHips);
@@ -969,7 +1093,7 @@ class CharacterCompareUnit {
       t = loop ? (this.activeClock % dur) : Math.min(dur, this.activeClock);
     }
     this.activeAction.time = t;
-    this.mixer.update(0);
+    this.mixer.update(Math.max(dt, 1e-5));
     for (let i = 0; i < this.boneList.length; i++) this.base[i].copy(this.boneList[i].quaternion);
     if (this.H("Hips")) this.baseHips.copy(this.H("Hips").position);
     this.baseValid = true;
@@ -988,7 +1112,9 @@ class CharacterCompareUnit {
 
     if (this.activeFile !== "__blend2d__") {
       this.mixer.stopAllAction();
+      this.mixer.uncacheRoot(this.model);
       this.blendActions.clear();
+      this.blendWeights.clear();
       this.activeFile = "__blend2d__";
       this.activeAction = null;
       this.baseValid = false;
@@ -1006,38 +1132,59 @@ class CharacterCompareUnit {
     this.locoPhase = (this.locoPhase + (dt * rate) / Math.max(effDur, 0.2)) % 1;
     if (this.locoPhase < 0) this.locoPhase += 1;
 
-    const activeFiles = new Set();
+    const targetMap = new Map();
+    const entryMeta = new Map();
+    const isFresh = this.blendActions.size === 0;
     for (const r of resolved) {
-      activeFiles.add(r.file);
-      let action = this.blendActions.get(r.file);
-      if (!action) {
-        action = this.mixer.clipAction(r.clip);
+      targetMap.set(r.file, r.weight);
+      entryMeta.set(r.file, r);
+      if (!this.blendActions.has(r.file)) {
+        const action = this.mixer.clipAction(r.clip);
         action.reset();
         action.setLoop(THREE.LoopRepeat, Infinity);
         action.timeScale = 0;
         action.enabled = true;
         action.play();
         this.blendActions.set(r.file, action);
+        this.blendWeights.set(r.file, isFresh ? r.weight : 0);
       }
-      action.enabled = true;
-      action.setEffectiveWeight(r.weight);
-      action.time = this.locoPhase * (r.clip.duration || 1);
-    }
-    for (const [f, action] of this.blendActions) {
-      if (!activeFiles.has(f)) action.setEffectiveWeight(0);
     }
 
-    this.mixer.update(0);
+    // 平滑阻尼四向混合权重 + 归一化，消除跨 45° / 90° 方向界时的单帧脚步抽搐
+    const damp = 1 - Math.exp(-Math.max(dt, 0) / 0.085);
+    let smoothSum = 0;
+    for (const [file] of this.blendActions) {
+      const tgt = targetMap.get(file) || 0;
+      const cur = this.blendWeights.get(file) ?? tgt;
+      const next = Math.abs(tgt - cur) < 1e-4 ? tgt : cur + (tgt - cur) * damp;
+      this.blendWeights.set(file, next);
+      smoothSum += next;
+    }
+    for (const [file, action] of this.blendActions) {
+      const rawW = this.blendWeights.get(file) || 0;
+      const effW = smoothSum > 1e-5 ? rawW / smoothSum : 0;
+      action.enabled = effW > 1e-4;
+      action.setEffectiveWeight(effW);
+      if (effW > 1e-4) {
+        const meta = entryMeta.get(file);
+        const phaseOff = meta?.phaseOffset ?? action._phaseOffset ?? 0;
+        action._phaseOffset = phaseOff;
+        const dur = action.getClip().duration || 1;
+        action.time = ((this.locoPhase + phaseOff) % 1) * dur;
+      }
+    }
+
+    this.mixer.update(Math.max(dt, 1e-5));
     for (let i = 0; i < this.boneList.length; i++) this.base[i].copy(this.boneList[i].quaternion);
     if (this.H("Hips")) this.baseHips.copy(this.H("Hips").position);
     this.baseValid = true;
   }
 
   _BeginBlend(dur = 0.18) {
-    if (!this.shownValid) return;
+    if (!this.preOverlayValid) return;
     const b = this.blend || (this.blend = { q: this.boneList.map(() => new THREE.Quaternion()), hips: new THREE.Vector3(), t: 0, dur });
-    for (let i = 0; i < this.boneList.length; i++) b.q[i].copy(this.shownQ[i]);
-    b.hips.copy(this.shownHips);
+    for (let i = 0; i < this.boneList.length; i++) b.q[i].copy(this.preOverlayQ[i]);
+    b.hips.copy(this.preOverlayHips);
     b.t = 0;
     b.dur = dur;
   }
@@ -1115,7 +1262,6 @@ class CharacterCompareUnit {
     const rPos = off.position.clone().applyQuaternion(_q).add(_p);
     const rQuat = _q.clone().multiply(off.quaternion);
 
-    // Aim rifle smoothly toward left palm using exact game AimAt(quaternion, axis, to, reach)
     const palmL = Palm(lh, this.H("LeftHandMiddle1"), new THREE.Vector3());
     const muzzle = new THREE.Vector3(0, 0, -1).applyQuaternion(rQuat);
     const toLeft = palmL.clone().sub(rPos);
@@ -1126,7 +1272,6 @@ class CharacterCompareUnit {
     this.rifleObj.quaternion.copy(rQuat);
     this.rifleObj.updateMatrixWorld(true);
 
-    // 2-Bone IK locking LeftHand palm onto rifle's front handguard gripL
     const targetL = this.rifleGripL.clone().applyMatrix4(this.rifleObj.matrixWorld);
     this._SolveArm("L", targetL, 1.0);
     this.container.updateMatrixWorld(true);
@@ -1175,12 +1320,11 @@ class CharacterCompareUnit {
     if (mps > 0.1) {
       this.arrowVel.visible = true;
       this.arrowVel.setDirection(new THREE.Vector3(vx / mps, 0, vz / mps));
-      this.arrowVel.setLength(Clamp(mps * 0.36, 0.45, 1.25), 0.16, 0.11);
+      this.arrowVel.setLength(Clamp(mps * 0.34, 0.45, 1.2), 0.15, 0.10);
     } else {
       this.arrowVel.visible = false;
     }
 
-    // Place target marker 2.6m along intended aim line from shoulder height
     const originY = this.H("Spine2") ? FreshPosition(this.H("Spine2"), _v1).y + 0.04 : 1.32;
     const targetPos = new THREE.Vector3(0, originY, 0).addScaledVector(aimDir, 2.55);
     this.targetMarker.position.copy(targetPos);
@@ -1218,14 +1362,12 @@ class FirstPersonLegRig {
     const bootMat = new THREE.MeshStandardMaterial({ color: 0x3a2e22, roughness: 0.82 });
     const jointMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.45 });
 
-    // Sleek anatomical pelvis bar + hip/velocity arrows
     this.pelvisMesh = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.045, 0.075), jointMat);
     this.group.add(this.pelvisMesh);
     this.hipArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.03, 0), 0.72, 0x67c5d8, 0.14, 0.09);
     this.velArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0.05, 0), 0.78, 0x7fd486, 0.14, 0.09);
     this.group.add(this.hipArrow, this.velArrow);
 
-    // Articulated 3D thighs, shins, knees, boots (matching Script_FirstPersonGaitTest: hipY=0.873, ankleY=0.092)
     this.thighLen = 0.41;
     this.shinLen = 0.40;
     this.hipY = 0.873;
@@ -1242,7 +1384,6 @@ class FirstPersonLegRig {
       return { thigh, shin, knee, boot, pad };
     });
 
-    // High-visibility 3D caliper cylinder + endpoint spheres measuring closest leg-axis distance
     this.clearMat = new THREE.MeshBasicMaterial({ color: 0x7fd486 });
     this.clearBar = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 1, 8), this.clearMat);
     this.dotA = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), this.clearMat);
@@ -1272,7 +1413,6 @@ class FirstPersonLegRig {
   SetVisible(v) { this.group.visible = v; }
 
   Update(targetVx, targetVz, dt) {
-    // Smooth acceleration matching real player movement & Script_FirstPersonGaitTest
     const k = 1 - Math.exp(-dt * 12);
     this.vx += (targetVx - this.vx) * k;
     this.vz += (targetVz - this.vz) * k;
@@ -1287,7 +1427,6 @@ class FirstPersonLegRig {
       hipHeight: 0.873, legReach: 0.86, ankleHeight: 0.092,
     });
 
-    // Measure planted-foot slip
     for (let i = 0; i < 2; i++) {
       const f = this.gait.feet[i];
       if (f.planted && this.lastFeet[i].planted) {
@@ -1320,7 +1459,6 @@ class FirstPersonLegRig {
       hipPts.push(hip);
       anklePts.push(ankle);
 
-      // Analytical 2-bone leg IK with forward knee bend
       const toAnkle = ankle.clone().sub(hip);
       const dist = Clamp(toAnkle.length(), 0.12, this.thighLen + this.shinLen - 0.005);
       const dir = toAnkle.clone().normalize();
@@ -1338,7 +1476,6 @@ class FirstPersonLegRig {
       this.legs[i].pad.visible = f.planted;
     }
 
-    // Exact same 3D leg-axis clearance measurement as Script_FirstPersonGaitTest (hip->ankle centerline)
     const best = ClosestPointsSegments(hipPts[0], anklePts[0], hipPts[1], anklePts[1]);
     this.curClearCm = +(best.dist * 100).toFixed(1);
     if (this.elapsed > 0.65 && this.curClearCm < this.minClearCm) this.minClearCm = this.curClearCm;
@@ -1356,18 +1493,17 @@ class FirstPersonLegRig {
 
   _PlaceBone(mesh, a, b) {
     mesh.position.copy(a).add(b).multiplyScalar(0.5);
-    const dir = b.clone().sub(a).normalize();
-    mesh.quaternion.setFromUnitVectors(_up, dir);
+    mesh.quaternion.setFromUnitVectors(_up, b.clone().sub(a).normalize());
   }
 }
 
-// ---------- Treadmill Scene Factory ----------
-function MakeStageScene(renderer) {
+// ---------- Stage Scene Factory (Smooth Anti-Aliased Tiled Floor + Real Displacement Trail Dots) ----------
+function MakeStageScene(renderer, floorTex) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1b1e21);
   scene.fog = new THREE.Fog(0x1b1e21, 12, 34);
-  scene.add(new THREE.HemisphereLight(0xf3ebd9, 0x35322c, 1.25));
-  const sun = new THREE.DirectionalLight(0xfff5e4, 2.0);
+  scene.add(new THREE.HemisphereLight(0xf3ebd9, 0x35322c, 1.28));
+  const sun = new THREE.DirectionalLight(0xfff5e4, 2.05);
   sun.position.set(2.8, 5.5, -3.5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -1377,7 +1513,6 @@ function MakeStageScene(renderer) {
   rim.position.set(-3.2, 2.4, 3.0);
   scene.add(rim);
 
-  // Subtle environment reflections so steel rifle barrels gleam nicely
   const sky = new THREE.SphereGeometry(8, 24, 12), colors = [];
   const top = new THREE.Color(0xd8cfbd), bottom = new THREE.Color(0x22201c), c = new THREE.Color();
   for (let i = 0; i < sky.attributes.position.count; i++) {
@@ -1391,37 +1526,78 @@ function MakeStageScene(renderer) {
   scene.environmentIntensity = 0.55;
   pmrem.dispose();
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(60, 60),
-    new THREE.MeshStandardMaterial({ color: 0x2a2926, roughness: 0.96 }),
-  );
+  // Tiled floor (zero flickering yellow cross; UV offset scrolls continuously with velocity)
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: floorTex,
+    roughness: 0.94,
+    metalness: 0.02,
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // Scrolling treadmill grid (cell = 0.5 m) so foot slip vs planted-foot locking is unmistakable!
-  const gridGroup = new THREE.Group();
-  const grid = new THREE.GridHelper(32, 64, 0x6f5f3b, 0x3b3e42);
-  grid.position.y = 0.002;
-  gridGroup.add(grid);
-  scene.add(gridGroup);
+  // Subtle ground displacement trail markers (pips drift backward at -v*dt so real motion & speed read immediately)
+  const trailGroup = new THREE.Group();
+  const pipGeo = new THREE.CircleGeometry(0.042, 12);
+  pipGeo.rotateX(-Math.PI / 2);
+  const pips = [];
+  for (let i = 0; i < 10; i++) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0xdfbd68, transparent: true, opacity: 0 });
+    const mesh = new THREE.Mesh(pipGeo, mat);
+    mesh.position.y = 0.006;
+    trailGroup.add(mesh);
+    pips.push({ mesh, mat, age: 99 });
+  }
+  scene.add(trailGroup);
 
-  return { scene, gridGroup };
+  return { scene, floor, floorMat, trailGroup, pips, nextPip: 0, pipDist: 0 };
+}
+
+function UpdateStageDisplacement(stage, vx, vz, dt, enabled) {
+  stage.trailGroup.visible = enabled;
+  if (!enabled || dt <= 0) return;
+  const spd = Math.hypot(vx, vz);
+  if (spd > 0.08) {
+    stage.pipDist += spd * dt;
+    if (stage.pipDist >= 0.45) {
+      stage.pipDist = 0;
+      const p = stage.pips[stage.nextPip];
+      stage.nextPip = (stage.nextPip + 1) % stage.pips.length;
+      p.mesh.position.set(0, 0.006, 0);
+      p.age = 0;
+    }
+  }
+  for (const p of stage.pips) {
+    if (p.age > 3.5) { p.mat.opacity = 0; continue; }
+    p.age += dt;
+    p.mesh.position.x -= vx * dt;
+    p.mesh.position.z -= vz * dt;
+    const dist = Math.hypot(p.mesh.position.x, p.mesh.position.z);
+    p.mat.opacity = Clamp((1 - p.age / 3.0) * (1 - dist / 4.2) * 0.55, 0, 0.55);
+  }
+}
+
+function ResetStageTrail(stage) {
+  stage.pipDist = 0;
+  for (const p of stage.pips) { p.age = 99; p.mat.opacity = 0; }
 }
 
 // ---------- Deterministic Scenario Script Generators ----------
-function EvaluateScenarioCommand(scenarioId, t, state) {
-  // Base values (may be overridden by manual aim or sandbox keyboard)
-  let yaw = 0, vx = 0, vz = 0, stance = state.stance, lookYaw = 0, lookPitch = 0, fireSeq = state.manualFireSeq;
+function EvaluateScenarioCommand(scenarioId, t, dt, state) {
+  let yaw = 0, targetVx = 0, targetVz = 0, stance = state.stance, lookYaw = 0, lookPitch = 0, fireSeq = state.manualFireSeq;
   let phaseHint = "";
+  let useSmoothVel = false;
 
   if (scenarioId === "strafe2d") {
-    const cycle = t % 12;
-    if (cycle < 2.4) { vx = 1.65; vz = -1.65; phaseHint = "斜前右突击 (+45°)"; }
-    else if (cycle < 4.8) { vx = 2.15; vz = 0; phaseHint = "纯右侧向横移 (+90°)"; }
-    else if (cycle < 7.2) { vx = 1.35; vz = 1.35; phaseHint = "斜后右撤退 (+135°)"; }
-    else if (cycle < 9.6) { vx = -1.65; vz = -1.65; phaseHint = "斜前左突击 (-45°)"; }
-    else { vx = -2.15; vz = 0; phaseHint = "纯左侧向横移 (-90°)"; }
+    // 稳态 2.60 m/s 慢跑段（所有四向片段步频匹配 0.53–0.77s）+ 平滑加减速曲线，杜绝步态边界抖动
+    useSmoothVel = true;
+    const cycle = t % 13.0;
+    if (cycle < 2.6) { targetVx = 1.84; targetVz = -1.84; phaseHint = "斜前右突击 (+45°)"; }
+    else if (cycle < 5.2) { targetVx = 2.60; targetVz = 0; phaseHint = "纯右侧向横移 (+90°)"; }
+    else if (cycle < 7.8) { targetVx = 1.84; targetVz = 1.84; phaseHint = "斜后右撤退 (+135°)"; }
+    else if (cycle < 10.4) { targetVx = -1.84; targetVz = -1.84; phaseHint = "斜前左突击 (-45°)"; }
+    else { targetVx = -2.60; targetVz = 0; phaseHint = "纯左侧向横移 (-90°)"; }
   } else if (scenarioId === "turnInPlace") {
     const cycle = t % 11.5;
     if (cycle < 1.2) { yaw = 0; phaseHint = "静止正前瞄准 (0°)"; }
@@ -1439,12 +1615,13 @@ function EvaluateScenarioCommand(scenarioId, t, state) {
     lookPitch = (a.pitch + (b.pitch - a.pitch) * u) * DEG;
     phaseHint = `九宫格巡检：${a.label} (${a.yaw > 0 ? "+" : ""}${a.yaw}°y / ${a.pitch > 0 ? "+" : ""}${a.pitch}°p)`;
   } else if (scenarioId === "moveAndFire") {
+    useSmoothVel = true;
     const cycle = t % 6.4;
-    if (cycle < 3.2) { vx = 1.75; vz = -1.75; lookYaw = 16 * DEG; lookPitch = 8 * DEG; phaseHint = "斜前右冲刺中连射"; }
-    else { vx = -1.75; vz = -1.75; lookYaw = -16 * DEG; lookPitch = 10 * DEG; phaseHint = "斜前左冲刺中连射"; }
-    const autoShot = Math.floor(t / 0.85);
-    fireSeq = state.manualFireSeq + autoShot;
+    if (cycle < 3.2) { targetVx = 1.85; targetVz = -1.85; lookYaw = 16 * DEG; lookPitch = 8 * DEG; phaseHint = "斜前右冲刺中连射"; }
+    else { targetVx = -1.85; targetVz = -1.85; lookYaw = -16 * DEG; lookPitch = 10 * DEG; phaseHint = "斜前左冲刺中连射"; }
+    fireSeq = state.manualFireSeq + Math.floor(t / 0.85);
   } else if (scenarioId === "combatSequence") {
+    useSmoothVel = true;
     const cycle = t % 12;
     if (cycle < 2.0) {
       yaw = 28 * DEG * Math.sin((cycle / 2.0) * Math.PI);
@@ -1455,14 +1632,13 @@ function EvaluateScenarioCommand(scenarioId, t, state) {
       phaseHint = "② 大角敌情迈步转身 (+78°)";
     } else if (cycle < 7.6) {
       yaw = 78 * DEG;
-      // Local forward-right relative to yaw=78°
       const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw);
       const rgtX = Math.cos(yaw), rgtZ = -Math.sin(yaw);
-      vx = fwdX * 1.9 + rgtX * 1.7;
-      vz = fwdZ * 1.9 + rgtZ * 1.7;
+      targetVx = fwdX * 1.9 + rgtX * 1.7;
+      targetVz = fwdZ * 1.9 + rgtZ * 1.7;
       lookPitch = 14 * DEG;
       fireSeq = state.manualFireSeq + Math.floor((cycle - 4.4) / 0.85) + 1;
-      phaseHint = "③ 斜前突击 + 移动开火（2D 混合 + 扭曲 + 开火叠加）";
+      phaseHint = "③ 斜前突击 + 移动开火";
     } else if (cycle < 10.2) {
       yaw = 78 * DEG * (1 - Smooth01((cycle - 7.6) / 1.1));
       stance = "crouch";
@@ -1475,9 +1651,10 @@ function EvaluateScenarioCommand(scenarioId, t, state) {
     }
   } else if (scenarioId === "fpStrafeLegs") {
     const cycle = t % 7.0;
-    if (cycle < 3.5) { vx = 2.55; vz = 0; phaseHint = "右横移 2.55 m/s（注意双腿交错净距连线）"; }
-    else { vx = -2.55; vz = 0; phaseHint = "左横移 2.55 m/s（注意双腿交错净距连线）"; }
+    if (cycle < 3.5) { targetVx = 2.55; targetVz = 0; phaseHint = "右横移 2.55 m/s"; }
+    else { targetVx = -2.55; targetVz = 0; phaseHint = "左横移 2.55 m/s"; }
   } else if (scenarioId === "sandbox") {
+    useSmoothVel = true;
     yaw = state.sandboxYaw;
     const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw);
     const rgtX = Math.cos(yaw), rgtZ = -Math.sin(yaw);
@@ -1487,10 +1664,27 @@ function EvaluateScenarioCommand(scenarioId, t, state) {
     if (mag > 1e-4) {
       inF /= mag; inR /= mag;
       const spd = state.stance === "crouch" ? 1.15 : (state.keys.has("ShiftLeft") || state.keys.has("ShiftRight") ? 3.2 : 1.85);
-      vx = (fwdX * inF + rgtX * inR) * spd;
-      vz = (fwdZ * inF + rgtZ * inR) * spd;
+      targetVx = (fwdX * inF + rgtX * inR) * spd;
+      targetVz = (fwdZ * inF + rgtZ * inR) * spd;
     }
-    phaseHint = mag > 0 ? `沙盒移动 ${Math.hypot(vx, vz).toFixed(1)} m/s` : "沙盒待机（WASD 移动 · Q/E 转向 · F 开火）";
+    phaseHint = mag > 0 ? `沙盒移动 ${Math.hypot(targetVx, targetVz).toFixed(1)} m/s` : "沙盒待机（WASD / Q E / F）";
+  }
+
+  let vx = targetVx, vz = targetVz;
+  if (useSmoothVel) {
+    const tau = scenarioId === "sandbox" ? 0.08 : 0.16;
+    if (dt > 0) {
+      state.smoothVx = Approach(state.smoothVx, targetVx, dt, tau);
+      state.smoothVz = Approach(state.smoothVz, targetVz, dt, tau);
+      if (Math.hypot(targetVx, targetVz) < 1e-4 && Math.hypot(state.smoothVx, state.smoothVz) < 0.07) {
+        state.smoothVx = 0; state.smoothVz = 0;
+      }
+    }
+    vx = state.smoothVx;
+    vz = state.smoothVz;
+  } else {
+    state.smoothVx = targetVx;
+    state.smoothVz = targetVz;
   }
 
   if (state.manualAim) {
@@ -1500,8 +1694,62 @@ function EvaluateScenarioCommand(scenarioId, t, state) {
   return { yaw, vx, vz, stance, lookYaw, lookPitch, fireSeq, phaseHint };
 }
 
+// ---------- Resizable Sidebars Setup ----------
+function SetupResizableSidebars() {
+  const KEY = "tengxian_motion_compare_layout_v1";
+  const rootStyle = document.documentElement.style;
+  let sideW = 288, inspW = 344;
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (saved?.sideW) sideW = Clamp(saved.sideW, 210, 480);
+    if (saved?.inspW) inspW = Clamp(saved.inspW, 240, 480);
+  } catch {}
+  const apply = () => {
+    const maxW = Math.max(240, Math.floor((window.innerWidth - 360) / 2));
+    sideW = Clamp(sideW, 210, Math.min(480, maxW));
+    inspW = Clamp(inspW, 240, Math.min(480, maxW));
+    rootStyle.setProperty("--side-w", `${sideW}px`);
+    rootStyle.setProperty("--insp-w", `${inspW}px`);
+  };
+  apply();
+  window.addEventListener("resize", apply);
+
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify({ sideW, inspW })); } catch {}
+  };
+
+  const bindHandle = (el, which) => {
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.add("dragging");
+      document.body.classList.add("resizing");
+      const startX = e.clientX;
+      const startW = which === "left" ? sideW : inspW;
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        if (which === "left") sideW = startW + dx;
+        else inspW = startW - dx;
+        apply();
+      };
+      const onUp = () => {
+        el.classList.remove("dragging");
+        document.body.classList.remove("resizing");
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        save();
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  };
+  bindHandle($("resizeLeft"), "left");
+  bindHandle($("resizeRight"), "right");
+}
+
 // ---------- Main Application ----------
 async function Main() {
+  SetupResizableSidebars();
   const bootBar = $("bootBar"), bootStep = $("bootStep"), bootOverlay = $("bootOverlay");
   const setBoot = (pct, msg) => { bootBar.style.width = `${pct}%`; bootStep.textContent = msg; };
 
@@ -1512,8 +1760,9 @@ async function Main() {
   renderer.setScissorTest(true);
   $("view").appendChild(renderer.domElement);
 
-  const oldStage = MakeStageScene(renderer);
-  const newStage = MakeStageScene(renderer);
+  const floorTex = CreateTiledFloorTexture(renderer);
+  const oldStage = MakeStageScene(renderer, floorTex);
+  const newStage = MakeStageScene(renderer, floorTex);
   const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 80);
 
   const orbit = { yaw: 0.56, pitch: 0.20, dist: 4.55, targetY: 0.88, pan: new THREE.Vector3() };
@@ -1524,7 +1773,6 @@ async function Main() {
     document.querySelectorAll("#camBtns .edBtn").forEach((b) => b.classList.toggle("on", b.dataset.cam === name));
   };
 
-  // Synced orbit controls on canvas
   let drag = null;
   const dom = renderer.domElement;
   dom.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1549,10 +1797,9 @@ async function Main() {
   }, { passive: false });
   dom.addEventListener("dblclick", () => ApplyCamPreset(activeScenario.defaultCam));
 
-  // Load shared asset bank
   const bank = new CompareAssetBank(renderer);
   await bank.Init(setBoot);
-  setBoot(82, "装配左右实机角色与第一人称步态求解器…");
+  setBoot(80, "装配人物、汉阳造 173R 与步态求解器…");
 
   const oldUnit = new CharacterCompareUnit(bank, oldStage.scene, { mode: "old" });
   const newUnit = new CharacterCompareUnit(bank, newStage.scene, { mode: "new" });
@@ -1561,12 +1808,12 @@ async function Main() {
   oldFp.SetVisible(false);
   newFp.SetVisible(false);
 
-  const initialChar = CHAR_KEYS.includes("ijaJia") ? "ijaJia" : CHAR_KEYS[0];
+  const initialChar = CHAR_KEYS.includes("heYoutian") ? "heYoutian" : CHAR_KEYS[0];
   await Promise.all([
     oldUnit.SetCharacter(initialChar),
     newUnit.SetCharacter(initialChar),
-    oldUnit.SetRifle("Type38"),
-    newUnit.SetRifle("Type38"),
+    oldUnit.SetRifle("HanYang"),
+    newUnit.SetRifle("HanYang"),
   ]);
 
   const state = {
@@ -1579,14 +1826,14 @@ async function Main() {
     manualPitchDeg: 0,
     manualFireSeq: 0,
     sandboxYaw: 0,
+    smoothVx: 0,
+    smoothVz: 0,
     keys: new Set(),
-    treadX: 0,
-    treadZ: 0,
     vis: { arrows: true, target: true, treadmill: true },
   };
   let activeScenario = SCENARIOS[0];
 
-  // Populate character dropdown
+  // Populate ALL 18 online characters
   const selChar = $("selChar");
   for (const k of CHAR_KEYS) {
     const opt = document.createElement("option");
@@ -1596,7 +1843,7 @@ async function Main() {
     selChar.appendChild(opt);
   }
   selChar.addEventListener("change", async () => {
-    $("topStatus").textContent = "切换测试人物…";
+    $("topStatus").textContent = "切换人物…";
     await Promise.all([oldUnit.SetCharacter(selChar.value), newUnit.SetCharacter(selChar.value)]);
     oldUnit.Reset(0); newUnit.Reset(0);
     UpdateTopStatus();
@@ -1604,6 +1851,7 @@ async function Main() {
 
   $("selRifle").addEventListener("change", async () => {
     const id = $("selRifle").value;
+    $("topStatus").textContent = "切换武器…";
     await Promise.all([oldUnit.SetRifle(id), newUnit.SetRifle(id)]);
     UpdateTopStatus();
   });
@@ -1611,11 +1859,11 @@ async function Main() {
   $("selOldAim").addEventListener("change", () => {
     oldUnit.oldAimBaseline = $("selOldAim").value;
     $("leftBadgeSub").textContent = oldUnit.oldAimBaseline === "procedural"
-      ? "左侧已切为「纯数学 5 节脊柱」· 专门对比右侧 BlenderMCP 9 帧精修"
-      : "单向播片 / 无朝向扭曲 / 无原地转身 / 开火锁腿";
+      ? "纯数学 5 节脊柱（对照 9 帧精修）"
+      : "单向播片 / 无扭曲 / 开火锁腿";
   });
 
-  // Build left scenario list
+  // Left scenario list
   const scListEl = $("scenarioList");
   for (const sc of SCENARIOS) {
     const item = document.createElement("div");
@@ -1626,7 +1874,7 @@ async function Main() {
     scListEl.appendChild(item);
   }
 
-  // Build 3x3 Aim Offset quick grid
+  // 3x3 Aim Offset quick grid
   const aoGridEl = $("aoGrid");
   AIM_GRID_CELLS.forEach((cell, idx) => {
     const btn = document.createElement("button");
@@ -1658,19 +1906,14 @@ async function Main() {
     if (!state.manualAim) aoGridEl.querySelectorAll(".aoCell").forEach((c) => c.classList.remove("on"));
   });
   $("rngYaw").addEventListener("input", () => {
-    state.manualAim = true;
-    $("chkManualAim").checked = true;
-    $("chipManualAim").classList.add("on");
+    state.manualAim = true; $("chkManualAim").checked = true; $("chipManualAim").classList.add("on");
     SetManualAim(Number($("rngYaw").value), state.manualPitchDeg);
   });
   $("rngPitch").addEventListener("input", () => {
-    state.manualAim = true;
-    $("chkManualAim").checked = true;
-    $("chipManualAim").classList.add("on");
+    state.manualAim = true; $("chkManualAim").checked = true; $("chipManualAim").classList.add("on");
     SetManualAim(state.manualYawDeg, Number($("rngPitch").value));
   });
 
-  // Playback / Speed / Camera / Stance buttons
   $("btnPlay").addEventListener("click", () => {
     state.playing = !state.playing;
     $("btnPlay").textContent = state.playing ? "暂停" : "播放";
@@ -1691,7 +1934,7 @@ async function Main() {
   document.querySelectorAll("#stanceBtns .edBtn").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.stance = btn.dataset.stance;
-      document.querySelectorAll("#stanceBtns .edBtn").forEach((b) => b.classList.toggle("on", b === btn));
+      document.querySelectorAll("#stanceBtns .edBtn").forEach((b) => b.classList.toggle("on", b.dataset.stance === state.stance));
     });
   });
 
@@ -1703,7 +1946,6 @@ async function Main() {
     });
   }
 
-  // Keyboard shortcuts (Space pause, F fire, WASD/Q/E/C in sandbox)
   window.addEventListener("keydown", (e) => {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     state.keys.add(e.code);
@@ -1718,8 +1960,12 @@ async function Main() {
 
   function ResetScenario() {
     state.time = 0;
-    state.treadX = 0; state.treadZ = 0;
     state.sandboxYaw = 0;
+    state.smoothVx = 0;
+    state.smoothVz = 0;
+    floorTex.offset.set(0, 0);
+    ResetStageTrail(oldStage);
+    ResetStageTrail(newStage);
     oldUnit.Reset(0);
     newUnit.Reset(0);
     oldFp.Reset();
@@ -1740,18 +1986,17 @@ async function Main() {
     newUnit.SetVisible(!isFp);
     oldFp.SetVisible(isFp);
     newFp.SetVisible(isFp);
-    $("leftBadgeTitle").textContent = isFp ? "优化前 · 旧步态参数" : "优化前 · 旧方案";
+    $("leftBadgeTitle").textContent = isFp ? "优化前 · 旧步态" : "优化前";
     $("leftBadgeSub").textContent = isFp
-      ? "orientWarp 40° / 无横移步宽 / 无摆腿外绕弧"
+      ? "扭曲 40° / 无横移步宽"
       : (oldUnit.oldAimBaseline === "procedural"
-        ? "左侧已切为「纯数学 5 节脊柱」· 专门对比右侧 BlenderMCP 9 帧精修"
-        : "单向播片 / 无朝向扭曲 / 无原地转身 / 开火锁腿");
-    $("rightBadgeTitle").textContent = isFp ? "优化后 · 防穿插步态参数" : "优化后 · 3C + 9 帧精修";
+        ? "纯数学 5 节脊柱（对照 9 帧精修）"
+        : "单向播片 / 无扭曲 / 开火锁腿");
+    $("rightBadgeTitle").textContent = isFp ? "优化后 · 防穿插" : "优化后";
     $("rightBadgeSub").textContent = isFp
-      ? "orientWarp 54° / 横移步宽 7.5 cm / 摆腿弧 5.5 cm"
-      : "2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加";
+      ? "扭曲 54° / 步宽 7.5 cm / 外摆弧"
+      : "2D 混合 / 扭曲 / 原地转身 / 9 帧精修";
 
-    // Auto-clear manual aim lock when switching away from Aim Offset scenario
     if (sc.id !== "aimOffset9" && sc.id !== "sandbox") {
       state.manualAim = false;
       $("chkManualAim").checked = false;
@@ -1765,50 +2010,51 @@ async function Main() {
 
   function UpdateTopStatus() {
     const charName = XBOT_CHARACTERS[selChar.value]?.name || selChar.value;
-    const rifleName = $("selRifle").value === "Type38" ? "三八式" : "中正式";
-    const aoStatus = bank.aimOffsetGrid ? "9 帧 Aim Offset 已就绪" : "程序化回退";
-    $("topStatus").textContent = `${charName} · ${rifleName} · ${aoStatus} · 场景 ${activeScenario.index}`;
+    const rifleName = RIFLE_LABELS[$("selRifle").value] || $("selRifle").value;
+    $("topStatus").textContent = `${charName} · ${rifleName} · 场景 ${activeScenario.index}`;
   }
 
-  function RenderDiffTable(cmd) {
-    const tbody = $("diffBody");
-    if (activeScenario.id === "fpStrafeLegs") {
-      const oldBad = oldFp.minClearCm < 13.5;
-      const newGood = newFp.minClearCm >= 14.5;
-      tbody.innerHTML = `
-        <tr><td class="metric">当前双腿净距</td><td class="oldVal ${oldFp.curClearCm < 13.5 ? "bad" : ""}">${oldFp.curClearCm.toFixed(1)} cm</td><td class="newVal ${newFp.curClearCm >= 14.5 ? "good" : ""}">${newFp.curClearCm.toFixed(1)} cm</td></tr>
-        <tr><td class="metric">历史最小净距</td><td class="oldVal ${oldBad ? "bad" : ""}">${oldFp.minClearCm < 900 ? oldFp.minClearCm.toFixed(1) + " cm" : "—"}</td><td class="newVal ${newGood ? "good" : ""}">${newFp.minClearCm < 900 ? newFp.minClearCm.toFixed(1) + " cm" : "—"}</td></tr>
-        <tr><td class="metric">骨盆扭曲角</td><td class="oldVal">${(oldFp.gait.lowerYaw / DEG).toFixed(1)}°</td><td class="newVal good">${(newFp.gait.lowerYaw / DEG).toFixed(1)}°</td></tr>
-        <tr><td class="metric">着地脚滑移</td><td class="oldVal">${oldFp.maxSlipMm.toFixed(2)} mm</td><td class="newVal good">${newFp.maxSlipMm.toFixed(2)} mm</td></tr>
-        <tr><td class="metric">横移步宽</td><td class="oldVal">0.0 cm</td><td class="newVal good">7.5 cm</td></tr>
-      `;
-      $("leftAlert").className = `vpAlert ${oldFp.curClearCm < 13.5 ? "warn" : ""}`;
-      $("leftAlert").textContent = oldFp.curClearCm < 13.5 ? `⚠ 双腿过近穿插风险：${oldFp.curClearCm.toFixed(1)} cm` : `当前净距 ${oldFp.curClearCm.toFixed(1)} cm（最小 ${oldFp.minClearCm.toFixed(1)} cm）`;
-      $("rightAlert").className = "vpAlert good";
-      $("rightAlert").textContent = `✓ 安全净距 ${newFp.curClearCm.toFixed(1)} cm（最小 ${newFp.minClearCm.toFixed(1)} cm · 滑移 ${newFp.maxSlipMm.toFixed(2)} mm）`;
-      return;
+  function RenderTelemetry(cmd) {
+    const isFp = activeScenario.id === "fpStrafeLegs";
+    if (isFp) {
+      const oldLow = oldFp.curClearCm < 13.5;
+      $("leftPill").className = `vpPill ${oldLow ? "warn" : ""}`;
+      $("leftPill").textContent = `净距 ${oldFp.curClearCm.toFixed(1)} cm（最低 ${oldFp.minClearCm < 900 ? oldFp.minClearCm.toFixed(1) : "—"}）`;
+      $("rightPill").className = "vpPill good";
+      $("rightPill").textContent = `净距 ${newFp.curClearCm.toFixed(1)} cm（最低 ${newFp.minClearCm < 900 ? newFp.minClearCm.toFixed(1) : "—"}）`;
+    } else {
+      const o = oldUnit.telemetry, n = newUnit.telemetry;
+      $("leftPill").className = `vpPill ${o.fireBad ? "warn" : ""}`;
+      $("leftPill").textContent = o.fireBad ? "开火冻腿 0.35s" : o.stateLabel;
+      $("rightPill").className = "vpPill good";
+      $("rightPill").textContent = n.fireLabel !== "未开火" ? n.fireLabel : n.stateLabel;
     }
 
+    // 仅当用户展开 Debug 折叠区时才重绘详细表，节省 DOM 开销
+    if (!$("debugFold").open) return;
+    const tbody = $("diffBody");
+    if (isFp) {
+      tbody.innerHTML = `
+        <tr><td class="metric">当前净距</td><td class="oldVal ${oldFp.curClearCm < 13.5 ? "bad" : ""}">${oldFp.curClearCm.toFixed(1)} cm</td><td class="newVal ${newFp.curClearCm >= 14.5 ? "good" : ""}">${newFp.curClearCm.toFixed(1)} cm</td></tr>
+        <tr><td class="metric">历史最低</td><td class="oldVal ${oldFp.minClearCm < 13.5 ? "bad" : ""}">${oldFp.minClearCm < 900 ? oldFp.minClearCm.toFixed(1) + " cm" : "—"}</td><td class="newVal good">${newFp.minClearCm < 900 ? newFp.minClearCm.toFixed(1) + " cm" : "—"}</td></tr>
+        <tr><td class="metric">骨盆扭曲</td><td class="oldVal">${(oldFp.gait.lowerYaw / DEG).toFixed(1)}°</td><td class="newVal good">${(newFp.gait.lowerYaw / DEG).toFixed(1)}°</td></tr>
+        <tr><td class="metric">着地滑移</td><td class="oldVal">${oldFp.maxSlipMm.toFixed(2)} mm</td><td class="newVal good">${newFp.maxSlipMm.toFixed(2)} mm</td></tr>
+        <tr><td class="metric">横移步宽</td><td class="oldVal">0.0 cm</td><td class="newVal good">7.5 cm</td></tr>
+      `;
+      return;
+    }
     const o = oldUnit.telemetry, n = newUnit.telemetry;
     tbody.innerHTML = `
-      <tr><td class="metric">当前阶段</td><td class="oldVal" colspan="2" style="color:var(--ui-gold)">${cmd.phaseHint || "—"}</td></tr>
-      <tr><td class="metric">步态状态</td><td class="oldVal ${o.fireBad ? "bad" : ""}">${o.stateLabel}</td><td class="newVal good">${n.stateLabel}</td></tr>
+      <tr><td class="metric">阶段</td><td class="oldVal" colspan="2" style="color:var(--ui-gold)">${cmd.phaseHint || "—"}</td></tr>
+      <tr><td class="metric">步态</td><td class="oldVal ${o.fireBad ? "bad" : ""}">${o.stateLabel}</td><td class="newVal good">${n.stateLabel}</td></tr>
       <tr><td class="metric">骨盆扭曲</td><td class="oldVal">${o.pelvisWarpDeg.toFixed(1)}°</td><td class="newVal">${n.pelvisWarpDeg > 0 ? "+" : ""}${n.pelvisWarpDeg.toFixed(1)}°</td></tr>
-      <tr><td class="metric">原地脚偏角</td><td class="oldVal">0.0° (直转)</td><td class="newVal">${n.tipOffsetDeg > 0 ? "+" : ""}${n.tipOffsetDeg.toFixed(1)}°${n.tipTurning ? " 迈步" : ""}</td></tr>
-      <tr><td class="metric">Aim Offset</td><td class="oldVal">${o.aimMode}</td><td class="newVal good">${n.aimMode}</td></tr>
-      <tr><td class="metric">开火处理</td><td class="oldVal ${o.fireBad ? "bad" : ""}">${o.fireLabel}</td><td class="newVal ${n.fireLabel !== "未开火" ? "good" : ""}">${n.fireLabel}</td></tr>
-      <tr><td class="metric">双掌握距差</td><td class="oldVal">R ${o.gripRMm} / L ${o.gripLMm} mm</td><td class="newVal">R ${n.gripRMm} / L ${n.gripLMm} mm</td></tr>
+      <tr><td class="metric">脚偏角</td><td class="oldVal">0.0°</td><td class="newVal">${n.tipOffsetDeg > 0 ? "+" : ""}${n.tipOffsetDeg.toFixed(1)}°${n.tipTurning ? " 迈步" : ""}</td></tr>
+      <tr><td class="metric">Aim</td><td class="oldVal">${o.aimMode}</td><td class="newVal good">${n.aimMode}</td></tr>
+      <tr><td class="metric">开火</td><td class="oldVal ${o.fireBad ? "bad" : ""}">${o.fireLabel}</td><td class="newVal ${n.fireLabel !== "未开火" ? "good" : ""}">${n.fireLabel}</td></tr>
+      <tr><td class="metric">握距差</td><td class="oldVal">R${o.gripRMm}/L${o.gripLMm}mm</td><td class="newVal">R${n.gripRMm}/L${n.gripLMm}mm</td></tr>
     `;
-
-    $("leftAlert").className = `vpAlert ${o.fireBad || (activeScenario.id === "turnInPlace" && Math.abs(cmd.yaw) > 0.05) || (activeScenario.id === "strafe2d") ? "warn" : ""}`;
-    $("leftAlert").textContent = o.fireBad
-      ? "⚠ 跑步开火切全动画 → 双腿冻住滑冰 0.35 s"
-      : `${o.stateLabel} · 枪口偏靶 ${o.muzzleErrDeg}°`;
-    $("rightAlert").className = "vpAlert good";
-    $("rightAlert").textContent = `✓ ${n.stateLabel} · ${n.aimMode} · 扭胯 ${n.pelvisWarpDeg > 0 ? "+" : ""}${n.pelvisWarpDeg}°`;
   }
 
-  // Resize & dual-viewport render loop
   let viewW = 1, viewH = 1;
   function Resize() {
     const r = $("view").getBoundingClientRect();
@@ -1819,7 +2065,6 @@ async function Main() {
   new ResizeObserver(Resize).observe($("view"));
   Resize();
 
-  // Read initial scenario from URL ?scenario=...
   const urlSc = new URLSearchParams(location.search).get("scenario");
   SelectScenario(urlSc || "strafe2d");
   setBoot(100, "就绪");
@@ -1835,17 +2080,15 @@ async function Main() {
       state.sandboxYaw = WrapAngle(state.sandboxYaw + turn * 1.9 * dt);
     }
     state.time += dt;
-    const cmd = EvaluateScenarioCommand(activeScenario.id, state.time, state);
+    const cmd = EvaluateScenarioCommand(activeScenario.id, state.time, dt, state);
 
-    // Scroll ground treadmill opposite to velocity (0.5 m grid cell wrap)
+    // 2.0 m per texture repeat -> UV offset scrolls smoothly opposite to world velocity (zero flicker!)
     if (state.vis.treadmill && dt > 0) {
-      state.treadX = (state.treadX - cmd.vx * dt) % 0.5;
-      state.treadZ = (state.treadZ - cmd.vz * dt) % 0.5;
+      floorTex.offset.x = (floorTex.offset.x + (cmd.vx * dt) / 2.0) % 1;
+      floorTex.offset.y = (floorTex.offset.y - (cmd.vz * dt) / 2.0) % 1;
     }
-    oldStage.gridGroup.visible = state.vis.treadmill;
-    newStage.gridGroup.visible = state.vis.treadmill;
-    oldStage.gridGroup.position.set(state.treadX, 0, state.treadZ);
-    newStage.gridGroup.position.set(state.treadX, 0, state.treadZ);
+    UpdateStageDisplacement(oldStage, cmd.vx, cmd.vz, dt, state.vis.treadmill);
+    UpdateStageDisplacement(newStage, cmd.vx, cmd.vz, dt, state.vis.treadmill);
 
     const stepDt = dt > 0 ? dt : 1e-5;
     if (activeScenario.id === "fpStrafeLegs") {
@@ -1858,7 +2101,6 @@ async function Main() {
       newUnit.Update(cmd, stepDt, state.vis);
     }
 
-    // Update synced camera
     const target = new THREE.Vector3(0, orbit.targetY, 0).add(orbit.pan);
     const cp = Math.cos(orbit.pitch), sp = Math.sin(orbit.pitch);
     camera.position.set(
@@ -1868,7 +2110,6 @@ async function Main() {
     );
     camera.lookAt(target);
 
-    // Split center region between left (#side 330px) and right (#inspector 358px) panels
     const stageRect = $("stageHud").getBoundingClientRect();
     const leftPx = Math.max(0, Math.floor(stageRect.left));
     const widthPx = Math.max(2, Math.floor(stageRect.width));
@@ -1876,20 +2117,17 @@ async function Main() {
     const bottomY = Math.max(0, viewH - Math.floor(stageRect.bottom));
     const heightPx = Math.max(2, Math.floor(stageRect.height));
 
-    // Clear full canvas background
     renderer.setScissorTest(false);
     renderer.setClearColor(0x0b0c0a, 1);
     renderer.clear();
     renderer.setScissorTest(true);
 
-    // Left viewport: Old (Before)
     camera.aspect = halfW / heightPx;
     camera.updateProjectionMatrix();
     renderer.setViewport(leftPx, bottomY, halfW, heightPx);
     renderer.setScissor(leftPx, bottomY, halfW, heightPx);
     renderer.render(oldStage.scene, camera);
 
-    // Right viewport: New (After)
     const rightW = widthPx - halfW;
     camera.aspect = rightW / heightPx;
     camera.updateProjectionMatrix();
@@ -1900,7 +2138,7 @@ async function Main() {
     uiAccum += rawDt;
     if (uiAccum >= 0.08) {
       uiAccum = 0;
-      RenderDiffTable(cmd);
+      RenderTelemetry(cmd);
     }
   }
 
@@ -1912,10 +2150,10 @@ async function Main() {
   }
   requestAnimationFrame(Loop);
 
-  // Expose automation / inspection handle
   window.MotionCompare = {
     ready: true,
     scenarios: SCENARIOS.map((s) => s.id),
+    characters: CHAR_KEYS,
     setScenario: (id) => SelectScenario(id),
     setOldAim: (mode) => { $("selOldAim").value = mode; $("selOldAim").dispatchEvent(new Event("change")); },
     setAim: (yawDeg, pitchDeg) => {
@@ -1924,11 +2162,20 @@ async function Main() {
       $("chipManualAim").classList.add("on");
       SetManualAim(yawDeg, pitchDeg);
     },
+    setKey: (code, down) => { if (down) state.keys.add(code); else state.keys.delete(code); },
     setSlowMo: (rate) => { state.rate = rate; },
     fire: () => { state.manualFireSeq += 1; },
     step: (dt = 1 / 60, count = 1) => { for (let i = 0; i < count; i++) StepFrame(dt); },
+    riflePose: () => ({
+      oldPos: oldUnit.rifleObj ? oldUnit.rifleObj.position.toArray() : null,
+      newPos: newUnit.rifleObj ? newUnit.rifleObj.position.toArray() : null,
+      oldQ: oldUnit.rifleObj ? oldUnit.rifleObj.quaternion.toArray() : null,
+      newQ: newUnit.rifleObj ? newUnit.rifleObj.quaternion.toArray() : null,
+    }),
     state: () => ({
       scenario: activeScenario.id,
+      character: selChar.value,
+      rifle: $("selRifle").value,
       aimOffsetLoaded: !!bank.aimOffsetGrid,
       old: { ...oldUnit.telemetry },
       new: { ...newUnit.telemetry },

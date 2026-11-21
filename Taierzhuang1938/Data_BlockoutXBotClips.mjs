@@ -123,40 +123,40 @@ export const XBOT_NATIVE = Object.freeze({
 
 /**
  * 2D 混合空间四向步态对照表（2026-11-21）：按速度在角色局部坐标中的前后左右分解，
- * 对齐相位同步混合相邻两个方向的 Mixamo 原生动作。键与 XBOT_NATIVE 的步态键对应。
+ * 按实测左脚摆动最高点（phaseOffset，Sync Marker）对齐相位并同步混合相邻两个方向的 Mixamo 原生动作。
  */
 export const XBOT_LOCOMOTION_4WAY = Object.freeze({
   standWalkRifleAim: Object.freeze({
-    forward: M("Walking_V3", { speedMps: 1.25 }),
-    backward: M("WalkingBackwards_V1", { speedMps: 1.05 }),
-    left: M("RunLeft_V1", { speedMps: 2.1 }),
-    right: M("RunRight_V1", { speedMps: 2.1 }),
+    forward: M("Walking_V3", { speedMps: 1.25, phaseOffset: 0.97 }),
+    backward: M("WalkingBackwards_V1", { speedMps: 1.05, phaseOffset: 0.12 }),
+    left: M("RunLeft_V1", { speedMps: 2.1, phaseOffset: 0.18 }),
+    right: M("RunRight_V1", { speedMps: 2.1, phaseOffset: 0.87 }),
   }),
   standRunRifleAim: Object.freeze({
-    forward: M("RifleRun_V1", { speedMps: 3.4 }),
-    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5 }),
-    left: M("RunLeft_V1", { speedMps: 2.8 }),
-    right: M("RunRight_V1", { speedMps: 2.8 }),
+    forward: M("RifleRun_V1", { speedMps: 3.4, phaseOffset: 0.92 }),
+    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5, phaseOffset: 0.22 }),
+    left: M("RunLeft_V1", { speedMps: 2.8, phaseOffset: 0.18 }),
+    right: M("RunRight_V1", { speedMps: 2.8, phaseOffset: 0.87 }),
   }),
   standWalkRifle: Object.freeze({
-    forward: M("RifleWalk_V1", { speedMps: 1.3 }),
-    backward: M("BackwardsRifleWalk_V1", { speedMps: 1.15 }),
+    forward: M("RifleWalk_V1", { speedMps: 1.3, phaseOffset: 0.92 }),
+    backward: M("BackwardsRifleWalk_V1", { speedMps: 1.15, phaseOffset: 0.12 }),
   }),
   standRunRifle: Object.freeze({
-    forward: M("RifleRun_V2", { speedMps: 3.6 }),
-    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5 }),
+    forward: M("RifleRun_V2", { speedMps: 3.6, phaseOffset: 0.87 }),
+    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5, phaseOffset: 0.22 }),
   }),
   crouchWalkRifleAim: Object.freeze({
-    forward: M("CrouchedWalking_V1", { speedMps: 0.95 }),
-    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85 }),
-    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0 }),
-    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0 }),
+    forward: M("CrouchedWalking_V1", { speedMps: 0.95, phaseOffset: 0.90 }),
+    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85, phaseOffset: 0.03 }),
+    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0, phaseOffset: 0.12 }),
+    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0, phaseOffset: 0.88 }),
   }),
   crouchWalkRifle: Object.freeze({
-    forward: M("RifleCrouchWalk_V1", { speedMps: 0.9 }),
-    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85 }),
-    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0 }),
-    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0 }),
+    forward: M("RifleCrouchWalk_V1", { speedMps: 0.9, phaseOffset: 0.93 }),
+    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85, phaseOffset: 0.03 }),
+    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0, phaseOffset: 0.12 }),
+    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0, phaseOffset: 0.88 }),
   }),
 });
 

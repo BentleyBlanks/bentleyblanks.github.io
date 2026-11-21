@@ -627,11 +627,34 @@ export class XBotSkins {
         const derived = file.startsWith("Derived/");
         const loop = entry?.loop ?? false;
         if (!derived && !entry?.inPlace) this._FixRoot(clip, pin ?? !loop);
+        if (!derived && loop) this._CloseLoopSeam(clip);
         this.loaded.set(file, clip);
         return clip;
       }));
     }
     return this.clips.get(file);
+  }
+
+  /** 对循环片段末尾 2 帧向首帧做平滑闭合，消除 Mixamo 原始片段（如 RifleRun_V1 6.6° 接缝）循环回绕瞬间的局部抽搐。 */
+  _CloseLoopSeam(clip) {
+    const q0 = new THREE.Quaternion(), qn = new THREE.Quaternion(), qi = new THREE.Quaternion();
+    for (const tr of clip.tracks) {
+      if (!tr.name.endsWith(".quaternion")) continue;
+      const n = tr.times.length;
+      if (n < 6) continue;
+      const v = tr.values;
+      q0.set(v[0], v[1], v[2], v[3]).normalize();
+      qn.set(v[(n - 1) * 4], v[(n - 1) * 4 + 1], v[(n - 1) * 4 + 2], v[(n - 1) * 4 + 3]).normalize();
+      if (q0.dot(qn) < 0) qn.set(-qn.x, -qn.y, -qn.z, -qn.w);
+      if (q0.angleTo(qn) < 0.015) continue;
+      // 末帧对齐首帧，倒数第 2 帧半程平滑过渡
+      v[(n - 1) * 4] = q0.x; v[(n - 1) * 4 + 1] = q0.y; v[(n - 1) * 4 + 2] = q0.z; v[(n - 1) * 4 + 3] = q0.w;
+      const prevOff = (n - 2) * 4;
+      qi.set(v[prevOff], v[prevOff + 1], v[prevOff + 2], v[prevOff + 3]).normalize();
+      if (qi.dot(q0) < 0) qi.set(-qi.x, -qi.y, -qi.z, -qi.w);
+      qi.slerp(q0, 0.5).normalize();
+      v[prevOff] = qi.x; v[prevOff + 1] = qi.y; v[prevOff + 2] = qi.z; v[prevOff + 3] = qi.w;
+    }
   }
 
   _FixRoot(clip, pinAll) {
@@ -838,6 +861,9 @@ export class XBotSkin {
     this.locoPhase = 0;
     this.pelvisWarp = 0;
     this.blendActions = new Map();
+    this.blendWeights = new Map();
+    this.preOverlayQ = this.boneList.map(() => new THREE.Quaternion());
+    this.preOverlayValid = false;
     this.addFireAge = Infinity;
     this.lastFireSeq = null;
     this.prevFiring = false;
@@ -982,9 +1008,12 @@ export class XBotSkin {
       : !this.current || this.current.mirror ? "mirror"
         : pick.mode === "blend2d" ? "blend2d:" + pick.groupKey
           : pick.file + (pick.death ? "|death" : "");
-    if (this.shownValid && (key !== this.pickKey || this.jumped)) this._BeginBlend();
+    if (this.shownValid && (key !== this.pickKey || this.jumped)) this._BeginBlend(live3C);
     this.pickKey = key;
     this._ApplyBlend(dt);
+    // 记录叠加 Aim Offset / 开火后坐 / 手部 IK 之前的纯净底层姿态，避免换状态时把 Aim Offset 叠加两次导致步枪抖动
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.preOverlayQ[i].copy(this.boneList[i].quaternion);
+    this.preOverlayValid = true;
     this.container.updateMatrixWorld(true);
     // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格，未就绪/空手/卧倒自动退回程序化脊柱分摊）+ 开火上半身 Additive 叠加
     if (live3C) {
@@ -1013,11 +1042,12 @@ export class XBotSkin {
     this.prevDown = !!intent.down;
   }
 
-  /** 从上一帧看到的姿势起一段过渡。根这一帧挪了 rerootM 以内：胯照它在世界里的位置换到新的根下（片段换根不跳）。 */
-  _BeginBlend() {
+  /** 从上一帧看到的姿势起一段过渡。3C 态用叠加 AimOffset/IK 前的底层姿态起淡，杜绝切停时双倍 AimOffset 引起枪口抖动。 */
+  _BeginBlend(usePreOverlay = false) {
     const hips = this.H("Hips");
     const b = this.blend || (this.blend = { q: this.boneList.map(() => new THREE.Quaternion()), hips: new THREE.Vector3(), t: 0, dur: null });
-    for (let i = 0; i < this.boneList.length; i++) b.q[i].copy(this.shownQ[i]);
+    const srcQ = usePreOverlay && this.preOverlayValid ? this.preOverlayQ : this.shownQ;
+    for (let i = 0; i < this.boneList.length; i++) b.q[i].copy(srcQ[i]);
     const moved = this.container.getWorldPosition(_p).distanceTo(this.shownAt);
     if (moved <= XBOT.rerootM) {
       hips.parent.updateWorldMatrix(true, false);
@@ -1247,6 +1277,7 @@ export class XBotSkin {
       this.mixer.stopAllAction();
       this.mixer.uncacheRoot(this.model);
       this.blendActions.clear();
+      this.blendWeights.clear();
       this.baseValid = false;
       this.current = { mode: "blend2d", file: pick.file, mirror: false, lastT: null };
     } else if (this.baseValid) {
@@ -1268,25 +1299,45 @@ export class XBotSkin {
     this.locoPhase = (this.locoPhase + (dt * rate) / Math.max(effDur, 0.2)) % 1;
     if (this.locoPhase < 0) this.locoPhase += 1;
 
-    const activeFiles = new Set();
+    const targetMap = new Map();
+    const entryMeta = new Map();
     for (const r of resolved) {
-      activeFiles.add(r.file);
-      let action = this.blendActions.get(r.file);
-      if (!action) {
-        action = this.mixer.clipAction(r.clip);
+      targetMap.set(r.file, r.weight);
+      entryMeta.set(r.file, r);
+      if (!this.blendActions.has(r.file)) {
+        const action = this.mixer.clipAction(r.clip);
         action.reset();
         action.setLoop(THREE.LoopRepeat, Infinity);
         action.timeScale = 0;
         action.enabled = true;
         action.play();
         this.blendActions.set(r.file, action);
+        // 首次进入 2D 混合直接赋初始权重，后续换向按时间常数平滑过渡避免腿部抽搐
+        this.blendWeights.set(r.file, this.blendActions.size === 1 ? r.weight : 0);
       }
-      action.enabled = true;
-      action.setEffectiveWeight(r.weight);
-      action.time = this.locoPhase * (r.clip.duration || 1);
+    }
+    // 平滑阻尼四向混合权重并重新归一化，消除跨 45° / 90° 象限时的单帧脚步跳变
+    const damp = 1 - Math.exp(-Math.max(dt, 0) / 0.085);
+    let smoothSum = 0;
+    for (const [file] of this.blendActions) {
+      const tgt = targetMap.get(file) || 0;
+      const cur = this.blendWeights.get(file) ?? tgt;
+      const next = Math.abs(tgt - cur) < 1e-4 ? tgt : cur + (tgt - cur) * damp;
+      this.blendWeights.set(file, next);
+      smoothSum += next;
     }
     for (const [file, action] of this.blendActions) {
-      if (!activeFiles.has(file)) action.setEffectiveWeight(0);
+      const rawW = this.blendWeights.get(file) || 0;
+      const effW = smoothSum > 1e-5 ? rawW / smoothSum : 0;
+      action.enabled = effW > 1e-4;
+      action.setEffectiveWeight(effW);
+      if (effW > 1e-4) {
+        const meta = entryMeta.get(file);
+        const phaseOff = meta?.phaseOffset ?? action._phaseOffset ?? 0;
+        action._phaseOffset = phaseOff;
+        const dur = action.getClip().duration || 1;
+        action.time = ((this.locoPhase + phaseOff) % 1) * dur;
+      }
     }
 
     this.wasDown = false;

@@ -11,6 +11,11 @@
 <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
 <link rel="stylesheet" href="./Style_Editor.css">
 <style>
+  :root {
+    --side-w: 288px;
+    --insp-w: 344px;
+    --panel-gap: 12px;
+  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0a; }
   #view { position: fixed; inset: 0; }
   #view canvas { display: block; width: 100%; height: 100%; }
@@ -26,75 +31,130 @@
   #edRoot.mc .edMenuStatus { margin-left: auto; }
 
   #edRoot.mc .edPanel { top: calc(var(--ed-bar-h) + 12px); bottom: 14px; }
-  #edRoot.mc #side { left: 14px; width: 312px; }
-  #edRoot.mc #inspector { right: 14px; width: 344px; }
+  #edRoot.mc #side { left: 12px; width: var(--side-w); }
+  #edRoot.mc #inspector { right: 12px; width: var(--insp-w); }
   #edRoot.mc .edBody { padding: 6px 13px 14px; }
-  #edRoot.mc .edSection { margin: 7px 0 3px; }
+  #edRoot.mc .edSection { margin: 8px 0 4px; }
   #edRoot.mc .edSection > .h { padding-bottom: 4px; margin-bottom: 6px; }
   #edRoot.mc .edPanel input[type="range"] { width: 100%; }
 
-  /* 中央双视口分屏标注层（位于左右两块面板之间，不挡鼠标拖拽旋转） */
+  /* 左右边栏可拖拽调宽手柄 */
+  .splitHandle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 12;
+    pointer-events: auto;
+    background: transparent;
+    transition: background 0.12s linear;
+  }
+  .splitHandle::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: transparent;
+    transition: background 0.12s linear;
+  }
+  #resizeLeft { right: -4px; }
+  #resizeLeft::after { left: 3px; }
+  #resizeRight { left: -4px; }
+  #resizeRight::after { left: 3px; }
+  .splitHandle:hover::after,
+  .splitHandle.dragging::after { background: var(--ui-gold); }
+  .splitHandle:hover,
+  .splitHandle.dragging { background: rgba(223, 189, 104, 0.10); }
+  body.resizing { cursor: col-resize !important; user-select: none; }
+
+  /* 中央双视口分屏标注层（随左右边栏宽度实时伸缩） */
   #stageHud {
     position: fixed;
     top: calc(var(--ed-bar-h, 46px) + 12px);
-    left: 344px;
-    right: 372px;
+    left: calc(12px + var(--side-w) + var(--panel-gap));
+    right: calc(12px + var(--insp-w) + var(--panel-gap));
     bottom: 14px;
     pointer-events: none;
     display: grid;
     grid-template-columns: 1fr 1fr;
+    border: 1px solid rgba(214, 217, 209, 0.14);
   }
-  .vpCol { position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 14px; }
+  .vpCol { position: relative; display: flex; flex-direction: column; justify-content: flex-start; }
   .vpCol.left { border-right: 1px solid rgba(214, 217, 209, 0.22); }
-  .vpBadge {
-    align-self: flex-start;
-    padding: 6px 12px;
-    background: rgba(11, 13, 13, 0.86);
-    border: 1px solid var(--ui-line);
-    border-left: 3px solid #c96852;
+
+  /* 优化前 / 优化后 顶部一体化通栏标签（精致细线 + 色点 + 行内状态，无漂浮黑盒） */
+  .vpStrip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px 9px;
+    background: linear-gradient(180deg, rgba(10, 12, 12, 0.88) 0%, rgba(10, 12, 12, 0.54) 100%);
+    border-bottom: 1px solid rgba(214, 217, 209, 0.14);
     backdrop-filter: blur(2px);
   }
-  .vpCol.right .vpBadge { border-left-color: var(--ui-gold); }
-  .vpBadge .k { font: 700 13px/1.3 var(--ed-serif, var(--ui-font)); letter-spacing: 0.08em; color: var(--ui-bright); }
-  .vpCol.left .vpBadge .k { color: #e29987; }
-  .vpCol.right .vpBadge .k { color: var(--ui-gold); }
-  .vpBadge .s { margin-top: 2px; font-size: 11px; color: var(--ui-muted); letter-spacing: 0.03em; }
-
-  .vpAlert {
-    align-self: flex-start;
-    padding: 4px 10px;
-    background: rgba(11, 13, 13, 0.84);
-    border: 1px solid var(--ui-line);
-    font: 11.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
-    color: var(--ui-text);
+  .vpDot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border: 1px solid currentColor;
+    background: currentColor;
   }
-  .vpAlert.warn { border-color: rgba(214, 96, 74, 0.7); color: #ef9984; }
-  .vpAlert.good { border-color: rgba(118, 178, 112, 0.65); color: #9ad48f; }
+  .vpCol.left .vpDot { color: #d66d56; }
+  .vpCol.right .vpDot { color: var(--ui-gold); }
+  .vpTitleGroup { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; overflow: hidden; }
+  .vpStrip .k {
+    font: 700 13px/1.2 var(--ed-serif, var(--ui-font));
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .vpCol.left .vpStrip .k { color: #e8a495; }
+  .vpCol.right .vpStrip .k { color: var(--ui-gold); }
+  .vpStrip .s {
+    font-size: 11px;
+    color: var(--ui-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .vpPill {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border: 1px solid rgba(214, 217, 209, 0.2);
+    background: rgba(14, 17, 17, 0.8);
+    font: 11px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-muted);
+    white-space: nowrap;
+  }
+  .vpPill.warn { border-color: rgba(214, 109, 86, 0.65); color: #f09b88; }
+  .vpPill.good { border-color: rgba(132, 198, 122, 0.55); color: #9cd692; }
 
-  /* 底部场景对比说明条 */
+  /* 底部场景对比说明条（随左右边栏宽度实时伸缩） */
   #captionBar {
     position: fixed;
-    left: 358px;
-    right: 386px;
-    bottom: 18px;
+    left: calc(12px + var(--side-w) + var(--panel-gap) + 10px);
+    right: calc(12px + var(--insp-w) + var(--panel-gap) + 10px);
+    bottom: 22px;
     pointer-events: none;
-    padding: 9px 14px;
-    background: rgba(11, 13, 13, 0.88);
+    padding: 8px 13px;
+    background: rgba(11, 13, 13, 0.86);
     border: 1px solid var(--ui-line);
     border-left: 3px solid var(--ui-gold);
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
-  #captionTitle { font-size: 12.5px; font-weight: 700; color: var(--ui-gold); letter-spacing: 0.06em; }
-  #captionDesc { font-size: 11.5px; color: var(--ui-text); line-height: 1.5; }
+  #captionTitle { font-size: 12px; font-weight: 700; color: var(--ui-gold); letter-spacing: 0.05em; }
+  #captionDesc { font-size: 11.5px; color: var(--ui-text); line-height: 1.48; }
   #captionHelp { font-size: 10.5px; color: var(--ui-muted); letter-spacing: 0.04em; }
 
-  /* 左侧场景列表（沿用 Mixamo 动作预览的左金边卡片风格） */
-  .scList { margin: 4px -14px 0; }
+  /* 左侧场景列表 */
+  .scList { margin: 2px -13px 0; }
   .scItem {
     cursor: pointer;
-    padding: 9px 14px 9px 13px;
+    padding: 9px 13px 9px 12px;
     border-left: 3px solid transparent;
     border-bottom: 1px solid rgba(214, 217, 209, 0.09);
     transition: background 0.12s linear, border-color 0.12s linear;
@@ -107,22 +167,12 @@
   .scItem.on .scName { color: var(--ui-gold); }
   .scTag { font-size: 10px; padding: 1px 5px; border: 1px solid var(--ui-line); color: var(--ui-muted); white-space: nowrap; }
   .scItem.on .scTag { border-color: rgba(223, 189, 104, 0.5); color: var(--ui-gold); }
-  .scHint { margin-top: 3px; font-size: 11.5px; color: var(--ui-muted); line-height: 1.45; }
-
-  /* 右侧实时对比读数表 */
-  .diffTable { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 11.5px; }
-  .diffTable th, .diffTable td { padding: 5px 6px; border-bottom: 1px solid rgba(214, 217, 209, 0.11); text-align: left; }
-  .diffTable th { color: var(--ui-muted); font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em; }
-  .diffTable td.metric { color: var(--ui-muted); width: 78px; }
-  .diffTable td.oldVal { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; color: #d8a69a; }
-  .diffTable td.newVal { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; color: #d9cfa8; }
-  .diffTable td.bad { color: #ef8a75; font-weight: 700; }
-  .diffTable td.good { color: #96d68b; font-weight: 700; }
+  .scHint { margin-top: 3px; font-size: 11.5px; color: var(--ui-muted); line-height: 1.42; }
 
   /* 3x3 Aim Offset 九宫格快捷按钮 */
-  .aoGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 6px 0 8px; }
+  .aoGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 5px 0 7px; }
   .aoCell {
-    cursor: pointer; padding: 6px 4px; text-align: center;
+    cursor: pointer; padding: 5px 4px; text-align: center;
     background: #141818; border: 1px solid rgba(214, 217, 209, 0.2);
     color: var(--ui-text); font-size: 11px; border-radius: 0;
     transition: background 0.1s linear, border-color 0.1s linear;
@@ -136,12 +186,53 @@
   .toggles .edChip input { display: none; }
 
   .noteBox {
-    margin-top: 8px; padding: 7px 10px;
-    border-left: 3px solid var(--ui-gold); background: rgba(223, 189, 104, 0.08);
-    color: var(--ui-text); font-size: 11.5px; line-height: 1.55;
+    margin: 4px 0 6px; padding: 7px 9px;
+    border-left: 2px solid var(--ui-gold); background: rgba(223, 189, 104, 0.07);
+    color: var(--ui-text); font-size: 11.5px; line-height: 1.5;
   }
-  .kbdHint { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--ui-muted); }
+  .kbdHint { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0 4px; font-size: 11px; color: var(--ui-muted); }
+  .kbdHint[hidden] { display: none; }
   .kbdHint kbd { padding: 1px 5px; border: 1px solid var(--ui-line); background: #121515; color: var(--ui-bright); font-family: ui-monospace, Consolas, monospace; font-size: 10.5px; }
+
+  /* 默认折叠的 Debug 实时指标表 */
+  .debugFold {
+    margin-top: 10px;
+    border-top: 1px solid var(--ui-line);
+    padding-top: 6px;
+  }
+  .debugFold > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 0;
+    color: var(--ui-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    user-select: none;
+  }
+  .debugFold > summary::-webkit-details-marker { display: none; }
+  .debugFold > summary::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--ui-muted);
+    flex: 0 0 auto;
+  }
+  .debugFold[open] > summary { color: var(--ui-gold); }
+  .debugFold[open] > summary::before { background: var(--ui-gold); border-color: var(--ui-gold); }
+  .debugFold > summary:hover { color: var(--ui-gold); }
+
+  .diffTable { width: 100%; border-collapse: collapse; margin: 4px 0 2px; font-size: 11.5px; }
+  .diffTable th, .diffTable td { padding: 4px 5px; border-bottom: 1px solid rgba(214, 217, 209, 0.11); text-align: left; }
+  .diffTable th { color: var(--ui-muted); font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em; }
+  .diffTable td.metric { color: var(--ui-muted); width: 74px; }
+  .diffTable td.oldVal { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; color: #d8a69a; }
+  .diffTable td.newVal { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; color: #d9cfa8; }
+  .diffTable td.bad { color: #ef8a75; font-weight: 700; }
+  .diffTable td.good { color: #96d68b; font-weight: 700; }
 
   #bootOverlay {
     position: fixed; inset: 0; z-index: 60;
@@ -184,53 +275,107 @@
   <aside class="edPanel" id="side">
     <div class="edHead">
       <div class="edTitle">对比场景</div>
-      <div class="edSub">左：优化前旧方案 · 右：新 3C + 9 帧精修</div>
+      <div class="edSub">左旧 · 右新</div>
     </div>
     <div class="edBody">
       <div class="scList" id="scenarioList"></div>
-      <div class="noteBox" id="scenarioChecklist"></div>
     </div>
+    <div class="splitHandle" id="resizeLeft" title="拖拽调整左侧栏宽度"></div>
   </aside>
 
   <div id="stageHud">
     <div class="vpCol left">
-      <div class="vpBadge">
-        <div class="k" id="leftBadgeTitle">优化前 · 旧方案</div>
-        <div class="s" id="leftBadgeSub">单向播片 / 无朝向扭曲 / 无原地转身 / 开火锁腿</div>
+      <div class="vpStrip">
+        <span class="vpDot"></span>
+        <div class="vpTitleGroup">
+          <span class="k" id="leftBadgeTitle">优化前</span>
+          <span class="s" id="leftBadgeSub">单向播片 / 无扭曲 / 开火锁腿</span>
+        </div>
+        <span class="vpPill" id="leftPill">—</span>
       </div>
-      <div class="vpAlert" id="leftAlert" style="margin-bottom:106px">—</div>
     </div>
     <div class="vpCol right">
-      <div class="vpBadge">
-        <div class="k" id="rightBadgeTitle">优化后 · 3C + 9 帧精修</div>
-        <div class="s" id="rightBadgeSub">2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加</div>
+      <div class="vpStrip">
+        <span class="vpDot"></span>
+        <div class="vpTitleGroup">
+          <span class="k" id="rightBadgeTitle">优化后</span>
+          <span class="s" id="rightBadgeSub">2D 混合 / 扭曲 / 原地转身 / 9 帧精修</span>
+        </div>
+        <span class="vpPill good" id="rightPill">—</span>
       </div>
-      <div class="vpAlert" id="rightAlert" style="margin-bottom:106px">—</div>
     </div>
   </div>
 
   <div id="captionBar">
     <div id="captionTitle">—</div>
     <div id="captionDesc">—</div>
-    <div id="captionHelp">左键拖拽同步旋转 · 滚轮缩放 · 右键平移 · 双击复位 · 空格暂停 · F 点射（自由沙盒：WASD 移动）</div>
+    <div id="captionHelp">左键拖拽同步旋转 · 滚轮缩放 · 右键平移 · 双击复位 · 空格暂停 · F 点射</div>
   </div>
 
   <aside class="edPanel work" id="inspector">
+    <div class="splitHandle" id="resizeRight" title="拖拽调整右侧栏宽度"></div>
     <div class="edHead">
-      <div class="edTitle">对比控制与读数</div>
-      <div class="edSub" id="inspectorSub">实机骨骼与求解器同步驱动</div>
+      <div class="edTitle">参数控制</div>
+      <div class="edSub">人物 · 瞄准 · 机位</div>
     </div>
     <div class="edBody">
+      <!-- 重点 1：模型与对比基线 -->
       <div class="edSection">
-        <div class="h">实时指标对照</div>
-        <table class="diffTable">
-          <thead>
-            <tr><th>指标</th><th>优化前</th><th>优化后</th></tr>
-          </thead>
-          <tbody id="diffBody"></tbody>
-        </table>
+        <div class="h">模型与对比基线</div>
+        <div class="edRow">
+          <div class="l">测试人物</div>
+          <div class="c"><select id="selChar"></select></div>
+        </div>
+        <div class="edRow">
+          <div class="l">武器</div>
+          <div class="c">
+            <select id="selRifle">
+              <option value="HanYang" selected>汉阳造 173R</option>
+              <option value="Type38">三八式步枪</option>
+              <option value="ZhongZheng">中正式步枪</option>
+            </select>
+          </div>
+        </div>
+        <div class="edRow">
+          <div class="l">基础姿态</div>
+          <div class="c">
+            <div class="edBtns" id="stanceBtns" style="margin:0">
+              <button class="edBtn on" data-stance="stand">站姿</button>
+              <button class="edBtn" data-stance="crouch">蹲姿</button>
+            </div>
+          </div>
+        </div>
+        <div class="edRow" title="可把左侧切为「纯数学 5 节脊柱」，专门对比 BlenderMCP 9 帧精修带来的锁骨/肘部/贴腮提升">
+          <div class="l">左侧 Aim</div>
+          <div class="c">
+            <select id="selOldAim">
+              <option value="none" selected>旧版无 Aim Offset（僵直）</option>
+              <option value="procedural">纯数学 5 节脊柱（对比 9 帧精修）</option>
+            </select>
+          </div>
+        </div>
       </div>
 
+      <!-- 重点 2：9 向瞄准手控覆盖 -->
+      <div class="edSection">
+        <div class="h">9 向瞄准手控</div>
+        <div class="toggles">
+          <label class="edChip" id="chipManualAim"><input id="chkManualAim" type="checkbox">手动锁定瞄准角</label>
+        </div>
+        <div class="aoGrid" id="aoGrid"></div>
+        <div class="edRow">
+          <div class="l">偏航 Yaw</div>
+          <div class="c"><input id="rngYaw" type="range" min="-75" max="75" step="1" value="0"></div>
+          <div class="edVal" id="valYaw" style="width:42px;text-align:right">0°</div>
+        </div>
+        <div class="edRow">
+          <div class="l">俯仰 Pitch</div>
+          <div class="c"><input id="rngPitch" type="range" min="-45" max="50" step="1" value="0"></div>
+          <div class="edVal" id="valPitch" style="width:42px;text-align:right">0°</div>
+        </div>
+      </div>
+
+      <!-- 次重点：播放与镜头 -->
       <div class="edSection">
         <div class="h">播放与镜头</div>
         <div class="edBtns">
@@ -261,66 +406,10 @@
         </div>
       </div>
 
+      <!-- 次次重点：观察提示、推荐连招与辅助显示 -->
       <div class="edSection">
-        <div class="h">模型与对比基线</div>
-        <div class="edRow">
-          <div class="l">测试人物</div>
-          <div class="c"><select id="selChar"></select></div>
-        </div>
-        <div class="edRow">
-          <div class="l">武器</div>
-          <div class="c">
-            <select id="selRifle">
-              <option value="Type38" selected>三八式步枪</option>
-              <option value="ZhongZheng">中正式步枪</option>
-            </select>
-          </div>
-        </div>
-        <div class="edRow">
-          <div class="l">基础姿态</div>
-          <div class="c">
-            <div class="edBtns" id="stanceBtns" style="margin:0">
-              <button class="edBtn on" data-stance="stand">站姿</button>
-              <button class="edBtn" data-stance="crouch">蹲姿</button>
-            </div>
-          </div>
-        </div>
-        <div class="edRow" title="可把左侧切为「纯数学脊柱 Aim」，专门对比 BlenderMCP 9 帧精修带来的锁骨/肘部/贴腮提升">
-          <div class="l">左侧 Aim</div>
-          <div class="c">
-            <select id="selOldAim">
-              <option value="none" selected>旧版无 Aim Offset（僵直）</option>
-              <option value="procedural">纯数学 5 节脊柱（对比 9 帧精修）</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="edSection">
-        <div class="h">9 向瞄准手控覆盖</div>
-        <div class="toggles">
-          <label class="edChip" id="chipManualAim"><input id="chkManualAim" type="checkbox">手动锁定瞄准角</label>
-        </div>
-        <div class="aoGrid" id="aoGrid"></div>
-        <div class="edRow">
-          <div class="l">偏航 Yaw</div>
-          <div class="c"><input id="rngYaw" type="range" min="-75" max="75" step="1" value="0"></div>
-          <div class="edVal" id="valYaw" style="width:42px;text-align:right">0°</div>
-        </div>
-        <div class="edRow">
-          <div class="l">俯仰 Pitch</div>
-          <div class="c"><input id="rngPitch" type="range" min="-45" max="50" step="1" value="0"></div>
-          <div class="edVal" id="valPitch" style="width:42px;text-align:right">0°</div>
-        </div>
-      </div>
-
-      <div class="edSection">
-        <div class="h">辅助可视化</div>
-        <div class="toggles" id="visToggles">
-          <label class="edChip on"><input id="visArrows" type="checkbox" checked>朝向/速度箭头</label>
-          <label class="edChip on"><input id="visTarget" type="checkbox" checked>瞄准靶与射线</label>
-          <label class="edChip on"><input id="visTreadmill" type="checkbox" checked>移动地面网格</label>
-        </div>
+        <div class="h">观察提示与辅助</div>
+        <div class="noteBox" id="scenarioChecklist"></div>
         <div class="kbdHint" id="sandboxKeys" hidden>
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span>
           <span><kbd>Shift</kbd> 疾跑</span>
@@ -328,14 +417,30 @@
           <span><kbd>C</kbd> 站/蹲</span>
           <span><kbd>F</kbd> 开火</span>
         </div>
+        <div class="toggles" id="visToggles">
+          <label class="edChip on"><input id="visArrows" type="checkbox" checked>朝向/速度箭头</label>
+          <label class="edChip on"><input id="visTarget" type="checkbox" checked>瞄准靶与射线</label>
+          <label class="edChip on"><input id="visTreadmill" type="checkbox" checked>地面位移标尺</label>
+        </div>
       </div>
+
+      <!-- 默认折叠的 Debug 指标对照 -->
+      <details class="debugFold" id="debugFold">
+        <summary>实时指标对照（Debug）</summary>
+        <table class="diffTable">
+          <thead>
+            <tr><th>指标</th><th>优化前</th><th>优化后</th></tr>
+          </thead>
+          <tbody id="diffBody"></tbody>
+        </table>
+      </details>
     </div>
   </aside>
 </div>
 
 <div id="bootOverlay">
   <div id="bootTitle">动作衔接对比</div>
-  <div id="bootStep">正在载入角色骨骼、Mixamo 动作与 9 帧精修 Aim Offset…</div>
+  <div id="bootStep">正在载入角色骨骼、步枪与 9 帧精修 Aim Offset…</div>
   <div id="bootTrack"><div id="bootBar"></div></div>
 </div>
 
