@@ -30,7 +30,7 @@ import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 import {
   NPC_3C, WrapAngle, Clamp, Smooth01,
-  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
+  ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
@@ -67,8 +67,8 @@ export const XBOT = Object.freeze({
   stepS: 0.12,
   /** 跑和走的分界（m/s），同原生步态 */
   runMps: 2.2,
-  /** 原地循环动作的播放速率夹在这个范围里（太慢像慢动作、太快像抽搐） */
-  rate: [0.4, 2.2],
+  /** 原地循环动作的播放速率夹在这个范围里（覆盖实测 STANCE_MPS 0.36..3.82 m/s 与不同走跑速度匹配） */
+  rate: [0.35, 2.4],
   /** 动作预览工具里标定步枪用的那条（第 0 帧两手都在枪上） */
   rifleCalibration: "Animation_Mixamo_RifleAimingIdle_V1.glb",
   /** 开一枪之后播开枪动作这么久（试玩里 AI 的 state.firing 只亮一帧） */
@@ -830,6 +830,11 @@ export class XBotSkin {
     this.wasDown = null;
     this.rifleOnLeft = null;
     this.H = (n) => this.bones.get(n);
+    this.model.updateMatrixWorld(true);
+    const lfBind = this.H("LeftFoot"), rfBind = this.H("RightFoot");
+    const bindLy = lfBind ? lfBind.getWorldPosition(_p).y : 0.095;
+    const bindRy = rfBind ? rfBind.getWorldPosition(_p).y : bindLy;
+    this.ankleRestOffY = THREE.MathUtils.clamp((bindLy + bindRy) * 0.5, 0.06, 0.18);
     // 换动作的过渡（XBOT.fadeS）：mixer 只在值变了的时候才写骨头（three PropertyMixer），过渡和握枪 IK 改过的骨头
     // 下一帧要先还原成 mixer 上一次写的值（base），不然停住的动作会把改过的值留着
     this.base = this.boneList.map(() => new THREE.Quaternion());
@@ -855,9 +860,11 @@ export class XBotSkin {
     this.rifleSwap = null;
     this.weaponVisualFit = null;
     this.weaponVisualOffset = new THREE.Vector3();
-    // 3C 动作系统状态（2D Blend Space / Orientation Warping / Turn-in-Place / Additive Fire）
+    // 3C 动作系统状态（四向主干朝向扭曲 / 支撑脚锁地 IK / 原地转身 / Additive 开火）
     this.tip = new TurnInPlaceController();
+    this.footLock = new FootLockController();
     this.locoRunning = false;
+    this.locoPrimary = null;
     this.locoPhase = 0;
     this.pelvisWarp = 0;
     this.blendActions = new Map();
@@ -893,7 +900,9 @@ export class XBotSkin {
     if (!visible) {
       this.shownValid = false; this.blend = null; this._EndRifleSwap(); this.rifleShown = null;
       this.tip.Reset(Number.isFinite(intent.yaw) ? intent.yaw : 0);
+      this.footLock.Reset();
       this.pelvisWarp = 0;
+      this.locoPrimary = null;
       return;
     }
     this.container.position.copy(rig.root.position);
@@ -942,9 +951,11 @@ export class XBotSkin {
     if (live3C) {
       loco3c = ComputeLocomotion2D({
         vx: intent.vx || 0, vz: intent.vz || 0, yaw: intent.yaw,
-        stance, aimWeight, rifleInHands: rifle, speedMps: intent.mps, running: this.locoRunning,
+        stance, aimWeight, rifleInHands: rifle, speedMps: intent.mps,
+        running: this.locoRunning, prevPrimary: this.locoPrimary,
       });
       this.locoRunning = loco3c.running;
+      this.locoPrimary = loco3c.moving ? loco3c.primary : null;
       tip3c = this.tip.Update(dt, {
         yaw: intent.yaw, mps: intent.mps || 0, stance, aimWeight, rifleInHands: rifle,
         active: true, teleported,
@@ -958,8 +969,10 @@ export class XBotSkin {
       this.last3C = { loco: loco3c, tip: tip3c, pelvisWarp: this.pelvisWarp, lowerYawOff };
     } else {
       this.tip.Reset(Number.isFinite(intent.yaw) ? intent.yaw : 0);
+      this.footLock.Reset();
       this.pelvisWarp = 0;
       this.locoRunning = false;
+      this.locoPrimary = null;
       this.last3C = null;
     }
 
@@ -1015,10 +1028,11 @@ export class XBotSkin {
     for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.preOverlayQ[i].copy(this.boneList[i].quaternion);
     this.preOverlayValid = true;
     this.container.updateMatrixWorld(true);
-    // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格，未就绪/空手/卧倒自动退回程序化脊柱分摊）+ 开火上半身 Additive 叠加
+    // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格）+ 开火上半身 Additive 叠加 + 支撑脚锁地 2-Bone Leg IK
     if (live3C) {
       this._ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance, rifle);
       this._ApplyAdditiveFire(intent, rifle, stance);
+      this._ApplyFootLock(dt, !!loco3c?.moving && !tip3c?.turning, stance, teleported);
       this.container.updateMatrixWorld(true);
     }
     this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
@@ -1473,6 +1487,52 @@ export class XBotSkin {
       if (Math.abs(rec.kickRollRad) > 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimFwd, rec.kickRollRad));
       RotateBoneWorld(spine2, _aimQ);
     }
+  }
+
+  /**
+   * 支撑脚锁地 2-Bone Leg IK（Foot Locking）：
+   * 脚踩进支撑期瞬间记下世界落点，用解析两节腿 IK 把脚踝钉死在地面落点，彻底消除动捕非匀速起伏带来的脚底滑移；
+   * 仅作用于 UpLeg / Leg / Foot，对 Hips、脊柱与步枪瞄线 0° 零干扰。
+   */
+  _ApplyFootLock(dt, moving, stance, teleported) {
+    if (stance === "prone") { this.footLock.Reset(); return; }
+    const groundY = this.container.matrixWorld.elements[13];
+    const scaleY = this.container.matrixWorld.getMaxScaleOnAxis() || 1;
+    const ankleRestY = groundY + this.ankleRestOffY * scaleY;
+    for (let i = 0; i < 2; i += 1) {
+      const side = i === 0 ? "Left" : "Right";
+      const up = this.H(side + "UpLeg"), lo = this.H(side + "Leg"), ft = this.H(side + "Foot");
+      if (!up || !lo || !ft) continue;
+      const A = FreshPosition(up), B = FreshPosition(lo), Cw = FreshPosition(ft);
+      const maxReachM = A.distanceTo(B) + B.distanceTo(Cw);
+      const res = this.footLock.UpdateFoot(i, {
+        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        hipX: A.x, hipY: A.y, hipZ: A.z,
+        ankleRestY, groundY, maxReachM, dt, moving, teleported,
+      });
+      if (res.active) this._SolveLeg(up, lo, ft, _p.set(res.targetX, res.targetY, res.targetZ));
+    }
+  }
+
+  _SolveLeg(upper, lower, foot, target) {
+    const footQ = FreshQuaternion(foot);
+    const A = FreshPosition(upper), B = FreshPosition(lower), Cw = FreshPosition(foot);
+    const lab = A.distanceTo(B), lbc = B.distanceTo(Cw);
+    const lat = THREE.MathUtils.clamp(A.distanceTo(target), Math.abs(lab - lbc) + 0.02, (lab + lbc) * 0.985);
+    const ba = A.clone().sub(B), bc = Cw.clone().sub(B);
+    let axis = ba.clone().cross(bc);
+    if (axis.lengthSq() < 1e-10) {
+      const e = this.container.matrixWorld.elements;
+      axis.set(e[0], e[1], e[2]);
+    }
+    axis.normalize();
+    const cur = ba.angleTo(bc);
+    const des = Math.acos(THREE.MathUtils.clamp((lab * lab + lbc * lbc - lat * lat) / (2 * lab * lbc), -1, 1));
+    RotateBoneWorld(lower, new THREE.Quaternion().setFromAxisAngle(axis, des - cur));
+    const C2 = FreshPosition(foot);
+    const ac = C2.sub(A).normalize(), at = target.clone().sub(A).normalize();
+    RotateBoneWorld(upper, new THREE.Quaternion().setFromUnitVectors(ac, at));
+    SetBoneWorldQuaternion(foot, footQ);
   }
 
   /** 3C 动作系统诊断探针（用于单测与实机验证）。 */

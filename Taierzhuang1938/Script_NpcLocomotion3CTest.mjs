@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   NPC_3C, WrapAngle,
-  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
+  ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
 import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET } from "./Data_BlockoutXBotClips.mjs";
 
@@ -28,8 +28,8 @@ function Check(name, fn) {
   catch (error) { results.push(`FAIL ${name}: ${error.message}`); process.exitCode = 1; }
 }
 
-// 1. 2D Blend Space
-Check("2D Blend Space：四向基向量与 45° 斜向平滑混合", () => {
+// 1. UE5 Lyra Cardinal Orientation Warping (Zero Double-Rotation + 100% Full Stride)
+Check("UE5 四向主干 + 精准朝向扭曲：任意方向脚步合成角误差 0°、步幅 100% 不缩水", () => {
   // 朝 -Z（yaw=0）：前 = (0,-2)，右 = (+2,0)，左 = (-2,0)，后 = (0,+2)
   const fwd = ComputeLocomotion2D({ vx: 0, vz: -2.0, yaw: 0, aimWeight: 1 });
   assert.equal(fwd.primary, "forward");
@@ -46,39 +46,71 @@ Check("2D Blend Space：四向基向量与 45° 斜向平滑混合", () => {
   const back = ComputeLocomotion2D({ vx: 0, vz: 2.0, yaw: 0, aimWeight: 1 });
   assert.equal(back.primary, "backward");
 
-  const diagFR = ComputeLocomotion2D({ vx: 1.5, vz: -1.5, yaw: 0, aimWeight: 1 });
-  assert.ok(new Set([diagFR.primary, diagFR.secondary]).has("forward"));
-  assert.ok(new Set([diagFR.primary, diagFR.secondary]).has("right"));
-  assert.ok(Math.abs(diagFR.wPrimary - 0.5) < 1e-6 && Math.abs(diagFR.wSecondary - 0.5) < 1e-6);
-  assert.ok(Math.abs(diagFR.wPrimary + diagFR.wSecondary - 1) < 1e-6);
+  // 检验 360° 多个典型斜向角：主干基角 - pelvisWarpRad === moveAngle（零双倍偏转！）
+  const baseDeg = { forward: 0, right: 90, backward: 180, left: -90 };
+  for (const deg of [0, 30, 45, 70, 90, 120, 135, 180, -30, -45, -70, -90, -135]) {
+    const r = deg * DEG;
+    const res = ComputeLocomotion2D({ vx: Math.sin(r) * 2.5, vz: -Math.cos(r) * 2.5, yaw: 0, aimWeight: 1 });
+    assert.equal(res.wPrimary, 1, `full unshrunk stride at ${deg}°`);
+    const effectiveDeg = WrapAngle((baseDeg[res.primary] * DEG) - res.pelvisWarpRad) / DEG;
+    const err = Math.abs(WrapAngle((effectiveDeg - deg) * DEG)) / DEG;
+    assert.ok(err < 0.05, `zero double-rotation at ${deg}° (got effective ${effectiveDeg.toFixed(1)}°, err=${err.toFixed(3)}°)`);
+  }
 
   // 角色转向 90°（yaw=+π/2，正面朝 -X，右侧朝 -Z）：往 -Z 移动应识别为向右横移
   const rotatedRight = ComputeLocomotion2D({ vx: 0, vz: -2.0, yaw: Math.PI / 2, aimWeight: 1 });
   assert.equal(rotatedRight.primary, "right");
 });
 
-Check("2D Blend Space：走 / 跑速度回差防边界抖动", () => {
-  const walk = ComputeLocomotion2D({ vx: 0, vz: -2.1, yaw: 0, running: false });
-  assert.equal(walk.running, false, "2.1 m/s from walk stays walk");
-  const enterRun = ComputeLocomotion2D({ vx: 0, vz: -2.5, yaw: 0, running: false });
-  assert.equal(enterRun.running, true, "2.5 m/s enters run");
-  const stayRun = ComputeLocomotion2D({ vx: 0, vz: -2.1, yaw: 0, running: true });
-  assert.equal(stayRun.running, true, "2.1 m/s from run stays run (hysteresis)");
-  const exitRun = ComputeLocomotion2D({ vx: 0, vz: -1.8, yaw: 0, running: true });
-  assert.equal(exitRun.running, false, "1.8 m/s exits run");
+Check("走 / 跑速度回差防边界抖动", () => {
+  const walk = ComputeLocomotion2D({ vx: 0, vz: -1.5, yaw: 0, running: false });
+  assert.equal(walk.running, false, "1.5 m/s from walk stays walk");
+  const enterRun = ComputeLocomotion2D({ vx: 0, vz: -1.8, yaw: 0, running: false });
+  assert.equal(enterRun.running, true, "1.8 m/s enters run");
+  const stayRun = ComputeLocomotion2D({ vx: 0, vz: -1.5, yaw: 0, running: true });
+  assert.equal(stayRun.running, true, "1.5 m/s from run stays run (hysteresis)");
+  const exitRun = ComputeLocomotion2D({ vx: 0, vz: -1.2, yaw: 0, running: true });
+  assert.equal(exitRun.running, false, "1.2 m/s exits run");
 });
 
-// 2. Orientation Warping
+// 2. Orientation Warping & Foot Locking
 Check("Orientation Warping：斜前右移骨盆负偏航（向右扭）、斜前左移正偏航（向左扭）", () => {
   const fr = ComputeLocomotion2D({ vx: 1.0, vz: -1.732, yaw: 0, aimWeight: 1 }); // +30° 右前
-  assert.ok(fr.pelvisWarpRad < -10 * DEG && fr.pelvisWarpRad > -36 * DEG, `fr warp ${fr.pelvisWarpRad / DEG}°`);
+  assert.ok(Math.abs(fr.pelvisWarpRad / DEG - (-30)) < 0.5, `fr warp ${fr.pelvisWarpRad / DEG}°`);
   const fl = ComputeLocomotion2D({ vx: -1.0, vz: -1.732, yaw: 0, aimWeight: 1 }); // -30° 左前
-  assert.ok(fl.pelvisWarpRad > 10 * DEG && fl.pelvisWarpRad < 36 * DEG, `fl warp ${fl.pelvisWarpRad / DEG}°`);
+  assert.ok(Math.abs(fl.pelvisWarpRad / DEG - 30) < 0.5, `fl warp ${fl.pelvisWarpRad / DEG}°`);
   assert.ok(Math.abs(fr.pelvisWarpRad + fl.pelvisWarpRad) < 1e-6, "symmetric warp");
 
   // 卧倒绝不做骨盆扭曲
   const prone = ComputeLocomotion2D({ vx: 0.5, vz: -0.5, yaw: 0, stance: "prone" });
   assert.equal(prone.pelvisWarpRad, 0);
+});
+
+Check("FootLockController：支撑期磁吸锁地零滑移，抬脚摆腿平滑释放", () => {
+  const fl = new FootLockController();
+  const dt = 1 / 60;
+  // 模拟在跑步机上（地面以 vx=2.4 m/s 向 -X 滚）脚踩地，但原始动画脚慢了 30%（产生滑移）
+  let lockX = 0.25, animX = 0.25;
+  let last = null;
+  for (let i = 0; i < 12; i++) {
+    if (i > 0) {
+      lockX -= 2.4 * dt;      // 真实砖缝位置
+      animX -= 1.6 * dt;      // 未校速动画脚位置（每帧滑移！）
+    }
+    last = fl.UpdateFoot(0, {
+      animX, animY: 0.095, animZ: 0, hipX: 0, hipY: 0.90, hipZ: 0,
+      ankleRestY: 0.088, maxReachM: 0.88, dt, moving: true, driftX: -2.4 * dt, driftZ: 0,
+    });
+  }
+  assert.equal(last.locked, true, "foot stays locked during stance");
+  assert.ok(last.rawAnimSlipCm > 10, `raw anim had >10 cm slip (${last.rawAnimSlipCm} cm)`);
+  assert.ok(Math.abs(last.targetX - lockX) < 0.005, `IK target pinned to ground nail within 5mm (err=${Math.abs(last.targetX - lockX) * 1000}mm)`);
+  // 抬脚离地 10cm -> 自动释放回摆腿弧线
+  const swing = fl.UpdateFoot(0, {
+    animX: animX + 0.05, animY: 0.19, animZ: 0, hipX: 0, hipY: 0.90, hipZ: 0,
+    ankleRestY: 0.088, maxReachM: 0.88, dt, moving: true, driftX: -2.4 * dt, driftZ: 0,
+  });
+  assert.equal(swing.locked, false, "foot releases lock on swing liftoff");
 });
 
 // 3. Turn-in-Place

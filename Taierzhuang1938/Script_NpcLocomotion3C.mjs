@@ -24,10 +24,11 @@ export function Smooth01(t) { t = Clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 
 export const NPC_3C = Object.freeze({
   moveThresholdMps: 0.12,
-  runEnterMps: 2.35,
-  runExitMps: 1.95,
-  maxPelvisWarpDeg: 36,
-  maxNoStrafeWarpDeg: 42,
+  runEnterMps: 1.65,
+  runExitMps: 1.35,
+  maxPelvisWarpDeg: 45,
+  maxNoStrafeWarpDeg: 48,
+  cardinalHysteresisDeg: 7,
   turnDeadzoneStandDeg: 44,
   turnDeadzoneCrouchDeg: 48,
   turnMaxLagDeg: 82,
@@ -39,22 +40,25 @@ export const NPC_3C = Object.freeze({
   fireKickRollDeg: 1.4,
 });
 
+const CARDINAL_ANGLES = Object.freeze({
+  forward: 0,
+  right: Math.PI / 2,
+  backward: Math.PI,
+  left: -Math.PI / 2,
+});
+
 /**
- * 1) 2D Blend Space + 2) Orientation Warping（纯函数）。
+ * 1) UE5 Lyra 四向主干 + 2) 精准朝向扭曲（Cardinal Orientation Warping，纯函数）。
  *
- * @param {object} input
- *   vx, vz        世界水平速度（m/s）
- *   yaw           角色当前朝向（弧度，forward = (-sin yaw, -cos yaw)）
- *   stance        "stand" | "crouch" | "prone"
- *   aimWeight     据枪权重（0..1）
- *   rifleInHands  是否手里端枪
- *   speedMps      标量速度（可省略，默认 hypot(vx, vz)）
- *   running       上一帧是否处于跑步态（用于走/跑速度回差）
- *   hasStrafe     当前姿态是否有专属左右横移动作（站/蹲端枪有，空手/卧倒无）
+ * 为什么用「四向主干 100% 满步幅 + 精准朝向扭曲」替代「正交 50/50 混合再叠加扭曲」：
+ *   · 50/50 混合前跑与右跑会让垂直步幅向量缩短为 0.707 倍（丢 29% 步长），若再叠加扭胯还会双倍偏转；
+ *   · 四向主干模式在 ±45° 扇区内播放 100% 满步幅主片段，并由骨盆精准吸收全部残余角度（-residual），
+ *     保证「脚步蹬地方向 === 真实地面位移方向（0° 偏差）」且「步幅 100% 不缩水」，
+ *     同时用 ±7° 扇区回差防止斜向边界反复抖动，扇区切换平滑度由下游权重阻尼接住。
  */
 export function ComputeLocomotion2D({
   vx = 0, vz = 0, yaw = 0, stance = "stand", aimWeight = 0,
-  rifleInHands = true, speedMps = null, running = false, hasStrafe = null,
+  rifleInHands = true, speedMps = null, running = false, hasStrafe = null, prevPrimary = null,
 } = {}) {
   const spd = Number.isFinite(speedMps) ? speedMps : Math.hypot(vx, vz);
   const moving = spd > NPC_3C.moveThresholdMps;
@@ -82,67 +86,204 @@ export function ComputeLocomotion2D({
   const vLen = Math.hypot(localFwd, localRight);
   const moveAngle = vLen > 1e-4 ? Math.atan2(localRight, localFwd) : 0; // 0=前, +π/2=右, -π/2=左, ±π=后
 
-  // 象限平滑双余弦权重（保证四向权重恒非负、和严格为 1，且 45° 处各占 0.5）
-  let wF = 0, wB = 0, wL = 0, wR = 0;
+  let primary = "forward";
   if (strafeCapable) {
-    if (moveAngle >= 0 && moveAngle <= Math.PI / 2) {
-      const c = Math.cos(moveAngle), s = Math.sin(moveAngle);
-      wF = c * c; wR = s * s;
-    } else if (moveAngle > Math.PI / 2) {
-      const a = moveAngle - Math.PI / 2;
-      const c = Math.cos(a), s = Math.sin(a);
-      wR = c * c; wB = s * s;
-    } else if (moveAngle < 0 && moveAngle >= -Math.PI / 2) {
-      const a = -moveAngle;
-      const c = Math.cos(a), s = Math.sin(a);
-      wF = c * c; wL = s * s;
-    } else {
-      const a = -moveAngle - Math.PI / 2;
-      const c = Math.cos(a), s = Math.sin(a);
-      wL = c * c; wB = s * s;
+    const hyst = NPC_3C.cardinalHysteresisDeg * DEG;
+    const candidates = ["forward", "right", "backward", "left"];
+    let bestDir = "forward", bestErr = Infinity;
+    for (const dir of candidates) {
+      let err = Math.abs(WrapAngle(moveAngle - CARDINAL_ANGLES[dir]));
+      if (dir === prevPrimary) err -= hyst;
+      if (err < bestErr) { bestErr = err; bestDir = dir; }
     }
+    primary = bestDir;
   } else {
-    // 无专属左右横移动作（如低姿奔跑/空手）：仅按前后半球切前/后，侧向分量完全交给 Orientation Warping
     const cosA = Math.cos(moveAngle);
-    if (cosA >= -0.15) { wF = 1; } else { wB = 1; }
+    primary = prevPrimary === "backward" ? (cosA > 0.15 ? "forward" : "backward") : (cosA >= -0.15 ? "forward" : "backward");
   }
 
-  const entries = [
-    ["forward", wF], ["right", wR], ["backward", wB], ["left", wL],
-  ].sort((a, b) => b[1] - a[1]);
-
-  const primary = entries[0][0];
-  let secondary = entries[1][1] > 0.03 ? entries[1][0] : null;
-  let wPrimary = entries[0][1];
-  let wSecondary = secondary ? entries[1][1] : 0;
-  const sum = wPrimary + wSecondary || 1;
-  wPrimary /= sum; wSecondary /= sum;
-
-  // Orientation Warping：把骨盆往真实行进方向微扭，消除斜走滑步（+yaw 为左转，+moveAngle 为向右，故取负号）。
+  // Orientation Warping：把骨盆精准扭向真实行进方向（+yaw 为左转，+residual 为向右，故取负号）
   let pelvisWarpRad = 0;
-  const speedRamp = Smooth01((spd - NPC_3C.moveThresholdMps) / 0.45);
+  const speedRamp = Smooth01((spd - NPC_3C.moveThresholdMps) / 0.35);
+  const cardinalAngle = CARDINAL_ANGLES[primary];
+  const residual = WrapAngle(moveAngle - cardinalAngle);
   if (stance !== "prone" && vLen > 1e-4) {
-    if (strafeCapable) {
-      // 主片段已覆盖 0° / ±90° / 180°，只把主片段朝向到实际行进角的残差扭 65%（上限 ±36°）
-      const cardinalAngle = primary === "forward" ? 0
-        : primary === "right" ? Math.PI / 2
-          : primary === "left" ? -Math.PI / 2 : Math.PI;
-      const residual = WrapAngle(moveAngle - cardinalAngle);
-      pelvisWarpRad = Clamp(-residual * 0.65, -NPC_3C.maxPelvisWarpDeg * DEG, NPC_3C.maxPelvisWarpDeg * DEG) * speedRamp;
-    } else {
-      // 无左右片段时：往前走对准 moveAngle，往后走对准 (moveAngle - π)
-      const refAngle = wB > 0.5 ? WrapAngle(moveAngle - Math.PI) : moveAngle;
-      pelvisWarpRad = Clamp(-refAngle, -NPC_3C.maxNoStrafeWarpDeg * DEG, NPC_3C.maxNoStrafeWarpDeg * DEG) * speedRamp;
+    const maxWarp = (strafeCapable ? NPC_3C.maxPelvisWarpDeg : NPC_3C.maxNoStrafeWarpDeg) * DEG;
+    pelvisWarpRad = Clamp(-residual, -maxWarp, maxWarp) * speedRamp;
+  }
+
+  // 若骨盆扭曲已完全吃掉残角（±45° 内且全速），主干 100% 满步幅播放，彻底杜绝双倍偏转与步幅缩水；
+  // 仅当起步未满速或超 ±45° 存在未吸收残角时，才把剩余残角少量混给相邻主干方向。
+  let secondary = null, wPrimary = 1, wSecondary = 0;
+  const unwarpedResidual = WrapAngle(moveAngle + pelvisWarpRad - cardinalAngle);
+  if (strafeCapable && Math.abs(unwarpedResidual) > 2 * DEG) {
+    const order = ["forward", "right", "backward", "left"];
+    const idx = order.indexOf(primary);
+    const adjIdx = (idx + (unwarpedResidual > 0 ? 1 : 3)) % 4;
+    const blendFrac = Clamp(Math.abs(unwarpedResidual) / (Math.PI / 2), 0, 0.5);
+    if (blendFrac > 0.03) {
+      secondary = order[adjIdx];
+      wSecondary = blendFrac;
+      wPrimary = 1 - blendFrac;
     }
   }
+
+  const weights = { forward: 0, backward: 0, left: 0, right: 0 };
+  weights[primary] = wPrimary;
+  if (secondary) weights[secondary] = wSecondary;
 
   return {
     moving: true, running: nextRunning, speedMps: spd,
     localFwd, localRight, moveAngle,
-    weights: { forward: wF, backward: wB, left: wL, right: wR },
-    primary, secondary, wPrimary, wSecondary,
+    weights, primary, secondary, wPrimary, wSecondary,
     pelvisWarpRad,
   };
+}
+
+/**
+ * 2b) 实时支撑脚锁地控制器（Foot Locking State Machine，纯数学、零 three 依赖）。
+ *
+ * 在动画播放、Aim Offset 之后驱动左右腿 2-Bone IK：
+ *   · 支撑期（脚踝贴近站立高度且未抬升）锁住着地点的世界 (x, z)；
+ *   · 在跑步机预览模式下随地面滚动 (driftX = -vx*dt, driftZ = -vz*dt)，在真实世界模式下 drift = 0；
+ *   · 抬脚或超安全腿长时平滑释放回原始动捕弧线，彻底消除肉眼可见的脚底搓地与平移感。
+ */
+export class FootLockController {
+  constructor() {
+    this.feet = [0, 1].map(() => ({
+      locked: false,
+      weight: 0,
+      lockX: 0,
+      lockZ: 0,
+      floorOffY: null,
+      prevAnimY: null,
+      slipAccumM: 0,
+      maxSlipM: 0,
+    }));
+  }
+
+  Reset() {
+    for (const f of this.feet) {
+      f.locked = false;
+      f.weight = 0;
+      f.lockX = 0;
+      f.lockZ = 0;
+      f.floorOffY = null;
+      f.prevAnimY = null;
+      f.slipAccumM = 0;
+      f.maxSlipM = 0;
+    }
+  }
+
+  /**
+   * 更新单只脚的锁地目标。
+   * 支持不同角色靴底高度自适应（通过 floorOffY 追踪实际最低触地踝高），
+   * 触地瞬间从当前求解位置连续上锁（零跳变 + 零弹性回滑），抬脚摆腿时平滑交还动画。
+   */
+  UpdateFoot(index, {
+    animX, animY, animZ,
+    hipX, hipY, hipZ,
+    ankleRestY,
+    groundY = 0,
+    maxReachM,
+    dt,
+    moving = true,
+    driftX = 0,
+    driftZ = 0,
+    teleported = false,
+  }) {
+    const f = this.feet[index];
+    const restOff = ankleRestY - groundY;
+    if (teleported || !moving || !(dt > 0)) {
+      f.locked = false;
+      if (teleported) {
+        f.weight = 0;
+        f.floorOffY = null;
+      } else if (f.weight > 0) {
+        f.lockX += driftX;
+        f.lockZ += driftZ;
+        f.weight *= Math.exp(-Math.max(dt, 0) / 0.06);
+        if (f.weight < 1e-3) f.weight = 0;
+      }
+      f.prevAnimY = animY;
+      const targetX = animX + (f.lockX - animX) * f.weight;
+      const targetZ = animZ + (f.lockZ - animZ) * f.weight;
+      return {
+        active: f.weight > 1e-3,
+        weight: f.weight,
+        targetX,
+        targetY: animY,
+        targetZ,
+        lockX: f.lockX,
+        lockZ: f.lockZ,
+        locked: false,
+        rawAnimSlipCm: 0,
+        solvedSlipCm: 0,
+      };
+    }
+
+    const footLocalY = animY - groundY;
+    if (f.floorOffY === null) f.floorOffY = restOff;
+    if (footLocalY < f.floorOffY) {
+      const k = 1 - Math.exp(-dt / 0.04);
+      f.floorOffY = Math.max(restOff - 0.045, f.floorOffY + (footLocalY - f.floorOffY) * k);
+    } else if (!f.locked && footLocalY > f.floorOffY + 0.012) {
+      f.floorOffY = Math.min(restOff + 0.045, f.floorOffY + 0.025 * dt);
+    }
+    const floorY = groundY + f.floorOffY;
+    const lift = animY - floorY;
+    const vy = f.prevAnimY !== null ? (animY - f.prevAnimY) / Math.max(dt, 1e-4) : 0;
+    f.prevAnimY = animY;
+
+    // 无论是锁地期还是松锁淡出期，地钉点都随地面同步漂移（世界模式 drift=0，跑步机模式 drift=-v*dt）
+    if (f.locked || f.weight > 1e-3) {
+      f.lockX += driftX;
+      f.lockZ += driftZ;
+    }
+
+    if (f.locked) {
+      const distFromAnim = Math.hypot(f.lockX - animX, f.lockZ - animZ);
+      const distFromHip = Math.hypot(f.lockX - hipX, floorY - hipY, f.lockZ - hipZ);
+      // 抬脚离地超过滞回阈值（兼容蹲走小步幅）、明显上蹬、拉扯超安全帽、或超出 98.5% 腿长时自动松锁进入摆腿期
+      if (lift > 0.044 || (lift > 0.022 && vy > 0.28) || distFromAnim > 0.30 || distFromHip > maxReachM * 0.985) {
+        f.locked = false;
+      }
+    } else if (lift < 0.032 && vy < 0.25) {
+      // C0 连续瞬时上锁：从当前脚部求解坐标起钉并立刻将 weight 置 1，杜绝落脚跳变与前几帧弹性回滑
+      const curX = animX + (f.lockX - animX) * f.weight;
+      const curZ = animZ + (f.lockZ - animZ) * f.weight;
+      f.locked = true;
+      f.lockX = curX;
+      f.lockZ = curZ;
+      f.weight = 1;
+      f.slipAccumM = 0;
+    }
+
+    if (!f.locked && f.weight > 0) {
+      f.weight *= Math.exp(-dt / 0.070);
+      if (f.weight < 1e-3) f.weight = 0;
+    }
+
+    // 锁定时脚底沿地钉 (lockX, lockZ) 吸住，高度不陷入地面；释放时平滑回到 animPos
+    const targetX = animX + (f.lockX - animX) * f.weight;
+    const targetZ = animZ + (f.lockZ - animZ) * f.weight;
+    const targetY = f.locked ? Math.max(floorY, animY) : animY;
+    const rawSlipM = f.locked ? Math.hypot(animX - f.lockX, animZ - f.lockZ) : 0;
+    if (rawSlipM > f.maxSlipM) f.maxSlipM = rawSlipM;
+
+    return {
+      active: f.weight > 1e-3,
+      weight: f.weight,
+      targetX,
+      targetY,
+      targetZ,
+      lockX: f.lockX,
+      lockZ: f.lockZ,
+      locked: f.locked,
+      rawAnimSlipCm: +(rawSlipM * 100).toFixed(1),
+      solvedSlipCm: f.locked ? +(Math.hypot(targetX - f.lockX, targetZ - f.lockZ) * 100).toFixed(1) : 0,
+    };
+  }
 }
 
 /**

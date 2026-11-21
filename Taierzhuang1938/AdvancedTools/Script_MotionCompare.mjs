@@ -22,7 +22,7 @@ import { LoadHairGroom, LoadHairAtlas, HairGroom } from "../Script_HairGroom.mjs
 import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET } from "../Data_BlockoutXBotClips.mjs";
 import {
   NPC_3C, WrapAngle, Clamp, Smooth01,
-  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution,
+  ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution,
   EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "../Script_NpcLocomotion3C.mjs";
 import { FirstPersonGait, ModelToWorld } from "../Script_FirstPersonGait.mjs";
@@ -102,12 +102,12 @@ const SCENARIOS = [
     id: "strafe2d",
     index: "01",
     name: "持枪横移与斜向跑动",
-    tag: "2D 混合 + 扭曲",
-    hint: "枪口锁定前方靶标，身体斜前/纯侧/斜后平滑换向机动",
+    tag: "锁地 IK + 扭曲",
+    hint: "枪口锁定前方靶标，身体斜前/纯侧/斜后平滑换向机动，观察靴底与地钉圆环",
     defaultCam: "front34",
-    captionTitle: "脚方向与移动方向贴合 · 下盘扭曲与上身反补",
-    captionDesc: "左（旧）：只能硬播单条前跑横向硬漂。右（新）：四向按左脚摆峰相位对齐 + 权重平滑阻尼 + 下盘扭胯 ±45° + 上身 9 帧精修反补锁靶。",
-    checklist: "观察要点：结合地面砖纹与位移轨迹点，可切「俯视步法」看青色下盘箭头如何顺着绿色速度方向扭转、黄色枪口方向纹丝不动。",
+    captionTitle: "实测步速标定 · 主干朝向扭曲 · 支撑脚锁地 2-Bone IK",
+    captionDesc: "左（旧）：单条前跑硬漂，落地红环会瞬间甩开靴底形成 15~40 cm 脚滑。右（新）：主干片段 100% 满步幅 + ±45° 无重叠加扭胯 + 支撑脚锁地 IK，靴底牢牢钉在绿环上直到抬腿。",
+    checklist: "观察要点：开 0.5x 慢放或切「俯视步法」看靴底与地面圆环——左脚踩下即被红环甩开，右脚踩下即锁死绿环随地砖同步后退。",
   },
   {
     id: "turnInPlace",
@@ -693,10 +693,18 @@ class CharacterCompareUnit {
     this.muzzleFlash = null;
     this.charKey = "heYoutian";
     this.hipsScale = 1;
+    this.ankleRestOffY = 0.095;
+    this.lastFootProbe = [
+      { locked: false, lockX: 0, lockZ: 0, animX: 0, animY: 0, animZ: 0, rawSlipCm: 0, solvedSlipCm: 0 },
+      { locked: false, lockX: 0, lockZ: 0, animX: 0, animY: 0, animZ: 0, rawSlipCm: 0, solvedSlipCm: 0 },
+    ];
 
     // 3C & legacy state
     this.tip = new TurnInPlaceController();
+    this.footLock = new FootLockController();
+    this.slipProbe = new FootLockController(); // 仅用于测量优化前旧方案的支撑脚真实滑移量
     this.locoRunning = false;
+    this.locoPrimary = null;
     this.locoPhase = 0;
     this.pelvisWarp = 0;
     this.blendActions = new Map();
@@ -728,14 +736,25 @@ class CharacterCompareUnit {
       gripRMm: 0,
       gripLMm: 0,
       muzzleErrDeg: 0,
+      footSlipCm: 0,
+      footLocked: false,
     };
 
-    // Visual diagnostic overlays (arrows + aim ray + target post)
+    // Visual diagnostic overlays (arrows + aim ray + target post + foot-lock ground contact rings)
     this.visGroup = new THREE.Group();
     this.scene.add(this.visGroup);
     this.arrowAim = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.05, 0), 0.92, 0xdfbd68, 0.16, 0.11);
     this.arrowHips = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.035, 0), 0.76, 0x67c5d8, 0.14, 0.09);
     this.arrowVel = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.065, 0), 0.85, 0x7fd486, 0.15, 0.10);
+    const padGeo = new THREE.RingGeometry(0.055, 0.085, 18);
+    padGeo.rotateX(-Math.PI / 2);
+    this.footPads = [0, 1].map(() => {
+      const m = new THREE.Mesh(padGeo, new THREE.MeshBasicMaterial({ color: mode === "new" ? 0x7fd486 : 0xe86f58, side: THREE.DoubleSide }));
+      m.position.y = 0.008;
+      m.visible = false;
+      this.visGroup.add(m);
+      return m;
+    });
     this.visGroup.add(this.arrowAim, this.arrowHips, this.arrowVel);
 
     // Aim target marker & muzzle ray
@@ -809,6 +828,15 @@ class CharacterCompareUnit {
     this.blendWeights.clear();
     this.activeAction = null;
     this.activeFile = null;
+
+    this.container.updateMatrixWorld(true);
+    const lfBind = this.H("LeftFoot"), rfBind = this.H("RightFoot");
+    const bindLy = lfBind ? lfBind.getWorldPosition(_p).y : 0.095;
+    const bindRy = rfBind ? rfBind.getWorldPosition(_p).y : bindLy;
+    this.ankleRestOffY = Clamp((bindLy + bindRy) * 0.5, 0.06, 0.18);
+    this.footLock.Reset();
+    this.slipProbe.Reset();
+    this.locoPrimary = null;
   }
 
   async SetRifle(id) {
@@ -830,7 +858,10 @@ class CharacterCompareUnit {
 
   Reset(yaw = 0) {
     this.tip.Reset(yaw);
+    this.footLock.Reset();
+    this.slipProbe.Reset();
     this.locoRunning = false;
+    this.locoPrimary = null;
     this.locoPhase = 0;
     this.pelvisWarp = 0;
     this.addFireAge = Infinity;
@@ -842,6 +873,9 @@ class CharacterCompareUnit {
     this.pickKey = null;
     this.activeClock = 0;
     this.blendWeights.clear();
+    this.telemetry.footSlipCm = 0;
+    this.telemetry.footLocked = false;
+    for (const p of this.footPads) p.visible = false;
   }
 
   SetVisible(v) {
@@ -931,6 +965,7 @@ class CharacterCompareUnit {
     this._ApplyBlend(dt);
     this._CapturePreOverlay();
     this.container.updateMatrixWorld(true);
+    this._ProbeOldFootSlip(vx, vz, dt, mps > 0.12);
 
     let aimMode = "无（僵直）";
     if (this.oldAimBaseline === "procedural" && (Math.abs(lookYaw) > 1e-3 || Math.abs(lookPitch) > 1e-3)) {
@@ -949,9 +984,11 @@ class CharacterCompareUnit {
 
   _UpdateNew(yaw, vx, vz, mps, stance, lookYaw, lookPitch, dt) {
     const loco = ComputeLocomotion2D({
-      vx, vz, yaw, stance, aimWeight: 1, rifleInHands: true, speedMps: mps, running: this.locoRunning,
+      vx, vz, yaw, stance, aimWeight: 1, rifleInHands: true, speedMps: mps,
+      running: this.locoRunning, prevPrimary: this.locoPrimary,
     });
     this.locoRunning = loco.running;
+    this.locoPrimary = loco.moving ? loco.primary : null;
     const tip = this.tip.Update(dt, {
       yaw, mps, stance, aimWeight: 1, rifleInHands: true, active: true, teleported: false,
     });
@@ -992,9 +1029,13 @@ class CharacterCompareUnit {
       if (loco.secondary && loco.wSecondary > 0.01 && group[loco.secondary]) entries.push({ ...group[loco.secondary], weight: loco.wSecondary, dir: loco.secondary });
       key = "blend2d:" + groupKey;
       const dirZh = { forward: "前", backward: "后", left: "左", right: "右" };
+      const gaitZh = stance === "crouch" ? "蹲走" : (loco.running ? "跑" : "走");
+      const wDeg = Math.round(this.pelvisWarp / DEG);
       label = entries.length > 1
-        ? `2D 混合 (${dirZh[entries[0].dir]}${Math.round(entries[0].weight * 100)}/${dirZh[entries[1].dir]}${Math.round(entries[1].weight * 100)})`
-        : `2D 步态 (${dirZh[entries[0]?.dir || "forward"]})`;
+        ? `主干${dirZh[entries[0].dir]}/${dirZh[entries[1].dir]}${gaitZh} + 扭胯`
+        : (Math.abs(wDeg) >= 2
+          ? `主干${dirZh[entries[0]?.dir || "forward"]}${gaitZh} + 扭胯 ${wDeg > 0 ? "+" : ""}${wDeg}°`
+          : `主干${dirZh[entries[0]?.dir || "forward"]}${gaitZh}`);
       if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.18);
       this.pickKey = key;
       this._PlayBlendSpace(entries, mps, dt);
@@ -1008,7 +1049,7 @@ class CharacterCompareUnit {
     }
 
     this._ApplyBlend(dt);
-    // 严格在 AimOffset / 开火叠加 / 左手 IK 之前保存纯净底层姿态，停步过渡绝不重复叠 AimOffset！
+    // 严格在 AimOffset / 开火叠加 / 锁地 IK / 左手 IK 之前保存纯净底层姿态，停步过渡绝不重复叠 AimOffset！
     this._CapturePreOverlay();
     this.container.updateMatrixWorld(true);
 
@@ -1050,6 +1091,9 @@ class CharacterCompareUnit {
         RotateBoneWorld(s2, _aimQ);
       }
     }
+
+    // 支撑脚锁地 2-Bone Leg IK：只改双腿骨，将落地支撑脚钉死在同步后退的地面点上，对上身/枪线零干扰
+    this._ApplyFootLock(vx, vz, dt, loco.moving && !tip.turning);
 
     this.telemetry.stateLabel = label;
     this.telemetry.pelvisWarpDeg = +(this.pelvisWarp / DEG).toFixed(1);
@@ -1128,7 +1172,7 @@ class CharacterCompareUnit {
       nominal += (r.speedMps || 1.3) * r.weight;
       effDur += (r.clip.duration || 1) * r.weight;
     }
-    const rate = mps > 0.05 ? Clamp(mps / Math.max(nominal * this.hipsScale, 0.2), 0.4, 2.2) : 0;
+    const rate = mps > 0.05 ? Clamp(mps / Math.max(nominal * this.hipsScale, 0.2), 0.35, 2.4) : 0;
     this.locoPhase = (this.locoPhase + (dt * rate) / Math.max(effDur, 0.2)) % 1;
     if (this.locoPhase < 0) this.locoPhase += 1;
 
@@ -1303,6 +1347,98 @@ class CharacterCompareUnit {
     const ac = C2.sub(A).normalize(), at = target.clone().sub(A).normalize();
     RotateBoneWorld(upper, new THREE.Quaternion().setFromUnitVectors(ac, at));
     SetBoneWorldQuaternion(hand, handQ);
+  }
+
+  /** 仅探测优化前旧方案的真实着地滑移量，并把红色落地点圆环留在地面上供肉眼对照，不修改旧方案任何骨骼。 */
+  _ProbeOldFootSlip(vx, vz, dt, moving) {
+    const driftX = -vx * dt, driftZ = -vz * dt;
+    let maxSlip = 0, anyLocked = false;
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? "Left" : "Right";
+      const up = this.H(side + "UpLeg"), lo = this.H(side + "Leg"), ft = this.H(side + "Foot");
+      if (!up || !lo || !ft) { this.footPads[i].visible = false; continue; }
+      const A = FreshPosition(up), B = FreshPosition(lo), Cw = FreshPosition(ft);
+      const maxReachM = A.distanceTo(B) + B.distanceTo(Cw);
+      const res = this.slipProbe.UpdateFoot(i, {
+        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        hipX: A.x, hipY: A.y, hipZ: A.z,
+        ankleRestY: this.ankleRestOffY, groundY: 0, maxReachM, dt, moving, driftX, driftZ,
+      });
+      this.footPads[i].visible = res.locked;
+      if (res.locked) {
+        this.footPads[i].position.set(res.lockX, 0.008, res.lockZ);
+        anyLocked = true;
+        if (res.rawAnimSlipCm > maxSlip) maxSlip = res.rawAnimSlipCm;
+      }
+      this.lastFootProbe[i] = {
+        locked: res.locked, lockX: res.lockX, lockZ: res.lockZ,
+        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        solvedX: Cw.x, solvedY: Cw.y, solvedZ: Cw.z,
+        rawSlipCm: res.rawAnimSlipCm, solvedSlipCm: res.rawAnimSlipCm,
+      };
+    }
+    this.telemetry.footSlipCm = +maxSlip.toFixed(1);
+    this.telemetry.footLocked = anyLocked;
+  }
+
+  /** 优化后方案的实时支撑脚锁地 2-Bone Leg IK，仅改写左右大腿/小腿/踝，绝不影响脊柱与瞄准。 */
+  _ApplyFootLock(vx, vz, dt, moving) {
+    const driftX = -vx * dt, driftZ = -vz * dt;
+    let maxSolvedSlip = 0, anyLocked = false, solvedAny = false;
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? "Left" : "Right";
+      const up = this.H(side + "UpLeg"), lo = this.H(side + "Leg"), ft = this.H(side + "Foot");
+      if (!up || !lo || !ft) { this.footPads[i].visible = false; continue; }
+      const A = FreshPosition(up), B = FreshPosition(lo), Cw = FreshPosition(ft);
+      const maxReachM = A.distanceTo(B) + B.distanceTo(Cw);
+      const res = this.footLock.UpdateFoot(i, {
+        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        hipX: A.x, hipY: A.y, hipZ: A.z,
+        ankleRestY: this.ankleRestOffY, groundY: 0, maxReachM, dt, moving, driftX, driftZ,
+      });
+      if (res.active) {
+        this._SolveLeg(up, lo, ft, _p.set(res.targetX, res.targetY, res.targetZ));
+        solvedAny = true;
+      }
+      const after = FreshPosition(ft);
+      const actualSlipCm = res.locked ? +(Math.hypot(after.x - res.lockX, after.z - res.lockZ) * 100).toFixed(1) : 0;
+      this.footPads[i].visible = res.locked;
+      if (res.locked) {
+        this.footPads[i].position.set(res.lockX, 0.008, res.lockZ);
+        anyLocked = true;
+        if (actualSlipCm > maxSolvedSlip) maxSolvedSlip = actualSlipCm;
+      }
+      this.lastFootProbe[i] = {
+        locked: res.locked, lockX: res.lockX, lockZ: res.lockZ,
+        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        solvedX: after.x, solvedY: after.y, solvedZ: after.z,
+        rawSlipCm: res.rawAnimSlipCm, solvedSlipCm: actualSlipCm,
+      };
+    }
+    if (solvedAny) this.container.updateMatrixWorld(true);
+    this.telemetry.footSlipCm = +maxSolvedSlip.toFixed(1);
+    this.telemetry.footLocked = anyLocked;
+  }
+
+  _SolveLeg(upper, lower, foot, target) {
+    const footQ = FreshQuaternion(foot);
+    const A = FreshPosition(upper), B = FreshPosition(lower), Cw = FreshPosition(foot);
+    const lab = A.distanceTo(B), lbc = B.distanceTo(Cw);
+    const lat = Clamp(A.distanceTo(target), Math.abs(lab - lbc) + 0.02, (lab + lbc) * 0.985);
+    const ba = A.clone().sub(B), bc = Cw.clone().sub(B);
+    let axis = ba.clone().cross(bc);
+    if (axis.lengthSq() < 1e-10) {
+      const e = this.container.matrixWorld.elements;
+      axis.set(e[0], e[1], e[2]);
+    }
+    axis.normalize();
+    const cur = ba.angleTo(bc);
+    const des = Math.acos(Clamp((lab * lab + lbc * lbc - lat * lat) / (2 * lab * lbc), -1, 1));
+    RotateBoneWorld(lower, new THREE.Quaternion().setFromAxisAngle(axis, des - cur));
+    const C2 = FreshPosition(foot);
+    const ac = C2.sub(A).normalize(), at = target.clone().sub(A).normalize();
+    RotateBoneWorld(upper, new THREE.Quaternion().setFromUnitVectors(ac, at));
+    SetBoneWorldQuaternion(foot, footQ);
   }
 
   _UpdateVisuals(yaw, vx, vz, mps, lookYaw, lookPitch, visOpts) {
@@ -1995,7 +2131,7 @@ async function Main() {
     $("rightBadgeTitle").textContent = isFp ? "优化后 · 防穿插" : "优化后";
     $("rightBadgeSub").textContent = isFp
       ? "扭曲 54° / 步宽 7.5 cm / 外摆弧"
-      : "2D 混合 / 扭曲 / 原地转身 / 9 帧精修";
+      : "主干扭曲 / 锁地 IK / 原地转身 / 9 帧精修";
 
     if (sc.id !== "aimOffset9" && sc.id !== "sandbox") {
       state.manualAim = false;
@@ -2047,6 +2183,7 @@ async function Main() {
     tbody.innerHTML = `
       <tr><td class="metric">阶段</td><td class="oldVal" colspan="2" style="color:var(--ui-gold)">${cmd.phaseHint || "—"}</td></tr>
       <tr><td class="metric">步态</td><td class="oldVal ${o.fireBad ? "bad" : ""}">${o.stateLabel}</td><td class="newVal good">${n.stateLabel}</td></tr>
+      <tr><td class="metric">支撑脚滑移</td><td class="oldVal ${o.footSlipCm > 4 ? "bad" : ""}">${o.footSlipCm.toFixed(1)} cm</td><td class="newVal ${n.footSlipCm <= 1.5 ? "good" : ""}">${n.footSlipCm.toFixed(1)} cm${n.footLocked ? " 锁地" : ""}</td></tr>
       <tr><td class="metric">骨盆扭曲</td><td class="oldVal">${o.pelvisWarpDeg.toFixed(1)}°</td><td class="newVal">${n.pelvisWarpDeg > 0 ? "+" : ""}${n.pelvisWarpDeg.toFixed(1)}°</td></tr>
       <tr><td class="metric">脚偏角</td><td class="oldVal">0.0°</td><td class="newVal">${n.tipOffsetDeg > 0 ? "+" : ""}${n.tipOffsetDeg.toFixed(1)}°${n.tipTurning ? " 迈步" : ""}</td></tr>
       <tr><td class="metric">Aim</td><td class="oldVal">${o.aimMode}</td><td class="newVal good">${n.aimMode}</td></tr>
@@ -2166,6 +2303,11 @@ async function Main() {
     setSlowMo: (rate) => { state.rate = rate; },
     fire: () => { state.manualFireSeq += 1; },
     step: (dt = 1 / 60, count = 1) => { for (let i = 0; i < count; i++) StepFrame(dt); },
+    footMetrics: () => ({
+      old: oldUnit.lastFootProbe.map((p) => ({ ...p })),
+      new: newUnit.lastFootProbe.map((p) => ({ ...p })),
+      vel: { vx: state.smoothVx, vz: state.smoothVz },
+    }),
     riflePose: () => ({
       oldPos: oldUnit.rifleObj ? oldUnit.rifleObj.position.toArray() : null,
       newPos: newUnit.rifleObj ? newUnit.rifleObj.position.toArray() : null,
