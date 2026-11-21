@@ -86,6 +86,8 @@ try {
     "Each recorded render identifies its timeline position and viewport configuration");
   assert.ok(frames.some(frame=>frame.cpu["encounterTimeline/EvaluateFlow"]>0&&frame.cpu["encounterViewport/视口 1/人物与姓名"]>0),
     "Timeline and Canvas 2D costs are measured inside their parents");
+  assert.ok(frames.some(f=>f.preview?.viewports.some(v=>v.terrainWork?.visitedNodes>0&&v.terrainWork.selected>0)),
+    "per-viewport terrain traversal counts survive the Profiler JSON export");
   const detailFrame=frames.find(frame=>frame.cpu["encounterViewport/视口 2/3D 底图/地形几何"]>0);
   assert.ok(detailFrame,"The 3D viewport measures terrain generation");
   const parentKey="encounterViewport/视口 2/3D 底图";

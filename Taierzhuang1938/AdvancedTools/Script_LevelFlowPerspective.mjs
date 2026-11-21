@@ -42,6 +42,7 @@ export class FlowPerspectiveView extends FlowMapView {
 
   Draw(frame,layers,selection,annotations,draft,viewport,trace=null) {
     const start=performance.now();this.frameDrawing=true;
+    this.terrainWork=trace?.cpu?{rootGroupsTested:0,rootGroupsCulled:0,visitedNodes:0,patchNodes:0,reusedSubtrees:0,selected:0,patchSelections:0,patchBuilds:0,cellIndexBuilds:0,patchCellLookups:0,patchIndicesWritten:0}:null;
     this.raster.debugTrace=trace;
     try {super.Draw(frame,layers,selection,annotations,draft,viewport,trace);}
     finally {this.raster.debugTrace=null;this.frameDrawing=false;ApplyEncounterSky(null);}
@@ -288,33 +289,35 @@ export class FlowPerspectiveView extends FlowMapView {
     const terrainCamera=[0,0,0],objectPoint=[0,0,0],objectCamera=[0,0,0];
     const terrain=this.mapData.terrain;
     const usePatches=texturedTerrain&&!!terrain.selectTerrainPatch;
+    const work=this.terrainWork;
     const Visit=(cell)=>{
+      if(work) work.visitedNodes++;
       const heightRange=cell.maxHeight-cell.minHeight,radius=cell.radius;
       const camera=this.CameraPoint(cell.center,terrainCamera);
       if(!SphereInView(camera,radius)) return;
       const projectionScale=(perspective?this.focal/Math.max(near,camera[2]-radius):this.scale)*renderScale;
       // Only batch fully visible patches. Keep culling individual cells at the frustum edge.
       if(usePatches&&cell.size<=FLOW_RENDERING.terrainPatchSizeM&&SphereInView(camera,-radius)) {
-        terrainCells.push(terrain.selectTerrainPatch(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale));
+        terrainCells.push(terrain.selectTerrainPatch(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale,work));
         return;
       }
-      let heightError=cell.heightError??heightRange;
-      if(heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels&&this.mapData.terrain.heightErrorForCell) {
+      let heightError=cell.exactHeightError??cell.heightError??heightRange;
+      if(cell.exactHeightError===undefined&&heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels&&terrain.heightErrorForCell) {
         heightError=this.mapData.terrain.heightErrorForCell(cell,FLOW_RENDERING.terrainFlatHeightPixels/projectionScale);
       }
       // Preserve projected relief error, while planar slopes can stay coarse.
       // Surface colors use a separate projected cell-size threshold.
-      if(cell.children&&(heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
+      if((heightError*projectionScale>FLOW_RENDERING.terrainFlatHeightPixels
         ||!texturedTerrain&&cell.size*projectionScale>FLOW_RENDERING.terrainCellPixels
           &&cell.size>1&&(cell.near||cell.painted&&cell.size*projectionScale>FLOW_RENDERING.terrainPaintCellPixels)
-            &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))) {
+            &&(!this.mapData.terrain.colorRangeForCell||this.mapData.terrain.colorRangeForCell(cell)>1))&&cell.children) {
         for(const child of cell.children) Visit(child);
         return;
       }
       terrainCells.push(cell);
     };
     const DrawTerrainCell=(cell,boundaries)=>{
-      if(usePatches&&terrain.indicesForCell) {this.raster.WorldBatch(terrain.indicesForCell(cell,boundaries));return;}
+      if(usePatches&&terrain.indicesForCell) {this.raster.WorldBatch(terrain.indicesForCell(cell,boundaries,work));return;}
       if(this.raster.accelerated&&this.mapData.terrain.packedFacesForCell) {
         this.raster.WorldBatch(this.mapData.terrain.packedFacesForCell(cell,texturedTerrain,boundaries));return;
       }
@@ -410,14 +413,39 @@ export class FlowPerspectiveView extends FlowMapView {
     } else {
     cpu?.Begin("地形选块与接缝");
     cpu?.Begin("视锥和细节筛选");
-    for(const root of terrain.roots) Visit(root);
+    if(terrain.rootIndex&&terrain.rootIndex.roots===terrain.roots) {
+      const {eye,forward,right,up}=this;
+      // Each plane uses positive signed distances inside the frustum.
+      const Plane=(axis,sign,slope,offset)=>{
+        const a=sign*axis[0]+slope*forward[0],b=sign*axis[1]+slope*forward[1],c=sign*axis[2]+slope*forward[2];
+        return [a,b,c,offset,Math.abs(a),Math.abs(b),Math.abs(c)];
+      };
+      const planes=[Plane(forward,1,0,-near),Plane(forward,-1,0,far),
+        Plane(right,1,perspective?horizontal:0,perspective?0:width/(2*this.scale)),
+        Plane(right,-1,perspective?horizontal:0,perspective?0:width/(2*this.scale)),
+        Plane(up,-1,perspective?top:0,perspective?0:height*.57/this.scale),
+        Plane(up,1,perspective?bottom:0,perspective?0:height*.43/this.scale)];
+      const Outside=(center,extent)=>{
+        const dx=center[0]-eye[0],dy=center[1]-eye[1],dz=center[2]-eye[2];
+        for(const p of planes) if(p[0]*dx+p[1]*dy+p[2]*dz+p[3]+p[4]*extent[0]+p[5]*extent[1]+p[6]*extent[2]<-1e-7) return true;
+        return false;
+      };
+      for(const {start,end,center,extent} of terrain.rootIndex.groups) {
+        if(work) work.rootGroupsTested++;
+        if(Outside(center,extent)) {if(work) work.rootGroupsCulled++;continue;}
+        for(let i=start;i<end;i++) Visit(terrain.roots[i]);
+      }
+    } else for(const root of terrain.roots) Visit(root);
+    if(work) work.selected=terrainCells.length;
     cpu?.End();cpu?.Begin("共享边界");
     const selectBoundaries=usePatches&&terrain.visibleBoundariesForCells||terrain.boundariesForCells;
     this.terrainBoundaries=selectBoundaries?.(terrainCells,this.terrainBoundaries||{});
     cpu?.End();cpu?.End();
     cpu?.Begin("地形几何");
     for(const cell of terrainCells) {
-      if(cell.perimeter) this.raster.WorldBatch((terrain.indexedTerrainPatch||terrain.packedTerrainPatch)(cell,this.terrainBoundaries));
+      if(cell.perimeter&&terrain.terrainPatchBatches) {
+        for(const batch of terrain.terrainPatchBatches(cell,this.terrainBoundaries,work)) this.raster.WorldBatch(batch);
+      } else if(cell.perimeter) this.raster.WorldBatch((terrain.indexedTerrainPatch||terrain.packedTerrainPatch)(cell,this.terrainBoundaries,work));
       else DrawTerrainCell(cell,this.terrainBoundaries);
     }
     this.terrainTriangles=this.raster.triangles;

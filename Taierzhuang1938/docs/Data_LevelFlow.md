@@ -28,6 +28,8 @@
 
 Profiler 导出的 `preview` 保留每个实际重绘视口的眼点、朝向、投影参数和导航状态。`cpuMs` 是本次 Render 工作区间；`beforeRender` 单列本次 rAF 里先执行的调试窗口更新与导航。连续 rAF 的 `interval` 用于帧率统计，跳过重绘的间隔会置零；`redrawIntervalMs` 则保留相邻重绘的实时间隔（含按需等待）。GPU 数值只汇总 WebGL 定时查询，Canvas 合成单列 CPU 插桩。不可用、未完成、失效或只覆盖部分段的查询用空值和 `gpuTiming` 状态表示。
 
+三维视口的 `preview.viewports[].terrainWork` 记录当帧实际工作量。`visitedNodes` 是外层四叉树访问数，`patchNodes` 是细分块内部访问数，`reusedSubtrees` 是直接复用的子树数。`cellIndexBuilds` 统计新生成索引的小格；`patchBuilds`、`patchCellLookups` 和 `patchIndicesWritten` 分别统计发生重建的块、重新查询的小格和为拼块实际写入的索引项。上传和物件开销另看 WebGL2 计时。
+
 本地核对可运行 `node Taierzhuang1938/Script_LevelFlowProfilerAudit.mjs --sample`。它在浏览器内操作右键转镜头、中键平移、W 键与滚轮，从 Profiler 窗口导出 JSON；另以原生 WebGL 调用、计时器返回值与 CPU 样本区间核对每帧和每段，生成 `tmp/EncounterProfilerAudit/After/` 下的录制与核对结果。
 
 编辑器里的 Frame Debugger 点「捕获当前帧」会重绘一次所有可见视口。事件先按「视口 1、2、3、4」分组，再按实际执行次序列出。3D 视口记录 WebGL2 绘制、清除与拷贝，2D 与软件光栅按 Canvas 层记录。点视口组可看该视口完成时的快照；编辑器只保存可见输出，不回放中间 GPU 缓冲，也不会冻结时间轴。进入 Play 后同样的按钮改为调试游戏实例，双视口按玩家／观察视角分组；停止 Play 会关闭游戏调试窗口并恢复编辑器入口。再次点击已打开的工具会聚焦原窗口。

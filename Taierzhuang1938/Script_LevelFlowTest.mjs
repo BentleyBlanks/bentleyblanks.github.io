@@ -1396,6 +1396,32 @@ const seam=terrain.boundariesForCells([bankPatch,neighbour]);
 const neighbourMesh=terrain.packedFacesForCell(neighbour,true,seam);
 const bankMesh=terrain.packedTerrainPatch(bankPatch,seam);
 assert.equal(terrain.packedTerrainPatch(bankPatch,seam),bankMesh,"unchanged edges reuse packed vertices");
+// Compare the incremental patch to a fresh, ordered quadtree cut and the
+// ordinary sorted-line mesh builder across changing LODs and neighbours.
+for(const tolerance of [.001,.014,.017,.023,.025,.031,.09,.014,.001]) {
+  const patch=terrain.selectTerrainPatch(bankCell,tolerance);
+  if(!patch.perimeter) continue;
+  const limit=2**(Math.floor(4*Math.log2(tolerance))/4),expected=[];
+  const Cut=cell=>{
+    if(cell.children&&terrain.heightErrorForCell(cell)>limit) cell.children.forEach(Cut);
+    else expected.push(cell);
+  };
+  Cut(bankCell);
+  assert.equal(patch.cells.length,expected.length);
+  assert.ok(patch.cells.every((cell,i)=>cell===expected[i]),"reused threshold intervals preserve the ordered LOD cut");
+  for(const neighbours of [[neighbour],neighbour.children||[neighbour],[neighbour]]) {
+    const selection=[patch,...neighbours],active=terrain.visibleBoundariesForCells(selection);
+    const global=terrain.boundariesForCells(selection),local=terrain.boundariesForCells(expected);
+    for(const z of [patch.z,patch.z+patch.size]) local.rows.set(z,global.rows.get(z));
+    for(const x of [patch.x,patch.x+patch.size]) local.columns.set(x,global.columns.get(x));
+    const batches=terrain.terrainPatchBatches(patch,active),reference=expected.map(cell=>terrain.packedFacesForCell(cell,true,local));
+    const expanded=terrain.expandNative(terrain.indexedTerrainPatch(patch,active));
+    let offset=0;
+    for(const mesh of reference) {assert.deepEqual(expanded.subarray(offset,offset+mesh.length),mesh);offset+=mesh.length;}
+    assert.equal(expanded.length,offset);
+    assert.equal(batches.reduce((sum,batch)=>sum+batch.length*9,0),offset,"batched and contiguous indices cover the same geometry");
+  }
+}
 function BankEdge(mesh) {
   const heights=new Map();
   for(let i=0;i<mesh.length;i+=9) if(mesh[i]===edgeX) heights.set(mesh[i+2],mesh[i+1]);

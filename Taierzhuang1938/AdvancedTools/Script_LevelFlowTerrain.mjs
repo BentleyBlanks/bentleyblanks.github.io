@@ -234,25 +234,40 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     cell.radius=Math.hypot(size/Math.SQRT2,(cell.maxHeight-cell.minHeight)/2);
     return cell;
   };
-  const restoredNodes=new Map();
-  const RestoreNode=(index)=>{
-    if(restoredNodes.has(index)) return restoredNodes.get(index);
-    const data=prepared.nodes,offset=index*15;
-    const x=data[offset],z=data[offset+1],size=data[offset+2],minHeight=data[offset+3],maxHeight=data[offset+4];
-    const heightError=data[offset+5],near=data[offset+6],painted=data[offset+7],firstChild=data[offset+8];
-    const corners=[data[offset+9],data[offset+10],data[offset+11],data[offset+12]],centerHeight=data[offset+13];
-    const cell={x,z,size,minHeight,maxHeight,heightError,corners,centerHeight,near:!!near,painted:!!painted,nodeIndex:index,
-      center:[x+size/2,(minHeight+maxHeight)/2,z+size/2],radius:Math.hypot(size/Math.SQRT2,(maxHeight-minHeight)/2)};
-    if(data[offset+14]>=0) cell.exactHeightError=data[offset+14];
-    restoredNodes.set(index,cell);
-    if(firstChild>=0) Object.defineProperty(cell,"children",{configurable:true,get(){
-      const children=[0,1,2,3].map(child=>RestoreNode(firstChild+child));
-      Object.defineProperty(cell,"children",{value:children});return children;
-    }});
-    return cell;
-  };
+  const restoredNodes=prepared?new Array(prepared.nodes.length/15):null;
+  class SnapshotCell {
+    constructor(index) {
+      const data=prepared.nodes,at=index*15;
+      this.nodeIndex=index;this.x=data[at];this.z=data[at+1];this.size=data[at+2];
+      this.minHeight=data[at+3];this.maxHeight=data[at+4];this.heightError=data[at+5];
+      this.near=!!data[at+6];this.painted=!!data[at+7];this.firstChild=data[at+8];
+      this.corners=[data[at+9],data[at+10],data[at+11],data[at+12]];this.centerHeight=data[at+13];
+      this.exactHeightError=data[at+14]>=0?data[at+14]:undefined;
+      this.center=[this.x+this.size/2,(this.minHeight+this.maxHeight)/2,this.z+this.size/2];
+      this.radius=Math.hypot(this.size/Math.SQRT2,(this.maxHeight-this.minHeight)/2);
+      this.childNodes=null;
+    }
+    get children() {
+      const first=this.firstChild;
+      if(first<0) return undefined;
+      return this.childNodes??=[RestoreNode(first),RestoreNode(first+1),RestoreNode(first+2),RestoreNode(first+3)];
+    }
+  }
+  const RestoreNode=index=>restoredNodes[index]??=new SnapshotCell(index);
   const roots=prepared?Array.from({length:prepared.rootCount},(_,index)=>RestoreNode(index)):[];
   if(!prepared) for(let z=-radius;z<radius;z+=256) for(let x=-radius;x<radius;x+=256) roots.push(Refine(x,z,256));
+  // Group consecutive roots without changing their traversal order. Bounds enclose
+  // the *spheres* accepted by the original culler, including their overhang.
+  const rootGroups=[];
+  for(let start=0;start<roots.length;start+=8) {
+    const end=Math.min(roots.length,start+8),lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];
+    for(let i=start;i<end;i++) for(let axis=0;axis<3;axis++) {
+      const c=roots[i];lo[axis]=Math.min(lo[axis],c.center[axis]-c.radius);hi[axis]=Math.max(hi[axis],c.center[axis]+c.radius);
+    }
+    rootGroups.push({start,end,center:lo.map((v,i)=>(v+hi[i])/2),extent:lo.map((v,i)=>(hi[i]-v)/2)});
+  }
+  const gridStep=prepared?prepared.leafIds.reduce((step,id)=>Math.min(step,prepared.nodes[id*15+2]),Infinity):
+    cells.reduce((step,c)=>Math.min(step,c.size),Infinity);
   const VisitBoundaryPoints=(cell,visit,delta)=>{
     if(cell.perimeter) {
       for(const [x,z] of cell.perimeter) visit(x,z,delta);
@@ -310,9 +325,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       let words=0;
       for(const [source,index] of [[fullBoundaries.rows,rows],[fullBoundaries.columns,columns]]) {
         for(const [at,values] of source) {
-          const length=Math.ceil(values.length/32);
-          const line={at,values,first:words,end:words+length,row:index===rows};
-          index.set(at,line);lines.push(line);words+=length;
+          const blocks=new Map(),coordinates=[],first=words;
+          for(const value of values) {
+            const block=Math.floor(value/(32*gridStep));
+            if(block!==coordinates.at(-1)) {blocks.set(block,words++);coordinates.push(block);}
+          }
+          const line={at,blocks,coordinates,first,end:words,row:index===rows};
+          index.set(at,line);lines.push(line);
         }
       }
       edgeGrid={rows,columns,lines,words};
@@ -329,8 +348,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         let at=0;
         VisitBoundaryPoints(cell,(x,z)=>{
           const row=edgeGrid.rows.get(z),column=edgeGrid.columns.get(x);
-          bits[at++]=row.first*32+LowerBound(row.values,x);
-          bits[at++]=column.first*32+LowerBound(column.values,z);
+          const u=x/gridStep,v=z/gridStep;
+          bits[at++]=row.blocks.get(Math.floor(u/32))*32+(u&31);
+          bits[at++]=column.blocks.get(Math.floor(v/32))*32+(v&31);
         });
         cellBits.set(cell,bits);
       }
@@ -345,7 +365,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         let mask=next[word];
         while(mask) {
           const bit=31-Math.clz32(mask&-mask);
-          points.push(line.values[(word-line.first)*32+bit]);mask&=mask-1;
+          points.push((line.coordinates[word-line.first]*32+bit)*gridStep);mask&=mask-1;
         }
       }
       const target=line.row?state.rows:state.columns;
@@ -400,7 +420,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       Check(child.x+child.size,child.z+child.size,child.corners[2]); Check(child.x,child.z+child.size,child.corners[3]);
       Check(child.x+child.size/2,child.z+child.size/2,child.centerHeight);
     }
-    if(!state.pending.length) cell.exactHeightError=state.error;
+    if(!state.pending.length) {cell.exactHeightError=state.error;heightErrorCache.delete(cell);}
     return state.error;
   };
   const normalCache = new Map();
@@ -589,7 +609,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       NativeVertex(x+size,corners[2],z+size,normals[2]),NativeVertex(x,corners[3],z+size,normals[3]),
       NativeVertex(x+size/2,centerHeight,z+size/2,normals[4])];
   };
-  const QuadMesh=cell=>{
+  const QuadMesh=(cell,work)=>{
+    if(work) work.cellIndexBuilds++;
     const index=preparedMeshes.get(cell.nodeIndex);
     if(index!==undefined&&prepared.packedVertices) {
       const packed=prepared.packedVertices.subarray(prepared.packedOffsets[index],prepared.packedOffsets[index+1]);
@@ -601,50 +622,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     }
     const baked=index!==undefined&&prepared.quadVertexIds;
     const normals=baked?null:QuadNormals(cell);
-    const vertices=baked?prepared.quadVertexIds.subarray(index*5,index*5+5):QuadIds(cell,normals);
+    const vertices=baked?prepared.quadVertexIds:QuadIds(cell,normals),start=baked?index*5:0;
     const order=quadIndices[baked?prepared.quadTopology[index]:QuadTopology(cell,normals)];
-    return {faces:null,indices:Uint32Array.from(order,i=>vertices[i])};
+    const indices=new Uint32Array(order.length);
+    for(let i=0;i<order.length;i++) indices[i]=vertices[start+order[i]];
+    return {faces:null,indices};
   };
-  const MeshForCell=(cell,boundaries=fullBoundaries,textured=false)=>{
-    let cached=faceCache.get(cell);
-    if(!cached) {cached={variants:new Map(),textured:null,shaded:null};faceCache.set(cell,cached);}
-    // The finest source grid has no possible intermediate edge vertices.
-    if(textured&&cell.size===FLOW_RENDERING.terrainDetailCellM) return cached.quad??=QuadMesh(cell);
-    const previous=textured?cached.textured:cached.shaded;
-    if(previous&&previous.segments[0].line===boundaries.rows.get(cell.z)
-      &&previous.segments[1].line===boundaries.columns.get(cell.x+cell.size)
-      &&previous.segments[2].line===boundaries.rows.get(cell.z+cell.size)
-      &&previous.segments[3].line===boundaries.columns.get(cell.x)) return previous.record;
-    const edges=[boundaries.rows.get(cell.z),boundaries.columns.get(cell.x+cell.size),
-      boundaries.rows.get(cell.z+cell.size),boundaries.columns.get(cell.x)];
-    if(previous) {
-      let unchanged=true;
-      for(let side=0;side<4;side++) {
-        const old=previous.segments[side],line=edges[side];
-        if(old.line===line) continue;
-        const from=side%2?cell.z:cell.x,start=LowerBound(line,from),end=LowerBound(line,from+cell.size+1e-8);
-        if(end-start!==old.end-old.start) {unchanged=false;break;}
-        for(let index=0;index<end-start;index++) if(line[start+index]!==old.line[old.start+index]) {unchanged=false;break;}
-        if(!unchanged) break;
-        old.line=line;old.start=start;old.end=end;
-      }
-      if(unchanged) return previous.record;
-    }
-    const segments=edges.map((line,side)=>{
-      const from=side%2?cell.z:cell.x;
-      return {line,start:LowerBound(line,from),end:LowerBound(line,from+cell.size+1e-8)};
-    });
-    if(textured&&segments.every(segment=>segment.end-segment.start===2)) {
-      const record=cached.quad??=QuadMesh(cell);
-      cached.textured={segments,record};return record;
-    }
-    const outline=OutlineForCell(cell,boundaries);
-    const key=(textured?"T:":"S:")+outline.flat().join(",");
-    const variants=cached.variants;
-    if(variants.has(key)) {
-      const record=variants.get(key);
-      cached[textured?"textured":"shaded"]={segments,record};return record;
-    }
+  const BuildMesh=(cell,outline,textured,work)=>{
     const triangles=[];
     const {x,z,size}=cell,maxX=x+size,maxZ=z+size;
     const center=VertexAt(x+size/2,z+size/2);
@@ -678,6 +662,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     }
     let meshIndices=null;
     if(textured) {
+      if(work) work.cellIndexBuilds++;
       meshIndices=new Uint32Array(pointSets.length*3);
       let offset=0;
       for(const points of pointSets) for(const point of points) meshIndices[offset++]=NativeVertex(...point);
@@ -688,8 +673,50 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         Math.round((channel + vertexColors[1][axis] + vertexColors[2][axis]) / 3).toString(16).padStart(2, "0")).join("");
       triangles.push({points,color,vertexColors,vertexNormals,minX:x,maxX,minZ:z,maxZ});
     }
+    return {faces:triangles,indices:meshIndices};
+  };
+  const MeshForCell=(cell,boundaries=fullBoundaries,textured=false,work=null)=>{
+    let cached=faceCache.get(cell);
+    if(!cached) {cached={};faceCache.set(cell,cached);}
+    // The finest source grid has no possible intermediate edge vertices.
+    if(textured&&cell.size===FLOW_RENDERING.terrainDetailCellM) return cached.quad??=QuadMesh(cell,work);
+    const previous=textured?cached.textured:cached.shaded;
+    if(previous&&previous.segments[0].line===boundaries.rows.get(cell.z)
+      &&previous.segments[1].line===boundaries.columns.get(cell.x+cell.size)
+      &&previous.segments[2].line===boundaries.rows.get(cell.z+cell.size)
+      &&previous.segments[3].line===boundaries.columns.get(cell.x)) return previous.record;
+    const edges=[boundaries.rows.get(cell.z),boundaries.columns.get(cell.x+cell.size),
+      boundaries.rows.get(cell.z+cell.size),boundaries.columns.get(cell.x)];
+    if(previous) {
+      let unchanged=true;
+      for(let side=0;side<4;side++) {
+        const old=previous.segments[side],line=edges[side];
+        if(old.line===line) continue;
+        const from=side%2?cell.z:cell.x,start=LowerBound(line,from),end=LowerBound(line,from+cell.size+1e-8);
+        if(end-start!==old.end-old.start) {unchanged=false;break;}
+        for(let index=0;index<end-start;index++) if(line[start+index]!==old.line[old.start+index]) {unchanged=false;break;}
+        if(!unchanged) break;
+        old.line=line;old.start=start;old.end=end;
+      }
+      if(unchanged) return previous.record;
+    }
+    const segments=edges.map((line,side)=>{
+      const from=side%2?cell.z:cell.x;
+      return {line,start:LowerBound(line,from),end:LowerBound(line,from+cell.size+1e-8)};
+    });
+    if(textured&&segments.every(segment=>segment.end-segment.start===2)) {
+      const record=cached.quad??=QuadMesh(cell,work);
+      cached.textured={segments,record};return record;
+    }
+    const outline=OutlineForCell(cell,boundaries);
+    const key=(textured?"T:":"S:")+outline.flat().join(",");
+    const variants=cached.variants??=new Map();
+    if(variants.has(key)) {
+      const record=variants.get(key);
+      cached[textured?"textured":"shaded"]={segments,record};return record;
+    }
+    const record=BuildMesh(cell,outline,textured,work);
     if(variants.size>=4) variants.delete(variants.keys().next().value);
-    const record={faces:triangles,indices:meshIndices};
     variants.set(key,record);
     cached[textured?"textured":"shaded"]={segments,record};
     return record;
@@ -711,38 +738,128 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   };
   // Cache the selection within a small patch. Publish only its perimeter to
   // neighbouring patches; interior vertices never participate in their seams.
-  const patchCache=new WeakMap();
-  const SelectTerrainPatch=(root,heightLimit)=>{
-    if(!root.children||root.heightError<=heightLimit||HeightErrorForCell(root,heightLimit)<=heightLimit) return root;
-    const band=Math.floor(Math.log2(heightLimit)*4);
+  const patchCache=new WeakMap(),subtreeCuts=new WeakMap();
+  const SelectTerrainPatch=(root,heightLimit,work)=>{
+    if(work) work.patchSelections++;
+    if((root.exactHeightError??root.heightError)<=heightLimit||HeightErrorForCell(root,heightLimit)<=heightLimit) return root;
+    const band=Math.floor(Math.log2(heightLimit)*4),limit=2**(band/4);
     let variants=patchCache.get(root);
-    if(!variants) {variants=new Map();patchCache.set(root,variants);}
-    if(variants.has(band)) return variants.get(band);
-    // Round toward finer geometry using the nearest depth of the whole patch.
-    const limit=2**(band/4),cells=[];
+    if(!variants) {variants=[];patchCache.set(root,variants);}
+    // Every accepted parent remains valid above its measured error, and every
+    // split remains necessary below its witnessed error. Adjacent LOD bands
+    // often have exactly the same cells; reuse their geometry and boundaries.
+    for(const patch of variants) if(limit>=patch.minLimit&&limit<patch.maxLimit) return patch;
+    let minLimit=0,maxLimit=Infinity;
+    const cells=[];
     const Select=cell=>{
-      if(cell.children&&cell.heightError>limit&&HeightErrorForCell(cell,limit)>limit) {
-        for(const child of cell.children) Select(child);
-      } else cells.push(cell);
+      if(work) work.patchNodes++;
+      const error=cell.exactHeightError??(cell.heightError<=limit?cell.heightError:HeightErrorForCell(cell,limit));
+      if(error>limit) {
+        maxLimit=Math.min(maxLimit,error);
+        // This sub-cut is shared by multiple enclosing patch bands. Keep only
+        // the last cut at this size; the certified interval gives identical cells.
+        if(cell.size===FLOW_RENDERING.terrainPatchSizeM/4) {
+          const cut=subtreeCuts.get(cell);
+          if(cut&&limit>=cut.min&&limit<cut.max) {
+            if(work) work.reusedSubtrees++;
+            minLimit=Math.max(minLimit,cut.min);maxLimit=Math.min(maxLimit,cut.max);
+            for(const leaf of cut.cells) cells.push(leaf);
+          } else {
+            const lo=minLimit,hi=maxLimit,start=cells.length;
+            minLimit=0;maxLimit=error;
+            for(const child of cell.children) Select(child);
+            subtreeCuts.set(cell,{min:minLimit,max:maxLimit,cells:cells.slice(start)});
+            minLimit=Math.max(lo,minLimit);maxLimit=Math.min(hi,maxLimit);
+          }
+        } else for(const child of cell.children) Select(child);
+        return;
+      }
+      minLimit=Math.max(minLimit,error);
+      cells.push(cell);
     };
     Select(root);
-    const boundaries=BoundariesForCells(cells),{x,z,size}=root;
-    const perimeter=[];
-    for(const edgeZ of [z,z+size]) {
-      for(const edgeX of boundaries.rows.get(edgeZ)) perimeter.push([edgeX,edgeZ]);
+    const {x,z,size}=root,step=gridStep,span=size/step;
+    const patch={x,z,size,cells,minLimit,maxLimit,perimeter:[],edgeLines:[],packed:null};
+    if(Number.isInteger(span)&&span<=32) {
+      // The two endpoints are implicit. All interior grid points on an 8 m
+      // edge (25 cm source detail) fit in one word.
+      const rows=new Uint32Array(span+1),columns=new Uint32Array(span+1);
+      const Mark=(u,v)=>{
+        if(u>0&&u<span) rows[v]|=1<<(u-1);
+        if(v>0&&v<span) columns[u]|=1<<(v-1);
+      };
+      const sides=new Uint8Array(cells.length);
+      for(let i=0;i<cells.length;i++) {
+        const c=cells[i],u=(c.x-x)/step,v=(c.z-z)/step,n=c.size/step;
+        Mark(u,v);Mark(u+n,v);Mark(u,v+n);Mark(u+n,v+n);
+        sides[i]=(v===0?1:0)|(v+n===span?2:0)|(u===0?4:0)|(u+n===span?8:0);
+      }
+      patch.grid={step,span,rows,columns,sides};
+      patch.perimeter.push([x,z],[x+size,z],[x,z+size],[x+size,z+size]);
+      for(let i=1;i<span;i++) {
+        const bit=1<<(i-1);
+        if(rows[0]&bit) patch.perimeter.push([x+i*step,z]);
+        if(rows[span]&bit) patch.perimeter.push([x+i*step,z+size]);
+        if(columns[0]&bit) patch.perimeter.push([x,z+i*step]);
+        if(columns[span]&bit) patch.perimeter.push([x+size,z+i*step]);
+      }
+    } else {
+      const boundaries=BoundariesForCells(cells);patch.boundaries=boundaries;
+      for(const edgeZ of [z,z+size]) for(const edgeX of boundaries.rows.get(edgeZ)) patch.perimeter.push([edgeX,edgeZ]);
+      for(const edgeX of [x,x+size]) for(const edgeZ of boundaries.columns.get(edgeX))
+        if(edgeZ!==z&&edgeZ!==z+size) patch.perimeter.push([edgeX,edgeZ]);
     }
-    for(const edgeX of [x,x+size]) {
-      for(const edgeZ of boundaries.columns.get(edgeX)) if(edgeZ!==z&&edgeZ!==z+size) perimeter.push([edgeX,edgeZ]);
-    }
-    const patch={x,z,size,cells,boundaries,perimeter,edgeLines:[],packed:null};
-    if(variants.size>=3) variants.delete(variants.keys().next().value);
-    variants.set(band,patch);
+    if(variants.length>=3) variants.shift();
+    variants.push(patch);
     return patch;
   };
-  const IndicesForCell=(cell,boundaries)=>MeshForCell(cell,boundaries,true).indices;
-  const IndexedTerrainPatch=(patch,visible)=>{
+  const GridCellIndices=(cell,patch,work)=>{
+    const {rows,columns,step}=patch.grid,u=(cell.x-patch.x)/step,v=(cell.z-patch.z)/step,n=cell.size/step;
+    const mask=2**(n-1)-1;
+    return CellMaskIndices(cell,step,n,(rows[v]>>>u)&mask,(columns[u+n]>>>v)&mask,
+      (rows[v+n]>>>u)&mask,(columns[u]>>>v)&mask,work);
+  };
+  const CellMaskIndices=(cell,step,n,top,right,bottom,left,work)=>{
+    let cached=faceCache.get(cell);
+    if(!cached) {cached={};faceCache.set(cell,cached);}
+    if(!(top|right|bottom|left)) return (cached.quad??=QuadMesh(cell,work)).indices;
+    const last=cached.gridMesh;
+    if(last&&last.top===top&&last.right===right&&last.bottom===bottom&&last.left===left) return last.indices;
+    const key=`G:${top}:${right}:${bottom}:${left}`;
+    const variants=cached.variants??=new Map();
+    let record=variants.get(key);
+    if(!record) {
+      const {x,z,size}=cell,outline=[[x,z]];
+      for(let i=1;i<n;i++) if(top&(1<<(i-1))) outline.push([x+i*step,z]);
+      outline.push([x+size,z]);
+      for(let i=1;i<n;i++) if(right&(1<<(i-1))) outline.push([x+size,z+i*step]);
+      outline.push([x+size,z+size]);
+      for(let i=n-1;i>0;i--) if(bottom&(1<<(i-1))) outline.push([x+i*step,z+size]);
+      outline.push([x,z+size]);
+      for(let i=n-1;i>0;i--) if(left&(1<<(i-1))) outline.push([x,z+i*step]);
+      record=BuildMesh(cell,outline,true,work);
+      if(cached.variants.size>=4) cached.variants.delete(cached.variants.keys().next().value);
+      cached.variants.set(key,record);
+    }
+    cached.gridMesh={top,right,bottom,left,indices:record.indices};return record.indices;
+  };
+  // Aligned quadtree cells up to 32 native steps have all their interior edge
+  // coordinates in a single word, even when the far endpoint is in the next block.
+  const EdgeMask=(visible,line,from,mask)=>{
+    const u=from/gridStep,word=line.blocks.get(Math.floor(u/32));
+    return word===undefined?0:(visible.active[word]>>>((u&31)+1))&mask;
+  };
+  const IndicesForCell=(cell,boundaries,work)=>{
+    const n=cell.size/gridStep;
+    if(!boundaries?.grid||n>32||!Number.isInteger(n)) return MeshForCell(cell,boundaries,true,work).indices;
+    if(n===1) return CellMaskIndices(cell,gridStep,n,0,0,0,0,work);
+    const {x,z,size}=cell,{rows,columns}=boundaries.grid,mask=2**(n-1)-1;
+    return CellMaskIndices(cell,gridStep,n,EdgeMask(boundaries,rows.get(z),x,mask),EdgeMask(boundaries,columns.get(x+size),z,mask),
+      EdgeMask(boundaries,rows.get(z+size),x,mask),EdgeMask(boundaries,columns.get(x),z,mask),work);
+  };
+  const TerrainPatchBatches=(patch,visible,work)=>{
     const {x,z,size,boundaries}=patch;
-    let rebuild=!patch.indices;
+    let changed=0;
     // Match the visible neighbour's actual edge. A change elsewhere on the
     // same grid line must not invalidate this patch's resident vertex buffer.
     for(let side=0;side<4;side++) {
@@ -751,17 +868,56 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const line=visible[axis].get(at);
       if(patch.edgeLines[side]===line) continue;
       patch.edgeLines[side]=line;
+      if(patch.grid) {
+        const grid=patch.grid,edge=grid[axis],index=(side%2)*grid.span;
+        let bits=0;
+        if(visible.grid) bits=EdgeMask(visible,visible.grid[axis].get(at),from,2**(grid.span-1)-1);
+        else for(let i=LowerBound(line,from)+1;i<line.length&&line[i]<from+size;i++) bits|=1<<((line[i]-from)/grid.step-1);
+        if(bits!==edge[index]) {edge[index]=bits;changed|=1<<side;}
+        continue;
+      }
       const current=boundaries[axis].get(at);
       const first=LowerBound(line,from),last=LowerBound(line,from+size+1e-8);
       if(current.length===last-first&&current.every((v,i)=>v===line[first+i])) continue;
       boundaries[axis].set(at,line.slice(first,last));
-      rebuild=true;
+      changed|=1<<side;
     }
-    if(rebuild) {
-      const meshes=patch.cells.map(cell=>IndicesForCell(cell,boundaries));
-      patch.indices=new Uint32Array(meshes.reduce((sum,mesh)=>sum+mesh.length,0));patch.packed=null;
-      let offset=0;
-      for(const mesh of meshes) {patch.indices.set(mesh,offset);offset+=mesh.length;}
+    const fresh=!patch.batches;
+    if(fresh||changed) {
+      const meshes=patch.meshes??=new Array(patch.cells.length),batches=patch.batches??=[];
+      let rebuilt=false;
+      // Keep draw order while replacing short runs. A changed border does
+      // not require copying the entire patch back into a new index array.
+      const run=32;
+      for(let start=0;start<meshes.length;start+=run) {
+        const end=Math.min(start+run,meshes.length);
+        let dirty=fresh;
+        for(let i=start;i<end;i++) {
+          if(!fresh&&patch.grid&&!(patch.grid.sides[i]&changed)) continue;
+          const mesh=patch.grid?GridCellIndices(patch.cells[i],patch,work):IndicesForCell(patch.cells[i],boundaries,work);
+          if(work) work.patchCellLookups++;
+          if(mesh!==meshes[i]) {meshes[i]=mesh;dirty=true;}
+        }
+        if(!dirty) continue;
+        rebuilt=true;
+        if(end===start+1) {batches[start/run]=meshes[start];continue;}
+        let length=0;
+        for(let i=start;i<end;i++) length+=meshes[i].length;
+        const batch=new Uint32Array(length);
+        for(let i=start,offset=0;i<end;i++) {batch.set(meshes[i],offset);offset+=meshes[i].length;}
+        batches[start/run]=batch;
+        if(work) work.patchIndicesWritten+=length;
+      }
+      if(rebuilt) {patch.indices=null;patch.packed=null;if(work) work.patchBuilds++;}
+    }
+    return patch.batches;
+  };
+  const IndexedTerrainPatch=(patch,visible,work)=>{
+    const batches=TerrainPatchBatches(patch,visible,work);
+    if(batches.length===1) return batches[0];
+    if(!patch.indices) {
+      patch.indices=new Uint32Array(batches.reduce((sum,v)=>sum+v.length,0));
+      let offset=0;for(const batch of batches) {patch.indices.set(batch,offset);offset+=batch.length;}
     }
     return patch.indices;
   };
@@ -776,6 +932,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const cell=all[index];indices.set(cell,index);
       if(cell.children) {childIndices.push(all.length);all.push(...cell.children);} else childIndices.push(-1);
     }
+    // Close-range LOD queries revisit these same source samples at many camera
+    // angles. Store their exact deviations in the existing snapshot node field.
+    for(const cell of all) if(cell.children&&cell.size<=FLOW_RENDERING.terrainPatchSizeM) HeightErrorForCell(cell);
     const settings=FLOW_RENDERING.terrainBuild;
     // Store topology and five shared normal references instead of repeating
     // position, colour and normal for each triangle corner. Spend the existing
@@ -828,10 +987,10 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       packedIds:new Uint32Array(packedIds),quadVertexIds:new Uint32Array(quadVertexIds),nativeHeights,nativeNormalIds,quadTopology:new Uint8Array(quadTopology)};
   };
   let restoredCells;
-  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,
+  return {heightAt:HeightAt,sceneHeightAt:SceneHeightAt,preAt,surfaceColorAt:SurfaceColorAt,surfaceMaps:SurfaceMaps,colorAt:ColorAt,roots,rootIndex:{roots,groups:rootGroups},
     heightErrorForCell:HeightErrorForCell,boundariesForCells:BoundariesForCells,visibleBoundariesForCells:VisibleBoundariesForCells,colorRangeForCell:ColorRangeForCell,
     selectTerrainPatch:SelectTerrainPatch,packedTerrainPatch:PackedTerrainPatch,
-    nativePool,indicesForCell:IndicesForCell,indexedTerrainPatch:IndexedTerrainPatch,expandNative:ExpandNative,
+    nativePool,indicesForCell:IndicesForCell,indexedTerrainPatch:IndexedTerrainPatch,terrainPatchBatches:TerrainPatchBatches,expandNative:ExpandNative,
     facesForCell:(cell,boundaries)=>MeshForCell(cell,boundaries).faces,packedFacesForCell:PackedFacesForCell,prepareSnapshot:PrepareSnapshot,
     get cells(){return prepared?(restoredCells||=(Array.from(prepared.leafIds,RestoreNode))):cells;},
     leafCount:prepared?prepared.leafIds.length:cells.length,plan,source:scene.terrain.file,bounds};
