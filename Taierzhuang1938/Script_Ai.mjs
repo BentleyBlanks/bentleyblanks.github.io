@@ -1012,7 +1012,7 @@ export class AiDirector {
   }
 
   /** Scene director orders use the existing movement/combat components. */
-  DirectActor(s, { x, z, yaw, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7 } = {}) {
+  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7 } = {}) {
     if (!s?.alive) return;
     s.goal.set(x, this.ctx.battlefield.GroundHeight(x,z), z);
     s.order=moving?"advance":"hold";
@@ -1022,8 +1022,24 @@ export class AiDirector {
     s.p012Guided=moving;
     s.scriptMoveSpeedMps=moving?speed:undefined;
     s.scriptArrivalRadius=arrivalRadius;
-    if(Number.isFinite(yaw)&&!moving&&!s.target) s.yaw=yaw;
-    this.SetStance(s,stance,0.3,true);
+    // Do not snap yaw back every orderEveryS tick while AI is smoothly turning toward a
+    // target, last-known position, or gunshot watch direction.
+    const aiOwnsYaw = !forceYaw && (!!s.target
+      || (s.lkp && (s.lkpConfidence || 0) > 0)
+      || (this.time < s.watchUntil && Number.isFinite(s.watchYaw))
+      || !!s.watchAlerted);
+    if (Number.isFinite(yaw) && !moving && !aiOwnsYaw) {
+      if (forceYaw) s.watchUntil = -99;
+      s.yaw = yaw;
+    }
+    // Let active combat / alert / cover AI own tactical crouch & prone; only hold the
+    // authored stance for noncombatants or calm idle units, refreshing stanceUntil so
+    // repeated DirectActor ticks never oscillate stand ↔ crouch with ApplyWatchPose/FireStance.
+    const aiOwnsStance = combat && (!!s.target || !!s.watchAlerted || s.state !== STATE.IDLE || s.suppression > 0.2 || !!s.cover);
+    if (!aiOwnsStance) {
+      if (s.stance === stance) s.stanceUntil = Math.max(s.stanceUntil || 0, this.time + 0.45);
+      else this.SetStance(s, stance, 0.45, true);
+    }
   }
 
   Spawn(side, x, z, options = {}) {
@@ -4047,12 +4063,14 @@ export class AiDirector {
     // 落了地又没动的人按屏内 2 帧 / 远景与屏外 4 帧一步，dt 累着补偿 ——
     // 脚下被炸掉最多晚三帧（≈50 ms）才开始掉，屏外根本看不见。
     // 悬空的（正在掉、刚被炸飞）照旧每帧结算，别让人一顿一顿地落地。
+    let idleStepUsedDt = 0;
     if (!stepped) {
       s.idleStepDt += dt;
       const cadence = !s.grounded ? 1
         : (s.renderLod === "detail" ? 2 : 4);
       if (cadence === 1 || s.crowdPushX || s.crowdPushZ || (this.tickIndex + s.id) % cadence === 0) {
-        this.StepBody(s, 0, 0, Math.min(s.idleStepDt, 0.1));
+        idleStepUsedDt = Math.min(s.idleStepDt, 0.1);
+        this.StepBody(s, 0, 0, idleStepUsedDt);
         s.idleStepDt = 0;
       }
     } else {
@@ -4073,9 +4091,12 @@ export class AiDirector {
         || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
       if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) {
-        const moveDt = Math.max(dt, .0001);
-        const moveVx = (s.position.x - animationStartX) / moveDt;
-        const moveVz = (s.position.z - animationStartZ) / moveDt;
+        const moveDt = Math.max(stepped ? dt : (idleStepUsedDt || dt), .0001);
+        const dispX = s.position.x - animationStartX, dispZ = s.position.z - animationStartZ;
+        // Passive gravity/capsule settling when stationary must not spike locomotion speed and flicker walk/idle.
+        const passiveJitter = !stepped && s.moveSpeed <= 0 && (dispX * dispX + dispZ * dispZ) < 0.0004;
+        const moveVx = passiveJitter ? 0 : dispX / moveDt;
+        const moveVz = passiveJitter ? 0 : dispZ / moveDt;
         this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         locomotionTracked: !s.p012OnMovingTrain,

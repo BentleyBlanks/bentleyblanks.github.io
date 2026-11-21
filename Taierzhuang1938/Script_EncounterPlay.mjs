@@ -456,11 +456,12 @@ export class EncounterPlay {
     const guide=!!this.stealth&&entry.actor.id==="liu"&&frame.beat.id==="09a";
     const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):group?.speed||2.6;
     if(guide&&moving)yaw=Math.atan2(soldier.position.x-target[0],soldier.position.z-target[1]);
+    let forceYaw=false;
     if(this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId) {
-      target=[soldier.position.x,soldier.position.z];moving=false;
+      target=[soldier.position.x,soldier.position.z];moving=false;forceYaw=true;
       yaw=Math.atan2(-(this.host.player.position.x-soldier.position.x),-(this.host.player.position.z-soldier.position.z));
     }
-    this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,
+    this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
       stance:guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"?1:0,
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7)});
   }
