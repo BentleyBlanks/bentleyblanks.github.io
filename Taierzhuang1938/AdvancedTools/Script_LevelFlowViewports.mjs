@@ -199,6 +199,27 @@ export class EncounterViewports {
   MakeView(canvas,type,sceneCamera) {
     return ["plan","battle"].includes(type)?new FlowMapView(canvas,this.mapData):new FlowPerspectiveView(canvas,this.mapData,type,sceneCamera);
   }
+  SetMapData(mapData) {
+    this.mapData=mapData;
+    this.contentKey="";
+    for(const entry of this.entries) {
+      const old=entry.map;
+      entry.drawKey=null;
+      entry.map=this.MakeView(entry.canvas,entry.type,entry.sceneCamera);
+      entry.map.center=[...old.center];
+      entry.map.scale=old.scale;
+      entry.map.yaw=old.yaw||0;
+      entry.map.pitch=old.pitch||0.67;
+      entry.map.target=old.target||"player";
+      entry.map.followZoom=old.followZoom??1;
+      if(entry.type==="scene"&&old.freeCamera) {
+        entry.map.freeCamera=structuredClone(old.freeCamera);
+        entry.map.focusDistance=old.focusDistance||22;
+      }
+      this.Frame(entry);
+    }
+    this.Activate(this.activeIndex);
+  }
   get active() {return this.entries[this.activeIndex];}
   Visible() {return this.entries.slice(0,this.count);}
 

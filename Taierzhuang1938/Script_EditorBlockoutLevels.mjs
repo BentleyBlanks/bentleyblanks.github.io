@@ -13,7 +13,8 @@
 import { MISSION_LAYOUT, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
-import { BlockoutDocFromScene, DecodeSceneHeights } from "./Script_SceneDoc.mjs";
+import { BlockoutDocFromScene } from "./Script_SceneDoc.mjs";
+import { FetchResolvedScene } from "./Script_SceneInherit.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
@@ -791,24 +792,15 @@ export function MakeBlockoutPhase(level) {
       // 每次进关都重读：场景文件可能被场景编辑器 / 人 / agent 改过。读不到时退回上一次的布局（若有）。
       try {
         const sceneUrl = phase.blockout.SceneUrl();
-        const response = await globalThis.fetch(`${sceneUrl}?t=${Date.now()}`, { cache: "no-store" });
-        if (!response.ok) throw new Error(`场景文件读不到（HTTP ${response.status}）`);
         let doc;
-        try { doc = await response.json(); } catch (error) { throw new Error("场景文件不是 JSON"); }
         if (level.scene.kind === "scene") {
-          const heightUrl = new URL(doc?.terrain?.file || "", new URL(sceneUrl, globalThis.location?.href)).href;
-          const heightResponse = await globalThis.fetch(`${heightUrl}?t=${Date.now()}`, { cache: "no-store" });
-          if (!heightResponse.ok) throw new Error(`高度图读不到（HTTP ${heightResponse.status}）`);
-          const pre = DecodeSceneHeights(await heightResponse.arrayBuffer(), doc.terrain);
-          // 场景壕沟（Script_SceneTrenches）：高度图存的是没挖沟的地面，读进来按样条现挖
-          let datum = null;
-          if (doc.trenches?.datum?.file) {
-            const datumResponse = await globalThis.fetch(`${new URL(doc.trenches.datum.file, heightUrl).href}?t=${Date.now()}`, { cache: "no-store" });
-            if (!datumResponse.ok) throw new Error(`壕沟基准面读不到（HTTP ${datumResponse.status}）`);
-            datum = await datumResponse.arrayBuffer();
-          }
-          const { heights, plan } = PrepareSceneTerrain(doc, pre, datum);
-          doc = BlockoutSliceDoc(level, doc, heights, plan);
+          const resolved = await FetchResolvedScene(sceneUrl, { bustCache: true });
+          const { heights, plan } = PrepareSceneTerrain(resolved.doc, resolved.heights, resolved.datumBytes);
+          doc = BlockoutSliceDoc(level, resolved.doc, heights, plan);
+        } else {
+          const response = await globalThis.fetch(`${sceneUrl}?t=${Date.now()}`, { cache: "no-store" });
+          if (!response.ok) throw new Error(`场景文件读不到（HTTP ${response.status}）`);
+          try { doc = await response.json(); } catch { throw new Error("场景文件不是 JSON"); }
         }
         ApplyLayout(phase, LayoutFromSceneDoc(doc));
         phase.blockout.sceneError = null;

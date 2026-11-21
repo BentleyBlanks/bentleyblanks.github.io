@@ -73,6 +73,12 @@ export class EncounterTimeline {
     this.Layout(anchorTime, x);
   }
 
+  SetDuration(duration) {
+    this.duration = duration;
+    this.time = Math.min(this.time, duration);
+    this.Layout(this.time);
+  }
+
   SetTime(time) {
     const changed = Math.abs(this.time - time) > 0.001;
     this.time = time;

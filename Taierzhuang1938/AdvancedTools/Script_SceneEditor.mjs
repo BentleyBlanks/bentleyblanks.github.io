@@ -24,6 +24,7 @@ import { MISSION_LAYOUT } from "../Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "../Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "../Script_WhiteboxGrid.mjs";
 import { WHITEBOX_MATERIAL } from "../Data_Tuning_WhiteboxMaterial.mjs";
+import { ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
 
 export const SCENE_EDITOR = Object.freeze({
   pollMs: 2000,
@@ -128,6 +129,11 @@ class SceneEditorApp {
     this.scene.add(sun);
     this.world = new THREE.Group();
     this.scene.add(this.world);
+    this.inheritedGroup = new THREE.Group();
+    this.inheritedGroup.name = "SceneEditor_InheritedNorth";
+    this.scene.add(this.inheritedGroup);
+    this.showInherited = true;
+    this.inheritedObjectCount = 0;
     this.selectionLines = new THREE.Group();
     this.scene.add(this.selectionLines);
     this.BuildGizmo();
@@ -207,6 +213,7 @@ class SceneEditorApp {
     this.CarveAll();
     this.lookKey = null;
     this.Rebuild();
+    await this.SyncInheritedPreview();
     if (!keepCamera) this.Home();
     this.FillSignals();
     this.RenderTree();
@@ -225,6 +232,146 @@ class SceneEditorApp {
     this.RebuildObjects();
     this.BuildTrenchLines();
     this.BuildTrenchDressing();
+  }
+
+  ClearInheritedPreview() {
+    while (this.inheritedGroup.children.length) {
+      const child = this.inheritedGroup.children.pop();
+      if (child.geometry && child.geometry !== this.geometry.box) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    }
+    this.inheritedObjectCount = 0;
+  }
+
+  async SyncInheritedPreview() {
+    this.ClearInheritedPreview();
+    const encLink = $("seEncounterLink");
+    if (encLink) {
+      const matched = ENCOUNTER_VARIANTS.find((v) => v.scene === this.sceneId);
+      encLink.hidden = !matched;
+      if (matched) {
+        encLink.href = `./Tool_LevelFlow.html${matched.isBaseline ? "" : `?variant=${encodeURIComponent(matched.id)}`}`;
+        encLink.textContent = "遭遇设计 ↗";
+        encLink.title = `在遭遇设计编辑器打开：${matched.title}`;
+      }
+    }
+    const note = $("seInheritNote");
+    const inherit = this.model?.doc?.inherit;
+    if (!inherit) {
+      if (note) note.hidden = true;
+      return;
+    }
+    if (note) {
+      note.textContent = "";
+      note.append(El("span", "", `🔗 z<${inherit.maxZ} 继承 ${inherit.scene}`));
+      const toggleWrap = El("label", "");
+      const toggle = El("input");
+      toggle.type = "checkbox";
+      toggle.checked = this.showInherited;
+      toggle.addEventListener("change", () => {
+        this.showInherited = toggle.checked;
+        this.inheritedGroup.visible = this.showInherited;
+      });
+      toggleWrap.append(toggle, document.createTextNode("预览北段"));
+      const jumpBase = El("button", "", "编辑基线 ↗");
+      jumpBase.addEventListener("click", () => {
+        if (this.model?.dirty && !confirm("有没保存的改动，换场景就丢掉了，继续？")) return;
+        const nextUrl = new URL(location.href);
+        nextUrl.searchParams.set("scene", inherit.scene);
+        location.assign(nextUrl.href);
+      });
+      note.append(toggleWrap, jumpBase);
+      note.hidden = false;
+    }
+    this.inheritedGroup.visible = this.showInherited;
+    try {
+      const baseUrl = new URL(`../${SceneDir(inherit.scene)}/${SceneFileName(inherit.scene)}`, location.href);
+      const res = await fetch(`${baseUrl.href}?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const baseDoc = await res.json();
+      const hRes = await fetch(`${new URL(baseDoc.terrain.file, baseUrl).href}?t=${Date.now()}`, { cache: "no-store" });
+      if (!hRes.ok) return;
+      const basePre = DecodeSceneHeights(await hRes.arrayBuffer(), baseDoc.terrain);
+      let baseDatum = [];
+      if (baseDoc.trenches?.datum?.file) {
+        const dRes = await fetch(`${new URL(baseDoc.trenches.datum.file, baseUrl).href}?t=${Date.now()}`, { cache: "no-store" });
+        if (dRes.ok) baseDatum = DecodeTrenchDatum(baseDoc.trenches.datum, await dRes.arrayBuffer());
+      }
+      const bt = baseDoc.terrain;
+      const splitRow = Math.min(bt.rows, Math.max(1, Math.round((inherit.maxZ - bt.minZ) / bt.cellM)));
+      const northPlan = CompileSceneTrenches(baseDoc.trenches, { datum: baseDatum, pre: GridSampler(bt, basePre) });
+      const carved = CarveSceneHeights(bt, basePre, northPlan);
+      const northSampler = HeightGridSampler({ ...bt, heights: carved });
+      const step = Math.max(1, Math.ceil(Math.sqrt(((bt.cols + 1) * (splitRow + 1)) / (E.terrainMaxVerts * 0.5))));
+      const nx = Math.floor(bt.cols / step), nz = Math.floor(splitRow / step);
+      const positions = new Float32Array((nx + 1) * (nz + 1) * 3);
+      const colors = new Float32Array(positions.length);
+      const tint = baseDoc.look?.heightTint || { lo: -3, hi: 8 };
+      const rgb = [0, 0, 0], col = new THREE.Color();
+      let k = 0;
+      for (let iz = 0; iz <= nz; iz++) {
+        const gz = iz === nz ? splitRow : iz * step;
+        for (let ix = 0; ix <= nx; ix++) {
+          const gx = ix === nx ? bt.cols : ix * step;
+          const x = bt.minX + gx * bt.cellM, z = bt.minZ + gz * bt.cellM, y = carved[gz * (bt.cols + 1) + gx];
+          positions[k] = x; positions[k + 1] = y; positions[k + 2] = z;
+          BlockoutTintColor(y, tint, rgb);
+          col.setRGB(rgb[0] * 0.78, rgb[1] * 0.85, Math.min(1, rgb[2] * 0.94), THREE.SRGBColorSpace);
+          colors[k] = col.r; colors[k + 1] = col.g; colors[k + 2] = col.b;
+          k += 3;
+        }
+      }
+      const index = new Uint32Array(nx * nz * 6);
+      let n = 0;
+      for (let iz = 0; iz < nz; iz++) {
+        for (let ix = 0; ix < nx; ix++) {
+          const a = iz * (nx + 1) + ix, b = a + 1, c = a + nx + 1, e = c + 1;
+          index[n++] = a; index[n++] = c; index[n++] = b;
+          index[n++] = b; index[n++] = c; index[n++] = e;
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geo.setIndex(new THREE.BufferAttribute(index, 1));
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+      ApplyPatches(mat, [MakeWhiteboxGridPatch(E.grid)]);
+      const northTerrain = new THREE.Mesh(geo, mat);
+      northTerrain.name = "SceneEditor_InheritedTerrain";
+      this.inheritedGroup.add(northTerrain);
+
+      const northBoxes = (baseDoc.objects || []).filter((o) =>
+        o.pos && o.pos[2] < inherit.maxZ && o.layer !== "backdrop" && o.visual !== false && o.tag !== "airWall" && o.size);
+      this.inheritedObjectCount = northBoxes.length;
+      if (northBoxes.length) {
+        const boxMat = new THREE.MeshStandardMaterial({ color: 0x8ea0aa, roughness: 0.92, metalness: 0, transparent: true, opacity: 0.86 });
+        const inst = new THREE.InstancedMesh(this.geometry.box, boxMat, northBoxes.length);
+        const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+        northBoxes.forEach((o, i) => {
+          const [x, rawY, z] = o.pos, [w, h, d] = o.size;
+          const baseY = rawY === null ? northSampler(x, z) : rawY;
+          m.compose(new THREE.Vector3(x, baseY + h / 2, z), q.setFromAxisAngle(up, (o.yawDeg || 0) * DEG), new THREE.Vector3(w, h, d));
+          inst.setMatrixAt(i, m);
+        });
+        inst.frustumCulled = false;
+        this.inheritedGroup.add(inst);
+      }
+
+      const seamPts = [];
+      for (let x = baseDoc.bounds.minX; x <= baseDoc.bounds.maxX; x += 4) {
+        seamPts.push(new THREE.Vector3(x, northSampler(x, inherit.maxZ) + 0.35, inherit.maxZ));
+      }
+      const seamLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(seamPts),
+        new THREE.LineDashedMaterial({ color: 0x8fc4d8, dashSize: 3, gapSize: 2, depthTest: false, transparent: true, opacity: 0.9 }),
+      );
+      seamLine.computeLineDistances();
+      seamLine.renderOrder = 24;
+      this.inheritedGroup.add(seamLine);
+    } catch (error) {
+      console.warn("[SceneEditor] 继承北段预览读取失败", error);
+    }
   }
 
   // ------------------------------------------------------------------ 壕沟（docs/Data_Scene.md §9）
@@ -1978,6 +2125,7 @@ ${seg.note}` : ""}`;
         trenches: this.model?.trenchSegments.length ?? 0, trench: this.model?.trench ?? null, trenchPoint: this.model?.trenchPoint ?? null,
         trenchDressing: this.trenchDressingCount ?? 0,
         layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep, terrainLook: this.terrainLook, style: this.style,
+        inheritedFrom: this.model?.doc.inherit || null, inheritedObjects: this.inheritedObjectCount || 0,
         camera: { x: this.cam.pos.x, y: this.cam.pos.y, z: this.cam.pos.z, yawDeg: this.cam.yaw / DEG, pitchDeg: this.cam.pitch / DEG },
       }),
       Find: (id) => this.model.Find(id),

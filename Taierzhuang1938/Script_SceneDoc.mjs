@@ -125,6 +125,14 @@ export function ValidateScene(doc) {
   if (doc.look?.proceduralDressing !== undefined && typeof doc.look.proceduralDressing !== "boolean")
     errors.push("look.proceduralDressing 要是 true / false");
   if (doc.ways !== undefined && !IsObject(doc.ways)) errors.push("ways 要是对象");
+  if (doc.inherit !== undefined) {
+    const inh = doc.inherit;
+    if (!IsObject(inh) || !SCENE_IDS.includes(inh.scene) || inh.scene === doc.id || !Finite(inh.maxZ)) {
+      errors.push("inherit 要是 { scene: 有效其他场景 id, maxZ: 有限数字 }");
+    } else if (IsObject(t) && Finite(t.minZ) && Math.abs(t.minZ - inh.maxZ) > 1e-6) {
+      errors.push(`inherit.maxZ (${inh.maxZ}) 必须与本场景 terrain.minZ (${t.minZ}) 对齐`);
+    }
+  }
   if (doc.trenches !== undefined) SceneTrenchIssues(doc.trenches, errors);
   return { ok: errors.length === 0, errors, warnings };
 }

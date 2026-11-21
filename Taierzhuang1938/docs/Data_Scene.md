@@ -241,3 +241,11 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 - **沟头**：中线往北接长 24 m（`(34.8,172) → (33.4,184) → (30,196)`），水面半宽 0.9 → 2.6，深度从 z 170 起 44 m 渐浅到平地（z 214 满深）；断面是碗形，两边先浅、中间后深，水线在 z≈197 收成一个舌头。新水块 `RiverWater_1_00`，沟头浅洼里补 5 丛苇子（`Reed_HechaHead_*`），地标 `LmHechaHead`（河汊子沟头）。北边集结处干沟不相连。
 - **沟尾**：z 561 起 22 m 渐浅（原来 574 起 8 m），半宽 3 → 2，水线在 z≈573 收成舌头；尾水块分三截收窄（`HechaTailWater` / `_2` / `_3`，底一律 −2.7 与上游同水面 −1.7），尾上补 5 丛苇子（`Reed_HechaTail_*`）。z 583 起是官道旁的平地，z 556±1 接缝与 0610 解析地面逐点相同（1218 测试 0.001 m 门限）。
 - 中线 z 214…561 一格不动，`L0610_RIVER` 的折线与半宽数据没改（头尾是场景里的补充，不在 `Data_*` 里）。`Script_EditorBlockoutFirstLevel0610SceneTest`（沟头一路渐浅、水块）与 `1218SceneTest`（沟尾一路渐浅、三截水块）钉住。
+
+### 变体场景北段继承（`doc.inherit`，2026-11-22）
+
+当多个关卡变体共用前半程场地、只在某道分界线往南分叉时，`tengxian-scene/1` 支持可选头字段 `inherit: { scene: "<基线场景ID>", maxZ: <分界Z> }`（须满足 `inherit.maxZ === terrain.minZ`）：
+
+- **磁盘只存分叉南段**：例如 `Scenes/FirstLevelMerged/Scene_FirstLevelMerged.json` 写 `inherit: { scene: "FirstLevelEncounter", maxZ: 355 }`，自身只存 `z >= 355` 的高度图、壕沟、物件、涂色与地标，不复制 `01–07` 北段数据。
+- **运行时毫秒级无缝拼接**：`Script_SceneInherit.mjs`（`ResolveInheritedScene` / `FetchResolvedScene`）在浏览器与 Node 侧自动裁取基线场景 `z < maxZ` 的高度行、壕沟基准面、物件、样条与地表，与变体南段拼成标准内存场景，供 `Script_EditorBlockoutLevels`、`EncounterPlay` 与 `Tool_LevelFlow` 统一消费。
+- **场景编辑器只读北段预览与原生存盘**：`SceneEditor.html` 打开带 `inherit` 的场景时，在顶栏提示继承来源、提供「编辑基线 ↗」与「遭遇设计 ↗」直跳，并在视图中以冷灰半透明只读组渲染基线北段（`z < maxZ`）及切口虚线；`Ctrl+S`（`/__scene/save`）仍只写回变体自身的 `z >= maxZ` 南段。门禁见 `Script_SceneDocTest.mjs` 与 `Script_EncounterVariantsTest.mjs`。

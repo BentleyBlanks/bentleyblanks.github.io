@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { EncounterPlayPlan, EncounterCanPlay, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
-import { EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, BeatById, FLOW_TIMELINE } from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
+import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
 import { VillageStealthRules, VillageStealthAt, StageVillageCompanions } from "./Scenes/FirstLevelEncounter/Script_LevelFlowVillage.mjs";
 import { SampleBeatRoute } from "./Scenes/FirstLevelEncounter/Script_LevelFlowGeometry.mjs";
 import { VillageStealthPlay } from "./Script_VillageStealthPlay.mjs";
-import { GroupPath, ENCOUNTER_CINEMATICS } from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
+import { GroupPath } from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
@@ -17,7 +17,6 @@ import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { XBOT_DEATHS } from "./Data_BlockoutXBotClips.mjs";
-import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 import { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";
 import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
@@ -69,15 +68,18 @@ export class EncounterPlay {
     this.orderClock=0;this.lastBeat=null;this.music=null;this.lastStateSent=0;this.smoke=new Map();this.pendingActions=new Map();this.retiredMaterials=new DeferredMaterialDispose();this.warmedSignatures=new Set();
     let payload=null;
     try {payload=JSON.parse(sessionStorage.getItem(PAYLOAD_KEY)||"null");}catch{}
-    this.plan=new EncounterPlayPlan(payload?.document||DEFAULT_ENCOUNTER_DOCUMENT,payload?.time||0);
-    this.stealth=new VillageStealthPlay(host,new VillageStealthRules(FLOW_TIMELINE));
+    const urlVariant=new URLSearchParams(globalThis.location?.search||"").get("variant");
+    this.variant=CompileEncounterVariant(payload?.variantId||urlVariant||undefined);
+    this.plan=new EncounterPlayPlan(payload?.document||this.variant.defaultDocument,payload?.time||0,this.variant);
+    this.stealth=this.variant.stealthPlan?new VillageStealthPlay(host,new VillageStealthRules(this.variant.timeline)):null;
+    this.noFireShots=0;this.noFireGrenades=0;this.noFireFailure=null;
     this.checkpointInventory=payload?.checkpointInventory||null;
     this.checkpointTime=null;
-    this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
+    this.templeEnteredAt=this.stealth&&this.plan.beat.id==="09b"?0:null;
     this.token=payload?.token||"standalone";
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,loadCast:LoadEncounterCast,
-      groundAt:(x,z)=>BeishaheSurfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
-      characterKeys:[...new Set([...Object.values(CONFIG.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
+      groundAt:(x,z)=>this.variant.surfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
+      characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
     this.view=new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
     this.BuildUi();
@@ -113,19 +115,23 @@ export class EncounterPlay {
     for(const result of deaths)if(result.status==="rejected")console.warn("[EncounterPlay] Death clip warmup failed; retaining mirrored poses",result.reason);
     if(this.disposed||!this.active)return;
     for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
-    const frame=EvaluateFlow(this.plan.time,this.plan.document);
+    const cfg=this.plan.config;
+    const frame=this.variant.evaluate(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
     this.SyncEnvironment(frame,true);
-    if(this.host.Weapon()!==CONFIG.startWeapon)this.host.Pickup(CONFIG.startWeapon);
-    this.host.state.clips=CONFIG.inventory.spareClips;
-    if(this.host.state.mags.primary)this.host.state.mags.primary.clips=CONFIG.inventory.spareClips;
-    this.host.state.grenades=CONFIG.inventory.grenades;this.host.state.bundles=CONFIG.inventory.bundles;
+    if(this.host.Weapon()!==cfg.startWeapon)this.host.Pickup(cfg.startWeapon);
+    this.host.state.clips=cfg.inventory.spareClips;
+    if(this.host.state.mags.primary)this.host.state.mags.primary.clips=cfg.inventory.spareClips;
+    this.host.state.grenades=cfg.inventory.grenades;this.host.state.bundles=cfg.inventory.bundles;
     this.RestoreCheckpointInventory();
     this.host.ctx.ApplyDebugOptions({reload:true});
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
-    this.stealth.Reset();
+    this.stealth?.Reset();
+    this.noFireShots=this.host.state.playerShots;
+    this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
+    this.noFireFailure=null;
     this.initialized=true;this.ready=true;this.preparingPuppets=true;this.Update(0);
     this.puppets.Settle(40,.05,this.host.player.position);this.preparingPuppets=false;this.SetPlayerPuppetVisible(false);
     this.Send("ready");
@@ -136,10 +142,14 @@ export class EncounterPlay {
     else this.view.SetLayout(1);
     this.starting=true;this.active=true;this.token=payload.token;
     const token=this.token;
-    this.plan=new EncounterPlayPlan(payload.document,payload.time);
-    this.templeEnteredAt=this.plan.beat.id==="09b"?0:null;
+    if(payload.variantId&&payload.variantId!==this.variant.id) {
+      this.variant=CompileEncounterVariant(payload.variantId);
+      this.stealth=this.variant.stealthPlan?new VillageStealthPlay(this.host,new VillageStealthRules(this.variant.timeline)):null;
+    }
+    this.plan=new EncounterPlayPlan(payload.document,payload.time,this.variant);
+    this.templeEnteredAt=this.stealth&&this.plan.beat.id==="09b"?0:null;
     this.checkpointInventory=payload.checkpointInventory||null;this.checkpointTime=null;this.alarmAnnounced=false;
-    this.failed=false;this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
+    this.failed=false;this.noFireFailure=null;this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
     this.host.ctx.RespawnPlayer(true);
     this.host.state.deathTimer=0;this.host.state.playerShots=0;this.host.state.lastShot=null;
     this.host.hud.HideDeathCard?.();this.host.viewmodel.ResetDeath?.();
@@ -173,13 +183,13 @@ export class EncounterPlay {
       this.puppets.Clear();this.host.vfx.ClearParticles();this.host.battlefield.deformation?.Reset();
     });
     this.view.SetLayout(1);this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
-    this.speech.Clear();this.stealth.Reset();
+    this.speech.Clear();this.stealth?.Reset();this.noFireFailure=null;
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
   SyncEnvironment(frame,snap=false) {
     const {env,envBridge}=this.host.ctx;
     if(!env?.active)return;
-    const config=CONFIG.environment;
+    const config=this.plan.config.environment;
     const night=Math.round((frame.nightBlend||0)*config.steps)/config.steps;
     const hour=frame.beat.id<config.duskBeat?config.dayHour:config.duskHour+(config.nightHour-config.duskHour)*night;
     if(snap||this.environmentHour!==hour) {env.SetHour(hour);this.environmentHour=hour;}
@@ -302,7 +312,7 @@ export class EncounterPlay {
   Spawn(actor,initial=false) {
     if(this.entries.has(actor.id)||this.plan.dead.has(actor.id))return false;
     if(!initial&&actor.side==="enemy"&&this.VisibleSpawn(actor))return false;
-    const spec=EncounterActorSpec(actor),group=actor.group||this.plan.compiled.groups.find(g=>g.id===actor.groupId);
+    const spec=EncounterActorSpec(actor,null,this.variant),group=actor.group||this.plan.compiled.groups.find(g=>g.id===actor.groupId);
     let hash=2166136261;for(const c of actor.id)hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
     const variants=CHARACTER_RANDOM_VARIANTS_BY_KIND[spec.side];
     const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,
@@ -335,40 +345,41 @@ export class EncounterPlay {
   AliveIds(){return new Set([...this.entries].filter(([,entry])=>entry.soldier.alive).map(([id])=>id));}
   Order(entry,frame) {
     const {soldier,group,route}=entry;
-    const reachM=entry.actor.id==="liu"&&["09a","09b"].includes(frame.beat.id)?0.18:CONFIG.routeReachM;
+    const cfg=this.plan.config;
+    const reachM=this.stealth&&entry.actor.id==="liu"&&["09a","09b"].includes(frame.beat.id)?0.18:cfg.routeReachM;
     if(!soldier.alive)return;
     const current=frame.actors.find(a=>a.id===entry.actor.id);
-    if(group?.id==="TempleSearch"&&this.templeEnteredAt===null&&!this.stealth.state?.alarm) {
+    if(group?.id==="TempleSearch"&&this.templeEnteredAt===null&&!this.stealth?.state?.alarm) {
       this.host.ai.DirectActor(soldier,{x:soldier.position.x,z:soldier.position.z,stance:1,combat:false,moving:false});
       return;
     }
     let target=group&&!route?[entry.spec.x,entry.spec.z]:current?.p||[soldier.position.x,soldier.position.z],moving=false;
     if(route) {
-      const arrived=Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<CONFIG.routeReachM;
+      const arrived=Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<cfg.routeReachM;
       if(arrived&&entry.waitedIndex!==entry.routeIndex){
         entry.waitedIndex=entry.routeIndex;
         entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||0));
       }
-      if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth.state?.alarm)&&entry.routeIndex<route.length-1)entry.routeIndex++;
+      if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm)&&entry.routeIndex<route.length-1)entry.routeIndex++;
       target=route[entry.routeIndex];
-      if(this.plan.elapsed<entry.waitUntil&&!this.stealth.state?.alarm)target=[soldier.position.x,soldier.position.z];
+      if(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm)target=[soldier.position.x,soldier.position.z];
     }
     moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
     entry.engaged ||= !!current?.firing||current?.pose==="shoot"||current?.pose==="melee";
     let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:entry.engaged;
-    if(this.stealth.state?.alarm && entry.spec.side==="ija")combat=true;
+    if(this.stealth?.state?.alarm && entry.spec.side==="ija")combat=true;
     if(group?.suppressedBy?.some(id=>[...this.entries.values()].some(e=>e.actor.groupId===id&&e.soldier.alive&&e.soldier.targetVisible))) {
       if(group.suppressionStop)target=group.suppressionStop;
-      moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>CONFIG.routeReachM;
+      moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>cfg.routeReachM;
     }
     let yaw=current?.heading===undefined?entry.spec.yawDeg*Math.PI/180:-current.heading;
     if(group?.afterRouteLookAt&&route&&entry.routeIndex===route.length-1&&!moving&&!combat) {
       yaw=Math.atan2(soldier.position.x-group.afterRouteLookAt[0],soldier.position.z-group.afterRouteLookAt[1]);
     }
-    const guide=entry.actor.id==="liu"&&frame.beat.id==="09a";
+    const guide=!!this.stealth&&entry.actor.id==="liu"&&frame.beat.id==="09a";
     const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):group?.speed||2.6;
     if(guide&&moving)yaw=Math.atan2(soldier.position.x-target[0],soldier.position.z-target[1]);
-    if(this.stealth.state?.suspicion>0 && entry.actor.id===this.stealth.observerId) {
+    if(this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId) {
       target=[soldier.position.x,soldier.position.z];moving=false;
       yaw=Math.atan2(-(this.host.player.position.x-soldier.position.x),-(this.host.player.position.z-soldier.position.z));
     }
@@ -379,12 +390,21 @@ export class EncounterPlay {
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
     if(this.failed){this.RenderHud();return;}
-    const {player,state}=this.host;
+    const {player,state}=this.host,cfg=this.plan.config;
     for(const [id,entry] of this.entries)if(!entry.soldier.alive)this.plan.Kill(id);
     if(!player.Alive){this.Fail();return;}
     const alive=this.AliveIds();
     const before=this.plan.Frame();
-    const stealth=this.stealth.Update(before,dt,this.entries);
+    let stealth={active:!!before.stealth?.active,alarm:false,failed:false};
+    if(this.stealth) {
+      stealth=this.stealth.Update(before,dt,this.entries);
+    } else {
+      const totalGrenades=state.grenades+state.bundles;
+      const brokeNoFire=before.stealth?.noFire&&(state.playerShots>this.noFireShots||totalGrenades<this.noFireGrenades);
+      this.noFireShots=state.playerShots;
+      this.noFireGrenades=totalGrenades;
+      if(brokeNoFire){this.noFireFailure="响枪惊动了院内日军";this.Fail();return;}
+    }
     this.SaveCheckpoint();
     if(stealth.failed) {
       this.Fail();return;
@@ -397,15 +417,15 @@ export class EncounterPlay {
     const departed=[];
     for(const group of this.plan.compiled.groups){
       const entries=[...this.entries.values()].filter(e=>e.actor.groupId===group.id);
-      if(this.plan.groups.get(group.id).count>=group.count&&entries.every(e=>!e.soldier.alive||e.route&&e.routeIndex===e.route.length-1&&Math.hypot(e.soldier.position.x-e.route.at(-1)[0],e.soldier.position.z-e.route.at(-1)[1])<CONFIG.routeReachM))departed.push(group.id);
+      if(this.plan.groups.get(group.id).count>=group.count&&entries.every(e=>!e.soldier.alive||e.route&&e.routeIndex===e.route.length-1&&Math.hypot(e.soldier.position.x-e.route.at(-1)[0],e.soldier.position.z-e.route.at(-1)[1])<cfg.routeReachM))departed.push(group.id);
     }
-    const escorted=[...this.puppets.puppets.values()].filter(p=>/^stretcher\d+$/.test(p.id)&&p.z>=CONFIG.escortExitZ).length;
+    const escorted=[...this.puppets.puppets.values()].filter(p=>/^stretcher\d+$/.test(p.id)&&p.z>=cfg.escortExitZ).length;
     const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
     if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
     const frame=this.plan.Frame();
     this.SyncEnvironment(frame);
     this.SaveCheckpoint();
-    if(previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
+    if(this.stealth&&previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
       this.templeEnteredAt=this.plan.elapsed;
       for(const entry of this.entries.values())if(entry.actor.groupId==="TempleSearch") {
         const index=Number(entry.actor.id.split("_").at(-1));
@@ -413,20 +433,20 @@ export class EncounterPlay {
         entry.waitedIndex=-1;
       }
     }
-    const companionTime=this.stealth.CompanionFrameTime(frame,this.entries,this.plan.elapsed);
+    const companionTime=this.stealth?this.stealth.CompanionFrameTime(frame,this.entries,this.plan.elapsed):null;
     if(companionTime!==null) {
       const companions=["player","liu","nier"].map(id=>{
         const actor=frame.actors.find(a=>a.id===id);
         return {id,p:[...actor.p],pose:actor.pose};
       });
       companions[0].p=SampleBeatRoute(frame.beat,(companionTime-frame.beat.start)/frame.beat.duration);
-      StageVillageCompanions(companions,companionTime,FLOW_TIMELINE);
+      StageVillageCompanions(companions,companionTime,this.variant.timeline);
       for(const source of companions.slice(1)) {
         const actor=frame.actors.find(a=>a.id===source.id);
         Object.assign(actor,{p:source.p,pose:source.pose,heading:source.heading,status:source.status});
       }
     }
-    const signals=EncounterSceneSignals(frame,this.plan.facts);signals.add("Stage0105Done");
+    const signals=EncounterSceneSignals(frame,this.plan.facts,this.variant);signals.add("Stage0105Done");
     this.sceneSignals=[...signals];
     const signalKey=[...signals].join(",");
     if(this.signalKey!==signalKey){
@@ -437,14 +457,14 @@ export class EncounterPlay {
     for(const actor of frame.actors)if(this.IsSoldier(actor)&&!this.plan.groups.has(actor.groupId))this.Spawn(actor);
     for(const actor of this.plan.Spawns(alive))this.Spawn(actor);
     this.orderClock-=dt;
-    if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=CONFIG.orderEveryS;}
+    if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=cfg.orderEveryS;}
     const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)&&!this.plan.groups.has(a.groupId)).map(a=>{
-      const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId));
+      const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId),this.variant);
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
       if(a.kind==="litter")spec.kind="litter";
       return spec;
     });
-    units.push({...EncounterActorSpec({id:"player",name:"",side:"player",kind:"person",p:[player.position.x,player.position.z],pose:"stand"}),
+    units.push({...EncounterActorSpec({id:"player",name:"",side:"player",kind:"person",p:[player.position.x,player.position.z],pose:"stand"},null,this.variant),
       yawDeg:player.yaw*180/Math.PI,stance:player.stance,state:"alive",visible:this.view.count===2||this.preparingPuppets===true,
       weapon:state.activeSlot==="melee"?"Dadao":this.host.Weapon()});
     this.puppets.SyncFrame(units,dt,this.view.count===2?null:player.position);
@@ -455,7 +475,7 @@ export class EncounterPlay {
       const point=new THREE.Vector3(actor.p[0],this.host.battlefield.GroundHeight(...actor.p)+.7,actor.p[1]);
       this.smoke.set(actor.id,this.host.vfx.SmokeSource(point,{kind:"black",rate:7,life:5}));
     }
-    const cue=this.failed||this.plan.completed?null:CONFIG.music[this.plan.beat.stage];
+    const cue=this.failed||this.plan.completed?null:cfg.music[this.plan.beat.stage];
     if(cue!==this.music){this.music=cue;this.host.audio.Music(cue,{fadeOut:1.6,levelScale:0.7});}
     this.RenderHud(frame);
     if(this.plan.elapsed-this.lastStateSent>0.2||this.lastBeat!==this.plan.beat.id){
@@ -475,12 +495,12 @@ export class EncounterPlay {
     return puppet?new THREE.Vector3(puppet.x,this.host.battlefield.GroundHeight(puppet.x,puppet.z),puppet.z):null;
   }
   PartyAtEndpoint() {
-    if(this.plan.beat.id!=="09b")return false;
-    const end=this.plan.beat.p.at(-1);
+    if(!this.stealth||this.plan.beat.id!=="09b")return false;
+    const end=this.plan.beat.p.at(-1),reachM=this.plan.config.reachM;
     return ["liu","nier"].every(id=>{
       if(this.plan.dead.has(id))return true;
       const position=this.Position(id);
-      return position&&Math.hypot(position.x-end[0],position.z-end[1])<CONFIG.reachM;
+      return position&&Math.hypot(position.x-end[0],position.z-end[1])<reachM;
     });
   }
   Interact() {
@@ -506,7 +526,7 @@ export class EncounterPlay {
   }
   OnKey(detail) {
     if(detail.code==="KeyR" && detail.down && !detail.repeat && this.failed)return this.Retry();
-    if(this.stealth.CapturesInput() && detail.down && !["Escape","KeyO"].includes(detail.code))return true;
+    if(this.stealth?.CapturesInput() && detail.down && !["Escape","KeyO"].includes(detail.code))return true;
     if(detail.code==="KeyO"&&this.view.count===2) {
       if(detail.down&&!detail.repeat) {
         if(this.view.focused){this.view.canvas.blur();this.host.Focus({fromClick:true});}
@@ -517,16 +537,19 @@ export class EncounterPlay {
     if(detail.code==="KeyF"&&detail.down!==false&&this.plan.gate.action)return this.Interact();
   }
   RenderHud(frame=this.plan.Frame()) {
-    const currentTask=frame.beat.id==="09b"&&this.stealth.exitStartedElapsed!==null?UI.templeExit:this.plan.beat.task;
-    const task=this.stealth.state?.active?`${currentTask} · ${UI.stealthNoFire}`:currentTask;
+    const ui=this.plan.config.ui,reachM=this.plan.config.reachM;
+    const stealthState=this.stealth?.state||null;
+    const currentTask=this.stealth&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed!==null?ui.templeExit:this.plan.beat.task;
+    const task=(stealthState?.active||frame.stealth?.noFire)?`${currentTask} · ${ui.stealthNoFire}`:currentTask;
     const title=this.plan.beat.id.toUpperCase()+" · "+this.plan.beat.title;
-    const status=this.failed && this.stealth.state?.active ? (this.stealth.state.failure||UI.dead)
-      : this.failed?UI.dead:this.stealth.state?.alarm?UI.stealthAlarm:this.stealth.state?.suspicion>0?UI.stealthSuspicion:this.plan.completed?UI.complete:task;
+    const status=this.failed&&this.noFireFailure?this.noFireFailure
+      :this.failed&&stealthState?.active?(stealthState.failure||ui.dead)
+      :this.failed?ui.dead:stealthState?.alarm?ui.stealthAlarm:stealthState?.suspicion>0?ui.stealthSuspicion:this.plan.completed?ui.complete:task;
     const p=this.host.player.position,end=this.plan.gate.retreat&&this.plan.interacted.has(this.plan.beat.id)?this.plan.beat.p.at(-1):this.plan.Area().center,distance=Math.hypot(p.x-end[0],p.z-end[1]);
-    const hint=this.failed&&this.stealth.state?.active?UI.stealthRetry:this.stealth.state?.locked?UI.stealthPull:frame.beat.id==="09b"&&distance<=CONFIG.reachM&&!this.PartyAtEndpoint()?UI.waitParty:this.stealth.state?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?UI.stealthWait:this.failed?UI.retry:this.plan.completed?UI.stop:
-      this.plan.CanInteract([p.x,p.z])?UI.interact:
-      this.plan.waiting==="combat"?UI.clear:this.plan.waiting==="event"?UI.event:this.plan.waiting==="escort"?UI.escort:this.plan.waiting==="departure"?UI.departure:distance>CONFIG.reachM?UI.reach+" "+distance.toFixed(0)+" m":"";
-    const dialogue=EncounterDialogueLines(this.plan,frame,{failed:this.failed,exit:this.stealth.exitStartedElapsed!==null,
+    const hint=this.failed&&(stealthState?.active||this.noFireFailure)?ui.stealthRetry:stealthState?.locked?ui.stealthPull:this.stealth&&frame.beat.id==="09b"&&distance<=reachM&&!this.PartyAtEndpoint()?ui.waitParty:stealthState?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?ui.stealthWait:this.failed?ui.retry:this.plan.completed?ui.stop:
+      this.plan.CanInteract([p.x,p.z])?ui.interact:
+      this.plan.waiting==="combat"?ui.clear:this.plan.waiting==="event"?ui.event:this.plan.waiting==="escort"?ui.escort:this.plan.waiting==="departure"?ui.departure:distance>reachM?ui.reach+" "+distance.toFixed(0)+" m":"";
+    const dialogue=EncounterDialogueLines(this.plan,frame,{failed:this.failed,exit:!!(this.stealth&&this.stealth.exitStartedElapsed!==null),
       interact:this.plan.CanInteract([p.x,p.z])});
     this.speech.Set(frame,dialogue);
     const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
@@ -546,10 +569,10 @@ export class EncounterPlay {
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
-  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth.state,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
+  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
   CapturesInput() {
-    return !this.active || this.paused || this.starting || !this.ready || this.failed || this.stealth.CapturesInput()
-      || VillageStealthAt(this.plan.time,FLOW_TIMELINE).locked
+    return !this.active || this.paused || this.starting || !this.ready || this.failed || !!this.stealth?.CapturesInput()
+      || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
       || this.view.count===2&&this.view.focused;
   }
   Fail() {
@@ -559,11 +582,11 @@ export class EncounterPlay {
     return true;
   }
   SaveCheckpoint() {
-    const stealth=VillageStealthAt(this.plan.time,FLOW_TIMELINE);
+    const stealth=this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline):{active:false};
     const desiredTime=stealth.active?stealth.checkpoint:this.plan.beat.start;
     if(this.checkpointTime===desiredTime)return;
     // The approach checkpoint can reference a skipped cinematic (08F).
-    const time=FLOW_TIMELINE.find(beat=>beat.start>=desiredTime&&EncounterCanPlay(beat.start)).start;
+    const time=this.variant.timeline.find(beat=>beat.start>=desiredTime&&EncounterCanPlay(beat.start,this.variant)).start;
     if(this.checkpointTime===time)return;
     const preserveInventory=this.checkpointTime===null&&stealth.active&&this.checkpointInventory;
     this.checkpointTime=time;
@@ -596,7 +619,7 @@ export class EncounterPlay {
   }
   Retry() {
     if(!this.active || !this.ready || this.starting || this.disposed || !this.failed)return false;
-    const plan=new EncounterPlayPlan(this.plan.document,this.checkpointTime??this.plan.beat.start);
+    const plan=new EncounterPlayPlan(this.plan.document,this.checkpointTime??this.plan.beat.start,this.variant);
     const {player,state,combat,battlefield,vfx,ctx}=this.host;
     this.host.audio.ResetSession();
     ctx.gore?.ReleaseAll();ctx.meleeCombat?.Reset();
@@ -613,7 +636,7 @@ export class EncounterPlay {
     for(const source of this.smoke.values())vfx.RemoveSmokeSource(source);
     this.smoke.clear();
     Object.assign(this,{
-      plan,failed:false,paused:false,alarmAnnounced:false,templeEnteredAt:plan.beat.id==="09b"?0:null,
+      plan,failed:false,noFireFailure:null,paused:false,alarmAnnounced:false,templeEnteredAt:this.stealth&&plan.beat.id==="09b"?0:null,
       orderClock:0,lastBeat:null,lastStateSent:-1,hudKey:null,signalKey:null,music:null
     });
     ctx.RespawnPlayer(true);
@@ -629,7 +652,9 @@ export class EncounterPlay {
     ctx.viewmodel.Equip(this.host.Weapon(),state.weaponVariants[state.activeSlot]||0,{instant:true});
     ctx.SyncBayonet();
     ctx.viewmodel.root.visible=true;
-    this.stealth.Reset();
+    this.stealth?.Reset();
+    this.noFireShots=state.playerShots;
+    this.noFireGrenades=state.grenades+state.bundles;
     for(const actor of plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
     this.Update(0);

@@ -24,9 +24,9 @@ let count = 0;
 function Check(ok, label) { assert.ok(ok, label); count++; }
 
 // 1) 清单
-Check(new Set(SCENE_IDS).size === SCENE_LIST.length && ["FirstLevelWhitebox", "FirstLevel", "FirstLevelEncounter"].every(id => SCENE_IDS.includes(id)),
-  "场景清单编号唯一，保留第一关白盒、正式与独立 Encounter 场景");
-Check(SceneStyle("FirstLevelEncounter")==="whitebox","独立 Encounter 场景保持白盒材质");
+Check(new Set(SCENE_IDS).size === SCENE_LIST.length && ["FirstLevelWhitebox", "FirstLevel", "FirstLevelEncounter", "FirstLevelMerged"].every(id => SCENE_IDS.includes(id)),
+  "场景清单编号唯一，保留第一关白盒、正式、独立 Encounter 与单村合并变体场景");
+Check(SceneStyle("FirstLevelEncounter")==="whitebox" && SceneStyle("FirstLevelMerged")==="whitebox","独立 Encounter 场景及变体保持白盒材质");
 Check(SceneStyle("FirstLevelWhitebox") === "whitebox" && SceneStyle("FirstLevel") === "formal", "两个场景的样子：whitebox / formal");
 const path = SceneFilePath("FirstLevel");
 const text = fs.readFileSync(path, "utf8");

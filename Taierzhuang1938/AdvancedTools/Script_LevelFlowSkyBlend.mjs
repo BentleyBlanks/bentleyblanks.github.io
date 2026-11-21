@@ -17,10 +17,19 @@ function MixDirection(a, b, t) {
   return mixed.map(value => value / length);
 }
 
+let activeDuskRange = [FLOW_DUSK.fromZ, FLOW_DUSK.toZ];
+
+export function SetEncounterDuskRange(range) {
+  activeDuskRange = Array.isArray(range) && range.length === 2 && range.every(Number.isFinite) && range[1] > range[0]
+    ? [range[0], range[1]]
+    : [FLOW_DUSK.fromZ, FLOW_DUSK.toZ];
+}
+
 /** 0 = day, 1 = dusk; stepped so cached colors and static layers do not churn while the camera drifts. */
-export function EncounterDuskBlend(focusZ) {
+export function EncounterDuskBlend(focusZ, range = activeDuskRange) {
   if (!Number.isFinite(focusZ)) return 0;
-  const t = Math.max(0, Math.min(1, (focusZ - FLOW_DUSK.fromZ) / (FLOW_DUSK.toZ - FLOW_DUSK.fromZ)));
+  const [fromZ, toZ] = range;
+  const t = Math.max(0, Math.min(1, (focusZ - fromZ) / (toZ - fromZ)));
   return Math.round(t * t * (3 - 2 * t) * FLOW_DUSK.steps) / FLOW_DUSK.steps;
 }
 

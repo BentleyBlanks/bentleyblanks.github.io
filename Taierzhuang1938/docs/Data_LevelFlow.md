@@ -1,5 +1,7 @@
 # 第一关 Encounter Designer
 
+2026-11-22 支持多关卡与分段变体（Track-Fork 架构）：`Data_EncounterVariants.mjs` 登记关卡（第一关可玩、第二关预留槽位）与变体规格，`Script_EncounterVariants.mjs` 按段落包（`segments`）或同场景覆写（`overrides`）组装完整时间线、遭遇文档、对白、场景信号与 `EncounterPlay` 门禁。工具栏左上角新增变体切换器（`#variantPicker`），展示关卡页签、共用/分叉轨道对齐条、绑定场景及「场景编辑器 ↗」双向直跳链接；底部时间轴同步标识 `01–07` 共用段与分叉段。初始提供「现行双村版（`L1_Original`，`FirstLevelEncounter`，54:09）」与「北沙河单村合并版（`L1_BeishaheMerged`，`FirstLevelMerged`，35:40）」两套共存方案：`01–07` 前沿与凹路（`z < 355`）的场景几何与编排零重复共用，`08–13` 合并进北沙河单村（救护所抢车位、西巷潜行与妮儿咬手、空袭三趟抢人、洞内画黑子与赠袄、黄昏赶桥与炸毁铁路桥），两套草稿使用独立 `storageKey` 互不覆盖，且均可直接启动 ▶ Play 实机试玩。验收门禁为 `Script_EncounterVariantsTest.mjs`。
+
 2026-11-18 核对北沙河布设。姜克实引任世淦的战后调查，记多处民宅使用避难壕洞，有一例是水坑边的浅土洞。山东抗战纪念设施名录记一户人家躲在地窖、部分村民躲进德国教堂、村中有水坑和墙上标语。两种材料都缺少逐户洞位和规格。撤回复制到普通院落的 38 处同型洞与标注，回填挖改的高度图。保留救护所两洞、田嫂家、席子洞人家和被炸院落共五处，各自承担剧本场面。三口井作为共享取水点保留，井的数量和位置为推定。《滕县志》记 1949 年前全县取水多用河、坑、沟、溪，少数用井泉。[姜克实原刊论文，第 226–228 页](https://2ec5e10d-f73c-49d9-b553-ecb06bcb56a2.filesusr.com/ugd/895474_a99f54f26858440088e20b6b1f0944f6.pdf)、[山东抗战纪念设施和遗址名录](https://shandong-chorography.org/database/f063/section/25/article/33/)、[《滕县志·乡村建设》](https://shandong-chorography.org/database/c46/section/3/article/221/)
 
 可核的村级关系是村在北岸、旧官道斜穿村、津浦铁路约在村西一公里。白盒中村中心约 X138.5、铁路 X−80，东西相距约 219 米，适配步行节奏。村内三条东西街、院落、门窗、井和教堂院址属于场景布置，目前缺少能对照这些细节的 1938 年村图。用于解释区域关系的 1954 年美军 1:25 万图也不足以定位单个院落。[1954 年滕县地形图](https://maps.lib.utexas.edu/maps/ams/china/txu-oclc-10552568-ni50-3.jpg)

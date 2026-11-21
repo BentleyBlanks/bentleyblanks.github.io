@@ -13,7 +13,8 @@ export const ENCOUNTER_BEHAVIORS = {
 export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","02d","02e","02f","08f","09d","10g","11c","18g"];
 const Area = (center, width = 5, depth = width) => ({ shape: "rect", center: [...center], size: [width, depth] });
 
-export function CreateEncounterDocument(timeline, waves) {
+export function CreateEncounterDocument(timeline, waves, options = {}) {
+  const { id: docId = "FirstLevelEncounter", revision = "2026-11-17-beishahe-story-1" } = options;
   const Find = (id) => timeline.find((beat) => beat.id === id);
   const triggers = timeline.filter((beat) => beat.zone).map((beat) => ({
     id: `Arrival_${beat.id}`, label: beat.title, beat: beat.id, endBeat: beat.id,
@@ -75,15 +76,18 @@ export function CreateEncounterDocument(timeline, waves) {
   }
   Add("CrestWest","坡顶西侧接应","03g","04a",[27.5,128],[[27.5,128],[28.5,129]],2,"friend","guard","enemy",160);
   Add("CrestEast","坡顶东侧接应","03g","04a",[43,129],[[43,129],[43,129]],2,"friend","guard","enemy",160);
-  Add("VillageGun","北屋枪眼机枪组","08a","09i",[100,471.5],[[100,471.5]],3,"enemy","suppress","ramp",700);
-  Add("VillageRifles","北屋与墙角守军","08a","09i",[104,471],[[104,471]],4,"enemy","guard","ramp",700);
-  for(const group of groups.filter(entry=>["VillageGun","VillageRifles"].includes(entry.id))) group.engageOn="09e";
-  Add("SearchYard","街坊家搜人组","09a","09d",[74,459],[[74,459]],4,"enemy","guard","none",300);
-  Add("SearchNeighbor","隔壁搜人组","09a","09d",[61,448],[[61,448]],2,"enemy","guard","none",300);
-  Add("GateGuard","门房守卫","09e","09f",[73,465.5],[[73,465.5]],1,"enemy","guard","none",40);
-  Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
-  Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
-  Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
+  const hasGengjiazhuang = !!(Find("09i") && Find("10b"));
+  if (hasGengjiazhuang) {
+    Add("VillageGun","北屋枪眼机枪组","08a","09i",[100,471.5],[[100,471.5]],3,"enemy","suppress","ramp",700);
+    Add("VillageRifles","北屋与墙角守军","08a","09i",[104,471],[[104,471]],4,"enemy","guard","ramp",700);
+    for(const group of groups.filter(entry=>["VillageGun","VillageRifles"].includes(entry.id))) group.engageOn="09e";
+    Add("SearchYard","街坊家搜人组","09a","09d",[74,459],[[74,459]],4,"enemy","guard","none",300);
+    Add("SearchNeighbor","隔壁搜人组","09a","09d",[61,448],[[61,448]],2,"enemy","guard","none",300);
+    Add("GateGuard","门房守卫","09e","09f",[73,465.5],[[73,465.5]],1,"enemy","guard","none",40);
+    Add("KitchenGuard","灶屋守卫","09a","09i",[94,479.3],[[94,479.3]],1,"enemy","guard","none",400);
+    Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
+    Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
+  }
   for(const formation of FLOW_GROUND_FORMATIONS) {
     const group=groups.find(item=>item.id===formation.id);
     group.area.size=[...formation.areaSize];
@@ -127,21 +131,26 @@ export function CreateEncounterDocument(timeline, waves) {
       note:"集结处待命；03G 班长压北面时闻枪声接应，分三路前出，到位后阻击"});
     Object.assign(triggers.find(entry=>entry.id===group.triggerId),{beat:"03f"});
   }
-  for(const staging of FLOW_STREET_DEFENSE.groups) {
-    const group=groups.find(entry=>entry.id===staging.id);
-    Object.assign(group,structuredClone(staging));
-    Object.assign(triggers.find(entry=>entry.id===group.triggerId),{
-      beat:group.beat,endBeat:group.endBeat,mode:"time",delay:0,
-    });
+  if (hasGengjiazhuang) {
+    for(const staging of FLOW_STREET_DEFENSE.groups) {
+      const group=groups.find(entry=>entry.id===staging.id);
+      if (!group) continue;
+      Object.assign(group,structuredClone(staging));
+      Object.assign(triggers.find(entry=>entry.id===group.triggerId),{
+        beat:group.beat,endBeat:group.endBeat,mode:"time",delay:0,
+      });
+    }
+    const patrol = structuredClone(FLOW_VILLAGE_STEALTH.patrol);
+    patrol.triggerId = "Trigger_TempleSearch";
+    groups.push(patrol);
+    triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
+      mode:"time",delay:0,area:structuredClone(patrol.area)});
+    for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
   }
-  const patrol = structuredClone(FLOW_VILLAGE_STEALTH.patrol);
-  patrol.triggerId = "Trigger_TempleSearch";
-  groups.push(patrol);
-  triggers.push({id:patrol.triggerId,label:patrol.label,beat:patrol.beat,endBeat:patrol.endBeat,
-    mode:"time",delay:0,area:structuredClone(patrol.area)});
-  for (const group of groups.filter(group=>["VillageGun","VillageRifles"].includes(group.id))) group.engageOn="09j";
-  for(const group of groups) if(["BeishaheGunWest","BeishaheGunEast","RailBridgeGun"].includes(group.id)) group.weapon="machineGun";
-  return {schema:ENCOUNTER_SCHEMA,id:"FirstLevelEncounter",revision:"2026-11-17-beishahe-story-1",triggers,groups,annotations:[]};
+  for(const group of groups) {
+    if(["BeishaheGunWest","BeishaheGunEast","RailBridgeGun","MergedHouseGun","MergedBridgeGun"].includes(group.id)) group.weapon="machineGun";
+  }
+  return {schema:ENCOUNTER_SCHEMA,id:docId,revision,triggers,groups,annotations:[]};
 }
 
 function Require(condition, message) { if (!condition) throw new Error(message); }
@@ -729,6 +738,12 @@ function UpgradeExistingEncounterDocument(input,defaults) {
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
+  if(defaults.id!=="FirstLevelEncounter") {
+    const cloned=structuredClone(input);
+    cloned.id=defaults.id;
+    cloned.revision=defaults.revision;
+    return cloned;
+  }
   const value=UpgradePriorBeishaheDocument(input,defaults);
   if(input.revision===defaults.revision) return value;
   if(value===input) return input;

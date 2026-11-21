@@ -1,8 +1,11 @@
 import { FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
-import { FLOW_SOURCE } from "./Data_LevelFlow.mjs";
-import { FLOW_SOURCE_EXCERPTS } from "./Data_LevelFlowSource.mjs";
-import { BeatById, Clamp, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_DURATION, FLOW_TIMELINE, FormatFlowTime, STAGE_TIMELINE } from "./Script_LevelFlowModel.mjs";
-import { GroupPath, ENCOUNTER_CINEMATICS } from "./Script_LevelFlowEncounter.mjs";
+import { Clamp } from "./Script_LevelFlowModel.mjs";
+import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
+import {
+  ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_LEVELS, ENCOUNTER_VARIANTS,
+  CompileEncounterVariant, FormatFlowTime,
+} from "../Script_EncounterVariants.mjs";
+import { SetEncounterDuskRange } from "./Script_LevelFlowSkyBlend.mjs";
 import { EncounterDocument, CreateFramePacket } from "./Script_LevelFlowDocument.mjs";
 import { LoadEncounterMap } from "./Script_LevelFlowMap.mjs";
 import { EncounterViewports } from "./Script_LevelFlowViewports.mjs";
@@ -16,480 +19,727 @@ import { LevelFlowDebug } from "./Script_LevelFlowDebug.mjs";
 import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas,workspace,navigation,annotationEditor,chat,gamePlay,timeline,previewDebug;
+let canvas, workspace, navigation, annotationEditor, chat, gamePlay, timeline, previewDebug;
 let storage;
-try { storage=window.localStorage; } catch { storage=null; }
-const project=new EncounterDocument(DEFAULT_ENCOUNTER_DOCUMENT,FLOW_TIMELINE,storage);
+try { storage = window.localStorage; } catch { storage = null; }
 
-let map, time=0, playing=false, mode="select", selection=null;
-let navigationTool="select";
-let selectedUnitIds=[], multipleUnits=false;
-let frame=EvaluateFlow(0,project.value), shownStage="", shownBeat="", lastTimestamp=0, pointer=null, draft=null;
-let toastTimer=0, renderPending=false;
-let inspectorCollapsed=false, inspectorTab="chat";
-let timelineCollapsed=false;
-const INSPECTOR_COLLAPSED_KEY="tengxian1938_encounter_sidebar_collapsed_v1";
-const TIMELINE_COLLAPSED_KEY="tengxian1938_encounter_timeline_collapsed_v1";
-const params=new URLSearchParams(location.search);
+const params = new URLSearchParams(location.search);
+let activeVariant = CompileEncounterVariant(params.get("variant") || ENCOUNTER_DEFAULT_VARIANT_ID);
+SetEncounterDuskRange(activeVariant.spec.duskBlendZ);
 
-function Toast(message,persistent=false) {
-  clearTimeout(toastTimer);Element("flowError").textContent=message;Element("flowError").hidden=false;
-  if(!persistent) toastTimer=setTimeout(()=>{Element("flowError").hidden=true;},5000);
+function MakeProject(variant) {
+  return new EncounterDocument(variant.defaultDocument, variant.timeline, storage, {
+    storageKey: variant.spec.storageKey,
+    legacyStorageKey: variant.spec.legacyStorageKey,
+  });
+}
+
+let project = MakeProject(activeVariant);
+const loadedMaps = new Map();
+let mapData = null, variantSwitchSeq = 0;
+
+let map, time = 0, playing = false, mode = "select", selection = null;
+let navigationTool = "select";
+let selectedUnitIds = [], multipleUnits = false;
+let frame = activeVariant.evaluate(0, project.value), shownStage = "", shownBeat = "", lastTimestamp = 0, pointer = null, draft = null;
+let toastTimer = 0, renderPending = false;
+let inspectorCollapsed = false, inspectorTab = "chat";
+let timelineCollapsed = false;
+const INSPECTOR_COLLAPSED_KEY = "tengxian1938_encounter_sidebar_collapsed_v1";
+const TIMELINE_COLLAPSED_KEY = "tengxian1938_encounter_timeline_collapsed_v1";
+
+function Toast(message, persistent = false) {
+  clearTimeout(toastTimer); Element("flowError").textContent = message; Element("flowError").hidden = false;
+  if (!persistent) toastTimer = setTimeout(() => { Element("flowError").hidden = true; }, 5000);
 }
 function SetPlaying(value) {
-  playing=value;lastTimestamp=performance.now();
-  Element("playFlow").textContent=value?"暂停":"播放";
-  Element("playFlow").setAttribute("aria-pressed",String(value));
+  playing = value; lastTimestamp = performance.now();
+  Element("playFlow").textContent = value ? "暂停" : "播放";
+  Element("playFlow").setAttribute("aria-pressed", String(value));
   RequestRender();
 }
 function SetMode(value) {
-  mode=value;
-  for(const entry of workspace.Visible()) entry.canvas.dataset.mode=value;
-  for(const button of document.querySelectorAll("[data-mode]")) button.classList.toggle("selected",button.dataset.mode===value);
-  if(value!=="select") SetPlaying(false);
+  mode = value;
+  for (const entry of workspace.Visible()) entry.canvas.dataset.mode = value;
+  for (const button of document.querySelectorAll("[data-mode]")) button.classList.toggle("selected", button.dataset.mode === value);
+  if (value !== "select") SetPlaying(false);
 }
 function SetNavigationTool(value) {
   navigation.Clear();
   CancelPointer();
-  navigationTool=value;
+  navigationTool = value;
   SetMode("select");
-  for(const entry of workspace.entries) {
-    entry.canvas.dataset.navigationTool=value;
+  for (const entry of workspace.entries) {
+    entry.canvas.dataset.navigationTool = value;
     delete entry.canvas.dataset.unitHover;
-    entry.map.hoveredActorId=null;
+    entry.map.hoveredActorId = null;
   }
-  for(const button of document.querySelectorAll("button[data-navigation-tool]")) {
-    button.setAttribute("aria-pressed",String(button.dataset.navigationTool===value));
+  for (const button of document.querySelectorAll("button[data-navigation-tool]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.navigationTool === value));
   }
-  Element("mapTooltip").hidden=true;
+  Element("mapTooltip").hidden = true;
   RequestRender();
 }
-function SetInspectorCollapsed(collapsed,persist=true) {
-  inspectorCollapsed=collapsed;
-  document.querySelector(".lfWorkspace").dataset.inspectorCollapsed=String(collapsed);
-  const button=Element("toggleInspector"),label=collapsed?"展开右侧栏":"收起右侧栏";
-  button.setAttribute("aria-expanded",String(!collapsed));
-  button.setAttribute("aria-label",label);button.title=label;
-  Element("inspectorResizeHandle").hidden=collapsed;
-  for(const name of ["chat","script"]) Element(`${name}Pane`).hidden=collapsed||name!==inspectorTab;
-  if(persist) {try {storage?.setItem(INSPECTOR_COLLAPSED_KEY,String(collapsed));} catch { /* Keep this window's layout. */ }}
+function SetInspectorCollapsed(collapsed, persist = true) {
+  inspectorCollapsed = collapsed;
+  document.querySelector(".lfWorkspace").dataset.inspectorCollapsed = String(collapsed);
+  const button = Element("toggleInspector"), label = collapsed ? "展开右侧栏" : "收起右侧栏";
+  button.setAttribute("aria-expanded", String(!collapsed));
+  button.setAttribute("aria-label", label); button.title = label;
+  Element("inspectorResizeHandle").hidden = collapsed;
+  for (const name of ["chat", "script"]) Element(`${name}Pane`).hidden = collapsed || name !== inspectorTab;
+  if (persist) { try { storage?.setItem(INSPECTOR_COLLAPSED_KEY, String(collapsed)); } catch { /* Keep this window's layout. */ } }
   RequestRender();
 }
-function SetTimelineCollapsed(collapsed,persist=true) {
-  timelineCollapsed=collapsed;
-  Element("flowTimeline").hidden=collapsed;
-  Element("flowTimeline").parentElement.dataset.collapsed=String(collapsed);
-  const button=Element("toggleTimeline");
-  const label=collapsed?"展开 Timeline":"收起 Timeline";
-  button.setAttribute("aria-expanded",String(!collapsed));
-  button.setAttribute("aria-label",label);
-  button.title=label;
-  if(persist) {
-    try {storage?.setItem(TIMELINE_COLLAPSED_KEY,String(collapsed));}
+function SetTimelineCollapsed(collapsed, persist = true) {
+  timelineCollapsed = collapsed;
+  Element("flowTimeline").hidden = collapsed;
+  Element("flowTimeline").parentElement.dataset.collapsed = String(collapsed);
+  const button = Element("toggleTimeline");
+  const label = collapsed ? "展开 Timeline" : "收起 Timeline";
+  button.setAttribute("aria-expanded", String(!collapsed));
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  if (persist) {
+    try { storage?.setItem(TIMELINE_COLLAPSED_KEY, String(collapsed)); }
     catch { /* Keep this window's layout. */ }
   }
-  if(gamePlay?.active&&!gamePlay.paused&&gamePlay.state?.ready) gamePlay.frame?.focus();
+  if (gamePlay?.active && !gamePlay.paused && gamePlay.state?.ready) gamePlay.frame?.focus();
   RequestRender();
 }
 function ShowTab(value) {
-  if(value==="notes") {
-    OpenAnnotations();Element("legacyAnnotations").open=true;Element("notesPane").hidden=false;return;
+  if (value === "notes") {
+    OpenAnnotations(); Element("legacyAnnotations").open = true; Element("notesPane").hidden = false; return;
   }
-  inspectorTab=value;SetInspectorCollapsed(false);
-  for(const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected",button.dataset.tab===value);
-  UpdateAnnotations();Render();
+  inspectorTab = value; SetInspectorCollapsed(false);
+  for (const button of document.querySelectorAll("[data-tab]")) button.classList.toggle("selected", button.dataset.tab === value);
+  UpdateAnnotations(); Render();
 }
 function Apply(edit) {
-  try {project.Change(edit);Changed();return true;}
-  catch(error) {Toast(error.message);return false;}
+  try { project.Change(edit); Changed(); return true; }
+  catch (error) { Toast(error.message); return false; }
 }
 function Changed() {
-  UpdateAnnotations();Render();
-  Element("saveStatus").textContent=project.warning?"当前窗口草稿":"本机已保存";
-  if(project.warning) Toast(project.warning,true);
+  UpdateAnnotations(); Render();
+  Element("saveStatus").textContent = project.warning ? "当前窗口草稿" : "本机已保存";
+  if (project.warning) Toast(project.warning, true);
 }
 function SelectedObject() {
-  return selection?.type==="trigger"?project.value.triggers.find((item)=>item.id===selection.id)
-    :selection?.type==="group"?project.value.groups.find((item)=>item.id===selection.id):null;
+  return selection?.type === "trigger" ? project.value.triggers.find((item) => item.id === selection.id)
+    : selection?.type === "group" ? project.value.groups.find((item) => item.id === selection.id) : null;
 }
-function Select(value, { additive=false }={}) {
-  if(value?.type==="actor") {
-    if(!frame.actors.some(actor=>actor.id===value.id)||chat?.sending) return;
+function Select(value, { additive = false } = {}) {
+  if (value?.type === "actor") {
+    if (!frame.actors.some((actor) => actor.id === value.id) || chat?.sending) return;
     SetPlaying(false);
-    selectedUnitIds=additive||multipleUnits
-      ?selectedUnitIds.includes(value.id)?selectedUnitIds.filter(id=>id!==value.id):[...selectedUnitIds,value.id]
-      :[value.id];
-    selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
-    chat?.OpenUnits();ShowTab("chat");
-  } else {selection=value;selectedUnitIds=[];}
-  if(value?.type==="group"||value?.type==="trigger") {SetMode("select");}
-  if(value?.type==="annotation") {ShowTab("notes");Element("annotationText").value=project.value.annotations.find((item)=>item.id===value.id)?.text||"";}
+    selectedUnitIds = additive || multipleUnits
+      ? selectedUnitIds.includes(value.id) ? selectedUnitIds.filter((id) => id !== value.id) : [...selectedUnitIds, value.id]
+      : [value.id];
+    selection = selectedUnitIds.length ? { type: "actor", id: selectedUnitIds.at(-1), ids: [...selectedUnitIds] } : null;
+    chat?.OpenUnits(); ShowTab("chat");
+  } else { selection = value; selectedUnitIds = []; }
+  if (value?.type === "group" || value?.type === "trigger") { SetMode("select"); }
+  if (value?.type === "annotation") { ShowTab("notes"); Element("annotationText").value = project.value.annotations.find((item) => item.id === value.id)?.text || ""; }
   Render();
 }
 function SetUnitSelectionMode(multiple) {
-  multipleUnits=multiple;
-  if(!multiple&&selectedUnitIds.length>1) {
-    selectedUnitIds=[selectedUnitIds.at(-1)];
-    selection={type:"actor",id:selectedUnitIds[0],ids:[...selectedUnitIds]};
+  multipleUnits = multiple;
+  if (!multiple && selectedUnitIds.length > 1) {
+    selectedUnitIds = [selectedUnitIds.at(-1)];
+    selection = { type: "actor", id: selectedUnitIds[0], ids: [...selectedUnitIds] };
   }
   Render();
 }
 function StageBounds() {
-  const points=frame.stage.beats.flatMap((beat)=>beat.p);
-  if(Number(frame.stage.id)<=2) points.push([0,-10],[76,82]);
-  if(frame.stage.id==="05") points.push([88,112],[92,98]);
-  for(const group of frame.groups.filter((item)=>item.beat.slice(0,2)===frame.stage.id)) {
-    points.push(group.area.center,...group.route);
-    for(let index=0;index<(group.memberPlans?.length||0);index++) points.push(...GroupPath(group,index));
+  const points = frame.stage.beats.flatMap((beat) => beat.p);
+  if (Number(frame.stage.id) <= 2) points.push([0, -10], [76, 82]);
+  if (frame.stage.id === "05") points.push([88, 112], [92, 98]);
+  for (const group of frame.groups.filter((item) => item.beat.slice(0, 2) === frame.stage.id)) {
+    points.push(group.area.center, ...group.route);
+    for (let index = 0; index < (group.memberPlans?.length || 0); index++) points.push(...GroupPath(group, index));
   }
-  const xs=points.map((point)=>point[0]),zs=points.map((point)=>point[1]);
-  return [Math.min(...xs)-14,Math.max(...xs)+14,Math.min(...zs)-14,Math.max(...zs)+14];
+  const xs = points.map((point) => point[0]), zs = points.map((point) => point[1]);
+  return [Math.min(...xs) - 14, Math.max(...xs) + 14, Math.min(...zs) - 14, Math.max(...zs) + 14];
 }
-function Seek(value,{fit=false}={}) {
-  const previousStage=frame.stage.id;
-  lastTimestamp=performance.now();
-  time=Clamp(Number(value)||0,0,FLOW_DURATION);frame=EvaluateFlow(time,project.value);
-  if(previousStage!==frame.stage.id) {selection=null;selectedUnitIds=[];}
-  if(map&&(fit||previousStage!==frame.stage.id)) workspace.FrameStage();
-  draft=null;Render();
+function Seek(value, { fit = false } = {}) {
+  const previousStage = frame.stage.id;
+  lastTimestamp = performance.now();
+  time = Clamp(Number(value) || 0, 0, activeVariant.duration);
+  frame = activeVariant.evaluate(time, project.value);
+  if (previousStage !== frame.stage.id) { selection = null; selectedUnitIds = []; }
+  if (map && (fit || previousStage !== frame.stage.id)) workspace.FrameStage();
+  draft = null; Render();
 }
-function JumpBeat(id) {const beat=BeatById(id);if(beat) Seek(beat.start,{fit:workspace.active.mode==="stage"});}
-function StepBeat(direction) {const index=FLOW_TIMELINE.indexOf(frame.beat);JumpBeat(FLOW_TIMELINE[Clamp(index+direction,0,FLOW_TIMELINE.length-1)].id);}
-function Button(text,action) {const button=document.createElement("button");button.type="button";button.textContent=text;button.addEventListener("click",action);return button;}
+function JumpBeat(id) {
+  const beat = activeVariant.BeatById(String(id).toLowerCase()) || activeVariant.BeatById(id);
+  if (beat) Seek(beat.start, { fit: workspace?.active?.mode === "stage" });
+}
+function StepBeat(direction) {
+  const tl = activeVariant.timeline;
+  const index = tl.indexOf(frame.beat);
+  JumpBeat(tl[Clamp(index + direction, 0, tl.length - 1)].id);
+}
+function Button(text, action) { const button = document.createElement("button"); button.type = "button"; button.textContent = text; button.addEventListener("click", action); return button; }
+
+function PopulateVariantPicker() {
+  const picker = Element("variantPicker");
+  if (!picker) return;
+  const spec = activeVariant.spec;
+  const currentLevel = ENCOUNTER_LEVELS.find((lvl) => lvl.id === spec.level) || ENCOUNTER_LEVELS[0];
+  picker.dataset.forked = String(!spec.isBaseline);
+  Element("variantLevelCode").textContent = currentLevel.code;
+  Element("variantCurrentTitle").textContent = spec.title;
+  const badge = Element("variantCurrentBadge");
+  badge.textContent = spec.badge;
+  badge.dataset.kind = spec.isBaseline ? "base" : "fork";
+
+  const sceneLink = Element("openInSceneEditor");
+  sceneLink.href = `./SceneEditor.html?scene=${encodeURIComponent(spec.scene)}`;
+  Element("variantSceneCode").textContent = spec.scene;
+
+  const levelBar = Element("variantLevels");
+  levelBar.replaceChildren();
+  for (const lvl of ENCOUNTER_LEVELS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.role = "tab";
+    btn.disabled = !lvl.available;
+    btn.setAttribute("aria-selected", String(lvl.id === currentLevel.id));
+    btn.classList.toggle("selected", lvl.id === currentLevel.id);
+    btn.title = lvl.note || lvl.title;
+    btn.textContent = lvl.title;
+    if (!lvl.available) {
+      const tag = document.createElement("span");
+      tag.className = "lfSoonTag";
+      tag.textContent = "待建";
+      btn.append(tag);
+    }
+    levelBar.append(btn);
+  }
+
+  const list = Element("variantList");
+  list.replaceChildren();
+  for (const item of ENCOUNTER_VARIANTS.filter((v) => v.level === currentLevel.id)) {
+    const compiled = CompileEncounterVariant(item.id);
+    if (item.forkNote) {
+      const connector = document.createElement("div");
+      connector.className = "lfForkConnector";
+      const elbow = document.createElement("span");
+      elbow.className = "lfForkElbow";
+      elbow.textContent = "└─";
+      const text = document.createElement("span");
+      text.textContent = item.forkNote;
+      connector.append(elbow, text);
+      list.append(connector);
+    }
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "lfVariantCard";
+    card.dataset.variantId = item.id;
+    card.dataset.forked = String(!item.isBaseline);
+    card.setAttribute("aria-pressed", String(item.id === activeVariant.id));
+    card.addEventListener("click", () => {
+      picker.open = false;
+      SwitchVariant(item.id);
+    });
+
+    const head = document.createElement("div");
+    head.className = "lfVariantCardHead";
+    const titleWrap = document.createElement("span");
+    titleWrap.className = "lfVariantCardTitle";
+    const dot = document.createElement("span");
+    dot.className = "lfVariantDot";
+    const strong = document.createElement("strong");
+    strong.textContent = item.title;
+    const tag = document.createElement("span");
+    tag.className = "lfVariantBadge";
+    tag.dataset.kind = item.isBaseline ? "base" : "fork";
+    tag.textContent = item.badge;
+    titleWrap.append(dot, strong, tag);
+
+    const meta = document.createElement("span");
+    meta.className = "lfVariantMeta";
+    const code = document.createElement("code");
+    code.textContent = item.sceneLabel || item.scene;
+    meta.append(code, document.createTextNode(` · ${FormatFlowTime(compiled.duration)}`));
+    head.append(titleWrap, meta);
+
+    const trackBar = document.createElement("div");
+    trackBar.className = "lfTrackBar";
+    for (const seg of item.tracks || []) {
+      const pill = document.createElement("span");
+      pill.className = "lfTrackSeg";
+      pill.dataset.shared = String(!!seg.shared);
+      pill.style.gridColumn = `span ${seg.span}`;
+      pill.textContent = `${seg.shared ? "🔗 " : "✦ "}${seg.label}`;
+      pill.title = seg.label;
+      trackBar.append(pill);
+    }
+
+    const note = document.createElement("div");
+    note.className = "lfVariantSummaryNote";
+    note.textContent = item.summary;
+
+    card.append(head, trackBar, note);
+    list.append(card);
+  }
+}
 
 function PopulateTimeline() {
-  for(const stage of STAGE_TIMELINE) {
-    const button=Button(`${stage.id} ${stage.title}`,()=>{workspace.active.mode="stage";Seek(stage.start,{fit:true});});
-    button.dataset.stage=stage.id;button.title=`${stage.status} · ${FormatFlowTime(stage.start)}—${FormatFlowTime(stage.end)}`;
-    button.style.left=`${stage.start/FLOW_DURATION*100}%`;button.style.width=`${(stage.end-stage.start)/FLOW_DURATION*100}%`;
-    button.classList.toggle("draft",stage.status==="草稿");Element("timelineStages").append(button);
+  const stagesEl = Element("timelineStages"), beatsEl = Element("timelineBeats");
+  stagesEl.replaceChildren();
+  beatsEl.replaceChildren();
+  stagesEl.dataset.forked = String(!activeVariant.spec.isBaseline);
+  const sharedStages = new Set(activeVariant.spec.sharedStages || []);
+  const duration = activeVariant.duration;
+
+  for (const stage of activeVariant.stages) {
+    const isShared = sharedStages.has(stage.id);
+    const button = Button(`${stage.id} ${stage.title}`, () => { workspace.active.mode = "stage"; Seek(stage.start, { fit: true }); });
+    button.dataset.stage = stage.id;
+    button.dataset.shared = String(isShared);
+    const shareSuffix = activeVariant.spec.isBaseline ? "" : (isShared ? " · 🔗 与基线共用段" : " · ✦ 本变体分叉段");
+    button.title = `${stage.status} · ${FormatFlowTime(stage.start)}—${FormatFlowTime(stage.end)}${shareSuffix}`;
+    button.style.left = `${stage.start / duration * 100}%`;
+    button.style.width = `${(stage.end - stage.start) / duration * 100}%`;
+    button.classList.toggle("draft", stage.status === "草稿");
+    stagesEl.append(button);
   }
-  for(const beat of FLOW_TIMELINE) {
-    const cinematic=ENCOUNTER_CINEMATICS.includes(beat.id);
-    const button=Button(beat.id.toUpperCase(),()=>JumpBeat(beat.id));
-    button.setAttribute("aria-label",`${beat.id.toUpperCase()} ${beat.title}`);
-    button.dataset.beat=beat.id;button.style.left=`${beat.start/FLOW_DURATION*100}%`;button.style.width=`${beat.duration/FLOW_DURATION*100}%`;
-    button.classList.toggle("cinematic",cinematic);
-    button.title=`${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic?" · 镜头动画段":""}`;
-    Element("timelineBeats").append(button);
+  for (const beat of activeVariant.timeline) {
+    const cinematic = activeVariant.cinematics.includes(beat.id);
+    const button = Button(beat.id.toUpperCase(), () => JumpBeat(beat.id));
+    button.setAttribute("aria-label", `${beat.id.toUpperCase()} ${beat.title}`);
+    button.dataset.beat = beat.id;
+    button.style.left = `${beat.start / duration * 100}%`;
+    button.style.width = `${beat.duration / duration * 100}%`;
+    button.classList.toggle("cinematic", cinematic);
+    button.title = `${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic ? " · 镜头动画段" : ""}`;
+    beatsEl.append(button);
   }
-  timeline=new EncounterTimeline({viewport:Element("timelineScroll"),axis:Element("timelineAxis"),
-    ruler:Element("timelineRuler"),fitButton:Element("timelineFit"),scaleOutput:Element("timelineScale"),
-    duration:FLOW_DURATION,formatTime:FormatFlowTime});
-  Element("flowSeek").max=String(FLOW_DURATION);Element("sourceLink").href=FLOW_SOURCE.url;
+  if (!timeline) {
+    timeline = new EncounterTimeline({
+      viewport: Element("timelineScroll"), axis: Element("timelineAxis"),
+      ruler: Element("timelineRuler"), fitButton: Element("timelineFit"), scaleOutput: Element("timelineScale"),
+      duration, formatTime: FormatFlowTime,
+    });
+  } else {
+    timeline.SetDuration(duration);
+  }
+  Element("flowSeek").max = String(duration);
+  Element("sourceLink").href = activeVariant.sourceInfo.url;
+  shownStage = "";
+  shownBeat = "";
 }
+
+async function EnsureVariantMap(variant, focus) {
+  const sceneId = variant.spec.scene;
+  if (loadedMaps.has(sceneId)) return loadedMaps.get(sceneId);
+  const loaded = await LoadEncounterMap({ sceneId, variantSpec: variant.spec, focus });
+  loadedMaps.set(sceneId, loaded);
+  return loaded;
+}
+
+async function SwitchVariant(variantId) {
+  const target = CompileEncounterVariant(variantId);
+  if (target.id === activeVariant.id) return activeVariant.id;
+  const seq = ++variantSwitchSeq;
+  if (gamePlay?.active) gamePlay.Stop();
+  gamePlay?.DropHost();
+  SetPlaying(false);
+  CancelPointer();
+  selection = null;
+  selectedUnitIds = [];
+
+  const prevShared = new Set(activeVariant.spec.sharedStages || []);
+  const targetShared = new Set(target.spec.sharedStages || []);
+  const keepSharedBeat = prevShared.has(frame.stage.id) && targetShared.has(frame.stage.id)
+    ? target.BeatById(frame.beat.id)
+    : null;
+  const forkBeatId = `${target.spec.forkAtStage || activeVariant.spec.forkAtStage || "08"}a`;
+  const fallbackBeat = target.BeatById(forkBeatId) || target.timeline[0];
+  const nextTime = keepSharedBeat
+    ? keepSharedBeat.start + frame.progress * keepSharedBeat.duration
+    : fallbackBeat.start;
+
+  const nextProject = MakeProject(target);
+  const focus = target.evaluate(nextTime, nextProject.value).player;
+  const sceneChanged = target.spec.scene !== activeVariant.spec.scene;
+  if (sceneChanged) {
+    Element("mapLoading").textContent = `切换空间底图 · ${target.spec.title}…`;
+    Element("mapLoading").hidden = false;
+  }
+  let nextMap;
+  try {
+    nextMap = await EnsureVariantMap(target, focus);
+  } catch (error) {
+    if (seq === variantSwitchSeq) {
+      Element("mapLoading").hidden = true;
+      Toast(`变体场景载入失败 · ${error.message}`, true);
+    }
+    throw error;
+  }
+  if (seq !== variantSwitchSeq) return activeVariant.id;
+
+  activeVariant = target;
+  project = nextProject;
+  SetEncounterDuskRange(activeVariant.spec.duskBlendZ);
+  PopulateVariantPicker();
+  PopulateTimeline();
+
+  if (nextMap !== mapData) {
+    mapData = nextMap;
+    workspace.SetMapData(mapData);
+  }
+  Element("mapLoading").hidden = true;
+
+  const nextUrl = new URL(location.href);
+  if (activeVariant.id === ENCOUNTER_DEFAULT_VARIANT_ID) nextUrl.searchParams.delete("variant");
+  else nextUrl.searchParams.set("variant", activeVariant.id);
+  history.replaceState(null, "", nextUrl);
+
+  time = Clamp(nextTime, 0, activeVariant.duration);
+  frame = activeVariant.evaluate(time, project.value);
+  workspace.FrameStage();
+  UpdateAnnotations();
+  Changed();
+  return activeVariant.id;
+}
+
 function UpdateTimeline() {
   gamePlay?.SetCursorTime(time);
-  if(shownStage!==frame.stage.id) {
-    shownStage=frame.stage.id;
-    for(const button of document.querySelectorAll("[data-stage]")) button.classList.toggle("selected",button.dataset.stage===shownStage);
+  if (shownStage !== frame.stage.id) {
+    shownStage = frame.stage.id;
+    for (const button of document.querySelectorAll("[data-stage]")) button.classList.toggle("selected", button.dataset.stage === shownStage);
   }
-  if(shownBeat!==frame.beat.id) {
-    shownBeat=frame.beat.id;
-    Element("timelineMode").hidden=!ENCOUNTER_CINEMATICS.includes(frame.beat.id);Element("timelineMode").textContent=`${frame.beat.id.toUpperCase()} 镜头动画`;
-    Element("beatId").textContent=frame.beat.id.toUpperCase();Element("beatTitle").textContent=frame.beat.title;
-    Element("stageStatus").textContent=frame.stage.status;FormatSourcePassage(Element("sourcePassage"),FLOW_SOURCE_EXCERPTS[frame.beat.id]);
-    Element("planningNote").hidden=!frame.beat.planning;
-    Element("planningNote").textContent=frame.beat.planning?`当前编排 · ${frame.beat.planning}`:"";
-    for(const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected",button.dataset.beat===shownBeat);
-    Element("frameHeading").textContent=`${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
+  if (shownBeat !== frame.beat.id) {
+    shownBeat = frame.beat.id;
+    const isCinematic = activeVariant.cinematics.includes(frame.beat.id);
+    Element("timelineMode").hidden = !isCinematic;
+    Element("timelineMode").textContent = `${frame.beat.id.toUpperCase()} 镜头动画`;
+    Element("beatId").textContent = frame.beat.id.toUpperCase();
+    Element("beatTitle").textContent = frame.beat.title;
+    Element("stageStatus").textContent = frame.stage.status;
+    FormatSourcePassage(Element("sourcePassage"), activeVariant.sourceExcerpts[frame.beat.id]);
+    Element("planningNote").hidden = !frame.beat.planning;
+    Element("planningNote").textContent = frame.beat.planning ? `当前编排 · ${frame.beat.planning}` : "";
+    for (const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected", button.dataset.beat === shownBeat);
+    Element("frameHeading").textContent = `${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
   }
-  const timeText=`${FormatFlowTime(time)} / ${FormatFlowTime(FLOW_DURATION)}`;
-  if(Element("flowTime").textContent!==timeText) Element("flowTime").textContent=timeText;
-  Element("flowSeek").value=String(time);
+  const timeText = `${FormatFlowTime(time)} / ${FormatFlowTime(activeVariant.duration)}`;
+  if (Element("flowTime").textContent !== timeText) Element("flowTime").textContent = timeText;
+  Element("flowSeek").value = String(time);
   timeline.SetTime(time);
-  Element("flowSeek").setAttribute("aria-valuetext",`${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);
+  Element("flowSeek").setAttribute("aria-valuetext", `${FormatFlowTime(time)} · ${frame.beat.id.toUpperCase()} ${frame.beat.title}`);
 }
 function UpdateAnnotations() {
-  Element("legacyAnnotations").hidden=!project.value.annotations.length;
-  const list=Element("annotationFrames");list.replaceChildren();
-  const times=[...new Set(project.value.annotations.map((item)=>item.time))].sort((a,b)=>a-b);
-  for(const stamp of times) {
-    const notes=project.value.annotations.filter((item)=>item.time===stamp),beat=EvaluateFlow(stamp,project.value).beat;
-    const button=Button(`${FormatFlowTime(stamp)} · ${beat.id.toUpperCase()} · ${notes.length} 处`,()=>{
-      SetPlaying(false);Seek(stamp);
-      if(notes[0].viewports) {workspace.Restore(notes[0].viewports);Element("viewportLayout").value=String(workspace.count);}
-      else {workspace.SetType(0,"plan");workspace.Activate(0);const view=notes[0].view;if(view) RestoreView(view,notes[0].viewport);}
+  Element("legacyAnnotations").hidden = !project.value.annotations.length;
+  const list = Element("annotationFrames"); list.replaceChildren();
+  const times = [...new Set(project.value.annotations.map((item) => item.time))].sort((a, b) => a - b);
+  for (const stamp of times) {
+    const notes = project.value.annotations.filter((item) => item.time === stamp), beat = activeVariant.evaluate(stamp, project.value).beat;
+    const button = Button(`${FormatFlowTime(stamp)} · ${beat.id.toUpperCase()} · ${notes.length} 处`, () => {
+      SetPlaying(false); Seek(stamp);
+      if (notes[0].viewports) { workspace.Restore(notes[0].viewports); Element("viewportLayout").value = String(workspace.count); }
+      else { workspace.SetType(0, "plan"); workspace.Activate(0); const view = notes[0].view; if (view) RestoreView(view, notes[0].viewport); }
       Render();
-    });button.className="lfFrameBookmark";button.dataset.annotationTime=String(stamp);list.append(button);
+    }); button.className = "lfFrameBookmark"; button.dataset.annotationTime = String(stamp); list.append(button);
   }
 }
-function RequestRender() {renderPending=true;}
-function Render(tick=null) {
-  if(!map||!workspace) return;
-  renderPending=false;
-  const debug=!gamePlay?.active&&(previewDebug?.profiler?.recording||previewDebug?.capture.state==="armed")?previewDebug:null;
-  let failure=null;
-  debug?.BeginFrame(tick?.time??performance.now(),tick);
+function RequestRender() { renderPending = true; }
+function Render(tick = null) {
+  if (!map || !workspace) return;
+  renderPending = false;
+  const debug = !gamePlay?.active && (previewDebug?.profiler?.recording || previewDebug?.capture.state === "armed") ? previewDebug : null;
+  let failure = null;
+  debug?.BeginFrame(tick?.time ?? performance.now(), tick);
   try {
     debug?.BeginCpu("encounterTimeline");
-    const previousStage=frame.stage.id;
+    const previousStage = frame.stage.id;
     debug?.BeginCpu("encounterTimeline/EvaluateFlow");
-    frame=EvaluateFlow(time,project.value);
+    frame = activeVariant.evaluate(time, project.value);
     debug?.EndCpu("encounterTimeline/EvaluateFlow");
     debug?.BeginCpu("encounterTimeline/UpdateTimeline");
-    if(tick?.advancing&&previousStage!==frame.stage.id) workspace.FrameStage();
+    if (tick?.advancing && previousStage !== frame.stage.id) workspace.FrameStage();
     UpdateTimeline();
     debug?.EndCpu("encounterTimeline/UpdateTimeline");
     debug?.SetFrameContext(frame);
     debug?.BeginCpu("encounterTimeline/UpdateUnits");
-    selectedUnitIds=selectedUnitIds.filter(id=>frame.actors.some(actor=>actor.id===id));
-    if(selection?.type==="actor") selection=selectedUnitIds.length?{type:"actor",id:selectedUnitIds.at(-1),ids:[...selectedUnitIds]}:null;
-    chat?.UpdateUnits(CreateUnitsAttachment(frame,workspace,selectedUnitIds,project.value),multipleUnits);
+    selectedUnitIds = selectedUnitIds.filter((id) => frame.actors.some((actor) => actor.id === id));
+    if (selection?.type === "actor") selection = selectedUnitIds.length ? { type: "actor", id: selectedUnitIds.at(-1), ids: [...selectedUnitIds] } : null;
+    chat?.UpdateUnits(CreateUnitsAttachment(frame, workspace, selectedUnitIds, project.value), multipleUnits);
     debug?.EndCpu("encounterTimeline/UpdateUnits");
     debug?.EndCpu("encounterTimeline");
-    workspace.Draw(frame,null,selection,project.value.annotations,draft,project.value,debug);
-  } catch(error) {failure=error;throw error;}
-  finally {debug?.EndFrame(failure);}
+    workspace.Draw(frame, null, selection, project.value.annotations, draft, project.value, debug);
+  } catch (error) { failure = error; throw error; }
+  finally { debug?.EndFrame(failure); }
 }
-function Hit(point,view=map) {
-  const priority={annotationHandle:6,annotation:5,actor:3,group:2,trigger:1};
-  const DistanceTo=item=>Math.hypot(item.screen[0]-point[0],item.screen[1]-point[1]);
-  const candidates=view.hits.filter(item=>(item.type!=="actor"||!view.PickActor)&&DistanceTo(item)<=item.radius);
-  const body=view.PickActor?.(point);
-  if(body) candidates.push(body);
-  return candidates.sort((a,b)=>(priority[b.type]||0)-(priority[a.type]||0)||DistanceTo(a)-DistanceTo(b))[0];
+function Hit(point, view = map) {
+  const priority = { annotationHandle: 6, annotation: 5, actor: 3, group: 2, trigger: 1 };
+  const DistanceTo = (item) => Math.hypot(item.screen[0] - point[0], item.screen[1] - point[1]);
+  const candidates = view.hits.filter((item) => (item.type !== "actor" || !view.PickActor) && DistanceTo(item) <= item.radius);
+  const body = view.PickActor?.(point);
+  if (body) candidates.push(body);
+  return candidates.sort((a, b) => (priority[b.type] || 0) - (priority[a.type] || 0) || DistanceTo(a) - DistanceTo(b))[0];
 }
 
-function LocalPoint(event,surface=canvas) {const rect=surface.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top];}
+function LocalPoint(event, surface = canvas) { const rect = surface.getBoundingClientRect(); return [event.clientX - rect.left, event.clientY - rect.top]; }
 function Packet() {
-  const rect=canvas.getBoundingClientRect();
-  const packet=CreateFramePacket(project.value,frame,map,{width:rect.width,height:rect.height});
-  packet.context.viewports=workspace.Serialize();packet.context.selection=structuredClone(selection);return packet;
+  const rect = canvas.getBoundingClientRect();
+  const packet = CreateFramePacket(project.value, frame, map, { width: rect.width, height: rect.height }, {
+    scene: activeVariant.spec.scene,
+    variant: activeVariant.id,
+  });
+  packet.context.viewports = workspace.Serialize(); packet.context.selection = structuredClone(selection); return packet;
 }
 
-function RestoreView(view,viewport) {
-  map.center=[...view.center];
-  const rect=canvas.getBoundingClientRect();
-  const ratio=viewport?Math.min(rect.width/viewport.width,rect.height/viewport.height):1;
-  map.scale=Clamp(view.scale*ratio,FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);workspace.active.mode="manual";
+function RestoreView(view, viewport) {
+  map.center = [...view.center];
+  const rect = canvas.getBoundingClientRect();
+  const ratio = viewport ? Math.min(rect.width / viewport.width, rect.height / viewport.height) : 1;
+  map.scale = Clamp(view.scale * ratio, FLOW_ZOOM.minScale, FLOW_ZOOM.maxScale); workspace.active.mode = "manual";
 }
 
 function CancelPointer() {
-  if(pointer?.action==="edit") project.value=pointer.original;
-  pointer=null;draft=null;
+  if (pointer?.action === "edit") project.value = pointer.original;
+  pointer = null; draft = null;
 }
 
 function BindMap(entry) {
-  const surface=entry.canvas;
-  const HoverUnit=(hit=null)=>{
-    const id=navigationTool==="select"&&mode==="select"&&hit?.type==="actor"?hit.id:null;
-    if(id) surface.dataset.unitHover=id;
+  const surface = entry.canvas;
+  const HoverUnit = (hit = null) => {
+    const id = navigationTool === "select" && mode === "select" && hit?.type === "actor" ? hit.id : null;
+    if (id) surface.dataset.unitHover = id;
     else delete surface.dataset.unitHover;
-    if(entry.map.hoveredActorId===id) return;
-    entry.map.hoveredActorId=id;
+    if (entry.map.hoveredActorId === id) return;
+    entry.map.hoveredActorId = id;
     RequestRender();
   };
-  surface.addEventListener("contextmenu",event=>event.preventDefault());
-  surface.addEventListener("pointerdown",(event)=>{
-    HoverUnit();Element("mapTooltip").hidden=true;
-    if(navigation.TouchBegin(entry,event)) {CancelPointer();RequestRender();return;}
-    if(navigation.Begin(entry,event,{forcePan:navigationTool==="hand"&&mode==="select"})) return;
-    if(event.button!==0) return;
+  surface.addEventListener("contextmenu", (event) => event.preventDefault());
+  surface.addEventListener("pointerdown", (event) => {
+    HoverUnit(); Element("mapTooltip").hidden = true;
+    if (navigation.TouchBegin(entry, event)) { CancelPointer(); RequestRender(); return; }
+    if (navigation.Begin(entry, event, { forcePan: navigationTool === "hand" && mode === "select" })) return;
+    if (event.button !== 0) return;
     workspace.Activate(entry.index);
-    surface.focus();surface.setPointerCapture(event.pointerId);
-    const screen=LocalPoint(event),hit=Hit(screen);
-    const action=mode!=="select"?"annotate":hit?.type==="annotationHandle"?"edit":entry.map.type?"select":"pan";
-    const world=action==="annotate"||action==="pan"?map.ToWorld(screen):null;
-    pointer={pointerId:event.pointerId,screen,world,center:[...map.center],hit,action,moved:false,original:project.value,viewport:entry.index,yaw:map.yaw||0,rotate:map.type==="eye"||event.altKey,additive:event.ctrlKey||event.metaKey||event.shiftKey};
-    if(action==="annotate") {
-      const rect=canvas.getBoundingClientRect();
-      draft={id:`Note_${Date.now()}`,kind:mode,time:Math.round(time*100)/100,a:world,b:[...world],text:"",view:{center:[...map.center],scale:map.scale},viewport:{width:rect.width,height:rect.height},viewports:workspace.Serialize()};
-      if(mode==="text") draft.text="文字";
+    surface.focus(); surface.setPointerCapture(event.pointerId);
+    const screen = LocalPoint(event), hit = Hit(screen);
+    const action = mode !== "select" ? "annotate" : hit?.type === "annotationHandle" ? "edit" : entry.map.type ? "select" : "pan";
+    const world = action === "annotate" || action === "pan" ? map.ToWorld(screen) : null;
+    pointer = { pointerId: event.pointerId, screen, world, center: [...map.center], hit, action, moved: false, original: project.value, viewport: entry.index, yaw: map.yaw || 0, rotate: map.type === "eye" || event.altKey, additive: event.ctrlKey || event.metaKey || event.shiftKey };
+    if (action === "annotate") {
+      const rect = canvas.getBoundingClientRect();
+      draft = { id: `Note_${Date.now()}`, kind: mode, time: Math.round(time * 100) / 100, a: world, b: [...world], text: "", view: { center: [...map.center], scale: map.scale }, viewport: { width: rect.width, height: rect.height }, viewports: workspace.Serialize() };
+      if (mode === "text") draft.text = "文字";
     }
   });
-  surface.addEventListener("pointermove",(event)=>{
-    if(navigation.TouchMove(entry,event)) return;
-    if(navigation.Move(entry,event)) return;
-    if(pointer&&pointer.pointerId!==event.pointerId) return;
-    const screen=LocalPoint(event,surface);
-    if(pointer&&pointer.viewport===entry.index) {
-      const dx=screen[0]-pointer.screen[0],dy=screen[1]-pointer.screen[1];if(Math.hypot(dx,dy)>3) pointer.moved=true;
-      if(pointer.action==="pan"&&pointer.moved) {
-        if(pointer.rotate&&map.type) map.yaw=pointer.yaw-dx*0.007;
+  surface.addEventListener("pointermove", (event) => {
+    if (navigation.TouchMove(entry, event)) return;
+    if (navigation.Move(entry, event)) return;
+    if (pointer && pointer.pointerId !== event.pointerId) return;
+    const screen = LocalPoint(event, surface);
+    if (pointer && pointer.viewport === entry.index) {
+      const dx = screen[0] - pointer.screen[0], dy = screen[1] - pointer.screen[1]; if (Math.hypot(dx, dy) > 3) pointer.moved = true;
+      if (pointer.action === "pan" && pointer.moved) {
+        if (pointer.rotate && map.type) map.yaw = pointer.yaw - dx * 0.007;
         else {
-          workspace.active.mode="manual";
-          const current=map.ToWorld(screen);
-          map.center=map.center.map((value,index)=>value+pointer.world[index]-current[index]);
+          workspace.active.mode = "manual";
+          const current = map.ToWorld(screen);
+          map.center = map.center.map((value, index) => value + pointer.world[index] - current[index]);
         }
       }
-      if(pointer.action==="annotate") draft.b=entry.map.ToWorld(screen);
-      if(pointer.action==="edit") {
-        const world=entry.map.ToWorld(screen);
-        const candidate=structuredClone(pointer.original),hit=pointer.hit;
-        const target=candidate.annotations.find((item)=>item.id===hit.id);
-        target[hit.handle]=world;
-        project.value=candidate;
+      if (pointer.action === "annotate") draft.b = entry.map.ToWorld(screen);
+      if (pointer.action === "edit") {
+        const world = entry.map.ToWorld(screen);
+        const candidate = structuredClone(pointer.original), hit = pointer.hit;
+        const target = candidate.annotations.find((item) => item.id === hit.id);
+        target[hit.handle] = world;
+        project.value = candidate;
       }
-      Element("mapTooltip").hidden=true;RequestRender();return;
+      Element("mapTooltip").hidden = true; RequestRender(); return;
     }
-    const hit=Hit(screen,entry.map),tip=Element("mapTooltip");
-    if(navigationTool==="hand") {HoverUnit();tip.hidden=true;return;}
-    HoverUnit(hit);tip.hidden=!hit?.text;
-    if(hit?.text) {tip.textContent=hit.text;const grid=Element("viewportGrid").getBoundingClientRect(),rect=surface.getBoundingClientRect();tip.style.left=`${Clamp(rect.x-grid.x+screen[0]+14,5,grid.width-270)}px`;tip.style.top=`${Clamp(rect.y-grid.y+screen[1]+15,5,grid.height-50)}px`;}
+    const hit = Hit(screen, entry.map), tip = Element("mapTooltip");
+    if (navigationTool === "hand") { HoverUnit(); tip.hidden = true; return; }
+    HoverUnit(hit); tip.hidden = !hit?.text;
+    if (hit?.text) { tip.textContent = hit.text; const grid = Element("viewportGrid").getBoundingClientRect(), rect = surface.getBoundingClientRect(); tip.style.left = `${Clamp(rect.x - grid.x + screen[0] + 14, 5, grid.width - 270)}px`; tip.style.top = `${Clamp(rect.y - grid.y + screen[1] + 15, 5, grid.height - 50)}px`; }
   });
-  surface.addEventListener("pointerup",event=>{
-    if(navigation.TouchEnd(entry,event)) return;
-    if(navigation.End(entry)) return;
-    if(!pointer||pointer.viewport!==entry.index||pointer.pointerId!==event.pointerId) return;
-    const action=pointer.action;
-    if(action==="edit") {const candidate=project.value;project.value=pointer.original;try {project.Replace(candidate);Changed();} catch(error) {Toast(error.message);}}
-    if(action==="annotate"&&draft&&(pointer.moved||draft.kind==="text")) {
-      const annotation=draft;draft=null;Apply((document)=>document.annotations.push(annotation));Select({type:"annotation",id:annotation.id});
-      if(annotation.kind==="text") {Element("annotationText").focus();Element("annotationText").select();}
+  surface.addEventListener("pointerup", (event) => {
+    if (navigation.TouchEnd(entry, event)) return;
+    if (navigation.End(entry)) return;
+    if (!pointer || pointer.viewport !== entry.index || pointer.pointerId !== event.pointerId) return;
+    const action = pointer.action;
+    if (action === "edit") { const candidate = project.value; project.value = pointer.original; try { project.Replace(candidate); Changed(); } catch (error) { Toast(error.message); } }
+    if (action === "annotate" && draft && (pointer.moved || draft.kind === "text")) {
+      const annotation = draft; draft = null; Apply((document) => document.annotations.push(annotation)); Select({ type: "annotation", id: annotation.id });
+      if (annotation.kind === "text") { Element("annotationText").focus(); Element("annotationText").select(); }
     }
-    if(["pan","select"].includes(action)&&!pointer.moved) {
-      const hit=pointer.hit;
-      if(hit) Select({type:hit.type,id:hit.id},{additive:pointer.additive});
-      else if(!pointer.additive&&!multipleUnits) Select(null);
+    if (["pan", "select"].includes(action) && !pointer.moved) {
+      const hit = pointer.hit;
+      if (hit) Select({ type: hit.type, id: hit.id }, { additive: pointer.additive });
+      else if (!pointer.additive && !multipleUnits) Select(null);
     }
-    pointer=null;draft=null;Render();
+    pointer = null; draft = null; Render();
   });
-  surface.addEventListener("pointercancel",()=>{HoverUnit();navigation.Clear();CancelPointer();Render();});
-  surface.addEventListener("lostpointercapture",event=>{
-    if(navigation.TouchLost(event)||pointer?.pointerId===event.pointerId) {CancelPointer();RequestRender();}
+  surface.addEventListener("pointercancel", () => { HoverUnit(); navigation.Clear(); CancelPointer(); Render(); });
+  surface.addEventListener("lostpointercapture", (event) => {
+    if (navigation.TouchLost(event) || pointer?.pointerId === event.pointerId) { CancelPointer(); RequestRender(); }
     navigation.End(entry);
   });
-  surface.addEventListener("wheel",event=>{HoverUnit();Element("mapTooltip").hidden=true;navigation.Wheel(entry,event);},{passive:false});
-  surface.addEventListener("pointerleave",()=>{HoverUnit();Element("mapTooltip").hidden=true;});
-  surface.addEventListener("blur",()=>HoverUnit());
+  surface.addEventListener("wheel", (event) => { HoverUnit(); Element("mapTooltip").hidden = true; navigation.Wheel(entry, event); }, { passive: false });
+  surface.addEventListener("pointerleave", () => { HoverUnit(); Element("mapTooltip").hidden = true; });
+  surface.addEventListener("blur", () => HoverUnit());
 }
 
 function OpenAnnotations() {
-  navigation.Clear();SetPlaying(false);SetMode("select");Render();
-  annotationEditor.Open(workspace.Capture(),Packet());
+  navigation.Clear(); SetPlaying(false); SetMode("select"); Render();
+  annotationEditor.Open(workspace.Capture(), Packet());
 }
 
 function BindControls() {
-  window.addEventListener("blur",()=>{CancelPointer();RequestRender();});
-  Element("toggleInspector").onclick=()=>SetInspectorCollapsed(!inspectorCollapsed);
-  Element("toggleTimeline").onclick=()=>SetTimelineCollapsed(!timelineCollapsed);
-  let collapsed=false,timelineHidden=false;
+  window.addEventListener("blur", () => { CancelPointer(); RequestRender(); });
+  const picker = Element("variantPicker");
+  if (picker) {
+    document.addEventListener("pointerdown", (event) => {
+      if (picker.open && !event.target.closest("#variantPicker")) picker.open = false;
+    });
+    picker.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && picker.open) {
+        event.preventDefault(); event.stopPropagation();
+        picker.open = false; Element("variantSummary")?.focus();
+      }
+    });
+  }
+  Element("toggleInspector").onclick = () => SetInspectorCollapsed(!inspectorCollapsed);
+  Element("toggleTimeline").onclick = () => SetTimelineCollapsed(!timelineCollapsed);
+  let collapsed = false, timelineHidden = false;
   try {
-    collapsed=storage?.getItem(INSPECTOR_COLLAPSED_KEY)==="true";
-    timelineHidden=storage?.getItem(TIMELINE_COLLAPSED_KEY)==="true";
+    collapsed = storage?.getItem(INSPECTOR_COLLAPSED_KEY) === "true";
+    timelineHidden = storage?.getItem(TIMELINE_COLLAPSED_KEY) === "true";
   } catch { /* Storage is optional. */ }
-  SetInspectorCollapsed(collapsed,false);
-  SetTimelineCollapsed(timelineHidden,false);
-  for(const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick=()=>{
-    SetNavigationTool(button.dataset.navigationTool);workspace.active.canvas.focus();
+  SetInspectorCollapsed(collapsed, false);
+  SetTimelineCollapsed(timelineHidden, false);
+  for (const button of document.querySelectorAll("button[data-navigation-tool]")) button.onclick = () => {
+    SetNavigationTool(button.dataset.navigationTool); workspace.active.canvas.focus();
   };
-  for(const button of document.querySelectorAll("[data-tab]")) button.onclick=()=>ShowTab(button.dataset.tab);
-  for(const button of document.querySelectorAll("[data-mode]")) button.onclick=()=>SetMode(button.dataset.mode);
-  Element("playFlow").onclick=()=>{if(time>=FLOW_DURATION) Seek(0);SetMode("select");SetPlaying(!playing);};
-  Element("previousBeat").onclick=()=>StepBeat(-1);Element("nextBeat").onclick=()=>StepBeat(1);
-  Element("flowSeek").oninput=(event)=>Seek(Number(event.target.value));
-  Element("viewportLayout").onchange=(event)=>{const count=Number(event.target.value);if(gamePlay?.SetLayout(count))return;workspace.SetLayout(count);Render();};
-  Element("annotationText").onchange=(event)=>{if(selection?.type==="annotation") Apply((document)=>{document.annotations.find((item)=>item.id===selection.id).text=event.target.value;});};
-  Element("deleteAnnotation").onclick=()=>{if(selection?.type==="annotation") {Apply((document)=>{document.annotations=document.annotations.filter((item)=>item.id!==selection.id);});selection=null;Element("annotationText").value="";Render();}};
-  document.addEventListener("keydown",(event)=>{
-    if(gamePlay?.active)return;
-    if(event.target.matches("input,select,textarea,button,a,summary")) return;
-    if(navigation.Key(event)) return;
-    if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&["KeyQ","KeyW"].includes(event.code)) {
-      event.preventDefault();SetNavigationTool(event.code==="KeyQ"?"hand":"select");return;
+  for (const button of document.querySelectorAll("[data-tab]")) button.onclick = () => ShowTab(button.dataset.tab);
+  for (const button of document.querySelectorAll("[data-mode]")) button.onclick = () => SetMode(button.dataset.mode);
+  Element("playFlow").onclick = () => { if (time >= activeVariant.duration) Seek(0); SetMode("select"); SetPlaying(!playing); };
+  Element("previousBeat").onclick = () => StepBeat(-1); Element("nextBeat").onclick = () => StepBeat(1);
+  Element("flowSeek").oninput = (event) => Seek(Number(event.target.value));
+  Element("viewportLayout").onchange = (event) => { const count = Number(event.target.value); if (gamePlay?.SetLayout(count)) return; workspace.SetLayout(count); Render(); };
+  Element("annotationText").onchange = (event) => { if (selection?.type === "annotation") Apply((document) => { document.annotations.find((item) => item.id === selection.id).text = event.target.value; }); };
+  Element("deleteAnnotation").onclick = () => { if (selection?.type === "annotation") { Apply((document) => { document.annotations = document.annotations.filter((item) => item.id !== selection.id); }); selection = null; Element("annotationText").value = ""; Render(); } };
+  document.addEventListener("keydown", (event) => {
+    if (gamePlay?.active) return;
+    if (event.target.matches("input,select,textarea,button,a,summary")) return;
+    if (navigation.Key(event)) return;
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ["KeyQ", "KeyW"].includes(event.code)) {
+      event.preventDefault(); SetNavigationTool(event.code === "KeyQ" ? "hand" : "select"); return;
     }
-    if(event.code==="KeyF") {
-      event.preventDefault();const object=SelectedObject(),actor=frame.actors.find(item=>selection?.type==="actor"&&item.id===selection.id);
-      const note=project.value.annotations.find(item=>selection?.type==="annotation"&&item.id===selection.id);
-      navigation.Focus(object?.area.center||actor?.p||note?.b||frame.player,object?Math.max(...object.area.size)/2:6);return;
+    if (event.code === "KeyF") {
+      event.preventDefault(); const object = SelectedObject(), actor = frame.actors.find((item) => selection?.type === "actor" && item.id === selection.id);
+      const note = project.value.annotations.find((item) => selection?.type === "annotation" && item.id === selection.id);
+      navigation.Focus(object?.area.center || actor?.p || note?.b || frame.player, object ? Math.max(...object.area.size) / 2 : 6); return;
     }
-    if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z") {event.preventDefault();event.shiftKey?project.Redo():project.Undo();Changed();return;}
-    if(event.code==="Space") {event.preventDefault();SetMode("select");SetPlaying(!playing);}
-    if(event.key==="ArrowLeft"||event.key==="ArrowRight") {event.preventDefault();Seek(time+(event.key==="ArrowRight"?1:-1)*(event.shiftKey?5:1));}
-    if(event.key==="[") StepBeat(-1);if(event.key==="]") StepBeat(1);
-    if(event.key==="Escape") {SetNavigationTool("select");Render();}
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? project.Redo() : project.Undo(); Changed(); return; }
+    if (event.code === "Space") { event.preventDefault(); SetMode("select"); SetPlaying(!playing); }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); Seek(time + (event.key === "ArrowRight" ? 1 : -1) * (event.shiftKey ? 5 : 1)); }
+    if (event.key === "[") StepBeat(-1); if (event.key === "]") StepBeat(1);
+    if (event.key === "Escape") { SetNavigationTool("select"); Render(); }
   });
 }
 function Tick(timestamp) {
-  if(gamePlay?.active){lastTimestamp=timestamp;requestAnimationFrame(Tick);return;}
-  const elapsed=lastTimestamp?Math.max(0,(timestamp-lastTimestamp)/1000):0;
-  const measuring=!!previewDebug.profiler?.recording;
-  const beforeUpdate=measuring?performance.now():0;
-  previewDebug.Update(Math.min(elapsed,1));
-  const beforeNavigation=measuring?performance.now():0;
-  const navigated=!Element("annotationDialog").open&&navigation.Tick(Math.min(0.1,elapsed));
-  const beforeRender=measuring?{debugUpdateMs:beforeNavigation-beforeUpdate,navigationMs:performance.now()-beforeNavigation}:null;
-  if(playing&&lastTimestamp) {
+  if (gamePlay?.active) { lastTimestamp = timestamp; requestAnimationFrame(Tick); return; }
+  const elapsed = lastTimestamp ? Math.max(0, (timestamp - lastTimestamp) / 1000) : 0;
+  const measuring = !!previewDebug.profiler?.recording;
+  const beforeUpdate = measuring ? performance.now() : 0;
+  previewDebug.Update(Math.min(elapsed, 1));
+  const beforeNavigation = measuring ? performance.now() : 0;
+  const navigated = !Element("annotationDialog").open && navigation.Tick(Math.min(0.1, elapsed));
+  const beforeRender = measuring ? { debugUpdateMs: beforeNavigation - beforeUpdate, navigationMs: performance.now() - beforeNavigation } : null;
+  if (playing && lastTimestamp) {
     // Frames sample an absolute-time plan. Dropping elapsed time on a slow
     // render makes 1x playback (and every actor's metres/second) run too slowly.
-    const delta=elapsed*Number(Element("flowSpeed").value);
-    const end=Element("loopStage").checked?frame.stage.end:FLOW_DURATION;
-    if(time+delta>=end) {
-      if(Element("loopStage").checked) {
-        const duration=end-frame.stage.start;
-        time=frame.stage.start+(time+delta-frame.stage.start)%duration;
-      } else {time=FLOW_DURATION;SetPlaying(false);}
-    } else time+=delta;
-    Render({time:timestamp,previous:lastTimestamp,advancing:true,beforeRender});
+    const delta = elapsed * Number(Element("flowSpeed").value);
+    const end = Element("loopStage").checked ? frame.stage.end : activeVariant.duration;
+    if (time + delta >= end) {
+      if (Element("loopStage").checked) {
+        const duration = end - frame.stage.start;
+        time = frame.stage.start + (time + delta - frame.stage.start) % duration;
+      } else { time = activeVariant.duration; SetPlaying(false); }
+    } else time += delta;
+    Render({ time: timestamp, previous: lastTimestamp, advancing: true, beforeRender });
   }
-  else if(navigated||renderPending) Render({time:timestamp,previous:lastTimestamp,beforeRender});
-  lastTimestamp=timestamp;requestAnimationFrame(Tick);
+  else if (navigated || renderPending) Render({ time: timestamp, previous: lastTimestamp, beforeRender });
+  lastTimestamp = timestamp; requestAnimationFrame(Tick);
 }
 
 async function Start() {
+  PopulateVariantPicker();
   PopulateTimeline();
-  const mapData=await LoadEncounterMap({focus:frame.player});
-  workspace=new EncounterViewports(Element("viewportGrid"),mapData,{
-    activate:(entry)=>{map=entry.map;canvas=entry.canvas;canvas.dataset.mode=mode;canvas.dataset.navigationTool=navigationTool;},
-    change:()=>Render(),bounds:StageBounds,bind:BindMap,storage,
+  mapData = await EnsureVariantMap(activeVariant, frame.player);
+  workspace = new EncounterViewports(Element("viewportGrid"), mapData, {
+    activate: (entry) => { map = entry.map; canvas = entry.canvas; canvas.dataset.mode = mode; canvas.dataset.navigationTool = navigationTool; },
+    change: () => Render(), bounds: StageBounds, bind: BindMap, storage,
   });
-  navigation=new EncounterSceneControls(workspace,RequestRender);
-  for(const entry of workspace.entries) navigation.BindGizmo(entry);
-  previewDebug=new LevelFlowDebug({requestRender:RequestRender,renderFrame:()=>Render(),toast:Toast,visible:()=>workspace.Visible()});
-  gamePlay=new LevelFlowPlay({
-    snapshot:()=>({time,document:structuredClone(project.value),viewports:workspace.Serialize(),selection:structuredClone(selection)}),
-    pause:()=>{SetPlaying(false);navigation.Clear();},
-    restore:saved=>{Element("playStatus").hidden=true;selection=saved.selection;Seek(saved.time);workspace.Restore(saved.viewports);Render();},
-    showSource:()=>ShowTab("script"),
-    onState:state=>{
-      time=state.timelineTime;frame=EvaluateFlow(time,project.value);UpdateTimeline();
-      Element("playStatus").hidden=false;
-      Element("playStatusTitle").textContent=(state.paused?"已暂停 · ":"")+(state.hints?.title||"");
-      Element("playStatusTask").textContent=state.hints?.task||"";
-      Element("playStatusHint").textContent=state.hints?.hint||"";
+  navigation = new EncounterSceneControls(workspace, RequestRender);
+  for (const entry of workspace.entries) navigation.BindGizmo(entry);
+  previewDebug = new LevelFlowDebug({ requestRender: RequestRender, renderFrame: () => Render(), toast: Toast, visible: () => workspace.Visible() });
+  gamePlay = new LevelFlowPlay({
+    getVariant: () => activeVariant,
+    snapshot: () => ({ time, document: structuredClone(project.value), viewports: workspace.Serialize(), selection: structuredClone(selection) }),
+    pause: () => { SetPlaying(false); navigation.Clear(); },
+    restore: (saved) => { Element("playStatus").hidden = true; selection = saved.selection; Seek(saved.time); workspace.Restore(saved.viewports); Render(); },
+    showSource: () => ShowTab("script"),
+    onState: (state) => {
+      time = state.timelineTime; frame = activeVariant.evaluate(time, project.value); UpdateTimeline();
+      Element("playStatus").hidden = false;
+      Element("playStatusTitle").textContent = (state.paused ? "已暂停 · " : "") + (state.hints?.title || "");
+      Element("playStatusTask").textContent = state.hints?.task || "";
+      Element("playStatusHint").textContent = state.hints?.hint || "";
     },
-    toast:Toast,
+    toast: Toast,
     previewDebug,
   });
-  annotationEditor=new ScreenshotAnnotations(async()=>{
-    await chat.Attach(annotationEditor);annotationEditor.dialog.close();ShowTab("chat");
+  annotationEditor = new ScreenshotAnnotations(async () => {
+    await chat.Attach(annotationEditor); annotationEditor.dialog.close(); ShowTab("chat");
   });
-  chat=new EncounterChat({
-    snapshot:()=>({frame:Packet(),location:JSON.parse(CreateLocationText(frame,workspace,selection,project.value))}),
-    openScreenshot:OpenAnnotations,
-    editScreenshot:(image)=>{if(image) annotationEditor.Open(image.capture,image.frame,image.marks);},
-    openUnits:()=>{SetNavigationTool("select");SetPlaying(false);ShowTab("chat");},
-    setUnitMode:SetUnitSelectionMode,
-    removeUnit:id=>Select({type:"actor",id},{additive:true}),
-    clearUnits:()=>Select(null),
-    resizeViewports:resizing=>workspace.SetResizing(resizing),
+  chat = new EncounterChat({
+    snapshot: () => ({ frame: Packet(), location: JSON.parse(CreateLocationText(frame, workspace, selection, project.value)) }),
+    openScreenshot: OpenAnnotations,
+    editScreenshot: (image) => { if (image) annotationEditor.Open(image.capture, image.frame, image.marks); },
+    openUnits: () => { SetNavigationTool("select"); SetPlaying(false); ShowTab("chat"); },
+    setUnitMode: SetUnitSelectionMode,
+    removeUnit: (id) => Select({ type: "actor", id }, { additive: true }),
+    clearUnits: () => Select(null),
+    resizeViewports: (resizing) => workspace.SetResizing(resizing),
   });
-  Element("mapLoading").hidden=true;
+  Element("mapLoading").hidden = true;
   BindControls();
-  window.LevelFlow={
-    Seek,JumpBeat,SetPlaying,Select,Packet,SetMode,
-    Timeline:()=>timeline.Inspect(),
-    Play:{Start:mode=>gamePlay.Start(mode),Pause:on=>gamePlay.Pause(on),Stop:()=>gamePlay.Stop(),SetLayout:count=>gamePlay.SetLayout(count),State:()=>gamePlay.Inspect()},
-    Evaluate:(value)=>EvaluateFlow(value,project.value),
-    Stealth:()=>structuredClone(frame.stealth),
-    Inspect:()=>({time,playing,stage:frame.stage.id,beat:frame.beat.id,duration:FLOW_DURATION,actors:frame.actors,effects:frame.effects,dialogue:frame.dialogue,stretchersPassed:frame.stretchersPassed,task:frame.beat.task,speechBubbles:workspace.Visible().map(entry=>entry.map.InspectSpeech?.()||entry.map.speechBubbles||[]),layers:{...workspace.active.layers},view:{center:[...map.center],scale:map.scale},viewports:workspace.Serialize(),rendering:workspace.Visible().map(entry=>entry.map.Diagnostics?.()||null),mapObjects:mapData.objects.length,terrainBuild:mapData.terrain.buildInfo,groups:frame.groups,triggers:frame.triggers,document:structuredClone(project.value)}),
-    ToScreen:(point,index=workspace.activeIndex)=>workspace.entries[index].map.ToScreen(point),
-    SetLayout:(count)=>{workspace.SetLayout(count);Element("viewportLayout").value=String(count);},
-    SetViewType:(index,type)=>workspace.SetType(index,type),
-    ActivateView:(index)=>workspace.Activate(index),
-    RestoreViewports:(layout)=>{workspace.Restore(layout);Element("viewportLayout").value=String(workspace.count);Render();},
+  window.LevelFlow = {
+    Seek, JumpBeat, SetPlaying, Select, Packet, SetMode, SwitchVariant,
+    Variant: () => ({ id: activeVariant.id, level: activeVariant.spec.level, scene: activeVariant.spec.scene, title: activeVariant.spec.title, badge: activeVariant.spec.badge, duration: activeVariant.duration, forked: !activeVariant.spec.isBaseline }),
+    Variants: () => ENCOUNTER_VARIANTS.map((v) => ({ id: v.id, level: v.level, title: v.title, badge: v.badge, scene: v.scene })),
+    Timeline: () => timeline.Inspect(),
+    Play: { Start: (mode) => gamePlay.Start(mode), Pause: (on) => gamePlay.Pause(on), Stop: () => gamePlay.Stop(), SetLayout: (count) => gamePlay.SetLayout(count), State: () => gamePlay.Inspect() },
+    Evaluate: (value) => activeVariant.evaluate(value, project.value),
+    Stealth: () => structuredClone(frame.stealth),
+    Inspect: () => ({ variant: activeVariant.id, scene: activeVariant.spec.scene, time, playing, stage: frame.stage.id, beat: frame.beat.id, duration: activeVariant.duration, actors: frame.actors, effects: frame.effects, dialogue: frame.dialogue, stretchersPassed: frame.stretchersPassed, task: frame.beat.task, speechBubbles: workspace.Visible().map((entry) => entry.map.InspectSpeech?.() || entry.map.speechBubbles || []), layers: { ...workspace.active.layers }, view: { center: [...map.center], scale: map.scale }, viewports: workspace.Serialize(), rendering: workspace.Visible().map((entry) => entry.map.Diagnostics?.() || null), mapObjects: mapData.objects.length, terrainBuild: mapData.terrain.buildInfo, groups: frame.groups, triggers: frame.triggers, document: structuredClone(project.value) }),
+    ToScreen: (point, index = workspace.activeIndex) => workspace.entries[index].map.ToScreen(point),
+    SetLayout: (count) => { workspace.SetLayout(count); Element("viewportLayout").value = String(count); },
+    SetViewType: (index, type) => workspace.SetType(index, type),
+    ActivateView: (index) => workspace.Activate(index),
+    RestoreViewports: (layout) => { workspace.Restore(layout); Element("viewportLayout").value = String(workspace.count); Render(); },
   };
-  const stage=STAGE_TIMELINE.find((item)=>item.id===params.get("stage")?.padStart(2,"0"));
-  if(params.has("beat")) JumpBeat(params.get("beat"));else Seek(params.has("t")?Number(params.get("t")):stage?.start||0,{fit:true});
-  if(["x","z","zoom"].every((key)=>params.has(key)&&Number.isFinite(Number(params.get(key))))) {
-    map.center=[Number(params.get("x")),Number(params.get("z"))];map.scale=Clamp(Number(params.get("zoom")),FLOW_ZOOM.minScale,FLOW_ZOOM.maxScale);workspace.active.mode="manual";
-    if(map.type==="scene") {
-      const distance=Clamp(map.focal/map.scale,4,map.far/2),target=[map.center[0],map.Ground(map.center)+0.8,map.center[1]];
-      map.freeCamera.eye=target.map((value,axis)=>value-map.forward[axis]*distance);map.focusDistance=distance;
+  const stage = activeVariant.stages.find((item) => item.id === params.get("stage")?.padStart(2, "0"));
+  if (params.has("beat")) JumpBeat(params.get("beat")); else Seek(params.has("t") ? Number(params.get("t")) : stage?.start || 0, { fit: true });
+  if (["x", "z", "zoom"].every((key) => params.has(key) && Number.isFinite(Number(params.get(key))))) {
+    map.center = [Number(params.get("x")), Number(params.get("z"))]; map.scale = Clamp(Number(params.get("zoom")), FLOW_ZOOM.minScale, FLOW_ZOOM.maxScale); workspace.active.mode = "manual";
+    if (map.type === "scene") {
+      const distance = Clamp(map.focal / map.scale, 4, map.far / 2), target = [map.center[0], map.Ground(map.center) + 0.8, map.center[1]];
+      map.freeCamera.eye = target.map((value, axis) => value - map.forward[axis] * distance); map.focusDistance = distance;
     }
   }
-  if(project.warning) Toast(project.warning,true);
-  UpdateAnnotations();Render();chat.RestoreDraft();requestAnimationFrame(Tick);
+  if (project.warning) Toast(project.warning, true);
+  UpdateAnnotations(); Render(); chat.RestoreDraft(); requestAnimationFrame(Tick);
 }
-Start().catch((error)=>{Element("mapLoading").textContent=error.message;Toast(error.message,true);console.error(error);});
+Start().catch((error) => { Element("mapLoading").textContent = error.message; Toast(error.message, true); console.error(error); });

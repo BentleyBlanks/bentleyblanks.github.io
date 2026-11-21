@@ -1,0 +1,98 @@
+// 遭遇设计编辑器（Encounter Designer）关卡与变体注册表。
+// 纯 JSON 可序列化数据，零函数（遵守 Data_DataSources 门禁）。
+
+export const ENCOUNTER_DEFAULT_VARIANT_ID = "L1_Original";
+
+export const ENCOUNTER_LEVELS = Object.freeze([
+  Object.freeze({
+    id: "L1",
+    code: "01",
+    title: "第一关 · 往南的路",
+    available: true,
+    note: "北沙河以北撤退、后送与毁桥",
+  }),
+  Object.freeze({
+    id: "L2",
+    code: "02",
+    title: "第二关 · 手榴弹雨",
+    available: false,
+    note: "待建 · 后续接入东关场景与段落包即可直接选关",
+  }),
+]);
+
+export const ENCOUNTER_VARIANTS = Object.freeze([
+  Object.freeze({
+    id: "L1_Original",
+    level: "L1",
+    title: "现行双村版",
+    badge: "基线",
+    isBaseline: true,
+    summary: "01–07 前沿凹路 → 08–10 耿家庄 → 11–18 北沙河与炸桥",
+    scene: "FirstLevelEncounter",
+    sceneLabel: "FirstLevelEncounter",
+    baseVariant: null,
+    forkAtStage: null,
+    forkNote: null,
+    sharedStages: Object.freeze(["01", "02", "03", "04", "05", "06", "07"]),
+    tracks: Object.freeze([
+      Object.freeze({ label: "01–07 前沿与凹路", span: 4, shared: true }),
+      Object.freeze({ label: "08–10 耿家庄", span: 3, shared: false }),
+      Object.freeze({ label: "11–18 北沙河与铁路桥", span: 5, shared: false }),
+    ]),
+    segments: Object.freeze(["L1_Front0107", "L1_Gengjiazhuang0810", "L1_Beishahe1118"]),
+    storageKey: "tengxian1938_encounter_FirstLevelEncounter_v1",
+    legacyStorageKey: "tengxian1938_encounter_v2",
+    mapMaxZ: 1440,
+    playRegionMaxZ: 1440,
+    duskBlendZ: Object.freeze([820, 960]),
+    stampPaths: Object.freeze([
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.trench.bin",
+      "Scenes/FirstLevelEncounter/Environment_FirstLevelEncounter.json",
+      "Environment/EnvPreset_FirstLevelEncounter.json",
+      "Environment/EnvPreset_FirstLevelEncounterDusk.json",
+      "Scenes/FirstLevelEncounter/Data_Play.mjs",
+      "Scenes/FirstLevelEncounter/Data_LevelFlow.mjs",
+      "Scenes/FirstLevelEncounter/Data_LevelFlowBeishahe.mjs",
+      "Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs",
+    ]),
+  }),
+  Object.freeze({
+    id: "L1_BeishaheMerged",
+    level: "L1",
+    title: "北沙河单村合并版",
+    badge: "合并测试",
+    isBaseline: false,
+    summary: "01–07 共用 → 08–13 单村合并（救护所抢位 / 西巷端老耿家 / 空袭 / 炸桥）",
+    scene: "FirstLevelMerged",
+    sceneLabel: "FirstLevelMerged (北段继承 z<355)",
+    baseVariant: "L1_Original",
+    forkAtStage: "08",
+    forkNote: "从 08 分叉 · 01–07 场景(z<355)与编排完全共用",
+    sharedStages: Object.freeze(["01", "02", "03", "04", "05", "06", "07"]),
+    tracks: Object.freeze([
+      Object.freeze({ label: "01–07 共用", span: 4, shared: true }),
+      Object.freeze({ label: "08–13 北沙河单村合并（救护所 / 西巷潜行 / 空袭 / 炸桥）", span: 8, shared: false }),
+    ]),
+    segments: Object.freeze(["L1_Front0107", "L1_BeishaheMerged0813"]),
+    storageKey: "tengxian1938_encounter_L1_BeishaheMerged_v1",
+    legacyStorageKey: null,
+    mapMaxZ: 910,
+    playRegionMaxZ: 910,
+    duskBlendZ: Object.freeze([355, 450]),
+    stampPaths: Object.freeze([
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
+      "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.trench.bin",
+      "Scenes/FirstLevelMerged/Scene_FirstLevelMerged.json",
+      "Scenes/FirstLevelMerged/Scene_FirstLevelMerged.height.bin",
+      "Scenes/FirstLevelMerged/Scene_FirstLevelMerged.trench.bin",
+      "Scenes/FirstLevelMerged/Environment_FirstLevelMerged.json",
+      "Environment/EnvPreset_FirstLevelEncounter.json",
+      "Environment/EnvPreset_FirstLevelEncounterDusk.json",
+      "Scenes/FirstLevelMerged/Data_LevelFlowMerged.mjs",
+      "Scenes/FirstLevelMerged/Script_LevelFlowMerged.mjs",
+    ]),
+  }),
+]);

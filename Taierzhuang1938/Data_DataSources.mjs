@@ -13,7 +13,7 @@
 const RULE = (match, role, by, note) => Object.freeze({ match, role, by: Object.freeze(by), note });
 
 export const DATA_SOURCE_RULES = Object.freeze([
-  RULE("Scenes/FirstLevelEncounter/Data_*.mjs", "source", [], "Independent encounter choreography and cast source"),
+  RULE("Scenes/*/Data_*.mjs", "source", [], "Independent encounter choreography and cast source"),
   RULE("Data_PublishPathRules.json", "source", ["Script_StrictTextureRules.mjs"], "全发布范围图片规则：路径、明确格式、正数最大边长；包含模型内嵌图，不允许自动跳过"),
   // --- 关卡内容 ---------------------------------------------------------------------------------------------
   RULE("Scenes/*/Environment_*.json", "source", ["Script_EditorEnvironment.mjs", "../scripts/Script_LocalPreview.mjs", "Script_EnvPresetSeed.mjs"],

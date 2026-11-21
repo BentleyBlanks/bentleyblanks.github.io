@@ -2,9 +2,9 @@ import { FLOW_DIALOGUE } from "./Data_LevelFlow.mjs";
 import { FLOW_SPEECH_HUD as HUD } from "../../Data_Tuning_LevelFlow.mjs";
 import { Clamp } from "./Script_LevelFlowGeometry.mjs";
 
-export function SampleFlowDialogue(beat, time, actors) {
+export function SampleFlowDialogue(beat, time, actors, dialogueTable = FLOW_DIALOGUE) {
   const quotes = [...beat.passage.matchAll(/[「“]([^」”]+)[」”]/gu)].map(match => match[1]);
-  return (FLOW_DIALOGUE[beat.id] || []).flatMap((cue, index) => {
+  return (dialogueTable[beat.id] || []).flatMap((cue, index) => {
     const start = beat.start + cue.at, end = Math.min(beat.end, start + cue.duration);
     if (time < start || time >= end) return [];
     const actor = actors.find(entry => cue.actor ? entry.id === cue.actor : entry.groupId === cue.group && entry.pose !== "dead");

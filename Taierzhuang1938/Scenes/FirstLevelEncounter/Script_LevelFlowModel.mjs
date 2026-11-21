@@ -804,6 +804,7 @@ function Effects(beat, time, progress, actors) {
   return effects;
 }
 
+export { CoreActors as SharedFrontActors, OpeningActors as SharedFrontOpeningActors, Effects as SharedFrontEffects };
 export const DEFAULT_ENCOUNTER_DOCUMENT = CreateEncounterDocument(FLOW_TIMELINE, FLOW_WAVES);
 const compiledDocuments = new WeakMap();
 

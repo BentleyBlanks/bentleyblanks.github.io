@@ -4,8 +4,8 @@ import {ReadCastLibrary} from "./Script_EncounterCastLibrary.mjs";
 
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
-  constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug}) {
-    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,previewDebug});
+  constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug,getVariant}) {
+    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,previewDebug,getVariant});
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
@@ -36,9 +36,11 @@ export class LevelFlowPlay {
     });
     window.addEventListener("pagehide",()=>this.DropHost(),{once:true});this.UpdateControls();
   }
+  ActiveVariant(){return this.getVariant?.()||null;}
   SetCursorTime(time){this.cursorTime=time;this.UpdateControls();}
   UpdateControls() {
-    const allowed=this.menu.value==="beginning"||EncounterCanPlay(this.cursorTime);
+    const variant=this.ActiveVariant();
+    const allowed=this.menu.value==="beginning"||EncounterCanPlay(this.cursorTime,variant||undefined);
     this.button.disabled=this.active?!this.paused&&!this.state?.failed:!allowed;
     this.button.title=!allowed&&!this.active?"镜头动画段暂不支持 Play":this.state?.failed?"从检查点重新开始":this.paused?"继续 Play":"播放";
     this.button.setAttribute("aria-label",this.state?.failed?"重新开始 Play":"Play");
@@ -70,7 +72,8 @@ export class LevelFlowPlay {
     for(const button of this.debugButtons)editor?.CloseOverlay(button.dataset.debugTool);
   }
   async SceneStamp() {
-    const paths=["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
+    const variant=this.ActiveVariant();
+    const paths=variant?.spec?.stampPaths||["Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json","Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.trench.bin","Scenes/FirstLevelEncounter/Environment_FirstLevelEncounter.json",
       "Environment/EnvPreset_FirstLevelEncounter.json","Environment/EnvPreset_FirstLevelEncounterDusk.json",
       "Scenes/FirstLevelEncounter/Data_Play.mjs","Scenes/FirstLevelEncounter/Data_LevelFlow.mjs",
@@ -82,15 +85,16 @@ export class LevelFlowPlay {
       return [...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,"0")).join("");
     });
     hashes.push(ReadCastLibrary().then(library=>JSON.stringify(library?.data.models||null)).catch(()=>"null"));
-    return (await Promise.all(hashes)).join(":");
+    return `${variant?.id||"L1_Original"}:${(await Promise.all(hashes)).join(":")}`;
   }
   Start(mode="current") {
     if(this.active)return false;
+    const variant=this.ActiveVariant();
     this.saved=this.snapshot();
-    const time=mode==="beginning"?EncounterFirstPlayable().start:this.saved.time;
-    if(!EncounterCanPlay(time)){this.saved=null;this.toast("镜头动画段暂不支持 Play，请选择战斗关键帧。");return false;}
+    const time=mode==="beginning"?EncounterFirstPlayable(variant||undefined).start:this.saved.time;
+    if(!EncounterCanPlay(time,variant||undefined)){this.saved=null;this.toast("镜头动画段暂不支持 Play，请选择战斗关键帧。");return false;}
     clearTimeout(this.cacheTimer);this.pause();this.token=crypto.randomUUID();this.state=null;this.paused=false;this.launching=true;
-    const payload={token:this.token,time,document:this.saved.document};
+    const payload={token:this.token,variantId:variant?.id||"L1_Original",time,document:this.saved.document};
     try{sessionStorage.setItem("tengxian1938_encounter_play_session_v1",JSON.stringify(payload));}
     catch(error){this.toast("Play 开局数据保存失败："+error.message,true);this.saved=null;return false;}
     this.previewDebug.CloseAll();
@@ -119,7 +123,8 @@ export class LevelFlowPlay {
     this.DropHost();this.cachedStamp=stamp;
     this.host=document.createElement("div");this.host.className="lfPlayHost";
     this.loading=document.createElement("div");this.loading.className="lfPlayLoading";this.loading.textContent="正在载入战斗场景…";
-    this.frame=document.createElement("iframe");this.frame.title="Encounter Play";this.frame.allow="autoplay; fullscreen";this.frame.src="../index.html?encounterPlay=1";
+    const variantQuery=payload.variantId?`&variant=${encodeURIComponent(payload.variantId)}`:"";
+    this.frame=document.createElement("iframe");this.frame.title="Encounter Play";this.frame.allow="autoplay; fullscreen";this.frame.src=`../index.html?encounterPlay=1${variantQuery}`;
     const frame=this.frame;
     frame.addEventListener("load",()=>{
       if(this.frame!==frame)return;

@@ -997,10 +997,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
 }
 
 export async function LoadEncounterTerrain(scene,sceneUrl,map,options) {
-  const urls=[new URL(scene.terrain.file,sceneUrl),...(scene.trenches?.datum?.file?[new URL(scene.trenches.datum.file,sceneUrl)]:[])];
-  const responses=await Promise.all(urls.map((url)=>fetch(url,{cache:"no-store"})));
-  for(const response of responses) if(!response.ok) throw new Error(`场景地形读取失败 ${response.status}`);
-  const bytes=await Promise.all(responses.map((response)=>response.arrayBuffer()));
+  let bytes=options?.resolvedBytes;
+  if(!bytes) {
+    const urls=[new URL(scene.terrain.file,sceneUrl),...(scene.trenches?.datum?.file?[new URL(scene.trenches.datum.file,sceneUrl)]:[])];
+    const responses=await Promise.all(urls.map((url)=>fetch(url,{cache:"no-store"})));
+    for(const response of responses) if(!response.ok) throw new Error(`场景地形读取失败 ${response.status}`);
+    bytes=await Promise.all(responses.map((response)=>response.arrayBuffer()));
+  }
   const {PrepareEncounterTerrain}=await import("./Script_LevelFlowTerrainLoader.mjs");
   return PrepareEncounterTerrain(scene,bytes,map,options);
 }

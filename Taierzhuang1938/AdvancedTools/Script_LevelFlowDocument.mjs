@@ -61,16 +61,20 @@ function ValidateSavedDocument(value,timeline) {
 }
 
 export class EncounterDocument {
-  constructor(defaults,timeline,storage) {
+  constructor(defaults,timeline,storage,options={}) {
     this.defaults=defaults;
     this.timeline=timeline;
     this.storage=storage;
+    this.storageKey=options.storageKey||ENCOUNTER_STORAGE_KEY;
+    const legacyKey=options.legacyStorageKey===undefined
+      ?(this.storageKey===ENCOUNTER_STORAGE_KEY?"tengxian1938_encounter_v2":null)
+      :options.legacyStorageKey;
     this.value=structuredClone(defaults);
     this.undo=[];this.redo=[];this.warning="";
     try {
       // Copy the existing arrangement once; never write the old scene's draft.
-      const own=storage?.getItem(ENCOUNTER_STORAGE_KEY);
-      const saved=own||storage?.getItem("tengxian1938_encounter_v2");
+      const own=storage?.getItem(this.storageKey);
+      const saved=own||(legacyKey?storage?.getItem(legacyKey):null);
       if(saved) {
         const original=ValidateSavedDocument(JSON.parse(saved),timeline);
         this.value=ValidateSavedDocument(UpgradeEncounterDocument(original,defaults),timeline);
@@ -106,16 +110,17 @@ export class EncounterDocument {
 
   Save() {
     this.warning="";
-    try { this.storage?.setItem(ENCOUNTER_STORAGE_KEY,JSON.stringify(this.value)); }
+    try { this.storage?.setItem(this.storageKey,JSON.stringify(this.value)); }
     catch(error) { this.warning=`草稿仍在当前窗口 · 保存失败 ${error.message}`; }
   }
 }
 
-export function CreateFramePacket(document,frame,view,viewport) {
+export function CreateFramePacket(document,frame,view,viewport,meta={}) {
+  const scene=meta.scene||"FirstLevelEncounter",level=meta.level||"FirstLevel";
   return {
     schema:FRAME_SCHEMA,
     frameId:`L1-${frame.beat.id.toUpperCase()}-${Math.round(frame.time*1000)}`,
-    context:{level:"FirstLevel",scene:"FirstLevelEncounter",stage:frame.stage.id,beat:frame.beat.id,title:frame.beat.title,time:frame.time,
+    context:{level,scene,...(meta.variant?{variant:meta.variant}:{}),stage:frame.stage.id,beat:frame.beat.id,title:frame.beat.title,time:frame.time,
       player:[...frame.player],view:{center:[...view.center],scale:view.scale},viewport,
       bounds:view.Bounds?view.Bounds():[view.center[0]-viewport.width/(2*view.scale),view.center[0]+viewport.width/(2*view.scale),view.center[1]-viewport.height/(2*view.scale),view.center[1]+viewport.height/(2*view.scale)],
       projection:view.type||"plan",camera:view.eye?{eye:[...view.eye],aim:[...view.aim]}:null,

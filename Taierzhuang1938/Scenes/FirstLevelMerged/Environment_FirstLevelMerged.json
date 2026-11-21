@@ -1,0 +1,39 @@
+{
+  "schema": "tengxian-env-scene/1",
+  "scene": "FirstLevelMerged",
+  "time": {
+    "hour": 12,
+    "speed": 0.1,
+    "paused": true
+  },
+  "volumes": [
+    {
+      "id": "Fallback",
+      "name": "兜底（全场）",
+      "shape": "global",
+      "priority": 0,
+      "blendS": 0,
+      "mode": "full",
+      "preset": "FirstLevelEncounter"
+    },
+    {
+      "id": "BeishaheDusk",
+      "name": "北沙河黄昏（凹路出口 z355 起到南界）",
+      "shape": "box",
+      "center": [
+        80,
+        0,
+        635
+      ],
+      "size": [
+        520,
+        400,
+        560
+      ],
+      "priority": 10,
+      "blendS": 20,
+      "mode": "full",
+      "preset": "FirstLevelEncounterDusk"
+    }
+  ]
+}

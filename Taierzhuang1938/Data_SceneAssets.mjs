@@ -17,6 +17,8 @@ export const SCENE_LIST = Object.freeze([
     note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，道具换外部模型、地面换分层地表，体块仍是白盒网格，之后单独打磨" }),
   Object.freeze({ id: "FirstLevelEncounter", title: "第一关 · Encounter Play", style: "whitebox", note: "独立遭遇场景；编排和 Play 共用，原场景保持独立" }),
   Object.freeze({ id: "DugoutAidOpenFields", title: "沟底包扎 · 朝田野敞开的木棚", style: "formal", previewParam: "dugoutAidOpenFields" }),
+  Object.freeze({ id: "FirstLevelMerged", title: "第一关 · 北沙河单村合并版", style: "whitebox",
+    note: "01–07（z<355）实时继承 FirstLevelEncounter，z>=355 为合并后的北沙河单村分叉段" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */

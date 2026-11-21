@@ -5,8 +5,9 @@ import { DrawFlowDialogue, SpeechHeadHeight } from "./Scenes/FirstLevelEncounter
 // Orders are tied to real gates, not the preview clock or an audio duration.
 export function EncounterDialogueLines(plan, frame, {failed=false, exit=false, interact=false}={}) {
   if(failed || plan.completed)return [];
+  const cfg=plan.config||CONFIG;
   let speech=frame.dialogue.filter(line=>!plan.dead.has(line.actorId));
-  const guide=CONFIG.guidance[frame.beat.id];
+  const guide=cfg.guidance[frame.beat.id];
   if(!guide)return speech;
   const actor=frame.actors.find(actor=>actor.id===guide.actor&&!plan.dead.has(actor.id));
   // A dead/absent leader does not speak through walls or from beyond the grave.
@@ -14,7 +15,7 @@ export function EncounterDialogueLines(plan, frame, {failed=false, exit=false, i
   const text=!actor?frame.beat.task:exit&&guide.exit?guide.exit:
     plan.interacted.has(frame.beat.id)&&guide.afterAction?guide.afterAction:guide.text;
   const order={id:frame.beat.id+"_order",actorId:actor?.id||null,name:actor?.name||"",
-    text:text+(interact?"\n"+CONFIG.ui.interact:""),order:true};
+    text:text+(interact?"\n"+cfg.ui.interact:""),order:true};
   if(exit&&guide.exit||plan.interacted.has(frame.beat.id)&&guide.afterAction)speech=speech.filter(line=>line.actorId!==actor?.id);
   return [...speech,order];
 }

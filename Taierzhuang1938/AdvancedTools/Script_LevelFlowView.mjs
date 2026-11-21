@@ -43,11 +43,13 @@ export function EncounterSignals(frame) {
   if(frame.beat.id>="05a") signals.add("CartDeparted");
   if(frame.beat.id>="06e") signals.add("L1TrunkTossed");
   if(frame.beat.id>="06i") signals.add("L1SunkenRoadBlocked");
-  if(frame.beat.id>="09i") signals.add("SideGateOpen");
-  if(frame.beat.id>="10a") {signals.add("MgSilenced");signals.add("EastGateBurst");}
-  if(frame.beat.id>="10d") signals.add("NorthYardGatesBroken");
-  if(frame.beat.id>="10g") signals.add("BarrageHit");
-  if(frame.beat.id>="10i") signals.add("LaneWallCollapse");
+  if(!frame.customSignals) {
+    if(frame.beat.id>="09i") signals.add("SideGateOpen");
+    if(frame.beat.id>="10a") {signals.add("MgSilenced");signals.add("EastGateBurst");}
+    if(frame.beat.id>="10d") signals.add("NorthYardGatesBroken");
+    if(frame.beat.id>="10g") signals.add("BarrageHit");
+    if(frame.beat.id>="10i") signals.add("LaneWallCollapse");
+  }
   return signals;
 }
 

@@ -75,8 +75,45 @@ textarea { resize: vertical; min-height: 64px; }
 .lfSrOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The toolbar keeps current context and frequent actions on a single row. */
-.lfToolbar { display: flex; align-items: center; flex: none; gap: 12px; height: 52px; padding: 8px 16px; border-bottom: 1px solid #00000080; background: linear-gradient(180deg, #070807f7, #0b0c0aee); box-shadow: inset 0 1px var(--ed-rule-2), 0 2px 8px #00000030; z-index: 2; }
-#frameHeading { color: var(--ed-text-hi); font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; padding-right: 14px; border-right: 1px solid var(--lf-line); }
+.lfToolbar { display: flex; align-items: center; flex: none; gap: 12px; height: 52px; padding: 8px 16px; border-bottom: 1px solid #00000080; background: linear-gradient(180deg, #070807f7, #0b0c0aee); box-shadow: inset 0 1px var(--ed-rule-2), 0 2px 8px #00000030; z-index: 20; }
+.lfVariantPicker { position: relative; flex: none; }
+.lfVariantSummary { list-style: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 4px 10px 4px 8px; border: 1px solid var(--ed-edge); border-radius: 6px; background: var(--ed-field); color: var(--ed-text); cursor: pointer; user-select: none; white-space: nowrap; box-shadow: inset 0 1px #d8d4c307, 0 1px 2px #00000035; transition: border-color .12s, background-color .12s; }
+.lfVariantSummary::-webkit-details-marker { display: none; }
+.lfVariantSummary::after { content: "▾"; font-size: 11px; color: var(--ed-text-3); margin-left: 2px; }
+.lfVariantSummary:hover, .lfVariantPicker[open] .lfVariantSummary { background: var(--ed-sel); border-color: #cdb77b88; color: var(--ed-gold-hi); }
+.lfVariantPicker[data-forked="true"] .lfVariantSummary { border-color: #b89e5d88; background: linear-gradient(180deg, #252116, #181711); }
+.lfVariantCode { display: inline-grid; place-items: center; min-width: 22px; height: 19px; padding: 0 5px; border-radius: 4px; background: #ffffff0c; border: 1px solid #ffffff14; color: var(--ed-text-2); font: 600 11px/1 var(--ui-mono); }
+.lfVariantTitle { font-size: 13px; font-weight: 600; color: var(--ed-text-hi); }
+.lfVariantBadge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; line-height: 1.45; font-weight: 600; background: #262e31; border: 1px solid #53686f80; color: #b5cad0; }
+.lfVariantBadge[data-kind="fork"] { background: #362d19; border-color: #c5a86288; color: #f0da9e; }
+.lfVariantMenu { position: absolute; left: 0; top: calc(100% + 7px); width: min(600px, calc(100vw - 28px)); padding: 12px; border: 1px solid #5e5842; border-radius: 9px; background: linear-gradient(180deg, #141613fa, #0d0f0cfa); box-shadow: 0 18px 48px #00000095, inset 0 1px #ffffff10; z-index: 60; }
+.lfVariantHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--lf-line); }
+.lfVariantLevels { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lfToolbar .lfVariantLevels button { height: 28px; padding: 3px 10px; font-size: 12px; border-radius: 5px; }
+.lfVariantLevels button .lfSoonTag { margin-left: 5px; padding: 0 4px; border-radius: 3px; font-size: 10px; background: #ffffff10; color: var(--ed-text-3); }
+.lfSceneEditorLink { font-size: 12px; color: #d6c089; white-space: nowrap; }
+.lfSceneEditorLink code { font: 11px var(--ui-mono); color: #e9d9ae; background: #ffffff0c; padding: 1px 5px; border-radius: 3px; }
+.lfVariantList { display: flex; flex-direction: column; gap: 6px; }
+.lfForkConnector { display: flex; align-items: center; gap: 6px; padding: 1px 0 1px 14px; font-size: 11.5px; color: #ccb57c; }
+.lfForkConnector .lfForkElbow { font-family: var(--ui-mono); color: #b59c5c; font-weight: 700; }
+.lfForkConnector code { font: 11px var(--ui-mono); color: #9fc0c9; }
+.lfToolbar .lfVariantCard { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; height: auto; padding: 10px 12px; text-align: left; white-space: normal; border-radius: 7px; border: 1px solid var(--ed-edge); background: #161916; }
+.lfToolbar .lfVariantCard:hover:not(:disabled) { background: #1e221c; border-color: #b8a16588; color: var(--ed-text); }
+.lfToolbar .lfVariantCard[aria-pressed="true"] { background: linear-gradient(90deg, #282317, #1b1c16); border-color: #cfb36c; box-shadow: inset 3px 0 0 var(--ed-gold), 0 2px 10px #00000045; color: var(--ed-text); }
+.lfVariantCardHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.lfVariantCardTitle { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ed-text-hi); }
+.lfVariantDot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #8c968b; background: transparent; flex: none; }
+.lfVariantCard[aria-pressed="true"] .lfVariantDot { border-color: #ebd293; background: var(--ed-gold); box-shadow: 0 0 6px #d6b96c88; }
+.lfVariantMeta { font: 11.5px var(--ui-mono); color: var(--ed-text-3); }
+.lfVariantMeta code { font: inherit; color: #b9c5bc; }
+.lfTrackBar { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; width: 100%; }
+.lfTrackSeg { padding: 3px 7px; border-radius: 4px; font-size: 11px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #455257; background: #1c2629; color: #a9c3cb; }
+.lfTrackSeg[data-shared="false"] { border-color: #55594d; background: #232620; color: #c7cbbd; }
+.lfVariantCard[data-forked="true"] .lfTrackSeg[data-shared="false"] { border-color: #9e8549; background: #2e2716; color: #edd79f; }
+.lfVariantSummaryNote { font-size: 12px; color: var(--ed-text-3); line-height: 1.4; }
+.lfVariantFooter { margin-top: 10px; padding-top: 8px; border-top: 1px solid #2b312b; font-size: 11.5px; color: var(--ed-text-3); }
+.lfVariantFooter code { font: 11px var(--ui-mono); color: #9fc0c9; }
+#frameHeading { color: var(--ed-text-hi); font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; padding: 0 14px 0 4px; border-right: 1px solid var(--lf-line); }
 .lfToolGroup { display: flex; align-items: center; gap: 5px; }
 .lfToolbar button, .lfToolbar select { font-size: 14px; height: 32px; }
 .lfViewTools { gap: 3px; padding: 2px; border: 1px solid #00000066; border-radius: 7px; background: var(--ed-field); box-shadow: inset 0 1px 3px #00000030; }
@@ -208,8 +245,12 @@ textarea { resize: vertical; min-height: 64px; }
 .lfStages, .lfBeats { position: relative; height: 29px; }
 .lfStages button, .lfBeats button { position: absolute; top: 0; height: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box; border: 0; border-right: 2px solid var(--ed-black); border-radius: 2px; padding: 3px 5px; }
 .lfStages button { text-align: left; font-size: 12px; color: #abb5a8; background: var(--ed-field); }
+.lfStages[data-forked="true"] button[data-shared="true"] { box-shadow: inset 0 2px #587f8c; }
+.lfStages[data-forked="true"] button[data-shared="false"] { box-shadow: inset 0 2px #c8ad6b; color: #dfd0a7; }
 .lfStages button:hover { background: #33392f; color: #d4c396; }
 .lfStages button.selected { background: var(--ed-sel-strong); color: #e9d6a6; box-shadow: inset 0 -2px #b39e67; }
+.lfStages[data-forked="true"] button[data-shared="true"].selected { box-shadow: inset 0 2px #587f8c, inset 0 -2px #b39e67; }
+.lfStages[data-forked="true"] button[data-shared="false"].selected { box-shadow: inset 0 2px #e0c377, inset 0 -2px #b39e67; }
 .lfStages button.draft { color: #a9a0b5; background: #25262b; }
 #flowSeek { display: block; appearance: none; width: calc(100% + 14px); height: 14px; margin: 3px -7px; background: transparent; cursor: ew-resize; position: relative; z-index: 2; padding: 0; }
 #flowSeek::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right,#a38f5c var(--progress),#333d34 var(--progress)); border: 0; }
