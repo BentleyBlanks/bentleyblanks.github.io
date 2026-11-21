@@ -173,6 +173,21 @@ export const XBOT_TURN_IN_PLACE = Object.freeze({
 });
 
 /**
+ * 9 帧精修端枪 Aim Offset 网格资产（2026-11-21，由 _import/Script_BakeRifleAimOffset9.py 经 BlenderMCP 烘焙）：
+ * 帧 0..8 对应 3×3 网格（Up/Mid/Down × Left/Center/Right），帧 4 为精确无改动的 RifleAimingIdle_V1 基准姿态，
+ * 下半身与 Hips 9 帧严格 0° 差值，运行时按 Mesh-Space（脊柱/头）+ Local-Space（锁骨/双臂）做双线性 Additive 叠加。
+ */
+export const XBOT_AIM_OFFSET = Object.freeze({
+  file: "Animation_RifleAimOffset9.glb",
+  fps: 30,
+  cols: 3,
+  rows: 3,
+  refFrame: 4,
+  yawColsDeg: Object.freeze([75, 0, -75]),
+  pitchRowsDeg: Object.freeze([50, 0, -45]),
+});
+
+/**
  * 白刃战（刺刀，2026-11-01）：白刃导演（Script_MeleeCombat.Pose）给的动作名 → 动作库「刺刀专项」里的 Mixamo 动作。
  * 攻击 / 格挡 / 推开按这一下的进度（animationNormalized / normalized）对时间，上步 / 退步按循环播。
  * 表里没有的（戒备 Guard、蓄力 Charge、倒地、锁枪僵持 Bind / Pressure、被推开 Pushed、起身）和大刀，照原身体的白刃动作当场换算。

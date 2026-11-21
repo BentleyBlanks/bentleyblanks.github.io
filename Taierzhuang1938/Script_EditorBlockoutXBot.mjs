@@ -20,7 +20,7 @@ import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/Skeleto
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
-import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose, MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
@@ -30,7 +30,7 @@ import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 import {
   NPC_3C, WrapAngle, Clamp, Smooth01,
-  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAdditiveFireRecoil,
+  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
@@ -85,6 +85,8 @@ const _yawQ = new THREE.Quaternion(), _aimQ = new THREE.Quaternion(), _aimQ2 = n
 const _aimRight = new THREE.Vector3(), _aimFwd = new THREE.Vector3();
 const _addQ0 = new THREE.Quaternion(), _addQ1 = new THREE.Quaternion(), _addDelta = new THREE.Quaternion();
 const _idQuat = new THREE.Quaternion();
+const _aoTop = new THREE.Quaternion(), _aoBot = new THREE.Quaternion();
+const _aoModelQ = new THREE.Quaternion(), _aoModelQInv = new THREE.Quaternion();
 
 /** 开火 Additive 叠加仅作用上半身骨骼（双腿与 Hips 严格 0° 透明，跑动开火绝不锁腿滑步）。 */
 const XBOT_ADDITIVE_FIRE_BONES = new Set([
@@ -99,6 +101,21 @@ const XBOT_ADDITIVE_FIRE_BONES = new Set([
 const XBOT_SPINE_CHAIN = [
   ["Spine", "spine"], ["Spine1", "spine1"], ["Spine2", "spine2"], ["Neck", "neck"], ["Head", "head"],
 ];
+/** 9 帧 Aim Offset：脊柱/头用增量 Mesh-Space Delta（不随跑步前倾歪轴），锁骨与双臂用 Local-Space Delta。 */
+const XBOT_AIM_SPINE_BONES = ["Spine", "Spine1", "Spine2", "Neck", "Head"];
+const XBOT_AIM_ARM_BONES = [
+  ["LeftShoulder", 1.0], ["RightShoulder", 1.0],
+  ["LeftArm", 0.85], ["LeftForeArm", 0.85], ["LeftHand", 0.75],
+  ["RightArm", 0.85], ["RightForeArm", 0.85], ["RightHand", 0.75],
+];
+
+/** 对 9 帧网格的 4 个角四元数做双线性 Slerp（保证最短弧并归一化）。 */
+function SampleBilinearQuat(arr, w, out) {
+  const q00 = arr[w.f00], q01 = arr[w.f01], q10 = arr[w.f10], q11 = arr[w.f11];
+  _aoTop.slerpQuaternions(q00, q01, w.u);
+  _aoBot.slerpQuaternions(q10, q11, w.u);
+  return out.slerpQuaternions(_aoTop, _aoBot, w.v).normalize();
+}
 
 /** 从一条旋转关键帧轨道采样 t 秒处的四元数差值（相对第 0 帧已预减）。 */
 function SampleAdditiveTrack(track, t, out) {
@@ -359,6 +376,7 @@ export class XBotSkins {
     this.rifleTracks = new Map(); // file → PrepareRifleTrack 的结果（X Bot 模型空间、缩放 1）| null
     this.additiveFireCache = new Map(); // file → { duration, tracks: [{ boneName, times, deltas }] }
     this.turnYawCache = new Map();      // file → { duration, times, values }（Hips 相对第 0 帧的水平偏航增量）
+    this.aimOffsetGrid = null;          // 9 帧端枪 Aim Offset 网格（meshDelta + localDelta）
     this.loading = null;
   }
 
@@ -392,7 +410,7 @@ export class XBotSkins {
     // 每种人物一套（模型、头高、身体胶囊、初始骨头）；X Bot 之外的按阵营表读，读不到不影响 X Bot
     this.kits = new Map([["xbot", { key: "xbot", def: XBOT_CHARACTERS.xbot, source: this.source, headY: this.headY, bodyVolumes: this.bodyVolumes, restBones: this.restBones }]]);
     const keys=this.characterKeys||[...new Set([...Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys), ...Object.values(XBOT_CAST_CHARACTERS)])];
-    await Promise.all([this._CalibrateRifle(), ...keys.map(key => this._LoadKit(key))]);
+    await Promise.all([this._CalibrateRifle(), this._LoadAimOffsetGrid(), ...keys.map(key => this._LoadKit(key))]);
     this.ready = true;
   }
 
@@ -483,6 +501,93 @@ export class XBotSkins {
     const inv = _q.clone().invert();
     this.rifleOffset = { position: right.sub(_p).applyQuaternion(inv), quaternion: inv.multiply(rifleQ) };
     mixer.stopAllAction();
+  }
+
+  /**
+   * 载入 BlenderMCP 烘焙的 9 帧端枪 Aim Offset（Animation_RifleAimOffset9.glb）并离线预减基准帧（帧 4）：
+   *   · Spine..Head 计算模型空间增量 Delta（ΔM[b] = D_w[b] · D_w[parent]⁻¹），在跑步前倾时依然沿竖直平面抬/压枪；
+   *   · Left/RightShoulder、Arm、ForeArm、Hand 计算本地空间 Additive Delta（Q_ref⁻¹ · Q_pose），保留锁骨耸肩/贴腮/手肘微调；
+   *   · 双腿与 Hips 不入表（0° 透明）。加载失败时静默退回程序化脊柱分摊，不影响主流程。
+   */
+  async _LoadAimOffsetGrid() {
+    try {
+      const cfg = XBOT_AIM_OFFSET;
+      const gltf = await this.loader.loadAsync(this.base + cfg.file);
+      const clip = gltf?.animations?.[0];
+      if (!clip) return;
+      const model = CloneSkinned(this.source);
+      const bones = new Map();
+      model.traverse((o) => { if (o.isBone) bones.set(o.name, o); });
+      const mixer = new THREE.AnimationMixer(model);
+      const action = mixer.clipAction(clip);
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      action.play();
+
+      const total = cfg.cols * cfg.rows;
+      const worldQ = Array.from({ length: total }, () => new Map());
+      const localQ = Array.from({ length: total }, () => new Map());
+      const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
+
+      for (let f = 0; f < total; f += 1) {
+        action.time = Math.min(clip.duration, f / cfg.fps);
+        mixer.update(0);
+        model.updateMatrixWorld(true);
+        for (const name of XBOT_AIM_SPINE_BONES) {
+          const b = bones.get(name);
+          if (!b) continue;
+          b.matrixWorld.decompose(wp, wq, ws);
+          worldQ[f].set(name, wq.clone().normalize());
+        }
+        for (const [name] of XBOT_AIM_ARM_BONES) {
+          const b = bones.get(name);
+          if (b) localQ[f].set(name, b.quaternion.clone().normalize());
+        }
+      }
+      mixer.stopAllAction();
+      mixer.uncacheRoot(model);
+
+      const ref = cfg.refFrame;
+      // 1) Spine..Head 增量 Mesh-Space Delta：D_w[k][b] = Q_w[k][b] · Q_w[ref][b]⁻¹, ΔM[k][b] = D_w[k][b] · D_w[k][parent]⁻¹
+      const totalDelta = Array.from({ length: total }, () => new Map());
+      const meshDelta = new Map();
+      for (let i = 0; i < XBOT_AIM_SPINE_BONES.length; i += 1) {
+        const name = XBOT_AIM_SPINE_BONES[i];
+        const parentName = i > 0 ? XBOT_AIM_SPINE_BONES[i - 1] : null;
+        const qRef = worldQ[ref].get(name);
+        if (!qRef) continue;
+        const qRefInv = qRef.clone().invert();
+        const arr = [];
+        for (let f = 0; f < total; f += 1) {
+          const dw = worldQ[f].get(name).clone().multiply(qRefInv).normalize();
+          totalDelta[f].set(name, dw);
+          const dParent = parentName ? totalDelta[f].get(parentName) : null;
+          const inc = dParent ? dw.clone().multiply(dParent.clone().invert()).normalize() : dw.clone();
+          if (inc.w < 0) inc.set(-inc.x, -inc.y, -inc.z, -inc.w);
+          arr.push(inc);
+        }
+        meshDelta.set(name, arr);
+      }
+
+      // 2) Clavicle & Arm 本地空间 Additive Delta：ΔL[k][b] = Q_local[ref][b]⁻¹ · Q_local[k][b]
+      const localDelta = new Map();
+      for (const [name] of XBOT_AIM_ARM_BONES) {
+        const qRef = localQ[ref].get(name);
+        if (!qRef) continue;
+        const qRefInv = qRef.clone().invert();
+        const arr = [];
+        for (let f = 0; f < total; f += 1) {
+          const dl = qRefInv.clone().multiply(localQ[f].get(name)).normalize();
+          if (dl.w < 0) dl.set(-dl.x, -dl.y, -dl.z, -dl.w);
+          arr.push(dl);
+        }
+        localDelta.set(name, arr);
+      }
+
+      this.aimOffsetGrid = { cfg, meshDelta, localDelta };
+    } catch (error) {
+      console.warn("[XBot] 9-pose Aim Offset load skipped, falling back to procedural spine aim:", error?.message || error);
+    }
   }
 
   /**
@@ -881,9 +986,9 @@ export class XBotSkin {
     this.pickKey = key;
     this._ApplyBlend(dt);
     this.container.updateMatrixWorld(true);
-    // 脊柱 Aim Offset（Mesh Space）+ 开火上半身 Additive 叠加（排在武器挂接与左手 IK 之前，让枪和双臂自然随胸腔转动）
+    // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格，未就绪/空手/卧倒自动退回程序化脊柱分摊）+ 开火上半身 Additive 叠加
     if (live3C) {
-      this._ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance);
+      this._ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance, rifle);
       this._ApplyAdditiveFire(intent, rifle, stance);
       this.container.updateMatrixWorld(true);
     }
@@ -1186,7 +1291,7 @@ export class XBotSkin {
 
     this.wasDown = false;
     this.mixer.update(dt);
-    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.boneList[i].quaternion.copy(this.base[i]);
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.base[i].copy(this.boneList[i].quaternion);
     this.H("Hips") && this.baseHips.copy(this.H("Hips").position);
     this.baseValid = true;
     this.pick = { ...pick, mode: "clip", file: resolved[0].file };
@@ -1205,14 +1310,62 @@ export class XBotSkin {
 
   /**
    * Mesh-Space 脊柱瞄准偏移（Aim Offset）：
-   * 把「目标偏航 − 下盘扭转」与俯仰按解剖学比例分摊到 Spine→Spine1→Spine2→Neck→Head，
-   * 在底层步态混合之后以世界系旋转增量叠加，100% 保留底层跑步颠簸并让胸肩、枪、头自然随动。
+   *   · 站/蹲端枪且 9 帧 BlenderMCP 精修资产（Animation_RifleAimOffset9.glb）已就绪时，
+   *     对 3×3 网格做双线性 Slerp：脊柱/头用模型空间增量 Delta（绝不因跑步前倾歪轴），
+   *     锁骨/上臂/前臂/手腕用本地空间 Additive Delta（还原右撇子不对称探肩、贴腮、肘部下沉），
+   *     双腿严格 0° 透明；
+   *   · 卧倒、空手或资产加载中无缝退回程序化五节脊柱分摊。
    */
-  _ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance) {
+  _ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance, rifle = false) {
     const yawRad = WrapAngle((intent.lookYaw || 0) - lowerYawOff);
     const pitchRad = intent.lookPitch || 0;
     const activeW = Math.max(aimWeight, Math.abs(lowerYawOff) > 0.01 ? 1 : (Math.abs(yawRad) > 0.015 ? 0.85 : 0));
+    if (this.last3C) this.last3C.aimOffsetMode = "none";
     if (activeW < 1e-3 || (Math.abs(yawRad) < 1e-3 && Math.abs(pitchRad) < 1e-3)) return;
+
+    const grid = rifle && stance !== "prone" ? this.skins.aimOffsetGrid : null;
+    if (grid) {
+      const w = EvaluateAimOffsetGridWeights({
+        yawRad,
+        pitchRad,
+        stance,
+        yawColsDeg: grid.cfg.yawColsDeg,
+        pitchRowsDeg: grid.cfg.pitchRowsDeg,
+      });
+      // 将模型空间增量 Delta 共轭到世界系：ΔM_world = Q_model · ΔM_model · Q_model⁻¹
+      this.model.matrixWorld.decompose(_p, _aoModelQ, _s);
+      _aoModelQ.normalize();
+      _aoModelQInv.copy(_aoModelQ).invert();
+
+      for (const boneName of XBOT_AIM_SPINE_BONES) {
+        const bone = this.H(boneName);
+        const arr = grid.meshDelta.get(boneName);
+        if (!bone || !arr) continue;
+        SampleBilinearQuat(arr, w, _aimQ);
+        if (activeW < 0.999) _aimQ.slerpQuaternions(_idQuat, _aimQ, activeW);
+        // 几乎单位四元数直接跳过
+        if (Math.abs(1 - Math.abs(_aimQ.w)) < 1e-7) continue;
+        _aimQ.premultiply(_aoModelQ).multiply(_aoModelQInv).normalize();
+        RotateBoneWorld(bone, _aimQ);
+      }
+
+      // 锁骨与双臂叠加本地 Additive Delta（贴腮、右撇子左肩前探、高仰角耸肩、下瞄肘部放松）
+      for (const [boneName, scaleW] of XBOT_AIM_ARM_BONES) {
+        const bone = this.H(boneName);
+        const arr = grid.localDelta.get(boneName);
+        if (!bone || !arr) continue;
+        const effW = activeW * scaleW;
+        if (effW < 1e-3) continue;
+        SampleBilinearQuat(arr, w, _aimQ);
+        if (effW < 0.999) _aimQ.slerpQuaternions(_idQuat, _aimQ, effW);
+        if (Math.abs(1 - Math.abs(_aimQ.w)) < 1e-7) continue;
+        bone.quaternion.multiply(_aimQ);
+      }
+      this.container.updateMatrixWorld(true);
+      if (this.last3C) this.last3C.aimOffsetMode = "baked9";
+      return;
+    }
+
     const dist = EvaluateSpineAimDistribution({ yawRad, pitchRad, stance, aimWeight: activeW, rigKind: "xbot" });
     // 取逻辑朝向的水平右轴与前轴作为 Mesh-Space 俯仰/滚转参考轴
     const yaw = intent.yaw || 0;
@@ -1229,6 +1382,7 @@ export class XBotSkin {
       if (Math.abs(d.roll) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimFwd, d.roll));
       RotateBoneWorld(bone, _aimQ);
     }
+    if (this.last3C) this.last3C.aimOffsetMode = "procedural";
   }
 
   /**
@@ -1284,6 +1438,7 @@ export class XBotSkin {
       tipOffsetDeg: +(c.tip.visualYawOffset * 180 / Math.PI).toFixed(1),
       tipTurning: c.tip.turning,
       tipClip: c.tip.turnClipKey,
+      aimOffsetMode: c.aimOffsetMode || "none",
       addFireActive: this.addFireAge < NPC_3C.fireDurationS,
     };
   }

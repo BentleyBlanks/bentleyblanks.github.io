@@ -334,6 +334,68 @@ export function EvaluateSpineAimDistribution({
 }
 
 /**
+ * 4b) 9 帧 3×3 Aim Offset 网格的双线性采样权重计算：
+ * 将 (yawRad, pitchRad) 映射到 3×3 网格中包围当前方向的 4 个角帧索引与插值因子 (u, v)。
+ * 约定：+yaw = 向左，-yaw = 向右；+pitch = 向上，-pitch = 向下；
+ * 行 0..2 为 [Up, Mid, Down]，列 0..2 为 [Left, Center, Right]，帧 4 为 (0, 0) 基准帧。
+ */
+export function EvaluateAimOffsetGridWeights({
+  yawRad = 0,
+  pitchRad = 0,
+  stance = "stand",
+  yawColsDeg = [75, 0, -75],
+  pitchRowsDeg = [50, 0, -45],
+} = {}) {
+  const maxYawL = yawColsDeg[0];   // +75
+  const midYaw = yawColsDeg[1];    // 0
+  const maxYawR = yawColsDeg[2];   // -75
+  const maxPitchU = pitchRowsDeg[0]; // +50
+  const midPitch = pitchRowsDeg[1];  // 0
+  const minPitchD = pitchRowsDeg[2]; // -45
+
+  // 蹲姿收缩向下俯角和极限偏航，防止上身折进膝盖
+  const yawLimit = stance === "crouch" ? 68 : Math.max(Math.abs(maxYawL), Math.abs(maxYawR));
+  const pitchMinLim = stance === "crouch" ? Math.max(minPitchD, -18) : minPitchD;
+  const pitchMaxLim = stance === "crouch" ? Math.min(maxPitchU, 38) : maxPitchU;
+
+  const yawDeg = Clamp(yawRad / DEG, Math.max(maxYawR, -yawLimit), Math.min(maxYawL, yawLimit));
+  const pitchDeg = Clamp(pitchRad / DEG, pitchMinLim, pitchMaxLim);
+
+  let c0 = 1, c1 = 1, u = 0;
+  if (yawDeg >= midYaw) {
+    c0 = 0; c1 = 1;
+    const span = maxYawL - midYaw;
+    u = span > 1e-4 ? Clamp((maxYawL - yawDeg) / span, 0, 1) : 1;
+  } else {
+    c0 = 1; c1 = 2;
+    const span = midYaw - maxYawR;
+    u = span > 1e-4 ? Clamp((midYaw - yawDeg) / span, 0, 1) : 0;
+  }
+
+  let r0 = 1, r1 = 1, v = 0;
+  if (pitchDeg >= midPitch) {
+    r0 = 0; r1 = 1;
+    const span = maxPitchU - midPitch;
+    v = span > 1e-4 ? Clamp((maxPitchU - pitchDeg) / span, 0, 1) : 1;
+  } else {
+    r0 = 1; r1 = 2;
+    const span = midPitch - minPitchD;
+    v = span > 1e-4 ? Clamp((midPitch - pitchDeg) / span, 0, 1) : 0;
+  }
+
+  return {
+    f00: r0 * 3 + c0,
+    f01: r0 * 3 + c1,
+    f10: r1 * 3 + c0,
+    f11: r1 * 3 + c1,
+    u,
+    v,
+    yawDeg,
+    pitchDeg,
+  };
+}
+
+/**
  * 5) 开火 Additive 后坐包络：返回叠加动画进度（0..1）与上身阻尼后坐俯仰/滚转角。
  * 彻底替代旧版「开火 0.35 秒强切站立开火动作导致跑步腿冻住滑步」的做法。
  */

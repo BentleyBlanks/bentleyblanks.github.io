@@ -15,9 +15,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   NPC_3C, WrapAngle,
-  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAdditiveFireRecoil,
+  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
-import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET } from "./Data_BlockoutXBotClips.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEG = Math.PI / 180;
@@ -163,6 +163,62 @@ Check("XBOT_NATIVE / 4WAY / TURN_IN_PLACE 引用的每个 Mixamo GLB 文件均�
     for (const [d, v] of Object.entries(dirs)) checkFile(`XBOT_LOCOMOTION_4WAY.${g}.${d}`, v.file);
   }
   for (const [k, v] of Object.entries(XBOT_TURN_IN_PLACE)) checkFile(`XBOT_TURN_IN_PLACE.${k}`, v.file);
+});
+
+// 6. 9 帧精修端枪 Aim Offset 网格权重与 BlenderMCP 烘焙资产校验
+Check("EvaluateAimOffsetGridWeights：四角、中心、半角双线性权重与蹲姿限位准确", () => {
+  const ul = EvaluateAimOffsetGridWeights({ yawRad: 75 * DEG, pitchRad: 50 * DEG });
+  assert.equal(ul.f00, 0);
+  assert.ok(ul.u === 0 && ul.v === 0, "UpLeft hits frame 0 with u=0, v=0");
+
+  const dr = EvaluateAimOffsetGridWeights({ yawRad: -75 * DEG, pitchRad: -45 * DEG });
+  assert.equal(dr.f11, 8);
+  assert.ok(dr.u === 1 && dr.v === 1, "DownRight hits frame 8 with u=1, v=1");
+
+  const center = EvaluateAimOffsetGridWeights({ yawRad: 0, pitchRad: 0 });
+  const centerWeight =
+    (center.f00 === 4 ? (1 - center.u) * (1 - center.v) : 0) +
+    (center.f01 === 4 ? center.u * (1 - center.v) : 0) +
+    (center.f10 === 4 ? (1 - center.u) * center.v : 0) +
+    (center.f11 === 4 ? center.u * center.v : 0);
+  assert.ok(Math.abs(centerWeight - 1) < 1e-6, `Center (0,0) puts 100% weight on refFrame 4 (got ${centerWeight})`);
+
+  const mid = EvaluateAimOffsetGridWeights({ yawRad: 37.5 * DEG, pitchRad: 25 * DEG });
+  assert.deepEqual([mid.f00, mid.f01, mid.f10, mid.f11], [0, 1, 3, 4]);
+  assert.ok(Math.abs(mid.u - 0.5) < 1e-6 && Math.abs(mid.v - 0.5) < 1e-6);
+
+  const crouchClamp = EvaluateAimOffsetGridWeights({ yawRad: 0, pitchRad: -45 * DEG, stance: "crouch" });
+  assert.ok(crouchClamp.pitchDeg >= -18.01, `crouch pitch clamped >= -18° (got ${crouchClamp.pitchDeg}°)`);
+});
+
+Check("Animation_RifleAimOffset9.glb：9 帧完整、下半身零漂移、含烘焙元数据且体积可控", () => {
+  const glbPath = path.join(here, "Animation/Mixamo", XBOT_AIM_OFFSET.file);
+  assert.ok(fs.existsSync(glbPath), `missing baked Aim Offset GLB: ${glbPath}`);
+  const buf = fs.readFileSync(glbPath);
+  assert.ok(buf.length > 10000 && buf.length < 256 * 1024, `compact GLB size (${buf.length} bytes)`);
+  assert.equal(buf.readUInt32LE(0), 0x46546c67, "valid glTF magic header");
+  const jsonLen = buf.readUInt32LE(12);
+  const gltf = JSON.parse(buf.slice(20, 20 + jsonLen).toString("utf8"));
+  assert.ok(gltf.animations?.length >= 1, "contains animation");
+  const anim = gltf.animations[0];
+  for (const upperBone of ["Spine", "Spine1", "Spine2", "Neck", "Head", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm"]) {
+    const ni = gltf.nodes.findIndex((n) => n.name === upperBone);
+    assert.ok(ni >= 0, `node ${upperBone} exists`);
+    const ch = anim.channels.find((c) => c.target.node === ni && c.target.path === "rotation");
+    assert.ok(ch, `rotation channel for ${upperBone}`);
+    const acc = gltf.accessors[anim.samplers[ch.sampler].input];
+    assert.equal(acc.count, 9, `${upperBone} has 9 pose keyframes`);
+  }
+  // 校验 scene extras 里记录的 9 帧质检报告：每帧下半身零漂移且握距误差 < 5 mm
+  const extrasStr = gltf.scenes?.[0]?.extras?.tz_aim_offset;
+  assert.ok(extrasStr, "scene extras tz_aim_offset present");
+  const meta = JSON.parse(extrasStr);
+  assert.equal(meta.refFrame, 4);
+  assert.equal(meta.poses.length, 9);
+  for (const p of meta.poses) {
+    assert.ok(p.maxLegDeltaDeg < 1e-3, `frame ${p.frame} leg delta ${p.maxLegDeltaDeg}°`);
+    assert.ok(p.gripErrMm < 5.0, `frame ${p.frame} grip error ${p.gripErrMm} mm`);
+  }
 });
 
 console.log(results.join("\n"));
