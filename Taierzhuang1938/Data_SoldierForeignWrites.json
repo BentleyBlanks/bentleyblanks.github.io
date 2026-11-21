@@ -58,9 +58,6 @@
   "missionCombatAlert": [
    "Script_EditorBlockoutPuppets.mjs"
   ],
-  "moveSpeed": [
-   "Script_EditorSquadMarch.mjs"
-  ],
   "order": [
    "Script_EditorBlockoutPlay.mjs",
    "Script_ExplosionRange.mjs",
@@ -80,9 +77,6 @@
   ],
   "scriptArrivalRadius": [
    "Script_ExplosionRange.mjs"
-  ],
-  "squadMarchCommand": [
-   "Script_EditorSquadMarch.mjs"
   ],
   "stance": [
    "Script_EditorBlockoutConfig.mjs"
@@ -114,7 +108,6 @@
   ],
   "yaw": [
    "Script_EditorBlockoutPuppets.mjs",
-   "Script_EditorSquadMarch.mjs",
    "Script_FirstLevelCollection.mjs",
    "Script_GoreRange.mjs",
    "Script_Main.mjs",

@@ -53,15 +53,6 @@ export const LITTER_GAIT = Object.freeze({
   noPauseGateM: 6, noPauseEndM: 8, laneTaperInM: 3, laneTaperOutM: 8,
 });
 
-export const SQUAD_MARCH_EDITOR = Object.freeze({
-  count: 6, seed: 17, leaderIndex: 0, preset: 'guided', startYawJitterRad: .45,
-  storageKey: 'tengxian1938_squad_march_v1',
-  route: Object.freeze([
-    Object.freeze({x:-12,z:10}), Object.freeze({x:-12,z:-12}),
-    Object.freeze({x:12,z:-12}), Object.freeze({x:12,z:10}),
-  ]),
-});
-
 // Local crowd recovery only; static collision and slope checks remain in the AI host.
 export const SQUAD_MARCH_AVOID = Object.freeze({
   queryRadiusM:12, circleSamples:12, clearanceScale:1.05, ringScale:1.18,

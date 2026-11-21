@@ -39,7 +39,7 @@
 
 - **Encounter Play 独立场景（2026-11-15）**：Encounter Designer 与工具栏 Play 共用 `Scenes/FirstLevelEncounter/`，旧 `FirstLevelWhitebox` 和 `FirstLevel` 保留独立。新场景内的 `Data_LevelFlow*` 是编排源，`Data_Play.gates` 是事件过关条件，不能用时间代替。镜头动画段禁用 Play；从头从首个战斗关键帧开始。工具栏播放／暂停／停止，状态放右侧原文；`Data_Play.guidance` 提供独立于配音、保留到实际完成的文字行动指令，人物头顶气泡与底部对白随真实视线切换。默认单视口、最多双视口；停止不回写运行结果并短时复用已加载资源。接线与验收见 [Encounter Play](docs/Data_EncounterPlay.md)。
 
-- **高级工具拆分（2026-11-12）**：场景编辑器、遭遇设计、Mixamo 动作预览、贴图管理与九个摄影棚类编辑器在 `AdvancedTools/`（本地控制中心 `ControlCenter.html`、独立宿主 `Tool_Studio.html`），口径见 [编辑器套件](docs/Data_EditorSuite.md)「AdvancedTool ControlCenter 与独立工具宿主」。**方向规则：游戏目录的非测试代码不 import `./AdvancedTools/`，唯一例外 `Script_DevToolsSplit.mjs`**；线上发布恒换成 `*Split*Stub`、不含该目录；守门 `Script_DevToolsIsolationTest` + `Script_AdvancedToolsTest`。
+- **高级工具拆分（2026-11-12）**：场景编辑器、遭遇设计、Mixamo 动作预览、贴图管理及摄影棚类编辑器在 `AdvancedTools/`（本地控制中心 `ControlCenter.html`、独立宿主 `Tool_Studio.html`），口径见 [编辑器套件](docs/Data_EditorSuite.md)「AdvancedTool ControlCenter 与独立工具宿主」。**方向规则：游戏目录的非测试代码不 import `./AdvancedTools/`，唯一例外 `Script_DevToolsSplit.mjs`**；线上发布恒换成 `*Split*Stub`、不含该目录；守门 `Script_DevToolsIsolationTest` + `Script_AdvancedToolsTest`。
 
 - **第一关 Encounter Designer（2026-11-13）**位于高级工具 → 关卡 → Encounter Designer，入口 `Tool_LevelFlow.html`。01–07 对应 Notion 11-11 定稿，08–10 对应现行草稿。完整空间底图取自 `FirstLevelWhitebox` 场景与归档空间表，空间图的沟岸与沟底分层合并绘制，立体视口复用真实高度图与壕沟采样，连接点须保持贯通。单／双／三／四视口共用时间轴，双视口左右等宽，三视口左侧全高、右侧上下两格。视角菜单分为 2D（战斗局部）与 3D（Scene 自由视角、跟拍、玩家视线）；触发区、生成区、数量、行为可编辑。镜头段在时间轴标记。草稿存浏览器，导出 PNG 的 `EncounterFrame` iTXt 包含帧定位、标注与布设，也支持工程 JSON。设计规则与回读方法见 [Encounter Designer](docs/Data_LevelFlow.md)，门禁 `LevelFlowTest` / `LevelFlowBrowserTest`。
 

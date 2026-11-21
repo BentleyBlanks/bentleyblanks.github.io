@@ -164,7 +164,7 @@ Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGea
 // 菜单栏有六组高级工具、右侧 Debug工具，共 17 个高级工具入口。
 Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
   && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
-  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
+  && !afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
 Check("Debug工具八项在音量条旁的下拉里，不混进编辑器条目",

@@ -2740,10 +2740,6 @@ async function Boot() {
     const tool = params.get("tool");
     if (tool) editor.Toggle(tool);
   }
-  if (EDITOR_PARAM === "squadMarch" && !SHOT) {
-    ShowBoot(false);
-    editor?.Open("squadMarch");
-  }
   if (EDITOR_PARAM === "vfx") {
     ShowBoot(false);state.menu=false;state.running=false;editor?.Open("vfx");
   }

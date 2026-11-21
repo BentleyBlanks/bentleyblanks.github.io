@@ -1,4 +1,4 @@
-// 独立工具宿主（Tool_Studio.html?tool=<id>）：九个摄影棚类高级工具不靠游戏主程序、单独一页就能开。
+// 独立工具宿主（Tool_Studio.html?tool=<id>）：摄影棚类高级工具不靠游戏主程序、单独一页就能开。
 //
 // 渲染底座在 Script_ToolStudioRenderBase（自己装配，不改 Script_Main）；这里是外壳：顶部菜单栏 + 右侧 Inspector
 // + 一次只开一个工具，布局、样式与 EditorSuite 同一套（Style_Interface / Style_Editor、Script_EditorUi、
@@ -13,7 +13,6 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
@@ -24,11 +23,11 @@ import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
 
 /** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页，不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
+  ActorEditor, FacialEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
   PropLibraryEditor, AssetStandardsEditor,
 ]);
 
-/** 菜单分组：Data_DevTools.TOOL_MENUS 里挑出这九个，空组不列。 */
+/** 菜单分组：从 Data_DevTools.TOOL_MENUS 中筛选摄影棚类工具，空组不列。 */
 export function StudioMenus(editors = STUDIO_EDITORS) {
   const editorById = new Map(editors.map((Editor) => [Editor.id, Editor]));
   return TOOL_MENUS

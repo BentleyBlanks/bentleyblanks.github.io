@@ -71,6 +71,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 - **2026-11-13**：样条与撒点验证界面移入 `AdvancedTools/`，入口为 `Tool_Pcg.html?tool=splines|propPcg`。宿主复用工具渲染底座与界面外壳，通过 `TengxianField` / `FirstLevelWhiteboxField`、`AddExternalProps` 装配场地与真实布设。生产生成器和数据仍由游戏共享调用，发布包剔除这两项验证界面。环境转入 Debug工具独立窗口，第一人称持枪移动检查删除。控制中心共 17 项，15 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
 - **2026-11-21**：新增独立窗口工具「动作衔接对比」（`motionCompare`，入口 `AdvancedTools/Tool_MotionCompare.html` + `Script_MotionCompare.mjs` + `Script_EditorMotionCompare.mjs`），归入「角色」分组；左右同步分屏实机对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / BlenderMCP 9 帧 Aim Offset / 开火叠加 / 第一人称双腿防穿插 / WASD 沙盒）。控制中心共 18 项，16 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
+- **2026-11-22**：删除「小队行进」编辑器及其独立宿主与游戏内入口。控制中心共 17 项，其中 8 项使用摄影棚宿主、7 项开独立窗口、2 项走游戏入口。
 
 ## 精简测试界面
 
@@ -970,10 +971,3 @@ node Taierzhuang1938/Script_AiEditorTest.mjs
 
 改了编辑器以外的东西照旧跑 `Script_BootTest.mjs`（画面健康 + draw call 红线）与
 `Script_PlayTest.mjs`（玩法与剧本）。
-
-
-### 小队行进 `Script_EditorSquadMarch.mjs`
-
-入口 `?editor=squadMarch&phase=1` 或「编辑器 → 小队行进」。复用摄影棚、正式人物模型与 `Script_SquadMarch` 共享行为；正式场景通过 `SquadMarchAi` 使用同一调度。支持 1–24 人、班长选择、可复现随机种子、跑停与间距参数、拖动路线、成员跟随、时间带、暂停/单帧和速度控制。按人数保留浏览器样式，JSON 可导出及验证后导入。
-
-编辑器暂停并隐藏正式玩法；只创建预览人物，退出清理演员并还原相机、舞台大小与可见性。平地样式预览与关卡碰撞/威胁验收分别记录，详见 [小队行进设计](Data_NpcGuideCadence.md) 第 8–9 节。回归入口：`Script_SquadMarchTest.mjs` / `Script_SquadMarchEditorTest.mjs`。
