@@ -4,7 +4,7 @@
 //      每一步跨的距离 ≈ 速度 ÷ 步频（距离匹配）。
 //   3. 停步后脚收回脚位、不再挪；瞬移后脚直接落到新位置。
 import assert from "node:assert/strict";
-import { FirstPersonGait, WrapAngle, Interp } from "./Script_FirstPersonGait.mjs";
+import { FirstPersonGait, ModelToWorld, WrapAngle, Interp } from "./Script_FirstPersonGait.mjs";
 import { FIRST_PERSON_BODY as T } from "./Data_Tuning_FirstPersonBody.mjs";
 
 const RIG = { feet: [{ x: 0.078, z: -0.057 }, { x: -0.078, z: -0.056 }] };
@@ -205,6 +205,49 @@ for (const speed of [2.5, 3.05, 5.25]) {
     }
   });
 }
+
+// 2026-11-21：侧向横移时双腿三维轴线保持足够净距（旧版 orientWarp 40° 且无脚道扩宽与摆动外绕，
+// 横移时两条腿三维中心线挤到 0.118 m 以内，小腿与大腿视觉上互相穿插）。
+Check("横移 1.5 / 2.5 / 3.05 m/s：左右腿三维轴线净距 ≥ 0.145 m、不互相穿插", () => {
+  const segDist = (a0, a1, b0, b1) => {
+    let best = Infinity;
+    for (let i = 0; i <= 10; i++) {
+      const u = i / 10;
+      const ax = a0[0] + (a1[0] - a0[0]) * u, ay = a0[1] + (a1[1] - a0[1]) * u, az = a0[2] + (a1[2] - a0[2]) * u;
+      for (let j = 0; j <= 10; j++) {
+        const v = j / 10;
+        const bx = b0[0] + (b1[0] - b0[0]) * v, by = b0[1] + (b1[1] - b0[1]) * v, bz = b0[2] + (b1[2] - b0[2]) * v;
+        best = Math.min(best, Math.hypot(ax - bx, ay - by, az - bz));
+      }
+    }
+    return best;
+  };
+  for (const speed of [1.5, 2.5, 3.05]) {
+    for (const dirDeg of [90, -90]) {
+      const gait = new FirstPersonGait(T, RIG);
+      const s = { x: 0, z: 0, vx: 0, vz: 0 };
+      const Input = () => ({ playerX: s.x, playerY: 0, playerZ: s.z, anchorX: s.x, anchorZ: s.z + 0.18, aimYaw: 0,
+        grounded: true, crouch: 0, prone: 0, hipHeight: 0.873, legReach: 0.86, ankleHeight: 0.092 });
+      for (let i = 0; i < 30; i++) gait.Update(DT, Input());
+      let minSeg = Infinity;
+      for (let i = 0; i < 240; i++) {
+        const d = dirDeg * DEG, k = 1 - Math.exp(-DT * 12);
+        s.vx += (-Math.sin(d) * speed - s.vx) * k; s.vz += (-Math.cos(d) * speed - s.vz) * k;
+        s.x += s.vx * DT; s.z += s.vz * DT;
+        gait.Update(DT, Input());
+        if (i > 40) {
+          const [hLx, hLz] = ModelToWorld(0.09, 0, gait.lowerYaw);
+          const [hRx, hRz] = ModelToWorld(-0.09, 0, gait.lowerYaw);
+          const hipL = [s.x + hLx, 0.87, s.z + 0.18 + hLz], hipR = [s.x + hRx, 0.87, s.z + 0.18 + hRz];
+          const fL = [gait.feet[0].x, gait.feet[0].y + 0.09 + gait.feet[0].lift, gait.feet[0].z];
+          const fR = [gait.feet[1].x, gait.feet[1].y + 0.09 + gait.feet[1].lift, gait.feet[1].z];
+          minSeg = Math.min(minSeg, segDist(hipL, fL, hipR, fR));
+        }
+      }
+      assert.ok(minSeg >= 0.145, `strafe ${speed} m/s dir ${dirDeg}: 3D leg clearance ${minSeg.toFixed(3)} m < 0.145 m`);
+    }
+  }
+});
 
 Check("直走、慢转（死区内）时不触发脚跟着胯拧 / 推开", () => {
   const { gait, s, Step } = Sim();

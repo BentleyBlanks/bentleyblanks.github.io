@@ -445,13 +445,26 @@ try {
         const footBefore = foot.getWorldPosition(new THREE.Vector3());
         const head = this.characterRig.bones.head;
         const headBefore = head.getWorldPosition(new THREE.Vector3());
+        const chestBeforeQ = this.characterRig.bones.chest.getWorldQuaternion(new THREE.Quaternion());
         applyAim.call(this, state);
         const gripAfter = this.weaponGroup.worldToLocal(left.getWorldPosition(new THREE.Vector3()));
+        const headAfter = head.getWorldPosition(new THREE.Vector3());
+        const pelvisAfter = this.characterRig.bones.pelvis.getWorldPosition(new THREE.Vector3());
+        const chestAfterQ = this.characterRig.bones.chest.getWorldQuaternion(new THREE.Quaternion());
         check(gripBefore.distanceTo(gripAfter) < 1e-4, "aim correction detached left hand from rifle");
         check(footBefore.distanceTo(foot.getWorldPosition(new THREE.Vector3())) < 1e-5,
           "aim correction moved planted foot");
-        check(headBefore.distanceTo(head.getWorldPosition(new THREE.Vector3())) < 1e-5,
-          "aim correction folded the head/torso into the crouched legs");
+        check(headBefore.y - headAfter.y < 0.08,
+          `aim correction folded the head/torso downward (${(headBefore.y - headAfter.y).toFixed(3)} m)`);
+        if (state.crouch > 0.5 && !(state.prone > 0.5)) {
+          const lean = Math.atan2(Math.hypot(headAfter.x - pelvisAfter.x, headAfter.z - pelvisAfter.z), Math.max(1e-4, headAfter.y - pelvisAfter.y)) * 180 / Math.PI;
+          check(lean < 40 && headAfter.y > pelvisAfter.y + 0.2,
+            `crouch spine aim folded torso into knees: lean=${lean.toFixed(1)}°`);
+        }
+        if (!(state.prone > 0.5) && Math.abs(state.lookYaw || 0) >= 0.4 && (state.aim || 0) > 0.9) {
+          check(chestBeforeQ.angleTo(chestAfterQ) > 0.12,
+            `standing/crouched aim left chest frozen (wooden upper body): angle=${chestBeforeQ.angleTo(chestAfterQ).toFixed(3)}`);
+        }
         frames++;
       };
       for (const stance of [0, 1, 2]) for (const lookYaw of [-.55, .4]) for (const lookPitch of [-.35, .4]) {

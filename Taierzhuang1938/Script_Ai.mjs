@@ -3955,6 +3955,14 @@ export class AiDirector {
     }
 
     let targetYaw = null;
+    // 战术侧移 / 掩体探头缩头时保持面向威胁（交由 2D 混合空间侧移/退步 + 朝向扭曲 + 脊柱瞄准表现），
+    // 不再为了 0.55 m 探头或短距离换位把整个人拧开 90°、走两步停下再甩回 90°。长距离推进 / 冲向掩体 / 躲雷仍朝行进方向跑。
+    const keepCombatFacing = !evading && (
+      (s.state === STATE.COVER_ENGAGE && (s.coverPhase === "peek" || s.coverPhase === "hide"))
+      || ((s.state === STATE.FIRE || s.state === STATE.SUPPRESS)
+        && s.aimBlend > 0.35 && s.moveSpeed < 0.65
+        && (this.time < s.displaceUntil || (Number.isFinite(s.moveArriveM) && s.moveArriveM <= 0.8)))
+    );
     // 【§20】环境射击接管枪口：这一拍打不出「对人」的一发、而关卡给了授权点的人，
     // 面向那个点、据枪、抬到那个高度（`AmbientOwnsAim` 判；没有授权点就是 false）。
     const ambient = s.ambientFirePoint && this.AmbientOwnsAim ? this.AmbientOwnsAim(s) : false;
@@ -3964,7 +3972,7 @@ export class AiDirector {
       s.lookPitch = this.shooting.LookPitch(this.shooting.MuzzleOrigin(s), p);
       targetYaw = Math.atan2(-(p.x - s.position.x), -(p.z - s.position.z));
       s.muzzleAimYaw = targetYaw;
-      if (s.moveSpeed < 0.08) wantedYaw = targetYaw;
+      if (s.moveSpeed < 0.08 || keepCombatFacing) wantedYaw = targetYaw;
     } else if (s.target && s.targetVisible) {
       // Track height before the first shot and during the cooldown, not after firing.
       this.UpdateMuzzle(s);
@@ -3983,16 +3991,15 @@ export class AiDirector {
       }
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
       targetYaw = Math.atan2(-dx, -dz);
-      // 停火瞄准与冲锋面向敌人；跑向掩体时身体面向移动方向，只让上身有限度地看敌。
-      // 旧代码无条件用 targetYaw 覆盖移动朝向，移动与目标分列两侧时会逐帧互相抢方向。
-      if (s.moveSpeed < 0.08 || s.state === STATE.CHARGE) wantedYaw = targetYaw;
+      // 停火瞄准、冲锋、掩体探头/缩头及短距离据枪换位面向敌人；长距离跑向掩体仍面向移动方向、由上身脊柱跟瞄。
+      if (s.moveSpeed < 0.08 || s.state === STATE.CHARGE || keepCombatFacing) wantedYaw = targetYaw;
     } else if (s.lkp && (s.lkpConfidence || 0) > 0) {
       targetYaw = Math.atan2(s.position.x-s.lkp.x,s.position.z-s.lkp.z);
       if(s.state===STATE.INVESTIGATE && s.moveSpeed<.08){
         targetYaw += Math.sin(this.time*2*Math.PI/INVESTIGATE.scanS)*WATCH.scanYawRad;
       }
       s.muzzleAimYaw=targetYaw;
-      if(s.moveSpeed<.08)wantedYaw=targetYaw;
+      if(s.moveSpeed<.08 || keepCombatFacing)wantedYaw=targetYaw;
     } else if (this.time < s.watchUntil && Number.isFinite(s.watchYaw)) {
       // 【§15】戒备：没有目标，但听见过动静 —— 面向那边（`ApplyWatchPose` 每
       // scanIntervalS 把这个角度往左右扳一次，看起来就是在扫扇面）。转速仍由下面
@@ -4008,7 +4015,7 @@ export class AiDirector {
     // 导航场在相邻格之间切方向时 wantedYaw 会左右跳，身体因为有转速限制尚且平滑，
     // 枪却每帧直接吃跳变后的 lookYaw，于是原地疯狂改枪口方向。
     const wantedLookYaw = targetYaw === null
-      ? 0 : Clamp(AngleDelta(s.yaw, s.target ? (s.muzzleAimYaw ?? targetYaw) : targetYaw), -0.75, 0.75);
+      ? 0 : Clamp(AngleDelta(s.yaw, s.target ? (s.muzzleAimYaw ?? targetYaw) : targetYaw), -0.92, 0.92);
     s.lookYaw += Clamp(wantedLookYaw - s.lookYaw, -4.8 * dt, 4.8 * dt);
 
     // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
@@ -4065,10 +4072,16 @@ export class AiDirector {
       const carriagePerformance = !!s.missionCarriageAction
         || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
-      if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
+      if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) {
+        const moveDt = Math.max(dt, .0001);
+        const moveVx = (s.position.x - animationStartX) / moveDt;
+        const moveVz = (s.position.z - animationStartZ) / moveDt;
+        this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         locomotionTracked: !s.p012OnMovingTrain,
-        moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
+        moveSpeedMps: Math.hypot(moveVx, moveVz),
+        moveVx,
+        moveVz,
         bayonetFixed: s.bayonetFixed,
         aim: s.aimBlend,
         crouch: s.crouchBlend,
@@ -4089,6 +4102,7 @@ export class AiDirector {
         carryRole: s.carryRole || null,
         woundedWalk: s.woundedWalk || 0,
       });
+      }
     }
     // Fire only after movement, turning and this frame's visible skeleton are synchronized.
     if (wantsFire && !s.meleeCombat) this.TryFire(s, dt, player);

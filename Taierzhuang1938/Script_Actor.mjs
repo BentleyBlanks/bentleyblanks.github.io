@@ -41,6 +41,7 @@ import {
 } from "./Script_CharacterModel.mjs";
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { HitReactionOf, ChooseHitDeath } from "./Script_HitReactionLayer.mjs";
+import { EvaluateSpineAimDistribution } from "./Script_NpcLocomotion3C.mjs";
 import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { MeshUrl, WeaponMeshId } from "./Script_Meshes.mjs";
 
@@ -1203,6 +1204,11 @@ const RIG_AIM_PARENT_Q = new THREE.Quaternion();
 const RIG_AIM_DELTA_Q = new THREE.Quaternion();
 const RIG_AIM_LOCAL_Q = new THREE.Quaternion();
 const RIG_AIM_PIVOT = new THREE.Vector3();
+const RIG_AIM_RIGHT = new THREE.Vector3();
+const RIG_AIM_FWD_AXIS = new THREE.Vector3();
+const RIG_AIM_SPINE_Q = new THREE.Quaternion();
+const RIG_AIM_SPINE_Q2 = new THREE.Quaternion();
+const RIG_AIM_WORLD_Q = new THREE.Quaternion();
 const RIG_IK_AXIS = new THREE.Vector3();
 const RIG_IK_POLE = new THREE.Vector3();
 const RIG_IK_ELBOW = new THREE.Vector3();
@@ -2255,6 +2261,11 @@ export class Actor {
     if (this.characterRig) {
       // Undo our post-animation correction before the mixer (including unkeyed bones).
       if (this.rigAimApplied) {
+        if (this.rigAimSpine) {
+          for (let i = this.rigAimSpine.length - 1; i >= 0; i--) {
+            this.rigAimSpine[i].bone.quaternion.copy(this.rigAimSpine[i].base);
+          }
+        }
         for (const arm of this.rigAimArms) {
           arm.upper.quaternion.copy(arm.upperBase);
           arm.lower.quaternion.copy(arm.lowerBase);
@@ -2736,7 +2747,11 @@ export class Actor {
     if(this.characterRig.hitReaction?.active)this._ApplyHitReaction(dt,state);
   }
 
-  /** Aim the arms and rifle without folding the animated torso into the knees. */
+  /**
+   * 脊柱瞄准偏移（Mesh Space）+ 双臂残差精对准：
+   * 先把水平/俯仰按安全解剖权重分摊到 Spine→Spine1→Chest→Neck→Head（蹲姿限制腰椎前俯绝不折进膝盖，
+   * 卧姿不动下腰），消除「躯干木头不动、只有双臂硬扳」的僵硬感；再由双臂 IK 吸收剩余几度残差把枪口锁死到目标方向。
+   */
   _ApplyRiggedAim(state) {
     const rig = this.characterRig;
     const weight = Clamp01(state.aim || 0);
@@ -2753,9 +2768,50 @@ export class Actor {
         wrist: new THREE.Vector3(), target: new THREE.Vector3(), pole: new THREE.Vector3(),
       }));
     }
+    if (!this.rigAimSpine) {
+      const chest = rig.bones.chest || null;
+      const spine1 = chest?.parent?.isBone && /Spine1/i.test(chest.parent.name) ? chest.parent : null;
+      const spine = spine1?.parent?.isBone && /Spine$/i.test(spine1.parent.name) ? spine1.parent : null;
+      const chain = [
+        ["spine", spine], ["spine1", spine1], ["spine2", chest],
+        ["neck", rig.bones.neck || null], ["head", rig.bones.head || null],
+      ];
+      this.rigAimSpine = chain.filter(([, bone]) => !!bone).map(([key, bone]) => ({ key, bone, base: new THREE.Quaternion() }));
+    }
     if (this.rigAimArms.some(arm => !arm.upper || !arm.lower || !arm.hand)) return;
-    POSE_E.set(Clamp(state.lookPitch || 0, -1.0, 0.9),
-      Clamp(state.lookYaw || 0, -1.4, 1.4), 0, "YXZ");
+
+    const clampedPitch = Clamp(state.lookPitch || 0, -1.0, 0.9);
+    const clampedYaw = Clamp(state.lookYaw || 0, -1.4, 1.4);
+    for (const entry of this.rigAimSpine) entry.base.copy(entry.bone.quaternion);
+
+    // 1) Mesh-Space 脊柱分摊（说话手势占着脊柱时不抢脊柱；说话转头占着头时不抢头）
+    const spineBusy = (rig.speakerGesture?.weight || 0) > 0.05;
+    const headBusy = (rig.speakerHead?.weight || 0) > 0.05;
+    if (!spineBusy && (Math.abs(clampedYaw) > 1e-3 || Math.abs(clampedPitch) > 1e-3)) {
+      const stance = (state.prone || 0) > 0.45 ? "prone"
+        : ((state.crouch || 0) > 0.35 || (state.kneel || 0) > 0.35) ? "crouch" : "stand";
+      const dist = EvaluateSpineAimDistribution({
+        yawRad: clampedYaw, pitchRad: clampedPitch, stance, aimWeight: weight, rigKind: "biped",
+      });
+      this.root.getWorldQuaternion(RIG_AIM_ROOT_Q);
+      RIG_AIM_RIGHT.set(1, 0, 0).applyQuaternion(RIG_AIM_ROOT_Q);
+      RIG_AIM_FWD_AXIS.set(0, 0, -1).applyQuaternion(RIG_AIM_ROOT_Q);
+      for (const entry of this.rigAimSpine) {
+        if (headBusy && (entry.key === "head" || entry.key === "neck")) continue;
+        const d = dist[entry.key];
+        if (!d || (Math.abs(d.yaw) < 1e-4 && Math.abs(d.pitch) < 1e-4 && Math.abs(d.roll) < 1e-4)) continue;
+        RIG_AIM_SPINE_Q.identity();
+        if (Math.abs(d.yaw) >= 1e-4) RIG_AIM_SPINE_Q.premultiply(RIG_AIM_SPINE_Q2.setFromAxisAngle(HIT_Y_AXIS, d.yaw));
+        if (Math.abs(d.pitch) >= 1e-4) RIG_AIM_SPINE_Q.premultiply(RIG_AIM_SPINE_Q2.setFromAxisAngle(RIG_AIM_RIGHT, d.pitch));
+        if (Math.abs(d.roll) >= 1e-4) RIG_AIM_SPINE_Q.premultiply(RIG_AIM_SPINE_Q2.setFromAxisAngle(RIG_AIM_FWD_AXIS, d.roll));
+        entry.bone.parent.getWorldQuaternion(RIG_AIM_PARENT_Q).invert();
+        entry.bone.getWorldQuaternion(RIG_AIM_WORLD_Q);
+        entry.bone.quaternion.copy(RIG_AIM_PARENT_Q.multiply(RIG_AIM_SPINE_Q.multiply(RIG_AIM_WORLD_Q)));
+        entry.bone.updateWorldMatrix(false, true);
+      }
+    }
+
+    POSE_E.set(clampedPitch, clampedYaw, 0, "YXZ");
     RIG_AIM_ROOT_Q.setFromEuler(POSE_E);
     RIG_AIM_DIRECTION.set(0, 0, -1).applyQuaternion(RIG_AIM_ROOT_Q);
     this.root.getWorldQuaternion(RIG_AIM_ROOT_Q);

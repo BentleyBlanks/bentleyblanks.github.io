@@ -23,10 +23,19 @@ export class SoldierView {
   SetObserverCameras(cameras) { this.observerCameras=cameras; }
   SetSkin(s,skin) { if(skin)this.skins.set(s,skin);else this.skins.delete(s); }
   SyncSkin(s,dt,state) {
+    const aimWeight = Number.isFinite(state.aim) ? state.aim : (state.aim ? 1 : 0);
     this.skins.get(s)?.Sync({
       mps:Number.isFinite(state.moveSpeedMps)?state.moveSpeedMps:(state.moveSpeed||0)*3.6,
+      vx:Number.isFinite(state.moveVx)?state.moveVx:0,
+      vz:Number.isFinite(state.moveVz)?state.moveVz:0,
+      yaw:Number.isFinite(s.yaw)?s.yaw:undefined,
       stance:state.prone>0.5?"prone":state.crouch>0.5?"crouch":"stand",
-      aim:state.aim>0.5,melee:state.meleeCombat||null,down:!!state.dead||!!s.actor.ragdollState,firing:!!state.firing,
+      aim:aimWeight>0.5,aimWeight,
+      lookYaw:Number.isFinite(state.lookYaw)?state.lookYaw:0,
+      lookPitch:Number.isFinite(state.lookPitch)?state.lookPitch:0,
+      melee:state.meleeCombat||null,down:!!state.dead||!!s.actor.ragdollState,
+      firing:!!state.firing,
+      fireSequence:Number.isFinite(state.fireSequence)?state.fireSequence:null,
       throwSeconds:s.actor.characterRig?.currentId==="GrenadeThrow"?s.actor.characterRig.currentAction?.time:null,
     },dt);
   }

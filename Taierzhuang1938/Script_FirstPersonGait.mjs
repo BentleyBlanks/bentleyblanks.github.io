@@ -60,6 +60,7 @@ export class FirstPersonGait {
     this.ready = false;
     this.lowerYaw = 0;
     this.twist = 0;
+    this.strafe = 0;
     this.phase = 0;
     this.moving = false;
     this.turning = false;
@@ -82,9 +83,11 @@ export class FirstPersonGait {
   }
 
   /** 第 i 只脚的脚位（胯在 ax, az、朝 yaw 时它该站的地方），写进 out = [x, z]。 */
-  _Home(i, ax, az, yaw, out) {
+  _Home(i, ax, az, yaw, out, strafeScale = 0) {
     const h = this.homes[i];
-    const [dx, dz] = ModelToWorld(h.x, h.z, yaw);
+    const widen = (this.t.strafeWideM || 0) * Math.abs(strafeScale);
+    const mx = h.x + (i === 0 ? widen : -widen);
+    const [dx, dz] = ModelToWorld(mx, h.z, yaw);
     out[0] = ax + dx; out[1] = az + dz;
     return out;
   }
@@ -172,7 +175,19 @@ export class FirstPersonGait {
       const r = this.backward ? WrapAngle(rel - Math.PI) : rel;
       const warp = Math.abs(r) <= Math.PI / 4 ? Math.sin(2 * r) : Math.sign(r);
       const target = input.aimYaw + t.orientWarpDeg * DEG * warp;
-      this.lowerYaw += WrapAngle(target - this.lowerYaw) * (1 - Math.exp(-dt * t.movingTurnRate));
+      let nextYaw = WrapAngle(this.lowerYaw + WrapAngle(target - this.lowerYaw) * (1 - Math.exp(-dt * t.movingTurnRate)));
+      // 朝向扭曲自发的转胯（非视角急甩拖着走）不越过着地脚的踝关节拧角上限：
+      // 先转到着地脚允许的 34°，等下一步迈出去落脚后再顺势把剩余扭曲角转到位，全程着地零滑动。
+      const safeLim = (t.footTwistLimitDeg - 1) * DEG;
+      for (let i = 0; i < 2; i++) {
+        const f = this.feet[i];
+        if (!f.planted) continue;
+        const toeOff = (i === 0 ? 1 : -1) * t.toeOutDeg * DEG;
+        const footCenterYaw = WrapAngle(f.yaw - toeOff);
+        const relNext = WrapAngle(nextYaw - footCenterYaw);
+        if (Math.abs(relNext) > safeLim) nextYaw = WrapAngle(footCenterYaw + Math.sign(relNext) * safeLim);
+      }
+      this.lowerYaw = nextYaw;
     } else {
       const off = WrapAngle(input.aimYaw - this.lowerYaw);
       if (Math.abs(off) > t.idleDeadzoneDeg * DEG) this.turning = true;
@@ -189,7 +204,6 @@ export class FirstPersonGait {
     this.lowerYaw = WrapAngle(this.lowerYaw);
     this.twist = WrapAngle(input.aimYaw - this.lowerYaw);
     this._UpdateLegHeading();
-    this._KeepFeetUnderHips(input, dt);
 
     // ---- 步态参数 ----
     const speed = Math.min(this.speed, 7);
@@ -202,6 +216,14 @@ export class FirstPersonGait {
     let lead = 0;
     if (this.speed > 1e-3) lead = Math.min(this.speed * stanceS * 0.5 * t.leadScale, t.maxLeadM);
     const vdx = this.speed > 1e-3 ? this.vx / this.speed : 0, vdz = this.speed > 1e-3 ? this.vz / this.speed : 0;
+    // 相对胯朝向的侧向移动分量（+1 = 往胯右侧横移，-1 = 往胯左侧横移，直走/站定 = 0）。
+    const pelvisRx = Math.cos(this.lowerYaw), pelvisRz = -Math.sin(this.lowerYaw);
+    const rawStrafe = this.moving && this.speed > 1e-3
+      ? (vdx * pelvisRx + vdz * pelvisRz) * Smooth01((this.speed - 0.3) / 0.7) : 0;
+    this.strafe = rawStrafe;
+    const absStrafe = Math.abs(this.strafe);
+    const legLx = -Math.cos(this.legHeading), legLz = Math.sin(this.legHeading);
+    this._KeepFeetUnderHips(input, dt);
 
     for (const f of this.feet) if (f.planted) f.plantedS += dt;
     const tmp = [0, 0];
@@ -265,19 +287,26 @@ export class FirstPersonGait {
         s.u += dt * Math.max(s.rate || this.lastSwingRate, t.finishMinRate);
       }
       // 落点：落地那一刻胯在哪儿 + 往移动方向留半个着地距离；停着就是脚位。
+      // 横移时沿脚步左右轴扩宽脚道，领跑脚略前、跟随脚略收，摆动中段微微外绕，让两条腿在三维空间始终拉开净距不穿插。
       let tx, tz;
+      const sideSign = i === 0 ? 1 : -1;
       if (this.moving && !s.settle) {
         const tau = Math.max(0, 1 - s.u) / Math.max(s.rate, 1e-3);
-        this._Home(i, input.anchorX + this.vx * tau, input.anchorZ + this.vz * tau, this.lowerYaw, tmp);
-        tx = tmp[0] + vdx * lead; tz = tmp[1] + vdz * lead;
+        const leadBias = (i === 1 ? 1 : -1) * this.strafe * (t.strafeLeadBiasM || 0);
+        const footLead = Clamp(lead + leadBias, 0, t.maxLeadM);
+        const laneWiden = (t.strafeWideM || 0) * absStrafe * sideSign;
+        this._Home(i, input.anchorX + this.vx * tau, input.anchorZ + this.vz * tau, this.lowerYaw, tmp, 0);
+        tx = tmp[0] + vdx * footLead + legLx * laneWiden;
+        tz = tmp[1] + vdz * footLead + legLz * laneWiden;
       } else {
-        this._Home(i, input.anchorX, input.anchorZ, this.lowerYaw, tmp);
+        this._Home(i, input.anchorX, input.anchorZ, this.lowerYaw, tmp, 0);
         tx = tmp[0]; tz = tmp[1];
       }
       const ty = this._Ground(tx, tz, input);
       const u = Math.min(s.u, 1), e = Smooth01(u);
-      f.x = s.fromX + (tx - s.fromX) * e;
-      f.z = s.fromZ + (tz - s.fromZ) * e;
+      const arc = this.moving && !s.settle ? (t.strafeSwingArcM || 0) * absStrafe * Math.sin(Math.PI * u) * sideSign : 0;
+      f.x = s.fromX + (tx - s.fromX) * e + legLx * arc;
+      f.z = s.fromZ + (tz - s.fromZ) * e + legLz * arc;
       f.y = s.fromY + (ty - s.fromY) * u;
       f.lift = s.lift * Math.sin(Math.PI * u);
       f.yaw = s.fromYaw + WrapAngle(this._ToeYaw(i) - s.fromYaw) * e;

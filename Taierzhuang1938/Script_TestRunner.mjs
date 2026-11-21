@@ -443,6 +443,7 @@ export const testDefs = {
   EditorBlockoutPlayPlanTest: { file: "Script_EditorBlockoutPlayPlanTest.mjs", desc: "白盒试玩（§17，2026-10-31）：试玩编排校验正反例、每一步怎么打（推断 / 谁变 AI / push / fresh / 上限）、过关判断、提交的 *.play.json 零错零警告且 01–05 每帧都写了（纯 Node，秒级）" },
   EditorBlockoutPlayBrowserTest: { file: "Script_EditorBlockoutPlayBrowserTest.mjs", timeoutMs: 600000, desc: "白盒试玩（§17，2026-10-31）实机：面板预设与开关、开打后不再无敌、02-4 追兵是真 AI 且站在沟底、打光进下一步先走过去再放兵、fresh 重放、中止出小结收兵还原、K 再来一遍、阵亡后摆回那一步机位、看戏步播预演 N 跳过" },
   XBotCharactersTest: { file: "Script_XBotCharactersTest.mjs", desc: "顶替 X Bot 的人物（日兵甲、何有田、罗班长）：骨名层级与初始朝向同 X Bot、初始即绑定姿势、hipsScale 同转换报告、权重与头顶收 Head、动作换人去骨长位移（纯 Node，秒级）" },
+  NpcLocomotion3CTest: { file: "Script_NpcLocomotion3CTest.mjs", desc: "NPC 第三人称 3C 动作系统：2D 四向混合权重、朝向扭曲、原地转身死区与收敛、脊柱瞄准分摊、开火 Additive 后坐及 Mixamo 清单文件核对（纯 Node，毫秒级）" },
   ShunziCharacterBrowserTest: { file: "Script_ShunziCharacterBrowserTest.mjs", timeoutMs: 300000, desc: "顺子 V5：真实动作预览、六个代表动作逐帧蒙皮、原头部与帽子刚性、播放交互及 720p 取证" },
   DongguaCharacterBrowserTest: { file: "Script_DongguaCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "冬瓜 V3：65骨蒙皮、八个代表动作、头帽刚性和场景角色映射" },
   TaniHisaoCharacterBrowserTest: { file: "Script_TaniHisaoCharacterBrowserTest.mjs", timeoutMs: 600000, desc: "谷寿夫 V4：共用骨架、代表动作、头帽刚性和场景角色配置" },
@@ -832,6 +833,7 @@ export const tier0Fast = [
   "EditorBlockoutSaveTest",
   "EditorBlockoutPrevizPlanTest",
   "XBotCharactersTest",
+  "NpcLocomotion3CTest",
   "EditorBlockoutPlayPlanTest",
   "EditorBlockoutFirstLevel0105SceneTest",
   "EditorBlockoutFirstLevel0105KeyframesTest",
@@ -1034,7 +1036,7 @@ export const domains = {
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
     // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
-    tests: ["AiBehaviorTest", "SoldierComponentsTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
+    tests: ["AiBehaviorTest", "SoldierComponentsTest", "NpcLocomotion3CTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -1054,7 +1056,7 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "AmbBedVariantTest", "BattleBedLayersTest", "AmbBedVariantBrowserTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "FirstLevelAudioNodeBudgetTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "ToolsHomeTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneFormalTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "EnvSystemTest", "EnvironmentBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "XBotCharactersTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutFirstLevel0107KeyframesTest", "EditorBlockoutFirstLevel0107PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneFormalTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "EnvSystemTest", "EnvironmentBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "XBotCharactersTest", "NpcLocomotion3CTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutFirstLevel0107KeyframesTest", "EditorBlockoutFirstLevel0107PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/Timeline/剧本派发/车厢生活动作",
     // LEVEL_CUES 的构建在 Script_Story 与组装层里，碰剧本的改动要连着 MissionHooksTest 一起跑（毫秒级）。
@@ -1116,6 +1118,8 @@ const changedDomainRules = [
   {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_EditorPropLibrary/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},
+  {domain:"ai",pattern:/NpcLocomotion3C/},
+  {domain:"editor",pattern:/NpcLocomotion3C/},
   // The full-body player shadow follows the first-person body and participates
   // in shadow rendering; changing it requires both domain suites.
   {domain:"combat",pattern:/Script_FirstPersonShadow\.mjs$/},

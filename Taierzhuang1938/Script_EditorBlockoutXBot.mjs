@@ -20,7 +20,7 @@ import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/Skeleto
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
-import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose, MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
@@ -28,6 +28,10 @@ import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
+import {
+  NPC_3C, WrapAngle, Clamp, Smooth01,
+  ComputeLocomotion2D, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAdditiveFireRecoil,
+} from "./Script_NpcLocomotion3C.mjs";
 
 /** 这个人的配色：有名字的角色（castId，或没有 castId 的单位 id）各一种；其余按阵营的素色。 */
 export function XBotLook({ faction = "nra", castId = null, unitId = null } = {}) {
@@ -76,6 +80,59 @@ const SOLDIER_OF_XBOT = new Map(Object.entries(XBOT_FROM_SOLDIER).map(([s, x]) =
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 const _p2 = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _s2 = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _rel = new THREE.Matrix4(), _inv = new THREE.Matrix4();
+const _up = new THREE.Vector3(0, 1, 0);
+const _yawQ = new THREE.Quaternion(), _aimQ = new THREE.Quaternion(), _aimQ2 = new THREE.Quaternion();
+const _aimRight = new THREE.Vector3(), _aimFwd = new THREE.Vector3();
+const _addQ0 = new THREE.Quaternion(), _addQ1 = new THREE.Quaternion(), _addDelta = new THREE.Quaternion();
+const _idQuat = new THREE.Quaternion();
+
+/** 开火 Additive 叠加仅作用上半身骨骼（双腿与 Hips 严格 0° 透明，跑动开火绝不锁腿滑步）。 */
+const XBOT_ADDITIVE_FIRE_BONES = new Set([
+  "Spine", "Spine1", "Spine2", "Neck", "Head",
+  "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+  "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+  "RightHandThumb1", "RightHandThumb2", "RightHandThumb3",
+  "RightHandIndex1", "RightHandIndex2", "RightHandIndex3",
+  "RightHandMiddle1", "RightHandMiddle2", "RightHandMiddle3",
+  "LeftHandThumb1", "LeftHandThumb2", "LeftHandIndex1", "LeftHandIndex2",
+]);
+const XBOT_SPINE_CHAIN = [
+  ["Spine", "spine"], ["Spine1", "spine1"], ["Spine2", "spine2"], ["Neck", "neck"], ["Head", "head"],
+];
+
+/** 从一条旋转关键帧轨道采样 t 秒处的四元数差值（相对第 0 帧已预减）。 */
+function SampleAdditiveTrack(track, t, out) {
+  const times = track.times, deltas = track.deltas, n = times.length;
+  if (n === 0) return out.identity();
+  if (t <= times[0] || n === 1) return out.fromArray(deltas, 0);
+  if (t >= times[n - 1]) return out.fromArray(deltas, (n - 1) * 4);
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= t) lo = mid; else hi = mid;
+  }
+  const span = times[hi] - times[lo];
+  const f = span > 1e-6 ? (t - times[lo]) / span : 0;
+  _addQ0.fromArray(deltas, lo * 4);
+  _addQ1.fromArray(deltas, hi * 4);
+  return out.slerpQuaternions(_addQ0, _addQ1, f);
+}
+
+/** 从预提取的标量曲线采样 t 秒处的数值（用于 Turn-in-Place 的 Hips 偏航剥离）。 */
+function SampleScalarCurve(curve, t) {
+  const times = curve.times, values = curve.values, n = times.length;
+  if (n === 0) return 0;
+  if (t <= times[0] || n === 1) return values[0];
+  if (t >= times[n - 1]) return values[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= t) lo = mid; else hi = mid;
+  }
+  const span = times[hi] - times[lo];
+  const f = span > 1e-6 ? (t - times[lo]) / span : 0;
+  return values[lo] + (values[hi] - values[lo]) * f;
+}
 
 /**
  * 枪与手（_PlaceWeapon）：原身体掌心离枪身这么近算握着；X Bot 掌心离握点 near 内全拉、far 外不拉；淡入淡出时长。
@@ -300,6 +357,8 @@ export class XBotSkins {
     this.sourceRests = new Map(); // 原身体模型号 → { rest, retarget, headY }
     this.materials = new Map();
     this.rifleTracks = new Map(); // file → PrepareRifleTrack 的结果（X Bot 模型空间、缩放 1）| null
+    this.additiveFireCache = new Map(); // file → { duration, tracks: [{ boneName, times, deltas }] }
+    this.turnYawCache = new Map();      // file → { duration, times, values }（Hips 相对第 0 帧的水平偏航增量）
     this.loading = null;
   }
 
@@ -486,6 +545,75 @@ export class XBotSkins {
     }
   }
 
+  /**
+   * 提纯开火动画的上半身 Additive 差值轨道（离线减法：每根上半身骨 Q_delta(t) = Q(0)⁻¹ · Q(t)）。
+   * 下半身与 Hips 不入表（等于 0° 透明），运行时直接叠在走路 / 跑步 / 横移之上，彻底消除开火滑步。
+   */
+  AdditiveFireTracks(file) {
+    if (this.additiveFireCache.has(file)) return this.additiveFireCache.get(file);
+    const clip = this.loaded.get(file);
+    if (!clip) { this.Clip(file); return null; }
+    const tracks = [];
+    const q0 = new THREE.Quaternion(), q0Inv = new THREE.Quaternion(), qk = new THREE.Quaternion(), dq = new THREE.Quaternion();
+    for (const track of clip.tracks) {
+      if (!track.name.endsWith(".quaternion")) continue;
+      const boneName = track.name.slice(0, -11);
+      if (!XBOT_ADDITIVE_FIRE_BONES.has(boneName)) continue;
+      const vals = track.values, count = track.times.length;
+      if (count < 1 || vals.length < 4) continue;
+      q0.set(vals[0], vals[1], vals[2], vals[3]).normalize();
+      q0Inv.copy(q0).invert();
+      const deltas = new Float32Array(count * 4);
+      let maxAng = 0;
+      for (let i = 0; i < count; i++) {
+        qk.set(vals[i * 4], vals[i * 4 + 1], vals[i * 4 + 2], vals[i * 4 + 3]).normalize();
+        dq.copy(q0Inv).multiply(qk).normalize();
+        if (dq.w < 0) dq.set(-dq.x, -dq.y, -dq.z, -dq.w);
+        const ang = 2 * Math.acos(Clamp(dq.w, -1, 1));
+        if (ang > maxAng) maxAng = ang;
+        deltas[i * 4] = dq.x; deltas[i * 4 + 1] = dq.y; deltas[i * 4 + 2] = dq.z; deltas[i * 4 + 3] = dq.w;
+      }
+      if (maxAng > 0.005) tracks.push({ boneName, times: track.times, deltas });
+    }
+    const entry = { duration: clip.duration || 0.25, tracks };
+    this.additiveFireCache.set(file, entry);
+    return entry;
+  }
+
+  /**
+   * 提纯 Turn-in-Place 片段里 Hips 相对第 0 帧的水平偏航曲线（模型空间 Y 轴分量，连续解缠）。
+   * 播放原地转身片段时按此曲线反向抵消 Hips 旋转（Root Yaw Extraction），避免与下盘控制器双重旋转或在切回 Idle 时跳帧。
+   */
+  TurnYawCurve(file) {
+    if (this.turnYawCache.has(file)) return this.turnYawCache.get(file);
+    const clip = this.loaded.get(file);
+    if (!clip) { this.Clip(file); return null; }
+    const track = clip.tracks.find((tr) => tr.name === "Hips.quaternion");
+    if (!track || !this.rootParent) { this.turnYawCache.set(file, null); return null; }
+    const pQ = new THREE.Quaternion(), pPos = new THREE.Vector3(), pSc = new THREE.Vector3();
+    this.rootParent.decompose(pPos, pQ, pSc);
+    const pQInv = pQ.clone().invert();
+    const vals = track.values, count = track.times.length;
+    const q0 = new THREE.Quaternion(vals[0], vals[1], vals[2], vals[3]).normalize();
+    const q0Inv = q0.clone().invert();
+    const qk = new THREE.Quaternion(), dm = new THREE.Quaternion();
+    const values = new Float32Array(count);
+    let accum = 0, prev = 0;
+    for (let i = 0; i < count; i++) {
+      qk.set(vals[i * 4], vals[i * 4 + 1], vals[i * 4 + 2], vals[i * 4 + 3]).normalize();
+      // 模型空间里相对第 0 帧的旋转：dm = pQ * (qk * q0⁻¹) * pQ⁻¹
+      dm.copy(qk).multiply(q0Inv).premultiply(pQ).multiply(pQInv).normalize();
+      // 绕 Y 轴的 Swing-Twist 偏航分量
+      const raw = 2 * Math.atan2(dm.y, dm.w);
+      if (i > 0) accum += WrapAngle(raw - prev);
+      prev = raw;
+      values[i] = accum;
+    }
+    const curve = { duration: clip.duration || 1, times: track.times, values };
+    this.turnYawCache.set(file, curve);
+    return curve;
+  }
+
   /** 同一种配色的人共用材质（都是同一套蒙皮，不会来回换着色器）。 */
   Material(look, part) {
     const key = `${look.key}:${part}`;
@@ -599,6 +727,16 @@ export class XBotSkin {
     this.rifleSwap = null;
     this.weaponVisualFit = null;
     this.weaponVisualOffset = new THREE.Vector3();
+    // 3C 动作系统状态（2D Blend Space / Orientation Warping / Turn-in-Place / Additive Fire）
+    this.tip = new TurnInPlaceController();
+    this.locoRunning = false;
+    this.locoPhase = 0;
+    this.pelvisWarp = 0;
+    this.blendActions = new Map();
+    this.addFireAge = Infinity;
+    this.lastFireSeq = null;
+    this.prevFiring = false;
+    this.last3C = null;
   }
 
   get visible() { return this.container.visible; }
@@ -621,7 +759,12 @@ export class XBotSkin {
     this.container.visible = visible;
     for (const mesh of this.hidden) mesh.visible = false;
     // 藏起来过：再出来时没人看见它之前的样子，直接摆当前姿势（不从藏起来那一刻的姿势淡）
-    if (!visible) { this.shownValid = false; this.blend = null; this._EndRifleSwap(); this.rifleShown = null; return; }
+    if (!visible) {
+      this.shownValid = false; this.blend = null; this._EndRifleSwap(); this.rifleShown = null;
+      this.tip.Reset(Number.isFinite(intent.yaw) ? intent.yaw : 0);
+      this.pelvisWarp = 0;
+      return;
+    }
     this.container.position.copy(rig.root.position);
     this.container.quaternion.copy(rig.root.quaternion);
     this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
@@ -644,9 +787,57 @@ export class XBotSkin {
       this.model.traverse(o => { if (o.isMesh && !o.userData.hairGroom) o.castShadow = this.shadow; });
     }
 
-    this.fireT = intent.firing ? XBOT.fireHoldS : Math.max(0, (this.fireT || 0) - dt);
+    // 实时战斗/AI 角色启用 3C 动作系统（预演片段 / 精确换算 / 白刃 / 倒地 / 投弹走原路不动）
+    const rifle = this._RifleInHands();
+    const stance = intent.stance === "prone" ? "prone" : intent.stance === "crouch" ? "crouch" : "stand";
+    const aimWeight = Number.isFinite(intent.aimWeight) ? Clamp(intent.aimWeight, 0, 1) : (intent.aim ? 1 : 0);
+    const live3C = !intent.down && !intent.exact && !intent.melee && !intent.clip
+      && !Number.isFinite(intent.throwSeconds) && Number.isFinite(intent.yaw)
+      && !intent.carryRole && !intent.woundedWalk;
+    const teleported = this.shownValid && this.container.getWorldPosition(_p).distanceTo(this.shownAt) > 1.5;
+
+    // Additive 开火脉冲边沿检测（逐发触发，不锁死双腿）
+    const fireSeq = Number.isFinite(intent.fireSequence) ? intent.fireSequence : null;
+    if (fireSeq !== null) {
+      if (this.lastFireSeq !== null && fireSeq !== this.lastFireSeq) this.addFireAge = 0;
+      this.lastFireSeq = fireSeq;
+    } else if (intent.firing && !this.prevFiring) {
+      this.addFireAge = 0;
+    }
+    this.prevFiring = !!intent.firing;
+    if (this.addFireAge < NPC_3C.fireDurationS) this.addFireAge += Math.max(dt, 0);
+
+    let loco3c = null, tip3c = null, lowerYawOff = 0;
+    if (live3C) {
+      loco3c = ComputeLocomotion2D({
+        vx: intent.vx || 0, vz: intent.vz || 0, yaw: intent.yaw,
+        stance, aimWeight, rifleInHands: rifle, speedMps: intent.mps, running: this.locoRunning,
+      });
+      this.locoRunning = loco3c.running;
+      tip3c = this.tip.Update(dt, {
+        yaw: intent.yaw, mps: intent.mps || 0, stance, aimWeight, rifleInHands: rifle,
+        active: true, teleported,
+      });
+      this.pelvisWarp = teleported ? 0 : Approach(this.pelvisWarp, loco3c.pelvisWarpRad, dt, 0.11);
+      lowerYawOff = WrapAngle(tip3c.visualYawOffset + this.pelvisWarp);
+      if (Math.abs(lowerYawOff) > 1e-5) {
+        this.container.quaternion.premultiply(_yawQ.setFromAxisAngle(_up, lowerYawOff));
+        this.container.updateWorldMatrix(true, false);
+      }
+      this.last3C = { loco: loco3c, tip: tip3c, pelvisWarp: this.pelvisWarp, lowerYawOff };
+    } else {
+      this.tip.Reset(Number.isFinite(intent.yaw) ? intent.yaw : 0);
+      this.pelvisWarp = 0;
+      this.locoRunning = false;
+      this.last3C = null;
+    }
+
+    // 仅保留卧倒/无 3C 上下文时的旧开火保持；站/蹲实机走上半身 Additive 后坐，绝不锁腿
+    this.fireT = (!live3C || stance === "prone")
+      ? (intent.firing ? XBOT.fireHoldS : Math.max(0, (this.fireT || 0) - dt))
+      : 0;
     this.down = !!intent.down;
-    const pick = this._Pick(intent);
+    const pick = this._Pick(intent, live3C ? { loco: loco3c, tip: tip3c, rifle, stance, aimWeight } : null);
     this.jumped = false;
     // 停在倒地姿势时，藏起来的原身体还在放它自己的倒地、布娃娃（actor.body 一上一下、在坡上会滑）：X Bot 改挂到人物根
     // （actor.root：只有预演摆它 —— 位置、朝向、藏不藏），停住那一刻相对它在哪就一直在哪；预演挪人（下一段换位置）照样跟着走
@@ -667,20 +858,35 @@ export class XBotSkin {
         rig.root.parent.add(this.container);
         this.container.position.copy(rig.root.position);
         this.container.quaternion.copy(rig.root.quaternion);
+        if (Math.abs(lowerYawOff) > 1e-5) this.container.quaternion.premultiply(_yawQ.setFromAxisAngle(_up, lowerYawOff));
         this.container.scale.copy(rig.root.scale).multiplyScalar(this.scaleK);
         this.container.updateWorldMatrix(true, false);
       }
     }
     if (pick.mode === "hold") this._Hold();
+    else if (pick.mode === "blend2d") this._PlayBlendSpace(pick, intent, dt);
     else if (pick.mode === "mirror" || !pick.file) this._Mirror(dt);
     else this._Play(pick, intent, dt);
+    // Turn-in-Place Root Yaw Extraction：剔除片段自带的 Hips 转向，由下盘控制器统一驱动
+    if (pick.turnInPlace && this.current && !this.current.mirror && this.current.lastT !== null) {
+      this._CancelTurnHipsYaw(pick.file, this.current.lastT);
+    }
     // 换了动作（或同一条动作跳了时间）：从上一帧看到的姿势淡过去
     // 按这一帧实际摆出来的算（动作还没读到时照原身体换算，读到那一帧也是换动作）
-    const key = pick.mode === "hold" ? this.pickKey : !this.current || this.current.mirror ? "mirror" : pick.file + (pick.death ? "|death" : "");
+    const key = pick.mode === "hold" ? this.pickKey
+      : !this.current || this.current.mirror ? "mirror"
+        : pick.mode === "blend2d" ? "blend2d:" + pick.groupKey
+          : pick.file + (pick.death ? "|death" : "");
     if (this.shownValid && (key !== this.pickKey || this.jumped)) this._BeginBlend();
     this.pickKey = key;
     this._ApplyBlend(dt);
     this.container.updateMatrixWorld(true);
+    // 脊柱 Aim Offset（Mesh Space）+ 开火上半身 Additive 叠加（排在武器挂接与左手 IK 之前，让枪和双臂自然随胸腔转动）
+    if (live3C) {
+      this._ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance);
+      this._ApplyAdditiveFire(intent, rifle, stance);
+      this.container.updateMatrixWorld(true);
+    }
     this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
     this._Remember(intent);
     const view = this.skins.view;
@@ -750,8 +956,8 @@ export class XBotSkin {
     this.H("Hips")?.position.copy(this.baseHips);
   }
 
-  /** 这一帧播什么：{ mode: "clip" | "mirror", file, time?, rate?, loop, once, hold, rifleHand } */
-  _Pick(intent) {
+  /** 这一帧播什么：{ mode: "clip" | "blend2d" | "mirror" | "hold", file, time?, rate?, loop, once, hold, rifleHand } */
+  _Pick(intent, ctx3c = null) {
     const skins = this.skins;
     if (!intent.down) this.downHold = false;
     if (intent.exact) return { mode: "mirror" };
@@ -791,10 +997,41 @@ export class XBotSkin {
         loop: intent.clipLoop ?? lib?.loop ?? false, travel: entry.speedMps && intent.mps > 0.05 ? entry.speedMps : null,
         derived: !!(entry.retarget || entry.mirror), hold: entry.retarget ? null : lib?.hold, rifleHand: lib?.rifleHand };
     }
-    const rifle = this._RifleInHands();
+    const rifle = ctx3c ? ctx3c.rifle : this._RifleInHands();
     if (this.fireT > 0 && rifle) {
       const fire = intent.stance === "prone" ? XBOT_NATIVE.fireProne : intent.stance === "crouch" ? XBOT_NATIVE.fireCrouch : XBOT_NATIVE.fireStand;
       return { mode: "clip", file: fire.file, once: true, hold: "端枪", key: "fire" };
+    }
+    // 3C 原地转身（Turn-in-Place）：静止超死区时播真实迈步转身片段，剔除 Hips 偏航由下盘控制器统一驱动
+    if (ctx3c?.tip?.turning && ctx3c.tip.turnClipKey) {
+      const turnEntry = XBOT_TURN_IN_PLACE[ctx3c.tip.turnClipKey];
+      if (turnEntry) {
+        const lib = skins.library.get(turnEntry.file);
+        return {
+          mode: "clip", file: turnEntry.file, once: true, turnInPlace: true,
+          normalized: ctx3c.tip.turnProgress, key: "tip:" + ctx3c.tip.turnClipKey,
+          hold: lib?.hold || "端枪", rifleHand: lib?.rifleHand,
+        };
+      }
+    }
+    // 3C 四向 2D Blend Space：端枪站/蹲移动时同步混合主/副方向片段
+    if (ctx3c?.loco?.moving && rifle && ctx3c.stance !== "prone") {
+      const move = ctx3c.stance === "crouch" ? "Walk" : (ctx3c.loco.running ? "Run" : "Walk");
+      const groupKey = `${ctx3c.stance}${move}Rifle${ctx3c.aimWeight >= 0.35 ? "Aim" : ""}`;
+      const group = XBOT_LOCOMOTION_4WAY[groupKey];
+      if (group) {
+        const pEntry = group[ctx3c.loco.primary] || group.forward;
+        const sEntry = ctx3c.loco.secondary && group[ctx3c.loco.secondary] && group[ctx3c.loco.secondary].file !== pEntry.file
+          ? group[ctx3c.loco.secondary] : null;
+        const lib = skins.library.get(pEntry.file);
+        return {
+          mode: "blend2d", groupKey, file: pEntry.file,
+          entries: sEntry
+            ? [{ ...pEntry, weight: ctx3c.loco.wPrimary }, { ...sEntry, weight: ctx3c.loco.wSecondary }]
+            : [{ ...pEntry, weight: 1 }],
+          key: groupKey, hold: lib?.hold || "端枪", rifleHand: lib?.rifleHand,
+        };
+      }
     }
     const key = NativeKey(intent, rifle);
     const entry = XBOT_NATIVE[key];
@@ -820,10 +1057,11 @@ export class XBotSkin {
       return;
     }
     let cur = this.current;
-    if (!cur || cur.file !== pick.file) {
+    if (!cur || cur.mode === "blend2d" || cur.file !== pick.file) {
       // 换动作：旧的停掉、绑定全扔（新绑定第一帧每根骨都写，不会留着上一条 / 当场换算的值），淡入交给 _BeginBlend
       this.mixer.stopAllAction();
       this.mixer.uncacheRoot(this.model);
+      this.blendActions.clear();
       this.baseValid = false;
       const action = this.mixer.clipAction(clip);
       action.reset();
@@ -879,12 +1117,184 @@ export class XBotSkin {
     this.pick = pick;
   }
 
+  /**
+   * 2D 混合空间同步播放：最多同时混合相邻两个方向片段（如前走 + 右侧移），
+   * 共用归一化步态相位 locoPhase（UE5 Sync Group 原理），避免双腿步频错拍打架。
+   */
+  _PlayBlendSpace(pick, intent, dt) {
+    const resolved = [];
+    for (const item of pick.entries) {
+      const raw = this.kit.clips?.get(item.file) || this.skins.loaded.get(item.file);
+      const clip = ClipForCharacter(raw, this.kit.def);
+      if (clip) resolved.push({ ...item, clip });
+      else this.skins.Clip(item.file);
+    }
+    if (!resolved.length) {
+      this._Mirror(dt);
+      return;
+    }
+    // 归一化已就绪片段的权重
+    let wSum = 0;
+    for (const r of resolved) wSum += r.weight;
+    for (const r of resolved) r.weight = wSum > 1e-6 ? r.weight / wSum : 1 / resolved.length;
+
+    if (!this.current || this.current.mode !== "blend2d") {
+      this.mixer.stopAllAction();
+      this.mixer.uncacheRoot(this.model);
+      this.blendActions.clear();
+      this.baseValid = false;
+      this.current = { mode: "blend2d", file: pick.file, mirror: false, lastT: null };
+    } else if (this.baseValid) {
+      for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.boneList[i].quaternion.copy(this.base[i]);
+      this.H("Hips")?.position.copy(this.baseHips);
+    }
+
+    // 距离匹配相位推进：按加权标称速度与加权周期时长计算每秒圈数
+    const k = this.kit.def.heightM
+      ? this.container.getWorldScale(_s2).x * this.kit.def.hipsScale
+      : this.container.scale.x || 1;
+    let nominal = 0, effDur = 0;
+    for (const r of resolved) {
+      nominal += (r.speedMps || 1.3) * r.weight;
+      effDur += (r.clip.duration || 1) * r.weight;
+    }
+    const mps = intent.mps || 0;
+    const rate = mps > 0.05 ? THREE.MathUtils.clamp(mps / Math.max(nominal * k, 0.2), XBOT.rate[0], XBOT.rate[1]) : 0;
+    this.locoPhase = (this.locoPhase + (dt * rate) / Math.max(effDur, 0.2)) % 1;
+    if (this.locoPhase < 0) this.locoPhase += 1;
+
+    const activeFiles = new Set();
+    for (const r of resolved) {
+      activeFiles.add(r.file);
+      let action = this.blendActions.get(r.file);
+      if (!action) {
+        action = this.mixer.clipAction(r.clip);
+        action.reset();
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.timeScale = 0;
+        action.enabled = true;
+        action.play();
+        this.blendActions.set(r.file, action);
+      }
+      action.enabled = true;
+      action.setEffectiveWeight(r.weight);
+      action.time = this.locoPhase * (r.clip.duration || 1);
+    }
+    for (const [file, action] of this.blendActions) {
+      if (!activeFiles.has(file)) action.setEffectiveWeight(0);
+    }
+
+    this.wasDown = false;
+    this.mixer.update(dt);
+    for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.boneList[i].quaternion.copy(this.base[i]);
+    this.H("Hips") && this.baseHips.copy(this.H("Hips").position);
+    this.baseValid = true;
+    this.pick = { ...pick, mode: "clip", file: resolved[0].file };
+  }
+
+  /** Turn-in-Place Root Yaw Extraction：抵消片段自带的 Hips 偏航角，让脚步转体与下盘控制器严丝合缝。 */
+  _CancelTurnHipsYaw(file, t) {
+    const hips = this.H("Hips");
+    const curve = hips ? this.skins.TurnYawCurve(file) : null;
+    if (!curve) return;
+    const yawDelta = SampleScalarCurve(curve, t);
+    if (Math.abs(yawDelta) < 1e-4) return;
+    this.container.updateMatrixWorld(true);
+    RotateBoneWorld(hips, _yawQ.setFromAxisAngle(_up, -yawDelta));
+  }
+
+  /**
+   * Mesh-Space 脊柱瞄准偏移（Aim Offset）：
+   * 把「目标偏航 − 下盘扭转」与俯仰按解剖学比例分摊到 Spine→Spine1→Spine2→Neck→Head，
+   * 在底层步态混合之后以世界系旋转增量叠加，100% 保留底层跑步颠簸并让胸肩、枪、头自然随动。
+   */
+  _ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance) {
+    const yawRad = WrapAngle((intent.lookYaw || 0) - lowerYawOff);
+    const pitchRad = intent.lookPitch || 0;
+    const activeW = Math.max(aimWeight, Math.abs(lowerYawOff) > 0.01 ? 1 : (Math.abs(yawRad) > 0.015 ? 0.85 : 0));
+    if (activeW < 1e-3 || (Math.abs(yawRad) < 1e-3 && Math.abs(pitchRad) < 1e-3)) return;
+    const dist = EvaluateSpineAimDistribution({ yawRad, pitchRad, stance, aimWeight: activeW, rigKind: "xbot" });
+    // 取逻辑朝向的水平右轴与前轴作为 Mesh-Space 俯仰/滚转参考轴
+    const yaw = intent.yaw || 0;
+    _aimRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+    _aimFwd.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    for (const [boneName, key] of XBOT_SPINE_CHAIN) {
+      const bone = this.H(boneName);
+      const d = dist[key];
+      if (!bone || !d) continue;
+      if (Math.abs(d.yaw) < 1e-4 && Math.abs(d.pitch) < 1e-4 && Math.abs(d.roll) < 1e-4) continue;
+      _aimQ.identity();
+      if (Math.abs(d.yaw) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_up, d.yaw));
+      if (Math.abs(d.pitch) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimRight, d.pitch));
+      if (Math.abs(d.roll) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimFwd, d.roll));
+      RotateBoneWorld(bone, _aimQ);
+    }
+  }
+
+  /**
+   * 开火上半身 Additive 叠加层：
+   * 1) 叠加离线提纯的 Mixamo 开火差值（FiringRifle_V1 / FireRifle_V1 相对第 0 帧的上半身骨骼增量）；
+   * 2) 叠一记阻尼上跳后坐（Spine1/Spine2 绕水平右轴后仰回弹）；
+   * 双腿与 Hips 零介入，跑动 / 横移开枪彻底告别滑步。
+   */
+  _ApplyAdditiveFire(intent, rifle, stance) {
+    if (!rifle || stance === "prone") return;
+    const rec = EvaluateAdditiveFireRecoil(this.addFireAge);
+    if (!rec.active) return;
+    const fireFile = stance === "crouch" ? XBOT_NATIVE.fireCrouch.file : XBOT_NATIVE.fireStand.file;
+    const additive = this.skins.AdditiveFireTracks(fireFile);
+    if (additive) {
+      const t = rec.u * additive.duration;
+      const tailFade = 1 - Smooth01((rec.u - 0.72) / 0.28);
+      for (const tr of additive.tracks) {
+        const bone = this.H(tr.boneName);
+        if (!bone) continue;
+        SampleAdditiveTrack(tr, t, _addDelta);
+        if (tailFade < 0.999) _addDelta.slerpQuaternions(_idQuat, _addDelta, tailFade);
+        bone.quaternion.multiply(_addDelta);
+      }
+      this.container.updateMatrixWorld(true);
+    }
+    // 叠加阻尼枪口上跳与右肩滚转后坐
+    const yaw = intent.yaw || 0;
+    _aimRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+    _aimFwd.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const spine1 = this.H("Spine1"), spine2 = this.H("Spine2");
+    if (spine1 && Math.abs(rec.kickPitchRad) > 1e-4) {
+      RotateBoneWorld(spine1, _aimQ.setFromAxisAngle(_aimRight, rec.kickPitchRad * 0.4));
+    }
+    if (spine2 && Math.abs(rec.kickPitchRad) > 1e-4) {
+      _aimQ.setFromAxisAngle(_aimRight, rec.kickPitchRad * 0.6);
+      if (Math.abs(rec.kickRollRad) > 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimFwd, rec.kickRollRad));
+      RotateBoneWorld(spine2, _aimQ);
+    }
+  }
+
+  /** 3C 动作系统诊断探针（用于单测与实机验证）。 */
+  Probe3C() {
+    const c = this.last3C;
+    if (!c) return null;
+    return {
+      mode: this.current?.mode || (this.current?.mirror ? "mirror" : "clip"),
+      primary: c.loco?.primary || null,
+      secondary: c.loco?.secondary || null,
+      wPrimary: c.loco?.wPrimary ?? 1,
+      wSecondary: c.loco?.wSecondary ?? 0,
+      pelvisWarpDeg: +(c.pelvisWarp * 180 / Math.PI).toFixed(1),
+      tipOffsetDeg: +(c.tip.visualYawOffset * 180 / Math.PI).toFixed(1),
+      tipTurning: c.tip.turning,
+      tipClip: c.tip.turnClipKey,
+      addFireActive: this.addFireAge < NPC_3C.fireDurationS,
+    };
+  }
+
   /** 当场把原身体的姿势换算到 X Bot（表里没有的、要精确贴位置的）。 */
   _Mirror(dt) {
     const source = this.source;
     if (!source) return;
     if (!this.current?.mirror) {
       this.mixer.stopAllAction();
+      this.blendActions.clear();
       this.current = { mirror: true };
     }
     this.baseValid = false;
@@ -1177,7 +1587,7 @@ export class XBotSkin {
     const srcSeg = Seg(srcW);
     const srcPalm = { R: this._SrcPalm("R"), L: this._SrcPalm("L") };
     const srcGap = { R: SegmentDistance(srcPalm.R, srcSeg), L: SegmentDistance(srcPalm.L, srcSeg) };
-    const mixamo = pick?.mode === "clip" && pick.hold === "端枪" && this.skins.rifleOffset;
+    const mixamo = (pick?.mode === "clip" || pick?.mode === "blend2d") && pick.hold === "端枪" && this.skins.rifleOffset;
     let mode, W, trackMode = "hand";
     if (mixamo) {
       if (pick.rifleHand === "L") { if (!this.rifleOnLeft || this.rifleOnLeft.file !== pick.file) this.rifleOnLeft = this._PinLeft(pick.file); }

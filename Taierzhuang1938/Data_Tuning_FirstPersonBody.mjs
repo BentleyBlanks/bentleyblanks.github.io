@@ -24,11 +24,17 @@ export const FIRST_PERSON_BODY = Object.freeze({
   twistSpine1: 0.45,
   twistSpine2: 0.55,
   // 走动：胯朝向追视线的速率（1/s）；横移 / 斜走时胯往移动方向偏，最多 orientWarpDeg（Orientation Warping，正横移时最大）。
-  // 正横移时胯偏 40° → 步子与胯差 50°，腿的左右次序沿移动方向量，不会卡住后脚（2026-10-28）。
+  // 正横移时胯打开 54°（上身脊柱拧角 54° < maxTwistDeg 85°），腿接近斜前跑而不是纯横着交叉；
+  // 配合横移扩宽脚道 / 前后脚错位 / 摆动外绕弧，避免侧移时大腿与小腿互相穿插（2026-11-21）。
   // 移动方向过了正横移再多 orientWarpHysteresisDeg 度才从「胯正前对着走」切到「胯正后对着走」（反过来同理）。
   movingTurnRate: 9,
-  orientWarpDeg: 40,
+  orientWarpDeg: 54,
   orientWarpHysteresisDeg: 20,
+  // 横移防穿插三项（按移动方向相对胯的侧向分量平滑生效，直走时恒为 0）：
+  // 沿脚步垂直轴扩宽左右脚道（每侧米）、领跑脚前伸/跟随脚略收偏置（米）、摆动脚中段外绕净距（米）。
+  strafeWideM: 0.075,
+  strafeLeadBiasM: 0.09,
+  strafeSwingArcM: 0.055,
   // 算不算在走（m/s）：高于 startMps 开始迈步，低于 stopMps 停步（回差）。
   startMps: 0.3,
   stopMps: 0.15,

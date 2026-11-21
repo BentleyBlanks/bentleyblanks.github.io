@@ -88,16 +88,16 @@ export const XBOT_NATIVE = Object.freeze({
   standIdleRifleAim: M("RifleAimingIdle_V1"),
   standIdleEmpty: M("NeutralIdle_V1"),
   standWalkRifle: M("RifleWalk_V1", { speedMps: 1.3 }),
-  standWalkRifleAim: M("WalkWithRifle_V1", { speedMps: 1.3 }),
+  standWalkRifleAim: M("Walking_V3", { speedMps: 1.25 }),
   standWalkEmpty: M("Walking_V21", { speedMps: 1.35 }),
   standRunRifle: M("RifleRun_V2", { speedMps: 3.6 }),
-  standRunRifleAim: M("RifleRun_V2", { speedMps: 3.6 }),
+  standRunRifleAim: M("RifleRun_V1", { speedMps: 3.4 }),
   standRunEmpty: M("UnarmedRunForward_V1", { speedMps: 3.4 }),
   crouchIdleRifle: M("RifleKneelIdle_V1"),
-  crouchIdleRifleAim: M("RifleKneelIdle_V1"),
+  crouchIdleRifleAim: M("IdleCrouchingAiming_V1"),
   crouchIdleEmpty: M("KneelingIdle_V1"),
   crouchWalkRifle: M("RifleCrouchWalk_V1", { speedMps: 0.9 }),
-  crouchWalkRifleAim: M("RifleCrouchWalk_V1", { speedMps: 0.9 }),
+  crouchWalkRifleAim: M("CrouchedWalking_V1", { speedMps: 0.95 }),
   crouchWalkEmpty: M("CrouchedWalking_V2", { speedMps: 1.0 }),
   crouchRunRifle: M("CrouchedRun_V1", { speedMps: 2.6 }),
   crouchRunRifleAim: M("CrouchedRun_V1", { speedMps: 2.6 }),
@@ -115,10 +115,61 @@ export const XBOT_NATIVE = Object.freeze({
   // 投弹：国军木柄弹（拧盖拽火绳），日军九一式（拔销磕钢盔）
   grenadeNra: C("StickGrenadeStand"),
   grenadeIja: C("Type91GrenadeThrow"),
-  // 开枪（试玩里的日军）
+  // 开枪（试玩里的日军：站/蹲走上半身 Additive 叠加，不打断双腿步态；卧姿静止时复用）
   fireStand: M("FiringRifle_V1"),
   fireCrouch: M("FireRifle_V1"),
   fireProne: M("ProneFiringRifle_V1"),
+});
+
+/**
+ * 2D 混合空间四向步态对照表（2026-11-21）：按速度在角色局部坐标中的前后左右分解，
+ * 对齐相位同步混合相邻两个方向的 Mixamo 原生动作。键与 XBOT_NATIVE 的步态键对应。
+ */
+export const XBOT_LOCOMOTION_4WAY = Object.freeze({
+  standWalkRifleAim: Object.freeze({
+    forward: M("Walking_V3", { speedMps: 1.25 }),
+    backward: M("WalkingBackwards_V1", { speedMps: 1.05 }),
+    left: M("RunLeft_V1", { speedMps: 2.1 }),
+    right: M("RunRight_V1", { speedMps: 2.1 }),
+  }),
+  standRunRifleAim: Object.freeze({
+    forward: M("RifleRun_V1", { speedMps: 3.4 }),
+    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5 }),
+    left: M("RunLeft_V1", { speedMps: 2.8 }),
+    right: M("RunRight_V1", { speedMps: 2.8 }),
+  }),
+  standWalkRifle: Object.freeze({
+    forward: M("RifleWalk_V1", { speedMps: 1.3 }),
+    backward: M("BackwardsRifleWalk_V1", { speedMps: 1.15 }),
+  }),
+  standRunRifle: Object.freeze({
+    forward: M("RifleRun_V2", { speedMps: 3.6 }),
+    backward: M("BackwardsRifleRun_V1", { speedMps: 2.5 }),
+  }),
+  crouchWalkRifleAim: Object.freeze({
+    forward: M("CrouchedWalking_V1", { speedMps: 0.95 }),
+    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85 }),
+    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0 }),
+    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0 }),
+  }),
+  crouchWalkRifle: Object.freeze({
+    forward: M("RifleCrouchWalk_V1", { speedMps: 0.9 }),
+    backward: M("RifleCrouchBackwardWalk_V1", { speedMps: 0.85 }),
+    left: M("CrouchWalkStrafeLeft_V1", { speedMps: 1.0 }),
+    right: M("CrouchWalkStrafeRight_V1", { speedMps: 1.0 }),
+  }),
+});
+
+/**
+ * 原地迈步转身（Turn-in-Place，2026-11-21）：实测 Mixamo 库里现成的原地转身片段，
+ * 播放时剔除片段自带的 Hips 旋转增量（Root Yaw Extraction），由下盘控制器同步吃掉角度差。
+ */
+export const XBOT_TURN_IN_PLACE = Object.freeze({
+  standAimLeft90: M("Turn90Left_V1", { turnDeg: 90 }),
+  standAimRight90: M("Turn90Right_V1", { turnDeg: -90 }),
+  standHipLeft45: M("RifleTurn_V1", { turnDeg: 45 }),
+  standHipRight45: M("RifleTurn_V2", { turnDeg: -39 }),
+  crouchLeft90: M("RifleCrouchTurn_V2", { turnDeg: 90 }),
 });
 
 /**
