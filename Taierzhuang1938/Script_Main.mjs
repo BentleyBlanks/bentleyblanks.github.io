@@ -2856,6 +2856,7 @@ function SandboxHost() {
       player.health = 100; player.bleeding = false;
     },
     EnsureDebugInventory,
+    SetBootStep: (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)),
     // 主文件的工具箱：靶场与白刃实验场的运行时（Script_RangeTargets / Script_MeleeLabRuntime）从这里读写主文件的状态。
     ctx,
     GoreDebug: () => window.Taierzhuang?.Debug?.Gore || null,

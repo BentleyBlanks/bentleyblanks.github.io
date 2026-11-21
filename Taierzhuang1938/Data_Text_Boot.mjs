@@ -23,6 +23,13 @@ export const TEXT = Object.freeze({
   "boot.step.relightScene": "重编场景光照…… {done}/{total}",
   "boot.step.warmMaterials": "预热材质…… {done}/{total}",
   "boot.step.loadMeshes": "载入网格…… {done}/{total}",
+  "boot.step.encounterPostShaders": "提交后处理着色器……",
+  "boot.step.encounterCast": "载入正式人物与动作……",
+  "boot.step.encounterTextures": "整理人物贴图…… {done}/{total}",
+  "boot.step.encounterDeaths": "载入倒地动作……",
+  "boot.step.encounterActors": "布置战场人物……",
+  "boot.step.encounterActorShaders": "准备人物着色器……",
+  "boot.step.encounterWarmFrames": "预热首帧画面…… {done}/{total}",
 
   // --- 开始按钮。走哪一条由 URL 入口决定（见 Script_Main.BootStartLabel）。
   "boot.start.play": "进 城",

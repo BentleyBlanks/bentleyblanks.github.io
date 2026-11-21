@@ -24,12 +24,16 @@ export function PrepareEncounterLibraryRequest(root) {
     }
     return jobs.get(type);
   }
-  async function CastStamp() {
-    const files=[script,index,path.join(project,"Data_Tuning_EncounterPlayStartup.mjs"),
+  async function CastInputStamp() {
+    const files=[script,path.join(project,"Data_Tuning_EncounterPlayStartup.mjs"),
       path.join(project,"Data_XBotCharacters.mjs"),path.join(project,"Script_StrictTexturePublish.mjs"),
       path.join(project,"Script_PublishAssetPaths.mjs"),path.join(root,"package.json")];
     const sourceDir=path.join(project,"Model/Character");
     for(const name of (await fs.readdir(sourceDir)).sort())if(name.endsWith(".glb"))files.push(path.join(sourceDir,name));
+    return (await Promise.all(files.map(Stamp))).join("|");
+  }
+  async function CastOutputStamp() {
+    const files=[index];
     const manifest=JSON.parse(await fs.readFile(index,"utf8"));
     for(const {file} of Object.values(manifest.models)) {
       if(!/^[a-f0-9]{64}\.glb$/.test(file))throw Error("Invalid character library filename");
@@ -38,14 +42,19 @@ export function PrepareEncounterLibraryRequest(root) {
     }
     return (await Promise.all(files.map(Stamp))).join("|");
   }
+  async function CastStamp() {
+    const [inputs,outputs]=await Promise.all([CastInputStamp(),CastOutputStamp()]);
+    return inputs+"||"+outputs;
+  }
   async function Handle(route,file){
     if(route==="/Taierzhuang1938/AdvancedTools/Library/Data_Cast.json"){
       let revision=await CastStamp().catch(()=>null);
       for(let attempt=0;(!revision||revision!==castRevision)&&attempt<3;attempt++) {
+        const inputsBefore=await CastInputStamp();
         await Import("cast");
-        const next=await CastStamp();
-        if(next===revision)castRevision=next;
-        revision=next;
+        const [inputsAfter,outputsAfter]=await Promise.all([CastInputStamp(),CastOutputStamp()]);
+        revision=inputsAfter+"||"+outputsAfter;
+        if(inputsAfter===inputsBefore)castRevision=revision;
       }
       if(revision!==castRevision)throw Error("Character inputs changed during import");
       return true;

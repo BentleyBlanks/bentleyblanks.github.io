@@ -104,25 +104,35 @@ export class LevelFlowPlay {
     this.layout.value="1";document.body.classList.add("lfPlayingGame");
     document.querySelector("#chatPane").inert=true;document.querySelector("#flowTimeline").inert=true;
     this.showSource?.();this.UpdateControls();
+    this.ShowLoading("正在校验场景与人物资源…");
     this.Launch(payload,generation).catch(error=>{
       if(!this.active||generation!==this.generation)return;
       this.LoadError(error.message);
     });
     return true;
   }
+  ShowLoading(text) {
+    if(!this.host){
+      this.host=document.createElement("div");this.host.className="lfPlayHost";
+      this.loading=document.createElement("div");this.loading.className="lfPlayLoading";
+      this.host.append(this.loading);document.querySelector(".lfViewport").append(this.host);
+    }
+    this.host.className="lfPlayHost";this.host.hidden=false;
+    this.loading.hidden=false;this.loading.textContent=text;
+  }
   async Launch(payload,generation) {
     const stamp=await this.SceneStamp();
     if(!this.active||generation!==this.generation)return;
     const api=this.frame?.contentWindow.Tengxian?.Debug.EncounterPlay;
     if(api?.State().initialized&&!api.State().error&&!this.frame.contentWindow.Tengxian.renderer.getContext().isContextLost()&&stamp===this.cachedStamp) {
-      this.host.className="lfPlayHost";this.host.hidden=false;this.loading.hidden=false;this.loading.textContent="正在重置试玩…";
+      this.ShowLoading("正在重置试玩…");
       await api.Begin(payload);
       if(!this.active||generation!==this.generation)return;
       this.launching=false;this.StartHost();return;
     }
-    this.DropHost();this.cachedStamp=stamp;
-    this.host=document.createElement("div");this.host.className="lfPlayHost";
-    this.loading=document.createElement("div");this.loading.className="lfPlayLoading";this.loading.textContent="正在载入战斗场景…";
+    if(this.frame)this.DropHost();
+    this.cachedStamp=stamp;
+    this.ShowLoading("正在载入战斗场景…");
     const variantQuery=payload.variantId?`&variant=${encodeURIComponent(payload.variantId)}`:"";
     this.frame=document.createElement("iframe");this.frame.title="Encounter Play";this.frame.allow="autoplay; fullscreen";this.frame.src=`../index.html?encounterPlay=1${variantQuery}`;
     const frame=this.frame;
@@ -132,7 +142,7 @@ export class LevelFlowPlay {
         if(!this.active&&this.frame===frame){this.DropHost();this.UpdateControls();}
       },true);
     },{once:true});
-    this.host.append(this.frame,this.loading);document.querySelector(".lfViewport").append(this.host);
+    this.host.insertBefore(this.frame,this.loading);
     this.launching=false;this.timer=setInterval(()=>this.StartHost(),100);
   }
   StartHost() {
@@ -199,7 +209,7 @@ export class LevelFlowPlay {
     clearTimeout(this.cacheTimer);
     this.CloseDebugTools();
     try{this.frame?.contentWindow.Tengxian?.Debug?.EncounterPlay?.Dispose?.();}catch{}
-    if(this.frame)this.frame.src="about:blank";this.host?.remove();this.frame=null;this.host=null;
+    if(this.frame)this.frame.src="about:blank";this.host?.remove();this.frame=null;this.host=null;this.loading=null;
   }
   Inspect(){return {active:this.active,paused:this.paused,state:this.state,savedTime:this.saved?.time??null,loadMs:this.loadMs??null,cached:!!this.frame};}
 }
