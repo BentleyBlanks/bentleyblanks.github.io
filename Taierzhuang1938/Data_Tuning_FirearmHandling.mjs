@@ -65,6 +65,47 @@ export const ADS_LOOK_SWAY = Object.freeze({
 // Walking while aimed: sights sway on the step cycle (zero-mean, rotation only).
 export const ADS_MOVE_BOB = Object.freeze({ yawDeg: 1.0, pitchDeg: 0.6, rollDeg: 1.5, crouchScale: 0.55 });
 
+// COD-style procedural weapon movement & acceleration inertia (2026-11-22):
+//   1. Strafe acceleration impulse + spring return (`dv_right` high-pass): starting a
+//      right strafe initially lags the rifle left (-x, +yaw, +roll) and springs back
+//      toward steady banking while still strafing; stopping or counter-strafing carries
+//      momentum forward before settling.
+//   2. Longitudinal surge (`dv_forward`): starting forward presses the stock slightly
+//      into the shoulder (+z); sudden stops surge the rifle forward (-z, -pitch) and settle.
+//   3. Stance / terrain eye-height lag (`d(eyeHeight)/dt` while grounded): dropping into
+//      crouch/prone briefly floats the rifle behind the descending head (+y, +pitch)
+//      before settling down with weight; standing up hangs heavy (-y, -pitch) then rises.
+//   4. Gait envelope & stop-step settle: smooths bob onset/release and adds a subtle
+//      weight dip when decelerating from walk/sprint to a stop.
+// Translational offsets attenuate to 0 in ADS so settled iron sights stay pixel-centred.
+export const MOVE_INERTIA = Object.freeze({
+  walkSpeedMps: 3.2,
+  maxDeltaSpeedMps: 4.5,
+  maxEyeSpeedMps: 2.4,
+  strafeFrequencyHz: 3.1,
+  strafeDamping: 0.74,
+  strafeImpulseXM: -0.0044,         // metres per (m/s) of lateral velocity change (~ -14 mm on crisp walk start)
+  strafeImpulseYawDeg: 0.36,        // degrees of barrel lag per (m/s)
+  strafeImpulseRollDeg: 0.52,       // degrees of initial counter-roll per (m/s)
+  strafeBankRollRad: 0.044,         // steady banking into actual lateral velocity (replaces digital key tilt)
+  strafeBankXM: -0.0024,            // subtle steady lateral offset at full walk strafe
+  strafeBankLerpSpeed: 7.5,
+  surgeFrequencyHz: 2.9,
+  surgeDamping: 0.78,
+  surgeImpulseZM: 0.0032,           // +z back on forward accel, -z forward surge on hard stop (~ -13 mm from sprint)
+  surgeImpulsePitchDeg: 0.34,       // slight barrel rise on launch / dip (-rx) on hard stop
+  stanceFrequencyHz: 3.3,
+  stanceDamping: 0.76,
+  stanceImpulseYM: -0.0068,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
+  stanceImpulsePitchDeg: -0.82,     // dropping eye -> +pitch lag; rising eye -> -pitch lag
+  gaitAttackPerS: 10.0,
+  gaitReleasePerS: 6.5,
+  stopSettleSpeedMps: 0.65,
+  stopSettleDipYM: -0.0042,
+  stopSettlePitchDeg: -0.45,
+  adsRotationScale: 0,              // full ADS keeps swayPivot strictly zero so sights match AimDirection
+});
+
 // Idle aim sway of the whole line of sight (camera + aim together, so settled sights
 // stay centred and the world moves). COD-style: breathing figure 8 (vertical at twice
 // the horizontal rate), slow wander, fine tremor. Scaled by Player.SwayCondition

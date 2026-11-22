@@ -1,4 +1,4 @@
-import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY, LOOK_SWAY, AIM_IDLE_SWAY, ADS_MOVE_BOB } from "./Data_Tuning_FirearmHandling.mjs";
+import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY, LOOK_SWAY, AIM_IDLE_SWAY, ADS_MOVE_BOB, MOVE_INERTIA } from "./Data_Tuning_FirearmHandling.mjs";
 
 const Clamp01 = (value) => Math.max(0, Math.min(1, value));
 export const IsAutomaticGun = (weapon) => weapon?.kind === "lmg" || weapon?.kind === "hmg";
@@ -210,4 +210,146 @@ export function CycleReferenceS(cycle, playedS) {
     if (PaceForward(keys, slopes, i, mid) < playedS) low = mid; else high = mid;
   }
   return (low + high) / 2;
+}
+
+// COD-style procedural weapon movement & acceleration inertia (high-pass velocity
+// impulses into damped springs + actual-velocity strafe banking + stance mass lag +
+// smoothed gait envelope). Fixed 1/240 s substeps match LookSway's frame-rate invariance.
+const INERTIA_PEAK_GAIN = 1 / 0.36;
+export class MoveInertia {
+  constructor(tuning = MOVE_INERTIA) {
+    this.tuning = tuning;
+    this.Reset();
+  }
+  Reset() {
+    this.initialized = false;
+    this.prevRightMps = 0;
+    this.prevForwardMps = 0;
+    this.prevEyeHeight = null;
+    this.wasMoving = false;
+    this.gaitEnvelope = 0;
+    this.bankRoll = 0;
+    this.bankX = 0;
+    this.strafe = { x: 0, yaw: 0, roll: 0, vx: 0, vyaw: 0, vroll: 0 };
+    this.surge = { z: 0, pitch: 0, vz: 0, vpitch: 0 };
+    this.stance = { y: 0, pitch: 0, vy: 0, vpitch: 0 };
+    this.lastDeltaRight = 0;
+    this.lastDeltaForward = 0;
+    this.x = 0; this.y = 0; this.z = 0;
+    this.pitch = 0; this.yaw = 0; this.roll = 0;
+    return this;
+  }
+  Step(dt, {
+    rightMps = 0,
+    forwardMps = 0,
+    gaitTarget = 0,
+    eyeHeight = null,
+    grounded = true,
+    ads = 0,
+    massScale = 1,
+  } = {}) {
+    if (!(dt > 1e-5)) return this;
+    const M = this.tuning;
+    const scale = Clamp(massScale || 1, 0.55, 1.45);
+    const right = Number.isFinite(rightMps) ? rightMps : 0;
+    const forward = Number.isFinite(forwardMps) ? forwardMps : 0;
+
+    if (!this.initialized) {
+      this.initialized = true;
+      this.prevEyeHeight = Number.isFinite(eyeHeight) ? eyeHeight : null;
+    }
+
+    const dRight = Clamp(right - this.prevRightMps, -M.maxDeltaSpeedMps, M.maxDeltaSpeedMps);
+    const dForward = Clamp(forward - this.prevForwardMps, -M.maxDeltaSpeedMps, M.maxDeltaSpeedMps);
+    this.prevRightMps = right;
+    this.prevForwardMps = forward;
+    this.lastDeltaRight = dRight;
+    this.lastDeltaForward = dForward;
+
+    const wStrafe = TAU * M.strafeFrequencyHz;
+    const kStrafe = wStrafe * INERTIA_PEAK_GAIN * scale;
+    const wSurge = TAU * M.surgeFrequencyHz;
+    const kSurge = wSurge * INERTIA_PEAK_GAIN * scale;
+
+    // Grounded stance / step eye-height lag (ignores teleports and airborne jumps so
+    // JumpTest's dedicated jumpRise/jumpFall/land curve stays untouched).
+    let clampedEye = 0;
+    if (Number.isFinite(eyeHeight)) {
+      if (this.prevEyeHeight !== null && grounded) {
+        const dEye = eyeHeight - this.prevEyeHeight;
+        if (Math.abs(dEye) > 1e-5 && Math.abs(dEye) < 0.65) {
+          clampedEye = Clamp(dEye, -M.maxEyeSpeedMps * dt, M.maxEyeSpeedMps * dt);
+        }
+      }
+      this.prevEyeHeight = eyeHeight;
+    }
+
+    // Stop-step weight settle when decelerating from a brisk walk/sprint to rest.
+    const speed = Math.hypot(right, forward);
+    if (grounded && this.wasMoving && speed < 0.18) {
+      this.wasMoving = false;
+      const wSettle = TAU * M.stanceFrequencyHz * INERTIA_PEAK_GAIN * scale;
+      this.stance.vy += M.stopSettleDipYM * wSettle;
+      this.stance.vpitch += M.stopSettlePitchDeg * DEG * wSettle;
+    } else if (speed > M.stopSettleSpeedMps) {
+      this.wasMoving = true;
+    }
+
+    // Smooth gait envelope (eliminates instantaneous bob amplitude snaps).
+    const gTarget = Clamp01(gaitTarget);
+    const gRate = gTarget > this.gaitEnvelope ? M.gaitAttackPerS : M.gaitReleasePerS;
+    this.gaitEnvelope += (gTarget - this.gaitEnvelope) * (1 - Math.exp(-gRate * dt));
+
+    // Steady strafe bank driven by real lateral velocity (not raw digital key).
+    const normRight = Clamp(right / Math.max(0.5, M.walkSpeedMps), -1.35, 1.35);
+    const bankFollow = 1 - Math.exp(-M.strafeBankLerpSpeed * dt);
+    this.bankRoll += (-normRight * M.strafeBankRollRad * scale - this.bankRoll) * bankFollow;
+    this.bankX += (normRight * M.strafeBankXM * scale - this.bankX) * bankFollow;
+
+    // Integrate damped springs in fixed 1/240 s substeps, distributing impulses evenly.
+    const span = Math.min(dt, 0.1);
+    const steps = Math.max(1, Math.ceil(span * 240));
+    const h = span / steps;
+    const stepStrafeVx = (dRight * M.strafeImpulseXM * kStrafe) / steps;
+    const stepStrafeVyaw = (dRight * M.strafeImpulseYawDeg * DEG * kStrafe) / steps;
+    const stepStrafeVroll = (dRight * M.strafeImpulseRollDeg * DEG * kStrafe) / steps;
+    const stepSurgeVz = (dForward * M.surgeImpulseZM * kSurge) / steps;
+    const stepSurgeVpitch = (dForward * M.surgeImpulsePitchDeg * DEG * kSurge) / steps;
+    const stepEyeY = (clampedEye * (M.stanceImpulseYM * 3.4) * scale) / steps;
+    const stepEyePitch = (clampedEye * (M.stanceImpulsePitchDeg * DEG * 3.4) * scale) / steps;
+    const cStrafe = 2 * M.strafeDamping * wStrafe;
+    const cSurge = 2 * M.surgeDamping * wSurge;
+    const wStance = TAU * M.stanceFrequencyHz, cStance = 2 * M.stanceDamping * wStance;
+    for (let i = 0; i < steps; i += 1) {
+      this.strafe.vx += stepStrafeVx + (-wStrafe * wStrafe * this.strafe.x - cStrafe * this.strafe.vx) * h;
+      this.strafe.x += this.strafe.vx * h;
+      this.strafe.vyaw += stepStrafeVyaw + (-wStrafe * wStrafe * this.strafe.yaw - cStrafe * this.strafe.vyaw) * h;
+      this.strafe.yaw += this.strafe.vyaw * h;
+      this.strafe.vroll += stepStrafeVroll + (-wStrafe * wStrafe * this.strafe.roll - cStrafe * this.strafe.vroll) * h;
+      this.strafe.roll += this.strafe.vroll * h;
+
+      this.surge.vz += stepSurgeVz + (-wSurge * wSurge * this.surge.z - cSurge * this.surge.vz) * h;
+      this.surge.z += this.surge.vz * h;
+      this.surge.vpitch += stepSurgeVpitch + (-wSurge * wSurge * this.surge.pitch - cSurge * this.surge.vpitch) * h;
+      this.surge.pitch += this.surge.vpitch * h;
+
+      this.stance.y += stepEyeY;
+      this.stance.pitch += stepEyePitch;
+      this.stance.vy += (-wStance * wStance * this.stance.y - cStance * this.stance.vy) * h;
+      this.stance.y += this.stance.vy * h;
+      this.stance.vpitch += (-wStance * wStance * this.stance.pitch - cStance * this.stance.vpitch) * h;
+      this.stance.pitch += this.stance.vpitch * h;
+    }
+
+    // Translations attenuate to 0 in ADS so settled iron sights never drift off screen centre.
+    const hipWeight = 1 - Clamp01(ads);
+    const rotWeight = Mix(1, M.adsRotationScale, Clamp01(ads));
+    this.x = (this.strafe.x + this.bankX) * hipWeight;
+    this.y = this.stance.y * hipWeight;
+    this.z = this.surge.z * hipWeight;
+    this.pitch = (this.surge.pitch + this.stance.pitch) * rotWeight;
+    this.yaw = this.strafe.yaw * rotWeight;
+    this.roll = (this.strafe.roll + this.bankRoll) * hipWeight;
+    return this;
+  }
 }

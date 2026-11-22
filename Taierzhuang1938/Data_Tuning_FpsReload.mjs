@@ -45,10 +45,9 @@ export const FPS_RIFLE_RELOAD = Object.freeze({
     [0.655, -0.035, 0.046, 0.075, 0.080, 0.320, -0.430],
     [0.750, -0.031, 0.050, 0.069, 0.110, 0.280, -0.390],
     [0.825, -0.035, 0.049, 0.073, 0.100, 0.320, -0.430],
-    [0.905, -0.041, 0.037, 0.083, 0.055, 0.350, -0.460],
-    [0.940, -0.029, 0.040, 0.065, 0.110, 0.280, -0.370],
-    [0.980, -0.005, 0.006, 0.010, 0.020, 0.040, -0.055],
-    [0.994, 0.001, -0.001, -0.002, -0.004, -0.008, 0.010],
+    [0.875, -0.036, 0.041, 0.075, 0.072, 0.320, -0.425],
+    [0.920, -0.022, 0.025, 0.046, 0.056, 0.195, -0.255],
+    [0.962, -0.007, 0.008, 0.014, 0.018, 0.058, -0.076],
     [1.000, 0, 0, 0, 0, 0, 0],
   ],
   // Relative to the guide: clear the receiver on an arc, align, then seat.
@@ -205,6 +204,11 @@ export const FPS_BOLT_HAND = Object.freeze({
   graspAt: .140, approachFraction:.60, liftLead:.105, releaseGap: .010, clearFraction: .40,
   liftLeadByWeapon:{HanYang:.160},
   clearOffset: [.016,.008,.020],
+  // In-shoulder ADS bolt retention (COD WWII / Easy Red 2): keep rifle shouldered
+  // instead of kicking FOV all the way back to hipfire every round.
+  boltAdsKeep: 0.72,
+  boltDelayByWeapon: Object.freeze({ ZhongZheng: 0.035, Type38: 0.035 }),
+  boltDurationByWeapon: Object.freeze({ ZhongZheng: 1.14, Type38: 1.22 }),
 });
 
 // Shoulder-to-shoulder bolt cycle, digitised frame by frame from reference 04
@@ -232,7 +236,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // the clip (the 2.30 s reference shouldered only after the regrip).
     durationS: 1.95, startS: 0.02,
     pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
-      [1.02, 0.740], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
+      [1.02, 0.735], [1.26, 0.825], [1.41, 0.940], [1.95, 1.215]],
     // Half-width (played s) of the centred smoothing on the whole-rifle tracks (lower, head,
     // sway). 2026-11-13 (user: the bolt cycle moved in jerks): the rifle froze between beats
     // and then lurched 7.5 cm in three frames; the window rounds every start and stop without
@@ -261,10 +265,10 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // the working rifle and hand big and close; squeezing the whole layer's depth does
     // that without moving the hand nearer the shoulder (which tears the arm skin).
     workDepthScale: 0.6,
-    // [s, weight]; the rifle leaves the cheek .19-.35 s played and is back on it by 1.13 s
-    // (COD .20-.33 and ~1.13), rising while the hand still presses the handle down.
-    lower: [[0, 0], [0.25, 0], [0.40, 0.45], [0.55, 1], [1.24, 1], [1.36, 0.5], [1.50, 0.2], [1.65, 0]],
-    head: [[0, 0], [0.25, 0], [0.40, 0.6], [0.50, 1], [1.30, 1], [1.42, 0.5], [1.56, 0.15], [1.70, 0]],
+    // [s, weight]; the rifle rises continuously alongside the returning hand so
+    // sights settle right as the trigger unlocks (no 190 ms dead post-sight freeze).
+    lower: [[0, 0], [0.22, 0], [0.38, 0.48], [0.54, 1], [1.24, 1], [1.46, 0.52], [1.70, 0.16], [1.91, 0]],
+    head: [[0, 0], [0.22, 0], [0.38, 0.60], [0.50, 1], [1.28, 1], [1.50, 0.48], [1.74, 0.14], [1.93, 0]],
     // The rifle riding on the working hand, rotating about the eye ([s, -, -, -, rx, ry, rz]),
     // from the COD clip's front sight frame by frame: it dips ~0.03 of the frame as the rifle
     // leaves the cheek (.23 s), sits ~0.08 above centre while lowered, and is driven back down by
@@ -372,6 +376,17 @@ export const FPS_BOLT_CYCLE = Object.freeze({
       { at: 1.114, offset: 0.555, maxDuration: 0.110, closing: true },
       { at: 1.395, offset: 0.665, maxDuration: 0.100, closing: true },
     ],
+  }),
+});
+
+export const FPS_BOLT_CYCLE_LEGACY = Object.freeze({
+  HanYang: Object.freeze({
+    ...FPS_BOLT_CYCLE.HanYang,
+    pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
+      [1.02, 0.740], [1.26, 0.830], [1.41, 0.950], [1.95, 1.322]],
+    lower: [[0, 0], [0.25, 0], [0.40, 0.45], [0.55, 1], [1.24, 1], [1.36, 0.5], [1.50, 0.2], [1.65, 0]],
+    head: [[0, 0], [0.25, 0], [0.40, 0.6], [0.50, 1], [1.30, 1], [1.42, 0.5], [1.56, 0.15], [1.70, 0]],
+    extraFirePadS: 0.02,
   }),
 });
 

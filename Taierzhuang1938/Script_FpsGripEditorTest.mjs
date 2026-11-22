@@ -177,6 +177,44 @@ try {
   Check("实时输入收掉钉住的动作", !timeline.cleared && timeline.action === null,
     `仍在程序动作=${timeline.cleared} action=${timeline.action}`);
 
+  const compareBench = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const editor = T.editor.active;
+    editor.SetWeapon("HanYang");
+    editor.SetMode("bolt");
+    editor.SetComparisonProfile("before");
+    for (let i = 0; i < 95; i += 1) editor.Update(1 / 60);
+    const boltBefore = { shots: editor.boltShotCount, drops: editor.boltDropCount, scopeVisible: !editor.scopeDock.hidden };
+    editor.SetComparisonProfile("after");
+    for (let i = 0; i < 95; i += 1) editor.Update(1 / 60);
+    const boltAfter = { shots: editor.boltShotCount, drops: editor.boltDropCount };
+
+    editor.SetMode("inertia");
+    editor.SetComparisonProfile("before");
+    let minBeforeX = 0;
+    for (let i = 0; i < 60; i += 1) {
+      editor.Update(1 / 60);
+      minBeforeX = Math.min(minBeforeX, editor.inertiaHistory.at(-1)?.xMm ?? 0);
+    }
+    editor.SetComparisonProfile("after");
+    let minAfterX = 0, lateAfterX = 0;
+    for (let i = 0; i < 84; i += 1) {
+      editor.Update(1 / 60);
+      const xMm = editor.inertiaHistory.at(-1)?.xMm ?? 0;
+      if (i < 32) minAfterX = Math.min(minAfterX, xMm);
+      if (i >= 70) lateAfterX = xMm;
+    }
+    return { boltBefore, boltAfter, minBeforeX, minAfterX, lateAfterX, writeBack: editor.Snapshot().writeBack };
+  });
+  Check("#3 连射拉栓台架直观复现改前吞键与改后连发",
+    compareBench.boltBefore.scopeVisible && compareBench.boltBefore.drops >= 1
+      && compareBench.boltAfter.drops === 0 && compareBench.boltAfter.shots >= 2,
+    `改前 击发=${compareBench.boltBefore.shots}/吞键=${compareBench.boltBefore.drops} → 改后 击发=${compareBench.boltAfter.shots}/吞键=${compareBench.boltAfter.drops}`);
+  Check("#4 移动惯性台架直观复现改前零横移与改后先滞后回弹",
+    compareBench.minBeforeX === 0 && compareBench.minAfterX < -8 && compareBench.lateAfterX > compareBench.minAfterX * 0.35
+      && compareBench.writeBack === false,
+    `改前 X=${compareBench.minBeforeX.toFixed(1)}mm → 改后起步 ${compareBench.minAfterX.toFixed(1)}mm / 匀速回位 ${compareBench.lateAfterX.toFixed(1)}mm`);
+
   const restored = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.editor.Close();
@@ -184,20 +222,23 @@ try {
     return {
       weaponId: T.viewmodel.weaponId,
       variant: T.viewmodel.weaponVariant,
+      comparisonProfile: T.viewmodel.comparisonProfile,
       rootParentIsCamera: T.viewmodel.root.parent === T.camera,
       visible: T.viewmodel.root.visible,
       fov: T.camera.fov,
       position: T.viewmodel.root.position.toArray(),
       quaternion: T.viewmodel.root.quaternion.toArray(),
       markerCount: T.scene.getObjectsByProperty("name", "FpsGripEditorSkeleton", []).length
+        + T.scene.getObjectsByProperty("name", "FpsRangeBackdrop", []).length
         + T.viewmodel.root.getObjectsByProperty("name", "FpsGripEditorMarkers", []).length,
-      domCount: document.querySelectorAll(".edFpsMountHud, .edFpsLegend").length,
+      domCount: document.querySelectorAll(".edFpsMountHud, .edFpsLegend, .edFpsScope").length,
       clean: document.body.classList.contains("edFpsClean"),
     };
   });
   const CloseArray = (a, b) => a.length === b.length && a.every((value, index) => Math.abs(value - b[index]) < 1e-6);
   Check("退出还原玩家武器与视图模型父节点",
     restored.weaponId === before.weaponId && restored.variant === before.variant
+      && restored.comparisonProfile === "after"
       && restored.rootParentIsCamera === before.rootParentIsCamera && restored.visible === before.visible,
     `${before.weaponId}/${before.variant} → ${restored.weaponId}/${restored.variant}`);
   Check("退出还原相机与 Viewmodel 局部变换",

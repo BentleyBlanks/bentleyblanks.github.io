@@ -75,7 +75,10 @@ try {
         throw new Error(`Did not finish ${kind}`);
       }
       try {
+        game.Debug.Mouse(2, true);
+        for (let i = 0; i < 20; i++) await new Promise(requestAnimationFrame);
         await Action("bolt", () => game.Debug.Fire());
+        game.Debug.Mouse(2, false);
         const afterShot = game.state.ammo;
         await Action("reload", () => game.Debug.Key("KeyR"));
         const afterPartial = game.state.ammo;

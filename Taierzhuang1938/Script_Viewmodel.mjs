@@ -61,9 +61,9 @@ import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
-import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH, ADS_LOOK_SWAY, ADS_MOVE_BOB, AIM_IDLE_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
-import { LookSway, AimIdleSway, AdsMoveBob, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
+import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH, ADS_LOOK_SWAY, ADS_MOVE_BOB, AIM_IDLE_SWAY, MOVE_INERTIA } from "./Data_Tuning_FirearmHandling.mjs";
+import { LookSway, AimIdleSway, AdsMoveBob, MoveInertia, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_BOLT_CYCLE_LEGACY, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 
@@ -1637,6 +1637,8 @@ export class Viewmodel {
     // 整条视线的呼吸漂移走 holdDrift（相机与瞄准一起动）。
     this.adsLookSway = new LookSway(ADS_LOOK_SWAY);
     this.aimIdleSway = new AimIdleSway();
+    this.moveInertia = new MoveInertia();
+    this.comparisonProfile = "after";   // "after" | "before"（仅供第一人称持枪检查只读前后对比）
     this.sightSway = { pitch: 0, yaw: 0, roll: 0 };
     this.holdDrift = { pitch: 0, yaw: 0 };
     this.aimSwayEnabled = true;
@@ -2066,8 +2068,12 @@ export class Viewmodel {
     const visibility = shown.map(object => object.visible);
     const rounds = props.at(-1)?.userData.rounds;
     const originals = rounds?.children.map(mesh => mesh.geometry);
+    const savedShot = this.flashShot, savedTime = this.flashTime, savedBorn = this.flashBorn, savedFresh = this.flashFresh;
     try {
       for (const object of shown) object.visible = true;
+      this.flashShot = this._RollFlash(0, 0.5);
+      this.flashTime = 0; this.flashBorn = 0; this.flashFresh = false;
+      this._PlaceFlash();
       draw();
       if (rounds) {
         const profile = props.at(-1).userData.profile;
@@ -2079,9 +2085,23 @@ export class Viewmodel {
         }
       }
     } finally {
+      this.flashShot = savedShot; this.flashTime = savedTime; this.flashBorn = savedBorn; this.flashFresh = savedFresh;
       if (rounds) rounds.children.forEach((mesh, index) => { mesh.geometry = originals[index]; });
       shown.forEach((object, index) => { object.visible = visibility[index]; });
     }
+  }
+
+  /** 第一人称持枪检查：只读切换「改前 / 改后」对比曲线，不写回任何资产或配置。 */
+  SetComparisonProfile(profile = "after") {
+    this.comparisonProfile = profile === "before" ? "before" : "after";
+    this.moveInertia?.Reset();
+    return this.comparisonProfile;
+  }
+
+  _ActiveBoltCycle(weaponId = this.weaponId) {
+    if (!weaponId) return null;
+    if (this.comparisonProfile === "before" && FPS_BOLT_CYCLE_LEGACY[weaponId]) return FPS_BOLT_CYCLE_LEGACY[weaponId];
+    return FPS_BOLT_CYCLE[weaponId] || null;
   }
 
   // -------------------------------------------------------------------------
@@ -2124,6 +2144,7 @@ export class Viewmodel {
     this.pendingHoldOpen = false;
     this.flashTime = 999;
     this.flash.visible = false;
+    this.moveInertia?.Reset();
     this.clipProp.visible = false;
     this.packetProp.visible = false;
     this.usedPacketProp.visible = false;
@@ -2569,8 +2590,10 @@ export class Viewmodel {
       // 延迟可由武器数据覆盖，没写的一律 0.20 s。实录枪机声不靠这个延迟对位，
       // 它跟着 onBoltStart 在动作真正开始时起播。
       // 有逐帧对标拉栓（FPS_BOLT_CYCLE）的枪按那份表的起手时刻排。
-      const cycle = FPS_BOLT_CYCLE[this.weaponId];
-      this.pendingBoltAt = cycle ? CyclePlayedS(cycle, cycle.startS) : this.weapon.boltDelayS ?? 0.20;
+      const cycle = this._ActiveBoltCycle(this.weaponId);
+      const legacy = this.comparisonProfile === "before";
+      const fastDelay = !legacy ? FPS_BOLT_HAND.boltDelayByWeapon?.[this.weaponId] : null;
+      this.pendingBoltAt = cycle ? CyclePlayedS(cycle, cycle.startS) : (fastDelay ?? this.weapon.boltDelayS ?? 0.20);
     }
     if (this.weapon.kind === "boltRifle") this.spentCasePending = true;
 
@@ -2597,8 +2620,10 @@ export class Viewmodel {
   _StartBolt(afterShot = false) {
     // 汉阳造走逐帧对标的整套拉栓（FPS_BOLT_CYCLE，时刻按开枪后的秒数写）；
     // 其余栓动枪仍是 boltTimeS 那段程序化拉栓。
-    const cycle = FPS_BOLT_CYCLE[this.weaponId] || null;
-    this._StartAction("bolt", cycle ? CyclePlayedS(cycle, cycle.durationS) - CyclePlayedS(cycle, cycle.startS) : this.weapon.boltTimeS || 1.05);
+    const cycle = this._ActiveBoltCycle(this.weaponId);
+    const legacy = this.comparisonProfile === "before";
+    const procDuration = (!legacy && FPS_BOLT_HAND.boltDurationByWeapon?.[this.weaponId]) || this.weapon.boltTimeS || 1.05;
+    this._StartAction("bolt", cycle ? CyclePlayedS(cycle, cycle.durationS) - CyclePlayedS(cycle, cycle.startS) : procDuration);
     this.action.roundsRemaining = this.visualAmmo;
     this.action.startedOpen = this.boltOpen;
     this.action.ejectSpent = this.spentCasePending;
@@ -2615,8 +2640,17 @@ export class Viewmodel {
   /** 玩家射击间隔：手拉一整套栓的枪，拉完之前打不出下一发（AI 仍读 fireIntervalS）。 */
   FireIntervalS(weapon = this.weapon) {
     const base = weapon?.fireIntervalS ?? 1.2;
-    const cycle = weapon && FPS_BOLT_CYCLE[weapon.id];
-    return cycle ? Math.max(base, CyclePlayedS(cycle, cycle.durationS) + 0.02) : base;
+    const legacy = this.comparisonProfile === "before";
+    const cycle = weapon && this._ActiveBoltCycle(weapon.id);
+    if (cycle) {
+      const pad = cycle.extraFirePadS || 0;
+      return Math.max(base, CyclePlayedS(cycle, cycle.durationS) + pad);
+    }
+    if (!legacy && weapon?.id && FPS_BOLT_HAND.boltDurationByWeapon?.[weapon.id]) {
+      const delay = FPS_BOLT_HAND.boltDelayByWeapon?.[weapon.id] ?? weapon.boltDelayS ?? 0.04;
+      return delay + FPS_BOLT_HAND.boltDurationByWeapon[weapon.id];
+    }
+    return base;
   }
 
   /** 逐帧拉栓里某个参考秒（表里写的时刻）对应的动作进度 0..1；没有逐帧拉栓时为 null。 */
@@ -2875,18 +2909,27 @@ export class Viewmodel {
 
     // 装填/拉栓/劈砍时强制脱离瞄准：手都离开握把了还能瞄才是穿帮
     // 逐帧拉栓自己给出「枪离开瞄准线」的曲线（落低 / 低头），不用通用的 Pulse。
+    const legacyMotion = this.comparisonProfile === "before";
     const cycle = this.boltCycleState;
     const cycleAway = cycle ? Math.max(cycle.lower, cycle.head) : 0;
-    const actionBlend = this.action && !cycle ? Ease.Pulse(Clamp01(this.action.t)) : 0;
+    const procBolt = !legacyMotion && this.action?.kind === "bolt" && !cycle;
+    const boltAway = procBolt ? Math.sin(Math.PI * Clamp01(this.action.t)) ** 1.35 : 0;
+    const actionBlend = this.action && !cycle && !procBolt ? Ease.Pulse(Clamp01(this.action.t)) : 0;
     // 这一份要给相机看：相机的 FOV 也得跟着枪一起离开瞄准线，
     // 否则枪都甩出画面了视野还是窄的 —— 玩家读到的是「视野卡住」而不是「在拉栓」。
     // 让相机读这条曲线（而不是自己另起一个定时器 snap 出去再 snap 回来），
     // 因果才是对的：**视野丢失是因为枪动了**，两者本来就该是同一条曲线。
     // A Blender reload clip holds the rifle in its own hip-based poses throughout: aiming is
     // dropped for the whole reload (its first frames ease down from the sights) and comes back after.
-    this.adsSuppress = this.action?.skeletal ? 0 : (cycle ? 1 - cycleAway : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
-    // 逐帧拉栓期间开镜姿态照旧是底座（枪从开镜位落下、回到开镜位），离开瞄准线由 cycle.lower 负责。
-    const adsInput = Clamp01(input.ads ?? 0) * (cycle ? 1 - this.wallLower : this.adsSuppress) * (1 - sprint * 0.9);
+    const boltAdsDrop = 1 - (FPS_BOLT_HAND.boltAdsKeep ?? 0.72);
+    const skeletalOut = this.action?.skeletal?.blendOutS > 0
+      ? Ease.InOut(Clamp01(1 - Math.max(0, (1 - this.action.t) * this.action.duration) / this.action.skeletal.blendOutS))
+      : 0;
+    this.adsSuppress = this.action?.skeletal ? skeletalOut * (1 - this.wallLower)
+      : (cycle ? 1 - cycleAway : procBolt ? 1 - boltAway * boltAdsDrop : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
+    // 逐帧拉栓与程序化抵肩拉栓都保留开镜底座，避免中正式/三八式每打一发都暴力退回腰射再缩回。
+    const adsActionKeep = cycle ? 1 - this.wallLower : procBolt ? (1 - boltAway * 0.38) * (1 - this.wallLower) : this.adsSuppress;
+    const adsInput = Clamp01(input.ads ?? 0) * adsActionKeep * (1 - sprint * 0.9);
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
@@ -2948,15 +2991,44 @@ export class Viewmodel {
     const idleKind = AIM_IDLE_SWAY.kinds.includes(this.weapon?.kind);
     const swayOn = idleKind && !this.mount && this.aimSwayEnabled;
     const swayGain = (this.weapon ? this.weapon.swayScale ?? 1 : 1) * (1 - adsVisual);
-    const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0, swayGain, strafe);
-    this.swayPivot.rotation.set(sway.pitch, sway.yaw, sway.roll + sway.strafeRoll, "YXZ");
-    this.swayPivot.position.set(sway.x, sway.y, 0);
+    const gaitRaw = Math.max(moveSpeed, sprint);
+    const walkRef = MOVE_INERTIA.walkSpeedMps;
+    const synthSpeedMps = moveSpeed * walkRef * (sprint > 0.35 ? 1.55 : 1);
+    const rightMps = Number.isFinite(input.localMoveRight) ? input.localMoveRight : (strafe || 0) * synthSpeedMps;
+    const forwardMps = Number.isFinite(input.localMoveForward)
+      ? input.localMoveForward
+      : (input.forward ?? (Math.abs(strafe || 0) > 0.01 ? 0 : (moveSpeed > 0.01 ? 1 : 0))) * synthSpeedMps;
+    const stanceEye = Number.isFinite(input.stanceEyeHeight)
+      ? input.stanceEyeHeight
+      : (1.65 - crouch * 0.58 - Clamp01(input.prone ?? 0) * 1.15);
+    const massScale = this.weapon ? Clamp((this.weapon.swayScale ?? 1) * 0.92 + 0.08, 0.65, 1.35) : 1;
+    const inertiaOn = !legacyMotion && !this.mount && this.aimSwayEnabled;
+    if (!inertiaOn) this.moveInertia.Reset();
+    const inertia = inertiaOn
+      ? this.moveInertia.Step(step, {
+        rightMps, forwardMps, gaitTarget: gaitRaw, eyeHeight: stanceEye,
+        grounded, ads: adsVisual, massScale,
+      })
+      : this.moveInertia;
+    const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0,
+      swayGain, inertiaOn ? 0 : strafe);
+    this.swayPivot.rotation.set(
+      sway.pitch + (inertiaOn ? inertia.pitch : 0),
+      sway.yaw + (inertiaOn ? inertia.yaw : 0),
+      sway.roll + sway.strafeRoll + (inertiaOn ? inertia.roll : 0),
+      "YXZ",
+    );
+    this.swayPivot.position.set(
+      sway.x + (inertiaOn ? inertia.x : 0),
+      sway.y + (inertiaOn ? inertia.y : 0),
+      inertiaOn ? inertia.z : 0,
+    );
 
     // --- 步伐晃动：走 / 跑 / 蹲三档 -----------------------------------------
-    const gait = Math.max(moveSpeed, sprint);
+    const gait = inertiaOn ? inertia.gaitEnvelope : gaitRaw;
     // 频率：走 1.55 Hz，冲刺 2.5 Hz，蹲下拖慢到 0.78
     const cadence = Mix(1.55, 2.50, sprint) * Mix(1.0, 0.78, crouchValue) * Math.PI * 2;
-    this.bobPhase += step * cadence * (0.25 + gait * 0.75);
+    this.bobPhase += step * cadence * (legacyMotion ? (0.25 + gait * 0.75) : (0.08 + gait * 0.92));
     if (this.bobPhase > Math.PI * 200) this.bobPhase -= Math.PI * 200;   // 别让 float 精度慢慢烂掉
     const bobScale = gait * (1 - adsVisual) * Mix(1, 0.55, crouchValue);
     const ampX = Mix(0.013, 0.030, sprint) * bobScale;
@@ -2972,8 +3044,11 @@ export class Viewmodel {
 
     // 照门摇摆（B 层，只转 root，在 FOV 压扁层之上，屏幕角 = 施加角）：开镜转向惯性 + 走动晃动，
     // 静止时归零，所以停稳的照门仍在屏幕中心；Player.AimDirection 加同一角度，子弹跟照门走。
+    const effectiveAdsStrafe = inertiaOn
+      ? (Math.abs(strafe || 0) > 0.01 ? Clamp(rightMps / walkRef, -1, 1) : 0)
+      : strafe;
     const adsSway = this.adsLookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0,
-      swayOn ? adsVisual * (this.weapon.swayScale ?? 1) : 0, strafe);
+      swayOn ? adsVisual * (this.weapon.swayScale ?? 1) : 0, effectiveAdsStrafe);
     const bob = swayOn
       ? AdsMoveBob(this.bobPhase, adsVisual * gait * Mix(1, ADS_MOVE_BOB.crouchScale, crouchValue))
       : { pitch: 0, yaw: 0, roll: 0 };
@@ -4795,6 +4870,7 @@ export class Viewmodel {
         while(scene.parent&&!scene.isScene)scene=scene.parent;
         if(scene.isScene&&slot.mesh.parent!==scene) {
           scene.add(slot.mesh);
+          slot.mesh.layers.set(0);
           slot.mesh.userData.foregroundPrepass=false;
         }
         slot.releaseSource = null; slot.releaseOffset = null;

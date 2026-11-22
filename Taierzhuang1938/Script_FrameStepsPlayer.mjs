@@ -304,6 +304,10 @@ export function PlayStepView(ctx, f) {
   const driftBefore = ctx.viewmodel.holdDrift || NO_DRIFT;
   ctx.camera.rotation.x += driftBefore.pitch - dipBefore;
   ctx.camera.rotation.y += driftBefore.yaw;
+  const yawCos = Math.cos(ctx.player.yaw), yawSin = Math.sin(ctx.player.yaw);
+  const vx = ctx.player.velocity.x, vz = ctx.player.velocity.z;
+  const localMoveRight = yawCos * vx - yawSin * vz;
+  const localMoveForward = -yawSin * vx - yawCos * vz;
   ctx.viewmodel.Update(dt, {
     // 被冲击波掀倒时枪跟着放下去（借贴墙收枪那一层；Script_PlayerKnockback.GunLower）
     wallLower: ctx.mountView.active ? 0 : Math.max(ctx.player.gunClearance.lower, ctx.player.knock?.GunLower ?? 0),
@@ -316,8 +320,9 @@ export function PlayStepView(ctx, f) {
     // 第一人称的腿和身子：白刃倒地、被冲击波掀倒横在地上时都藏起来（那套站姿身体对不上）
     meleeCameraDrop: Math.max(ctx.player.meleeCameraDrop, ctx.player.knock?.BodyHidden ? 1 : 0),
     prone: ctx.player.stanceBlend.prone, alive: ctx.player.Alive,
-    dt, moveSpeed: Clamp01(Math.hypot(ctx.player.velocity.x, ctx.player.velocity.z) / 3.2),
-    strafe: ctx.input.strafe, grounded: ctx.player.grounded, sprint: ctx.player.sprint,
+    dt, moveSpeed: Clamp01(Math.hypot(vx, vz) / 3.2),
+    localMoveRight, localMoveForward, stanceEyeHeight: ctx.player.eyeHeight,
+    strafe: ctx.input.strafe, forward: ctx.input.forward, grounded: ctx.player.grounded, sprint: ctx.player.sprint,
     verticalVelocity: ctx.player.velocity.y,
     ads: ctx.mountView.active ? (ctx.emplacedAds ? 1 : 0) : ctx.player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
     // 自由瞄准的**绝对**偏移（不是增量）：枪要真的指到那儿去。

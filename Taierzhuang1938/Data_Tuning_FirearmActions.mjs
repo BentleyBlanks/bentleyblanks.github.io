@@ -1,7 +1,8 @@
 // Authored input grace and mechanical events. Normalized reload times match
 // the production hand/part animations; one timeline owns sound and ammo commit.
 export const FIRE_CONTROL = Object.freeze({
-  inputBufferS: 0.15, sprintFireDelayS: 0.22, timerEpsilonS: 1e-8,
+  inputBufferS: 0.15, boltInputBufferS: 0.36, legacyInputBufferS: 0.15,
+  sprintFireDelayS: 0.22, timerEpsilonS: 1e-8,
 });
 
 const Event = (at, id, cue = null, extra = {}) => Object.freeze({ at, id, cue, ...extra });

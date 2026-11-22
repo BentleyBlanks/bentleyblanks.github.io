@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SampleShotDisk, FirearmHandling, GunClearance, LookSway, AimIdleSway, AdsMoveBob, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
+import { SampleShotDisk, FirearmHandling, GunClearance, LookSway, AimIdleSway, AdsMoveBob, MoveInertia, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
 import { FPS_BOLT_CYCLE } from "./Data_Tuning_FpsReload.mjs";
 import { LOOK_SWAY, ADS_LOOK_SWAY, ADS_MOVE_BOB } from "./Data_Tuning_FirearmHandling.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
@@ -178,6 +178,59 @@ assert.ok(Math.abs(bobZero.yaw) + Math.abs(bobZero.pitch) + Math.abs(bobZero.rol
     last = played;
   }
 }
+// COD movement & strafe inertia (2026-11-22): lateral impulse lags acceleration then springs
+// back while still strafing, carries forward on sudden stop, surges on launch/stop, lags grounded
+// stance eye-height drops/rises, zeroes translation in ADS, and matches across 30/60/144 fps.
+{
+  function RunStrafe(fps) {
+    const inertia = new MoveInertia(), dt = 1 / fps;
+    let minLaunchX = 0, steadyX = 0, peakStopX = 0;
+    for (let i = 0; i < Math.round(2.4 * fps); i += 1) {
+      const t = (i + 1) * dt;
+      const rightMps = t < 1.1 ? 3.8 * (1 - Math.exp(-16 * t)) : 3.8 * Math.exp(-16 * (t - 1.1));
+      const out = inertia.Step(dt, { rightMps, forwardMps: 0, gaitTarget: rightMps > 0.2 ? 0.8 : 0, grounded: true, ads: 0, eyeHeight: 1.62 });
+      if (t < 0.45) minLaunchX = Math.min(minLaunchX, out.x);
+      if (t >= 0.95 && t < 1.08) steadyX = out.x;
+      if (t >= 1.1 && t < 1.6) peakStopX = Math.max(peakStopX, out.x);
+    }
+    return { minLaunchX, steadyX, peakStopX, finalX: inertia.x };
+  }
+  const s60 = RunStrafe(60), s30 = RunStrafe(30), s144 = RunStrafe(144);
+  assert.ok(s60.minLaunchX < -0.008, `strafe right lags left at launch (${s60.minLaunchX * 1000} mm)`);
+  assert.ok(s60.steadyX > s60.minLaunchX * 0.35, `springs back during steady strafe (${s60.steadyX * 1000} vs ${s60.minLaunchX * 1000} mm)`);
+  assert.ok(s60.peakStopX > 0.005, `sudden stop carries weapon right before settling (${s60.peakStopX * 1000} mm)`);
+  assert.ok(Math.abs(s60.finalX) < 1e-4, "settles cleanly to zero after stop");
+  assert.ok(Math.abs(s30.minLaunchX - s144.minLaunchX) < Math.abs(s144.minLaunchX) * 0.12, "strafe impulse is frame-rate invariant");
+
+  // Forward launch presses stock back (+z), sudden stop surges forward (-z) & dips muzzle (-pitch).
+  const fwd = new MoveInertia(), dt = 1 / 60;
+  let speed = 0, launchZ = 0, stopZ = 0, stopPitch = 0;
+  for (let i = 0; i < 140; i += 1) {
+    const t = i * dt;
+    speed += ((t < 0.9 ? 4.2 : 0) - speed) * (1 - Math.exp(-16 * dt));
+    const out = fwd.Step(dt, { rightMps: 0, forwardMps: speed, gaitTarget: speed > 0.2 ? 1 : 0, grounded: true, ads: 0, eyeHeight: 1.62 });
+    if (t < 0.4) launchZ = Math.max(launchZ, out.z);
+    if (t >= 0.9 && t < 1.4) { stopZ = Math.min(stopZ, out.z); stopPitch = Math.min(stopPitch, out.pitch); }
+  }
+  assert.ok(launchZ > 0.004 && stopZ < -0.004 && stopPitch < -0.2 * DEG, "forward launch/stop surge works");
+
+  // Grounded crouch drop floats weapon slightly up (+y) before settling; ADS zeroes all translations.
+  const stance = new MoveInertia();
+  stance.Step(dt, { rightMps: 0, forwardMps: 0, gaitTarget: 0, grounded: true, ads: 0, eyeHeight: 1.62 });
+  let eyeY = 1.62, peakCrouchY = 0;
+  for (let i = 0; i < 60; i += 1) {
+    eyeY += (1.05 - eyeY) * (1 - Math.exp(-12 * dt));
+    const out = stance.Step(dt, { rightMps: 0, forwardMps: 0, gaitTarget: 0, grounded: true, ads: 0, eyeHeight: eyeY });
+    peakCrouchY = Math.max(peakCrouchY, out.y);
+  }
+  assert.ok(peakCrouchY > 0.003 && Math.abs(stance.y) < 0.001, "crouch drop lags upward then settles");
+  const adsInertia = new MoveInertia();
+  for (let i = 0; i < 20; i += 1) {
+    const out = adsInertia.Step(dt, { rightMps: 2.5, forwardMps: 2.5, gaitTarget: 1, grounded: true, ads: 1, eyeHeight: 1.62 });
+    assert.ok(out.x === 0 && out.y === 0 && out.z === 0, "ADS zeroes translational inertia so sights stay true");
+  }
+}
+
 console.log(JSON.stringify({ adsIdleDeg: { pitch: ads60.pitch / DEG, yaw: ads60.yaw / DEG, hipRatio, held: [held.pitch / DEG, held.yaw / DEG] },
   yawSignChanges: { rested: ads60.signChanges, tired: tired.signChanges }, adsLookCapDeg: adsCap / DEG }));
 console.log(JSON.stringify({centerHalfFraction:inner/count, mean:[sumX/count,sumY/count], quadrants,

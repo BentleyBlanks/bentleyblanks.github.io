@@ -16,7 +16,7 @@ import { PrepareWoundMaterials } from "./Script_CharacterWounds.mjs";
 import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
-import { XBOT_DEATHS } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_DEATHS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE } from "./Data_BlockoutXBotClips.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 import { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";
 import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
@@ -106,13 +106,32 @@ export class EncounterPlay {
     if(phase.blockout?.sceneError)throw new Error(phase.blockout.sceneError);
     // Launch independent driver work while character kits are still loading.
     this.passProgramsSubmitted=this.initialized?0:SubmitEncounterPrograms(this.host);
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary()]);
+    let sfxWarm=null;
+    if(this.host.audio?.enabled) {
+      if(!this.host.audio.ctx)this.host.audio.CreateContext?.();
+      if(this.host.audio.ctx&&!this.host.audio.sfxReady&&!this.host.audio.sfxLoading) {
+        this.host.audio.sfxLoading=true;
+        sfxWarm=Promise.resolve(this.host.audio.LoadSfxPack?.()).catch(()=>{}).finally(()=>{this.host.audio.sfxLoading=false;});
+      }
+      this.host.audio.LoadPacks?.();
+    }
+    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits);
     await this.castTexturesReady;
-    const deaths=await Promise.allSettled(Object.values(XBOT_DEATHS).map(entry=>this.puppets.xbot.Clip(entry.file)));
-    for(const result of deaths)if(result.status==="rejected")console.warn("[EncounterPlay] Death clip warmup failed; retaining mirrored poses",result.reason);
+    const combatClipFiles=new Set([
+      ...Object.values(XBOT_DEATHS).map(entry=>entry?.file),
+      ...Object.values(XBOT_NATIVE).map(entry=>entry?.file),
+      ...Object.values(XBOT_TURN_IN_PLACE).map(entry=>entry?.file),
+      ...Object.values(XBOT_LOCOMOTION_4WAY).flatMap(group=>Object.values(group||{}).map(entry=>entry?.file)),
+    ].filter(Boolean));
+    const clipWarmups=await Promise.allSettled([...combatClipFiles].map(file=>this.puppets.xbot.Clip(file)));
+    for(const result of clipWarmups)if(result.status==="rejected")console.warn("[EncounterPlay] Combat/death clip warmup failed; retaining fallback poses",result.reason);
+    for(const key of ["fireStand","fireCrouch","fireProne"]) {
+      const file=XBOT_NATIVE[key]?.file;
+      if(file)this.puppets.xbot.AdditiveFireTracks?.(file);
+    }
     if(this.disposed||!this.active)return;
     for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
     const cfg=this.plan.config;
@@ -214,6 +233,8 @@ export class EncounterPlay {
     const post=host.post;
     const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
     const hiddenHair=[];
+    const prevVmVisible=host.viewmodel.root.visible;
+    host.viewmodel.root.visible=true;
     const group=new THREE.Group();group.name="EncounterWarmExtras";
     AddGoreWarmProxies(group,[...this.entries.values()].map(e=>e.soldier.actor));
     const debris=host.viewmodel.CreateActionDebrisWarmProxy();
@@ -245,6 +266,7 @@ export class EncounterPlay {
     } catch(error) {
       this.error=String(error.stack||error);this.ready=false;this.Send("error",{message:String(error.message||error)});throw error;
     } finally {
+      host.viewmodel.root.visible=prevVmVisible;
       group.removeFromParent();
       for(const mesh of hiddenHair)mesh.visible=false;
       for(const child of group.children)if(child.isMesh&&child.name.startsWith("GoreWarm_Part_"))child.geometry.dispose();
@@ -260,12 +282,13 @@ export class EncounterPlay {
     const blood=host.vfx.bloodEffects;
     const ready=host.state.ready;
     const warming=host.state.warming;
+    const prevWarmVmVisible=host.viewmodel.root.visible;
     const DrawWarmFrame=()=>{
       host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);
       host.renderer.getContext().finish();
     };
     try{
-      host.state.ready=true;host.state.warming=false;
+      host.state.ready=true;host.state.warming=false;host.viewmodel.root.visible=true;
       // Update the actual camera and blood distance-culling eye first.
       DrawWarmFrame();
       // Restart reconstructs actors and their batch membership even when the
@@ -280,9 +303,23 @@ export class EncounterPlay {
       bloodDrops=blood.activeDrops.length-existingDrops;
       spot.y=host.battlefield.GroundHeight(spot.x,spot.z);
       blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
+      const weaponKind=host.viewmodel.weapon?.kind||"boltRifle";
+      host.vfx.MuzzleFlash?.(spot,direction,{scale:0.25,player:true,kind:weaponKind});
+      host.vfx.Impact?.(spot,new THREE.Vector3(0,1,0),"brick",{weaponKind});
+      host.vfx.Impact?.(spot,new THREE.Vector3(0,1,0),"dirt",{weaponKind});
+      host.vfx.Tracer?.(spot,spot.clone().addScaledVector(direction,6),{kind:"nra"});
+      const prevAds=host.player.ads,prevWantAds=host.player.wantAds,prevFovT=host.ctx.adsFovT;
+      try {
+        host.player.ads=1;host.player.wantAds=true;host.ctx.adsFovT=1;
+        DrawWarmFrame();
+      } finally {
+        host.player.ads=prevAds;host.player.wantAds=prevWantAds;host.ctx.adsFovT=prevFovT;
+      }
       for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++)DrawWarmFrame();
     }finally{
+      host.viewmodel.root.visible=prevWarmVmVisible;
       host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
+      host.vfx.ClearParticles?.();
       post.NotifyCameraCut();
     }
     host.state.actorShaderWarm={mode:retained?"retainedPrograms":"activeScene",ms:performance.now()-start,programs:host.renderer.info.programs.length,bloodDrops,prepassBatchPrimed,shadowBatchPrimed,passProgramsSubmitted:this.passProgramsSubmitted,actorProgramsSubmitted,firstBatch};

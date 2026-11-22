@@ -4151,8 +4151,14 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
       const SLICES = 8;
       const size = Math.ceil(outside.length / SLICES) || 1;
       for (let i = 0; i < outside.length; i += size) {
-        for (const object of outside.slice(i, i + size)) object.layers.mask = outsideMasks.get(object);
+        const slice = outside.slice(i, i + size);
+        const culled = slice.map((object) => object.frustumCulled);
+        for (const object of slice) {
+          object.layers.mask = outsideMasks.get(object);
+          object.frustumCulled = false;
+        }
         RenderScene(0);
+        for (let k = 0; k < slice.length; k += 1) slice[k].frustumCulled = culled[k];
         const shown = Math.min(outside.length, i + size);
         onStep?.(T("boot.step.relightScene", { done: Math.ceil(shown / size), total: SLICES }),
           BootProgress(BOOT.warm.relightScene, shown / outside.length));
@@ -4203,12 +4209,19 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
 
     // --- 四、把剩下的网格放出来 ---------------------------------------------
     // 上面只画了代表件，另外三千多件的顶点/索引缓冲一次都还没传上去 —— 全堆在
-    // 第一帧就是一秒半的卡顿。缓冲上传比编译便宜得多，按大批累加放出来即可；
-    // 最后一批放完场上就是完整的一套，正好当收尾的兜底帧。
+    // 第一帧就是一秒半的卡顿。缓冲上传比编译便宜得多，按大批放出来即可；
+    // 每批临时关掉 frustumCulled，保证视野外的地形瓦片（deformableTerrain）与城建网格
+    // 也在加载条后完成 VBO/IBO 上传，避免进场后首次开镜/拉栓/转头时批量触发 bufferData。
     const REVEAL = options.revealBatch || 256;
     for (let i = 0; i < meshes.length; i += REVEAL) {
-      for (const object of meshes.slice(i, i + REVEAL)) object.layers.mask = masks.get(object);
+      const slice = meshes.slice(i, i + REVEAL);
+      const culled = slice.map((object) => object.frustumCulled);
+      for (const object of slice) {
+        object.layers.mask = masks.get(object);
+        object.frustumCulled = false;
+      }
       RenderScene(0);
+      for (let k = 0; k < slice.length; k += 1) slice[k].frustumCulled = culled[k];
       const shown = Math.min(meshes.length, i + REVEAL);
       onStep?.(T("boot.step.loadMeshes", { done: shown, total: meshes.length }),
         BootProgress(BOOT.warm.loadMeshes, shown / meshes.length));
@@ -7613,8 +7626,11 @@ function TryFire(dt, returningGrenade = false) {
   if (carry?.Blocking) { if (fireEdge) carry.Throw("fire"); return; }
   if (viewmodel.IsBusy?.()) {
     const action = viewmodel.action;
-    if (fireEdge && WEAPONS[currentWeapon]?.ammo && ["bolt", "reload"].includes(action.kind)
-      && action.duration * (1 - action.t) <= FIRE_CONTROL.inputBufferS) QueueFirearmShot();
+    const activeWeapon = WEAPONS[currentWeapon];
+    const bufferWindow = activeWeapon?.kind === "boltRifle" && viewmodel.comparisonProfile !== "before"
+      ? FIRE_CONTROL.boltInputBufferS : FIRE_CONTROL.inputBufferS;
+    if (fireEdge && activeWeapon?.ammo && ["bolt", "reload"].includes(action.kind)
+      && action.duration * (1 - action.t) <= bufferWindow) QueueFirearmShot(bufferWindow);
     else if (!["bolt", "reload"].includes(action.kind)) state.queuedFire = null;
     return;
   }
@@ -7672,7 +7688,9 @@ function TryFire(dt, returningGrenade = false) {
   // 单发模式（仅捷克式）：一次按下只出一发
   if (weapon.rpm && state.fireMode === "semi" && !fireEdge && !buffered) return;
   if (!fireCadence.Ready()) {
-    if (fireEdge && fireCadence.remainingS <= FIRE_CONTROL.inputBufferS) QueueFirearmShot();
+    const bufferWindow = weapon.kind === "boltRifle" && viewmodel.comparisonProfile !== "before"
+      ? FIRE_CONTROL.boltInputBufferS : FIRE_CONTROL.inputBufferS;
+    if (fireEdge && fireCadence.remainingS <= bufferWindow) QueueFirearmShot(bufferWindow);
     return;
   }
   // 空仓的分支已经上移到冲刺闸前面（空枪左键 = 白刃那一支）。空膛"咔"的三维

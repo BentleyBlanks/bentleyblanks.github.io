@@ -410,10 +410,20 @@ export class DofPass {
       [this.matFill, this.fill], [this.material, this.target],
     ].map(([material, target]) => this.pipeline.blitter.Compile(material, target)));
     const P = this.pipeline, savedTarget = P.renderer.getRenderTarget();
+    const savedCoc = { ...this.coc, sightUv: this.coc.sightUv ? [...this.coc.sightUv] : null };
     try {
-      this.Render({sceneColor:P.targets.hdr, normalDepthTexture:P.targets.normalDepth?.texture, blitter:P.blitter});
+      Object.assign(this.coc, {
+        focus: 1.6, farGain: 4.0, nearGain: 8.0, farMaxPx: 4.0, nearMaxPx: 4.5,
+        active: true, sightUv: [0.5, 0.5], viewmodelMaxPx: 3.0,
+      });
+      const fg = P.foregroundViewDepth ?? 0;
+      for (const U of [this.uniformsDown, this.uniforms]) ApplyCocUniforms(U, this.coc, fg);
+      this.Render({ sceneColor: P.targets.hdr, normalDepthTexture: P.targets.normalDepth?.texture, blitter: P.blitter });
       this.warmedTarget = this.target;
     } finally {
+      Object.assign(this.coc, savedCoc);
+      const fg = P.foregroundViewDepth ?? 0;
+      for (const U of [this.uniformsDown, this.uniforms]) ApplyCocUniforms(U, this.coc, fg);
       P.renderer.setRenderTarget(savedTarget);
     }
   }

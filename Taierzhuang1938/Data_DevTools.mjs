@@ -38,7 +38,7 @@ export const TOOL_INFO = Object.freeze({
     window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare", features: "popup,width=1600,height=1000" } },
   weapon: { label: "枪械检查台", hint: "查看模型外观、挂点和尺寸", split: true,
     window: { url: "./AdvancedTools/Tool_WeaponInspection.html", name: "TengxianWeaponInspection", features: "popup,width=1440,height=900" } },
-  firstPerson: { label: "第一人称持枪检查", hint: "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差、准心校准", split: true },
+  firstPerson: { label: "第一人称持枪检查", hint: "枪/投掷/近战切换、玩家/外部视角、挂点残差与准心核验、连射拉栓与移动惯性前后对比", split: true },
   vfx: { label: "特效预览", hint: "查看火焰、烟雾、爆炸、命中、枪口焰与曳光", split: true },
   audio: { label: "音效音乐", hint: "全部配方的试听、混音参数与盲听指认", split: true },
   props: { label: "构件库预览", hint: "逐项预览场景可布设的全部 Prop、构件与模型", split: true },

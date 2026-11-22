@@ -626,7 +626,10 @@ export class FpsArmRig {
     if (!this.fixedRestLengths && ["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
       const pistol = this.poseSpec.family === "pistol";
       const adsShoulder = this.poseSpec.ads.weapon.eyeDistance > 0.45 ? -0.41 : -0.26;
-      const leftZ = THREE.MathUtils.lerp(-0.41, adsShoulder, this.poseState.ads);
+      const leftAds = AdsContactMix(this.poseSpec, "left", this.poseState.adsGrip) > 0 && this.contactWeight.l > 0.5
+        ? Math.max(this.poseState.ads, this.poseState.adsGrip)
+        : this.poseState.ads;
+      const leftZ = THREE.MathUtils.lerp(-0.41, adsShoulder, leftAds);
       return {shoulders:{right:[0.19,-0.40,0.08],left:[-0.19,-0.40,pistol ? 0.04 : leftZ]},
         elbowPoles:{right:[0.30,-0.80,0.12],left:[-0.30,-0.80,0.12]}};
     }
@@ -638,26 +641,36 @@ export class FpsArmRig {
       THREE.MathUtils.lerp(a[1], b[1], t),
       THREE.MathUtils.lerp(a[2], b[2], t),
     ];
-    const MixBody = (a, b, t) => ({
+    const MixBody = (a, b, tRight, tLeft = tRight) => ({
       shoulders: {
-        right: MixVector(a.shoulders.right, b.shoulders.right, t),
-        left: MixVector(a.shoulders.left, b.shoulders.left, t),
+        right: MixVector(a.shoulders.right, b.shoulders.right, tRight),
+        left: MixVector(a.shoulders.left, b.shoulders.left, tLeft),
       },
       elbowPoles: {
-        right: MixVector(a.elbowPoles.right, b.elbowPoles.right, t),
-        left: MixVector(a.elbowPoles.left, b.elbowPoles.left, t),
+        right: MixVector(a.elbowPoles.right, b.elbowPoles.right, tRight),
+        left: MixVector(a.elbowPoles.left, b.elbowPoles.left, tLeft),
       },
     });
-    const body = MixBody(MixBody(hip, ads, this.poseState.ads), sprint, this.poseState.sprint);
+    const leftAdsBody = AdsContactMix(this.poseSpec, "left", this.poseState.adsGrip) > 0 && this.contactWeight.l > 0.5
+      ? Math.max(this.poseState.ads, this.poseState.adsGrip)
+      : this.poseState.ads;
+    const body = MixBody(MixBody(hip, ads, this.poseState.ads, leftAdsBody), sprint, this.poseState.sprint);
     // A repaired holding wrist can use a different elbow plane from loading.
-    // Follow the existing release weight so the operating arm retains its
-    // reviewed route outside the receiver before returning to the new grip.
+    // Apply per arm only when that arm actually releases its holding contact, so
+    // right-hand bolt/reload work never hijacks the stationary left support elbow.
     const operating = this.poseSpec.actions?.operatingBody;
-    const released = this.operationPose.r ? 1 - this.contactWeight.r : 0;
-    if (operating && released > 0) {
-      const blend = released * released * (3 - 2 * released);
-      for (const group of ["shoulders", "elbowPoles"]) for (const side of ["right", "left"]) {
-        if (operating[group]?.[side]) body[group][side] = MixVector(body[group][side], operating[group][side], blend);
+    if (operating) {
+      const releasedBySide = {
+        right: this.operationPose.r ? 1 - this.contactWeight.r : 0,
+        left: this.operationPose.l ? 1 - this.contactWeight.l : 0,
+      };
+      for (const side of ["right", "left"]) {
+        const released = releasedBySide[side];
+        if (!(released > 0)) continue;
+        const blend = released * released * (3 - 2 * released);
+        for (const group of ["shoulders", "elbowPoles"]) {
+          if (operating[group]?.[side]) body[group][side] = MixVector(body[group][side], operating[group][side], blend);
+        }
       }
     }
     const offset = this.poseState.reload && this.reloadBodyOffset;
