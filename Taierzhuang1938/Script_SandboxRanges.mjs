@@ -98,9 +98,11 @@ function FixedSceneCamera(host, pose) {
   };
 }
 
-function SceneryPreview(sceneId, extraPbrSets = []) {
+function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
+  const phase = CreateScenePreviewPhase(SceneInfo(sceneId));
+  if (soilMarker) phase.groundImpactDust = true;
   return {
-    phase: CreateScenePreviewPhase(SceneInfo(sceneId)), World: FirstLevelWhiteboxField,
+    phase, World: FirstLevelWhiteboxField,
     startup: {
       sceneryOnly: true,
       pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr", ...extraPbrSets],
@@ -111,6 +113,10 @@ function SceneryPreview(sceneId, extraPbrSets = []) {
       const { layout } = battlefield;
       const backdrop = CreateScenePreviewBackdrop(host);
       const ApplyPose = FixedSceneCamera(host, layout.camera);
+      const impact = soilMarker && layout.landmarks?.find((marker) => marker.id === soilMarker);
+      const ground = impact && battlefield.StaticGroundHeight(impact.x, impact.z);
+      let untilImpact = .4;
+      let impactAge = null;
       const runtime = {
         api: { State: () => ({
           scene: layout.scene, camera: layout.camera, backdrop: backdrop.Stats(),
@@ -119,8 +125,21 @@ function SceneryPreview(sceneId, extraPbrSets = []) {
           missing: battlefield.scenePropStats?.missing ?? [],
           terrainTriangles: battlefield.stats.groundTris,
           smoke: vfx.smokeSources.size,
+          ...(impact ? { impactAge } : {}),
         }) },
-        Update(dt) { vfx.Update(dt, camera, state.elapsed); },
+        Update(dt) {
+          if (impact) {
+            untilImpact -= dt;
+            if (untilImpact <= 0) {
+              vfx.GroundImpact({ x: impact.x, y: ground, z: impact.z },
+                { groundY: ground, chargeKg: .025, massScale: .18 });
+              untilImpact += 12;
+              impactAge = 0;
+            }
+            if (impactAge !== null) impactAge += dt;
+          }
+          vfx.Update(dt, camera, state.elapsed);
+        },
         Dispose() { backdrop.Dispose(); host.SetViewmodelHidden(false); },
       };
       return Instance(runtime, {
@@ -136,6 +155,8 @@ function SceneryPreview(sceneId, extraPbrSets = []) {
 const PLUGINS = {
   gengjiazhuangFieldApproach: SceneryPreview("GengjiazhuangFieldApproach"),
   gengjiazhuangEastSmoke: SceneryPreview("GengjiazhuangEastSmoke", ["Sandbag"]),
+  tanketteAdvanceEastTrack: SceneryPreview("TanketteAdvanceEastTrack",
+    ["Sandbag", "WoodCrate", "HandcartWood"], "RoadsideSoilBurst"),
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) {

@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **东侧战车道独立场景（2026-11-23）**。沟沿固定机位，原尺寸九四式两辆在上层土路，断榆、灰木支护和担架留在下层撤离沟。场景编辑器可改撤离沟样条与道具，游戏机位分开渲染低云、两道烟柱、局部火光和贴地浮尘。入口、模型预算与重建见[场景说明](../Scenes/TanketteAdvanceEastTrack/README.md)。
+
 - **独立枪械检查台（2026-11-22）**。ControlCenter 开独立窗口，模型列表、大视口和只读信息并列。中性灯光、比例尺、三向观察和附件叠层用于检查模型。旧地址及台架出图脚本接到新页面。[枪械检查台](Data_EditorSuite.md#枪械检查台)
 
 - **Profiler 逐帧导出（2026-11-20）**。主界面保留帧图、卡点和数据表，点击卡点定位到具体插桩。Encounter Designer 记录地形、场景叠层、WebGL 提交和 `gl.readPixels` 等 CPU 子项。JSON 保存逐实例样本、所选帧、预览视口和已完成的函数采样。验收入口为 `Script_LevelFlowDebugBrowserTest` 和 `Script_ProfilerRecordingTest`。[Profiler](Data_EditorSuite.md#profiler-script_editorprofilermjs叠加层独立窗口)

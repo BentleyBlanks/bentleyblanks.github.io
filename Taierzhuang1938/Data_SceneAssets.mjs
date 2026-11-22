@@ -21,6 +21,7 @@ export const SCENE_LIST = Object.freeze([
     note: "01–07（z<355）实时继承 FirstLevelEncounter，z>=355 为合并后的北沙河单村分叉段" }),
   Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", previewParam: "gengjiazhuangFieldApproach" }),
   Object.freeze({ id: "GengjiazhuangEastSmoke", title: "凹路尽头 · 望庄东", style: "formal", previewParam: "gengjiazhuangEastSmoke" }),
+  Object.freeze({ id: "TanketteAdvanceEastTrack", title: "从沟沿望向东侧战车道", style: "formal", previewParam: "tanketteAdvanceEastTrack" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -82,6 +83,11 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/ryCartWheel": Prop("ryCartWheel", "timber", "车轮", [0.9, 0.9, 0.12]),
   "Prop/marketRiceSack01": Prop("marketRiceSack01", "canvas", "包袱 / 麻袋", [0.7, 0.45, 0.5]),
   "Prop/wardBandageRoll": Prop("wardBandageRoll", "canvas", "绷带卷", [0.35, 0.04, 0.25]),
+  "Prop/eastTrackSplinteredElm": Prop("eastTrackSplinteredElm", "timber", "裂口榆树干", [2.4645, 4.6105, 2.4272]),
+  "Prop/eastTrackGreyTimberShoring": Prop("eastTrackGreyTimberShoring", "timber", "灰木沟壁支护", [2.5816, 1.5385, 0.471]),
+  "Prop/type94Tankette": Prop("type94Tankette", "metal", "九四式轻装甲车", [1.62, 1.63, 3.08]),
+  "Prop/battlefieldTimberBeam": Prop("battlefieldTimberBeam", "timber", "旧木梁", [1.20, 0.14, 0.18]),
+  "Prop/eastTrackBambooStretcher": Prop("eastTrackBambooStretcher", "canvas", "竹竿布兜担架", [0.65, 0.20, 2.15]),
   ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(asset => [`Prop/${asset.model}`, asset])),
   "Prop/fieldApproachOldElm": Prop("fieldApproachOldElm", "timber", "沟沿老榆树", [7.316, 8.345, 4.899]),
   "Prop/fieldApproachLoadedCart": Prop("fieldApproachLoadedCart", "timber", "载草木车", [1.884, 1.940, 3.958]),

@@ -1,0 +1,99 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "TanketteAdvanceEastTrack",
+  "title": "东侧战车道 · 阴云与浮尘",
+  "looks": [
+    {"id": "overcast", "label": "阴云", "hour": 12}
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {"elevation": 50, "azimuth": 217, "color": "#eee2d7", "intensity": 1.49, "discIntensity": 0}
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {"probe": 0.83, "color": "#c9c5c3", "intensity": 0.72}
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {"intensity": 0.23}
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {
+        "zenith": [0.37, 0.36, 0.37],
+        "horizon": [0.43, 0.413, 0.41],
+        "ground": [0.27, 0.24, 0.22],
+        "glow": 0,
+        "smoke": 0.22,
+        "smokeHeight": 0.16,
+        "smokeColor": [0.39, 0.372, 0.371]
+      }
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {
+        "structure": 1,
+        "coverage": 0.98,
+        "scale": 0.88,
+        "softness": 1.52,
+        "warp": 0.51,
+        "underside": 0.61,
+        "shade": [0.164, 0.159, 0.164],
+        "gap": 0.62,
+        "silver": 0,
+        "shapeScale": 1.45,
+        "shapeCover": 0.81
+      }
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": 6.4,
+        "mieG": 0.71,
+        "rayleigh": 0.32,
+        "ozone": 0.5,
+        "groundAlbedo": 0.16,
+        "sunIrradiance": 2.5,
+        "skyTint": [0.6, 0.59, 0.58],
+        "skyFloor": [0.34, 0.327, 0.326],
+        "artGlow": 0,
+        "aerialBlend": 0.19,
+        "aerialGain": 0.16
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": 0.0135,
+        "falloff": 13,
+        "max": 0.68,
+        "skyColor": [0.317, 0.306, 0.3],
+        "groundColor": [0.279, 0.263, 0.252],
+        "sunGain": 0,
+        "desat": 0.47,
+        "flatten": 0.068
+      }
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "profile": "firstLevelBattleDay",
+        "exposure": 1.12,
+        "saturation": 0.6,
+        "contrast": 0.95,
+        "contrastCurve": "soft",
+        "gain": [1.02, 1, 0.98],
+        "lift": [0.009, 0.008, 0.008],
+        "shadowTint": [0.98, 1, 1.035],
+        "highlightTint": [1.036, 1, 0.97],
+        "splitShadow": 0.24,
+        "splitHighlight": 0.17,
+        "bloom": 0.06,
+        "bloomThreshold": 1.25,
+        "godStrength": 0,
+        "lensFlare": 0
+      }
+    }
+  }
+}

@@ -233,4 +233,24 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
     "凹路保留沟沿到车辙的高差");
 }
 
+{
+  const id = "TanketteAdvanceEastTrack";
+  const { doc, heights, pre, plan } = ReadSceneSync(id);
+  const layout = LayoutFromSceneDoc(BlockoutDocFromScene(doc, heights, { level: id, trenchPlan: plan }));
+  const ground = GridSampler(doc.terrain, heights);
+  const uncut = GridSampler(doc.terrain, pre);
+  const wounded = doc.markers.find(marker => marker.id === "WoundedPosition");
+  const floor = ground(wounded.x, wounded.z);
+  Check(ValidateScene(doc).ok && layout.style === "formal" && plan.segments[0].id === "EastTrackDitch",
+    "东侧战车道作为正式场景加载可编辑撤离沟样条");
+  Check(uncut(wounded.x, wounded.z) - floor > .45, "伤员地标位于实际挖出的下层沟底");
+  const tanks = doc.objects.filter(obj => obj.asset === "Prop/type94Tankette");
+  Check(tanks.length === 2 && tanks[0].pos[2] > tanks[1].pos[2] && tanks.every(({ pos: [x, y, z] }) =>
+    y - floor > .60 && Math.abs(y - ground(x, z)) < .025 && Math.abs(y - uncut(x, z)) < .025),
+    "两辆九四式以前后距离落在未挖过的上层车道");
+  Check(layout.camera.fovDeg === doc.camera.fovDeg && layout.smokeColumns.length === 5
+    && layout.landmarks.some(marker => marker.id === "RoadsideSoilBurst"),
+    "固定机位、分层烟源与路缘扬土地标进入游戏布局");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);

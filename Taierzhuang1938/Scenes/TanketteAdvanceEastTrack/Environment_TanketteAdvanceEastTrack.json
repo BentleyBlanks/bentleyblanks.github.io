@@ -1,0 +1,12 @@
+{
+  "schema": "tengxian-env-scene/1",
+  "scene": "TanketteAdvanceEastTrack",
+  "time": {
+    "hour": 12,
+    "speed": 0,
+    "paused": true
+  },
+  "volumes": [
+    {"id": "Fallback", "name": "低云与浮尘", "shape": "global", "priority": 0, "blendS": 0, "mode": "full", "preset": "TanketteAdvanceEastTrack"}
+  ]
+}

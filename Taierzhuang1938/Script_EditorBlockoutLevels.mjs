@@ -717,6 +717,7 @@ export function LayoutFromSceneDoc(doc) {
     spawn: { x: doc.spawn.x, z: doc.spawn.z, yawDeg: Number.isFinite(doc.spawn.yawDeg) ? doc.spawn.yawDeg : 0 },
     ...(doc.camera ? { camera: doc.camera } : {}),
     ...(doc.smokeColumns ? { smokeColumns: doc.smokeColumns } : {}),
+    ...(doc.landmarks ? { landmarks: doc.landmarks.map((marker) => ({ ...marker })) } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
       trenches: (doc.ways?.trenches || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
