@@ -111,8 +111,12 @@ export class EncounterPlay {
     const phase=this.host.ctx.PHASE_TABLE[this.host.state.phaseIndex];
     if(phase.blockout?.sceneError)throw new Error(phase.blockout.sceneError);
     // Launch independent driver work while character kits are still loading.
-<<<<<<< HEAD
-    this.passProgramsSubmitted=this.initialized?0:SubmitEncounterPrograms(this.host);
+    if(!this.initialized) {
+      this.ReportStep(T("boot.step.encounterPostShaders"),0.02);
+      await PaintFrame();
+      if(this.disposed||!this.active)return;
+      this.passProgramsSubmitted=SubmitEncounterPrograms(this.host);
+    } else this.passProgramsSubmitted=0;
     let sfxWarm=null;
     if(this.host.audio?.enabled) {
       if(!this.host.audio.ctx)this.host.audio.CreateContext?.();
@@ -122,23 +126,14 @@ export class EncounterPlay {
       }
       this.host.audio.LoadPacks?.();
     }
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm]);
-=======
-    if(!this.initialized) {
-      this.ReportStep(T("boot.step.encounterPostShaders"),0.02);
-      await PaintFrame();
-      if(this.disposed||!this.active)return;
-      this.passProgramsSubmitted=SubmitEncounterPrograms(this.host);
-    } else this.passProgramsSubmitted=0;
     this.ReportStep(T("boot.step.encounterCast"),0.06);
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary()]);
->>>>>>> f46b648d6 (Antigravity Taierzhuang1938: show immediate Encounter Play loading state and avoid duplicate cast import)
+    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits,(done,total)=>
       this.ReportStep(T("boot.step.encounterTextures",{done,total}),0.06+(done/total)*0.08));
     await this.castTexturesReady;
-<<<<<<< HEAD
+    this.ReportStep(T("boot.step.encounterDeaths"),0.16);
     const combatClipFiles=new Set([
       ...Object.values(XBOT_DEATHS).map(entry=>entry?.file),
       ...Object.values(XBOT_NATIVE).map(entry=>entry?.file),
@@ -153,19 +148,11 @@ export class EncounterPlay {
     }
     if(this.disposed||!this.active)return;
     for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
-    const cfg=this.plan.config;
-    const frame=this.variant.evaluate(this.plan.time,this.plan.document);
-=======
-    this.ReportStep(T("boot.step.encounterDeaths"),0.16);
-    const deaths=await Promise.allSettled(Object.values(XBOT_DEATHS).map(entry=>this.puppets.xbot.Clip(entry.file)));
-    for(const result of deaths)if(result.status==="rejected")console.warn("[EncounterPlay] Death clip warmup failed; retaining mirrored poses",result.reason);
-    if(this.disposed||!this.active)return;
-    for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
     this.ReportStep(T("boot.step.encounterActors"),0.2);
     await PaintFrame();
     if(this.disposed||!this.active)return;
-    const frame=EvaluateFlow(this.plan.time,this.plan.document);
->>>>>>> f46b648d6 (Antigravity Taierzhuang1938: show immediate Encounter Play loading state and avoid duplicate cast import)
+    const cfg=this.plan.config;
+    const frame=this.variant.evaluate(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
     this.SyncEnvironment(frame,true);
@@ -339,7 +326,6 @@ export class EncounterPlay {
       bloodDrops=blood.activeDrops.length-existingDrops;
       spot.y=host.battlefield.GroundHeight(spot.x,spot.z);
       blood.decals.Add(spot,new THREE.Vector3(0,1,0),0.1,{now:host.vfx.time});
-<<<<<<< HEAD
       const weaponKind=host.viewmodel.weapon?.kind||"boltRifle";
       host.vfx.MuzzleFlash?.(spot,direction,{scale:0.25,player:true,kind:weaponKind});
       host.vfx.Impact?.(spot,new THREE.Vector3(0,1,0),"brick",{weaponKind});
@@ -352,13 +338,10 @@ export class EncounterPlay {
       } finally {
         host.player.ads=prevAds;host.player.wantAds=prevWantAds;host.ctx.adsFovT=prevFovT;
       }
-      for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++)DrawWarmFrame();
-=======
       for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++){
         this.ReportStep(T("boot.step.encounterWarmFrames",{done:i+1,total:ENCOUNTER_PLAY_STARTUP.settleFrames}),0.95+((i+1)/ENCOUNTER_PLAY_STARTUP.settleFrames)*0.05);
         DrawWarmFrame();
       }
->>>>>>> f46b648d6 (Antigravity Taierzhuang1938: show immediate Encounter Play loading state and avoid duplicate cast import)
     }finally{
       host.viewmodel.root.visible=prevWarmVmVisible;
       host.state.ready=ready;host.state.warming=warming;blood.mist.Clear();blood.drops.Clear();blood.Clear();
