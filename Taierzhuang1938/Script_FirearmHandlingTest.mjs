@@ -229,6 +229,24 @@ assert.ok(Math.abs(bobZero.yaw) + Math.abs(bobZero.pitch) + Math.abs(bobZero.rol
     const out = adsInertia.Step(dt, { rightMps: 2.5, forwardMps: 2.5, gaitTarget: 1, grounded: true, ads: 1, eyeHeight: 1.62 });
     assert.ok(out.x === 0 && out.y === 0 && out.z === 0, "ADS zeroes translational inertia so sights stay true");
   }
+
+  // Direct A<->D counter-strafe: coherent roll sign (never twists wrong way first) and zero false stop-settle dip.
+  const cs = new MoveInertia();
+  let rVel = 0, rollBefore = 0, minRollAfterRev = Infinity, maxDipDuringRev = 0;
+  for (let i = 0; i < 150; i += 1) {
+    const t = i * dt;
+    const target = t < 1.0 ? 3.5 : -3.5;
+    rVel += (target - rVel) * (1 - Math.exp(-15 * dt));
+    const out = cs.Step(dt, { rightMps: rVel, forwardMps: 0, gaitTarget: Math.min(1, Math.abs(rVel) / 3.2), grounded: true, ads: 0, eyeHeight: 1.62 });
+    if (t >= 0.92 && t < 1.0) rollBefore = out.roll;
+    if (t >= 1.0 && t < 1.45) {
+      minRollAfterRev = Math.min(minRollAfterRev, out.roll);
+      maxDipDuringRev = Math.min(maxDipDuringRev, out.y);
+    }
+  }
+  assert.ok(rollBefore < -0.02 && cs.roll > 0.02, `counter-strafe smoothly banks right -> left (${rollBefore / DEG} -> ${cs.roll / DEG} deg)`);
+  assert.ok(minRollAfterRev >= rollBefore - 0.002, `counter-strafe never rolls further wrong way on reversal (${minRollAfterRev / DEG} vs ${rollBefore / DEG} deg)`);
+  assert.ok(Math.abs(maxDipDuringRev) < 1e-4, `direct A<->D zero-crossing triggers no false stop-settle dip (${maxDipDuringRev * 1000} mm)`);
 }
 
 console.log(JSON.stringify({ adsIdleDeg: { pitch: ads60.pitch / DEG, yaw: ads60.yaw / DEG, hipRatio, held: [held.pitch / DEG, held.yaw / DEG] },

@@ -954,8 +954,21 @@ class FirstPersonInspectionApp {
   TryPlayerFire(allowEmptyAutoRefill = false) {
     const w = WEAPONS[this.weaponId];
     if (!CanAction(w, "fire")) return false;
-    if (this.vm.IsBusy?.()) return false;
-    if (!this.boltCadence.Ready()) return false;
+    const busy = this.vm.IsBusy?.() && !this.vm.CanInterruptBoltToFire?.();
+    const ready = this.boltCadence.Ready();
+    if (busy || !ready) {
+      // 靶场试射同样接入与实机一致的栓动预输入缓冲：闭锁前点击直接排队、闭锁就绪瞬发（不等完全贴腮）
+      const action = this.vm.action;
+      if (w.kind === "boltRifle" && (!action || action.kind === "bolt")) {
+        const remAction = action?.kind === "bolt"
+          ? (this.vm.BoltFireRemainingS?.() ?? Math.max(0, action.duration * (1 - action.t)))
+          : 0;
+        const rem = Math.max(remAction, Math.max(0, this.boltCadence.remainingS || 0));
+        const buf = FIRE_CONTROL.boltInputBufferS;
+        if (rem <= buf) this.queuedBoltShot = { until: this.time + buf + 0.05 };
+      }
+      return false;
+    }
     const mag = w.magazine || 0;
     if (mag > 0 && this.ammo <= 0) {
       if (allowEmptyAutoRefill) {
@@ -965,6 +978,7 @@ class FirstPersonInspectionApp {
       }
       return false;
     }
+    this.queuedBoltShot = null;
     return this.ExecuteFire({ consumeAmmo: this.mode !== "bolt" });
   }
 
@@ -1048,19 +1062,24 @@ class FirstPersonInspectionApp {
   HandleBoltTrigger(isUser = false) {
     const w = WEAPONS[this.weaponId];
     if (!w || w.kind !== "boltRifle") return false;
-    const busy = this.vm.IsBusy?.();
+    const busy = this.vm.IsBusy?.() && !this.vm.CanInterruptBoltToFire?.();
     const ready = this.boltCadence.Ready();
     if (!busy && ready) {
+      const earlyCut = !!this.vm.CanInterruptBoltToFire?.();
       this.queuedBoltShot = null;
       this.ExecuteFire({ consumeAmmo: false });
       this.boltShots += 1;
-      if (isUser) this.SetBoltFeedback("✓ 击发完成，正在拉栓装填", "ok");
+      if (isUser) {
+        this.SetBoltFeedback(earlyCut ? "✓ 闭锁就绪即射（无需等完全贴腮开镜）" : "✓ 击发完成，正在拉栓装填", "ok");
+      }
       this.RefreshBoltCard();
       return true;
     }
 
     const action = this.vm.action;
-    const remAction = action?.kind === "bolt" ? Math.max(0, action.duration * (1 - action.t)) : 0;
+    const remAction = action?.kind === "bolt"
+      ? (this.vm.BoltFireRemainingS?.() ?? Math.max(0, action.duration * (1 - action.t)))
+      : 0;
     const remCadence = Math.max(0, this.boltCadence.remainingS || 0);
     const rem = Math.max(remAction, remCadence);
     const bufferWindow = this.EffectiveBoltBufferS();
@@ -1069,13 +1088,13 @@ class FirstPersonInspectionApp {
     if (canBuffer) {
       this.queuedBoltShot = { until: this.time + bufferWindow + 0.05 };
       this.boltBuffers += 1;
-      this.SetBoltFeedback("✓ 提前点击已预存，拉栓收尾瞬间立即击发！", "ok");
+      this.SetBoltFeedback("✓ 提前点击已预存，闭锁完成瞬发（不等回镜走完）！", "ok");
       this.RefreshBoltCard();
       return true;
     }
 
     this.boltDrops += 1;
-    this.SetBoltFeedback(`× 刚才点击被吞（拉栓还剩 ${Math.round(rem * 1000)} ms，超出旧缓冲）`, "drop");
+    this.SetBoltFeedback(`× 刚才点击被吞（距可射还剩 ${Math.round(rem * 1000)} ms，超出旧缓冲）`, "drop");
     this.RefreshBoltCard();
     return false;
   }
@@ -1085,15 +1104,15 @@ class FirstPersonInspectionApp {
     if (this.queuedBoltShot) {
       if (this.time > this.queuedBoltShot.until) {
         this.queuedBoltShot = null;
-      } else if (!this.vm.IsBusy?.() && this.boltCadence.Ready()) {
+      } else if ((!this.vm.IsBusy?.() || this.vm.CanInterruptBoltToFire?.()) && this.boltCadence.Ready()) {
         this.queuedBoltShot = null;
         this.ExecuteFire({ consumeAmmo: false });
         this.boltShots += 1;
         if (this.boltAuto && this.boltDriver === "sightTap") {
           const w = WEAPONS[this.weaponId];
           const total = this.vm.FireIntervalS ? this.vm.FireIntervalS(w) : (w.fireIntervalS || 1.2);
-          // 模拟真实玩家「看到准星刚回正就点左键」（比拉栓结束早 0.25s）
-          this.boltTapTimer = Math.max(0.35, total - 0.25);
+          // 模拟真实玩家「看到准星刚回正就点左键」（比可射时刻早 0.22s）
+          this.boltTapTimer = Math.max(0.35, total - 0.22);
         }
         this.RefreshBoltCard();
       }
@@ -1112,7 +1131,7 @@ class FirstPersonInspectionApp {
         } else if (this.queuedBoltShot) {
           this.boltTapTimer = 99;
         } else {
-          this.boltTapTimer = Math.max(0.35, total - 0.25);
+          this.boltTapTimer = Math.max(0.35, total - 0.22);
         }
       }
     }
@@ -1124,10 +1143,10 @@ class FirstPersonInspectionApp {
     this.dom.boltStats.textContent = `连发 ${this.boltShots} · 吞键 ${this.boltDrops}`;
     const w = WEAPONS[this.weaponId];
     const total = Math.max(0.3, this.vm.FireIntervalS ? this.vm.FireIntervalS(w) : (w?.fireIntervalS || 1.25));
-    const rem = Math.max(
-      this.vm.action?.kind === "bolt" ? Math.max(0, this.vm.action.duration * (1 - this.vm.action.t)) : 0,
-      Math.max(0, this.boltCadence.remainingS || 0),
-    );
+    const remAction = this.vm.action?.kind === "bolt"
+      ? (this.vm.BoltFireRemainingS?.() ?? Math.max(0, this.vm.action.duration * (1 - this.vm.action.t)))
+      : 0;
+    const rem = Math.max(remAction, Math.max(0, this.boltCadence.remainingS || 0));
     const progress = Clamp01(1 - rem / total);
     this.dom.boltCursor.style.left = `${(progress * 100).toFixed(1)}%`;
 
@@ -1145,8 +1164,9 @@ class FirstPersonInspectionApp {
     this.inertiaClock = 0;
     this.velRight = 0;
     this.velForward = 0;
-    this.posX = 0;
-    this.posZ = 0;
+    // 起始位放在靶位一侧，让自动演示走真实位移，不再在急停时把相机拉回原点
+    this.posX = (this.inertiaDriver === "counterStrafe" || this.inertiaDriver === "stepStrafe") ? -0.95 : 0;
+    this.posZ = this.inertiaDriver === "surgeStop" ? 0.85 : 0;
     this.crouchT = 0;
     this.eyeY = PLAYER_BASE_EYE.y;
     this.inertiaTrail.length = 0;
@@ -1360,11 +1380,13 @@ class FirstPersonInspectionApp {
 
   // ------------------------------------------------------------------ 主仿真步进
   BuildViewmodelInput(dt, targetSprint, targetAds) {
-    const moveSpeed = Math.hypot(this.velRight, this.velForward);
+    const speedMps = Math.hypot(this.velRight, this.velForward);
+    // 与正片 Script_FrameStepsPlayer.mjs 一致：moveSpeed 归一化到 0..1（而非原始 m/s）
+    const moveSpeed = Clamp01(speedMps / 3.2);
     return {
       dt,
       moveSpeed,
-      strafe: Clamp(this.velRight / 3.8, -1, 1),
+      strafe: Clamp(this.velRight / 3.2, -1, 1),
       localMoveRight: this.velRight,
       localMoveForward: this.velForward,
       stanceEyeHeight: this.eyeY,
@@ -1395,36 +1417,50 @@ class FirstPersonInspectionApp {
     if (this.keys.has("ArrowDown")) this.aimPitch = Clamp(this.aimPitch - turnSpeed * 0.7 * dt, -0.32, 0.32);
 
     const hasManualKeys = this.keys.has("KeyW") || this.keys.has("KeyA") || this.keys.has("KeyS") || this.keys.has("KeyD");
+    let useRealAutoDisplacement = false;
 
     if (this.mode === "inertia" && this.inertiaAuto && this.inertiaDriver !== "manual" && !hasManualKeys) {
+      useRealAutoDisplacement = true;
+      const prevClock = this.inertiaClock;
       this.inertiaClock += dt;
       if (this.inertiaDriver === "stepStrafe") {
-        const u = this.inertiaClock % 3.2;
-        if (u < 1.65) {
-          targetRight = 3.8;
+        const period = 3.2;
+        if (Math.floor(this.inertiaClock / period) > Math.floor(prevClock / period)) this.posX = -0.95;
+        const u = this.inertiaClock % period;
+        if (u < 1.35) {
+          targetRight = 3.5;
           this.virtualKeys.add("KeyD");
-          phaseLabel = u < 0.32 ? "起步滞后" : "匀速回正";
+          phaseLabel = u < 0.30 ? "起步滞后" : "匀速侧倾";
         } else {
           targetRight = 0;
-          phaseLabel = u < 2.15 ? "急停前甩" : "已回稳";
+          phaseLabel = u < 1.85 ? "急停惯性" : "已回稳";
         }
       } else if (this.inertiaDriver === "counterStrafe") {
-        const u = this.inertiaClock % 3.2;
-        if (u < 1.15) { targetRight = 3.8; this.virtualKeys.add("KeyD"); phaseLabel = u < 0.28 ? "右切滞后" : "右移回正"; }
-        else if (u < 1.55) { targetRight = 0; phaseLabel = "急停回摆"; }
-        else if (u < 2.70) { targetRight = -3.8; this.virtualKeys.add("KeyA"); phaseLabel = u < 1.85 ? "左折滞后" : "左移回正"; }
-        else { targetRight = 0; phaseLabel = "急停回摆"; }
+        // 真实 A↔D 干脆折返：直接换向无拖沓停顿，相机同步在 -0.95m ↔ +0.95m 往返，绝不反向回弹
+        const period = 2.2;
+        const u = this.inertiaClock % period;
+        if (u < 1.1) {
+          targetRight = 3.5;
+          this.virtualKeys.add("KeyD");
+          phaseLabel = u < 0.28 ? "右折惯性" : "右移稳定";
+        } else {
+          targetRight = -3.5;
+          this.virtualKeys.add("KeyA");
+          phaseLabel = u < 1.38 ? "左折惯性" : "左移稳定";
+        }
       } else if (this.inertiaDriver === "surgeStop") {
-        const u = this.inertiaClock % 3.0;
-        if (u < 1.45) {
-          targetForward = 4.6;
+        const period = 3.0;
+        if (Math.floor(this.inertiaClock / period) > Math.floor(prevClock / period)) this.posZ = 0.85;
+        const u = this.inertiaClock % period;
+        if (u < 1.25) {
+          targetForward = 4.4;
           targetSprint = 0.45;
           this.virtualKeys.add("KeyW");
           this.virtualKeys.add("Shift");
-          phaseLabel = u < 0.30 ? "冲刺后压" : "前推巡航";
+          phaseLabel = u < 0.28 ? "冲刺后压" : "前推巡航";
         } else {
           targetForward = 0;
-          phaseLabel = u < 1.95 ? "急停前冲" : "已回稳";
+          phaseLabel = u < 1.80 ? "急停前冲" : "已回稳";
         }
       } else if (this.inertiaDriver === "stanceHop") {
         const u = this.inertiaClock % 2.8;
@@ -1445,7 +1481,7 @@ class FirstPersonInspectionApp {
       if (crouchKey && this.mode === "inertia") targetCrouch = 1;
       if (shift && (r || f)) targetSprint = 1;
       const len = Math.hypot(r, f) || 1;
-      const top = targetSprint ? 5.0 : targetCrouch ? 2.1 : 3.8;
+      const top = targetSprint ? 5.0 : targetCrouch ? 2.1 : 3.5;
       targetRight = (r / len) * (r || f ? top : 0);
       targetForward = (f / len) * (r || f ? top : 0);
       if (r || f) phaseLabel = targetSprint ? "冲刺前推" : "移动惯性";
@@ -1458,13 +1494,10 @@ class FirstPersonInspectionApp {
     this.crouchT += (targetCrouch - this.crouchT) * crouchFollow;
     this.eyeY = THREE.MathUtils.lerp(PLAYER_BASE_EYE.y, CROUCH_EYE_Y, this.crouchT);
 
-    // 射手位置在靶位安全区内真实移动，横移与前进时两侧水泥柱立刻产生清晰视差
-    if (this.mode === "inertia" && this.inertiaAuto && this.inertiaDriver !== "manual" && !hasManualKeys) {
-      const targetX = Clamp(this.velRight * 0.24, -1.25, 1.25);
-      const targetZ = Clamp(-this.velForward * 0.16, -0.75, 0.75);
-      const follow = 1 - Math.exp(-5.5 * dt);
-      this.posX += (targetX - this.posX) * follow;
-      this.posZ += (targetZ - this.posZ) * follow;
+    // 真实速度积分位移：停止时人物纹丝不动，折返时方向与枪身惯性完全吻合，不再把速度当位置导致急停倒退
+    if (useRealAutoDisplacement) {
+      this.posX = Clamp(this.posX + this.velRight * dt * 0.50, -1.65, 1.65);
+      this.posZ = Clamp(this.posZ - this.velForward * dt * 0.30, -0.45, 1.25);
     } else {
       this.posX = Clamp(this.posX + this.velRight * dt * 0.65, -2.6, 2.6);
       this.posZ = Clamp(this.posZ - this.velForward * dt * 0.65, -0.55, 2.2);
@@ -1491,11 +1524,19 @@ class FirstPersonInspectionApp {
     this.recoilPitch += (0 - this.recoilPitch) * recAlpha;
     this.recoilYaw += (0 - this.recoilYaw) * recAlpha;
 
-    // 节拍与自动连发
+    // 节拍与自动连发（靶场试射下同样消费栓动预输入队列）
     if (this.mode === "bolt") {
       this.StepBoltBench(dt);
     } else {
       this.boltCadence.Step(dt);
+      if (this.queuedBoltShot) {
+        if (this.time > this.queuedBoltShot.until) {
+          this.queuedBoltShot = null;
+        } else if ((!this.vm.IsBusy?.() || this.vm.CanInterruptBoltToFire?.()) && this.boltCadence.Ready()) {
+          this.queuedBoltShot = null;
+          this.TryPlayerFire(false);
+        }
+      }
       const w = WEAPONS[this.weaponId];
       if ((this.autoFire || (this.lmbHeld && CanAction(w, "auto"))) && this.mode === "range") {
         this.TryPlayerFire(false);

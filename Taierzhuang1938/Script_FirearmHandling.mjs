@@ -227,6 +227,7 @@ export class MoveInertia {
     this.prevForwardMps = 0;
     this.prevEyeHeight = null;
     this.wasMoving = false;
+    this.lowSpeedS = 0;
     this.gaitEnvelope = 0;
     this.bankRoll = 0;
     this.bankX = 0;
@@ -284,15 +285,20 @@ export class MoveInertia {
       this.prevEyeHeight = eyeHeight;
     }
 
-    // Stop-step weight settle when decelerating from a brisk walk/sprint to rest.
+    // Stop-step weight settle when decelerating from a brisk walk/sprint to a true stop
+    // (holding below threshold briefly avoids false dips during direct A<->D counter-strafe zero-crossings).
     const speed = Math.hypot(right, forward);
-    if (grounded && this.wasMoving && speed < 0.18) {
-      this.wasMoving = false;
-      const wSettle = TAU * M.stanceFrequencyHz * INERTIA_PEAK_GAIN * scale;
-      this.stance.vy += M.stopSettleDipYM * wSettle;
-      this.stance.vpitch += M.stopSettlePitchDeg * DEG * wSettle;
-    } else if (speed > M.stopSettleSpeedMps) {
-      this.wasMoving = true;
+    if (speed < 0.22) {
+      this.lowSpeedS += dt;
+      if (grounded && this.wasMoving && this.lowSpeedS >= (M.stopSettleHoldS ?? 0.065)) {
+        this.wasMoving = false;
+        const wSettle = TAU * M.stanceFrequencyHz * INERTIA_PEAK_GAIN * scale;
+        this.stance.vy += M.stopSettleDipYM * wSettle;
+        this.stance.vpitch += M.stopSettlePitchDeg * DEG * wSettle;
+      }
+    } else {
+      this.lowSpeedS = 0;
+      if (speed > M.stopSettleSpeedMps) this.wasMoving = true;
     }
 
     // Smooth gait envelope (eliminates instantaneous bob amplitude snaps).

@@ -207,6 +207,7 @@ export const FPS_BOLT_HAND = Object.freeze({
   // In-shoulder ADS bolt retention (COD WWII / Easy Red 2): keep rifle shouldered
   // instead of kicking FOV all the way back to hipfire every round.
   boltAdsKeep: 0.72,
+  boltFireReadyT: 0.78,
   boltDelayByWeapon: Object.freeze({ ZhongZheng: 0.035, Type38: 0.035 }),
   boltDurationByWeapon: Object.freeze({ ZhongZheng: 1.14, Type38: 1.22 }),
 });
@@ -234,7 +235,7 @@ export const FPS_BOLT_CYCLE = Object.freeze({
     // (55 mm a frame on the working hand) and the hand's return is held to it too.
     // The rifle rises to the cheek while the hand travels back, as in
     // the clip (the 2.30 s reference shouldered only after the regrip).
-    durationS: 1.95, startS: 0.02,
+    durationS: 1.95, startS: 0.02, fireReadyRefS: 1.68,
     pace: [[0, 0], [0.13, 0.13], [0.62, 0.392], [0.68, 0.420], [0.81, 0.505], [0.90, 0.560],
       [1.02, 0.735], [1.26, 0.825], [1.41, 0.940], [1.95, 1.215]],
     // Half-width (played s) of the centred smoothing on the whole-rifle tracks (lower, head,

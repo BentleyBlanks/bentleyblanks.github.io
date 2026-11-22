@@ -2540,6 +2540,12 @@ export class Viewmodel {
     if (!this.weapon || !this.rig) return null;
     // 大刀和手榴弹没有"开火"。不挡住的话大刀会喷枪焰，这种 bug 一上截图就要返工
     if (this.weapon.kind === "melee" || this.weapon.kind === "throwable") return null;
+    // 闭锁完成后的回镜收尾段可直接打断开火（对标 COD / BF1 步兵栓动，不等完全贴腮）
+    if (this.CanInterruptBoltToFire()) {
+      this.action = null;
+      this.boltCycleState = null;
+      this.pendingBoltAt = -1;
+    }
     this.shotIndex += 1;
     if (this.weapon.reloadKind === "stripFeed") this.feedRounds = Math.max(0, this.feedRounds - 1);
     const automatic = AUTOMATIC_RECOIL[this.weapon.kind];
@@ -2637,18 +2643,52 @@ export class Viewmodel {
     if (this.onBoltStart) this.onBoltStart(this.weapon);
   }
 
-  /** 玩家射击间隔：手拉一整套栓的枪，拉完之前打不出下一发（AI 仍读 fireIntervalS）。 */
+  /**
+   * 栓动步枪在枪机闭锁完成、进入最后回镜/稳枪收尾段时即可打断开火（COD / BF1 步兵步枪口径），
+   * 不必傻等最后 ~150-200 ms 贴腮完全走完；改前旧档（before）保留锁满整段用于对照。
+   */
+  CanInterruptBoltToFire() {
+    if (this.comparisonProfile === "before") return false;
+    const a = this.action;
+    if (!a || a.kind !== "bolt" || this.boltOpen) return false;
+    if (a.cycle?.fireReadyRefS) {
+      const start = CyclePlayedS(a.cycle, a.cycle.startS);
+      const played = start + a.t * a.duration;
+      return played >= CyclePlayedS(a.cycle, a.cycle.fireReadyRefS) - 1e-4;
+    }
+    return a.t >= (FPS_BOLT_HAND.boltFireReadyT ?? 0.78);
+  }
+
+  /** 当前拉栓距离真正可开火（闭锁就绪）还剩多少秒；非拉栓时按常规动作余量返回。 */
+  BoltFireRemainingS() {
+    const a = this.action;
+    if (!a) return 0;
+    if (a.kind !== "bolt" || this.comparisonProfile === "before" || this.boltOpen) {
+      return Math.max(0, a.duration * (1 - a.t));
+    }
+    if (a.cycle?.fireReadyRefS) {
+      const start = CyclePlayedS(a.cycle, a.cycle.startS);
+      const played = start + a.t * a.duration;
+      return Math.max(0, CyclePlayedS(a.cycle, a.cycle.fireReadyRefS) - played);
+    }
+    const readyT = FPS_BOLT_HAND.boltFireReadyT ?? 0.78;
+    return Math.max(0, a.duration * (readyT - a.t));
+  }
+
+  /** 玩家射击间隔：手拉一整套栓的枪，闭锁就绪即可连射（AI 仍读 fireIntervalS）。 */
   FireIntervalS(weapon = this.weapon) {
     const base = weapon?.fireIntervalS ?? 1.2;
     const legacy = this.comparisonProfile === "before";
     const cycle = weapon && this._ActiveBoltCycle(weapon.id);
     if (cycle) {
       const pad = cycle.extraFirePadS || 0;
+      if (!legacy && cycle.fireReadyRefS) return CyclePlayedS(cycle, cycle.fireReadyRefS);
       return Math.max(base, CyclePlayedS(cycle, cycle.durationS) + pad);
     }
     if (!legacy && weapon?.id && FPS_BOLT_HAND.boltDurationByWeapon?.[weapon.id]) {
       const delay = FPS_BOLT_HAND.boltDelayByWeapon?.[weapon.id] ?? weapon.boltDelayS ?? 0.04;
-      return delay + FPS_BOLT_HAND.boltDurationByWeapon[weapon.id];
+      const readyT = FPS_BOLT_HAND.boltFireReadyT ?? 0.78;
+      return delay + FPS_BOLT_HAND.boltDurationByWeapon[weapon.id] * readyT;
     }
     return base;
   }

@@ -7629,13 +7629,16 @@ function TryFire(dt, returningGrenade = false) {
   // 挨打的时候玩家去够的键本来就是左键，不该让他先想起来 F 在哪。
   // 担架 canThrow:false —— 那是个人，不是麻袋，摔不掉，左键就什么也不做。
   if (carry?.Blocking) { if (fireEdge) carry.Throw("fire"); return; }
-  if (viewmodel.IsBusy?.()) {
+  if (viewmodel.IsBusy?.() && !viewmodel.CanInterruptBoltToFire?.()) {
     const action = viewmodel.action;
     const activeWeapon = WEAPONS[currentWeapon];
     const bufferWindow = activeWeapon?.kind === "boltRifle" && viewmodel.comparisonProfile !== "before"
       ? FIRE_CONTROL.boltInputBufferS : FIRE_CONTROL.inputBufferS;
+    const remS = action.kind === "bolt"
+      ? (viewmodel.BoltFireRemainingS?.() ?? action.duration * (1 - action.t))
+      : action.duration * (1 - action.t);
     if (fireEdge && activeWeapon?.ammo && ["bolt", "reload"].includes(action.kind)
-      && action.duration * (1 - action.t) <= bufferWindow) QueueFirearmShot(bufferWindow);
+      && remS <= bufferWindow) QueueFirearmShot(bufferWindow);
     else if (!["bolt", "reload"].includes(action.kind)) state.queuedFire = null;
     return;
   }

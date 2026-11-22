@@ -82,25 +82,26 @@ export const MOVE_INERTIA = Object.freeze({
   walkSpeedMps: 3.2,
   maxDeltaSpeedMps: 4.5,
   maxEyeSpeedMps: 2.4,
-  strafeFrequencyHz: 3.1,
-  strafeDamping: 0.74,
-  strafeImpulseXM: -0.0044,         // metres per (m/s) of lateral velocity change (~ -14 mm on crisp walk start)
-  strafeImpulseYawDeg: 0.36,        // degrees of barrel lag per (m/s)
-  strafeImpulseRollDeg: 0.52,       // degrees of initial counter-roll per (m/s)
-  strafeBankRollRad: 0.044,         // steady banking into actual lateral velocity (replaces digital key tilt)
-  strafeBankXM: -0.0024,            // subtle steady lateral offset at full walk strafe
-  strafeBankLerpSpeed: 7.5,
+  strafeFrequencyHz: 2.85,
+  strafeDamping: 0.88,              // near-critically damped COD feel: crisp lag & counter-strafe carry, no rubbery rebound
+  strafeImpulseXM: -0.0040,         // metres per (m/s) of lateral velocity change (~ -13 mm on crisp walk start)
+  strafeImpulseYawDeg: 0.34,        // degrees of barrel lag per (m/s)
+  strafeImpulseRollDeg: -0.34,      // same directional sign as steady bank (no mid-strafe roll sign flip on A<->D)
+  strafeBankRollRad: 0.038,         // steady banking into actual lateral velocity (~2.2 deg at full walk)
+  strafeBankXM: -0.0022,            // subtle steady lateral offset at full walk strafe
+  strafeBankLerpSpeed: 8.5,
   surgeFrequencyHz: 2.9,
-  surgeDamping: 0.78,
+  surgeDamping: 0.84,
   surgeImpulseZM: 0.0032,           // +z back on forward accel, -z forward surge on hard stop (~ -13 mm from sprint)
   surgeImpulsePitchDeg: 0.34,       // slight barrel rise on launch / dip (-rx) on hard stop
   stanceFrequencyHz: 3.3,
-  stanceDamping: 0.76,
+  stanceDamping: 0.80,
   stanceImpulseYM: -0.0068,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
   stanceImpulsePitchDeg: -0.82,     // dropping eye -> +pitch lag; rising eye -> -pitch lag
   gaitAttackPerS: 10.0,
   gaitReleasePerS: 6.5,
   stopSettleSpeedMps: 0.65,
+  stopSettleHoldS: 0.065,           // require brief true stop so 1-frame zero-crossing during A<->D reversal never dips
   stopSettleDipYM: -0.0042,
   stopSettlePitchDeg: -0.45,
   adsRotationScale: 0,              // full ADS keeps swayPivot strictly zero so sights match AimDirection
