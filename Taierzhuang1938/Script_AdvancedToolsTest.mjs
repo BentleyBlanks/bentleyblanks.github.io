@@ -45,10 +45,10 @@ Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([..
 
 // --- 2. 搬家 ---------------------------------------------------------------------
 const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html",
-  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_Studio.html", "ControlCenter.html"];
+  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
 Check("旧位置不留跳转壳", pages.slice(0, 5).every((page) => !fs.existsSync(path.join(projectDir, page))));
-Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "Vfx", "Audio", "PropLibrary", "AssetStandards",
+Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio", "PropLibrary", "AssetStandards",
   "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
 Check("旧枪械工作窗已移除", !fs.existsSync(path.join(toolsDir, "Script_EditorWeapon.mjs")));
@@ -66,6 +66,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["mixamoPreview", "Script_EditorMixamoPreview.mjs", "MixamoPreviewEditor", "Tool_MixamoAnimationPreview.html"],
     ["motionCompare", "Script_EditorMotionCompare.mjs", "MotionCompareEditor", "Tool_MotionCompare.html"],
     ["weapon", "Script_EditorWeaponEntry.mjs", "WeaponInspectionEntry", "Tool_WeaponInspection.html"],
+    ["firstPerson", "Script_EditorFirstPersonEntry.mjs", "FirstPersonInspectionEntry", "Tool_FirstPersonInspection.html"],
     ["textures", "Script_EditorTextures.mjs", "TextureEditor", "TextureManager.html"],
     ["splines", "Script_EditorPcgEntry.mjs", "SplineEntry", "Tool_Pcg.html"],
     ["propPcg", "Script_EditorPcgEntry.mjs", "PropPcgEntry", "Tool_Pcg.html"],

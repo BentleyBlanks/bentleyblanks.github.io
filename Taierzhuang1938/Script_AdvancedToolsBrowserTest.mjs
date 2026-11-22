@@ -363,6 +363,36 @@ try {
     await legacy.close();
   }
 
+  if (!only || only.has("firstPerson")) {
+    const { page: legacyFp } = await OpenPage(`${base}Tool_Studio.html?tool=firstPerson&mode=bolt&weapon=HanYang`, { waitUntil: "commit" });
+    await legacyFp.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_FirstPersonInspection.html")
+      && url.searchParams.get("mode") === "bolt" && url.searchParams.get("weapon") === "HanYang");
+    Check("旧摄影棚链接保留参数直达第一人称持枪检查独立窗口", true);
+    await legacyFp.close();
+
+    const { page, errors } = await OpenPage(`${base}Tool_FirstPersonInspection.html?audio=0&quality=low&scale=small`);
+    await page.waitForFunction(() => window.FirstPersonInspection?.ready, null, { timeout: 180000 });
+    await page.evaluate(() => window.FirstPersonInspection.StepFrames(4));
+    const snap = await page.evaluate(() => window.FirstPersonInspection.Snapshot());
+    Check("第一人称检查独立窗口载入昼光靶场与汉阳造",
+      snap.sky === "firstLevelBattleDay" && snap.weaponId === "HanYang" && snap.ammo === 5 && snap.mode === "range",
+      JSON.stringify(snap));
+    // 右键禁止弹出浏览器菜单并触发开镜
+    const ctxPrevented = await page.evaluate(() => {
+      const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
+      document.getElementById("view").dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+    Check("视口右键拦截浏览器菜单", ctxPrevented);
+    // 校验空仓换弹走 openSkipS 实机路径
+    await page.locator('[data-act="emptyReload"]').click();
+    await page.evaluate(() => window.FirstPersonInspection.StepFrames(6));
+    const reloadSnap = await page.evaluate(() => window.FirstPersonInspection.Snapshot());
+    Check("空仓换弹与实机同源（空仓开膛触发 reload）", reloadSnap.action?.kind === "reload" && reloadSnap.ammo === 0, JSON.stringify(reloadSnap));
+    Check("第一人称独立窗口没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await page.close();
+  }
+
   const windows = [
     ["场景编辑器", "SceneEditor.html?scene=FirstLevelWhitebox", () => window.SceneEditor && document.getElementById("seCanvas")],
     ["遭遇设计", "Tool_LevelFlow.html?t=384", () => window.LevelFlow && document.getElementById("flowMap")],

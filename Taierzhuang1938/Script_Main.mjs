@@ -2559,14 +2559,14 @@ async function Boot() {
   window.Taierzhuang.editor = editor;
   window.Taierzhuang.settings = settings;
   // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态。剔除开发工具后它们都按「没有」回答。
-  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor?.Open(id);
+  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor?.Open(id, { harness: true });
   // 设置 → Debug工具 那一页的同一份开关（菜单点的也是它）
   window.Taierzhuang.Debug.DebugTools = () => editor?.DebugToolStates() ?? [];
   window.Taierzhuang.Debug.ToggleDebugTool = (id) => editor?.ToggleDebugTool(id) ?? [];
   // Deterministic first-person animation inspection, shared with the UI.
   window.Taierzhuang.Debug.FirstPersonAnimation = (options = {}) => {
     if (!editor) throw new Error("Developer tools are stripped from this build");
-    if(editor.ActiveId!=="firstPerson")editor.Open("firstPerson");
+    if(editor.ActiveId!=="firstPerson")editor.Open("firstPerson", { harness: true });
     const tool=editor.active;
     if(options.weapon&&!tool.SetWeapon(options.weapon,options.variant))throw new Error(`Unknown FPS weapon: ${options.weapon}`);
     if(options.view)tool.SetView(options.view);

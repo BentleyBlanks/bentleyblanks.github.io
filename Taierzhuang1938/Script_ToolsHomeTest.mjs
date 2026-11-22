@@ -36,15 +36,22 @@ try {
 
     if (name === "Desktop") {
       // 摄影棚工具直接开；Esc 回首页
-      await page.click('#edRoot .edHomeTool[data-home-tool="firstPerson"]');
+      await page.click('#edRoot .edHomeTool[data-home-tool="actor"]');
       await page.waitForSelector("#edRoot .edPanel.work");
-      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), "firstPerson");
+      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), "actor");
       assert.equal(await page.locator("#edRoot .edHome").isHidden(), true);
       await page.evaluate(() => window.Tengxian.StepFrames?.(5));
-      await page.screenshot({ path: path.join(out, "FirstPersonFromHome.png") });
+      await page.screenshot({ path: path.join(out, "ActorFromHome.png") });
       await page.keyboard.press("Escape");
       assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null);
       assert.equal(await page.locator("#edRoot .edHome").isVisible(), true, "Esc 先回首页");
+
+      const fpReady = page.waitForEvent("popup");
+      await page.click('#edRoot .edHomeTool[data-home-tool="firstPerson"]');
+      const fp = await fpReady;
+      await fp.waitForURL(`${base}AdvancedTools/Tool_FirstPersonInspection.html`);
+      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null, "游戏宿主未打开旧第一人称工作窗");
+      await fp.close();
 
       const weaponReady = page.waitForEvent("popup");
       await page.click('#edRoot .edHomeTool[data-home-tool="weapon"]');

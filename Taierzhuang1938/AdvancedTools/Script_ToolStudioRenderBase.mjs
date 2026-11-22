@@ -62,17 +62,27 @@ function DustBox(phase) {
  * 建底座。onStep(label, progress) 报开机进度。
  * 返回的对象就是各编辑器的 host 里「渲染侧 + 系统侧」那一半（见 Script_ToolStudio 里 EditorHost）。
  */
-export async function CreateStudioBase({ canvas, search = location.search, onStep = () => {} } = {}) {
+export async function CreateStudioBase({ canvas, search = location.search, onStep = () => {}, fitCanvas = false, initialSky = null } = {}) {
   const params = new URLSearchParams(search);
   const GRAPHICS_PROFILE = LoadGraphicsProfile(search);
   const QUALITY = GRAPHICS_PROFILE;
   const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
   const state = { elapsed: 0, frame: 0, ready: false };
 
+  const ViewportSize = () => {
+    if (!fitCanvas) return { width: window.innerWidth, height: window.innerHeight };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      width: Math.max(2, Math.round(rect.width || canvas.clientWidth || window.innerWidth)),
+      height: Math.max(2, Math.round(rect.height || canvas.clientHeight || window.innerHeight)),
+    };
+  };
+  const initSize = ViewportSize();
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
   SetTextureImportRenderer(renderer);
   renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.setSize(initSize.width, initSize.height, false);
   renderer.debug.checkShaderErrors = false;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -82,12 +92,12 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
 
   const scene = new THREE.Scene();
   scene.matrixWorldAutoUpdate = false;
-  const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg, window.innerWidth / window.innerHeight, 0.06, 620);
+  const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg, initSize.width / initSize.height, 0.06, 620);
   camera.rotation.order = "YXZ";
   camera.far = PHASE.cameraFar ?? 620;
   camera.updateProjectionMatrix();
 
-  const post = new PostPipeline(renderer, { width: window.innerWidth, height: window.innerHeight, quality: QUALITY });
+  const post = new PostPipeline(renderer, { width: initSize.width, height: initSize.height, quality: QUALITY });
   const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
   const ssrUniforms = post.SsrUniforms;
 
@@ -97,8 +107,8 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
   {
     const bootScale = Clamp(graphics.renderScale, 0.4, 1.6);
-    post.SetSize(Math.round(window.innerWidth * bootScale), Math.round(window.innerHeight * bootScale),
-      window.innerWidth, window.innerHeight);
+    post.SetSize(Math.round(initSize.width * bootScale), Math.round(initSize.height * bootScale),
+      initSize.width, initSize.height);
   }
 
   const GI_ON = GI_QUALITY[QUALITY] != null;
@@ -159,9 +169,9 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
 
   audio.PrefetchPacks?.();
 
-  // --- 天光：高级工具首页那一关的预设 -----------------------------------------------------
-  let skyOverride = null;
-  const preset = sky.Apply(PHASE.sky);
+  // --- 天光：默认用高级工具首页预设，或调用方指定的预设 -----------------------------------
+  let skyOverride = (initialSky && SKY_PRESETS[initialSky]) ? initialSky : null;
+  const preset = sky.Apply(skyOverride || PHASE.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
@@ -231,13 +241,14 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   function ApplyGraphics() {
     NormalizeGraphicsDetails(graphics, post);
     const scale = Clamp(graphics.renderScale, 0.4, 1.6);
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const vp = ViewportSize();
+    camera.aspect = vp.width / vp.height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    const width = Math.round(window.innerWidth * scale), height = Math.round(window.innerHeight * scale);
+    renderer.setSize(vp.width, vp.height, false);
+    const width = Math.round(vp.width * scale), height = Math.round(vp.height * scale);
     if (post.width !== width || post.height !== height
-      || post.outputWidth !== window.innerWidth || post.outputHeight !== window.innerHeight) {
-      post.SetSize(width, height, window.innerWidth, window.innerHeight);
+      || post.outputWidth !== vp.width || post.outputHeight !== vp.height) {
+      post.SetSize(width, height, vp.width, vp.height);
     }
     post.SetTaaEnabled(graphics.taa !== false);
     post.SetSsrEnabled(graphics.ssr !== false);
@@ -311,10 +322,27 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   }
 
   // 存档里的画质与音量（玩家在游戏设置里调的那一套）
+  let onResizeHook = null;
+  const HandleResize = () => {
+    ApplyGraphics();
+    onResizeHook?.();
+  };
   const savedSettings = { game: { graphics, ApplyGraphics }, audio };
   try { ApplySavedSettings(savedSettings); } catch (error) { console.warn("[ToolStudio] 存档设置装不回去：", error); }
   ApplyGraphics();
-  window.addEventListener("resize", ApplyGraphics);
+  window.addEventListener("resize", HandleResize);
+  if (fitCanvas && typeof ResizeObserver === "function") {
+    let lastW = initSize.width;
+    let lastH = initSize.height;
+    const observer = new ResizeObserver(() => {
+      const vp = ViewportSize();
+      if (vp.width === lastW && vp.height === lastH) return;
+      lastW = vp.width;
+      lastH = vp.height;
+      HandleResize();
+    });
+    observer.observe(canvas);
+  }
 
   /** 把环境换成某个天光预设（特效编辑器的日 / 夜光照预览用）；同 Script_Main.ApplySkyPreset 没有环境系统那一支。 */
   function ApplySkyPreset(name) {
@@ -337,19 +365,20 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
 
   /**
    * 一帧：同 FrameModeEditor 里灯光与阴影框那几行 + RenderScene；编辑器的 Update 由外壳先跑。
-   * 特效编辑器开着时灯光时间由它的预览时间定（vfxPreview），同游戏宿主。
+   * 特效编辑器开着时灯光时间由它的预览时间定（vfxPreview），同游戏宿主；
+   * 独立第一人称窗口可传入 nearDof（与正片 ADS 近景景深同源）和 lensFlareScale。
    */
-  function Frame(dt, { vfxPreview = false, previewTime } = {}) {
+  function Frame(dt, { vfxPreview = false, previewTime, nearDof = null, lensFlareScale = 1 } = {}) {
     state.elapsed += dt;
     state.frame += 1;
     camera.getWorldDirection(forward);
     if (vfxPreview) lights.Update(0, previewTime ?? state.elapsed, camera.position);
     else lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, forward);
-    RenderScene(dt);
+    RenderScene(dt, nearDof, lensFlareScale);
   }
 
-  function RenderScene(dt) {
+  function RenderScene(dt, nearDof = null, lensFlareScale = 1) {
     if (viewmodel.body) viewmodel.body.root.visible = false;
     if (gi) {
       gi.Update(dt, camera.position, lights);
@@ -375,6 +404,7 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     StepRifleSlings(dt, camera);
     if (firstPersonSelfShadow?.enabled) firstPersonSelfShadow.Render(sky.sunDirection, dt);
     if (actorBatch) actorBatch.Update(camera);
+    const ndStrength = nearDof?.strength > 0 ? nearDof.strength : 0;
     post.Render(scene, camera, {
       sunDirection: sky.sunDirection,
       sunColor: preset.sunColor,
@@ -395,8 +425,14 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
       damage: 0, hitDisorientation: 0,
       motionBlur: graphics.motionBlur,
       dofStrength: 0, dofFocus: 1.5, dofRange: 2.8, dofMaxPx: 11.0,
-      lensFlare: preset.lensFlare ?? 1,
-      nearDofStrength: 0,
+      lensFlare: (preset.lensFlare ?? 1) * lensFlareScale,
+      nearDofStrength: ndStrength,
+      ...(ndStrength > 0 ? {
+        nearDofFocus: nearDof.focus ?? 1.60,
+        nearDofRange: nearDof.range ?? 0.85,
+        nearDofMaxPx: nearDof.maxPx ?? 4.5,
+        nearDofSightUv: nearDof.sightUv || null,
+      } : null),
     });
     if (firstPersonReflection?.enabled) {
       firstPersonReflection.Update(dt, camera.position, !!viewmodel?.root?.visible);
@@ -433,6 +469,7 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     THREE, params, state, renderer, scene, camera, canvas, post, ssao, graphics, library, sky, lights, vfx, audio,
     actorFactory, actorBatch, viewmodel, firstPersonSelfShadow, firstPersonReflection, shadingUniforms,
     get gi() { return gi; },
+    set onResize(fn) { onResizeHook = typeof fn === "function" ? fn : null; },
     ApplyGraphics, ApplySkyPreset, RestoreLevelSky, Frame, RenderScene,
     GetEnvironmentState: () => ({ name: skyOverride || PHASE.sky, override: !!skyOverride }),
     RestoreEnvironmentState(snapshot) {

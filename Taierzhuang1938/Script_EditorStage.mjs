@@ -391,7 +391,12 @@ export class ViewportInput {
       if (!this.enabled || e.target !== canvas) return;
       if (this.OnWheel) this.OnWheel(e.deltaY);
     };
+    this._contextMenu = (e) => {
+      if (!this.enabled) return;
+      e.preventDefault();
+    };
     canvas.addEventListener("mousedown", this._down);
+    canvas.addEventListener("contextmenu", this._contextMenu);
     window.addEventListener("mousemove", this._move);
     window.addEventListener("mouseup", this._up);
     canvas.addEventListener("wheel", this._wheel, { passive: true });
@@ -399,6 +404,7 @@ export class ViewportInput {
 
   Dispose() {
     this.canvas.removeEventListener("mousedown", this._down);
+    this.canvas.removeEventListener("contextmenu", this._contextMenu);
     window.removeEventListener("mousemove", this._move);
     window.removeEventListener("mouseup", this._up);
     this.canvas.removeEventListener("wheel", this._wheel);

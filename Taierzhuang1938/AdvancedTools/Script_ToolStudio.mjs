@@ -13,7 +13,6 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
@@ -22,7 +21,7 @@ import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
 
 /** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页，不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor, FirstPersonEditor, VfxEditor, AudioEditor,
+  ActorEditor, FacialEditor, VfxEditor, AudioEditor,
   PropLibraryEditor, AssetStandardsEditor,
 ]);
 
@@ -413,6 +412,15 @@ async function Main() {
   const params = new URLSearchParams(location.search);
   if (params.get("tool") === "weapon") {
     location.replace(new URL(TOOL_INFO.weapon.window.url, document.baseURI));
+    return;
+  }
+  if (params.get("tool") === "firstPerson") {
+    const dest = new URL(TOOL_INFO.firstPerson.window.url, document.baseURI);
+    for (const key of ["mode", "weapon", "profile", "manual"]) {
+      const value = params.get(key);
+      if (value != null) dest.searchParams.set(key, value);
+    }
+    location.replace(dest);
     return;
   }
   const bootEl = document.getElementById("tsBoot");

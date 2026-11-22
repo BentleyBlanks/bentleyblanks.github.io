@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../">
+  <title>第一人称持枪检查 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261122">
+  <script>
+    (function () {
+      var map = '{"imports":{"three":"./vendor/three/build/three.module.js"}}';
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "./index.html", false);
+        xhr.send();
+        var found = /<script type="importmap">([\s\S]*?)<\/script>/.exec(xhr.responseText);
+        if (found) map = found[1];
+      } catch (error) { console.error("[FirstPersonInspection] 读取 index.html import map 失败", error); }
+      var script = document.createElement("script");
+      script.type = "importmap";
+      script.textContent = map;
+      document.currentScript.after(script);
+    })();
+  </script>
+  <script type="module" src="./AdvancedTools/Script_FirstPersonInspection.mjs"></script>
+</head>
+<body>
+  <header class="tool-header">
+    <div class="tool-title">
+      <span class="viewfinder" aria-hidden="true"></span>
+      <h1>第一人称持枪检查</h1>
+      <span class="readonly">只读</span>
+    </div>
+
+    <nav class="mode-tabs" role="tablist" aria-label="检查模式">
+      <button type="button" role="tab" data-mode="range" aria-selected="true">靶场试射</button>
+      <button type="button" role="tab" data-mode="bolt" aria-selected="false">连射拉栓对比</button>
+      <button type="button" role="tab" data-mode="inertia" aria-selected="false">移动惯性对比</button>
+    </nav>
+
+    <div class="header-right">
+      <div class="seg-group lighting-group" role="group" aria-label="靶场光照">
+        <button type="button" data-sky="firstLevelBattleDay" aria-pressed="true">昼光</button>
+        <button type="button" data-sky="smokyDay" aria-pressed="false">阴天</button>
+        <button type="button" data-sky="dusk" aria-pressed="false">黄昏</button>
+      </div>
+      <button type="button" id="muteToggle" class="icon-btn" title="切换工具音效静音" aria-pressed="false">🔊</button>
+      <a id="controlCenter" class="back-link" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="stage" id="stage" aria-label="第一人称靶场视口">
+      <canvas id="view" tabindex="0" aria-label="三维第一人称视口"></canvas>
+
+      <!-- 中心准心（仅玩家视角且开启准心时显示） -->
+      <div class="reticle" id="reticle" aria-hidden="true">
+        <span class="reticle-h l"></span>
+        <span class="reticle-h r"></span>
+        <span class="reticle-v t"></span>
+        <span class="reticle-v b"></span>
+        <span class="reticle-dot"></span>
+      </div>
+
+      <!-- 命中回馈瞬闪十字 -->
+      <div class="hitmarker" id="hitmarker" aria-hidden="true"></div>
+
+      <!-- 左上角极简视口胶囊 -->
+      <div class="hud-top-left">
+        <div class="pill-group" role="group" aria-label="观察视角">
+          <button type="button" data-view="player" aria-pressed="true">第一人称</button>
+          <button type="button" data-view="inspect" aria-pressed="false">外部视角</button>
+        </div>
+        <div class="pill-group" id="orbitPresets" role="group" aria-label="外部机位" hidden>
+          <button type="button" data-orbit="rightRear" aria-pressed="true">右后</button>
+          <button type="button" data-orbit="leftRear" aria-pressed="false">左后</button>
+          <button type="button" data-orbit="front" aria-pressed="false">正前</button>
+          <button type="button" data-orbit="top" aria-pressed="false">俯视</button>
+        </div>
+        <button type="button" id="reticleToggle" class="pill-btn" aria-pressed="true">准心</button>
+        <button type="button" id="debugToggle" class="pill-btn" aria-pressed="false">骨骼调试</button>
+        <span id="debugBadge" class="debug-badge" hidden>掌心贴合 0.00 mm</span>
+      </div>
+
+      <!-- 顶部居中 A/B 改前改后切换胶囊（仅对比模式可见） -->
+      <div class="ab-float" id="abFloat" hidden>
+        <button type="button" class="ab-btn before" data-profile="before" aria-pressed="false">改前 · 旧手感</button>
+        <button type="button" class="ab-btn after" data-profile="after" aria-pressed="true">改后 · 新手感</button>
+        <span class="kbd-hint">Tab</span>
+      </div>
+
+      <!-- 左下角：可视化人物姿态 + 键位高亮 + 弹仓 + 紧凑惯性指示盘 -->
+      <div class="hud-bottom-left" id="postureDock">
+        <div class="posture-card">
+          <div class="silhouette-wrap" id="silhouetteWrap" data-stance="stand" data-ads="0" data-moving="0">
+            <svg class="soldier-svg" viewBox="0 0 64 82" aria-hidden="true">
+              <!-- 站立剪影 -->
+              <g class="pose-stand">
+                <circle cx="30" cy="14" r="7.5" />
+                <path d="M22 25 C22 22 38 22 39 26 L42 46 L36 48 L35 76 L29 76 L28 53 L25 76 L19 76 L21 44 Z" />
+                <path class="pose-gun" d="M31 30 L57 27 L57 30 L34 34 Z" />
+              </g>
+              <!-- 蹲伏剪影 -->
+              <g class="pose-crouch">
+                <circle cx="31" cy="30" r="7.5" />
+                <path d="M22 40 C23 37 38 37 40 42 L43 56 L36 60 L40 76 L33 76 L28 63 L22 76 L16 76 L22 57 Z" />
+                <path class="pose-gun" d="M32 45 L58 42 L58 45 L35 49 Z" />
+              </g>
+              <!-- 冲刺前倾剪影 -->
+              <g class="pose-sprint">
+                <circle cx="37" cy="16" r="7.2" />
+                <path d="M26 25 C30 22 41 24 42 29 L38 46 L49 62 L44 66 L33 52 L22 75 L16 72 L25 46 Z" />
+                <path class="pose-gun" d="M29 33 L52 21 L54 24 L31 36 Z" />
+              </g>
+            </svg>
+          </div>
+          <div class="posture-info">
+            <div class="posture-head">
+              <strong id="stanceLabel">站立 · 腰射</strong>
+              <span id="speedLabel" class="mono">静止</span>
+            </div>
+            <div class="keycaps" id="keycaps" aria-label="移动与姿态键位状态">
+              <div class="keycap-row">
+                <span class="kc" data-k="KeyW">W</span>
+              </div>
+              <div class="keycap-row">
+                <span class="kc" data-k="KeyA">A</span>
+                <span class="kc" data-k="KeyS">S</span>
+                <span class="kc" data-k="KeyD">D</span>
+                <span class="kc wide" data-k="Shift">Shift</span>
+                <span class="kc" data-k="KeyC">C</span>
+              </div>
+            </div>
+            <div class="ammo-row" id="ammoRow">
+              <div class="ammo-bars" id="ammoBars"></div>
+              <span class="ammo-text mono" id="ammoText">5 / 5</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 紧凑型枪身惯性指示盘（仅 #4 移动惯性对比模式显示） -->
+        <div class="inertia-dial" id="inertiaDial" hidden>
+          <canvas id="inertiaCanvas" width="116" height="116"></canvas>
+          <div class="inertia-phase" id="inertiaPhase">已回稳</div>
+        </div>
+      </div>
+
+      <!-- 右下角：紧凑型 #3 连射拉栓节奏条（仅连射拉栓对比模式显示） -->
+      <div class="bolt-card" id="boltCard" hidden>
+        <div class="bolt-card-head">
+          <span class="bolt-title">连射节拍</span>
+          <span class="bolt-stats mono" id="boltStats">连发 0 · 吞键 0</span>
+        </div>
+        <div class="bolt-bar" id="boltBar">
+          <div class="bolt-seg seg-fire" id="segFire">击发</div>
+          <div class="bolt-seg seg-bolt" id="segBolt">拉栓</div>
+          <div class="bolt-seg seg-buf" id="segBuf">预输入</div>
+          <div class="bolt-cursor" id="boltCursor"></div>
+        </div>
+        <div class="bolt-feedback" id="boltFeedback">归位前提前扣扳机，对比改前吞键与改后顺发</div>
+      </div>
+
+      <!-- 骨骼调试文字挂点层（默认隐藏，仅开启骨骼调试时显示） -->
+      <div class="mount-labels" id="mountLabels" hidden></div>
+
+      <!-- 底部居中极简操作提示 -->
+      <div class="stage-hint" id="stageHint">左键开火 · 右键瞄准 · WASD 移动 · C 蹲伏 · R 换弹</div>
+
+      <!-- 载入遮罩 -->
+      <div class="boot-overlay" id="bootOverlay">
+        <div class="boot-title">第一人称持枪检查</div>
+        <div class="boot-track"><div class="boot-bar" id="bootBar"></div></div>
+        <div class="boot-step" id="bootStep">正在初始化渲染底座与靶场…</div>
+      </div>
+    </section>
+
+    <aside class="controls" aria-label="检查控制面板">
+      <!-- 对比专属卡片（仅 #3 / #4 模式可见） -->
+      <section class="card compare-card" id="compareCard" hidden>
+        <h2 id="compareCardTitle">对比演示</h2>
+        <div id="boltControls" hidden>
+          <div class="sub-label">栓动步枪</div>
+          <div class="chip-grid cols-3" id="boltRifleChips"></div>
+          <div class="sub-label">触发方式</div>
+          <div class="chip-grid cols-3" id="boltDriverChips"></div>
+          <div class="btn-row">
+            <button type="button" id="boltAutoBtn" class="ctrl-btn toggle" aria-pressed="true">自动循环</button>
+            <button type="button" id="boltTriggerBtn" class="ctrl-btn">扣一次扳机</button>
+          </div>
+        </div>
+        <div id="inertiaControls" hidden>
+          <div class="sub-label">运动测试科目</div>
+          <div class="chip-grid cols-2" id="inertiaDriverChips"></div>
+          <div class="btn-row">
+            <button type="button" id="inertiaAutoBtn" class="ctrl-btn toggle" aria-pressed="true">自动演示</button>
+            <button type="button" id="inertiaReplayBtn" class="ctrl-btn">重播</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 武器列表 -->
+      <section class="card weapon-card">
+        <div class="card-head">
+          <h2>武器</h2>
+          <span class="muted mono" id="weaponMeta"></span>
+        </div>
+        <div class="weapon-list" id="weaponList" role="listbox" aria-label="第一人称武器列表"></div>
+      </section>
+
+      <!-- 姿态与实战动作 -->
+      <section class="card action-card">
+        <h2>姿态与动作</h2>
+        <div class="chip-grid cols-4" id="stanceChips">
+          <button type="button" class="chip" data-stance="stand" aria-pressed="true">站立</button>
+          <button type="button" class="chip" data-stance="crouch" aria-pressed="false">蹲伏</button>
+          <button type="button" class="chip" data-stance="sprint" aria-pressed="false">冲刺</button>
+          <button type="button" class="chip" id="adsToggleBtn" aria-pressed="false">开镜</button>
+        </div>
+        <div class="action-grid" id="actionGrid">
+          <button type="button" class="ctrl-btn primary" data-act="fire">开火</button>
+          <button type="button" class="ctrl-btn" data-act="bolt">拉栓</button>
+          <button type="button" class="ctrl-btn" data-act="emptyReload">空仓换弹</button>
+          <button type="button" class="ctrl-btn" data-act="tacReload">战术换弹</button>
+          <button type="button" class="ctrl-btn" data-act="melee">白刃</button>
+          <button type="button" class="ctrl-btn" data-act="throw">投掷</button>
+        </div>
+        <div class="btn-row compact-row">
+          <button type="button" id="autoFireBtn" class="ctrl-btn toggle" aria-pressed="false" hidden>按住连发</button>
+          <button type="button" id="bayonetBtn" class="ctrl-btn toggle" aria-pressed="false" hidden>上刺刀</button>
+          <button type="button" id="clearHolesBtn" class="ctrl-btn">清弹孔</button>
+        </div>
+      </section>
+
+      <!-- 慢放与逐帧（取代隐晦的“动作帧检”下拉菜单） -->
+      <section class="card playback-card">
+        <div class="card-head">
+          <h2>慢放与逐帧</h2>
+          <span class="muted mono" id="actionStatusText">实时运行</span>
+        </div>
+        <div class="chip-grid cols-3" id="speedChips">
+          <button type="button" class="chip" data-speed="1" aria-pressed="true">1×</button>
+          <button type="button" class="chip" data-speed="0.5" aria-pressed="false">0.5×</button>
+          <button type="button" class="chip" data-speed="0.25" aria-pressed="false">0.25×</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="pauseBtn" class="ctrl-btn" aria-pressed="false">⏸ 暂停</button>
+          <button type="button" id="stepBackBtn" class="ctrl-btn" title="当前动作回退一帧">◀ 单帧</button>
+          <button type="button" id="stepFwdBtn" class="ctrl-btn" title="步进一帧">单帧 ▶</button>
+        </div>
+        <div class="scrub-wrap" id="scrubWrap" hidden>
+          <input type="range" id="actionScrub" min="0" max="1" step="0.002" value="0" aria-label="当前动作进度">
+        </div>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>

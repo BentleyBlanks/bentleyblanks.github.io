@@ -572,9 +572,10 @@ export class EditorSuite {
   // -------------------------------------------------------------------------
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
-  Open(id) {
-    if (WINDOW_TOOLS.has(id)) {
-      try { return TOOL_CLASSES.get(id).Open(); }
+  Open(id, { harness = false } = {}) {
+    const EntryClass = TOOL_CLASSES.get(id);
+    if (WINDOW_TOOLS.has(id) && !(harness && EntryClass?.harness)) {
+      try { return EntryClass.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。
@@ -588,7 +589,7 @@ export class EditorSuite {
       catch (error) { this.SetHint(error.message); return null; }
     }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
-    const Editor = EDITORS.find((e) => e.id === id);
+    const Editor = (harness && EntryClass?.harness) || EDITORS.find((e) => e.id === id);
     if (!Editor) return null;
     if (this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
