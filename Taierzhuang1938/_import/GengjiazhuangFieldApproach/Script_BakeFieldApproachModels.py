@@ -134,7 +134,8 @@ def Bake(source=None, review=None, names=None):
             bpy.context.view_layer.objects.active = objects[0]
             target = output / f"Model_{name}.glb"
             bpy.ops.export_scene.gltf(filepath=str(target), export_format="GLB",
-                                      use_selection=True, use_active_scene=True, export_animations=False)
+                                      use_selection=True, use_active_scene=True, export_animations=False,
+                                      export_image_format="WEBP", export_image_quality=90)
             working.collection.children.unlink(collection)
             scene.collection.children.link(collection)
             size = hi-lo
