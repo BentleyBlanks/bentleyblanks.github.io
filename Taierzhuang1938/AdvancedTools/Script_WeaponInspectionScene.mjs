@@ -222,7 +222,7 @@ export class WeaponInspectionScene {
       this.scene.add(model.group);
       const max = Math.max(...model.size.toArray());
       const step = max < .4 ? .05 : max < 1.8 ? .1 : max < 3 ? .25 : .5;
-      this.grid = new THREE.GridHelper(step * 24, 24, 0x728891, 0x83949c);
+      this.grid = new THREE.GridHelper(step * 24, 24, 0xc2b99d, 0xaaa694);
       this.grid.material.transparent = true;
       this.grid.material.opacity = .31;
       this.grid.visible = this.gridVisible;

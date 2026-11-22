@@ -6,25 +6,23 @@
   <base href="../">
   <title>枪械检查台 · 血战滕县</title>
   <link rel="icon" href="./Icon_TabSeal32.png">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261113earbraid">
+  <link rel="stylesheet" href="./Style_Editor.css?v=20261113ToolsSeparation">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122CommandRoom">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
   <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs"></script>
 </head>
-<body>
+<body class="uiToolSurface edThemedSurface">
   <header class="tool-header">
-    <div class="tool-title">
-      <span class="viewfinder" aria-hidden="true"></span>
-      <h1>枪械检查台</h1>
-      <span class="readonly">只读</span>
-    </div>
-    <a id="controlCenter" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
+    <h1>枪械检查台</h1>
+    <a id="controlCenter" class="edMenuMainMenu" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
   </header>
 
-  <main class="workspace">
-    <aside class="panel catalog" aria-labelledby="catalogTitle">
-      <header class="panel-header">
+  <main class="workspace edHome">
+    <aside class="catalog" aria-labelledby="catalogTitle">
+      <header class="catalog-header">
         <h2 id="catalogTitle">模型列表</h2>
         <output id="catalogCount" for="modelSearch"></output>
       </header>
@@ -34,17 +32,17 @@
       <div id="modelList" class="model-list"></div>
     </aside>
 
-    <section class="panel bench" aria-label="模型视口">
+    <section id="inspectionBench" class="bench" aria-label="模型视口">
       <div class="view-bar">
         <div class="view-presets" role="group" aria-label="观察方向">
-          <button type="button" data-view="side" aria-pressed="false">正侧</button>
-          <button type="button" data-view="angle" aria-pressed="true">斜视</button>
-          <button type="button" data-view="top" aria-pressed="false">俯视</button>
+          <button type="button" class="edBtn" data-view="side" aria-pressed="false">正侧</button>
+          <button type="button" class="edBtn on" data-view="angle" aria-pressed="true">斜视</button>
+          <button type="button" class="edBtn" data-view="top" aria-pressed="false">俯视</button>
         </div>
         <div class="view-zoom" role="group" aria-label="视口缩放">
-          <button type="button" data-zoom="out" aria-label="缩小">−</button>
-          <button type="button" data-zoom="in" aria-label="放大">+</button>
-          <button type="button" id="fitView">适配</button>
+          <button type="button" class="edBtn" data-zoom="out" aria-label="缩小">−</button>
+          <button type="button" class="edBtn" data-zoom="in" aria-label="放大">+</button>
+          <button type="button" class="edBtn" id="fitView">适配</button>
         </div>
       </div>
 
@@ -55,32 +53,35 @@
         <div class="scale" id="viewScale" hidden><span id="scaleValue"></span></div>
         <div class="stage-status" id="stageStatus">
           <span id="loadMessage" role="status">正在载入模型…</span>
-          <button type="button" id="retryLoad" hidden>重试</button>
+          <button type="button" class="edBtn" id="retryLoad" hidden>重试</button>
         </div>
       </div>
 
       <footer class="bench-footer">
         <div class="overlays" role="group" aria-label="预览叠层">
-          <button type="button" id="gridToggle" aria-pressed="true">网格</button>
-          <button type="button" id="mountToggle" aria-pressed="false">挂点</button>
-          <button type="button" id="bayonetToggle" aria-pressed="false" hidden>刺刀预览</button>
+          <button type="button" class="edBtn on" id="gridToggle" aria-pressed="true">网格</button>
+          <button type="button" class="edBtn" id="mountToggle" aria-pressed="false">挂点</button>
+          <button type="button" class="edBtn" id="bayonetToggle" aria-pressed="false" hidden>刺刀预览</button>
         </div>
-        <span id="viewHint">左键旋转 · 右键平移 · 滚轮缩放</span>
+        <div id="viewHint">
+          <span><kbd>左键</kbd> 旋转</span>
+          <span><kbd>右键</kbd> 平移</span>
+          <span><kbd>滚轮</kbd> 缩放</span>
+        </div>
       </footer>
     </section>
 
-    <aside class="panel details" aria-labelledby="detailsTitle">
-      <header class="panel-header"><h2 id="detailsTitle">模型信息</h2></header>
-      <div class="model-heading">
-        <h3 id="modelName"></h3>
+    <aside class="details" aria-labelledby="modelName">
+      <header class="model-heading">
+        <h2 id="modelName"></h2>
         <p id="modelFullName"></p>
         <code id="modelId"></code>
-      </div>
+      </header>
       <dl class="facts">
         <div><dt>类别</dt><dd id="modelKind"></dd></div>
         <div><dt>阵营</dt><dd id="modelSide"></dd></div>
-        <div class="file"><dt>模型文件</dt><dd id="modelFile"></dd></div>
         <div><dt>三角面</dt><dd id="modelTriangles"></dd></div>
+        <div class="file"><dt>模型文件</dt><dd id="modelFile"></dd></div>
       </dl>
       <div class="bounds">
         <h3>模型尺寸 <small>mm</small></h3>
@@ -90,7 +91,7 @@
           <div><dt>纵深</dt><dd id="sizeZ">—</dd></div>
         </dl>
       </div>
-      <p class="resource-note" id="resourceNote" role="status" hidden></p>
+      <p class="edNote warn" id="resourceNote" role="status" hidden></p>
     </aside>
   </main>
 </body>

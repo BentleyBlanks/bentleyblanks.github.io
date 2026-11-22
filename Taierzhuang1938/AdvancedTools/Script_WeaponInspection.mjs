@@ -17,7 +17,10 @@ const SCALE_METERS = [.005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
 const number = new Intl.NumberFormat("zh-CN");
 const ById = (id) => document.getElementById(id);
 const Text = (id, value) => { ById(id).textContent = value; };
-const SetPressed = (button, on) => button.setAttribute("aria-pressed", String(on));
+function SetPressed(button, on) {
+  button.setAttribute("aria-pressed", String(on));
+  button.classList.toggle("on", on);
+}
 const Kind = (weapon) => weapon.id === "MediumMortar" ? "迫击炮" : (KIND[weapon.kind] || weapon.kind);
 
 function LabelNode(parent, tag, text) {
