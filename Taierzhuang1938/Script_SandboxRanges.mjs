@@ -17,7 +17,8 @@
 //   OnKey(detail)     键先给测试场看（返回 undefined = 不归它管）；ActionPrompts() 返回整条底部提示
 //   UpdatePanel(frame)  HUD 那一步里刷新测试场自己的面板
 //
-// 插件模块可选的 startup：轻量开机（只加载列出的 PBR 组与音效，不预载担架、飞机、弹坑碎屑；只预载武器模型）。
+// 插件模块可选的 startup：轻量开机（只加载列出的 PBR 组与音效，不预载担架、飞机、弹坑碎屑）。
+// sceneryOnly 供纯环境机位使用，跳过人物和前景道具的预载。
 //
 // 宿主 `host` 是装配层交过来的「工具箱」：场地、玩家、相机、各系统，以及几只装配层自己的函数
 // （抢指针锁、藏枪模、给手榴弹、换枪补给），以及主文件的工具箱 ctx（靶场与白刃实验场的运行时整块读写主文件状态时用）。
@@ -101,6 +102,11 @@ function FixedSceneCamera(host, pose) {
 const PLUGINS = {
   gengjiazhuangFieldApproach: {
     phase: FIELD_APPROACH_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
+    startup: {
+      sceneryOnly: true,
+      pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr"],
+      audio: { voice: false, ambience: false, music: false, sfx: [] },
+    },
     Create(host) {
       const { battlefield, camera, vfx, state } = host;
       const { layout } = battlefield;

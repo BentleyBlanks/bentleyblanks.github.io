@@ -1571,7 +1571,8 @@ async function Boot() {
   // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
-  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false });
+  const meshes = SANDBOX_STARTUP?.sceneryOnly ? actorFactory.meshReport
+    : await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false });
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
@@ -1583,7 +1584,10 @@ async function Boot() {
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
   // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
-  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), ...(SANDBOX_STARTUP ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()])]);
+  const [grenadeAsset] = await Promise.all([
+    SANDBOX_STARTUP?.sceneryOnly ? null : LoadGrenadeAsset(),
+    ...(SANDBOX_STARTUP ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()]),
+  ]);
   await NextFrame();
   // Start the lab sound queue after the required models have finished downloading.
   if (SANDBOX_STARTUP) audio.PrefetchPacks?.();
@@ -5361,7 +5365,7 @@ function RespawnPlayer(initial = false) {
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
-  viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
+  viewmodel.Equip(SANDBOX_STARTUP?.sceneryOnly ? null : currentWeapon, SlotWeaponVariant(state.activeSlot));
   SyncBayonet();
   viewmodel.root.visible = true;
   hud.SetWeaponName(currentWeapon
@@ -5850,7 +5854,7 @@ function OnPointerLockChange() {
 
 function StartRun() {
   // Direct whitebox links also warm the deferred body clips after boot.
-  LoadMeleeAnimations();
+  if (!SANDBOX_STARTUP?.sceneryOnly) LoadMeleeAnimations();
   ShowBoot(false);
   state.menu = false;
   state.running = true;
