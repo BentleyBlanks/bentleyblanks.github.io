@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-engraving-finish-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
+ assert.equal(evidence.identity.version,'511-wood-rim-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
  assert.equal(evidence.identity.npcTriangles,66214);assert.equal(evidence.identity.nearNpcTriangles,70822);
  assert.equal(evidence.identity.worldTriangles,70822);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);

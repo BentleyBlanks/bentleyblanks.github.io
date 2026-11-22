@@ -93,8 +93,17 @@ const seamProbe=new THREE.Raycaster(new THREE.Vector3(.04,(crownBounds.max.y+ext
 seamProbe.layers.enableAll();assert(seamProbe.intersectObject(exteriorCrown).length>0,'side silhouette spans the old visible air gap');
 assert(Math.abs(crownBounds.max.y-.05245)<.0001,'original visual tip height retained');
 assert(contract.triangles<=80000 && doc.asset.extras.runtimeTriangles===contract.triangles);
+const woodRim=fps.meshes.find(mesh=>mesh.userData.type38Part==='Wood_UpperFittedCrown05');
+const middleBand=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_MiddleBand57');
+for(const part of [woodRim,middleBand])part.geometry.computeBoundingBox();
+const bandBox=middleBand.geometry.boundingBox,rimBox=woodRim.geometry.boundingBox;
+const bandSpan=bandBox.max.z-bandBox.min.z,rimFraction=(bandBox.min.z-rimBox.min.z)/bandSpan;
+assert(rimFraction>.65&&rimFraction<1.05,'rounded wood lip must remain visible beyond the grey band');
+const woodProbe=new THREE.Raycaster(new THREE.Vector3(.06,bandBox.max.y-.38*bandSpan,bandBox.min.z-.42*bandSpan),new THREE.Vector3(-1,0,0));
+woodProbe.layers.enableAll();
+assert.equal(woodProbe.intersectObjects(fps.meshes)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
 const edgeStart=new THREE.Vector3(),edgeEnd=new THREE.Vector3(),corner=new THREE.Vector3(),normal=new THREE.Vector3(),tangent=new THREE.Vector3();
-for(const mesh of fps.meshes.filter(item=>Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
+for(const mesh of fps.meshes.filter(item=>item===woodRim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
  const geometry=mesh.geometry,{position,normal:normalAttr,tangent:tangentAttr}=geometry.attributes;
  for(let index=0;index<position.count;index++){
   normal.fromBufferAttribute(normalAttr,index);tangent.fromBufferAttribute(tangentAttr,index);

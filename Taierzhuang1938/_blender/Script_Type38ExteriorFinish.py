@@ -176,6 +176,75 @@ def PaintTimberMarks(doc, views, primitive, size):
                           lambda side, height, length: ((length + .566) / .144, .50 + side / .015))
 
 
+def RevealWoodRim(doc, views):
+    def Primitive(part):
+        mesh = next(node['mesh'] for node in doc['nodes'] if node.get('extras', {}).get('SourceObject') == part)
+        return doc['meshes'][mesh]['primitives'][0]
+
+    def Attribute(primitive, name, width):
+        accessor = doc['accessors'][primitive['attributes'][name]]
+        assert accessor['componentType'] == 5126 and not accessor.get('byteOffset')
+        return np.frombuffer(views[accessor['bufferView']], '<f4').reshape(-1, width).astype(np.float64)
+
+    wood = Primitive('Wood_UpperFittedCrown05')
+    band = Attribute(Primitive('Exterior_MiddleBand57'), 'POSITION', 3)
+    points = Attribute(wood, 'POSITION', 3)
+    normals = Attribute(wood, 'NORMAL', 3)
+    tangents = Attribute(wood, 'TANGENT', 4)
+    left, right = np.min(band[:, 2]), np.max(band[:, 2])
+    width = right - left
+    tip = np.min(points[:, 2])
+    shift = tip - left + .85 * width
+    levels = np.clip(1 - (points[:, 2] - tip) / (width * .20), 0, 1)
+    end = points[:, 2] < right + .6 * width
+    assert np.any(end) and not np.any((levels > 0) & ~end)
+    edge = points[end]
+    center = np.array([np.mean([edge[:, 0].min(), edge[:, 0].max()]), np.max(edge[:, 1]) - .12 * width])
+    delta = points[:, :2] - center
+    taper = np.ones((len(points), 2))
+    taper[end] = np.array([.80, .62]) - levels[end, None] ** 2 * np.array([.065, .075])
+    shear = (levels / (width * .20))[:, None] * np.array([.130,.150]) * delta
+    jacobian = np.zeros((len(points), 3, 3))
+    jacobian[:, 0, 0], jacobian[:, 1, 1] = taper.T
+    jacobian[:, 2, 2] = 1
+    lower = np.clip((center[1] - points[:, 1]) / (width * 1.65), 0, 1)
+    pinch = .50 * lower[end] ** 2
+    taper[end, 0] *= 1 - pinch
+    jacobian[end, 0, 0] = taper[end, 0]
+    jacobian[end, 0, 1] = delta[end, 0] * jacobian[end, 0, 0] / (1 - pinch) * lower[end] / (width * 1.65)
+    shear[end, 0] *= 1 - pinch
+    shear[~end] = 0
+    jacobian[:, :2, 2] = shear
+    points[end, 2] -= shift
+    points[end, :2] = center + delta[end] * taper[end]
+    points[end, 1] -= width * .12
+    normals[end] = np.linalg.solve(np.swapaxes(jacobian[end], 1, 2), normals[end, :, None])[:, :, 0]
+    normals[end] /= np.linalg.norm(normals[end], axis=1, keepdims=True)
+    directions = (jacobian[end] @ tangents[end, :3, None])[:, :, 0]
+    directions -= normals[end] * np.sum(normals[end] * directions, axis=1, keepdims=True)
+    tangents[end, :3] = directions / np.linalg.norm(directions, axis=1, keepdims=True)
+    for field, values in [('POSITION', points), ('NORMAL', normals), ('TANGENT', tangents)]:
+        accessor = doc['accessors'][wood['attributes'][field]]
+        data = np.asarray(values, dtype='<f4')
+        assert np.all(np.isfinite(data))
+        views[accessor['bufferView']] = data.tobytes()
+        for key, statistic in [('min', np.min), ('max', np.max)]:
+            if key in accessor:
+                accessor[key] = statistic(data, axis=0).tolist()
+
+
+def PaintBandScuff(doc, views, primitive, size):
+    stamp = Image.new('L', (192, 160))
+    drawing = ImageDraw.Draw(stamp)
+    drawing.polygon([(155, 19),(167, 25),(161, 37),(177, 46),(173, 61),(181, 75),(174, 100),
+                     (164, 123),(146, 132),(120, 139),(110, 130),(88, 134),(70, 124),(54, 122),
+                     (42, 111),(46, 101),(32, 94),(41, 79),(34, 67),(49, 60),(58, 44),(78, 47),
+                     (87, 35),(109, 32),(117, 24),(139, 29)], fill=255)
+    return ProjectArtwork(doc, views, primitive, size, stamp.filter(ImageFilter.GaussianBlur(4)),
+                          ([.008, .014, -.607], [.024, .039, -.586]),
+                          lambda side, height, length: ((-.586 - length) / .021, (.037 - height) / .019))
+
+
 def Refinish(doc, views):
     def ImageInfo(slot):
         return doc['images'][doc['textures'][slot['index']]['source']]
@@ -237,6 +306,10 @@ def Refinish(doc, views):
                 graded *= 1 - .72 * density[:, :, None]
                 surface[:, :, 0] = np.rint(surface[:, :, 0] * (1 - .49 * density))
                 rough += 15 * density
+                scuff = PaintBandScuff(doc, views, primitive, image.size) * np.clip(.65 + .22 * patina + .12 * cloud, .2, 1)
+                graded += scuff[:, :, None] * (np.array([15, 12, 8]) - .68 * graded)
+                rough += 27 * scuff
+                surface[:, :, 0] = np.rint(surface[:, :, 0] * (1 - .62 * scuff))
                 inlay = PaintBandInlay(doc, views, primitive, image.size) * amount
                 wornSteel = np.array([54, 53, 52]) + (5 * stroke + 2 * patina + 8 * wear)[:, :, None]
                 graded += inlay[:, :, None] * (wornSteel - graded)
@@ -249,6 +322,11 @@ def Refinish(doc, views):
                 graded *= 1 - .66 * carving[:, :, None]
                 rough += 25 * carving
                 surface[:, :, 0] = np.rint(surface[:, :, 0] * (1 - .83 * carving))
+                rim = ProjectArtwork(doc, views, primitive, image.size, Image.new('L', (16, 16), 255),
+                                     ([-.025, .020, -.633], [.025, .060, -.609]),
+                                     lambda side, height, length: (.5 + side / .055, (.061 - height) / .045))
+                graded += rim[:, :, None] * (np.array([3, -2, -3]) - .035 * graded)
+                rough -= 9 * rim
             Store(surfaceSlot, surface)
         else:
             value = color.mean(axis=2, keepdims=True)
@@ -352,10 +430,11 @@ def Build():
     doc['materials'] = colors['materials']
     manifest = json.loads(Original('0ad1f3a0', 'Data_Type38_511.json'))
     changes = manifest['exteriorTriangleDeltas']
+    RevealWoodRim(doc, views)
     finish = Refinish(doc, views)
     triangles = sum(doc['accessors'][primitive['indices']]['count'] // 3 for mesh in doc['meshes'] for primitive in mesh['primitives'])
     assert triangles == manifest['triangles'] <= 80000
-    doc['asset']['extras'].update(runtimeTriangles=triangles, version='Type38_EngravingFinish20261122', originalImagePayloadsPreserved=False)
+    doc['asset']['extras'].update(runtimeTriangles=triangles, version='Type38_WoodRim20261122', originalImagePayloadsPreserved=False)
     digest = WriteGlb(out / 'Model_Type38_511.glb', doc, views)
     manifest.update(version=2, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Exterior.py + _blender/Script_Type38ExteriorFinish.py',
                     exteriorBaselineSha256=baseline, exteriorTriangleDeltas=changes, finishRoughnessP10P50P90=finish,
