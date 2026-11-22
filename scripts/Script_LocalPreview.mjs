@@ -350,6 +350,32 @@ async function ProbeExisting(port) {
   } catch { return null; }
 }
 
+function IsLoopbackAddress(address) {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+async function RequestGracefulShutdown(port, rootDir) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/__preview/shutdown`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ root: rootDir }),
+      signal: AbortSignal.timeout(1200),
+    });
+    if (!response.ok) return false;
+    const body = await response.json().catch(() => null);
+    if (!body?.stopping) return false;
+    const deadline = Date.now() + 2500;
+    while (Date.now() < deadline) {
+      if (!(await ProbeExisting(port))) return true;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // ------------------------------------------------------------------ 主体
 
 const mounts = new Map(); // absRoot -> { port, server }
@@ -365,8 +391,38 @@ function CreateServer(rootDir, context) {
     try { route = decodeURIComponent(rawRoute); } catch { route = rawRoute; }
 
     if (route === "/__preview/ping") {
+      const latestRevision = PreviewRuntimeRevision(rootDir);
       response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      response.end(JSON.stringify({ app: APP_ID, root: rootDir, port: context.port, runtimeRevision }));
+      response.end(JSON.stringify({
+        app: APP_ID, root: rootDir, port: context.port, runtimeRevision,
+        stale: runtimeRevision !== latestRevision, canShutdown: true,
+      }));
+      return;
+    }
+    if (route === "/__preview/shutdown" && request.method === "POST") {
+      if (!IsLoopbackAddress(request.socket?.remoteAddress)) {
+        response.writeHead(403, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "loopback only" }));
+        return;
+      }
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      let body = null;
+      try { body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { body = null; }
+      if (!body?.root || path.resolve(String(body.root)) !== path.resolve(rootDir)) {
+        response.writeHead(403, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "root mismatch" }));
+        return;
+      }
+      response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ stopping: true, port: context.port }));
+      setImmediate(() => {
+        for (const mounted of mounts.values()) {
+          mounted.server?.closeAllConnections?.();
+          mounted.server?.close?.();
+        }
+        server.closeAllConnections?.();
+        server.close(() => process.exit(0));
+        setTimeout(() => process.exit(0), 500).unref();
+      });
       return;
     }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
@@ -982,12 +1038,20 @@ async function Main() {
   // 8080 很可能被别人的树占着，无脑复用等于把浏览器指到别人的代码上，
   // 而且看起来一切正常 —— 这种错最难发现。根不一样就往上让一个端口。
   const existing = await ProbeExisting(basePort);
-  if (existing && path.resolve(existing.root) === rootDir && existing.runtimeRevision === PreviewRuntimeRevision(rootDir)) {
+  const sameRoot = existing && path.resolve(existing.root) === rootDir;
+  if (sameRoot && existing.runtimeRevision === PreviewRuntimeRevision(rootDir)) {
     console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
     if (shouldOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
     return;
   }
-  if (existing) {
+  if (sameRoot) {
+    const replaced = await RequestGracefulShutdown(basePort, rootDir);
+    if (replaced) {
+      console.log(`:${basePort} 上的旧版同仓预览服已平滑退出，原地重启最新服务。`);
+    } else {
+      console.log(`:${basePort} 上已有旧版预览（根：${existing.root}），为当前运行时另选端口。`);
+    }
+  } else if (existing) {
     console.log(`:${basePort} 上已有预览（根：${existing.root}），为当前运行时另选端口。`);
   }
 

@@ -114,11 +114,29 @@ function Main() {
   bar.setAttribute("role", "banner");
   bar.appendChild(El("div", "edMenuBrand", CONTROL_CENTER_TITLE));
   const cards = ControlCenterCards();
-  bar.appendChild(El("div", "edMenuStatus", `本地 · ${cards.length} 个工具`));
+  const baseStatus = `本地 · ${cards.length} 个工具`;
+  const statusEl = El("div", "edMenuStatus", baseStatus);
+  bar.appendChild(statusEl);
   root.appendChild(bar);
   root.appendChild(RenderControlCenter(cards).root);
   document.body.appendChild(root);
-  window.ControlCenter = { cards };
+  const CheckPreviewFreshness = async () => {
+    try {
+      const response = await fetch("/__preview/ping", { cache: "no-store" });
+      if (!response.ok) return;
+      const info = await response.json();
+      if (info?.stale) {
+        statusEl.textContent = `本地 :${info.port} · 后端已更新（重开桌面快捷方式即可原地升级）`;
+        statusEl.style.color = "var(--ed-gold-text, #d8c48a)";
+      } else {
+        statusEl.textContent = baseStatus;
+        statusEl.style.color = "";
+      }
+    } catch { /* 非预览服打开时忽略 */ }
+  };
+  CheckPreviewFreshness();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) CheckPreviewFreshness(); });
+  window.ControlCenter = { cards, CheckPreviewFreshness };
 }
 
 if (typeof document !== "undefined" && document.body?.dataset.controlCenter !== undefined) Main();

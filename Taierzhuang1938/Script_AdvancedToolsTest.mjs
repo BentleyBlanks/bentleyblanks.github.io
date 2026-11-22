@@ -187,6 +187,44 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
     await new Promise((resolve) => (child.exitCode !== null ? resolve() : child.once("exit", resolve)));
     oldPreview.closeAllConnections(); await new Promise(resolve => oldPreview.close(resolve));
   }
+
+  // Simulate a stale same-repo preview server that supports graceful /__preview/shutdown:
+  // launcher should replace it in place and reclaim the exact same pinned port.
+  let shutdownRoot = null;
+  const replaceable = http.createServer(async (request, response) => {
+    if (request.url === "/__preview/shutdown" && request.method === "POST") {
+      const chunks = [];
+      for await (const c of request) chunks.push(c);
+      shutdownRoot = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}").root || null;
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ stopping: true }));
+      replaceable.closeAllConnections();
+      replaceable.close();
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ app: "BlanksLocalPreview", root: REPO_ROOT, runtimeRevision: "older-runtime", canShutdown: true }));
+  });
+  replaceable.listen(0, "127.0.0.1"); await once(replaceable, "listening");
+  const pinnedPort = replaceable.address().port;
+  const child2 = spawn(process.execPath, [launcher, String(pinnedPort), "--no-open"], { cwd: os.tmpdir(), stdio: ["ignore", "pipe", "inherit"], windowsHide: true });
+  let text2 = "";
+  child2.stdout.on("data", (chunk) => { text2 += chunk; });
+  const deadline2 = Date.now() + 30000;
+  let port2 = null;
+  while (Date.now() < deadline2 && !port2) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    port2 = Number(/控制中心：http:\/\/127\.0\.0\.1:(\d+)\//.exec(text2)?.[1]) || null;
+  }
+  try {
+    Check("同目录旧服务支持平滑停服时在原端口原地升级", port2 === pinnedPort && path.resolve(shutdownRoot || "") === REPO_ROOT, `pinned=${pinnedPort}, got=${port2}`);
+  } finally {
+    if (process.platform === "win32") {
+      try { execFileSync("taskkill", ["/pid", String(child2.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true }); } catch { /* Already stopped. */ }
+    } else child2.kill();
+    await new Promise((resolve) => (child2.exitCode !== null ? resolve() : child2.once("exit", resolve)));
+    if (replaceable.listening) { replaceable.closeAllConnections(); await new Promise(resolve => replaceable.close(resolve)); }
+  }
 }
 
 console.log(failed ? `${failed} 项未过` : "高级工具拆分：全部通过");
