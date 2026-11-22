@@ -1,5 +1,5 @@
 // 「北沙河单村合并版」分叉段（08–13）绝对时间采样与场面演出（纯函数，零 DOM、零 three）。
-// 任意正向/反向拖动时间轴均可确定性还原同一帧人物、桥面、车辆与空袭状态。
+// 任意正向/反向拖动时间轴均可确定性还原同一帧人物、桥面、车辆、侧包与班排协同状态。
 
 import {
   MERGED_SIGNALS, MERGED_SURFACES, MERGED_DIALOGUE,
@@ -44,28 +44,52 @@ function BehindPlayer(beat, progress, metres, timeline) {
   return [...beat.p[0]];
 }
 
+function SelectNearestTarget(shooter, candidates, maxRange, filter = null) {
+  let best = null;
+  let bestDist = maxRange;
+  for (const enemy of candidates) {
+    if (filter && !filter(enemy)) continue;
+    const d = Distance(shooter.p, enemy.p);
+    if (d < bestDist) {
+      bestDist = d;
+      best = enemy;
+    }
+  }
+  return best;
+}
+
 const CART_MAIN_STREET = [
   [104, 486], [114, 520], [140, 560], [146, 564], [163, 586],
   [172, 600], [146, 607], [121, 613], [122.3, 639],
 ];
 
+// 妮儿从救护所顺西巷偷偷折回关帝庙南檐下的纯街巷路线（0 穿墙、抢在西翼搜兵到前缩入庙南墙后）
 const NIER_SLIP_BACK = [
-  [121, 639], [121, 613], [84, 613], [84, 561], [86, 533],
+  [121, 639], [121, 613], [84, 613], [84, 561], [85.5, 538], [80.3, 529.6],
 ];
 
+// 空袭单向冲进田嫂避难洞路线（沿东墙根转入南院门，0 穿墙）
 const SHELTER_DASH = [
   [122.3, 639], [121, 642.5], [121, 664], [108, 664], [108, 659.6], [100, 659.6],
 ];
 
+// 罗班长、何有田、幺娃（捷克式 ZB-26）全链路沿真实街道与掩体行动轨迹（0 穿墙）：
+// 08b-08c 守沟口东段 → 08d-09c 抢占村心打麦场北口正面压制老耿家并甩雷调走西翼搜兵 → 09d 合围汇合
+// → 10a-11a 守南街口断后抵御轰炸与追兵 → 11b 洞口领命 → 11c-12b 村南口断后 → 13a-13c 奔桥抢过钢梁
 const LEADER_KEYS = [
-  ["08b", 0.5, 99, 475], ["08b", 1, 118, 478],
-  ["08d", 1, 118, 478], ["09a", 0.6, 126, 520], ["09b", 1, 136, 556],
-  ["09d", 0.4, 136, 556], ["09d", 1, 133, 563],
-  ["10a", 0, 133, 563], ["10a", 1, 121, 613],
-  ["10c", 0.8, 108, 664], ["11b", 0, 104, 661], ["11c", 1, 121, 675],
-  ["13a", 0, 121, 675], ["13a", 0.35, 60, 710], ["13a", 0.7, -20, 727], ["13a", 1, -68, 742],
-  ["13b", 0.6, -68, 742], ["13b", 1, -76, 745],
-  ["13c", 0, -80, 746], ["13c", 0.45, -80, 772], ["13c", 0.85, -80, 794], ["13c", 1, -87, 798],
+  ["08b", 0.0, 99, 466], ["08b", 0.35, 99, 471], ["08b", 0.65, 99, 476], ["08b", 0.85, 104, 478], ["08b", 1.0, 114, 478],
+  ["08d", 0.45, 114, 478], ["08d", 0.65, 104, 486], ["08d", 0.85, 114, 520], ["08d", 1.0, 124, 535],
+  ["09a", 0.35, 130, 545], ["09a", 0.6, 133.5, 549.5],
+  ["09d", 0.62, 133.5, 549.5], ["09d", 0.82, 136, 558], ["09d", 1.0, 131.5, 560],
+  ["10a", 0.0, 131.5, 560], ["10a", 0.14, 140, 560], ["10a", 0.25, 146, 564], ["10a", 0.50, 163, 586],
+  ["10a", 0.66, 172, 600], ["10a", 0.82, 146, 607], ["10a", 1.0, 121, 613],
+  ["11a", 0.35, 121, 613], ["11a", 0.60, 121, 642.5], ["11a", 0.80, 121, 664], ["11a", 0.92, 108, 664], ["11a", 1.0, 104, 661],
+  ["11b", 1.0, 104, 661],
+  ["11c", 0.22, 108, 664], ["11c", 0.45, 121, 664], ["11c", 0.70, 121, 675],
+  ["13a", 0.0, 121, 675], ["13a", 0.12, 114, 690], ["13a", 0.22, 100, 698], ["13a", 0.42, 60, 710],
+  ["13a", 0.62, 20, 720], ["13a", 0.78, -20, 727], ["13a", 0.90, -55, 735], ["13a", 1.0, -68, 742],
+  ["13b", 0.62, -68, 742], ["13b", 1.0, -78, 745],
+  ["13c", 0.0, -80, 746], ["13c", 0.45, -80, 772], ["13c", 0.85, -80, 794], ["13c", 1.0, -87, 798],
 ];
 
 export function MergedSignals(time, timeline) {
@@ -90,8 +114,8 @@ export function MergedActors(beat, time, player, progress, timeline) {
   const Follow = (delay) => PlayerAt(Math.max(At("08a"), time - delay), timeline);
   const actors = [Actor("player", "顺子", "player", "person", player, beat.cover ? "kneel" : beat.pose, { lookAt: beat.lookAt })];
 
-  // 老耿驴车：08a 抵沟口 → 08b 妮儿牵过板桥 → 08c 先行沿主街送冬瓜去西南救护所 → 10c 空袭焚毁
-  const cartEnd = At("08c", 0.9);
+  // 老耿驴车：08a 抵沟口 → 08b 妮儿牵过板桥 → 08c 前 62% 沿主街抢先抵达西南救护所（远早于东翼日军抵中街）→ 10c 空袭焚毁
+  const cartEnd = At("08c", 0.62);
   let cart = [122.3, 639];
   let nextCart = cart;
   if (beat.id === "08a") {
@@ -112,16 +136,16 @@ export function MergedActors(beat, time, player, progress, timeline) {
   if (!burned) {
     actors.push(Actor("cart", "老耿的车", "civilian", "cart", cart, "stand", { heading }));
     const donkey = beat.id === "08b" && progress < 0.35 ? [99, 468]
-      : [cart[0] + Math.sin(heading) * 2.3, cart[1] - Math.cos(heading) * 2.3];
+      : [cart[0] + Math.sin(heading) * 2.1, cart[1] - Math.cos(heading) * 2.1];
     actors.push(Actor("donkey", "黑子", "civilian", "donkey", donkey, beat.id === "08b" && progress < 0.35 ? "stand" : "walk", { heading }));
   }
 
-  // 冬瓜：08a-08c 乘车先行到救护所 → 08d-10a 在救护所院心等止血 → 10b 抬上车 → 10c 随顺子单向冲进田嫂避难洞 → 11c 起担架出村过桥
+  // 冬瓜：08a-08c 乘车先到救护所 → 08d-10a 在院心止血 → 10b 抬上车 → 10c 随顺子单向冲进田嫂避难洞 → 11c 担架出村过桥
   let winter = cart, winterExtra = { parentId: "cart", elevation: 1.05, heading };
   if (time >= cartEnd && time < At("10b", 0.65)) {
     winter = Track([
-      ["08c", 0.9, 122.3, 639], ["08d", 0.25, 108, 642.5], ["08d", 0.6, 101, 635],
-      ["10b", 0.2, 101, 635], ["10b", 0.5, 108, 642.5], ["10b", 0.65, 122.3, 639],
+      ["08c", 0.62, 122.3, 639], ["08c", 0.82, 114, 642.5], ["08d", 0.2, 108, 642.5], ["08d", 0.55, 101, 636],
+      ["10b", 0.2, 101, 636], ["10b", 0.5, 108, 642.5], ["10b", 0.65, 122.3, 639],
     ], time, timeline);
     winterExtra = {};
   }
@@ -150,83 +174,147 @@ export function MergedActors(beat, time, player, progress, timeline) {
   }
   actors.push(Actor("winter", "冬瓜", "friend", "quilt", winter, "wounded", winterExtra));
 
-  // 罗班长、何有田、幺娃
+  // 罗班长、何有田、幺娃（全队按街道轨迹编队，0 穿墙；正面吸火/甩雷/殿后清晰可见）
   const carrying = time >= At("11c") && (beat.pose === "carry" || beat.id === "13e" || (beat.id === "12b" && progress >= 0.55));
-  const leader = time < At("08b", 0.5) ? Follow(3) : beat.id === "13e" ? Follow(3) : Track(LEADER_KEYS, time, timeline);
-  const leaderMoving = time >= At("08b", 0.5) && Distance(leader, Track(LEADER_KEYS, time + 0.05, timeline)) > 0.01;
+  const leader = time < At("08b") ? Follow(2.8) : beat.id === "13e" ? Follow(3) : Track(LEADER_KEYS, time, timeline);
+  const leaderNext = time < At("08b") ? Follow(2.7) : Track(LEADER_KEYS, time + 0.08, timeline);
+  const leaderMoving = time >= At("08b") && Distance(leader, leaderNext) > 0.01;
+  const pinningMainStreet = ["09a", "09b", "09c"].includes(beat.id) || (beat.id === "09d" && progress < 0.62);
+  const rearguardHolding = ["10b", "10c", "11c", "12a", "12b"].includes(beat.id) || (beat.id === "11a" && progress < 0.35);
+  const ditchHolding = beat.id === "08c" || (beat.id === "08d" && progress < 0.45);
+  const leaderCovering = ditchHolding || pinningMainStreet || rearguardHolding;
+
   for (const [index, id, name] of [[0, "luo", "罗班长"], [1, "he", "何有田"], [2, "yao", "幺娃"]]) {
-    const onBridge = leader[0] >= -82 && leader[0] <= -78 && leader[1] >= 745 && leader[1] <= 795;
-    let p = leaderMoving || onBridge ? Track(LEADER_KEYS, time - index * 0.6, timeline)
-      : [leader[0] + index * 0.8, leader[1] - index * 1.2];
-    if (beat.id === "13e") p = Follow(3 + index * 0.6);
-    if (beat.id === "11a") p = id === "yao" ? [101.1, 659.9] : [112 + index, 664];
-    if (beat.id === "11b") p = id === "luo" ? [103.5, 661] : id === "yao" ? [101.1, 659.9] : [104.5, 662];
-    const firing = ["08c", "09b", "09d", "12a", "12b", "13a", "13b"].includes(beat.id);
+    let p;
+    if (time < At("08b")) {
+      p = Follow(2.6 + index * 0.9);
+    } else if (beat.id === "13e") {
+      p = Follow(3 + index * 0.7);
+    } else if (ditchHolding) {
+      // 沟南东段战壕内并排占领火力位
+      p = [113 + index * 2.2, 478];
+    } else if (pinningMainStreet) {
+      // 打麦场东南/主街掩体后一线展开，正对 24m 外老耿家正面压制
+      p = [[133.5, 549.5], [135.2, 548.2], [131.8, 547.5]][index];
+    } else if (beat.id === "11b") {
+      p = [[103.5, 661.0], [104.8, 661.5], [102.2, 660.2]][index];
+    } else if (leaderMoving) {
+      p = Track(LEADER_KEYS, Math.max(At("08b"), time - index * 0.7), timeline);
+    } else if (rearguardHolding && beat.stage === "10") {
+      p = [[121, 613], [122.4, 612.2], [119.8, 613.5]][index];
+    } else if (rearguardHolding && (beat.id === "11c" || beat.stage === "12")) {
+      p = [[121, 675], [122.2, 674], [119.8, 676]][index];
+    } else if (time >= At("13c", 1) && beat.id !== "13e") {
+      p = [[-87, 798], [-85.5, 798.5], [-84, 799]][index];
+    } else {
+      p = Track(LEADER_KEYS, Math.max(At("08b"), time - index * 0.65), timeline);
+    }
+
+    const firing = ditchHolding || pinningMainStreet || rearguardHolding || ["13a", "13b"].includes(beat.id);
     const stuck = id === "yao" && beat.id === "13c" && progress >= 0.25 && progress < 0.55;
-    actors.push(Actor(id, name, "friend", "person", p, stuck ? "down" : firing ? "shoot" : "stand", {
-      heavy: id === "yao", firing,
-      status: stuck ? "脚卡枕木缝，班长回身拽" : firing ? "正面吸引与殿后掩护" : "随队行动",
+    const status = stuck ? "脚卡枕木缝，班长回身死拽"
+      : ditchHolding ? (id === "yao" ? "捷克式压制沟北基准火力" : "沟口指挥控弹阻击")
+      : pinningMainStreet ? (id === "yao" ? "捷克式正面死咬老耿家机枪" : id === "he" ? "主街掷手榴弹吸引并震撼敌阵" : "正面牵制掩护顺子西翼绕后")
+      : rearguardHolding ? "死守街口断后，挡住村内追兵"
+      : beat.id === "13a" ? "摆脱村内追兵，全速奔向铁桥北坎"
+      : beat.id === "13b" || beat.id === "13c" ? "借顺子掩护抢渡四孔钢梁桥"
+      : "随队行动";
+    actors.push(Actor(id, name, "friend", "person", p, stuck ? "down" : firing ? "shoot" : "walk", {
+      heavy: id === "yao",
+      firing,
+      coveringEvacuation: leaderCovering,
+      status,
     }));
   }
 
-  // 刘文财
+  // 刘文财：始终严格沿顺子行进轨迹跟随（0 侧移穿墙）
   const liu = carrying || (beat.id === "12b" && progress < 0.55)
     ? BehindPlayer(beat, beat.id === "12b" ? (progress < 0.55 ? 0 : (progress - 0.55) / 0.45) : progress, 2.9, timeline)
     : ["11a", "11b"].includes(beat.id) ? [101, 660.4]
     : time >= At("13b") && time < At("13e") ? [-88.5, 798]
-    : Follow(1.5);
+    : Follow(0.95);
   actors.push(Actor("liu", "刘文财", "friend", "person", liu,
     carrying ? "carry" : beat.cover ? "shoot" : ["09a", "09b", "09c"].includes(beat.id) ? "crouch" : "walk",
-    { firing: beat.cover === true }));
+    { firing: beat.cover === true || beat.id === "09d" }));
 
-  // 老耿：08a-08c 赶车送冬瓜到西南救护所 → 08d-10b 守在救护所 → 10c 进避难洞 → 11c 起跟队过桥
-  let gengP = [cart[0] + 1.2, cart[1] + 0.6];
-  if (time >= cartEnd && time < At("10b")) gengP = [104, 636];
-  else if (beat.id === "10b") gengP = [122, 641];
-  else if (beat.id === "10c") gengP = SampleRoute(SHELTER_DASH, Clamp(progress / 0.85, 0, 1));
-  else if (time >= At("11a") && time < At("11c")) gengP = [99.2, 660.5];
-  else if (time >= At("11c")) gengP = time >= At("13a", 1) && beat.id !== "13e" ? [-93, 801] : Follow(3.2);
-  actors.push(Actor("geng", "老耿", "civilian", "person", gengP, beat.stage === "11" && beat.id !== "11c" ? "kneel" : "walk"));
+  // 老耿：08a-08c 沿官道/主街护车到救护所（略错后 0.5m 不穿墙）→ 08d-10b 守在救护所 → 10c 冲进避难洞 → 11c 跟队过桥
+  let gengP;
+  if (beat.id === "08a") gengP = PlayerAt(Math.min(time + 0.8, At("08a", 1)), timeline);
+  else if (beat.id === "08b") {
+    const t = Clamp((progress - 0.35) / 0.65, 0, 1);
+    gengP = SampleRoute([[99, 468], [99, 471], [99, 476], [104, 486]], Clamp(t - 0.08, 0, 1));
+  } else if (time < cartEnd) {
+    const t = Clamp((time - At("08c")) / (cartEnd - At("08c")), 0, 1);
+    gengP = SampleRoute(CART_MAIN_STREET, Clamp(t - 0.02, 0, 1));
+  } else if (time < At("10b")) {
+    gengP = [104, 636];
+  } else if (beat.id === "10b") {
+    gengP = [121.2, 641];
+  } else if (beat.id === "10c") {
+    gengP = SampleRoute(SHELTER_DASH, Clamp(progress / 0.82, 0, 1));
+  } else if (time < At("11c")) {
+    gengP = [99.2, 660.5];
+  } else {
+    gengP = time >= At("13a", 1) && beat.id !== "13e" ? [-93, 806] : Follow(3.2);
+  }
+  actors.push(Actor("geng", "老耿", "civilian", "person", gengP,
+    (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "walk"));
 
-  // 妮儿：08b 护黑子过板桥 → 08c 随车去救护所 → 08d-09a 顺西巷偷偷折回家拿灶锅 → 09b-09d 撞见顺子并钻洞开便门 → 10a-10c 随顺子返救护所并进洞
-  let nierP = [cart[0] - 1.0, cart[1] + 1.4];
-  if (beat.id === "08b") {
-    nierP = [cart[0], cart[1] + 2.4];
-  } else if (time >= cartEnd && time < At("09b")) {
-    const slipT = Clamp((time - At("08d")) / Math.max(1, At("09b") - At("08d")), 0, 1);
+  // 妮儿：08b 牵黑子过板桥 → 08c 随车去救护所 → 08d-09a 顺西巷抢在西翼搜兵到前缩进关帝庙南墙后 → 09b-09d 钻洞开便门 → 10a-10c 返救护所进洞
+  let nierP;
+  if (beat.id === "08a") nierP = PlayerAt(Math.min(time + 2.0, At("08a", 1)), timeline);
+  else if (beat.id === "08b") {
+    const t = Clamp((progress - 0.35) / 0.65, 0, 1);
+    nierP = SampleRoute([[99, 468], [99, 471], [99, 476], [104, 486]], Clamp(t + 0.08, 0, 1));
+  } else if (time < cartEnd) {
+    const t = Clamp((time - At("08c")) / (cartEnd - At("08c")), 0, 1);
+    nierP = SampleRoute(CART_MAIN_STREET, Clamp(t + 0.02, 0, 1));
+  } else if (time < At("09b")) {
+    // 08d 起始出发，在 09a + 20s 前即抵达关帝庙南院墙后 [80.8, 535.0]，早于西翼搜兵到达，全程隔墙不照面
+    const slipEnd = At("09a") + 20;
+    const slipT = Clamp((time - At("08d")) / Math.max(1, slipEnd - At("08d")), 0, 1);
     nierP = SampleRoute(NIER_SLIP_BACK, slipT);
-  } else if (time >= At("09b") && time < At("10a")) {
-    nierP = beat.id === "09c" && progress > 0.55 ? [125.6, 564.8] : [player[0] - 0.7, player[1] - 0.6];
+  } else if (beat.id === "09c") {
+    // 09c 平滑顺院门步入夹壁便门前，0.85 拔开便门后再步入老耿家前院（0 穿墙）
+    nierP = progress < 0.85
+      ? SampleRoute([[118, 558], [119.1, 562.8], [122.5, 564.8], [124.2, 564.8]], Clamp(progress / 0.8, 0, 1))
+      : SampleRoute([[124.2, 564.8], [125.6, 564.8]], Clamp((progress - 0.85) / 0.15, 0, 1));
+  } else if (time < At("10a")) {
+    nierP = Follow(1.4);
   } else if (beat.id === "10a") {
     nierP = Follow(2.2);
   } else if (beat.id === "10b") {
     nierP = [120.5, 642];
   } else if (beat.id === "10c") {
-    nierP = SampleRoute(SHELTER_DASH, Clamp(progress / 0.75, 0, 1));
-  } else if (time >= At("11a") && time < At("11c")) {
+    nierP = SampleRoute(SHELTER_DASH, Clamp(progress / 0.72, 0, 1));
+  } else if (time < At("11c")) {
     nierP = [100.6, 660.5];
-  } else if (time >= At("11c")) {
-    nierP = time >= At("13a", 1) && beat.id !== "13e" ? [-91, 801] : Follow(4.5);
+  } else {
+    nierP = time >= At("13a", 1) && beat.id !== "13e" ? [-91, 806] : Follow(4.5);
   }
   actors.push(Actor("nier", "妮儿", "civilian", "child", nierP,
-    ["09b", "09c"].includes(beat.id) ? "crouch" : beat.stage === "11" && beat.id !== "11c" ? "kneel" : "walk",
-    { status: beat.id === "09b" && progress > 0.65 ? "误解顺子见死不救，咬手推开" : undefined }));
+    ["09b", "09c"].includes(beat.id) ? "crouch"
+      : (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "walk",
+    { status: beat.id === "09b" && progress > 0.68 ? "误解顺子见死不救，狠咬手背" : undefined }));
 
-  // 救护所与田嫂、二丫（08d 起驴车抵达后激活，保证 10a-11b 人员齐全）
+  // 救护所与田嫂、二丫
   if (time >= cartEnd) {
     let tian = beat.id === "10a" ? [113, 639.6]
-      : beat.id === "10b" ? [110, 662]
-      : beat.id === "10c" ? SampleRoute([[110, 662], [108, 659.6], [101, 659.6]], Clamp(progress / 0.7, 0, 1))
+      : beat.id === "10b" ? [109, 663.5]
+      : beat.id === "10c" ? SampleRoute([[109, 663.5], [108, 659.6], [101, 659.6]], Clamp(progress / 0.7, 0, 1))
       : [101, 659.6];
-    if (time >= At("11c")) tian = time >= At("13a", 1) && beat.id !== "13e" ? [-94, 802] : Follow(5.5);
-    actors.push(Actor("tian", "田嫂", "civilian", "person", tian, beat.stage === "11" && beat.id !== "11c" ? "kneel" : "stand"));
+    if (time >= At("11c")) tian = time >= At("13a", 1) && beat.id !== "13e" ? [-94, 806] : Follow(5.5);
+    actors.push(Actor("tian", "田嫂", "civilian", "person", tian,
+      (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "stand"));
 
-    let girl = time < At("10c") ? [114, 663.5] : [114, 663.5];
-    if (beat.id === "10c" && progress >= 0.48) girl = [player[0] + 0.3, player[1]];
+    let girl = [114, 664];
+    if (beat.id === "10c" && progress >= 0.45) girl = [player[0], player[1]];
     if (time >= At("11a")) girl = [100.7, 660.1];
     if (time >= At("11c")) girl = tian;
-    actors.push(Actor("erya", "二丫", "civilian", "child", girl, time >= At("11c") ? "carry" : "kneel",
-      { elevation: time >= At("11c") ? 0.8 : 0 }));
+    const eryaShelteringSouth = time >= At("13a", 1) && beat.id !== "13e";
+    actors.push(Actor("erya", "二丫", "civilian", "child", girl,
+      eryaShelteringSouth ? "kneel" : time >= At("11c") ? "carry" : "kneel",
+      { elevation: !eryaShelteringSouth && time >= At("11c") ? 0.8 : 0 }));
 
     const medicDead = time >= At("10c", 0.35);
     const medic = beat.id === "10a" ? [102, 635] : [105, 640];
@@ -258,20 +346,22 @@ export function MergedActors(beat, time, player, progress, timeline) {
     }
   }
 
+  // 过板桥的老乡与散兵：严格沿官道中心线南行（0 穿掩体/篱笆）
   if (["08c", "08d"].includes(beat.id)) {
     for (let index = 0; index < 5; index++) {
-      const start = At("08c") + index * 3.5;
-      const p = SampleRoute([[106 + index, 435 - index * 2], [99, 459], [99, 471], [99, 476], [103, 486]], Clamp((time - start) / 24, 0, 1));
+      const start = At("08c") + index * 4.0;
+      const p = SampleRoute([[102.5, 434], [101, 452], [99, 466], [99, 476], [103.5, 486]], Clamp((time - start) / 22, 0, 1));
       actors.push(Actor(`ditchEvacuee${index}`, `过板桥的老乡与散兵 ${index + 1}`, index % 2 ? "friend" : "civilian", "person", p, "run"));
     }
   }
 
+  // 九四式轻装甲车：沿官道压至沟北沿扫射
   if (time >= At("08b", 0.5) && time < At("10a")) {
     const tank = Track([
-      ["08b", 0.5, 95, 420], ["08c", 0.35, 99, 464], ["08c", 0.75, 99, 466], ["09a", 1, 99, 464],
+      ["08b", 0.5, 102, 420], ["08c", 0.35, 100, 462], ["08c", 0.75, 99, 465], ["09a", 1, 99, 464],
     ], time, timeline);
     actors.push(Actor("tank3", "九四式 · 沟北受阻车", "enemy", "tank", tank, "stand",
-      { surface: "ground", heading: Math.PI, turret: Math.PI, status: "被防战车壕挡在沟北扫射" }));
+      { surface: "ground", heading: Math.PI, turret: Math.PI, status: "被防战车壕挡在沟北交叉扫射" }));
   }
 
   if (beat.stage === "13") {
@@ -310,24 +400,69 @@ export function MergedEffects(beat, time, progress, actors, timeline) {
   if (Number(beat.stage) < 8) return [];
   const effects = [];
   const Beat = (id) => timeline.find((entry) => entry.id === id);
-  if (["08c", "09d", "12b", "13b", "13c", "13d"].includes(beat.id)) {
-    const enemies = actors.filter((actor) => actor.side === "enemy" && actor.pose !== "dead" && actor.kind !== "tank");
-    for (const id of ["player", "liu", "luo", "he", "yao"]) {
-      const actor = actors.find((entry) => entry.id === id);
-      const target = enemies[0];
-      if (actor && target && (beat.cover || actor.firing || beat.id === "09d")) {
-        effects.push({ kind: "fire", a: actor.p, b: target.p, side: actor.side, sourceId: actor.id, targetId: target.id, phase: (time * 3 + id.length) % 1 });
-      }
+  const enemies = actors.filter((actor) => actor.side === "enemy" && actor.pose !== "dead" && actor.kind !== "tank");
+
+  // 严格按“最近可见战术扇区目标”生成我方火线，绝不隔着半个村子无视眼前敌人乱射远方
+  const EmitFriendlyFire = (ids, maxRange, filter = null) => {
+    for (const id of ids) {
+      const shooter = actors.find((entry) => entry.id === id);
+      if (!shooter || shooter.pose === "dead") continue;
+      const target = SelectNearestTarget(shooter, enemies, maxRange, filter);
+      if (!target) continue;
+      effects.push({
+        kind: "fire", a: shooter.p, b: target.p, side: shooter.side,
+        sourceId: shooter.id, targetId: target.id, heavy: shooter.heavy,
+        phase: (time * 3.1 + id.length) % 1,
+      });
     }
+  };
+
+  if (beat.id === "08c") {
+    // 沟口守军只打沟北（z < 475）正在压制和垫沟的日军，绝不隔着六排民房去打东头中街渗入的侧包组
+    EmitFriendlyFire(["player", "liu", "luo", "he", "yao"], 85, (e) => e.p[1] < 475);
+  } else if (beat.id === "08d" && progress >= 0.35) {
+    // 08d 后半拍：东翼侧包进老耿家的机枪沿主街朝大槐树石碾口扫射封路（24m 直视），班长三人压上主街正面交火
+    effects.push({ kind: "fire", a: [131.6, 573.1], b: [133.5, 549.5], side: "enemy", heavy: true, phase: (time * 5.2) % 1 });
+    if (progress >= 0.65) EmitFriendlyFire(["luo", "he", "yao"], 48, (e) => e.groupId === "MergedHouseGun" && e.p[0] < 145);
+  } else if (["09a", "09b", "09c"].includes(beat.id)) {
+    // 顺子与刘文财处于潜行禁火态绝不开火；只有班长三人在主街掩体后正面死咬老耿家封街机枪组！
+    EmitFriendlyFire(["luo", "he", "yao"], 38, (e) => e.groupId === "MergedHouseGun" && e.p[0] < 145);
+  } else if (beat.id === "09d") {
+    // 顺子与刘文财突入老耿家后院，严格优先打眼前最近的敌人（先灶屋守卫，后正房机枪组），最大 18m
+    EmitFriendlyFire(["player", "liu"], 18, (e) => e.p[0] >= 124 && e.p[0] <= 140 && e.p[1] >= 563 && e.p[1] <= 579);
+    if (progress < 0.65) {
+      EmitFriendlyFire(["luo", "he", "yao"], 34, (e) => e.groupId === "MergedHouseGun");
+    }
+  } else if (beat.id === "12b") {
+    EmitFriendlyFire(["player", "liu"], 78, (e) => e.groupId === "MergedRailAmbush");
+  } else if (["13b", "13c", "13d"].includes(beat.id)) {
+    EmitFriendlyFire(["player", "liu"], 115, (e) => e.p[0] < -55);
   }
+
+  // 九四式在沟北沿交叉扫射沟南战壕
   if (beat.id === "08c" || beat.id === "08d") {
     const tank = actors.find((actor) => actor.id === "tank3");
     if (tank) effects.push({ kind: "fire", a: tank.p, b: [108, 478], side: "enemy", heavy: true, phase: (time * 6) % 1 });
   }
-  // 08d 后半拍及 09a-09c：老耿家正房机枪朝村心大槐树与主街倾泻压制火力，纯视觉提示主街不可通行
-  if ((beat.id === "08d" && progress >= 0.4) || ["09a", "09b", "09c"].includes(beat.id)) {
-    effects.push({ kind: "fire", a: [131.6, 573.1], b: [134, 550], side: "enemy", heavy: true, phase: (time * 5.2) % 1 });
-  }
+
+  // 罗班长与何有田在主街投掷真实手榴弹：
+  // 09b +15s（连扔两雷调走西翼搜兵）、09c 末/09d 初（正面震撼老耿家窗口掩护顺子突入）
+  const EmitLuoGrenade = (beatId, localAt, targetPoint) => {
+    const b = Beat(beatId);
+    if (!b) return;
+    const age = time - (b.start + localAt);
+    if (age < 0 || age > 4.2) return;
+    const he = actors.find((a) => a.id === "he") || actors.find((a) => a.id === "luo");
+    if (!he) return;
+    if (age < 2.2) effects.push({ kind: "grenade", a: he.p, b: targetPoint, phase: age / 2.2, side: "friend" });
+    else effects.push({ kind: "blast", p: targetPoint, age: age - 2.2, side: "friend" });
+  };
+  EmitLuoGrenade("09b", 5.5, [132.5, 567.0]);
+  EmitLuoGrenade("09b", 7.8, [130.5, 569.0]);
+  EmitLuoGrenade("09d", 0.5, [131.6, 571.2]);
+  EmitLuoGrenade("09d", 13.5, [132.4, 571.5]);
+
+  // 10c 空袭三机低空俯冲扫射救护所
   if (beat.id === "10c") {
     const cycle = (time - Beat("10c").start) % 16;
     const target = [108, 642];

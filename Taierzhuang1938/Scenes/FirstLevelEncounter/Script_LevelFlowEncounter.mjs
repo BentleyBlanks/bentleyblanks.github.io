@@ -36,6 +36,12 @@ export function CreateEncounterDocument(timeline, waves, options = {}) {
       ...(wave.spacingMetres ? {spacingMetres:wave.spacingMetres} : {}),
       ...(wave.coverWaitSeconds !== undefined ? {coverWaitSeconds:wave.coverWaitSeconds} : {}),
       ...(wave.suppressedBy ? {suppressedBy:[...wave.suppressedBy],suppressionStop:[...wave.suppressionStop]} : {}),
+      ...(wave.weapon ? {weapon: wave.weapon} : {}),
+      ...(wave.firingArea ? {firingArea: structuredClone(wave.firingArea)} : {}),
+      ...(wave.engageOn ? {engageOn: wave.engageOn} : {}),
+      ...(wave.fireCycle ? {fireCycle: structuredClone(wave.fireCycle)} : {}),
+      ...(wave.afterRouteLookAt ? {afterRouteLookAt: [...wave.afterRouteLookAt]} : {}),
+      ...(wave.withdrawAlongRoute ? {withdrawAlongRoute: true} : {}),
       count: wave.count, interval: wave.interval, maxAlive: wave.maxAlive ?? (wave.cyclic ? 5 : wave.count),
       lifetime: wave.lifetime ?? (wave.cyclic ? 44 : Math.max(5,wave.lastFall - (wave.count-1)*wave.interval)), speed: wave.speed ?? 2.5, grenadeInterval: wave.grenadeInterval ?? 0,
       behavior: wave.behavior || (wave.transfer ? "withdraw" : wave.id.startsWith("Tank") ? "escort" : wave.cyclic ? "bounds" : "advance"),
@@ -523,8 +529,10 @@ export function SampleEncounters(plan,time,coreActors,sampleCore=()=>coreActors)
     const blockingGuards=suppression?actors.filter(guard=>guard.side==="friend" && guard.firing && suppression.includes(guard.groupId)):[];
     const coveringTarget=actor.side==="enemy" && actor.target==="player" && [...campGuards,...blockingGuards].reduce((nearest,guard)=>
       !nearest||Distance(actor.p,guard.p)<Distance(actor.p,nearest.p)?guard:nearest,null);
+    const preferPlayer=actor.side==="enemy" && actor.target==="player" && player && coveringTarget
+      && player.pose==="shoot" && Distance(actor.p,player.p)<16 && Distance(actor.p,player.p)<Distance(actor.p,coveringTarget.p);
     const target=actor.target==="enemy"?enemies.reduce((nearest,enemy)=>!nearest||Distance(actor.p,enemy.p)<Distance(actor.p,nearest.p)?enemy:nearest,null)
-      :actor.target==="ramp"?{p:[100,384]}:casualty||coveringTarget||(coreActors.find((item)=>item.id===actor.target)??player);
+      :actor.target==="ramp"?{p:[100,384]}:casualty||(preferPlayer?player:coveringTarget)||(coreActors.find((item)=>item.id===actor.target)??player);
     if(target&&Distance(actor.p,target.p)<180) effects.push({kind:"fire",a:actor.p,b:target.p,side:actor.side,sourceId:actor.id,targetId:target.id,groupId:actor.groupId,heavy:actor.heavy,phase:(time*2.3+actor.p[0])%1});
   }
   return {actors,effects,triggers:plan.triggers.map((trigger)=>({...trigger,active:trigger.firedAt!==null&&time>=trigger.firedAt})),

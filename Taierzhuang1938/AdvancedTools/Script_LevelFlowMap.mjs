@@ -72,26 +72,55 @@ function FrontPaperFields() {
   return fields;
 }
 
-// Organic multi-strip fields extending seamlessly south of z=206 for merged single-village maps
-// (replaces the crude dark-green Wheat_* rectangles with the same warm painterly Lunan patchwork as FrontPaperFields).
+// Non-overlapping Lunan agricultural parcel mosaic south of z=206 for FirstLevelMerged:
+// clean contiguous plots separated by narrow earthen field ridges (田埂), zero stacked overlapping blocks.
 function MergedPaperFields(maxZ = 910) {
-  let seed = 1938032;
+  let seed = 1938035;
   const Random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const fields = [], kinds = ["wheat", "wheat", "wheat", "plowed", "fallow"];
-  for (let z = 206; z < maxZ; z += 56 + Random() * 44) {
-    for (let x = -175; x < 335; x += 48 + Random() * 42) {
-      const width = 48 + Random() * 58, depth = 64 + Random() * 64;
-      const angle = 3 + (Random() - 0.5) * 20 + (Random() < 0.25 ? 90 : 0);
-      const whole = Random() < 0.2, strips = [];
-      for (let offset = -width / 2; offset < width / 2;) {
-        const stripWidth = whole ? width : 10 + Random() * 20;
-        strips.push({ from: offset, to: Math.min(width / 2, offset + stripWidth), kind: kinds[Math.floor(Random() * kinds.length)] });
-        offset += stripWidth;
+  const kinds = ["wheat", "wheat", "plowed", "wheat", "fallow", "plowed"];
+  const fields = [];
+  const AddParcelGrid = (zone, xBreaks, zBreaks, angleDeg = 0) => {
+    for (let zi = 0; zi < zBreaks.length - 1; zi++) {
+      const z0 = zBreaks[zi] + 0.55, z1 = zBreaks[zi + 1] - 0.55;
+      if (z1 - z0 < 6) continue;
+      for (let xi = 0; xi < xBreaks.length - 1; xi++) {
+        const x0 = xBreaks[xi] + 0.55, x1 = xBreaks[xi + 1] - 0.55;
+        if (x1 - x0 < 6) continue;
+        const w = x1 - x0, d = z1 - z0;
+        const strips = [];
+        // Subdivide each parcel cleanly into 2–4 furrow strips without overlapping neighbors
+        const stripCount = w > 52 ? 4 : w > 30 ? 3 : 2;
+        const baseKind = kinds[Math.floor(Random() * kinds.length)];
+        let cursor = -w / 2;
+        for (let s = 0; s < stripCount; s++) {
+          const isLast = s === stripCount - 1;
+          const sw = isLast ? (w / 2 - cursor) : (w / stripCount) * (0.78 + Random() * 0.44);
+          const to = isLast ? w / 2 : Math.min(w / 2 - 2, cursor + sw);
+          const kind = Random() < 0.65 ? baseKind : kinds[Math.floor(Random() * kinds.length)];
+          strips.push({ from: cursor, to, kind });
+          cursor = to;
+        }
+        fields.push({ zone, x: (x0 + x1) / 2, z: (z0 + z1) / 2, w, d, angleDeg, strips });
       }
-      fields.push({ zone: "MergedPaper", x: x + width / 2, z: z + depth / 2, w: width, d: depth, angleDeg: angle, strips });
     }
-  }
+  };
+  // Four clean agricultural tracts separated by the railway (x=-80), official road (x=100), village & river
+  AddParcelGrid("MergedWestRail", [-160, -124, -84], [206, 265, 330, 405, 480, 560, 645, 742], 0);
+  AddParcelGrid("MergedWestPlain", [-74, -34, 8, 52], [206, 262, 326, 392, 462, 534, 608, 682], 0);
+  AddParcelGrid("MergedNorthApproach", [52, 95, 146, 206, 264, 320], [206, 268, 338, 408, 466], 0);
+  AddParcelGrid("MergedEastPlain", [224, 272, 320], [466, 536, 612, 690], 0);
+  AddParcelGrid("MergedSouthBank", [-160, -110, -56, 8, 76, 152, 232, 320], [798, 855, Math.max(890, maxZ)], 0);
   return fields;
+}
+
+function MergedFieldZones(maxZ = 910) {
+  return [
+    { id: "MergedWestRail", poly: [[-160, 206], [-83, 206], [-83, 744], [-160, 756]] },
+    { id: "MergedWestPlain", poly: [[-75, 206], [54, 206], [54, 678], [-44, 678], [-44, 718], [-75, 725]] },
+    { id: "MergedNorthApproach", poly: [[52, 206], [320, 206], [320, 468], [220, 468], [150, 466], [52, 468]] },
+    { id: "MergedEastPlain", poly: [[222, 468], [320, 468], [320, 690], [250, 680], [222, 622]] },
+    { id: "MergedSouthBank", poly: [[-160, 796], [320, 796], [320, maxZ], [-160, maxZ]] },
+  ];
 }
 
 export function BuildEncounterMap(scene, options = {}) {
@@ -193,11 +222,22 @@ export function BuildEncounterMap(scene, options = {}) {
       { id: "FrontPaper", poly: [[-160, -12], [330, -12], [330, 206], [-160, 206]] },
       ...(hasGengjiazhuang
         ? village.L0610_FIELD_ZONES
-        : [{ id: "MergedPaper", poly: [[-160, 206], [320, 206], [320, mapMaxZ], [-160, mapMaxZ]] }]),
+        : MergedFieldZones(mapMaxZ)),
     ],
     footpaths: [
       ...front.L0105_FIELD_LANES,
-      ...(hasGengjiazhuang ? village.L0610_FOOTPATHS.map((path) => path.line) : []),
+      ...(hasGengjiazhuang
+        ? village.L0610_FOOTPATHS.map((path) => path.line)
+        : [
+            [[-74, 462], [-20, 462], [38, 468], [56, 516]],
+            [[-74, 534], [-10, 534], [54, 534]],
+            [[-74, 608], [8, 608], [62, 610]],
+            [[8, 326], [8, 462], [8, 608], [8, 678]],
+            [[146, 338], [146, 466]],
+            [[206, 338], [222, 468], [224, 572], [272, 572], [318, 572]],
+            [[224, 536], [272, 536], [318, 536]],
+            [[272, 466], [272, 682]],
+          ]),
     ].map((line) => line.map(Point)),
     river: hasGengjiazhuang ? village.L0610_RIVER.line.map(Point) : [],
     groves: hasGengjiazhuang ? village.L0610_GROVES : [],

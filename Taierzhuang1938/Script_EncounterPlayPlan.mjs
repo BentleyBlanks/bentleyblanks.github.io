@@ -164,7 +164,7 @@ export class EncounterPlayPlan {
       if (this.elapsed - state.lastSpawn < group.interval) continue;
       const index = state.count, path = GroupPath(group, index);
       const lateGarrison = this.beatIndex === this.startIndex
-        && ["suppress", "guard"].includes(group.behavior)
+        && ["suppress", "guard", "flank"].includes(group.behavior)
         && (this.gate.clear || []).includes(group.id)
         && this.beatOrder.get(group.beat) < this.startIndex
         && path.length > 1;

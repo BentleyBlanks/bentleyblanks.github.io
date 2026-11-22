@@ -92,7 +92,7 @@ assert.notEqual(ENCOUNTER_VARIANTS[0].storageKey, ENCOUNTER_VARIANTS[1].storageK
 const original = CompileEncounterVariant("L1_Original");
 const merged = CompileEncounterVariant("L1_BeishaheMerged");
 assert.equal(original.duration, 3249, "基线双村版全程保持 54:09 不变");
-assert.equal(merged.duration, 1985, "单村合并单向动线版全程压缩至 33:05（1985s）");
+assert.equal(merged.duration, 1922, "单村合并单向动线版全程压缩至 32:02（1922s）");
 
 // 2. 01–07 共用段编排 100% 零分叉一致
 const frontBeats = original.timeline.filter((b) => Number(b.stage) <= 7);
@@ -170,10 +170,31 @@ assert.ok(resolved.doc.objects.some((o) => o.id === "MA3_SideGate_Door" && o.hid
 for (const landmarkId of ["Merged_House_TempleHall_Roof", "Merged_RoadShrineRoof", "Merged_WatchTower", "Merged_BigLocust", "Merged_MillStone"]) {
   assert.ok(resolved.doc.objects.some((o) => o.id === landmarkId), `合成场景包含鲁南特色建筑地标 ${landmarkId}`);
 }
+// 验证村落建筑多样性改造与鲁南田野乡土景物、底色提亮与无重叠麦田地块
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_ThatchCrown")), "村落包含草顶土坯农舍差异化屋顶");
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_Ridge") || o.id.endsWith("_HighRidge")), "村落包含双坡灰瓦高脊院落");
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_Chimney")), "村落包含砖砌灶台烟囱");
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_Rick_")), "外围田野包含麦秸垛");
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_Mound_")), "外围田野包含鲁南田间坟头与孤树");
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_FieldTree_")), "外围田野包含沿田埂水沟的榆柳树排");
+const villagePaint = resolved.doc.paint.find((p) => p.id === "Village");
+assert.equal(villagePaint?.color, "#c6b99c", "村庄地基色提亮为鲁南夯实黄土，避免巷道与打麦场周围像黑色阴影");
 assert.ok(!resolved.doc.paint.some((p) => /^Wheat_/.test(p.id || "") && p.z >= 355), "合并村外围不再残留突兀绿方块麦田矩形");
 
 const mergedMap = BuildEncounterMap(resolved.doc, { sceneId: "FirstLevelMerged", variantSpec: GetEncounterVariantSpec("L1_BeishaheMerged") });
 assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 910]);
+const mergedOnlyFields = mergedMap.fields.filter((f) => f.zone.startsWith("Merged"));
+assert.ok(mergedOnlyFields.length >= 40, "合并村外围具备完整无重叠农田地块网格");
+for (let i = 0; i < mergedOnlyFields.length; i++) {
+  const a = mergedOnlyFields[i];
+  assert.equal(a.angleDeg, 0, "合并村农田地块不再旋转堆叠");
+  for (let j = i + 1; j < mergedOnlyFields.length; j++) {
+    const b = mergedOnlyFields[j];
+    const overlapX = Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.1;
+    const overlapZ = Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.1;
+    assert.ok(!(overlapX && overlapZ), `农田地块 (${i},${j}) 严禁互相重叠堆叠`);
+  }
+}
 for (const expectedLabel of ["防炮洞", "小土地庙", "土炮楼", "关帝庙（兼村塾）", "大槐树", "石碾", "老耿家（中街西头）", "夹壁便门"]) {
   assert.ok(mergedMap.labels.some((l) => l.name === expectedLabel), `合并版底图包含地标：${expectedLabel}`);
 }
@@ -210,23 +231,28 @@ assert.equal(fakeStore.get(original.spec.storageKey), undefined, "修改合并�
 assert.equal(docOrig.value.groups[0].count, original.defaultDocument.groups[0].count);
 
 // 6. 单村合并版 08–13 单向动线、完整敌军渗入路径与全链路 Play 过关验证
-const f08d = merged.evaluate(merged.BeatById("08d").start + 25);
+const f08d = merged.evaluate(merged.BeatById("08d").start + 28);
 assert.ok(f08d.dialogue.some((d) => d.actorId === "liu" && d.text.includes("关帝庙")), "08d 顺视线转向关帝庙绕后");
-const f09b = merged.evaluate(merged.BeatById("09b").start + 32);
+const f09b = merged.evaluate(merged.BeatById("09b").start + 26);
 assert.ok(f09b.stealth.noFire, "09b 处于关帝庙西巷禁火潜行态");
 assert.ok(f09b.dialogue.some((d) => d.actorId === "player" && d.text.includes("老子是救你")), "09b 包含妮儿咬手误解冲突");
 const f10b = merged.evaluate(merged.BeatById("10b").start + 10);
-assert.ok(f10b.dialogue.some((d) => d.actorId === "batman" && d.text.includes("营长的东西")), "10b 包含营部勤务兵抢车位冲突");
+assert.ok(f10b.dialogue.some((d) => d.actorId === "batman" && d.text.includes("营长的箱子")), "10b 包含营部勤务兵抢车位冲突");
 const f10c = merged.evaluate(merged.BeatById("10c").start + 18);
 assert.ok(f10c.signals.includes("RaidAftermath") && f10c.signals.includes("AidCartBurned"), "10c 处于空袭单向突围信号态");
 const f13d = merged.evaluate(merged.BeatById("13d").start + 15);
 assert.ok(f13d.signals.includes("BridgeBlown"), "13d 后半拍触发炸毁铁路桥高潮信号");
 
-// 验证老耿家日军拥有完整东路渗入路径（非凭空冒出），且直跳 09d Play 时自动落位屋中
+// 验证老耿家日军真实沿东翼侧包行进到位（behavior=flank 且 08c 末进入老耿家），且直跳 09d Play 时自动落位屋中
 const houseGun = merged.defaultDocument.groups.find((g) => g.id === "MergedHouseGun");
 const kitchenGuard = merged.defaultDocument.groups.find((g) => g.id === "MergedKitchenGuard");
+assert.equal(houseGun.behavior, "flank", "老耿家封街机枪组以专业侧包行为沿中街东段实际行进");
+assert.equal(kitchenGuard.behavior, "flank", "老耿家灶屋警戒兵随东翼侧包实际行进");
 assert.ok(houseGun.route.length >= 6 && houseGun.route[0][0] > 200, "老耿家封街机枪组具备村东沿中街完整渗入路径");
 assert.ok(kitchenGuard.route.length >= 6 && kitchenGuard.route[0][0] > 200, "老耿家灶屋守卫具备村东沿中街完整渗入路径");
+const f08cEnd = merged.evaluate(merged.BeatById("08c").end - 1);
+assert.ok(f08cEnd.actors.some((a) => a.groupId === "MergedHouseGun" && a.p[0] < 135 && a.p[1] > 570), "东翼侧包机枪组在 08c 末实际渗入老耿家正房");
+assert.ok(f08cEnd.actors.some((a) => a.groupId === "MergedKitchenGuard" && a.p[0] < 130 && a.p[1] > 565), "东翼侧包灶屋警戒兵在 08c 末实际渗入西厢灶屋");
 const latePlan09d = new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("09d").start, merged);
 latePlan09d.Step(0.2, latePlan09d.beat.p[0], new Set());
 const lateSpawns09d = latePlan09d.Spawns(new Set());
@@ -315,4 +341,50 @@ for (const group of mergedEnemyGroups) {
   );
 }
 
-console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates & enemy occlusion");
+// 8. 全员 0 穿墙、潜行/平民零照面穿帮、合理近距交火线回归审计（按 1s 步进扫完整个 08a–13e）
+const solidWalls = solidObjects.filter((o) => o.size[1] >= 0.45 && o.meta?.obstacle !== "barbedWire");
+const prevActorMap = new Map();
+for (let t = merged.BeatById("08a").start; t < merged.duration; t += 1.0) {
+  const fr = merged.evaluate(t);
+  const sigs = fr.signals || [];
+  const livingEnemies = fr.actors.filter((a) => a.side === "enemy" && a.pose !== "dead" && a.kind !== "tank");
+  for (const actor of fr.actors) {
+    if (actor.pose === "dead" || actor.kind === "quilt") continue;
+    const prev = prevActorMap.get(actor.id);
+    if (prev && prev.stage === fr.beat.stage) {
+      const stepDist = Math.hypot(actor.p[0] - prev.p[0], actor.p[1] - prev.p[1]);
+      if (stepDist >= 0.05 && stepDist <= 15) {
+        const pA = [prev.p[0], (prev.sy ?? groundAt(prev.p[0], prev.p[1])) + 1.0, prev.p[1]];
+        const pB = [actor.p[0], (actor.surfaceY ?? groundAt(actor.p[0], actor.p[1])) + 1.0, actor.p[1]];
+        for (const wall of solidWalls) {
+          if (wall.hideOn && sigs.includes(wall.hideOn)) continue;
+          assert.ok(!RayHitsOrientedBox(pA, pB, wall, groundAt), `角色 ${actor.id} 在 ${fr.beat.id} 穿墙：${wall.id}`);
+        }
+      }
+    }
+    prevActorMap.set(actor.id, { p: actor.p, sy: actor.surfaceY, stage: fr.beat.stage });
+  }
+  if (["09a", "09b", "09c"].includes(fr.beat.id)) {
+    for (const id of ["player", "liu", "nier"]) {
+      const friendly = fr.actors.find((a) => a.id === id);
+      if (!friendly) continue;
+      for (const enemy of livingEnemies) {
+        const d = Math.hypot(friendly.p[0] - enemy.p[0], friendly.p[1] - enemy.p[1]);
+        if (d > 42) continue;
+        const occ = SegmentOccluded(friendly.p, enemy.p, groundAt, solidWalls.filter((w) => !(w.hideOn && sigs.includes(w.hideOn))));
+        assert.ok(occ.occluded, `潜行拍 ${fr.beat.id} 中 ${id} 与 ${enemy.groupId} 无遮挡照面 (dist=${d.toFixed(1)}m)`);
+      }
+    }
+  }
+  for (const eff of fr.effects) {
+    if (eff.kind !== "fire") continue;
+    const dist = Math.hypot(eff.a[0] - eff.b[0], eff.a[1] - eff.b[1]);
+    const cap = fr.beat.id.startsWith("13") ? 125 : 95;
+    assert.ok(dist <= cap, `异常超距跨村火线 ${fr.beat.id}: ${eff.sourceId} -> ${eff.targetId} (${dist.toFixed(1)}m)`);
+    if (eff.groupId === "MergedHouseGun") {
+      assert.ok(eff.a[0] <= 140, `老耿家封街机枪组未到位前不得隔村乱射 (${eff.a})`);
+    }
+  }
+}
+
+console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates, enemy occlusion & full zero-clip/zero-LOS/fire-line audit");

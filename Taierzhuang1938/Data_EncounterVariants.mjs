@@ -81,7 +81,7 @@ export const ENCOUNTER_VARIANTS = Object.freeze([
     legacyStorageKey: null,
     mapMaxZ: 910,
     playRegionMaxZ: 910,
-    duskBlendZ: Object.freeze([355, 450]),
+    duskBlendZ: Object.freeze([635, 745]),
     stampPaths: Object.freeze([
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",
