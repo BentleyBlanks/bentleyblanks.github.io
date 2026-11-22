@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  NPC_3C, WrapAngle,
+  NPC_3C, XBOT_UPPER_BODY_TURN_MASK_BONES, WrapAngle,
   ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
 import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET } from "./Data_BlockoutXBotClips.mjs";
@@ -151,6 +151,27 @@ Check("Turn-in-Place：死区内双脚不动、上身补偿精确抵消；超死
   assert.ok(Math.abs(out.visualYawOffset) > 30 * DEG);
   for (let i = 0; i < 40; i++) out = tip.Update(dt, { yaw, mps: 2.0, stance: "stand", aimWeight: 1 });
   assert.ok(Math.abs(out.visualYawOffset) < 1 * DEG, "moving decays visualYawOffset to 0");
+
+  // 真实 TurnYawCurve 同拍收敛 + 上半身分层遮罩骨单测
+  const tipCurve = new TurnInPlaceController();
+  tipCurve.Update(dt, { yaw: 0, mps: 0, stance: "stand", aimWeight: 1 });
+  // 一次性转右 60° 触发 standAimRight90，用前重曲线 u^0.5 验证中点消耗 ~71% 而非对称 50%
+  const frontLoaded = (_, u) => Math.sqrt(u);
+  let cOut = tipCurve.Update(dt, { yaw: -60 * DEG, mps: 0, stance: "stand", aimWeight: 1, sampleTurnFrac: frontLoaded });
+  assert.equal(cOut.turning, true);
+  assert.equal(cOut.turnClipKey, "standAimRight90");
+  // 推到进度 ~0.5
+  let midSnap = null;
+  for (let i = 0; i < 60; i++) {
+    cOut = tipCurve.Update(dt, { yaw: -60 * DEG, mps: 0, stance: "stand", aimWeight: 1, sampleTurnFrac: frontLoaded });
+    if (!midSnap && cOut.turnProgress >= 0.48) midSnap = cOut;
+  }
+  assert.ok(midSnap && Math.abs(midSnap.visualYawOffset) < 22 * DEG, `front-loaded curve consumes ~70% by mid-turn (rem=${(midSnap?.visualYawOffset / DEG)?.toFixed(1)}°)`);
+  assert.equal(cOut.turning, false, "curve-driven turn finishes cleanly");
+  assert.ok(Math.abs(cOut.visualYawOffset) < 0.5 * DEG);
+
+  assert.ok(XBOT_UPPER_BODY_TURN_MASK_BONES.includes("Spine2") && XBOT_UPPER_BODY_TURN_MASK_BONES.includes("RightHand"));
+  assert.ok(!XBOT_UPPER_BODY_TURN_MASK_BONES.includes("Hips") && !XBOT_UPPER_BODY_TURN_MASK_BONES.includes("LeftUpLeg"));
 });
 
 // 4. Mesh-Space Spine Aim Offset & Additive Fire

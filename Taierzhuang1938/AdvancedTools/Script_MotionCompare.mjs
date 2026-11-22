@@ -21,7 +21,7 @@ import { ClipForCharacter } from "../Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom } from "../Script_HairGroom.mjs";
 import { XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET } from "../Data_BlockoutXBotClips.mjs";
 import {
-  NPC_3C, WrapAngle, Clamp, Smooth01,
+  NPC_3C, XBOT_UPPER_BODY_TURN_MASK_BONES, WrapAngle, Clamp, Smooth01,
   ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution,
   EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "../Script_NpcLocomotion3C.mjs";
@@ -116,8 +116,8 @@ const SCENARIOS = [
     tag: "Turn-in-Place",
     hint: "目标先在 ±35° 死区内微移，再大角度甩到 ±88° 观察迈步衔接",
     defaultCam: "front34",
-    captionTitle: "±44° 死区双脚锁死 · 超阈值迈步换脚转身",
-    captionDesc: "左（旧）：目标微动即整个人像电动转盘原地蹭脚自转。右（新）：±44° 内双脚纹丝不动仅转上身；超 44° 触发 Turn90 迈步转身并剥离 Hips 偏航收敛。",
+    captionTitle: "±44° 死区双脚锁死 · 分层锁枪迈步转身（不垂枪）",
+    captionDesc: "左（旧）：目标微动即整个人像电动转盘原地蹭脚自转。右（新）：±44° 内双脚纹丝不动仅转上身；超 44° 后下半身播 Turn90 迈步并按真实偏航曲线同拍收敛，上半身分层锁死在抵肩瞄准姿，全程绝不放低步枪。",
     checklist: "观察要点：切 0.5x 慢放盯住靴底与地面砖缝——左侧全程原地打滑，右侧死区内钉死、过 44° 后清晰迈步把下盘带正。",
   },
   {
@@ -348,6 +348,7 @@ class CompareAssetBank {
     this.charClips = new Map();
     this.additiveFireCache = new Map();
     this.turnYawCache = new Map();
+    this.upperPoseCache = new Map();
     this.charSources = new Map();
     this.groomCache = new Map();
     this.hairAtlas = null;
@@ -612,6 +613,44 @@ class CompareAssetBank {
     const curve = { duration: clip.duration || 1, times: track.times, values };
     this.turnYawCache.set(file, curve);
     return curve;
+  }
+
+  SampleTurnCurveFrac(file, u) {
+    const curve = file ? this.TurnYawCurve(file) : null;
+    if (!curve || !curve.values.length) return null;
+    const total = curve.values[curve.values.length - 1];
+    if (Math.abs(total) < 0.05) return null;
+    return Clamp(SampleScalarCurve(curve, Clamp(u, 0, 1) * curve.duration) / total, 0, 1);
+  }
+
+  IdleUpperPose(file) {
+    if (this.upperPoseCache.has(file)) return this.upperPoseCache.get(file);
+    const clip = this.rawClips.get(file);
+    if (!clip || !this.xbotSource) return null;
+    const model = CloneSkinned(this.xbotSource);
+    const mixer = new THREE.AnimationMixer(model);
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    action.play();
+    action.time = 0;
+    mixer.update(0);
+    model.updateMatrixWorld(true);
+    const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
+    const sp = model.getObjectByName("Spine"), sp1 = model.getObjectByName("Spine1");
+    let spineModelQ = null, spine1ModelQ = null;
+    if (sp) { sp.matrixWorld.decompose(wp, wq, ws); spineModelQ = wq.clone().normalize(); }
+    if (sp1) { sp1.matrixWorld.decompose(wp, wq, ws); spine1ModelQ = wq.clone().normalize(); }
+    const localQ = new Map();
+    for (const name of XBOT_UPPER_BODY_TURN_MASK_BONES) {
+      const b = model.getObjectByName(name);
+      if (b) localQ.set(name, b.quaternion.clone().normalize());
+    }
+    mixer.stopAllAction();
+    mixer.uncacheRoot(model);
+    const entry = { spineModelQ, spine1ModelQ, localQ };
+    this.upperPoseCache.set(file, entry);
+    return entry;
   }
 
   async LoadCharacterSource(key) {
@@ -991,6 +1030,7 @@ class CharacterCompareUnit {
     this.locoPrimary = loco.moving ? loco.primary : null;
     const tip = this.tip.Update(dt, {
       yaw, mps, stance, aimWeight: 1, rifleInHands: true, active: true, teleported: false,
+      sampleTurnFrac: (clipKey, u) => this.bank.SampleTurnCurveFrac(XBOT_TURN_IN_PLACE[clipKey]?.file, u),
     });
     this.pelvisWarp = Approach(this.pelvisWarp, loco.pelvisWarpRad, dt, 0.11);
     const lowerYawOff = WrapAngle(tip.visualYawOffset + this.pelvisWarp);
@@ -1006,8 +1046,8 @@ class CharacterCompareUnit {
       const clip = this.bank.GetClipFor(this.charKey, turnFile);
       const turnTime = tip.turnProgress * (clip?.duration || 0.7);
       key = "tip:" + turnFile;
-      label = tip.turnDir > 0 ? "原地左迈步转身" : "原地右迈步转身";
-      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.14);
+      label = tip.turnDir > 0 ? "原地左迈步转身（锁枪）" : "原地右迈步转身（锁枪）";
+      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.12);
       this.pickKey = key;
       this._PlaySingleClip(turnFile, dt, 1, false, turnTime);
       const hips = this.H("Hips");
@@ -1019,6 +1059,9 @@ class CharacterCompareUnit {
           RotateBoneWorld(hips, _yawQ.setFromAxisAngle(_up, -yawDelta));
         }
       }
+      // 分层遮罩（Mesh-Space Layered Blend）：下盘迈步转身，上半身全程锁在抵肩瞄准姿绝不垂枪
+      const idleFile = stance === "crouch" ? XBOT_NATIVE.crouchIdleRifleAim.file : XBOT_NATIVE.standIdleRifleAim.file;
+      this._ApplyTurnUpperBodyMask(idleFile, 1.0);
     } else if (loco.moving) {
       const groupKey = stance === "crouch"
         ? "crouchWalkRifleAim"
@@ -1043,7 +1086,7 @@ class CharacterCompareUnit {
       const file = stance === "crouch" ? XBOT_NATIVE.crouchIdleRifleAim.file : XBOT_NATIVE.standIdleRifleAim.file;
       key = "idle:" + file;
       label = Math.abs(tip.visualYawOffset) > 0.03 ? "死区锁脚 + 腰肩瞄准" : "持枪瞄准待机";
-      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.20);
+      if (this.preOverlayValid && key !== this.pickKey) this._BeginBlend(0.16);
       this.pickKey = key;
       this._PlaySingleClip(file, dt, 1, true, null);
     }
@@ -1245,6 +1288,50 @@ class CharacterCompareUnit {
     }
     hips.position.lerpVectors(b.hips, _p.copy(hips.position), e);
     if (k >= 1) this.blend = null;
+  }
+
+  _ApplyTurnUpperBodyMask(idleFile, maskW) {
+    if (maskW <= 1e-3) return;
+    const pose = this.bank.IdleUpperPose(idleFile);
+    if (!pose) return;
+    this.container.updateMatrixWorld(true);
+    this.model.matrixWorld.decompose(_p, _aoModelQ, _s);
+    _aoModelQ.normalize();
+
+    const spine = this.H("Spine");
+    if (spine && pose.spineModelQ) {
+      _aimQ.copy(_aoModelQ).multiply(pose.spineModelQ).normalize();
+      _aimQ2.copy(FreshQuaternion(spine));
+      if (_aimQ2.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+      _aimQ2.slerp(_aimQ, 0.78 * maskW).normalize();
+      SetBoneWorldQuaternion(spine, _aimQ2);
+    }
+
+    const spine1 = this.H("Spine1");
+    if (spine1 && pose.spine1ModelQ) {
+      _aimQ.copy(_aoModelQ).multiply(pose.spine1ModelQ).normalize();
+      if (maskW >= 0.999) {
+        SetBoneWorldQuaternion(spine1, _aimQ);
+      } else {
+        _aimQ2.copy(FreshQuaternion(spine1));
+        if (_aimQ2.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+        _aimQ2.slerp(_aimQ, maskW).normalize();
+        SetBoneWorldQuaternion(spine1, _aimQ2);
+      }
+    }
+
+    for (const [name, qTarget] of pose.localQ) {
+      const bone = this.H(name);
+      if (!bone) continue;
+      if (maskW >= 0.999) {
+        bone.quaternion.copy(qTarget);
+      } else {
+        _aimQ.copy(qTarget);
+        if (bone.quaternion.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+        bone.quaternion.slerp(_aimQ, maskW).normalize();
+      }
+    }
+    this.container.updateMatrixWorld(true);
   }
 
   _ApplyBaked9AimOffset(yawRad, pitchRad, stance, activeW) {

@@ -33,12 +33,32 @@ export const NPC_3C = Object.freeze({
   turnDeadzoneCrouchDeg: 48,
   turnMaxLagDeg: 82,
   turnReturnRate: 10,
-  turnMinDurationS: 0.48,
-  turnMaxDurationS: 0.78,
+  turnMinDurationS: 0.58,
+  turnMaxDurationS: 0.84,
   fireDurationS: 0.28,
   fireKickPitchDeg: 4.8,
   fireKickRollDeg: 1.4,
 });
+
+/**
+ * 原地转身（Turn-in-Place）上半身分层遮罩骨骼清单（Spine1 以下由 Mesh-Space 衔接，Spine2 以上锁定在据枪待机姿态）：
+ * 保证据枪转身时枪口全程抵肩锁靶、绝不垂枪到腰间再重新抬起，同时让 Hips + 双腿自然迈步、Spine 柔顺吸收 22% 重心切换。
+ */
+export const XBOT_UPPER_BODY_TURN_MASK_BONES = Object.freeze([
+  "Spine2", "Neck", "Head",
+  "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+  "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+  "LeftHandThumb1", "LeftHandThumb2", "LeftHandThumb3",
+  "LeftHandIndex1", "LeftHandIndex2", "LeftHandIndex3",
+  "LeftHandMiddle1", "LeftHandMiddle2", "LeftHandMiddle3",
+  "LeftHandRing1", "LeftHandRing2", "LeftHandRing3",
+  "LeftHandPinky1", "LeftHandPinky2", "LeftHandPinky3",
+  "RightHandThumb1", "RightHandThumb2", "RightHandThumb3",
+  "RightHandIndex1", "RightHandIndex2", "RightHandIndex3",
+  "RightHandMiddle1", "RightHandMiddle2", "RightHandMiddle3",
+  "RightHandRing1", "RightHandRing2", "RightHandRing3",
+  "RightHandPinky1", "RightHandPinky2", "RightHandPinky3",
+]);
 
 const CARDINAL_ANGLES = Object.freeze({
   forward: 0,
@@ -310,7 +330,7 @@ export class TurnInPlaceController {
 
   Update(dt, {
     yaw = 0, mps = 0, stance = "stand", aimWeight = 0, rifleInHands = true,
-    active = true, teleported = false,
+    active = true, teleported = false, sampleTurnFrac = null,
   } = {}) {
     if (!active || teleported || stance === "prone" || !Number.isFinite(yaw)) {
       this.Reset(Number.isFinite(yaw) ? yaw : 0);
@@ -335,12 +355,18 @@ export class TurnInPlaceController {
     // 静止中：逻辑朝向变化先由 visualYawOffset 反向吃掉，脚在世界里保持原地不动
     this.visualYawOffset = WrapAngle(this.visualYawOffset - dYaw);
 
-    // 若正在播原地转身片段：按剩余 S 曲线比例动态消化当前全部 visualYawOffset（转身途中目标继续小幅偏移时，迈步顺势一步到位）
+    // 若正在播原地转身片段：优先按片段真实 TurnYawCurve 进度同步消化 visualYawOffset（缺曲线时退回 Smooth01），
+    // 让下盘旋转角速度与真实抬脚落脚节奏严格同拍，消除支撑脚反扭与衔接顿挫
     if (this.activeTurn) {
       const turn = this.activeTurn;
       turn.elapsed += stepDt;
       const u = Clamp(turn.elapsed / turn.duration, 0, 1);
-      const e = Smooth01(u);
+      const sampled = typeof sampleTurnFrac === "function" && turn.clipKey
+        ? sampleTurnFrac(turn.clipKey, u)
+        : null;
+      const e = Number.isFinite(sampled)
+        ? Clamp(sampled, turn.prevE, 1)
+        : Smooth01(u);
       const remainE = Math.max(1 - turn.prevE, 1e-4);
       const frac = u >= 1 ? 1 : Clamp((e - turn.prevE) / remainE, 0, 1);
       turn.prevE = e;

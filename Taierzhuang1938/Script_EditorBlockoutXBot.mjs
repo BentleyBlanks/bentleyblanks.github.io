@@ -29,7 +29,7 @@ import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 import {
-  NPC_3C, WrapAngle, Clamp, Smooth01,
+  NPC_3C, XBOT_UPPER_BODY_TURN_MASK_BONES, WrapAngle, Clamp, Smooth01,
   ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
 } from "./Script_NpcLocomotion3C.mjs";
 
@@ -376,6 +376,7 @@ export class XBotSkins {
     this.rifleTracks = new Map(); // file → PrepareRifleTrack 的结果（X Bot 模型空间、缩放 1）| null
     this.additiveFireCache = new Map(); // file → { duration, tracks: [{ boneName, times, deltas }] }
     this.turnYawCache = new Map();      // file → { duration, times, values }（Hips 相对第 0 帧的水平偏航增量）
+    this.upperPoseCache = new Map();    // file → { spineModelQ, spine1ModelQ, localQ }（原地转身据枪上半身分层遮罩姿态）
     this.aimOffsetGrid = null;          // 9 帧端枪 Aim Offset 网格（meshDelta + localDelta）
     this.loading = null;
   }
@@ -742,6 +743,49 @@ export class XBotSkins {
     return curve;
   }
 
+  /** 返回原地转身片段在归一化进度 u ∈ [0,1] 处已完成的总偏航比例，用于驱动下盘与真实迈步同拍收敛。 */
+  SampleTurnCurveFrac(file, u) {
+    const curve = file ? this.TurnYawCurve(file) : null;
+    if (!curve || !curve.values.length) return null;
+    const total = curve.values[curve.values.length - 1];
+    if (Math.abs(total) < 0.05) return null;
+    return Clamp(SampleScalarCurve(curve, Clamp(u, 0, 1) * curve.duration) / total, 0, 1);
+  }
+
+  /**
+   * 采样待机据枪片段（如 RifleAimingIdle_V1）第 0 帧的上半身姿态（Spine/Spine1 模型空间 + Spine2 以上本地空间），
+   * 供原地转身（Turn-in-Place）做 Layered Blend per Bone：下半身用 Turn90 迈步、上半身全程保持抵肩锁靶绝不垂枪。
+   */
+  IdleUpperPose(file) {
+    if (this.upperPoseCache.has(file)) return this.upperPoseCache.get(file);
+    const clip = this.loaded.get(file);
+    if (!clip || !this.source) { if (file) this.Clip(file); return null; }
+    const model = CloneSkinned(this.source);
+    const mixer = new THREE.AnimationMixer(model);
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    action.play();
+    action.time = 0;
+    mixer.update(0);
+    model.updateMatrixWorld(true);
+    const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
+    const sp = model.getObjectByName("Spine"), sp1 = model.getObjectByName("Spine1");
+    let spineModelQ = null, spine1ModelQ = null;
+    if (sp) { sp.matrixWorld.decompose(wp, wq, ws); spineModelQ = wq.clone().normalize(); }
+    if (sp1) { sp1.matrixWorld.decompose(wp, wq, ws); spine1ModelQ = wq.clone().normalize(); }
+    const localQ = new Map();
+    for (const name of XBOT_UPPER_BODY_TURN_MASK_BONES) {
+      const b = model.getObjectByName(name);
+      if (b) localQ.set(name, b.quaternion.clone().normalize());
+    }
+    mixer.stopAllAction();
+    mixer.uncacheRoot(model);
+    const entry = { spineModelQ, spine1ModelQ, localQ };
+    this.upperPoseCache.set(file, entry);
+    return entry;
+  }
+
   /** 同一种配色的人共用材质（都是同一套蒙皮，不会来回换着色器）。 */
   Material(look, part) {
     const key = `${look.key}:${part}`;
@@ -959,6 +1003,7 @@ export class XBotSkin {
       tip3c = this.tip.Update(dt, {
         yaw: intent.yaw, mps: intent.mps || 0, stance, aimWeight, rifleInHands: rifle,
         active: true, teleported,
+        sampleTurnFrac: (clipKey, u) => this.skins.SampleTurnCurveFrac(XBOT_TURN_IN_PLACE[clipKey]?.file, u),
       });
       this.pelvisWarp = teleported ? 0 : Approach(this.pelvisWarp, loco3c.pelvisWarpRad, dt, 0.11);
       lowerYawOff = WrapAngle(tip3c.visualYawOffset + this.pelvisWarp);
@@ -1011,9 +1056,14 @@ export class XBotSkin {
     else if (pick.mode === "blend2d") this._PlayBlendSpace(pick, intent, dt);
     else if (pick.mode === "mirror" || !pick.file) this._Mirror(dt);
     else this._Play(pick, intent, dt);
-    // Turn-in-Place Root Yaw Extraction：剔除片段自带的 Hips 转向，由下盘控制器统一驱动
+    // Turn-in-Place Root Yaw Extraction：剔除片段自带的 Hips 转向，由下盘控制器统一驱动；
+    // 据枪瞄准态同步叠加上半身分层遮罩（Mesh-Space Layered Blend），只取 Turn90 的迈步、上半身全程保持抵肩锁靶不垂枪
     if (pick.turnInPlace && this.current && !this.current.mirror && this.current.lastT !== null) {
       this._CancelTurnHipsYaw(pick.file, this.current.lastT);
+      if (rifle && aimWeight >= 0.2 && stance !== "prone") {
+        const idleFile = stance === "crouch" ? XBOT_NATIVE.crouchIdleRifleAim.file : XBOT_NATIVE.standIdleRifleAim.file;
+        this._ApplyTurnUpperBodyMask(idleFile, Smooth01((aimWeight - 0.15) / 0.4));
+      }
     }
     // 换了动作（或同一条动作跳了时间）：从上一帧看到的姿势淡过去
     // 按这一帧实际摆出来的算（动作还没读到时照原身体换算，读到那一帧也是换动作）
@@ -1371,6 +1421,55 @@ export class XBotSkin {
     if (Math.abs(yawDelta) < 1e-4) return;
     this.container.updateMatrixWorld(true);
     RotateBoneWorld(hips, _yawQ.setFromAxisAngle(_up, -yawDelta));
+  }
+
+  /**
+   * 原地转身（Turn-in-Place）上半身分层遮罩（Mesh-Space Layered Blend per Bone）：
+   * Spine 按 78% 向据枪待机过渡（保留 22% 迈步扭腰重心感），Spine1 与其上所有胸/颈/头/肩/双臂/手指 100% 锁定在
+   * RifleAimingIdle 模型空间姿态，消除 Turn90 低姿持枪导致的「先垂枪 28 cm 再抬枪」断层。
+   */
+  _ApplyTurnUpperBodyMask(idleFile, maskW) {
+    if (maskW <= 1e-3) return;
+    const pose = this.skins.IdleUpperPose(idleFile);
+    if (!pose) return;
+    this.container.updateMatrixWorld(true);
+    this.model.matrixWorld.decompose(_p, _aoModelQ, _s);
+    _aoModelQ.normalize();
+
+    const spine = this.H("Spine");
+    if (spine && pose.spineModelQ) {
+      _aimQ.copy(_aoModelQ).multiply(pose.spineModelQ).normalize();
+      _aimQ2.copy(FreshQuaternion(spine));
+      if (_aimQ2.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+      _aimQ2.slerp(_aimQ, 0.78 * maskW).normalize();
+      SetBoneWorldQuaternion(spine, _aimQ2);
+    }
+
+    const spine1 = this.H("Spine1");
+    if (spine1 && pose.spine1ModelQ) {
+      _aimQ.copy(_aoModelQ).multiply(pose.spine1ModelQ).normalize();
+      if (maskW >= 0.999) {
+        SetBoneWorldQuaternion(spine1, _aimQ);
+      } else {
+        _aimQ2.copy(FreshQuaternion(spine1));
+        if (_aimQ2.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+        _aimQ2.slerp(_aimQ, maskW).normalize();
+        SetBoneWorldQuaternion(spine1, _aimQ2);
+      }
+    }
+
+    for (const [name, qTarget] of pose.localQ) {
+      const bone = this.H(name);
+      if (!bone) continue;
+      if (maskW >= 0.999) {
+        bone.quaternion.copy(qTarget);
+      } else {
+        _aimQ.copy(qTarget);
+        if (bone.quaternion.dot(_aimQ) < 0) _aimQ.set(-_aimQ.x, -_aimQ.y, -_aimQ.z, -_aimQ.w);
+        bone.quaternion.slerp(_aimQ, maskW).normalize();
+      }
+    }
+    this.container.updateMatrixWorld(true);
   }
 
   /**
