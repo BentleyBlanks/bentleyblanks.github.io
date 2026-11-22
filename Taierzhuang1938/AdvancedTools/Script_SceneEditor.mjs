@@ -636,7 +636,9 @@ class SceneEditorApp {
     try {
       const [{ MaterialLibrary }, { LoadTerrainLayers, CreateTerrainMaterial }] = await Promise.all([
         import("../Script_Materials.mjs"), import("../Script_TerrainMaterial.mjs")]);
-      this.terrainPack ||= await LoadTerrainLayers(MISSION_LAYOUT.ground.terrainLayers, { anisotropy: this.renderer.capabilities.getMaxAnisotropy() });
+      this.terrainPack ||= await LoadTerrainLayers(MISSION_LAYOUT.ground.terrainLayers, {
+        anisotropy: this.renderer.capabilities.getMaxAnisotropy(), assetBase: new URL("../", location.href),
+      });
       if (token !== this.terrainToken || mesh !== this.terrain) return false;
       const surface = BuildSceneGroundSurface(this.model.doc, this.sampler);
       const position = mesh.geometry.getAttribute("position"), n = position.count;

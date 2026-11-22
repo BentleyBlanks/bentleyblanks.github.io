@@ -20,6 +20,7 @@ export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "FirstLevelMerged", title: "第一关 · 北沙河单村合并版", style: "whitebox",
     note: "01–07（z<355）实时继承 FirstLevelEncounter，z>=355 为合并后的北沙河单村分叉段" }),
   Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", previewParam: "gengjiazhuangFieldApproach" }),
+  Object.freeze({ id: "GengjiazhuangEastSmoke", title: "凹路尽头 · 望庄东", style: "formal", previewParam: "gengjiazhuangEastSmoke" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -92,6 +93,10 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/fieldApproachDryGrass": Prop("fieldApproachDryGrass", "foliage", "沟沿干草与细根", [0.352, 0.267, 0.328]),
   "Prop/fieldApproachSoilClod": Prop("fieldApproachSoilClod", "earthDark", "翻土块", [0.147, 0.071, 0.108]),
   "Prop/fieldApproachPackDonkey": Prop("fieldApproachPackDonkey", "canvas", "驮草小驴", [1.245, 1.643, 1.913]),
+  "Prop/eastSmokeCourtyardGate": Prop("eastSmokeCourtyardGate", "plaster", "庄东破损院墙与门洞", [7.8, 2.21, 0.82]),
+  "Prop/woodenEvacCart": Prop("woodenEvacCart", "timber", "撤运木车（静置）", [1.95, 1.32, 4.8]),
+  "Prop/singleBlanket": Prop("singleBlanket", "canvas", "土布单被（静置）", [1.4, 0.055, 1.9]),
+  "Prop/singleBlanketCrumpled": Prop("singleBlanketCrumpled", "canvas", "揉起的土布单被（静置）", [0.45, 0.25, 0.45]),
   "Backdrop/Box": Object.freeze({ kind: "backdropBox", layer: "backdrop", label: "远景盒子", note: "房墙、屋顶、院墙；params: w d h lift color" }),
   "Backdrop/Blob": Object.freeze({ kind: "backdropBlob", layer: "backdrop", label: "远景树冠", note: "椭球；params: rx rz h lift color" }),
   "Backdrop/Hill": Object.freeze({ kind: "backdropHill", layer: "backdrop", label: "远景低山", note: "params: rx rz h color topColor" }),

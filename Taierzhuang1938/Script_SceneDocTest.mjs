@@ -216,4 +216,21 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(layers[0] > 0.5 && color[0] > 1, "细土路的车辙权重和暖色倍率随场景载入");
 }
 
+{
+  const id = "GengjiazhuangEastSmoke";
+  const { doc, heights } = ReadSceneSync(id);
+  const layout = LayoutFromSceneDoc(BlockoutDocFromScene(doc, heights, { level: id }));
+  Check(ValidateScene(doc).ok && layout.style === "formal", "庄东烟景是可校验的独立正式场景");
+  assert.deepEqual(layout.camera, doc.camera);
+  Check(layout.sceneProps.length === doc.objects.length && layout.blocks.some(block =>
+    block.id === "EvacuationCart" && block.propAuthoredGrounding), "木车、铺盖、院墙和田野道具保留作者布设");
+  Check(layout.smokeColumns.filter(column => column.options.fire > 0).length === 1 &&
+    layout.smokeColumns.some(column => column.options.backdrop?.driftX > 0),
+    "庄东只有一处明火，烟沿画面右侧漂移");
+  Check(["CartPallet", "RoadsideAid", "PackTrain"].every(id => doc.markers.some(marker => marker.id === id)),
+    "车板、沟沿、远端驮队的留空位置被保存");
+  Check(layout.terrainSampler(-1.2, -5.5) - layout.terrainSampler(4, -5.5) > .55,
+    "凹路保留沟沿到车辙的高差");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);

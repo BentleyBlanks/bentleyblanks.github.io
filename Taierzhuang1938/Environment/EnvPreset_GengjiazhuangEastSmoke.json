@@ -1,0 +1,98 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "GengjiazhuangEastSmoke",
+  "title": "庄东 · 烟尘阴天",
+  "looks": [
+    {"id": "overcast", "label": "烟尘阴天", "hour": 12}
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {"elevation": 58, "azimuth": 196, "color": "#e0d9cf", "intensity": 0.86, "discIntensity": 0}
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {"probe": 1.19, "color": "#d6d1c9", "intensity": 1.1}
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {"intensity": 0.12}
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {
+        "zenith": [0.42, 0.43, 0.45],
+        "horizon": [0.29, 0.285, 0.285],
+        "ground": [0.235, 0.22, 0.2],
+        "glow": 0,
+        "smoke": 0.46,
+        "smokeColor": [0.32, 0.325, 0.334],
+        "smokeHeight": 0.35
+      }
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {
+        "structure": 0.66,
+        "coverage": 0.95,
+        "scale": 1.2,
+        "softness": 1.45,
+        "warp": 1.46,
+        "underside": 0.38,
+        "shade": [0.39, 0.395, 0.4],
+        "gap": 0.1,
+        "silver": 0,
+        "shapeCover": 0.57
+      }
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": 10.8,
+        "mieG": 0.68,
+        "rayleigh": 0.49,
+        "ozone": 1,
+        "groundAlbedo": 0.14,
+        "sunIrradiance": 2,
+        "skyTint": [0.55, 0.554, 0.565],
+        "skyFloor": [0.61, 0.614, 0.625],
+        "artGlow": 0,
+        "aerialBlend": 0.47,
+        "aerialGain": 0.27
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": 0.0093,
+        "falloff": 23,
+        "max": 0.78,
+        "skyColor": [0.174, 0.181, 0.188],
+        "groundColor": [0.27, 0.259, 0.253],
+        "sunGain": 0,
+        "desat": 0.74,
+        "flatten": 0.095
+      }
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "profile": "firstLevelBattleDay",
+        "exposure": 0.98,
+        "saturation": 0.54,
+        "contrast": 1.01,
+        "contrastCurve": "soft",
+        "gain": [1, 0.99, 0.985],
+        "lift": [0.024, 0.021, 0.018],
+        "shadowTint": [1, 0.986, 0.961],
+        "highlightTint": [0.995, 0.998, 1.009],
+        "splitShadow": 0.14,
+        "splitHighlight": 0.14,
+        "bloom": 0.014,
+        "bloomThreshold": 1.49,
+        "godStrength": 0,
+        "lensFlare": 0
+      }
+    }
+  }
+}

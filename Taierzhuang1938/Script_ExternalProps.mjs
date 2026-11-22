@@ -281,6 +281,10 @@ const ASSETS = Object.freeze({
   fieldApproachDryGrass: { label: "沟沿干草与细根", url: "./Model/GengjiazhuangFieldApproach/Model_DryGrass.glb?v=2026112202", category: "景观", solid: false },
   fieldApproachSoilClod: { label: "翻土块", url: "./Model/GengjiazhuangFieldApproach/Model_SoilClod.glb?v=2026112202", category: "景观", solid: false },
   fieldApproachPackDonkey: { label: "驮草小驴", url: "./Model/GengjiazhuangFieldApproach/Model_PackDonkey.glb?v=2026112202", category: "景观", solid: false },
+  eastSmokeCourtyardGate: { label: "庄东破损院墙与门洞", url: "./Model/GengjiazhuangEastSmoke/Model_CourtyardGate.glb?v=2026112201", category: "建筑", solid: false },
+  woodenEvacCart: { label: "撤运木车（静置）", url: "./Model/OxCart/Model_WoodenEvacCart.glb?v=2026101401", category: "景观", solid: false, staticBindPose: true },
+  singleBlanket: { label: "土布单被（静置）", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell", category: "景观", solid: false, staticBindPose: true },
+  singleBlanketCrumpled: { label: "揉起的土布单被（静置）", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell", category: "景观", solid: false, staticBindPose: true, staticMorph: "Crumpled" },
   crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodCrate", tag: "prop", category: "院落小件" },
   rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble", category: "院落小件" },
   militaryCrateClosed: {
@@ -581,6 +585,45 @@ async function LoadSource(id) {
   return pending;
 }
 
+function StaticPropMeshes(root, morphName) {
+  const meshes = [];
+  root.traverse((object) => { if (object.isSkinnedMesh) meshes.push(object); });
+  for (const skinned of meshes) {
+    const mesh = new THREE.Mesh().copy(skinned, false);
+    if (morphName) {
+      const target = mesh.morphTargetDictionary?.[morphName];
+      if (target === undefined) throw new Error(`Missing scenery morph ${morphName} in ${mesh.name}`);
+      mesh.morphTargetInfluences.fill(0);
+      mesh.morphTargetInfluences[target] = 1;
+      const baked = mesh.geometry.clone(), position = baked.getAttribute("position");
+      const vertex = new THREE.Vector3();
+      for (let i = 0; i < position.count; i++) {
+        mesh.getVertexPosition(i, vertex);
+        position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      baked.morphAttributes = {};
+      baked.computeVertexNormals();
+      baked.computeBoundingBox();
+      baked.computeBoundingSphere();
+      mesh.geometry = baked;
+      mesh.morphTargetInfluences = mesh.morphTargetDictionary = undefined;
+    }
+    const colors = mesh.geometry.getAttribute("color");
+    if (colors && mesh.material.vertexColors) {
+      // Scenery batches keep the usual position/normal/uv channels.
+      const mean = new THREE.Color(0, 0, 0);
+      for (let i = 0; i < colors.count; i++) {
+        mean.r += colors.getX(i); mean.g += colors.getY(i); mean.b += colors.getZ(i);
+      }
+      mesh.material = mesh.material.clone();
+      mesh.material.color.multiply(mean.multiplyScalar(1 / colors.count));
+      mesh.material.vertexColors = false;
+    }
+    skinned.parent.add(mesh);
+    skinned.removeFromParent();
+  }
+}
+
 /**
  * 把该资产的节点搬进一个"底面几何中心即原点"的外壳里，并量出归一化之后的
  * 包围盒（碰撞盒就照它出）。
@@ -608,6 +651,8 @@ function PrepareAsset(id, gltf) {
   node.position.set(0, 0, 0);
   node.rotation.set(0, 0, 0);
   node.scale.copy(source.scale);
+  // Opt-in scenery variants reuse authored geometry and leave the shared rig intact.
+  if (spec.staticBindPose) StaticPropMeshes(node, spec.staticMorph);
   PrepareRuntimeUvs(node, spec);
   node.updateMatrixWorld(true);
   const raw = new THREE.Box3().setFromObject(node, spec.preciseBounds === true);

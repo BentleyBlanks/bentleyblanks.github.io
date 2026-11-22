@@ -82,7 +82,6 @@ function FireRangeOptions(h) {
 }
 
 const DUGOUT_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("DugoutAidOpenFields"));
-const FIELD_APPROACH_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("GengjiazhuangFieldApproach"));
 
 function FixedSceneCamera(host, pose) {
   const camera = host.camera;
@@ -99,12 +98,12 @@ function FixedSceneCamera(host, pose) {
   };
 }
 
-const PLUGINS = {
-  gengjiazhuangFieldApproach: {
-    phase: FIELD_APPROACH_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
+function SceneryPreview(sceneId, extraPbrSets = []) {
+  return {
+    phase: CreateScenePreviewPhase(SceneInfo(sceneId)), World: FirstLevelWhiteboxField,
     startup: {
       sceneryOnly: true,
-      pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr"],
+      pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr", ...extraPbrSets],
       audio: { voice: false, ambience: false, music: false, sfx: [] },
     },
     Create(host) {
@@ -131,7 +130,12 @@ const PLUGINS = {
         Warmup: async () => {},
       });
     },
-  },
+  };
+}
+
+const PLUGINS = {
+  gengjiazhuangFieldApproach: SceneryPreview("GengjiazhuangFieldApproach"),
+  gengjiazhuangEastSmoke: SceneryPreview("GengjiazhuangEastSmoke", ["Sandbag"]),
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) {

@@ -88,10 +88,12 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
   Check(stubs.Explosions.State() === null, "不在爆炸场时 Debug.Explosions.State() 是 null");
   current = { id: "explosions", api: { State: () => ({ ok: 1 }), GoTo: () => "went", Reset: () => "reset" } };
   Check(stubs.Explosions.State().ok === 1 && stubs.Explosions.GoTo("a") === "went", "在爆炸场时转给插件");
-  const hooks = { gengjiazhuangFieldApproach: ["UpdateCamera"], encounterPlay:["ScaleDt","CapturesInput"], cloth: ["UpdateCamera"], hair: ["UpdateCamera"], impacts: ["ScaleDt", "CapturesInput", "ApplyCamera"], reactions: ["ScaleDt"], gore: ["ScaleDt"] };
+  const hooks = { gengjiazhuangFieldApproach: ["UpdateCamera"], gengjiazhuangEastSmoke: ["UpdateCamera"], encounterPlay:["ScaleDt","CapturesInput"], cloth: ["UpdateCamera"], hair: ["UpdateCamera"], impacts: ["ScaleDt", "CapturesInput", "ApplyCamera"], reactions: ["ScaleDt"], gore: ["ScaleDt"] };
   const source = fs.readFileSync(new URL("./Script_SandboxRanges.mjs", import.meta.url), "utf8");
   for (const plugin of SANDBOX_PLUGINS) {
-    const body = source.slice(source.indexOf(`  ${plugin.id}: {`), source.indexOf("\n  },", source.indexOf(`  ${plugin.id}: {`)));
+    const shared = source.includes(`  ${plugin.id}: SceneryPreview(`);
+    const start = source.indexOf(shared ? "function SceneryPreview(" : `  ${plugin.id}: {`);
+    const body = start < 0 ? "" : source.slice(start, source.indexOf(shared ? "\n}" : "\n  },", start));
     for (const hook of ["ScaleDt", "CapturesInput", "ApplyCamera", "UpdateCamera"]) {
       const declared = new RegExp(`\\b${hook}:`).test(body);
       Check(declared === (hooks[plugin.id] || []).includes(hook), `${plugin.id}: ${declared ? "接" : "不接"} ${hook}（与改造前装配层调用的一致）`);

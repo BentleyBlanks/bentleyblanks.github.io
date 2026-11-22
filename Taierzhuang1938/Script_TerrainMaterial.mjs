@@ -51,11 +51,12 @@ const SRGB_TO_LINEAR = (() => {
  * 连接挂住时既不 load 也不 error，开机那一步会永远等下去）。
  * `colorSpaceConversion: "none"`：法线与 Orh 是数据，不许按显示器色彩空间转换。
  */
-async function LoadBitmap(url, timeoutMs) {
+async function LoadBitmap(url, timeoutMs, assetBase) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(ResolveTextureImportUrl(url), { signal: controller.signal });
+    const source = ResolveTextureImportUrl(url);
+    const response = await fetch(assetBase ? new URL(source, assetBase) : source, { signal: controller.signal });
     if (!response.ok) throw new Error("HTTP " + response.status + ": " + url);
     const blob = await response.blob();
     return await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
@@ -105,13 +106,13 @@ function MakeArrayTexture(data, size, layers, srgb, anisotropy) {
  *
  * @returns {Promise<{setName, albedo, surface, albedoMean: Float32Array, surfaceMean: Float32Array, bytes: number}>}
  */
-export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 45000, extraLayers = [], layerOverrides = {} } = {}) {
+export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 45000, extraLayers = [], layerOverrides = {}, assetBase } = {}) {
   const set = TERRAIN_SETS[setName];
   if (!set) throw new Error(`Unknown terrain set: ${setName}`);
   const urls = [...TerrainLayerUrls(setName).map((url, i) => layerOverrides[i] || url), ...extraLayers];
   const layers = urls.length, size = set.textureSize, dataSize = size / 2;
   const bitmaps = await Promise.all(urls.map((u) => Promise.all([
-    LoadBitmap(u.base, timeoutMs), LoadBitmap(u.normal, timeoutMs), LoadBitmap(u.orh, timeoutMs),
+    LoadBitmap(u.base, timeoutMs, assetBase), LoadBitmap(u.normal, timeoutMs, assetBase), LoadBitmap(u.orh, timeoutMs, assetBase),
   ])));
   const bases = bitmaps.map(([base]) => PixelsOf(base, size));
   const normals = bitmaps.map(([, normal]) => PixelsOf(normal, dataSize));
