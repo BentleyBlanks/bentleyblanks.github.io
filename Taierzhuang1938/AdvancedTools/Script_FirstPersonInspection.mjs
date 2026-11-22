@@ -215,9 +215,9 @@ class FirstPersonInspectionApp {
 
     // 音效音量（复用高级工具存档键）
     this.toolsVolume = LoadToolsVolume(base.audio?.masterVolume ?? 1);
-    this.ApplyToolsVolume();
 
     this.CollectDom();
+    this.ApplyToolsVolume();
     this.WireViewmodelCallbacks();
     this.ApplySky("firstLevelBattleDay");
     this.BuildWeaponList();
@@ -351,7 +351,7 @@ class FirstPersonInspectionApp {
     if (this.dom?.muteToggle) {
       const muted = this.toolsVolume.muted || level <= 0.001;
       this.dom.muteToggle.setAttribute("aria-pressed", String(muted));
-      this.dom.muteToggle.textContent = muted ? "🔇" : "🔊";
+      this.dom.muteToggle.textContent = muted ? "静音" : "声音";
     }
   }
 
@@ -1164,11 +1164,11 @@ class FirstPersonInspectionApp {
     const r = w * 0.43;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#0b1117";
+    ctx.fillStyle = "#070807";
     ctx.fillRect(0, 0, w, h);
 
-    // 圆形坐标格
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    // 圆形坐标格（橄榄灰细线，同全仓界面）
+    ctx.strokeStyle = "rgba(193, 189, 171, 0.22)";
     ctx.lineWidth = 1;
     for (const frac of [0.5, 1.0]) {
       ctx.beginPath();
@@ -1192,8 +1192,8 @@ class FirstPersonInspectionApp {
     this.inertiaTrail.push({ x: px, y: py });
     if (this.inertiaTrail.length > 28) this.inertiaTrail.shift();
 
-    // 轨迹拖尾
-    const accent = this.profile === "before" ? "240,138,108" : "142,224,207";
+    // 轨迹拖尾（改后旧金、改前暗红）
+    const accent = this.profile === "before" ? "214,96,74" : "237,202,131";
     for (let i = 1; i < this.inertiaTrail.length; i += 1) {
       const a = i / this.inertiaTrail.length;
       ctx.strokeStyle = `rgba(${accent}, ${(a * 0.78).toFixed(2)})`;
@@ -1208,21 +1208,21 @@ class FirstPersonInspectionApp {
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(-roll * 4.8);
-    ctx.strokeStyle = "#e8c474";
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = "#eeeee7";
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(-11, 0); ctx.lineTo(11, 0);
     ctx.stroke();
     ctx.restore();
 
     // 中心实心光点
-    ctx.fillStyle = this.profile === "before" ? "#f08a6c" : "#8ee0cf";
+    ctx.fillStyle = this.profile === "before" ? "#d6604a" : "#edca83";
     ctx.beginPath();
     ctx.arc(px, py, 4.2, 0, Math.PI * 2);
     ctx.fill();
 
     this.dom.inertiaPhase.textContent = phaseText;
-    this.dom.inertiaPhase.style.color = this.profile === "before" ? "#ffb39c" : "#8ee0cf";
+    this.dom.inertiaPhase.style.color = this.profile === "before" ? "#f0927e" : "#e6cb91";
   }
 
   // ------------------------------------------------------------------ 慢放、暂停、逐帧

@@ -6,7 +6,9 @@
   <base href="../">
   <title>第一人称持枪检查 · 血战滕县</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
-  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261122">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261113earbraid">
+  <link rel="stylesheet" href="./Style_Editor.css?v=20261122FpsInspect">
+  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261122GameTheme">
   <script>
     (function () {
       var map = '{"imports":{"three":"./vendor/three/build/three.module.js"}}';
@@ -25,12 +27,10 @@
   </script>
   <script type="module" src="./AdvancedTools/Script_FirstPersonInspection.mjs"></script>
 </head>
-<body>
+<body class="uiToolSurface edThemedSurface">
   <header class="tool-header">
     <div class="tool-title">
-      <span class="viewfinder" aria-hidden="true"></span>
       <h1>第一人称持枪检查</h1>
-      <span class="readonly">只读</span>
     </div>
 
     <nav class="mode-tabs" role="tablist" aria-label="检查模式">
@@ -45,12 +45,12 @@
         <button type="button" data-sky="smokyDay" aria-pressed="false">阴天</button>
         <button type="button" data-sky="dusk" aria-pressed="false">黄昏</button>
       </div>
-      <button type="button" id="muteToggle" class="icon-btn" title="切换工具音效静音" aria-pressed="false">🔊</button>
-      <a id="controlCenter" class="back-link" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
+      <button type="button" id="muteToggle" class="icon-btn" title="切换工具音效静音" aria-pressed="false">声</button>
+      <a id="controlCenter" class="edMenuMainMenu" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
     </div>
   </header>
 
-  <main class="workspace">
+  <main class="workspace edHome">
     <section class="stage" id="stage" aria-label="第一人称靶场视口">
       <canvas id="view" tabindex="0" aria-label="三维第一人称视口"></canvas>
 
