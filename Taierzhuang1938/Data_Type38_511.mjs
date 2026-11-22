@@ -1,14 +1,14 @@
 // Dots 511, user-approved HanYang-class reduction. Author frame measured from
 // the delivered vertices: metres, +Y up, muzzle -Z. See Model/Type38_511.
 export const TYPE38_511 = {
-  version: '511-exterior-20261122',
-  url: './Model/Type38_511/Model_Type38_511.glb?v=511-exterior-20261122',
+  version: '511-photo-finish-20261122',
+  url: './Model/Type38_511/Model_Type38_511.glb?v=511-photo-finish-20261122',
   npcLodUrl: './Model/Type38_511/Model_Type38_511NpcLod.glb?v=1',
   npcLodPart: 'Exterior_FoldedFrame12',
   npcTriangles: 66214,
   triangles: 70822,
   parts: 45,
-  sourceSha256: '7d81e41a53b953297c0a5b35c48e15b7ba8fe00d87200ac16a4c5a640388c7c3',
+  sourceSha256: 'd02e4f6ed5bf0aeb5d2a7b149354901c225a649046c99585cd2eeba0a7b16761',
   frameOffset: [0, -0.005, -0.027],
   textureAnisotropy: 16,
   // One shared exposure compensation for the author's studio-lit PBR bake;

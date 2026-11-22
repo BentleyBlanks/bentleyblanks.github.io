@@ -3,7 +3,7 @@
   "version": 2,
   "generator": "_blender/Script_Type38Exterior.py + _blender/Script_Type38ExteriorFinish.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "7d81e41a53b953297c0a5b35c48e15b7ba8fe00d87200ac16a4c5a640388c7c3",
+  "runtimeSha256": "d02e4f6ed5bf0aeb5d2a7b149354901c225a649046c99585cd2eeba0a7b16761",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 70822,
@@ -23,7 +23,12 @@
     "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG",
     "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG",
     "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG",
-    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG"
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_inscriptions.JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG",
+    "https://commons.wikimedia.org/wiki/File:Inscriptions_on_a_Japanese_Arisaka_Type_38_rifle.JPG"
   ],
   "imagePayloads": [
     {
@@ -77,8 +82,8 @@
     {
       "index": 8,
       "name": "Texture_Type38Sample03Base",
-      "bytes": 194254,
-      "sha256": "6e30acebc5460757a857215d78ceaebaabe217a8ea1045665e7b9c2469a1c324"
+      "bytes": 207704,
+      "sha256": "8a9b879818708d4e5ef8c4b91af758a9a091af88a1bcd6badb1b03744b34acae"
     },
     {
       "index": 9,
@@ -107,8 +112,8 @@
     {
       "index": 13,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 24832,
-      "sha256": "6fd4757ce6f385bd1b42186540940bcec29cd8278e1c62c43ec578195a5d8017"
+      "bytes": 378217,
+      "sha256": "788d0e9b115208ad4ed1fb00909609d3ca343d0150c26279520b18483fc84c9c"
     },
     {
       "index": 14,
@@ -119,20 +124,20 @@
     {
       "index": 15,
       "name": "Texture_Type38Sample05Normal",
-      "bytes": 829895,
-      "sha256": "5fc330352a1cbc0cb0c77720d141ae120284208d10b78ba151ac69c19908d70f"
+      "bytes": 767371,
+      "sha256": "06856f45f77e70a7a1c14ad9131c3757af29685a864099446132b430d77cce41"
     },
     {
       "index": 16,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 820396,
-      "sha256": "3ac8b8c8441854a19dc1b2b0bcae50eba9756830cc6e6db77cb8237e1dea3ae6"
+      "bytes": 733992,
+      "sha256": "e6dc70e858c0349b09c29732cfc9d5661b78df3e21180bddcd9f57e272dc6dcd"
     },
     {
       "index": 17,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 361158,
-      "sha256": "fc93e67ddab43fd646f83720cd94f4dc80d35bed648a25b5c242241346b4c774"
+      "bytes": 354373,
+      "sha256": "063551fe37d400459863018f6a2f1f94403ba5a19fc064124ca37bfe15c9ee92"
     },
     {
       "index": 18,
@@ -227,14 +232,14 @@
     {
       "index": 33,
       "name": "Texture_Type38Sample13Base",
-      "bytes": 132498,
-      "sha256": "760db0818c4fff02667e985641d37a4fcfb40a477e45d67aac4f848fcd2a6a4b"
+      "bytes": 122403,
+      "sha256": "7e13a0a3765b1996a306dcfd739b41ade1221e757e340e660676ec665706777f"
     },
     {
       "index": 34,
       "name": "Texture_Type38Sample13Orm",
-      "bytes": 70813,
-      "sha256": "38a4dc8a595dad70fec8759f99419a9b5fbe8883c97c4573e4bcd11b5e861189"
+      "bytes": 60029,
+      "sha256": "4639cbaa1afd76bd12b4028d855546260a69c0de077ca6480dad69a2f19d1db0"
     },
     {
       "index": 35,
@@ -491,14 +496,14 @@
     {
       "index": 77,
       "name": "Texture_Type38Sample33Base",
-      "bytes": 211208,
-      "sha256": "81f7532c65c5bd4ab2d06a78a45495704f837e63e2068dc7e3957fc88d8d8aaa"
+      "bytes": 191954,
+      "sha256": "c00d65f585727da5f750cf0eecb48b2507eec1879b9521d32c4b79ea421de159"
     },
     {
       "index": 78,
       "name": "Texture_Type38Sample33Orm",
-      "bytes": 194339,
-      "sha256": "5b4f15b73d1f4c1972919e01932637aed5c86155d1c743329ed54f22cd4b29a7"
+      "bytes": 202088,
+      "sha256": "8b7a5193d5cd5f0c8a66ea716903bb4ed64a51108c157e993a12a23eaa953f17"
     },
     {
       "index": 79,
@@ -581,26 +586,26 @@
     {
       "index": 92,
       "name": "Texture_Type38Sample37Normal",
-      "bytes": 292009,
-      "sha256": "ca899cbcb3e2a73e096c4edc3af2d08b4283da0b8e9e69e79085fbde25973471"
+      "bytes": 289408,
+      "sha256": "42a76ced75d6e08d3c787d9dfa95ec66ddc011a2d9fadbc21f941c5a2cbf5314"
     },
     {
       "index": 93,
       "name": "Texture_Type38Sample37Base",
-      "bytes": 132000,
-      "sha256": "97d4eede474a4746679d8d0d63f03302258653e4b293e1c011fdb8a70522732f"
+      "bytes": 144511,
+      "sha256": "f67a2c508738328b89467ccfc6b17d4edfe97dbd97ddc996bfbdb2ed78a6064f"
     },
     {
       "index": 94,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 87378,
-      "sha256": "972e5f82dfd7e3ca057c104287b447be01e1a52fa61e797e4bf472490aea7d5a"
+      "bytes": 98149,
+      "sha256": "23ef646ffb950b9ee31171046c36f75d34379a7713b2365b5bb034d030c29b89"
     },
     {
       "index": 95,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 74583,
-      "sha256": "e39c607c1bc84f111a0752d53b5eb1adb04b1c2b93a3f6b8fdb6a6f628de2809"
+      "bytes": 329673,
+      "sha256": "fc54fbc89d0f52f40eb3d92c4dffcd51875a5657aa23966f6f4005fc47875ed1"
     },
     {
       "index": 96,
@@ -611,20 +616,20 @@
     {
       "index": 97,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 989419,
-      "sha256": "161d3cd44c0012910ff1d11c1a7de63f174526e82dc7d177cfc79fadb20868ee"
+      "bytes": 930782,
+      "sha256": "820aaf08d4d885ca905ea785a1d2f0f7785250f3ae48b5b0bc213d90ba8f906d"
     },
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 976886,
-      "sha256": "36641ed356a6bff0c7a9b04ea8956d205a4a629b04dd0fcf7fd63803bf94576f"
+      "bytes": 850174,
+      "sha256": "f47f92ef5ac73054db60a39d5995864614daaf3a4fd8d7afd24c3cd13a58d202"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 391241,
-      "sha256": "4a5bdeaf627b79181fe168a80ce6a895d82d8dbaba542d4cc5665b75d58eeacb"
+      "bytes": 383002,
+      "sha256": "81c79c067a8346b1a3f1259c9fdb2bd99e1df48e5bfebae9df883838d728cd0f"
     },
     {
       "index": 100,
@@ -683,14 +688,14 @@
     {
       "index": 109,
       "name": "Texture_Type38Sample42Base",
-      "bytes": 37023,
-      "sha256": "4a167d0a074f9e0ea26ccbe9a1e8085479d7929772740ed470e9cf9736efa9c5"
+      "bytes": 30781,
+      "sha256": "f1d3edc4e0f7fe991d416dc49869c4baa18f75c10eefc9af9afbfd2831ba9a7a"
     },
     {
       "index": 110,
       "name": "Texture_Type38Sample42Orm",
-      "bytes": 40472,
-      "sha256": "2c6c09036ca11c22f43ac86f73be6265794622496187647fb8c703a05d0f11a4"
+      "bytes": 40419,
+      "sha256": "2658bb04bfeeebb0bd710f83db2f81c345e3e7b9998a5973cb9585fe3565488c"
     },
     {
       "index": 111,
@@ -701,20 +706,20 @@
     {
       "index": 112,
       "name": "Texture_Type38Sample43Base",
-      "bytes": 79210,
-      "sha256": "f4263e6118752c194b8d66152ffd672fdb2ccb692ca49d7492b4601153c6d908"
+      "bytes": 70211,
+      "sha256": "d78597f4bc2b93b4d3e6b2103c39ef81ecc903c0eee5c693182a1008890771eb"
     },
     {
       "index": 113,
       "name": "Texture_Type38Sample43Orm",
-      "bytes": 72389,
-      "sha256": "7c74b7235251f066f259cc5fc810aded77dc8e14744cd6cda31f92274d91444d"
+      "bytes": 72477,
+      "sha256": "dc9290cc6b0a618d8415628c149ed54798ca469bebe811a08a6000e40c8bfadc"
     },
     {
       "index": 114,
       "name": "Texture_Type38Sample44Base",
-      "bytes": 74496,
-      "sha256": "403764b72e235cb1210f12e238d07d2228cf98a5e1b93355a40e30e4a0ae6cf7"
+      "bytes": 78652,
+      "sha256": "ffb47b411d0cb05a4dea87a2900e36d25d13cf72041a606ac052921a2010df50"
     },
     {
       "index": 115,
@@ -762,9 +767,9 @@
       88.0
     ],
     "Wood_UpperFittedCrown05": [
-      77.0,
+      80.0,
       87.0,
-      96.0
+      94.0
     ],
     "Exterior_Guard02": [
       107.0,
@@ -803,8 +808,8 @@
     ],
     "Exterior_MiddleBand57": [
       98.0,
-      107.0,
-      115.0
+      104.0,
+      109.0
     ],
     "Exterior_LowRoundedSupport70": [
       102.0,
@@ -912,14 +917,14 @@
       93.0
     ],
     "T38_440D2_IndependentVisibleRecess": [
-      108.0,
-      117.0,
-      125.0
+      109.0,
+      116.0,
+      122.0
     ],
     "T38_460G_WoodGroove_VisualCandidate": [
-      74.0,
-      83.0,
-      94.0
+      77.0,
+      84.0,
+      92.0
     ],
     "T38_462_TriggerTip_VisualCandidate": [
       97.0,
@@ -937,14 +942,14 @@
       129.0
     ],
     "SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH": [
-      96.0,
-      104.0,
-      113.0
+      86.0,
+      95.0,
+      103.0
     ],
     "SightDetailV3_DecorativeConvexRoundSurface": [
-      95.0,
-      103.0,
-      112.0
+      85.0,
+      94.0,
+      102.0
     ],
     "SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY": [
       95.0,

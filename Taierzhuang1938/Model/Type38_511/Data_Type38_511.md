@@ -11,21 +11,31 @@
 | 木料高频斑纹与接缝高光 | 同一组环箍细照、[后部视图](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)、[照门顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG) | 分离木料大纹理和亮色纤维，降低划痕对比，保留薄漆反射。对托底板、中箍、木托金属嵌边、护圈等可见硬边做局部双段倒角。其余接缝通过原有几何和表面层次显示，不把所有交接处刷成白线。 |
 | 使用状态 | [C138903：战损藏品](https://www.awm.gov.au/collection/C138903)、[C153513：严重腐蚀藏品](https://www.awm.gov.au/collection/C153513) | 用来区分不同保存状态；不照搬缺件或重锈。本版不是某支滕县实枪的扫描；旧痕、反光强度及不可见面没有逐处实物认证。 |
 
+### 单件实物外观对标
+
+主参考限定为 Ca.garcia.s 于 **2013-05-17** 同一晚拍摄的三八式照片组（Wikimedia Commons，CC BY-SA 3.0）。它们是历史实物的现代照片，不是 1938 年战地照；澳大利亚战争纪念馆照片只用于辨别不同保存状态，不从另一件藏品移植附件或磨痕。游戏材质手工绘制，不将照片的闪光、阴影或背景烘进贴图。
+
+| 部位 | 主参考 | 实际落实与边界 |
+| --- | --- | --- |
+| 托尾 | [完整侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG) | 手绘单侧竖排「387」，沿木纹保留不均匀墨色；它是这件实物的外观标志，不是滕县参战枪编号的证据。 |
+| 前段木料、中箍 | [中箍侧面](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)、完整侧照 | 中箍为磨亮的灰钢；一侧狭长嵌条通过现有 UV 的底色、金属度、粗糙度、法线表现，不建隐藏结构。前后木料减弱碎亮纤维，重新写入清漆贴图 R/G；旧版两块木料的清漆 R 通道均为零。 |
+| 上护木刻痕 | [木面刻痕近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_inscriptions.JPG) | 按可见笔画画出深浅不一的痕迹，局部破漆；未认定文字含义。沿木料的方向可见，照片裁切缺乏两端定位，纵向落点为估计。 |
+| 上方金属铭文 | [铭文与磨损纹样](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG) | 保留可读「三八式」与纹样两侧残留轮廓，中间作擦磨，不还原成完整徽记。划痕位置与光泽是表现性重建，不是逐痕测绘。 |
+| 尾端金属圆面 | [尾端近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) | 外圈细密点纹、内圈圆痕以及亮暗差异通过底色、粗糙度、法线表现，不增加几何面。 |
+| 上方框面 | [顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG) | 恢复深色外框和较亮内片的区分，保留原美术表面刻线；不据此声称数字逐字相同。 |
+| 尚不能全证 | [托部另一组双印](https://commons.wikimedia.org/wiki/File:Inscriptions_on_a_Japanese_Arisaka_Type_38_rifle.JPG) | 近照不足以把双印定位到完整侧照上的确定位置，未贴在猜测的位置。未覆盖面、实际反射率、微小磨痕及 1938 年的个体状态也未确认。 |
+
+本版沿用已验收的外部几何，不新增部件、材质或贴图槽。近景实机对照固定相机、灯光和曝光；浏览器回归在木面有效纹素上抽样验证清漆，避免再次出现材质参数非零但贴图完全屏蔽清漆的情况。
+
 **重建现版**（仓库根目录，系统 Python 需要 NumPy / Pillow；Blender 使用 5.2）：
 
 ```powershell
-python Taierzhuang1938/_blender/Script_Type38ExteriorFinish.py --stage
-$env:TYPE38_REPO_ROOT=(Get-Location).Path
-node scripts/Script_BlenderMcp.mjs start --task Type38Exterior
-$build=Get-Content -Raw -Encoding UTF8 Taierzhuang1938/_blender/Script_Type38Exterior.py
-("import os`nos.environ['TYPE38_REPO_ROOT']=" + (ConvertTo-Json $env:TYPE38_REPO_ROOT -Compress) + "`n" + $build) | node scripts/Script_BlenderMcp.mjs exec --stdin
 python Taierzhuang1938/_blender/Script_Type38ExteriorFinish.py
-node scripts/Script_BlenderMcp.mjs stop
 node Taierzhuang1938/Script_Type38_511AssetTest.mjs
 node Taierzhuang1938/Script_Type38_511BrowserTest.mjs
 ```
 
-`--stage` 从历史提交取回校验过的游戏版本。仅用专属空场景执行外观脚本。普通 NPC 共用近景贴图，旧的几何覆盖件无需重新导出。下方旧重建命令只用于重建基线，不要用它覆盖现版。固定机位新旧对照、参考缩略图与可编辑工程保存在 OneDrive 的 `Blender/Taierzhuang1938/Type38_Exterior_20261122/`，不随游戏发布。
+脚本从 Git 读取经哈希验证的未调色原图（`33062973`）及上版已验收的 Blender 网格（`0ad1f3a0`）。不重复调色、不重新排序顶点、不必存几份旧 GLB。普通 NPC 共用近景贴图。下方旧命令只用于重建基线，不要覆盖现版。固定机位对照与可编辑工程在 OneDrive 的 `Blender/Taierzhuang1938/Type38_Exterior_20261122/`，不随游戏发布。
 
 ## 原接入基线 · 2026-11-08
 

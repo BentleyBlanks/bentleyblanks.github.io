@@ -34,12 +34,35 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-exterior-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
+ assert.equal(evidence.identity.version,'511-photo-finish-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
  assert.equal(evidence.identity.npcTriangles,66214);assert.equal(evidence.identity.nearNpcTriangles,70822);
  assert.equal(evidence.identity.worldTriangles,70822);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
  assert(evidence.identity.materials.filter(m=>m.normal==='').length>=20);
  assert(evidence.identity.materials.filter(m=>m.clearcoat).length>=2);
+ if(!external){
+  evidence.woodCoat=await page.evaluate(()=>{
+   const samples=[];
+   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
+    if(!mesh.isMesh||mesh.userData.weaponSurface!=='wood')return;
+    const mat=mesh.material,coat=mat.clearcoatMap.image,orm=mat.roughnessMap.image;
+    const canvas=document.createElement('canvas');canvas.width=coat.width;canvas.height=coat.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(coat,0,0);
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;ctx.drawImage(orm,0,0);
+    const coverage=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    let visible=0,varnished=0;
+    for(let offset=0;offset<pixels.length;offset+=4*17){
+     if(coverage[offset]<230||coverage[offset+2]>50)continue;
+     visible++;
+     if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
+    }
+    samples.push({part:mesh.userData.type38Part,visible,varnished});
+   });
+   return samples;
+  });
+  assert.equal(evidence.woodCoat.length,2);
+  for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
+ }
  assert(evidence.identity.materials.every(m=>m.colour.every(c=>Math.abs(c-2.5)<1e-8)));
  assert.equal(evidence.identity.glError,0);
  if(external)assert(evidence.identity.compressedTextures>0,'published Type38 uses actual GPU-compressed textures');
