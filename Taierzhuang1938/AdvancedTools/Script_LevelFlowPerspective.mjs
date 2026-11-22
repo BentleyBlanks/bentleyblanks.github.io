@@ -697,6 +697,9 @@ export class FlowPerspectiveView extends FlowMapView {
     const point=this.LabelVertex(actor);
     return this.raster.Occluded(point)?hidden:1;
   }
+  SpeechOpacity(actor) {
+    return this.type==="eye"&&!this.freeCamera?this.ActorLabelOpacity(actor):1;
+  }
   OrderActors(actors) {return [...actors].sort((a,b)=>Distance(b.p,this.center)-Distance(a.p,this.center));}
   DrawActor(context,actor,frame) {
     const [x,z]=actor.p,base=(actor.surfaceY??this.Ground(actor.p))+(actor.elevation||0),color=FLOW_COLORS[actor.side],stats={visible:0,hidden:0};
@@ -784,7 +787,7 @@ export class FlowPerspectiveView extends FlowMapView {
     if(!this.speechBubbles?.length||!this.raster.sparseDepth) return this.speechBubbles||[];
     this.InspectOcclusion();
     return this.speechBubbles.flatMap(bubble=>{
-      const actor=this.frame.actors.find(a=>a.id===bubble.actorId),opacity=this.ActorLabelOpacity(actor);
+      const actor=this.frame.actors.find(a=>a.id===bubble.actorId),opacity=this.SpeechOpacity(actor);
       return opacity>0?[{...bubble,opacity}]:[];
     });
   }

@@ -262,8 +262,9 @@ export class EncounterGpuOverlay {
   }
   Speech(actor,speech,lines,box,paint,tail) {
     const view=this.raster.view,anchor=view.LabelVertex(actor);
-    const test=[anchor.x,anchor.y,anchor.depth,view.type==="eye"&&!view.freeCamera?0:.22];
-    const slot=this.actorSlots.get(actor.id)??-1,[left,top,w,h]=box;
+    const eyeOnly=view.type==="eye"&&!view.freeCamera;
+    const test=eyeOnly?[anchor.x,anchor.y,anchor.depth,0]:[0,0,0,1];
+    const slot=eyeOnly?(this.actorSlots.get(actor.id)??-1):-1,[left,top,w,h]=box;
     this.Billboard(["speech",speech.name,lines],left-2,top-2,w+4,h+4,ctx=>paint(ctx,2,2),test,slot);
     const Point=(x,y)=>({x,y,depth:anchor.depth});
     const a=Point(tail.x-7,tail.edgeY),tip=Point(tail.tipX,tail.tipY),b=Point(tail.x+7,tail.edgeY);

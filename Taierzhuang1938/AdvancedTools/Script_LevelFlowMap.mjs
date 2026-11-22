@@ -72,9 +72,31 @@ function FrontPaperFields() {
   return fields;
 }
 
+// Organic multi-strip fields extending seamlessly south of z=206 for merged single-village maps
+// (replaces the crude dark-green Wheat_* rectangles with the same warm painterly Lunan patchwork as FrontPaperFields).
+function MergedPaperFields(maxZ = 910) {
+  let seed = 1938032;
+  const Random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const fields = [], kinds = ["wheat", "wheat", "wheat", "plowed", "fallow"];
+  for (let z = 206; z < maxZ; z += 56 + Random() * 44) {
+    for (let x = -175; x < 335; x += 48 + Random() * 42) {
+      const width = 48 + Random() * 58, depth = 64 + Random() * 64;
+      const angle = 3 + (Random() - 0.5) * 20 + (Random() < 0.25 ? 90 : 0);
+      const whole = Random() < 0.2, strips = [];
+      for (let offset = -width / 2; offset < width / 2;) {
+        const stripWidth = whole ? width : 10 + Random() * 20;
+        strips.push({ from: offset, to: Math.min(width / 2, offset + stripWidth), kind: kinds[Math.floor(Random() * kinds.length)] });
+        offset += stripWidth;
+      }
+      fields.push({ zone: "MergedPaper", x: x + width / 2, z: z + depth / 2, w: width, d: depth, angleDeg: angle, strips });
+    }
+  }
+  return fields;
+}
+
 export function BuildEncounterMap(scene, options = {}) {
   const sceneId = options.sceneId || scene.id || "FirstLevelEncounter";
-  const hasGengjiazhuang = options.hasGengjiazhuang ?? (sceneId === "FirstLevelEncounter");
+  const hasGengjiazhuang = options.hasGengjiazhuang ?? (sceneId !== "FirstLevelMerged");
   const mapMaxZ = options.mapMaxZ ?? options.variantSpec?.mapMaxZ ?? (hasGengjiazhuang ? ENCOUNTER_MAP_MAX_Z : (scene.bounds?.maxZ ?? ENCOUNTER_MAP_MAX_Z));
   const southWaysZ = hasGengjiazhuang ? GENGJIAZHUANG_SOUTH_Z : FRONT_SHARED_SPLIT_Z - 5;
 
@@ -154,9 +176,7 @@ export function BuildEncounterMap(scene, options = {}) {
       ["耿家庄", 154, 373], ["村口路沟", 69, 380], ["主街", 100, 429], ["老耿家", 101, 480],
       ["街坊家", 74, 456], ["本家院", 84, 482], ["石碾", 113.2, 465.7], ["关帝庙", 84.5, 425],
       ["土地庙", 181, 481], ["土炮楼", 229.5, 390.5], ["村南口", 117, 545], ["河汊子", 38, 407],
-    ] : [
-      ["西巷", 35, 535], ["老耿家（中街西头）", 55, 535], ["田大娘防空洞", 59, 495],
-    ]),
+    ] : []),
   ].map(([name, x, z]) => ({ name, p: [x, z] }));
   labels.push(...baseSupplemental.filter((label) => !labels.some((marker) => marker.name === label.name)));
   // Apertures come from the same cut walls that Play collides with. Close views
@@ -168,10 +188,12 @@ export function BuildEncounterMap(scene, options = {}) {
     bounds: [-160, 320, -480, mapMaxZ], objects, farObjects, roads, trenches, labels, floors, ramps,
     planningPockets: scene.surface?.pockets || FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => (paint.poly || paint.line)?.some((point) => (point.z ?? point[1]) < mapMaxZ)),
-    fields: hasGengjiazhuang ? [...FrontPaperFields(), ...village.L0610_FIELDS] : FrontPaperFields(),
+    fields: hasGengjiazhuang ? [...FrontPaperFields(), ...village.L0610_FIELDS] : [...FrontPaperFields(), ...MergedPaperFields(mapMaxZ)],
     fieldZones: [
       { id: "FrontPaper", poly: [[-160, -12], [330, -12], [330, 206], [-160, 206]] },
-      ...(hasGengjiazhuang ? village.L0610_FIELD_ZONES : []),
+      ...(hasGengjiazhuang
+        ? village.L0610_FIELD_ZONES
+        : [{ id: "MergedPaper", poly: [[-160, 206], [320, 206], [320, mapMaxZ], [-160, mapMaxZ]] }]),
     ],
     footpaths: [
       ...front.L0105_FIELD_LANES,
@@ -187,7 +209,7 @@ export function BuildEncounterMap(scene, options = {}) {
         { name: "院门", p: [108, 483.5], kind: "opening" }, { name: "枪眼", p: [100, 470], kind: "window" },
         ...Object.values(village.L0610_ALLEY_WINDOWS).map((window) => ({ name: window.id, p: [window.x, window.z], kind: "window" })),
       ] : [
-        { name: "夹壁便门", p: [47.2, 535.4], kind: "opening" },
+        { name: "夹壁便门", p: [125.1, 564.8], kind: "opening" },
       ]),
     ],
   };

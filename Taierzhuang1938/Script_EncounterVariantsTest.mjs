@@ -16,6 +16,7 @@ import { EncounterPlayPlan, EncounterCanPlay, EncounterSceneSignals } from "./Sc
 import { EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { EncounterDocument } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
+import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 
@@ -91,7 +92,7 @@ assert.notEqual(ENCOUNTER_VARIANTS[0].storageKey, ENCOUNTER_VARIANTS[1].storageK
 const original = CompileEncounterVariant("L1_Original");
 const merged = CompileEncounterVariant("L1_BeishaheMerged");
 assert.equal(original.duration, 3249, "基线双村版全程保持 54:09 不变");
-assert.equal(merged.duration, 2140, "单村合并版全程压缩至 35:40（2140s）");
+assert.equal(merged.duration, 1985, "单村合并单向动线版全程压缩至 33:05（1985s）");
 
 // 2. 01–07 共用段编排 100% 零分叉一致
 const frontBeats = original.timeline.filter((b) => Number(b.stage) <= 7);
@@ -166,11 +167,17 @@ const actualNorthObjects = resolved.doc.objects.filter((o) => !o.pos || o.pos[2]
 assert.equal(actualNorthObjects, expectedNorthObjects, "北段继承物件数量与基线 100% 一致");
 assert.ok(resolved.doc.objects.some((o) => o.id === "DugoutRoofTimber" && o.pos[2] < 355), "合成场景包含北段继承物件");
 assert.ok(resolved.doc.objects.some((o) => o.id === "MA3_SideGate_Door" && o.hideOn === "SideGateOpen"), "合成场景包含西巷老耿家夹壁便门");
+for (const landmarkId of ["Merged_House_TempleHall_Roof", "Merged_RoadShrineRoof", "Merged_WatchTower", "Merged_BigLocust", "Merged_MillStone"]) {
+  assert.ok(resolved.doc.objects.some((o) => o.id === landmarkId), `合成场景包含鲁南特色建筑地标 ${landmarkId}`);
+}
+assert.ok(!resolved.doc.paint.some((p) => /^Wheat_/.test(p.id || "") && p.z >= 355), "合并村外围不再残留突兀绿方块麦田矩形");
 
 const mergedMap = BuildEncounterMap(resolved.doc, { sceneId: "FirstLevelMerged", variantSpec: GetEncounterVariantSpec("L1_BeishaheMerged") });
 assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 910]);
-assert.ok(!mergedMap.labels.some((l) => l.name === "关帝庙" || l.name === "土地庙"), "单村合并版底图不混入耿家庄专属地标");
-assert.ok(mergedMap.labels.some((l) => l.name === "防炮洞") && mergedMap.labels.some((l) => l.name === "老耿家（中街西头）"), "共用段与合并村地标齐全");
+for (const expectedLabel of ["防炮洞", "小土地庙", "土炮楼", "关帝庙（兼村塾）", "大槐树", "石碾", "老耿家（中街西头）", "夹壁便门"]) {
+  assert.ok(mergedMap.labels.some((l) => l.name === expectedLabel), `合并版底图包含地标：${expectedLabel}`);
+}
+assert.ok(!mergedMap.labels.some((l) => l.name === "西巷" && l.p[0] < 50), "不再残留错位漂在村外的西巷标注");
 
 // 4. 同场景遭遇微调变体（spec.overrides）支持验证
 const customOverrideVariant = CompileEncounterVariant({
@@ -202,28 +209,56 @@ assert.equal(JSON.parse(fakeStore.get(merged.spec.storageKey)).groups.find((g) =
 assert.equal(fakeStore.get(original.spec.storageKey), undefined, "修改合并版草稿不写入基线存储键");
 assert.equal(docOrig.value.groups[0].count, original.defaultDocument.groups[0].count);
 
-// 6. 单村合并版 08–13 核心人物弧光与全链路 Play 过关验证
-const f08f = merged.evaluate(merged.BeatById("08f").start + 10);
-assert.ok(f08f.dialogue.some((d) => d.actorId === "batman" && d.text.includes("营长的东西")), "08f 包含营部勤务兵抢车位冲突");
-const f09e = merged.evaluate(merged.BeatById("09e").start + 37);
-assert.ok(f09e.stealth.noFire, "09e 处于西巷禁火潜行态");
-assert.ok(f09e.dialogue.some((d) => d.actorId === "player" && d.text.includes("老子是救你")), "09e 包含妮儿咬手误解冲突");
-const f10b = merged.evaluate(merged.BeatById("10b").start + 3);
-assert.ok(f10b.signals.includes("RaidAftermath") && f10b.signals.includes("AidCartBurned"), "10b 已处于救护所空袭场景信号态");
-const f13e = merged.evaluate(merged.BeatById("13e").start + 15);
-assert.ok(f13e.signals.includes("BridgeBlown"), "13e 后半拍触发炸毁铁路桥高潮信号");
+// 6. 单村合并版 08–13 单向动线、完整敌军渗入路径与全链路 Play 过关验证
+const f08d = merged.evaluate(merged.BeatById("08d").start + 25);
+assert.ok(f08d.dialogue.some((d) => d.actorId === "liu" && d.text.includes("关帝庙")), "08d 顺视线转向关帝庙绕后");
+const f09b = merged.evaluate(merged.BeatById("09b").start + 32);
+assert.ok(f09b.stealth.noFire, "09b 处于关帝庙西巷禁火潜行态");
+assert.ok(f09b.dialogue.some((d) => d.actorId === "player" && d.text.includes("老子是救你")), "09b 包含妮儿咬手误解冲突");
+const f10b = merged.evaluate(merged.BeatById("10b").start + 10);
+assert.ok(f10b.dialogue.some((d) => d.actorId === "batman" && d.text.includes("营长的东西")), "10b 包含营部勤务兵抢车位冲突");
+const f10c = merged.evaluate(merged.BeatById("10c").start + 18);
+assert.ok(f10c.signals.includes("RaidAftermath") && f10c.signals.includes("AidCartBurned"), "10c 处于空袭单向突围信号态");
+const f13d = merged.evaluate(merged.BeatById("13d").start + 15);
+assert.ok(f13d.signals.includes("BridgeBlown"), "13d 后半拍触发炸毁铁路桥高潮信号");
+
+// 验证老耿家日军拥有完整东路渗入路径（非凭空冒出），且直跳 09d Play 时自动落位屋中
+const houseGun = merged.defaultDocument.groups.find((g) => g.id === "MergedHouseGun");
+const kitchenGuard = merged.defaultDocument.groups.find((g) => g.id === "MergedKitchenGuard");
+assert.ok(houseGun.route.length >= 6 && houseGun.route[0][0] > 200, "老耿家封街机枪组具备村东沿中街完整渗入路径");
+assert.ok(kitchenGuard.route.length >= 6 && kitchenGuard.route[0][0] > 200, "老耿家灶屋守卫具备村东沿中街完整渗入路径");
+const latePlan09d = new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("09d").start, merged);
+latePlan09d.Step(0.2, latePlan09d.beat.p[0], new Set());
+const lateSpawns09d = latePlan09d.Spawns(new Set());
+const lateGunSpawn = lateSpawns09d.find((s) => s.groupId === "MergedHouseGun");
+assert.ok(lateGunSpawn && lateGunSpawn.p[0] < 140 && lateGunSpawn.p[1] > 570, "直跳 09d Play 时老耿家机枪组直接就位正房室内");
+
+// 验证编辑器 3D 视口气泡不半透明遮挡，第一人称 eye 视角仍尊重遮挡
+const fakeViewScene = { type: "scene", freeCamera: false, ActorLabelOpacity: () => 0.22 };
+const fakeViewChase = { type: "chase", freeCamera: false, ActorLabelOpacity: () => 0.22 };
+const fakeViewEye = { type: "eye", freeCamera: false, ActorLabelOpacity: () => 0 };
+assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewScene, {}), 1, "3D 场景编辑器视口气泡保持 100% 不透明");
+assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewChase, {}), 1, "3D 追随视口气泡保持 100% 不透明");
+assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewEye, {}), 0, "第一人称视角气泡仍遵守建筑遮挡");
+
+// 验证所有 08–13 可玩节点都有在场的指令发言人
+for (const beat of merged.timeline.filter((b) => Number(b.stage) >= 8 && EncounterCanPlay(b.start, merged))) {
+  const bPlan = new EncounterPlayPlan(merged.defaultDocument, beat.start, merged);
+  const bLines = EncounterDialogueLines(bPlan, bPlan.Frame(), { interact: true });
+  assert.ok(bLines.some((l) => l.order && l.actorId), `${beat.id} 指令引导存在在场发言人`);
+}
 
 const plan = new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("08a").start, merged);
 assert.equal(plan.State().variant, "L1_BeishaheMerged");
 assert.equal(plan.State().scene, "FirstLevelMerged");
 assert.equal(plan.beat.id, "08a");
 
-const lines08f = EncounterDialogueLines(
-  new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("08f").start, merged),
-  merged.evaluate(merged.BeatById("08f").start + 2),
+const lines10b = EncounterDialogueLines(
+  new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("10b").start, merged),
+  merged.evaluate(merged.BeatById("10b").start + 2),
   { interact: true },
 );
-assert.ok(lines08f.some((l) => l.order && l.text.includes("推开勤务兵")), "EncounterDialogueLines 读取变体专属指令引导");
+assert.ok(lines10b.some((l) => l.order && l.text.includes("推开勤务兵")), "EncounterDialogueLines 读取变体专属指令引导");
 
 let safety = 0;
 while (!plan.completed && safety++ < 200) {
@@ -250,9 +285,9 @@ while (!plan.completed && safety++ < 200) {
   }
   plan.Step(0.5, target, new Set());
 }
-assert.ok(plan.completed, `单村合并版 08a→13e 全可玩节点顺畅通关，已完成：${plan.completedBeats.join(",")}`);
-assert.ok(!plan.completedBeats.includes("13f"), "结尾过场动画拍 13f 自动跳过");
-assert.ok(plan.completedBeats.includes("13e"), "终局高潮 13e 实玩完成");
+assert.ok(plan.completed, `单村合并版 08a→13d 全可玩节点顺畅通关，已完成：${plan.completedBeats.join(",")}`);
+assert.ok(!plan.completedBeats.includes("13e"), "结尾过场动画拍 13e 自动跳过");
+assert.ok(plan.completedBeats.includes("13d"), "终局高潮 13d 实玩完成");
 
 // 7. 敌军生成默认避开玩家视线（AGENTS.md 2026-11-14 规范校验）与实机白盒场景切片校验
 const { heights: carvedHeights, plan: carvedPlan } = PrepareSceneTerrain(resolved.doc, resolved.heights, null);

@@ -162,10 +162,17 @@ export class EncounterPlayPlan {
       const state = this.groups.get(group.id), live = [...aliveIds].filter((id) => id.startsWith(group.id + "_")).length;
       if (state.count >= group.count || live >= group.maxAlive || group.reinforceAfterClear && state.count >= group.maxAlive && live > 0) continue;
       if (this.elapsed - state.lastSpawn < group.interval) continue;
-      const index = state.count, path = GroupPath(group, index), p = path[0];
+      const index = state.count, path = GroupPath(group, index);
+      const lateGarrison = this.beatIndex === this.startIndex
+        && ["suppress", "guard"].includes(group.behavior)
+        && (this.gate.clear || []).includes(group.id)
+        && this.beatOrder.get(group.beat) < this.startIndex
+        && path.length > 1;
+      const route = lateGarrison ? [path.at(-1)] : path;
+      const p = route[0];
       result.push({
         id: group.id + "_" + index, name: group.label, side: group.side, kind: "person", p, pose: "stand", groupId: group.id,
-        heavy: group.weapon === "machineGun" && index % group.maxAlive === 0, route: path, group,
+        heavy: group.weapon === "machineGun" && index % group.maxAlive === 0, route, group,
       });
     }
     return result;

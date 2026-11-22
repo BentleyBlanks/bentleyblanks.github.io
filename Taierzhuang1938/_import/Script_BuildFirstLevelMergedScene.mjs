@@ -90,26 +90,29 @@ function BuildMergedScene() {
     .filter((patch) => patch.minZ >= SOURCE_START_Z)
     .map((patch) => ({ ...patch, minZ: Fix(patch.minZ + DELTA_Z) }));
 
-  // Shift Beishahe objects (z >= SOURCE_START_Z), replacing MA3_WallR with a side-gate opening to MA4 (Old Geng's home)
+  // Shift Beishahe objects (z >= SOURCE_START_Z):
+  // - replace WA1 ordinary yard with authentic Guandi Temple (transplanted from Gengjiazhuang)
+  // - cut side gate in MA3_WallR connecting MA3 to MA4 (Old Geng's yard)
   const ownObjects = [];
   for (const raw of baseDoc.objects) {
     if (!raw.pos || raw.pos[2] < SOURCE_START_Z) continue;
+    if (raw.id.startsWith("WA1_")) continue;
     if (raw.id === "MA3_WallR") {
-      const shiftedZ = Fix(raw.pos[2] + DELTA_Z); // 570.83, spans 563.08..578.58
+      // Wall spans z = 563.08..578.58; cut side gate cleanly at z = 564.8 facing MA4's open front courtyard & kitchen door
       ownObjects.push(
         {
           id: "MA3_WallR_North", asset: "Whitebox/Box", material: "Whitebox/Plaster",
-          pos: [125.1, null, Fix(shiftedZ - 4.4)], size: [0.5, 2.2, 6.7], yawDeg: raw.yawDeg,
+          pos: [125.1, null, 563.55], size: [0.5, 2.2, 0.95], yawDeg: raw.yawDeg,
           group: "08–13合并/建筑/MA3",
         },
         {
           id: "MA3_WallR_South", asset: "Whitebox/Box", material: "Whitebox/Plaster",
-          pos: [125.1, null, Fix(shiftedZ + 4.65)], size: [0.5, 2.2, 6.2], yawDeg: raw.yawDeg,
+          pos: [125.1, null, 572.1], size: [0.5, 2.2, 13.0], yawDeg: raw.yawDeg,
           group: "08–13合并/建筑/MA3",
         },
         {
           id: "MA3_SideGate_Door", asset: "Whitebox/Box", material: "Whitebox/Timber",
-          pos: [125.1, null, Fix(shiftedZ + 0.35)], size: [0.18, 2.0, 1.55], yawDeg: raw.yawDeg,
+          pos: [125.1, null, 564.8], size: [0.18, 2.0, 1.55], yawDeg: raw.yawDeg,
           hideOn: "SideGateOpen", group: "08–13合并/事件/便门",
         },
       );
@@ -117,6 +120,53 @@ function BuildMergedScene() {
     }
     ownObjects.push(ShiftObject(raw));
   }
+
+  // Transplant iconic regional landmarks into FirstLevelMerged so the merged village keeps
+  // strong visual orientation & Lunan local flavor without needing hint markers:
+  const Transplant = (raw, dx, dz, group, idPrefix = "Merged_", patch = null) => {
+    const obj = structuredClone(raw);
+    obj.id = `${idPrefix}${raw.id}`;
+    obj.pos = [Fix(raw.pos[0] + dx), raw.pos[1], Fix(raw.pos[2] + dz)];
+    obj.group = group;
+    if (obj.meta?.openings) {
+      obj.meta.openings = obj.meta.openings.map((op) => ({
+        ...op,
+        p: Array.isArray(op.p) ? [Fix(op.p[0] + dx), Fix(op.p[1] + dz)] : op.p,
+      }));
+    }
+    if (obj.meta?.room?.center) {
+      obj.meta.room.center = [Fix(obj.meta.room.center[0] + dx), Fix(obj.meta.room.center[1] + dz)];
+    }
+    if (patch) patch(obj);
+    ownObjects.push(obj);
+  };
+
+  // 1) 关帝庙（兼村塾，25 件）：替换 WA1 普通院落，紧邻北街西段与西胡同（ΔX=-4.2, ΔZ=+99.5）
+  for (const raw of baseDoc.objects) {
+    if (!/^House_TempleHall|^Temple(Guandi|Incense|Dropped|Fallen|Altar|Desk|YardWest|HallWest)/.test(raw.id)) continue;
+    Transplant(raw, -4.2, 99.5, "08–13合并/地标/关帝庙", "Merged_", (obj) => {
+      if (raw.id === "TempleYardWestSouth") {
+        obj.pos[2] = 534.8;
+        obj.size = [0.5, 2.4, 6.8];
+      }
+    });
+  }
+  // 2) 官道旁小土地庙（10 件）：村口官道东侧 [109, 418]（ΔX=0, ΔZ=-442）
+  for (const raw of baseDoc.objects) {
+    if (!/^RoadShrine/.test(raw.id)) continue;
+    Transplant(raw, 0, -442, "08–13合并/地标/土地庙", "Merged_");
+  }
+  // 3) 村东北角高耸土炮楼（7.8m）：沟口东南视野地标 [219, 496]
+  for (const raw of baseDoc.objects) {
+    if (!/^WatchTower/.test(raw.id)) continue;
+    Transplant(raw, 219 - 229.5, 496 - 390.5, "08–13合并/地标/土炮楼", "Merged_");
+  }
+  // 4) 村心大槐树（[132.5, 551.5]）与老石碾（[128, 553]）：位于主街/中街交汇广场，老耿家正门对面
+  for (const raw of baseDoc.objects) {
+    if (raw.id === "BigLocust") Transplant(raw, 132.5 - 121.5, 551.5 - 548.5, "08–13合并/地标/村心广场", "Merged_");
+    if (raw.id === "MillBase" || raw.id === "MillStone") Transplant(raw, 128 - 77, 553 - 457, "08–13合并/地标/村心广场", "Merged_");
+  }
+
   // Add road telegraph poles bridging z = 365..455 along x = -87 so west horizon is continuous
   for (const [idx, zPos] of [375, 410, 445].entries()) {
     ownObjects.push({
@@ -135,22 +185,32 @@ function BuildMergedScene() {
     }));
 
   // Shift Beishahe paint, ways, markers, backdrop paint
+  // Drop crude solid dark-green Wheat_* rectangles (organic angled strips are rendered seamlessly via MergedPaperFields)
   const InSouth = (pts) => pts?.every((pt) => (Array.isArray(pt) ? pt[1] : pt.z) >= SOURCE_START_Z);
-  const ShiftPaintEntry = (entry) => ({
-    ...entry,
-    ...(entry.poly ? { poly: entry.poly.map(ShiftPoint) } : {}),
-    ...(entry.line ? { line: entry.line.map(ShiftPoint) } : {}),
-  });
-  const ownPaint = (baseDoc.paint || []).filter((e) => InSouth(e.poly || e.line)).map(ShiftPaintEntry);
-  // Add connecting official road paint from z=355 (sunken road mouth) to z=467 (anti-tank ditch)
+  const ShiftPaintEntry = (entry) => {
+    const shifted = {
+      ...entry,
+      ...(entry.poly ? { poly: entry.poly.map(ShiftPoint) } : {}),
+      ...(entry.line ? { line: entry.line.map(ShiftPoint) } : {}),
+    };
+    if (/^Garden_/.test(entry.id || "")) {
+      shifted.color = "#969e74";
+      shifted.strength = 0.42;
+    }
+    return shifted;
+  };
+  const ownPaint = (baseDoc.paint || [])
+    .filter((e) => InSouth(e.poly || e.line) && !/^Wheat_/.test(e.id || ""))
+    .map(ShiftPaintEntry);
+  // Add connecting official road paint from z=355 (sunken road mouth) past RoadShrine to z=467 (anti-tank ditch)
   ownPaint.unshift({
     id: "MergedConnectRoad",
-    line: [{ x: 99, z: 355 }, { x: 97, z: 392 }, { x: 96, z: 430 }, { x: 99, z: 467 }],
+    line: [{ x: 99, z: 355 }, { x: 103, z: 392 }, { x: 103.5, z: 418 }, { x: 102, z: 440 }, { x: 99, z: 467 }],
     halfW: 2.6, feather: 0.8, color: "#cbbba0",
   });
 
   const ownRoads = [
-    [{ x: 98.5, z: 344 }, { x: 99, z: 355 }, { x: 97, z: 392 }, { x: 96, z: 430 }, { x: 99, z: 467 }],
+    [{ x: 98.5, z: 344 }, { x: 99, z: 355 }, { x: 103, z: 392 }, { x: 103.5, z: 418 }, { x: 102, z: 440 }, { x: 99, z: 467 }],
     ...(baseDoc.ways?.roads || [])
       .filter((line) => line.every((pt) => (pt.z ?? pt[1]) >= 995))
       .map((line) => line.map(ShiftPoint)),
@@ -163,9 +223,13 @@ function BuildMergedScene() {
     ...(baseDoc.markers || [])
       .filter((m) => m.z >= SOURCE_START_Z)
       .map((m) => ({ ...m, z: Fix(m.z + DELTA_Z) })),
-    { id: "LmMergedGengYard", name: "老耿家（村中院）", x: 131.6, z: 569.5, kind: "place" },
-    { id: "LmMergedSideGate", name: "邻院便门", x: 125.1, z: 571.2, kind: "place" },
-    { id: "LmMergedWestYard", name: "西巷街坊院", x: 78.5, z: 530.0, kind: "place" },
+    { id: "LmMergedTemple", name: "关帝庙（兼村塾）", x: 80.3, z: 526.5, kind: "place" },
+    { id: "LmMergedRoadShrine", name: "小土地庙", x: 109.0, z: 418.0, kind: "place" },
+    { id: "LmMergedWatchTower", name: "土炮楼", x: 219.0, z: 496.0, kind: "place" },
+    { id: "LmMergedBigLocust", name: "大槐树", x: 132.5, z: 551.5, kind: "place" },
+    { id: "LmMergedMill", name: "石碾", x: 128.0, z: 553.0, kind: "place" },
+    { id: "LmMergedGengYard", name: "老耿家（中街西头）", x: 131.6, z: 569.5, kind: "place" },
+    { id: "LmMergedSideGate", name: "夹壁便门", x: 125.1, z: 564.8, kind: "place" },
   ];
 
   const maxZ = INHERIT_MAX_Z + outRows * cellM; // 910

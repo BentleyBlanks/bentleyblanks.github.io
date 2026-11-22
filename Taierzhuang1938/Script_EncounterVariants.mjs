@@ -196,15 +196,15 @@ function CompileMergedVariant(spec) {
     const dialogue = inFront
       ? SampleFlowDialogue(beat, time, actors)
       : SampleFlowDialogue(beat, time, actors, MERGED_DIALOGUE);
-    const stealthActive = ["09d", "09e", "09f"].includes(beat.id);
+    const stealthActive = ["09a", "09b", "09c"].includes(beat.id);
     const stealth = {
       active: stealthActive,
       noFire: stealthActive,
       pulling: false,
-      objective: stealthActive ? "西巷隐蔽摸向老耿家后院，途中禁止响枪" : null,
+      objective: stealthActive ? "穿过关帝庙与西巷绕向老耿家后院，途中禁止响枪" : null,
     };
     const signals = inFront ? [] : MergedSignals(time, timeline);
-    const duskStart = BeatById("12a").start, nightStart = BeatById("13f").start;
+    const duskStart = BeatById("12a").start, nightStart = BeatById("13e").start;
     const nightBlend = time < duskStart ? 0 : Clamp((time - duskStart) / Math.max(1, nightStart - duskStart), 0, 1);
 
     return {

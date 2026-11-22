@@ -41,7 +41,8 @@ export function DrawFlowDialogue(context, view, frame, width, height, drawBillbo
     if (!actor || view.VisibleActor && !view.VisibleActor(actor)) continue;
     const anchor = view.SpeechAnchor(actor);
     if (!anchor || anchor[0] < 0 || anchor[0] > width || anchor[1] < 0 || anchor[1] > height) continue;
-    const opacity = !drawBillboard&&view.ActorLabelOpacity ? view.ActorLabelOpacity(actor) : 1;
+    const opacityFn = view.SpeechOpacity || view.ActorLabelOpacity;
+    const opacity = !drawBillboard && opacityFn ? opacityFn.call(view, actor) : 1;
     if (opacity <= 0) continue;
     context.save();
     context.globalAlpha = opacity;
