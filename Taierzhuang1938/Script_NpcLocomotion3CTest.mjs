@@ -113,6 +113,68 @@ Check("FootLockController：支撑期磁吸锁地零滑移，抬脚摆腿平滑�
   assert.equal(swing.locked, false, "foot releases lock on swing liftoff");
 });
 
+Check("FootLockController.UpdatePair：转身轴脚零漂移 + 停步一脚钉死另一脚抬腿弧线收齐", () => {
+  const fl = new FootLockController();
+  const dt = 1 / 60;
+  // 1) 原地转身（turn）：先在 idle 站定，切入 turn 后右脚抬升 3.8cm 迈步，左脚应死死钉在原地 (0.12, 0.22)
+  fl.UpdatePair({
+    mode: "idle", ankleRestY: 0.10, dt,
+    feet: [
+      { animX: 0.12, animY: 0.10, animZ: 0.22, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+      { animX: -0.08, animY: 0.11, animZ: -0.18, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+    ],
+  });
+  let turnRes = null;
+  for (let i = 0; i < 12; i++) {
+    turnRes = fl.UpdatePair({
+      mode: "turn", ankleRestY: 0.10, dt,
+      feet: [
+        // 模拟取消 Hips 转向后原始动画左脚横向漂移 10cm
+        { animX: 0.12 + i * 0.008, animY: 0.10, animZ: 0.22 - i * 0.005, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+        // 右脚抬升 3.8cm 迈向新方向
+        { animX: -0.08 + i * 0.015, animY: 0.11 + 0.038, animZ: -0.18 + i * 0.012, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+      ],
+    });
+  }
+  assert.equal(turnRes[0].locked, true, "pivot left foot stays locked during turn");
+  assert.ok(Math.hypot(turnRes[0].targetX - 0.12, turnRes[0].targetZ - 0.22) < 0.002, "pivot foot has <2mm drift");
+  assert.equal(turnRes[1].locked, false, "stepping right foot releases freely");
+
+  // 2) 横移急停切静止（move -> idle）：左脚撑地、右脚离位 25cm，切 idle 后左脚先钉死、右脚抬腿 >=4.5cm 收步，再换左脚抬腿收齐
+  fl.Reset();
+  fl.UpdatePair({
+    mode: "move", ankleRestY: 0.10, dt, driftX: -0.03, driftZ: 0,
+    feet: [
+      { animX: 0.24, animY: 0.10, animZ: 0.02, hipX: 0, hipY: 0.90, hipZ: 0, maxReachM: 0.89 },
+      { animX: -0.28, animY: 0.16, animZ: -0.04, hipX: 0, hipY: 0.90, hipZ: 0, maxReachM: 0.89 },
+    ],
+  });
+  let maxRightLiftCm = 0, maxLeftLiftCm = 0;
+  let leftPinnedDuringRightStep = true;
+  let lastStop = null;
+  for (let f = 0; f < 40; f++) {
+    lastStop = fl.UpdatePair({
+      mode: "idle", ankleRestY: 0.10, dt, driftX: 0, driftZ: 0,
+      feet: [
+        { animX: 0.10, animY: 0.10, animZ: 0.12, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+        { animX: -0.10, animY: 0.10, animZ: -0.12, hipX: 0, hipY: 0.92, hipZ: 0, maxReachM: 0.89 },
+      ],
+    });
+    if (lastStop[1].stepping) {
+      maxRightLiftCm = Math.max(maxRightLiftCm, (lastStop[1].targetY - 0.10) * 100);
+      if (!lastStop[0].locked) leftPinnedDuringRightStep = false;
+    }
+    if (lastStop[0].stepping) {
+      maxLeftLiftCm = Math.max(maxLeftLiftCm, (lastStop[0].targetY - 0.10) * 100);
+    }
+  }
+  assert.ok(leftPinnedDuringRightStep, "planted left foot stays pinned while right foot steps into idle");
+  assert.ok(maxRightLiftCm >= 4.0, `trailing right foot lifts cleanly off floor (${maxRightLiftCm.toFixed(1)} cm)`);
+  assert.ok(maxLeftLiftCm >= 4.0, `anchor left foot then takes lifted settle step (${maxLeftLiftCm.toFixed(1)} cm)`);
+  assert.ok(Math.hypot(lastStop[0].targetX - 0.10, lastStop[0].targetZ - 0.12) < 0.02, "left foot settled into idle");
+  assert.ok(Math.hypot(lastStop[1].targetX - (-0.10), lastStop[1].targetZ - (-0.12)) < 0.02, "right foot settled into idle");
+});
+
 // 3. Turn-in-Place
 Check("Turn-in-Place：死区内双脚不动、上身补偿精确抵消；超死区触发迈步转身并收敛", () => {
   const tip = new TurnInPlaceController();

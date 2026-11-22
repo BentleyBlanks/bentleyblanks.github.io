@@ -1135,8 +1135,10 @@ class CharacterCompareUnit {
       }
     }
 
-    // 支撑脚锁地 2-Bone Leg IK：只改双腿骨，将落地支撑脚钉死在同步后退的地面点上，对上身/枪线零干扰
-    this._ApplyFootLock(vx, vz, dt, loco.moving && !tip.turning);
+    // 三态支撑脚锁地与停步收步 2-Bone Leg IK（move / turn / idle 全覆盖）：
+    // 行进零搓地、转身轴脚 0 漂移、急停切静止由一脚钉死 + 另一脚抬腿弧线收齐，对上身/枪线零干扰
+    const footMode = tip.turning ? "turn" : (loco.moving ? "move" : "idle");
+    this._ApplyFootLock(vx, vz, dt, footMode);
 
     this.telemetry.stateLabel = label;
     this.telemetry.pelvisWarpDeg = +(this.pelvisWarp / DEG).toFixed(1);
@@ -1215,7 +1217,7 @@ class CharacterCompareUnit {
       nominal += (r.speedMps || 1.3) * r.weight;
       effDur += (r.clip.duration || 1) * r.weight;
     }
-    const rate = mps > 0.05 ? Clamp(mps / Math.max(nominal * this.hipsScale, 0.2), 0.35, 2.4) : 0;
+    const rate = mps > 0.05 ? Clamp(mps / Math.max(nominal * this.hipsScale, 0.2), 0.12, 2.4) : 0;
     this.locoPhase = (this.locoPhase + (dt * rate) / Math.max(effDur, 0.2)) % 1;
     if (this.locoPhase < 0) this.locoPhase += 1;
 
@@ -1468,26 +1470,40 @@ class CharacterCompareUnit {
     this.telemetry.footLocked = anyLocked;
   }
 
-  /** 优化后方案的实时支撑脚锁地 2-Bone Leg IK，仅改写左右大腿/小腿/踝，绝不影响脊柱与瞄准。 */
-  _ApplyFootLock(vx, vz, dt, moving) {
+  /** 优化后方案的实时三态支撑脚锁地与收步 2-Bone Leg IK，仅改写左右大腿/小腿/踝，绝不影响脊柱与瞄准。 */
+  _ApplyFootLock(vx, vz, dt, footMode) {
     const driftX = -vx * dt, driftZ = -vz * dt;
-    let maxSolvedSlip = 0, anyLocked = false, solvedAny = false;
+    const rigs = [];
+    const inputs = [];
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? "Left" : "Right";
       const up = this.H(side + "UpLeg"), lo = this.H(side + "Leg"), ft = this.H(side + "Foot");
-      if (!up || !lo || !ft) { this.footPads[i].visible = false; continue; }
+      if (!up || !lo || !ft) { this.footPads[i].visible = false; return; }
       const A = FreshPosition(up), B = FreshPosition(lo), Cw = FreshPosition(ft);
-      const maxReachM = A.distanceTo(B) + B.distanceTo(Cw);
-      const res = this.footLock.UpdateFoot(i, {
+      rigs.push({ up, lo, ft, anim: Cw });
+      inputs.push({
         animX: Cw.x, animY: Cw.y, animZ: Cw.z,
         hipX: A.x, hipY: A.y, hipZ: A.z,
-        ankleRestY: this.ankleRestOffY, groundY: 0, maxReachM, dt, moving, driftX, driftZ,
+        maxReachM: A.distanceTo(B) + B.distanceTo(Cw),
       });
+    }
+    const results = this.footLock.UpdatePair({
+      mode: footMode,
+      feet: inputs,
+      ankleRestY: this.ankleRestOffY,
+      groundY: 0,
+      dt,
+      driftX,
+      driftZ,
+    });
+    let maxSolvedSlip = 0, anyLocked = false, solvedAny = false;
+    for (let i = 0; i < 2; i++) {
+      const res = results[i];
       if (res.active) {
-        this._SolveLeg(up, lo, ft, _p.set(res.targetX, res.targetY, res.targetZ));
+        this._SolveLeg(rigs[i].up, rigs[i].lo, rigs[i].ft, _p.set(res.targetX, res.targetY, res.targetZ));
         solvedAny = true;
       }
-      const after = FreshPosition(ft);
+      const after = FreshPosition(rigs[i].ft);
       const actualSlipCm = res.locked ? +(Math.hypot(after.x - res.lockX, after.z - res.lockZ) * 100).toFixed(1) : 0;
       this.footPads[i].visible = res.locked;
       if (res.locked) {
@@ -1496,8 +1512,8 @@ class CharacterCompareUnit {
         if (actualSlipCm > maxSolvedSlip) maxSolvedSlip = actualSlipCm;
       }
       this.lastFootProbe[i] = {
-        locked: res.locked, lockX: res.lockX, lockZ: res.lockZ,
-        animX: Cw.x, animY: Cw.y, animZ: Cw.z,
+        locked: res.locked, stepping: !!res.stepping, lockX: res.lockX, lockZ: res.lockZ,
+        animX: rigs[i].anim.x, animY: rigs[i].anim.y, animZ: rigs[i].anim.z,
         solvedX: after.x, solvedY: after.y, solvedZ: after.z,
         rawSlipCm: res.rawAnimSlipCm, solvedSlipCm: actualSlipCm,
       };
@@ -1899,7 +1915,7 @@ function EvaluateScenarioCommand(scenarioId, t, dt, state) {
     if (dt > 0) {
       state.smoothVx = Approach(state.smoothVx, targetVx, dt, tau);
       state.smoothVz = Approach(state.smoothVz, targetVz, dt, tau);
-      if (Math.hypot(targetVx, targetVz) < 1e-4 && Math.hypot(state.smoothVx, state.smoothVz) < 0.07) {
+      if (Math.hypot(targetVx, targetVz) < 1e-4 && Math.hypot(state.smoothVx, state.smoothVz) < 0.11) {
         state.smoothVx = 0; state.smoothVz = 0;
       }
     }

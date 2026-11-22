@@ -161,15 +161,16 @@ export function ComputeLocomotion2D({
 }
 
 /**
- * 2b) 实时支撑脚锁地控制器（Foot Locking State Machine，纯数学、零 three 依赖）。
+ * 2b) 实时支撑脚锁地控制器（Foot Locking + Stop-Settle State Machine，纯数学、零 three 依赖）。
  *
- * 在动画播放、Aim Offset 之后驱动左右腿 2-Bone IK：
- *   · 支撑期（脚踝贴近站立高度且未抬升）锁住着地点的世界 (x, z)；
- *   · 在跑步机预览模式下随地面滚动 (driftX = -vx*dt, driftZ = -vz*dt)，在真实世界模式下 drift = 0；
- *   · 抬脚或超安全腿长时平滑释放回原始动捕弧线，彻底消除肉眼可见的脚底搓地与平移感。
+ * 三种工作模式无缝衔接（move / turn / idle）：
+ *   · move（走/跑/横移）：支撑期锁住着地点的世界 (x, z)，随地面滚动 (driftX, driftZ)，抬脚平滑释放；
+ *   · turn（原地迈步转身）：用双脚各自归一化抬升差识别支撑轴脚与迈步脚，轴脚 0 cm 钉死绝不漂移，迈步脚自由转体；
+ *   · idle（停步收脚与站定）：切静止绝不瞬间丢锁导致双脚冰面横滑——保留支撑脚钉死，另一脚自动抬起 5~8 cm 弧线收步落稳后再依次换脚收齐。
  */
 export class FootLockController {
   constructor() {
+    this.prevMode = "idle";
     this.feet = [0, 1].map(() => ({
       locked: false,
       weight: 0,
@@ -177,12 +178,17 @@ export class FootLockController {
       lockZ: 0,
       floorOffY: null,
       prevAnimY: null,
+      lastSolvedX: null,
+      lastSolvedY: null,
+      lastSolvedZ: null,
+      step: null, // { startX, startZ, elapsed, dur, liftM }
       slipAccumM: 0,
       maxSlipM: 0,
     }));
   }
 
   Reset() {
+    this.prevMode = "idle";
     for (const f of this.feet) {
       f.locked = false;
       f.weight = 0;
@@ -190,15 +196,305 @@ export class FootLockController {
       f.lockZ = 0;
       f.floorOffY = null;
       f.prevAnimY = null;
+      f.lastSolvedX = null;
+      f.lastSolvedY = null;
+      f.lastSolvedZ = null;
+      f.step = null;
       f.slipAccumM = 0;
       f.maxSlipM = 0;
     }
   }
 
   /**
-   * 更新单只脚的锁地目标。
-   * 支持不同角色靴底高度自适应（通过 floorOffY 追踪实际最低触地踝高），
-   * 触地瞬间从当前求解位置连续上锁（零跳变 + 零弹性回滑），抬脚摆腿时平滑交还动画。
+   * 同步更新左右双脚的锁地与收步目标（支持 "move" | "turn" | "idle" 三模式连续切换）。
+   * @param {{ mode?: "move"|"turn"|"idle", feet: Array<{animX:number,animY:number,animZ:number,hipX:number,hipY:number,hipZ:number,maxReachM:number}>, ankleRestY:number, groundY?:number, dt:number, driftX?:number, driftZ?:number, teleported?:boolean }} params
+   */
+  UpdatePair({
+    mode = "move",
+    feet,
+    ankleRestY,
+    groundY = 0,
+    dt,
+    driftX = 0,
+    driftZ = 0,
+    teleported = false,
+  }) {
+    if (teleported || !(dt > 0) || !feet || feet.length < 2) {
+      if (teleported) this.Reset();
+      this.prevMode = mode;
+      return [0, 1].map((i) => {
+        const inp = feet?.[i] || { animX: 0, animY: ankleRestY, animZ: 0 };
+        const f = this.feet[i];
+        f.prevAnimY = inp.animY;
+        f.lastSolvedX = inp.animX;
+        f.lastSolvedY = inp.animY;
+        f.lastSolvedZ = inp.animZ;
+        return {
+          active: false, weight: 0,
+          targetX: inp.animX, targetY: inp.animY, targetZ: inp.animZ,
+          lockX: inp.animX, lockZ: inp.animZ,
+          locked: false, stepping: false, rawAnimSlipCm: 0, solvedSlipCm: 0,
+        };
+      });
+    }
+
+    const restOff = ankleRestY - groundY;
+    const prevMode = this.prevMode;
+    this.prevMode = mode;
+
+    // 1) 公共预处理：更新每只脚的自适应接地基线 floorOffY、垂直速度 vy，以及随地漂移地钉/收步起点
+    const lifts = [0, 0];
+    const vys = [0, 0];
+    const floorYs = [0, 0];
+    for (let i = 0; i < 2; i += 1) {
+      const f = this.feet[i];
+      const inp = feet[i];
+      const footLocalY = inp.animY - groundY;
+      if (f.floorOffY === null) f.floorOffY = footLocalY;
+      if (mode === "idle" && !f.step && f.weight < 0.05) {
+        // 站稳静止时贴合各自真实靴高（兼容如右脚微垫脚跟的 1.3 cm 左右差）
+        const k = 1 - Math.exp(-dt / 0.08);
+        f.floorOffY = Clamp(f.floorOffY + (footLocalY - f.floorOffY) * k, restOff - 0.045, restOff + 0.055);
+      } else if (footLocalY < f.floorOffY) {
+        const k = 1 - Math.exp(-dt / 0.035);
+        f.floorOffY = Math.max(restOff - 0.045, f.floorOffY + (footLocalY - f.floorOffY) * k);
+      } else if (!f.locked && !f.step && footLocalY > f.floorOffY + 0.012) {
+        f.floorOffY = Math.min(restOff + 0.055, f.floorOffY + 0.025 * dt);
+      }
+      floorYs[i] = groundY + f.floorOffY;
+      lifts[i] = inp.animY - floorYs[i];
+      vys[i] = f.prevAnimY !== null ? (inp.animY - f.prevAnimY) / Math.max(dt, 1e-4) : 0;
+      f.prevAnimY = inp.animY;
+
+      if (f.locked || f.weight > 1e-3) {
+        f.lockX += driftX;
+        f.lockZ += driftZ;
+      }
+      if (f.step) {
+        f.step.startX += driftX;
+        f.step.startZ += driftZ;
+      }
+    }
+
+    // 若从 idle 收步途中重新进入 move / turn：把进行中的收步无缝转为平滑释放，杜绝切态跳变
+    if (mode !== "idle") {
+      for (let i = 0; i < 2; i += 1) {
+        const f = this.feet[i];
+        if (f.step) {
+          f.lockX = f.lastSolvedX ?? feet[i].animX;
+          f.lockZ = f.lastSolvedZ ?? feet[i].animZ;
+          f.locked = false;
+          f.weight = 0.85;
+          f.step = null;
+        }
+      }
+    }
+
+    // 2) 模式 A：移动步态（walk / run / strafe）
+    if (mode === "move") {
+      return [0, 1].map((i) => {
+        const f = this.feet[i];
+        const inp = feet[i];
+        const lift = lifts[i], vy = vys[i], floorY = floorYs[i];
+        if (f.locked) {
+          const distFromAnim = Math.hypot(f.lockX - inp.animX, f.lockZ - inp.animZ);
+          const distFromHip = Math.hypot(f.lockX - inp.hipX, floorY - inp.hipY, f.lockZ - inp.hipZ);
+          if (lift > 0.044 || (lift > 0.022 && vy > 0.28) || distFromAnim > 0.30 || distFromHip > inp.maxReachM * 0.985) {
+            f.locked = false;
+          }
+        } else if (lift < 0.032 && vy < 0.25) {
+          const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
+          const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+          f.locked = true;
+          f.lockX = curX;
+          f.lockZ = curZ;
+          f.weight = 1;
+          f.slipAccumM = 0;
+        }
+        if (!f.locked && f.weight > 0) {
+          f.weight *= Math.exp(-dt / 0.070);
+          if (f.weight < 1e-3) f.weight = 0;
+        }
+        return this._EmitFoot(i, inp, floorY, false);
+      });
+    }
+
+    // 3) 模式 B：原地迈步转身（Turn-in-Place）—— 轴脚钉死 0 漂移，迈步脚靠相对抬升差灵敏松锁
+    if (mode === "turn") {
+      // 刚从静止进入转身：先把双脚起钉在当前真实站立点，避免 Idle -> Turn90 起始姿态 12 cm 横滑
+      if (prevMode === "idle") {
+        for (let i = 0; i < 2; i += 1) {
+          const f = this.feet[i];
+          const sx = f.lastSolvedX ?? feet[i].animX;
+          const sz = f.lastSolvedZ ?? feet[i].animZ;
+          f.locked = true;
+          f.lockX = sx;
+          f.lockZ = sz;
+          f.weight = 1;
+        }
+      }
+      for (let i = 0; i < 2; i += 1) {
+        const f = this.feet[i];
+        const inp = feet[i];
+        const lift = lifts[i], otherLift = lifts[1 - i], vy = vys[i], floorY = floorYs[i];
+        const relLift = lift - otherLift;
+        if (f.locked) {
+          const distFromAnim = Math.hypot(f.lockX - inp.animX, f.lockZ - inp.animZ);
+          const distFromHip = Math.hypot(f.lockX - inp.hipX, floorY - inp.hipY, f.lockZ - inp.hipZ);
+          // 抬升明显高于另一只支撑脚（兼容各角色 3.2~5.7 cm 迈步高度）或超安全距时释放迈步
+          if (relLift > 0.015 || (relLift > 0.008 && vy > 0.14) || lift > 0.026 || distFromAnim > 0.28 || distFromHip > inp.maxReachM * 0.985) {
+            f.locked = false;
+          }
+        } else if (relLift < 0.010 && lift < 0.020 && vy < 0.12) {
+          const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
+          const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+          f.locked = true;
+          f.lockX = curX;
+          f.lockZ = curZ;
+          f.weight = 1;
+        }
+        if (!f.locked && f.weight > 0) {
+          f.weight *= Math.exp(-dt / 0.055);
+          if (f.weight < 1e-3) f.weight = 0;
+        }
+      }
+      return [0, 1].map((i) => this._EmitFoot(i, feet[i], floorYs[i], false));
+    }
+
+    // 4) 模式 C：停步收脚与站定（Idle）—— 支撑脚保持钉死，离位脚自动做 5~8 cm 抬脚收步弧线落稳，杜绝切静止滑冰！
+    const f0 = this.feet[0], f1 = this.feet[1];
+    if (prevMode !== "idle") {
+      // 刚从移动或转身切入静止：确保至少有一只更贴地的脚处于钉死状态（即使在跑步腾空帧急停也不双脚齐滑）
+      if (!f0.locked && !f1.locked) {
+        const y0 = f0.lastSolvedY ?? feet[0].animY;
+        const y1 = f1.lastSolvedY ?? feet[1].animY;
+        const anchor = y0 <= y1 ? 0 : 1;
+        const fa = this.feet[anchor];
+        fa.locked = true;
+        fa.lockX = fa.lastSolvedX ?? feet[anchor].animX;
+        fa.lockZ = fa.lastSolvedZ ?? feet[anchor].animZ;
+        fa.weight = 1;
+      }
+      // 另一只未锁的摆动脚若离 Idle 站位 > 4.5 cm，直接以抬脚弧线收步，不贴地搓过去
+      for (let i = 0; i < 2; i += 1) {
+        const f = this.feet[i];
+        if (f.locked || f.step) continue;
+        const sx = f.lastSolvedX ?? feet[i].animX;
+        const sz = f.lastSolvedZ ?? feet[i].animZ;
+        const dist = Math.hypot(sx - feet[i].animX, sz - feet[i].animZ);
+        if (dist > 0.045) {
+          f.step = { startX: sx, startZ: sz, elapsed: 0, dur: 0.21, liftM: Clamp(dist * 0.28, 0.045, 0.080) };
+          f.weight = 1;
+        }
+      }
+    }
+
+    // 推进进行中的抬脚收步
+    for (let i = 0; i < 2; i += 1) {
+      const f = this.feet[i];
+      if (!f.step) continue;
+      f.step.elapsed += dt;
+      if (f.step.elapsed >= f.step.dur) {
+        f.step = null;
+        f.locked = true;
+        f.lockX = feet[i].animX;
+        f.lockZ = feet[i].animZ;
+        f.weight = 1;
+      }
+    }
+
+    // 若两脚当前都未在抬脚收步，但有锁地脚偏离 Idle 站位 > 4.5 cm（或超腿长），让偏离更大的那只脚抬脚收齐（另一只保持钉死！）
+    if (!f0.step && !f1.step) {
+      const errs = [0, 1].map((i) => {
+        const f = this.feet[i], inp = feet[i];
+        if (!f.locked && f.weight < 0.05) return 0;
+        const cx = inp.animX + (f.lockX - inp.animX) * f.weight;
+        const cz = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+        return Math.hypot(cx - inp.animX, cz - inp.animZ);
+      });
+      const maxErr = Math.max(errs[0], errs[1]);
+      if (maxErr > 0.045) {
+        const mover = errs[0] >= errs[1] ? 0 : 1;
+        const anchor = 1 - mover;
+        const fm = this.feet[mover], fa = this.feet[anchor];
+        // 确保支撑脚先钉牢
+        if (!fa.locked) {
+          fa.locked = true;
+          fa.lockX = fa.lastSolvedX ?? feet[anchor].animX;
+          fa.lockZ = fa.lastSolvedZ ?? feet[anchor].animZ;
+          fa.weight = 1;
+        }
+        const sx = feet[mover].animX + (fm.lockX - feet[mover].animX) * fm.weight;
+        const sz = feet[mover].animZ + (fm.lockZ - feet[mover].animZ) * fm.weight;
+        fm.locked = false;
+        fm.weight = 1;
+        fm.step = { startX: sx, startZ: sz, elapsed: 0, dur: 0.21, liftM: Clamp(errs[mover] * 0.28, 0.045, 0.080) };
+      } else if (Math.hypot(driftX, driftZ) < 1e-4) {
+        // 双脚已全部收齐且地面完全刹停：平滑淡出 IK 权重归还自然待机呼吸
+        for (let i = 0; i < 2; i += 1) {
+          const f = this.feet[i];
+          f.locked = false;
+          if (f.weight > 0) {
+            f.weight *= Math.exp(-dt / 0.10);
+            if (f.weight < 1e-3) f.weight = 0;
+          }
+        }
+      }
+    }
+
+    return [0, 1].map((i) => this._EmitFoot(i, feet[i], floorYs[i], true));
+  }
+
+  _EmitFoot(index, inp, floorY, allowStep) {
+    const f = this.feet[index];
+    if (allowStep && f.step) {
+      const u = Clamp(f.step.elapsed / f.step.dur, 0, 1);
+      const e = Smooth01(u);
+      const targetX = f.step.startX + (inp.animX - f.step.startX) * e;
+      const targetZ = f.step.startZ + (inp.animZ - f.step.startZ) * e;
+      const targetY = Math.max(floorY, inp.animY) + Math.sin(Math.PI * u) * f.step.liftM;
+      f.lastSolvedX = targetX;
+      f.lastSolvedY = targetY;
+      f.lastSolvedZ = targetZ;
+      return {
+        active: true,
+        weight: 1,
+        targetX,
+        targetY,
+        targetZ,
+        lockX: targetX,
+        lockZ: targetZ,
+        locked: false,
+        stepping: true,
+        rawAnimSlipCm: 0,
+        solvedSlipCm: 0,
+      };
+    }
+    const targetX = inp.animX + (f.lockX - inp.animX) * f.weight;
+    const targetZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+    const targetY = f.locked ? Math.max(floorY, inp.animY) : inp.animY;
+    const rawSlipM = f.locked ? Math.hypot(inp.animX - f.lockX, inp.animZ - f.lockZ) : 0;
+    if (rawSlipM > f.maxSlipM) f.maxSlipM = rawSlipM;
+    f.lastSolvedX = targetX;
+    f.lastSolvedY = targetY;
+    f.lastSolvedZ = targetZ;
+    return {
+      active: f.weight > 1e-3,
+      weight: f.weight,
+      targetX,
+      targetY,
+      targetZ,
+      lockX: f.lockX,
+      lockZ: f.lockZ,
+      locked: f.locked,
+      stepping: false,
+      rawAnimSlipCm: +(rawSlipM * 100).toFixed(1),
+      solvedSlipCm: f.locked ? +(Math.hypot(targetX - f.lockX, targetZ - f.lockZ) * 100).toFixed(1) : 0,
+    };
+  }
+
+  /**
+   * 兼容单脚调用接口（单元测试及旧探针复用）。
    */
   UpdateFoot(index, {
     animX, animY, animZ,
@@ -216,6 +512,7 @@ export class FootLockController {
     const restOff = ankleRestY - groundY;
     if (teleported || !moving || !(dt > 0)) {
       f.locked = false;
+      f.step = null;
       if (teleported) {
         f.weight = 0;
         f.floorOffY = null;
@@ -228,6 +525,7 @@ export class FootLockController {
       f.prevAnimY = animY;
       const targetX = animX + (f.lockX - animX) * f.weight;
       const targetZ = animZ + (f.lockZ - animZ) * f.weight;
+      f.lastSolvedX = targetX; f.lastSolvedY = animY; f.lastSolvedZ = targetZ;
       return {
         active: f.weight > 1e-3,
         weight: f.weight,
@@ -237,6 +535,7 @@ export class FootLockController {
         lockX: f.lockX,
         lockZ: f.lockZ,
         locked: false,
+        stepping: false,
         rawAnimSlipCm: 0,
         solvedSlipCm: 0,
       };
@@ -255,7 +554,6 @@ export class FootLockController {
     const vy = f.prevAnimY !== null ? (animY - f.prevAnimY) / Math.max(dt, 1e-4) : 0;
     f.prevAnimY = animY;
 
-    // 无论是锁地期还是松锁淡出期，地钉点都随地面同步漂移（世界模式 drift=0，跑步机模式 drift=-v*dt）
     if (f.locked || f.weight > 1e-3) {
       f.lockX += driftX;
       f.lockZ += driftZ;
@@ -264,12 +562,10 @@ export class FootLockController {
     if (f.locked) {
       const distFromAnim = Math.hypot(f.lockX - animX, f.lockZ - animZ);
       const distFromHip = Math.hypot(f.lockX - hipX, floorY - hipY, f.lockZ - hipZ);
-      // 抬脚离地超过滞回阈值（兼容蹲走小步幅）、明显上蹬、拉扯超安全帽、或超出 98.5% 腿长时自动松锁进入摆腿期
       if (lift > 0.044 || (lift > 0.022 && vy > 0.28) || distFromAnim > 0.30 || distFromHip > maxReachM * 0.985) {
         f.locked = false;
       }
     } else if (lift < 0.032 && vy < 0.25) {
-      // C0 连续瞬时上锁：从当前脚部求解坐标起钉并立刻将 weight 置 1，杜绝落脚跳变与前几帧弹性回滑
       const curX = animX + (f.lockX - animX) * f.weight;
       const curZ = animZ + (f.lockZ - animZ) * f.weight;
       f.locked = true;
@@ -284,25 +580,7 @@ export class FootLockController {
       if (f.weight < 1e-3) f.weight = 0;
     }
 
-    // 锁定时脚底沿地钉 (lockX, lockZ) 吸住，高度不陷入地面；释放时平滑回到 animPos
-    const targetX = animX + (f.lockX - animX) * f.weight;
-    const targetZ = animZ + (f.lockZ - animZ) * f.weight;
-    const targetY = f.locked ? Math.max(floorY, animY) : animY;
-    const rawSlipM = f.locked ? Math.hypot(animX - f.lockX, animZ - f.lockZ) : 0;
-    if (rawSlipM > f.maxSlipM) f.maxSlipM = rawSlipM;
-
-    return {
-      active: f.weight > 1e-3,
-      weight: f.weight,
-      targetX,
-      targetY,
-      targetZ,
-      lockX: f.lockX,
-      lockZ: f.lockZ,
-      locked: f.locked,
-      rawAnimSlipCm: +(rawSlipM * 100).toFixed(1),
-      solvedSlipCm: f.locked ? +(Math.hypot(targetX - f.lockX, targetZ - f.lockZ) * 100).toFixed(1) : 0,
-    };
+    return this._EmitFoot(index, { animX, animY, animZ }, floorY, false);
   }
 }
 

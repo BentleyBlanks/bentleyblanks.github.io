@@ -67,8 +67,8 @@ export const XBOT = Object.freeze({
   stepS: 0.12,
   /** 跑和走的分界（m/s），同原生步态 */
   runMps: 2.2,
-  /** 原地循环动作的播放速率夹在这个范围里（覆盖实测 STANCE_MPS 0.36..3.82 m/s 与不同走跑速度匹配） */
-  rate: [0.35, 2.4],
+  /** 原地循环动作的播放速率夹在这个范围里（覆盖实测 STANCE_MPS 0.22..3.82 m/s 与减速刹停，防低速快脚滑步） */
+  rate: [0.12, 2.4],
   /** 动作预览工具里标定步枪用的那条（第 0 帧两手都在枪上） */
   rifleCalibration: "Animation_Mixamo_RifleAimingIdle_V1.glb",
   /** 开一枪之后播开枪动作这么久（试玩里 AI 的 state.firing 只亮一帧） */
@@ -1078,11 +1078,12 @@ export class XBotSkin {
     for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.preOverlayQ[i].copy(this.boneList[i].quaternion);
     this.preOverlayValid = true;
     this.container.updateMatrixWorld(true);
-    // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格）+ 开火上半身 Additive 叠加 + 支撑脚锁地 2-Bone Leg IK
+    // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格）+ 开火上半身 Additive 叠加 + 三态支撑脚锁地/收步 2-Bone Leg IK
     if (live3C) {
       this._ApplySpineAimOffset(intent, lowerYawOff, aimWeight, stance, rifle);
       this._ApplyAdditiveFire(intent, rifle, stance);
-      this._ApplyFootLock(dt, !!loco3c?.moving && !tip3c?.turning, stance, teleported);
+      const footMode = tip3c?.turning ? "turn" : (loco3c?.moving ? "move" : "idle");
+      this._ApplyFootLock(dt, footMode, stance, teleported);
       this.container.updateMatrixWorld(true);
     }
     this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
@@ -1589,27 +1590,42 @@ export class XBotSkin {
   }
 
   /**
-   * 支撑脚锁地 2-Bone Leg IK（Foot Locking）：
-   * 脚踩进支撑期瞬间记下世界落点，用解析两节腿 IK 把脚踝钉死在地面落点，彻底消除动捕非匀速起伏带来的脚底滑移；
+   * 支撑脚锁地与停步收脚 2-Bone Leg IK（Foot Locking + Stop-Settle）：
+   *   · move：支撑脚钉死世界落点，零搓地；
+   *   · turn：原地转身时轴脚钉死 0 漂移，迈步脚按相对抬升释放；
+   *   · idle：切静止时保持一脚钉死，另一脚抬起 5~8 cm 弧线收步落稳，杜绝刹停滑冰。
    * 仅作用于 UpLeg / Leg / Foot，对 Hips、脊柱与步枪瞄线 0° 零干扰。
    */
-  _ApplyFootLock(dt, moving, stance, teleported) {
+  _ApplyFootLock(dt, footMode, stance, teleported) {
     if (stance === "prone") { this.footLock.Reset(); return; }
     const groundY = this.container.matrixWorld.elements[13];
     const scaleY = this.container.matrixWorld.getMaxScaleOnAxis() || 1;
     const ankleRestY = groundY + this.ankleRestOffY * scaleY;
+    const rigs = [];
+    const inputs = [];
     for (let i = 0; i < 2; i += 1) {
       const side = i === 0 ? "Left" : "Right";
       const up = this.H(side + "UpLeg"), lo = this.H(side + "Leg"), ft = this.H(side + "Foot");
-      if (!up || !lo || !ft) continue;
+      if (!up || !lo || !ft) return;
       const A = FreshPosition(up), B = FreshPosition(lo), Cw = FreshPosition(ft);
-      const maxReachM = A.distanceTo(B) + B.distanceTo(Cw);
-      const res = this.footLock.UpdateFoot(i, {
+      rigs.push({ up, lo, ft });
+      inputs.push({
         animX: Cw.x, animY: Cw.y, animZ: Cw.z,
         hipX: A.x, hipY: A.y, hipZ: A.z,
-        ankleRestY, groundY, maxReachM, dt, moving, teleported,
+        maxReachM: A.distanceTo(B) + B.distanceTo(Cw),
       });
-      if (res.active) this._SolveLeg(up, lo, ft, _p.set(res.targetX, res.targetY, res.targetZ));
+    }
+    const results = this.footLock.UpdatePair({
+      mode: footMode,
+      feet: inputs,
+      ankleRestY,
+      groundY,
+      dt,
+      teleported,
+    });
+    for (let i = 0; i < 2; i += 1) {
+      const res = results[i];
+      if (res.active) this._SolveLeg(rigs[i].up, rigs[i].lo, rigs[i].ft, _p.set(res.targetX, res.targetY, res.targetZ));
     }
   }
 
