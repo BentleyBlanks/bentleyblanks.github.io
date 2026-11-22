@@ -32,7 +32,7 @@
 
 样本与记录位于 [DugoutAidOpenFields 材质烘焙目录](../../_import/DugoutAidOpenFields/Data_DugoutMaterialSources.json)。近景贴图随 GLB 载入，烘焙样本随仓库保存。版本对照和新版源工程位于 OneDrive 的 `DugoutAidOpenFields/MaterialDetail/`。
 
-Pages 对树皮、木茬、草根覆土、夯土、碎石和灰砖的反照率使用原尺寸高质量 WebP，对法线与 AO/粗糙度保留 GPU 纹理。发布规则对应 GLB 图像索引 2、6、9、12、15、18。改动 GLB 的材质顺序时，需核对索引对应的反照率图。
+Pages 对模型包的反照率使用原尺寸高质量 WebP，法线与 AO/粗糙度保留 GPU 纹理。改动 GLB 的材质顺序时，按 `pbrMetallicRoughness.baseColorTexture` 核对发布规则中的图像索引。
 
 ## 重建
 
