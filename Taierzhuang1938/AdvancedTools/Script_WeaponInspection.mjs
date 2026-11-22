@@ -12,7 +12,6 @@ const KIND = {
   throwable: "投掷物", melee: "刀具", mortar: "架设武器", vehicle: "战车",
 };
 const SIDE = { nra: "中方", ija: "日方", neutral: "待考" };
-const VIEWS = { side: [0, 0], angle: [-.32, .28], top: [0, Math.PI / 2 - .001] };
 const SCALE_METERS = [.005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
 const number = new Intl.NumberFormat("zh-CN");
 const ById = (id) => document.getElementById(id);
@@ -39,10 +38,8 @@ const gridButton = ById("gridToggle");
 const mountButton = ById("mountToggle");
 const bladeButton = ById("bayonetToggle");
 const scale = ById("viewScale");
-const fitButton = ById("fitView");
-const presets = [...document.querySelectorAll("[data-view]")];
-const zoomButtons = [...document.querySelectorAll("[data-zoom]")];
-const viewButtons = [...presets, ...zoomButtons, fitButton, gridButton, mountButton, bladeButton];
+const channelButtons = [...document.querySelectorAll("[data-channel]")];
+const viewButtons = [...channelButtons, gridButton, mountButton, bladeButton];
 const dimensionIds = ["sizeX", "sizeY", "sizeZ"];
 const mountLabels = [
   { key: "muzzle", label: ById("muzzleLabel") },
@@ -166,12 +163,7 @@ async function Select(id, variant = 0) {
 
 function BindViewport() {
   const panAxis = new THREE.Vector3();
-  const SetView = (id) => {
-    for (const button of presets) SetPressed(button, button.dataset.view === id);
-    stage.SetView(...VIEWS[id]);
-  };
   const Rotate = (dx, dy) => {
-    for (const preset of presets) SetPressed(preset, false);
     stage.yaw -= dx * .009;
     const limit = Math.PI / 2 - .001;
     stage.pitch = Math.max(-limit, Math.min(limit, stage.pitch + dy * .009));
@@ -187,9 +179,12 @@ function BindViewport() {
     stage.center.addScaledVector(panAxis.setFromMatrixColumn(stage.camera.matrixWorld, 1), dy * metersPerPixel);
     stage.RequestDraw();
   };
-  for (const button of presets) button.addEventListener("click", () => SetView(button.dataset.view));
-  for (const button of zoomButtons) button.addEventListener("click", () => Zoom(button.dataset.zoom === "in" ? 1.25 : .8));
-  fitButton.addEventListener("click", () => stage.Fit());
+  for (const button of channelButtons) {
+    button.addEventListener("click", () => {
+      stage.SetChannel(button.dataset.channel);
+      for (const item of channelButtons) SetPressed(item, item === button);
+    });
+  }
   gridButton.addEventListener("click", () => {
     stage.gridVisible = !stage.gridVisible;
     if (stage.grid) stage.grid.visible = stage.gridVisible;
@@ -240,7 +235,7 @@ function BindViewport() {
     else return;
     event.preventDefault();
   });
-  SetView("angle");
+  stage.SetView(-.32, .28);
 }
 
 const back = ById("controlCenter");

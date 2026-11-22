@@ -206,7 +206,7 @@ try {
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
       && independent.opener?.endsWith("/ControlCenter.html") && independent.standalone && independent.noWrites
       && independent.models === Object.keys(WEAPONS).length, JSON.stringify(independent));
-    const pixels = await page.evaluate(() => {
+    const ReadPixels = () => page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
       stage.Draw();
       const copy = document.createElement("canvas");
@@ -215,44 +215,88 @@ try {
       const ctx = copy.getContext("2d");
       ctx.drawImage(stage.canvas, 0, 0);
       const data = ctx.getImageData(0, 0, copy.width, copy.height).data;
-      let minX = copy.width, maxX = 0, count = 0;
+      let minX = copy.width, maxX = 0, count = 0, min = 255, max = 0, chromatic = 0, hash = 0;
       for (let i = 3; i < data.length; i += 4) {
         if (data[i] < 245) continue;
         const x = ((i - 3) / 4) % copy.width;
+        const r = data[i - 3], g = data[i - 2], b = data[i - 1];
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
+        min = Math.min(min, r);
+        max = Math.max(max, r);
+        if (r !== g || g !== b) chromatic += 1;
+        hash = Math.imul(hash ^ ((r << 16) | (g << 8) | b), 16777619);
         count += 1;
       }
-      return { count, left: minX / copy.width, right: maxX / copy.width,
+      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, chromatic, hash,
         triangles: stage.model.triangles, quiet: stage.model.blade?.visible === false };
     });
+    const pixels = await ReadPixels();
     Check("中正式真实模型在视口内居中且占主要宽度",
       pixels.count > 2500 && pixels.left > .03 && pixels.right < .97 && pixels.right - pixels.left > .60
       && pixels.triangles === 6703 && pixels.quiet, JSON.stringify(pixels));
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
 
-    await page.locator('[data-view="top"]').click();
-    Check("俯视按钮实际切换相机", await page.evaluate(() => window.WeaponInspection.scene.pitch > 1.56));
-    await page.locator('[data-view="side"]').click();
+    const channels = ["beauty", "normal", "tangent", "albedo", "roughness", "metallic", "ao", "reflection", "shadow"];
+    const Channel = (id) => page.locator(`[data-channel="${id}"]`).click();
+    const activeChannel = page.locator('.view-bar button[aria-pressed="true"]');
+    Check("顶栏只保留渲染通道切换", (await page.locator(".view-bar button").evaluateAll((buttons) =>
+      buttons.map((button) => button.dataset.channel))).join() === channels.join());
+
+    await page.locator("#gridToggle").click();
+    await Inspect("HanYang");
+    const CameraState = () => page.evaluate(() => {
+      const { yaw, pitch, zoom, center } = window.WeaponInspection.scene;
+      return [yaw, pitch, zoom, ...center.toArray()];
+    });
+    const beforeChannels = await CameraState();
+    const rendered = {};
+    let channelSelection = true;
+    for (const id of channels) {
+      await Channel(id);
+      rendered[id] = await ReadPixels();
+      channelSelection &&= await activeChannel.count() === 1 && await activeChannel.getAttribute("data-channel") === id;
+    }
+    const views = Object.values(rendered);
+    Check("汉阳造九个通道各自绘制模型并保持机位",
+      channelSelection && views.every((view) => view.count > 2500 && view.count === rendered.beauty.count)
+      && new Set(views.map((view) => view.hash)).size === channels.length
+      && (await CameraState()).join() === beforeChannels.join());
+    Check("法线、切线、底色和反射保留色彩，粗糙度、金属度和阴影有真实灰阶",
+      [rendered.normal, rendered.tangent, rendered.albedo, rendered.reflection].every((view) => view.chromatic > 1000)
+      && [rendered.roughness, rendered.metallic, rendered.shadow].every((view) => view.chromatic === 0 && view.max - view.min > 10)
+      && rendered.shadow.min < 128 && rendered.shadow.max === 255);
+    await Channel("beauty");
+    Check("切回完整材质恢复同一画面", (await ReadPixels()).hash === rendered.beauty.hash);
+    await Channel("ao");
+    await Inspect("ZhongZheng");
+    const packedAo = await ReadPixels();
+    Check("换模型保留通道，AO 分别读取打包贴图与无遮蔽默认值",
+      await activeChannel.getAttribute("data-channel") === "ao" && packedAo.chromatic === 0 && packedAo.max < 255
+      && packedAo.count > 2500 && rendered.ao.min === 255);
+    await Channel("beauty");
+    await page.locator("#gridToggle").click();
+
     const canvas = page.locator("#view");
     const rect = await canvas.boundingBox();
+    const [beforeYaw, beforePitch] = await CameraState();
     await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
     await page.mouse.down();
     await page.mouse.move(rect.x + rect.width / 2 + 65, rect.y + rect.height / 2 + 25, { steps: 4 });
     await page.mouse.up();
     await page.mouse.wheel(0, -230);
     await page.waitForFunction(() => window.WeaponInspection.scene.zoom > 1);
-    Check("拖动、滚轮和适配改变实际相机",
-      await page.evaluate(() => window.WeaponInspection.scene.yaw !== 0
-        && !document.querySelector('[data-view][aria-pressed="true"]')));
+    const [yaw, pitch] = await CameraState();
+    Check("拖动、滚轮改变实际相机", Math.abs(yaw - beforeYaw) > .1 && Math.abs(pitch - beforePitch) > .1);
     const beforePan = await page.evaluate(() => window.WeaponInspection.scene.center.toArray());
     await page.mouse.down({ button: "right" });
     await page.mouse.move(rect.x + rect.width / 2 + 103, rect.y + rect.height / 2 + 25, { steps: 3 });
     await page.mouse.up({ button: "right" });
     Check("右键拖动平移检视中心", await page.evaluate((before) => window.WeaponInspection.scene.center.toArray()
       .some((value, index) => Math.abs(value - before[index]) > .01), beforePan));
-    await page.locator("#fitView").click();
-    Check("适配复位倍率", await page.evaluate(() => window.WeaponInspection.scene.zoom === 1));
+    await canvas.press("Home");
+    const [, , resetZoom, ...resetCenter] = await CameraState();
+    Check("Home 适配复位倍率和中心", resetZoom === 1 && resetCenter.every((value, index) => Math.abs(value - beforePan[index]) < .001));
     await page.locator("#gridToggle").click();
     await page.locator("#mountToggle").click();
     await page.waitForFunction(() => !document.querySelector("#muzzleLabel").hidden && !document.querySelector("#gripLabel").hidden);
@@ -280,7 +324,7 @@ try {
       for (const id of ids) {
         const model = await tool.Select(id);
         if (!model) { details[id] = null; continue; }
-        model.group.updateMatrixWorld(true);
+        tool.scene.Draw();
         details[id] = {
           minY: new Box3().setFromObject(model.body, true).min.y,
           pitch: model.pose.rotation.x, span: model.size.toArray(), turret: !!model.nodes?.get("turret"), triangles: model.triangles,
@@ -302,6 +346,10 @@ try {
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionMobile.png") });
     Check("窄窗口视口和控制可达、没有横向溢出", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
       && document.querySelector("#view").clientWidth > 280 && document.querySelector("#view").clientHeight > 220));
+    await page.setViewportSize({ width: 280, height: 550 });
+    Check("通道多行排列时保留可用视口", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
+      && document.querySelector("#view").clientHeight > 220
+      && [...document.querySelectorAll("[data-channel]")].every((button) => button.getBoundingClientRect().right <= innerWidth)));
     Check("枪械检查台只读资源，不启动游戏与摄影棚", requests.length > 0
       && requests.every(({ url, method }) => method === "GET" && !/Script_(Main|ToolStudioRenderBase)\.mjs|\/__scene\//.test(url)));
     Check("枪械窗口没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));

@@ -8,7 +8,7 @@
   <link rel="icon" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261113earbraid">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261113ToolsSeparation">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122CommandRoom">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122Channels">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
@@ -33,21 +33,21 @@
     </aside>
 
     <section id="inspectionBench" class="bench" aria-label="模型视口">
-      <div class="view-bar">
-        <div class="view-presets" role="group" aria-label="观察方向">
-          <button type="button" class="edBtn" data-view="side" aria-pressed="false">正侧</button>
-          <button type="button" class="edBtn on" data-view="angle" aria-pressed="true">斜视</button>
-          <button type="button" class="edBtn" data-view="top" aria-pressed="false">俯视</button>
-        </div>
-        <div class="view-zoom" role="group" aria-label="视口缩放">
-          <button type="button" class="edBtn" data-zoom="out" aria-label="缩小">−</button>
-          <button type="button" class="edBtn" data-zoom="in" aria-label="放大">+</button>
-          <button type="button" class="edBtn" id="fitView">适配</button>
-        </div>
+      <div class="view-bar" role="group" aria-label="渲染通道">
+        <span aria-hidden="true">通道</span>
+        <button type="button" class="edBtn on" data-channel="beauty" aria-pressed="true">完整</button>
+        <button type="button" class="edBtn" data-channel="normal" aria-pressed="false" title="视空间着色法线，包含法线贴图">法线</button>
+        <button type="button" class="edBtn" data-channel="tangent" aria-pressed="false" title="视空间切线方向">切线</button>
+        <button type="button" class="edBtn" data-channel="albedo" aria-pressed="false" title="材质底色">Albedo</button>
+        <button type="button" class="edBtn" data-channel="roughness" aria-pressed="false" title="粗糙度">Roughness</button>
+        <button type="button" class="edBtn" data-channel="metallic" aria-pressed="false" title="金属度">Metallic</button>
+        <button type="button" class="edBtn" data-channel="ao" aria-pressed="false" title="材质环境光遮蔽">AO</button>
+        <button type="button" class="edBtn" data-channel="reflection" aria-pressed="false" title="台架环境镜面反射，提亮显示">Reflection</button>
+        <button type="button" class="edBtn" data-channel="shadow" aria-pressed="false" title="主灯可见度，白色无遮挡，黑色遮挡">Shadow</button>
       </div>
 
       <div class="stage">
-        <canvas id="view" tabindex="0" aria-label="三维模型，方向键旋转，Shift 加方向键平移，正负号缩放" aria-describedby="viewHint"></canvas>
+        <canvas id="view" tabindex="0" aria-label="三维模型，方向键旋转，Shift 加方向键平移，正负号缩放，Home 适配" aria-describedby="viewHint"></canvas>
         <span class="mount mount-muzzle" id="muzzleLabel" hidden>枪口</span>
         <span class="mount mount-grip" id="gripLabel" hidden>前握</span>
         <div class="scale" id="viewScale" hidden><span id="scaleValue"></span></div>
@@ -67,6 +67,7 @@
           <span><kbd>左键</kbd> 旋转</span>
           <span><kbd>右键</kbd> 平移</span>
           <span><kbd>滚轮</kbd> 缩放</span>
+          <span><kbd>Home</kbd> 适配</span>
         </div>
       </footer>
     </section>

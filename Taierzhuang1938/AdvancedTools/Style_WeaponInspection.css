@@ -137,17 +137,29 @@ button { cursor: pointer; }
 .search-empty { padding: 8px 0; color: var(--ed-text-3); font-size: 13px; }
 
 .bench { display: flex; flex-direction: column; }
-.view-bar, .bench-footer {
+.view-bar, .bench-footer, .overlays {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+}
+.view-bar {
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 9px;
+}
+.view-bar > span {
+  margin-inline-end: 4px;
+  color: var(--ed-text-3);
+  font-size: 12px;
+  letter-spacing: .15em;
+}
+.view-bar .edBtn { white-space: nowrap; }
+.bench-footer {
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 12px;
+  padding-top: 10px;
 }
-.view-bar { padding-bottom: 9px; }
-.bench-footer { padding-top: 10px; }
-.view-presets, .view-zoom, .overlays { display: flex; gap: 5px; align-items: center; }
-#inspectionBench [data-zoom] { min-width: 33px; padding-inline: 7px; font-size: 17px; line-height: 1; }
+.overlays { gap: 5px; }
 #viewHint { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--ed-text-3); font-size: 12px; }
 #viewHint span { white-space: nowrap; }
 #viewHint kbd {
@@ -292,9 +304,11 @@ button { cursor: pointer; }
   #controlCenter { padding-left: 10px; font-size: 12px; }
   .workspace.edHome {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(350px, 48dvh) auto;
+    grid-template-rows: auto auto auto;
   }
   .details { grid-column: 1; }
+  .bench { min-height: max(380px, 48dvh); }
+  .stage { min-height: 230px; }
   .model-list { max-height: 136px; }
   .search { margin-block: 9px 10px; }
   #inspectionBench .edBtn { padding-inline: 8px; }

@@ -6,6 +6,7 @@ import { TYPE38_511 } from "../Data_Type38_511.mjs";
 import { ActorFactory } from "../Script_Actor.mjs";
 import { ConfigureHanYang173R, InstantiateHanYang173R, LoadHanYang173R } from "../Script_HanYang173R.mjs";
 import { ConfigureType38_511, InstantiateType38_511, LoadType38_511 } from "../Script_Type38_511.mjs";
+import { ApplyPatches, MakePatch, PatchesOf } from "../Script_MaterialPatches.mjs";
 import { MaterialLibrary } from "../Script_Materials.mjs";
 import { ClearMeshCache, LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl, WeaponMeshId } from "../Script_Meshes.mjs";
@@ -18,10 +19,118 @@ const GLB = {
   Type38_511: { url: TYPE38_511.url, Load: LoadType38_511, Configure: ConfigureType38_511, Instantiate: InstantiateType38_511 },
 };
 const PITCH_BY_ASSET = { OfficerSwordSet: -Math.PI / 2, MediumMortar: Math.PI * .34 };
+const CHANNELS = Object.freeze({
+  beauty: 0, normal: 1, tangent: 2, albedo: 3, roughness: 4, metallic: 5, ao: 6, reflection: 7, shadow: 8,
+});
+const KEY_LIGHT_DIRECTION = new THREE.Vector3(-3, 5, 4).normalize();
+const SHADOW_MAP_SIZE = 2048;
 const WEAPON_PBR_NAMES = new Set([
   "Steel", "WoodStock", "Type89Armor", "Type89Track", "GrenadePbr", "DadaoPbr",
   "LugouqiaoOfficerSword", "LugouqiaoType11AmmoBox", "LugouqiaoType11Body", "LugouqiaoType11BodyAlt", "LugouqiaoType11Fore",
 ]);
+
+function AttachInspectionChannels(material, channel) {
+  const packedAo = material.userData.ormUniforms?.ao;
+  // A GLB can omit UVs or tangents. Constant zero attributes leave those parts neutral in Tangent.
+  material.defaultAttributeValues = { ...material.defaultAttributeValues, uv: [0, 0], tangent: [0, 0, 0, 1] };
+  const inspection = MakePatch({
+    key: packedAo ? "inspectionChannels1Orm" : "inspectionChannels1",
+    defines: { USE_UV: "" },
+    uniforms: (uniforms) => { uniforms.uInspectionChannel = channel; },
+    vertex: [
+      ["#include <common>", /* glsl */`
+        #ifndef USE_TANGENT
+          attribute vec4 tangent;
+          varying vec3 vInspectionTangent;
+        #endif`],
+      ["#include <defaultnormal_vertex>", /* glsl */`
+        #ifndef USE_TANGENT
+          vInspectionTangent = mat3(modelViewMatrix) * tangent.xyz;
+        #endif`],
+    ],
+    fragment: [
+      ["#include <common>", /* glsl */`
+        uniform int uInspectionChannel;
+        #ifndef USE_TANGENT
+          varying vec3 vInspectionTangent;
+        #endif`],
+      // Read the finished PBR inputs and light terms. Color channels use the display transfer,
+      // while vector and scalar channels write their numeric values straight to the screen.
+      ["#include <colorspace_fragment>", /* glsl */`
+        switch (uInspectionChannel) {
+          case ${CHANNELS.normal}:
+            gl_FragColor.rgb = normal * 0.5 + 0.5;
+            break;
+          case ${CHANNELS.tangent}: {
+            #if defined( USE_NORMALMAP_TANGENTSPACE ) || defined( USE_CLEARCOAT_NORMALMAP ) || defined( USE_ANISOTROPY )
+              vec3 tangentDirection = tbn[0];
+            #else
+              #ifdef USE_TANGENT
+                vec3 authoredTangent = vTangent;
+              #else
+                vec3 authoredTangent = vInspectionTangent;
+              #endif
+              // The U axis of the same derivative frame used by three's normal map shader.
+              vec3 uvTangent = cross(dFdy(-vViewPosition), nonPerturbedNormal) * dFdx(vUv.x)
+                + cross(nonPerturbedNormal, dFdx(-vViewPosition)) * dFdy(vUv.x);
+              vec3 tangentDirection = dot(authoredTangent, authoredTangent) > 0.0 ? authoredTangent : uvTangent;
+              #ifdef DOUBLE_SIDED
+                tangentDirection *= faceDirection;
+              #endif
+            #endif
+            float lengthSquared = dot(tangentDirection, tangentDirection);
+            if (lengthSquared > 0.0) tangentDirection *= inversesqrt(lengthSquared);
+            gl_FragColor.rgb = tangentDirection * 0.5 + 0.5;
+            break;
+          }
+          case ${CHANNELS.albedo}:
+            gl_FragColor.rgb = linearToOutputTexel(vec4(diffuseColor.rgb, 1.0)).rgb;
+            break;
+          case ${CHANNELS.roughness}:
+            gl_FragColor.rgb = vec3(saturate(roughnessFactor));
+            break;
+          case ${CHANNELS.metallic}:
+            gl_FragColor.rgb = vec3(saturate(metalnessFactor));
+            break;
+          case ${CHANNELS.ao}:
+            #ifdef USE_AOMAP
+              gl_FragColor.rgb = vec3(saturate(ambientOcclusion));
+            #else
+              gl_FragColor.rgb = vec3(saturate(${packedAo ? "gMaterialAo" : "1.0"}));
+            #endif
+            break;
+          case ${CHANNELS.reflection}: {
+            vec3 reflection = reflectedLight.indirectSpecular;
+            #ifdef USE_SHEEN
+              reflection += sheenSpecularIndirect;
+            #endif
+            #ifdef USE_CLEARCOAT
+              reflection = reflection * (1.0 - material.clearcoat * Fcc) + material.clearcoat * clearcoatSpecularIndirect;
+            #endif
+            // Lift the isolated specular term for inspection of matte surfaces.
+            reflection *= 6.0;
+            #ifdef TONE_MAPPING
+              reflection = toneMapping(reflection);
+            #endif
+            gl_FragColor.rgb = linearToOutputTexel(vec4(reflection, 1.0)).rgb;
+            break;
+          }
+          case ${CHANNELS.shadow}:
+            gl_FragColor.rgb = vec3(1.0);
+            #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+              if (receiveShadow) {
+                DirectionalLightShadow keyShadow = directionalLightShadows[0];
+                gl_FragColor.rgb = vec3(getShadow(directionalShadowMap[0], keyShadow.shadowMapSize,
+                  keyShadow.shadowIntensity, keyShadow.shadowBias, keyShadow.shadowRadius, vDirectionalShadowCoord[0]));
+              }
+            #endif
+            break;
+        }`],
+    ],
+  });
+  ApplyPatches(material, [...(PatchesOf(material) || []), inspection]);
+  material.needsUpdate = true;
+}
 
 async function LoadMaterials(library) {
   const sets = [
@@ -40,8 +149,16 @@ async function LoadMaterials(library) {
 
 function CreateLighting(renderer, scene) {
   scene.add(new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25));
+  const key = new THREE.DirectionalLight(0xfff5e7, 2.4);
+  key.position.copy(KEY_LIGHT_DIRECTION);
+  key.castShadow = true;
+  key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+  key.shadow.autoUpdate = false;
+  key.shadow.bias = -2 / SHADOW_MAP_SIZE;
+  key.shadow.radius = .65;
+  scene.add(key, key.target);
   for (const [color, intensity, x, y, z] of [
-    [0xfff5e7, 2.4, -3, 5, 4], [0xd6eaff, 1.15, 3, 1, 3], [0xffffff, 1.75, 2, 3, -5],
+    [0xd6eaff, 1.15, 3, 1, 3], [0xffffff, 1.75, 2, 3, -5],
   ]) {
     const light = new THREE.DirectionalLight(color, intensity);
     light.position.set(x, y, z);
@@ -65,6 +182,23 @@ function CreateLighting(renderer, scene) {
     card.geometry.dispose();
     card.material.dispose();
   }
+  return key;
+}
+
+function FitShadow(key, center, extent) {
+  const radius = Math.max(extent.length() * .55, .001);
+  key.target.position.copy(center);
+  key.position.copy(center).addScaledVector(KEY_LIGHT_DIRECTION, 2 * radius);
+  const { shadow } = key;
+  const camera = shadow.camera;
+  camera.left = camera.bottom = -radius;
+  camera.right = camera.top = radius;
+  camera.near = radius;
+  camera.far = 3 * radius;
+  camera.updateProjectionMatrix();
+  shadow.normalBias = 2 * radius / SHADOW_MAP_SIZE;
+  // The model and key light stay still during orbit, pan and zoom.
+  shadow.needsUpdate = true;
 }
 
 function MountPosition(instance, name) {
@@ -94,7 +228,10 @@ export class WeaponInspectionScene {
     this.zoom = 1;
     this.gridVisible = true;
     this.pendingFrame = 0;
-    CreateLighting(this.renderer, this.scene);
+    this.channel = { value: CHANNELS.beauty };
+    this.inspectionMaterials = new WeakSet();
+    this.keyLight = CreateLighting(this.renderer, this.scene);
+    this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
     this.resizeObserver.observe(canvas);
   }
@@ -219,6 +356,16 @@ export class WeaponInspectionScene {
       this.grid = null;
     }
     if (model) {
+      // These runtime materials belong to the standalone page. Keep their textures and factors intact.
+      model.group.traverse((object) => {
+        if (!object.isMesh) return;
+        object.castShadow = object.receiveShadow = true;
+        for (const material of [object.material].flat()) {
+          if (!material?.isMeshStandardMaterial || this.inspectionMaterials.has(material)) continue;
+          AttachInspectionChannels(material, this.channel);
+          this.inspectionMaterials.add(material);
+        }
+      });
       this.scene.add(model.group);
       const max = Math.max(...model.size.toArray());
       const step = max < .4 ? .05 : max < 1.8 ? .1 : max < 3 ? .25 : .5;
@@ -248,6 +395,13 @@ export class WeaponInspectionScene {
     this.Fit();
   }
 
+  SetChannel(name) {
+    const mode = CHANNELS[name];
+    if (!Number.isInteger(mode) || mode === this.channel.value) return;
+    this.channel.value = mode;
+    this.RequestDraw();
+  }
+
   Direction() {
     const cos = Math.cos(this.pitch);
     return new THREE.Vector3(Math.sin(this.yaw) * cos, Math.sin(this.pitch), Math.cos(this.yaw) * cos);
@@ -261,6 +415,7 @@ export class WeaponInspectionScene {
     if (blade?.visible) bounds.union(new THREE.Box3().setFromObject(blade));
     bounds.getCenter(this.center);
     const extent = bounds.getSize(new THREE.Vector3());
+    FitShadow(this.keyLight, this.center, extent);
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const up = this.Direction().cross(right);
     const ProjectionExtent = (axis) => Math.abs(axis.x) * extent.x + Math.abs(axis.y) * extent.y + Math.abs(axis.z) * extent.z;
