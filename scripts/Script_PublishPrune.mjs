@@ -22,6 +22,16 @@ import { IsPublishedSource } from "./Script_PublishScope.mjs";
 export const PUBLISH_EXCLUDE = Object.freeze([
   { path: "Taierzhuang1938/_import/", why: "滕县导入管线工作区：FBX / TGA / 二进制源文件、烘焙脚本与记录，网页不加载" },
   { path: "Taierzhuang1938/_blender/", why: "滕县 Blender 构建脚本与中间文件" },
+  { path: "Taierzhuang1938/Script_*Test.mjs", why: "自动化验收由工作检出执行，保留仍被生成入口或数据来源表引用的脚本",
+    keep: Object.freeze([
+      "Taierzhuang1938/Script_DebugApiTest.mjs",
+      "Taierzhuang1938/Script_SoldierComponentsTest.mjs",
+      "Taierzhuang1938/Script_FirstLevelSpaceTest.mjs",
+      "Taierzhuang1938/Script_EditorBlockoutFirstLevel0105PrevizTest.mjs",
+      "Taierzhuang1938/Script_EditorBlockoutFirstLevel0107PrevizTest.mjs",
+      "Taierzhuang1938/Script_EditorBlockoutFirstLevel0610PrevizTest.mjs",
+      "Taierzhuang1938/Script_EditorBlockoutFirstLevel1218PrevizTest.mjs",
+    ]) },
   { path: "Taierzhuang1938/AdvancedTools/", why: "已拆出游戏的高级工具与本地控制中心：只在本地预览使用；游戏里它们的入口由 Script_DevToolsSplit 的剔除版去掉，index.html 的 import map 条目在下面 StripAdvancedToolsImports 里一并摘掉" },
   { path: "TunnelLight1943/StyleConceptShots/", why: "地道里的光的风格概念图与两个 zip 包，没有页面引用" },
   { path: "Model/StrawSleepingMat/Source/", why: "随身草席的 Blender 源文件" },
@@ -45,6 +55,13 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const Esc = (s) => s.replace(/[.+^${}()|[\]\\?]/g, "\\$&");
 const Glob = (pattern) => new RegExp(`^${pattern.split("**/").map((a) => a.split("**").map((b) => b.split("*").map(Esc).join("[^/]*")).join(".*")).join("(?:.*/)?")}$`);
 const MiB = (bytes) => (bytes / 1048576).toFixed(1);
+
+function MatchEntry(entry) {
+  const glob = entry.path.includes("*") ? Glob(entry.path) : null;
+  const kept = new Set(entry.keep);
+  return (file) => !kept.has(file) && (glob ? glob.test(file)
+    : entry.path.endsWith("/") ? file.startsWith(entry.path) : file === entry.path);
+}
 
 function Walk(dir, visit, rel = "") {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -91,9 +108,9 @@ export function Prune(siteDir) {
         fs.rmSync(target, { recursive: true, force: true });
       }
     } else {
-      const re = Glob(entry.path);
+      const matches = MatchEntry(entry);
       const hits = [];
-      Walk(siteDir, (rel, full, isDir) => { if (!isDir && re.test(rel)) hits.push(full); });
+      Walk(siteDir, (rel, full, isDir) => { if (!isDir && matches(rel)) hits.push(full); });
       for (const f of hits) { bytes += fs.statSync(f).size; files += 1; fs.rmSync(f, { force: true }); }
     }
     results.push({ entry, bytes, files });
@@ -109,19 +126,17 @@ export function SiteBytes(siteDir) { return SizeOf(siteDir); }
 export function CheckRepo({ root = repoRoot, tracked = null, runtimeFilter = () => true } = {}) {
   const problems = [];
   tracked ??= execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
-  const excluded = PUBLISH_EXCLUDE.map((e) => (e.path.includes("*") ? Glob(e.path) : null));
-  const IsExcluded = (file) => PUBLISH_EXCLUDE.some((e, i) => (excluded[i] ? excluded[i].test(file)
-    : e.path.endsWith("/") ? file.startsWith(e.path) : file === e.path));
+  const excluded = PUBLISH_EXCLUDE.map(MatchEntry);
+  const IsExcluded = (file) => excluded.some(matches => matches(file));
   for (const [i, e] of PUBLISH_EXCLUDE.entries()) {
-    const hit = excluded[i] ? tracked.some((f) => excluded[i].test(f))
-      : tracked.some((f) => e.path.endsWith("/") ? f.startsWith(e.path) : f === e.path);
+    const hit = tracked.some(excluded[i]);
     if (!hit) problems.push(`清单里的 ${e.path} 在仓库里已经没有了，删掉这一行`);
   }
   const prefixes = PUBLISH_EXCLUDE.filter((e) => !e.path.includes("*")).map((e) => e.path);
   const tails = prefixes.map((p) => p.split("/").filter(Boolean).slice(1).join("/")).filter(Boolean);
   // 文件规则（含通配）也要拦：文件名常先写进常量，再由 loader 加载；glTF 的 uri 同样会被浏览器读取。
-  const fileNames = [...new Set(tracked.filter((f) => IsExcluded(f) && PUBLISH_EXCLUDE.some((e, i) =>
-    !e.path.endsWith("/") && (excluded[i] ? excluded[i].test(f) : f === e.path))).map((f) => path.posix.basename(f)))];
+  const fileNames = [...new Set(tracked.filter((f) => PUBLISH_EXCLUDE.some((e, i) =>
+    !e.path.endsWith("/") && excluded[i](f))).map((f) => path.posix.basename(f)))];
   const fileReference = fileNames.length ? new RegExp(fileNames.map(Esc).join("|")) : null;
   const LOAD = /(fetch\(|import\(|new URL\(|\.load(?:Async)?\(|src\s*=|href\s*=|<script[^>]*src=|<link[^>]*href=)/;
   const runtime = tracked.filter((f) => runtimeFilter(f) && /\.(html|mjs|js|css|gltf)$/.test(f) && !IsExcluded(f)

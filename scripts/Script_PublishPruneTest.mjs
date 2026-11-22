@@ -19,6 +19,8 @@ try {
     Write(file, "source-only");
   }
   const runtime = {
+    ...Object.fromEntries(PUBLISH_EXCLUDE.flatMap(entry => (entry.keep || [])
+      .map(file => [file, "retained-automation-dependency"]))),
     "Taierzhuang1938/Model/Character/Model_JapaneseSoldierA.glb": "soldier-a",
     "Taierzhuang1938/Model/Character/Model_JapaneseSoldierJia.glb": "jia",
     "Taierzhuang1938/Model/Character/Model_HeYoutian.glb": "he",
@@ -39,6 +41,9 @@ try {
   for (const file of ["index.html", "Script_Game.mjs", "Model/Runtime.gltf"]) {
     assert.ok(problems.some((problem) => problem.startsWith(file + ":")), `${file} 引用排除文件必须失败`);
   }
+  Write("Script_Game.mjs", 'import("./Taierzhuang1938/Script_FixtureTest.mjs");');
+  assert.ok(CheckRepo({ root, tracked }).some(problem => problem.includes("Script_FixtureTest.mjs")),
+    "运行时不能导入裁掉的验收模块");
   const bytesBefore = SiteBytes(root);
   const results = Prune(root);
   assert.equal(results.length, PUBLISH_EXCLUDE.length);
