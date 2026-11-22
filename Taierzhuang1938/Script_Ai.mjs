@@ -1012,15 +1012,20 @@ export class AiDirector {
   }
 
   /** Scene director orders use the existing movement/combat components. */
-  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7 } = {}) {
+  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7, coverSlackM=0, suppressible=false, allowCover=false } = {}) {
     if (!s?.alive) return;
+    const inContact = allowCover && combat && (!!s.target || s.suppression >= 0.35);
+    const tacticalAdvance = moving && inContact;
+    const guidedMove = moving && !inContact;
     s.goal.set(x, this.ctx.battlefield.GroundHeight(x,z), z);
     s.order=moving?"advance":"hold";
-    s.holdZone=moving?null:{x,z,radius:1.5};
+    s.holdZone=moving?null:{x,z,radius:allowCover?2.5:1.5};
     s.scriptDefensive=!moving&&combat;
+    s.scriptCoverSlackM=(!moving&&combat&&allowCover)?coverSlackM:0;
+    s.scriptSuppressible=!!suppressible;
     s.scriptedNoncombatant=!combat;
-    s.p012Guided=moving;
-    s.scriptMoveSpeedMps=moving?speed:undefined;
+    s.p012Guided=guidedMove;
+    s.scriptMoveSpeedMps=guidedMove?speed:undefined;
     s.scriptArrivalRadius=arrivalRadius;
     // Do not snap yaw back every orderEveryS tick while AI is smoothly turning toward a
     // target, last-known position, or gunshot watch direction.
@@ -1035,8 +1040,9 @@ export class AiDirector {
     // Let active combat / alert / cover AI own tactical crouch & prone; only hold the
     // authored stance for noncombatants or calm idle units, refreshing stanceUntil so
     // repeated DirectActor ticks never oscillate stand ↔ crouch with ApplyWatchPose/FireStance.
-    const aiOwnsStance = combat && (!!s.target || !!s.watchAlerted || s.state !== STATE.IDLE || s.suppression > 0.2 || !!s.cover);
-    if (!aiOwnsStance) {
+    const aiOwnsStance = combat && (!!s.target || !!s.watchAlerted || s.state !== STATE.IDLE || s.suppression > 0.2 || !!s.cover
+      || (allowCover && (!moving || tacticalAdvance)));
+    if (!aiOwnsStance && Number.isFinite(stance)) {
       if (s.stance === stance) s.stanceUntil = Math.max(s.stanceUntil || 0, this.time + 0.45);
       else this.SetStance(s, stance, 0.45, true);
     }

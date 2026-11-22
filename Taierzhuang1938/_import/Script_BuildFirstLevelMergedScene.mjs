@@ -478,6 +478,43 @@ function BuildMergedScene() {
     });
   }
 
+  // 战术低矮掩体（土坎/沙包/枕木垛）：薄墙厚度 d=0.50m（半厚 0.25m，配合 COVER.standoffM 0.65m 留出
+  // 0.40m 净距 > hitSlackM 0.30m 且 > 人物胶囊 0.34m，确保实机射线验证与可走性 100% 通过）；
+  // 宽度 >= 3.2m 的掩体在左右两端各登记一个 cover.points（间隔 >= 1.8m），让两两跃进小组两人能并排躲在同一土坎后。
+  // 全部严格避开官道中线、驴车与九四式车道、以及全员行走路径。
+  for (const [id, x, z, w, h, d, fx, fz, yawDeg = 0] of [
+    // 08c 沟北日军火力基准组（MergedRifles）两道跃进掩体土坎
+    ["NorthBerm1", 144.0, 412.8, 4.4, 1.08, 0.50, 0, 1, 0],
+    ["NorthBerm2", 136.5, 413.6, 4.2, 1.08, 0.50, 0, 1, 0],
+    ["NorthBerm3", 130.0, 438.6, 4.6, 1.12, 0.50, 0, 1, 0],
+    ["NorthBerm4", 123.0, 439.4, 4.2, 1.08, 0.50, 0, 1, 0],
+    // 08c 官道两侧土堆掩体（MergedBoards 跃进架桥工兵组，避开 x=99..104 官道中线）
+    ["RoadBerm1", 108.5, 434.2, 3.6, 1.08, 0.50, 0, 1, 0],
+    ["RoadBerm2", 94.0, 434.2, 3.6, 1.08, 0.50, 0, 1, 0],
+    ["RoadBerm3", 106.2, 456.8, 3.4, 1.08, 0.50, 0, 1, 0],
+    ["RoadBerm4", 93.2, 456.8, 3.4, 1.08, 0.50, 0, 1, 0],
+    // 08d–09d 主街村心罗班长正面压制掩体（大槐树与石碾西侧沙袋垛，避开主街行车道）
+    ["MainStBags", 130.2, 550.2, 3.8, 1.08, 0.50, 0, 1, 0],
+    // 12b 铁路路基截击组（MergedRailAmbush）枕木与道砟堆掩体
+    ["RailStones1", -72.8, 700.0, 3.8, 1.08, 0.50, 0.6, 0.8, 0],
+    ["RailStones2", -76.5, 696.2, 3.8, 1.08, 0.50, 0.6, 0.8, 0],
+    // 13b 桥北路基封锁机枪组（MergedBridgeGun）沙袋枕木阵位
+    ["BridgeGunBags", -73.2, 695.4, 3.6, 1.08, 0.50, 0, 1, 0],
+    // 13b–13d 南岸河堤顺子与刘文财反击沙袋掩体（堤北沿，避开南堤上坡线）
+    ["SouthBankBags", -89.8, 795.6, 4.4, 1.08, 0.50, 0, -1, 0],
+  ]) {
+    const span = +(w * 0.27).toFixed(2);
+    const points = w >= 3.2
+      ? [{ x: +(x - span).toFixed(2), z }, { x: +(x + span).toFixed(2), z }]
+      : [{ x, z }];
+    ownObjects.push({
+      id: `Merged_Cover_${id}`, asset: "Whitebox/Box", material: "Whitebox/Cover",
+      pos: [x, null, z], size: [w, h, d], ...(yawDeg ? { yawDeg } : {}),
+      cover: { faceX: fx, faceZ: fz, points }, meta: { planning: true },
+      group: "08–13合并/战术掩体",
+    });
+  }
+
   // Shift Beishahe trenches
   const ownSegments = (baseDoc.trenches?.segments || [])
     .filter((seg) => seg.points.every((pt) => pt[1] >= SOURCE_START_Z))

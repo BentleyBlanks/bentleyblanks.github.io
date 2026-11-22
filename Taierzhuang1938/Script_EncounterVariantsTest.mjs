@@ -17,6 +17,7 @@ import { EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { EncounterDocument } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
+import { AiDirector } from "./Script_Ai.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 
@@ -325,6 +326,52 @@ const sliceDoc = BlockoutDocFromScene(resolved.doc, carvedHeights, {
 });
 const sliceCheck = ValidateBlockoutScene(sliceDoc);
 assert.ok(sliceCheck.ok, `合成场景转实机 Blockout 切片通过校验：${sliceCheck.errors.join("；")}`);
+const coverBlocks = sliceDoc.blocks.filter((b) => b.id?.startsWith("Merged_Cover_") && b.cover);
+assert.equal(coverBlocks.length, 13, "全部 13 处战术掩体块携带显式 cover 法线进入实机 CoverRegistry");
+for (const b of coverBlocks) {
+  assert.ok(b.d <= 0.55, `掩体 ${b.id} 厚度 ${b.d}m 超过 0.55m，会令 standoffM(0.65)-半厚 < hitSlackM(0.30) 导致射线校验失败`);
+  assert.ok((b.cover.points?.length || 0) >= 2, `双人掩体 ${b.id} 须登记 >=2 个隐蔽点供两两跃进小组同掩体躲藏`);
+}
+
+// 验证时间轴预览中敌军具备真实缩头/探头（kneel/shoot）掩体节奏，且 DirectActor 放行实机自动寻掩体与被压制躲掩体
+const riflesPoses = new Set();
+for (let dt = 12; dt < 52; dt += 1.0) {
+  const fr = merged.evaluate(merged.BeatById("08c").start + dt);
+  for (const a of fr.actors) if (a.groupId === "MergedRifles" && a.pose !== "dead") riflesPoses.add(a.pose);
+}
+assert.ok(riflesPoses.has("kneel") && riflesPoses.has("shoot") && riflesPoses.has("run"),
+  `08c 沟北日军须同时呈现掩体缩头(kneel)、探头射击(shoot)与掩体跃进(run)，实测：${[...riflesPoses].join(",")}`);
+
+// 验证 AiDirector.DirectActor 在 allowCover=true 时不把正在躲掩体的敌军强掰回站姿，并开放 coverSlackM 与接敌/受压制自由找掩体
+const mockAi = {
+  ctx: { battlefield: { GroundHeight: () => 0 } },
+  stanceCalls: 0,
+  SetStance(s, stance) { this.stanceCalls++; s.stance = stance; },
+};
+const holdEnemy = { alive: true, position: { x: 130, z: 437 }, goal: { set() {} }, stance: 1, suppression: 0 };
+AiDirector.prototype.DirectActor.call(mockAi, holdEnemy, {
+  x: 130, z: 437, yaw: 0, stance: null, combat: true, moving: false, allowCover: true, coverSlackM: 8.5, suppressible: true,
+});
+assert.equal(holdEnemy.scriptDefensive, true);
+assert.equal(holdEnemy.scriptCoverSlackM, 8.5, "守点与跃进停顿敌军放开 8.5m 掩体搜寻余量");
+assert.equal(holdEnemy.scriptSuppressible, true, "战斗敌军允许受压制缩头/卧倒");
+assert.equal(mockAi.stanceCalls, 0, "allowCover 守点时不强行覆写 AI 蹲/卧掩体姿态");
+assert.equal(holdEnemy.stance, 1);
+
+const inContactRunner = { alive: true, position: { x: 108, z: 433 }, goal: { set() {} }, stance: 1, suppression: 0, target: { id: 1 } };
+AiDirector.prototype.DirectActor.call(mockAi, inContactRunner, {
+  x: 100, z: 466, yaw: 0, stance: 0, combat: true, moving: true, allowCover: true, coverSlackM: 8.5, suppressible: true,
+});
+assert.equal(inContactRunner.p012Guided, false, "行进中敌军一旦接敌或受压制立即解除死板直线引导，交还给 AiDirector/TacticsDirector 自主寻掩体与掩护跃进");
+assert.equal(inContactRunner.scriptDefensive, false);
+assert.equal(inContactRunner.order, "advance");
+assert.equal(mockAi.stanceCalls, 0, "接敌推进时不强掰站姿");
+
+const approachRunner = { alive: true, position: { x: 205, z: 571 }, goal: { set() {} }, stance: 0, suppression: 0, target: null };
+AiDirector.prototype.DirectActor.call(mockAi, approachRunner, {
+  x: 182, z: 552, yaw: 0, stance: 0, combat: true, moving: true, allowCover: true, coverSlackM: 8.5, suppressible: true,
+});
+assert.equal(approachRunner.p012Guided, true, "尚未接敌且未受压制的绕后部队沿设定路线静音到位");
 const groundAt = GridSampler(resolved.doc.terrain, carvedHeights);
 const solidObjects = resolved.doc.objects.filter((o) =>
   o.pos && o.size && o.solid !== false && o.layer !== "backdrop" && o.tag !== "airWall" && !o.showOn);

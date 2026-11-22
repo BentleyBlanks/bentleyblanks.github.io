@@ -175,6 +175,8 @@ export class EncounterPlay {
     this.host.state.grenades=cfg.inventory.grenades;this.host.state.bundles=cfg.inventory.bundles;
     this.RestoreCheckpointInventory();
     this.host.ctx.ApplyDebugOptions({reload:true});
+    if(this.previousMissionCoverRules===undefined)this.previousMissionCoverRules=this.host.ai.missionCoverRules;
+    this.host.ai.missionCoverRules=true;
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
     this.stealth?.Reset();
@@ -221,6 +223,7 @@ export class EncounterPlay {
   }
   Suspend() {
     if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
+    if(this.previousMissionCoverRules!==undefined) this.host.ai.missionCoverRules=this.previousMissionCoverRules;
     this.active=false;this.paused=false;this.ready=false;this.host.state.running=false;
     this.host.ctx.ReleasePointerLock();this.host.audio.ResetSession();this.host.audio.ctx?.suspend();
     this.retiredMaterials.Collect(()=>{
@@ -435,7 +438,8 @@ export class EncounterPlay {
       const arrived=Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<cfg.routeReachM;
       if(arrived&&entry.waitedIndex!==entry.routeIndex){
         entry.waitedIndex=entry.routeIndex;
-        entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||0));
+        const boundWait=group?.behavior==="bounds"&&entry.routeIndex>0&&entry.routeIndex<route.length-1?(group.coverWaitSeconds??6.5):0;
+        entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||boundWait));
       }
       if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm)&&entry.routeIndex<route.length-1)entry.routeIndex++;
       target=route[entry.routeIndex];
@@ -461,9 +465,12 @@ export class EncounterPlay {
       target=[soldier.position.x,soldier.position.z];moving=false;forceYaw=true;
       yaw=Math.atan2(-(this.host.player.position.x-soldier.position.x),-(this.host.player.position.z-soldier.position.z));
     }
+    const allowCover=combat&&!guide&&!frame.stealth?.active;
+    const authoredStance=guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"||current?.pose==="crouch"?1:0;
     this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
-      stance:guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"?1:0,
-      combat,moving,speed,arrivalRadius:Math.min(reachM,0.7)});
+      stance:allowCover?null:authoredStance,
+      combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
+      allowCover,coverSlackM:allowCover?8.5:0,suppressible:allowCover});
   }
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
