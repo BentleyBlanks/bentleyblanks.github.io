@@ -1,0 +1,20 @@
+{
+  "schema": "tengxian-env-scene/1",
+  "scene": "AircraftEvacuationDitch",
+  "time": {
+    "hour": 13,
+    "speed": 0,
+    "paused": true
+  },
+  "volumes": [
+    {
+      "id": "Fallback",
+      "name": "铅灰低云与浮烟",
+      "shape": "global",
+      "priority": 0,
+      "blendS": 0,
+      "mode": "full",
+      "preset": "AircraftEvacuationDitch"
+    }
+  ]
+}

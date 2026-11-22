@@ -157,6 +157,7 @@ const PLUGINS = {
   gengjiazhuangEastSmoke: SceneryPreview("GengjiazhuangEastSmoke", ["Sandbag"]),
   tanketteAdvanceEastTrack: SceneryPreview("TanketteAdvanceEastTrack",
     ["Sandbag", "WoodCrate", "HandcartWood"], "RoadsideSoilBurst"),
+  aircraftEvacuationDitch: SceneryPreview("AircraftEvacuationDitch", ["WoodCrate", "WoodBeam", "HandcartWood", "Sandbag"]),
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) {

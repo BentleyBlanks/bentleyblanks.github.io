@@ -1,0 +1,169 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "AircraftEvacuationDitch",
+  "title": "凹路撤运 · 铅灰低云",
+  "looks": [
+    {
+      "id": "day",
+      "label": "阴天",
+      "hour": 13
+    }
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {
+        "elevation": 45,
+        "azimuth": 28,
+        "color": "#e5dfd9",
+        "intensity": 1.7,
+        "discIntensity": 0
+      }
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {
+        "probe": 0.72,
+        "color": "#bec0c2",
+        "intensity": 0.71
+      }
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {
+        "intensity": 0.17
+      }
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {
+        "zenith": [
+          0.28,
+          0.285,
+          0.3
+        ],
+        "horizon": [
+          0.335,
+          0.33,
+          0.325
+        ],
+        "ground": [
+          0.17,
+          0.157,
+          0.15
+        ],
+        "glow": 0,
+        "smoke": 0.27,
+        "smokeColor": [
+          0.3,
+          0.303,
+          0.315
+        ],
+        "smokeHeight": 0.24
+      }
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {
+        "shapeScale": 4.9,
+        "shapeLow": 0.22,
+        "shapeHigh": 0.61,
+        "shapeCover": 0.87,
+        "structure": 1,
+        "coverage": 0.97,
+        "scale": 1.31,
+        "softness": 1.42,
+        "warp": 1.16,
+        "underside": 0.76,
+        "shade": [
+          0.2,
+          0.201,
+          0.212
+        ],
+        "gap": 1.04,
+        "silver": 0
+      }
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": 10.4,
+        "mieG": 0.75,
+        "rayleigh": 0.16,
+        "ozone": 0.64,
+        "groundAlbedo": 0.11,
+        "sunIrradiance": 3.55,
+        "skyTint": [
+          0.8,
+          0.81,
+          0.83
+        ],
+        "skyFloor": [
+          0.29,
+          0.295,
+          0.31
+        ],
+        "artGlow": 0,
+        "aerialBlend": 0.38,
+        "aerialGain": 0.18
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": 0.0101,
+        "falloff": 124,
+        "max": 0.69,
+        "skyColor": [
+          0.27,
+          0.272,
+          0.282
+        ],
+        "groundColor": [
+          0.29,
+          0.28,
+          0.274
+        ],
+        "sunGain": 0,
+        "desat": 0.62,
+        "flatten": 0.063
+      }
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "profile": "overcast",
+        "exposure": 1.04,
+        "saturation": 0.51,
+        "contrast": 1.007,
+        "contrastCurve": "soft",
+        "gain": [
+          1.012,
+          1,
+          0.992
+        ],
+        "lift": [
+          0.009,
+          0.007,
+          0.006
+        ],
+        "shadowTint": [
+          1.01,
+          1,
+          0.995
+        ],
+        "highlightTint": [
+          1.02,
+          1,
+          0.995
+        ],
+        "splitShadow": 0.13,
+        "splitHighlight": 0.12,
+        "bloom": 0.04,
+        "bloomThreshold": 1.04,
+        "godStrength": 0,
+        "lensFlare": 0
+      }
+    }
+  }
+}

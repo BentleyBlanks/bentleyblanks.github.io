@@ -22,6 +22,7 @@ export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", previewParam: "gengjiazhuangFieldApproach" }),
   Object.freeze({ id: "GengjiazhuangEastSmoke", title: "凹路尽头 · 望庄东", style: "formal", previewParam: "gengjiazhuangEastSmoke" }),
   Object.freeze({ id: "TanketteAdvanceEastTrack", title: "从沟沿望向东侧战车道", style: "formal", previewParam: "tanketteAdvanceEastTrack" }),
+  Object.freeze({ id: "AircraftEvacuationDitch", title: "凹路撤运 · 沟底仰视三机", style: "formal", previewParam: "aircraftEvacuationDitch" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -82,6 +83,11 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/clothLantern": Prop("clothLantern", "canvas", "马灯 / 灯笼", [0.2, 0.3, 0.2]),
   "Prop/ryCartWheel": Prop("ryCartWheel", "timber", "车轮", [0.9, 0.9, 0.12]),
   "Prop/marketRiceSack01": Prop("marketRiceSack01", "canvas", "包袱 / 麻袋", [0.7, 0.45, 0.5]),
+  "Prop/ditchBrokenElm": Prop("ditchBrokenElm", "timber", "裂干枯榆", [6.094, 7.413, 3.244]),
+  "Prop/ditchDamagedFarmhouse": Prop("ditchDamagedFarmhouse", "plaster", "破灰瓦土屋", [8.934, 3.436, 4.931]),
+  "Prop/ditchDonkeyCart": Prop("ditchDonkeyCart", "timber", "灰驴与两轮木车 · 静置", [1.652, 1.562, 2.991]),
+  "Prop/ditchStretcher": Prop("ditchStretcher", "canvas", "竹竿布兜担架", [0.69, 0.128, 2.15]),
+  "Prop/ditchDistantAircraft": Prop("ditchDistantAircraft", "steel", "Ki-30 远景飞机", [14.55, 3.03, 10.14]),
   "Prop/wardBandageRoll": Prop("wardBandageRoll", "canvas", "绷带卷", [0.35, 0.04, 0.25]),
   "Prop/eastTrackSplinteredElm": Prop("eastTrackSplinteredElm", "timber", "裂口榆树干", [2.4645, 4.6105, 2.4272]),
   "Prop/eastTrackGreyTimberShoring": Prop("eastTrackGreyTimberShoring", "timber", "灰木沟壁支护", [2.5816, 1.5385, 0.471]),

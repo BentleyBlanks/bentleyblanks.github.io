@@ -17,6 +17,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
   - `FirstLevelWhitebox`（第一关新剧本 01–18 的白盒，三段合一，见 §5）：白盒编辑器的编辑与预演跑它；
   - `FirstLevel`（第一关正式场景，2026-11-01，见 §8）：白盒编辑器的试玩跑它，之后单独打磨细节。
   - `DugoutAidOpenFields` 是独立环境「沟底包扎 · 朝田野敞开的木棚」。在场景编辑器里选它，点「查看原画机位」就会用游戏渲染器加载保存的机位。详见[场景说明](../Scenes/DugoutAidOpenFields/README.md)。
+  - `AircraftEvacuationDitch` 是独立环境「凹路撤运 · 沟底仰视三机」。在场景编辑器里可调整远机、撤离道具和沟岸布设，点「查看原画机位」进入固定机位。详见[场景说明](../Scenes/AircraftEvacuationDitch/README.md)。
 - **场景文件就是这个场景的唯一真相**：人、agent、以后的场景编辑器都直接改它；没有生成器在后面覆盖。改完跑 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all`。
 - JSON 一律 LF（`.gitattributes`），大数组一行一项，方便按 id grep 与 diff。
 

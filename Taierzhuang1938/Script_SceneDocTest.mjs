@@ -253,4 +253,19 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
     "固定机位、分层烟源与路缘扬土地标进入游戏布局");
 }
 
+{
+  const id = "AircraftEvacuationDitch";
+  const { doc, heights } = ReadSceneSync(id);
+  const slice = BlockoutDocFromScene(doc, heights, { level: id });
+  const layout = LayoutFromSceneDoc(slice);
+  assert.deepEqual(layout.camera, doc.camera);
+  Check(ValidateScene(doc).ok && ValidateBlockoutScene(slice).ok
+    && layout.style === "formal", "沟底仰视三机可通过正式场景与游戏布局校验");
+  const aircraft = layout.blocks.filter(block => block.propModel === "ditchDistantAircraft");
+  Check(aircraft.length === 3 && aircraft.every(block => block.y > 100 && block.propAuthoredGrounding && !block.solid),
+    "三架飞机保留编辑器标高，处于布局边界内且不生成碰撞");
+  Check(layout.sceneProps.length === doc.objects.length && layout.smokeColumns.some(source => source.options.fire > 0)
+    && slice.landmarks.length === 5, "沟底撤运道具、火源与五个站位完整进入预览");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);

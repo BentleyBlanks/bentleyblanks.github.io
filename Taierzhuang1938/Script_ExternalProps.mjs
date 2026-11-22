@@ -40,6 +40,7 @@ import { DUGOUT_AID_OPEN_FIELDS_PROPS } from "./Data_SceneAssets.mjs";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import { NAKAJIMA_KI4_ASSET } from "./Data_NakajimaKi4.mjs";
+import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
 import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
@@ -270,6 +271,13 @@ const ASSETS = Object.freeze({
     label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2",
     materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart", category: "院落小件",
   },
+  ditchBrokenElm: { label: "裂干枯榆", url: "./Model/AircraftEvacuationDitch/Model_BrokenElm.glb?v=2026112202", category: "景观", solid: false },
+  ditchDamagedFarmhouse: { label: "破灰瓦土屋", url: "./Model/AircraftEvacuationDitch/Model_DamagedFarmhouse.glb?v=2026112202", category: "景观", solid: false },
+  ditchDonkeyCart: { label: "灰驴与两轮木车 · 静置", url: "./Model/DonkeyCart/Model_DonkeyCart.glb",
+    category: "景观", solid: false, staticBindPose: true },
+  ditchStretcher: { label: "竹竿布兜担架", url: "./Model/Model_BambooStretcher.glb?v=stretcher20260927", category: "景观", solid: false },
+  ditchDistantAircraft: { label: "Ki-30 远景飞机", url: AIRCRAFT_ASSETS.find(({ id }) => id === "MitsubishiKi30").url,
+    category: "景观", solid: false },
   fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WattleFence", tag: "fence", category: "工事" },
   fieldApproachOldElm: { label: "沟沿老榆树", url: "./Model/GengjiazhuangFieldApproach/Model_OldElm.glb?v=2026112202", category: "景观", solid: false },
   fieldApproachLoadedCart: { label: "载草木车", url: "./Model/GengjiazhuangFieldApproach/Model_LoadedCart.glb?v=2026112202", category: "景观", solid: false },

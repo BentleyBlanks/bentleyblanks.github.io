@@ -38,6 +38,8 @@ export const SANDBOX_RANGES = Object.freeze([
     muteAudio: true, ownsFrame: true, identify: false, steadyView: true }),
   RANGE({ id: "tanketteAdvanceEastTrack", externalProps: false, trimProps: false,
     muteAudio: true, ownsFrame: true, identify: false, steadyView: true }),
+  RANGE({ id: "aircraftEvacuationDitch", externalProps: false, trimProps: false,
+    muteAudio: true, ownsFrame: true, identify: false, steadyView: true }),
   RANGE({ id: "movement", bootLabel: "boot.start.movementRange", externalProps: false, trimProps: false }),
   RANGE({ id: "weapons", bootLabel: "boot.start.weaponRange", targetDetail: false, steadyView: true }),
   RANGE({ id: "range", pinsPhase: false }),
