@@ -6,8 +6,10 @@ import {BuildBrowserBundle} from './Script_BuildBrowserBundle.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {SANDBOX_RANGE_KEYS} from './Data_SandboxRanges.mjs';
-// Encounter Play uses the director's launch controls and shares startup routing.
-const visibleSandboxKeys = SANDBOX_RANGE_KEYS.filter(key => key !== 'encounterPlay');
+import {SCENE_LIST} from './Data_SceneAssets.mjs';
+// Encounter Play and fixed camera previews use their authoring tools to launch.
+const scenePreviewKeys = new Set(SCENE_LIST.map(scene => scene.previewParam).filter(Boolean));
+const visibleSandboxKeys = SANDBOX_RANGE_KEYS.filter(key => key !== 'encounterPlay' && !scenePreviewKeys.has(key));
 
 for (const query of ['', 'quality=high', 'menuPreview=3&menuPreviewUi=0', 'audio=0']) assert.ok(IsMenuStartup(new URLSearchParams(query)), query);
 for (const query of ['whitebox=p012', ...SANDBOX_RANGE_KEYS.map(key => `${key}=1`), 'shot=1', 'phase=0', 'poseTest=1', 'editor=vfx', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);

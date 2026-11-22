@@ -97,6 +97,11 @@ export function ValidateScene(doc) {
     || (camera.nearFocusM !== undefined && !(Finite(camera.nearFocusM) && camera.nearFocusM > 0)))) {
     errors.push("camera 要带 [x, y, z]、yawDeg、pitchDeg（±90° 以内）及垂直 fovDeg（0–180° 之间）；nearFocusM 如有须为正数");
   }
+  const smoke = doc.smokeColumns;
+  if (smoke !== undefined && (!Array.isArray(smoke) || smoke.some(entry => !IsObject(entry)
+    || !Finite(entry.x) || !Finite(entry.z) || !Finite(entry.heightOffset) || !IsObject(entry.options)))) {
+    errors.push("smokeColumns 每个烟源要带 x、z、heightOffset、options");
+  }
   const t = doc.terrain;
   if (!IsObject(t)) errors.push("terrain 要是对象");
   else {
@@ -237,6 +242,7 @@ export function SceneObjectToBlock(obj) {
     semantic: SceneObjectSemantic(obj),
     solid: obj.solid !== false,
     ...(asset?.kind === "prop" ? { propModel: asset.model } : {}),
+    ...(asset?.kind === "prop" && Finite(obj.pos[1]) && obj.params?.grounding === "authored" ? { propAuthoredGrounding: true } : {}),
     // 道具铺几件（params.tile = [nx, ny, nz]，同现行第一关替换表的 tile：一只长盒子里排几个模型）
     ...(asset?.kind === "prop" && Array.isArray(obj.params?.tile) ? { propTile: [...obj.params.tile] } : {}),
     ...(asset?.kind === "tree" ? { sceneTree: true } : {}),
@@ -313,7 +319,9 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     ...(look.heightTint ? { heightTint: { ...look.heightTint } } : {}),
     ...(look.colorSemantics ? { colorSemantics: [...look.colorSemantics] } : {}),
     ...(look.semanticColors ? { semanticColors: { ...look.semanticColors } } : {}),
+    ...(look.groundPaintCellM !== undefined ? { groundPaintCellM: look.groundPaintCellM } : {}),
     ...(look.proceduralDressing === false ? { proceduralDressing: false } : {}),
+    ...(scene.smokeColumns ? { smokeColumns: scene.smokeColumns.filter(s => Inside(area, s.x, s.z)) } : {}),
     blocks,
     ...(gates.length ? { gates } : {}),
     ...(paint.length ? { paint: paint.map(p => ({ ...p })) } : {}),

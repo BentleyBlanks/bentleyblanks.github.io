@@ -19,6 +19,7 @@ export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "DugoutAidOpenFields", title: "沟底包扎 · 朝田野敞开的木棚", style: "formal", previewParam: "dugoutAidOpenFields" }),
   Object.freeze({ id: "FirstLevelMerged", title: "第一关 · 北沙河单村合并版", style: "whitebox",
     note: "01–07（z<355）实时继承 FirstLevelEncounter，z>=355 为合并后的北沙河单村分叉段" }),
+  Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", previewParam: "gengjiazhuangFieldApproach" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -81,6 +82,16 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/marketRiceSack01": Prop("marketRiceSack01", "canvas", "包袱 / 麻袋", [0.7, 0.45, 0.5]),
   "Prop/wardBandageRoll": Prop("wardBandageRoll", "canvas", "绷带卷", [0.35, 0.04, 0.25]),
   ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(asset => [`Prop/${asset.model}`, asset])),
+  "Prop/fieldApproachOldElm": Prop("fieldApproachOldElm", "timber", "沟沿老榆树", [7.316, 8.345, 4.899]),
+  "Prop/fieldApproachLoadedCart": Prop("fieldApproachLoadedCart", "timber", "载草木车", [1.884, 1.928, 3.741]),
+  "Prop/fieldApproachTileFarmhouse": Prop("fieldApproachTileFarmhouse", "plaster", "灰瓦夯土农舍", [9.331, 3.852, 4.96]),
+  "Prop/fieldApproachStrawRick": Prop("fieldApproachStrawRick", "canvas", "田边草垛", [2.446, 1.135, 1.666]),
+  "Prop/fieldApproachSplitRailFence": Prop("fieldApproachSplitRailFence", "timber", "枝条栅栏", [3.438, 0.986, 0.204]),
+  "Prop/fieldApproachFieldElm": Prop("fieldApproachFieldElm", "timber", "田间细榆树", [3.674, 4.783, 2.106]),
+  "Prop/fieldApproachWheatTuft": Prop("fieldApproachWheatTuft", "foliage", "矮麦苗", [0.214, 0.143, 0.179]),
+  "Prop/fieldApproachDryGrass": Prop("fieldApproachDryGrass", "foliage", "沟沿干草与细根", [0.352, 0.267, 0.328]),
+  "Prop/fieldApproachSoilClod": Prop("fieldApproachSoilClod", "earthDark", "翻土块", [0.138, 0.068, 0.114]),
+  "Prop/fieldApproachPackDonkey": Prop("fieldApproachPackDonkey", "canvas", "驮草小驴", [1.245, 1.643, 1.913]),
   "Backdrop/Box": Object.freeze({ kind: "backdropBox", layer: "backdrop", label: "远景盒子", note: "房墙、屋顶、院墙；params: w d h lift color" }),
   "Backdrop/Blob": Object.freeze({ kind: "backdropBlob", layer: "backdrop", label: "远景树冠", note: "椭球；params: rx rz h lift color" }),
   "Backdrop/Hill": Object.freeze({ kind: "backdropHill", layer: "backdrop", label: "远景低山", note: "params: rx rz h color topColor" }),

@@ -1,0 +1,79 @@
+{
+  "schema": "tengxian-env-preset/1",
+  "id": "GengjiazhuangFieldApproach",
+  "title": "耿家庄田间 · 薄云日光",
+  "looks": [
+    {"id": "day", "label": "白天", "hour": 12}
+  ],
+  "components": {
+    "Sun": {
+      "enabled": true,
+      "params": {"elevation": 43, "azimuth": 315, "color": "#fff1dd", "intensity": 3.03, "discIntensity": 0.25}
+    },
+    "Ambient": {
+      "enabled": true,
+      "params": {"probe": 0.81, "color": "#d8deea", "intensity": 0.49}
+    },
+    "Reflection": {
+      "enabled": true,
+      "params": {"intensity": 0.24}
+    },
+    "Sky": {
+      "enabled": true,
+      "params": {"zenith": [0.74, 0.89, 1.13], "horizon": [0.76, 0.83, 0.96], "ground": [0.29, 0.276, 0.264], "glow": 0.03, "smoke": 0}
+    },
+    "Clouds": {
+      "enabled": true,
+      "params": {"structure": 0.8, "coverage": 0.82, "scale": 2.17, "softness": 0.75, "warp": 0.81, "underside": 0.18, "shade": [0.7, 0.79, 0.93], "gap": 0.82, "silver": 0.12}
+    },
+    "Atmosphere": {
+      "enabled": true,
+      "params": {
+        "mie": 3.7,
+        "mieG": 0.75,
+        "rayleigh": 0.67,
+        "ozone": 1,
+        "groundAlbedo": 0.2,
+        "sunIrradiance": 8.9,
+        "skyTint": [0.86, 0.96, 1.13],
+        "skyFloor": [0.75, 0.83, 0.95],
+        "artGlow": 0.045,
+        "aerialBlend": 0.51,
+        "aerialGain": 0.31
+      }
+    },
+    "Fog": {
+      "enabled": true,
+      "params": {
+        "density": 0.00158,
+        "falloff": 21,
+        "max": 0.59,
+        "skyColor": [0.57, 0.62, 0.71],
+        "groundColor": [0.53, 0.565, 0.62],
+        "sunGain": 0.03,
+        "desat": 0.23,
+        "flatten": 0.027
+      }
+    },
+    "Grade": {
+      "enabled": true,
+      "params": {
+        "profile": "firstLevelBattleDay",
+        "exposure": 1.19,
+        "saturation": 0.88,
+        "contrast": 0.99,
+        "contrastCurve": "soft",
+        "gain": [1.01, 1, 0.99],
+        "lift": [0, 0, 0],
+        "shadowTint": [0.97, 1, 1.06],
+        "highlightTint": [1.035, 1.008, 0.97],
+        "splitShadow": 0.18,
+        "splitHighlight": 0.2,
+        "bloom": 0.025,
+        "bloomThreshold": 1.24,
+        "godStrength": 0,
+        "lensFlare": 0
+      }
+    }
+  }
+}

@@ -97,7 +97,7 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
     const corners = CornersOf({ x: union.x, z: union.z, w: union.w, d: union.d, ry: union.ry });
     const centerGround = groundAt(union.x, union.z);
     let bottom = union.bottom;
-    if (Math.abs(bottom - centerGround) <= PROP_GROUND.snapM) {
+    if (!main.propAuthoredGrounding && Math.abs(bottom - centerGround) <= PROP_GROUND.snapM) {
       bottom = Math.min(centerGround, ...corners.map((p) => groundAt(p.x, p.z))) - PROP_GROUND.embedM;
     }
     const [nw, nh, nd] = entry.tile || [1, 1, 1];

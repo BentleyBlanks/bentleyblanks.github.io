@@ -25,7 +25,7 @@
 import { SANDBOX_RANGES } from "./Data_SandboxRanges.mjs";
 import { ENCOUNTER_PLAY_PHASE, ENCOUNTER_PLAY_STARTUP, EncounterPlay } from "./Script_EncounterPlaySplit.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
-import { CreateScenePreviewPhase } from "./Script_DevTools.mjs";
+import { CreateScenePreviewBackdrop, CreateScenePreviewPhase } from "./Script_DevTools.mjs";
 import { SceneInfo } from "./Data_SceneAssets.mjs";
 import { RANGE_PHASE } from "./Data_Range.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
@@ -81,6 +81,7 @@ function FireRangeOptions(h) {
 }
 
 const DUGOUT_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("DugoutAidOpenFields"));
+const FIELD_APPROACH_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("GengjiazhuangFieldApproach"));
 
 function FixedSceneCamera(host, pose) {
   const camera = host.camera;
@@ -98,6 +99,33 @@ function FixedSceneCamera(host, pose) {
 }
 
 const PLUGINS = {
+  gengjiazhuangFieldApproach: {
+    phase: FIELD_APPROACH_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
+    Create(host) {
+      const { battlefield, camera, vfx, state } = host;
+      const { layout } = battlefield;
+      const backdrop = CreateScenePreviewBackdrop(host);
+      const ApplyPose = FixedSceneCamera(host, layout.camera);
+      const runtime = {
+        api: { State: () => ({
+          scene: layout.scene, camera: layout.camera, backdrop: backdrop.Stats(),
+          props: battlefield.scenePropStats?.stats.props ?? 0,
+          propTriangles: battlefield.scenePropStats?.stats.propTriangles ?? 0,
+          missing: battlefield.scenePropStats?.missing ?? [],
+          terrainTriangles: battlefield.stats.groundTris,
+          smoke: vfx.smokeSources.size,
+        }) },
+        Update(dt) { vfx.Update(dt, camera, state.elapsed); },
+        Dispose() { backdrop.Dispose(); host.SetViewmodelHidden(false); },
+      };
+      return Instance(runtime, {
+        debugName: "ScenePreview", ownsFrame: true, dropDebugOnDispose: true,
+        OnInstalled: ApplyPose,
+        UpdateCamera: ApplyPose,
+        Warmup: async () => {},
+      });
+    },
+  },
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) {

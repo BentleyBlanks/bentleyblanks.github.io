@@ -14,6 +14,7 @@ export function CreateDevTools(host) {
 // 白盒关卡编辑器（?editor=blockout，docs/Data_EditorBlockout.md）也是开发工具：关卡表与总控都从这里给宿主。
 import { BLOCKOUT_PHASES, BlockoutLevelIndex, MakeBlockoutPhase } from "./Script_EditorBlockoutLevels.mjs";
 import { SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
+import { BlockoutBackdrop } from "./Script_EditorBlockoutBackdrop.mjs";
 
 /** 编辑器模式的关卡表（每关一片 phase）。剔除版返回空表。 */
 export function BlockoutPhases() {
@@ -28,8 +29,14 @@ export function BlockoutStartIndex(levelKey) {
 /** 独立场景的固定机位预览，沿用场景建场。剔除版不注册预览。 */
 export function CreateScenePreviewPhase({ id, title }) {
   return MakeBlockoutPhase({
-    key: id, label: title, scene: { kind: "scene", url: `./${SceneDir(id)}/${SceneFileName(id)}` },
+    key: id, label: title, scenePreview: true, scene: { kind: "scene", url: `./${SceneDir(id)}/${SceneFileName(id)}` },
   });
+}
+
+export function CreateScenePreviewBackdrop({ scene, renderer, battlefield }) {
+  const backdrop = new BlockoutBackdrop({ scene, renderer });
+  backdrop.Sync(battlefield.layout);
+  return backdrop;
 }
 
 /** 建白盒关卡编辑器总控（按需载入，平常开游戏不下载）。剔除版返回 null。 */

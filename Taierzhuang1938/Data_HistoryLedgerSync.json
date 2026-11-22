@@ -737,6 +737,18 @@
   ],
   "stagingReviews": [
     {
+      "id": "GengjiazhuangFieldApproach",
+      "date": "2026-11-22",
+      "scope": "Standalone environment, original farm props, and camera reconstructed from Reference_GengjiazhuangFieldApproach.png.",
+      "classification": "invented",
+      "runtime": "Scenes/GengjiazhuangFieldApproach/Scene_GengjiazhuangFieldApproach.json",
+      "notionSnapshots": [
+        { "id": "3fd60335331c8194aa82f0b238084d34", "lastEdited": "2026-11-22T08:19:30.884Z" },
+        { "id": "3fd60335331c818fa24deadb6d72ca70", "lastEdited": "2026-11-22T08:19:29.954Z" }
+      ],
+      "decision": "The exact ditch, field path, village and props follow the supplied scene art. Generated turnarounds informed modeling. The scoped Notion rows and the HistoryAndCreation item mark the layout as creative."
+    },
+    {
       "id": "DugoutAidOpenFields",
       "date": "2026-11-22",
       "scope": "Standalone environment and nine original scene meshes reconstructed from the approved open-fields concept.",

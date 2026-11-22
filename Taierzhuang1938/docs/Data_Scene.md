@@ -30,6 +30,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
   "source": { "importedFrom": […], "importer": "…", "importedAt": "ISO", "notes": "…" },
   "bounds": { "minX": -160, "maxX": 320, "minZ": -480, "maxZ": 980 },
   "spawn": { "x": 66.5, "z": 64.2, "yawDeg": 90 },
+  "camera": { "position": [0, 1.36, 0], "yawDeg": 0, "pitchDeg": -4.52, "fovDeg": 42 },
   "terrain": { "file": "Scene_FirstLevelWhitebox.height.bin", "encoding": "int16-cm-le", "minX": -160, "minZ": -480, "cellM": 0.5, "cols": 960, "rows": 2920 },
   "look": { "heightTint": { "lo": -2.68, "hi": 3.85 }, "colorSemantics": ["foliage", …], "semanticColors": { "roof": "#4d473c", … } },
   "backdrop": { "far": 7000, "ground": {…}, "haze": {…}, "siteBounds": {…}, "paint": [ … ] },
@@ -48,6 +49,10 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 ```
 
 坐标同全项目：X 向东、Z 向南、Y 向上，单位为米。独立场景可用 `camera` 保存摄影机的 `position: [x, y, z]`、`yawDeg`、`pitchDeg`、垂直视场角 `fovDeg` 和可选的近景对焦距离 `nearFocusM`。正式场景可设 `look.proceduralDressing: false`，由场景物件提供植被和零散土石。
+
+注册表的 `previewParam` 让场景编辑器打开对应项目渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
+各 `paint` 项可用 `tint` 设置正式地表的反照率倍率，支持六位 Hex 或 0–2 的三个 sRGB 倍率。
+显式标高的道具可用 `params.grounding: "authored"` 控制贴地。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。
 
 一个物件：
 

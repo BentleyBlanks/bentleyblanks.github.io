@@ -13,7 +13,7 @@
 import { MISSION_LAYOUT, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
-import { BlockoutDocFromScene } from "./Script_SceneDoc.mjs";
+import { BlockoutDocFromScene, ValidateScene } from "./Script_SceneDoc.mjs";
 import { FetchResolvedScene } from "./Script_SceneInherit.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
@@ -270,6 +270,7 @@ function GroundedBlock(block, groundAt) {
     // 2026-11-01：正式场景（docs/Data_Scene.md §8）的道具模型（铺几件）、树
     ...(block.propModel ? { propModel: block.propModel } : {}),
     ...(block.propTile ? { propTile: [...block.propTile] } : {}),
+    ...(block.propAuthoredGrounding ? { propAuthoredGrounding: true } : {}),
     ...(block.sceneTree ? { sceneTree: true } : {}),
     ...(block.semantic === "water" && block.waterRibbon ? { waterRibbon: block.waterRibbon } : {}),
   };
@@ -423,7 +424,14 @@ export function BuildSceneGroundSurface(doc, sampler) {
   for (const line of doc.ways?.trenches || []) {
     if (line.length >= 2) items.push({ line, halfW: S.trench.halfW, feather: S.trench.feather, rgb: [0, 1, 0] });
   }
-  const raster = items.length ? BuildGroundPaint(items, doc.bounds, { cellM: S.cellM, maxCells: S.maxCells }) : null;
+  const cellM = Number.isFinite(doc.groundPaintCellM) ? Math.max(0.25, Math.min(S.cellM, doc.groundPaintCellM)) : S.cellM;
+  const raster = items.length ? BuildGroundPaint(items, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
+  const tintItems = (doc.paint || []).flatMap(item => {
+    const rgb = typeof item.tint === "string" && /^#[0-9a-f]{6}$/i.test(item.tint) ? HexRgb(item.tint) : item.tint;
+    return (item.poly || item.line) && Array.isArray(rgb) && rgb.length === 3 && rgb.every(value => Number.isFinite(value) && value >= 0 && value <= 2)
+      ? [{ ...item, rgb }] : [];
+  });
+  const tint = tintItems.length ? BuildGroundPaint(tintItems, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
   const w = [0, 0, 0], step = S.slope.stepM, span = S.slope.to - S.slope.from;
   // 场景壕沟：翻土层跟着样条的实际沟沿走，沿弃土垄再铺一层（同现行第一关 SampleMissionTerrain 那一段）
   const plan = doc.trenchPlan || null;
@@ -445,6 +453,7 @@ export function BuildSceneGroundSurface(doc, sampler) {
     if (steep > spoil) spoil = steep;
     track *= 1 - steep;
     color[0] = 1; color[1] = 1; color[2] = 1;
+    tint?.Blend(x, z, color);
     layers[0] = track; layers[1] = spoil; layers[2] = Math.max(0, Math.min(1, 1 - track - spoil - soil)); layers[3] = 1;
     return color;
   };
@@ -707,6 +716,7 @@ export function LayoutFromSceneDoc(doc) {
     zones: [],
     spawn: { x: doc.spawn.x, z: doc.spawn.z, yawDeg: Number.isFinite(doc.spawn.yawDeg) ? doc.spawn.yawDeg : 0 },
     ...(doc.camera ? { camera: doc.camera } : {}),
+    ...(doc.smokeColumns ? { smokeColumns: doc.smokeColumns } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
       trenches: (doc.ways?.trenches || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
@@ -738,6 +748,7 @@ function ApplyLayout(phase, layout) {
   phase.cameraFar = Number.isFinite(layout.cameraFar) ? layout.cameraFar : BLOCKOUT_CAMERA_FAR;
   phase.bounds = { ...layout.bounds };
   if (layout.spawn) phase.spawn = SpawnFrom(layout.spawn);
+  if (phase.blockout?.scenePreview) phase.smokeColumns = layout.smokeColumns || [];
   phase.zones = ZonesFor(phase.label, phase.spawn);
 }
 
@@ -775,6 +786,7 @@ export function MakeBlockoutPhase(level) {
   phase.blockout = {
     key: level.key,
     configUrl: level.configUrl,
+    scenePreview: level.scenePreview === true,
     scene: level.scene,
     sceneError: null,
     /**
@@ -795,6 +807,12 @@ export function MakeBlockoutPhase(level) {
         let doc;
         if (level.scene.kind === "scene") {
           const resolved = await FetchResolvedScene(sceneUrl, { bustCache: true });
+          if (level.scenePreview) {
+            const result = ValidateScene(resolved.doc);
+            if (!result.ok || !resolved.doc.camera || resolved.doc.id !== level.key) {
+              throw new Error(result.errors[0] || "场景缺少已登记的预览机位");
+            }
+          }
           const { heights, plan } = PrepareSceneTerrain(resolved.doc, resolved.heights, resolved.datumBytes);
           doc = BlockoutSliceDoc(level, resolved.doc, heights, plan);
         } else {

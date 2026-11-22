@@ -17,6 +17,10 @@ export function CreateScenePreviewPhase() {
   return null;
 }
 
+export function CreateScenePreviewBackdrop() {
+  return null;
+}
+
 export async function CreateBlockoutEditor() {
   return null;
 }

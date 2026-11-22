@@ -196,4 +196,24 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(!ValidateScene({ ...doc, camera: { ...doc.camera, nearFocusM: 0 } }).ok, "拒绝无效的近景焦距");
 }
 
+{
+  const id = "GengjiazhuangFieldApproach";
+  const { doc, heights } = ReadSceneSync(id);
+  const layout = LayoutFromSceneDoc(BlockoutDocFromScene(doc, heights, { level: id }));
+  Check(ValidateScene(doc).ok && layout.style === "formal", "耿家庄独立场景是可校验的正式场景");
+  Check(!ValidateScene({ ...doc, camera: { ...doc.camera, fovDeg: 0 } }).ok, "拒绝无效的独立机位");
+  Check(!ValidateScene({ ...doc, smokeColumns: [{ x: 0 }] }).ok, "拒绝未指定位置的局部烟源");
+  assert.deepEqual(layout.camera, doc.camera);
+  Check(layout.sceneProps.length === doc.objects.filter(obj => obj.asset.startsWith("Prop/")).length
+    && layout.proceduralDressing === false, "独立场景使用自己布设的道具和植被");
+  Check(layout.smokeColumns.length === 1 && layout.backdrop.shapes.every(shape => shape.kind === "hill"),
+    "耿家庄保留屋后单烟源和远岗");
+  const cart = layout.blocks.find(block => block.id === "CroppedLoadedCart");
+  Check(cart.propAuthoredGrounding, "木车按指定沟底标高摆放");
+  const [rut] = doc.paint.find(item => item.id === "FieldPathLeftRut").line.filter(point => point.z < -13);
+  const layers = [0, 0, 0, 1];
+  const color = layout.SampleGroundSurface(rut.x, rut.z, [1, 1, 1], layers);
+  Check(layers[0] > 0.5 && color[0] > 1, "细土路的车辙权重和暖色倍率随场景载入");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);
