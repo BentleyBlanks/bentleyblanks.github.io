@@ -195,7 +195,7 @@ function PopulateVariantPicker() {
 
   const sceneLink = Element("openInSceneEditor");
   sceneLink.href = `./SceneEditor.html?scene=${encodeURIComponent(spec.scene)}`;
-  Element("variantSceneCode").textContent = spec.scene;
+  sceneLink.title = `在场景编辑器中打开 ${spec.scene}`;
 
   const levelBar = Element("variantLevels");
   levelBar.replaceChildren();
@@ -217,72 +217,162 @@ function PopulateVariantPicker() {
     levelBar.append(btn);
   }
 
-  const list = Element("variantList");
-  list.replaceChildren();
-  for (const item of ENCOUNTER_VARIANTS.filter((v) => v.level === currentLevel.id)) {
-    const compiled = CompileEncounterVariant(item.id);
-    if (item.forkNote) {
-      const connector = document.createElement("div");
-      connector.className = "lfForkConnector";
-      const elbow = document.createElement("span");
-      elbow.className = "lfForkElbow";
-      elbow.textContent = "└─";
-      const text = document.createElement("span");
-      text.textContent = item.forkNote;
-      connector.append(elbow, text);
-      list.append(connector);
-    }
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "lfVariantCard";
-    card.dataset.variantId = item.id;
-    card.dataset.forked = String(!item.isBaseline);
-    card.setAttribute("aria-pressed", String(item.id === activeVariant.id));
-    card.addEventListener("click", () => {
+  const graph = Element("variantList");
+  graph.replaceChildren();
+  const variants = ENCOUNTER_VARIANTS.filter((v) => v.level === currentLevel.id);
+  const compiledList = variants.map((item) => ({ item, compiled: CompileEncounterVariant(item.id) }));
+  const sharedStages = new Set(variants[0]?.sharedStages || []);
+  const sharedTrackLabel = variants[0]?.tracks?.find((t) => t.shared)?.label || "01–07 共用主干";
+  const lastSharedStage = compiledList[0]?.compiled.stages.filter((s) => sharedStages.has(s.id)).at(-1);
+  const sharedDuration = lastSharedStage?.end ?? 0;
+  const forkStageCode = lastSharedStage?.id || "07";
+  const forkTooltip = variants.find((v) => v.forkNote)?.forkNote || `分叉点 ${forkStageCode} 末`;
+
+  const ROW_H = 66, ROW_GAP = 10;
+  const totalH = variants.length * ROW_H + Math.max(0, variants.length - 1) * ROW_GAP;
+  const midY = totalH / 2;
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const SvgEl = (tag, attrs = {}) => {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
+  };
+
+  // Column 1: Single shared trunk (01-07) — physically drawn ONCE for all branches
+  const trunk = document.createElement("div");
+  trunk.className = "lfDagTrunk";
+  trunk.title = forkTooltip;
+  const trunkSvg = SvgEl("svg", { class: "lfDagTrunkSvg", viewBox: `0 0 152 ${totalH}`, preserveAspectRatio: "none" });
+  trunkSvg.append(
+    SvgEl("line", { x1: 8, y1: midY, x2: 152, y2: midY, stroke: "#6fa8b8", "stroke-width": 2.6, "stroke-linecap": "round" }),
+    SvgEl("circle", { cx: 8, cy: midY, r: 4, fill: "#101517", stroke: "#89c4d4", "stroke-width": 2 }),
+  );
+  const trunkLabel = document.createElement("span");
+  trunkLabel.className = "lfDagTrunkLabel";
+  trunkLabel.textContent = sharedTrackLabel;
+  const trunkMeta = document.createElement("span");
+  trunkMeta.className = "lfDagTrunkMeta";
+  trunkMeta.textContent = FormatFlowTime(sharedDuration);
+  trunk.append(trunkSvg, trunkLabel, trunkMeta);
+
+  // Column 2: Smooth Git-style Bezier fork curves from the single fork node (0, midY)
+  const connector = SvgEl("svg", { class: "lfDagConnector", width: 46, height: totalH, viewBox: `0 0 46 ${totalH}` });
+  const defs = SvgEl("defs");
+  const grad = SvgEl("linearGradient", { id: "lfDagActiveGrad", x1: "0%", y1: "0%", x2: "100%", y2: "0%" });
+  grad.append(
+    SvgEl("stop", { offset: "0%", "stop-color": "#6fa8b8" }),
+    SvgEl("stop", { offset: "100%", "stop-color": "#e2c375" }),
+  );
+  defs.append(grad);
+  connector.append(defs);
+
+  const curveById = new Map();
+  const inactiveCurves = [], activeCurves = [];
+  compiledList.forEach(({ item }, index) => {
+    const rowY = index * (ROW_H + ROW_GAP) + ROW_H / 2;
+    const isActive = item.id === activeVariant.id;
+    const path = SvgEl("path", {
+      class: "lfDagCurve",
+      d: `M 0 ${midY} C 24 ${midY}, 20 ${rowY}, 46 ${rowY}`,
+      "data-variant-id": item.id,
+      "data-active": String(isActive),
+      "data-hovered": "false",
+    });
+    curveById.set(item.id, path);
+    if (isActive) activeCurves.push(path);
+    else inactiveCurves.push(path);
+  });
+  for (const p of [...inactiveCurves, ...activeCurves]) connector.append(p);
+
+  const forkGroup = SvgEl("g", { class: "lfDagForkNode" });
+  const forkTitle = SvgEl("title");
+  forkTitle.textContent = forkTooltip;
+  forkGroup.append(
+    forkTitle,
+    SvgEl("circle", { cx: 0, cy: midY, r: 6, fill: "#101517", stroke: "#8cc8d8", "stroke-width": 2.2 }),
+    SvgEl("circle", { cx: 0, cy: midY, r: 2.3, fill: "#e6cb81" }),
+  );
+  const forkTag = SvgEl("text", { class: "lfDagForkTag", x: 0, y: midY + 17 });
+  forkTag.textContent = forkStageCode;
+  forkGroup.append(forkTag);
+  connector.append(forkGroup);
+
+  // Column 3: Branch rows with proportional commit rails
+  const branchesEl = document.createElement("div");
+  branchesEl.className = "lfDagBranches";
+  const maxForkDur = Math.max(1, ...compiledList.map(({ compiled }) => Math.max(1, compiled.duration - sharedDuration)));
+
+  for (const { item, compiled } of compiledList) {
+    const isActive = item.id === activeVariant.id;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "lfBranchRow";
+    row.dataset.variantId = item.id;
+    row.dataset.forked = String(!item.isBaseline);
+    row.setAttribute("aria-pressed", String(isActive));
+    row.title = item.summary;
+    row.addEventListener("pointerenter", () => {
+      const curve = curveById.get(item.id);
+      if (curve && !isActive) {
+        curve.setAttribute("data-hovered", "true");
+        connector.insertBefore(curve, forkGroup);
+      }
+    });
+    row.addEventListener("pointerleave", () => {
+      const curve = curveById.get(item.id);
+      if (curve) curve.setAttribute("data-hovered", "false");
+    });
+    row.addEventListener("click", () => {
       picker.open = false;
       SwitchVariant(item.id);
     });
 
     const head = document.createElement("div");
-    head.className = "lfVariantCardHead";
-    const titleWrap = document.createElement("span");
-    titleWrap.className = "lfVariantCardTitle";
-    const dot = document.createElement("span");
-    dot.className = "lfVariantDot";
-    const strong = document.createElement("strong");
-    strong.textContent = item.title;
+    head.className = "lfBranchHead";
+    const nameWrap = document.createElement("span");
+    nameWrap.className = "lfBranchNameWrap";
+    const name = document.createElement("span");
+    name.className = "lfBranchName";
+    name.textContent = item.title;
     const tag = document.createElement("span");
     tag.className = "lfVariantBadge";
     tag.dataset.kind = item.isBaseline ? "base" : "fork";
     tag.textContent = item.badge;
-    titleWrap.append(dot, strong, tag);
-
-    const meta = document.createElement("span");
-    meta.className = "lfVariantMeta";
-    const code = document.createElement("code");
-    code.textContent = item.sceneLabel || item.scene;
-    meta.append(code, document.createTextNode(` · ${FormatFlowTime(compiled.duration)}`));
-    head.append(titleWrap, meta);
-
-    const trackBar = document.createElement("div");
-    trackBar.className = "lfTrackBar";
-    for (const seg of item.tracks || []) {
-      const pill = document.createElement("span");
-      pill.className = "lfTrackSeg";
-      pill.dataset.shared = String(!!seg.shared);
-      pill.style.gridColumn = `span ${seg.span}`;
-      pill.textContent = `${seg.shared ? "🔗 " : "✦ "}${seg.label}`;
-      pill.title = seg.label;
-      trackBar.append(pill);
+    nameWrap.append(name, tag);
+    if (isActive) {
+      const headTag = document.createElement("span");
+      headTag.className = "lfBranchHeadTag";
+      headTag.textContent = "HEAD";
+      nameWrap.append(headTag);
     }
 
-    const note = document.createElement("div");
-    note.className = "lfVariantSummaryNote";
-    note.textContent = item.summary;
+    const meta = document.createElement("span");
+    meta.className = "lfBranchMeta";
+    const sceneSpan = document.createElement("span");
+    sceneSpan.textContent = item.sceneLabel || item.scene;
+    const durStrong = document.createElement("strong");
+    durStrong.textContent = FormatFlowTime(compiled.duration);
+    meta.append(sceneSpan, document.createTextNode("·"), durStrong);
+    head.append(nameWrap, meta);
 
-    card.append(head, trackBar, note);
-    list.append(card);
+    const rail = document.createElement("div");
+    rail.className = "lfBranchRail";
+    const forkDur = Math.max(1, compiled.duration - sharedDuration);
+    const railPct = Math.round(58 + 42 * (forkDur / maxForkDur));
+    rail.style.width = `${railPct}%`;
+    for (const seg of (item.tracks || []).filter((t) => !t.shared)) {
+      const node = document.createElement("span");
+      node.className = "lfCommitNode";
+      const dot = document.createElement("i");
+      node.append(dot, document.createTextNode(seg.label));
+      rail.append(node);
+    }
+
+    row.append(head, rail);
+    branchesEl.append(row);
   }
+
+  graph.append(trunk, connector, branchesEl);
 }
 
 function PopulateTimeline() {
