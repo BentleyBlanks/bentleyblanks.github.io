@@ -16,6 +16,7 @@ export const SCENE_LIST = Object.freeze([
   Object.freeze({ id: "FirstLevel", title: "第一关 · 正式", style: "formal",
     note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，道具换外部模型、地面换分层地表，体块仍是白盒网格，之后单独打磨" }),
   Object.freeze({ id: "FirstLevelEncounter", title: "第一关 · Encounter Play", style: "whitebox", note: "独立遭遇场景；编排和 Play 共用，原场景保持独立" }),
+  Object.freeze({ id: "DugoutAidOpenFields", title: "沟底包扎 · 朝田野敞开的木棚", style: "formal", previewParam: "dugoutAidOpenFields" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */
@@ -33,6 +34,21 @@ export function SceneInfo(sceneId) {
  */
 // size：场景编辑器新加一件时的缺省盒子（米，取白盒里同类道具最常见的那个尺寸）
 const Prop = (model, semantic, label, size) => Object.freeze({ kind: "prop", sized: true, model, semantic, label, size: Object.freeze(size), note: `外部道具 ${model}` });
+
+// 节点名与 Blender 导出的模型包一一对应。
+export const DUGOUT_AID_OPEN_FIELDS_PROPS = Object.freeze([
+  ["SplitTimber", "timber", "裂口木柱", [0.33, 2.68, 0.37]],
+  ["BrokenSodRoof", "timber", "破损覆土木棚", [7.44, 1.45, 4.79]],
+  ["CutEarthBank", "earthDark", "沟壁与土阶", [3.27, 2.25, 2.42]],
+  ["DamagedGrayBrickWall", "structure", "残缺灰砖矮墙", [1.43, 0.66, 0.32]],
+  ["WickerBasket", "timber", "柳条编篮", [0.60, 0.40, 0.34]],
+  ["EarthenRubble", "earthDark", "断角土石", [0.47, 0.33, 0.37]],
+  ["BareFieldElm", "foliage", "田边枯榆", [7.98, 7.85, 4.44]],
+  ["Farmhouse", "structure", "田野灰瓦农舍", [9.21, 3.77, 4.78]],
+  ["WheatField", "foliage", "麦苗田畦", [8, 0.21, 3.8]],
+].map(([node, semantic, label, size]) => Object.freeze({
+  node, ...Prop(`dugoutAid${node}`, semantic, label, size),
+})));
 
 export const SCENE_ASSETS = Object.freeze({
   "Whitebox/Box": Object.freeze({ kind: "box", sized: true, label: "白盒体块", note: "米制长方体；样子看 material，碰撞看 solid" }),
@@ -62,6 +78,7 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/ryCartWheel": Prop("ryCartWheel", "timber", "车轮", [0.9, 0.9, 0.12]),
   "Prop/marketRiceSack01": Prop("marketRiceSack01", "canvas", "包袱 / 麻袋", [0.7, 0.45, 0.5]),
   "Prop/wardBandageRoll": Prop("wardBandageRoll", "canvas", "绷带卷", [0.35, 0.04, 0.25]),
+  ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(asset => [`Prop/${asset.model}`, asset])),
   "Backdrop/Box": Object.freeze({ kind: "backdropBox", layer: "backdrop", label: "远景盒子", note: "房墙、屋顶、院墙；params: w d h lift color" }),
   "Backdrop/Blob": Object.freeze({ kind: "backdropBlob", layer: "backdrop", label: "远景树冠", note: "椭球；params: rx rz h lift color" }),
   "Backdrop/Hill": Object.freeze({ kind: "backdropHill", layer: "backdrop", label: "远景低山", note: "params: rx rz h color topColor" }),

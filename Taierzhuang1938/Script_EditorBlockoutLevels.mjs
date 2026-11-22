@@ -677,6 +677,7 @@ export function LayoutFromSceneDoc(doc) {
     // 正式场景的道具（Prop/*）：盒子只留碰撞，FirstLevelWhiteboxField 换外部模型
     sceneProps: formal ? blocks.filter((block) => block.propModel)
       .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,
+    ...(doc.proceduralDressing === false ? { proceduralDressing: false } : {}),
     heightTint: tint,
     groundPaint,
     colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
@@ -704,6 +705,7 @@ export function LayoutFromSceneDoc(doc) {
     trenchDressingStats: trenchDressing.stats,
     zones: [],
     spawn: { x: doc.spawn.x, z: doc.spawn.z, yawDeg: Number.isFinite(doc.spawn.yawDeg) ? doc.spawn.yawDeg : 0 },
+    ...(doc.camera ? { camera: doc.camera } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
       trenches: (doc.ways?.trenches || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),

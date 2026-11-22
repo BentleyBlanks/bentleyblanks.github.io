@@ -1,0 +1,16 @@
+{
+  "schema": "tengxian-env-scene/1",
+  "scene": "DugoutAidOpenFields",
+  "time": { "hour": 14, "speed": 0, "paused": true },
+  "volumes": [
+    {
+      "id": "OpenFieldsDaylight",
+      "name": "田野日光",
+      "shape": "global",
+      "priority": 0,
+      "blendS": 0,
+      "mode": "full",
+      "preset": "DugoutAidOpenFields"
+    }
+  ]
+}

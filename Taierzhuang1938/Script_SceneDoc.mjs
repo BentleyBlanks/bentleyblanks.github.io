@@ -90,6 +90,13 @@ export function ValidateScene(doc) {
   if (!NonEmpty(doc.title)) errors.push("title 要是非空字符串");
   if (!IsBounds(doc.bounds)) errors.push("bounds 要带有限且 max > min 的 minX / maxX / minZ / maxZ");
   if (!IsObject(doc.spawn) || !Finite(doc.spawn.x) || !Finite(doc.spawn.z)) errors.push("spawn 要带有限的 x / z");
+  const camera = doc.camera;
+  if (camera !== undefined && (!IsObject(camera) || !Array.isArray(camera.position) || camera.position.length !== 3
+    || !camera.position.every(Finite) || !Finite(camera.yawDeg) || !Finite(camera.pitchDeg)
+    || Math.abs(camera.pitchDeg) >= 90 || !(Finite(camera.fovDeg) && camera.fovDeg > 0 && camera.fovDeg < 180)
+    || (camera.nearFocusM !== undefined && !(Finite(camera.nearFocusM) && camera.nearFocusM > 0)))) {
+    errors.push("camera 要带 [x, y, z]、yawDeg、pitchDeg（±90° 以内）及垂直 fovDeg（0–180° 之间）；nearFocusM 如有须为正数");
+  }
   const t = doc.terrain;
   if (!IsObject(t)) errors.push("terrain 要是对象");
   else {
@@ -115,6 +122,8 @@ export function ValidateScene(doc) {
     }
   }
   if (doc.look !== undefined && !IsObject(doc.look)) errors.push("look 要是对象");
+  if (doc.look?.proceduralDressing !== undefined && typeof doc.look.proceduralDressing !== "boolean")
+    errors.push("look.proceduralDressing 要是 true / false");
   if (doc.ways !== undefined && !IsObject(doc.ways)) errors.push("ways 要是对象");
   if (doc.trenches !== undefined) SceneTrenchIssues(doc.trenches, errors);
   return { ok: errors.length === 0, errors, warnings };
@@ -291,10 +300,12 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     style: SceneStyle(scene.id),
     bounds: area,
     spawn: spawn ? { ...spawn } : { ...scene.spawn },
+    ...(scene.camera ? { camera: { ...scene.camera, position: [...scene.camera.position] } } : {}),
     terrain: { kind: "heightmap", ...crop.terrain, encoding: "int16-cm-base64", heights: crop.heights },
     ...(look.heightTint ? { heightTint: { ...look.heightTint } } : {}),
     ...(look.colorSemantics ? { colorSemantics: [...look.colorSemantics] } : {}),
     ...(look.semanticColors ? { semanticColors: { ...look.semanticColors } } : {}),
+    ...(look.proceduralDressing === false ? { proceduralDressing: false } : {}),
     blocks,
     ...(gates.length ? { gates } : {}),
     ...(paint.length ? { paint: paint.map(p => ({ ...p })) } : {}),

@@ -13,6 +13,10 @@ export function BlockoutStartIndex() {
   return 0;
 }
 
+export function CreateScenePreviewPhase() {
+  return null;
+}
+
 export async function CreateBlockoutEditor() {
   return null;
 }

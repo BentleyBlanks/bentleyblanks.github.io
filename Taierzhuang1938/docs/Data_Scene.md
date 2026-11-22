@@ -16,6 +16,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 - 现有场景（清单 `Data_SceneAssets.SCENE_LIST`，场景编辑器的下拉、存盘口都认这张表）：
   - `FirstLevelWhitebox`（第一关新剧本 01–18 的白盒，三段合一，见 §5）：白盒编辑器的编辑与预演跑它；
   - `FirstLevel`（第一关正式场景，2026-11-01，见 §8）：白盒编辑器的试玩跑它，之后单独打磨细节。
+  - `DugoutAidOpenFields` 是独立环境「沟底包扎 · 朝田野敞开的木棚」。在场景编辑器里选它，点「查看原画机位」就会用游戏渲染器加载保存的机位。详见[场景说明](../Scenes/DugoutAidOpenFields/README.md)。
 - **场景文件就是这个场景的唯一真相**：人、agent、以后的场景编辑器都直接改它；没有生成器在后面覆盖。改完跑 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all`。
 - JSON 一律 LF（`.gitattributes`），大数组一行一项，方便按 id grep 与 diff。
 
@@ -46,7 +47,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 }
 ```
 
-坐标同全项目：X 向东、Z 向南、Y 向上，米。
+坐标同全项目：X 向东、Z 向南、Y 向上，单位为米。独立场景可用 `camera` 保存摄影机的 `position: [x, y, z]`、`yawDeg`、`pitchDeg`、垂直视场角 `fovDeg` 和可选的近景对焦距离 `nearFocusM`。正式场景可设 `look.proceduralDressing: false`，由场景物件提供植被和零散土石。
 
 一个物件：
 

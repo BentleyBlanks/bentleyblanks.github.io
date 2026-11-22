@@ -1,7 +1,7 @@
 // Script_SceneFormalTest.mjs —— 第一关正式场景（Scenes/FirstLevel，docs/Data_Scene.md §8）的 node 门禁。
 //
 // 跑法：node Taierzhuang1938/Script_SceneFormalTest.mjs
-//   1. 场景清单：两个场景，白盒 + 正式；正式场景过校验、高度图格点数对；
+//   1. 场景清单保留第一关场景，所有编号唯一；正式场景过校验、高度图格点数对；
 //   2. 正式场景里正式资产只有道具（Prop/*，模型都在外部道具目录里）与树（Tree/*）；体块不是正式资产，
 //      和白盒场景逐个一样（Whitebox/Box + Whitebox/*，灰面 + 米格线，用户 2026-11-01：不给它自己造外观）；
 //   3. 白盒编辑器 10 月稿三段：试玩跑正式场景（scene.playUrl），编辑跑白盒；11-09 新剧本 01–07 试玩也跑白盒；正式那一块转出来是 formal 样子、
@@ -24,7 +24,8 @@ let count = 0;
 function Check(ok, label) { assert.ok(ok, label); count++; }
 
 // 1) 清单
-Check(SCENE_LIST.length === 3 && ["FirstLevelWhitebox","FirstLevel","FirstLevelEncounter"].every(id=>SCENE_IDS.includes(id)), "场景清单：保留白盒与正式场景，另有独立 Encounter 场景");
+Check(new Set(SCENE_IDS).size === SCENE_LIST.length && ["FirstLevelWhitebox", "FirstLevel", "FirstLevelEncounter"].every(id => SCENE_IDS.includes(id)),
+  "场景清单编号唯一，保留第一关白盒、正式与独立 Encounter 场景");
 Check(SceneStyle("FirstLevelEncounter")==="whitebox","独立 Encounter 场景保持白盒材质");
 Check(SceneStyle("FirstLevelWhitebox") === "whitebox" && SceneStyle("FirstLevel") === "formal", "两个场景的样子：whitebox / formal");
 const path = SceneFilePath("FirstLevel");

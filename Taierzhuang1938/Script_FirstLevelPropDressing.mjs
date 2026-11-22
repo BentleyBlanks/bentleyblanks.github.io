@@ -393,7 +393,9 @@ export function AddScenePropModels(sink, layout, dressing, groundAt, materials, 
   const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
   const plan = PlanPropDressing(layout.blocks, groundAt, sizes, layout.sceneProps || []);
   const triangles = AddPropPlacements(sink, plan.placements, dressing, materials);
-  const { rubble, rubbleTriangles } = AddRubbleScatter(sink, SceneDressingContext(layout, groundAt), materials, library, { scene, meshes });
+  const { rubble, rubbleTriangles } = layout.proceduralDressing === false
+    ? { rubble: { hidden: [], pieces: [] }, rubbleTriangles: 0 }
+    : AddRubbleScatter(sink, SceneDressingContext(layout, groundAt), materials, library, { scene, meshes });
   sink.SetSector("FirstLevelWhitebox");
   return { replaced: new Set([...plan.replaced, ...(library ? rubble.hidden : [])]), placements: plan.placements, missing: plan.missing,
     stats: { props: plan.placements.length, propTriangles: Math.round(triangles), rubble: rubble.pieces.length,

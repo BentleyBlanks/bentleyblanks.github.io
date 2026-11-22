@@ -274,7 +274,7 @@ export class FirstLevelWhiteboxField {
     if(this.layout.sceneProps?.length&&this.library&&typeof document!=="undefined")
       this.scenePropModels=await LoadFirstLevelPropDressing(this.library,{ids:this.layout.sceneProps.map(entry=>entry.asset)});
     // 正式场景也长现行第一关的枯草丛（按场景的路与沟撒，Data_FirstLevelVegetation.SceneDressingContext）
-    if(this.layout.style==="formal"&&!this.vegetationAtlas&&this.library&&typeof document!=="undefined")
+    if(this.layout.style==="formal"&&this.layout.proceduralDressing!==false&&!this.vegetationAtlas&&this.library&&typeof document!=="undefined")
       this.vegetationAtlas=await LoadFirstLevelVegetationAtlas(this.library);
   }
 

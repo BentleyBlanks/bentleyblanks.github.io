@@ -184,4 +184,16 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(segs("FirstLevel0105").length === 45 && JSON.stringify(segs("FirstLevel1218")) === JSON.stringify(["VillageNorthWest", "VillageNorthEast"]), "01–05 那一块带 45 段、11–18 那一块只带村北两段");
 }
 
+{
+  const id = "DugoutAidOpenFields";
+  const { doc, heights } = ReadSceneSync(id);
+  const validation = ValidateScene(doc);
+  Check(validation.ok, `${id} 场景与资产引用有效：${validation.errors.join("；")}`);
+  const layout = LayoutFromSceneDoc(BlockoutDocFromScene(doc, heights, { level: id }));
+  Check(layout.style === "formal" && layout.sceneProps.length === doc.objects.length, "独立正式场景的模型进入建场布局");
+  Check(layout.proceduralDressing === false, "独立场景用自己布设的麦畦和碎石");
+  assert.deepEqual(layout.camera, doc.camera, "场景机位透传到运行时");
+  Check(!ValidateScene({ ...doc, camera: { ...doc.camera, nearFocusM: 0 } }).ok, "拒绝无效的近景焦距");
+}
+
 console.log(`场景文件测试全过（${checks} 项）`);

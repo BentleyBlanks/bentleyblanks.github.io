@@ -8,6 +8,7 @@
 //   updateSlot        每帧在哪儿跑：afterPlayer（玩家移动之后）/ beforeAi（AI 之前）/ afterCombat（战斗结算之后）
 //   ownsFrame         整帧交给测试场（布料）：只跑它自己、天空灯光与画面
 //   Update(dt) / UpdateCamera(dt) / ScaleDt(dt) / CapturesInput() / ApplyCamera(camera) / Dispose()
+//   PostOptions()    当前镜头的后期参数，随插件一起销毁
 //   OnInstalled()     装配层把它记成当前测试场之后再调（枪械射击要先登记再补弹药）
 //   armory            枪械射击场的弹药规则（装配层的补给、换弹、HUD 读它）
 //   Maintain()        补兵那个 3 秒节拍里调（靶场、白刃实验场复位木桩兵）；没有就不补兵
@@ -24,6 +25,8 @@
 import { SANDBOX_RANGES } from "./Data_SandboxRanges.mjs";
 import { ENCOUNTER_PLAY_PHASE, ENCOUNTER_PLAY_STARTUP, EncounterPlay } from "./Script_EncounterPlaySplit.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
+import { CreateScenePreviewPhase } from "./Script_DevTools.mjs";
+import { SceneInfo } from "./Data_SceneAssets.mjs";
 import { RANGE_PHASE } from "./Data_Range.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
 import { CreateRangeTargets } from "./Script_RangeTargets.mjs";
@@ -77,6 +80,23 @@ function FireRangeOptions(h) {
   };
 }
 
+const DUGOUT_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("DugoutAidOpenFields"));
+
+function FixedSceneCamera(host, pose) {
+  const camera = host.camera;
+  return () => {
+    host.SetViewmodelHidden(true);
+    if (!pose) return;
+    const radians = Math.PI / 180;
+    camera.position.set(...pose.position);
+    camera.rotation.set(pose.pitchDeg * radians, pose.yawDeg * radians, 0, "YXZ");
+    if (camera.fov !== pose.fovDeg) {
+      camera.fov = pose.fovDeg;
+      camera.updateProjectionMatrix();
+    }
+  };
+}
+
 const PLUGINS = {
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
@@ -84,6 +104,7 @@ const PLUGINS = {
       const runtime=new EncounterPlay(h);
       return Instance(runtime,{
         debugName:"EncounterPlay",updateSlot:"beforeAi",holdsRespawn:true,
+        captureViewportName:"视口 1 · 玩家视角",
         ScaleDt:dt=>runtime.active&&runtime.ready&&!runtime.paused&&!runtime.failed&&!runtime.plan.completed?dt:0,
         CapturesInput:()=>runtime.CapturesInput(),
         OnKey:detail=>runtime.OnKey(detail),
@@ -91,6 +112,22 @@ const PLUGINS = {
         ViewportSize:()=>runtime.view.Size(),
         AfterRender:(dt,options)=>runtime.AfterRender(dt,options),
         Warmup:onStep=>runtime.Warmup(onStep),
+      });
+    },
+  },
+  dugoutAidOpenFields: {
+    phase: DUGOUT_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
+    Create(host) {
+      const pose = DUGOUT_PREVIEW_PHASE.whitebox.layout?.camera;
+      const UpdateCamera = FixedSceneCamera(host, pose);
+      UpdateCamera();
+      return Instance(null, {
+        ownsFrame: true, UpdateCamera,
+        PostOptions: () => pose?.nearFocusM ? {
+          nearDofFocus: pose.nearFocusM, nearDofRange: pose.nearFocusM * 0.60,
+          nearDofStrength: 0.72, nearDofMaxPx: 4.5,
+        } : null,
+        Dispose: () => host.SetViewmodelHidden(false),
       });
     },
   },
@@ -202,10 +239,11 @@ const PLUGINS = {
 };
 
 /** 登记表顺序的全部插件（选章「测试场景」一组、场地类表都按它）。 */
-export const SANDBOX_PLUGINS = Object.freeze(SANDBOX_RANGES.map((entry) => {
+export const SANDBOX_PLUGINS = Object.freeze(SANDBOX_RANGES.flatMap((entry) => {
   const plugin = PLUGINS[entry.id];
   if (!plugin) throw new Error(`SandboxRanges: no plugin for ${entry.id}`);
-  return Object.freeze({ id: entry.id, entry, ...plugin, Create: (host) => Object.assign(plugin.Create(host), { id: entry.id }) });
+  if (!plugin.phase) return [];
+  return [Object.freeze({ id: entry.id, entry, ...plugin, Create: (host) => Object.assign(plugin.Create(host), { id: entry.id }) })];
 }));
 
 /** 登记表里的那一行对应的插件。 */

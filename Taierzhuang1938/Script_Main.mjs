@@ -274,8 +274,8 @@ const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
  * 装配层只剩三个测试场还有自己的逻辑留在这里（靶场撒木桩兵、白刃实验场、枪械射击场的弹药与开机资产），
  * 其余测试场的接线全在 Script_SandboxRanges 的插件里。
  */
-const SANDBOX_RANGE = SandboxRangeFromParams(params);
-const SANDBOX_PLUGIN = SandboxPluginFor(SANDBOX_RANGE);
+const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
+const SANDBOX_RANGE = SANDBOX_PLUGIN?.entry ?? null;
 /** 测试场插件声明的轻量开机（枪械射击场：只加载要用的 PBR 组与音效、不预载担架/飞机/弹坑碎屑）；其余入口是 null。 */
 const SANDBOX_STARTUP = SANDBOX_PLUGIN?.startup ?? null;
 // 断肢测试场（?gore=1，登记表里的 gore）与断肢内容总闸（?gore=0）是两回事，见下面 GORE_FORCED_OFF。
@@ -8389,7 +8389,7 @@ if (!Object.getOwnPropertyDescriptor(THREE.BatchedMesh.prototype, "colorTexture"
  */
 function RenderScene(dt) {
   if (frameDebugger.frozen) return;
-  const capturing = frameDebugger.BeginRender(SANDBOX_RANGE?.id === "encounterPlay" ? "视口 1 · 玩家视角" : null);
+  const capturing = frameDebugger.BeginRender(sandbox?.captureViewportName ?? null);
   let failure = null;
   try { RenderSceneContent(dt); }
   catch (error) { failure = error; throw error; }
@@ -8639,6 +8639,7 @@ function RenderSceneContent(dt) {
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
   }, openingLens), stun);
+  Object.assign(framePostOptions, sandbox?.PostOptions?.());
   post.Render(scene, camera, framePostOptions);
   sandbox?.AfterRender?.(dt, framePostOptions);
   if (SANDBOX_RANGE?.id === "encounterPlay") frameDebugger.SetViewport();

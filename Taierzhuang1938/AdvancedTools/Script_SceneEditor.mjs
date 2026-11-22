@@ -887,7 +887,10 @@ class SceneEditorApp {
     $("seShowBackdrop").addEventListener("change", (e) => { this.show.backdrop = e.target.checked; this.RebuildObjects(); });
     $("seShowHidden").addEventListener("change", (e) => { this.show.hidden = e.target.checked; this.RebuildObjects(); });
     $("seBlockout").addEventListener("click", () => this.OpenInBlockout());
-    if (this.style === "formal") $("seBlockout").textContent = "在白盒编辑器里看（正式场景）";
+    if (SceneInfo(this.sceneId)?.previewParam) {
+      $("seBlockout").textContent = "查看原画机位";
+      $("seBlockout").title = "在游戏渲染器里打开已保存的场景机位";
+    } else if (this.style === "formal") $("seBlockout").textContent = "在白盒编辑器里看（正式场景）";
     const jumps = $("seJumps");
     const regions = BLOCKOUT_LEVELS.filter(l => l.scene?.kind === "scene").map(l => ({ label: l.short || l.key.replace(/^FirstLevel/, ""), region: l.scene.region }));
     for (const r of regions) { const b = El("button", "", r.label); b.title = "跳到这一段的场地"; b.addEventListener("click", () => this.JumpRegion(r.region)); jumps.append(b); }
@@ -1919,6 +1922,14 @@ ${seg.note}` : ""}`;
   }
 
   OpenInBlockout() {
+    const previewParam = SceneInfo(this.sceneId)?.previewParam;
+    if (previewParam) {
+      const url = new URL("../index.html", location.href);
+      url.searchParams.set(previewParam, "1");
+      url.searchParams.set("shot", "1");
+      window.open(url.href, "_blank");
+      return;
+    }
     const at = this.ScreenCenterGround();
     const level = BLOCKOUT_LEVELS.find(l => l.scene?.kind === "scene" && Inside(l.scene.region, at.x, at.z));
     if (!level) { this.Toast("画面中心不在任何一段白盒关卡的场地里"); return; }

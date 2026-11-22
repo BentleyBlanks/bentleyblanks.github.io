@@ -36,6 +36,7 @@
 // 等比放大会把 10 m 长的排屋拉到二十几米，会不会撞上旁边的程序化院落要另外量。
 
 import * as THREE from "three";
+import { DUGOUT_AID_OPEN_FIELDS_PROPS } from "./Data_SceneAssets.mjs";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import { NAKAJIMA_KI4_ASSET } from "./Data_NakajimaKi4.mjs";
@@ -313,6 +314,10 @@ const ASSETS = Object.freeze({
   ...PackAssets(CL_PACK, CL_ASSETS),
   ...PackAssets(TK_PACK, TK_ASSETS),
   ...PackAssets(WARD_PACK, WARD_ASSETS),
+  ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(({ model, node, label }) => [model, {
+    label, node, url: "./Model/DugoutAidOpenFields/Model_DugoutAidOpenFields.glb?v=1",
+    category: "沟底木棚", tag: "prop", projectUvs: false, preciseBounds: true,
+  }])),
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
