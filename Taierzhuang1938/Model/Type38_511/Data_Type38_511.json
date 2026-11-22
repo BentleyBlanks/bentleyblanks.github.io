@@ -1,12 +1,12 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 1,
-  "generator": "_blender/Script_Type38_511Runtime.py",
+  "version": 2,
+  "generator": "_blender/Script_Type38Exterior.py + _blender/Script_Type38ExteriorFinish.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "77768c563db9fe7a3db3b0fd937279b4b6d05eb058cc441cafb3bcda0e668ad5",
+  "runtimeSha256": "7d81e41a53b953297c0a5b35c48e15b7ba8fe00d87200ac16a4c5a640388c7c3",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
-  "triangles": 69586,
+  "triangles": 70822,
   "parts": 45,
   "images": 116,
   "adaptation": {
@@ -17,7 +17,14 @@
     "notchDepthM": 0.004
   },
   "reconstructionScope": "Dots作者外观与美术旧化；照门缺口、握持和动作接入为游戏适配，不据此认定滕县某支实物的细节。",
-  "historicalReferences": [],
+  "historicalReferences": [
+    "https://www.awm.gov.au/collection/C142149",
+    "https://www.awm.gov.au/collection/C138903",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG",
+    "https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG"
+  ],
   "imagePayloads": [
     {
       "index": 0,
@@ -28,38 +35,38 @@
     {
       "index": 1,
       "name": "Texture_Type38Sample00Base",
-      "bytes": 193904,
-      "sha256": "1b6a9baf403c7ccc483f90930263d827bd11373534f4ecd519ca6c56355af717"
+      "bytes": 180848,
+      "sha256": "18f22d28f62efc747bf5e4ee797a77bd42a9608bc02f10871caa689778fae0a8"
     },
     {
       "index": 2,
       "name": "Texture_Type38Sample00Orm",
-      "bytes": 140240,
-      "sha256": "4364f4e99bd24c1e747b60eef5ed3a9485fc3990874a8b3b9aea59b8dd73f1b3"
+      "bytes": 130633,
+      "sha256": "104041954e7c52fab3dcf51e0849f42796997acdb1da5d15983a5a825fde9379"
     },
     {
       "index": 3,
       "name": "Texture_Type38Sample01Base",
-      "bytes": 30849,
-      "sha256": "02175ebeaaa51a080cb24ed456067b87c23c48f599c1150352efe619e13e9609"
+      "bytes": 233510,
+      "sha256": "496d8c1648092c54b04b1604996774ecb632d37360232ffb9a3ea9a4610d0d34"
     },
     {
       "index": 4,
       "name": "Texture_Type38Sample01Orm",
-      "bytes": 344391,
-      "sha256": "284da6a2eb00cf305bf116e16f44ac7e80ef13212b02e259f1ad2c9cddd409e1"
+      "bytes": 232255,
+      "sha256": "12fcc97f9a066b4a865a145de1ebdf7dfebe7e193e04c1e22f04e7b8085b28b5"
     },
     {
       "index": 5,
       "name": "Texture_Type38Sample02Base",
-      "bytes": 7540,
-      "sha256": "204c4a83771a6466dc6fe7fb0785fc73d8cd23caaaf9a5c00c5f2f9d0271c328"
+      "bytes": 74275,
+      "sha256": "2c5a9900c54244ad859549b493a04baf821b3dfd6ec66c05a89a30d3d1800a49"
     },
     {
       "index": 6,
       "name": "Texture_Type38Sample02Orm",
-      "bytes": 91076,
-      "sha256": "51a6be152432bcfa3eb000a41a91fbe84fd7964b33047716fbe65e7bc72921f6"
+      "bytes": 79052,
+      "sha256": "bcccb95436f1eb4d101ca49d09fa95887068420575639603e3a2edfe2b79d9f9"
     },
     {
       "index": 7,
@@ -70,14 +77,14 @@
     {
       "index": 8,
       "name": "Texture_Type38Sample03Base",
-      "bytes": 40029,
-      "sha256": "91240e26dfb1e359840310f011e25391161f2b7306ab32c9da5a6df74b4fc365"
+      "bytes": 194254,
+      "sha256": "6e30acebc5460757a857215d78ceaebaabe217a8ea1045665e7b9c2469a1c324"
     },
     {
       "index": 9,
       "name": "Texture_Type38Sample03Orm",
-      "bytes": 119135,
-      "sha256": "07c0a05b0a36d7b390f48eca6ba62f576759fb94da51ea9725c3bb055e2e41d9"
+      "bytes": 187871,
+      "sha256": "37b608619455867cc2b4441b0f323a6e249a134aaa606e39a01400151e2292a2"
     },
     {
       "index": 10,
@@ -88,14 +95,14 @@
     {
       "index": 11,
       "name": "Texture_Type38Sample04Base",
-      "bytes": 206096,
-      "sha256": "9f089a2514e652cf98ce3ba78181ae5f05e233395afdc1113d946db2b118db17"
+      "bytes": 198574,
+      "sha256": "304ca931e1a155f844ab35a1807b7903a22ca2c70be13bb62c63f8f16d311509"
     },
     {
       "index": 12,
       "name": "Texture_Type38Sample04Orm",
-      "bytes": 117083,
-      "sha256": "9f21ab95c2732160752f5cbec77571e761cdb0117649107910ca7720361c0ec1"
+      "bytes": 93769,
+      "sha256": "d5b803456c2be65e03340a2d320090767cc038b00c78c0348fedfef1356ca2c9"
     },
     {
       "index": 13,
@@ -112,20 +119,20 @@
     {
       "index": 15,
       "name": "Texture_Type38Sample05Normal",
-      "bytes": 824802,
-      "sha256": "89c42bc083d39d2f17f33c638614589b0133022ac345ccfd7a0bdea6ee2269a4"
+      "bytes": 829895,
+      "sha256": "5fc330352a1cbc0cb0c77720d141ae120284208d10b78ba151ac69c19908d70f"
     },
     {
       "index": 16,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 1101520,
-      "sha256": "22086f437b563f51ce1fbb5567c1a34d88029502aa48928501fc67808629305a"
+      "bytes": 820396,
+      "sha256": "3ac8b8c8441854a19dc1b2b0bcae50eba9756830cc6e6db77cb8237e1dea3ae6"
     },
     {
       "index": 17,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 649305,
-      "sha256": "cb8c1b77945b7380b554f02e248746fc78aa5bd25ccca7e7987db5cb19cb96f4"
+      "bytes": 361158,
+      "sha256": "fc93e67ddab43fd646f83720cd94f4dc80d35bed648a25b5c242241346b4c774"
     },
     {
       "index": 18,
@@ -136,98 +143,98 @@
     {
       "index": 19,
       "name": "Texture_Type38Sample06Base",
-      "bytes": 26536,
-      "sha256": "6a85e0e83c16cd039c7742e8ce7111479f68f3e87af53721b706004046a719c9"
+      "bytes": 73016,
+      "sha256": "48f29d86a91e5ef2eef59d4ee9a3aa06037d55bdf6b7416f62c8479f137ef43d"
     },
     {
       "index": 20,
       "name": "Texture_Type38Sample06Orm",
-      "bytes": 44863,
-      "sha256": "38890182f9f3c25c74ecbc315bc274c608e3cecf69ba411e88b7850164ca6d7f"
+      "bytes": 75616,
+      "sha256": "4f183686e7d2fcdf99072d37990535ac7148b9028d8d7b118b0e2dcf079558b2"
     },
     {
       "index": 21,
       "name": "Texture_Type38Sample07Base",
-      "bytes": 280001,
-      "sha256": "d1c1fa722a5047cac2f97da4246a66814e4775d0d599b6c4270b18bbe65b7936"
+      "bytes": 226885,
+      "sha256": "7e92081ee729e0a274885207a05d06d95bd389df2cdf430f8fcaa8bfceb13d85"
     },
     {
       "index": 22,
       "name": "Texture_Type38Sample07Orm",
-      "bytes": 195859,
-      "sha256": "befaeb8ff635c31380f3c694220f139ee791f181faa44840f4468894079111f2"
+      "bytes": 155829,
+      "sha256": "bb661ec3cf27108fa9509ff1885d57541dc0b900fba9073c29f446ef67162e02"
     },
     {
       "index": 23,
       "name": "Texture_Type38Sample08Base",
-      "bytes": 14329,
-      "sha256": "af3e956e81dcc9daf38a5ab09eb927420b1aa2e1acb45eef18ef2ab99ad87856"
+      "bytes": 69532,
+      "sha256": "701f31c8f237a88c5d831eeb7553030f50217dbbc39d8e28d0713e97c43716bd"
     },
     {
       "index": 24,
       "name": "Texture_Type38Sample08Orm",
-      "bytes": 19909,
-      "sha256": "95845a772d6770a723867b94e8f351136af94f34b712392cf364c2991fd08fc5"
+      "bytes": 69664,
+      "sha256": "85ef27830d91e9a11a631b0f371cefd39d2abf5760dfe345534b7b962e092b52"
     },
     {
       "index": 25,
       "name": "Texture_Type38Sample09Base",
-      "bytes": 16222,
-      "sha256": "9b0c10fe1d191703b1b6d602c0e88d7a4b2976263a6c5f2f29968f53ae143212"
+      "bytes": 68884,
+      "sha256": "cee866aa9098d042f758b2180d50d4ebb614e1c0debc5bd1f19e305fb9dd5574"
     },
     {
       "index": 26,
       "name": "Texture_Type38Sample09Orm",
-      "bytes": 12800,
-      "sha256": "c39b385b5ff4217d33e1b1390016da1d75228984f7d4ac1a23d6d68da0f17c5a"
+      "bytes": 66996,
+      "sha256": "43f03bbf1869ab459a04fd31e19175d1094f5c430e62ee606859d6f3f88b5eef"
     },
     {
       "index": 27,
       "name": "Texture_Type38Sample10Base",
-      "bytes": 14907,
-      "sha256": "b5069d664eaa4619bd3a0a78a9f0d62aa5da255501a3fb47ba748840f79c8fa9"
+      "bytes": 70160,
+      "sha256": "62509e34d2a4c75e92e20f76498a873e7da4ef956036407a68674aece2548642"
     },
     {
       "index": 28,
       "name": "Texture_Type38Sample10Orm",
-      "bytes": 14934,
-      "sha256": "32131915c1c35a1a15890ae55adf1bba39d0fd539cff3c29ffde5e14ef0a31d2"
+      "bytes": 66692,
+      "sha256": "792f55c0e227ecdc2d78efb99ad44d6af889a99e282fec44d9536c1f9ebcb324"
     },
     {
       "index": 29,
       "name": "Texture_Type38Sample11Base",
-      "bytes": 11043,
-      "sha256": "36fe63d01a168ca689247c6163018239a0740abb1b1dd5182760027fd4c005a9"
+      "bytes": 39568,
+      "sha256": "53215e265659d69eae84e25d0b1bdb2e73096d0be115e3597309db90924abd8b"
     },
     {
       "index": 30,
       "name": "Texture_Type38Sample11Orm",
-      "bytes": 10046,
-      "sha256": "62964c38c009c8c302640bb338a9a0748eb75b7bbc25189cd80e48b2d7f0b05d"
+      "bytes": 39833,
+      "sha256": "a0e7dd646af8a424d2109d717082c859151df732d2f6b799537951fbdce6bfb6"
     },
     {
       "index": 31,
       "name": "Texture_Type38Sample12Base",
-      "bytes": 14713,
-      "sha256": "41c41c643b7d99593a7d064981e2ab3bf1f6a8cddb1a91402250829a4946dee7"
+      "bytes": 76653,
+      "sha256": "ba900cb711db5132ec8b7fa2e030b034df48b6a9f5bb6c19725ccd32e80e6ac1"
     },
     {
       "index": 32,
       "name": "Texture_Type38Sample12Orm",
-      "bytes": 15316,
-      "sha256": "aa72063fe7c071ab603a0bd109a15aee0017b7ffe2666ff6dff05267c5a04c4f"
+      "bytes": 76496,
+      "sha256": "d5d60d5b56ef1cf2d65184413b6831abdb850b10fe0b6fe39939a29424758611"
     },
     {
       "index": 33,
       "name": "Texture_Type38Sample13Base",
-      "bytes": 110964,
-      "sha256": "89392d9cc1b28bd3451ae1c00960bb503fb3c3401e48599258599af9c39d52d1"
+      "bytes": 132498,
+      "sha256": "760db0818c4fff02667e985641d37a4fcfb40a477e45d67aac4f848fcd2a6a4b"
     },
     {
       "index": 34,
       "name": "Texture_Type38Sample13Orm",
-      "bytes": 17859,
-      "sha256": "36ac945e34261b722e0a091d84a41bd46d0ea534124adb8aadf0ddac4ebba546"
+      "bytes": 70813,
+      "sha256": "38a4dc8a595dad70fec8759f99419a9b5fbe8883c97c4573e4bcd11b5e861189"
     },
     {
       "index": 35,
@@ -238,26 +245,26 @@
     {
       "index": 36,
       "name": "Texture_Type38Sample14Base",
-      "bytes": 81368,
-      "sha256": "87331fa52f9a5b86bf19414905da2be41c0fdb31d65c9a611beeae29305b110f"
+      "bytes": 212805,
+      "sha256": "4eac14e05c880f8c074591de50b7c0842d447038a5989b5035d15bc85cf7f68b"
     },
     {
       "index": 37,
       "name": "Texture_Type38Sample14Orm",
-      "bytes": 95754,
-      "sha256": "069ac05968fcfb1e6ed5d25d4635aad7e76e28021304274c92e9105bcc3bcf20"
+      "bytes": 199109,
+      "sha256": "57a8e0fef4c41247cbe4b942348c88ad2ab35426aa96795e1a8c54bfa5060b66"
     },
     {
       "index": 38,
       "name": "Texture_Type38Sample15Base",
-      "bytes": 35714,
-      "sha256": "21c12d869ade806b9d04468f110508411e537e0a9d1da1b77e60375899e24178"
+      "bytes": 82946,
+      "sha256": "f99e3045d26f47cddd0a5329ee735ab7fb4df26d382a6e62e02ef96839f3020c"
     },
     {
       "index": 39,
       "name": "Texture_Type38Sample15Orm",
-      "bytes": 33558,
-      "sha256": "7f787097e5da6627c3589c71797c01336bd010cd58d61df2b42191feb021c5b1"
+      "bytes": 77682,
+      "sha256": "d7147135a5ddab77c73ccd2d0cd1aef43789799a32649d1dd8900c25680f673f"
     },
     {
       "index": 40,
@@ -268,14 +275,14 @@
     {
       "index": 41,
       "name": "Texture_Type38Sample16Base",
-      "bytes": 227956,
-      "sha256": "333e74c29e633e64a4ad9d534771043c4fd17e122d6f6a3cf57e5cce53e82cf0"
+      "bytes": 190723,
+      "sha256": "72c9c1d983d6aa71ca7c88381cfc0896f0a2b9b83b954868fa9dcf3844de0294"
     },
     {
       "index": 42,
       "name": "Texture_Type38Sample16Orm",
-      "bytes": 51385,
-      "sha256": "12427c319bb9f2c1ca62378274ffa6139ea783cb8e1c708d222af025f9fe430f"
+      "bytes": 66528,
+      "sha256": "7e778b5ce96c13ec8006de54912401b4a648d236a9894f1445bf78e61f12b543"
     },
     {
       "index": 43,
@@ -286,110 +293,110 @@
     {
       "index": 44,
       "name": "Texture_Type38Sample17Base",
-      "bytes": 1016234,
-      "sha256": "0946d0954ec0ac770a8c720acf2e8cb739261f171f8fc73095576c8f6acaa07c"
+      "bytes": 1162258,
+      "sha256": "4f7ff182bd6807982c9b80ca430f6ad29beb221fc8e8135135f8d77cec94ab9e"
     },
     {
       "index": 45,
       "name": "Texture_Type38Sample17Orm",
-      "bytes": 666932,
-      "sha256": "c448d0dcff2fd83b21a92e5bb3ef240e41348e995c0ce5904c247073b83db52b"
+      "bytes": 803940,
+      "sha256": "9cdcb9f2c7052691f6a2b9044da2d7d0c44f3d86f4cd348b958377aba6e74ac2"
     },
     {
       "index": 46,
       "name": "Texture_Type38Sample18Base",
-      "bytes": 540974,
-      "sha256": "f1ec84227374760265940c96fd6b0ec9ac0a8dd10dfda155707eaffbb7e9ee05"
+      "bytes": 442661,
+      "sha256": "5595e258b1c9737bc63e46c88ae2c6732c1078cdc0dea59914995b737cff7539"
     },
     {
       "index": 47,
       "name": "Texture_Type38Sample18Orm",
-      "bytes": 374260,
-      "sha256": "c9612d4a615597b3fb9b9a98b49100cff372ba92aed9e9e0ce5257062414ff19"
+      "bytes": 297555,
+      "sha256": "1b28c3c69f21d3515d64d7d515fc89d7bed6bc9094f76c7f915d2c3666afaf1e"
     },
     {
       "index": 48,
       "name": "Texture_Type38Sample19Base",
-      "bytes": 150680,
-      "sha256": "0714ff60cb6cf6ffe3507c8fdda7f89b6eb8b41a2c10e7b0d7380bd24f0b36f0"
+      "bytes": 148302,
+      "sha256": "47f38a262cc0af249239dd8bbc6d1f07377a9744477413bba51a1bed23768376"
     },
     {
       "index": 49,
       "name": "Texture_Type38Sample19Orm",
-      "bytes": 97883,
-      "sha256": "b8e47d190bff8034d9822a2f248b13f6e5b4eb2f44c93b5c0f9ffa351464bf4c"
+      "bytes": 110042,
+      "sha256": "2861cfac5c3bfd3f9b2c7bd706c6cb071af44895b37b71cb10ac6132d6a94523"
     },
     {
       "index": 50,
       "name": "Texture_Type38Sample20Base",
-      "bytes": 149240,
-      "sha256": "1eb33ee28068b738502a3efd933901fdf75f53392730e61ebf9d59b5613d12e4"
+      "bytes": 148516,
+      "sha256": "1a7217cf376060e62365590f4b56c8661d959830df94fcc0b176c68d4adc09c3"
     },
     {
       "index": 51,
       "name": "Texture_Type38Sample20Orm",
-      "bytes": 89680,
-      "sha256": "232344b079200793506bd8828b5cdbd8bd78eca9bedaa5f657257b29c841f7db"
+      "bytes": 107723,
+      "sha256": "b3b86e733866293d28a7553b3aa8828af070bbada6c49eb342adfbbdaed1df64"
     },
     {
       "index": 52,
       "name": "Texture_Type38Sample21Base",
-      "bytes": 130265,
-      "sha256": "ae56e5f9866e1b98d25ca624bc83be087e8a6bb36ad4f1bd5574d5741aa01b17"
+      "bytes": 119038,
+      "sha256": "2d912f1643c7a383f14cfbdb1cb841ff6efaeda4dce8c43efbe5f1d3c896ff98"
     },
     {
       "index": 53,
       "name": "Texture_Type38Sample21Orm",
-      "bytes": 98737,
-      "sha256": "6c072aecdd24c8da0bdb9d385ca2f09d54166b67a74ae0c19f3f05f5d9ee0cef"
+      "bytes": 101681,
+      "sha256": "5894ee892f3a621edaed02c66035df862ec03e006804e5d46a0b5fbcba5f4616"
     },
     {
       "index": 54,
       "name": "Texture_Type38Sample22Base",
-      "bytes": 177583,
-      "sha256": "a44896bbe5b2eca4d4a3cc9efb67b4378e93306fb61a932005beb9c8de96e009"
+      "bytes": 156681,
+      "sha256": "da46589c7911e5e2fbf17c8e005f11bcfe66afb7698d04c5326b243d3c0a5045"
     },
     {
       "index": 55,
       "name": "Texture_Type38Sample22Orm",
-      "bytes": 128654,
-      "sha256": "99e5440365bd1cbe31fb0509c8b0aa1a85cafffdd5b80df0a931ea683fdf789d"
+      "bytes": 119338,
+      "sha256": "8a5b34b5edca96f50d827390f17ef26b651fc73fe5829eb87f5ff8a7d5314f91"
     },
     {
       "index": 56,
       "name": "Texture_Type38Sample25Base",
-      "bytes": 223826,
-      "sha256": "27635041c84b9b2f6a6114d43a0989efd10f6d7bcbde4fc1dab8b75cf33ad062"
+      "bytes": 187639,
+      "sha256": "88497e21534a67496426ab803f1e28e50d51228b1ef6e7158dd6ab8a44d74915"
     },
     {
       "index": 57,
       "name": "Texture_Type38Sample25Orm",
-      "bytes": 247195,
-      "sha256": "b3886bcf75e3ad3b17f6e2ea20328e7fb0a0f5ed5364f8e85197e9a1e9f2c363"
+      "bytes": 174911,
+      "sha256": "a4b0c46ec6ce59f7978d9757f729b42feceaa6df55debd9732bb11d3d5d151ce"
     },
     {
       "index": 58,
       "name": "Texture_Type38Sample26Base",
-      "bytes": 185630,
-      "sha256": "d93aef5e67b79ac8168f3519e3457b79ded648bb6a888b47e17e2b44f1838832"
+      "bytes": 165889,
+      "sha256": "f7ebcfb7bd40dd8351d4d8e496fddb08e638edc3eee0f7f4765f71d3898a2b85"
     },
     {
       "index": 59,
       "name": "Texture_Type38Sample26Orm",
-      "bytes": 125320,
-      "sha256": "990eb4cc16b01ea87d3ce974307109e8cdf52afa6b1fcd8c19424ef764bfe8d5"
+      "bytes": 120277,
+      "sha256": "10c1b8d01fbfc32a5b16eaa79e1e8a77c20e98757e1d47b649cb9064f9dec699"
     },
     {
       "index": 60,
       "name": "Texture_Type38Sample27Base",
-      "bytes": 407620,
-      "sha256": "75307c360d9092cb23621a3c3540e7d7d7e4db168992278820f2b8753cefa86e"
+      "bytes": 404987,
+      "sha256": "2f4ec697a66c806aae9e796779309f3c4dbad5556ab6f668c806e34ed4c922d1"
     },
     {
       "index": 61,
       "name": "Texture_Type38Sample27Orm",
-      "bytes": 235315,
-      "sha256": "0fb7c85c58e4be2a3b441ec3bf55d16738d9b3d5d9ff8b5c1035f03dcb0b9839"
+      "bytes": 272316,
+      "sha256": "82d64d682e9613c4f7e4c9c1dce13fb8e87371a95f650e59f2132fec2815c463"
     },
     {
       "index": 62,
@@ -400,14 +407,14 @@
     {
       "index": 63,
       "name": "Texture_Type38Sample28Base",
-      "bytes": 305351,
-      "sha256": "dcd4af7137db5582b675be0d9e59cfa2bfd4f0d21976e70958529e46cbc8cd67"
+      "bytes": 250787,
+      "sha256": "646da7915a92c7220804734fe9fe7706eeb9e67b37ebd894843a7567d621b3dd"
     },
     {
       "index": 64,
       "name": "Texture_Type38Sample28Orm",
-      "bytes": 158854,
-      "sha256": "c06357363b3a5fd469094dbe7e28dcb9c910c3dd4b3e05e73b45dc8c5a9c15a9"
+      "bytes": 84443,
+      "sha256": "213a4ad40e0d4076075eb0ebd56cc98a99473f1cc01607df47e9c5c18633ecc0"
     },
     {
       "index": 65,
@@ -418,14 +425,14 @@
     {
       "index": 66,
       "name": "Texture_Type38Sample29Base",
-      "bytes": 422649,
-      "sha256": "86a660282a30c93566b7a6330d32812c4e56557694b92065fa2f04be39d70a28"
+      "bytes": 353840,
+      "sha256": "096ffbfb651a577e5c28e1ef3ba4a87c32bc6b782ce526687aa9a6605d6fdda4"
     },
     {
       "index": 67,
       "name": "Texture_Type38Sample29Orm",
-      "bytes": 221153,
-      "sha256": "5cf976089ca08b16fb789b1730eae6893980b182195509dcf62bf7bf6c8dafc3"
+      "bytes": 118459,
+      "sha256": "0a0ed17c36ea3a6e9f39a28babf7c75314c9570bdd5cc727a66e37560657c2ea"
     },
     {
       "index": 68,
@@ -436,14 +443,14 @@
     {
       "index": 69,
       "name": "Texture_Type38Sample30Base",
-      "bytes": 754761,
-      "sha256": "fb14661b269f56b2dc32c229a21fc2df1d823045eb9e68cfc9414ca118d27242"
+      "bytes": 625627,
+      "sha256": "9ee574e18b6e4614ef9fe9c43b08b954e121664ec70d294c2b2493944c05a391"
     },
     {
       "index": 70,
       "name": "Texture_Type38Sample30Orm",
-      "bytes": 401173,
-      "sha256": "c1258c35551bfc8762a5afa7fbe5d0a6d017352228ff9245f321850b1b66b3f3"
+      "bytes": 213381,
+      "sha256": "40098c2311cf50f1fc807f324c98f073ecba212ca56a433fe1711d3c182873b8"
     },
     {
       "index": 71,
@@ -454,14 +461,14 @@
     {
       "index": 72,
       "name": "Texture_Type38Sample31Base",
-      "bytes": 158473,
-      "sha256": "ad9fec60dda35f8899f41a7839bcf41f2a2fe88b55ff0e71998aaa0e50ec69c4"
+      "bytes": 135650,
+      "sha256": "2479b3fa17fc10f68adb01d1eb6ed1d1e6bb94cd21f28fae6a5febdf76d21edc"
     },
     {
       "index": 73,
       "name": "Texture_Type38Sample31Orm",
-      "bytes": 95115,
-      "sha256": "aca789e5d315f2b6d039735ea43cbc7d61bd2e264445b0338b7a0897811cfe08"
+      "bytes": 92659,
+      "sha256": "2b19f68049d5289f4818985fa1b7b0888089a2c9c70ca362743f531ca0865ab5"
     },
     {
       "index": 74,
@@ -472,26 +479,26 @@
     {
       "index": 75,
       "name": "Texture_Type38Sample32Base",
-      "bytes": 3166942,
-      "sha256": "969f63e351f0abef0f90ea379ff2a8e11758ca2a7e184520096146eecf0dd1d6"
+      "bytes": 2903723,
+      "sha256": "769f661e6be861ed1dd9717e2e9bce49f422ac6a4f48835f394eac972559c95c"
     },
     {
       "index": 76,
       "name": "Texture_Type38Sample32Orm",
-      "bytes": 2177710,
-      "sha256": "bf620a08d86d92d89386b1b6fba631bc94463a795bf84671a3f0ae268509ada9"
+      "bytes": 1796926,
+      "sha256": "43c7ad8fe16448e74b29a05f2443fcea722e2a34b1cf0b597d945336cc2145ac"
     },
     {
       "index": 77,
       "name": "Texture_Type38Sample33Base",
-      "bytes": 73875,
-      "sha256": "85949ab8a84c360591173dd936c0841bc8c2248a2055a54fd2d1681787617c86"
+      "bytes": 211208,
+      "sha256": "81f7532c65c5bd4ab2d06a78a45495704f837e63e2068dc7e3957fc88d8d8aaa"
     },
     {
       "index": 78,
       "name": "Texture_Type38Sample33Orm",
-      "bytes": 71286,
-      "sha256": "2f154a9048d50cea169a2978e09058624ab86dfc0ece159f7e6c1ea0526e7c06"
+      "bytes": 194339,
+      "sha256": "5b4f15b73d1f4c1972919e01932637aed5c86155d1c743329ed54f22cd4b29a7"
     },
     {
       "index": 79,
@@ -502,14 +509,14 @@
     {
       "index": 80,
       "name": "Texture_Type38Sample34Base",
-      "bytes": 226473,
-      "sha256": "1e94fc2845b5d766a2a68d2e947ce01ec4ee341b12295afcd80421f1a30f13df"
+      "bytes": 183569,
+      "sha256": "d6e76464713463d60f5ac93f0cddc2e85d3fbc2c8f3a1af021fc908de5eda5bd"
     },
     {
       "index": 81,
       "name": "Texture_Type38Sample34Orm",
-      "bytes": 134001,
-      "sha256": "a4a2a96476c9b2b918aee0e04d6b00a09db67b953678d1ab1dc825b594a982a0"
+      "bytes": 119100,
+      "sha256": "941c7f9acae78f810f9256bcfd0a7da5bf57b1613d34198e34f73fbed994a3f1"
     },
     {
       "index": 82,
@@ -532,14 +539,14 @@
     {
       "index": 85,
       "name": "Texture_Type38Sample35Base",
-      "bytes": 119337,
-      "sha256": "d461bd1985167eb3293ff8130295afadf150769fabe8cf5ed289c99cd812bdd7"
+      "bytes": 115052,
+      "sha256": "be3a88f2c0aa1115ba1974c105e78ab1c107dad1c0757dfd6cdc9c9300e14c6e"
     },
     {
       "index": 86,
       "name": "Texture_Type38Sample35Orm",
-      "bytes": 45774,
-      "sha256": "0e14313038544a07df445e185e8acf651a57d89a2ebeba7e0cf89bca9c10835c"
+      "bytes": 77470,
+      "sha256": "b758f6ab548ec0b3bc92776a176dfedbe3a974cc8b4881db36d3faa20a234277"
     },
     {
       "index": 87,
@@ -550,14 +557,14 @@
     {
       "index": 88,
       "name": "Texture_Type38Sample36Base",
-      "bytes": 815101,
-      "sha256": "9f0b72fe11f5d85043f9ad979c5fb1b0ce9ee1a06eb09e70103c93e772917d97"
+      "bytes": 704800,
+      "sha256": "9829cd9de06c2160e53a2403ebd06b553fe8c96f0f7a6d14905eb59992a238c3"
     },
     {
       "index": 89,
       "name": "Texture_Type38Sample36Orm",
-      "bytes": 486005,
-      "sha256": "37f6a029e48f84d5e76b5fef7e38ecdaeedac668493c47aefc7a11302d71364c"
+      "bytes": 243982,
+      "sha256": "949823345540501a43a0a40faeb0a03637547ae6dc75221572d69f41fdf008c8"
     },
     {
       "index": 90,
@@ -580,14 +587,14 @@
     {
       "index": 93,
       "name": "Texture_Type38Sample37Base",
-      "bytes": 138019,
-      "sha256": "e6f1db2c56f44bb8d2f848559ec1c5d187a7e96e9b034ddf2fea3c5db5cf4176"
+      "bytes": 132000,
+      "sha256": "97d4eede474a4746679d8d0d63f03302258653e4b293e1c011fdb8a70522732f"
     },
     {
       "index": 94,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 49377,
-      "sha256": "3db380b99b7b7a5a76391ce85aab53f65743e0349cd1476cc57d1bd4d78e77b6"
+      "bytes": 87378,
+      "sha256": "972e5f82dfd7e3ca057c104287b447be01e1a52fa61e797e4bf472490aea7d5a"
     },
     {
       "index": 95,
@@ -604,32 +611,32 @@
     {
       "index": 97,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 973907,
-      "sha256": "b57cb2ffc16a853b6a38dad4edbcdd153e1947026731202cf1587abd9ef3e4d7"
+      "bytes": 989419,
+      "sha256": "161d3cd44c0012910ff1d11c1a7de63f174526e82dc7d177cfc79fadb20868ee"
     },
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 1329060,
-      "sha256": "af18418fb63a7de0144a5e796551c70260f5031296ed2f2237745578f7a1bf46"
+      "bytes": 976886,
+      "sha256": "36641ed356a6bff0c7a9b04ea8956d205a4a629b04dd0fcf7fd63803bf94576f"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 699243,
-      "sha256": "bb8e53b502c97cd811aa0d3c35b2652e5564b0a65a85730bf32827dfcec783cc"
+      "bytes": 391241,
+      "sha256": "4a5bdeaf627b79181fe168a80ce6a895d82d8dbaba542d4cc5665b75d58eeacb"
     },
     {
       "index": 100,
       "name": "Texture_Type38Sample39Base",
-      "bytes": 8930,
-      "sha256": "0d231ca6216f8f813df03fe90031af1e0d162592afc28096fc9221f195cd6c73"
+      "bytes": 68871,
+      "sha256": "c53763fba3951f359c05e097bd5534bf46fe06962aab948151169f2bbd55935e"
     },
     {
       "index": 101,
       "name": "Texture_Type38Sample39Orm",
-      "bytes": 66795,
-      "sha256": "aaf7fd9550e57d03197eb3231228ad2fd5266454e53ff07803cb206ea21f0bec"
+      "bytes": 70463,
+      "sha256": "6854598876a2c16c5c935e3ce163f7530c972f96a0e485d6b4e12ecc13ddd761"
     },
     {
       "index": 102,
@@ -640,14 +647,14 @@
     {
       "index": 103,
       "name": "Texture_Type38Sample40Base",
-      "bytes": 285961,
-      "sha256": "99dd8385bad349449a7cff56136bff993ce52781261d3479139bf70f1455d1dc"
+      "bytes": 403487,
+      "sha256": "634d475705ab943f45506fcb756df2e835993017e1cd688a59a044a60b6bcd5c"
     },
     {
       "index": 104,
       "name": "Texture_Type38Sample40Orm",
-      "bytes": 311910,
-      "sha256": "cbb9db3bd3d7e8994e8f809dec15c0ee822a0f240a6b292588e927b6870c73a0"
+      "bytes": 341724,
+      "sha256": "8effd174547d2eff47914924e4b4eb7a1a2492a7e63d653760f9025084047163"
     },
     {
       "index": 105,
@@ -658,14 +665,14 @@
     {
       "index": 106,
       "name": "Texture_Type38Sample41Base",
-      "bytes": 44817,
-      "sha256": "29df1d5397645d4bb5d45fcd2e6f7a90f8963ee1a02492bd3935ac1f1b0e2561"
+      "bytes": 92216,
+      "sha256": "37bff65d8f51a51b77348b276910316e2687c5db3c064ea41d488e21688700a7"
     },
     {
       "index": 107,
       "name": "Texture_Type38Sample41Orm",
-      "bytes": 43184,
-      "sha256": "ae35d49ba4be96ecbde0b937bdab9884a93bcf292eb1537becc3a0f6238943e0"
+      "bytes": 79971,
+      "sha256": "565b0bf58ce3c208e136ec048ef190be824e358cfea196d497d777afdbc9b76f"
     },
     {
       "index": 108,
@@ -676,14 +683,14 @@
     {
       "index": 109,
       "name": "Texture_Type38Sample42Base",
-      "bytes": 5672,
-      "sha256": "a24062e60a0b8bd188bcb25b0aee54617448967e29d97464bac2ef2596e45958"
+      "bytes": 37023,
+      "sha256": "4a167d0a074f9e0ea26ccbe9a1e8085479d7929772740ed470e9cf9736efa9c5"
     },
     {
       "index": 110,
       "name": "Texture_Type38Sample42Orm",
-      "bytes": 21561,
-      "sha256": "ca3b943a96ba2e8763b3ed087d2ada3b29bf524f11b52862387adbbe7e0fa9e0"
+      "bytes": 40472,
+      "sha256": "2c6c09036ca11c22f43ac86f73be6265794622496187647fb8c703a05d0f11a4"
     },
     {
       "index": 111,
@@ -694,26 +701,255 @@
     {
       "index": 112,
       "name": "Texture_Type38Sample43Base",
-      "bytes": 13338,
-      "sha256": "06496d45548fa45aec153ecd20257708e778ff14866b13981c3b88b0a7759b44"
+      "bytes": 79210,
+      "sha256": "f4263e6118752c194b8d66152ffd672fdb2ccb692ca49d7492b4601153c6d908"
     },
     {
       "index": 113,
       "name": "Texture_Type38Sample43Orm",
-      "bytes": 7240,
-      "sha256": "5db921efe6c05487de0032712fa58f403c1e81da59db9f0a65573430ceee5729"
+      "bytes": 72389,
+      "sha256": "7c74b7235251f066f259cc5fc810aded77dc8e14744cd6cda31f92274d91444d"
     },
     {
       "index": 114,
       "name": "Texture_Type38Sample44Base",
-      "bytes": 6709,
-      "sha256": "3534a9d45f922e7230fc695a12d08f67e4d7eb923e398b134da1a64ce177e12f"
+      "bytes": 74496,
+      "sha256": "403764b72e235cb1210f12e238d07d2228cf98a5e1b93355a40e30e4a0ae6cf7"
     },
     {
       "index": 115,
       "name": "Texture_Type38Sample44Orm",
-      "bytes": 27392,
-      "sha256": "e9ca0e1ead6dded9bb4eb2fc74c04abe8496140b8e2c66ddd5812c6aab209035"
+      "bytes": 82006,
+      "sha256": "3d677dc7ae6e24d3eb7b28c0f5858586c36c7651f7dc3a432db49153cabc42be"
     }
-  ]
+  ],
+  "exteriorBaselineSha256": "77768c563db9fe7a3db3b0fd937279b4b6d05eb058cc441cafb3bcda0e668ad5",
+  "exteriorTriangleDeltas": {
+    "Exterior_ButtCap04": 482,
+    "Exterior_FrontUpperDetail76_Neg": 131,
+    "Exterior_FrontUpperDetail76_Pos": 105,
+    "Exterior_Guard02": 68,
+    "Exterior_MiddleBand57": 222,
+    "Exterior_SeatedTang05": 69,
+    "T38_407F_VisualSkin_Exterior_FrontBandBody78": 30,
+    "T38_430J_Exterior_ImportedRemainder_Plate72": 0,
+    "T38_463C_FrontPad_VisualCandidate": 129
+  },
+  "finishRoughnessP10P50P90": {
+    "Mesh_Type38_adsNear_3": [
+      103.0,
+      112.0,
+      120.0
+    ],
+    "Exterior_ButtCap04": [
+      97.0,
+      106.0,
+      114.0
+    ],
+    "Exterior_SeatedTang05": [
+      97.0,
+      106.0,
+      113.0
+    ],
+    "Exterior_FoldedFrame12": [
+      96.0,
+      105.0,
+      113.0
+    ],
+    "Exterior_HandleOval08": [
+      71.0,
+      79.0,
+      88.0
+    ],
+    "Wood_UpperFittedCrown05": [
+      77.0,
+      87.0,
+      96.0
+    ],
+    "Exterior_Guard02": [
+      107.0,
+      116.0,
+      124.0
+    ],
+    "Exterior_LongRound44": [
+      101.0,
+      111.0,
+      120.0
+    ],
+    "Exterior_FoldedShortBridge47": [
+      102.0,
+      110.0,
+      119.0
+    ],
+    "Exterior_FoldedRoundShoulder47_-1": [
+      101.0,
+      111.0,
+      119.0
+    ],
+    "Exterior_FoldedRoundShoulder47_1": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "Exterior_RearTransverseRelief49": [
+      102.0,
+      110.0,
+      119.0
+    ],
+    "Exterior_FrontWindowBacking49": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "Exterior_MiddleBand57": [
+      98.0,
+      107.0,
+      115.0
+    ],
+    "Exterior_LowRoundedSupport70": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "Exterior_ShortTransverseHead71": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "Exterior_VisibleLowerWall72": [
+      100.0,
+      108.0,
+      117.0
+    ],
+    "Exterior_RetainedImportedBody74": [
+      103.0,
+      112.0,
+      120.0
+    ],
+    "Exterior_FrontOuterTube76": [
+      100.0,
+      110.0,
+      118.0
+    ],
+    "Exterior_FrontUpperDetail76_Neg": [
+      101.0,
+      110.0,
+      119.0
+    ],
+    "Exterior_FrontUpperDetail76_Pos": [
+      101.0,
+      110.0,
+      118.0
+    ],
+    "Exterior_FrontBandEnd78": [
+      99.0,
+      108.0,
+      116.0
+    ],
+    "Exterior_FrontUpperRoot80": [
+      100.0,
+      109.0,
+      117.0
+    ],
+    "T38_407F_VisualSkin_Exterior_FrontBandBody78": [
+      101.0,
+      110.0,
+      118.0
+    ],
+    "T38_407F_VisualSkin_Exterior_FrontBandLowerStep78": [
+      101.0,
+      110.0,
+      118.0
+    ],
+    "T38_432_VisualExposedSlimStrip": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "T38_430B_ContinuousLowerFacing_VisualOnly": [
+      104.0,
+      113.0,
+      120.0
+    ],
+    "T38_430B_IndependentLeftCoverSkin": [
+      103.0,
+      112.0,
+      120.0
+    ],
+    "T38_430B_RetainedRightCoverHalf": [
+      102.0,
+      112.0,
+      120.0
+    ],
+    "T38_430J_Exterior_ComplementaryPlateSkin72": [
+      99.0,
+      108.0,
+      116.0
+    ],
+    "T38_430J_Exterior_ImportedRemainder_Plate72": [
+      102.0,
+      111.0,
+      120.0
+    ],
+    "T38_430L_VisibleUpperShoulderCoordination": [
+      102.0,
+      111.0,
+      119.0
+    ],
+    "T38_433E_VisibleSideBlockRimInset": [
+      100.0,
+      108.0,
+      117.0
+    ],
+    "T38_435F2_IndependentTailNeckExterior": [
+      108.0,
+      117.0,
+      125.0
+    ],
+    "T38_435F2_VisualBackingRearEnd": [
+      75.0,
+      84.0,
+      93.0
+    ],
+    "T38_440D2_IndependentVisibleRecess": [
+      108.0,
+      117.0,
+      125.0
+    ],
+    "T38_460G_WoodGroove_VisualCandidate": [
+      74.0,
+      83.0,
+      94.0
+    ],
+    "T38_462_TriggerTip_VisualCandidate": [
+      97.0,
+      106.0,
+      113.0
+    ],
+    "T38_463C_FrontPad_VisualCandidate": [
+      106.0,
+      115.0,
+      125.0
+    ],
+    "T38_463C_FrontSlottedHead_Cosmetic": [
+      111.0,
+      120.0,
+      129.0
+    ],
+    "SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH": [
+      96.0,
+      104.0,
+      113.0
+    ],
+    "SightDetailV3_DecorativeConvexRoundSurface": [
+      95.0,
+      103.0,
+      112.0
+    ],
+    "SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY": [
+      95.0,
+      103.0,
+      111.0
+    ]
+  }
 }

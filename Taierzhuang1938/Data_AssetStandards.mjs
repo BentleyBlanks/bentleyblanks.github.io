@@ -119,10 +119,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({id:'Type38_511',name:'三八式511（当前手持与世界模型）',pack:'Type38_511/Model_Type38_511.glb',
-    sourceTriangles:473796,actualTriangles:69586,npcTriangles:64978,targetTriangles:70000,policy:'target',
+    sourceTriangles:473796,actualTriangles:70822,npcTriangles:66214,targetTriangles:80000,policy:'target',
     sourceTexture:'用户提供Dots 511工程；高模及作者程序材质留OneDrive',
-    runtimeTexture:'45部件、116张原字节PBR图；保留UV法线/切线场与clearcoat/specular',
-    note:'用户2026-11-08要求参考游戏汉阳造68657面，并尽量保细节。减面版69454面，双向采样最大0.209mm；运行时照门补4.5mm缺口增加132面。116图像保留原字节；原工程、高低模工程和对照图留OneDrive。外观旧化为美术创作，非逐痕实物扫描。'}),
+    runtimeTexture:'45部件、116张内嵌图；木料与金属分区重做颜色和粗糙度，保留打包数据通道',
+    note:'2026-11-22 外观修订；实物照片对照见模型说明。8万面上限，普通NPC仍共用材质及原照门LOD。'}),
   Object.freeze({id:'RifleSlingFlatV3',name:'尼龙织带步枪背带',pack:'RifleSlingV3/Model_RifleSlingFlatV3.glb',
     sourceTriangles:6584,actualTriangles:6584,targetTriangles:6584,policy:'source',
     sourceTexture:'内置 imagegen 一级生成的细密尼龙织纹；BlenderMCP 扁带、折返收口与缝线',

@@ -20,7 +20,7 @@ assert.equal(contract.runtimeSha256,D.sourceSha256);
 assert.equal(contract.approvedReductionTriangles,69454);assert.equal(contract.triangles,D.triangles);
 assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
 assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,116);
-assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),69586);
+assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),70822);
 assert(!doc.animations?.length&&!doc.skins?.length);
 for(const [index,image]of doc.images.entries()){assert.equal(image.uri,undefined);const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=contract.imagePayloads[index];assert.equal(expected.index,index);assert.equal(expected.name,image.name);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 assert.equal(contract.adaptation.notchWidthM,.0045);assert.equal(contract.adaptation.runtimeTriangles-contract.adaptation.sourceTriangles,132);
@@ -51,12 +51,12 @@ const asset={gltf,npcLod,materials:new Map()},library=new MaterialLibrary(null);
 ConfigureType38_511(asset,library);
 const fps=InstantiateType38_511(asset),world=InstantiateType38_511(asset,{batch:true});
 const npc=InstantiateType38_511(asset,{batch:true,npcLod:true});
-assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.tris,64978);assert.equal(npc.meshes.length,45);
+assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.tris,66214);assert.equal(npc.meshes.length,45);
 for(let i=0;i<npc.meshes.length;i++){
  assert.equal(npc.meshes[i].material,fps.meshes[i].material);
  if(npc.meshes[i].userData.type38Part!==D.npcLodPart)assert.deepEqual(npc.meshes[i].geometry.attributes.position.array,world.meshes[i].geometry.attributes.position.array,'all other44 parts retain exact full geometry');
 }
-assert.equal(fps.tris,69586);assert.equal(world.tris,69586);assert.equal(fps.meshes.length,45);
+assert.equal(fps.tris,70822);assert.equal(world.tris,70822);assert.equal(fps.meshes.length,45);
 assert(fps.meshes.every((mesh,i)=>mesh.geometry!==world.meshes[i].geometry&&mesh.material===world.meshes[i].material));
 assert.equal(fps.nodes.get('boltBody').children.length,4);assert.equal(fps.nodes.get('dustCover').children.length,2);
 assert(fps.meshes.every(mesh=>mesh.material.color.r===D.exposureGain));
@@ -79,5 +79,35 @@ fps.root.updateMatrixWorld(true);const ray=new THREE.Raycaster(new THREE.Vector3
 assert.equal(ray.intersectObject(head).length,0,'real open sight notch at the eye line');
 ray.ray.origin.x=.006;assert(ray.intersectObject(head).length>0,'both solid sight shoulders remain');
 assert(Math.abs(fps.bounds.max.z-fps.bounds.min.z-1.276)<.002);
+const exteriorCrown=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_430J_Exterior_ImportedRemainder_Plate72');
+const exteriorSeat=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_FrontUpperRoot80');
+const crownPositions=exteriorCrown.geometry.attributes.position,tipPoints=[];
+for(let index=0;index<crownPositions.count;index++){
+ const point=new THREE.Vector3().fromBufferAttribute(crownPositions,index);
+ if(point.z<D.frontSightRegion.z+.01)tipPoints.push(point);
+}
+const crownBounds=new THREE.Box3().setFromPoints(tipPoints);
+exteriorSeat.geometry.computeBoundingBox();
+assert(crownBounds.intersectsBox(exteriorSeat.geometry.boundingBox),'visible crown meets its authored base');
+const seamProbe=new THREE.Raycaster(new THREE.Vector3(.04,(crownBounds.max.y+exteriorSeat.geometry.boundingBox.max.y)/2,crownBounds.getCenter(new THREE.Vector3()).z),new THREE.Vector3(-1,0,0));
+seamProbe.layers.enableAll();assert(seamProbe.intersectObject(exteriorCrown).length>0,'side silhouette spans the old visible air gap');
+assert(Math.abs(crownBounds.max.y-.05245)<.0001,'original visual tip height retained');
+assert(contract.triangles<=80000 && doc.asset.extras.runtimeTriangles===contract.triangles);
+const edgeStart=new THREE.Vector3(),edgeEnd=new THREE.Vector3(),corner=new THREE.Vector3(),normal=new THREE.Vector3(),tangent=new THREE.Vector3();
+for(const mesh of fps.meshes.filter(item=>Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
+ const geometry=mesh.geometry,{position,normal:normalAttr,tangent:tangentAttr}=geometry.attributes;
+ for(let index=0;index<position.count;index++){
+  normal.fromBufferAttribute(normalAttr,index);tangent.fromBufferAttribute(tangentAttr,index);
+  assert(Math.abs(tangent.length()-1)<.0001&&Math.abs(normal.dot(tangent))<.0001,`invalid exterior tangent: ${mesh.name}`);
+ }
+ for(let index=0;index<geometry.index.count;index+=3){
+  corner.fromBufferAttribute(position,geometry.index.getX(index));
+  edgeStart.fromBufferAttribute(position,geometry.index.getX(index+1)).sub(corner);
+  edgeEnd.fromBufferAttribute(position,geometry.index.getX(index+2)).sub(corner);
+  assert(edgeStart.cross(edgeEnd).length()>1e-12,`collapsed exterior bevel: ${mesh.name}`);
+ }
+}
+assert.equal(Object.keys(contract.finishRoughnessP10P50P90).length,43);
+for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
-console.log('ok Type38 511: 69586 real triangles, 45 parts, 116 unchanged PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');
+console.log('ok Type38 511: 70822 real triangles, 45 parts, 116 verified PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');

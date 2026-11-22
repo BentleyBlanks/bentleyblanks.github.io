@@ -1,5 +1,34 @@
 # Dots Type38 511 runtime integration
 
+## 当前外观版 · 2026-11-22
+
+近景 / 检查器 / 地面模型 **70,822** 三角，普通 NPC **66,214**，上限 80,000。仍是 45 个部件 / 116 张内嵌图，不增加材质、采样器或绘制批次。下方 11 月 8 日的历史记录不是本版数据。现版哈希、部件面数增量、每张成品图哈希与各部件的粗糙度分位值见同目录 JSON。
+
+| 可见问题 | 实物依据 | 本版处理与证据边界 |
+| --- | --- | --- |
+| 图二正面准星中央透光 | [三八式长步枪完整侧照，放大前端](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG) | 原 GLB 中央外形与外底座分离。延伸既有外皮，保留顶点高度；用侧向射线和回导正面近景检查，不建内部件。 |
+| 图一、三深色金属、亮柄和护圈像同一种光泽 | [澳大利亚战争纪念馆 C142149 的材质记录](https://www.awm.gov.au/collection/C142149)、[实物环箍特写](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)、[实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG) | 暗色表面、磨亮的环箍和亮柄分开调色；粗糙度叠加局部抛光、细条纹及轻微斑驳。照片光照不同，不以照片亮度作绝对反射率。 |
+| 木料高频斑纹与接缝高光 | 同一组环箍细照、[后部视图](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)、[照门顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG) | 分离木料大纹理和亮色纤维，降低划痕对比，保留薄漆反射。对托底板、中箍、木托金属嵌边、护圈等可见硬边做局部双段倒角。其余接缝通过原有几何和表面层次显示，不把所有交接处刷成白线。 |
+| 使用状态 | [C138903：战损藏品](https://www.awm.gov.au/collection/C138903)、[C153513：严重腐蚀藏品](https://www.awm.gov.au/collection/C153513) | 用来区分不同保存状态；不照搬缺件或重锈。本版不是某支滕县实枪的扫描；旧痕、反光强度及不可见面没有逐处实物认证。 |
+
+**重建现版**（仓库根目录，系统 Python 需要 NumPy / Pillow；Blender 使用 5.2）：
+
+```powershell
+python Taierzhuang1938/_blender/Script_Type38ExteriorFinish.py --stage
+$env:TYPE38_REPO_ROOT=(Get-Location).Path
+node scripts/Script_BlenderMcp.mjs start --task Type38Exterior
+$build=Get-Content -Raw -Encoding UTF8 Taierzhuang1938/_blender/Script_Type38Exterior.py
+("import os`nos.environ['TYPE38_REPO_ROOT']=" + (ConvertTo-Json $env:TYPE38_REPO_ROOT -Compress) + "`n" + $build) | node scripts/Script_BlenderMcp.mjs exec --stdin
+python Taierzhuang1938/_blender/Script_Type38ExteriorFinish.py
+node scripts/Script_BlenderMcp.mjs stop
+node Taierzhuang1938/Script_Type38_511AssetTest.mjs
+node Taierzhuang1938/Script_Type38_511BrowserTest.mjs
+```
+
+`--stage` 从历史提交取回校验过的游戏版本。仅用专属空场景执行外观脚本。普通 NPC 共用近景贴图，旧的几何覆盖件无需重新导出。下方旧重建命令只用于重建基线，不要用它覆盖现版。固定机位新旧对照、参考缩略图与可编辑工程保存在 OneDrive 的 `Blender/Taierzhuang1938/Type38_Exterior_20261122/`，不随游戏发布。
+
+## 原接入基线 · 2026-11-08
+
 The `Type38` gameplay id now resolves to the 511 GLB for FPS, NPC/carried weapons,
 ground pickups and the weapon editor. `Type38_511` is its external model id. The
 old TZM remains an offline source/regression fixture and is not requested by the

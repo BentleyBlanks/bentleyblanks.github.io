@@ -34,9 +34,9 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-20261108');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,69586);
- assert.equal(evidence.identity.npcTriangles,64978);assert.equal(evidence.identity.nearNpcTriangles,69586);
- assert.equal(evidence.identity.worldTriangles,69586);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.version,'511-exterior-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
+ assert.equal(evidence.identity.npcTriangles,66214);assert.equal(evidence.identity.nearNpcTriangles,70822);
+ assert.equal(evidence.identity.worldTriangles,70822);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
  assert(evidence.identity.materials.filter(m=>m.normal==='').length>=20);
  assert(evidence.identity.materials.filter(m=>m.clearcoat).length>=2);
@@ -104,5 +104,5 @@ try{
  assert(requests.some(url=>/Model_Type38_511[^/]*\.glb/.test(url)));
  assert.deepEqual(errors,[]);
  await fs.writeFile(path.join(out,'Data_RuntimeAcceptance.json'),JSON.stringify({...evidence,errors},null,2));
- console.log('ok Type38 511: actual FPS/NPC/world 69586 triangles, 45 parts, PBR maps, ADS, 120mm independent bolt/cover, held-open reload and GI/batched sampler budget');
+ console.log('ok Type38 511: actual FPS/NPC/world 70822 triangles, 45 parts, PBR maps, ADS, 120mm independent bolt/cover, held-open reload and GI/batched sampler budget');
 }finally{await browser.close();server?.close();}
