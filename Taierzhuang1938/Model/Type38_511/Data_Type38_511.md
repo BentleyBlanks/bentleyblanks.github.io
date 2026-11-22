@@ -22,8 +22,9 @@
 | 上护木刻痕 | [木面刻痕近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_inscriptions.JPG) | 按可见笔画画出深浅不一的痕迹，局部破漆；未认定文字含义。沿木料的方向可见，照片裁切缺乏两端定位，纵向落点为估计。 |
 | 上方金属铭文 | [铭文与磨损纹样](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG) | 保留可读「三八式」与纹样两侧残留轮廓，中间作擦磨，不还原成完整徽记。划痕位置与光泽是表现性重建，不是逐痕测绘。 |
 | 尾端金属圆面 | [尾端近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) | 外圈细密点纹、内圈圆痕以及亮暗差异通过底色、粗糙度、法线表现，不增加几何面。 |
-| 上方框面 | [顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG) | 恢复深色外框和较亮内片的区分，保留原美术表面刻线；不据此声称数字逐字相同。 |
-| 尚不能全证 | [托部另一组双印](https://commons.wikimedia.org/wiki/File:Inscriptions_on_a_Japanese_Arisaka_Type_38_rifle.JPG) | 近照不足以把双印定位到完整侧照上的确定位置，未贴在猜测的位置。未覆盖面、实际反射率、微小磨痕及 1938 年的个体状态也未确认。 |
+| 上方框面 | [顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG) | 将顶视照片与现有法线贴图分行转正，逐字符核对：两行所含数字与顺序一致。保留原字形，仅将凹笔画同时写入底色与粗糙度，改善顺光可读性；另区分内片与圆面颜色，补圆面斜线。实机左端一个字符被原有外形遮住。数字内容相符不等于字体、物理位置或整张顶视外形全等。 |
+| 托部双印定位 | [双印特写](https://commons.wikimedia.org/wiki/File:Inscriptions_on_a_Japanese_Arisaka_Type_38_rifle.JPG)、[反侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)、完整侧照 | 同组侧照与反侧斜照均看不到能与特写同时对应的两个印形及邻近缺口。用木面局部作三个尺度的特征配准，未取得可验证变换；同图旋转缩小的阳性对照能配准。不能由此断定实物没有双印，也不在模型上猜位置。 |
+| 证据边界 | 同组九张照片 | 未覆盖面、绝对反射率、磨痕精确分布及 1938 年的个体状态均未确认。 |
 
 本版沿用已验收的外部几何，不新增部件、材质或贴图槽。近景实机对照固定相机、灯光和曝光；浏览器回归在木面有效纹素上抽样验证清漆，避免再次出现材质参数非零但贴图完全屏蔽清漆的情况。
 

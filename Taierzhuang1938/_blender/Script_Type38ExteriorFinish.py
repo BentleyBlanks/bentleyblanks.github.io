@@ -39,6 +39,18 @@ def Noise(rng, size, grid):
     return (np.asarray(Image.fromarray(cells).resize(size, Image.Resampling.BICUBIC), dtype=np.float32) - 128) / 96
 
 
+def FrameEngraving(normalImage):
+    slopes = np.abs(np.asarray(normalImage, dtype=np.float32)[:, :, :2] - 127.5)
+    assert normalImage.size == (1024, 1024)
+    field = np.zeros(slopes.shape[:2], dtype=np.float32)
+    for left, right in [(432, 499), (696, 764)]:
+        local = slopes[128:950, left:right].max(axis=2)
+        strength = Image.fromarray(np.uint8(np.clip((local - 1.0) * 24, 0, 255)))
+        closed = strength.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+        field[128:950, left:right] = np.asarray(closed.filter(ImageFilter.GaussianBlur(.6))) / 255
+    return field
+
+
 def ProjectArtwork(doc, views, primitive, size, stamp, bounds, coordinates):
     def Attribute(index, channels):
         accessor = doc['accessors'][index]
@@ -257,9 +269,25 @@ def Refinish(doc, views):
                 surface = np.asarray(image.filter(ImageFilter.GaussianBlur(3)), dtype=np.float32)
                 detail = np.clip((color - surface).mean(axis=2), -10, 10)
                 graded = .94 * graded + np.array([27, 26, 25]) + 2.8 * detail[:, :, None]
+                if name == 'Exterior_FoldedFrame12':
+                    ink = FrameEngraving(Load(material['normalTexture']))
+                    graded = .92 * graded + np.array([27, 26, 24]) - 56 * ink[:, :, None]
+                    rough += 23 * ink
+                else:
+                    graded = .92 * graded + np.array([27, 26, 24])
             if name in ('SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH', 'SightDetailV3_DecorativeConvexRoundSurface'):
-                graded = .74 * graded + np.array([62, 56, 46])
-                rough -= 13
+                sheet = name == 'SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH'
+                graded = .74 * graded + np.array([90, 83, 71] if sheet else [58, 52, 44])
+                rough = (92 if sheet else 102) + 4 * cloud + 5 * stroke + 3 * patina
+                if not sheet:
+                    primitive = doc['meshes'][node['mesh']]['primitives'][0]
+                    stamp = Image.new('L', (128, 128))
+                    ImageDraw.Draw(stamp).line([(9, 32), (119, 96)], fill=255, width=12)
+                    line = ProjectArtwork(doc, views, primitive, image.size, stamp.filter(ImageFilter.GaussianBlur(1.6)),
+                                          ([.0011, .0556, -.3494], [.0059, .0563, -.3446]),
+                                          lambda side, height, length: ((length + .3493) / .0046, (side - .0012) / .0046))
+                    graded *= 1 - .68 * line[:, :, None]
+                    rough += 33 * line
             if name == 'T38_430L_VisibleUpperShoulderCoordination':
                 primitive = doc['meshes'][node['mesh']]['primitives'][0]
                 letters = PaintMakerLettering(doc, views, primitive, image.size)
@@ -327,7 +355,7 @@ def Build():
     finish = Refinish(doc, views)
     triangles = sum(doc['accessors'][primitive['indices']]['count'] // 3 for mesh in doc['meshes'] for primitive in mesh['primitives'])
     assert triangles == manifest['triangles'] <= 80000
-    doc['asset']['extras'].update(runtimeTriangles=triangles, version='Type38_PhotoFinish20261122', originalImagePayloadsPreserved=False)
+    doc['asset']['extras'].update(runtimeTriangles=triangles, version='Type38_EngravingFinish20261122', originalImagePayloadsPreserved=False)
     digest = WriteGlb(out / 'Model_Type38_511.glb', doc, views)
     manifest.update(version=2, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Exterior.py + _blender/Script_Type38ExteriorFinish.py',
                     exteriorBaselineSha256=baseline, exteriorTriangleDeltas=changes, finishRoughnessP10P50P90=finish,
