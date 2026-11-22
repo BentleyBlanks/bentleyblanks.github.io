@@ -26,7 +26,6 @@ export function ConfigureType38_511(asset,library) {
     if(!mesh.isMesh)return;
     const part=mesh.userData.SourceObject;
     mesh.material.name=`Type38_511_${part}`;
-    mesh.material.color.setScalar(D.exposureGain);
     // KTX2 decoders may label linear numeric maps as LinearSRGBColorSpace.
     // Normal/ORM/coat/specular-intensity slots are data, in both source and
     // published models. Keep their original bits and use the same data tag.

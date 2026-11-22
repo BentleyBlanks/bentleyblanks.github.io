@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-wood-rim-20261122');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
+ assert.equal(evidence.identity.version,'511-scanned-surface-01');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70822);
  assert.equal(evidence.identity.npcTriangles,66214);assert.equal(evidence.identity.nearNpcTriangles,70822);
  assert.equal(evidence.identity.worldTriangles,70822);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -63,7 +63,7 @@ try{
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
  }
- assert(evidence.identity.materials.every(m=>m.colour.every(c=>Math.abs(c-2.5)<1e-8)));
+ assert(evidence.identity.materials.filter(m=>m.base).every(m=>m.colour.every(c=>Math.abs(c-1)<1e-8)));
  assert.equal(evidence.identity.glError,0);
  if(external)assert(evidence.identity.compressedTextures>0,'published Type38 uses actual GPU-compressed textures');
  await page.screenshot({path:path.join(out,'Scene_GameHip.png')});

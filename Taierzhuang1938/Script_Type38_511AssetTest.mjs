@@ -59,7 +59,11 @@ for(let i=0;i<npc.meshes.length;i++){
 assert.equal(fps.tris,70822);assert.equal(world.tris,70822);assert.equal(fps.meshes.length,45);
 assert(fps.meshes.every((mesh,i)=>mesh.geometry!==world.meshes[i].geometry&&mesh.material===world.meshes[i].material));
 assert.equal(fps.nodes.get('boltBody').children.length,4);assert.equal(fps.nodes.get('dustCover').children.length,2);
-assert(fps.meshes.every(mesh=>mesh.material.color.r===D.exposureGain));
+assert(fps.meshes.every((mesh,index)=>{
+ const source=doc.materials[doc.meshes[index].primitives[0].material].pbrMetallicRoughness;
+ const expected=(source.baseColorFactor||[1,1,1]).slice(0,3);
+ return mesh.material.color.toArray().every((channel,component)=>Math.abs(channel-expected[component])<1e-6);
+}));
 assert(fps.meshes.every(mesh=>mesh.material.userData.externalMaterialClass==='authored'&&!mesh.material.userData.materialShadingSurface.skin));
 const namedShell=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshPhysicalMaterial({clearcoat:.6,clearcoatRoughness:.3,specularIntensity:.4}));
 namedShell.material.name='Head_Skin_VisualMetalShell';const sourceMaterial=namedShell.material;
@@ -117,6 +121,10 @@ for(const mesh of fps.meshes.filter(item=>item===woodRim||Object.hasOwn(contract
  }
 }
 assert.equal(Object.keys(contract.finishRoughnessP10P50P90).length,43);
+assert.deepEqual(contract.markings,['scale graduations and numerals only']);
+for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_MiddleBand57']){
+ const [low,,high]=contract.finishRoughnessP10P50P90[part];assert(high-low>24,`flat surface response: ${part}`);
+}
 for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
 console.log('ok Type38 511: 70822 real triangles, 45 parts, 116 verified PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');
