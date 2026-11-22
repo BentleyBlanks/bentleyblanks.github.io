@@ -1,7 +1,7 @@
 // 高级工具拆分（AdvancedTools/）真浏览器门禁。
 //
 // 查：
-//   1. 控制中心 ControlCenter.html：17 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
+//   1. 控制中心 ControlCenter.html：18 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
 //      点一张摄影棚卡片真能开出独立工具宿主；
 //   2. 独立工具宿主 Tool_Studio.html?tool=<id>：摄影棚工具逐个开，工作窗 .edPanel.work 出现、没有 console.error / pageerror、
 //      画布不是一片纯色；菜单栏只列摄影棚类工具、可在页内切换、有「返回控制中心」；无 tool 参数时是空 Inspector；
@@ -85,9 +85,12 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("17 张卡片，小队行进入口已删除", info.cards.length === 17 && !info.cards.some((entry) => entry.id === "squadMarch"), String(info.cards.length));
+    Check("18 张卡片，含模型制作工作台，小队行进入口已删除", info.cards.length === 18
+      && info.cards.some((entry) => entry.id === "modelWorkbench" && entry.href.includes("Tool_ModelWorkbench.html"))
+      && !info.cards.some((entry) => entry.id === "squadMarch"), String(info.cards.length));
     const card = (id) => info.cards.find((entry) => entry.id === id);
-    Check("文案取 TOOL_INFO 的 label / hint", info.cards.every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
+    Check("游戏工具文案取 TOOL_INFO 的 label / hint", info.cards.filter((entry) => entry.id !== "modelWorkbench")
+      .every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
     for (const id of WINDOW_TOOL_IDS) {
       const expected = new URL(TOOL_INFO[id].window.url, `http://127.0.0.1:${port}/Taierzhuang1938/`).href;
       Check(`${id} 卡片开自己的页面`, card(id).href === expected && card(id).target === TOOL_INFO[id].window.name, card(id).href);

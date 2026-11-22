@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>3D 模型制作工作台 · 血战滕县</title>
+  <link rel="icon" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" href="../Style_Interface.css?v=20261113DarkWorkspace">
+  <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
+  <link rel="stylesheet" href="./Style_ModelWorkbench.css?v=20261122">
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js"}}</script>
+  <script type="module" src="./Script_ModelWorkbench.mjs?v=20261122"></script>
+</head>
+<body class="edThemedSurface">
+  <header class="mwMenu">
+    <button id="navToggle" type="button" aria-label="切换任务列表" aria-controls="sidebar" aria-expanded="true">☰ <span>任务</span></button>
+    <a href="./ControlCenter.html" class="mwBrand">血战滕县</a>
+    <span class="mwMenuTitle">3D 模型制作工作台</span>
+    <button id="notifications" type="button" hidden>验收通知</button>
+    <button id="chatToggle" type="button" aria-controls="chatPanel" aria-expanded="true">会话 <span>◫</span></button>
+  </header>
+  <main id="workspace">
+    <aside id="sidebar">
+      <div class="mwRailHead"><h2>任务列表</h2><button id="newTask" type="button" class="primary" aria-label="新建任务">＋</button></div>
+      <input id="search" type="search" placeholder="搜索任务" aria-label="搜索任务">
+      <nav id="jobs" aria-label="模型任务"></nav>
+    </aside>
+    <section id="work" aria-label="制作区">
+      <div id="welcome" class="mwEmpty mwWelcome">
+        <div class="mwEmptyIcon" aria-hidden="true">◇</div>
+        <h1>3D 模型制作</h1>
+        <p>从局部原画或多角度参考开始，核准参考图后进入建模。</p>
+        <button id="welcomeCreate" type="button" class="primary">＋ 新建任务</button>
+      </div>
+      <header id="taskHead" class="mwTaskHead" hidden>
+        <div><span id="taskType"></span><h1 id="taskTitle"></h1></div>
+        <span id="taskStatus" class="mwStatus" role="status"></span>
+      </header>
+      <nav id="steps" aria-label="制作步骤" hidden>
+        <button type="button" data-step="references">参考图</button>
+        <button type="button" data-step="model">模型</button>
+      </nav>
+      <div id="stage" tabindex="-1" hidden>
+        <p id="brief" class="mwBrief" hidden></p>
+        <div id="progress" class="mwProgress" role="status" hidden></div>
+        <div id="stageError" class="mwProgress mwError" role="alert" hidden></div>
+        <div id="stageActions" class="mwActions"></div>
+        <div id="materials"></div>
+      </div>
+    </section>
+    <aside id="chatPanel" aria-label="会话栏">
+      <div class="mwChatHead">
+        <div><h2>需求会话</h2><small id="connection" role="status">正在连接本机服务…</small></div>
+        <button id="newChat" type="button" aria-label="新建会话">＋</button>
+      </div>
+      <label class="mwSession"><span class="srOnly">选择会话</span><select id="sessions"></select></label>
+      <div id="chatScroll"><div id="thread" role="log" aria-label="任务会话"></div></div>
+      <form id="composer">
+        <div id="attached" aria-label="会话附件"></div>
+        <label class="srOnly" for="message">需求或返修说明</label>
+        <textarea id="message" rows="3" maxlength="8000" placeholder="向建模会话提出需求…"></textarea>
+        <div class="mwActions">
+          <button id="markScreenshot" type="button" title="截取当前对比图，或粘贴图片" aria-haspopup="dialog">＋ 截图</button>
+          <button id="stop" type="button" hidden>停止</button>
+          <button id="send" type="submit" class="primary">发送 ↑</button>
+        </div>
+        <p id="chatNotice" role="status" hidden></p>
+      </form>
+    </aside>
+    <div class="mwResize" id="resizeSidebar" tabindex="0" role="separator" aria-orientation="vertical" aria-label="调整任务栏宽度"></div>
+    <div class="mwResize" id="resizeChat" tabindex="0" role="separator" aria-orientation="vertical" aria-label="调整会话栏宽度"></div>
+  </main>
+
+  <dialog id="createDialog" aria-labelledby="createTitle">
+    <form id="createForm">
+      <header class="mwDialogHead"><h2 id="createTitle">新建模型任务</h2></header>
+      <label>任务名称<input name="title" required maxlength="100" autocomplete="off"></label>
+      <label>参考图来源<select id="taskSourceType" name="type">
+        <option value="concept">原画局部 · 按截图或圈注生成三视图</option>
+        <option value="research">自行搜集 · Agent 查找多角度参考图</option>
+      </select></label>
+      <label>生成三视图的途径<select name="provider" class="providerSelect"></select></label>
+      <label>制作要求<textarea name="brief" rows="4" maxlength="8000" placeholder="描述对象、尺寸、材质，或圈注所指的位置…"></textarea></label>
+      <p id="createError" role="alert" hidden></p>
+      <footer class="mwActions"><button type="button" id="cancelCreate">取消</button><button type="submit" class="primary">创建任务</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="referenceDialog" aria-labelledby="referenceTitle">
+    <form id="referenceForm">
+      <header class="mwDialogHead"><h2 id="referenceTitle">准备参考图</h2></header>
+      <label>生成三视图的途径<select name="provider" class="providerSelect"></select></label>
+      <label>原画或标注截图<input id="sourceFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+      <div id="referenceInputs" class="mwAttachments"></div>
+      <button id="markSource" type="button">标注原画或粘贴截图</button>
+      <label>本次要求<textarea name="text" rows="3" maxlength="8000" placeholder="指定对象、调整三视图，或补充搜索线索…"></textarea></label>
+      <p id="referenceError" class="mwError" role="alert" hidden></p>
+      <footer class="mwActions"><button type="button" id="cancelReference">取消</button><button id="runReference" type="submit" class="primary">开始</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="photoDialog" aria-labelledby="photoTitle">
+    <header class="mwDialogHead"><h2 id="photoTitle"></h2><button id="markPhoto" type="button">标注图片</button><button id="closePhoto" type="button">关闭</button></header>
+    <div id="photoSurface"><img id="photo" alt=""></div>
+  </dialog>
+  <dialog id="modelDialog" aria-labelledby="modelDialogTitle">
+    <header class="mwDialogHead"><h2 id="modelDialogTitle">3D 模型预览</h2><button id="closeModel" type="button">关闭</button></header>
+    <div id="viewer"></div><p id="viewerStatus" role="status"></p>
+  </dialog>
+
+  <dialog id="screenshotDialog" aria-labelledby="screenshotTitle">
+    <header class="mwDialogHead"><h2 id="screenshotTitle">截图标注</h2><button id="closeScreenshot" type="button">取消</button></header>
+    <div id="screenshotStage">
+      <p id="screenshotEmpty">粘贴截图（Ctrl / ⌘ + V），或选择一张图片。</p>
+      <div id="screenshotSheet" hidden><canvas id="screenshotCanvas" aria-label="截图标注画布"></canvas><textarea id="screenshotText" rows="1" wrap="off" maxlength="120" placeholder="输入文字" aria-label="标注文字" hidden></textarea></div>
+    </div>
+    <p id="screenshotStatus" role="status" hidden></p>
+    <footer class="screenshotTools">
+      <div role="group" aria-label="标注工具">
+        <button type="button" data-mark="rect" aria-label="矩形框">框</button>
+        <button type="button" data-mark="brush" aria-label="画笔">笔</button>
+        <button type="button" data-mark="text" aria-label="文字">字</button>
+        <button type="button" data-mark="arrow" aria-label="箭头">↗</button>
+      </div>
+      <div role="group" aria-label="标注历史"><button id="undoMark" type="button">撤销</button><button id="redoMark" type="button">重做</button></div>
+      <input id="screenshotFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <button id="importScreenshot" type="button">选择图片</button>
+      <button id="attachScreenshot" class="primary" type="button" disabled>附加到会话</button>
+    </footer>
+  </dialog>
+</body>
+</html>

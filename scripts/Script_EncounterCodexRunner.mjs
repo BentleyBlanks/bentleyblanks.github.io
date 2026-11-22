@@ -8,10 +8,10 @@ import { createRequire } from "node:module";
 export const ENCOUNTER_CODEX_MODEL = "gpt-6.1-sol";
 export const ENCOUNTER_CODEX_EFFORT = "high";
 
-function SpawnAppServer(rootDir) {
+export function SpawnAppServer(rootDir, configArgs = []) {
   const entry = path.join(process.env.APPDATA || "", "npm/node_modules/@openai/codex/bin/codex.js");
   let command = fs.existsSync(entry) ? process.execPath : process.platform === "win32" ? "codex.exe" : "codex";
-  const args = ["app-server", "--listen", "stdio://"];
+  const args = ["app-server", "--listen", "stdio://", ...configArgs];
   let commandArgs = fs.existsSync(entry) ? [entry, ...args] : args;
   if (process.platform === "win32" && fs.existsSync(entry)) {
     const packageName = `@openai/codex-win32-${process.arch}`;
@@ -27,10 +27,13 @@ function SpawnAppServer(rootDir) {
 
 // Keep the bridge's final-output child contract while using the bidirectional
 // app-server protocol for live turn/steer requests and local image attachments.
-export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = SpawnAppServer } = {}) {
+export function CreateSteerableCodexChild(args, rootDir, {
+  spawnAppServer = SpawnAppServer, model = ENCOUNTER_CODEX_MODEL, effort = ENCOUNTER_CODEX_EFFORT,
+  title, goal, images = [], threadOptions = {},
+} = {}) {
   const child = new EventEmitter();
   child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
-  const server = spawnAppServer(rootDir);
+  const server = spawnAppServer(rootDir, goal ? ["--enable", "goals"] : []);
   child.pid = server.pid;
   const pending = new Map(), finalMessages = new Map(), commentary = new Map();
   const startedTurns = new Set(), startWaiters = new Map();
@@ -65,24 +68,32 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
     child.emit("close", code);
   }
   function Complete() {
-    setImmediate(() => {
+    setImmediate(async () => {
       if (closed || steering || !completed) return;
+      const finishedTurn = completed;
       const text = [...finalMessages.values()].join("\n\n").trim();
       try {
+        if (goal && finishedTurn.status === "completed") {
+          const { goal: current } = await Request("thread/goal/get", { threadId });
+          if (closed || completed !== finishedTurn || steering) return;
+          if (current?.status === "active") return;
+          if (current?.status !== "complete") throw new Error(`Goal 未完成（${current?.status || "未知"}）`);
+        }
         if (text) fs.writeFileSync(output, text);
-        Close(completed.status === "completed" && text ? 0 : 1);
+        if (finishedTurn.status === "completed" && text) Close(0);
+        else Close(1, finishedTurn.error?.message && new Error(finishedTurn.error.message));
       } catch (error) { Close(1, error); }
     });
   }
   async function StartTurn(input) {
     completed = null;
-    const result = await Request("turn/start", { threadId, input, model: ENCOUNTER_CODEX_MODEL, effort: ENCOUNTER_CODEX_EFFORT });
+    const result = await Request("turn/start", { threadId, input, model, effort });
     turnId = result.turn.id;
     if (!startedTurns.has(turnId)) await new Promise((resolve, reject) => startWaiters.set(turnId, { resolve, reject }));
   }
-  function Input(text, imagePath) {
+  function Input(text, imagePaths = []) {
     const input = [{ type: "text", text, text_elements: [] }];
-    if (imagePath) input.push({ type: "localImage", path: imagePath });
+    for (const imagePath of imagePaths) input.push({ type: "localImage", path: imagePath });
     return input;
   }
   let lastProgress = 0;
@@ -110,6 +121,7 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
       if (params?.threadId !== threadId) continue;
       if (event.method === "turn/started") {
         turnId = params.turn.id; completed = null; startedTurns.add(turnId);
+        if (goal) finalMessages.clear();
         startWaiters.get(turnId)?.resolve(); startWaiters.delete(turnId);
         Progress({ phase: "running", activity: "正在处理需求" });
       }
@@ -127,6 +139,7 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
       if (event.method === "item/completed" && params.item.type === "agentMessage"
         && (!params.item.phase || params.item.phase === "final_answer")) finalMessages.set(params.item.id, params.item.text);
       if (event.method === "turn/completed" && params.turn.id === turnId) { completed = params.turn; Complete(); }
+      if (goal && event.method === "thread/goal/updated" && completed) Complete();
     }
   });
   server.stderr.resume();
@@ -136,17 +149,20 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
   child.stdin.on("data", chunk => { prompt += chunk.toString(); });
   child.stdin.on("finish", async () => {
     try {
-      await Request("initialize", { clientInfo: { name: "encounter_designer", version: "1.0.0" }, capabilities: {} });
+      await Request("initialize", { clientInfo: { name: title ? "model_workbench" : "encounter_designer", version: "1.0.0" }, capabilities: goal ? { experimentalApi: true } : {} });
       Send({ method: "initialized", params: {} });
       const resume = args[1] === "resume";
       const result = await Request(resume ? "thread/resume" : "thread/start", {
-        cwd: rootDir, model: ENCOUNTER_CODEX_MODEL, config: { model_reasoning_effort: ENCOUNTER_CODEX_EFFORT }, ...(resume ? { threadId: args[2] } : {}),
+        cwd: rootDir, model, ...threadOptions,
+        config: { ...threadOptions.config, model_reasoning_effort: effort }, ...(resume ? { threadId: args[2] } : {}),
       });
       threadId = result.thread.id;
-      Progress({ phase: "preparing", activity: "已连接，正在提交需求", model: result.model || ENCOUNTER_CODEX_MODEL, effort: result.reasoningEffort || ENCOUNTER_CODEX_EFFORT });
+      if (title && !resume) await Request("thread/name/set", { threadId, name: title });
+      Progress({ phase: "preparing", activity: "已连接，正在提交需求", model: result.model || model, effort: result.reasoningEffort || effort });
       child.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: threadId })}\n`);
       const imageIndex = args.indexOf("--image");
-      await StartTurn(Input(prompt, imageIndex >= 0 ? args[imageIndex + 1] : null));
+      if (goal) await Request("thread/goal/set", { threadId, objective: goal, status: "active", origin: "user" });
+      await StartTurn(Input(prompt, imageIndex >= 0 ? [...images, args[imageIndex + 1]] : images));
       resolveReady();
     } catch (error) { Close(1, error); }
   });
@@ -155,7 +171,7 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
     steering++;
     const operation = steerQueue.then(async () => {
       await ready;
-      const input = Input(text, imagePath);
+      const input = Input(text, Array.isArray(imagePath) ? imagePath : imagePath ? [imagePath] : []);
       if (completed) return StartTurn(input);
       try { await Request("turn/steer", { threadId, expectedTurnId: turnId, input }); }
       catch (error) {
@@ -173,5 +189,6 @@ export function CreateSteerableCodexChild(args, rootDir, { spawnAppServer = Spaw
     await ready;
     if (!closed && !completed) await Request("turn/interrupt", { threadId, turnId });
   };
+  child.abort = () => Close(1, new Error("Codex 执行已中断"));
   return child;
 }
