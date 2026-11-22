@@ -1018,19 +1018,22 @@ try {
   const layerState=await page.evaluate(()=>LevelFlow.Inspect().viewports.views.map(view=>view.layers));
   assert.equal(layerState[0].fire,false);assert.equal(layerState[1].fire,true,'display settings belong to each viewport');
   await fireMenu.locator('[data-layer="fire"]').check();
-  await fireMenu.locator('[data-layer="landmarks"]').uncheck();
+  await fireMenu.locator('[data-layer="importantLandmarks"]').uncheck();
   const hiddenLandmarks=await page.evaluate(()=>LevelFlow.Packet().context.viewports);
+  assert.equal(hiddenLandmarks.views[0].layers.importantLandmarks,false);
   assert.equal(hiddenLandmarks.views[0].layers.landmarks,false);
-  assert.equal(hiddenLandmarks.views[1].layers.landmarks,true,'scene names belong to each viewport');
+  assert.equal(hiddenLandmarks.views[1].layers.importantLandmarks,true,'important scene names belong to each viewport');
   assert.equal(hiddenLandmarks.views[0].layers.names,true,'scene names leave the character-name setting independent');
   await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),hiddenLandmarks);
-  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),false,'saved frame layouts restore the scene-name setting');
+  assert.equal(await fireMenu.locator('[data-layer="importantLandmarks"]').isChecked(),false,'saved frame layouts restore the important-scene setting');
+  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),false,'saved frame layouts restore the all-scene setting');
   const invalidLandmarks=structuredClone(hiddenLandmarks);invalidLandmarks.views[0].layers.landmarks='off';
   assert.equal(await page.evaluate(layout=>{try{LevelFlow.RestoreViewports(layout);return false;}catch{return true;}},invalidLandmarks),true);
   const legacyLandmarks=structuredClone(hiddenLandmarks);
-  for(const view of legacyLandmarks.views) delete view.layers.landmarks;
+  for(const view of legacyLandmarks.views) {delete view.layers.landmarks;delete view.layers.importantLandmarks;}
   await page.evaluate(layout=>LevelFlow.RestoreViewports(layout),legacyLandmarks);
-  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),true,'older layouts default to visible scene names');
+  assert.equal(await fireMenu.locator('[data-layer="importantLandmarks"]').isChecked(),true,'older layouts default to visible important scene names');
+  assert.equal(await fireMenu.locator('[data-layer="landmarks"]').isChecked(),false,'older layouts default to hiding minor scene names');
   await fireMenu.locator('summary').click();
   let downloads=0;page.on('download',()=>downloads++);
   await page.click('#attachCodexScreenshot');

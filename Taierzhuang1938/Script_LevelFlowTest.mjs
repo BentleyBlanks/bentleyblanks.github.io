@@ -5,7 +5,7 @@ import { CompileEncounters, ValidateEncounterDocument, UpgradeEncounterDocument 
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_OPENING, FLOW_OPENING_RESCUE, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_PURSUIT } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { EnterArea, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 import { EncounterDocument, CreateFramePacket, ReadFramePacket, AddPngFrameMetadata, ReadPngFrameMetadata, ValidateScreenshot } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
-import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt, ENCOUNTER_MAP_MAX_Z } from "./AdvancedTools/Script_LevelFlowMap.mjs";
+import { BuildEncounterMap, EncounterFloorConnections, EncounterHeightAt, ENCOUNTER_MAP_MAX_Z, IsMainlineLandmark, LandmarkMode } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD, FLOW_FRIEND_REINFORCEMENTS } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
@@ -405,6 +405,20 @@ for (const marker of sceneMapMarkers) {
   assert.deepEqual(label, {...marker,p:[marker.x,marker.z]}, "landmarks retain authored names, location, kind, extent and notes");
 }
 assert.equal(map.labels.filter(label => label.name === "防炮洞").length, 1, "scene names take precedence over duplicate fallback labels");
+const mainlineLabels = map.labels.filter(IsMainlineLandmark);
+assert.ok(mainlineLabels.length >= 40 && mainlineLabels.length < map.labels.length / 3, "important mainline landmarks filter out background clutter");
+for (const id of ["LmDugout", "LmGully", "LmTemple", "LmAid", "LmRailBridge"]) {
+  assert.ok(mainlineLabels.some(label => label.id === id), `${id} is included in important mainline landmarks`);
+}
+for (const id of ["LmWell_1", "LmPond_W", "LmSlogan_NC1", "LmWoodZhao", "LmFarm_N"]) {
+  assert.ok(!mainlineLabels.some(label => label.id === id), `${id} is excluded from important mainline landmarks`);
+}
+assert.ok(!mainlineLabels.some(label => label.detail), "detail door/window labels are excluded from important mainline landmarks");
+assert.equal(LandmarkMode({ importantLandmarks: true, landmarks: false }), "important");
+assert.equal(LandmarkMode({ importantLandmarks: true, landmarks: true }), "all");
+assert.equal(LandmarkMode({ importantLandmarks: false, landmarks: false }), "none");
+assert.equal(LandmarkMode({ landmarks: false }), "none");
+assert.equal(LandmarkMode({ landmarks: true }), "all");
 assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="WaterVat_T2")),"cover metadata marks ordinary prop materials");
 assert.ok(IsEncounterCover(map.objects.find(object=>object.id==="Encounter_DragWestBerm")),"authored planning berms receive cover markings");
 assert.ok(IsEncounterCover({material:"Whitebox/Cover"}));

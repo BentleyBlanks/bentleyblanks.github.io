@@ -1,5 +1,6 @@
 import { PickEncounterBody } from "./Script_LevelFlowPicking.mjs";
 import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
+import { LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
 import { FLOW_RENDERING, FLOW_SCENE_CAMERA, FLOW_VIEW_HORIZONTAL_FOV_DEG, FLOW_ZOOM } from "../Data_Tuning_LevelFlow.mjs";
@@ -556,7 +557,8 @@ export class FlowPerspectiveView extends FlowMapView {
     this.BeginOverlay(context);
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
-    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);else this.visibleLandmarks=[];
+    const landmarkMode=LandmarkMode(layers);
+    if(landmarkMode!=="none") this.DrawLandmarks(context,width,height,landmarkMode);else this.visibleLandmarks=[];
     this.EndOverlay(context);
     cpu?.End();
     if(trace?.capturing) trace.Canvas("绘制地标与掩体标记",this.baseCanvas,markersStart);

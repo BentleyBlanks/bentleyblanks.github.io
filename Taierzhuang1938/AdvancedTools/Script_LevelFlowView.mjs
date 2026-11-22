@@ -2,6 +2,7 @@ import { GroupPath } from "./Script_LevelFlowEncounter.mjs";
 import { FLOW_GROUND } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
+import { IsMainlineLandmark, LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
@@ -337,15 +338,17 @@ export class FlowMapView {
       if(point[0]<10||point[0]>width-35||point[1]<20||point[1]>height-20) continue;
       Line(context,[[point[0]-4,point[1]-4],[point[0]+4,point[1]+4]],"#a7503f",1.5);
       Line(context,[[point[0]-4,point[1]+4],[point[0]+4,point[1]-4]],"#a7503f",1.5);
-      if(layers.landmarks!==false) Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
+      if(LandmarkMode(layers)==="all") Label(context,"死巷",point[0]+7,point[1]-9,"#94513c",10,true);
     }
-    if(layers.landmarks!==false) this.DrawLandmarks(context,width,height);
+    const landmarkMode=LandmarkMode(layers);
+    if(landmarkMode!=="none") this.DrawLandmarks(context,width,height,landmarkMode);
   }
 
-  DrawLandmarks(context,width,height) {
+  DrawLandmarks(context,width,height,mode="all") {
     const occupied=[];
     const Priority=landmark=>landmark.detail?0:landmark.kind==="area"?6:landmark.kind==="hole"?5:landmark.kind==="pit"?4:2;
-    const labels=[...(this.mapData.labels||[])].sort((a,b)=>Priority(b)-Priority(a));
+    const source=mode==="important"?(this.mapData.labels||[]).filter(IsMainlineLandmark):(this.mapData.labels||[]);
+    const labels=[...source].sort((a,b)=>Priority(b)-Priority(a));
     const displayed=[];this.visibleLandmarks=displayed;
     for(const landmark of labels) {
       if(this.eye) {
@@ -451,7 +454,7 @@ export class FlowMapView {
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
-    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,layers.landmarks!==false,
+    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,LandmarkMode(layers),
       frame.signals,Math.round((frame.nightBlend||0)*FLOW_DUSK.steps)]);
     cpu?.End();
     if(trace?.redrawBase||key!==this.baseKey) {

@@ -30,6 +30,7 @@ export function ValidateViewportLayout(layout) {
       &&(view.freeCamera==null||Array.isArray(view.freeCamera.eye)&&view.freeCamera.eye.length===3&&view.freeCamera.eye.every(value=>Number.isFinite(value)&&Math.abs(value)<=10000)
         &&Number.isFinite(view.freeCamera.yaw)&&Number.isFinite(view.freeCamera.pitch)&&Math.abs(view.freeCamera.pitch)<Math.PI/2)
       &&(view.layers===undefined||view.layers&&["fire","triggers","spawns","routes","names"].every(key=>typeof view.layers[key]==="boolean"))
+      &&(view.layers?.importantLandmarks===undefined||typeof view.layers.importantLandmarks==="boolean")
       &&(view.layers?.landmarks===undefined||typeof view.layers.landmarks==="boolean")
       &&(view.layers?.hud===undefined||typeof view.layers.hud==="boolean")
       &&Number.isFinite(view.viewport?.width)&&view.viewport.width>0&&Number.isFinite(view.viewport?.height)&&view.viewport.height>0);

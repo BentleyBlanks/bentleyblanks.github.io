@@ -255,6 +255,41 @@ export function BuildEncounterMap(scene, options = {}) {
   };
 }
 
+export const MAINLINE_LANDMARK_IDS = Object.freeze(new Set([
+  // 01–05 前沿与拖冬瓜主线
+  "LmDugout", "LmDugoutMouth", "LmInterrogation", "LmBranch", "LmBranchGun",
+  "LmSteps", "LmCorner2", "LmBridge", "LmCrest", "LmGully", "LmCompanyPost",
+  "LmCartStop", "LmLaneHead", "LmPit", "LmCorner1", "LmBend", "LmTankSeen",
+  // 06–10 凹路与耿家庄主线
+  "LmLaneEnd", "LmDitch", "LmMouthShooters", "LmVillageMouth", "LmMainStreet",
+  "LmTemple", "LmAlleyMouth", "LmJiefangBreach", "LmJiefangGatehouse", "LmDogHole",
+  "LmSideGate", "LmKitchenDoor", "LmLoophole_mg", "LmSquare", "LmRoller",
+  "LmEastStreet", "LmSouthLane", "LmLaneCollapse", "LmVillageSouth", "LmBigLocust",
+  // 11–18 官道、北沙河村与铁路桥主线
+  "LmLongRoad", "LmFlare", "LmAtDitch", "LmPlank", "LmTrenchSquad",
+  "LmVillage", "LmMainStreet_1218", "LmBombedYard", "LmAid", "LmGateYard",
+  "LmTianYard", "LmMatHome", "LmGuandaoBridge", "LmLizihang", "LmBank",
+  "LmRiver_1218", "LmRailBridge", "LmLevee", "LmSouthRoad",
+]));
+
+const MAINLINE_SUPPLEMENTAL_NAMES = Object.freeze(new Set([
+  "防炮洞", "西边机枪坑", "支沟口", "拐角", "坡顶", "干沟集结处", "凹路", "收窄的弯",
+  "耿家庄", "村口路沟", "主街", "老耿家", "街坊家", "本家院", "石碾", "关帝庙", "村南口",
+]));
+
+export function IsMainlineLandmark(landmark) {
+  if (!landmark || landmark.detail) return false;
+  if (landmark.id) return MAINLINE_LANDMARK_IDS.has(landmark.id);
+  return MAINLINE_SUPPLEMENTAL_NAMES.has(landmark.name);
+}
+
+export function LandmarkMode(layers = {}) {
+  if (layers.landmarks === true) return "all";
+  if (layers.importantLandmarks === true) return "important";
+  if (layers.landmarks === false || layers.importantLandmarks === false) return "none";
+  return "important";
+}
+
 export async function LoadEncounterMap(options = {}) {
   const sceneId = options.sceneId || options.variantSpec?.scene || "FirstLevelEncounter";
   const sceneRel = `Scenes/${sceneId}/Scene_${sceneId}.json`;
