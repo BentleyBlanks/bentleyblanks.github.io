@@ -18,19 +18,28 @@
 | 破损覆土棚顶 | 上沿约 90%，画面顶部约四分之一高度 | `BattlefieldTrenchEarthwork` 14,928，连片工事几何 | ≤ 18,000 | 17,526 |
 | 沟壁与土阶 | 右侧叠合约 30–35% | `BattlefieldTrenchEarthwork` 14,928，另参考 `TrenchCliffRootCrown` 330 | ≤ 6,000 | 5,796 |
 | 残缺灰砖矮墙 | 左中景约 15% | `CityWallBreachShoulderLeft` 1,272，单处灰砖断口 | ≤ 3,000 | 2,664 |
-| 柳条编篮 | 左中景约 5–6% | `WickerBasketLidded` 2,800 | ≤ 4,600 | 4,500 |
-| 断角土石 | 右侧两块合占约 24%，其余为小碎石 | `TrenchAggregateHigh` 160 | ≤ 800 | 768 |
+| 柳条编篮 | 左中景约 5–6% | `WickerBasketLidded` 2,800 | ≤ 4,600 | 2,400 |
+| 断角土石 | 右侧两块合占约 24%，其余为小碎石 | `TrenchAggregateHigh` 160 | ≤ 800 | 594 |
 | 田边枯榆 | 主树约 5–7%，树线单株更小 | `LeaflessTreeLowPoly` 22,700 | ≤ 12,000 | 10,554 |
 | 灰瓦农舍 | 远景单栋约 3–6% | `Model_ChineseRuralHouse.glb` 58,812 | ≤ 5,000 | 4,676 |
 | 麦苗田畦 | 横向成片、单株低于画面 1% | `TrenchDryGrass` 1,040，单组草丛 | ≤ 5,500 | 5,152 |
 
-带近景轮廓的木裂口、土阶、灰砖砂浆缝、篮筐口沿和石块断面由几何构成。模型包使用已有项目材质与烘焙的编纹贴图。运行时加载同一个 GLB 内的九个命名节点，实例位置、角度和尺寸由场景文件保存。三视图和审片图存于 OneDrive 的 Blender 源工程目录。
+带近景轮廓的木裂口、土阶、灰砖砂浆缝、篮筐口沿和石块断面由几何构成。场景文件保存九个 GLB 节点的实例位置、角度和尺寸。三视图和审片图存于 OneDrive 的 Blender 源工程目录。
+
+## 材质细节
+
+沟壁夯土、覆土草根、老榆木、外露木茬、积土碎石、灰砖和柳编各用一套按原画制作的贴图。ImageGen 返回的每张样本为 1254×1254。近景沟壁与棚木的反照率烘成 2048×2048，其余采用 1024×1024。法线为 512 或 1024 像素，AO 与粗糙度打包成 512 像素纹理。木料沿纹理方向展开，木梁端面单独烘焙年轮。沟壁按剖面弧长展开，断石的破面沿切口平面投影，柳编沿篮身周长展开。
+
+样本与记录位于 [DugoutAidOpenFields 材质烘焙目录](../../_import/DugoutAidOpenFields/Data_DugoutMaterialSources.json)。近景贴图随 GLB 载入，烘焙样本随仓库保存。版本对照和新版源工程位于 OneDrive 的 `DugoutAidOpenFields/MaterialDetail/`。
+
+Pages 对树皮、木茬、草根覆土、夯土、碎石和灰砖的反照率使用原尺寸高质量 WebP，对法线与 AO/粗糙度保留 GPU 纹理。发布规则对应 GLB 图像索引 2、6、9、12、15、18。改动 GLB 的材质顺序时，需核对索引对应的反照率图。
 
 ## 重建
 
 从仓库根执行。Blender 5.1 的重建输出包含内嵌材质与贴图。
 
 ```powershell
+python Taierzhuang1938/_import/Script_BakeDugoutMaterials.py
 node scripts/Script_BlenderMcp.mjs start --batch Taierzhuang1938/_import/Script_BakeDugoutAidOpenFields.py --task DugoutAidOpenFieldsBake
 node Taierzhuang1938/_import/Script_BakeDugoutAidTerrain.mjs
 node Taierzhuang1938/_import/Script_BakeDugoutAidTerrain.mjs --check

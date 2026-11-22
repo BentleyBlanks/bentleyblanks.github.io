@@ -341,7 +341,7 @@ const ASSETS = Object.freeze({
   ...PackAssets(TK_PACK, TK_ASSETS),
   ...PackAssets(WARD_PACK, WARD_ASSETS),
   ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(({ model, node, label }) => [model, {
-    label, node, url: "./Model/DugoutAidOpenFields/Model_DugoutAidOpenFields.glb?v=1",
+    label, node, url: "./Model/DugoutAidOpenFields/Model_DugoutAidOpenFields.glb?v=2",
     category: "沟底木棚", tag: "prop", projectUvs: false, preciseBounds: true,
   }])),
 });

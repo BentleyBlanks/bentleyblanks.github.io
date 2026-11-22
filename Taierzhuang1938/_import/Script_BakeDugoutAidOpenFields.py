@@ -8,7 +8,7 @@ import argparse
 import math
 import random
 import sys
-from math import cos, pi, sin
+from math import atan2, cos, pi, sin
 from pathlib import Path
 
 import bpy
@@ -18,6 +18,7 @@ from mathutils import Vector
 
 PROJECT = Path(__file__).resolve().parents[1]
 OUTPUT = PROJECT / "Model" / "DugoutAidOpenFields" / "Model_DugoutAidOpenFields.glb"
+MATERIAL_BAKE = PROJECT.parent / "tmp" / "DugoutAidOpenFields" / "MaterialBake"
 TAU = 2 * pi
 
 
@@ -25,7 +26,53 @@ def Clamp(x, lo, hi):
     return min(hi, max(lo, x))
 
 
-def Mat(name, color, roughness, texture=None, tone=None, normalStrength=0.7):
+def BindImage(material, image, label):
+    node = material.node_tree.nodes.new("ShaderNodeTexImage")
+    node.label = label
+    node.image = image
+    return node
+
+
+def SetNormal(material, image, strength):
+    tree = material.node_tree
+    tile = BindImage(material, image, "Tangent-space normal")
+    node = tree.nodes.new("ShaderNodeNormalMap")
+    node.inputs["Strength"].default_value = strength
+    tree.links.new(tile.outputs["Color"], node.inputs["Color"])
+    tree.links.new(node.outputs["Normal"], tree.nodes["Principled BSDF"].inputs["Normal"])
+
+
+def SetBakedMaterial(material, name, normalStrength):
+    tree = material.node_tree
+    shader = tree.nodes["Principled BSDF"]
+
+    def Read(channel, ext, colorspace):
+        path = MATERIAL_BAKE / f"Texture_Dugout{name}{channel}.{ext}"
+        if not path.is_file():
+            raise FileNotFoundError(f"{path.name} is missing. Run Script_BakeDugoutMaterials.py first.")
+        image = bpy.data.images.load(str(path), check_existing=True)
+        image.colorspace_settings.name = colorspace
+        return image
+
+    base = BindImage(material, Read("Base", "jpg", "sRGB"), "Base color")
+    tree.links.new(base.outputs["Color"], shader.inputs["Base Color"])
+    SetNormal(material, Read("Normal", "png", "Non-Color"), normalStrength)
+    atlas = BindImage(material, Read("Orm", "png", "Non-Color"), "Occlusion / roughness / metallic")
+    channels = tree.nodes.new("ShaderNodeSeparateColor")
+    tree.links.new(atlas.outputs["Color"], channels.inputs["Color"])
+    tree.links.new(channels.outputs["Green"], shader.inputs["Roughness"])
+    tree.links.new(channels.outputs["Blue"], shader.inputs["Metallic"])
+    # The Blender glTF exporter reads per-material AO from this named socket.
+    group = bpy.data.node_groups.get("glTF Material Output")
+    if group is None:
+        group = bpy.data.node_groups.new("glTF Material Output", "ShaderNodeTree")
+        group.interface.new_socket(name="Occlusion", in_out="INPUT", socket_type="NodeSocketFloat")
+    gltf = tree.nodes.new("ShaderNodeGroup")
+    gltf.node_tree = group
+    tree.links.new(channels.outputs["Red"], gltf.inputs["Occlusion"])
+
+
+def Mat(name, color, roughness, texture=None, tone=None, normalStrength=0.7, *, baked=None):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
     shader = material.node_tree.nodes.get("Principled BSDF")
@@ -34,6 +81,8 @@ def Mat(name, color, roughness, texture=None, tone=None, normalStrength=0.7):
     linear = tuple(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in srgb)
     material.diffuse_color = (*linear, 1)
     shader.inputs["Base Color"].default_value = material.diffuse_color
+    if baked:
+        SetBakedMaterial(material, baked, normalStrength)
     if texture:
         for suffix, colorspace in (("Base", "sRGB"), ("Normal", "Non-Color")):
             label = f"Texture_{texture}{suffix}"
@@ -52,40 +101,38 @@ def Mat(name, color, roughness, texture=None, tone=None, normalStrength=0.7):
                 np.clip(rgb, 0, 1, out=rgb)
                 image.pixels.foreach_set(pixels)
                 image.update()
+                # The tinted legacy variants are on the distant field plots or mortar.
+                if image.size[0] > 512:
+                    image.scale(512, 512)
                 image.pack()
-            tile = material.node_tree.nodes.new("ShaderNodeTexImage")
-            tile.image = image
             if suffix == "Normal":
-                normal = material.node_tree.nodes.new("ShaderNodeNormalMap")
-                normal.inputs["Strength"].default_value = normalStrength
-                material.node_tree.links.new(tile.outputs["Color"], normal.inputs["Color"])
-                material.node_tree.links.new(normal.outputs["Normal"], shader.inputs["Normal"])
+                SetNormal(material, image, normalStrength)
             else:
+                tile = BindImage(material, image, "Base color")
                 material.node_tree.links.new(tile.outputs["Color"], shader.inputs["Base Color"])
     return material
 
 
-def WickerLining():
+def TimberEndGrain():
     size = 512
-    rng = np.random.default_rng(810)
-    v, u = np.mgrid[0:size, 0:size].astype(np.float32) / size
-    rib = u * 16 + 0.12 * np.sin(v * TAU * 3)
-    reed = v * 47 + 0.21 * np.sin(u * TAU * 2) + 0.08 * np.cos(u * TAU * 6)
-    over = (np.floor(rib) + np.floor(reed)) % 2 == 0
-    across = np.maximum(0, np.cos((reed % 1 - 0.5) * pi)) ** 1.5 * (0.83 + 0.17 * over)
-    standing = np.maximum(0, np.cos((rib % 1 - 0.5) * pi)) ** 9 * (0.62 + 0.41 * (~over))
-    grain = rng.random((size, size)) * 0.071 + 0.018 * np.cos(v * TAU * 282 + u * 12)
-    fibers = np.maximum(across, standing) * 0.76 + grain
-    rgb = 0.11 + fibers[:, :, None] * np.array((0.38, 0.26, 0.15), dtype=np.float32)
-    image = bpy.data.images.new("Texture_WickerLiningBase", size, size, alpha=False)
+    rng = np.random.default_rng(516)
+    v, u = np.mgrid[0:size, 0:size].astype(np.float32) / size - 0.5
+    theta = np.arctan2(v + 0.025, u - 0.037)
+    radius = np.hypot((u - 0.037) * 1.08, (v + 0.025) * 0.91)
+    warped = radius + radius * (0.05 * np.sin(3 * theta + radius * 5) + 0.024 * np.cos(6 * theta - radius * 3))
+    growth = warped * 49 + 0.41 * np.sin(warped * 32) + 0.16 * np.sin(warped * 102)
+    rings = np.cos(growth * TAU) * 0.5 + 0.5
+    checked = (np.maximum(0, np.cos(9 * theta + 2.7 * radius)) ** 120) * np.clip((radius - 0.10) * 4, 0, 1)
+    dust = 0.047 * np.sin(u * 43 + v * 14) * np.cos(v * 29) + rng.normal(0, 0.012, (size, size))
+    tone = 0.85 + 0.16 * rings - 0.33 * checked + dust
+    image = bpy.data.images.new("Texture_DugoutTimberEndBase", size, size, alpha=False)
     pixels = np.ones((size, size, 4), dtype=np.float32)
-    pixels[:, :, :3] = rgb
+    pixels[:, :, :3] = np.clip(tone[:, :, None] * np.array((0.44, 0.364, 0.276), dtype=np.float32), 0, 1)
     image.pixels.foreach_set(pixels.ravel())
     image.update()
     image.pack()
-    material = Mat("WeaveInterior", (65, 46, 32), 0.96)
-    node = material.node_tree.nodes.new("ShaderNodeTexImage")
-    node.image = image
+    material = Mat("WeatheredEndGrain", (112, 92, 70), 0.96)
+    node = BindImage(material, image, "Weathered growth rings")
     material.node_tree.links.new(node.outputs["Color"], material.node_tree.nodes.get("Principled BSDF").inputs["Base Color"])
     return material
 
@@ -150,13 +197,14 @@ class Asset:
         print(f"{self.root.name}: {faces} triangles")
 
 
-def Tube(mesh, points, radii, sides, *, uvMeters=0.9, around=1, twist=0, deform=None, caps=True):
+def Tube(mesh, points, radii, sides, *, uvMeters=0.9, around=1, twist=0, deform=None, caps=True,
+         uvOffset=(0, 0), endGrain=None):
     path = [Vector(p) for p in points]
     axis = (path[-1] - path[0]).normalized()
     fallback = Vector((1, 0, 0)) if abs(axis.x) < 0.8 else Vector((0, 0, 1))
     side = fallback.cross(axis).normalized()
     rings = []
-    advance = [0.0]
+    advance = [uvOffset[1]]
     for row, (p, radius) in enumerate(zip(path, radii)):
         tangent = (path[min(row + 1, len(path) - 1)] - path[max(0, row - 1)]).normalized()
         radial = (side - tangent * side.dot(tangent)).normalized()
@@ -175,15 +223,25 @@ def Tube(mesh, points, radii, sides, *, uvMeters=0.9, around=1, twist=0, deform=
     for row, (a, b) in enumerate(zip(rings, rings[1:])):
         for i in range(sides):
             j = (i + 1) % sides
-            u, v = i / sides * around, (i + 1) / sides * around
+            u, v = i / sides * around + uvOffset[0], (i + 1) / sides * around + uvOffset[0]
             mesh.Face((a + i, a + j, b + j, b + i), ((u, advance[row]), (v, advance[row]),
                       (v, advance[row + 1]), (u, advance[row + 1])))
     if caps:
-        mesh.Face(range(rings[0] + sides - 1, rings[0] - 1, -1), smooth=False)
-        mesh.Face(range(rings[-1], rings[-1] + sides), smooth=False)
+        for row, clockwise in ((0, True), (len(rings) - 1, False)):
+            order = list(reversed(range(sides))) if clockwise else list(range(sides))
+            vertices = [rings[row] + i for i in order]
+            if endGrain is None:
+                mesh.Face(vertices, smooth=False)
+                continue
+            points = [mesh.vertices[index] for index in vertices]
+            start = endGrain.Add(points)
+            twistAngle = uvOffset[0] * TAU + pi * 0.3 * clockwise
+            uv = [(0.5 + 0.40 * cos(TAU * i / sides + twistAngle),
+                   0.5 + 0.40 * sin(TAU * i / sides + twistAngle)) for i in order]
+            endGrain.Face(range(start, start + sides), uv, smooth=False)
 
 
-def Log(mesh, start, end, radius, seed, fracture=0.06, rings=9, sides=12):
+def Log(mesh, start, end, radius, seed, fracture=0.06, rings=9, sides=12, endGrain=None):
     rng = random.Random(seed)
     a, b = Vector(start), Vector(end)
     path = [a.lerp(b, i / rings) + Vector((rng.uniform(-0.017, 0.017),
@@ -195,7 +253,8 @@ def Log(mesh, start, end, radius, seed, fracture=0.06, rings=9, sides=12):
         return ridges[i] * (1 + 0.09 * sin(row * 0.9 + i)), tip[i] if row == rings else 0
 
     radii = [radius * (1.05 - 0.2 * (i / rings) + 0.05 * sin(i * 0.95)) for i in range(rings + 1)]
-    Tube(mesh, path, radii, sides, around=max(0.3, TAU * radius / 0.68), deform=Deform)
+    Tube(mesh, path, radii, sides, uvMeters=1.22, around=max(1, round(TAU * radius / 0.67)), deform=Deform,
+         uvOffset=(rng.random(), rng.random()), endGrain=endGrain)
 
 
 def Grid(mesh, nu, nv, Point, *, flip=False, UV=None, smooth=True):
@@ -209,7 +268,7 @@ def Grid(mesh, nu, nv, Point, *, flip=False, UV=None, smooth=True):
             mesh.Face(quad[::-1] if flip else quad, uv[::-1] if flip and uv else uv, smooth)
 
 
-def RoundedBlock(mesh, center, size, seed, divisions=4, bevel=0.18, chip=0, tile=0.7, split=0):
+def RoundedBlock(mesh, center, size, seed, divisions=4, bevel=0.18, chip=0, tile=0.7):
     """Make a distorted bevelled block with shared normals and separate UV seams."""
     rng = random.Random(seed)
     phase = rng.uniform(0, 32)
@@ -232,13 +291,6 @@ def RoundedBlock(mesh, center, size, seed, divisions=4, bevel=0.18, chip=0, tile
                         point = core + normal * (bevel + rough)
                         lostCorner = max(0, (point.x - point.y + point.z - 1.70) * 0.66) * chip
                         point -= Vector((lostCorner, -lostCorner * 0.22, lostCorner * 1.17))
-                        if split and key[1] == 0 and 0 < key[2] < divisions:
-                            middle = divisions // 2
-                            fissure = Clamp(-0.21 - 0.26 * point.z + 0.11 * sin(point.z * 11), -0.36, 0.34)
-                            if key[0] in (middle - 1, middle, middle + 1):
-                                point.x = fissure + (key[0] - middle) * 0.108
-                                if key[0] == middle:
-                                    point.y += split
                         vertices[key] = mesh.Add([tuple(center[i] + point[i] * half[i] for i in range(3))])
             for v in range(divisions):
                 for u in range(divisions):
@@ -250,15 +302,7 @@ def RoundedBlock(mesh, center, size, seed, divisions=4, bevel=0.18, chip=0, tile
                         index = vertices[tuple(key)]
                         indices.append(index)
                     points = [Vector(mesh.vertices[index]) for index in indices]
-                    projection = axis
-                    if split:
-                        normal = (points[1] - points[0]).cross(points[2] - points[0]).normalized()
-                        # A deep chip can turn a former top face into a side wall.
-                        # Project onto the new face's dominant plane to keep the grit isotropic.
-                        if abs(normal[axis]) < 0.57:
-                            projection = max(range(3), key=lambda i: abs(normal[i]))
-                    pu, pv = (projection + 1) % 3, (projection + 2) % 3
-                    uv = [(p[pu] / tile + phase, p[pv] / tile + phase * 0.41) for p in points]
+                    uv = [(p[uAxis] / tile + phase, p[vAxis] / tile + phase * 0.41) for p in points]
                     mesh.Face(indices if sign > 0 else indices[::-1], uv if sign > 0 else uv[::-1])
 
 
@@ -286,7 +330,8 @@ def SplitTimber(asset):
         return surface, notches[i] if row == len(path) - 1 else 0
 
     Tube(mesh, path, [0.114, 0.142, 0.139, 0.147, 0.128, 0.142, 0.133, 0.142, 0.124,
-                      0.119, 0.122, 0.103], 16, deform=Deform)
+                      0.119, 0.122, 0.103], 16, uvMeters=1.20, deform=Deform,
+         uvOffset=(0.15, 0.22), endGrain=asset.Mesh("EndGrain"))
     for x, y, z, dx, dy, rise in ((-0.076, -0.045, 2.27, -0.051, 0.01, 0.36),
                                   (0.097, -0.04, 2.23, 0.035, 0.003, 0.4),
                                   (0.036, -0.102, 2.42, 0.026, -0.006, 0.18)):
@@ -307,6 +352,7 @@ def SplitTimber(asset):
 def BrokenSodRoof(asset):
     rng = random.Random(311)
     front, rear = -1.95, 2.05
+    endGrain = asset.Mesh("EndGrain")
 
     def Rise(x, y):
         return 0.33 + 0.052 * x - 0.062 * y
@@ -316,7 +362,7 @@ def BrokenSodRoof(asset):
         level = -0.175 if i == 1 else 0
         Log(asset.Mesh("ShelterWood"), (x0, y, Rise(x0, y) + level),
             (x1, y + rng.uniform(-0.08, 0.08), Rise(x1, y) + level),
-            (0.187, 0.151, 0.126, 0.13, 0.152)[i], 330 + i, 0.125, rings=19)
+            (0.187, 0.151, 0.126, 0.13, 0.152)[i], 330 + i, 0.125, rings=19, endGrain=endGrain)
     for i in range(23):
         x = -3.43 + 0.306 * i
         y0, y1 = front - rng.uniform(0.05, 0.32), rear + rng.uniform(-0.06, 0.18)
@@ -324,19 +370,20 @@ def BrokenSodRoof(asset):
             y0 += rng.uniform(0.55, 1.75)
         Log(asset.Mesh("Bark" if i % 4 == 0 else "ShelterWood"),
             (x, y0, Rise(x, y0) + 0.118), (x + rng.uniform(-0.16, 0.13), y1, Rise(x, y1) + 0.12),
-            rng.uniform(0.068, 0.146), 411 + i, 0.072, rings=8, sides=9)
+            rng.uniform(0.068, 0.146), 411 + i, 0.072, rings=8, sides=9, endGrain=endGrain)
     for i in range(11):
         x = rng.uniform(0.73, 2.23)
         y = front + rng.uniform(0.12, 0.52)
         z = Rise(x, y) + rng.uniform(0.12, 0.18)
         Tube(asset.Mesh("SplitWood"), [(x, y, z), (x - 0.27, y - 0.2, z - 0.13),
              (x - rng.uniform(0.5, 1.07), y - rng.uniform(0.31, 0.72), z - rng.uniform(0.26, 0.51))],
-             [rng.uniform(0.016, 0.057), rng.uniform(0.016, 0.04), 0.0007], 5)
+             [rng.uniform(0.016, 0.057), rng.uniform(0.016, 0.04), 0.0007], 5, uvOffset=(i*0.165, i*0.12))
     brokenEnd = asset.Mesh("SplitWood")
     for i in range(3):
         offset = i * 0.095
         Tube(brokenEnd, [(1.88+offset,-1.92,0.67), (1.45+offset,-2.16,0.44),
-             (0.68+offset,-2.49,0.14+0.047*i)], [0.10-0.023*i, 0.079-0.016*i, 0.0015], 6)
+             (0.68+offset,-2.49,0.14+0.047*i)], [0.10-0.023*i, 0.079-0.016*i, 0.0015], 6,
+             uvOffset=(0.25+i*0.205, i*0.2))
     ridge = asset.Mesh("Bark")
     twigPaths = [
         [(-2.60,-1.43,0.80), (-2.10,-1.71,0.84), (-1.20,-1.91,0.98), (-0.28,-1.86,1.11)],
@@ -357,8 +404,12 @@ def BrokenSodRoof(asset):
             return x, y, z
 
         soil = asset.Mesh("Sod")
-        Grid(soil, 32, 14, Skin)
-        Grid(soil, 32, 14, lambda u, v: Skin(u, v, True), flip=True)
+        def SurfaceUV(u, v):
+            x, y, _ = Skin(u, v)
+            return x / 0.8, y / 0.8
+
+        Grid(soil, 32, 14, Skin, UV=SurfaceUV)
+        Grid(soil, 32, 14, lambda u, v: Skin(u, v, True), flip=True, UV=SurfaceUV)
         for edge in (0, 1):
             Grid(soil, 32, 2, lambda u, v: Vector(Skin(u, edge, True)).lerp(Vector(Skin(u, edge)), v), flip=edge == 1)
             Grid(soil, 14, 2, lambda u, v: Vector(Skin(edge, u, True)).lerp(Vector(Skin(edge, u)), v), flip=edge == 0)
@@ -378,33 +429,52 @@ def CutEarthBank(asset):
     def Face(u, row):
         x = -1.59 + 3.18 * u
         y, h = contour[row]
-        relief = sin(x * 11 - h * 9) * cos(h * 18 + x) * 0.041 + sin(x * 34 + h * 19) * 0.017
+        relief = sin(x * 11 - h * 9) * cos(h * 18 + x) * 0.022 + sin(x * 34 + h * 19) * 0.006
         y += relief + 0.115 * sin(x * 2.1) + 0.064 * cos(x * 4.1 + h * 9.4)
         top = 1.26 + 0.81 * u + 0.18 * sin(u * 6.5)
-        z = h * top + (0.041 * sin(x * 8 + row) + 0.021 * cos(x * 21)) * (0.25 + h * 0.75)
+        z = h * top + (0.026 * sin(x * 8 + row) + 0.010 * cos(x * 21)) * (0.25 + h * 0.75)
         return x, y, z
 
     soil = asset.Mesh("Bank")
     columns, rows = 48, len(contour)
-    start = soil.Add([Face(i / columns, row) for row in range(rows) for i in range(columns + 1)])
+    bankPoints = [Vector(Face(i / columns, row)) for row in range(rows) for i in range(columns + 1)]
+    start = soil.Add(bankPoints)
+    stride = columns + 1
+    # Use world height on the cut and add the ground distance needed to
+    # unfold the ledge. Keep compacted layers horizontal along the wall.
+    arc = [0.0]
+    for row in range(1, rows):
+        first = row * stride
+        length = sum((bankPoints[k] - bankPoints[k-stride]).length for k in range(first, first+stride))
+        arc.append(arc[-1] + length / stride)
+    offsets = [distance - sum(p.z for p in bankPoints[row*stride:(row+1)*stride])/stride
+               for row, distance in enumerate(arc)]
     for row in range(rows - 1):
         for i in range(columns):
-            a = start + row * (columns + 1) + i
-            b = a + columns + 1
+            a = start + row * stride + i
+            b = a + stride
             corners = (a, a + 1, b + 1, b)
-            uv = [(soil.vertices[k][0] / 0.83, (soil.vertices[k][2] + soil.vertices[k][1] * 0.3) / 0.83)
+            uv = [(soil.vertices[k].x / 0.72, (soil.vertices[k].z + offsets[(k-start)//stride]) / 0.72)
                   for k in corners]
             soil.Face(corners, uv)
     def Cap(u, v):
         x, y, z = Face(u, rows - 1)
         return x, y + v * (1.17 - y), z + v * 0.09 + sin(u * 27 + v * 16) * 0.025 * sin(v*pi)
-    Grid(soil, columns, 8, Cap, UV=lambda u, v: (u * 4.7, v * 1.7))
+    def CapUV(u, v):
+        x, y, _ = Cap(u, v)
+        return x / 0.80, y / 0.80
+
+    Grid(asset.Mesh("Sod"), columns, 8, Cap, UV=CapUV)
     for border in (0, 1):
         def Side(u, v):
             x, y, z = Face(border, round(v * (rows - 1)))
             return x, y + u * (1.18 - y), z
-        Grid(soil, 2, rows - 1, Side, flip=border == 0)
-    Grid(soil, columns, 1, lambda u, v: (Face(u, rows - 1)[0], 1.17, v * Cap(u, 1)[2]), flip=True)
+        def SideUV(u, v):
+            _, y, z = Side(u, v)
+            return y / 0.72, z / 0.72
+        Grid(soil, 2, rows - 1, Side, flip=border == 0, UV=SideUV)
+    Grid(soil, columns, 1, lambda u, v: (Face(u, rows - 1)[0], 1.17, v * Cap(u, 1)[2]), flip=True,
+         UV=lambda u,v: (Face(u, rows - 1)[0] / 0.72, v * Cap(u, 1)[2] / 0.72))
     for i in range(190):
         u = rng.random()
         row = rng.choices((3, 5, 6, 8, 9), weights=(2, 8, 12, 4, 10))[0]
@@ -447,30 +517,26 @@ def WickerBasket(asset):
         y = math.copysign(abs(sin(a)) ** 0.46, sin(a)) * (0.166 * swell + delta)
         return (x, y, z + 0.0017 * sin(6 * a) + 0.0011 * sin(15 * a))
 
-    nodes = 40
-    liner = asset.Mesh("WickerShadow")
-    Grid(liner, nodes, 3, lambda u, v: RimPoint(u * TAU, 0.018 + 0.273 * v, -0.0045),
-         UV=lambda u,v:(u*3.6,v*0.45))
-    Grid(liner, nodes, 2, lambda u, v: RimPoint((1-u) * TAU, 0.021 + 0.266 * v, -0.006),
-         UV=lambda u,v:(u*3.6,v*0.45))
-    RoundedBlock(liner, (0, 0, 0.014), (0.443, 0.263, 0.026), 78, divisions=3, bevel=0.28, tile=0.39)
-    for row in range(17):
-        z = 0.024 + 0.0148 * row
-        strand = asset.Mesh(("Wicker", "WickerWarm", "WickerDark")[row % 3])
-        points = [RimPoint(i / nodes * TAU, z + 0.0027 * sin(i * 1.57 + row * 2.3), 0.0025)
-                  for i in range(nodes + 1)]
-        # Close-spaced willow in a shallow triangular cross section gives real shadows.
-        for i in range(nodes):
-            a, b = points[i], points[i+1]
-            base = strand.Add([(a[0], a[1], a[2] - 0.006), (b[0], b[1], b[2] - 0.006),
-                               (b[0] * 1.017, b[1] * 1.020, b[2]), (a[0] * 1.017, a[1] * 1.020, a[2]),
-                               (b[0], b[1], b[2] + 0.006), (a[0], a[1], a[2] + 0.006)])
-            strand.Face((base, base+1, base+2, base+3))
-            strand.Face((base+3, base+2, base+4, base+5))
-    for i in range(18):
-        a = i * TAU / 18 + 0.008
-        points = [RimPoint(a, k * 0.092 + 0.008, 0.004 + 0.001 * (k % 2)) for k in range(4)]
-        Tube(asset.Mesh("WickerWarm"), points, [0.003] * 4, 3, caps=False)
+    nodes = 56
+    liner = asset.Mesh("WillowWeave")
+    outline = [Vector(RimPoint(i * TAU / nodes, 0.29)) for i in range(nodes+1)]
+    arc = [0.0]
+    for a, b in zip(outline, outline[1:]):
+        arc.append(arc[-1] + (b-a).length)
+    repeats = round(arc[-1] / 0.24)
+
+    def Side(u, v, inside):
+        angle = (1-u if inside else u) * TAU
+        # Broad warp under the physical rim. Thin strands live in the baked maps.
+        ripple = 0.002 * sin(angle * 17 + v * 5) * sin(pi*v)
+        return RimPoint(angle, 0.018 + 0.275 * v, (-0.006 if inside else 0.003) + ripple)
+
+    for inside in (False, True):
+        def SideUV(u, v):
+            i = round((1-u if inside else u) * nodes)
+            return repeats * arc[i] / arc[-1], 0.19 + v * 0.275 / 0.24
+        Grid(liner, nodes, 6, lambda u,v: Side(u, v, inside), UV=SideUV)
+    RoundedBlock(liner, (0, 0, 0.014), (0.443, 0.263, 0.026), 78, divisions=3, bevel=0.28, tile=0.24)
     # Overlapping bindings along the hollow lip and two slanted willow loop handles.
     for sign in (-1, 1):
         strand = asset.Mesh("WickerDark" if sign == 1 else "Wicker")
@@ -484,8 +550,51 @@ def WickerBasket(asset):
 
 
 def EarthenRubble(asset):
-    RoundedBlock(asset.Mesh("Clod"), (0, 0, 0.161), (0.45, 0.36, 0.32), 793,
-                 divisions=8, bevel=0.19, chip=0.98, tile=0.37, split=0.31)
+    center = Vector((0, 0, 0.161))
+    source = MeshDraft()
+    RoundedBlock(source, center, (0.45, 0.36, 0.32), 793, divisions=7, bevel=0.19, tile=0.38)
+    outward = Vector((0.77, -0.46, 0.80)).normalized()
+    distance = [(Vector(p) - center).dot(outward) - 0.227 for p in source.vertices]
+    rock = asset.Mesh("Clod")
+    original, intersections = {}, {}
+
+    for face, uv in zip(source.faces, source.uvs):
+        polygon, texel = [], []
+        for i, a in enumerate(face):
+            j = (i+1) % len(face)
+            b = face[j]
+            sideA, sideB = distance[a] <= 0, distance[b] <= 0
+            if sideA:
+                if a not in original:
+                    original[a] = rock.Add([source.vertices[a]])
+                polygon.append(original[a])
+                texel.append(uv[i])
+            if sideA != sideB:
+                key = tuple(sorted((a,b)))
+                mix = distance[a] / (distance[a] - distance[b])
+                if key not in intersections:
+                    point = Vector(source.vertices[a]).lerp(Vector(source.vertices[b]), mix)
+                    intersections[key] = rock.Add([point])
+                polygon.append(intersections[key])
+                texel.append(tuple(Vector(uv[i]).lerp(Vector(uv[j]), mix)))
+        if len(polygon) >= 3:
+            rock.Face(polygon, texel)
+
+    # Give the real cut its own projection in metres. The outer skin uses intact
+    # UVs interpolated at the cut edges; no UV island is stretched into the chip.
+    points = [rock.vertices[index] for index in intersections.values()]
+    midpoint = sum(points, Vector((0, 0, 0))) / len(points)
+    tangent = Vector((0, 1, 0)).cross(outward).normalized()
+    bitangent = outward.cross(tangent)
+    points.sort(key=lambda p: atan2((p-midpoint).dot(bitangent), (p-midpoint).dot(tangent)))
+    ring = rock.Add(points)
+    inset = midpoint - outward * 0.004
+    middle = rock.Add([inset])
+    for i, point in enumerate(points):
+        j = (i+1) % len(points)
+        uv = tuple((p.dot(tangent)/0.38 + 0.28, p.dot(bitangent)/0.38 + 0.74)
+                   for p in (inset, point, points[j]))
+        rock.Face((middle, ring+i, ring+j), uv, smooth=False)
 
 
 def BareFieldElm(asset):
@@ -616,22 +725,20 @@ def Build(output, blend):
     bpy.data.orphans_purge(do_recursive=True)
     scene.unit_settings.system = "METRIC"
     materials = {
-        "Bark": Mat("WeatheredElmBark", (85, 72, 59), 0.91, "TreeBark", (0.82, 0.78, 0.73)),
-        "ShelterWood": Mat("PeelingShelterWood", (77, 62, 47), 0.9, "OpeningTimber", (0.82, 0.76, 0.68)),
-        "SplitWood": Mat("ExposedSplitWood", (126, 100, 71), 0.87, "VillageTimber", (1.23, 1.05, 0.83)),
+        "Bark": Mat("WeatheredElmBark", (107, 92, 76), 0.90, baked="ElmBark", normalStrength=1.05),
+        "SplitWood": Mat("ExposedSplitWood", (131, 109, 83), 0.89, baked="SplitElm", normalStrength=0.90),
+        "EndGrain": TimberEndGrain(),
         "GrayWood": Mat("GrayBuildingWood", (97, 87, 69), 0.94, "VillageTimber"),
-        "Sod": Mat("RoofSod", (89, 69, 50), 0.98, "MissionSoil", (0.76, 0.72, 0.68)),
-        "Bank": Mat("CutLoess", (119, 88, 58), 0.97, "MissionSoil", (1.08, 0.96, 0.83), 0.95),
-        "Clod": Mat("DustyClods", (102, 88, 70), 0.92, "TrenchStone", (0.68, 0.61, 0.50), 0.85),
-        "Brick": Mat("AshGrayBrick", (91, 88, 80), 0.94, "TrenchStone", (0.52, 0.54, 0.55), 0.83),
-        "BrickDark": Mat("AshGrayBrickDark", (73, 71, 65), 0.96, "TrenchStone", (0.46, 0.47, 0.48), 0.83),
+        "Sod": Mat("RootMattedSod", (102, 85, 64), 0.94, baked="RootedSod", normalStrength=0.88),
+        "Bank": Mat("CutLoess", (106, 87, 67), 0.94, baked="CutLoess", normalStrength=0.74),
+        "Clod": Mat("DustyClods", (101, 90, 75), 0.92, baked="MudStone", normalStrength=0.72),
+        "Brick": Mat("AshGrayBrick", (104, 99, 94), 0.91, baked="FiredGrayClay", normalStrength=0.87),
         "Mortar": Mat("DryClayMortar", (53, 46, 36), 0.98, "MissionSoil", (0.55, 0.52, 0.49)),
         "Root": Mat("DryRoots", (110, 83, 56), 0.96),
         "Straw": Mat("CopperStraw", (151, 120, 81), 0.92),
         "Wicker": Mat("WillowFiber", (99, 78, 55), 0.91),
-        "WickerWarm": Mat("WarmWillowFiber", (117, 91, 64), 0.92),
         "WickerDark": Mat("DarkWillowFiber", (80, 65, 49), 0.96),
-        "WickerShadow": WickerLining(),
+        "WillowWeave": Mat("InterlacedWillow", (112, 94, 75), 0.90, baked="WillowWeave", normalStrength=1.02),
         "Plaster": Mat("FarmWornMudPlaster", (133, 110, 83), 0.98, "VillageMudPlaster"),
         "RoofTile": Mat("FarmWeatheredTile", (90, 91, 87), 0.94, "VillageRoofTile"),
         "Openings": Mat("FarmDarkOpenings", (34, 30, 25), 0.96),
@@ -641,6 +748,8 @@ def Build(output, blend):
         "WheatLight": Mat("YoungWheatLight", (124, 125, 74), 0.93),
         "WheatDark": Mat("YoungWheatDark", (80, 92, 54), 0.98),
     }
+    materials["ShelterWood"] = materials["Bark"]
+    materials["BrickDark"] = materials["Brick"]
     for key in ("WheatGreen", "WheatLight", "WheatDark"):
         materials[key].use_backface_culling = False
     for i, builder in enumerate(BUILDERS):
@@ -653,7 +762,7 @@ def Build(output, blend):
         bpy.context.preferences.filepaths.save_version = 0
         bpy.ops.wm.save_as_mainfile(filepath=str(blend))
     output.parent.mkdir(parents=True, exist_ok=True)
-    bpy.ops.export_scene.gltf(filepath=str(output), export_format="GLB", export_image_format="JPEG",
+    bpy.ops.export_scene.gltf(filepath=str(output), export_format="GLB", export_image_format="AUTO",
                               export_jpeg_quality=92, export_cameras=False, export_lights=False)
 
 

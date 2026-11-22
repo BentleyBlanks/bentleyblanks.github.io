@@ -45,7 +45,7 @@ const Prop = (model, semantic, label, size) => Object.freeze({ kind: "prop", siz
 export const DUGOUT_AID_OPEN_FIELDS_PROPS = Object.freeze([
   ["SplitTimber", "timber", "裂口木柱", [0.33, 2.68, 0.37]],
   ["BrokenSodRoof", "timber", "破损覆土木棚", [7.44, 1.45, 4.79]],
-  ["CutEarthBank", "earthDark", "沟壁与土阶", [3.27, 2.25, 2.42]],
+  ["CutEarthBank", "earthDark", "沟壁与土阶", [3.27, 2.23, 2.40]],
   ["DamagedGrayBrickWall", "structure", "残缺灰砖矮墙", [1.43, 0.66, 0.32]],
   ["WickerBasket", "timber", "柳条编篮", [0.60, 0.40, 0.34]],
   ["EarthenRubble", "earthDark", "断角土石", [0.47, 0.33, 0.37]],
