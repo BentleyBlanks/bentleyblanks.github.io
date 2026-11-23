@@ -818,9 +818,14 @@ function renderTaskDetail() {
   $$("#s3ModelPresets .mwPresetBtn").forEach((b) => {
     b.classList.toggle("active", b.dataset.m === mPreset);
     b.onclick = async () => {
+      const patch = { modelPreset: b.dataset.m };
+      // MiniMax-H3 defaults to 720p when switching from 480p draft (still manually switchable to 1080p/480p)
+      if (b.dataset.m === "minimax_h3_colab" && (!task.storyboard?.qualityPreset || task.storyboard.qualityPreset === "480p")) {
+        patch.storyboard = { ...(task.storyboard || {}), qualityPreset: "720p" };
+      }
       const res = await api(`/api/tasks/${task.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ modelPreset: b.dataset.m }),
+        body: JSON.stringify(patch),
       });
       replaceTask(res.task);
     };
@@ -855,6 +860,21 @@ function renderTaskDetail() {
     s3Box.appendChild(tile);
   }
 
+  // Stage 03 resolution selector (H3 defaults to 720p; supports 480p / 720p / 1080p)
+  const activeRes = task.storyboard?.qualityPreset || "720p";
+  $$("#s3ResolutionPresets .mwResBtn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.r === activeRes);
+    b.onclick = async () => {
+      const res = await api(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ storyboard: { ...(task.storyboard || {}), qualityPreset: b.dataset.r } }),
+      });
+      replaceTask(res.task);
+    };
+  });
+  $("#btnStage3Gen").textContent = takes.length > 0 ? "再抽 1 条视频" : "生成 1 条视频";
+  $("#s3InspFoot")?.classList.toggle("hidden", !selectedTake?.url);
+
   // Stage 04 · 骨骼提取
   const pPreset = task.stage4?.precisionPreset || "standard_l4";
   $$("#s4PrecisionPresets .mwPresetBtn").forEach((b) => {
@@ -867,11 +887,22 @@ function renderTaskDetail() {
       replaceTask(res.task);
     };
   });
+
+  // Visual Input Video Source Card
+  const hasInputVid = Boolean(selectedTake?.url);
+  $("#s4InputThumb").classList.toggle("hidden", !hasInputVid);
+  $("#s4InputEmpty").classList.toggle("hidden", hasInputVid);
+  setVideoSrcIfChanged($("#s4InputThumb"), hasInputVid ? selectedTake.url : "");
   $("#s4SelectedVideo").textContent = selectedTake
-    ? `${selectedTake.label} (${fmtSize(selectedTake.sizeBytes)})`
+    ? selectedTake.label
     : isMixamo
-    ? "复用 Mixamo 动作（跳过提骨）"
-    : "未选定视频";
+    ? "复用 Mixamo 通用库动作"
+    : "尚未定稿输入视频";
+  $("#s4SelectedVideoSub").textContent = selectedTake
+    ? `${selectedTake.resolution || "720p"} · ${selectedTake.duration || task.durationSec || 6}s · ${fmtSize(selectedTake.sizeBytes)}`
+    : isMixamo
+    ? "可直接进入 05 重定向 3D 验收"
+    : "请先在 03 视频生成出片";
 
   const run = activeMocapRun(task);
   const isRunning = run && (run.status === "running" || run.status === "queued");
@@ -914,10 +945,26 @@ function renderTaskDetail() {
     };
   }
 
+  const runs = task.stage4?.runs || [];
   $("#s4Empty").classList.toggle("hidden", hasResult);
   $("#s4ResultArea").classList.toggle("hidden", !hasResult);
+  $("#s4InspFoot")?.classList.toggle("hidden", !hasResult);
   $("#btnStage4Run").disabled = Boolean(isRunning);
-  $("#btnStage4Run").textContent = isRunning ? "提骨进行中…" : "重新提骨";
+  $("#btnStage4Run").textContent = isRunning ? "云端提骨进行中…" : runs.length > 0 ? "重新提交云端提骨" : "提交云端提骨";
+
+  function formatLogLineHtml(line) {
+    const raw = String(line || "");
+    const safe = escapeHtml(raw);
+    let cls = "";
+    if (/ERROR|失败|Traceback|RuntimeError|Service Unavailable|503/i.test(raw)) cls = "isErr";
+    else if (/自动切换|重试|暂不可用|warn|超时/i.test(raw)) cls = "isWarn";
+    else if (/已分配|复用热机|已导出|完成|就绪|\[DONE\]/i.test(raw)) cls = "isOk";
+    let html = safe
+      .replace(/^(\[Colab CLI[^\]]*\])/i, '<span class="lgTag">$1</span>')
+      .replace(/^(\[GEM-X[^\]]*\])/i, '<span class="lgTagBlue">$1</span>')
+      .replace(/^(\$\s+.+)$/i, '<span class="lgCmd">$1</span>');
+    return `<div class="mwLogLine ${cls}">${html}</div>`;
+  }
 
   if (!hasResult) {
     const showProg = Boolean(isRunning && !isMixamo);
@@ -928,27 +975,92 @@ function renderTaskDetail() {
 
     if (showProg) {
       const pct = Math.max(0, Math.min(100, Number(run.progress || 0)));
-      const gpuTag = task.stage4?.precisionPreset === "high_a100" ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77 骨";
+      const isA100 = task.stage4?.precisionPreset === "high_a100";
+      const gpuTag = isA100 ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77 骨";
       $("#s4ProgSpec").textContent = gpuTag;
       $("#s4ProgJob").textContent = run.jobId;
+
+      // Elapsed time mm:ss
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - Number(run.createdAt || Date.now())) / 1000));
+      const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+      const ss = String(elapsedSec % 60).padStart(2, "0");
+      $("#s4ProgElapsed").textContent = `已用时 ${mm}:${ss}`;
+
       $("#s4LivePct").textContent = `${pct}%`;
       $("#s4LiveFill").style.width = `${pct}%`;
-      $("#s4LiveText").textContent = run.stageLabel || "正在连接 Google Colab GPU…";
 
-      // 4 步进度节点（申请 GPU → 上传视频 → GEM-X 推理 → 回传重定向）
+      // Split formal short title vs secondary muted note (strip parenthetical hints out of main headline)
+      const rawStage = String(run.stageLabel || "申请云端 GPU").replace(/…+$/, "");
+      const parenMatch = /^([^（(]+)[（(]([^）)]+)[）)]/.exec(rawStage);
+      const shortHeadline = (parenMatch ? parenMatch[1] : rawStage).trim();
+      const subNote = parenMatch
+        ? parenMatch[2].trim()
+        : pct < 15
+        ? "高峰期可能排队 1~3 分钟 · 当前卡型暂满时自动顺延备选 GPU"
+        : pct < 22
+        ? "正在经 Colab CLI 直传输入视频至云端临时盘"
+        : pct < 88
+        ? "YOLOX 追踪 → ViTPose77 关键点 → 12 层时序 Transformer → Contact/IK"
+        : "打包 GLB / FBX / BVH / USD 并自动执行 Retarget v3 转换";
+      $("#s4LiveText").textContent = shortHeadline;
+      $("#s4LiveHint").textContent = subNote;
+
+      // 4 rich pipeline stage cards with live per-stage sub-status
       const activeIdx = pct < 15 ? 0 : pct < 22 ? 1 : pct < 88 ? 2 : 3;
-      const steps = ["申请 GPU", "上传视频", "GEM-X 推理", "回传重定向"];
-      $("#s4Milestones").innerHTML = steps
-        .map((lbl, i) => {
+      const vidSize = selectedTake ? fmtSize(selectedTake.sizeBytes) : "";
+      const stageDefs = [
+        {
+          title: "申请 GPU",
+          doneSub: isA100 ? "已就绪 · 高配 GPU" : "已就绪 · 云端 GPU",
+          curSub: isA100 ? "分配 A100 (备选 G4/L4)" : "分配 L4 (备选 A100/G4)",
+          waitSub: "等待分配",
+        },
+        {
+          title: "上传视频",
+          doneSub: vidSize ? `已上传 · ${vidSize}` : "已上传至运行时",
+          curSub: vidSize ? `直传中 · ${vidSize}` : "直传至云端临时盘",
+          waitSub: "等待 GPU 就绪",
+        },
+        {
+          title: "GEM-X 推理",
+          doneSub: "77 关节提取完成",
+          curSub: shortHeadline.length <= 18 ? shortHeadline : "77 骨重建 + Contact/IK",
+          waitSub: "等待视频上传",
+        },
+        {
+          title: "回传重定向",
+          doneSub: "已生成 Mixamo GLB",
+          curSub: "打包回传 + Retarget v3",
+          waitSub: "等待推理完成",
+        },
+      ];
+      $("#s4Milestones").innerHTML = stageDefs
+        .map((d, i) => {
           const st = i < activeIdx ? "done" : i === activeIdx ? "current" : "pending";
           const mk = i < activeIdx ? "✓" : i === activeIdx ? "●" : `${i + 1}`;
-          return `<span class="mwNode" data-state="${st}"><span class="mwNodeMark">${mk}</span><span>${lbl}</span></span>`;
+          const sub = st === "done" ? d.doneSub : st === "current" ? d.curSub : d.waitSub;
+          return `
+            <div class="mwPipeTile" data-state="${st}">
+              <div class="mwPipeTileHead"><span class="mwPipeIdx">${mk}</span><span>${d.title}</span></div>
+              <div class="mwPipeTileSub">${escapeHtml(sub)}</div>
+            </div>
+          `;
         })
         .join("");
 
-      const tailLogs = (run.logs || []).slice(-4).join("\n").trim();
-      $("#s4ProgLogs").classList.toggle("hidden", !tailLogs);
-      $("#s4ProgLogs").textContent = tailLogs;
+      const allLogs = run.logs || [];
+      $("#s4TermCount").textContent = `实时执行终端 · ${allLogs.length} 行`;
+      const termEl = $("#s4ProgLogs");
+      if (allLogs.length > 0) {
+        termEl.innerHTML = allLogs.slice(-40).map(formatLogLineHtml).join("");
+        termEl.scrollTop = termEl.scrollHeight;
+      } else {
+        termEl.innerHTML = `<div class="mwLogEmpty">等待云端返回执行日志…</div>`;
+      }
+      $("#btnCopyS4Logs").onclick = async () => {
+        await navigator.clipboard.writeText(allLogs.join("\n"));
+        toast("已复制当前批次日志");
+      };
     } else if (showFail) {
       const diag = parseMocapFailure(run);
       $("#s4FailJobId").textContent = run.jobId;
@@ -960,7 +1072,7 @@ function renderTaskDetail() {
       $("#s4EmptyTitle").textContent = isMixamo
         ? "Mixamo 通用动作 · 直接前往 05 重定向 3D 验收"
         : selectedTake
-        ? "已就绪 · 点击提交云端提骨"
+        ? "已就绪 · 点击右侧「提交云端提骨」开始"
         : "请先在「03 视频生成」定稿视频";
     }
   } else {
@@ -993,8 +1105,9 @@ function renderTaskDetail() {
     }
   }
 
-  const runs = task.stage4?.runs || [];
   $("#s4RunsSec").classList.toggle("hidden", runs.length === 0);
+  const runsSumEl = $("#s4RunsSummary");
+  if (runsSumEl) runsSumEl.textContent = `历史批次 (${runs.length})`;
   const runBox = $("#s4RunTabs");
   runBox.innerHTML = "";
   for (const r of runs) {

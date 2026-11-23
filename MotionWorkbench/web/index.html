@@ -257,25 +257,64 @@
 
           <aside class="mwInspector">
             <div class="mwInspBody">
+              <!-- ① 上游分镜锁定卡 -->
               <div class="mwSec">
-                <div class="mwSecH">视频生成引擎</div>
-                <div class="mwPresetCol" id="s3ModelPresets">
-                  <button class="mwPresetBtn" data-m="seedance_2.5_flash" type="button">Seedance 2.5 Flash（快抽卡）</button>
-                  <button class="mwPresetBtn" data-m="seedance_2.5" type="button">Seedance 2.5 正片（高精）</button>
-                  <button class="mwPresetBtn" data-m="minimax_h3_colab" type="button">MiniMax-H3 完整版（Colab G4 96G）</button>
+                <div class="mwSecRow">
+                  <span class="mwSecH">01 · 上游分镜锁定</span>
+                  <button class="mwLinkBtn" data-goto="2" type="button">调整分镜 →</button>
                 </div>
-              </div>
-              <div class="mwSec">
-                <div class="mwSecH">上游锁定</div>
                 <div id="s3SourceSummary" class="mwReadout">—</div>
               </div>
+
+              <!-- ② 视频生成引擎卡片（清晰解释 3 种引擎的作用、耗时与积分成本） -->
               <div class="mwSec">
-                <div class="mwSecH">抽卡</div>
-                <button id="btnStage3Gen" class="mwBtn mwFull" type="button">再抽 1 条视频</button>
+                <div class="mwSecH">02 · 视频生成引擎</div>
+                <div class="mwSpecCards" id="s3ModelPresets">
+                  <button class="mwSpecCard mwPresetBtn" data-m="seedance_2.5_flash" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">Seedance 2.5 Flash</span>
+                      <span class="mwSpecBadge">快抽卡</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">即梦画布 · 省积分</div>
+                    <div class="mwSpecDesc">直喂分镜图快速出片，适合先验证动作节奏与四肢走位</div>
+                  </button>
+                  <button class="mwSpecCard mwPresetBtn" data-m="seedance_2.5" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">Seedance 2.5 正片</span>
+                      <span class="mwSpecBadge">高精画质</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">即梦画布 · 正片模型</div>
+                    <div class="mwSpecDesc">动作连贯性与细节更稳，耗积分较多，适合定稿抽卡</div>
+                  </button>
+                  <button class="mwSpecCard mwPresetBtn" data-m="minimax_h3_colab" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">MiniMax-H3 完整版</span>
+                      <span class="mwSpecBadge">0 即梦积分</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">Colab 96G G4 · ComfyUI + 2x 超分</div>
+                    <div class="mwSpecDesc">机房光纤直拉 44GB 权重跑首尾帧 FL2V，完片自动停表</div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ③ 输出分辨率（MiniMax-H3 默认 720p，支持手切 1080p 超分 / 480p 快抽） -->
+              <div class="mwSec">
+                <div class="mwSecH">03 · 输出分辨率与画质</div>
+                <div class="mwResGrid" id="s3ResolutionPresets">
+                  <button class="mwResBtn" data-r="480p" type="button">480p<span>快抽</span></button>
+                  <button class="mwResBtn active" data-r="720p" type="button">720p<span>默认</span></button>
+                  <button class="mwResBtn" data-r="1080p" type="button">1080p<span>超分</span></button>
+                </div>
+              </div>
+
+              <!-- ④ 主操作 CTA -->
+              <div class="mwSec">
+                <button id="btnStage3Gen" class="mwBtnCta mwFull" type="button">生成 1 条视频</button>
               </div>
             </div>
-            <div class="mwInspFoot">
-              <button class="mwBtn mwPrimary mwFull" data-goto="4" type="button">✓ 定稿视频 → 骨骼提取</button>
+            <!-- 仅在已有可用视频时显示进入 04 提骨按钮 -->
+            <div class="mwInspFoot hidden" id="s3InspFoot">
+              <button class="mwBtn mwPrimary mwFull" data-goto="4" type="button">进入 04 骨骼提取 →</button>
             </div>
           </aside>
         </section>
@@ -291,25 +330,35 @@
                 </div>
               </div>
 
-              <!-- 统一制作进度卡（清爽主次层次：规格标签 + 大号百分比 + 4 步节点 + 实时终端日志） -->
+              <!-- 专业级全宽提骨执行控制台：清晰主标题 + 小字提示 + 4 阶段状态卡片 + 语法高亮终端日志 -->
               <div id="s4ProgressCard" class="mwProgCard hidden" role="status" aria-live="polite">
                 <div class="mwProgTopBar">
                   <div class="mwProgMeta">
                     <span id="s4ProgSpec" class="mwProgPill">L4 · NVIDIA GEM-X 77 骨</span>
                     <span id="s4ProgJob" class="mwProgSub mwMono">—</span>
+                    <span id="s4ProgElapsed" class="mwProgSub mwMono">已用时 00:00</span>
                   </div>
                   <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
                 </div>
                 <div class="mwProgHero">
                   <div class="mwProgHeroLeft">
                     <span class="mwSpinner" aria-hidden="true"></span>
-                    <div id="s4LiveText" class="mwProgHeadline">正在连接 Google Colab GPU…</div>
+                    <div class="mwProgTitles">
+                      <div id="s4LiveText" class="mwProgHeadline">申请云端 GPU</div>
+                      <div id="s4LiveHint" class="mwProgNote">高峰期可能排队 1~3 分钟 · L4 暂满时自动切至 A100 / G4</div>
+                    </div>
                   </div>
                   <strong id="s4LivePct" class="mwProgPct mwMono">0%</strong>
                 </div>
                 <div class="mwTrack mwTrackProg"><div id="s4LiveFill" class="mwTrackFill" style="width:0%"></div></div>
-                <div id="s4Milestones" class="mwNodeTrack mwNodeTrack4"></div>
-                <pre id="s4ProgLogs" class="mwProgLogs hidden"></pre>
+                <div id="s4Milestones" class="mwPipeGrid"></div>
+                <div class="mwTermBox">
+                  <div class="mwTermHead">
+                    <span id="s4TermCount" class="mwMono">实时执行终端 · 0 行</span>
+                    <button id="btnCopyS4Logs" class="mwLinkBtn" type="button">复制日志</button>
+                  </div>
+                  <div id="s4ProgLogs" class="mwTermBody"></div>
+                </div>
               </div>
 
               <!-- 提骨失败诊断卡：明确展示失败原因 + 一键修复入口 -->
@@ -370,27 +419,61 @@
 
           <aside class="mwInspector">
             <div class="mwInspBody">
+              <!-- ① 输入视频源（可视化卡片，一眼看清送去提骨的素材） -->
               <div class="mwSec">
-                <div class="mwSecH">识别规格</div>
-                <div class="mwPresetCol" id="s4PrecisionPresets">
-                  <button class="mwPresetBtn" data-p="standard_l4" type="button">标准 · L4（纯 NVIDIA GEM-X 77骨）</button>
-                  <button class="mwPresetBtn" data-p="high_a100" type="button">精修 · A100（GEM-X + WiLoR 十指精修）</button>
+                <div class="mwSecRow">
+                  <span class="mwSecH">01 · 输入视频源</span>
+                  <button class="mwLinkBtn" data-goto="3" type="button">更换视频 →</button>
+                </div>
+                <div class="mwSourceCard">
+                  <div class="mwSourceThumb">
+                    <video id="s4InputThumb" muted loop playsinline></video>
+                    <span id="s4InputEmpty" class="mwSourceEmpty">待定稿视频</span>
+                  </div>
+                  <div class="mwSourceMeta">
+                    <div id="s4SelectedVideo" class="mwSourceName">—</div>
+                    <div id="s4SelectedVideoSub" class="mwSourceSub mwMono">—</div>
+                  </div>
                 </div>
               </div>
+
+              <!-- ② 提骨规格卡片（用清晰卡片层级解释两种规格的作用与差异） -->
               <div class="mwSec">
-                <div class="mwSecH">输入视频</div>
-                <div id="s4SelectedVideo" class="mwReadout">—</div>
+                <div class="mwSecH">02 · 提骨规格</div>
+                <div class="mwSpecCards" id="s4PrecisionPresets">
+                  <button class="mwSpecCard mwPresetBtn" data-p="standard_l4" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">标准提骨 · L4</span>
+                      <span class="mwSpecBadge">日常首选</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">NVIDIA GEM-X 77 骨</div>
+                    <div class="mwSpecDesc">一次提取全身与基础十指，省算力；L4 暂满时自动切至 A100 / G4</div>
+                  </button>
+                  <button class="mwSpecCard mwPresetBtn" data-p="high_a100" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">手部精修 · A100</span>
+                      <span class="mwSpecBadge">特写推荐</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">GEM-X + WiLoR 十指增强</div>
+                    <div class="mwSpecDesc">在 GEM-X 主干上叠加 WiLoR 强化手指细节，适合捏弹壳、勒带、拉栓</div>
+                  </button>
+                </div>
               </div>
+
+              <!-- ③ 主操作 CTA -->
               <div class="mwSec">
-                <button id="btnStage4Run" class="mwBtn mwFull" type="button">重新提骨</button>
+                <button id="btnStage4Run" class="mwBtnCta mwFull" type="button">提交云端提骨</button>
               </div>
-              <div class="mwSec" id="s4RunsSec">
-                <div class="mwSecH">批次</div>
+
+              <!-- ④ 历史批次（次要信息折叠收拢，不再抢占主配置区） -->
+              <details class="mwRunDetails" id="s4RunsSec">
+                <summary id="s4RunsSummary">历史批次 (0)</summary>
                 <div id="s4RunTabs" class="mwRunList"></div>
-              </div>
+              </details>
             </div>
-            <div class="mwInspFoot">
-              <button id="btnApproveStage4" class="mwBtn mwPrimary mwFull" type="button">✓ 通过提骨 → 重定向验收</button>
+            <!-- 仅在提骨成功后显示，避免未完成时出现令人困惑的「通过提骨」按钮 -->
+            <div class="mwInspFoot hidden" id="s4InspFoot">
+              <button id="btnApproveStage4" class="mwBtn mwPrimary mwFull" type="button">进入 05 重定向验收 →</button>
             </div>
           </aside>
         </section>

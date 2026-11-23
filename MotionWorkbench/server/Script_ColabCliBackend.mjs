@@ -339,18 +339,17 @@ export async function runColabMocapJob({
   if (!exe) throw new Error("未找到 colab.exe，请先安装 google-colab-cli");
 
   const isA100 = precisionPreset === "high_a100";
-  const gpuVariant = isA100 ? "A100" : "L4";
-  const sessionName = isA100 ? "mw_a100" : "mw_l4";
+  const gpuChain = isA100 ? ["A100", "G4", "L4"] : ["L4", "A100", "G4"];
+  let activeGpu = gpuChain[0];
+  let sessionName = `mw_${activeGpu.toLowerCase()}`;
 
-  clearIdleStopTimer(sessionName);
   await fsp.mkdir(outDir, { recursive: true });
 
-  onProgress?.(5, `检查 Colab ${gpuVariant} 会话（${sessionName}）…`);
-  let hasWarm = false;
+  onProgress?.(5, "检查云端 GPU 会话");
+  let existingSessions = [];
   try {
     const sessOut = await runColabCmd(exe, ["sessions"], { timeoutMs: 12000 });
-    const list = parseSessionsOutput(sessOut);
-    hasWarm = list.some((s) => s.name === sessionName);
+    existingSessions = parseSessionsOutput(sessOut);
   } catch (err) {
     const raw = String(err?.message || "");
     if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized|credentials/i.test(raw)) {
@@ -360,26 +359,65 @@ export async function runColabMocapJob({
     throw new Error(`Colab CLI 连接失败（请检查网络或代理）：${raw.slice(0, 200)}`);
   }
 
-  if (hasWarm) {
-    onLog?.(`[Colab CLI] 复用热机 ${gpuVariant} 会话：${sessionName}`);
+  // Prefer any existing warm session matching our GPU chain
+  const warmHit = gpuChain
+    .map((g) => ({ gpu: g, name: `mw_${g.toLowerCase()}` }))
+    .find((cand) => existingSessions.some((s) => s.name === cand.name));
+
+  if (warmHit) {
+    activeGpu = warmHit.gpu;
+    sessionName = warmHit.name;
+    clearIdleStopTimer(sessionName);
+    onProgress?.(14, `复用热机 ${activeGpu} GPU`);
+    onLog?.(`[Colab CLI] 复用热机 ${activeGpu} 会话：${sessionName}`);
   } else {
-    onProgress?.(10, `正在向 Google Colab 申请 ${gpuVariant} GPU（高峰期可能排队 1~3 分钟）…`);
-    onLog?.(`[Colab CLI] colab new --gpu ${gpuVariant} -s ${sessionName}`);
-    const newArgs = ["new", "--gpu", gpuVariant, "-s", sessionName];
-    if (isA100) newArgs.push("--high-mem");
-    await runColabCmd(exe, newArgs, {
-      timeoutMs: 240000,
-      envExtra: { COLAB_CLI_ASSIGN_RETRIES: "2", COLAB_CLI_RETRY_BACKOFF: "6" },
-    });
-    activeSessionNames.add(sessionName);
+    let allocated = false;
+    let lastAllocErr = "";
+    for (let i = 0; i < gpuChain.length; i++) {
+      const tryGpu = gpuChain[i];
+      const trySession = `mw_${tryGpu.toLowerCase()}`;
+      clearIdleStopTimer(trySession);
+      onProgress?.(8 + i * 2, `申请 Colab ${tryGpu} GPU`);
+      onLog?.(`[Colab CLI] colab new --gpu ${tryGpu} -s ${trySession}`);
+      const newArgs = ["new", "--gpu", tryGpu, "-s", trySession];
+      if (tryGpu === "A100") newArgs.push("--high-mem");
+      try {
+        await runColabCmd(exe, newArgs, {
+          timeoutMs: 150000,
+          envExtra: { COLAB_CLI_ASSIGN_RETRIES: "1", COLAB_CLI_RETRY_BACKOFF: "5" },
+        });
+        activeGpu = tryGpu;
+        sessionName = trySession;
+        activeSessionNames.add(sessionName);
+        onLog?.(`[Colab CLI] 已分配 ${tryGpu} GPU 运行时 (${trySession})`);
+        allocated = true;
+        break;
+      } catch (err) {
+        const cleanErr = String(err?.message || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+        const is503 = /Service Unavailable|503|Allocation refused|412|no quota|rejected accelerator|超时/i.test(cleanErr);
+        const errTail = cleanErr.split(/\r?\n/).filter((l) => l.trim() && !/^[┌┐└┘│─\s]+$/.test(l)).slice(-2).join(" ");
+        lastAllocErr = errTail || cleanErr.slice(0, 180);
+        onLog?.(`[Colab CLI] ${tryGpu} 暂不可用 (${is503 ? "机房暂满/503" : "分配失败"}): ${lastAllocErr.slice(0, 160)}`);
+        if (i + 1 < gpuChain.length) {
+          onLog?.(`[Colab CLI] 自动切换备选 GPU → ${gpuChain[i + 1]}…`);
+        }
+      }
+    }
+    if (!allocated) {
+      throw new Error(`Google Colab 当前 ${gpuChain.join("/")} GPU 均暂不可用（机房 503 满载），请稍后重试。详情：${lastAllocErr.slice(0, 180)}`);
+    }
   }
 
-  try {
-    onProgress?.(16, "上传视频到 Colab 运行时（免 Google Drive）…");
-    onLog?.(`[Colab CLI] colab upload ${path.basename(videoPath)} -> /content/mw_input.mp4`);
-    await runColabCmd(exe, ["upload", videoPath, "/content/mw_input.mp4", "-s", sessionName], { timeoutMs: 180000 });
+  const jobKey = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const remoteIn = `/content/mw_${jobKey}_input.mp4`;
+  const remoteOut = `/content/mw_${jobKey}_output.zip`;
 
-    onProgress?.(20, "启动远端 GEM-X 77 关节骨骼提取…");
+  try {
+    onProgress?.(16, `上传视频到 ${activeGpu} 运行时`);
+    onLog?.(`[Colab CLI] colab upload ${path.basename(videoPath)} -> ${remoteIn}`);
+    await runColabCmd(exe, ["upload", videoPath, remoteIn, "-s", sessionName], { timeoutMs: 180000 });
+
+    onProgress?.(20, "启动远端 GEM-X 77 骨推理");
     await new Promise((resolve, reject) => {
       const proc = spawn(
         exe,
@@ -392,9 +430,9 @@ export async function runColabMocapJob({
           "--timeout",
           "0",
           "--env",
-          "GEMX_INPUT_MP4=/content/mw_input.mp4",
+          `GEMX_INPUT_MP4=${remoteIn}`,
           "--env",
-          "GEMX_OUTPUT_ZIP=/content/mw_output.zip",
+          `GEMX_OUTPUT_ZIP=${remoteOut}`,
           "--env",
           `GEMX_STEM=${stem}`,
           "--env",
@@ -458,9 +496,9 @@ export async function runColabMocapJob({
       });
     });
 
-    onProgress?.(94, "回传骨骼产物到本地工作区…");
+    onProgress?.(94, "回传骨骼产物到本地工作区");
     const zipPath = path.join(outDir, "mw_output.zip");
-    await runColabCmd(exe, ["download", "/content/mw_output.zip", zipPath, "-s", sessionName], { timeoutMs: 180000 });
+    await runColabCmd(exe, ["download", remoteOut, zipPath, "-s", sessionName], { timeoutMs: 180000 });
 
     onProgress?.(97, "解压并索引 GLB / FBX / BVH / USD…");
     await new Promise((resolve, reject) => {
