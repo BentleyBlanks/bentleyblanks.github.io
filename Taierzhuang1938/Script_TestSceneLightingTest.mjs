@@ -14,7 +14,8 @@ import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.m
 import { MOVEMENT_RANGE_PHASE } from "./Data_MovementRange.mjs";
 
 const phases = [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_P012_WHITEBOX_PHASE];
-for (const phase of phases) assert.equal(phase.sky, "testSceneDay", phase.id);
+// 白刃实验场 2026-11-23 起用自己的侧光白天（Script_Sky.MELEE_LAB_DAY），其余测试场照共享基准。
+for (const phase of phases) assert.equal(phase.sky, phase === MELEE_QTE_PHASE ? "meleeLabDay" : "testSceneDay", phase.id);
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.join(projectDir, "_shots", "TestSceneLighting");
 mkdirSync(outputDir, { recursive: true });
@@ -136,9 +137,11 @@ try {
           exposure: g.post.uniformsComposite.uExposure.value };
       });
       evidence.scenes.push(result);
-      assert.equal(result.sky, "testSceneDay", query);
+      // 白刃实验场 2026-11-23 起用自己的侧光白天（Script_Sky.MELEE_LAB_DAY：太阳挪到侧前方、填充光压低），其余照共享基准。
+      const melee = query === "melee=1";
+      assert.equal(result.sky, melee ? "meleeLabDay" : "testSceneDay", query);
       assert.equal(result.sun, 3.2, query);
-      assert.equal(result.ambient, 1, query);
+      assert.equal(result.ambient, melee ? 0.55 : 1, query);
       assert.equal(result.ambientColor, 0xffffff, query);
       assert.equal(result.exposure, .62, query);
       if (process.argv.includes("--shot")) await page.screenshot({ path: path.join(outputDir, `Scene_${result.level}.png`) });

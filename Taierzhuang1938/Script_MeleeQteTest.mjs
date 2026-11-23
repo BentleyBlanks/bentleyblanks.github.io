@@ -40,49 +40,30 @@ try {
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat,null,{timeout:120000});
   assert.equal(await page.evaluate(()=>Taierzhuang.player.debug.invincible),false);
   if(!posesOnly){
-  assert(await page.evaluate(()=>Taierzhuang.ai.soldiers.length===12&&Taierzhuang.ai.soldiers.every(s=>s.meleeDormant)),'field contains six dormant encounter groups');
-  const field=await page.evaluate(()=>{
-    const T=Taierzhuang,L=T.Debug.MeleeCombat,result=[];
-    for(const [id,x,z,trigger,count] of [['AutoOne',1392,1450,'auto',1],['AutoTwo',1400,1450,'auto',2],['AutoThree',1408,1450,'auto',3],['UseOne',1392,1462,'interact',1],['UseTwo',1400,1462,'interact',2],['UseThree',1408,1462,'interact',3]]) {
-      L.Select('EncounterField');
-      const placed=L.State().targets.filter(t=>t.id.startsWith(id+'_'));
-      const placementError=Math.max(...placed.map((t,i)=>Math.hypot(t.x-(x+(i-(count-1)/2)*1.2),t.z-z)));
-      T.player.Spawn(x,z+6,0);T.Debug.Key('KeyW',true);
-      for(let i=0;i<240 && !L.State().encounter && !L.State().nearby;i++)T.StepFrames(1,1/60,false);
-      T.Debug.Key('KeyW',false);T.StepFrames(2,1/60,false);
-      const before=L.State().encounter;
-      if(trigger==='interact'){T.Debug.Key('KeyF',true);T.Debug.Key('KeyF',false);T.StepFrames(2,1/60,false);}
-      const started={id,trigger,count,placementError,before,active:L.State().encounter,awake:T.ai.soldiers.filter(s=>!s.meleeDormant).length,dormant:T.ai.soldiers.filter(s=>s.meleeDormant).length};
-      // Cross the actual arena with production input, physics, actors and damage.
-      for(let frame=0;frame<60*45&&T.player.Alive&&L.State().encounter;frame++){
-        const enemies=T.ai.soldiers.filter(s=>!s.meleeDormant&&s.alive).sort((a,b)=>a.position.distanceTo(T.player.position)-b.position.distanceTo(T.player.position));
-        if(!enemies.length){T.StepFrames(2,1/60,false);break;}
-        const e=enemies[0],d=e.position.distanceTo(T.player.position),f=T.meleeCombat.Fighter(T.player);
-        T.player.yaw=Math.atan2(T.player.position.x-e.position.x,T.player.position.z-e.position.z);T.player.pitch=0;
-        T.Debug.Key('KeyW',d>1.22);T.Debug.Key('KeyD',enemies.length>1&&d<2.5);
-        if(L.State().active){if(frame%12===0){T.Debug.Key('KeyF',true);T.Debug.Key('KeyF',false);}}
-        else if(f.state==='idle'){
-          const incoming=enemies.find(s=>{const g=T.meleeCombat.Fighter(s);return g.attack&&g.t>g.attack.windup-.13&&g.t<g.attack.windup&&s.position.distanceTo(T.player.position)<g.attack.reach;});
-          if(incoming){T.Debug.Mouse(2,true);T.Debug.Mouse(2,false);}
-          else if(d<1.5){T.Debug.Mouse(0,true);T.Debug.Mouse(0,false);}
-        }
-        T.StepFrames(1,1/60,false);
+  // 2026-11-23 用户把实验场简化成一个对手（六组遭遇撤了）：开场就是一对一，用正式输入把他砍倒。
+  assert(await page.evaluate(()=>Taierzhuang.ai.soldiers.length===1&&Taierzhuang.Debug.MeleeCombat.State().scenario==='DadaoOne'),'the lab opens on a single one-on-one opponent');
+  const duel=await page.evaluate(()=>{
+    const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('DadaoOne');L.Pause(false);
+    for(let frame=0;frame<60*45&&T.player.Alive;frame++){
+      const enemies=T.ai.soldiers.filter(s=>s.alive&&s.side==='ija');
+      if(!enemies.length){T.StepFrames(2,1/60,false);break;}
+      const e=enemies[0],d=e.position.distanceTo(T.player.position),f=T.meleeCombat.Fighter(T.player);
+      T.player.yaw=Math.atan2(T.player.position.x-e.position.x,T.player.position.z-e.position.z);T.player.pitch=0;
+      T.Debug.Key('KeyW',d>1.22);
+      if(L.State().active){if(frame%12===0){T.Debug.Key('KeyF',true);T.Debug.Key('KeyF',false);}}
+      else if(f.state==='idle'){
+        const g=T.meleeCombat.Fighter(e),incoming=g.attack&&g.t>g.attack.windup-.13&&g.t<g.attack.windup&&d<g.attack.reach;
+        if(incoming){T.Debug.Mouse(2,true);T.Debug.Mouse(2,false);}
+        else if(d<1.5){T.Debug.Mouse(0,true);T.Debug.Mouse(0,false);}
       }
-      T.Debug.Key('KeyW',false);T.Debug.Key('KeyD',false);T.StepFrames(2,1/60,false);
-      const ended={...started,alive:T.player.Alive,health:T.player.health,completed:L.State().completed,remaining:T.ai.soldiers.filter(s=>!s.meleeDormant&&s.alive).length};
-      if(id==='UseOne'){
-        T.player.yaw=0;T.Debug.Key('KeyW',true);
-        for(let i=0;i<300&&!L.State().encounter;i++)T.StepFrames(1,1/60,false);
-        T.Debug.Key('KeyW',false);ended.next=L.State().encounter;ended.kept=L.State().completed.includes('UseOne');
-      }
-      result.push(ended);
+      T.StepFrames(1,1/60,false);
     }
-    L.Select('EncounterField');return result;
+    T.Debug.Key('KeyW',false);T.StepFrames(2,1/60,false);
+    return {alive:T.player.Alive,health:T.player.health,remaining:T.ai.soldiers.filter(s=>s.alive&&s.side==='ija').length};
   });
-  console.log('FIELD',JSON.stringify(field));
-  for(const e of field){assert.equal(e.active,e.id,JSON.stringify(e));assert.equal(e.awake,e.count);assert.equal(e.dormant,12-e.count);assert(e.placementError<.25,`${e.id}: actor was clamped away from its arena`);assert(e.alive&&e.remaining===0&&e.completed.includes(e.id),`${e.id}: encounter must be fightable and completable`);if(e.trigger==='interact')assert.equal(e.before,null);}
-  console.log('PASS six physical encounters: correct actor placement, real walking / F activation, combat and completion');
-  assert(field.find(e=>e.id==='UseOne').next==='AutoOne'&&field.find(e=>e.id==='UseOne').kept,'walking to the next encounter retains the completed result');
+  console.log('DUEL',JSON.stringify(duel));
+  assert(duel.alive&&duel.remaining===0,'one-on-one is fightable with production input: '+JSON.stringify(duel));
+  console.log('PASS one-on-one: real walking, parry and cutting down the single opponent');
   await page.evaluate(()=>{const T=Taierzhuang;T.Debug.MeleeCombat.Select('BayonetOne');T.Debug.MeleeCombat.Pause(true);T.StepFrames(2,1/60,false);});
   await page.keyboard.press('v');
   const fireStance=await page.evaluate(()=>{const T=Taierzhuang;T.StepFrames(2,1/60,false);return {fixed:T.state.bayonetFixed,canMelee:T.meleeCombat.CanUse(),stance:T.Debug.MeleeCombat.State().stance};});
@@ -169,7 +150,7 @@ try {
           out.push({route,first,second:es.map(e=>e.health),health:P.health,moved:pos.distanceTo(P.position),events:C.events.slice()});
         }else{
           es.forEach(s=>T.ai.Remove(s));
-          if(route==='environment')P.Spawn(1402.8,1462,-Math.PI/2);
+          if(route==='environment')P.Spawn(1411.6,1462,-Math.PI/2);   // 场边矮墙（2026-11-23 起六组遭遇的隔墙撤了）
           Step(.1);T.Debug.Mouse(0,true);T.Debug.Mouse(0,false);Step(route==='miss'?.75:.3);
           out.push({route,events:C.events.slice(),pose:L.State().player.action,sounds:[...sounds]});
         }
@@ -183,7 +164,7 @@ try {
   assert(beat.enemy===48&&beat.events.some(e=>e.kind==='weaponBeat')&&beat.sounds.includes('bayonetHit')&&beat.sounds.includes('dadaoHit'),'actual weapon beat buffers a damaging counter with distinct contact sounds');
   assert.deepEqual(switched.first,[48,100]);assert.deepEqual(switched.second,[48,48]);assert(switched.moved<1&&switched.health>0,'both enemies remain alive while the player switches within close combat');
   assert(miss.events.some(e=>e.kind==='miss')&&miss.sounds.includes('dadaoSwing')&&!miss.sounds.includes('dadaoHit'));
-  assert(wall.pose==='Obstructed'&&wall.events.some(e=>e.kind==='environment')&&wall.sounds.includes('bodyFall')&&!wall.sounds.includes('dadaoHit'),'actual divider collision visibly rebounds with a separate sound');
+  assert(wall.pose==='Obstructed'&&wall.events.some(e=>e.kind==='environment')&&wall.sounds.includes('bodyFall')&&!wall.sounds.includes('dadaoHit'),'actual arena wall collision visibly rebounds with a separate sound');
   console.log('PASS movement entry / weapon beat entry / close target switching / four contact outcomes');
   const qtes = await page.evaluate(() => {
     const T=Taierzhuang,lab=T.Debug.MeleeCombat;

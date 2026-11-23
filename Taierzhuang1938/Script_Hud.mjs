@@ -676,12 +676,13 @@ export class Hud {
     const root = this.el.meleeQte;
     if (!view) {
       // 拔刀卡淡出时留在原位（不留 lodge 的话它会先跳回屏幕正中再消失）。
-      root.className = "hudMeleeQte" + (this.meleeQteState?.kind === "lodge" ? " lodge" : "");
+      root.className = "hudMeleeQte" + (this.meleeQteLastKind === "lodge" ? " lodge" : "");
       root.setAttribute("aria-hidden", "true");
       this.meleeQteState = null;
       return;
     }
     this.meleeQteState = { ...view, keys: [...(view.keys || [])] };
+    this.meleeQteLastKind = view.kind;
     root.className = `hudMeleeQte on ${view.kind} ${view.phase}`
       + (view.success === true ? " success" : view.success === false ? " fail" : "")
       + (view.wrongPulse > 0.05 ? " wrong" : "");

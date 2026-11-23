@@ -125,8 +125,6 @@ export const TEXT = Object.freeze({
   "hud.hint.p012Retry": "保留现场进度与剩余补给",
   "hud.hint.ammoIssued": "已领子弹，按 R 装弹；可以边走边装",
   "hud.hint.bandagesGiven": "补充{n}包绷带；受伤流血时按 B 包扎",
-  "hud.hint.meleeEncounter": "{name} · 自由移动、转向与攻击",
-  "hud.hint.meleeEncounterDone": "交锋结束 · 可继续前往另一组",
   "hud.hint.meleeTestDown": "本轮阵亡 · 在白刃实验面板开始／重开",
   "hud.hint.noBipod": "这支枪没有两脚架",
   "hud.hint.bipodNeedsRest": "得先趴下，或者靠着能搭枪的东西",

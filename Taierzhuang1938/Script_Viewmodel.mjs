@@ -4663,6 +4663,8 @@ export class Viewmodel {
     // 镜像按权重从 1 翻到 −1（起手头一段刀从右边甩过中线到左边），不是一帧跳过去。
     if (pose.swingRoll) this.actionPivot.rotateZ(pose.swingRoll);
     this.actionPivot.scale.x = pose.swingMirror ? Math.cos(Math.PI * pose.swingMirror) : 1;
+    // 拖拽挥砍的架势：整副手臂连刀跟着鼠标偏出去（相机空间，米）。
+    if (pose.aimOffset) { this.actionPivot.position.x += pose.aimOffset.x; this.actionPivot.position.y += pose.aimOffset.y; }
     // 卡刀：刀吃在肉里往回拽，手跟着发抖；拔刀那一下往怀里猛抽一把。
     if (pose.lodge) {
       const { strain = 0, pulse = 0, yank = 0 } = pose.lodge;

@@ -332,8 +332,22 @@ export const TEST_SCENE_DAY = {
     aerialBlend: 0.5, aerialGain: 0.532, artGlow: 0.35 },
 };
 
+/**
+ * 白刃实验场（?melee=1）白天（2026-11-23 用户：「这个场景完全没有阴影」）。
+ * 量下来不是阴影坏了：testSceneDay 的太阳方位 35° 正好在出生点身后（对手在 −Z，太阳在 +X+Z），
+ * 人和刀的影子全落在自己身后被身体挡住；环境光又是满格白光，背光面和地上的影子都被抹平。
+ * 这里只改两样：太阳挪到右前方侧光（方位 110°、高度 40°，影子朝左后方、落在画面里），
+ * 环境 / IBL / 球谐填充光压到约六成。其余（天色、调色、曝光）照抄测试场白天。
+ */
+export const MELEE_LAB_DAY = {
+  ...TEST_SCENE_DAY,
+  sunElevation: 40, sunAzimuth: 110,
+  ambientIntensity: 0.55, envIntensity: 0.45, shProbeIntensity: 0.55,
+};
+
 export const SKY_PRESETS = {
   testSceneDay: TEST_SCENE_DAY,
+  meleeLabDay: MELEE_LAB_DAY,
   // Notion "游戏概念参考图", 06 / 06_B (2026-09-26): pale cloud cover,
   // warm gray smoke and a veiled sun. Only the playable first level uses this;
   // shared model/range daylight and the final night transition stay independent.

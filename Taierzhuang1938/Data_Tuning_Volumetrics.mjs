@@ -128,6 +128,7 @@ export const VOLUMETRIC_PRESETS = {
   // 白盒/测试档：fog.density = 0，体积雾等于不存在。留一行是为了让白盒也走同一条
   // 代码路径（不走 fallback），出问题能在最干净的场景里复现。
   testSceneDay: { densityScale: 1.0, noiseAmount: 0.0, sunScale: 0.0, skyScale: 0.0, far: 200 },
+  meleeLabDay: { densityScale: 1.0, noiseAmount: 0.0, sunScale: 0.0, skyScale: 0.0, far: 200 },
   weaponRangeDay: { densityScale: 1.0, noiseAmount: 0.0, sunScale: 0.0, skyScale: 0.0, far: 200 },
   p012WhiteboxDay: { densityScale: 1.0, noiseAmount: 0.0, sunScale: 0.0, skyScale: 0.0, far: 200 },
   // 关卡策划白盒：环境体块全白，空气里再加光柱会盖掉形体。只留很淡的一层。

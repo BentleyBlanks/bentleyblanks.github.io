@@ -49,6 +49,7 @@ export const ENV_PROFILES = Object.freeze([
   Object.freeze({ value: "whiteboxDay", label: "白盒白天" }),
   Object.freeze({ value: "editorClear", label: "长视距晴天" }),
   Object.freeze({ value: "testSceneDay", label: "测试场白天" }),
+  Object.freeze({ value: "meleeLabDay", label: "白刃实验场白天" }),
 ]);
 
 const P = (fields) => Object.freeze(fields);

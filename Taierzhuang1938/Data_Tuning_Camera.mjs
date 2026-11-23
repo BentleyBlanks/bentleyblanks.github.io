@@ -132,6 +132,7 @@ export const SKY_EXPOSURE = {
   whiteboxDay: { logLum: null, evBias: 0, evUp: 1.2, evDown: 1.2 },
   editorClear: { logLum: null, evBias: 0, evUp: 1.2, evDown: 1.2 },
   testSceneDay: { logLum: null, evBias: 0, evUp: 1.0, evDown: 1.0 },
+  meleeLabDay: { logLum: null, evBias: 0, evUp: 1.0, evDown: 1.0 },
   weaponRangeDay: { logLum: null, evBias: 0, evUp: 1.0, evDown: 1.0 },
   p012WhiteboxDay: { logLum: null, evBias: 0, evUp: 1.0, evDown: 1.0 },
 };

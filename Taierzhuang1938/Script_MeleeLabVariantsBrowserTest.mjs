@@ -1,8 +1,10 @@
-// 白刃实验场（?melee=1）玩法变体的浏览器验收（2026-11-23）：
-//   · 面板是 .shellImpactLab 那一套，玩法两组按钮真点得动、切了立即重开项目；
-//   · 卡刀：真实左键砍进活人 → 双方 lodged、底部卡换成拔刀进度、第一人称刀定格 → 真实连按左键拔出 → 对方踉跄 → 真实 F 补刀致死；
-//   · 方向挥砍：真实左键出刀，八向指示在，竖劈 / 横扫 / 倒放的来向在第一人称里滚转（pose.swingRoll 进了 actionPivot）；
-//   · 方向挥砍 × 卡刀 组合也走得通；整程无页面报错。
+// 白刃实验场（?melee=1）的浏览器验收（2026-11-23，同日第二轮按用户改过）：
+//   · 场景只有一个对手，用遭遇编辑器那套日军人物（日兵甲，X Bot 换皮）；侧光白天，人和方块的影子落在画面里；
+//   · 面板是 .shellImpactLab 那一套、只留「玩法 / 项目 / 操作 / 读数」，玩法两组按钮真点得动、切了立即重开；
+//   · 卡刀：真实左键贴近砍进身体 → 双方 lodged、拔刀进度卡、第一人称刀定格 → 真实连按左键拔出 → 对方踉跄 → 真实 F 补刀；
+//     站远了刀尖擦过只是一道口子、不卡；
+//   · 拖拽挥砍：真实按住左键 → 拖刀架势、视角不转；鼠标一甩（Debug.Look，同 mousemove 进来的那条链）就顺着甩的方向砍，
+//     八向指示在；与卡刀组合也走得通；整程无页面报错。
 // 出图（--shots）：长边 640 px，写到忽略目录 tmp/DadaoLab/shots。浏览器静音（BrowserTestKit 自带 --mute-audio）。
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -25,10 +27,12 @@ page.on("console", (m) => { if (m.type() === "error" && !/fonts|ERR_BLOCKED_BY_C
 const Step = (n = 1, render = false) => page.evaluate(([n, render]) => Taierzhuang.StepFrames(n, 1 / 60, render), [n, render]);
 const State = () => page.evaluate(() => {
   const s = Taierzhuang.Debug.MeleeCombat.State();
-  return { variant: s.variant, player: s.player && { state: s.player.state, phase: s.player.phase, roll: s.player.swingRoll || 0, mirror: s.player.swingMirror || 0, direction: s.player.direction, kind: s.player.attackKind, lodge: s.player.lodge || null },
-    stats: s.stats, lodge: s.lodge, finishTarget: s.finishTarget, hud: s.hud && { kind: s.hud.kind, label: s.hud.label },
-    enemy: s.targets.find((t) => t.side === "ija") && (({ health, alive, distance, pose }) => ({ health, alive, distance, state: pose?.state || null }))(s.targets.find((t) => t.side === "ija")),
-    ring: !document.querySelector(".mlDirRing")?.hidden, swingPreview: s.swingPreview };
+  const enemy = s.targets.find((t) => t.side === "ija");
+  return { variant: s.variant, player: s.player && { state: s.player.state, phase: s.player.phase, roll: s.player.swingRoll || 0, mirror: s.player.swingMirror || 0,
+    direction: s.player.direction, aim: s.player.aimOffset || null, lodge: s.player.lodge || null },
+    stats: s.stats, lodge: s.lodge, finishTarget: s.finishTarget, hud: s.hud && { kind: s.hud.kind, label: s.hud.label }, targets: s.targets.length,
+    enemy: enemy && { health: enemy.health, alive: enemy.alive, distance: enemy.distance, state: enemy.pose?.state || null },
+    ring: !document.querySelector(".mlDirRing")?.hidden, dragPreview: s.dragPreview, yaw: Taierzhuang.player.yaw };
 });
 async function Shot(name) {
   if (!SHOTS) return;
@@ -38,108 +42,114 @@ async function Shot(name) {
   execFileSync("python", ["-c", `from PIL import Image;im=Image.open(r'${full}');im.thumbnail((640,640));im.save(r'${small}')`]);
   fs.rmSync(full);
 }
-async function Setup(scenario) {
+async function Setup(scenario, distance = 1.35) {
   await page.getByLabel("独立战斗项目").selectOption(scenario);
   await page.getByRole("button", { name: "开始／重开", exact: true }).click();
-  await page.evaluate(() => {
+  await page.evaluate((distance) => {
     const T = Taierzhuang, L = T.Debug.MeleeCombat;
     L.Pause(true);
     const enemy = L.State().targets.find((t) => t.side === "ija");
-    T.player.Spawn(enemy.x, enemy.z + 1.35, 0);
+    T.player.Spawn(enemy.x, enemy.z + distance, 0);
     T.StepFrames(20, 1 / 60, false);
-  });
+  }, distance);
   await page.mouse.move(800, 400);
 }
 async function Click(times = 1, gap = 10) {
   for (let i = 0; i < times; i++) { await page.mouse.down(); await page.mouse.up(); await Step(gap); }
+}
+/** 按着左键时一帧一帧喂鼠标位移（lookY 向下为正），每帧推一帧。 */
+async function Flick(dx, dy, frames = 3) {
+  await page.evaluate(([dx, dy, frames]) => { for (let i = 0; i < frames; i++) { Taierzhuang.Debug.Look(dx, dy); Taierzhuang.StepFrames(1, 1 / 60, false); } }, [dx, dy, frames]);
 }
 try {
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort("blockedbyclient"));
   await page.addInitScript(() => localStorage.setItem("tengxian1938_debug_options_v1", JSON.stringify({ invincible: true })));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`, { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.state?.ready && window.Taierzhuang?.state?.running && window.Taierzhuang?.Debug?.MeleeCombat, null, { timeout: 120000 });
-  await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.Pause(true));
+  await page.waitForFunction(() => { Taierzhuang.StepFrames(1, 1 / 60, false); return Taierzhuang.Debug.MeleeCombat.Skins().every((s) => s.skinned); }, null, { timeout: 120000, polling: 250 });
   await Step(30);
   await page.mouse.move(800, 400);
-  const panel = await page.evaluate(() => {
-    const root = document.querySelector(".meleeLab");
-    return { shell: root.classList.contains("shellImpactLab"), groups: [...root.querySelectorAll("h3")].map((h) => h.textContent),
+  const scene = await page.evaluate(() => {
+    const T = Taierzhuang, root = document.querySelector(".meleeLab");
+    return { level: T.Debug.Level().id, sky: T.sky.presetName, ambient: T.lights.ambient.intensity, soldiers: T.ai.soldiers.length, skins: T.Debug.MeleeCombat.Skins(),
+      scenarios: [...root.querySelectorAll(".mlScenario option")].map((o) => o.value), shell: root.classList.contains("shellImpactLab"),
+      groups: [...root.querySelectorAll("h3")].map((h) => h.textContent), details: root.querySelectorAll("details").length,
       variants: [...root.querySelectorAll(".mlControl,.mlImpact")].map((b) => [b.textContent, b.classList.contains("active")]) };
   });
-  assert(panel.shell, "melee panel uses the shared .shellImpactLab look");
-  assert.deepEqual(panel.groups.slice(0, 4), ["玩法", "项目", "操作", "读数"]);
-  assert.equal(panel.variants.filter(([, on]) => on).length, 2, "one control and one impact option are active");
-  console.log("PASS panel", JSON.stringify(panel.variants));
-  await Shot("01_Panel");
+  assert.equal(scene.soldiers, 1, "the lab holds exactly one opponent");
+  assert.deepEqual(scene.skins.map((s) => s.kit), ["ijaJia"], "the opponent wears the encounter editor's Japanese soldier");
+  assert.equal(scene.sky, "meleeLabDay"); assert(scene.ambient < 0.7, "fill light is lowered so shadows read");
+  assert(scene.shell, "melee panel uses the shared .shellImpactLab look");
+  assert.deepEqual(scene.groups, ["玩法", "项目", "操作", "读数"], "only the basic layout is left"); assert.equal(scene.details, 0);
+  assert(!scene.scenarios.includes("EncounterField") && !scene.scenarios.includes("DadaoTwo") && !scene.scenarios.includes("AlliedDadao"), "panel lists one-on-one items only");
+  console.log("PASS scene", JSON.stringify(scene));
+  await Shot("01_Scene");
 
   // ── 卡刀 → 拔刀 → 踉跄 → 补刀（原版操控）─────────────────────────────────
   await page.getByRole("button", { name: "卡刀 · 拔刀 · 补刀", exact: true }).click();
   assert.deepEqual((await State()).variant, { control: "classic", impact: "lodge" });
-  await Setup("DadaoOne");
+  await Setup("DadaoOne", 1.55);
+  await page.mouse.down(); await Step(4); await page.mouse.up();
+  for (let i = 0; i < 40 && (await State()).enemy.health === 100; i++) await Step(1);
+  let s = await State();
+  assert.equal(s.enemy.health, 48, "a tip cut still wounds"); assert.notEqual(s.player.state, "lodged", "a tip graze does not lodge"); assert.equal(s.stats.shallowCuts, 1);
+  console.log("PASS shallow cut", JSON.stringify(s.enemy));
+  await Setup("DadaoOne", 1.3);
   await page.mouse.down(); await Step(4); await page.mouse.up();
   for (let i = 0; i < 40 && (await State()).player?.state !== "lodged"; i++) await Step(1);
-  let s = await State();
-  if (s.player?.state !== "lodged") console.log(JSON.stringify({ s, events: await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.State().events.slice(-8)) }));
-  assert.equal(s.player.state, "lodged", "real left click into a living man lodges the blade");
-  assert.equal(s.enemy.state, "lodged"); assert.equal(s.enemy.health, 48); assert.equal(s.hud?.kind, "lodge", "bottom card turns into the pull-out bar");
+  s = await State();
+  assert.equal(s.player.state, "lodged", "a close cut into the body lodges the blade");
+  assert.equal(s.enemy.state, "lodged"); assert.equal(s.enemy.health, 48); assert.equal(s.hud?.kind, "lodge", "the pull-out bar appears");
   console.log("PASS lodge", JSON.stringify({ enemy: s.enemy, hud: s.hud }));
   await Step(8); await Shot("02_Lodged");
-  await Click(2, 8);
-  s = await State(); assert(s.lodge?.progress > 0.3 && s.player.state === "lodged", `mashing fills the pull bar (${s.lodge?.progress})`);
-  await Shot("03_Pulling");
-  for (let i = 0; i < 8 && (await State()).player.state === "lodged"; i++) await Click(1, 8);
+  for (let i = 0; i < 10 && (await State()).player.state === "lodged"; i++) await Click(1, 8);
   s = await State(); assert.equal(s.stats.yanks, 1, "the blade comes out"); assert.equal(s.enemy.state, "reel", "he staggers");
-  await Step(2); await Shot("04_Yank");
+  await Step(2); await Shot("03_Yank");
   for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
-  await Step(20); await Shot("05_Reel");
+  await Step(20); await Shot("04_Reel");
   s = await State(); assert(s.finishTarget, "F finisher offered while he reels");
-  const prompt = await page.evaluate(() => document.querySelector(".hudActions")?.textContent || "");
-  console.log("PASS reel", JSON.stringify({ enemy: s.enemy, finishTarget: s.finishTarget, prompt }));
   await page.keyboard.press("f");
   for (let i = 0; i < 60 && (await State()).enemy.alive; i++) await Step(1);
   s = await State(); assert(!s.enemy.alive, "F finisher kills him"); assert.equal(s.stats.finishes, 1);
   console.log("PASS finish", JSON.stringify(s.stats));
-  await Step(6); await Shot("06_Finished");
+  await Step(6); await Shot("05_Finished");
 
-  // ── 方向挥砍（原版命中）：真实左键 + 取证口选来向 ─────────────────────────
+  // ── 拖拽挥砍（原版命中）────────────────────────────────────────────────
   await page.getByRole("button", { name: "原版 · 砍中即退", exact: true }).click();
-  await page.getByRole("button", { name: "方向挥砍 · Mordhau", exact: true }).click();
-  assert.deepEqual((await State()).variant, { control: "directional", impact: "classic" });
-  const rolls = {};
-  for (const dir of ["upRight", "up", "right", "upLeft", "left", "downRight", "downLeft", "down"]) {
-    await Setup("DadaoOne");
-    await page.evaluate((dir) => Taierzhuang.Debug.MeleeCombat.Swing(dir), dir);
-    await Step(13);
+  await page.getByRole("button", { name: "拖拽挥砍", exact: true }).click();
+  assert.deepEqual((await State()).variant, { control: "drag", impact: "classic" });
+  const cuts = {};
+  for (const [name, dx, dy, expect] of [["Left", -40, 6, "right"], ["Right", 40, -6, "left"], ["Down", 4, 40, "up"], ["UpRight", 30, -30, "downLeft"]]) {
+    await Setup("DadaoOne", 1.6);
+    await page.mouse.down();
+    const yaw0 = (await State()).yaw;
+    await Flick(dx * 0.12, dy * 0.12, 6);
     s = await State();
-    assert.equal(s.player.direction, dir); assert(s.ring, "eight-way ring is shown in directional mode");
-    rolls[dir] = [+s.player.roll.toFixed(3), +s.player.mirror.toFixed(2)];
-    await Shot(`07_Swing_${dir}`);
-    if (SHOTS) { await Step(7); await Shot(`07_Swing_${dir}_Active`); }
+    assert.equal(s.player.state, "aim", "holding left button raises the drag guard"); assert(Math.abs(s.yaw - yaw0) < 1e-6, "the mouse moves the blade, not the view");
+    await Shot(`06_Aim_${name}`);
+    await Flick(dx, dy, 3);
+    s = await State(); assert.equal(s.player.direction, expect, `flick ${name} cuts from ${expect}`); assert(s.ring, "eight-way ring shows while dragging");
+    cuts[name] = [s.player.direction, +s.player.roll.toFixed(2), +s.player.mirror.toFixed(2)];
+    await Step(4); await Shot(`07_Cut_${name}`);
+    await page.mouse.up();
     for (let i = 0; i < 60 && (await State()).player.phase !== "idle"; i++) await Step(1);
   }
-  assert(rolls.up[0] > 0.5 && rolls.right[0] < -0.5 && rolls.left[1] > 0.9 && rolls.upLeft[1] > 0.9 && rolls.upRight[1] === 0, `swing roll per direction ${JSON.stringify(rolls)}`);
-  // 真实左键（没甩鼠标＝默认右上斜劈）
-  await Setup("DadaoOne");
-  await page.mouse.down(); await page.mouse.up(); await Step(2);
-  s = await State(); assert.equal(s.player.direction, "upRight", "a plain click swings the default upper-right chop at once");
-  for (let i = 0; i < 40 && (await State()).enemy.health === 100; i++) await Step(1);
-  assert.equal((await State()).enemy.health, 40);
-  console.log("PASS directional", JSON.stringify(rolls));
+  console.log("PASS drag", JSON.stringify(cuts));
 
-  // ── 方向挥砍 × 卡刀 ────────────────────────────────────────────────────
+  // ── 拖拽挥砍 × 卡刀 ────────────────────────────────────────────────────
   await page.getByRole("button", { name: "卡刀 · 拔刀 · 补刀", exact: true }).click();
-  await Setup("DadaoOne");
-  await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.Swing("right"));
+  await Setup("DadaoOne", 1.3);
+  await page.mouse.down(); await Flick(-40, 6, 3); await page.mouse.up();
   for (let i = 0; i < 40 && (await State()).player.state !== "lodged"; i++) await Step(1);
   s = await State(); assert.equal(s.player.state, "lodged"); assert(s.player.roll < -0.3, "lodged pose keeps the side-swing roll");
-  await Step(6); await Shot("08_DirectionalLodged");
+  await Step(6); await Shot("08_DragLodged");
   await page.keyboard.down("s"); for (let i = 0; i < 30 && (await State()).player.state === "lodged"; i++) await Step(6); await page.keyboard.up("s");
   s = await State(); assert.equal(s.enemy.state, "reel", "holding S also pulls the blade");
   for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
   await page.keyboard.press("f");
   for (let i = 0; i < 60 && (await State()).enemy.alive; i++) await Step(1);
   assert(!(await State()).enemy.alive);
-  console.log("PASS directional+lodge");
+  console.log("PASS drag+lodge");
   assert.deepEqual(errors, []);
   console.log("PASS no page errors");
 } catch (error) { console.error("page errors:", errors.slice(0, 5)); throw error;

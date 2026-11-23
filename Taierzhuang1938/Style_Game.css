@@ -1141,16 +1141,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   50% { transform:scale(1.12); color:#fff; background:rgba(224,176,98,.48); box-shadow:0 0 24px rgba(224,176,98,.65); }
 }
 @media(prefers-reduced-motion:reduce) { .hudMeleeQte.input .mqKeys kbd.expected { animation:none; background:rgba(224,176,98,.4); } }
-/* 白刃实验场（?melee=1）在 .shellImpactLab 之上补的几样：分组里的小标签、下拉框、折叠段、滑条；
-   方向挥砍的八向指示（准心外一圈短刻度）；卡刀时抵抗卡换成拔刀进度、挪到准心右下，别挡住刀口。 */
+/* 白刃实验场（?melee=1）在 .shellImpactLab 之上补的几样：分组里的小标签、下拉框；
+   拖拽挥砍的八向指示（准心外一圈短刻度）；卡刀时抵抗卡换成拔刀进度、挪到准心右下，别挡住刀口。 */
 .shellImpactLab .siLabel{margin:8px 0 2px;font-size:11px;letter-spacing:.08em;color:#a7a89e}
 .shellImpactLab .siSelect{display:block;width:100%;box-sizing:border-box;margin:6px 0;background:#13140b66;color:#deddd2;border:1px solid #c1bdab40;padding:6px 8px;font:inherit;border-radius:0}
 .shellImpactLab .siSelect:focus-visible{outline:1px solid #edca83;outline-offset:2px}
 .shellImpactLab .siRead+.siRead{margin-top:6px}
-.shellImpactLab .siDetails{margin:12px 0 0;border-top:1px solid #c1bdab30;padding-top:6px}
-.shellImpactLab .siDetails summary{cursor:pointer;font-size:11px;letter-spacing:.2em;color:#b8b49f}
-.shellImpactLab .siRange{width:100%;accent-color:#d9bb7b}
-.meleeLab .mlControlHint,.meleeLab .mlImpactHint{min-height:2.9em}
 .mlDirRing{position:fixed;left:50%;top:50%;width:0;height:0;z-index:30;pointer-events:none}
 .mlDirRing[hidden]{display:none}
 .mlDirRing i{position:absolute;left:0;top:0;width:12px;height:3px;margin:-1.5px 0 0 -6px;background:#deddd240;transform:rotate(var(--a)) translateX(44px)}

@@ -1,17 +1,16 @@
 // 通用白刃规则：玩家、敌军、友军同一状态机。纯 Node 可跑，宿主负责物理与伤害。
 import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G,
-  MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DIRECTIONAL as D } from "./Data_MeleeCombat.mjs";
+  MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DRAG as D } from "./Data_MeleeCombat.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { T } from "./Script_Text.mjs";
 const Smooth = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
 const DIRECTIONS = new Map(D.directions.map((d) => [d.id, d]));
-/** 鼠标位移（屏幕坐标，y 朝上）→ 八个来向里最近的那一个；没甩够死区按默认方向。 */
-export function SwingDirectionFromMouse(x, y) {
-  if (Math.hypot(x, y) < D.deadzonePx) return DIRECTIONS.get(D.defaultDirection);
-  const angle = Math.atan2(y, x) * 180 / Math.PI;
+/** 拖拽挥砍：鼠标这一甩的方向（屏幕坐标，y 朝上）→ 刀从反方向来的那个来向（刀顺着甩的方向走）。 */
+export function DirectionForStroke(x, y) {
+  const from = Math.atan2(-y, -x) * 180 / Math.PI;
   let best = null, gap = Infinity;
   for (const d of D.directions) {
-    const g = Math.abs(((angle - d.angleDeg + 540) % 360) - 180);
+    const g = Math.abs(((from - d.angleDeg + 540) % 360) - 180);
     if (g < gap) { gap = g; best = d; }
   }
   return best;
@@ -47,11 +46,12 @@ export class MeleeCombatDirector {
     this.indexCells = new Map(); this.indexRank = new Map(); this.indexAt = -1;
     this.nearA = []; this.nearB = [];
     this.stats = { attacks: 0, hits: 0, misses: 0, parries: 0, pushes: 0, standing: 0, ground: 0, successes: 0, failures: 0,
-      lodges: 0, yanks: 0, finishes: 0, feints: 0, ripostes: 0, chambers: 0, combos: 0 };
+      lodges: 0, shallowCuts: 0, yanks: 0, finishes: 0, drags: 0 };
     this.qte = new MeleeQteDirector({ Resolve: (a) => this.ResolveQte(a), Finish: (a) => this.FinishQte(a) }, options);
-    // 玩法变体（只有白刃实验场会切，见 Data_MeleeCombat.MELEE_VARIANTS）与最近的鼠标甩动（方向挥砍用）。
+    // 玩法变体（只有白刃实验场会切，见 Data_MeleeCombat.MELEE_VARIANTS）；拖拽挥砍要的鼠标：
+    // pending 是这一帧还没记账的位移，strokes 是最近 windowS 秒逐帧的位移，aim 是刀架跟着鼠标偏出去的量（像素）。
     this.variant = { control: "classic", impact: "classic" };
-    this.mouse = { x: 0, y: 0 };
+    this.mouse = { pending: { x: 0, y: 0 }, strokes: [], aim: { x: 0, y: 0 } };
   }
   SetVariant({ control = this.variant.control, impact = this.variant.impact } = {}) {
     this.variant = { control: V.control.includes(control) ? control : "classic", impact: V.impact.includes(impact) ? impact : "classic" };
@@ -60,15 +60,29 @@ export class MeleeCombatDirector {
     if (f?.lodge) this.ReleaseLodge(f, "variant");
     return { ...this.variant };
   }
-  get Directional() { return this.variant.control === "directional"; }
-  /** 每帧喂一次鼠标位移（像素，lookY 向下为正）；方向挥砍取它的短时指数平均，卡刀时晃鼠标也算撬刀。 */
+  get Drag() { return this.variant.control === "drag"; }
+  /** 按着左键拖拽时鼠标归刀不归视角（实验场插件按它把这一帧的转视角吞掉）。 */
+  get CapturesLook() {
+    const f = this.fighters.get(this.Player());
+    return this.Drag && this.held.has("Mouse0") && (f?.state === "aim" || (f?.state === "attack" && !!f.attack?.drag));
+  }
+  /** 每帧喂一次鼠标位移（像素，lookY 向下为正）：拖拽挥砍拿它出刀，卡刀时晃鼠标也算撬刀。 */
   AddLook(dx = 0, dy = 0) {
-    this.mouse.x += dx; this.mouse.y -= dy;
+    this.mouse.pending.x += dx; this.mouse.pending.y -= dy;
     const f = this.fighters.get(this.Player());
     if (f?.state === "lodged") f.lodge.progress = Clamp(f.lodge.progress + Math.hypot(dx, dy) * L.wigglePerPx, 0, 1);
   }
-  /** 现在按左键会从哪边砍（面板方向指示用）。 */
-  SwingPreview() { return SwingDirectionFromMouse(this.mouse.x, this.mouse.y).id; }
+  /** 最近 windowS 秒鼠标走过的位移（像素，y 朝上）。 */
+  StrokeVector() {
+    let x = 0, y = 0;
+    for (const s of this.mouse.strokes) { x += s.x; y += s.y; }
+    return { x, y };
+  }
+  /** 现在这一甩会砍出哪个来向（没甩够为 null，面板八向指示用）。 */
+  DragPreview() {
+    const v = this.StrokeVector();
+    return Math.hypot(v.x, v.y) >= D.minStrokePx * 0.5 ? DirectionForStroke(v.x, v.y).id : null;
+  }
   Player() { return this.host.Player?.(); }
   Soldiers() { return this.host.Soldiers?.() || []; }
   Weapon(entity) { return this.host.Weapon?.(entity) || entity?.meleeWeapon || null; }
@@ -111,7 +125,7 @@ export class MeleeCombatDirector {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !f?.weapon || this.Active && entity === this.Player()) return false;
     if (f.state === "lodged") { this.PullLodge(f); return true; }
-    if (entity === this.Player() && this.Directional && W[f.weapon]) return this.DirectionalDown(f);
+    if (entity === this.Player() && this.Drag && W[f.weapon]) return this.BeginAim(f);
     if (f.state !== "idle") {
       if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
         f.buffer = {expires:this.time+R.inputBufferS, released:false}; return true;
@@ -122,7 +136,7 @@ export class MeleeCombatDirector {
   }
   AttackUp(entity = this.Player()) {
     const f = this.Fighter(entity);
-    if (entity === this.Player() && this.Directional) return true;
+    if (entity === this.Player() && this.Drag) { if (f?.state === "aim") this.SetState(f, "idle"); return true; }
     if (f?.buffer) { f.buffer.released = true; return true; }
     if (f?.state !== "charge") return false;
     const held = f.t;
@@ -151,68 +165,64 @@ export class MeleeCombatDirector {
     this.SetState(f, "charge", G.feintS, "Charge"); f.feint = true;
     this.Log("feint", entity, f.target); return true;
   }
-  // ── 方向挥砍（对标 Mordhau，只给玩家；见 Data_MeleeCombat.MELEE_DIRECTIONAL）──────────
-  /** 方向挥砍的左键：空闲就按甩鼠标的方向出刀；出刀中按下记一刀连击（接触段里按的等接触段走完再接）。 */
-  DirectionalDown(f) {
-    const dir = SwingDirectionFromMouse(this.mouse.x, this.mouse.y);
-    const a = f.attack;
-    if (f.state === "attack" && a?.direction) {
-      if (f.t < a.windup) return false;
-      if (f.t < a.windup + a.active) { a.combo = dir; return true; }
-      if (f.t < a.windup + a.active + a.recovery * 0.6) return this.ChainCombo(f, dir);
-      f.buffer = { expires: this.time + R.inputBufferS, released: true }; return true;
-    }
-    if (!this.Idle(f)) {
-      if (["parry", "push"].includes(f.state) && f.duration - f.t <= R.inputBufferS) {
-        f.buffer = { expires: this.time + R.inputBufferS, released: true }; return true;
-      }
-      return false;
-    }
-    return this.AttackDirectional(f.entity, dir);
+  // ── 拖拽挥砍（只给玩家；见 Data_MeleeCombat.MELEE_DRAG）──────────────────────────────
+  /** 按下左键：进拖拽架势（刀举起来跟着鼠标走）；出刀中按下的，砍完自动回架势。 */
+  BeginAim(f) {
+    if (!this.Idle(f)) return f.state === "attack" && !!f.attack?.drag;
+    this.mouse.strokes.length = 0; this.mouse.aim.x = 0; this.mouse.aim.y = 0;
+    this.SetState(f, "aim", 0, "Charge"); return true;
   }
-  ChainCombo(f, dir) {
-    if (!f.attack.connected) { this.stats.misses++; this.Log("miss", f.entity); }
+  StepAim(f, dt) {
+    const m = this.mouse, fade = Math.exp(-dt / D.aimReturnS);
+    m.aim.x *= fade; m.aim.y *= fade;
+    // 甩得够长（窗口里累计位移）且够快（窗口里最快那一帧的速度）才出刀；力道也按最快那一帧算。
+    const v = this.StrokeVector(), length = Math.hypot(v.x, v.y);
+    const speed = m.strokes.reduce((top, s) => Math.max(top, Math.hypot(s.x, s.y) / Math.max(s.dt, 1e-3)), 0);
+    if (length < D.minStrokePx || speed < D.triggerPxPerS) return;
+    const power = Clamp((speed - D.powerPxPerS[0]) / (D.powerPxPerS[1] - D.powerPxPerS[0]), 0, 1);
+    const scale = D.powerScale[0] + (D.powerScale[1] - D.powerScale[0]) * power;
+    m.strokes.length = 0;
     this.SetState(f, "idle");
-    return this.AttackDirectional(f.entity, dir, { windupScale: D.comboWindupScale, tag: "combo" });
+    if (this.AttackDirectional(f.entity, DirectionForStroke(v.x, v.y), { damageScale: scale, drag: true })) {
+      this.stats.drags++;
+      f.attack.dragSpeed = Math.round(speed);
+    }
   }
-  AttackDirectional(entity, dir, { windupScale = 1, tag = null } = {}) {
+  /** 一刀从某个来向砍出去（第一人称刀轨按来向倒放 / 镜像 / 滚转）。拖拽挥砍与拖拽模式下的补刀都走它。 */
+  AttackDirectional(entity, dir, { windupScale = 1, damageScale = 1, tag = null, drag = false } = {}) {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || !dir) return false;
     const overhead = dir.id === "up";
     const spec = { ...D.attack, ...(overhead ? D.overhead : {}) };
     if (f.stamina < spec.cost) { this.SetState(f, "idle"); this.Log("exhausted", entity); return false; }
-    let kind = tag;
-    if (!kind && this.time - f.lastParry <= D.riposteWindowS) kind = "riposte";
-    if (!kind) {
-      // 对砍：对方的起手只剩 chamberWindowS，迎着出刀等同拨开他。
-      const incoming = this.Opponents(entity).find((o) => {
-        const of = this.Fighter(o), oa = of?.attack;
-        return of?.state === "attack" && oa && !oa.connected && of.t < oa.windup && oa.windup - of.t <= D.chamberWindowS
-          && Distance(o, entity) <= oa.reach + 0.3 && Facing(o, entity) > 0.5 && Facing(entity, o) > 0.5 && this.Visible(o, entity);
-      });
-      if (incoming && f.stamina >= spec.cost + D.chamberCost) {
-        f.stamina -= D.chamberCost; kind = "chamber";
-        this.Stagger(incoming, entity, "Deflected", R.parryStaggerS, 17);
-        this.Log("chamber", entity, incoming);
-      }
-    }
-    if (kind === "riposte" || kind === "chamber") windupScale *= D.riposteWindupScale;
     const windup = spec.windup * windupScale;
     f.stamina -= spec.cost;
     this.SetState(f, "attack", windup + spec.active + spec.recovery, overhead ? "Heavy" : "Light");
-    f.attack = { ...spec, windup, baseWindup: spec.windup, baseActive: spec.active, baseDuration: spec.windup + spec.active + spec.recovery,
-      heavy: overhead, yaw: entity.yaw || 0, connected: false, lungeDone: 0, previousTip: null, locked: false,
-      direction: dir, sweep: dir.sweep * R.bladeSweepRad, dragged: 0, lastYaw: entity.yaw || 0, kind, combo: null };
+    f.attack = { ...spec, damage: Math.round(spec.damage * damageScale), windup, baseWindup: spec.windup, baseActive: spec.active,
+      baseDuration: spec.windup + spec.active + spec.recovery, heavy: overhead, yaw: entity.yaw || 0, connected: false, lungeDone: 0,
+      previousTip: null, locked: false, direction: dir, sweep: dir.sweep * R.bladeSweepRad, kind: tag, drag };
     f.hit = false; f.buffer = null; this.stats.attacks++;
-    const tally = { riposte: "ripostes", chamber: "chambers", combo: "combos" }[kind];
-    if (tally) this.stats[tally]++;
-    this.Log(overhead ? "heavy" : "light", entity, null, { direction: dir.id, kind });
+    this.Log(overhead ? "heavy" : "light", entity, null, { direction: dir.id, kind: tag });
     return true;
   }
   // ── 卡刀 → 拔刀 → 踉跄 → 补刀（见 Data_MeleeCombat.MELEE_LODGE）─────────────────────
+  /**
+   * 这一刀算不算砍进了身体里：刀刃吃进去的深度（够得着的长度 − 到对方体表的距离）够深，
+   * 而且对方在这一刀正中线附近（砍在边上、刀尖擦过的只是一道口子，不卡）。轻击力道小，要更深才卡。
+   */
+  CutDepth(e, f, target) {
+    const a = f.attack, distance = Distance(e, target);
+    const toward = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
+    return { depth: a.reach - (distance - R.bodyRadiusM), offAxis: Math.abs(Wrap(toward - a.yaw)),
+      need: L.minDepthM + (a.heavy ? 0 : L.lightExtraDepthM) };
+  }
   LodgeEligible(e, f, target) {
-    return this.variant.impact === "lodge" && e === this.Player() && L.weapons.includes(f.weapon)
-      && Alive(target) && !f.attack?.finisher && !!this.Fighter(target)?.weapon;
+    if (this.variant.impact !== "lodge" || e !== this.Player() || !L.weapons.includes(f.weapon)
+      || !Alive(target) || f.attack?.finisher || !this.Fighter(target)?.weapon) return false;
+    const cut = this.CutDepth(e, f, target);
+    const deep = cut.depth >= cut.need && cut.offAxis <= L.maxOffAxisRad;
+    if (!deep) { this.stats.shallowCuts++; this.Log("shallowCut", e, target, { depth: +cut.depth.toFixed(2), offAxis: +cut.offAxis.toFixed(2) }); }
+    return deep;
   }
   StrokeOf(f) {
     const a = f.attack;
@@ -300,7 +310,7 @@ export class MeleeCombatDirector {
     const target = this.FinishCandidate(entity), f = this.Fighter(entity);
     if (!target) return false;
     f.stamina = Math.max(f.stamina, 40);
-    if (this.Directional) {
+    if (this.Drag) {
       if (!this.AttackDirectional(entity, DIRECTIONS.get("up"), { windupScale: L.finishWindupScale, tag: "finish" })) return false;
     } else {
       if (!this.Attack(entity, true)) return false;
@@ -319,12 +329,7 @@ export class MeleeCombatDirector {
   }
   Parry(entity = this.Player()) {
     const f = this.Fighter(entity);
-    // 方向挥砍：起手里按右键＝佯攻，收刀回中；再按一次才是拨挡。
-    if (entity === this.Player() && this.Directional && f?.state === "attack" && f.attack?.direction
-      && f.t < f.attack.windup * D.feintWindowN && f.attack.kind !== "finish") {
-      f.stamina = Math.max(0, f.stamina - D.feintCost);
-      this.SetState(f, "idle"); this.stats.feints++; this.Log("feint", entity); return true;
-    }
+    if (f?.state === "aim") this.SetState(f, "idle");   // 拖拽架势里也随时能拨挡
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || f.stamina < R.parryCost) return false;
     f.stamina -= R.parryCost; f.parryUsed = false;
     const intent = this.host.MoveIntent?.(entity) || {strafe:0};
@@ -839,6 +844,7 @@ export class MeleeCombatDirector {
     if (f.state === "lodged") { if (e === this.Player()) this.StepLodge(f, dt); return; }
     if (f.state === "yank") { if (f.t >= f.duration) { f.lodge = null; this.SetState(f, "idle"); } return; }
     if (f.state === "reel") { this.StepReel(f, dt); return; }
+    if (f.state === "aim") { this.StepAim(f, dt); return; }
     if(f.state==='contact' && f.t>=f.duration) {
       const other=f.contactTarget;
       if(!Alive(other) || !this.BeginBind(e,other,f.contactReason||'visibleWeaponBrace')) {
@@ -865,20 +871,13 @@ export class MeleeCombatDirector {
         if (need > 0) { const step = Math.min(need, L.finishLungeMps * dt); this.Move(e, -Math.sin(want) * step, -Math.cos(want) * step); }
       }
       const aimUntil=a.windup-(e===this.Player()?0:R.npcAimCommitLeadS);
-      if (a.direction) {
-        // 方向挥砍不锁朝向：刀跟着视角走，转视角就是拖刀／送刀。逆着扫向转＝拖刀，接触段按转过的角度延长。
-        const turn = Wrap((e.yaw || 0) - a.lastYaw); a.lastYaw = e.yaw || 0; a.yaw = e.yaw || 0;
-        if (f.t >= a.windup && f.t < a.windup + a.active && a.sweep && Math.sign(turn) === Math.sign(a.sweep)) {
-          const extend = Math.min(D.dragMaxS - a.dragged, Math.abs(turn) * D.dragPerRad);
-          if (extend > 0) { a.active += extend; f.duration += extend; a.dragged += extend; }
-        }
-      }
+      // 拖拽挥砍的刀跟着视角（按着左键时视角是定住的），不走 NPC 的锁定修正。
+      if (a.direction) a.yaw = e.yaw || 0;
       else if(f.t<aimUntil) a.yaw=e.yaw||0;
       else if(!a.locked) { a.locked=true; a.lockYaw=a.yaw; }
       else a.yaw=a.lockYaw+Clamp(Wrap((e.yaw||0)-a.lockYaw),-R.attackCorrectionRad,R.attackCorrectionRad);
       if (f.t >= a.windup && f.t <= a.windup + a.active && !a.connected) this.ResolveContact(f);
       if (f.state !== "attack") return;
-      if (a.combo && f.t >= a.windup + a.active) { this.ChainCombo(f, a.combo); return; }
       const lunge = a.lunge * Clamp((f.t - a.windup) / a.active, 0, 1);
       if (lunge > a.lungeDone) {
         this.Move(e, -Math.sin(a.yaw) * (lunge - a.lungeDone), -Math.cos(a.yaw) * (lunge - a.lungeDone)); a.lungeDone = lunge;
@@ -886,6 +885,8 @@ export class MeleeCombatDirector {
       if (f.t >= f.duration) {
         if (!a.connected) { this.stats.misses++; this.Log("miss", e); }
         this.SetState(f, "idle");
+        // 拖拽挥砍：左键还按着就回到架势，接着甩下一刀。
+        if (a.drag && e === this.Player() && this.held.has("Mouse0")) this.BeginAim(f);
       }
       return;
     }
@@ -986,12 +987,19 @@ export class MeleeCombatDirector {
   }
   Update(dt) {
     if (!Number.isFinite(dt) || dt <= 0 || !this.enabled) return;
+    // 拖拽挥砍：这一帧的鼠标位移记进最近 windowS 秒的账；按着左键时刀架跟着它偏出去。
+    const m = this.mouse, frame = m.pending;
+    m.strokes.push({ t: this.time + dt, dt, x: frame.x, y: frame.y });
+    while (m.strokes.length && m.strokes[0].t < this.time + dt - D.windowS) m.strokes.shift();
+    if (this.fighters.get(this.Player())?.state === "aim") {
+      m.aim.x = Clamp(m.aim.x + frame.x, -D.aimRadiusPx, D.aimRadiusPx); m.aim.y = Clamp(m.aim.y + frame.y, -D.aimRadiusPx, D.aimRadiusPx);
+    }
+    frame.x = 0; frame.y = 0;
     let left = Math.min(dt, 0.25);
     while (left > 1e-8) { const step = Math.min(left, R.maxStepS); this.Step(step); left -= step; }
   }
   Step(dt) {
     this.time += dt;
-    const fade = Math.exp(-dt / D.sampleS); this.mouse.x *= fade; this.mouse.y *= fade;
     const player = this.Player();
     // 赢下来之后对方死在结算里（剧本一次性按键的反刺）不算「人没了」：结算那 0.6 s 与起身照常走完。
     const won = this.qte.active?.phase === "resolve" && this.qte.active.success === true;
@@ -1078,6 +1086,11 @@ export class MeleeCombatDirector {
       result.swingRoll = stroke.roll * weight; result.swingMirror = stroke.mirror ? weight : 0;
       result.direction = f.attack.direction.id; result.attackKind = f.attack.kind;
     }
+    if (f.state === "aim" && f.entity === this.Player()) {
+      // 拖拽架势：刀举在蓄力顶点，整副手臂跟着鼠标往那边偏、往那边歪一点。
+      const ax = this.mouse.aim.x / D.aimRadiusPx, ay = this.mouse.aim.y / D.aimRadiusPx;
+      Object.assign(result, { aimOffset: { x: ax * D.aimOffsetM, y: ay * D.aimOffsetM }, swingRoll: -ax * D.aimRollRad, direction: this.DragPreview() });
+    }
     if (f.attack?.finisher) result.finisher = true;
     if ((f.state === "lodged" || f.state === "yank") && f.lodge && f.entity === this.Player()) {
       // 第一人称：刀定在砍进去那一帧，拔刀时顺着刀路往回抽、回到架势。
@@ -1126,7 +1139,7 @@ export class MeleeCombatDirector {
   State() {
     const view = this.View();
     return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14),
-      variant: { ...this.variant }, swingPreview: this.Directional ? this.SwingPreview() : null, lodge: view?.kind === "lodge" ? view : null,
+      variant: { ...this.variant }, dragPreview: this.Drag ? this.DragPreview() : null, lodge: view?.kind === "lodge" ? view : null,
       finishTarget: this.FinishCandidate()?.id ?? null };
   }
   Cancel(reason = "reset") {

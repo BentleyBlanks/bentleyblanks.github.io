@@ -26,11 +26,6 @@ export const TEXT = Object.freeze({
   "range.field.melee": "白刃测试场",
   "range.field.rifle": "靶场",
 
-  // ── 白刃工位的场内标牌（?range=1 的白刃格）────────────────────────────
-  "range.melee.signVersus": "1 对 {enemies}",
-  "range.melee.signAuto": "靠近白线开始",
-  "range.melee.signManual": "白线前按 F 开始",
-
   // ── 枪械白盒（?weapons=1）：路牌 ───────────────────────────────────────
   "range.weapon.signWelcome": "枪械白盒靶场",
   "range.weapon.signWelcomeSub": "长桌 F 领取 · 无限弹药",
@@ -150,6 +145,7 @@ export const TEXT = Object.freeze({
   "range.explosion.signRoute": "通行验证 · 士兵往返穿越炮坑",
 
   // ── 白刃实验场（?melee=1）：面板 ──────────────────────────────────────
+  // 2026-11-23 第二轮（用户）：只留最基本的布局 —— 玩法两组、项目、操作、读数；说明性的长句都撤了。
   "range.melee.aria": "白刃战独立实验",
   "range.melee.title": "白刃战实验场",
   "range.melee.subtitle": "大刀与刺刀",
@@ -157,22 +153,6 @@ export const TEXT = Object.freeze({
   "range.melee.btnStart": "开始／重开",
   "range.melee.btnPause": "暂停对手",
   "range.melee.btnResume": "恢复对手",
-  "range.melee.controlAttack": "左键：轻击／蓄力重击",
-  "range.melee.controlParry": "右键：拨枪 · WASD：移动避刺",
-  "range.melee.controlPress": "F：贴身压枪／顶架 · 抵抗时连按 F",
-  "range.melee.controlWeapon": "1／3：步枪／大刀 · V：射击／白刃架势",
-  "range.melee.controlAlt": "按住 Alt 操作面板 · 松开继续战斗",
-  "range.melee.animSummary": "动作检查",
-  "range.melee.animLabel": "动作",
-  "range.melee.btnPreview": "播放敌我动作",
-  "range.melee.btnResumeFight": "恢复战斗",
-  "range.melee.animTimeAria": "动作逐帧进度",
-  "range.melee.animNote": "播放时暂停对手；拖动进度条定格。开始／重开恢复战斗。",
-  "range.melee.assistLabel": "QTE 输入",
-  "range.melee.assistTap": "标准 · 连按 F",
-  "range.melee.assistHold": "辅助 · 长按 F",
-  "range.melee.assistAuto": "辅助 · 自动抵抗",
-  "range.melee.logSummary": "最近交锋",
   "range.melee.collapse": "收起",
   "range.melee.expand": "展开",
   "range.melee.group.variant": "玩法",
@@ -183,23 +163,30 @@ export const TEXT = Object.freeze({
   "range.melee.controlLabel": "操控",
   "range.melee.impactLabel": "命中反馈",
   "range.melee.control.classic": "原版 · 按住蓄力",
-  "range.melee.control.directional": "方向挥砍 · Mordhau",
-  "range.melee.control.classicHint": "按住左键蓄力，松开出轻击／重击；刀路固定从右上劈向左下。",
-  "range.melee.control.directionalHint": "照《Mordhau》：甩鼠标选刀从哪边来，一下左键就出刀，八个来向；起手中按右键佯攻，拨挡成功后立刻反砍更快，对方起手末段迎着出刀是对砍，出刀中再按左键连击，接触段转视角拖刀。",
+  "range.melee.control.drag": "拖拽挥砍",
   "range.melee.impact.classic": "原版 · 砍中即退",
   "range.melee.impact.lodge": "卡刀 · 拔刀 · 补刀",
-  "range.melee.impact.classicHint": "砍中活人后对方失衡后退，刀照常收回来。",
-  "range.melee.impact.lodgeHint": "大刀砍进活人身上会被卡住：人动不了、视角被拽着，按住 S 往回拽、连按左键撬、晃鼠标都能拔；拔出来对方踉踉跄跄两秒多，这时随便一刀就是补刀，按 F 自动抢上一步补一刀。一刀砍死的照样劈穿，久拔不出对方会挣脱。",
-  "range.melee.controlSwing": "甩鼠标再按左键：刀从甩的那边来（不甩＝右上斜劈，往上甩＝竖劈）",
-  "range.melee.controlFeint": "起手中右键：佯攻收刀 · 再按右键：拨挡 · 拨挡后出刀：反砍",
-  "range.melee.controlCombo": "出刀中左键：连击 · 接触段逆着刀路转视角：拖刀",
-  "range.melee.controlLodge": "卡刀：按住 S／连按左键／晃鼠标拔刀 · 对方踉跄时 F：补刀",
-  "range.melee.readSwing": "来向 {direction}{kind}",
-  "range.melee.readKind": " · {kind}",
+  "range.melee.controlAttack": "左键：轻击／蓄力重击",
+  "range.melee.controlParry": "右键：拨枪 · WASD：移动避刺",
+  "range.melee.controlDrag": "按住左键：刀跟着鼠标走 · 一甩就顺着甩的方向砍下去，甩得越快越重",
+  "range.melee.controlParryDrag": "右键：拨挡 · WASD：移动",
+  "range.melee.controlPress": "F：贴身压枪／顶架 · 抵抗时连按 F",
+  "range.melee.controlLodge": "刀砍进身体卡住：按住 S／连按左键／晃鼠标拔刀 · 对方踉跄时 F：补刀",
+  "range.melee.controlWeapon": "1／3：步枪／大刀 · V：射击／白刃架势",
+
+  // ── 白刃实验场：状态读数 ──────────────────────────────────────────────
+  "range.melee.statusDead": "本轮阵亡 · 可重开",
+  "range.melee.weaponDadao": "大刀",
+  "range.melee.weaponBayonet": "刺刀 · 白刃架势",
+  "range.melee.weaponRifle": "步枪 · 射击架势",
+  "range.melee.phaseReady": "准备",
+  "range.melee.parryWindow": "（窗口有效）",
+  "range.melee.meters": "{weapon} · {phase}{parry}\n生命 {health} · 体力 {stamina} · 平衡 {poise}",
+  "range.melee.enemyLine": "日军 · {distance}m · 生命 {health} · {phase}",
+  "range.melee.enemyDown": "日军 · 已倒下",
   "range.melee.readLodge": "刀卡住了 · 拔出 {progress}% · 还剩 {seconds} 秒",
-  "range.melee.readFinish": "可补刀：{target}（F）",
-  "range.melee.readStats": "卡刀 {lodges} · 拔刀 {yanks} · 补刀 {finishes} · 佯攻 {feints} · 反砍 {ripostes} · 对砍 {chambers} · 连击 {combos}",
-  // 八个来向（MELEE_DIRECTIONAL.directions 的 id）与出刀类型（AttackDirectional 的 kind）。
+  "range.melee.readFinish": "可补刀（F）",
+  // 八个来向（MELEE_DRAG.directions 的 id）：拖拽挥砍的准心八向指示上写这一刀的名字。
   "range.melee.dir.upRight": "右上斜劈",
   "range.melee.dir.right": "右横扫",
   "range.melee.dir.downRight": "右下上撩",
@@ -208,36 +195,8 @@ export const TEXT = Object.freeze({
   "range.melee.dir.left": "左横扫",
   "range.melee.dir.upLeft": "左上斜劈",
   "range.melee.dir.up": "竖劈",
-  "range.melee.kind.riposte": "反砍",
-  "range.melee.kind.chamber": "对砍",
-  "range.melee.kind.combo": "连击",
-  "range.melee.kind.finish": "补刀",
 
-  // ── 白刃实验场：状态读数 ──────────────────────────────────────────────
-  "range.melee.statusDead": "本轮阵亡 · 可重开",
-  "range.melee.statusField": "已完成 {done}／{total} 组 · {state}",
-  "range.melee.statusEncounter": "正在交锋",
-  "range.melee.statusApproach": "走近场内标牌选择对手",
-  "range.melee.statusCleared": "本轮完成 · 可重开",
-  "range.melee.statusRemain": "{name}　剩余 {living}",
-  "range.melee.weaponDadao": "大刀",
-  "range.melee.weaponBayonet": "刺刀 · 白刃架势",
-  "range.melee.weaponRifle": "步枪 · 射击架势",
-  "range.melee.phaseReady": "准备",
-  "range.melee.parryWindow": "（窗口有效）",
-  "range.melee.meters": "{weapon} · {phase}{parry}\n生命 {health} · 体力 {stamina} · 平衡 {poise}",
-  "range.melee.sideNra": "友军",
-  "range.melee.sideIja": "日军",
-  "range.melee.targetLine": "{side} {id} · {body}",
-  "range.melee.targetAlive": "{distance}m · {health}生命 · {phase}",
-  "range.melee.targetAliveRole": "{distance}m · {health}生命 · {phase} · {role}",
-  "range.melee.targetDown": "已倒下",
-  "range.melee.targetsIdle": "{living} 名对手待命 · 可前往下一组",
-
-  // 交锋状态机的相位名与多打一的分工名（Data_MeleeCombat 的 phase / role 是 ASCII id，
-  // 这里是它们的显示名）。
-  "range.melee.role.front": "正面牵制",
-  "range.melee.role.flank": "侧翼",
+  // 交锋状态机的相位名（Data_MeleeCombat 的 phase 是 ASCII id，这里是它们的显示名）。
   "range.melee.state.idle": "警戒",
   "range.melee.state.charge": "蓄力",
   "range.melee.state.windup": "起手",
@@ -253,6 +212,7 @@ export const TEXT = Object.freeze({
   "range.melee.state.lodged": "卡刀",
   "range.melee.state.yank": "拔刀",
   "range.melee.state.reel": "踉跄",
+  "range.melee.state.aim": "拖刀架势",
 
   // ── 断肢测试场（?gore=1）：路牌 ────────────────────────────────────────
   "range.gore.signWelcome": "断肢测试场",
@@ -322,7 +282,6 @@ export const GATED_MODULES = Object.freeze([
 /**
  * 运行时拼出来的键前缀。可变部分**只来自代码/数据里的 id**，不是自由字符串：
  *   · `range.melee.state.<phase>`  —— phase 是 Data_MeleeCombat 的状态机相位 id；
- *   · `range.melee.role.<role>`    —— role 是多打一的分工 id（front / flank）；
  *   · `range.movement.kind.<kind>` —— kind 是 Script_Player 记的动作类型
  *     （jump / runJump / vault / mantle）。
  * 前两处查不到时退回相位/分工的原 id（画面上看得见是哪一个没登记），不静默空白。
@@ -333,10 +292,8 @@ export const GATED_MODULES = Object.freeze([
  */
 export const DYNAMIC_PREFIXES = Object.freeze([
   "range.melee.state.",
-  "range.melee.role.",
-  // `range.melee.dir.<id>` / `range.melee.kind.<id>` —— 方向挥砍的来向与出刀类型 id（Data_MeleeCombat），查不到退回原 id。
+  // `range.melee.dir.<id>` —— 拖拽挥砍的来向 id（Data_MeleeCombat.MELEE_DRAG），查不到退回原 id。
   "range.melee.dir.",
-  "range.melee.kind.",
   "range.movement.kind.",
   // `range.gore.limb.<id>` —— id 是 CHARACTER_HITBOX_PROFILE 的 shape id
   //（upperArmL / forearmL / thighL / calfL / head 与右侧同名），查不到时退回原 id。

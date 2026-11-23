@@ -18,9 +18,9 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state.ready&&Taierzhuang.Debug?.MeleeCombat,null,{timeout:120000});
   await page.evaluate(()=>Taierzhuang.StepFrames(3,1/60,true));
-  await page.screenshot({path:path.join(out,'Scene_EncounterField.png')});
+  await page.screenshot({path:path.join(out,'Scene_MeleeLab.png')});
   const evidence=[];
-  for(const scenario of ['DadaoTwo','BayonetTwo','DadaoBind','BayonetGround']) {
+  for(const scenario of ['DadaoOne','BayonetOne','DadaoBind','BayonetGround']) {
     await page.evaluate(id=>{Taierzhuang.Debug.MeleeCombat.Select(id);Taierzhuang.StepFrames(2,1/60,true);},scenario);
     for(let frame=0;frame<140;frame++) {
       const state=await page.evaluate(({scenario,frame})=>{
