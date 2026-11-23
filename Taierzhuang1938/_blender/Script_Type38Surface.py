@@ -543,12 +543,12 @@ def Build(cache):
                 wornArc = np.exp(-((length+.631)/.022)**2)
                 stripWear = np.clip(.24+.65*wornArc+.19*stain+.17*grainSteel,.07,1)
                 lip = np.clip((up-stripCenter)/.0018,-1,1)
-                steelTone = Tint([65,56,52],[127,113,103],.27+.46*stripWear+.07*rolled)
+                steelTone = Tint([56,48,44],[119,105,96],.27+.46*stripWear+.07*rolled)
                 color = Blend(color,steelTone,inlay)
                 metal = inlay*(198+42*stripWear)
                 varnish[:, :, 0] = np.rint(varnish[:, :, 0]*(1-inlay)*(1-.50*scuff))
                 rough += 31*scuff
-                rough += inlay * (177-39*stripWear-7*rolled+9*lip+8*grainSteel-rough)
+                rough += inlay * (185-46*stripWear-10*rolled+9*lip+8*grainSteel-rough)
                 relief = relief*(1-inlay) + ((1.23+.30*stripWear)*rolled+.27*inlay)*Ramp(.006,.010,side)-.25*scuff
             Store(coat['clearcoatTexture'], varnish)
         else:
@@ -606,11 +606,41 @@ def Build(cache):
             if part == 'Exterior_FoldedFrame12':
                 marks = FrameEngraving(Image.fromarray(Load(material['normalTexture'])))
                 color = Tint([108,104,97],[160,155,142],.50+.19*flow+.06*stain)
-                color = Blend(color, np.array([39,39,38], dtype='f'), marks*.84)
+                nearCap = Ramp(-.311,-.305,length)
+                farCap = 1-Ramp(-.373,-.367,length)
+                cap = np.maximum(nearCap,farCap)
+                worn = np.clip(.52*edge+.19*stain+.12*grainSteel-.10,0,.62)
+                capSteel = Tint([53,51,48],[122,118,111],.41+.15*flow+.12*stain+.13*brush)
+                capSteel *= (1+.16*nearCap-.13*farCap)[:,:,None]
+                capSteel = Blend(capSteel,np.array([139,135,124],dtype='f'),worn)
+                color = Blend(color,capSteel,cap)
                 rough = 112+10*flow+6*brush+24*marks
+                rough += cap*(139+12*flow+9*stain-42*worn-rough)
+                metal += cap*(196+33*worn+9*flow-metal)
+                rail = (1-cap)*Ramp(.57,.91,normalUp)
+                rough += rail*(34-4*flow) + 33*nearCap+42*farCap
+                metal -= 36*rail+34*nearCap
+                color = Blend(color,np.array([194,189,178],dtype='f'),rail*.51)
+                color = Blend(color,np.array([39,39,38],dtype='f'),marks*.84)
+            if part == 'Exterior_ShortTransverseHead71':
+                rubbedFace = np.clip(.35+.38*flow+.15*stain+.36*edge,0,1)
+                color = Tint([72,71,67],[151,147,138],.28+.53*rubbedFace)
+                rough = 144+16*stain+8*brush-39*rubbedFace
+                metal = 153+46*rubbedFace
             if part == 'SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH':
                 color = Tint([154,146,128],[198,187,159],.57+.12*flow+.05*stain)
-                rough = 108+11*flow+7*brush
+                rough = 91+13*flow+7*brush
+            if part == 'SightDetailV3_DecorativeConvexRoundSurface':
+                alongMark = (length+.3493)/.0046
+                crossMark = (side-.0012)/.0046
+                slant = crossMark-(.211+.582*alongMark)
+                radial = np.hypot(alongMark-.5,crossMark-.5)
+                boundary = (1-Ramp(.42,.50,radial))*Ramp(.25,.78,normalUp)
+                groove = (1-Ramp(.031,.078,np.abs(slant)))*boundary
+                border = np.exp(-((np.abs(slant)-.081)/.026)**2)*boundary
+                color = Blend(color,np.array([55,49,43],dtype='f'),groove*.88)
+                rough += 28*groove-8*border
+                relief += -2.8*groove+.64*border
         if 'normalTexture' in material:
             normalSlot = material['normalTexture']
             normals = Load(normalSlot).astype('f') / 127.5 - 1
@@ -637,7 +667,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_HandguardGlaze07'
+    doc['asset']['extras']['version'] = 'Type38_ScalePatina08'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -645,7 +675,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=9, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=10, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):

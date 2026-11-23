@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 9,
+  "version": 10,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "b72df438b5353ca078e818aa4ff1cb493d55c5190672d9ca69805d6acafa3d49",
+  "runtimeSha256": "ff06946dca9621a35fb56e3e3d23a7674277db88cd59b31bdd94cc8a49a183c6",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72088,
@@ -82,14 +82,14 @@
     {
       "index": 8,
       "name": "Texture_Type38Sample03Base",
-      "bytes": 354034,
-      "sha256": "e73c89ff1e0eeda16bb52973ca38ff7420696847c2a2fe14b2fa878b67283cd6"
+      "bytes": 522218,
+      "sha256": "2dcc39408a52f0f7df3a3985666c8acd24e2d4ae49226d29a72fa673e01e23c1"
     },
     {
       "index": 9,
       "name": "Texture_Type38Sample03Orm",
-      "bytes": 459128,
-      "sha256": "cebda16ad47014841348a969f7dc409886c48616b86f36842fe8c242dd2b7d12"
+      "bytes": 465408,
+      "sha256": "f6c9ea4ad048ef962f56670254c623631c756b3f5533cf39c2ade4883c49c550"
     },
     {
       "index": 10,
@@ -262,14 +262,14 @@
     {
       "index": 38,
       "name": "Texture_Type38Sample15Base",
-      "bytes": 240823,
-      "sha256": "fb6dffc2cc6564cfd1109eac6269496abfed770b1198998904eefd8f3e57d1f7"
+      "bytes": 195159,
+      "sha256": "90b7dce5100a81b8b62149992a9d71c6f630af38ae406dc80124ad276edc91a9"
     },
     {
       "index": 39,
       "name": "Texture_Type38Sample15Orm",
-      "bytes": 162851,
-      "sha256": "eb3050bf8f3662aed6e3b4f61579a3b159f56d291ca92b02f4e2ec232bd0efd5"
+      "bytes": 230344,
+      "sha256": "1201e7e4dd4fbaa3e7d08b44b5e886b2cf10e698956948ae7fcd7483bccef74a"
     },
     {
       "index": 40,
@@ -622,14 +622,14 @@
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2106444,
-      "sha256": "2ba38cbf315b176f88689d5f9a35ef08ace87557744b33c11c28fb66254e3cd4"
+      "bytes": 2106424,
+      "sha256": "2818ede8e42292cc815bc934c27e2ac52126f137cfaefd34eb8158bac490a20e"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 1281943,
-      "sha256": "c260c95a9974618894a2843a5163e083460d6a2f755d6e536cccad4563af53d9"
+      "bytes": 1281990,
+      "sha256": "884026324fce898803844a0ceaf548e7dbe275c861747e340eca7e896ba73ca3"
     },
     {
       "index": 100,
@@ -694,26 +694,26 @@
     {
       "index": 110,
       "name": "Texture_Type38Sample42Orm",
-      "bytes": 81850,
-      "sha256": "8a288af755f25b9898e7c50ef0f27946a54f9d5459399ca9b6bf7d859cfe7628"
+      "bytes": 81864,
+      "sha256": "ba2a53558ea537740cac94daaf8b054370a8d178920c17b036012c3daedb7be6"
     },
     {
       "index": 111,
       "name": "Texture_Type38Sample43Normal",
-      "bytes": 68715,
-      "sha256": "a41ae0d224b6ecc74ef91884ce3110b09d271c22eda602271111f8ee3a52f363"
+      "bytes": 71737,
+      "sha256": "7f4f9f1e874271b9557d3791b58c63668e851a1d0e5900351e1410581b0d8e9d"
     },
     {
       "index": 112,
       "name": "Texture_Type38Sample43Base",
-      "bytes": 63272,
-      "sha256": "edb08471b60f90e26d0d2df1239c488a092f94d20186ab3460b9a17a37873575"
+      "bytes": 67118,
+      "sha256": "3d81d6db8d8219c7c298f4300532323f0765c252148f4278a15e1644fe8e1d6d"
     },
     {
       "index": 113,
       "name": "Texture_Type38Sample43Orm",
-      "bytes": 62514,
-      "sha256": "2ff0baacce0374e449f450cd5393fc5cc88d31c44d9b2c8f5beb2dbdbf16bbc4"
+      "bytes": 64507,
+      "sha256": "7462aa81f9bfc9840d6994a7bea1fe756f219ad31bf595e1e1a492095d426c6f"
     },
     {
       "index": 114,
@@ -759,9 +759,9 @@
       111.5
     ],
     "Exterior_FoldedFrame12": [
-      108.4,
-      115.1,
-      119.9
+      112.2,
+      150.7,
+      176.2
     ],
     "Exterior_HandleOval08": [
       47.6,
@@ -819,9 +819,9 @@
       117.8
     ],
     "Exterior_ShortTransverseHead71": [
-      86.5,
-      99.5,
-      111.7
+      124.6,
+      133.9,
+      144.3
     ],
     "Exterior_VisibleLowerWall72": [
       97.5,
@@ -944,14 +944,14 @@
       123.5
     ],
     "SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH": [
-      105.4,
-      111.8,
-      116.0
+      88.4,
+      95.4,
+      99.7
     ],
     "SightDetailV3_DecorativeConvexRoundSurface": [
-      96.0,
-      101.3,
-      105.1
+      95.4,
+      101.0,
+      117.6
     ],
     "SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY": [
       81.2,

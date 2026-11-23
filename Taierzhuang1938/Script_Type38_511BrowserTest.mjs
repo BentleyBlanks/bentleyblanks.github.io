@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-handguard-glaze-07');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-scale-patina-08');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -95,6 +95,23 @@ try{
   const {neck,oval}=evidence.gripFinish;
   assert(neck.count>100&&oval.count>100&&neck.metalness-oval.metalness>25&&oval.roughness-neck.roughness>12,
    'the grip finish must separate polished neck from darker worn oval on the actual runtime maps');
+  evidence.frameFinish=await page.evaluate(()=>{
+   let mat;
+   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_FoldedFrame12')mat=mesh.material;});
+   const Sample=(image,u,v,channel)=>{
+    const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);
+    const patch=ctx.getImageData(Math.round(u*image.width)-3,Math.round(v*image.height)-3,7,7).data;
+    const values=[];for(let offset=channel;offset<patch.length;offset+=4)values.push(patch[offset]);
+    return values.sort((first,second)=>first-second)[24];
+   };
+   return [[.6641,.0708],[.6338,.9453],[.7301,.3281]].map(([u,v])=>({
+    albedo:Sample(mat.map.image,u,v,0),roughness:Sample(mat.roughnessMap.image,u,v,1)
+   }));
+  });
+  const [rearCap,frontCap,scaleRail]=evidence.frameFinish;
+  assert([rearCap,frontCap].every(cap=>scaleRail.albedo-cap.albedo>40&&cap.roughness>scaleRail.roughness+5),
+   'frame caps must retain darker, less polished steel than the engraved rail');
  }
  assert(evidence.identity.materials.filter(m=>m.base).every(m=>m.colour.every(c=>Math.abs(c-1)<1e-8)));
  assert.equal(evidence.identity.glError,0);

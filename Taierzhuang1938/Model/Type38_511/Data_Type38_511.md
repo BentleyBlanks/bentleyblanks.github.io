@@ -1,6 +1,14 @@
 # Dots Type38 511 runtime integration
 
-## 当前外观：上护木漆层与窄钢条 · 2026-11-23
+## 当前外观：刻度框与磨亮钢边 · 2026-11-23
+
+以[同一实物的顶视照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG)和[侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG)对照外观。两端与刻度带共用材质，但不是同一种表面：端部保留暗氧化层和磨亮边缘，刻度带呈较浅的旧钢色；横片在直射光下有不均匀高光。分区烘焙底色和粗糙度，不把曝光亮斑画进底色。原刻度法线的像素不变，中央小圆面恢复可见斜痕。中箍窄钢条仅调局部色泽与失光，木面、轮廓、文字策略均不变。
+
+预览中先用中央明暗区域选择近光位置，再锁定相机和照明，用独立的端部区域比较前后。两端五个区域的亮度中位数对照片的平均绝对差，从旧版 **39.9** 降至 GPU 版 **4.7**（0–255 显示亮度）；中央亮／暗区域为 **245 / 129**，照片为 **253 / 130**。窄钢条另以[中箍侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)取 120 条横断面，中位显示亮度 **97.2**，照片 **94.6**。这些是固定视图的外观比较，不是实测反射率；个别笔画的遮挡和角度也不等于扫描复刻。
+
+源模型与实际 GPU 压缩模型核对 13 个机位、43 组画面，前景亮度 SSIM 最低 **0.98339**；该指标仅评价压缩损失。与前版相比，改变 10 张内嵌图，226 个几何访问器和所有节点逐字节／结构相同。仍为 45 部件、116 图，近景 **72,088** 三角、普通 NPC **67,480**。完整外观证据另汇集了整枪侧面、托尾、护木、中箍、栓尾、覆面、刻度框和前端八组实物对照。
+
+## 上护木漆层与窄钢条 · 2026-11-23（前一版）
 
 [上护木近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_inscriptions.JPG)、[上方斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG)和[中箍特写](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)显示两种相邻但不同的外观：中段迎光侧为橙棕色漆木，箍边仍为深红。只参考木材和漆层，不复刻照片上的汉字、编号或徽记。
 
