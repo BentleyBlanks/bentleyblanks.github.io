@@ -3,18 +3,17 @@
 // 2026-11-23 改成其他测试场同一套面板（.shellImpactLab：分组小标题、直角按钮组、选中金条、读数块、可收起），
 // 加「玩法」两组切换：操控（原版蓄力 / 拖拽挥砍）× 命中反馈（原版 / 卡刀·拔刀·补刀），切了立即重开当前项目。
 // 同日第二轮（用户）：只保留最基本的布局 —— QTE 输入、动作检查、最近交锋三段撤掉（取证口里的同名功能还在），
-// 项目只列一对一。拖拽挥砍时屏幕中心另画一圈八向指示（这一甩会从哪边砍）。
+// 项目只列一对一。第三轮：八向指示圈撤了（用户：不要轮盘选方向），「玩法」组加一条滑条 ——
+// 拖拽挥砍时视角跟刀的比例（0 = 只动刀，1 = 视角全跟）。
 // DOM 与事件纪律照 Script_ShellImpactLab：mousedown / mouseup / keydown / keyup 一律 stopPropagation；
 // Alt 交还给 Script_Main（放开指针锁点面板，松手收回）；Escape 不拦。
 //
 // 面板上的每一句都走 `T("range.melee.…")`（表在 Data_Text_Range.mjs）。
 // MELEE_SCENARIOS 的 name / tip 是内容数据（Data_MeleeCombat），只当参数带进来。
-import { MELEE_SCENARIOS, MELEE_VARIANTS, MELEE_DRAG } from './Data_MeleeCombat.mjs';
+import { MELEE_SCENARIOS, MELEE_VARIANTS } from './Data_MeleeCombat.mjs';
 import { T, HasText } from './Script_Text.mjs';
-// 相位、来向是 Data_MeleeCombat 的 ASCII id，键按 id 拼（DYNAMIC_PREFIXES 已登记）。
+// 相位是 Data_MeleeCombat 的 ASCII id，键按 id 拼（DYNAMIC_PREFIXES 已登记）。
 const StateKey = phase => 'range.melee.state.' + phase;
-const DirKey = id => 'range.melee.dir.' + id;
-const DirName = id => (HasText(DirKey(id)) ? T(DirKey(id)) : id);
 /** 玩家相位：没登记的相位原样显示 id（看得见是哪一个漏了），没有相位时显示"准备"。 */
 const PlayerPhase = phase => (phase
   ? (HasText(StateKey(phase)) ? T(StateKey(phase)) : phase)
@@ -40,6 +39,7 @@ export class MeleeLab {
       <div class="siBody">
         <h3>${T('range.melee.group.variant')}</h3>
         <p class="siLabel">${T('range.melee.controlLabel')}</p><div class="siButtons">${controlButtons}</div>
+        <p class="siLabel mlFollowLabel"></p><input type="range" class="siRange mlFollow" min="0" max="100" step="5" aria-label="${T('range.melee.followAria')}">
         <p class="siLabel">${T('range.melee.impactLabel')}</p><div class="siButtons">${impactButtons}</div>
         <h3>${T('range.melee.group.scenario')}</h3>
         <select class="siSelect mlScenario" aria-label="${T('range.melee.scenarioAria')}">${MELEE_LAB_SCENARIOS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
@@ -50,10 +50,6 @@ export class MeleeLab {
         <div class="siRead mlMeters"></div>
       </div>`;
     document.body.append(this.root);
-    // 拖拽挥砍的八向指示：准心外一圈短刻度，暗金＝这一甩会从哪边砍，亮金＝正在砍的这一刀。
-    this.ring=document.createElement('div'); this.ring.className='mlDirRing'; this.ring.hidden=true; this.ring.setAttribute('aria-hidden','true');
-    this.ring.innerHTML=MELEE_DRAG.directions.map(d=>`<i data-dir="${d.id}" style="--a:${-d.angleDeg}deg"></i>`).join('')+'<b class="mlDirName"></b>';
-    document.body.append(this.ring);
     this.select=this.root.querySelector('.mlScenario');
     this.currentScenario=this.select.value;
     const Click=(selector,action)=>{for(const el of this.root.querySelectorAll(selector))el.onclick=(e)=>{action(el,e);e.currentTarget.blur();host.Focus?.();};};
@@ -61,6 +57,9 @@ export class MeleeLab {
     Click('.mlPause',(el)=>{const on=host.Pause();el.textContent=on?T('range.melee.btnResume'):T('range.melee.btnPause');});
     Click('.mlControl',(el)=>host.SetVariant({control:el.dataset.control}));
     Click('.mlImpact',(el)=>host.SetVariant({impact:el.dataset.impact}));
+    this.follow=this.root.querySelector('.mlFollow');
+    this.follow.oninput=()=>host.SetViewFollow?.(this.follow.value/100);
+    this.follow.onchange=()=>{this.follow.blur();host.Focus?.();};
     this.root.querySelector('.siCollapse').onclick=(event)=>{
       const collapsed=this.root.classList.toggle('collapsed');
       event.currentTarget.setAttribute('aria-expanded',String(!collapsed));
@@ -86,6 +85,9 @@ export class MeleeLab {
     for(const el of this.root.querySelectorAll('.mlControl'))this.Flag(el,'active',el.dataset.control===variant.control);
     for(const el of this.root.querySelectorAll('.mlImpact'))this.Flag(el,'active',el.dataset.impact===variant.impact);
     const drag=variant.control==='drag', lodge=variant.impact==='lodge';
+    const follow=Math.round((snapshot.viewFollow??0.5)*100);
+    if(document.activeElement!==this.follow&&+this.follow.value!==follow)this.follow.value=String(follow);
+    this.Put('.mlFollowLabel',T('range.melee.followLabel',{percent:follow}));
     const controls=drag?[T('range.melee.controlDrag'),T('range.melee.controlParryDrag')]:[T('range.melee.controlAttack'),T('range.melee.controlParry')];
     controls.push(T('range.melee.controlPress'));
     if(lodge)controls.push(T('range.melee.controlLodge'));
@@ -101,20 +103,9 @@ export class MeleeLab {
       health:Math.round(snapshot.health),stamina:Math.round(f?.stamina??100),poise:Math.round(f?.poise??100)})];
     if(enemy)meters.push(enemy.alive?T('range.melee.enemyLine',{distance:enemy.distance.toFixed(2),health:Math.round(enemy.health),phase:TargetPhase(enemy.pose?.phase)})
       :T('range.melee.enemyDown'));
-    if(snapshot.lodge)meters.push(T('range.melee.readLodge',{progress:Math.round(snapshot.lodge.progress*100),seconds:snapshot.lodge.timeLeft.toFixed(1)}));
+    if(snapshot.lodge)meters.push(T('range.melee.readLodge',{progress:Math.round(snapshot.lodge.progress*100)}));
     if(snapshot.finishTarget!=null)meters.push(T('range.melee.readFinish'));
     this.Put('.mlMeters',meters.join('\n'));
-    // 八向指示
-    const ring=drag&&snapshot.alive&&!snapshot.menu&&(f?.phase==='aim'||['windup','active','recovery'].includes(f?.phase));
-    if(this.ring.hidden===ring)this.ring.hidden=!ring;
-    if(ring){
-      const swinging=['windup','active','recovery'].includes(f?.phase)?f.direction:null;
-      for(const tick of this.ring.querySelectorAll('i')){
-        this.Flag(tick,'preview',tick.dataset.dir===snapshot.dragPreview);
-        this.Flag(tick,'swing',tick.dataset.dir===swinging);
-      }
-      this.Put(this.ring.querySelector('.mlDirName'),swinging?DirName(swinging):'');
-    }
   }
-  Dispose(){this.root.remove();this.ring.remove();document.body.classList.remove('meleeLabActive');}
+  Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}
 }

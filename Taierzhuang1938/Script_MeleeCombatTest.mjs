@@ -360,7 +360,8 @@ Test('press input: auto assist presses for the player shortly after the ring ope
 });
 // ── 白刃实验场的玩法变体：卡刀拔刀补刀、拖拽挥砍（Data_MeleeCombat.MELEE_LODGE / MELEE_DRAG）──
 const Distance0=(a,b)=>Math.hypot(a.position.x-b.position.x,a.position.z-b.position.z);
-const Mash=(c,hz,seconds)=>{for(let t=0;t<seconds&&c.Fighter(c.Player()).state==='lodged';t+=1/hz){c.HandleInput('Mouse0',true);c.HandleInput('Mouse0',false);Step(c,1/hz);}};
+// 拔刀：长按 F seconds 秒再松开。
+const HoldF=(c,seconds)=>{c.HandleInput('KeyF',true);Step(c,seconds);c.HandleInput('KeyF',false);};
 // 拖拽：每 1/60 s 喂一帧鼠标位移（lookY 向下为正），frames 帧。
 const Drag=(c,dx,dy,frames=4)=>{for(let i=0;i<frames;i++){c.AddLook(dx,dy);c.Update(1/60);}};
 const LodgeAt=1.3;
@@ -373,38 +374,41 @@ Test('lodge: a deep dadao cut into a living man sticks both fighters and blocks 
   const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({impact:'lodge'});
   c.Attack(p); StepUntil(c,()=>e.health<100,1);
   assert.equal(e.health,48); assert.equal(c.Fighter(p).state,'lodged'); assert.equal(c.Fighter(e).state,'lodged');
-  assert(c.Blocking,'player cannot walk while the blade is stuck'); assert.equal(c.View().kind,'lodge'); assert.equal(c.stats.lodges,1);
+  assert(c.Blocking,'player cannot walk while the blade is stuck'); assert.equal(c.View(),null,'no QTE card'); assert.equal(c.stats.lodges,1);
+  assert.deepEqual(c.PromptView(),{mode:'press',key:'F',progress:0,pulse:0},'one on-screen ring with F in it');
   assert.equal(c.State().player.state,'lodged'); assert(c.State().player.lodge,'first-person pose carries the lodge strain');
   assert(!c.Parry(),'cannot parry with a stuck blade');
 });
 Test('lodge: a tip graze or an off-centre cut is only a wound and needs no pulling',()=>{
   const far=Make('Dadao',1.52); far.c.SetVariant({impact:'lodge'}); far.c.Attack(far.p); StepUntil(far.c,()=>far.e.health<100,1);
   assert.equal(far.e.health,48,'the tip still cuts'); assert.notEqual(far.c.Fighter(far.p).state,'lodged'); assert.equal(far.c.stats.lodges,0);
-  assert.equal(far.c.stats.shallowCuts,1); assert.equal(far.c.View(),null);
+  assert.equal(far.c.stats.shallowCuts,1); assert.equal(far.c.PromptView(),null);
   const side=Make('Dadao',LodgeAt); side.c.SetVariant({impact:'lodge'}); side.e.position.x=0.62; side.e.position.z=-1.15;
   side.c.Attack(side.p); StepUntil(side.c,()=>side.e.health<100,1);
   if(side.e.health<100){assert.notEqual(side.c.Fighter(side.p).state,'lodged','a cut at the edge of the arc glances off');assert.equal(side.c.stats.shallowCuts,1);}
 });
-Test('lodge: mashing left button yanks the blade out, the opponent reels and any hit finishes him',()=>{
+Test('lodge: holding F fills the ring and yanks the blade out, the opponent reels and F again finishes him',()=>{
   const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({impact:'lodge'});
   c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
-  Mash(c,6,2); assert.equal(c.stats.yanks,1); assert.equal(c.Fighter(e).state,'reel');
-  assert(Distance0(p,e)>1.35,'yank shoves him back'); assert.equal(c.View(),null);
+  c.HandleInput('KeyF',true); Step(c,.4); const half=c.PromptView().progress; assert(half>.4&&half<.6,`ring half full after 0.4 s (${half})`);
+  assert(c.PromptView().pulse>0,'the F key throbs while held'); assert.equal(c.Fighter(e).state,'lodged');
+  Step(c,.45); assert.equal(c.stats.yanks,1); assert.equal(c.Fighter(e).state,'reel');
+  StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert.equal(c.FinishCandidate(),e); c.HandleInput('KeyF',true,true); assert.equal(c.Fighter(p).attack?.finisher??null,null,'still holding F from the yank does not finish');
+  c.HandleInput('KeyF',false);
+  assert(Distance0(p,e)>1.35,'yank shoves him back'); assert.equal(c.PromptView(),null);
   StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert.equal(c.FinishCandidate(),e);
   assert(c.HandleInput('KeyF',true)); c.HandleInput('KeyF',false);
   StepUntil(c,()=>!e.alive,1.5); assert(!e.alive,'F finisher kills the reeling man'); assert.equal(c.stats.finishes,1);
 });
-Test('lodge: holding S pulls the blade out without mashing; mouse wiggle helps',()=>{
+Test('lodge: only F pulls; letting go slides the ring back; the stuck man never wrenches free',()=>{
   const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({impact:'lodge'});
   c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
-  c.HandleInput('KeyS',true); c.AddLook(120,0); Step(c,1.6); c.HandleInput('KeyS',false);
-  assert.equal(c.Fighter(e).state,'reel');
-});
-Test('lodge: leaving the blade in lets the opponent wrench free, no finisher window',()=>{
-  const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({impact:'lodge'});
-  c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
-  Step(c,2.7); assert.equal(c.Fighter(p).state,'stagger'); assert.notEqual(c.Fighter(e).state,'reel');
-  assert(c.events.some(x=>x.kind==='lodgeTimeout')); assert.equal(c.FinishCandidate(),null);
+  for(let i=0;i<10;i++){c.HandleInput('Mouse0',true);c.HandleInput('Mouse0',false);Step(c,.1);}
+  c.HandleInput('KeyS',true); c.AddLook(300,0); Step(c,.5); c.HandleInput('KeyS',false);
+  assert.equal(c.PromptView().progress,0,'mashing, S and mouse wiggle do nothing');
+  HoldF(c,.5); const held=c.PromptView().progress; Step(c,.5); assert(c.PromptView().progress<held,'releasing F slides back');
+  Step(c,8); assert.equal(c.Fighter(p).state,'lodged'); assert.equal(c.Fighter(e).state,'lodged','no time limit: he cannot move with the blade in him');
+  assert.equal(e.position.z,-LodgeAt);
 });
 Test('lodge: a killing heavy cleaves through, bayonet never lodges',()=>{
   const a=Make('Dadao',LodgeAt); a.c.SetVariant({impact:'lodge'}); a.c.Attack(a.p,true); Step(a.c,.8); assert(!a.e.alive); assert.equal(a.c.stats.lodges,0);
@@ -415,7 +419,7 @@ Test('lodge: getting hit while stuck lets go of the blade',()=>{
   c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
   c.Stagger(p,e,'Hit',.3,10); assert.notEqual(c.Fighter(p).state,'lodged'); assert.notEqual(c.Fighter(e).state,'lodged');
 });
-Test('drag: holding left button raises the blade and the mouse moves it instead of the view',()=>{
+Test('drag: holding left button raises the blade and the mouse leads it (the view follows only partly)',()=>{
   const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({control:'drag'});
   c.HandleInput('Mouse0',true); assert.equal(c.Fighter(p).state,'aim'); assert(c.CapturesLook,'mouse belongs to the blade while held');
   Drag(c,8,0,6); const pose=c.State().player; assert.equal(pose.state,'aim'); assert(pose.aimOffset.x>0,'the guard follows the mouse');
@@ -449,7 +453,7 @@ Test('drag + lodge combine: a deep flick lodges, the frozen pose keeps its roll,
   c.HandleInput('Mouse0',true); Drag(c,-40,0,3); c.HandleInput('Mouse0',false);
   StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
   const pose=c.State().player; assert.equal(pose.state,'lodged'); assert(pose.swingRoll<-0.1); assert(pose.strokeSplit);
-  Mash(c,6,2); StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert(c.Finish()); assert.equal(c.Fighter(p).attack.direction.id,'up');
+  HoldF(c,1); StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert(c.Finish()); assert.equal(c.Fighter(p).attack.direction.id,'up');
   StepUntil(c,()=>!e.alive,1.5); assert(!e.alive);
 });
 console.log(`${count} melee rule tests passed`);

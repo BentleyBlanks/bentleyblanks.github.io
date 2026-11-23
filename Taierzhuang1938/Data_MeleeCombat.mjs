@@ -95,10 +95,9 @@ export const MELEE_LODGE = Object.freeze({
   minDepthM: 0.42, lightExtraDepthM: 0.06, maxOffAxisRad: 0.42,
   // 卡住之后刀停在接触那一刻再往里吃一点（攻击归一化时间 +pressInN）。
   pressInN: 0.03,
-  // 拔刀进度：连按左键每下（限每秒 maxRate 下）、按住 S 每秒、鼠标每像素；不拔会慢慢回落。
-  pullPerPress: 0.2, maxRate: 8, pullHoldPerS: 0.72, wigglePerPx: 0.0016, decayPerS: 0.1,
-  // 超过 maxS 没拔出来：对方挣脱、把你推一个趔趄，不给补刀。
-  maxS: 2.6, timeoutStaggerS: 0.7,
+  // 拔刀（2026-11-23 第三轮，用户：「不是 QTE，屏幕上一个圈，长按 F 就拔出来」）：长按 F，holdS 秒把圈走满；
+  // 中途松手按 decayPerS 往回退。没有时限 —— 对方挨了这一刀动不了，刀不拔就一直卡着。
+  holdS: 0.8, decayPerS: 0.6,
   // 卡着的时候视角被拽回对方（每秒回拉比例），对方被钉在原地发抖。
   tetherRate: 7, tremorRad: 0.05,
   // 拔刀动作时长；对方随即踉跄 reelS 秒：往后倒退、左右打晃。
@@ -109,7 +108,9 @@ export const MELEE_LODGE = Object.freeze({
 });
 export const MELEE_DRAG = Object.freeze({
   // 按住左键时鼠标带着刀走：刀架往鼠标那边偏（最多 aimOffsetM，aimRadiusPx 像素到头），松开鼠标 aimReturnS 秒回中。
-  aimRadiusPx: 220, aimOffsetM: 0.07, aimReturnS: 0.35, aimRollRad: 0.5,
+  aimRadiusPx: 220, aimOffsetM: 0.14, aimReturnS: 0.35, aimRollRad: 0.5,
+  // 视角跟着转：按着左键时视角只跟鼠标的 viewFollow 倍（刀走一整步、视角走一半）；实验场面板滑条可调 0–1。
+  viewFollow: 0.5,
   // 出刀：最近 windowS 秒里鼠标走过的位移 ≥ minStrokePx，且速度 ≥ triggerPxPerS，就顺着这一甩的方向砍下去。
   windowS: 0.1, minStrokePx: 60, triggerPxPerS: 1200,
   // 甩得越快砍得越重：速度从 powerPxPerS[0] 到 [1]，伤害 × powerScale[0] → [1]。

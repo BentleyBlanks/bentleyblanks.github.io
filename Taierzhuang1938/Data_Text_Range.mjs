@@ -168,10 +168,12 @@ export const TEXT = Object.freeze({
   "range.melee.impact.lodge": "卡刀 · 拔刀 · 补刀",
   "range.melee.controlAttack": "左键：轻击／蓄力重击",
   "range.melee.controlParry": "右键：拨枪 · WASD：移动避刺",
-  "range.melee.controlDrag": "按住左键：刀跟着鼠标走 · 一甩就顺着甩的方向砍下去，甩得越快越重",
+  "range.melee.controlDrag": "按住左键：刀跟着鼠标走、视角跟一部分 · 一甩就顺着甩的方向砍下去，甩得越快越重",
+  "range.melee.followLabel": "拖拽时视角跟随 {percent}%",
+  "range.melee.followAria": "拖拽挥砍时视角跟随刀的比例",
   "range.melee.controlParryDrag": "右键：拨挡 · WASD：移动",
   "range.melee.controlPress": "F：贴身压枪／顶架 · 抵抗时连按 F",
-  "range.melee.controlLodge": "刀砍进身体卡住：按住 S／连按左键／晃鼠标拔刀 · 对方踉跄时 F：补刀",
+  "range.melee.controlLodge": "刀砍进身体卡住：长按 F 拔刀 · 拔出来后再砍一刀或按 F：补刀",
   "range.melee.controlWeapon": "1／3：步枪／大刀 · V：射击／白刃架势",
 
   // ── 白刃实验场：状态读数 ──────────────────────────────────────────────
@@ -184,17 +186,8 @@ export const TEXT = Object.freeze({
   "range.melee.meters": "{weapon} · {phase}{parry}\n生命 {health} · 体力 {stamina} · 平衡 {poise}",
   "range.melee.enemyLine": "日军 · {distance}m · 生命 {health} · {phase}",
   "range.melee.enemyDown": "日军 · 已倒下",
-  "range.melee.readLodge": "刀卡住了 · 拔出 {progress}% · 还剩 {seconds} 秒",
+  "range.melee.readLodge": "刀卡住了 · 拔出 {progress}%",
   "range.melee.readFinish": "可补刀（F）",
-  // 八个来向（MELEE_DRAG.directions 的 id）：拖拽挥砍的准心八向指示上写这一刀的名字。
-  "range.melee.dir.upRight": "右上斜劈",
-  "range.melee.dir.right": "右横扫",
-  "range.melee.dir.downRight": "右下上撩",
-  "range.melee.dir.down": "下撩",
-  "range.melee.dir.downLeft": "左下上撩",
-  "range.melee.dir.left": "左横扫",
-  "range.melee.dir.upLeft": "左上斜劈",
-  "range.melee.dir.up": "竖劈",
 
   // 交锋状态机的相位名（Data_MeleeCombat 的 phase 是 ASCII id，这里是它们的显示名）。
   "range.melee.state.idle": "警戒",
@@ -292,8 +285,6 @@ export const GATED_MODULES = Object.freeze([
  */
 export const DYNAMIC_PREFIXES = Object.freeze([
   "range.melee.state.",
-  // `range.melee.dir.<id>` —— 拖拽挥砍的来向 id（Data_MeleeCombat.MELEE_DRAG），查不到退回原 id。
-  "range.melee.dir.",
   "range.movement.kind.",
   // `range.gore.limb.<id>` —— id 是 CHARACTER_HITBOX_PROFILE 的 shape id
   //（upperArmL / forearmL / thighL / calfL / head 与右侧同名），查不到时退回原 id。

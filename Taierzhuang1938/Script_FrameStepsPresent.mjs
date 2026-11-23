@@ -81,7 +81,8 @@ export function PlayStepHud(ctx, f) {
   }), phase.hud);
   ctx.hud.SetSuppression(ctx.player.suppression);
   // 屋内伏击那一拍自带一个提示环，共用的底部僵持进度卡这时候让位（其余场合照旧）。
-  const cinematicPrompt = ctx.missionRuntime?.AmbushPromptView?.() || null;
+  // 白刃实验场的卡刀也借这个环：中间 F，长按拔刀（规则层只交脱敏视图）。
+  const cinematicPrompt = ctx.missionRuntime?.AmbushPromptView?.() || ctx.meleeCombat?.PromptView?.() || null;
   ctx.hud.SetCinematicBeat(ctx.missionRuntime?.AmbushCinematic === true);
   ctx.hud.SetCinematicPrompt(cinematicPrompt);
   ctx.hud.SetMeleeQte(ctx.missionRuntime?.AmbushCinematic ? null : (ctx.meleeCombat?.View() || null));

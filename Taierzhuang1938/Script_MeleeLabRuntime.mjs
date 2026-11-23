@@ -7,7 +7,7 @@
 // 2026-11-01 从 Script_Main 搬来；实验场的状态（当前项目、遭遇进度、暂停、动作预览、面板）跟页面走，
 // 换关重建不清，与搬家前一致。装配层只按测试场插件的通用接口调它（见 Script_SandboxRanges 头注）。
 
-import { MELEE_SCENARIOS } from "./Data_MeleeCombat.mjs";
+import { MELEE_SCENARIOS, MELEE_DRAG } from "./Data_MeleeCombat.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { XBotSkins } from "./Script_EditorBlockoutXBot.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
@@ -29,6 +29,8 @@ let meleePreviewFrame = null;
 const meleeTargets = [];
 const urlParams = new URLSearchParams(globalThis.location?.search || "");
 let meleeVariant = { control: urlParams.get("meleeControl") || "classic", impact: urlParams.get("meleeImpact") || "classic" };
+/** 拖拽挥砍时视角跟鼠标的比例（面板滑条；网址 ?meleeViewFollow=0.5 也能指定）。 */
+let meleeViewFollow = urlParams.has("meleeViewFollow") ? +urlParams.get("meleeViewFollow") : MELEE_DRAG.viewFollow;
 
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
@@ -36,6 +38,7 @@ function StartMeleeScenario(id) {
   ctx.post.hasPrev=false;ctx.post.hasTaaHistory=false;
   ctx.meleeCombat.Reset();
   meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
+  meleeViewFollow = ctx.meleeCombat.SetViewFollow(meleeViewFollow);
   for (const soldier of [...ctx.ai.soldiers]) ctx.ai.Remove(soldier);
   meleeTargets.length = 0;
   ctx.player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
@@ -103,16 +106,16 @@ function SeedMeleeTargets() {
   for (const entry of meleeTargets) entry.soldier.meleeTraining.passive = true;
 }
 
-/** 白刃层每帧之前：喂这一帧的鼠标位移（拖拽挥砍、卡刀晃鼠标撬刀）；按着左键拖刀时这一帧不转视角。 */
+/** 白刃层每帧之前：喂这一帧的鼠标位移（拖拽挥砍带刀、出刀）；按着左键拖刀时视角只跟 viewFollow 倍。 */
 function BeforeMeleeStep() {
   const input = ctx.input;
   ctx.meleeCombat.AddLook(input?.lookX || 0, input?.lookY || 0);
-  if (input && ctx.meleeCombat.CapturesLook) { input.lookX = 0; input.lookY = 0; }
+  if (input && ctx.meleeCombat.CapturesLook) { input.lookX *= meleeViewFollow; input.lookY *= meleeViewFollow; }
 }
 
 function MeleeSnapshot() {
   const core = ctx.meleeCombat.State();
-  return { ...core, scenario: meleeScenario, menu: ctx.state.menu, health: ctx.player.health, alive: ctx.player.Alive,
+  return { ...core, scenario: meleeScenario, viewFollow: meleeViewFollow, menu: ctx.state.menu, health: ctx.player.health, alive: ctx.player.Alive,
     weapon: ctx.meleeCombat.Weapon(ctx.player), stance:ctx.meleeStance?'melee':'fire', preview: meleePreview, paused: meleePaused,
     targets: meleeTargets.map(({ soldier: s, id }) => ({ id, runtimeId: s.id, side: s.side, health: s.health, alive: s.alive, x: s.position.x, z: s.position.z, distance: Math.hypot(s.position.x - ctx.player.position.x, s.position.z - ctx.player.position.z), pose: s.meleeCombat })),
     hud: ctx.hud.MeleeQteState(),
@@ -133,6 +136,8 @@ const api = {
   /** 切玩法（{control, impact} 缺哪个留哪个），重开当前项目。 */
   SetVariant: (variant) => { meleeVariant = { ...meleeVariant, ...variant }; StartMeleeScenario(meleeScenario); return { ...meleeVariant }; },
   Variant: () => ({ ...meleeVariant }),
+  /** 拖拽时视角跟随比例 0–1（不重开项目）。 */
+  SetViewFollow: (value) => (meleeViewFollow = ctx.meleeCombat.SetViewFollow(value)),
   /** 日军换没换上遭遇编辑器那套人物（取证用）。 */
   Skins: () => meleeTargets.map(({ soldier, id }) => ({ id, skinned: skinned.has(soldier), kit: ctx.ai.view.skins.get(soldier)?.kit?.key || null })),
 };
@@ -141,7 +146,7 @@ const api = {
 export function CreateMeleeLab(host) {
   ctx = host.ctx;
   LoadEnemySkins(host);
-  if (!meleeLab) meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, SetVariant: api.SetVariant, Focus: host.Focus });
+  if (!meleeLab) meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, SetVariant: api.SetVariant, SetViewFollow: api.SetViewFollow, Focus: host.Focus });
   SeedMeleeTargets();
   return {
     debugName: "MeleeCombat", api,

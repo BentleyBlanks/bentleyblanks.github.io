@@ -1,10 +1,10 @@
 // 白刃实验场（?melee=1）的浏览器验收（2026-11-23，同日第二轮按用户改过）：
 //   · 场景只有一个对手，用遭遇编辑器那套日军人物（日兵甲，X Bot 换皮）；侧光白天，人和方块的影子落在画面里；
 //   · 面板是 .shellImpactLab 那一套、只留「玩法 / 项目 / 操作 / 读数」，玩法两组按钮真点得动、切了立即重开；
-//   · 卡刀：真实左键贴近砍进身体 → 双方 lodged、拔刀进度卡、第一人称刀定格 → 真实连按左键拔出 → 对方踉跄 → 真实 F 补刀；
+//   · 卡刀：真实左键贴近砍进身体 → 双方 lodged、屏幕上一个 F 圈、第一人称刀定格 → 真实长按 F 拔出 → 对方踉跄 → 再按 F 补刀；
 //     站远了刀尖擦过只是一道口子、不卡；
-//   · 拖拽挥砍：真实按住左键 → 拖刀架势、视角不转；鼠标一甩（Debug.Look，同 mousemove 进来的那条链）就顺着甩的方向砍，
-//     八向指示在；与卡刀组合也走得通；整程无页面报错。
+//   · 拖拽挥砍：真实按住左键 → 拖刀架势、视角按面板滑条的比例跟一部分（真拖滑条 50% / 100% 对比）；鼠标一甩
+//     （Debug.Look，同 mousemove 进来的那条链）就顺着甩的方向砍；与卡刀组合也走得通；整程无页面报错。
 // 出图（--shots）：长边 640 px，写到忽略目录 tmp/DadaoLab/shots。浏览器静音（BrowserTestKit 自带 --mute-audio）。
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -30,9 +30,9 @@ const State = () => page.evaluate(() => {
   const enemy = s.targets.find((t) => t.side === "ija");
   return { variant: s.variant, player: s.player && { state: s.player.state, phase: s.player.phase, roll: s.player.swingRoll || 0, mirror: s.player.swingMirror || 0,
     direction: s.player.direction, aim: s.player.aimOffset || null, lodge: s.player.lodge || null },
-    stats: s.stats, lodge: s.lodge, finishTarget: s.finishTarget, hud: s.hud && { kind: s.hud.kind, label: s.hud.label }, targets: s.targets.length,
+    stats: s.stats, lodge: s.lodge, finishTarget: s.finishTarget, hud: s.hud && { kind: s.hud.kind }, prompt: Taierzhuang.hud.CinematicPromptState(), targets: s.targets.length, viewFollow: s.viewFollow,
     enemy: enemy && { health: enemy.health, alive: enemy.alive, distance: enemy.distance, state: enemy.pose?.state || null },
-    ring: !document.querySelector(".mlDirRing")?.hidden, dragPreview: s.dragPreview, yaw: Taierzhuang.player.yaw };
+    yaw: Taierzhuang.player.yaw };
 });
 async function Shot(name) {
   if (!SHOTS) return;
@@ -99,11 +99,15 @@ try {
   for (let i = 0; i < 40 && (await State()).player?.state !== "lodged"; i++) await Step(1);
   s = await State();
   assert.equal(s.player.state, "lodged", "a close cut into the body lodges the blade");
-  assert.equal(s.enemy.state, "lodged"); assert.equal(s.enemy.health, 48); assert.equal(s.hud?.kind, "lodge", "the pull-out bar appears");
-  console.log("PASS lodge", JSON.stringify({ enemy: s.enemy, hud: s.hud }));
+  assert.equal(s.enemy.state, "lodged"); assert.equal(s.enemy.health, 48); assert.equal(s.hud, null, "no QTE card");
+  assert.equal(s.prompt?.key, "F", "one on-screen ring with F");
+  console.log("PASS lodge", JSON.stringify({ enemy: s.enemy, prompt: s.prompt }));
   await Step(8); await Shot("02_Lodged");
-  for (let i = 0; i < 10 && (await State()).player.state === "lodged"; i++) await Click(1, 8);
-  s = await State(); assert.equal(s.stats.yanks, 1, "the blade comes out"); assert.equal(s.enemy.state, "reel", "he staggers");
+  await page.keyboard.down("f"); await Step(24); s = await State();
+  assert(s.prompt.progress > 0.35 && s.player.state === "lodged", "holding F fills the ring"); await Shot("02b_HoldF");
+  for (let i = 0; i < 20 && (await State()).player.state === "lodged"; i++) await Step(4);
+  await page.keyboard.up("f");
+  s = await State(); assert.equal(s.stats.yanks, 1, "the blade comes out"); assert.equal(s.enemy.state, "reel", "he staggers"); assert.equal(s.prompt, null);
   await Step(2); await Shot("03_Yank");
   for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
   await Step(20); await Shot("04_Reel");
@@ -118,6 +122,16 @@ try {
   await page.getByRole("button", { name: "原版 · 砍中即退", exact: true }).click();
   await page.getByRole("button", { name: "拖拽挥砍", exact: true }).click();
   assert.deepEqual((await State()).variant, { control: "drag", impact: "classic" });
+  const follow = {};
+  for (const percent of ["100", "50"]) {
+    await page.locator(".mlFollow").fill(percent);
+    assert.equal((await State()).viewFollow, percent / 100, "slider sets the view follow");
+    await Setup("DadaoOne", 1.6); await page.mouse.down();
+    const yaw0 = (await State()).yaw; await Flick(5, 0, 6); follow[percent] = Math.abs((await State()).yaw - yaw0);
+    await page.mouse.up(); await Step(30);
+  }
+  assert(follow["50"] > 0 && Math.abs(follow["50"] / follow["100"] - 0.5) < 0.05, `view follows half as far at 50% (${JSON.stringify(follow)})`);
+  console.log("PASS view follow", JSON.stringify(follow));
   const cuts = {};
   for (const [name, dx, dy, expect] of [["Left", -40, 6, "right"], ["Right", 40, -6, "left"], ["Down", 4, 40, "up"], ["UpRight", 30, -30, "downLeft"]]) {
     await Setup("DadaoOne", 1.6);
@@ -125,10 +139,10 @@ try {
     const yaw0 = (await State()).yaw;
     await Flick(dx * 0.12, dy * 0.12, 6);
     s = await State();
-    assert.equal(s.player.state, "aim", "holding left button raises the drag guard"); assert(Math.abs(s.yaw - yaw0) < 1e-6, "the mouse moves the blade, not the view");
+    assert.equal(s.player.state, "aim", "holding left button raises the drag guard"); assert(Math.abs(s.yaw - yaw0) > 1e-4, "the view follows the blade partly");
     await Shot(`06_Aim_${name}`);
     await Flick(dx, dy, 3);
-    s = await State(); assert.equal(s.player.direction, expect, `flick ${name} cuts from ${expect}`); assert(s.ring, "eight-way ring shows while dragging");
+    s = await State(); assert.equal(s.player.direction, expect, `flick ${name} cuts from ${expect}`); assert(!(await page.locator(".mlDirRing").count()), "no direction wheel");
     cuts[name] = [s.player.direction, +s.player.roll.toFixed(2), +s.player.mirror.toFixed(2)];
     await Step(4); await Shot(`07_Cut_${name}`);
     await page.mouse.up();
@@ -143,8 +157,8 @@ try {
   for (let i = 0; i < 40 && (await State()).player.state !== "lodged"; i++) await Step(1);
   s = await State(); assert.equal(s.player.state, "lodged"); assert(s.player.roll < -0.3, "lodged pose keeps the side-swing roll");
   await Step(6); await Shot("08_DragLodged");
-  await page.keyboard.down("s"); for (let i = 0; i < 30 && (await State()).player.state === "lodged"; i++) await Step(6); await page.keyboard.up("s");
-  s = await State(); assert.equal(s.enemy.state, "reel", "holding S also pulls the blade");
+  await page.keyboard.down("f"); for (let i = 0; i < 30 && (await State()).player.state === "lodged"; i++) await Step(6); await page.keyboard.up("f");
+  s = await State(); assert.equal(s.enemy.state, "reel", "holding F pulls the blade");
   for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
   await page.keyboard.press("f");
   for (let i = 0; i < 60 && (await State()).enemy.alive; i++) await Step(1);

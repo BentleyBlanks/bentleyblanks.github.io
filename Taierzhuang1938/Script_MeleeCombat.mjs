@@ -50,7 +50,7 @@ export class MeleeCombatDirector {
     this.qte = new MeleeQteDirector({ Resolve: (a) => this.ResolveQte(a), Finish: (a) => this.FinishQte(a) }, options);
     // 玩法变体（只有白刃实验场会切，见 Data_MeleeCombat.MELEE_VARIANTS）；拖拽挥砍要的鼠标：
     // pending 是这一帧还没记账的位移，strokes 是最近 windowS 秒逐帧的位移，aim 是刀架跟着鼠标偏出去的量（像素）。
-    this.variant = { control: "classic", impact: "classic" };
+    this.variant = { control: "classic", impact: "classic" }; this.viewFollow = D.viewFollow;
     this.mouse = { pending: { x: 0, y: 0 }, strokes: [], aim: { x: 0, y: 0 } };
   }
   SetVariant({ control = this.variant.control, impact = this.variant.impact } = {}) {
@@ -61,16 +61,16 @@ export class MeleeCombatDirector {
     return { ...this.variant };
   }
   get Drag() { return this.variant.control === "drag"; }
-  /** 按着左键拖拽时鼠标归刀不归视角（实验场插件按它把这一帧的转视角吞掉）。 */
+  /** 按着左键拖拽时鼠标主要归刀：视角只跟 viewFollow 倍（实验场插件按它缩这一帧的转视角）。 */
   get CapturesLook() {
     const f = this.fighters.get(this.Player());
     return this.Drag && this.held.has("Mouse0") && (f?.state === "aim" || (f?.state === "attack" && !!f.attack?.drag));
   }
-  /** 每帧喂一次鼠标位移（像素，lookY 向下为正）：拖拽挥砍拿它出刀，卡刀时晃鼠标也算撬刀。 */
+  /** 拖拽时视角跟鼠标的比例（0 = 视角不动、只动刀，1 = 视角照常全跟）。 */
+  SetViewFollow(value) { this.viewFollow = Clamp(Number.isFinite(+value) ? +value : D.viewFollow, 0, 1); return this.viewFollow; }
+  /** 每帧喂一次鼠标位移（像素，lookY 向下为正）：拖拽挥砍拿它带刀、出刀。 */
   AddLook(dx = 0, dy = 0) {
     this.mouse.pending.x += dx; this.mouse.pending.y -= dy;
-    const f = this.fighters.get(this.Player());
-    if (f?.state === "lodged") f.lodge.progress = Clamp(f.lodge.progress + Math.hypot(dx, dy) * L.wigglePerPx, 0, 1);
   }
   /** 最近 windowS 秒鼠标走过的位移（像素，y 朝上）。 */
   StrokeVector() {
@@ -124,7 +124,7 @@ export class MeleeCombatDirector {
   AttackDown(entity = this.Player()) {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !f?.weapon || this.Active && entity === this.Player()) return false;
-    if (f.state === "lodged") { this.PullLodge(f); return true; }
+    if (f.state === "lodged") return true;
     if (entity === this.Player() && this.Drag && W[f.weapon]) return this.BeginAim(f);
     if (f.state !== "idle") {
       if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
@@ -234,33 +234,21 @@ export class MeleeCombatDirector {
     const e = f.entity, tf = this.Fighter(target);
     const stroke = this.StrokeOf(f);
     f.lodge = { target, clip: f.clip, n: Clamp(this.AttackTime(f) + L.pressInN, 0, 1), ...stroke,
-      progress: 0, credit: 1, held: false, pulse: 0, presses: 0, direction: f.attack.direction?.id || null };
+      progress: 0, held: !!this.held.has("KeyF"), direction: f.attack.direction?.id || null };
     const lodge = f.lodge;
-    this.SetState(f, "lodged", L.maxS, lodge.clip); f.lodge = lodge;
-    this.SetState(tf, "lodged", L.maxS, "Hit"); tf.lodgedBy = e; tf.buffer = null;
+    this.SetState(f, "lodged", Infinity, lodge.clip); f.lodge = lodge;
+    this.SetState(tf, "lodged", Infinity, "Hit"); tf.lodgedBy = e; tf.buffer = null;
     this.stats.lodges++; this.Log("lodge", e, target);
-  }
-  PullLodge(f) {
-    const lodge = f.lodge;
-    if (!lodge || f.state !== "lodged") return false;
-    if (lodge.credit < 1) return false;
-    lodge.credit -= 1; lodge.presses++; lodge.pulse = 1;
-    lodge.progress = Clamp(lodge.progress + L.pullPerPress, 0, 1);
-    if (lodge.progress >= 1) this.Yank(f);
-    return true;
   }
   StepLodge(f, dt) {
     const e = f.entity, lodge = f.lodge, target = lodge?.target, tf = target && this.Fighter(target);
     if (!lodge || !Alive(target) || tf.state !== "lodged") { this.ReleaseLodge(f, "released"); return; }
-    lodge.credit = Math.min(1, lodge.credit + dt * L.maxRate);
-    lodge.pulse = Math.max(0, lodge.pulse - dt * 5);
-    lodge.progress = Clamp(lodge.progress + (lodge.held ? L.pullHoldPerS * dt : 0), 0, 1);
-    if (lodge.progress < 1) lodge.progress = Math.max(0, lodge.progress - L.decayPerS * dt);
-    // 卡着的刀把视角拽回对方：鼠标还能晃（晃也算撬刀），一松手就被拉回来。
+    // 长按 F 把圈走满，松手往回退；没有时限。
+    lodge.progress = Clamp(lodge.progress + (lodge.held ? dt / L.holdS : -L.decayPerS * dt), 0, 1);
+    // 卡着的刀把视角拽回对方：鼠标还能晃，一松手就被拉回来。
     const want = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
     e.yaw = (e.yaw || 0) + Wrap(want - (e.yaw || 0)) * Math.min(1, dt * L.tetherRate);
     if (lodge.progress >= 1) this.Yank(f);
-    else if (f.t >= L.maxS) this.LodgeTimeout(f);
   }
   Yank(f) {
     const e = f.entity, lodge = f.lodge, target = lodge.target, tf = this.Fighter(target);
@@ -272,12 +260,6 @@ export class MeleeCombatDirector {
     tf.reelSide = this.serial % 2 ? 1 : -1;
     tf.nextThink = Math.max(tf.nextThink, this.time + L.reelS);
     this.stats.yanks++; this.Log("yank", e, target);
-  }
-  LodgeTimeout(f) {
-    const e = f.entity, target = f.lodge?.target, tf = target && this.Fighter(target);
-    f.lodge = null; this.SetState(f, "stagger", L.timeoutStaggerS, "Pushed");
-    if (Alive(target)) { tf.lodgedBy = null; this.SetState(tf, "stagger", 0.45, "Hit"); this.Repel(e, target, 0.25); }
-    this.Log("lodgeTimeout", e, target);
   }
   ReleaseLodge(f, reason) {
     const target = f.lodge?.target, tf = target && this.fighters.get(target);
@@ -674,11 +656,11 @@ export class MeleeCombatDirector {
       if (code === "KeyF") this.qte.Press(down, repeat);
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
-    // 卡刀：按住 S 往回拽、连按左键撬，其余白刃键吞掉（Esc / Alt / ` 照常放行）。
+    // 卡刀：长按 F 拔刀，其余白刃键吞掉（Esc / Alt / ` 照常放行）。按着的键照记，拔出来以后再按 F 才是补刀。
     const pf = this.fighters.get(this.Player());
     if (pf?.state === "lodged" || pf?.state === "yank") {
-      if (code === "KeyS" && pf.lodge) pf.lodge.held = !!down;
-      else if (code === "Mouse0" && down && !repeat) this.PullLodge(pf);
+      if (down) this.held.add(code); else this.held.delete(code);
+      if (code === "KeyF" && pf.lodge) pf.lodge.held = !!down;
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
     if (!this.CanUse()) return false;
@@ -1098,7 +1080,7 @@ export class MeleeCombatDirector {
       const weight = L0.split ? this.RollWeight(L0.n, ...L0.split) * (1 - p) : 0;
       Object.assign(result, { clip: `${f.weapon}${L0.clip}`, action: L0.clip, animationNormalized: L0.n * (1 - p),
         strokeSplit: L0.split, strokeReverse: L0.reverse, swingRoll: L0.roll * weight, swingMirror: L0.mirror ? weight : 0, weaponYawOffset: 0,
-        lodge: { progress: L0.progress, pulse: L0.pulse, held: L0.held, yank: p, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
+        lodge: { progress: L0.progress, held: L0.held, yank: p, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
     } else if (f.state === "lodged") {
       Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.32 + Math.sin(this.time * 41) * 0.02 });
     } else if (f.state === "reel") {
@@ -1126,20 +1108,19 @@ export class MeleeCombatDirector {
   View() {
     const qte = this.qte.View();
     if (qte) return qte;
+    return null;
+  }
+  /** 卡刀时屏幕上那一个圈（HUD 的按键提示环，与屋内伏击同一个）：中间 F，长按把圈走满。 */
+  PromptView() {
     const f = this.fighters.get(this.Player());
     if (f?.state !== "lodged" || !f.lodge) return null;
-    const lodge = f.lodge;
-    return { kind: "lodge", serial: -1, phase: "input", success: null,
-      label: T("gameplay.melee.lodge.label"), prompt: T("gameplay.melee.lodge.prompt"),
-      keys: [T("gameplay.melee.lodge.keyPull"), T("gameplay.melee.lodge.keyMash")], expected: T("gameplay.melee.lodge.keyMash"),
-      input: "mash", index: lodge.presses, progress: lodge.progress, timeT: f.t / L.maxS, timeLeft: Math.max(0, L.maxS - f.t),
-      resolveT: 0, pulse: lodge.pulse, assist: this.qte.assist, accepted: lodge.presses, rejected: 0, reason: "lodge" };
+    return { mode: "press", key: "F", progress: f.lodge.progress, pulse: f.lodge.held ? 0.5 + 0.5 * Math.sin(this.time * 24) : 0 };
   }
   SetAssist(mode) { return this.qte.SetAssist(mode); }
   State() {
-    const view = this.View();
+    const pf = this.fighters.get(this.Player());
     return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14),
-      variant: { ...this.variant }, dragPreview: this.Drag ? this.DragPreview() : null, lodge: view?.kind === "lodge" ? view : null,
+      variant: { ...this.variant }, dragPreview: this.Drag ? this.DragPreview() : null, lodge: pf?.state === "lodged" && pf.lodge ? { progress: pf.lodge.progress, held: pf.lodge.held } : null,
       finishTarget: this.FinishCandidate()?.id ?? null };
   }
   Cancel(reason = "reset") {

@@ -1141,21 +1141,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   50% { transform:scale(1.12); color:#fff; background:rgba(224,176,98,.48); box-shadow:0 0 24px rgba(224,176,98,.65); }
 }
 @media(prefers-reduced-motion:reduce) { .hudMeleeQte.input .mqKeys kbd.expected { animation:none; background:rgba(224,176,98,.4); } }
-/* 白刃实验场（?melee=1）在 .shellImpactLab 之上补的几样：分组里的小标签、下拉框；
-   拖拽挥砍的八向指示（准心外一圈短刻度）；卡刀时抵抗卡换成拔刀进度、挪到准心右下，别挡住刀口。 */
+/* 白刃实验场（?melee=1）在 .shellImpactLab 之上补的几样：分组里的小标签、下拉框、滑条（视角跟随比例）。 */
+.shellImpactLab .siRange{display:block;width:100%;margin:4px 0 2px;accent-color:#d9bb7b}
 .shellImpactLab .siLabel{margin:8px 0 2px;font-size:11px;letter-spacing:.08em;color:#a7a89e}
 .shellImpactLab .siSelect{display:block;width:100%;box-sizing:border-box;margin:6px 0;background:#13140b66;color:#deddd2;border:1px solid #c1bdab40;padding:6px 8px;font:inherit;border-radius:0}
 .shellImpactLab .siSelect:focus-visible{outline:1px solid #edca83;outline-offset:2px}
 .shellImpactLab .siRead+.siRead{margin-top:6px}
-.mlDirRing{position:fixed;left:50%;top:50%;width:0;height:0;z-index:30;pointer-events:none}
-.mlDirRing[hidden]{display:none}
-.mlDirRing i{position:absolute;left:0;top:0;width:12px;height:3px;margin:-1.5px 0 0 -6px;background:#deddd240;transform:rotate(var(--a)) translateX(44px)}
-.mlDirRing i.preview{background:#cdb77b99}
-.mlDirRing i.swing{background:#edca83;height:4px;box-shadow:0 0 6px #edca83aa;width:18px;margin-left:-9px}
-.mlDirRing .mlDirName{position:absolute;left:0;top:58px;transform:translateX(-50%);white-space:nowrap;font:700 12px/1 var(--ui-font,sans-serif);letter-spacing:.12em;color:#edca83;text-shadow:0 1px 3px #000}
-.hudMeleeQte.lodge,.hudMeleeQte.lodge.on{left:auto;right:6%;bottom:12%;transform:none;width:250px}
-.hudMeleeQte.lodge .mqSlow,.hudMeleeQte.lodge .mqAssist{display:none}
-.hudMeleeQte.lodge .mqKeys kbd{width:auto;min-width:54px;padding:0 10px;font-size:22px}
 /* 人物战场反应测试场（?reactions=1）：沿用 .shellImpactLab 的整套样式，只补方位九宫格与距离一排。 */
 .battleReactionLab .brCompass{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
 .battleReactionLab .brCompass .siBtn{padding:6px 2px}
