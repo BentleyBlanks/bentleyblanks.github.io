@@ -249,6 +249,7 @@ class FirstPersonInspectionApp {
       reloadPrompt: $("reloadPrompt"),
       orbitPresets: $("orbitPresets"),
       reticleToggle: $("reticleToggle"),
+      lockMouseToggle: $("lockMouseToggle"),
       debugToggle: $("debugToggle"),
       debugBadge: $("debugBadge"),
       abFloat: $("abFloat"),
@@ -565,10 +566,25 @@ class FirstPersonInspectionApp {
       if (Number.isFinite(t)) this.ScrubActiveAction(t);
     });
 
-    // 鼠标在 3D 画布上的交互（玩家视角：左键开火、右键按住开镜兼拖曳微调准心；外部视角：左键环绕、右键平移、滚轮缩放）
+    // 鼠标在 3D 画布上的交互（玩家视角：左键开火兼拖曳瞄准、右键按住开镜兼拖曳微调准心、双击或点「锁鼠标」直接 FPS 自由瞄准；外部视角：左键环绕、右键平移、滚轮缩放）
     let dragMode = null;
     let lastX = 0;
     let lastY = 0;
+    const syncPointerLockUi = () => {
+      const locked = document.pointerLockElement === this.dom.canvas;
+      this.dom.lockMouseToggle?.setAttribute("aria-pressed", String(locked));
+      if (this.dom.lockMouseToggle) this.dom.lockMouseToggle.textContent = locked ? "已锁鼠标 (Esc)" : "锁鼠标";
+    };
+    document.addEventListener("pointerlockchange", syncPointerLockUi);
+    this.dom.lockMouseToggle?.addEventListener("click", () => {
+      if (document.pointerLockElement === this.dom.canvas) document.exitPointerLock?.();
+      else if (this.view === "player") this.dom.canvas.requestPointerLock?.();
+    });
+    this.dom.canvas.addEventListener("dblclick", () => {
+      if (this.view !== "player") return;
+      if (document.pointerLockElement === this.dom.canvas) document.exitPointerLock?.();
+      else this.dom.canvas.requestPointerLock?.();
+    });
     this.dom.canvas.addEventListener("mousedown", (e) => {
       this.dom.canvas.focus();
       lastX = e.clientX;
@@ -579,6 +595,7 @@ class FirstPersonInspectionApp {
       }
       if (e.button === 0) {
         this.lmbHeld = true;
+        dragMode = "aim";
         if (this.mode === "bolt") this.HandleBoltTrigger(true);
         else this.TryPlayerFire();
       } else if (e.button === 2) {
@@ -593,6 +610,11 @@ class FirstPersonInspectionApp {
     });
 
     window.addEventListener("mousemove", (e) => {
+      if (document.pointerLockElement === this.dom.canvas && this.view === "player") {
+        this.aimYaw = Clamp(this.aimYaw - (e.movementX || 0) * 0.0022, -0.56, 0.56);
+        this.aimPitch = Clamp(this.aimPitch - (e.movementY || 0) * 0.0020, -0.32, 0.32);
+        return;
+      }
       if (!dragMode) return;
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
@@ -775,6 +797,10 @@ class FirstPersonInspectionApp {
   SetView(view) {
     if (view !== "player" && view !== "inspect") return false;
     this.view = view;
+    if (view === "inspect" && document.pointerLockElement === this.dom.canvas) {
+      document.exitPointerLock?.();
+    }
+    if (this.dom.lockMouseToggle) this.dom.lockMouseToggle.hidden = view !== "player";
     for (const btn of document.querySelectorAll("[data-view]")) {
       btn.setAttribute("aria-pressed", String(btn.dataset.view === view));
     }
@@ -841,7 +867,7 @@ class FirstPersonInspectionApp {
     } else if (this.mode === "inertia") {
       this.dom.stageHint.textContent = "WASD 移动 · Shift 冲刺 · C 蹲伏 · Tab 切换改前/改后";
     } else {
-      this.dom.stageHint.textContent = "左键开火 · 右键瞄准并拖曳微调 · WASD 移动 · C 蹲伏 · R 换弹";
+      this.dom.stageHint.textContent = "左键开火/拖曳瞄准 · 右键开镜 · 双击锁鼠标 · WASD 移动 · R 换弹";
     }
   }
 
@@ -1504,7 +1530,8 @@ class FirstPersonInspectionApp {
       this.posZ = Clamp(this.posZ - this.velForward * dt * 0.65, -0.55, 2.2);
     }
 
-    const adsWanted = HasIronSight(this.weaponId) && !this.vm?.boltOpen && (this.adsLocked || this.rmbHeld) ? 1 : 0;
+    const openBoltBusy = !!(this.vm?.boltOpen || (this.vm?.action?.kind === "bolt" && this.vm?.pendingHoldOpen));
+    const adsWanted = HasIronSight(this.weaponId) && !openBoltBusy && (this.adsLocked || this.rmbHeld) ? 1 : 0;
     const sprintEff = adsWanted > 0.2 ? 0 : targetSprint;
     return { sprintEff, adsWanted, phaseLabel };
   }

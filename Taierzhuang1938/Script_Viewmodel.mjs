@@ -2988,7 +2988,12 @@ export class Viewmodel {
       : 0;
     // 空仓挂机（boltOpen === true 且不在骨骼装填尾段）时枪栓竖在机匣后方，
     // 禁止贴眼开镜与缩放，避免竖起的拉机柄直接怼在照门和屏幕正中（由情境 HUD 提示「R 装弹」）。
-    const boltClosed = (this.boltOpen && !this.action?.skeletal) ? 0 : 1;
+    // 打完最后一发开始拉空栓（pendingHoldOpen）时，在拉栓前半段（0.05 -> 0.45）顺滑退镜，
+    // 避免整段拉栓还硬顶在镜里、收尾瞬间突然弹回腰射。
+    const openBoltExit = (this.action?.kind === "bolt" && this.pendingHoldOpen)
+      ? Ease.InOut(Ease.Seg(this.action.t, 0.05, 0.45))
+      : 0;
+    const boltClosed = (this.boltOpen && !this.action?.skeletal) ? 0 : (1 - openBoltExit);
     this.adsSuppress = (this.action?.skeletal ? skeletalOut * (1 - this.wallLower)
       : (cycle ? 1 - cycleAway : procBolt ? 1 - boltAway * boltAdsDrop : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower)) * boltClosed;
     // 逐帧拉栓与程序化抵肩拉栓都保留开镜底座，避免中正式/三八式每打一发都暴力退回腰射再缩回。
