@@ -432,7 +432,7 @@ function setSystemDrawer(open, targetTab = null) {
 }
 
 /* --- 左栏：参照角色制作管线（ModelWorkbench）的卡片式任务卡 + 重定向 3D 封面 --- */
-const CARD_STEP_LABELS = ["白盒", "分镜", "视频", "提骨", "重定", "修缮"];
+const CARD_STEP_LABELS = ["白盒", "分镜", "视频", "提骨", "重定"];
 
 function taskStatusMeta(task, st) {
   const activeRun = activeMocapRun(task);
@@ -480,9 +480,10 @@ function renderTaskList() {
       ? { text: "分镜", cls: "" }
       : { text: "GEM-X", cls: "" };
 
-    // 计算每个管线节点状态（done / current / failed / pending）
-    const firstUndone = st.findIndex((s) => !s.done);
-    const nodesHtml = st
+    // 计算每个管线节点状态（5 阶段：白盒 · 分镜 · 视频 · 提骨 · 重定）
+    const st5 = st.slice(0, 5);
+    const firstUndone = st5.findIndex((s) => !s.done);
+    const nodesHtml = st5
       .map((s, idx) => {
         let nState = "pending";
         let mark = `${idx + 1}`;
@@ -927,8 +928,8 @@ function renderTaskDetail() {
 
     if (showProg) {
       const pct = Math.max(0, Math.min(100, Number(run.progress || 0)));
-      const gpuTag = task.stage4?.precisionPreset === "high_a100" ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77骨";
-      $("#s4ProgTitle").textContent = `云端提骨进行中（${gpuTag}）`;
+      const gpuTag = task.stage4?.precisionPreset === "high_a100" ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77 骨";
+      $("#s4ProgSpec").textContent = gpuTag;
       $("#s4ProgJob").textContent = run.jobId;
       $("#s4LivePct").textContent = `${pct}%`;
       $("#s4LiveFill").style.width = `${pct}%`;
@@ -1020,11 +1021,6 @@ function renderTaskDetail() {
 
   // Stage 05 · 重定向验收
   renderStage5Retarget(task, selectedTake);
-
-  // Stage 06 · 修缮
-  setVideoSrcIfChanged($("#vidRefOrig"), selectedTake?.url || "");
-  setVideoSrcIfChanged($("#vidRefOverlay"), files["render/overlay.mp4"]?.url || "");
-  renderStage6(task);
 }
 
 /* --- STAGE 05 · 独立重定向二次验收 --- */
@@ -1128,7 +1124,7 @@ function captureRetargetCover(task) {
         const res = await api(`/api/tasks/${task.id}/cover`, {
           method: "POST",
           silent: true,
-          body: JSON.stringify({ dataUrl, version: 2 }),
+          body: JSON.stringify({ dataUrl, version: 3 }),
         });
         if (res?.task) replaceTask(res.task);
       } catch {
@@ -1165,8 +1161,8 @@ async function syncRetargetViewer(task) {
       appState.retDuration = res.duration;
       $("#s5RetScrub").max = String(res.duration);
       setRetargetTime(appState.retTime % res.duration);
-      // 自动截取重定向 3D 角色动画封面（若尚未保存最新版封面）
-      if (!task.retargetCoverUrl || (task.retargetCoverVersion || 0) < 2) {
+      // 自动截取重定向 3D 角色动画封面（若尚未保存最新版平衡曝光封面）
+      if (!task.retargetCoverUrl || (task.retargetCoverVersion || 0) < 3) {
         captureRetargetCover(task);
       }
     }
@@ -1642,113 +1638,27 @@ $("#btnApproveRetarget").onclick = async () => {
   toast("二次验收通过，已标记可入库");
 };
 
-$("#btnSendToRefine").onclick = async () => {
-  const task = currentTask();
-  if (!task) return;
-  const res = await api(`/api/tasks/${task.id}/stage5/approve`, {
-    method: "POST",
-    body: JSON.stringify({ status: "needs_refine", characterId: task.stage5?.characterId || task.characterId }),
-  });
-  replaceTask(res.task);
-  gotoStage(6);
-};
-
-// Stage 6 controls
-function s6Videos() {
-  return [$("#vidRefOrig"), $("#vidRefOverlay")].filter((v) => v && v.getAttribute("src"));
-}
-function updateS6TimeUi() {
-  const v = $("#vidRefOrig");
-  const cur = v?.currentTime || 0;
-  const dur = v?.duration || 10;
-  $("#s6Scrub").max = String(dur || 10);
-  $("#s6Scrub").value = String(cur);
-  $("#s6FrameDisplay").textContent = `F${String(Math.round(cur * 30)).padStart(3, "0")}`;
-  $("#btnRefPlay").textContent = v && !v.paused ? "❚❚" : "▶";
-}
-$("#btnRefPlay").onclick = () => {
-  const vids = s6Videos();
-  if (!vids.length) return;
-  const shouldPlay = vids[0].paused;
-  const t = vids[0].currentTime;
-  for (const v of vids) {
-    v.currentTime = t;
-    if (shouldPlay) v.play().catch(() => {});
-    else v.pause();
+// Space 键全局切换播放 / 暂停（输入法/文本框聚焦时不拦截）
+window.addEventListener("keydown", (e) => {
+  if (e.code !== "Space" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (document.activeElement?.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || document.activeElement?.isContentEditable) return;
+  if (appState.sysOpen) return;
+  if (appState.activeStage === 5 && !$("#s5RetargetStage")?.classList.contains("hidden")) {
+    e.preventDefault();
+    $("#btnRetPlay")?.click();
+  } else if (appState.activeStage === 4 && !$("#s4ResultArea")?.classList.contains("hidden")) {
+    e.preventDefault();
+    $("#btnSyncPlay")?.click();
+  } else if (appState.activeStage === 3) {
+    const v = $("#s3MainVideo");
+    if (v && v.getAttribute("src") && !v.classList.contains("hidden")) {
+      e.preventDefault();
+      if (v.paused) v.play().catch(() => {});
+      else v.pause();
+    }
   }
-  setTimeout(updateS6TimeUi, 40);
-};
-$("#s6Scrub").oninput = (e) => {
-  const t = Number(e.target.value);
-  for (const v of s6Videos()) {
-    v.pause();
-    v.currentTime = t;
-  }
-  updateS6TimeUi();
-};
-$("#vidRefOrig").addEventListener("loadedmetadata", updateS6TimeUi);
-$("#vidRefOrig").addEventListener("timeupdate", updateS6TimeUi);
-$("#btnMarkFrame").onclick = () => {
-  const f = Math.round(($("#vidRefOrig").currentTime || 0) * 30);
-  const el = $("#issFrames");
-  el.value = !el.value.trim() || el.value.includes("-") ? `${f}-${f + 30}` : `${el.value.trim()}-${f}`;
-  el.focus();
-};
-
-$("#btnAddIssue").onclick = async () => {
-  const task = currentTask();
-  if (!task) return;
-  const desc = $("#issDesc").value.trim();
-  if (!desc) return toast("请填写问题");
-  const next = [
-    ...(task.stage6?.issues || []),
-    {
-      id: `iss_${Date.now().toString(36)}`,
-      frameRange: $("#issFrames").value.trim() || "全程",
-      bodyPart: $("#issPart").value.trim() || "全身",
-      description: desc,
-      targetFix: $("#issFix").value.trim() || "贴合原视频",
-      status: "open",
-    },
-  ];
-  const res = await api(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ issues: next }) });
-  $("#issDesc").value = "";
-  $("#issFix").value = "";
-  replaceTask(res.task);
-};
-
-$("#btnGenBrief").onclick = async () => {
-  const task = currentTask();
-  if (!task) return;
-  try {
-    const res = await api(`/api/tasks/${task.id}/stage6/brief`, { method: "POST", body: "{}" });
-    $("#s6BriefPreview").textContent = res.briefText;
-    appState.s6Tab = "brief";
-    replaceTask(res.task);
-    toast("任务单已生成");
-  } catch (err) {
-    toast(err.message, 4000);
-  }
-};
-
-$("#btnCopyBrief").onclick = async () => {
-  await navigator.clipboard.writeText($("#s6BriefPreview").textContent);
-  toast("已复制");
-};
-
-$("#btnDispatchRefine").onclick = async () => {
-  const task = currentTask();
-  if (!task) return;
-  try {
-    const res = await api(`/api/tasks/${task.id}/stage6/dispatch`, { method: "POST", body: "{}" });
-    $("#s6BriefPreview").textContent = res.briefText;
-    appState.s6Tab = "logs";
-    replaceTask(res.task);
-    toast("已派发 BlenderMCP 修缮");
-  } catch (err) {
-    toast(err.message, 4500);
-  }
-};
+});
 
 /* --- 系统抽屉 --- */
 $("#btnSystem").onclick = () => setSystemDrawer(!appState.sysOpen);

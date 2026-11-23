@@ -406,9 +406,12 @@ export async function runColabMocapJob({
         }
       );
 
+      const stripAnsi = (s) => String(s || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
       let buf = "";
+      let sawDone = false;
+      let lastPyErr = "";
       const handleLine = (line) => {
-        const trimmed = line.trim();
+        const trimmed = stripAnsi(line).trim();
         if (!trimmed) return;
         if (trimmed.startsWith("[PROGRESS] ")) {
           const rest = trimmed.slice(11);
@@ -428,6 +431,13 @@ export async function runColabMocapJob({
           }
           return;
         }
+        if (trimmed.startsWith("[DONE] ")) {
+          sawDone = true;
+          return;
+        }
+        if (/^(RuntimeError|FileNotFoundError|ModuleNotFoundError|ImportError|ValueError|OSError|CalledProcessError|CUDA out of memory|torch\.OutOfMemoryError)\b/i.test(trimmed)) {
+          lastPyErr = trimmed;
+        }
         onLog?.(trimmed);
       };
 
@@ -442,8 +452,9 @@ export async function runColabMocapJob({
       proc.on("error", reject);
       proc.on("close", (code) => {
         if (buf.trim()) handleLine(buf);
-        if (code === 0) resolve();
-        else reject(new Error(`Colab 远端 GEM-X 提骨退出异常 (code=${code})`));
+        if (code === 0 && sawDone) resolve();
+        else if (lastPyErr) reject(new Error(`云端 GEM-X 执行出错：${lastPyErr}`));
+        else reject(new Error(`Colab 远端 GEM-X 提骨异常结束 (code=${code})，请展开日志查看详情`));
       });
     });
 

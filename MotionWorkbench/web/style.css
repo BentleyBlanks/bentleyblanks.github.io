@@ -407,13 +407,13 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 .mwCardStatus[data-state="done"] { color: #aac6ac; }
 .mwCardStatus[data-state="failed"] { color: #efa69b; }
 
-/* 参照 ModelWorkbench (.mwTrack / .mwNode) 的连线圆点阶段管线轨 */
+/* 参照 ModelWorkbench (.mwTrack / .mwNode) 的连线圆点阶段管线轨（5 阶段） */
 .mwNodeTrack {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   text-align: center;
   color: #9e9b8d;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 .mwNodeTrack4 {
   grid-template-columns: repeat(4, 1fr);
@@ -470,49 +470,70 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 }
 .mwNode[data-state="failed"] span:last-child { color: #efa69b; }
 
-/* Stage 04 统一制作进度卡（替代原先分散 4 处的进度展示） */
+/* Stage 04 统一制作进度卡（清晰视觉层次：顶部规格标 + 大号主状态与百分比 + 4 步节点 + 终端日志） */
 .mwProgCard {
   --card-bg: #151712;
-  width: min(600px, 92%);
+  width: min(620px, 92%);
   text-align: left;
-  background: var(--card-bg);
-  border: 1px solid #ae925677;
-  border-left: 3px solid var(--gold);
-  border-radius: 4px;
-  padding: 20px 22px;
+  background: linear-gradient(180deg, #191c15 0%, #12140f 100%);
+  border: 1px solid #ae925666;
+  border-radius: 6px;
+  padding: 22px 26px 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  box-shadow: 0 14px 40px #00000099;
+  gap: 16px;
+  box-shadow: 0 18px 48px #000000aa;
 }
-.mwProgHead {
+.mwProgTopBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
-.mwProgHeadLeft { display: flex; align-items: center; gap: 12px; }
-.mwProgHeadRight { display: flex; align-items: baseline; gap: 12px; }
-.mwProgTitle { font-size: 16px; font-weight: 700; color: var(--text-hi); }
-.mwProgSub { font-size: 12px; color: #9c988a; margin-top: 2px; }
-.mwProgPct { font-size: 26px; font-weight: 700; color: var(--gold-hi); line-height: 1; }
-.mwTrackProg { height: 6px; }
-.mwProgCurrent {
-  font-size: 13.5px;
+.mwProgMeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mwProgPill {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #f3d89a;
+  background: #2b2516;
+  border: 1px solid #ae925666;
+  border-radius: 3px;
+  padding: 2px 9px;
+}
+.mwProgSub { font-size: 12px; color: #8f8c7f; }
+.mwProgHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.mwProgHeroLeft { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mwProgHeadline {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-hi);
-  padding: 9px 12px;
-  background: #10120d;
-  border: 1px solid var(--rule-2);
+  line-height: 1.35;
 }
+.mwProgPct {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--gold-hi);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.mwTrackProg { height: 6px; border-radius: 99px; overflow: hidden; }
 .mwProgLogs {
   margin: 0;
-  padding: 9px 12px;
-  max-height: 110px;
+  padding: 10px 13px;
+  max-height: 115px;
   overflow: auto;
-  background: #0a0b09;
-  border: 1px solid var(--rule-2);
+  background: #0b0c09;
+  border: 1px solid #c1bdab20;
+  border-radius: 4px;
   color: #a9a596;
-  font: 11.5px/1.5 var(--ui-mono);
+  font: 11.5px/1.55 var(--ui-mono);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -527,117 +548,66 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 }
 .mwTaskView { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-/* --- 顶部 6 阶段流程轨（建筑级铜金/钢蓝阶梯牌 + 定向流向桥） --- */
+/* --- 顶部 5 阶段标签栏（参照角色制作管线 #steps 简洁底部高亮风格） --- */
 .mwRail {
   flex: none;
-  height: 62px;
-  display: grid;
-  grid-template-columns: 1fr 22px 1fr 22px 1fr 22px 1fr 22px 1fr 22px 1fr;
-  align-items: center;
-  background: linear-gradient(180deg, #0c0d0a 0%, #070806 100%);
-  border-bottom: 1px solid var(--rule);
-  padding: 8px 10px;
+  height: 44px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 16px;
+  background: #12140e;
+  border-bottom: 1px solid var(--edge);
 }
-.mwBridge { display: grid; place-items: center; color: #c1bdab2c; transition: color 0.15s linear; user-select: none; }
-.mwBridge svg { width: 18px; height: 10px; display: block; }
-.mwBridge.done { color: #9dc0e488; }
-.mwBridge.lead { color: #edca83cc; }
-
 .mwStep {
   position: relative;
-  height: 100%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 9px 0 7px;
-  background: linear-gradient(180deg, #121410 0%, #0b0c09 100%);
-  border: 1px solid #c1bdab26;
-  box-shadow: inset 0 1px 0 #ffffff08;
-  cursor: pointer;
-  color: var(--muted);
-  text-align: left;
-  overflow: hidden;
-  transition: border-color 0.14s linear, background 0.14s linear, color 0.14s linear;
-}
-.mwStep::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
+  gap: 8px;
+  padding: 0 16px;
   background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: #a5a293;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: color 0.14s linear, background 0.14s linear, border-color 0.14s linear;
 }
 .mwStep:hover {
-  border-color: #c1bdab62;
-  background: linear-gradient(180deg, #191b15 0%, #10110d 100%);
   color: var(--text-hi);
+  background: #1a1d15;
 }
-.mwStep.done {
-  border-color: #9dc0e43d;
-  background: linear-gradient(180deg, #12171b 0%, #0b0e11 100%);
-}
-.mwStep.done::after { background: #9dc0e466; }
 .mwStep.active {
-  border-color: #edca838c;
-  background:
-    radial-gradient(82% 110% at 50% 100%, #edca8326 0%, transparent 72%),
-    linear-gradient(180deg, #1e1b11 0%, #12100a 100%);
-  box-shadow: inset 0 1px 0 #edca8326, 0 2px 12px #00000055;
   color: var(--gold-hi);
+  font-weight: 700;
+  border-bottom-color: var(--gold);
+  background: #201e15;
 }
-.mwStep.active::after {
-  background: var(--gold);
-  box-shadow: 0 0 10px #edca83aa;
-}
-@keyframes mwStepPulse {
-  0%, 100% { border-color: #edca8366; }
-  50% { border-color: #ffe0a1dd; }
-}
-.mwStep.running { animation: mwStepPulse 1.8s ease-in-out infinite; }
-
-.mwStepIdx {
+.mwStepDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #55574b;
   flex: none;
-  width: 25px;
-  height: 25px;
-  display: grid;
-  place-items: center;
-  font: 700 11px/1 var(--ui-mono);
-  color: var(--dim);
-  background: #070806;
-  border: 1px solid #c1bdab30;
 }
-.mwStep.done .mwStepIdx {
-  color: #b9d7f5;
-  border-color: #9dc0e475;
-  background: linear-gradient(180deg, #17242e 0%, #0e161d 100%);
+.mwStep.done .mwStepDot { background: #7aa37d; }
+.mwStep.active .mwStepDot { background: var(--gold-hi); }
+@keyframes mwStepPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
-.mwStep.active .mwStepIdx {
-  color: #fff0c8;
-  border-color: var(--gold);
-  background: linear-gradient(180deg, #3e341c 0%, #221c0e 100%);
-  box-shadow: 0 0 8px #edca8333;
-}
-.mwStepMeta { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.mwStepName {
-  font: 700 12.5px/1.2 var(--ui-serif);
-  letter-spacing: 0.1em;
-  color: var(--text);
+.mwStep.running .mwStepDot { background: var(--gold-hi); animation: mwStepPulse 1.3s ease-in-out infinite; }
+.mwStepName { letter-spacing: 0.04em; color: inherit; }
+.mwStepState {
+  font-size: 11.5px;
+  color: #848174;
+  font-family: var(--ui-mono);
   white-space: nowrap;
 }
-.mwStep.active .mwStepName { color: var(--gold-hi); }
-.mwStep.done:not(.active) .mwStepName { color: var(--text-hi); }
-.mwStepState { font: 10px/1.2 var(--ui-mono); color: var(--dim); white-space: nowrap; }
-.mwStep.done .mwStepState { color: var(--good); }
-.mwStep.active .mwStepState { color: var(--gold-text); }
+.mwStep.done .mwStepState { color: #9ab89c; }
+.mwStep.active .mwStepState { color: #d5bb7b; }
 .mwStep.running .mwStepState { color: var(--gold-hi); }
-
-.mwStepMark { margin-left: auto; flex: none; width: 12px; display: grid; place-items: center; font-size: 9px; color: #c1bdab2c; }
-.mwStepMark::before { content: "▫"; }
-.mwStep.done .mwStepMark { color: var(--good); font-size: 10.5px; }
-.mwStep.done .mwStepMark::before { content: "✓"; }
-.mwStep.active .mwStepMark { color: var(--gold); font-size: 8.5px; }
-.mwStep.active .mwStepMark::before { content: "◆"; }
 
 /* --- 统一两栏阶段容器 --- */
 .mwStage {

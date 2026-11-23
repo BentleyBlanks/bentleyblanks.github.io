@@ -16,12 +16,12 @@ function clipForCharacter(clip, hipsScale = 1) {
 function buildStudioEnvTexture(renderer) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene();
-  envScene.background = new THREE.Color(0xc8d4e0);
+  envScene.background = new THREE.Color(0x8a95a3);
 
-  // Overhead daylight softbox
+  // Soft overhead studio fill (restrained luminance so skin/cloth never clip)
   const topBox = new THREE.Mesh(
     new THREE.PlaneGeometry(14, 14),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0xd4dae0, side: THREE.DoubleSide })
   );
   topBox.position.set(0, 7, 0);
   topBox.rotation.x = Math.PI / 2;
@@ -30,7 +30,7 @@ function buildStudioEnvTexture(renderer) {
   // Warm key softbox (front-right)
   const keyBox = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xfff3de, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0xded5c6, side: THREE.DoubleSide })
   );
   keyBox.position.set(5, 3, 6);
   keyBox.lookAt(0, 0, 0);
@@ -39,16 +39,16 @@ function buildStudioEnvTexture(renderer) {
   // Cool sky fill softbox (front-left)
   const fillBox = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xdcebff, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0xb7c7d9, side: THREE.DoubleSide })
   );
   fillBox.position.set(-6, 2.5, 5);
   fillBox.lookAt(0, 0, 0);
   envScene.add(fillBox);
 
-  // Low bright bounce card so faces under cap brims & chins get even light
+  // Mid-grey floor bounce
   const bounceFloor = new THREE.Mesh(
     new THREE.PlaneGeometry(18, 18),
-    new THREE.MeshBasicMaterial({ color: 0xd5cfc2, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0x7a7870, side: THREE.DoubleSide })
   );
   bounceFloor.position.set(0, -4, 0);
   bounceFloor.rotation.x = -Math.PI / 2;
@@ -65,11 +65,11 @@ function createSkyDome() {
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      uZenith: { value: new THREE.Color(0x7ca2c7) },
-      uHorizon: { value: new THREE.Color(0xe2e8ee) },
-      uGround: { value: new THREE.Color(0xb2b6ba) },
+      uZenith: { value: new THREE.Color(0x5d728a) },
+      uHorizon: { value: new THREE.Color(0xa6b1bd) },
+      uGround: { value: new THREE.Color(0x6d7278) },
       uSunDir: { value: new THREE.Vector3(0.45, 0.62, 0.64).normalize() },
-      uSunColor: { value: new THREE.Color(0xfff7e4) },
+      uSunColor: { value: new THREE.Color(0xebe3d3) },
     },
     vertexShader: `
       varying vec3 vWorldDir;
@@ -89,10 +89,10 @@ function createSkyDome() {
         vec3 d = normalize(vWorldDir);
         float h = d.y;
         vec3 col = h >= 0.0
-          ? mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55))
+          ? mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.58))
           : mix(uHorizon, uGround, pow(clamp(-h * 2.4, 0.0, 1.0), 0.7));
         float sunAmt = max(dot(d, uSunDir), 0.0);
-        col += uSunColor * (pow(sunAmt, 24.0) * 0.25 + pow(sunAmt, 160.0) * 0.35);
+        col += uSunColor * (pow(sunAmt, 28.0) * 0.12 + pow(sunAmt, 160.0) * 0.16);
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -158,8 +158,8 @@ export class RetargetViewer {
     this.rimLight.position.set(-2.8, 2.8, -3.0);
     this.scene.add(this.rimLight);
 
-    // Studio floor + dual grids (daylight vs dark studio)
-    this.dayGrid = new THREE.GridHelper(10, 20, 0x868f9a, 0xb2b8c0);
+    // Studio floor + dual grids (balanced mid-grey daylight vs dark studio)
+    this.dayGrid = new THREE.GridHelper(10, 20, 0x5c626a, 0x6f757d);
     this.dayGrid.position.y = 0.001;
     this.scene.add(this.dayGrid);
 
@@ -169,7 +169,7 @@ export class RetargetViewer {
     this.scene.add(this.darkGrid);
 
     const floorGeo = new THREE.CircleGeometry(14, 64);
-    this.floorMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd2, roughness: 0.92, metalness: 0.0 });
+    this.floorMat = new THREE.MeshStandardMaterial({ color: 0x7b8087, roughness: 0.94, metalness: 0.0 });
     this.floor = new THREE.Mesh(floorGeo, this.floorMat);
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = -0.001;
@@ -268,17 +268,17 @@ export class RetargetViewer {
     this.lightingMode = mode === "dark" ? "dark" : "daylight";
     const isDay = this.lightingMode === "daylight";
     this.skyDome.visible = isDay;
-    this.scene.background = new THREE.Color(isDay ? 0xdbe3ec : 0x181a17);
-    this.scene.fog = new THREE.Fog(isDay ? 0xdbe3ec : 0x181a17, isDay ? 10 : 8, isDay ? 28 : 20);
+    this.scene.background = new THREE.Color(isDay ? 0x9aa6b4 : 0x1a1c19);
+    this.scene.fog = new THREE.Fog(isDay ? 0x9aa6b4 : 0x1a1c19, isDay ? 10 : 8, isDay ? 26 : 20);
     this.dayGrid.visible = isDay;
     this.darkGrid.visible = !isDay;
-    this.floorMat.color.setHex(isDay ? 0xc9cdd2 : 0x232520);
-    this.renderer.toneMappingExposure = isDay ? 1.22 : 1.3;
-    this.hemiLight.intensity = isDay ? 1.35 : 1.15;
-    this.keyLight.intensity = isDay ? 2.25 : 2.1;
-    this.faceFillLight.intensity = isDay ? 1.25 : 1.1;
-    this.rimLight.intensity = isDay ? 1.0 : 1.1;
-    this.scene.environmentIntensity = isDay ? 0.9 : 0.65;
+    this.floorMat.color.setHex(isDay ? 0x7b8087 : 0x262823);
+    this.renderer.toneMappingExposure = isDay ? 0.94 : 1.05;
+    this.hemiLight.intensity = isDay ? 0.72 : 0.7;
+    this.keyLight.intensity = isDay ? 1.4 : 1.5;
+    this.faceFillLight.intensity = isDay ? 0.55 : 0.65;
+    this.rimLight.intensity = isDay ? 0.6 : 0.75;
+    this.scene.environmentIntensity = isDay ? 0.48 : 0.45;
   }
 
   resize() {

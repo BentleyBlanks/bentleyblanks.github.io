@@ -71,60 +71,32 @@
     <!-- 主工作区：顶部 6 步装配线 + 下方统一「左视口 / 右确认检视」 -->
     <main class="mwMain">
       <div id="taskView" class="mwTaskView">
-        <!-- 6 阶段可视化流程轨 -->
+        <!-- 5 阶段清洁下划线标签栏（参照角色制作管线 #steps） -->
         <nav class="mwRail" id="stepper" aria-label="制作阶段">
           <button class="mwStep" data-stage="1" type="button">
-            <span class="mwStepIdx">01</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">白盒导演</span>
-              <span class="mwStepState" data-step-state="1"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
+            <span class="mwStepDot" aria-hidden="true"></span>
+            <span class="mwStepName">白盒导演</span>
+            <span class="mwStepState" data-step-state="1"></span>
           </button>
-          <span class="mwBridge" data-bridge="1" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
           <button class="mwStep" data-stage="2" type="button">
-            <span class="mwStepIdx">02</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">电影分镜</span>
-              <span class="mwStepState" data-step-state="2"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
+            <span class="mwStepDot" aria-hidden="true"></span>
+            <span class="mwStepName">电影分镜</span>
+            <span class="mwStepState" data-step-state="2"></span>
           </button>
-          <span class="mwBridge" data-bridge="2" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
           <button class="mwStep" data-stage="3" type="button">
-            <span class="mwStepIdx">03</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">视频生成</span>
-              <span class="mwStepState" data-step-state="3"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
+            <span class="mwStepDot" aria-hidden="true"></span>
+            <span class="mwStepName">视频生成</span>
+            <span class="mwStepState" data-step-state="3"></span>
           </button>
-          <span class="mwBridge" data-bridge="3" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
           <button class="mwStep" data-stage="4" type="button">
-            <span class="mwStepIdx">04</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">骨骼提取</span>
-              <span class="mwStepState" data-step-state="4"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
+            <span class="mwStepDot" aria-hidden="true"></span>
+            <span class="mwStepName">骨骼提取</span>
+            <span class="mwStepState" data-step-state="4"></span>
           </button>
-          <span class="mwBridge" data-bridge="4" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
           <button class="mwStep" data-stage="5" type="button">
-            <span class="mwStepIdx">05</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">重定向</span>
-              <span class="mwStepState" data-step-state="5"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
-          </button>
-          <span class="mwBridge" data-bridge="5" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
-          <button class="mwStep" data-stage="6" type="button">
-            <span class="mwStepIdx">06</span>
-            <span class="mwStepMeta">
-              <span class="mwStepName">修缮</span>
-              <span class="mwStepState" data-step-state="6"></span>
-            </span>
-            <span class="mwStepMark" aria-hidden="true"></span>
+            <span class="mwStepDot" aria-hidden="true"></span>
+            <span class="mwStepName">重定向验收</span>
+            <span class="mwStepState" data-step-state="5"></span>
           </button>
         </nav>
 
@@ -319,24 +291,24 @@
                 </div>
               </div>
 
-              <!-- 统一制作进度卡（合并原先分散的 4 处进度展示：步骤节点 + 百分比 + 实时状态 + 精简日志） -->
+              <!-- 统一制作进度卡（清爽主次层次：规格标签 + 大号百分比 + 4 步节点 + 实时终端日志） -->
               <div id="s4ProgressCard" class="mwProgCard hidden" role="status" aria-live="polite">
-                <div class="mwProgHead">
-                  <div class="mwProgHeadLeft">
+                <div class="mwProgTopBar">
+                  <div class="mwProgMeta">
+                    <span id="s4ProgSpec" class="mwProgPill">L4 · NVIDIA GEM-X 77 骨</span>
+                    <span id="s4ProgJob" class="mwProgSub mwMono">—</span>
+                  </div>
+                  <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
+                </div>
+                <div class="mwProgHero">
+                  <div class="mwProgHeroLeft">
                     <span class="mwSpinner" aria-hidden="true"></span>
-                    <div>
-                      <div class="mwProgTitle" id="s4ProgTitle">云端骨骼提取进行中</div>
-                      <div class="mwProgSub mwMono" id="s4ProgJob">—</div>
-                    </div>
+                    <div id="s4LiveText" class="mwProgHeadline">正在连接 Google Colab GPU…</div>
                   </div>
-                  <div class="mwProgHeadRight">
-                    <strong id="s4LivePct" class="mwProgPct mwMono">0%</strong>
-                    <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
-                  </div>
+                  <strong id="s4LivePct" class="mwProgPct mwMono">0%</strong>
                 </div>
                 <div class="mwTrack mwTrackProg"><div id="s4LiveFill" class="mwTrackFill" style="width:0%"></div></div>
                 <div id="s4Milestones" class="mwNodeTrack mwNodeTrack4"></div>
-                <div id="s4LiveText" class="mwProgCurrent">正在连接云端算力…</div>
                 <pre id="s4ProgLogs" class="mwProgLogs hidden"></pre>
               </div>
 
@@ -510,67 +482,8 @@
                 <button id="btnRunRetarget" class="mwBtn mwFull" type="button">重新转换 Mixamo GLB</button>
               </div>
             </div>
-            <div class="mwInspFoot mwFootStack">
+            <div class="mwInspFoot">
               <button id="btnApproveRetarget" class="mwBtn mwPrimary mwFull" type="button">✓ 二次验收通过 · 可入库</button>
-              <button id="btnSendToRefine" class="mwBtn mwFull" type="button">发现瑕疵 → 送 06 修缮</button>
-            </div>
-          </aside>
-        </section>
-
-        <!-- STAGE 06 · 修缮（BlenderMCP 逐帧精修） -->
-        <section class="mwStage hidden" data-panel="6">
-          <div class="mwCanvas mwStage6Canvas">
-            <div class="mwRefStrip">
-              <div class="mwRefVideos">
-                <div class="mwViewPane">
-                  <div class="mwViewHead"><span>原片参考</span></div>
-                  <div class="mwViewBody"><video id="vidRefOrig" muted loop playsinline></video></div>
-                </div>
-                <div class="mwViewPane">
-                  <div class="mwViewHead"><span>骨骼叠加</span></div>
-                  <div class="mwViewBody"><video id="vidRefOverlay" muted loop playsinline></video></div>
-                </div>
-              </div>
-              <div class="mwTransport mwTransportCompact">
-                <button id="btnRefPlay" class="mwBtn mwSm" type="button">▶</button>
-                <input id="s6Scrub" class="mwScrub" type="range" min="0" max="10" step="0.033" value="0">
-                <span id="s6FrameDisplay" class="mwMono mwTime">F000</span>
-                <button id="btnMarkFrame" class="mwBtn mwSm" type="button">填入当前帧</button>
-              </div>
-            </div>
-
-            <div class="mwIssueSection">
-              <div class="mwIssueAdder">
-                <input id="issFrames" type="text" placeholder="帧段 (0-120)">
-                <input id="issPart" type="text" placeholder="部位">
-                <input id="issDesc" type="text" placeholder="问题">
-                <input id="issFix" type="text" placeholder="目标">
-                <button id="btnAddIssue" class="mwBtn mwPrimary mwSm" type="button">+ 记录</button>
-              </div>
-              <div id="s6IssueList" class="mwIssueList"></div>
-            </div>
-          </div>
-
-          <aside class="mwInspector">
-            <div class="mwInspBody">
-              <div class="mwSec">
-                <div class="mwSecH">修缮派发</div>
-                <div class="mwBtnStack">
-                  <button id="btnDispatchRefine" class="mwBtn mwPrimary" type="button">派发 BlenderMCP 修缮</button>
-                  <div class="mwBtnRow">
-                    <button id="btnGenBrief" class="mwBtn" type="button">生成任务单</button>
-                    <button id="btnCopyBrief" class="mwBtn" type="button">复制</button>
-                  </div>
-                </div>
-              </div>
-              <div class="mwSec mwSecGrow">
-                <div class="mwSubTabs">
-                  <button class="mwSubTab active" data-s6tab="brief" type="button">任务单</button>
-                  <button class="mwSubTab" data-s6tab="logs" type="button">执行日志</button>
-                </div>
-                <pre id="s6BriefPreview" class="mwCodeBox">点击「生成任务单」</pre>
-                <pre id="s6RefineLogs" class="mwCodeBox hidden">暂无执行记录</pre>
-              </div>
             </div>
           </aside>
         </section>
