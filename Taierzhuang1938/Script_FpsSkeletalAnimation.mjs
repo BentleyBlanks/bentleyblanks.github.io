@@ -157,7 +157,7 @@ export class FpsSkeletalAnimation {
 
   CanUseIdle(input={}) {
     const vm=this.vm;
-    return !(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.action||vm.flashTime<.6||(vm.rig?.assetVersion&&vm.boltOpen));
+    return !(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||vm.action||vm.flashTime<.6||(vm.rig?.assetVersion&&vm.boltOpen));
   }
 
   // The clip owns the arms, the rifle and its moving parts for the whole reload;
@@ -181,7 +181,7 @@ export class FpsSkeletalAnimation {
     let toTarget=null;
     if(outLinear<1){
       // Evaluate the live post-reload target pose (Idle if hip-still, else live IK).
-      const wantIdle=!(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||(vm.rig?.assetVersion&&vm.boltOpen))&&!!this.Clip('Idle');
+      const wantIdle=!(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||(vm.rig?.assetVersion&&vm.boltOpen))&&!!this.Clip('Idle');
       this.SetCameraScale(1);
       if(wantIdle){
         this.Apply('Idle',LoopTime(this.clock,this.Clip('Idle').duration),{preserveParts:true});
@@ -253,6 +253,7 @@ export class FpsSkeletalAnimation {
         }
       }
       vm.root.rotation.set(0,0,0);vm.swayPivot.position.set(0,0,0);vm.swayPivot.quaternion.identity();
+      if(vm.inertiaPivot){vm.inertiaPivot.position.set(0,0,0);vm.inertiaPivot.quaternion.identity();}
       vm.statePivot.position.set(0,0,0);vm.statePivot.quaternion.identity();
       vm.flash.visible=false;vm.flashTime=99;
       const spec=FPS_SKELETAL_RELOADS[vm.weaponId],view=preview.name===spec?.clip?spec.view:null;
@@ -264,9 +265,9 @@ export class FpsSkeletalAnimation {
       this.Apply(preview.name,preview.time,{visible:true});
       for(const side of ['r','l'])arms.operationPose[side]=arms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
     }else{
-      // The bake knows nothing of the wall carry pivot: lowered against a wall
-      // the hands must follow the gun through IK, not hold the empty air.
-      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.wallLower||0)>.001||(vm.rig?.assetVersion&&vm.boltOpen)){
+      // The bake knows nothing of the wall carry or weapon inertia pivots: when either
+      // is active the hands must follow the gun through live IK, not hold empty air.
+      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.wallLower||0)>.001||vm.inertiaActive||(vm.rig?.assetVersion&&vm.boltOpen)){
         this.idleWeight=0;
         return false;
       }

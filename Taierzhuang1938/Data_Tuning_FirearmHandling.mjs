@@ -84,27 +84,35 @@ export const MOVE_INERTIA = Object.freeze({
   maxEyeSpeedMps: 2.4,
   strafeFrequencyHz: 2.85,
   strafeDamping: 0.88,              // near-critically damped COD feel: crisp lag & counter-strafe carry, no rubbery rebound
-  strafeImpulseXM: -0.0040,         // metres per (m/s) of lateral velocity change (~ -13 mm on crisp walk start)
-  strafeImpulseYawDeg: 0.34,        // degrees of barrel lag per (m/s)
-  strafeImpulseRollDeg: -0.34,      // same directional sign as steady bank (no mid-strafe roll sign flip on A<->D)
-  strafeBankRollRad: 0.038,         // steady banking into actual lateral velocity (~2.2 deg at full walk)
-  strafeBankXM: -0.0022,            // subtle steady lateral offset at full walk strafe
+  strafeImpulseXM: -0.0028,         // metres per (m/s) of lateral velocity change at rear stock (~ -9 mm on crisp walk start)
+  strafeImpulseYawDeg: 0.65,        // degrees of heavy-barrel lag around stock/grip per (m/s)
+  strafeImpulseRollDeg: -0.52,      // same directional sign as steady bank (no mid-strafe roll sign flip on A<->D)
+  strafeBankRollRad: 0.044,         // steady banking around rifle axis into actual lateral velocity (~2.5 deg at full walk)
+  strafeBankXM: -0.0014,            // subtle steady stock lateral offset at full walk strafe
   strafeBankLerpSpeed: 8.5,
   surgeFrequencyHz: 2.9,
   surgeDamping: 0.84,
-  surgeImpulseZM: 0.0032,           // +z back on forward accel, -z forward surge on hard stop (~ -13 mm from sprint)
-  surgeImpulsePitchDeg: 0.34,       // slight barrel rise on launch / dip (-rx) on hard stop
+  surgeImpulseZM: 0.0035,           // +z into shoulder on forward accel, -z forward surge on hard stop (~ -14 mm relative to shoulders)
+  surgeImpulsePitchDeg: 0.48,       // barrel rise on launch / dip (-rx) around stock on hard stop
   stanceFrequencyHz: 3.3,
   stanceDamping: 0.80,
-  stanceImpulseYM: -0.0068,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
-  stanceImpulsePitchDeg: -0.82,     // dropping eye -> +pitch lag; rising eye -> -pitch lag
+  stanceImpulseYM: -0.0064,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
+  stanceImpulsePitchDeg: -1.05,     // dropping eye -> +pitch lag around stock; rising eye -> -pitch lag
   gaitAttackPerS: 10.0,
   gaitReleasePerS: 6.5,
   stopSettleSpeedMps: 0.65,
   stopSettleHoldS: 0.065,           // require brief true stop so 1-frame zero-crossing during A<->D reversal never dips
-  stopSettleDipYM: -0.0042,
-  stopSettlePitchDeg: -0.45,
-  adsRotationScale: 0,              // full ADS keeps swayPivot strictly zero so sights match AimDirection
+  stopSettleDipYM: -0.0044,
+  stopSettlePitchDeg: -0.60,
+  adsRotationScale: 0,              // full ADS keeps swayPivot & inertiaPivot strictly zero so sights match AimDirection
+  // Anatomical decoupling (2026-11-23): shoulders belong to the torso (`armAnchor`), not a
+  // rigid block with the gun. Only a small sympathetic share rides on `swayPivot` (torso/shoulders);
+  // the majority rides on `inertiaPivot` under `weaponMount` around the rear stock/grip pocket so
+  // the barrel pivots in the soldier's hands and 2-bone IK flexes elbows & forearms naturally.
+  shoulderShare: Object.freeze({ x: 0.12, y: 0.22, z: 0.14, pitch: 0.14, yaw: 0.10, roll: 0.15 }),
+  lookSwayShoulderShare: 0.18,
+  twoHandStockBackM: 0.16,          // rear stock pocket behind right grip (+z in weaponMount local space)
+  twoHandStockDownM: -0.02,
 });
 
 // Idle aim sway of the whole line of sight (camera + aim together, so settled sights

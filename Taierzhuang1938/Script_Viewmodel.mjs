@@ -1594,6 +1594,18 @@ export class Viewmodel {
     this.actionPivot = new THREE.Group();      // 拉栓 / 突刺 / 投弹的整枪位移
     this.recoilPivot = new THREE.Group();      // 后坐
     this.weaponMount = new THREE.Group();      // 腰射↔开镜↔冲刺的姿态插值
+    // Weapon-only inertia pivot below `weaponMount` (not shared with `armAnchor`),
+    // rotating around the rear stock/grip pocket so the shoulders stay anchored to
+    // the torso while 2-bone IK flexes elbows & forearms to absorb weapon mass.
+    this.inertiaPivot = new THREE.Group();
+    this.inertiaPivot.name = "WeaponInertiaPivot";
+    this.inertiaAnchor = new THREE.Vector3();
+    this.inertiaActive = false;
+    this._inertiaQ = new THREE.Quaternion();
+    this._inertiaQInv = new THREE.Quaternion();
+    this._inertiaE = new THREE.Euler(0, 0, 0, "YXZ");
+    this._inertiaV = new THREE.Vector3();
+    this._inertiaPivotPt = new THREE.Vector3();
     // Reload is articulated around the hand still supporting the gun, below
     // its holding pose. The camera-origin action layer would orbit the entire
     // gun and both shoulders left when yawing to expose the loading port.
@@ -1625,7 +1637,8 @@ export class Viewmodel {
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
     this.recoilPivot.add(this.armAnchor);
-    this.weaponMount.add(this.wallPivot);
+    this.weaponMount.add(this.inertiaPivot);
+    this.inertiaPivot.add(this.wallPivot);
     this.wallPivot.add(this.reloadPivot);
     this.reloadPivot.add(this.swingPivot);
 
@@ -2157,9 +2170,10 @@ export class Viewmodel {
       this.equipSpring.Set(1);
       this.compensation.set(1, 1, 1);
       this.fovRig.scale.set(1, 1, 1);
-      for (const pivot of [this.weaponMount, this.reloadPivot, this.swingPivot, this.actionPivot]) {
+      for (const pivot of [this.weaponMount, this.inertiaPivot, this.reloadPivot, this.swingPivot, this.actionPivot]) {
         pivot.position.set(0, 0, 0); pivot.quaternion.identity();
       }
+      this.inertiaActive = false;
       this.armAnchor.add(this.handRight.group, this.handLeft.group, this.gripContactRight, this.gripContactLeft);
       this._UpdateUnarmedHands(0, 0, 0);
       this.riggedArms?.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
@@ -3052,17 +3066,23 @@ export class Viewmodel {
       : this.moveInertia;
     const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0,
       swayGain, inertiaOn ? 0 : strafe);
-    this.swayPivot.rotation.set(
-      sway.pitch + (inertiaOn ? inertia.pitch : 0),
-      sway.yaw + (inertiaOn ? inertia.yaw : 0),
-      sway.roll + sway.strafeRoll + (inertiaOn ? inertia.roll : 0),
-      "YXZ",
-    );
-    this.swayPivot.position.set(
-      sway.x + (inertiaOn ? inertia.x : 0),
-      sway.y + (inertiaOn ? inertia.y : 0),
-      inertiaOn ? inertia.z : 0,
-    );
+    const decouple = inertiaOn && !!this.weapon && !this.action?.skeletal && !this.meleeVideoFrame && !this._ThrowTrack();
+    const sh = MOVE_INERTIA.shoulderShare;
+    const lookSh = decouple ? MOVE_INERTIA.lookSwayShoulderShare : 1;
+    const swX = sway.x * lookSh + (inertiaOn ? inertia.x * (decouple ? sh.x : 1) : 0);
+    const swY = sway.y * lookSh + (inertiaOn ? inertia.y * (decouple ? sh.y : 1) : 0);
+    const swZ = inertiaOn ? inertia.z * (decouple ? sh.z : 1) : 0;
+    const swPitch = sway.pitch * lookSh + (inertiaOn ? inertia.pitch * (decouple ? sh.pitch : 1) : 0);
+    const swYaw = sway.yaw * lookSh + (inertiaOn ? inertia.yaw * (decouple ? sh.yaw : 1) : 0);
+    const swRoll = (sway.roll + sway.strafeRoll) * lookSh + (inertiaOn ? inertia.roll * (decouple ? sh.roll : 1) : 0);
+    this.swayPivot.rotation.set(swPitch, swYaw, swRoll, "YXZ");
+    this.swayPivot.position.set(swX, swY, swZ);
+    let wpX = decouple ? sway.x * (1 - lookSh) + inertia.x * (1 - sh.x) : 0;
+    let wpY = decouple ? sway.y * (1 - lookSh) + inertia.y * (1 - sh.y) : 0;
+    let wpZ = decouple ? inertia.z * (1 - sh.z) : 0;
+    let wpPitch = decouple ? sway.pitch * (1 - lookSh) + inertia.pitch * (1 - sh.pitch) : 0;
+    let wpYaw = decouple ? sway.yaw * (1 - lookSh) + inertia.yaw * (1 - sh.yaw) : 0;
+    let wpRoll = decouple ? (sway.roll + sway.strafeRoll) * (1 - lookSh) + inertia.roll * (1 - sh.roll) : 0;
 
     // --- 步伐晃动：走 / 跑 / 蹲三档 -----------------------------------------
     const gait = inertiaOn ? inertia.gaitEnvelope : gaitRaw;
@@ -3111,11 +3131,21 @@ export class Viewmodel {
     const drift = this.holdDrift;
     drift.pitch = idleDrift.pitch; drift.yaw = idleDrift.yaw;
     const breath = idleKind ? 0 : 1;
-    this.bobPivot.position.set(bobX + breathX * breath, bobY + breathY * breath, 0);
-    this.bobPivot.rotation.set(
-      Math.sin(phase * 2) * 0.010 * bobScale,
-      Math.sin(phase) * 0.014 * bobScale,
-      -Math.sin(phase) * 0.018 * bobScale);
+    const bobRx = Math.sin(phase * 2) * 0.010 * bobScale;
+    const bobRy = Math.sin(phase) * 0.014 * bobScale;
+    const bobRz = -Math.sin(phase) * 0.018 * bobScale;
+    const shBobX = decouple ? 0.25 : 1;
+    const shBobY = decouple ? 0.45 : 1;
+    const shBobR = decouple ? 0.25 : 1;
+    this.bobPivot.position.set(bobX * shBobX + breathX * breath, bobY * shBobY + breathY * breath, 0);
+    this.bobPivot.rotation.set(bobRx * shBobR, bobRy * shBobR, bobRz * shBobR);
+    if (decouple) {
+      wpX += bobX * (1 - shBobX);
+      wpY += bobY * (1 - shBobY);
+      wpPitch += bobRx * (1 - shBobR);
+      wpYaw += bobRy * (1 - shBobR);
+      wpRoll += bobRz * (1 - shBobR);
+    }
 
     // --- 状态层：起跳收枪 / 滞空换重心 / 落地下沉 / 蹲低 / 掏枪 / 贴墙收枪 ---
     // 上升段枪口略压、枪身贴胸；越过最高点以后手臂开始向前接落地。
@@ -3197,7 +3227,7 @@ export class Viewmodel {
     // 换匣那一层（actionPivot / reloadPivot）同样清零：随身时绕左手把整挺枪歪过来，
     // 架在工事上的枪不动，只剩右手离开握把去拔插弹匣（手的轨迹本来就写在枪局部）。
     if (this.mount && this.rig) {
-      for (const pivot of [this.swayPivot, this.bobPivot, this.statePivot, this.actionPivot, this.reloadPivot]) {
+      for (const pivot of [this.swayPivot, this.bobPivot, this.statePivot, this.actionPivot, this.inertiaPivot, this.reloadPivot]) {
         pivot.position.set(0, 0, 0); pivot.quaternion.identity();
       }
       this.weaponMount.position.copy(this.mount.position);
@@ -3206,6 +3236,36 @@ export class Viewmodel {
         this.compensation.set(1, 1, 1);
         this.fovRig.scale.set(1, 1, 1);
       }
+    }
+
+    // Weapon-only movement/look inertia around the rear stock/grip pocket (camera-aligned
+    // axes mapped into weaponMount local space). Shoulders stay anchored to `armAnchor`,
+    // so 2-bone arm IK visibly flexes elbows & forearms instead of translating rigidly.
+    const inertiaMag = Math.abs(wpX) + Math.abs(wpY) + Math.abs(wpZ)
+      + Math.abs(wpPitch) + Math.abs(wpYaw) + Math.abs(wpRoll);
+    if (decouple && !this.mount && this.rig && inertiaMag > 1e-6) {
+      this._inertiaE.set(wpPitch, wpYaw, wpRoll, "YXZ");
+      const qCam = this._inertiaQ.setFromEuler(this._inertiaE);
+      const qMount = this.weaponMount.quaternion;
+      const qInv = this._inertiaQInv.copy(qMount).invert();
+      // Local rotation equivalent to camera-space qCam: qLocal = qMount^-1 * qCam * qMount
+      this.inertiaPivot.quaternion.copy(qInv).multiply(qCam).multiply(qMount);
+      // Pivot around rear stock pocket for two-handed firearms, or right wrist/grip otherwise.
+      const twoHanded = this.weapon?.kind === "boltRifle" || this.weapon?.kind === "lmg" || this.weapon?.kind === "hmg";
+      const pivotPt = this._inertiaPivotPt.copy(this.handBase.right);
+      if (twoHanded) {
+        pivotPt.y += MOVE_INERTIA.twoHandStockDownM;
+        pivotPt.z += MOVE_INERTIA.twoHandStockBackM;
+      }
+      this.inertiaAnchor.copy(pivotPt).applyQuaternion(this.inertiaPivot.quaternion);
+      this._inertiaV.set(wpX, wpY, wpZ).applyQuaternion(qInv);
+      this.inertiaPivot.position.copy(pivotPt).sub(this.inertiaAnchor).add(this._inertiaV);
+      this.inertiaActive = (Math.abs(wpX) + Math.abs(wpY) + Math.abs(wpZ) > 0.0004)
+        || (Math.abs(wpPitch) + Math.abs(wpYaw) + Math.abs(wpRoll) > 0.0012);
+    } else {
+      this.inertiaPivot.position.set(0, 0, 0);
+      this.inertiaPivot.quaternion.identity();
+      this.inertiaActive = false;
     }
 
     // Lower around the gripping hand, leaving the shoulders in place. The
