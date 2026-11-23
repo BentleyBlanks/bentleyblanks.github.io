@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-window-lacquer-09');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-flank-lacquer-10');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -61,7 +61,17 @@ try{
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
     steelRoughness.sort((first,second)=>first-second);
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,
+    const colorPatch=(u,v)=>{
+     const red=[],green=[];
+     for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
+      const offset=4*((Math.round(v*canvas.height)+row)*canvas.width+Math.round(u*canvas.width)+col);
+      red.push(base[offset]);green.push(base[offset+1]);
+     }
+     return [red.sort((one,two)=>one-two)[12],green.sort((one,two)=>one-two)[12]];
+    };
+    const sideValues=mesh.userData.type38Part.includes('WoodGroove')?
+     [[.1005,.539,.1307,.5377],[.0938,.5167,.1239,.5154],[.0872,.4944,.1171,.4931]].map(([insideU,insideV,belowU,belowV])=>[colorPatch(insideU,insideV),colorPatch(belowU,belowV)]):[];
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,sideValues,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
@@ -71,6 +81,8 @@ try{
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
   assert(lower.meanGreen>upper.meanGreen*1.35&&lower.meanRed>upper.meanRed*1.12,'the stained crown and warmer lower wood must not collapse to the same brown');
   assert(upper.meanRed>108&&upper.meanGreen>39,'the upper handguard must retain warm wood beneath the lacquer');
+  assert(lower.sideValues.length===3&&lower.sideValues.every(([inside,below])=>below[0]-inside[0]>18&&below[1]-inside[1]>7),
+   'recessed flank and adjacent amber wood must remain distinct on the authored map, without relying on a baked highlight');
   assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
    'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{

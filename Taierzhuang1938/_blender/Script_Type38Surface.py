@@ -575,6 +575,16 @@ def Build(cache):
                 color *= (1+np.clip(woodOil,-1,1)*(.055+.070*sun))[:,:,None]
                 quiet = Ramp(.038,.16,length)*.47
                 color = Blend(color,Tint([88,32,13],[157,68,27],.49+.14*stain),quiet)
+                grooveEnd = np.maximum(np.maximum(length+.264,-.444-length),0)
+                grooveRadius = np.hypot(grooveEnd/.010,(up-.0266)/.0075)
+                flank = Ramp(.25,.78,-normalSide)*Ramp(.010,.016,-side)
+                recess = flank*(1-Ramp(.78,1.27,grooveRadius))
+                insetTone = Tint([68,33,15],[146,89,34],np.clip(.41+.40*fibre+.085*stain,0,1))
+                color = Blend(color,insetTone,recess*(.86+.055*stain))
+                rubbedLip = np.exp(-((grooveRadius-.86)/.33)**2)*flank*recess
+                rubbedLip *= np.clip(.61+.18*stain+.08*grainSteel,.2,.95)
+                bodyPolish = flank*Ramp(-.47,-.430,length)*(1-Ramp(-.26,-.21,length))
+                bodyPolish *= np.exp(-((up-.0135)/.0064)**2)*np.clip(.78+.17*stain,.35,1)
                 rearPanel = Ramp(.004,.060,length)*Ramp(.10,.76,np.abs(normalSide))
                 upperEdge = .018-.062*length
                 depth = np.clip((upperEdge-up)/(.067+.37*np.maximum(0,length-.05)),0,1)
@@ -619,9 +629,13 @@ def Build(cache):
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.47*mellow))
                 varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1]+33*mellow,0,142),0)
                 rough += 16*mellow
+                varnish[:,:,0] = np.where(padded,np.rint(np.clip(varnish[:,:,0]+6*recess+23*bodyPolish,0,244)),0)
+                varnish[:,:,1] = np.where(padded,np.rint(np.clip(varnish[:,:,1]+8*recess-17*rubbedLip+6*bodyPolish,34,142)),0)
+                rough += 9*recess-11*rubbedLip-8*bodyPolish
             metal = np.zeros_like(rough)
             relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
             if not separate:
+                relief *= 1-.29*recess-.22*bodyPolish
                 distal = 1-Ramp(-.649,-.605,length)
                 stripCenter = .0276+.0029*distal+.00018*np.sin((length+.623)*106)
                 edgeDist = np.hypot(np.maximum(np.maximum(-.673-length,length+.599),0),up-stripCenter)
@@ -761,7 +775,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_LacquerWindow09'
+    doc['asset']['extras']['version'] = 'Type38_FlankLacquer10'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -769,7 +783,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=11, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=12, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
