@@ -247,6 +247,29 @@ assert.ok(Math.abs(bobZero.yaw) + Math.abs(bobZero.pitch) + Math.abs(bobZero.rol
   assert.ok(rollBefore < -0.02 && cs.roll > 0.02, `counter-strafe smoothly banks right -> left (${rollBefore / DEG} -> ${cs.roll / DEG} deg)`);
   assert.ok(minRollAfterRev >= rollBefore - 0.002, `counter-strafe never rolls further wrong way on reversal (${minRollAfterRev / DEG} vs ${rollBefore / DEG} deg)`);
   assert.ok(Math.abs(maxDipDuringRev) < 1e-4, `direct A<->D zero-crossing triggers no false stop-settle dip (${maxDipDuringRev * 1000} mm)`);
+
+  // Pure sideways strafe must produce zero phantom vertical/pitch/longitudinal inertia
+  // and scale proportionally with actual speed (no canned fixed-amplitude animation).
+  function PeakStrafe(topSpeed) {
+    const m = new MoveInertia();
+    let peakX = 0, peakY = 0, peakPitch = 0, peakZ = 0, v = 0;
+    for (let i = 0; i < 150; i += 1) {
+      const target = i < 70 ? topSpeed : 0;
+      v += (target - v) * (1 - Math.exp(-15 * dt));
+      const out = m.Step(dt, { rightMps: v, forwardMps: 0, gaitTarget: Math.min(1, v / 3.2), grounded: true, ads: 0, eyeHeight: 1.62 });
+      peakX = Math.max(peakX, Math.abs(out.x));
+      peakY = Math.max(peakY, Math.abs(out.y));
+      peakPitch = Math.max(peakPitch, Math.abs(out.pitch));
+      peakZ = Math.max(peakZ, Math.abs(out.z));
+    }
+    return { peakX, peakY, peakPitch, peakZ };
+  }
+  const slowStrafe = PeakStrafe(1.75), fastStrafe = PeakStrafe(3.5);
+  assert.equal(fastStrafe.peakY, 0, "pure sideways strafe has strictly zero vertical inertia");
+  assert.equal(fastStrafe.peakPitch, 0, "pure sideways strafe has strictly zero pitch inertia");
+  assert.equal(fastStrafe.peakZ, 0, "pure sideways strafe has strictly zero longitudinal inertia");
+  const speedRatio = slowStrafe.peakX / fastStrafe.peakX;
+  assert.ok(speedRatio > 0.45 && speedRatio < 0.55, `strafe inertia scales proportionally with velocity (${speedRatio.toFixed(3)})`);
 }
 
 console.log(JSON.stringify({ adsIdleDeg: { pitch: ads60.pitch / DEG, yaw: ads60.yaw / DEG, hipRatio, held: [held.pitch / DEG, held.yaw / DEG] },

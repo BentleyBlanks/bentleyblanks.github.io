@@ -298,20 +298,9 @@ export class MoveInertia {
       this.prevEyeHeight = eyeHeight;
     }
 
-    // Stop-step weight settle when decelerating from a brisk walk/sprint to a true stop
-    // (holding below threshold briefly avoids false dips during direct A<->D counter-strafe zero-crossings).
-    const speed = Math.hypot(right, forward);
-    if (speed < 0.22) {
-      this.lowSpeedS += dt;
-      if (grounded && this.wasMoving && this.lowSpeedS >= (M.stopSettleHoldS ?? 0.065)) {
-        this.wasMoving = false;
-        this.stance.vy += M.stopSettleDipYM * kStance;
-        this.stance.vpitch += M.stopSettlePitchDeg * DEG * kStance;
-      }
-    } else {
-      this.lowSpeedS = 0;
-      if (speed > M.stopSettleSpeedMps) this.wasMoving = true;
-    }
+    // All inertia channels are strictly proportional to real velocity & acceleration
+    // (no binary/canned stop-settle impulse), so pure sideways strafing never injects
+    // phantom vertical lift/dip and gentle movement produces proportionally gentle lag.
 
     // Smooth gait envelope (eliminates instantaneous bob amplitude snaps).
     const gTarget = Clamp01(gaitTarget);
