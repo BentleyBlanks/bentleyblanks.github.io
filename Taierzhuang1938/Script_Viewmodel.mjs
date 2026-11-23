@@ -2998,13 +2998,17 @@ export class Viewmodel {
       : (cycle ? 1 - cycleAway : procBolt ? 1 - boltAway * boltAdsDrop : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower)) * boltClosed;
     // 逐帧拉栓与程序化抵肩拉栓都保留开镜底座，避免中正式/三八式每打一发都暴力退回腰射再缩回。
     const adsActionKeep = (cycle ? 1 - this.wallLower : procBolt ? (1 - boltAway * 0.38) * (1 - this.wallLower) : this.adsSuppress) * boltClosed;
-    const adsInput = Clamp01(input.ads ?? 0) * adsActionKeep * (1 - sprint * 0.9);
+    // 开镜意图优先于冲刺（Script_Player / 靶场开镜时均立即终止冲刺），
+    // 不再用衰减中的 sprint 反压 adsInput，避免冲刺转开镜被拖慢一倍。
+    const wantAdsNow = Clamp01(input.ads ?? 0);
+    const sprintBlockAds = wantAdsNow > 0.25 ? 0 : sprint * 0.9;
+    const adsInput = wantAdsNow * adsActionKeep * (1 - sprintBlockAds);
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
     // 托枪手的开镜握法与枪身共用同一套 adsSpring 刚度/阻尼，只是不跟拉栓/装填时枪临时离开瞄准线走：
     // 这样开镜与收镜时左手与枪身严格同起同止（不会枪已停稳、左手还在护木上慢爬），同时拉栓时左手不乱转。
-    const adsGripTarget = Clamp01(input.ads ?? 0) * (1 - this.wallLower) * (1 - sprint * 0.9) * boltClosed;
+    const adsGripTarget = wantAdsNow * (1 - this.wallLower) * (1 - sprintBlockAds) * boltClosed;
     this.adsGrip = Clamp01(this.adsGripSpring.Step(step, adsGripTarget));
     // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
     if (this.adsHideParts.length) {
@@ -3016,7 +3020,15 @@ export class Viewmodel {
         this._RestoreAdsHideParts();
       }
     }
-    const sprintSpringValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+    // 冲刺→开镜走更干脆的收枪刚度（~145 ms 收完，紧贴原地开镜节奏，对标 COD14 sprint-to-ADS），
+    // 普通进出冲刺仍保持 [90, 0.95] 的沉稳节奏，不再拖着冲刺斜姿态横跨半秒。
+    const sprintTarget = sprint * (1 - adsInput) * (grounded ? 1 : 0);
+    const sprintOutToAds = adsInput > 0.25 && sprintTarget < 0.1;
+    const sprintK = sprintOutToAds ? 900 : 90;
+    const sprintZeta = sprintOutToAds ? 0.92 : 0.95;
+    this.sprintSpring.stiffness = sprintK;
+    this.sprintSpring.damping = 2 * sprintZeta * Math.sqrt(sprintK);
+    const sprintSpringValue = this.sprintSpring.Step(step, sprintTarget);
 
     // --- 冲刺姿态的白刃静音 --------------------------------------------------
     // 冲刺姿态是"把刀压到画面右下角、让出视野"，这条本身没错；错的是挥刀也从那儿起手。
