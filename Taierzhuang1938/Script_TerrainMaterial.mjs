@@ -594,6 +594,7 @@ function TerrainWaterUniforms() {
  */
 export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
   const set = TERRAIN_SETS[pack.setName];
+  const stubble = set.stubble || TERRAIN_STUBBLE;
   const layers = set.layers;
   const PerLayer = (fn) => new THREE.Vector4(...layers.map(fn));
   const uniforms = {
@@ -618,8 +619,7 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
     },
     uTerrainMacroAmp: { value: Vec4Of([...TERRAIN_MACRO.brightness, TERRAIN_MACRO.damp]) },
     uTerrainStubble: {
-      value: Vec4Of([1 / TERRAIN_STUBBLE.scaleM, 1 / TERRAIN_STUBBLE.breakupScaleM,
-        TERRAIN_STUBBLE.threshold[0], TERRAIN_STUBBLE.threshold[1]]),
+      value: Vec4Of([1 / stubble.scaleM, 1 / stubble.breakupScaleM, ...stubble.threshold]),
     },
     uTerrainBlend: {
       value: new THREE.Vector3(TERRAIN_BLEND.heightDepth, 1 / TERRAIN_BLEND.antiTileScaleM, TERRAIN_BLEND.antiTileBands),

@@ -248,6 +248,7 @@ export function MakeVolumetricParams(presetName, fog) {
   params.falloff = Math.max(f.falloff ?? 18, 0.5);
   params.base = f.base ?? 0;
   params.maxOpacity = f.max ?? 0.94;
+  params.skyScale = f.skyScale ?? params.skyScale;
   params.sunGain = f.sunGain ?? 0.28;
   params.skyColor = f.sky || [0.62, 0.64, 0.68];
   params.groundColor = f.ground || [0.42, 0.38, 0.33];

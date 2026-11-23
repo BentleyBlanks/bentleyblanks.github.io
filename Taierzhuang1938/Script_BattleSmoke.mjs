@@ -12,9 +12,9 @@ export class BattleSmoke {
  constructor({root,shared,quality='high',particles=null}){
    this.quality=quality;this.sources=new Map();this.handles=new Map();this.disposed=false;
    this.ownsParticles=!particles;this.particles=particles||new ParticleEffects(root,shared,quality);
-   this.pool=this.particles.renderer.volumes.Pool('ChimneySmoke');
-   this.mesh=this.pool.mesh;
  }
+ get pool(){return this.particles.renderer.volumes.Pool('ChimneySmoke');}
+ get mesh(){return this.pool.mesh;}
  get texture(){return this.pool.material?.uniforms.uVolume.value??null;}
  get geometry(){return this.mesh.geometry;}
  get material(){return this.mesh.material;}

@@ -150,6 +150,8 @@ export const ENV_COMPONENTS = Object.freeze([
       P({ key: "density", label: "浓度", kind: "number", min: 0, max: 0.05, step: 0.0001, default: 0.0032, out: "fog.density", group: "量" }),
       P({ key: "falloff", label: "高度衰减", kind: "number", min: 1, max: 600, step: 0.5, default: 45, out: "fog.falloff", group: "量", hint: "米：越大雾越往上走" }),
       P({ key: "max", label: "最浓", kind: "number", min: 0, max: 1, step: 0.01, default: 0.72, out: "fog.max", group: "量" }),
+      P({ key: "skyScale", label: "天际雾量", kind: "number", min: 0, max: 1, step: 0.01, default: 0, out: "fog.skyScale", group: "量",
+        hint: "体积雾对地平线以上天空的混合量" }),
       P({ key: "skyColor", label: "雾色（天）", kind: "rgb", min: 0, max: 2, step: 0.005, default: RGB(0.60, 0.60, 0.59), lerp: "log", out: "fog.sky", group: "颜色" }),
       P({ key: "groundColor", label: "雾色（地）", kind: "rgb", min: 0, max: 2, step: 0.005, default: RGB(0.45, 0.43, 0.40), lerp: "log", out: "fog.ground", group: "颜色" }),
       P({ key: "sunGain", label: "朝阳增亮", kind: "number", min: 0, max: 1, step: 0.01, default: 0.08, out: "fog.sunGain", group: "颜色" }),

@@ -49,11 +49,15 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 }
 ```
 
-坐标同全项目：X 向东、Z 向南、Y 向上，单位为米。独立场景可用 `camera` 保存摄影机的 `position: [x, y, z]`、`yawDeg`、`pitchDeg`、垂直视场角 `fovDeg` 和可选的近景对焦距离 `nearFocusM`。正式场景可设 `look.proceduralDressing: false`，由场景物件提供植被和零散土石。
+坐标同全项目：X 向东、Z 向南、Y 向上，单位为米。独立场景可用 `camera` 保存摄影机的 `position: [x, y, z]`、`yawDeg`、`pitchDeg`、垂直视场角 `fovDeg`，以及可选的近景对焦距离 `nearFocusM` 和独立渲染机位的暗角强度 `vignette`（0 到 1）。正式场景可设 `look.proceduralDressing: false`，由场景物件提供植被和零散土石。`look.terrainLayers` 可选择 `Data_Tuning_Terrain.TERRAIN_SETS` 中的四层地面材质，游戏与场景编辑器共用该选择，省略时使用 `MissionPlain`。
 
 注册表的 `previewParam` 让场景编辑器打开对应项目渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
 各 `paint` 项可用 `tint` 设置正式地表的反照率倍率，支持六位 Hex 或 0–2 的三个 sRGB 倍率。
 显式标高的道具可用 `params.grounding: "authored"` 控制贴地。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。
+
+场景可在 `smokeColumns[].options.backdrop.volume` 提供已登记的 TVOL 资产 `asset`、三轴全尺寸 `bounds`、消光系数 `density` 和播放倍率 `speed`。`backdrop` 还需要 `seed`、`life`，可用绝对米制坐标 `ignition` 设烟场锚点。明火可通过 `options.firePosition` 单独定位。
+
+独立预览可用 `fogVolumes` 登记贴地雾。每条写 `shape`（`sphere` 或 `box`）、世界坐标 `position`、三轴半尺寸 `size`、消光 `density`、反照率 `albedo` 和可选的边缘衰减 `falloff`。支持体积雾的画质档将它们注入游戏雾系统。
 
 一个物件：
 

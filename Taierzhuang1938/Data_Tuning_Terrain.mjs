@@ -48,6 +48,21 @@ export const TERRAIN_SETS = Object.freeze({
       Object.freeze({ id: "SpoilEarth", file: "SpoilEarth", tileM: 2.1, farTileM: 11.9, normalScale: 1, heightOffset: 0.06 }),
     ]),
   }),
+  EastSmokeField: Object.freeze({
+    textureSize: 1024,
+    version: "20261123EastSmoke01",
+    albedoScale: 0.92,
+    stubble: Object.freeze({ scaleM: 12, breakupScaleM: 2.9, threshold: Object.freeze([0.26, 0.50]) }),
+    layers: Object.freeze([
+      Object.freeze({ id: "FieldSoil", file: "EastSmokeCutLoam", tileM: 1.65, farTileM: 9.35, normalScale: 0.79, heightOffset: 0 }),
+      Object.freeze({ id: "CartTrack", file: "CartTrack", tileM: 3.1, farTileM: 16.9, normalScale: 0.52, heightOffset: -0.14,
+        tint: Object.freeze([0.88, 0.91, 0.99]) }),
+      Object.freeze({ id: "DryStubble", file: "EastSmokeStubbleSoil", tileM: 2.4, farTileM: 12.9, normalScale: 0.76, heightOffset: 0.09,
+        tint: Object.freeze([1.16, 1.12, 1.06]) }),
+      Object.freeze({ id: "SpoilEarth", file: "EastSmokeCutLoam", tileM: 1.65, farTileM: 9.35, normalScale: 0.92, heightOffset: 0.05,
+        tint: Object.freeze([0.95, 0.91, 0.88]) }),
+    ]),
+  }),
 });
 
 /**

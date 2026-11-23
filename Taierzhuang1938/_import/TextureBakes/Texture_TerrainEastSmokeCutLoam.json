@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-11-23",
+  "name": "TerrainEastSmokeCutLoam",
+  "preset": "drySoil",
+  "source": {
+    "path": "_import/GengjiazhuangEastSmoke/Source_CutLoam.webp",
+    "sha256": "a2314fd4a4fd59793a752aed485ff27aa7c66d9166bf1d8bceb6b41f074e5e38",
+    "metrics": {
+      "meanSrgb": [
+        0.3365,
+        0.284,
+        0.2407
+      ],
+      "luma": 0.2871,
+      "lumaStd": 0.0576,
+      "sat": 0.2846,
+      "clipLow": 0.0001,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0253
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.39,
+      0.343,
+      0.288
+    ],
+    "contrast": 0.085,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.024,
+    "rough": 0.94,
+    "roughVar": 0.051,
+    "roughLumaK": 0.0,
+    "ao": 0.49,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.19,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.65,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orh",
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 73,
+    "dataQuality": 72,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.3,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainEastSmokeCutLoamBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 226482,
+      "sha256": "f2f8e665f13238e0f03682b134414daf4f29ecc33e0c21a2d10c8f331f18c6e3"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainEastSmokeCutLoamNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 103846,
+      "sha256": "49edd2f96c6546d89bd4d31dd8fa5b9acd9ae8c6e2579689cfc2837a2e7d9995"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainEastSmokeCutLoamOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 32128,
+      "sha256": "e891e13bd968dbf081aac08a996413d83ba90763455c02207ca7629c7733819f"
+    }
+  ],
+  "totalBytes": 362456,
+  "metrics": {
+    "meanSrgb": [
+      0.3896,
+      0.3439,
+      0.2874
+    ],
+    "luma": 0.3403,
+    "lumaStd": 0.0847,
+    "sat": 0.2622,
+    "clipLow": 0.0011,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0216,
+    "seam": 0.0555,
+    "interior": 0.0549,
+    "seamRatio": 1.011,
+    "border": 0.939,
+    "swing": 0.0074,
+    "aoMean": 0.903,
+    "roughMean": 0.93,
+    "texelsPerMeter": 620.6
+  },
+  "gateProblems": []
+}

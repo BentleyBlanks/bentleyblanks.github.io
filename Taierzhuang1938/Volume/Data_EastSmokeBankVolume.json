@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "asset": "EastSmokeBank",
+  "source": "authored",
+  "encoding": "sqrt-unorm8",
+  "dimensions": [
+    240,
+    112,
+    52
+  ],
+  "atlasTiles": [
+    2,
+    2,
+    1
+  ],
+  "channels": 1,
+  "frames": 4,
+  "duration": 8,
+  "sourceFrameIndices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "anchor": [
+    0.5,
+    0,
+    0.5
+  ],
+  "boundsM": [
+    184,
+    65,
+    112
+  ],
+  "anchorPositionM": [
+    0,
+    0,
+    -69
+  ],
+  "gpuBytes": 5591040,
+  "bytes": 1210394,
+  "sha256": "8243b641c4d16a5c459168654d626f02452c796e0a7a69bde0b21973f8e7c927"
+}

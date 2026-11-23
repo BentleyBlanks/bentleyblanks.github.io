@@ -906,6 +906,32 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_TerrainSpoilEarthOrh.webp", "Orh", 512, 512],
     ],
   },
+  {
+    id: "TerrainEastSmokeCutLoam", kind: "terrainLayer", tier: "level:GengjiazhuangEastSmoke",
+    toneClass: "drySoil", metersPerTile: 1.65, normalConvention: "terrain",
+    bake: "_import/GengjiazhuangEastSmoke/Script_BakeEastSmokeMaterials.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainEastSmokeCutLoam.json",
+    source: { provider: "imagegen", date: "2026-11-23", prompt: "Scenes/GengjiazhuangEastSmoke/README.md" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "EastSmokeCutLoam" }],
+    files: [
+      ["Texture_TerrainEastSmokeCutLoamBase.webp", "Base", 1024, 1024],
+      ["Texture_TerrainEastSmokeCutLoamNormal.webp", "Normal", 512, 512],
+      ["Texture_TerrainEastSmokeCutLoamOrh.webp", "Orh", 512, 512],
+    ],
+  },
+  {
+    id: "TerrainEastSmokeStubbleSoil", kind: "terrainLayer", tier: "level:GengjiazhuangEastSmoke",
+    toneClass: "drySoil", metersPerTile: 2.4, normalConvention: "terrain",
+    bake: "_import/GengjiazhuangEastSmoke/Script_BakeEastSmokeMaterials.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainEastSmokeStubbleSoil.json",
+    source: { provider: "imagegen", date: "2026-11-23", prompt: "Scenes/GengjiazhuangEastSmoke/README.md" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "EastSmokeStubbleSoil" }],
+    files: [
+      ["Texture_TerrainEastSmokeStubbleSoilBase.webp", "Base", 1024, 1024],
+      ["Texture_TerrainEastSmokeStubbleSoilNormal.webp", "Normal", 512, 512],
+      ["Texture_TerrainEastSmokeStubbleSoilOrh.webp", "Orh", 512, 512],
+    ],
+  },
   // 3A 迭代 B5（2026-09-28）：01–04 开场布景的风化旧木与旧弹药箱板（分镜 01/02/03A/04A 的灰褐旧木，替换程序化橙黄 WoodBeam / WoodCrate）。
   {
     id: "OpeningTimber", kind: "material", tier: "level:FirstLevel",

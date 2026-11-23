@@ -106,6 +106,7 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/fieldApproachSoilClod": Prop("fieldApproachSoilClod", "earthDark", "翻土块", [0.147, 0.071, 0.108]),
   "Prop/fieldApproachPackDonkey": Prop("fieldApproachPackDonkey", "canvas", "驮草小驴", [1.245, 1.643, 1.913]),
   "Prop/eastSmokeCourtyardGate": Prop("eastSmokeCourtyardGate", "plaster", "庄东破损院墙与门洞", [7.8, 2.21, 0.82]),
+  "Prop/eastSmokeMaizeStubble": Prop("eastSmokeMaizeStubble", "foliage", "庄东折断的玉米残茬", [0.69, 0.4, 0.36]),
   "Prop/woodenEvacCart": Prop("woodenEvacCart", "timber", "撤运木车（静置）", [1.95, 1.32, 4.8]),
   "Prop/singleBlanket": Prop("singleBlanket", "canvas", "土布单被（静置）", [1.4, 0.055, 1.9]),
   "Prop/singleBlanketCrumpled": Prop("singleBlanketCrumpled", "canvas", "揉起的土布单被（静置）", [0.45, 0.25, 0.45]),

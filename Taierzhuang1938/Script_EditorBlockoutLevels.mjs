@@ -699,7 +699,7 @@ export function LayoutFromSceneDoc(doc) {
     cameraFar: backdrop ? Math.max(BLOCKOUT_CAMERA_FAR, backdrop.far) : BLOCKOUT_CAMERA_FAR,
     bounds: { ...doc.bounds },
     ground: formal ? { ...ground, pbr: MISSION_LAYOUT.ground.pbr, pbrOptions: { ...MISSION_LAYOUT.ground.pbrOptions },
-      terrainLayers: MISSION_LAYOUT.ground.terrainLayers } : ground,
+      terrainLayers: doc.terrainLayers || MISSION_LAYOUT.ground.terrainLayers } : ground,
     // 可选 semanticColors（2026-10-20）：场景文件改的几种块色盖在第一关那张表上
     semanticColors: { ...MISSION_LAYOUT.semanticColors,
       ...Object.fromEntries(Object.entries(doc.semanticColors || {}).map(([k, v]) => [k, parseInt(v.slice(1), 16)])) },
@@ -717,6 +717,7 @@ export function LayoutFromSceneDoc(doc) {
     spawn: { x: doc.spawn.x, z: doc.spawn.z, yawDeg: Number.isFinite(doc.spawn.yawDeg) ? doc.spawn.yawDeg : 0 },
     ...(doc.camera ? { camera: doc.camera } : {}),
     ...(doc.smokeColumns ? { smokeColumns: doc.smokeColumns } : {}),
+    ...(doc.fogVolumes ? { fogVolumes: doc.fogVolumes } : {}),
     ...(doc.landmarks ? { landmarks: doc.landmarks.map((marker) => ({ ...marker })) } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),

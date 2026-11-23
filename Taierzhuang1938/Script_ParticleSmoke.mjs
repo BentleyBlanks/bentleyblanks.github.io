@@ -10,22 +10,26 @@ const Position=v=>[v.x,v.y,v.z];
 // authored height, prevailing drift and opacity remain scene inputs.
 export function BattleSmokeModules(source,quality='high'){
  const p=source.backdrop;if(!p)return [];
- const style=BATTLE_SMOKE_STYLES[p.frame]||BATTLE_SMOKE_STYLES[0],burst=p.frame===5;
- const asset=burst?'DustImpact':[1,2,4].includes(p.frame)?'DenseSmoke':'ChimneySmoke',baseTint=PARTICLE_VOLUME_ASSETS[asset].albedo;
- const origin=source.firePosition?Position(source.firePosition):p.ignition||Position(source.position);
+ const authored=p.volume;
+ const style=BATTLE_SMOKE_STYLES[p.frame]||BATTLE_SMOKE_STYLES[0],burst=!authored&&p.frame===5;
+ const asset=authored?.asset||(burst?'DustImpact':[1,2,4].includes(p.frame)?'DenseSmoke':'ChimneySmoke');
+ const baseTint=PARTICLE_VOLUME_ASSETS[asset].albedo;
+ const origin=authored?p.ignition||Position(source.position)
+   :source.firePosition?Position(source.firePosition):p.ignition||Position(source.position);
  const height=Math.max(.4,p.height+source.position.y-origin[1]);
  const drift=Math.hypot(p.driftX||0,p.driftZ||0),yaw=Math.atan2(p.driftX||0,p.driftZ||1e-6);
  const cycle=Math.max(1,p.life),life=burst?cycle*.62:120;
- const bounds=burst?[p.crownWidth,height,p.crownWidth]:[p.crownWidth,height,Math.max(p.baseWidth*2,drift+p.crownWidth*.5)];
+ const bounds=authored?.bounds||(burst?[p.crownWidth,height,p.crownWidth]:[p.crownWidth,height,Math.max(p.baseWidth*2,drift+p.crownWidth*.5)]);
+ const density=authored?.density??Math.max(.2,Math.min(32,style.opticalDepth*p.opacity*(asset==='DenseSmoke'?40:160)/height));
  return [{name:'Plume/'+p.seed,preset:burst?'VolumeExplosion':'VolumePlume',position:origin,modules:{
    main:{duration:burst?cycle:120,loop:true,prewarm:burst,startLifetime:life,startSpeed:0,startSize:1,maxParticles:1,simulationSpace:'local',randomSeed:p.seed>>>0,
-     startRotation:yaw,startColor:[...style.tint.map((n,i)=>n/baseTint[i]),1]},
+     startRotation:authored?0:yaw,startColor:authored?[1,1,1,1]:[...style.tint.map((n,i)=>n/baseTint[i]),1]},
    emission:{rateOverTime:0,bursts:[{time:burst?cycle*(1-(p.seed%4096)/4096):0,count:1}]},shape:{enabled:false},
    sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},
    renderer:{mode:'bakedVolume',volumeAsset:asset,bounds,
      // Optical depth is a column property. Compensate the world-space scale so
      // nearby six-metre plumes do not become wisps while huge distant ones seal up.
-     density:Math.max(.2,Math.min(32,style.opticalDepth*p.opacity*(asset==='DenseSmoke'?40:160)/height)),volumeSpeed:burst?PARTICLE_VOLUME_ASSETS.DustImpact.duration/life:Math.max(.3,Math.min(2,14/cycle)),
+     density,volumeSpeed:authored?.speed??(burst?PARTICLE_VOLUME_ASSETS.DustImpact.duration/life:Math.max(.3,Math.min(2,14/cycle))),
      emissionStrength:0,flameExtinction:0,volumeLoop:!burst,nearFade:0},
  }}];
 }

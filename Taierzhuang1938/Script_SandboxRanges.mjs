@@ -112,6 +112,9 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
       const { battlefield, camera, vfx, state } = host;
       const { layout } = battlefield;
       const backdrop = CreateScenePreviewBackdrop(host);
+      const volumetrics = host.post.volumetricsPass;
+      const fogHandles = (layout.fogVolumes || []).map(({ position: [x, y, z], size: [rx, ry, rz], ...look }) =>
+        volumetrics.AddFogVolume({ ...look, position: { x, y, z }, size: { x: rx, y: ry, z: rz } }));
       const ApplyPose = FixedSceneCamera(host, layout.camera);
       const impact = soilMarker && layout.landmarks?.find((marker) => marker.id === soilMarker);
       const ground = impact && battlefield.StaticGroundHeight(impact.x, impact.z);
@@ -124,6 +127,8 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
           propTriangles: battlefield.scenePropStats?.stats.propTriangles ?? 0,
           missing: battlefield.scenePropStats?.missing ?? [],
           terrainTriangles: battlefield.stats.groundTris,
+          terrainLayers: battlefield.terrainLayers?.setName ?? null,
+          fogVolumes: fogHandles.length,
           smoke: vfx.smokeSources.size,
           ...(impact ? { impactAge } : {}),
         }) },
@@ -140,13 +145,18 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
           }
           vfx.Update(dt, camera, state.elapsed);
         },
-        Dispose() { backdrop.Dispose(); host.SetViewmodelHidden(false); },
+        Dispose() {
+          for (const handle of fogHandles) volumetrics.RemoveFogVolume(handle);
+          backdrop.Dispose();
+          host.SetViewmodelHidden(false);
+        },
       };
       return Instance(runtime, {
         debugName: "ScenePreview", ownsFrame: true, dropDebugOnDispose: true,
         OnInstalled: ApplyPose,
         UpdateCamera: ApplyPose,
-        Warmup: async () => {},
+        PostOptions: () => layout.camera?.vignette === undefined ? null : { vignette: layout.camera.vignette },
+        Warmup: () => vfx.particles.Ready(),
       });
     },
   };

@@ -294,6 +294,7 @@ const ASSETS = Object.freeze({
   eastTrackBambooStretcher: { label: "竹竿布兜担架", url: "./Model/Model_BambooStretcher.glb?v=stretcher20260927", category: "生活道具", solid: false },
   fieldApproachPackDonkey: { label: "驮草小驴", url: "./Model/GengjiazhuangFieldApproach/Model_PackDonkey.glb?v=2026112202", category: "景观", solid: false },
   eastSmokeCourtyardGate: { label: "庄东破损院墙与门洞", url: "./Model/GengjiazhuangEastSmoke/Model_CourtyardGate.glb?v=2026112201", category: "建筑", solid: false },
+  eastSmokeMaizeStubble: { label: "庄东折断的玉米残茬", url: "./Model/GengjiazhuangEastSmoke/Model_MaizeStubble.glb?v=2026112302", category: "景观", solid: false },
   woodenEvacCart: { label: "撤运木车（静置）", url: "./Model/OxCart/Model_WoodenEvacCart.glb?v=2026101401", category: "景观", solid: false, staticBindPose: true },
   singleBlanket: { label: "土布单被（静置）", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell", category: "景观", solid: false, staticBindPose: true },
   singleBlanketCrumpled: { label: "揉起的土布单被（静置）", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell", category: "景观", solid: false, staticBindPose: true, staticMorph: "Crumpled" },

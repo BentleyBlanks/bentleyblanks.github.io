@@ -8,11 +8,11 @@
   "components": {
     "Sun": {
       "enabled": true,
-      "params": {"elevation": 58, "azimuth": 196, "color": "#e0d9cf", "intensity": 0.86, "discIntensity": 0}
+      "params": {"elevation": 42, "azimuth": 226, "color": "#e1d9cd", "intensity": 1.11, "discIntensity": 0}
     },
     "Ambient": {
       "enabled": true,
-      "params": {"probe": 1.19, "color": "#d6d1c9", "intensity": 1.1}
+      "params": {"probe": 1.16, "color": "#c9c5bf", "intensity": 1.08}
     },
     "Reflection": {
       "enabled": true,
@@ -21,26 +21,26 @@
     "Sky": {
       "enabled": true,
       "params": {
-        "zenith": [0.42, 0.43, 0.45],
-        "horizon": [0.29, 0.285, 0.285],
+        "zenith": [0.179, 0.181, 0.184],
+        "horizon": [0.186, 0.187, 0.19],
         "ground": [0.235, 0.22, 0.2],
         "glow": 0,
-        "smoke": 0.46,
-        "smokeColor": [0.32, 0.325, 0.334],
-        "smokeHeight": 0.35
+        "smoke": 0,
+        "smokeColor": [0.214, 0.216, 0.22],
+        "smokeHeight": 0.21
       }
     },
     "Clouds": {
-      "enabled": true,
+      "enabled": false,
       "params": {
-        "structure": 0.66,
-        "coverage": 0.95,
-        "scale": 1.2,
-        "softness": 1.45,
+        "structure": 0.48,
+        "coverage": 0.98,
+        "scale": 1.18,
+        "softness": 1.57,
         "warp": 1.46,
-        "underside": 0.38,
-        "shade": [0.39, 0.395, 0.4],
-        "gap": 0.1,
+        "underside": 0.25,
+        "shade": [0.54, 0.535, 0.538],
+        "gap": 0.08,
         "silver": 0,
         "shapeCover": 0.57
       }
@@ -48,48 +48,49 @@
     "Atmosphere": {
       "enabled": true,
       "params": {
-        "mie": 10.8,
-        "mieG": 0.68,
+        "mie": 6.4,
+        "mieG": 0.63,
         "rayleigh": 0.49,
         "ozone": 1,
         "groundAlbedo": 0.14,
-        "sunIrradiance": 2,
-        "skyTint": [0.55, 0.554, 0.565],
-        "skyFloor": [0.61, 0.614, 0.625],
+        "sunIrradiance": 0.12,
+        "skyTint": [0.52, 0.528, 0.539],
+        "skyFloor": [0.388, 0.389, 0.394],
         "artGlow": 0,
-        "aerialBlend": 0.47,
-        "aerialGain": 0.27
+        "aerialBlend": 0,
+        "aerialGain": 0.22
       }
     },
     "Fog": {
       "enabled": true,
       "params": {
-        "density": 0.0093,
-        "falloff": 23,
-        "max": 0.78,
-        "skyColor": [0.174, 0.181, 0.188],
-        "groundColor": [0.27, 0.259, 0.253],
+        "density": 0.0132,
+        "falloff": 9.9,
+        "max": 0.88,
+        "skyColor": [0.195, 0.2, 0.205],
+        "groundColor": [0.229, 0.216, 0.208],
         "sunGain": 0,
-        "desat": 0.74,
-        "flatten": 0.095
+        "desat": 0.65,
+        "flatten": 0.072,
+        "skyScale": 0.22
       }
     },
     "Grade": {
       "enabled": true,
       "params": {
-        "profile": "firstLevelBattleDay",
-        "exposure": 0.98,
-        "saturation": 0.54,
-        "contrast": 1.01,
+        "profile": "overcast",
+        "exposure": 0.99,
+        "saturation": 0.63,
+        "contrast": 1.03,
         "contrastCurve": "soft",
         "gain": [1, 0.99, 0.985],
-        "lift": [0.024, 0.021, 0.018],
+        "lift": [0.021, 0.018, 0.016],
         "shadowTint": [1, 0.986, 0.961],
         "highlightTint": [0.995, 0.998, 1.009],
         "splitShadow": 0.14,
         "splitHighlight": 0.14,
-        "bloom": 0.014,
-        "bloomThreshold": 1.49,
+        "bloom": 0.025,
+        "bloomThreshold": 1.25,
         "godStrength": 0,
         "lensFlare": 0
       }

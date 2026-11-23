@@ -13,6 +13,9 @@
 import { SCENE_ASSETS, SCENE_MATERIALS, SCENE_LIST, SceneInfo, SceneObjectSemantic } from "./Data_SceneAssets.mjs";
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 import { SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
+import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
+import { MAX_FOG_VOLUMES } from "./Data_Tuning_Volumetrics.mjs";
+import { PARTICLE_VOLUME_ASSETS } from "./Data_ParticleVolumeAssets.mjs";
 
 export const SCENE_SCHEMA = "tengxian-scene/1";
 export const SCENE_HEIGHT_ENCODING = "int16-cm-le";
@@ -94,13 +97,33 @@ export function ValidateScene(doc) {
   if (camera !== undefined && (!IsObject(camera) || !Array.isArray(camera.position) || camera.position.length !== 3
     || !camera.position.every(Finite) || !Finite(camera.yawDeg) || !Finite(camera.pitchDeg)
     || Math.abs(camera.pitchDeg) >= 90 || !(Finite(camera.fovDeg) && camera.fovDeg > 0 && camera.fovDeg < 180)
-    || (camera.nearFocusM !== undefined && !(Finite(camera.nearFocusM) && camera.nearFocusM > 0)))) {
-    errors.push("camera 要带 [x, y, z]、yawDeg、pitchDeg（±90° 以内）及垂直 fovDeg（0–180° 之间）；nearFocusM 如有须为正数");
+    || (camera.nearFocusM !== undefined && !(Finite(camera.nearFocusM) && camera.nearFocusM > 0))
+    || (camera.vignette !== undefined && !(Finite(camera.vignette) && camera.vignette >= 0 && camera.vignette <= 1)))) {
+    errors.push("camera 要带 [x, y, z]、yawDeg、pitchDeg（±90° 以内）及垂直 fovDeg（0–180° 之间）；nearFocusM 如有须为正数、vignette 如有须在 [0, 1]");
   }
   const smoke = doc.smokeColumns;
   if (smoke !== undefined && (!Array.isArray(smoke) || smoke.some(entry => !IsObject(entry)
     || !Finite(entry.x) || !Finite(entry.z) || !Finite(entry.heightOffset) || !IsObject(entry.options)))) {
     errors.push("smokeColumns 每个烟源要带 x、z、heightOffset、options");
+  } else if (smoke?.some(({ options }) => {
+    const { volume, ignition, seed, life } = options.backdrop || {};
+    return volume !== undefined && (!IsObject(volume) || typeof volume.asset !== "string"
+      || !Object.hasOwn(PARTICLE_VOLUME_ASSETS, volume.asset)
+      || !Array.isArray(volume.bounds) || volume.bounds.length !== 3 || !volume.bounds.every(n => Finite(n) && n > 0)
+      || !Finite(volume.density) || volume.density <= 0 || !Finite(volume.speed) || volume.speed < 0
+      || !Number.isInteger(seed) || !Finite(life) || life <= 0
+      || (ignition !== undefined && (!Array.isArray(ignition) || ignition.length !== 3 || !ignition.every(Finite))));
+  })) {
+    errors.push("smokeColumns 中的烘焙烟场需要已登记的体积资产、米制尺寸、浓度、速度、时长与种子");
+  }
+  const fogVolumes = doc.fogVolumes;
+  if (fogVolumes !== undefined && (!Array.isArray(fogVolumes) || fogVolumes.length > MAX_FOG_VOLUMES
+    || fogVolumes.some(volume => !IsObject(volume) || !["sphere", "box"].includes(volume.shape)
+      || !Array.isArray(volume.position) || volume.position.length !== 3 || !volume.position.every(Finite)
+      || !Array.isArray(volume.size) || volume.size.length !== 3 || !volume.size.every(n => Finite(n) && n > 0)
+      || !Finite(volume.density) || volume.density <= 0 || !/^#[0-9a-f]{6}$/i.test(volume.albedo)
+      || (volume.falloff !== undefined && (!Finite(volume.falloff) || volume.falloff <= 0))))) {
+    errors.push(`fogVolumes 最多 ${MAX_FOG_VOLUMES} 个，要求有效的形状、米制位置与半尺寸、浓度、颜色和边缘衰减`);
   }
   const t = doc.terrain;
   if (!IsObject(t)) errors.push("terrain 要是对象");
@@ -129,6 +152,8 @@ export function ValidateScene(doc) {
   if (doc.look !== undefined && !IsObject(doc.look)) errors.push("look 要是对象");
   if (doc.look?.proceduralDressing !== undefined && typeof doc.look.proceduralDressing !== "boolean")
     errors.push("look.proceduralDressing 要是 true / false");
+  if (doc.look?.terrainLayers !== undefined && (typeof doc.look.terrainLayers !== "string" || !Object.hasOwn(TERRAIN_SETS, doc.look.terrainLayers)))
+    errors.push("look.terrainLayers 要是 TERRAIN_SETS 中的编号");
   if (doc.ways !== undefined && !IsObject(doc.ways)) errors.push("ways 要是对象");
   if (doc.inherit !== undefined) {
     const inh = doc.inherit;
@@ -320,8 +345,11 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     ...(look.colorSemantics ? { colorSemantics: [...look.colorSemantics] } : {}),
     ...(look.semanticColors ? { semanticColors: { ...look.semanticColors } } : {}),
     ...(look.groundPaintCellM !== undefined ? { groundPaintCellM: look.groundPaintCellM } : {}),
+    ...(look.terrainLayers ? { terrainLayers: look.terrainLayers } : {}),
     ...(look.proceduralDressing === false ? { proceduralDressing: false } : {}),
     ...(scene.smokeColumns ? { smokeColumns: scene.smokeColumns.filter(s => Inside(area, s.x, s.z)) } : {}),
+    ...(scene.fogVolumes ? { fogVolumes: scene.fogVolumes.filter(({ position: [x, , z], size: [rx, , rz] }) =>
+      x + rx >= area.minX && x - rx <= area.maxX && z + rz >= area.minZ && z - rz <= area.maxZ) } : {}),
     blocks,
     ...(gates.length ? { gates } : {}),
     ...(paint.length ? { paint: paint.map(p => ({ ...p })) } : {}),

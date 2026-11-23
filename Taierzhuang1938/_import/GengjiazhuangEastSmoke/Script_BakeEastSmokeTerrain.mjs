@@ -18,6 +18,18 @@ function Smooth(t) {
 
 function Mix(a, b, k) { return a + (b - a) * k; }
 
+function Noise(x, z, metres) {
+  const gx = Math.floor(x / metres), gz = Math.floor(z / metres);
+  const tx = Smooth(x / metres - gx), tz = Smooth(z / metres - gz);
+  const Hash = (a, b) => {
+    let n = (Math.imul(a, 0x27d4eb2d) ^ Math.imul(b, 0x165667b1)) >>> 0;
+    n = Math.imul(n ^ (n >>> 15), 0x85ebca6b) >>> 0;
+    return (n ^ (n >>> 13)) / 0x80000000;
+  };
+  return Mix(Mix(Hash(gx, gz), Hash(gx + 1, gz), tx),
+    Mix(Hash(gx, gz + 1), Hash(gx + 1, gz + 1), tx), tz);
+}
+
 export function RoadSection(depth) {
   const next = roadSections.findIndex(([d]) => d > depth);
   if (next === 0) return roadSections[0].slice(1);
@@ -35,16 +47,22 @@ export function RoadSection(depth) {
 export function GroundAt(x, z) {
   const depth = -z;
   const [bankX, width] = RoadSection(depth);
-  const wobble = .16 * Math.sin(z * 1.7) + .09 * Math.sin(4.1 * z + .6);
+  const wobble = .29 * Noise(5, z, 1.28) + .10 * Noise(-2, z, .51);
   const left = bankX + wobble, right = bankX + width + Math.max(0, 3.4 - depth) * 2.6;
   const floorInfluence = Smooth((x - left + .10) / .97) * Smooth((right - x + .45) / .89);
   const leftShoulder = Math.exp(-((x - left + .33) ** 2) / .75);
-  const rolls = .062 * Math.sin(x * .85 + z * 1.19) + .045 * Math.sin(x * 1.67 - z * .57);
-  const furrows = .038 * Math.sin(z * 5.1 + .54 * Math.sin(x * .56));
-  const rough = .042 * Math.sin(x * 6.1 + z * 5.31) + .025 * Math.sin(x * 8.7 - z * 5.7);
+  const rolls = .093 * Noise(x, z, 1.9) + .034 * Noise(x, z, .77);
+  const furrows = .013 * Math.sin((z + .51 * Noise(x, z, 2.45)) * 6.8)
+    * Smooth(.47 + .70 * Noise(x, z, 3.85));
+  const rough = .04 * Noise(x, z, .43);
   const nearBankDrop = .21 * Smooth((12 - depth) / 8.4) * (1 - Smooth((x - .8) / 3.7));
-  const base = .78 - .54 * Smooth((depth - 5.0) / 37) - nearBankDrop;
-  const shoulder = base + rolls + furrows + rough + leftShoulder * (.09 + .055 * Math.sin(x * 3.7));
+  const nearRidge = .18 * Smooth((x + .55) / 1.33) * Smooth((2.05 - x) / .68)
+    * Smooth((12 - depth) / 4.4) * leftShoulder;
+  const farField = .33 * Smooth((depth - 53) / 40) * Smooth((-x - 20) / 21)
+    * (.62 + .38 * Noise(x, z, 11));
+  const base = .78 - .54 * Smooth((depth - 5.0) / 37) - nearBankDrop + farField;
+  const shoulder = base + rolls + furrows + rough
+    + leftShoulder * (.15 + .105 * Noise(x, z, .83) + .049 * Noise(x, z, .39)) + nearRidge;
   const inside = (x - left) / (right - left);
   const rut = Math.exp(-((inside - .32) ** 2) / .012) + Math.exp(-((inside - .72) ** 2) / .012);
   const floor = -.18 + .47 * Smooth((depth - 4) / 47) - .032 * rut + .028 * Math.sin(x * 2.47 + z * 1.94);

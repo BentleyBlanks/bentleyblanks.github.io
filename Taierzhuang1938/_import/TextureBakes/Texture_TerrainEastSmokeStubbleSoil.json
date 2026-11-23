@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-11-23",
+  "name": "TerrainEastSmokeStubbleSoil",
+  "preset": "drySoil",
+  "source": {
+    "path": "_import/GengjiazhuangEastSmoke/Source_StubbleSoil.webp",
+    "sha256": "eab1320e57d51968623f0b7a331c1465dfc90842451f1ef6b914fc2d0c91be91",
+    "metrics": {
+      "meanSrgb": [
+        0.2998,
+        0.275,
+        0.2521
+      ],
+      "luma": 0.2756,
+      "lumaStd": 0.0833,
+      "sat": 0.1589,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.033
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.385,
+      0.35,
+      0.31
+    ],
+    "contrast": 0.099,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.017,
+    "rough": 0.94,
+    "roughVar": 0.051,
+    "roughLumaK": 0.0,
+    "ao": 0.49,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.19,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 2.4,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orh",
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 73,
+    "dataQuality": 72,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.38,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainEastSmokeStubbleSoilBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 258492,
+      "sha256": "618b486bc20a790625dad4ca7d77b0e39151adf20ace016e6128df4c9ff5c4a5"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainEastSmokeStubbleSoilNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 69398,
+      "sha256": "be34cd7bc6f90a204fe16491bb967ae24814aaf744d35f74f00ae3172a4c3aa2"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainEastSmokeStubbleSoilOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 32414,
+      "sha256": "86567c6631f5da9e3cf4aae6c9505faf5cfb3c879a2310c6951e1090800b0cb8"
+    }
+  ],
+  "totalBytes": 360304,
+  "metrics": {
+    "meanSrgb": [
+      0.3845,
+      0.3508,
+      0.3096
+    ],
+    "luma": 0.3483,
+    "lumaStd": 0.0992,
+    "sat": 0.1948,
+    "clipLow": 0.0,
+    "clipHigh": 0.0001,
+    "lowFreq": 0.022,
+    "seam": 0.0678,
+    "interior": 0.0689,
+    "seamRatio": 0.983,
+    "border": 0.954,
+    "swing": 0.0111,
+    "aoMean": 0.914,
+    "roughMean": 0.913,
+    "texelsPerMeter": 426.7
+  },
+  "gateProblems": []
+}

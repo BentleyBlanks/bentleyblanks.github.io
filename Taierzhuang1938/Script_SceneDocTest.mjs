@@ -225,8 +225,15 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(layout.sceneProps.length === doc.objects.length && layout.blocks.some(block =>
     block.id === "EvacuationCart" && block.propAuthoredGrounding), "木车、铺盖、院墙和田野道具保留作者布设");
   Check(layout.smokeColumns.filter(column => column.options.fire > 0).length === 1 &&
-    layout.smokeColumns.some(column => column.options.backdrop?.driftX > 0),
-    "庄东只有一处明火，烟沿画面右侧漂移");
+    layout.smokeColumns.some(column => column.options.backdrop?.volume?.asset === "EastSmokeBank"),
+    "庄东只有一处明火，沿风烟幕读取独立的三维密度场");
+  Check(layout.ground.terrainLayers === "EastSmokeField" && layout.fogVolumes.length === 3 &&
+    layout.sceneProps.some(({ asset }) => asset === "eastSmokeMaizeStubble"),
+    "土壤图层、贴地雾和残茬网格随场景载入");
+  const badSmoke = { ...doc.smokeColumns[0], options: { backdrop:{ volume:{ asset:"Unknown" }, life:8, seed:1 } } };
+  Check(!ValidateScene({ ...doc, smokeColumns: [badSmoke] }).ok, "拒绝未登记的烘焙烟场");
+  Check(!ValidateScene({ ...doc, fogVolumes: [{ ...doc.fogVolumes[0], size: [0, 2, 8] }] }).ok, "拒绝无厚度的雾体");
+  Check(!ValidateScene({ ...doc, look: { ...doc.look, terrainLayers: "Unknown" } }).ok, "拒绝未登记的地表材质");
   Check(["CartPallet", "RoadsideAid", "PackTrain"].every(id => doc.markers.some(marker => marker.id === id)),
     "车板、沟沿、远端驮队的留空位置被保存");
   Check(layout.terrainSampler(-1.2, -5.5) - layout.terrainSampler(4, -5.5) > .55,
