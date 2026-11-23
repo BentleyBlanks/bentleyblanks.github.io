@@ -916,7 +916,7 @@ export class AiDirector {
         // 的是能直接取分量的量，拷进复用向量最稳（也让将来换实现不必再查一遍）。
         this._hostFrom.set(from.x, from.y, from.z);
         this._hostDir.set(dir.x, dir.y, dir.z);
-        return bf.Raycast(this._hostFrom, this._hostDir, maxDist);
+        return bf.Raycast(this._hostFrom, this._hostDir, maxDist, this.missionCoverRules ? { terrain: true } : null);
       },
       BlocksSight: (from, to) => {
         const blocks = this.ctx.BlocksSight;
@@ -3637,7 +3637,7 @@ export class AiDirector {
     const dist = dir.length();
     if (dist < 0.001) return true;
     dir.divideScalar(dist);
-    const hit = this.ctx.battlefield.Raycast(from, dir, dist);
+    const hit = this.ctx.battlefield.Raycast(from, dir, dist, this.missionCoverRules ? { terrain: true } : null);
     const clear = !hit || hit.t >= dist - 0.4;
     const entry = cache[s.losSlot % cache.length];
     entry.id = id; entry.time = this.time; entry.clear = clear; entry.lean = lean;
@@ -4239,7 +4239,7 @@ export class AiDirector {
     // 不在射线世界里）—— 钻进了就在那儿溅一蓬土，飞过去了就什么都不溅。
     const end = this.tmpEnd.copy(fromV).addScaledVector(dir, dist);
     let impact = null, normal = null, surface = "dirt";
-    const hit = bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6) : null;
+    const hit = bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6, this.missionCoverRules ? { terrain: true } : null) : null;
     if (hit) {
       end.copy(fromV).addScaledVector(dir, hit.t);
       impact = end; normal = new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]);
@@ -5198,11 +5198,17 @@ export class AiDirector {
       targetRadiusM: closeAssist ? CLOSE_RANGE.targetRadiusM : 0,
       rnd: s.rnd,
     });
-    const hit = shot.hit;
+    const rawHit = shot.hit;
     // 曳光与弹着都跟着**真正飞出去的那条线**走：打偏时是 missDir，不再是瞄点方向
     // 加一团随机偏移（那会让曳光穿过目标、弹着却出现在别处）。
-    const flight = hit ? shot.dir : shot.missDir;
+    const flight = rawHit ? shot.dir : shot.missDir;
     dir.set(flight.x, flight.y, flight.z);
+    const bfRay = this.ctx.battlefield;
+    const terrainBlocked = this.missionCoverRules && bfRay?.Raycast
+      ? bfRay.Raycast(fromV, dir, Math.max(0.1, dist - 0.35), { terrain: true })
+      : null;
+    const hit = rawHit && !terrainBlocked;
+    const tracerDist = terrainBlocked ? terrainBlocked.t : dist;
     const vfx = this.ctx.vfx;
     const audio = this.ctx.audio;
     if (vfx) {
@@ -5210,7 +5216,7 @@ export class AiDirector {
         scale: s.weapon.kind === "lmg" ? 1.15 : 1,
         kind: s.weapon.kind,
       });
-      vfx.Tracer(fromV, this.tmpEnd.copy(fromV).addScaledVector(dir, dist), {
+      vfx.Tracer(fromV, this.tmpEnd.copy(fromV).addScaledVector(dir, tracerDist), {
         kind: s.side === "nra" ? "nra" : "ija",
       });
     }
@@ -5286,7 +5292,7 @@ export class AiDirector {
       // 弹着点由 Resolve 给：散布是按**瞄准误差 × 距离**算的高斯，
       // 不再是围着瞄点撒的一团各向同性随机数（那个数跟枪、跟距离都没关系）。
       const bf = this.ctx.battlefield;
-      const h = bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6) : null;
+      const h = terrainBlocked || (bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6, this.missionCoverRules ? { terrain: true } : null) : null);
       let p = null, normal = null, surface = "dirt";
       if (h) {
         p = fromV.clone().addScaledVector(dir, h.t);
