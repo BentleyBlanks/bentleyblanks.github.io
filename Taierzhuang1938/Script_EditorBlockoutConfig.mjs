@@ -384,6 +384,12 @@ export function ValidateBlockoutScene(doc) {
   if (doc.heightTint !== undefined) {
     const ht = doc.heightTint;
     if (!IsObject(ht) || !Finite(ht.lo) || !Finite(ht.hi) || ht.hi <= ht.lo) errors.push("heightTint 要是 { lo, hi }，有限数字且 hi > lo");
+    else {
+      for (const key of ["low", "mid", "high", "slope"])
+        if (ht[key] !== undefined && !/^#[0-9a-fA-F]{6}$/.test(ht[key])) errors.push(`heightTint.${key} 要是 "#rrggbb"`);
+      if (ht.slopeRange !== undefined && !(Array.isArray(ht.slopeRange) && ht.slopeRange.length === 2 && ht.slopeRange.every(Finite) && ht.slopeRange[0] >= 0 && ht.slopeRange[1] > ht.slopeRange[0]))
+        errors.push("heightTint.slopeRange 要是 [起, 满]，0 ≤ 起 < 满");
+    }
   }
   // 可选 colorSemantics（§2.2 / §6.3，2026-10-20）：这几种 semantic 的块的白盒材质保留语义色（屋顶深灰、树冠暗绿）再加米格线，不刷成灰。
   if (doc.colorSemantics !== undefined) {

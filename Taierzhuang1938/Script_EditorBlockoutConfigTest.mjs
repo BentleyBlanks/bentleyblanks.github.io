@@ -190,6 +190,29 @@ Check("ValidateBlockoutScene：可选 paint / heightTint / colorSemantics / sema
   assert.equal(BuildGroundPaint([], null), null);
 });
 
+Check("heightTint 可选色标与陡坡色（2026-11-23）：校验、自定色带、坡面渐变；不写色标的关卡不变", () => {
+  const cols = 8, rows = 4;
+  const heights = Buffer.alloc((cols + 1) * (rows + 1) * 2);
+  for (let iz = 0; iz <= rows; iz++) for (let ix = 0; ix <= cols; ix++) heights.writeInt16LE(ix >= 4 ? (ix - 4) * 100 : 0, (iz * (cols + 1) + ix) * 2);
+  const tint = { lo: -1, hi: 4, low: "#59513f", mid: "#8a7e65", high: "#a19172", slope: "#5e4e3c", slopeRange: [0.25, 0.85] };
+  const scene = { schema: BLOCKOUT_SCENE_SCHEMA, level: "SecondLevel", bounds: { minX: 0, maxX: 8, minZ: 0, maxZ: 4 }, spawn: { x: 1, z: 1 },
+    terrain: { kind: "heightmap", minX: 0, minZ: 0, cellM: 1, cols, rows, encoding: "int16-cm-base64", data: heights.toString("base64") }, blocks: [], heightTint: tint };
+  assert.equal(ValidateBlockoutScene(scene).ok, true, ValidateBlockoutScene(scene).errors.join("; "));
+  for (const mutate of [(t) => { t.mid = "brown"; }, (t) => { t.slope = 0x5e4e3c; }, (t) => { t.slopeRange = [0.8, 0.2]; }, (t) => { t.slopeRange = [0.2]; }]) {
+    const s = structuredClone(scene); mutate(s.heightTint);
+    assert.equal(ValidateBlockoutScene(s).ok, false, JSON.stringify(s.heightTint));
+  }
+  const layout = LayoutFromSceneDoc(scene);
+  const flat = layout.SampleGroundColor(1, 2), mid = BlockoutTintColor(0, tint);
+  assert.deepEqual(flat, mid, "平地只按自定色带");
+  assert.ok(Math.abs(mid[0] - (0x59 + (0x8a - 0x59) * 0.352) / 255) < 1e-6, `自定色带：高度 0 在 low→mid 的 smoothstep(0.4) 处 ${mid}`);
+  const steep = layout.SampleGroundColor(6, 2);
+  assert.ok(steep.every((v, i) => Math.abs(v - [0x5e, 0x4e, 0x3c][i] / 255) < 1e-6), `坡度 1 取满陡坡色 ${steep}`);
+  const plain = structuredClone(scene); plain.heightTint = { lo: -1, hi: 4 };
+  const p2 = LayoutFromSceneDoc(plain);
+  assert.deepEqual(p2.SampleGroundColor(6, 2), BlockoutTintColor(2, { lo: -1, hi: 4 }), "不写色标：照旧按高度上色，没有坡面色");
+});
+
 Check("ValidateBlockoutScene：可选 backdrop 远景层（2026-10-20）：校验、交出、远平面、接缝高度、地面图；不写的关卡不变", () => {
   const cols = 4, rows = 4;
   const heights = Buffer.alloc((cols + 1) * (rows + 1) * 2);

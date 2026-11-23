@@ -116,12 +116,41 @@ export const BLOCKOUT_TINT_STOPS = Object.freeze({
  */
 export const FIRST_LEVEL_TINT = Object.freeze({ lo: -3, hi: 4 });
 
+/** 场景 heightTint 可另给 low / mid / high / slope 色标（"#rrggbb"，sRGB）；没给的沿用 BLOCKOUT_TINT_STOPS。 */
+export const BLOCKOUT_TINT_KEYS = Object.freeze(["low", "mid", "high", "slope"]);
+const tintStops = new WeakMap();
+export function BlockoutTintStops(tint) {
+  if (!tint || !BLOCKOUT_TINT_KEYS.some((key) => tint[key])) return BLOCKOUT_TINT_STOPS;
+  let stops = tintStops.get(tint);
+  if (!stops) {
+    stops = Object.fromEntries(BLOCKOUT_TINT_KEYS.map((key) => [key, tint[key] ? HexRgb(tint[key]) : BLOCKOUT_TINT_STOPS[key] || null]));
+    tintStops.set(tint, stops);
+  }
+  return stops;
+}
+
+/**
+ * 陡坡色：heightTint.slope 给了才生效。坡度（每米升高）在 slopeRange [起, 满] 之间由色带色渐变到 slope 色，
+ * 沟岸、坡面和平地、路面分得开（2026-11-23 Encounter 场景）。改写 rgb，返回它。
+ */
+export function BlockoutSlopeTint(sampler, x, z, tint, rgb) {
+  const slope = BlockoutTintStops(tint).slope;
+  if (!slope) return rgb;
+  const [from, to] = tint.slopeRange || [0.3, 0.9];
+  const g = Math.hypot(sampler(x + 0.5, z) - sampler(x - 0.5, z), sampler(x, z + 0.5) - sampler(x, z - 0.5));
+  const k = Math.max(0, Math.min(1, (g - from) / Math.max(1e-3, to - from)));
+  const s = k * k * (3 - 2 * k);
+  for (let i = 0; i < 3; i++) rgb[i] += (slope[i] - rgb[i]) * s;
+  return rgb;
+}
+
 /** 高度 → sRGB 三元组（写进 out）。 */
 export function BlockoutTintColor(y, tint, out = [0, 0, 0]) {
+  const stops = BlockoutTintStops(tint);
   const span = Math.max(0.5, tint.hi - tint.lo);
   const t = Math.max(0, Math.min(1, (y - tint.lo) / span));
-  const a = t < 0.5 ? BLOCKOUT_TINT_STOPS.low : BLOCKOUT_TINT_STOPS.mid;
-  const b = t < 0.5 ? BLOCKOUT_TINT_STOPS.mid : BLOCKOUT_TINT_STOPS.high;
+  const a = t < 0.5 ? stops.low : stops.mid;
+  const b = t < 0.5 ? stops.mid : stops.high;
   const k = t < 0.5 ? t * 2 : (t - 0.5) * 2;
   // smoothstep 让中段过渡柔一点，两端不出硬边
   const s = k * k * (3 - 2 * k);
@@ -637,7 +666,7 @@ export function LayoutFromSceneDoc(doc) {
   const w = t.cols * t.cellM, d = t.rows * t.cellM;
   const ground = { x: t.minX + w / 2, z: t.minZ + d / 2, w, d, h: 1, y: -0.5, semantic: "ground" };
   // 可选 heightTint（2026-10-20）：场景文件写了就用它（坑北抬高了，色带别跟着把南面的颜色挪掉）
-  const tint = doc.heightTint ? { lo: doc.heightTint.lo, hi: doc.heightTint.hi } : { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
+  const tint = doc.heightTint ? { ...doc.heightTint } : { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
   // 可选 paint（2026-10-20）：地面涂色栅格，没写就是 null
   const groundPaint = BuildGroundPaint(doc.paint, doc.bounds);
   const backdrop = NormalizeBackdrop(doc.backdrop);
@@ -681,8 +710,8 @@ export function LayoutFromSceneDoc(doc) {
     terrainSampler: sampler,
     // 正式场景：分层地表读不到时退回平铺土，顶点色不再乘色带
     SampleGroundColor: formal ? () => neutral : groundPaint
-      ? (x, z) => { const rgb = BlockoutTintColor(sampler(x, z), tint); groundPaint.Blend(x, z, rgb); return rgb; }
-      : (x, z) => BlockoutTintColor(sampler(x, z), tint),
+      ? (x, z) => { const rgb = BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)); groundPaint.Blend(x, z, rgb); return rgb; }
+      : (x, z) => BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)),
     SampleGroundSurface: formal ? BuildSceneGroundSurface(doc, sampler) : null,
     // 正式场景的道具（Prop/*）：盒子只留碰撞，FirstLevelWhiteboxField 换外部模型
     sceneProps: formal ? blocks.filter((block) => block.propModel)

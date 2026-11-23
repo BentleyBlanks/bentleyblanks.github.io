@@ -116,6 +116,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
   - `paint`：地面涂色，按数组顺序叠（后面的盖前面的）。每项 `id`（全关唯一）、`color`（`"#rrggbb"`，sRGB）、多边形 `poly`（≥ 3 点）**或**折线 `line`（≥ 2 点）+ 半宽 `halfW`（米，> 0）；可选 `strength`（0–1，缺省 1，不透明度）、`feather`（米，(0, 20]，缺省 1：边界处覆盖一半，往外 feather/2 落到 0、往里 feather/2 到满，smoothstep）。至多 `BLOCKOUT_PAINT_MAX_ITEMS`（5000）项。
   - `LayoutFromSceneDoc` 用 `BuildGroundPaint(paint, bounds)` 把它烘成一张栅格（格距从 0.5 m 起，格数超过 40 万就翻倍；0105 是 1 m，约 300×470 格）：每格存预乘颜色 C 与覆盖度 A，逐项 `A ← A(1−a) + a`、`C ← C(1−a) + color·a`。布局给出 `groundPaint`（`{ Blend(x, z, rgb) }`：双线性取 C、A，`rgb ← rgb(1−A) + C`，返回 A；没写 paint 是 `null`）、`paint`（原样，给全关总图）、`SampleGroundColor` 也混进涂色。
   - `heightTint`：高度色带上下限（米，`hi > lo`）；不写 = 网格最低 / 最高。0105 坑北抬高了 5 m 上下，钉在南面（z ≥ −8）的最高点，南面颜色一点不变。
+  - 2026-11-23 `heightTint` 可另给色标 `low` / `mid` / `high`（`"#rrggbb"`，sRGB，替换 `BLOCKOUT_TINT_STOPS` 对应一档）与陡坡色 `slope` + `slopeRange: [起, 满]`（每米升高，缺省 [0.3, 0.9]）：坡度在区间内由色带色 smoothstep 到 `slope`，再叠 `paint`。不写这些键的关卡逐位不变。`FirstLevelEncounter` / `FirstLevelMerged` 用土色色标（低处 `#59513f`、平地 `#8a7e65`、高处 `#a19172`、坡面 `#5e4e3c`，[0.25, 0.85]）：原来的灰蓝→浅灰色带在白天日照下发白，沟底发蓝，路、田、沟岸分不开。校验见 `Script_EditorBlockoutConfigTest`。
   - `colorSemantics`：这几种 semantic 的块的白盒材质保留语义色（`DressWorld` 对它们的材质 `DressAsWhitebox(material, { keepColor: true })`，再加米格线）；其余语义的材质都是同一种灰网格，远处的村子屋顶和墙分不开。至多 16 个。
   - `semanticColors`：`{ semantic: "#rrggbb" }`，盖在第一关那张语义色表上（只影响这一关）。至多 32 项。
 - **2026-10-20 可选 `backdrop`（远景层，只看不走）**（01–05 坑北第三版加的；只做加法，不写的关卡逐位不变、远平面照旧 650）：场地（`bounds` / `terrain`）以外、玩家走不到的远处地面、田、路、村子、山包。

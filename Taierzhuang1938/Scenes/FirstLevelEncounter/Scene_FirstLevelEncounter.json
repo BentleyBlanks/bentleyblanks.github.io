@@ -6,7 +6,7 @@
   "bounds": {"minX":-160,"maxX":320,"minZ":-480,"maxZ":1440},
   "spawn": {"x":66.5,"z":64.2,"yawDeg":90},
   "terrain": {"file":"Scene_FirstLevelEncounter.height.bin","encoding":"int16-cm-le","minX":-160,"minZ":-480,"cellM":0.5,"cols":960,"rows":3840},
-  "look": {"heightTint":{"lo":-2.68,"hi":3.85},"colorSemantics":["foliage","roof","structure","canvas","danger","metal","timber"],"semanticColors":{"roof":"#4d473c","structure":"#d9d3c4","canvas":"#ebe4d0","danger":"#b8452e","metal":"#3c4245","timber":"#6e5c45"}},
+  "look": {"heightTint":{"lo":-2.68,"hi":3.85,"low":"#59513f","mid":"#8a7e65","high":"#a19172","slope":"#5e4e3c","slopeRange":[0.25,0.85]},"colorSemantics":["foliage","roof","structure","canvas","danger","metal","timber"],"semanticColors":{"roof":"#4d473c","structure":"#d9d3c4","canvas":"#ebe4d0","danger":"#b8452e","metal":"#3c4245","timber":"#6e5c45"}},
   "backdrop": {
     "far": 7000,
     "ground": {"color":"#7a7150","y":-2.74,"radiusM":6000,"blendM":160},
