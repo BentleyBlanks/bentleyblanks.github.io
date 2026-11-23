@@ -89,6 +89,7 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
   current = { id: "explosions", api: { State: () => ({ ok: 1 }), GoTo: () => "went", Reset: () => "reset" } };
   Check(stubs.Explosions.State().ok === 1 && stubs.Explosions.GoTo("a") === "went", "在爆炸场时转给插件");
   const hooks = {
+    firstLevelScenePreview: ["UpdateCamera"], dugoutAidOpenFields: ["UpdateCamera"],
     gengjiazhuangFieldApproach: ["UpdateCamera"], gengjiazhuangEastSmoke: ["UpdateCamera"],
     tanketteAdvanceEastTrack: ["UpdateCamera"], aircraftEvacuationDitch: ["UpdateCamera"],
     encounterPlay: ["ScaleDt", "CapturesInput", "ApplyCamera"],

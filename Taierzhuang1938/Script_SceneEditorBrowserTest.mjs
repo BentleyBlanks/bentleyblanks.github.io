@@ -4,7 +4,7 @@
 //   1. 开起来：物件数 = 场景文件、按材质分批、地形画出来了（数像素：不是满屏天空色、颜色够多）、没有报错；
 //   2. 选中 + 拖 X 箭头：那个物件 x 变了、只记一步撤销、标成没保存；Ctrl+Z 回原位；
 //   3. 在画面里点另一个物件：选中换成它；拖金圈转、Esc 取消拖动不留改动；
-//   4. 搜索 Prefab、拖放到地面、检视卡收展、壕沟放置、撤销；改信号：随信号消失的块藏起来；
+//   4. 真实段落的展开 / 收起 / 显隐、复制 / 删除、检视卡收展；
 //   5. 保存：发出去的场景过校验、带读盘时的版本号；200 后标成已保存；409 挂横幅；
 //   6. 外面改了场景文件（status 报新版本号）：没改动时 2 s 内自动重读出新位置。
 
@@ -65,7 +65,7 @@ const Wait = (ms) => page.waitForTimeout(ms);
 
 try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevelWhitebox`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => window.SceneEditor, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.SceneEditor?.State().objects > 0, null, { timeout: 60000 });
   await E(() => window.SceneEditor.ready);
   await Wait(500);
 
@@ -118,84 +118,36 @@ try {
   const yaw1 = await E(() => window.SceneEditor.Find(window.SceneEditor.State().selected[0]).yawDeg || 0);
   Check("拖金圈中途 Esc：不留改动", yaw1 === yaw0 && (await E(() => window.SceneEditor.State().undo)) === 0, `${yaw0} → ${yaw1}`);
 
-  // 4. 从资产面板拖放；检查落点、Inspector 与撤销行为。
-  await page.locator("#seTabAssets").click();
-  const search = page.locator("#sePrefabSearch");
-  const boxTile = page.locator('[data-prefab="Whitebox/Box"]');
-  await search.fill("Whitebox/Box");
-  Check("按资产编号搜索 Prefab", await page.locator("[data-prefab]").count() === 1 && await boxTile.isVisible());
-  const canvas = page.locator("#seCanvas");
-  const view = await canvas.boundingBox();
-  const drop = { x: Math.round(view.width * 0.7), y: Math.round(view.height * 0.7) };
-  const tile = await boxTile.boundingBox();
-  await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(view.x + drop.x, view.y + drop.y, { steps: 6 });
-  await page.mouse.move(view.x + drop.x + 1, view.y + drop.y);
-  await page.locator("#sePrefabDrop.ready").waitFor({ state: "visible" });
-  Check("拖动预览不提前生成物件", (await E(() => window.SceneEditor.State())).objects === state.objects);
-  await page.mouse.up();
-  const placed = await E(() => {
-    const editor = window.SceneEditor;
-    const current = editor.State();
-    return { ...current, object: editor.Find(current.selected[0]), pivot: editor.ProjectGizmo("origin") };
-  });
-  Check("拖到非中心位置：生成且选中一个落地实例", placed.objects === state.objects + 1 && placed.selected.length === 1
-    && placed.object?.asset === "Whitebox/Box" && placed.object.pos[1] === null && placed.undo === 1
-    && Math.hypot(placed.pivot.x - view.x - drop.x, placed.pivot.y - view.y - drop.y) < 8, JSON.stringify(placed.object?.pos));
-  Check("放置后清除落点预览", await page.locator("#sePrefabDrop").isHidden());
+  // 4. 只有本场景实际存在的段落能展开或从视口隐藏。
+  Check("移除通用段落栏、剧情事件与资产面板", await page.locator("#seJumps, #seSignals, #seTabAssets, #sePaneAssets").count() === 0);
+  const map = await E(() => window.SceneEditor.State().layers.reduce((sum, layer) => sum + layer.count, 0));
+  const stage = page.getByRole("checkbox", { name: "显示 01–05", exact: true });
+  const folder = stage.locator("..").locator(".seFolder");
+  Check("段落在层级里可展开", (await folder.getAttribute("aria-expanded")) === "true");
+  await folder.click();
+  Check("收起段落只折叠树", (await folder.getAttribute("aria-expanded")) === "false"
+    && (await E(() => window.SceneEditor.State().layers.reduce((sum, layer) => sum + layer.count, 0))) === map);
+  await stage.uncheck();
+  const hidden = await E(() => window.SceneEditor.State());
+  Check("关闭 01–05 只隐藏该段的布设", hidden.hiddenStages.includes("01–05") && hidden.objects === state.objects
+    && hidden.layers.reduce((sum, layer) => sum + layer.count, 0) < map && !hidden.dirty);
+  await stage.check();
+  await E((id) => window.SceneEditor.Select([id]), target);
   const transform = page.getByRole("button", { name: "变换", exact: true });
   await transform.press("Space");
   Check("键盘折叠变换卡，焦点留在卡头", await page.locator("#seComponent-transform").isHidden()
     && await transform.getAttribute("aria-expanded") === "false"
     && await transform.evaluate((button) => button === document.activeElement));
   await transform.press("Space");
-  const collider = page.locator('[id="seComponent-collider"]');
-  await page.getByRole("checkbox", { name: /^挡人/ }).uncheck();
-  Check("卡头勾选编辑碰撞，卡片保持展开", await collider.isVisible()
-    && (await E((id) => window.SceneEditor.Find(id), placed.selected[0]))?.solid === false);
-  await page.locator("#seUndo").click();
-  await search.clear();
-  await Shot("04_PrefabInspector");
-  await page.locator("#seUndo").click();
-  Check("撤销拖放恢复物件数量、选中实例被移除", (await E(() => window.SceneEditor.State())).objects === state.objects
-    && !(await E((id) => window.SceneEditor.Find(id), placed.selected[0])));
-  await page.locator("#seRedo").click();
-  Check("重做拖放恢复同一实例", !!(await E((id) => window.SceneEditor.Find(id), placed.selected[0])));
-  await page.locator("#seUndo").click();
-
-  const trenchTile = page.locator('[data-prefab="Trench/Spline"]');
-  await trenchTile.dragTo(canvas, { targetPosition: { x: drop.x - 55, y: drop.y + 24 } });
-  const trench = await E(() => {
-    const editor = window.SceneEditor;
-    const current = editor.State();
-    return { current, segment: editor.Trench(current.trench) };
-  });
-  Check("拖放样条壕沟：生成两点、选中沟并打开对应检视", trench.current.trenches === state.trenches + 1
-    && trench.segment?.points.length === 2 && await page.getByRole("button", { name: "走向", exact: true }).isVisible());
-  await page.locator("#seUndo").click();
-  await boxTile.dragTo(page.locator(".seRight h2"));
-  Check("拖到检视面板外部取消：场景无改动", await page.locator("#sePrefabDrop").isHidden()
-    && !(await E(() => window.SceneEditor.State())).dirty);
-  await boxTile.click();
-  await page.locator("#sePlacePrefab").click();
-  Check("资产区放到中心可直接放置所选预制件", (await E(() => window.SceneEditor.State())).objects === state.objects + 1);
-  await page.locator("#seUndo").click();
-  await page.locator("#seTabTree").click();
-
-  // API 入口仍可带初始材质、尺寸；删、撤销；信号。
-  const added = await E(() => window.SceneEditor.Add("Whitebox/Box", { material: "Whitebox/Cover", size: [2, 1, 1] }));
-  Check("从资产加一个白盒体块：选中它、在场景里", !!added && !!(await E((id) => window.SceneEditor.Find(id), added)), added);
+  const added = (await E(() => window.SceneEditor.Duplicate()))[0];
+  Check("复制现有物件并选中", !!added && (await E(() => window.SceneEditor.State())).objects === state.objects + 1);
+  await page.locator("#seCanvas").focus();
   await page.keyboard.press("Delete");
   Check("Del 删掉", !(await E((id) => window.SceneEditor.Find(id), added)));
   await page.keyboard.press("Control+z");
   Check("撤销删除：回来了", !!(await E((id) => window.SceneEditor.Find(id), added)));
-  const count = (layers) => layers.reduce((s, l) => s + l.count, 0);
-  const n0 = count((await E(() => window.SceneEditor.State())).layers);
-  await E(() => window.SceneEditor.Signals(["PitShelled"]));
-  const n1 = count((await E(() => window.SceneEditor.State())).layers);
-  Check("勾上 PitShelled：随它消失的块藏起来、随它出现的块显示", n1 !== n0, `${n0} → ${n1}`);
-  await E(() => window.SceneEditor.Signals([]));
+  await E((id) => window.SceneEditor.Select([id]), added);
+  await Shot("04_StageHierarchy");
 
   // 5. 保存
   const saved = await E(() => window.SceneEditor.Save());
@@ -222,6 +174,83 @@ try {
   await page.waitForFunction(([id, x]) => window.SceneEditor.Find(id)?.pos[0] === x, [target, moved.objects.find(x => x.id === target).pos[0]], { timeout: 8000 }).catch(() => {});
   const synced = await E((id) => window.SceneEditor.Find(id).pos[0], target);
   Check("外面改了：2 s 内自动重读出新位置", synced === moved.objects.find(x => x.id === target).pos[0], `${synced}`);
+
+  // 7. 独立正式场景的原画机位和正式预览（从未保存的编辑文档加载）。
+  await context.addInitScript(() => {
+    localStorage.setItem("tengxian1938_graphics_profile_v1", JSON.stringify("low"));
+    localStorage.setItem("tengxian1938_graphics_v1", JSON.stringify({ volumetrics: false }));
+    localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master:0 }));
+  });
+  const independentUrl = `http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=GengjiazhuangEastSmoke`;
+  await page.goto(independentUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.SceneEditor?.State().objects > 0, null, { timeout: 60000 });
+  Check("独立场景没有虚构的第一关段落", await page.locator("[data-stage]").count() === 0);
+  await page.locator("#seTabPreview").click();
+  await page.locator("#seSelectShot").click();
+  await page.waitForFunction(() => window.SceneEditor.State().shotGizmo);
+  Check("原画机位带可见 Gizmo 与检视", (await E(() => window.SceneEditor.State().cameraSelected))
+    && await page.getByRole("spinbutton", { name: "垂直视角 °" }).isVisible());
+  const original = await E(() => window.SceneEditor.Doc().camera);
+  const gizmo = await E(() => ({ handle: window.SceneEditor.ProjectGizmo("x"), origin: window.SceneEditor.ProjectGizmo("origin") }));
+  const gx = gizmo.handle.x - gizmo.origin.x, gy = gizmo.handle.y - gizmo.origin.y;
+  const gLength = Math.hypot(gx, gy);
+  await page.mouse.move(gizmo.handle.x, gizmo.handle.y);
+  await page.mouse.down();
+  await page.mouse.move(gizmo.handle.x + 45 * gx / gLength, gizmo.handle.y + 45 * gy / gLength, { steps: 4 });
+  await page.mouse.up();
+  const movedCamera = await E(() => window.SceneEditor.Doc().camera);
+  Check("拖动机位的 X 箭头只改变 X", movedCamera.position[0] !== original.position[0]
+    && movedCamera.position[1] === original.position[1] && movedCamera.position[2] === original.position[2]);
+  await page.locator("#seUndo").click();
+  Check("撤销机位移动恢复磁盘位姿", JSON.stringify(await E(() => window.SceneEditor.Doc().camera)) === JSON.stringify(original));
+  await page.getByRole("spinbutton", { name: "俯仰 °" }).fill("-3.5");
+  await page.getByRole("spinbutton", { name: "俯仰 °" }).press("Tab");
+  Check("机位检视写入当前文档并标记未保存", (await E(() => window.SceneEditor.Doc().camera.pitchDeg)) === -3.5
+    && (await E(() => window.SceneEditor.State())).dirty);
+  await page.locator("#seUndo").click();
+  const free = await E(() => window.SceneEditor.State().camera);
+  await page.locator("#seShotView").click();
+  const shotState = await E(() => window.SceneEditor.State());
+  Check("原画机位按原位姿与视角出画", shotState.viewMode === "original"
+    && Math.abs(shotState.camera.y - original.position[1]) < .001 && shotState.camera.fovDeg === original.fovDeg && !shotState.shotGizmo);
+  await page.locator("#seFreeView").click();
+  Check("切回自由视角恢复之前的相机", JSON.stringify((await E(() => window.SceneEditor.State())).camera) === JSON.stringify(free));
+  await Shot("05_ReferenceGizmo");
+  const edited = await E(() => {
+    const app = window.SceneEditor;
+    const model = app.Doc().objects.find((o) => o.asset === "Prop/eastSmokeMaizeStubble");
+    app.Select([model.id]);
+    const before = app.State().objects;
+    app.Duplicate();
+    return { count: before + 1, dirty: app.State().dirty };
+  });
+  await page.locator("#seShotView").click();
+  await page.locator("#seFormalPreview").click();
+  await page.waitForFunction(() => window.SceneEditor.State().preview === "ready", null, { timeout: 95000 });
+  const frame = page.frames().find((f) => /sceneEditorPreview=/.test(f.url()));
+  const preview = await frame.evaluate(() => {
+    const game = window.Tengxian;
+    const view = game.Debug.ScenePreview.State();
+    const before = game.Particles.Inspect().entries.find((p) => p.name.startsWith("Plume/"));
+    if (before.time < 120) game.Particles.Get(before.id).system.Update(120 + 1/60 - before.time);
+    game.StepFrames(3, 1/60, true);
+    const plume = game.Particles.Inspect(before.id);
+    const pool = game.Particles.Inspect().volumes.find((v) => v.asset === "EastSmokeBank");
+    return { ...view, rendererProfile: game.GraphicsProfile.Inspect().profile, volumetrics: game.post.preset.volumetrics,
+      live: pool?.live, ready: pool?.ready, particleCount: plume.particleCount, dropped: plume.dropped, time: plume.time };
+  });
+  Check("同页正式预览读取未保存布设与模型", edited.dirty && preview.props === edited.count
+    && preview.missing?.length === 0 && preview.terrainSet === "EastSmokeField", JSON.stringify(preview));
+  Check("正式预览使用固定画质与实际雾，烟体跨 120 秒连续", preview.rendererProfile === "high"
+    && preview.volumetrics && preview.fogVolumes === 3 && preview.live === 1 && preview.ready && preview.time > 120
+    && preview.particleCount === 1 && preview.dropped === 0, JSON.stringify(preview));
+  await Shot("06_FormalPreview");
+  await page.locator("#seFreeView").click();
+  await frame.waitForFunction(fov => window.Tengxian.Debug.ScenePreview.State().camera.fovDeg === fov, free.fovDeg);
+  Check("同一正式预览可以切换到自由视角", (await E(() => window.SceneEditor.State())).viewMode === "free");
+  await page.locator("#seClosePreview").click();
+  Check("退出正式预览释放画面且保留未保存编辑", await page.locator("#sePreviewMount iframe").count() === 0
+    && (await E(() => window.SceneEditor.State())).dirty);
 } catch (error) {
   Check("跑完没抛错", false, String(error?.stack || error).slice(0, 600));
 } finally {

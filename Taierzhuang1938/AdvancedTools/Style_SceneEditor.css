@@ -81,57 +81,33 @@ textarea { font: 11px/1.5 ui-monospace, Consolas, monospace; resize: vertical; m
 /* 壕沟检视：清掉段上数值的小叉、灰字 = 缺省值 */
 .seMini { flex: none; padding: 0 6px; min-width: 0; }
 input.seDefault::placeholder { color: var(--se-muted); }
-.seEvent { margin-left: auto; font-style: normal; color: var(--se-gold-text); font-size: 10px; flex: none; }
 .seMore { padding: 4px 10px; font-size: 11px; color: var(--se-muted); }
 
-.sePrefabPane { padding: 10px 10px 0; }
-.seAssets { flex: 1; overflow: auto; padding: 4px 1px 12px; scrollbar-gutter: stable; }
-.sePrefabGroup { margin-top: 11px; }
-.sePrefabGroup h3 { margin: 0 0 5px; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--se-muted); }
-.sePrefabGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
-.sePrefab { display: grid; place-items: center; grid-template-rows: 36px auto; gap: 3px; min-width: 0; min-height: 65px; padding: 6px 4px; border-color: #c1bdab29; border-radius: 4px; background: #191b15; cursor: grab; letter-spacing: 0; }
-.sePrefab:active { cursor: grabbing; }
-.sePrefab[aria-pressed=true] { border-color: #edca8399; background: #2a261a; color: var(--se-gold-text); }
-.sePrefabName { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-.sePrefabIcon { display: block; position: relative; width: 34px; height: 34px; pointer-events: none; }
-.sePrefabIcon::before, .sePrefabIcon::after { content: ""; position: absolute; }
-.sePrefabIcon.box::before, .sePrefabIcon.prop::before, .sePrefabIcon.backdropBox::before {
-  inset: 2px 4px; background: conic-gradient(from 60deg at 50% 44%, #8d754e 0 120deg, #b99e6b 120deg 240deg, #dbc498 240deg);
-  clip-path: polygon(50% 0, 100% 24%, 100% 75%, 50% 100%, 0 75%, 0 24%);
-}
-.sePrefabIcon.prop::before { inset: 6px 3px 4px; }
-.sePrefabIcon.prop::after { inset: 13px 4px 9px; border-block: 2px solid #493d2da6; transform: skewY(19deg); }
-.sePrefabIcon.trench::before { inset: 7px 2px; transform: rotate(-25deg); border: 2px solid #c3a47a; border-radius: 9px 4px 9px 4px; background: repeating-linear-gradient(90deg, #69543e 0 5px, #3e3528 5px 7px); }
-.sePrefabIcon.tree::before, .sePrefabIcon.backdropTree::before { inset: 2px 4px 5px; background: linear-gradient(110deg, #8e9f73 50%, #576649 50%); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.sePrefabIcon.tree::after, .sePrefabIcon.backdropTree::after { inset: auto 15px 1px; height: 5px; background: #8b7256; }
-.sePrefabIcon.backdropBox, .sePrefabIcon.backdropTree { filter: saturate(.55); }
-.sePrefabIcon.backdropBlob::before { inset: 6px 2px; border-radius: 50%; background: radial-gradient(ellipse at 34% 28%, #aab18a, #5b674b 75%); }
-.sePrefabIcon.backdropHill::before { inset: 4px 0; background: linear-gradient(135deg, #b3b4a0 30%, #6e7668 70%); clip-path: polygon(0 91%, 35% 19%, 58% 58%, 74% 40%, 100% 91%); }
-.sePrefabActions { display: flex; gap: 6px; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--se-edge); color: var(--se-muted); font-size: 11px; }
-.sePrefabActions button { padding: 3px 7px; }
+.sePreviewPane { gap: 4px; padding: 6px 10px 12px; overflow: auto; }
+.sePreviewGroup { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--se-edge); }
+.sePreviewGroup:last-child { border-bottom: 0; }
+.sePreviewGroup button[aria-pressed=true] { border-color: var(--se-gold); color: var(--se-gold-text); background: #292417; }
+.sePreviewStatus { margin: 0; color: var(--se-muted); font-size: 11px; overflow-wrap: anywhere; }
+.sePreviewStatus.error { color: #ffcdbf; }
+.seFolderRow { display: flex; align-items: center; }
+.seFolderRow .seFolder { flex: 1; min-width: 0; }
+.seFolderRow.off .seFolder { color: var(--se-muted); }
+.seStageVisible { flex: none; margin: 0 6px 0 4px; cursor: pointer; }
 
 .seView { position: relative; min-width: 0; min-height: 0; background: #adb8c2; }
 .seView canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
-.seTools { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; pointer-events: none; }
-.seTools > * { pointer-events: auto; }
-.seToolGroup, .seSignals { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #080907d9; border: 1px solid var(--se-edge); }
-.seToolGroup button { padding: 2px 8px; font-size: 12px; }
-.seToolLabel { font-size: 10px; letter-spacing: .2em; color: var(--se-gold-text); }
 .seCheck { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
-.seSignals { display: block; max-width: 300px; }
-.seSignals summary { cursor: pointer; font-size: 12px; letter-spacing: .1em; color: var(--se-gold-text); }
-.seSignals > div { max-height: 260px; overflow: auto; padding-top: 4px; }
-.seSignals label { display: flex; gap: 5px; align-items: flex-start; font-size: 11.5px; margin: 2px 0; }
-.seSignals label code { display: block; font-size: 10px; color: var(--se-muted); }
-.seSignals .seNote { margin: 0 0 6px; }
+.sePreviewMount { position: absolute; inset: 0; display: grid; place-items: center; background: #090a08; pointer-events: none; container-type: size; }
+.sePreviewMount iframe { display: block; width: 100%; height: 100%; border: 0; }
+.sePreviewMount.authored iframe { width: min(100cqw, 177.778cqh); height: min(100cqh, 56.25cqw); }
+.sePreviewBar { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 9px; background: #080907e8; border: 1px solid var(--se-edge); }
+.sePreviewBar span { color: var(--se-gold-text); font-size: 11px; }
+.sePreviewBar button { padding: 3px 8px; }
+
 .seHud { position: absolute; left: 10px; bottom: 10px; padding: 3px 8px; background: #080907c7; border: 1px solid var(--se-edge); font: 11px/1.5 ui-monospace, Consolas, monospace; color: var(--se-text); pointer-events: none; white-space: pre; }
 .seHelp { position: absolute; bottom: 10px; right: 10px; color: var(--se-text); font-size: 11px; }
 .seHelp summary { display: list-item; width: max-content; margin-left: auto; padding: 3px 8px; background: #080907d9; border: 1px solid var(--se-edge); cursor: pointer; }
 .seHelp div { position: absolute; bottom: calc(100% + 6px); right: 0; width: min(300px, 60vw); padding: 9px 10px; background: #11130ff5; border: 1px solid var(--se-rule); }
-.sePrefabDrop { position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border: 1px solid var(--se-rule); border-radius: 4px; background: #171810f5; color: var(--se-text); white-space: nowrap; pointer-events: none; }
-.sePrefabDrop.ready { border-color: var(--se-gold); color: var(--se-gold-text); }
-.seView:has(.sePrefabDrop.ready:not([hidden]))::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px #edca83aa; pointer-events: none; }
-
 /* 检视：实例卡和可折叠的组件卡 */
 .seInspector { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: 10px 8px 10px 10px; font-size: 12px; }
 .seEmpty { margin: 0; padding: 12px 4px; }
@@ -150,7 +126,7 @@ input.seDefault::placeholder { color: var(--se-muted); }
 .seComp.open > .seCompHead { border-bottom: 1px solid #c1bdab26; }
 .seCompDisclosure { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; background: transparent; text-align: left; }
 .seCompDisclosure:hover:not(:disabled) { background: #edca8311; }
-.seCompDisclosure:focus-visible, .sePrefab:focus-visible { outline: 1px solid var(--se-gold); outline-offset: -2px; }
+.seCompDisclosure:focus-visible { outline: 1px solid var(--se-gold); outline-offset: -2px; }
 .seCompDisclosure .seTwisty { color: var(--se-gold-text); }
 .seCompHead input[type=checkbox] { margin: 0 10px 0 4px; }
 .seCompTitle { font-size: 12px; letter-spacing: .1em; color: var(--se-text-hi); font-weight: 600; }

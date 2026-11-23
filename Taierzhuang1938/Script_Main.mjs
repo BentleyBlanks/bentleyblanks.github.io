@@ -255,7 +255,8 @@ window.__bootMainAlive = true;
 window.__bootGuardDismiss?.();
 
 const params = new URLSearchParams(location.search);
-const GRAPHICS_PROFILE = LoadGraphicsProfile(location.search);
+const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
+const GRAPHICS_PROFILE = SANDBOX_PLUGIN?.startup?.graphicsProfile ?? LoadGraphicsProfile(location.search);
 // 画质档同时决定几何 / 资产预算与呈现（2026-10-31 起没有「白盒」档，白盒编辑器走同一套）。
 const QUALITY = GRAPHICS_PROFILE;
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
@@ -278,7 +279,6 @@ const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
  * 装配层只剩三个测试场还有自己的逻辑留在这里（靶场撒木桩兵、白刃实验场、枪械射击场的弹药与开机资产），
  * 其余测试场的接线全在 Script_SandboxRanges 的插件里。
  */
-const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
 const SANDBOX_RANGE = SANDBOX_PLUGIN?.entry ?? null;
 // Archived content is a developer regression fixture, absent from chapter selection.
 const ARCHIVED_P012_FIXTURE = !!ARCHIVED_P012_PHASE && params.get("whitebox") === "p012-archive";
@@ -1502,7 +1502,7 @@ async function Boot() {
 
 
   setStep(T("boot.step.loadPbr"), BOOT.progress.loadPbr.from);
-  const pbrQueue = PBR_SETS.filter(set => !SANDBOX_STARTUP || SANDBOX_STARTUP.pbrSets.includes(set.name));
+  const pbrQueue = PBR_SETS.filter(set => !SANDBOX_STARTUP?.pbrSets || SANDBOX_STARTUP.pbrSets.includes(set.name));
   const pbrTotal = pbrQueue.length;
   const pbrFailed = [];
   let pbrDone = 0;
@@ -2455,7 +2455,7 @@ async function Boot() {
   // 预热全编成了用不上的变体，第一颗手榴弹炸出弹坑、断肢那一帧再现编（实测 3 s + 9 s）。
   // 编辑器那次再套是同一组值，编译期开关不变就不重编。
   try {
-    if (LoadSavedGraphics(graphics)) ApplyGraphics();
+    if (!SANDBOX_STARTUP?.graphicsProfile && LoadSavedGraphics(graphics)) ApplyGraphics();
   } catch (error) {
     console.warn("[Main] 预热前套用存档画质失败（退回编辑器建好后再套）", error);
   }
@@ -2486,7 +2486,7 @@ async function Boot() {
     OnClose: (id, { embedded } = {}) => (embedded ? FinishEmbeddedSettings() : FinishSettings()),
   });
   try {
-    ApplySavedSettings(settings.pageHost);
+    ApplySavedSettings(settings.pageHost, { restoreGraphics: !SANDBOX_STARTUP?.graphicsProfile });
   } catch (error) {
     console.warn("[Settings] 设置装不回去：", error);
   }

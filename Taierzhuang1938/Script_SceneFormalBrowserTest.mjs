@@ -8,7 +8,7 @@
 //      体块不是正式资产，仍是白盒灰面 + 米格线（用户 2026-11-01），道具的材质不许被刷成白盒；水同白盒编辑器铺水面；
 //      碰撞体数与白盒一样（试玩的编排坐标都在这套布局上）；
 //   3. 试玩开打先换成正式场景；关小结回到编辑换回白盒；
-//   4. 场景编辑器的下拉里有两个场景，正式场景的资产页列白盒体块、道具与树；
+//   4. 场景编辑器的下拉可切换场景，正式预览入口在机位与预览面板；
 //   5. 全程没有未捕获错误。截图存 _shots/SceneFormal/（不提交）。
 // ===========================================================================
 
@@ -162,18 +162,18 @@ try {
     await B(() => window.Tengxian.Debug.Blockout.Fly(false));
   }
 
-  // 4) 场景编辑器：场景切换入口与正式场景资产
+  // 4) 场景编辑器：场景切换与画面预览入口
   console.log("--- scene editor");
   const editor = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   editor.on("pageerror", (error) => errors.push(`SCENEEDITOR PAGEERROR ${String(error).slice(0, 300)}`));
   await editor.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevel`, { waitUntil: "load", timeout: 120000 });
-  await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0 && document.querySelector("#seAssets [data-prefab]"), null, { timeout: 120000 });
+  await editor.waitForFunction(() => window.SceneEditor?.State?.().objects > 0, null, { timeout: 120000 });
   const se = await editor.evaluate(() => {
     const options = [...document.querySelectorAll("#seScene option")].map((o) => [o.value, o.textContent]);
-    const assets = [...document.querySelectorAll("#seAssets [data-prefab]")].map((tile) => tile.dataset.prefab);
     const state = window.SceneEditor.State();
     const pixels = window.SceneEditor.PixelStats?.();
-    return { options, assets, objects: state.objects ?? state.count, style: state.style, pixels };
+    const stages = [...document.querySelectorAll("[data-stage]")].map((input) => input.dataset.stage);
+    return { options, stages, objects: state.objects ?? state.count, style: state.style, pixels };
   });
   const terrainOk = await editor.evaluate(() => window.SceneEditor.TerrainReady());
   const look = await editor.evaluate(() => {
@@ -185,7 +185,8 @@ try {
       comps: [...document.querySelectorAll("#seInspector .seCompTitle")].map((n) => n.textContent) };
   });
   Check("场景编辑器里正式场景的地面是分层地表（同试玩），不是白盒的高度色带", terrainOk && look.terrainLook === "layers", J({ terrainOk, look: look.terrainLook }));
-  Check("层级是一层层文件夹（段落 / 类别 / 院子），检视按组件分卡", look.depths >= 4 && ["变换", "外观", "碰撞", "剧情事件"].every((c) => look.comps.includes(c)), J(look));
+  Check("层级是一层层文件夹（段落 / 类别 / 院子），检视提供布设组件", look.depths >= 4 && ["变换", "外观", "碰撞"].every((c) => look.comps.includes(c))
+    && !look.comps.includes("剧情事件"), J(look));
   // 壕沟：层级里有、选中能拖点重挖、细节开关会改构件、撤销回去
   const tr = await editor.evaluate(async () => {
     const A = window.SceneEditor;
@@ -208,7 +209,10 @@ try {
     J({ h0: tr.h0, h1: tr.h1, at0: tr.at0, at1: tr.at1, back: tr.back, dirty: tr.dirty }));
   Check("场景编辑器：套餐换成「新挖完好」，护壁、踏板摆出来", tr.d1 > tr.d0 + 10, J({ before: tr.d0, fresh: tr.d1 }));
   Check("场景编辑器下拉包含白盒、正式和 Encounter Play", ["FirstLevelWhitebox", "FirstLevel", "FirstLevelEncounter"].every((id) => se.options.some(([v]) => v === id)), J(se.options));
-  Check("正式场景的资产页列白盒体块、道具与树", se.assets.some((a) => a.startsWith("Prop/")) && se.assets.includes("Tree/Dead") && se.assets.includes("Whitebox/Box"), J(se.assets.slice(0, 8)));
+  Check("正式场景只列本场景的段落", ["01–05", "06–10", "11–18"].every((stage) => se.stages.includes(stage)) && !se.stages.includes("01–07"), J(se.stages));
+  await editor.locator("#seTabPreview").click();
+  Check("第一关可用自由视角正式预览，原画机位按场景数据出现", await editor.locator("#seFormalPreview").isVisible()
+    && await editor.locator("#seShotView").isHidden());
   await editor.screenshot({ path: path.join(shotDir, "SceneEditor_Formal.png") });
   await editor.close();
 

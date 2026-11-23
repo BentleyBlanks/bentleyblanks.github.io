@@ -1,6 +1,6 @@
 # 沟底包扎 · 朝田野敞开的木棚
 
-在本地场景编辑器选择 **DugoutAidOpenFields**，可编辑模型布设并保存场景文件。「查看原画机位」会打开游戏渲染器。镜头固定在沟底，从前后两排支柱之间向北看麦畦、村舍和枯树。原画中人物所在的位置留空。
+在本地场景编辑器选择 **DugoutAidOpenFields**，可编辑模型布设并保存场景文件。在「机位与预览」选原画机位，再打开正式预览。镜头固定在沟底，从前后两排支柱之间向北看麦畦、村舍和枯树。原画中人物所在的位置留空。
 
 - 场景编辑器使用 `/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=DugoutAidOpenFields`。
 - 实机机位使用 `/Taierzhuang1938/?dugoutAidOpenFields=1&shot=1`。

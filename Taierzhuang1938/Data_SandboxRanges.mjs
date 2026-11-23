@@ -31,6 +31,8 @@ const RANGE = (spec) => Object.freeze({
 
 export const SANDBOX_RANGES = Object.freeze([
   RANGE({ id: "encounterPlay", externalProps: false, trimProps: false }),
+  RANGE({ id: "firstLevelScenePreview", externalProps: false, trimProps: false,
+    muteAudio: true, ownsFrame: true, identify: false, steadyView: true }),
   RANGE({ id: "dugoutAidOpenFields", externalProps: false, trimProps: false, muteAudio: true, ownsFrame: true }),
   RANGE({ id: "gengjiazhuangFieldApproach", externalProps: false, trimProps: false,
     muteAudio: true, ownsFrame: true, identify: false, steadyView: true }),

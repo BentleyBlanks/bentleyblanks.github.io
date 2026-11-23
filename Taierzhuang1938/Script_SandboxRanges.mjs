@@ -19,6 +19,7 @@
 //
 // 插件模块可选的 startup：轻量开机（只加载列出的 PBR 组与音效，不预载担架、飞机、弹坑碎屑）。
 // sceneryOnly 供纯环境机位使用，跳过人物和前景道具的预载。
+// graphicsProfile 供原画 / 正式场景预览使用，走固定画质而不装玩家的画面偏好。
 //
 // 宿主 `host` 是装配层交过来的「工具箱」：场地、玩家、相机、各系统，以及几只装配层自己的函数
 // （抢指针锁、藏枪模、给手榴弹、换枪补给），以及主文件的工具箱 ctx（靶场与白刃实验场的运行时整块读写主文件状态时用）。
@@ -30,6 +31,7 @@ import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { CreateScenePreviewBackdrop, CreateScenePreviewPhase } from "./Script_DevTools.mjs";
 import { SceneInfo } from "./Data_SceneAssets.mjs";
+import { IsSceneCamera } from "./Script_SceneDoc.mjs";
 import { RANGE_PHASE } from "./Data_Range.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
 import { CreateRangeTargets } from "./Script_RangeTargets.mjs";
@@ -83,13 +85,11 @@ function FireRangeOptions(h) {
   };
 }
 
-const DUGOUT_PREVIEW_PHASE = CreateScenePreviewPhase(SceneInfo("DugoutAidOpenFields"));
-
-function FixedSceneCamera(host, pose) {
+function FixedSceneCamera(host, poseForFrame) {
   const camera = host.camera;
   return () => {
     host.SetViewmodelHidden(true);
-    if (!pose) return;
+    const pose = poseForFrame();
     const radians = Math.PI / 180;
     camera.position.set(...pose.position);
     camera.rotation.set(pose.pitchDeg * radians, pose.yawDeg * radians, 0, "YXZ");
@@ -124,11 +124,13 @@ function RoadsideSoil(vfx, { x, z }, y) {
 }
 
 function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
+  const phase = CreateScenePreviewPhase(SceneInfo(sceneId));
   return {
-    phase: CreateScenePreviewPhase(SceneInfo(sceneId)), World: FirstLevelWhiteboxField,
+    phase, World: FirstLevelWhiteboxField,
     startup: {
       sceneryOnly: true,
-      pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr", ...extraPbrSets],
+      graphicsProfile: "high",
+      pbrSets: extraPbrSets && ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr", ...extraPbrSets],
       audio: { voice: false, ambience: false, music: false, sfx: [] },
     },
     Create(host) {
@@ -138,7 +140,13 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
       const volumetrics = host.post.volumetricsPass;
       const fogHandles = (layout.fogVolumes || []).map(({ position: [x, y, z], size: [rx, ry, rz], ...look }) =>
         volumetrics.AddFogVolume({ ...look, position: { x, y, z }, size: { x: rx, y: ry, z: rz } }));
-      const ApplyPose = FixedSceneCamera(host, layout.camera);
+      const spawn = layout.spawn || { x: 0, z: 0, yawDeg: 0 };
+      const defaultPose = layout.camera || {
+        position: [spawn.x, battlefield.StaticGroundHeight(spawn.x, spawn.z) + 1.65, spawn.z],
+        yawDeg: spawn.yawDeg, pitchDeg: 0, fovDeg: 55,
+      };
+      let pose = defaultPose;
+      const ApplyPose = FixedSceneCamera(host, () => pose);
       const impact = soilMarker && layout.landmarks?.find((marker) => marker.id === soilMarker);
       const ground = impact && battlefield.StaticGroundHeight(impact.x, impact.z);
       let untilImpact = .4;
@@ -150,8 +158,12 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
         if (soilEmitter && vfx.particles.FallingSoil.entries.has(soilEmitter)) vfx.particles.FallingSoil.Remove(soilEmitter);
       };
       const runtime = {
-        api: { State: () => ({
-          scene: layout.scene, camera: layout.camera, backdrop: backdrop.Stats(),
+        api: { SetCamera(next) {
+          if (!IsSceneCamera(next)) return false;
+          pose = { ...next, position: [...next.position] };
+          return true;
+        }, State: () => ({
+          scene: layout.scene, camera: pose, backdrop: backdrop.Stats(), error: phase.blockout.sceneError,
           props: battlefield.scenePropStats?.stats.props ?? 0,
           propTriangles: battlefield.scenePropStats?.stats.propTriangles ?? 0,
           missing: battlefield.scenePropStats?.missing ?? [],
@@ -190,7 +202,11 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
         debugName: "ScenePreview", ownsFrame: true, dropDebugOnDispose: true,
         OnInstalled: ApplyPose,
         UpdateCamera: ApplyPose,
-        PostOptions: () => layout.camera?.vignette === undefined ? null : { vignette: layout.camera.vignette },
+        PostOptions: () => ({
+          ...(pose.vignette === undefined ? {} : { vignette: pose.vignette }),
+          ...(pose.nearFocusM ? { nearDofFocus: pose.nearFocusM, nearDofRange: pose.nearFocusM * .6,
+            nearDofStrength: .72, nearDofMaxPx: 4.5 } : {}),
+        }),
         Warmup: async () => {
           const preparingFigures = loadFigures?.(host, layout.landmarks).then(loaded => {
             if (disposed) loaded.Dispose();
@@ -204,6 +220,8 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
 }
 
 const PLUGINS = {
+  firstLevelScenePreview: SceneryPreview("FirstLevel", null),
+  dugoutAidOpenFields: SceneryPreview("DugoutAidOpenFields", null),
   gengjiazhuangFieldApproach: SceneryPreview("GengjiazhuangFieldApproach"),
   gengjiazhuangEastSmoke: SceneryPreview("GengjiazhuangEastSmoke", ["Sandbag"]),
   tanketteAdvanceEastTrack: SceneryPreview("TanketteAdvanceEastTrack",
@@ -213,22 +231,6 @@ const PLUGINS = {
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
     Create(h) { return CreateEncounterPlayPluginInstance(h, { mode: "editor" }); },
-  },
-  dugoutAidOpenFields: {
-    phase: DUGOUT_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
-    Create(host) {
-      const pose = DUGOUT_PREVIEW_PHASE.whitebox.layout?.camera;
-      const UpdateCamera = FixedSceneCamera(host, pose);
-      UpdateCamera();
-      return Instance(null, {
-        ownsFrame: true, UpdateCamera,
-        PostOptions: () => pose?.nearFocusM ? {
-          nearDofFocus: pose.nearFocusM, nearDofRange: pose.nearFocusM * 0.60,
-          nearDofStrength: 0.72, nearDofMaxPx: 4.5,
-        } : null,
-        Dispose: () => host.SetViewmodelHidden(false),
-      });
-    },
   },
   movement: {
     phase: MOVEMENT_RANGE_PHASE, World: MovementRangeField,

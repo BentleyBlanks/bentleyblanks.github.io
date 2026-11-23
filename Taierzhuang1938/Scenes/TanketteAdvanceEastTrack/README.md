@@ -1,7 +1,7 @@
 # 从沟沿望向东侧战车道
 
 - 本地场景编辑器使用 `/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=TanketteAdvanceEastTrack`。
-- 编辑器的「查看原画机位」打开游戏渲染器 `/Taierzhuang1938/?tanketteAdvanceEastTrack=1&shot=1`。
+- 在编辑器的「机位与预览」选原画机位，再打开正式预览。游戏渲染直达入口为 `/Taierzhuang1938/?tanketteAdvanceEastTrack=1&shot=1`。
 - [场景文件](Scene_TanketteAdvanceEastTrack.json)保存固定相机、可编辑撤离沟样条、道具与局部烟源。[场景环境](Environment_TanketteAdvanceEastTrack.json)引用[阴云与浮尘预设](../../Environment/EnvPreset_TanketteAdvanceEastTrack.json)。
 
 依据用户指定的 `06A_坦克车_沟沿看东侧战车道.png`。局部坐标的 −Z 是画面朝向。机位高程 1.41 米、俯角 5.4°、竖直视角 38°。近景用裁边断榆、横梁、灰木护壁框住下层撤离沟。伤员地标在担架处，右侧留照护位，横梁外留低姿观察位，沿沟向镜头后方撤离。中景两辆等尺寸九四式都在上层车道，离机位约 11.4 米与 21.7 米。

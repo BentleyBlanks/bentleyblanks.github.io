@@ -129,12 +129,14 @@ export function EncodeResolvedSceneBinary(resolved) {
   return { heightBytes, datumBytes };
 }
 
-async function FetchSingleScene(sceneUrl, fetchFn = globalThis.fetch, bustCache = false) {
+async function FetchSingleScene(sceneUrl, fetchFn, bustCache, sourceDoc = null) {
   const suffix = bustCache ? `?t=${Date.now()}` : "";
-  const res = await fetchFn(`${sceneUrl}${suffix}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`场景文件读不到（HTTP ${res.status}）：${sceneUrl}`);
-  let doc;
-  try { doc = await res.json(); } catch { throw new Error("场景文件不是 JSON"); }
+  let doc = sourceDoc;
+  if (!doc) {
+    const res = await fetchFn(`${sceneUrl}${suffix}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`场景文件读不到（HTTP ${res.status}）：${sceneUrl}`);
+    try { doc = await res.json(); } catch { throw new Error("场景文件不是 JSON"); }
+  }
   const baseHref = new URL(sceneUrl, globalThis.location?.href || "http://localhost/Taierzhuang1938/index.html").href;
   const heightUrl = new URL(doc.terrain.file, baseHref).href;
   const hRes = await fetchFn(`${heightUrl}${suffix}`, { cache: "no-store" });
@@ -155,8 +157,8 @@ async function FetchSingleScene(sceneUrl, fetchFn = globalThis.fetch, bustCache 
 /**
  * 浏览器侧读取场景（自动处理 inherit 合成），返回合成后的 doc、heights、datum 以及原始二进制字节。
  */
-export async function FetchResolvedScene(sceneUrl, { fetchFn = globalThis.fetch, bustCache = false } = {}) {
-  const own = await FetchSingleScene(sceneUrl, fetchFn, bustCache);
+export async function FetchResolvedScene(sceneUrl, { fetchFn = globalThis.fetch, bustCache = false, sourceDoc = null } = {}) {
+  const own = await FetchSingleScene(sceneUrl, fetchFn, bustCache, sourceDoc);
   if (!own.doc.inherit) {
     return {
       rawDoc: own.doc, doc: own.doc, heights: own.heights, datum: own.datum,

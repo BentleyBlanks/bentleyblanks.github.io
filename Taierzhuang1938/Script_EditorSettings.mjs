@@ -132,8 +132,8 @@ export function LoadSavedGraphics(graphics) {
  * 开机时把存下来的设置装回去。EditorSuite 的构造函数调它 ——
  * 只在打开面板时才生效的设置不叫设置，那叫开关。
  */
-export function ApplySavedSettings(host) {
-  if (host.game && host.game.graphics && LoadSavedGraphics(host.game.graphics) !== null) {
+export function ApplySavedSettings(host, { restoreGraphics = true } = {}) {
+  if (restoreGraphics && host.game && host.game.graphics && LoadSavedGraphics(host.game.graphics) !== null) {
     if (host.game.ApplyGraphics) host.game.ApplyGraphics();
   }
   const sfx = ReadJson(KEY_SFX);

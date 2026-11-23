@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>场景编辑器 · 血战滕县</title>
-  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261122-inherit">
+  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261124-preview">
   <!--
     场景编辑器（docs/Data_Scene.md §6）。导入表不在这里另抄一份版本戳：开机先同步读 ../index.html 里那张 import map
     （线上发布的 index.html 也保留它），键值按 index.html 的位置解析成绝对地址再插进来、再起主程序，
@@ -31,7 +31,7 @@
       document.currentScript.after(script);
     })();
   </script>
-  <script type="module">import("./Script_SceneEditor.mjs?v=20261122-inherit").catch((error) => { document.getElementById("seStatus").textContent = "场景编辑器起不来：" + error.message; console.error(error); });</script>
+  <script type="module">import("./Script_SceneEditor.mjs").catch((error) => { document.getElementById("seStatus").textContent = "场景编辑器起不来：" + error.message; console.error(error); });</script>
 </head>
 <body>
   <header class="seBar">
@@ -53,34 +53,39 @@
     <aside class="seLeft">
       <div class="seTabs" role="group" aria-label="编辑器面板">
         <button id="seTabTree" class="seTab selected" aria-controls="sePaneTree" aria-pressed="true">层级</button>
-        <button id="seTabAssets" class="seTab" aria-controls="sePaneAssets" aria-pressed="false">资产</button>
+        <button id="seTabPreview" class="seTab" aria-controls="sePanePreview" aria-pressed="false">机位与预览</button>
       </div>
       <div id="sePaneTree" class="sePane">
         <input id="seSearch" type="search" placeholder="搜名字、分组、资产、材质…" aria-label="搜物件">
         <div id="seCount" class="seCount"></div>
         <div id="seTree" class="seTree" role="tree" aria-label="场景物件"></div>
       </div>
-      <div id="sePaneAssets" class="sePane sePrefabPane" hidden>
-        <input id="sePrefabSearch" type="search" placeholder="搜索 Prefab…" aria-label="搜索 Prefab">
-        <div id="seAssets" class="seAssets"></div>
-        <div class="sePrefabActions">
-          <span>拖到视图放置</span>
-          <button id="sePlacePrefab" title="把选中的 Prefab 放到视图中心" disabled>放到中心</button>
+      <div id="sePanePreview" class="sePane sePreviewPane" hidden>
+        <div class="sePreviewGroup" role="group" aria-label="视角">
+          <button id="seFreeView" aria-pressed="true">自由视角</button>
+          <button id="seShotView" aria-pressed="false" hidden>原画机位</button>
+        </div>
+        <div id="seShotControls" class="sePreviewGroup" hidden>
+          <label class="seCheck"><input id="seShotGizmo" type="checkbox" checked>显示机位 Gizmo</label>
+          <button id="seSelectShot">定位并选中机位</button>
+        </div>
+        <div id="seFormalControls" class="sePreviewGroup" hidden>
+          <button id="seFormalPreview" class="sePrimary" aria-pressed="false">正式预览</button>
+          <button id="seRefreshPreview" hidden>刷新正式预览</button>
+          <p id="sePreviewStatus" class="sePreviewStatus" role="status" hidden></p>
+        </div>
+        <div class="sePreviewGroup" role="group" aria-label="显示">
+          <label class="seCheck"><input id="seShowBackdrop" type="checkbox" checked>显示远景</label>
+          <label class="seCheck"><input id="seShowHidden" type="checkbox">编辑视口显示空气墙</label>
         </div>
       </div>
     </aside>
     <section class="seView" aria-label="场景视图">
       <canvas id="seCanvas" tabindex="0"></canvas>
-      <span id="sePrefabDrop" class="sePrefabDrop" hidden></span>
-      <div class="seTools">
-        <div class="seToolGroup" id="seJumps"><span class="seToolLabel">段落</span></div>
-        <div class="seToolGroup">
-          <span class="seToolLabel">显示</span>
-          <label class="seCheck"><input id="seShowBackdrop" type="checkbox" checked> 远景</label>
-          <label class="seCheck"><input id="seShowHidden" type="checkbox"> 空气墙</label>
-        </div>
-        <details class="seSignals"><summary title="剧情走到某一步（炸桥、塌洞……）时随它出现 / 消失的物件，勾上预览">剧情事件 <span id="seSignalCount"></span></summary><div id="seSignalList"></div></details>
-        <button id="seBlockout" title="在白盒关卡编辑器里，从画面中心那一点打开">在白盒编辑器里看</button>
+      <div id="sePreviewMount" class="sePreviewMount" hidden></div>
+      <div id="sePreviewBar" class="sePreviewBar" hidden>
+        <span id="sePreviewBadge"></span>
+        <button id="seClosePreview">退出预览</button>
       </div>
       <div id="seHud" class="seHud"></div>
       <details class="seHelp">

@@ -838,10 +838,11 @@ export function MakeBlockoutPhase(level) {
         const sceneUrl = phase.blockout.SceneUrl();
         let doc;
         if (level.scene.kind === "scene") {
-          const resolved = await FetchResolvedScene(sceneUrl, { bustCache: true });
+          const sourceDoc = level.scene.ReadEditorScene?.();
+          const resolved = await FetchResolvedScene(sceneUrl, { bustCache: true, sourceDoc });
           if (level.scenePreview) {
             const result = ValidateScene(resolved.doc);
-            if (!result.ok || !resolved.doc.camera || resolved.doc.id !== level.key) {
+            if (!result.ok || (!level.previewCameraOptional && !resolved.doc.camera) || resolved.doc.id !== level.key) {
               throw new Error(result.errors[0] || "场景缺少已登记的预览机位");
             }
           }

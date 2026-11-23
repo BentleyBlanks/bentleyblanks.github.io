@@ -6,7 +6,7 @@
 // 壕沟（doc.trenches.segments，docs/Data_Scene.md §9）走同一条路，记录上带 trench: true；选中壕沟和选中物件互斥。
 
 import { SCENE_ASSETS, SCENE_MATERIALS } from "../Data_SceneAssets.mjs";
-import { ValidateScene } from "../Script_SceneDoc.mjs";
+import { IsSceneCamera, ValidateScene } from "../Script_SceneDoc.mjs";
 import { TrenchGroup } from "../Script_SceneTrenches.mjs";
 import { TRENCH_DETAILS } from "../Data_TrenchDetails.mjs";
 
@@ -106,13 +106,6 @@ export class SceneEditModel {
     return root;
   }
 
-  /** 场景里出现过的剧情事件（hideOn / showOn，代码里叫信号），排好序。 */
-  Signals() {
-    const set = new Set();
-    for (const obj of this.doc.objects) { if (obj.hideOn) set.add(obj.hideOn); if (obj.showOn) set.add(obj.showOn); }
-    return [...set].sort();
-  }
-
   // ---------------------------------------------------------------- 选中
 
   Select(ids, { add = false, toggle = false } = {}) {
@@ -137,6 +130,17 @@ export class SceneEditModel {
     if (this.undo.length > 400) this.undo.shift();
     this.redo = [];
     return true;
+  }
+
+  SetCamera(pose) {
+    if (!IsSceneCamera(pose)) throw new Error("机位的位置、角度或视角无效");
+    const before = this.doc.camera;
+    const after = { ...pose, position: pose.position.map(value => Fix(value, P.posM)),
+      yawDeg: Fix(pose.yawDeg, P.yawDeg), pitchDeg: Fix(pose.pitchDeg, P.yawDeg), fovDeg: Fix(pose.fovDeg, P.yawDeg) };
+    if (!IsSceneCamera(after)) throw new Error("机位角度超出可用范围");
+    if (JSON.stringify(before) === JSON.stringify(after)) return false;
+    this.doc.camera = after;
+    return this.Push("调整原画机位", [{ camera: true, before, after }]);
   }
 
   /** 原地改一批物件：fn(obj) 直接改传进去的副本；返回改了几个。 */
@@ -404,8 +408,13 @@ export class SceneEditModel {
 
   Apply(changes, backward) {
     const list = backward ? [...changes].reverse() : changes;
-    for (const { index, before, after, trench } of list) {
+    for (const { index, before, after, trench, camera } of list) {
       const from = backward ? after : before, to = backward ? before : after;
+      if (camera) {
+        if (to) this.doc.camera = Clone(to);
+        else delete this.doc.camera;
+        continue;
+      }
       const array = trench ? (this.doc.trenches ||= { segments: [] }).segments : this.doc.objects;
       if (trench) this.trenchRev++;
       if (from && to) array[index] = Clone(to);

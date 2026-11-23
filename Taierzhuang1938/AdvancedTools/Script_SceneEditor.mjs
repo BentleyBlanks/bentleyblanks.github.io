@@ -1,20 +1,19 @@
 // 场景编辑器（docs/Data_Scene.md §6）：SceneEditor.html 的主程序。
 //
 // 读 Scenes/<Id>/Scene_<Id>.json + 高度图，自己起一个轻量三维视图（不起游戏）：地形按高度色带 + 地面涂色 + 米格线，
-// 白盒体块按材质分批实例化画，远景层画成简单的盒子 / 椭球 / 锥。点选、拖箭头移动、拖金圈转、检视面板改数值，
+// 编辑视口按材质分批画布设，正式预览按需使用同页的游戏渲染器。点选、拖箭头移动、拖金圈转、检视面板改数值，
 // 改动全走 Script_SceneEditModel（带撤销）。存盘：本机预览走 /__scene/save（带版本号，对不上 409），线上只能下载。
 // 场景文件被人 / agent 在外面改了：没改动就 2 s 内自动重读，有改动就挂横幅让人选。
 //
 // 只给开发用，面板文字不走文本表（项目契约 10 的开发者面板例外）。
 
 import * as THREE from "three";
-import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo, SceneAssetsFor } from "../Data_SceneAssets.mjs";
-import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, SceneStyle } from "../Script_SceneDoc.mjs";
+import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo } from "../Data_SceneAssets.mjs";
+import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, IsSceneCamera, SceneStyle } from "../Script_SceneDoc.mjs";
 import { SceneEditModel, SplitGroup } from "./Script_SceneEditModel.mjs";
 import {
-  BLOCKOUT_LEVELS, HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface, SceneTrenchDressing,
+  HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface, SceneTrenchDressing,
 } from "../Script_EditorBlockoutLevels.mjs";
-import { SCENE_EVENTS, SceneEventLabel } from "../Data_SceneEvents.mjs";
 import {
   DecodeTrenchDatum, CompileSceneTrenches, CarveSceneHeights, GridSampler, TrenchGroup, SegmentReachBounds, UnionBounds,
 } from "../Script_SceneTrenches.mjs";
@@ -39,9 +38,6 @@ export const SCENE_EDITOR = Object.freeze({
   dragPx: 4,
 });
 const E = SCENE_EDITOR;
-const PREFAB_DRAG_TYPE = "application/x-tengxian-scene-prefab";
-const TRENCH_PREFAB = "Trench/Spline";
-const PREFAB_CATEGORIES = [["box", "构件"], ["prop", "道具"], ["tree", "植被"], ["backdrop", "远景"]];
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
 
@@ -67,6 +63,7 @@ function HexInt(value, fallback = parseInt(WHITEBOX_MATERIAL.surfaceColor.slice(
 
 const Inside = (r, x, z) => r && x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ;
 const Fixed = (v, n = 2) => (Number.isFinite(v) ? v.toFixed(n) : "—");
+const StageName = /^\d{2}[–-]\d{2}/;
 
 // ---------------------------------------------------------------------------------------------- 编辑器
 
@@ -74,28 +71,25 @@ class SceneEditorApp {
   constructor() {
     this.sceneId = new URLSearchParams(location.search).get("scene") || SCENE_IDS[0];
     if (!SCENE_IDS.includes(this.sceneId)) this.sceneId = SCENE_IDS[0];
-    // whitebox = 白盒场景（白盒体块）；formal = 正式场景（白盒体块 + 道具、树）—— 决定资产页列哪些
     this.style = SceneStyle(this.sceneId);
-    this.prefabs = new Map([
-      ["Whitebox/Box", SCENE_ASSETS["Whitebox/Box"]],
-      [TRENCH_PREFAB, { label: "样条壕沟", kind: "trench" }],
-      ...SceneAssetsFor(this.style).filter(([id]) => id !== "Whitebox/Box"),
-    ]);
-    this.selectedPrefab = "Whitebox/Box";
+    this.previewParam = SceneInfo(this.sceneId)?.previewParam;
     this.model = null;
     this.writable = false;
     this.revision = null;
-    this.signals = new Set();
     this.show = { backdrop: true, hidden: false };
     this.layers = [];
     this.where = new Map();          // id → { layer, index }
     this.open = new Set();           // 层级里展开的文件夹（路径），记在本机
+    this.hiddenStages = new Set();
     this.LoadOpen();
     this.LoadFolds();                // 检视里各节折叠没有，记在本机
     this.terrainLook = "tint";       // 地面现在怎么画：tint 高度色带 + 米格线；layers 正式场景的分层地表
     this.drag = null;
     this.keys = new Set();
     this.cam = { pos: new THREE.Vector3(), yaw: 0, pitch: -0.5 };
+    this.viewMode = "free";
+    this.showShotGizmo = true;
+    this.cameraSelected = false;
     this.toastTimer = 0;
     this.ready = new Promise((resolve) => { this.Resolve = resolve; });
   }
@@ -137,6 +131,13 @@ class SceneEditorApp {
     this.selectionLines = new THREE.Group();
     this.scene.add(this.selectionLines);
     this.BuildGizmo();
+    this.shotCamera = new THREE.PerspectiveCamera(E.fov, 16 / 9, .2, 3.5);
+    this.shotHelper = new THREE.CameraHelper(this.shotCamera);
+    this.shotHelper.name = "SceneEditor_ReferenceCamera";
+    this.shotHelper.material.depthTest = false;
+    this.shotHelper.renderOrder = 23;
+    this.shotHelper.visible = false;
+    this.scene.add(this.shotHelper);
     this.geometry = {
       box: new THREE.BoxGeometry(1, 1, 1),
       sphere: new THREE.SphereGeometry(0.5, 14, 10),
@@ -144,11 +145,6 @@ class SceneEditorApp {
     };
     this.edges = new THREE.EdgesGeometry(this.geometry.box);
     this.edgeMaterial = new THREE.LineBasicMaterial({ color: 0xedca83, depthTest: false, transparent: true, opacity: 0.95 });
-    this.prefabGhost = new THREE.Mesh(this.geometry.box, new THREE.MeshBasicMaterial({
-      color: 0xedca83, transparent: true, opacity: 0.55, depthWrite: false,
-    }));
-    this.prefabGhost.visible = false;
-    this.scene.add(this.prefabGhost);
     new ResizeObserver(() => this.Resize()).observe(canvas.parentElement);
     this.Resize();
   }
@@ -210,15 +206,16 @@ class SceneEditorApp {
     this.stamp = stamp;
     if (this.model) this.model.Load(doc);
     else this.model = new SceneEditModel(doc);
+    if (!doc.camera) { this.viewMode = "free"; this.cameraSelected = false; }
     this.CarveAll();
     this.lookKey = null;
     this.Rebuild();
     await this.SyncInheritedPreview();
     if (!keepCamera) this.Home();
-    this.FillSignals();
     this.RenderTree();
     this.RenderInspector();
-    this.RenderAssets();
+    this.SyncPreviewControls();
+    if (this.previewFrame) this.StartFormalPreview();
     this.UpdateDirty();
     this.Status(`${doc.title}：${doc.objects.length} 个物件 · ${this.writable ? "本机预览，能直接保存" : this.writeReason}`);
   }
@@ -429,9 +426,11 @@ class SceneEditorApp {
     if (this.trenchDressing) { this.world.remove(this.trenchDressing); this.trenchDressing.traverse((o) => { if (o.isMesh) { o.dispose?.(); o.material.dispose(); } }); this.trenchDressing = null; }
     this.trenchDressingCount = 0;
     if (!this.trenchPlan) return;
-    const keep = this.model.objects.filter((o) => o.layer !== "backdrop" && o.solid !== false && o.tag !== "airWall" && o.size)
+    const keep = this.model.objects.filter((o) => this.StageVisible(o.group) && o.layer !== "backdrop" && o.solid !== false && o.tag !== "airWall" && o.size)
       .map((o) => ({ x: o.pos[0], z: o.pos[2], w: o.size[0], d: o.size[2], h: o.size[1], ry: (o.yawDeg || 0) * DEG, solid: true }));
-    const { blocks } = SceneTrenchDressing(this.trenchPlan, this.sampler, keep, this.model.doc.bounds);
+    const hiddenTrenches = new Set(this.model.trenchSegments.filter((seg) => !this.StageVisible(TrenchGroup(seg))).map((seg) => seg.id));
+    const plan = hiddenTrenches.size ? { ...this.trenchPlan, segments: this.trenchPlan.segments.filter((seg) => !hiddenTrenches.has(seg.id)) } : this.trenchPlan;
+    const { blocks } = SceneTrenchDressing(plan, this.sampler, keep, this.model.doc.bounds);
     this.trenchDressingCount = blocks.length;
     if (!blocks.length) return;
     const group = new THREE.Group();
@@ -462,6 +461,7 @@ class SceneEditorApp {
     const plan = this.trenchPlan, sel = this.model.trench;
     const Lift = (x, z, up) => new THREE.Vector3(x, (Inside(this.model.doc.bounds, x, z) ? this.sampler(x, z) : 0) + up, z);
     for (const seg of this.model.trenchSegments) {
+      if (!this.StageVisible(TrenchGroup(seg))) continue;
       const selected = seg.id === sel;
       const compiled = plan?.segments.find((s) => s.id === seg.id);
       const pts = preview && selected ? preview : seg.points;
@@ -507,7 +507,8 @@ class SceneEditorApp {
   /** 地面上这一点落在哪段沟里（沟沿外弃土也算）。 */
   TrenchAt(point) {
     const hit = point && this.trenchPlan?.Corridor(point.x, point.z);
-    return hit ? hit.id : null;
+    const seg = hit && this.model.FindTrench(hit.id);
+    return seg && this.StageVisible(TrenchGroup(seg)) ? seg.id : null;
   }
 
   /** 选中壕沟后 Alt+点地面：在离点击处最近的那一截控制折线里插一个点。 */
@@ -530,6 +531,7 @@ class SceneEditorApp {
   }
 
   SelectTrench(id, point = null) {
+    this.cameraSelected = false;
     this.model.SelectTrench(id, point);
     const seg = this.model.FindTrench(id);
     if (seg) { const parts = SplitGroup(TrenchGroup(seg)); for (let i = 1; i <= parts.length; i++) this.open.add(parts.slice(0, i).join("/")); this.SaveOpen(); }
@@ -547,15 +549,6 @@ class SceneEditorApp {
     for (const [x, z] of seg.points) box.expandByPoint(new THREE.Vector3(x, this.sampler(x, z), z));
     const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
     this.LookAt(center, Math.max(14, size * 1.1), Math.min(-25, this.cam.pitch / DEG));
-  }
-
-  /** 新建一段顺着视线方向的壕沟。 */
-  AddTrenchHere({ preset = "communication", look = "", group = "" } = {}, at = this.ScreenCenterGround()) {
-    const dx = -Math.sin(this.cam.yaw) * 8, dz = -Math.cos(this.cam.yaw) * 8;
-    const points = [[at.x - dx, at.z - dz], [at.x + dx, at.z + dz]];
-    this.model.AddTrench({ preset, points, group: group || undefined, look: look || undefined });
-    this.AfterEdit(null);
-    this.SelectTrench(this.model.trench);
   }
 
   SemanticColor(semantic) {
@@ -622,6 +615,7 @@ class SceneEditorApp {
       plane.rotation.x = -Math.PI / 2;
       plane.position.set(cx, bd.ground.y - 0.6, cz);
       plane.name = "SceneEditor_BackdropGround";
+      plane.visible = this.show.backdrop;
       this.backdropGround = plane;
       this.world.add(plane);
     }
@@ -712,8 +706,7 @@ class SceneEditorApp {
   }
 
   Visible(obj) {
-    if (obj.hideOn && this.signals.has(obj.hideOn)) return false;
-    if (obj.showOn && !this.signals.has(obj.showOn)) return false;
+    if (!this.StageVisible(obj.group)) return false;
     if (obj.layer === "backdrop") return this.show.backdrop;
     if (obj.visual === false) return this.show.hidden;
     return true;
@@ -838,6 +831,9 @@ class SceneEditorApp {
   }
 
   Pivot(override = null) {
+    if (this.cameraSelected && this.viewMode === "free" && this.showShotGizmo && this.ShotPose()) {
+      return new THREE.Vector3(...this.ShotPose().position);
+    }
     const list = [...this.model.selection].map(id => override?.get(id) || this.model.Find(id)).filter(Boolean);
     if (!list.length) return null;
     const p = new THREE.Vector3();
@@ -921,10 +917,62 @@ class SceneEditorApp {
 
   // ------------------------------------------------------------------ 相机
 
+  ShotPose() { return this.drag?.cameraPreview || this.model?.doc.camera; }
+
+  ViewPose() {
+    return (this.viewMode === "original" && this.ShotPose()) || {
+      position: this.cam.pos.toArray(), yawDeg: this.cam.yaw / DEG, pitchDeg: this.cam.pitch / DEG, fovDeg: E.fov,
+    };
+  }
+
   ApplyCamera() {
-    this.camera.position.copy(this.cam.pos);
-    this.camera.rotation.set(this.cam.pitch, this.cam.yaw, 0, "YXZ");
+    const pose = this.ViewPose();
+    this.camera.position.fromArray(pose.position);
+    this.camera.rotation.set(pose.pitchDeg * DEG, pose.yawDeg * DEG, 0, "YXZ");
+    if (this.camera.fov !== pose.fovDeg) {
+      this.camera.fov = pose.fovDeg;
+      this.camera.updateProjectionMatrix();
+    }
     this.camera.updateMatrixWorld(true);
+  }
+
+  SyncShotGizmo() {
+    const pose = this.ShotPose();
+    this.shotHelper.visible = !!pose && this.showShotGizmo && this.viewMode === "free";
+    if (!this.shotHelper.visible) return;
+    const cam = this.shotCamera;
+    if (cam.fov !== pose.fovDeg) { cam.fov = pose.fovDeg; cam.updateProjectionMatrix(); this.shotHelper.update(); }
+    cam.position.fromArray(pose.position);
+    cam.rotation.set(pose.pitchDeg * DEG, pose.yawDeg * DEG, 0, "YXZ");
+    cam.updateMatrixWorld(true);
+  }
+
+  SelectShot({ frame = false } = {}) {
+    const pose = this.ShotPose();
+    if (!pose) return;
+    this.model.Select([]);
+    this.cameraSelected = true;
+    this.showShotGizmo = true;
+    if (frame) {
+      this.cam.yaw = (pose.yawDeg + 28) * DEG;
+      this.LookAt(new THREE.Vector3(...pose.position), 8, -33);
+    }
+    this.SyncSelectionLines();
+    this.BuildTrenchLines();
+    this.SyncPreviewControls();
+    this.RenderTree();
+    this.RenderInspector();
+  }
+
+  SetView(mode) {
+    const next = mode === "original" && this.ShotPose() ? "original" : "free";
+    if (this.viewMode === next) return;
+    this.viewMode = next;
+    this.keys.clear();
+    this.ApplyCamera();
+    this.SyncShotGizmo();
+    this.UpdateGizmo();
+    this.SyncPreviewControls();
   }
 
   Forward() {
@@ -933,6 +981,7 @@ class SceneEditorApp {
   }
 
   LookAt(target, distance, pitchDeg = -32) {
+    this.SetView("free");
     this.cam.pitch = pitchDeg * DEG;
     const f = this.Forward();
     this.cam.pos.copy(target).addScaledVector(f, -distance);
@@ -943,13 +992,6 @@ class SceneEditorApp {
     const sp = this.model.doc.spawn;
     this.cam.yaw = (sp.yawDeg || 0) * DEG;
     this.LookAt(new THREE.Vector3(sp.x, this.sampler(sp.x, sp.z), sp.z), 70, -35);
-  }
-
-  JumpRegion(r) {
-    const cx = (r.minX + r.maxX) / 2, cz = (r.minZ + r.maxZ) / 2;
-    const span = Math.max(r.maxX - r.minX, r.maxZ - r.minZ);
-    this.cam.yaw = 0;
-    this.LookAt(new THREE.Vector3(cx, this.sampler(cx, cz), cz), span * 0.95, -58);
   }
 
   Frame(ids = [...this.model.selection]) {
@@ -970,7 +1012,7 @@ class SceneEditorApp {
     const dt = Math.min(0.1, (now - (this.lastTick || now)) / 1000);
     this.lastTick = now;
     const move = new THREE.Vector3();
-    if (!this.TypingInField()) {
+    if (this.viewMode === "free" && !this.TypingInField()) {
       const f = this.Forward(), right = new THREE.Vector3(Math.cos(this.cam.yaw), 0, -Math.sin(this.cam.yaw));
       if (this.keys.has("KeyW")) move.add(f);
       if (this.keys.has("KeyS")) move.sub(f);
@@ -984,8 +1026,12 @@ class SceneEditorApp {
       this.cam.pos.addScaledVector(move.normalize(), speed * dt);
     }
     this.ApplyCamera();
-    this.UpdateGizmo();
-    this.renderer.render(this.scene, this.camera);
+    if (this.previewFrame) this.SyncFormalPreview(now);
+    else {
+      this.SyncShotGizmo();
+      this.UpdateGizmo();
+      this.renderer.render(this.scene, this.camera);
+    }
     this.UpdateHud();
     requestAnimationFrame((t) => this.Tick(t));
   }
@@ -997,10 +1043,83 @@ class SceneEditorApp {
 
   UpdateHud() {
     if ((this.hudFrame = (this.hudFrame || 0) + 1) % 6) return;
-    const p = this.cam.pos, ground = Inside(this.model.doc.bounds, p.x, p.z) ? this.sampler(p.x, p.z) : 0;
+    const p = this.camera.position, ground = Inside(this.model.doc.bounds, p.x, p.z) ? this.sampler(p.x, p.z) : 0;
     const sel = this.model.selection.size;
-    $("seHud").textContent = `相机 x ${Fixed(p.x, 1)}  z ${Fixed(p.z, 1)}  离地 ${Fixed(p.y - ground, 1)} m  朝向 ${Fixed(this.cam.yaw / DEG, 0)}°`
+    $("seHud").textContent = `相机 x ${Fixed(p.x, 1)}  z ${Fixed(p.z, 1)}  离地 ${Fixed(p.y - ground, 1)} m  朝向 ${Fixed(this.camera.rotation.y / DEG, 0)}°`
       + (sel ? `\n选中 ${sel} 个` : "");
+  }
+
+  SyncPreviewControls(message = "", error = false) {
+    const hasShot = !!this.model?.doc.camera, inPreview = !!this.previewFrame, authored = this.viewMode === "original";
+    $("seShotView").hidden = $("seShotControls").hidden = !hasShot;
+    $("seFreeView").setAttribute("aria-pressed", String(!authored));
+    $("seShotView").setAttribute("aria-pressed", String(authored));
+    $("seShotGizmo").checked = this.showShotGizmo;
+    $("seFormalControls").hidden = !this.previewParam;
+    $("seFormalPreview").setAttribute("aria-pressed", String(inPreview));
+    $("seRefreshPreview").hidden = !inPreview;
+    $("seRefreshPreview").disabled = inPreview && !this.previewReady;
+    $("sePreviewMount").classList.toggle("authored", authored);
+    $("sePreviewBar").hidden = !inPreview;
+    $("sePreviewBadge").textContent = this.previewReady ? `正式预览 · ${authored ? "原画机位" : "自由视角"}` : "正在加载正式预览…";
+    const status = $("sePreviewStatus");
+    status.textContent = message || (inPreview && this.previewSceneChanged ? "布设已改动，刷新预览后可查看。" : "");
+    status.hidden = !status.textContent;
+    status.classList.toggle("error", error);
+  }
+
+  StartFormalPreview() {
+    if (!this.previewParam || !this.model) return;
+    this.CancelDrag();
+    const doc = this.model.ToDoc();
+    doc.objects = doc.objects.filter((obj) => this.StageVisible(obj.group) && (this.show.backdrop || obj.layer !== "backdrop"));
+    if (doc.trenches) doc.trenches.segments = doc.trenches.segments.filter((seg) => this.StageVisible(TrenchGroup(seg)));
+    if (!this.show.backdrop) delete doc.backdrop;
+    const token = crypto.randomUUID();
+    this.previewSnapshot = { token, doc };
+    this.previewReady = false;
+    this.previewSceneChanged = false;
+    this.previewModelState = this.model.state;
+    this.previewPoseKey = "";
+    this.previewStarted = performance.now();
+    const url = new URL("../index.html", location.href);
+    url.searchParams.set(this.previewParam, "1");
+    url.searchParams.set("shot", "1");
+    url.searchParams.set("sceneEditorPreview", token);
+    const frame = El("iframe");
+    frame.title = "正式场景预览";
+    frame.tabIndex = -1;
+    frame.src = url.href;
+    this.previewFrame = frame;
+    $("sePreviewMount").replaceChildren(frame);
+    $("sePreviewMount").hidden = false;
+    this.SyncPreviewControls();
+    this.canvas.focus();
+  }
+
+  StopFormalPreview(error = "") {
+    this.previewFrame?.remove();
+    this.previewFrame = this.previewSnapshot = null;
+    this.previewReady = this.previewSceneChanged = false;
+    $("sePreviewMount").hidden = true;
+    this.SyncPreviewControls(error, !!error);
+  }
+
+  SyncFormalPreview(now) {
+    const game = this.previewFrame.contentWindow?.Tengxian;
+    const api = game?.Debug?.ScenePreview;
+    if (!this.previewReady) {
+      const state = api?.State();
+      if (state?.error) { this.StopFormalPreview(state.error); return; }
+      if (!game?.state?.ready || state?.scene !== this.sceneId) {
+        if (now - this.previewStarted > 120000) this.StopFormalPreview("正式预览加载超时，可重新打开。");
+        return;
+      }
+      this.previewReady = true;
+      this.SyncPreviewControls();
+    }
+    const pose = this.ViewPose(), key = JSON.stringify(pose);
+    if (key !== this.previewPoseKey && api?.SetCamera(pose)) this.previewPoseKey = key;
   }
 
   // ------------------------------------------------------------------ 鼠标与键盘
@@ -1012,10 +1131,6 @@ class SceneEditorApp {
     c.addEventListener("pointermove", (e) => this.PointerMove(e));
     c.addEventListener("pointerup", (e) => this.PointerUp(e));
     c.addEventListener("wheel", (e) => this.Wheel(e), { passive: false });
-    c.addEventListener("dragover", (e) => this.PrefabDragOver(e));
-    c.addEventListener("dragleave", () => this.ShowPrefabDrop());
-    c.addEventListener("drop", (e) => this.PrefabDrop(e));
-    window.addEventListener("dragend", () => this.EndPrefabDrag());
     window.addEventListener("keydown", (e) => this.KeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
@@ -1037,41 +1152,43 @@ class SceneEditorApp {
       this.LoadScene().catch((error) => this.Fail(error));
     });
     $("seSearch").addEventListener("input", () => this.RenderTree());
-    $("sePrefabSearch").addEventListener("input", () => this.RenderAssets());
-    $("sePlacePrefab").addEventListener("click", () => {
-      if (!this.model || !this.selectedPrefab) return;
-      const rect = c.getBoundingClientRect();
-      this.PlacePrefab(this.selectedPrefab, this.PrefabGroundAt(this.selectedPrefab, rect.x + rect.width / 2, rect.y + rect.height / 2));
-    });
     $("seTabTree").addEventListener("click", () => this.Tab("tree"));
-    $("seTabAssets").addEventListener("click", () => this.Tab("assets"));
-    $("seShowBackdrop").addEventListener("change", (e) => { this.show.backdrop = e.target.checked; this.RebuildObjects(); });
+    $("seTabPreview").addEventListener("click", () => this.Tab("preview"));
+    $("seFreeView").addEventListener("click", () => { this.SetView("free"); this.canvas.focus(); });
+    $("seShotView").addEventListener("click", () => this.SetView("original"));
+    $("seShotGizmo").addEventListener("change", (e) => { this.showShotGizmo = e.target.checked; });
+    $("seSelectShot").addEventListener("click", () => {
+      if (this.previewFrame) this.StopFormalPreview();
+      this.SelectShot({ frame: true });
+      this.canvas.focus();
+    });
+    $("seFormalPreview").addEventListener("click", () => this.previewFrame ? this.StopFormalPreview() : this.StartFormalPreview());
+    $("seRefreshPreview").addEventListener("click", () => this.StartFormalPreview());
+    $("seClosePreview").addEventListener("click", () => this.StopFormalPreview());
+    $("seShowBackdrop").addEventListener("change", (e) => {
+      this.show.backdrop = e.target.checked;
+      if (this.backdropGround) this.backdropGround.visible = this.show.backdrop;
+      this.RebuildObjects();
+      if (this.previewFrame) this.StartFormalPreview();
+    });
     $("seShowHidden").addEventListener("change", (e) => { this.show.hidden = e.target.checked; this.RebuildObjects(); });
-    $("seBlockout").addEventListener("click", () => this.OpenInBlockout());
-    if (SceneInfo(this.sceneId)?.previewParam) {
-      $("seBlockout").textContent = "查看原画机位";
-      $("seBlockout").title = "在游戏渲染器里打开已保存的场景机位";
-    } else if (this.style === "formal") $("seBlockout").textContent = "在白盒编辑器里看（正式场景）";
-    const jumps = $("seJumps");
-    const regions = BLOCKOUT_LEVELS.filter(l => l.scene?.kind === "scene").map(l => ({ label: l.short || l.key.replace(/^FirstLevel/, ""), region: l.scene.region }));
-    for (const r of regions) { const b = El("button", "", r.label); b.title = "跳到这一段的场地"; b.addEventListener("click", () => this.JumpRegion(r.region)); jumps.append(b); }
-    const all = El("button", "", "全景"); all.addEventListener("click", () => this.JumpRegion(this.model.doc.bounds)); jumps.append(all);
   }
 
   Tab(which) {
-    for (const [id, tab] of [["seTabTree", "tree"], ["seTabAssets", "assets"]]) {
+    for (const [id, tab] of [["seTabTree", "tree"], ["seTabPreview", "preview"]]) {
       $(id).classList.toggle("selected", which === tab);
       $(id).setAttribute("aria-pressed", String(which === tab));
     }
     $("sePaneTree").hidden = which !== "tree";
-    $("sePaneAssets").hidden = which !== "assets";
+    $("sePanePreview").hidden = which !== "preview";
   }
 
   PointerDown(e) {
+    if (!this.model) return;
     this.canvas.focus();
     this.canvas.setPointerCapture(e.pointerId);
     this.down = { x: e.clientX, y: e.clientY, button: e.button, moved: false, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
-    if (e.button !== 0) return;
+    if (e.button !== 0 || this.previewFrame || this.viewMode === "original") return;
     const raycaster = this.Ray(e.clientX, e.clientY);
     // 选中壕沟时：按住控制点拖；Alt + 点地面加一个控制点
     if (this.model.trench) {
@@ -1082,6 +1199,9 @@ class SceneEditorApp {
     const handle = this.PickHandle(raycaster);
     if (handle) { this.BeginDrag(handle, raycaster.ray); this.down.handled = true; return; }
     const hit = this.PickObject(raycaster.ray);
+    raycaster.params.Line.threshold = .16;
+    const shotHit = this.shotHelper.visible && raycaster.intersectObject(this.shotHelper)[0];
+    if (shotHit && (!hit || shotHit.distance < hit.t)) { this.down.shot = true; return; }
     this.down.hit = hit;
     if (hit && this.model.selection.has(hit.id) && !this.down.ctrl && !this.down.shift) this.down.bodyDrag = true;
   }
@@ -1091,6 +1211,7 @@ class SceneEditorApp {
     if (!down) return;
     const dx = e.clientX - down.x, dy = e.clientY - down.y;
     if (!down.moved && Math.hypot(dx, dy) > E.dragPx) down.moved = true;
+    if (this.viewMode === "original" || (this.previewFrame && down.button === 0)) return;
     if (down.button === 2) {
       this.cam.yaw -= e.movementX * E.lookRadPerPx;
       this.cam.pitch = Math.max(-1.55, Math.min(1.55, this.cam.pitch - e.movementY * E.lookRadPerPx));
@@ -1113,10 +1234,11 @@ class SceneEditorApp {
     const down = this.down;
     this.down = null;
     if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
-    if (!down || down.button !== 0) return;
+    if (!down || down.button !== 0 || this.previewFrame || this.viewMode === "original") return;
     if (this.drag) { this.EndDrag(); return; }
     if (down.handled || down.moved) return;
-    if (down.hit) this.SelectIds([down.hit.id], { toggle: down.ctrl, add: down.shift });
+    if (down.shot) this.SelectShot();
+    else if (down.hit) this.SelectIds([down.hit.id], { toggle: down.ctrl, add: down.shift });
     else if (!down.ctrl && !down.shift) {
       // 没点中物件：点在沟里（含沟沿弃土）就选那段沟
       const trench = this.TrenchAt(this.PickGround(this.Ray(e.clientX, e.clientY).ray));
@@ -1127,6 +1249,7 @@ class SceneEditorApp {
 
   Wheel(e) {
     e.preventDefault();
+    if (this.viewMode === "original" || !this.model) return;
     const ray = this.Ray(e.clientX, e.clientY).ray;
     const ground = this.PickGround(ray, 3000);
     const dist = ground ? ground.distanceTo(this.cam.pos) : 40;
@@ -1142,8 +1265,18 @@ class SceneEditorApp {
     if (ctrl && e.code === "KeyY") { e.preventDefault(); this.Redo(); return; }
     if (ctrl && e.code === "KeyD") { e.preventDefault(); this.DuplicateSelection(); return; }
     if (e.code === "Delete" || e.code === "Backspace") { e.preventDefault(); this.DeleteSelection(); return; }
-    if (e.code === "Escape") { if (this.drag) this.CancelDrag(); else this.SelectIds([]); return; }
-    if (e.code === "KeyF" && !ctrl) { if (this.model.trench) this.FrameTrench(); else this.Frame(); return; }
+    if (e.code === "Escape") {
+      if (this.previewFrame) this.StopFormalPreview();
+      else if (this.drag) this.CancelDrag();
+      else this.SelectIds([]);
+      return;
+    }
+    if (e.code === "KeyF" && !ctrl) {
+      if (this.cameraSelected) this.SelectShot({ frame: true });
+      else if (this.model.trench) this.FrameTrench();
+      else this.Frame();
+      return;
+    }
     if (!ctrl) this.keys.add(e.code);
   }
 
@@ -1151,10 +1284,11 @@ class SceneEditorApp {
 
   BeginDrag(handle, ray) {
     const ids = [...this.model.selection];
-    if (!ids.length) return;
+    const cameraBefore = this.cameraSelected ? this.ShotPose() : null;
+    if (!ids.length && !cameraBefore) return;
     const pivot = this.Pivot();
     const start = new Map(ids.map(id => [id, JSON.parse(JSON.stringify(this.model.Find(id)))]));
-    this.drag = { handle, ids, pivot, start, preview: new Map(start), delta: [0, 0, 0], yaw: 0 };
+    this.drag = { handle, ids, pivot, start, preview: new Map(start), delta: [0, 0, 0], yaw: 0, cameraBefore };
     if (handle.axis) this.drag.t0 = this.AxisParam(ray, pivot, handle.dir);
     else this.drag.p0 = this.PlaneHit(ray, pivot.y);
   }
@@ -1215,6 +1349,14 @@ class SceneEditorApp {
         preview.set(id, o);
       }
     }
+    if (d.cameraBefore) {
+      d.cameraPreview = {
+        ...d.cameraBefore,
+        position: d.cameraBefore.position.map((n, i) => n + d.delta[i]),
+        yawDeg: d.cameraBefore.yawDeg + d.yaw,
+      };
+      return;
+    }
     d.preview = preview;
     this.UpdateInstances(d.ids, preview);
   }
@@ -1242,6 +1384,10 @@ class SceneEditorApp {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
+    if (d.cameraBefore) {
+      if (d.cameraPreview) this.ChangeShot(d.cameraPreview);
+      return;
+    }
     if (d.trench) {
       if (d.preview) { const [x, z] = d.preview[d.index]; this.model.MoveTrenchPoint(d.trench, d.index, x, z); }
       this.AfterEdit(null);
@@ -1262,6 +1408,7 @@ class SceneEditorApp {
   // ------------------------------------------------------------------ 改动
 
   SelectIds(ids, opts = {}) {
+    this.cameraSelected = false;
     this.model.Select(ids, opts);
     this.RevealSelection();
     this.revealPending = true;
@@ -1279,10 +1426,11 @@ class SceneEditorApp {
     else if (structural || !ids) this.RebuildObjects();
     else this.UpdateInstances(ids);
     this.BuildTrenchLines();
-    this.FillSignals();
     this.RenderTree();
     this.RenderInspector();
     this.UpdateDirty();
+    if (this.previewFrame) this.previewSceneChanged = this.previewModelState !== this.model.state;
+    this.SyncPreviewControls();
   }
 
   Undo() { const label = this.model.Undo(); if (label) { this.AfterEdit(null); this.Toast(`撤销：${label}`); } }
@@ -1316,53 +1464,28 @@ class SceneEditorApp {
     this.Toast(`删了 ${ids.length} 个（Ctrl+Z 撤销）`);
   }
 
-  ScreenCenterGround() {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    return this.PickGround(raycaster.ray, 2000) || this.cam.pos.clone().addScaledVector(this.Forward(), 20);
-  }
-
-  AssetOptions(assetId, at, { material, size, group } = {}) {
-    const asset = SCENE_ASSETS[assetId];
-    return {
-      pos: [at.x, null, at.z], material, size: size || asset.size || [1, 1, 1], group: group || undefined,
-      ...(asset.layer ? { layer: asset.layer } : {}),
-      ...(asset.sized ? {} : { params: assetId === "Backdrop/Tree" ? { h: 10 } : { h: 4, w: 4, d: 4, rx: 4, color: "#8a8370" } }),
-    };
-  }
-
-  AddAsset(assetId, opts, at = this.ScreenCenterGround()) {
-    this.model.Add(assetId, this.AssetOptions(assetId, at, opts));
-    this.AfterEdit(null, { structural: true });
-    this.SelectIds([...this.model.selection]);
-  }
-
-  // ------------------------------------------------------------------ 剧情事件
-
-  /** 剧情事件面板（代码里叫信号，Data_SceneEvents）：勾上 = 看这件事发生之后的样子。 */
-  FillSignals() {
-    const list = this.model.Signals();
-    const key = list.join("|");
-    if (key === this.signalKey) return;
-    this.signalKey = key;
-    for (const s of [...this.signals]) if (!list.includes(s)) this.signals.delete(s);
-    const box = $("seSignalList");
-    box.textContent = "";
-    box.append(El("p", "seNote", "剧情走到某一步（炸桥、塌洞、门被撞开……）就「发生」一个事件：写了「消失于」它的物件藏起来，写了「出现于」它的物件显示出来。勾上 = 看它发生之后的样子（只是预览，不存盘）。"));
-    for (const s of list) {
-      const label = El("label");
-      const input = El("input");
-      input.type = "checkbox";
-      input.checked = this.signals.has(s);
-      input.addEventListener("change", () => { if (input.checked) this.signals.add(s); else this.signals.delete(s); this.RebuildObjects(); $("seSignalCount").textContent = this.signals.size ? `${this.signals.size}` : ""; });
-      const text = El("span", "", SceneEventLabel(s));
-      text.append(El("code", "", s));
-      label.append(input, text);
-      box.append(label);
-    }
-  }
-
   // ------------------------------------------------------------------ 层级
+
+  StageVisible(group) {
+    return !this.hiddenStages.size || !this.hiddenStages.has(SplitGroup(group)[0]);
+  }
+
+  SetStageVisible(name, visible) {
+    if (visible) this.hiddenStages.delete(name);
+    else this.hiddenStages.add(name);
+    try { localStorage.setItem(`sceneEditor.hiddenStages.${this.sceneId}`, JSON.stringify([...this.hiddenStages])); } catch { /* 不记 */ }
+    const selected = this.model.Selected(), trench = this.model.FindTrench(this.model.trench);
+    if (trench && !this.StageVisible(TrenchGroup(trench))) this.model.SelectTrench(null);
+    else if (selected.some((obj) => !this.StageVisible(obj.group))) {
+      this.model.Select(selected.filter((obj) => this.StageVisible(obj.group)).map((obj) => obj.id));
+    }
+    this.RebuildObjects();
+    this.BuildTrenchLines();
+    this.BuildTrenchDressing();
+    this.RenderTree();
+    this.RenderInspector();
+    if (this.previewFrame) this.StartFormalPreview();
+  }
 
   /** 物件在层级里的小图标与副标题：体块按语义色、道具 ◆、树 ♣、空气墙虚框、远景淡色。 */
   ItemBadge(obj) {
@@ -1390,6 +1513,7 @@ class SceneEditorApp {
 
   LoadOpen() {
     try { for (const path of JSON.parse(localStorage.getItem(`sceneEditor.open.${this.sceneId}`) || "[]")) this.open.add(path); } catch { /* 读不到：全收起 */ }
+    try { for (const path of JSON.parse(localStorage.getItem(`sceneEditor.hiddenStages.${this.sceneId}`) || "[]")) this.hiddenStages.add(path); } catch { /* 读不到：全显示 */ }
   }
 
   RenderTree() {
@@ -1406,9 +1530,7 @@ class SceneEditorApp {
       const icon = El("i", `seIcon ${badge.cls}`, badge.icon);
       if (badge.color) icon.style.color = badge.color;
       b.append(icon, El("span", "seName", obj.id), El("small", "", showPath ? (obj.group || "") : badge.sub));
-      const events = [obj.showOn && `出现于：${SceneEventLabel(obj.showOn)}`, obj.hideOn && `消失于：${SceneEventLabel(obj.hideOn)}`].filter(Boolean);
-      if (events.length) b.append(El("em", "seEvent", "⚑"));
-      b.title = [`${obj.asset}${obj.material ? ` · ${obj.material}` : ""}`, obj.group ? `分组：${obj.group}` : "", ...events].filter(Boolean).join("\n");
+      b.title = [`${obj.asset}${obj.material ? ` · ${obj.material}` : ""}`, obj.group ? `分组：${obj.group}` : ""].filter(Boolean).join("\n");
       b.addEventListener("click", (e) => this.SelectIds([obj.id], { toggle: e.ctrlKey || e.metaKey, add: e.shiftKey }));
       b.addEventListener("dblclick", () => this.Frame([obj.id]));
       // 拖到文件夹上 = 挪进那个分组（拖的是选中的之一就整批挪）
@@ -1435,7 +1557,7 @@ ${seg.note}` : ""}`;
     if (q) {
       const trenchHits = this.model.trenchSegments.filter((s) => `${s.id} ${TrenchGroup(s)} ${s.preset} ${s.look || ""} 壕沟 ${s.note || ""}`.toLowerCase().includes(q));
       for (const seg of trenchHits) tree.append(TrenchItem(seg, 0, true));
-      const hits = this.model.objects.filter(o => `${o.id} ${o.group || ""} ${o.asset} ${o.material || ""} ${o.meta?.prop || ""} ${o.showOn || ""} ${o.hideOn || ""}`.toLowerCase().includes(q));
+      const hits = this.model.objects.filter(o => `${o.id} ${o.group || ""} ${o.asset} ${o.material || ""} ${o.meta?.prop || ""}`.toLowerCase().includes(q));
       $("seCount").textContent = `搜到 ${hits.length + trenchHits.length} 个`;
       for (const obj of hits.slice(0, E.searchLimit)) tree.append(Item(obj, 0, true));
       if (hits.length > E.searchLimit) tree.append(El("div", "seMore", `还有 ${hits.length - E.searchLimit} 个，搜得再细一点`));
@@ -1446,6 +1568,7 @@ ${seg.note}` : ""}`;
     const Folder = (node, depth) => {
       const open = this.open.has(node.path);
       const head = El("button", `seFolder${open ? " open" : ""}`);
+      head.setAttribute("aria-expanded", String(open));
       head.style.paddingLeft = `${6 + depth * 14}px`;
       const InPath = (g) => g === node.path || g.startsWith(`${node.path}/`);
       const selectedTrench = this.model.FindTrench(this.model.trench);
@@ -1466,7 +1589,19 @@ ${seg.note}` : ""}`;
         this.AfterEdit(null);
         this.Toast(`${ids.length} 个挪进「${node.path}」`);
       });
-      tree.append(head);
+      if (depth === 0 && StageName.test(node.name)) {
+        const active = this.StageVisible(node.path);
+        const row = El("div", `seFolderRow${active ? "" : " off"}`);
+        const visibility = El("input", "seStageVisible");
+        visibility.type = "checkbox";
+        visibility.checked = active;
+        visibility.dataset.stage = node.name;
+        visibility.setAttribute("aria-label", `显示 ${node.name}`);
+        visibility.title = `在视口中显示 ${node.name}`;
+        visibility.addEventListener("change", () => this.SetStageVisible(node.path, visibility.checked));
+        row.append(head, visibility);
+        tree.append(row);
+      } else tree.append(head);
       if (!open) return;
       for (const child of node.folders.values()) Folder(child, depth + 1);
       for (const id of node.trenches || []) tree.append(TrenchItem(this.model.FindTrench(id), depth + 1));
@@ -1491,113 +1626,6 @@ ${seg.note}` : ""}`;
     const out = [...node.ids];
     for (const child of node.folders.values()) out.push(...this.IdsUnder(child));
     return out;
-  }
-
-  // ------------------------------------------------------------------ 资产
-
-  RenderAssets() {
-    const box = $("seAssets");
-    const query = $("sePrefabSearch").value.trim().toLowerCase();
-    box.replaceChildren();
-    for (const [category, label] of PREFAB_CATEGORIES) {
-      const grid = El("div", "sePrefabGrid");
-      for (const [id, prefab] of this.prefabs) {
-        const folder = prefab.layer || (prefab.kind === "trench" ? "box" : prefab.kind);
-        if (folder !== category || !`${prefab.label} ${id} ${label}`.toLowerCase().includes(query)) continue;
-        const tile = El("button", "sePrefab");
-        tile.dataset.prefab = id;
-        tile.title = `${prefab.label} · ${id}`;
-        tile.draggable = true;
-        const icon = El("span", `sePrefabIcon ${prefab.kind}`);
-        icon.setAttribute("aria-hidden", "true");
-        tile.append(icon, El("span", "sePrefabName", prefab.label));
-        tile.addEventListener("click", () => this.SelectPrefab(id));
-        tile.addEventListener("dragstart", (e) => {
-          this.SelectPrefab(id);
-          this.draggedPrefab = id;
-          e.dataTransfer.effectAllowed = "copy";
-          e.dataTransfer.setData(PREFAB_DRAG_TYPE, id);
-        });
-        grid.append(tile);
-      }
-      if (grid.childElementCount) {
-        const group = El("section", "sePrefabGroup");
-        group.append(El("h3", "", label), grid);
-        box.append(group);
-      }
-    }
-    if (!box.childElementCount) box.append(El("p", "seMuted seEmpty", "没有匹配的 Prefab。"));
-    this.SelectPrefab(this.selectedPrefab);
-  }
-
-  SelectPrefab(id) {
-    this.selectedPrefab = null;
-    for (const tile of $("seAssets").querySelectorAll("[data-prefab]")) {
-      const selected = tile.dataset.prefab === id;
-      tile.setAttribute("aria-pressed", String(selected));
-      if (selected) this.selectedPrefab = id;
-    }
-    $("sePlacePrefab").disabled = !this.model || !this.selectedPrefab;
-  }
-
-  PrefabGroundAt(id, x, y) {
-    const point = this.PickGround(this.Ray(x, y).ray);
-    const backdrop = this.prefabs.get(id)?.layer === "backdrop";
-    return point && (backdrop || Inside(this.model.doc.bounds, point.x, point.z)) ? point : null;
-  }
-
-  PlacePrefab(id, point) {
-    if (!point) { this.Toast("请把 Prefab 放到视图中的地面上"); return; }
-    if (id === TRENCH_PREFAB) {
-      this.AddTrenchHere({}, point);
-    } else {
-      if (this.prefabs.get(id).layer === "backdrop" && !this.show.backdrop) {
-        this.show.backdrop = true;
-        $("seShowBackdrop").checked = true;
-      }
-      this.AddAsset(id, { group: this.model.Selected()[0]?.group }, point);
-    }
-    this.canvas.focus();
-  }
-
-  PrefabDragOver(e) {
-    const id = this.draggedPrefab;
-    if (!this.model || !id || !e.dataTransfer.types.includes(PREFAB_DRAG_TYPE)) return;
-    const point = this.PrefabGroundAt(id, e.clientX, e.clientY);
-    if (point) e.preventDefault();
-    e.dataTransfer.dropEffect = point ? "copy" : "none";
-    this.ShowPrefabDrop(id, point);
-  }
-
-  PrefabDrop(e) {
-    if (!this.model || !this.draggedPrefab || !e.dataTransfer.types.includes(PREFAB_DRAG_TYPE)) return;
-    e.preventDefault();
-    const id = e.dataTransfer.getData(PREFAB_DRAG_TYPE);
-    const allowed = id === this.draggedPrefab;
-    this.EndPrefabDrag();
-    if (allowed) this.PlacePrefab(id, this.PrefabGroundAt(id, e.clientX, e.clientY));
-  }
-
-  EndPrefabDrag() {
-    this.draggedPrefab = null;
-    this.ShowPrefabDrop();
-  }
-
-  ShowPrefabDrop(id, point) {
-    const label = $("sePrefabDrop");
-    label.hidden = !id;
-    this.prefabGhost.visible = !!point;
-    if (!id) return;
-    label.textContent = point ? `放置 · ${this.prefabs.get(id).label}` : "移到可放置的地面";
-    label.classList.toggle("ready", !!point);
-    if (!point) return;
-    const shape = id === TRENCH_PREFAB
-      ? { kind: "box", c: [point.x, point.y + 0.15, point.z], half: [0.35, 0.15, 8], yaw: this.cam.yaw }
-      : this.Shape({ asset: id, ...this.AssetOptions(id, point) });
-    this.prefabGhost.geometry = this.geometry[shape.kind];
-    this.prefabGhost.position.set(...shape.c);
-    this.prefabGhost.rotation.y = shape.yaw;
-    this.prefabGhost.scale.set(...shape.half.map((half) => half * 2));
   }
 
   // ------------------------------------------------------------------ 检视卡片
@@ -1707,10 +1735,6 @@ ${seg.note}` : ""}`;
       return s;
     };
     kit.MaterialOptions = () => Object.entries(SCENE_MATERIALS).map(([mid, m]) => [mid, `${m.label}（${mid.replace(/^Whitebox\//, "")}）`]);
-    kit.EventOptions = (current) => {
-      const names = [...new Set([...Object.keys(SCENE_EVENTS), ...this.model.Signals(), ...(current ? [current] : [])])];
-      return [["", "（不跟事件）"], ...names.map((n) => [n, `${SceneEventLabel(n)} · ${n}`])];
-    };
     kit.GroupInput = (value, onChange) => {
       const input = kit.Text(value, onChange, "06–10/建筑/WN1（「/」分层）");
       const dl = El("datalist"); dl.id = "seGroupPaths";
@@ -1738,9 +1762,41 @@ ${seg.note}` : ""}`;
     try { this.folds = new Map(JSON.parse(localStorage.getItem("sceneEditor.folds") || "[]")); } catch { this.folds = new Map(); }
   }
 
+  ChangeShot(pose) {
+    try {
+      if (!IsSceneCamera(pose)) throw new Error("机位的位置、角度或视角无效");
+      this.model.SetCamera(pose);
+      this.ApplyCamera();
+      this.SyncShotGizmo();
+      this.UpdateDirty();
+    } catch (error) { this.Toast(error.message); }
+    this.RenderInspector();
+  }
+
+  RenderShotInspector(box) {
+    const pose = this.model.doc.camera;
+    const section = El("section", "seComp open");
+    const head = El("div", "seObjHead");
+    head.append(El("strong", "seObjTitle", "原画机位"));
+    section.append(head);
+    box.append(section);
+    const k = this.InspectorKit(box, [], El("div", "seError"));
+    k.Row(section, "位置", k.Vec(pose.position, (axis, value) => {
+      const position = [...pose.position];
+      position[axis] = value;
+      this.ChangeShot({ ...pose, position });
+    }, { step: .01, precision: 2 }));
+    for (const [key, label] of [["yawDeg", "朝向 °"], ["pitchDeg", "俯仰 °"], ["fovDeg", "垂直视角 °"]]) {
+      const input = k.Num(pose[key], (value) => this.ChangeShot({ ...pose, [key]: value }), { step: .1 });
+      input.setAttribute("aria-label", label);
+      k.Row(section, label, input);
+    }
+  }
+
   RenderInspector() {
     const box = $("seInspector");
     box.textContent = "";
+    if (this.cameraSelected && this.model.doc.camera) { this.RenderShotInspector(box); return; }
     if (this.model.trench) { this.RenderTrenchInspector(box, this.model.FindTrench(this.model.trench)); return; }
     const list = this.model.Selected();
     if (!list.length) { box.append(El("p", "seMuted seEmpty", "在视图或层级中选中物件。")); return; }
@@ -1765,7 +1821,7 @@ ${seg.note}` : ""}`;
     const meta = El("div", "seObjMeta");
     const source = El("span", "seId seSource", asset.label || obj.asset);
     source.title = [obj.asset, asset.note].filter(Boolean).join(" · ");
-    k.Row(meta, "Prefab", source);
+    k.Row(meta, "模型来源", source);
     k.Row(meta, "分组", k.GroupInput(obj.group, (v) => k.Set("group", v || undefined, "改分组", true)));
     objectCard.append(head, meta);
     box.append(objectCard);
@@ -1799,12 +1855,6 @@ ${seg.note}` : ""}`;
       k.Row(col, "翻越", k.Check(" 不能翻过去", obj.noClimb === true, (on) => k.Set("noClimb", on ? true : undefined, "改不能翻")));
       k.Row(col, "站上去", k.Check(" 演员能站在上面（桥面、走道）", obj.standOn === true, (on) => k.Set("standOn", on ? true : undefined, "改能站上去")));
     }
-
-    // 剧情事件
-    const ev = k.Section("events", "剧情事件", { defaultOpen: !!(obj.showOn || obj.hideOn) });
-    k.Row(ev, "出现于", k.Select(k.EventOptions(obj.showOn), obj.showOn || "", (v) => k.Set("showOn", v || undefined, "改出现事件", true)));
-    k.Row(ev, "消失于", k.Select(k.EventOptions(obj.hideOn), obj.hideOn || "", (v) => k.Set("hideOn", v || undefined, "改消失事件", true)));
-    ev.append(El("p", "seNote", "这件事发生之前 / 之后它在不在。哪一刻发生由白盒编辑器那一关的关键帧决定；画面上方「剧情事件」可以勾上预览。"));
 
     // 参数 / 附加数据（JSON，默认收起）
     for (const [key, label] of [["params", "参数"], ["meta", "附加数据"]]) {
@@ -1987,9 +2037,6 @@ ${seg.note}` : ""}`;
       const look = k.Section("look", "外观");
       k.Row(look, "材质", k.Select([["", "（不改）"], ...k.MaterialOptions()], "", (v) => { if (v) { this.model.SetField(boxes, "material", v, "改材质"); this.AfterEdit(null, { structural: true }); } }));
     }
-    const ev = k.Section("events", "剧情事件", { defaultOpen: list.some((o) => o.showOn || o.hideOn) });
-    k.Row(ev, "出现于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "showOn", v || undefined, "改出现事件"); this.AfterEdit(null, { structural: true }); } }));
-    k.Row(ev, "消失于", k.Select([["-", "（不改）"], ...k.EventOptions()], "-", (v) => { if (v !== "-") { this.model.SetField(ids, "hideOn", v || undefined, "改消失事件"); this.AfterEdit(null, { structural: true }); } }));
     this.InspectorButtons(box);
   }
 
@@ -2053,7 +2100,7 @@ ${seg.note}` : ""}`;
   }
 
   async Poll() {
-    if (!this.model || this.drag || this.draggedPrefab || this.polling) return;
+    if (!this.model || this.drag || this.polling) return;
     this.polling = true;
     try {
       let changed = false;
@@ -2082,28 +2129,6 @@ ${seg.note}` : ""}`;
     } catch { /* 下次再查 */ } finally { this.polling = false; }
   }
 
-  OpenInBlockout() {
-    const previewParam = SceneInfo(this.sceneId)?.previewParam;
-    if (previewParam) {
-      const url = new URL("../index.html", location.href);
-      url.searchParams.set(previewParam, "1");
-      url.searchParams.set("shot", "1");
-      window.open(url.href, "_blank");
-      return;
-    }
-    const at = this.ScreenCenterGround();
-    const level = BLOCKOUT_LEVELS.find(l => l.scene?.kind === "scene" && Inside(l.scene.region, at.x, at.z));
-    if (!level) { this.Toast("画面中心不在任何一段白盒关卡的场地里"); return; }
-    const url = new URL("../index.html", location.href);
-    url.searchParams.set("editor", "blockout");
-    url.searchParams.set("level", level.key);
-    url.searchParams.set("pose", [at.x.toFixed(2), at.z.toFixed(2), (this.cam.yaw / DEG).toFixed(1), "0", "stand"].join(","));
-    // 正式场景：白盒编辑器进关后换成它（试玩跑的就是它，docs/Data_EditorBlockout.md §17）
-    if (this.style === "formal") url.searchParams.set("scene", this.sceneId);
-    window.open(url.href, "_blank");
-  }
-
-  // ------------------------------------------------------------------ 提示
 
   Status(text, error = false) { const s = $("seStatus"); s.textContent = text; s.classList.toggle("error", error); }
 
@@ -2140,15 +2165,21 @@ ${seg.note}` : ""}`;
         trenchDressing: this.trenchDressingCount ?? 0,
         layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep, terrainLook: this.terrainLook, style: this.style,
         inheritedFrom: this.model?.doc.inherit || null, inheritedObjects: this.inheritedObjectCount || 0,
-        camera: { x: this.cam.pos.x, y: this.cam.pos.y, z: this.cam.pos.z, yawDeg: this.cam.yaw / DEG, pitchDeg: this.cam.pitch / DEG },
+        camera: { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z,
+          yawDeg: this.camera.rotation.y / DEG, pitchDeg: this.camera.rotation.x / DEG, fovDeg: this.camera.fov },
+        viewMode: this.viewMode, shotGizmo: this.shotHelper?.visible ?? false, cameraSelected: this.cameraSelected,
+        hiddenStages: [...this.hiddenStages], preview: this.previewFrame ? (this.previewReady ? "ready" : "loading") : "closed",
       }),
+      PreviewDocument: (token, id) => {
+        const snapshot = this.previewSnapshot;
+        return snapshot && snapshot.token === token && snapshot.doc.id === id ? structuredClone(snapshot.doc) : null;
+      },
       Find: (id) => this.model.Find(id),
       Select: (ids) => this.SelectIds(ids),
       Frame: (ids) => this.Frame(ids),
       MoveBy: (dx, dy, dz) => { const ids = [...this.model.selection]; this.model.MoveBy(ids, dx, dy, dz, { groundY: (o) => this.GroundY(o) }); this.AfterEdit(ids); },
       RotateBy: (deg) => { const ids = [...this.model.selection]; this.model.RotateBy(ids, deg); this.AfterEdit(ids); },
       SetField: (key, value) => { this.model.SetField([...this.model.selection], key, value); this.AfterEdit(null, { structural: true }); },
-      Add: (assetId, opts = {}) => { this.AddAsset(assetId, opts); return [...this.model.selection][0]; },
       Duplicate: () => { this.DuplicateSelection(); return [...this.model.selection]; },
       Delete: () => this.DeleteSelection(),
       Undo: () => this.Undo(),
@@ -2187,7 +2218,6 @@ ${seg.note}` : ""}`;
         }
         return { skyFraction: skyish / (w * h), colors: colors.size };
       },
-      Signals: (list) => { this.signals = new Set(list); this.RebuildObjects(); },
       TerrainReady: () => this.terrainReady || Promise.resolve(false),
       Tree: () => [...document.querySelectorAll("#seTree .seFolder, #seTree .seItem")].map((n) => ({ folder: n.classList.contains("seFolder"), text: n.querySelector(".seName")?.textContent, indent: parseInt(n.style.paddingLeft, 10) || 0 })),
       Open: (paths) => { for (const p of paths) this.open.add(p); this.RenderTree(); },
@@ -2198,7 +2228,6 @@ ${seg.note}` : ""}`;
       MoveTrenchPoint: (id, i, x, z) => { this.model.MoveTrenchPoint(id, i, x, z); this.AfterEdit(null); },
       SetTrenchDetail: (id, key, value) => { this.model.SetTrenchDetail(id, key, value); this.AfterEdit(null); },
       SetTrenchField: (id, key, value) => { this.model.SetTrenchField(id, key, value); this.AfterEdit(null); },
-      AddTrench: (opts = {}) => { this.AddTrenchHere(opts); return this.model.trench; },
       /** 地面高（挖好的）与没挖的地面高。 */
       HeightAt: (x, z) => ({ carved: this.sampler(x, z), pre: this.preSampler(x, z) }),
       ProjectTrenchPoint: (id, i) => {

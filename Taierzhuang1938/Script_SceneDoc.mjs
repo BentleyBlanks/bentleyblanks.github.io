@@ -32,6 +32,14 @@ const IsBounds = (b) => IsObject(b) && ["minX", "maxX", "minZ", "maxZ"].every(k 
 const NonEmpty = (value) => typeof value === "string" && value.length > 0;
 const DEG = Math.PI / 180;
 
+export function IsSceneCamera(camera) {
+  return IsObject(camera) && Array.isArray(camera.position) && camera.position.length === 3 && camera.position.every(Finite)
+    && Finite(camera.yawDeg) && Finite(camera.pitchDeg) && Math.abs(camera.pitchDeg) < 90
+    && Finite(camera.fovDeg) && camera.fovDeg > 0 && camera.fovDeg < 180
+    && (camera.nearFocusM === undefined || (Finite(camera.nearFocusM) && camera.nearFocusM > 0))
+    && (camera.vignette === undefined || (Finite(camera.vignette) && camera.vignette >= 0 && camera.vignette <= 1));
+}
+
 /** 现有的场景（场景编辑器的下拉、本机存盘口 /__scene/* 只认这张表；清单在 Data_SceneAssets.SCENE_LIST）。 */
 export const SCENE_IDS = Object.freeze(SCENE_LIST.map((scene) => scene.id));
 /** 场景的样子：whitebox / formal（清单里没有的当 whitebox）。 */
@@ -98,11 +106,7 @@ export function ValidateScene(doc) {
   if (!IsBounds(doc.bounds)) errors.push("bounds 要带有限且 max > min 的 minX / maxX / minZ / maxZ");
   if (!IsObject(doc.spawn) || !Finite(doc.spawn.x) || !Finite(doc.spawn.z)) errors.push("spawn 要带有限的 x / z");
   const camera = doc.camera;
-  if (camera !== undefined && (!IsObject(camera) || !Array.isArray(camera.position) || camera.position.length !== 3
-    || !camera.position.every(Finite) || !Finite(camera.yawDeg) || !Finite(camera.pitchDeg)
-    || Math.abs(camera.pitchDeg) >= 90 || !(Finite(camera.fovDeg) && camera.fovDeg > 0 && camera.fovDeg < 180)
-    || (camera.nearFocusM !== undefined && !(Finite(camera.nearFocusM) && camera.nearFocusM > 0))
-    || (camera.vignette !== undefined && !(Finite(camera.vignette) && camera.vignette >= 0 && camera.vignette <= 1)))) {
+  if (camera !== undefined && !IsSceneCamera(camera)) {
     errors.push("camera 要带 [x, y, z]、yawDeg、pitchDeg（±90° 以内）及垂直 fovDeg（0–180° 之间）；nearFocusM 如有须为正数、vignette 如有须在 [0, 1]");
   }
   const smoke = doc.smokeColumns;

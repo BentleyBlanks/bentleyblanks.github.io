@@ -13,7 +13,7 @@ export function CreateDevTools(host) {
 
 // 白盒关卡编辑器（?editor=blockout，docs/Data_EditorBlockout.md）也是开发工具：关卡表与总控都从这里给宿主。
 import { BLOCKOUT_PHASES, BlockoutLevelIndex, MakeBlockoutPhase } from "./Script_EditorBlockoutLevels.mjs";
-import { SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
+import { SceneDir, SceneFileName, ValidateScene } from "./Script_SceneDoc.mjs";
 import { BlockoutBackdrop } from "./Script_EditorBlockoutBackdrop.mjs";
 
 /** 编辑器模式的关卡表（每关一片 phase）。剔除版返回空表。 */
@@ -27,9 +27,20 @@ export function BlockoutStartIndex(levelKey) {
 }
 
 /** 独立场景的固定机位预览，沿用场景建场。剔除版不注册预览。 */
-export function CreateScenePreviewPhase({ id, title }) {
+export function CreateScenePreviewPhase({ id, title, previewCameraOptional }) {
+  const ReadEditorScene = () => {
+    const token = new URLSearchParams(globalThis.location?.search).get("sceneEditorPreview");
+    if (!token) return null;
+    // The same-origin editor grants this frame access to one scene snapshot.
+    const doc = globalThis.parent?.SceneEditor?.PreviewDocument(token, id);
+    if (doc?.id !== id) throw new Error("场景编辑器的预览已失效，请重新打开");
+    const result = ValidateScene(doc);
+    if (!result.ok) throw new Error(result.errors[0]);
+    return doc;
+  };
   return MakeBlockoutPhase({
-    key: id, label: title, scenePreview: true, scene: { kind: "scene", url: `./${SceneDir(id)}/${SceneFileName(id)}` },
+    key: id, label: title, scenePreview: true, previewCameraOptional,
+    scene: { kind: "scene", url: `./${SceneDir(id)}/${SceneFileName(id)}`, ReadEditorScene },
   });
 }
 

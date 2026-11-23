@@ -16,8 +16,8 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 - 现有场景（清单 `Data_SceneAssets.SCENE_LIST`，场景编辑器的下拉、存盘口都认这张表）：
   - `FirstLevelWhitebox`（第一关新剧本 01–18 的白盒，三段合一，见 §5）：白盒编辑器的编辑与预演跑它；
   - `FirstLevel`（第一关正式场景，2026-11-01，见 §8）：白盒编辑器的试玩跑它，之后单独打磨细节。
-  - `DugoutAidOpenFields` 是独立环境「沟底包扎 · 朝田野敞开的木棚」。在场景编辑器里选它，点「查看原画机位」就会用游戏渲染器加载保存的机位。详见[场景说明](../Scenes/DugoutAidOpenFields/README.md)。
-  - `AircraftEvacuationDitch` 是独立环境「凹路撤运 · 沟底仰视三机」。在场景编辑器里可调整远机、撤离道具和沟岸布设，点「查看原画机位」进入固定机位。详见[场景说明](../Scenes/AircraftEvacuationDitch/README.md)。
+  - `DugoutAidOpenFields` 是独立环境「沟底包扎 · 朝田野敞开的木棚」。在场景编辑器里选它，可在「机位与预览」里选择原画机位并开启正式预览。详见[场景说明](../Scenes/DugoutAidOpenFields/README.md)。
+  - `AircraftEvacuationDitch` 是独立环境「凹路撤运 · 沟底仰视三机」。在场景编辑器里可调整远机、撤离道具和沟岸布设，在「机位与预览」里切到原画机位。详见[场景说明](../Scenes/AircraftEvacuationDitch/README.md)。
 - **场景文件就是这个场景的唯一真相**：人、agent、以后的场景编辑器都直接改它；没有生成器在后面覆盖。改完跑 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all`。
 - JSON 一律 LF（`.gitattributes`），大数组一行一项，方便按 id grep 与 diff。
 
@@ -51,7 +51,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 坐标同全项目：X 向东、Z 向南、Y 向上，单位为米。独立场景可用 `camera` 保存摄影机的 `position: [x, y, z]`、`yawDeg`、`pitchDeg`、垂直视场角 `fovDeg`，以及可选的近景对焦距离 `nearFocusM` 和独立渲染机位的暗角强度 `vignette`（0 到 1）。正式场景可设 `look.proceduralDressing: false`，由场景物件提供植被和零散土石。`look.terrainLayers` 可选择 `Data_Tuning_Terrain.TERRAIN_SETS` 中的四层地面材质，游戏与场景编辑器共用该选择，省略时使用 `MissionPlain`。
 
-注册表的 `previewParam` 让场景编辑器打开对应项目渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
+注册表的 `previewParam` 让场景编辑器在视口内加载对应的游戏渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
 各 `paint` 项可用 `tint` 设置正式地表的反照率倍率，支持六位 Hex 或 0–2 的三个 sRGB 倍率。
 显式标高的道具可用 `params.grounding: "authored"` 控制贴地。落地、常驻、无碰撞的单件道具可用 `params.grounding: "conform"`，把枯草或根须的顶点沿地表弯折。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。`options.fireEmission` 是火舌亮度的倍率，默认为 1。
 
@@ -113,16 +113,16 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 ## 6. 场景编辑器（2026-10-31）
 
-入口：高级工具 → 场景 → 「场景编辑器」（`Script_EditorSceneEntry`，同贴图管理开独立窗口），或直接打开 `SceneEditor.html?scene=FirstLevelWhitebox`。不起游戏，自己一个轻量三维视图。
+入口：高级工具 → 场景 → 「场景编辑器」（`Script_EditorSceneEntry`，同贴图管理开独立窗口），或直接打开 `SceneEditor.html?scene=FirstLevelWhitebox`。默认使用轻量编辑视口，正式预览按需加载同页的游戏渲染器。
 
 - **页面**：`SceneEditor.html` 开机先同步读 `index.html` 里的 import map 插进来（线上发布的 index.html 也保留它），模块版本永远跟游戏同一套戳，不另抄。主程序 `Script_SceneEditor.mjs`，数据层 `Script_SceneEditModel.mjs`（纯，带撤销），样式 `Style_SceneEditor.css`（同设置页口径）。
-- **画法**：白盒场景的地形按高度色带 + 地面涂色 + 米格线（`Script_WhiteboxGrid`，与游戏白盒同一段着色）；正式场景的地形同试玩那份分层地表（MissionPlain 四层贴图，权重 `BuildSceneGroundSurface`，读不到贴图就退回色带并在状态栏说）；网格太密时按步长抽稀（不超过约 90 万个顶点）；白盒体块按材质分批实例化、颜色取 `look.semanticColors` 与第一关语义色表；远景层画成盒子 / 椭球 / 锥（可关）；`visual: false` 的空气墙勾「空气墙」才画（半透明红）。画面上方「剧情事件」里勾上的当已经发生（随它消失的藏、随它出现的显示），每个事件显示中文名与第一次发生的关键帧。段落按钮跳到三段各自的场地。
-- **操作**：右键按住转视角、WASD 移动、Q/E 降升、Shift 加速、滚轮前后、中键平移；左键点选（Ctrl 多选、Shift 加选，层级里同样），拖红绿蓝箭头沿 X/Y/Z 挪、拖金圈绕竖轴转、按住已选中的物件直接在水平面上拖；Ctrl 吸附 0.5 m / 15°；F 看选中、Del 删除、Ctrl+D 复制、Ctrl+Z / Ctrl+Y 撤销重做、Esc 取消拖动。落地的物件被竖着挪就不再落地。**层级**（2026-11-01）：按 `group` 路径一层层文件夹，单击展开 / 收起（记在本机），双击选中文件夹里全部，把物件拖到文件夹上 = 挪进那个分组；物件行前的小图标分体块（语义色）/ 道具 ◆ / 树 ♣ / 空气墙 ▢，跟剧情事件走的带 ⚑；画面里点选会展开到它、滚到它。
-- **检视**：实例卡显示可见性、名称、Prefab 来源和分组。组件独立成卡，可展开或收起，折叠状态记在本机。变换卡保留 X / Y / Z 拖拽调值（Shift 十倍），外观卡提供材质，碰撞卡头勾选控制挡人。剧情事件、参数和附加数据按需展开。
-- **资产**：按构件、道具、植被和远景浏览 Prefab，可按名称、编号或类别搜索。拖到视图地面时先看放置预览，松手创建默认实例并选中，可一步撤销。也可选中资产后点「放到中心」。放置后的材质、尺寸、分组与壕沟套餐在检视里调整。视口右下角的「操作键」可展开快捷键。
+- **画法**：白盒场景的地形按高度色带 + 地面涂色 + 米格线（`Script_WhiteboxGrid`，与游戏白盒同一段着色）；正式场景的地形同试玩那份分层地表（MissionPlain 四层贴图，权重 `BuildSceneGroundSurface`，读不到贴图就退回色带并在状态栏说）；网格太密时按步长抽稀（不超过约 90 万个顶点）；白盒体块按材质分批实例化、颜色取 `look.semanticColors` 与第一关语义色表；远景层画成盒子 / 椭球 / 锥（可关）；`visual: false` 的空气墙勾「空气墙」才画（半透明红）。
+- **操作**：右键按住转视角、WASD 移动、Q/E 降升、Shift 加速、滚轮前后、中键平移；左键点选（Ctrl 多选、Shift 加选，层级里同样），拖红绿蓝箭头沿 X/Y/Z 挪、拖金圈绕竖轴转、按住已选中的物件直接在水平面上拖；Ctrl 吸附 0.5 m / 15°；F 看选中、Del 删除、Ctrl+D 复制、Ctrl+Z / Ctrl+Y 撤销重做、Esc 取消拖动。落地的物件被竖着挪就不再落地。**层级**（2026-11-01）：按 `group` 路径一层层文件夹，单击展开 / 收起（记在本机），双击选中文件夹里全部，把物件拖到文件夹上 = 挪进那个分组；物件行前的小图标分体块（语义色）/ 道具 ◆ / 树 ♣ / 空气墙 ▢。画面里点选会展开到它、滚到它。场景里实际存在的编号段落在顶层文件夹上提供独立的视口显隐开关，展开树与隐藏布设可分别操作。
+- **检视**：实例卡显示可见性、名称、模型来源和分组。组件独立成卡，可展开或收起，折叠状态记在本机。变换卡保留 X / Y / Z 拖拽调值（Shift 十倍），外观卡提供材质，碰撞卡头勾选控制挡人。参数和附加数据按需展开。
+- **机位与预览**：有 `camera` 的场景可在自由视角与原画机位之间切换。原画机位的视锥可显示、定位和选中。用箭头移动、金圈调整朝向，或在检视中修改位置、俯仰与垂直视角。修改走场景的撤销与保存。
+- **正式预览**：在同一视口用固定高画质和游戏渲染器画出真实模型、地表、环境与特效，浏览自由视角时仍可移动相机。打开或刷新读取编辑器当前布设，含未保存的修改和段落显隐。退出时释放预览。正式预览按场景加载时的状态出画，配置文件中的运行时事件字段继续交给游戏。
 - **存盘**：本机预览（`node scripts/Script_LocalPreview.mjs`）下 `POST /__scene/save { scene, doc, revision }` 直接写回场景文件；闸同 `/__blockout/save`（本机 Host、同源、JSON、版本号 = 读场景时原始字节的 sha1，对不上 409 + 当前版本号），过 `ValidateScene` 才按 `FormatSceneJson` 原子写；`GET /__scene/status` 报能不能写与版本号。线上（Pages）没有这个口，「保存」退化成下载，换掉 `Scenes/` 里那份再提交。高度图 v1 不开放写。
 - **同步**：每 2 s 查一次版本号。外面（人 / agent / 别的窗口）改了场景文件：这边没改动就自动重读（相机、选中保留）；有没保存的改动就挂横幅，让人选重新读取还是先不管。存盘遇到 409 同样挂横幅，可下载自己的版本。
-- **接白盒编辑器**：「在白盒编辑器里看」按画面中心的地面点找它落在哪一段，打开 `index.html?editor=blockout&level=<那一段>&pose=x,z,朝向,0,stand`。白盒编辑器每 2 s 也会发现场景文件变了、整片重建。
 - **壕沟**（2026-11-01，§9）：
   - **层级与选中**：每段沟一行（〰，挂在它的 `group` 下，缺省「壕沟」）；画面里点在沟里（沟沿弃土也算）就选中那段沟。
   - **改走向**：选中后，金色控制点按住能拖（Ctrl 吸附半米）；Alt + 点地面，在最近的那一截加点；Del 删选中的点，没选点就删整段。
@@ -133,10 +133,9 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
     - 表现套餐；
     - 每一项细节：标题条上的勾 = 开关，展开改参数，灰字是缺省值，● = 段上改过；
     - 沿沟深度 / 基准面抬降 / 塌方（JSON）。
-  - **新建**：从资产页拖入「样条壕沟」，沿当前视线方向生成一段两点的新沟。
-  - **预览**：构件（护壁、踏板、射击位、杂物）照游戏那份摆成半透明盒子；土崖、土团、草根这些土面细节只在游戏里画。
-- **给 agent / 测试**：`window.SceneEditor`（`State()`、`Select(ids)`、`MoveBy(dx, dy, dz)`、`RotateBy(deg)`、`SetField(key, value)`、`Add(asset, opts)`、`Duplicate()`、`Delete()`、`Undo()`、`Redo()`、`Save()`、`Reload()`、`Doc()`、`PixelStats()`、`Signals(list)`、`Show({ backdrop, hidden })`、`TerrainReady()`、`Tree()`、`Open(paths)`；壕沟：`Trench(id)`、`SelectTrench(id, point)`、`MoveTrenchPoint(id, i, x, z)`、`SetTrenchField(id, key, value)`、`SetTrenchDetail(id, key, value)`、`AddTrench(opts)`、`HeightAt(x, z)`（挖好的 / 没挖的）、`ProjectTrenchPoint(id, i)`）。
-- 门禁：`Script_SceneEditModelTest`（纯 node：移动 / 转 / 改字段 / 加删复制改名 / 撤销顺序 / 存盘判定，真场景改一圈撤到底逐字相同）、`Script_SceneSaveTest`（真起本地预览：写成什么样、409 与各种拒绝都不落盘）、`Script_SceneEditorBrowserTest`（真浏览器：数像素证明画出来了、拖箭头、点选、Esc 取消、加删撤销、信号、保存 / 409、外部改动自动重读；存盘口在页面里拦截，不写仓库文件）。
+  - **预览**：构件（护壁、踏板、射击位、杂物）照游戏那份摆成半透明盒子。正式预览也会画土崖、土团与草根。
+- **给 agent / 测试**：`window.SceneEditor`（`State()`、`Select(ids)`、`MoveBy(dx, dy, dz)`、`RotateBy(deg)`、`SetField(key, value)`、`Duplicate()`、`Delete()`、`Undo()`、`Redo()`、`Save()`、`Reload()`、`Doc()`、`PixelStats()`、`Show({ backdrop, hidden })`、`TerrainReady()`、`Tree()`、`Open(paths)`；壕沟：`Trench(id)`、`SelectTrench(id, point)`、`MoveTrenchPoint(id, i, x, z)`、`SetTrenchField(id, key, value)`、`SetTrenchDetail(id, key, value)`、`HeightAt(x, z)`（挖好的 / 没挖的）、`ProjectTrenchPoint(id, i)`）。
+- 门禁：`Script_SceneEditModelTest`（纯 node：移动 / 转 / 改字段 / 加删复制改名 / 撤销顺序 / 存盘判定，真场景改一圈撤到底逐字相同）、`Script_SceneSaveTest`（真起本地预览：写成什么样、409 与各种拒绝都不落盘）、`Script_SceneEditorBrowserTest`（真浏览器：数像素证明画出来了、拖箭头、点选、Esc 取消、段落显隐、原画机位、正式预览、保存 / 409、外部改动自动重读；存盘口在页面里拦截，不写仓库文件）。
 
 ## 7. 还没做的
 
@@ -146,7 +145,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
   - 场景编辑器改一次地形约 1.3 s：整张地面重画，正式场景还要重算分层权重；只重画改动的那一块还没做。
   - 01–05 沟沿那一圈空气墙（`KeepIn_*`）是按原来的沟烘的物件，沟挪了它不跟着走。
   - 积水 / 湿泥是全关的水位模型，不能按段开关。
-- 正式场景的房子、墙、工事还是白盒体块（灰面 + 米格线），等做了正式的房子 / 构件模型再换成资产；场景编辑器里道具、树画成盒子 / 锥，不是真模型。
+- 正式场景的房子、墙、工事还是白盒体块（灰面 + 米格线），等做了正式的房子 / 构件模型再换成资产；场景编辑器的编辑视口用盒子和锥代理。正式预览使用游戏渲染器加载模型与环境。
 
 ## 8. 第一关正式场景（2026-11-01）
 
@@ -161,7 +160,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
   - 现行第一关的枯草丛与碎砖瓦也撒：`Data_FirstLevelVegetation.SceneDressingContext` 把撒点的「路线」换成场景的路与沟、锚点换成出生点，没有旧关卡的河与弹坑表；规则 `SCENE_VEGETATION`（去掉按旧坐标挖的空圈、`Reed_` 也按苇子长）。三段各 7–9 万丛草、碎砖瓦 10 / 1130 / 1444 块。
 - **建场**：`BlockoutDocFromScene` 带出 `style: "formal"`，物件带 `propModel` / `sceneTree`；`LayoutFromSceneDoc` 对正式场景不开 `materialLooks`、地面挂 `terrainLayers: "MissionPlain"` 与 `SampleGroundSurface`、列 `sceneProps`；`FirstLevelWhiteboxField` 摆道具模型与碎砖瓦（`AddScenePropModels`）、植被按场景撒；白盒编辑器 `DressWorld` 对正式场景不碰地面（分层地表），只把体块的语义材质（`semanticColors` 那几份 + `Whitebox`）改成灰面 + 米格线、铺水面——道具、碎砖瓦、地表的材质不动。
 - **白盒编辑器怎么切**：关卡注册表的 `scene.playUrl` 是正式场景；phase 的 `blockout.variant`（edit / play）决定建哪个。试玩「开打」先整片重建成正式场景（`UseSceneVariant("play")`，无头浏览器约 18–25 s），关小结「回到编辑」换回白盒；换关回到白盒。地址栏 `scene=FirstLevel` 进关后直接换成正式场景（试玩中刷新、场景编辑器「在白盒编辑器里看（正式场景）」都走这条）。`Debug.Blockout.Play.Scene()` / `UseScene(variant)` 给测试与 agent。
-- **场景编辑器**：下拉里两个场景（显示标题）；正式场景的资产页列白盒体块、道具、树与远景，材质下拉两个场景一样是 `Whitebox/*`；道具画成按语义色提亮的盒子、树画成锥。
+- **场景编辑器**：下拉里两个场景（显示标题）；正式场景的材质下拉沿用 `Whitebox/*`。可在「机位与预览」打开同页游戏渲染，查看布设、环境与特效。
 - 门禁：`Script_SceneFormalTest`（纯 node）、`Script_SceneFormalBrowserTest`（真浏览器：白盒 / 正式互换、体块仍是米格线且道具材质没被刷白、分层地表、道具全摆上、体块数同白盒、试玩换正式 / 回编辑换白盒、06–10 / 11–18 建得起来、场景编辑器两个场景）。截图 `_shots/SceneFormal/`。
 
 ## 8.1 11–18 第四版重建（2026-11-02）

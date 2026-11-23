@@ -2,7 +2,7 @@
 
 - 本机场景编辑器 `/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=AircraftEvacuationDitch`
 - 游戏固定机位 `/Taierzhuang1938/?aircraftEvacuationDitch=1&shot=1`
-- 编辑器里的「查看原画机位」会在游戏渲染器打开上面的机位。高程、物件、镜头和烟源由[场景文件](Scene_AircraftEvacuationDitch.json)读取，光线、雾和天空由[场景环境](Environment_AircraftEvacuationDitch.json)与[环境预设](../../Environment/EnvPreset_AircraftEvacuationDitch.json)控制。
+- 在编辑器的「机位与预览」选原画机位，再打开正式预览。高程、物件、镜头和烟源由[场景文件](Scene_AircraftEvacuationDitch.json)读取，光线、雾和天空由[场景环境](Environment_AircraftEvacuationDitch.json)与[环境预设](../../Environment/EnvPreset_AircraftEvacuationDitch.json)控制。
 
 取景来自 `05B_凹路行军_沟底仰视三机.png`，参考白盒 `Plate05B` 的仰视方向。独立场景原点在镜头底下，镜头坐标 `[0, 1.55, 0]`，离沟底约 1.5 米，垂直视场角 57°，仰角 15.3°。以 1280×720 画幅计，几何地平线约在画面高度 75%。三机的投影中心约为 `(611,179)`、`(739,146)`、`(846,188)`，单架翼宽约 40–45 px。左侧近火和中距烟向上散开，空中灰霾压低远机的对比度。飞机沿用现有 Ki-30 网格，在场景中各自保留位置、朝向和标高。
 
