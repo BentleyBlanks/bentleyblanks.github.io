@@ -97,7 +97,9 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   camera.far = PHASE.cameraFar ?? 620;
   camera.updateProjectionMatrix();
 
-  const post = new PostPipeline(renderer, { width: initSize.width, height: initSize.height, quality: QUALITY });
+  const post = new PostPipeline(renderer, {
+    width: Math.max(2, renderer.domElement.width), height: Math.max(2, renderer.domElement.height), quality: QUALITY,
+  });
   const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
   const ssrUniforms = post.SsrUniforms;
 
@@ -107,8 +109,10 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
   {
     const bootScale = Clamp(graphics.renderScale, 0.4, 1.6);
-    post.SetSize(Math.round(initSize.width * bootScale), Math.round(initSize.height * bootScale),
-      initSize.width, initSize.height);
+    const bootOutW = Math.max(2, renderer.domElement.width);
+    const bootOutH = Math.max(2, renderer.domElement.height);
+    post.SetSize(Math.max(2, Math.round(bootOutW * bootScale)), Math.max(2, Math.round(bootOutH * bootScale)),
+      bootOutW, bootOutH);
   }
 
   const GI_ON = GI_QUALITY[QUALITY] != null;
@@ -245,10 +249,12 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     camera.aspect = vp.width / vp.height;
     camera.updateProjectionMatrix();
     renderer.setSize(vp.width, vp.height, false);
-    const width = Math.round(vp.width * scale), height = Math.round(vp.height * scale);
+    const outW = Math.max(2, renderer.domElement.width);
+    const outH = Math.max(2, renderer.domElement.height);
+    const width = Math.max(2, Math.round(outW * scale)), height = Math.max(2, Math.round(outH * scale));
     if (post.width !== width || post.height !== height
-      || post.outputWidth !== vp.width || post.outputHeight !== vp.height) {
-      post.SetSize(width, height, vp.width, vp.height);
+      || post.outputWidth !== outW || post.outputHeight !== outH) {
+      post.SetSize(width, height, outW, outH);
     }
     post.SetTaaEnabled(graphics.taa !== false);
     post.SetSsrEnabled(graphics.ssr !== false);

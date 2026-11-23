@@ -253,13 +253,15 @@ void main() {
   float vfxSpike = max(curHdrLuma - max(histHdrLuma * 2.2, 0.9), 0.0);
   float reactive = smoothstep(0.35, 2.2, vfxSpike) * smoothstep(0.12, 0.65, clipAmount);
   w = max(w, reactive * ${(TAAU.reactiveSpikeWeight ?? 0.72).toFixed(3)});
-  // ③ responsive（UE ResponsiveAA）：第一人称手/枪几乎只用当前帧。
-  //    预通道给它们写的是常数前景标签深度，速度恒 0 —— 世界在它们背后滑过时
-  //    历史会把瞄具边缘拖出一条虚影，正是 FPS 手感的红线。
+  // ③ responsive（UE ResponsiveAA / COD Filmic SMAA T2x）：
+  //    静止或慢瞄时保留适度时域累积（0.14），让第一人称枪身与照门边缘也能吃到子像素抗锯齿，不再呈阶梯锯齿；
+  //    镜头转动或人物跑动时按速度平滑拉到 uResponsiveWeight（0.50），背景滑过时不拖虚影。
   float responsive = max(reactive, disocclusion * 0.5);
   if (uForegroundDepth > 0.0 && abs(centerDepth - uForegroundDepth) < uForegroundEps) {
     responsive = 1.0;
-    w = max(w, uResponsiveWeight);
+    float camMovePx = length((closestUv - prevUvClosest) * uHistoryResolution);
+    float fgMotion = max(smoothstep(0.15, 2.0, max(velocityPx, camMovePx)), smoothstep(0.08, 0.45, clipAmount));
+    w = max(w, mix(0.14, uResponsiveWeight, fgMotion));
   }
   w = clamp(max(w, uMinWeight), 0.0, 1.0);
   // Genuine changing illumination must not be classified as sampling flicker.

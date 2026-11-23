@@ -53,7 +53,7 @@ export const TAAU = {
   currentFrameWeight: 0.04,
   fastMotionWeight: 0.2,
   fastMotionPx: 40,
-  filterGaussianK: 2.29,
+  filterGaussianK: 2.75,
   varianceGamma: 1.25,
   antiFlicker: 0.6,
   antiFlickerFloor: 0.35,

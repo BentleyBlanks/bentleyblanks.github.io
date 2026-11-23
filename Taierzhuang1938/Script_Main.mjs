@@ -505,7 +505,7 @@ camera.rotation.order = "YXZ";
 
 const trailFocus = new THREE.Vector3();
 const post = new PostPipeline(renderer, {
-  width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
+  width: Math.max(2, renderer.domElement.width), height: Math.max(2, renderer.domElement.height), quality: QUALITY,
 });
 // AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
 // （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
@@ -652,8 +652,10 @@ const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
 // renderScale 要等玩家改窗口大小才生效（症状：high 档默认仍旧满分辨率跑）。
 {
   const bootScale = Clamp(graphics.renderScale, 0.4, 1.6);
-  post.SetSize(Math.round(window.innerWidth * bootScale),
-    Math.round(window.innerHeight * bootScale), window.innerWidth, window.innerHeight);
+  const bootOutW = Math.max(2, renderer.domElement.width);
+  const bootOutH = Math.max(2, renderer.domElement.height);
+  post.SetSize(Math.max(2, Math.round(bootOutW * bootScale)),
+    Math.max(2, Math.round(bootOutH * bootScale)), bootOutW, bootOutH);
 }
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
@@ -9092,13 +9094,17 @@ function ApplyGraphics() {
   camera.aspect = viewportSize.width / viewportSize.height;
   camera.updateProjectionMatrix();
   renderer.setSize(viewportSize.width, viewportSize.height, false);
-  const width = Math.round(viewportSize.width * scale), height = Math.round(viewportSize.height * scale);
-  // 两组尺寸：内部（renderScale 缩过的）与输出（画布满分辨率）。TAAU 开着时
+  // 输出靶与物理画布缓冲 1:1 对齐（pixelRatio 已在 447 行封顶 1.5）：避免 Windows 125%–150% DPI 下
+  // CAS 锐化后被二次双线性拉糊，也消除 EncounterPlay 预热完后 AutoQuality 触发时的分辨率断崖下跌。
+  const outW = Math.max(2, renderer.domElement.width);
+  const outH = Math.max(2, renderer.domElement.height);
+  const width = Math.max(2, Math.round(outW * scale)), height = Math.max(2, Math.round(outH * scale));
+  // 两组尺寸：内部（renderScale 缩过的）与输出（画布满物理分辨率）。TAAU 开着时
   // TAA 把画面解算到后者，composite 与末趟都在满分辨率上跑；关着时两者由
   // SetSize 内部拉平，行为与 TAAU 落地之前一致。
   if (post.width !== width || post.height !== height
-    || post.outputWidth !== viewportSize.width || post.outputHeight !== viewportSize.height) {
-    post.SetSize(width, height, viewportSize.width, viewportSize.height);
+    || post.outputWidth !== outW || post.outputHeight !== outH) {
+    post.SetSize(width, height, outW, outH);
   }
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。

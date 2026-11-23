@@ -133,7 +133,7 @@
  *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
  *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
  *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
- *   filmGrain     颗粒算法档，非开关。low = 单采样高通银盐亮度细粒；其余档 = 双无理角旋转采样（无平铺）+ 三层弱色度染料乳剂。
+ *   filmGrain     颗粒算法档，非开关。low = 单采样纯银盐亮度颗粒；其余档 = 双无理角旋转无平铺 35mm 软乳剂颗粒（对标 COD IW8 / UE5 逐帧离散单色胶片感）。
  *                 全档沿用后处理强度 grain（0 = 关）与粒径倍率 grainSize。
  *   stunTrail     近爆眩晕的拖影（Script_PostStunTrail：composite 之后的帧反馈，两张输出分辨率 HalfFloat 靶懒建；
  *                 还要 options.stunTrail > 0 且没开 reduced-motion 才真跑，平时不占显存与时间）
@@ -183,7 +183,7 @@ export const QUALITY_PRESETS = {
     ...CAMERA_OFF,
     ssao: false, gtao: "low", ssil: false,
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
-    aoScale: 0.5, sharpen: 0.14, taa: false,
+    aoScale: 0.5, sharpen: 0.20, taa: false,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: false,
     // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §17.5「自动降档」
     // 那一段为低配档写死的那个数（「集显同时把 setPixelRatio(1) 并允许 0.85×
@@ -225,7 +225,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
     ssao: true, gtao: "medium", ssil: false,
     bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.5, sharpen: 0.18, taa: true,
+    aoScale: 0.5, sharpen: 0.42, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "medium",
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
@@ -255,7 +255,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
     ssao: true, gtao: "high", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.5, sharpen: 0.22, taa: true,
+    aoScale: 0.5, sharpen: 0.50, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "high",
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs §4.8）。
@@ -279,7 +279,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
     ssao: true, gtao: "ultra", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
-    aoScale: 1.0, sharpen: 0.22, taa: true,
+    aoScale: 1.0, sharpen: 0.48, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "ultra",
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,

@@ -39,8 +39,8 @@ const GRAIN_TEX_RANGE = 5.0; // ±5.0 映射到 [0, 255]，覆盖 >99.98% 高斯
  * 离线合成一张 256×256 无缝周期 35mm 银盐乳剂纹理（零网络资产、约 256 KB 显存）。
  *
  * 通道布局（NoColorSpace 线性数据，127.5/255 为零均值中心）：
- *   · A    主银盐亮度乳剂（σ_mtf = 0.30，配合硬件双线性呈细腻微晶，高通 −96% 去除 4–12 px 低频泥斑）；
- *   · RGB  独立三层彩色染料云（R 0.40 / G 0.36 / B 0.44，模拟胶片蓝敏黄染料层略柔的物理特征，同样高通去脏斑）。
+ *   · A    主银盐亮度乳剂（σ_mtf = 0.18 细腻微晶，radius=2 三遍滑窗 −96% 高通彻底剔除 >4 px 糊状脏斑，配合硬件旋转双线性呈 1:1 精致 35mm 银盐）；
+ *   · RGB  独立三层彩色染料云（R 0.24 / G 0.20 / B 0.28，COD 默认 chroma=0 纯单色银盐，开启色度时模拟三层胶片染料）。
  *
  * 每通道按「旋转随机相位下的硬件双线性期望方差」精确归一，所以无论 uGrainPx 调多粗、
  * 怎么旋转，送屏标准差始终等于 uGrain × 亮度响应，不随颗粒大小滑杆漂移。
@@ -119,6 +119,7 @@ function BuildFilmGrainTexture(size = GRAIN_TEX_SIZE) {
     const white = new Float32Array(count);
     for (let i = 0; i < count; i++) white[i] = Gauss();
     const fine = GaussBlur(white, sigmaMtf);
+    // radius=2 三遍滑窗 −96% 高通彻底剔除 >4 px 糊状脏斑，配合 σ_mtf=0.18 与硬件旋转双线性保持细腻 35mm 银盐微晶（不粗不糊）。
     const low = BoxBlurLow(fine, 2, 3);
     const out = new Float32Array(count);
     let mean = 0;
@@ -150,10 +151,11 @@ function BuildFilmGrainTexture(size = GRAIN_TEX_SIZE) {
     return out;
   };
 
-  const r = MakeLayer(0.40, 0.96);
-  const g = MakeLayer(0.36, 0.96);
-  const b = MakeLayer(0.44, 0.96);
-  const a = MakeLayer(0.30, 0.96);
+  // A = 35mm 精细银盐微晶层（σ_mtf = 0.18，彻底去粗糊与低频泥斑）；RGB = 可选染料色度层（COD 默认 chroma=0 纯单色）。
+  const r = MakeLayer(0.24, 0.96);
+  const g = MakeLayer(0.20, 0.96);
+  const b = MakeLayer(0.28, 0.96);
+  const a = MakeLayer(0.18, 0.96);
   const bytes = new Uint8Array(count * 4);
   const scale = 127.5 / GRAIN_TEX_RANGE;
   const Pack = (v) => Math.max(0, Math.min(255, Math.round(127.5 + v * scale)));
@@ -216,14 +218,14 @@ vec3 FilmGrainFieldAt(vec2 fragCoord, float seed, float chromaWeight) {
   vec4 tapA = SampleGrainPlate(plate, angleA, offsetA);
   if (uGrainMode < 0.5) return vec3(tapA.a);
 
-  // 第二层无理角旋转 + 0.85x 微尺差：彻底打破 256px 周期性与轴向双线性格感，
-  // 同时模拟真实银盐乳剂微小的晶体尺度起伏，而不引入任何低频大糊斑。
+  // 第二层无理角旋转 + 1.15x 细谐波：打破 256px 周期性与轴向双线性格感，同时保持微晶细腻不发粗。
   float angleB = angleA + 1.17809725;
   vec2 offsetB = fract(seed * vec2(0.61803399, 0.38196601) + vec2(0.47, 0.83));
-  vec4 tapB = SampleGrainPlate(plate * 0.85, angleB, offsetB);
+  vec4 tapB = SampleGrainPlate(plate * 1.15, angleB, offsetB);
   vec4 emul = 0.78 * tapA + 0.62578 * tapB;
 
   float silver = emul.a;
+  if (chromaWeight <= 0.0001) return vec3(silver);
   // 真实三层 RGB 染料云中剥离纯零亮度色度，保证不漂移均值且无 1D 橙蓝脏斑。
   vec3 dye = emul.rgb - vec3(Luma(emul.rgb));
   float c = clamp(chromaWeight, 0.0, 0.5);
@@ -241,16 +243,17 @@ vec3 FilmGrainField(vec2 fragCoord, float chromaWeight) {
 }
 
 float FilmGrainResponse(float y) {
-  // 极黑趾部（< 0.015）归零保护黑位，阴影到中间调最饱满，高光/天空沿摄影肩部柔顺退净。
+  // 对标 COD IW8 / UE5 胶片响应：极黑趾部（< 0.015）归零保黑位，阴影与下中间调柔润自然，
+  // 浅灰墙面与亮空沿二次摄影肩部平滑压净，避免平整灰面起沙噪。
   float toe = smoothstep(0.015, uGrainResponse.x, y);
-  float hi = 1.0 - smoothstep(uGrainResponse.y, 0.94, y);
-  return toe * hi * (0.35 + 0.65 * hi);
+  float hi = 1.0 - smoothstep(uGrainResponse.y, 0.88, y);
+  return toe * hi * hi;
 }
 
 vec3 ApplyFilmGrain(vec3 color) {
   float y = Luma(color);
   float response = FilmGrainResponse(y);
-  // 暗部自动退回纯银盐亮度颗粒（真实胶片与 COD 暗部不出彩色数字噪点）。
+  // 暗部自动退回纯银盐亮度颗粒（COD IW8 默认 chroma = 0，全明度纯单色银盐无彩噪）。
   float chromaWeight = uGrainChroma * smoothstep(0.08, 0.28, y);
   vec3 amplitude = min(vec3(uGrain * response), 0.28 * min(color, 1.0 - color));
   return clamp(color + FilmGrainField(gl_FragCoord.xy, chromaWeight) * amplitude, 0.0, 1.0);
@@ -377,6 +380,7 @@ export class FxaaPass {
   constructor(pipeline) {
     this.name = "fxaa";
     this.grainClock = 0;
+    this.grainFrame = 0;
     this.pipeline = pipeline;
     this.grainTexture = BuildFilmGrainTexture();
     this.uniforms = {
@@ -433,17 +437,22 @@ export class FxaaPass {
     U.uGrain.value = Math.max(0, options.grain ?? FILM_GRAIN.strength);
     const grainSize = Math.min(FILM_GRAIN.sizeRange.max, Math.max(FILM_GRAIN.sizeRange.min,
       Number.isFinite(options.grainSize) ? options.grainSize : FILM_GRAIN.sizeRange.value));
-    U.uGrainPx.value = Math.max(0.75, FILM_GRAIN.sizePx * grainSize * P.renderer.domElement.height / 1080);
+    // 按 √(输出高 / 1080) 做感知分辨率无关缩放：720p–4K 颗粒观感一致，且高分/高 DPI 屏不会线性放大成粗颗粒。
+    U.uGrainPx.value = Math.max(0.75, FILM_GRAIN.sizePx * grainSize * Math.sqrt(P.renderer.domElement.height / 1080));
     U.uGrainMode.value = ctx.preset.filmGrain ? 1 : 0;
-    if (Number.isFinite(options.dt)) this.grainClock += Math.max(0, options.dt);
-    else this.grainClock = ctx.frame / 60;
-    const grainPhase = this.grainClock * FILM_GRAIN.rateHz;
-    const grainSeed = Math.floor(grainPhase) % FILM_GRAIN.seedCount;
-    U.uGrainSeed.value = grainSeed;
-    U.uGrainSeedNext.value = (grainSeed + 1) % FILM_GRAIN.seedCount;
-    const angle = (grainPhase - Math.floor(grainPhase)) * Math.PI / 2;
-    const nextWeight = Math.sin(angle);
-    U.uGrainBlend.value = nextWeight / (Math.cos(angle) + nextWeight);
+    // 对标 COD IW8 / UE5（r.FilmGrain.SequenceLength = 97）：每帧推进 1 格素数周期、零跨帧混合（uGrainBlend = 0）。
+    // 严格逐帧步进可避免 59.94/60 Hz rAF 抖动与时钟取整拍频导致的偶发滞留闪动，同时省掉一半颗粒纹理采样。
+    if (Number.isFinite(options.dt)) {
+      if (options.dt > 0) {
+        this.grainClock += options.dt;
+        this.grainFrame = (this.grainFrame + 1) % FILM_GRAIN.seedCount;
+      }
+      U.uGrainSeed.value = this.grainFrame;
+    } else {
+      U.uGrainSeed.value = ctx.frame % FILM_GRAIN.seedCount;
+    }
+    U.uGrainSeedNext.value = (U.uGrainSeed.value + 1) % FILM_GRAIN.seedCount;
+    U.uGrainBlend.value = 0;
     ctx.blitter.Blit(this.material, null);
   }
 

@@ -378,26 +378,28 @@ export const FILM_OPTICS = {
 export const OUTPUT = { dither: 0.75 };
 
 /**
- * 全屏胶片颗粒（COD 系 35mm 电影感口径，在 Script_PostFxaa 最终送屏、CAS 锐化之后施加）。
+ * 全屏胶片颗粒（对标 COD:MW2019 IW8 默认 0.25 + UE5 r.FilmGrain.SequenceLength=97 + 35mm 柯达乳剂）。
  *
- * 与旧版单纯形低频云团颗粒的区别：
- *   · 启动时离线合成一张 256×256 无缝高通银盐乳剂纹理（零网络资产、约 256 KB 显存），
- *     用微光学 MTF（σ≈0.30）滤除像素锯齿，再用高通（−96% 低频）彻底去掉 4–12 px 糊状脏斑；
- *   · 完整档用两次无理角旋转采样（1.0× 与 0.85× 微尺差）消除周期平铺与双线性格感，
- *     R/G/B 独立三层零亮度染料云在暗部自动退回纯银盐亮度颗粒，避免暗部彩色噪点；
- *   · 亮度响应（response）：极黑趾部（< 0.015）归零不抬黑位，阴影到中间调（0.18–0.36）
- *     最饱满（贴合 35mm 负片与 COD 战役质感），亮部与天空肩部柔顺退净，不脏脸不脏天；
- *   · 时域以 16 Hz 球面等方差平滑轮换（避开 8 Hz 肉眼最敏感的慢蠕动频段，也无 24 Hz 硬切闪烁）。
+ * 参数对齐依据：
+ *   · 强度（strength = 0.0055 / nightStrength = 0.0072）：约 1.4 级 sRGB 标准差（浅灰墙面自动压到 ~0.6 级），
+ *     对标 COD:MW2019 出厂 0.25 档——破除 CGI 塑料感与 8-bit 灰阶断层，但绝不在平整灰墙上呈现电视雪花噪点；
+ *   · 纯单色银盐（chroma = 0.0）：对标 COD IW8 单色胶片颗粒，彻底杜绝平整灰面上的红绿紫数码传感器彩噪；
+ *   · 精细 35mm 光学微晶（sizePx = 0.92、σ_mtf = 0.18、radius=2 −96% 高通去 >4 px 脏斑、1.15× 细谐波双采）：
+ *     配合 √(输出高 / 1080) 感知分辨率无关缩放，1080p/1440p/4K 观感一致且绝不发粗成糊点；
+ *   · 逐帧离散换片（rateHz = 60、seedCount = 97、零跨帧混合）：对标 COD IW8 / UE5 逐帧离散片门，
+ *     彻底消除 8–16 Hz 跨帧渐变在人眼闪烁敏感带产生的「奇怪闪动 / 蠕动感」，同时颗粒纹理采样减半；
+ *   · 摄影二次肩部亮度响应（toeEnd = 0.14、shoulderStart = 0.24）：极黑归零保黑位，阴影与下中间调最柔润，
+ *     浅灰墙面与亮空沿二次肩部自然退净。
  */
 export const FILM_GRAIN = {
-  strength: 0.013,
-  nightStrength: 0.015,
-  sizePx: 1.12,
+  strength: 0.0055,
+  nightStrength: 0.0072,
+  sizePx: 0.92,
   sizeRange: { min: 1, max: 3, step: 0.05, value: 1 },
-  chroma: 0.10,
-  rateHz: 16,
-  seedCount: 4096,
-  response: { toeEnd: 0.18, shoulderStart: 0.36 },
+  chroma: 0.0,
+  rateHz: 60,
+  seedCount: 97,
+  response: { toeEnd: 0.14, shoulderStart: 0.24 },
 };
 
 export function FilmGrainStrengthFor(profile) {

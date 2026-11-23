@@ -273,28 +273,36 @@ vec2 DistortSceneUv(vec2 uv) {
   return clamp(uv + delta, vec2(0.001), vec2(0.999));
 }
 
-vec3 SampleSpectralCa(vec2 uv, vec2 centered, float ca) {
+vec3 SampleSpectralCa(vec2 uv, vec2 centered, float r2, float ca) {
   vec3 c0 = texture2D(uHdr, uv).rgb;
   if (ca <= 0.0001) return c0;
-  if (uSpectralCa < 0.5) {
-    return vec3(texture2D(uHdr, clamp(uv + centered * ca, 0.0, 1.0)).r, c0.g,
-      texture2D(uHdr, clamp(uv - centered * ca, 0.0, 1.0)).b);
+  // 常态游玩（非近爆眩晕）：色散严格限定在最外圈四角，中心 65% 与第一人称枪械保持 100% 零色散锐利，
+  // 且按输出像素封顶 ≤ 0.9 px（防止超宽屏把 UV 偏移拉宽成多像素糊边）；绿色亮度锚点永远不糊。
+  bool blastCa = uChromaKeep > 0.5 || uAberration > 0.0035;
+  float effCa = blastCa ? ca : ca * smoothstep(0.20, 0.52, r2);
+  if (effCa <= 0.00005) return c0;
+  vec2 stepUv = centered * effCa;
+  if (!blastCa) {
+    vec2 maxStep = vec2(0.9) / max(uResolution, vec2(1.0));
+    stepUv = clamp(stepUv, -maxStep, maxStep);
   }
-  // 5 谱段径向连续色散（权重逐通道精确归一到 (1, 1, 1)，杜绝单次偏移的红青硬边）
-  vec2 stepUv = centered * ca;
+  if (uSpectralCa < 0.5) {
+    return vec3(texture2D(uHdr, clamp(uv + stepUv, 0.0, 1.0)).r, c0.g,
+      texture2D(uHdr, clamp(uv - stepUv, 0.0, 1.0)).b);
+  }
+  // 绿色通道钉死在中心像素 c0.g（71.5% 亮度锐度零损失），仅对红/蓝做柔和光谱过渡
   vec3 sR = texture2D(uHdr, clamp(uv + stepUv, 0.0, 1.0)).rgb;
   vec3 sO = texture2D(uHdr, clamp(uv + stepUv * 0.5, 0.0, 1.0)).rgb;
   vec3 sC = texture2D(uHdr, clamp(uv - stepUv * 0.5, 0.0, 1.0)).rgb;
   vec3 sB = texture2D(uHdr, clamp(uv - stepUv, 0.0, 1.0)).rgb;
-  float r = sR.r * 0.55 + sO.r * 0.35 + c0.r * 0.10;
-  float g = sO.g * 0.22 + c0.g * 0.56 + sC.g * 0.22;
-  float b = c0.b * 0.10 + sC.b * 0.35 + sB.b * 0.55;
-  return vec3(r, g, b);
+  float r = sR.r * 0.70 + sO.r * 0.30;
+  float b = sC.b * 0.30 + sB.b * 0.70;
+  return vec3(r, c0.g, b);
 }
 
 vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   float ca = uAberration * r2;
-  vec3 clear = SampleSpectralCa(uv, centered, ca);
+  vec3 clear = SampleSpectralCa(uv, centered, r2, ca);
   // Concussion is an optical response, independent of velocity/TAA history.
   // A compact Gaussian footprint keeps silhouettes continuous; the centre
   // resolves earlier than the periphery. No extra pass, target or sampler.
