@@ -265,9 +265,11 @@ export class FpsSkeletalAnimation {
       this.Apply(preview.name,preview.time,{visible:true});
       for(const side of ['r','l'])arms.operationPose[side]=arms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
     }else{
-      // The bake knows nothing of the wall carry or weapon inertia pivots: when either
-      // is active the hands must follow the gun through live IK, not hold empty air.
-      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.wallLower||0)>.001||vm.inertiaActive||(vm.rig?.assetVersion&&vm.boltOpen)){
+      // The bake knows nothing of the wall carry pivot: lowered against a wall
+      // the hands must follow the gun through IK, not hold the empty air.
+      // Weapon inertia (`vm.inertiaActive`) is handled via `CanUseIdle` so the
+      // Idle -> live IK transition crossfades smoothly instead of snapping in 1 frame.
+      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.wallLower||0)>.001||(vm.rig?.assetVersion&&vm.boltOpen)){
         this.idleWeight=0;
         return false;
       }

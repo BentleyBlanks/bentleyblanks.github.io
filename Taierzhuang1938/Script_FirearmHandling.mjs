@@ -226,6 +226,9 @@ export class MoveInertia {
     this.prevRightMps = 0;
     this.prevForwardMps = 0;
     this.prevEyeHeight = null;
+    this.smoothRight = 0;
+    this.smoothForward = 0;
+    this.smoothEye = null;
     this.wasMoving = false;
     this.lowSpeedS = 0;
     this.gaitEnvelope = 0;
@@ -258,6 +261,7 @@ export class MoveInertia {
     if (!this.initialized) {
       this.initialized = true;
       this.prevEyeHeight = Number.isFinite(eyeHeight) ? eyeHeight : null;
+      this.smoothEye = this.prevEyeHeight;
     }
 
     const dRight = Clamp(right - this.prevRightMps, -M.maxDeltaSpeedMps, M.maxDeltaSpeedMps);
@@ -271,16 +275,25 @@ export class MoveInertia {
     const kStrafe = wStrafe * INERTIA_PEAK_GAIN * scale;
     const wSurge = TAU * M.surgeFrequencyHz;
     const kSurge = wSurge * INERTIA_PEAK_GAIN * scale;
+    const wStance = TAU * M.stanceFrequencyHz;
+    const kStance = wStance * INERTIA_PEAK_GAIN * scale;
 
-    // Grounded stance / step eye-height lag (ignores teleports and airborne jumps so
+    // Grounded stance / step eye-height target (ignores teleports and airborne jumps so
     // JumpTest's dedicated jumpRise/jumpFall/land curve stays untouched).
-    let clampedEye = 0;
+    let targetEye = this.smoothEye;
     if (Number.isFinite(eyeHeight)) {
       if (this.prevEyeHeight !== null && grounded) {
         const dEye = eyeHeight - this.prevEyeHeight;
-        if (Math.abs(dEye) > 1e-5 && Math.abs(dEye) < 0.65) {
-          clampedEye = Clamp(dEye, -M.maxEyeSpeedMps * dt, M.maxEyeSpeedMps * dt);
+        if (Math.abs(dEye) >= 0.65) {
+          // Teleport: snap filter without impulse
+          this.smoothEye = eyeHeight;
+          targetEye = eyeHeight;
+        } else {
+          targetEye = eyeHeight;
         }
+      } else {
+        this.smoothEye = eyeHeight;
+        targetEye = eyeHeight;
       }
       this.prevEyeHeight = eyeHeight;
     }
@@ -292,9 +305,8 @@ export class MoveInertia {
       this.lowSpeedS += dt;
       if (grounded && this.wasMoving && this.lowSpeedS >= (M.stopSettleHoldS ?? 0.065)) {
         this.wasMoving = false;
-        const wSettle = TAU * M.stanceFrequencyHz * INERTIA_PEAK_GAIN * scale;
-        this.stance.vy += M.stopSettleDipYM * wSettle;
-        this.stance.vpitch += M.stopSettlePitchDeg * DEG * wSettle;
+        this.stance.vy += M.stopSettleDipYM * kStance;
+        this.stance.vpitch += M.stopSettlePitchDeg * DEG * kStance;
       }
     } else {
       this.lowSpeedS = 0;
@@ -306,44 +318,55 @@ export class MoveInertia {
     const gRate = gTarget > this.gaitEnvelope ? M.gaitAttackPerS : M.gaitReleasePerS;
     this.gaitEnvelope += (gTarget - this.gaitEnvelope) * (1 - Math.exp(-gRate * dt));
 
-    // Steady strafe bank driven by real lateral velocity (not raw digital key).
-    const normRight = Clamp(right / Math.max(0.5, M.walkSpeedMps), -1.35, 1.35);
+    // Steady strafe bank driven by smoothed lateral velocity (no sudden digital snap).
+    const normRight = Clamp(this.smoothRight / Math.max(0.5, M.walkSpeedMps), -1.35, 1.35);
     const bankFollow = 1 - Math.exp(-M.strafeBankLerpSpeed * dt);
     this.bankRoll += (-normRight * M.strafeBankRollRad * scale - this.bankRoll) * bankFollow;
     this.bankX += (normRight * M.strafeBankXM * scale - this.bankX) * bankFollow;
 
-    // Integrate damped springs in fixed 1/240 s substeps, distributing impulses evenly.
+    // Integrate damped springs in fixed 1/240 s substeps, filtering input velocity inside the
+    // substep loop so acceleration ramps smoothly (C2 continuity, zero frame-1 velocity kick).
     const span = Math.min(dt, 0.1);
     const steps = Math.max(1, Math.ceil(span * 240));
     const h = span / steps;
-    const stepStrafeVx = (dRight * M.strafeImpulseXM * kStrafe) / steps;
-    const stepStrafeVyaw = (dRight * M.strafeImpulseYawDeg * DEG * kStrafe) / steps;
-    const stepStrafeVroll = (dRight * M.strafeImpulseRollDeg * DEG * kStrafe) / steps;
-    const stepSurgeVz = (dForward * M.surgeImpulseZM * kSurge) / steps;
-    const stepSurgeVpitch = (dForward * M.surgeImpulsePitchDeg * DEG * kSurge) / steps;
-    const stepEyeY = (clampedEye * (M.stanceImpulseYM * 3.4) * scale) / steps;
-    const stepEyePitch = (clampedEye * (M.stanceImpulsePitchDeg * DEG * 3.4) * scale) / steps;
+    const smoothRate = M.inputSmoothPerS ?? 13.5;
+    const smoothAlpha = 1 - Math.exp(-smoothRate * h);
     const cStrafe = 2 * M.strafeDamping * wStrafe;
     const cSurge = 2 * M.surgeDamping * wSurge;
-    const wStance = TAU * M.stanceFrequencyHz, cStance = 2 * M.stanceDamping * wStance;
+    const cStance = 2 * M.stanceDamping * wStance;
+    const maxStepRight = M.maxDeltaSpeedMps * (h / span);
+    const maxStepEye = M.maxEyeSpeedMps * h;
     for (let i = 0; i < steps; i += 1) {
-      this.strafe.vx += stepStrafeVx + (-wStrafe * wStrafe * this.strafe.x - cStrafe * this.strafe.vx) * h;
+      const nextRight = this.smoothRight + (right - this.smoothRight) * smoothAlpha;
+      const dR = Clamp(nextRight - this.smoothRight, -maxStepRight, maxStepRight);
+      this.smoothRight = nextRight;
+
+      const nextForward = this.smoothForward + (forward - this.smoothForward) * smoothAlpha;
+      const dF = Clamp(nextForward - this.smoothForward, -maxStepRight, maxStepRight);
+      this.smoothForward = nextForward;
+
+      let dE = 0;
+      if (targetEye !== null && this.smoothEye !== null) {
+        const nextEye = this.smoothEye + (targetEye - this.smoothEye) * smoothAlpha;
+        dE = Clamp(nextEye - this.smoothEye, -maxStepEye, maxStepEye);
+        this.smoothEye = nextEye;
+      }
+
+      this.strafe.vx += dR * M.strafeImpulseXM * kStrafe + (-wStrafe * wStrafe * this.strafe.x - cStrafe * this.strafe.vx) * h;
       this.strafe.x += this.strafe.vx * h;
-      this.strafe.vyaw += stepStrafeVyaw + (-wStrafe * wStrafe * this.strafe.yaw - cStrafe * this.strafe.vyaw) * h;
+      this.strafe.vyaw += dR * M.strafeImpulseYawDeg * DEG * kStrafe + (-wStrafe * wStrafe * this.strafe.yaw - cStrafe * this.strafe.vyaw) * h;
       this.strafe.yaw += this.strafe.vyaw * h;
-      this.strafe.vroll += stepStrafeVroll + (-wStrafe * wStrafe * this.strafe.roll - cStrafe * this.strafe.vroll) * h;
+      this.strafe.vroll += dR * M.strafeImpulseRollDeg * DEG * kStrafe + (-wStrafe * wStrafe * this.strafe.roll - cStrafe * this.strafe.vroll) * h;
       this.strafe.roll += this.strafe.vroll * h;
 
-      this.surge.vz += stepSurgeVz + (-wSurge * wSurge * this.surge.z - cSurge * this.surge.vz) * h;
+      this.surge.vz += dF * M.surgeImpulseZM * kSurge + (-wSurge * wSurge * this.surge.z - cSurge * this.surge.vz) * h;
       this.surge.z += this.surge.vz * h;
-      this.surge.vpitch += stepSurgeVpitch + (-wSurge * wSurge * this.surge.pitch - cSurge * this.surge.vpitch) * h;
+      this.surge.vpitch += dF * M.surgeImpulsePitchDeg * DEG * kSurge + (-wSurge * wSurge * this.surge.pitch - cSurge * this.surge.vpitch) * h;
       this.surge.pitch += this.surge.vpitch * h;
 
-      this.stance.y += stepEyeY;
-      this.stance.pitch += stepEyePitch;
-      this.stance.vy += (-wStance * wStance * this.stance.y - cStance * this.stance.vy) * h;
+      this.stance.vy += dE * (M.stanceImpulseYM * 3.8) * kStance + (-wStance * wStance * this.stance.y - cStance * this.stance.vy) * h;
       this.stance.y += this.stance.vy * h;
-      this.stance.vpitch += (-wStance * wStance * this.stance.pitch - cStance * this.stance.vpitch) * h;
+      this.stance.vpitch += dE * (M.stanceImpulsePitchDeg * DEG * 3.8) * kStance + (-wStance * wStance * this.stance.pitch - cStance * this.stance.vpitch) * h;
       this.stance.pitch += this.stance.vpitch * h;
     }
 

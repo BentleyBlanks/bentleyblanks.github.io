@@ -82,35 +82,36 @@ export const MOVE_INERTIA = Object.freeze({
   walkSpeedMps: 3.2,
   maxDeltaSpeedMps: 4.5,
   maxEyeSpeedMps: 2.4,
-  strafeFrequencyHz: 2.85,
-  strafeDamping: 0.88,              // near-critically damped COD feel: crisp lag & counter-strafe carry, no rubbery rebound
-  strafeImpulseXM: -0.0028,         // metres per (m/s) of lateral velocity change at rear stock (~ -9 mm on crisp walk start)
-  strafeImpulseYawDeg: 0.65,        // degrees of heavy-barrel lag around stock/grip per (m/s)
-  strafeImpulseRollDeg: -0.52,      // same directional sign as steady bank (no mid-strafe roll sign flip on A<->D)
-  strafeBankRollRad: 0.044,         // steady banking around rifle axis into actual lateral velocity (~2.5 deg at full walk)
+  inputSmoothPerS: 13.5,            // low-pass velocity filter so impulses ramp in smoothly (C2, zero frame-1 jerk)
+  strafeFrequencyHz: 2.15,          // weighted rifle cadence (~0.46s period) instead of twitchy high-Hz snap
+  strafeDamping: 0.93,              // near-critically damped silky settle, zero rubbery rebound
+  strafeImpulseXM: -0.0040,         // metres per (m/s) of smoothed lateral velocity change at rear stock (~ -8.8 mm peak)
+  strafeImpulseYawDeg: 0.46,        // organic barrel lag around stock/grip per (m/s)
+  strafeImpulseRollDeg: -0.38,      // coherent directional roll (no mid-strafe sign flip on A<->D)
+  strafeBankRollRad: 0.036,         // steady banking around rifle axis into actual lateral velocity (~2.1 deg)
   strafeBankXM: -0.0014,            // subtle steady stock lateral offset at full walk strafe
-  strafeBankLerpSpeed: 8.5,
-  surgeFrequencyHz: 2.9,
-  surgeDamping: 0.84,
-  surgeImpulseZM: 0.0035,           // +z into shoulder on forward accel, -z forward surge on hard stop (~ -14 mm relative to shoulders)
-  surgeImpulsePitchDeg: 0.48,       // barrel rise on launch / dip (-rx) around stock on hard stop
-  stanceFrequencyHz: 3.3,
-  stanceDamping: 0.80,
-  stanceImpulseYM: -0.0064,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
-  stanceImpulsePitchDeg: -1.05,     // dropping eye -> +pitch lag around stock; rising eye -> -pitch lag
-  gaitAttackPerS: 10.0,
-  gaitReleasePerS: 6.5,
+  strafeBankLerpSpeed: 6.0,         // silky banking follow
+  surgeFrequencyHz: 2.15,
+  surgeDamping: 0.92,
+  surgeImpulseZM: 0.0036,           // +z into shoulder on forward accel, -z forward surge on hard stop
+  surgeImpulsePitchDeg: 0.36,       // barrel rise on launch / dip (-rx) around stock on hard stop
+  stanceFrequencyHz: 2.35,
+  stanceDamping: 0.90,
+  stanceImpulseYM: -0.0062,         // dropping eye (dy < 0) -> +y float then settle; rising eye -> -y heavy lag
+  stanceImpulsePitchDeg: -0.78,     // dropping eye -> +pitch lag around stock; rising eye -> -pitch lag
+  gaitAttackPerS: 7.5,
+  gaitReleasePerS: 5.5,
   stopSettleSpeedMps: 0.65,
   stopSettleHoldS: 0.065,           // require brief true stop so 1-frame zero-crossing during A<->D reversal never dips
-  stopSettleDipYM: -0.0044,
-  stopSettlePitchDeg: -0.60,
+  stopSettleDipYM: -0.0040,
+  stopSettlePitchDeg: -0.48,
   adsRotationScale: 0,              // full ADS keeps swayPivot & inertiaPivot strictly zero so sights match AimDirection
   // Anatomical decoupling (2026-11-23): shoulders belong to the torso (`armAnchor`), not a
-  // rigid block with the gun. Only a small sympathetic share rides on `swayPivot` (torso/shoulders);
+  // rigid block with the gun. A modest sympathetic share rides on `swayPivot` (torso/shoulders);
   // the majority rides on `inertiaPivot` under `weaponMount` around the rear stock/grip pocket so
   // the barrel pivots in the soldier's hands and 2-bone IK flexes elbows & forearms naturally.
-  shoulderShare: Object.freeze({ x: 0.12, y: 0.22, z: 0.14, pitch: 0.14, yaw: 0.10, roll: 0.15 }),
-  lookSwayShoulderShare: 0.18,
+  shoulderShare: Object.freeze({ x: 0.16, y: 0.24, z: 0.18, pitch: 0.16, yaw: 0.14, roll: 0.18 }),
+  lookSwayShoulderShare: 0.22,
   twoHandStockBackM: 0.16,          // rear stock pocket behind right grip (+z in weaponMount local space)
   twoHandStockDownM: -0.02,
 });

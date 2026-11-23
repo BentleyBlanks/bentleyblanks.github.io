@@ -1601,6 +1601,7 @@ export class Viewmodel {
     this.inertiaPivot.name = "WeaponInertiaPivot";
     this.inertiaAnchor = new THREE.Vector3();
     this.inertiaActive = false;
+    this.inertiaDecoupleWeight = 0;
     this._inertiaQ = new THREE.Quaternion();
     this._inertiaQInv = new THREE.Quaternion();
     this._inertiaE = new THREE.Euler(0, 0, 0, "YXZ");
@@ -3066,23 +3067,32 @@ export class Viewmodel {
       : this.moveInertia;
     const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0,
       swayGain, inertiaOn ? 0 : strafe);
-    const decouple = inertiaOn && !!this.weapon && !this.action?.skeletal && !this.meleeVideoFrame && !this._ThrowTrack();
+    const decoupleAllowed = inertiaOn && !!this.weapon && !this.action?.skeletal && !this.meleeVideoFrame && !this._ThrowTrack();
+    // Crossfade decoupling in lockstep with skeletal Idle weight so Idle -> live IK never snaps
+    // in 1 frame and baked Idle hands never detach from the rifle during the 0.12 s fade.
+    const skelIdleRaw = this.skeletalAnimation?.Clip?.("Idle") ? Clamp01(this.skeletalAnimation.idleWeight ?? 0) : 0;
+    const skelIdleSmooth = skelIdleRaw * skelIdleRaw * (3 - 2 * skelIdleRaw);
+    const decoupleTarget = decoupleAllowed ? (1 - skelIdleSmooth) : 0;
+    this.inertiaDecoupleWeight += (decoupleTarget - this.inertiaDecoupleWeight) * (1 - Math.exp(-18 * step));
+    const dw = Clamp01(this.inertiaDecoupleWeight);
     const sh = MOVE_INERTIA.shoulderShare;
-    const lookSh = decouple ? MOVE_INERTIA.lookSwayShoulderShare : 1;
-    const swX = sway.x * lookSh + (inertiaOn ? inertia.x * (decouple ? sh.x : 1) : 0);
-    const swY = sway.y * lookSh + (inertiaOn ? inertia.y * (decouple ? sh.y : 1) : 0);
-    const swZ = inertiaOn ? inertia.z * (decouple ? sh.z : 1) : 0;
-    const swPitch = sway.pitch * lookSh + (inertiaOn ? inertia.pitch * (decouple ? sh.pitch : 1) : 0);
-    const swYaw = sway.yaw * lookSh + (inertiaOn ? inertia.yaw * (decouple ? sh.yaw : 1) : 0);
-    const swRoll = (sway.roll + sway.strafeRoll) * lookSh + (inertiaOn ? inertia.roll * (decouple ? sh.roll : 1) : 0);
+    const shX = Mix(1, sh.x, dw), shY = Mix(1, sh.y, dw), shZ = Mix(1, sh.z, dw);
+    const shP = Mix(1, sh.pitch, dw), shYaw = Mix(1, sh.yaw, dw), shR = Mix(1, sh.roll, dw);
+    const lookSh = Mix(1, MOVE_INERTIA.lookSwayShoulderShare, dw);
+    const swX = sway.x * lookSh + (inertiaOn ? inertia.x * shX : 0);
+    const swY = sway.y * lookSh + (inertiaOn ? inertia.y * shY : 0);
+    const swZ = inertiaOn ? inertia.z * shZ : 0;
+    const swPitch = sway.pitch * lookSh + (inertiaOn ? inertia.pitch * shP : 0);
+    const swYaw = sway.yaw * lookSh + (inertiaOn ? inertia.yaw * shYaw : 0);
+    const swRoll = (sway.roll + sway.strafeRoll) * lookSh + (inertiaOn ? inertia.roll * shR : 0);
     this.swayPivot.rotation.set(swPitch, swYaw, swRoll, "YXZ");
     this.swayPivot.position.set(swX, swY, swZ);
-    let wpX = decouple ? sway.x * (1 - lookSh) + inertia.x * (1 - sh.x) : 0;
-    let wpY = decouple ? sway.y * (1 - lookSh) + inertia.y * (1 - sh.y) : 0;
-    let wpZ = decouple ? inertia.z * (1 - sh.z) : 0;
-    let wpPitch = decouple ? sway.pitch * (1 - lookSh) + inertia.pitch * (1 - sh.pitch) : 0;
-    let wpYaw = decouple ? sway.yaw * (1 - lookSh) + inertia.yaw * (1 - sh.yaw) : 0;
-    let wpRoll = decouple ? (sway.roll + sway.strafeRoll) * (1 - lookSh) + inertia.roll * (1 - sh.roll) : 0;
+    let wpX = sway.x * (1 - lookSh) + (inertiaOn ? inertia.x * (1 - shX) : 0);
+    let wpY = sway.y * (1 - lookSh) + (inertiaOn ? inertia.y * (1 - shY) : 0);
+    let wpZ = inertiaOn ? inertia.z * (1 - shZ) : 0;
+    let wpPitch = sway.pitch * (1 - lookSh) + (inertiaOn ? inertia.pitch * (1 - shP) : 0);
+    let wpYaw = sway.yaw * (1 - lookSh) + (inertiaOn ? inertia.yaw * (1 - shYaw) : 0);
+    let wpRoll = (sway.roll + sway.strafeRoll) * (1 - lookSh) + (inertiaOn ? inertia.roll * (1 - shR) : 0);
 
     // --- 步伐晃动：走 / 跑 / 蹲三档 -----------------------------------------
     const gait = inertiaOn ? inertia.gaitEnvelope : gaitRaw;
@@ -3134,12 +3144,12 @@ export class Viewmodel {
     const bobRx = Math.sin(phase * 2) * 0.010 * bobScale;
     const bobRy = Math.sin(phase) * 0.014 * bobScale;
     const bobRz = -Math.sin(phase) * 0.018 * bobScale;
-    const shBobX = decouple ? 0.25 : 1;
-    const shBobY = decouple ? 0.45 : 1;
-    const shBobR = decouple ? 0.25 : 1;
+    const shBobX = Mix(1, 0.28, dw);
+    const shBobY = Mix(1, 0.45, dw);
+    const shBobR = Mix(1, 0.28, dw);
     this.bobPivot.position.set(bobX * shBobX + breathX * breath, bobY * shBobY + breathY * breath, 0);
     this.bobPivot.rotation.set(bobRx * shBobR, bobRy * shBobR, bobRz * shBobR);
-    if (decouple) {
+    if (dw > 1e-4) {
       wpX += bobX * (1 - shBobX);
       wpY += bobY * (1 - shBobY);
       wpPitch += bobRx * (1 - shBobR);
@@ -3241,9 +3251,15 @@ export class Viewmodel {
     // Weapon-only movement/look inertia around the rear stock/grip pocket (camera-aligned
     // axes mapped into weaponMount local space). Shoulders stay anchored to `armAnchor`,
     // so 2-bone arm IK visibly flexes elbows & forearms instead of translating rigidly.
+    const rawInertiaMag = inertiaOn
+      ? (Math.abs(inertia.x) + Math.abs(inertia.y) + Math.abs(inertia.z)
+        + Math.abs(inertia.pitch) + Math.abs(inertia.yaw) + Math.abs(inertia.roll)
+        + Math.abs(sway.x) + Math.abs(sway.y) + Math.abs(sway.pitch) + Math.abs(sway.yaw))
+      : 0;
+    this.inertiaActive = decoupleAllowed && !this.mount && !!this.rig && rawInertiaMag > 0.0012;
     const inertiaMag = Math.abs(wpX) + Math.abs(wpY) + Math.abs(wpZ)
       + Math.abs(wpPitch) + Math.abs(wpYaw) + Math.abs(wpRoll);
-    if (decouple && !this.mount && this.rig && inertiaMag > 1e-6) {
+    if (dw > 1e-4 && !this.mount && this.rig && inertiaMag > 1e-6) {
       this._inertiaE.set(wpPitch, wpYaw, wpRoll, "YXZ");
       const qCam = this._inertiaQ.setFromEuler(this._inertiaE);
       const qMount = this.weaponMount.quaternion;
@@ -3260,12 +3276,9 @@ export class Viewmodel {
       this.inertiaAnchor.copy(pivotPt).applyQuaternion(this.inertiaPivot.quaternion);
       this._inertiaV.set(wpX, wpY, wpZ).applyQuaternion(qInv);
       this.inertiaPivot.position.copy(pivotPt).sub(this.inertiaAnchor).add(this._inertiaV);
-      this.inertiaActive = (Math.abs(wpX) + Math.abs(wpY) + Math.abs(wpZ) > 0.0004)
-        || (Math.abs(wpPitch) + Math.abs(wpYaw) + Math.abs(wpRoll) > 0.0012);
     } else {
       this.inertiaPivot.position.set(0, 0, 0);
       this.inertiaPivot.quaternion.identity();
-      this.inertiaActive = false;
     }
 
     // Lower around the gripping hand, leaving the shoulders in place. The
