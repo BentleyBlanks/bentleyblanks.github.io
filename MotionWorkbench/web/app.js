@@ -74,12 +74,16 @@ function updateGlobalBusyUI() {
     }
   }
 
-  const label = bgLabel || viewerLoadingText || (inflightApiCount > 0 ? "请求处理中…" : "");
-  const busy = Boolean(label);
-  if (bar) bar.classList.toggle("active", busy);
+  // Only surface the top-bar busy pill for background jobs NOT already visible in the active canvas
+  const viewingTask = currentTask();
+  const viewingSameStage =
+    bgTarget && viewingTask && viewingTask.id === bgTarget.taskId && appState.activeStage === bgTarget.stage;
+  const pillLabel = (!viewingSameStage ? bgLabel : "") || viewerLoadingText || (inflightApiCount > 0 ? "请求处理中…" : "");
+  const barBusy = Boolean(bgLabel || viewerLoadingText || inflightApiCount > 0);
+  if (bar) bar.classList.toggle("active", barBusy);
   if (pill && pillText) {
-    pill.classList.toggle("hidden", !busy);
-    if (busy) pillText.textContent = label;
+    pill.classList.toggle("hidden", !pillLabel);
+    if (pillLabel) pillText.textContent = pillLabel;
     pill.dataset.taskId = bgTarget?.taskId || "";
     pill.dataset.stage = bgTarget ? String(bgTarget.stage) : "";
   }
@@ -288,15 +292,13 @@ function renderSystemAggregated() {
 
   const dot = $("#sysDot");
   const label = $("#sysBtnLabel");
+  label.textContent = "系统";
   if (runningRun) {
     dot.className = "mwDot busy";
-    label.textContent = `GPU ${runningRun.progress ?? 0}%`;
   } else if (d?.loggedIn && c?.online) {
     dot.className = "mwDot ok";
-    label.textContent = "系统";
   } else {
     dot.className = "mwDot warn";
-    label.textContent = "系统";
   }
 
   // Top 3-column metric strip
@@ -429,7 +431,30 @@ function setSystemDrawer(open, targetTab = null) {
   }
 }
 
-/* --- 左栏：概念图封面动作卡 --- */
+/* --- 左栏：参照角色制作管线（ModelWorkbench）的卡片式任务卡 + 重定向 3D 封面 --- */
+const CARD_STEP_LABELS = ["白盒", "分镜", "视频", "提骨", "重定", "修缮"];
+
+function taskStatusMeta(task, st) {
+  const activeRun = activeMocapRun(task);
+  if (activeRun && (activeRun.status === "running" || activeRun.status === "queued")) {
+    return { text: `提骨中 ${activeRun.progress ?? 0}%`, state: "running" };
+  }
+  if ((task.stage3?.takes || []).some((x) => x.status === "running")) {
+    return { text: "生成视频中", state: "running" };
+  }
+  if ((task.storyboard?.shots || []).some((s) => s.status === "running")) {
+    return { text: "分镜出图中", state: "running" };
+  }
+  if (activeRun?.status === "failed" && !task.stage5?.mixamoGlb?.url) {
+    return { text: "提骨失败", state: "failed" };
+  }
+  if (task.stage5?.status === "approved") return { text: "已入库", state: "done" };
+  if (task.stage5?.mixamoGlb?.url) return { text: "待二验", state: "ready" };
+  if ((task.stage3?.takes || []).some((x) => x.status === "succeeded")) return { text: "待提骨", state: "ready" };
+  if ((task.storyboard?.shots || []).some((s) => s.status === "succeeded")) return { text: "待出视频", state: "idle" };
+  return { text: "待分镜", state: "idle" };
+}
+
 function renderTaskList() {
   const list = filteredTasks();
   const mocapCount = appState.tasks.filter((t) => t.routeType !== "mixamo").length;
@@ -442,28 +467,66 @@ function renderTaskList() {
   for (const task of list) {
     const st = stageStates(task);
     const isMixamo = task.routeType === "mixamo";
+    const activeRun = activeMocapRun(task);
+    const statusMeta = taskStatusMeta(task, st);
+
+    // 封面优先级：重定向 3D 角色动画封面 > 概念图 > 首张已生成分镜图 > 极简占位
+    const coverUrl = task.retargetCoverUrl || task.conceptCoverUrl || task.storyboardCoverUrl || null;
+    const coverTag = task.retargetCoverUrl
+      ? { text: "3D 动画", cls: "is3d" }
+      : isMixamo
+      ? { text: "Mixamo", cls: "isMixamo" }
+      : task.storyboardCoverUrl
+      ? { text: "分镜", cls: "" }
+      : { text: "GEM-X", cls: "" };
+
+    // 计算每个管线节点状态（done / current / failed / pending）
+    const firstUndone = st.findIndex((s) => !s.done);
+    const nodesHtml = st
+      .map((s, idx) => {
+        let nState = "pending";
+        let mark = `${idx + 1}`;
+        if (idx === 3 && activeRun?.status === "failed" && !s.done) {
+          nState = "failed";
+          mark = "!";
+        } else if (s.running) {
+          nState = "current";
+          mark = "●";
+        } else if (s.done) {
+          nState = "done";
+          mark = "✓";
+        } else if (idx === firstUndone) {
+          nState = "current";
+          mark = "·";
+        }
+        return `<span class="mwNode" data-state="${nState}"><span class="mwNodeMark">${mark}</span><span>${CARD_STEP_LABELS[idx]}</span></span>`;
+      })
+      .join("");
+
     const card = document.createElement("button");
     card.type = "button";
     card.className = `mwActionCard ${task.id === appState.selectedTaskId ? "active" : ""}`;
     card.innerHTML = `
       <div class="mwCoverSlot">
-        ${task.conceptCoverUrl ? `<img src="${task.conceptCoverUrl}" alt="${escapeHtml(task.title)}">` : `<span class="mwCoverPlaceholder">概念图待补</span>`}
+        ${coverUrl ? `<img src="${coverUrl}" alt="${escapeHtml(task.title)}">` : `<span class="mwCoverPlaceholder">待生成封面</span>`}
         <span class="mwCoverBeat">${escapeHtml(task.beatCode || "")}</span>
-        <span class="mwCoverRoute ${isMixamo ? "mixamo" : "mocap"}">${isMixamo ? "Mixamo" : "GEM-X"}</span>
+        <span class="mwCoverTag ${coverTag.cls}">${coverTag.text}</span>
       </div>
       <div class="mwCardInfo">
-        <div class="mwCardTitle">${escapeHtml(task.title)}</div>
-        <div class="mwSegBar">${st.map((s) => `<i class="${s.running ? "run" : s.done ? "done" : ""}"></i>`).join("")}</div>
+        <div class="mwCardHead">
+          <div class="mwCardTitle">${escapeHtml(task.title)}</div>
+          <span class="mwCardStatus" data-state="${statusMeta.state}">${escapeHtml(statusMeta.text)}</span>
+        </div>
+        <div class="mwNodeTrack">${nodesHtml}</div>
       </div>
     `;
     card.onclick = () => {
       appState.selectedTaskId = task.id;
-      // Smart default stage: Mixamo items jump straight to Stage 5 3D preview; new mocap items jump to their latest ready stage
       if (task.routeType === "mixamo") {
         appState.activeStage = 5;
       } else if (task.stage5?.mixamoGlb?.url) {
         appState.activeStage = 5;
-      } else if (task.stage4?.runs?.some((r) => r.status === "succeeded")) {
+      } else if (task.stage4?.runs?.some((r) => r.status === "running" || r.status === "queued" || r.status === "succeeded")) {
         appState.activeStage = 4;
       } else if (task.stage3?.takes?.some((t) => t.status === "succeeded")) {
         appState.activeStage = 3;
@@ -850,21 +913,42 @@ function renderTaskDetail() {
     };
   }
 
-  $("#s4LiveBar").classList.toggle("hidden", !isRunning);
-  if (isRunning) {
-    const pct = Math.max(0, Math.min(100, Number(run.progress || 0)));
-    $("#s4LiveText").textContent = run.stageLabel || "云端 GPU 提骨中";
-    $("#s4LivePct").textContent = `${pct}%`;
-    $("#s4LiveFill").style.width = `${pct}%`;
-  }
-
   $("#s4Empty").classList.toggle("hidden", hasResult);
   $("#s4ResultArea").classList.toggle("hidden", !hasResult);
+  $("#btnStage4Run").disabled = Boolean(isRunning);
+  $("#btnStage4Run").textContent = isRunning ? "提骨进行中…" : "重新提骨";
+
   if (!hasResult) {
-    const showFail = Boolean(isFailed && !isMixamo);
-    $("#s4IdleBlock").classList.toggle("hidden", showFail);
+    const showProg = Boolean(isRunning && !isMixamo);
+    const showFail = Boolean(isFailed && !isMixamo && !showProg);
+    $("#s4ProgressCard").classList.toggle("hidden", !showProg);
     $("#s4FailCard").classList.toggle("hidden", !showFail);
-    if (showFail) {
+    $("#s4IdleBlock").classList.toggle("hidden", showProg || showFail);
+
+    if (showProg) {
+      const pct = Math.max(0, Math.min(100, Number(run.progress || 0)));
+      const gpuTag = task.stage4?.precisionPreset === "high_a100" ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77骨";
+      $("#s4ProgTitle").textContent = `云端提骨进行中（${gpuTag}）`;
+      $("#s4ProgJob").textContent = run.jobId;
+      $("#s4LivePct").textContent = `${pct}%`;
+      $("#s4LiveFill").style.width = `${pct}%`;
+      $("#s4LiveText").textContent = run.stageLabel || "正在连接 Google Colab GPU…";
+
+      // 4 步进度节点（申请 GPU → 上传视频 → GEM-X 推理 → 回传重定向）
+      const activeIdx = pct < 15 ? 0 : pct < 22 ? 1 : pct < 88 ? 2 : 3;
+      const steps = ["申请 GPU", "上传视频", "GEM-X 推理", "回传重定向"];
+      $("#s4Milestones").innerHTML = steps
+        .map((lbl, i) => {
+          const st = i < activeIdx ? "done" : i === activeIdx ? "current" : "pending";
+          const mk = i < activeIdx ? "✓" : i === activeIdx ? "●" : `${i + 1}`;
+          return `<span class="mwNode" data-state="${st}"><span class="mwNodeMark">${mk}</span><span>${lbl}</span></span>`;
+        })
+        .join("");
+
+      const tailLogs = (run.logs || []).slice(-4).join("\n").trim();
+      $("#s4ProgLogs").classList.toggle("hidden", !tailLogs);
+      $("#s4ProgLogs").textContent = tailLogs;
+    } else if (showFail) {
       const diag = parseMocapFailure(run);
       $("#s4FailJobId").textContent = run.jobId;
       $("#s4FailTitle").textContent = diag.title;
@@ -874,8 +958,6 @@ function renderTaskDetail() {
     } else {
       $("#s4EmptyTitle").textContent = isMixamo
         ? "Mixamo 通用动作 · 直接前往 05 重定向 3D 验收"
-        : isRunning
-        ? "正在云端提取 77 关节骨骼…"
         : selectedTake
         ? "已就绪 · 点击提交云端提骨"
         : "请先在「03 视频生成」定稿视频";
@@ -919,7 +1001,7 @@ function renderTaskDetail() {
     b.type = "button";
     const failed = r.status === "failed";
     b.className = `mwRunItem ${r.jobId === run?.jobId ? "active" : ""} ${failed ? "isFailed" : ""}`;
-    const mainLine = `${r.jobId} · ${r.status === "succeeded" ? "完成" : failed ? "失败" : `${r.progress ?? 0}%`}`;
+    const mainLine = `${r.jobId} · ${r.status === "succeeded" ? "完成" : failed ? "失败" : "运行中"}`;
     if (failed) {
       const diag = parseMocapFailure(r);
       b.innerHTML = `<span>${escapeHtml(mainLine)}</span><span class="mwRunItemSub">${escapeHtml(diag.shortTag)}</span>`;
@@ -1015,6 +1097,47 @@ function renderStage5Retarget(task, selectedTake) {
   }
 }
 
+const capturedCoverTasks = new Set();
+function captureRetargetCover(task) {
+  if (!task || capturedCoverTasks.has(task.id)) return;
+  const srcCanvas = $("#retargetCanvas");
+  if (!srcCanvas || srcCanvas.width < 100 || srcCanvas.height < 100) return;
+  capturedCoverTasks.add(task.id);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      try {
+        const outW = 480;
+        const outH = 270;
+        const tmp = document.createElement("canvas");
+        tmp.width = outW;
+        tmp.height = outH;
+        const ctx = tmp.getContext("2d");
+        // Center-crop 16:9 from the 3D canvas around the character torso/head
+        const srcRatio = srcCanvas.width / srcCanvas.height;
+        const dstRatio = outW / outH;
+        let sx = 0, sy = 0, sw = srcCanvas.width, sh = srcCanvas.height;
+        if (srcRatio > dstRatio) {
+          sw = Math.round(srcCanvas.height * dstRatio);
+          sx = Math.round((srcCanvas.width - sw) / 2);
+        } else {
+          sh = Math.round(srcCanvas.width / dstRatio);
+          sy = Math.round((srcCanvas.height - sh) * 0.36);
+        }
+        ctx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, outW, outH);
+        const dataUrl = tmp.toDataURL("image/jpeg", 0.86);
+        const res = await api(`/api/tasks/${task.id}/cover`, {
+          method: "POST",
+          silent: true,
+          body: JSON.stringify({ dataUrl, version: 2 }),
+        });
+        if (res?.task) replaceTask(res.task);
+      } catch {
+        capturedCoverTasks.delete(task.id);
+      }
+    });
+  });
+}
+
 async function syncRetargetViewer(task) {
   if (!task || !task.stage5?.mixamoGlb?.url) return;
   if (!appState.retViewer) {
@@ -1042,6 +1165,10 @@ async function syncRetargetViewer(task) {
       appState.retDuration = res.duration;
       $("#s5RetScrub").max = String(res.duration);
       setRetargetTime(appState.retTime % res.duration);
+      // 自动截取重定向 3D 角色动画封面（若尚未保存最新版封面）
+      if (!task.retargetCoverUrl || (task.retargetCoverVersion || 0) < 2) {
+        captureRetargetCover(task);
+      }
     }
   } catch (err) {
     viewerLoadingText = "";
@@ -1476,6 +1603,12 @@ $("#btnToggleSkel").onclick = () => {
   const on = !$("#btnToggleSkel").classList.contains("active");
   $("#btnToggleSkel").classList.toggle("active", on);
   appState.retViewer?.setShowSkeleton(on);
+};
+$("#btnToggleLight").onclick = () => {
+  const isDay = !$("#btnToggleLight").classList.contains("active");
+  $("#btnToggleLight").classList.toggle("active", isDay);
+  $("#btnToggleLight").textContent = isDay ? "天空" : "暗棚";
+  appState.retViewer?.setLightingMode(isDay ? "daylight" : "dark");
 };
 
 $("#btnRunRetarget").onclick = async () => {

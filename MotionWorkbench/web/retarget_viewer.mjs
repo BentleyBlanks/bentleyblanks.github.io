@@ -13,6 +13,93 @@ function clipForCharacter(clip, hipsScale = 1) {
   return copy;
 }
 
+function buildStudioEnvTexture(renderer) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0xc8d4e0);
+
+  // Overhead daylight softbox
+  const topBox = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+  );
+  topBox.position.set(0, 7, 0);
+  topBox.rotation.x = Math.PI / 2;
+  envScene.add(topBox);
+
+  // Warm key softbox (front-right)
+  const keyBox = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfff3de, side: THREE.DoubleSide })
+  );
+  keyBox.position.set(5, 3, 6);
+  keyBox.lookAt(0, 0, 0);
+  envScene.add(keyBox);
+
+  // Cool sky fill softbox (front-left)
+  const fillBox = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xdcebff, side: THREE.DoubleSide })
+  );
+  fillBox.position.set(-6, 2.5, 5);
+  fillBox.lookAt(0, 0, 0);
+  envScene.add(fillBox);
+
+  // Low bright bounce card so faces under cap brims & chins get even light
+  const bounceFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(18, 18),
+    new THREE.MeshBasicMaterial({ color: 0xd5cfc2, side: THREE.DoubleSide })
+  );
+  bounceFloor.position.set(0, -4, 0);
+  bounceFloor.rotation.x = -Math.PI / 2;
+  envScene.add(bounceFloor);
+
+  const rt = pmrem.fromScene(envScene, 0.04);
+  pmrem.dispose();
+  return rt;
+}
+
+function createSkyDome() {
+  const geo = new THREE.SphereGeometry(28, 32, 20);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      uZenith: { value: new THREE.Color(0x7ca2c7) },
+      uHorizon: { value: new THREE.Color(0xe2e8ee) },
+      uGround: { value: new THREE.Color(0xb2b6ba) },
+      uSunDir: { value: new THREE.Vector3(0.45, 0.62, 0.64).normalize() },
+      uSunColor: { value: new THREE.Color(0xfff7e4) },
+    },
+    vertexShader: `
+      varying vec3 vWorldDir;
+      void main() {
+        vWorldDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uZenith;
+      uniform vec3 uHorizon;
+      uniform vec3 uGround;
+      uniform vec3 uSunDir;
+      uniform vec3 uSunColor;
+      varying vec3 vWorldDir;
+      void main() {
+        vec3 d = normalize(vWorldDir);
+        float h = d.y;
+        vec3 col = h >= 0.0
+          ? mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55))
+          : mix(uHorizon, uGround, pow(clamp(-h * 2.4, 0.0, 1.0), 0.7));
+        float sunAmt = max(dot(d, uSunDir), 0.0);
+        col += uSunColor * (pow(sunAmt, 24.0) * 0.25 + pow(sunAmt, 160.0) * 0.35);
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
 export class RetargetViewer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -23,38 +110,73 @@ export class RetargetViewer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.22;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0b0c0a);
-    this.scene.fog = new THREE.Fog(0x0b0c0a, 6.5, 16);
+    this.lightingMode = "daylight";
 
-    this.camera = new THREE.PerspectiveCamera(36, 1, 0.05, 50);
+    // Procedural IBL so PBR skin/cloth never crushes into black shadow
+    this._envRT = buildStudioEnvTexture(this.renderer);
+    this.scene.environment = this._envRT.texture;
+
+    // Daylight Sky Dome
+    this.skyDome = createSkyDome();
+    this.scene.add(this.skyDome);
+
+    this.camera = new THREE.PerspectiveCamera(36, 1, 0.05, 65);
     this.orbit = { yaw: 0.42, pitch: 0.2, dist: 2.65, targetX: 0, targetY: 0.85, targetZ: 0 };
     this._hipsPos = new THREE.Vector3();
     this.hipsBone = null;
 
-    // 3-point warm-key / cool-rim lighting matching Taierzhuang1938 ToolStudio
-    const hemi = new THREE.HemisphereLight(0xeef2f5, 0x26241d, 1.15);
-    this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff1d6, 2.1);
-    key.position.set(2.4, 4.2, 3.2);
-    this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9dc0e4, 0.95);
-    rim.position.set(-2.8, 2.5, -2.5);
-    this.scene.add(rim);
+    // Bright daylight studio 4-point rig + soft ground shadows
+    this.hemiLight = new THREE.HemisphereLight(0xf6faff, 0xc5bfb2, 1.35);
+    this.scene.add(this.hemiLight);
 
-    // Subtle olive-brass studio floor grid
-    const grid = new THREE.GridHelper(6, 18, 0x6a6349, 0x262721);
-    grid.position.y = 0;
-    this.scene.add(grid);
+    this.keyLight = new THREE.DirectionalLight(0xfff6e8, 2.25);
+    this.keyLight.position.set(2.8, 4.6, 3.6);
+    this.keyLight.castShadow = true;
+    this.keyLight.shadow.mapSize.set(2048, 2048);
+    this.keyLight.shadow.camera.near = 0.5;
+    this.keyLight.shadow.camera.far = 16;
+    const d = 2.6;
+    this.keyLight.shadow.camera.left = -d;
+    this.keyLight.shadow.camera.right = d;
+    this.keyLight.shadow.camera.top = d;
+    this.keyLight.shadow.camera.bottom = -d;
+    this.keyLight.shadow.bias = -0.0005;
+    this.scene.add(this.keyLight);
 
-    const floorGeo = new THREE.CircleGeometry(3.2, 48);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x11120f, roughness: 0.95, metalness: 0.0 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.002;
-    this.scene.add(floor);
+    // Low front face-fill light: keeps eyes/chin/hands bright even under military cap brims & downward gaze
+    this.faceFillLight = new THREE.DirectionalLight(0xedf4ff, 1.25);
+    this.faceFillLight.position.set(0.4, 0.95, 3.4);
+    this.scene.add(this.faceFillLight);
+
+    // Rim back light for crisp silhouette separation
+    this.rimLight = new THREE.DirectionalLight(0xd4e6ff, 1.0);
+    this.rimLight.position.set(-2.8, 2.8, -3.0);
+    this.scene.add(this.rimLight);
+
+    // Studio floor + dual grids (daylight vs dark studio)
+    this.dayGrid = new THREE.GridHelper(10, 20, 0x868f9a, 0xb2b8c0);
+    this.dayGrid.position.y = 0.001;
+    this.scene.add(this.dayGrid);
+
+    this.darkGrid = new THREE.GridHelper(10, 20, 0x6a6349, 0x2a2c25);
+    this.darkGrid.position.y = 0.001;
+    this.darkGrid.visible = false;
+    this.scene.add(this.darkGrid);
+
+    const floorGeo = new THREE.CircleGeometry(14, 64);
+    this.floorMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd2, roughness: 0.92, metalness: 0.0 });
+    this.floor = new THREE.Mesh(floorGeo, this.floorMat);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.position.y = -0.001;
+    this.floor.receiveShadow = true;
+    this.scene.add(this.floor);
+
+    this.setLightingMode("daylight");
 
     this.modelRoot = null;
     this.skeletonHelper = null;
@@ -142,6 +264,23 @@ export class RetargetViewer {
     if (this.skeletonHelper) this.skeletonHelper.visible = this.showSkeleton;
   }
 
+  setLightingMode(mode = "daylight") {
+    this.lightingMode = mode === "dark" ? "dark" : "daylight";
+    const isDay = this.lightingMode === "daylight";
+    this.skyDome.visible = isDay;
+    this.scene.background = new THREE.Color(isDay ? 0xdbe3ec : 0x181a17);
+    this.scene.fog = new THREE.Fog(isDay ? 0xdbe3ec : 0x181a17, isDay ? 10 : 8, isDay ? 28 : 20);
+    this.dayGrid.visible = isDay;
+    this.darkGrid.visible = !isDay;
+    this.floorMat.color.setHex(isDay ? 0xc9cdd2 : 0x232520);
+    this.renderer.toneMappingExposure = isDay ? 1.22 : 1.3;
+    this.hemiLight.intensity = isDay ? 1.35 : 1.15;
+    this.keyLight.intensity = isDay ? 2.25 : 2.1;
+    this.faceFillLight.intensity = isDay ? 1.25 : 1.1;
+    this.rimLight.intensity = isDay ? 1.0 : 1.1;
+    this.scene.environmentIntensity = isDay ? 0.9 : 0.65;
+  }
+
   resize() {
     const rect = this.canvas.parentElement?.getBoundingClientRect();
     if (!rect || rect.width < 10 || rect.height < 10) return;
@@ -181,6 +320,15 @@ export class RetargetViewer {
       const gltf = await this.loader.loadAsync(modelUrl);
       if (token !== this.loadToken) return null;
       this.modelRoot = gltf.scene;
+      this.modelRoot.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+          if (obj.material && "envMapIntensity" in obj.material) {
+            obj.material.envMapIntensity = 0.85;
+          }
+        }
+      });
       this.scene.add(this.modelRoot);
       this.hipsBone = this.modelRoot.getObjectByName("Hips") || null;
 

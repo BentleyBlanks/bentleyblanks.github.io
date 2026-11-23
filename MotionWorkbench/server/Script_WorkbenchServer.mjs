@@ -424,6 +424,14 @@ function hydrateTaskForClient(task) {
   } else if (typeof clone.stage5?.mixamoGlb?.url === "string" && clone.stage5.mixamoGlb.url.startsWith("/")) {
     clone.stage5.mixamoGlb.url = clone.stage5.mixamoGlb.url.slice(1);
   }
+  if (clone.retargetCoverPath && fs.existsSync(clone.retargetCoverPath)) {
+    const v = clone.retargetCoverVersion || 1;
+    clone.retargetCoverUrl = `${toWorkspaceUrl(clone.retargetCoverPath)}?v=${v}`;
+  } else {
+    clone.retargetCoverUrl = null;
+  }
+  const firstShot = (clone.storyboard?.shots || []).find((s) => s.status === "succeeded" && s.url);
+  clone.storyboardCoverUrl = firstShot?.url || null;
   return clone;
 }
 
@@ -762,6 +770,25 @@ async function handleApi(req, res, urlObj) {
       await saveTasks();
       return sendJson(res, 200, { ok: true });
     }
+  }
+
+  // Save retargeted 3D animation cover snapshot captured from RetargetViewer
+  const mCover = /^\/api\/tasks\/([^/]+)\/cover$/.exec(p);
+  if (mCover && method === "POST") {
+    const task = findTask(decodeURIComponent(mCover[1]));
+    const body = await readJsonBody(req);
+    const dataUrl = String(body.dataUrl || "");
+    const mData = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+    if (!mData) return sendJson(res, 400, { ok: false, error: "Invalid cover image dataUrl" });
+    const ext = mData[1] === "png" ? "png" : mData[1] === "webp" ? "webp" : "jpg";
+    const coverPath = path.join(WORKSPACE_DIR, "tasks", task.id, `cover_retarget.${ext}`);
+    await fsp.mkdir(path.dirname(coverPath), { recursive: true });
+    await fsp.writeFile(coverPath, Buffer.from(mData[2], "base64"));
+    task.retargetCoverPath = coverPath;
+    task.retargetCoverVersion = Number(body.version || 2);
+    task.updatedAt = Date.now();
+    await saveTasks();
+    return sendJson(res, 200, { ok: true, task: hydrateTaskForClient(task) });
   }
 
   // Stage 1: Approve whitebox blocking

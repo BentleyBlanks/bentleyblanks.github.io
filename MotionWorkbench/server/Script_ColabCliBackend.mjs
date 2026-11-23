@@ -21,7 +21,7 @@ function resolveColabExe(config) {
   return null;
 }
 
-function runColabCmd(exe, args, { timeoutMs = 15000 } = {}) {
+function runColabCmd(exe, args, { timeoutMs = 15000, envExtra = null } = {}) {
   return new Promise((resolve, reject) => {
     execFile(
       exe,
@@ -30,12 +30,22 @@ function runColabCmd(exe, args, { timeoutMs = 15000 } = {}) {
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         windowsHide: true,
-        env: { ...process.env, NO_COLOR: "1", RICH_DISABLE: "1" },
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          RICH_DISABLE: "1",
+          PYTHONUNBUFFERED: "1",
+          PYTHONUTF8: "1",
+          ...(envExtra || {}),
+        },
       },
       (err, stdout, stderr) => {
         const out = `${stdout || ""}\n${stderr || ""}`.trim();
         if (err) {
-          const e = new Error(out || err.message);
+          const msg = err.killed
+            ? `Colab 命令执行超时（已等待 ${Math.round(timeoutMs / 1000)} 秒，通常是当前 GPU 排队拥挤或代理波动；可重试或切换 L4/A100）。最后输出：${out || "无"}`
+            : out || err.message;
+          const e = new Error(msg);
           e.killed = err.killed;
           e.code = err.code;
           return reject(e);
@@ -353,11 +363,14 @@ export async function runColabMocapJob({
   if (hasWarm) {
     onLog?.(`[Colab CLI] 复用热机 ${gpuVariant} 会话：${sessionName}`);
   } else {
-    onProgress?.(10, `正在申请 Colab ${gpuVariant} GPU 运行时…`);
+    onProgress?.(10, `正在向 Google Colab 申请 ${gpuVariant} GPU（高峰期可能排队 1~3 分钟）…`);
     onLog?.(`[Colab CLI] colab new --gpu ${gpuVariant} -s ${sessionName}`);
     const newArgs = ["new", "--gpu", gpuVariant, "-s", sessionName];
     if (isA100) newArgs.push("--high-mem");
-    await runColabCmd(exe, newArgs, { timeoutMs: 120000 });
+    await runColabCmd(exe, newArgs, {
+      timeoutMs: 240000,
+      envExtra: { COLAB_CLI_ASSIGN_RETRIES: "2", COLAB_CLI_RETRY_BACKOFF: "6" },
+    });
     activeSessionNames.add(sessionName);
   }
 

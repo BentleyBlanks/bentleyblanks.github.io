@@ -308,26 +308,36 @@
           </aside>
         </section>
 
-        <!-- STAGE 04 · 骨骼提取（GEM-X 77 关节原始还原验收） -->
+        <!-- STAGE 04 · 骨骼提取（统一进度卡 + 失败诊断卡 + 三视图同期验收） -->
         <section class="mwStage hidden" data-panel="4">
           <div class="mwCanvas mwStage4Canvas">
-            <div id="s4LiveBar" class="mwLiveBar hidden">
-              <div class="mwLiveRow">
-                <span id="s4LiveText">提骨中…</span>
-                <span class="mwLiveRight">
-                  <strong id="s4LivePct" class="mwMono">0%</strong>
-                  <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
-                </span>
-              </div>
-              <div class="mwTrack"><div id="s4LiveFill" class="mwTrackFill" style="width:0%"></div></div>
-            </div>
-
             <div id="s4Empty" class="mwPlaceholder hidden">
               <div id="s4IdleBlock" class="mwEmptyStack">
                 <div class="mwPhTitle" id="s4EmptyTitle">等待提骨</div>
                 <div class="mwPhActions">
                   <button id="btnStage4RunCenter" class="mwBtn mwPrimary" type="button">提交云端提骨</button>
                 </div>
+              </div>
+
+              <!-- 统一制作进度卡（合并原先分散的 4 处进度展示：步骤节点 + 百分比 + 实时状态 + 精简日志） -->
+              <div id="s4ProgressCard" class="mwProgCard hidden" role="status" aria-live="polite">
+                <div class="mwProgHead">
+                  <div class="mwProgHeadLeft">
+                    <span class="mwSpinner" aria-hidden="true"></span>
+                    <div>
+                      <div class="mwProgTitle" id="s4ProgTitle">云端骨骼提取进行中</div>
+                      <div class="mwProgSub mwMono" id="s4ProgJob">—</div>
+                    </div>
+                  </div>
+                  <div class="mwProgHeadRight">
+                    <strong id="s4LivePct" class="mwProgPct mwMono">0%</strong>
+                    <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
+                  </div>
+                </div>
+                <div class="mwTrack mwTrackProg"><div id="s4LiveFill" class="mwTrackFill" style="width:0%"></div></div>
+                <div id="s4Milestones" class="mwNodeTrack mwNodeTrack4"></div>
+                <div id="s4LiveText" class="mwProgCurrent">正在连接云端算力…</div>
+                <pre id="s4ProgLogs" class="mwProgLogs hidden"></pre>
               </div>
 
               <!-- 提骨失败诊断卡：明确展示失败原因 + 一键修复入口 -->
@@ -391,8 +401,8 @@
               <div class="mwSec">
                 <div class="mwSecH">识别规格</div>
                 <div class="mwPresetCol" id="s4PrecisionPresets">
-                  <button class="mwPresetBtn" data-p="standard_l4" type="button">标准 · L4 (GEM-X 77骨)</button>
-                  <button class="mwPresetBtn" data-p="high_a100" type="button">精修 · A100 (+WiLoR 手部)</button>
+                  <button class="mwPresetBtn" data-p="standard_l4" type="button">标准 · L4（纯 NVIDIA GEM-X 77骨）</button>
+                  <button class="mwPresetBtn" data-p="high_a100" type="button">精修 · A100（GEM-X + WiLoR 十指精修）</button>
                 </div>
               </div>
               <div class="mwSec">
@@ -444,6 +454,7 @@
                       <button class="mwCamBtn" data-cam="side" type="button">侧</button>
                       <button class="mwCamBtn" data-cam="back" type="button">背</button>
                       <button class="mwCamBtn" id="btnToggleSkel" type="button">骨架</button>
+                      <button class="mwCamBtn active" id="btnToggleLight" type="button" title="切换明亮天空球 / 深灰暗棚">天空</button>
                     </div>
                   </div>
                   <div class="mwViewBody mw3dWrap">

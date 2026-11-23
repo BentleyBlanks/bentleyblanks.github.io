@@ -296,13 +296,16 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   gap: 8px;
 }
 
+/* 参照角色制作管线（ModelWorkbench .mwJob）的卡片式动作任务卡 */
 .mwActionCard {
+  --card-bg: #171a13;
+  flex: none;
   width: 100%;
   text-align: left;
   padding: 0;
-  background: #0a0b09;
-  border: 1px solid var(--rule-2);
-  border-left: 3px solid transparent;
+  background: var(--card-bg);
+  border: 1px solid #6a6a554e;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -310,84 +313,209 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   transition: border-color 0.14s linear, background 0.14s linear;
 }
 .mwActionCard:hover {
-  border-color: var(--edge);
-  background: #11130e;
+  border-color: #ae925699;
+  background: #1d2017;
 }
 .mwActionCard.active {
-  border-color: #edca8377;
-  border-left-color: var(--gold);
-  background: linear-gradient(180deg, #1b1810, #0f100c);
+  --card-bg: #24231a;
+  border-color: #ae9256;
+  box-shadow: inset 3px 0 #d5b46e;
+  background: var(--card-bg);
 }
 
-/* 16:9 概念图封面占位框 */
+/* 16:9 封面槽：优先展示重定向完的 3D 角色动画封面，其次分镜图，否则极简占位 */
 .mwCoverSlot {
   position: relative;
+  flex: none;
   aspect-ratio: 16 / 9;
   width: 100%;
-  background:
-    radial-gradient(circle at 50% 42%, #1d1f19 0%, #090a08 78%),
-    repeating-linear-gradient(45deg, transparent 0 10px, #ffffff03 10px 11px);
-  border-bottom: 1px solid var(--rule-2);
+  background: radial-gradient(circle at 50% 42%, #20231b 0%, #0d0f0b 82%);
+  border-bottom: 1px solid #c1bdab22;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.mwCoverSlot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mwCoverSlot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+  display: block;
+}
 .mwCoverPlaceholder {
-  font: 700 10px var(--ui-mono);
-  letter-spacing: 0.22em;
-  color: #c1bdab3a;
-  border: 1px dashed #c1bdab28;
-  padding: 4px 10px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #8c8a7d;
 }
 .mwCoverBeat {
   position: absolute;
   left: 6px;
   top: 6px;
-  padding: 1px 5px;
-  background: #060705cc;
-  border: 1px solid var(--rule-2);
-  font: 700 10px var(--ui-mono);
-  color: var(--gold-text);
+  padding: 2px 6px;
+  background: #080907d8;
+  border: 1px solid #c1bdab33;
+  border-radius: 2px;
+  font: 700 10.5px var(--ui-mono);
+  color: var(--gold-hi);
 }
-.mwCoverRoute {
+.mwCoverTag {
   position: absolute;
   right: 6px;
   top: 6px;
-  padding: 1px 5px;
-  background: #060705cc;
-  border: 1px solid var(--rule-2);
-  font: 10px var(--ui-mono);
-  color: var(--muted);
+  padding: 2px 6px;
+  background: #080907d8;
+  border: 1px solid #c1bdab33;
+  border-radius: 2px;
+  font: 600 10px var(--ui-sans);
+  color: #c2beb0;
 }
-.mwCoverRoute.mocap { color: var(--gold-text); border-color: #edca8355; }
-.mwCoverRoute.mixamo { color: var(--good); border-color: #9dc0e455; }
+.mwCoverTag.is3d { color: #f3d796; border-color: #edca8366; }
+.mwCoverTag.isMixamo { color: #aac6ac; border-color: #76957866; }
 
 .mwCardInfo {
-  padding: 7px 9px 8px;
+  padding: 9px 10px 10px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.mwCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #c1bdab22;
 }
 .mwCardTitle {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.35;
-  color: var(--text);
+  color: var(--text-hi);
 }
 .mwActionCard.active .mwCardTitle { color: var(--gold-hi); }
+.mwCardStatus {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #c2b99e;
+  white-space: nowrap;
+}
+.mwCardStatus[data-state="running"] { color: var(--gold-hi); }
+.mwCardStatus[data-state="ready"] { color: #e3c487; }
+.mwCardStatus[data-state="done"] { color: #aac6ac; }
+.mwCardStatus[data-state="failed"] { color: #efa69b; }
 
-/* 6 段微进度条 */
-.mwSegBar {
+/* 参照 ModelWorkbench (.mwTrack / .mwNode) 的连线圆点阶段管线轨 */
+.mwNodeTrack {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 2px;
+  text-align: center;
+  color: #9e9b8d;
+  font-size: 10px;
 }
-.mwSegBar i { display: block; height: 3px; background: #c1bdab22; }
-.mwSegBar i.done { background: var(--good); }
-.mwSegBar i.run { background: var(--gold); }
-.mwSegBar i.ok { background: var(--ok); }
+.mwNodeTrack4 {
+  grid-template-columns: repeat(4, 1fr);
+  font-size: 12px;
+  color: #b7b3a2;
+}
+.mwNode {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  position: relative;
+  isolation: isolate;
+}
+.mwNode:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 100%;
+  border-top: 1px solid #6a6a57;
+  z-index: -1;
+}
+.mwNodeTrack4 .mwNode:not(:last-child)::before { top: 10px; }
+.mwNodeMark {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid #7d806e;
+  border-radius: 50%;
+  background: var(--card-bg, #151711);
+  font-size: 9px;
+  line-height: 1;
+  color: #9b9a8c;
+}
+.mwNodeTrack4 .mwNodeMark { width: 21px; height: 21px; font-size: 11px; }
+.mwNode[data-state="done"] .mwNodeMark {
+  color: #d5ebd3;
+  background: #354a37;
+  border-color: #769578;
+}
+.mwNode[data-state="current"] .mwNodeMark {
+  background: #a18552;
+  color: #11120d;
+  border-color: #e6ca86;
+  font-weight: 700;
+}
+.mwNode[data-state="current"] span:last-child { color: var(--gold-hi); font-weight: 600; }
+.mwNode[data-state="failed"] .mwNodeMark {
+  background: #733a31;
+  color: #ffded6;
+  border-color: #c07469;
+  font-weight: 700;
+}
+.mwNode[data-state="failed"] span:last-child { color: #efa69b; }
+
+/* Stage 04 统一制作进度卡（替代原先分散 4 处的进度展示） */
+.mwProgCard {
+  --card-bg: #151712;
+  width: min(600px, 92%);
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid #ae925677;
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 14px 40px #00000099;
+}
+.mwProgHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mwProgHeadLeft { display: flex; align-items: center; gap: 12px; }
+.mwProgHeadRight { display: flex; align-items: baseline; gap: 12px; }
+.mwProgTitle { font-size: 16px; font-weight: 700; color: var(--text-hi); }
+.mwProgSub { font-size: 12px; color: #9c988a; margin-top: 2px; }
+.mwProgPct { font-size: 26px; font-weight: 700; color: var(--gold-hi); line-height: 1; }
+.mwTrackProg { height: 6px; }
+.mwProgCurrent {
+  font-size: 13.5px;
+  color: var(--text-hi);
+  padding: 9px 12px;
+  background: #10120d;
+  border: 1px solid var(--rule-2);
+}
+.mwProgLogs {
+  margin: 0;
+  padding: 9px 12px;
+  max-height: 110px;
+  overflow: auto;
+  background: #0a0b09;
+  border: 1px solid var(--rule-2);
+  color: #a9a596;
+  font: 11.5px/1.5 var(--ui-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 
 /* 主工作区 */
 .mwMain {
