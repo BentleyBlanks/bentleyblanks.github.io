@@ -144,7 +144,13 @@ export class FirstLevelOpeningTimeline {
     if (!configResp.ok) throw new Error(`Opening keyframe config load failed: HTTP ${configResp.status}`);
     const [timelineDoc, configDoc] = await Promise.all([timelineResp.json(), configResp.json()]);
     if (this.disposed) return false;
-    this.adapter.doc = NormalizeBlockout(configDoc);
+    const doc = NormalizeBlockout(configDoc);
+    // Drop legacy unnamed dugout filler soldiers (Squad1..Squad3) that are not in the authored Encounter squad.
+    const HIDDEN_OPENING_EXTRAS = new Set(["Squad1", "Squad2", "Squad3"]);
+    for (const kf of doc.keyframes || []) {
+      if (Array.isArray(kf.units)) kf.units = kf.units.filter((u) => !HIDDEN_OPENING_EXTRAS.has(u.id));
+    }
+    this.adapter.doc = doc;
     this.timelineDoc = timelineDoc;
     await this.previz.UseSource(TimelineAsPreviz(timelineDoc));
     await this.previz.EnsureOpening();

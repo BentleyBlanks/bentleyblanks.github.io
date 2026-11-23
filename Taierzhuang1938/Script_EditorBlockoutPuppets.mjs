@@ -102,7 +102,7 @@ import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } f
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
 import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
 import { XBotSkins, XBotLook } from "./Script_EditorBlockoutXBot.mjs";
-import { XBOT_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
+import { XBOT_CHARACTERS, XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -812,7 +812,7 @@ export class BlockoutPuppets {
    */
   _SyncXBot(puppet, human, { drive, state, mps, aim, carryRole, throwing, clipState, lieAlong, lieClip, seat, distance, cameraPosition }, step) {
     if (!this.xbot?.ready) return;
-    if(this.formalOnly&&!XBOT_CAST_CHARACTERS[human.castId]&&human.faction!=="ija")return;
+    if(this.formalOnly&&!XBOT_CAST_CHARACTERS[human.castId]&&!XBOT_FACTION_CHARACTERS[human.faction]?.length)return;
     // 配色：有名字的角色各一种（castId，或顺子 / 老耿 / 妮儿这类按单位 id）；抬担架的、普通人按阵营素色
     if (!human.skin && human.body === "rig") human.skin = this.xbot.Attach(human.actor, { faction: human.faction,
       castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null, seed: `${puppet.unit.id}:${human.slot}` });

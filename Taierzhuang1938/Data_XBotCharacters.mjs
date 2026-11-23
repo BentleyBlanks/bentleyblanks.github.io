@@ -113,7 +113,10 @@ export const XBOT_CHARACTERS = Object.freeze({
  * 白盒里这个阵营的普通士兵（没有专属配色的）换成哪些人；没写的阵营照用 X Bot。写几个就按兵的编号固定分（XBotSkins.KitFor，
  * 同一个兵每次进来都是同一张脸）。11-06 起普通日军在日兵甲、日军士兵A、日兵乙、日军士兵C中固定取一款。
  */
-export const XBOT_FACTION_CHARACTERS = Object.freeze({ ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]) });
+export const XBOT_FACTION_CHARACTERS = Object.freeze({
+  ija: Object.freeze(["ijaJia", "ijaA", "ijaYi", "ijaC"]),
+  nra: Object.freeze(["heYoutian", "liuWencai", "shunzi", "donggua"]),
+});
 
 /** 白盒里有名字的人（Data_BlockoutXBotClips.mjs 的 XBOT_CHARACTER_LOOKS 的键）换成哪个人；没写的照用各自配色的 X Bot。 */
 export const XBOT_CAST_CHARACTERS = Object.freeze({ heyoutian: "heYoutian", luo: "luo", shunzi: "shunzi", comrade: "donggua", yaowa: "yaowa", geng: "oldGeng", taniHisao: "taniHisao", azumaShiro: "azumaShiro", liuwencai: "liuWencai", nier: "nier", erya: "erya", interpreter: "interpreter", tiansao: "tianSao" });

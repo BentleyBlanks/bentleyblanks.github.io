@@ -474,10 +474,11 @@ export class XBotSkins {
    * 这个配色的人用哪套人物：有名字的人（look.key 是角色键）按 XBOT_CAST_CHARACTERS，阵营素色（look.key 就是阵营）按
    * XBOT_FACTION_CHARACTERS（写了几个人就按 seed —— 兵的编号 —— 的字符串哈希固定挑一个，读不到的跳过），其余 X Bot。
    */
-  KitFor(look, seed = "") {
+  KitFor(look, seed = "", faction = null) {
     const cast = this.kits.get(XBOT_CAST_CHARACTERS[look.key]);
     if (cast) return cast;
-    const kits = FactionCharacterKeys(look.key).map(key => this.kits.get(key)).filter(Boolean);
+    let kits = FactionCharacterKeys(look.key).map(key => this.kits.get(key)).filter(Boolean);
+    if (!kits.length && faction && faction !== look.key) kits = FactionCharacterKeys(faction).map(key => this.kits.get(key)).filter(Boolean);
     if (!kits.length) return this.kits.get("xbot");
     let h = 2166136261;
     for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
@@ -828,7 +829,7 @@ export class XBotSkin {
     this.rig = actor.characterRig;
     this.faction = faction;
     this.look = look;
-    this.kit = skins.KitFor(look, seed);
+    this.kit = skins.KitFor(look, seed, faction);
     this.model = CloneSkinned(this.kit.source);
     this.model.name = "XBot";
     this.model.traverse((o) => {

@@ -118,7 +118,7 @@ export class EncounterPlay {
     this.groundAt=groundAt;
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,loadCast:LoadEncounterCast,
       groundAt,formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
-      characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
+      characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...Object.values(XBOT_FACTION_CHARACTERS).flat()])]});
     this.view=this.isCampaign?CreateSingleViewportStub(host):new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
     this.opening=this.isCampaign
@@ -540,7 +540,7 @@ export class EncounterPlay {
     const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,
       navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),modelVariant:variants[hash%variants.length],...SpeakingCastOptions(spec.castId)});
     if(!soldier)return false;
-    const skin=spec.castId||spec.side==="ija"?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
+    const skin=spec.castId||XBOT_FACTION_CHARACTERS[spec.side]?.length?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
     if(skin)this.host.ai.view.SetSkin(soldier,skin);
     const index=Number(actor.id.slice((actor.groupId||"").length+1))||0;
     const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
