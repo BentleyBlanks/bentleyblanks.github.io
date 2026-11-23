@@ -32,15 +32,44 @@ import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { MOTION_BLUR } from "./Data_Tuning_TemporalDof.mjs";
 
+// --- 相机速度剥离（将镜头平移/旋转与逐物体速度解耦）--------------------------
+// 镜头旋转/走位按 uCameraScale（0.28）大幅克制，避免 FPS 一动起来整屏糊成一片；
+// 跑动士兵、飞行手雷、行进战车等相对相机的逐物体速度仍保留 100% 物理运动模糊。
+const GLSL_EFFECTIVE_VEL = /* glsl */`
+uniform vec2 uProjScale;
+uniform mat4 uInvView;
+uniform mat4 uPrevViewProjection;
+uniform float uCameraScale;
+
+vec3 MbViewPos(vec2 uv, float depth) {
+  vec2 ndc = uv * 2.0 - 1.0;
+  return vec3(ndc.x / uProjScale.x, ndc.y / uProjScale.y, -1.0) * depth;
+}
+
+vec2 EffectiveVelocity(vec2 uv, vec2 rawVel, float z) {
+  if (dot(rawVel, rawVel) < 1e-10) return vec2(0.0);
+  if (z <= 0.0 || (uForegroundDepth > 0.0 && abs(z - uForegroundDepth) < uForegroundEps)) return vec2(0.0);
+  vec4 prevClip = uPrevViewProjection * (uInvView * vec4(MbViewPos(uv, z), 1.0));
+  if (prevClip.w <= 0.0) return rawVel * uCameraScale;
+  vec2 prevUv = (prevClip.xy / max(abs(prevClip.w), 1e-4)) * 0.5 + 0.5;
+  vec2 camVel = uv - prevUv;
+  return camVel * uCameraScale + (rawVel - camVel);
+}
+`;
+
 // --- tile max（可分离：先 X 后 Y）------------------------------------------
 // uAxis = (1,0) 走 X、(0,1) 走 Y。一份材质两趟用，省一次编译。
 function MakeTileMaxFrag(tilePx) {
   return /* glsl */`
 uniform sampler2D uSource;
+uniform sampler2D uNormalDepth;
 uniform vec2 uSourceTexel;
 uniform vec2 uAxis;
 uniform float uFirstPass;   // 1 = 源是速度靶（rg），0 = 源是上一趟 tile（rg）
+uniform float uForegroundDepth;
+uniform float uForegroundEps;
 varying vec2 vUv;
+${GLSL_EFFECTIVE_VEL}
 void main() {
   vec2 best = vec2(0.0);
   float bestLen = -1.0;
@@ -49,6 +78,9 @@ void main() {
   for (int i = 0; i < ${tilePx}; i++) {
     vec2 uv = base + uAxis * (float(i) * uSourceTexel);
     vec2 v = texture2D(uSource, uv).xy;
+    if (uFirstPass > 0.5) {
+      v = EffectiveVelocity(uv, v, texture2D(uNormalDepth, uv).w);
+    }
     float len = dot(v, v);
     if (len > bestLen) { bestLen = len; best = v; }
   }
@@ -94,6 +126,7 @@ uniform float uForegroundEps;
 uniform vec2 uNormalDepthResolution;
 varying vec2 vUv;
 ${GLSL_COMMON}
+${GLSL_EFFECTIVE_VEL}
 
 float Cone(float dist, float len) { return clamp(1.0 - dist / max(len, 1e-4), 0.0, 1.0); }
 float Cylinder(float dist, float len) {
@@ -107,8 +140,9 @@ float ViewDepth(vec2 uv) {
   float d = texture2D(uNormalDepth, uv).w;
   return d <= 0.0 ? 1.0e4 : d;    // 天空当无穷远
 }
-vec2 BlurVector(vec2 uv) {
-  return clamp(texture2D(uVelocity, uv).xy * uBlurScale, -uMaxBlurUv, uMaxBlurUv);
+vec2 BlurVector(vec2 uv, float rawZ) {
+  vec2 eff = EffectiveVelocity(uv, texture2D(uVelocity, uv).xy, rawZ);
+  return clamp(eff * uBlurScale, -uMaxBlurUv, uMaxBlurUv);
 }
 
 void main() {
@@ -128,15 +162,15 @@ void main() {
     gl_FragColor = vec4(centerColor, 1.0);
     return;
   }
-  vec2 dirC = BlurVector(vUv);
+  vec2 dirC = BlurVector(vUv, nd.w);
   float lenC = length(dirC * uPixelResolution);
   // 本像素几乎不动时借邻域方向（否则交替采样的一半退化成原地踏步）
   if (lenC < 0.5) { dirC = dirN; }
   lenC = max(lenC, 0.5);
   float zC = nd.w <= 0.0 ? 1.0e4 : nd.w;
 
-  // 中心权重（McGuire）：本像素越模糊，自己的权重越低。
-  float total = float(${taps}) / (40.0 * lenC);
+  // 中心权重锚定：保住主体轮廓清晰度，避免高速甩枪时中心原色权重掉到 <1% 把敌人糊成无法辨认的条纹。
+  float total = max(0.65, float(${taps}) / (12.0 * lenC));
   vec3 sum = centerColor * total;
   float jitter = Ign(gl_FragCoord.xy + uFrame * 7.13) - 0.5;
   for (int i = 0; i < ${taps}; i++) {
@@ -147,8 +181,9 @@ void main() {
     vec2 dir = (i % 2 == 0) ? dirN : dirC;
     vec2 sampleUv = vUv + dir * t;
     float dist = abs(t) * length(dir * uPixelResolution);
-    float zS = ViewDepth(sampleUv);
-    float lenS = max(length(BlurVector(sampleUv) * uPixelResolution), 0.5);
+    float rawZS = texture2D(uNormalDepth, sampleUv).w;
+    float zS = rawZS <= 0.0 ? 1.0e4 : rawZS;
+    float lenS = max(length(BlurVector(sampleUv, rawZS) * uPixelResolution), 0.5);
     // 前景（zS 更小）模糊到中心 / 中心模糊透出后面的 S / 两者都模糊
     float front = SoftDepthCompare(zS, zC);
     float back = SoftDepthCompare(zC, zS);
@@ -204,8 +239,14 @@ export class MotionBlurPass {
     this.scale = preset.motionBlurScale > 0 ? preset.motionBlurScale : 1;
 
     this.uniformsTile = {
-      uSource: { value: null }, uSourceTexel: { value: new THREE.Vector2() },
+      uSource: { value: null }, uNormalDepth: { value: null },
+      uSourceTexel: { value: new THREE.Vector2() },
       uAxis: { value: new THREE.Vector2(1, 0) }, uFirstPass: { value: 1 },
+      uForegroundDepth: { value: 0 }, uForegroundEps: { value: 0.002 },
+      uProjScale: { value: new THREE.Vector2(1, 1) },
+      uInvView: { value: new THREE.Matrix4() },
+      uPrevViewProjection: { value: new THREE.Matrix4() },
+      uCameraScale: { value: MOTION_BLUR.cameraScale ?? 0.28 },
     };
     this.matTile = MakeFullscreenMaterial(MakeTileMaxFrag(this.tilePx), this.uniformsTile);
 
@@ -225,6 +266,10 @@ export class MotionBlurPass {
       uFrame: { value: 0 },
       uForegroundDepth: { value: 0 }, uForegroundEps: { value: 0.002 },
       uNormalDepthResolution: { value: new THREE.Vector2(2, 2) },
+      uProjScale: { value: new THREE.Vector2(1, 1) },
+      uInvView: { value: new THREE.Matrix4() },
+      uPrevViewProjection: { value: new THREE.Matrix4() },
+      uCameraScale: { value: MOTION_BLUR.cameraScale ?? 0.28 },
     };
     this.material = MakeFullscreenMaterial(MakeReconstructFrag(this.taps), this.uniforms);
 
@@ -303,14 +348,28 @@ export class MotionBlurPass {
   Render(ctx) {
     const P = this.pipeline;
     const strength = ctx.options.motionBlur ?? 1;
-    const blurScale = MOTION_BLUR.shutterFraction * 0.5 * strength;
+    // 帧率归一化（对标 UE5 r.MotionBlur.TargetFPS = 60 / COD:AW）：低帧率或掉帧时按 60fps 快门时间收敛，
+    // 防止 30–50 FPS 下整帧速度变大导致运动模糊成倍拉长。
+    const dt = ctx.options.dt;
+    const targetDt = 1 / (MOTION_BLUR.targetFps || 60);
+    const fpsScale = (Number.isFinite(dt) && dt > 0)
+      ? Math.min(1.0, targetDt / Math.max(dt, 1 / 240))
+      : 1.0;
+    const blurScale = MOTION_BLUR.shutterFraction * 0.5 * strength * fpsScale;
+    const cameraScale = MOTION_BLUR.cameraScale ?? 0.28;
 
-    // 1) tile max：先 X 后 Y（可分离，K + K 次取样而不是 K²）
+    // 1) tile max：先 X 后 Y（可分离，K + K 次取样而不是 K²）；首趟同步剥离相机速度衰减
     const UT = this.uniformsTile;
     UT.uSource.value = ctx.velocityTexture;
+    UT.uNormalDepth.value = ctx.normalDepthTexture;
     UT.uSourceTexel.value.set(1 / P.width, 1 / P.height);
     UT.uAxis.value.set(1, 0);
     UT.uFirstPass.value = 1;
+    UT.uForegroundDepth.value = P.foregroundViewDepth ?? 0;
+    UT.uProjScale.value.copy(ctx.projScale);
+    UT.uInvView.value.copy(ctx.invView);
+    UT.uPrevViewProjection.value.copy(ctx.prevViewProjection);
+    UT.uCameraScale.value = cameraScale;
     ctx.blitter.Blit(this.matTile, this.tileX);
     UT.uSource.value = this.tileX.texture;
     UT.uSourceTexel.value.set(1 / this.tileX.width, 1 / this.tileX.height);
@@ -332,12 +391,16 @@ export class MotionBlurPass {
     U.uNormalDepthResolution.value.set(P.width, P.height);
     U.uNeighborMax.value = this.neighbor.texture;
     U.uPixelResolution.value.set(P.width, P.height);
-    // 最大半位移 = 半个 tile：McGuire 的前提是「没有像素跑得比一个 tile 还远」，
-    // 越界就会在 tile 边界露出硬边。
-    U.uMaxBlurUv.value.set(this.tilePx * 0.5 / P.width, this.tilePx * 0.5 / P.height);
+    // 最大半位移封顶（默认 4.5 px，且不超过半个 tile）：保留干净的动感提示，杜绝甩枪糊成 20+ px 泥浆。
+    const maxPx = Math.min(this.tilePx * 0.5, MOTION_BLUR.maxBlurPx ?? (this.tilePx * 0.5));
+    U.uMaxBlurUv.value.set(maxPx / P.width, maxPx / P.height);
     U.uBlurScale.value = blurScale;
     U.uFrame.value = ctx.frame;
     U.uForegroundDepth.value = P.foregroundViewDepth ?? 0;
+    U.uProjScale.value.copy(ctx.projScale);
+    U.uInvView.value.copy(ctx.invView);
+    U.uPrevViewProjection.value.copy(ctx.prevViewProjection);
+    U.uCameraScale.value = cameraScale;
     if (this.blurTarget) {
       ctx.blitter.Blit(this.material, this.blurTarget);
       // 4) 半分辨率回填：静止区域取回全分辨率原图

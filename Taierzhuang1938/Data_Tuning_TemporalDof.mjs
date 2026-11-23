@@ -51,10 +51,11 @@
  */
 export const TAAU = {
   currentFrameWeight: 0.04,
-  fastMotionWeight: 0.2,
-  fastMotionPx: 40,
+  fastMotionWeight: 0.38,
+  fastMotionPx: 14,
   filterGaussianK: 2.75,
   varianceGamma: 1.25,
+  motionVarianceGamma: 0.85,
   antiFlicker: 0.6,
   antiFlickerFloor: 0.35,
   responsiveWeight: 0.5,
@@ -74,21 +75,24 @@ export const TAAU = {
 /**
  * 逐物体运动模糊。
  *
- *   tilePx           tile max 的边长（输入像素）。**它同时是单帧最大模糊位移**
- *                    —— McGuire 的前提是「任何像素的速度不超过一个 tile」，
- *                    超了就会在 tile 边界露出硬边。20 px 是讲义里的取值。
- *   shutterFraction  快门开合占一帧的比例。0.5 = 电影的 180° 快门。
- *                    速度靶记的是**整帧**位移，所以模糊长度 = 速度 × 这个数。
+ *   tilePx           tile max 的边长（输入像素）。
+ *   shutterFraction  快门开合占一帧的比例。0.30 ≈ 108° 游戏清晰快门（旧 0.50 电影快门在 FPS 转身时整屏糊成一片）。
+ *   cameraScale      相机平移/旋转速度的衰减系数（0.28）：把「镜头运动模糊」压成极克制的顺滑感，同时保留 100% 逐物体速度。
+ *   maxBlurPx        单帧最大半模糊半径（输入像素，旧版直接取 tilePx/2 = 10 px 导致甩枪 20–25 px 糊屏，现封顶 4.5 px）。
+ *   targetFps        快门标定帧率（60 fps）：低帧率或掉帧时按 (1/targetFps)/dt 自动收敛，杜绝掉帧时模糊翻倍。
  *   softZExtent      McGuire 的 SOFT_Z_EXTENT（米）：深度分类的软过渡宽度。
- *   minBlurPx        低于这个像素长度直接返回中心色（跳过整个重建循环）。
+ *   minBlurPx        低于这个像素长度直接返回中心色（跳过整个重建循环，常态走位/微瞄 100% 锐利零模糊）。
  *   halfResBlendPx   半分辨率档的混合曲线：模糊长度到这个像素数时完全采用半分辨率
  *                    结果，之下按比例混回全分辨率原图（静止区域仍然是锐的）。
  */
 export const MOTION_BLUR = {
   tilePx: 20,
-  shutterFraction: 0.5,
+  shutterFraction: 0.30,
+  cameraScale: 0.28,
+  maxBlurPx: 4.5,
+  targetFps: 60,
   softZExtent: 0.6,
-  minBlurPx: 0.6,
+  minBlurPx: 0.65,
   halfResBlendPx: 2.5,
 };
 

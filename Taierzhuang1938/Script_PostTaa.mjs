@@ -180,28 +180,32 @@ void main() {
   // 对折是 UE 的 rounded AABB，两头都稳
   boxMin = 0.5 * (boxMin + crossMin);
   boxMax = 0.5 * (boxMax + crossMax);
-  // 方差裁剪（Salvi 2016 / UE4 AA_VARIANCE）：把盒子再按 μ ± γσ 收一次。
-  // γ 越小越稳（闪烁少、鬼影多），越大越锐。
-  if (uVarianceGamma > 0.0) {
-    vec3 mu = m1 / 9.0;
-    vec3 sigma = sqrt(max(m2 / 9.0 - mu * mu, vec3(0.0)));
-    boxMin = max(boxMin, mu - uVarianceGamma * sigma);
-    boxMax = min(boxMax, mu + uVarianceGamma * sigma);
-    boxMin = min(boxMin, filtered);      // 当前帧自己永远要在盒子里，否则会自锁
-    boxMax = max(boxMax, filtered);
-  }
-
   // --- 2) 速度：优先读预通道 RT1（逐物体），退路是相机深度反投影 --------
   // 两条路都在**最近片元**上取（closest-fragment dilation）。
+  // 天空（closestDepth >= 399）在预通道被跳过、RT1 恒为 0，必须走相机旋转反投影，避免转身云层糊影。
   vec3 viewPos = ViewPos(closestUv, closestDepth);
   vec4 world = uInvView * vec4(viewPos, 1.0);
   vec4 prevClip = uPrevViewProjection * world;
   vec2 prevUvClosest = (prevClip.xy / max(abs(prevClip.w), 1e-4)) * 0.5 + 0.5;
   vec2 velocity = closestUv - prevUvClosest;
   bool clipValid = prevClip.w > 0.0;
-  if (uUseVelocityBuffer > 0.5) {
+  if (uUseVelocityBuffer > 0.5 && closestDepth < 399.0) {
     velocity = texture2D(uVelocity, closestUv).xy;
     clipValid = true;                    // 速度靶自带钳制与首帧归零，不需要 w 判据
+  }
+  float velocityPx = length(velocity * uHistoryResolution);
+  float motionT = smoothstep(0.35, 4.0, velocityPx);
+
+  // 方差裁剪（Salvi 2016 / UE4 AA_VARIANCE）：静止保持 1.25 稳抗锯齿，运动中动态收紧到
+  // motionVarianceGamma（0.85）斩断移动拖影与级联重采样发糊。
+  if (uVarianceGamma > 0.0) {
+    vec3 mu = m1 / 9.0;
+    vec3 sigma = sqrt(max(m2 / 9.0 - mu * mu, vec3(0.0)));
+    float dynGamma = mix(uVarianceGamma, ${(TAAU.motionVarianceGamma ?? 0.85).toFixed(3)}, motionT);
+    boxMin = max(boxMin, mu - dynGamma * sigma);
+    boxMax = min(boxMax, mu + dynGamma * sigma);
+    boxMin = min(boxMin, filtered);      // 当前帧自己永远要在盒子里，否则会自锁
+    boxMax = max(boxMax, filtered);
   }
   vec2 prevUv = vUv - velocity;
 
@@ -225,17 +229,15 @@ void main() {
   history = center + dir * clamp(t, 0.0, 1.0);
 
   // --- 4) 混合权重 -----------------------------------------------------
-  // ① anti-flicker 只压**静止**那一档：局部亮度对比越高越信历史，因为高对比
-  //    像素上「这一帧恰好采到哪」本身就是噪声源（HDRP 的 feedback 调制同一件事）。
-  //    **必须压在 mix 之前**：压在之后的话快动像素的 0.2 会被一起压到 0.07，
-  //    邻域裁剪来不及跟上，运动物体的边就开始拖影 —— 那正是要避免的那一头。
+  // ① anti-flicker 只压**真正静止**像素：一旦像素开始移动（motionT→1），立刻解除防闪压制，
+  //    避免走位或慢转镜头时高对比边缘被压到 0.014 权重而拖出十几帧重采样糊影。
   float stillWeight = uCurrentWeight;
   if (uAntiFlicker > 0.0) {
     float contrast = (boxMax.x - boxMin.x) / max(0.5 * (boxMax.x + boxMin.x), 0.05);
-    stillWeight *= mix(1.0, uAntiFlickerFloor, clamp(contrast * uAntiFlicker, 0.0, 1.0));
+    float antiFlickerAmt = clamp(contrast * uAntiFlicker, 0.0, 1.0) * (1.0 - motionT);
+    stillWeight *= mix(1.0, uAntiFlickerFloor, antiFlickerAmt);
   }
-  // ② 静止吃上面那一档（UE 缺省 0.04），快动向 0.2 抬减少拖尾
-  float velocityPx = length(velocity * uHistoryResolution);
+  // ② 静止吃 0.04 稳抗锯齿，移动迅速拉高到 uFastMotionWeight（0.38 @ 14 px）保持动态清晰
   float w = mix(stillWeight, uFastMotionWeight,
                 clamp(velocityPx / max(uFastMotionPx, 1.0), 0.0, 1.0));
   // ②b 遮挡变化拒绝（Disocclusion）：前景运动轮廓与背后新露出像素速度差大时抬高当前帧权重，消掉人物/车辆拖影
