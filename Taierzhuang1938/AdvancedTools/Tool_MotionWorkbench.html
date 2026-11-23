@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>动作工作台 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #080907;
+      color: #deddd2;
+      font-family: system-ui, "Microsoft YaHei UI", sans-serif;
+    }
+    #mwFrame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    #mwFallback {
+      display: none;
+      position: fixed;
+      inset: 0;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      background: #080907;
+    }
+    #mwFallback.show { display: grid; }
+    .box {
+      max-width: 520px;
+      padding: 20px 24px;
+      border: 1px solid #edca8366;
+      background: #10120d;
+      line-height: 1.7;
+      font-size: 13px;
+    }
+    .box h1 { margin: 0 0 8px; font-size: 16px; color: #ffe0a1; letter-spacing: 0.12em; }
+    .box code { padding: 2px 6px; background: #070806; border: 1px solid #c1bdab33; color: #edca83; }
+  </style>
+</head>
+<body>
+  <iframe id="mwFrame" src="/__motion-workbench/" title="动作工作台"></iframe>
+  <div id="mwFallback">
+    <div class="box">
+      <h1>需要通过本地预览服打开</h1>
+      <p>动作工作台依赖本地预览服挂载的 <code>/__motion-workbench/</code> 后端接口。</p>
+      <p>请通过 <code>AdvancedTool ControlCenter</code> 快捷方式或运行 <code>node scripts/Script_LocalPreview.mjs</code> 后再打开此窗口。</p>
+    </div>
+  </div>
+  <script>
+    fetch("/__motion-workbench/api/tasks", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); })
+      .catch(function () {
+        document.getElementById("mwFrame").style.display = "none";
+        document.getElementById("mwFallback").classList.add("show");
+      });
+  </script>
+</body>
+</html>

@@ -37,19 +37,19 @@ const Same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].s
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);
 const splitIds = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
-Check("split 条目共 15 项", splitIds.length === 15, splitIds.join(","));
+Check("split 条目共 16 项", splitIds.length === 16, splitIds.join(","));
 Check("独立窗口 + 摄影棚 = split 的全部", Same([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS], splitIds));
 Check("独立窗口 = split 且带 window 的条目", Same(WINDOW_TOOL_IDS, splitIds.filter((id) => TOOL_INFO[id].window)));
 Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, menuIds.filter((id) => !TOOL_INFO[id].split)));
-Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 17);
+Check("菜单 18 项且三类互不重叠", menuIds.length === 18 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 18);
 
 // --- 2. 搬家 ---------------------------------------------------------------------
-const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html",
+const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "Tool_MotionWorkbench.html",
   "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
-Check("旧位置不留跳转壳", pages.slice(0, 5).every((page) => !fs.existsSync(path.join(projectDir, page))));
+Check("旧位置不留跳转壳", pages.slice(0, 6).every((page) => !fs.existsSync(path.join(projectDir, page))));
 Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio", "PropLibrary", "AssetStandards",
-  "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
+  "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "MotionWorkbench", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
 Check("旧枪械工作窗已移除", !fs.existsSync(path.join(toolsDir, "Script_EditorWeapon.mjs")));
 
@@ -65,6 +65,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["levelFlow", "Script_EditorLevelFlow.mjs", "LevelFlowEntry", "Tool_LevelFlow.html"],
     ["mixamoPreview", "Script_EditorMixamoPreview.mjs", "MixamoPreviewEditor", "Tool_MixamoAnimationPreview.html"],
     ["motionCompare", "Script_EditorMotionCompare.mjs", "MotionCompareEditor", "Tool_MotionCompare.html"],
+    ["motionWorkbench", "Script_EditorMotionWorkbench.mjs", "MotionWorkbenchEditor", "Tool_MotionWorkbench.html"],
     ["weapon", "Script_EditorWeaponEntry.mjs", "WeaponInspectionEntry", "Tool_WeaponInspection.html"],
     ["firstPerson", "Script_EditorFirstPersonEntry.mjs", "FirstPersonInspectionEntry", "Tool_FirstPersonInspection.html"],
     ["textures", "Script_EditorTextures.mjs", "TextureEditor", "TextureManager.html"],
@@ -124,7 +125,7 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   const cards = ControlCenterCards(page);
   Check("标题是 AdvancedTool ControlCenter", CONTROL_CENTER_TITLE === "AdvancedTool ControlCenter");
   const gameMenuCards = cards.filter((card) => card.id !== "modelWorkbench");
-  Check("卡片 18 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 18 && new Set(cards.map((card) => card.group)).size === 6
+  Check("卡片 19 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 19 && new Set(cards.map((card) => card.group)).size === 6
     && JSON.stringify(gameMenuCards.map((card) => card.id)) === JSON.stringify(menuIds));
   Check("游戏工具文案取 TOOL_INFO 的 label / hint", gameMenuCards.every((card) => card.label === TOOL_INFO[card.id].label && card.hint === TOOL_INFO[card.id].hint));
   Check("模型制作工作台是控制中心的独立资产工具", cards.some((card) => card.id === "modelWorkbench" && card.group === "assets"

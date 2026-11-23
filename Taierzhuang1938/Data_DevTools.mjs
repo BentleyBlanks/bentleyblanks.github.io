@@ -36,6 +36,8 @@ export const TOOL_INFO = Object.freeze({
     window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
   motionCompare: { label: "动作衔接对比", hint: "打开独立窗口：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
     window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare", features: "popup,width=1600,height=1000" } },
+  motionWorkbench: { label: "动作工作台", hint: "打开独立窗口：白盒导演、电影分镜（4 源切换）、Seedance 视频抽卡、GEM-X 77 骨提取与 Mixamo 3D 重定向验收", split: true,
+    window: { url: "./AdvancedTools/Tool_MotionWorkbench.html", name: "TengxianMotionWorkbench", features: "popup,width=1600,height=1000" } },
   weapon: { label: "枪械检查台", hint: "查看模型外观、挂点和尺寸", split: true,
     window: { url: "./AdvancedTools/Tool_WeaponInspection.html", name: "TengxianWeaponInspection", features: "popup,width=1440,height=900" } },
   firstPerson: { label: "第一人称持枪检查", hint: "打开独立靶场窗口：第一人称持枪试射、真实装填与慢放逐帧、连射拉栓与移动惯性前后对比", split: true,
@@ -54,7 +56,7 @@ export const TOOL_INFO = Object.freeze({
 const TOOL_MENU_DEFS = [
   { id: "scene", label: "场景", items: ["sceneEditor", "splines", "propPcg"] },
   { id: "level", label: "关卡", items: ["blockout", "timeline", "levelFlow"] },
-  { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare"] },
+  { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare", "motionWorkbench"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson"] },
   { id: "media", label: "特效与声音", items: ["vfx", "audio"] },
   { id: "assets", label: "资产", items: ["props", "assetStandards", "textures"] },

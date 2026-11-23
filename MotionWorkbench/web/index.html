@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>动作工作台 · 第一关 01 防炮洞</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23080907'/%3E%3Crect x='1' y='1' width='30' height='30' fill='none' stroke='%23edca83' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='9' r='3' fill='%23edca83'/%3E%3Cpath d='M16 12v8m0-5-5.5 3m5.5-3 5.5 3m-5.5 2-4 6m4-6 4 6' stroke='%23deddd2' stroke-width='2' stroke-linecap='square' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./three/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 顶部栏：仅标题、当前动作名与路线标、以及唯一聚合的「系统」抽屉入口 -->
+  <header class="mwBar">
+    <div class="mwBrand">动作工作台</div>
+    <div class="mwBarDiv"></div>
+    <div class="mwCurrentHead">
+      <span id="topBeatCode" class="mwMono mwTopCode">—</span>
+      <span id="topTaskTitle" class="mwTopTitle">加载中…</span>
+      <span id="topRouteTag" class="mwRoutePill">—</span>
+    </div>
+    <div class="mwBarRight">
+      <button id="btnSystem" class="mwSysBtn" type="button" aria-expanded="false" aria-controls="sysDrawer">
+        <span id="sysDot" class="mwDot"></span>
+        <span id="sysBtnLabel">系统</span>
+        <span class="mwCaret">▾</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="mwShell">
+    <!-- 左栏：第一关 · 01 防炮洞 大纲动作卡（带概念图封面占位，零手填新建表单） -->
+    <aside class="mwLeft">
+      <div class="mwLeftHead">
+        <div class="mwSceneCaption">
+          <span class="mwPaneTitle">第一关 · 01 防炮洞</span>
+          <span id="taskCountBadge" class="mwMono mwDim">—</span>
+        </div>
+        <div class="mwFilterBar" id="routeFilters">
+          <button class="mwFilterBtn active" data-filter="mocap" type="button">需转骨骼</button>
+          <button class="mwFilterBtn" data-filter="all" type="button">全部</button>
+          <button class="mwFilterBtn" data-filter="mixamo" type="button">Mixamo</button>
+        </div>
+      </div>
+      <div id="taskList" class="mwTaskList"></div>
+    </aside>
+
+    <!-- 主工作区：顶部 6 步装配线 + 下方统一「左视口 / 右确认检视」 -->
+    <main class="mwMain">
+      <div id="taskView" class="mwTaskView">
+        <!-- 6 阶段可视化流程轨 -->
+        <nav class="mwRail" id="stepper" aria-label="制作阶段">
+          <button class="mwStep" data-stage="1" type="button">
+            <span class="mwStepIdx">01</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">白盒导演</span>
+              <span class="mwStepState" data-step-state="1"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+          <span class="mwBridge" data-bridge="1" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
+          <button class="mwStep" data-stage="2" type="button">
+            <span class="mwStepIdx">02</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">电影分镜</span>
+              <span class="mwStepState" data-step-state="2"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+          <span class="mwBridge" data-bridge="2" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
+          <button class="mwStep" data-stage="3" type="button">
+            <span class="mwStepIdx">03</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">视频生成</span>
+              <span class="mwStepState" data-step-state="3"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+          <span class="mwBridge" data-bridge="3" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
+          <button class="mwStep" data-stage="4" type="button">
+            <span class="mwStepIdx">04</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">骨骼提取</span>
+              <span class="mwStepState" data-step-state="4"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+          <span class="mwBridge" data-bridge="4" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
+          <button class="mwStep" data-stage="5" type="button">
+            <span class="mwStepIdx">05</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">重定向</span>
+              <span class="mwStepState" data-step-state="5"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+          <span class="mwBridge" data-bridge="5" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><line x1="0" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="1.2"/><polygon points="16,2.5 23,6 16,9.5" fill="currentColor"/></svg></span>
+          <button class="mwStep" data-stage="6" type="button">
+            <span class="mwStepIdx">06</span>
+            <span class="mwStepMeta">
+              <span class="mwStepName">修缮</span>
+              <span class="mwStepState" data-step-state="6"></span>
+            </span>
+            <span class="mwStepMark" aria-hidden="true"></span>
+          </button>
+        </nav>
+
+        <!-- STAGE 01 · 白盒导演（概念图封面参考 + 多人合演站位 + 单人白盒拆轨确认） -->
+        <section class="mwStage hidden" data-panel="1">
+          <div class="mwCanvas mwStage1Canvas">
+            <div class="mwDirectorGrid">
+              <!-- 左：概念图封面占位槽（暂留空，按大纲预填画面构图签） -->
+              <div class="mwViewPane">
+                <div class="mwViewHead">
+                  <span>概念图封面参考</span>
+                  <span class="mwMono mwDim">16:9 · 待补图</span>
+                </div>
+                <div class="mwConceptStage">
+                  <div class="mwCornerFrame">
+                    <span class="mwCorner tl"></span><span class="mwCorner tr"></span>
+                    <span class="mwCorner bl"></span><span class="mwCorner br"></span>
+                    <div class="mwConceptMark">CONCEPT</div>
+                    <div id="s1ConceptCaption" class="mwConceptCap"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 右：01 防炮洞 6 人白盒合演平面导演图 -->
+              <div class="mwViewPane">
+                <div class="mwViewHead">
+                  <span>01 防炮洞 · 6 人白盒合演站位</span>
+                  <span class="mwMono mwGold" id="s1FloorHighlight">—</span>
+                </div>
+                <div class="mwFloorStage" id="s1FloorStage"></div>
+              </div>
+            </div>
+
+            <!-- 底部：白盒合演 → 单人白盒拆轨规格（只读展示，零手填） -->
+            <div class="mwSpecStrip">
+              <div class="mwSpecCell">
+                <div class="mwSpecK">合演时段</div>
+                <div id="s1EnsembleNote" class="mwSpecV">—</div>
+              </div>
+              <div class="mwSpecCell">
+                <div class="mwSpecK">白盒位移锁定</div>
+                <div id="s1Displacement" class="mwSpecV">—</div>
+              </div>
+              <div class="mwSpecCell">
+                <div class="mwSpecK">单人拆轨方案</div>
+                <div id="s1SoloStrategy" class="mwSpecV">—</div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecH">大纲卡片</div>
+                <div class="mwFacts">
+                  <div class="mwFact"><span class="k">场次</span><span id="s1MetaBeat" class="v">—</span></div>
+                  <div class="mwFact"><span class="k">角色</span><span id="s1MetaChar" class="v">—</span></div>
+                  <div class="mwFact"><span class="k">时长</span><span id="s1MetaDur" class="v mwMono">—</span></div>
+                  <div class="mwFact"><span class="k">路线</span><span id="s1MetaRoute" class="v">—</span></div>
+                </div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">对应台词</div>
+                <div id="s1MetaCue" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">判定依据</div>
+                <div id="s1MetaReason" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">动作节拍</div>
+                <div id="s1MetaDesc" class="mwReadout mwReadoutTall">—</div>
+              </div>
+            </div>
+            <div class="mwInspFoot">
+              <button id="btnApproveStage1" class="mwBtn mwPrimary mwFull" type="button">✓ 确认白盒走位 → 分镜</button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- STAGE 02 · 电影分镜（横向分镜板，确认后直连 Seedance） -->
+        <section class="mwStage hidden" data-panel="2">
+          <div class="mwCanvas mwStage2Canvas">
+            <div id="s2StoryboardBoard" class="mwBoardStrip"></div>
+            <div class="mwDriveBar">
+              <div class="mwDriveLeft">
+                <span class="mwSubTitle">SEEDANCE 2.5 对接</span>
+                <span id="s2DriveModeText" class="mwMono mwGold">—</span>
+              </div>
+              <div id="s2TimelineTicks" class="mwTimelineTicks"></div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecHeadRow">
+                  <div class="mwSecH">分镜图来源</div>
+                  <button id="btnS2ProviderCfg" class="mwLinkBtn" type="button">配置 ↗</button>
+                </div>
+                <div id="s2ProviderGrid" class="mwProvGrid"></div>
+                <div id="s2ProviderHint" class="mwProvHint">—</div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">画质档位</div>
+                <div class="mwPresetRow" id="s2QualityPresets">
+                  <button class="mwPresetBtn" data-q="480p" type="button">480p 抽卡</button>
+                  <button class="mwPresetBtn" data-q="720p" type="button">720p 精片</button>
+                  <button class="mwPresetBtn" data-q="1080p" type="button">1080p 高精</button>
+                </div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">已锁定分镜</div>
+                <div id="s2LockSummary" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">分镜动作</div>
+                <div class="mwBtnStack">
+                  <button id="btnGenNextShot" class="mwBtn" type="button">生成首张未出分镜</button>
+                  <button id="btnApproveAndSeedance" class="mwBtn mwPrimary" type="button">✓ 确认分镜 → 送入 Seedance</button>
+                </div>
+              </div>
+            </div>
+            <div class="mwInspFoot">
+              <button class="mwBtn mwNext" data-goto="3" type="button">查看阶段 03 视频 →</button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- STAGE 03 · 视频生成（Seedance 抽卡验收） -->
+        <section class="mwStage hidden" data-panel="3">
+          <div class="mwCanvas mwStage3Canvas">
+            <div class="mwHeroPlayer">
+              <div id="s3PlayerEmpty" class="mwPlaceholder">
+                <div class="mwPhTitle">待生成视频</div>
+                <div class="mwPhActions">
+                  <button id="btnStage3GenCenter" class="mwBtn mwPrimary" type="button">按已确认分镜生成视频</button>
+                  <label class="mwBtn mwUpload">
+                    导入本地 MP4
+                    <input id="inputUploadMp4Alt" type="file" accept="video/mp4,video/quicktime,video/webm" hidden>
+                  </label>
+                </div>
+              </div>
+              <video id="s3MainVideo" class="hidden" controls muted loop playsinline></video>
+              <div id="s3MainCap" class="mwVideoBadge hidden"></div>
+            </div>
+            <div class="mwStripWrap">
+              <div class="mwSubBar">
+                <span class="mwSubTitle">抽卡版本</span>
+                <label class="mwBtn mwSm mwUpload">
+                  + 导入 MP4
+                  <input id="inputUploadMp4" type="file" accept="video/mp4,video/quicktime,video/webm" hidden>
+                </label>
+              </div>
+              <div id="s3Takes" class="mwFilmstrip"></div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecH">模型档位</div>
+                <div class="mwPresetRow" id="s3ModelPresets">
+                  <button class="mwPresetBtn" data-m="seedance_2.5_flash" type="button">2.5 Flash</button>
+                  <button class="mwPresetBtn" data-m="seedance_2.5" type="button">2.5 正片</button>
+                </div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">上游锁定</div>
+                <div id="s3SourceSummary" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">抽卡</div>
+                <button id="btnStage3Gen" class="mwBtn mwFull" type="button">再抽 1 条视频</button>
+              </div>
+            </div>
+            <div class="mwInspFoot">
+              <button class="mwBtn mwPrimary mwFull" data-goto="4" type="button">✓ 定稿视频 → 骨骼提取</button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- STAGE 04 · 骨骼提取（GEM-X 77 关节原始还原验收） -->
+        <section class="mwStage hidden" data-panel="4">
+          <div class="mwCanvas mwStage4Canvas">
+            <div id="s4LiveBar" class="mwLiveBar hidden">
+              <div class="mwLiveRow">
+                <span id="s4LiveText">提骨中…</span>
+                <span class="mwLiveRight">
+                  <strong id="s4LivePct" class="mwMono">0%</strong>
+                  <button id="btnOpenSysFromRun" class="mwLinkBtn" type="button">硬件状态 ↗</button>
+                </span>
+              </div>
+              <div class="mwTrack"><div id="s4LiveFill" class="mwTrackFill" style="width:0%"></div></div>
+            </div>
+
+            <div id="s4Empty" class="mwPlaceholder hidden">
+              <div class="mwPhTitle" id="s4EmptyTitle">等待提骨</div>
+              <div class="mwPhActions">
+                <button id="btnStage4RunCenter" class="mwBtn mwPrimary" type="button">提交云端提骨</button>
+              </div>
+            </div>
+
+            <div id="s4ResultArea" class="mwMocapStage hidden">
+              <div class="mwTriple">
+                <div class="mwViewPane">
+                  <div class="mwViewHead"><span>原片</span></div>
+                  <div class="mwViewBody"><video id="vidOrig" muted loop playsinline></video></div>
+                </div>
+                <div class="mwViewPane">
+                  <div class="mwViewHead"><span>77 关节叠加</span><span class="mwLegend"><i class="lBody"></i>躯干 <i class="lHand"></i>十指</span></div>
+                  <div class="mwViewBody"><video id="vidOverlay" muted loop playsinline></video></div>
+                </div>
+                <div class="mwViewPane">
+                  <div class="mwViewHead"><span>世界 3D</span></div>
+                  <div class="mwViewBody"><video id="vidWorld" muted loop playsinline></video></div>
+                </div>
+              </div>
+
+              <div class="mwTransport">
+                <button id="btnSyncPlay" class="mwBtn mwPrimary mwSm" type="button">▶ 播放</button>
+                <button id="btnStepBack" class="mwBtn mwSm" type="button" title="上一帧">◀</button>
+                <button id="btnStepFwd" class="mwBtn mwSm" type="button" title="下一帧">▶</button>
+                <input id="s4Scrub" class="mwScrub" type="range" min="0" max="10" step="0.033" value="0">
+                <span id="syncTimeDisplay" class="mwMono mwTime">0.00 / 0.00 s</span>
+                <select id="selSyncRate" class="mwRate" aria-label="倍速">
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1.0×</option>
+                </select>
+              </div>
+
+              <div class="mwExportBar">
+                <span id="s4MetricSummary" class="mwMono mwMetric"></span>
+                <div id="s4Downloads" class="mwDlRow"></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecH">识别规格</div>
+                <div class="mwPresetCol" id="s4PrecisionPresets">
+                  <button class="mwPresetBtn" data-p="standard_l4" type="button">标准 · L4 (GEM-X 77骨)</button>
+                  <button class="mwPresetBtn" data-p="high_a100" type="button">精修 · A100 (+WiLoR 手部)</button>
+                </div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">输入视频</div>
+                <div id="s4SelectedVideo" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <button id="btnStage4Run" class="mwBtn mwFull" type="button">重新提骨</button>
+              </div>
+              <div class="mwSec" id="s4RunsSec">
+                <div class="mwSecH">批次</div>
+                <div id="s4RunTabs" class="mwRunList"></div>
+              </div>
+            </div>
+            <div class="mwInspFoot">
+              <button id="btnApproveStage4" class="mwBtn mwPrimary mwFull" type="button">✓ 通过提骨 → 重定向验收</button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- STAGE 05 · 重定向验收（独立二次验收节点：原片 vs 实时真实游戏角色 3D 预览） -->
+        <section class="mwStage hidden" data-panel="5">
+          <div class="mwCanvas mwStage5RetargetCanvas">
+            <div id="s5RetargetEmpty" class="mwPlaceholder hidden">
+              <div class="mwPhTitle">待完成 04 骨骼提取</div>
+              <div class="mwPhActions">
+                <button class="mwBtn mwPrimary" data-goto="4" type="button">返回 04 骨骼提取</button>
+              </div>
+            </div>
+
+            <div id="s5RetargetStage" class="mwRetargetStage hidden">
+              <div class="mwRetargetSplit">
+                <!-- 左：原片对照 -->
+                <div class="mwViewPane" id="s5VideoCol">
+                  <div class="mwViewHead"><span>原始视频对照</span></div>
+                  <div class="mwViewBody">
+                    <video id="vidRetargetOrig" muted loop playsinline></video>
+                    <div id="s5NoVideoNote" class="mwNoVid hidden">Mixamo 通用库动作 · 直接看右侧角色 3D 表现</div>
+                  </div>
+                </div>
+
+                <!-- 右：真实游戏角色 3D 实时重定向舞台 -->
+                <div class="mwViewPane">
+                  <div class="mwViewHead">
+                    <span id="s5CharViewportTitle">角色 3D 重定向预览</span>
+                    <div class="mwCamBtns">
+                      <button class="mwCamBtn" data-cam="front" type="button">正</button>
+                      <button class="mwCamBtn active" data-cam="oblique" type="button">45°</button>
+                      <button class="mwCamBtn" data-cam="side" type="button">侧</button>
+                      <button class="mwCamBtn" data-cam="back" type="button">背</button>
+                      <button class="mwCamBtn" id="btnToggleSkel" type="button">骨架</button>
+                    </div>
+                  </div>
+                  <div class="mwViewBody mw3dWrap">
+                    <canvas id="retargetCanvas"></canvas>
+                    <div id="s5ViewerStatus" class="mw3dStatus hidden"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 同步时间轴 -->
+              <div class="mwTransport">
+                <button id="btnRetPlay" class="mwBtn mwPrimary mwSm" type="button">▶ 播放</button>
+                <button id="btnRetBack" class="mwBtn mwSm" type="button" title="上一帧">◀</button>
+                <button id="btnRetFwd" class="mwBtn mwSm" type="button" title="下一帧">▶</button>
+                <input id="s5RetScrub" class="mwScrub" type="range" min="0" max="10" step="0.033" value="0">
+                <span id="s5RetTime" class="mwMono mwTime">0.00 / 0.00 s</span>
+                <select id="selRetRate" class="mwRate" aria-label="倍速">
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1.0×</option>
+                </select>
+              </div>
+
+              <!-- 导出栏 -->
+              <div class="mwExportBar">
+                <span id="s5RetSummary" class="mwMono mwMetric"></span>
+                <div id="s5RetDownloads" class="mwDlRow"></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecH">试穿目标角色（Mixamo 规范）</div>
+                <div id="s5CharGrid" class="mwCharGrid"></div>
+              </div>
+              <div class="mwSec">
+                <div class="mwSecH">重定向体检</div>
+                <div class="mwFacts">
+                  <div class="mwFact"><span class="k">骨位映射</span><span id="qaMapped" class="v mwMono">—</span></div>
+                  <div class="mwFact"><span class="k">十指通道</span><span id="qaFingers" class="v mwMono">—</span></div>
+                  <div class="mwFact"><span class="k">身高缩放</span><span id="qaScale" class="v mwMono">—</span></div>
+                  <div class="mwFact"><span class="k">鞋底高度</span><span id="qaFoot" class="v mwMono">—</span></div>
+                  <div class="mwFact"><span class="k">腕部平滑</span><span id="qaWrist" class="v mwMono">—</span></div>
+                </div>
+                <div id="qaHint" class="mwReadout">—</div>
+              </div>
+              <div class="mwSec">
+                <button id="btnRunRetarget" class="mwBtn mwFull" type="button">重新转换 Mixamo GLB</button>
+              </div>
+            </div>
+            <div class="mwInspFoot mwFootStack">
+              <button id="btnApproveRetarget" class="mwBtn mwPrimary mwFull" type="button">✓ 二次验收通过 · 可入库</button>
+              <button id="btnSendToRefine" class="mwBtn mwFull" type="button">发现瑕疵 → 送 06 修缮</button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- STAGE 06 · 修缮（BlenderMCP 逐帧精修） -->
+        <section class="mwStage hidden" data-panel="6">
+          <div class="mwCanvas mwStage6Canvas">
+            <div class="mwRefStrip">
+              <div class="mwRefVideos">
+                <div class="mwViewPane">
+                  <div class="mwViewHead"><span>原片参考</span></div>
+                  <div class="mwViewBody"><video id="vidRefOrig" muted loop playsinline></video></div>
+                </div>
+                <div class="mwViewPane">
+                  <div class="mwViewHead"><span>骨骼叠加</span></div>
+                  <div class="mwViewBody"><video id="vidRefOverlay" muted loop playsinline></video></div>
+                </div>
+              </div>
+              <div class="mwTransport mwTransportCompact">
+                <button id="btnRefPlay" class="mwBtn mwSm" type="button">▶</button>
+                <input id="s6Scrub" class="mwScrub" type="range" min="0" max="10" step="0.033" value="0">
+                <span id="s6FrameDisplay" class="mwMono mwTime">F000</span>
+                <button id="btnMarkFrame" class="mwBtn mwSm" type="button">填入当前帧</button>
+              </div>
+            </div>
+
+            <div class="mwIssueSection">
+              <div class="mwIssueAdder">
+                <input id="issFrames" type="text" placeholder="帧段 (0-120)">
+                <input id="issPart" type="text" placeholder="部位">
+                <input id="issDesc" type="text" placeholder="问题">
+                <input id="issFix" type="text" placeholder="目标">
+                <button id="btnAddIssue" class="mwBtn mwPrimary mwSm" type="button">+ 记录</button>
+              </div>
+              <div id="s6IssueList" class="mwIssueList"></div>
+            </div>
+          </div>
+
+          <aside class="mwInspector">
+            <div class="mwInspBody">
+              <div class="mwSec">
+                <div class="mwSecH">修缮派发</div>
+                <div class="mwBtnStack">
+                  <button id="btnDispatchRefine" class="mwBtn mwPrimary" type="button">派发 BlenderMCP 修缮</button>
+                  <div class="mwBtnRow">
+                    <button id="btnGenBrief" class="mwBtn" type="button">生成任务单</button>
+                    <button id="btnCopyBrief" class="mwBtn" type="button">复制</button>
+                  </div>
+                </div>
+              </div>
+              <div class="mwSec mwSecGrow">
+                <div class="mwSubTabs">
+                  <button class="mwSubTab active" data-s6tab="brief" type="button">任务单</button>
+                  <button class="mwSubTab" data-s6tab="logs" type="button">执行日志</button>
+                </div>
+                <pre id="s6BriefPreview" class="mwCodeBox">点击「生成任务单」</pre>
+                <pre id="s6RefineLogs" class="mwCodeBox hidden">暂无执行记录</pre>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- 唯一聚合的「系统与资源」指挥抽屉 -->
+  <div id="sysBackdrop" class="mwBackdrop hidden"></div>
+  <aside id="sysDrawer" class="mwDrawer hidden" aria-label="系统与资源">
+    <div class="mwDrawerHead">
+      <div class="mwDrawerHeadLeft">
+        <span class="mwDrawerTitle">系统与资源</span>
+        <span id="sysHeadBadge" class="mwStatusPill">—</span>
+      </div>
+      <div class="mwDrawerHeadRight">
+        <button id="btnRefreshSys" class="mwBtn mwSm" type="button" title="刷新所有服务探测">刷新</button>
+        <button id="btnCloseSys" class="mwIconBtn" type="button" aria-label="关闭">✕</button>
+      </div>
+    </div>
+
+    <div class="mwSysTabs" role="tablist">
+      <button class="mwSysTab active" data-systab="overview" type="button">总览</button>
+      <button class="mwSysTab" data-systab="config" type="button">管线配置</button>
+      <button class="mwSysTab" data-systab="logs" type="button">运行日志</button>
+    </div>
+
+    <!-- TAB 1: 总览（一眼抓重点，零表单干扰） -->
+    <div class="mwDrawerBody" data-syspanel="overview">
+      <!-- 2×2 KPI 核心摘要卡 -->
+      <div class="mwKpiGrid">
+        <div class="mwKpiCard kpiGold">
+          <div class="mwKpiTop">
+            <span class="mwKpiLbl">即梦积分</span>
+            <span id="kpiDreaminaPill" class="mwStatusPill">—</span>
+          </div>
+          <div id="sysDreaminaCredits" class="mwKpiVal mwMono mwGold">—</div>
+          <div id="sysDreaminaUser" class="mwKpiSub">—</div>
+        </div>
+
+        <div class="mwKpiCard kpiBlue">
+          <div class="mwKpiTop">
+            <span class="mwKpiLbl">分镜出图源</span>
+            <span id="kpiProvPill" class="mwStatusPill">—</span>
+          </div>
+          <div id="kpiProvName" class="mwKpiVal mwKpiValSm">—</div>
+          <div id="kpiProvSub" class="mwKpiSub">—</div>
+        </div>
+
+        <div class="mwKpiCard kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU 网关">
+          <div class="mwKpiTop">
+            <span class="mwKpiLbl">云端提骨 GPU</span>
+            <span id="kpiCloudPill" class="mwStatusPill">—</span>
+          </div>
+          <div id="kpiGpuState" class="mwKpiVal mwKpiValSm">—</div>
+          <div id="kpiGpuSub" class="mwKpiSub">—</div>
+        </div>
+
+        <div class="mwKpiCard">
+          <div class="mwKpiTop">
+            <span class="mwKpiLbl">本机可用内存</span>
+            <span id="sysHostName" class="mwStatusPill mwMono">—</span>
+          </div>
+          <div id="sysHostRam" class="mwKpiVal mwKpiValSm mwMono">—</div>
+          <div class="mwTrack mwTrackThin"><div id="sysHostRamBar" class="mwTrackFill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- 4 路分镜出图引擎状态矩阵 -->
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead">
+          <span>分镜图生成引擎（4 源切换）</span>
+          <button class="mwLinkBtn" data-jump-systab="config" type="button">参数设置 →</button>
+        </div>
+        <div id="sysProvList" class="mwProvList"></div>
+      </div>
+
+      <!-- 云端 GPU 实时遥测监控 -->
+      <div class="mwDashBox" id="sysGpuPanel">
+        <div class="mwDashBoxHead">
+          <span id="gGpuName">Colab CLI · 0 卡休眠</span>
+          <span class="mwDrawerHeadRight">
+            <span id="gGpuUtil" class="mwMono mwMuted">0% · --°C</span>
+            <button id="btnColabStopGpu" class="mwBtn mwSm hidden" type="button">释放 GPU</button>
+          </span>
+        </div>
+        <div id="sysGpuUnconfiguredNote" class="mwInlineNotice hidden">
+          <span id="sysGpuNoticeText">Colab CLI 已安装，完成首次 Google 授权即可直连 Pro+ 算力</span>
+          <button id="btnColabLogin" class="mwBtn mwSm mwPrimary" type="button">一键登录 Colab</button>
+          <button id="btnJumpModalCfg" class="mwLinkBtn hidden" data-jump-systab="config" type="button">填入 URL →</button>
+        </div>
+        <div class="mwMeterStack" id="sysGpuMeters">
+          <div class="mwMeterRow">
+            <div class="mwMeterHead"><span>显存 VRAM</span><span id="gVram" class="mwMono">0 / 24 GB</span></div>
+            <div class="mwTrack mwTrackMd"><div id="gVramBar" class="mwTrackFill" style="width:0%"></div></div>
+          </div>
+          <div class="mwMeterRow">
+            <div class="mwMeterHead"><span>系统 RAM</span><span id="gRam" class="mwMono">0 / 53 GB</span></div>
+            <div class="mwTrack mwTrackMd"><div id="gRamBar" class="mwTrackFill" style="width:0%"></div></div>
+          </div>
+          <div class="mwMeterRow">
+            <div class="mwMeterHead"><span>暂存 Disk</span><span id="gDisk" class="mwMono">0 / 235 GB</span></div>
+            <div class="mwTrack mwTrackMd"><div id="gDiskBar" class="mwTrackFill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快捷操作 -->
+      <div class="mwDashActions">
+        <button id="btnOpenWorkspace" class="mwBtn mwFull" type="button">打开当前任务本地目录</button>
+      </div>
+    </div>
+
+    <!-- TAB 2: 管线配置（按功能分组） -->
+    <div class="mwDrawerBody hidden" data-syspanel="config">
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead"><span>分镜图生成来源</span></div>
+        <div class="mwCfgGrid2">
+          <div class="mwPropCol">
+            <span class="mwLbl">默认分镜来源</span>
+            <select id="cfgImageProvider" class="mwSelect">
+              <option value="seedream">01 · Seedream（即梦画布）</option>
+              <option value="cursor_grok">02 · CursorCLI + Grok</option>
+              <option value="codex_imagegen">03 · CodexCLI + Imagegen</option>
+              <option value="openai_api">04 · OpenAI APIKey</option>
+            </select>
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">Seedream 模型</span>
+            <select id="cfgSeedreamModel" class="mwSelect">
+              <option value="high_aes_general_v50_flash">Seedream 5.0 Flash（推荐）</option>
+              <option value="seedream_5.0_pro">Seedream 5.0 Pro</option>
+              <option value="seedream_5.5">Seedream 5.5</option>
+              <option value="seedream_4.0">Seedream 4.0</option>
+            </select>
+          </div>
+        </div>
+        <div class="mwCfgGrid2">
+          <div class="mwPropCol">
+            <span class="mwLbl">Cursor CLI 路径</span>
+            <input id="cfgCursorPath" type="text" placeholder="agent.ps1 / cursor-agent">
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">Cursor Grok 模型</span>
+            <select id="cfgCursorModel" class="mwSelect">
+              <option value="grok-4.7-xhigh">Grok 4.7 Extra High（推荐）</option>
+              <option value="grok-4.7-xhigh-fast">Grok 4.7 Extra High Fast</option>
+              <option value="cursor-grok-4.6-xhigh">Cursor Grok 4.6 Extra High</option>
+              <option value="cursor-grok-4.6-xhigh-fast">Cursor Grok 4.6 Extra High Fast</option>
+              <option value="grok-4.7-high">Grok 4.7 High</option>
+              <option value="cursor-grok-4.5-high">Cursor Grok 4.5 High</option>
+            </select>
+          </div>
+        </div>
+        <div class="mwCfgGrid2">
+          <div class="mwPropCol">
+            <span class="mwLbl">Codex CLI 路径</span>
+            <input id="cfgCodexPath" type="text" placeholder="codex">
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">Codex 模型（可选）</span>
+            <input id="cfgCodexModel" type="text" placeholder="留空沿用默认">
+          </div>
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">OpenAI API Key <em id="cfgOpenAiKeyBadge" class="mwKeyState"></em></span>
+          <input id="cfgOpenAiKey" type="password" placeholder="sk-...（留空保持已有密钥或环境变量）">
+        </div>
+        <div class="mwCfgGrid2">
+          <div class="mwPropCol">
+            <span class="mwLbl">OpenAI Base URL</span>
+            <input id="cfgOpenAiBase" type="text" placeholder="https://api.openai.com">
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">OpenAI 图片模型</span>
+            <input id="cfgOpenAiModel" type="text" placeholder="gpt-image-1">
+          </div>
+        </div>
+      </div>
+
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead"><span>云端提骨 GPU（Colab CLI / Modal）</span></div>
+        <div class="mwCfgGrid2">
+          <div class="mwPropCol">
+            <span class="mwLbl">提骨引擎</span>
+            <select id="cfgMocapBackend" class="mwSelect">
+              <option value="colab_cli">Colab CLI（推荐 · 用现有 Pro+）</option>
+              <option value="modal_serverless">Modal Serverless（按秒无服务器）</option>
+            </select>
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">空闲自动释放（秒，0=跑完即停）</span>
+            <input id="cfgColabAutoStop" type="text" placeholder="180">
+          </div>
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">Colab CLI 路径</span>
+          <input id="cfgColabPath" type="text" placeholder="C:\Users\admin\.local\bin\colab.exe">
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">Modal 网关 URL（仅切换 Modal 时需要）</span>
+          <input id="cfgModalUrl" type="text" placeholder="https://...--gemx-mocap-serverless-web-api.modal.run">
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">Modal Bearer Token（可选）</span>
+          <input id="cfgModalToken" type="password" placeholder="留空表示无鉴权">
+        </div>
+      </div>
+
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead"><span>本地工具与目录</span></div>
+        <div class="mwPropCol">
+          <span class="mwLbl">即梦 CLI</span>
+          <input id="cfgDreaminaPath" type="text">
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">成品镜像目录</span>
+          <input id="cfgExportMirror" type="text">
+        </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">修缮命令模板</span>
+          <input id="cfgRefineCmd" type="text">
+        </div>
+      </div>
+
+      <div class="mwCfgFoot">
+        <span id="cfgTestStatus" class="mwCfgMsg"></span>
+        <button id="btnSaveConfig" class="mwBtn mwPrimary" type="button">保存并测活</button>
+      </div>
+    </div>
+
+    <!-- TAB 3: 运行日志 -->
+    <div class="mwDrawerBody mwLogBody hidden" data-syspanel="logs">
+      <div class="mwDashBoxHead">
+        <span>分镜生图与云端提骨实时日志</span>
+        <button id="btnCopySysLogs" class="mwBtn mwSm" type="button">复制日志</button>
+      </div>
+      <pre id="s4Logs" class="mwCodeBox mwLogFull">暂无日志</pre>
+    </div>
+  </aside>
+
+  <!-- 积分确认弹窗 -->
+  <div id="creditModal" class="mwModal hidden">
+    <div class="mwModalCard">
+      <div class="mwDrawerHead">
+        <span class="mwDrawerTitle">确认消耗积分</span>
+        <button id="btnCancelCredit" class="mwIconBtn" type="button">✕</button>
+      </div>
+      <div id="creditModalBody" class="mwModalBody"></div>
+      <div class="mwModalFoot">
+        <button id="btnAbortCredit" class="mwBtn" type="button">取消</button>
+        <button id="btnApproveCredit" class="mwBtn mwPrimary" type="button">确认执行</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="mwToast hidden"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

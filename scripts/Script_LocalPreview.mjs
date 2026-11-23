@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
+import { HandleMotionWorkbenchRequest } from "../MotionWorkbench/server/Script_WorkbenchServer.mjs";
 import { PrepareEncounterLibraryRequest } from "./Script_EncounterLibraryServer.mjs";
 import { CreateReloadableEncounterCodexHandler, PreviewRuntimeRevision } from "./Script_LocalPreviewRuntime.mjs";
 import { CreateModelWorkbenchHandler } from "./Script_ModelWorkbenchServer.mjs";
@@ -428,6 +429,16 @@ function CreateServer(rootDir, context) {
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
     if (route.startsWith("/__model-workbench/")) { await handleModelWorkbench(request, response); return; }
     if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
+    if (route === "/__motion-workbench") {
+      response.writeHead(302, { Location: "/__motion-workbench/", "Cache-Control": "no-store" });
+      response.end();
+      return;
+    }
+    if (route.startsWith("/__motion-workbench/")) {
+      if (!IsLoopback(request)) { SendJson(response, 403, { ok: false, error: "动作工作台仅允许本机访问" }); return; }
+      await HandleMotionWorkbenchRequest(request, response, { basePrefix: "/__motion-workbench" });
+      return;
+    }
     if (route === "/__preview" || route === "/__preview/") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       response.end(RenderHub({ ...context, rootDir, mounts }));

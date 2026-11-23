@@ -12,7 +12,7 @@ export const STUDIO_TOOL_IDS = Object.freeze([
   "assetStandards", "props", "actor", "facial",
 ]);
 
-export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "weapon", "firstPerson", "vfx", "audio", "textures", "splines", "propPcg"]);
+export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "motionWorkbench", "weapon", "firstPerson", "vfx", "audio", "textures", "splines", "propPcg"]);
 
 export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
 
