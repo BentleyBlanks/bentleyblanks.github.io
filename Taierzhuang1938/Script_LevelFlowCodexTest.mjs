@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunner.mjs";
-import { CreateAntigravityChild, CreateDevinChild, ParseModelList } from "../scripts/Script_EncounterAgentProviders.mjs";
+import { AntigravityCommand, CreateAntigravityChild, CreateDevinChild, ParseModelList } from "../scripts/Script_EncounterAgentProviders.mjs";
 import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
 import { CreateReloadableEncounterCodexHandler } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { LoadPreviewModules } from "../scripts/Script_PreviewModules.mjs";
@@ -563,4 +563,17 @@ async function TestAgentProviders(directory, server, base) {
   assert.ok(agyArgs.includes("--dangerously-skip-permissions"));
   assert.equal(JSON.parse(agyInput.trim()).message.content, "需求二");
   assert.match(agyVisible, /"thread_id":"conv-1"/); assert.match(agyVisible, /正在执行本地命令/);
+
+  const fakeLocalAppData = fs.mkdtempSync(path.join(directory, "LocalAppData-"));
+  const fakeAgy = path.join(fakeLocalAppData, "agy", "bin", "agy.exe");
+  fs.mkdirSync(path.dirname(fakeAgy), { recursive: true });
+  fs.writeFileSync(fakeAgy, "");
+  const savedEnv = { path: process.env.PATH, local: process.env.LOCALAPPDATA, cli: process.env.ANTIGRAVITY_CLI_PATH };
+  try {
+    process.env.PATH = ""; process.env.LOCALAPPDATA = fakeLocalAppData; delete process.env.ANTIGRAVITY_CLI_PATH;
+    assert.equal(AntigravityCommand(), fakeAgy, "AntigravityCommand finds Windows default LOCALAPPDATA/agy/bin/agy.exe");
+  } finally {
+    process.env.PATH = savedEnv.path; process.env.LOCALAPPDATA = savedEnv.local;
+    if (savedEnv.cli === undefined) delete process.env.ANTIGRAVITY_CLI_PATH; else process.env.ANTIGRAVITY_CLI_PATH = savedEnv.cli;
+  }
 }

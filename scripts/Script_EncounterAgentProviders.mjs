@@ -43,6 +43,7 @@ export function DevinCommand() {
 
 export function AntigravityCommand() {
   return FirstExisting([process.env.ANTIGRAVITY_CLI_PATH]) || OnPath(["agy"]) || FirstExisting([
+    path.join(process.env.LOCALAPPDATA || "", "agy/bin/agy.exe"),
     path.join(process.env.LOCALAPPDATA || "", "Programs/Antigravity/bin/agy.exe"),
     path.join(process.env.LOCALAPPDATA || "", "Programs/Antigravity CLI/agy.exe"),
     path.join(os.homedir(), ".local/bin/agy"),
