@@ -28,12 +28,12 @@ try {
     const errors = [], modules = new Set(), failedSets = [];
     page.on('console', message => { const match = message.text().match(/外部 PBR「(\w+)」/); if (match) failedSets.push(match[1]); });
     if (fixture.name === 'Whitebox') {
-      // The reported DadaoPbr crash needs a real image timeout; carriage failures must be safe too.
+      // The reported DadaoPbr crash needs a real image timeout; encounter startup PBR failures must be safe too.
       await page.route('**/Texture_DadaoBase.webp*', () => {});
-      await page.route(/Texture_Carriage(?:BenchWood|FloorSteel|CeilingSteel)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
+      await page.route(/Texture_(?:HandcartWood|WoodCrate|Type89Armor)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
     }
     if (fixture.name === 'MissingCharacters') {
-      await page.route(/Model_TengxianNra0[124][.]glb/,
+      await page.route(/Model_(?:HeYoutian|Yaowa|JapaneseSoldierJia)[.]glb/,
         route => route.fulfill({status:503,body:'interrupted character download'}));
       await page.addInitScript(() => {
         window.bundleFixtureErrors=[];
@@ -64,109 +64,67 @@ try {
     }
     assert.equal(await page.evaluate(() => window.Tengxian?.state?.ready), true, await page.locator('#bootStep').textContent());
     if (fixture.name === 'Whitebox') {
-      const expectedFallbacks = ['DadaoPbr','CarriageBenchWood','CarriageFloorSteel','CarriageCeilingSteel'];
+      const expectedFallbacks = ['DadaoPbr','HandcartWood','WoodCrate','Type89Armor'];
       assert.deepEqual(failedSets.sort(), [...expectedFallbacks].sort(), 'only the four interrupted texture sets use fallback materials');
       assert.ok(await page.evaluate(names => names.every(name => { const material=window.Tengxian.library.Get(name); return material.map && material.normalMap && material.roughnessMap; }), expectedFallbacks), 'each fallback supplies a usable complete PBR material');
       assert.equal(await page.locator('#bootRetry').count(), 0, 'normal boot clears the slow-download notice');
       assert.ok(await page.locator('#bootStart').isEnabled());
       await page.locator('#bootStart').click();
       await page.waitForFunction(() => window.Tengxian.state.running && document.getElementById('boot').classList.contains('gone'), null, {timeout:10000});
-      const before = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().time);
-      await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
-      assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Trapped"));
+      await page.waitForFunction(() => {
+        const m = window.Tengxian.Debug.FirstLevelMission();
+        return m && m.opening && m.time > 0.05;
+      }, null, {timeout:30000});
+      const opening = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
+      assert.equal(opening.variant, 'L1_BeishaheMerged', 'formal level 1 defaults to the merged Beishahe encounter variant');
+      assert.equal(opening.stage, '01');
+      assert.equal(opening.opening, true);
+      await page.evaluate(() => window.Tengxian.Debug.EncounterPlay.SkipOpening());
+      await page.waitForFunction(() => {
+        const m = window.Tengxian.Debug.FirstLevelMission();
+        return m && !m.opening && m.beat === '02g' && m.alive > 0;
+      }, null, {timeout:15000});
     } else if (fixture.name === 'MissingCharacters') {
-      // The 09.23 opening director creates its comrade, runner, shouter and interpreter only
-      // after Start. Preserve each selected appearance slot through the failed
-      // downloads, then exercise their actual director and close-up performances.
-      const partial=await page.evaluate(()=>{const g=window.Tengxian;
-        const actors=g.ai.soldiers.filter(a=>a.alive&&a.side==='nra');
-        const mission=g.Debug.FirstLevelMission();
-        return {count:actors.length,models:Object.fromEntries(actors.map(a=>[a.castId,a.actor?.characterRig?.modelId||null])),
-          cast:actors.map(a=>a.castId).filter(Boolean).sort(),stage:mission.stage};});
-      assert.equal(partial.stage,'Trapped','the interrupted boot still opens on the collapsed bunker');
-      assert.equal(partial.count,4,'all four squad members exist before the director starts');
-      assert.deepEqual(partial.cast,['heyoutian','liuwencai','luo','yaowa'],'the whole squad is physically present');
-      assert.deepEqual(partial.models,{luo:'TengxianNra05',yaowa:null,heyoutian:null,liuwencai:null},
-        'failed selected slots stay whitebox; the surviving approved leader keeps his own appearance');
+      // Partial character GLB failures must not block formal level 1 boot, opening playback, or 02g combat.
+      const bootMission = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
+      assert.equal(bootMission.variant, 'L1_BeishaheMerged');
+      assert.equal(bootMission.pendingOpening, true);
       await page.locator('#bootStart').click();
-      await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
-      await page.waitForFunction(()=>{const b=window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker;
-        return window.bundleFixtureErrors.length||b?.ready&&b.setup&&b.firstPerson;},null,{timeout:60000});
-      assert.deepEqual(await page.evaluate(()=>window.bundleFixtureErrors),[],
-        'the new opening director must finish setup with missing selected character models');
-      const setup=await page.evaluate(()=>{const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),b=r.frontShow.bunker;
-        const Person=a=>{const root=a?.actor?.root;let attached=false;
-          for(let node=root;node;node=node.parent)if(node===r.scene)attached=true;
-          return {alive:a?.alive===true,physical:!!root&&root.children.length>0&&!!a.body&&g.ai.soldiers.includes(a),
-            attached,lod:a?.renderLod||null,
-            finite:!!root&&[...root.position.toArray(),...root.quaternion.toArray(),...root.scale.toArray(),a.position.x,a.position.y,a.position.z].every(Number.isFinite),
-            model:a?.actor?.characterRig?.modelId||null};};
-        // Backdrop NRA (MISSION_ENCOUNTERS role backdropNra and the Data_FirstLevelBackdropSquads walkers) are extras: count the named seven.
-        const backdrop=new Set((r.backdrop?.members||[]).map(m=>m.actor));
-        for(const a of g.ai.soldiers)if(a.side==='nra'&&/^(BunkerBackdropNra|Opening_DepthNra)/.test(a.missionId||''))backdrop.add(a); // MISSION_ENCOUNTERS backdropNra and the SB01 depth walkers (2026-09-25 storyboard round)
-        return {count:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra'&&!backdrop.has(a)).length,backdrop:backdrop.size,nra:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra'&&!backdrop.has(a)).map(a=>a.missionId||a.castId||a.id),
-          captives:b.captives.map(a=>a.missionId).sort(),
-          cast:Object.fromEntries(Object.entries(b.cast).map(([id,a])=>[id,Person(a)])),
-          squad:Object.fromEntries(r.squad.map(a=>[a.castId,Person(a)])),
-          enemies:Object.fromEntries(['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>[id,Person(r.enemies.get(id))])),
-          playerModel:b.playerBody?.characterRig?.modelId||null};});
-      assert.equal(setup.count,7,`the four squad members, the wounded comrade, the runner and the shouter all remain physical NRA actors (${JSON.stringify(setup.nra)})`);
-      assert.deepEqual(setup.captives,['Opening_comrade'],'the opening has exactly one physical captive (the wounded comrade)');
-      assert.deepEqual(Object.keys(setup.cast).sort(),['DepthNraA','DepthNraB','DepthNraC','comrade','interpreter','runner','shouter'], // DepthNra*: SB01 depth walkers (01-03 storyboard contract §2 item 3)
-        'the director creates its complete current cast after Start');
-      assert.deepEqual(Object.fromEntries(Object.entries(setup.cast).map(([id,a])=>[id,a.model])),
-        {DepthNraA:'TengxianNra05',DepthNraB:'TengxianNra05',DepthNraC:'TengxianNra05',comrade:null,interpreter:'TengxianNra06',runner:null,shouter:null},
-        'new cast uses its requested model slots instead of reassigning failed downloads '
-        +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
-      assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
-      assert.equal(setup.enemies.BunkerExecutionerA.model,'TengxianIja06',
-        'ijaA (BunkerExecutionerA) wears the approved IJA06 through the failed NRA downloads (Model package, 2026-09-24)');
-      for(const [id,actor] of Object.entries({...setup.squad,...setup.cast,...setup.enemies})) {
-        assert.ok(actor.alive&&actor.physical&&actor.finite,`${id} remains a live physical person: ${JSON.stringify(actor)}`);
-        assert.ok(actor.attached||['culled','crowd'].includes(actor.lod),
-          `${id} must be in the scene or explicitly represented by the normal culling/LOD system`);
-      }
-      // Let ordinary production time and the real cue tracks drive the complete
-      // captive/contact sequence into the interrogation close-up. No debug jump,
-      // synthetic mission facts or manual phase advancement may mask a crash.
-      await page.waitForFunction(()=>{const b=window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker;
-        return window.bundleFixtureErrors.length||b?.phase==='Interrogation'&&b.Age>2;},null,{timeout:240000});
-      const closeup=await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),b=r.frontShow.bunker;
-        const actors=[...r.squad,...Object.values(b.cast),...['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>r.enemies.get(id))];
-        return {errors:window.bundleFixtureErrors,stage:r.flow.stage.id,phase:b.phase,time:r.time,
-          beats:[...b.beats],camera:r.player.camera.position.toArray(),captives:b.captives.map(a=>({id:a.missionId,alive:a.alive})),
-          actors:actors.map(a=>{const root=a?.actor?.root;let attached=false,finite=!!root;
-            if(a?.openingStoryboardHidden)return {id:a?.castId||a?.missionId,hidden:true,finite:true};
-            for(let node=root;node;node=node.parent)if(node===r.scene)attached=true;
-            root?.traverse(node=>{finite&&=node.matrixWorld.elements.every(Number.isFinite);});
-            return {id:a?.castId||a?.missionId,attached,finite,lod:a?.renderLod||null};})};});
-      await fs.writeFile(path.join(outputDir,'MissingCharacters.json'),JSON.stringify({partial,setup,closeup},null,2));
-      assert.deepEqual(closeup.errors,[],'missing characters must not crash the captive, collar, strike or interrogation performances');
-      assert.equal(closeup.stage,'Trapped');
-      assert.equal(closeup.phase,'Interrogation');
-      for(const phase of ['Count','Banter','Orders','Incoming','Blast','Black','Wake','DropIn','Sweep','CaptiveDragged','CaptiveWall','Interrogation'])
-        assert.ok(closeup.beats.includes(phase),'the missing-model run physically completed '+phase);
-      assert.deepEqual(closeup.captives,[{id:'Opening_comrade',alive:true}],
-        'the actual captive survives creation and kneels at the wall for the interrogation');
-      for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.hidden||actor.attached||['culled','crowd'].includes(actor.lod)),
-        `${actor.id} still has a finite hierarchy under the normal culling/LOD contract`);
-      // Close-up rows are keyed by castId||missionId: squad by castId, the director's own cast by
-      // its missionId (Opening_<slot>), so the interpreter row is Opening_interpreter.
-      for(const id of ['BunkerExecutionerA','Opening_interpreter']) {
-        const actor=closeup.actors.find(a=>a.id===id);
-        assert.ok(actor?.attached&&actor.lod==='detail',`${id} must actually render in the interrogation close-up`);
-      }
-      assert.ok(closeup.camera.every(Number.isFinite),'the interrogation camera remains finite');
+      await page.waitForFunction(() => window.Tengxian.state.running && document.getElementById('boot').classList.contains('gone'), null, {timeout:10000});
+      await page.waitForFunction(() => window.bundleFixtureErrors.length || (window.Tengxian.Debug.FirstLevelMission()?.opening && window.Tengxian.Debug.FirstLevelMission()?.time > 0.05), null, {timeout:30000});
+      assert.deepEqual(await page.evaluate(() => window.bundleFixtureErrors), [], 'opening timeline runs cleanly with missing character GLBs');
+      await page.evaluate(() => window.Tengxian.Debug.EncounterPlay.SkipOpening());
+      await page.waitForFunction(() => {
+        const m = window.Tengxian.Debug.FirstLevelMission();
+        return m && !m.opening && m.beat === '02g' && m.alive > 0;
+      }, null, {timeout:15000});
+      const combat = await page.evaluate(() => {
+        const g = window.Tengxian, m = g.Debug.FirstLevelMission();
+        const luo = m.actors.find(a => a.id === 'luo');
+        const he = m.actors.find(a => a.id === 'he');
+        const enemy = m.actors.find(a => a.id === 'opening4');
+        const finite = m.actors.every(a => a.position.every(Number.isFinite));
+        return { beat: m.beat, alive: m.alive, luo, he, enemy, finite, errors: window.bundleFixtureErrors };
+      });
+      await fs.writeFile(path.join(outputDir, 'MissingCharacters.json'), JSON.stringify(combat, null, 2));
+      assert.deepEqual(combat.errors, [], 'missing character downloads must not crash 02g combat');
+      assert.equal(combat.beat, '02g');
+      assert.ok(combat.finite && combat.alive >= 4, 'squad and opening enemy remain live with finite transforms');
+      assert.equal(combat.luo?.model, 'luo', 'surviving character GLB keeps its formal cast appearance');
+      assert.ok(combat.he?.alive && combat.enemy?.alive, 'failed character GLB actors fall back and stay alive');
     } else {
       await page.waitForFunction(()=>window.Tengxian?.Debug?.Menu?.().open,null,{timeout:60000});
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
       await page.evaluate(()=>window.Tengxian.Debug.MenuAct("settings"));
       await page.locator('[data-setting="debug"]').click();
-      assert.equal(await page.locator("#firstLevelStageSelect option").count(),18);
-      await page.selectOption("#firstLevelStageSelect","Transfer");
+      assert.equal(await page.locator("#firstLevelStageSelect option").count(),13);
+      await page.selectOption("#firstLevelStageSelect","08");
       await page.locator('[data-action="firstLevelJump"]').click();
-      await page.waitForFunction(()=>window.Tengxian?.state?.running&&!window.Tengxian.state.advancing&&window.Tengxian.Debug.FirstLevelMission()?.phaseNumber===12,null,{timeout:180000});
-      assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().facts.includes("courtyardPassed")));
+      await page.waitForFunction(()=>window.Tengxian?.state?.running&&!window.Tengxian.state.advancing&&window.Tengxian.Debug.FirstLevelMission()?.stage==="08",null,{timeout:180000});
+      const jumped = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
+      assert.equal(jumped.variant, 'L1_BeishaheMerged');
+      assert.equal(jumped.opening, false);
+      assert.equal(jumped.beat, '08a');
     }
     assert.deepEqual(errors, []);
     assert.ok(![...modules].some(url => url.endsWith('/Script_Main.mjs')), 'source entry is not also loaded');

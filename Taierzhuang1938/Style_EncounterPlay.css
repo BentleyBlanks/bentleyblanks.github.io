@@ -23,3 +23,19 @@
 .encounterFailure p{margin:0;padding:5px 16px;background:#0e1114c8;border-radius:4px}
 .encounterDual .encounterFailure{width:50%}
 @keyframes encounterFailureIn{from{opacity:0}to{opacity:1}}
+.encounterCampaign .hudBrief{display:none!important}
+.encounterOpening #hud{display:none!important}
+.encounterOpeningRoot{position:fixed;inset:0;z-index:28;pointer-events:none;font-family:"Noto Serif SC","Songti SC",serif}
+.encounterOpeningRoot[hidden]{display:none}
+.encounterOpeningRoot .boPrevizOverlay{position:absolute;inset:0;pointer-events:none}
+.encounterOpeningRoot .boPrevizBlack,.encounterOpeningRoot .boPrevizFlash{position:absolute;inset:0;opacity:0}
+.encounterOpeningRoot .boPrevizBlack{background:#000}
+.encounterOpeningRoot .boPrevizFlash{background:#fffdf6}
+.encounterOpeningRoot .boPrevizCaption{position:absolute;left:50%;bottom:168px;transform:translateX(-50%);max-width:min(760px,70vw);padding:4px 12px;color:#d6d0c0;background:#0c0d0acc;border-radius:3px;font-size:15px;line-height:1.5;text-align:center;letter-spacing:0.06em}
+.encounterOpeningRoot .boPrevizSubs{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);width:min(880px,76vw);display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.encounterOpeningRoot .boPrevizSub{display:inline-flex;align-items:baseline;gap:10px;max-width:100%;padding:6px 16px 7px;background:#0c0d0ae0;border-left:2px solid #cdb77b;color:#f4f0e4;font-size:18px;line-height:1.5;letter-spacing:0.04em}
+.encounterOpeningRoot .boPrevizSub.aside{font-size:15px;color:#c9c3b3;padding-top:3px;padding-bottom:3px}
+.encounterOpeningRoot .boPrevizWho{flex:0 0 auto;color:#e0c888;font-size:0.82em;letter-spacing:0.14em}
+.encounterOpeningRoot .boPrevizWho::after{content:"·";margin-left:10px;color:#8a8575}
+.encounterOpeningSkip{position:fixed;right:24px;bottom:22px;z-index:32;pointer-events:auto;padding:7px 14px;border:1px solid #cdb77b88;border-radius:3px;background:#101210cc;color:#e8e2d0;font:13px/1.2 system-ui;letter-spacing:0.06em;cursor:pointer}
+.encounterOpeningSkip:hover{border-color:#e0c888;background:#1a1c17e8;color:#fff}

@@ -24,7 +24,9 @@
 // （抢指针锁、藏枪模、给手榴弹、换枪补给），以及主文件的工具箱 ctx（靶场与白刃实验场的运行时整块读写主文件状态时用）。
 
 import { SANDBOX_RANGES } from "./Data_SandboxRanges.mjs";
-import { ENCOUNTER_PLAY_PHASE, ENCOUNTER_PLAY_STARTUP, EncounterPlay } from "./Script_EncounterPlaySplit.mjs";
+import { EncounterPlay } from "./Script_EncounterPlay.mjs";
+import { ENCOUNTER_PLAY_PHASE } from "./Script_EncounterPlayScene.mjs";
+import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { CreateScenePreviewBackdrop, CreateScenePreviewPhase } from "./Script_DevTools.mjs";
 import { SceneInfo } from "./Data_SceneAssets.mjs";
@@ -210,20 +212,7 @@ const PLUGINS = {
   aircraftEvacuationDitch: SceneryPreview("AircraftEvacuationDitch", ["WoodCrate", "WoodBeam", "HandcartWood", "Sandbag"]),
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,
-    Create(h) {
-      const runtime=new EncounterPlay(h);
-      return Instance(runtime,{
-        debugName:"EncounterPlay",updateSlot:"beforeAi",holdsRespawn:true,
-        captureViewportName:"视口 1 · 玩家视角",
-        ScaleDt:dt=>runtime.ScaleDt(dt),
-        CapturesInput:()=>runtime.CapturesInput(),
-        OnKey:detail=>runtime.OnKey(detail),
-        OnPlayerDown:()=>runtime.Fail(),
-        ViewportSize:()=>runtime.view.Size(),
-        AfterRender:(dt,options)=>runtime.AfterRender(dt,options),
-        Warmup:onStep=>runtime.Warmup(onStep),
-      });
-    },
+    Create(h) { return CreateEncounterPlayPluginInstance(h, { mode: "editor" }); },
   },
   dugoutAidOpenFields: {
     phase: DUGOUT_PREVIEW_PHASE, World: FirstLevelWhiteboxField,
@@ -347,6 +336,26 @@ const PLUGINS = {
     },
   },
 };
+
+/** 遭遇设计试玩与第一关正式战役共用的插件装配（同一份 EncounterPlay 运行时与钩子）。 */
+export function CreateEncounterPlayPluginInstance(h, options = {}) {
+  const runtime = new EncounterPlay(h, options);
+  return Instance(runtime, {
+    id: options.mode === "campaign" ? "firstLevelCampaign" : "encounterPlay",
+    debugName: "EncounterPlay",
+    updateSlot: "beforeAi",
+    holdsRespawn: true,
+    captureViewportName: "视口 1 · 玩家视角",
+    ScaleDt: (dt) => runtime.ScaleDt(dt),
+    CapturesInput: () => runtime.CapturesInput(),
+    ApplyCamera: (camera) => runtime.ApplyCamera(camera),
+    OnKey: (detail) => runtime.OnKey(detail),
+    OnPlayerDown: () => runtime.Fail(),
+    ViewportSize: () => runtime.view.Size(),
+    AfterRender: (dt, frameOptions) => runtime.AfterRender(dt, frameOptions),
+    Warmup: (onStep) => runtime.Warmup(onStep),
+  });
+}
 
 /** 登记表顺序的全部插件（选章「测试场景」一组、场地类表都按它）。 */
 export const SANDBOX_PLUGINS = Object.freeze(SANDBOX_RANGES.flatMap((entry) => {

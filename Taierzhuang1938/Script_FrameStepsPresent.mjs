@@ -12,7 +12,13 @@ export function PlayStepHud(ctx, f) {
   // --- HUD ---
   ctx.profiler.B("hud");
   // The campaign objective is read on the pause screen, without HUD notifications.
-  ctx.hud.SetObjective(phase.whitebox?.fullMission ? ctx.missionRuntime?.ObjectiveNotice() || "" : ctx.state.storyObjective || phase.label, phase.whitebox?.fullMission?null:ctx.state.nraPool, null);
+  const encounterCampaign = !!phase.whitebox?.encounterCampaign;
+  const objectiveText = encounterCampaign
+    ? (ctx.sandbox?.runtime?.ObjectiveText?.() || "")
+    : phase.whitebox?.fullMission
+      ? (ctx.missionRuntime?.ObjectiveNotice() || "")
+      : (ctx.state.storyObjective || phase.label);
+  ctx.hud.SetObjective(objectiveText, phase.whitebox?.fullMission || encounterCampaign ? null : ctx.state.nraPool, null);
   // 架着机枪时右下那块弹药读数换成**机枪**的：同一个元素、同一套低弹/空膛配色，
   // 不另画一块小字面板 —— 两套口径并排，玩家会读成两件不同的事。
   // 备弹照步枪口径折成发数（板数 × 每板），不是「3 板」。
@@ -52,7 +58,7 @@ export function PlayStepHud(ctx, f) {
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
     visible: DIFFICULTY.showCrosshair !== false && ctx.player.Alive
       && (empView || GunReadyFromCover(ctx.player.gunClearance, ctx.viewmodel.wallLower))
-      && !ctx.state.ordersOpen && !ctx.state.cutscene && !ctx.meleeCombat?.Active && !ctx.carry?.Blocking && !ctx.p012Runtime?.binocularOwned && !ctx.missionRuntime?.EmptyHands,
+      && !ctx.state.ordersOpen && !ctx.state.cutscene && !ctx.meleeCombat?.Active && !ctx.carry?.Blocking && !ctx.p012Runtime?.binocularOwned && !ctx.missionRuntime?.EmptyHands && !ctx.sandbox?.runtime?.openingActive,
     spreadDeg,
     fovDeg: ctx.camera.fov,
     viewportHeight: window.innerHeight,
@@ -63,7 +69,7 @@ export function PlayStepHud(ctx, f) {
     dt,
   });
   // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
-  ctx.hud.SetTarget(ctx.SANDBOX_RANGE?.identify === false || ctx.missionRuntime?.frontShow?.bunker.CameraActive ? null : ctx.identify.Update(dt, {
+  ctx.hud.SetTarget(ctx.SANDBOX_RANGE?.identify === false || ctx.sandbox?.runtime?.openingActive || ctx.missionRuntime?.frontShow?.bunker.CameraActive ? null : ctx.identify.Update(dt, {
     eye: ctx._idEye.copy(ctx.player.EyePosition),
     dir: ctx.player.AimDirection(ctx._idAim),
     soldiers: ctx.ai.soldiers,
@@ -83,7 +89,7 @@ export function PlayStepHud(ctx, f) {
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   ctx.hud.SetInteractProgress(ctx.interact?.View() || null);
   ctx.hud.SetCarry(ctx.carry?.View() || null);
-  ctx.hud.SetWeaponUiVisible(!ctx.missionRuntime?.EmptyHands);
+  ctx.hud.SetWeaponUiVisible(!ctx.missionRuntime?.EmptyHands && !ctx.sandbox?.runtime?.openingActive);
   for(const entry of ctx.setpieceProps.values())if(entry.woundedActor&&entry.root.visible)ctx.UpdateWoundedActor(entry.woundedActor,dt);
   // 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。同样只读脱敏快照。
   ctx.hud.SetEmplacement(empView);

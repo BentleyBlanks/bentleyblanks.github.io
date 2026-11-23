@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
 import {FLOW_TIMELINE,DEFAULT_ENCOUNTER_DOCUMENT,BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import {FIRST_LEVEL_MUSIC_CUES} from "./Data_FirstLevelMissionMusic.mjs";
 import {WEAPONS} from "./Data_Weapons.mjs";
@@ -11,6 +11,8 @@ import {EncounterDocument,ENCOUNTER_STORAGE_KEY} from "./AdvancedTools/Script_Le
 import {ENCOUNTER_CINEMATICS} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 import {DebugOptions, DEBUG_OPTION_KEYS} from "./Script_DebugOptions.mjs";
 import {EncounterDialogueLines,EncounterSpeechAnchor} from "./Script_EncounterPlayDialogue.mjs";
+import {CompileEncounterVariant} from "./Script_EncounterVariants.mjs";
+import {FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_OPENING_CONFIG_URL, FIRST_LEVEL_OPENING_SEQUENCES, FIRST_LEVEL_OPENING_TIMELINE_URL} from "./Data_FirstLevelCampaign.mjs";
 import {Vector3,PerspectiveCamera} from "./vendor/three/build/three.module.js";
 for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start);
@@ -183,4 +185,26 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
  const actual=PrepareSceneTerrain({terrain,surface:patches},pre).heights;
  assert.deepEqual(actual,reference,"Bounded surface work preserves every height sample");
 }
-console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music and independent scene");
+{
+ const merged=CompileEncounterVariant(FIRST_LEVEL_CAMPAIGN_VARIANT_ID);
+ assert.equal(FIRST_LEVEL_CAMPAIGN_STAGES.length,merged.stages.length,"Campaign stage table matches L1_BeishaheMerged stage count");
+ for(let i=0;i<merged.stages.length;i++){
+  assert.equal(FIRST_LEVEL_CAMPAIGN_STAGES[i].id,merged.stages[i].id);
+  assert.equal(FIRST_LEVEL_CAMPAIGN_STAGES[i].number,i+1);
+  const start=ResolveEncounterStageStart(merged,merged.stages[i].id);
+  assert.equal(start.opening,i===0,"Only stage 01 starts with the opening timeline");
+  assert.ok(EncounterCanPlay(start.time,merged),"Every campaign stage resolves to a playable combat beat: "+merged.stages[i].id);
+ }
+ assert.equal(ResolveEncounterStageStart(merged,"08a").beat.id,"08a");
+ assert.equal(ResolveEncounterStageStart(merged,"08a").opening,false);
+ assert.equal(ResolveEncounterStageStart(merged,null,{skipOpening:true}).opening,false);
+ const openingTimeline=JSON.parse(fs.readFileSync(new URL(FIRST_LEVEL_OPENING_TIMELINE_URL,import.meta.url)));
+ const openingConfig=JSON.parse(fs.readFileSync(new URL(FIRST_LEVEL_OPENING_CONFIG_URL,import.meta.url)));
+ const timelineKeyframes=new Set((openingTimeline.sequences||[]).map(s=>s.keyframe));
+ const configKeyframes=new Set((openingConfig.keyframes||[]).map(k=>k.id));
+ for(const id of FIRST_LEVEL_OPENING_SEQUENCES){
+  assert.ok(timelineKeyframes.has(id),"Opening timeline includes sequence "+id);
+  assert.ok(configKeyframes.has(id),"Opening keyframe config includes "+id);
+ }
+}
+console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync and independent scene");

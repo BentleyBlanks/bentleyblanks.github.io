@@ -29,6 +29,33 @@ export function EncounterFirstPlayable(variant = DEFAULT_VARIANT) {
   const v = ResolveVariant(variant);
   return v.BeatById(v.playConfig.firstPlayableBeat);
 }
+/** Resolve a campaign stage number/id or beat id into { time, opening, stage, beat }. */
+export function ResolveEncounterStageStart(variant = DEFAULT_VARIANT, stageOrBeat = null, { skipOpening = false } = {}) {
+  const v = ResolveVariant(variant);
+  const firstPlayable = EncounterFirstPlayable(v);
+  if (stageOrBeat == null || stageOrBeat === "") {
+    return { time: firstPlayable.start, opening: !skipOpening, stage: v.stages[0], beat: firstPlayable };
+  }
+  const raw = String(stageOrBeat).trim();
+  const beatExact = v.timeline.find((b) => b.id.toLowerCase() === raw.toLowerCase());
+  if (beatExact && EncounterCanPlay(beatExact.start, v)) {
+    const stage = v.stages.find((s) => s.id === beatExact.stage) || v.stages[0];
+    return { time: beatExact.start, opening: false, stage, beat: beatExact };
+  }
+  const num = Number(raw);
+  const stage = v.stages.find((s, idx) => s.id === raw || s.id === raw.padStart(2, "0") || (Number.isInteger(num) && idx + 1 === num)) || null;
+  if (stage) {
+    const stageIndex = v.stages.indexOf(stage);
+    if (stageIndex === 0) {
+      return { time: firstPlayable.start, opening: !skipOpening, stage, beat: firstPlayable };
+    }
+    const playable = stage.beats.find((b) => EncounterCanPlay(b.start, v))
+      || v.timeline.find((b) => b.start >= stage.start && EncounterCanPlay(b.start, v))
+      || firstPlayable;
+    return { time: playable.start, opening: false, stage, beat: playable };
+  }
+  return { time: firstPlayable.start, opening: !skipOpening, stage: v.stages[0], beat: firstPlayable };
+}
 export function EncounterPlayerYaw(beat) {
   const from = beat.p[0], to = beat.lookAt || beat.p.find((p) => Distance(p, from) > 0.1);
   return to ? Math.atan2(from[0] - to[0], from[1] - to[1]) : Math.PI / 2;

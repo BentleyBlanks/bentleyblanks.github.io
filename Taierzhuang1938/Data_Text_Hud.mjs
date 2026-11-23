@@ -183,6 +183,7 @@ export const TEXT = Object.freeze({
 
   // --- 阵亡卡上玩家所属的番号 -----------------------------------------------
   "hud.death.unit": "第三十一师 一八六团",
+  "hud.opening.skip": "Space · 跳过开场",
 });
 
 /** 这张表覆盖的代码模块。登记后 Script_TextTest 就不许它们再出现玩家可见中文字面量。 */

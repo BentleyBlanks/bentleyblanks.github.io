@@ -1,7 +1,7 @@
 // 调试口 window.Tengxian.Debug 的一组：关卡与任务：换关跳段、钉关、检查点、摆点、第一关与 P012、叙事结果（docs/Data_DebugApi.md）。
 // 主文件里的状态、服务、函数一律从工具箱 ctx 取；名字与签名是测试脚本的契约，改名要同步改测试。
 
-import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_CAMPAIGN_STAGES } from "./Data_FirstLevelCampaign.mjs";
 import { PhaseContentId } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import { CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
@@ -78,12 +78,12 @@ export function MissionDebugApi(ctx) {
        *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
        */
       Setpieces: () => (ctx.setpieces ? ctx.setpieces.State() : null),
-      P012: () => ctx.missionRuntime?.State() || ctx.p012Flow?.State() || null,
-      FirstLevelMission: () => ctx.missionRuntime?.State() || null,
-      FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:ctx.missionRuntime?.flow.phase.id===stage.id})),
+      P012: () => (ctx.sandbox?.id === "firstLevelCampaign" ? ctx.sandbox.runtime?.MissionState?.() : null) || ctx.missionRuntime?.State() || ctx.p012Flow?.State() || null,
+      FirstLevelMission: () => (ctx.sandbox?.id === "firstLevelCampaign" ? ctx.sandbox.runtime?.MissionState?.() : null) || ctx.missionRuntime?.State() || null,
+      FirstLevelStages: () => (ctx.sandbox?.id === "firstLevelCampaign" ? ctx.sandbox.runtime?.Stages?.() : null) || FIRST_LEVEL_CAMPAIGN_STAGES.map(stage => ({...stage,current:false})),
       FirstLevelJump: (value) => ctx.JumpFirstLevelStage(value),
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
-      FirstLevelMissionRuntime: () => ctx.missionRuntime || null,
+      FirstLevelMissionRuntime: () => (ctx.sandbox?.id === "firstLevelCampaign" ? ctx.sandbox.runtime : null) || ctx.missionRuntime || null,
       P012Progress: () => ctx.p012Debug.State(),
       P012NextProgress: () => ctx.p012Debug.Next(),
       P012CarryView: () => ctx.p012CarryView?.Debug() || null,

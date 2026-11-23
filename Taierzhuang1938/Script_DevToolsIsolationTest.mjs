@@ -27,10 +27,26 @@ import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 
-// 名字带 Editor 但随玩家设置一起发布的两个模块（设置页的类、控件工具箱）。
-// 名字是历史遗留；它们只许 import 彼此与普通运行时模块，不许碰下面的开发模块。
-const SHIPPED_EDITOR_MODULES = new Set(["Script_EditorSettings.mjs", "Script_EditorUi.mjs"]);
+// 名字带 Editor 但随玩家设置或第一关正式战役（EncounterPlay + 开场 Timeline）一起发布的纯运行时模块。
+// 名字是历史遗留；它们只许 import 彼此与普通运行时模块，不许碰真正的开发编辑器模块（Script_Editor / Blockout / Timeline / DevTools）。
+const SHIPPED_EDITOR_MODULES = new Set([
+  "Script_EditorSettings.mjs",
+  "Script_EditorUi.mjs",
+  "Script_EditorVolume.mjs",
+  "Script_EditorBlockoutBlanket.mjs",
+  "Script_EditorBlockoutConfig.mjs",
+  "Script_EditorBlockoutLevels.mjs",
+  "Script_EditorBlockoutPreviz.mjs",
+  "Script_EditorBlockoutPrevizAircraft.mjs",
+  "Script_EditorBlockoutPrevizFx.mjs",
+  "Script_EditorBlockoutPrevizPlan.mjs",
+  "Script_EditorBlockoutPrevizProps.mjs",
+  "Script_EditorBlockoutPuppets.mjs",
+  "Script_EditorBlockoutWoundTowel.mjs",
+  "Script_EditorBlockoutXBot.mjs",
+]);
 const DEV_BOUNDARY = new Set(["Script_DevTools.mjs", "Data_DevTools.mjs", "Script_DevToolsSplit.mjs", "Data_DevToolsSplit.mjs"]);
+const SPLIT_BOUNDARY_FILES = new Set(Object.keys(SPLIT_TOOL_STUBS).map((file) => path.basename(file)));
 const SPLIT_IDS = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
 const IsDevModule = (file) => {
   const name = path.basename(file);
@@ -76,7 +92,7 @@ for (const [real, stub] of Object.entries({ ...DEV_TOOL_STUBS, ...SPLIT_TOOL_STU
     JSON.stringify(realClasses.SPLIT_TOOL_CLASSES.map((Editor) => Editor.id).sort()) === JSON.stringify([...SPLIT_IDS].sort()), SPLIT_IDS.join(","));
 }
 
-// --- 1b. 方向规则：游戏不 import AdvancedTools/（唯一例外 Script_DevToolsSplit） ------------------
+// --- 1b. 方向规则：游戏不 import AdvancedTools/（仅允许已登记在 SPLIT_TOOL_STUBS 的拆分边界） ------------------
 {
   const offenders = [];
   const SKIP_DIRS = new Set(["AdvancedTools", "node_modules", "_shots", "_import", "_blender", "vendor"]);
@@ -85,15 +101,18 @@ for (const [real, stub] of Object.entries({ ...DEV_TOOL_STUBS, ...SPLIT_TOOL_STU
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) await Walk(full); continue; }
       if (!/\.(mjs|js)$/.test(entry.name) || /Test\.(mjs|js)$/.test(entry.name)) continue;
-      if (entry.name === "Script_DevToolsSplit.mjs") continue;
+      if (SPLIT_BOUNDARY_FILES.has(entry.name)) continue;
       const text = await fs.readFile(full, "utf8");
       if (/(?:from|import\s*\()\s*["'][^"']*AdvancedTools\//.test(text)) offenders.push(path.relative(projectDir, full));
     }
   }
   await Walk(projectDir);
-  Check("游戏目录的非测试代码除 Script_DevToolsSplit 外不 import AdvancedTools/", offenders.length === 0, offenders.join(", "));
-  const split = await fs.readFile(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8");
-  Check("Script_DevToolsSplit 只 import ./AdvancedTools/ 里的工具类", [...split.matchAll(/^import .* from "([^"]+)";/gm)].every((match) => match[1].startsWith("./AdvancedTools/")));
+  Check("游戏目录的非测试代码除拆分边界外不 import AdvancedTools/", offenders.length === 0, offenders.join(", "));
+  for (const boundary of ["Script_DevToolsSplit.mjs", "Script_EncounterPlaySplit.mjs"]) {
+    const split = await fs.readFile(path.join(projectDir, boundary), "utf8");
+    const imports = [...split.matchAll(/^import .* from "([^"]+)";/gm), ...split.matchAll(/^export .* from "([^"]+)";/gm)];
+    Check(`${boundary} 只引用 ./AdvancedTools/ 里的模块`, imports.length > 0 && imports.every((match) => match[1].startsWith("./AdvancedTools/")));
+  }
 }
 
 // --- 2. 构建对账 --------------------------------------------------------------

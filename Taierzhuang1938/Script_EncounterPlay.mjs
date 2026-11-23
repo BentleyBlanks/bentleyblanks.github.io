@@ -1,6 +1,9 @@
 import * as THREE from "three";
-import { EncounterPlayPlan, EncounterCanPlay, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+export { ResolveEncounterStageStart };
 import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
+import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
+import { FirstLevelOpeningTimeline } from "./Script_FirstLevelOpeningTimeline.mjs";
 import { VillageStealthRules, VillageStealthAt, StageVillageCompanions } from "./Scenes/FirstLevelEncounter/Script_LevelFlowVillage.mjs";
 import { SampleBeatRoute } from "./Scenes/FirstLevelEncounter/Script_LevelFlowGeometry.mjs";
 import { VillageStealthPlay } from "./Script_VillageStealthPlay.mjs";
@@ -18,15 +21,26 @@ import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { XBOT_DEATHS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE } from "./Data_BlockoutXBotClips.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
-import { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";
+import { LoadEncounterCast } from "./Script_EncounterPlaySplit.mjs";
 import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
 import { T } from "./Script_Text.mjs";
 import { DeathTime } from "./Script_PlayerDeath.mjs";
 import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
-const UI=CONFIG.ui;
 const PaintFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+
+function CreateSingleViewportStub(host) {
+  return {
+    count:1, focused:false, canvas:null, camera:host.camera,
+    SetLayout(){},
+    Size(){return {width:window.innerWidth,height:window.innerHeight};},
+    Update(){},
+    Render(){},
+    State(){return {count:1,mode:"player",target:"player"};},
+    Dispose(){},
+  };
+}
 
 // All instances of a cast member share the loaded kit. Resize its source once,
 // before spawning anyone, including maps used by more than one material slot.
@@ -61,8 +75,13 @@ async function PrepareCastTextures(kits,onProgress) {
 }
 
 export class EncounterPlay {
-  constructor(host) {
-    this.host=host;this.hostId=crypto.randomUUID();this.entries=new Map();this.failed=false;this.ready=false;this.disposed=false;this.active=true;this.paused=false;this.starting=false;this.initialized=false;
+  constructor(host, options = {}) {
+    this.host=host;this.hostId=crypto.randomUUID();this.mode=options.mode==="campaign"?"campaign":"editor";
+    this.isCampaign=this.mode==="campaign";
+    this.onComplete=options.onComplete||null;
+    this.onFail=options.onFail||null;
+    this.entries=new Map();this.failed=false;this.ready=false;this.disposed=false;this.active=true;this.paused=false;this.starting=false;this.initialized=false;
+    this.completedHandled=false;
     // These terrain tiles are already individual spatial batches. Copying the
     // entire 1.9 km field into two more buffers competes with combat draws for
     // resident memory. Both passes can draw the same indexed tiles as color.
@@ -72,39 +91,62 @@ export class EncounterPlay {
     }
     this.orderClock=0;this.lastBeat=null;this.music=null;this.lastStateSent=0;this.smoke=new Map();this.pendingActions=new Map();this.retiredMaterials=new DeferredMaterialDispose();this.warmedSignatures=new Set();
     let payload=null;
-    try {payload=JSON.parse(sessionStorage.getItem(PAYLOAD_KEY)||"null");}catch{}
-    const urlVariant=new URLSearchParams(globalThis.location?.search||"").get("variant");
-    this.variant=CompileEncounterVariant(payload?.variantId||urlVariant||undefined);
-    this.plan=new EncounterPlayPlan(payload?.document||this.variant.defaultDocument,payload?.time||0,this.variant);
+    if(!this.isCampaign){
+      try {payload=JSON.parse(sessionStorage.getItem(PAYLOAD_KEY)||"null");}catch{}
+    }
+    const search=new URLSearchParams(globalThis.location?.search||"");
+    const urlVariant=search.get("variant");
+    const resolvedVariantId=this.isCampaign
+      ?(options.variantId||urlVariant||FIRST_LEVEL_CAMPAIGN_VARIANT_ID)
+      :(payload?.variantId||urlVariant||undefined);
+    this.variant=CompileEncounterVariant(resolvedVariantId);
+    const skipOpening=!!(options.skipOpening||search.get("skipOpening")==="1");
+    const startPlan=this.isCampaign
+      ?ResolveEncounterStageStart(this.variant,options.startStage,{skipOpening})
+      :{time:payload?.time||0,opening:false};
+    this.pendingOpening=!!(this.isCampaign&&startPlan.opening);
+    this.openingActive=false;
+    this.combatStarted=!this.pendingOpening;
+    this.plan=new EncounterPlayPlan(this.isCampaign?this.variant.defaultDocument:(payload?.document||this.variant.defaultDocument),startPlan.time,this.variant);
     this.stealth=this.variant.stealthPlan?new VillageStealthPlay(host,new VillageStealthRules(this.variant.timeline)):null;
     this.noFireShots=0;this.noFireGrenades=0;this.noFireFailure=null;
     this.checkpointInventory=payload?.checkpointInventory||null;
     this.checkpointTime=null;
     this.templeEnteredAt=this.stealth&&this.plan.beat.id==="09b"?0:null;
-    this.token=payload?.token||"standalone";
+    this.token=payload?.token||(this.isCampaign?"campaign":"standalone");
+    const groundAt=(x,z)=>this.variant.surfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z);
+    this.groundAt=groundAt;
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,loadCast:LoadEncounterCast,
-      groundAt:(x,z)=>this.variant.surfaceAt([x,z],this.sceneSignals||[])??host.battlefield.GroundHeight(x,z),formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
+      groundAt,formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
       characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...XBOT_FACTION_CHARACTERS.ija])]});
-    this.view=new EncounterPlayView(host);
+    this.view=this.isCampaign?CreateSingleViewportStub(host):new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
+    this.opening=this.isCampaign
+      ?new FirstLevelOpeningTimeline({host,puppets:this.puppets,groundAt,onComplete:()=>this.OnOpeningComplete()})
+      :null;
     this.BuildUi();
-    this.api={State:()=>this.State(),SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
-      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:()=>this.Retry(),Begin:p=>this.Begin(p),Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
+    this.api={State:()=>this.State(),MissionState:()=>this.MissionState(),Stages:()=>this.Stages(),
+      SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
+      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:opts=>this.Retry(opts),
+      Begin:p=>this.Begin(p),JumpToStage:v=>this.JumpToStage(v),SkipOpening:()=>this.SkipOpening(),
+      Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
     this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);console.error(error);this.Send("error",{message:String(error.message||error)});});
   }
   BuildUi() {
-    document.body.classList.add("encounterGame");
-    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261123FailureCard",import.meta.url).href;document.head.append(this.style);
+    document.body.classList.add(this.isCampaign?"encounterCampaign":"encounterGame");
+    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261123CampaignSync",import.meta.url).href;document.head.append(this.style);
     this.speech=new EncounterPlayDialogue(this.host,this.view,id=>{
       const position=this.Position(id),soldier=this.entries.get(id)?.soldier;
       return position?{position,pose:soldier?.stance}:null;
     });
-    this.onMessage=e=>{
-      if(e.source!==window.parent||e.origin!==location.origin||e.data?.token!==this.token)return;
-      if(e.data.type==="encounter-play-layout")this.view.SetLayout(e.data.count);
-      if(e.data.type==="encounter-play-stop")this.Dispose();
-    };
-    window.addEventListener("message",this.onMessage);
+    if(!this.isCampaign){
+      this.onMessage=e=>{
+        if(e.source!==window.parent||e.origin!==location.origin||e.data?.token!==this.token)return;
+        if(e.data.type==="encounter-play-layout")this.view.SetLayout(e.data.count);
+        if(e.data.type==="encounter-play-stop")this.Dispose();
+      };
+      window.addEventListener("message",this.onMessage);
+    }
     this.failureCard=document.createElement("div");this.failureCard.className="encounterFailure";
     this.failureCard.setAttribute("role","alert");this.failureCard.hidden=true;
     this.failureCard.append(document.createElement("strong"),document.createElement("p"));
@@ -119,6 +161,7 @@ export class EncounterPlay {
     return this.plan.completed?0:dt;
   }
   RenderFailure(status,hint){
+    if(this.isCampaign){if(!this.failureCard.hidden)this.failureCard.hidden=true;return;}
     const show=(this.failed||this.plan.completed)&&this.ready&&!this.starting&&this.DeathSettled();
     if(show){
       const [title,text]=this.failureCard.children;
@@ -151,7 +194,10 @@ export class EncounterPlay {
       this.host.audio.LoadPacks?.();
     }
     this.ReportStep(T("boot.step.encounterCast"),0.06);
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm]);
+    const openingLoad=this.opening&&this.pendingOpening
+      ?this.opening.Load().catch(error=>{console.warn("[EncounterPlay] Opening timeline unavailable, falling back to 02g",error);this.pendingOpening=false;this.combatStarted=true;})
+      :null;
+    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm,openingLoad]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits,(done,total)=>
@@ -171,44 +217,114 @@ export class EncounterPlay {
       if(file)this.puppets.xbot.AdditiveFireTracks?.(file);
     }
     if(this.disposed||!this.active)return;
-    for(const key of this.puppets.xbot.characterKeys||[])if(!this.puppets.xbot.kits.has(key))throw new Error("正式人物模型加载失败："+key);
+    const missingKeys=(this.puppets.xbot.characterKeys||[]).filter(key=>!this.puppets.xbot.kits.has(key));
+    if(missingKeys.length){
+      if(this.isCampaign)console.warn("[EncounterPlay] Character model missing; retaining fallback rig:",missingKeys.join(", "));
+      else throw new Error("正式人物模型加载失败："+missingKeys[0]);
+    }
     this.ReportStep(T("boot.step.encounterActors"),0.2);
     await PaintFrame();
     if(this.disposed||!this.active)return;
-    const cfg=this.plan.config;
+    this.PreparePlayerLoadout();
+    if(this.previousMissionCoverRules===undefined)this.previousMissionCoverRules=this.host.ai.missionCoverRules;
+    this.host.ai.missionCoverRules=true;
+    if(!this.isCampaign)this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
+    this.stealth?.Reset();
+    this.noFireShots=this.host.state.playerShots;
+    this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
+    this.noFireFailure=null;
+    if(this.pendingOpening&&this.opening?.loaded){
+      this.combatStarted=false;
+      const frame=this.variant.evaluate(this.plan.time,this.plan.document);
+      this.SyncEnvironment(frame,true);
+      await this.opening.Stage("01-1");
+      this.initialized=true;this.ready=true;
+      this.puppets.Settle(10,.05,this.host.camera.position);
+      this.Send("ready");
+      return;
+    }
+    this.combatStarted=true;
     const frame=this.variant.evaluate(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
     this.SyncEnvironment(frame,true);
+    for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
+    this.initialized=true;this.ready=true;this.preparingPuppets=true;this.Update(0);
+    this.puppets.Settle(40,.05,this.host.player.position);this.preparingPuppets=false;this.SetPlayerPuppetVisible(false);
+    this.Send("ready");
+  }
+  PreparePlayerLoadout() {
+    const cfg=this.plan.config;
     if(this.host.Weapon()!==cfg.startWeapon)this.host.Pickup(cfg.startWeapon);
     this.host.state.clips=cfg.inventory.spareClips;
     if(this.host.state.mags.primary)this.host.state.mags.primary.clips=cfg.inventory.spareClips;
     this.host.state.grenades=cfg.inventory.grenades;this.host.state.bundles=cfg.inventory.bundles;
     this.RestoreCheckpointInventory();
     this.host.ctx.ApplyDebugOptions({reload:true});
-    if(this.previousMissionCoverRules===undefined)this.previousMissionCoverRules=this.host.ai.missionCoverRules;
+  }
+  OnStartRun() {
+    if(!this.isCampaign||!this.ready||this.disposed)return;
+    if(this.pendingOpening&&this.opening?.loaded){
+      this.pendingOpening=false;
+      this.openingActive=true;
+      this.combatStarted=false;
+      this.opening.Start("01-1");
+    }
+  }
+  OnOpeningComplete() {
+    if(this.disposed)return;
+    this.openingActive=false;
+    this.pendingOpening=false;
+    this.ActivateCombat();
+  }
+  SkipOpening() {
+    if(!this.openingActive&&!this.pendingOpening)return false;
+    if(this.openingActive)return this.opening.Skip();
+    this.pendingOpening=false;
+    this.ActivateCombat();
+    return true;
+  }
+  ActivateCombat() {
+    if(this.disposed)return;
+    this.combatStarted=true;
+    this.completedHandled=false;
+    this.failed=false;
+    this.signalKey=null;
+    this.hudKey=null;
+    this.music=null;
+    this.PreparePlayerLoadout();
+    const frame=this.variant.evaluate(this.plan.time,this.plan.document);
+    const p=frame.actors.find(a=>a.id==="player");
+    this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
+    this.SyncEnvironment(frame,true);
     this.host.ai.missionCoverRules=true;
-    for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
-    this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
-    this.stealth?.Reset();
     this.noFireShots=this.host.state.playerShots;
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
-    this.initialized=true;this.ready=true;this.preparingPuppets=true;this.Update(0);
-    this.puppets.Settle(40,.05,this.host.player.position);this.preparingPuppets=false;this.SetPlayerPuppetVisible(false);
-    this.Send("ready");
+    for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
+    if(this.isCampaign&&this.host.ctx.hudRoot&&!this.host.state.menu)this.host.ctx.hudRoot.style.display="";
+    if(this.host.viewmodel)this.host.viewmodel.root.visible=true;
+    this.preparingPuppets=true;this.Update(0);
+    this.puppets.Settle(20,.05,this.host.player.position);this.preparingPuppets=false;this.SetPlayerPuppetVisible(false);
+    this.SaveCheckpoint();
+    this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
+    if(this.isCampaign&&this.host.state.running&&!this.host.state.menu)this.host.ctx.RequestPointerLock?.();
   }
   async Begin(payload) {
     if(this.disposed)throw new Error("Play host disposed");
-    if(this.active||this.ready||this.entries.size||this.pendingActions.size)this.Suspend();
+    if(this.active||this.ready||this.entries.size||this.pendingActions.size||this.openingActive)this.Suspend();
     else this.view.SetLayout(1);
-    this.starting=true;this.active=true;this.token=payload.token;
+    this.starting=true;this.active=true;this.token=payload.token||(this.isCampaign?"campaign":"standalone");
     const token=this.token;
     if(payload.variantId&&payload.variantId!==this.variant.id) {
       this.variant=CompileEncounterVariant(payload.variantId);
       this.stealth=this.variant.stealthPlan?new VillageStealthPlay(this.host,new VillageStealthRules(this.variant.timeline)):null;
     }
-    this.plan=new EncounterPlayPlan(payload.document,payload.time,this.variant);
+    this.pendingOpening=!!(this.isCampaign&&payload.opening);
+    this.openingActive=false;
+    this.combatStarted=!this.pendingOpening;
+    this.completedHandled=false;
+    this.plan=new EncounterPlayPlan(this.isCampaign?this.variant.defaultDocument:payload.document,payload.time,this.variant);
     this.templeEnteredAt=this.stealth&&this.plan.beat.id==="09b"?0:null;
     this.checkpointInventory=payload.checkpointInventory||null;this.checkpointTime=null;this.alarmAnnounced=false;
     this.failed=false;this.noFireFailure=null;this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
@@ -222,17 +338,33 @@ export class EncounterPlay {
     this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
     this.starting=false;this.host.ctx.menu?.Close();this.host.state.menu=false;this.host.state.running=true;
     this.host.audio.SetPaused(false);this.host.audio.ctx?.resume().catch(()=>{});
+    if(this.pendingOpening)this.OnStartRun();
     this.host.ctx.RenderScene(0);this.Send("state",{state:this.State()});return true;
+  }
+  async JumpToStage(stageOrBeat) {
+    if(this.disposed)return null;
+    const start=ResolveEncounterStageStart(this.variant,stageOrBeat,{skipOpening:false});
+    await this.Begin({token:"campaign",variantId:this.variant.id,time:start.time,document:this.variant.defaultDocument,opening:start.opening});
+    return this.MissionState();
+  }
+  SetPaused(on) {
+    if(!this.active||!this.ready||this.starting)return false;
+    this.paused=!!on;
+    if(this.openingActive)this.opening?.SetPaused(this.paused);
+    return this.paused;
   }
   Pause(on=!this.paused) {
     if(!this.active||!this.ready||this.starting)return false;
     this.paused=!!on;this.host.state.running=!this.paused;
+    if(this.openingActive)this.opening?.SetPaused(this.paused);
     this.host.audio.SetPaused(this.paused);
     if(this.paused){this.host.ctx.ReleasePointerLock();this.host.audio.ctx?.suspend();}
     else{this.host.ctx.menu?.Close();this.host.state.menu=false;this.host.audio.ctx?.resume();}
     this.Send("state",{state:this.State()});return this.paused;
   }
   Suspend() {
+    this.opening?.Stop();
+    this.openingActive=false;this.pendingOpening=false;this.combatStarted=false;
     if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
     if(this.previousMissionCoverRules!==undefined) this.host.ai.missionCoverRules=this.previousMissionCoverRules;
     this.active=false;this.paused=false;this.ready=false;this.host.state.running=false;
@@ -268,7 +400,7 @@ export class EncounterPlay {
     if(!this.ready)throw new Error(this.error||"Encounter assets not ready");
     await Promise.all([...this.puppets.puppets.values()].flatMap(p=>p.humans.map(h=>h.towel?.Ready?.()).filter(Boolean)));
     const {host}=this,start=performance.now(),wasWarming=host.state.warming;
-    const signature=JSON.stringify([this.plan.startBeat.id,host.ctx.graphics,host.viewmodel.weaponId,
+    const signature=JSON.stringify([this.plan.startBeat.id,this.pendingOpening,host.ctx.graphics,host.viewmodel.weaponId,
       [...this.entries.values()].map(e=>[e.actor.id,e.soldier.actor?.characterRig?.modelId,e.skin?.kit?.key,e.spec.weapon]),
       this.Presentation().map(p=>[p.id,p.kind,p.humans])]);
     const retained=this.warmedSignatures.has(signature);
@@ -484,6 +616,11 @@ export class EncounterPlay {
   }
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
+    if(this.openingActive){
+      this.opening.Update(dt);
+      return;
+    }
+    if(!this.combatStarted)return;
     if(this.failed){this.RenderHud();return;}
     const {player,state}=this.host,cfg=this.plan.config;
     for(const [id,entry] of this.entries)if(!entry.soldier.alive)this.plan.Kill(id);
@@ -517,6 +654,14 @@ export class EncounterPlay {
     const escorted=[...this.puppets.puppets.values()].filter(p=>/^stretcher\d+$/.test(p.id)&&p.z>=cfg.escortExitZ).length;
     const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
     if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
+    if(this.isCampaign&&this.plan.completed&&!this.completedHandled){
+      this.completedHandled=true;
+      this.host.audio.Music(null,{fadeOut:1.5});
+      this.speech.Clear();
+      this.RenderHud();
+      this.onComplete?.(this.MissionState());
+      return;
+    }
     const frame=this.plan.Frame();
     this.SyncEnvironment(frame);
     this.SaveCheckpoint();
@@ -577,6 +722,10 @@ export class EncounterPlay {
       this.lastStateSent=this.plan.elapsed;this.lastBeat=this.plan.beat.id;this.Send("state",{state:this.State()});
     }
   }
+  ApplyCamera(camera) {
+    if(this.openingActive)return this.opening.ApplyCamera(camera);
+    return false;
+  }
   SetPlayerPuppetVisible(visible){for(const human of this.playerPuppet?.humans||[]){
     // This proxy is revealed only inside the observer draw, after the main
     // camera's batch collection. Keep its attachments on their ordinary Mesh path.
@@ -599,7 +748,7 @@ export class EncounterPlay {
     });
   }
   Interact() {
-    if(!this.active||this.paused||!this.ready||this.failed||this.plan.completed)return false;
+    if(!this.active||this.paused||!this.ready||this.openingActive||!this.combatStarted||this.failed||this.plan.completed)return false;
     const p=this.host.player.position;
     if(!this.plan.CanInteract([p.x,p.z]))return false;
     const action=this.plan.gate.action;
@@ -620,9 +769,14 @@ export class EncounterPlay {
     return true;
   }
   OnKey(detail) {
+    if(this.openingActive){
+      if(detail.code==="Escape")return undefined;
+      if(detail.code==="Space"&&detail.down&&!detail.repeat){this.SkipOpening();return true;}
+      return true;
+    }
     if(detail.code==="KeyR" && detail.down && !detail.repeat && this.failed)return this.Retry();
     if(this.stealth?.CapturesInput() && detail.down && !["Escape","KeyO"].includes(detail.code))return true;
-    if(detail.code==="KeyO"&&this.view.count===2) {
+    if(!this.isCampaign&&detail.code==="KeyO"&&this.view.count===2) {
       if(detail.down&&!detail.repeat) {
         if(this.view.focused){this.view.canvas.blur();this.host.Focus({fromClick:true});}
         else {this.host.ctx.ReleasePointerLock();this.view.mode="free";this.view.canvas.focus();}
@@ -630,6 +784,16 @@ export class EncounterPlay {
       return true;
     }
     if(detail.code==="KeyF"&&detail.down!==false&&this.plan.gate.action)return this.Interact();
+  }
+  ObjectiveText() {
+    if(this.openingActive||!this.combatStarted)return "";
+    if(!this.hudInfo)return this.plan.beat.task||"";
+    const beatId=this.plan.beat.id.toUpperCase();
+    const beatTitle=this.plan.beat.title||"";
+    const head=beatTitle&&this.hudInfo.task?.startsWith(beatTitle)
+      ?`${beatId} · ${this.hudInfo.task}`
+      :`${this.hudInfo.title} · ${this.hudInfo.task}`;
+    return this.hudInfo.campaignHint?`${head} — ${this.hudInfo.campaignHint}`:head;
   }
   RenderHud(frame=this.plan.Frame()) {
     const ui=this.plan.config.ui,reachM=this.plan.config.reachM;
@@ -651,30 +815,56 @@ export class EncounterPlay {
     const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
     const help=(this.failed?[hint]:[hint,actions,notice]).filter(Boolean).join(" · ");
     this.RenderFailure(status,this.failed?hint:ui.stop);
-    const key=JSON.stringify([title,status,help,dialogue]);
+    const key=JSON.stringify([title,status,help,hint,dialogue]);
     if(key===this.hudKey)return;this.hudKey=key;
-    this.hudInfo={title,task:status,hint:help};
+    this.hudInfo={title,task:status,hint:help,campaignHint:this.failed||this.plan.completed?"":hint};
   }
   AfterRender(dt,options){
+    if(this.openingActive)return;
     this.view.Render(dt,options,()=>this.SetPlayerPuppetVisible(true),()=>this.SetPlayerPuppetVisible(false));
     this.speech.Render();
   }
   RequestStop(){if(window.parent!==window)this.Send("stop");else history.back();}
-  Send(kind,extra={}){if(window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
+  Send(kind,extra={}){if(!this.isCampaign&&window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
   Actors(){return [...this.entries].map(([id,e])=>({id,soldierId:e.soldier.id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor?.characterRig?.modelId,group:e.actor.groupId||null}));}
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
-  State(){return {...this.plan.State(),hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
+  Stages(){
+    const currentStageId=this.openingActive||this.pendingOpening?this.variant.stages[0]?.id:this.plan.beat.stage;
+    return this.variant.stages.map((stage,index)=>({
+      number:index+1,id:stage.id,title:stage.title,
+      entryBeat:(index===0?EncounterFirstPlayable(this.variant):stage.beats.find(b=>EncounterCanPlay(b.start,this.variant))||stage.beats[0])?.id||null,
+      opening:index===0,current:stage.id===currentStageId,
+    }));
+  }
+  MissionState(){
+    const stageId=this.openingActive||this.pendingOpening?this.variant.stages[0]?.id:this.plan.beat.stage;
+    const stageIndex=Math.max(0,this.variant.stages.findIndex(s=>s.id===stageId));
+    const stageObj=this.variant.stages[stageIndex]||this.variant.stages[0];
+    return {
+      mode:this.mode,variant:this.variant.id,scene:this.plan.config.scene,
+      stage:stageObj?.id||stageId,stageNumber:stageIndex+1,stageTitle:stageObj?.title||"",
+      beat:this.openingActive||this.pendingOpening?(this.opening?.State().keyframe||"01-1"):this.plan.beat.id,
+      opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,
+      time:this.openingActive?(this.opening?.State().t||0):this.plan.time,
+      elapsed:this.plan.elapsed,waiting:this.plan.waiting,completed:this.plan.completed,failed:this.failed,
+      objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),
+      dead:[...this.plan.dead],triggers:[...this.plan.triggers.keys()],signals:this.sceneSignals||[],
+    };
+  }
+  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
   CapturesInput() {
-    return !this.active || this.paused || this.starting || !this.ready || this.failed || !!this.stealth?.CapturesInput()
+    return !this.active || this.paused || this.starting || !this.ready || this.openingActive || !this.combatStarted || this.failed || !!this.stealth?.CapturesInput()
       || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
       || this.view.count===2&&this.view.focused;
   }
   Fail() {
+    if(this.failed)return true;
     this.failed=true;
     this.host.audio.Music(null,{fadeOut:0.2});
     this.RenderHud();this.Send("state",{state:this.State()});
+    if(this.isCampaign)this.onFail?.(this.MissionState());
     return true;
   }
   SaveCheckpoint() {
@@ -713,8 +903,9 @@ export class EncounterPlay {
     }
     if(saved.wounds)player.wounds=structuredClone(saved.wounds);
   }
-  Retry() {
-    if(!this.active || !this.ready || this.starting || this.disposed || !this.failed)return false;
+  Retry({force=false}={}) {
+    if(!this.active || !this.ready || this.starting || this.disposed || (!this.failed&&!force))return false;
+    if(this.openingActive){this.opening.Stop();this.openingActive=false;this.pendingOpening=false;}
     const plan=new EncounterPlayPlan(this.plan.document,this.checkpointTime??this.plan.beat.start,this.variant);
     const {player,state,combat,battlefield,vfx,ctx}=this.host;
     this.host.audio.ResetSession();
@@ -732,7 +923,7 @@ export class EncounterPlay {
     for(const source of this.smoke.values())vfx.RemoveSmokeSource(source);
     this.smoke.clear();
     Object.assign(this,{
-      plan,failed:false,noFireFailure:null,paused:false,alarmAnnounced:false,templeEnteredAt:this.stealth&&plan.beat.id==="09b"?0:null,
+      plan,failed:false,completedHandled:false,combatStarted:true,noFireFailure:null,paused:false,alarmAnnounced:false,templeEnteredAt:this.stealth&&plan.beat.id==="09b"?0:null,
       orderClock:0,lastBeat:null,lastStateSent:-1,hudKey:null,signalKey:null,music:null
     });
     ctx.RespawnPlayer(true);
@@ -745,6 +936,7 @@ export class EncounterPlay {
     ctx.router.SetSuppressed(true);
     ctx.router.SetSuppressed(false);
     ctx.menu?.Close();this.host.hud.HideDeathCard?.();ctx.viewmodel.ResetDeath?.();
+    if(this.isCampaign&&ctx.hudRoot)ctx.hudRoot.style.display="";
     ctx.viewmodel.Equip(this.host.Weapon(),state.weaponVariants[state.activeSlot]||0,{instant:true});
     ctx.SyncBayonet();
     ctx.viewmodel.root.visible=true;
@@ -755,17 +947,19 @@ export class EncounterPlay {
     this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
     this.Update(0);
     this.host.audio.SetPaused(false);this.host.audio.ctx?.resume().catch(()=>{});
+    if(this.isCampaign)ctx.RequestPointerLock?.();
     this.Send("state",{state:this.State()});
     return true;
   }
   Dispose() {
     if(this.disposed)return;this.disposed=true;this.ready=false;
+    this.opening?.Dispose();
     this.host.audio.Music(null,{fadeOut:0});this.host.audio.Dispose();this.view.Dispose();
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);
-    this.entries.clear();this.puppets.Dispose();window.removeEventListener("message",this.onMessage);
+    this.entries.clear();this.puppets.Dispose();if(this.onMessage)window.removeEventListener("message",this.onMessage);
     this.retiredMaterials.Flush();
     this.speech.Dispose();this.failureCard.remove();this.style.remove();
-    document.body.classList.remove("encounterGame");
+    document.body.classList.remove("encounterGame","encounterCampaign","encounterOpening");
   }
 }

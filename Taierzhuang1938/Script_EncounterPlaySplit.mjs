@@ -1,4 +1,2 @@
-// Local Encounter Designer runtime boundary, omitted from published game bundles.
-export { EncounterPlay } from "./Script_EncounterPlay.mjs";
-export { ENCOUNTER_PLAY_PHASE } from "./Script_EncounterPlayScene.mjs";
-export { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
+// Local Encounter Designer cast cache boundary, swapped for a direct loader in published bundles.
+export { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";

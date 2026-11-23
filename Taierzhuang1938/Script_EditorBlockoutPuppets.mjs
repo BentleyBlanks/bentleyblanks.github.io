@@ -812,7 +812,7 @@ export class BlockoutPuppets {
    */
   _SyncXBot(puppet, human, { drive, state, mps, aim, carryRole, throwing, clipState, lieAlong, lieClip, seat, distance, cameraPosition }, step) {
     if (!this.xbot?.ready) return;
-    if(this.formalOnly&&!human.castId&&human.faction!=="ija")return;
+    if(this.formalOnly&&!XBOT_CAST_CHARACTERS[human.castId]&&human.faction!=="ija")return;
     // 配色：有名字的角色各一种（castId，或顺子 / 老耿 / 妮儿这类按单位 id）；抬担架的、普通人按阵营素色
     if (!human.skin && human.body === "rig") human.skin = this.xbot.Attach(human.actor, { faction: human.faction,
       castId: human.castId, unitId: human.slot === "main" ? puppet.unit.id : null, seed: `${puppet.unit.id}:${human.slot}` });

@@ -95,12 +95,20 @@ LocalPreview 打开遭遇编辑器时开始监听当前工作树的源文件，�
 
 ## 运行边界
 
-- `Script_EncounterPlayPlan`：关键帧开局、触发、数量预算、阶段通过与运行状态；复制输入文档。
-- `Script_EncounterPlay`：在游戏宿主已有时钟中下达命令、同步表现与文字、选择 BGM。通过 `Script_SandboxRanges` 登记，主循环不认识具体场景。
-- `Script_EncounterPlayView`：同一 WebGLRenderer、两份 PostPipeline 历史与两个显示画布。每帧世界只模拟一次，声音只以玩家相机为听者。观察镜头不另建游戏。两视口人物剔除取并集。
+- `Script_EncounterPlayPlan`：关键帧开局、触发、数量预算、阶段通过、战役阶段起点解析（`ResolveEncounterStageStart`）与运行状态；复制输入文档。
+- `Script_EncounterPlay`：在游戏宿主已有时钟中下达命令、同步表现与文字、选择 BGM。通过 `Script_SandboxRanges.CreateEncounterPlayPluginInstance` 同时服务编辑器试玩（`mode: "editor"`）与第一关正式战役（`mode: "campaign"`），主循环不认识具体场景。
+- `Script_FirstLevelOpeningTimeline`：正式战役开场 01–02f 播放器，复用 `BlockoutPreviz` 与 `Timeline/FirstLevelOpening.timeline.json`（`01-1`…`02-2`），播完或跳过后直接交接 `EncounterPlay` 的 `02g` 战斗。
+- `Data_FirstLevelCampaign`：正式战役默认变体（`L1_BeishaheMerged`）、开场序列与 13 阶段菜单表（纯 JSON 数据，供独立标题菜单与调试跳转共用）。
+- `Script_EncounterPlayView`：同一 WebGLRenderer、两份 PostPipeline 历史与两个显示画布。每帧世界只模拟一次，声音只以玩家相机为听者。观察镜头不另建游戏。两视口人物剔除取并集。正式战役使用单视口空壳，不建双视口 DOM。
 - `Script_EncounterPlayDialogue`：独立于音频的文字行动指令、真实人物头顶气泡与玩家视口底部回退。
 - `AdvancedTools/Script_LevelFlowPlay`：编辑快照、播放／暂停／停止、右侧状态、内容指纹与宿主缓存。停止后不运行后台玩法或 GPU 渲染。
-- `Script_EncounterPlaySplit`：本地工具运行边界，发布构建替换为 Stub，避免把本地高级工具接回线上游戏包。
+- `Script_EncounterPlaySplit`：本地人物铸模缓存边界（`LoadEncounterCast`），发布构建（`--deploy` / `--strip-dev-tools`）替换为 `Script_EncounterPlaySplitStub`，让 `EncounterPlay` 正式战役直接上线 GitHub Pages 而不引入 `AdvancedTools/`。
+
+## 第一关正式战役同步（2026-11-23）
+
+- 主菜单「开始」/「第一关」与 `?whitebox=p012` 复用 `EncounterPlay`（默认变体 `L1_BeishaheMerged`，13 阶段，01–07 共享 `FirstLevelEncounter`、08–13 为合并北沙河单村与炸桥，支持 `?variant=L1_Original` 与 `?missionStage=<stage|beat>`、`?skipOpening=1`）。
+- 正式战役始终读取仓库提交的 `variant.defaultDocument`，不读取浏览器 `localStorage` / `sessionStorage` 中的编辑器草稿；编辑器试玩（`?encounterPlay=1`）仍读取 `sessionStorage` 草稿。
+- 正式战役保留单视口、正式 HUD（顶部目标/提示、准星、弹药、交互）、Esc 暂停菜单、阵亡/潜行失败菜单（支持 R 键与按钮从检查点重试）与通关进度写入（`Progress.MarkCleared`）；局部角色 GLB 下载失败时记录警告并退回备用骨架，避免线上弱网中断开机。
 
 ## 验收
 

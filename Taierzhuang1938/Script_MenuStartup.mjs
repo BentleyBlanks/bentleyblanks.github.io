@@ -23,7 +23,7 @@ import {CLOTH_RANGE_PHASE} from './Data_ClothRange.mjs';
 import {HAIR_RANGE_PHASE} from './Data_HairRange.mjs';
 import {MELEE_QTE_PHASE} from './Data_MeleeQte.mjs';
 import {GORE_RANGE_PHASE} from './Data_GoreRange.mjs';
-import {FIRST_LEVEL_STAGES} from './Data_FirstLevelMissionStages.mjs';
+import {FIRST_LEVEL_CAMPAIGN_STAGES} from './Data_FirstLevelCampaign.mjs';
 import {DebugOptions} from './Script_DebugOptions.mjs';
 import {SandboxUrl} from './Data_StartupRouting.mjs';
 import {T} from './Script_Text.mjs';
@@ -123,7 +123,7 @@ menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdr
   DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,
   PlaySandbox: GoToSandbox, ExitSandbox: () => GoToSandbox(null), Play: StartLevel,
   DebugOptions: () => debugOptions.Get(), SetDebugOption: (id, enabled) => debugOptions.Set(id, enabled),
-  FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage, current: false})),
+  FirstLevelStages: () => FIRST_LEVEL_CAMPAIGN_STAGES.map(stage => ({...stage, current: false})),
   FirstLevelJump: stage => GoToSandbox('firstLevelP012Whitebox', {stage}),
 });
 const api = {renderer, camera, scene: room.scene, audio, state, menu, graphics, GraphicsProfile: graphicsProfile, StepFrames,

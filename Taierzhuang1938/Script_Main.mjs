@@ -49,7 +49,10 @@ import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 // 测试场：登记表（网址开关与通用待遇）+ 插件（场地、建什么、每帧排在哪儿），见 docs/Data_SandboxRanges.md。
 import { SandboxRangeFromParams } from "./Data_SandboxRanges.mjs";
-import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses } from "./Script_SandboxRanges.mjs";
+import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses, CreateEncounterPlayPluginInstance } from "./Script_SandboxRanges.mjs";
+import { CreateEncounterPlayPhase } from "./Script_EncounterPlayScene.mjs";
+import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
+import { FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
 // 玩法时间的唯一入口：慢放 / 暂停 / 单步都往这里登记（Script_GameClock）。
 import { GameClock, CLOCK_ORDER } from "./Script_GameClock.mjs";
 // 每帧调度表：模式与正常游戏的步骤先后（Data_FrameSchedule），Frame 只按它分派。
@@ -74,12 +77,10 @@ import {
   FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
   FIRST_LEVEL_P012_WHITEBOX_PHASE as ARCHIVED_P012_PHASE,
 } from "./Data_FirstLevelP012Whitebox.mjs";
-import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { ApplyLensToPost } from "./Script_OpeningLens.mjs";
 import { LENS_DEFAULT } from "./Data_OpeningLens.mjs";
 import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
-import { ResolveFirstLevelStage } from "./Script_FirstLevelMissionStages.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -276,8 +277,16 @@ const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
  */
 const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
 const SANDBOX_RANGE = SANDBOX_PLUGIN?.entry ?? null;
-/** 测试场插件声明的轻量开机（枪械射击场：只加载要用的 PBR 组与音效、不预载担架/飞机/弹坑碎屑）；其余入口是 null。 */
-const SANDBOX_STARTUP = SANDBOX_PLUGIN?.startup ?? null;
+// Archived content is a developer regression fixture, absent from chapter selection.
+const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
+const FIRST_LEVEL_CAMPAIGN = params.get("whitebox") === "p012";
+const FIRST_LEVEL_P012_WHITEBOX = FIRST_LEVEL_CAMPAIGN || ARCHIVED_P012_FIXTURE;
+const FIRST_LEVEL_CAMPAIGN_PHASE = FIRST_LEVEL_CAMPAIGN
+  ? CreateEncounterPlayPhase({ variantId: params.get("variant") || FIRST_LEVEL_CAMPAIGN_VARIANT_ID, campaign: true })
+  : null;
+const FIRST_LEVEL_STAGE_START = FIRST_LEVEL_CAMPAIGN ? (params.get("missionStage") || null) : null;
+/** 测试场插件声明的轻量开机（枪械射击场 / 遭遇试玩 / 第一关正式战役：只加载要用的 PBR 组与音效）；其余入口是 null。 */
+const SANDBOX_STARTUP = SANDBOX_PLUGIN?.startup ?? (FIRST_LEVEL_CAMPAIGN ? ENCOUNTER_PLAY_STARTUP : null);
 // 断肢测试场（?gore=1，登记表里的 gore）与断肢内容总闸（?gore=0）是两回事，见下面 GORE_FORCED_OFF。
 // 内容总闸的运行时覆盖。`?gore=0` 一段肢体都不掉（`Data_Tuning_Gore.ENABLED` 与
 // `Debug.Gore.SetEnabled` 是另外两个入口，三者任一关闭即关闭）。
@@ -285,11 +294,6 @@ const SANDBOX_STARTUP = SANDBOX_PLUGIN?.startup ?? null;
 // 出图与回归都靠这个参数拿到确定的画面，不能被上一次玩到一半存下的偏好推翻。
 const GORE_FORCED_OFF = params.get("gore") === "0";
 if (GORE_FORCED_OFF) SetGoreEnabled(false);
-// Archived content is a developer regression fixture, absent from chapter selection.
-const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
-const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012" || ARCHIVED_P012_FIXTURE;
-const FIRST_LEVEL_STAGE_START = FIRST_LEVEL_P012_WHITEBOX && !ARCHIVED_P012_FIXTURE
-  ? FIRST_LEVEL_STAGES.find(stage => stage.id === params.get("missionStage") || String(stage.number) === params.get("missionStage"))?.id || null : null;
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
  * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
@@ -324,7 +328,7 @@ const TOOLS_HOME = DEV_TOOLS_ENABLED && EDITOR_PARAM === "tools" && !SHOT && PHA
   && !(SANDBOX_RANGE || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT);
 const SANDBOX = !!SANDBOX_RANGE || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT || TOOLS_HOME;
 const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES : SANDBOX_PLUGIN ? [SANDBOX_PLUGIN.phase]
-    : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_P012_WHITEBOX_PHASE]
+    : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_CAMPAIGN_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
         : OVERVIEW ? [OVERVIEW_PHASE]
           : FULL_SCENE ? [FULL_SCENE_PHASE]
@@ -2654,6 +2658,7 @@ async function Boot() {
       root: menuRoot, camera, campaign: CAMPAIGN_ENTRIES,
       SliceIndex: () => state.builtPhase,
       CurrentObjective: () => {
+        if (sandbox?.id === "firstLevelCampaign") return sandbox.runtime?.ObjectiveText?.() || "";
         const stage = missionRuntime?.flow.stage;
         return stage ? Localize(FirstLevelStageTextId(stage.id), stage.objective) : p012Flow?.CurrentObjective().text || state.storyObjective || "";
       },
@@ -2678,7 +2683,10 @@ async function Boot() {
       SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
       ExitSandbox: () => GoToSandbox(null),
       RestartSandbox: () => location.reload(),
-      RetrySandbox: () => { if(missionRuntime?.Retry() || p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);} },
+      RetrySandbox: () => {
+        if (sandbox?.id === "firstLevelCampaign") { ContinueCheckpoint(); return; }
+        if(missionRuntime?.Retry() || p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);}
+      },
       Resume: () => ResumeFromPause(),
       // 画面 / 声音 / 操作走玩家设置页（SettingsHost，关掉回到设置目录，见 FinishSettings）；
       // 「高级工具」是开发工具，走 OpenDevTools。
@@ -2700,7 +2708,8 @@ async function Boot() {
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
-      FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
+      FirstLevelStages: () => (sandbox?.id === "firstLevelCampaign" ? sandbox.runtime?.Stages?.() : null)
+        || FIRST_LEVEL_CAMPAIGN_STAGES.map(stage => ({...stage,current:false})),
       FirstLevelJump: value => JumpFirstLevelStage(value),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       CheckpointStatus,
@@ -2874,6 +2883,28 @@ function SandboxHost() {
 function InstallSandbox() {
   DisposeSandbox();
   sandbox = SANDBOX_PLUGIN.Create(SandboxHost());
+  if (sandbox.ScaleDt) clock.Add("sandbox", sandbox.ScaleDt, CLOCK_ORDER.sandbox);
+  sandbox.OnInstalled?.();
+  RegisterSandboxDebug();
+}
+
+/** 第一关正式战役：直接复用 EncounterPlay 运行时与北沙河单村合并版场景、编排、AI 及开场 Timeline。 */
+function InstallCampaignEncounter({ variantId, startStage = null } = {}) {
+  DisposeSandbox();
+  sandbox = CreateEncounterPlayPluginInstance(SandboxHost(), {
+    mode: "campaign",
+    variantId,
+    startStage,
+    onComplete: () => {
+      Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, 0);
+      ShowPauseMenu();
+      menu?.OpenSandboxComplete();
+    },
+    onFail: () => {
+      ShowDeathMenu();
+      if (player?.Alive) menu?.SetDeathReveal(1);
+    },
+  });
   if (sandbox.ScaleDt) clock.Add("sandbox", sandbox.ScaleDt, CLOCK_ORDER.sandbox);
   sandbox.OnInstalled?.();
   RegisterSandboxDebug();
@@ -3430,10 +3461,10 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   const contentId = PhaseContentId(phase);
   // 废弃场景传空 beats：第一关的章节内容还在（P0/P1/P2 白盒用），正片入口不许播它。
   // 白盒关卡编辑器同样传空 beats：只看布设，没有故事拍、过场与同伴。
-  const loaded = story.BeginLevel(contentId, { beats: deprecated || BLOCKOUT ? [] : phase.whitebox?.storyBeats,
+  const loaded = story.BeginLevel(contentId, { beats: deprecated || BLOCKOUT || phase.whitebox?.encounterCampaign ? [] : phase.whitebox?.storyBeats,
     actualEventsOnly: phase.whitebox?.actualEventsOnly });
   state.storyObjective = phase.objectives[0] ? Localize(LevelObjectiveStepId(phase.id, 0), phase.objectives[0]) : null;
-  if (loaded === 0 && !deprecated && !BLOCKOUT) console.warn("这一章没有剧本：", phase.id);
+  if (loaded === 0 && !deprecated && !BLOCKOUT && !phase.whitebox?.encounterCampaign) console.warn("这一章没有剧本：", phase.id);
 
   // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
   // 底下那片地皮上不该有一条战线在后台开火消耗票池。
@@ -3442,7 +3473,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!SANDBOX_RANGE && !BLOCKOUT && !TOOLS_HOME && !deprecated && companion) {
+  if (!SANDBOX_RANGE && !BLOCKOUT && !TOOLS_HOME && !deprecated && !phase.whitebox?.encounterCampaign && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -3466,7 +3497,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!phase.whitebox?.fullMission && !SANDBOX_RANGE && !BLOCKOUT && !TOOLS_HOME && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !phase.whitebox?.encounterCampaign && !SANDBOX_RANGE && !BLOCKOUT && !TOOLS_HOME && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3867,6 +3898,10 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   SetLooseGunEnabled(phase);
   // 测试场：插件自己建（Script_SandboxRanges），装配层只管登记、挂取证口和收尾。
   if (SANDBOX_PLUGIN) { state.pinned = true; InstallSandbox(); }
+  else if (phase.whitebox?.encounterCampaign) {
+    state.pinned = true;
+    InstallCampaignEncounter({ variantId: phase.encounterVariant, startStage: stageJump ?? FIRST_LEVEL_STAGE_START });
+  }
   else if (FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   // 白盒关卡编辑器：敌我单位是编辑器自己摆的独立演员，不撒兵、不换关。
   else if (BLOCKOUT) { state.pinned = true; }
@@ -3880,7 +3915,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
 
   // 只给具名角色穿的外观（翻译的 NRA06）不进开机下载（清单 loadOnDemand），第一关进关时
   // 按说话人钉死表拉下来 —— 放在人物预热之前，这样它的材质也在加载画面后面编掉。
-  if (FIRST_LEVEL_P012_WHITEBOX && actorFactory?.characterAssets) {
+  if (ARCHIVED_P012_FIXTURE && actorFactory?.characterAssets) {
     try { await LoadLugouCastModels(actorFactory.characterAssets, Object.values(FIRST_LEVEL_SPEAKING_CAST)); }
     catch (error) { console.warn("[Main] 具名角色外观下载失败（该角色退回缺模型的兜底）", error); }
   }
@@ -5319,7 +5354,7 @@ function RespawnPlayer(initial = false) {
   ClearLooseGuns({ keepFlying: true });
   carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
-  state.identity = phase.whitebox?.p012 ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:DEFAULT_PLAYER_WEAPON}
+  state.identity = (phase.whitebox?.p012 || phase.whitebox?.encounterCampaign) ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:DEFAULT_PLAYER_WEAPON}
     : {...MakeSoldierIdentity(seed),weapon:DEFAULT_PLAYER_WEAPON};
   currentWeapon = state.identity.weapon;
 
@@ -5882,7 +5917,7 @@ function OnPointerLockChange() {
     if (performance.now() - lockGrantedAt < LOCK_ECHO_MS) {
       clearTimeout(lockEchoRetry);
       lockEchoRetry = setTimeout(() => {
-        if (state.running && !state.menu && !state.cutscene && !PointerLocked()) RequestPointerLock();
+        if (state.running && !state.menu && !state.cutscene && !sandbox?.runtime?.openingActive && !PointerLocked()) RequestPointerLock();
       }, LOCK_ECHO_RETRY_MS);
       return;
     }
@@ -5899,6 +5934,11 @@ function StartRun() {
   if (SANDBOX_RANGE?.ownsFrame) { hudRoot.style.display = "none"; sandbox?.UpdateCamera?.(0); return; }
   if (SHOT) return;
   audio.Unlock();
+  sandbox?.runtime?.OnStartRun?.();
+  if (sandbox?.runtime?.openingActive) {
+    hudRoot.style.display = "none";
+    return;
+  }
   RequestPointerLock();
 }
 bootStart.addEventListener("click", StartRun);
@@ -6030,13 +6070,27 @@ async function StartLevel(index, { stageJump = null } = {}) {
 /** 第一关阶段跳转（菜单里的「阶段跳转」与测试夹具 Debug.FirstLevelJump）。 */
 async function JumpFirstLevelStage(value) {
   if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
-  const stage = ResolveFirstLevelStage(value);
   if (state.advancing) throw new Error("Level loading is already in progress");
-  const index = PHASE_TABLE.findIndex(phase => phase.whitebox?.fullMission);
-  if (index < 0) return {navigating:true,phaseNumber:stage.number,phaseId:stage.id,
-    url:GoToSandbox("firstLevelP012Whitebox",{stage:stage.id})};
-  await StartLevel(index, { stageJump: stage.id });
-  return missionRuntime.State();
+  if (sandbox?.id === "firstLevelCampaign" && sandbox.runtime?.JumpToStage) {
+    const result = await sandbox.runtime.JumpToStage(value);
+    if (menu?.open) menu.Close();
+    state.menu = false;
+    state.running = true;
+    hudRoot.style.display = sandbox.runtime.openingActive ? "none" : "";
+    SetDevToolsHidden(false);
+    if (!sandbox.runtime.openingActive) RequestPointerLock();
+    return result;
+  }
+  const raw = String(value ?? "").trim();
+  const num = Number(raw);
+  const stage = FIRST_LEVEL_CAMPAIGN_STAGES.find(s => s.id === raw || s.id === raw.padStart(2, "0") || (Number.isInteger(num) && s.number === num))
+    || FIRST_LEVEL_CAMPAIGN_STAGES[0];
+  return {
+    navigating: true,
+    phaseNumber: stage.number,
+    phaseId: stage.id,
+    url: GoToSandbox("firstLevelP012Whitebox", { stage: stage.id }),
+  };
 }
 
 /**
@@ -6240,6 +6294,7 @@ function SuspendGameplay() {
   state.queuedFire = null; state.queuedReload = null;
   meleeCombat?.HandleInput("Blur", false);
   missionRuntime?.voice.Pause();
+  sandbox?.runtime?.SetPaused?.(true);
   state.running = false;
   interact?.CancelHold("pause");
   p012BinocularRaised = false;
@@ -6290,6 +6345,12 @@ function PauseGame() {
 
 /** Both death and debug recovery use the current level's saved checkpoint. */
 function CheckpointStatus() {
+  if (sandbox?.id === "firstLevelCampaign") {
+    const rt = sandbox.runtime;
+    const available = !!player && !state.menu && !state.cutscene && !state.advancing
+      && !!rt?.ready && !rt.plan?.completed && rt.checkpointTime !== null;
+    return { available, note: available ? T("menu.checkpoint.noteP012") : T("menu.checkpoint.none") };
+  }
   const available = !!player && !state.menu && !state.cutscene && !state.advancing
     && !missionRuntime?.completed && !p012Runtime?.completed
     && !!(missionRuntime ? missionRuntime.safePoint : p012Runtime ? p012Runtime.safePoint : checkpoint?.saved);
@@ -6300,6 +6361,15 @@ function CheckpointStatus() {
 
 function ContinueCheckpoint() {
   if (!CheckpointStatus().available) return false;
+  if (sandbox?.id === "firstLevelCampaign") {
+    if (!sandbox.runtime?.Retry({ force: true })) return false;
+    editorReturnMenuMode = null;
+    if (editor && editor.panelOpen) editor.TogglePanel(false);
+    settings?.Dismiss();
+    SetDevToolsHidden(false);
+    hud.Hint(T("hud.hint.checkpointResumed"), 3);
+    return true;
+  }
   // Release at the old position so recovery never teleports a payload across the scene.
   if (p012Runtime) carry?.ForceRelease("debugCheckpoint");
   if (!(missionRuntime || p012Runtime || checkpoint).ContinueCheckpoint()) return false;
@@ -6319,6 +6389,7 @@ function ContinueCheckpoint() {
 function ResumeFromPause() {
   if (!menu) return;
   if (missionRuntime?.completed || missionRuntime?.failed) return;
+  if (sandbox?.id === "firstLevelCampaign" && (sandbox.runtime?.plan?.completed || sandbox.runtime?.failed)) return;
   if (p012Runtime?.completed) return;
   if (p012Runtime?.failed) return;
   viewmodel?.ResetDeath();
@@ -6334,11 +6405,13 @@ function ResumeFromPause() {
   menu.Close();
   state.menu = false;
   state.running = true;
-  hudRoot.style.display = "";
+  const openingActive = !!sandbox?.runtime?.openingActive;
+  hudRoot.style.display = openingActive ? "none" : "";
   SetDevToolsHidden(false);
   audio.SetPaused(false);
   missionRuntime?.voice.Resume();
-  RequestPointerLock();
+  sandbox?.runtime?.SetPaused?.(false);
+  if (!openingActive) RequestPointerLock();
 }
 
 /**
@@ -6380,7 +6453,7 @@ const router = new InputRouter({
   Context: () => (state.ordersOpen ? "orders" : "world"),
   // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
   Guard: (e) => {
-    if (SANDBOX_RANGE?.ownsFrame) return false;
+    if (SANDBOX_RANGE?.ownsFrame || sandbox?.runtime?.openingActive) return false;
     if (frameDebugger.frozen) return false;
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
@@ -6411,7 +6484,7 @@ const router = new InputRouter({
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
   },
   OnAction: (action, detail) => {
-    if (SANDBOX_RANGE?.ownsFrame) return;
+    if (SANDBOX_RANGE?.ownsFrame || sandbox?.runtime?.openingActive) return;
     if (frameDebugger.frozen) return;
     if(missionRuntime?.controls)return;
     if (missionRuntime?.ReceivingFood && (["crouch","prone","traverse"].includes(action) || action.startsWith("stance:"))) return;
@@ -6522,7 +6595,7 @@ document.addEventListener("keyup", (event) => {
   if (event.code !== "AltLeft" && event.code !== "AltRight") return;
   altMouseFree = false;
   // Timeline 里松 Alt 后仍要能点面板；普通玩法则恢复原来的锁定手感。
-  if (state.running && !state.menu && !state.cutscene && !UiCapturing()) RequestPointerLock();
+  if (state.running && !state.menu && !state.cutscene && !sandbox?.runtime?.openingActive && !UiCapturing()) RequestPointerLock();
   event.preventDefault();
 });
 
@@ -8476,7 +8549,7 @@ function UpdateFirstPersonShadow() {
 function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
   // 白盒编辑器的预演播放中：相机不在玩家身上，枪模与第一人称身体一起藏（播完 / 中断由编辑器还原枪模）
-  const openingBody=!!SANDBOX_RANGE?.ownsFrame || (player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
+  const openingBody=!!SANDBOX_RANGE?.ownsFrame || !!sandbox?.runtime?.openingActive || (player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
   if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !player.knock?.BodyHidden && !state.cutscene && !state.menu && !UiCapturing();
   UpdateFirstPersonShadow();
@@ -8705,7 +8778,7 @@ function RenderSceneContent(dt) {
   Object.assign(framePostOptions, sandbox?.PostOptions?.());
   post.Render(scene, camera, framePostOptions);
   sandbox?.AfterRender?.(dt, framePostOptions);
-  if (SANDBOX_RANGE?.id === "encounterPlay") frameDebugger.SetViewport();
+  if (SANDBOX_RANGE?.id === "encounterPlay" || sandbox?.id === "firstLevelCampaign") frameDebugger.SetViewport();
   profiler.E("post");
   // 第一人称本地反射图：排在主画面之后（阴影图本帧已烘过、骨头还没再动），拍的是下一帧给枪映的那张。
   if (firstPersonReflection?.enabled) {
@@ -8899,6 +8972,12 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) { interact?.CancelHold("hidden"); ReleasePointerLock(); }
 });
 document.addEventListener("keydown", (event) => {
+  if (event.code === "KeyR" && !event.repeat && menu?.open && menu.mode === "failure"
+      && sandbox?.id === "firstLevelCampaign" && sandbox.runtime?.failed) {
+    event.preventDefault();
+    ContinueCheckpoint();
+    return;
+  }
   // 按住不放的自动重复不算再按一次：否则暂停 / 继续会跟着重复频率来回翻。
   if (event.key !== "Escape" || event.repeat) return;
   // 脚本镜头夺走控制权期间 Esc 不暂停（镜头放完自己交还）；这里只管游戏中的退出
