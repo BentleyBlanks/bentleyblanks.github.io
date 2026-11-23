@@ -195,9 +195,9 @@ def RearFace(side, up):
     horizontal = side/.014
     radius = np.hypot(vertical,horizontal)
     angle = np.arctan2(vertical,horizontal)
-    rows = (radius-.25)*10.4
+    rows = (radius-.25)*8.75
     row = np.rint(rows)
-    count = np.maximum(12,np.rint(np.maximum(.25+row/10.4,.22)*64))
+    count = np.maximum(12,np.rint(np.maximum(.25+row/8.75,.22)*58))
     around = angle*count/(2*np.pi) + (row%2)*.5
     footprint = ((rows-row)/.50)**2 + ((around-np.rint(around))/.49)**2
     beads = np.maximum(0,1-footprint)**1.08 * Ramp(.22,.26,radius)*(1-Ramp(.92,.98,radius/(1+RearOutline(angle))))
@@ -315,8 +315,8 @@ def MedallionRelief(doc, views, primitive, field, valid, padded):
     side,up = field[rows,cols,0],field[rows,cols,1]
     def Height(side,up):
         beads,center,radius = RearFace(side,up)
-        boss = (1-Ramp(.22,.32,radius))*(1-np.exp(-(radius/.129)**2))
-        return .00032*beads + .00080*center + .00044*boss + .0046*(1-np.minimum(radius,1.3)**2)
+        boss = (1-Ramp(.19,.36,radius))*(1-np.exp(-(radius/.113)**2))
+        return .00023*beads + .00097*center + .00066*boss + .0095*(1-np.minimum(radius,1.3)**2)
     step = .000045
     gradX = (Height(side+step,up)-Height(side-step,up))/(2*step)
     gradY = (Height(side,up+step)-Height(side,up-step))/(2*step)
@@ -552,11 +552,12 @@ def Build(cache):
                 face = Ramp(.18,.69,normalLength)*Ramp(-.0547,-.0519,length)
                 beads,center,radius = RearFace(side,up)
                 centerPlate = 1-Ramp(.14,.22,radius)
-                diskColor = Tint([143,139,131],[226,218,201],.33+.57*beads+.24*center+.07*flow)
-                diskColor = Blend(diskColor,np.array([145,136,124],dtype='f'),centerPlate*.60)
+                wear = Ramp(.10,.62,beads)
+                diskColor = Tint([132,123,110],[232,224,207],.25+.63*wear+.25*center+.06*flow)
+                diskColor = Blend(diskColor,np.array([154,145,133],dtype='f'),centerPlate*.60)
                 color = Blend(color,diskColor,face)
-                rough += (139-48*beads-41*center-10*centerPlate+7*stain-rough)*face
-                metal += (212+24*beads+7*center+8*centerPlate+4*flow-metal)*face
+                rough += (168-68*wear-57*center-17*centerPlate+7*stain-rough)*face
+                metal += (218+30*wear+9*center+9*centerPlate+4*flow-metal)*face
                 relief += face*(1.48*beads + .78*center)
             if part == 'Exterior_FoldedFrame12':
                 marks = FrameEngraving(Image.fromarray(Load(material['normalTexture'])))
@@ -589,7 +590,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_GalleryHighlights05'
+    doc['asset']['extras']['version'] = 'Type38_CrownRelief06'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -597,7 +598,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=7, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=8, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
