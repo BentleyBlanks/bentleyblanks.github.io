@@ -542,77 +542,70 @@
       <button class="mwSysTab" data-systab="logs" type="button">运行日志</button>
     </div>
 
-    <!-- TAB 1: 总览（克制三栏数据带 + 干净分组列表） -->
+    <!-- TAB 1: 总览（清晰主次层级：即梦主卡 → 云端算力 → 出图来源 → 本机页脚） -->
     <div class="mwDrawerBody" data-syspanel="overview">
-      <!-- 顶部三栏核心指标带 -->
-      <div class="mwMetricStrip">
-        <div class="mwMetricCell">
-          <div class="mwMetricK">即梦积分</div>
-          <div id="sysDreaminaCredits" class="mwMetricV mwMono mwGold">—</div>
-          <div class="mwMetricSub"><i id="dotDreamina" class="mwTinyDot"></i><span id="sysDreaminaUser">—</span></div>
-        </div>
-        <div class="mwMetricCell kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU">
-          <div class="mwMetricK">云端算力</div>
-          <div id="kpiGpuState" class="mwMetricV mwMetricVSm">—</div>
-          <div class="mwMetricSub"><i id="dotCloud" class="mwTinyDot"></i><span id="kpiGpuSub">—</span></div>
-        </div>
-        <div class="mwMetricCell">
-          <div class="mwMetricK">本机可用内存</div>
-          <div id="sysHostRam" class="mwMetricV mwMetricVSm mwMono">—</div>
-          <div class="mwMetricSub"><span id="sysHostName" class="mwMono">—</span></div>
-        </div>
-      </div>
-
-      <!-- 即梦双账号切换 -->
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead">
-          <span>即梦账号切换</span>
-          <button id="btnDreaminaLogin" class="mwLinkBtn" type="button">登录当前号 ↗</button>
+      <!-- 焦点 1：即梦账号与积分（合并主卡） -->
+      <section class="mwHeroCard">
+        <div class="mwHeroTop">
+          <div class="mwHeroMain">
+            <div class="mwEyebrow">即梦账号与积分</div>
+            <div class="mwHeroNumRow">
+              <span id="sysDreaminaCredits" class="mwHeroNum mwMono">—</span>
+              <span class="mwHeroUnit">积分</span>
+            </div>
+            <div class="mwHeroStatus">
+              <i id="dotDreamina" class="mwTinyDot"></i>
+              <span id="sysDreaminaUser">—</span>
+            </div>
+          </div>
+          <button id="btnDreaminaLogin" class="mwLinkBtn mwLinkLg" type="button">登录当前号 ↗</button>
         </div>
         <div class="mwAccSwitchRow" id="dreaminaProfileRow">
-          <button class="mwAccBtn active" data-dprof="default" type="button">主号 <span class="mwMono">default</span></button>
-          <button class="mwAccBtn" data-dprof="account2" type="button">副号 <span class="mwMono">account2</span></button>
+          <button class="mwAccBtn active" data-dprof="default" type="button">
+            <span>主号</span><span class="mwMono">default</span>
+          </button>
+          <button class="mwAccBtn" data-dprof="account2" type="button">
+            <span>副号</span><span class="mwMono">account2</span>
+          </button>
         </div>
-      </div>
+      </section>
 
-      <!-- 4 路分镜出图来源（极简列表） -->
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead">
-          <span>分镜出图来源</span>
-          <button class="mwLinkBtn" data-jump-systab="config" type="button">参数设置 →</button>
-        </div>
-        <div id="sysProvList" class="mwProvList"></div>
-      </div>
-
-      <!-- 云端 GPU（Colab CLI / Modal）+ 内置 OAuth 授权码回填 -->
-      <div class="mwDashBox" id="sysGpuPanel">
-        <div class="mwDashBoxHead">
-          <span id="gGpuName">Colab CLI · 0 卡休眠</span>
-          <span class="mwDrawerHeadRight">
-            <span id="gGpuUtil" class="mwMono mwMuted">0% · --°C</span>
+      <!-- 焦点 2：云端算力（Colab CLI / Modal）+ 内置 OAuth 授权 -->
+      <section class="mwHeroCard" id="sysGpuPanel">
+        <div class="mwHeroHeadRow kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU">
+          <div class="mwHeroHeadLeft">
+            <div class="mwEyebrow">云端算力 · MiniMax-H3 &amp; 动捕提骨</div>
+            <div class="mwHeroTitleRow">
+              <span id="gGpuName" class="mwCardTitle">Colab CLI · 0 卡休眠</span>
+              <span class="mwStatusInline"><i id="dotCloud" class="mwTinyDot"></i><span id="kpiGpuSub">—</span></span>
+            </div>
+          </div>
+          <div class="mwDrawerHeadRight">
+            <span id="kpiGpuState" class="hidden">—</span>
+            <span id="gGpuUtil" class="mwMono mwMutedLg">0% · --°C</span>
             <button id="btnColabStopGpu" class="mwBtn mwSm hidden" type="button">释放 GPU</button>
-          </span>
+          </div>
         </div>
 
-        <div id="sysGpuUnconfiguredNote" class="mwInlineNotice hidden">
+        <div id="sysGpuUnconfiguredNote" class="mwCalloutBar hidden">
           <span id="sysGpuNoticeText">首次使用需完成一次 Google 授权</span>
-          <button id="btnColabLogin" class="mwBtn mwSm mwPrimary" type="button">登录 Colab</button>
-          <button id="btnJumpModalCfg" class="mwLinkBtn hidden" data-jump-systab="config" type="button">填入 URL →</button>
+          <button id="btnColabLogin" class="mwBtnCta" type="button">登录 Colab</button>
+          <button id="btnJumpModalCfg" class="mwLinkBtn mwLinkLg hidden" data-jump-systab="config" type="button">填入 URL →</button>
         </div>
 
         <!-- Colab OAuth 内置授权码回填栏（点击登录 Colab 后展开） -->
         <div id="colabAuthBox" class="mwAuthCodeBox hidden">
           <div class="mwAuthHint">
             <span>已在浏览器打开 Google 授权页，同意后复制授权码粘贴于此：</span>
-            <a id="colabAuthLink" class="mwLinkBtn" href="#" target="_blank" rel="noopener">重开授权页 ↗</a>
+            <a id="colabAuthLink" class="mwLinkBtn mwLinkLg" href="#" target="_blank" rel="noopener">重开授权页 ↗</a>
           </div>
           <div class="mwAuthRow">
             <input id="inputColabAuthCode" type="text" placeholder="粘贴 Google 返回的授权码…">
-            <button id="btnSubmitColabCode" class="mwBtn mwPrimary mwSm" type="button">确认授权</button>
+            <button id="btnSubmitColabCode" class="mwBtnCta" type="button">确认授权</button>
           </div>
         </div>
 
-        <!-- 紧凑三列水平资源条 -->
+        <!-- 紧凑三列云端显存/内存/磁盘 -->
         <div class="mwMiniMeters" id="sysGpuMeters">
           <div class="mwMiniMeter">
             <div class="mwMiniHead"><span>VRAM</span><span id="gVram" class="mwMono">0/24G</span></div>
@@ -627,11 +620,25 @@
             <div class="mwTrack mwTrackThin"><div id="gDiskBar" class="mwTrackFill" style="width:0%"></div></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="mwDashActions">
-        <button id="btnOpenWorkspace" class="mwBtn mwFull" type="button">打开当前任务本地目录</button>
-      </div>
+      <!-- 焦点 3：分镜出图来源（开放分区，不套多余盒子） -->
+      <section class="mwSysSection">
+        <div class="mwSecHead">
+          <span class="mwSecTitle">分镜出图来源</span>
+          <button class="mwLinkBtn mwLinkLg" data-jump-systab="config" type="button">参数设置 →</button>
+        </div>
+        <div id="sysProvList" class="mwProvList"></div>
+      </section>
+
+      <!-- 次要页脚：本机环境 + 任务目录 -->
+      <footer class="mwSysFoot">
+        <div class="mwSysFootMeta">
+          <span>本机可用内存 <strong id="sysHostRam" class="mwMono">—</strong></span>
+          <span id="sysHostName" class="mwMono mwMutedFoot">—</span>
+        </div>
+        <button id="btnOpenWorkspace" class="mwBtn mwFootBtn" type="button">打开任务目录</button>
+      </footer>
     </div>
 
     <!-- TAB 2: 管线配置（按功能分组） -->
