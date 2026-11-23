@@ -1,6 +1,14 @@
 # Dots Type38 511 runtime integration
 
-## 当前外观：漆木与钢件对照 · 2026-11-23
+## 当前外观：栓尾盘与托尾 · 2026-11-23
+
+按[同一实物的后视照片](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)重做栓尾盘外壳。原网格近圆，左上有缺口，却没有照片左下的短凸耳。现版左下凸耳、连续盘缘、向后收窄的侧壁和中央凹部／圆圈均由顶点形成；点纹只承担表面细节，连续铺到凸耳。后视照片能证明外轮廓，不能单独确定侧壁的精确曲率；侧壁是游戏外观近似，不是实物测绘。
+
+[整枪侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)与[反侧照片](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)显示托尾靠底板偏暗、向前过渡到暖棕，和前段亮琥珀色不同。仅重分配托尾既有材质中的染色与漆层磨光，未改变木托轮廓、UV 或增加文字。托尾三处木面取样和圆盘上下半区的显示亮度留在本地验收记录，均不作绝对反射率。
+
+近景 **72,088** 三角，普通 NPC **67,480**，预算 **80,000**；仍为 45 部件与 116 图。相对前一版只替换一个外观网格（尾盘 1,599 → 2,880 三角），不改节点挂点与动作。资产回归直接检查左下轮廓和中央凸圈顶点高度，防止退回仅用底色、法线描形。
+
+## 漆木与钢件对照 · 2026-11-23（前一版）
 
 主要依据是[整枪侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)、[中箍和前段木料近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)、[反侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)、[后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)和[刻度框顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG)。仅参考外观，不使用实物照片像素制作运行时贴图；不复刻编号、徽记、刻字。不同机位、闪光强度与曝光不能作为实测 PBR。
 

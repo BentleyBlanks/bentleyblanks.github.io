@@ -136,7 +136,7 @@ try {
           check((bare.source === "model") === expectModel, `${weaponId}: wrong geometry source tested`);
           if(weaponId==='HanYang')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===64266,
             'HanYang must retain its authored GLB even when the TZM cache is empty');
-          if(weaponId==='Type38')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===66199,
+          if(weaponId==='Type38')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===67480,
             'Type38 NPC must use its measured sight-frame LOD even when the TZM cache is empty');
           const bareCount = VertexCount(bare.geometries);
           check(VertexCount(fixed.geometries) > bareCount,

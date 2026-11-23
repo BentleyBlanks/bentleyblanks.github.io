@@ -184,20 +184,146 @@ def ShapeHandle(doc, views, primitive):
                 accessor[key] = function(values,axis=0).tolist()
 
 
+def RearOutline(angle):
+    delta = (np.rad2deg(angle)-190+180)%360-180
+    return PchipInterpolator([-180,-40,-29,-19,-8,2,13,20,28,39,180],
+                             [0,0,.013,.104,.257,.282,.243,.140,.035,0,0])(delta)
+
+
 def RearFace(side, up):
     vertical = (up-.0423)/.014
     horizontal = side/.014
     radius = np.hypot(vertical,horizontal)
     angle = np.arctan2(vertical,horizontal)
-    rows = (radius-.25)*12.8
+    rows = (radius-.25)*10.4
     row = np.rint(rows)
-    count = np.maximum(12,np.rint((.25+row/12.8)*75))
+    count = np.maximum(12,np.rint(np.maximum(.25+row/10.4,.22)*64))
     around = angle*count/(2*np.pi) + (row%2)*.5
     footprint = ((rows-row)/.50)**2 + ((around-np.rint(around))/.49)**2
-    beads = np.maximum(0,1-footprint)**1.3 * Ramp(.23,.28,radius)*(1-Ramp(.92,.98,radius))
+    beads = np.maximum(0,1-footprint)**1.08 * Ramp(.23,.28,radius)*(1-Ramp(.92,.98,radius/(1+RearOutline(angle))))
     center = .76*np.exp(-(radius/.15)**2)
     ring = .55*np.exp(-((radius-.201)/.027)**2)
     return beads,center+ring,radius
+
+
+def ShapeRearMedallion(doc, views, primitive):
+    attrs = primitive['attributes']
+    source = Attribute(doc, views, attrs['POSITION'], 3)
+    centerX,centerY = (source.max(axis=0)[:2]+source.min(axis=0)[:2])*.5
+    radius = np.ptp(source[:,0])*.5
+    contact = source[:,2].min()
+    rim = source[:,2].max()-.00062
+    segments = 72
+    angles = np.arange(segments+1)*2*np.pi/segments
+    direction = np.column_stack((np.cos(angles),np.sin(angles)))
+    ear = RearOutline(angles)
+    crown = [(0.045,.029),(.10,.028),(.143,.045),(.175,.071),(.201,.065),
+             (.225,.041),(.285,.037),(.43,.034),(.62,.027),(.79,.018),(.93,.006),(.975,0)]
+    positions,texcoords,indices = [],[],[]
+    def Ring(xy,depth,chart):
+        first = len(positions)
+        axial = np.broadcast_to(depth,len(xy))
+        positions.extend(np.column_stack((centerX+xy[:,0]*radius,centerY+xy[:,1]*radius,axial)))
+        texcoords.extend(chart)
+        return np.arange(first,first+len(xy))
+    def Connect(inner,outer):
+        for segment in range(segments):
+            indices.extend([(inner[segment],outer[segment],outer[segment+1]),(inner[segment],outer[segment+1],inner[segment+1])])
+    def FaceUv(xy):
+        return np.column_stack((.408+.29*xy[:,0],.48-.40*xy[:,1]))
+    faceRings = []
+    for distance,height in crown:
+        xy = direction*distance*(1+ear[:,None]*Ramp(.15,.84,distance))
+        faceRings.append(Ring(xy,rim+radius*(height-.035*xy[:,1]**2),FaceUv(xy)))
+    faceCenter = len(positions)
+    positions.append((centerX,centerY,rim+radius*.031))
+    texcoords.append((.408,.48))
+    for segment in range(segments):
+        indices.append((faceCenter,faceRings[0][segment],faceRings[0][segment+1]))
+    for inner,outer in zip(faceRings,faceRings[1:]):
+        Connect(inner,outer)
+    shoulder = [(0,.975,1),(.018,.995,1),(.047,1,1),(.11,.994,.95),
+                (.26,.937,.69),(.39,.901,.30),(.57,.90,0),(.83,.89,0),(1,.87,0)]
+    sideRings = []
+    for advance,scale,tab in shoulder:
+        xy = direction*scale*(1+tab*ear[:,None])
+        axial = rim+(contact-rim)*advance-radius*.035*xy[:,1]**2*(1-advance)
+        chart = np.column_stack((.75+.23*advance*np.ones_like(angles),.025+.83*angles/(2*np.pi)))
+        sideRings.append(Ring(xy,axial,chart))
+    for inner,outer in zip(sideRings,sideRings[1:]):
+        Connect(inner,outer)
+    back = Ring(direction*.87,contact,direction*.030+np.array([.804,.936]))
+    backCenter = len(positions)
+    positions.append((centerX,centerY,contact))
+    texcoords.append((.804,.936))
+    for segment in range(segments):
+        indices.append((backCenter,back[segment+1],back[segment]))
+    points = np.array(positions)
+    uv = np.array(texcoords)
+    faces = np.asarray(indices)
+    edgeA,edgeB = points[faces[:,1]]-points[faces[:,0]],points[faces[:,2]]-points[faces[:,0]]
+    normals = np.cross(edgeA,edgeB)
+    uvA,uvB = uv[faces[:,1]]-uv[faces[:,0]],uv[faces[:,2]]-uv[faces[:,0]]
+    det = uvA[:,0]*uvB[:,1]-uvA[:,1]*uvB[:,0]
+    assert np.min(np.abs(det))>1e-10 and np.linalg.norm(normals,axis=1).min()>1e-10
+    tangent = (edgeA*uvB[:,1,None]-edgeB*uvA[:,1,None])/det[:,None]
+    bitangent = (edgeB*uvA[:,0,None]-edgeA*uvB[:,0,None])/det[:,None]
+    weld,group = np.unique(points.round(7),axis=0,return_inverse=True)
+    smooth = np.zeros_like(weld)
+    sideways = np.zeros_like(points)
+    vertical = np.zeros_like(points)
+    for corner in faces.T:
+        np.add.at(smooth,group[corner],normals)
+        np.add.at(sideways,corner,tangent)
+        np.add.at(vertical,corner,bitangent)
+    smooth = smooth[group]
+    smooth /= np.linalg.norm(smooth,axis=1,keepdims=True)
+    sideways -= smooth*np.sum(smooth*sideways,axis=1,keepdims=True)
+    sideways /= np.linalg.norm(sideways,axis=1,keepdims=True)
+    handedness = np.sign(np.sum(np.cross(smooth,sideways)*vertical,axis=1))
+    assert np.isfinite(sideways).all() and np.all(abs(handedness)==1)
+    for slot,array in [(attrs['POSITION'],points),(attrs['NORMAL'],smooth),(attrs['TANGENT'],np.column_stack((sideways,handedness))),
+                       (attrs['TEXCOORD_0'],uv),(primitive['indices'],faces.reshape(-1,1))]:
+        accessor = doc['accessors'][slot]
+        data = array.astype('<u2' if accessor['componentType']==5123 else '<f4')
+        accessor['count'] = len(data)
+        views[accessor['bufferView']] = data.tobytes()
+        for key,stat in [('min',np.min),('max',np.max)]:
+            if key in accessor:
+                accessor[key] = stat(data,axis=0).tolist()
+
+
+def MedallionRelief(doc, views, primitive, field, valid, padded):
+    attrs = primitive['attributes']
+    tangents = Attribute(doc, views, attrs['TANGENT'], 4)
+    uv = Attribute(doc, views, attrs['TEXCOORD_0'], 2)
+    height,width = valid.shape
+    chart = np.rint(uv*[width,height]-.5).astype(int)
+    indexMap = np.zeros((height,width),np.int32)
+    faces = Attribute(doc, views, primitive['indices'], 3).astype(int)
+    for index,face in enumerate(faces):
+        cv2.fillConvexPoly(indexMap,chart[face].astype('int32'),index+1)
+    faceMask = (field[:,:,5]>.56)&(field[:,:,2]>-.053)&padded
+    rows,cols = np.nonzero(faceMask)
+    selected = faces[np.maximum(indexMap[rows,cols]-1,0)]
+    frameN = field[rows,cols,3:6]
+    frameN = frameN/np.maximum(np.linalg.norm(frameN,axis=1,keepdims=True),1e-6)
+    frameT = tangents[selected,:3].mean(axis=1)
+    frameT -= frameN*np.sum(frameT*frameN,axis=1,keepdims=True)
+    frameT /= np.maximum(np.linalg.norm(frameT,axis=1,keepdims=True),1e-6)
+    frameB = np.cross(frameN,frameT)*np.sign(tangents[selected,3].mean(axis=1,keepdims=True))
+    side,up = field[rows,cols,0],field[rows,cols,1]
+    def Height(side,up):
+        beads,center,radius = RearFace(side,up)
+        return .00031*beads + .00020*center + .00245*(1-np.minimum(radius,1.3)**2)
+    step = .000045
+    gradX = (Height(side+step,up)-Height(side-step,up))/(2*step)
+    gradY = (Height(side,up+step)-Height(side,up-step))/(2*step)
+    target = np.column_stack((-gradX,-gradY,np.ones_like(side)))
+    target /= np.linalg.norm(target,axis=1,keepdims=True)
+    tangentSpace = np.column_stack((np.sum(target*frameT,axis=1),np.sum(target*frameB,axis=1),np.sum(target*frameN,axis=1)))
+    weight = Ramp(.56,.83,frameN[:,2])*Ramp(-.053,-.0519,field[rows,cols,2])
+    return rows,cols,tangentSpace,weight
 
 
 def PoreField(length, transverse):
@@ -274,6 +400,8 @@ def Build(cache):
         disk = part == 'T38_440D2_IndependentVisibleRecess'
         if handle:
             ShapeHandle(doc, views, primitive)
+        if disk:
+            ShapeRearMedallion(doc, views, primitive)
         field, padded, valid = SurfaceAtlas(doc, views, primitive, (width, height))
         if part == 'T38_460G_WoodGroove_VisualCandidate':
             orm[~padded,0] = 0
@@ -333,6 +461,18 @@ def Build(cache):
                 color *= (1+np.clip(woodOil,-1,1)*(.055+.070*sun))[:,:,None]
                 quiet = Ramp(.038,.16,length)*.47
                 color = Blend(color,Tint([88,32,13],[157,68,27],.49+.14*stain),quiet)
+                rearPanel = Ramp(.004,.060,length)*Ramp(.10,.76,np.abs(normalSide))
+                upperEdge = .018-.062*length
+                depth = np.clip((upperEdge-up)/(.067+.37*np.maximum(0,length-.05)),0,1)
+                rearward = Ramp(.102,.231,length)
+                warmPath = np.exp(-((depth-(.61+.065*np.sin(17*length)))/.245)**2)*(1-.79*rearward)
+                darkMargin = .26*rearward + .14*(1-Ramp(.08,.42,depth))+.10*Ramp(.78,1,depth)
+                broadStain = .55*SteelPatch(2.2,.18)+.32*stain+.13*grainSteel
+                bodyColor = Tint([69,26,9],[142,63,17],np.clip(.52+.12*fibre+.12*broadStain,0,1))
+                bodyColor = Blend(bodyColor,np.array([149,84,23],dtype='f'),warmPath*(.58+.08*stain))
+                endMargin = np.exp(-((.251+up*.20-length)/.011)**2)*(.49+.11*stain)
+                bodyColor = Blend(bodyColor,np.array([47,18,8],dtype='f'),np.clip(darkMargin+endMargin-.055*broadStain,0,.81))
+                color = Blend(color,bodyColor,rearPanel*.84)
             scratch,chip = VarnishTraces(length,up,side>0) if not separate else (0,0)
             color = Blend(color,np.array([74,33,16],dtype='f'),scratch*.62) if not separate else color
             if not separate:
@@ -345,6 +485,11 @@ def Build(cache):
             varnish = Load(coat['clearcoatTexture'])
             varnish[:, :, 0] = np.where(padded, np.clip(206 + 19*handling - 20*fleck - 114*breach-68*scratch-117*chip, 0, 238), 0)
             varnish[:, :, 1] = np.where(padded, np.clip(63 + .33*(glossScan-60) + 12*fleck + 7*stain - 13*handling + 48*breach, 34, 132), 0)
+            if not separate:
+                mellow = rearPanel*np.clip(.72+.22*rearward-.24*warmPath,0,1)
+                varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.47*mellow))
+                varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1]+33*mellow,0,142),0)
+                rough += 16*mellow
             metal = np.zeros_like(rough)
             relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
             if not separate:
@@ -400,10 +545,14 @@ def Build(cache):
             relief = .025*grainSteel + .024*brush
             if disk:
                 face = Ramp(.18,.69,normalLength)*Ramp(-.0547,-.0519,length)
-                beads,center,_ = RearFace(side,up)
-                color = Blend(color,Tint([141,135,125],[210,201,185],.29+.42*beads+.35*center+.09*flow),face)
-                rough += (102-31*beads-32*center+6*stain-rough)*face
-                relief += face*(2.2*beads + 5.1*center)
+                beads,center,radius = RearFace(side,up)
+                centerPlate = 1-Ramp(.14,.22,radius)
+                diskColor = Tint([162,157,147],[214,209,195],.46+.39*beads+.19*center+.09*flow)
+                diskColor = Blend(diskColor,np.array([154,147,135],dtype='f'),centerPlate*.42)
+                color = Blend(color,diskColor,face)
+                rough += (117-35*beads-33*center-9*centerPlate+6*stain-rough)*face
+                metal += (208+33*beads+11*center+12*centerPlate+5*flow-metal)*face
+                relief += face*(1.48*beads + .78*center)
             if part == 'Exterior_FoldedFrame12':
                 marks = FrameEngraving(Image.fromarray(Load(material['normalTexture'])))
                 color = Tint([108,104,97],[160,155,142],.50+.19*flow+.06*stain)
@@ -424,6 +573,9 @@ def Build(cache):
             direction = np.dstack((-gradientU, gradientV)) * (.86 if wood else .92 if disk else .69)
             limit = .90 if disk else .33 if wood else .18
             normals[:, :, :2] += np.clip(direction, -limit, limit)
+            if disk:
+                rows,cols,tangentSpace,weight = MedallionRelief(doc,views,primitive,field,valid,padded)
+                normals[rows,cols] += (tangentSpace-normals[rows,cols])*weight[:,None]
             normals /= np.maximum(1e-7, np.linalg.norm(normals, axis=2, keepdims=True))
             Store(normalSlot, np.where(padded[:, :, None], (normals+1)*127.5, [128,128,255]))
         orm[:, :, 1] = np.where(padded, np.clip(rough, 39, 196), 0)
@@ -432,14 +584,15 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_AmberLacquer03'
+    doc['asset']['extras']['version'] = 'Type38_HeelPatina04'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
-    assert triangles == 70807
+    assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
     digest = WriteGlb(folder/'Model_Type38_511.glb', doc, views)
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
-    manifest.update(version=5, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
+    manifest.update(version=6, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
