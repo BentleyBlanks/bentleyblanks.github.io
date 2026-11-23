@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-polished-apron-11');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-worn-film-12');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -71,7 +71,7 @@ try{
     };
     const sideValues=mesh.userData.type38Part.includes('WoodGroove')?
      [[.1005,.539,.1307,.5377],[.0938,.5167,.1239,.5154],[.0872,.4944,.1171,.4931]].map(([insideU,insideV,belowU,belowV])=>[colorPatch(insideU,insideV),colorPatch(belowU,belowV)]):[];
-    const lacquerReflection=[];
+    const lacquerReflection=[],filmRoughness=[];
     if(sideValues.length){
      const spec=mat.specularIntensityMap.image;
      ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -80,9 +80,15 @@ try{
       const patch=ctx.getImageData(Math.round(u*canvas.width)-2,Math.round(v*canvas.height)-2,5,5).data;
       const alpha=[];for(let offset=3;offset<patch.length;offset+=4)alpha.push(patch[offset]);
       lacquerReflection.push(alpha.sort((one,two)=>one-two)[12]);
+      const rough=[];
+      for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
+       const index=4*((Math.round(v*canvas.height)+row)*canvas.width+Math.round(u*canvas.width)+col);
+       rough.push(pixels[index+1]);
+      }
+      filmRoughness.push(rough.sort((one,two)=>one-two)[12]);
      }
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,sideValues,lacquerReflection,
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,sideValues,lacquerReflection,filmRoughness,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
@@ -96,6 +102,8 @@ try{
    'recessed flank and adjacent amber wood must remain distinct on the authored map, without relying on a baked highlight');
   assert(lower.lacquerReflection.length===6&&lower.lacquerReflection.slice(0,3).every((value,index)=>value>lower.lacquerReflection[index+3]+75),
    'the polished lower curve must have locally stronger dielectric reflection than the unchanged recess');
+  assert(lower.filmRoughness[1]+18<lower.filmRoughness[4]&&lower.filmRoughness[1]+9<lower.filmRoughness[2],
+   'clearcoat under the center of the groove must be smoother than the recess and taper back at its far end');
   assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
    'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{

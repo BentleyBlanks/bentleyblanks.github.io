@@ -598,6 +598,8 @@ def Build(cache):
                 color = Blend(color,Tint([70,46,9],[142,96,22],.49+.26*fibre+.11*stain),.59*patina)
                 oldFilm = (1-Ramp(-.419,-.370,length))*polishBand
                 glossShoulder = np.exp(-((up-.0148)/.0049)**4)*glazeFill
+                polishedCenter = Ramp(-.417,-.382,length)*(1-Ramp(-.322,-.293,length))
+                filmSmooth = polishBand*polishedCenter*np.clip(.97+.06*stain-.035*fleck,.83,1)
                 lowerReturn = Ramp(-.466,-.427,length)*(1-Ramp(-.255,-.218,length))
                 lowerReturn *= (1-Ramp(.010,.0134,up))*Ramp(.14,.59,-normalSide)*Ramp(.007,.014,-side)
                 color = Blend(color,Tint([65,26,8],[136,72,21],.39+.29*fibre+.10*stain),.60*lowerReturn)
@@ -651,9 +653,12 @@ def Build(cache):
                 varnish[:,:,0] = np.where(padded,np.rint(varnish[:,:,0]+(250-varnish[:,:,0])*glazeFill),0)
                 varnish[:,:,1] = np.where(padded,np.rint(np.clip(varnish[:,:,1]-6*glossShoulder+11*oldFilm,34,142)),0)
                 rough -= 30*glazeFill
+                varnish[:,:,1] = np.rint(np.clip(varnish[:,:,1]*(1-.26*filmSmooth),0,255))
+                rough *= 1-.37*filmSmooth
                 glossSlot = material['extensions']['KHR_materials_specular']['specularTexture']
                 gloss = Load(glossSlot)
                 gloss[:,:,3] = np.rint(gloss[:,:,3]+(235-gloss[:,:,3].astype('f'))*glazeFill)
+                gloss[:,:,3] = np.rint(gloss[:,:,3]*(1-.19*filmSmooth))
                 Store(glossSlot,gloss)
             metal = np.zeros_like(rough)
             relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
@@ -803,7 +808,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_PolishedApron11'
+    doc['asset']['extras']['version'] = 'Type38_WornFilm12'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -811,7 +816,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=13, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=14, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
