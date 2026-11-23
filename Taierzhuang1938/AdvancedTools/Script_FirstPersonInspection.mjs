@@ -157,6 +157,10 @@ class FirstPersonInspectionApp {
     this.aimPitch = 0;
     this.prevAimYaw = 0;
     this.prevAimPitch = 0;
+    this.altMouseFree = false;
+    this.hoverAimReady = false;
+    this.hoverLastX = 0;
+    this.hoverLastY = 0;
     this.recoilPitch = 0;
     this.recoilYaw = 0;
     this.recoilRecoverS = 0.4;
@@ -569,24 +573,46 @@ class FirstPersonInspectionApp {
       if (Number.isFinite(t)) this.ScrubActiveAction(t);
     });
 
-    // 鼠标在 3D 画布上的交互（玩家视角：左键开火兼拖曳瞄准、右键按住开镜兼拖曳微调准心、双击或点「锁鼠标」直接 FPS 自由瞄准；外部视角：左键环绕、右键平移、滚轮缩放）
+    // 鼠标在 3D 画布上的交互（对标主游戏 Script_Main：第一人称下默认移动鼠标即控视角，点击画布自动进指针锁；
+    // 按住 Alt 立即释放指针锁并显示鼠标指针供操作面板，松开 Alt 或再次点画布恢复锁定；外部视角：左键环绕、右键平移、滚轮缩放）
     let dragMode = null;
     let lastX = 0;
     let lastY = 0;
+    const requestLock = () => {
+      if (this.view !== "player" || this.altMouseFree) return;
+      if (document.pointerLockElement === this.dom.canvas) return;
+      try {
+        const res = this.dom.canvas.requestPointerLock?.();
+        if (res && typeof res.catch === "function") res.catch(() => {});
+      } catch {}
+    };
+    const releaseLock = () => {
+      if (document.pointerLockElement && typeof document.exitPointerLock === "function") {
+        document.exitPointerLock();
+      }
+    };
     const syncPointerLockUi = () => {
       const locked = document.pointerLockElement === this.dom.canvas;
+      if (locked && (this.altMouseFree || this.view !== "player")) {
+        releaseLock();
+        return;
+      }
+      this.hoverAimReady = false;
       this.dom.lockMouseToggle?.setAttribute("aria-pressed", String(locked));
-      if (this.dom.lockMouseToggle) this.dom.lockMouseToggle.textContent = locked ? "已锁鼠标 (Esc)" : "锁鼠标";
+      if (this.dom.lockMouseToggle) this.dom.lockMouseToggle.textContent = locked ? "已锁鼠标 (Alt)" : "锁鼠标";
     };
     document.addEventListener("pointerlockchange", syncPointerLockUi);
     this.dom.lockMouseToggle?.addEventListener("click", () => {
-      if (document.pointerLockElement === this.dom.canvas) document.exitPointerLock?.();
-      else if (this.view === "player") this.dom.canvas.requestPointerLock?.();
+      if (document.pointerLockElement === this.dom.canvas) releaseLock();
+      else requestLock();
     });
-    this.dom.canvas.addEventListener("dblclick", () => {
-      if (this.view !== "player") return;
-      if (document.pointerLockElement === this.dom.canvas) document.exitPointerLock?.();
-      else this.dom.canvas.requestPointerLock?.();
+    this.dom.canvas.addEventListener("mouseenter", (e) => {
+      this.hoverLastX = e.clientX;
+      this.hoverLastY = e.clientY;
+      this.hoverAimReady = true;
+    });
+    this.dom.canvas.addEventListener("mouseleave", () => {
+      this.hoverAimReady = false;
     });
     this.dom.canvas.addEventListener("mousedown", (e) => {
       this.dom.canvas.focus();
@@ -595,6 +621,9 @@ class FirstPersonInspectionApp {
       if (this.view === "inspect") {
         dragMode = e.button === 2 ? "pan" : "orbit";
         return;
+      }
+      if (!this.altMouseFree && document.pointerLockElement !== this.dom.canvas) {
+        requestLock();
       }
       if (e.button === 0) {
         this.lmbHeld = true;
@@ -613,26 +642,53 @@ class FirstPersonInspectionApp {
     });
 
     window.addEventListener("mousemove", (e) => {
-      if (document.pointerLockElement === this.dom.canvas && this.view === "player") {
-        this.aimYaw = Clamp(this.aimYaw - (e.movementX || 0) * 0.0022, -1.05, 1.05);
-        this.aimPitch = Clamp(this.aimPitch - (e.movementY || 0) * 0.0020, -0.48, 0.48);
+      if (this.altMouseFree) {
+        this.hoverAimReady = false;
         return;
       }
-      if (!dragMode) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      if (dragMode === "orbit") {
-        this.orbit.yaw -= dx * 0.007;
-        this.orbit.pitch = Clamp(this.orbit.pitch + dy * 0.006, -0.55, 1.35);
-      } else if (dragMode === "pan") {
-        const right = new THREE.Vector3(Math.cos(this.orbit.yaw), 0, -Math.sin(this.orbit.yaw));
-        this.orbit.target.addScaledVector(right, -dx * 0.0018 * this.orbit.dist);
-        this.orbit.target.y = Clamp(this.orbit.target.y + dy * 0.0018 * this.orbit.dist, 0.5, 2.4);
-      } else if (dragMode === "aim") {
-        this.aimYaw = Clamp(this.aimYaw - dx * 0.0022, -1.05, 1.05);
-        this.aimPitch = Clamp(this.aimPitch - dy * 0.0020, -0.48, 0.48);
+      if (document.pointerLockElement === this.dom.canvas && this.view === "player") {
+        const mx = e.movementX || 0;
+        const my = e.movementY || 0;
+        if (Math.abs(mx) < 180 && Math.abs(my) < 180) {
+          this.aimYaw = Clamp(this.aimYaw - mx * 0.0022, -1.05, 1.05);
+          this.aimPitch = Clamp(this.aimPitch - my * 0.0020, -0.48, 0.48);
+        }
+        return;
+      }
+      if (dragMode) {
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (dragMode === "orbit") {
+          this.orbit.yaw -= dx * 0.007;
+          this.orbit.pitch = Clamp(this.orbit.pitch + dy * 0.006, -0.55, 1.35);
+        } else if (dragMode === "pan") {
+          const right = new THREE.Vector3(Math.cos(this.orbit.yaw), 0, -Math.sin(this.orbit.yaw));
+          this.orbit.target.addScaledVector(right, -dx * 0.0018 * this.orbit.dist);
+          this.orbit.target.y = Clamp(this.orbit.target.y + dy * 0.0018 * this.orbit.dist, 0.5, 2.4);
+        } else if (dragMode === "aim") {
+          this.aimYaw = Clamp(this.aimYaw - dx * 0.0022, -1.05, 1.05);
+          this.aimPitch = Clamp(this.aimPitch - dy * 0.0020, -0.48, 0.48);
+        }
+        return;
+      }
+      // 未锁指针时，在第一人称 3D 画布上直接移动鼠标也能默认控制视角转动（移到侧栏或按住 Alt 时自动放行光标）
+      if (this.view === "player" && e.target === this.dom.canvas) {
+        if (!this.hoverAimReady) {
+          this.hoverLastX = e.clientX;
+          this.hoverLastY = e.clientY;
+          this.hoverAimReady = true;
+          return;
+        }
+        const dx = e.clientX - this.hoverLastX;
+        const dy = e.clientY - this.hoverLastY;
+        this.hoverLastX = e.clientX;
+        this.hoverLastY = e.clientY;
+        if (Math.abs(dx) < 180 && Math.abs(dy) < 180) {
+          this.aimYaw = Clamp(this.aimYaw - dx * 0.0022, -1.05, 1.05);
+          this.aimPitch = Clamp(this.aimPitch - dy * 0.0020, -0.48, 0.48);
+        }
       }
     });
 
@@ -651,8 +707,15 @@ class FirstPersonInspectionApp {
       this.orbit.dist = Clamp(this.orbit.dist * (1 + Math.sign(e.deltaY) * 0.10), 0.65, 3.2);
     }, { passive: false });
 
-    // 键盘交互：WASD 移动、Shift 冲刺、C 蹲伏、R 换弹、V 白刃、Tab 切改前/改后、Space 暂停/继续、Home 视角回正
+    // 键盘交互：Alt 呼出指针（同主游戏）、WASD 移动、Shift 冲刺、C 蹲伏、R 换弹、V 白刃、Tab 切改前/改后、Space 暂停/继续、Home 视角回正
     window.addEventListener("keydown", (e) => {
+      if (e.code === "AltLeft" || e.code === "AltRight") {
+        this.altMouseFree = true;
+        this.hoverAimReady = false;
+        releaseLock();
+        e.preventDefault();
+        return;
+      }
       if (e.target.closest?.("input, select, textarea")) return;
       if (e.code === "Tab" && this.mode !== "range") {
         e.preventDefault();
@@ -684,8 +747,18 @@ class FirstPersonInspectionApp {
         this.keys.add(e.code);
       }
     });
-    window.addEventListener("keyup", (e) => this.keys.delete(e.code));
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "AltLeft" || e.code === "AltRight") {
+        this.altMouseFree = false;
+        e.preventDefault();
+        return;
+      }
+      this.keys.delete(e.code);
+    });
     window.addEventListener("blur", () => {
+      this.altMouseFree = false;
+      this.hoverAimReady = false;
+      releaseLock();
       this.keys.clear();
       this.rmbHeld = false;
       this.lmbHeld = false;
@@ -876,7 +949,7 @@ class FirstPersonInspectionApp {
     } else if (this.mode === "inertia") {
       this.dom.stageHint.textContent = "WASD 移动 · Shift 冲刺 · C 蹲伏 · Tab 切换改前/改后";
     } else {
-      this.dom.stageHint.textContent = "左键开火/拖曳瞄准 · 右键开镜 · 双击锁鼠标 · WASD 移动 · R 换弹";
+      this.dom.stageHint.textContent = "移动鼠标瞄准（点画布锁定 · 按住 Alt 呼出指针）· 左键开火 · 右键开镜 · WASD 移动 · R 换弹";
     }
   }
 
