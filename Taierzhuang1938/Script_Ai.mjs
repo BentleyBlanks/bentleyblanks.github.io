@@ -4096,7 +4096,7 @@ export class AiDirector {
       const carriagePerformance = !!s.missionCarriageAction
         || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
-      if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) {
+      if ((this.view.Shown(s) || carriagePerformance) && (wantsFire || s.actor.poseDirty || (this.tickIndex + s.id) % cadence === 0)) {
         const moveDt = Math.max(stepped ? dt : (idleStepUsedDt || dt), .0001);
         const dispX = s.position.x - animationStartX, dispZ = s.position.z - animationStartZ;
         // Passive gravity/capsule settling when stationary must not spike locomotion speed and flicker walk/idle.

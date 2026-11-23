@@ -431,7 +431,7 @@ export class EncounterPlay {
         post.SetSize(width,height,Math.round(width*post.outputWidth/post.width),Math.round(height*post.outputHeight/post.height));
       }
       host.scene.traverse(mesh=>{if(mesh.userData.hairGroom&&!mesh.visible){hiddenHair.push(mesh);mesh.visible=true;}});
-      host.ai.PrepareCrowd(["nra","ija"]);
+      if(!host.actorFactory?.characterAssets?.minimalRig)host.ai.PrepareCrowd(["nra","ija"]);
       PrepareWoundMaterials(host.scene);
       if(retained) {
         // These programs and action buffers already exist. A whole-scene
@@ -518,8 +518,8 @@ export class EncounterPlay {
   }
   VisibleSpawn(actor) {
     const {camera,battlefield}=this.host;
-    camera.updateMatrixWorld();
-    const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+    camera.updateWorldMatrix(true,false);
+    const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix));
     const y=battlefield.GroundHeight(...actor.p),from=camera.position;
     for(const [offset,height] of [[0,.4],[0,1.1],[0,1.7],[-.35,1.4],[.35,1.4]]) {
       const point=new THREE.Vector3(actor.p[0]+offset,y+height,actor.p[1]);
@@ -541,7 +541,17 @@ export class EncounterPlay {
       navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),modelVariant:variants[hash%variants.length],...SpeakingCastOptions(spec.castId)});
     if(!soldier)return false;
     const skin=spec.castId||XBOT_FACTION_CHARACTERS[spec.side]?.length?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
-    if(skin)this.host.ai.view.SetSkin(soldier,skin);
+    if(skin){
+      this.host.ai.view.SetSkin(soldier,skin);
+      this.host.ai.view.Place(soldier);
+      this.host.ai.view.Animate(soldier,0,{
+        moveSpeed:0,aim:0,
+        crouch:spec.stance==="crouch"?1:0,
+        prone:spec.stance==="prone"?1:0,
+        grounded:true,dead:spec.state==="down",dying:spec.state==="down"?1:0,
+        elapsed:this.host.ai.time,lookYaw:0,lookPitch:0,
+      });
+    }
     const index=Number(actor.id.slice((actor.groupId||"").length+1))||0;
     const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
     let routeIndex=0;

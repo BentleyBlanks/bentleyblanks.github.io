@@ -862,7 +862,7 @@ export class XBotSkin {
       ? CharacterScaleHeight(this.rig.asset.record) / this.kit.def.heightM
       : this.source ? this.source.headY / this.kit.headY : 0.97;
     this.hidden = [];
-    this.rig.root.traverse(o => { if (o.isSkinnedMesh) this.hidden.push(o); });
+    this.rig.root.traverse(o => { if (o.isSkinnedMesh) { o.visible = false; this.hidden.push(o); } });
     this.srcBones = this.source ? this.source.rest.bones.map(b => this.rig.root.getObjectByName(b.name)) : [];
     this.srcQ = this.srcBones.map(() => new THREE.Quaternion());
     this.outQ = skins.rest.bones.map(() => new THREE.Quaternion());

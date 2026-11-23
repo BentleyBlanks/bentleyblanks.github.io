@@ -137,11 +137,35 @@ export class SoldierView {
       // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
       // **断过肢的人不进远景层**：远景层是按姿势桶烘的整人（见 ActorCrowd 的头注），
       // 换过去等于把卸掉的胳膊长回来 —— 四十米外的尸体会突然肢体齐全。
-      // 距离更远时仍按 corpseCrowdMaxM 整个剔除，那一条不受影响。
-      const detailed = !crowd || !!s.gore || distanceSq <= detailLimit * detailLimit;
+      // **挂了正式人物外观（XBotSkin）或 minimalRig 骨架的人也不进旧版卢沟桥远景层**：
+      // EncounterPlay / 正式战役启了 minimalCharacterRig，旧远景层里没有正式外观，
+      // 且 ija 远景桶会退回 TengxianNra02（国军模型），46 m 处会从国军瞬间变成日军。
+      // 距离更远时尸体仍按 corpseCrowdMaxM 整个剔除，视锥外仍正常剔除。
+      const hasSkin = this.skins.has(s);
+      const minimalRig = !!this.ai.ctx.actorFactory?.characterAssets?.minimalRig;
+      const wasShown = s.actor.root.visible && !!s.actor.root.parent;
+      const detailed = !crowd || !!s.gore || hasSkin || minimalRig || distanceSq <= detailLimit * detailLimit;
       this.ai._SetDetailedAttached(s.actor, detailed);
       s.renderLod = detailed ? "detail" : "crowd";
-      if (detailed) s.actor.SetCrowdHitboxes?.(null);
+      if (detailed) {
+        s.actor.SetCrowdHitboxes?.(null);
+        if (hasSkin && !wasShown) {
+          if (s.alive) this.Place(s);
+          else this.PlaceCorpse(s);
+          this.Animate(s, 0, {
+            moveSpeed: s.moveSpeed ?? 0,
+            aim: s.aimBlend ?? 0,
+            crouch: s.crouchBlend ?? 0,
+            prone: s.proneBlend ?? 0,
+            grounded: s.grounded !== false,
+            dead: !s.alive,
+            dying: !s.alive ? Math.min(1, (s.deadTime ?? 0) / 0.9) : 0,
+            elapsed: this.ai.time,
+            lookYaw: s.lookYaw ?? 0,
+            lookPitch: s.lookPitchBlend ?? 0,
+          });
+        }
+      }
       if (!detailed) {
         const prone = Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
         // 姿态与移动信号一并交给远景层，让它挑姿势桶（站 / 跪 / 真卧 / 跑步翻页）。

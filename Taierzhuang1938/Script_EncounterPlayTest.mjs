@@ -206,6 +206,18 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
   assert.ok(timelineKeyframes.has(id),"Opening timeline includes sequence "+id);
   assert.ok(configKeyframes.has(id),"Opening keyframe config includes "+id);
  }
+ // Formal XBot-skinned / minimalRig soldiers must never fall back to legacy Lugou ActorCrowd
+ // (which only loads TengxianNra02 under minimalRig, turning distant IJA soldiers into NRA models
+ // until crossing ACTOR_DETAIL.enterM = 46m). Native meshes must also be hidden immediately on attach.
+ const soldierViewSrc=fs.readFileSync(new URL("./Script_SoldierView.mjs",import.meta.url),"utf8");
+ assert.match(soldierViewSrc,/const hasSkin = this\.skins\.has\(s\);/);
+ assert.match(soldierViewSrc,/const minimalRig = !!this\.ai\.ctx\.actorFactory\?\.characterAssets\?\.minimalRig;/);
+ assert.match(soldierViewSrc,/const detailed = !crowd \|\| !!s\.gore \|\| hasSkin \|\| minimalRig \|\| distanceSq <= detailLimit \* detailLimit;/);
+ assert.match(soldierViewSrc,/if \(hasSkin && !wasShown\)/,"Re-attaching a skinned soldier syncs its pose immediately on the rising edge");
+ const xbotSrc=fs.readFileSync(new URL("./Script_EditorBlockoutXBot.mjs",import.meta.url),"utf8");
+ assert.match(xbotSrc,/if \(o\.isSkinnedMesh\) \{ o\.visible = false; this\.hidden\.push\(o\); \}/,"XBotSkin hides native Lugou meshes immediately in its constructor");
+ const playSrc=fs.readFileSync(new URL("./Script_EncounterPlay.mjs",import.meta.url),"utf8");
+ assert.match(playSrc,/if\(!host\.actorFactory\?\.characterAssets\?\.minimalRig\)host\.ai\.PrepareCrowd\(\["nra","ija"\]\);/,"EncounterPlay skips baking legacy Lugou crowd batches under minimalRig");
 }
 {
  // 08c 老耿沿主街南下进救护所：没有编排 heading 的平民木偶按实际位移转向，不能倒着跑。
