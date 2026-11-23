@@ -197,7 +197,7 @@ export class EncounterPlay {
     const openingLoad=this.opening&&this.pendingOpening
       ?this.opening.Load().catch(error=>{console.warn("[EncounterPlay] Opening timeline unavailable, falling back to 02g",error);this.pendingOpening=false;this.combatStarted=true;})
       :null;
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm,openingLoad]);
+    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm,openingLoad,this.puppets.LoadTankette()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits,(done,total)=>
@@ -842,7 +842,7 @@ export class EncounterPlay {
   Send(kind,extra={}){if(!this.isCampaign&&window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
   Actors(){return [...this.entries].map(([id,e])=>({id,soldierId:e.soldier.id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor?.characterRig?.modelId,group:e.actor.groupId||null}));}
   Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,x:p.x,z:p.z,yawDeg:p.yawDeg,moving:!!p.moving,
-    model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
+    model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":p.body?.userData.model?.tankette?"type94Tankette":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
   Stages(){
     const currentStageId=this.openingActive||this.pendingOpening?this.variant.stages[0]?.id:this.plan.beat.stage;

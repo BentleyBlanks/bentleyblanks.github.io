@@ -100,6 +100,7 @@ import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
 import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
+import { InstantiateExternalProp } from "./Script_ExternalProps.mjs";
 import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
 import { XBotSkins, XBotLook } from "./Script_EditorBlockoutXBot.mjs";
 import { XBOT_CHARACTERS, XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -133,9 +134,11 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   tank: { w: 2.18, d: 5.75, h: 1.2, turretW: 1.5, turretD: 1.7, turretH: 0.75, barrel: 1.6 },
   /**
    * 九四式轻装甲车（2026-10-24，单位 kind "tank" + shape "tankette"）：史料 3.36 × 1.62 × 1.63 m、2 人、1 挺机枪、没有炮。
-   * 履带箱 0.5 高、车体 0.65、小机枪塔 0.48（偏右前），加起来 1.63；塔上一截机枪管 0.5 m，没有炮管。白盒下跟 tank 一样只是体块（不换正式模型）。
+   * 2026-11-24（用户：直接用正式资产，不要白盒体块）：外形只用正式模型 Model/Type94Tankette（ExternalProps "type94Tankette"，
+   * -Z 车头、原点贴地，炮塔节点 TurretYaw）；这里只留脚印尺寸给 TankGroundY。模型下完之前不画车。
    */
-  tankette: { w: 1.62, d: 3.36, trackH: 0.5, hullH: 0.65, turretW: 0.7, turretD: 0.8, turretH: 0.48, turretX: 0.33, turretZ: -0.55, mg: 0.5 },
+  tankette: { w: 1.62, d: 3.36 },
+  tanketteModel: "type94Tankette",
   litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55,
     /** 正式担架模型在担架组里的摆法（文件头 2026-10-21）：转 180°（前头朝 −Z）、竿心落到组原点 + 0.03。 */
     modelYaw: Math.PI, modelY: 0.03 - 0.12 },
@@ -426,13 +429,7 @@ export class BlockoutPuppets {
     group.userData.boxes = boxes;
     if (unit.kind !== "litter") group.add(boxes);
     if (unit.kind === "tank" && TankShape(unit) === "tankette") {
-      // 九四式轻装甲车（2026-10-24）：履带箱 + 矮车体 + 偏右前的小机枪塔 + 一截机枪管；没有炮管
-      const t = P.tankette;
-      Box(boxes, m.dark, t.w + 0.1, t.trackH, t.d * 0.98, 0, t.trackH / 2, 0);
-      Box(boxes, side, t.w - 0.2, t.hullH, t.d * 0.92, 0, t.trackH + t.hullH / 2, 0.05);
-      const turretY = t.trackH + t.hullH + t.turretH / 2;
-      Box(boxes, side, t.turretW, t.turretH, t.turretD, t.turretX, turretY, t.turretZ);
-      Box(boxes, m.dark, 0.07, 0.07, t.mg, t.turretX, turretY + 0.08, t.turretZ - t.turretD / 2 - t.mg / 2);
+      // 九四式轻装甲车只用正式模型（_DressModel），不画体块
     } else if (unit.kind === "tank") {
       const t = P.tank;
       Box(boxes, side, t.w, t.h, t.d, 0, 0.35 + t.h / 2, 0);
@@ -532,6 +529,7 @@ export class BlockoutPuppets {
       else if (model?.stretcher) model.stretcher.removeFromParent();   // 几何与材质全场共用，不拆
       else if (model?.blanket) model.blanket.Dispose();               // 同上（骨架是克隆的，几何贴图共用）
       else if (model?.tank) model.tank.root.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+      else if (model?.tankette) model.tankette.removeFromParent();   // 几何与材质是 ExternalProps 缓存共用的，不拆
       (puppet.body.userData.boxes || puppet.body).traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       puppet.body.removeFromParent();
       puppet.body = null;
@@ -859,14 +857,30 @@ export class BlockoutPuppets {
       .catch((error) => { console.warn("[BlockoutPuppets] draft cart models failed; carts stay blocks", error); this.draftAssets = false; });
   }
 
+  /** 九四式正式模型预读（只读一次；失败记 false，之后不再试）。调用方可 await，保证开场就有车。 */
+  LoadTankette() {
+    if (this.tanketteAsset === undefined) {
+      this.tanketteAsset = InstantiateExternalProp(BLOCKOUT_PUPPETS.tanketteModel, this.library).then((root) => { this.tanketteAsset = root || false; })
+        .catch((error) => { console.warn("[BlockoutPuppets] Type94 tankette model failed", error); this.tanketteAsset = false; });
+    }
+    return Promise.resolve(this.tanketteAsset);
+  }
+
   /** 体块换正式模型（只试一次；车与牲口要等模型下完）。→ userData.model = { tank, turret } | { draft, kind, … } | null */
   _DressModel(puppet) {
     const body = puppet.body, unit = puppet.unit;
     if (!body?.userData.boxes || body.userData.model !== undefined) return;
     let model = null;
     if (unit.kind === "tank" && TankShape(unit) === "tankette") {
-      // 九四式轻装甲车没有正式模型（八九式那辆带炮，不对）：一直用体块
-      body.userData.model = null;
+      // 九四式轻装甲车：正式模型 Model_Type94Tankette（几何、材质由 ExternalProps 缓存共用，拆车时不 dispose）
+      this.LoadTankette();
+      if (this.tanketteAsset instanceof Promise) return;
+      if (this.tanketteAsset) {
+        const root = this.tanketteAsset.clone(true);
+        body.add(root);
+        model = { tankette: root, turret: root.getObjectByName("TurretYaw") || null };
+      }
+      body.userData.model = model;
       return;
     }
     if (unit.kind === "tank") {
@@ -1445,7 +1459,7 @@ export class BlockoutPuppets {
       seat: puppet.seat ? { ...puppet.seat } : null,
       rootY: human ? human.actor.root.position.y : (puppet.body ? puppet.body.position.y : null),
       // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
-      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.blanket ? "SingleBlanket" : m?.kind ?? null; })(),
+      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.tankette ? BLOCKOUT_PUPPETS.tanketteModel : m?.stretcher ? "BambooStretcher" : m?.blanket ? "SingleBlanket" : m?.kind ?? null; })(),
       blanketDrag: puppet.body?.userData.model?.blanket ? +puppet.body.userData.model.blanket.drag.toFixed(3) : null,
       blanketDragSolo: puppet.body?.userData.model?.blanket ? (puppet.drive && puppet.drive.dragSolo !== undefined ? !!puppet.drive.dragSolo : !!puppet.unit.dragSolo) : null,
       // 2026-10-21：单被的布料（两角离手多远、最高点、最大拉长、贴地 / 被压住的点数，见 Script_EditorBlockoutBlanket Probe）

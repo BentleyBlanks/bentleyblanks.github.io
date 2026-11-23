@@ -353,13 +353,19 @@ export function MergedActors(beat, time, player, progress, timeline) {
     }
   }
 
-  // 九四式轻装甲车：沿官道压至沟北沿扫射
+  // 九四式轻装甲车：过土地庙后离开官道，从架桥组（x≤108.5）与沟北基准火力组（x≥121）之间的空地南下，
+  // 碾过板桥以东的铁丝网（BshWire_15），停在反坦克沟北沿（上口 z≈468.3）扫射；不占板桥北头与老乡、架桥组的路线
   if (time >= At("08b", 0.5) && time < At("10a")) {
-    const tank = Track([
-      ["08b", 0.5, 102, 420], ["08c", 0.35, 100, 462], ["08c", 0.75, 99, 465], ["09a", 1, 99, 464],
-    ], time, timeline);
+    const keys = [
+      ["08b", 0.5, 102, 420], ["08b", 0.62, 103, 424], ["08b", 0.84, 113, 432], ["08c", 0.02, 115, 440],
+      ["08c", 0.35, 115, 465.8], ["09a", 1, 115, 465.8],
+    ];
+    const tank = Track(keys, time, timeline), ahead = Track(keys, time + 0.2, timeline);
+    const moving = Distance(tank, ahead) > 0.01;
+    const heading = moving ? Math.atan2(ahead[0] - tank[0], -(ahead[1] - tank[1])) : Math.PI;
+    const turret = moving ? heading : Math.atan2(108 - tank[0], -(478 - tank[1]));
     actors.push(Actor("tank3", "九四式 · 沟北受阻车", "enemy", "tank", tank, "stand",
-      { surface: "ground", heading: Math.PI, turret: Math.PI, status: "被防战车壕挡在沟北交叉扫射" }));
+      { surface: "ground", heading, turret, status: moving ? "离开官道碾过铁丝网" : "被防战车壕挡在沟北交叉扫射" }));
   }
 
   if (beat.stage === "13") {

@@ -239,4 +239,26 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
  assert.equal(EncounterPuppetYaw(still,{x:3.001,z:4,yawDeg:0},dt),37,"Idle jitter keeps the last facing");
  assert.equal(EncounterPuppetYaw(still,{x:30,z:4,yawDeg:0},dt),37,"Teleports keep the last facing");
 }
+{
+ // 08 沟北九四式：离开官道碾过东侧铁丝网，停在反坦克沟北沿（上口 z≈468.3），不堵板桥北头，不与老乡、架桥组、沟北火力组相撞。
+ const merged=CompileEncounterVariant(FIRST_LEVEL_CAMPAIGN_VARIANT_ID),from=merged.BeatById("08b").start,to=merged.BeatById("08d").end;
+ let last=null;
+ for(let time=from;time<to;time+=0.25) {
+  const frame=merged.evaluate(time),tank=frame.actors.find(actor=>actor.id==="tank3");
+  if(!tank) continue;
+  for(const other of frame.actors) {
+   if(other.id==="tank3"||other.kind!=="person"||other.pose==="dead") continue;
+   assert.ok(Math.hypot(other.p[0]-tank.p[0],other.p[1]-tank.p[1])>2.6,`08 tank3 clears ${other.id} at ${time.toFixed(2)}`);
+  }
+  if(last&&Math.hypot(tank.p[0]-last.p[0],tank.p[1]-last.p[1])>0.05) {
+   const dx=tank.p[0]-last.p[0],dz=tank.p[1]-last.p[1];
+   assert.ok((Math.sin(tank.heading)*dx-Math.cos(tank.heading)*dz)/Math.hypot(dx,dz)>0.6,`08 tank3 drives nose first at ${time.toFixed(2)}`);
+  }
+  last=tank;
+ }
+ assert.ok(last.p[1]+1.68<468.3&&Math.abs(last.p[0]-99)>5,"08 tank3 stops on the ditch lip off the plank bridge");
+ const spec=EncounterActorSpec(last,null,merged.id);
+ assert.equal(spec.shape,"tankette");
+ assert.ok(Math.abs(spec.arc.yawDeg+last.turret*180/Math.PI)<1e-9,"Tank turret yaw reaches the puppet");
+}
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync and independent scene");

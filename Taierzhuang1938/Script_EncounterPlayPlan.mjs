@@ -71,6 +71,7 @@ export function EncounterActorSpec(actor, carrier = null, variant = DEFAULT_VARI
     kind: actor.kind === "tank" ? "tank" : actor.kind === "cart" ? "cart" : actor.kind === "donkey" ? "animal" : actor.kind === "child" ? "child" : actor.kind === "quilt" ? "soldier" : civilian ? "civilian" : "soldier",
     weapon: civilian || actor.id === "winter" ? null : actor.side === "enemy" ? (actor.heavy ? "Type11" : "Type38") : (actor.heavy ? "Zb26" : "HanYang"),
     shape: "tankette", ...(actor.kind === "cart" ? { animal: false } : {}),
+    ...(actor.kind === "tank" && Number.isFinite(actor.turret) ? { arc: { yawDeg: -actor.turret * 180 / Math.PI } } : {}),
   };
   if (actor.kind === "quilt" && actor.carried) next.lie = "along";
   if (actor.parentId && carrier) {
