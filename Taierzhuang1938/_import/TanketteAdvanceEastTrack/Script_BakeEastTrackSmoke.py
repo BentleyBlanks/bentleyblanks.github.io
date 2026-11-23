@@ -69,7 +69,8 @@ def MeasureOpticalDepth(reference, clear=None, rendered=None, refine=False):
         residual = gaussian_filter(np.clip(np.log(measured/transmittance),-.40,.66)*window, 1.38)
         # The horizon has the strongest background light and needs more
         # attenuation than the higher authoring samples for the same display error.
-        gain = .77 + 1.33*Ease(v,.334,.356) if refine else .77
+        left_core = Ease(u,.25,.33)*Ease(1-u,.52,.57)*Ease(v,.102,.176)
+        gain = .77 + .51*left_core + 1.33*Ease(v,.334,.356) if refine else .77
         optical += gain*residual
     optical = gaussian_filter(optical, .28 if refine else .86)
     GUIDE.write_bytes(np.uint8(np.rint(255*np.clip(optical/2.6,0,1))).tobytes())

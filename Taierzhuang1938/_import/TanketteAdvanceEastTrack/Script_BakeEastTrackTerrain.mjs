@@ -105,7 +105,6 @@ function Line(id, color, tint, halfW, feather, from, to, at, strength = 1) {
 
 paint.push({ id: "ClearedShellStruckField", color: "#514943", tint: [.93,.88,.84], feather: 1.2, strength:.64,
   poly: [point(-45,-103.5),point(54.5,-103.5),point(54.5,6.5),point(-45,6.5)] });
-Line("DitchSoilCut", "#493c34", [.60,.46,.37], .60, .46, -4, 22, (d) => eastLip(d)-.07);
 Line("DitchSoilFloor", "#483e34", [.75,.71,.67], .56, .46, -4, 21, (d) => eastLip(d)-1.45);
 Line("FieldPathEastRoad", "#726a61", [1.22,1.12,1.02], 1.96, .82, -4, 100, roadX, .84);
 Line("FieldPathWestTrack", "#524a42", [.85,.80,.74], .20, .24, -4, 86, (d) => roadX(d)-.71, .50);
@@ -124,6 +123,8 @@ Line("FieldPathGravelSkim", "#827365", [1.57,1.44,1.25], .22, .30, 3.48, 7.24,
   (d) => 1.33+.12*d+.23*Math.sin(d*1.54), .58);
 Line("FieldPathRaisedPatch", "#827365", [1.46,1.32,1.17], .34, .32, 4.68, 8.47,
   (d) => 3.97+.20*Math.cos(d*.73), .53);
+// Keep the freshly cut shoulder above the track tint where they overlap.
+Line("DitchSoilCut", "#493c34", [.70,.55,.47], .43, .43, -4, 22, (d) => eastLip(d)-.06, .86);
 
 Prop("ElmAtCamera","eastTrackSplinteredElm",-1.44,-1.82,[2.46,4.61,2.10],23,"近景/取景断榆");
 Prop("ShoringCrossbeam","eastTrackGreyTimberShoring",-2.11,-5.33,[2.42,1.45,.45],-4,"近景/灰木护壁",-.65);
