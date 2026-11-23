@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterPuppetYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
 export { ResolveEncounterStageStart };
 import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
 import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
@@ -705,6 +705,7 @@ export class EncounterPlay {
       const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId),this.variant);
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
       if(a.kind==="litter")spec.kind="litter";
+      if(a.heading===undefined&&!a.parentId)spec.yawDeg=EncounterPuppetYaw(this.puppets.puppets.get(a.id),spec,dt,cfg.puppetFacing);
       return spec;
     });
     units.push({...EncounterActorSpec({id:"player",name:"",side:"player",kind:"person",p:[player.position.x,player.position.z],pose:"stand"},null,this.variant),
@@ -830,7 +831,7 @@ export class EncounterPlay {
   RequestStop(){if(window.parent!==window)this.Send("stop");else history.back();}
   Send(kind,extra={}){if(!this.isCampaign&&window.parent!==window)window.parent.postMessage({type:"encounter-play-"+kind,token:this.token,...extra},location.origin);}
   Actors(){return [...this.entries].map(([id,e])=>({id,soldierId:e.soldier.id,alive:e.soldier.alive,health:e.soldier.health,position:e.soldier.position.toArray(),model:e.skin?.kit?.key||e.soldier.actor?.characterRig?.modelId,group:e.actor.groupId||null}));}
-  Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,
+  Presentation(){return [...this.puppets.puppets.values()].map(p=>({id:p.id,kind:p.unit.kind,stance:p.stance,x:p.x,z:p.z,yawDeg:p.yawDeg,moving:!!p.moving,
     model:p.body?.userData.model?.kind||(p.body?.userData.model?.tank?"tank":null),
     humans:p.humans.map(h=>h.skin?.kit?.key||h.actor.characterRig?.modelId||null)}));}
   Stages(){

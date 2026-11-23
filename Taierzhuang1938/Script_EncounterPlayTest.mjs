@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,EncounterPuppetYaw,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
 import {FLOW_TIMELINE,DEFAULT_ENCOUNTER_DOCUMENT,BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import {FIRST_LEVEL_MUSIC_CUES} from "./Data_FirstLevelMissionMusic.mjs";
 import {WEAPONS} from "./Data_Weapons.mjs";
@@ -206,5 +206,25 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
   assert.ok(timelineKeyframes.has(id),"Opening timeline includes sequence "+id);
   assert.ok(configKeyframes.has(id),"Opening keyframe config includes "+id);
  }
+}
+{
+ // 08c 老耿沿主街南下进救护所：没有编排 heading 的平民木偶按实际位移转向，不能倒着跑。
+ const merged=CompileEncounterVariant(FIRST_LEVEL_CAMPAIGN_VARIANT_ID),beat=merged.BeatById("08c"),dt=1/30;
+ let previous=null,checked=0;
+ for(let time=beat.start;time<beat.start+beat.duration*0.62;time+=dt) {
+  const geng=merged.evaluate(time).actors.find(actor=>actor.id==="geng");
+  assert.equal(geng.heading,undefined,"08c Geng relies on movement facing");
+  const spec=EncounterActorSpec(geng,null,merged.id);
+  spec.yawDeg=EncounterPuppetYaw(previous,spec,dt,merged.playConfig.puppetFacing);
+  if(previous&&time>beat.start+1) {
+   const dx=spec.x-previous.x,dz=spec.z-previous.z,moved=Math.hypot(dx,dz),ry=spec.yawDeg*Math.PI/180;
+   if(moved>0.02){assert.ok((-Math.sin(ry)*dx-Math.cos(ry)*dz)/moved>0.7,`08c Geng faces his run at ${time.toFixed(2)}s`);checked++;}
+  }
+  previous={x:spec.x,z:spec.z,yawDeg:spec.yawDeg};
+ }
+ assert.ok(checked>100,"08c Geng run is sampled");
+ const still={x:3,z:4,yawDeg:37};
+ assert.equal(EncounterPuppetYaw(still,{x:3.001,z:4,yawDeg:0},dt),37,"Idle jitter keeps the last facing");
+ assert.equal(EncounterPuppetYaw(still,{x:30,z:4,yawDeg:0},dt),37,"Teleports keep the last facing");
 }
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync and independent scene");

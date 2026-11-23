@@ -4,6 +4,8 @@ export const ENCOUNTER_PLAY = {
   scene:"FirstLevelEncounter", schema:"tengxian-encounter-play/1",
   ui:{"stop":"■ 停止 Play","loadFailed":"Play 加载失败","dead":"顺子阵亡","complete":"本段试玩完成","retry":"R · 从当前关键帧重来，也可点击 ▶","interact":"F · 完成当前交互","clear":"清除当前目标","reach":"前往目标","stealthAlarm":"日军正在示警，后送通道暴露","stealthRetry":"R · 从检查点重来，也可点击 ▶","stealthSuspicion":"有人往这边看，缩回掩体","stealthPull":"低头，贴住侧墙","stealthWait":"保持隐蔽，等搜查兵走远","stealthNoFire":"禁止开火、投弹","stealthNoFireAhead":"进村后禁止开火、投弹","event":"等待交互结果","escort":"掩护担架通过","departure":"等待敌军离开","templeExit":"跟着文财和妮儿出庙，接回西巷","waitParty":"等文财和妮儿跟上"},
   reachM:3, routeReachM:1.2, orderEveryS:0.15, corpseKeepM:100,
+  // 编排里没写 heading 的木偶（老耿、妮儿等平民）按实际位移转向：慢于 minSpeedMps 保持原朝向，单帧跳变超过 teleportM 视为瞬移不转，转身角速度上限 turnRateRadS。
+  puppetFacing:{minSpeedMps:0.3, teleportM:4, turnRateRadS:9},
   reachByBeat:{"09a":0.65,"09b":0.8},
   // Text-only Play directions. Keep the current order until its gameplay gate is
   // satisfied; these lines introduce no new story events or voice recordings.

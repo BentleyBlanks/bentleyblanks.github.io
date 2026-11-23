@@ -81,6 +81,16 @@ export function EncounterActorSpec(actor, carrier = null, variant = DEFAULT_VARI
   return next;
 }
 
+// Puppets without an authored heading face where they actually move (yawDeg: forward = (-sin, -cos)).
+export function EncounterPuppetYaw(previous, spec, dt, facing = CONFIG.puppetFacing) {
+  if (!previous || !Number.isFinite(previous.x) || !Number.isFinite(previous.yawDeg) || !(dt > 0)) return spec.yawDeg;
+  const dx = spec.x - previous.x, dz = spec.z - previous.z, moved = Math.hypot(dx, dz);
+  if (moved > facing.teleportM || moved < facing.minSpeedMps * dt) return previous.yawDeg;
+  const current = previous.yawDeg * Math.PI / 180, wanted = Math.atan2(-dx, -dz);
+  const delta = Math.atan2(Math.sin(wanted - current), Math.cos(wanted - current)), limit = facing.turnRateRadS * dt;
+  return (current + Math.max(-limit, Math.min(limit, delta))) * 180 / Math.PI;
+}
+
 // Authored time is a director clock. Gameplay facts, not preview lifetimes,
 // decide deaths, area triggers and reinforcement slots after the chosen keyframe.
 export class EncounterPlayPlan {
