@@ -99,6 +99,19 @@ assert(Math.abs(crownBounds.max.y-.05245)<.0001,'original visual tip height reta
 assert(contract.triangles<=80000 && doc.asset.extras.runtimeTriangles===contract.triangles);
 const woodRim=fps.meshes.find(mesh=>mesh.userData.type38Part==='Wood_UpperFittedCrown05');
 const middleBand=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_MiddleBand57');
+const windowTrim=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_FrontWindowBacking49');
+windowTrim.geometry.computeBoundingBox();
+const trimBounds=windowTrim.geometry.boundingBox,windowCenter=trimBounds.getCenter(new THREE.Vector3());
+const windowExtent=trimBounds.getSize(new THREE.Vector3()).multiplyScalar(.5);
+const windowProbe=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
+windowProbe.layers.enableAll();
+for(const [longitudinal,expected] of [[-.34,woodRim],[.075,windowTrim],[.445,woodRim]]){
+ for(const lateral of [-.24,0,.24]){
+  windowProbe.ray.origin.set(windowCenter.x+lateral*windowExtent.x,trimBounds.max.y+.08,windowCenter.z+longitudinal*windowExtent.z);
+  assert.equal(windowProbe.intersectObjects(fps.meshes)[0]?.object,expected,'both exterior windows reveal the actual handguard, with a steel divider between them');
+ }
+}
+assert.equal(windowTrim.geometry.index.count/3,1000);
 for(const part of [woodRim,middleBand])part.geometry.computeBoundingBox();
 const bandBox=middleBand.geometry.boundingBox,rimBox=woodRim.geometry.boundingBox;
 const bandSpan=bandBox.max.z-bandBox.min.z,rimFraction=(bandBox.min.z-rimBox.min.z)/bandSpan;
@@ -107,7 +120,7 @@ const woodProbe=new THREE.Raycaster(new THREE.Vector3(.06,bandBox.max.y-.38*band
 woodProbe.layers.enableAll();
 assert.equal(woodProbe.intersectObjects(fps.meshes)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
 const edgeStart=new THREE.Vector3(),edgeEnd=new THREE.Vector3(),corner=new THREE.Vector3(),normal=new THREE.Vector3(),tangent=new THREE.Vector3();
-for(const mesh of fps.meshes.filter(item=>item===woodRim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
+for(const mesh of fps.meshes.filter(item=>item===woodRim||item===windowTrim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
  const geometry=mesh.geometry,{position,normal:normalAttr,tangent:tangentAttr}=geometry.attributes;
  for(let index=0;index<position.count;index++){
   normal.fromBufferAttribute(normalAttr,index);tangent.fromBufferAttribute(tangentAttr,index);

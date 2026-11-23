@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 10,
+  "version": 11,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "ff06946dca9621a35fb56e3e3d23a7674277db88cd59b31bdd94cc8a49a183c6",
+  "runtimeSha256": "06b206fc7fef574654f8c51549c8b6e856478225726f05af39333bad22aabf00",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72088,
@@ -112,8 +112,8 @@
     {
       "index": 13,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 528012,
-      "sha256": "b79f2c36cba910944aeddac494a6361d0cd9026ac70605b27e8f20ba3e9b2bf0"
+      "bytes": 528340,
+      "sha256": "a6382c2bce458095bab24ac545d2a5ea15fa2f9c6b6bf151261e941eaa823525"
     },
     {
       "index": 14,
@@ -130,14 +130,14 @@
     {
       "index": 16,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 560630,
-      "sha256": "f1560cd74422006c9b1e20a9f5459d171aaaf1a54b94b584a99306e54ca218c1"
+      "bytes": 560982,
+      "sha256": "52db64ffdc37ba94010b6fb39f610608f51b444c51c6cacae54dd9311fd8b6b5"
     },
     {
       "index": 17,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 335861,
-      "sha256": "1992a425d45d9726eda393293d64b234af13eb1a871fc693f5b7b40b71d54e44"
+      "bytes": 335919,
+      "sha256": "2cc165cf29a32f01732409853a50944d23f13f0ba67e2d105dbfcad0c56434b4"
     },
     {
       "index": 18,
@@ -220,14 +220,14 @@
     {
       "index": 31,
       "name": "Texture_Type38Sample12Base",
-      "bytes": 144862,
-      "sha256": "fcfb365183ac5bf78e066dd60e142cc6e727dea3bda3ccf73f918e5ecf002dc5"
+      "bytes": 193648,
+      "sha256": "1ad2f29ec3762393e60307b1cc2a3de827d39f350f2d3e1b39ac28e412b727d8"
     },
     {
       "index": 32,
       "name": "Texture_Type38Sample12Orm",
-      "bytes": 167894,
-      "sha256": "ac1cb0432d3487a634b5459ce9b67227db0f55421a2943b7157aa96e0ea61075"
+      "bytes": 176407,
+      "sha256": "c0ed1866876464fcd21745c71e3f5e055cbed4d8a954432a3ff844debfbee76b"
     },
     {
       "index": 33,
@@ -770,8 +770,8 @@
     ],
     "Wood_UpperFittedCrown05": [
       81.4,
-      95.5,
-      110.9
+      95.6,
+      111.4
     ],
     "Exterior_Guard02": [
       96.4,
@@ -804,9 +804,9 @@
       115.8
     ],
     "Exterior_FrontWindowBacking49": [
-      85.7,
-      101.7,
-      113.7
+      119.9,
+      134.4,
+      148.6
     ],
     "Exterior_MiddleBand57": [
       79.8,

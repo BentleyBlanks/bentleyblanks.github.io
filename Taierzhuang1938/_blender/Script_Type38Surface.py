@@ -184,6 +184,79 @@ def ShapeHandle(doc, views, primitive):
                 accessor[key] = function(values,axis=0).tolist()
 
 
+def ShapeWindowTrim(doc, views, primitive):
+    attrs = primitive['attributes']
+    original = Attribute(doc, views, attrs['POSITION'], 3)
+    low,high = original.min(axis=0),original.max(axis=0)
+    center = (low+high)*.5
+    extent = (high-low)*.5
+    count = 25
+    angle = np.linspace(0,2*np.pi,count+1)
+    axis = np.column_stack((np.cos(angle),np.sin(angle)))
+    def Rounded(exponent):
+        return np.sign(axis)*np.abs(axis)**(2/exponent)
+    section = [(0,.19),(.017,.085),(.061,.024),(.17,0),(.80,0),(.962,.064),
+               (1,.22),(1,.81),(.925,1),(0,.96)]
+    points,uv,faces = [],[],[]
+    bands = [(-1,.08,-.34,.255),(.08,1.11,.445,.225)]
+    for band,(start,end,opening,span) in enumerate(bands):
+        offset=len(points)
+        outer = center[[0,2]]+extent[[0,2]]*(Rounded(10)*[1,(end-start)*.5]+[0,(end+start)*.5])
+        corner = np.clip(-axis[:,0]*axis[:,1],0,1)*(.17 if band==0 else .055)
+        inner = center[[0,2]]+extent[[0,2]]*([-.014,opening]+Rounded(5 if band==0 else 7)*[.55 if band==0 else .62,span]*(1-corner[:,None]))
+        for index,(inset,depth) in enumerate(section+[section[0]]):
+            base = outer+(inner-outer)*inset
+            crown = .28*(1-((base[:,0]-center[0])/extent[0])**2)
+            top = high[1]-extent[1]*(.46-crown+.23*band)
+            top += .62*extent[1]*band*Ramp(.68,1.04,(base[:,1]-center[2])/extent[2])
+            rings = np.column_stack((base[:,0],top-(top-low[1])*depth,base[:,1]))
+            points.extend(rings)
+            uv.extend(np.column_stack((.025+.95*angle/(2*np.pi),np.full(count+1,.025+.50*band+.45*index/len(section)))))
+            if index:
+                for segment in range(count):
+                    near=offset+(index-1)*(count+1)+segment
+                    far=near+count+1
+                    faces.extend([(near,far,near+1),(near+1,far,far+1)])
+    points,uv,faces = np.asarray(points),np.asarray(uv),np.asarray(faces)
+    edgeA=points[faces[:,1]]-points[faces[:,0]]
+    edgeB=points[faces[:,2]]-points[faces[:,0]]
+    cross=np.cross(edgeA,edgeB)
+    assert np.linalg.norm(cross,axis=1).min()>1e-11
+    if np.mean(cross[3*count*2:4*count*2,1])<0:
+        faces=faces[:,[0,2,1]]
+        cross=-cross
+    welded,group=np.unique(points.round(8),axis=0,return_inverse=True)
+    smooth=np.zeros_like(welded)
+    for corner in faces.T:
+        np.add.at(smooth,group[corner],cross)
+    normals=smooth[group]
+    normals/=np.linalg.norm(normals,axis=1,keepdims=True)
+    tangents=np.zeros((len(points),4))
+    for row in range((len(section)+1)*len(bands)):
+        band,index=divmod(row,len(section)+1)
+        first=row*(count+1)
+        loop=points[first:first+count]
+        along=np.roll(loop,-1,axis=0)-np.roll(loop,1,axis=0)
+        along=np.vstack((along,along[0]))
+        basis=normals[first:first+count+1]
+        along-=basis*np.sum(along*basis,axis=1,keepdims=True)
+        along/=np.linalg.norm(along,axis=1,keepdims=True)
+        forward=(band*(len(section)+1)+(index+1)%len(section))*(count+1)
+        delta=points[forward:forward+count+1]-points[first:first+count+1]
+        tangents[first:first+count+1,:3]=along
+        tangents[first:first+count+1,3]=np.sign(np.sum(np.cross(basis,along)*delta,axis=1))
+    assert len(faces)==1000 and np.isfinite(normals).all() and np.all(abs(tangents[:,3])==1)
+    for slot,values in [(attrs['POSITION'],points),(attrs['NORMAL'],normals),(attrs['TEXCOORD_0'],uv),
+                        (attrs['TANGENT'],tangents),(primitive['indices'],faces.reshape(-1,1))]:
+        accessor=doc['accessors'][slot]
+        data=values.astype('<f4' if accessor['componentType']==5126 else '<u2')
+        views[accessor['bufferView']]=data.tobytes()
+        accessor['count']=len(data)
+        for key,stat in [('min',np.min),('max',np.max)]:
+            if key in accessor:
+                accessor[key]=stat(data,axis=0).tolist()
+
+
 def RearOutline(angle):
     delta = (np.rad2deg(angle)-190+180)%360-180
     return PchipInterpolator([-180,-40,-29,-19,-8,2,13,20,28,39,180],
@@ -431,7 +504,12 @@ def Build(cache):
             ShapeHandle(doc, views, primitive)
         if disk:
             ShapeRearMedallion(doc, views, primitive)
+        trim = part == 'Exterior_FrontWindowBacking49'
+        if trim:
+            ShapeWindowTrim(doc, views, primitive)
         field, padded, valid = SurfaceAtlas(doc, views, primitive, (width, height))
+        if trim:
+            orm[:,:,0]=np.where(padded,255,0)
         if part == 'T38_460G_WoodGroove_VisualCandidate':
             orm[~padded,0] = 0
         side, up, length, normalSide, normalUp, normalLength, bend = np.moveaxis(field, 2, 0)
@@ -525,6 +603,17 @@ def Build(cache):
                 glossVariation = .47*(glossScan-60) + 13*stain + 6*grainSteel
                 varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1] + glaze*(8+glossVariation),34,139),0)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.10*glaze*fleck))
+                sheltered = Ramp(-.3775,-.3718,length)*(1-Ramp(-.3642,-.3624,length))*Ramp(.42,.80,normalUp)
+                color = Blend(color,Tint([38,13,7],[91,32,15],amber),sheltered*.71)
+                grainTone = np.clip(.54*(fibre-.55)+.13*stain,-.32,.30)
+                color *= (1+sheltered*grainTone)[:,:,None]
+                warmPocket = sheltered*Ramp(-.3705,-.3655,length)
+                color = Blend(color,Tint([57,20,8],[115,44,17],amber),warmPocket*.36)
+                innerRim = sheltered*(1-Ramp(-.371,-.367,length))
+                color = Blend(color,Tint([61,26,11],[122,54,23],amber),innerRim*.64)
+                varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.48*sheltered))
+                varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1]+28*sheltered,0,150),0)
+                rough += 17*sheltered
             if not separate:
                 mellow = rearPanel*np.clip(.72+.22*rearward-.24*warmPath,0,1)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.47*mellow))
@@ -591,6 +680,11 @@ def Build(cache):
                 metal -= knob*(42+16*oxidation)
             if jacket:
                 metal -= 16+7*oxidation
+            if trim:
+                color = Tint([39,37,33],[90,83,73],.42+.26*flow+.09*stain)
+                color = Blend(color,np.array([132,124,109],dtype='f'),.35*edge)
+                rough = 143+16*flow+13*stain-26*edge
+                metal = 207+19*edge-9*oxidation
             relief = .025*grainSteel + .024*brush
             if disk:
                 face = Ramp(.18,.69,normalLength)*Ramp(-.0547,-.0519,length)
@@ -667,7 +761,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_ScalePatina08'
+    doc['asset']['extras']['version'] = 'Type38_LacquerWindow09'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -675,7 +769,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=10, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=11, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
