@@ -52,7 +52,7 @@ import { SandboxRangeFromParams } from "./Data_SandboxRanges.mjs";
 import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses, CreateEncounterPlayPluginInstance } from "./Script_SandboxRanges.mjs";
 import { CreateEncounterPlayPhase } from "./Script_EncounterPlayScene.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
-import { FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
+import { FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID } from "./Data_FirstLevelCampaign.mjs";
 // 玩法时间的唯一入口：慢放 / 暂停 / 单步都往这里登记（Script_GameClock）。
 import { GameClock, CLOCK_ORDER } from "./Script_GameClock.mjs";
 // 每帧调度表：模式与正常游戏的步骤先后（Data_FrameSchedule），Frame 只按它分派。
@@ -74,26 +74,29 @@ import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
 import { DEV_TOOLS_ENABLED, TOOL_INFO } from "./Data_DevTools.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
 import {
-  FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
-  FIRST_LEVEL_P012_WHITEBOX_PHASE as ARCHIVED_P012_PHASE,
-} from "./Data_FirstLevelP012Whitebox.mjs";
-import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
+  ARCHIVED_P012_PHASE,
+  FirstLevelP012Debug,
+  FirstLevelP012Director,
+  FirstLevelP012Runtime,
+  FirstLevelP012Resting,
+  FirstLevelP012CarryView,
+  AllowP012InfiniteAmmo,
+  SyncP012ActiveMagazine,
+  RestoreP012ManualReload,
+  FirstLevelP012Binoculars,
+  P012BinocularLensContains,
+  P012SouthPoint,
+  InstallP012OpeningPose,
+  InstallP012ActorMotion,
+  SelectP012CompanionCast,
+  SelectP012RecruitCast,
+  P012SegmentClear,
+  FirstLevelP012StageZero,
+} from "./Script_ArchivedP012Split.mjs";
 import { ApplyLensToPost } from "./Script_OpeningLens.mjs";
 import { LENS_DEFAULT } from "./Data_OpeningLens.mjs";
 import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
-import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
-import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
-import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
-import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
-import { FirstLevelP012CarryView } from "./Script_FirstLevelP012CarryView.mjs";
-import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
-import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
-import { P012SouthPoint } from "./Script_FirstLevelP012Space.mjs";
-import { InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
-import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Script_FirstLevelP012Cast.mjs";
-import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
-import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import { PhaseContentId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
@@ -278,7 +281,7 @@ const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
 const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
 const SANDBOX_RANGE = SANDBOX_PLUGIN?.entry ?? null;
 // Archived content is a developer regression fixture, absent from chapter selection.
-const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
+const ARCHIVED_P012_FIXTURE = !!ARCHIVED_P012_PHASE && params.get("whitebox") === "p012-archive";
 const FIRST_LEVEL_CAMPAIGN = params.get("whitebox") === "p012";
 const FIRST_LEVEL_P012_WHITEBOX = FIRST_LEVEL_CAMPAIGN || ARCHIVED_P012_FIXTURE;
 const FIRST_LEVEL_CAMPAIGN_PHASE = FIRST_LEVEL_CAMPAIGN
@@ -1578,7 +1581,10 @@ async function Boot() {
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
   const meshes = SANDBOX_STARTUP?.sceneryOnly ? actorFactory.meshReport
-    : await actorFactory.PreloadMeshes({ weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false });
+    : await actorFactory.PreloadMeshes({
+        weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false,
+        minimalCharacterRig: !!SANDBOX_STARTUP?.minimalCharacterRig,
+      });
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
@@ -3854,34 +3860,7 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
-  missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    flare,
-    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
-    // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
-    profiler,
-    FireVehicleBullet,
-    Objective:text=>{state.storyObjective=text;},
-    NotifyCameraCut:()=>{post.NotifyCameraCut();lights.NotifyCameraCut();},
-    VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
-    Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
-    GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{AddSupplyClips(clips);state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;},
-    SpawnMissionRifle:(point)=>{
-      const item={weaponId:"HanYang",weaponVariant:0,yaw:point.yaw??0,
-        position:{x:point.x,y:battlefield.GroundHeight(point.x,point.z),z:point.z},view:null};
-      BuildGroundWeaponView(item);
-      return item;
-    },
-    RemoveMissionRifle:item=>DisposeGroundWeaponView(item),
-    // instant: the rifle is already in his hands on screen (02's hand-over: Luo gave it to him in the cutscene) -- no draw.
-    RestoreRifle:({instant=false}={})=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands({instant});viewmodel.root.visible=!carry?.Blocking;},
-    Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
-    LevelLoading:()=>state.advancing,
-    // 关尾夜行军：黑屏里换夜间天空，退出/重试时还原本关自己的天光。
-    ApplySky:name=>ApplySkyOverride(name),
-    RestoreSky:()=>RestoreSkyOverride(),
-    Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
-    MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
-  }) : null;
+  missionRuntime = null;
   await missionRuntime?.voiceReady;
   SyncMissionHands();
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。

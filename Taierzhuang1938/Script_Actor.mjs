@@ -3729,7 +3729,7 @@ export class ActorFactory {
    *
    * 普通 TZM 404 只作废该 id。汉阳造 173R 是必需资产，加载失败显式中止并提示重试。
    */
-  async PreloadMeshes({ weaponsOnly = false } = {}) {
+  async PreloadMeshes({ weaponsOnly = false, minimalCharacterRig = false } = {}) {
     if (this.meshLoading) return this.meshLoading;
     const wanted = new Set([
       // SoldierNra / SoldierIja 已从正式通路废弃：军人 GLB 失败时宁可显式退回 box，
@@ -3757,7 +3757,7 @@ export class ActorFactory {
       const [docs, riggedAssets, characterAssets, hanYang173R, type38] = await Promise.all([
         Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
         LoadRiggedAssets(),
-        LoadLugouCharacterAssets(),
+        LoadLugouCharacterAssets({ minimalRig: minimalCharacterRig }),
         LoadHanYang173R(),
         LoadType38_511(),
       ]);

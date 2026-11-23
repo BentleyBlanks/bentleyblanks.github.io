@@ -1,6 +1,7 @@
 // 第一关正式战役纯数据：复用遭遇设计编辑器「北沙河单村合并版」与开场 Timeline 源。
 // 纯 JSON 可序列化数据，零 import、零函数（标题菜单与游戏宿主共用）。
 
+export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
 export const FIRST_LEVEL_CAMPAIGN_VARIANT_ID = "L1_BeishaheMerged";
 export const FIRST_LEVEL_OPENING_TIMELINE_URL = "./Timeline/FirstLevelOpening.timeline.json";
 export const FIRST_LEVEL_OPENING_CONFIG_URL = "./Blockout/FirstLevel0105.json";

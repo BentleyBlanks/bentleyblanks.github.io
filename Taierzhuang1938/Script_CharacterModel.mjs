@@ -573,13 +573,35 @@ async function LoadAsset(record) {
   }
 }
 
-export async function LoadLugouCharacterAssets() {
+export async function LoadLugouCharacterAssets({ minimalRig = false } = {}) {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     try {
       const response = await fetch(MANIFEST_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`manifest HTTP ${response.status}`);
       const manifest = await response.json();
+      if (minimalRig) {
+        const refRecord = (manifest.models || []).find((record) => record.id === "TengxianNra02")
+          || (manifest.models || []).find((record) => !record.loadOnDemand);
+        const gltf = refRecord ? await LOADER.loadAsync(VersionedUrl(refRecord.url, refRecord.version)) : null;
+        const asset = refRecord && gltf
+          ? { record: refRecord, gltf, infantry: null, death: null, facial: null, proneCrawl: null, error: null }
+          : null;
+        return {
+          manifest,
+          minimalRig: true,
+          byFaction: { nra: asset ? [asset] : [], ija: asset ? [asset] : [] },
+          report: {
+            requested: refRecord ? 1 : 0,
+            loaded: asset ? 1 : 0,
+            missing: asset ? [] : [refRecord?.id || "TengxianNra02"],
+            onDemand: [],
+            onDemandLoaded: [],
+            animations: 0,
+            ready: true,
+          },
+        };
+      }
       // loadOnDemand records (cast-only looks: the interpreter's NRA06) are not part of
       // the boot download; LoadLugouCastModels fetches them for the level that uses them.
       const loaded = await Promise.all((manifest.models || []).filter((record) => !record.loadOnDemand).map(LoadAsset));
@@ -1625,7 +1647,8 @@ export function CreateLugouCharacterRig(
       : randomVariants[HashString(`${faction}:${options.seed ?? 0}:model`) % randomVariants.length];
   // Loaded arrays omit failed downloads; numeric slots must never change model identity.
   const modelId = LugouCharacterModelId(kind, index);
-  const asset = variants.find(candidate => candidate.record?.id === modelId);
+  const asset = variants.find(candidate => candidate.record?.id === modelId)
+    || (library?.minimalRig ? variants[0] : null);
   if (!asset?.gltf) return null;
   // Face rig: the cast list in the manifest (named speakers), or an explicit
   // options.facial for a speaking extra; options.facial === false forces the plain skin.

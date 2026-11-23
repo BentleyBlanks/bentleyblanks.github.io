@@ -108,7 +108,7 @@ export class FirstLevelOpeningTimeline {
       OnPrevizStatus() {},
     };
 
-    this.previz = new BlockoutPreviz(this.adapter);
+    this.previz = new BlockoutPreviz(this.adapter, { metadataOnly: true });
     this.previz.SetCameraMode("move");
     // Ensure skip button stays above black/flash overlay and captions/subtitles.
     this.root.append(this.skipButton);

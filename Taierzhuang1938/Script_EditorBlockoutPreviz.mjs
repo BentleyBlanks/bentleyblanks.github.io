@@ -112,8 +112,9 @@ function Fmt(t) { return `${Math.max(0, t).toFixed(1)} s`; }
 
 export class BlockoutPreviz {
   /** @param {import("./Script_EditorBlockout.mjs").EditorBlockout} editor */
-  constructor(editor) {
+  constructor(editor, { metadataOnly = false } = {}) {
     this.editor = editor;
+    this.metadataOnly = !!metadataOnly;
     // 镜头：缺省切镜（运镜直接切到落幅，§14.2）；?previzCamera=move 看照写的运镜
     this.cameraMode = editor.params?.get?.("previzCamera") === "move" ? "move" : "cut";
     this.doc = null;          // 归一化后的预演
@@ -449,9 +450,11 @@ export class BlockoutPreviz {
     // 并行下载，按表的顺序并库：同名片段表里靠前的赢（2026-10-20 起 PrevizKimodo 排第一，顶掉手 K 的同名片段；
     // 生成器 PrevizClipMeta 与各 PrevizTest 读清单也是表里靠前的赢）
     const loaded = await Promise.all(BLOCKOUT_PREVIZ_CLIP_LIBRARIES.map(async (lib) => {
+      if (this.metadataOnly && lib.name === "CollectionCare") return null;
       try {
         const v = `?v=${encodeURIComponent(lib.version)}`;
         const config = await Read(lib.base + lib.manifest + v);
+        if (this.metadataOnly) return { config, record: null };
         const row = (config.models || []).find(m => m.id === "TengxianNra02") || config.models?.[0];
         if (!row?.file) throw Error("清单里没有骨架记录");
         return { config, record: await Read(lib.base + row.file + v) };
@@ -499,7 +502,7 @@ export class BlockoutPreviz {
     if (this.opening) return Promise.resolve(this.opening);
     return this.openingLoading ||= (async () => {
       const api = await import("./Script_OpeningStoryboardAnimation.mjs");
-      const library = await api.LoadOpeningStoryboardAnimation();
+      const library = await api.LoadOpeningStoryboardAnimation({ metadataOnly: this.metadataOnly });
       await this.LoadExtraClipLibraries(api);
       this.opening = { api, library };
       this.editor.puppets.SetOpeningLibrary(this.opening);

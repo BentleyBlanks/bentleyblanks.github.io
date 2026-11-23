@@ -3,7 +3,7 @@
 // 主文件里的状态、服务、函数一律从工具箱 ctx 取（ctx.player、ctx.RenderScene()……）；f 是这一帧在步骤之间传的量。
 // 结束这一帧用 return STOP，不写裸 return;（门禁 FrameScheduleTest）。
 
-import { FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID } from "./Data_FirstLevelP012Whitebox.mjs";
+import { FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID } from "./Data_FirstLevelCampaign.mjs";
 import { CompleteP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { ContentZoneId } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { Progress } from "./Script_Menu.mjs";

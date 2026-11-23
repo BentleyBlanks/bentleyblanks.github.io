@@ -107,10 +107,13 @@ function NewPropSet(actor,record){
 }
 /** Terminal clips end on the corpse; the frozen-corpse logic lets them finish their frames. */
 export function IsOpeningTerminalClip(clip){return clip==="ShotCollapse"||OpeningClipMeta(clip)?.terminal===true;}
-export function LoadOpeningStoryboardAnimation(){
-  return pending ||= (async()=>{
+export function LoadOpeningStoryboardAnimation({ metadataOnly = false } = {}){
+  if(library&&(!library.metadataOnly||metadataOnly))return Promise.resolve(library);
+  if(pending&&(!pending.metadataOnly||metadataOnly))return pending;
+  const job=(async()=>{
     const Read=async(file)=>{const response=await fetch(C.animationBase+file+"?v="+C.version);if(!response.ok)throw Error(`Opening animation ${file}: ${response.status}`);return response.json();};
     const config=await Read("Data_OpeningStoryboardsAnimation.json");
+    if(metadataOnly)return library={config,models:new Map(),metadataOnly:true};
     const [captives]=await Promise.all([LoadMachineGunCaptivesAnimation(),LoadMeleeAnimations()]);
     const models=new Map(await Promise.all(config.models.map(async row=>[row.id,await Read(row.file)])));
     for(const [id,record] of models){
@@ -118,8 +121,10 @@ export function LoadOpeningStoryboardAnimation(){
       if(source&&JSON.stringify(source.bones)!==JSON.stringify(record.bones))throw Error(`Opening animation rig order: ${id}`);
       for(const clip of CAPTIVES_REUSED)if(source?.clips[clip]&&!record.clips[clip])record.clips[clip]=source.clips[clip];
     }
-    return library={config,models};
+    return library={config,models,metadataOnly:false};
   })();
+  job.metadataOnly=metadataOnly;
+  return pending=job;
 }
 // Clips merged in from another library (AddOpeningClipLibrary) that carry the rifle on the back instead of in the hands
 // (the white-box previz's talking / first-aid clips: Data_BlockoutPrevizClips.PREVIZ_WEAPON_SLUNG). The game's own opening
@@ -137,11 +142,14 @@ export function IsOpeningSlungClip(clip){return clip==="InterrogateCrouch"||slun
  */
 export function AddOpeningClipLibrary(config,record,{weaponSlung=[]}={}){
   if(!library)throw Error("AddOpeningClipLibrary: the opening library is not loaded");
-  const bones=JSON.stringify(record?.bones||null),added=new Set(),rigs=[];
-  for(const [id,target] of library.models){
-    if(JSON.stringify(target.bones)!==bones)continue;
-    rigs.push(id);
-    for(const [name,row] of Object.entries(record.clips||{}))if(!target.clips[name]){target.clips[name]=row;added.add(name);}
+  const added=new Set(),rigs=[];
+  if(record){
+    const bones=JSON.stringify(record?.bones||null);
+    for(const [id,target] of library.models){
+      if(JSON.stringify(target.bones)!==bones)continue;
+      rigs.push(id);
+      for(const [name,row] of Object.entries(record.clips||{}))if(!target.clips[name]){target.clips[name]=row;added.add(name);}
+    }
   }
   const clips=library.config.clips ||= {};
   for(const [name,meta] of Object.entries(config?.clips||{}))clips[name] ||= meta;

@@ -1,6 +1,7 @@
 // Encounter Play keeps game quality; only unrelated startup work is excluded.
 export const ENCOUNTER_PLAY_STARTUP = {
   weaponsOnly:false,
+  minimalCharacterRig:true,
   craterDebris:true,
   pbrSets:["Steel","WoodStock","GrenadePbr","DadaoPbr","Ground","GroundRubble","CraterScorched","Type89Armor","Type89Track",
     "HandcartWood","WoodCrate","LugouqiaoType11AmmoBox","LugouqiaoType11Body","LugouqiaoType11BodyAlt","LugouqiaoType11Fore"],
