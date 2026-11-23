@@ -70,7 +70,7 @@
         "falloff": 7.7,
         "max": 0.86,
         "skyColor": [0.223, 0.202, 0.203],
-        "groundColor": [0.158, 0.141, 0.136],
+        "groundColor": [0.22, 0.201, 0.196],
         "sunGain": 0.015,
         "desat": 0.43,
         "flatten": 0.056

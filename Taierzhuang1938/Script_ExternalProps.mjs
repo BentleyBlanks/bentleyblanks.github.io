@@ -293,7 +293,8 @@ const ASSETS = Object.freeze({
     node: "TimberShoring", category: "工事", solid: false },
   eastTrackDrapedTimberShoring: { label: "覆旧帆布的沟壁支护", url: "./Model/TanketteAdvanceEastTrack/Model_GreyTimberShoring.glb?v=2026112305",
     category: "工事", solid: false },
-  type94Tankette: { label: "九四式轻装甲车", url: "./Model/Type94Tankette/Model_Type94Tankette.glb?v=20261030CurrentWearV106-43969e24", category: "车辆", solid: false },
+  type94Tankette: { label: "九四式轻装甲车", url: "./Model/Type94Tankette/Model_Type94Tankette.glb?v=20261030CurrentWearV106-43969e24",
+    category: "车辆", solid: false, staticYawDeg: { TurretYaw: 48 } },
   eastTrackBambooStretcher: { label: "竹竿布兜担架", url: "./Model/Model_BambooStretcher.glb?v=stretcher20260927", category: "生活道具", solid: false },
   eastTrackDressingBlanket: { label: "沟底旧毯", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell",
     category: "生活道具", solid: false, staticBindPose: true, staticMorph: "Crumpled", staticTint: 0x706049 },
@@ -671,6 +672,10 @@ function PrepareAsset(id, gltf) {
   node.scale.copy(source.scale);
   // Opt-in scenery variants reuse authored geometry and leave the shared rig intact.
   if (spec.staticBindPose) StaticPropMeshes(node, spec.staticMorph);
+  for (const [name, degrees] of Object.entries(spec.staticYawDeg || {})) {
+    const part = node.getObjectByName(name);
+    if (part) part.rotation.y += THREE.MathUtils.degToRad(degrees);
+  }
   if (spec.staticTint !== undefined) {
     const color = new THREE.Color(spec.staticTint);
     const materials = new Map();

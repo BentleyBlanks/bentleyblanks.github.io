@@ -17,10 +17,16 @@ const FIGURES = [
 
 function DressPatientHead(rig) {
   const { head, neck } = rig.bones;
-  if (!head || !neck) return null;
+  const center = rig.hitboxNodes.headCenter;
+  if (!head || !neck || !center) return null;
   const towardNeck = head.worldToLocal(neck.getWorldPosition(new THREE.Vector3()));
-  return WrapLimb({ bones: { head, wrapAxis: { position: towardNeck } } }, "head", "wrapAxis",
-    { at: -.40, radiusM: .10, lengthM: .058 });
+  const wrap = WrapLimb({ bones: { head, wrapAxis: { position: towardNeck } } }, "head", "wrapAxis",
+    { at: 0, radiusM: .103, lengthM: .052 });
+  if (!wrap) return null;
+  const scale = head.getWorldScale(new THREE.Vector3()).x;
+  wrap.position.copy(head.worldToLocal(center.getWorldPosition(new THREE.Vector3())));
+  wrap.position.addScaledVector(towardNeck.normalize(), -.026 / scale);
+  return wrap;
 }
 
 export async function BuildEastTrackFigures(host, landmarks) {

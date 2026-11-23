@@ -28,18 +28,18 @@ FRAME_COUNT = 6
 # Short ascending roots connect the fire and the left source to the suspended
 # density field. Each node is x, y, z, three radii and optical mass.
 OUTLETS = (
-    (-10.6,1.4,-44,1.4,1.5,2.8,.08),
-    (-10.1,3.0,-46,2.4,1.9,4.1,.11),
-    (-8.8,4.6,-49,3.5,2.2,5.2,.08),
-    (-7,6.3,-53,4.9,2.7,5.7,.08),
-    (15.3,1.7,-39,1.8,1.4,3.5,.12),
-    (14.7,3.4,-42,2.8,2.1,4.5,.16),
-    (14,5.5,-46,4.5,2.9,6.4,.14),
-    (12.8,7.4,-50,5.7,3.4,7.7,.09),
+    (-10.6,1.4,-44,1.4,1.5,2.8,.09),
+    (-10.1,3.0,-46,2.4,1.9,4.1,.17),
+    (-8.8,4.6,-49,3.5,2.2,5.2,.17),
+    (-7,6.3,-53,4.9,2.7,5.7,.13),
+    (15.3,1.7,-39,1.8,1.4,3.5,.13),
+    (14.7,3.4,-42,2.8,2.1,4.5,.19),
+    (14,5.5,-46,4.5,2.9,6.4,.20),
+    (12.8,7.4,-50,5.7,3.4,7.7,.14),
 )
 
 
-def MeasureOpticalDepth(reference, clear=None, rendered=None):
+def MeasureOpticalDepth(reference, clear=None, rendered=None, refine=False):
     target = ReadLuminance(reference)
     width, height = GUIDE_SIZE
     u, v = np.meshgrid((np.arange(width)+.5)/width, (np.arange(height)+.5)/height)
@@ -47,21 +47,31 @@ def MeasureOpticalDepth(reference, clear=None, rendered=None):
     # remove the thin branches that cross the remaining sky.
     ridge = np.interp(u, [0,.16,.24,.33,.47,.59,.70,.83,.91,1],
         [.26,.32,.365,.370,.374,.368,.358,.371,.364,.357])
-    window = Ease(u,.145,.205) * (1-Ease(v,ridge-.029,ridge))
+    window = Ease(u,.145,.205) * (1-Ease(v,ridge-.010,ridge+.004))
     clear_luminance = ReadLuminance(clear) if clear else 119 + 14*Ease(v,.05,.39)
+    actual = ReadLuminance(rendered) if rendered else None
+    # A moved ridge can expose more sky than the older clear frame contained.
+    # The newer image is a lower bound for incident light on those rays.
+    if actual is not None:
+        near_ridge = Ease(v,.323,.356)
+        clear_luminance += near_ridge*np.maximum(actual-clear_luminance,0)
     incident = np.clip(clear_luminance, 106, 182)
     linear = lambda n: (np.maximum(n,0)/255)**2.18
     scattered = linear(48)
     transmittance = np.clip((linear(target)-scattered)/(linear(incident)-scattered), .10, 1)
-    optical = -np.log(transmittance)
-    if rendered:
-        actual = ReadLuminance(rendered)
+    optical = -np.log(transmittance)*window
+    if refine:
+        optical = np.frombuffer(GUIDE.read_bytes(),dtype=np.uint8).reshape(height,width).astype(np.float32)*(2.6/255)
+    if actual is not None:
         measured = np.clip((linear(actual)-scattered)/(linear(incident)-scattered), .10, 1)
         # Correct the residual measured in the engine's current light. Blurring
         # it before baking keeps independent scenery silhouettes out of the smoke.
         residual = gaussian_filter(np.clip(np.log(measured/transmittance),-.40,.66)*window, 1.38)
-        optical += .77*residual
-    optical = gaussian_filter(optical*window, .86)
+        # The horizon has the strongest background light and needs more
+        # attenuation than the higher authoring samples for the same display error.
+        gain = .77 + 1.33*Ease(v,.334,.356) if refine else .77
+        optical += gain*residual
+    optical = gaussian_filter(optical, .28 if refine else .86)
     GUIDE.write_bytes(np.uint8(np.rint(255*np.clip(optical/2.6,0,1))).tobytes())
 
 
@@ -132,11 +142,14 @@ if __name__ == "__main__":
     parser.add_argument("--reference", type=Path)
     parser.add_argument("--clear", type=Path)
     parser.add_argument("--rendered", type=Path)
+    parser.add_argument("--refine", action="store_true")
     args = parser.parse_args()
     if args.clear and not args.reference:
         parser.error("--clear requires --reference")
     if args.rendered and not args.clear:
         parser.error("--rendered requires --clear")
+    if args.refine and not args.rendered:
+        parser.error("--refine requires --rendered")
     if args.reference:
-        MeasureOpticalDepth(args.reference,args.clear,args.rendered)
+        MeasureOpticalDepth(args.reference,args.clear,args.rendered,args.refine)
     Bake()

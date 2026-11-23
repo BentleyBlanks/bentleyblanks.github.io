@@ -27,7 +27,7 @@ const rand = (a, b) => mix(a, b, rng());
 const roadX = (depth) => 1.96 + .63 * Math.sin(depth * .120 + .18) + Math.max(0, depth - 24) * .054;
 const eastLip = (depth) => .30 - .032 * depth + .123 * Math.sin(depth * .81)
   + .053 * Math.sin(depth * 3.8);
-const spoil = [5.02, -9.63];
+const spoil = [4.51, -8.54];
 const lift = (x, z, cx, cz, sx, sz) => Math.exp(-(((x-cx)/sx)**2 + ((z-cz)/sz)**2));
 // Shallow, broken berms on the far side of the evacuation slot.
 const fieldBanks = [
@@ -65,7 +65,7 @@ function GroundAt(x, z) {
     + .24*lift(x,z,spoil[0]-.73,spoil[1]-.61,.76,.58)
     - .39*lift(x,z,spoil[0]-.11,spoil[1]+.10,.46,.41)
     + .22*lift(x,z,17,-27,2.42,1.33) - .20*lift(x,z,-7.2,-18,1.5,1.45);
-  const farRelief = .80 * ease((d-27)/33)*(ValueNoise2(x*.068,z*.052,506)-.23);
+  const farRelief = .53 * ease((d-27)/33)*(ValueNoise2(x*.068,z*.052,506)-.23);
   const fieldBerms = fieldBanks.reduce((sum,[cx,cz,rx,rz,h]) => sum + h*lift(x,z,cx,cz,rx,rz), 0);
   return crest + bank + mounds + farRelief + fieldBerms;
 }
@@ -110,7 +110,7 @@ Line("DitchSoilFloor", "#483e34", [.75,.71,.67], .56, .46, -4, 21, (d) => eastLi
 Line("FieldPathEastRoad", "#726a61", [1.22,1.12,1.02], 1.96, .82, -4, 100, roadX, .84);
 Line("FieldPathWestTrack", "#524a42", [.85,.80,.74], .20, .24, -4, 86, (d) => roadX(d)-.71, .50);
 Line("FieldPathEastTrack", "#504941", [.87,.84,.79], .21, .24, -4, 86, (d) => roadX(d)+.69, .51);
-Line("DitchSoilFreshSpoil", "#3b3028", [.57,.51,.48], .60, .63, 8.69, 10.84, (d) => spoil[0]+.36*Math.cos(d));
+Line("DitchSoilFreshSpoil", "#3b3028", [.57,.51,.48], .60, .63, 7.60, 9.75, (d) => spoil[0]+.36*Math.cos(d));
 for (const [i,[from,to,x,halfW,strength]] of [
   [3.92,6.44,1.58,.37,.58], [5.56,8.40,4.06,.44,.62], [7.15,11.58,1.33,.39,.49],
   [9.72,14.52,4.88,.66,.45], [13.5,18.8,1.24,.70,.42],
@@ -159,7 +159,7 @@ for (const [i,[x,z,w,h,yaw]] of [
 ].entries()) {
   Prop(`FieldSplitTimber${i+1}`,"battlefieldTimberBeam",x,z,[w,h,.20],yaw,"中景/碎木");
 }
-Prop("SplitTreeAcrossField","eastTrackSplinteredElm",-6.39,-18.1,[1.12,5.28,.91],-32,"远景/断梢榆树");
+Prop("SplitTreeAcrossField","fieldApproachFieldElm",-6.39,-18.1,[1.64,5.75,.83],-47,"远景/断梢榆树");
 
 for (const [index,[x,z,h,w,yaw]] of [
   [-8.10,-22.5,5.25,1.86,-9],[-8.7,-35.1,4.8,2.05,54],[-13,-23.3,3.95,2.29,15],
@@ -214,8 +214,8 @@ for (let i=0; i<58; i++) {
   Prop(`FreshSpoil${i+1}`,"fieldApproachSoilClod",x,z,[s,s*.49,s*.72],rand(-180,180),"地表/新翻土",
     carved(x,z)-s*.12);
 }
-for (const [i,[x,z,rx,rz,h]] of [[-93,-204,56,27,2.9],[-26,-246,74,55,3.7],
-  [102,-240,68,53,3.8],[192,-315,102,68,5.2]].entries()) {
+for (const [i,[x,z,rx,rz,h]] of [[-93,-204,56,27,1.16],[-26,-246,74,55,1.63],
+  [102,-240,68,53,1.34],[192,-315,102,68,1.71]].entries()) {
   objects.push({ id:`HorizonRidge${i+1}`, asset:"Backdrop/Hill", pos:[x,null,z], layer:"backdrop",
     group:"远景/低地平线", params:{ rx,rz,h,color:"#5c5552",topColor:"#777371" } });
 }
@@ -247,7 +247,7 @@ const smokeColumns = [
 const fogVolumes = [
   {shape:"sphere",position:[3.56,.45,-12.75],size:[6.4,.72,7.7],density:.024,albedo:"#c4bcb6",falloff:1.68},
   {shape:"sphere",position:[2.19,.69,-21.8],size:[6.5,1.26,9.8],density:.039,albedo:"#bdb6b3",falloff:1.42},
-  {shape:"sphere",position:[-14.3,1.64,-54.8],size:[38.1,3.26,30.9],density:.030,albedo:"#b9b5b4",falloff:1.68},
+  {shape:"sphere",position:[-14.3,1.64,-54.8],size:[38.1,3.26,30.9],density:.036,albedo:"#b6b2b1",falloff:1.68},
   {shape:"sphere",position:[19.4,1.39,-49.7],size:[28.4,2.29,22.2],density:.023,albedo:"#bcb2ad",falloff:1.69},
 ];
 const scene = {
@@ -257,7 +257,7 @@ const scene = {
   bounds, spawn:{x:0,z:0,yawDeg:0}, camera, terrain, trenches, smokeColumns, fogVolumes, paint, objects,
   look:{heightTint:{lo:-1.8,hi:1.3},proceduralDressing:false,groundPaintCellM:.22,terrainLayers:"EastTrack"},
   backdrop:{far:690,ground:{color:"#645c55",y:.13,radiusM:540,blendM:23},
-    haze:{color:"#5f5a57",fromM:21,toM:160,max:.76},siteBounds:bounds,paint:[]},
+    haze:{color:"#686264",fromM:21,toM:160,max:.85},siteBounds:bounds,paint:[]},
   ways:{roads:[],trenches:[]},
   markers:[
     figure("WoundedPosition","沟底伤员位",...bedPosition,bedYaw,bedGround+.24,
@@ -289,7 +289,7 @@ const preset = {
     Atmosphere:{enabled:true,params:{mie:6.4,mieG:.71,rayleigh:.32,ozone:.5,groundAlbedo:.16,sunIrradiance:2.5,
       skyTint:[.61,.584,.602],skyFloor:[.355,.335,.343],artGlow:0,aerialBlend:.17,aerialGain:.15}},
     Fog:{enabled:true,params:{density:.0204,falloff:7.7,max:.86,skyColor:[.223,.202,.203],
-      groundColor:[.158,.141,.136],sunGain:.015,desat:.43,flatten:.056}},
+      groundColor:[.220,.201,.196],sunGain:.015,desat:.43,flatten:.056}},
     Grade:{enabled:true,params:{profile:"firstLevelBattleDay",exposure:1.12,saturation:.60,contrast:.95,
       contrastCurve:"soft",gain:[1.02,1,.98],lift:[.009,.008,.008],shadowTint:[.98,1,1.035],
       highlightTint:[1.036,1,.97],splitShadow:.24,splitHighlight:.17,bloom:.06,
