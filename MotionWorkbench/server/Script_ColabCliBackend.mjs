@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER_SCRIPT = path.resolve(__dirname, "..", "cloud", "colab_gemx_runner.py");
+const H3_RUNNER_SCRIPT = path.resolve(__dirname, "..", "cloud", "colab_minimax_h3_runner.py");
 const DEFAULT_COLAB_CLI = path.join(os.homedir(), ".local", "bin", "colab.exe");
 
 const idleStopTimers = new Map();
@@ -165,19 +166,102 @@ export async function checkColabCliHealth(config) {
   }
 }
 
-export function launchColabInteractiveLogin(config) {
+let pendingAuthProc = null;
+let pendingAuthUrl = null;
+
+export function startColabOAuthFlow(config) {
   const exe = resolveColabExe(config);
   if (!exe) throw new Error("未找到 colab.exe，请先执行 uv tool install google-colab-cli");
-  if (process.platform === "win32") {
-    const psCmd = `& '${exe.replace(/'/g, "''")}' usage; Write-Host ''; Write-Host '登录完成后关闭此窗口，回到工作台点击「刷新」即可。' -ForegroundColor Green; Pause`;
-    spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process powershell -ArgumentList '-NoProfile','-Command','${psCmd.replace(/'/g, "''")}'`], {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    }).unref();
-    return { started: true, exe };
+
+  if (pendingAuthProc) {
+    try { pendingAuthProc.kill(); } catch {}
+    pendingAuthProc = null;
+    pendingAuthUrl = null;
   }
-  throw new Error("请在终端手动运行 colab usage 完成 OAuth 登录");
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(exe, ["usage"], {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1", RICH_DISABLE: "1", BROWSER: "echo" },
+    });
+    pendingAuthProc = proc;
+
+    let settled = false;
+    let buf = "";
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("等待 Colab 授权链接超时，请重试"));
+      }
+    }, 15000);
+
+    const onData = (chunk) => {
+      buf += chunk.toString("utf8");
+      const m = /(https:\/\/accounts\.google\.com\/o\/oauth2\/auth\S+)/.exec(buf);
+      if (m && !settled) {
+        settled = true;
+        clearTimeout(timer);
+        pendingAuthUrl = m[1].trim();
+        resolve({ alreadyLoggedIn: false, authUrl: pendingAuthUrl });
+      }
+    };
+
+    proc.stdout.on("data", onData);
+    proc.stderr.on("data", onData);
+    proc.on("error", (err) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        pendingAuthProc = null;
+        reject(err);
+      }
+    });
+    proc.on("close", (code) => {
+      if (pendingAuthProc === proc) pendingAuthProc = null;
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        if (code === 0) {
+          resolve({ alreadyLoggedIn: true, output: buf.trim() });
+        } else {
+          reject(new Error(buf.trim().slice(0, 200) || `colab usage 退出 (${code})`));
+        }
+      }
+    });
+  });
+}
+
+export function submitColabAuthCode(code) {
+  const clean = String(code || "").trim();
+  if (!clean) throw new Error("请粘贴 Google 页面显示的授权码");
+  if (!pendingAuthProc || pendingAuthProc.killed) {
+    throw new Error("授权会话已过期，请重新点击「登录 Colab」获取新链接");
+  }
+  const proc = pendingAuthProc;
+  return new Promise((resolve, reject) => {
+    let out = "";
+    const timer = setTimeout(() => {
+      reject(new Error("提交授权码超时，请重试"));
+    }, 25000);
+    const onData = (chunk) => {
+      out += chunk.toString("utf8");
+    };
+    proc.stdout.on("data", onData);
+    proc.stderr.on("data", onData);
+    proc.once("close", (exitCode) => {
+      clearTimeout(timer);
+      if (pendingAuthProc === proc) pendingAuthProc = null;
+      pendingAuthUrl = null;
+      if (exitCode === 0) {
+        resolve({ ok: true, output: out.trim() });
+      } else {
+        reject(new Error(out.trim().slice(0, 220) || `授权失败 (code=${exitCode})`));
+      }
+    });
+    proc.stdin.write(`${clean}\n`);
+    proc.stdin.end();
+  });
 }
 
 function clearIdleStopTimer(sessionName) {
@@ -217,7 +301,7 @@ export async function stopWorkbenchColabSessions(config) {
   const exe = resolveColabExe(config);
   if (!exe) return { stopped: [] };
   const stopped = [];
-  const targets = new Set([...activeSessionNames, "mw_l4", "mw_a100"]);
+  const targets = new Set([...activeSessionNames, "mw_l4", "mw_a100", "mw_h3_g4"]);
   for (const name of targets) {
     clearIdleStopTimer(name);
     try {
@@ -391,5 +475,114 @@ export async function runColabMocapJob({
     return { files, summary, sessionName, gpuVariant };
   } finally {
     scheduleIdleStop(exe, sessionName, config.colabAutoStopSec ?? 180, onLog);
+  }
+}
+
+export async function runColabMiniMaxH3Job({
+  config,
+  prompt,
+  duration = 6,
+  resolution = "720p",
+  startImagePath = null,
+  endImagePath = null,
+  outMp4Path,
+  onProgress,
+  onTelemetry,
+  onLog,
+}) {
+  const exe = resolveColabExe(config);
+  if (!exe) throw new Error("未找到 colab.exe，请先安装 google-colab-cli");
+
+  const sessionName = "mw_h3_g4";
+  clearIdleStopTimer(sessionName);
+  await fsp.mkdir(path.dirname(outMp4Path), { recursive: true });
+
+  onProgress?.("检查 Colab 96G G4 会话（mw_h3_g4）…");
+  let hasWarm = false;
+  try {
+    const sessOut = await runColabCmd(exe, ["sessions"], { timeoutMs: 12000 });
+    hasWarm = parseSessionsOutput(sessOut).some((s) => s.name === sessionName);
+  } catch (err) {
+    throw new Error(`Colab CLI 未授权，请先在「系统与资源」完成 Colab 登录：${err.message}`);
+  }
+
+  if (hasWarm) {
+    onLog?.("[MiniMax-H3] 复用热机 Colab 96G G4 会话：mw_h3_g4");
+  } else {
+    onProgress?.("申请 Colab 96G G4 GPU 运行时…");
+    onLog?.("[MiniMax-H3] colab new --gpu G4 -s mw_h3_g4");
+    await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 120000 });
+    activeSessionNames.add(sessionName);
+  }
+
+  try {
+    const remoteStart = "/content/mw_h3_start.png";
+    const remoteEnd = "/content/mw_h3_end.png";
+    const envs = [
+      `H3_PROMPT=${String(prompt || "").replace(/\r?\n/g, " ")}`,
+      `H3_DURATION=${duration}`,
+      `H3_RESOLUTION=${resolution}`,
+      "H3_OUTPUT_MP4=/content/mw_h3_out.mp4",
+      "H3_UPSCALE=1",
+    ];
+    if (startImagePath && fs.existsSync(startImagePath)) {
+      onProgress?.("上传首帧分镜图到 G4 运行时…");
+      await runColabCmd(exe, ["upload", startImagePath, remoteStart, "-s", sessionName], { timeoutMs: 120000 });
+      envs.push(`H3_START_IMG=${remoteStart}`);
+    }
+    if (endImagePath && fs.existsSync(endImagePath)) {
+      onProgress?.("上传尾帧分镜图到 G4 运行时…");
+      await runColabCmd(exe, ["upload", endImagePath, remoteEnd, "-s", sessionName], { timeoutMs: 120000 });
+      envs.push(`H3_END_IMG=${remoteEnd}`);
+    }
+
+    onProgress?.("启动 ComfyUI + MiniMax-H3 (44GB) 推理…");
+    await new Promise((resolve, reject) => {
+      const args = ["exec", "-s", sessionName, "-f", H3_RUNNER_SCRIPT, "--timeout", "0"];
+      for (const kv of envs) args.push("--env", kv);
+      const proc = spawn(exe, args, {
+        windowsHide: true,
+        env: { ...process.env, NO_COLOR: "1", RICH_DISABLE: "1" },
+      });
+
+      let buf = "";
+      const handleLine = (line) => {
+        const t = line.trim();
+        if (!t) return;
+        if (t.startsWith("[PROGRESS] ")) {
+          const rest = t.slice(11);
+          const sep = rest.indexOf("|");
+          if (sep > 0) onProgress?.(rest.slice(sep + 1).trim());
+          return;
+        }
+        if (t.startsWith("[TELEMETRY] ")) {
+          try { onTelemetry?.(JSON.parse(t.slice(12))); } catch {}
+          return;
+        }
+        onLog?.(t);
+      };
+      const feed = (chunk) => {
+        buf += chunk.toString("utf8");
+        const parts = buf.split(/\r?\n/);
+        buf = parts.pop() || "";
+        for (const p of parts) handleLine(p);
+      };
+      proc.stdout.on("data", feed);
+      proc.stderr.on("data", feed);
+      proc.on("error", reject);
+      proc.on("close", (code) => {
+        if (buf.trim()) handleLine(buf);
+        if (code === 0) resolve();
+        else reject(new Error(`MiniMax-H3 (G4) 执行退出异常 (code=${code})`));
+      });
+    });
+
+    onProgress?.("回传 MiniMax-H3 视频到本地…");
+    await runColabCmd(exe, ["download", "/content/mw_h3_out.mp4", outMp4Path, "-s", sessionName], { timeoutMs: 180000 });
+    const st = await fsp.stat(outMp4Path);
+    return { localPath: outMp4Path, sizeBytes: st.size };
+  } finally {
+    // Release G4 immediately (or after idle window) so zero compute units are wasted
+    scheduleIdleStop(exe, sessionName, config.colabAutoStopSec ?? 0, onLog);
   }
 }

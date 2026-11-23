@@ -1203,60 +1203,102 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 .mwLogBody { overflow: hidden; }
 .mwLogFull { flex: 1; min-height: 0; }
 
-/* 状态胶囊 */
-.mwStatusPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  font: 700 10px var(--ui-mono);
-  letter-spacing: 0.06em;
-  border: 1px solid var(--rule-2);
-  color: var(--muted);
-  background: #141611;
-}
-.mwStatusPill.ok { color: #9be0ac; border-color: #78c88c55; background: #112115; }
-.mwStatusPill.warn { color: var(--gold-text); border-color: #edca8355; background: #231d10; }
-.mwStatusPill.blue { color: #b8d6f5; border-color: #9dc0e455; background: #121c25; }
-.mwStatusPill.dim { color: var(--dim); border-color: var(--rule-2); background: #0e0f0c; }
-
-/* 2×2 KPI 核心摘要卡 */
-.mwKpiGrid {
+/* 极简三栏核心指标带（克制无杂色） */
+.mwMetricStrip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.mwKpiCard {
-  padding: 11px 12px;
-  background: linear-gradient(180deg, #141611 0%, #0d0e0b 100%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid var(--edge);
-  border-top: 2px solid var(--edge);
+  background: #0d0f0b;
+}
+.mwMetricCell {
+  padding: 12px 13px;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  border-right: 1px solid var(--rule-2);
 }
-.mwKpiCard.kpiGold { border-top-color: var(--gold); }
-.mwKpiCard.kpiBlue { border-top-color: var(--good); }
-.mwKpiCard.kpiClickable { cursor: pointer; }
-.mwKpiCard.kpiClickable:hover { border-color: var(--gold-text); }
-.mwKpiTop {
+.mwMetricCell:last-child { border-right: 0; }
+.mwMetricCell.kpiClickable { cursor: pointer; }
+.mwMetricCell.kpiClickable:hover { background: #131510; }
+.mwMetricK { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
+.mwMetricV { font-size: 20px; font-weight: 700; line-height: 1.2; color: var(--text-hi); }
+.mwMetricV.mwMetricVSm { font-size: 15px; padding-top: 4px; }
+.mwMetricSub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mwTinyDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: #5c5c52;
+}
+.mwTinyDot.ok { background: #8fb398; }
+.mwTinyDot.warn { background: var(--gold); }
+
+/* 即梦双账号切换 */
+.mwAccSwitchRow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mwAccBtn {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--field);
+  border: 1px solid var(--rule-2);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
 }
-.mwKpiLbl { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
-.mwKpiVal { font-size: 24px; font-weight: 700; line-height: 1.15; color: var(--text-hi); letter-spacing: 0.02em; }
-.mwKpiVal.mwKpiValSm { font-size: 16px; padding-top: 3px; }
-.mwKpiSub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mwTrackThin { height: 4px; margin-top: 3px; }
-.mwTrackMd { height: 7px; }
+.mwAccBtn:hover { border-color: var(--edge); color: var(--text-hi); }
+.mwAccBtn.active {
+  border-color: var(--gold);
+  background: #1c1910;
+  color: var(--gold-hi);
+}
+.mwAccBtn .mwMono { font-size: 10.5px; opacity: 0.7; }
+
+/* Colab 内置 OAuth 授权码输入区 */
+.mwAuthCodeBox {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+  background: #13120c;
+  border: 1px solid #edca8355;
+}
+.mwAuthHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.45;
+}
+.mwAuthRow { display: flex; gap: 6px; }
+.mwAuthRow input { flex: 1; min-width: 0; }
+
+/* 紧凑三列水平资源条 */
+.mwMiniMeters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mwMiniMeters.dimmed { opacity: 0.45; }
+.mwMiniMeter { display: flex; flex-direction: column; gap: 4px; }
+.mwMiniHead { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+.mwMiniHead .mwMono { color: var(--text); }
+.mwTrackThin { height: 4px; }
 
 /* 仪表盘分组盒 */
 .mwDashBox {
   border: 1px solid var(--edge);
-  background: #090a08;
-  padding: 11px 12px;
+  background: #0a0b09;
+  padding: 11px 13px;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -1271,53 +1313,44 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: var(--gold-text);
+  color: var(--text);
 }
 .mwMuted { color: var(--muted); font-weight: 400; }
 
-/* 4 路分镜引擎行 */
-.mwProvList { display: flex; flex-direction: column; gap: 5px; }
+/* 4 路分镜引擎极简列表 */
+.mwProvList { display: flex; flex-direction: column; }
 .mwProvRow {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
-  background: #10120e;
-  border: 1px solid var(--rule-2);
-  border-left: 3px solid transparent;
+  gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--rule-2);
 }
-.mwProvRow.active {
-  border-color: #edca8366;
-  border-left-color: var(--gold);
-  background: #1a1811;
-}
-.mwProvIdx { font: 700 11px var(--ui-mono); color: var(--dim); }
-.mwProvRow.active .mwProvIdx { color: var(--gold); }
+.mwProvRow:last-child { border-bottom: 0; }
+.mwProvRow.active { background: #16150f; }
 .mwProvInfo { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.mwProvTitle { font-size: 12px; font-weight: 600; color: var(--text-hi); }
-.mwProvDesc { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mwProvTitle { font-size: 12.5px; font-weight: 600; color: var(--text-hi); }
+.mwProvRow.active .mwProvTitle { color: var(--gold-hi); }
+.mwProvDesc { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mwProvActiveTag {
-  padding: 2px 7px;
-  font: 700 10.5px var(--ui-mono);
-  color: var(--gold-hi);
-  border: 1px solid var(--gold);
-  background: #272011;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--gold-text);
+  padding: 0 4px;
 }
 
 .mwInlineNotice {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 9px;
-  background: #1c180f;
-  border: 1px solid #edca8344;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #13120c;
+  border: 1px solid var(--rule-2);
   font-size: 11.5px;
-  color: var(--gold-text);
+  color: var(--text);
 }
-.mwMeterStack { display: flex; flex-direction: column; gap: 8px; }
-.mwMeterStack.dimmed { opacity: 0.45; }
 .mwDashActions { display: flex; gap: 8px; }
 
 .mwCfgGrid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

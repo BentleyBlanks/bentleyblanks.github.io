@@ -238,105 +238,69 @@ function renderSystemAggregated() {
     label.textContent = "系统";
   }
 
-  // Drawer header badge
-  const activeProv = getProviderInfo();
-  const headBadge = $("#sysHeadBadge");
-  if (runningRun) {
-    headBadge.textContent = `GPU 提骨 ${runningRun.progress ?? 0}%`;
-    headBadge.className = "mwStatusPill warn";
-  } else if (d?.loggedIn) {
-    headBadge.textContent = `${activeProv.shortName} · ${d.availableCredits ?? "--"} 积分`;
-    headBadge.className = "mwStatusPill ok";
-  } else {
-    headBadge.textContent = "需检查连接";
-    headBadge.className = "mwStatusPill warn";
-  }
-
-  // KPI 1: Dreamina credits
-  const kpiDPill = $("#kpiDreaminaPill");
-  kpiDPill.textContent = d?.loggedIn ? "已连接" : "未登录";
-  kpiDPill.className = `mwStatusPill ${d?.loggedIn ? "ok" : "warn"}`;
+  // Top 3-column metric strip
+  $("#dotDreamina").className = `mwTinyDot ${d?.loggedIn ? "ok" : "warn"}`;
   $("#sysDreaminaCredits").textContent =
     d?.availableCredits != null ? Number(d.availableCredits).toLocaleString("en-US") : "—";
-  $("#sysDreaminaUser").textContent = d?.displayName ? `账号：${d.displayName}` : "未检出登录态";
+  $("#sysDreaminaUser").textContent = d?.loggedIn
+    ? `${d.displayName || "已登录"} (${d.profile || "default"})`
+    : `未登录 (${d?.profile || "default"})`;
 
-  // KPI 2: Active storyboard image provider
-  const kpiPPill = $("#kpiProvPill");
-  kpiPPill.textContent = activeProv.statusText;
-  kpiPPill.className = `mwStatusPill ${activeProv.ready ? "ok" : "warn"}`;
-  $("#kpiProvName").textContent = activeProv.shortName;
-  $("#kpiProvSub").textContent = activeProv.modelLabel || activeProv.engine;
+  // Dreamina dual-account buttons
+  const curProf = appState.config?.dreaminaProfile || d?.profile || "default";
+  $$("#dreaminaProfileRow .mwAccBtn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.dprof === curProf);
+  });
 
-  // KPI 3: Cloud GPU (Colab CLI or Modal Serverless)
+  // Cloud GPU metric
   const tmRun = runningRun || run;
   const tm = tmRun?.telemetry || {};
   const isSleep = !tmRun || tmRun.containerState === "scaled_to_zero" || tmRun.status === "succeeded";
   const isColab = (c?.backend || appState.config?.mocapBackend || "colab_cli") === "colab_cli";
-  const kpiCPill = $("#kpiCloudPill");
+  $("#dotCloud").className = `mwTinyDot ${c?.online ? "ok" : "warn"}`;
   if (isColab) {
     if (c?.online) {
-      kpiCPill.textContent = c.activeJobs > 0 ? `运行 ${c.activeJobs}` : "Colab 就绪";
-      kpiCPill.className = "mwStatusPill ok";
-      $("#kpiGpuState").textContent = c.balance != null ? `${c.balance} 单元` : c.activeJobs > 0 ? "GPU 运行中" : "0 卡待命";
-      $("#kpiGpuSub").textContent = c.hourlyRate != null ? `Colab CLI ${c.version || ""} · ${c.hourlyRate}/时` : `Colab CLI ${c.version || ""} · 自动停机`;
+      $("#kpiGpuState").textContent = c.balance != null ? `${c.balance} 单元` : c.activeJobs > 0 ? "运行中" : "已就绪";
+      $("#kpiGpuSub").textContent = c.hourlyRate != null ? `Colab · ${c.hourlyRate}/时` : `Colab v${c.version || "0.8"}`;
     } else if (c?.installed) {
-      kpiCPill.textContent = "待登录";
-      kpiCPill.className = "mwStatusPill warn";
       $("#kpiGpuState").textContent = "Colab CLI";
-      $("#kpiGpuSub").textContent = `v${c.version || "0.8"} 已装 · 点下方登录`;
+      $("#kpiGpuSub").textContent = "待授权登录";
     } else {
-      kpiCPill.textContent = "未安装";
-      kpiCPill.className = "mwStatusPill warn";
-      $("#kpiGpuState").textContent = "未检出";
-      $("#kpiGpuSub").textContent = "uv tool install google-colab-cli";
+      $("#kpiGpuState").textContent = "未安装";
+      $("#kpiGpuSub").textContent = "google-colab-cli";
     }
   } else if (c?.online) {
-    kpiCPill.textContent = c.activeJobs > 0 ? `运行 ${c.activeJobs}` : "在线";
-    kpiCPill.className = "mwStatusPill ok";
-    $("#kpiGpuState").textContent = c.activeJobs > 0 ? `运行中 ${tm.gpuUtilPct ?? 0}%` : "0 卡休眠";
-    $("#kpiGpuSub").textContent = `${tm.gpuName || "NVIDIA L4"} · ${c.latencyMs ?? "--"}ms`;
-  } else if (c?.configured) {
-    kpiCPill.textContent = "离线";
-    kpiCPill.className = "mwStatusPill warn";
-    $("#kpiGpuState").textContent = "网关不可达";
-    $("#kpiGpuSub").textContent = "点击检查 Modal URL";
+    $("#kpiGpuState").textContent = c.activeJobs > 0 ? `${tm.gpuUtilPct ?? 0}%` : "0 卡休眠";
+    $("#kpiGpuSub").textContent = `Modal · ${c.latencyMs ?? "--"}ms`;
   } else {
-    kpiCPill.textContent = "未配置";
-    kpiCPill.className = "mwStatusPill warn";
-    $("#kpiGpuState").textContent = "0 卡休眠";
-    $("#kpiGpuSub").textContent = "点击绑定 Modal 网关 →";
+    $("#kpiGpuState").textContent = c?.configured ? "离线" : "未配置";
+    $("#kpiGpuSub").textContent = "Modal 网关";
   }
 
-  // KPI 4: Local host RAM
+  // Local host RAM
   if (appState.host) {
-    $("#sysHostName").textContent = appState.host.hostname;
-    const freeGb = appState.host.ramFreeGb;
-    const totGb = appState.host.ramTotalGb || 1;
-    const usedPct = Math.min(100, Math.max(0, ((totGb - freeGb) / totGb) * 100));
-    $("#sysHostRam").textContent = `${freeGb} / ${totGb} GB`;
-    $("#sysHostRamBar").style.width = `${usedPct.toFixed(0)}%`;
+    $("#sysHostName").textContent = `${appState.host.hostname} · 共 ${appState.host.ramTotalGb}G`;
+    $("#sysHostRam").textContent = `${appState.host.ramFreeGb} GB`;
   }
 
-  // 4-provider readiness matrix inside drawer
+  // 4-provider minimal list
   const provList = $("#sysProvList");
   if (provList) {
     const activeId = activeImageProviderId();
     provList.innerHTML = appState.imageProviders
       .map((p) => {
         const isAct = p.id === activeId;
-        const pillCls = p.ready ? "ok" : "dim";
         return `
           <div class="mwProvRow ${isAct ? "active" : ""}">
-            <span class="mwProvIdx">${escapeHtml(p.code)}</span>
+            <i class="mwTinyDot ${p.ready ? "ok" : ""}"></i>
             <div class="mwProvInfo">
               <div class="mwProvTitle">${escapeHtml(p.name)}</div>
-              <div class="mwProvDesc">${escapeHtml(p.detail || p.modelLabel || "")}</div>
+              <div class="mwProvDesc">${escapeHtml(p.modelLabel || "")} · ${escapeHtml(p.statusText)}</div>
             </div>
-            <span class="mwStatusPill ${pillCls}">${escapeHtml(p.statusText)}</span>
             ${
               isAct
-                ? `<span class="mwProvActiveTag">当前</span>`
-                : `<button class="mwBtn mwSm" data-pick-provider="${p.id}" type="button">切换</button>`
+                ? `<span class="mwProvActiveTag">使用中</span>`
+                : `<button class="mwBtn mwSm" data-pick-provider="${p.id}" type="button">选用</button>`
             }
           </div>
         `;
@@ -350,33 +314,35 @@ function renderSystemAggregated() {
   // Cloud GPU telemetry panel
   $("#gGpuName").textContent = isSleep
     ? `${isColab ? "Colab CLI" : tm.gpuName || "NVIDIA L4"} · 0 卡休眠`
-    : tm.gpuName || "NVIDIA L4 · 冷启中";
+    : tm.gpuName || "NVIDIA GPU · 运行中";
   $("#gGpuUtil").textContent = `${tm.gpuUtilPct ?? 0}% · ${tm.gpuTempC ?? "--"}°C`;
   const needAction = isColab ? !c?.online : !c?.configured;
   $("#sysGpuUnconfiguredNote").classList.toggle("hidden", !needAction);
   if (needAction) {
     $("#sysGpuNoticeText").textContent = isColab
-      ? c?.message || "Colab CLI 已安装，点击右侧完成首次 Google 授权"
-      : "未绑定 Modal 无服务器网关，当前 0 卡零计费";
+      ? "首次使用需完成一次 Google 授权"
+      : "未绑定 Modal 网关，当前 0 卡零计费";
     $("#btnColabLogin").classList.toggle("hidden", !isColab || !c?.installed);
     $("#btnJumpModalCfg").classList.toggle("hidden", isColab);
+  } else {
+    $("#colabAuthBox").classList.add("hidden");
   }
   $("#btnColabStopGpu").classList.toggle("hidden", !isColab || !(c?.activeJobs > 0));
   $("#sysGpuMeters").classList.toggle("dimmed", isSleep && needAction);
 
   const vramU = tm.gpuVramUsedGb ?? 0;
   const vramT = tm.gpuVramTotalGb || 24;
-  $("#gVram").textContent = `${vramU} / ${vramT} GB`;
+  $("#gVram").textContent = `${vramU}/${vramT}G`;
   $("#gVramBar").style.width = `${Math.min(100, (vramU / vramT) * 100)}%`;
 
   const ramU = tm.ramUsedGb ?? 0;
   const ramT = tm.ramTotalGb || 53;
-  $("#gRam").textContent = `${ramU} / ${ramT} GB`;
+  $("#gRam").textContent = `${ramU}/${ramT}G`;
   $("#gRamBar").style.width = `${Math.min(100, (ramU / ramT) * 100)}%`;
 
   const dU = tm.diskUsedGb ?? 0;
   const dT = tm.diskTotalGb || 235;
-  $("#gDisk").textContent = `${dU} / ${dT} GB`;
+  $("#gDisk").textContent = `${dU}/${dT}G`;
   $("#gDiskBar").style.width = `${Math.min(100, (dU / dT) * 100)}%`;
 
   // Unified logs (recent storyboard provider logs + cloud mocap logs)
@@ -1194,6 +1160,18 @@ async function triggerSeedanceFromStoryboard() {
     const model = task.stage3?.modelPreset || "seedance_2.5_flash";
     const resolution = task.storyboard?.qualityPreset || "720p";
     const duration = task.durationSec || 10;
+
+    if (model === "minimax_h3_colab") {
+      toast("已提交至 Colab 96G G4 运行 MiniMax-H3（0 积分）…");
+      const res = await api(`/api/tasks/${task.id}/stage3/run`, {
+        method: "POST",
+        body: JSON.stringify({ model, resolution, duration, ratio: "16:9" }),
+      });
+      replaceTask(res.task);
+      gotoStage(3);
+      return;
+    }
+
     toast("查询 Seedance 报价…");
     const q = await api(`/api/tasks/${task.id}/stage3/quote`, {
       method: "POST",
@@ -1560,12 +1538,70 @@ $("#btnOpenWorkspace").onclick = async () => {
   await api("/api/open-folder", { method: "POST", body: JSON.stringify({ path: target }) });
 };
 
-$("#btnColabLogin").onclick = async () => {
+$$("#dreaminaProfileRow .mwAccBtn").forEach((b) => {
+  b.onclick = async () => {
+    try {
+      toast(`切换即梦账号至 ${b.dataset.dprof}…`);
+      const res = await api("/api/dreamina/profile", {
+        method: "POST",
+        body: JSON.stringify({ profile: b.dataset.dprof }),
+      });
+      appState.config = res.config;
+      appState.dreamina = res.dreamina;
+      appState.imageProviders = res.imageProviders || appState.imageProviders;
+      renderAll();
+      toast(res.dreamina?.loggedIn ? `已切换：${res.dreamina.displayName}（${res.dreamina.availableCredits} 积分）` : `已切至 ${b.dataset.dprof}（未登录，点右侧登录）`);
+    } catch (err) {
+      toast(err.message, 4500);
+    }
+  };
+});
+$("#btnDreaminaLogin").onclick = async () => {
   try {
-    await api("/api/cloud/colab/login", { method: "POST", body: "{}" });
-    toast("已打开 Colab 授权窗口，浏览器确认后点右上角「刷新」", 5000);
+    const profile = appState.config?.dreaminaProfile || "default";
+    await api("/api/dreamina/login", { method: "POST", body: JSON.stringify({ profile }) });
+    toast(`已为 ${profile} 打开即梦登录页，扫码完成后点右上角「刷新」`, 5000);
   } catch (err) {
     toast(err.message, 4500);
+  }
+};
+$("#btnColabLogin").onclick = async () => {
+  try {
+    toast("正在向 Colab CLI 获取 Google 授权链接…");
+    const res = await api("/api/cloud/colab/login", { method: "POST", body: "{}" });
+    if (res.alreadyLoggedIn) {
+      appState.cloud = res.cloud;
+      renderAll();
+      toast("Colab CLI 已处于登录状态");
+      return;
+    }
+    if (res.authUrl) {
+      $("#colabAuthLink").href = res.authUrl;
+      $("#colabAuthBox").classList.remove("hidden");
+      $("#inputColabAuthCode").value = "";
+      $("#inputColabAuthCode").focus();
+      window.open(res.authUrl, "_blank", "noopener");
+      toast("已打开 Google 授权页，同意后把授权码贴回此处", 5000);
+    }
+  } catch (err) {
+    toast(err.message, 5000);
+  }
+};
+$("#btnSubmitColabCode").onclick = async () => {
+  const code = $("#inputColabAuthCode").value.trim();
+  if (!code) return toast("请先粘贴 Google 返回的授权码");
+  try {
+    toast("正在提交授权码并保存凭据…");
+    const res = await api("/api/cloud/colab/auth-code", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    appState.cloud = res.cloud;
+    $("#colabAuthBox").classList.add("hidden");
+    renderAll();
+    toast("Colab Pro+ 授权成功！");
+  } catch (err) {
+    toast(err.message, 5000);
   }
 };
 $("#btnColabStopGpu").onclick = async () => {

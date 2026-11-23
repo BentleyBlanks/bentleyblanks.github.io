@@ -1,15 +1,18 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const DEFAULT_CLI_PATH = process.env.DREAMINA_CLI_PATH || "C:\\Users\\admin\\bin\\dreamina-canvas.exe";
 
-function runCli(args, { cliPath = DEFAULT_CLI_PATH, timeoutMs = 60000 } = {}) {
+function runCli(args, { cliPath = DEFAULT_CLI_PATH, profile = "default", timeoutMs = 60000 } = {}) {
+  const fullArgs = ["--format", "json"];
+  if (profile && profile !== "default") fullArgs.push("--profile", profile);
+  fullArgs.push(...args);
   return new Promise((resolve, reject) => {
     execFile(
       cliPath,
-      ["--format", "json", ...args],
+      fullArgs,
       { timeout: timeoutMs, maxBuffer: 20 * 1024 * 1024, windowsHide: true },
       (err, stdout, stderr) => {
         const text = (stdout || "").trim();
@@ -44,18 +47,19 @@ function runCli(args, { cliPath = DEFAULT_CLI_PATH, timeoutMs = 60000 } = {}) {
   });
 }
 
-export async function getDreaminaStatus(cliPath = DEFAULT_CLI_PATH) {
+export async function getDreaminaStatus(cliPath = DEFAULT_CLI_PATH, profile = "default") {
   try {
-    const status = await runCli(["auth", "status"], { cliPath, timeoutMs: 15000 });
+    const status = await runCli(["auth", "status"], { cliPath, profile, timeoutMs: 15000 });
     const loggedIn = Boolean(status.data?.loggedIn);
     let account = null;
     if (loggedIn) {
-      const acc = await runCli(["auth", "account"], { cliPath, timeoutMs: 15000 }).catch(() => null);
+      const acc = await runCli(["auth", "account"], { cliPath, profile, timeoutMs: 15000 }).catch(() => null);
       account = acc?.data || null;
     }
     return {
       installed: true,
       cliPath,
+      profile: profile || "default",
       loggedIn,
       version: status.data?.version || null,
       displayName: account?.displayName || null,
@@ -66,35 +70,56 @@ export async function getDreaminaStatus(cliPath = DEFAULT_CLI_PATH) {
     return {
       installed: false,
       cliPath,
+      profile: profile || "default",
       loggedIn: false,
       error: err.message,
     };
   }
 }
 
-export async function listDreaminaModels(type = "video", cliPath = DEFAULT_CLI_PATH) {
-  const res = await runCli(["model", "list", "--type", type], { cliPath, timeoutMs: 20000 });
+export function startDreaminaProfileLogin(cliPath = DEFAULT_CLI_PATH, profile = "default") {
+  const args = [];
+  if (profile && profile !== "default") args.push("--profile", profile);
+  args.push("auth", "login");
+  // dreamina-canvas auth login automatically opens the system browser to complete QR/account login
+  spawn(cliPath, args, { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  return { started: true, profile: profile || "default" };
+}
+
+export async function listDreaminaModels(type = "video", cliPath = DEFAULT_CLI_PATH, profile = "default") {
+  const res = await runCli(["model", "list", "--type", type], { cliPath, profile, timeoutMs: 20000 });
   return res.data?.items || [];
 }
 
 export async function ensureWorkbenchCanvas(config, saveConfig) {
   const cliPath = config.dreaminaCliPath || DEFAULT_CLI_PATH;
-  if (config.dreaminaCanvasId) {
+  const profile = config.dreaminaProfile || "default";
+  const map = { ...(config.dreaminaCanvasIds || {}) };
+  if (profile === "default" && config.dreaminaCanvasId && !map.default) {
+    map.default = config.dreaminaCanvasId;
+  }
+  if (map[profile]) {
     return {
-      projectId: config.dreaminaCanvasId,
-      webUrl: config.dreaminaCanvasUrl || `https://jimeng.jianying.com/ai-tool/ai-canvas/${config.dreaminaCanvasId}`,
+      projectId: map[profile],
+      profile,
+      webUrl: `https://jimeng.jianying.com/ai-tool/ai-canvas/${map[profile]}`,
     };
   }
-  const created = await runCli(["canvas", "create", "动作管线工作台", "--use"], { cliPath, timeoutMs: 25000 });
+  const created = await runCli(["canvas", "create", "动作管线工作台", "--use"], { cliPath, profile, timeoutMs: 25000 });
   const project = created.data.project;
-  config.dreaminaCanvasId = project.projectId;
-  config.dreaminaCanvasUrl = project.webUrl;
+  map[profile] = project.projectId;
+  config.dreaminaCanvasIds = map;
+  if (profile === "default") {
+    config.dreaminaCanvasId = project.projectId;
+    config.dreaminaCanvasUrl = project.webUrl;
+  }
   await saveConfig(config);
-  return { projectId: project.projectId, webUrl: project.webUrl };
+  return { projectId: project.projectId, profile, webUrl: project.webUrl };
 }
 
 export async function uploadLocalResource({
   cliPath = DEFAULT_CLI_PATH,
+  profile = "default",
   projectId,
   filePath,
   name = null,
@@ -107,7 +132,7 @@ export async function uploadLocalResource({
     "--import-kind", importKind,
   ];
   if (name) args.push("--name", name);
-  const res = await runCli(args, { cliPath, timeoutMs: 90000 });
+  const res = await runCli(args, { cliPath, profile, timeoutMs: 90000 });
   const resourceId =
     res.data?.resource?.resourceId ||
     res.data?.resourceId ||
@@ -119,6 +144,7 @@ export async function uploadLocalResource({
 
 export async function createAndQuoteVideoNode({
   cliPath = DEFAULT_CLI_PATH,
+  profile = "default",
   projectId,
   title,
   prompt,
@@ -162,10 +188,11 @@ export async function createAndQuoteVideoNode({
   for (const r of refs) {
     args.push("--ref", `${r.type}:${r.id}`);
   }
-  const created = await runCli(args, { cliPath, timeoutMs: 30000 });
+  const created = await runCli(args, { cliPath, profile, timeoutMs: 30000 });
   const nodeId = created.data.node.nodeId;
   const quoted = await runCli(["node", "quote", "--project-id", projectId, "--node-id", nodeId], {
     cliPath,
+    profile,
     timeoutMs: 20000,
   });
   return {
@@ -183,6 +210,7 @@ export async function createAndQuoteVideoNode({
 
 export async function createAndQuoteImageNode({
   cliPath = DEFAULT_CLI_PATH,
+  profile = "default",
   projectId,
   title,
   prompt,
@@ -192,7 +220,7 @@ export async function createAndQuoteImageNode({
 }) {
   let chosenModel = model;
   if (!chosenModel) {
-    const models = await listDreaminaModels("image", cliPath);
+    const models = await listDreaminaModels("image", cliPath, profile);
     const preferred =
       models.find((m) => /high_aes_general_v50_flash/i.test(m.model)) ||
       models.find((m) => /seedream/i.test(m.model)) ||
@@ -211,10 +239,11 @@ export async function createAndQuoteImageNode({
     "--count", "1",
     "--prompt", prompt,
   ];
-  const created = await runCli(args, { cliPath, timeoutMs: 30000 });
+  const created = await runCli(args, { cliPath, profile, timeoutMs: 30000 });
   const nodeId = created.data.node.nodeId;
   const quoted = await runCli(["node", "quote", "--project-id", projectId, "--node-id", nodeId], {
     cliPath,
+    profile,
     timeoutMs: 20000,
   });
   return {
@@ -229,6 +258,7 @@ export async function createAndQuoteImageNode({
 
 export async function runAndDownloadNode({
   cliPath = DEFAULT_CLI_PATH,
+  profile = "default",
   projectId,
   nodeId,
   creditCeiling,
@@ -238,7 +268,7 @@ export async function runAndDownloadNode({
   onProgress?.("正在批准积分上限并提交云端生成...");
   const confirm = await runCli(
     ["node", "confirm", "--project-id", projectId, "--node-id", nodeId, "--credit-ceiling", String(creditCeiling)],
-    { cliPath, timeoutMs: 25000 }
+    { cliPath, profile, timeoutMs: 25000 }
   );
   const token = confirm.data.creditConfirmationToken;
   const submitId = crypto.randomUUID();
@@ -250,14 +280,14 @@ export async function runAndDownloadNode({
       "--submit-id", submitId,
       "--credit-token", token,
     ],
-    { cliPath, timeoutMs: 30000 }
+    { cliPath, profile, timeoutMs: 30000 }
   );
   const resourceId = runRes.data?.items?.[0]?.resources?.[0]?.resourceId || null;
   onProgress?.(`已受理（submitId=${submitId.slice(0, 8)}），等待即梦云端渲染完成...`);
 
   const waited = await runCli(
     ["operation", "wait", submitId, "--project-id", projectId, "--timeout", "10m", "--interval", "5s"],
-    { cliPath, timeoutMs: 630000 }
+    { cliPath, profile, timeoutMs: 630000 }
   );
   const finalResId = waited.data?.resources?.[0]?.resourceId || resourceId;
   if (!finalResId) {
@@ -268,10 +298,11 @@ export async function runAndDownloadNode({
   onProgress?.("渲染完成，正在下载到本地工作区...");
   const dl = await runCli(
     ["resource", "download", finalResId, "--project-id", projectId, "--output", outputPath],
-    { cliPath, timeoutMs: 120000 }
+    { cliPath, profile, timeoutMs: 120000 }
   );
   const meta = await runCli(["resource", "get", finalResId, "--project-id", projectId], {
     cliPath,
+    profile,
     timeoutMs: 20000,
   }).catch(() => null);
 

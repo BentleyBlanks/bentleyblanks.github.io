@@ -268,10 +268,11 @@
           <aside class="mwInspector">
             <div class="mwInspBody">
               <div class="mwSec">
-                <div class="mwSecH">模型档位</div>
-                <div class="mwPresetRow" id="s3ModelPresets">
-                  <button class="mwPresetBtn" data-m="seedance_2.5_flash" type="button">2.5 Flash</button>
-                  <button class="mwPresetBtn" data-m="seedance_2.5" type="button">2.5 正片</button>
+                <div class="mwSecH">视频生成引擎</div>
+                <div class="mwPresetCol" id="s3ModelPresets">
+                  <button class="mwPresetBtn" data-m="seedance_2.5_flash" type="button">Seedance 2.5 Flash（快抽卡）</button>
+                  <button class="mwPresetBtn" data-m="seedance_2.5" type="button">Seedance 2.5 正片（高精）</button>
+                  <button class="mwPresetBtn" data-m="minimax_h3_colab" type="button">MiniMax-H3 完整版（Colab G4 96G）</button>
                 </div>
               </div>
               <div class="mwSec">
@@ -524,14 +525,11 @@
     </main>
   </div>
 
-  <!-- 唯一聚合的「系统与资源」指挥抽屉 -->
+  <!-- 唯一聚合的「系统与资源」指挥抽屉（克制滕县档案风格，无刺眼亮绿） -->
   <div id="sysBackdrop" class="mwBackdrop hidden"></div>
   <aside id="sysDrawer" class="mwDrawer hidden" aria-label="系统与资源">
     <div class="mwDrawerHead">
-      <div class="mwDrawerHeadLeft">
-        <span class="mwDrawerTitle">系统与资源</span>
-        <span id="sysHeadBadge" class="mwStatusPill">—</span>
-      </div>
+      <span class="mwDrawerTitle">系统与资源</span>
       <div class="mwDrawerHeadRight">
         <button id="btnRefreshSys" class="mwBtn mwSm" type="button" title="刷新所有服务探测">刷新</button>
         <button id="btnCloseSys" class="mwIconBtn" type="button" aria-label="关闭">✕</button>
@@ -544,57 +542,49 @@
       <button class="mwSysTab" data-systab="logs" type="button">运行日志</button>
     </div>
 
-    <!-- TAB 1: 总览（一眼抓重点，零表单干扰） -->
+    <!-- TAB 1: 总览（克制三栏数据带 + 干净分组列表） -->
     <div class="mwDrawerBody" data-syspanel="overview">
-      <!-- 2×2 KPI 核心摘要卡 -->
-      <div class="mwKpiGrid">
-        <div class="mwKpiCard kpiGold">
-          <div class="mwKpiTop">
-            <span class="mwKpiLbl">即梦积分</span>
-            <span id="kpiDreaminaPill" class="mwStatusPill">—</span>
-          </div>
-          <div id="sysDreaminaCredits" class="mwKpiVal mwMono mwGold">—</div>
-          <div id="sysDreaminaUser" class="mwKpiSub">—</div>
+      <!-- 顶部三栏核心指标带 -->
+      <div class="mwMetricStrip">
+        <div class="mwMetricCell">
+          <div class="mwMetricK">即梦积分</div>
+          <div id="sysDreaminaCredits" class="mwMetricV mwMono mwGold">—</div>
+          <div class="mwMetricSub"><i id="dotDreamina" class="mwTinyDot"></i><span id="sysDreaminaUser">—</span></div>
         </div>
-
-        <div class="mwKpiCard kpiBlue">
-          <div class="mwKpiTop">
-            <span class="mwKpiLbl">分镜出图源</span>
-            <span id="kpiProvPill" class="mwStatusPill">—</span>
-          </div>
-          <div id="kpiProvName" class="mwKpiVal mwKpiValSm">—</div>
-          <div id="kpiProvSub" class="mwKpiSub">—</div>
+        <div class="mwMetricCell kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU">
+          <div class="mwMetricK">云端算力</div>
+          <div id="kpiGpuState" class="mwMetricV mwMetricVSm">—</div>
+          <div class="mwMetricSub"><i id="dotCloud" class="mwTinyDot"></i><span id="kpiGpuSub">—</span></div>
         </div>
-
-        <div class="mwKpiCard kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU 网关">
-          <div class="mwKpiTop">
-            <span class="mwKpiLbl">云端提骨 GPU</span>
-            <span id="kpiCloudPill" class="mwStatusPill">—</span>
-          </div>
-          <div id="kpiGpuState" class="mwKpiVal mwKpiValSm">—</div>
-          <div id="kpiGpuSub" class="mwKpiSub">—</div>
-        </div>
-
-        <div class="mwKpiCard">
-          <div class="mwKpiTop">
-            <span class="mwKpiLbl">本机可用内存</span>
-            <span id="sysHostName" class="mwStatusPill mwMono">—</span>
-          </div>
-          <div id="sysHostRam" class="mwKpiVal mwKpiValSm mwMono">—</div>
-          <div class="mwTrack mwTrackThin"><div id="sysHostRamBar" class="mwTrackFill" style="width:0%"></div></div>
+        <div class="mwMetricCell">
+          <div class="mwMetricK">本机可用内存</div>
+          <div id="sysHostRam" class="mwMetricV mwMetricVSm mwMono">—</div>
+          <div class="mwMetricSub"><span id="sysHostName" class="mwMono">—</span></div>
         </div>
       </div>
 
-      <!-- 4 路分镜出图引擎状态矩阵 -->
+      <!-- 即梦双账号切换 -->
       <div class="mwDashBox">
         <div class="mwDashBoxHead">
-          <span>分镜图生成引擎（4 源切换）</span>
+          <span>即梦账号切换</span>
+          <button id="btnDreaminaLogin" class="mwLinkBtn" type="button">登录当前号 ↗</button>
+        </div>
+        <div class="mwAccSwitchRow" id="dreaminaProfileRow">
+          <button class="mwAccBtn active" data-dprof="default" type="button">主号 <span class="mwMono">default</span></button>
+          <button class="mwAccBtn" data-dprof="account2" type="button">副号 <span class="mwMono">account2</span></button>
+        </div>
+      </div>
+
+      <!-- 4 路分镜出图来源（极简列表） -->
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead">
+          <span>分镜出图来源</span>
           <button class="mwLinkBtn" data-jump-systab="config" type="button">参数设置 →</button>
         </div>
         <div id="sysProvList" class="mwProvList"></div>
       </div>
 
-      <!-- 云端 GPU 实时遥测监控 -->
+      <!-- 云端 GPU（Colab CLI / Modal）+ 内置 OAuth 授权码回填 -->
       <div class="mwDashBox" id="sysGpuPanel">
         <div class="mwDashBoxHead">
           <span id="gGpuName">Colab CLI · 0 卡休眠</span>
@@ -603,28 +593,42 @@
             <button id="btnColabStopGpu" class="mwBtn mwSm hidden" type="button">释放 GPU</button>
           </span>
         </div>
+
         <div id="sysGpuUnconfiguredNote" class="mwInlineNotice hidden">
-          <span id="sysGpuNoticeText">Colab CLI 已安装，完成首次 Google 授权即可直连 Pro+ 算力</span>
-          <button id="btnColabLogin" class="mwBtn mwSm mwPrimary" type="button">一键登录 Colab</button>
+          <span id="sysGpuNoticeText">首次使用需完成一次 Google 授权</span>
+          <button id="btnColabLogin" class="mwBtn mwSm mwPrimary" type="button">登录 Colab</button>
           <button id="btnJumpModalCfg" class="mwLinkBtn hidden" data-jump-systab="config" type="button">填入 URL →</button>
         </div>
-        <div class="mwMeterStack" id="sysGpuMeters">
-          <div class="mwMeterRow">
-            <div class="mwMeterHead"><span>显存 VRAM</span><span id="gVram" class="mwMono">0 / 24 GB</span></div>
-            <div class="mwTrack mwTrackMd"><div id="gVramBar" class="mwTrackFill" style="width:0%"></div></div>
+
+        <!-- Colab OAuth 内置授权码回填栏（点击登录 Colab 后展开） -->
+        <div id="colabAuthBox" class="mwAuthCodeBox hidden">
+          <div class="mwAuthHint">
+            <span>已在浏览器打开 Google 授权页，同意后复制授权码粘贴于此：</span>
+            <a id="colabAuthLink" class="mwLinkBtn" href="#" target="_blank" rel="noopener">重开授权页 ↗</a>
           </div>
-          <div class="mwMeterRow">
-            <div class="mwMeterHead"><span>系统 RAM</span><span id="gRam" class="mwMono">0 / 53 GB</span></div>
-            <div class="mwTrack mwTrackMd"><div id="gRamBar" class="mwTrackFill" style="width:0%"></div></div>
+          <div class="mwAuthRow">
+            <input id="inputColabAuthCode" type="text" placeholder="粘贴 Google 返回的授权码…">
+            <button id="btnSubmitColabCode" class="mwBtn mwPrimary mwSm" type="button">确认授权</button>
           </div>
-          <div class="mwMeterRow">
-            <div class="mwMeterHead"><span>暂存 Disk</span><span id="gDisk" class="mwMono">0 / 235 GB</span></div>
-            <div class="mwTrack mwTrackMd"><div id="gDiskBar" class="mwTrackFill" style="width:0%"></div></div>
+        </div>
+
+        <!-- 紧凑三列水平资源条 -->
+        <div class="mwMiniMeters" id="sysGpuMeters">
+          <div class="mwMiniMeter">
+            <div class="mwMiniHead"><span>VRAM</span><span id="gVram" class="mwMono">0/24G</span></div>
+            <div class="mwTrack mwTrackThin"><div id="gVramBar" class="mwTrackFill" style="width:0%"></div></div>
+          </div>
+          <div class="mwMiniMeter">
+            <div class="mwMiniHead"><span>RAM</span><span id="gRam" class="mwMono">0/53G</span></div>
+            <div class="mwTrack mwTrackThin"><div id="gRamBar" class="mwTrackFill" style="width:0%"></div></div>
+          </div>
+          <div class="mwMiniMeter">
+            <div class="mwMiniHead"><span>DISK</span><span id="gDisk" class="mwMono">0/235G</span></div>
+            <div class="mwTrack mwTrackThin"><div id="gDiskBar" class="mwTrackFill" style="width:0%"></div></div>
           </div>
         </div>
       </div>
 
-      <!-- 快捷操作 -->
       <div class="mwDashActions">
         <button id="btnOpenWorkspace" class="mwBtn mwFull" type="button">打开当前任务本地目录</button>
       </div>

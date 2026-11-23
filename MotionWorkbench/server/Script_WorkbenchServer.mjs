@@ -13,6 +13,7 @@ import {
   ensureWorkbenchCanvas,
   getDreaminaStatus,
   runAndDownloadNode,
+  startDreaminaProfileLogin,
   uploadLocalResource,
 } from "./Script_DreaminaBridge.mjs";
 import {
@@ -27,9 +28,11 @@ import {
 } from "./Script_MocapBackend.mjs";
 import {
   checkColabCliHealth,
-  launchColabInteractiveLogin,
+  runColabMiniMaxH3Job,
   runColabMocapJob,
+  startColabOAuthFlow,
   stopWorkbenchColabSessions,
+  submitColabAuthCode,
 } from "./Script_ColabCliBackend.mjs";
 import {
   launchRefinementCommand,
@@ -62,7 +65,9 @@ const DEFAULT_CONFIG = {
   modalBaseUrl: "",
   modalApiToken: "",
   dreaminaCliPath: "C:\\Users\\admin\\bin\\dreamina-canvas.exe",
+  dreaminaProfile: "default",
   dreaminaCanvasId: "338c67f0-ad69-483d-931e-b02b07dc2391",
+  dreaminaCanvasIds: { default: "338c67f0-ad69-483d-931e-b02b07dc2391" },
   dreaminaCanvasUrl: "https://jimeng.jianying.com/ai-tool/ai-canvas/338c67f0-ad69-483d-931e-b02b07dc2391",
   exportMirrorDir: "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
   refineCommandTemplate: 'codex exec "请严格按以下任务单操控 BlenderMCP 完成逐帧骨骼修缮：{{BRIEF_FILE}}"',
@@ -104,7 +109,7 @@ async function getCachedProbes(forceRefresh = false) {
   if (probeInflight && !forceRefresh) return probeInflight;
   probeInflight = (async () => {
     const [dreamina, cloud] = await Promise.all([
-      getDreaminaStatus(state.config.dreaminaCliPath),
+      getDreaminaStatus(state.config.dreaminaCliPath, state.config.dreaminaProfile || "default"),
       checkActiveCloudHealth(),
     ]);
     const imageProviders = await detectImageProviders(state.config, dreamina);
@@ -641,12 +646,23 @@ async function handleApi(req, res, urlObj) {
   }
 
   if (method === "POST" && p === "/api/cloud/colab/login") {
-    const launched = launchColabInteractiveLogin(state.config);
-    if (!state.config.colabAuthorized) {
+    const flow = await startColabOAuthFlow(state.config);
+    if (flow.alreadyLoggedIn) {
       await saveConfig({ ...state.config, colabAuthorized: true });
+      const { cloud } = await getCachedProbes(true);
+      return sendJson(res, 200, { ok: true, alreadyLoggedIn: true, cloud });
     }
-    pushSystemLog("[Colab CLI] 已打开首次 Google OAuth 登录窗口，完成授权后点击「刷新」");
-    return sendJson(res, 200, { ok: true, ...launched });
+    pushSystemLog("[Colab CLI] 已生成 Google OAuth 授权链接，请在浏览器同意后回填授权码");
+    return sendJson(res, 200, { ok: true, alreadyLoggedIn: false, authUrl: flow.authUrl });
+  }
+
+  if (method === "POST" && p === "/api/cloud/colab/auth-code") {
+    const body = await readJsonBody(req);
+    await submitColabAuthCode(body.code);
+    await saveConfig({ ...state.config, colabAuthorized: true });
+    pushSystemLog("[Colab CLI] Google 账号授权成功，已保存至本机凭据库");
+    const { cloud } = await getCachedProbes(true);
+    return sendJson(res, 200, { ok: true, cloud });
   }
 
   if (method === "POST" && p === "/api/cloud/colab/stop") {
@@ -657,8 +673,25 @@ async function handleApi(req, res, urlObj) {
   }
 
   if (method === "GET" && p === "/api/dreamina/status") {
-    const dreamina = await getDreaminaStatus(state.config.dreaminaCliPath);
+    const dreamina = await getDreaminaStatus(state.config.dreaminaCliPath, state.config.dreaminaProfile || "default");
     return sendJson(res, 200, { ok: true, dreamina });
+  }
+
+  if (method === "POST" && p === "/api/dreamina/profile") {
+    const body = await readJsonBody(req);
+    const profile = String(body.profile || "default").trim() || "default";
+    await saveConfig({ ...state.config, dreaminaProfile: profile });
+    const { dreamina, imageProviders } = await getCachedProbes(true);
+    pushSystemLog(`[即梦] 已切换账号档案：${profile} (${dreamina.loggedIn ? dreamina.displayName : "未登录"})`);
+    return sendJson(res, 200, { ok: true, config: sanitizeConfigForClient(state.config), dreamina, imageProviders });
+  }
+
+  if (method === "POST" && p === "/api/dreamina/login") {
+    const body = await readJsonBody(req);
+    const profile = String(body.profile || state.config.dreaminaProfile || "default").trim() || "default";
+    const started = startDreaminaProfileLogin(state.config.dreaminaCliPath, profile);
+    pushSystemLog(`[即梦] 已为档案 ${profile} 拉起浏览器登录授权，完成后点击「刷新」`);
+    return sendJson(res, 200, { ok: true, ...started });
   }
 
   if (method === "GET" && p === "/api/tasks") {
@@ -767,6 +800,7 @@ async function handleApi(req, res, urlObj) {
         const canvas = await ensureWorkbenchCanvas(state.config, saveConfig);
         const quote = await createAndQuoteImageNode({
           cliPath: state.config.dreaminaCliPath,
+          profile: canvas.profile,
           projectId: canvas.projectId,
           title: `${task.beatCode || task.id}_${shot.code}_${shot.role}`,
           prompt,
@@ -807,6 +841,7 @@ async function handleApi(req, res, urlObj) {
 
       runAndDownloadNode({
         cliPath: state.config.dreaminaCliPath,
+        profile: canvas.profile,
         projectId: canvas.projectId,
         nodeId: body.nodeId,
         creditCeiling: Number(body.creditCeiling),
@@ -931,6 +966,7 @@ async function handleApi(req, res, urlObj) {
 
     runAndDownloadNode({
       cliPath: state.config.dreaminaCliPath,
+      profile: canvas.profile,
       projectId: canvas.projectId,
       nodeId: body.nodeId,
       creditCeiling: Number(body.creditCeiling),
@@ -992,6 +1028,83 @@ async function handleApi(req, res, urlObj) {
     }
 
     const body = await readJsonBody(req);
+    const chosenModel = body.model || task.stage3?.modelPreset || state.config.defaultVideoModel;
+
+    // MiniMax-H3 (Colab 96G G4 + ComfyUI + RealESRGAN_x2plus) — zero Dreamina credits
+    if (chosenModel === "minimax_h3_colab") {
+      const shots = task.storyboard?.shots || [];
+      const readyShots = shots.filter((s) => s.status === "succeeded" && s.localPath);
+      const startShot = readyShots.find((s) => s.lockRole === "start") || readyShots[0] || null;
+      const endShot = readyShots.find((s) => s.lockRole === "end") || null;
+      const duration = Number(body.duration || task.durationSec || 6);
+      const resolution = body.resolution || task.storyboard?.qualityPreset || "720p";
+
+      if (action === "quote") {
+        return sendJson(res, 200, {
+          ok: true,
+          quote: {
+            external: true,
+            model: "minimax_h3_colab",
+            mode: startShot && endShot ? "fl2v" : startShot ? "i2v" : "t2v",
+            refCount: (startShot ? 1 : 0) + (endShot && endShot !== startShot ? 1 : 0),
+            resolution,
+            duration,
+            maxCredits: 0,
+            confirmationRequired: false,
+          },
+        });
+      }
+
+      const takeId = `take_${Date.now().toString(36)}`;
+      const takeNum = task.stage3.takes.length + 1;
+      const outPath = path.join(WORKSPACE_DIR, "tasks", task.id, "videos", `${task.id}_h3_take${takeNum}.mp4`);
+      const takeEntry = {
+        id: takeId,
+        label: `Take #${takeNum} · MiniMax-H3 (G4 96G) ${resolution} ${duration}s`,
+        model: "minimax_h3_colab",
+        resolution,
+        duration,
+        status: "running",
+        progressText: "正在通过 Colab CLI 启动 96G G4…",
+        createdAt: Date.now(),
+      };
+      task.stage3.takes.unshift(takeEntry);
+      task.updatedAt = Date.now();
+      await saveTasks();
+
+      runColabMiniMaxH3Job({
+        config: state.config,
+        prompt: body.prompt || task.stage1.videoPrompt,
+        duration,
+        resolution,
+        startImagePath: startShot?.localPath || null,
+        endImagePath: endShot && endShot !== startShot ? endShot.localPath : null,
+        outMp4Path: outPath,
+        onProgress: (msg) => {
+          takeEntry.progressText = msg;
+        },
+        onLog: (line) => pushSystemLog(line),
+      })
+        .then(async (resH3) => {
+          takeEntry.status = "succeeded";
+          takeEntry.localPath = resH3.localPath;
+          takeEntry.sizeBytes = resH3.sizeBytes;
+          takeEntry.progressText = "MiniMax-H3 成片已回传本地";
+          task.stage3.selectedTakeId = takeEntry.id;
+          task.updatedAt = Date.now();
+          await saveTasks();
+        })
+        .catch(async (err) => {
+          takeEntry.status = "failed";
+          takeEntry.error = err.message;
+          takeEntry.progressText = `失败: ${err.message}`;
+          task.updatedAt = Date.now();
+          await saveTasks();
+        });
+
+      return sendJson(res, 200, { ok: true, task: hydrateTaskForClient(task) });
+    }
+
     const canvas = await ensureWorkbenchCanvas(state.config, saveConfig);
 
     if (action === "quote") {
@@ -1016,6 +1129,7 @@ async function handleApi(req, res, urlObj) {
           pushSystemLog(`[Dreamina] 自动托管外部分镜 ${task.beatCode} ${sh.code} 至画布…`);
           const up = await uploadLocalResource({
             cliPath: state.config.dreaminaCliPath,
+            profile: canvas.profile,
             projectId: canvas.projectId,
             filePath: sh.localPath,
             name: `${task.beatCode}_${sh.code}_${sh.providerLabel || "ext"}.png`,
@@ -1034,6 +1148,7 @@ async function handleApi(req, res, urlObj) {
 
       const quote = await createAndQuoteVideoNode({
         cliPath: state.config.dreaminaCliPath,
+        profile: canvas.profile,
         projectId: canvas.projectId,
         title: `${task.title}_Take${task.stage3.takes.length + 1}`,
         prompt: body.prompt || task.stage1.videoPrompt,
@@ -1067,6 +1182,7 @@ async function handleApi(req, res, urlObj) {
 
     runAndDownloadNode({
       cliPath: state.config.dreaminaCliPath,
+      profile: canvas.profile,
       projectId: canvas.projectId,
       nodeId: body.nodeId,
       creditCeiling: Number(body.creditCeiling),
