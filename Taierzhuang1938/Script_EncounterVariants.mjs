@@ -113,7 +113,7 @@ function CompileMergedVariant(spec) {
     ...BASE_PLAY_CONFIG,
     scene: spec.scene,
     reachByBeat: FilterFrontRecord(BASE_PLAY_CONFIG.reachByBeat),
-    environment: { ...BASE_PLAY_CONFIG.environment, duskBeat: "08a" },
+    environment: { ...BASE_PLAY_CONFIG.environment, duskBeat: "11c" },
     guidance: {
       ...FilterFrontRecord(BASE_PLAY_CONFIG.guidance),
       ...MERGED_GUIDANCE,

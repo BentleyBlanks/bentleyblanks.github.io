@@ -441,4 +441,18 @@ for (let t = merged.BeatById("08a").start; t < merged.duration; t += 1.0) {
   }
 }
 
+// Play 的钟点只在离开日间预设后才转黄昏：日间兜底预设的 18 点外观未调成可玩画面（曝光过高、浓雾吞掉地面）。
+for (const spec of ENCOUNTER_VARIANTS) {
+  const variant = CompileEncounterVariant(spec.id);
+  const config = variant.playConfig.environment;
+  const zones = JSON.parse(fs.readFileSync(path.join(dirHere, "Scenes", spec.scene, `Environment_${spec.scene}.json`), "utf8"))
+    .volumes.filter((v) => v.shape === "box" && v.preset !== "FirstLevelEncounter");
+  for (const beat of variant.timeline) {
+    if (beat.id < config.duskBeat) continue;
+    const [x, z] = variant.evaluate(beat.start + 0.01, variant.defaultDocument).player;
+    assert.ok(zones.some((v) => Math.abs(x - v.center[0]) <= v.size[0] / 2 && Math.abs(z - v.center[2]) <= v.size[2] / 2),
+      `${spec.id} ${beat.id} 已按黄昏钟点开局，但玩家 (${x.toFixed(0)}, ${z.toFixed(0)}) 不在黄昏环境区域内`);
+  }
+}
+
 console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates, enemy occlusion & full zero-clip/zero-LOS/fire-line audit");
