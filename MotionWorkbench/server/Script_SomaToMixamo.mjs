@@ -50,13 +50,14 @@ export const SOMA_TO_MIXAMO = Object.freeze((() => {
 })());
 
 // Child reference used for rest-pose 1D swing alignment when bone has a single anatomical axis.
+// Note: Neck & Head are intentionally omitted because both SOMA-77 and Mixamo X Bot have level,
+// +Z-facing rest heads; aligning dummy leaf offsets (HeadEnd -7.5° vs HeadTop_End +18.7°) injects
+// a bogus ~26° pitch offset and causes severe Neck/Head opposing-kink jaw/cheek distortion.
 const SWING_CHILD_PAIR = Object.freeze((() => {
   const pairs = {
     Spine: ["Spine2", "Spine1"],
     Spine1: ["Chest", "Spine2"],
     Spine2: ["Neck1", "Neck"],
-    Neck: ["Head", "Head"],
-    Head: ["HeadEnd", "HeadTop_End"],
   };
   for (const side of ["Left", "Right"]) {
     pairs[`${side}Shoulder`] = [`${side}Arm`, `${side}Arm`];
@@ -497,6 +498,20 @@ export function retargetSomaGlbToMixamo({
   const lwIdx = boneNames.indexOf("LeftHand");
   const rwIdx = boneNames.indexOf("RightHand");
 
+  const spine2Idx = boneNames.indexOf("Spine2");
+  const neckIdx = boneNames.indexOf("Neck");
+  const headIdx = boneNames.indexOf("Head");
+  const somaHeadIdx = mixamoToSomaIdx.get("Head");
+  const restSpine2ToHead =
+    neckIdx >= 0 && headIdx >= 0
+      ? xbotBones[neckIdx].localQ.clone().multiply(xbotBones[headIdx].localQ).normalize()
+      : new THREE.Quaternion();
+  const restSpine2ToHeadInv = restSpine2ToHead.clone().invert();
+  const identityQ = new THREE.Quaternion();
+  const headDesiredWorldQ = new THREE.Quaternion();
+  const neckDeltaQ = new THREE.Quaternion();
+  const totalHeadDeltaQ = new THREE.Quaternion();
+
   // Compute source frame-0 horizontal center so character starts centered at X=0, Z=0
   let originX = 0;
   let originZ = 0;
@@ -551,10 +566,37 @@ export function retargetSomaGlbToMixamo({
       const sIdx = mixamoToSomaIdx.get(b.name);
       const parentQ = b.parent >= 0 ? xbotWorldQ[b.parent] : rootParentQ;
 
-      if (sIdx !== undefined && corrections[bi]) {
-        // For Neck: use Neck2 world orientation (combines Neck1 + Neck2 cleanly) when available
-        const srcQ = b.name === "Neck" && neck2Idx !== undefined ? somaWorldQ[neck2Idx] : somaWorldQ[sIdx];
-        xbotWorldQ[bi].copy(worldTurnY180).multiply(srcQ).multiply(corrections[bi]).normalize();
+      if (
+        b.name === "Neck" &&
+        spine2Idx >= 0 &&
+        headIdx >= 0 &&
+        somaHeadIdx !== undefined &&
+        corrections[headIdx]
+      ) {
+        // SOMA-77 uses a 2-segment neck (Neck1+Neck2) that can crane +60° forward while Head counter-pitches -45°.
+        // Dumping that opposing S-bend onto Mixamo's single Neck/Head (which share lower-face/jaw skin weights)
+        // stretches the chin and cheeks. Instead, compute the exact desired world Head orientation and distribute
+        // the Spine2->Head delta smoothly (35% Neck, 65% Head) along the shortest arc so Head gaze is 100% exact
+        // with zero opposing kink across the face.
+        headDesiredWorldQ
+          .copy(worldTurnY180)
+          .multiply(somaWorldQ[somaHeadIdx])
+          .multiply(corrections[headIdx])
+          .normalize();
+        totalHeadDeltaQ
+          .copy(parentQ)
+          .invert()
+          .multiply(headDesiredWorldQ)
+          .premultiply(restSpine2ToHeadInv)
+          .normalize();
+        if (totalHeadDeltaQ.w < 0) {
+          totalHeadDeltaQ.set(-totalHeadDeltaQ.x, -totalHeadDeltaQ.y, -totalHeadDeltaQ.z, -totalHeadDeltaQ.w);
+        }
+        neckDeltaQ.copy(identityQ).slerp(totalHeadDeltaQ, 0.35).normalize();
+        tmpQ.copy(b.localQ).multiply(neckDeltaQ).normalize();
+        xbotWorldQ[bi].copy(parentQ).multiply(tmpQ).normalize();
+      } else if (sIdx !== undefined && corrections[bi]) {
+        xbotWorldQ[bi].copy(worldTurnY180).multiply(somaWorldQ[sIdx]).multiply(corrections[bi]).normalize();
         tmpQ.copy(parentQ).invert().multiply(xbotWorldQ[bi]).normalize();
       } else {
         tmpQ.copy(b.localQ);
@@ -613,7 +655,7 @@ export function retargetSomaGlbToMixamo({
     outPath: outGlbPath,
     sizeBytes: stat.size,
     qa: {
-      retargetVersion: 2,
+      retargetVersion: 3,
       targetSkeleton: "Mixamo X Bot (65 骨)",
       mappedBones: mappedCount,
       totalTargetBones: boneNames.length,

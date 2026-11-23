@@ -15,7 +15,21 @@
   </script>
 </head>
 <body>
-  <!-- 顶部栏：仅标题、当前动作名与路线标、以及唯一聚合的「系统」抽屉入口 -->
+  <!-- 全局顶部加载进度条（请求 / 3D 载入 / 后台任务进行中自动点亮） -->
+  <div id="globalLoadBar" class="mwGlobalLoadBar active" aria-hidden="true"></div>
+
+  <!-- 首次进入加载遮罩（水合完成后自动退场，不再让用户面对静默黑屏） -->
+  <div id="bootOverlay" class="mwBootOverlay" role="status" aria-live="polite">
+    <div class="mwBootCard">
+      <span class="mwSpinner mwSpinnerLg" aria-hidden="true"></span>
+      <div class="mwBootText">
+        <strong id="bootOverlayTitle">正在加载 AI 动作生成…</strong>
+        <span id="bootOverlaySub">同步动作列表、探测即梦账号与云端算力状态</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 顶部栏：仅标题、当前动作名与路线标、实时运行态提示、以及唯一聚合的「系统」抽屉入口 -->
   <header class="mwBar">
     <div class="mwBrand">AI 动作生成</div>
     <div class="mwBarDiv"></div>
@@ -25,6 +39,10 @@
       <span id="topRouteTag" class="mwRoutePill">—</span>
     </div>
     <div class="mwBarRight">
+      <button id="topBusyPill" class="mwBusyPill hidden" type="button" title="点击定位正在运行的任务">
+        <span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span>
+        <span id="topBusyText">加载中…</span>
+      </button>
       <button id="btnSystem" class="mwSysBtn" type="button" aria-expanded="false" aria-controls="sysDrawer">
         <span id="sysDot" class="mwDot"></span>
         <span id="sysBtnLabel">系统</span>
@@ -305,9 +323,30 @@
             </div>
 
             <div id="s4Empty" class="mwPlaceholder hidden">
-              <div class="mwPhTitle" id="s4EmptyTitle">等待提骨</div>
-              <div class="mwPhActions">
-                <button id="btnStage4RunCenter" class="mwBtn mwPrimary" type="button">提交云端提骨</button>
+              <div id="s4IdleBlock" class="mwEmptyStack">
+                <div class="mwPhTitle" id="s4EmptyTitle">等待提骨</div>
+                <div class="mwPhActions">
+                  <button id="btnStage4RunCenter" class="mwBtn mwPrimary" type="button">提交云端提骨</button>
+                </div>
+              </div>
+
+              <!-- 提骨失败诊断卡：明确展示失败原因 + 一键修复入口 -->
+              <div id="s4FailCard" class="mwFailCard hidden">
+                <div class="mwFailHead">
+                  <span class="mwFailBadge">提骨失败</span>
+                  <span id="s4FailJobId" class="mwMono mwFailJob">—</span>
+                </div>
+                <div id="s4FailTitle" class="mwFailTitle">—</div>
+                <div id="s4FailHint" class="mwFailHint">—</div>
+                <div class="mwFailActions">
+                  <button id="btnS4FixColabLogin" class="mwBtnCta hidden" type="button">去登录 Colab</button>
+                  <button id="btnS4RetryFromFail" class="mwBtn mwPrimary" type="button">重新提骨</button>
+                  <button id="btnS4OpenLogs" class="mwBtn" type="button">查看运行日志</button>
+                </div>
+                <details id="s4FailLogWrap" class="mwFailDetails">
+                  <summary>展开原始错误日志</summary>
+                  <pre id="s4FailLogPre" class="mwFailPre"></pre>
+                </details>
               </div>
             </div>
 
@@ -409,7 +448,10 @@
                   </div>
                   <div class="mwViewBody mw3dWrap">
                     <canvas id="retargetCanvas"></canvas>
-                    <div id="s5ViewerStatus" class="mw3dStatus hidden"></div>
+                    <div id="s5ViewerStatus" class="mw3dStatus hidden" role="status" aria-live="polite">
+                      <span class="mwSpinner" aria-hidden="true"></span>
+                      <span id="s5ViewerStatusText">载入角色与重定向骨骼…</span>
+                    </div>
                   </div>
                 </div>
               </div>

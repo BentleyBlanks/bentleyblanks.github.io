@@ -213,7 +213,7 @@ function ensureMixamoRetargetForTask(task) {
     task.stage5?.mixamoGlb?.sourceRunId === activeRun.jobId &&
     fs.existsSync(outGlbPath) &&
     task.stage5?.qa?.frames > 10 &&
-    task.stage5?.qa?.retargetVersion === 2
+    task.stage5?.qa?.retargetVersion === 3
   ) {
     return false;
   }

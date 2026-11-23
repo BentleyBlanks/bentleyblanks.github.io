@@ -342,7 +342,12 @@ export async function runColabMocapJob({
     const list = parseSessionsOutput(sessOut);
     hasWarm = list.some((s) => s.name === sessionName);
   } catch (err) {
-    throw new Error(`Colab CLI 未授权或网络不可达，请先在「系统与资源」点击「一键登录 Colab」：${err.message}`);
+    const raw = String(err?.message || "");
+    if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized|credentials/i.test(raw)) {
+      onLog?.(`[Colab CLI] 原始鉴权提示: ${raw.slice(0, 260)}`);
+      throw new Error("Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成首次授权后再重试。");
+    }
+    throw new Error(`Colab CLI 连接失败（请检查网络或代理）：${raw.slice(0, 200)}`);
   }
 
   if (hasWarm) {
@@ -503,7 +508,12 @@ export async function runColabMiniMaxH3Job({
     const sessOut = await runColabCmd(exe, ["sessions"], { timeoutMs: 12000 });
     hasWarm = parseSessionsOutput(sessOut).some((s) => s.name === sessionName);
   } catch (err) {
-    throw new Error(`Colab CLI 未授权，请先在「系统与资源」完成 Colab 登录：${err.message}`);
+    const raw = String(err?.message || "");
+    if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized|credentials/i.test(raw)) {
+      onLog?.(`[MiniMax-H3] 原始鉴权提示: ${raw.slice(0, 260)}`);
+      throw new Error("Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成首次授权后再重试。");
+    }
+    throw new Error(`Colab CLI 连接失败：${raw.slice(0, 200)}`);
   }
 
   if (hasWarm) {

@@ -968,18 +968,107 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 .mwDlLink:hover { border-color: var(--gold); color: var(--gold-text); background: var(--sel); }
 .mwDlLink span { color: var(--muted); font-size: 10.5px; }
 
-.mwRunList { display: flex; flex-direction: column; gap: 4px; }
+.mwRunList { display: flex; flex-direction: column; gap: 6px; }
 .mwRunItem {
   text-align: left;
-  padding: 5px 8px;
+  padding: 8px 10px;
   background: var(--field);
   border: 1px solid var(--rule-2);
   border-left: 3px solid transparent;
-  font: 11.5px var(--ui-mono);
+  font: 12px var(--ui-mono);
   color: var(--muted);
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
+.mwRunItem:hover { border-color: var(--edge); color: var(--text-hi); }
 .mwRunItem.active { border-left-color: var(--gold); background: var(--sel-strong); color: var(--gold-text); }
+.mwRunItem.isFailed { border-left-color: #c8645a; }
+.mwRunItem.isFailed.active { background: #1e1211; color: #f4b7af; }
+.mwRunItemSub {
+  font-family: var(--ui-sans);
+  font-size: 11.5px;
+  color: #d48980;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Stage 04 提骨失败诊断卡 */
+.mwEmptyStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.mwFailCard {
+  width: min(560px, 92%);
+  text-align: left;
+  background: #14110f;
+  border: 1px solid #c8645a66;
+  border-left: 3px solid #d46b60;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 36px #00000088;
+}
+.mwFailHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mwFailBadge {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #f4b7af;
+  background: #2c1715;
+  border: 1px solid #c8645a88;
+  padding: 3px 10px;
+}
+.mwFailJob { font-size: 12.5px; color: #9c988a; }
+.mwFailTitle {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--text-hi);
+  line-height: 1.4;
+}
+.mwFailHint {
+  font-size: 13.5px;
+  color: #c2beb0;
+  line-height: 1.6;
+}
+.mwFailActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.mwFailDetails {
+  margin-top: 4px;
+  border-top: 1px solid var(--rule-2);
+  padding-top: 10px;
+  font-size: 12.5px;
+  color: #9c988a;
+}
+.mwFailDetails summary { cursor: pointer; user-select: none; }
+.mwFailDetails summary:hover { color: var(--text-hi); }
+.mwFailPre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow: auto;
+  background: #080907;
+  border: 1px solid var(--rule-2);
+  color: #c7c3b5;
+  font: 11.5px/1.5 var(--ui-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 
 /* --- STAGE 05: 重定向二次验收（原片 + 真 3D 角色视口） --- */
 .mwRetargetSplit {
@@ -997,13 +1086,101 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  padding: 6px 14px;
-  background: #070807dd;
-  border: 1px solid var(--edge);
-  color: var(--gold-text);
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #0c0d0af0;
+  border: 1px solid #edca8388;
+  box-shadow: 0 10px 30px #000000cc;
+  color: var(--gold-hi);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   pointer-events: none;
+  z-index: 5;
 }
+
+/* 全局醒目加载态：顶部铜金流光条 + 旋转环 + 首次启动遮罩 + 顶部栏实时运行胶囊 */
+@keyframes mwSpin { to { transform: rotate(360deg); } }
+@keyframes mwShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+.mwGlobalLoadBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 120;
+  background: #edca8322;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.mwGlobalLoadBar.active { opacity: 1; }
+.mwGlobalLoadBar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--gold-hi), transparent);
+  animation: mwShimmer 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.mwSpinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #edca8333;
+  border-top-color: var(--gold-hi);
+  animation: mwSpin 0.75s linear infinite;
+  flex: none;
+}
+.mwSpinnerSm { width: 13px; height: 13px; border-width: 2px; }
+.mwSpinnerLg { width: 28px; height: 28px; border-width: 2.5px; }
+
+.mwBootOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: #080907e8;
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  transition: opacity 0.22s ease;
+}
+.mwBootOverlay.hidden { display: none; }
+.mwBootCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 28px;
+  background: #12140f;
+  border: 1px solid #edca8377;
+  box-shadow: 0 18px 48px #000000cc;
+}
+.mwBootText { display: flex; flex-direction: column; gap: 4px; }
+.mwBootText strong { font-size: 16px; color: var(--gold-hi); letter-spacing: 0.06em; }
+.mwBootText span { font-size: 13px; color: #b5b1a0; }
+
+.mwBusyPill {
+  height: 30px;
+  padding: 0 12px;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1d1a10;
+  border: 1px solid #edca8388;
+  color: var(--gold-hi);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.mwBusyPill:hover { background: #262214; border-color: var(--gold-hi); }
 .mwNoVid {
   position: absolute;
   inset: 0;

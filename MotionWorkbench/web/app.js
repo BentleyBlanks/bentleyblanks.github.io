@@ -36,17 +36,78 @@ function toast(msg, ms = 2600) {
   toast._t = setTimeout(() => el.classList.add("hidden"), ms);
 }
 
-async function api(url, opts = {}) {
-  const relUrl = typeof url === "string" && url.startsWith("/") ? `.${url}` : url;
-  const res = await fetch(relUrl, {
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-    ...opts,
-  });
-  const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.error || `请求失败 (${res.status})`);
+let inflightApiCount = 0;
+let viewerLoadingText = "";
+
+function updateGlobalBusyUI() {
+  const bar = $("#globalLoadBar");
+  const pill = $("#topBusyPill");
+  const pillText = $("#topBusyText");
+
+  // Detect any active background job across all tasks
+  let bgLabel = "";
+  let bgTarget = null;
+  for (const t of appState.tasks || []) {
+    const run = (t.stage4?.runs || []).find((r) => r.status === "running" || r.status === "queued");
+    if (run) {
+      bgLabel = `${t.beatCode} 提骨中 ${run.progress ?? 0}%`;
+      bgTarget = { taskId: t.id, stage: 4 };
+      break;
+    }
+    const take = (t.stage3?.takes || []).find((x) => x.status === "running");
+    if (take) {
+      bgLabel = `${t.beatCode} 生成视频中…`;
+      bgTarget = { taskId: t.id, stage: 3 };
+      break;
+    }
+    const shot = (t.storyboard?.shots || []).find((s) => s.status === "running");
+    if (shot) {
+      bgLabel = `${t.beatCode} 分镜出图中…`;
+      bgTarget = { taskId: t.id, stage: 2 };
+      break;
+    }
+    const refRun = (t.stage6?.runs || []).find((r) => r.status === "running");
+    if (refRun) {
+      bgLabel = `${t.beatCode} Blender 修缮中…`;
+      bgTarget = { taskId: t.id, stage: 6 };
+      break;
+    }
   }
-  return data;
+
+  const label = bgLabel || viewerLoadingText || (inflightApiCount > 0 ? "请求处理中…" : "");
+  const busy = Boolean(label);
+  if (bar) bar.classList.toggle("active", busy);
+  if (pill && pillText) {
+    pill.classList.toggle("hidden", !busy);
+    if (busy) pillText.textContent = label;
+    pill.dataset.taskId = bgTarget?.taskId || "";
+    pill.dataset.stage = bgTarget ? String(bgTarget.stage) : "";
+  }
+}
+
+async function api(url, opts = {}) {
+  const silent = Boolean(opts.silent);
+  const relUrl = typeof url === "string" && url.startsWith("/") ? `.${url}` : url;
+  if (!silent) {
+    inflightApiCount++;
+    updateGlobalBusyUI();
+  }
+  try {
+    const res = await fetch(relUrl, {
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      ...opts,
+    });
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || `请求失败 (${res.status})`);
+    }
+    return data;
+  } finally {
+    if (!silent) {
+      inflightApiCount = Math.max(0, inflightApiCount - 1);
+      updateGlobalBusyUI();
+    }
+  }
 }
 
 function escapeHtml(str) {
@@ -750,8 +811,44 @@ function renderTaskDetail() {
 
   const run = activeMocapRun(task);
   const isRunning = run && (run.status === "running" || run.status === "queued");
+  const isFailed = run && run.status === "failed";
   const files = run?.files || {};
   const hasResult = run?.status === "succeeded" && Object.keys(files).length > 0;
+
+  function parseMocapFailure(r) {
+    const raw = [r?.stageLabel || "", ...(r?.logs || [])].join("\n");
+    const isColabAuth = /未授权|authorization code|accounts\.google\.com\/o\/oauth2|一键登录 Colab|去登录 Colab/i.test(raw);
+    const isNetErr = /timed out|timeout|ECONNREFUSED|ENOTFOUND|网络不可达/i.test(raw);
+    if (isColabAuth) {
+      return {
+        shortTag: "Colab 未授权",
+        title: "Colab CLI 尚未完成 Google 授权",
+        hint: "本机已装好 Colab CLI，但尚未登录你的 Google 账号，因此无法向 Colab 申请 L4 / A100 GPU。点下方「去登录 Colab」在浏览器同意授权并贴回授权码后即可直接提骨。",
+        isColabAuth: true,
+        raw: (r?.logs || []).join("\n") || r?.stageLabel || "无详细日志",
+      };
+    }
+    if (isNetErr) {
+      return {
+        shortTag: "网络超时",
+        title: "连接云端算力超时或网络受阻",
+        hint: "请确认本机代理可访问 Google Colab / Modal 接口，然后点击「重新提骨」。",
+        isColabAuth: false,
+        raw: (r?.logs || []).join("\n") || r?.stageLabel || "无详细日志",
+      };
+    }
+    const cleanLine = String(r?.stageLabel || "云端提骨执行失败")
+      .replace(/^失败[：:]\s*/, "")
+      .split(/\r?\n/)[0]
+      .slice(0, 120);
+    return {
+      shortTag: cleanLine.slice(0, 18) || "执行异常",
+      title: cleanLine || "云端提骨执行失败",
+      hint: "可展开下方原始错误日志排查原因，或在「系统 → 运行日志」查看完整输出。",
+      isColabAuth: false,
+      raw: (r?.logs || []).join("\n") || r?.stageLabel || "无详细日志",
+    };
+  }
 
   $("#s4LiveBar").classList.toggle("hidden", !isRunning);
   if (isRunning) {
@@ -764,13 +861,25 @@ function renderTaskDetail() {
   $("#s4Empty").classList.toggle("hidden", hasResult);
   $("#s4ResultArea").classList.toggle("hidden", !hasResult);
   if (!hasResult) {
-    $("#s4EmptyTitle").textContent = isMixamo
-      ? "Mixamo 通用动作 · 直接前往 05 重定向 3D 验收"
-      : isRunning
-      ? "正在云端提取 77 关节骨骼…"
-      : selectedTake
-      ? "已就绪 · 点击提交云端提骨"
-      : "请先在「03 视频生成」定稿视频";
+    const showFail = Boolean(isFailed && !isMixamo);
+    $("#s4IdleBlock").classList.toggle("hidden", showFail);
+    $("#s4FailCard").classList.toggle("hidden", !showFail);
+    if (showFail) {
+      const diag = parseMocapFailure(run);
+      $("#s4FailJobId").textContent = run.jobId;
+      $("#s4FailTitle").textContent = diag.title;
+      $("#s4FailHint").textContent = diag.hint;
+      $("#btnS4FixColabLogin").classList.toggle("hidden", !diag.isColabAuth);
+      $("#s4FailLogPre").textContent = diag.raw;
+    } else {
+      $("#s4EmptyTitle").textContent = isMixamo
+        ? "Mixamo 通用动作 · 直接前往 05 重定向 3D 验收"
+        : isRunning
+        ? "正在云端提取 77 关节骨骼…"
+        : selectedTake
+        ? "已就绪 · 点击提交云端提骨"
+        : "请先在「03 视频生成」定稿视频";
+    }
   } else {
     setVideoSrcIfChanged($("#vidOrig"), selectedTake?.url || "");
     setVideoSrcIfChanged($("#vidOverlay"), files["render/overlay.mp4"]?.url || "");
@@ -808,8 +917,15 @@ function renderTaskDetail() {
   for (const r of runs) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = `mwRunItem ${r.jobId === run?.jobId ? "active" : ""}`;
-    b.textContent = `${r.jobId} · ${r.status === "succeeded" ? "完成" : r.status === "failed" ? "失败" : `${r.progress ?? 0}%`}`;
+    const failed = r.status === "failed";
+    b.className = `mwRunItem ${r.jobId === run?.jobId ? "active" : ""} ${failed ? "isFailed" : ""}`;
+    const mainLine = `${r.jobId} · ${r.status === "succeeded" ? "完成" : failed ? "失败" : `${r.progress ?? 0}%`}`;
+    if (failed) {
+      const diag = parseMocapFailure(r);
+      b.innerHTML = `<span>${escapeHtml(mainLine)}</span><span class="mwRunItemSub">${escapeHtml(diag.shortTag)}</span>`;
+    } else {
+      b.textContent = mainLine;
+    }
     b.onclick = async () => {
       const res = await api(`/api/tasks/${task.id}`, {
         method: "PATCH",
@@ -908,13 +1024,17 @@ async function syncRetargetViewer(task) {
   }
   const cInfo = charInfo(task.stage5?.characterId || task.characterId || "xbot");
   const statusEl = $("#s5ViewerStatus");
+  const statusTxt = $("#s5ViewerStatusText");
   try {
     const res = await appState.retViewer.load({
       modelUrl: cInfo.modelUrl,
       clipUrl: task.stage5.mixamoGlb.url,
       hipsScale: cInfo.hipsScale,
       onStatus: (txt) => {
-        statusEl.textContent = txt;
+        viewerLoadingText = txt || "";
+        updateGlobalBusyUI();
+        if (statusTxt) statusTxt.textContent = txt || "";
+        else statusEl.textContent = txt || "";
         statusEl.classList.toggle("hidden", !txt);
       },
     });
@@ -924,7 +1044,10 @@ async function syncRetargetViewer(task) {
       setRetargetTime(appState.retTime % res.duration);
     }
   } catch (err) {
-    statusEl.textContent = `3D 加载失败：${err.message}`;
+    viewerLoadingText = "";
+    updateGlobalBusyUI();
+    if (statusTxt) statusTxt.textContent = `3D 加载失败：${err.message}`;
+    else statusEl.textContent = `3D 加载失败：${err.message}`;
     statusEl.classList.remove("hidden");
   }
 }
@@ -1029,6 +1152,7 @@ function renderAll() {
   renderSystemAggregated();
   renderTaskList();
   renderTaskDetail();
+  updateGlobalBusyUI();
 }
 
 /* --- 积分确认弹窗 --- */
@@ -1654,21 +1778,40 @@ $("#btnSaveConfig").onclick = async () => {
 };
 
 /* --- 启动 --- */
-async function boot() {
-  const data = await api("/api/bootstrap");
-  appState.config = data.config;
-  appState.tasks = data.tasks;
-  appState.characters = data.characters || [];
-  appState.floorplan = data.floorplan || null;
-  appState.dreamina = data.dreamina;
-  appState.cloud = data.cloud;
-  appState.imageProviders = data.imageProviders || [];
-  appState.recentLogs = data.recentLogs || [];
-  appState.host = data.host;
-  appState.selectedTaskId = filteredTasks()[0]?.id || data.tasks[0]?.id || null;
-  appState.activeStage = 5;
-  populateConfigInputs();
+$("#topBusyPill").onclick = () => {
+  const tid = $("#topBusyPill").dataset.taskId;
+  const stg = Number($("#topBusyPill").dataset.stage || 0);
+  if (tid) appState.selectedTaskId = tid;
+  if (stg >= 1 && stg <= 6) appState.activeStage = stg;
   renderAll();
+};
+$("#btnS4FixColabLogin").onclick = () => {
+  setSystemDrawer(true, "overview");
+  $("#btnColabLogin")?.click();
+};
+$("#btnS4RetryFromFail").onclick = () => $("#btnStage4Run")?.click();
+$("#btnS4OpenLogs").onclick = () => setSystemDrawer(true, "logs");
+
+async function boot() {
+  try {
+    const data = await api("/api/bootstrap");
+    appState.config = data.config;
+    appState.tasks = data.tasks;
+    appState.characters = data.characters || [];
+    appState.floorplan = data.floorplan || null;
+    appState.dreamina = data.dreamina;
+    appState.cloud = data.cloud;
+    appState.imageProviders = data.imageProviders || [];
+    appState.recentLogs = data.recentLogs || [];
+    appState.host = data.host;
+    appState.selectedTaskId = filteredTasks()[0]?.id || data.tasks[0]?.id || null;
+    appState.activeStage = 5;
+    populateConfigInputs();
+    renderAll();
+  } finally {
+    $("#bootOverlay")?.classList.add("hidden");
+    updateGlobalBusyUI();
+  }
 
   setInterval(async () => {
     const anyActive = appState.tasks.some(
@@ -1680,7 +1823,10 @@ async function boot() {
     );
     if (!anyActive) return;
     try {
-      const [tasksRes, bootRes] = await Promise.all([api("/api/tasks"), api("/api/bootstrap")]);
+      const [tasksRes, bootRes] = await Promise.all([
+        api("/api/tasks", { silent: true }),
+        api("/api/bootstrap", { silent: true }),
+      ]);
       appState.tasks = tasksRes.tasks;
       appState.dreamina = bootRes.dreamina;
       appState.recentLogs = bootRes.recentLogs || [];
@@ -1689,4 +1835,8 @@ async function boot() {
   }, 2500);
 }
 
-boot().catch((err) => toast(err.message, 6000));
+boot().catch((err) => {
+  $("#bootOverlay")?.classList.add("hidden");
+  updateGlobalBusyUI();
+  toast(err.message, 6000);
+});
