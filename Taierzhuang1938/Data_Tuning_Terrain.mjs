@@ -26,26 +26,41 @@
  *   normalScale  法线强度（近景满强度，远处再乘 DISTANCE.normalFar）
  *   heightOffset 高度混合时整层抬高/压低（0..1 高度单位）。车道压实，草茬与翻土更「高」。
  */
+const MISSION_PLAIN = Object.freeze({
+  textureSize: 1024,
+  version: "terrain20260928ground08",
+  // 整体反照率倍率（线性）。**是亮度对齐旧地面的标定，不是美术旋钮**：旧 ORM 的 AO
+  // 几乎是常数 0.75（烘焙时 R 下限 190），微阴影把它变成直射光约 −30%、间接光再 −18%；
+  // 新图的 AO 是真实的腔体遮蔽（均值 0.87–0.93），同样的反照率画面整体亮 9.1%
+  //（12 个俯视采样点、sky 像素逐位相同的条件下实测）。改图或改 AO 后按 docs 的亮度
+  // 抽样重新标定。
+  albedoScale: 0.87,
+  // tint：线性反照率逐通道倍率（2026-09-28 对标参考图的冷灰棕：底土与草茬原图色相 38–43°、饱和度 0.36–0.40，
+  // 参考图地面实拍色相 24–30°、饱和度约 0.2–0.28；亮度不变，只把偏黄压回灰褐）。新生成的车道与壕沟土已按
+  // 目标色烘进贴图，tint 为 1。缺省 1。
+  layers: Object.freeze([
+    Object.freeze({ id: "FieldSoil", file: "FieldSoil", tileM: 2.0, farTileM: 11.3, normalScale: 0.9, heightOffset: 0,
+      tint: Object.freeze([1, 1, 1.11]) }),
+    Object.freeze({ id: "CartTrack", file: "CartTrack", tileM: 3.1, farTileM: 16.9, normalScale: 0.6, heightOffset: -0.08 }),
+    Object.freeze({ id: "DryStubble", file: "DryStubble", tileM: 2.3, farTileM: 12.7, normalScale: 1, heightOffset: 0.1,
+      tint: Object.freeze([1, 1, 1.125]) }),
+    Object.freeze({ id: "SpoilEarth", file: "SpoilEarth", tileM: 2.1, farTileM: 11.9, normalScale: 1, heightOffset: 0.06 }),
+  ]),
+});
+
 export const TERRAIN_SETS = Object.freeze({
-  MissionPlain: Object.freeze({
+  MissionPlain: MISSION_PLAIN,
+  SunkenRoad: Object.freeze({
     textureSize: 1024,
-    version: "terrain20260928ground08",
-    // 整体反照率倍率（线性）。**是亮度对齐旧地面的标定，不是美术旋钮**：旧 ORM 的 AO
-    // 几乎是常数 0.75（烘焙时 R 下限 190），微阴影把它变成直射光约 −30%、间接光再 −18%；
-    // 新图的 AO 是真实的腔体遮蔽（均值 0.87–0.93），同样的反照率画面整体亮 9.1%
-    //（12 个俯视采样点、sky 像素逐位相同的条件下实测）。改图或改 AO 后按 docs 的亮度
-    // 抽样重新标定。
-    albedoScale: 0.87,
-    // tint：线性反照率逐通道倍率（2026-09-28 对标参考图的冷灰棕：底土与草茬原图色相 38–43°、饱和度 0.36–0.40，
-    // 参考图地面实拍色相 24–30°、饱和度约 0.2–0.28；亮度不变，只把偏黄压回灰褐）。新生成的车道与壕沟土已按
-    // 目标色烘进贴图，tint 为 1。缺省 1。
+    version: "terrain2026112302",
+    albedoScale: 0.93,
     layers: Object.freeze([
-      Object.freeze({ id: "FieldSoil", file: "FieldSoil", tileM: 2.0, farTileM: 11.3, normalScale: 0.9, heightOffset: 0,
-        tint: Object.freeze([1, 1, 1.11]) }),
-      Object.freeze({ id: "CartTrack", file: "CartTrack", tileM: 3.1, farTileM: 16.9, normalScale: 0.6, heightOffset: -0.08 }),
-      Object.freeze({ id: "DryStubble", file: "DryStubble", tileM: 2.3, farTileM: 12.7, normalScale: 1, heightOffset: 0.1,
-        tint: Object.freeze([1, 1, 1.125]) }),
-      Object.freeze({ id: "SpoilEarth", file: "SpoilEarth", tileM: 2.1, farTileM: 11.9, normalScale: 1, heightOffset: 0.06 }),
+      MISSION_PLAIN.layers[0],
+      MISSION_PLAIN.layers[1],
+      Object.freeze({ id: "DryStubble", file: "DitchRootedVerge", tileM: 1.55, farTileM: 8.6,
+        normalScale: .66, heightOffset: .08 }),
+      Object.freeze({ id: "SpoilEarth", file: "DitchCutLoess", tileM: 1.58, farTileM: 8.25,
+        normalScale: .70, heightOffset: .04 }),
     ]),
   }),
   EastSmokeField: Object.freeze({

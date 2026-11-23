@@ -70,6 +70,10 @@ function ObjectIssues(obj, at, errors, ids) {
   if ((asset.layer || undefined) !== obj.layer) errors.push(asset.layer ? `${at}.layer 要是 ${JSON.stringify(asset.layer)}` : `${at}.layer 只给远景资产写`);
   if (obj.group !== undefined && !(typeof obj.group === "string" && obj.group.length <= SCENE_LIMITS.groupMax)) errors.push(`${at}.group 要是至多 ${SCENE_LIMITS.groupMax} 字的字符串`);
   if (obj.params !== undefined && !IsObject(obj.params)) errors.push(`${at}.params 要是对象`);
+  if (obj.params?.grounding === "conform" && (asset.kind !== "prop" || obj.pos?.[1] !== null
+    || obj.solid !== false || obj.params.tile || obj.showOn || obj.hideOn)) {
+    errors.push(`${at}.params.grounding=conform 需要落地、无碰撞且常驻的单件道具`);
+  }
   if (obj.meta !== undefined && !IsObject(obj.meta)) errors.push(`${at}.meta 要是对象`);
   if (obj.meta?.waterRibbon !== undefined) {
     const rows = obj.meta.waterRibbon;
@@ -268,6 +272,7 @@ export function SceneObjectToBlock(obj) {
     solid: obj.solid !== false,
     ...(asset?.kind === "prop" ? { propModel: asset.model } : {}),
     ...(asset?.kind === "prop" && Finite(obj.pos[1]) && obj.params?.grounding === "authored" ? { propAuthoredGrounding: true } : {}),
+    ...(asset?.kind === "prop" && obj.params?.grounding === "conform" ? { propConformGround: true } : {}),
     // 道具铺几件（params.tile = [nx, ny, nz]，同现行第一关替换表的 tile：一只长盒子里排几个模型）
     ...(asset?.kind === "prop" && Array.isArray(obj.params?.tile) ? { propTile: [...obj.params.tile] } : {}),
     ...(asset?.kind === "tree" ? { sceneTree: true } : {}),

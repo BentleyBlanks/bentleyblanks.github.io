@@ -53,7 +53,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 注册表的 `previewParam` 让场景编辑器打开对应项目渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
 各 `paint` 项可用 `tint` 设置正式地表的反照率倍率，支持六位 Hex 或 0–2 的三个 sRGB 倍率。
-显式标高的道具可用 `params.grounding: "authored"` 控制贴地。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。
+显式标高的道具可用 `params.grounding: "authored"` 控制贴地。落地、常驻、无碰撞的单件道具可用 `params.grounding: "conform"`，把枯草或根须的顶点沿地表弯折。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。`options.fireEmission` 是火舌亮度的倍率，默认为 1。
 
 场景可在 `smokeColumns[].options.backdrop.volume` 提供已登记的 TVOL 资产 `asset`、三轴全尺寸 `bounds`、消光系数 `density` 和播放倍率 `speed`。`backdrop` 还需要 `seed`、`life`，可用绝对米制坐标 `ignition` 设烟场锚点。明火可通过 `options.firePosition` 单独定位。
 
@@ -78,6 +78,8 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 | `meta` | 其余原样带过去的字段（`prop`、`loophole`、`window`…… 预演与测试读） |
 
 其他节：`trenches` 是样条壕沟网络（§9，读场景时按它挖地面）；`ways.trenches` 只剩不归网络管的几条中线（06–10 的排水沟、反坦克沟……，给俯视图与地面涂色），网络里的沟中线读场景时现取；`markers` 是设计标注（白盒编辑器的地标，格式同 docs/Data_EditorBlockout.md §2.2 landmarks），不是物件；`paint` / `backdrop.paint` / `ways` 同白盒场景；`look` 是这个场景的样子（高度色带、保留语义色的几种块、改块色）；`backdrop.siteBounds` 是远景层围着的那片场地（按范围取一块时，取到这片的中心才带远景层）。
+
+`RootedVerge` 开头的涂色区可在清理过的地面分片恢复草茬权重。
 
 ## 3. 资产与材质只写编号
 

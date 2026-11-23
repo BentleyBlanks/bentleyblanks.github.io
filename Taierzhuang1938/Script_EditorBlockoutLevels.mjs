@@ -287,7 +287,7 @@ function GroundedBlock(block, groundAt) {
   }
   return {
     id: block.id, x: block.x, z: block.z, w: block.w, d: block.d, h: block.h, ry,
-    y: lowest + block.h / 2,
+    y: (block.propConformGround ? groundAt(block.x, block.z) : lowest) + block.h / 2,
     semantic: block.semantic, tag: block.tag || "whiteboxWall",
     solid: block.solid !== false,
     ...(block.cover ? { cover: { ...block.cover } } : {}),
@@ -300,6 +300,7 @@ function GroundedBlock(block, groundAt) {
     ...(block.propModel ? { propModel: block.propModel } : {}),
     ...(block.propTile ? { propTile: [...block.propTile] } : {}),
     ...(block.propAuthoredGrounding ? { propAuthoredGrounding: true } : {}),
+    ...(block.propConformGround ? { propConformGround: true } : {}),
     ...(block.sceneTree ? { sceneTree: true } : {}),
     ...(block.semantic === "water" && block.waterRibbon ? { waterRibbon: block.waterRibbon } : {}),
   };

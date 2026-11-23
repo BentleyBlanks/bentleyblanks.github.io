@@ -271,11 +271,21 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   assert.deepEqual(layout.camera, doc.camera);
   Check(ValidateScene(doc).ok && ValidateBlockoutScene(slice).ok
     && layout.style === "formal", "沟底仰视三机可通过正式场景与游戏布局校验");
+  Check(layout.ground.terrainLayers === "SunkenRoad"
+    && !ValidateScene({ ...doc, look: { ...doc.look, terrainLayers: "unknown" } }).ok,
+    "凹路在正式场景加载专属地表，拒绝未登记的层集");
   const aircraft = layout.blocks.filter(block => block.propModel === "ditchDistantAircraft");
   Check(aircraft.length === 3 && aircraft.every(block => block.y > 100 && block.propAuthoredGrounding && !block.solid),
     "三架飞机保留编辑器标高，处于布局边界内且不生成碰撞");
   Check(layout.sceneProps.length === doc.objects.length && layout.smokeColumns.some(source => source.options.fire > 0)
     && slice.landmarks.length === 5, "沟底撤运道具、火源与五个站位完整进入预览");
+  Check(layout.smokeColumns.some(source => source.options.backdrop?.frame === 0)
+    && layout.smokeColumns.some(source => source.options.backdrop?.volume?.asset === "SunkenRoadHaze"),
+    "凹路预览保留带厚度的烟柱和独立的漂浮灰雾");
+  const roots = doc.objects.find(obj => obj.params?.grounding === "conform");
+  Check(doc.terrain.cellM === .2 && roots && layout.blocks.some(block => block.id === roots.id && block.propConformGround)
+    && !ValidateScene({ ...doc, objects: [{ ...roots, solid: true }] }).ok,
+    "沟沿根须沿厘米制高程贴坡，无碰撞");
 }
 
 console.log(`场景文件测试全过（${checks} 项）`);

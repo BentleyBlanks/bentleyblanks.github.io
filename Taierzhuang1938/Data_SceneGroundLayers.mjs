@@ -17,6 +17,8 @@ export const SCENE_GROUND_CLASSES = Object.freeze([
   Object.freeze({ match: /^(SapSpoil|OldTrench_|OldFoxhole_|DitchSoil|DitchSand|AtDitch|ScarpFace|Grave_|FieldGrave_|WoodLiu_Grave|WoodZhao_Grave|SandBed|Stream)/, spoil: 1 }),
   // 阵地前清过的地：底土，不长草茬
   Object.freeze({ match: /^Cleared/, soil: 1 }),
+  // Paint patches of rooted soil back into otherwise bare verges.
+  Object.freeze({ match: /^RootedVerge/ }),
 ]);
 
 export const SCENE_GROUND_SURFACE = Object.freeze({

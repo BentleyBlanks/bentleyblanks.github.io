@@ -85,6 +85,7 @@ export const SCENE_ASSETS = Object.freeze({
   "Prop/ryCartWheel": Prop("ryCartWheel", "timber", "车轮", [0.9, 0.9, 0.12]),
   "Prop/marketRiceSack01": Prop("marketRiceSack01", "canvas", "包袱 / 麻袋", [0.7, 0.45, 0.5]),
   "Prop/ditchBrokenElm": Prop("ditchBrokenElm", "timber", "裂干枯榆", [6.094, 7.413, 3.244]),
+  "Prop/deadTreeTrunk01": Prop("deadTreeTrunk01", "timber", "断枯树干", [0.74, 2.22, 0.67]),
   "Prop/ditchDamagedFarmhouse": Prop("ditchDamagedFarmhouse", "plaster", "破灰瓦土屋", [8.934, 3.436, 4.931]),
   "Prop/ditchDonkeyCart": Prop("ditchDonkeyCart", "timber", "灰驴与两轮木车 · 静置", [1.652, 1.562, 2.991]),
   "Prop/ditchStretcher": Prop("ditchStretcher", "canvas", "竹竿布兜担架", [0.69, 0.128, 2.15]),

@@ -652,9 +652,11 @@ class SceneEditorApp {
       const surface = BuildSceneGroundSurface(this.model.doc, this.sampler);
       const position = mesh.geometry.getAttribute("position"), n = position.count;
       const colors = new Float32Array(n * 3), layers = new Float32Array(n * 4), c = [1, 1, 1], w = [0, 0, 1, 1];
+      const color = new THREE.Color();
       for (let i = 0; i < n; i++) {
         surface(position.getX(i), position.getZ(i), c, w);
-        colors.set(c, i * 3); layers.set(w, i * 4);
+        color.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace).toArray(colors, i * 3);
+        layers.set(w, i * 4);
       }
       mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
@@ -675,6 +677,7 @@ class SceneEditorApp {
   GroundY(obj) {
     const [x, , z] = obj.pos;
     if (obj.layer === "backdrop") return this.backdropAt ? this.backdropAt(x, z) : (this.model.doc.backdrop?.ground?.y ?? 0);
+    if (obj.params?.grounding === "conform") return this.sampler(x, z);
     const [w, , d] = obj.size || [0, 0, 0];
     const ry = (obj.yawDeg || 0) * DEG, c = Math.cos(ry), s = Math.sin(ry), hx = w / 2, hz = d / 2;
     let lowest = this.sampler(x, z);

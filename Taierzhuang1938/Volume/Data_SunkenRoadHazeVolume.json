@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "asset": "SunkenRoadHaze",
+  "dimensions": [
+    72,
+    44,
+    24
+  ],
+  "atlasTiles": [
+    4,
+    3,
+    2
+  ],
+  "frames": 24,
+  "duration": 8,
+  "anchor": [
+    0.5,
+    0,
+    0.5
+  ],
+  "channels": 1,
+  "encoding": "sqrt-unorm8",
+  "source": "authored",
+  "sourceType": "procedural",
+  "sourceFrameIndices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23
+  ],
+  "boundsM": [
+    96,
+    35,
+    48
+  ],
+  "file": "Volume_SunkenRoadHaze.bin.gz",
+  "compressedBytes": 871732,
+  "gpuBytes": 1824768,
+  "sha256": "5edf6d3aacf4f5fd443ae6decfcc237edbf8070cb195eab8e00396bb83f17004",
+  "opticalGuideSha256": "77810f99dcb33558d0693a6149503c87f82d92580b3f1445077b2669f6143147",
+  "recipe": "_import/AircraftEvacuationDitch/Script_BakeDitchHaze.py"
+}

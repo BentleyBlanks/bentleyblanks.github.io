@@ -9,6 +9,8 @@ export const PARTICLE_VOLUME_ASSETS=Object.freeze({
    source:'authored',description:'Layered windblown soot for the east track'},
  GroundExplosion:{url:'./Volume/Volume_GroundExplosion.bin.gz?v=202610100100',albedo:[.42,.34,.24],bounds:[7,9,8.16],duration:6.738624338624338,description:'JangaFX CC0 Ground Explosion'},
  DustImpact:{url:'./Volume/Volume_DustImpact.bin.gz?v=202610100100',albedo:[.42,.34,.24],bounds:[10,4.5,13],duration:6.704761904761905,description:'JangaFX CC0 Grenade Dust Impact'},
+ SunkenRoadHaze:{url:'./Volume/Volume_SunkenRoadHaze.bin.gz?v=2026112303',albedo:[.105,.103,.105],
+   source:'authored',frameCount:24,description:'Procedural rolling haze for the sunken road'},
 });
 export const PARTICLE_VOLUME_QUALITY=Object.freeze({
  low:{capacity:128,steps:24,shadowSteps:2},medium:{capacity:160,steps:32,shadowSteps:3},

@@ -17,6 +17,11 @@ for(const id of Object.keys(PARTICLE_VOLUME_ASSETS)){
  assert.equal(report.gpuBytes,data.byteLength);assert.ok(size.every(n=>n<=2048));assert.ok(m.anchor.every(n=>Number.isFinite(n)&&n>=0&&n<=1));
  assert.equal(m.sourceFrameIndices.length,m.frames);
  assert.ok(m.sourceFrameIndices.every((n,i,a)=>i===0||n>a[i-1]));assert.ok(m.frames>=(authored?4:48));assert.ok(data.some(n=>n>32));assert.ok(m.duration>1&&m.duration<10);
+ if(PARTICLE_VOLUME_ASSETS[id].frameCount){
+   assert.equal(m.frames,PARTICLE_VOLUME_ASSETS[id].frameCount);
+   assert.equal(m.sourceType,'procedural');
+   assert.ok(report.recipe);
+ }
  assert.throws(()=>ParseParticleVolume(decoded.subarray(0,decoded.length-1)),/payload/);
  console.log(id,JSON.stringify({frames:m.frames,size,gpuMiB:data.byteLength/1048576,transferMiB:bytes.length/1048576}));
 }

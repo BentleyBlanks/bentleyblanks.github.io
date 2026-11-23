@@ -251,7 +251,7 @@ function SectorKey(x, z) {
 }
 
 /** 把一份摆位计划（PlanPropDressing 的 placements）的模型几何按 192 m 分区加进 BuildSink；返回三角形数。 */
-function AddPropPlacements(sink, placements, dressing, materials) {
+function AddPropPlacements(sink, placements, dressing, materials, groundAt) {
   const matrix = new THREE.Matrix4(), local = new THREE.Matrix4(), roll = new THREE.Matrix4();
   const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), position = new THREE.Vector3(), scale = new THREE.Vector3();
   let triangles = 0;
@@ -276,6 +276,17 @@ function AddPropPlacements(sink, placements, dressing, materials) {
       materials.set(key, mesh.material);
       local.multiplyMatrices(matrix, roll).multiply(mesh.matrixWorld);
       const geometry = mesh.geometry.clone().applyMatrix4(local);
+      if (placement.conformGround) {
+        const vertices = geometry.getAttribute("position");
+        const ground = groundAt(placement.x, placement.z);
+        for (let i = 0; i < vertices.count; i++) {
+          const offset = groundAt(vertices.getX(i), vertices.getZ(i)) - ground;
+          vertices.setY(i, vertices.getY(i) + offset);
+        }
+        geometry.computeVertexNormals();
+        geometry.boundingBox = null;
+        geometry.boundingSphere = null;
+      }
       triangles += (geometry.index?.count ?? geometry.attributes.position.count) / 3;
       sink.Add(key, geometry);
     });
@@ -292,7 +303,7 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
   const started = typeof performance !== "undefined" ? performance.now() : 0;
   const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
   const plan = PlanPropDressing(layout.blocks, groundAt, sizes);
-  let triangles = AddPropPlacements(sink, plan.placements, dressing, materials);
+  let triangles = AddPropPlacements(sink, plan.placements, dressing, materials, groundAt);
   const strawMats = AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materials);
   triangles += strawMats.triangles;
   const { rubble, rubbleTriangles } = AddRubbleScatter(sink, MissionDressingContext(layout, groundAt), materials, library, { scene, meshes });
@@ -392,7 +403,7 @@ function AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materi
 export function AddScenePropModels(sink, layout, dressing, groundAt, materials, library, { scene = null, meshes = null } = {}) {
   const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
   const plan = PlanPropDressing(layout.blocks, groundAt, sizes, layout.sceneProps || []);
-  const triangles = AddPropPlacements(sink, plan.placements, dressing, materials);
+  const triangles = AddPropPlacements(sink, plan.placements, dressing, materials, groundAt);
   const { rubble, rubbleTriangles } = layout.proceduralDressing === false
     ? { rubble: { hidden: [], pieces: [] }, rubbleTriangles: 0 }
     : AddRubbleScatter(sink, SceneDressingContext(layout, groundAt), materials, library, { scene, meshes });

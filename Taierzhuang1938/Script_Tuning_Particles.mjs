@@ -10,6 +10,9 @@ export function BurningParticleModules(source, scale=1) {
     if(preset==='FireTongue'){
       const width=Math.max(.35,radius*2.05),height=(source.fireShape==='ground'?1.35:2.15)*Math.sqrt(size);
       modules.renderer.bounds=[width,height,width*.95];modules.main.startRotation=(modules.main.randomSeed%360)*Math.PI/180;
+      if(Number.isFinite(source.fireEmission)){
+        modules.renderer.emissionStrength*=Math.max(0,Math.min(2,source.fireEmission));
+      }
       return {preset,modules};
     }
     modules.main.startSize.min*=size;modules.main.startSize.max*=size;

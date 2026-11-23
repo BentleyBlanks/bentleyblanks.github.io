@@ -97,7 +97,7 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
     const corners = CornersOf({ x: union.x, z: union.z, w: union.w, d: union.d, ry: union.ry });
     const centerGround = groundAt(union.x, union.z);
     let bottom = union.bottom;
-    if (!main.propAuthoredGrounding && Math.abs(bottom - centerGround) <= PROP_GROUND.snapM) {
+    if (!main.propAuthoredGrounding && !main.propConformGround && Math.abs(bottom - centerGround) <= PROP_GROUND.snapM) {
       bottom = Math.min(centerGround, ...corners.map((p) => groundAt(p.x, p.z))) - PROP_GROUND.embedM;
     }
     const [nw, nh, nd] = entry.tile || [1, 1, 1];
@@ -105,7 +105,7 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
     const c = Math.cos(union.ry), s = Math.sin(union.ry);
     const rng = Rng(HashSeed(entry.block));
     for (let iy = 0; iy < nh; iy++) for (let iz = 0; iz < nd; iz++) for (let ix = 0; ix < nw; ix++) {
-      const fit = FitPropToBox(size, cell, entry);
+      const fit = FitPropToBox(size, cell, main.propConformGround ? { ...entry, maxStretch: Infinity } : entry);
       const lx = -union.w / 2 + (ix + 0.5) * cell.w, lz = -union.d / 2 + (iz + 0.5) * cell.d;
       const jitter = (entry.jitterYaw ?? (nw * nh * nd > 1 ? 0.06 : 0)) * (rng() * 2 - 1);
       placements.push({
@@ -114,6 +114,7 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
         // A 180-degree facing flip keeps the measured box/scale and all collision contracts intact.
         yaw: union.ry + fit.yaw + jitter + (entry.flipFacing ? Math.PI : 0), rollDeg: entry.rollDeg || 0, scale: fit.scale, visual: fit.visual,
         box: { ...cell },
+        ...(main.propConformGround ? { conformGround: true } : {}),
       });
     }
     replaced.add(main.id);

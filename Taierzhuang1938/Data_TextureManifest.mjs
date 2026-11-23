@@ -112,6 +112,9 @@ const BEISHAHE_TRUSS_FINISH_BYTES = 384 * 1024;
 const BEISHAHE_MAINTENANCE_ASSET_BYTES = 384 * 1024;
 // Three PBR layers loaded by the east track preview only.
 const EAST_TRACK_TERRAIN_BYTES = 640 * 1024;
+// The sunken-road preview loads these two 1024² surface sets on demand.
+// Preserve the cut-face and fine root detail within a separate 650 KiB limit.
+const AIRCRAFT_DITCH_TERRAIN_BYTES = 650 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -122,6 +125,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
   tierBytes: Object.freeze({
     "level:FirstLevel": 12 * 1024 * 1024,
     "level:TanketteAdvanceEastTrack": EAST_TRACK_TERRAIN_BYTES,
+    "level:AircraftEvacuationDitch": AIRCRAFT_DITCH_TERRAIN_BYTES,
     fx: 6.5 * 1024 * 1024,
     // ui：2026-09-30 加载画面报纸剪报 11 张 ~2 MB 入库，玩家每次开机只下其中 1 张（~0.2 MB），所以整层上限抬到 5.5 MB。
     // 2026-10-06: 11 matched PBR pairs total 2.28 MiB; only one pair per boot.
@@ -137,7 +141,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
   totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES
     + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
     + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
-    + EAST_TRACK_TERRAIN_BYTES,
+    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -978,6 +982,38 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_TerrainEastTrackCutBase.webp", "Base", 512, 512],
       ["Texture_TerrainEastTrackCutNormal.webp", "Normal", 256, 256],
       ["Texture_TerrainEastTrackCutOrh.webp", "Orh", 256, 256],
+    ],
+  },
+  {
+    id: "TerrainDitchCutLoess", kind: "terrainLayer", tier: "level:AircraftEvacuationDitch",
+    toneClass: "rammedEarth",
+    metersPerTile: 1.58,
+    normalConvention: "terrain",
+    bake: "_import/AircraftEvacuationDitch/Script_BakeDitchSurfaces.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainDitchCutLoess.json",
+    source: { provider: "imagegen", date: "2026-11-23", prompt: "Scenes/AircraftEvacuationDitch/README.md",
+      note: "以 05B 原画右岸切面为参考，重新烘进宽土片与斜向冲刷沟槽。" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "DitchCutLoess" }],
+    files: [
+      ["Texture_TerrainDitchCutLoessBase.webp", "Base", 1024, 1024],
+      ["Texture_TerrainDitchCutLoessNormal.webp", "Normal", 512, 512],
+      ["Texture_TerrainDitchCutLoessOrh.webp", "Orh", 512, 512],
+    ],
+  },
+  {
+    id: "TerrainDitchRootedVerge", kind: "terrainLayer", tier: "level:AircraftEvacuationDitch",
+    toneClass: "drySoil",
+    metersPerTile: 1.55,
+    normalConvention: "terrain",
+    bake: "_import/AircraftEvacuationDitch/Script_BakeDitchSurfaces.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainDitchRootedVerge.json",
+    source: { provider: "imagegen", date: "2026-11-22", prompt: "_import/DugoutAidOpenFields/Data_DugoutMaterialSources.json",
+      note: "复用沟底包扎的 RootedSod 源图，保留伏地枯茬与根须，重烘为地形层。" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "DitchRootedVerge" }],
+    files: [
+      ["Texture_TerrainDitchRootedVergeBase.webp", "Base", 1024, 1024],
+      ["Texture_TerrainDitchRootedVergeNormal.webp", "Normal", 512, 512],
+      ["Texture_TerrainDitchRootedVergeOrh.webp", "Orh", 512, 512],
     ],
   },
   // 3A 迭代 B5（2026-09-28）：01–04 开场布景的风化旧木与旧弹药箱板（分镜 01/02/03A/04A 的灰褐旧木，替换程序化橙黄 WoodBeam / WoodCrate）。

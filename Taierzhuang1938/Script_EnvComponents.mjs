@@ -49,10 +49,12 @@ export function ComposeByPath(decl, values, out) {
  */
 const LEGACY_ABSENT = Object.freeze({
   "cloudShape.0": 5.5, "cloudShape.1": 0.445, "cloudShape.2": 0.615, "cloudShape.3": 0,
+  "smokeHazeTint": [1, 1, 1],
   "cloudDeck.structure": 0, "cloudDeck.underside": 0, "cloudDeck.gap": 1, "cloudDeck.silver": 0,
   "cloudDeck.scale": 1.6, "cloudDeck.coverage": 0.7, "cloudDeck.softness": 0.8, "cloudDeck.warp": 1.2,
   "cloudDeck.fadeHeight": 0.30,
   "cloudDeck.shade": [0.5, 0.5, 0.5],
+  "cloudDeck.bankStrength": 0, "cloudDeck.bankAzimuth": 0, "cloudDeck.bankWidth": 38, "cloudDeck.bankShear": 0,
   "atmosphere.mie": 1, "atmosphere.mieG": 0.8, "atmosphere.rayleigh": 1, "atmosphere.ozone": 1,
   "atmosphere.groundAlbedo": 0.3, "atmosphere.sunIrradiance": 20, "atmosphere.skyTint": [1, 1, 1],
   "atmosphere.skyFloor": [0, 0, 0], "atmosphere.artGlow": 0.35, "atmosphere.sunDiskT": 1, "atmosphere.belowVeil": 0,

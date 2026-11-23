@@ -63,6 +63,7 @@ uniform float uGlowSpread;
 uniform float uSmoke;        // 战场烟尘的总量
 uniform vec3 uSmokeColor;
 uniform float uSmokeHeight;
+uniform vec3 uSmokeHazeTint;
 // Scale, low/high density thresholds, and minimum cloud cover. Defaults retain
 // the existing skies; the first-level cloud deck also fills the gaps between billows.
 uniform vec4 uCloudShape;
@@ -73,6 +74,7 @@ uniform vec4 uCloudDeck;
 uniform vec4 uCloudDeckShape;
 uniform float uCloudDeckFadeHeight;
 uniform vec3 uCloudShade;
+uniform vec4 uCloudBank; // optical depth, azimuth, half-width, shear (angles in radians)
 uniform float uStars;
 uniform float uTime;
 // 物理天空之上的美术层强度：LUT 里已经有真的前向散射，这一层只补"辉光多亮"。
@@ -168,7 +170,20 @@ vec3 CloudDeck(vec3 dir, vec3 sunDir, float sunDot, vec3 skyBehind) {
   body += uSunColor * rim * uCloudDeck.w;
   // 云缝里是更亮的高层薄幕（不是蓝天：浮尘大，缝里仍是白的）
   vec3 gap = skyBehind * uCloudDeck.z;
-  return mix(skyBehind, mix(gap, body, clamp(deck.x * uCloudDeck.x, 0.0, 1.0)), fade);
+  vec3 radiance = mix(skyBehind, mix(gap, body, clamp(deck.x * uCloudDeck.x, 0.0, 1.0)), fade);
+  if (uCloudBank.x <= 0.001) return radiance;
+
+  // A broad storm bank attenuates the high deck on the same world bearings
+  // from both the scene camera and the sky sampled by the lighting probes.
+  float fall = 1.0 - smoothstep(0.05, 0.72, up);
+  float heading = atan(dir.x, dir.z) - (uCloudBank.y + uCloudBank.w * fall);
+  float bearing = abs(atan(sin(heading), cos(heading)));
+  float grain = Fbm2(dir.xz * 6.0 + vec2(up * 4.1, -up * 6.0), 5);
+  float edgeNoise = (grain - 0.47) * 0.43;
+  float cover = 1.0 - smoothstep(uCloudBank.z * 0.37, uCloudBank.z, bearing + edgeNoise);
+  float altitudeBand = smoothstep(0.014, 0.34, up) * (1.0 - 0.4 * smoothstep(0.46, 0.74, up));
+  float opacity = cover * altitudeBand * (0.76 + 0.7 * grain);
+  return radiance * exp(-uCloudBank.x * opacity);
 }
 
 vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
@@ -264,7 +279,7 @@ vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   // 这一条带管的是**天本身有多脏**，两件事。天空视图 LUT 刻意不含霾，
   // 两处都放就是双份灰（那正是 2026-08 那次"单调白"的成因）。
   float haze = exp(-max(up, 0.0) / max(uSmokeHeight, 0.01));
-  sky = mix(sky, uSmokeColor * (0.85 + glow * 0.6), haze * clamp(uSmoke * 0.55 + 0.04, 0.0, 0.62));
+  sky = mix(sky, uSmokeColor * uSmokeHazeTint * (0.85 + glow * 0.6), haze * clamp(uSmoke * 0.55 + 0.04, 0.0, 0.62));
 
   // --- 地平线以下：地面反照（IBL 的下半球靠它，不然人物下巴死黑）---
   // 物理档同样保留：LUT 的地面项只有朗伯反照，落到 PMREM 下半球会比
@@ -933,10 +948,12 @@ export class SkyDome {
       uSmoke: { value: 0.6 },
       uSmokeColor: { value: new THREE.Vector3(0.45, 0.4, 0.36) },
       uSmokeHeight: { value: 0.25 },
+      uSmokeHazeTint: { value: new THREE.Vector3(1, 1, 1) },
       uCloudShape: { value: new THREE.Vector4(5.5, 0.445, 0.615, 0) },
       uCloudDeck: { value: new THREE.Vector4(0, 0, 1, 0) },
       uCloudDeckShape: { value: new THREE.Vector4(1.6, 0.7, 0.8, 1.2) },
       uCloudDeckFadeHeight: { value: 0.30 },
+      uCloudBank: { value: new THREE.Vector4(0, 0, 0.66, 0) },
       uCloudShade: { value: new THREE.Vector3(0.5, 0.5, 0.5) },
       uStars: { value: 0 },
       uTime: { value: 0 },
@@ -1018,12 +1035,15 @@ export class SkyDome {
     U.uSmoke.value = preset.smoke;
     U.uSmokeColor.value.copy(Vec3(preset.smokeColor));
     U.uSmokeHeight.value = preset.smokeHeight;
+    U.uSmokeHazeTint.value.fromArray(preset.smokeHazeTint ?? [1, 1, 1]);
     U.uCloudShape.value.fromArray(preset.cloudShape ?? [5.5, 0.445, 0.615, 0]);
     // 结构化云层：没写 cloudDeck 的预设 structure = 0，着色器走旧云项（逐比特不变）
     const deck = preset.cloudDeck || null;
     U.uCloudDeck.value.set(deck?.structure ?? 0, deck?.underside ?? 0, deck?.gap ?? 1, deck?.silver ?? 0);
     U.uCloudDeckShape.value.set(deck?.scale ?? 1.6, deck?.coverage ?? 0.7, deck?.softness ?? 0.8, deck?.warp ?? 1.2);
     U.uCloudDeckFadeHeight.value = deck?.fadeHeight ?? 0.30;
+    U.uCloudBank.value.set(deck?.bankStrength ?? 0, THREE.MathUtils.degToRad(deck?.bankAzimuth ?? 0),
+      THREE.MathUtils.degToRad(deck?.bankWidth ?? 38), THREE.MathUtils.degToRad(deck?.bankShear ?? 0));
     U.uCloudShade.value.fromArray(deck?.shade ?? [0.5, 0.5, 0.5]);
     U.uStars.value = preset.stars;
 

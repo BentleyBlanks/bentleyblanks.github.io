@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-11-23",
+  "name": "TerrainDitchRootedVerge",
+  "preset": "drySoil",
+  "source": {
+    "path": "_import/DugoutAidOpenFields/Source_RootedSod.webp",
+    "sha256": "4043463d40b58fcf4ccfcf4bda2e19f1194cffcf260f9fea83fff32447c602dc",
+    "metrics": {
+      "meanSrgb": [
+        0.354,
+        0.2607,
+        0.184
+      ],
+      "luma": 0.2663,
+      "lumaStd": 0.1069,
+      "sat": 0.4803,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0255
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.425,
+      0.383,
+      0.339
+    ],
+    "contrast": 0.068,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.006,
+    "rough": 0.93,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.21,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.065,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.55,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orh",
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 77,
+    "dataQuality": 83,
+    "dataLossless": false,
+    "detailBalance": 0.5,
+    "heightFineWeight": 0.28,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainDitchRootedVergeBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 228886,
+      "sha256": "048d1a3393ba5490ab773e9e764938709af97fba38a7f565e78b1d0f36218fdb"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainDitchRootedVergeNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 66574,
+      "sha256": "6754d5473329dd05f2155d76144c23d49e08a23033753087afb4a70426cc193c"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainDitchRootedVergeOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 41462,
+      "sha256": "1a45762ebc28e6a50a5f0704df80686dab725bb5580a7cf70ba96d038b0e75ee"
+    }
+  ],
+  "totalBytes": 336922,
+  "metrics": {
+    "meanSrgb": [
+      0.4243,
+      0.3838,
+      0.3385
+    ],
+    "luma": 0.3822,
+    "lumaStd": 0.067,
+    "sat": 0.2021,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0028,
+    "seam": 0.0478,
+    "interior": 0.0479,
+    "seamRatio": 0.997,
+    "border": 0.983,
+    "swing": 0.0045,
+    "aoMean": 0.953,
+    "roughMean": 0.916,
+    "texelsPerMeter": 660.6
+  },
+  "gateProblems": []
+}

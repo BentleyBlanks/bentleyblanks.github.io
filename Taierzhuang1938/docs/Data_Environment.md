@@ -33,7 +33,7 @@
 | `Ambient` | 环境光 | 光照 | 天光探针 → `shProbeIntensity`；底色 / 底色强度 → `ambientColor/ambientIntensity` |
 | `Reflection` | 反射 | 反射 | 环境反射 → `envIntensity`（IBL 与探针体 GI 同乘） |
 | `Sky` | 天空 | 天空 | 天顶 / 地平线 / 地面色、辉光、战场烟尘、星 |
-| `Clouds` | 云层 | 天空 | 旧云项 `cloudShape` + 结构化层积云 `cloudDeck` |
+| `Clouds` | 云层 | 天空 | 旧云项 `cloudShape`、结构化层积云 `cloudDeck` 及按世界方位调节的低云带 |
 | `Atmosphere` | 物理大气 | 天空 | `atmosphere.*`：霾、瑞利、臭氧、辐照度、色调、大气透视 |
 | `Fog` | 雾 | 雾 | `fog.*`：浓度、高度衰减、最浓、雾色、朝阳增亮、去饱和 |
 | `Grade` | 曝光与调色 | 后期 | 曝光、饱和、对比、泛光、光束、镜头光晕、分离调色 `fog.grade.*`；**后期档案**（`profile`）决定自动曝光锚点、体积雾参数、胶片颗粒、照明弹昼夜口径按哪一档 `SKY_PRESETS` 查 |

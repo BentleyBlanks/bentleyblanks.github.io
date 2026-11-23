@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-11-23",
+  "name": "TerrainDitchCutLoess",
+  "preset": "rammedEarth",
+  "source": {
+    "path": "_import/AircraftEvacuationDitch/Source_CutBank.webp",
+    "sha256": "ec5d1735c9ff6ccce839a5110484a9d1311d549cbc661cba572557608611939b",
+    "metrics": {
+      "meanSrgb": [
+        0.3649,
+        0.2957,
+        0.2478
+      ],
+      "luma": 0.3028,
+      "lumaStd": 0.0702,
+      "sat": 0.321,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0613
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.451,
+      0.402,
+      0.354
+    ],
+    "contrast": 0.071,
+    "lumaRange": [
+      0.32,
+      0.52
+    ],
+    "satRange": [
+      0.12,
+      0.38
+    ],
+    "stdRange": [
+      0.035,
+      0.11
+    ],
+    "reliefM": 0.012,
+    "rough": 0.93,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.21,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.1,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.58,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orh",
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 77,
+    "dataQuality": 83,
+    "dataLossless": false,
+    "detailBalance": 0.22,
+    "heightFineWeight": 0.16,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainDitchCutLoessBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 173026,
+      "sha256": "67adf013212b40e9c7504ddd9facbf953d61f78d45ceda59040d601c850f3f93"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainDitchCutLoessNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 66212,
+      "sha256": "c4a383c36b55d3e971fd56cdc7af0ae98b7b0f6834a5e5c285aedc4bb9c98484"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainDitchCutLoessOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 27160,
+      "sha256": "aaf0960b9f2068e4895b9967d9d5818acb6444228962e3af85f7288fd238a414"
+    }
+  ],
+  "totalBytes": 266398,
+  "metrics": {
+    "meanSrgb": [
+      0.4505,
+      0.4029,
+      0.3535
+    ],
+    "luma": 0.4023,
+    "lumaStd": 0.0701,
+    "sat": 0.2152,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0184,
+    "seam": 0.0363,
+    "interior": 0.0357,
+    "seamRatio": 1.017,
+    "border": 0.92,
+    "swing": 0.0057,
+    "aoMean": 0.958,
+    "roughMean": 0.926,
+    "texelsPerMeter": 648.1
+  },
+  "gateProblems": []
+}
