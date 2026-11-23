@@ -274,6 +274,9 @@ export class EncounterPlay {
     const retained=this.warmedSignatures.has(signature);
     let bloodDrops=0,prepassBatchPrimed=0,shadowBatchPrimed=0,actorProgramsSubmitted=0,firstBatch=null;
     const excluded=new Set([...this.entries.values()].flatMap(entry=>entry.skin?.hidden||[]));
+    // Formal skins hide these native bodies on every synced frame. Newly attached
+    // ones are still visible here, and drawing them only links unused skinned programs.
+    for(const mesh of excluded)mesh.visible=false;
     const post=host.post;
     const dimensions=retained?null:[post.width,post.height,post.outputWidth,post.outputHeight];
     const hiddenHair=[];
@@ -287,7 +290,7 @@ export class EncounterPlay {
     group.add(debris);
     host.scene.add(group);host.state.warming=true;
     const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch,
-      drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded,
+      drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded,overlapLink:true,
       onFirstDraw:(ms,programs)=>{firstBatch={ms,programs};}};
     try {
       if(dimensions){

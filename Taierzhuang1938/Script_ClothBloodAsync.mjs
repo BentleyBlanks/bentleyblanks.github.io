@@ -1,6 +1,6 @@
 // Runtime towel offload. Authoring keeps the synchronous solver. Resolve the
 // original modules through the stamped import map, including in bundled builds.
-const stateKeys=['params','initialParams','tick','timeS','pendingS','cursor','feed','injectedMl','durationS','events','revision','capacityReached','layers'];
+export const CLOTH_BLOOD_STATE_KEYS=['params','initialParams','tick','timeS','pendingS','cursor','feed','injectedMl','durationS','events','revision','capacityReached','layers'];
 let sourcePromise;
 function Sources(){
   return sourcePromise ||= Promise.all(['./Data_Tuning_ClothBlood.mjs','./Script_Tuning_ClothBlood.mjs','./Script_ClothBloodModel.mjs'].map(async name=>{
@@ -9,7 +9,7 @@ function Sources(){
 }
 const workerLoop=`
 let model,cap,sequence=0;
-const keys=${JSON.stringify(stateKeys)};
+const keys=${JSON.stringify(CLOTH_BLOOD_STATE_KEYS)};
 function Send(flushId,ready=false){
   const state=Object.fromEntries(keys.map(key=>[key,model[key]]));
   state.layers=model.layers.map(layer=>Object.fromEntries(Object.entries(layer).map(([key,value])=>[key,value.slice()])));
@@ -56,7 +56,7 @@ export class AsyncClothBlood {
       if(data.ready){this.resolveReady(true);this.Revoke();}
       if(data.flushId){this.waiters.get(data.flushId)?.(true);this.waiters.delete(data.flushId);}
     };
-    const b=this.blood,state=Object.fromEntries(stateKeys.map(key=>[key,b[key]]));
+    const b=this.blood,state=Object.fromEntries(CLOTH_BLOOD_STATE_KEYS.map(key=>[key,b[key]]));
     worker.postMessage({type:'init',options:{width:b.width,length:b.length,profile:b.profile,params:b.initialParams},state,cap:this.cap});
     for(const item of this.pending)worker.postMessage({type:'advance',...item});
   }

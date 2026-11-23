@@ -4104,6 +4104,9 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
     // 所以不绑靶就 compile 出来的是**另一份用不上的 program** —— 白链一遍，
     // 真正那份到第一帧还得现编现等。（改之前每个材质因此各多一份 `srgb` 变体。）
     // 绑靶与白盒那一层都在 CompileAsRendered 里。
+    // overlapLink：代表件全藏着时先画一帧，天空、背景与后处理在出画时才建的那几份
+    // 程序趁驱动队列还短先链好；否则下面第一批代表件要等整条队列编完才画得出来。
+    if (options.overlapLink && !outside.length) RenderScene(0);
     const submitList = picks.concat(outsidePicks);
     // Keep the driver queue short enough that grabbing the paper can stop the
     // next batch before dozens of pending shader compiles saturate the GPU.
@@ -4127,6 +4130,50 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
     // 没有这一段的话，同样这笔账会在第二段渲染时一个一个被同步逼出来。
     // 兜底：驱动不给这个扩展时 isReady() 恒真，这一段直接空过；卡住超过 90 s 也放行
     // （剩下的照旧退回「用到时现编」，慢但不会挂）。
+    //
+    // options.overlapLink：等链接的这几秒主线程是空的，第三段「按批真画」里最贵的
+    // 贴图上传与首用也只在主线程上。程序已经链好的代表件就在这里先画掉，
+    // 只挑材质的全部 program 都已就绪的那几件，画它不会同步等驱动。场外还有
+    // 第二段要重画的网格时不重叠（那一段要先把它们藏起来）。
+    const pending = picks.slice();
+    let chunk = options.drawBatch || 2;
+    let done = 0;
+    const DrawPicks = (batch) => {
+      const culled = batch.map((object) => object.frustumCulled);
+      for (const object of batch) {
+        object.layers.mask = masks.get(object);
+        // 视锥剔除会把没进画面的整批跳过 —— 跳过就没编，账原封不动留给后面某一镜。
+        // 这一步要的是把 program 逼出来，不是把画面画对。
+        object.frustumCulled = false;
+      }
+      const started = performance.now();
+      const had = renderer.info.programs.length;
+      RenderScene(0);
+      const cost = performance.now() - started;
+      const born = renderer.info.programs.length - had;
+      if(done===0)options.onFirstDraw?.(cost,born);
+      for (let k = 0; k < batch.length; k += 1) {
+        batch[k].layers.set(HIDDEN_LAYER);
+        batch[k].frustumCulled = culled[k];
+      }
+      done += batch.length;
+      if (!options.drawBatch) {
+        if (born) chunk = 1;
+        else if (cost < 30) chunk = Math.min(32, chunk * 2);
+      }
+    };
+    const ProgramsReady = (object) => {
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!material) continue;
+        const programs = renderer.properties.get(material).programs;
+        if (!programs?.size) return false;
+        for (const program of programs.values()) {
+          if (typeof program.isReady === "function" && !program.isReady()) return false;
+        }
+      }
+      return true;
+    };
+    const overlap = !!options.overlapLink && !outside.length;
     {
       const linking = renderer.info.programs.slice();
       const deadline = performance.now() + 90000;
@@ -4139,6 +4186,13 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
         onStep?.(T("boot.step.linkShaders", { done: ready, total: linking.length }),
           BootProgress(BOOT.warm.submitShaders, 0.5 + (ready / Math.max(1, linking.length)) * 0.5));
         if (ready >= linking.length || performance.now() > deadline) break;
+        if (overlap) {
+          const batch = [];
+          for (let i = 0; i < pending.length && batch.length < chunk; i += 1) {
+            if (ProgramsReady(pending[i])) batch.push(...pending.splice(i--, 1));
+          }
+          if (batch.length) DrawPicks(batch);
+        }
         if (!await Yield()) return picks.length;
       }
     }
@@ -4182,32 +4236,8 @@ async function WarmupShaders(root, onStep = null, shouldStop = null, options = {
     // 一批画多少件按上一批的结果收放：建出了新 program 的收到一件（一个 program
     // 三五百毫秒，几件挤进同一帧就是好几秒的冻结），纯命中缓存的一路翻倍放开
     // （那种一批只要几毫秒，逐件跑三百趟纯属白等）。
-    let chunk = options.drawBatch || 2;
-    let done = 0;
-    while (done < picks.length) {
-      const batch = picks.slice(done, done + chunk);
-      const culled = batch.map((object) => object.frustumCulled);
-      for (const object of batch) {
-        object.layers.mask = masks.get(object);
-        // 视锥剔除会把没进画面的整批跳过 —— 跳过就没编，账原封不动留给后面某一镜。
-        // 这一步要的是把 program 逼出来，不是把画面画对。
-        object.frustumCulled = false;
-      }
-      const started = performance.now();
-      const had = renderer.info.programs.length;
-      RenderScene(0);
-      const cost = performance.now() - started;
-      const born = renderer.info.programs.length - had;
-      if(done===0)options.onFirstDraw?.(cost,born);
-      for (let k = 0; k < batch.length; k += 1) {
-        batch[k].layers.set(HIDDEN_LAYER);
-        batch[k].frustumCulled = culled[k];
-      }
-      done += batch.length;
-      if (!options.drawBatch) {
-        if (born) chunk = 1;
-        else if (cost < 30) chunk = Math.min(32, chunk * 2);
-      }
+    while (pending.length) {
+      DrawPicks(pending.splice(0, chunk));
       onStep?.(T("boot.step.warmMaterials", { done, total: picks.length }),
         BootProgress(BOOT.warm.warmMaterials, done / picks.length));
       if (!await Yield()) return picks.length;

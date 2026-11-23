@@ -505,21 +505,48 @@ export class MaterialLibrary {
       ? Math.min(this.smallTextureSize, this.textureSize) : this.textureSize;
   }
 
-  /** Same bytes and texture settings as PrepareSteps; CPU baking stays off the UI thread. */
+  /**
+   * Same bytes and texture settings as PrepareSteps; CPU baking stays off the UI thread.
+   * 配方互不依赖（各自按种子起随机数），按顺序交出结果、但分几条 Worker 同时烘：
+   * 单条 Worker 逐张烘时开机这一步有八成时间主线程在空等。
+   */
   async *PrepareStepsAsync(names = Object.keys(RECIPES)) {
-    const baker = new TextureBaker();
+    const jobs = this.PendingShadingSteps() ? [["DetailNormal", DETAIL_NORMAL.size], ["SkinLut"]] : [];
+    for (const name of names) if (Object.hasOwn(RECIPES, name)) jobs.push([name, this.BakeSize(name)]);
+    if (!jobs.length) return;
+    const results = jobs.map(() => {
+      let resolve, reject;
+      const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; });
+      promise.catch(() => {});
+      return { promise, resolve, reject };
+    });
+    const cores = globalThis.navigator?.hardwareConcurrency || 4;
+    const bakers = Array.from({ length: Math.max(1, Math.min(jobs.length, 4, cores >> 1)) }, () => new TextureBaker());
+    let next = 0, stopped = false;
+    const lanes = bakers.map(async (baker) => {
+      while (!stopped && next < jobs.length) {
+        const index = next++;
+        try { results[index].resolve(await baker.Bake(...jobs[index])); } catch (error) { results[index].reject(error); }
+      }
+    });
     try {
+      let index = 0;
       if (this.PendingShadingSteps()) {
-        const detailNormal = await baker.Bake("DetailNormal", DETAIL_NORMAL.size);
-        const skinLut = await baker.Bake("SkinLut");
+        const detailNormal = await results[index++].promise;
+        const skinLut = await results[index++].promise;
         yield* this.PrepareShadingSteps({ DetailNormal: detailNormal, SkinLut: skinLut });
       }
-      for (const name of names) {
-        if (!Object.hasOwn(RECIPES, name)) continue;
-        const maps = await baker.Bake(name, this.BakeSize(name));
+      for (; index < jobs.length; index += 1) {
+        const [name] = jobs[index];
+        const maps = await results[index].promise;
         yield* this.PrepareSteps([name], { [name]: maps });
       }
-    } finally { baker.Dispose(); }
+    } finally {
+      // 提前结束时先等在烘的那几张收尾再关 Worker：中途关掉会让它们等到超时、退回主线程同步烘。
+      stopped = true;
+      await Promise.all(lanes);
+      for (const baker of bakers) baker.Dispose();
+    }
   }
 
   /** 一张下好的图 → 一张按本库约定配好的贴图。外部图三条路共用。 */

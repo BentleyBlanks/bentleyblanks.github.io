@@ -8,7 +8,7 @@ export const ENCOUNTER_PLAY_STARTUP = {
   audio:{voice:false,ambience:false,music:false},
   shaderSubmitBatch:32,
   // Linked materials can share a draw. Full post frames per two meshes dominate loading.
-  shaderDrawBatch:16,
+  shaderDrawBatch:64,
   meshRevealBatch:2048,
   // Warm draws need the real formats and quality, while pixel count can stay small.
   warmupHeight:144,

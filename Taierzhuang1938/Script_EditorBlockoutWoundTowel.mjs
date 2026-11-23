@@ -11,7 +11,7 @@
 import * as THREE from "three";
 import { CreateClothSampleMaterials } from "./Script_ClothSampleMaterials.mjs";
 import { ClothBlood } from "./Script_ClothBlood.mjs";
-import { AsyncClothBlood } from "./Script_ClothBloodAsync.mjs";
+import { AsyncClothBlood, CLOTH_BLOOD_STATE_KEYS } from "./Script_ClothBloodAsync.mjs";
 
 export const BLOCKOUT_WOUND_TOWEL = Object.freeze({
   /** 叠好的毛巾：宽（顺两肩）、长（顺脊柱）、厚，米；边缘收薄到厚度的 edgeThin 倍；面上褶的起伏。 */
@@ -55,6 +55,10 @@ function TowelGeometry() {
   return g;
 }
 
+// 空推 soakS 秒的结果只由尺寸、档位与初始参数决定。每次 Play 都重算一遍要在主线程上占一秒多，
+// 第一条算完记下状态，后面的毛巾照抄（与重算逐位相同），再各自开始渗血。
+const soaked = new Map();
+
 const _p = new THREE.Vector3(), _c = new THREE.Vector3(), _l = new THREE.Vector3(), _r = new THREE.Vector3();
 const _up = new THREE.Vector3(), _right = new THREE.Vector3(), _fwd = new THREE.Vector3(), _m = new THREE.Matrix4();
 
@@ -68,8 +72,13 @@ export function CreateWoundTowel({asyncBlood=false}={}) {
   let blood = null;
   try {
     blood = new ClothBlood(mesh, { width: W.widthM, length: W.lengthM, profile: W.profile });
-    blood.Inject({ u: 0.5, v: 0.5, side: -1, amountMl: W.soakMl, ageS: 0 });
-    blood.Advance(W.soakS);
+    const key = JSON.stringify([W.widthM, W.lengthM, W.profile, W.soakMl, W.soakS, blood.initialParams]);
+    if (soaked.has(key)) { Object.assign(blood, structuredClone(soaked.get(key))); blood.Sync(); }
+    else {
+      blood.Inject({ u: 0.5, v: 0.5, side: -1, amountMl: W.soakMl, ageS: 0 });
+      blood.Advance(W.soakS);
+      soaked.set(key, structuredClone(Object.fromEntries([...CLOTH_BLOOD_STATE_KEYS, "checkpoints"].map((name) => [name, blood[name]]))));
+    }
     blood.StartFeed({ u: 0.5, v: 0.5, side: -1, rateMlS: W.feedMlS });
   } catch (error) { console.warn("[BlockoutWoundTowel] cloth blood failed; plain towel", error); blood = null; }
   const asynchronous=asyncBlood&&blood?new AsyncClothBlood(blood,W.capMl):null;
