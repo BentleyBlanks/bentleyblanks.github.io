@@ -32,8 +32,8 @@ const PLAYER_BOLT_VOLUME = 0.42;
 
 const WEAPON_LIGHT_BY_SKY = Object.freeze({
   firstLevelBattleDay: Object.freeze({ fill: 0.55, spec: 0.25, color: "#ffffff", ambient: 1.0, sun: 1.0 }),
-  smokyDay: Object.freeze({ fill: 0.55, spec: 0.25, color: "#ffffff", ambient: 1.0, sun: 1.0 }),
   dusk: Object.freeze({ fill: 0.50, spec: 0.22, color: "#ffe2c4", ambient: 0.5, sun: 0.6 }),
+  firstLevelNight: Object.freeze({ fill: 0.30, spec: 0.14, color: "#b4c4e8", ambient: 1.0, sun: 1.0 }),
 });
 
 const IMPACT_CUE = Object.freeze({
