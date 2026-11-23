@@ -132,6 +132,15 @@ for(let index=0;index<gripPoints.count;index++){
 }
 assert(angles.size>=28,'handle neck must give a continuous round highlight, not the old four-flat silhouette');
 assert.equal(grip.index.count/3,1984);
+const stock=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_460G_WoodGroove_VisualCandidate').geometry;
+const stockUv=stock.attributes.uv;
+let stockArea=0;
+for(let corner=0;corner<stock.index.count;corner+=3){
+ const first=stock.index.getX(corner),second=stock.index.getX(corner+1),third=stock.index.getX(corner+2);
+ stockArea+=Math.abs((stockUv.getX(second)-stockUv.getX(first))*(stockUv.getY(third)-stockUv.getY(first))
+                    -(stockUv.getY(second)-stockUv.getY(first))*(stockUv.getX(third)-stockUv.getX(first)))/2;
+}
+assert(stockArea>.30&&stockArea<.34,'stock pore detail must use the widened non-overlapping UV charts');
 for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_MiddleBand57']){
  const [low,,high]=contract.finishRoughnessP10P50P90[part];assert(high-low>24,`flat surface response: ${part}`);
 }

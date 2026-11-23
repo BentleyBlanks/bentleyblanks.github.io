@@ -12,7 +12,7 @@ from PIL import Image
 from scipy.ndimage import distance_transform_edt, gaussian_filter
 from scipy.interpolate import PchipInterpolator
 
-from Script_Type38ExteriorFinish import FrameEngraving, ReadGlb, WriteGlb
+from Script_Type38ExteriorFinish import FrameEngraving, PaintBandScuff, ReadGlb, WriteGlb
 
 
 SAMPLES = {
@@ -113,6 +113,22 @@ def Ramp(low, high, value):
     return phase*phase*(3-2*phase)
 
 
+def WidenStockChart(doc, views, primitive, material, load, store):
+    accessor = doc['accessors'][primitive['attributes']['TEXCOORD_0']]
+    uv = Attribute(doc, views, primitive['attributes']['TEXCOORD_0'], 2).copy()
+    uv[:,0] = .01+2.77*uv[:,0]
+    assert uv.max() < 1 and uv.min() > 0
+    views[accessor['bufferView']] = uv.astype('<f4').tobytes()
+    accessor.update(min=uv.min(axis=0).tolist(), max=uv.max(axis=0).tolist())
+    pbr = material['pbrMetallicRoughness']
+    coat = material['extensions']['KHR_materials_clearcoat']
+    for slot in (pbr['metallicRoughnessTexture'],coat['clearcoatTexture'],material['extensions']['KHR_materials_specular']['specularTexture']):
+        data = load(slot)
+        height,width = data.shape[:2]
+        matrix = np.float64([[2.77,0,.01*width+(2.77-1)*.5],[0,1,0]])
+        store(slot,cv2.warpAffine(data,matrix,(width,height),flags=cv2.INTER_LINEAR,borderMode=cv2.BORDER_REPLICATE))
+
+
 def ShapeHandle(doc, views, primitive):
     points = Attribute(doc, views, primitive['attributes']['POSITION'], 3)
     lower, upper = points.min(axis=0), points.max(axis=0)
@@ -184,6 +200,45 @@ def RearFace(side, up):
     return beads,center+ring,radius
 
 
+def PoreField(length, transverse):
+    def Hash(col, row, salt):
+        value = col.astype('uint32')*np.uint32(3266489917) + row.astype('uint32')*np.uint32(668265263) + np.uint32(salt)
+        value ^= value >> 15
+        value *= np.uint32(2246822519)
+        return ((value ^ (value >> 13)) >> 8).astype('f')/16777216
+    along = length*331
+    across = transverse*764+.17*np.sin(length*82)
+    col,row = np.floor(along).astype('i'),np.floor(across).astype('i')
+    offsetX = along-col-.24-.52*Hash(col,row,117)
+    offsetY = across-row-.25-.50*Hash(col,row,1891)
+    size = Hash(col,row,7201)
+    distance = (offsetX/(.13+.23*size))**2 + ((offsetY+.13*offsetX)/(.12+.13*size))**2
+    return (1-Ramp(.18,1,distance))*Ramp(.18,.77,Hash(col,row,3343))
+
+
+def VarnishTraces(length, transverse, positiveSide):
+    rng = np.random.default_rng(381713)
+    traces = np.zeros_like(length)
+    chips = np.zeros_like(length)
+    for low,high,count in [(-.9,-.70,8),(-.70,-.56,15),(-.56,-.16,16),(-.16,.04,7),(.04,.25,9)]:
+        for index in range(count):
+            center = rng.uniform(low,high)
+            elevation = rng.uniform(-.068,-.009) if low>0 else rng.uniform(.009,.037)
+            extent = rng.uniform(.0019,.0062)
+            selected = (np.abs(length-center)<extent)&(np.abs(transverse-elevation)<.004)&positiveSide
+            if not selected.any():
+                continue
+            phase = (length[selected]-center)/extent
+            direction = rng.uniform(-.43,.43)
+            width = rng.uniform(.00022,.00051)
+            distance = np.abs(transverse[selected]-elevation - extent*(direction*phase+.11*phase**2))
+            feather = (1-Ramp(.40,1,np.abs(phase)))*(.61+.39*np.cos(phase*3.21+index)**2)
+            opacity = (1-Ramp(width*.22,width*1.60,distance))*feather
+            target = chips if index%4==0 else traces
+            target[selected] = np.maximum(target[selected],opacity)
+    return traces,chips
+
+
 def Build(cache):
     repo = Path(__file__).resolve().parents[2]
     folder = repo / 'Taierzhuang1938/Model/Type38_511'
@@ -211,6 +266,8 @@ def Build(cache):
         if 'baseColorTexture' not in pbr:
             continue
         baseSlot, ormSlot = pbr['baseColorTexture'], pbr['metallicRoughnessTexture']
+        if part == 'T38_460G_WoodGroove_VisualCandidate':
+            WidenStockChart(doc, views, primitive, material, Load, Store)
         orm = Load(ormSlot).astype('f')
         height, width = orm.shape[:2]
         handle = part == 'Exterior_HandleOval08'
@@ -218,6 +275,8 @@ def Build(cache):
         if handle:
             ShapeHandle(doc, views, primitive)
         field, padded, valid = SurfaceAtlas(doc, views, primitive, (width, height))
+        if part == 'T38_460G_WoodGroove_VisualCandidate':
+            orm[~padded,0] = 0
         side, up, length, normalSide, normalUp, normalLength, bend = np.moveaxis(field, 2, 0)
         angle = .4 * np.sin(11.3 * length) + .15 * np.sin(31 * length)
         wood = 'Wood' in part
@@ -248,25 +307,60 @@ def Build(cache):
             pore = np.clip((132 - poreScan) / 51, -.7, 1.15)
             handling = np.exp(-((length-.025) / .115) ** 2) + .65 * np.exp(-((length+.5) / .16) ** 2)
             handling *= np.clip(.56 + .27 * normalSide ** 2 + .23 * stain, 0, 1)
-            amber = np.clip(.27 + .47 * fibre + .055 * stain + .05 * angle, .06, .94)
-            color = Tint([58,29,19] if separate else [57,30,20], [152,85,43] if separate else [149,89,49], amber)
+            amber = np.clip(.46 + .39 * fibre + .047 * stain + .052 * angle, .09, .98)
+            sun = Ramp(-.79,-.661,length)*(1-Ramp(-.23,-.065,length))
+            warmWrist = np.exp(-((length+.035)/.17)**2)
+            vessels = PoreField(length,transverse+side*side*13)
+            fleck = np.clip((pore-.12)*.73 + (.37-fibre)*.50 + .76*vessels,0,1)
+            honey = Tint([116,53,5],[237,136,20],amber)
+            oldLacquer = Tint([38,12,6],[91,30,12],amber)
+            rim = 1-Ramp(-.625,-.606,length)
+            color = Blend(oldLacquer,Tint([68,22,10],[129,49,21],amber),rim) if separate else Blend(
+                Tint([62,22,9],[158,66,22],amber),honey,np.clip(.06+.94*sun+.12*warmWrist,0,1))
+            if separate:
+                shoulder = Ramp(-.596,-.521,length)*(1-Ramp(-.394,-.352,length))
+                color = Blend(color,Tint([65,22,9],[134,51,16],amber),shoulder*.72)
+            else:
+                foreTip = 1-Ramp(-.91,-.69,length)
+                color = Blend(color,Tint([48,17,8],[116,49,19],amber),foreTip*.84)
+                handBed = np.exp(-((length+.29)/.18)**2)
+                color = Blend(color,Tint([88,35,12],[199,92,24],amber),handBed*.43)
+            color *= (1-(.17 if separate else .25)*fleck)[:,:,None]
+            if not separate:
+                heel = Ramp(.12,.245,length)*np.clip(.62-.28*stain,0,1)
+                color = Blend(color,Tint([53,21,10],[113,46,18],amber),heel*.63)
+                woodOil = (.34*grainSteel+.60*stain+.35*SteelPatch(2.6,.23))
+                color *= (1+np.clip(woodOil,-1,1)*(.055+.070*sun))[:,:,None]
+                quiet = Ramp(.038,.16,length)*.47
+                color = Blend(color,Tint([88,32,13],[157,68,27],.49+.14*stain),quiet)
+            scratch,chip = VarnishTraces(length,up,side>0) if not separate else (0,0)
+            color = Blend(color,np.array([74,33,16],dtype='f'),scratch*.62) if not separate else color
+            if not separate:
+                color = Blend(color,np.array([170,122,66],dtype='f'),chip*.65)
             breach = np.clip((.74 * edge + .30 * stain + .22 * grainSteel - .49) * 2.0, 0, .90)
             color = Blend(color, Tint([88,56,35], [155,111,70], fibre), breach * .85)
-            rough = 105 + .39*(glossScan-60) + 10*pore + 11*stain - 25*handling + breach*47
+            rough = 102 + .49*(glossScan-60) + 15*fleck + 11*stain - 27*handling + breach*47 + 23*scratch+33*chip
             coat = material['extensions']['KHR_materials_clearcoat']
-            coat['clearcoatFactor'] = .81
+            coat['clearcoatFactor'] = .96
             varnish = Load(coat['clearcoatTexture'])
-            varnish[:, :, 0] = np.where(padded, np.clip(145 + 31*handling - 24*pore - 106*breach, 0, 220), 0)
-            varnish[:, :, 1] = np.where(padded, np.clip(81 + .57*(glossScan-60) + 15*pore + 10*stain - 18*handling + 43*breach, 36, 143), 0)
+            varnish[:, :, 0] = np.where(padded, np.clip(206 + 19*handling - 20*fleck - 114*breach-68*scratch-117*chip, 0, 238), 0)
+            varnish[:, :, 1] = np.where(padded, np.clip(63 + .33*(glossScan-60) + 12*fleck + 7*stain - 13*handling + 48*breach, 34, 132), 0)
             metal = np.zeros_like(rough)
+            relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
             if not separate:
-                inlay = np.clip((orm[:, :, 2]-26)/196, 0, 1)
-                color = Blend(color, Tint([83,82,78],[134,131,122],rubbed), inlay)
+                distal = Ramp(-.673,-.616,length)
+                edgeDist = np.hypot(np.maximum(np.maximum(-.673-length,length+.599),0),up-(.0284+.0019*distal))
+                inlay = (1-Ramp(.00150,.00212,edgeDist))*Ramp(.006,.010,side)
+                rolled = (1-Ramp(.0001,.00225,edgeDist))**.63
+                scuff = PaintBandScuff(doc, views, primitive, (width,height))*np.clip(.74+.22*grainSteel,.22,1)
+                color = Blend(color,Tint([54,28,17],[101,49,20],amber),scuff*.88)
+                color = Blend(color, Tint([96,84,72],[138,124,105],.45+.26*rolled+.11*stain), inlay)
                 metal = inlay * 250
-                varnish[:, :, 0] = np.rint(varnish[:, :, 0]*(1-inlay))
-                rough += inlay * (111 + grainSteel*11 - rough)
+                varnish[:, :, 0] = np.rint(varnish[:, :, 0]*(1-inlay)*(1-.50*scuff))
+                rough += 31*scuff
+                rough += inlay * (97-21*rolled+6*stain-rough)
+                relief = relief*(1-inlay) + (1.12*rolled+.36*inlay)*Ramp(.006,.010,side)-.25*scuff
             Store(coat['clearcoatTexture'], varnish)
-            relief = (poreScan-132) * .0042 + (rgbScan-36) * .0016
         else:
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
             lightTube = part in ('Exterior_LongRound44','Exterior_FrontOuterTube76')
@@ -288,7 +382,15 @@ def Build(cache):
             if jacket or band:
                 rough += 9*flow + 8*stain
             if lightTube:
-                rough = 72 + 12*flow + 10*stain + 4*brush
+                exposed = part == 'Exterior_LongRound44'
+                color = Tint([150,151,149],[194,192,183],.60+.15*flow+.04*stain) if exposed else Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
+                rough = (68 if exposed else 86) + 7*flow + 5*stain + 4*brush
+            if band:
+                color = Tint([116,113,107],[170,166,156],.48+.22*flow+.05*stain)
+                rough = 87+24*flow+17*stain+5*brush-15*edge
+            if jacket:
+                color = Tint([64,61,57],[105,100,92],.51+.22*flow+.05*stain)
+                rough = 97+25*flow+18*stain+4*brush-16*edge
             if handle:
                 knob = Ramp(.044,.054,side)
                 color = Blend(Tint([155,149,139],[199,193,183],.48+.19*flow),
@@ -304,8 +406,12 @@ def Build(cache):
                 relief += face*(2.2*beads + 5.1*center)
             if part == 'Exterior_FoldedFrame12':
                 marks = FrameEngraving(Image.fromarray(Load(material['normalTexture'])))
+                color = Tint([108,104,97],[160,155,142],.50+.19*flow+.06*stain)
                 color = Blend(color, np.array([39,39,38], dtype='f'), marks*.84)
-                rough += 25*marks
+                rough = 112+10*flow+6*brush+24*marks
+            if part == 'SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH':
+                color = Tint([154,146,128],[198,187,159],.57+.12*flow+.05*stain)
+                rough = 108+11*flow+7*brush
         if 'normalTexture' in material:
             normalSlot = material['normalTexture']
             normals = Load(normalSlot).astype('f') / 127.5 - 1
@@ -326,14 +432,14 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_MuseumSteel02'
+    doc['asset']['extras']['version'] = 'Type38_AmberLacquer03'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 70807
     doc['asset']['extras']['runtimeTriangles'] = triangles
     digest = WriteGlb(folder/'Model_Type38_511.glb', doc, views)
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
-    manifest.update(version=4, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=5, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):

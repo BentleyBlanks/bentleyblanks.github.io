@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-museum-steel-02');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70807);
+ assert.equal(evidence.identity.version,'511-amber-lacquer-03');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,70807);
  assert.equal(evidence.identity.npcTriangles,66199);assert.equal(evidence.identity.nearNpcTriangles,70807);
  assert.equal(evidence.identity.worldTriangles,70807);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -50,18 +50,22 @@ try{
     const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(coat,0,0);
     const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;ctx.drawImage(orm,0,0);
     const coverage=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    let visible=0,varnished=0;
+    ctx.drawImage(mat.map.image,0,0);const base=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    let visible=0,varnished=0,redSum=0,greenSum=0;
     for(let offset=0;offset<pixels.length;offset+=4*17){
      if(coverage[offset]<230||coverage[offset+2]>50)continue;
      visible++;
+     redSum+=base[offset];greenSum+=base[offset+1];
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished});
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible});
    });
    return samples;
   });
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
+  const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
+  assert(lower.meanGreen>upper.meanGreen*1.35&&lower.meanRed>upper.meanRed*1.12,'the stained crown and warmer lower wood must not collapse to the same brown');
  }
  assert(evidence.identity.materials.filter(m=>m.base).every(m=>m.colour.every(c=>Math.abs(c-1)<1e-8)));
  assert.equal(evidence.identity.glError,0);

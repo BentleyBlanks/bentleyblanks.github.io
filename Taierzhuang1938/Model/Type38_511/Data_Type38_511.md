@@ -1,6 +1,16 @@
 # Dots Type38 511 runtime integration
 
-## 当前外观：馆藏钢件 · 2026-11-23
+## 当前外观：漆木与钢件对照 · 2026-11-23
+
+主要依据是[整枪侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)、[中箍和前段木料近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)、[反侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)、[后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)和[刻度框顶视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_(top_view).JPG)。仅参考外观，不使用实物照片像素制作运行时贴图；不复刻编号、徽记、刻字。不同机位、闪光强度与曝光不能作为实测 PBR。
+
+- 整体侧照中，托尾与靠近前端的木料偏深，中段更暖；中箍特写又区分出深红上护木、漆木露边和琥珀色下木。底色分区随模型表面连续变化。木孔、薄漆亮带和局部脱漆分别进入颜色、粗糙度、微法线与清漆图。
+- 长木托旧 UV 面积仅占图集约 11.5%。仅沿 U 方向拉开原有图岛（不旋转、不翻转、不改变顶点或原接缝），使覆盖率达到 31.8%，横向采样提高 2.77 倍。在新坐标回填材质，重映射共用的数据图、保留透明通道，并把图岛外无效的覆盖值清零。
+- 中箍邻近的窄嵌条改为有圆收头、窄边高光的深灰钢，不是覆在木面的大片银色噪声。中箍、裸露长钢面、深色前端与覆面分别处理；刻度框与中央钢面在纹理和失光程度上分开。枪栓、所有几何、动作、挂点和贴图数量不变。
+- 检查器在 **8 个机位 × 3 种光照**下对照旧版、新版源模型与实际 GPU 发布副本；近轴闪光仅供局部照片对标，不更改游戏光照。中箍侧面下木／上木显示亮度比：参考 **4.73**、旧版 **1.24**、新版 GPU **5.10**；嵌条／下木各为 **0.44、1.72、0.39**。匹配的是部位关系和外观趋势，并非所有曝光和磨痕逐像素相同。
+- 网页压缩相对源模型的 24 组前景亮度 SSIM 最低 **0.9878**（下取四位），指标仅用来检查压缩是否损害质感。运行时 **70,807** 三角，普通 NPC **66,199**；45 部件，116 张内嵌图。源模型由下方 `Script_Type38Surface.py` 重建。
+
+## 馆藏钢件 · 2026-11-23（前一版）
 
 主参考是 Ca.garcia.s 同一件实物的[后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)、[反侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)、[上方斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG)和[木箍与长金属面的同框照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)。取它们共同支持的轮廓与相对明暗，不把室内暖色闪光烘入纹理。
 
