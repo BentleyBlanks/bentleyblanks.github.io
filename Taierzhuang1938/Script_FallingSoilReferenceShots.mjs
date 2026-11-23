@@ -12,7 +12,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')console.log('ERROR',m.text().slice(0,600));});
  await page.addInitScript(()=>{localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));});
- await page.goto(base+'/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&quality=high&audio=0&manual=1&menu=0',{waitUntil:'domcontentloaded',timeout:180000});
+ await page.goto(base+'/Taierzhuang1938/?editor=vfx&effect=SoilCeilingShake&quality=high&audio=0&manual=1&menu=0',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});console.log('Reference camera ready',label);
  const report=[];
  const effects=Arg('effects','SoilCeilingShake,SoilPlankLeak,SoilBrokenEdge').split(',');

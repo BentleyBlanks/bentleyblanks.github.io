@@ -9,10 +9,10 @@
 // 路径口径：下面的地址都以 AdvancedTools/ 目录里的页面为基准（`./` = AdvancedTools/，`../` = Taierzhuang1938/）。
 
 export const STUDIO_TOOL_IDS = Object.freeze([
-  "assetStandards", "audio", "props", "actor", "facial", "vfx",
+  "assetStandards", "props", "actor", "facial",
 ]);
 
-export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "weapon", "firstPerson", "textures", "splines", "propPcg"]);
+export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "weapon", "firstPerson", "vfx", "audio", "textures", "splines", "propPcg"]);
 
 export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
 

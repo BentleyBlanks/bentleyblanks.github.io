@@ -23,7 +23,7 @@ try{
  page.on('pageerror',e=>{errors.push(String(e));console.log('PAGE ERROR',String(e));});page.on('console',m=>{if(m.type()==='error'){errors.push(m.text().slice(0,700));console.log('CONSOLE ERROR',m.text().slice(0,700));}});
  await page.addInitScript(()=>{localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));});
  const Open=async quality=>{
-   await page.goto(base+'/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&manual=1&menu=0&audio=0'+(quality?'&quality='+quality:''),{waitUntil:'domcontentloaded',timeout:300000});
+   await page.goto(base+'/Taierzhuang1938/?editor=vfx&effect=SoilCeilingShake&manual=1&menu=0&audio=0'+(quality?'&quality='+quality:''),{waitUntil:'domcontentloaded',timeout:300000});
    try{await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});}
    catch(error){console.log('STARTUP',await page.locator('body').innerText());await Capture('StartupFailure');throw error;}
    console.log('editor ready',quality||'default');

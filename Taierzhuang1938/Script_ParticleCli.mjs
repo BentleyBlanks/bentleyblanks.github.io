@@ -99,7 +99,7 @@ try {
      if(!/^[A-Za-z0-9]+$/.test(effect)||!Number.isFinite(seconds)||seconds<0||seconds>20)throw new Error('Invalid effect capture');
      const state=await page.evaluate(async({effect,seconds})=>{
        const g=window.Tengxian;
-       if(g.editor.ActiveId!=='vfx')g.editor.Open('vfx');
+       if(g.editor.ActiveId!=='vfx')g.editor.Open('vfx',{harness:true});
        const editor=g.editor.active;
        if(!editor.Effects().some(entry=>entry.id===effect))throw new Error('Unknown editor effect '+effect);
        editor.Stop();editor.loop=false;
@@ -115,7 +115,7 @@ try {
  }
  if(argv.includes('--editor-check'))report.editor=await page.evaluate(()=>{
    const g=window.Tengxian,original=g.Particles,sources=g.vfx.smokeSources,before=JSON.stringify(original.Inspect());
-   g.editor.Open('vfx');g.StepFrames(30,1/60,true);
+   g.editor.Open('vfx',{harness:true});g.StepFrames(30,1/60,true);
    const result={isolated:g.Particles!==original,frozen:before===JSON.stringify(original.Inspect()),
      previewAlive:g.Particles.Inspect().entries.some(e=>e.particleCount>0)};
    g.editor.Close();result.restored=g.Particles===original&&g.vfx.smokeSources===sources&&before===JSON.stringify(original.Inspect());

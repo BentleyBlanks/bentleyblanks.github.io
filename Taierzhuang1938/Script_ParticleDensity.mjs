@@ -1,4 +1,4 @@
-import {MakeVolumetricNoiseTexture} from './Script_PostVolumetrics.mjs';
+import {MakeVolumetricNoiseTexture} from './Script_VolumetricNoise.mjs';
 const fields=new WeakMap();
 export const PARTICLE_DENSITY_GLSL=/*glsl*/`
 precision highp sampler3D;

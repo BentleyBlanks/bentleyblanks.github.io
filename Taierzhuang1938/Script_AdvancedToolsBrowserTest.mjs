@@ -135,11 +135,12 @@ try {
     if (id === STUDIO_TOOL_IDS[0]) {
       Check("菜单栏只列摄影棚工具、有「返回控制中心」", [...probe.entries].sort().join(",") === [...STUDIO_TOOL_IDS].sort().join(",") && probe.back === "返回控制中心", probe.entries.join(","));
       // 页内切换：一次只开一个
-      await page.evaluate(() => window.ToolStudio.Open("vfx"));
+      const other = STUDIO_TOOL_IDS.find((tool) => tool !== id);
+      await page.evaluate((tool) => window.ToolStudio.Open(tool), other);
       await page.waitForTimeout(800);
       const switched = await page.evaluate(() => ({ active: window.ToolStudio.activeId, work: document.querySelectorAll(".edPanel.work").length,
         on: [...document.querySelectorAll(".edMenuItem.on")].map((item) => item.dataset.editor) }));
-      Check("页内切换工具：一次只开一个", switched.active === "vfx" && switched.on.join() === "vfx" && switched.work === 1, JSON.stringify(switched));
+      Check("页内切换工具：一次只开一个", switched.active === other && switched.on.join() === other && switched.work >= 1, JSON.stringify(switched));
       await page.keyboard.press("Escape");
       const closed = await page.evaluate(() => ({ active: window.ToolStudio.activeId, work: document.querySelectorAll(".edPanel.work").length, empty: !document.getElementById("edInspectorEmpty")?.hidden }));
       Check("Esc 关掉当前工具回到空 Inspector", closed.active === null && closed.work === 0 && closed.empty, JSON.stringify(closed));
@@ -393,6 +394,138 @@ try {
     const reloadSnap = await page.evaluate(() => window.FirstPersonInspection.Snapshot());
     Check("空仓换弹与实机同源（空仓开膛触发 reload）", reloadSnap.action?.kind === "reload" && reloadSnap.ammo === 0, JSON.stringify(reloadSnap));
     Check("第一人称独立窗口没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await page.close();
+  }
+
+  // --- 3b. 特效预览 / 音效音乐独立窗口（2026-11-23 从工具宿主拆出）---------------------------
+  // 只装各自要预览的系统：特效窗口 = 特效系统 + 中性预览台 + 环境预设；声音窗口 = 音频引擎。
+  const MEDIA_FORBIDDEN = /\/Script_(Main|Post\w*|Light|Sky|Gi|Atmosphere|Materials|MaterialShading|World|ClusteredLights|ToolStudioRenderBase|TengxianCity|TengxianField)\.mjs|\/Data_(Battle|Tengxian|FirstLevelMissionLayout)\.mjs|\/__scene\//;
+  if (!only || only.has("vfx")) {
+    const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=vfx&effect=ExplosionGrenade`, { waitUntil: "commit" });
+    await legacy.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_VfxPreview.html") && url.searchParams.get("effect") === "ExplosionGrenade");
+    Check("旧工具宿主链接带参数转到特效预览独立窗口", true);
+    await legacy.close();
+
+    const requests = [];
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 240)}`));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(`CONSOLE ${message.text().slice(0, 200)}`); });
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(`${base}Tool_VfxPreview.html?effect=FireMedium&quality=low&manual=1`, { waitUntil: "load", timeout: 120000 });
+    await page.waitForFunction(() => window.VfxPreview?.ready || !document.getElementById("vfxBootError")?.hidden, null, { timeout: 180000 });
+    await page.evaluate(() => window.VfxPreview.StepFrames(120));
+    const fire = await page.evaluate(() => {
+      const v = window.VfxPreview, i = v.Inspect();
+      return { effect: i.editor.effect, alive: i.editor.particles.entries.reduce((n, e) => n + e.particleCount, 0),
+        lights: i.lights, env: i.environment, exposure: i.exposure, presets: v.environment.presetIds.length,
+        looks: v.environment.Looks().map((look) => look.id), panel: !!document.querySelector('.edPanel.work [data-vfx-action="play"]'),
+        sceneChildren: v.stage.scene.children.map((child) => child.type) };
+    });
+    Check("特效窗口：持续火焰在中性预览台里真实发射，火源点光亮着", fire.effect === "FireMedium" && fire.alive > 0 && fire.lights.fires > 0 && fire.lights.active > 0 && fire.panel,
+      JSON.stringify({ alive: fire.alive, lights: fire.lights }));
+    Check("特效窗口：昼夜来自项目环境预设（预设自带 looks）", fire.presets > 0 && fire.env.preset && fire.looks.length >= 2 && Number.isFinite(fire.env.hour),
+      JSON.stringify({ env: fire.env, looks: fire.looks, presets: fire.presets }));
+    const buffer = await page.screenshot();
+    const spread = await Spread(buffer, { left: 40, top: 80, width: 900, height: 700 });
+    Check("特效窗口：视口不是一片纯色", spread > 12, `spread=${spread.toFixed(1)}`);
+    if (shots) await fs.writeFile(path.join(shotDir, "VfxPreview_FireMedium.png"), buffer);
+
+    // 换昼夜：灯与曝光取预设那一档的数值，不是写死的一套
+    const looks = {};
+    for (const look of fire.looks) {
+      await page.locator("[data-vfx-environment]").selectOption(look);
+      await page.evaluate(() => window.VfxPreview.StepFrames(2));
+      looks[look] = await page.evaluate(() => {
+        const v = window.VfxPreview;
+        return { look: v.environment.lookId, sun: v.stage.lights.sun.intensity, wanted: v.environment.env.lightIntensity,
+          exposure: v.stage.OutputExposure, wantedExposure: v.environment.env.exposure, probe: v.stage.lights.globalProbe.intensity,
+          wantedProbe: v.environment.env.shProbeIntensity, flareScale: v.stage.lights.flareSceneScale };
+      });
+    }
+    Check("特效窗口：每一档的主光、天光与曝光都等于环境预设拼出来的值",
+      Object.entries(looks).every(([id, s]) => s.look === id && Math.abs(s.sun - s.wanted) < 1e-6 && Math.abs(s.exposure - s.wantedExposure) < 1e-6
+        && Math.abs(s.probe - s.wantedProbe) < 1e-6) && new Set(Object.values(looks).map((s) => s.sun)).size > 1, JSON.stringify(looks));
+    const presetOptions = await page.locator("[data-vfx-env-preset] option").evaluateAll((options) => options.map((option) => option.value));
+    if (presetOptions.length > 1) {
+      await page.locator("[data-vfx-env-preset]").selectOption(presetOptions[1]);
+      await page.waitForFunction((id) => window.VfxPreview.environment.presetId === id, presetOptions[1]);
+      Check("特效窗口：可以换环境预设，昼夜选项跟着这份预设走", await page.evaluate(() => {
+        const v = window.VfxPreview;
+        const options = [...document.querySelectorAll("[data-vfx-environment] option")].map((option) => option.value);
+        return options.join() === v.environment.Looks().map((look) => look.id).join() && options.includes(v.environment.lookId);
+      }));
+    }
+
+    // 照明弹：进入时默认切到预设的「晚上」那一档，升空后有一盏带阴影的预览灯照着场地
+    await page.evaluate(() => { window.VfxPreview.editor.SelectEffect("Illumination"); window.VfxPreview.StepFrames(330); });
+    const flare = await page.evaluate(() => {
+      const v = window.VfxPreview, i = v.Inspect();
+      return { look: v.environment.lookId, flare: i.editor.flare, lights: i.lights, shadowLight: v.stage.lights.shadowLight.intensity,
+        field: v.editor.flareField?.root.visible };
+    });
+    Check("特效窗口：照明弹默认用预设的「晚上」、点燃后照亮场地", flare.look === "night" && flare.field && flare.shadowLight > 0 && flare.lights.flareSceneScale === 1,
+      JSON.stringify({ look: flare.look, shadow: flare.shadowLight, scale: flare.lights.flareSceneScale, phase: flare.flare?.flares?.[0]?.phase }));
+    const flareShot = await page.screenshot();
+    if (shots) await fs.writeFile(path.join(shotDir, "VfxPreview_IlluminationNight.png"), flareShot);
+    Check("特效窗口：不加载游戏的灯光装置、后处理、天空、材质库与关卡", !requests.some((url) => MEDIA_FORBIDDEN.test(url)),
+      requests.filter((url) => MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
+    Check("特效窗口：没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await page.close();
+  }
+
+  if (!only || only.has("audio")) {
+    const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=audio`, { waitUntil: "commit" });
+    await legacy.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_AudioPreview.html"));
+    Check("旧工具宿主链接转到音效音乐独立窗口", true);
+    await legacy.close();
+
+    const requests = [];
+    const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 240)}`));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(`CONSOLE ${message.text().slice(0, 200)}`); });
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(`${base}Tool_AudioPreview.html`, { waitUntil: "load", timeout: 120000 });
+    await page.waitForFunction(() => window.AudioPreview?.ready, null, { timeout: 60000 });
+    await page.mouse.click(40, 600);
+    const audio = await page.evaluate(async () => {
+      const { editor } = window.AudioPreview;
+      const names = editor.Names();
+      editor.PlayCurrent();
+      editor.NewBlind();
+      const { CATEGORIES } = await import("./AdvancedTools/Script_EditorAudio.mjs");
+      const { SOUND_NAMES } = await import("./Script_Audio.mjs");
+      const seen = new Set();
+      for (const category of CATEGORIES.filter((c) => c !== "全部")) { editor.category = category; for (const name of editor.Names()) seen.add(name); }
+      editor.category = "全部";
+      return { count: names.length, blind: editor.blind?.options.length ?? 0, undescribed: SOUND_NAMES.filter((name) => !seen.has(name)),
+        canvas: document.querySelectorAll("canvas").length, panel: !!document.querySelector(".edPanel.work [data-ambience]") };
+    });
+    Check("音效窗口：列出全部配方、盲听出四选一", audio.count >= 30 && audio.blind === 4 && audio.panel, JSON.stringify(audio));
+    Check("音效窗口：每个配方都有分类与说明", audio.undescribed.length === 0, audio.undescribed.join(", "));
+    await page.click('[data-ambience="night"]');
+    await page.click('[data-music="tension"]');
+    await page.waitForFunction(() => !!window.AudioPreview.audio.musicLayer && window.AudioPreview.audio.ambLayers.length + window.AudioPreview.audio.ambienceNodes.length > 0,
+      null, { timeout: 60000 }).catch(() => {});
+    const playing = await page.evaluate(() => {
+      const a = window.AudioPreview.audio;
+      return { paused: a.paused, ambience: a.ambiencePreset, ambienceLive: a.ambLayers.length + a.ambienceNodes.length, music: a.musicCue, musicLive: !!a.musicLayer };
+    });
+    Check("音效窗口：环境床与音乐能试听", !playing.paused && playing.ambience === "night" && playing.ambienceLive > 0 && playing.music === "tension" && playing.musicLive,
+      JSON.stringify(playing));
+    await page.click("[data-stop-ambience]");
+    await page.click("[data-stop-music]");
+    const stopped = await page.evaluate(() => {
+      const a = window.AudioPreview.audio;
+      return { ambience: a.ambiencePreset, music: a.musicCue, musicLive: !!a.musicLayer };
+    });
+    Check("音效窗口：环境与音乐各自都能停", stopped.ambience === "silence" && stopped.music === null && !stopped.musicLive, JSON.stringify(stopped));
+    if (shots) await page.screenshot({ path: path.join(shotDir, "AudioPreview.png") });
+    Check("音效窗口：不建渲染器、不加载 three 与任何渲染模块", audio.canvas === 0
+      && !requests.some((url) => /\/vendor\/three\/|\/Script_(Vfx|Particle\w*|EditorStage)\.mjs/.test(url) || MEDIA_FORBIDDEN.test(url)),
+      requests.filter((url) => /\/vendor\/three\/|Script_(Vfx|Particle)/.test(url) || MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
+    Check("音效窗口：没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
     await page.close();
   }
 

@@ -4,6 +4,7 @@ import { Mulberry32 } from "./Script_Noise.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_SORTIE, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGE_ROUTES, MISSION_REAR_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { PLUME_STYLES, PlumeProfile } from "./Data_SmokePlumeStyles.mjs";
 
 export const DISTANT_SMOKE_SEED = 19380406;
 export const DISTANT_SMOKE_REGIONS = Object.freeze([
@@ -36,14 +37,7 @@ export const DISTANT_SMOKE_TYPES = Object.freeze({
     plume: Object.freeze([1.7, 0.6, 0.2, 0.7]) }),
 });
 
-const ROAD_STYLES = Object.freeze([
-  { type:"sootColumn", frame:0, height:9, width:4.6, base:.9, aspect:1.08, opacity:.23, life:18 },
-  { type:"billowColumn", frame:1, height:7, width:6.0, base:1.3, aspect:.95, opacity:.35, life:12 },
-  { type:"dustBank", frame:2, height:2.8, width:6.0, base:2.2, aspect:.45, opacity:.25, life:10 },
-  { type:"windShear", frame:3, height:3.6, width:7.0, base:2.0, aspect:.34, opacity:.25, life:11 },
-  { type:"groundScreen", frame:4, height:2.6, width:6.0, base:1.4, aspect:.62, opacity:.38, life:10 },
-  { type:"burstDust", frame:5, height:5.0, width:6.5, base:.8, aspect:.84, opacity:.43, life:11 },
-].map(Object.freeze));
+const ROAD_STYLES = PLUME_STYLES;
 // These pockets give the opening/front views and each later road a readable
 // non-black effect, instead of hiding all the alternatives behind distant soot.
 const VARIETY_POCKETS = Object.freeze([
@@ -56,13 +50,8 @@ const VARIETY_POCKETS = Object.freeze([
   {id:"BridgeDustPulse",x:114,z:115,frame:5},
   {id:"RearWhiteBillow",x:-114,z:207,frame:1},
 ]);
-function RoadProfile(style,scale,random,tier="near") {
-  const size=tier==="middle"?1.5:1;
-  return Object.freeze({type:style.type,frame:style.frame,seed:Math.floor(random()*0xffffffff),
-    height:style.height*scale*size,baseWidth:style.base*scale,crownWidth:style.width*scale*size,
-    aspect:style.aspect,opacity:style.opacity,life:style.life*(.85+random()*.3),spread:scale*.65,
-    driftX:-(style.frame===3?3.5:2.4)*scale,driftZ:-.5*scale,nearFade:2.4});
-}
+// 烟柱样式与 backdrop 参数归 Data_SmokePlumeStyles（效果定义，不依赖本关路线）。
+const RoadProfile = PlumeProfile;
 
 // Scatter alongside the actual walking/tank roads, including the village and
 // bridge approach. The seed changes the shoulder, spacing, scale and recipe.

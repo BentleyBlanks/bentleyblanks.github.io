@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- 页面在 AdvancedTools/ 里；特效模块按游戏根目录读 ./Texture/…、./Vfx/…，环境预设在 ./Environment/，
+       所以文档基准指回上一层。 -->
+  <base href="../">
+  <title>特效预览 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
+  <link rel="stylesheet" href="./Style_Editor.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: #08080a; overflow: hidden; }
+    #view { position: fixed; top: var(--vfx-bar-h, 46px); left: 0; right: var(--ed-inspector-w, 380px); bottom: 0;
+      width: calc(100% - var(--ed-inspector-w, 380px)); height: calc(100% - var(--vfx-bar-h, 46px)); display: block; outline: none; }
+    #vfxPreviewPage #edRoot .edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)::before { content: "高级工具 / 特效预览"; }
+    #vfxBootError { position: fixed; left: 24px; bottom: 24px; z-index: 60; color: #ffae98; font: 14px/1.5 var(--ui-font, sans-serif); }
+  </style>
+  <!-- 这一页只认 three；特效模块之间都是相对路径，不读游戏 index.html 的整张 import map。 -->
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./AdvancedTools/Script_VfxPreview.mjs"></script>
+</head>
+<body id="vfxPreviewPage" class="uiToolSurface edThemedSurface">
+  <canvas id="view" tabindex="0" aria-label="特效预览视口：左键旋转，右键平移，滚轮缩放"></canvas>
+  <p id="vfxBootError" role="alert" hidden></p>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- 页面在 AdvancedTools/ 里；音频引擎按游戏根目录读 ./Audio/…，所以文档基准指回上一层。 -->
+  <base href="../">
+  <title>音效音乐 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
+  <link rel="stylesheet" href="./Style_Editor.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0c0b; overflow: hidden; }
+    /* 没有三维视口：面板占满菜单栏下面整页，列表与参数居中摊开。选择器压过 Style_Editor 的 Inspector 停靠规则。 */
+    #audioPreviewPage #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) {
+      left: 0; right: 0; width: auto; border-left: 0; box-shadow: none; background: var(--ed-panel);
+    }
+    #audioPreviewPage #edRoot .edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)::before {
+      content: "高级工具 / 音效音乐"; max-width: 980px; width: 100%; margin: 0 auto; box-sizing: border-box;
+    }
+    #audioPreviewPage #edRoot .edPanel.work .edHead,
+    #audioPreviewPage #edRoot .edPanel.work .edBody {
+      max-width: 980px; width: 100%; margin: 0 auto; box-sizing: border-box;
+    }
+  </style>
+  <!-- 这一页只用到 three 之外的模块；不读游戏 index.html 的整张 import map。 -->
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./AdvancedTools/Script_AudioPreview.mjs"></script>
+</head>
+<body id="audioPreviewPage" class="uiToolSurface edThemedSurface">
+</body>
+</html>

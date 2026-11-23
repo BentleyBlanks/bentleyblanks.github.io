@@ -15,8 +15,9 @@ import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
 import { ClusteredLights, SetActiveClusteredLights } from "./Script_ClusteredLights.mjs";
 import { EFFECT_LIGHT_COUNT } from "./Data_Tuning_Lights.mjs";
 import { MakeClusterTier } from "./Script_Tuning_Lights.mjs";
+import { FireFlicker, SpotFlicker, ExplosionEnvelope, MuzzleEnvelope } from "./Script_EffectLightEnvelope.mjs";
 import {
-  CsmRig, ApplyRendererShadowSettings, SUN_SHADOW_SAMPLER_GLSL, MakeSunShadowUniforms,
+  CsmRig, ApplyRendererShadowSettings,
 } from "./Script_Csm.mjs";
 const MAX_EXPLOSION_ENVELOPES = 12;
 
@@ -51,22 +52,9 @@ function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
 //   · normal offset 在世界空间做（把着色点沿法线推出去），不是把 bias 调大 ——
 //     后者是 peter-panning。
 // ---------------------------------------------------------------------------
-export const SUN_SHADOW_GLSL = SUN_SHADOW_SAMPLER_GLSL;
-
-/**
- * 在一份 uniforms 上建齐 `SUN_SHADOW_GLSL` 要的条目，并接上当前的级联阴影图。
- * `lightRig` 传 null 也合法（建条目、置 `uSunShadowEnabled = 0`），
- * 之后再调 `lightRig.SyncShadowUniforms()` 补上。
- * @returns {object} 同一份 uniforms（方便链式）
- */
-export function BindSunShadowUniforms(uniforms, lightRig = null) {
-  MakeSunShadowUniforms(uniforms);
-  if (lightRig) {
-    lightRig.RegisterShadowUniforms(uniforms);
-    lightRig.SyncShadowUniforms();
-  }
-  return uniforms;
-}
+// 本体住在 Script_SunShadowSampling（只引 Script_Csm，贴花这类调用方不必再拖进整个灯光装置），
+// 这里再导出，老的调用点照旧从 Script_Light 取。
+export { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_SunShadowSampling.mjs";
 
 export class LightRig {
   /**
@@ -548,18 +536,13 @@ export class LightRig {
     const scoringFocus = this.hasEffectFocus ? this.effectFocus : null;
     const candidates = [];
 
-    // 火焰闪烁：两个不同频率的正弦叠一点噪声。单频率会看出规律的"呼吸"。
+    // 火焰闪烁（Script_EffectLightEnvelope.FireFlicker，独立特效预览共用同一份）。
     // `flicker:false` 的光源自带包络（照明弹），这里原样兑现它写进来的强度。
     for (const state of this.fireSources.values()) {
       if (state.flicker === false) {
         state.currentIntensity = state.base;
       } else {
-        const t = elapsed * 1.0 + state.seed;
-        const flicker = 0.72
-          + 0.18 * Math.sin(t * 7.3)
-          + 0.10 * Math.sin(t * 17.9 + 1.7)
-          + 0.08 * Math.sin(t * 31.1 + 3.1);
-        state.currentIntensity = state.base * Math.max(0.28, flicker);
+        state.currentIntensity = state.base * FireFlicker(elapsed, state.seed);
       }
       state.currentRadius = state.radius;
       state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
@@ -569,18 +552,15 @@ export class LightRig {
     for (let i = this.explosionEnvelopes.length - 1; i >= 0; i -= 1) {
       const state = this.explosionEnvelopes[i];
       state.age += step;
-      const t = Clamp01(state.age / state.duration);
-      if (t >= 1) {
+      // 极短的白热峰 + 稍长的火球余辉（Script_EffectLightEnvelope.ExplosionEnvelope）。
+      const envelope = ExplosionEnvelope(state.age, state.duration);
+      if (envelope.done) {
         this.explosionEnvelopes.splice(i, 1);
         continue;
       }
-      // 极短的白热峰 + 稍长的火球余辉。两项都按秒算，30/60/120 fps 下同一时刻同亮度。
-      const flash = 0.62 * Math.exp(-8 * t);
-      const fire = 0.38 * (1 - t) * (1 - t);
-      state.currentIntensity = state.base * (flash + fire);
-      state.currentRadius = state.radius * (0.55 + 0.45 * Clamp01(t / 0.22));
-      const warm = 1 - Math.exp(-12 * t);
-      state.currentColor.copy(state.coreColor).lerp(state.fireColor, warm);
+      state.currentIntensity = state.base * envelope.intensity;
+      state.currentRadius = state.radius * envelope.radius;
+      state.currentColor.copy(state.coreColor).lerp(state.fireColor, envelope.warm);
       state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
       candidates.push(state);
     }
@@ -603,8 +583,7 @@ export class LightRig {
     // 先按当前年龄给亮度、再长一岁：开枪就发生在这一帧里，紧跟着画出来的那一帧
     // 必须是满亮度。原来先长一岁再算，60 fps 只剩 42%、20 fps 直接是 0。
     if (this.muzzleAge < this.muzzleDuration) {
-      const t = Clamp01(this.muzzleAge / this.muzzleDuration);
-      this.muzzle.intensity = this.muzzleBase * (1 - t) * (1 - t);
+      this.muzzle.intensity = this.muzzleBase * MuzzleEnvelope(this.muzzleAge, this.muzzleDuration);
       this.muzzleAge += step;
     } else {
       this.muzzle.intensity = 0;
@@ -613,9 +592,7 @@ export class LightRig {
     // 聚光的包络：与点光同一套（flicker 默认关，探照灯不该在抖）。
     for (const state of this.spotSources.values()) {
       if (state.flicker) {
-        const t = elapsed * 1.0 + state.seed;
-        const flicker = 0.78 + 0.14 * Math.sin(t * 6.1) + 0.08 * Math.sin(t * 15.3 + 2.2);
-        state.currentIntensity = state.base * Math.max(0.3, flicker);
+        state.currentIntensity = state.base * SpotFlicker(elapsed, state.seed);
       } else {
         state.currentIntensity = state.base;
       }

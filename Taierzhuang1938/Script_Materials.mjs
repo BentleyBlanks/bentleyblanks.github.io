@@ -679,6 +679,14 @@ export class MaterialLibrary {
   }
 
   /**
+   * 取一份可以自己改颜色 / 粗糙度的私有副本（补丁照带，同 CloneShadedMaterial）。
+   * 预览场地这类「借正片材质、再调个底色」的调用方用它，就不必自己 import 本模块。
+   */
+  CloneShaded(name, options = {}) {
+    return CloneShadedMaterial(this.Get(name, options));
+  }
+
+  /**
    * 取一份材质。同一个 name + 同一组 options 只建一次。
    * @param {string} name 配方名
    * @param {object} options repeat / normalScale / roughness / metalness / color / side / transparent

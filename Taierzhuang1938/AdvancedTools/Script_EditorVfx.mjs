@@ -8,7 +8,7 @@ import { SCENE_EFFECTS } from "../Script_Vfx.mjs";
 import {ParticleInspector} from './Script_EditorParticleInspector.mjs';
 import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve,IntegrateCurve} from '../Script_ParticleModules.mjs';
 import {Mulberry32} from '../Script_Noise.mjs';
-import {FIRST_LEVEL_DISTANT_SMOKE} from '../Data_FirstLevelDistantSmoke.mjs';
+import {PLUME_STYLES,PlumeProfile} from '../Data_SmokePlumeStyles.mjs';
 import {PARTICLE_SURFACE_ART} from '../Data_Tuning_Particles.mjs';
 import {FlareDirector,MakeFlareHost,SampleFlarePosition} from '../Script_Flare.mjs';
 import {FlareVisuals} from '../Script_FlareVisual.mjs';
@@ -28,7 +28,8 @@ const INSTANT_EFFECTS = [
   })),
   ...[['SootColumn',0,'浓黑烟柱'],['BillowColumn',1,'翻卷烟团'],['DustBank',2,'贴地尘幕'],['WindShear',3,'风切烟带'],['GroundScreen',4,'白色烟幕'],['DustPulse',5,'间歇土烟']].map(([id,frame,name])=>({
     id:'Plume'+id,name:'烟场 · '+name,note:'真实场景同源体积烟',continuous:true,sourceHandle:true,run:(v,s)=>{
-      const source=FIRST_LEVEL_DISTANT_SMOKE.find(p=>p.tier!=='far'&&p.options.backdrop.frame===frame),backdrop={...source.options.backdrop,seed:1938};
+      // 样式来自烟场样式表（与第一关撒点同一份定义），不为预览载入关卡的路线与地块。
+      const backdrop={...PlumeProfile(PLUME_STYLES[frame],1,Mulberry32(1938+frame)),seed:1938};
       for(const key of ['height','baseWidth','crownWidth','driftX','driftZ','spread'])backdrop[key]*=s;
       return v.SmokeSource({x:0,y:.04,z:0},{rate:0,fire:0,backdrop});
     },
@@ -97,6 +98,7 @@ export class VfxEditor {
   Enter(root) {
     const vfx = this.host.vfx;
     this.previewEnvironment=null;
+    this.initialLook=this.host.previewEnvironment?.lookId??null;
     this.savedWind = vfx.wind.clone();
     this.wind.copy(this.savedWind);
     this.savedVfxVisible = vfx.root.visible;
@@ -254,7 +256,13 @@ export class VfxEditor {
     this.timeLength=Select(playback,'时间轴长度',[{value:10,label:'10 秒'},{value:30,label:'30 秒'},{value:60,label:'60 秒'}],10,value=>this.timeSlider.root.querySelector('input').max=value);
     Select(playback,'播放速度',[.1,.25,.5,1,2].map(value=>({value,label:value+'×'})),1,value=>{this.speed=Number(value)});
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
-    this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
+    const env=this.host.previewEnvironment;
+    if(env){
+      // 独立窗口：昼夜取项目的环境预设（预设 + 它自带的白天 / 黄昏 / 晚上），不另写时段。
+      this.envPresetSelect=Select(playback,'环境预设',env.Options(),env.presetId,value=>this.SetEnvironmentPreset(value));
+      this.envPresetSelect.root.dataset.vfxEnvPreset='true';
+      this.environmentSelect=Select(playback,'预览昼夜',env.LookOptions(),env.lookId,value=>this.SetPreviewEnvironment(value));
+    }else this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
     this.environmentSelect.root.dataset.vfxEnvironment='true';
     this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'observer',label:'人眼高度 · 夜间观察'},{value:'follow',label:'燃烧体近景'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
     this.flareCameraSelect.root.dataset.flareCamera='true';
@@ -294,8 +302,8 @@ export class VfxEditor {
       {label:'导入 JSON',onClick:()=>this.Try(()=>this.Import(JSON.parse(this.json.value)))},{label:'下载 JSON',onClick:()=>this.Download()}]);
     const file=El('input');file.type='file';file.accept='.json,application/json';file.setAttribute('aria-label','选择粒子预设文件');
     file.addEventListener('change',async()=>{const chosen=file.files?.[0];if(!chosen)return;const text=await chosen.text();if(this.panel)this.Try(()=>this.Import(JSON.parse(text)));});storage.appendChild(file);
-    ButtonRow(storage,[{label:'应用参数到当前关卡同名层',onClick:()=>this.ApplyToScene()}]);
-    Note(storage,'应用到关卡会更新已存在及后续生成的同名层；不会直接改写项目源文件。');
+    if(!this.host.standalone){ButtonRow(storage,[{label:'应用参数到当前关卡同名层',onClick:()=>this.ApplyToScene()}]);
+      Note(storage,'应用到关卡会更新已存在及后续生成的同名层；不会直接改写项目源文件。');}
     this.facts=Facts(Section(body,'运行状态'));this.RefreshSaved();this.ShowTab(FALLING_SOIL_PRESETS[this.effectId]?'soil':'library');
   }
   ShowTab(tab){for(const [key,box]of Object.entries(this.tabs))box.hidden=key!==tab;if(tab==='modules')this.inspector.Show();if(tab==='soil')this.soil.Show();}
@@ -510,6 +518,16 @@ export class VfxEditor {
     return this.SetPreviewEnvironment(on?'night':'original');
   }
   SetPreviewEnvironment(mode){
+    const env=this.host.previewEnvironment;
+    if(env){
+      // 独立窗口：mode 是预设里的 look id；'original' = 打开时的那一档。预设没有这一档就取第一档。
+      const looks=env.Looks().map(look=>look.id);
+      const look=mode==='original'?(this.initialLook??env.lookId):looks.includes(mode)?mode:looks[0];
+      if(!look||!env.SelectLook(look))return false;
+      this.previewEnvironment=mode==='original'?null:look;this.environmentSelect?.Set(look);
+      this.host.post?.NotifyCameraCut();
+      return true;
+    }
     if(!['original','day','night'].includes(mode))return false;
     if(mode!=='original'){
       const environment=this.host.game.GetEnvironmentState?.();
@@ -519,6 +537,15 @@ export class VfxEditor {
     this.previewEnvironment=mode;this.environmentSelect?.Set(mode);
     this.host.post?.NotifyCameraCut();
     return true;
+  }
+  /** 独立窗口：换一份环境预设（沿用当前那一档 look；新预设没有就取它的第一档）。 */
+  async SetEnvironmentPreset(id){
+    const env=this.host.previewEnvironment;if(!env)return false;
+    try{await env.Select(id,env.lookId);}catch(error){this.Status('环境预设读不到：'+error.message,true);return false;}
+    if(!this.panel)return false;
+    this.environmentSelect?.Fill(env.LookOptions(),env.lookId);this.envPresetSelect?.Set(id);
+    if(this.previewEnvironment!==null)this.previewEnvironment=env.lookId;
+    this.host.post?.NotifyCameraCut();return true;
   }
   AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);
     api.Get(created.id).editorKey=key;this.customLayers.push({key,definition:api.Export(created.id)});this.customIds.push(created.id);this.selectedLayer=key;this.playing=true;this.RefreshLayers(true);return created;});}
@@ -547,7 +574,8 @@ export class VfxEditor {
   SaveLocal(){this.Try(()=>{const name=this.savedName.value.trim()||this.effectId,saved=this.ReadSaved();Object.defineProperty(saved,name,{value:this.Export(),enumerable:true,configurable:true,writable:true});localStorage.setItem('Tengxian.ParticleEffectPresets.v1',JSON.stringify(saved));this.RefreshSaved();this.savedSelect.Set(name);this.Status('已保存到此浏览器。');});}
   LoadLocal(){this.Try(()=>{const data=this.ReadSaved()[this.savedSelect.Value()];if(!data)throw new Error('请选择已保存的预设。');this.Import(data);});}
   Download(){const text=JSON.stringify(this.Export(),null,2);this.json.value=text;const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const link=El('a');link.href=url;link.download='Data_ParticleEffect_'+this.effectId+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  ApplyToScene(){return this.Try(()=>{const target=this.savedParticleEffects;let changed=0;
+  ApplyToScene(){return this.Try(()=>{if(this.host.standalone){this.Status('独立窗口里没有关卡：请用「生成 JSON / 下载 JSON」交付参数。');return {changed:0};}
+    const target=this.savedParticleEffects;let changed=0;
     if(this.soil?.selected){const config=this.soil.Config();for(const [id,e]of target.FallingSoil.entries)if(e.preset===this.effectId){target.FallingSoil.Configure(id,config);changed++;}
       this.Status('已更新关卡中 '+changed+' 个同预设落土源。永久配置请使用导出的 soil 数据。');return {changed};}
     for(const [id,entry]of target.systems){const key=this.Key(entry),patch=this.layerPatches.get(key);if(patch){target.Configure(id,patch);changed++;}}

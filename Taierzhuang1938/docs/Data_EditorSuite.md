@@ -73,6 +73,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **2026-11-21**：新增独立窗口工具「动作衔接对比」（`motionCompare`，入口 `AdvancedTools/Tool_MotionCompare.html` + `Script_MotionCompare.mjs` + `Script_EditorMotionCompare.mjs`），归入「角色」分组；左右同步分屏实机对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / BlenderMCP 9 帧 Aim Offset / 开火叠加 / 第一人称双腿防穿插 / WASD 沙盒）。控制中心共 18 项，16 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
 - **2026-11-22**：删除「小队行进」编辑器及其独立宿主与游戏内入口。控制中心共 17 项，其中 8 项使用摄影棚宿主、7 项开独立窗口、2 项走游戏入口。
 - **2026-11-22**：枪械检查台改用独立窗口，控制中心现有 7 项使用摄影棚宿主、8 项开独立窗口、2 项走游戏入口。[枪械检查台](#枪械检查台)
+- **2026-11-23**：特效预览与音效音乐拆为独立窗口（`Tool_VfxPreview.html`、`Tool_AudioPreview.html`，共用窗口壳 `Script_ToolWindowShell.mjs`、入口类 `Script_EditorMediaEntry.mjs`），从游戏灯光 / 后处理 / 天空 / 材质库 / 关卡数据解耦：音效窗口只装 `AudioEngine` 与固定听者，零渲染依赖；特效窗口装 `VfxSystem` + 中性预览台 `Script_VfxPreviewStage.mjs` / 预览灯 `Script_VfxPreviewLights.mjs`（与游戏共用 `Script_EffectLightEnvelope.mjs`、`Script_ToneMapCurves.mjs`）+ 昼夜读取项目环境预设 `Script_VfxPreviewEnvironment.mjs`（`Environment/EnvPreset_*.json` 的 looks，不写死时段）。共享预通道标记（`Script_RenderTags.mjs`）、太阳阴影采样（`Script_SunShadowSampling.mjs`）、体积噪声（`Script_VolumetricNoise.mjs`）与烟场样式（`Data_SmokePlumeStyles.mjs`）从重模块拆出，也顺带让主菜单包去掉了整条后处理与灯光链。游戏内回归测试（`?editor=vfx`、`Debug.OpenEditor("vfx")`）经 `VfxPreviewEntry.harness` 保留原游戏宿主口径；旧 `Tool_Studio.html?tool=vfx|audio` 重定向至新页。控制中心现有 4 项使用工具宿主（`actor facial props assetStandards`）、11 项开独立窗口（另含模型制作工作台共 12 张独立窗口卡）、2 项走游戏入口。
 
 ## 精简测试界面
 

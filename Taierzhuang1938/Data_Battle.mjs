@@ -267,12 +267,8 @@ export const NAME_POOL = {
   ],
 };
 
-/** 战场规模三档。开局跑一次性能探针自动推荐。 */
-export const SCALE_PRESETS = {
-  small: { label: "小（40 人）", maxAlive: 40, vfxBudget: 2200, shadow: 2048 },
-  medium: { label: "中（70 人）", maxAlive: 70, vfxBudget: 3400, shadow: 2048 },
-  large: { label: "大（110 人）", maxAlive: 110, vfxBudget: 4200, shadow: 4096, warn: "需要较好的设备" },
-};
+/** 战场规模三档。开局跑一次性能探针自动推荐。本体在 Data_BattleScale（零依赖）。 */
+export { SCALE_PRESETS } from "./Data_BattleScale.mjs";
 
 /**
  * 玩家能下的命令。按住 Tab 出**径向轮盘**（Script_Wheel，纯 Canvas 2D，零 3D 开销），

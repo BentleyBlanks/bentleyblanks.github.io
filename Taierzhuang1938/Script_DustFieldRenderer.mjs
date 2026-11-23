@@ -13,7 +13,7 @@
 // 材质用完不销毁、回收复用：销毁最后一只就会把着色器程序一起删掉，下一发再编一遍（第一发 / 清空之后卡约半秒）。
 
 import * as THREE from "three";
-import { MarkNoPrepass } from "./Script_Post.mjs";
+import { MarkNoPrepass } from "./Script_RenderTags.mjs";
 import { DustFlowField } from "./Script_DustFlow.mjs";
 import { GROUND_IMPACT_RENDER as RENDER, GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
 import { DUST_COMPOSITE_RENDER_ORDER } from "./Script_DustOcclusion.mjs";

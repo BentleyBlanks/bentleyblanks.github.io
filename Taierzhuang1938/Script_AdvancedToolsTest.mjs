@@ -70,6 +70,8 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["textures", "Script_EditorTextures.mjs", "TextureEditor", "TextureManager.html"],
     ["splines", "Script_EditorPcgEntry.mjs", "SplineEntry", "Tool_Pcg.html"],
     ["propPcg", "Script_EditorPcgEntry.mjs", "PropPcgEntry", "Tool_Pcg.html"],
+    ["vfx", "Script_EditorMediaEntry.mjs", "VfxPreviewEntry", "Tool_VfxPreview.html"],
+    ["audio", "Script_EditorMediaEntry.mjs", "AudioPreviewEntry", "Tool_AudioPreview.html"],
   ];
   for (const [id, file, name, page] of entries) {
     const module = await import(pathToFileURL(path.join(toolsDir, file)).href);
@@ -81,6 +83,39 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     Check(`${id} 窗口名与尺寸沿用 TOOL_INFO`, opened.at(-1).name === TOOL_INFO[id].window.name && opened.at(-1).features === TOOL_INFO[id].window.features);
   }
   delete globalThis.window;
+}
+
+// --- 3b. 特效 / 声音独立窗口：不依赖游戏的灯光、后处理、天空与关卡 -----------------------
+// 两个页面入口的静态模块图里不许出现这些模块（2026-11-23 用户：特效、音乐、构件本就该与灯光、后处理解耦）。
+// 特效系统本身（Script_Vfx 与粒子 / 照明弹模块）是要预览的对象，照旧共用。
+{
+  // 关卡布局 / 地形 / 路线数据也不许进来（声音的配方表 Data_FirstLevelMissionMusic、…BattleSound 是音频数据，可以）。
+  const FORBIDDEN = /^(Script_(Main|Post\w*|Light|Sky|Gi|Atmosphere|Materials|MaterialShading|MaterialPatches|World|ClusteredLights|TengxianCity|TengxianField|Editor|ToolStudioRenderBase|FirstLevelWhitebox\w*|FirstLevelMission(Terrain|Topology)?)|Data_(Battle|Tengxian|FirstLevelMission|FirstLevelMission(Layout|Terrain|Topology|Trenches|TrenchCover|Fortifications|Front)|FirstLevelWhiteboxTerrain\w*|FirstLevelDistantSmoke))\.mjs$/;
+  const Closure = (entry) => {
+    const seen = new Set();
+    const Walk = (file) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const source = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      for (const match of source.matchAll(/(?:import|export)\s[^;'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]/g)) Walk(path.resolve(path.dirname(file), match[1].split("?")[0]));
+    };
+    Walk(path.join(toolsDir, entry));
+    return [...seen].map((file) => path.basename(file));
+  };
+  for (const [entry, page] of [["Script_AudioPreview.mjs", "Tool_AudioPreview.html"], ["Script_VfxPreview.mjs", "Tool_VfxPreview.html"]]) {
+    const modules = Closure(entry);
+    const bad = modules.filter((name) => FORBIDDEN.test(name));
+    Check(`${page} 的模块图不含游戏灯光 / 后处理 / 天空 / 材质库 / 关卡（${modules.length} 个模块）`, bad.length === 0, bad.join(", "));
+    Check(`${page} 页面存在并只登记 three`, fs.existsSync(path.join(toolsDir, page))
+      && /"imports":\s*\{\s*"three":/.test(fs.readFileSync(path.join(toolsDir, page), "utf8")));
+  }
+  const audioScene = Closure("Script_AudioPreview.mjs").filter((name) => /^Script_(Vfx|Particle\w*|EditorStage)\.mjs$/.test(name));
+  Check("音效音乐窗口不装渲染：模块图里没有特效、粒子与摄影棚", audioScene.length === 0, audioScene.join(","));
+  const studio = fs.readFileSync(path.join(toolsDir, "Script_ToolStudio.mjs"), "utf8");
+  Check("工具宿主不再装特效 / 声音编辑器，旧地址转到独立窗口", !/Script_Editor(Vfx|Audio)\.mjs/.test(studio) && /vfx: \[/.test(studio) && /audio: \[/.test(studio));
+  const vfxEditor = fs.readFileSync(path.join(toolsDir, "Script_EditorVfx.mjs"), "utf8");
+  Check("特效编辑器的昼夜在独立窗口里取环境预设（host.previewEnvironment），不再引第一关撒点数据",
+    /host\.previewEnvironment/.test(vfxEditor) && !/Data_FirstLevelDistantSmoke/.test(vfxEditor));
 }
 
 // --- 4. 控制中心卡片 ----------------------------------------------------------------

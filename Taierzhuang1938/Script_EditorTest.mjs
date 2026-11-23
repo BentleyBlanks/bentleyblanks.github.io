@@ -1396,9 +1396,18 @@ Check("手榴弹只显示投掷，不显示白刃与准心校准",
   weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden && weapon.grenadeCalibrationHidden);
 
 // ---------------------------------------------------------------------------
-// 4) 特效预览编辑器
+// 4) 特效预览编辑器：菜单与控制中心开的是独立窗口（Tool_VfxPreview，验收见 AdvancedToolsBrowserTest）；
+//    游戏内保留 harness 宿主给照明弹 / 粒子回归测试用，这里验同一个编辑器在正片宿主里照常工作。
 // ---------------------------------------------------------------------------
-await ClickTool("vfx");
+{
+  const popupReady = page.waitForEvent("popup");
+  await ClickTool("vfx");
+  const popup = await popupReady;
+  Check("特效预览从菜单打开独立窗口", popup.url().includes("AdvancedTools/Tool_VfxPreview.html"), popup.url());
+  await popup.close();
+  await page.bringToFront();
+}
+await page.evaluate(() => { window.Taierzhuang.editor.Open("vfx", { harness: true }); });
 await Step(90);
 const vfxEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -1448,96 +1457,18 @@ Check("特效预览器可重播瞬时爆炸且 shader 无 GL 错误",
   !!vfxEditor.instant && vfxEditor.glError === 0, JSON.stringify(vfxEditor.instant));
 
 // ---------------------------------------------------------------------------
-// 5) 音效音乐编辑器
+// 5) 音效音乐：独立窗口（Tool_AudioPreview，只装音频引擎）。试听、环境床 / 音乐的播放与停止、
+//    盲听与「每个配方都有分类与说明」在 AdvancedToolsBrowserTest 里对着那个窗口验；这里只验菜单开的是它。
 // ---------------------------------------------------------------------------
-await ClickTool("audio");
-await Step(10);
-const audio = await page.evaluate(() => {
-  const editor = window.Taierzhuang.editor;
-  const active = editor.active;
-  const names = active.Names();
-  active.PlayCurrent();
-  active.NewBlind();
-  const blind = active.blind ? active.blind.options.length : 0;
-  return {
-    id: editor.ActiveId, count: names.length, blind,
-    ambience: window.Taierzhuang.audio.ambiencePreset,
-  };
-});
-Check("音效编辑器列出全部配方", audio.id === "audio" && audio.count >= 30, `配方 ${audio.count} 条`);
-Check("盲听出四选一", audio.blind === 4);
-
-// 音效是一次性节点，暂停背景也能响；环境床 / 音乐是常驻节点。必须真的点 UI，
-// 防止编辑器再次退化成「按钮改了 cue 名，但 SetPaused(true) 把播放头全掐掉」。
-await page.click('[data-ambience="night"]');
-await page.click('[data-music="tension"]');
-await Step(8);
-// 音乐包 5.6 MB，是四个包里最后落地的那一个：按下按钮时 `musicBuffers` 多半还空着，
-// `Music()` 只把 cue 记下来就返回（Script_Audio「还没载到：这一段就是没有音乐」），
-// 等包到了 LoadMusicPack 的回调再拿 musicCue 补播一次。所以这里等的是
-// **播放头真的建起来**，不是等一个固定帧数 —— 固定 8 帧在包变大之后就是一条
-// 随机红（2026-08-29 实测：musicCue=tension 而 musicLayer=null）。
-// 包一直载不到时不在这儿卡死：跳出去让下面那条断言照常报红。
-for (let i = 0; i < 120; i += 1) {
-  if (await page.evaluate(() => !!window.Taierzhuang.audio.musicLayer)) break;
-  await Step(4);
-  await page.waitForTimeout(250);
+{
+  await page.evaluate(() => window.Taierzhuang.editor.CloseTool?.());
+  const popupReady = page.waitForEvent("popup");
+  await ClickTool("audio");
+  const popup = await popupReady;
+  Check("音效音乐从菜单打开独立窗口", popup.url().includes("AdvancedTools/Tool_AudioPreview.html"), popup.url());
+  await popup.close();
+  await page.bringToFront();
 }
-const backgroundPlaying = await page.evaluate(() => {
-  const audio = window.Taierzhuang.audio;
-  return {
-    paused: audio.paused,
-    ambience: audio.ambiencePreset,
-    ambienceLive: audio.ambLayers.length + audio.ambienceNodes.length,
-    ambienceTimer: !!audio.ambienceTimer,
-    music: audio.musicCue,
-    musicLive: !!audio.musicLayer,
-  };
-});
-Check("音效编辑器允许环境床在玩法暂停时试听",
-  !backgroundPlaying.paused && backgroundPlaying.ambience === "night"
-    && backgroundPlaying.ambienceLive > 0 && backgroundPlaying.ambienceTimer,
-  JSON.stringify(backgroundPlaying));
-Check("音效编辑器允许音乐在玩法暂停时试听",
-  !backgroundPlaying.paused && backgroundPlaying.music === "tension" && backgroundPlaying.musicLive,
-  JSON.stringify(backgroundPlaying));
-
-await page.click('[data-stop-ambience]');
-await page.click('[data-stop-music]');
-await Step(4);
-const backgroundStopped = await page.evaluate(() => {
-  const audio = window.Taierzhuang.audio;
-  return {
-    ambience: audio.ambiencePreset,
-    ambienceLive: audio.ambLayers.length + audio.ambienceNodes.length,
-    ambienceTimer: !!audio.ambienceTimer,
-    music: audio.musicCue,
-    musicLive: !!audio.musicLayer,
-  };
-});
-Check("环境与音乐各自都有可用的停止按钮",
-  backgroundStopped.ambience === "silence" && backgroundStopped.ambienceLive === 0
-    && !backgroundStopped.ambienceTimer && backgroundStopped.music === null && !backgroundStopped.musicLive,
-  JSON.stringify(backgroundStopped));
-
-// 每个配方都要有中文说明（"指认" 那一栏，漏一条就等于列表里有个认不出的名字）
-const undescribed = await page.evaluate(async () => {
-  const audioModule = await import("./Script_Audio.mjs");
-  const editor = window.Taierzhuang.editor.active;
-  // 用编辑器自己的过滤器逐类点一遍，凑齐的名字应该等于 SOUND_NAMES
-  const seen = new Set();
-  // 分类签从编辑器模块读，**不在这里拄一份** —— 拄一份的话，
-  // 那边新开一类（断肢就是）这条断言会红在一个与它无关的地方。
-  const editorAudio = await import("./AdvancedTools/Script_EditorAudio.mjs");
-  for (const cat of editorAudio.CATEGORIES.filter((c) => c !== "全部")) {
-    editor.category = cat;
-    for (const name of editor.Names()) seen.add(name);
-  }
-  editor.category = "全部";
-  return audioModule.SOUND_NAMES.filter((n) => !seen.has(n));
-});
-Check("每个配方都有分类与说明", undescribed.length === 0,
-  undescribed.length ? `漏了：${undescribed.join(", ")}` : "");
 
 // ---------------------------------------------------------------------------
 // 6) Timeline 编辑器：菜单里那一项是跳转入口（整页换成白盒编辑器 + Timeline 面板），

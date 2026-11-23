@@ -43,8 +43,6 @@ function Check(name, ok, detail = "") {
 const SETUP = {
   actor: (editor) => { editor.playing = false; },
   facial: () => {},
-  vfx: (editor) => { editor.playing = false; },
-  audio: () => {},
   props: () => {},
   assetStandards: () => {},
 };

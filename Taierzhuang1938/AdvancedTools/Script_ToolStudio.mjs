@@ -13,15 +13,13 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { VfxEditor } from "./Script_EditorVfx.mjs";
-import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
 import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
 
-/** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页，不在这里。 */
+/** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页（含特效预览、音效音乐），不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor, VfxEditor, AudioEditor,
+  ActorEditor, FacialEditor,
   PropLibraryEditor, AssetStandardsEditor,
 ]);
 
@@ -258,15 +256,15 @@ export class ToolStudio {
     if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
     this.inspectorToggle.setAttribute("aria-controls", inspector.id);
     this.SetInspectorCollapsed(this.inspectorCollapsed);
-    // 音效音乐编辑器要试听环境床与音乐，其余工具里背景层静音（同 EditorSuite）
-    const silenceBackground = this.activeId !== AudioEditor.id;
+    // 背景层（环境床与音乐）在这一页里始终静音：试听它们的「音效音乐」已是独立窗口（Tool_AudioPreview）。
+    const silenceBackground = true;
     if (silenceBackground !== this._audioPaused) {
       this._audioPaused = silenceBackground;
       this.base.audio?.SetPaused?.(silenceBackground);
     }
     if (this.status) {
       const label = this.active ? (TOOL_INFO[this.activeId]?.label || this.activeId) : "未选择工具";
-      this.status.textContent = `${label} · 独立工具宿主${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}`;
+      this.status.textContent = `${label} · 独立工具宿主`;
     }
     this.SyncToolsVolume();
   }
@@ -401,15 +399,22 @@ export class ToolStudio {
 // 页面入口
 // ---------------------------------------------------------------------------
 
-/** 一步：编辑器 → 灯光与阴影框 → 出画（同 FrameModeEditor；特效编辑器的灯光时间由它自己的预览时间定）。 */
+/** 一步：编辑器 → 灯光与阴影框 → 出画（同 FrameModeEditor）。 */
 function StepFrame(base, studio, dt) {
   studio.Update(dt);
-  const vfx = studio.activeId === VfxEditor.id;
-  base.Frame(dt, vfx ? { vfxPreview: true, previewTime: studio.active?.previewTime } : undefined);
+  base.Frame(dt);
 }
 
 async function Main() {
   const params = new URLSearchParams(location.search);
+  // 已改成独立窗口的工具：旧地址（书签、旧测试）转到新页，带上它们认的网址参数。
+  const moved = { vfx: ["effect", "flareCamera", "env", "look", "quality", "manual"], audio: ["audio"] }[params.get("tool")];
+  if (moved) {
+    const dest = new URL(TOOL_INFO[params.get("tool")].window.url, document.baseURI);
+    for (const key of moved) { const value = params.get(key); if (value != null) dest.searchParams.set(key, value); }
+    location.replace(dest);
+    return;
+  }
   if (params.get("tool") === "weapon") {
     location.replace(new URL(TOOL_INFO.weapon.window.url, document.baseURI));
     return;

@@ -17,7 +17,7 @@
 //    地面用解析高程 + 二分，实体用 Script_TengxianField 已有的 AABB 网格射线。
 
 import * as THREE from "three";
-import { MarkNoPrepass } from "./Script_Post.mjs";
+import { MarkNoPrepass } from "./Script_RenderTags.mjs";
 
 /**
  * 把世界藏起来 / 放回来。

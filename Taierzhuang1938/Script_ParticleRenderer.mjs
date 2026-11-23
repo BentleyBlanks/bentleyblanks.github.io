@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MarkNoPrepass } from './Script_Post.mjs';
+import { MarkNoPrepass } from './Script_RenderTags.mjs';
 import { EvaluateCurve, EvaluateGradient, IntegrateCurve } from './Script_ParticleModules.mjs';
 import { PARTICLE_LIMITS,PARTICLE_VOLUME } from './Data_Tuning_Particles.mjs';
 import { ParticleBatch, ParticleMeshBatch } from './Script_ParticleBatch.mjs';

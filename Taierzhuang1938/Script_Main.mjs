@@ -2745,7 +2745,8 @@ async function Boot() {
     if (tool) editor.Toggle(tool);
   }
   if (EDITOR_PARAM === "vfx") {
-    ShowBoot(false);state.menu=false;state.running=false;editor?.Open("vfx");
+    // 菜单与控制中心开的是独立窗口；这条网址入口是游戏内回归测试的特效宿主（正片灯光 + 后处理下量画面）。
+    ShowBoot(false);state.menu=false;state.running=false;editor?.Open("vfx",{harness:true});
   }
   if (EDITOR_PARAM === "firstPerson" && editor) {
     ShowBoot(false);

@@ -2,8 +2,8 @@
 // No floating quads, copied terrain formula, extra frame-graph pass or Three addon.
 // Each layer is one draw; persistent dressing and transient impacts own separate slots.
 import * as THREE from "three";
-import { MarkNoPrepass } from "./Script_Post.mjs";
-import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_Light.mjs";
+import { MarkNoPrepass } from "./Script_RenderTags.mjs";
+import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_SunShadowSampling.mjs";
 import { BLOOD_SURFACE as C } from "./Data_Tuning_Blood.mjs";
 
 const VERT = /* glsl */`

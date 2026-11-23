@@ -1,7 +1,7 @@
 // Metre-scale studio references, never injected into the campaign world.
+// 场地件只借宿主材质库（游戏里是正片材质，独立特效窗口是中性底色），不 import 城市生成器与材质模块。
 import * as THREE from 'three';
-import {BuildSink} from '../Script_World.mjs';
-import {CloneShadedMaterial} from '../Script_Materials.mjs';
+import {PreviewSink,PreviewSurfaceMaterial} from './Script_VfxPreviewSurfaces.mjs';
 
 export class FlarePreviewField {
  constructor(studio,library){
@@ -14,10 +14,10 @@ export class FlarePreviewField {
    positions.setY(i,edge*(3+2*Math.sin(x*.023)*Math.cos(z*.017)));
    uv.setXY(i,x/24+.5,z/24+.5);
   }this.groundGeometry.computeVertexNormals();
-  const ground=CloneShadedMaterial(library.Get('Ground'));ground.color.setHex(0x827866);
-  const wall=CloneShadedMaterial(library.Get('BrickWall'));wall.color.setHex(0x736b5f);wall.roughness=.95;
-  const wood=CloneShadedMaterial(library.Get('WoodBeam'));wood.color.setHex(0x62533c);wood.roughness=.94;
-  this.materials=[ground,wall,wood];const mats={ground,wall,wood},sink=new BuildSink();
+  const ground=PreviewSurfaceMaterial(library,'Ground',{color:0x827866});
+  const wall=PreviewSurfaceMaterial(library,'BrickWall',{color:0x736b5f,roughness:.95});
+  const wood=PreviewSurfaceMaterial(library,'WoodBeam',{color:0x62533c,roughness:.94});
+  this.materials=[ground,wall,wood];const mats={ground,wall,wood},sink=new PreviewSink();
   const Box=(mat,x,y,z,w,h,d)=>{const g=new THREE.BoxGeometry(w,h,d);g.translate(x,y,z);g.userData.effectSurface=true;sink.Add(mat,g);};
   // Low walls, roofed shelters and 1.7 m posts make the light's reach and the
   // moving shadows visible, without emissive rings or a painted light disc.

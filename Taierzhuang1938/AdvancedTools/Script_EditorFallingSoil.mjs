@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import {El,Section,Slider,Select,Toggle,ButtonRow,Note,Row} from '../Script_EditorUi.mjs';
 import {CurveField,ColorField} from './Script_EditorParticleInspector.mjs';
-import {BuildSink} from '../Script_World.mjs';
-import {CloneShadedMaterial} from '../Script_Materials.mjs';
+import {PreviewSink,PreviewSurfaceMaterial} from './Script_VfxPreviewSurfaces.mjs';
 import {NormalizeFallingSoil,NormalizeSoilPreview} from '../Script_FallingSoilRules.mjs';
 import {FALLING_SOIL_SCHEMA as SCHEMA,FALLING_SOIL_STAGE as STAGE,FALLING_SOIL_PRESETS as PRESETS,FALLING_SOIL_LIMITS as LIMITS} from '../Data_Tuning_FallingSoil.mjs';
 const Clone=value=>JSON.parse(JSON.stringify(value));
@@ -80,18 +79,18 @@ export class FallingSoilInspector{
   BuildStage(c){
     this.root=new THREE.Group();this.root.name='FallingSoilPreviewReferences';this.editor.studio.stand.add(this.root);
     const library=this.editor.host.library;
-    const ground=CloneShadedMaterial(library.Get('Ground'));ground.color.setHex(0x9a8c76);ground.roughness=1;
-    const earth=CloneShadedMaterial(library.Get('Ground'));earth.color.setHex(0x947354);earth.roughness=1;
-    const wood=library.baked?.has('WoodBeam')?CloneShadedMaterial(library.Get('WoodBeam')):new THREE.MeshStandardMaterial({color:0x735638,roughness:.94});
+    const ground=PreviewSurfaceMaterial(library,'Ground',{color:0x9a8c76,roughness:1});
+    const earth=PreviewSurfaceMaterial(library,'Ground',{color:0x947354,roughness:1});
+    const wood=library?.baked?.has('WoodBeam')&&library.CloneShaded?library.CloneShaded('WoodBeam'):new THREE.MeshStandardMaterial({color:0x735638,roughness:.94});
     const backdrop=new THREE.MeshStandardMaterial({color:0x20241f,roughness:1});this.materials=[ground,earth,wood,backdrop];
-    const sink=new BuildSink();sink.SetSector('FallingSoilPreview');
+    const sink=new PreviewSink();sink.SetSector('FallingSoilPreview');
     const box=(target,key,w,h,d,x,y,z)=>{const geo=new THREE.BoxGeometry(w,h,d),uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(1,w),uv.getY(i)*Math.max(1,d));geo.translate(x,y,z);target.Add(key,geo);};
     box(sink,'ground',6,.035,5,0,this.stage.groundY-.0175,0);
     const b=this.stage.beam;if(b.enabled)box(sink,'wood',b.width,b.height,b.depth,b.x,b.y,b.z);
     if(this.stage.backdrop){const h=Math.max(2,c.emitter.position[1]-this.stage.groundY+1.2);box(sink,'backdrop',Math.max(6,c.emitter.width+2),h,.06,c.emitter.position[0],this.stage.groundY+h*.5,c.emitter.position[2]+c.emitter.length*.5+1.2);}
     sink.Flush(this.root,{Get:key=>key==='ground'?ground:key==='wood'?wood:backdrop},{castShadow:false});
     this.source=new THREE.Group();this.root.add(this.source);this.source.visible=this.stage.sourceReference;
-    const source=new BuildSink();source.SetSector('SoilSource');const w=Math.max(.4,c.emitter.width),d=Math.max(.4,c.emitter.length);
+    const source=new PreviewSink();source.SetSector('SoilSource');const w=Math.max(.4,c.emitter.width),d=Math.max(.4,c.emitter.length);
     if(c.emitter.shape==='line'){
       const seam=Math.max(.015,c.emitter.length);
       box(source,'wood',w+.25,.08,.32,0,.04,-.16-seam*.5);box(source,'wood',w+.25,.08,.32,0,.04,.16+seam*.5);

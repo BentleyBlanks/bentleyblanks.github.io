@@ -27,7 +27,7 @@
 // 不重编译。
 
 import * as THREE from "three";
-import {FLARE_PREVIEW_NIGHT,FLARE_PHOTOMETRY} from './Data_Tuning_FlareEffects.mjs';
+import {FLARE_PREVIEW_NIGHT,FlareSceneScaleFor} from './Data_Tuning_FlareEffects.mjs';
 import {
   Atmosphere, ATMOSPHERE_SAMPLE_GLSL, ATMOSPHERE_EARTH,
   MakeAtmospherePreset, PhysicalSunLight, SetActiveAtmosphere,
@@ -774,8 +774,7 @@ SKY_PRESETS.flarePreviewNight={
 
 // Explicit environment metadata: never infer day/night from the camera's
 // exposure, local shadows, or a user editing the key light's intensity.
-for(const [name,preset] of Object.entries(SKY_PRESETS))preset.flareSceneScale=
-  ['night','firstLevelNight','flarePreviewNight'].includes(name)?FLARE_PHOTOMETRY.nightScale:FLARE_PHOTOMETRY.dayScale;
+for(const [name,preset] of Object.entries(SKY_PRESETS))preset.flareSceneScale=FlareSceneScaleFor(name);
 
 // ---------------------------------------------------------------------------
 // 天空取证探针（回归测试与标定脚本共用）

@@ -60,6 +60,7 @@ import { TRENCH_SURFACE } from './Data_TrenchSurface.mjs';
 import { HZB, VELOCITY } from "./Data_Tuning_Graphics.mjs";
 import { OverrideKind, OverrideVariants } from "./Script_OverrideVariants.mjs";
 import { InstanceSortId } from './Script_InstanceFrustumScope.mjs';
+import { MarkNoPrepass, MarkDynamicPrepass, InvalidatePrepassSkip, PrepassMarkStamp } from './Script_RenderTags.mjs';
 
 /**
  * 前景（第一人称手 / 枪）在预通道里的**常数近景深度**。
@@ -73,14 +74,13 @@ import { InstanceSortId } from './Script_InstanceFrustumScope.mjs';
 export const FOREGROUND_VIEW_DEPTH = 1.0;
 
 /**
- * 预通道归属的标记戳。`_CollectSkipped` 把「谁要藏出这一趟」的分类结果缓存起来
+ * 预通道归属的标记戳住在零依赖的 Script_RenderTags（粒子、贴花、编辑器网格只打标，
+ * 不该为此 import 整条后处理）。`_CollectSkipped` 把「谁要藏出这一趟」的分类结果缓存起来
  * （见那个函数的抬头），场景结构变化由 childadded / childremoved 自己报，
- * 而改标记（allowOverride、前景根）不经过场景结构，只能在这里报一声。
- * 不走下面两个标记函数、直接改 allowOverride / skipNormalDepth 的地方调
- * `InvalidatePrepassSkip()`。
+ * 而改标记（allowOverride、前景根）不经过场景结构，只能经那边的戳报一声。
+ * 不走标记函数、直接改 allowOverride / skipNormalDepth 的地方调 `InvalidatePrepassSkip()`。
  */
-let MARK_STAMP = 0;
-export function InvalidatePrepassSkip() { MARK_STAMP += 1; }
+export { MarkNoPrepass, MarkDynamicPrepass, InvalidatePrepassSkip };
 
 /**
  * 预通道共用一只覆盖材质，three 的程序选择跟着物体种类走（蒙皮 / 实例 / 批次 / 形变 /
@@ -116,13 +116,7 @@ export function PrepassOpaqueSort(a, b) {
  * 覆盖大片屏幕的，还要给对象挂 `userData.skipNormalDepth = true`，
  * PostPipeline 那一趟会把它整个藏掉。
  */
-export function MarkNoPrepass(material) {
-  if (!material) return material;
-  if (Array.isArray(material)) { material.forEach(MarkNoPrepass); return material; }
-  material.allowOverride = false;
-  MARK_STAMP += 1;
-  return material;
-}
+// MarkNoPrepass 的本体在 Script_RenderTags（上面再导出）。
 
 /**
  * 把一棵前景子树（`viewmodel.root`）接进深度法线预通道。
@@ -143,7 +137,7 @@ export function MarkNoPrepass(material) {
  */
 export function MarkForegroundPrepass(root) {
   if (!root) return root;
-  MARK_STAMP += 1;
+  InvalidatePrepassSkip();
   root.userData.foregroundPrepassRoot = true;
   root.traverse((object) => {
     if (!object.isMesh || !object.material) return;
@@ -566,7 +560,7 @@ export class PrepassPass {
     this._JoinSkipClassification();
     this._skipScene = scene;
     this._skipDirty = false;
-    this._skipMarkStamp = MARK_STAMP;
+    this._skipMarkStamp = PrepassMarkStamp();
     this._skipVelocity = mrt;
   }
 
@@ -684,7 +678,7 @@ export class PrepassPass {
    */
   _CollectSkipped(scene, camera = null) {
     if (this._skipDirty || scene !== this._skipScene
-        || this._skipMarkStamp !== MARK_STAMP || this._skipVelocity !== this.velocityEnabled) {
+        || this._skipMarkStamp !== PrepassMarkStamp() || this._skipVelocity !== this.velocityEnabled) {
       this._RebuildSkipClassification(scene);
     } else if (this._skipDirtyTops.size) {
       this._UpdateSkipClassification(scene);
@@ -1024,11 +1018,7 @@ export class PrepassPass {
  * Compatibility/diagnostic marker for existing callers. Ordinary rigid meshes
  * are tracked automatically by PrepassPass, including unmarked new props.
  * Never replace object hooks: foreground rendering owns them.
+ * 本体在 Script_RenderTags（文件头再导出）。
  */
-export function MarkDynamicPrepass(object) {
-  if (!object || !object.isMesh || object.userData.prepassDynamic) return object;
-  object.userData.prepassDynamic = true;
-  return object;
-}
 
 export { GLSL_COMMON };
