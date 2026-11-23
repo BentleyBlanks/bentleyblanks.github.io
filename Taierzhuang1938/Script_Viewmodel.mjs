@@ -1658,6 +1658,8 @@ export class Viewmodel {
     this.aimSwayEnabled = true;
     // 开镜带一点点过冲（0.72 阻尼比），到位那一下有"顿"感；再低就晃得看不清准星
     this.adsSpring = new Spring(240, 0.72);
+    this.adsGripSpring = new Spring(240, 0.72);
+    this.adsGrip = 0;
     this.sprintSpring = new Spring(90, 0.95);
     // 白刃期间把冲刺姿态"静音"的权重（0 = 冲刺姿态照常，1 = 完全按腰射姿态挥）。
     // 它不是弹簧：这条曲线不许过冲，过冲会让刀在收招时越过腰射姿态弹一下。见 Update。
@@ -2466,6 +2468,10 @@ export class Viewmodel {
     const [adsStiffness, adsDamping] = profile?.adsSpring || [240, 0.72];
     this.adsSpring.stiffness = adsStiffness;
     this.adsSpring.damping = 2 * adsDamping * Math.sqrt(adsStiffness);
+    this.adsGripSpring.stiffness = adsStiffness;
+    this.adsGripSpring.damping = this.adsSpring.damping;
+    this.adsGripSpring.Set(Clamp01(this.adsSpring.value));
+    this.adsGrip = Clamp01(this.adsGripSpring.value);
     this.rifleViewPosition.set(0, 0, 0);
     this.rifleViewRotation.identity();
     if (profile) {
@@ -2988,10 +2994,10 @@ export class Viewmodel {
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
-    // 托枪手的开镜握法跟玩家按没按住瞄准走，不跟拉栓/装填时枪临时离开瞄准线走：
-    // 否则每开一枪左手都要在护木上转一圈再转回来。时间常数取开镜 FOV 那条 150 ms 的一半多。
+    // 托枪手的开镜握法与枪身共用同一套 adsSpring 刚度/阻尼，只是不跟拉栓/装填时枪临时离开瞄准线走：
+    // 这样开镜与收镜时左手与枪身严格同起同止（不会枪已停稳、左手还在护木上慢爬），同时拉栓时左手不乱转。
     const adsGripTarget = Clamp01(input.ads ?? 0) * (1 - this.wallLower) * (1 - sprint * 0.9);
-    this.adsGrip = (this.adsGrip || 0) + (adsGripTarget - (this.adsGrip || 0)) * (1 - Math.exp(-step / 0.09));
+    this.adsGrip = Clamp01(this.adsGripSpring.Step(step, adsGripTarget));
     // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
     if (this.adsHideParts.length) {
       const adsShown = ads * (1 - cycleAway);   // 枪落下来看机匣时，贴眼藏掉的枪托要放回来

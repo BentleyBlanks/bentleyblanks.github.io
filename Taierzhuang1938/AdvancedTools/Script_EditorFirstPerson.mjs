@@ -666,6 +666,7 @@ export class FirstPersonEditor {
       vm.boltOpen = false;
       vm._ResetAnimatedParts?.();
       vm.adsSpring?.Set(this.ads);
+      vm.adsGripSpring?.Set(this.ads);
       vm.sprintSpring?.Set(0);
     }
     if (kickFirstShot && this.boltPlaying) {
@@ -1111,6 +1112,7 @@ export class FirstPersonEditor {
     vm.pendingBoltAt = -1;
     vm._ResetAnimatedParts();
     vm.adsSpring.Set(0);
+    vm.adsGripSpring?.Set(0);
     vm.sprintSpring.Set(0);
     this.ads = 0;
     this.sprint = 0;
