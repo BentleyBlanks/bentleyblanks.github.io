@@ -1670,6 +1670,9 @@ export class AiDirector {
         // 放完那一帧（t 到 1）照常走一遍，接地拟合的终帧旋转就在那一帧写进去，之后才停。
         if (s.actor && (s.deadTime <= 0.9 || s.corpse || (s.actor.ragdollState && s.actor.ragdollState.t < 1))) {
           this.view.AnimateCorpse(s, dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
+        } else if (s.actor?.root.visible && this.view.CorpseSkinPending(s)) {
+          // 原身体已经定住，换上的外观（遭遇试玩 / 白刃实验室）还没在画面里倒完：只补推外观，见 SoldierView.CorpseSkinPending
+          this.view.SyncCorpseSkin(s, dt);
         }
         profiler?.E("ai/corpse");
         continue;

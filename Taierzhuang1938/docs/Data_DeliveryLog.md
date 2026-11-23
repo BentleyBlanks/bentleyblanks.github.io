@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **换皮尸体倒完、不再凭空消失（2026-11-24）**。遭遇试玩和白刃实验场的士兵外观是 X Bot／正式人物皮（`XBotSkin`），倒地动作原来只在尸体循环推原身体时一起推：原身体倒地（1.6–3.2 s）比外观的 Mixamo 倒地（约 2.6–3.5 s）短，原身体一倒完外观就定在半跪／撑地的中间帧；倒地时人在屏外，外观可见性停在「藏着」、原身体又不再更新，回头一看尸体没了（只剩枪和血）。现在外观的倒地按死了多久（`downAge` = `deadTime`）取帧，尸体循环在原身体定住后、外观出现在画面里时补推（`SoldierView.CorpseSkinPending` / `SyncCorpseSkin`），放到最后一帧即 `corpseSettled`，之后一帧不碰。尸体仍保留到本关结束：24 m 内完整人物、往外远景合批、160 m 外不画（`ACTOR_DETAIL`），定住后没有逐帧开销。临时实测（03b，杀全场 25 人）：外观倒完头高 0–0.06 m，屏外死的 14 具转回来全部可见且躺平；`MeleeLabVariantsBrowserTest`、`AiBehaviorTest` 通过。
+
 - **白刃实验场重构（2026-11-23，四轮）**。`?melee=1` 面板改用 `.shellImpactLab` 那一套，第二轮按用户要求只留「玩法 / 项目 / 操作 / 读数」四组；场上只剩一个对手，换成遭遇编辑器那套日兵甲（X Bot 换皮）；六组遭遇、隔墙与标牌撤了。阴影「完全没有」是共享测试天光的太阳正在身后 + 满格环境光，实验场改用自己的侧光白天 `meleeLabDay`。玩法切换：操控（原版蓄力 / 拖拽挥砍：按住左键、一甩就顺着甩的方向砍下去）× 命中反馈（原版 / 卡刀：刀真砍进身体才卡，屏幕上一个 F 圈、长按 F 拔出 → 对方踉跄 → 任一刀或再按 F 补刀；刀尖擦过不卡）；拖拽时视角跟刀一部分，比例在面板滑条上调（默认 50%），方向轮盘撤了；第四轮：通用倒地 QTE 删掉（只留剧本入口 `BeginScriptedGround`）、玩家 F 近身推架删掉（对手照样会顶人），卡住的刀尖钉在对方肩上一点、转视角不动，拖拽模式点一下也出刀、连点排队不丢。第一轮的「方向挥砍·对标 Mordhau」被用户否了、已撤。正片白刃层不受影响。界面字体与字幕字体按新文案重烘子集、字体戳 `20261123DadaoLab`、`Style_Game.css` 戳 `20261123DadaoLabF`（第四轮未改样式）。口径见[白刃战系统「场地与专项入口」「玩法变体」](Data_MeleeQte.md#场地与专项入口)；门禁 `MeleeCombatTest`、`MeleeLabVariantsBrowserTest`、`MeleeQteTest`。
 
 - **特效预览与音效音乐独立窗口（2026-11-23）**。`Tool_AudioPreview.html` 只装 `AudioEngine`（零渲染器 / Three.js 依赖），`Tool_VfxPreview.html` 装 `VfxSystem`、中性 HDR 预览台与项目环境预设（`Environment/EnvPreset_*.json` 的昼夜 looks，不再固化昼夜），两项均从 `Tool_Studio` 拆出且不加载游戏灯光装置、后处理、天空、材质库与关卡。补齐两项手榴弹爆炸音效说明；拆出 `Script_RenderTags` / `Script_VolumetricNoise` / `Script_ToneMapCurves` / `Script_SunShadowSampling` / `Script_EffectLightEnvelope` / `Data_SmokePlumeStyles` / `Data_BattleScale` 解耦运行时重依赖，主菜单包同步省去后处理与灯光链。游戏内 `?editor=vfx` 经 `harness` 保留原回归口径。详见[编辑器套件](Data_EditorSuite.md)。

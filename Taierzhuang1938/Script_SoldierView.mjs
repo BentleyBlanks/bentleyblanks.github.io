@@ -34,6 +34,7 @@ export class SoldierView {
       lookYaw:Number.isFinite(state.lookYaw)?state.lookYaw:0,
       lookPitch:Number.isFinite(state.lookPitch)?state.lookPitch:0,
       melee:state.meleeCombat||null,down:!!state.dead||!!s.actor.ragdollState,
+      downAge:s.alive?undefined:s.deadTime,
       firing:!!state.firing,
       fireSequence:Number.isFinite(state.fireSequence)?state.fireSequence:null,
       throwSeconds:s.actor.characterRig?.currentId==="GrenadeThrow"?s.actor.characterRig.currentAction?.time:null,
@@ -86,6 +87,14 @@ export class SoldierView {
 
   /** 尸体的倒地 / 下垂姿势（不进 ai/act/anim 子桶：它归 ai/corpse，见 AiDirector.Update 的尸体循环）。 */
   AnimateCorpse(s, dt, options) { s.actor.Update(dt, options); this.SyncSkin(s,dt,options); }
+
+  /**
+   * 换了外观（X Bot / 正式人物）的尸体还没在画面里倒完：原身体倒完就不再更新，外观的倒地动作更长，
+   * 倒地时在屏外的那具连可见性都停在「藏着」—— 半跪着定住、回头一看人没了（2026-11-24）。
+   * 尸体循环只在它出现在画面里时补推外观，倒完（corpseSettled）之后一帧都不再碰。
+   */
+  CorpseSkinPending(s) { const skin = this.skins.get(s); return !!skin && !skin.corpseSettled; }
+  SyncCorpseSkin(s, dt) { this.SyncSkin(s, dt, { dead: true }); }
 
   /**
    * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；

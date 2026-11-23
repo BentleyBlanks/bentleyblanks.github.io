@@ -938,6 +938,7 @@ export class XBotSkin {
     const rig = this.rig, actor = this.actor;
     this.sourceMatricesReady = false;
     this.frame += 1;
+    if (!intent.down) this.corpseSettled = false;
     const visible = actor.root.visible !== false && rig.root.visible !== false;
     this.container.visible = visible;
     for (const mesh of this.hidden) mesh.visible = false;
@@ -1089,6 +1090,12 @@ export class XBotSkin {
     }
     this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
     this._Remember(intent);
+    // 倒地动作在画面里放到最后一帧、过渡也淡完：尸体定住了，SoldierView 之后不再推它。
+    // 倒地动作没读到、照原身体换算（mirror）的：原身体倒完了，这一帧换算的就是最后的姿势
+    const cur = this.current;
+    this.corpseSettled = !!intent.down && !this.blend && (pick.mode === "hold"
+      || (!!pick.death && !!cur && !cur.mirror && cur.file === pick.file && cur.lastT >= cur.action.getClip().duration - 1e-4)
+      || (!!cur?.mirror && actor.ragdollState?.t >= 1));
     const view = this.skins.view;
     if (this.hair && view?.camera) {
       this.hair.maxLod = HAIR_QUALITY[view.post?.quality || 'high'];
@@ -1291,6 +1298,11 @@ export class XBotSkin {
       if (pick.derived) t = pick.loop ? pick.sourceSeconds % D : Math.min(D, pick.sourceSeconds);
       else if (pick.loop) t = ((pick.sourceSeconds % S) / S) * D;
       else t = Math.min(D, (pick.sourceSeconds / S) * D);
+    } else if (pick.death && Number.isFinite(intent.downAge)) {
+      // 试玩 AI 的尸体：按死了多久定这一帧。原身体的倒地比这条短、倒完就不再推，倒地时在屏外也不推 ——
+      // 按帧累加会冻在半跪（2026-11-24 实拍），回到画面时也不会从头再死一遍
+      cur.clock = Math.max(0, intent.downAge);
+      t = Math.min(D, cur.clock);
     } else {
       const k = this.kit.def.heightM
         ? this.container.getWorldScale(_s2).x * this.kit.def.hipsScale
