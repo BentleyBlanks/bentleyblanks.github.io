@@ -32,6 +32,14 @@ burst.Play();burst.Update(.6);assert.equal(burst.emitted,7);assert.equal(burst.s
 burst.Play();burst.Update(.1);assert.equal(burst.emitted,3,'completed one-shot can be played again');
 const looping=new ParticleSystem({main:{duration:.5,startLifetime:2},emission:{rateOverTime:0,bursts:[{time:0,count:1}]}});
 looping.Play();looping.Update(1.2);assert.equal(looping.emitted,3,'time-zero burst repeats at each cycle boundary');
+const plume=new ParticleSystem({main:{duration:120,startLifetime:120,maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]}});
+plume.Play();
+for(let i=0;i<3;i++){
+  plume.Update(120);
+  assert.equal(plume.particles.length,1,'stationary smoke keeps one live volume at handoff');
+  assert.equal(plume.dropped,0,'expiry frees the only slot before the replacement burst');
+}
+assert.equal(plume.emitted,4);
 const delayed=new ParticleSystem({main:{startDelay:.1,loop:false,duration:1},emission:{rateOverTime:0,bursts:[{time:0,count:4}]}});
 delayed.Play();delayed.Update(.2);assert.equal(delayed.emitted,4,'delayed time-zero burst fires exactly once on a step boundary');
 const endBurst=new ParticleSystem({main:{duration:.5,loop:false},emission:{rateOverTime:0,bursts:[{time:.5,count:2}]}});

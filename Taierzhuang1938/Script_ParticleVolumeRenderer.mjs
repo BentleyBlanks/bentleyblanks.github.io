@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MarkNoPrepass } from './Script_RenderTags.mjs';
 import {LoadParticleVolume} from './Script_ParticleVolumeAsset.mjs';
 import {CreateParticleVolumeMaterial} from './Script_ParticleVolumeMaterial.mjs';
+import {PARTICLE_TIME_EPSILON} from './Script_ParticleModules.mjs';
 import {PARTICLE_VOLUME_ASSETS,PARTICLE_VOLUME_QUALITY} from './Data_ParticleVolumeAssets.mjs';
 
 const assets=new Map();
@@ -36,7 +37,10 @@ export class ParticleVolumeRenderer {
  }
  Spawn(p,system,slot){
    const pool=this.Pool(system.modules.renderer.volumeAsset);let index=-1;
-   for(let offset=0;offset<pool.capacity;offset++){const i=(pool.cursor+offset)%pool.capacity,owner=pool.owners[i];if(!owner||pool.arrays.iBirth[i*4]+pool.arrays.iBirth[i*4+1]<=owner.time){index=i;break;}}
+   for(let offset=0;offset<pool.capacity;offset++){
+     const i=(pool.cursor+offset)%pool.capacity,owner=pool.owners[i],record=pool.records[i];
+     if(!owner||record.birth+record.life<=owner.time+PARTICLE_TIME_EPSILON){index=i;break;}
+   }
    if(index<0){pool.dropped++;return -1;}
    pool.cursor=(index+1)%pool.capacity;pool.owners[index]=system;pool.records[index]=p;if(pool.material)pool.mesh.visible=true;const a=pool.arrays;
    const m=system.modules,phaseSeed=m.main.maxParticles===1&&m.renderer.volumeLoop?((m.main.randomSeed>>>0)*.61803398875)%1:p.seed;

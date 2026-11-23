@@ -1,6 +1,7 @@
 // Serializable Unity-style modules. Pure rules: no renderer or browser dependency.
 import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 export const PARTICLE_STEP = 1 / 60;
+export const PARTICLE_TIME_EPSILON = 1e-9;
 export const PARTICLE_MODULES = Object.freeze(['main', 'emission', 'shape', 'velocityOverLifetime',
   'forceOverLifetime', 'sizeOverLifetime', 'colorOverLifetime', 'rotationOverLifetime', 'noise', 'renderer']);
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -181,10 +182,12 @@ export class ParticleSystem {
   }
   Tick(dt) {
     const previous=this.time;this.time+=dt;
-    this.particles=this.particles.filter(p=>p.birth+p.life>this.time);
+    // A replacement burst can fall on this step within floating-point error.
+    // Release the expiring slot at the same boundary used to admit the burst.
+    this.particles=this.particles.filter(p=>p.birth+p.life>this.time+PARTICLE_TIME_EPSILON);
     const {main,emission}=this.modules;
     const start=previous-main.startDelay,end=this.time-main.startDelay;
-    if(this.emitting&&emission.enabled&&end>=-1e-9) {
+    if(this.emitting&&emission.enabled&&end>=-PARTICLE_TIME_EPSILON) {
       const activeStart=Math.max(0,start),activeEnd=main.loop?end:Math.min(main.duration,end);
       if(activeEnd>activeStart) {
         this.accumulator+=EvaluateCurve(emission.rateOverTime,((activeStart+activeEnd)*.5%main.duration)/main.duration)*(activeEnd-activeStart);
@@ -194,11 +197,11 @@ export class ParticleSystem {
       }
       for(const burst of emission.bursts) {
         const firstCycle=Math.max(0,Math.floor(Math.max(0,start)/main.duration));
-        const lastCycle=main.loop?Math.floor((end+1e-9)/main.duration):0;
+        const lastCycle=main.loop?Math.floor((end+PARTICLE_TIME_EPSILON)/main.duration):0;
         for(let cycle=firstCycle;cycle<=lastCycle;cycle++)for(let repeat=0;repeat<(burst.cycles??1);repeat++) {
           const at=cycle*main.duration+burst.time+repeat*(burst.repeatInterval??0);
           if(at>cycle*main.duration+main.duration)continue;
-          if((at>start+1e-9||at===0&&previous===0)&&at<=end+1e-9)this.Emit(Math.floor(EvaluateCurve(burst.count,0,this.random())),{birth:at+main.startDelay});
+          if((at>start+PARTICLE_TIME_EPSILON||at===0&&previous===0)&&at<=end+PARTICLE_TIME_EPSILON)this.Emit(Math.floor(EvaluateCurve(burst.count,0,this.random())),{birth:at+main.startDelay});
         }
       }
     }
