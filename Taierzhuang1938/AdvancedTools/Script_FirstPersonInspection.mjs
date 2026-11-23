@@ -113,6 +113,7 @@ const INERTIA_DRIVERS = Object.freeze([
   { value: "counterStrafe", label: "左右折返" },
   { value: "surgeStop", label: "急起急停" },
   { value: "stanceHop", label: "蹲立切换" },
+  { value: "mouseFlick", label: "视角甩枪" },
   { value: "manual", label: "自由走动" },
 ]);
 
@@ -154,6 +155,8 @@ class FirstPersonInspectionApp {
     this.bayonetFixed = false;
     this.aimYaw = 0;
     this.aimPitch = 0;
+    this.prevAimYaw = 0;
+    this.prevAimPitch = 0;
     this.recoilPitch = 0;
     this.recoilYaw = 0;
     this.recoilRecoverS = 0.4;
@@ -611,8 +614,8 @@ class FirstPersonInspectionApp {
 
     window.addEventListener("mousemove", (e) => {
       if (document.pointerLockElement === this.dom.canvas && this.view === "player") {
-        this.aimYaw = Clamp(this.aimYaw - (e.movementX || 0) * 0.0022, -0.56, 0.56);
-        this.aimPitch = Clamp(this.aimPitch - (e.movementY || 0) * 0.0020, -0.32, 0.32);
+        this.aimYaw = Clamp(this.aimYaw - (e.movementX || 0) * 0.0022, -1.05, 1.05);
+        this.aimPitch = Clamp(this.aimPitch - (e.movementY || 0) * 0.0020, -0.48, 0.48);
         return;
       }
       if (!dragMode) return;
@@ -628,8 +631,8 @@ class FirstPersonInspectionApp {
         this.orbit.target.addScaledVector(right, -dx * 0.0018 * this.orbit.dist);
         this.orbit.target.y = Clamp(this.orbit.target.y + dy * 0.0018 * this.orbit.dist, 0.5, 2.4);
       } else if (dragMode === "aim") {
-        this.aimYaw = Clamp(this.aimYaw - dx * 0.0022, -0.56, 0.56);
-        this.aimPitch = Clamp(this.aimPitch - dy * 0.0020, -0.32, 0.32);
+        this.aimYaw = Clamp(this.aimYaw - dx * 0.0022, -1.05, 1.05);
+        this.aimPitch = Clamp(this.aimPitch - dy * 0.0020, -0.48, 0.48);
       }
     });
 
@@ -672,6 +675,8 @@ class FirstPersonInspectionApp {
       if (e.code === "Home" || e.code === "KeyQ") {
         this.aimYaw = 0;
         this.aimPitch = 0;
+        this.prevAimYaw = 0;
+        this.prevAimPitch = 0;
         return;
       }
       if (["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyC", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
@@ -719,6 +724,8 @@ class FirstPersonInspectionApp {
       this.adsLocked = true;
       this.aimYaw = 0;
       this.aimPitch = 0;
+      this.prevAimYaw = 0;
+      this.prevAimPitch = 0;
       this.vm.SetComparisonProfile?.(this.profile);
       this.ResetBoltBench(this.boltAuto);
     } else if (mode === "inertia") {
@@ -728,6 +735,8 @@ class FirstPersonInspectionApp {
       this.adsLocked = false;
       this.aimYaw = 0;
       this.aimPitch = 0;
+      this.prevAimYaw = 0;
+      this.prevAimPitch = 0;
       this.vm.SetComparisonProfile?.(this.profile);
       this.ResetInertiaBench();
     } else {
@@ -1196,8 +1205,16 @@ class FirstPersonInspectionApp {
     this.posZ = this.inertiaDriver === "surgeStop" ? 0.85 : 0;
     this.crouchT = 0;
     this.eyeY = PLAYER_BASE_EYE.y;
+    if (this.inertiaDriver === "mouseFlick") {
+      this.aimYaw = 0;
+      this.aimPitch = 0;
+      this.prevAimYaw = 0;
+      this.prevAimPitch = 0;
+    }
     this.inertiaTrail.length = 0;
     this.vm.moveInertia?.Reset?.();
+    this.vm.lookSway?.Reset?.();
+    this.vm.adsLookSway?.Reset?.();
   }
 
   DrawInertiaDial(phaseText) {
@@ -1228,10 +1245,11 @@ class FirstPersonInspectionApp {
     ctx.stroke();
 
     const mi = this.vm.moveInertia;
-    const ox = mi?.x || 0;
-    const oy = mi?.y || 0;
+    const ls = this.vm.lookSway;
+    const ox = (mi?.x || 0) + (ls?.x || 0);
+    const oy = (mi?.y || 0) + (ls?.y || 0);
     const oz = mi?.z || 0;
-    const roll = mi?.roll || 0;
+    const roll = (mi?.roll || 0) + (ls?.roll || 0);
 
     // 映射到指示盘像素（±14mm 对应满圆，清晰可见起步滞后与急停回摆）
     const px = cx + Clamp(ox / 0.014, -1, 1) * (r - 6);
@@ -1406,7 +1424,7 @@ class FirstPersonInspectionApp {
   }
 
   // ------------------------------------------------------------------ 主仿真步进
-  BuildViewmodelInput(dt, targetSprint, targetAds) {
+  BuildViewmodelInput(dt, targetSprint, targetAds, lookDeltaYaw = 0, lookDeltaPitch = 0) {
     const speedMps = Math.hypot(this.velRight, this.velForward);
     // 与正片 Script_FrameStepsPlayer.mjs 一致：moveSpeed 归一化到 0..1（而非原始 m/s）
     const moveSpeed = Clamp01(speedMps / 3.2);
@@ -1420,8 +1438,8 @@ class FirstPersonInspectionApp {
       grounded: true,
       sprint: targetAds > 0.2 ? 0 : targetSprint,
       ads: targetAds,
-      lookDeltaYaw: 0,
-      lookDeltaPitch: 0,
+      lookDeltaYaw,
+      lookDeltaPitch,
       crouch: this.crouchT,
       elapsed: this.time,
       lowAmmo: (WEAPONS[this.weaponId]?.magazine || 0) > 0 && this.ammo <= 0,
@@ -1438,10 +1456,10 @@ class FirstPersonInspectionApp {
 
     // 方向键微调瞄准方向
     const turnSpeed = 0.85;
-    if (this.keys.has("ArrowLeft")) this.aimYaw = Clamp(this.aimYaw + turnSpeed * dt, -0.56, 0.56);
-    if (this.keys.has("ArrowRight")) this.aimYaw = Clamp(this.aimYaw - turnSpeed * dt, -0.56, 0.56);
-    if (this.keys.has("ArrowUp")) this.aimPitch = Clamp(this.aimPitch + turnSpeed * 0.7 * dt, -0.32, 0.32);
-    if (this.keys.has("ArrowDown")) this.aimPitch = Clamp(this.aimPitch - turnSpeed * 0.7 * dt, -0.32, 0.32);
+    if (this.keys.has("ArrowLeft")) this.aimYaw = Clamp(this.aimYaw + turnSpeed * dt, -1.05, 1.05);
+    if (this.keys.has("ArrowRight")) this.aimYaw = Clamp(this.aimYaw - turnSpeed * dt, -1.05, 1.05);
+    if (this.keys.has("ArrowUp")) this.aimPitch = Clamp(this.aimPitch + turnSpeed * 0.7 * dt, -0.48, 0.48);
+    if (this.keys.has("ArrowDown")) this.aimPitch = Clamp(this.aimPitch - turnSpeed * 0.7 * dt, -0.48, 0.48);
 
     const hasManualKeys = this.keys.has("KeyW") || this.keys.has("KeyA") || this.keys.has("KeyS") || this.keys.has("KeyD");
     let useRealAutoDisplacement = false;
@@ -1499,6 +1517,16 @@ class FirstPersonInspectionApp {
           targetCrouch = 0;
           phaseLabel = u < 1.78 ? "起身下沉" : "站姿已稳";
         }
+      } else if (this.inertiaDriver === "mouseFlick") {
+        // 模拟 COD14 快甩目标（右甩 → 停稳 → 左甩 → 停稳）
+        const u = this.inertiaClock % 2.6;
+        const targetYaw = u < 1.3 ? -0.42 : 0.42;
+        const targetPitch = u < 0.65 ? 0.08 : (u < 1.3 ? 0 : (u < 1.95 ? -0.06 : 0));
+        const flickFollow = 1 - Math.exp(-16 * dt);
+        this.aimYaw += (targetYaw - this.aimYaw) * flickFollow;
+        this.aimPitch += (targetPitch - this.aimPitch) * flickFollow;
+        const turning = Math.abs(targetYaw - this.aimYaw) > 0.04;
+        phaseLabel = turning ? (targetYaw < 0 ? "向右快甩" : "向左快甩") : "准心回稳";
       }
     } else {
       const r = (this.keys.has("KeyD") ? 1 : 0) - (this.keys.has("KeyA") ? 1 : 0);
@@ -1571,9 +1599,13 @@ class FirstPersonInspectionApp {
       }
     }
 
-    // 运动、姿态与 Viewmodel 更新
+    // 运动、姿态与 Viewmodel 更新（同时把真实视角增量传给 LookSway / adsLookSway）
     const { sprintEff, adsWanted, phaseLabel } = this.ComputeMovementAndStance(dt);
-    const vmInput = this.BuildViewmodelInput(dt, sprintEff, adsWanted);
+    const lookDeltaYaw = this.aimYaw - this.prevAimYaw;
+    const lookDeltaPitch = this.aimPitch - this.prevAimPitch;
+    this.prevAimYaw = this.aimYaw;
+    this.prevAimPitch = this.aimPitch;
+    const vmInput = this.BuildViewmodelInput(dt, sprintEff, adsWanted, lookDeltaYaw, lookDeltaPitch);
     this.vm.Update(dt, vmInput);
 
     // 相机 ADS FOV 过渡（150ms，受 adsSuppress 调制，同 Script_FrameStepsPlayer）

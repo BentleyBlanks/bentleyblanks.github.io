@@ -3281,7 +3281,17 @@ export class Viewmodel {
     const inertiaMag = Math.abs(wpX) + Math.abs(wpY) + Math.abs(wpZ)
       + Math.abs(wpPitch) + Math.abs(wpYaw) + Math.abs(wpRoll);
     if (dw > 1e-4 && !this.mount && this.rig && inertiaMag > 1e-6) {
-      this._inertiaE.set(wpPitch, wpYaw, wpRoll, "YXZ");
+      // Smooth ergonomic soft-clamp (linear for normal motion, asymptotic at human wrist/arm limits)
+      // so simultaneous movement + fast mouse flick + stride bob compose cleanly without clipping.
+      const lim = MOVE_INERTIA.softLimits;
+      const SoftLimit = (v, cap) => (cap > 0 ? cap * Math.tanh(v / cap) : v);
+      const cX = SoftLimit(wpX, lim.xM);
+      const cY = SoftLimit(wpY, lim.yM);
+      const cZ = SoftLimit(wpZ, lim.zM);
+      const cPitch = SoftLimit(wpPitch, lim.pitchDeg * DEG);
+      const cYaw = SoftLimit(wpYaw, lim.yawDeg * DEG);
+      const cRoll = SoftLimit(wpRoll, lim.rollDeg * DEG);
+      this._inertiaE.set(cPitch, cYaw, cRoll, "YXZ");
       const qCam = this._inertiaQ.setFromEuler(this._inertiaE);
       const qMount = this.weaponMount.quaternion;
       const qInv = this._inertiaQInv.copy(qMount).invert();
@@ -3295,7 +3305,7 @@ export class Viewmodel {
         pivotPt.z += MOVE_INERTIA.twoHandStockBackM;
       }
       this.inertiaAnchor.copy(pivotPt).applyQuaternion(this.inertiaPivot.quaternion);
-      this._inertiaV.set(wpX, wpY, wpZ).applyQuaternion(qInv);
+      this._inertiaV.set(cX, cY, cZ).applyQuaternion(qInv);
       this.inertiaPivot.position.copy(pivotPt).sub(this.inertiaAnchor).add(this._inertiaV);
     } else {
       this.inertiaPivot.position.set(0, 0, 0);

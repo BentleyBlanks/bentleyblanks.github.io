@@ -42,12 +42,12 @@ export const WALL_CARRY = Object.freeze({
 // 125 deg/s turn by about 1.2 deg and 0.8 cm, caps at 3 deg / 1.9 cm, and settles
 // in about 0.4 s with at most ~2 % overshoot (no visible rebound, see 2026-10-20).
 export const LOOK_SWAY = Object.freeze({
-  maxDegPerFrame: 5,
-  frequencyHz: 2.3, damping: 0.8,                 // second-order follow (omit = first-order DiffTrack at lerpSpeed)
-  yawScale: 0.6, pitchScale: 0.5,                 // degrees of lag per degree/frame
-  horizM: 0.0038, vertM: 0.0030,                  // metres of lag per degree/frame
-  rollScale: 0.45,                                // bank into the turn
-  strafeRollRad: 0.045, strafeLerpSpeed: 6,       // existing strafe lean, now without rebound
+  maxDegPerFrame: 6.5,
+  frequencyHz: 2.25, damping: 0.90,               // near-critically damped COD WWII mass-spring, unified with MOVE_INERTIA
+  yawScale: 0.65, pitchScale: 0.55,               // degrees of barrel lag per degree/frame
+  horizM: 0.0040, vertM: 0.0032,                  // metres of lag per degree/frame
+  rollScale: 0.48,                                // natural weighted roll trailing the turn
+  strafeRollRad: 0.045, strafeLerpSpeed: 6,       // legacy strafe lean (used when MoveInertia is off)
 });
 
 // Aimed sight sway (2026-11-05 user: fully steady ADS feels fake, match COD). Same
@@ -55,10 +55,10 @@ export const LOOK_SWAY = Object.freeze({
 // (Script_Viewmodel) so the sights lag a turn for a moment and settle back to the
 // screen centre; Player.AimDirection adds the same angle so bullets follow the sights.
 export const ADS_LOOK_SWAY = Object.freeze({
-  maxDegPerFrame: 4, lerpSpeed: 6,
-  yawScale: 0.5, pitchScale: 0.5,
+  maxDegPerFrame: 5, lerpSpeed: 7.0,
+  yawScale: 0.58, pitchScale: 0.55,
   horizM: 0, vertM: 0,            // rotation only: the sight line stays a straight line through the eye
-  rollScale: 0.2,
+  rollScale: 0.28,
   strafeRollRad: 0.025, strafeLerpSpeed: 6,
 });
 
@@ -114,6 +114,9 @@ export const MOVE_INERTIA = Object.freeze({
   lookSwayShoulderShare: 0.22,
   twoHandStockBackM: 0.16,          // rear stock pocket behind right grip (+z in weaponMount local space)
   twoHandStockDownM: -0.02,
+  // Smooth ergonomic soft-limits (tanh) for combined movement + look + bob weapon inertia so
+  // simultaneous sprint/strafe/180-flick never over-twists the wrist or clips the sleeve.
+  softLimits: Object.freeze({ xM: 0.026, yM: 0.022, zM: 0.024, pitchDeg: 5.5, yawDeg: 6.5, rollDeg: 6.0 }),
 });
 
 // Idle aim sway of the whole line of sight (camera + aim together, so settled sights
