@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../Style_Editor.css?v=20261114MenuTheme">
   <link rel="stylesheet" href="./Style_ModelWorkbench.css?v=20261122">
   <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js"}}</script>
-  <script type="module" src="./Script_ModelWorkbench.mjs?v=20261122"></script>
+  <script type="module" src="./Script_ModelWorkbench.mjs?v=20261124"></script>
 </head>
 <body class="edThemedSurface">
   <header class="mwMenu">
@@ -75,6 +75,7 @@
     <form id="createForm">
       <header class="mwDialogHead"><h2 id="createTitle">新建模型任务</h2></header>
       <label>任务名称<input name="title" required maxlength="100" autocomplete="off"></label>
+      <label>资产代号（可选）<input name="assetCode" maxlength="64" pattern="[A-Za-z][A-Za-z0-9_]*" placeholder="例如 CourtyardGate" autocomplete="off"></label>
       <label>参考图来源<select id="taskSourceType" name="type">
         <option value="concept">原画局部 · 按截图或圈注生成三视图</option>
         <option value="research">自行搜集 · Agent 查找多角度参考图</option>

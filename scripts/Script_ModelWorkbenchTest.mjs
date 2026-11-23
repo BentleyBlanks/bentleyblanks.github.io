@@ -215,6 +215,7 @@ try {
   await page.goto(base + workbench);
   await page.getByRole("button", { name: "新建任务", exact: true }).click();
   await page.getByLabel("任务名称").fill("鲁南木箱");
+  await page.getByLabel("资产代号（可选）").fill("WoodCrate");
   await page.getByRole("button", { name: "创建任务" }).click();
   await page.getByRole("dialog", { name: "生成原画局部三视图" }).waitFor();
   await page.locator("#sourceFiles").setInputFiles(ImagePath(6));
@@ -226,6 +227,10 @@ try {
   const current = async () => (await fetch(base + api + "/" + id)).json();
   const approved = await current();
   assert.equal(approved.referenceSets[0].views.length, 3);
+  assert.equal(path.basename(path.dirname(approved.workspace)), "WoodCrate");
+  for (const folder of ["References", "Models", "Textures", "Review", "Exports", "_Scratch"]) {
+    assert.ok((await fs.stat(path.join(approved.workspace, folder))).isDirectory());
+  }
   const badApprove = await fetch(base + api + "/" + id + "/action", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "approveReferences", revision: approved.revision, referenceSet: "old-version" }),
@@ -243,6 +248,13 @@ try {
   assert.equal(result.candidates[0].review.verdict, "revise");
   assert.equal(result.candidates[0].review.attachments.length, 1);
   assert.equal(result.candidates[1].review.verdict, "pass");
+  assert.deepEqual(result.candidates.map(candidate => candidate.round), ["R002", "R003"]);
+  const index = JSON.parse(await fs.readFile(path.join(result.workspace, "Data_Task.json"), "utf8"));
+  assert.equal(index.approved, result.approved);
+  const archived = [result.referenceSets[0].views[0].archive, ...result.candidates.flatMap(candidate => [
+    candidate.archive.model, candidate.views[0].archive, `Review/${candidate.round}/Data_Review.json`,
+  ])];
+  for (const file of archived) assert.ok((await fs.stat(path.join(result.workspace, file))).isFile());
   await page.getByRole("button", { name: "左侧", exact: true }).click();
   await page.getByRole("button", { name: "查看参考图 · 左侧" }).waitFor();
   await page.getByRole("button", { name: "查看 3D 模型" }).click();

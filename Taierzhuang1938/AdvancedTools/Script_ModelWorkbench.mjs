@@ -6,8 +6,9 @@ const labels = {
   draft: "待准备参考图", preparing: "参考图准备中", refsReady: "参考图待验收",
   refsApproved: "参考图已通过", building: "建模中", candidate: "模型待独立验收",
   reviewing: "独立验收中", needsRevision: "模型返修中", modelReady: "模型待你验收", complete: "已验收",
+  externalIteration: "原会话迭代中",
 };
-const types = { concept: "原画局部", research: "自行搜集" };
+const types = { concept: "原画局部", research: "自行搜集", imported: "已接入的任务记录" };
 const checks = { silhouette: "轮廓", proportion: "比例", structure: "结构", material: "材质", details: "细节" };
 const drafts = new Map();
 let tasks = [], task, activeId, stage = "references", viewpoint, selectedSet, selectedModel, selectedSession;
@@ -95,7 +96,7 @@ function RenderJobs() {
     status.dataset.state = job.failure ? "failed" : job.state;
     head.append(El("strong", "", job.title), status);
     const track = El("span", "mwTrack");
-    const states = job.approved
+    const states = job.state === "externalIteration" ? ["waiting", "current"] : job.approved
       ? ["done", job.failure ? "failed" : job.state === "complete" ? "done" : "current"]
       : [job.failure ? "failed" : "current", "waiting"];
     for (const [index, label] of ["参考图", "模型"].entries()) {
@@ -286,6 +287,33 @@ function RenderStage() {
   const previousDetails = new Set([...materials.querySelectorAll("details[open]")].map(node => node.querySelector("summary").textContent));
   actions.replaceChildren();
   materials.replaceChildren();
+  if (task.workspace) {
+    const folder = task.workspace;
+    const copy = Button("复制任务目录", async () => {
+      try { await navigator.clipboard.writeText(folder); copy.textContent = "已复制任务目录"; }
+      catch { copy.textContent = "目录复制失败"; }
+    });
+    copy.title = folder;
+    actions.append(copy);
+  }
+  if (task.original) {
+    const original = El("a", "", "打开原 Codex 会话");
+    original.href = `codex://threads/${task.original.threadId}`;
+    actions.append(original);
+    if (stage === "references") {
+      materials.append(Gallery("原会话的反馈截图", task.sessions[0].messages[0].attachments));
+    } else {
+      const files = El("ul");
+      for (const { name, file } of task.original.files) {
+        const item = El("li", "", `${name} · `);
+        item.append(El("code", "", file));
+        files.append(item);
+      }
+      materials.append(Details("原工程与已有产物路径", files));
+      if (task.original.evidence.length) materials.append(Gallery("原会话的模型对照", task.original.evidence));
+    }
+    return;
+  }
   if (!task.active && task.retry && task.retry !== "chat") actions.append(Button("重试上次操作", () => StageAction("retry"), "primary"));
   if (stage === "references") {
     const newest = task.referenceSets.at(-1);
@@ -389,15 +417,17 @@ function RenderChat() {
   const sessions = task?.sessions || [];
   const session = selectedSession === "" ? undefined
     : sessions.find(item => item.id === selectedSession) || sessions.at(-1);
-  const enabled = Boolean(task && !disconnect);
+  const enabled = Boolean(task && !disconnect && !task.original);
   $("newChat").disabled = !enabled;
   for (const id of ["sessions", "message", "markScreenshot", "send"]) $(id).disabled = !enabled;
   $("stop").hidden = !task?.active;
-  $("connection").textContent = disconnect || (session ? `${session.model.replace("gpt-", "")} · ${session.effort}` : "本机 Codex");
+  $("composer").hidden = Boolean(task?.original);
+  $("connection").textContent = disconnect || (task?.original ? "原会话记录" : session ? `${session.model.replace("gpt-", "")} · ${session.effort}` : "本机 Codex");
   const stamp = JSON.stringify([task?.id, sessions.map(item => [item.id, item.messages.length]), session?.id, task?.active?.sessionId, enabled]);
   if (stamp === chatStamp) return;
   chatStamp = stamp;
-  $("sessions").replaceChildren(new Option("新会话", ""), ...sessions.map(item => new Option(item.title, item.id)));
+  const options = sessions.map(item => new Option(item.title, item.id));
+  $("sessions").replaceChildren(...(task?.original ? options : [new Option("新会话", ""), ...options]));
   $("sessions").value = session?.id || "";
   $("thread").replaceChildren(...(session?.messages || []).map(message => {
     const article = El("article", "mwMessage");

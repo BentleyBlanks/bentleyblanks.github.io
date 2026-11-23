@@ -17,6 +17,16 @@ const maxViews = 12;
 const imageHelper = fileURLToPath(new URL("./Script_ModelWorkbenchImages.py", import.meta.url));
 const RunFile = promisify(execFile);
 const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".glb": "model/gltf-binary", ".py": "application/octet-stream" };
+const workspaceFolders = ["References", "Models", "Textures", "Review", "Exports", "_Scratch"];
+const assetCodePattern = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+function DefaultStorage() {
+  return process.env.MODEL_WORKBENCH_DATA || path.join(process.env.LOCALAPPDATA || os.homedir(), "BlanksTools", "ModelWorkbench");
+}
+
+function DefaultBlenderRoot() {
+  return process.env.MODEL_WORKBENCH_BLENDER || path.join(os.homedir(), "OneDrive", "AI", "Models", "Blender", "Taierzhuang1938");
+}
 
 class RequestError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -77,6 +87,81 @@ function ImageExtension(bytes) {
   return null;
 }
 
+function PrepareWorkspace(root, assetCode, date, id) {
+  Assert(assetCodePattern.test(assetCode) && !/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(assetCode), "资产代号须为英文字母、数字或下划线，且以字母开头");
+  Assert(/^\d{8}$/.test(date), "任务日期须为 YYYYMMDD");
+  const directory = path.resolve(root, assetCode, `ModelTask_${date}_${id.slice(0, 8)}`);
+  fs.mkdirSync(directory, { recursive: true });
+  const relative = path.relative(fs.realpathSync(root), fs.realpathSync(directory));
+  Assert(relative && !relative.startsWith("..") && !path.isAbsolute(relative), "任务目录须在 Blender 源工程根目录内");
+  for (const folder of workspaceFolders) fs.mkdirSync(path.join(directory, folder), { recursive: true });
+  return directory;
+}
+
+function WriteWorkspaceIndex(task) {
+  if (!task.workspace) return;
+  const { id, title, state, created, updated, original, sources, referenceSets, approved, candidates } = task;
+  SaveJson(path.join(task.workspace, "Data_Task.json"), {
+    schema: 1, id, title, state, created, updated, original, sources, approved,
+    referenceSets: referenceSets.map(({ id, archive, views }) => ({ id, archive, views })),
+    candidates: candidates.map(({ id, round, approved, blend, archive, summary, views, review }) => ({
+      id, round, referenceSet: approved, blend, archive, summary, views, review,
+    })),
+  });
+}
+
+function ArchiveFile(workspace, relative, bytes) {
+  const file = path.join(workspace, relative);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, bytes);
+  return relative.replaceAll("\\", "/");
+}
+
+// The importer is a local CLI, never an HTTP endpoint that can read arbitrary files.
+export function ImportModelWorkbenchTask(record, { storage = DefaultStorage(), blenderRoot = DefaultBlenderRoot() } = {}) {
+  const { threadId, assetCode, date, projectFiles = [], attachments = [], evidence = [], messages = [] } = record;
+  Assert(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(threadId) && Clean(record.title, 100), "缺少原会话 ID 或任务标题");
+  Assert([...attachments, ...evidence].length <= 50 && messages.length <= 100, "历史任务导入资料过多");
+  const folder = path.resolve(storage, threadId);
+  const file = path.join(folder, "Task.json");
+  const existing = fs.existsSync(file) ? ReadJson(file) : null;
+  Assert(!existing || existing.original?.threadId === threadId, "该任务编号已占用", 409);
+  const workspace = existing?.workspace || PrepareWorkspace(blenderRoot, assetCode, date, threadId);
+  const assetFolder = path.join(folder, "Assets");
+  fs.mkdirSync(assetFolder, { recursive: true });
+  function Images(entries, group) {
+    return entries.map(({ name, file }, i) => {
+      const bytes = fs.readFileSync(file);
+      const ext = ImageExtension(bytes);
+      Assert(ext && bytes.length <= 32 * 1024 * 1024, "导入截图须为不超过 32 MB 的 PNG、JPEG 或 WebP");
+      const hash = createHash("sha256").update(bytes).digest("hex");
+      const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}${ext}`;
+      const archive = ArchiveFile(workspace, `Review/Imported/${group}/Image_${i + 1}_${hash.slice(0, 8)}${ext}`, bytes);
+      if (!fs.existsSync(path.join(assetFolder, id))) fs.writeFileSync(path.join(assetFolder, id), bytes);
+      return { id, name: Clean(name, 140) || `截图 ${i + 1}`, archive };
+    });
+  }
+  const screenshots = Images(attachments, "Feedback");
+  const comparison = Images(evidence, "Comparison");
+  const task = {
+    id: threadId, workspace, revision: (existing?.revision || 0) + 1, title: Clean(record.title, 100), brief: Clean(record.brief, 8000),
+    type: "imported", state: "externalIteration", provider: "openai", created: existing?.created || record.created || Date.now(),
+    updated: Date.now(), sources: [], referenceSets: [], candidates: [],
+    original: { threadId, files: projectFiles.map(({ name, file }) => ({ name: Clean(name, 140), file: path.resolve(file) })), evidence: comparison },
+    sessions: [{ id: threadId, threadId, role: "imported", title: "原 Codex 会话摘录", messages: [
+      { role: "user", text: Clean(record.request, 32_000), attachments: screenshots, time: record.created || Date.now() },
+      ...messages.map(({ role, text, time }) => ({ role: role === "user" ? "user" : "agent", text: Clean(text, 32_000), attachments: [], time })),
+      ...(comparison.length ? [{ role: "system", text: "原会话对照记录", attachments: comparison, time: Date.now() }] : []),
+    ] }],
+  };
+  const sessionFolder = path.join(workspace, "Review", "Imported");
+  fs.mkdirSync(sessionFolder, { recursive: true });
+  SaveJson(path.join(sessionFolder, "Data_Session.json"), task.sessions[0]);
+  WriteWorkspaceIndex(task);
+  SaveJson(file, task);
+  return task;
+}
+
 function CheckedFile(folder, name) {
   Assert(typeof name === "string" && name && !path.isAbsolute(name), "产物文件须使用任务目录内的相对路径");
   const parent = fs.realpathSync(folder);
@@ -104,7 +189,7 @@ function RunCodex({ root, directory, session, notify, prompt, images, goal, sign
         allowProviderModelFallback: false,
         approvalPolicy: "never",
         sandbox: "workspace-write",
-        runtimeWorkspaceRoots: [directory, ...(building ? [root, building.sourceDir] : [])],
+        runtimeWorkspaceRoots: [directory, ...(building ? [root, building.sourceDir, building.textureDir].filter(Boolean) : [])],
         config: {
           web_search: session.role === "research" ? "live" : "disabled",
           sandbox_workspace_write: { network_access: session.role === "research" || session.role === "generate" || Boolean(building) },
@@ -153,8 +238,7 @@ async function BlenderRun(root, args) {
 }
 
 export function CreateModelWorkbenchHandler(root, {
-  storage = process.env.MODEL_WORKBENCH_DATA || path.join(process.env.LOCALAPPDATA || os.homedir(), "BlanksTools", "ModelWorkbench"),
-  blenderRoot = process.env.MODEL_WORKBENCH_BLENDER || path.join(os.homedir(), "OneDrive", "AI", "Models", "Blender", "Taierzhuang1938", "ModelWorkbench"),
+  storage = DefaultStorage(), blenderRoot = DefaultBlenderRoot(),
   runCodex = RunCodex, generateOpenAi = GenerateOpenAiViews, runBlender = BlenderRun,
 } = {}) {
   storage = path.resolve(storage);
@@ -168,9 +252,10 @@ export function CreateModelWorkbenchHandler(root, {
     return ReadJson(State(id));
   }
 
-  function Save(task) {
+  function Save(task, updateArchive = true) {
     task.updated = Date.now();
     task.revision++;
+    if (updateArchive) WriteWorkspaceIndex(task);
     SaveJson(State(task.id), task);
   }
 
@@ -250,6 +335,7 @@ export function CreateModelWorkbenchHandler(root, {
     if (payload.sessionId) Assert(session, "会话不存在", 404);
     const stage = { references: "preparing", build: "building", review: "reviewing" }[action];
     const run = { id: randomUUID(), pid: process.pid, action, previous: task.state, detail: "正在准备", sessionId: session?.id };
+    if (action === "build") run.buildNumber = task.buildNumber = (task.buildNumber ?? task.candidates.length) + 1;
     task.active = run;
     task.failure = null;
     task.retry = null;
@@ -261,12 +347,12 @@ export function CreateModelWorkbenchHandler(root, {
   }
 
   async function Execute(task, run, payload, live) {
-    const directory = path.join(Folder(task.id), "Runs", run.id);
+    const directory = task.workspace ? path.join(task.workspace, "_Scratch", run.id) : path.join(Folder(task.id), "Runs", run.id);
     const signal = AbortSignal.any([live.controller.signal, AbortSignal.timeout(2 * 60 * 60_000)]);
     let session;
     function Progress(detail) {
       run.detail = Clean(detail, 1200);
-      Save(task);
+      Save(task, false);
     }
     function Message(role, text, attachments = []) {
       session.messages.push({ role, text: Clean(text, 32000), attachments, time: Date.now() });
@@ -380,7 +466,7 @@ export function CreateModelWorkbenchHandler(root, {
           let views;
           if (task.provider === "openai") {
             views = await generateOpenAi({ ...task, brief: [task.brief, task.refFeedback].filter(Boolean).join("\n") },
-              generationInputs, path.join(Folder(task.id), "ImageRequests", task.referenceRequest || run.id), { signal, progress: Progress });
+              generationInputs, path.join(task.workspace ? path.join(task.workspace, "References", "Requests") : path.join(Folder(task.id), "ImageRequests"), task.referenceRequest || run.id), { signal, progress: Progress });
           } else {
             await Agent([
               Context(), ThreeViewPrompt(task), AlternateProviderInstructions(task.provider),
@@ -398,7 +484,11 @@ export function CreateModelWorkbenchHandler(root, {
           decision ||= "由局部原画生成正、侧、背三视图，遮挡或背面细节待确认。";
           Message("system", "三视图已保存，等待用户确认。", references.filter(item => item.generated).map(item => ({ ...item, name: item.label })));
         }
-        task.referenceSets.push({ id: run.id, views: references, decision, time: Date.now() });
+        const archive = task.workspace ? `References/${run.id}` : undefined;
+        if (archive) {
+          for (const view of [...task.sources, ...references]) view.archive = ArchiveFile(task.workspace, `${archive}/${view.id}`, fs.readFileSync(Asset(task.id, view.id)));
+        }
+        task.referenceSets.push({ id: run.id, views: references, archive, decision, time: Date.now() });
         task.state = "refsReady";
       } else if (actionIs("build")) {
         const approved = task.referenceSets.find(set => set.id === task.approved);
@@ -407,8 +497,12 @@ export function CreateModelWorkbenchHandler(root, {
         const previous = task.candidates.at(-1);
         const feedback = task.feedback;
         Message("system", "按批准的参考图建模，并提交逐视角的对齐证明。", feedback?.attachments || []);
-        const sourceDir = path.resolve(blenderRoot, task.id, run.id);
+        const round = `R${String(run.buildNumber).padStart(3, "0")}`;
+        const legacyRoot = process.env.MODEL_WORKBENCH_BLENDER || path.join(blenderRoot, "ModelWorkbench");
+        const sourceDir = task.workspace ? path.join(task.workspace, "Models", round) : path.resolve(legacyRoot, task.id, run.id);
+        const textureDir = task.workspace ? path.join(task.workspace, "Textures", round) : undefined;
         fs.mkdirSync(sourceDir, { recursive: true });
+        if (textureDir) fs.mkdirSync(textureDir, { recursive: true });
         const blend = path.join(sourceDir, "Model.blend");
         await RecoverBlender(task.abandonedBlender);
         delete task.abandonedBlender;
@@ -428,10 +522,11 @@ export function CreateModelWorkbenchHandler(root, {
             Context(), goal,
             `使用 BlenderMCP：node "${path.join(root, "scripts", "Script_BlenderMcp.mjs")}" exec --port ${blender.port} --file "<当前目录的脚本>"。服务管理此端口与收尾。只能在当前任务目录与指定 .blend 路径写产物。`,
             `保存工程至 ${blend}，在当前目录生成 Model.glb、可重建的 Rebuild.py，以及每张参考图对应的模型独立渲染 PNG。导出后回导查看并反复修到一致。`,
+            textureDir && `贴图源文件和正式烘焙图放在 ${textureDir}。Blender 贴图使用到 Textures 的相对路径。不得引用 _Scratch 内文件作为工程依赖。`,
             `批准的参考图（逐图匹配，顺序同附件）\n${JSON.stringify(references)}`,
             feedback && `上一轮反馈：${feedback.text}\n附带的标注图：${JSON.stringify(critique)}`,
             '写 Model.json，格式 {"summary":"自检结果","views":[{"referenceId":"批准资料 id","render":"相对路径","camera":"投影、方位/仰角、焦距或正交尺度及构图对齐依据","checks":{"silhouette":"对齐证据","proportion":"对齐证据","structure":"对齐证据","material":"对齐证据","details":"对齐证据"},"matched":true}]}。只有逐视角通过自检且检查无遗漏才能交独立验收。不得用原参考图充当模型渲染。',
-          ].filter(Boolean).join("\n"), [...references, ...critique].map(item => item.path), { goal, building: { sourceDir } });
+          ].filter(Boolean).join("\n"), [...references, ...critique].map(item => item.path), { goal, building: { sourceDir, textureDir } });
           evidence = Manifest("Model.json");
           Assert(Clean(evidence.summary) && Array.isArray(evidence.views) && evidence.views.length === references.length, "缺少逐视角对齐资料");
           const rows = references.map(reference => {
@@ -457,7 +552,14 @@ export function CreateModelWorkbenchHandler(root, {
             return { referenceId, id: ImageAsset(task, bytes), camera: Clean(row.camera, 1000),
               checks: Object.fromEntries(Object.entries(row.checks).map(([key, value]) => [key, Clean(value, 1000)])) };
           });
-          evidence = { id: run.id, approved: task.approved, blend, views, model: SaveAsset(task, ".glb", glb),
+          const archive = task.workspace ? {
+            model: ArchiveFile(task.workspace, `Exports/${round}/Model.glb`, glb),
+            rebuild: ArchiveFile(task.workspace, `Exports/${round}/Rebuild.py`, rebuild),
+          } : undefined;
+          if (archive) {
+            for (const view of views) view.archive = ArchiveFile(task.workspace, `Review/${round}/${view.id}`, fs.readFileSync(Asset(task.id, view.id)));
+          }
+          evidence = { id: run.id, approved: task.approved, blend, round, archive, views, model: SaveAsset(task, ".glb", glb),
             rebuild: SaveAsset(task, ".py", rebuild), summary: Clean(evidence.summary, 3200), time: Date.now() };
         } finally {
           if (blender?.port) await runBlender(root, ["stop", "--port", String(blender.port)]);
@@ -505,6 +607,11 @@ export function CreateModelWorkbenchHandler(root, {
         const verdict = `${Clean(review.summary, 3000)}\n${problems.join("\n")}`.trim();
         Message("system", verdict, attachments);
         candidate.review = { verdict: review.verdict, sessionId: session.id, notes: verdict, checks: review.checks, attachments };
+        if (task.workspace && candidate.round) {
+          const folder = `Review/${candidate.round}`;
+          for (const image of attachments) image.archive = ArchiveFile(task.workspace, `${folder}/${image.id}`, fs.readFileSync(Asset(task.id, image.id)));
+          SaveJson(path.join(task.workspace, folder, "Data_Review.json"), candidate.review);
+        }
         if (review.verdict === "pass") task.state = "modelReady";
         else {
           task.feedback = { text: verdict, attachments };
@@ -538,6 +645,7 @@ export function CreateModelWorkbenchHandler(root, {
   }
 
   function Change(task, body) {
+    Assert(!task.original, "请从原 Codex 会话继续已接入的历史任务", 409);
     const action = body.action;
     const active = running.get(task.id);
     const attachments = Uploads(task, body.attachments);
@@ -618,6 +726,7 @@ export function CreateModelWorkbenchHandler(root, {
       Assert(request.method === "POST" && (id ? action === "upload" || action === "action" : !action), "不支持此操作", 405);
       if (action === "upload") {
         const task = Load(id);
+        Assert(!task.original, "请从原 Codex 会话添加截图", 409);
         const bytes = await ReadBody(request, 32 * 1024 * 1024);
         Send(response, 201, { id: ImageAsset(task, bytes), name: Clean(url.searchParams.get("name"), 140) || "截图" });
         return;
@@ -632,7 +741,10 @@ export function CreateModelWorkbenchHandler(root, {
         Send(response, 200, Visible(Load(id)));
       } else {
         Assert(Clean(body.title, 100) && ["concept", "research"].includes(body.type), "请填写任务名称和参考图来源");
-        const task = { id: randomUUID(), revision: 0, title: Clean(body.title, 100), brief: Clean(body.brief, 8000),
+        const id = randomUUID();
+        const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "");
+        const workspace = PrepareWorkspace(blenderRoot, Clean(body.assetCode, 64) || `Asset_${id.slice(0, 8)}`, date, id);
+        const task = { id, workspace, revision: 0, title: Clean(body.title, 100), brief: Clean(body.brief, 8000),
           type: body.type, provider: Object.hasOwn(PROVIDERS, body.provider) ? body.provider : "openai",
           created: Date.now(), state: "draft", sources: [], sessions: [], referenceSets: [], candidates: [] };
         fs.mkdirSync(path.join(Folder(task.id), "Assets"), { recursive: true });

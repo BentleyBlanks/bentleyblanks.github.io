@@ -13,5 +13,7 @@
 
 - 使用当前账户登录的 Codex CLI，两个会话模型均需可用。Python 需要 Pillow，用于原图尺寸检查、Agent 预览和验收标注。默认从 PATH 调用 `python`，可用 `MODEL_WORKBENCH_PYTHON` 指定可执行文件。
 - Lovart 使用登录并选好项目的官方 Agent OpenAPI skill，可用 `MODEL_WORKBENCH_LOVART_CLI` 指向 `agent_skill.py`。有供应商付款确认时按供应商要求处理。Seedream 使用已登录的 Dreamina CLI，可用 `MODEL_WORKBENCH_SEEDREAM_CLI` 指定。内置 imagegen 需要本机 Codex 会话提供该工具。工作台按所选途径运行，失败时在任务内显示原因。
-- 任务、审批、截图、生成请求和产物历史保存在 `%LOCALAPPDATA%/BlanksTools/ModelWorkbench`，也可在起服前设置 `MODEL_WORKBENCH_DATA`。独立 Blender 源工程按任务和轮次保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/ModelWorkbench` 下，可用 `MODEL_WORKBENCH_BLENDER` 指定源工程根目录。
+- 工作台任务状态和页面附件缓存在 `%LOCALAPPDATA%/BlanksTools/ModelWorkbench`，可用 `MODEL_WORKBENCH_DATA` 指定。新任务自动在 `OneDrive/AI/Models/Blender/Taierzhuang1938/<资产代号>/ModelTask_<YYYYMMDD>_<短ID>` 建目录。可用 `MODEL_WORKBENCH_BLENDER` 指定项目目录。资产代号可在新建时填写，留空用 `Asset_<短ID>`。已有任务继续读取原路径。
+- `Data_Task.json` 索引参考图、轮次、导出、审批和原会话。服务准备 `References/`、`Models/Rxxx/`、`Textures/Rxxx/`、`Review/Rxxx/`、`Exports/Rxxx/` 与 `_Scratch/`。Agent 将正式贴图写入本轮 `Textures`，Blender 用相对路径引用。服务把通过交付检查的导出和对照图归档。任务停下后，先检查正式工程的贴图依赖，再手动清理 `_Scratch/`，保留需要追溯的请求和验收记录。
+- 存量任务用 `node scripts/Script_ModelWorkbenchImport.mjs <本机任务索引 JSON>` 接入。输入可为一条或多条记录，每条包含 `threadId`、`title`、`assetCode`、`date`（`YYYYMMDD`）、`brief`、`request`、`created`（毫秒时间戳）、`projectFiles`、`attachments`、`evidence` 和 `messages`。前三个文件数组的元素使用 `{ name, file }`，`messages` 使用 `{ role, text, time }`。重复导入按原会话 ID 更新记录。原项目文件以路径关联，截图与会话摘录归档到 `Review/Imported/`。页面从原会话入口继续原任务。已有工程要转成可独立交付的规范目录时，先复制并重连依赖，再从新位置回导验证。
 - 回归入口为 `node scripts/Script_ModelWorkbenchTest.mjs`。测试用隔离的本地存储和替身供应商，覆盖审批闸门、证据缺漏、独立退回、带标注返修和最终用户验收。

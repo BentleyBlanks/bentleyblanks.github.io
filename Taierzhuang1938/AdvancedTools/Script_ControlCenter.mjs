@@ -51,7 +51,7 @@ export function ControlCenterCards(pageHref = globalThis.location?.href || "http
   cards.push({
     group: "assets", groupLabel: "资产", id: "modelWorkbench", kind: "window", label: "3D 模型制作工作台",
     hint: "管理参考图、Blender 建模、同视角比对与独立验收",
-    href: new URL("./Tool_ModelWorkbench.html?v=20261122", pageHref).href,
+    href: new URL("./Tool_ModelWorkbench.html?v=20261124", pageHref).href,
     target: "TengxianModelWorkbench", features: "popup,width=1520,height=960",
   });
   return cards;
