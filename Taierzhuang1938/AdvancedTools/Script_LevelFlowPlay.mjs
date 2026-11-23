@@ -1,4 +1,5 @@
 import {EncounterCanPlay,EncounterFirstPlayable} from "../Script_EncounterPlayPlan.mjs";
+import {ENCOUNTER_DEFAULT_VARIANT_ID} from "../Data_EncounterVariants.mjs";
 import {ENCOUNTER_PLAY_STARTUP} from "../Data_Tuning_EncounterPlayStartup.mjs";
 import {ReadCastLibrary} from "./Script_EncounterCastLibrary.mjs";
 
@@ -85,7 +86,7 @@ export class LevelFlowPlay {
       return [...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,"0")).join("");
     });
     hashes.push(ReadCastLibrary().then(library=>JSON.stringify(library?.data.models||null)).catch(()=>"null"));
-    return `${variant?.id||"L1_Original"}:${(await Promise.all(hashes)).join(":")}`;
+    return `${variant?.id||ENCOUNTER_DEFAULT_VARIANT_ID}:${(await Promise.all(hashes)).join(":")}`;
   }
   Start(mode="current") {
     if(this.active)return false;
@@ -94,7 +95,7 @@ export class LevelFlowPlay {
     const time=mode==="beginning"?EncounterFirstPlayable(variant||undefined).start:this.saved.time;
     if(!EncounterCanPlay(time,variant||undefined)){this.saved=null;this.toast("镜头动画段暂不支持 Play，请选择战斗关键帧。");return false;}
     clearTimeout(this.cacheTimer);this.pause();this.token=crypto.randomUUID();this.state=null;this.paused=false;this.launching=true;
-    const payload={token:this.token,variantId:variant?.id||"L1_Original",time,document:this.saved.document};
+    const payload={token:this.token,variantId:variant?.id||ENCOUNTER_DEFAULT_VARIANT_ID,time,document:this.saved.document};
     try{sessionStorage.setItem("tengxian1938_encounter_play_session_v1",JSON.stringify(payload));}
     catch(error){this.toast("Play 开局数据保存失败："+error.message,true);this.saved=null;return false;}
     this.previewDebug.CloseAll();

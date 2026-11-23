@@ -22,7 +22,7 @@ try {
   page.on("console", message => {
     if (message.type() === "error" && /THREE\.WebGL|Shader Error|INVALID_OPERATION/.test(message.text())) errors.push(message.text());
   });
-  const payload = { document: DEFAULT_ENCOUNTER_DOCUMENT, time: BeatById("04a").start + 1, token: "NierDirtyReview" };
+  const payload = { variantId: "L1_Original", document: DEFAULT_ENCOUNTER_DOCUMENT, time: BeatById("04a").start + 1, token: "NierDirtyReview" };
   await page.addInitScript(payload => {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));

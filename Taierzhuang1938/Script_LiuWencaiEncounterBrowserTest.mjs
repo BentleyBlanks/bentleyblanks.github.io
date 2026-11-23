@@ -21,7 +21,7 @@ try {
   page.on("console", message => {
     if (message.type() === "error" && /THREE\.WebGL|Shader Error|INVALID_OPERATION/.test(message.text())) errors.push(message.text());
   });
-  const payload = { document: DEFAULT_ENCOUNTER_DOCUMENT, time: 222, token: "LiuWencaiDirtyReview" };
+  const payload = { variantId: "L1_Original", document: DEFAULT_ENCOUNTER_DOCUMENT, time: 222, token: "LiuWencaiDirtyReview" };
   await page.addInitScript(payload => {
     localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ master: 0 }));
     localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true }));

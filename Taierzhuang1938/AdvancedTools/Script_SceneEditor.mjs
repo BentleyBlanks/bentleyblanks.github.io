@@ -24,7 +24,7 @@ import { MISSION_LAYOUT } from "../Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "../Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "../Script_WhiteboxGrid.mjs";
 import { WHITEBOX_MATERIAL } from "../Data_Tuning_WhiteboxMaterial.mjs";
-import { ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
+import { ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
 
 export const SCENE_EDITOR = Object.freeze({
   pollMs: 2000,
@@ -250,7 +250,7 @@ class SceneEditorApp {
       const matched = ENCOUNTER_VARIANTS.find((v) => v.scene === this.sceneId);
       encLink.hidden = !matched;
       if (matched) {
-        encLink.href = `./Tool_LevelFlow.html${matched.isBaseline ? "" : `?variant=${encodeURIComponent(matched.id)}`}`;
+        encLink.href = `./Tool_LevelFlow.html${matched.id === ENCOUNTER_DEFAULT_VARIANT_ID ? "" : `?variant=${encodeURIComponent(matched.id)}`}`;
         encLink.textContent = "遭遇设计 ↗";
         encLink.title = `在遭遇设计编辑器打开：${matched.title}`;
       }

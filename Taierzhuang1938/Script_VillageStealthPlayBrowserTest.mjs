@@ -44,7 +44,7 @@ async function Walk(points,nextBeat) {
   },{points,nextBeat});
 }
 try {
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/index.html?encounterPlay=1&manual=1`);
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/index.html?encounterPlay=1&variant=L1_Original&manual=1`);
   await Ready();console.log("ok temple Play loaded");
   const pageMarker=await page.evaluate(()=>window.templePageMarker=crypto.randomUUID());
   let state=await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State());
@@ -121,7 +121,7 @@ try {
     assert.equal(await page.evaluate(()=>Tengxian.Debug.EncounterPlay.State().beat),"09c");
   }
   console.log("ok continuous alley walk, physical patrol, safe exit and companion arrival through 09C");
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?beat=09b`);
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?variant=L1_Original&beat=09b`);
   await page.waitForFunction(()=>window.LevelFlow);
   const editor=await page.evaluate(()=>({time:LevelFlow.Inspect().time,document:JSON.stringify(LevelFlow.Inspect().document)}));
   await page.locator("#playGame").click();

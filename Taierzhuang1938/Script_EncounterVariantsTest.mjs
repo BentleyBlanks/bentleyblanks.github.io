@@ -4,20 +4,30 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { registerHooks } from "node:module";
 import { fileURLToPath } from "node:url";
 import { SCENE_IDS, ValidateScene, DecodeSceneHeights, BlockoutDocFromScene } from "./Script_SceneDoc.mjs";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { DecodeTrenchDatum, PrepareSceneTerrain, GridSampler } from "./Script_SceneTrenches.mjs";
 import { ResolveInheritedScene, FetchResolvedScene } from "./Script_SceneInherit.mjs";
 import {
-  ENCOUNTER_LEVELS, ENCOUNTER_VARIANTS, GetEncounterVariantSpec, CompileEncounterVariant,
+  ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_LEVELS, ENCOUNTER_VARIANTS, GetEncounterVariantSpec, CompileEncounterVariant,
 } from "./Script_EncounterVariants.mjs";
 import { EncounterPlayPlan, EncounterCanPlay, EncounterSceneSignals } from "./Script_EncounterPlayPlan.mjs";
 import { EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { EncounterDocument } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
-import { AiDirector } from "./Script_Ai.mjs";
+
+const threeVendorUrl = new URL("./vendor/three/build/three.module.js", import.meta.url).href;
+const threeHooks = registerHooks({
+  resolve(id, context, next) {
+    if (id === "three") return { url: threeVendorUrl, shortCircuit: true };
+    return next(id, context);
+  },
+});
+const { AiDirector } = await import("./Script_Ai.mjs");
+threeHooks.deregister();
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +93,8 @@ function SegmentOccluded(fromXZ, toXZ, groundAt, solidObjects) {
 // 1. 注册表契约：关卡预留 + 两个初始变体（基线双村版 + 北沙河单村合并版）
 assert.ok(ENCOUNTER_LEVELS.some((l) => l.id === "L1" && l.available === true), "第一关已开放选关");
 assert.ok(ENCOUNTER_LEVELS.some((l) => l.id === "L2" && l.available === false), "第二关预留选关槽位");
+assert.equal(ENCOUNTER_DEFAULT_VARIANT_ID, "L1_BeishaheMerged", "遭遇编辑器默认启动为北沙河单村合并版");
+assert.equal(CompileEncounterVariant().id, "L1_BeishaheMerged", "未指定变体时默认编译北沙河单村合并版");
 assert.equal(ENCOUNTER_VARIANTS.length, 2, "初始 UI 仅展示基线与单村合并两个变体");
 assert.deepEqual(ENCOUNTER_VARIANTS.map((v) => v.id), ["L1_Original", "L1_BeishaheMerged"]);
 for (const spec of ENCOUNTER_VARIANTS) {

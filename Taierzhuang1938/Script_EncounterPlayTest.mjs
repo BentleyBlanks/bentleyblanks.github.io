@@ -14,8 +14,8 @@ import {EncounterDialogueLines,EncounterSpeechAnchor} from "./Script_EncounterPl
 import {CompileEncounterVariant} from "./Script_EncounterVariants.mjs";
 import {FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_OPENING_CONFIG_URL, FIRST_LEVEL_OPENING_SEQUENCES, FIRST_LEVEL_OPENING_TIMELINE_URL} from "./Data_FirstLevelCampaign.mjs";
 import {Vector3,PerspectiveCamera} from "./vendor/three/build/three.module.js";
-for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
- const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start);
+for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start,"L1_Original"))){
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start,"L1_Original");
  assert.ok(C.guidance[beat.id]?.text,"A playable gate needs a text order: "+beat.id);
  const first=EncounterDialogueLines(plan,plan.Frame()).find(line=>line.order);
  assert.ok(first?.actorId,"A text order has a present speaker: "+beat.id);
@@ -23,7 +23,7 @@ for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
  assert.ok(EncounterDialogueLines(plan,plan.Frame()).some(line=>line.order),"Waiting never expires the current direction: "+beat.id);
 }
 {
- const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start);
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start,"L1_Original");
  const before=EncounterDialogueLines(plan,plan.Frame(),{interact:true});
  assert.ok(before.some(line=>line.order&&line.text.includes(C.ui.interact)),"Available interaction is readable even during authored speech");
  plan.Interact();
@@ -38,7 +38,7 @@ for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
  plan.completed=true;assert.deepEqual(EncounterDialogueLines(plan,plan.Frame()),[]);
 }
 {
- const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09b").start);
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09b").start,"L1_Original");
  assert.ok(EncounterDialogueLines(plan,plan.Frame(),{exit:true}).some(line=>line.text===C.guidance["09b"].exit),"The real patrol exit switches wait to leave");
  const camera=new PerspectiveCamera(60,16/9,.1,1500);camera.position.set(0,1.6,0);camera.updateMatrixWorld();
  const actor={kind:"person",pose:"stand"},clear={Raycast:()=>null};
@@ -63,9 +63,9 @@ for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start))){
  }
 }
 for(const beat of FLOW_TIMELINE) {
-  if(beat.start>=EncounterFirstPlayable().start&&!ENCOUNTER_CINEMATICS.includes(beat.id))assert.ok(C.gates[beat.id],"Missing gameplay gate: "+beat.id);
-  if(!EncounterCanPlay(beat.start)){assert.throws(()=>new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+.01));continue;}
-  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+beat.duration/2);
+  if(beat.start>=EncounterFirstPlayable("L1_Original").start&&!ENCOUNTER_CINEMATICS.includes(beat.id))assert.ok(C.gates[beat.id],"Missing gameplay gate: "+beat.id);
+  if(!EncounterCanPlay(beat.start,"L1_Original")){assert.throws(()=>new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+.01,"L1_Original"));continue;}
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start+beat.duration/2,"L1_Original");
   assert.equal(plan.time,beat.start);assert.equal(plan.beat.id,beat.id);
   plan.Step(beat.duration*10,[500,500],new Set(plan.initial.map(a=>a.id)));
   assert.equal(plan.beat.id,beat.id,beat.id+": elapsed time alone never advances a stage");
@@ -77,13 +77,13 @@ assert.equal(EncounterFirstPlayable().id,"02g");
 {
  const doc=structuredClone(DEFAULT_ENCOUNTER_DOCUMENT),beat=BeatById("03b");
  const trigger=doc.triggers.find(t=>t.id==="Trigger_Fork");trigger.mode="time";trigger.delay=beat.duration+5;
- const plan=new EncounterPlayPlan(doc,beat.start);
+ const plan=new EncounterPlayPlan(doc,beat.start,"L1_Original");
  plan.Step(beat.duration,[0,0],new Set());assert.ok(!plan.triggers.has(trigger.id));
  plan.Step(6,[0,0],new Set());assert.ok(plan.triggers.has(trigger.id),"A held stage still runs its real spawn timer");
  assert.equal(plan.beat.id,"03b");
 }
-for(const beat of FLOW_TIMELINE.filter(b=>EncounterCanPlay(b.start))){
- const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start),gate=plan.gate;
+for(const beat of FLOW_TIMELINE.filter(b=>EncounterCanPlay(b.start,"L1_Original"))){
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start,"L1_Original"),gate=plan.gate;
  for(const id of gate.kill||[]){assert.ok(plan.initial.some(a=>a.id===id));plan.Kill(id);}
  for(const id of gate.clear||[]){
    const group=plan.compiled.groups.find(g=>g.id===id);assert.ok(group,"Unknown clear target "+id);
@@ -114,7 +114,7 @@ assert.equal(EncounterActorSpec({id:"tian",kind:"person",side:"civilian",pose:"k
 }
 const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
 {
-  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03c").start);
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03c").start,"L1_Original");
   plan.Step(1000,[500,500],new Set(["Corner_0"]));
   assert.equal(plan.beat.id,"03c");assert.equal(plan.waiting,"reach");
   assert.ok(!plan.dead.has("Corner_0"),"Preview lifetimes never kill a gameplay soldier");
@@ -124,7 +124,7 @@ const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
   const doc=structuredClone(DEFAULT_ENCOUNTER_DOCUMENT);
   const group=doc.groups.find(g=>g.id==="Fork");group.count=2;group.maxAlive=1;group.interval=0;group.reinforceAfterClear=true;
   const trigger=doc.triggers.find(t=>t.id===group.triggerId);trigger.mode="area";trigger.area.center=[300,300];
-  const plan=new EncounterPlayPlan(doc,BeatById("03b").start);
+  const plan=new EncounterPlayPlan(doc,BeatById("03b").start,"L1_Original");
   plan.Step(1,[0,0],new Set());assert.ok(!plan.triggers.has(trigger.id));
   plan.Step(0,[300,300],new Set());assert.ok(plan.triggers.has(trigger.id),"Actual player arrival fires trigger");
   const first=plan.Spawns(new Set()).find(a=>a.groupId==="Fork");assert.ok(first);plan.Spawned(first);
@@ -135,21 +135,21 @@ const original=JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT);
   plan.Kill(second.id);plan.Step(0,[0,0],new Set());assert.equal(plan.beat.id,"03c","Recorded kills advance immediately");
 }
 {
-  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("02i").start);
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("02i").start,"L1_Original");
   plan.Step(999,plan.beat.p[0],new Set());assert.equal(plan.waiting,"interact");
   plan.Interact();plan.Step(0,plan.beat.p[0],new Set());assert.equal(plan.beat.id,"03a");
   const goal=plan.Area().center;plan.Step(0,goal,new Set());assert.equal(plan.beat.id,"03b","Actual area arrival advances without waiting for the authored duration");
 }
 {
- const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start);
+ const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("03d").start,"L1_Original");
  plan.Interact();plan.Step(999,plan.beat.p[0],new Set());assert.equal(plan.beat.id,"03d","Throwing alone cannot substitute for detonation");
  plan.Step(0,plan.beat.p[0],new Set(),{facts:["grenadeReturned"]});assert.equal(plan.beat.id,"03e");
- const skip=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("08e").start);
+ const skip=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("08e").start,"L1_Original");
  skip.Step(0,skip.Area().center,new Set());assert.equal(skip.beat.id,"08g","Camera animation 08F is never played");
 }
 assert.equal(JSON.stringify(DEFAULT_ENCOUNTER_DOCUMENT),original,"Play does not mutate authoring data");
 {
-  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09a").start);
+  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,BeatById("09a").start,"L1_Original");
   plan.Step(0,plan.beat.p.at(-1),new Set());
   assert.equal(plan.beat.id,"09b","temple entry uses actual arrival without waiting for the preview duration");
   plan.Step(1000,plan.beat.p.at(-1),new Set(),{partyArrived:false});

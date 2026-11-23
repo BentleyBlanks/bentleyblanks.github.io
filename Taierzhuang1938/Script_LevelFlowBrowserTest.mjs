@@ -1703,7 +1703,7 @@ try {
   // Install before the new document schedules its RAF loop. A native callback
   // already queued before installation cannot be driven by fastForward().
   await page.clock.install();
-  await page.goto(base+`AdvancedTools/Tool_LevelFlow.html?t=${transferEnd}&x=96&z=460&zoom=9`);
+  await page.goto(base+`AdvancedTools/Tool_LevelFlow.html?variant=L1_Original&t=${transferEnd}&x=96&z=460&zoom=9`);
   await ReadyPlan();
   const transferArrival=await page.evaluate(()=>LevelFlow.Inspect().actors.filter(actor=>actor.groupId==='YardTransfer'));
   assert.equal(transferArrival.length,5);

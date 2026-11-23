@@ -1,7 +1,7 @@
 // 遭遇设计编辑器（Encounter Designer）关卡与变体注册表。
 // 纯 JSON 可序列化数据，零函数（遵守 Data_DataSources 门禁）。
 
-export const ENCOUNTER_DEFAULT_VARIANT_ID = "L1_Original";
+export const ENCOUNTER_DEFAULT_VARIANT_ID = "L1_BeishaheMerged";
 
 export const ENCOUNTER_LEVELS = Object.freeze([
   Object.freeze({

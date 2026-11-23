@@ -15,7 +15,7 @@ try {
    localStorage.setItem("tengxian1938_tools_volume_v1",JSON.stringify({volume:0,muted:true}));
    localStorage.setItem("tengxian1938_audio_v1",JSON.stringify({master:0}));
  });
- await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=2400`);
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?variant=L1_Original&t=2400`);
  await page.waitForFunction(()=>window.LevelFlow,{},{timeout:180000});
  await page.locator("#toggleInspector").click();
  const Camera=async(eye,target)=>page.evaluate(({eye,target})=>{
