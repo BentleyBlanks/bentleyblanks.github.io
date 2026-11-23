@@ -83,3 +83,62 @@ export const MELEE_SCENARIOS = Object.freeze([
   { id: "AlliedBayonet", name: "友军刺刀 · 敌友对练", weapon: "Bayonet", enemies: 1, allies: 1, allyWeapon: "Bayonet", kind: "observe", tip: "观察两方短刺、拨挡和长刺，或亲自加入战斗。" },
   { id: "ParryTiming", name: "拨挡 · 早／准／晚", weapon: "Dadao", enemies: 1, kind: "timing", tip: "对手重复可读的长刺；按住右键不会延长窗口，成功不会自动反杀。" },
 ].map(Object.freeze));
+// ── 白刃实验场的玩法变体（2026-11-23 用户要的两种新玩法，面板上切换对照）──────────────
+// 正片不设变体，一律 classic；只有 ?melee=1 的面板（或 ?meleeControl= / ?meleeImpact=）会切。
+//   control  classic     原版：按住左键蓄力，松开出轻／重击
+//            directional 方向挥砍，对标《Mordhau》：鼠标往哪边甩、刀就从哪边砍下去，一下左键即出刀；
+//                        起手中右键佯攻、拨挡后立刻反砍（riposte）、对方起手末段对砍（chamber）、
+//                        出刀中再按左键连击（combo）、转视角拖刀（drag）
+//   impact   classic     原版：砍中即退（对方失衡）
+//            lodge       卡刀：砍进活人身上卡住 → 连按左键／按住 S／晃鼠标拔出来 → 对方踉跄，此时任一刀即补刀（F 自动补一刀）
+export const MELEE_VARIANTS = Object.freeze({
+  control: Object.freeze(["classic", "directional"]),
+  impact: Object.freeze(["classic", "lodge"]),
+});
+export const MELEE_LODGE = Object.freeze({
+  weapons: Object.freeze(["Dadao"]),
+  // 卡住之后刀停在接触那一刻再往里吃一点（攻击归一化时间 +pressInN）。
+  pressInN: 0.03,
+  // 拔刀进度：连按左键每下（限每秒 maxRate 下）、按住 S 每秒、鼠标每像素；不拔会慢慢回落。
+  pullPerPress: 0.2, maxRate: 8, pullHoldPerS: 0.72, wigglePerPx: 0.0016, decayPerS: 0.1,
+  // 超过 maxS 没拔出来：对方挣脱、把你推一个趔趄，不给补刀。
+  maxS: 2.6, timeoutStaggerS: 0.7,
+  // 卡着的时候视角被拽回对方（每秒回拉比例），对方被钉在原地发抖。
+  tetherRate: 7, tremorRad: 0.05,
+  // 拔刀动作时长；对方随即踉跄 reelS 秒：往后倒退、左右打晃。
+  yankS: 0.36, yankRepelM: 0.22, reelS: 2.4, reelSpeedMps: 0.55, reelSwayRad: 0.34, reelCycleS: 0.8,
+  // 补刀：F 对 finishReachM 内踉跄中的对手自动转身补一刀（起手按 finishWindupScale 缩短）。
+  // 起手到接触段里自动转身、以 finishLungeMps 抢步跟进到离刀尖 finishStandoffM 的距离。
+  finishReachM: 2.1, finishWindupScale: 0.55, finishTurnRate: 9, finishLungeMps: 4.5, finishStandoffM: 0.4,
+});
+export const MELEE_DIRECTIONAL = Object.freeze({
+  // 甩鼠标的方向：最近 sampleS 秒鼠标位移的指数平均，小于 deadzonePx 视为没甩（按默认方向）。
+  sampleS: 0.14, deadzonePx: 5, defaultDirection: "upRight",
+  // 八个来向（刀从哪边来）。第一人称刀轨只有一条「右上 → 左下」的实拍劈砍，八个方向由三样组合：
+  // reverse = 倒放（左下 → 右上的上撩），mirror = 左右镜像整副手臂与刀（换左手位，从左边来的几刀），
+  // rollDeg = 绕视线滚转（逆时针为正）。滚转只用到 ±45°：再大肩膀就从屏幕侧边转进来了。
+  // sweep = 接触判定的水平扫向（× bladeSweepRad，正 = 从左往右扫），竖着的两刀扫幅小。
+  directions: Object.freeze([
+    { id: "upRight", angleDeg: 45, reverse: false, mirror: false, rollDeg: 0, sweep: -1 },
+    { id: "right", angleDeg: 0, reverse: false, mirror: false, rollDeg: -45, sweep: -1 },
+    { id: "downRight", angleDeg: -45, reverse: true, mirror: true, rollDeg: 0, sweep: -0.7 },
+    { id: "down", angleDeg: -90, reverse: true, mirror: false, rollDeg: 45, sweep: 0.25 },
+    { id: "downLeft", angleDeg: -135, reverse: true, mirror: false, rollDeg: 0, sweep: 0.7 },
+    { id: "left", angleDeg: 180, reverse: false, mirror: true, rollDeg: 45, sweep: 1 },
+    { id: "upLeft", angleDeg: 135, reverse: false, mirror: true, rollDeg: 0, sweep: 1 },
+    { id: "up", angleDeg: 90, reverse: false, mirror: false, rollDeg: 45, sweep: -0.25 },
+  ].map(Object.freeze)),
+  // 一下左键就出刀，起手比原版轻击长（看得清、来得及佯攻），竖劈 up 伤害高、收招长。
+  attack: Object.freeze({ windup: 0.3, active: 0.16, recovery: 0.4, reach: 1.62, damage: 60, poise: 34, arcDot: 0.62, cost: 12, lunge: 0 }),
+  overhead: Object.freeze({ damage: 78, poise: 46, recovery: 0.5 }),
+  // 起手前 feintWindowN（占起手的比例）内按右键＝佯攻：收刀回中、扣体力，紧接着就能拨挡。
+  feintWindowN: 0.85, feintCost: 8,
+  // 出刀中（接触段或收招前段）再按左键＝连击：跳过收招，下一刀起手 × comboWindupScale。
+  comboWindupScale: 0.72,
+  // 拨挡成功后 riposteWindowS 内出刀＝反砍，起手 × riposteWindupScale。
+  riposteWindowS: 0.55, riposteWindupScale: 0.6,
+  // 对方起手只剩 chamberWindowS 秒时迎着出刀＝对砍：等同拨开对方，自己这一刀按反砍速度走。
+  chamberWindowS: 0.22, chamberCost: 10,
+  // 接触段里逆着扫向转视角＝拖刀：每弧度延长 dragPerRad 秒接触段，累计不超过 dragMaxS。
+  dragPerRad: 0.35, dragMaxS: 0.1,
+});

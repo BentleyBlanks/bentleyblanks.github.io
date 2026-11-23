@@ -516,6 +516,8 @@ export const testDefs = {
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
   MeleeKillBloodTest: { file: "Script_MeleeKillBloodTest.mjs", desc: "玩家真实大刀击杀日军：两张真透明局部溅血随机切换、非受伤与短时淡出" },
+  MeleeLabVariantsBrowserTest: { file: "Script_MeleeLabVariantsBrowserTest.mjs", timeoutMs: 10 * 60 * 1000,
+    desc: "白刃实验场玩法变体（?melee=1）：面板切换、卡刀→真实连按拔刀→踉跄→F 补刀、方向挥砍八向滚转／镜像、两者组合；--shots 出 640 px 图" },
   GoreRangeTest: { file: "Script_GoreRangeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "断肢测试场（?gore=1）：四工位木桩、面板、真枪/爆炸/大刀断肢、预算、释放与像素证据" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
@@ -775,7 +777,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "HanYangReloadClearanceTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
-  "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
+  "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "MeleeLabVariantsBrowserTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "AboutBrowserTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "FilmGrainTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -990,7 +992,7 @@ export const domains = {
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','RifleHoldRunTest','RifleShoulderMarchTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场/人物战场反应测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest", "BlastReactionTest", "BlastStunTest", "BlastKnockbackTest", "BattleReactionRangeBrowserTest"] },
   // 测试场插件（Script_SandboxRanges）、玩法时钟、开机路由：改了就把九个测试场的入口各开一遍。
-  sandboxRanges: { label: "测试场登记表 / 插件 / 玩法时钟 / 开机路由", tests: ["SandboxRangesTest", "MovementRangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "RangeTest", "ExplosionRangeTest", "MeleeQteTest", "GoreRangeTest", "ShellImpactRangeBrowserTest", "BattleReactionRangeBrowserTest", "ClothRangeBrowserTest", "MenuStartupTest", "BrowserBundleTest"] },
+  sandboxRanges: { label: "测试场登记表 / 插件 / 玩法时钟 / 开机路由", tests: ["SandboxRangesTest", "MovementRangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "RangeTest", "ExplosionRangeTest", "MeleeQteTest", "MeleeLabVariantsBrowserTest", "GoreRangeTest", "ShellImpactRangeBrowserTest", "BattleReactionRangeBrowserTest", "ClothRangeBrowserTest", "MenuStartupTest", "BrowserBundleTest"] },
   // 大文件直接进 Git（没开 LFS）：改到模型 / 贴图 / 音视频就量一遍体积。
   repoSize: { label: "仓库体积闸门（GitHub 单文件上限）", tests: ["RepoSizeGateTest"] },
   terrain: {
@@ -1293,7 +1295,7 @@ const changedDomainRules = [
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView|SoldierArchetypes|SoldierForeignWrites/i },
-  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLabRuntime/ },
+  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLab/ },
   { domain: "dataRules", pattern: /Data_DataSources|Script_Data(Sources|Json|Refs)Test/ },
   // 数据模块的配套函数（2026-11-02 从 Data_X 搬到 Script_X）：领域跟着原来的数据模块走。
   { domain: "render", pattern: /Script_(CharacterSelection|Tengxian|Tuning_Gtao).mjs$/ },

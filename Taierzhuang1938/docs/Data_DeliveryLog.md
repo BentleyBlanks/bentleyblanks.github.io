@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **白刃实验场重构：面板换样式 + 两种新玩法（2026-11-23）**。`?melee=1` 面板改用 `.shellImpactLab` 那一套；加「玩法」切换：操控（原版蓄力 / 方向挥砍·对标《Mordhau》）× 命中反馈（原版 / 卡刀·拔刀·补刀），四种组合可对照。卡刀：大刀砍进活人卡住 → 按住 S／连按左键／晃鼠标拔出 → 对方踉跄 → 任一刀或 F 补刀。方向挥砍：甩鼠标选八个来向、佯攻、反砍、对砍、连击、拖刀。正片白刃层不受影响（变体只在实验场设）。界面字体与字幕字体按新文案重烘子集、字体与 `Style_Game.css` 戳改 `20261123DadaoLab`。口径见[白刃战系统「玩法变体」](Data_MeleeQte.md#玩法变体2026-11-23)；门禁 `MeleeCombatTest`、`MeleeLabVariantsBrowserTest`。
+
 - **特效预览与音效音乐独立窗口（2026-11-23）**。`Tool_AudioPreview.html` 只装 `AudioEngine`（零渲染器 / Three.js 依赖），`Tool_VfxPreview.html` 装 `VfxSystem`、中性 HDR 预览台与项目环境预设（`Environment/EnvPreset_*.json` 的昼夜 looks，不再固化昼夜），两项均从 `Tool_Studio` 拆出且不加载游戏灯光装置、后处理、天空、材质库与关卡。补齐两项手榴弹爆炸音效说明；拆出 `Script_RenderTags` / `Script_VolumetricNoise` / `Script_ToneMapCurves` / `Script_SunShadowSampling` / `Script_EffectLightEnvelope` / `Data_SmokePlumeStyles` / `Data_BattleScale` 解耦运行时重依赖，主菜单包同步省去后处理与灯光链。游戏内 `?editor=vfx` 经 `harness` 保留原回归口径。详见[编辑器套件](Data_EditorSuite.md)。
 
 - **东侧战车道独立场景（2026-11-23）**。沟沿固定机位，原尺寸九四式两辆在上层土路，断榆、灰木支护和担架留在下层撤离沟。场景编辑器可改撤离沟样条与道具，游戏机位分开渲染低云、两道烟柱、局部火光和贴地浮尘。入口、模型预算与重建见[场景说明](../Scenes/TanketteAdvanceEastTrack/README.md)。

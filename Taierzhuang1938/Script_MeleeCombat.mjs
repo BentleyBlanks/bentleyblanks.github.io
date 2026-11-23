@@ -1,6 +1,21 @@
 // 通用白刃规则：玩家、敌军、友军同一状态机。纯 Node 可跑，宿主负责物理与伤害。
-import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G } from "./Data_MeleeCombat.mjs";
+import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G,
+  MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DIRECTIONAL as D } from "./Data_MeleeCombat.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
+import { T } from "./Script_Text.mjs";
+const Smooth = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
+const DIRECTIONS = new Map(D.directions.map((d) => [d.id, d]));
+/** 鼠标位移（屏幕坐标，y 朝上）→ 八个来向里最近的那一个；没甩够死区按默认方向。 */
+export function SwingDirectionFromMouse(x, y) {
+  if (Math.hypot(x, y) < D.deadzonePx) return DIRECTIONS.get(D.defaultDirection);
+  const angle = Math.atan2(y, x) * 180 / Math.PI;
+  let best = null, gap = Infinity;
+  for (const d of D.directions) {
+    const g = Math.abs(((angle - d.angleDeg + 540) % 360) - 180);
+    if (g < gap) { gap = g; best = d; }
+  }
+  return best;
+}
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const Alive = (entity) => !!entity && (entity.Alive ?? entity.alive) === true;
 const Distance = (a, b) => Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z);
@@ -31,9 +46,29 @@ export class MeleeCombatDirector {
     // 近邻网格与两个复用的查询数组（Near 返回的就是它们，别存下来）
     this.indexCells = new Map(); this.indexRank = new Map(); this.indexAt = -1;
     this.nearA = []; this.nearB = [];
-    this.stats = { attacks: 0, hits: 0, misses: 0, parries: 0, pushes: 0, standing: 0, ground: 0, successes: 0, failures: 0 };
+    this.stats = { attacks: 0, hits: 0, misses: 0, parries: 0, pushes: 0, standing: 0, ground: 0, successes: 0, failures: 0,
+      lodges: 0, yanks: 0, finishes: 0, feints: 0, ripostes: 0, chambers: 0, combos: 0 };
     this.qte = new MeleeQteDirector({ Resolve: (a) => this.ResolveQte(a), Finish: (a) => this.FinishQte(a) }, options);
+    // 玩法变体（只有白刃实验场会切，见 Data_MeleeCombat.MELEE_VARIANTS）与最近的鼠标甩动（方向挥砍用）。
+    this.variant = { control: "classic", impact: "classic" };
+    this.mouse = { x: 0, y: 0 };
   }
+  SetVariant({ control = this.variant.control, impact = this.variant.impact } = {}) {
+    this.variant = { control: V.control.includes(control) ? control : "classic", impact: V.impact.includes(impact) ? impact : "classic" };
+    // 不经 Fighter()：重开项目时玩家的武器还没换好，这里先建出来会把旧武器记进去。
+    const f = this.fighters.get(this.Player());
+    if (f?.lodge) this.ReleaseLodge(f, "variant");
+    return { ...this.variant };
+  }
+  get Directional() { return this.variant.control === "directional"; }
+  /** 每帧喂一次鼠标位移（像素，lookY 向下为正）；方向挥砍取它的短时指数平均，卡刀时晃鼠标也算撬刀。 */
+  AddLook(dx = 0, dy = 0) {
+    this.mouse.x += dx; this.mouse.y -= dy;
+    const f = this.fighters.get(this.Player());
+    if (f?.state === "lodged") f.lodge.progress = Clamp(f.lodge.progress + Math.hypot(dx, dy) * L.wigglePerPx, 0, 1);
+  }
+  /** 现在按左键会从哪边砍（面板方向指示用）。 */
+  SwingPreview() { return SwingDirectionFromMouse(this.mouse.x, this.mouse.y).id; }
   Player() { return this.host.Player?.(); }
   Soldiers() { return this.host.Soldiers?.() || []; }
   Weapon(entity) { return this.host.Weapon?.(entity) || entity?.meleeWeapon || null; }
@@ -41,7 +76,7 @@ export class MeleeCombatDirector {
   CanChangeWeapon() { const f = this.Fighter(this.Player()); return !this.Active && (!f?.weapon || this.Idle(f)); }
   get Active() { return this.qte.Active; }
   get TimeScale() { return 1; }
-  get Blocking() { return this.Active || ["fall", "down", "rise"].includes(this.Fighter(this.Player())?.state); }
+  get Blocking() { return this.Active || ["fall", "down", "rise", "lodged", "yank"].includes(this.Fighter(this.Player())?.state); }
   Fighter(entity) {
     if (!entity) return null;
     if (!this.fighters.has(entity)) this.fighters.set(entity, {
@@ -75,6 +110,8 @@ export class MeleeCombatDirector {
   AttackDown(entity = this.Player()) {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !f?.weapon || this.Active && entity === this.Player()) return false;
+    if (f.state === "lodged") { this.PullLodge(f); return true; }
+    if (entity === this.Player() && this.Directional && W[f.weapon]) return this.DirectionalDown(f);
     if (f.state !== "idle") {
       if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
         f.buffer = {expires:this.time+R.inputBufferS, released:false}; return true;
@@ -85,6 +122,7 @@ export class MeleeCombatDirector {
   }
   AttackUp(entity = this.Player()) {
     const f = this.Fighter(entity);
+    if (entity === this.Player() && this.Directional) return true;
     if (f?.buffer) { f.buffer.released = true; return true; }
     if (f?.state !== "charge") return false;
     const held = f.t;
@@ -113,8 +151,180 @@ export class MeleeCombatDirector {
     this.SetState(f, "charge", G.feintS, "Charge"); f.feint = true;
     this.Log("feint", entity, f.target); return true;
   }
+  // ── 方向挥砍（对标 Mordhau，只给玩家；见 Data_MeleeCombat.MELEE_DIRECTIONAL）──────────
+  /** 方向挥砍的左键：空闲就按甩鼠标的方向出刀；出刀中按下记一刀连击（接触段里按的等接触段走完再接）。 */
+  DirectionalDown(f) {
+    const dir = SwingDirectionFromMouse(this.mouse.x, this.mouse.y);
+    const a = f.attack;
+    if (f.state === "attack" && a?.direction) {
+      if (f.t < a.windup) return false;
+      if (f.t < a.windup + a.active) { a.combo = dir; return true; }
+      if (f.t < a.windup + a.active + a.recovery * 0.6) return this.ChainCombo(f, dir);
+      f.buffer = { expires: this.time + R.inputBufferS, released: true }; return true;
+    }
+    if (!this.Idle(f)) {
+      if (["parry", "push"].includes(f.state) && f.duration - f.t <= R.inputBufferS) {
+        f.buffer = { expires: this.time + R.inputBufferS, released: true }; return true;
+      }
+      return false;
+    }
+    return this.AttackDirectional(f.entity, dir);
+  }
+  ChainCombo(f, dir) {
+    if (!f.attack.connected) { this.stats.misses++; this.Log("miss", f.entity); }
+    this.SetState(f, "idle");
+    return this.AttackDirectional(f.entity, dir, { windupScale: D.comboWindupScale, tag: "combo" });
+  }
+  AttackDirectional(entity, dir, { windupScale = 1, tag = null } = {}) {
+    const f = this.Fighter(entity);
+    if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || !dir) return false;
+    const overhead = dir.id === "up";
+    const spec = { ...D.attack, ...(overhead ? D.overhead : {}) };
+    if (f.stamina < spec.cost) { this.SetState(f, "idle"); this.Log("exhausted", entity); return false; }
+    let kind = tag;
+    if (!kind && this.time - f.lastParry <= D.riposteWindowS) kind = "riposte";
+    if (!kind) {
+      // 对砍：对方的起手只剩 chamberWindowS，迎着出刀等同拨开他。
+      const incoming = this.Opponents(entity).find((o) => {
+        const of = this.Fighter(o), oa = of?.attack;
+        return of?.state === "attack" && oa && !oa.connected && of.t < oa.windup && oa.windup - of.t <= D.chamberWindowS
+          && Distance(o, entity) <= oa.reach + 0.3 && Facing(o, entity) > 0.5 && Facing(entity, o) > 0.5 && this.Visible(o, entity);
+      });
+      if (incoming && f.stamina >= spec.cost + D.chamberCost) {
+        f.stamina -= D.chamberCost; kind = "chamber";
+        this.Stagger(incoming, entity, "Deflected", R.parryStaggerS, 17);
+        this.Log("chamber", entity, incoming);
+      }
+    }
+    if (kind === "riposte" || kind === "chamber") windupScale *= D.riposteWindupScale;
+    const windup = spec.windup * windupScale;
+    f.stamina -= spec.cost;
+    this.SetState(f, "attack", windup + spec.active + spec.recovery, overhead ? "Heavy" : "Light");
+    f.attack = { ...spec, windup, baseWindup: spec.windup, baseActive: spec.active, baseDuration: spec.windup + spec.active + spec.recovery,
+      heavy: overhead, yaw: entity.yaw || 0, connected: false, lungeDone: 0, previousTip: null, locked: false,
+      direction: dir, sweep: dir.sweep * R.bladeSweepRad, dragged: 0, lastYaw: entity.yaw || 0, kind, combo: null };
+    f.hit = false; f.buffer = null; this.stats.attacks++;
+    const tally = { riposte: "ripostes", chamber: "chambers", combo: "combos" }[kind];
+    if (tally) this.stats[tally]++;
+    this.Log(overhead ? "heavy" : "light", entity, null, { direction: dir.id, kind });
+    return true;
+  }
+  // ── 卡刀 → 拔刀 → 踉跄 → 补刀（见 Data_MeleeCombat.MELEE_LODGE）─────────────────────
+  LodgeEligible(e, f, target) {
+    return this.variant.impact === "lodge" && e === this.Player() && L.weapons.includes(f.weapon)
+      && Alive(target) && !f.attack?.finisher && !!this.Fighter(target)?.weapon;
+  }
+  StrokeOf(f) {
+    const a = f.attack;
+    if (!a?.direction) return { split: null, reverse: false, mirror: false, roll: 0 };
+    return { split: [a.baseWindup / a.baseDuration, (a.baseWindup + a.baseActive) / a.baseDuration],
+      reverse: a.direction.reverse, mirror: a.direction.mirror, roll: a.direction.rollDeg * Math.PI / 180 };
+  }
+  BeginLodge(f, target) {
+    const e = f.entity, tf = this.Fighter(target);
+    const stroke = this.StrokeOf(f);
+    f.lodge = { target, clip: f.clip, n: Clamp(this.AttackTime(f) + L.pressInN, 0, 1), ...stroke,
+      progress: 0, credit: 1, held: false, pulse: 0, presses: 0, direction: f.attack.direction?.id || null };
+    const lodge = f.lodge;
+    this.SetState(f, "lodged", L.maxS, lodge.clip); f.lodge = lodge;
+    this.SetState(tf, "lodged", L.maxS, "Hit"); tf.lodgedBy = e; tf.buffer = null;
+    this.stats.lodges++; this.Log("lodge", e, target);
+  }
+  PullLodge(f) {
+    const lodge = f.lodge;
+    if (!lodge || f.state !== "lodged") return false;
+    if (lodge.credit < 1) return false;
+    lodge.credit -= 1; lodge.presses++; lodge.pulse = 1;
+    lodge.progress = Clamp(lodge.progress + L.pullPerPress, 0, 1);
+    if (lodge.progress >= 1) this.Yank(f);
+    return true;
+  }
+  StepLodge(f, dt) {
+    const e = f.entity, lodge = f.lodge, target = lodge?.target, tf = target && this.Fighter(target);
+    if (!lodge || !Alive(target) || tf.state !== "lodged") { this.ReleaseLodge(f, "released"); return; }
+    lodge.credit = Math.min(1, lodge.credit + dt * L.maxRate);
+    lodge.pulse = Math.max(0, lodge.pulse - dt * 5);
+    lodge.progress = Clamp(lodge.progress + (lodge.held ? L.pullHoldPerS * dt : 0), 0, 1);
+    if (lodge.progress < 1) lodge.progress = Math.max(0, lodge.progress - L.decayPerS * dt);
+    // 卡着的刀把视角拽回对方：鼠标还能晃（晃也算撬刀），一松手就被拉回来。
+    const want = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
+    e.yaw = (e.yaw || 0) + Wrap(want - (e.yaw || 0)) * Math.min(1, dt * L.tetherRate);
+    if (lodge.progress >= 1) this.Yank(f);
+    else if (f.t >= L.maxS) this.LodgeTimeout(f);
+  }
+  Yank(f) {
+    const e = f.entity, lodge = f.lodge, target = lodge.target, tf = this.Fighter(target);
+    this.SetState(f, "yank", L.yankS, lodge.clip); f.lodge = lodge;
+    tf.lodgedBy = null; tf.poise = 0;
+    this.Repel(target, e, L.yankRepelM);
+    this.SetState(tf, "reel", L.reelS, "Pushed");
+    tf.reelBy = e; tf.reelYaw = Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z);
+    tf.reelSide = this.serial % 2 ? 1 : -1;
+    tf.nextThink = Math.max(tf.nextThink, this.time + L.reelS);
+    this.stats.yanks++; this.Log("yank", e, target);
+  }
+  LodgeTimeout(f) {
+    const e = f.entity, target = f.lodge?.target, tf = target && this.Fighter(target);
+    f.lodge = null; this.SetState(f, "stagger", L.timeoutStaggerS, "Pushed");
+    if (Alive(target)) { tf.lodgedBy = null; this.SetState(tf, "stagger", 0.45, "Hit"); this.Repel(e, target, 0.25); }
+    this.Log("lodgeTimeout", e, target);
+  }
+  ReleaseLodge(f, reason) {
+    const target = f.lodge?.target, tf = target && this.fighters.get(target);
+    f.lodge = null;
+    if (tf?.state === "lodged") { tf.lodgedBy = null; this.SetState(tf, "stagger", 0.4, "Hit"); }
+    if (f.state === "lodged") this.SetState(f, "idle");
+    this.Log("lodgeRelease", f.entity, target, { reason });
+  }
+  StepReel(f, dt) {
+    const e = f.entity, by = f.reelBy, k = Math.sqrt(Math.max(0, 1 - f.t / f.duration));
+    const wave = Math.sin(f.t * 2 * Math.PI / L.reelCycleS);
+    if (by && Alive(by)) {
+      const d = Distance(e, by) || 1, ax = (e.position.x - by.position.x) / d, az = (e.position.z - by.position.z) / d;
+      const sway = wave * f.reelSide;
+      this.Move(e, (ax * L.reelSpeedMps * k - az * sway * 0.5 * k) * dt, (az * L.reelSpeedMps * k + ax * sway * 0.5 * k) * dt);
+    }
+    e.yaw = (f.reelYaw ?? e.yaw ?? 0) + Math.sin(f.t * Math.PI / L.reelCycleS) * L.reelSwayRad * k * f.reelSide;
+    if (f.t >= f.duration) { f.reelBy = null; f.poise = 40; this.SetState(f, "idle"); }
+  }
+  FinishCandidate(entity = this.Player()) {
+    const f = this.Fighter(entity);
+    if (!f || !this.Idle(f) || !W[f.weapon] || this.Active) return null;
+    return this.Opponents(entity).find((t) => {
+      const tf = this.fighters.get(t);
+      return tf?.state === "reel" && tf.reelBy === entity && Distance(entity, t) <= L.finishReachM && this.Visible(entity, t);
+    }) || null;
+  }
+  /** F 补刀：对踉跄中的对手自动转身补一刀（原版走重击、方向挥砍走竖劈，起手都缩短）。 */
+  Finish(entity = this.Player()) {
+    const target = this.FinishCandidate(entity), f = this.Fighter(entity);
+    if (!target) return false;
+    f.stamina = Math.max(f.stamina, 40);
+    if (this.Directional) {
+      if (!this.AttackDirectional(entity, DIRECTIONS.get("up"), { windupScale: L.finishWindupScale, tag: "finish" })) return false;
+    } else {
+      if (!this.Attack(entity, true)) return false;
+      const a = f.attack; a.windup *= L.finishWindupScale; f.duration = a.windup + a.active + a.recovery;
+    }
+    f.attack.finisher = target;
+    this.Log("finishStart", entity, target); return true;
+  }
+  /** 攻击动作的归一化播放时间（拖刀延长的接触段按比例拉慢，不是让动作提前播完）。 */
+  AttackTime(f) {
+    const a = f.attack, active = a.baseActive ?? a.active;
+    const t = f.t < a.windup ? f.t / a.windup * a.baseWindup
+      : f.t < a.windup + a.active ? a.baseWindup + (f.t - a.windup) / a.active * active
+        : a.baseWindup + active + (f.t - a.windup - a.active);
+    return t / a.baseDuration;
+  }
   Parry(entity = this.Player()) {
     const f = this.Fighter(entity);
+    // 方向挥砍：起手里按右键＝佯攻，收刀回中；再按一次才是拨挡。
+    if (entity === this.Player() && this.Directional && f?.state === "attack" && f.attack?.direction
+      && f.t < f.attack.windup * D.feintWindowN && f.attack.kind !== "finish") {
+      f.stamina = Math.max(0, f.stamina - D.feintCost);
+      this.SetState(f, "idle"); this.stats.feints++; this.Log("feint", entity); return true;
+    }
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || f.stamina < R.parryCost) return false;
     f.stamina -= R.parryCost; f.parryUsed = false;
     const intent = this.host.MoveIntent?.(entity) || {strafe:0};
@@ -253,6 +463,7 @@ export class MeleeCombatDirector {
   }
   Stagger(entity, from, clip, duration, poise = 0) {
     const f = this.Fighter(entity);
+    if (f.state === "lodged" && f.lodge) this.ReleaseLodge(f, "interrupted");
     // Damage is already applied; repeated hits must not restart falling or rising.
     if (entity === this.Player() && (["fall", "down", "rise", "qte"].includes(f.state) || this.time < f.recoveryUntil)) return;
     f.poise = Math.max(0, f.poise - poise); f.lastHit = this.time; f.pressureBy = from;
@@ -429,7 +640,7 @@ export class MeleeCombatDirector {
     const p=this.Player();
     return this.Opponents(p).find(e=>e!==partner && this.Weapon(e) && !e.meleeTraining?.passive
       && Distance(e,p)<=W[this.Weapon(e)].light.reach+.55 && this.Visible(e,p) && !this.BodyBlocker(e,p)
-      && !['stagger','fall','down','rise','qte'].includes(this.Fighter(e).state));
+      && !['stagger','fall','down','rise','qte','lodged','reel'].includes(this.Fighter(e).state));
   }
   EscapeQte(threat) {
     const a=this.qte.active;if(!a)return;
@@ -450,11 +661,19 @@ export class MeleeCombatDirector {
       this.held.clear(); this.qte.Press(false);
       const f = this.Fighter(this.Player());
       if(f)f.buffer=null;
+      if (f?.lodge) f.lodge.held = false;
       if (f?.state === "charge") this.SetState(f, "idle");
       return false;
     }
     if (this.Active) {
       if (code === "KeyF") this.qte.Press(down, repeat);
+      return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
+    }
+    // 卡刀：按住 S 往回拽、连按左键撬，其余白刃键吞掉（Esc / Alt / ` 照常放行）。
+    const pf = this.fighters.get(this.Player());
+    if (pf?.state === "lodged" || pf?.state === "yank") {
+      if (code === "KeyS" && pf.lodge) pf.lodge.held = !!down;
+      else if (code === "Mouse0" && down && !repeat) this.PullLodge(pf);
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
     if (!this.CanUse()) return false;
@@ -466,6 +685,7 @@ export class MeleeCombatDirector {
     }
     if (repeat || this.held.has(code)) return true;
     if (code === "KeyF") {
+      if (!this.Blocking && this.Finish()) { this.held.add(code); return true; }
       const pushed = !this.Blocking && this.Push();
       if (pushed) this.held.add(code); return pushed || this.Blocking;
     }
@@ -481,7 +701,7 @@ export class MeleeCombatDirector {
     if (!target || !spec) return;
     const tf = this.Fighter(target), d = Distance(e, target);
     const yaw = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
-    if (f.state !== "attack" || !f.attack.locked) e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
+    if ((f.state !== "attack" || !f.attack.locked) && f.state !== "lodged" && f.state !== "reel") e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
     if (f.state !== "idle") return;
     const training = e.meleeTraining || {};
     if (training.passive || e.meleeDormant) return;
@@ -616,6 +836,9 @@ export class MeleeCombatDirector {
     if (f.state === "idle") { f.stamina = Math.min(100, f.stamina + R.staminaRecovery * dt); }
     if (this.time - f.lastHit > 1.5 && f.state === "idle") f.poise = Math.min(100, f.poise + R.poiseRecovery * dt);
     if (f.state === "qte") return;
+    if (f.state === "lodged") { if (e === this.Player()) this.StepLodge(f, dt); return; }
+    if (f.state === "yank") { if (f.t >= f.duration) { f.lodge = null; this.SetState(f, "idle"); } return; }
+    if (f.state === "reel") { this.StepReel(f, dt); return; }
     if(f.state==='contact' && f.t>=f.duration) {
       const other=f.contactTarget;
       if(!Alive(other) || !this.BeginBind(e,other,f.contactReason||'visibleWeaponBrace')) {
@@ -633,12 +856,29 @@ export class MeleeCombatDirector {
       const a = f.attack;
       // Plant the NPC's forward foot before the point arrives. Tracking until the
       // first contact frame made normal walking too slow to clear the body radius.
+      // 补刀：起手里自动转向踉跄的那个人。
+      if (a.finisher && Alive(a.finisher) && !a.connected && f.t < a.windup + a.active) {
+        const want = Math.atan2(e.position.x - a.finisher.position.x, e.position.z - a.finisher.position.z);
+        if (f.t < a.windup) e.yaw = (e.yaw || 0) + Clamp(Wrap(want - (e.yaw || 0)), -L.finishTurnRate * dt, L.finishTurnRate * dt);
+        // 抢上一步：踉跄的人在往后退，补刀要跟进到刀够得着的距离。
+        const d = Distance(e, a.finisher), need = d - (a.reach - L.finishStandoffM);
+        if (need > 0) { const step = Math.min(need, L.finishLungeMps * dt); this.Move(e, -Math.sin(want) * step, -Math.cos(want) * step); }
+      }
       const aimUntil=a.windup-(e===this.Player()?0:R.npcAimCommitLeadS);
-      if(f.t<aimUntil) a.yaw=e.yaw||0;
+      if (a.direction) {
+        // 方向挥砍不锁朝向：刀跟着视角走，转视角就是拖刀／送刀。逆着扫向转＝拖刀，接触段按转过的角度延长。
+        const turn = Wrap((e.yaw || 0) - a.lastYaw); a.lastYaw = e.yaw || 0; a.yaw = e.yaw || 0;
+        if (f.t >= a.windup && f.t < a.windup + a.active && a.sweep && Math.sign(turn) === Math.sign(a.sweep)) {
+          const extend = Math.min(D.dragMaxS - a.dragged, Math.abs(turn) * D.dragPerRad);
+          if (extend > 0) { a.active += extend; f.duration += extend; a.dragged += extend; }
+        }
+      }
+      else if(f.t<aimUntil) a.yaw=e.yaw||0;
       else if(!a.locked) { a.locked=true; a.lockYaw=a.yaw; }
       else a.yaw=a.lockYaw+Clamp(Wrap((e.yaw||0)-a.lockYaw),-R.attackCorrectionRad,R.attackCorrectionRad);
       if (f.t >= a.windup && f.t <= a.windup + a.active && !a.connected) this.ResolveContact(f);
       if (f.state !== "attack") return;
+      if (a.combo && f.t >= a.windup + a.active) { this.ChainCombo(f, a.combo); return; }
       const lunge = a.lunge * Clamp((f.t - a.windup) / a.active, 0, 1);
       if (lunge > a.lungeDone) {
         this.Move(e, -Math.sin(a.yaw) * (lunge - a.lungeDone), -Math.cos(a.yaw) * (lunge - a.lungeDone)); a.lungeDone = lunge;
@@ -680,7 +920,7 @@ export class MeleeCombatDirector {
     const e = f.entity, a = f.attack, weapon = W[f.weapon];
     const u=Clamp((f.t-a.windup)/a.active,0,1), blade=f.weapon==='Dadao';
     // 刀刃这一刀扫过的半幅（带符号，Alt 分镜左右镜像）：接触点与断肢选段共用同一个数。
-    const sweep=blade?(f.clip.endsWith('Alt')?-1:1)*R.bladeSweepRad:0;
+    const sweep=a.direction?a.sweep:blade?(f.clip.endsWith('Alt')?-1:1)*R.bladeSweepRad:0;
     const yaw=a.yaw+sweep*(1-2*u);
     const end=Tip(e,yaw,blade?a.reach:.66+(a.reach-.66)*Math.sin(u*Math.PI/2));
     const start=Tip(e,yaw,blade?.42:Math.max(.6,(a.previousReach??.66)));
@@ -731,7 +971,12 @@ export class MeleeCombatDirector {
     }
     if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; this.SetState(f,'stagger',.3,'WeaponClash'); return; }
     a.connected = true;
-    this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light", { yaw: a.yaw, sweep, reach: a.reach, start, end, previous });
+    // 踉跄中的对手（刚被拔刀的那个）挨上任何一刀都是补刀。
+    const finishing = tf.state === "reel" && tf.reelBy === e;
+    const amount = finishing ? Math.max(a.damage, (target.health ?? 100) + 1) : a.damage;
+    this.Damage(target, e, amount, a.heavy ? "heavy" : "light", { yaw: a.yaw, sweep, reach: a.reach, start, end, previous });
+    if (finishing) { this.stats.finishes++; this.Log("finish", e, target); }
+    if (Alive(target) && this.LodgeEligible(e, f, target)) { this.BeginLodge(f, target); return; }
     if (Alive(target)) {
       const protectedRecovery=this.time<tf.interruptUntil;
       this.Stagger(target,e,'Hit',a.heavy?R.staggerS:protectedRecovery?.12:.32,a.poise);
@@ -746,6 +991,7 @@ export class MeleeCombatDirector {
   }
   Step(dt) {
     this.time += dt;
+    const fade = Math.exp(-dt / D.sampleS); this.mouse.x *= fade; this.mouse.y *= fade;
     const player = this.Player();
     // 赢下来之后对方死在结算里（剧本一次性按键的反刺）不算「人没了」：结算那 0.6 s 与起身照常走完。
     const won = this.qte.active?.phase === "resolve" && this.qte.active.success === true;
@@ -811,7 +1057,7 @@ export class MeleeCombatDirector {
       if (a.phase === "resolve") clip = a.kind === "ground" ? (f.entity === this.Player() ? a.success ? "GroundWin" : "GroundLose" : a.success ? "Pushed" : "Pressure") : a.success === (f.entity === this.Player()) ? "BindWin" : "BindLose";
     }
     const phase = f.attack ? f.t < f.attack.windup ? "windup" : f.t < f.attack.windup + f.attack.active ? "active" : "recovery" : f.state;
-    const attackTime=f.attack ? (f.t<f.attack.windup ? f.t/f.attack.windup*f.attack.baseWindup : f.attack.baseWindup+f.t-f.attack.windup) / f.attack.baseDuration : null;
+    const attackTime=f.attack ? this.AttackTime(f) : null;
     const result = { managed: true, weapon: f.weapon, state: f.state, phase, clip: `${f.weapon}${clip}`, action: clip,
       t: f.t, duration: f.duration, normalized: f.duration ? Clamp(f.t / f.duration, 0, 1) : (f.t % 1),
       animationNormalized:attackTime ?? (f.state === "parry" ? f.t/(R.parryWindowS+R.parryRecoveryS) : null),
@@ -825,6 +1071,30 @@ export class MeleeCombatDirector {
       focusPitch: a?.kind === "ground" ? .70 : -.28,
       move: f.move, targetId: f.target?.id ?? null, role: f.role?.kind || null,
     };
+    if (f.attack?.direction) {
+      const stroke = this.StrokeOf(f), [s0, s1] = stroke.split;
+      const weight = this.RollWeight(attackTime, s0, s1);
+      result.strokeSplit = stroke.split; result.strokeReverse = stroke.reverse;
+      result.swingRoll = stroke.roll * weight; result.swingMirror = stroke.mirror ? weight : 0;
+      result.direction = f.attack.direction.id; result.attackKind = f.attack.kind;
+    }
+    if (f.attack?.finisher) result.finisher = true;
+    if ((f.state === "lodged" || f.state === "yank") && f.lodge && f.entity === this.Player()) {
+      // 第一人称：刀定在砍进去那一帧，拔刀时顺着刀路往回抽、回到架势。
+      const L0 = f.lodge, p = f.state === "yank" ? Smooth(f.t / f.duration) : 0;
+      const weight = L0.split ? this.RollWeight(L0.n, ...L0.split) * (1 - p) : 0;
+      Object.assign(result, { clip: `${f.weapon}${L0.clip}`, action: L0.clip, animationNormalized: L0.n * (1 - p),
+        strokeSplit: L0.split, strokeReverse: L0.reverse, swingRoll: L0.roll * weight, swingMirror: L0.mirror ? weight : 0, weaponYawOffset: 0,
+        lodge: { progress: L0.progress, pulse: L0.pulse, held: L0.held, yank: p, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
+    } else if (f.state === "lodged") {
+      Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.32 + Math.sin(this.time * 41) * 0.02 });
+    } else if (f.state === "reel") {
+      // 踉跄：Hit / Pushed 两段交替，每段 reelCycleS，段与段之间 0.08 s 交接。
+      const cycle = f.t / L.reelCycleS, index = Math.floor(cycle), u = cycle - index;
+      const action = index % 2 ? "Hit" : "Pushed", other = index % 2 ? "Pushed" : "Hit";
+      Object.assign(result, { clip: `${f.weapon}${action}`, action, animationNormalized: 0.12 + u * 0.7, finishable: true,
+        transition: index > 0 && u < 0.1 ? { from: { ...result, clip: `${f.weapon}${other}`, action: other, animationNormalized: 0.82, transition: null }, mix: u / 0.1 } : result.transition });
+    }
     const tail=f.parryVisualTail;
     if(f.state === "idle" && tail) {
       const elapsed=this.time-tail.startedAt;
@@ -834,15 +1104,40 @@ export class MeleeCombatDirector {
     }
     return result;
   }
+  /** 方向挥砍的滚转权重：起手前七成里滚进去，收招后六成里滚回来。 */
+  RollWeight(n, s0, s1) {
+    const out = s1 + (1 - s1) * 0.4;
+    return Smooth((n ?? 0) / Math.max(1e-3, s0 * 0.7)) * (1 - Smooth(((n ?? 0) - out) / Math.max(1e-3, 1 - out)));
+  }
   ViewPose() { return this.CanUse() ? this.Pose(this.Fighter(this.Player())) : null; }
-  View() { return this.qte.View(); }
+  View() {
+    const qte = this.qte.View();
+    if (qte) return qte;
+    const f = this.fighters.get(this.Player());
+    if (f?.state !== "lodged" || !f.lodge) return null;
+    const lodge = f.lodge;
+    return { kind: "lodge", serial: -1, phase: "input", success: null,
+      label: T("gameplay.melee.lodge.label"), prompt: T("gameplay.melee.lodge.prompt"),
+      keys: [T("gameplay.melee.lodge.keyPull"), T("gameplay.melee.lodge.keyMash")], expected: T("gameplay.melee.lodge.keyMash"),
+      input: "mash", index: lodge.presses, progress: lodge.progress, timeT: f.t / L.maxS, timeLeft: Math.max(0, L.maxS - f.t),
+      resolveT: 0, pulse: lodge.pulse, assist: this.qte.assist, accepted: lodge.presses, rejected: 0, reason: "lodge" };
+  }
   SetAssist(mode) { return this.qte.SetAssist(mode); }
-  State() { return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14) }; }
+  State() {
+    const view = this.View();
+    return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14),
+      variant: { ...this.variant }, swingPreview: this.Directional ? this.SwingPreview() : null, lodge: view?.kind === "lodge" ? view : null,
+      finishTarget: this.FinishCandidate()?.id ?? null };
+  }
   Cancel(reason = "reset") {
     this.qte.Cancel(); this.held.clear();
-    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.groundHoldS=null;f.entity.meleeCombat = null; }
+    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.groundHoldS=null;f.lodge=null;f.lodgedBy=null;f.reelBy=null;f.entity.meleeCombat = null; }
     this.Log("cancel", null, null, { reason });
   }
-  ReleasePlayer() { this.held.clear(); const f = this.Fighter(this.Player()); if(f)f.buffer=null;if (f && !this.Active) this.SetState(f, "idle"); }
+  ReleasePlayer() {
+    this.held.clear(); const f = this.Fighter(this.Player()); if(f)f.buffer=null;
+    if (f?.lodge) this.ReleaseLodge(f, "release");
+    if (f && !this.Active) this.SetState(f, "idle");
+  }
   Reset() { this.Cancel(); this.fighters.clear(); this.events.length = 0; this.time = 0; for (const key of Object.keys(this.stats)) this.stats[key] = 0; }
 }

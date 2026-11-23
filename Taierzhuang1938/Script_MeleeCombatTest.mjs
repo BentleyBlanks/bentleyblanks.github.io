@@ -358,6 +358,94 @@ Test('press input: auto assist presses for the player shortly after the ring ope
   Step(c,Q.pressAutoS-.05);assert.equal(c.qte.active.phase,'input');
   Step(c,.1);assert.equal(c.qte.active.success,true);
 });
+const Distance0=(a,b)=>Math.hypot(a.position.x-b.position.x,a.position.z-b.position.z);
+// ── 白刃实验场的玩法变体：卡刀拔刀补刀、方向挥砍（Data_MeleeCombat.MELEE_LODGE / MELEE_DIRECTIONAL）──
+const Mash=(c,hz,seconds)=>{for(let t=0;t<seconds&&c.Fighter(c.Player()).state==='lodged';t+=1/hz){c.HandleInput('Mouse0',true);c.HandleInput('Mouse0',false);Step(c,1/hz);}};
+Test('variants default to classic and reject unknown values',()=>{
+  const {c}=Make(); assert.deepEqual(c.variant,{control:'classic',impact:'classic'});
+  assert.deepEqual(c.SetVariant({control:'nope',impact:'lodge'}),{control:'classic',impact:'lodge'});
+});
+Test('lodge: a surviving dadao hit sticks both fighters and blocks movement until pulled',()=>{
+  const {p,e,c}=Make(); c.SetVariant({impact:'lodge'});
+  c.Attack(p); StepUntil(c,()=>e.health<100,1);
+  assert.equal(e.health,48); assert.equal(c.Fighter(p).state,'lodged'); assert.equal(c.Fighter(e).state,'lodged');
+  assert(c.Blocking,'player cannot walk while the blade is stuck'); assert.equal(c.View().kind,'lodge'); assert.equal(c.stats.lodges,1);
+  assert.equal(c.State().player.state,'lodged'); assert(c.State().player.lodge,'first-person pose carries the lodge strain');
+  assert(!c.Parry(),'cannot parry with a stuck blade');
+});
+Test('lodge: mashing left button yanks the blade out, the opponent reels and any hit finishes him',()=>{
+  const {p,e,c}=Make(); c.SetVariant({impact:'lodge'});
+  c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
+  Mash(c,6,2); assert.equal(c.stats.yanks,1); assert.equal(c.Fighter(e).state,'reel');
+  assert(Distance0(p,e)>1.4,'yank shoves him back'); assert.equal(c.View(),null);
+  StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert.equal(c.FinishCandidate(),e);
+  assert(c.HandleInput('KeyF',true)); c.HandleInput('KeyF',false);
+  StepUntil(c,()=>!e.alive,1.5); assert(!e.alive,'F finisher kills the reeling man'); assert.equal(c.stats.finishes,1);
+});
+Test('lodge: holding S pulls the blade out without mashing; mouse wiggle helps',()=>{
+  const {p,e,c}=Make(); c.SetVariant({impact:'lodge'});
+  c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
+  c.HandleInput('KeyS',true); c.AddLook(120,0); Step(c,1.6); c.HandleInput('KeyS',false);
+  assert.equal(c.Fighter(e).state,'reel');
+});
+Test('lodge: leaving the blade in lets the opponent wrench free, no finisher window',()=>{
+  const {p,e,c}=Make(); c.SetVariant({impact:'lodge'});
+  c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
+  Step(c,2.7); assert.equal(c.Fighter(p).state,'stagger'); assert.notEqual(c.Fighter(e).state,'reel');
+  assert(c.events.some(x=>x.kind==='lodgeTimeout')); assert.equal(c.FinishCandidate(),null);
+});
+Test('lodge: a killing heavy cleaves through, bayonet never lodges',()=>{
+  const a=Make(); a.c.SetVariant({impact:'lodge'}); a.c.Attack(a.p,true); Step(a.c,.8); assert(!a.e.alive); assert.equal(a.c.stats.lodges,0);
+  const b=Make('Bayonet',2); b.c.SetVariant({impact:'lodge'}); b.c.Attack(b.p); Step(b.c,.4); assert.equal(b.e.health,50); assert.equal(b.c.stats.lodges,0);
+});
+Test('lodge: getting hit while stuck lets go of the blade',()=>{
+  const {p,e,c}=Make(); c.SetVariant({impact:'lodge'});
+  c.Attack(p); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
+  c.Stagger(p,e,'Hit',.3,10); assert.notEqual(c.Fighter(p).state,'lodged'); assert.notEqual(c.Fighter(e).state,'lodged');
+});
+Test('directional: mouse flick picks the side the blade comes from; one click swings, no charge',()=>{
+  const {p,e,c}=Make(); c.SetVariant({control:'directional'});
+  c.AddLook(40,0); assert.equal(c.SwingPreview(),'right');
+  assert(c.AttackDown()); assert.equal(c.Fighter(p).state,'attack'); assert.equal(c.Fighter(p).attack.direction.id,'right');
+  const pose=c.State().player; assert(pose.strokeSplit && pose.swingRoll<=0,'right swing rolls the stroke clockwise');
+  Step(c,.6); assert.equal(e.health,40);
+  const up=Make(); up.c.SetVariant({control:'directional'}); up.c.AddLook(0,-40); up.c.AttackDown(); assert.equal(up.c.Fighter(up.p).attack.direction.id,'up'); Step(up.c,.6); assert.equal(up.e.health,22,'overhead hits harder');
+  const none=Make(); none.c.SetVariant({control:'directional'}); none.c.AttackDown(); assert.equal(none.c.Fighter(none.p).attack.direction.id,'upRight');
+  const left=Make(); left.c.SetVariant({control:'directional'}); left.c.AddLook(-40,0); left.c.AttackDown(); Step(left.c,.2); assert(left.c.State().player.swingMirror>0.9,"left swings mirror the arms");
+});
+Test('directional: right button during windup feints back to guard and a second press parries',()=>{
+  const {p,e,c}=Make(); c.SetVariant({control:'directional'});
+  c.AttackDown(); Step(c,.1); assert(c.Parry()); assert.equal(c.Fighter(p).state,'idle'); assert.equal(c.stats.feints,1);
+  Step(c,.5); assert.equal(e.health,100,'a feint never connects'); assert(c.Parry()); assert.equal(c.Fighter(p).state,'parry');
+});
+Test('directional: clicking during the release chains a combo that skips recovery',()=>{
+  const {p,c}=Make('Dadao',4); c.SetVariant({control:'directional'});
+  c.AttackDown(); Step(c,.34); c.AddLook(-40,0); assert(c.AttackDown()); Step(c,.2);
+  const f=c.Fighter(p); assert.equal(f.attack?.kind,'combo'); assert.equal(f.attack.direction.id,'left'); assert.equal(c.stats.combos,1);
+});
+Test('directional: riposte after a parry and chamber against a late windup both speed up the swing',()=>{
+  const r=Make('Dadao',2); r.c.SetVariant({control:'directional'});
+  r.c.Attack(r.e); Step(r.c,R.npcTellS-.06); r.c.Parry(); Step(r.c,.2); assert.equal(r.c.stats.parries,1);
+  StepUntil(r.c,()=>r.c.Fighter(r.p).state==='idle',1); r.c.AttackDown(); assert.equal(r.c.Fighter(r.p).attack.kind,'riposte');
+  assert(r.c.Fighter(r.p).attack.windup<0.2);
+  const ch=Make('Dadao',2); ch.c.SetVariant({control:'directional'});
+  ch.c.Attack(ch.e); Step(ch.c,R.npcTellS-.15); ch.c.AttackDown();
+  assert.equal(ch.c.Fighter(ch.p).attack.kind,'chamber'); assert.equal(ch.c.Fighter(ch.e).state,'stagger'); assert.equal(ch.c.stats.chambers,1);
+  Step(ch.c,.6); assert.equal(ch.p.health,100);
+});
+Test('directional: turning against the sweep during release drags the blade (longer contact window)',()=>{
+  const {p,c}=Make('Dadao',4); c.SetVariant({control:'directional'});
+  c.AddLook(40,0); c.AttackDown(); const a=c.Fighter(p).attack;
+  Step(c,a.windup+.02); for(let i=0;i<10;i++){p.yaw+=Math.sign(a.sweep)*.05;Step(c,1/90);}
+  assert(a.dragged>0.05 && a.dragged<=0.1+1e-9,`dragged ${a.dragged}`);
+});
+Test('directional + lodge combine: a side swing lodges and the frozen pose keeps its roll',()=>{
+  const {p,e,c}=Make(); c.SetVariant({control:'directional',impact:'lodge'});
+  c.AddLook(40,0); c.AttackDown(); StepUntil(c,()=>c.Fighter(p).state==='lodged',1);
+  const pose=c.State().player; assert.equal(pose.state,'lodged'); assert(pose.swingRoll<-0.1); assert(pose.strokeSplit);
+  Mash(c,6,2); StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert(c.Finish()); assert.equal(c.Fighter(p).attack.direction.id,'up');
+  StepUntil(c,()=>!e.alive,1.5); assert(!e.alive);
+});
 console.log(`${count} melee rule tests passed`);
 
 assert.deepEqual(failures,[]);

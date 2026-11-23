@@ -1804,7 +1804,13 @@ async function Boot() {
         if (event.progress < .3) audio.Play("hurt", {volume:.2, pitch:.85});
         return;
       }
-      const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing" : ["parry","weaponBeat","weaponClash","bodyObstruction","tooClose"].includes(event.kind) ? "bayonetHit" : event.kind === "hit" ? "dadaoHit" : ["push","environment"].includes(event.kind) ? "bodyFall" : null;
+      // 卡刀拔出来那一下（白刃实验场的卡刀玩法）：再带一蓬血，从刀口往拔刀方向甩出去。
+      if (event.kind === "yank" && target?.position && actor?.position) {
+        const at = target.position.clone(); at.y += 1.05;
+        const away = new THREE.Vector3().subVectors(actor.position, target.position); away.y = 0; away.normalize();
+        vfx?.Blood(at, away, 0.8);
+      }
+      const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing" : ["parry","weaponBeat","weaponClash","bodyObstruction","tooClose","chamber"].includes(event.kind) ? "bayonetHit" : ["hit","yank"].includes(event.kind) ? "dadaoHit" : ["push","environment","lodgeTimeout"].includes(event.kind) ? "bodyFall" : null;
       if (sound) audio.Play(sound, { position: (target || actor)?.position?.clone?.(), volume: 0.65 });
     },
   }, { assist: params.get("qteAssist") || "tap" });

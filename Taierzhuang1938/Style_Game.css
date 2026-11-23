@@ -1037,9 +1037,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudHitmark .t:nth-child(4) { transform: rotate(-45deg)  translateX(var(--spread)); }
 /* 击杀：更长、干血红。不做旋转/放大动画 —— 那是连杀播报的语汇，不是这个游戏的。 */
 .hudHitmark.kill { --len: 13px; --mk: rgba(204, 66, 48, 1); }
-.meleeLab{--mlMaxHeight:calc(100dvh - 36px);position:fixed;left:18px;top:18px;z-index:38;box-sizing:border-box;width:300px;max-width:calc(50vw - 36px);max-height:var(--mlMaxHeight);overflow:auto;background:rgba(19,25,27,.93);color:#e9e6d9;border:1px solid #788280;border-top:3px solid #c5af72;padding:16px;font:13px/1.55 system-ui,sans-serif;box-shadow:0 10px 38px #0007;pointer-events:auto}
-.meleeLab[hidden]{display:none}.mlHeading{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;margin-bottom:12px}.mlHeading b{font-size:18px}.mlHeading span{font-size:11px;color:#b2b9b2}.meleeLab label{display:block;color:#adb6ae;font-size:11px}.meleeLab select{width:100%;background:#273034;color:#f7f1df;border:1px solid #65706c;padding:8px;margin:5px 0 10px}.mlButtons{display:flex;gap:7px}.meleeLab button{background:#c7b276;color:#172020;border:0;padding:8px 10px;cursor:pointer;flex:1}.meleeLab button:focus-visible,.meleeLab select:focus-visible{outline:2px solid #fff}.mlTip{color:#e0d3af;margin:12px 0}.mlControls{font-size:12px;color:#b9c2c0;border-top:1px solid #54615a;padding-top:10px}.mlControls small{color:#d8c181}.mlStatus{display:block;color:#cdd9ad;margin-bottom:8px}.mlMeters,.mlTargets,.mlLog{white-space:pre-line;font-variant-numeric:tabular-nums}.mlMeters{padding:9px;background:#ffffff09}.mlTargets{font-size:11px;margin:9px 0;color:#b8c7cb}.mlLog{font-size:11px;color:#a9b4ad}.meleeLab details{border-top:1px solid #52615b;padding-top:8px;margin-top:8px}.meleeLab summary{cursor:pointer}.hudMeleeQte{width:340px;top:64%;padding:12px 18px}.hudMeleeQte .mqSlow{font-size:10px}.hudMeleeQte .mqTitle{font-size:22px}.hudMeleeQte .mqProgress{position:relative}.hudMeleeQte .mqProgress:before{content:'敌方';position:absolute;left:0;top:9px;font-size:10px}.hudMeleeQte .mqProgress:after{content:'我方';position:absolute;right:0;top:9px;font-size:10px}.hudMeleeQte .mqTimeline{margin-top:25px}
-@media(max-width:760px){.meleeLab{--mlMaxHeight:45dvh;top:10px;left:8px;width:220px;max-width:calc(50vw - 20px);padding:10px;font-size:11px}.mlHeading b{font-size:14px}.mlControls{font-size:10px}.hudMeleeQte{width:280px;top:65%}}
+/* 白刃实验场（?melee=1）面板 2026-11-23 起用 .shellImpactLab 那一套（见下方炮击扬尘测试场），这里只留隐藏开关。 */
+.meleeLab[hidden]{display:none}
+.hudMeleeQte{width:340px;top:64%;padding:12px 18px}.hudMeleeQte .mqSlow{font-size:10px}.hudMeleeQte .mqTitle{font-size:22px}.hudMeleeQte .mqProgress{position:relative}.hudMeleeQte .mqProgress:before{content:'敌方';position:absolute;left:0;top:9px;font-size:10px}.hudMeleeQte .mqProgress:after{content:'我方';position:absolute;right:0;top:9px;font-size:10px}.hudMeleeQte .mqTimeline{margin-top:25px}
+@media(max-width:760px){.hudMeleeQte{width:280px;top:65%}}
 
 .hudMeleeQte{top:auto;bottom:18px;transform:translateX(-50%);width:310px;padding:10px 14px}.hudMeleeQte .mqSlow{margin-bottom:2px}.hudMeleeQte .mqTitle{font-size:18px}.hudMeleeQte .mqKeys{margin:4px 0}.hudMeleeQte kbd{width:34px;height:34px;line-height:34px;font-size:20px}.hudMeleeQte .mqTimeline{margin-top:15px}.hudMeleeQte .mqProgress:before,.hudMeleeQte .mqProgress:after{display:none}
 
@@ -1050,7 +1051,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudMeleeQte .mqProgress i{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;transform:translateX(-50%);background:var(--warn);box-shadow:0 0 5px #0008;transition:left .04s linear}
 
 /* Keep the left control panel above the resistance HUD during a bind. */
-.meleeLabActive:has(.hudMeleeQte.on) .meleeLab{max-height:min(var(--mlMaxHeight),calc(100dvh - 290px))}
+.meleeLabActive:has(.hudMeleeQte.on) .meleeLab{max-height:calc(100dvh - 290px)}
 
 /* Mounted weapon heat sits above the shared ammunition readout. */
 .hudEmplacement.heat-cool .empHeat {opacity:.28}
@@ -1140,6 +1141,25 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   50% { transform:scale(1.12); color:#fff; background:rgba(224,176,98,.48); box-shadow:0 0 24px rgba(224,176,98,.65); }
 }
 @media(prefers-reduced-motion:reduce) { .hudMeleeQte.input .mqKeys kbd.expected { animation:none; background:rgba(224,176,98,.4); } }
+/* 白刃实验场（?melee=1）在 .shellImpactLab 之上补的几样：分组里的小标签、下拉框、折叠段、滑条；
+   方向挥砍的八向指示（准心外一圈短刻度）；卡刀时抵抗卡换成拔刀进度、挪到准心右下，别挡住刀口。 */
+.shellImpactLab .siLabel{margin:8px 0 2px;font-size:11px;letter-spacing:.08em;color:#a7a89e}
+.shellImpactLab .siSelect{display:block;width:100%;box-sizing:border-box;margin:6px 0;background:#13140b66;color:#deddd2;border:1px solid #c1bdab40;padding:6px 8px;font:inherit;border-radius:0}
+.shellImpactLab .siSelect:focus-visible{outline:1px solid #edca83;outline-offset:2px}
+.shellImpactLab .siRead+.siRead{margin-top:6px}
+.shellImpactLab .siDetails{margin:12px 0 0;border-top:1px solid #c1bdab30;padding-top:6px}
+.shellImpactLab .siDetails summary{cursor:pointer;font-size:11px;letter-spacing:.2em;color:#b8b49f}
+.shellImpactLab .siRange{width:100%;accent-color:#d9bb7b}
+.meleeLab .mlControlHint,.meleeLab .mlImpactHint{min-height:2.9em}
+.mlDirRing{position:fixed;left:50%;top:50%;width:0;height:0;z-index:30;pointer-events:none}
+.mlDirRing[hidden]{display:none}
+.mlDirRing i{position:absolute;left:0;top:0;width:12px;height:3px;margin:-1.5px 0 0 -6px;background:#deddd240;transform:rotate(var(--a)) translateX(44px)}
+.mlDirRing i.preview{background:#cdb77b99}
+.mlDirRing i.swing{background:#edca83;height:4px;box-shadow:0 0 6px #edca83aa;width:18px;margin-left:-9px}
+.mlDirRing .mlDirName{position:absolute;left:0;top:58px;transform:translateX(-50%);white-space:nowrap;font:700 12px/1 var(--ui-font,sans-serif);letter-spacing:.12em;color:#edca83;text-shadow:0 1px 3px #000}
+.hudMeleeQte.lodge,.hudMeleeQte.lodge.on{left:auto;right:6%;bottom:12%;transform:none;width:250px}
+.hudMeleeQte.lodge .mqSlow,.hudMeleeQte.lodge .mqAssist{display:none}
+.hudMeleeQte.lodge .mqKeys kbd{width:auto;min-width:54px;padding:0 10px;font-size:22px}
 /* 人物战场反应测试场（?reactions=1）：沿用 .shellImpactLab 的整套样式，只补方位九宫格与距离一排。 */
 .battleReactionLab .brCompass{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
 .battleReactionLab .brCompass .siBtn{padding:6px 2px}

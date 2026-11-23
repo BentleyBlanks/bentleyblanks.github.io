@@ -159,6 +159,7 @@ export const TEXT = Object.freeze({
 
   // --- 装配层追加的提示条 ---------------------------------------------------
   "hud.prompt.push": "近身推架",
+  "hud.prompt.finish": "补刀",
   "hud.prompt.meleeToFire": "白刃架势 → 射击",
   "hud.prompt.fireToMelee": "射击架势 → 白刃",
   "hud.prompt.pullBolt": "拉枪机",

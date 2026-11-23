@@ -3569,6 +3569,7 @@ export class Viewmodel {
     if (this.riggedArms) this.riggedArms.reloadBodyOffset = null;
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
+    this.actionPivot.scale.x = 1;
     this.reloadPivot.position.set(0, 0, 0);
     this.reloadPivot.rotation.set(0, 0, 0);
     this.reloadBlend = 0;
@@ -4615,6 +4616,18 @@ export class Viewmodel {
       this.swingPivot.quaternion.identity();
     }
     this.actionPivot.rotation.y += THREE.MathUtils.clamp(pose.weaponYawOffset || 0,-1.1,1.1);
+    // 方向挥砍：整副手臂连刀绕视线滚转（原点在相机）、从左边来的几刀左右镜像，一条实拍刀轨出八个来向。
+    // 镜像按权重从 1 翻到 −1（起手头一段刀从右边甩过中线到左边），不是一帧跳过去。
+    if (pose.swingRoll) this.actionPivot.rotateZ(pose.swingRoll);
+    this.actionPivot.scale.x = pose.swingMirror ? Math.cos(Math.PI * pose.swingMirror) : 1;
+    // 卡刀：刀吃在肉里往回拽，手跟着发抖；拔刀那一下往怀里猛抽一把。
+    if (pose.lodge) {
+      const { strain = 0, pulse = 0, yank = 0 } = pose.lodge;
+      const shake = (0.002 + strain * 0.006 + pulse * 0.006) * (1 - yank);
+      this.actionPivot.position.x += Math.sin(this.elapsed * 47) * shake;
+      this.actionPivot.position.y += Math.sin(this.elapsed * 61 + 1.3) * shake - strain * 0.012;
+      this.actionPivot.position.z += strain * 0.045 + pulse * 0.02 + Math.sin(Math.PI * yank) * 0.09;
+    }
     if (pose.state === "qte") {
       const struggle = 1 - pose.progress;
       this.actionPivot.position.z += struggle * 0.12;

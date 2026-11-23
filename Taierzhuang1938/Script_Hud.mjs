@@ -675,7 +675,8 @@ export class Hud {
   SetMeleeQte(view) {
     const root = this.el.meleeQte;
     if (!view) {
-      root.className = "hudMeleeQte";
+      // 拔刀卡淡出时留在原位（不留 lodge 的话它会先跳回屏幕正中再消失）。
+      root.className = "hudMeleeQte" + (this.meleeQteState?.kind === "lodge" ? " lodge" : "");
       root.setAttribute("aria-hidden", "true");
       this.meleeQteState = null;
       return;

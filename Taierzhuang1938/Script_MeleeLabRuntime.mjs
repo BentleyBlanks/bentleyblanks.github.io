@@ -1,9 +1,11 @@
 // 白刃实验场（?melee=1）：一个项目一组正式 Actor；面板选项目、暂停、看动作，取证口 Debug.MeleeCombat。
 // 结束后由玩家重开，避免尸体自动复活干扰结果。
+// 2026-11-23：面板多一组「玩法」——操控（原版 / 方向挥砍）× 命中反馈（原版 / 卡刀）；切了就重开当前项目。
+// 网址也能直接指定：?meleeControl=directional&meleeImpact=lodge。变体只在实验场里设，正片的白刃层永远是 classic。
 // 2026-11-01 从 Script_Main 搬来；实验场的状态（当前项目、遭遇进度、暂停、动作预览、面板）跟页面走，
 // 换关重建不清，与搬家前一致。装配层只按测试场插件的通用接口调它（见 Script_SandboxRanges 头注）。
 
-import { MELEE_ENCOUNTERS, MELEE_SCENARIOS } from "./Data_MeleeCombat.mjs";
+import { MELEE_ENCOUNTERS, MELEE_SCENARIOS, MELEE_DIRECTIONAL } from "./Data_MeleeCombat.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
 import { T } from "./Script_Text.mjs";
@@ -19,6 +21,8 @@ let meleePaused = false;
 let meleePreview = null;
 let meleePreviewFrame = null;
 const meleeTargets = [];
+const urlParams = new URLSearchParams(globalThis.location?.search || "");
+let meleeVariant = { control: urlParams.get("meleeControl") || "classic", impact: urlParams.get("meleeImpact") || "classic" };
 
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
@@ -27,6 +31,7 @@ function StartMeleeScenario(id) {
   for(const sign of ctx.battlefield.meleeLabels||[])sign.visible=spec.kind==='field';
   meleeEncounter=null;meleeCompleted.clear();
   ctx.meleeCombat.Reset();
+  meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
   for (const soldier of [...ctx.ai.soldiers]) ctx.ai.Remove(soldier);
   meleeTargets.length = 0;
   ctx.player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
@@ -111,6 +116,12 @@ function MaintainMeleeTargets() {
   const near=NearbyMeleeEncounter();if(near?.trigger==='auto')TriggerMeleeEncounter(near);
 }
 
+/** 白刃层每帧之前：喂这一帧的鼠标位移（方向挥砍选来向、卡刀晃鼠标撬刀），再清点遭遇战。 */
+function BeforeMeleeStep() {
+  ctx.meleeCombat.AddLook(ctx.input?.lookX || 0, ctx.input?.lookY || 0);
+  MaintainMeleeTargets();
+}
+
 function MeleeSnapshot() {
   const core = ctx.meleeCombat.State();
   return { ...core, scenario: meleeScenario, menu: ctx.state.menu, health: ctx.player.health, alive: ctx.player.Alive,
@@ -132,12 +143,23 @@ const api = {
     meleePreview = clip; meleePreviewFrame = frame; api.Pause(!!clip); return clip;
   },
   SetAssist: (mode) => ctx.meleeCombat.SetAssist(mode),
+  /** 切玩法（{control, impact} 缺哪个留哪个），重开当前项目。 */
+  SetVariant: (variant) => { meleeVariant = { ...meleeVariant, ...variant }; StartMeleeScenario(meleeScenario); return { ...meleeVariant }; },
+  Variant: () => ({ ...meleeVariant }),
+  /** 取证用：按指定来向出一刀（不经鼠标），方向挥砍才有意义。 */
+  Swing: (direction) => {
+    const d = MELEE_DIRECTIONAL.directions.find((x) => x.id === direction);
+    if (!d) return false;
+    const r = (d.angleDeg * Math.PI) / 180;
+    ctx.meleeCombat.mouse.x = Math.cos(r) * 40; ctx.meleeCombat.mouse.y = Math.sin(r) * 40;
+    return ctx.meleeCombat.AttackDown();
+  },
 };
 
 /** 测试场插件（Script_SandboxRanges 的 melee）用：第一次建时开面板，撒这一项目的木桩，交回装配层要调的几只钩子。 */
 export function CreateMeleeLab(host) {
   ctx = host.ctx;
-  if (!meleeLab) meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, Focus: host.Focus });
+  if (!meleeLab) meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, SetVariant: api.SetVariant, Focus: host.Focus });
   SeedMeleeTargets();
   return {
     debugName: "MeleeCombat", api,
@@ -150,7 +172,7 @@ export function CreateMeleeLab(host) {
     },
     // 补兵节拍与白刃层每帧之前：遭遇战清点、自动触发。
     Maintain: MaintainMeleeTargets,
-    BeforeMeleeUpdate: MaintainMeleeTargets,
+    BeforeMeleeUpdate: BeforeMeleeStep,
     // 动作预览：白刃层算完之后把木桩的姿势换成预览片段的那一帧。
     AfterMeleeUpdate() {
       if (!meleePreview) return;
@@ -166,7 +188,10 @@ export function CreateMeleeLab(host) {
     // 底部操作提示整条由实验场给。
     ActionPrompts() {
       const near=NearbyMeleeEncounter();
-      const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]:ctx.meleeCombat?.CanUse() && ctx.meleeCombat.PushCandidate() ? [{keys:"F",label:T("hud.prompt.push"),kind:"push"}] : [];
+      const finish=ctx.meleeCombat?.CanUse() && ctx.meleeCombat.FinishCandidate();
+      const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]
+        :finish?[{keys:"F",label:T("hud.prompt.finish"),kind:"push"}]
+        :ctx.meleeCombat?.CanUse() && ctx.meleeCombat.PushCandidate() ? [{keys:"F",label:T("hud.prompt.push"),kind:"push"}] : [];
       if(WEAPONS[ctx.currentWeapon]?.bayonet && ctx.state.bayonetFixed)prompts.push({keys:"V",label:ctx.meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
       return prompts;
     },

@@ -47,8 +47,12 @@ export function SampleMeleeVideo(pose, transition = true) {
     if (authored) {
       const attack = MELEE_WEAPONS.Dadao[pose.action === 'Heavy' ? 'heavy' : 'light'];
       const duration = attack.windup+attack.active+attack.recovery;
-      const start=attack.windup/duration,end=(attack.windup+attack.active)/duration;
+      // 方向挥砍（白刃实验场）自带起手／接触分段；strokeReverse 把这一条实拍刀轨倒着放（左下 → 右上）。
+      const [start,end]=pose.strokeSplit || [attack.windup/duration,(attack.windup+attack.active)/duration];
       time=pose.action==='Charge' ? Math.min(1,(pose.t||0)/MELEE_RULES.chargeMinS)*clip.cutStart
+        : pose.strokeReverse ? (time<start ? 1-time/start*(1-clip.cutEnd) : time<end
+          ? clip.cutEnd-(time-start)/(end-start)*(clip.cutEnd-clip.cutStart)
+          : clip.cutStart*(1-(time-end)/(1-end)))
         : time<start ? time/start*clip.cutStart : time<end
           ? clip.cutStart+(time-start)/(end-start)*(clip.cutEnd-clip.cutStart)
           : clip.cutEnd+(time-end)/(1-end)*(1-clip.cutEnd);
