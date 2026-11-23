@@ -5,6 +5,9 @@ import { ReadUnitsAttachment, UnitsLabel } from "./Script_LevelFlowUnits.mjs";
 
 const Element = id => document.getElementById(id);
 const API = "/__encounter/codex";
+const AGENT_CHOICE_KEY = "tengxian1938_encounter_agent_v1";
+const PROVIDER_LABELS = { codex: "Codex", devin: "Devin", antigravity: "Antigravity" };
+const EFFORT_LABELS = { low: "低", medium: "中", high: "高", xhigh: "超高", max: "最高", ultra: "极限" };
 
 const markdown = new Marked({ gfm: true, breaks: true });
 
@@ -45,8 +48,8 @@ function ContextLabel(context) {
 
 function SessionState(session) {
   if (session.status === "running") {
-    const preparing = session.progress?.phase === "preparing"
-      || ["正在启动本机 Codex", "已连接，正在提交需求"].includes(session.progress?.activity);
+    const preparing = session.progress?.phase === "preparing" || session.progress?.activity === "已连接，正在提交需求"
+      || session.progress?.activity?.startsWith("正在启动本机");
     return { state: preparing ? "preparing" : "running", label: preparing ? "准备中" : "进行中",
       detail: session.progress?.activity || "正在处理需求" };
   }
@@ -108,6 +111,8 @@ export class EncounterChat {
     this.pendingUnits = null;
     this.unitActions = { openUnits, setUnitMode, removeUnit, clearUnits };
     this.drafts = new Map();
+    this.providers = [];
+    this.choices = new Map();
     this.available = false;
     this.loading = false;
     this.sending = false;
@@ -151,6 +156,10 @@ export class EncounterChat {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); Element("codexComposer").requestSubmit(); }
     });
     Element("codexComposer").onsubmit = event => { event.preventDefault(); this.Send(); };
+    for (const [id, field] of [["codexProvider", "provider"], ["codexModel", "model"], ["codexEffort", "effort"]]) {
+      Element(id).addEventListener("change", event => this.SetChoice(field, event.target.value));
+    }
+    this.LoadProviders();
     this.Connect();
     Element("codexContextSummary").parentElement.addEventListener("toggle", () => this.RefreshContext());
     // Polling also restores runs after a browser reload. Background sessions remain in the list.
@@ -217,6 +226,46 @@ export class EncounterChat {
   Error(message = "") {
     Element("codexChatError").textContent = message;
     Element("codexChatError").hidden = !message;
+  }
+
+  async LoadProviders(refresh = false) {
+    try {
+      const { providers } = await Request(`/providers${refresh ? "?refresh=1" : ""}`);
+      this.providers = providers;
+    } catch { this.providers = []; }
+    this.DrawConnection(); this.UpdateSend();
+  }
+
+  // Selection for the visible conversation: an explicit change wins, then the
+  // session's last run, then the last choice made for a new conversation.
+  Choice() {
+    const key = this.current?.id || "new";
+    let stored = null;
+    if (!this.current) { try { stored = JSON.parse(localStorage.getItem(AGENT_CHOICE_KEY)); } catch { /* Storage is optional. */ } }
+    const base = this.current ? { provider: this.current.provider || "codex", model: this.current.model, effort: this.current.effort } : stored || {};
+    const choice = { ...(this.choices.get(key) || base) };
+    const provider = this.providers.find(item => item.id === choice.provider) || this.providers.find(item => item.id === "codex");
+    choice.provider = provider?.id || choice.provider || "codex";
+    if (!provider) return { choice, provider: null, model: null };
+    if (!choice.model) choice.model = provider.defaultModel;
+    const model = provider.models.find(item => item.id === choice.model) || null;
+    const efforts = model?.efforts || [];
+    if (choice.effort == null || (efforts.length && !efforts.includes(choice.effort))) {
+      choice.effort = choice.model === provider.defaultModel && efforts.includes(provider.defaultEffort) ? provider.defaultEffort : model?.defaultEffort || efforts[0] || "";
+    }
+    return { choice, provider, model };
+  }
+
+  SetChoice(field, value) {
+    const { choice } = this.Choice();
+    const next = { ...choice, [field]: value };
+    if (field === "provider") { delete next.model; delete next.effort; }
+    if (field === "model") delete next.effort;
+    this.choices.set(this.current?.id || "new", next);
+    const resolved = this.Choice().choice;
+    this.choices.set(this.current?.id || "new", resolved);
+    if (!this.current) { try { localStorage.setItem(AGENT_CHOICE_KEY, JSON.stringify(resolved)); } catch { /* Keep this window's choice. */ } }
+    this.Error(); this.DrawConnection(); this.UpdateSend();
   }
 
   async Connect() {
@@ -421,6 +470,15 @@ export class EncounterChat {
     for (const id of ["attachCodexScreenshot", "attachCodexLocation", "removeCodexLocation", "editCodexImage", "removeCodexImage",
       "attachCodexUnits", "removeCodexUnits", "selectSingleUnit", "selectMultipleUnits"]) Element(id).disabled = this.sending || deleted || !!this.managing;
     Element("newCodexChat").disabled = this.sending || !!this.managing;
+    const { choice, provider, model } = this.Choice();
+    const steerBlocked = running && choice.provider !== "codex";
+    if (provider?.available === false || steerBlocked) Element("sendCodexChat").disabled = true;
+    Element("sendCodexChat").title = steerBlocked ? `${provider?.label || choice.provider} 不支持执行中补充要求，请等待完成或先暂停` : "Ctrl + Enter";
+    if (steerBlocked) Element("sendCodexChat").textContent = "执行中";
+    const locked = this.sending || deleted || !!this.managing;
+    Element("codexProvider").disabled = locked || !this.providers.length || !!this.current?.messages?.length;
+    Element("codexModel").disabled = locked || !provider?.models.length;
+    Element("codexEffort").disabled = locked || !(model?.efforts?.length > 1);
     if (this.selectedUnits) this.UpdateUnits(this.selectedUnits, Element("selectMultipleUnits").getAttribute("aria-pressed") === "true");
   }
 
@@ -444,7 +502,7 @@ export class EncounterChat {
       const button = document.createElement("button");
       button.className = "lfChatSession";
       button.disabled = this.sending || !!this.managing;
-      button.title = session.title;
+      button.title = `${session.title} · ${PROVIDER_LABELS[session.provider || "codex"]}`;
       button.classList.toggle("selected", selected);
       button.setAttribute("aria-current", String(selected));
       const title = document.createElement("span"), status = document.createElement("span"), activity = document.createElement("small");
@@ -470,7 +528,7 @@ export class EncounterChat {
       const action = document.createElement("button"); action.type = "button"; action.className = "lfChatSessionAction";
       action.textContent = this.showDeleted ? "还原" : "删除";
       action.setAttribute("aria-label", `${action.textContent}会话 · ${session.title}`);
-      action.title = this.showDeleted ? "还原到会话列表" : "移入已删除列表，保留本机 Codex 记录";
+      action.title = this.showDeleted ? "还原到会话列表" : `移入已删除列表，保留本机 ${PROVIDER_LABELS[session.provider || "codex"]} 记录`;
       action.disabled = this.sending || !!this.managing;
       action.onclick = () => this.SetDeleted(session.id, !session.deletedAt);
       footer.append(action); row.append(button, footer); list.append(row);
@@ -481,17 +539,33 @@ export class EncounterChat {
   }
 
   DrawConnection() {
-    const model = this.current ? this.current.model || "旧会话沿用原配置" : this.model;
-    const effort = this.current ? this.current.effort : this.effort;
-    Element("codexConnection").textContent = ["本机 Codex CLI", model, effort].filter(Boolean).join(" · ");
+    const { choice, provider, model } = this.Choice();
+    const Fill = (select, options, value) => {
+      select.replaceChildren(...options.map(([id, label]) => new Option(label, id, false, id === value)));
+      select.value = value;
+    };
+    const providers = this.providers.length ? this.providers : [{ id: choice.provider, label: PROVIDER_LABELS[choice.provider] || choice.provider }];
+    Fill(Element("codexProvider"), providers.map(item => [item.id, item.available === false ? `${item.label}（未就绪）` : item.label]), choice.provider);
+    const models = (provider?.models || []).map(item => [item.id, item.label]);
+    if (choice.model && !models.some(([id]) => id === choice.model)) models.unshift([choice.model, choice.model]);
+    Fill(Element("codexModel"), models.length ? models : [["", "旧会话沿用原配置"]], choice.model || "");
+    const efforts = (model?.efforts?.length ? model.efforts : choice.effort ? [choice.effort] : []).map(id => [id, id]);
+    Fill(Element("codexEffort"), efforts.length ? efforts : [["", "默认深度"]], choice.effort || "");
+    Element("codexProvider").title = this.current?.messages?.length ? "会话已绑定此客户端，切换客户端请新建会话" : provider?.error || "选择本机客户端";
+    Element("codexModel").title = "选择模型，下一轮生效";
+    Element("codexEffort").title = choice.effort ? `思考深度 ${EFFORT_LABELS[choice.effort] || choice.effort}，下一轮生效` : "该模型使用默认思考深度";
+    Element("codexConnection").textContent = provider?.available === false ? provider.error : "本机";
+    Element("codexConnection").dataset.state = provider?.available === false ? "unavailable" : "ready";
   }
+
+  AgentLabel() { return PROVIDER_LABELS[this.current?.provider || "codex"]; }
 
   DrawProgress() {
     const pending = Element("codexProgress");
     if (!pending || this.current?.status !== "running") return;
     const progress = this.current.progress;
     const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(progress?.updatedAt || this.current.updatedAt)) / 1000));
-    pending.querySelector("strong").textContent = progress?.activity || (this.current.model ? "正在连接本机 Codex" : "旧版 CLI 正在执行");
+    pending.querySelector("strong").textContent = progress?.activity || (this.current.model ? `正在连接本机 ${this.AgentLabel()}` : "旧版 CLI 正在执行");
     pending.querySelector("p").textContent = progress?.text || "";
     pending.querySelector("small").textContent = Number.isFinite(seconds) ? `最后更新 ${seconds} 秒前` : "等待进度同步";
   }
@@ -505,7 +579,7 @@ export class EncounterChat {
     for (const message of this.current?.messages || []) {
       const row = document.createElement("article"); row.className = `lfChatMessage ${message.role}`;
       const label = document.createElement("span"); label.className = "lfChatAuthor";
-      label.textContent = message.role === "user" ? "你" : "Codex";
+      label.textContent = message.role === "user" ? "你" : this.AgentLabel();
       const bubble = document.createElement("div"); bubble.className = "lfChatBubble";
       if (message.role === "assistant") RenderMarkdown(bubble, message.text);
       else bubble.textContent = message.text;
@@ -541,7 +615,7 @@ export class EncounterChat {
       if (this.current.status === "running") {
         const row = document.createElement("article"); row.className = "lfChatMessage";
         const label = document.createElement("span"); label.className = "lfChatAuthor";
-        label.textContent = "Codex";
+        label.textContent = this.AgentLabel();
         pending.classList.add("lfChatBubble");
         pending.id = "codexProgress"; pending.setAttribute("role", "status");
         pending.append(document.createElement("strong"), document.createElement("p"), document.createElement("small"));
@@ -559,7 +633,9 @@ export class EncounterChat {
   async Send() {
     if (Element("sendCodexChat").disabled) return;
     const { frame = null, location = null } = this.pendingLocation || {};
+    const { choice } = this.Choice();
     const body = { sessionId: this.current?.id, steer: this.current?.status === "running", prompt: Element("codexPrompt").value, frame, location, units: this.pendingUnits,
+      provider: choice.provider, model: choice.model || undefined, effort: choice.effort ?? undefined,
       screenshot: this.pendingImage ? { image: this.pendingImage.image, frame: this.pendingImage.frame } : null };
     const content = JSON.stringify(body);
     if (this.lastSubmission?.content !== content) this.lastSubmission = { content, requestId: crypto.randomUUID() };

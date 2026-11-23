@@ -543,7 +543,7 @@ try {
     await page.waitForTimeout(1500);
     Check(`${label}：新地址能开、没有报错`, errors.length === 0, errors.slice(0, 3).join(" | "));
     if (label === "遭遇设计") {
-      Check("遭遇设计会话接口已连接", await page.locator("#codexConnection").textContent() === "本机 Codex CLI");
+      Check("遭遇设计会话接口已连接", await page.locator("#codexConnection").textContent() === "本机" && await page.locator("#codexProvider").inputValue() === "codex");
     }
     if (label === "场景编辑器") {
       const status = await page.evaluate(async () => { const response = await fetch("/__scene/status", { cache: "no-store" }); return { ok: response.ok, body: await response.json() }; });

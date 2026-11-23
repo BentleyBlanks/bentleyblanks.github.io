@@ -5,7 +5,8 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { CreateSteerableCodexChild, ENCOUNTER_CODEX_MODEL, ENCOUNTER_CODEX_EFFORT } from "./Script_EncounterCodexRunner.mjs";
+import { ENCOUNTER_CODEX_MODEL, ENCOUNTER_CODEX_EFFORT } from "./Script_EncounterCodexRunner.mjs";
+import { CreateProviderCatalogCache, EFFORT_PATTERN, MODEL_PATTERN, PROVIDER_IDS, PROVIDER_LABELS, SpawnAgent } from "./Script_EncounterAgentProviders.mjs";
 import { CreateLegacyProgressReader } from "./Script_EncounterCodexProgress.mjs";
 import { LoadPreviewModules } from "./Script_PreviewModules.mjs";
 
@@ -15,11 +16,13 @@ const VALIDATION_FILES = ["Document", "Model", "Units"].map(name =>
 const PREFIX = "/__encounter/codex";
 const ID = /^[a-f0-9-]{36}$/;
 const BODY_LIMIT = 32 * 1024 * 1024;
-const CLI_FAILURE = "Codex 执行失败，请在本机 CLI 检查登录和网络后重试";
-const CLI_MISSING = "未找到本机 Codex CLI，请检查安装和 PATH 配置";
-const CLI_START_FAILURE = "本机 Codex CLI 启动失败，请检查本机运行环境";
+const CliFailure = label => `${label} 执行失败，请在本机 CLI 检查登录和网络后重试`;
+const CliMissing = label => `未找到本机 ${label} CLI，请检查安装和 PATH 配置`;
+const CliStartFailure = label => `本机 ${label} CLI 启动失败，请检查本机运行环境`;
+const CLI_FAILURE = CliFailure("Codex");
 const CLI_INTERRUPTED = "本地服务已重启，上次执行已中断。可继续发送需求。";
-const PUBLIC_ERRORS = new Set([CLI_FAILURE, CLI_MISSING, CLI_START_FAILURE, CLI_INTERRUPTED]);
+const PUBLIC_ERRORS = new Set([CLI_INTERRUPTED, ...Object.values(PROVIDER_LABELS).flatMap(label => [CliFailure(label), CliMissing(label), CliStartFailure(label)])]);
+const ProviderOf = session => session.provider || "codex";
 
 class RequestError extends Error {}
 const RunFile = promisify(execFile);
@@ -59,6 +62,9 @@ async function ReadTurn(request) {
   if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 20000) throw new RequestError("请填写需求，最多 20000 字");
   if (body.sessionId != null && !ID.test(body.sessionId)) throw new RequestError("会话编号无效");
   if (body.requestId != null && !ID.test(body.requestId)) throw new RequestError("请求编号无效");
+  if (body.provider != null && !PROVIDER_IDS.includes(body.provider)) throw new RequestError("本机客户端无效");
+  if (body.model != null && (typeof body.model !== "string" || !MODEL_PATTERN.test(body.model))) throw new RequestError("模型名称无效");
+  if (body.effort != null && body.effort !== "" && (typeof body.effort !== "string" || !EFFORT_PATTERN.test(body.effort))) throw new RequestError("思考深度无效");
   const [{ ReadFramePacket }, { FLOW_TIMELINE }, { ReadUnitsAttachment }] = await LoadPreviewModules(VALIDATION_FILES);
   function ReadFrame(value, label) {
     try { return ReadFramePacket(value, FLOW_TIMELINE); }
@@ -82,8 +88,8 @@ async function ReadTurn(request) {
   return { ...body, frame, units, prompt: body.prompt.trim() };
 }
 
-function SpawnCodex(args, rootDir) {
-  return CreateSteerableCodexChild(args, rootDir);
+function SpawnCodex(args, rootDir, options) {
+  return SpawnAgent(args, rootDir, options);
 }
 
 async function StopCodex(child) {
@@ -105,10 +111,11 @@ async function LegacyCliPid(session) {
   return pid;
 }
 
-export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex, readLegacyProgress = CreateLegacyProgressReader(), state = {} } = {}) {
+export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, stopCodex = StopCodex, readLegacyProgress = CreateLegacyProgressReader(), loadCatalog, state = {} } = {}) {
   const directory = path.join(rootDir, "tmp", "EncounterCodex");
   const active = state.active ||= new Map();
   const submissions = state.submissions ||= new Map();
+  const catalog = loadCatalog ? CreateProviderCatalogCache(rootDir, loadCatalog) : state.catalog ||= CreateProviderCatalogCache(rootDir);
   const SessionPath = id => path.join(directory, id, "Session.json");
   const InterruptPath = id => path.join(directory, id, "Interrupt.json");
   const DeletedPath = id => path.join(directory, id, "Deleted.json");
@@ -151,7 +158,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       session.error = CLI_INTERRUPTED;
       Save(session);
     }
-    if (["running", "failed"].includes(session.status) && !active.has(id) && !interruption) {
+    if (ProviderOf(session) === "codex" && ["running", "failed"].includes(session.status) && !active.has(id) && !interruption) {
       const legacy = readLegacyProgress(session);
       if (legacy?.model) session.model = legacy.model;
       if (legacy?.effort) session.effort = legacy.effort;
@@ -189,15 +196,18 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
     if (turn.screenshot) args.push("--image", path.join(folder, "Screenshot.png"));
     args.push("-");
     const prompt = Prompt(turn, folder);
+    const provider = ProviderOf(session), label = PROVIDER_LABELS[provider];
     session.status = "running";
-    session.model = ENCOUNTER_CODEX_MODEL; session.effort = ENCOUNTER_CODEX_EFFORT;
-    session.progress = { phase: "preparing", activity: "正在启动本机 Codex", text: "", updatedAt: new Date().toISOString() };
+    session.provider = provider;
+    session.model = turn.model || (provider === "codex" ? ENCOUNTER_CODEX_MODEL : session.model || "");
+    session.effort = turn.effort ?? (provider === "codex" ? ENCOUNTER_CODEX_EFFORT : session.effort || "");
+    session.progress = { phase: "preparing", activity: `正在启动本机 ${label}`, text: "", updatedAt: new Date().toISOString() };
     session.runnerPid = process.pid;
     session.error = "";
     Save(session);
     let child;
-    try { child = spawnCodex(args, rootDir); }
-    catch (error) { session.status = "failed"; session.error = error.code === "ENOENT" ? CLI_MISSING : CLI_START_FAILURE; Save(session); return; }
+    try { child = spawnCodex(args, rootDir, { provider, model: session.model, effort: session.effort }); }
+    catch (error) { session.status = "failed"; session.error = error.code === "ENOENT" ? CliMissing(label) : CliStartFailure(label); Save(session); return; }
     active.set(session.id, { child, session });
     session.cliPid = child.pid;
     Save(session);
@@ -234,7 +244,7 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       const conclusion = fs.existsSync(output) ? fs.readFileSync(output, "utf8").trim() : "";
       session.status = ReadInterrupt(session) ? "interrupted" : code === 0 && conclusion ? "completed" : "failed";
       if (conclusion) session.messages.push({ role: "assistant", text: conclusion, createdAt: new Date().toISOString() });
-      if (session.status === "failed") session.error = error?.code === "ENOENT" ? CLI_MISSING : CLI_FAILURE;
+      if (session.status === "failed") session.error = error?.code === "ENOENT" ? CliMissing(label) : CliFailure(label);
       session.updatedAt = new Date().toISOString();
       Save(session);
     }
@@ -285,9 +295,14 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       if (request.method === "GET" && route === "/sessions") {
         const sessions = fs.existsSync(directory) ? fs.readdirSync(directory).filter(id => ID.test(id)).map(Load) : [];
         const summaries = sessions.map(WithVisibility).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-          .map(({ id, title, status, updatedAt, progress, model, effort, deletedAt }) => ({ id, title, status, updatedAt, progress, model, effort, deletedAt }));
+          .map(({ id, title, status, updatedAt, progress, provider, model, effort, deletedAt }) => ({ id, title, status, updatedAt, progress, provider: provider || "codex", model, effort, deletedAt }));
         Send(response, 200, { model: ENCOUNTER_CODEX_MODEL, effort: ENCOUNTER_CODEX_EFFORT,
           sessions: summaries.filter(session => !session.deletedAt), deletedSessions: summaries.filter(session => session.deletedAt) });
+        return;
+      }
+      if (request.method === "GET" && route === "/providers") {
+        const refresh = new URL(request.url, "http://localhost").searchParams.get("refresh") === "1";
+        Send(response, 200, { providers: await catalog(refresh) });
         return;
       }
       const sessionRoute = /^\/sessions\/([a-f0-9-]{36})$/.exec(route);
@@ -335,7 +350,11 @@ export function CreateEncounterCodexHandler(rootDir, { spawnCodex = SpawnCodex, 
       const submissionKey = `${sessionId}/${turnId}`;
       if (submissions.has(submissionKey)) await submissions.get(submissionKey);
       if (session?.messages.some(message => message.requestId === turnId)) { Send(response, 202, session); return; }
-      let next = session || { id: sessionId, title: turn.prompt.slice(0, 32), messages: [], createdAt: now };
+      let next = session || { id: sessionId, title: turn.prompt.slice(0, 32), provider: turn.provider || "codex", messages: [], createdAt: now };
+      if (turn.provider && turn.provider !== ProviderOf(next)) { Send(response, 400, { error: `会话已使用 ${PROVIDER_LABELS[ProviderOf(next)]}，切换客户端请新建会话` }); return; }
+      if (ProviderOf(next) !== "codex" && ["running", "interrupting"].includes(next.status)) {
+        Send(response, 409, { error: `${PROVIDER_LABELS[ProviderOf(next)]} 不支持执行中补充要求，请等待完成或先暂停后继续` }); return;
+      }
       if (turn.steer === true && next.status === "running" && !running?.child.steer) {
         await MigrateLegacyRun(next);
         running = active.get(sessionId);

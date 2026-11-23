@@ -379,6 +379,14 @@ textarea { resize: vertical; min-height: 64px; }
 .lfChatHeading strong { display: block; font-size: 14px; font-weight: 500; color: var(--ed-text-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #codexConnection { color: var(--ed-text-3); font-size: 12px; }
 #codexConnection::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 2px; }
+#codexConnection[data-state="unavailable"] { color: #d9a25f; flex-basis: 100%; order: 1; }
+.lfChatAgent { display: flex; flex-wrap: wrap; align-items: center; gap: 0 1px; min-width: 0; color: var(--ed-text-3); font-size: 12px; }
+.lfChatAgent > i { font-style: normal; color: var(--ed-text-3); }
+.lfChatAgent select { field-sizing: content; min-width: 0; max-width: 160px; height: 22px; padding: 0 3px; line-height: 1.2; font-size: 12px; color: var(--ed-text-3); background: transparent; border-color: transparent; box-shadow: none; text-overflow: ellipsis; cursor: pointer; }
+.lfChatAgent select:hover:not(:disabled), .lfChatAgent select:focus-visible { color: var(--ed-text-hi); background: var(--ed-black); border-color: var(--ed-edge); }
+.lfChatAgent select:disabled { cursor: default; opacity: 1; }
+#codexProvider { color: var(--ed-text); }
+.lfChatAgent option { color: var(--ed-text); background: #141a16; }
 .lfChatMessages { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 12px; scrollbar-width: thin; scrollbar-color: #45544a transparent; }
 .lfChatMessage { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 20px; }
 .lfChatMessage.user { align-items: flex-end; padding-left: 16px; }

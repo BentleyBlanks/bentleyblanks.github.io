@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { CreateSteerableCodexChild } from "../scripts/Script_EncounterCodexRunner.mjs";
+import { CreateAntigravityChild, CreateDevinChild, ParseModelList } from "../scripts/Script_EncounterAgentProviders.mjs";
 import { CreateLegacyProgressReader } from "../scripts/Script_EncounterCodexProgress.mjs";
 import { CreateReloadableEncounterCodexHandler } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { LoadPreviewModules } from "../scripts/Script_PreviewModules.mjs";
@@ -271,6 +272,7 @@ try {
   await TestAppServerSteering(directory);
   TestLegacyProgress(directory);
   await TestLegacyRecovery(directory, server, base);
+  await TestAgentProviders(directory, server, base);
   await TestRouteReload(directory);
   await TestValidationReload(directory);
   console.log("ok  Encounter Codex bridge: same-origin gate, attachments, final-only replies, resume, live steering, idempotent retries and persisted history");
@@ -465,4 +467,100 @@ async function TestLegacyRecovery(directory, server, base) {
   assert.equal((await Read()).status, "completed", "a late legacy process exit cannot overwrite recorded success");
   fs.writeFileSync(sessionFile, JSON.stringify({ ...session, messages: [...recovered.messages, { role: "user", text: "继续修改", createdAt: "2026-11-14T02:00:00Z" }] }));
   assert.equal((await Read()).status, "running", "a new request stays active until its own completion");
+}
+
+function FakeProcess() {
+  const proc = new EventEmitter();
+  proc.pid = process.pid;
+  proc.stdin = new PassThrough(); proc.stdout = new PassThrough(); proc.stderr = new PassThrough();
+  return proc;
+}
+
+async function TestAgentProviders(directory, server, base) {
+  const spawned = [];
+  const catalog = [
+    { id: "codex", label: "Codex", available: true, error: "", models: [{ id: "gpt-6.1-sol", label: "gpt-6.1-sol", efforts: ["low", "high"], defaultEffort: "high" }], defaultModel: "gpt-6.1-sol", defaultEffort: "high" },
+    { id: "devin", label: "Devin", available: true, error: "", models: [{ id: "claude-opus-5-5", label: "claude-opus-5-5", efforts: ["high", "xhigh"], defaultEffort: "high" }], defaultModel: "claude-opus-5-5", defaultEffort: "high" },
+  ];
+  server.removeAllListeners("request");
+  server.on("request", CreateEncounterCodexHandler(directory, { loadCatalog: async () => catalog, spawnCodex(args, root, options) {
+    const child = FakeProcess(); child.args = args; child.options = options; spawned.push(child); return child;
+  }, stopCodex(child) { child.emit("close", 130); } }));
+  assert.deepEqual((await (await fetch(`${base}/providers`)).json()).providers, catalog);
+  const Turn = value => fetch(`${base}/turns`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestId: randomUUID(), prompt: "用 Devin 调整", ...value }) });
+  assert.equal((await Turn({ provider: "other" })).status, 400);
+  assert.equal((await Turn({ provider: "devin", model: "bad model" })).status, 400);
+  assert.equal((await Turn({ provider: "devin", effort: "HIGH!" })).status, 400);
+  const started = await (await Turn({ provider: "devin", model: "claude-opus-5-5", effort: "xhigh" })).json();
+  assert.equal(started.provider, "devin"); assert.equal(started.model, "claude-opus-5-5"); assert.equal(started.effort, "xhigh");
+  assert.deepEqual(spawned[0].options, { provider: "devin", model: "claude-opus-5-5", effort: "xhigh" });
+  assert.match(started.progress.activity, /Devin/);
+  assert.equal((await Turn({ sessionId: started.id, provider: "devin", steer: true })).status, 409, "print-mode providers reject live steering");
+  spawned[0].stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: "opaque-alibi" })}\n`);
+  await new Promise(resolve => setImmediate(resolve));
+  fs.writeFileSync(spawned[0].args[spawned[0].args.indexOf("--output-last-message") + 1], "Devin 已完成");
+  spawned[0].emit("close", 0);
+  const done = await (await fetch(`${base}/sessions/${started.id}`)).json();
+  assert.equal(done.status, "completed"); assert.equal(done.messages.at(-1).text, "Devin 已完成");
+  assert.equal((await (await fetch(`${base}/sessions`)).json()).sessions.find(item => item.id === started.id).provider, "devin");
+  assert.equal((await Turn({ sessionId: started.id, provider: "codex" })).status, 400, "a session keeps its provider");
+  const resumed = await (await Turn({ sessionId: started.id, provider: "devin", model: "claude-sonnet-5-5", effort: "high" })).json();
+  assert.deepEqual(spawned[1].args.slice(0, 3), ["exec", "resume", "opaque-alibi"]);
+  assert.equal(spawned[1].options.model, "claude-sonnet-5-5"); assert.equal(resumed.model, "claude-sonnet-5-5");
+  spawned[1].emit("close", 1);
+  assert.equal((await (await fetch(`${base}/sessions/${started.id}`)).json()).error, "Devin 执行失败，请在本机 CLI 检查登录和网络后重试");
+
+  assert.deepEqual(ParseModelList("gemini-4-neon-xhigh   Gemini 4 Neon (XHigh)\ngemini-4-neon-high   Gemini 4 Neon (High)\nfusion-claude-opus-5-5-high-sidekick-claude-sonnet-5-5-medium  Fusion\n"), [
+    { id: "gemini-4-neon", label: "Gemini 4 Neon", efforts: ["high", "xhigh"], defaultEffort: "high" },
+    { id: "fusion-claude-opus-5-5-high-sidekick-claude-sonnet-5-5-medium", label: "Fusion", efforts: [], defaultEffort: "" },
+  ]);
+
+  const folder = fs.mkdtempSync(path.join(directory, "Devin-"));
+  const devinOutput = path.join(folder, "Conclusion.txt");
+  let devinArgs;
+  const devin = CreateDevinChild(["exec", "resume", "opaque-alibi", "--json", "--output-last-message", devinOutput, "--image", "Shot.png", "-"], directory, {
+    model: "claude-opus-5-5", effort: "high", command: "devin.exe", spawnCli(command, args) {
+      devinArgs = args;
+      const proc = FakeProcess();
+      setImmediate(() => {
+        proc.stdout.write("正在修改");
+        fs.writeFileSync(path.join(folder, "Export.json"), JSON.stringify({ session_id: "opaque-alibi", steps: [{ source: "user", message: "需求" }, { source: "agent", message: "Devin 结论" }] }));
+        proc.emit("close", 0);
+      });
+      return proc;
+    } });
+  const devinClosed = once(devin, "close");
+  devin.stdin.end("需求");
+  assert.deepEqual(await devinClosed, [0]);
+  assert.equal(fs.readFileSync(devinOutput, "utf8"), "Devin 结论");
+  assert.equal(devinArgs[devinArgs.indexOf("--model") + 1], "claude-opus-5-5-high");
+  assert.equal(devinArgs[devinArgs.indexOf("-r") + 1], "opaque-alibi");
+  assert.equal(devinArgs[devinArgs.indexOf("--permission-mode") + 1], "dangerous");
+  assert.match(fs.readFileSync(path.join(folder, "Prompt.txt"), "utf8"), /需求[\s\S]*Shot\.png/);
+
+  const agyOutput = path.join(folder, "Agy.txt");
+  let agyArgs, agyInput = "";
+  const agy = CreateAntigravityChild(["exec", "--json", "--output-last-message", agyOutput, "-"], directory, {
+    model: "gemini-4-neon", effort: "xhigh", command: "agy.exe", spawnCli(command, args) {
+      agyArgs = args;
+      const proc = FakeProcess();
+      proc.stdin.on("data", chunk => { agyInput += chunk; });
+      proc.stdin.on("finish", () => proc.emit("close", 0));
+      setImmediate(() => {
+        for (const event of [{ event: "init", conversation_id: "conv-1" }, { event: "step_update", step_update: { step_type: "run_command", state: "ACTIVE" } },
+          { event: "step_update", step_update: { step_type: "agent_response", state: "DONE", text_delta: "部分" } },
+          { event: "result", result: { status: "SUCCESS", response: "Agy 结论" } }]) proc.stdout.write(`${JSON.stringify(event)}\n`);
+      });
+      return proc;
+    } });
+  let agyVisible = ""; agy.stdout.on("data", chunk => { agyVisible += chunk; });
+  const agyClosed = once(agy, "close");
+  agy.stdin.end("需求二");
+  assert.deepEqual(await agyClosed, [0]);
+  assert.equal(fs.readFileSync(agyOutput, "utf8"), "Agy 结论");
+  assert.equal(agyArgs[agyArgs.indexOf("--model") + 1], "gemini-4-neon-xhigh");
+  assert.ok(agyArgs.includes("--dangerously-skip-permissions"));
+  assert.equal(JSON.parse(agyInput.trim()).message.content, "需求二");
+  assert.match(agyVisible, /"thread_id":"conv-1"/); assert.match(agyVisible, /正在执行本地命令/);
 }

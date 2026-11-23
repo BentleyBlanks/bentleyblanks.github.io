@@ -13,11 +13,20 @@ import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexSer
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const storage = fs.mkdtempSync(path.join(os.tmpdir(), "EncounterChatBrowser-"));
 const calls = [];
-const handler = CreateEncounterCodexHandler(storage, { spawnCodex(args) {
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+const catalog = [
+  { id: "codex", label: "Codex", available: true, error: "", defaultModel: "gpt-6.1-sol", defaultEffort: "high",
+    models: [{ id: "gpt-6.1-sol", label: "gpt-6.1-sol", efforts: EFFORTS, defaultEffort: "high" }, { id: "gpt-6.2-sol", label: "gpt-6.2-sol", efforts: EFFORTS, defaultEffort: "medium" }] },
+  { id: "devin", label: "Devin", available: true, error: "", defaultModel: "claude-opus-5-5", defaultEffort: "high",
+    models: [{ id: "claude-opus-5-5", label: "claude-opus-5-5", efforts: ["low", "medium", "high", "xhigh"], defaultEffort: "high" }, { id: "swe-1-6-fast", label: "swe-1-6-fast", efforts: [], defaultEffort: "" }] },
+  { id: "antigravity", label: "Antigravity", available: false, error: "未找到本机 Antigravity CLI", defaultModel: "gemini-4-neon", defaultEffort: "high",
+    models: [{ id: "gemini-4-neon", label: "gemini-4-neon", efforts: ["low", "medium", "high", "xhigh"], defaultEffort: "high" }] },
+];
+const handler = CreateEncounterCodexHandler(storage, { loadCatalog: async () => catalog, spawnCodex(args, root, options) {
   const child = new EventEmitter();
   child.pid = process.pid;
   child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
-  child.prompt = ""; child.args = args;
+  child.prompt = ""; child.args = args; child.options = options;
   child.steered = [];
   child.steer = async (prompt, image) => { child.steered.push({ prompt, image }); };
   child.stdin.on("data", chunk => { child.prompt += chunk.toString(); });
@@ -78,7 +87,30 @@ try {
   });
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_LevelFlow.html?t=384`);
-  await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent.includes("gpt-6.1-sol · high"));
+  await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexModel").value === "gpt-6.1-sol" && document.querySelector("#codexEffort").value === "high");
+  // Provider, model and effort pickers sit in the chat header; a new chat may switch all three.
+  assert.deepEqual(await page.locator("#codexProvider option").allTextContents(), ["Codex", "Devin", "Antigravity（未就绪）"]);
+  assert.deepEqual(await page.locator("#codexModel option").allTextContents(), ["gpt-6.1-sol", "gpt-6.2-sol"]);
+  assert.equal(await page.locator("#codexEffort option").count(), 5);
+  await page.selectOption("#codexModel", "gpt-6.2-sol");
+  assert.equal(await page.locator("#codexEffort").inputValue(), "medium", "a model switch falls back to that model's default effort");
+  await page.selectOption("#codexProvider", "devin");
+  assert.equal(await page.locator("#codexModel").inputValue(), "claude-opus-5-5");
+  assert.equal(await page.locator("#codexEffort").inputValue(), "high");
+  await page.selectOption("#codexModel", "swe-1-6-fast");
+  assert.equal(await page.locator("#codexEffort").isDisabled(), true, "models without effort variants lock the effort picker");
+  await page.selectOption("#codexProvider", "antigravity");
+  assert.equal(await page.locator("#codexConnection").textContent(), "未找到本机 Antigravity CLI");
+  await page.locator("#codexPrompt").fill("未就绪的客户端不能发送");
+  assert.equal(await page.locator("#sendCodexChat").isDisabled(), true);
+  await page.locator("#codexPrompt").fill("");
+  await page.selectOption("#codexProvider", "devin"); await page.selectOption("#codexModel", "claude-opus-5-5");
+  await page.selectOption("#codexEffort", "xhigh");
+  await page.screenshot({ path: path.join(out, "CodexAgentPicker.png"), clip: { x: 880, y: 40, width: 400, height: 200 } });
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexEffort").value === "xhigh");
+  assert.equal(await page.locator("#codexProvider").inputValue(), "devin", "the last new-chat choice survives a reload");
+  await page.selectOption("#codexProvider", "codex");
+  await page.waitForFunction(() => document.querySelector("#codexModel").value === "gpt-6.1-sol" && document.querySelector("#codexEffort").value === "high");
   assert.equal(await page.locator("#newCodexChat").isVisible(), false);
   assert.equal(await page.locator("#toggleCodexSessions").getAttribute("aria-expanded"), "false");
   assert.equal((await page.locator(".lfInspector").boundingBox()).width, 390);
@@ -390,6 +422,7 @@ try {
   assert.equal(await page.locator(".lfChatMessage.user .lfChatBubble strong").count(), 0);
   assert.match(await page.locator(".lfChatMessage.user .lfChatBubble").innerText(), /\*\*原样文字\*\*/);
   assert.ok(calls[0].args.includes("--image"));
+  assert.deepEqual(calls[0].options, { provider: "codex", model: "gpt-6.1-sol", effort: "high" });
   const outputDirectory = path.dirname(calls[0].args[calls[0].args.indexOf("--output-last-message") + 1]);
   const frame = JSON.parse(fs.readFileSync(path.join(outputDirectory, "Frame.json"), "utf8"));
   const location = JSON.parse(fs.readFileSync(path.join(outputDirectory, "Location.json"), "utf8"));
@@ -670,7 +703,7 @@ try {
   assert.ok(theme.panel.includes("rgba(8, 9, 7, 0.94)"));
   assert.ok(theme.titleFont.includes("TzTitleText"));
   // New chats send location only after an explicit attachment action.
-  await page.reload(); await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexConnection").textContent.includes("gpt-6.1-sol"));
+  await page.reload(); await page.waitForFunction(() => window.LevelFlow && document.querySelector("#codexModel").value === "gpt-6.1-sol" && document.querySelector("#codexEffort").value === "high");
   assert.equal(await page.locator("#attachCodexLocation").innerText(), "＋ 未附加定位");
   await page.locator("#codexPrompt").fill("没有附加定位的新会话"); await page.click("#sendCodexChat");
   await page.waitForFunction(() => document.querySelector("#codexProgress"));
