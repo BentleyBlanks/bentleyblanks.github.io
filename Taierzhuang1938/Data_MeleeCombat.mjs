@@ -57,6 +57,7 @@ export const MELEE_ANIMATION_ACTIONS = Object.freeze([
   "Fall", "Ground", "GroundWin", "GroundLose", "Pressure", "Rise",
   "ParryLeft", "ParryRight", "Compact", "CompactAlt", "Obstructed", "WeaponClash",
 ]);
+// 2026-11-23 用户：推架（F）与倒地抵抗两类项目撤了 —— 玩家不再有近身推架，倒地 QTE 只由剧本触发。
 // 2026-11-23 用户：实验场只要一个对手。面板只列一对一的项目（enemies 1、没有友军）；
 // 一对二 / 一对三 / 敌友对练留在表里只给取证口与回归测试（多打一分工是正片在用的规则）。
 export const MELEE_SCENARIOS = Object.freeze([
@@ -66,12 +67,8 @@ export const MELEE_SCENARIOS = Object.freeze([
   { id: "BayonetOne", name: "刺刀 · 对刺刀", weapon: "Bayonet", enemies: 1, kind: "duel", tip: "短刺试探，拨开后反刺；长刺有一步突进和较长收招。" },
   { id: "BayonetTwo", name: "刺刀 · 一对二", weapon: "Bayonet", enemies: 2, kind: "duel", tip: "正面佯刺骗你拨挡、侧翼趁机突刺；控制中线，注意长刺挥空后的恢复。" },
   { id: "BayonetThree", name: "刺刀 · 一对三", weapon: "Bayonet", enemies: 3, kind: "duel", tip: "让对手留在视野内，借身体和墙角挡住第二条攻击线路。" },
-  { id: "DadaoPush", name: "大刀 · F 推架", weapon: "Dadao", enemies: 1, kind: "push", tip: "进入刀身无法展开的极近距离，F 压枪顶开；推架不造成伤害。" },
-  { id: "BayonetPush", name: "刺刀 · F 推枪", weapon: "Bayonet", enemies: 1, kind: "push", tip: "贴身时枪尖够不到人，F 横推枪身制造短刺空间。" },
   { id: "DadaoBind", name: "大刀 · 站立僵持", weapon: "Dadao", enemies: 1, kind: "bind", tip: "贴近后与对手同时蓄力进攻，刀枪硬架触发僵持；连按 F 顶开。" },
   { id: "BayonetBind", name: "刺刀 · 交叉僵持", weapon: "Bayonet", enemies: 1, kind: "bind", tip: "两支枪在近距离同时向前发力会交叉锁住；成功后自行反刺。" },
-  { id: "DadaoGround", name: "大刀 · 倒地抵抗", weapon: "Dadao", enemies: 1, kind: "ground", tip: "本项目以低平衡起步，近身遭撞击后对手上前压制；连按 F 推开起身。" },
-  { id: "BayonetGround", name: "刺刀 · 倒地抵抗", weapon: "Bayonet", enemies: 1, kind: "ground", tip: "倒地后枪尖随失势逼近；抵抗成功起身，停止输入可验证失败伤害。" },
   { id: "AlliedDadao", name: "友军大刀 · 敌友对练", weapon: "Dadao", enemies: 1, allies: 1, allyWeapon: "Dadao", kind: "observe", tip: "观察友军越过枪尖、斩击与推架；双方使用同一战斗规则。" },
   { id: "AlliedBayonet", name: "友军刺刀 · 敌友对练", weapon: "Bayonet", enemies: 1, allies: 1, allyWeapon: "Bayonet", kind: "observe", tip: "观察两方短刺、拨挡和长刺，或亲自加入战斗。" },
   { id: "ParryTiming", name: "拨挡 · 早／准／晚", weapon: "Dadao", enemies: 1, kind: "timing", tip: "对手重复可读的长刺；按住右键不会延长窗口，成功不会自动反杀。" },
@@ -98,8 +95,10 @@ export const MELEE_LODGE = Object.freeze({
   // 拔刀（2026-11-23 第三轮，用户：「不是 QTE，屏幕上一个圈，长按 F 就拔出来」）：长按 F，holdS 秒把圈走满；
   // 中途松手按 decayPerS 往回退。没有时限 —— 对方挨了这一刀动不了，刀不拔就一直卡着。
   holdS: 0.8, decayPerS: 0.6,
-  // 卡着的时候视角被拽回对方（每秒回拉比例），对方被钉在原地发抖。
-  tetherRate: 7, tremorRad: 0.05,
+  // 刀吃进去的那一点（2026-11-23 第四轮，用户：「固定在某一个点，例如肩膀，可以转视角，但刀砍的位置不动」）：
+  // 对方脚下往上 anchorShoulderM（上撩的几刀落在腰腹 anchorTorsoM），朝刀来的那一侧偏 anchorSideM。
+  // 第一人称整副手臂连刀锁在这一点上（世界空间），视角随便转，直到 F 拔出来。对方被钉在原地发抖。
+  anchorShoulderM: 1.38, anchorTorsoM: 1.1, anchorSideM: 0.16, tremorRad: 0.05,
   // 拔刀动作时长；对方随即踉跄 reelS 秒：往后倒退、左右打晃。
   yankS: 0.36, yankRepelM: 0.22, reelS: 2.4, reelSpeedMps: 0.55, reelSwayRad: 0.34, reelCycleS: 0.8,
   // 补刀：F 对 finishReachM 内踉跄中的对手自动转身补一刀（起手按 finishWindupScale 缩短）。
@@ -113,6 +112,10 @@ export const MELEE_DRAG = Object.freeze({
   viewFollow: 0.5,
   // 出刀：最近 windowS 秒里鼠标走过的位移 ≥ minStrokePx，且速度 ≥ triggerPxPerS，就顺着这一甩的方向砍下去。
   windowS: 0.1, minStrokePx: 60, triggerPxPerS: 1200,
+  // 点一下（按下到松开不到 tapS 秒、没甩出刀）也出一刀（2026-11-23 第四轮，用户：连点左键好几刀出不来）：
+  // 刀架已经偏出去 tapAimPx 以上就顺着偏的方向砍，否则 tapDirection；力道按最轻那一档。
+  // 出刀中再点会排进缓冲，这一刀收完马上接下一刀。
+  tapS: 0.22, tapAimPx: 40, tapDirection: "upRight",
   // 甩得越快砍得越重：速度从 powerPxPerS[0] 到 [1]，伤害 × powerScale[0] → [1]。
   powerPxPerS: Object.freeze([1200, 3200]), powerScale: Object.freeze([0.85, 1.3]),
   // 一甩就出刀，起手只剩一小段（甩本身就是起手）；收招照常，砍完左键还按着就回到拖拽架势接着甩。

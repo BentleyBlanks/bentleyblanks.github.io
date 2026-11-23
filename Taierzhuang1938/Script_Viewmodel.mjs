@@ -4645,6 +4645,28 @@ export class Viewmodel {
     this.actionPivot.rotation.set(0.20 * hit, -0.70 * hit, 0.55 * hit, "YXZ");
   }
 
+  /**
+   * 卡刀：整副手臂连刀锁在对方身上那一点（世界空间），视角怎么转刀尖都扎在那儿。
+   * 每帧在刀架父节点的局部空间里算：从相机原点看，刀尖（往回 5%，吃进肉里那一截）的方向转到 anchor 的方向，
+   * 绕相机原点整副手臂一起转过去。不能在世界空间里转再换算回来 —— 视图模型根节点带非等比缩放
+   *（窄 FOV 的深度压缩，见文件头），世界里的旋转换回局部就成了切变；而局部空间里对齐的是方向，
+   * 透视投影只认方向，画面上刀尖就落在 anchor 上。拔刀（yank）那一段按进度松回原姿态。
+   */
+  _LockLodgeToWorld(lodge) {
+    const camera = this.root.parent, pivot = this.actionPivot, parent = pivot.parent;
+    if (!camera || !parent || !lodge.anchor || !this.rig?.muzzle) return;
+    parent.updateWorldMatrix(true, false); pivot.updateMatrixWorld(true);
+    const v = this._lockV ||= { c: new THREE.Vector3(), tip: new THREE.Vector3(), to: new THREE.Vector3(), q: new THREE.Quaternion(), i: new THREE.Quaternion() };
+    const c = parent.worldToLocal(camera.getWorldPosition(v.c));
+    const tip = parent.worldToLocal(this.rig.group.localToWorld(v.tip.copy(this.rig.muzzle).multiplyScalar(0.95))).sub(c).normalize();
+    const to = parent.worldToLocal(v.to.set(lodge.anchor.x, lodge.anchor.y, lodge.anchor.z)).sub(c).normalize();
+    const R = v.q.setFromUnitVectors(tip, to);
+    if (lodge.yank > 0) R.slerp(v.i, Math.min(1, lodge.yank));
+    pivot.position.sub(c).applyQuaternion(R).add(c);
+    pivot.quaternion.premultiply(R);
+    this.lodgeLock = { serial: lodge.serial };
+  }
+
   /** Source channels are baked in Blender; existing grip/arm IK follows the animated weapon. */
   _AnimMeleeBaked(pose) {
     this.meleeVideoFrame = SampleMeleeVideo(pose);
@@ -4672,7 +4694,8 @@ export class Viewmodel {
       this.actionPivot.position.x += Math.sin(this.elapsed * 47) * shake;
       this.actionPivot.position.y += Math.sin(this.elapsed * 61 + 1.3) * shake - strain * 0.012;
       this.actionPivot.position.z += strain * 0.045 + pulse * 0.02 + Math.sin(Math.PI * yank) * 0.09;
-    }
+      this._LockLodgeToWorld(pose.lodge);
+    } else this.lodgeLock = null;
     if (pose.state === "qte") {
       const struggle = 1 - pose.progress;
       this.actionPivot.position.z += struggle * 0.12;

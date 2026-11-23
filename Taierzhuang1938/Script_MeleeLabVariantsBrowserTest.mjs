@@ -103,6 +103,23 @@ try {
   assert.equal(s.prompt?.key, "F", "one on-screen ring with F");
   console.log("PASS lodge", JSON.stringify({ enemy: s.enemy, prompt: s.prompt }));
   await Step(8); await Shot("02_Lodged");
+  // 刀锁在对方身上那一点：转头看别处，刀在世界里的位置不动。
+  const BladePoint = () => page.evaluate(() => {
+    const T = Taierzhuang, vm = T.viewmodel; T.scene.updateMatrixWorld(true); T.camera.updateMatrixWorld(true);
+    const p = vm.rig.group.localToWorld(vm.rig.muzzle.clone().multiplyScalar(0.95)), a = T.meleeCombat.Pose(T.meleeCombat.Fighter(T.player)).lodge.anchor;
+    const c = T.camera.getWorldPosition(p.clone()), d1 = p.clone().sub(c).normalize(), d2 = new p.constructor(a.x, a.y, a.z).sub(c).normalize();
+    return { p: p.toArray(), anchor: [a.x, a.y, a.z], yaw: T.player.yaw, aim: d1.angleTo(d2) };
+  });
+  const lock0 = await BladePoint();
+  await page.evaluate(() => { for (let i = 0; i < 12; i++) { Taierzhuang.Debug.Look(28, -6); Taierzhuang.StepFrames(1, 1 / 60, false); } Taierzhuang.StepFrames(30, 1 / 60, false); });
+  const lock1 = await BladePoint(), Gap = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+  assert(Math.abs(lock1.yaw - lock0.yaw) > 0.2, "the view turns freely while the blade is stuck");
+  assert(Gap(lock0.p, lock1.p) < 0.06, `the blade stays put in the world (${Gap(lock0.p, lock1.p).toFixed(3)} m)`);
+  assert(lock0.aim < 0.12 && lock1.aim < 0.12, `the blade tip sits on the shoulder point (${lock0.aim.toFixed(3)} / ${lock1.aim.toFixed(3)} rad)`);
+  assert.equal((await State()).player.state, "lodged");
+  console.log("PASS lodge lock", JSON.stringify({ moved: Gap(lock0.p, lock1.p), aim: lock0.aim, turned: lock1.yaw - lock0.yaw }));
+  await Shot("02a_LookAway");
+  await page.evaluate(() => { for (let i = 0; i < 12; i++) { Taierzhuang.Debug.Look(-28, 6); Taierzhuang.StepFrames(1, 1 / 60, false); } });
   await page.keyboard.down("f"); await Step(24); s = await State();
   assert(s.prompt.progress > 0.35 && s.player.state === "lodged", "holding F fills the ring"); await Shot("02b_HoldF");
   for (let i = 0; i < 20 && (await State()).player.state === "lodged"; i++) await Step(4);
@@ -118,6 +135,10 @@ try {
   console.log("PASS finish", JSON.stringify(s.stats));
   await Step(6); await Shot("05_Finished");
 
+  // 近身推架撤了：贴身按 F 什么也不推。
+  await page.getByRole("button", { name: "原版 · 砍中即退", exact: true }).click();
+  await Setup("DadaoOne", 0.8); await page.keyboard.press("f"); await Step(20);
+  assert.equal((await State()).stats.pushes, 0, "F no longer pushes"); console.log("PASS no push");
   // ── 拖拽挥砍（原版命中）────────────────────────────────────────────────
   await page.getByRole("button", { name: "原版 · 砍中即退", exact: true }).click();
   await page.getByRole("button", { name: "拖拽挥砍", exact: true }).click();
@@ -149,6 +170,13 @@ try {
     for (let i = 0; i < 60 && (await State()).player.phase !== "idle"; i++) await Step(1);
   }
   console.log("PASS drag", JSON.stringify(cuts));
+  // 连点左键：每一下都出刀（点一下 = 一刀，砍的中途再点排进缓冲），不会卡住。
+  await Setup("DadaoOne", 4);
+  for (let i = 0; i < 14; i++) { await page.mouse.down(); await Step(2); await page.mouse.up(); await Step(6); }
+  for (let i = 0; i < 90 && (await State()).player.phase !== "idle"; i++) await Step(1);
+  s = await State(); assert(s.stats.drags >= 3, `spam clicking keeps cutting (${s.stats.drags} cuts)`); assert.equal(s.player.phase, "idle");
+  await page.mouse.down(); await Step(2); await page.mouse.up(); assert.equal((await State()).player.state, "attack", "still cuts after the spam");
+  console.log("PASS click spam", s.stats.drags); await Step(60);
 
   // ── 拖拽挥砍 × 卡刀 ────────────────────────────────────────────────────
   await page.getByRole("button", { name: "卡刀 · 拔刀 · 补刀", exact: true }).click();

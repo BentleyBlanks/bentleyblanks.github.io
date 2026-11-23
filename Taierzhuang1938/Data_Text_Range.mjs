@@ -172,7 +172,7 @@ export const TEXT = Object.freeze({
   "range.melee.followLabel": "拖拽时视角跟随 {percent}%",
   "range.melee.followAria": "拖拽挥砍时视角跟随刀的比例",
   "range.melee.controlParryDrag": "右键：拨挡 · WASD：移动",
-  "range.melee.controlPress": "F：贴身压枪／顶架 · 抵抗时连按 F",
+  "range.melee.controlPress": "刀枪硬架僵持时：连按 F 抵抗",
   "range.melee.controlLodge": "刀砍进身体卡住：长按 F 拔刀 · 拔出来后再砍一刀或按 F：补刀",
   "range.melee.controlWeapon": "1／3：步枪／大刀 · V：射击／白刃架势",
 

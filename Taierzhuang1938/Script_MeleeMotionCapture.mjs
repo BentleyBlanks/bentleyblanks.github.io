@@ -20,7 +20,7 @@ try {
   await page.evaluate(()=>Taierzhuang.StepFrames(3,1/60,true));
   await page.screenshot({path:path.join(out,'Scene_MeleeLab.png')});
   const evidence=[];
-  for(const scenario of ['DadaoOne','BayonetOne','DadaoBind','BayonetGround']) {
+  for(const scenario of ['DadaoOne','BayonetOne','DadaoBind','BayonetBind']) {
     await page.evaluate(id=>{Taierzhuang.Debug.MeleeCombat.Select(id);Taierzhuang.StepFrames(2,1/60,true);},scenario);
     for(let frame=0;frame<140;frame++) {
       const state=await page.evaluate(({scenario,frame})=>{

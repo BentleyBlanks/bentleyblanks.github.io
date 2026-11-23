@@ -14,7 +14,9 @@ let count=0;const failures=[];
 const Test = (name, body) => {try{body();count++;console.log('PASS',name);}catch(error){failures.push({name,error:String(error)});console.error('FAIL',name,String(error));}};
 Test('scenario coverage includes 1/2/3 enemies and both weapon special fights',()=>{
   assert.deepEqual(S.filter(s=>s.weapon==='Dadao'&&s.kind==='duel').map(s=>s.enemies),[1,2,3]);
-  for (const weapon of ['Dadao','Bayonet']) for(const kind of ['push','bind','ground']) assert(S.some(s=>s.weapon===weapon&&s.kind===kind));
+  for (const weapon of ['Dadao','Bayonet']) assert(S.some(s=>s.weapon===weapon&&s.kind==='bind'));
+  // 2026-11-23：推架与倒地抵抗两类项目撤了（玩家没有近身推架，倒地 QTE 只由剧本触发）。
+  assert(!S.some(s=>['push','ground'].includes(s.kind)));
 });
 Test('light attack hits in active phase, not when mouse goes down or during windup',()=>{
   const {p,e,c}=Make(); c.AttackDown(); Step(c,.05); assert.equal(e.health,100); c.AttackUp(); Step(c,.12); assert.equal(e.health,100); Step(c,.1); assert.equal(e.health,48); Step(c,.5); assert.equal(e.health,48); assert(p.alive);
@@ -34,7 +36,12 @@ Test('holding right button cannot renew its window; early and late parries fail'
   for(const early of [true,false]) {const {p,e,c}=Make('Dadao',2); if(early)c.HandleInput('Mouse2',true); Step(c,.32); c.Attack(e); Step(c,R.npcTellS+.14); if(!early)c.Parry(); assert(p.health<100);}
   const {c}=Make(); c.HandleInput('Mouse2',true); Step(c,.8); c.HandleInput('Mouse2',true); assert.equal(c.Fighter(c.Player()).state,'idle'); c.HandleInput('Mouse2',false); c.HandleInput('Mouse2',true); assert.equal(c.Fighter(c.Player()).state,'parry');
 });
-Test('F push requires close distance, interrupts and creates room without health damage',()=>{
+Test('player F no longer pushes, even point-blank; the shared Push still works for the opponent',()=>{
+  const {p,e,c}=Make('Dadao',.75); assert.equal(c.HandleInput('KeyF',true),false,'F falls through to the generic interaction'); c.HandleInput('KeyF',false);
+  Step(c,.3); assert.equal(c.stats.pushes,0); assert.equal(c.Fighter(p).state,'idle');
+  assert(c.Push(e),'the opponent can still shove the player'); Step(c,.2); assert.equal(c.stats.pushes,1);
+});
+Test('shared Push requires close distance, interrupts and creates room without health damage',()=>{
   const {p,e,c}=Make('Dadao',.75); c.Attack(e); assert(c.Push()); Step(c,.18); assert.equal(e.health,100); assert(e.position.z<-.85 && e.position.z> -1.1,'dadao clears the weapon while retaining cutting distance'); assert.equal(c.Fighter(e).state,'stagger'); assert.equal(p.health,100); assert(!c.Push());
   const far=Make('Dadao',1.4); assert(!far.c.Push());
 });
@@ -48,8 +55,10 @@ Test('simultaneous close heavy contact starts standing QTE only',()=>{
 Test('long thrust has forward movement and keeps recovery',()=>{
   const {p,e,c}=Make('Bayonet',5); c.Attack(p,true); Step(c,.65); assert(p.position.z<-.35); assert(!c.AttackDown()); assert.equal(e.health,100);
 });
-Test('ground pressure follows actual low-poise knockdown',()=>{
-  const {p,e,c}=Make('Dadao',.8); e.meleeTraining={kind:'ground'}; c.Fighter(p).poise=20; c.Fighter(e).nextThink=0; Step(c,1.5); assert(c.events.some(e=>e.kind==='knockdown')); assert.equal(c.View()?.kind,'ground');
+Test('a real knockdown leaves the player down and rising, never a ground QTE on its own',()=>{
+  const {p,e,c}=Make('Dadao',.8); assert(c.KnockDown(p,e)); c.Fighter(e).nextThink=0;
+  for(let t=0;t<3;t+=1/60){c.Update(1/60);assert(!c.Active,'no generic ground QTE');}
+  assert.equal(c.stats.ground,0); assert.notEqual(c.Fighter(p).state,'down','he gets up by himself');
 });
 Test('QTE input rate cap rejects repeat and >7 Hz; 5 Hz can win without auto kill',()=>{
   for(const kind of ['standing','ground']) {
@@ -64,7 +73,7 @@ Test('standing success returns a living opponent and a free attack opportunity',
 });
 Test('standing failure returns control without another knockdown; ground failure applies actual health damage',()=>{
   const {p,e,c}=Make('Dadao',1); c.Fighter(p).poise=20;c.BeginBind(p,e,'testContact');Step(c,3.1);assert(p.health<100);assert.equal(c.stats.failures,1);
-  const b=Make('Bayonet',1);b.c.Fighter(b.p).state='down';assert(b.c.BeginGround(b.e));Step(b.c,3);assert(b.p.health<=28);assert.equal(b.e.health,100);
+  const b=Make('Bayonet',1);b.c.Fighter(b.p).state='down';assert(b.c.BeginScriptedGround(b.p,b.e));Step(b.c,3);assert(b.p.health<=28);assert.equal(b.e.health,100);
 });
 Test('death/reset releases QTE input ownership',()=>{
   const {p,e,c}=Make('Dadao',1);c.BeginBind(p,e,'testContact');e.alive=false;Step(c,.1);assert(!c.Active);c.Reset();assert.equal(c.events.length,0);assert(p.alive);
@@ -75,8 +84,8 @@ Test('weapon changes cannot cancel committed recovery; blur cancels a held charg
 Test('both factions alternate light directions, with no fixed combo requirements',()=>{
   const {e,c}=Make('Dadao',5);c.Attack(e);const first=c.Fighter(e).clip;Step(c,1);c.Attack(e);assert.notEqual(c.Fighter(e).clip,first);
 });
-Test('ground QTE cannot begin while standing; impact must actually knock down',()=>{
-  const {p,e,c}=Make('Dadao',1);assert(!c.BeginGround(e));assert(c.KnockDown(p,e,'blast'));assert(!c.BeginGround(e));Step(c,.7);assert(c.BeginGround(e));
+Test('the generic ground QTE entry is gone; only the scripted entry opens it',()=>{
+  const {p,e,c}=Make('Dadao',1);assert.equal(c.BeginGround,undefined);assert(c.KnockDown(p,e,'blast'));Step(c,.7);assert(!c.Active);assert(c.BeginScriptedGround(p,e));assert.equal(c.qte.active.kind,'ground');
 });
 Test('charged weapon can brace a close heavy contact, while ordinary defense remains a parry',()=>{
   const {p,e,c}=Make('Dadao',1.05);c.AttackDown(p);Step(c,.5);c.Attack(e,true);Step(c,.7);assert.equal(c.View()?.reason,'chargedWeaponBrace');assert.equal(p.health,100);
@@ -204,7 +213,7 @@ Test('a second ready threat prevents a long bind and an approaching threat relea
   assert(c.events.some(e=>e.kind==='qteEscape'));assert(c.Fighter(other).nextThink>c.time);
 });
 Test('ground success gives recovery advantage after the player finishes rising',()=>{
-  const {p,e,c}=Make('Bayonet',1);c.Fighter(p).state='down';assert(c.BeginGround(e));c.SetAssist('auto');
+  const {p,e,c}=Make('Bayonet',1);c.Fighter(p).state='down';assert(c.BeginScriptedGround(p,e));c.SetAssist('auto');
   while(c.Active)Step(c,.01);
   assert.equal(c.Fighter(p).state,'rise');Step(c,R.riseS+.01);
   assert.equal(c.Fighter(p).state,'idle');assert.equal(c.Fighter(e).state,'stagger');assert(c.Fighter(e).duration-c.Fighter(e).t>.5);
@@ -252,13 +261,13 @@ Test('ground QTE failure and escape preserve get-up and restart the global coold
   for(const escape of [false,true]) {
     const {p,e,c}=Make('Dadao',1);const other={...e,id:'Other',position:{x:1,y:0,z:0}};
     c.host.Soldiers=()=>[e,other];c.host.Damage=()=>{};
-    c.Fighter(p).state='down';assert(c.BeginGround(e));
+    c.Fighter(p).state='down';assert(c.BeginScriptedGround(p,e));
     if(escape)c.EscapeQte(other);else {c.qte.Resolve(false);Step(c,Q.resolveS+.02);}
     assert.equal(c.Fighter(p).state,'rise');
     assert(c.Fighter(p).qteUntil>=c.time+Q.cooldownS);
     for(let i=0;i<110;i++){c.Stagger(p,i%2?e:other,'Hit',.32,65);Step(c,1/90);}
     assert.equal(c.Fighter(p).state,'idle');assert(c.AttackDown());
-    c.SetState(c.Fighter(p),'down');assert(!c.BeginGround(other),'second attacker shares the post-QTE cooldown');
+    for(let t=0;t<1;t+=1/60){c.Update(1/60);assert(!c.Active,'nobody restarts a ground QTE on their own');}
   }
 });
 // 剧本倒地与剧本地面僵持（第一关屋内伏击：枪托砸倒 → 压刺刀 → 推刀 → 反捅）。
@@ -424,7 +433,7 @@ Test('drag: holding left button raises the blade and the mouse leads it (the vie
   c.HandleInput('Mouse0',true); assert.equal(c.Fighter(p).state,'aim'); assert(c.CapturesLook,'mouse belongs to the blade while held');
   Drag(c,8,0,6); const pose=c.State().player; assert.equal(pose.state,'aim'); assert(pose.aimOffset.x>0,'the guard follows the mouse');
   assert.equal(e.health,100,'slow movement never swings');
-  c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'idle'); assert(!c.CapturesLook);
+  Step(c,.2); c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'idle','a long hold without a flick is not a tap'); assert(!c.CapturesLook);
 });
 Test('drag: a fast flick cuts along the flick, faster flicks cut harder',()=>{
   const slow=Make('Dadao',LodgeAt); slow.c.SetVariant({control:'drag'});
@@ -455,6 +464,19 @@ Test('drag + lodge combine: a deep flick lodges, the frozen pose keeps its roll,
   const pose=c.State().player; assert.equal(pose.state,'lodged'); assert(pose.swingRoll<-0.1); assert(pose.strokeSplit);
   HoldF(c,1); StepUntil(c,()=>c.Fighter(p).state==='idle',1); assert(c.Finish()); assert.equal(c.Fighter(p).attack.direction.id,'up');
   StepUntil(c,()=>!e.alive,1.5); assert(!e.alive);
+});
+Test('drag: spamming clicks still cuts every time — a tap cuts, clicks during a cut queue the next one',()=>{
+  const {p,c}=Make('Dadao',4); c.SetVariant({control:'drag'});
+  c.HandleInput('Mouse0',true); Step(c,.05); c.HandleInput('Mouse0',false);
+  assert.equal(c.Fighter(p).state,'attack','a tap without a flick still cuts'); assert.equal(c.Fighter(p).attack.direction.id,'upRight');
+  let cuts=1;
+  for(let i=0;i<24;i++){
+    c.HandleInput('Mouse0',true); Step(c,.04); c.HandleInput('Mouse0',false); Step(c,.06);
+    const f=c.Fighter(p); if(f.state==='attack'&&f.t<.1)cuts++;
+  }
+  assert(c.stats.drags>=4,`clicking for 2.4 s chains cuts back to back (${c.stats.drags})`);
+  StepUntil(c,()=>c.Fighter(p).state==='idle',2); assert.equal(c.Fighter(p).state,'idle','nothing gets stuck');
+  c.HandleInput('Mouse0',true); Step(c,.05); c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'attack','still cuts afterwards: '+JSON.stringify({state:c.Fighter(p).state,stamina:c.Fighter(p).stamina,buffer:c.Fighter(p).buffer,ev:c.events.slice(-3).map(e=>e.kind)}));
 });
 console.log(`${count} melee rule tests passed`);
 

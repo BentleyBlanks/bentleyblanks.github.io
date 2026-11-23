@@ -125,7 +125,12 @@ export class MeleeCombatDirector {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !f?.weapon || this.Active && entity === this.Player()) return false;
     if (f.state === "lodged") return true;
-    if (entity === this.Player() && this.Drag && W[f.weapon]) return this.BeginAim(f);
+    if (entity === this.Player() && this.Drag && W[f.weapon]) {
+      if (this.Idle(f)) return this.BeginAim(f);
+      // 拖拽挥砍出刀中再按：排进缓冲，这一刀收完就接（左键还按着就回架势，已经松开就是点一下的那一刀）。
+      if (f.state === "attack" && f.attack?.drag) { f.buffer = { expires: this.time + Math.max(0, f.duration - f.t) + R.inputBufferS, released: false }; return true; }
+      return false;
+    }
     if (f.state !== "idle") {
       if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
         f.buffer = {expires:this.time+R.inputBufferS, released:false}; return true;
@@ -136,7 +141,11 @@ export class MeleeCombatDirector {
   }
   AttackUp(entity = this.Player()) {
     const f = this.Fighter(entity);
-    if (entity === this.Player() && this.Drag) { if (f?.state === "aim") this.SetState(f, "idle"); return true; }
+    if (entity === this.Player() && this.Drag) {
+      if (f?.buffer && f.state === "attack") { f.buffer.released = true; return true; }
+      if (f?.state === "aim") { if (f.t <= D.tapS) return this.TapCut(f); this.SetState(f, "idle"); }
+      return true;
+    }
     if (f?.buffer) { f.buffer.released = true; return true; }
     if (f?.state !== "charge") return false;
     const held = f.t;
@@ -169,8 +178,16 @@ export class MeleeCombatDirector {
   /** 按下左键：进拖拽架势（刀举起来跟着鼠标走）；出刀中按下的，砍完自动回架势。 */
   BeginAim(f) {
     if (!this.Idle(f)) return f.state === "attack" && !!f.attack?.drag;
-    this.mouse.strokes.length = 0; this.mouse.aim.x = 0; this.mouse.aim.y = 0;
+    this.mouse.strokes.length = 0; this.mouse.aim.x = 0; this.mouse.aim.y = 0; f.buffer = null;
     this.SetState(f, "aim", 0, "Charge"); return true;
+  }
+  /** 点一下的那一刀：刀架偏出去了就顺着偏的方向，否则右上斜劈；力道最轻一档。 */
+  TapCut(f) {
+    const a = this.mouse.aim;
+    const dir = Math.hypot(a.x, a.y) > D.tapAimPx ? DirectionForStroke(a.x, a.y) : D.directions.find((d) => d.id === D.tapDirection);
+    this.SetState(f, "idle");
+    if (!this.AttackDirectional(f.entity, dir, { damageScale: D.powerScale[0], drag: true })) return false;
+    this.stats.drags++; f.attack.tap = true; return true;
   }
   StepAim(f, dt) {
     const m = this.mouse, fade = Math.exp(-dt / D.aimReturnS);
@@ -234,8 +251,13 @@ export class MeleeCombatDirector {
     const e = f.entity, tf = this.Fighter(target);
     const stroke = this.StrokeOf(f);
     f.lodge = { target, clip: f.clip, n: Clamp(this.AttackTime(f) + L.pressInN, 0, 1), ...stroke,
-      progress: 0, held: !!this.held.has("KeyF"), direction: f.attack.direction?.id || null };
+      progress: 0, held: !!this.held.has("KeyF"), direction: f.attack.direction?.id || null, serial: ++this.serial };
     const lodge = f.lodge;
+    // 刀吃进去的那一点（世界坐标）：肩膀（上撩落在腰腹），偏向刀来的那一侧（玩家视角的左右）。
+    const dir = f.attack.direction, sweep = dir ? dir.sweep : -1, yaw = e.yaw || 0;
+    const side = -Math.sign(sweep || -1) * L.anchorSideM;
+    lodge.anchor = { x: target.position.x + Math.cos(yaw) * side, y: (target.position.y || 0) + (dir?.reverse ? L.anchorTorsoM : L.anchorShoulderM),
+      z: target.position.z - Math.sin(yaw) * side };
     this.SetState(f, "lodged", Infinity, lodge.clip); f.lodge = lodge;
     this.SetState(tf, "lodged", Infinity, "Hit"); tf.lodgedBy = e; tf.buffer = null;
     this.stats.lodges++; this.Log("lodge", e, target);
@@ -245,9 +267,7 @@ export class MeleeCombatDirector {
     if (!lodge || !Alive(target) || tf.state !== "lodged") { this.ReleaseLodge(f, "released"); return; }
     // 长按 F 把圈走满，松手往回退；没有时限。
     lodge.progress = Clamp(lodge.progress + (lodge.held ? dt / L.holdS : -L.decayPerS * dt), 0, 1);
-    // 卡着的刀把视角拽回对方：鼠标还能晃，一松手就被拉回来。
-    const want = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
-    e.yaw = (e.yaw || 0) + Wrap(want - (e.yaw || 0)) * Math.min(1, dt * L.tetherRate);
+    // 视角不拽：刀锁在对方身上那一点（第一人称按 lodge.anchor 锁在世界空间），玩家随便转头看。
     if (lodge.progress >= 1) this.Yank(f);
   }
   Yank(f) {
@@ -523,7 +543,8 @@ export class MeleeCombatDirector {
   /**
    * 剧本地面僵持（推刀）：由任务编排强制开一次倒地 QTE。
    *
-   * 与 BeginGround 的唯一区别在**入口**：不查距离与视线、不看 qteCount / qteUntil，
+   * 2026-11-23 起这是倒地 QTE **唯一的入口**（用户：通用的倒地 QTE 删掉，改成特定关卡 / 剧情触发）：
+   * 白刃战里被撞倒只是倒地、起身，不再自动开 QTE。不查距离与视线、不看 qteCount / qteUntil，
    * 也不要求玩家手里正握着白刃武器 —— 压上来的是对方的刺刀。
    * 窗口、力度、连按进度与成败结算仍然走共用规则，成功不自动杀敌
    *（这一拍的杀招是赢了之后玩家自己按下去的那一下反捅）。
@@ -577,17 +598,6 @@ export class MeleeCombatDirector {
       const f = this.fighters.get(opponent);
       if (f) f.qteCount = 0;
     }
-  }
-  BeginGround(opponent) {
-    const p = this.Player(), pf = this.Fighter(p);
-    if (pf.state !== "down" || !Alive(p) || !Alive(opponent) || !this.CanUse() || this.Active || Distance(p, opponent) > R.bindReachM + 0.3 || !this.Visible(p, opponent)) return false;
-    const of=this.Fighter(opponent);
-    if (this.time<pf.qteUntil || of.qteCount>=Q.perOpponentLimit || this.ImmediateThreat(opponent)) return false;
-    if (!this.qte.Begin("ground", opponent, { stamina: pf.stamina / 100, reason: "knockdownPressure" })) return false;
-    this.SetState(pf, "qte", Q.windowS, "Ground");
-    this.SetState(this.Fighter(opponent), "qte", Q.windowS, "Pressure");
-    of.qteCount++; pf.qteUntil=this.time+Q.cooldownS;
-    this.stats.ground++; this.Log("groundQte", p, opponent); return true;
   }
   ResolveQte(a) {
     this.stats[a.success ? "successes" : "failures"]++;
@@ -671,10 +681,11 @@ export class MeleeCombatDirector {
       return code !== "KeyF";
     }
     if (repeat || this.held.has(code)) return true;
+    // F 只剩卡刀实验的补刀；玩家的近身推架 2026-11-23 撤了（用户），不归白刃管的 F 交回通用交互。
+    // Push() 本身还在：对手贴身时照样会顶开玩家。
     if (code === "KeyF") {
       if (!this.Blocking && this.Finish()) { this.held.add(code); return true; }
-      const pushed = !this.Blocking && this.Push();
-      if (pushed) this.held.add(code); return pushed || this.Blocking;
+      return this.Blocking;
     }
     this.held.add(code);
     if (this.Blocking) return true;
@@ -692,19 +703,14 @@ export class MeleeCombatDirector {
     if (f.state !== "idle") return;
     const training = e.meleeTraining || {};
     if (training.passive || e.meleeDormant) return;
+    // 玩家倒地：上前候着等他起身（通用倒地 QTE 已撤，只有剧本能开，见 BeginScriptedGround）。
     if (target === this.Player() && ["fall", "down"].includes(tf.state)) {
       if (d > 1.05) this.AdvanceNpc(f, target, dt, 1);
-      else if (tf.state === "down") this.BeginGround(e);
       return;
     }
     if (tf.state === "qte") { this.CircleNpc(f,target,dt,f.role?.angle||45,2.4); return; }
     if (training.kind === "bind") {
       if (tf.state === "attack" && tf.attack?.heavy && d < R.bindReachM && this.time >= f.nextThink) this.Attack(e, true);
-      return;
-    }
-    if (training.kind === "push") return;
-    if (training.kind === "ground") {
-      if (this.time >= f.nextThink && d <= spec.pushReach) { this.Push(e); f.nextThink = this.time + 1.4; }
       return;
     }
     // 可读动作触发反应；训练时序项目不给额外闪避。无全知百分百拨挡。
@@ -1080,7 +1086,7 @@ export class MeleeCombatDirector {
       const weight = L0.split ? this.RollWeight(L0.n, ...L0.split) * (1 - p) : 0;
       Object.assign(result, { clip: `${f.weapon}${L0.clip}`, action: L0.clip, animationNormalized: L0.n * (1 - p),
         strokeSplit: L0.split, strokeReverse: L0.reverse, swingRoll: L0.roll * weight, swingMirror: L0.mirror ? weight : 0, weaponYawOffset: 0,
-        lodge: { progress: L0.progress, held: L0.held, yank: p, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
+        lodge: { progress: L0.progress, held: L0.held, yank: p, anchor: L0.anchor, serial: L0.serial, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
     } else if (f.state === "lodged") {
       Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.32 + Math.sin(this.time * 41) * 0.02 });
     } else if (f.state === "reel") {

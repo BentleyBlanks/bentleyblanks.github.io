@@ -22,6 +22,8 @@ let meleePaused = false;
 /** 日军用遭遇编辑器那套正式人物：只装日兵甲一个人，读完之前对手先用原身体，读完马上换。 */
 const MELEE_ENEMY_CHARACTER = "ijaJia";
 let enemySkins = null;
+/** 取证口 ScriptedGround 砸倒之后，等玩家真躺下再开剧本地面僵持。 */
+let pendingGround = null;
 /** 已经换上人物的日军（不往 soldier 上挂字段，契约 20）。 */
 const skinned = new WeakSet();
 let meleePreview = null;
@@ -36,7 +38,7 @@ function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
   meleeScenario = spec.id; meleePaused = false; meleePreview = null;
   ctx.post.hasPrev=false;ctx.post.hasTaaHistory=false;
-  ctx.meleeCombat.Reset();
+  ctx.meleeCombat.Reset(); pendingGround = null;
   meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
   meleeViewFollow = ctx.meleeCombat.SetViewFollow(meleeViewFollow);
   for (const soldier of [...ctx.ai.soldiers]) ctx.ai.Remove(soldier);
@@ -54,8 +56,7 @@ function StartMeleeScenario(id) {
   ctx.state.bayonetFixed = true; ctx.meleeStance=true; ctx.SyncBayonet();
   ctx.hud.SetWeaponName(ctx.WeaponName(ctx.currentWeapon));
   const centerZ = spec.kind === "observe" ? 1463 : 1467;
-  const close = ["push", "ground", "bind"].includes(spec.kind);
-  const separation = close ? (spec.kind === "bind" ? 1.04 : 0.82) : 3.3;
+  const separation = spec.kind === "bind" ? 1.04 : 3.3;
   for (let i = 0; i < spec.enemies + (spec.allies || 0); i++) {
     const ally = i >= spec.enemies;
     const offset = spec.enemies === 1 ? 0 : (i - (spec.enemies - 1) / 2) * 1.65;
@@ -69,7 +70,6 @@ function StartMeleeScenario(id) {
     meleeTargets.push({ soldier, id: ally ? `Friend${i}` : `Enemy${i + 1}` });
   }
   SkinEnemies();
-  if (spec.kind === "ground") ctx.meleeCombat.Fighter(ctx.player).poise = 20;
   ctx.state.deathTimer = 0; ctx.state.pendingRespawn = false; ctx.state.playerAliveLast = true;
   ctx.player.meleeCameraDrop = 0; ctx.player.meleePose = null;
   ctx.viewmodel.root.visible = true; ctx.hud.HideDeathCard(); ctx.hud.Hint("", 0);
@@ -109,6 +109,9 @@ function SeedMeleeTargets() {
 /** 白刃层每帧之前：喂这一帧的鼠标位移（拖拽挥砍带刀、出刀）；按着左键拖刀时视角只跟 viewFollow 倍。 */
 function BeforeMeleeStep() {
   const input = ctx.input;
+  if (pendingGround && ctx.meleeCombat.Fighter(ctx.player)?.state === "down") {
+    ctx.meleeCombat.BeginScriptedGround(ctx.player, pendingGround, { reason: "labScripted" }); pendingGround = null;
+  }
   ctx.meleeCombat.AddLook(input?.lookX || 0, input?.lookY || 0);
   if (input && ctx.meleeCombat.CapturesLook) { input.lookX *= meleeViewFollow; input.lookY *= meleeViewFollow; }
 }
@@ -138,6 +141,19 @@ const api = {
   Variant: () => ({ ...meleeVariant }),
   /** 拖拽时视角跟随比例 0–1（不重开项目）。 */
   SetViewFollow: (value) => (meleeViewFollow = ctx.meleeCombat.SetViewFollow(value)),
+  /**
+   * 剧本式倒地僵持（取证与回归用，面板上没有）：对手贴到身前、把玩家砸倒，躺下后开地面 QTE。
+   * 通用的倒地 QTE 2026-11-23 撤了，正片只由关卡剧本触发（BeginScriptedGround），这里走的是同一个入口。
+   */
+  ScriptedGround: () => {
+    const e = meleeTargets.find(t => t.soldier.side === "ija" && t.soldier.alive)?.soldier, P = ctx.player;
+    if (!e) return false;
+    const yaw = P.yaw || 0;
+    e.position.set(P.position.x - Math.sin(yaw) * 0.85, e.position.y, P.position.z - Math.cos(yaw) * 0.85);
+    e.body?.Teleport?.(e.position.x, e.position.y, e.position.z); e.goal?.copy(e.position);
+    if (!ctx.meleeCombat.ScriptedKnockDown(P, e, 4, "labScripted")) return false;
+    pendingGround = e; return true;
+  },
   /** 日军换没换上遭遇编辑器那套人物（取证用）。 */
   Skins: () => meleeTargets.map(({ soldier, id }) => ({ id, skinned: skinned.has(soldier), kit: ctx.ai.view.skins.get(soldier)?.kit?.key || null })),
 };
@@ -172,8 +188,7 @@ export function CreateMeleeLab(host) {
     // 底部操作提示整条由实验场给。
     ActionPrompts() {
       const finish=ctx.meleeCombat?.CanUse() && ctx.meleeCombat.FinishCandidate();
-      const prompts=finish?[{keys:"F",label:T("hud.prompt.finish"),kind:"push"}]
-        :ctx.meleeCombat?.CanUse() && ctx.meleeCombat.PushCandidate() ? [{keys:"F",label:T("hud.prompt.push"),kind:"push"}] : [];
+      const prompts=finish?[{keys:"F",label:T("hud.prompt.finish"),kind:"push"}]:[];
       if(WEAPONS[ctx.currentWeapon]?.bayonet && ctx.state.bayonetFixed)prompts.push({keys:"V",label:ctx.meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
       return prompts;
     },

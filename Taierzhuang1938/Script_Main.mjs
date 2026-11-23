@@ -6977,11 +6977,7 @@ function UpdateContextualActionPrompts() {
     // 与 Reload() 的放行条件同口径：有备弹（或无限弹）才提示 R。
     canReload: EffectiveInfiniteAmmo() || state.clips > 0,
   });
-  // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），不插入推架提示。
-  // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
-  if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
-    prompts.unshift({ keys: "F", label: T("hud.prompt.push"), kind: "push" });
-  }
+  // 近身推架（F）2026-11-23 撤了（用户），提示条不再插推架。
   hud.SetActionPrompts(carry?.Active ? prompts : WithTraverse(prompts));
 }
 

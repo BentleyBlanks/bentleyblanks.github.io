@@ -156,7 +156,6 @@ export const TEXT = Object.freeze({
   "hud.say.noOneLeft": "没有人可以填上去了。",
 
   // --- 装配层追加的提示条 ---------------------------------------------------
-  "hud.prompt.push": "近身推架",
   "hud.prompt.finish": "补刀",
   "hud.prompt.meleeToFire": "白刃架势 → 射击",
   "hud.prompt.fireToMelee": "射击架势 → 白刃",

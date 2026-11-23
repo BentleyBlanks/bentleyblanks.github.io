@@ -74,29 +74,25 @@ try {
   await page.keyboard.press('v');
   assert(await page.evaluate(()=>{Taierzhuang.StepFrames(2,1/60,false);return Taierzhuang.meleeCombat.CanUse();}));
   console.log('PASS V changes stance while X installation and shooting remain independent');
-  await page.getByLabel('独立战斗项目').selectOption('DadaoPush');
+  // 面板按钮点完键盘要回到战斗（2026-11-23 起近身推架撤了，改用 V 切架势来验）。
+  await page.getByLabel('独立战斗项目').selectOption('BayonetOne');
   await page.getByRole('button',{name:'开始／重开',exact:true}).click();
-  await page.keyboard.press('f');
-  const buttonInput=await page.evaluate(()=>{Taierzhuang.StepFrames(22,1/60,false);return {...Taierzhuang.Debug.MeleeCombat.State(),inputEvidence:{focus:document.activeElement?.tagName,canUse:Taierzhuang.meleeCombat.CanUse(),busy:Taierzhuang.viewmodel.IsBusy(),position:Taierzhuang.player.position.toArray(),foes:Taierzhuang.ai.soldiers.map(s=>s.position.toArray()),running:Taierzhuang.state.running}};});
-  assert.equal(buttonInput.stats.pushes,1,'starting through the actual DOM button must return keyboard input to combat: '+JSON.stringify(buttonInput));
-  assert.equal(buttonInput.targets[0].health,100);
+  const stance0=await page.evaluate(()=>Taierzhuang.Debug.MeleeCombat.State().stance);
+  await page.keyboard.press('v');
+  const buttonInput=await page.evaluate(()=>{Taierzhuang.StepFrames(4,1/60,false);return {...Taierzhuang.Debug.MeleeCombat.State(),inputEvidence:{focus:document.activeElement?.tagName}};});
+  assert.notEqual(buttonInput.stance,stance0,'starting through the actual DOM button must return keyboard input to combat: '+JSON.stringify(buttonInput.inputEvidence));
+  await page.keyboard.press('v');
+  await page.getByLabel('独立战斗项目').selectOption('DadaoOne');
+  await page.getByRole('button',{name:'开始／重开',exact:true}).click();
   assert.match(await page.locator('.combatWeapon').textContent(),/大刀/,'HUD follows the scenario weapon');
-  await page.getByRole('button',{name:'开始／重开',exact:true}).click();
   await page.keyboard.down('Alt');
-  await page.getByRole('button',{name:'暂停对手',exact:true}).click();
+  await page.locator('.meleeLab .mlPause').click();
   await page.keyboard.up('Alt');
+  const panelInput=await page.evaluate(()=>{const T=Taierzhuang,e=T.ai.soldiers[0];e.position.set(T.player.position.x,e.position.y,T.player.position.z-.8);e.body?.Teleport?.(e.position.x,e.position.y,e.position.z);T.StepFrames(2,1/60,false);return {panelFocused:!!document.activeElement?.closest('.meleeLab')};});
   await page.keyboard.press('f');
-  const panelInput=await page.evaluate(()=>{Taierzhuang.StepFrames(22,1/60,false);return {state:Taierzhuang.Debug.MeleeCombat.State(),panelFocused:!!document.activeElement?.closest('.meleeLab')};});
+  const pushed=await page.evaluate(()=>{Taierzhuang.StepFrames(22,1/60,false);return Taierzhuang.Debug.MeleeCombat.State().stats.pushes;});
   assert.equal(panelInput.panelFocused,false,'releasing Alt leaves the focused panel control');
-  assert.equal(panelInput.state.stats.pushes,1,'F works after using a panel control while holding Alt');
-  const reloading=await page.evaluate(()=>{
-    const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('BayonetPush');L.Pause(true);T.StepFrames(2,1/60,false);
-    T.state.ammo=0;T.state.clips=1;T.Debug.Key('KeyR');const busy=T.viewmodel.IsBusy();
-    T.Debug.Key('KeyF');T.StepFrames(22,1/60,false);return {busy,pushes:L.State().stats.pushes,health:L.State().targets[0].health};
-  });
-  assert(reloading.busy,'reload fixture must enter the actual weapon action');
-  assert.equal(reloading.pushes,0,'F cannot bypass the reload gate through the generic interaction handler');
-  assert.equal(reloading.health,100);
+  assert.equal(pushed,0,'point-blank F no longer pushes (close push removed 2026-11-23)');
   const result=await page.evaluate(()=>{
     const T=Taierzhuang,lab=T.Debug.MeleeCombat;
     const Step=(seconds)=>T.StepFrames(Math.round(seconds*60),1/60,false);
@@ -109,18 +105,17 @@ try {
     const pose=s.actor.characterRig?.meleeAnimation?.lastClip;
     const fp=T.viewmodel?.lastMeleeClip;
     Select('BayonetOne');Pause();const b=Place(2);Step(.1);T.Debug.Mouse(0,true);Step(.05);T.Debug.Mouse(0,false);Step(.4);const stabHealth=b.health;
-    Select('DadaoPush');Pause();Step(.1);const pushTarget=T.ai.soldiers[0];const z0=pushTarget.position.z;T.Debug.Key('KeyF');Step(.25);const push={health:pushTarget.health,moved:z0-pushTarget.position.z};
     Select('DadaoOne');Pause();Step(.2);
     const actor=T.ai.soldiers[0].actor;actor.root.updateMatrixWorld(true);
     const bones=actor.characterRig.bones;
     const height={};for(const name of ['pelvis','head','handR','handL','footR','footL']){const p=bones[name].getWorldPosition(actor.tmpVec?.clone?.()||T.player.position.clone());height[name]={x:p.x-actor.root.position.x,y:p.y-actor.root.position.y,z:p.z-actor.root.position.z};}
-    return {boneCount:actor.characterRig.meleeAnimation.bones.length,triple:triple.targets.length,windHealth,beforeContact,afterContact,pose,fp,stabHealth,push,height,final:lab.State()};
+    return {boneCount:actor.characterRig.meleeAnimation.bones.length,triple:triple.targets.length,windHealth,beforeContact,afterContact,pose,fp,stabHealth,height,final:lab.State()};
   });
   console.log('CONTACT',JSON.stringify({...result,final:undefined}));
   fs.mkdirSync(path.join(project,'_shots'),{recursive:true});
   await page.evaluate(()=>Taierzhuang.StepFrames(2,1/60,true));
   await page.screenshot({path:path.join(project,'_shots','Scene_MeleeInitial.png')});
-  assert.equal(result.boneCount,50,'all authored bones must be matched, including fingers');assert.equal(result.triple,3);assert.equal(result.windHealth,100);assert.equal(result.beforeContact,100);assert.equal(result.afterContact,48);assert.equal(result.stabHealth,50);assert.equal(result.push.health,100);assert(result.push.moved>.1&&result.push.moved<.3,'dadao F keeps the target close');
+  assert.equal(result.boneCount,50,'all authored bones must be matched, including fingers');assert.equal(result.triple,3);assert.equal(result.windHealth,100);assert.equal(result.beforeContact,100);assert.equal(result.afterContact,48);assert.equal(result.stabHealth,50);
   assert(result.height.head.y>1.2&&result.height.head.y<1.9,'standing head must be human height');
   const routes=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat,P=T.player,Step=s=>T.StepFrames(Math.round(s*60),1/60,false),out=[];
@@ -173,8 +168,10 @@ try {
       T.StepFrames(1,1/60,false);
       if(lab.State().active){const r=T.viewmodel.riggedArms;gripMax=Math.max(gripMax,r.gripError.r,r.gripError.l);wristMax=Math.max(wristMax,r.wristBend.r,r.wristBend.l);markerError=Math.max(markerError,Math.abs(Number.parseFloat(document.querySelector('.mqProgress i').style.left)-(1-lab.State().active.progress)*100));}
     }};
+    // 倒地抵抗 2026-11-23 起只由剧本触发：取证口 ScriptedGround 走同一个剧本入口（BeginScriptedGround）。
     const Begin=id=>{
-      lab.Select(id);Step(.75);
+      if(id.endsWith('Ground')){lab.Select(id.replace('Ground','One'));lab.Pause(true);Step(.3);lab.ScriptedGround();}
+      else{lab.Select(id);Step(.75);}
       if(id.endsWith('Bind')){T.Debug.Mouse(0,true);Step(.45);T.Debug.Mouse(0,false);}
       for(let i=0;i<50&&!lab.State().active;i++)Step(.05);
       return lab.State();
@@ -223,7 +220,9 @@ try {
   const pressure=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat,out=[];
     for(const id of ['DadaoBind','BayonetGround']){
-      L.Select(id);T.StepFrames(45,1/60,false);
+      if(id.endsWith('Ground')){L.Select('BayonetOne');L.Pause(true);T.StepFrames(20,1/60,false);L.ScriptedGround();}
+      else L.Select(id);
+      T.StepFrames(45,1/60,false);
       if(id.endsWith('Bind')){T.Debug.Mouse(0,true);T.StepFrames(28,1/60,false);T.Debug.Mouse(0,false);}
       for(let i=0;i<160&&!C.Active;i++)T.StepFrames(1,1/60,false);
       const actor=T.ai.soldiers[0].actor,points=[];
@@ -292,7 +291,7 @@ try {
   for(const v of victories){assert(v.alive&&v.left===0,`${v.id}: active movement/parry/light route must win`);}
   const edgeCases=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,Step=s=>T.StepFrames(Math.round(s*60),1/60,false);
-    const Begin=()=>{L.Select('DadaoGround');for(let i=0;i<160&&!L.State().active;i++)Step(1/60);};
+    const Begin=()=>{L.Select('DadaoOne');L.Pause(true);Step(.3);L.ScriptedGround();for(let i=0;i<160&&!L.State().active;i++)Step(1/60);};
     const assists=[];
     for(const mode of ['hold','auto']){
       L.SetAssist(mode);Begin();if(mode==='hold')T.Debug.Key('KeyF',true);
@@ -315,12 +314,12 @@ try {
   // Evidence frames use normal rendering and the same production actors, weapon mounts and FP hands.
   for(const entry of [
     ['Guard','DadaoOne',null],['Light','DadaoOne','Light'],['Heavy','DadaoOne','Heavy'],['Parry','DadaoOne','Parry'],
-    ['Bayonet','BayonetOne',null],['Standing','DadaoBind',null],['Ground','DadaoGround',null],['Allied','AlliedDadao',null]
+    ['Bayonet','BayonetOne',null],['Standing','DadaoBind',null],['Ground','DadaoOne',null],['Allied','AlliedDadao',null]
   ]) {
     const evidence=await page.evaluate(([name,id,clip])=>{
       const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select(id);
       if(name==='Standing'){T.StepFrames(45,1/60,false);T.Debug.Mouse(0,true);T.StepFrames(28,1/60,false);T.Debug.Mouse(0,false);T.StepFrames(22,1/60,false);}
-      else if(name==='Ground'){for(let i=0;i<160&&!L.State().active;i++)T.StepFrames(1,1/60,false);T.StepFrames(5,1/60,false);}
+      else if(name==='Ground'){L.Pause(true);T.StepFrames(20,1/60,false);L.ScriptedGround();for(let i=0;i<160&&!L.State().active;i++)T.StepFrames(1,1/60,false);T.StepFrames(5,1/60,false);}
       else{L.Pause(true);T.StepFrames(60,1/60,false);if(clip){L.Preview(clip);T.state.elapsed=0;T.StepFrames(20,1/60,false);}}
       // Diagnostic frames have skipped rendering during simulation; discard stale camera history.
       T.post.hasPrev=false;T.post.hasTaaHistory=false;
@@ -333,5 +332,5 @@ try {
     await page.screenshot({path:path.join(project,'_shots',`Scene_Melee${entry[0]}.png`)});
   }
   assert.equal(errors.length,0,errors.join('\n'));
-  console.log(posesOnly?'PASS melee pose evidence':'PASS melee input / contact / push / retarget / rendering');
+  console.log(posesOnly?'PASS melee pose evidence':'PASS melee input / contact / retarget / rendering');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
