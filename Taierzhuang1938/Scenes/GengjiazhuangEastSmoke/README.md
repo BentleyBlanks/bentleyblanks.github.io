@@ -3,7 +3,7 @@
 - 本机场景编辑器 `/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=GengjiazhuangEastSmoke`，可保存布设。「查看原画机位」打开游戏渲染器。
 - 固定机位 `/Taierzhuang1938/?gengjiazhuangEastSmoke=1&shot=1`，静音。相机、铺盖、人物留位、烟源和道具见 [场景文件](Scene_GengjiazhuangEastSmoke.json)。光照走[场景环境](Environment_GengjiazhuangEastSmoke.json)和[烟尘阴天预设](../../Environment/EnvPreset_GengjiazhuangEastSmoke.json)。
 
-取景依据 `07C_喘口气_凹路尽头望庄东.png`。用 Plate07C 判断观察方向，在独立米制场地里重定机位。相机位置 `[0, 1.45, 0]`，朝 −Z，俯 0.4°，竖直视角 43°。前景 3–11 米是沟沿、枯根、轻微车辙和裁入画面的撤运车。约 24–34 米是残茬田、低棚与枯树。院门在约 42 米，屋脊火点在约 53 米。实际的黑烟从屋脊沿 +X 向右抬升，再散进更远的烟层。约 82 米的左远端三只驮驴和一层淡扬尘留下了驮队构图。
+取景依据 `07C_喘口气_凹路尽头望庄东.png`。用 Plate07C 判断观察方向，在独立米制场地里重定机位。相机位置 `[0, 1.45, 0]`，朝 −Z，俯 0.4°，竖直视角 43°。前景 3–11 米是沟沿、枯根、轻微车辙和裁入画面的撤运车。约 24–34 米是残茬田、低棚与枯树。院门在约 42 米，屋顶火点在约 50 米。黑烟从屋顶沿 +X 向右抬升，再散进更远的烟层。约 82 米的左远端三只驮驴和一层淡扬尘留下了驮队构图。
 
 `CartPallet`、`RoadsideAid` 和 `PackTrain` 分别记录车板伤员位、沟沿蹲姿人员位和左远端队形范围。车上有草席、展开的单被、揉起的单被和绷带卷。场景只布置这些静置物件和站位。
 

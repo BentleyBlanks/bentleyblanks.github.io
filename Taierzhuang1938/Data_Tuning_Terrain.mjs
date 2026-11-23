@@ -58,9 +58,9 @@ export const TERRAIN_SETS = Object.freeze({
       Object.freeze({ id: "CartTrack", file: "CartTrack", tileM: 3.1, farTileM: 16.9, normalScale: 0.52, heightOffset: -0.14,
         tint: Object.freeze([0.88, 0.91, 0.99]) }),
       Object.freeze({ id: "DryStubble", file: "EastSmokeStubbleSoil", tileM: 2.4, farTileM: 12.9, normalScale: 0.76, heightOffset: 0.09,
-        tint: Object.freeze([1.16, 1.12, 1.06]) }),
+        tint: Object.freeze([1.28, 1.21, 1.10]) }),
       Object.freeze({ id: "SpoilEarth", file: "EastSmokeCutLoam", tileM: 1.65, farTileM: 9.35, normalScale: 0.92, heightOffset: 0.05,
-        tint: Object.freeze([0.95, 0.91, 0.88]) }),
+        tint: Object.freeze([0.985, 0.906, 0.842]) }),
     ]),
   }),
 });

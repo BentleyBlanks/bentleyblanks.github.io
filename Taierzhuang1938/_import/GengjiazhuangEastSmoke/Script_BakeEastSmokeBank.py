@@ -28,9 +28,9 @@ FRAME_COUNT = 4
 # Keep the primary outlet short and narrow, then spread overlapping rolls
 # downwind. The other traces feed the broad canopy at different distances.
 OUTLET = (
-    (14.1, 4.4, -53, 1.5, 1.2, 2.3, .48),
-    (14.9, 6.0, -56, 2.4, 1.9, 2.9, .53),
-    (17.4, 8.6, -59, 3.3, 2.5, 3.8, .62),
+    (13.0, 3.9, -51, 1.7, 1.25, 2.4, .51),
+    (14.0, 5.7, -55, 2.5, 2.1, 3.0, .60),
+    (16.9, 8.4, -59, 3.4, 2.6, 3.8, .62),
     (21.3, 10.9, -62, 4.5, 3.4, 5.3, .66),
     (26.6, 13.9, -65, 6.0, 4.3, 6.2, .67),
     (32.5, 17.7, -71, 7.2, 4.4, 7.2, .73),
@@ -174,7 +174,7 @@ def GenerateFrames():
         foreground = np.exp(-.5*((point[2]-centerZ)/depthSpread)**2)/(depthSpread*2.5066)
         background = np.exp(-.5*((point[2]-secondaryZ)/15)**2)/(15*2.5066)
         guided = optical*(foreground*.77 + background*.23)*(.79 + .30*Ease(eddies[0]+grain*.43,-.65,.55))
-        native = (outlet*.50 + outletShoulder*.18 + village*.07 + distant*distantMix*.015)*np.maximum(.13, roll)
+        native = (outlet*.67 + outletShoulder*.18 + village*.07 + distant*distantMix*.015)*np.maximum(.13, roll)
         guidedStrength = .77 + .18*Ease(screenV,.18,.40) + .09*downwind
         density = np.clip(guided*3.4*guidedStrength + native, 0, 1) * edges
         yield ((np.sqrt(density)*127 + .5).astype(np.uint8)*2)
