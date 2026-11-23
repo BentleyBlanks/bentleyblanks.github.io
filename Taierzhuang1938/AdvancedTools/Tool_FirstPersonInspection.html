@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261123DadaoLab">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261122FpsInspect">
-  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261122GameTheme">
+  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261123ReloadPrompt">
   <script>
     (function () {
       var map = '{"imports":{"three":"./vendor/three/build/three.module.js"}}';
@@ -65,6 +65,11 @@
 
       <!-- 命中回馈瞬闪十字 -->
       <div class="hitmarker" id="hitmarker" aria-hidden="true"></div>
+
+      <!-- 准心下方情境装弹提示（对标 COD14 / Style_Game.css .hudActions .hudAction.reload） -->
+      <div class="reload-prompt" id="reloadPrompt" aria-live="polite">
+        <span class="reload-prompt-line"><kbd>R</kbd><span>装弹</span></span>
+      </div>
 
       <!-- 左上角极简视口胶囊 -->
       <div class="hud-top-left">

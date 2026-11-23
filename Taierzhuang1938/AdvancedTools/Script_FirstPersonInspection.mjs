@@ -246,6 +246,7 @@ class FirstPersonInspectionApp {
       canvas: $("view"),
       reticle: $("reticle"),
       hitmarker: $("hitmarker"),
+      reloadPrompt: $("reloadPrompt"),
       orbitPresets: $("orbitPresets"),
       reticleToggle: $("reticleToggle"),
       debugToggle: $("debugToggle"),
@@ -1503,7 +1504,7 @@ class FirstPersonInspectionApp {
       this.posZ = Clamp(this.posZ - this.velForward * dt * 0.65, -0.55, 2.2);
     }
 
-    const adsWanted = HasIronSight(this.weaponId) && (this.adsLocked || this.rmbHeld) ? 1 : 0;
+    const adsWanted = HasIronSight(this.weaponId) && !this.vm?.boltOpen && (this.adsLocked || this.rmbHeld) ? 1 : 0;
     const sprintEff = adsWanted > 0.2 ? 0 : targetSprint;
     return { sprintEff, adsWanted, phaseLabel };
   }
@@ -1578,6 +1579,10 @@ class FirstPersonInspectionApp {
     this.dom.stanceLabel.textContent = `${stanceName} · ${aimName}`;
     this.dom.speedLabel.textContent = isMoving ? `${speed.toFixed(1)} m/s` : "静止";
     this.dom.reticle.classList.toggle("ads", isAds);
+    const hasMag = (WEAPONS[this.weaponId]?.magazine ?? 0) > 0;
+    const reloading = this.vm?.action?.kind === "reload";
+    const showReloadPrompt = this.view === "player" && hasMag && this.ammo <= 0 && !reloading;
+    this.dom.reloadPrompt?.classList.toggle("on", showReloadPrompt);
 
     // 实时键位高亮（支持真实按键 + 自动演示虚拟按键）
     const activeSet = new Set([...this.keys, ...this.virtualKeys]);

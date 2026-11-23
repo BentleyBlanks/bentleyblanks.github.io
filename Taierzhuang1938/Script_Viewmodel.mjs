@@ -2986,17 +2986,20 @@ export class Viewmodel {
     const skeletalOut = this.action?.skeletal?.blendOutS > 0
       ? Ease.InOut(Clamp01(1 - Math.max(0, (1 - this.action.t) * this.action.duration) / this.action.skeletal.blendOutS))
       : 0;
-    this.adsSuppress = this.action?.skeletal ? skeletalOut * (1 - this.wallLower)
-      : (cycle ? 1 - cycleAway : procBolt ? 1 - boltAway * boltAdsDrop : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
+    // 空仓挂机（boltOpen === true 且不在骨骼装填尾段）时枪栓竖在机匣后方，
+    // 禁止贴眼开镜与缩放，避免竖起的拉机柄直接怼在照门和屏幕正中（由情境 HUD 提示「R 装弹」）。
+    const boltClosed = (this.boltOpen && !this.action?.skeletal) ? 0 : 1;
+    this.adsSuppress = (this.action?.skeletal ? skeletalOut * (1 - this.wallLower)
+      : (cycle ? 1 - cycleAway : procBolt ? 1 - boltAway * boltAdsDrop : 1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower)) * boltClosed;
     // 逐帧拉栓与程序化抵肩拉栓都保留开镜底座，避免中正式/三八式每打一发都暴力退回腰射再缩回。
-    const adsActionKeep = cycle ? 1 - this.wallLower : procBolt ? (1 - boltAway * 0.38) * (1 - this.wallLower) : this.adsSuppress;
+    const adsActionKeep = (cycle ? 1 - this.wallLower : procBolt ? (1 - boltAway * 0.38) * (1 - this.wallLower) : this.adsSuppress) * boltClosed;
     const adsInput = Clamp01(input.ads ?? 0) * adsActionKeep * (1 - sprint * 0.9);
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
     // 托枪手的开镜握法与枪身共用同一套 adsSpring 刚度/阻尼，只是不跟拉栓/装填时枪临时离开瞄准线走：
     // 这样开镜与收镜时左手与枪身严格同起同止（不会枪已停稳、左手还在护木上慢爬），同时拉栓时左手不乱转。
-    const adsGripTarget = Clamp01(input.ads ?? 0) * (1 - this.wallLower) * (1 - sprint * 0.9);
+    const adsGripTarget = Clamp01(input.ads ?? 0) * (1 - this.wallLower) * (1 - sprint * 0.9) * boltClosed;
     this.adsGrip = Clamp01(this.adsGripSpring.Step(step, adsGripTarget));
     // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
     if (this.adsHideParts.length) {
