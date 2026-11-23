@@ -175,7 +175,7 @@ const PLUGINS = {
       return Instance(runtime,{
         debugName:"EncounterPlay",updateSlot:"beforeAi",holdsRespawn:true,
         captureViewportName:"视口 1 · 玩家视角",
-        ScaleDt:dt=>runtime.active&&runtime.ready&&!runtime.paused&&!runtime.failed&&!runtime.plan.completed?dt:0,
+        ScaleDt:dt=>runtime.ScaleDt(dt),
         CapturesInput:()=>runtime.CapturesInput(),
         OnKey:detail=>runtime.OnKey(detail),
         OnPlayerDown:()=>runtime.Fail(),

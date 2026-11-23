@@ -21,6 +21,8 @@ import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 import { LoadEncounterCast } from "./AdvancedTools/Script_EncounterCastLibrary.mjs";
 import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
 import { T } from "./Script_Text.mjs";
+import { DeathTime } from "./Script_PlayerDeath.mjs";
+import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 const UI=CONFIG.ui;
@@ -92,7 +94,7 @@ export class EncounterPlay {
   }
   BuildUi() {
     document.body.classList.add("encounterGame");
-    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261117SpeechBillboards",import.meta.url).href;document.head.append(this.style);
+    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261123FailureCard",import.meta.url).href;document.head.append(this.style);
     this.speech=new EncounterPlayDialogue(this.host,this.view,id=>{
       const position=this.Position(id),soldier=this.entries.get(id)?.soldier;
       return position?{position,pose:soldier?.stance}:null;
@@ -103,6 +105,28 @@ export class EncounterPlay {
       if(e.data.type==="encounter-play-stop")this.Dispose();
     };
     window.addEventListener("message",this.onMessage);
+    this.failureCard=document.createElement("div");this.failureCard.className="encounterFailure";
+    this.failureCard.setAttribute("role","alert");this.failureCard.hidden=true;
+    this.failureCard.append(document.createElement("strong"),document.createElement("p"));
+    document.body.append(this.failureCard);
+  }
+  // A failed or finished run freezes the world, but the collapse itself must
+  // finish first; otherwise death looks like a hung frame with no feedback.
+  DeathSettled(){return this.host.player.Alive||DeathTime(this.host.player)>=PLAYER_DEATH.durationS+PLAYER_DEATH.menuFadeS;}
+  ScaleDt(dt){
+    if(!this.active||!this.ready||this.paused)return 0;
+    if(this.failed)return this.DeathSettled()?0:dt;
+    return this.plan.completed?0:dt;
+  }
+  RenderFailure(status,hint){
+    const show=(this.failed||this.plan.completed)&&this.ready&&!this.starting&&this.DeathSettled();
+    if(show){
+      const [title,text]=this.failureCard.children;
+      if(title.textContent!==status)title.textContent=status;
+      if(text.textContent!==hint)text.textContent=hint;
+      this.failureCard.classList.toggle("encounterFailureDone",!this.failed);
+    }
+    if(this.failureCard.hidden===show)this.failureCard.hidden=!show;
   }
   ReportStep(label,progress=0) {
     (this.onWarmStep||this.host.SetBootStep)?.(label,progress);
@@ -222,7 +246,7 @@ export class EncounterPlay {
       this.puppets.Clear();this.host.vfx.ClearParticles();this.host.battlefield.deformation?.Reset();
     });
     this.view.SetLayout(1);this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
-    this.speech.Clear();this.stealth?.Reset();this.noFireFailure=null;
+    this.speech.Clear();this.stealth?.Reset();this.noFireFailure=null;this.failureCard.hidden=true;
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
   SyncEnvironment(frame,snap=false) {
@@ -623,6 +647,7 @@ export class EncounterPlay {
     const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
     const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
     const help=(this.failed?[hint]:[hint,actions,notice]).filter(Boolean).join(" · ");
+    this.RenderFailure(status,this.failed?hint:ui.stop);
     const key=JSON.stringify([title,status,help,dialogue]);
     if(key===this.hudKey)return;this.hudKey=key;
     this.hudInfo={title,task:status,hint:help};
@@ -737,7 +762,7 @@ export class EncounterPlay {
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);
     this.entries.clear();this.puppets.Dispose();window.removeEventListener("message",this.onMessage);
     this.retiredMaterials.Flush();
-    this.speech.Dispose();this.style.remove();
+    this.speech.Dispose();this.failureCard.remove();this.style.remove();
     document.body.classList.remove("encounterGame");
   }
 }

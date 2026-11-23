@@ -16,3 +16,10 @@
 .encounterSpeech[hidden]{display:none}
 .encounterDialogue p{white-space:pre-line}
 .encounterGame .hudObjective,.encounterGame .hudHint,.encounterGame .hudActions,.encounterGame .hudBrief,.encounterGame .hudTitle{display:none!important}
+.encounterFailure{position:fixed;left:0;top:38%;width:100%;z-index:27;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;color:#f1ece4;text-shadow:0 2px 4px #000;font:15px/1.5 system-ui;animation:encounterFailureIn .35s ease-out}
+.encounterFailure[hidden]{display:none}
+.encounterFailure strong{font-size:30px;letter-spacing:.12em;color:#e0a39a}
+.encounterFailure.encounterFailureDone strong{color:#ddc68e}
+.encounterFailure p{margin:0;padding:5px 16px;background:#0e1114c8;border-radius:4px}
+.encounterDual .encounterFailure{width:50%}
+@keyframes encounterFailureIn{from{opacity:0}to{opacity:1}}

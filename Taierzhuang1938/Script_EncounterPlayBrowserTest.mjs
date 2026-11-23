@@ -320,6 +320,17 @@ try{
  await page.waitForFunction(()=>LevelFlow.Play.State().state.failed);
  assert.ok(await page.locator("#playGame").isEnabled(),"Death exposes a toolbar retry");
  assert.match(await page.locator("#playStatus").textContent(),/R.*重来/);
+ assert.equal(await frame.locator(".encounterFailure").isVisible(),false,"The failure card waits for the death collapse");
+ const collapse=await frame.evaluate(()=>{
+   const g=Tengxian,Eye=()=>g.camera.getWorldPosition(g.camera.position.clone()).y,start=Eye();
+   g.StepFrames(150,1/60,false);
+   const card=document.querySelector(".encounterFailure"),settled=g.player.deadTime;
+   g.StepFrames(30,1/60,false);
+   return {dropM:start-Eye(),settled,frozen:g.player.deadTime===settled,shown:!card.hidden,text:card.textContent};
+ });
+ assert.ok(collapse.dropM>.5,"Death plays the first-person collapse before Play freezes");
+ assert.ok(collapse.frozen,"Play freezes once the collapse settles");
+ assert.ok(collapse.shown&&/阵亡/.test(collapse.text)&&/R.*重来/.test(collapse.text),"The play viewport itself states the death and the retry key");
  await page.screenshot({path:path.join(out,"PlayDeathRetry.png"),timeout:120000});
  await SavedDebugOptions(true);
  await frame.locator("body").focus();await page.keyboard.press("r");
@@ -327,6 +338,7 @@ try{
  const RetryState=()=>frame.evaluate(()=>({ammo:Tengxian.state.ammo,clips:Tengxian.state.clips,grenades:Tengxian.state.grenades,
    health:Tengxian.player.health,actors:Tengxian.Debug.EncounterPlay.State().actors.map(actor=>actor.id).sort()}));
  assert.deepEqual(await RetryState(),checkpoint,"Keyboard retry restores the current checkpoint and supplies");
+ assert.equal(await frame.locator(".encounterFailure").isVisible(),false,"Retry clears the failure card");
  await CheckDebugOptions(frame,true);
  await frame.evaluate(keys=>{for(const key of keys)Tengxian.Debug.SetDebugOption(key,false);},debugKeys);
  assert.equal((await State()).hostId,hostId);assert.equal((await State()).startBeat,"05b");
