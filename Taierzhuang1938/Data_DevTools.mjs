@@ -36,7 +36,7 @@ export const TOOL_INFO = Object.freeze({
     window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
   motionCompare: { label: "动作衔接对比", hint: "打开独立窗口：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
     window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare", features: "popup,width=1600,height=1000" } },
-  motionWorkbench: { label: "动作工作台", hint: "打开独立窗口：白盒导演、电影分镜（4 源切换）、Seedance 视频抽卡、GEM-X 77 骨提取与 Mixamo 3D 重定向验收", split: true,
+  motionWorkbench: { label: "AI 动作生成", hint: "打开独立窗口：分镜出图（4 源切换）→ Seedance / MiniMax-H3 视频生成 → GEM-X 77 骨动捕提取与 Mixamo 3D 重定向", split: true,
     window: { url: "./AdvancedTools/Tool_MotionWorkbench.html", name: "TengxianMotionWorkbench", features: "popup,width=1600,height=1000" } },
   weapon: { label: "枪械检查台", hint: "查看模型外观、挂点和尺寸", split: true,
     window: { url: "./AdvancedTools/Tool_WeaponInspection.html", name: "TengxianWeaponInspection", features: "popup,width=1440,height=900" } },

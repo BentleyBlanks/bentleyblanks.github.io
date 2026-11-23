@@ -1,4 +1,4 @@
-// 高级工具控制中心「角色」分类里的「动作工作台」独立窗口入口。
+// 高级工具控制中心「角色」分类里的「AI 动作生成」独立窗口入口。
 // 照 MixamoPreviewEditor 写法：仅声明静态 id / label / hint / Open()，不进入游戏互斥编辑器表；
 // 实际工作台页 Tool_MotionWorkbench.html 在本地预览服挂载的 /__motion-workbench/ 上运行。
 
@@ -19,7 +19,7 @@ export class MotionWorkbenchEditor {
         TOOL_INFO.motionWorkbench.window.features
       );
     }
-    if (!this.win) throw new Error("动作工作台窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("AI 动作生成窗口被拦截，请允许弹窗后重试");
     this.win.focus();
     return this.win;
   }
