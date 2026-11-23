@@ -79,9 +79,9 @@ export const ENCOUNTER_VARIANTS = Object.freeze([
     segments: Object.freeze(["L1_Front0107", "L1_BeishaheMerged0813"]),
     storageKey: "tengxian1938_encounter_L1_BeishaheMerged_v1",
     legacyStorageKey: null,
-    mapMaxZ: 910,
-    playRegionMaxZ: 910,
-    duskBlendZ: Object.freeze([635, 745]),
+    mapMaxZ: 990,
+    playRegionMaxZ: 990,
+    duskBlendZ: Object.freeze([715, 825]),
     stampPaths: Object.freeze([
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",
       "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.height.bin",

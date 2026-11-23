@@ -74,7 +74,7 @@ function FrontPaperFields() {
 
 // Non-overlapping Lunan agricultural parcel mosaic south of z=206 for FirstLevelMerged:
 // clean contiguous plots separated by narrow earthen field ridges (田埂), zero stacked overlapping blocks.
-function MergedPaperFields(maxZ = 910) {
+function MergedPaperFields(maxZ = 990) {
   let seed = 1938035;
   const Random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const kinds = ["wheat", "wheat", "plowed", "wheat", "fallow", "plowed"];
@@ -104,22 +104,22 @@ function MergedPaperFields(maxZ = 910) {
       }
     }
   };
-  // Four clean agricultural tracts separated by the railway (x=-80), official road (x=100), village & river
-  AddParcelGrid("MergedWestRail", [-160, -124, -84], [206, 265, 330, 405, 480, 560, 645, 742], 0);
-  AddParcelGrid("MergedWestPlain", [-74, -34, 8, 52], [206, 262, 326, 392, 462, 534, 608, 682], 0);
-  AddParcelGrid("MergedNorthApproach", [52, 95, 146, 206, 264, 320], [206, 268, 338, 408, 466], 0);
-  AddParcelGrid("MergedEastPlain", [224, 272, 320], [466, 536, 612, 690], 0);
-  AddParcelGrid("MergedSouthBank", [-160, -110, -56, 8, 76, 152, 232, 320], [798, 855, Math.max(890, maxZ)], 0);
+  // Clean non-overlapping Lunan agricultural tracts surrounding expanded Beishahe (x=20..268, z=486..756)
+  AddParcelGrid("MergedWestRail", [-160, -124, -84], [206, 270, 340, 415, 495, 580, 670, 755, 822], 0);
+  AddParcelGrid("MergedWestPlain", [-74, -34, 14], [206, 268, 336, 405, 476, 548, 622, 696, 762], 0);
+  AddParcelGrid("MergedNorthApproach", [14, 52, 95, 146, 206, 264, 320], [206, 268, 338, 408, 466], 0);
+  AddParcelGrid("MergedEastPlain", [272, 320], [466, 542, 622, 702, 766], 0);
+  AddParcelGrid("MergedSouthBank", [-160, -110, -56, 8, 76, 152, 232, 320], [878, 934, Math.max(970, maxZ)], 0);
   return fields;
 }
 
-function MergedFieldZones(maxZ = 910) {
+function MergedFieldZones(maxZ = 990) {
   return [
-    { id: "MergedWestRail", poly: [[-160, 206], [-83, 206], [-83, 744], [-160, 756]] },
-    { id: "MergedWestPlain", poly: [[-75, 206], [54, 206], [54, 678], [-44, 678], [-44, 718], [-75, 725]] },
-    { id: "MergedNorthApproach", poly: [[52, 206], [320, 206], [320, 468], [220, 468], [150, 466], [52, 468]] },
-    { id: "MergedEastPlain", poly: [[222, 468], [320, 468], [320, 690], [250, 680], [222, 622]] },
-    { id: "MergedSouthBank", poly: [[-160, 796], [320, 796], [320, maxZ], [-160, maxZ]] },
+    { id: "MergedWestRail", poly: [[-160, 206], [-83, 206], [-83, 824], [-160, 836]] },
+    { id: "MergedWestPlain", poly: [[-75, 206], [16, 206], [16, 758], [-44, 758], [-44, 798], [-75, 805]] },
+    { id: "MergedNorthApproach", poly: [[14, 206], [320, 206], [320, 468], [220, 468], [150, 466], [14, 468]] },
+    { id: "MergedEastPlain", poly: [[270, 468], [320, 468], [320, 766], [270, 744]] },
+    { id: "MergedSouthBank", poly: [[-160, 876], [320, 876], [320, maxZ], [-160, maxZ]] },
   ];
 }
 

@@ -93,7 +93,7 @@ assert.notEqual(ENCOUNTER_VARIANTS[0].storageKey, ENCOUNTER_VARIANTS[1].storageK
 const original = CompileEncounterVariant("L1_Original");
 const merged = CompileEncounterVariant("L1_BeishaheMerged");
 assert.equal(original.duration, 3249, "基线双村版全程保持 54:09 不变");
-assert.equal(merged.duration, 1922, "单村合并单向动线版全程压缩至 32:02（1922s）");
+assert.equal(merged.duration, 1926, "单村合并百户大村版全程 32:06（1926s）");
 
 // 2. 01–07 共用段编排 100% 零分叉一致
 const frontBeats = original.timeline.filter((b) => Number(b.stage) <= 7);
@@ -127,7 +127,7 @@ assert.equal(resolved.doc.inherit, undefined, "合成后的运行时场景不再
 const validResolved = ValidateScene(resolved.doc);
 assert.ok(validResolved.ok, `合成场景通过 ValidateScene：${validResolved.errors.join("；")}`);
 assert.equal(resolved.doc.bounds.minZ, -480);
-assert.equal(resolved.doc.bounds.maxZ, 910);
+assert.equal(resolved.doc.bounds.maxZ, 990);
 
 const fetchedViaUrl = await FetchResolvedScene(
   "http://localhost/Taierzhuang1938/Scenes/FirstLevelMerged/Scene_FirstLevelMerged.json",
@@ -148,7 +148,7 @@ const fetchedViaUrl = await FetchResolvedScene(
   },
 );
 assert.equal(fetchedViaUrl.doc.bounds.minZ, -480);
-assert.equal(fetchedViaUrl.doc.bounds.maxZ, 910);
+assert.equal(fetchedViaUrl.doc.bounds.maxZ, 990);
 assert.ok(fetchedViaUrl.heightBytes.byteLength > 1_000_000, "FetchResolvedScene 解析正确相对路径并输出完整二进制字节");
 
 const width = resolved.doc.terrain.cols + 1;
@@ -183,7 +183,11 @@ assert.equal(villagePaint?.color, "#c6b99c", "村庄地基色提亮为鲁南夯�
 assert.ok(!resolved.doc.paint.some((p) => /^Wheat_/.test(p.id || "") && p.z >= 355), "合并村外围不再残留突兀绿方块麦田矩形");
 
 const mergedMap = BuildEncounterMap(resolved.doc, { sceneId: "FirstLevelMerged", variantSpec: GetEncounterVariantSpec("L1_BeishaheMerged") });
-assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 910]);
+assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 990]);
+const expYards = new Set(resolved.doc.objects.filter((o) => /^Exp_[A-Z0-9]+_[A-Z0-9]+_/.test(o.id)).map((o) => o.id.match(/^(Exp_[A-Z0-9]+_[A-Z0-9]+)_/)[1]));
+assert.ok(expYards.size >= 60, `方案 A 扩建加密至少新增 60 座鲁南合院，实测：${expYards.size}`);
+const lmVillage = resolved.doc.markers.find((m) => m.id === "LmVillage");
+assert.ok(lmVillage && lmVillage.w >= 240 && lmVillage.d >= 260, `北沙河村规模已扩建至鲁南百户大村尺度（实测 ${lmVillage?.w}×${lmVillage?.d}m）`);
 const mergedOnlyFields = mergedMap.fields.filter((f) => f.zone.startsWith("Merged"));
 assert.ok(mergedOnlyFields.length >= 40, "合并村外围具备完整无重叠农田地块网格");
 for (let i = 0; i < mergedOnlyFields.length; i++) {
@@ -320,14 +324,14 @@ assert.ok(plan.completedBeats.includes("13d"), "终局高潮 13d 实玩完成");
 const { heights: carvedHeights, plan: carvedPlan } = PrepareSceneTerrain(resolved.doc, resolved.heights, null);
 const sliceDoc = BlockoutDocFromScene(resolved.doc, carvedHeights, {
   level: "FirstLevelEncounter",
-  region: { minX: -160, maxX: 320, minZ: -480, maxZ: 910 },
+  region: { minX: -160, maxX: 320, minZ: -480, maxZ: 990 },
   priorSignals: ["Stage0105Done"],
   trenchPlan: carvedPlan,
 });
 const sliceCheck = ValidateBlockoutScene(sliceDoc);
 assert.ok(sliceCheck.ok, `合成场景转实机 Blockout 切片通过校验：${sliceCheck.errors.join("；")}`);
 const coverBlocks = sliceDoc.blocks.filter((b) => b.id?.startsWith("Merged_Cover_") && b.cover);
-assert.equal(coverBlocks.length, 13, "全部 13 处战术掩体块携带显式 cover 法线进入实机 CoverRegistry");
+assert.equal(coverBlocks.length, 15, "全部 15 处战术掩体块携带显式 cover 法线进入实机 CoverRegistry");
 for (const b of coverBlocks) {
   assert.ok(b.d <= 0.55, `掩体 ${b.id} 厚度 ${b.d}m 超过 0.55m，会令 standoffM(0.65)-半厚 < hitSlackM(0.30) 导致射线校验失败`);
   assert.ok((b.cover.points?.length || 0) >= 2, `双人掩体 ${b.id} 须登记 >=2 个隐蔽点供两两跃进小组同掩体躲藏`);
