@@ -12,6 +12,7 @@ for(const id of Object.keys(PARTICLE_VOLUME_ASSETS)){
  const authored=PARTICLE_VOLUME_ASSETS[id].source==='authored';
  assert.equal(m.asset,id);
  if(authored)assert.equal(m.source,'authored');else assert.equal(m.license,'CC0-1.0');
+ if(report.generator)await fs.access(path.join(import.meta.dirname,report.generator));
  assert.equal(report.sha256,createHash('sha256').update(bytes).digest('hex'));
  assert.equal(report.gpuBytes,data.byteLength);assert.ok(size.every(n=>n<=2048));assert.ok(m.anchor.every(n=>Number.isFinite(n)&&n>=0&&n<=1));
  assert.equal(m.sourceFrameIndices.length,m.frames);

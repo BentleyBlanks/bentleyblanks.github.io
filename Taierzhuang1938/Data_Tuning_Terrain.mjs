@@ -63,6 +63,22 @@ export const TERRAIN_SETS = Object.freeze({
         tint: Object.freeze([0.985, 0.906, 0.842]) }),
     ]),
   }),
+  EastTrack: Object.freeze({
+    textureSize: 512,
+    version: "eastTrack20261123Ground",
+    albedoScale: .91,
+    stubble: Object.freeze({ scaleM: 10.5, breakupScaleM: 1.37, threshold: Object.freeze([.31,.57]) }),
+    layers: Object.freeze([
+      Object.freeze({ id: "FieldSoil", file: "EastTrackRoad", tileM: 1.14, farTileM: 7.6,
+        normalScale: 1.03, heightOffset: .005, tint: Object.freeze([.91,.89,.87]) }),
+      Object.freeze({ id: "CartTrack", file: "EastTrackRoad", tileM: 1.22, farTileM: 7.98,
+        normalScale: .98, heightOffset: -.075 }),
+      Object.freeze({ id: "DryStubble", file: "EastTrackStubble", tileM: 1.29, farTileM: 8.2,
+        normalScale: 1.06, heightOffset: .135 }),
+      Object.freeze({ id: "SpoilEarth", file: "EastTrackCut", tileM: 1.04, farTileM: 6.76,
+         normalScale: 1.18, heightOffset: .05 }),
+    ]),
+  }),
 });
 
 /**

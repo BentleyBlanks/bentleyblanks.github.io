@@ -115,6 +115,7 @@ export const ENV_COMPONENTS = Object.freeze([
       P({ key: "coverage", label: "覆盖率", kind: "number", min: 0, max: 1, step: 0.01, default: 0.62, out: "cloudDeck.coverage", group: "层积云" }),
       P({ key: "scale", label: "云盘频率", kind: "number", min: 0.2, max: 4, step: 0.01, default: 1.1, out: "cloudDeck.scale", group: "层积云" }),
       P({ key: "softness", label: "边缘软度", kind: "number", min: 0, max: 2, step: 0.01, default: 0.5, out: "cloudDeck.softness", group: "层积云" }),
+      P({ key: "fadeHeight", label: "远云淡出高度", kind: "number", min: 0.08, max: 0.5, step: 0.005, default: 0.30, out: "cloudDeck.fadeHeight", group: "层积云" }),
       P({ key: "warp", label: "扭曲", kind: "number", min: 0, max: 3, step: 0.01, default: 0.35, out: "cloudDeck.warp", group: "层积云" }),
       P({ key: "underside", label: "云底压暗", kind: "number", min: 0, max: 1, step: 0.01, default: 0.5, out: "cloudDeck.underside", group: "层积云" }),
       P({ key: "gap", label: "云缝亮度", kind: "number", min: 0, max: 3, step: 0.01, default: 1.40, out: "cloudDeck.gap", group: "层积云" }),

@@ -71,6 +71,7 @@ uniform vec4 uCloudShape;
 // Shape：x = 云盘频率、y = 覆盖率 0–1、z = 边缘软度（σ 单位）、w = 域扭曲量。
 uniform vec4 uCloudDeck;
 uniform vec4 uCloudDeckShape;
+uniform float uCloudDeckFadeHeight;
 uniform vec3 uCloudShade;
 uniform float uStars;
 uniform float uTime;
@@ -150,7 +151,7 @@ vec2 CloudDeckDensity(vec2 p) {
 vec3 CloudDeck(vec3 dir, vec3 sunDir, float sunDot, vec3 skyBehind) {
   float up = dir.y;
   // 地平线附近团块被投影压成亚像素的横纹，交给下面那条贴地霾带吃掉
-  float fade = smoothstep(0.012, 0.30, up);
+  float fade = smoothstep(0.012, uCloudDeckFadeHeight, up);
   if (fade <= 0.0) return skyBehind;
   vec2 p = dir.xz / (up + 0.10) * uCloudDeckShape.x + vec2(uTime * 0.0040, uTime * 0.0026);
   vec2 deck = CloudDeckDensity(p);
@@ -921,6 +922,7 @@ export class SkyDome {
       uCloudShape: { value: new THREE.Vector4(5.5, 0.445, 0.615, 0) },
       uCloudDeck: { value: new THREE.Vector4(0, 0, 1, 0) },
       uCloudDeckShape: { value: new THREE.Vector4(1.6, 0.7, 0.8, 1.2) },
+      uCloudDeckFadeHeight: { value: 0.30 },
       uCloudShade: { value: new THREE.Vector3(0.5, 0.5, 0.5) },
       uStars: { value: 0 },
       uTime: { value: 0 },
@@ -1007,6 +1009,7 @@ export class SkyDome {
     const deck = preset.cloudDeck || null;
     U.uCloudDeck.value.set(deck?.structure ?? 0, deck?.underside ?? 0, deck?.gap ?? 1, deck?.silver ?? 0);
     U.uCloudDeckShape.value.set(deck?.scale ?? 1.6, deck?.coverage ?? 0.7, deck?.softness ?? 0.8, deck?.warp ?? 1.2);
+    U.uCloudDeckFadeHeight.value = deck?.fadeHeight ?? 0.30;
     U.uCloudShade.value.fromArray(deck?.shade ?? [0.5, 0.5, 0.5]);
     U.uStars.value = preset.stars;
 

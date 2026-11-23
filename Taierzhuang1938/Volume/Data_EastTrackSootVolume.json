@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "asset": "EastTrackSoot",
+  "dimensions": [
+    192,
+    80,
+    37
+  ],
+  "atlasTiles": [
+    3,
+    2,
+    1
+  ],
+  "frames": 6,
+  "duration": 7.2,
+  "channels": 1,
+  "encoding": "sqrt-unorm8",
+  "anchor": [
+    0.5,
+    0,
+    0.5
+  ],
+  "sourceFrameIndices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "source": "authored",
+  "file": "Volume_EastTrackSoot.bin.gz",
+  "gpuBytes": 3409920,
+  "compressedBytes": 371872,
+  "boundsM": [
+    116,
+    31,
+    86
+  ],
+  "anchorPositionM": [
+    0,
+    -0.24,
+    -62
+  ],
+  "sha256": "2f7e12b002791c9332a952625e786e6d0de4b8ebf540a7ca51e30f09bb156c8f",
+  "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py"
+}

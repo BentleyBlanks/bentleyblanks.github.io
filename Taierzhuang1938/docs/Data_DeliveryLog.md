@@ -18,6 +18,8 @@
 
 - **特效预览与音效音乐独立窗口（2026-11-23）**。`Tool_AudioPreview.html` 只装 `AudioEngine`（零渲染器 / Three.js 依赖），`Tool_VfxPreview.html` 装 `VfxSystem`、中性 HDR 预览台与项目环境预设（`Environment/EnvPreset_*.json` 的昼夜 looks，不再固化昼夜），两项均从 `Tool_Studio` 拆出且不加载游戏灯光装置、后处理、天空、材质库与关卡。补齐两项手榴弹爆炸音效说明；拆出 `Script_RenderTags` / `Script_VolumetricNoise` / `Script_ToneMapCurves` / `Script_SunShadowSampling` / `Script_EffectLightEnvelope` / `Data_SmokePlumeStyles` / `Data_BattleScale` 解耦运行时重依赖，主菜单包同步省去后处理与灯光链。游戏内 `?editor=vfx` 经 `harness` 保留原回归口径。详见[编辑器套件](Data_EditorSuite.md)。
 
+- **东侧战车道材质与烟尘修订（2026-11-23）**。为本场景分层烘焙硬土、切土和残茬，补伏草与碎根的空间分布。断榆剥落改为连续纹理，支护重新制作上下横木、错列木板、斜撑及搭布。按原画校准三维黑烟的透光深度，车道与远田各有贴地雾区。路右扬土使用落土系统的实体碎块和细砂，沟底照护和中景人物取已有角色的静态姿态。 [东侧战车道说明](../Scenes/TanketteAdvanceEastTrack/README.md)
+
 - **东侧战车道独立场景（2026-11-23）**。沟沿固定机位，原尺寸九四式两辆在上层土路，断榆、灰木支护和担架留在下层撤离沟。场景编辑器可改撤离沟样条与道具，游戏机位分开渲染低云、两道烟柱、局部火光和贴地浮尘。入口、模型预算与重建见[场景说明](../Scenes/TanketteAdvanceEastTrack/README.md)。
 
 - **独立枪械检查台（2026-11-22）**。ControlCenter 开独立窗口，模型列表、大视口和只读信息并列。中性灯光、比例尺、三向观察和附件叠层用于检查模型。旧地址及台架出图脚本接到新页面。[枪械检查台](Data_EditorSuite.md#枪械检查台)

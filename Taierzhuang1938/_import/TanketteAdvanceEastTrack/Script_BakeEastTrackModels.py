@@ -19,13 +19,13 @@ from Script_BakeFieldApproachModels import Bounds, Studio
 from Script_FieldApproachMesh import Materials, Mesh, Tube
 
 
-def ProjectWood(materials, name, texture, color, strength):
+def TexturedWood(materials, name, stem, color, strength):
     material = materials.Make(name, color)
     nodes, links = material.node_tree.nodes, material.node_tree.links
     shader = nodes.get("Principled BSDF")
     for suffix, space in [("Base","sRGB"), ("Normal","Non-Color")]:
         image = nodes.new("ShaderNodeTexImage")
-        file = PROJECT / "Texture" / f"Texture_{texture}{suffix}.webp"
+        file = stem.with_name(stem.name + suffix + ".webp")
         image.image = bpy.data.images.load(str(file), check_existing=True)
         image.image.colorspace_settings.name = space
         image.image.pack()
@@ -40,9 +40,11 @@ def ProjectWood(materials, name, texture, color, strength):
 
 
 def SplinteredElm(mesh, materials):
-    bark = ProjectWood(materials, "EastTrackElmBark", "TreeBark", (.235,.205,.181), .82)
-    sap = materials.Make("EastTrackElmExposedWood", (.47, .353, .238), finish="wood")
-    dry = materials.Make("EastTrackElmInnerSplit", (.279, .216, .158), finish="wood")
+    bark = TexturedWood(materials, "EastTrackElmBark", PROJECT / "Texture" / "Texture_TreeBark", (.235,.205,.181), .88)
+    atlas = PROJECT.parent / "tmp" / "TanketteAdvanceEastTrack" / "Materials" / "Texture_EastTrackElmAtlas"
+    trunk = TexturedWood(materials, "EastTrackElmWeathering", atlas, (.231,.205,.181), .93)
+    sap = materials.Make("EastTrackElmExposedWood", (.57, .453, .325), finish="wood")
+    dry = materials.Make("EastTrackElmInnerSplit", (.363, .278, .204), finish="wood")
     rng = Random(19380604)
     sides, levels = 112, 67
     vertices = []
@@ -54,31 +56,23 @@ def SplinteredElm(mesh, materials):
             theta = tau * j / sides
             flare = (1.0 - fraction)**15 * (.17 + .08 * cos(theta * 7 + .8))
             ridge = .022 * sin(theta * 17 + fraction * 3) + .012 * sin(theta * 38 - fraction * 7)
-            radius = .54 - .09 * fraction + flare + ridge
+            radius = .50 + .037 * fraction + flare + ridge
             radius += .04 * sin(5 * theta + fraction * 2) + rng.uniform(-.009, .009)
+            angle = atan2(sin(theta + pi/2), cos(theta + pi/2))
+            scar = (fraction-.36)*.76 - abs(angle - 1.18 - .12*sin(fraction*9) - .062*sin(fraction*72))
+            radius -= min(.04, max(0, scar)*.21)
             z = fraction * trunk_height + tip[j] * fraction**12
             vertices.append((.18 * fraction + radius * cos(theta),
                              -.06 * fraction + .84 * radius * sin(theta), z))
-    patches = {material: ([], []) for material in (bark, sap, dry)}
+    faces, uv = [], []
     for i in range(levels - 1):
-        fraction = (i + .5) / (levels - 1)
         for j in range(sides):
             nxt = (j + 1) % sides
-            angle = tau * (j + .5) / sides + pi / 2
-            angle = atan2(sin(angle), cos(angle))
-            upper = fraction > .39 and abs(angle - .97 - .15 * sin(fraction * 11)) < (fraction - .35) * .65
-            base = .105 < fraction < .37 and abs(angle - .83 + .6 * fraction) < .178 * sin(pi * (fraction - .105) / .265)
-            material = (dry if rng.random() < .19 else sap) if upper or base else bark
-            a, b = j * 2 / sides, (j + 1) * 2 / sides
-            c, d = i / 15, (i + 1) / 15
-            faces, uv = patches[material]
+            a, b = j / sides, (j + 1) / sides
+            c, d = i / (levels-1), (i + 1) / (levels-1)
             faces.append((i*sides+j, i*sides+nxt, (i+1)*sides+nxt, (i+1)*sides+j))
             uv.append(((a,c), (b,c), (b,d), (a,d)))
-    for material, (faces, uv) in patches.items():
-        used = sorted({index for face in faces for index in face})
-        local = {original: index for index, original in enumerate(used)}
-        mesh.Add(material, [vertices[index] for index in used],
-                 [tuple(local[index] for index in face) for face in faces], uv=uv, smooth=True)
+    mesh.Add(trunk, vertices, faces, uv=uv, smooth=True)
     peak = (0.18, -0.06, 3.81)
     crown = vertices[-sides:]
     for j, a in enumerate(crown):
@@ -92,8 +86,8 @@ def SplinteredElm(mesh, materials):
                           (c*extent*.78, s*extent*.78, .06), (c*extent, s*extent, .014)],
              [.19, .135, .072, .012], 13, aspect=.62, furrow=.20, tile=(1, 1.45))
     for index, (points, radii) in enumerate([
-        ([(.32,-.05,2.96),(.62,-.07,3.15),(.92,-.04,3.30),(1.17,.01,3.36),(1.44,.07,3.57)], [.197,.16,.11,.068,.024]),
-        ([(.92,-.04,3.30),(1.05,-.10,3.55),(1.20,-.12,3.84)], [.092,.061,.019]),
+        ([(.31,.09,3.45),(.56,.105,3.51),(.75,.13,3.57),(.97,.15,3.59),(1.17,.18,3.64)], [.094,.071,.044,.019,.006]),
+        ([(.74,.13,3.56),(.87,.175,3.39),(1.05,.19,3.31)], [.038,.021,.005]),
         ([(-.33,.05,2.65),(-.62,.09,2.77),(-.74,.12,2.95)], [.106,.076,.035]),
         ([(.27,.20,1.98),(.51,.35,2.02),(.66,.38,2.17)], [.098,.068,.031]),
     ]):
@@ -108,49 +102,88 @@ def SplinteredElm(mesh, materials):
 
 def RoughBoard(mesh, material, start, end, width, depth, rng):
     start, end = Vector(start), Vector(end)
-    levels = [0, .055, .26, .52, .78, .955, 1]
+    levels = [0, .061, .34, .67, .93, 1]
     axis = (end - start).normalized()
     across = Vector((axis.z, 0, -axis.x)).normalized()
     slope = Vector((0, 1, 0))
-    cross = [(-.44,-.50),(.43,-.50),(.50,-.32),(.48,.37),(.39,.49),(-.45,.48),(-.51,.31),(-.50,-.32)]
+    cross = [(-.46,-.40),(-.24,-.51),(.04,-.56),(.29,-.49),(.46,-.43),(.51,-.25),
+             (.44,.37),(.34,.50),(-.33,.49),(-.51,.28),(-.53,-.12)]
+    count = len(cross)
     vertices, faces, uv = [], [], []
     for level in levels:
         for u, v in cross:
-            shift = axis * rng.uniform(-.024,.024) if level in (0, 1) else Vector((0, 0, 0))
-            vertices.append(start.lerp(end, level) + shift + across * width * (u+rng.uniform(-.04,.04))
-                            + slope * depth * (v+rng.uniform(-.12,.12)))
+            shift = axis * rng.uniform(-.061,.045) if level in (0, 1) else Vector((0, 0, 0))
+            vertices.append(start.lerp(end, level) + shift + across * width * (u+rng.uniform(-.047,.047))
+                            + slope * depth * (v+rng.uniform(-.13,.15)))
     length = (end-start).length
     offset = rng.random()
     for i in range(len(levels)-1):
-        for j in range(8):
-            k = (j + 1) % 8
-            faces.append((i*8+j, i*8+k, (i+1)*8+k, (i+1)*8+j))
-            a, b = j * .127 + offset, (j+1) * .127 + offset
-            lo, hi = levels[i] * length * .8, levels[i+1] * length * .8
+        for j in range(count):
+            k = (j + 1) % count
+            faces.append((i*count+j, i*count+k, (i+1)*count+k, (i+1)*count+j))
+            # Match grain frequency to physical width and run V with the fibers.
+            a, b = offset + j * width*.46, offset + (j+1)*width*.46
+            lo, hi = levels[i] * length / .84, levels[i+1] * length / .84
             uv.append(((a,lo),(b,lo),(b,hi),(a,hi)))
-    for ids in [tuple(reversed(range(8))), tuple(range(len(vertices)-8,len(vertices)))]:
+    for ids in [tuple(reversed(range(count))), tuple(range(len(vertices)-count,len(vertices)))]:
         faces.append(ids)
-        uv.append(tuple(cross[index % 8] for index in ids))
+        uv.append(tuple(cross[index % count] for index in ids))
     mesh.Add(material, vertices, faces, uv=uv)
 
 
+def FoldedCanvas(mesh, material):
+    vertices, faces, uv = [], [], []
+    columns, rows = 30, 12
+    for j in range(rows+1):
+        v = j / rows
+        for i in range(columns+1):
+            u = i / columns
+            wave = sin(u*29.6 + v*3.4)*.046 + cos(u*57 - v*4)*.021
+            fray = (sin(u*83)*.029 + sin(u*181)*.017)*v**7
+            x = -.47 + 1.68*u - .12*v
+            y = .115 - .57*min(1,v/.27) + wave*(.22+v) + .18*v**2
+            hem = .37 + .28*u + .098*sin(18.2*u+1.13) + .043*sin(45*u)
+            z = 1.398 - hem*max(0,(v-.24)/.76) + fray
+            vertices.append((x,y,z))
+    for j in range(rows):
+        for i in range(columns):
+            a = j*(columns+1)+i
+            b = a+columns+1
+            faces.append((a,a+1,b+1,b))
+            u, v = i/columns, j/rows
+            uv.append(((2*u,1.6*v),(2*(i+1)/columns,1.6*v),
+                       (2*(i+1)/columns,1.6*(j+1)/rows),(2*u,1.6*(j+1)/rows)))
+    mesh.Add(material, vertices, faces, uv=uv, smooth=True)
+
+
 def GreyTimberShoring(mesh, materials):
-    gray = ProjectWood(materials, "EastTrackWeatheredTimber", "HandcartWood", (.35,.33,.31), .71)
-    cap = ProjectWood(materials, "EastTrackCrossbeam", "TreeBark", (.38,.36,.33), .68)
-    sap = materials.Make("EastTrackCrossbeamEnd", (.503,.387,.258), finish="wood")
+    stem = PROJECT.parent / "tmp" / "TanketteAdvanceEastTrack" / "Materials" / "Texture_EastTrackWeatheredElm"
+    gray = TexturedWood(materials, "EastTrackWeatheredTimber", stem, (.35,.33,.31), .83)
+    sap = materials.Make("EastTrackCrossbeamEnd", (.379,.313,.246), finish="wood")
     iron = materials.Make("EastTrackOxidizedIron", (.116,.091,.066), metal=.35)
+    canvas = materials.Make("EastTrackDrapedCanvas", (.389,.359,.302), finish="cloth", double=True)
     rng = Random(76843)
-    for i in range(13):
-        x = -.98 + i*.164
-        RoughBoard(mesh, gray, (x,rng.uniform(.018,.060),.027), (x+rng.uniform(-.015,.015),.027,1.16),
-                   rng.uniform(.149,.163), rng.uniform(.080,.102), rng)
+    edge = -1.15
+    widths = [.25,.13,.23,.19,.26,.146,.218,.20,.24,.18,.25]
+    for width in widths:
+        x = edge + width/2
+        edge += width
+        base = rng.uniform(.005,.061)
+        face = rng.uniform(-.009,.077)
+        RoughBoard(mesh, gray, (x,face,base), (x+rng.uniform(-.036,.038),face+rng.uniform(-.023,.019),rng.uniform(1.09,1.22)),
+                   width*1.026, rng.uniform(.066,.111), rng)
     for x in [-1.06, 1.04]:
         RoughBoard(mesh, gray, (x,.11,.01), (x+.025,.13,1.13), .18,.14,rng)
-    RoughBoard(mesh, gray, (.15,-.145,.016), (.50,-.196,1.49), .143,.085,rng)
-    path = [(-1.23,0,1.211),(-1.16,0,1.222),(-.83,.02,1.232),
-            (-.35,.018,1.223),(.14,0,1.237),(.61,-.006,1.217),(1.12,0,1.234),(1.24,.013,1.251)]
-    Tube(mesh, cap, path, [.108,.132,.141,.127,.137,.133,.135,.107], 26,
-         aspect=.94, furrow=.18, phase=2, tile=(1.2,.58))
+    RoughBoard(mesh, gray, (.475,-.136,.01), (.224,-.209,1.45), .127,.09,rng)
+    path = [(-1.238,-.016,1.19),(-1.16,-.012,1.194),(-.89,.012,1.23),
+            (-.54,.008,1.218),(-.23,-.019,1.216),(.13,-.011,1.232),(.44,-.022,1.219),
+            (.76,.008,1.224),(1.08,-.013,1.208),(1.22,.003,1.232)]
+    Tube(mesh, gray, path, [.112,.139,.143,.13,.147,.134,.132,.149,.142,.114], 29,
+         aspect=.88, furrow=.19, phase=1.22, tile=(.85,1.12))
+    lowerRail = [(-1.23,-.137,1.013),(-.97,-.109,1.026),(-.59,-.124,1.011),
+                 (-.10,-.120,1.014),(.37,-.137,1.007),(.76,-.098,.986),(1.15,-.103,.992)]
+    Tube(mesh, gray, lowerRail, [.052,.073,.069,.077,.072,.062,.047], 14, aspect=.75,
+         furrow=.18, phase=.47, tile=(.43,1.21))
     for end in (path[0], path[-1]):
         sign = -1 if end[0] < 0 else 1
         for i in range(9):
@@ -158,8 +191,9 @@ def GreyTimberShoring(mesh, materials):
             y, z = end[1]+.074*cos(theta), end[2]+.08*sin(theta)
             Tube(mesh, sap, [(end[0]-sign*.037,y,z),(end[0]+sign*rng.uniform(.012,.064),y+rng.uniform(-.016,.016),z)],
                  [.026,.005], 6, furrow=.16, tile=(.2,2.8))
-    for x, y, z in [(-1.07,-.021,1.10), (1.05,-.024,1.07), (.39,-.244,1.22), (.25,-.216,.55)]:
+    for x, y, z in [(-1.07,-.021,1.10), (1.05,-.024,1.07), (.267,-.254,1.20), (.388,-.205,.56)]:
         Tube(mesh, iron, [(x,y+.013,z),(x,y-.016,z)], [.016,.012], 8)
+    FoldedCanvas(mesh, canvas)
 
 
 def Bake(source=None):
@@ -183,9 +217,17 @@ def Bake(source=None):
             mesh = Mesh()
             builder(mesh, materials)
             objects = mesh.Emit(collection)
+            selected = list(objects)
+            if builder is GreyTimberShoring:
+                shoring = bpy.data.objects.new("TimberShoring", None)
+                collection.objects.link(shoring)
+                for obj in objects:
+                    if obj.data.materials[0].name != "EastTrackDrapedCanvas":
+                        obj.parent = shoring
+                selected.append(shoring)
             bpy.context.view_layer.update()
             lo, hi = Bounds(objects)
-            for obj in objects:
+            for obj in selected:
                 obj.select_set(True)
             bpy.context.view_layer.objects.active = objects[0]
             bpy.ops.export_scene.gltf(filepath=str(output / f"Model_{name}.glb"), export_format="GLB",

@@ -1,6 +1,6 @@
 # 三维流体体积资产
 
-这些 `Volume_*.bin.gz` 是空间密度／燃烧场序列，不是二维贴图。来源为 [JangaFX 免费 VDB](https://jangafx.com/software/embergen/download/free-vdb-animations)，原始包和本目录 LICENSE.txt 均注明 CC0；作者 JangaFX LLC。
+这些 `Volume_*.bin.gz` 是空间密度与燃烧场序列。下表的素材由 JangaFX LLC 提供，原始包和本目录的 LICENSE.txt 均注明 CC0。 [JangaFX 免费 VDB](https://jangafx.com/software/embergen/download/free-vdb-animations)
 
 | 运行资产 | 官方原包 | 用途 |
 | --- | --- | --- |
@@ -9,6 +9,8 @@
 | DenseSmoke | Smoke_Plume_01.rar | 浓烟、白烟、低矮烟幕 |
 | DustImpact | GrenadeDustImpactVDB.zip | 破片爆炸土尘、间歇尘爆 |
 | GroundExplosion | GroundExplosionVDB.zip | 燃油爆炸、航空炸弹冷却烟体 |
+
+`EastTrackSoot` 是东侧战车道的六帧程序体积，综合原画透光深度、三维扰动和两处升烟。用 `python Taierzhuang1938/_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py` 重建。 [烘焙记录](Data_EastTrackSootVolume.json)
 
 原包留在仓库外。Data_*Volume.json 记录原包 SHA-256、选帧、原始范围、上轴转换、密度标尺、采样统计和产物 SHA-256。运行数据由 `_import/Script_ParticleVolumeBake.py` 重建，使用 numpy + openvdb；Windows 可用本机 Blender 5.2 的独立 Python，不启动 Blender。
 

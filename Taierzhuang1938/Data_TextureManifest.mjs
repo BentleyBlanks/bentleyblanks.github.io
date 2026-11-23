@@ -110,6 +110,8 @@ const BEISHAHE_TRUSS_FINISH_BYTES = 384 * 1024;
 // The requested pier maintenance layers share one 334,084-byte PBR set.
 // This standalone-model allowance does not add boot or level requests.
 const BEISHAHE_MAINTENANCE_ASSET_BYTES = 384 * 1024;
+// Three PBR layers loaded by the east track preview only.
+const EAST_TRACK_TERRAIN_BYTES = 640 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -119,6 +121,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
   // 抬这些数是决定不是手续（同 Script_BootPayloadTest 的口径）：先问这张图凭什么这么大。
   tierBytes: Object.freeze({
     "level:FirstLevel": 12 * 1024 * 1024,
+    "level:TanketteAdvanceEastTrack": EAST_TRACK_TERRAIN_BYTES,
     fx: 6.5 * 1024 * 1024,
     // ui：2026-09-30 加载画面报纸剪报 11 张 ~2 MB 入库，玩家每次开机只下其中 1 张（~0.2 MB），所以整层上限抬到 5.5 MB。
     // 2026-10-06: 11 matched PBR pairs total 2.28 MiB; only one pair per boot.
@@ -131,7 +134,10 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES
+    + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
+    + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
+    + EAST_TRACK_TERRAIN_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -930,6 +936,48 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_TerrainEastSmokeStubbleSoilBase.webp", "Base", 1024, 1024],
       ["Texture_TerrainEastSmokeStubbleSoilNormal.webp", "Normal", 512, 512],
       ["Texture_TerrainEastSmokeStubbleSoilOrh.webp", "Orh", 512, 512],
+    ],
+  },
+  {
+    id: "TerrainEastTrackRoad", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
+    toneClass: "drySoil", metersPerTile: 1.22, normalConvention: "terrain",
+    bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackRoad.json",
+    source: { provider: "imagegen", date: "2026-11-23",
+      ref: "_import/TanketteAdvanceEastTrack/Source_BattleLoam.webp", prompt: "Scenes/TanketteAdvanceEastTrack/README.md" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "EastTrackRoad" }],
+    files: [
+      ["Texture_TerrainEastTrackRoadBase.webp", "Base", 512, 512],
+      ["Texture_TerrainEastTrackRoadNormal.webp", "Normal", 256, 256],
+      ["Texture_TerrainEastTrackRoadOrh.webp", "Orh", 256, 256],
+    ],
+  },
+  {
+    id: "TerrainEastTrackStubble", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
+    toneClass: "drySoil", metersPerTile: 1.29, normalConvention: "terrain",
+    bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackStubble.json",
+    source: { provider: "imagegen", date: "2026-11-23",
+      ref: "_import/DugoutAidOpenFields/Source_RootedSod.webp", prompt: "_import/DugoutAidOpenFields/Data_DugoutMaterialSources.json" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "EastTrackStubble" }],
+    files: [
+      ["Texture_TerrainEastTrackStubbleBase.webp", "Base", 512, 512],
+      ["Texture_TerrainEastTrackStubbleNormal.webp", "Normal", 256, 256],
+      ["Texture_TerrainEastTrackStubbleOrh.webp", "Orh", 256, 256],
+    ],
+  },
+  {
+    id: "TerrainEastTrackCut", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
+    toneClass: "rammedEarth", metersPerTile: 1.04, normalConvention: "terrain",
+    bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
+    bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackCut.json",
+    source: { provider: "imagegen", date: "2026-11-23",
+      ref: "_import/DugoutAidOpenFields/Source_CutLoess.webp", prompt: "_import/DugoutAidOpenFields/Data_DugoutMaterialSources.json" },
+    consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "EastTrackCut" }],
+    files: [
+      ["Texture_TerrainEastTrackCutBase.webp", "Base", 512, 512],
+      ["Texture_TerrainEastTrackCutNormal.webp", "Normal", 256, 256],
+      ["Texture_TerrainEastTrackCutOrh.webp", "Orh", 256, 256],
     ],
   },
   // 3A 迭代 B5（2026-09-28）：01–04 开场布景的风化旧木与旧弹药箱板（分镜 01/02/03A/04A 的灰褐旧木，替换程序化橙黄 WoodBeam / WoodCrate）。

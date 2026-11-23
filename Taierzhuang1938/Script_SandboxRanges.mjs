@@ -98,11 +98,32 @@ function FixedSceneCamera(host, pose) {
   };
 }
 
-function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
-  const phase = CreateScenePreviewPhase(SceneInfo(sceneId));
-  if (soilMarker) phase.groundImpactDust = true;
+function RoadsideSoil(vfx, { x, z }, y) {
+  const range = (min,max) => ({ mode:"twoConstants", min, max });
+  // Turn the existing ground-colliding soil emitter upward. Its solid clods
+  // enter the normal/depth pass and receive the fog at their own position.
+  return vfx.FallingSoil({ preset: "SoilHeavyCrumble", config: {
+    emitter: { shape:"area", position:[x,y+.12,z], width:.70, length:.44, distribution:"uniform",
+      rotation:[Math.PI,0,-.25], clearance:.035, seed:411806 },
+    timing: { mode:"once", duration:.32, frequency:60, quantity:1.35, variation:.16,
+      intensity:[[0,1.48],[.38,1.08],[.83,.67],[1,0]] },
+    motion: { wind:[.21,0,.12], turbulence:.032 },
+    grains: { amount:26, size:range(.004,.028), sizeBias:1.45, speed:range(2.5,8.4), spread:3,
+      gravity:1.11, drag:.61, life:range(.44,1.1), color:[.039,.031,.027,.95], shutter:.022, minPixel:.61,
+      trailOpacity:.89, impactDust:.005, deposit:false, maxParticles:760 },
+    clods: { amount:1.89, size:range(.030,.115), sizeBias:1.86, speed:range(2.8,7.8), spread:3,
+      gravity:1.02, drag:.29, life:range(.54,1.49), color:[.046,.035,.028,1], aspect:[1,.70,.86],
+      maxParticles:45, impactDust:.55, maxBounces:1, fragmentChance:.07 },
+    dust: { amount:1.85, size:range(.13,.285), speed:range(1.9,5.9), spread:2.8, gravity:.53,
+      life:range(.65,1.75), color:[.109,.083,.067,.22], density:1.45, diffusion:2.55, sourceSpread:.16,
+      veil:false, aspect:1.48, fadeIn:.028, volumetric:true, impactAmount:.55, maxParticles:55 },
+    budget: { distance:48, fadeDistance:12, rayChecks:84, grainCollision:false },
+  }}).id;
+}
+
+function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
   return {
-    phase, World: FirstLevelWhiteboxField,
+    phase: CreateScenePreviewPhase(SceneInfo(sceneId)), World: FirstLevelWhiteboxField,
     startup: {
       sceneryOnly: true,
       pbrSets: ["Ground", "CraterScorched", "Steel", "WoodStock", "GrenadePbr", "DadaoPbr", ...extraPbrSets],
@@ -120,6 +141,12 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
       const ground = impact && battlefield.StaticGroundHeight(impact.x, impact.z);
       let untilImpact = .4;
       let impactAge = null;
+      let soilEmitter = null;
+      let figures = null;
+      let disposed = false;
+      const RemoveSoil = () => {
+        if (soilEmitter && vfx.particles.FallingSoil.entries.has(soilEmitter)) vfx.particles.FallingSoil.Remove(soilEmitter);
+      };
       const runtime = {
         api: { State: () => ({
           scene: layout.scene, camera: layout.camera, backdrop: backdrop.Stats(),
@@ -129,15 +156,18 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
           terrainTriangles: battlefield.stats.groundTris,
           terrainLayers: battlefield.terrainLayers?.setName ?? null,
           fogVolumes: fogHandles.length,
+          terrainSet: battlefield.terrainLayers?.setName,
           smoke: vfx.smokeSources.size,
-          ...(impact ? { impactAge } : {}),
+          ...(loadFigures ? { figures: figures?.ids || [] } : {}),
+          ...(impact ? { impactAge, soil: soilEmitter ? vfx.particles.FallingSoil.Inspect(soilEmitter) : null } : {}),
         }) },
         Update(dt) {
+          if (figures && !figures.root.parent) host.scene.add(figures.root);
           if (impact) {
             untilImpact -= dt;
             if (untilImpact <= 0) {
-              vfx.GroundImpact({ x: impact.x, y: ground, z: impact.z },
-                { groundY: ground, chargeKg: .025, massScale: .18 });
+              RemoveSoil();
+              soilEmitter = RoadsideSoil(vfx, impact, ground);
               untilImpact += 12;
               impactAge = 0;
             }
@@ -146,7 +176,10 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
           vfx.Update(dt, camera, state.elapsed);
         },
         Dispose() {
+          disposed = true;
+          figures?.Dispose();
           for (const handle of fogHandles) volumetrics.RemoveFogVolume(handle);
+          RemoveSoil();
           backdrop.Dispose();
           host.SetViewmodelHidden(false);
         },
@@ -156,7 +189,13 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker) {
         OnInstalled: ApplyPose,
         UpdateCamera: ApplyPose,
         PostOptions: () => layout.camera?.vignette === undefined ? null : { vignette: layout.camera.vignette },
-        Warmup: () => vfx.particles.Ready(),
+        Warmup: async () => {
+          const preparingFigures = loadFigures?.(host, layout.landmarks).then(loaded => {
+            if (disposed) loaded.Dispose();
+            else figures = loaded;
+          });
+          await Promise.all([vfx.particles.Ready(), preparingFigures]);
+        },
       });
     },
   };
@@ -166,7 +205,8 @@ const PLUGINS = {
   gengjiazhuangFieldApproach: SceneryPreview("GengjiazhuangFieldApproach"),
   gengjiazhuangEastSmoke: SceneryPreview("GengjiazhuangEastSmoke", ["Sandbag"]),
   tanketteAdvanceEastTrack: SceneryPreview("TanketteAdvanceEastTrack",
-    ["Sandbag", "WoodCrate", "HandcartWood"], "RoadsideSoilBurst"),
+    ["Sandbag", "WoodCrate", "HandcartWood"], "RoadsideSoilBurst",
+    async (host, landmarks) => (await import("./Script_EastTrackFigures.mjs")).BuildEastTrackFigures(host, landmarks)),
   aircraftEvacuationDitch: SceneryPreview("AircraftEvacuationDitch", ["WoodCrate", "WoodBeam", "HandcartWood", "Sandbag"]),
   encounterPlay: {
     phase: ENCOUNTER_PLAY_PHASE, World: FirstLevelWhiteboxField, startup: ENCOUNTER_PLAY_STARTUP,

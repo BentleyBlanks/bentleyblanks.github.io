@@ -613,6 +613,20 @@ export async function LoadLugouCharacterAssets() {
   return loadPromise;
 }
 
+/** Load only the named existing bodies for a shot that samples its poses separately. */
+export async function LoadLugouPoseAssets(kind, variants) {
+  const ids = new Set(variants.map(variant => LugouCharacterModelId(kind, variant)));
+  const response = await fetch(MANIFEST_URL, { cache: "no-store" });
+  if (!response.ok) throw new Error(`character manifest HTTP ${response.status}`);
+  const manifest = await response.json();
+  const records = (manifest.models || []).filter(record => ids.has(record.id));
+  if (records.length !== ids.size) throw new Error("A posed scenery figure is missing its body record");
+  const bodies = await Promise.all(records.map(async record => ({
+    record, gltf: await LOADER.loadAsync(VersionedUrl(record.url, record.version)),
+  })));
+  return { byFaction: { [FactionForKind(kind)]: bodies } };
+}
+
 const onDemandLoads = new Map();
 
 /**

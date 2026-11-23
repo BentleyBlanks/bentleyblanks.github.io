@@ -221,9 +221,11 @@ export class FirstLevelWhiteboxField {
         const trench = !!this.TrenchPlan();
         const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
           .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
-        this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers,
+        const terrainSet = this.layout.ground.terrainLayers;
+        this.terrainLayers = await LoadTerrainLayers(terrainSet,
           { anisotropy: this.library.anisotropy, extraLayers: trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer),VersionedLayer(TRENCH_SURFACE.looseLayer)] : [],
-            layerOverrides: trench ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
+            layerOverrides: trench && terrainSet === "MissionPlain"
+              ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
         if (trench) {
           this.trenchSurface = await LoadTrenchSurface();
           this.terrainContact = new TerrainContactField(this.terrain);

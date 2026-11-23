@@ -255,9 +255,12 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(tanks.length === 2 && tanks[0].pos[2] > tanks[1].pos[2] && tanks.every(({ pos: [x, y, z] }) =>
     y - floor > .60 && Math.abs(y - ground(x, z)) < .025 && Math.abs(y - uncut(x, z)) < .025),
     "两辆九四式以前后距离落在未挖过的上层车道");
-  Check(layout.camera.fovDeg === doc.camera.fovDeg && layout.smokeColumns.length === 5
-    && layout.landmarks.some(marker => marker.id === "RoadsideSoilBurst"),
-    "固定机位、分层烟源与路缘扬土地标进入游戏布局");
+  Check(layout.camera.fovDeg === doc.camera.fovDeg && layout.ground.terrainLayers === "EastTrack"
+    && layout.smokeColumns.filter(column => column.options.backdrop?.volume?.asset === "EastTrackSoot").length === 1
+    && layout.smokeColumns.filter(column => column.options.kind === "dust").length === 3
+    && layout.smokeColumns.filter(column => column.options.fire > 0).length === 1
+    && layout.fogVolumes.length === 4 && layout.landmarks.some(marker => marker.id === "RoadsideSoilBurst"),
+    "固定机位、专用地表、分层烟源与路缘扬土地标进入游戏布局");
 }
 
 {
