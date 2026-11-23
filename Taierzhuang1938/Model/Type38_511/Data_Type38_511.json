@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 12,
+  "version": 13,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "4607d06373cca6d467ee4c4d76f5f05d8fdc2469b9d987c5997035cb31c29c1a",
+  "runtimeSha256": "330efe92cbe18871b4b2b6607d6cf8971dea1d9aaa62e00fe5f4af287adda99c",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72088,
@@ -604,32 +604,32 @@
     {
       "index": 95,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 1910877,
-      "sha256": "b8c13512b9bf85089991729a3b7abe8a675ec67fa3308ba7ab1e4e1e591ee3fe"
+      "bytes": 1908476,
+      "sha256": "ba8dbb4ea69290b2ec231db25aa2788a8f470426d768a9ad1a4658fca1f1499a"
     },
     {
       "index": 96,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 47448,
-      "sha256": "46e6d13c5d5142b9a5795f7aadfbd663ced60c930447381a0b3ad3a8163689e2"
+      "bytes": 91789,
+      "sha256": "75e322a4cab096ee86683a7cadbf1e10634ca79e3f5a277089c68a69dd5280b5"
     },
     {
       "index": 97,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 1789498,
-      "sha256": "b386fbc9e8bc97cbbecc30632ad2f4e34835d4e797e14e016ceffd6bdf840330"
+      "bytes": 1791944,
+      "sha256": "0aea0ec69460cd3e571952f187468824c2989f6064e1bb3c9cfe3a26c0a2dadd"
     },
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2100590,
-      "sha256": "9baf458c531770355d194912172475a7df3a03f1f0394fee5798e4af15b21c69"
+      "bytes": 2094322,
+      "sha256": "aea31b2e614b2b503566a8514944cb152b61f1e308f96d38504756eae5232f7e"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 1281608,
-      "sha256": "4c13eb4f7588a87f17b8179cf5b0d7a604e09b4107736325aacba4c99a3d8325"
+      "bytes": 1281176,
+      "sha256": "5425fb31cc890dc1788fab164b2b5bb800c9111f16d809e83488635700072dd9"
     },
     {
       "index": 100,
@@ -924,8 +924,8 @@
       170.2
     ],
     "T38_460G_WoodGroove_VisualCandidate": [
-      84.9,
-      101.3,
+      84.0,
+      101.1,
       118.7
     ],
     "T38_462_TriggerTip_VisualCandidate": [

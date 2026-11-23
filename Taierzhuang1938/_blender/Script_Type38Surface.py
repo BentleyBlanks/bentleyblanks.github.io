@@ -416,9 +416,9 @@ def PoreField(length, transverse):
     return (1-Ramp(.18,1,distance))*Ramp(.18,.77,Hash(col,row,3343))
 
 
-def InlayShading(doc, views, primitive, field, inlay, stripCenter, wear):
-    rows,cols = np.nonzero(inlay>.002)
-    height,width = inlay.shape
+def StockShadingBasis(doc, views, primitive, field, mask):
+    rows,cols = np.nonzero(mask)
+    height,width = mask.shape
     attrs = primitive['attributes']
     triangles = Attribute(doc,views,primitive['indices'],3).astype(int)
     uv = Attribute(doc,views,attrs['TEXCOORD_0'],2)
@@ -434,6 +434,11 @@ def InlayShading(doc, views, primitive, field, inlay, stripCenter, wear):
     tangent -= surface*np.sum(tangent*surface,axis=1,keepdims=True)
     tangent /= np.maximum(np.linalg.norm(tangent,axis=1,keepdims=True),1e-6)
     binormal = np.cross(surface,tangent)*np.sign(tangents[:,:,3].mean(axis=1,keepdims=True))
+    return rows,cols,surface,tangent,binormal
+
+
+def InlayShading(doc, views, primitive, field, inlay, stripCenter, wear):
+    rows,cols,surface,tangent,binormal = StockShadingBasis(doc,views,primitive,field,inlay>.002)
     along = field[rows,cols,2]
     cross = np.clip((field[rows,cols,1]-stripCenter[rows,cols])/.00212,-.98,.98)
     acrossSlope = (.48+.19*wear[rows,cols])*cross/np.sqrt(1-cross**2)
@@ -585,6 +590,17 @@ def Build(cache):
                 rubbedLip *= np.clip(.61+.18*stain+.08*grainSteel,.2,.95)
                 bodyPolish = flank*Ramp(-.47,-.430,length)*(1-Ramp(-.26,-.21,length))
                 bodyPolish *= np.exp(-((up-.0135)/.0064)**2)*np.clip(.78+.17*stain,.35,1)
+                polishBand = Ramp(-.467,-.433,length)*(1-Ramp(-.250,-.217,length))
+                polishBand *= Ramp(.008,.018,-side)*Ramp(.25,.73,-normalSide)
+                polishBand *= np.exp(-((up-.0149)/.0079)**4)*(1-Ramp(.12,.62,recess))
+                glazeFill = polishBand*np.clip(.84+.11*stain+.045*grainSteel,.48,1)
+                patina = (1-.19*fleck)*glazeFill
+                color = Blend(color,Tint([70,46,9],[142,96,22],.49+.26*fibre+.11*stain),.59*patina)
+                oldFilm = (1-Ramp(-.419,-.370,length))*polishBand
+                glossShoulder = np.exp(-((up-.0148)/.0049)**4)*glazeFill
+                lowerReturn = Ramp(-.466,-.427,length)*(1-Ramp(-.255,-.218,length))
+                lowerReturn *= (1-Ramp(.010,.0134,up))*Ramp(.14,.59,-normalSide)*Ramp(.007,.014,-side)
+                color = Blend(color,Tint([65,26,8],[136,72,21],.39+.29*fibre+.10*stain),.60*lowerReturn)
                 rearPanel = Ramp(.004,.060,length)*Ramp(.10,.76,np.abs(normalSide))
                 upperEdge = .018-.062*length
                 depth = np.clip((upperEdge-up)/(.067+.37*np.maximum(0,length-.05)),0,1)
@@ -632,6 +648,13 @@ def Build(cache):
                 varnish[:,:,0] = np.where(padded,np.rint(np.clip(varnish[:,:,0]+6*recess+23*bodyPolish,0,244)),0)
                 varnish[:,:,1] = np.where(padded,np.rint(np.clip(varnish[:,:,1]+8*recess-17*rubbedLip+6*bodyPolish,34,142)),0)
                 rough += 9*recess-11*rubbedLip-8*bodyPolish
+                varnish[:,:,0] = np.where(padded,np.rint(varnish[:,:,0]+(250-varnish[:,:,0])*glazeFill),0)
+                varnish[:,:,1] = np.where(padded,np.rint(np.clip(varnish[:,:,1]-6*glossShoulder+11*oldFilm,34,142)),0)
+                rough -= 30*glazeFill
+                glossSlot = material['extensions']['KHR_materials_specular']['specularTexture']
+                gloss = Load(glossSlot)
+                gloss[:,:,3] = np.rint(gloss[:,:,3]+(235-gloss[:,:,3].astype('f'))*glazeFill)
+                Store(glossSlot,gloss)
             metal = np.zeros_like(rough)
             relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
             if not separate:
@@ -765,6 +788,11 @@ def Build(cache):
                 rows,cols,tangentSpace,weight = MedallionRelief(doc,views,primitive,field,valid,padded)
                 normals[rows,cols] += (tangentSpace-normals[rows,cols])*weight[:,None]
             if wood and not separate:
+                rows,cols,surface,tangent,binormal = StockShadingBasis(doc,views,primitive,field,patina>.001)
+                curvedStrip = Ramp(.0107,.0132,up[rows,cols])*(1-.57*Ramp(.0010,.0038,np.abs(up[rows,cols]-.0151)))
+                sweep = .166*patina[rows,cols]*curvedStrip*Ramp(-.442,-.354,length[rows,cols])*(.82+.13*stain[rows,cols])
+                normals[rows,cols,0] += sweep*tangent[:,2]
+                normals[rows,cols,1] += sweep*binormal[:,2]
                 rows,cols,target = InlayShading(doc,views,primitive,field,inlay,stripCenter,stripWear)
                 normals[rows,cols] += (target-normals[rows,cols])*inlay[rows,cols,None]
             normals /= np.maximum(1e-7, np.linalg.norm(normals, axis=2, keepdims=True))
@@ -775,7 +803,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_FlankLacquer10'
+    doc['asset']['extras']['version'] = 'Type38_PolishedApron11'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -783,7 +811,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=12, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=13, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
