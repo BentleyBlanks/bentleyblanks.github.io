@@ -927,6 +927,9 @@
       "./Script_EncounterPlayScene.mjs": "./Script_EncounterPlayScene.mjs",
       "./Script_ArchivedP012Split.mjs": "./Script_ArchivedP012Split.mjs",
       "./Script_ArchivedP012SplitStub.mjs": "./Script_ArchivedP012SplitStub.mjs",
+      "./Data_MenuContent.mjs": "./Data_MenuContent.mjs",
+      "./Data_MenuCampaign.mjs": "./Data_MenuCampaign.mjs",
+      "./Data_MenuSandboxes.mjs": "./Data_MenuSandboxes.mjs",
       "./Script_EncounterPlaySplit.mjs": "./Script_EncounterPlaySplit.mjs",
       "./Script_EncounterPlaySplitStub.mjs": "./Script_EncounterPlaySplitStub.mjs",
       "./Script_EncounterPlayView.mjs": "./Script_EncounterPlayView.mjs",
@@ -987,9 +990,17 @@
   <link rel="stylesheet" href="./Style_HistoryCodex.css?v=2026101801">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
   <link rel="stylesheet" href="./Style_Editor.css?v=20261122FpsInspect">
-  <!-- 白盒关卡编辑器（?editor=blockout）：卡片、导航栏、小地图与全关总图外框。不在该模式时一个元素都不挂。 -->
-  <link rel="stylesheet" href="./Style_EditorBlockout.css?v=20261102120000">
-  <link rel="stylesheet" href="./Style_EditorEnvironment.css?v=20261102200000">
+  <!-- 白盒关卡编辑器与环境编辑器样式：主菜单不加载，发布构建（--deploy）一并剔除。 -->
+  <script data-editor-styles>
+    if (location.search.length > 1) {
+      for (const href of ["./Style_EditorBlockout.css?v=20261102120000", "./Style_EditorEnvironment.css?v=20261102200000"]) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        document.head.appendChild(link);
+      }
+    }
+  </script>
 </head>
 <body>
   <canvas id="view"></canvas>

@@ -77,6 +77,9 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
   if (/<script\b[^>]*src="\.\/Script_(?:Main|MenuStartup)\.mjs/.test(sourceHtml)) throw new Error('The router must be the only runtime entry');
   // Only the small router and Three are unconditional. The router fetches one runtime.
   let html = sourceHtml.replace(entryPattern, '<script type="module" src="' + entryUrl + '"></script>');
+  if (stripSplitTools || stripDevTools) {
+    html = html.replace(/\s*<script data-editor-styles>[\s\S]*?<\/script>/g, '');
+  }
   // Source modules remain available for workers and diagnostics, but are never bulk-preloaded.
   html = html.replace('</head>', '<link rel="modulepreload" href="' + entryUrl + '">\n'
     + '<link rel="modulepreload" href="' + imports.three + '">\n'

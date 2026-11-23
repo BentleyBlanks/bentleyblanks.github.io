@@ -12,17 +12,8 @@ import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS, TOOL_INFO} from './Data_DevTools.mjs'
 import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
 import { CreateGameGraphics } from './Script_Tuning_GameGraphics.mjs';
-import {CAMPAIGN_ENTRIES} from './Data_Menu.mjs';
-import {MOVEMENT_RANGE_PHASE} from './Data_MovementRange.mjs';
-import {WEAPON_RANGE_PHASE} from './Data_WeaponRange.mjs';
-import {RANGE_PHASE} from './Data_Range.mjs';
-import {EXPLOSION_RANGE_PHASE} from './Data_ExplosionRange.mjs';
-import {SHELL_IMPACT_RANGE_PHASE} from './Data_ShellImpactRange.mjs';
-import {BATTLE_REACTION_RANGE_PHASE} from './Data_BattleReactionRange.mjs';
-import {CLOTH_RANGE_PHASE} from './Data_ClothRange.mjs';
-import {HAIR_RANGE_PHASE} from './Data_HairRange.mjs';
-import {MELEE_QTE_PHASE} from './Data_MeleeQte.mjs';
-import {GORE_RANGE_PHASE} from './Data_GoreRange.mjs';
+import {CAMPAIGN_ENTRIES} from './Data_MenuCampaign.mjs';
+import {MENU_SANDBOX_ENTRIES} from './Data_MenuSandboxes.mjs';
 import {FIRST_LEVEL_CAMPAIGN_STAGES} from './Data_FirstLevelCampaign.mjs';
 import {DebugOptions} from './Script_DebugOptions.mjs';
 import {SandboxUrl} from './Data_StartupRouting.mjs';
@@ -117,7 +108,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 }
 await preview.Load();
 menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdrop: true,
-  campaign: CAMPAIGN_ENTRIES, sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE, BATTLE_REACTION_RANGE_PHASE, CLOTH_RANGE_PHASE, HAIR_RANGE_PHASE],
+  campaign: CAMPAIGN_ENTRIES, sandboxes: MENU_SANDBOX_ENTRIES,
   CommandRoomPreview: () => preview.State(), PreviewCommandRoom, PrepareBackdrop: () => preview.Load(),
   SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings, CloseSettings: () => settings.Close(), OpenTool,
   DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,

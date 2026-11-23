@@ -18,10 +18,16 @@
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_CameraLens.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
-import { MENU, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
+import { MENU, PRESUMED_STAGING, CAST, PRESUMED } from "./Data_MenuContent.mjs";
 import { AboutDossier } from "./Script_About.mjs";
-import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
-import { PRESUMED } from "./Data_Tengxian.mjs";
+import { MENU_SCENE, MENU_SHOTS } from "./Data_MenuCampaign.mjs";
+function ShotsFor(levelId, firstZone = null) {
+  const list = MENU_SHOTS[levelId];
+  if (list && list.length) return list;
+  const x = firstZone?.x ?? 0;
+  const z = firstZone?.z ?? 0;
+  return [{ id: "Fallback", from: [x + 88, 26, z + 88], to: [x + 70, 22, z + 70], look: [x, 3, z], focalMm: 35 }];
+}
 // 界面文案走字符串表（Data_Text_Menu / Data_Text_About），内容原稿（MENU / CAST）留在
 // Data_TengxianScript 里，显示时按 id 过 Localize —— 口径见 docs/Data_TextAndTuning.md §3。
 import { T, Localize } from "./Script_Text.mjs";

@@ -67,99 +67,8 @@
  * 班长邱茂才与连长杨守成两个名字由设计书写死（docs/Data_TengxianDesign.md 关卡表），
  * 这里照抄，不许改名，改了下游按名字对台词的自检会漏。
  */
-export const CAST = {
-  // --- 任务流程重制的班组（docs/Data_MissionRemake.md §8 人物速查）---------
-  // 配音与 beats 的 who 一律用这些 id（契约 §10.2）。
-  shunzi: {
-    name: "谢长顺", short: "顺子", real: false,
-    note: "玩家。第 122 师 364 旅 727 团 3 营 9 连二等兵，赶场路上被绳子捆来的壮丁。籍贯与连别为推定",
-  },
-  luo: {
-    name: "罗茂才", short: "罗班长", real: false,
-    note: "9 连 3 班班长，四川人。老兵，出川那一趟从头走到尾。四关夜战救顺子时腹部中弹牺牲",
-  },
-  yaowa: {
-    name: "", short: "幺娃", real: false,
-    note: "班里最年轻的一个。前期模仿老兵骂人，日机扫射后第一个失控大骂；最怕黑、最想家",
-  },
-  heyoutian: {
-    name: "何有田", short: "何有田", real: false,
-    note: "最爱吹牛说笑（三个婆娘）。二关白刃战后呕吐；后期脏话越重、话越少。只有姐姐给他写过信",
-  },
-  liuwencai: {
-    name: "刘文财", short: "刘文财", real: false,
-    note: "斤斤计较、什么都数。后期数数变成控制恐惧的方式：机枪还剩多少、还有几副担架",
-  },
-  xiaoqin: {
-    name: "", short: "小秦", real: false,
-    note: "通信兵。护线、接电话、骂踩线的。五关末视角③、终章的玩家角色，随王铭章殉难倒下",
-  },
-  zhaodegui: {
-    name: "赵德贵", short: "赵德贵", real: false,
-    note: "老成持重。管弹药纪律，接想家的话头",
-  },
-  paizhang: {
-    name: "", short: "排长", real: false,
-    note: "负伤排长。五关下达「出了西关不用再回来」的军令",
-  },
-  junyi: {
-    name: "", short: "军医", real: false,
-    note: "军医／卫生兵。只处理战伤（刘文财牙痛没人理）",
-  },
-  s124: {
-    name: "", short: "伤兵", real: false,
-    note: "第 124 师伤兵，三七二旅的。五关视角①的机枪副射手",
-  },
-  danjiayuan: { name: "", short: "担架员", real: false, note: "虚构，无名" },
-  shangbing: { name: "", short: "伤员", real: false, note: "虚构，无名" },
-  junguan: { name: "", short: "军官", real: false, note: "兵站军官。序章「第五战区肯接，还给了枪弹」" },
-  canmou: { name: "", short: "参谋", real: false, note: "通信参谋。终章复诵最后电文" },
-  ija_gunso: { name: "", short: "军曹", real: false, note: "日军军曹。台词走日语分支（VoiceBake 的假名支）" },
-  // --- 上一轮的班组（旧关表已删，条目保留：旧过场的 who 仍指着它们）--------
-  player: {
-    name: "谢长顺", short: "长顺", real: false,
-    note: "第 122 师 364 旅 727 团 3 营 9 连 二等兵，四川三台人，十八岁。籍贯为推定",
-  },
-  qiu: {
-    name: "邱茂才", short: "班长", real: false,
-    note: "9 连 3 班班长，四川人。老兵，出川那一趟从头走到尾",
-  },
-  yang: {
-    name: "杨守成", short: "连长", real: false,
-    note: "9 连连长，四川人",
-  },
-  // --- 真实历史人物 ---------------------------------------------------------
-  // 契约 §10.2 的 id（新章一律用这个）；旧过场仍用 wang，两条指同一个人。
-  wangmingzhang: {
-    name: "王铭章", short: "师长", real: true,
-    note: "第 122 师师长／第 41 军前方总指挥。3 月 17 日殉国。终章：追问战况、「那就发」「收起」，西关电灯厂殉国",
-  },
-  wang: {
-    name: "王铭章", short: "师长", real: true,
-    note: "第 122 师师长／第 41 军前方总指挥（职务三说并列：代军长／前方总指挥／第二线指挥官）。3 月 17 日殉国",
-  },
-  zhao: {
-    name: "赵渭滨", short: "参谋长", real: true,
-    note: "第 122 师参谋长，少将，时年 44 岁。3 月 17 日殉国（有绝笔家书传世，信史）",
-  },
-  zhang: {
-    name: "张宣武", short: "团长", real: true,
-    note: "第 727 团团长，被王铭章任命为滕县城防司令。1983 年起的文史回忆是本役中方骨架史料",
-  },
-  yan: {
-    name: "严翊", short: "营长", real: true,
-    note: "第 731 团 1 营营长。东关缺口密集投弹堵口就是这个营干的",
-  },
-  hou: {
-    name: "侯子平", short: "副营长", real: true,
-    note: "第 727 团 3 营副营长。3 月 17 日 21 时指挥扒开北城门突围",
-  },
-  // --- 只出声不出场 ---------------------------------------------------------
-  adjutant: { name: "", short: "副官", real: false, note: "虚构，无名。只在 CS_WangMingzhang 画外喊一句" },
-  runner: { name: "", short: "传令兵", real: false, note: "虚构，无名" },
-  crowd: { name: "", short: "", real: false, note: "西门瓮城里挤着的人，无名无脸" },
-  narrator: { name: "", short: "", real: false },
-};
+// 人物表 / 菜单标题原稿抽至 Data_MenuContent.mjs，避免主菜单拖入七章剧本；此处原样重导出。
+export { CAST, MENU } from "./Data_MenuContent.mjs";
 
 // ===========================================================================
 // 章表（七章）—— 组装层
@@ -346,19 +255,7 @@ export function FindLevel(id) {
 // 菜单与关于页
 // ===========================================================================
 
-export const MENU = {
-  title: "台儿庄：血战滕县",
-  subtitle: "一九三八年三月十四日 — 十八日 · 山东滕县",
-  lines: [
-    "守城的是川军，没有钢盔，三分之一以上没有步枪。",
-    "城是必然陷落的。",
-    "你能改变的只有：这一小时守不守得住。",
-  ],
-  start: "开始游戏",
-  chapters: "选择章节",
-  codex: "史实注记",
-  credits: "关于",
-};
+// MENU 已在文件顶部从 Data_MenuContent.mjs 重导出。
 
 export const CREDITS = [
   "《台儿庄：血战滕县》 —— 浏览器 FPS 原型",
