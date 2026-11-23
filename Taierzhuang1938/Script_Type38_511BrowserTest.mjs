@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-rear-profile-04');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-gallery-highlights-05');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -66,6 +66,28 @@ try{
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
   assert(lower.meanGreen>upper.meanGreen*1.35&&lower.meanRed>upper.meanRed*1.12,'the stained crown and warmer lower wood must not collapse to the same brown');
+  evidence.gripFinish=await page.evaluate(()=>{
+   const rig=window.Tengxian.viewmodel.rig.group;let maps;
+   rig.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_HandleOval08')maps=mesh.material.roughnessMap.image;});
+   const canvas=document.createElement('canvas');canvas.width=maps.width;canvas.height=maps.height;
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(maps,0,0);
+   const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+   const Sample=(left,right)=>{
+    const roughness=[],metalness=[];
+    for(let row=Math.ceil(canvas.height*.08);row<canvas.height*.92;row+=5)
+     for(let col=Math.ceil(canvas.width*left);col<canvas.width*right;col+=5){
+      const offset=4*(row*canvas.width+col);
+      if(data[offset]<230)continue;
+      roughness.push(data[offset+1]);metalness.push(data[offset+2]);
+     }
+    const Median=values=>values.sort((first,second)=>first-second)[Math.floor(values.length/2)];
+    return {count:roughness.length,roughness:Median(roughness),metalness:Median(metalness)};
+   };
+   return {neck:Sample(.13,.40),oval:Sample(.65,.90)};
+  });
+  const {neck,oval}=evidence.gripFinish;
+  assert(neck.count>100&&oval.count>100&&neck.metalness-oval.metalness>25&&oval.roughness-neck.roughness>12,
+   'the grip finish must separate polished neck from darker worn oval on the actual runtime maps');
  }
  assert(evidence.identity.materials.filter(m=>m.base).every(m=>m.colour.every(c=>Math.abs(c-1)<1e-8)));
  assert.equal(evidence.identity.glError,0);

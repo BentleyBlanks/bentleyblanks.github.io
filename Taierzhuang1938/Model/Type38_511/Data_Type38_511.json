@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 6,
+  "version": 7,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "43933e1c71350eb30e9e7156eba3d5f2ddcc7d01e35ab23c4d57d60e48615755",
+  "runtimeSha256": "205fa49f0c409aa864002632190a74b297a08fc909e145d0b88755c9153b557b",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72088,
@@ -100,14 +100,14 @@
     {
       "index": 11,
       "name": "Texture_Type38Sample04Base",
-      "bytes": 113694,
-      "sha256": "cf14fe63460771e5b33699a9be7f965986b061f0a68d033b079638932b568353"
+      "bytes": 143440,
+      "sha256": "88b1636ceece5bddcca28902c0abf2ec7ea2aeaeb3a69ac43fc27ec0f3f1f8c2"
     },
     {
       "index": 12,
       "name": "Texture_Type38Sample04Orm",
-      "bytes": 154506,
-      "sha256": "bffa2393ac4b132d4d2c5d022f1b455ee54a84b682782536b3effc73abd0450b"
+      "bytes": 171901,
+      "sha256": "aa6b0dfe502884bd6c2ea64411e22b261ea321c7a924fab717b439d27e38ef06"
     },
     {
       "index": 13,
@@ -412,14 +412,14 @@
     {
       "index": 63,
       "name": "Texture_Type38Sample28Base",
-      "bytes": 150632,
-      "sha256": "3066c7ef50a75569e236e39f2d0cacc4682939100ade446f78e1dadc6a0092f9"
+      "bytes": 156350,
+      "sha256": "56e8b0d9e0153dc97a5e9e2c0cf3826d018334c5e406298b84b57810fa489406"
     },
     {
       "index": 64,
       "name": "Texture_Type38Sample28Orm",
-      "bytes": 234750,
-      "sha256": "5ccbb483d0762e209c87a46cd9940840e95d5d6b0291dac6c625195d8514ab16"
+      "bytes": 237096,
+      "sha256": "bb03751355fc8bf2efac844077bc346e591a2de570b17ee2e8b4dd4a40033c9c"
     },
     {
       "index": 65,
@@ -430,14 +430,14 @@
     {
       "index": 66,
       "name": "Texture_Type38Sample29Base",
-      "bytes": 189372,
-      "sha256": "294280dd6fbdd38954b55729351ea1e3794f0d7c26ac414622d5e3e8a9830e69"
+      "bytes": 199279,
+      "sha256": "6fe0fac0f561e2ff876d32eb359395a16a0977131e91efd9069a6c945551ff45"
     },
     {
       "index": 67,
       "name": "Texture_Type38Sample29Orm",
-      "bytes": 308482,
-      "sha256": "3a7134c32afb17ff6d19a8ff0455e712fdb2a7f8a2c62ce7ccec67387ba01f46"
+      "bytes": 311891,
+      "sha256": "477bb16366bf11469f89833c9a4f95c47f0cccb2308525aa254191d4cff5518b"
     },
     {
       "index": 68,
@@ -448,14 +448,14 @@
     {
       "index": 69,
       "name": "Texture_Type38Sample30Base",
-      "bytes": 320047,
-      "sha256": "eb138887cbeef6ce1a1bb2ecf0fe1f0ac614c03033521dc1349b2b5802693fb0"
+      "bytes": 337195,
+      "sha256": "560c74c457d740257fcbd465e90b6d701217d535429718fd46e14ea5df3fee0d"
     },
     {
       "index": 70,
       "name": "Texture_Type38Sample30Orm",
-      "bytes": 500441,
-      "sha256": "bed5289604d44fc8e555d4e2d56baea9f020734eccdcf286e6c8d399299383c1"
+      "bytes": 506271,
+      "sha256": "f61b3c9e048db02b6273e7c7728d511cda437918cbe407159bf9be9c6eab0831"
     },
     {
       "index": 71,
@@ -586,20 +586,20 @@
     {
       "index": 92,
       "name": "Texture_Type38Sample37Normal",
-      "bytes": 206285,
-      "sha256": "ed8068e8dba2a76df27ac31d37786990d5a639e7af6d54f5c512d2b51284c3e2"
+      "bytes": 209895,
+      "sha256": "bd4174af9b7e678bd5d3bab7d35f27eaa24eecc28c1aa28b89f8f7de7e10302e"
     },
     {
       "index": 93,
       "name": "Texture_Type38Sample37Base",
-      "bytes": 107905,
-      "sha256": "6e09384f5d007b2a18907275f166b5312296ae66d93a1bded2a2384e3e02aa56"
+      "bytes": 140949,
+      "sha256": "035650867fe66bfbf29ceb1fa325fb3fd7295b441001ca8703c1889b662bd897"
     },
     {
       "index": 94,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 132477,
-      "sha256": "d1db792b65d2c2c8ec57864655587ff5b74e0760fd40427965f8c58214635b9f"
+      "bytes": 132529,
+      "sha256": "7b052586240a07a6e1a50e4fd42c2f12daa72c6df21e71aabef69a873660ed14"
     },
     {
       "index": 95,
@@ -764,9 +764,9 @@
       119.9
     ],
     "Exterior_HandleOval08": [
-      67.4,
-      79.7,
-      91.2
+      47.6,
+      56.9,
+      75.2
     ],
     "Wood_UpperFittedCrown05": [
       85.6,
@@ -919,9 +919,9 @@
       107.3
     ],
     "T38_440D2_IndependentVisibleRecess": [
-      89.0,
-      101.5,
-      118.2
+      93.4,
+      110.4,
+      140.2
     ],
     "T38_460G_WoodGroove_VisualCandidate": [
       84.9,
