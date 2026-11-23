@@ -82,7 +82,7 @@ void main() {
     vec2 marchUv = (clip.xy / clip.w) * 0.5 + 0.5;
     if (marchUv.x < 0.0 || marchUv.x > 1.0 || marchUv.y < 0.0 || marchUv.y > 1.0) break;
     float sceneDepth = texture2D(uNormalDepth, marchUv).w;
-    if (sceneDepth <= 0.0) continue;               // 天空
+    if (sceneDepth <= uMinViewDepth) continue;     // 跳过天空（0）与第一人称前景标签（常数 1 m，非真实世界深度）
     float rayDepth = -marchPos.z;
     float diff = rayDepth - sceneDepth;            // > 0 = 射线跑到了表面后面
     // 下界跟着步长走：步长本身就是一个深度容差，固定小常数会在斜面上误判自遮挡。

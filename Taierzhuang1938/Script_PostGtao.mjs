@@ -253,6 +253,8 @@ void main() {
         vec4 snd = texture(uNormalDepth, suv);
         float sz = snd.w;
         if (sz <= 0.0) continue;                     // 天空不是遮挡物
+        // 第一人称手/枪写常数 1 m 前景标签（非真实世界深度），不得给近处背景（台面/掩体墙）投假 AO 黑边。
+        if (!foreground && uForegroundDepth > 0.0 && abs(sz - uForegroundDepth) < 0.002) continue;
         vec3 samplePos = ViewPosFromDepth(suv, sz, uProjScale);
         vec3 delta = samplePos - pixelPos;
         float sampleDist = length(delta);
