@@ -5068,7 +5068,7 @@ function HasLineOfSight(toX, toZ) {
  *     随便撒一个点有一多半落在别人家院子里，玩家永远看不见。
  */
 function SeedSoldiers(phase) {
-  if(phase.whitebox?.fullMission)return;
+  if (phase.whitebox?.fullMission || phase.whitebox?.encounterCampaign || sandbox) return;
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
   const nraTarget = phase.whitebox?.p012
     ? Math.max(0, phase.whitebox.friendlyLimit - (ai.deaths.nra || 0)) : Math.round(SCALE.maxAlive * 0.42);

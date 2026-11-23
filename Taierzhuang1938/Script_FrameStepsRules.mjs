@@ -229,7 +229,7 @@ export function PlayStepSpawn(ctx, f) {
     if (ctx.sandbox?.Maintain) ctx.sandbox.Maintain();
     // 其余测试场不补兵：枪械射击场的靶由它自己每帧维护；断肢场的木桩兵**不自动复位**
     //（断了的肢体要留在场上看，复位走面板的「重置木桩」）；其余场地本来就没有兵。
-    else if (ctx.SANDBOX_RANGE) { /* Sandbox fixtures maintain themselves. */ }
+    else if (ctx.SANDBOX_RANGE || ctx.sandbox) { /* Sandbox / campaign encounter plugins own their own actors. */ }
     else if (ctx.BLOCKOUT) { /* Blockout units are editor-owned puppets; nothing to reseed. */ }
     else if (ctx.TOOLS_HOME) { /* The tools home is an empty lot. */ }
     else ctx.SeedSoldiers(phase);
