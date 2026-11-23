@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 8,
+  "version": 9,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "88adb0437c62795695de4c682e2eb9726cd4bacd443cb37675dcc7e10d101525",
+  "runtimeSha256": "b72df438b5353ca078e818aa4ff1cb493d55c5190672d9ca69805d6acafa3d49",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72088,
@@ -112,8 +112,8 @@
     {
       "index": 13,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 641495,
-      "sha256": "11daabce81a0d622b67ccab0b22c4f5b395ac8b2ebff45f2bc5f32be42f79ca3"
+      "bytes": 528012,
+      "sha256": "b79f2c36cba910944aeddac494a6361d0cd9026ac70605b27e8f20ba3e9b2bf0"
     },
     {
       "index": 14,
@@ -124,20 +124,20 @@
     {
       "index": 15,
       "name": "Texture_Type38Sample05Normal",
-      "bytes": 463252,
-      "sha256": "c8532881317b3d6b8543977bc2fd1fe57b70a0917fd5e886e2110d9f3b0be0e3"
+      "bytes": 398785,
+      "sha256": "840f4888b71a39b2a61d8633692cb2210f476e50bdfc91c7d3f8cea5a9ae4ae6"
     },
     {
       "index": 16,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 616884,
-      "sha256": "6a4e2d4617db9cea18bf55f612bbc3da0b56b27c3d35a28c2222c2b38cfbaa58"
+      "bytes": 560630,
+      "sha256": "f1560cd74422006c9b1e20a9f5459d171aaaf1a54b94b584a99306e54ca218c1"
     },
     {
       "index": 17,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 404611,
-      "sha256": "3f9c948cb7da219d9e8beb3777ce900ac30f305889f92c4efe920e5800479525"
+      "bytes": 335861,
+      "sha256": "1992a425d45d9726eda393293d64b234af13eb1a871fc693f5b7b40b71d54e44"
     },
     {
       "index": 18,
@@ -604,8 +604,8 @@
     {
       "index": 95,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 1907599,
-      "sha256": "6c0ef37b98d7ef6bea4f9aba7a2f00b9c99e78f2116397eeeb98af5d01815715"
+      "bytes": 1907481,
+      "sha256": "65abc0229dd5ffc9b80f41d2dfcea875811a9e2080163fa0829c8384724b639f"
     },
     {
       "index": 96,
@@ -616,20 +616,20 @@
     {
       "index": 97,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 1797364,
-      "sha256": "ebbafccb42c903d726a43e36abac6fd903e10edc6bd52403c4ee0f2d2323ba21"
+      "bytes": 1797713,
+      "sha256": "a5ea2bf23962af7c510a69401d9c0e8dd7e174c55b4795be9d426d32d8d2168d"
     },
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2106185,
-      "sha256": "947e1f1c576b88fceb4491fb852ba0b660738f5c0c92496a4bbdcfece95019d0"
+      "bytes": 2106444,
+      "sha256": "2ba38cbf315b176f88689d5f9a35ef08ace87557744b33c11c28fb66254e3cd4"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 1279852,
-      "sha256": "defd7957aab2858a49924304bb6243439824393ee6c3a6d193c2102cc6540569"
+      "bytes": 1281943,
+      "sha256": "c260c95a9974618894a2843a5163e083460d6a2f755d6e536cccad4563af53d9"
     },
     {
       "index": 100,
@@ -769,9 +769,9 @@
       75.2
     ],
     "Wood_UpperFittedCrown05": [
-      85.6,
-      98.8,
-      118.6
+      81.4,
+      95.5,
+      110.9
     ],
     "Exterior_Guard02": [
       96.4,
@@ -924,9 +924,9 @@
       170.2
     ],
     "T38_460G_WoodGroove_VisualCandidate": [
-      84.9,
-      101.2,
-      118.5
+      85.0,
+      101.3,
+      118.7
     ],
     "T38_462_TriggerTip_VisualCandidate": [
       98.9,

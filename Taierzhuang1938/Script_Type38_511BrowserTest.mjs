@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-crown-relief-06');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-handguard-glaze-07');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -52,13 +52,17 @@ try{
     const coverage=ctx.getImageData(0,0,canvas.width,canvas.height).data;
     ctx.drawImage(mat.map.image,0,0);const base=ctx.getImageData(0,0,canvas.width,canvas.height).data;
     let visible=0,varnished=0,redSum=0,greenSum=0;
+    const steelRoughness=[];
     for(let offset=0;offset<pixels.length;offset+=4*17){
+     if(coverage[offset]>=230&&coverage[offset+2]>190)steelRoughness.push(coverage[offset+1]);
      if(coverage[offset]<230||coverage[offset+2]>50)continue;
      visible++;
      redSum+=base[offset];greenSum+=base[offset+1];
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible});
+    steelRoughness.sort((first,second)=>first-second);
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,
+     steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
   });
@@ -66,6 +70,9 @@ try{
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
   assert(lower.meanGreen>upper.meanGreen*1.35&&lower.meanRed>upper.meanRed*1.12,'the stained crown and warmer lower wood must not collapse to the same brown');
+  assert(upper.meanRed>108&&upper.meanGreen>39,'the upper handguard must retain warm wood beneath the lacquer');
+  assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
+   'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{
    const rig=window.Tengxian.viewmodel.rig.group;let maps;
    rig.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_HandleOval08')maps=mesh.material.roughnessMap.image;});

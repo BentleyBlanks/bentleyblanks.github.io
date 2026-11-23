@@ -343,6 +343,34 @@ def PoreField(length, transverse):
     return (1-Ramp(.18,1,distance))*Ramp(.18,.77,Hash(col,row,3343))
 
 
+def InlayShading(doc, views, primitive, field, inlay, stripCenter, wear):
+    rows,cols = np.nonzero(inlay>.002)
+    height,width = inlay.shape
+    attrs = primitive['attributes']
+    triangles = Attribute(doc,views,primitive['indices'],3).astype(int)
+    uv = Attribute(doc,views,attrs['TEXCOORD_0'],2)
+    chart = np.rint(uv*[width,height]-.5).astype('int32')
+    chartIds = np.zeros((height,width),np.int32)
+    for index,face in enumerate(triangles):
+        cv2.fillConvexPoly(chartIds,chart[face],index+1)
+    vertices = triangles[np.maximum(chartIds[rows,cols]-1,0)]
+    tangents = Attribute(doc,views,attrs['TANGENT'],4)[vertices]
+    surface = field[rows,cols,3:6].copy()
+    surface /= np.maximum(np.linalg.norm(surface,axis=1,keepdims=True),1e-6)
+    tangent = tangents[:,:,:3].mean(axis=1)
+    tangent -= surface*np.sum(tangent*surface,axis=1,keepdims=True)
+    tangent /= np.maximum(np.linalg.norm(tangent,axis=1,keepdims=True),1e-6)
+    binormal = np.cross(surface,tangent)*np.sign(tangents[:,:,3].mean(axis=1,keepdims=True))
+    along = field[rows,cols,2]
+    cross = np.clip((field[rows,cols,1]-stripCenter[rows,cols])/.00212,-.98,.98)
+    acrossSlope = (.48+.19*wear[rows,cols])*cross/np.sqrt(1-cross**2)
+    tipSlope = np.clip((-.673-along)/.00212,-1,1)*(along<-.673)
+    perturbed = surface+np.column_stack((np.zeros_like(along),acrossSlope,-.65*tipSlope))
+    perturbed /= np.maximum(np.linalg.norm(perturbed,axis=1,keepdims=True),1e-6)
+    target = np.column_stack((np.sum(perturbed*tangent,axis=1),np.sum(perturbed*binormal,axis=1),np.sum(perturbed*surface,axis=1)))
+    return rows,cols,target
+
+
 def VarnishTraces(length, transverse, positiveSide):
     rng = np.random.default_rng(381713)
     traces = np.zeros_like(length)
@@ -428,10 +456,14 @@ def Build(cache):
         if wood:
             separate = part == 'Wood_UpperFittedCrown05'
             across = (.13 if separate else .73) + transverse * 1.10 + side * side * 16 + .0035 * np.sin(8.4 * length)
-            down = (.63 if separate else .34) - along * 1.44
+            down = (.10 if separate else .34) - along * 1.44
             rgbScan = Sample(source['grain'], across, down)
             poreScan = Sample(source['pores'], across, down)
             glossScan = Sample(source['woodGloss'], across, down)
+            if separate:
+                stain = np.clip((Sample(source['grain'],.24+transverse*.84,.32-along*.64)-32)/30,-1.05,1.05)
+                grainSteel = np.clip((glossScan-59)/42,-1,1)
+                edge = np.clip((bend-.11)*1.8,0,1)*np.clip(.46+.27*stain+.18*grainSteel,0,1)
             fibre = np.clip((rgbScan - 15) / 49, 0, 1.3)
             pore = np.clip((132 - poreScan) / 51, -.7, 1.15)
             handling = np.exp(-((length-.025) / .115) ** 2) + .65 * np.exp(-((length+.5) / .16) ** 2)
@@ -447,8 +479,11 @@ def Build(cache):
             color = Blend(oldLacquer,Tint([68,22,10],[129,49,21],amber),rim) if separate else Blend(
                 Tint([62,22,9],[158,66,22],amber),honey,np.clip(.06+.94*sun+.12*warmWrist,0,1))
             if separate:
-                shoulder = Ramp(-.596,-.521,length)*(1-Ramp(-.394,-.352,length))
-                color = Blend(color,Tint([65,22,9],[134,51,16],amber),shoulder*.72)
+                shoulder = Ramp(-.603,-.552,length)*(1-Ramp(-.394,-.352,length))
+                crown = Ramp(.10,.85,normalUp)
+                glaze = np.clip(.28+.65*crown+.12*rgbScan/64+.06*stain,0,1)*shoulder
+                lacquerGrain = np.clip(.33+.64*fibre+.12*stain,0,1.06)
+                color = Blend(color,Tint([120,35,4],[237,93,13],lacquerGrain),glaze)
             else:
                 foreTip = 1-Ramp(-.91,-.69,length)
                 color = Blend(color,Tint([48,17,8],[116,49,19],amber),foreTip*.84)
@@ -486,6 +521,10 @@ def Build(cache):
             varnish = Load(coat['clearcoatTexture'])
             varnish[:, :, 0] = np.where(padded, np.clip(206 + 19*handling - 20*fleck - 114*breach-68*scratch-117*chip, 0, 238), 0)
             varnish[:, :, 1] = np.where(padded, np.clip(63 + .33*(glossScan-60) + 12*fleck + 7*stain - 13*handling + 48*breach, 34, 132), 0)
+            if separate:
+                glossVariation = .47*(glossScan-60) + 13*stain + 6*grainSteel
+                varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1] + glaze*(8+glossVariation),34,139),0)
+                varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.10*glaze*fleck))
             if not separate:
                 mellow = rearPanel*np.clip(.72+.22*rearward-.24*warmPath,0,1)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.47*mellow))
@@ -494,18 +533,23 @@ def Build(cache):
             metal = np.zeros_like(rough)
             relief = (poreScan-132)*.0027 - .10*fleck - .43*scratch - .62*chip
             if not separate:
-                distal = Ramp(-.673,-.616,length)
-                edgeDist = np.hypot(np.maximum(np.maximum(-.673-length,length+.599),0),up-(.0284+.0019*distal))
+                distal = 1-Ramp(-.649,-.605,length)
+                stripCenter = .0276+.0029*distal+.00018*np.sin((length+.623)*106)
+                edgeDist = np.hypot(np.maximum(np.maximum(-.673-length,length+.599),0),up-stripCenter)
                 inlay = (1-Ramp(.00150,.00212,edgeDist))*Ramp(.006,.010,side)
                 rolled = (1-Ramp(.0001,.00225,edgeDist))**.63
                 scuff = PaintBandScuff(doc, views, primitive, (width,height))*np.clip(.74+.22*grainSteel,.22,1)
                 color = Blend(color,Tint([54,28,17],[101,49,20],amber),scuff*.88)
-                color = Blend(color, Tint([96,84,72],[138,124,105],.45+.26*rolled+.11*stain), inlay)
-                metal = inlay * 250
+                wornArc = np.exp(-((length+.631)/.022)**2)
+                stripWear = np.clip(.24+.65*wornArc+.19*stain+.17*grainSteel,.07,1)
+                lip = np.clip((up-stripCenter)/.0018,-1,1)
+                steelTone = Tint([65,56,52],[127,113,103],.27+.46*stripWear+.07*rolled)
+                color = Blend(color,steelTone,inlay)
+                metal = inlay*(198+42*stripWear)
                 varnish[:, :, 0] = np.rint(varnish[:, :, 0]*(1-inlay)*(1-.50*scuff))
                 rough += 31*scuff
-                rough += inlay * (97-21*rolled+6*stain-rough)
-                relief = relief*(1-inlay) + (1.12*rolled+.36*inlay)*Ramp(.006,.010,side)-.25*scuff
+                rough += inlay * (177-39*stripWear-7*rolled+9*lip+8*grainSteel-rough)
+                relief = relief*(1-inlay) + ((1.23+.30*stripWear)*rolled+.27*inlay)*Ramp(.006,.010,side)-.25*scuff
             Store(coat['clearcoatTexture'], varnish)
         else:
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
@@ -582,6 +626,9 @@ def Build(cache):
             if disk:
                 rows,cols,tangentSpace,weight = MedallionRelief(doc,views,primitive,field,valid,padded)
                 normals[rows,cols] += (tangentSpace-normals[rows,cols])*weight[:,None]
+            if wood and not separate:
+                rows,cols,target = InlayShading(doc,views,primitive,field,inlay,stripCenter,stripWear)
+                normals[rows,cols] += (target-normals[rows,cols])*inlay[rows,cols,None]
             normals /= np.maximum(1e-7, np.linalg.norm(normals, axis=2, keepdims=True))
             Store(normalSlot, np.where(padded[:, :, None], (normals+1)*127.5, [128,128,255]))
         orm[:, :, 1] = np.where(padded, np.clip(rough, 39, 196), 0)
@@ -590,7 +637,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_CrownRelief06'
+    doc['asset']['extras']['version'] = 'Type38_HandguardGlaze07'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -598,7 +645,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=8, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=9, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
