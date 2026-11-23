@@ -1,6 +1,14 @@
 # Dots Type38 511 runtime integration
 
-## 当前材质版 · 2026-11-23
+## 当前外观：馆藏钢件 · 2026-11-23
+
+主参考是 Ca.garcia.s 同一件实物的[后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)、[反侧斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)、[上方斜照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG)和[木箍与长金属面的同框照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)。取它们共同支持的轮廓与相对明暗，不把室内暖色闪光烘入纹理。
+
+- 柄颈原截面近似方柱，近景拉出平面高光。现在单独重做外观壳与该壳 UV，保留原挂点；圆颈缓慢过渡到较饱满的深色卵形柄头，两段不再是同色银灰。尾部圆面有独立的中央圆纹和错列凸点，坡面响应入射光，而不是只有原法线中的模糊点影。
+- 长覆面从蓝黑粗斑转为中性旧钢，反光连续，局部失光来自较大尺度的粗糙度变化；前段外露长金属面按中箍特写改为较亮的钢灰。全枪木件不变，仍仅留刻度；不改变动作或可用功能。游戏近景 **70,807** 三角，普通 NPC **66,199**，仍为 45 部件、116 图。
+- 后视与斜侧照片不是正交扫描，柄头曲面与 PBR 响应是外观近似；灯型、相机白平衡及个体表面反射率没有实测标定。
+
+## 直纹木料与初版钢件 · 2026-11-23（前一版）
 
 现版按游戏美术要求不复刻馆藏个体标记：木面刻字、托尾「387」、金属铭文及徽记均不保留，仅保留表尺刻度与刻度数字。木件的底色、法线、粗糙度、清漆和金属顶面的底色、粗糙度均从无字的表面场重建，不用颜色盖住旧字。面数、UV、切线、部件与相机挂点不变；近景 70,822 三角，普通 NPC 66,214，116 张内嵌图。
 

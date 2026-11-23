@@ -20,7 +20,7 @@ assert.equal(contract.runtimeSha256,D.sourceSha256);
 assert.equal(contract.approvedReductionTriangles,69454);assert.equal(contract.triangles,D.triangles);
 assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
 assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,116);
-assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),70822);
+assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),70807);
 assert(!doc.animations?.length&&!doc.skins?.length);
 for(const [index,image]of doc.images.entries()){assert.equal(image.uri,undefined);const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=contract.imagePayloads[index];assert.equal(expected.index,index);assert.equal(expected.name,image.name);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 assert.equal(contract.adaptation.notchWidthM,.0045);assert.equal(contract.adaptation.runtimeTriangles-contract.adaptation.sourceTriangles,132);
@@ -51,12 +51,12 @@ const asset={gltf,npcLod,materials:new Map()},library=new MaterialLibrary(null);
 ConfigureType38_511(asset,library);
 const fps=InstantiateType38_511(asset),world=InstantiateType38_511(asset,{batch:true});
 const npc=InstantiateType38_511(asset,{batch:true,npcLod:true});
-assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.tris,66214);assert.equal(npc.meshes.length,45);
+assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.tris,66199);assert.equal(npc.meshes.length,45);
 for(let i=0;i<npc.meshes.length;i++){
  assert.equal(npc.meshes[i].material,fps.meshes[i].material);
  if(npc.meshes[i].userData.type38Part!==D.npcLodPart)assert.deepEqual(npc.meshes[i].geometry.attributes.position.array,world.meshes[i].geometry.attributes.position.array,'all other44 parts retain exact full geometry');
 }
-assert.equal(fps.tris,70822);assert.equal(world.tris,70822);assert.equal(fps.meshes.length,45);
+assert.equal(fps.tris,70807);assert.equal(world.tris,70807);assert.equal(fps.meshes.length,45);
 assert(fps.meshes.every((mesh,i)=>mesh.geometry!==world.meshes[i].geometry&&mesh.material===world.meshes[i].material));
 assert.equal(fps.nodes.get('boltBody').children.length,4);assert.equal(fps.nodes.get('dustCover').children.length,2);
 assert(fps.meshes.every((mesh,index)=>{
@@ -122,9 +122,19 @@ for(const mesh of fps.meshes.filter(item=>item===woodRim||Object.hasOwn(contract
 }
 assert.equal(Object.keys(contract.finishRoughnessP10P50P90).length,43);
 assert.deepEqual(contract.markings,['scale graduations and numerals only']);
+const grip=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_HandleOval08').geometry;
+const gripPoints=grip.attributes.position, gripNormals=grip.attributes.normal;
+grip.computeBoundingBox();
+const gripBox=grip.boundingBox,gripSpan=gripBox.max.x-gripBox.min.x,angles=new Set();
+for(let index=0;index<gripPoints.count;index++){
+ const phase=(gripPoints.getX(index)-gripBox.min.x)/gripSpan;
+ if(phase>.26&&phase<.28)angles.add(Math.round(Math.atan2(gripNormals.getZ(index),gripNormals.getY(index))*100));
+}
+assert(angles.size>=28,'handle neck must give a continuous round highlight, not the old four-flat silhouette');
+assert.equal(grip.index.count/3,1984);
 for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_MiddleBand57']){
  const [low,,high]=contract.finishRoughnessP10P50P90[part];assert(high-low>24,`flat surface response: ${part}`);
 }
 for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
-console.log('ok Type38 511: 70822 real triangles, 45 parts, 116 verified PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');
+console.log('ok Type38 511: 70807 real triangles, 45 parts, 116 verified PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');
