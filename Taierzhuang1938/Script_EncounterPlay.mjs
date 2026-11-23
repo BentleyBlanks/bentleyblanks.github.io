@@ -614,6 +614,9 @@ export class EncounterPlay {
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
       allowCover,coverSlackM:allowCover?8.5:0,suppressible:allowCover});
   }
+  NoFireArmed(frame) {
+    return !!frame.stealth?.noFire&&this.host.player.position.z>=(frame.stealth.armMinZ??-Infinity);
+  }
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
     if(this.openingActive){
@@ -632,7 +635,7 @@ export class EncounterPlay {
       stealth=this.stealth.Update(before,dt,this.entries);
     } else {
       const totalGrenades=state.grenades+state.bundles;
-      const brokeNoFire=before.stealth?.noFire&&(state.playerShots>this.noFireShots||totalGrenades<this.noFireGrenades);
+      const brokeNoFire=this.NoFireArmed(before)&&(state.playerShots>this.noFireShots||totalGrenades<this.noFireGrenades);
       this.noFireShots=state.playerShots;
       this.noFireGrenades=totalGrenades;
       if(brokeNoFire){this.noFireFailure="响枪惊动了院内日军";this.Fail();return;}
@@ -799,7 +802,7 @@ export class EncounterPlay {
     const ui=this.plan.config.ui,reachM=this.plan.config.reachM;
     const stealthState=this.stealth?.state||null;
     const currentTask=this.stealth&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed!==null?ui.templeExit:this.plan.beat.task;
-    const task=(stealthState?.active||frame.stealth?.noFire)?`${currentTask} · ${ui.stealthNoFire}`:currentTask;
+    const task=stealthState?.active||this.NoFireArmed(frame)?`${currentTask} · ${ui.stealthNoFire}`:frame.stealth?.noFire?`${currentTask} · ${ui.stealthNoFireAhead}`:currentTask;
     const title=this.plan.beat.id.toUpperCase()+" · "+this.plan.beat.title;
     const status=this.failed&&this.noFireFailure?this.noFireFailure
       :this.failed&&stealthState?.active?(stealthState.failure||ui.dead)

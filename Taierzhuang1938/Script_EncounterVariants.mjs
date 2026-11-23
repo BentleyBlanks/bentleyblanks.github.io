@@ -24,7 +24,7 @@ import { Clamp, Distance, SampleBeatRoute } from "./Scenes/FirstLevelEncounter/S
 import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import {
   MERGED_SOURCE, MERGED_STAGES, MERGED_BEATS, MERGED_WAVES, MERGED_DIALOGUE,
-  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_CINEMATICS, MERGED_MUSIC,
+  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_STEALTH, MERGED_CINEMATICS, MERGED_MUSIC,
 } from "./Scenes/FirstLevelMerged/Data_LevelFlowMerged.mjs";
 import {
   MergedActors, ApplyMergedSurfaces, MergedEffects, MergedSignals, MergedSurfaceAt,
@@ -196,10 +196,11 @@ function CompileMergedVariant(spec) {
     const dialogue = inFront
       ? SampleFlowDialogue(beat, time, actors)
       : SampleFlowDialogue(beat, time, actors, MERGED_DIALOGUE);
-    const stealthActive = ["09a", "09b", "09c"].includes(beat.id);
+    const stealthActive = MERGED_STEALTH.beats.includes(beat.id);
     const stealth = {
       active: stealthActive,
       noFire: stealthActive,
+      armMinZ: stealthActive ? MERGED_STEALTH.armMinZ : null,
       pulling: false,
       objective: stealthActive ? "穿过关帝庙与西巷绕向老耿家后院，途中禁止响枪" : null,
     };

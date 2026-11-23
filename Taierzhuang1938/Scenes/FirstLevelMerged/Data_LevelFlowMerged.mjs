@@ -156,6 +156,8 @@ export const MERGED_BEATS = [
   },
 ];
 
+export const MERGED_STEALTH = { beats: ["09a", "09b", "09c"], armMinZ: 505 };
+
 export const MERGED_SIGNALS = [
   { beat: "08d", fraction: 0.72, id: "PlankBridgeRemoved" },
   { beat: "08d", fraction: 0.86, id: "GuandaoBridgeBlown" },
