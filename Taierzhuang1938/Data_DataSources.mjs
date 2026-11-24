@@ -34,6 +34,8 @@ export const DATA_SOURCE_RULES = Object.freeze([
   RULE("Timeline/*.timeline.json", "source", ["Script_TimelineCli.mjs"], "Timeline 过场：白盒页底部 Timeline 面板与 agent 写"),
   RULE("Heightmap/Data_*.mjs", "generated", ["Script_HeightmapCli.mjs"], "高程表"),
   // --- 资产清单与烘焙产物 -------------------------------------------------------------------------------------
+  RULE("AssetPipeline/Data_AssetStandards.json", "source", ["AdvancedTools/Tool_AssetStandards.html", "../scripts/Script_LocalPreview.mjs"],
+    "资产导出规范（面数阈值、特例、逐件登记、贴图规则）：导入管线与验收门禁照它执行，游戏运行时不读。资产规范配置器经本机 /__assetStandards/save 存，agent 直接改它"),
   RULE("Hair/Data_HairStyles.json", "source", ["_import/Script_HairGroomBuild.mjs"], "头发胡子造型、人物挂接与实验室样本源表"),
   RULE("Hair/Data_HairReferences.json", "source", ["_import/Script_HairGroomBuild.mjs", "_import/Script_HairReferenceBake.py"], "个人原图、剃净参考、模型五官校准及头发胡子配方"),
   RULE("Hair/Data_HairReferenceMasks.json", "generated", ["_import/Script_HairReferenceBake.py"], "原图细须覆盖图集与发根采样、发际线轮廓"),
@@ -72,14 +74,14 @@ export const DATA_RETIRED = Object.freeze([
 
 /** 门禁扫哪些文件：数据模块、JSON（这些目录与根目录），不扫第三方、导入工作区、取证输出。 */
 export const DATA_SCAN = Object.freeze({
-  include: Object.freeze(["Data_*.mjs", "*.json", "Heightmap/Data_*.mjs", "Scenes/**/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
+  include: Object.freeze(["Data_*.mjs", "*.json", "AssetPipeline/*.json", "Heightmap/Data_*.mjs", "Scenes/**/Data_*.mjs", "Scenes/**/*.json", "Environment/*.json", "Blockout/*.json", "Timeline/*.json", "Animation/**/*.json",
     "Audio/**/*.json", "Font/*.json", "Volume/*.json", "Hair/**/*.json", "Model/**/*.json", "_blender/**/*.json", "docs/*.json"]),
   exclude: Object.freeze(["vendor/**", "node_modules/**", "_import/**", "_shots/**", "tmp/**"]),
 });
 
 /** 还导出函数或别的不能写成 JSON 的值的数据模块（旧账，只减不增；Script_DataJsonTest 守）。函数搬进同名 Script_ 模块后删掉这一行。 */
 export const DATA_JSON_DEBT = Object.freeze([
-  "Data_AssetStandards.mjs", "Data_Battle.mjs", "Data_BattleReactionRange.mjs",
+  "Data_Battle.mjs", "Data_BattleReactionRange.mjs",
   "Data_EditorBlockoutFirstLevel0105Lines.mjs", "Data_EditorBlockoutFirstLevel0105Space.mjs", "Data_EditorBlockoutFirstLevel0610Lines.mjs",
   "Data_EditorBlockoutFirstLevel0610Space.mjs", "Data_EditorBlockoutFirstLevel1218Lines.mjs", "Data_EditorBlockoutFirstLevel1218Space.mjs",
   "Data_FirstLevelBridgeFarBank.mjs", "Data_FirstLevelDistantSmoke.mjs", "Data_FirstLevelFarBankCrowd.mjs",

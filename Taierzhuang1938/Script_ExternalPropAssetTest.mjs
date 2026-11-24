@@ -9,7 +9,7 @@ import {
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
 import { ASSETS as CHINESE_LIFE_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
-import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
+import { EXTERNAL_GLB_STANDARDS } from "./AssetPipeline/Script_AssetStandardsNode.mjs";
 
 
 const root = path.dirname(fileURLToPath(import.meta.url));

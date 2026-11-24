@@ -235,7 +235,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 贴图按菜单使用时加载，不加入共享 `PBR_SETS`。五套 PBR、地图、电报、瓶签和光照图集，
 在 `Data_TextureManifest` 的 lazy 层单独登记；十张新纸图约 4 MB，预算相应增加 4 MB，
 运行时仅下载当前地图与信件（合计不足 1 MB），访问过的状态复用贴图。反射探针由场景运行时生成，不增加外部贴图请求。
-GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`。
+GLB 中静态几何按材质合并；预算见 `AssetPipeline/Data_AssetStandards.json` 的 `CommandRoom`。
 `Debug.CommandRoom()` 提供实际加载、绘制帧数、三角数和相机证据。
 视觉证据保留在忽略目录 `_shots/CommandRoom/`。
 

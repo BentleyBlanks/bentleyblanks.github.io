@@ -4,7 +4,7 @@
 //   1. 目录表 Data_AdvancedTools 与 Data_DevTools 对账，分别检查独立窗口、摄影棚、游戏内入口；
 //   2. 搬走的页面都在 AdvancedTools/，旧位置不留跳转壳；
 //   3. 独立窗口入口类解析出的仍是 AdvancedTools/<页面>；
-//   4. 控制中心卡片：19 张（游戏菜单 17 + 只在控制中心的构件库预览、模型制作工作台）、六组、地址与「游戏内」标注都对；
+//   4. 控制中心卡片：19 张（游戏菜单 16 + 只在控制中心的构件库预览、资产规范与限制、模型制作工作台）、六组、地址与「游戏内」标注都对；
 //   5. 启动器：--dry-run 的计划、--shortcut-dir 生成的 .lnk（目标 node、参数本脚本、工作目录仓库根）、
 //      没有预览服时真起一份（端口以输出为准）并能 ping 出本仓库根目录。
 //
@@ -37,27 +37,30 @@ const Same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].s
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);
 const splitIds = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
-Check("split 条目共 15 项", splitIds.length === 15, splitIds.join(","));
+Check("split 条目共 14 项", splitIds.length === 14, splitIds.join(","));
 Check("独立窗口 + 摄影棚 = split 的全部", Same([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS], splitIds));
 Check("独立窗口 = split 且带 window 的条目", Same(WINDOW_TOOL_IDS, splitIds.filter((id) => TOOL_INFO[id].window)));
 Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, menuIds.filter((id) => !TOOL_INFO[id].split)));
-Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 17);
+Check("菜单 16 项且三类互不重叠", menuIds.length === 16 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 16);
 Check("只在控制中心的独立工具不进游戏清单与拆分边界", STANDALONE_TOOLS.every((tool) => !TOOL_INFO[tool.id] && !menuIds.includes(tool.id)
   && ![...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS].includes(tool.id))
-  && !/PropLibrary/.test(fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8"))
-  && !/PropLibrary|PlaceableCatalog/.test(fs.readFileSync(path.join(projectDir, "index.html"), "utf8")));
+  && !/PropLibrary|AssetStandards/.test(fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8"))
+  && !/PropLibrary|PlaceableCatalog|AssetStandards|AssetPipeline/.test(fs.readFileSync(path.join(projectDir, "index.html"), "utf8")));
 
 // --- 2. 搬家 ---------------------------------------------------------------------
 const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "Tool_MotionWorkbench.html",
-  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html", "Tool_PropLibrary.html"];
+  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html", "Tool_PropLibrary.html", "Tool_AssetStandards.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
 Check("旧位置不留跳转壳", pages.slice(0, 6).every((page) => !fs.existsSync(path.join(projectDir, page))));
-Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio", "AssetStandards",
+Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio",
   "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "MotionWorkbench", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
 Check("旧枪械工作窗已移除", !fs.existsSync(path.join(toolsDir, "Script_EditorWeapon.mjs")));
 Check("游戏内构件库编辑器已移除，独立页面代码在 AdvancedTools/", !fs.existsSync(path.join(toolsDir, "Script_EditorPropLibrary.mjs"))
   && ["Script_PropLibrary.mjs", "Script_PropLibraryStage.mjs", "Style_PropLibrary.css", "Script_PlaceableCatalog.mjs"].every((file) => fs.existsSync(path.join(toolsDir, file))));
+Check("资产规范的工具宿主编辑器已移除，独立配置器代码在 AdvancedTools/、规范在 AssetPipeline/", !fs.existsSync(path.join(toolsDir, "Script_EditorAssetStandards.mjs"))
+  && ["Script_AssetStandardsTool.mjs", "Style_AssetStandards.css"].every((file) => fs.existsSync(path.join(toolsDir, file)))
+  && fs.existsSync(path.join(projectDir, "AssetPipeline", "Data_AssetStandards.json")));
 
 Check("PCG 验证界面迁入独立工具目录", ["Splines", "PropPcg"].every((id) => fs.existsSync(path.join(toolsDir, `Script_Editor${id}.mjs`)) && !fs.existsSync(path.join(projectDir, `Script_Editor${id}.mjs`))));
 Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPersonMotion.mjs", "Script_EditorFirstPersonMotionBrowserTest.mjs"].every((file) => !fs.existsSync(path.join(projectDir, file))));
@@ -147,9 +150,11 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   Check("模型制作工作台是控制中心的独立资产工具", cards.some((card) => card.id === "modelWorkbench" && card.group === "assets"
     && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_ModelWorkbench.html")));
   const assets = cards.filter((card) => card.group === "assets").map((card) => card.id);
-  Check("构件库预览是控制中心资产组第一张独立窗口卡片", assets[0] === "props" && assets.at(-1) === "modelWorkbench"
+  Check("构件库预览、资产规范是控制中心资产组前两张独立窗口卡片", assets[0] === "props" && assets[1] === "assetStandards" && assets.at(-1) === "modelWorkbench"
     && cards.some((card) => card.id === "props" && card.kind === "window" && card.target === "TengxianPropLibrary"
-      && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_PropLibrary.html")), assets.join(","));
+      && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_PropLibrary.html"))
+    && cards.some((card) => card.id === "assetStandards" && card.kind === "window" && card.target === "TengxianAssetStandards"
+      && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_AssetStandards.html")), assets.join(","));
   for (const id of WINDOW_TOOL_IDS) {
     const card = cards.find((entry) => entry.id === id);
     const expected = new URL(TOOL_INFO[id].window.url, "http://127.0.0.1:9/Taierzhuang1938/").href;

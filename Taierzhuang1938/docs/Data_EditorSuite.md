@@ -74,6 +74,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **2026-11-22**：删除「小队行进」编辑器及其独立宿主与游戏内入口。控制中心共 17 项，其中 8 项使用摄影棚宿主、7 项开独立窗口、2 项走游戏入口。
 - **2026-11-22**：枪械检查台改用独立窗口，控制中心现有 7 项使用摄影棚宿主、8 项开独立窗口、2 项走游戏入口。[枪械检查台](#枪械检查台)
 - **2026-11-25**：构件库预览拆出游戏，成为只在控制中心出现的独立只读页面 `Tool_PropLibrary.html`（见 [构件库预览](#构件库预览-advancedtoolstool_proplibraryhtml只在控制中心)）。游戏菜单 17 项（15 项拆分、2 项游戏内），控制中心 19 张卡（另含构件库预览与模型制作工作台两张只在控制中心的卡）；工具宿主剩 `actor facial assetStandards`。
+- **2026-11-25**：资产规范拆出游戏，改成只在控制中心出现的独立配置器 `Tool_AssetStandards.html`（见 [资产规范与限制](#资产规范与限制-advancedtoolstool_assetstandardshtml只在控制中心)）；规范真相从游戏根的 `Data_AssetStandards.mjs` 搬到 `AssetPipeline/Data_AssetStandards.json`，游戏运行时不再读它。游戏菜单 16 项（14 项拆分、2 项游戏内），控制中心仍 19 张卡（另含构件库预览、资产规范与限制、模型制作工作台三张只在控制中心的卡）；工具宿主只剩人物、面部两个摄影棚工具，旧地址 `Tool_Studio.html?tool=assetStandards` 转到新页。
 - **2026-11-23**：特效预览与音效音乐拆为独立窗口（`Tool_VfxPreview.html`、`Tool_AudioPreview.html`，共用窗口壳 `Script_ToolWindowShell.mjs`、入口类 `Script_EditorMediaEntry.mjs`），从游戏灯光 / 后处理 / 天空 / 材质库 / 关卡数据解耦：音效窗口只装 `AudioEngine` 与固定听者，零渲染依赖；特效窗口装 `VfxSystem` + 中性预览台 `Script_VfxPreviewStage.mjs` / 预览灯 `Script_VfxPreviewLights.mjs`（与游戏共用 `Script_EffectLightEnvelope.mjs`、`Script_ToneMapCurves.mjs`）+ 昼夜读取项目环境预设 `Script_VfxPreviewEnvironment.mjs`（`Environment/EnvPreset_*.json` 的 looks，不写死时段）。共享预通道标记（`Script_RenderTags.mjs`）、太阳阴影采样（`Script_SunShadowSampling.mjs`）、体积噪声（`Script_VolumetricNoise.mjs`）与烟场样式（`Data_SmokePlumeStyles.mjs`）从重模块拆出，也顺带让主菜单包去掉了整条后处理与灯光链。游戏内回归测试（`?editor=vfx`、`Debug.OpenEditor("vfx")`）经 `VfxPreviewEntry.harness` 保留原游戏宿主口径；旧 `Tool_Studio.html?tool=vfx|audio` 重定向至新页。控制中心现有 4 项使用工具宿主（`actor facial props assetStandards`）、11 项开独立窗口（另含模型制作工作台共 12 张独立窗口卡）、2 项走游戏入口。
 
 ## 精简测试界面
@@ -83,7 +84,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 渲染调试保留视图/着色/碰撞体开关，移除“当前靶”诊断表；详细检查继续通过调试 API 和验收脚本读取。
 人物动作保留资产/程序化动作、播放、单帧和速度，不再展示连续状态的手动混合滑杆。
 完整场景面板只保留场景、机位、路线叠加和环境切换，移除只读 JSON 与种子列表；数据仍供验收脚本查询。
-各工具的结果表通过 `Facts(parent, keys)` 明确列出核心字段；资产规范表和性能耗时表本身就是测试结果，保留。
+各工具的结果表通过 `Facts(parent, keys)` 明确列出核心字段；性能耗时表本身就是测试结果，保留（资产规范表 2026-11-25 起在控制中心的独立配置器里）。
 
 ## 怎么进
 
@@ -107,7 +108,7 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 （`Script_ToolsHomeField`，只为引擎有地方站），画面由整页的工具首页（`Script_EditorHome`）盖住，
 按菜单栏同一分组列出全部工具，等人自己挑。
 
-- 摄影棚类工具（人物、面部、资产规范）在首页上打开（构件库预览 2026-11-25 起只在控制中心）。Esc 先回首页，首页上再按 Esc 回标题菜单。
+- 摄影棚类工具（人物、面部）在首页上打开（构件库预览、资产规范 2026-11-25 起只在控制中心）。Esc 先回首页，首页上再按 Esc 回标题菜单。
 - 场景编辑器卡片标 ↗，点了直接开独立窗口，不用载入关卡。
 - 场景类工具（样条、PCG 撒点）卡片标「载入关卡」：先弹单子选七章之一，
   再整页换到 `?phase=N&editor=tools&tool=<id>`，载入完自动打开那个工具（菜单栏里点它们也走这张单子）。
@@ -121,7 +122,7 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 标题栏 × 左侧的无边框右箭头隐藏 Inspector，保留当前工具、装备、视角、参数及滚动位置，玩法继续暂停；
 菜单栏「返回主菜单」左侧的左箭头恢复原面板。两个图标按钮沿用关闭按钮的尺寸、颜色与悬停效果，保留操作提示与无障碍名称。
 选择另一个工具或重新进入高级工具时自动展开。
-空 Inspector 同样可收起；独立调试浮窗、资产规范整页及玩家设置不参与折叠。
+空 Inspector 同样可收起；独立调试浮窗及玩家设置不参与折叠。
 
 ## 一次只开一个
 
@@ -129,7 +130,7 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 完整场景预览 / 采样点 / 可破坏场景后，菜单栏里剩十二个互斥编辑器，另有一个不进菜单的「出图机位」），过场时间轴还要把相机交给过场导演。
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
 所以菜单栏里的工具虽然是勾选项，语义是**换到这一个**：开新的自动关旧的；再点一次打勾的那项就关掉它。
-不接管相机的三个（音频 / 资产规范 / 过场时间轴）也走同一条互斥路 —— 它们改的都是
+不接管相机的（音频 / 过场时间轴；资产规范 2026-11-25 起已不在游戏里）也走同一条互斥路 —— 它们改的都是
 这一局的运行时状态，退出时得各自收干净。可叠加的六个工具不在这条规矩里。
 
 ## 设置不在高级工具里
@@ -474,18 +475,32 @@ Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与�
 - 取证口 `window.PropLibrary`（`entries` / `Select` / `stage` / `selected` / `visible` / `vehicle`）；门禁 `Script_PropLibraryBrowserTest`，
   火车两件的懒载与 PBR 由 `Script_TrainLibraryTest` 在同一页面上查。
 
-### 资产规范 `Script_EditorAssetStandards.mjs`
+### 资产规范与限制 `AdvancedTools/Tool_AssetStandards.html`（只在控制中心）
 
-这是独立于构件库的只读分类，不摆模型、不接管相机。枪械、架设/炮械、刀剑/刺刀、战车、
-程序化 TZM、外部 GLB 与贴图规范分七栏；有源 TZM 与四套重点外部 GLB 都逐件显示选定源几何、游戏实际三角形、
-分类限制或指定目标、面数降幅、自带贴图、游戏内贴图策略与合规状态。展示件、备用状态、
-重复壳先从“原始”口径排除；史实补件与强制退化面清理单独标注，不伪装成减面。
+2026-11-25 用户：资产规范与限制完全从游戏里解耦，只作为**资产导出规范的配置器与预览器**——它产出的规范文件给资产导入 / 烘焙管线和验收门禁用，
+游戏运行时不读。游戏的高级工具菜单、`TOOL_INFO`、拆分边界、工具宿主与 `index.html` 的 import map 里都不再有它；入口只有控制中心资产组第二张卡
+（`Data_AdvancedTools.STANDALONE_TOOLS`），旧地址 `Tool_Studio.html?tool=assetStandards` 转到新页。原游戏内编辑器 `Script_EditorAssetStandards.mjs`
+与游戏根的 `Data_AssetStandards.mjs` 已删。
 
-规则真相在纯数据 `Data_AssetStandards.mjs`，实际面数仍读 `Data_Meshes.mjs`；Blender 侧阈值、
-三件特例及“目标降幅 ≤5% 不减面”在 `_blender/AssetBudgets.py`。外部 GLB 页当前登记乡村房屋、
-Battlefield Pack 24 件、Chinese Life 16 件与无叶乔木三变体，共 44 行。
-`Script_AssetStandardsTest.mjs` 同时核对两边、
-`Model/Data_ModelIndex.json` 构建元数据、import map 与编辑器分类，防止面数表悄悄过期。
+- **唯一真相** `AssetPipeline/Data_AssetStandards.json`（`schema: tengxian.assetStandards`、`version: 1`）：枪械 / 战车分类上限、5% 免减面阈值、
+  全场单帧预算 `sceneRenderLimits`、程序化 TZM 分类预算、指定特例、有源 TZM 逐件登记（`sourceAssets`）、外部 GLB 逐件登记（`externalGlb`）、
+  规则卡（`otherRules`）与使用方清单（`consumers`）。agent 直接改它也行，开着的配置器 2 s 内同步。
+- **判定公式** `AssetPipeline/Script_AssetStandards.mjs`（纯函数、零 import，第一个参数是规范文档）：`SourceTarget` / `ComplianceFor` /
+  `ExternalComplianceFor` / `ValidateAssetStandards` / `FormatAssetStandardsJson`，配置器、本机存盘口与 Node 门禁共用；Node 侧读盘口是
+  `AssetPipeline/Script_AssetStandardsNode.mjs`（冻结的 `SCENE_RENDER_LIMITS`、`EXTERNAL_GLB_STANDARDS` 等，BootTest、整关驾驶 Kit 与各资产门禁从这里取）。
+- **实际面数**：有源 TZM 与程序化 TZM 读构建产物 `Model/Data_ModelIndex.json`（`_blender/BuildAll.py` 每次重建都重写它），不读游戏的 `Data_Meshes.mjs`；
+  外部 GLB 的实际面数由各资产构建脚本实测后登记在规范里。
+- **页面**：`Script_AssetStandardsTool.mjs` + `Style_AssetStandards.css`（自带样式，不加载游戏的 Style_Interface / Style_Editor / vendor）。
+  三栏：左栏分类导航（总览、全局规则、七个分类，带件数与红黄点）；中栏是规则卡 + 搜索 + 状态筛选（全部 / 需处理 / 合规）+ 资产表
+  （原始、实际、限制 / 目标与来由、降幅、预算占用条、自带 / 游戏内贴图、状态）；右栏是选中资产的推导说明（为什么是这个目标）与编辑表单。
+  改任何数即时重算合规；地址 `#view=<分类>&id=<资产>` 可深链。
+- **存盘**：本机预览服务的 `/__assetStandards/status|save`（闸同场景存盘口：本机 Host、同源、application/json、revision = 读文件时原始字节的 sha1，
+  对不上 409；`ValidateAssetStandards` 不过 400）；静态服务 / 线上只读，改完「下载 JSON」。`Ctrl+S` 保存。
+- **Blender 镜像**：`_blender/AssetBudgets.py` 目前仍手抄分类上限、5% 阈值与特例（用户 2026-11-25：Blender 管线暂时不动），
+  `Script_AssetStandardsTest` 逐项对账，改了上限要同步那份。
+- **门禁**：`Script_AssetStandardsTest`（规范与构建产物、Blender 镜像对账；游戏运行时不 import `AssetPipeline/`，配置器只 import 判定模块）、
+  `Script_AssetStandardsSaveTest`（存盘口写盘 / 拒绝矩阵）、`Script_AssetStandardsBrowserTest`（真浏览器：入口、导航计数、筛选、编辑重算、只读退化、写盘与自动同步）。
+  发布副本不含 `AssetPipeline/`（`PUBLISH_EXCLUDE` + `IsPublishedSource`）。
 
 2026-11-01 删掉了构件库里只在这里用、正片和旧章都不建的条目：寨墙段、沙包路障、天主堂（旧通用版）、
 清真寺，以及建筑与地标的「炮击初损 / 严重破坏」两档预建模战损（`BuildingDamageEarly/Severe` PBR 与

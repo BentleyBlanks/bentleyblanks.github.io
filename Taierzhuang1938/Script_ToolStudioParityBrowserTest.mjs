@@ -43,7 +43,6 @@ function Check(name, ok, detail = "") {
 const SETUP = {
   actor: (editor) => { editor.playing = false; },
   facial: () => {},
-  assetStandards: () => {},
 };
 
 const server = await ServeRoot(rootDir, 0);

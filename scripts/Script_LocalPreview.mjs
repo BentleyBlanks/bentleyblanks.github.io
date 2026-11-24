@@ -22,6 +22,7 @@
 //   /__tuning/*   敌军 AI 编辑器把滑杆的数存回 Data_Tuning_*.mjs（docs/Data_EnemyAi.md §14.3）；
 //   /__blockout/* 白盒关卡编辑器把配置存回 Taierzhuang1938/Blockout/<Level>.json
 //                 （Taierzhuang1938/docs/Data_EditorBlockout.md §7；另查 Host / Origin / Content-Type 与版本号）。
+//   /__assetStandards/* 资产规范配置器把规范存回 Taierzhuang1938/AssetPipeline/Data_AssetStandards.json（闸同上）。
 //
 // 首页 http://127.0.0.1:<port>/__preview/ 是一个索引页：列出这棵树里所有
 // 带 index.html 的页面（按改动时间排序），并且能一键把任意 worktree 挂到
@@ -58,6 +59,10 @@ import {
   ENV_ID_RE, ENV_PRESET_FILE_RE, SCENE_ENV_FILE_RE, LEVEL_ENV_FILE_RE, EnvPresetRepoPath, SceneEnvRepoPath, LevelEnvRepoPath,
   ValidateEnvPreset, ValidateSceneEnv, FormatEnvJson,
 } from "../Taierzhuang1938/Script_EnvPreset.mjs";
+// 资产规范配置器（Taierzhuang1938/AdvancedTools/Tool_AssetStandards.html）的存盘。同场景那套闸，只写这一个文件：
+//   GET  /__assetStandards/status → { writable, root, file, revision: sha1 | null }
+//   POST /__assetStandards/save   { doc, revision } → 写 Taierzhuang1938/AssetPipeline/Data_AssetStandards.json
+import { ASSET_STANDARDS_REPO_PATH, ValidateAssetStandards, FormatAssetStandardsJson } from "../Taierzhuang1938/AssetPipeline/Script_AssetStandards.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -501,6 +506,18 @@ function CreateServer(rootDir, context) {
       return;
     }
 
+    if (route === "/__assetStandards/status" || route === "/__assetStandards/save") {
+      try {
+        if (route === "/__assetStandards/status") SendAssetStandardsStatus(request, response, rootDir);
+        else await HandleAssetStandardsSave(request, response, rootDir);
+      } catch (error) {
+        console.error(`  ${route} 出错：${error?.stack || error}`);
+        if (!response.headersSent) SendJson(response, 500, { ok: false, error: `存档口内部出错：${String(error?.message || error).slice(0, 200)}` });
+        else if (!response.writableEnded) response.end();
+      }
+      return;
+    }
+
     if (route === "/__environment/status" || route === "/__environment/save") {
       try {
         if (route === "/__environment/status") SendEnvironmentStatus(request, response, rootDir);
@@ -856,6 +873,64 @@ async function HandleSceneSave(request, response, rootDir) {
   SendJson(response, 200, { ok: true, scene: sceneId, file: relative, revision: createHash("sha1").update(text, "utf8").digest("hex"), warnings: check.warnings });
 }
 
+// -------------------------------------------- 资产规范保存（只在本地）
+//
+// 资产规范配置器（Taierzhuang1938/AdvancedTools/Tool_AssetStandards.html）只写一个文件：AssetPipeline/Data_AssetStandards.json。
+// 闸同场景存盘口（本机 Host、同源、application/json、revision = 读文件时那份原始字节的 sha1，对不上 409）；
+// ValidateAssetStandards 不过 → 400；按 FormatAssetStandardsJson（两格缩进 + 结尾换行）原子写。body ≤ 2 MB。
+const ASSET_STANDARDS_BODY_LIMIT = 2 * 1024 * 1024;
+
+function SendAssetStandardsStatus(request, response, rootDir) {
+  if (request.method !== "GET" && request.method !== "HEAD") { SendJson(response, 405, { ok: false, error: "只收 GET" }); return; }
+  let revision = null;
+  try { revision = BlockoutRevision(path.join(rootDir, ASSET_STANDARDS_REPO_PATH)); } catch { revision = null; }
+  const writable = IsLocalPage(request);
+  SendJson(response, 200, { writable, root: rootDir, file: ASSET_STANDARDS_REPO_PATH, revision, ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }) });
+}
+
+async function HandleAssetStandardsSave(request, response, rootDir) {
+  const Reject = (status, error, extra = {}) => SendJson(response, status, { ok: false, error, ...extra });
+  if (request.method !== "POST") { Reject(405, "只收 POST"); return; }
+  if (!IsLocalPage(request)) { Reject(403, "只接受本机 localhost / 127.0.0.1 的请求"); return; }
+  if (!String(request.headers["content-type"] || "").toLowerCase().startsWith("application/json")) { Reject(415, "Content-Type 必须是 application/json"); return; }
+  if (!IsSameOrigin(request)) { Reject(403, "只接受同源页面的请求"); return; }
+  let body;
+  try { body = await ReadBody(request, ASSET_STANDARDS_BODY_LIMIT); } catch (error) { Reject(413, error.message); return; }
+  let payload;
+  try { payload = JSON.parse(body); } catch { Reject(400, "body 不是 JSON"); return; }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) { Reject(400, "body 要是 { doc, revision }"); return; }
+  const filePath = path.resolve(rootDir, ASSET_STANDARDS_REPO_PATH);
+  if (!filePath.startsWith(rootDir + path.sep)) { Reject(403, "路径不在服务根之下"); return; }
+  const { revision, doc } = payload;
+  if (revision !== null && typeof revision !== "string") { Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）"); return; }
+  let check;
+  let text;
+  try {
+    check = ValidateAssetStandards(doc);
+    if (!check.ok) { Reject(400, "规范不合规", { details: check.errors.slice(0, 50), warnings: check.warnings }); return; }
+    text = FormatAssetStandardsJson(doc);
+  } catch (error) {
+    Reject(400, "规范没法校验或写回（多半是嵌套太深）", { details: [`${error?.name || "Error"}：${String(error?.message || error).slice(0, 200)}`] });
+    return;
+  }
+  let current;
+  try { current = BlockoutRevision(filePath); } catch (error) { Reject(500, String(error?.message || error)); return; }
+  if (revision !== current) {
+    Reject(409, current === null ? "盘上已经没有这个文件，按新文件保存要带 revision: null" : "规范已在别处改过（版本号对不上），先重新读取再保存", { revision: current });
+    return;
+  }
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    WriteAtomic(filePath, text);
+  } catch (error) {
+    try { fs.rmSync(`${filePath}.tmp`, { force: true }); } catch { /* 清不掉就算了，报错里有原因 */ }
+    Reject(500, String(error?.message || error));
+    return;
+  }
+  console.log(`  /__assetStandards/save ${ASSET_STANDARDS_REPO_PATH}：${Object.keys(doc.sourceAssets).length} 件有源资产、${doc.externalGlb.length} 件外部 GLB`);
+  SendJson(response, 200, { ok: true, file: ASSET_STANDARDS_REPO_PATH, revision: createHash("sha1").update(text, "utf8").digest("hex"), warnings: check.warnings });
+}
+
 // -------------------------------------------- 环境预设与区域保存（只在本地）
 //
 // 环境编辑器（Taierzhuang1938/docs/Data_Environment.md §8）存两种文件：预设（Environment/EnvPreset_<Id>.json，可以新建）
@@ -1026,7 +1101,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
 环境保存口（环境编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__environment/status；POST /__environment/save
   { kind: "preset" | "scene", id: "FirstLevel", doc: {...}, revision: "<读文件时那份原始字节的 sha1；新文件写 null>" }
   预设写 Taierzhuang1938/Environment/EnvPreset_<Id>.json（可新建），场景的区域文件写 Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json，
-  正片关卡的区域文件（kind: "level"）写 Taierzhuang1938/Environment/Level_<Id>.json（body ≤ 2 MB）；其余同上。`;
+  正片关卡的区域文件（kind: "level"）写 Taierzhuang1938/Environment/Level_<Id>.json（body ≤ 2 MB）；其余同上。
+资产规范保存口（资产规范配置器，只在本机 localhost / 127.0.0.1 上可写）：GET /__assetStandards/status；POST /__assetStandards/save
+  { doc: {...}, revision: "<读文件时那份原始字节的 sha1>" }
+  过 ValidateAssetStandards 后原子写 Taierzhuang1938/AssetPipeline/Data_AssetStandards.json（body ≤ 2 MB）；其余同上。`;
 
 async function Main() {
   const args = process.argv.slice(2);

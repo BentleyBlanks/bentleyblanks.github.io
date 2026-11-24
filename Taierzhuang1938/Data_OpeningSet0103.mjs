@@ -10,8 +10,6 @@
 // 这里全是**外观**：不进碰撞、不进 AI 掩体、不进 Space 量尺。要挡路、挡视线的东西在
 // Data_FirstLevelMissionLayout 的 MISSION_SCENARIO（洞口塌土 `BunkerMouthRubbleS` 等；本包只改了它的高度与宽度）。
 
-import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
-
 /** 01–03 的内部步骤：进这几步装载，离开（04 起、回跳到别处、整关拆除）全部收走。 */
 export const SET_STAGES = Object.freeze(["Trapped", "BunkerRescue", "RearTrench", "Support"]);
 
@@ -598,10 +596,10 @@ export function ProfileAt(profile, s) {
 // 和上面 01–03 布景（PROPS）各自一套生命周期（Script_OpeningSet.EnterRedraft / ExitRedraft）。
 export const REDRAFT_STAGES = Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]);
 // 原60k额度中的汉阳造为2828面（7d607348 的 Model_HanYang.tzm.json）。
-// 173R按现行资产标准分配额度，其余尸体和道具保留原有额度。
+// 173R按现行资产标准分配额度（AssetPipeline/Data_AssetStandards.json 里 HanYang173R 的 targetTriangles，AssetStandardsTest 对账），其余尸体和道具保留原有额度。
 export const REDRAFT_TRIANGLE_BUDGETS = Object.freeze({
   otherAssets: 60000 - 2828,
-  hanYang: EXTERNAL_GLB_STANDARDS.find(record => record.id === "HanYang173R").targetTriangles,
+  hanYang: 80000,
 });
 export const REDRAFT_TRIANGLE_BUDGET = REDRAFT_TRIANGLE_BUDGETS.otherAssets + REDRAFT_TRIANGLE_BUDGETS.hanYang;
 /**

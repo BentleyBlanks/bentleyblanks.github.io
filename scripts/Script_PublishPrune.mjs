@@ -33,6 +33,7 @@ export const PUBLISH_EXCLUDE = Object.freeze([
       "Taierzhuang1938/Script_EditorBlockoutFirstLevel1218PrevizTest.mjs",
     ]) },
   { path: "Taierzhuang1938/AdvancedTools/", why: "已拆出游戏的高级工具与本地控制中心：只在本地预览使用；游戏里它们的入口由 Script_DevToolsSplit 的剔除版去掉，index.html 的 import map 条目在下面 StripAdvancedToolsImports 里一并摘掉" },
+  { path: "Taierzhuang1938/AssetPipeline/", why: "资产导出规范（Data_AssetStandards.json 与判定模块）：导入管线、验收门禁与本地配置器用，游戏运行时不读" },
   { path: "TunnelLight1943/StyleConceptShots/", why: "地道里的光的风格概念图与两个 zip 包，没有页面引用" },
   { path: "Model/StrawSleepingMat/Source/", why: "随身草席的 Blender 源文件" },
   { path: "Taierzhuang1938/Model/TrainReference/Reference/", why: "火车参考图" },

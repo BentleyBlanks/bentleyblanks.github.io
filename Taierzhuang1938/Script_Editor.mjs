@@ -415,8 +415,8 @@ export class EditorSuite {
     this.home?.Show(homeShown);
     this.root.classList.toggle("homeShown", homeShown);
     if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active || !!this.home;
-    this.inspectorToggle.hidden = !this.panelOpen || homeShown || this.activeId === "assetStandards";
-    const inspector = this.workHost.querySelector(".edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)") || this.emptyInspector;
+    this.inspectorToggle.hidden = !this.panelOpen || homeShown;
+    const inspector = this.workHost.querySelector(".edPanel.work:not(.debugRendering):not(.ai)") || this.emptyInspector;
     this.inspectorElement = inspector;
     if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
     this.inspectorToggle.setAttribute("aria-controls", inspector.id);

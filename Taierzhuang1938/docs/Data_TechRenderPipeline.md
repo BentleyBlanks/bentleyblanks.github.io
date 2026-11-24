@@ -2135,7 +2135,7 @@ prepass → hzb → ssao → contactShadows → main → …
 原因是静态世界走 `BuildSink` 分区合批，那些巨大的合批块与地形块的包围体覆盖整片区，
 **逐级视锥剔除根本剔不掉它们** —— 半径开到 13 m 还是 230 m，进那一趟的三角数只差一倍。
 
-而 `Data_AssetStandards.SCENE_RENDER_LIMITS.triangles` 的单帧红线是 **8.10 M**，
+而 `AssetPipeline/Data_AssetStandards.json` 的 `sceneRenderLimits.triangles` 的单帧红线是 **8.10 M**，
 这一关不带阴影是 5.51 M（`BootTest` 那一帧含预通道 + 主场景 + GI），
 **留给阴影的余量只有 2.59 M —— 在城里也就是一帧一张**。四张一起烘是 8.4 M，
 第一版就是这么把 BootTest 的四关顶红的（phase 2/4/5/6，最高 11.07 M）。

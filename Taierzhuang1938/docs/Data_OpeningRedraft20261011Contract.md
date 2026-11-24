@@ -176,7 +176,7 @@
 
 Set 用 `Script_OpeningSetTest` 证明：每个标记与现行路线（`rescueRoute`、`chargeRoute`、`exitRoute`、`runnerRoute`、`interpreterEnter`、`walkIn`）净空 ≥0.5 m 或列为「刻意」；尸体不嵌沟壁、不悬空；跳下点落地高差 1.8–2.1 m。
 
-2026-11-07 汉阳造迁移统计修正。开场布景按 `Data_HanYang173R.url` 读取当前GLB并统计真实三角面，歪把子按 `Data_Meshes.Type11.file` 读取。原60,000面总额度中的旧汉阳造为2,828面，来源为 `7d607348842a7ca4759f20958ae56d13c4c0d4de` 中的旧模型。其余尸体与道具继续使用57,172面额度，173R使用现行资产标准的69,000面额度，总上限126,172面。`OpeningSetTest` 分别校验两项额度及总数，当前静态验收统计为115,834面。数值入口为 `Data_OpeningSet0103.REDRAFT_TRIANGLE_BUDGETS`，汉阳造额度跟随 `Data_AssetStandards`。
+2026-11-07 汉阳造迁移统计修正。开场布景按 `Data_HanYang173R.url` 读取当前GLB并统计真实三角面，歪把子按 `Data_Meshes.Type11.file` 读取。原60,000面总额度中的旧汉阳造为2,828面，来源为 `7d607348842a7ca4759f20958ae56d13c4c0d4de` 中的旧模型。其余尸体与道具继续使用57,172面额度，173R使用现行资产标准的69,000面额度，总上限126,172面。`OpeningSetTest` 分别校验两项额度及总数，当前静态验收统计为115,834面。数值入口为 `Data_OpeningSet0103.REDRAFT_TRIANGLE_BUDGETS`，汉阳造额度跟随 `AssetPipeline/Data_AssetStandards.json`（`Data_OpeningSet0103` 写数值，AssetStandardsTest 对账）。
 
 ## 6. 音效（Sfx 包；`Data_SfxSources` cue 名冻结）
 

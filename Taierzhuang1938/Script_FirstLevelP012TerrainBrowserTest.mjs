@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
-import {SCENE_RENDER_LIMITS} from './Data_AssetStandards.mjs';
+import {SCENE_RENDER_LIMITS} from './AssetPipeline/Script_AssetStandardsNode.mjs';
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(os.tmpdir(),'P012TerrainReview');
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(root,0),browser=await LaunchBrowser();

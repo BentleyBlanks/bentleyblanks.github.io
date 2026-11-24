@@ -46,7 +46,6 @@ export const TOOL_INFO = Object.freeze({
     window: { url: "./AdvancedTools/Tool_VfxPreview.html", name: "TengxianVfxPreview", features: "popup,width=1600,height=1000" } },
   audio: { label: "音效音乐", hint: "打开独立窗口：全部配方的试听、混音参数与盲听指认", split: true,
     window: { url: "./AdvancedTools/Tool_AudioPreview.html", name: "TengxianAudioPreview", features: "popup,width=1280,height=900" } },
-  assetStandards: { label: "资产规范", hint: "原始/实际面数、减面阈值、目标、贴图策略与合规状态总表", split: true },
   textures: { label: "贴图管理", hint: "打开独立贴图管理窗口：导入设置、发布压缩与程序化预览", split: true,
     window: { url: "./AdvancedTools/TextureManager.html", name: "TengxianTextureManager", features: "popup,width=1600,height=1000" } },
 });
@@ -58,7 +57,7 @@ const TOOL_MENU_DEFS = [
   { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare", "motionWorkbench"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson"] },
   { id: "media", label: "特效与声音", items: ["vfx", "audio"] },
-  { id: "assets", label: "资产", items: ["assetStandards", "textures"] },
+  { id: "assets", label: "资产", items: ["textures"] },
 ];
 // 已拆出去的工具在剔除拆分边界的版本（线上发布）里不列；一整组都拆走了就连这一组也不列。
 export const TOOL_MENUS = Object.freeze(TOOL_MENU_DEFS

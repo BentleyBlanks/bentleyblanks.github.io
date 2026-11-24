@@ -55,7 +55,7 @@ export function ServeRoot(rootDir, port = 0) {
     let route = decodeURIComponent(request.url.split("?")[0]);
     // Browser tests use this static server. Report editor capabilities honestly without
     // exposing write routes or flooding the console with expected status 404s.
-    if (request.method === "GET" && ["/__blockout/status", "/__scene/status", "/__environment/status"].includes(route)) {
+    if (request.method === "GET" && ["/__blockout/status", "/__scene/status", "/__environment/status", "/__assetStandards/status"].includes(route)) {
       const body = JSON.stringify({ writable: false, revisions: {}, presets: {}, scenes: {}, levels: {} });
       response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Content-Length": Buffer.byteLength(body) });
       response.end(body);

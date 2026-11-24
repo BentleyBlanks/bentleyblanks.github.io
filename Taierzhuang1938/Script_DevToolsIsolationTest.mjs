@@ -6,7 +6,7 @@
 //      一个开发工具模块都没有 —— 有人绕过 Script_DevTools 直接 import 编辑器时，这里报出是谁拉进来的；
 //      标题菜单包无论剔不剔都不许带编辑器；
 //   3. --browser：真浏览器里跑剔除后的包，开机、设置三页照常可用，菜单里没有「Debug工具」「高级工具」；
-//   4. 已拆进 AdvancedTools/ 的 15 个工具（docs/Data_EditorSuite.md「AdvancedTool ControlCenter 与独立工具宿主」）：
+//   4. 已拆进 AdvancedTools/ 的 14 个工具（docs/Data_EditorSuite.md「AdvancedTool ControlCenter 与独立工具宿主」）：
 //      拆分边界两对（Script_DevToolsSplit / Data_DevToolsSplit）与各自的剔除版导出同一组名字；
 //      游戏目录里的非测试代码除 Script_DevToolsSplit 外不许 import ./AdvancedTools/（方向只许 AdvancedTools → 游戏）；
 //      线上发布构建（--deploy）始终把这一对换成剔除版，发布副本不含 AdvancedTools/、index.html 的 import map 不残留它的条目，
@@ -88,7 +88,7 @@ for (const [real, stub] of Object.entries({ ...DEV_TOOL_STUBS, ...SPLIT_TOOL_STU
   Check("拆分边界：剔除版声明拆出去的工具不在，开发版在", stub.SPLIT_TOOLS_AVAILABLE === false && real.SPLIT_TOOLS_AVAILABLE === true);
   const stubClasses = await import("./Script_DevToolsSplitStub.mjs"), realClasses = await import("./Script_DevToolsSplit.mjs");
   Check("拆分边界：剔除版是空数组", Array.isArray(stubClasses.SPLIT_TOOL_CLASSES) && stubClasses.SPLIT_TOOL_CLASSES.length === 0);
-  Check("拆分边界：开发版 15 个类与 TOOL_INFO 里 split 的条目一一对应",
+  Check("拆分边界：开发版 14 个类与 TOOL_INFO 里 split 的条目一一对应",
     JSON.stringify(realClasses.SPLIT_TOOL_CLASSES.map((Editor) => Editor.id).sort()) === JSON.stringify([...SPLIT_IDS].sort()), SPLIT_IDS.join(","));
 }
 

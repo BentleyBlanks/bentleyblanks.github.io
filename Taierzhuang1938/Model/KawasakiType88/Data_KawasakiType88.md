@@ -7,7 +7,7 @@
 ## 项目配置
 
 - 资源：`Model_KawasakiType88.glb`；参数与轴心在 `../../Data_KawasakiType88.mjs`。
-- 资产规范表登记于 `../../Data_AssetStandards.mjs`，可在高级工具的资产规范页查看预算与贴图说明。
+- 资产规范表登记于 `../../AssetPipeline/Data_AssetStandards.json`，可在控制中心的「资产规范与限制」查看预算与贴图说明。
 - `campaignEnabled:false`：独立资产登记不自动改变既有任务编队。是否启用到正片，由具体任务配置单独决定。
 - 十个真实控制节点保留螺旋桨、双轮、方向舵、左右升降舵及上下左右副翼；`../../Script_KawasakiType88Motion.mjs` 同步外露推杆，无缩放变形模拟。
 

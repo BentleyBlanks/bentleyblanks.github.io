@@ -226,9 +226,9 @@ if(process.argv.includes('--launcher-only')){
 }
 
 // 菜单栏右端（2026-11-05）：没有「游戏」菜单、菜单栏 ×、⏻；只有「返回主菜单」。关工具用工作窗自己的 ×
-await ClickTool("assetStandards");
+await ClickTool("actor");
 await Step(1);
-await page.click("#edRoot .edPanel .edX");
+await page.click("#edRoot .edPanel.work .edX");
 const afterCloseTool = await page.evaluate(() => ({
   panelOpen: window.Taierzhuang.Debug.Editor().panelOpen, active: window.Taierzhuang.Debug.Editor().active,
 }));
@@ -242,35 +242,6 @@ Check("菜单栏没有「游戏」菜单、× 与 ⏻，最后一个按钮是「
       && !document.querySelector('#edRoot .edMenu[data-menu="game"]')
       && last?.classList.contains("edMenuMainMenu") && last.textContent.trim() === "返回主菜单" && last.dataset.action === "main-menu";
   }));
-
-// 资产规范是构件库之外的独立只读分类。它不摆模型，但必须把原始/实际/限制/贴图
-// 与七类入口真实摆出来；只注册一个空按钮不算完成。
-await ClickTool("assetStandards");
-await Step(2);
-const assetStandards = await page.evaluate(() => {
-  const panel = document.querySelector(".edPanel.assetStandards");
-  const headers = [...panel.querySelectorAll("th")].map((el) => el.textContent.trim());
-  const chips = [...panel.querySelectorAll(".edChip")].map((el) => el.textContent.trim());
-  const text = panel.textContent;
-  return {
-    active: window.Taierzhuang.Debug.Editor().active,
-    rows: panel.querySelectorAll("tbody tr").length,
-    headers, chips, text,
-    bad: panel.querySelectorAll("td.status.bad").length,
-  };
-});
-Check("资产规范是独立编辑器入口", assetStandards.active === "assetStandards");
-Check("资产规范有七个分类", assetStandards.chips.length === 7
-  && ["枪械", "架设 / 炮械", "刀剑 / 刺刀", "战车", "程序化 TZM", "外部 GLB", "贴图规范"]
-    .every((label) => assetStandards.chips.includes(label)), assetStandards.chips.join(" / "));
-// 枪械分类现有 7 行（P38 / K98k / MK98 栓动步枪按考据删除、C96 按用户要求移除后）。
-Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 7
-  && ["原始面数", "实际面数", "限制 / 目标", "面数降幅", "自带贴图", "游戏内贴图"]
-    .every((label) => assetStandards.headers.includes(label)));
-Check("枪械表显示捷克式原始 7,811 与实际 7,781", assetStandards.text.includes("7,811")
-  && assetStandards.text.includes("7,781"));
-Check("资产规范当前没有不合规红项", assetStandards.bad === 0, `红项=${assetStandards.bad}`);
-await ClickTool("assetStandards");
 
 // Debug Rendering 是观察工具，不可被互斥编辑器的切换顺手销毁。它要真的把
 // NormalDepth 靶送到屏幕，不能只是 DOM 面板里一串假的状态文字。

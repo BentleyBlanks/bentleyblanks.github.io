@@ -13,12 +13,11 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
 import { CONTROL_CENTER_URL, STANDALONE_TOOLS } from "./Data_AdvancedTools.mjs";
 
 /** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页（含特效预览、音效音乐），不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor, AssetStandardsEditor,
+  ActorEditor, FacialEditor,
 ]);
 
 /** 菜单分组：从 Data_DevTools.TOOL_MENUS 中筛选摄影棚类工具，空组不列。 */
@@ -248,8 +247,7 @@ export class ToolStudio {
       button.setAttribute("aria-checked", String(on));
     }
     if (this.emptyInspector) this.emptyInspector.hidden = !!this.active;
-    this.inspectorToggle.hidden = this.activeId === AssetStandardsEditor.id;
-    const inspector = this.workHost.querySelector(".edPanel.work:not(.assetStandards)") || this.emptyInspector;
+    const inspector = this.workHost.querySelector(".edPanel.work") || this.emptyInspector;
     this.inspectorElement = inspector;
     if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
     this.inspectorToggle.setAttribute("aria-controls", inspector.id);
@@ -413,7 +411,7 @@ async function Main() {
     location.replace(dest);
     return;
   }
-  // 构件库预览 2026-11-25 改成只在控制中心出现的独立只读页面（游戏与本宿主里都不再挂）。
+  // 构件库预览、资产规范 2026-11-25 改成只在控制中心出现的独立页面（游戏与本宿主里都不再挂），旧地址转过去。
   const standalone = STANDALONE_TOOLS.find((tool) => tool.id === params.get("tool"));
   if (standalone) {
     location.replace(new URL(standalone.window.url, location.href));

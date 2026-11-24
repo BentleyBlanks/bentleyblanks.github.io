@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { MakeTreePlacements, MakeAuthoredTreePlacements, TreePlacementAllowed, TreeBlastDamage } from "./Script_BreakableTreePlacements.mjs";
 import { BREAKABLE_TREES as T } from "./Data_Tuning_BreakableTrees.mjs";
-import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
+import { EXTERNAL_GLB_STANDARDS } from "./AssetPipeline/Script_AssetStandardsNode.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 const allPlacements=MakeTreePlacements(), placements=allPlacements.filter(p=>!p.authored);
 const authored=MakeAuthoredTreePlacements();

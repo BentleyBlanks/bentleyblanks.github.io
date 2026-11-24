@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>资产规范与限制 · 血战滕县</title>
+  <link rel="icon" href="../Icon_TabSeal32.png">
+  <!-- 资产导出规范的配置器与合规预览：只读写 ../AssetPipeline/Data_AssetStandards.json，读构建产物 ../Model/Data_ModelIndex.json；
+       不加载游戏的模块、样式与 vendor（Script_AssetStandardsTest 守）。 -->
+  <link rel="stylesheet" href="./Style_AssetStandards.css?v=20261125Standalone">
+  <script type="module" src="./Script_AssetStandardsTool.mjs?v=20261125Standalone"></script>
+</head>
+<body>
+  <header class="as-top">
+    <div class="as-brand">
+      <h1>资产规范与限制</h1>
+      <p>资产导出规范 · 配置与合规预览 · 导入管线与验收门禁照它执行，游戏运行时不读</p>
+    </div>
+    <div class="as-file">
+      <code id="specFile" title="规范文件（唯一真相）">AssetPipeline/Data_AssetStandards.json</code>
+      <span id="saveState" class="as-state" role="status">读取中…</span>
+      <span id="validState" class="as-valid" hidden></span>
+    </div>
+    <div class="as-actions">
+      <button type="button" id="reloadButton" class="as-btn" title="丢弃未保存的修改，重新读取盘上的规范">重新读取</button>
+      <button type="button" id="downloadButton" class="as-btn">下载 JSON</button>
+      <button type="button" id="saveButton" class="as-btn primary" disabled>保存 <kbd>Ctrl S</kbd></button>
+      <a id="controlCenter" class="as-link" href="./ControlCenter.html">← 控制中心</a>
+    </div>
+  </header>
+  <p id="banner" class="as-banner" role="alert" hidden></p>
+  <main class="as-layout">
+    <nav class="as-nav" id="groupNav" aria-label="规范分类"></nav>
+    <section class="as-main" id="mainView" aria-label="规范内容"></section>
+    <aside class="as-detail" id="detail" aria-label="详情与编辑"></aside>
+  </main>
+</body>
+</html>

@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
+import { SCENE_RENDER_LIMITS } from "./AssetPipeline/Script_AssetStandardsNode.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const baselineRoot=process.argv.find(arg=>arg.startsWith("--baseline-root="))?.slice("--baseline-root=".length);

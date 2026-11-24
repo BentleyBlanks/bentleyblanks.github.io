@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
-import {SCENE_RENDER_LIMITS} from './Data_AssetStandards.mjs';
+import {SCENE_RENDER_LIMITS} from './AssetPipeline/Script_AssetStandardsNode.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const baselineRoot=process.argv.find(arg=>arg.startsWith('--baseline-root='))?.slice('--baseline-root='.length);
@@ -19,7 +19,7 @@ const out=path.join(root,'tmp','FlareRenderBudget',label);
 await fs.mkdir(out,{recursive:true});
 const Git=(...args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8'}).trim();
 const identity={label,fixture:stressCity?'stress-city':'normal-game',sourceRoot,head:Git('rev-parse','HEAD'),statusBefore:Git('status','--short'),startedAt:new Date().toISOString(),servedModules:{}};
-const tracked=new Set(['Script_Main.mjs','Script_Post.mjs','Script_Flare.mjs','Script_FlareShadows.mjs','Script_FlareShadowBounds.mjs','Script_FlareShadowInstances.mjs','Script_InstanceFrustumScope.mjs','Script_StaticInstanceCulling.mjs','Script_ShadowInstanceCulling.mjs','Script_PostPrepass.mjs','Script_PropBatch.mjs','Script_MaterialPatches.mjs','Script_ShadowCasterBatch.mjs','Script_ClusteredLights.mjs','Script_PostTaa.mjs','Data_Tuning_Shadows.mjs','Data_Tuning_FlareEffects.mjs','Data_Tuning_Graphics.mjs','Data_AssetStandards.mjs']);
+const tracked=new Set(['Script_Main.mjs','Script_Post.mjs','Script_Flare.mjs','Script_FlareShadows.mjs','Script_FlareShadowBounds.mjs','Script_FlareShadowInstances.mjs','Script_InstanceFrustumScope.mjs','Script_StaticInstanceCulling.mjs','Script_ShadowInstanceCulling.mjs','Script_PostPrepass.mjs','Script_PropBatch.mjs','Script_MaterialPatches.mjs','Script_ShadowCasterBatch.mjs','Script_ClusteredLights.mjs','Script_PostTaa.mjs','Data_Tuning_Shadows.mjs','Data_Tuning_FlareEffects.mjs','Data_Tuning_Graphics.mjs']);
 const server=await ServeRoot(sourceRoot,0),browser=await LaunchBrowser();
 const errors=[],moduleReads=[];
 let report=null;

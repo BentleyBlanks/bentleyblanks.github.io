@@ -1,4 +1,5 @@
-// 资产面数规范、Blender 管线、生成清单与浏览器编辑器的离线一致性测试。
+// 资产导出规范（AssetPipeline/Data_AssetStandards.json）、Blender 管线、生成清单与独立配置器的离线一致性测试；
+// 另守「规范不进游戏」：游戏运行时与 index.html 不引用 AssetPipeline/，配置器页面不 import 游戏模块。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -10,15 +11,14 @@ import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import {
   ASSET_STANDARD_GROUPS, ComplianceFor, ExternalComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
   SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
-} from "./Data_AssetStandards.mjs";
+} from "./AssetPipeline/Script_AssetStandardsNode.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const type89Contract = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Type89MediumTank/Data_ReferenceContract.json"), "utf8"));
 const index = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Data_ModelIndex.json"), "utf8"));
 const built = new Map(index.models.map((entry) => [entry.name, entry]));
 const pythonRules = fs.readFileSync(path.join(projectDir, "_blender", "AssetBudgets.py"), "utf8");
-const editorSource = fs.readFileSync(path.join(projectDir, "AdvancedTools", "Script_EditorAssetStandards.mjs"), "utf8");
-const suiteSource = fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8");
+const toolSource = fs.readFileSync(path.join(projectDir, "AdvancedTools", "Script_AssetStandardsTool.mjs"), "utf8");
 const bootTestSource = fs.readFileSync(path.join(projectDir, "Script_BootTest.mjs"), "utf8");
 const html = fs.readFileSync(path.join(projectDir, "index.html"), "utf8");
 
@@ -155,15 +155,30 @@ Check(ExternalComplianceFor({actualTriangles:82202,targetTriangles:80000,selecte
 const groupIds = new Set(ASSET_STANDARD_GROUPS.map((entry) => entry.id));
 Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "texture"]
   .every((id) => groupIds.has(id)), "编辑器包含枪械/炮械/刀剑/战车/程序化/GLB/贴图七类");
-Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
-  && /面数降幅/.test(editorSource) && /自带贴图/.test(editorSource),
-"资产规范表展示原始/实际/降幅/贴图列");
-Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
-  "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
-Check(/AssetStandardsEditor/.test(suiteSource)
-  && html.includes('"./AdvancedTools/Script_EditorAssetStandards.mjs": "./AdvancedTools/Script_EditorAssetStandards.mjs"')
-  && html.includes('"./Data_AssetStandards.mjs": "./Data_AssetStandards.mjs"'),
-"资产规范编辑器已注册到套件与 import map");
+Check(/原始面数/.test(toolSource) && /实际面数/.test(toolSource)
+  && /面数降幅/.test(toolSource) && /自带贴图/.test(toolSource),
+"资产规范配置器展示原始/实际/降幅/贴图列");
+Check(/Data_ModelIndex\.json/.test(toolSource) && /Data_AssetStandards\.json/.test(toolSource),
+  "配置器读规范 JSON 与构建产物 Model/Data_ModelIndex.json，而不是游戏的 Data_Meshes");
+{
+  const imports = [...toolSource.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((match) => match[1]);
+  Check(imports.length > 0 && imports.every((spec) => spec === "../AssetPipeline/Script_AssetStandards.mjs"),
+    "配置器页面只 import AssetPipeline 的判定模块，不 import 游戏代码", imports.join(", "));
+  const page = fs.readFileSync(path.join(projectDir, "AdvancedTools", "Tool_AssetStandards.html"), "utf8");
+  Check(!/Style_(Interface|Editor)\.css|vendor\//.test(page), "配置器页面不加载游戏样式与 vendor");
+}
+{
+  // 游戏运行时（非测试的根目录 Script_ / Data_ 模块）不 import 规范目录，index.html 也不登记；整关驾驶 Kit 是 Node 侧测试驱动。
+  const nodeSideDrivers = new Set(["Script_FirstLevelCampaignKit.mjs"]);
+  const offenders = fs.readdirSync(projectDir).filter((name) => /^(Script|Data)_.*\.mjs$/.test(name) && !/Test/.test(name) && !nodeSideDrivers.has(name))
+    .filter((name) => /(?:from\s*|import\s*\(\s*)["'][^"']*(?:AssetPipeline\/|Data_AssetStandards)/.test(fs.readFileSync(path.join(projectDir, name), "utf8")));
+  Check(offenders.length === 0 && !/AssetPipeline|AssetStandards/.test(html), "游戏运行时与 import map 不引用资产规范", offenders.join(", "));
+  Check(!fs.existsSync(path.join(projectDir, "Data_AssetStandards.mjs"))
+    && !fs.existsSync(path.join(projectDir, "AdvancedTools", "Script_EditorAssetStandards.mjs")), "旧的游戏内规范模块与工具宿主编辑器已删除");
+  const { REDRAFT_TRIANGLE_BUDGETS } = await import("./Data_OpeningSet0103.mjs");
+  Check(REDRAFT_TRIANGLE_BUDGETS.hanYang === EXTERNAL_GLB_STANDARDS.find((record) => record.id === "HanYang173R").targetTriangles,
+    "01–02 布景里汉阳造173R的额度与规范登记目标一致", String(REDRAFT_TRIANGLE_BUDGETS.hanYang));
+}
 
 // Compare triangle-corner UV distributions against the downloaded glTF, so a
 // future rebuild cannot silently replace the authored atlas with box projection.

@@ -32,7 +32,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
-import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
+import { SCENE_RENDER_LIMITS } from "./AssetPipeline/Script_AssetStandardsNode.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
