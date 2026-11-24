@@ -137,18 +137,19 @@ def MakeBurstFrames():
         spread = .57 + .51*rise + .43*Ease(clock,.58,1.24)
         billow = map_coordinates(noise, positions + np.array([.64,-clock*3.2,-clock*.96])[:,None,None,None],
             order=1, mode="grid-wrap", prefilter=False)
-        side = (x-.5-.19*y-(billow-.5)*.108) / spread
+        side = (x-.5-.23*y-(billow-.5)*.142) / spread
         height = y / rise
         depth = (z-.5+.13*y+(billow-.5)*.084) / spread
         lobes = Nodes((side,height,depth), (
-            (-.010,.10,.010,.245,.117,.245,.52),
-            (-.025,.32,.035,.154,.294,.172,.48),
-            (.079,.49,-.068,.171,.252,.173,.30),
-            (-.122,.66,.046,.137,.196,.116,.33),
-            (.115,.89,.055,.110,.171,.138,.27),
+            (-.018,.08,.010,.137,.127,.148,.68),
+            (-.015,.32,.038,.127,.257,.144,.56),
+            (.064,.52,-.088,.149,.248,.148,.45),
+            (-.128,.66,.069,.151,.207,.121,.31),
+            (.177,.81,.046,.143,.185,.128,.32),
+            (.031,.98,-.056,.191,.125,.143,.18),
         ))
         strength = Ease(clock,0,.168)*(1-Ease(clock,.47,1.38))
-        density = np.clip(lobes * (.39 + .98*billow) * strength * rim, 0, 1)
+        density = np.clip(lobes * (.30 + 1.25*billow) * strength * rim, 0, 1)
         yield np.uint8(np.rint(np.rint(np.sqrt(density)*31)*(255/31)))
 
 

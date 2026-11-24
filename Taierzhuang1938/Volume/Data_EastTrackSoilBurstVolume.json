@@ -33,12 +33,12 @@
   "source": "authored",
   "file": "Volume_EastTrackSoilBurst.bin.gz",
   "gpuBytes": 253440,
-  "compressedBytes": 35760,
+  "compressedBytes": 32666,
   "boundsM": [
     1.87,
     2.32,
     1.61
   ],
-  "sha256": "bd26956d9ee8f535ce50075bd754dba7c0a3be1be9030a77c51192154d8c0392",
+  "sha256": "15d524493d0f27f14bd0a09e068891c152c81a31287ca4daac190b68b971891e",
   "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py"
 }

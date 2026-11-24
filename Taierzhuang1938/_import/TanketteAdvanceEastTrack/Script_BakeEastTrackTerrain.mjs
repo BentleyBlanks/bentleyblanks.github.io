@@ -66,7 +66,7 @@ function GroundAt(x, z) {
     * lift(x,z,eastLip(d)+.21,z,.40,1) * (1-ease((d-8)/13));
   const mounds = .26*lift(x,z,spoil[0]+.46,spoil[1]-.08,1.12,.86)
     + .16*lift(x,z,spoil[0]-.54,spoil[1]-.54,.71,.55)
-    - .29*lift(x,z,spoil[0]-.04,spoil[1]+.05,.34,.33)
+    - .22*lift(x,z,spoil[0]-.04,spoil[1]+.05,.34,.33)
     + .22*lift(x,z,17,-27,2.42,1.33) - .20*lift(x,z,-7.2,-18,1.5,1.45);
   const farRelief = .53 * ease((d-27)/33)*(ValueNoise2(x*.068,z*.052,506)-.23);
   const fieldBerms = fieldBanks.reduce((sum,[cx,cz,rx,rz,h]) => sum + h*lift(x,z,cx,cz,rx,rz), 0);
@@ -112,7 +112,8 @@ Line("DitchSoilFloor", "#483e34", [.75,.71,.67], .56, .46, -4, 21, (d) => eastLi
 Line("FieldPathEastRoad", "#726a61", [1.22,1.12,1.02], 1.96, .82, -4, 100, roadX, .84);
 Line("FieldPathWestTrack", "#524a42", [.85,.80,.74], .20, .24, -4, 86, (d) => roadX(d)-.71, .50);
 Line("FieldPathEastTrack", "#504941", [.87,.84,.79], .21, .24, -4, 86, (d) => roadX(d)+.69, .51);
-Line("DitchSoilFreshSpoil", "#3b3028", [.57,.51,.48], .54, .53, 6.7, 8.78, (d) => spoil[0]+.26*Math.cos(d));
+Line("DitchSoilFreshSpoil", "#48392e", [.67,.60,.54], .37, .46, 6.92, 8.44,
+  (d) => spoil[0]+.18*Math.cos(d), .79);
 for (const [i,[from,to,x,halfW,strength]] of [
   [3.92,6.44,1.58,.37,.58], [5.56,8.40,4.06,.44,.62], [7.15,11.58,1.33,.39,.49],
   [9.72,14.52,4.88,.66,.45], [13.5,18.8,1.24,.70,.42],
