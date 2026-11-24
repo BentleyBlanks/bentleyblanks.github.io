@@ -73,17 +73,61 @@ export const MELEE_SCENARIOS = Object.freeze([
   { id: "AlliedBayonet", name: "友军刺刀 · 敌友对练", weapon: "Bayonet", enemies: 1, allies: 1, allyWeapon: "Bayonet", kind: "observe", tip: "观察两方短刺、拨挡和长刺，或亲自加入战斗。" },
   { id: "ParryTiming", name: "拨挡 · 早／准／晚", weapon: "Dadao", enemies: 1, kind: "timing", tip: "对手重复可读的长刺；按住右键不会延长窗口，成功不会自动反杀。" },
 ].map(Object.freeze));
-// ── 白刃实验场的玩法变体（2026-11-23 用户要的两种新玩法，面板上切换对照）──────────────
-// 正片不设变体，一律 classic；只有 ?melee=1 的面板（或 ?meleeControl= / ?meleeImpact=）会切。
+// ── 白刃实验场的玩法变体（2026-11-23～11-24 面板切换对照，正片不设变体，一律 classic）──────
 //   control  classic  原版：按住左键蓄力，松开出轻／重击
-//            drag     拖拽挥砍：按住左键，鼠标不再转视角而是带着刀走；往哪个方向一甩，刀就顺着这一甩快速砍下去
-//                     （用户 11-23 第二轮：方向选择的那套「太不好操控」，换成这个）
+//            drag     拖拽挥砍：按住左键，鼠标带着刀走；往哪个方向一甩，刀就顺着这一甩快速砍下去
 //   impact   classic  原版：砍中即退（对方失衡）
-//            lodge    卡刀：刀真砍进身体里（够深、够正）才卡住 → 按住 S／连按左键／晃鼠标拔出来 → 对方踉跄，此时任一刀即补刀（F 自动补一刀）；
-//                     刀尖擦过、砍在边上的照常是一道口子，不用拔
+//            lodge    卡刀：刀深砍进身体卡住 → 长按 F 拔刀 → 对方踉跄，F 补刀
+//            cleave   吃肉顿刀 · 拖刃拉豁：砍进血肉瞬间刀身吃阻顿住、双向咬合，窗口内顺势甩鼠标或再按左键发力拉豁撕扯
+//            slide    磕枪顺刃 · 压杆劈杀：右键或挥刀磕住日军刺刀锁在枪管上，按住 W／前推鼠标沿枪管擦出火星欺身，左键顺杆劈杀
+//            crush    横枪硬接 · 震断破防：正面挥砍先硬磕日军横枪爆火星、削减护枪架势，重劈或连砍震断破防后 F／左键抢步处决（侧翼绕防直接砍肉）
+//            pofeng   破锋全开 · 三合一：横枪硬接破防 ＋ 磕枪顺刃压杆 ＋ 吃肉顿刀拉豁 三套交互同场生效
 export const MELEE_VARIANTS = Object.freeze({
   control: Object.freeze(["classic", "drag"]),
-  impact: Object.freeze(["classic", "lodge"]),
+  impact: Object.freeze(["classic", "lodge", "cleave", "slide", "crush", "pofeng"]),
+});
+export const MELEE_CLEAVE = Object.freeze({
+  weapons: Object.freeze(["Dadao"]),
+  // 吃肉顿刀窗口：刀刃咬进躯干后在 windowS 秒内以 crawlN 极慢阻尼切入；满 minBiteS 秒后允许顺势甩鼠或再点左键触发「拖刃拉豁」。
+  windowS: 0.36, minBiteS: 0.065, crawlN: 0.065, exitS: 0.18,
+  // 触发拉豁：咬合中鼠标累计拉拽 ≥ ripStrokePx（或瞬时速度 ≥ ripSpeedPxPerS），或新按一次左键。
+  ripStrokePx: 42, ripSpeedPxPerS: 920,
+  // 拉豁爆发：刀身高速撕出伤口，追加创伤与失衡，并沿刀刃扫掠切向把对手扯飞。
+  ripS: 0.24, ripDamage: 48, ripPoise: 65, wrenchSideM: 0.62, wrenchBackM: 0.28,
+  // 世界空间咬合锚点（锁住刀口与躯干，直到拉豁或自然滑出）。
+  anchorShoulderM: 1.32, anchorTorsoM: 1.08, anchorSideM: 0.12, lockBlend: 0.78,
+});
+export const MELEE_SLIDE = Object.freeze({
+  weapons: Object.freeze(["Dadao"]),
+  // 磕枪锁刃：在 catchReachM 内右键拨接或挥刀迎击正在突刺／挺枪的刺刀，刀口架锁在三八式枪管上。
+  catchReachM: 1.92, facingDot: 0.48, startProgress: 0.16, windowS: 1.45,
+  // 按住 W（或鼠标前推）沿枪管向护手／咽喉前压推进；松开缓慢回滑；推进每 sparkEveryProgress 迸一次钢火。
+  pushRatePerS: 1.85, mousePushPerPx: 0.0045, decayPerS: 0.26, sparkEvery: 0.22,
+  // 压过 strikeMinProgress 即可点左键顺杆劈杀；推到底（1.0）自动顺势劈出。
+  strikeMinProgress: 0.42, closeTargetDistM: 1.06, closeStepMps: 2.6,
+  // 枪管两端世界锚点（相对日军位置沿双方连线）：0 = 刺刀尖端，1 = 前护木／咽喉近端。
+  tipOffsetM: 1.18, hiltOffsetM: 0.40, tipHeightM: 1.18, hiltHeightM: 1.34, bindRollRad: -0.58,
+  // 顺杆劈杀与超时挣脱参数。
+  slashS: 0.24, slashDamage: 120, slashPoise: 85, slashRepelM: 0.36, breakS: 0.30, breakRepelM: 0.26,
+});
+export const MELEE_CRUSH = Object.freeze({
+  weapons: Object.freeze(["Dadao"]),
+  // 日军正面 ±35°（facingDot 0.82）端枪戒备时横枪硬接大刀，侧翼走位绕开或趁其收招破绽可直接砍进血肉。
+  guardFacingDot: 0.82, maxPoise: 100, regenDelayS: 1.8, regenPerS: 16,
+  // 每刀削减护枪架势：轻砍／普通拖刀 38（三刀必破），重劈／下劈 62（两重劈或一轻一重必破）。
+  lightDrain: 38, heavyDrain: 62, chipDamage: 6,
+  // 硬磕反弹：刀身短促弹回（期间可立即衔接下一刀连砸），对手被震退。
+  bounceS: 0.20, enemyBraceS: 0.28, lightRepelM: 0.24, heavyRepelM: 0.38,
+  // 架势清零震断破防：对手门户大开 crushedS 秒，可按 F 抢步处决或任意一刀重创斩杀。
+  crushRecoveryS: 0.12, crushedS: 1.95, crushRepelM: 0.50,
+  finishReachM: 2.25, finishDamage: 125, finishWindupScale: 0.5,
+});
+export const MELEE_FEEL = Object.freeze({
+  // 大刀挥空、磕铁、砍肉三档第一人称体感（仅实验场新交互模式启用，不动正片 classic）。
+  swingKickPitchRad: 0.011, swingKickRollRad: 0.018,
+  clashKickPitchRad: -0.020, clashKickRollRad: 0.034, clashFovPunch: 0.55,
+  fleshKickPitchRad: 0.024, fleshKickRollRad: 0.030, fleshFovPunch: 0.78,
+  ripKickPitchRad: 0.032, ripKickRollRad: 0.048, ripFovPunch: 1.0,
 });
 export const MELEE_LODGE = Object.freeze({
   weapons: Object.freeze(["Dadao"]),

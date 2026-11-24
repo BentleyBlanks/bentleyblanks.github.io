@@ -166,6 +166,10 @@ export const TEXT = Object.freeze({
   "range.melee.control.drag": "拖拽挥砍",
   "range.melee.impact.classic": "原版 · 砍中即退",
   "range.melee.impact.lodge": "卡刀 · 拔刀 · 补刀",
+  "range.melee.impact.cleave": "吃肉顿刀 · 拖刃拉豁",
+  "range.melee.impact.slide": "磕枪顺刃 · 压杆劈杀",
+  "range.melee.impact.crush": "横枪硬接 · 震断破防",
+  "range.melee.impact.pofeng": "破锋全开 · 三合一",
   "range.melee.controlAttack": "左键：轻击／蓄力重击",
   "range.melee.controlParry": "右键：拨枪 · WASD：移动避刺",
   "range.melee.controlDrag": "按住左键：刀跟着鼠标走、视角跟一部分 · 一甩就顺着甩的方向砍下去，甩得越快越重",
@@ -174,6 +178,10 @@ export const TEXT = Object.freeze({
   "range.melee.controlParryDrag": "右键：拨挡 · WASD：移动",
   "range.melee.controlPress": "刀枪硬架僵持时：连按 F 抵抗",
   "range.melee.controlLodge": "刀砍进身体卡住：长按 F 拔刀 · 拔出来后再砍一刀或按 F：补刀",
+  "range.melee.controlCleave": "刀刃吃进血肉顿刀咬骨：顺势甩鼠标或再点左键，拖刃拉豁并把对手横扯出去",
+  "range.melee.controlSlide": "右键或挥刀磕住刺刀：按住 W 沿枪管前压擦出火星，过半点左键顺杆劈杀",
+  "range.melee.controlCrush": "正面挥砍硬磕日军横枪爆火星：重劈或连砍震断护枪架势，按 F 抢步处决；侧移绕后直接砍肉",
+  "range.melee.controlPofeng": "三合一：正面硬磕震断破防（F 处决）· 磕住刺刀按 W 压杆劈杀 · 砍进血肉甩鼠／左键拉豁",
   "range.melee.controlWeapon": "1／3：步枪／大刀 · V：射击／白刃架势",
 
   // ── 白刃实验场：状态读数 ──────────────────────────────────────────────
@@ -187,6 +195,11 @@ export const TEXT = Object.freeze({
   "range.melee.enemyLine": "日军 · {distance}m · 生命 {health} · {phase}",
   "range.melee.enemyDown": "日军 · 已倒下",
   "range.melee.readLodge": "刀卡住了 · 拔出 {progress}%",
+  "range.melee.readCleave": "吃肉咬骨 · 甩鼠／左键拉豁 {progress}%",
+  "range.melee.readSlide": "磕枪锁刃 · 沿枪管前压 {progress}%{ready}",
+  "range.melee.readSlideReady": "（左键顺劈！）",
+  "range.melee.readGuard": "日军护枪架势 {guard}%",
+  "range.melee.readCrushed": "护枪已破 · 可抢步处决（F／左键）",
   "range.melee.readFinish": "可补刀（F）",
 
   // 交锋状态机的相位名（Data_MeleeCombat 的 phase 是 ASCII id，这里是它们的显示名）。
@@ -206,6 +219,13 @@ export const TEXT = Object.freeze({
   "range.melee.state.yank": "拔刀",
   "range.melee.state.reel": "踉跄",
   "range.melee.state.aim": "拖刀架势",
+  "range.melee.state.cleave": "吃肉顿刀",
+  "range.melee.state.cleaved": "被刀咬住",
+  "range.melee.state.rip": "拖刃拉豁",
+  "range.melee.state.sliding": "磕枪顺刃",
+  "range.melee.state.slideSlash": "顺杆劈杀",
+  "range.melee.state.guardBounce": "硬磕震回",
+  "range.melee.state.crushed": "破防失衡",
 
   // ── 断肢测试场（?gore=1）：路牌 ────────────────────────────────────────
   "range.gore.signWelcome": "断肢测试场",

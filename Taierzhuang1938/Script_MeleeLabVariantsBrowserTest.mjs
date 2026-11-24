@@ -9,7 +9,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -29,18 +28,28 @@ const State = () => page.evaluate(() => {
   const s = Taierzhuang.Debug.MeleeCombat.State();
   const enemy = s.targets.find((t) => t.side === "ija");
   return { variant: s.variant, player: s.player && { state: s.player.state, phase: s.player.phase, roll: s.player.swingRoll || 0, mirror: s.player.swingMirror || 0,
-    direction: s.player.direction, aim: s.player.aimOffset || null, lodge: s.player.lodge || null },
-    stats: s.stats, lodge: s.lodge, finishTarget: s.finishTarget, hud: s.hud && { kind: s.hud.kind }, prompt: Taierzhuang.hud.CinematicPromptState(), targets: s.targets.length, viewFollow: s.viewFollow,
-    enemy: enemy && { health: enemy.health, alive: enemy.alive, distance: enemy.distance, state: enemy.pose?.state || null },
+    direction: s.player.direction, aim: s.player.aimOffset || null, lodge: s.player.lodge || null, cleave: s.player.cleave || null, slide: s.player.slide || null },
+    stats: s.stats, lodge: s.lodge, cleave: s.cleave, slide: s.slide, enemyGuard: s.enemyGuard, finishTarget: s.finishTarget,
+    hud: s.hud && { kind: s.hud.kind }, prompt: Taierzhuang.hud.CinematicPromptState(), targets: s.targets.length, viewFollow: s.viewFollow,
+    enemy: enemy && { health: enemy.health, alive: enemy.alive, distance: enemy.distance, state: enemy.pose?.state || null, x: enemy.x, z: enemy.z },
     yaw: Taierzhuang.player.yaw };
 });
 async function Shot(name) {
   if (!SHOTS) return;
   await Step(1, true);
-  const full = path.join(shotDir, `${name}_full.png`), small = path.join(shotDir, `${name}.png`);
-  await page.screenshot({ path: full });
-  execFileSync("python", ["-c", `from PIL import Image;im=Image.open(r'${full}');im.thumbnail((640,640));im.save(r'${small}')`]);
-  fs.rmSync(full);
+  const raw = await page.screenshot();
+  const dataUrl = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const scale = Math.min(1, 640 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale);
+    c.height = Math.round(img.height * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  }, raw.toString("base64"));
+  fs.writeFileSync(path.join(shotDir, `${name}.png`), Buffer.from(dataUrl.split(",")[1], "base64"));
 }
 async function Setup(scenario, distance = 1.35) {
   await page.getByLabel("独立战斗项目").selectOption(scenario);
@@ -192,6 +201,110 @@ try {
   for (let i = 0; i < 60 && (await State()).enemy.alive; i++) await Step(1);
   assert(!(await State()).enemy.alive);
   console.log("PASS drag+lodge");
+
+  // ── 玩法一：吃肉顿刀 · 拖刃拉豁（cleave）──────────────────────────────────
+  await page.getByRole("button", { name: "原版 · 按住蓄力", exact: true }).click();
+  await page.getByRole("button", { name: "吃肉顿刀 · 拖刃拉豁", exact: true }).click();
+  assert.deepEqual((await State()).variant, { control: "classic", impact: "cleave" });
+  await Setup("DadaoOne", 1.3);
+  const cleaveX0 = (await State()).enemy.x;
+  await page.mouse.down(); await Step(4); await page.mouse.up();
+  for (let i = 0; i < 40 && (await State()).player?.state !== "cleave"; i++) await Step(1);
+  s = await State();
+  assert.equal(s.player.state, "cleave", "blade bites into flesh with drag resistance");
+  assert.equal(s.enemy.state, "cleaved", "enemy torso is coupled to the biting blade");
+  assert.equal(s.prompt?.key, "拉豁", "crimson rip-through prompt ring shown");
+  await Step(4); await Shot("09_CleaveBite");
+  await Flick(-32, 14, 2);
+  for (let i = 0; i < 20 && (await State()).enemy.alive; i++) await Step(1);
+  s = await State();
+  assert.equal(s.stats.rips, 1, "mouse pull rips the blade through");
+  assert(!s.enemy.alive, "rip-through trauma finishes the enemy");
+  assert(Math.abs(s.enemy.x - cleaveX0) > 0.2, "enemy body is wrenched sideways along the blade exit tangent");
+  await Step(4); await Shot("10_CleaveRip");
+  console.log("PASS cleave+rip", JSON.stringify({ rips: s.stats.rips, dx: +(s.enemy.x - cleaveX0).toFixed(2) }));
+
+  // ── 玩法二：磕枪顺刃 · 压杆劈杀（slide）───────────────────────────────────
+  await page.getByRole("button", { name: "磕枪顺刃 · 压杆劈杀", exact: true }).click();
+  assert.deepEqual((await State()).variant, { control: "classic", impact: "slide" });
+  await Setup("DadaoOne", 1.62);
+  await page.mouse.click(800, 400, { button: "right" });
+  await Step(2);
+  s = await State();
+  assert.equal(s.player.state, "sliding", "right-click locks dadao onto the bayonet barrel");
+  assert.equal(s.enemy.state, "sliding");
+  assert.equal(s.prompt?.key, "W", "prompt asks for W to grind down the barrel");
+  await Shot("11_SlideLock");
+  await page.keyboard.down("w");
+  for (let i = 0; i < 30 && !(await State()).slide?.ready; i++) await Step(1);
+  await page.keyboard.up("w");
+  s = await State();
+  assert(s.slide?.ready, "holding W grinds past the strike threshold");
+  assert.equal(s.prompt?.key, "左键", "prompt switches to LMB strike when ready");
+  await Shot("11b_SlideReady");
+  await page.mouse.down(); await page.mouse.up();
+  for (let i = 0; i < 25 && (await State()).enemy.alive; i++) await Step(1);
+  s = await State();
+  assert.equal(s.stats.slideSlashes, 1, "LMB unleashes barrel-slide throat slash");
+  assert(!s.enemy.alive);
+  await Step(4); await Shot("12_SlideSlash");
+  console.log("PASS slide+slash", JSON.stringify(s.stats));
+
+  // ── 玩法三：横枪硬接 · 震断破防（crush）───────────────────────────────────
+  await page.getByRole("button", { name: "横枪硬接 · 震断破防", exact: true }).click();
+  assert.deepEqual((await State()).variant, { control: "classic", impact: "crush" });
+  await Setup("DadaoOne", 1.35);
+  await page.mouse.down(); await Step(4); await page.mouse.up();
+  for (let i = 0; i < 40 && (await State()).stats.guardBlocks < 1; i++) await Step(1);
+  s = await State();
+  assert.equal(s.stats.guardBlocks, 1, "frontal slash clashes against rifle guard");
+  assert.equal(s.enemy.health, 100, "rifle guard absorbs flesh damage");
+  assert(s.enemyGuard?.guardPoise < 100, "guard poise reduced");
+  await Shot("13_GuardClashSparks");
+  for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
+  // 贴近重劈震断护枪架势 → F 抢步处决
+  await page.evaluate(() => {
+    const T = Taierzhuang, enemy = T.Debug.MeleeCombat.State().targets.find((t) => t.side === "ija");
+    T.player.Spawn(enemy.x, enemy.z + 1.35, 0);
+  });
+  await page.mouse.down(); await Step(26); await page.mouse.up();
+  for (let i = 0; i < 45 && (await State()).stats.guardCrushes < 1; i++) await Step(1);
+  s = await State();
+  assert.equal(s.stats.guardCrushes, 1, "heavy chop shatters the rifle guard");
+  assert.equal(s.enemy.state, "crushed");
+  assert.equal(s.prompt?.key, "F", "crimson F execution ring appears");
+  await Shot("14_GuardCrushed");
+  await page.keyboard.press("f");
+  for (let i = 0; i < 60 && (await State()).enemy.alive; i++) await Step(1);
+  s = await State();
+  assert(!s.enemy.alive, "F executes the guard-crushed soldier");
+  assert.equal(s.stats.crushFinishes, 1);
+  console.log("PASS crush+finish", JSON.stringify(s.stats));
+
+  // ── 破锋全开 × 拖拽挥砍（pofeng + drag）──────────────────────────────────
+  await page.getByRole("button", { name: "拖拽挥砍", exact: true }).click();
+  await page.getByRole("button", { name: "破锋全开 · 三合一", exact: true }).click();
+  assert.deepEqual((await State()).variant, { control: "drag", impact: "pofeng" });
+  await Setup("DadaoOne", 1.35);
+  await page.mouse.down(); await Flick(-42, 8, 3); await page.mouse.up();
+  for (let i = 0; i < 40 && (await State()).stats.guardBlocks < 1; i++) await Step(1);
+  assert.equal((await State()).stats.guardBlocks, 1, "pofeng blocks frontal drag cut");
+  for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
+  // 侧翼绕防直接吃肉顿刀 → 甩鼠拉豁
+  await page.evaluate(() => {
+    const T = Taierzhuang, enemy = T.Debug.MeleeCombat.State().targets.find((t) => t.side === "ija");
+    T.player.Spawn(enemy.x + 1.25, enemy.z, Math.PI / 2);
+    T.StepFrames(4, 1 / 60, false);
+  });
+  await page.mouse.down(); await Flick(4, 42, 3);
+  for (let i = 0; i < 40 && (await State()).player.state !== "cleave"; i++) await Step(1);
+  await Step(5); await Flick(-34, 14, 2); await page.mouse.up();
+  for (let i = 0; i < 30 && (await State()).enemy.alive; i++) await Step(1);
+  s = await State();
+  assert(!s.enemy.alive && s.stats.rips === 1, "pofeng flank cleave + rip kills cleanly");
+  await Step(4); await Shot("15_PofengCombined");
+  console.log("PASS pofeng+drag", JSON.stringify(s.stats));
+
   assert.deepEqual(errors, []);
   console.log("PASS no page errors");
 } catch (error) { console.error("page errors:", errors.slice(0, 5)); throw error;

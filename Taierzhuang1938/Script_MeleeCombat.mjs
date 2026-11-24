@@ -1,6 +1,7 @@
 // 通用白刃规则：玩家、敌军、友军同一状态机。纯 Node 可跑，宿主负责物理与伤害。
 import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G,
-  MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DRAG as D } from "./Data_MeleeCombat.mjs";
+  MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DRAG as D,
+  MELEE_CLEAVE as C, MELEE_SLIDE as S0, MELEE_CRUSH as K } from "./Data_MeleeCombat.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { T } from "./Script_Text.mjs";
 const Smooth = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
@@ -46,7 +47,8 @@ export class MeleeCombatDirector {
     this.indexCells = new Map(); this.indexRank = new Map(); this.indexAt = -1;
     this.nearA = []; this.nearB = [];
     this.stats = { attacks: 0, hits: 0, misses: 0, parries: 0, pushes: 0, standing: 0, ground: 0, successes: 0, failures: 0,
-      lodges: 0, shallowCuts: 0, yanks: 0, finishes: 0, drags: 0 };
+      lodges: 0, shallowCuts: 0, yanks: 0, finishes: 0, drags: 0,
+      cleaves: 0, rips: 0, slides: 0, slideSlashes: 0, guardBlocks: 0, guardCrushes: 0, crushFinishes: 0 };
     this.qte = new MeleeQteDirector({ Resolve: (a) => this.ResolveQte(a), Finish: (a) => this.FinishQte(a) }, options);
     // 玩法变体（只有白刃实验场会切，见 Data_MeleeCombat.MELEE_VARIANTS）；拖拽挥砍要的鼠标：
     // pending 是这一帧还没记账的位移，strokes 是最近 windowS 秒逐帧的位移，aim 是刀架跟着鼠标偏出去的量（像素）。
@@ -58,13 +60,21 @@ export class MeleeCombatDirector {
     // 不经 Fighter()：重开项目时玩家的武器还没换好，这里先建出来会把旧武器记进去。
     const f = this.fighters.get(this.Player());
     if (f?.lodge) this.ReleaseLodge(f, "variant");
+    if (f?.cleave) this.ReleaseCleave(f, "variant");
+    if (f?.slide) this.ReleaseSlide(f, "variant");
+    for (const entry of this.fighters.values()) entry.guardPoise = K.maxPoise;
     return { ...this.variant };
   }
   get Drag() { return this.variant.control === "drag"; }
+  get HasCleave() { return this.variant.impact === "cleave" || this.variant.impact === "pofeng"; }
+  get HasSlide() { return this.variant.impact === "slide" || this.variant.impact === "pofeng"; }
+  get HasCrush() { return this.variant.impact === "crush" || this.variant.impact === "pofeng"; }
+  get EnhancedFeel() { return this.variant.impact !== "classic"; }
   /** 按着左键拖拽时鼠标主要归刀：视角只跟 viewFollow 倍（实验场插件按它缩这一帧的转视角）。 */
   get CapturesLook() {
     const f = this.fighters.get(this.Player());
-    return this.Drag && this.held.has("Mouse0") && (f?.state === "aim" || (f?.state === "attack" && !!f.attack?.drag));
+    return (this.Drag && this.held.has("Mouse0") && (f?.state === "aim" || (f?.state === "attack" && !!f.attack?.drag)))
+      || f?.state === "cleave";
   }
   /** 拖拽时视角跟鼠标的比例（0 = 视角不动、只动刀，1 = 视角照常全跟）。 */
   SetViewFollow(value) { this.viewFollow = Clamp(Number.isFinite(+value) ? +value : D.viewFollow, 0, 1); return this.viewFollow; }
@@ -90,17 +100,20 @@ export class MeleeCombatDirector {
   CanChangeWeapon() { const f = this.Fighter(this.Player()); return !this.Active && (!f?.weapon || this.Idle(f)); }
   get Active() { return this.qte.Active; }
   get TimeScale() { return 1; }
-  get Blocking() { return this.Active || ["fall", "down", "rise", "lodged", "yank"].includes(this.Fighter(this.Player())?.state); }
+  get Blocking() {
+    return this.Active || ["fall", "down", "rise", "lodged", "yank", "cleave", "rip", "sliding", "slideSlash"].includes(this.Fighter(this.Player())?.state);
+  }
   Fighter(entity) {
     if (!entity) return null;
     if (!this.fighters.has(entity)) this.fighters.set(entity, {
       entity, state: "idle", t: 0, duration: 0, stamina: 100, poise: 100,
+      guardPoise: K.maxPoise, lastGuardHit: -99,
       weapon: this.Weapon(entity), actionSerial: 0, nextThink: this.time + 0.65,
       lastParry: -99, lastHit: -99, move: 0, target: null, pressureBy: null,
       attack: null, hit: false, parryUsed: false, buffer: null, qteCount: 0,
       qteUntil: -99, recoveryUntil: -99, beatUntil: -99, pushUntil: -99, interruptUntil: -99,
       // 剧本按住的倒地时长（ScriptedKnockDown 设，普通倒地是 null ＝ 共用 1.7 s）
-      groundHoldS: null,
+      groundHoldS: null, cleave: null, slide: null, crushedBy: null,
     });
     return this.fighters.get(entity);
   }
@@ -127,13 +140,16 @@ export class MeleeCombatDirector {
     if (f.state === "lodged") return true;
     if (entity === this.Player() && this.Drag && W[f.weapon]) {
       if (this.Idle(f)) return this.BeginAim(f);
-      // 拖拽挥砍出刀中再按：排进缓冲，这一刀收完就接（左键还按着就回架势，已经松开就是点一下的那一刀）。
-      if (f.state === "attack" && f.attack?.drag) { f.buffer = { expires: this.time + Math.max(0, f.duration - f.t) + R.inputBufferS, released: false }; return true; }
+      // 拖拽挥砍出刀或硬磕反弹中再按：排进缓冲，收完就接下一刀。
+      if ((f.state === "attack" && f.attack?.drag) || f.state === "guardBounce") {
+        f.buffer = { expires: this.time + Math.max(0, f.duration - f.t) + R.inputBufferS, released: false };
+        return true;
+      }
       return false;
     }
     if (f.state !== "idle") {
-      if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
-        f.buffer = {expires:this.time+R.inputBufferS, released:false}; return true;
+      if (f.state === "guardBounce" || (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS)) {
+        f.buffer = {expires:this.time + Math.max(0, f.duration - f.t) + R.inputBufferS, released:false}; return true;
       }
       return false;
     }
@@ -142,8 +158,8 @@ export class MeleeCombatDirector {
   AttackUp(entity = this.Player()) {
     const f = this.Fighter(entity);
     if (entity === this.Player() && this.Drag) {
-      if (f?.buffer && f.state === "attack") { f.buffer.released = true; return true; }
-      if (f?.state === "aim") { if (f.t <= D.tapS) return this.TapCut(f); this.SetState(f, "idle"); }
+      if (f?.buffer && (f.state === "attack" || f.state === "guardBounce")) { f.buffer.released = true; return true; }
+      if (f?.state === "aim") { if (!f.resumedAim && f.t <= D.tapS) return this.TapCut(f); this.SetState(f, "idle"); }
       return true;
     }
     if (f?.buffer) { f.buffer.released = true; return true; }
@@ -176,10 +192,10 @@ export class MeleeCombatDirector {
   }
   // ── 拖拽挥砍（只给玩家；见 Data_MeleeCombat.MELEE_DRAG）──────────────────────────────
   /** 按下左键：进拖拽架势（刀举起来跟着鼠标走）；出刀中按下的，砍完自动回架势。 */
-  BeginAim(f) {
+  BeginAim(f, resumed = false) {
     if (!this.Idle(f)) return f.state === "attack" && !!f.attack?.drag;
     this.mouse.strokes.length = 0; this.mouse.aim.x = 0; this.mouse.aim.y = 0; f.buffer = null;
-    this.SetState(f, "aim", 0, "Charge"); return true;
+    this.SetState(f, "aim", 0, "Charge"); f.resumedAim = !!resumed; return true;
   }
   /** 点一下的那一刀：刀架偏出去了就顺着偏的方向，否则右上斜劈；力道最轻一档。 */
   TapCut(f) {
@@ -301,25 +317,224 @@ export class MeleeCombatDirector {
   }
   FinishCandidate(entity = this.Player()) {
     const f = this.Fighter(entity);
-    if (!f || !this.Idle(f) || !W[f.weapon] || this.Active) return null;
+    if (!f || !(this.Idle(f) || f.state === "guardBounce") || !W[f.weapon] || this.Active) return null;
     return this.Opponents(entity).find((t) => {
       const tf = this.fighters.get(t);
-      return tf?.state === "reel" && tf.reelBy === entity && Distance(entity, t) <= L.finishReachM && this.Visible(entity, t);
+      if (tf?.state === "reel" && tf.reelBy === entity && Distance(entity, t) <= L.finishReachM && this.Visible(entity, t)) return true;
+      if (tf?.state === "crushed" && tf.crushedBy === entity && Distance(entity, t) <= K.finishReachM && this.Visible(entity, t)) return true;
+      return false;
     }) || null;
   }
-  /** F 补刀：对踉跄中的对手自动转身补一刀（原版走重击、方向挥砍走竖劈，起手都缩短）。 */
+  /** F 补刀／破防处决：对踉跄或护枪被震断的对手自动转身抢步补一刀。 */
   Finish(entity = this.Player()) {
     const target = this.FinishCandidate(entity), f = this.Fighter(entity);
     if (!target) return false;
+    if (f.state === "guardBounce") this.SetState(f, "idle");
+    const tf = this.fighters.get(target), crushed = tf?.state === "crushed";
+    const windupScale = crushed ? K.finishWindupScale : L.finishWindupScale;
     f.stamina = Math.max(f.stamina, 40);
     if (this.Drag) {
-      if (!this.AttackDirectional(entity, DIRECTIONS.get("up"), { windupScale: L.finishWindupScale, tag: "finish" })) return false;
+      if (!this.AttackDirectional(entity, DIRECTIONS.get("up"), { windupScale, tag: crushed ? "crushFinish" : "finish" })) return false;
     } else {
       if (!this.Attack(entity, true)) return false;
-      const a = f.attack; a.windup *= L.finishWindupScale; f.duration = a.windup + a.active + a.recovery;
+      const a = f.attack; a.windup *= windupScale; f.duration = a.windup + a.active + a.recovery;
     }
     f.attack.finisher = target;
-    this.Log("finishStart", entity, target); return true;
+    f.attack.crushFinish = crushed;
+    this.Log(crushed ? "crushFinishStart" : "finishStart", entity, target); return true;
+  }
+  // ── 玩法一：吃肉顿刀 · 拖刃拉豁（Data_MeleeCombat.MELEE_CLEAVE）───────────────────────
+  CleaveEligible(e, f, target) {
+    return this.HasCleave && e === this.Player() && C.weapons.includes(f.weapon)
+      && Alive(target) && !f.attack?.finisher && !!this.Fighter(target)?.weapon;
+  }
+  UpdateCleaveAnchor(cleave, e, target) {
+    const yaw = e.yaw || 0, side = -Math.sign(cleave.sweep || -1) * C.anchorSideM;
+    cleave.anchor = {
+      x: target.position.x + Math.cos(yaw) * side,
+      y: (target.position.y || 0) + (cleave.reverse ? C.anchorTorsoM : C.anchorShoulderM),
+      z: target.position.z - Math.sin(yaw) * side,
+    };
+  }
+  BeginCleave(f, target, { sweep = -1 } = {}) {
+    const e = f.entity, tf = this.Fighter(target), stroke = this.StrokeOf(f);
+    const cleave = {
+      target, clip: f.clip, n0: Clamp(this.AttackTime(f), 0.30, 0.56), ...stroke,
+      sweep, direction: f.attack?.direction?.id || null, drag: !!f.attack?.drag,
+      pullX: 0, pullY: 0, wantRip: false, serial: ++this.serial, anchor: null,
+    };
+    this.UpdateCleaveAnchor(cleave, e, target);
+    this.SetState(f, "cleave", C.windowS, cleave.clip); f.cleave = cleave;
+    this.SetState(tf, "cleaved", C.windowS + 0.12, "Hit"); tf.cleavedBy = e; tf.buffer = null;
+    this.stats.cleaves++; this.Log("cleave", e, target, { sweep, anchor: { ...cleave.anchor } });
+  }
+  StepCleave(f, _dt) {
+    const e = f.entity, cleave = f.cleave, target = cleave?.target, tf = target && this.Fighter(target);
+    if (!cleave || !Alive(target) || tf.state !== "cleaved") { this.ReleaseCleave(f, "released"); return; }
+    this.UpdateCleaveAnchor(cleave, e, target);
+    const pulled = Math.hypot(cleave.pullX, cleave.pullY);
+    const speed = this.mouse.strokes.reduce((top, s) => Math.max(top, Math.hypot(s.x, s.y) / Math.max(s.dt, 1e-3)), 0);
+    if (f.t >= C.minBiteS && (cleave.wantRip || pulled >= C.ripStrokePx || speed >= C.ripSpeedPxPerS)) {
+      this.Rip(f); return;
+    }
+    if (f.t >= f.duration) {
+      f.cleave = null; tf.cleavedBy = null;
+      this.SetState(tf, "stagger", 0.34, "Hit");
+      this.SetState(f, "idle");
+      if (cleave.drag && this.Drag && this.held.has("Mouse0")) this.BeginAim(f, true);
+      this.Log("cleaveExit", e, target);
+    }
+  }
+  Rip(f) {
+    const e = f.entity, cleave = f.cleave, target = cleave?.target, tf = target && this.Fighter(target);
+    if (!cleave || !Alive(target)) { this.ReleaseCleave(f, "gone"); return false; }
+    const yaw = e.yaw || 0, sg = Math.sign(cleave.sweep || -1) || -1;
+    // 刀刃出肉切向：顺着扫刀方向把人横扯出去，并稍往后带。
+    const tx = sg * Math.cos(yaw), tz = -sg * Math.sin(yaw);
+    const bx = Math.sin(yaw), bz = Math.cos(yaw);
+    tf.cleavedBy = null;
+    this.SetState(f, "rip", C.ripS, cleave.clip); f.cleave = cleave;
+    this.Damage(target, e, C.ripDamage, "heavy", { yaw, sweep: cleave.sweep });
+    if (Alive(target)) {
+      this.Move(target, tx * C.wrenchSideM + bx * C.wrenchBackM, tz * C.wrenchSideM + bz * C.wrenchBackM);
+      this.Stagger(target, e, "Pushed", R.staggerS + 0.25, C.ripPoise);
+    } else {
+      this.Move(target, tx * C.wrenchSideM * 0.65, tz * C.wrenchSideM * 0.65);
+    }
+    this.stats.rips++;
+    this.Log("rip", e, target, { sweep: cleave.sweep, tangent: { x: tx, z: tz }, anchor: { ...cleave.anchor } });
+    return true;
+  }
+  ReleaseCleave(f, reason) {
+    const target = f.cleave?.target, tf = target && this.fighters.get(target);
+    f.cleave = null;
+    if (tf?.state === "cleaved") { tf.cleavedBy = null; this.SetState(tf, "stagger", 0.32, "Hit"); }
+    if (f.state === "cleave" || f.state === "rip") this.SetState(f, "idle");
+    this.Log("cleaveRelease", f.entity, target, { reason });
+  }
+  // ── 玩法二：磕枪顺刃 · 压杆劈杀（Data_MeleeCombat.MELEE_SLIDE）───────────────────────
+  UpdateSlideAnchor(slide, e, target) {
+    const dx = e.position.x - target.position.x, dz = e.position.z - target.position.z;
+    const d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
+    const p = slide.progress;
+    const along = S0.tipOffsetM + (S0.hiltOffsetM - S0.tipOffsetM) * p;
+    const height = S0.tipHeightM + (S0.hiltHeightM - S0.tipHeightM) * p;
+    slide.anchor = { x: target.position.x + ux * along, y: (target.position.y || 0) + height, z: target.position.z + uz * along };
+  }
+  BeginSlide(f, target, reason = "parryCatch") {
+    const e = f.entity, tf = this.Fighter(target);
+    const pushNow = this.held.has("KeyW") || (this.host.MoveIntent?.(e)?.forward > 0);
+    const slide = {
+      target, progress: S0.startProgress, nextSparkAt: S0.startProgress + S0.sparkEvery,
+      pushHeld: !!pushNow, mousePush: 0, pushing: !!pushNow, reason, serial: ++this.serial, anchor: null,
+    };
+    this.UpdateSlideAnchor(slide, e, target);
+    this.SetState(f, "sliding", S0.windowS, "ParryRight"); f.slide = slide;
+    this.SetState(tf, "sliding", S0.windowS + 0.1, "WeaponClash"); tf.slideBy = e; tf.buffer = null;
+    this.stats.slides++;
+    this.Log("slideStart", e, target, { reason, point: { ...slide.anchor } });
+    return true;
+  }
+  StepSlide(f, dt) {
+    const e = f.entity, slide = f.slide, target = slide?.target, tf = target && this.Fighter(target);
+    if (!slide || !Alive(target) || tf.state !== "sliding") { this.ReleaseSlide(f, "released"); return; }
+    const intentFwd = this.host.MoveIntent?.(e)?.forward || 0;
+    const pushing = slide.pushHeld || intentFwd > 0.1 || slide.mousePush > 1e-4;
+    slide.pushing = pushing;
+    const delta = (pushing ? S0.pushRatePerS * dt : -S0.decayPerS * dt) + (slide.mousePush || 0);
+    slide.mousePush = 0;
+    slide.progress = Clamp(slide.progress + delta, 0, 1);
+    if (pushing && delta > 0) {
+      // 欺身压进刺刀死角（贴到 closeTargetDistM），把三八式的长枪管废掉。
+      const d = Distance(e, target), need = d - S0.closeTargetDistM;
+      if (need > 0) {
+        const step = Math.min(need, S0.closeStepMps * dt);
+        this.Move(e, (target.position.x - e.position.x) / d * step, (target.position.z - e.position.z) / d * step);
+      }
+    }
+    this.UpdateSlideAnchor(slide, e, target);
+    while (slide.progress >= slide.nextSparkAt && slide.nextSparkAt <= 1.01) {
+      this.Log("slideGrind", e, target, { progress: +slide.progress.toFixed(2), point: { ...slide.anchor } });
+      slide.nextSparkAt += S0.sparkEvery;
+    }
+    if (slide.progress >= 1) { this.SlideSlash(f); return; }
+    if (f.t >= f.duration) {
+      f.slide = null; tf.slideBy = null;
+      this.Repel(e, target, S0.breakRepelM * 0.5); this.Repel(target, e, S0.breakRepelM);
+      this.SetState(tf, "stagger", S0.breakS, "Deflected");
+      this.SetState(f, "stagger", S0.breakS * 0.75, "WeaponClash");
+      this.Log("slideBreak", e, target);
+    }
+  }
+  SlideSlash(f) {
+    const e = f.entity, slide = f.slide, target = slide?.target, tf = target && this.Fighter(target);
+    if (!slide || !Alive(target) || slide.progress < S0.strikeMinProgress) return false;
+    tf.slideBy = null;
+    this.SetState(f, "slideSlash", S0.slashS, "Heavy"); f.slide = slide;
+    const yaw = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
+    e.yaw = yaw;
+    this.Damage(target, e, S0.slashDamage, "heavy", { yaw, sweep: -R.bladeSweepRad, reach: W.Dadao.light.reach });
+    if (Alive(target)) {
+      this.Repel(target, e, S0.slashRepelM);
+      this.Stagger(target, e, "Hit", R.staggerS + 0.3, S0.slashPoise);
+    }
+    this.stats.slideSlashes++;
+    this.Log("slideSlash", e, target, { progress: +slide.progress.toFixed(2), point: { ...slide.anchor } });
+    return true;
+  }
+  ReleaseSlide(f, reason) {
+    const target = f.slide?.target, tf = target && this.fighters.get(target);
+    f.slide = null;
+    if (tf?.state === "sliding") { tf.slideBy = null; this.SetState(tf, "stagger", 0.3, "Deflected"); }
+    if (f.state === "sliding" || f.state === "slideSlash") this.SetState(f, "idle");
+    this.Log("slideRelease", f.entity, target, { reason });
+  }
+  // ── 玩法三：横枪硬接 · 震断破防（Data_MeleeCombat.MELEE_CRUSH）───────────────────────
+  CrushBlockEligible(e, f, target, tf) {
+    return this.HasCrush && e === this.Player() && K.weapons.includes(f.weapon)
+      && tf?.weapon === "Bayonet" && !f.attack?.finisher
+      && ["idle", "charge"].includes(tf.state) && tf.guardPoise > 0
+      && Facing(target, e) >= K.guardFacingDot;
+  }
+  ApplyGuardHit(f, target, tf) {
+    const e = f.entity, a = f.attack, heavy = !!a.heavy;
+    const drain = heavy ? K.heavyDrain : K.lightDrain;
+    tf.guardPoise = Math.max(0, tf.guardPoise - drain);
+    tf.lastGuardHit = this.time;
+    const d = Distance(e, target) || 1;
+    const point = {
+      x: target.position.x + (e.position.x - target.position.x) / d * 0.42,
+      y: (target.position.y || 0) + 1.26,
+      z: target.position.z + (e.position.z - target.position.z) / d * 0.42,
+    };
+    const sweep = a.sweep || -1;
+    if (tf.guardPoise <= 0) {
+      this.Repel(target, e, K.crushRepelM);
+      tf.poise = 0; tf.crushedBy = e;
+      this.SetState(tf, "crushed", K.crushedS, "Pushed");
+      tf.crushYaw = Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z);
+      tf.crushSide = sweep >= 0 ? 1 : -1;
+      tf.nextThink = Math.max(tf.nextThink, this.time + K.crushedS);
+      this.SetState(f, "guardBounce", K.crushRecoveryS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+      this.stats.guardCrushes++;
+      this.Log("guardCrush", e, target, { point, sweep });
+      return;
+    }
+    this.Repel(target, e, heavy ? K.heavyRepelM : K.lightRepelM);
+    this.SetState(tf, "stagger", K.enemyBraceS, "Deflected");
+    tf.nextThink = Math.max(tf.nextThink, this.time + K.enemyBraceS + 0.14);
+    this.SetState(f, "guardBounce", K.bounceS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+    this.stats.guardBlocks++;
+    this.Log("guardBlock", e, target, { point, guardPoise: tf.guardPoise, heavy, sweep });
+  }
+  StepCrushed(f, dt) {
+    const e = f.entity, by = f.crushedBy, k = Math.sqrt(Math.max(0, 1 - f.t / f.duration));
+    if (by && Alive(by)) {
+      const d = Distance(e, by) || 1, ax = (e.position.x - by.position.x) / d, az = (e.position.z - by.position.z) / d;
+      this.Move(e, ax * 0.32 * k * dt, az * 0.32 * k * dt);
+    }
+    e.yaw = (f.crushYaw ?? e.yaw ?? 0) + Math.sin(f.t * Math.PI / 0.72) * 0.28 * k * (f.crushSide || 1);
+    if (f.t >= f.duration) { f.crushedBy = null; f.poise = 45; f.guardPoise = K.maxPoise; this.SetState(f, "idle"); }
   }
   /** 攻击动作的归一化播放时间（拖刀延长的接触段按比例拉慢，不是让动作提前播完）。 */
   AttackTime(f) {
@@ -333,6 +548,16 @@ export class MeleeCombatDirector {
     const f = this.Fighter(entity);
     if (f?.state === "aim") this.SetState(f, "idle");   // 拖拽架势里也随时能拨挡
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || f.stamina < R.parryCost) return false;
+    // 磕枪顺刃：玩家持大刀按右键迎上正在出刺或挺枪对峙的日军，直接架锁三八式枪管。
+    if (entity === this.Player() && this.HasSlide && S0.weapons.includes(f.weapon)) {
+      const slideTarget = this.Closest(entity, S0.catchReachM, S0.facingDot);
+      const tf = slideTarget ? this.Fighter(slideTarget) : null;
+      if (slideTarget && tf?.weapon === "Bayonet" && Facing(slideTarget, entity) >= S0.facingDot
+        && (tf.state === "attack" || tf.state === "charge" || (tf.state === "idle" && Distance(entity, slideTarget) <= 1.75))) {
+        f.stamina -= R.parryCost;
+        return this.BeginSlide(f, slideTarget, tf.state === "attack" ? "parryCatch" : "beatCatch");
+      }
+    }
     f.stamina -= R.parryCost; f.parryUsed = false;
     const intent = this.host.MoveIntent?.(entity) || {strafe:0};
     const target = this.Closest(entity,W[f.weapon].beatReach,.4);
@@ -471,6 +696,8 @@ export class MeleeCombatDirector {
   Stagger(entity, from, clip, duration, poise = 0) {
     const f = this.Fighter(entity);
     if (f.state === "lodged" && f.lodge) this.ReleaseLodge(f, "interrupted");
+    if ((f.state === "cleave" || f.state === "rip") && f.cleave) this.ReleaseCleave(f, "interrupted");
+    if ((f.state === "sliding" || f.state === "slideSlash") && f.slide) this.ReleaseSlide(f, "interrupted");
     // Damage is already applied; repeated hits must not restart falling or rising.
     if (entity === this.Player() && (["fall", "down", "rise", "qte"].includes(f.state) || this.time < f.recoveryUntil)) return;
     f.poise = Math.max(0, f.poise - poise); f.lastHit = this.time; f.pressureBy = from;
@@ -637,7 +864,7 @@ export class MeleeCombatDirector {
     const p=this.Player();
     return this.Opponents(p).find(e=>e!==partner && this.Weapon(e) && !e.meleeTraining?.passive
       && Distance(e,p)<=W[this.Weapon(e)].light.reach+.55 && this.Visible(e,p) && !this.BodyBlocker(e,p)
-      && !['stagger','fall','down','rise','qte','lodged','reel'].includes(this.Fighter(e).state));
+      && !['stagger','fall','down','rise','qte','lodged','reel','cleaved','sliding','crushed'].includes(this.Fighter(e).state));
   }
   EscapeQte(threat) {
     const a=this.qte.active;if(!a)return;
@@ -659,18 +886,42 @@ export class MeleeCombatDirector {
       const f = this.Fighter(this.Player());
       if(f)f.buffer=null;
       if (f?.lodge) f.lodge.held = false;
+      if (f?.slide) f.slide.pushHeld = false;
       if (f?.state === "charge") this.SetState(f, "idle");
       return false;
+    }
+    if (code === "KeyW") {
+      if (down) this.held.add("KeyW"); else this.held.delete("KeyW");
     }
     if (this.Active) {
       if (code === "KeyF") this.qte.Press(down, repeat);
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
-    // 卡刀：长按 F 拔刀，其余白刃键吞掉（Esc / Alt / ` 照常放行）。按着的键照记，拔出来以后再按 F 才是补刀。
     const pf = this.fighters.get(this.Player());
+    // 卡刀：长按 F 拔刀，其余白刃键吞掉（Esc / Alt / ` 照常放行）。按着的键照记，拔出来以后再按 F 才是补刀。
     if (pf?.state === "lodged" || pf?.state === "yank") {
       if (down) this.held.add(code); else this.held.delete(code);
       if (code === "KeyF" && pf.lodge) pf.lodge.held = !!down;
+      return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
+    }
+    // 吃肉顿刀：再按左键（或甩鼠标）触发拖刃拉豁。
+    if (pf?.state === "cleave" || pf?.state === "rip") {
+      const wasHeld = this.held.has(code);
+      if (down) this.held.add(code); else this.held.delete(code);
+      if (pf.state === "cleave" && code === "Mouse0" && down && !repeat && !wasHeld && pf.cleave) {
+        pf.cleave.wantRip = true;
+        if (pf.t >= C.minBiteS) this.Rip(pf);
+      }
+      return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
+    }
+    // 磕枪顺刃：按住 W 沿枪管前压推进，推进过半后按左键顺杆劈杀。
+    if (pf?.state === "sliding" || pf?.state === "slideSlash") {
+      const wasHeld = this.held.has(code);
+      if (down) this.held.add(code); else this.held.delete(code);
+      if (pf.slide && code === "KeyW") pf.slide.pushHeld = !!down;
+      if (pf.state === "sliding" && code === "Mouse0" && down && !repeat && !wasHeld && pf.slide?.progress >= S0.strikeMinProgress) {
+        this.SlideSlash(pf);
+      }
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
     if (!this.CanUse()) return false;
@@ -681,8 +932,7 @@ export class MeleeCombatDirector {
       return code !== "KeyF";
     }
     if (repeat || this.held.has(code)) return true;
-    // F 只剩卡刀实验的补刀；玩家的近身推架 2026-11-23 撤了（用户），不归白刃管的 F 交回通用交互。
-    // Push() 本身还在：对手贴身时照样会顶开玩家。
+    // F 负责卡刀补刀与破防抢步处决；不归白刃管的 F 交回通用交互。
     if (code === "KeyF") {
       if (!this.Blocking && this.Finish()) { this.held.add(code); return true; }
       return this.Blocking;
@@ -699,7 +949,9 @@ export class MeleeCombatDirector {
     if (!target || !spec) return;
     const tf = this.Fighter(target), d = Distance(e, target);
     const yaw = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
-    if ((f.state !== "attack" || !f.attack.locked) && f.state !== "lodged" && f.state !== "reel") e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
+    if ((f.state !== "attack" || !f.attack.locked) && !["lodged", "reel", "cleaved", "sliding", "crushed"].includes(f.state)) {
+      e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
+    }
     if (f.state !== "idle") return;
     const training = e.meleeTraining || {};
     if (training.passive || e.meleeDormant) return;
@@ -828,10 +1080,38 @@ export class MeleeCombatDirector {
     }
     if (f.state === "idle") { f.stamina = Math.min(100, f.stamina + R.staminaRecovery * dt); }
     if (this.time - f.lastHit > 1.5 && f.state === "idle") f.poise = Math.min(100, f.poise + R.poiseRecovery * dt);
+    if (this.HasCrush && e !== this.Player() && f.state === "idle" && this.time - f.lastGuardHit > K.regenDelayS) {
+      f.guardPoise = Math.min(K.maxPoise, f.guardPoise + K.regenPerS * dt);
+    }
     if (f.state === "qte") return;
     if (f.state === "lodged") { if (e === this.Player()) this.StepLodge(f, dt); return; }
     if (f.state === "yank") { if (f.t >= f.duration) { f.lodge = null; this.SetState(f, "idle"); } return; }
     if (f.state === "reel") { this.StepReel(f, dt); return; }
+    if (f.state === "cleave") { if (e === this.Player()) this.StepCleave(f, dt); return; }
+    if (f.state === "cleaved") { if (f.t >= f.duration) { f.cleavedBy = null; this.SetState(f, "idle"); } return; }
+    if (f.state === "rip") {
+      if (f.t >= f.duration) {
+        const wasDrag = !!f.cleave?.drag; f.cleave = null; this.SetState(f, "idle");
+        if (wasDrag && e === this.Player() && this.Drag && this.held.has("Mouse0")) this.BeginAim(f, true);
+      }
+      return;
+    }
+    if (f.state === "sliding") { if (e === this.Player()) this.StepSlide(f, dt); else if (f.t >= f.duration) { f.slideBy = null; this.SetState(f, "idle"); } return; }
+    if (f.state === "slideSlash") {
+      if (f.t >= f.duration) {
+        f.slide = null; this.SetState(f, "idle");
+        if (e === this.Player() && this.Drag && this.held.has("Mouse0")) this.BeginAim(f, true);
+      }
+      return;
+    }
+    if (f.state === "guardBounce") {
+      if (f.t >= f.duration) {
+        const wasDrag = !!f.bounceDrag; f.bounceDrag = false; this.SetState(f, "idle");
+        if (wasDrag && e === this.Player() && this.Drag && this.held.has("Mouse0") && !f.buffer) this.BeginAim(f, true);
+      }
+      return;
+    }
+    if (f.state === "crushed") { this.StepCrushed(f, dt); return; }
     if (f.state === "aim") { this.StepAim(f, dt); return; }
     if(f.state==='contact' && f.t>=f.duration) {
       const other=f.contactTarget;
@@ -874,7 +1154,7 @@ export class MeleeCombatDirector {
         if (!a.connected) { this.stats.misses++; this.Log("miss", e); }
         this.SetState(f, "idle");
         // 拖拽挥砍：左键还按着就回到架势，接着甩下一刀。
-        if (a.drag && e === this.Player() && this.held.has("Mouse0")) this.BeginAim(f);
+        if (a.drag && e === this.Player() && this.held.has("Mouse0")) this.BeginAim(f, true);
       }
       return;
     }
@@ -943,13 +1223,23 @@ export class MeleeCombatDirector {
     const blocker=this.BodyBlocker(e,target);
     if(blocker) {a.connected=true;this.SetState(f,'stagger',.32,'Obstructed');this.Log('bodyObstruction',e,blocker);return;}
     if (tf.state === "qte") return;
+    // 磕枪顺刃：玩家挥大刀迎击正在突刺的刺刀手，刀口直接架锁在三八式枪管上。
+    if (this.HasSlide && e === this.Player() && S0.weapons.includes(f.weapon) && tf.weapon === "Bayonet"
+      && tf.state === "attack" && tf.t <= tf.attack.windup + tf.attack.active
+      && distance <= S0.catchReachM && Facing(e, target) >= S0.facingDot && Facing(target, e) >= S0.facingDot) {
+      a.connected = true;
+      this.BeginSlide(f, target, "attackClash");
+      return;
+    }
     if (tf.state === "parry" && tf.t <= R.parryWindowS && !tf.parryUsed && Facing(target, e) >= R.parryFacingDot) {
       tf.parryUsed = true; tf.lastParry = this.time;
       tf.duration=tf.t+R.parrySuccessRecoveryS;
       a.connected = true; this.Stagger(e, target, "Deflected", R.parryStaggerS, 17);
       this.stats.parries++; this.Log("parry", target, e); return;
     }
-    const hardBrace = a.heavy && ((tf.state === "attack" && tf.attack?.heavy && tf.t < tf.attack.windup + tf.attack.active) || (tf.state === "charge" && tf.t >= R.chargeMinS));
+    const trainingKind = target.meleeTraining?.kind || e.meleeTraining?.kind || null;
+    const hardBrace = (!this.HasCrush || trainingKind === "bind") && a.heavy
+      && ((tf.state === "attack" && tf.attack?.heavy && tf.t < tf.attack.windup + tf.attack.active) || (tf.state === "charge" && tf.t >= R.chargeMinS));
     if (distance <= R.bindReachM && hardBrace && Facing(target, e) > 0.65 && W[tf.weapon]) {
       if(this.WeaponContact(e,target)) {
         a.connected=true;
@@ -959,13 +1249,24 @@ export class MeleeCombatDirector {
       }
     }
     if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; this.SetState(f,'stagger',.3,'WeaponClash'); return; }
+    // 横枪硬接：正面戒备的日军横起三八式硬挡大刀，爆火星削减护枪架势；侧翼绕开或收招破绽不挡。
+    if (this.CrushBlockEligible(e, f, target, tf)) {
+      a.connected = true;
+      this.ApplyGuardHit(f, target, tf);
+      return;
+    }
     a.connected = true;
-    // 踉跄中的对手（刚被拔刀的那个）挨上任何一刀都是补刀。
-    const finishing = tf.state === "reel" && tf.reelBy === e;
-    const amount = finishing ? Math.max(a.damage, (target.health ?? 100) + 1) : a.damage;
+    // 踉跄（拔刀后）或破防失衡（护枪被震断后）的对手挨上任何一刀都是致命重创。
+    const reelHit = tf.state === "reel" && tf.reelBy === e;
+    const crushedHit = tf.state === "crushed" && tf.crushedBy === e;
+    const amount = crushedHit ? Math.max(a.damage, K.finishDamage, (target.health ?? 100) + 1)
+      : reelHit ? Math.max(a.damage, (target.health ?? 100) + 1) : a.damage;
+    if (crushedHit) tf.crushedBy = null;
     this.Damage(target, e, amount, a.heavy ? "heavy" : "light", { yaw: a.yaw, sweep, reach: a.reach, start, end, previous });
-    if (finishing) { this.stats.finishes++; this.Log("finish", e, target); }
+    if (crushedHit) { this.stats.crushFinishes++; this.Log("crushFinish", e, target, { sweep }); }
+    else if (reelHit) { this.stats.finishes++; this.Log("finish", e, target); }
     if (Alive(target) && this.LodgeEligible(e, f, target)) { this.BeginLodge(f, target); return; }
+    if (Alive(target) && this.CleaveEligible(e, f, target)) { this.BeginCleave(f, target, { sweep }); return; }
     if (Alive(target)) {
       const protectedRecovery=this.time<tf.interruptUntil;
       this.Stagger(target,e,'Hit',a.heavy?R.staggerS:protectedRecovery?.12:.32,a.poise);
@@ -975,12 +1276,18 @@ export class MeleeCombatDirector {
   }
   Update(dt) {
     if (!Number.isFinite(dt) || dt <= 0 || !this.enabled) return;
-    // 拖拽挥砍：这一帧的鼠标位移记进最近 windowS 秒的账；按着左键时刀架跟着它偏出去。
-    const m = this.mouse, frame = m.pending;
+    // 拖拽挥砍与吃肉拉豁／顺杆前压：记录最近 windowS 秒的鼠标位移。
+    const m = this.mouse, frame = m.pending, pf = this.fighters.get(this.Player());
     m.strokes.push({ t: this.time + dt, dt, x: frame.x, y: frame.y });
     while (m.strokes.length && m.strokes[0].t < this.time + dt - D.windowS) m.strokes.shift();
-    if (this.fighters.get(this.Player())?.state === "aim") {
+    if (pf?.state === "aim") {
       m.aim.x = Clamp(m.aim.x + frame.x, -D.aimRadiusPx, D.aimRadiusPx); m.aim.y = Clamp(m.aim.y + frame.y, -D.aimRadiusPx, D.aimRadiusPx);
+    }
+    if (pf?.state === "cleave" && pf.cleave && pf.t >= C.minBiteS) {
+      pf.cleave.pullX += frame.x; pf.cleave.pullY += frame.y;
+    }
+    if (pf?.state === "sliding" && pf.slide && frame.y > 0) {
+      pf.slide.mousePush = (pf.slide.mousePush || 0) + frame.y * S0.mousePushPerPx;
     }
     frame.x = 0; frame.y = 0;
     let left = Math.min(dt, 0.25);
@@ -1089,6 +1396,47 @@ export class MeleeCombatDirector {
         lodge: { progress: L0.progress, held: L0.held, yank: p, anchor: L0.anchor, serial: L0.serial, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
     } else if (f.state === "lodged") {
       Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.32 + Math.sin(this.time * 41) * 0.02 });
+    } else if ((f.state === "cleave" || f.state === "rip") && f.cleave && f.entity === this.Player()) {
+      const C0 = f.cleave, ripP = f.state === "rip" ? Smooth(f.t / f.duration) : 0;
+      const biteP = f.state === "cleave" ? Clamp(f.t / f.duration, 0, 1) : 1;
+      const nBite = Clamp(C0.n0 + C.crawlN * biteP, 0, 0.85);
+      const n = f.state === "rip" ? nBite + (1 - nBite) * ripP : nBite;
+      const weight = C0.split ? this.RollWeight(n, ...C0.split) : 0;
+      const pulled = Clamp(Math.hypot(C0.pullX, C0.pullY) / C.ripStrokePx, 0, 1);
+      Object.assign(result, {
+        clip: `${f.weapon}${C0.clip}`, action: C0.clip, animationNormalized: n,
+        strokeSplit: C0.split, strokeReverse: C0.reverse, swingRoll: C0.roll * weight, swingMirror: C0.mirror ? weight : 0, weaponYawOffset: 0,
+        cleave: { progress: pulled, bite: biteP, rip: ripP, anchor: C0.anchor, serial: C0.serial, sweep: C0.sweep },
+        lodge: { progress: pulled, held: true, yank: f.state === "rip" ? ripP : 1 - C.lockBlend * (1 - biteP * 0.3), anchor: C0.anchor, serial: C0.serial, strain: f.state === "rip" ? 0 : 0.45 + pulled * 0.45 },
+      });
+    } else if (f.state === "cleaved") {
+      Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.28 + Math.sin(this.time * 48) * 0.025 });
+    } else if ((f.state === "sliding" || f.state === "slideSlash") && f.slide && f.entity === this.Player()) {
+      const S1 = f.slide, slashP = f.state === "slideSlash" ? Smooth(f.t / f.duration) : 0;
+      if (f.state === "sliding") {
+        Object.assign(result, {
+          clip: `${f.weapon}Heavy`, action: "Heavy", animationNormalized: 0.36 + S1.progress * 0.08,
+          swingRoll: S0.bindRollRad * (1 - S1.progress * 0.25), weaponYawOffset: 0,
+          slide: { progress: S1.progress, pushing: S1.pushing, ready: S1.progress >= S0.strikeMinProgress, anchor: S1.anchor },
+          lodge: { progress: S1.progress, held: S1.pushing, yank: 0.12, anchor: S1.anchor, serial: S1.serial, strain: S1.pushing ? 0.7 : 0.3 },
+        });
+      } else {
+        Object.assign(result, {
+          clip: `${f.weapon}Heavy`, action: "Heavy", animationNormalized: 0.38 + slashP * 0.62,
+          swingRoll: -0.32 * (1 - slashP), weaponYawOffset: 0,
+          slide: { progress: 1, slash: slashP },
+        });
+      }
+    } else if (f.state === "sliding") {
+      const pf = this.fighters.get(this.Player()), p = pf?.slide?.progress ?? 0;
+      Object.assign(result, { clip: `${f.weapon}Deflected`, action: "Deflected", animationNormalized: 0.16 + p * 0.52 + Math.sin(this.time * 38) * 0.015 });
+    } else if (f.state === "guardBounce" && f.entity === this.Player()) {
+      const u = Clamp(f.t / Math.max(f.duration, 1e-3), 0, 1);
+      Object.assign(result, { clip: `${f.weapon}Obstructed`, action: "Obstructed", animationNormalized: u * 0.72, swingRoll: (f.bounceSweep || -1) * 0.18 * (1 - u) });
+    } else if (f.state === "crushed") {
+      const cycle = f.t / 0.72, index = Math.floor(cycle), u = cycle - index;
+      const action = index % 2 ? "Hit" : "Pushed";
+      Object.assign(result, { clip: `${f.weapon}${action}`, action, animationNormalized: 0.18 + u * 0.66, finishable: true });
     } else if (f.state === "reel") {
       // 踉跄：Hit / Pushed 两段交替，每段 reelCycleS，段与段之间 0.08 s 交接。
       const cycle = f.t / L.reelCycleS, index = Math.floor(cycle), u = cycle - index;
@@ -1096,6 +1444,7 @@ export class MeleeCombatDirector {
       Object.assign(result, { clip: `${f.weapon}${action}`, action, animationNormalized: 0.12 + u * 0.7, finishable: true,
         transition: index > 0 && u < 0.1 ? { from: { ...result, clip: `${f.weapon}${other}`, action: other, animationNormalized: 0.82, transition: null }, mix: u / 0.1 } : result.transition });
     }
+    if (this.HasCrush && f.entity !== this.Player()) result.guardPoise = Math.round(f.guardPoise);
     const tail=f.parryVisualTail;
     if(f.state === "idle" && tail) {
       const elapsed=this.time-tail.startedAt;
@@ -1116,27 +1465,62 @@ export class MeleeCombatDirector {
     if (qte) return qte;
     return null;
   }
-  /** 卡刀时屏幕上那一个圈（HUD 的按键提示环，与屋内伏击同一个）：中间 F，长按把圈走满。 */
+  /** 屏幕中央提示环：卡刀长按 F、吃肉顿刀甩鼠／左键拉豁、磕枪顺刃按 W 推杆／左键顺劈、破防失衡按 F 处决。 */
   PromptView() {
     const f = this.fighters.get(this.Player());
-    if (f?.state !== "lodged" || !f.lodge) return null;
-    return { mode: "press", key: "F", progress: f.lodge.progress, pulse: f.lodge.held ? 0.5 + 0.5 * Math.sin(this.time * 24) : 0 };
+    if (f?.state === "lodged" && f.lodge) {
+      return { mode: "press", key: "F", progress: f.lodge.progress, pulse: f.lodge.held ? 0.5 + 0.5 * Math.sin(this.time * 24) : 0 };
+    }
+    if (f?.state === "cleave" && f.cleave) {
+      const pulled = Clamp(Math.hypot(f.cleave.pullX, f.cleave.pullY) / C.ripStrokePx, 0, 1);
+      return { mode: "finisher", key: T("gameplay.melee.promptRip"), progress: Math.max(pulled, 1 - f.t / f.duration), pulse: 0.55 + 0.45 * Math.sin(this.time * 28) };
+    }
+    if (f?.state === "sliding" && f.slide) {
+      const ready = f.slide.progress >= S0.strikeMinProgress;
+      return {
+        mode: ready ? "finisher" : "press",
+        key: ready ? T("gameplay.melee.promptLmb") : "W",
+        progress: f.slide.progress,
+        pulse: ready ? 0.6 + 0.4 * Math.sin(this.time * 26) : (f.slide.pushing ? 0.5 + 0.5 * Math.sin(this.time * 22) : 0),
+      };
+    }
+    const finish = this.FinishCandidate();
+    const tf = finish ? this.fighters.get(finish) : null;
+    if (tf?.state === "crushed") {
+      return { mode: "finisher", key: "F", progress: Clamp(1 - tf.t / tf.duration, 0, 1), pulse: 0.6 + 0.4 * Math.sin(this.time * 24) };
+    }
+    return null;
   }
   SetAssist(mode) { return this.qte.SetAssist(mode); }
   State() {
     const pf = this.fighters.get(this.Player());
-    return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14),
-      variant: { ...this.variant }, dragPreview: this.Drag ? this.DragPreview() : null, lodge: pf?.state === "lodged" && pf.lodge ? { progress: pf.lodge.progress, held: pf.lodge.held } : null,
-      finishTarget: this.FinishCandidate()?.id ?? null };
+    const foe = this.Opponents(this.Player())[0], foeF = foe ? this.fighters.get(foe) : null;
+    return {
+      time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14),
+      variant: { ...this.variant }, dragPreview: this.Drag ? this.DragPreview() : null,
+      lodge: pf?.state === "lodged" && pf.lodge ? { progress: pf.lodge.progress, held: pf.lodge.held } : null,
+      cleave: pf?.state === "cleave" && pf.cleave ? { progress: Clamp(Math.hypot(pf.cleave.pullX, pf.cleave.pullY) / C.ripStrokePx, 0, 1), bite: Clamp(pf.t / pf.duration, 0, 1) } : null,
+      slide: pf?.state === "sliding" && pf.slide ? { progress: pf.slide.progress, pushing: pf.slide.pushing, ready: pf.slide.progress >= S0.strikeMinProgress } : null,
+      enemyGuard: this.HasCrush && foeF ? { guardPoise: Math.round(foeF.guardPoise), crushed: foeF.state === "crushed" } : null,
+      finishTarget: this.FinishCandidate()?.id ?? null,
+    };
   }
   Cancel(reason = "reset") {
     this.qte.Cancel(); this.held.clear();
-    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.groundHoldS=null;f.lodge=null;f.lodgedBy=null;f.reelBy=null;f.entity.meleeCombat = null; }
+    for (const f of this.fighters.values()) {
+      this.SetState(f, "idle"); f.buffer = null; f.groundHoldS = null;
+      f.lodge = null; f.lodgedBy = null; f.reelBy = null;
+      f.cleave = null; f.cleavedBy = null; f.slide = null; f.slideBy = null;
+      f.crushedBy = null; f.guardPoise = K.maxPoise;
+      f.entity.meleeCombat = null;
+    }
     this.Log("cancel", null, null, { reason });
   }
   ReleasePlayer() {
     this.held.clear(); const f = this.Fighter(this.Player()); if(f)f.buffer=null;
     if (f?.lodge) this.ReleaseLodge(f, "release");
+    if (f?.cleave) this.ReleaseCleave(f, "release");
+    if (f?.slide) this.ReleaseSlide(f, "release");
     if (f && !this.Active) this.SetState(f, "idle");
   }
   Reset() { this.Cancel(); this.fighters.clear(); this.events.length = 0; this.time = 0; for (const key of Object.keys(this.stats)) this.stats[key] = 0; }

@@ -755,7 +755,8 @@ export class Soldier extends SoldierFieldAccessors {
     if (!this.alive) {
       if (!this.scriptEssential && damage > 0) {
         try {
-          const gore = this.director?.ctx?.gore;
+          const hasSkin = !!(this.director && this.director.view && this.director.view.skins && this.director.view.skins.has(this));
+          const gore = hasSkin ? null : this.director?.ctx?.gore;
           const sever = gore?.Resolve?.(this, { ...info, part, kind: info.kind || "bullet",
             damage: damage * mult, wouldDie: true });
           if (sever?.limbs?.length) gore.Sever(this, sever.limbs, { ...sever, direction });
@@ -778,7 +779,8 @@ export class Soldier extends SoldierFieldAccessors {
     // 先累计肢段弹伤，再根据本次是否致死选择断肢；只有调试 force 可额外致死。
     // 叙事保护的角色整条链都不进，剧情角色不会因内容表现失去保护。
     // 与 Kill 里那一层同一条理由：判定抛错就按「不断」处理，伤害链照常走完。
-    const gore = this.scriptEssential ? null : this.director?.ctx?.gore;
+    const hasSkin = !!(this.director && this.director.view && this.director.view.skins && this.director.view.skins.has(this));
+    const gore = (this.scriptEssential || hasSkin) ? null : this.director?.ctx?.gore;
     let sever = null;
     try {
       sever = gore?.Resolve?.(this, {

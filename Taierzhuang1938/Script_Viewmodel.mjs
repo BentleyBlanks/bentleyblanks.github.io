@@ -4687,7 +4687,39 @@ export class Viewmodel {
     this.actionPivot.scale.x = pose.swingMirror ? Math.cos(Math.PI * pose.swingMirror) : 1;
     // 拖拽挥砍的架势：整副手臂连刀跟着鼠标偏出去（相机空间，米）。
     if (pose.aimOffset) { this.actionPivot.position.x += pose.aimOffset.x; this.actionPivot.position.y += pose.aimOffset.y; }
-    // 卡刀：刀吃在肉里往回拽，手跟着发抖；拔刀那一下往怀里猛抽一把。
+    // 吃肉顿刀／拖刃拉豁：咬合段刀身往伤口里吃紧，拉豁瞬间顺着切向猛甩出去。
+    if (pose.cleave) {
+      const { bite = 0, rip = 0, sweep = -1 } = pose.cleave;
+      const sg = Math.sign(sweep || -1) || -1;
+      if (rip > 0) {
+        const burst = Math.sin(Math.PI * rip);
+        this.actionPivot.position.x += sg * burst * 0.024;
+        this.actionPivot.position.y -= burst * 0.018;
+        this.actionPivot.position.z -= burst * 0.016;
+      } else {
+        this.actionPivot.position.z -= 0.028 * (1 - bite * 0.35);
+      }
+    }
+    // 磕枪顺刃：沿对方三八式枪管前压时，双手压刀往前顶住铁管并带高频摩擦震颤。
+    if (pose.slide) {
+      const { progress = 0, pushing = false, slash = 0 } = pose.slide;
+      if (slash > 0) {
+        this.actionPivot.position.x -= Math.sin(Math.PI * slash) * 0.05;
+        this.actionPivot.position.z -= Math.sin(Math.PI * slash) * 0.06;
+      } else {
+        const buzz = pushing ? 0.0038 : 0.0014;
+        this.actionPivot.position.x += Math.sin(this.elapsed * 73) * buzz;
+        this.actionPivot.position.y += Math.cos(this.elapsed * 89) * buzz;
+        this.actionPivot.position.z -= progress * 0.048;
+      }
+    }
+    // 横枪硬接反弹：砍在铁管木托上短促弹震。
+    if (pose.state === "guardBounce") {
+      const rebound = Math.sin(Math.PI * Math.min(1, pose.normalized || 0));
+      this.actionPivot.position.z += rebound * 0.048;
+      this.actionPivot.position.y += rebound * 0.022 + Math.sin(this.elapsed * 67) * 0.003 * (1 - (pose.normalized || 0));
+    }
+    // 卡刀（及吃肉锁点、顺杆锁点共用世界锚点）：整副手臂连刀锁在世界目标点上。
     if (pose.lodge) {
       const { strain = 0, pulse = 0, yank = 0 } = pose.lodge;
       const shake = (0.002 + strain * 0.006 + pulse * 0.006) * (1 - yank);

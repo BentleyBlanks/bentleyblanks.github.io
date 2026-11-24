@@ -1237,6 +1237,42 @@ export class VfxSystem {
    * hardSparks：打在硬面（HARD_SURFACE_SPARKS.surfaces）上另出一簇火星与亮闪 ——
    * 目前只有战车机枪传；incoming 是弹道方向，火星顺着反弹方向溅出去。
    */
+  /** 冷兵器磕枪／刮铁专用火星（与护木木屑）：只发高对比钢火拖尾与细碎木片，不发遮挡视线的火药烟团与悬空弹孔贴花。 */
+  BladeSparks(position, normal, { intensity = 1, splinters = false } = {}) {
+    const n = TMP_A.copy(normal).normalize();
+    const groundY = this.groundLevel;
+    const count = Math.max(4, Math.round(18 * intensity * this.spawnScale));
+    for (let i = 0; i < count; i += 1) {
+      const s = ResetSpawn();
+      this._ConeVelocity(n, 1.35, this._Range(3.4, 9.8) * Math.min(1.35, 0.75 + intensity * 0.35));
+      s.x = position.x + n.x * 0.02; s.y = position.y + n.y * 0.02; s.z = position.z + n.z * 0.02;
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 1.1; s.vz = TMP_B.z;
+      s.ay = -9.8; s.drag = 1.15;
+      s.life = this._Range(0.18, 0.52);
+      s.sizeStart = 0.013; s.sizeEnd = 0.004;
+      s.stretch = this._Range(0.18, 0.44);
+      s.minPx = 1.2;
+      s.opacity = 1; s.fadeIn = 0.01;
+      s.groundY = groundY;
+      s.colorA = VFX_PALETTE.sparkBurstHot; s.colorB = VFX_PALETTE.sparkBurstCool;
+      s.seed = this.random();
+      this.pools.streak.Spawn(s, this.time);
+    }
+    if (splinters) {
+      const chips = Math.max(2, Math.round(5 * intensity * this.spawnScale));
+      for (let i = 0; i < chips; i += 1) {
+        this._ConeVelocity(n, 1.1, 3.0 * this._Range(0.45, 1));
+        const size = this._Range(0.010, 0.028);
+        this._SpawnDebris(
+          position.x + n.x * 0.03, position.y + n.y * 0.03, position.z + n.z * 0.03,
+          TMP_B.x, TMP_B.y + 0.9, TMP_B.z,
+          size, size * 0.75, size * this._Range(2.4, 4.6),
+          VFX_PALETTE.wood, this._Range(0.75, 1.35), groundY, 0.32, 0.9,
+        );
+      }
+    }
+  }
+
   Impact(position, normal, surface = "dirt", { weaponKind = "rifle", hardSparks = false, incoming = null } = {}) {
     const profile = SURFACE_PROFILES[surface] || SURFACE_PROFILES.dirt;
     const n = TMP_A.copy(normal).normalize();

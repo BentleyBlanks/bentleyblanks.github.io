@@ -22,7 +22,14 @@ const PlayerPhase = phase => (phase
 const TargetPhase = phase => (phase && HasText(StateKey(phase))
   ? T(StateKey(phase)) : T('range.melee.state.idle'));
 const ControlName = id => (id === 'drag' ? T('range.melee.control.drag') : T('range.melee.control.classic'));
-const ImpactName = id => (id === 'lodge' ? T('range.melee.impact.lodge') : T('range.melee.impact.classic'));
+const ImpactName = id => (
+  id === 'lodge' ? T('range.melee.impact.lodge')
+  : id === 'cleave' ? T('range.melee.impact.cleave')
+  : id === 'slide' ? T('range.melee.impact.slide')
+  : id === 'crush' ? T('range.melee.impact.crush')
+  : id === 'pofeng' ? T('range.melee.impact.pofeng')
+  : T('range.melee.impact.classic')
+);
 /** 面板只列一对一（没有友军）的项目；多打一与敌友对练只给取证口。 */
 export const MELEE_LAB_SCENARIOS = MELEE_SCENARIOS.filter(s => s.enemies === 1 && !s.allies);
 export class MeleeLab {
@@ -32,7 +39,11 @@ export class MeleeLab {
     this.root=document.createElement('section'); this.root.className='shellImpactLab meleeLab';
     this.root.setAttribute('aria-label',T('range.melee.aria'));
     const controlButtons=MELEE_VARIANTS.control.map(id=>`<button type="button" class="siBtn mlControl" data-control="${id}">${ControlName(id)}</button>`).join('');
-    const impactButtons=MELEE_VARIANTS.impact.map(id=>`<button type="button" class="siBtn mlImpact" data-impact="${id}">${ImpactName(id)}</button>`).join('');
+    const impactRows=[];
+    for(let i=0;i<MELEE_VARIANTS.impact.length;i+=2){
+      const row=MELEE_VARIANTS.impact.slice(i,i+2).map(id=>`<button type="button" class="siBtn mlImpact" data-impact="${id}">${ImpactName(id)}</button>`).join('');
+      impactRows.push(`<div class="siButtons">${row}</div>`);
+    }
     this.root.innerHTML=`
       <div class="siHead"><b>${T('range.melee.title')}</b><span>${T('range.melee.subtitle')}</span>
         <button type="button" class="siCollapse" aria-expanded="true">${T('range.melee.collapse')}</button></div>
@@ -40,7 +51,7 @@ export class MeleeLab {
         <h3>${T('range.melee.group.variant')}</h3>
         <p class="siLabel">${T('range.melee.controlLabel')}</p><div class="siButtons">${controlButtons}</div>
         <p class="siLabel mlFollowLabel"></p><input type="range" class="siRange mlFollow" min="0" max="100" step="5" aria-label="${T('range.melee.followAria')}">
-        <p class="siLabel">${T('range.melee.impactLabel')}</p><div class="siButtons">${impactButtons}</div>
+        <p class="siLabel">${T('range.melee.impactLabel')}</p>${impactRows.join('')}
         <h3>${T('range.melee.group.scenario')}</h3>
         <select class="siSelect mlScenario" aria-label="${T('range.melee.scenarioAria')}">${MELEE_LAB_SCENARIOS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
         <div class="siButtons"><button type="button" class="siBtn siFire mlStart">${T('range.melee.btnStart')}</button><button type="button" class="siBtn mlPause">${T('range.melee.btnPause')}</button></div>
@@ -84,13 +95,17 @@ export class MeleeLab {
     const variant=snapshot.variant||{control:'classic',impact:'classic'};
     for(const el of this.root.querySelectorAll('.mlControl'))this.Flag(el,'active',el.dataset.control===variant.control);
     for(const el of this.root.querySelectorAll('.mlImpact'))this.Flag(el,'active',el.dataset.impact===variant.impact);
-    const drag=variant.control==='drag', lodge=variant.impact==='lodge';
+    const drag=variant.control==='drag';
     const follow=Math.round((snapshot.viewFollow??0.5)*100);
     if(document.activeElement!==this.follow&&+this.follow.value!==follow)this.follow.value=String(follow);
     this.Put('.mlFollowLabel',T('range.melee.followLabel',{percent:follow}));
     const controls=drag?[T('range.melee.controlDrag'),T('range.melee.controlParryDrag')]:[T('range.melee.controlAttack'),T('range.melee.controlParry')];
     controls.push(T('range.melee.controlPress'));
-    if(lodge)controls.push(T('range.melee.controlLodge'));
+    if(variant.impact==='lodge')controls.push(T('range.melee.controlLodge'));
+    else if(variant.impact==='cleave')controls.push(T('range.melee.controlCleave'));
+    else if(variant.impact==='slide')controls.push(T('range.melee.controlSlide'));
+    else if(variant.impact==='crush')controls.push(T('range.melee.controlCrush'));
+    else if(variant.impact==='pofeng')controls.push(T('range.melee.controlPofeng'));
     controls.push(T('range.melee.controlWeapon'));
     this.Put('.mlControls',controls.join('\n'));
     this.Put('.mlPause',snapshot.paused?T('range.melee.btnResume'):T('range.melee.btnPause'));
@@ -103,8 +118,11 @@ export class MeleeLab {
       health:Math.round(snapshot.health),stamina:Math.round(f?.stamina??100),poise:Math.round(f?.poise??100)})];
     if(enemy)meters.push(enemy.alive?T('range.melee.enemyLine',{distance:enemy.distance.toFixed(2),health:Math.round(enemy.health),phase:TargetPhase(enemy.pose?.phase)})
       :T('range.melee.enemyDown'));
+    if(snapshot.enemyGuard&&enemy?.alive)meters.push(snapshot.enemyGuard.crushed?T('range.melee.readCrushed'):T('range.melee.readGuard',{guard:snapshot.enemyGuard.guardPoise}));
     if(snapshot.lodge)meters.push(T('range.melee.readLodge',{progress:Math.round(snapshot.lodge.progress*100)}));
-    if(snapshot.finishTarget!=null)meters.push(T('range.melee.readFinish'));
+    if(snapshot.cleave)meters.push(T('range.melee.readCleave',{progress:Math.round(snapshot.cleave.progress*100)}));
+    if(snapshot.slide)meters.push(T('range.melee.readSlide',{progress:Math.round(snapshot.slide.progress*100),ready:snapshot.slide.ready?T('range.melee.readSlideReady'):''}));
+    if(snapshot.finishTarget!=null&&!snapshot.enemyGuard?.crushed)meters.push(T('range.melee.readFinish'));
     this.Put('.mlMeters',meters.join('\n'));
   }
   Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}

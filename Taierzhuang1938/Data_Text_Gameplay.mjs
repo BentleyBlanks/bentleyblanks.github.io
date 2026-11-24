@@ -122,6 +122,8 @@ export const TEXT = Object.freeze({
   "gameplay.melee.qte.prompt": "快速连按 F · 抵抗",
   // 一次性按键（09 灶屋伏击，照《使命召唤：战争世界》的万岁冲锋）：按一下就反刺。
   "gameplay.melee.qte.pressPrompt": "按 F · 反击",
+  "gameplay.melee.promptRip": "拉豁",
+  "gameplay.melee.promptLmb": "左键",
   // 卡刀（白刃实验场的卡刀玩法）：大刀吃在人身上拔不出来，底部那张抵抗卡改成拔刀进度。
 
   // --- Script_Combat ----------------------------------------------------------

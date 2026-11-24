@@ -378,6 +378,7 @@ Test('variants default to classic and reject unknown values',()=>{
   const {c}=Make(); assert.deepEqual(c.variant,{control:'classic',impact:'classic'});
   assert.deepEqual(c.SetVariant({control:'nope',impact:'lodge'}),{control:'classic',impact:'lodge'});
   assert.deepEqual(c.SetVariant({control:'drag'}),{control:'drag',impact:'lodge'});
+  for (const mode of ['cleave','slide','crush','pofeng']) assert.equal(c.SetVariant({impact:mode}).impact,mode);
 });
 Test('lodge: a deep dadao cut into a living man sticks both fighters and blocks movement until pulled',()=>{
   const {p,e,c}=Make('Dadao',LodgeAt); c.SetVariant({impact:'lodge'});
@@ -475,8 +476,92 @@ Test('drag: spamming clicks still cuts every time — a tap cuts, clicks during 
     const f=c.Fighter(p); if(f.state==='attack'&&f.t<.1)cuts++;
   }
   assert(c.stats.drags>=4,`clicking for 2.4 s chains cuts back to back (${c.stats.drags})`);
-  StepUntil(c,()=>c.Fighter(p).state==='idle',2); assert.equal(c.Fighter(p).state,'idle','nothing gets stuck');
+  StepUntil(c,()=>c.Fighter(p).state==='idle',2); assert.equal(c.Fighter(p).state==='idle',true,'nothing gets stuck');
   c.HandleInput('Mouse0',true); Step(c,.05); c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'attack','still cuts afterwards: '+JSON.stringify({state:c.Fighter(p).state,stamina:c.Fighter(p).stamina,buffer:c.Fighter(p).buffer,ev:c.events.slice(-3).map(e=>e.kind)}));
+});
+// ── 2026-11-24 三种白刃新交互与破锋全开（cleave / slide / crush / pofeng）───────────────
+Test('cleave: a cut into flesh bites with drag; mouse pull or fresh click rips through and wrenches the enemy sideways',()=>{
+  // 顺势甩鼠标拉豁
+  const a=Make('Dadao',LodgeAt); a.c.SetVariant({impact:'cleave'});
+  a.c.Attack(a.p); StepUntil(a.c,()=>a.c.Fighter(a.p).state==='cleave',1);
+  assert.equal(a.e.health,48,'initial cut deals normal flesh damage');
+  assert.equal(a.c.Fighter(a.e).state,'cleaved','enemy is coupled to the biting blade');
+  assert.equal(a.c.PromptView()?.key,'拉豁');
+  Step(a.c,.08); Drag(a.c,-28,12,2);
+  assert.equal(a.c.stats.rips,1,'mouse pull rips the blade through');
+  assert(!a.e.alive,'rip bonus trauma finishes the wounded enemy');
+  assert(Math.abs(a.e.position.x)>0.25,`enemy body is wrenched sideways along the blade tangent (x=${a.e.position.x.toFixed(2)})`);
+  // 左键再点一下也能拉豁；不操作则咬合窗口结束后自然收刀，不会卡死
+  const b=Make('Dadao',LodgeAt); b.e.health=140; b.c.SetVariant({impact:'cleave'});
+  b.c.Attack(b.p); StepUntil(b.c,()=>b.c.Fighter(b.p).state==='cleave',1);
+  b.c.HandleInput('Mouse0',true); b.c.HandleInput('Mouse0',false);
+  Step(b.c,.1); assert.equal(b.c.stats.rips,1,'clicking LMB during bite queues/triggers rip');
+  assert.equal(b.e.health,140-52-48);
+  const passive=Make('Dadao',LodgeAt); passive.c.SetVariant({impact:'cleave'});
+  passive.c.Attack(passive.p); StepUntil(passive.c,()=>passive.c.Fighter(passive.p).state==='cleave',1);
+  Step(passive.c,.6); assert.equal(passive.c.Fighter(passive.p).state,'idle','exits cleanly without rip input');
+  assert.equal(passive.c.stats.rips,0);
+});
+Test('slide: parrying or clashing into a bayonet locks onto the barrel; W grinds sparks forward and LMB cleaves',()=>{
+  const {p,e,c}=Make('Dadao',1.65); c.SetVariant({impact:'slide'});
+  c.Attack(e); Step(c,.12);
+  assert(c.Parry(p),'right-click catches the incoming bayonet');
+  assert.equal(c.Fighter(p).state,'sliding'); assert.equal(c.Fighter(e).state,'sliding');
+  assert.equal(c.PromptView()?.key,'W');
+  const d0=Distance0(p,e);
+  c.HandleInput('KeyW',true); Step(c,.26); c.HandleInput('KeyW',false);
+  const s1=c.State();
+  assert(s1.slide.ready,`pushing W slides past the strike threshold (${s1.slide.progress.toFixed(2)})`);
+  assert(Distance0(p,e)<d0,'player steps inside the bayonet guard while grinding forward');
+  assert(c.events.some(ev=>ev.kind==='slideGrind'),'grinding emits barrel spark events');
+  assert.equal(c.PromptView()?.key,'左键');
+  c.HandleInput('Mouse0',true); c.HandleInput('Mouse0',false);
+  assert.equal(c.stats.slideSlashes,1,'LMB unleashes the barrel-slide slash');
+  assert(!e.alive,'barrel-slide slash kills');
+  // 主动挥刀撞上对方突刺同样架锁枪管；超时不推则双方弹开
+  const clash=Make('Dadao',1.55); clash.c.SetVariant({impact:'slide'});
+  clash.c.Attack(clash.e); Step(clash.c,.15); clash.c.Attack(clash.p);
+  StepUntil(clash.c,()=>clash.c.Fighter(clash.p).state==='sliding',.5);
+  assert.equal(clash.c.Fighter(clash.p).state,'sliding','swinging into an active thrust clashes into barrel slide');
+  Step(clash.c,1.6); assert.notEqual(clash.c.Fighter(clash.p).state,'sliding','timeout breaks the lock');
+});
+Test('crush: frontal cuts clash off the rifle guard until guard poise shatters for F execution; flanking bypasses guard',()=>{
+  const {p,e,c}=Make('Dadao',1.35); c.SetVariant({impact:'crush'});
+  c.Attack(p,false); StepUntil(c,()=>c.stats.guardBlocks===1,1);
+  assert.equal(e.health,100,'frontal rifle block prevents flesh damage');
+  assert(c.State().enemyGuard.guardPoise<100,'guard poise drops on block');
+  assert(Distance0(p,e)>1.5,'heavy iron chop drives the blocker backward');
+  // 贴近一记重劈直接震断剩余护枪架势
+  e.position.z=-1.35; StepUntil(c,()=>c.Fighter(p).state==='idle',.5);
+  c.Attack(p,true); StepUntil(c,()=>c.stats.guardCrushes===1,1);
+  assert.equal(c.Fighter(e).state,'crushed','guard shatters into crushed state');
+  assert.equal(c.PromptView()?.key,'F');
+  StepUntil(c,()=>c.Fighter(p).state==='idle',.4);
+  assert.equal(c.FinishCandidate(),e);
+  assert(c.HandleInput('KeyF',true)); c.HandleInput('KeyF',false);
+  StepUntil(c,()=>!e.alive,1.5); assert(!e.alive,'F executes the guard-crushed opponent');
+  assert.equal(c.stats.crushFinishes,1);
+  // 绕到侧面出刀：不触发横枪格挡，第一刀直接砍进血肉
+  const flank=Make('Dadao',1.3); flank.c.SetVariant({impact:'crush'});
+  flank.p.position.x=1.25; flank.p.position.z=-1.3; flank.p.yaw=Math.PI/2; // 在日军正侧方 90° 挥砍
+  flank.c.Attack(flank.p,false); StepUntil(flank.c,()=>flank.e.health<100,1);
+  assert.equal(flank.c.stats.guardBlocks,0,'flanking bypasses the frontal rifle guard');
+  assert.equal(flank.e.health,48);
+});
+Test('pofeng + drag combine all three signature interactions seamlessly',()=>{
+  const {p,e,c}=Make('Dadao',1.35); c.SetVariant({control:'drag',impact:'pofeng'});
+  // 1) 正面甩刀 → 硬磕横枪
+  c.HandleInput('Mouse0',true); Drag(c,-45,6,3);
+  StepUntil(c,()=>c.stats.guardBlocks===1,1);
+  assert.equal(e.health,100);
+  StepUntil(c,()=>c.Fighter(p).state==='aim',.5);
+  c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'idle');
+  // 2) 绕到侧翼甩刀 → 绕过护枪直接吃肉顿刀 → 再甩鼠标拖刃拉豁斩杀
+  p.position.x=1.25; p.position.z=e.position.z; p.yaw=Math.PI/2;
+  c.HandleInput('Mouse0',true); Drag(c,0,42,3);
+  StepUntil(c,()=>c.Fighter(p).state==='cleave',1);
+  Step(c,.08); Drag(c,-30,15,2); c.HandleInput('Mouse0',false);
+  assert.equal(c.stats.rips,1); assert(!e.alive);
 });
 console.log(`${count} melee rule tests passed`);
 
