@@ -47,7 +47,9 @@ function Height(x, z) {
   const right = x > roadCenter;
   const advance = Smooth(-3, -26, z);
   const side = Math.abs(x - roadCenter);
-  const shoulderOpening = right ? .32 * Math.exp(-(((z + 7.6) / 5.4) ** 2)) : 0;
+  const shoulderOpening = right
+    ? .32 * Math.exp(-(((z + 7.6) / 5.4) ** 2)) + .86 * Math.exp(-(((z + 11.8) / 4.35) ** 2))
+    : 0;
   const edge = (right ? 1.49 : 1.75) + advance * .47 + shoulderOpening
     + .26 * Noise(right ? 7 : 4, z * .69) + .18 * Noise(right ? 2 : 5, z * 1.81);
   // Larger gullies continue down the bank from the same break in the lip.

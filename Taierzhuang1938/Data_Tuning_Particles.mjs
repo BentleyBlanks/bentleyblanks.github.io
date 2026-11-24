@@ -11,6 +11,7 @@ export const PARTICLE_VOLUME_PLUME=Object.freeze({
   Campfire:{dissipation:[.08,.25,.08],detail:0,multipleScattering:0},
   ChimneySmoke:{dissipation:[.16,.32,.22],detail:.12},
   DenseSmoke:{dissipation:[.16,.34,.24],detail:.16},
+  DitchFireSmoke:{dissipation:[.10,.17,.13],detail:.15,multipleScattering:.14},
 });
 export const PARTICLE_VOLUME_LIGHTING=Object.freeze({multipleScattering:.18,secondaryExtinction:.35});
 // Ring density extends beyond radius 1; pad its support without enlarging the

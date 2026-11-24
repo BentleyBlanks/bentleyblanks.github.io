@@ -989,7 +989,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "TerrainDitchCutLoess", kind: "terrainLayer", tier: "level:AircraftEvacuationDitch",
     toneClass: "rammedEarth",
-    metersPerTile: 1.21,
+    metersPerTile: 1.04,
     normalConvention: "terrain",
     bake: "_import/AircraftEvacuationDitch/Script_BakeDitchSurfaces.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainDitchCutLoess.json",

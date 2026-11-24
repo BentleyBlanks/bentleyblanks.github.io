@@ -55,15 +55,15 @@ export const TERRAIN_SETS = Object.freeze({
   MissionPlain: MISSION_PLAIN,
   SunkenRoad: Object.freeze({
     textureSize: 1024,
-    version: "terrain2026112401",
+    version: "terrain2026112402",
     albedoScale: 0.93,
     layers: Object.freeze([
       MISSION_PLAIN.layers[0],
       MISSION_PLAIN.layers[1],
       Object.freeze({ id: "DryStubble", file: "DitchRootedVerge", tileM: 1.55, farTileM: 8.6,
         normalScale: .59, heightOffset: .08 }),
-      Object.freeze({ id: "SpoilEarth", file: "DitchCutLoess", tileM: 1.21, farTileM: 8.25,
-        normalScale: .56, heightOffset: .04 }),
+      Object.freeze({ id: "SpoilEarth", file: "DitchCutLoess", tileM: 1.04, farTileM: 6.6,
+        normalScale: .61, heightOffset: .04 }),
     ]),
   }),
   EastSmokeField: Object.freeze({

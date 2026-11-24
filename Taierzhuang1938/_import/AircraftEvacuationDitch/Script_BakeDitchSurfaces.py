@@ -12,7 +12,7 @@ from Script_BakePbrTexture import Bake, ParseArgs
 def Main():
     for layer, source, preset, tile, mean, contrast, relief, flatten, detail, fine in [
         ("DitchCutLoess", "AircraftEvacuationDitch/Source_CutBank.webp", "rammedEarth",
-         "1.21", "0.448,0.391,0.341", "0.062", "0.0085", ".10", ".22", ".16"),
+         "1.04", "0.448,0.391,0.341", "0.060", "0.0068", ".092", ".22", ".16"),
         ("DitchRootedVerge", "DugoutAidOpenFields/Source_RootedSod.webp", "drySoil",
          "1.55", "0.431,0.392,0.348", "0.060", "0.0048", ".065", ".5", ".28"),
     ]:
