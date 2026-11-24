@@ -34,7 +34,7 @@
     "Clouds": {
       "enabled": true,
       "params": {
-        "structure": 0.79,
+        "structure": 0.19,
         "coverage": 0.77,
         "scale": 2.03,
         "softness": 0.74,
@@ -70,7 +70,7 @@
         "density": 0.0204,
         "falloff": 7.7,
         "max": 0.86,
-        "skyScale": 0.43,
+        "skyScale": 0.51,
         "skyColor": [0.134, 0.121, 0.123],
         "groundColor": [0.245, 0.224, 0.217],
         "sunGain": 0.015,

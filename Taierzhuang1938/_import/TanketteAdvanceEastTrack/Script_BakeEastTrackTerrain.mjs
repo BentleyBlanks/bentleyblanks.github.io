@@ -27,7 +27,7 @@ const rand = (a, b) => mix(a, b, rng());
 const roadX = (depth) => 1.96 + .63 * Math.sin(depth * .120 + .18) + Math.max(0, depth - 24) * .054;
 const eastLip = (depth) => .30 - .032 * depth + .123 * Math.sin(depth * .81)
   + .053 * Math.sin(depth * 3.8);
-const spoil = [4.02, -7.62];
+const spoil = [3.69, -7.62];
 const lift = (x, z, cx, cz, sx, sz) => Math.exp(-(((x-cx)/sx)**2 + ((z-cz)/sz)**2));
 // Shallow, broken berms on the far side of the evacuation slot.
 const fieldBanks = [
@@ -62,8 +62,11 @@ function GroundAt(x, z) {
   const tread = .58 + .21*ValueNoise2(z*.55,12,1031);
   const rails = (.052 + .028*ValueNoise2(z*.41,offset*.73,391)) * (1 - ease(Math.abs(shoulder-tread)/.33));
   const crest = .21 + .052 * Math.sin(z*.37) + .15 * ease((d-18)/27) + fine + churn + broad - rails * hardpack;
-  const bank = (.126 + .19 * ValueNoise2(x*1.91,z*1.63,619))
-    * lift(x,z,eastLip(d)+.21,z,.40,1) * (1-ease((d-8)/13));
+  // The raised side ends in broken shelves along the cut.
+  const outerEdge = eastLip(d)+.19+.19*(ValueNoise2(z*1.39,18,742)-.5);
+  const cap = 1-ease((Math.abs(x-outerEdge)-.12)/.35);
+  const chunks = ValueNoise2(x*2.15,z*2.07,619);
+  const bank = (.111 + .215*chunks) * cap * (1-ease((d-8)/13));
   const mounds = .26*lift(x,z,spoil[0]+.46,spoil[1]-.08,1.12,.86)
     + .16*lift(x,z,spoil[0]-.54,spoil[1]-.54,.71,.55)
     - .22*lift(x,z,spoil[0]-.04,spoil[1]+.05,.34,.33)
@@ -182,16 +185,16 @@ for (let i=0; i<500; i++) {
   const x = rand(-.69*d,.72*d);
   const packed = Math.abs(x-roadX(d)) < 1.5;
   if (packed && rng() < .79) continue;
-  const size = rand(.036,.20) * (packed ? .62 : 1);
-  Prop(`ScatteredClod${i+1}`,"fieldApproachSoilClod",x,-d,[size,size*rand(.31,.61),size*.79],
-    rand(-180,180),"地表/土团",carved(x,-d)-size*.18);
+  const size = rand(.032,.155) * (packed ? .63 : 1);
+  Prop(`ScatteredClod${i+1}`,"eastTrackBrokenEarth",x,-d,[size,size*rand(.26,.55),size*.79],
+    rand(-180,180),"地表/土团",carved(x,-d)-size*.11);
 }
 for (let i=0; i<118; i++) {
   const d = rand(1.55,21.0), x = eastLip(d) + rand(-.11,.60), s = rand(.16,.43);
   // Most of the cut is bare. The exposed sod survives as flat, broken patches.
   if (ValueNoise2(d*.96,x*5.1,132) < .51) continue;
-  Prop(`LipGrass${i+1}`,"fieldApproachDryGrass",x,-d,[s,s*rand(.10,.22),s*rand(.78,1.18)],
-    rand(-180,180),"地表/沟沿枯根",carved(x,-d)-.028);
+  Prop(`LipGrass${i+1}`,"eastTrackSettledStubble",x,-d,[s,s*rand(.054,.105),s*rand(.78,1.18)],
+    rand(-180,180),"地表/沟沿枯根",carved(x,-d)-.014);
 }
 for (let i=0; i<760; i++) {
   const d = 2.6 + rng()**1.62 * 52, z = -d, x = rand(-.73*d,.79*d);
@@ -201,8 +204,8 @@ for (let i=0; i<760; i++) {
   if (x < bounds.minX+1 || x > bounds.maxX-1 || inRuts || pocket < (onRoad ? .88 : .53)) continue;
   if (d<4.5 && x<eastLip(d)) continue;
   const s = rand(.11,.49) * (onRoad ? .68 : 1);
-  Prop(`FieldStubble${i+1}`,"fieldApproachDryGrass",x,z,[s*1.16,s*rand(.11,.27),s*.94],
-    rand(-180,180),"地表/成片残茬",carved(x,z)-.019);
+  Prop(`FieldStubble${i+1}`,"eastTrackSettledStubble",x,z,[s*1.16,s*rand(.055,.125),s*.94],
+    rand(-180,180),"地表/成片残茬",carved(x,z)-.013);
 }
 for (const [cluster, [cx,cz,rx,rz]] of [[.82,-4.37,.51,.81],[1.26,-6.8,.69,.9],
   [-4.7,-10.7,1.28,1.01],[-3.81,-16.77,1.42,1.35],[5.63,-13.1,.94,1.3]].entries()) {
@@ -210,23 +213,29 @@ for (const [cluster, [cx,cz,rx,rz]] of [[.82,-4.37,.51,.81],[1.26,-6.8,.69,.9],
     const angle = rand(0,Math.PI*2), r = rng()**.6;
     const x = cx+Math.cos(angle)*r*rx, z = cz+Math.sin(angle)*r*rz;
     const s = rand(.18,.52);
-    Prop(`StubblePocket${cluster+1}_${i+1}`,"fieldApproachDryGrass",x,z,[s,s*rand(.11,.22),s*.91],
-      rand(-180,180),"地表/零星草茬",carved(x,z)-.019);
+    Prop(`StubblePocket${cluster+1}_${i+1}`,"eastTrackSettledStubble",x,z,[s,s*rand(.065,.14),s*.91],
+      rand(-180,180),"地表/零星草茬",carved(x,z)-.013);
   }
 }
 for (let i=0; i<55; i++) {
   const theta = rand(0,2*Math.PI), radius = rand(.14,1.05);
   const x = spoil[0]+Math.cos(theta)*radius, z = spoil[1]+Math.sin(theta)*radius*.77;
   const s = rand(.045,.218);
-  Prop(`FreshSpoil${i+1}`,"fieldApproachSoilClod",x,z,[s,s*.49,s*.72],rand(-180,180),"地表/新翻土",
-    carved(x,z)-s*.12);
+  Prop(`FreshSpoil${i+1}`,"eastTrackBrokenEarth",x,z,[s,s*.49,s*.72],rand(-180,180),"地表/新翻土",
+    carved(x,z)-s*.14);
 }
-for (let i=0; i<96; i++) {
-  const d = rand(2.85,10.2);
-  const x = eastLip(d)+rand(.30,1.89);
-  const s = rand(.037,.13);
-  Prop(`ShoulderCrumb${i+1}`,"fieldApproachSoilClod",x,-d,[s,s*rand(.36,.58),s*rand(.52,.94)],
-    rand(-180,180),"地表/沟沿碎土",carved(x,-d)-s*.13);
+// Broken turf breaks into coarse groups with many lower chips between them.
+for (let group=0; group<19; group++) {
+  const depth = rand(2.75,11.0);
+  const offset = rand(.12,1.81);
+  const spread = rand(.12,.35);
+  for (let chip=0; chip<8; chip++) {
+    const d = depth+rand(-spread,spread);
+    const x = eastLip(d)+offset+rand(-spread,spread);
+    const s = chip === 0 ? rand(.094,.146) : rand(.025,.076);
+    Prop(`ShoulderCrumb${group+1}_${chip+1}`,"eastTrackBrokenEarth",x,-d,[s,s*rand(.28,.51),s*rand(.59,.99)],
+      rand(-180,180),"地表/沟沿碎土",carved(x,-d)-s*.11);
+  }
 }
 for (const [i,[x,z,rx,rz,h]] of [[-93,-204,56,27,1.16],[-26,-246,74,55,1.63],
   [102,-240,68,53,1.34],[192,-315,102,68,1.71]].entries()) {
@@ -298,11 +307,11 @@ const preset = {
     Reflection:{enabled:true,params:{intensity:.23}},
     Sky:{enabled:true,params:{zenith:[.37,.352,.371],horizon:[.365,.345,.351],ground:[.27,.24,.22],glow:0,
       smoke:.88,smokeHeight:.059,smokeColor:[.375,.354,.368],hazeTint:[.46,.46,.46]}},
-    Clouds:{enabled:true,params:{structure:.79,coverage:.77,scale:2.03,softness:.74,warp:.66,underside:.34,
+    Clouds:{enabled:true,params:{structure:.19,coverage:.77,scale:2.03,softness:.74,warp:.66,underside:.34,
       fadeHeight:.127,shade:[.359,.339,.357],gap:.96,silver:0,shapeScale:.96,shapeCover:.61}},
     Atmosphere:{enabled:true,params:{mie:6.4,mieG:.71,rayleigh:.32,ozone:.5,groundAlbedo:.16,sunIrradiance:1.18,
       skyTint:[.48,.46,.47],skyFloor:[.452,.431,.45],artGlow:0,aerialBlend:.09,aerialGain:.15}},
-    Fog:{enabled:true,params:{density:.0204,falloff:7.7,max:.86,skyScale:.43,skyColor:[.134,.121,.123],
+    Fog:{enabled:true,params:{density:.0204,falloff:7.7,max:.86,skyScale:.51,skyColor:[.134,.121,.123],
       groundColor:[.245,.224,.217],sunGain:.015,desat:.43,flatten:.056}},
     Grade:{enabled:true,params:{profile:"firstLevelBattleDay",exposure:1.12,saturation:.60,contrast:.95,
       contrastCurve:"soft",gain:[1.02,1,.98],lift:[.009,.008,.008],shadowTint:[.98,1,1.035],

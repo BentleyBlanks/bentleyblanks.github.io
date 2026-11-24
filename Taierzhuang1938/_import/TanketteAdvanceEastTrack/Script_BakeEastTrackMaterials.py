@@ -83,6 +83,10 @@ def Main():
         ])
         if Bake(args):
             raise RuntimeError(f"Could not bake {name}.")
+    with Image.open(work / "Texture_EastTrackWeatheredElmBase.webp") as image:
+        boards = np.asarray(image.convert("RGB").resize((384,384), Image.Resampling.LANCZOS), dtype=np.float32)
+    boards *= np.array([.81,.772,.714], dtype=np.float32)
+    Image.fromarray(np.uint8(boards)).save(work / "Texture_EastTrackRevetmentBase.webp", quality=88, method=6)
 
 
 if __name__ == "__main__":

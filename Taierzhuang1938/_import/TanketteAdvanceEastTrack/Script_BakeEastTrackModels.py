@@ -19,13 +19,13 @@ from Script_BakeFieldApproachModels import Bounds, Studio
 from Script_FieldApproachMesh import Materials, Mesh, Tube
 
 
-def TexturedWood(materials, name, stem, color, strength):
+def TexturedWood(materials, name, stem, color, strength, *, base=None):
     material = materials.Make(name, color)
     nodes, links = material.node_tree.nodes, material.node_tree.links
     shader = nodes.get("Principled BSDF")
     for suffix, space in [("Base","sRGB"), ("Normal","Non-Color")]:
         image = nodes.new("ShaderNodeTexImage")
-        file = stem.with_name(stem.name + suffix + ".webp")
+        file = base if base and suffix == "Base" else stem.with_name(stem.name + suffix + ".webp")
         image.image = bpy.data.images.load(str(file), check_existing=True)
         image.image.colorspace_settings.name = space
         image.image.pack()
@@ -138,12 +138,13 @@ def FoldedCanvas(mesh, material):
         v = j / rows
         for i in range(columns+1):
             u = i / columns
-            wave = sin(u*31.5 + v*3.4)*.028 + cos(u*59 - v*4)*.017
-            fray = (sin(u*103)*.023 + sin(u*181)*.012)*v**7
-            x = -.61 + 1.54*u - .15*v
-            y = .14 - .39*min(1,v/.25) + wave*(.22+v) + .046*v**2
-            hem = .43 + .14*u + .10*sin(17.0*u+1.1) + .047*sin(37*u)
-            z = 1.355 - hem*max(0,(v-.20)/.80) + fray
+            wave = sin(u*13.6 + v*2.9)*.036 + cos(u*28.9 - v*2.0)*.014
+            fray = (sin(u*113)*.015 + sin(u*173)*.007)*v**8
+            x = -.65 + 1.56*u - .087*v
+            y = .14 - .39*min(1,v/.26) + wave*(.32+v) + .035*v**2
+            tear = .11*max(0,1-abs(u-.78)/.091)
+            hem = .39 + .19*u + .058*sin(13.1*u + .83) + .031*sin(31*u) - tear
+            z = 1.357 - hem*max(0,(v-.20)/.80) + fray
             vertices.append((x,y,z))
     for j in range(rows):
         for i in range(columns):
@@ -159,25 +160,34 @@ def FoldedCanvas(mesh, material):
 def GreyTimberShoring(mesh, materials):
     stem = PROJECT.parent / "tmp" / "TanketteAdvanceEastTrack" / "Materials" / "Texture_EastTrackWeatheredElm"
     gray = TexturedWood(materials, "EastTrackWeatheredTimber", stem, (.373,.347,.310), .70)
+    recessed = TexturedWood(materials, "EastTrackRevetmentTimber", stem, (.30,.26,.221), .45,
+                            base=stem.with_name("Texture_EastTrackRevetmentBase.webp"))
     sap = materials.Make("EastTrackCrossbeamEnd", (.379,.313,.246), finish="wood")
     iron = materials.Make("EastTrackOxidizedIron", (.116,.091,.066), metal=.35)
     canvas = materials.Make("EastTrackDrapedCanvas", (.361,.331,.283), finish="cloth", double=True)
     rng = Random(76843)
     edge = -1.15
-    widths = [.25,.13,.23,.19,.26,.146,.218,.20,.24,.18,.25]
+    widths = [.27,.31,.22,.29,.24,.27,.32,.29]
     for width in widths:
         x = edge + width/2
         edge += width
         base = rng.uniform(.005,.061)
-        face = rng.uniform(-.018,.081)
-        RoughBoard(mesh, gray, (x,face,base), (x+rng.uniform(-.036,.038),face+rng.uniform(-.023,.019),rng.uniform(1.04,1.23)),
-                   width*.996, rng.uniform(.069,.113), rng)
+        face = rng.uniform(.092,.151)
+        RoughBoard(mesh, recessed, (x,face,base),
+                   (x+rng.uniform(-.026,.026),face+rng.uniform(-.031,.023),rng.uniform(1.025,1.19)),
+                   width*.986, rng.uniform(.077,.113), rng)
     for x in [-1.06, 1.04]:
         RoughBoard(mesh, gray, (x,.11,.01), (x+.025,.13,1.13), .18,.14,rng)
     RoughBoard(mesh, gray, (.479,-.132,.01), (.245,-.214,1.37), .117,.084,rng)
-    rail = [(-1.246,-.034,1.21),(1.193,-.058,1.231)]
-    RoughBoard(mesh, gray, *rail, .251,.273,rng)
-    RoughBoard(mesh, gray, (-1.179,-.087,.918),(1.108,-.078,.89), .112,.156,rng)
+    rail = [(-1.246,-.034,1.244),(1.193,-.058,1.212)]
+    RoughBoard(mesh, gray, *rail, .226,.298,rng)
+    RoughBoard(mesh, recessed, (-1.179,-.002,.956),(1.108,.012,.908), .132,.116,rng)
+    for x, length, y, z in [
+        (-1.11,.34,-.116,1.328),(-.91,.27,-.065,1.341),(-.62,.18,-.135,1.313),
+        (-.16,.40,-.094,1.336),(.22,.19,-.135,1.303),(.48,.24,-.076,1.318),(.85,.22,-.158,1.296),
+    ]:
+        Tube(mesh, sap, [(x,y,z),(x+length*.64,y-.003,z+.009),(x+length,y+.005,z+.006)],
+             [.002,.010,.002], 5, aspect=.59, furrow=.06, tile=(.12,1.23))
     for end in rail:
         sign = -1 if end[0] < 0 else 1
         for i in range(6):

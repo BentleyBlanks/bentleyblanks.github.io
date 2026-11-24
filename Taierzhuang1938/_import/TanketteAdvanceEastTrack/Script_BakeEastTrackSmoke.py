@@ -9,6 +9,7 @@ import struct
 import sys
 
 import numpy as np
+from PIL import Image
 from scipy.ndimage import gaussian_filter, map_coordinates
 
 
@@ -21,7 +22,7 @@ ASSET = "EastTrackSoot"
 GUIDE = HERE / "Source_EastTrackOpticalDepth.bin"
 BOUNDS = (116, 31, 86)
 ORIGIN = (0, -.24, -62)
-SIZE = (192, 96, 32)
+SIZE = (256, 112, 22)
 TILES = (3, 2, 1)
 FRAME_COUNT = 6
 BURST_SIZE = (30, 44, 24)
@@ -45,12 +46,18 @@ OUTLETS = (
 
 
 def MeasureOpticalDepth(reference, clear=None, rendered=None, refine=False):
-    target = ReadLuminance(reference)
     width, height = GUIDE_SIZE
     u, v = np.meshgrid((np.arange(width)+.5)/width, (np.arange(height)+.5)/height)
     # Exclude the tree and the ground when measuring the airborne soot.
     ridge = np.interp(u, [0,.16,.24,.33,.47,.59,.70,.83,.91,1],
         [.26,.32,.365,.370,.374,.368,.358,.371,.364,.357])
+    target = ReadLuminance(reference)
+    with Image.open(reference) as image:
+        detail = np.asarray(image.convert("L").resize(GUIDE_SIZE, Image.Resampling.LANCZOS), dtype=np.float32)
+    # Retain the small scallops of the cloud rim while excluding silhouettes
+    # beside the tree, at the ridge, and above the back vehicle.
+    open_sky = Ease(u,.205,.272)*(1-Ease(v,ridge-.075,ridge-.027))
+    target += .78*open_sky*np.clip(gaussian_filter(detail,.43)-target,-10,7)
     last_sky_sample = np.minimum(ridge-.018,.341)
     sky_rows = [np.minimum(v,last_sky_sample)*height-.5, np.maximum(u,.165)*width-.5]
 
@@ -75,7 +82,7 @@ def MeasureOpticalDepth(reference, clear=None, rendered=None, refine=False):
         optical = np.frombuffer(GUIDE.read_bytes(),dtype=np.uint8).reshape(height,width).astype(np.float32)*(2.6/255)
     if rendered:
         measured = Transmission(ReadLuminance(rendered))
-        residual = gaussian_filter(np.clip(np.log(measured/transmittance),-.43,.61)*window, 1.35)
+        residual = gaussian_filter(np.clip(np.log(measured/transmittance),-.43,.61)*window, .67)
         optical += (.82 if refine else .66)*residual
     optical = gaussian_filter(optical, .34 if refine else .69)
     GUIDE.write_bytes(np.uint8(np.rint(255*np.clip(optical/2.6,0,1))).tobytes())
@@ -101,6 +108,8 @@ def MakeFrames():
     random = np.random.default_rng(19380612)
     tables = [random.uniform(-1,1,s).astype(np.float32) for s in [(9,18,28),(12,34,48),(21,63,102)]]
     samples = [grid*np.array(table.shape,dtype=np.float32)[:,None,None,None] for table in tables]
+    eddies = random.uniform(-1,1,(37,64)).astype(np.float32)
+    height_gate = Ease(v,.045,.13)*(1-Ease(v,.312,.383))
     for frame in range(FRAME_COUNT):
         time = frame * 2*np.pi/FRAME_COUNT
         fields = []
@@ -116,7 +125,12 @@ def MakeFrames():
         depth_pos = z + roll*3.4 + curl*1.12
         near = np.exp(-.5*((depth_pos-sheet_center)/sheet_width)**2)/(2.5066*sheet_width)
         far = np.exp(-.5*((depth_pos-sheet_center+17)/10.3)**2)/(2.5066*10.3)
+        # The folds span neighbouring depth slices. Variation along the ray
+        # pulls them apart over distance and keeps the field usable off-axis.
+        fold = map_coordinates(eddies, [v*37+.72*curl+(z+60)*.023, u*64+.64*roll+np.sin(time)*.28],
+            order=1, mode="grid-wrap", prefilter=False)
         structure = 1 + .34*roll + .50*curl + .42*fine
+        structure *= 1 + .55*height_gate*fold
         suspended = optical*(near*.78+far*.22)*3.38*structure*(1-.22*left_source)
         outlets = Nodes((x+roll*1.25,y+curl*.88,z+roll*1.8),OUTLETS)*(.77+.31*roll+.35*curl+.18*fine)
         distant = .022*np.exp(-.5*(((z+80+roll*4)/12)**2 + ((y-1.04-curl*.25)/.94)**2))
@@ -138,19 +152,30 @@ def MakeBurstFrames():
         spread = .57 + .51*rise + .43*Ease(clock,.58,1.24)
         billow = map_coordinates(noise, positions + np.array([.64,-clock*3.2,-clock*.96])[:,None,None,None],
             order=1, mode="grid-wrap", prefilter=False)
-        side = (x-.5-.23*y-(billow-.5)*.142) / spread
         height = y / rise
-        depth = (z-.5+.13*y+(billow-.5)*.084) / spread
-        lobes = Nodes((side,height,depth), (
-            (-.018,.08,.010,.137,.127,.148,.68),
-            (-.015,.32,.038,.127,.257,.144,.56),
-            (.064,.52,-.088,.149,.248,.148,.45),
-            (-.128,.66,.069,.151,.207,.121,.31),
-            (.177,.81,.046,.143,.185,.128,.32),
-            (.031,.98,-.056,.191,.125,.143,.18),
+        side = (x-.5-(billow-.5)*.105) / spread
+        depth = (z-.5+(billow-.5)*.075) / spread
+        ground = Nodes((side,height,depth), (
+            (-.012,.075,0,.142,.124,.167,.57),
+            (.043,.144,-.033,.249,.110,.197,.15),
         ))
+        jets = np.zeros_like(ground)
+        # Each dark filament fans out from the source and fragments at a
+        # different height. The lower broad lobe is dust hanging over the soil.
+        for dx, dz, width, peak, top, mass in (
+            (-.23,.066,.060,.40,.74,.50),
+            (.21,-.08,.054,.49,1.04,.71),
+            (.41,.10,.045,.53,.91,.52),
+            (.62,-.06,.043,.52,.82,.35),
+        ):
+            split = height**1.21
+            cross_x = (side-dx*split)/(width*(.69+height*.62))
+            cross_z = (depth-dz*height)/(.064+height*.062)
+            profile = Ease(height,.01,.13)*(1-Ease(height,peak,top))
+            jets += mass*np.exp(-.5*(cross_x**2+cross_z**2))*profile
         strength = Ease(clock,0,.168)*(1-Ease(clock,.47,1.38))
-        density = np.clip(lobes * (.30 + 1.25*billow) * strength * rim, 0, 1)
+        erosion = .16+1.35*Ease(billow,.20,.85)
+        density = np.clip((ground + jets*erosion) * strength * rim, 0, 1)
         yield np.uint8(np.rint(np.rint(np.sqrt(density)*31)*(255/31)))
 
 

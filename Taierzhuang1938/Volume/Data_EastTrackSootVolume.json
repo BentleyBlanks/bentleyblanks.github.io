@@ -2,9 +2,9 @@
   "version": 1,
   "asset": "EastTrackSoot",
   "dimensions": [
-    192,
-    96,
-    32
+    256,
+    112,
+    22
   ],
   "atlasTiles": [
     3,
@@ -30,14 +30,14 @@
   ],
   "source": "authored",
   "file": "Volume_EastTrackSoot.bin.gz",
-  "gpuBytes": 3538944,
-  "compressedBytes": 308316,
+  "gpuBytes": 3784704,
+  "compressedBytes": 316199,
   "boundsM": [
     116,
     31,
     86
   ],
-  "sha256": "2b6671cdc115a1893964383449cceeb6d5f494c3bb137deba5db47e7ab494de1",
+  "sha256": "ad4c63c0ea7275f36a2bb953c7dc03d5c395d3c432b2d6912ea437e307b46a97",
   "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py",
   "anchorPositionM": [
     0,

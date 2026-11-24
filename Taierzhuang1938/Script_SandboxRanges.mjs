@@ -108,13 +108,13 @@ function RoadsideSoil(vfx, { x, z }, y) {
   // enter the normal/depth pass and receive the fog at their own position.
   const debris = vfx.FallingSoil({ preset: "SoilHeavyCrumble", config: {
     emitter: { shape:"area", position:[x,y+.065,z], width:.34, length:.32, distribution:"streams",
-      streams:4, streamWidth:.084, rotation:[Math.PI,0,-.29], clearance:.018, seed:411806 },
+      streams:5, streamWidth:.062, rotation:[Math.PI,0,.20], clearance:.018, seed:411806 },
     timing: { mode:"once", duration:.29, frequency:60, quantity:1.35, variation:.16,
       intensity:[[0,1.55],[.38,1.21],[.83,.64],[1,0]] },
     motion: { wind:[.21,0,.12], turbulence:.032 },
-    grains: { amount:28, size:range(.003,.027), sizeBias:1.69, speed:range(1.9,6.8), spread:2.85,
-      gravity:1.11, drag:.58, life:range(.44,1.1), color:[.045,.035,.029,.83], shutter:.007, minPixel:.36,
-      trailOpacity:.6, impactDust:.005, deposit:false, maxParticles:760 },
+    grains: { amount:39, size:range(.0025,.021), sizeBias:1.52, speed:range(1.7,6.7), spread:2.9,
+      gravity:1.11, drag:.58, life:range(.44,1.1), color:[.039,.032,.026,.85], shutter:.010, minPixel:.34,
+      trailOpacity:.67, impactDust:.005, deposit:false, maxParticles:1120 },
     clods: { amount:1.58, size:range(.022,.105), sizeBias:1.94, speed:range(1.5,6.6), spread:3,
       gravity:1.02, drag:.31, life:range(.54,1.49), color:[.046,.035,.028,1], aspect:[1,.70,.86],
       maxParticles:42, impactDust:.55, maxBounces:1, fragmentChance:.07 },
@@ -125,7 +125,7 @@ function RoadsideSoil(vfx, { x, z }, y) {
   }}).id;
   const plume = vfx.particles.VolumeBurst([x,y+.012,z], {
     asset:ROADSIDE_DUST_VOLUME, life:1.38,
-    density:9.1, color:[1,1,1,.92], fadeIn:.059, seed:26067,
+    density:10.9, color:[1,1,1,.92], fadeIn:.059, seed:34,
   })?.id;
   return { debris, plume };
 }

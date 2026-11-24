@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **东侧战车道局部复核（2026-11-24）**。对照固定机位下的无烟底片和原画，重新采样烟团的卷边并减弱高层云纹。路右炸土由低位积尘和数束抛土组成，沟沿按断续土坎、成簇碎土与伏草布设，灰木支护补上木刺、内收竖板和宽褶布边。[东侧战车道重建说明](../Scenes/TanketteAdvanceEastTrack/README.md)
+
 - **大刀测试场新增三套破锋白刃交互（2026-11-24）**。针对挥砍像切空气、命中仅播特效的问题，在 `?melee=1` 实验场（正片保持 `classic` 不变）新增三种可单独切换或「破锋全开 · 三合一」组合的交互玩法：① **吃肉顿刀 · 拖刃拉豁**（`cleave`）：命中活体瞬间刀身阻尼咬合在伤口世界锚点并耦合定住对手，窗口内顺势甩鼠标或再点左键可发力撕出伤口、爆出顺刃血雾并沿切向把对手横扯出去；② **磕枪顺刃 · 压杆劈杀**（`slide`）：右键或挥刀磕住日军三八式刺刀架锁枪管，按住 W／前推鼠标欺身沿枪管擦出连续钢火压进刺刀死角，过半点左键顺杆劈杀；③ **横枪硬接 · 震断破防**（`crush`）：正面戒备日军横枪硬挡大刀爆钢火与木屑、受骨骼弹簧冲击后退并扣减护枪架势，重劈或连砍震断破防后按 F 抢步处决，侧翼走位可直接绕防砍肉。同步补齐挥刀惯性、磕墙火星与命中 FOV／侧倾顿挫。面板扩为双列六档命中交互并实时显示咬合、顺杆与护枪架势读数。口径见[白刃战系统「玩法变体」](Data_MeleeQte.md#玩法变体2026-11-23)；门禁 `MeleeCombatTest`（68/68）、`MeleeLabVariantsBrowserTest`、`TextTest`、`SoldierComponentsTest`、`DevToolsIsolationTest`。
 
 - **换皮尸体倒向对上原身体（2026-11-24）**。试玩 AI（遭遇试玩、白刃实验场）的外观原来不管怎么死都播同一条「向右倒」，命中体、血和掉的枪却跟着原身体按命中方向倒，二者平均差 1.4 m（头）/ 0.9 m（胯）。现在外观按原身体这一次倒地片段的倒向（`Script_HitReactionLayer.DeathFallLocal`）从 `Data_BlockoutXBotClips.XBOT_DEATH_FALLS` 九条站姿起手的 Mixamo 倒地里挑最近的一条（往前倒的趴着、往后倒的仰着），剩下的偏角在倒地开始后 `DEATH.yawBlendS` 内转过去，胯在地面上跟着原身体的胯走（倒地片段库带位移，Mixamo 的钉在原地）。只走 SoldierView 给了 `downAge` 的那条路，白盒预演的演员照旧用 `XBOT_DEATHS`。遭遇试玩预载这九条。临时实测（03b 杀全场 25 人）：头差 1.38 → 0.25 m，胯差 0.90 → 0.11 m；`MeleeLabVariantsBrowserTest`、`EditorBlockoutPrevizRuntimeBrowserTest`、`ModuleGraphTest` 通过，quick 其余失败与改动前相同。
