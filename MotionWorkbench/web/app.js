@@ -1235,8 +1235,13 @@ function renderTaskDetail() {
 
     if (showProg) {
       const pct = Math.max(0, Math.min(100, Number(run.progress || 0)));
-      const isA100 = task.stage4?.precisionPreset === "high_a100";
-      const gpuTag = isA100 ? "A100 · GEM-X + WiLoR" : "L4 · NVIDIA GEM-X 77 骨";
+      const isModalRun = run.backend === "modal_serverless" || task.stage4?.precisionPreset === "modal_l4";
+      const isA100 = !isModalRun && task.stage4?.precisionPreset === "high_a100";
+      const gpuTag = isModalRun
+        ? "Modal Serverless · L4→A10G→L40S→A100"
+        : isA100
+        ? "A100 · GEM-X + WiLoR"
+        : "L4 · NVIDIA GEM-X 77 骨";
       $("#s4ProgSpec").textContent = gpuTag;
       $("#s4ProgJob").textContent = run.jobId;
 
@@ -1256,9 +1261,13 @@ function renderTaskDetail() {
       const subNote = parenMatch
         ? parenMatch[2].trim()
         : pct < 15
-        ? "高峰期可能排队 1~3 分钟 · 当前卡型暂满时自动顺延备选 GPU"
+        ? isModalRun
+          ? "Modal Serverless 按需冷启容器（约 10~25 秒），L4 暂满自动顺延 A10G / L40S / A100"
+          : "高峰期可能排队 1~3 分钟 · 当前卡型暂满时自动顺延备选 GPU"
         : pct < 22
-        ? "正在经 Colab CLI 直传输入视频至云端临时盘"
+        ? isModalRun
+          ? "正在上传输入视频至 Modal 持久化卷"
+          : "正在经 Colab CLI 直传输入视频至云端临时盘"
         : pct < 88
         ? "YOLOX 追踪 → ViTPose77 关键点 → 12 层时序 Transformer → Contact/IK"
         : "打包 GLB / FBX / BVH / USD 并自动执行 Retarget v3 转换";
@@ -1270,9 +1279,9 @@ function renderTaskDetail() {
       const vidSize = selectedTake ? fmtSize(selectedTake.sizeBytes) : "";
       const stageDefs = [
         {
-          title: "申请 GPU",
-          doneSub: isA100 ? "已就绪 · 高配 GPU" : "已就绪 · 云端 GPU",
-          curSub: isA100 ? "分配 A100 (备选 G4/L4)" : "分配 L4 (备选 A100/G4)",
+          title: isModalRun ? "拉起 Modal GPU" : "申请 GPU",
+          doneSub: isModalRun ? "已就绪 · Modal GPU" : isA100 ? "已就绪 · 高配 GPU" : "已就绪 · 云端 GPU",
+          curSub: isModalRun ? "顺位 L4→A10G→L40S→A100" : isA100 ? "分配 A100 (备选 G4/L4)" : "分配 L4 (备选 A100/G4)",
           waitSub: "等待分配",
         },
         {

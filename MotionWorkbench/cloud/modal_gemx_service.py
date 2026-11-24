@@ -225,11 +225,11 @@ def _ensure_weights_on_volume(job_id: str) -> None:
 
 @app.function(
     image=gpu_image,
-    gpu="L4",
+    gpu=["L4", "A10G", "L40S", "A100-40GB"],
     volumes={"/data": data_vol},
     scaledown_window=60,  # 自动在最后一个任务结束 60 秒后关机停表，零空转浪费！
     min_containers=0,
-    max_containers=3,  # 多任务并发时最多自动扩至 3 张 L4
+    max_containers=3,  # 多任务并发时最多自动扩至 3 张 GPU
     timeout=1200,
 )
 def run_gemx_gpu(job_id: str, options: dict[str, Any]) -> dict[str, Any]:
@@ -815,7 +815,7 @@ def web_api():
         return {
             "ok": True,
             "service": APP_NAME,
-            "gpuSpec": "NVIDIA L4 (24GB, scale-to-zero after 60s)",
+            "gpuSpec": "Modal Serverless (L4→A10G→L40S→A100-40GB, 60s自动停表)",
             "activeJobs": active,
             "serverTime": time.time(),
         }

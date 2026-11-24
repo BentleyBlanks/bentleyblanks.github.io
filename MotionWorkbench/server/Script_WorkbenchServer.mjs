@@ -1389,8 +1389,22 @@ async function handleApi(req, res, urlObj) {
       return sendJson(res, 400, { ok: false, error: "请先在第 3 阶段生成或上传并选定一条成功的视频" });
     }
 
-    const backend = state.config.mocapBackend || "colab_cli";
     const precisionPreset = body.precisionPreset || task.stage4?.precisionPreset || "standard_l4";
+    const backend =
+      precisionPreset === "modal_l4"
+        ? "modal_serverless"
+        : precisionPreset === "standard_l4" || precisionPreset === "high_a100"
+        ? state.config.mocapBackend === "modal_serverless" && state.config.modalBaseUrl
+          ? "modal_serverless"
+          : "colab_cli"
+        : state.config.mocapBackend || "colab_cli";
+
+    if (backend === "modal_serverless" && !state.config.modalBaseUrl) {
+      return sendJson(res, 400, {
+        ok: false,
+        error: "Modal Serverless 网关地址尚未配置。请先完成一次 modal deploy 并在「系统 → 高级设置」填入 Modal 网关地址。",
+      });
+    }
 
     if (backend === "colab_cli") {
       const jobId = `colab_${Date.now().toString(36)}`;

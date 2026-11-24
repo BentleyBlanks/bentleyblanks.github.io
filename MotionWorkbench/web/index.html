@@ -489,24 +489,32 @@
                 </div>
               </div>
 
-              <!-- ② 提骨规格卡片（用清晰卡片层级解释两种规格的作用与差异） -->
+              <!-- ② 提骨规格卡片（用清晰卡片层级解释 Colab 与 Modal 来源及顺位差异） -->
               <div class="mwSec">
-                <div class="mwSecH">02 · 提骨规格</div>
+                <div class="mwSecH">02 · 提骨规格与算力来源</div>
                 <div class="mwSpecCards" id="s4PrecisionPresets">
+                  <button class="mwSpecCard mwPresetBtn" data-p="modal_l4" type="button">
+                    <div class="mwSpecTop">
+                      <span class="mwSpecName">Modal 云端 · L4/A10G</span>
+                      <span class="mwSpecBadge">随叫随到</span>
+                    </div>
+                    <div class="mwSpecEngine mwMono">Modal Serverless · L4→A10G→L40S→A100</div>
+                    <div class="mwSpecDesc">独立商业 GPU 池自动顺位兜底，不受 Colab 503 影响；月免 $30，跑完 60 秒停表</div>
+                  </button>
                   <button class="mwSpecCard mwPresetBtn" data-p="standard_l4" type="button">
                     <div class="mwSpecTop">
-                      <span class="mwSpecName">标准提骨 · L4</span>
-                      <span class="mwSpecBadge">日常首选</span>
+                      <span class="mwSpecName">Colab 标准提骨 · L4</span>
+                      <span class="mwSpecBadge">Colab Pro+</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">NVIDIA GEM-X 77 骨</div>
-                    <div class="mwSpecDesc">一次提取全身与基础十指，省算力；L4 暂满时自动切至 A100 / G4</div>
+                    <div class="mwSpecEngine mwMono">NVIDIA GEM-X 77 骨 · L4→A100→G4</div>
+                    <div class="mwSpecDesc">一次提取全身与基础十指，消耗已购 Colab 算力点；L4 暂满时顺延备选 GPU</div>
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-p="high_a100" type="button">
                     <div class="mwSpecTop">
-                      <span class="mwSpecName">手部精修 · A100</span>
+                      <span class="mwSpecName">Colab 手部精修 · A100</span>
                       <span class="mwSpecBadge">特写推荐</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">GEM-X + WiLoR 十指增强</div>
+                    <div class="mwSpecEngine mwMono">GEM-X + WiLoR 十指增强 · A100→G4→L4</div>
                     <div class="mwSpecDesc">在 GEM-X 主干上叠加 WiLoR 强化手指细节，适合捏弹壳、勒带、拉栓</div>
                   </button>
                 </div>
