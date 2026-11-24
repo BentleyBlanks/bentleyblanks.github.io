@@ -751,9 +751,21 @@ function renderStage2Storyboard(task) {
       : `多镜连续参考 · m2v（${readyLocked.length} 图 · ${qVal}）`;
 
   $("#s2DriveModeText").textContent = modeLabel;
-  $("#s2LockSummary").textContent = shots.length
-    ? `已规划 ${shots.length} 镜 · 已生成 ${shots.filter((s) => s.status === "succeeded").length} 张 · 锁定 ${locked.map((s) => s.code).join(" / ") || "无"}`
-    : "通用复用项无需分镜";
+  const genAllBtn = $("#btnGenAllShots");
+  if (genAllBtn) {
+    const runningShots = shots.filter((s) => s.status === "running").length;
+    const pendingShots = shots.filter((s) => s.status !== "succeeded").length;
+    genAllBtn.disabled = !shots.length || runningShots > 0;
+    if (!shots.length) {
+      genAllBtn.textContent = "通用动作无需生成分镜";
+    } else if (runningShots > 0) {
+      genAllBtn.textContent = `分镜生成中（${shots.length - pendingShots} / ${shots.length}）…`;
+    } else if (pendingShots > 0) {
+      genAllBtn.textContent = `一键生成全部分镜图（待出 ${pendingShots} 张）`;
+    } else {
+      genAllBtn.textContent = `重抽全部分镜图（共 ${shots.length} 张）`;
+    }
+  }
 
   $("#s2TimelineTicks").innerHTML = shots
     .map((s) => `<span class="mwTick ${s.status === "succeeded" ? "on" : ""}">${escapeHtml(s.code)} · ${escapeHtml(s.timeRange)}</span>`)
@@ -1551,12 +1563,70 @@ async function quoteAndRunStoryboardShot(task, shotId) {
   }
 }
 
-$("#btnGenNextShot").onclick = () => {
+$("#btnGenAllShots").onclick = async () => {
   const task = currentTask();
   if (!task) return;
-  const next = (task.storyboard?.shots || []).find((s) => s.status !== "succeeded");
-  if (!next) return toast("当前分镜已全部生成");
-  quoteAndRunStoryboardShot(task, next.id);
+  const shots = task.storyboard?.shots || [];
+  if (!shots.length) return toast("当前动作无需生成分镜");
+  const targets = shots.filter((s) => s.status !== "succeeded");
+  const batch = targets.length > 0 ? targets : shots;
+  const providerId = activeImageProviderId();
+  const prov = getProviderInfo(providerId);
+  if (!prov.ready) {
+    toast(`${prov.name} 当前未就绪：${prov.detail}`, 4200);
+    setSystemDrawer(true, "config");
+    return;
+  }
+
+  try {
+    if (providerId === "seedream") {
+      toast(`正在查询 ${batch.length} 张分镜的 Seedream 总报价…`);
+      const quotes = await Promise.all(
+        batch.map(async (sh) => {
+          const q = await api(`/api/tasks/${task.id}/stage2/shot/${encodeURIComponent(sh.id)}/quote`, {
+            method: "POST",
+            body: JSON.stringify({ provider: "seedream", ratio: "16:9" }),
+          });
+          return { sh, quote: q.quote };
+        })
+      );
+      const totalCredits = quotes.reduce((acc, x) => acc + Number(x.quote?.maxCredits || 0), 0);
+      const codes = quotes.map((x) => x.sh.code).join(" / ");
+      openCreditConfirm(
+        `批量使用 <strong>Seedream</strong>（${escapeHtml(quotes[0]?.quote?.model || "5.0 Flash")} · ${escapeHtml(quotes[0]?.quote?.resolution || "2K")} · 16:9）一次生成 <strong>${quotes.length} 张分镜（${escapeHtml(codes)}）</strong><br>合计上限消耗：<strong class="mwGold">${totalCredits} 积分</strong>`,
+        async () => {
+          let latestTask = null;
+          for (const { sh, quote } of quotes) {
+            const res = await api(`/api/tasks/${task.id}/stage2/shot/${encodeURIComponent(sh.id)}/run`, {
+              method: "POST",
+              body: JSON.stringify({
+                provider: "seedream",
+                model: quote.model,
+                nodeId: quote.nodeId,
+                creditCeiling: quote.maxCredits,
+              }),
+            });
+            latestTask = res.task;
+          }
+          if (latestTask) replaceTask(latestTask);
+          toast(`已批量提交 ${quotes.length} 张分镜生成`);
+        }
+      );
+    } else {
+      toast(`已批量提交 ${batch.length} 张分镜至 ${prov.name}…`);
+      let latestTask = null;
+      for (const sh of batch) {
+        const res = await api(`/api/tasks/${task.id}/stage2/shot/${encodeURIComponent(sh.id)}/run`, {
+          method: "POST",
+          body: JSON.stringify({ provider: providerId }),
+        });
+        latestTask = res.task;
+      }
+      if (latestTask) replaceTask(latestTask);
+    }
+  } catch (err) {
+    toast(err.message, 4500);
+  }
 };
 
 async function triggerSeedanceFromStoryboard() {
